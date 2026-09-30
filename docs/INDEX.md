@@ -15,7 +15,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | 情報単位 | 正典 (ここだけ更新) | 参照側 (要約 + リンクのみ) |
 |---|---|---|
 | 制約規則 [C/HW/ABI/V/D] | [CONSTRAINTS.md](CONSTRAINTS.md) | CLAUDE.md (ID 参照、`make check` が照合)。Hermes 用の SOUL.md は 2026-09-29 に `SOUL.md` (非公開・リポジトリ外、`.gitignore`) へ (効力なし) |
-| 引き継ぎ (次の PM への申し送り)・v2.1 時点の現在地と残件 | [tasks/agents/HANDOVER_2026-09-29.md](tasks/agents/HANDOVER_2026-09-29.md) (fork 時点の申し送り、完了記録、表だけ。次の引き継ぎは os32-v3 で新しく起こす) | 前回は [archive/agents/HANDOVER_2026-09-22.md](archive/agents/HANDOVER_2026-09-22.md) (09-22〜25 の日ごとの追記) |
+| 引き継ぎ (次の PM への申し送り)・現在地と残件 | [tasks/agents/HANDOVER_2026-09-30.md](tasks/agents/HANDOVER_2026-09-30.md) (os32-v3 の初日、T0 の途中。表だけ) | 前回は [archive/agents/HANDOVER_2026-09-22.md](archive/agents/HANDOVER_2026-09-22.md) (09-22〜25 の日ごとの追記) |
 | エージェント運用体制 (役割・起動・規約) | [tasks/agents/ROLES.md](tasks/agents/ROLES.md) (§0「現行の体制」が 1 節で現行、下は経緯) | CLAUDE.md (体制 1 段落 + リンク)。過去の快照は [archive/agents/RETROSPECTIVE_2026-09-09.md](archive/agents/RETROSPECTIVE_2026-09-09.md) |
 | 番地・帯域 | `include/memmap.h` (定義) → [02_memory.md §2-1](02_memory.md) の**生成ブロック** (`tools/gen_memmap.py --write`、地図はここ 1 か所だけ) | CLAUDE.md は帯の粒度のみ。`memmap.h` の先頭は生成先への案内。重なり・逆転・写しのずれは `make check` の `gen_memmap.py --check` が見る |
 | KAPI の一覧・オフセット・版 | `sdk/kapi.json` → [KAPI_SPEC.md §4](KAPI_SPEC.md) | README.md / このファイル / KAPI_SPEC.md の版番号 (`tools/check_kapi_version.py` が照合。CLAUDE.md は版数を持たない) |
@@ -144,6 +144,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 
 | ドキュメント | 内容 |
 |-------------|------|
+| [tasks/agents/HANDOVER_2026-09-30.md](tasks/agents/HANDOVER_2026-09-30.md) | **引き継ぎ 2026-09-30 (現行)** — os32-v3 の初日: fork 手順 a〜f 完了、CI success、T0 (C11) は worktree `wt/t0-c11` で段 3 まで、次の PM の手順、09-30 の決定 (manga・フォント・apps/game)、v3 側の道具と罠 |
 | [tasks/agents/HANDOVER_2026-09-29.md](tasks/agents/HANDOVER_2026-09-29.md) | **fork 時点の申し送り (2026-09-29、完了記録)** — v2.1 のタグの時点の現在地、v3 の fork の段取り (決定済み、2026-09-30 に実施)、残件表、道具、罠。表だけ。次の引き継ぎは os32-v3 で新しく起こす |
 | [tasks/agents/ROLES.md](tasks/agents/ROLES.md) | **体制の正典** (現行) — §0 の 1 表が現行の体制、§1〜§5 が細則、末尾が経緯 |
 | [archive/agents/HANDOVER_2026-09-22.md](archive/agents/HANDOVER_2026-09-22.md) | 引き継ぎ 2026-09-22〜25 (完了記録) — 実機初日 (FD 起動・シリアル 115200・PCI 列挙・LAN の橋) から HDD 起動まで、日ごとの追記 |
