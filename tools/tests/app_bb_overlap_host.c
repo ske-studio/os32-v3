@@ -30,7 +30,11 @@
  *    (d) 私有領域の上端 (band_top = RING3_USTACK_TOP) が BB の下にあり、
  *        PDE の所有範囲 (帯 1 枚) は変わらない
  *    (e) teardown が BB の物理を pgalloc へ返そうとしない (paging.c の
- *        pgalloc_free_page 呼び出しを数える)
+ *        pgalloc_free_n_owner 呼び出しを数える)。T1b 以後は teardown の最後の
+ *        ledger_reclaim_owner(AS) が取り残しを回収するので、used_pages が戻る
+ *        だけでは漏れが無い証拠にならない — exec_as_leftover_pages (回収で
+ *        返った取り残し) と ledger_bad_free (他 owner のページ = BB を返そうと
+ *        して断られた回数) が増えないことも見る
  *    (f) BB が私有領域と重なる形 (上端が下がっていない) は起動を断り、
  *        私有 PTE を触らない
  *    (g) 17MB (BB が帯の上) / 12MB (帯の上、PDE 2) / 9801 planar (0x6A000、
@@ -43,9 +47,9 @@
 static u32 host_cr3;
 /* (e): paging.c が返す物理を数える口。pgalloc.h の宣言も同じ名に変わるので、
  * paging.c の呼び出しは全部この関数へ来る (本物へ転送する)。 */
-#define pgalloc_free_page host_free_page_hook
+#define pgalloc_free_n_owner host_free_hook
 #include "paging_host_source.c"
-#undef pgalloc_free_page
+#undef pgalloc_free_n_owner
 __asm__(".globl __sqlite_start\n.set __sqlite_start, 0x200000\n"
         ".globl __sqlite_end\n.set __sqlite_end, 0x240000\n"
         ".globl __bss_end\n.set __bss_end, 0x180000\n");
@@ -79,11 +83,13 @@ void gfx_bb_phys_range(u32 *base, u32 *size)
     if (base) *base = t_bb_base;
     if (size) *size = t_bb_size;
 }
-void host_free_page_hook(u32 phys)
+int host_free_hook(u32 owner, u32 pfn, int n)
 {
-    if (t_bb_size && phys >= t_bb_base && phys - t_bb_base < t_bb_size)
+    u32 phys = pfn * PAGE_SIZE;
+    if (t_bb_size && phys < t_bb_base + t_bb_size &&
+        phys + (u32)n * PAGE_SIZE > t_bb_base)
         bb_free_attempts++;
-    pgalloc_free_page(phys);
+    return pgalloc_free_n_owner(owner, pfn, n);
 }
 
 /* exec_teardown_app が引く。この試験は shlib を載せない。 */
@@ -126,7 +132,7 @@ static u32 *shared_pte(u32 va)
  * heap_size 無指定 (二段構えの段 1 = avail / 2)。戻り値は exec_map_shared_bb。 */
 static int launch(AppSlot *a)
 {
-    u32 heap_top, avail;
+    u32 heap_top, avail, owner;
 
     ring3_band_set(paging_app_band_pdes(T_CODE_END, 0, sys_usable_mem_end()));
     heap_top = RING3_HEAP_TOP;
@@ -143,7 +149,9 @@ static int launch(AppSlot *a)
     a->stack_top = RING3_USTACK_TOP;
     a->band_top = g_ring3_band_top;
     a->band_pdes = g_ring3_band_pdes;
-    CHECK(paging_addrspace_create_n(&a->as, g_ring3_band_pdes) == 0);
+    /* AS owner は AS 作成の直前に取る (exec_launch と同じ、T1b) */
+    CHECK(ledger_owner_new(LEDGER_KIND_AS, 2, "app", &owner));
+    CHECK(paging_addrspace_create_n(&a->as, owner, g_ring3_band_pdes) == 0);
     a->cpl3 = 1;
     CHECK(paging_addrspace_clear_app_band(&a->as) == 0);
     CHECK(app_map_region(&a->as, MEM_EXEC_LOAD_ADDR, T_SBRK_END) == 0);
@@ -181,10 +189,15 @@ static void check_layout(const AppSlot *a)
 
 static void teardown(AppSlot *a, u32 base_used)
 {
+    u32 owner = a->as.owner;
     exec_teardown_app(a);
     CHECK(a->as.pd_phys == 0);
     CHECK(used_pages == base_used);        /* (a) 1 枚も漏れない */
     CHECK(bb_free_attempts == 0);          /* (e) BB の物理を返そうとしない */
+    /* (a)(e) T1b: 回収で掃除された取り残しも、断られた解放も無い */
+    CHECK(exec_as_leftover_pages == 0);
+    CHECK(ledger_bad_free == 0);
+    CHECK(a->as.owner == 0 && ledger_owners[owner].kind == 0);   /* 番号は返った */
 }
 
 /* (g) 帯の外の BB: 共有 PT に恒等 + USER で写り、既存の属性 (PCD) を保つ。
@@ -239,8 +252,10 @@ void _start(void)
     host_pool_boot(T_RAM_KB);
     /* 起動時の姿: shlib 帯を押さえ、PEGC の BB を池の末尾から切る
      * (sys_reserve_top → pgalloc_reserve_pfn と同じ)。 */
-    pgalloc_mark_used(MEM_SHLIB_BASE, (int)(MEM_EXEC_LOAD_ADDR - MEM_SHLIB_BASE) / (int)PAGE_SIZE);
-    CHECK(pgalloc_reserve_pfn(T_BB_BASE / PAGE_SIZE, T_RAM_END / PAGE_SIZE));
+    CHECK(ledger_claim_fixed(LEDGER_OWNER_SHLIB, MEM_SHLIB_BASE / PAGE_SIZE,
+                             MEM_EXEC_LOAD_ADDR / PAGE_SIZE));
+    CHECK(pgalloc_reserve_pfn(LEDGER_OWNER_BOOT, T_BB_BASE / PAGE_SIZE,
+                              T_RAM_END / PAGE_SIZE));
     base_used = used_pages;
 
     /* ---- (a)〜(e): 8MB + PEGC、10 回の起動と終了 ------------------------ */
@@ -266,9 +281,9 @@ void _start(void)
     }
 
     /* V86 の backing (159 の連続) が取れる */
-    v86 = pgalloc_alloc_n(V86_BACKING_PAGES);
+    v86 = pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, V86_BACKING_PAGES);
     CHECK(v86 != 0);
-    pgalloc_free_n(v86, V86_BACKING_PAGES);
+    CHECK(pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, v86 / PAGE_SIZE, V86_BACKING_PAGES));
     CHECK(used_pages == base_used);
 
     /* ---- (f): 上端が下がっていないのに BB が帯の中 → 起動を断る --------- */

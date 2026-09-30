@@ -14,7 +14,10 @@ exec/exec.c の ring3_band_set — 私有領域の上端を帯の上端と sys_u
 exec_map_shared_bb / exec_teardown_app で起動と終了を 10 回まわし、used_pages が
 毎回戻ること・私有 PTE が BB を指さないこと・BB の仮想番地が BB の物理を指す
 こと・teardown が BB の物理を返そうとしないことを見る
-(tools/tests/app_bb_overlap_host.c)。
+(tools/tests/app_bb_overlap_host.c)。T1b (所有権台帳) 以後は teardown の最後の
+ledger_reclaim_owner(AS) が取り残しを回収するので、used_pages が戻るだけでは
+漏れが無い証拠にならない — exec_as_leftover_pages と ledger_bad_free が増えない
+こと、AS owner の番号が返ることも見る。
 
 exec_launch の呼び出し箇所は切り出せない (関数が大きく setjmp を含む) ので、
 テキストで見る: gfx_bb_phys_range() を呼ぶのは exec_map_shared_bb だけ、
@@ -50,6 +53,7 @@ WANTED = ('static u32 g_ring3_band_top = ',
           'static int app_map_region(',
           'static int exec_bb_overlaps_user(',
           'static int exec_map_shared_bb(',
+          'u32 exec_as_leftover_pages;',
           'static void exec_teardown_app(')
 
 # exec_launch の呼び出し箇所 (切り出せないのでテキストで見る)
