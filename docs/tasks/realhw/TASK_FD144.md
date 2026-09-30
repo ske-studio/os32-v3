@@ -19,7 +19,7 @@ FDD の仕様表は [`../../03_disk.md`](../../03_disk.md) §3-1。
 
 | 事実 | 出典 |
 |---|---|
-| DA/UA **`30H〜33H`** = 1.44MB 対応両用インタフェースのアクセスモード (`90H〜93H` が従来の 1MB I/F) | [`../../hw/PC9800Bible/2-9_ディスク.md`](../../hw/PC9800Bible/2-9_ディスク.md) 表 2-34 |
+| DA/UA **`30H〜33H`** = 1.44MB 対応両用インタフェースのアクセスモード (`90H〜93H` が従来の 1MB I/F) | `docs/hw/PC9800Bible/2-9_ディスク.md` 表 2-34 (ローカルミラー、git 管理外) |
 | INT 1Bh の主要機能 (01H〜10H) は 1.44MB でも ○ | 同 §INT 1Bh 機能一覧 |
 | `0000:0584h DISK_BOOT` (起動したディスクの DA/UA) に **`30〜33h` = 1.44MB メディア**が載る → **BIOS の想定内** | `../../hw/undocumented/memsys.md` |
 | **`I/O 04BEh` = 3モードFD I/F 制御** (Undocumented)。WRITE: bit6,5=ドライブ / bit4=1 でモード変更有効 / bit0=1 で 1.44MB。READ: bit4=1.44MB 可 / bit0=現在のモード | `../../hw/undocumented/io_fdd.md` |
