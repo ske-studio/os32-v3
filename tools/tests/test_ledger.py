@@ -522,14 +522,14 @@ def setjmp_run(texts):
         r = subprocess.run(['nasm', '-f', 'elf32', str(tmp / 'setjmp.asm'), '-o', str(tmp / 's.o')],
                            capture_output=True, text=True)
         if r.returncode:
-            return False, r.stderr
+            return False, 'compile\n' + r.stderr
         r = subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Werror', '-O0',
                             '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib',
                             '-static', '-no-pie', '-I' + str(tmp), '-I' + str(ROOT / 'include'),
                             str(tmp / 't.c'), str(tmp / 's.o'), '-o', str(tmp / 't')],
                            capture_output=True, text=True)
         if r.returncode:
-            return False, r.stderr
+            return False, 'compile\n' + r.stderr
         r = subprocess.run([str(tmp / 't')], capture_output=True, text=True, timeout=30)
         return r.returncode == 0, r.stdout + r.stderr
 
@@ -627,7 +627,7 @@ class Ledger(unittest.TestCase):
 MUTATIONS = [
     ('owner-check-removed', 'kernel/pgalloc.c',
      '    return bit(eligible, p) && bit(bitmap, p) && owner_map[p] == owner;',
-     '    return bit(eligible, p) && bit(bitmap, p);'),
+     '    (void)owner;\n    return bit(eligible, p) && bit(bitmap, p);'),
     ('claim-owner-blind', 'kernel/pgalloc.c',
      '        if (bit(eligible, p) && bit(bitmap, p) && owner_map[p] != owner) {',
      '        if (0) {'),
@@ -654,17 +654,24 @@ MUTATIONS = [
 
 def _mutate_one(m):
     results = all_checks(load(m))
-    reds = [name for name, ok, _ in results if not ok]
-    return m[0], reds
+    # コンパイル (組み立て) の失敗は RED と数えない — 実行時の検査が変異を
+    # 拾った証拠にならない (Codex P3)。
+    reds = [name for name, ok, log in results
+            if not ok and not log.startswith('compile')]
+    builds = [name for name, ok, log in results
+              if not ok and log.startswith('compile')]
+    return m[0], reds, builds
 
 
 def mutate():
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
     import mutpar
     red = 0
-    for name, reds in mutpar.run_ordered(_mutate_one, MUTATIONS, processes=True):
-        ok = bool(reds)
+    for name, reds, builds in mutpar.run_ordered(_mutate_one, MUTATIONS, processes=True):
+        ok = bool(reds) and not builds
         print('  変異 %-26s %s' % (name, ('RED (%s)' % ', '.join(reds)) if ok
+                                   else ('**組み立てで落ちた (%s) — 実行時の検出の証拠にならない**'
+                                         % ', '.join(builds)) if builds
                                    else '**GREEN — 試験が穴を見逃した**'))
         red += ok
     print('%d/%d の変異が RED' % (red, len(MUTATIONS)))
