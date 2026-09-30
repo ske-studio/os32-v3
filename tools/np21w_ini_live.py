@@ -26,8 +26,9 @@ OPERATIONS = {'cirrus-on': {'USEGD5430': 'true', 'GD5430TYPE': '91'},
               'pegc-off': {'USEPEGCP': 'false'},
               # ExMemory (ini の綴りは ExMemory、照合は大文字) は MB 単位の
               # 拡張メモリ。8MB は **CUI の**最低動作環境で、memory_boot が
-              # 新モデルを諦めて pgalloc_init へ落ちる legacy 経路を通すための
-              # 構成。GUI の最低要件ではない (INSTALL.md / docs/02_memory.md /
+              # 台帳の置き場を FIXED 型 (0x2F9000、低位 RAM の末尾に置けない構成)
+              # にする経路を通すための構成 (T1a で legacy の pgalloc_init は撤去)。
+              # GUI の最低要件ではない (INSTALL.md / docs/02_memory.md /
               # tasks/gui/DESIGN.md)。16 はゲスト 15360KB = 15MB (実測)。
               # NP21/W は 0xF00000〜0xFFFFFF (16MB システム空間) を RAM にしない
               # ので、ExMemory >= 16 では使える拡張メモリ = ExMemory - 1 MB

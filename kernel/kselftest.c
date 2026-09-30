@@ -47,6 +47,7 @@
 #include "bootinfo.h"     /* ブート情報域 (票 TASK_HDD_INSTALL 段 0) */
 #include "bootlog.h"      /* 起動ログ (/var/log/boot.log) */
 #include "gui.h"          /* gui_ime_set_render (ime_set_render の門) */
+#include "pgalloc.h"      /* pgalloc_model_state (T1a: legacy 経路の撤去) */
 
 /* 結果はホストから読めるようにグローバルにする。
  * ブート時の出力はスプラッシュで流れてしまい、rshell も未起動なので
@@ -617,6 +618,23 @@ static void test_memmap_pool_user(void)
 }
 
 /* ------------------------------------------------------------------------ */
+/*  物理ページの池 (票 docs/tasks/v3/TASK_T1_LEDGER.md §4-1、T1a)             */
+/*                                                                          */
+/*  legacy の pgalloc_init への fallback は撤去した。8MB でも 17MB でも池は  */
+/*  モデル経路で ONLINE でなければならない (legacy に戻ったら落ちる)。       */
+/*  exec の上端は台帳の置き場ではなくアリーナの上端から決まるので、8MB でも */
+/*  exec の最小域 (ロード起点 + スタック + sbrk + exec_heap) が残る (B2)。    */
+/*  置き場 (FIXED 型の [0x2F9000, 0x2FB000)) の RW / USER なしは             */
+/*  test_memmap の MM 検査が見る (T1-U1)。                                  */
+/* ------------------------------------------------------------------------ */
+static void test_pool_model(void)
+{
+    check(pgalloc_model_state() == PGALLOC_ONLINE, "pool:model online");
+    check(sys_usable_mem_end() >= MEM_EXEC_LOAD_ADDR + MEM_EXEC_STACK_SIZE +
+          MEM_EXEC_SBRK_MIN + MEM_EXEC_HEAP_MIN, "pool:exec range");
+}
+
+/* ------------------------------------------------------------------------ */
 /*  PCM (票 TASK_PCM_CS4231): 起動時の検出が走った後、driver が CLOSED で    */
 /*  待っていること。装置の有無は機種で変わるので**状態だけ**を見る           */
 /*  (NP21/W の既定構成には CS4231 が無い — 無くても壊れないのが要件)。       */
@@ -649,6 +667,7 @@ int kselftest_run_post_exec(void)
     test_kapi_layout();
     test_memmap();
     test_memmap_pool_user();
+    test_pool_model();
     test_pcm();
 
     if (ksel_fail != before) {

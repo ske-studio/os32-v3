@@ -4,7 +4,7 @@ import subprocess
 import tempfile
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument('--rebuild', choices=['nonmaster', 'rollback', 'sparse', 'attrs', 'final'])
+parser.add_argument('--rebuild', choices=['nonmaster', 'rollback'])
 args = parser.parse_args()
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-Wall', '-Wextra', '-Werror']

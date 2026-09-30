@@ -17,16 +17,45 @@ static void report(const char *text, u32 len)
 #define SAY(s) report(s "\n", sizeof(s "\n") - 1)
 #define CHECK(x) do { if (!(x)) { SAY("FAIL: " #x); die(1); } } while (0)
 #define pgalloc_alloc_n_pfn actual_alloc_n_pfn
+#define pgalloc_alloc_pt actual_alloc_pt
+#define pgalloc_free_pt actual_free_pt
 #include "pgalloc_host_source.c"
 #undef pgalloc_alloc_n_pfn
+#undef pgalloc_alloc_pt
+#undef pgalloc_free_pt
+/* pgalloc_host_source.c は irq_save() を 0 に置き換えてある。 */
+#define HOST_POOL_IRQ_SAVE() 0U
+#define HOST_POOL_IRQ_RESTORE(f) ((void)(f))
+#include "pgalloc_host_fixture.h"
 void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
+/* master の動的 PT は workspace からだけ来る (T1a で legacy の探索を撤去)。
+ * 使用中の workspace ページ数を数え、used に含める。 */
+static u32 ws_used;
 int pgalloc_alloc_n_pfn(int n, u32 first, u32 end, u32 *pfn)
 {
     calls++;
-    if (used_pages >= limit) return 0;
+    if (used_pages + ws_used >= limit) return 0;
     return actual_alloc_n_pfn(n, first, end, pfn);
 }
-#define used used_pages
+u32 pgalloc_alloc_pt(void)
+{
+    u32 r;
+    calls++;
+    if (used_pages + ws_used >= limit) return 0;
+    r = actual_alloc_pt();
+    if (r) ws_used++;
+    return r;
+}
+void pgalloc_free_pt(u32 phys)
+{
+    u32 p = phys / PAGE_SIZE;
+    if (p >= workspace_first && p < workspace_end && bit(workspace_used, p)) ws_used--;
+    actual_free_pt(phys);
+}
+#define used (used_pages + ws_used)
+/* 試験用の池の workspace: 16MiB の末尾 16 ページ (恒等写像済み、下で mmap)。 */
+#define HOST_WS_FIRST (0x1000000UL / PAGE_SIZE - 16)
+#define HOST_WS_END   (0x1000000UL / PAGE_SIZE)
 void _start(void)
 {
     u32 args[6] = {0x400000, 0xC00000, 3, 0x32, 0xFFFFFFFF, 0};
@@ -48,7 +77,7 @@ void _start(void)
     CHECK(((unsigned long)(void *)pt_raw & (PAGE_SIZE - 1)) == 0);
     CHECK(sizeof(pd_raw) == PAGE_SIZE);
     CHECK(((unsigned long)(void *)pd_raw & (PAGE_SIZE - 1)) == 0);
-    pgalloc_init(16384);
+    host_pool_boot_ws(16384, HOST_WS_FIRST, HOST_WS_END);
     CHECK(paging_map_phys(0xFFFFF000UL, 0xFFFFF000UL, 1, PAGE_RW | PTE_PCD) == 0);
     CHECK(paging_is_present(0xFFFFFFFFUL));
     CHECK(paging_map_phys(0xFFFFF000UL, 0, 2, PAGE_RW) == -1);
@@ -190,14 +219,14 @@ void _start(void)
          * syscall 中に歩いてはならない** ことの番人。
          *
          * カーネルはページテーブルを「物理 = 仮想」で読む。ところが PD も
-         * アプリ PT も pgalloc から取られ、`PGALLOC_BASE` は 0x400000 =
+         * アプリ PT も pgalloc から取られ、`MEM_POOL_BASE` は 0x400000 =
          * `MEM_APP_BAND_BASE` — **アプリ帯そのもの**。アプリの PD ではその
          * 仮想番地が per-app 物理へ張り替わるので、CR3 = アプリ PD のまま
          * 表を辿ると PT のつもりでアプリ自身のデータを読む。#PF も起きず、
          * 健全な .rodata を「非 present」と答える (実機で 2 回これを踏んだ)。
          *
          * ここで固定するのは 2 つ:
-         *   1. PGALLOC_BASE がアプリ帯の中にある (= 前提が成り立っている)
+         *   1. MEM_POOL_BASE がアプリ帯の中にある (= 前提が成り立っている)
          *   2. exec と同じ順序で組んだ AS では、アプリ PT の物理番地が
          *      アプリ PD の下で **別の物理** に解決される (= 歩けない) */
         struct addrspace as;
@@ -205,7 +234,7 @@ void _start(void)
         u32 pt_phys, pdi, pti;
         u32 *app_pt;
 
-        CHECK(PGALLOC_BASE == MEM_APP_BAND_BASE);
+        CHECK(MEM_POOL_BASE == MEM_APP_BAND_BASE);
         CHECK(paging_addrspace_create_n(&as, 1) == 0);
         CHECK(as.app_pde == APP_BAND_PDE && as.app_pde_count == 1);
         pt_phys = as.app_pt_phys[0];

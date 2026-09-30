@@ -73,6 +73,11 @@ void paging_init(u32 mem_kb);
  * It is the boundary between "already mapped, must only be verified" and
  * "must be mapped now", never a limit on how much RAM may be admitted. */
 u32 paging_boot_identity_end(void);
+/* 台帳の backing [MEM_LEDGER_META_BASE, MEM_LEDGER_META_END) を present /
+ * supervisor / RW にする。FIXED 型 (TASK_T1_LEDGER §3-3) のときだけ
+ * memory_boot_init が 1 回呼ぶ。ブート文脈の外では何もしない。1 = 成功。
+ * 以後 paging_memmap_selftest はこの範囲を MM_RW と期待する。 */
+int paging_map_ledger_backing(void);
 
 /* 指定ページの属性を変更。
  * flags に PTE_USER を含めると PDE 側にも USER を伝播させる
@@ -196,7 +201,7 @@ void paging_load_cr3(u32 pd_phys);
  * [APP_BAND_PDE, APP_BAND_PDE + pde_count) だけ新規確保したアプリ PT に
  * 差し替える。アプリ PT は master の同帯 PT と同一の identity で初期化する
  * (CPL=0 のまま CR3 を載せてもカーネルから見た番地が変わらない = V1)。
- * PD/PT のバッキングは pgalloc から取る (pgalloc_init 済みが前提)。
+ * PD/PT のバッキングは pgalloc から取る (memory_boot_init 済みが前提)。
  * pde_count は 1..MEM_APP_BAND_MAX_PDES。
  * 戻り値: 0=成功 (as を埋める), -1=引数不正 / 物理ページ不足 (何も確保しない)。
  *
@@ -285,7 +290,7 @@ int paging_addrspace_map_user_keep(struct addrspace *as, u32 vstart,
 
 /* ⚠ **走っているアプリの PD を、そのアプリの syscall 中に歩いてはならない**
  * (票 S0-K / 実機 K2、2026-09-13)。カーネルはページテーブルを「物理 = 仮想」で
- * 読むが、PD もアプリ PT も pgalloc から取られ (`PGALLOC_BASE` は 0x400000 =
+ * 読むが、PD もアプリ PT も pgalloc から取られ (`MEM_POOL_BASE` は 0x400000 =
  * **アプリ帯そのもの**)、アプリの PD ではその仮想番地が per-app 物理へ
  * 張り替わっている。したがって CR3 = アプリ PD のまま表を辿ると、PT の
  * つもりで **アプリ自身のデータ** を読む (#PF も起きないまま健全なページを
@@ -299,7 +304,7 @@ int paging_addrspace_map_user_keep(struct addrspace *as, u32 vstart,
  *   3. カーネル帯域の 1 語が master PD と新 PD で同一物理を指す (共有の証明)
  *   4. CR3 を master に戻し、AS を破棄する
  * 戻り値: 0=全通過。非0 はビットフラグで失敗内容を示す。
- * ブート時に kselftest_run() から呼ぶ想定 (pgalloc_init 後)。 */
+ * ブート時に kselftest_run() から呼ぶ想定 (memory_boot_init 後)。 */
 int paging_pd_clone_selftest(void);
 
 /* デバイス窓の貸し出しの自己診断 (レビュー #5 ②③)。守備範囲末尾の 2 ページを

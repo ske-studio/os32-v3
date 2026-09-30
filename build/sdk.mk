@@ -179,7 +179,7 @@ check-memory-host:
 	python3 -B tools/tests/test_pgalloc_model.py
 	python3 -B tools/tests/test_pgalloc_range.py
 	python3 -B tools/tests/test_highram_stage.py
-	python3 -B tools/tests/test_memory_boot.py
+	python3 -B tools/tests/test_memory_boot.py $(MUT)
 	python3 -B tools/tests/test_device_reservation.py
 	python3 -B tools/tests/test_sbrk_tier.py
 

@@ -37,18 +37,19 @@ void sys_halt(void);
 void buz_on(void);
 void buz_off(void);
 
-/* Boot-only model handoff; metadata must occupy the contiguous low RAM tail.
- * Freezes legacy exec below metadata; the arena ends at real RAM (the
- * hotdeploy window was retired 2026-09-09). verify has pgalloc_init_model's
- * mapping contract.
- * Does not map high RAM or authorize general high-address dereferences.
- * Current kernel entry still uses the safe legacy path; provider not wired. */
+/* Boot-only model handoff (metadata-only variant, used by host tests);
+ * metadata must occupy the contiguous low RAM tail. Freezes exec below
+ * metadata; verify has pgalloc_init_model's mapping contract.
+ * Does not map high RAM or authorize general high-address dereferences. */
 struct physmem;
 struct pgalloc_layout;
-/* Opt-in staged boot, not called by the current kernel entry. Layout is
- * [final exec][low PT workspace][metadata] up to real RAM end. Both low
- * claims validate atomically before any backing/model/sys state changes.
- * Pass paging_verify_identity after legacy paging_init. BOOTSTRAP denies
+/* Staged boot, called once by memory_boot_init (the only path since T1a).
+ * Layout is either ARENA_TOP — [final exec][low PT workspace][metadata] up to
+ * real RAM end — or FIXED — metadata + workspace in [MEM_LEDGER_META_BASE,
+ * MEM_LEDGER_META_END) with the whole low RAM left to exec (TASK_T1_LEDGER
+ * §3-3). Both claims validate atomically before any backing/model/sys state
+ * changes. The exec ceiling is frozen from pgalloc_arena_end() in both kinds.
+ * Pass paging_verify_identity after paging_init. BOOTSTRAP denies
  * all general allocations; stage maps eligible high RAM and only then
  * publishes ONLINE. Master + no live AS required for the WHOLE stage.
  * Failure after bootstrap is fail-stop: earlier maps may remain, allocator

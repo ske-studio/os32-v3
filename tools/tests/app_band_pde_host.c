@@ -35,6 +35,10 @@ static void report(const char *text, u32 len)
 #define SAY(s) report(s "\n", sizeof(s "\n") - 1)
 #define CHECK(x) do { if (!(x)) { SAY("FAIL: " #x); die(1); } } while (0)
 #include "pgalloc_host_source.c"
+/* pgalloc_host_source.c は irq_save() を 0 に置き換えてある。 */
+#define HOST_POOL_IRQ_SAVE() 0U
+#define HOST_POOL_IRQ_RESTORE(f) ((void)(f))
+#include "pgalloc_host_fixture.h"
 void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 #define used used_pages
 
@@ -51,7 +55,7 @@ void _start(void)
     CHECK(result == 0x400000);
 
     paging_init(16384);
-    pgalloc_init(16384);
+    host_pool_boot(16384);
 
     /* ---- A. 枚数計算 (純関数) ---------------------------------------- */
     /* 帯を伸ばせる上限 (子の claim 範囲 A の末尾) を 14MB として与える。 */

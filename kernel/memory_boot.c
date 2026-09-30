@@ -13,6 +13,36 @@
 /* Spare workspace page kept for later device windows, on top of the identity
  * PTs that high RAM needs. Never a cap on how much RAM may be admitted. */
 #define MEMORY_BOOT_WORKSPACE_PAGES 1UL
+/* FIXED 型の置き場 (TASK_T1_LEDGER §3-3): [MEM_LEDGER_META_BASE,
+ * MEM_LEDGER_META_END) = metadata 1 ページ + workspace 1 ページ。低位 RAM の
+ * 末尾に metadata + workspace を置くと下端が MEM_APP_BAND_MAX_TOP を割る構成
+ * (低位 RAM の上端が MEMORY_BOOT_FIXED_MAX_TOP 以下 = 8MB・9MB・12MB) だけが
+ * ここを使う。高位 RAM は無い (低位が 15MB 未満なら高位は存在しない)。 */
+#define MEMORY_BOOT_FIXED_META_PAGES 1UL
+#define MEMORY_BOOT_FIXED_FIRST      (MEM_LEDGER_META_BASE / PAGE_SIZE)
+#define MEMORY_BOOT_FIXED_WS_FIRST   (MEMORY_BOOT_FIXED_FIRST + \
+                                      MEMORY_BOOT_FIXED_META_PAGES)
+#define MEMORY_BOOT_FIXED_WS_END     (MEM_LEDGER_META_END / PAGE_SIZE)
+/* FIXED になる低位上端 (PFN) の最大。1 つ上から ARENA_TOP に入る
+ * (3,073 / 3,074 PFN の境界、§3-3)。 */
+#define MEMORY_BOOT_FIXED_MAX_TOP    (MEM_APP_BAND_MAX_TOP / PAGE_SIZE + \
+                                      MEMORY_BOOT_FIXED_META_PAGES + \
+                                      MEMORY_BOOT_WORKSPACE_PAGES - 1)
+STATIC_ASSERT((MEM_LEDGER_META_BASE & (PAGE_SIZE - 1)) == 0 &&
+              (MEM_LEDGER_META_END & (PAGE_SIZE - 1)) == 0,
+              ledger_backing_page_aligned);
+STATIC_ASSERT(MEMORY_BOOT_FIXED_WS_END - MEMORY_BOOT_FIXED_WS_FIRST ==
+              MEMORY_BOOT_WORKSPACE_PAGES, ledger_backing_is_meta_plus_ws);
+/* DMA プールの上側ガードを 1 ページ残し、カーネルスタックのガードに接する。 */
+STATIC_ASSERT(MEM_LEDGER_META_BASE == MEM_DMA_POOL_END + 1 + MEM_GUARD_SIZE,
+              ledger_backing_keeps_dma_guard);
+STATIC_ASSERT(MEM_LEDGER_META_END == MEM_STACK_GUARD,
+              ledger_backing_below_kstack_guard);
+/* 8MB 型の metadata (pgalloc の bitmap 2 面) は常に 1 ページに入る (T1-R2)。
+ * 式は pgalloc_metadata_bytes と同じ。 */
+STATIC_ASSERT(((MEMORY_BOOT_FIXED_MAX_TOP + 31) / 32) * 4UL * 2UL <=
+              MEMORY_BOOT_FIXED_META_PAGES * PAGE_SIZE,
+              ledger_fixed_metadata_fits);
 /* Probe pattern is derived from the address, so any aliasing (24-bit wrap or
  * a short RAM array repeating) shows up as a mismatch on the second pass. */
 #define MEMORY_BOOT_PROBE_XOR 0xAA55AA55UL
@@ -132,12 +162,12 @@ static u32 memory_boot_table_pages(u32 limit)
     return pages + memory_boot_workspace_pages(limit);
 }
 
-/* 表を置けるのは「アプリ帯の最大上端より上、15MB システム空間より下」の
- * 低位 RAM だけ (workspace >= MEM_APP_BAND_MAX_TOP は、2 枚 PDE のアプリが
- * master のページテーブルを USER で恒等マップして任意物理を書けてしまうのを
- * 防ぐ不変条件)。この帯の広さが、表で覆える RAM の量を決める。人為的な定数
- * ではなく置き場所から出てくる量なので、ここで高位 RAM の上端を丸める。
- * 現行のレイアウト (3MB の帯) で約 2.8GB まで覆える。 */
+/* 高位 RAM を覆う表を置けるのは「アプリ帯の最大上端より上、15MB システム
+ * 空間より下」の低位 RAM だけ (workspace >= MEM_APP_BAND_MAX_TOP は、2 枚
+ * PDE のアプリが master のページテーブルを USER で恒等マップして任意物理を
+ * 書けてしまうのを防ぐ不変条件)。この帯の広さが、表で覆える RAM の量を
+ * 決める。現行のレイアウト (3MB の帯) で約 2.8GB まで覆えるので、登録上限
+ * MEM_PHYS_RAM_CEILING (2GB、D11) の方が先に効く。 */
 static u32 memory_boot_high_fit(u32 high_end, u32 top)
 {
     u32 room, base;
@@ -191,34 +221,48 @@ int memory_boot_init(u32 mem_kb)
     physmem_bootstrap_legacy(&boot_memory, admitted_kb);
     top = physmem_legacy_end(&boot_memory);
     /* 16MB 超は別の供給源 (memory_boot_detect が検証した量) から来る。
-     * legacy アリーナ (exec の連続帯) はこれに影響されない。 */
-    high_end = boot_high_end > MEM_HIGH_RAM_BASE / PAGE_SIZE ?
-               memory_boot_high_fit(boot_high_end, top) : 0;
+     * legacy アリーナ (exec の連続帯) はこれに影響されない。2GB 以上は
+     * RAM として登録しない (D11。detect の頭打ちと同じ上限を重ねて守る)。 */
+    high_end = boot_high_end;
+    if (high_end > MEM_PHYS_RAM_CEILING / PAGE_SIZE)
+        high_end = MEM_PHYS_RAM_CEILING / PAGE_SIZE;
+    high_end = high_end > MEM_HIGH_RAM_BASE / PAGE_SIZE ?
+               memory_boot_high_fit(high_end, top) : 0;
     if (high_end && !memory_boot_add_high(high_end)) return 0;
     boot_ram_kb = memory_boot_sum_kb(admitted_kb, high_end);
     layout.capacity = pgalloc_metadata_bytes(&boot_memory);
     pages = layout.capacity / PAGE_SIZE;
     ws_pages = memory_boot_workspace_pages(high_end);
-    /* PREINIT choice only. In particular 8MiB has no shared workspace
-     * above APP_BAND_MAX_TOP; preserve its legacy allocator and exec limits.
-     * The floor is the **maximum** app band top, not the default one: the
-     * band now grows in 4MiB steps (docs/tasks/memory/APP_BAND_PDE.md), so a
-     * workspace between 0x800000 and 0xBFFFFF could be identity-mapped USER
-     * by a two-PDE app and let it rewrite shared page tables. */
-    if (!pages || top < pages + ws_pages ||
-        top - pages - ws_pages < MEM_APP_BAND_MAX_TOP / PAGE_SIZE) {
-        /* legacy の池は PHYSMEM_LEGACY_MAX_PFN までしか見ないので、ここへ
-         * 落ちた構成では高位 RAM は 1 ページも登録されない。報告も戻す。 */
-        boot_ram_kb = memory_boot_sum_kb(admitted_kb, 0);
-        pgalloc_init(mem_kb);
-        return 1;
+    if (!pages) return 0;
+    /* 置き場の 2 択 (TASK_T1_LEDGER §3-3)。legacy の pgalloc_init への
+     * fallback は撤去した (D32): どの構成もモデル経路を通る。
+     * ARENA_TOP: 低位 RAM の末尾に置いても下端が MEM_APP_BAND_MAX_TOP 以上
+     * (2 枚 PDE のアプリが workspace を USER で恒等写像できない — 帯は 4MB
+     * 単位で伸びるので、既定の上端 0x800000 ではなく最大の上端で見る)。
+     * FIXED: それ以外 (低位の上端が MEMORY_BOOT_FIXED_MAX_TOP 以下)。 */
+    if (top >= pages + ws_pages &&
+        top - pages - ws_pages >= MEM_APP_BAND_MAX_TOP / PAGE_SIZE) {
+        layout.kind = PGALLOC_BACKING_ARENA_TOP;
+        layout.metadata_first = top - pages;
+        layout.metadata = (void *)(layout.metadata_first * PAGE_SIZE);
+        layout.workspace_end = layout.metadata_first;
+        layout.workspace_first = layout.workspace_end - ws_pages;
+    } else {
+        /* 高位 RAM があれば memory_boot_high_fit が ARENA_TOP に収まる量に
+         * 丸めているので、ここへは来ない。来たら模型が壊れている。 */
+        if (high_end || pages > MEMORY_BOOT_FIXED_META_PAGES ||
+            ws_pages > MEMORY_BOOT_FIXED_WS_END - MEMORY_BOOT_FIXED_WS_FIRST)
+            return 0;
+        /* paging_init は予約域として NP にしている。FIXED のときだけ張る。 */
+        if (!paging_map_ledger_backing()) return 0;
+        layout.kind = PGALLOC_BACKING_FIXED;
+        layout.metadata_first = MEMORY_BOOT_FIXED_FIRST;
+        layout.metadata = (void *)MEM_LEDGER_META_BASE;
+        layout.workspace_first = MEMORY_BOOT_FIXED_WS_FIRST;
+        layout.workspace_end = MEMORY_BOOT_FIXED_WS_END;
     }
-    layout.metadata_first = top - pages;
-    layout.metadata = (void *)(layout.metadata_first * PAGE_SIZE);
-    layout.workspace_end = layout.metadata_first;
-    layout.workspace_first = layout.workspace_end - ws_pages;
     /* These calls verify real PTEs before touching metadata/workspace/hot.
-     * Once attempted, failure is fatal: never reinitialize as legacy. */
+     * Once attempted, failure is fatal (the caller fail-stops). */
     if (!sys_memory_bootstrap_model(&boot_memory, &layout, paging_verify_identity))
         return 0;
     return sys_memory_stage_online();

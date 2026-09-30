@@ -88,7 +88,7 @@ class Broker(unittest.TestCase):
     struct sys_device_capability cap = {SYS_DEVICE_IDLE, 0, 0};
     u32 total, i;
     const u32 fixed[] = {0, 1024, 1280, 3711, 3967, 4032};
-    sys_mem_kb = 16384; pgalloc_init(sys_mem_kb);
+    sys_mem_kb = 16384; host_pool_boot(sys_mem_kb);
     total = pgalloc_total_pages();
     for (i = 0; i < sizeof(fixed)/sizeof(fixed[0]); i++) {
         s.first = fixed[i]; s.end = s.first + 1;
@@ -101,7 +101,7 @@ class Broker(unittest.TestCase):
     static u32 backing[2048] __attribute__((aligned(4096)));
     struct sys_device_span s = {4030, 4031, SYS_DEVICE_MMIO};
     struct sys_device_capability cap = {SYS_DEVICE_IDLE, 0, 0};
-    struct pgalloc_layout l = {backing, sizeof(backing), 4030, 4000, 4030};
+    struct pgalloc_layout l = {backing, sizeof(backing), 4030, 4000, 4030, 0};
     u32 total;
     physmem_bootstrap_legacy(&m, 16384);
     CHECK(physmem_add_trusted(&m, 4096, 8192, PHYSMEM_SOURCE_SYNTHETIC));
@@ -130,7 +130,7 @@ class Broker(unittest.TestCase):
         {3936,3944,SYS_DEVICE_MMIO}, {4200,4300,SYS_DEVICE_MMIO}};
     struct sys_device_capability cap = {SYS_DEVICE_IDLE,0,0};
     u32 i, total;
-    sys_mem_kb = 8192; pgalloc_init(sys_mem_kb);
+    sys_mem_kb = 8192; host_pool_boot(sys_mem_kb);
     CHECK(sys_device_reserve_core(1,s,3,&cap)); /* Xe10 + duplicate subset */
     CHECK(device_claims == 2);
     s[0].first = 3936; s[0].end = 3944;
@@ -150,7 +150,7 @@ class Broker(unittest.TestCase):
     struct sys_device_span s = {PHYSMEM_MAX_PFN - 1,PHYSMEM_MAX_PFN,SYS_DEVICE_MMIO};
     struct sys_device_capability cap = {SYS_DEVICE_IDLE,0,0};
     CHECK(!sys_device_reserve_core(1,&s,1,&cap));
-    sys_mem_kb = 8192; pgalloc_init(sys_mem_kb);
+    sys_mem_kb = 8192; host_pool_boot(sys_mem_kb);
     CHECK(!sys_device_reserve_core(0,&s,1,&cap));
     CHECK(!sys_device_reserve_core(1,0,1,&cap));
     CHECK(!sys_device_reserve_core(1,&s,0,&cap));
@@ -209,7 +209,7 @@ class Broker(unittest.TestCase):
         self.run_c('''
     struct sys_device_span s = {3000,3001,SYS_DEVICE_MMIO};
     struct sys_device_capability cap = {SYS_DEVICE_IDLE,0,0};
-    sys_mem_kb = 8192; pgalloc_init(sys_mem_kb);
+    sys_mem_kb = 8192; host_pool_boot(sys_mem_kb);
     sys_mem_kb = 16384; /* do not allow a stale boot snapshot to under-protect */
     CHECK(!sys_device_reserve_core(1,&s,1,&cap));
 ''')
@@ -261,7 +261,7 @@ class Broker(unittest.TestCase):
     u32 total;
     CHECK(sys_device_reserve_core != 0);
     sys_mem_kb = 8192;
-    pgalloc_init(sys_mem_kb);
+    host_pool_boot(sys_mem_kb);
     total = pgalloc_total_pages();
     /* 8MiB。窓の撤去 (2026-09-09) で末尾 64 ページが戻り 1984 -> 2048。 */
     CHECK(total == 2048 - 1024);

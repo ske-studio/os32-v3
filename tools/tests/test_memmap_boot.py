@@ -63,6 +63,11 @@ MUTATIONS = {
                    "        paging_range_reject_count++;"
                    "   /* \u9006\u8ee2 = \u8a2d\u8a08\u304c\u58ca\u308c\u3066\u3044\u308b\u3002\u7a7a\u3068\u306f\u5225 */",
                    "    paging_set_not_present(MEM_SHM_RESV_START, MEM_SHM_RESV_END);"),
+    # 台帳の backing (FIXED 型) を張っても期待値が NP のまま = 張った構成で
+    # 自己診断が必ず落ちる (T1a、TASK_T1_LEDGER §4-1)
+    "ledger-blind": ("kernel/paging.c",
+                     "        return ledger_backing_mapped ? MM_RW : MM_NP;",
+                     "        return MM_NP;"),
     # 食い違いを 1 本にまとめない = 区間の本数が意味を失う
     "no-coalesce": ("kernel/paging.c",
                     "        for (j = i + 1; j < PTE_COUNT; j++) {",

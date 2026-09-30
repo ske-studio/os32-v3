@@ -661,6 +661,7 @@ checks:
     - tools/tests/highram_stage_host.c
     - tools/tests/host_arch/arch_cpu.h
     - tools/tests/memory_boot_host.c
+    - tools/tests/pgalloc_host_fixture.h
     - tools/tests/pgalloc_range_host.c
     - tools/tests/sbrk_tier_host.c
     - tools/tests/test_app_band_pde.py
@@ -779,6 +780,7 @@ checks:
     - tools/tests/host_arch/arch_cpu.h
     - tools/tests/memmap_boot_host.c
     - tools/tests/owner_reclaim_host.c
+    - tools/tests/pgalloc_host_fixture.h
     - tools/tests/test_memmap_boot.py
     - tools/tests/test_memmap_gen.py
     - tools/tests/test_owner_reclaim.py

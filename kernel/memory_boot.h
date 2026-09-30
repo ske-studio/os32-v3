@@ -3,7 +3,8 @@
 #include "types.h"
 
 /* Boot-only: success permits downstream init; failure requires fail-stop.
- * Never retry or select legacy after a model bootstrap/stage attempt. */
+ * Every configuration takes the model path (ARENA_TOP or FIXED backing,
+ * TASK_T1_LEDGER §3-3); there is no legacy allocator to fall back to. */
 int memory_boot_init(u32 mem_kb);
 
 /* Physical RAM extent in KiB (top-of-RAM address / 1024), folding the old

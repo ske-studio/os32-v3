@@ -391,33 +391,30 @@ int paging_verify_identity(u32 first, u32 count, void *identity)
     return 1;
 }
 
+/* 台帳の backing (FIXED 型) を present / supervisor / R/W にする
+ * (TASK_T1_LEDGER §3-3 ②、§4-1)。paging_init は予約域として NP にしている。
+ * memory_boot_init が FIXED を選んだときだけ、モデルの初期化の直前に 1 回
+ * 呼ぶ。下の 0x2F8000 (DMA プールの上側ガード) は NP のまま。
+ * ブート文脈 (master CR3、live AS 0) の外では何もしない。0 = 失敗。 */
+static int ledger_backing_mapped;
+
+int paging_map_ledger_backing(void)
+{
+    if (!paging_boot_context()) return 0;
+    if (paging_map_range(MEM_LEDGER_META_BASE, MEM_LEDGER_META_END,
+                         MEM_LEDGER_META_BASE, PAGE_RW) != 0) return 0;
+    ledger_backing_mapped = 1;
+    return 1;
+}
+
+/* 動的な master の PT は pgalloc の workspace からだけ取る。T1a で全構成が
+ * モデル経路 (workspace 持ち) になったので、旧 legacy の「アプリ帯の最大上端
+ * より上の恒等 RW ページを 1 枚ずつ探す」分岐は撤去した (TASK_T1_LEDGER
+ * §4-1)。workspace の下端の不変条件 (ARENA_TOP: MEM_APP_BAND_MAX_TOP 以上、
+ * FIXED: PDE 0 の中) は pgalloc_init_layout が見る。 */
 static u32 *reserve_table(void)
 {
-    u32 addr, pfn, end, allocated, index, entry;
-    u32 frame_mask = ~(u32)(PAGE_SIZE - 1);
-    u32 *table;
-
-    if (pgalloc_model_state()) return (u32 *)pgalloc_alloc_pt();
-    end = pgalloc_limit_pfn();
-    /* 下限は **最大まで伸ばしたアプリ帯の上端**。既定の 1 枚分 (0x800000) で
-     * 止めると、2 枚目 (0x800000-0xBFFFFF) を使うアプリが master の PT を
-     * USER で恒等マップしてしまい、自分のページテーブルを書き換えられる
-     * (= 任意物理への読み書き)。票 §2「USER は当該アプリの PD にだけ」。 */
-    for (pfn = MEM_APP_BAND_MAX_TOP >> PAGE_SHIFT; pfn < end; pfn++) {
-        addr = pfn << PAGE_SHIFT;
-        index = pfn / PTE_COUNT;
-        table = page_tables[index];
-        if (!table) continue;
-        entry = page_directory[index];
-        if ((entry & (frame_mask | PAGE_RW | PTE_PS | PTE_PCD | PTE_PWT)) !=
-            ((u32)table | PAGE_RW)) continue;
-        entry = table[(addr >> PAGE_SHIFT) % PTE_COUNT];
-        if ((entry & (frame_mask | PAGE_RW | PTE_USER | PTE_PCD | PTE_PWT)) !=
-            (addr | PAGE_RW)) continue;
-        if (pgalloc_alloc_n_pfn(1, pfn, pfn + 1, &allocated))
-            return (u32 *)addr;
-    }
-    return 0;
+    return (u32 *)pgalloc_alloc_pt();
 }
 
 /* 未公開 PT 自身を一時リストに使う。成功まで master は一切変更しない。 */
@@ -1229,6 +1226,11 @@ static u8 memmap_want_at(u32 a, u32 tramp)
      * 代替スタック末尾から決まる予約域) より **先に** 見る。逆にすると、
      * 予約域がスタックを飲んでいる状態を「期待どおり」と読んでしまう。 */
     if (a >= MEM_STACK_GUARD && a <= MEM_STACK_GUARD_END) return MM_NP;
+    /* 台帳の backing は FIXED 型のときだけ present / supervisor / R/W
+     * (T1-U1: USER は立たない)。それ以外は予約域 (NP) のまま。予約域の
+     * 分岐より先に見る (DMA プールと同じ理由)。 */
+    if (a >= MEM_LEDGER_META_BASE && a < MEM_LEDGER_META_END)
+        return ledger_backing_mapped ? MM_RW : MM_NP;
     if (a >= MEM_KSTACK_BASE && a < MEM_SHELL_LOAD_ADDR) return MM_RW;
     /* **予約域を NP とする分岐より先に** DMA プールを見る (票 §1-3)。
      * 逆にすると、張り忘れて NP のままの池を「期待どおり」と読む。 */

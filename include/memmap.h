@@ -289,6 +289,21 @@ extern u32 __sqlite_end;
 #define MEM_DMA_POOL_SIZE      0x010000UL   /* 64KB */
 #define MEM_DMA_POOL_END       (MEM_DMA_POOL_BASE + MEM_DMA_POOL_SIZE - 1)
 
+/* ---------------------------------------------------------------------- */
+/*  台帳の backing (FIXED 型、票 docs/tasks/v3/TASK_T1_LEDGER.md §3-3)      */
+/*                                                                          */
+/*  低位 RAM の末尾に metadata + workspace を置くと下端がアプリ帯の最大上端 */
+/*  (MEM_APP_BAND_MAX_TOP) を割る構成 (8MB・9MB・12MB。高位 RAM は無い) は、 */
+/*  ここ [BASE, END) に置く: metadata 1 ページ + workspace 1 ページ。       */
+/*  DMA プールの上側ガード (0x2F8000) は 1 ページ NP のまま残し、その上の   */
+/*  8KB だけを使う。上端は MEM_STACK_GUARD (カーネルスタックのガード) に    */
+/*  接する。present / supervisor / R/W にするのは FIXED 型のときだけで      */
+/*  (paging_map_ledger_backing)、それ以外の構成では予約域 (NP) のまま。     */
+/*  **END は排他** (半開区間)。                                             */
+/* ---------------------------------------------------------------------- */
+#define MEM_LEDGER_META_BASE   0x2F9000UL
+#define MEM_LEDGER_META_END    0x2FB000UL   /* exclusive (= MEM_STACK_GUARD) */
+
 /* ====================================================================== */
 /*  シェル常駐帯域 (0x300000-0x3FFFFF, 1MB)                                 */
 /*  シェルはここに常駐し、子プロセスは一切触れない。PD切り替え不要。         */
@@ -376,8 +391,8 @@ extern u32 __sqlite_end;
 /*        32bit 空間の最上位。BIOS ROM ミラーと PCI 機の MMIO 窓が          */
 /*        居る帯で、RAM にはならない (Win32 の実効 ≈3.2GB と同じ理由)。     */
 /*                                                                          */
-/*  RAM として登録してよい上端は MEM_PHYS_RAM_CEILING (= 窓の帯の先頭)。    */
-/*  K6 の表の置き場で実効の上限は約 2.8GB なので、この帯で失う RAM は無い。 */
+/*  RAM として登録してよい上端は MEM_PHYS_RAM_CEILING (2GB、D11)。          */
+/*  それより上 [2GB, 4GB) は窓の帯も含めて RAM にしない。                   */
 /* ====================================================================== */
 #define MEM_SYSTEM_SPACE_BASE MEM_APP_BAND_DEVICE_FLOOR /* 0x00F00000 (15MB) */
 #define MEM_SYSTEM_SPACE_END  0x01000000UL              /* 16MB */
@@ -386,7 +401,31 @@ extern u32 __sqlite_end;
 #define MEM_DEVICE_APERTURE_BASE 0xFE000000UL           /* 4GB - 32MB */
 #define MEM_DEVICE_APERTURE_END  MEM_PHYS_MMIO_TOP      /* exclusive */
 #define MEM_DEVICE_APERTURE_PDE_SIZE 0x00400000UL       /* PT 1 枚 = 4MB */
-#define MEM_PHYS_RAM_CEILING  MEM_DEVICE_APERTURE_BASE
+/* RAM として登録してよい上端 (D11、TASK_MEMMAP_V3)。0594h の申告はここで
+ * 頭打ちにし、[MEM_PHYS_RAM_CEILING, 4GB) は RAM にしない (PCI の BAR や
+ * デバイス窓の帯が載る。v3 のアプリ帯 0x80000000〜 は仮想なので物理とは
+ * 別物)。 */
+#define MEM_PHYS_RAM_CEILING  0x80000000UL              /* 2GB */
+
+/* ====================================================================== */
+/*  物理ページの池 (pgalloc の管理範囲の下端)                               */
+/*                                                                          */
+/*  T1 の間は 0x400000 のまま (旧 PGALLOC_BASE)。シェル帯が 0x400000 へ     */
+/*  来る T3 で 0x500000 にする (TASK_T1_LEDGER §4-1、§6 X9)。               */
+/* ====================================================================== */
+#define MEM_POOL_BASE         0x400000UL
+
+/* ====================================================================== */
+/*  ブート時の集積域・同梱域 (TASK_MEMMAP_V3 §4-5)                          */
+/*                                                                          */
+/*  集積域 = ローダが圧縮画像を読む場所 (展開が終われば池へ)。同梱域 =      */
+/*  ブート必須モジュールの展開先 (台帳が owner=bundle で予約)。T1 の時点    */
+/*  ではローダはどちらも使わない (定数だけ。ローダ側は T5b / T6b)。         */
+/* ====================================================================== */
+#define MEM_BOOT_STAGING_BASE 0x500000UL
+#define MEM_BOOT_STAGING_SIZE 0x100000UL   /* 1MB */
+#define MEM_BOOT_BUNDLE_BASE  0x600000UL
+#define MEM_BOOT_BUNDLE_SIZE  0x100000UL   /* 1MB */
 
 /* ====================================================================== */
 /*  共有ライブラリ帯域 (0x400000-0x4FFFFF, 1MB)  — GUI v1.1 K3              */

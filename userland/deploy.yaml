@@ -129,6 +129,10 @@ filesystem:
     - host: userland/tests/ring3_guard.bin
       guest: /usr/bin/
       tags: [test]
+    # --- cpl0_probe (CPL=0 の子の受入: ロード番地と sys_usable_mem_end、票 TASK_T1_LEDGER §4-1) ---
+    - host: userland/tests/cpl0_probe.bin
+      guest: /usr/bin/
+      tags: [test]
     # --- heap_test (子プロセス帯レイアウト検証: sbrk / exec_heap の位置と重なり) ---
     - host: userland/tests/heap_test.bin
       guest: /usr/bin/
