@@ -606,6 +606,17 @@ static inline u32  V2P(const volatile void *va) { return (u32)(uptr)va; }
 
 **PM が確かめること**: NP21/W 17MB / 8MB で PEGC・planar (`GFX=pc98`)・Cirrus (`cirrus-on`) の GUI 起動・描画・present、`cirrus-on` の gdi_test が 0xFE04B000 へ描けて `fault_kill_count` 不変、GUI → CUI → GUI で `gfx_bb_phys_range` の番地 (PEGC は `ledger_surfaces` の CLIENT の `first`) が同じ、BB の番地が T1e の前と同じ (17MB 0xEB2000・8MB 0x7B5000)、`cirrus-off` + `GFX=cirrus` で予約と写像が残り PC98、`cirrus-off` + `GFX=auto` で PEGC、起動 kselftest 0 fail、`ledger_check_fail` = 0 (GUI の後も)。見るシンボル: `ledger_surfaces` (24B × 8)、`ledger_regions` / `ledger_region_count` (gfx = owner 7 の DEVICE 区間)、`ledger_resources`、`arena_top` (pgalloc.c の static、凍結した PFN)、`sys_frozen_exec`、`ledger_owners` の boot (2) / gshell (5) の `pages` (PEGC の GUI の後は gshell = 75)、`ledger_check_fail` / `ledger_check_tag`、起動ログの `[gfx] ledger` の行。実機 Ra266 (ログだけ): `[gfx] ledger cand=3 ok=3 bb=… top=…` (`GFX=pegc` なら cand=1)、kselftest 0 fail、`cpl0_probe` の `usable_end` が T1e の前と同じ (0xef2000)。
 
+#### 4-5-N. T1e の NP21/W 回帰 (PM、2026-10-01、main `0fedc76` = T1e + Codex P3、`[selftest] 226/226 passed` は全構成で)
+
+| 構成 | 結果 |
+|---|---|
+| 17MB・PEGC (`GFX=auto`) | `[gfx] ledger cand=3 ok=3 bb=eb2000 top=eb2000` (BB は T1e 前と同じ 0xEB2000)。`gui_gate v12g4 --h 480` を 2 回 (GUI → CUI → GUI) とも OK、`ledger_surfaces` の PEGC CLIENT は `first`=0xEB2・75 ページのまま owner だけ boot (2) → gshell (5)、`ledger_check_fail`=0、`fault_kill_count`=0 |
+| 17MB・planar (`gfxmode pc98`) | `hal_test` = `backend pc98 (planar 4bpp)`、`[gfx] ledger cand=0 ok=0 bb=0 top=efd000`、`gui_gate --h 400` OK |
+| 17MB・Cirrus (`np21w_ini_live cirrus-on`、`GFX=auto`) | `hal_test` = `backend cirrus (packed 8bpp)` 640x480、`[gfx] ledger cand=3 ok=3 bb=eb2000` (実装時の訂正 5 のとおり PEGC の BB も確保)、`gui_gate --h 480` OK |
+| 8MB・PEGC (`ram-8mb`) | `[gfx] ledger cand=3 ok=3 bb=7b5000 top=7b5000`、`cpl0_probe usable_end=7b5000`、`test2` PASS、`v86 -t` OK、`pegcchk 3` pattern drawn |
+
+ini は切り替え道具のレシートで元 (`ExMemory=16`、`USEGD5430=false`) に戻した。未実施: `cirrus-off` + `GFX=cirrus` (予約と写像が残って PC98 で起動)、実機 Ra266 (`[gfx] ledger` の行と `cpl0_probe` の `usable_end`)。
+
 ### 4-6. T1f — P2V / V2P の全面適用と検査
 
 | 項 | 内容 |
