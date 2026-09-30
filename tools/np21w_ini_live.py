@@ -43,6 +43,7 @@ SIGNATURE_LIMIT = 256  # FileIdentity.Read: seven decimal integers + separators.
 SIGNATURE_JSON_BYTES = 12 * SIGNATURE_LIMIT  # Escaped UTF-16 surrogate pair per character.
 PROCESS_ID_MAX = 2147483647  # Query casts ProcessId to signed Int32.
 PROCESS_CREATED_LENGTH = 28  # Query: UTC DateTime.ToString('o').
+EXCHANGE_TIMEOUT = 30  # seconds per PS request (bounds PS_SERVER's $TransientMs retries).
 
 
 def path_key(path):
@@ -151,6 +152,21 @@ def identify(rows, target, pid=None):
             (pid is not None and row['pid'] != pid)):
         raise IniError('unsupported or mismatched explicit process/config identity')
     return row
+
+
+FILE_KEY_RE = re.compile(r'[0-9]+(?::[0-9]+){6}')
+CANDIDATE_KEY_RE = re.compile(r'[0-9]+:[0-9]+:[0-9]+')
+
+
+def file_key(signature):
+    """Volume:IndexHigh:IndexLow of a FileIdentity.Read signature.
+
+    ReplaceFile leaves the replacement (candidate) file's volume/index on the
+    target name, so the post-replace readback must carry the candidate's key.
+    """
+    if not isinstance(signature, str) or not FILE_KEY_RE.fullmatch(signature):
+        raise IniError('invalid file identity')
+    return ':'.join(signature.split(':')[:3])
 
 
 def checked_snapshot(value):
@@ -263,19 +279,32 @@ class Live:
             if checked_snapshot(ex.call('snapshot')) != before:
                 raise IniError('snapshot changed on exit; retain stopped state and review again')
             backup = ex.call('backup', snapshot=before)
+            replaced = False
             try:
                 absent()
                 if checked_snapshot(ex.call('snapshot')) != before:
                     raise IniError('intervening modification before replacement')
-                applied = checked_snapshot(ex.call('replace', expected=before, data=candidate))
-                absent()
-                if applied['data'] != candidate or checked_snapshot(ex.call('snapshot')) != applied:
-                    raise IniError('readback mismatch; retain backup and stopped state')
-                ex.call('receipt', receipt=backup, record=dict(planned_record, applied=applied))
+                # The fixed PS 'replace' writes receipt.json itself right after
+                # its full readback (applied = that readback), before any other
+                # check can fail, so every later failure leaves a receipt that
+                # restore accepts. A failed 'replace' ends the PS session, so
+                # Python could not write it afterwards (incident 2026-10-01).
+                done = ex.call('replace', expected=before, data=candidate,
+                               receipt=backup, record=planned_record)
+                applied = checked_snapshot(done['applied'])
+                # PS already refuses this before writing the receipt; a
+                # readback of another file with the same bytes (swapped while
+                # the open retried) must never become the restorable state.
+                if file_key(applied['signature']) != done['candidate']:
+                    raise IniError('readback identity differs from the candidate; '
+                                   'do not restore this bundle')
+                replaced = True
                 result['receipt'] = backup
+                if applied['data'] != candidate:
+                    raise IniError('readback mismatch; retain backup and stopped state')
                 absent()
                 if checked_snapshot(ex.call('snapshot')) != applied:
-                    raise IniError('changed before restart; retain backup')
+                    raise IniError('changed after replacement; retain backup and stopped state')
                 # Restart in the shape the stopped process was launched with.
                 launch = launch_of(process['command'], self.target)
                 started = ex.call('start', process=process, launch=launch)
@@ -287,7 +316,16 @@ class Live:
                 result.update(applied=True, pid=started)
                 return result
             except IniError as exc:
-                raise IniError(str(exc) + '; retained receipt ID: ' + backup) from exc
+                if replaced and operation == 'restore':
+                    # Its receipt has operation 'restore', which restore refuses.
+                    raise IniError(str(exc) + '; restore-operation receipt ID '
+                                   '(not restorable; investigate): ' + backup) from exc
+                if replaced:
+                    raise IniError(str(exc) + '; receipt ID for restore: ' + backup) from exc
+                # original.bin exists; receipt.json only if 'replace' failed
+                # after writing it. restore refuses a bundle without a receipt.
+                raise IniError(str(exc) + '; retained backup ID (receipt not confirmed): ' +
+                               backup) from exc
 
 
 # Fixed program only; requests travel as JSON on stdin, never as PS source.
@@ -342,9 +380,33 @@ function CheckPath($path) {
   $part = [IO.Path]::GetDirectoryName($part)
  }
 }
+# Right after the kill / File.Replace another handle (an on-access scanner,
+# cf. POLICY_DEBUG 4-60) can briefly deny our FileShare.Read open. Retry only
+# ERROR_SHARING_VIOLATION (32) / ERROR_LOCK_VIOLATION (33), bounded per open;
+# 'replace' opens up to five files, all within one EXCHANGE_TIMEOUT. The path
+# is rechecked (reparse points, parents included) before every attempt and
+# after the successful open: it may be swapped while we wait.
+$TransientMs = 4000
+function OpenShared($path) {
+ $clock = [Diagnostics.Stopwatch]::StartNew()
+ while ($true) {
+  CheckPath $path
+  try { $f = [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read) }
+  catch {
+   $e = $_.Exception
+   while ($e.InnerException) { $e = $e.InnerException }
+   $left = $TransientMs - $clock.ElapsedMilliseconds
+   if ($e -isnot [IO.IOException] -or (($e.HResult -band 0xFFFF) -notin @(32,33)) -or $left -le 0) { throw }
+   Start-Sleep -Milliseconds ([Math]::Min(250, $left))
+   if ($clock.ElapsedMilliseconds -ge $TransientMs) { throw }
+   continue
+  }
+  try { CheckPath $path } catch { $f.Dispose(); throw }
+  return $f
+ }
+}
 function Snapshot($path) {
- CheckPath $path
- $f = [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+ $f = OpenShared $path
  try {
   $sig = [FileIdentity]::Read($f.SafeFileHandle)
   if ($f.Length -gt 4194304) { throw 'oversized file' }
@@ -372,11 +434,27 @@ function NewFile($path, [byte[]]$bytes) {
  $f = [IO.FileStream]::new($path, [IO.FileMode]::CreateNew, [Security.AccessControl.FileSystemRights]::Write,
   [IO.FileShare]::None, 4096, [IO.FileOptions]::WriteThrough, $security)
  try { $f.Write($bytes,0,$bytes.Length); $f.Flush($true) } finally { $f.Dispose() }
- if ((Snapshot $path).data -cne [Convert]::ToBase64String($bytes)) { throw 'Readback failed' }
+ $s = Snapshot $path
+ if ($s.data -cne [Convert]::ToBase64String($bytes)) { throw 'Readback failed' }
+ return $s
 }
+# Volume:IndexHigh:IndexLow of a FileIdentity.Read signature (file_key).
+function FileKey($sig) {
+ if ($sig -cnotmatch '^[0-9]+(:[0-9]+){6}$') { throw 'invalid file identity' }
+ $parts = $sig.Split(':')
+ return $parts[0] + ':' + $parts[1] + ':' + $parts[2]
+}
+$CandidateIdentity = 'readback identity differs from the candidate'
 function Bundle($id) {
  if ($id -cnotmatch '^[a-f0-9]{32}$') { throw 'invalid receipt id' }
  return $target.ini + '.np21w-live-' + $id
+}
+function WriteReceipt($id, $record, $applied) {
+ $dir = Bundle $id
+ if ((Snapshot ($dir + '\original.bin')).data -cne $record.original.data) { throw 'backup changed' }
+ $record.applied = $applied
+ $json = $record | ConvertTo-Json -Depth 20 -Compress
+ $null = NewFile ($dir + '\receipt.json') ([Text.Encoding]::UTF8.GetBytes($json))
 }
 try {
  while ($null -ne ($line = [Console]::ReadLine())) {
@@ -417,23 +495,23 @@ try {
      $rule = [Security.AccessControl.FileSystemAccessRule]::new($sid,'FullControl','ContainerInherit,ObjectInherit','None','Allow')
      $acl.AddAccessRule($rule)
      [void][IO.Directory]::CreateDirectory($dir,$acl)
-     NewFile ($dir + '\original.bin') ([Convert]::FromBase64String($a.snapshot.data))
+     $null = NewFile ($dir + '\original.bin') ([Convert]::FromBase64String($a.snapshot.data))
     }
     'replace' {
      $temp = $target.ini + '.pending-' + [Guid]::NewGuid().ToString('N')
-     NewFile $temp ([Convert]::FromBase64String($a.data))
+     $candidate = NewFile $temp ([Convert]::FromBase64String($a.data))
      AssertAbsent
      AssertSnapshot $a.expected
      [IO.File]::Replace($temp, $target.ini, [System.Management.Automation.Language.NullString]::Value)
-     $value = Snapshot $target.ini
-     if ($value.data -cne $a.data) { throw 'Readback failed' }
+     $applied = Snapshot $target.ini
+     if ($applied.data -cne $a.data) { throw 'Readback failed' }
+     # ReplaceFile keeps the candidate's volume/index: same bytes from another
+     # file (swapped while the open retried) is not our replacement.
+     if ((FileKey $applied.signature) -cne (FileKey $candidate.signature)) { throw $CandidateIdentity }
+     # Receipt first: a failure below (or any later request) ends the session.
+     WriteReceipt $a.receipt $a.record $applied
      AssertAbsent
-    }
-    'receipt' {
-     $dir = Bundle $a.receipt
-     if ((Snapshot ($dir + '\original.bin')).data -cne $a.record.original.data) { throw 'backup changed' }
-     $json = $a.record | ConvertTo-Json -Depth 20 -Compress
-     NewFile ($dir + '\receipt.json') ([Text.Encoding]::UTF8.GetBytes($json))
+     $value = @{applied=$applied; candidate=(FileKey $candidate.signature)}
     }
     'load' {
      $dir = Bundle $a.receipt
@@ -471,7 +549,9 @@ try {
    @{ok=$true; value=$value} | ConvertTo-Json -Depth 24 -Compress | ForEach-Object { [Console]::WriteLine($_) }
   } catch {
    # Never echo raw exception text, file bytes or command-line contents.
-   [Console]::WriteLine('{"ok":false}') # ok=$false: explicit failure, never empty success
+   # ok=$false: explicit failure, never empty success; only fixed reason codes.
+   if ($_.Exception.Message -ceq $CandidateIdentity) { [Console]::WriteLine('{"ok":false,"reason":"candidate-identity"}') }
+   else { [Console]::WriteLine('{"ok":false}') }
    break
   }
  }
@@ -528,7 +608,7 @@ class PowerShellTransport:
         try:
             self.process.stdin.write(json.dumps(request).encode('ascii') + b'\n')
             self.process.stdin.flush()
-            line = self.queue.get(timeout=30)
+            line = self.queue.get(timeout=EXCHANGE_TIMEOUT)
             if not line or len(line) > 32 * LIMIT:
                 raise ValueError('missing/oversized response')
             if self.process.poll() not in (None, 0):
@@ -561,7 +641,7 @@ class PowerShellTransport:
 
 class WindowsExecutor:
     """Trusted adapter. Do not expose call() or construction to a model."""
-    OPS = {'lock', 'query', 'snapshot', 'stop', 'backup', 'replace', 'receipt', 'load', 'start'}
+    OPS = {'lock', 'query', 'snapshot', 'stop', 'backup', 'replace', 'load', 'start'}
 
     def __init__(self, target, transport=None):
         self.target, self.transport = dict(target), transport
@@ -581,14 +661,24 @@ class WindowsExecutor:
             raise IniError('unsupported executor operation')
         try:
             response = self.transport.exchange({'op': op, 'target': self.target, 'args': wire(args)})
+            # The only failure detail PS reports: a fixed code, never raw text.
+            if op == 'replace' and response == {'ok': False, 'reason': 'candidate-identity'}:
+                raise IniError('Windows operation failed: replace; readback identity differs from '
+                               'the candidate (no receipt written); retain backup and verify process state')
             if (not isinstance(response, dict) or set(response) != {'ok', 'value'} or
                     response['ok'] is not True):
                 raise IniError('Windows operation failed: ' + op + '; retain backup and verify process state')
             value = wire(response['value'], decode=True)
             if op == 'query':
                 identify(value, self.target)
-            elif op in ('snapshot', 'replace'):
+            elif op == 'snapshot':
                 checked_snapshot(value)
+            elif op == 'replace':
+                if (not isinstance(value, dict) or set(value) != {'applied', 'candidate'} or
+                        not isinstance(value['candidate'], str) or
+                        not CANDIDATE_KEY_RE.fullmatch(value['candidate'])):
+                    raise IniError('invalid replace result')
+                checked_snapshot(value['applied'])
             elif op == 'backup':
                 if not isinstance(value, str) or not re.fullmatch('[a-f0-9]{32}', value):
                     raise IniError('invalid backup receipt ID')
