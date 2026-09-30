@@ -11,19 +11,22 @@ check_constraints.py の ID 検査とは別に、**実際の旗とコンパイ�
       STATIC_ASSERT (include/types.h の実物のマクロ) が拒否され、真の STATIC_ASSERT は
       通ること (拒否は診断の文言まで確かめる — 別の理由の失敗を「拒否」と数えない)。
   (c) 公開 SDK ヘッダ (sdk/include/os32/*.h。os32_kapi_shared.h もここ) を
-      gnu89 (C90 との差を警告・エラーにする) と gnu11 の両方で取り込めること、
-      行コメントと C99/C11 の語を含まないこと。SDK が配る library ヘッダ
+      gnu89 (C90 との差を警告・エラーにする — 行コメントもここで落ちる) と gnu11 の
+      両方で取り込めること、前処理後に C99/C11 の語・ヘッダが無いこと。SDK が配る library ヘッダ
       (build/sdk.mk の SDK_LIB_HEADER_DIRS・rt・lib/utf8.h) は gnu89 と gnu11 で
       取り込めること。in-tree の gnu89 の例 (sdk/example/hello) が gnu89 のまま
       in-tree の SDK ヘッダでコンパイルできること (apps/game の代わり)。
   (d) 内部実装に T0 で新規導入しないもの (_Atomic・TLS・restrict・<threads.h>・
-      <stdatomic.h>) が無いこと。字句は文字列・コメントを区別し、vendor は除く。
+      <stdatomic.h>) が無いこと。(a) の翻訳単位を実際の旗で前処理 (-E) し、行標識で
+      ファイルと行を得る。行継続・コメント・VT/FF・#if・#include の解釈はコンパイラに
+      任せ、自前は文字列・文字定数を除いて識別子を数えるだけ。vendor は除く。
 
   python3 tools/check_c_dialect.py [--root <木>]
 
 終了コード: 0 = 合格、1 = 問題あり、2 = 実行できない (コンパイラ・make が無い)。
 試験は tools/tests/test_c_dialect.py (記録 tools/tests/c_dialect_tdd.md)。
 """
+import concurrent.futures
 import os
 import pathlib
 import re
@@ -55,8 +58,6 @@ REQUIRED_SRCS = SQLITE_SRCS + (
 )
 
 # ---- 内部実装の走査 --------------------------------------------------------
-INTERNAL_DIRS = ("kernel", "fs", "exec", "drivers", "gfx", "net", "lib", "include",
-                 "kapi", "arch", "platform", "boot", "userland", "sdk")
 VENDOR_DIRS = ("lib/sqlite3", "lib/zlib", "lib/microtar", "lib/fatfs", "lib/os32_lz4",
                "fs/fatfs", "userland/rust")
 INTERNAL_FORBIDDEN = ("_Atomic", "_Thread_local", "__thread", "restrict",
@@ -101,140 +102,83 @@ PROBES = (
      "accept", None),
 )
 
-WORD = "A-Za-z0-9_"
-
 
 # ==========================================================================
-#  字句 (コメント・文字列・文字定数を区別する)
+#  前処理後の出力を読む (字句はコンパイラに任せる)
 # ==========================================================================
+# 行継続 (バックスラッシュと改行の間の空白も含む)・コメント・VT/FF・#if・#include の解釈は
+# 本物の前処理器 (`-E`) に任せ、ここでは前処理後の出力から文字列・文字定数を除いて
+# 識別子を数えるだけにする。ファイルと行は行標識 (`# N "file" flags`) から取り、
+# 取り込んだヘッダは行標識の「入った」(flag 1) と「戻った」(flag 2) から
+# 「どのファイルの何行目の #include か」を得る (戻り先の行番号 - 1 が #include の行)。
 
-def _splice(text):
-    """翻訳段階 2: 行継続 (\\ 改行) を取り除く。(本文, 各文字の元の行番号)。"""
-    out = []
-    lm = []
-    line = 1
-    i = 0
-    n = len(text)
-    while i < n:
-        c = text[i]
-        if c == "\\":
-            j = i + 1
-            if j < n and text[j] == "\r":
-                j += 1
-            if j < n and text[j] == "\n":
-                line += 1
-                i = j + 1
-                continue
-        out.append(c)
-        lm.append(line)
-        if c == "\n":
-            line += 1
-        i += 1
-    lm.append(line)  # 末尾の番兵
-    return "".join(out), lm
+LITERAL_RE = re.compile(r'(?:u8|[LuU])?"(?:\\.|[^"\\\n])*"|[LuU]?\'(?:\\.|[^\'\\\n])*\'')
+IDENT_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+MARKER_RE = re.compile(r'^#\s*(\d+)\s+"((?:\\.|[^"\\])*)"((?:\s+\d+)*)\s*$')
 
 
-def _lex(text):
-    """C の翻訳段階の順 (行継続の除去 → コメントを空白に) で読む。
-    (blank, nocom, lm, lc): blank はコメントと文字列・文字定数の中身を空白にした本文、
-    nocom はコメントだけを空白にした本文 (#include のヘッダ名を読む用)、lm は
-    各文字の元の行番号、lc は行コメント (//) の始まる元の行番号の並び。
-    コメントは改行も含めて 1 文字ずつ空白にする (論理行を割らない)。"""
-    s, lm = _splice(text)
-    blank = []
-    nocom = []
-    lc = []
-    i = 0
-    n = len(s)
-    state = None  # None / "line" / "block" / '"' / "'"
-    while i < n:
-        c = s[i]
-        nx = s[i + 1] if i + 1 < n else ""
-        if state is None:
-            if c == "/" and nx == "/":
-                lc.append(lm[i])
-                state = "line"
-                blank.append("  ")
-                nocom.append("  ")
-                i += 2
-                continue
-            if c == "/" and nx == "*":
-                state = "block"
-                blank.append("  ")
-                nocom.append("  ")
-                i += 2
-                continue
-            if c in "\"'":
-                state = c
-            blank.append(c)
-            nocom.append(c)
-        elif state == "line":
-            if c == "\n":
-                state = None
-                blank.append(c)
-                nocom.append(c)
-            else:
-                blank.append(" ")
-                nocom.append(" ")
-        elif state == "block":
-            if c == "*" and nx == "/":
-                state = None
-                blank.append("  ")
-                nocom.append("  ")
-                i += 2
-                continue
-            blank.append(" ")
-            nocom.append(" ")
-        else:  # 文字列・文字定数
-            if c == "\\" and nx and nx != "\n":
-                blank.append("  ")
-                nocom.append(c + nx)
-                i += 2
-                continue
-            if c == state or c == "\n":  # 閉じない引用は行末で打ち切る
-                state = None
-                blank.append(c)
-            else:
-                blank.append(" ")
-            nocom.append(c)
-        i += 1
-    return "".join(blank), "".join(nocom), lm, lc
+def _unescape_marker(s):
+    return re.sub(r"\\(.)", r"\1", s)
 
 
-def strip_c(text):
-    """(code, line_comments)。code は行継続を除いたうえでコメントと文字列・
-    文字定数の中身を空白にした本文。line_comments は行コメント (//) の始まる
-    元のソースの行番号 (1 起点) の並び。"""
-    blank, _, _, lc = _lex(text)
-    return blank, lc
-
-
-INCLUDE_RE = re.compile(r'^[ \t]*#[ \t]*include[ \t]*([<"])([^>"\n]+)[>"]', re.M)
-
-
-def find_tokens(text, tokens):
-    """text のコード部分 (行継続を除き、コメント・文字列を除く) に現れる tokens を
-    [(元の行, token)] で返す。語は前後が識別子の文字でないものだけ数える。
-    ヘッダ名 (`x.h`・`<x.h>`) はコメントを空白にした後の #include で探す
-    (`<x.h>` は <> の形だけ)。"""
-    blank, nocom, lm, _ = _lex(text)
+def scan_preprocessed(out, words, headers):
+    """`-E` の出力から [(ファイル, 行, 語またはヘッダ名)] を返す。
+    words は禁止する識別子、headers は禁止するヘッダの basename。"""
     hits = []
-    words = [t for t in tokens if not t.endswith(".h") and not t.endswith(".h>")]
-    for t in words:
-        for m in re.finditer(r"(?<![%s])%s(?![%s])" % (WORD, re.escape(t), WORD), blank):
-            hits.append((lm[m.start()], t))
-    heads = [t for t in tokens if t not in words]
-    if heads:
-        for m in INCLUDE_RE.finditer(nocom):
-            delim, name = m.group(1), m.group(2).strip()
-            ln = lm[m.start()]
-            for t in heads:
-                if t.startswith("<"):
-                    if delim == "<" and "<%s>" % name == t:
-                        hits.append((ln, t))
-                elif name == t or name.endswith("/" + t):
-                    hits.append((ln, t))
-    return sorted(hits)
+    stack = []
+    pending = []  # (取り込んだファイル, ヘッダ名, 取り込んだ側の深さ)
+    cur = None
+    line = 0
+    for raw in out.split("\n"):
+        m = MARKER_RE.match(raw)
+        if m:
+            n = int(m.group(1))
+            f = _unescape_marker(m.group(2))
+            flags = m.group(3).split()
+            if "1" in flags:
+                if cur is not None and os.path.basename(f) in headers:
+                    pending.append((cur, os.path.basename(f), len(stack)))
+                stack.append(cur)
+            elif "2" in flags:
+                if stack:
+                    stack.pop()
+                keep = []
+                for inc, h, d in pending:
+                    if inc == f and d == len(stack):
+                        hits.append((inc, n - 1, h))
+                    else:
+                        keep.append((inc, h, d))
+                pending = keep
+            cur = f
+            line = n
+            continue
+        if cur is not None and words and raw:
+            for w in IDENT_RE.findall(LITERAL_RE.sub(" ", raw)):
+                if w in words:
+                    hits.append((cur, line, w))
+        line += 1
+    for inc, h, _ in pending:  # 戻りの標識が無いまま終わった (出力の打ち切りなど)
+        hits.append((inc, 0, h))
+    return hits
+
+
+def preprocess(cc, args, root):
+    """(rc, 出力, 標準エラー)。警告は -w で抑える (-Werror でも前処理を止めない)。"""
+    r = subprocess.run([cc] + list(args) + ["-E", "-w"], cwd=str(root),
+                       capture_output=True, text=True, errors="replace")
+    return r.returncode, r.stdout, r.stderr
+
+
+def scan_c_text(text, root, words, headers, flags=("-std=gnu11", "-ffreestanding"), cc=None):
+    """試験用: text を 1 翻訳単位として前処理し、そのファイル自身の [(行, 語)]。"""
+    with tempfile.TemporaryDirectory(prefix="c_dialect_scan_") as tmp:
+        src = pathlib.Path(tmp) / "t0_scan.c"
+        src.write_bytes(text.encode("utf-8"))
+        rc, out, err = preprocess(cc or CC, list(flags) + [str(src)], root)
+        if rc != 0:
+            raise RuntimeError(_first_error(err))
+        return sorted({(ln, w) for f, ln, w in scan_preprocessed(out, set(words), set(headers))
+                       if os.path.basename(f) == "t0_scan.c"})
 
 
 # ==========================================================================
@@ -276,8 +220,9 @@ def _is_cross_cc(tok):
 
 def parse_compile_lines(text):
     """`make -n` の出力から i386-elf-gcc の -c の行を拾い、
-    [{"src": 元の .c, "sig": 旗の組 (tuple), "cc": コンパイラ}] で返す。
-    旗の組からは -I・依存生成・-c・-o と元のソースを外す (言語に効かないもの)。"""
+    [{"src": 元の .c, "sig": 旗の組 (tuple), "cc": コンパイラ, "argv": 引数}] で返す。
+    旗の組からは -I・依存生成・-c・-o と元のソースを外す (言語に効かないもの)。
+    argv は依存生成・-c・-o だけを外した実際の引数 (前処理に使う)。"""
     units = []
     for line in text.splitlines():
         if "gcc" not in line:
@@ -287,14 +232,22 @@ def parse_compile_lines(text):
                 continue
             sig = []
             srcs = []
+            argv = []
             it = iter(seg[1:])
             for a in it:
-                if a in ARG_DROP:
+                if a in ("-o", "-MF", "-MT", "-MQ"):
                     next(it, None)
                     continue
+                if a not in FLAG_DROP:
+                    argv.append(a)
+                if a in ARG_DROP:
+                    argv.append(next(it, ""))
+                    continue
                 if a in ARG_KEEP:
+                    nx = next(it, "")
+                    argv.append(nx)
                     sig.append(a)
-                    sig.append(next(it, ""))
+                    sig.append(nx)
                     continue
                 if a in FLAG_DROP or (a.startswith("-I") and len(a) > 2):
                     continue
@@ -304,7 +257,7 @@ def parse_compile_lines(text):
                 sig.append(a)
             if len(srcs) != 1:
                 continue
-            units.append({"src": srcs[0], "sig": tuple(sig), "cc": seg[0]})
+            units.append({"src": srcs[0], "sig": tuple(sig), "cc": seg[0], "argv": argv})
     return units
 
 
@@ -417,16 +370,26 @@ def check_sdk_headers(root, cc=None):
     with tempfile.TemporaryDirectory(prefix="c_dialect_sdk_") as tmp:
         for h in hs:
             rel = _rel(root, h)
-            text = h.read_text(encoding="utf-8", errors="replace")
-            _, lc = strip_c(text)
-            for ln in lc:
-                probs.append("%s:%d: 公開 SDK ヘッダに行コメント (//)" % (rel, ln))
-            for ln, t in find_tokens(text, SDK_FORBIDDEN):
-                probs.append("%s:%d: 公開 SDK ヘッダに C99/C11 の %s" % (rel, ln, t))
             pre = ""
             if shared.is_file() and h.resolve() != shared.resolve():
                 pre = '#include "os32_kapi_shared.h"\n'
             body = pre + '#include "%s"\nint os32_sdk_probe_tu;\n' % h.resolve()
+            # 語とヘッダは前処理後の出力で (行コメント・宣言位置・_Bool 等は下の gnu89 の
+            # -Wc90-c99-compat -Werror がコンパイラの判定で拒否する)
+            src = pathlib.Path(tmp) / "sdk_scan.c"
+            src.write_text(body, encoding="utf-8")
+            args = SDK_BASE[1:] + SDK_MODES[0][1][:1]
+            for d in incs:
+                args += ["-I", str(d)]
+            rc, out, err = preprocess(cc, args + [str(src)], root)
+            if rc != 0:
+                probs.append("%s: 前処理できない — %s" % (rel, _first_error(err)))
+            words = {w for w in SDK_FORBIDDEN if not w.endswith(".h")}
+            heads = {w for w in SDK_FORBIDDEN if w.endswith(".h")}
+            for f, ln, w in sorted(set(scan_preprocessed(out, words, heads))):
+                if pathlib.Path(root, f).resolve().parent == (root / SDK_HDR_DIR).resolve():
+                    probs.append("%s:%d: 公開 SDK ヘッダに C99/C11 の %s"
+                                 % (_rel(root, pathlib.Path(root, f).resolve()), ln, w))
             for mode, fl in SDK_MODES:
                 rc, err = _compile(cc, SDK_BASE + fl, body, root, tmp, "sdk", incs)
                 if rc != 0:
@@ -510,91 +473,86 @@ def _is_vendor(rel):
     return any(rel == v or rel.startswith(v + "/") for v in VENDOR_DIRS)
 
 
-def internal_sources(root):
+def _tree_rel(root, f):
+    """前処理の行標識のファイル名を木からの相対パスに。木の外なら None。"""
+    try:
+        return os.path.relpath(str(pathlib.Path(root, f).resolve()),
+                               str(pathlib.Path(root).resolve())).replace(os.sep, "/")
+    except ValueError:
+        return None
+
+
+def check_internal_units(units, root, jobs=None):
+    """内部実装の翻訳単位 (vendor の元ソースを除く) を実際の旗で前処理し、
+    木の中の vendor 以外のファイルに現れる禁止語・禁止ヘッダの #include を返す。
+    (問題の並び, 前処理した翻訳単位の数)。"""
     root = pathlib.Path(root)
-    out = []
-    for top in INTERNAL_DIRS:
-        base = root / top
-        if not base.is_dir():
+    words = {w for w in INTERNAL_FORBIDDEN if not w.endswith(".h")}
+    heads = {w for w in INTERNAL_FORBIDDEN if w.endswith(".h")}
+    todo = {}
+    for u in units:
+        if _is_vendor(u["src"].replace(os.sep, "/")):
             continue
-        for dp, dns, fns in os.walk(str(base), followlinks=True):
-            reld = _rel(root, dp).replace(os.sep, "/")
-            if _is_vendor(reld):
-                dns[:] = []
+        if not pathlib.Path(root, u["src"]).is_file():
+            continue  # 生成物 (BUILD_OUT の build_id.c など)。手書きの内部実装ではない
+        todo.setdefault((u["cc"], tuple(u["argv"])), u["src"])
+    probs = set()
+
+    def one(key):
+        cc, argv = key
+        return key, preprocess(cc, argv, root)
+
+    n = jobs or max(1, os.cpu_count() or 1)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=n) as ex:
+        for (cc, argv), (rc, out, err) in ex.map(one, sorted(todo)):
+            if rc != 0:
+                probs.add("%s: 前処理できない — %s" % (todo[(cc, argv)], _first_error(err)))
                 continue
-            dns[:] = [d for d in dns if not d.startswith(".") and d != "target"
-                      and not _is_vendor(reld + "/" + d)]
-            for fn in fns:
-                if fn.endswith((".c", ".h", ".inc")):
-                    out.append(pathlib.Path(dp) / fn)
-    return sorted(out)
-
-
-def check_internal_tokens(root):
-    root = pathlib.Path(root)
-    probs = []
-    for p in internal_sources(root):
-        text = p.read_text(encoding="utf-8", errors="replace")
-        spliced = re.sub(r"\\\r?\n", "", text)  # 行継続で割った語も前段で落とさない
-        if not any(t in spliced for t in INTERNAL_FORBIDDEN):
-            continue
-        for ln, t in find_tokens(text, INTERNAL_FORBIDDEN):
-            probs.append("%s:%d: 内部実装に T0 で新規導入しない %s ([C1])"
-                         % (_rel(root, p).replace(os.sep, "/"), ln, t))
-    return probs
+            for f, ln, w in scan_preprocessed(out, words, heads):
+                rel = _tree_rel(root, f)
+                if rel is None or rel.startswith("../") or _is_vendor(rel):
+                    continue
+                probs.add("%s:%d: 内部実装に T0 で新規導入しない %s ([C1])" % (rel, ln, w))
+    return sorted(probs), len(todo)
 
 
 # ==========================================================================
 #  (a)(b) 実際の旗
 # ==========================================================================
 
-def make_overrides(makeflags):
-    """親の make から MAKEFLAGS で来たコマンドラインの変数指定 (`--` の後ろ) を、
-    子の make に渡す引数の並びにする。-j や --jobserver-auth など旗の側は捨てる
-    (ジョブサーバの fd / fifo は子に引き継がない)。GNU make は変数指定を逆順に並べ、
-    値の空白を `\\ ` と書くので、順序を戻して空白を戻す。"""
+JOBSERVER_RE = re.compile(r"^(-j\d*|--jobs(=\d+)?|--jobserver-(auth|fds)=.*)$")
+
+
+def strip_jobserver(makeflags):
+    """親の MAKEFLAGS から並列 make の引き継ぎ (-j…、--jobserver-auth=…、--jobserver-fds=…)
+    だけを取り除き、残り (単文字旗の束の e など、` -- ` 以降の変数指定) はバイト列のまま返す。
+    変数指定のエスケープの解釈は子の make 自身に任せる。"""
     mf = makeflags or ""
     if mf.startswith("-- "):
-        rest = mf[3:]
-    elif " -- " in mf:
-        rest = mf.split(" -- ", 1)[1]
-    else:
-        return []
-    toks = []
-    cur = []
-    i = 0
-    while i < len(rest):
-        c = rest[i]
-        if c == "\\" and i + 1 < len(rest) and rest[i + 1] == " ":
-            cur.append(" ")
-            i += 2
-            continue
-        if c == " ":
-            if cur:
-                toks.append("".join(cur))
-                cur = []
-        else:
-            cur.append(c)
-        i += 1
-    if cur:
-        toks.append("".join(cur))
-    return [x for x in reversed(toks) if re.match(r"^[A-Za-z_][A-Za-z0-9_.-]*\s*[:+?!]?=", x)]
+        return mf
+    head, sep, tail = mf.partition(" -- ")
+    kept = [w for w in head.split(" ") if w and not JOBSERVER_RE.match(w)]
+    out = " ".join(kept)
+    if sep:
+        out = (out + " -- " if out else "-- ") + tail
+    return out
 
 
 def dry_run(root):
-    """`make -n -B all`。親の make のコマンドライン変数 (C_STD=… など、コンパイル条件を
-    変えるもの) は子に渡し、ジョブサーバの引き継ぎは切る。BUILD_OUT は一時
+    """`make -n -B all`。親の make の旗と変数指定 (C_STD=…、-e など) は MAKEFLAGS のまま
+    子に渡し、ジョブサーバの引き継ぎだけを切る (strip_jobserver)。BUILD_OUT は一時
     ディレクトリに向ける — config.mk の `$(shell mkdir -p $(BUILD_OUT) …)` は -n でも
-    走るので、そのままだと実物の木 (写しの木なら symlink の先) に build/out を作り得る。
-    利用者が BUILD_OUT を指定したときはそちらが勝つ (後ろに並べる)。"""
+    走るので、そのままだと実物の木 (写しの木なら symlink の先) に build/out を作り得る
+    (コマンドラインの BUILD_OUT が MAKEFLAGS から来た指定より勝つ)。"""
     env = dict(os.environ)
-    over = make_overrides(env.get("MAKEFLAGS", ""))
-    for k in ("MAKEFLAGS", "MFLAGS", "MAKELEVEL", "MAKEOVERRIDES", "MAKE_TERMOUT",
-              "MAKE_TERMERR"):
+    mf = strip_jobserver(env.get("MAKEFLAGS", ""))
+    for k in ("MAKEFLAGS", "MFLAGS", "MAKE_TERMOUT", "MAKE_TERMERR"):
         env.pop(k, None)
+    if mf:
+        env["MAKEFLAGS"] = mf
     with tempfile.TemporaryDirectory(prefix="c_dialect_out_") as tmp:
         cmd = (["make", "--no-print-directory", "-n", "-B"] + MAKE_TARGETS
-               + ["BUILD_OUT=" + os.path.join(tmp, "out")] + over)
+               + ["BUILD_OUT=" + os.path.join(tmp, "out")])
         r = subprocess.run(cmd, cwd=str(root), capture_output=True, text=True, env=env)
     return r.returncode, r.stdout, r.stderr
 
@@ -639,7 +597,7 @@ def check_build_flags(root):
             probs.append("旗の組 %d 本目 (%s ほか %d 単位) で探りが期待どおりにならない: %s"
                          % (probed, srcs[0], len(srcs) - 1, ", ".join(miss)))
     return probs, {"units": len(units), "counts": counts, "sigs": len(eff_cache),
-                   "probed": probed}
+                   "probed": probed, "unit_list": units}
 
 
 def main(argv):
@@ -656,15 +614,15 @@ def main(argv):
     sdk_p = check_sdk_headers(root)
     lib_p, nlib = check_sdk_lib_headers(root)
     sample_p = check_sdk_sample(root)
-    int_p = check_internal_tokens(root)
+    int_p, nint = check_internal_units(summ.get("unit_list", []), root)
     probs += sdk_p + lib_p + sample_p + int_p
     c = summ.get("counts", {})
     print("check_c_dialect: 翻訳単位 %d (gnu11 %d、gnu89 %d、他 %d)、旗の組 %d (探り %d)、"
-          "公開 SDK ヘッダ %d 本、配布ライブラリヘッダ %d 本、内部実装 %d ファイル"
+          "公開 SDK ヘッダ %d 本、配布ライブラリヘッダ %d 本、内部実装 %d 翻訳単位 (前処理)"
           % (summ.get("units", 0), c.get(STD_MAIN, 0), c.get(STD_SQLITE, 0),
              sum(v for k, v in c.items() if k not in (STD_MAIN, STD_SQLITE)),
              summ.get("sigs", 0), summ.get("probed", 0), len(sdk_public_headers(root)),
-             nlib, len(internal_sources(root))))
+             nlib, nint))
     if probs:
         for p in probs:
             print("  NG " + p)

@@ -44,45 +44,43 @@ def load():
 
 
 # --------------------------------------------------------------------------
-#  1. 字句: コメント・文字列を区別する
+#  1. 字句 (本物の前処理器 -E に任せ、出力の行標識で行を得る)
 # --------------------------------------------------------------------------
 
+W = {"restrict", "_Atomic", "_Thread_local"}
+H = {"stdatomic.h", "stdbool.h", "threads.h"}
+
+
 def case_lex(cd):
-    print("== 1: 字句 (コメント・文字列・文字定数の読み分け) ==", flush=True)
-    code, lc = cd.strip_c('int a; // real\n')
-    check(lc == [1], "行コメント // を 1 行目に見つける")
-    check("real" not in code, "行コメントの中身はコードから消える")
-    code, lc = cd.strip_c('const char *s = "a // b";\n')
-    check(lc == [], "文字列の中の // は行コメントでない")
-    code, lc = cd.strip_c('/* x // y */ int b;\n')
-    check(lc == [], "ブロックコメントの中の // は行コメントでない")
-    code, lc = cd.strip_c("char c = '\"'; // after\n")
-    check(lc == [1], "文字定数の '\"' で文字列に入ったことにしない")
-    code, lc = cd.strip_c('const char *s = "\\" // still string";\n')
-    check(lc == [], "文字列の \\\" で文字列を抜けたことにしない")
-    code, lc = cd.strip_c('#define X a \\\n  // c\n')
-    check(lc == [2], "行継続の先の // も行番号どおりに見つける")
-    toks = cd.find_tokens('/* restrict */ int f(int *restrict p);\n', {"restrict"})
-    check(toks == [(1, "restrict")], "コメントの中の restrict は数えず、コードのものだけ数える")
-    toks = cd.find_tokens('const char *s = "_Atomic";\nint __restrict q;\n',
-                          {"_Atomic", "restrict"})
-    check(toks == [], "文字列の中の語と、語の一部 (__restrict) は数えない")
-    toks = cd.find_tokens('#include <stdbool.h>\n#include "threads.h"\n',
-                          {"<stdbool.h>", "threads.h"})
-    check(toks == [(1, "<stdbool.h>"), (2, "threads.h")],
-          "#include のヘッダ名 (<...> と \"...\") を見つける")
-    # 翻訳段階の順: 行継続を先に除き、コメントを空白にしてから判定する (Codex P2-2)
-    toks = cd.find_tokens('int a;\n#include /* C11 */ <stdatomic.h>\natomic_int x;\n',
-                          {"stdatomic.h"})
-    check(toks == [(2, "stdatomic.h")], "#include とヘッダ名の間のコメントを空白として読む")
-    toks = cd.find_tokens('#include /* a\n b */ <threads.h>\n', {"threads.h"})
-    check(toks == [(1, "threads.h")], "複数行のコメントを挟んだ #include も 1 行として読む")
-    toks = cd.find_tokens('int a;\nvoid t0_r(char *re\\\nstrict p);\n', {"restrict"})
-    check(toks == [(2, "restrict")], "行継続で割った restrict を見つけ、元の行番号で返す")
-    toks = cd.find_tokens('#inc\\\nlude <stdatomic.h>\n', {"stdatomic.h"})
-    check(toks == [(1, "stdatomic.h")], "行継続で割った #include も読む")
-    code, lc = cd.strip_c('int a; /\\\n/ c\nint b;\n')
-    check(lc == [1], "行継続で割った // も行コメント")
+    print("== 1: 字句 (前処理後の出力・行標識) ==", flush=True)
+
+    def sc(text):
+        return cd.scan_c_text(text, ROOT, W, H)
+    check(sc('/* restrict */ int f(int *restrict p);\n') == [(1, "restrict")],
+          "コメントの中の restrict は数えず、コードのものだけ数える")
+    check(sc('const char *s = "_Atomic";\nint __restrict q;\nchar c = \'"\'; int *restrict r;\n')
+          == [(3, "restrict")],
+          "文字列の中の語・語の一部 (__restrict) は数えず、文字定数の '\"' で文字列に入らない")
+    check(sc('const char *s = "\\" restrict";\n') == [], "文字列の \\\" で文字列を抜けたことにしない")
+    check(sc('#include <stdbool.h>\n#include <stdatomic.h>\n') == [(1, "stdbool.h"), (2, "stdatomic.h")],
+          "#include のヘッダを取り込んだ行で見つける")
+    check(sc('int a;\n#include /* C11 */ <stdatomic.h>\n') == [(2, "stdatomic.h")],
+          "#include とヘッダ名の間のコメント (Codex 1 回目 反例 a)")
+    check(sc('int a;\n/* a\n b */ #include <stdatomic.h>\n') == [(3, "stdatomic.h")],
+          "複数行コメントの後ろの #include は # のある行で数える (Codex 2 回目 P3)")
+    check(sc('int a;\nvoid t0_r(char *re\\\nstrict p);\n') == [(2, "restrict")],
+          "行継続で割った restrict を元の行番号で (Codex 1 回目 反例 b)")
+    check(sc('int a;\nvoid t0_r(char *re\\ \nstrict p);\n') == [(2, "restrict")],
+          "バックスラッシュと改行の間に空白がある行継続 (Codex 2 回目 反例 3)")
+    check(sc('int a;\nvoid t0_r(char *re\\\t\nstrict p);\n') == [(2, "restrict")],
+          "バックスラッシュと改行の間にタブがある行継続")
+    check(sc('#\vinclude <stdatomic.h>\n') == [(1, "stdatomic.h")], "#\\vinclude (VT、Codex 2 回目 反例 4)")
+    check(sc('#\finclude <stdbool.h>\n') == [(1, "stdbool.h")], "#\\finclude (FF)")
+    check(sc('#inc\\\nlude <stdatomic.h>\n') == [(2, "stdatomic.h")],
+          "行継続で割った #include (行は指令の終わりの物理行 — GCC の行標識のとおり)")
+    check(sc('#define X _Atomic\nX int y;\n') == [(2, "_Atomic")], "マクロで隠した _Atomic も展開後に数える")
+    check(sc('#if 0\n_Atomic int z;\n#endif\nint w;\n') == [],
+          "実際の旗で組まれない部分 (#if 0) は数えない (コンパイラの判定に従う)")
 
 
 # --------------------------------------------------------------------------
@@ -118,6 +116,10 @@ def case_parse(cd):
     check(cd.expected_std("kernel/kernel.c") == "gnu11", "本体は gnu11")
     check(cd.expected_std("boot/boot_main.c") == "gnu11", "ブートは gnu11")
     check(cd.expected_std("userland/lib/gfx/gfx.c") == "gnu11", "userland は gnu11")
+    a = units[0]["argv"]
+    check("-Iinclude" in a and "kernel/kernel.c" in a and "-c" not in a and "-MMD" not in a
+          and "-o" not in a and "kernel/kernel.o" not in a,
+          "前処理用の引数は -I とソースを残し、依存生成・-c・-o を外す")
 
 
 # --------------------------------------------------------------------------
@@ -133,11 +135,13 @@ def case_effective(cd):
     check(cd.effective_std([], ROOT) not in ("gnu11", "gnu89"),
           "-std 無しはコンパイラの既定 (gnu11 でも gnu89 でもない)")
     check(cd.effective_std(["-std=c11"], ROOT) == "c11", "-std=c11 は GNU 拡張なし (c11) と読む")
-    ov = cd.make_overrides(" -j4 --jobserver-auth=fifo:/tmp/GMfifo1 -- B:=1 A=b\\ c C_STD=-std=gnu89")
-    check(ov == ["C_STD=-std=gnu89", "A=b c", "B:=1"],
-          "親の MAKEFLAGS から変数指定だけを元の順で取り出し、-j / jobserver は捨てる (%r)" % (ov,))
-    check(cd.make_overrides("-- X=1") == ["X=1"], "旗なしの MAKEFLAGS (-- で始まる) も読む")
-    check(cd.make_overrides(" -j4 --jobserver-auth=fifo:/tmp/x") == [], "変数指定が無ければ空")
+    s = cd.strip_jobserver(" -j4 --jobserver-auth=fifo:/tmp/GMfifo1 -- B:=1 D=e\\f A=b\\ c C_STD=-std=gnu89")
+    check(s == "-- B:=1 D=e\\f A=b\\ c C_STD=-std=gnu89",
+          "MAKEFLAGS から -j / jobserver だけを除き、変数部分はバイト列のまま (%r)" % (s,))
+    s = cd.strip_jobserver("e -j8 --jobserver-fds=3,4 --no-print-directory")
+    check(s == "e --no-print-directory", "単文字旗の束 (e) と他の旗は残す (%r)" % (s,))
+    check(cd.strip_jobserver("-- X=1") == "-- X=1", "旗なしの MAKEFLAGS はそのまま")
+    check(cd.strip_jobserver("") == "", "空はそのまま")
 
 
 # --------------------------------------------------------------------------
@@ -216,6 +220,8 @@ def case_sdk(cd):
         ("_Static_assert", "_Static_assert(1, \"x\");\n"),
         ("restrict", "void os32_f(char *restrict p);\n"),
         ("long long", "extern long long os32_ll;\n"),
+        ("行継続で割った //", "int os32_a; /\\\n/ x\n"),
+        ("#\\f で取り込む stdbool", "#\finclude <stdbool.h>\nextern int os32_b;\n"),
     ]
     for what, body in bad_cases:
         with tempfile.TemporaryDirectory(prefix="c_dialect_sdk_") as td:
@@ -234,25 +240,47 @@ def case_sdk(cd):
 # --------------------------------------------------------------------------
 
 def case_internal(cd):
-    print("== 6: 内部実装の禁止トークン ==", flush=True)
+    print("== 6: 内部実装の禁止トークン (翻訳単位を実際の旗で前処理) ==", flush=True)
+
+    def unit(src):
+        return {"src": src, "cc": cd.CC, "sig": (),
+                "argv": ["-std=gnu11", "-ffreestanding", "-Iinclude", src]}
     with tempfile.TemporaryDirectory(prefix="c_dialect_int_") as td:
         t = pathlib.Path(td)
         (t / "kernel").mkdir()
         (t / "lib/sqlite3").mkdir(parents=True)
         (t / "kernel/a.c").write_text(
+            '#include "../lib/sqlite3/v.h"\n'
             "// C11 で許す行コメント\nint f(void) { int a = 0; a++; int b = a; return b; }\n"
             "/* _Atomic はコメントなら可 */\nconst char *s = \"_Thread_local\";\n",
             encoding="utf-8")
+        (t / "lib/sqlite3/v.h").write_text("int gv(int *restrict p);\n", encoding="utf-8")
         (t / "lib/sqlite3/v.c").write_text("int g(int *restrict p);\n", encoding="utf-8")
-        probs = cd.check_internal_tokens(t)
-        check(probs == [], "C11 で許す書き方・コメントと文字列の中・vendor は数えない (%r)" % (probs,))
-        for tok in ("_Atomic int x;", "_Thread_local int y;", "int h(int *restrict p);",
-                    "#include <threads.h>", "#include <stdatomic.h>",
-                    "#include /* C11 */ <stdatomic.h>\natomic_int t0_atomic;",
-                    "void t0_r(char *re\\\nstrict p) { (void)p; }"):
-            (t / "kernel/b.c").write_text(tok + "\n", encoding="utf-8")
-            probs = cd.check_internal_tokens(t)
-            check(any("kernel/b.c:1" in p for p in probs), "内部実装の %s を拒否する" % tok)
+        probs, n = cd.check_internal_units([unit("kernel/a.c"), unit("lib/sqlite3/v.c")], t)
+        check(probs == [] and n == 1,
+              "C11 で許す書き方・コメントと文字列の中・vendor (元ソースもヘッダも) は数えない (%r)" % (probs,))
+        cases = [
+            ("_Atomic int x;", "kernel/b.c:1"),
+            ("_Thread_local int y;", "kernel/b.c:1"),
+            ("int h(int *restrict p);", "kernel/b.c:1"),
+            ("#include <stdatomic.h>", "kernel/b.c:1"),
+            ("#include <threads.h>", "kernel/b.c"),  # freestanding には無い = 前処理で落ちる
+            ("#include /* C11 */ <stdatomic.h>\natomic_int t0_atomic;", "kernel/b.c:1"),
+            ("void t0_r(char *re\\\nstrict p) { (void)p; }", "kernel/b.c:1"),
+            ("void t0_r(char *re\\ \nstrict p) { (void)p; }", "kernel/b.c:1"),
+            ("#\vinclude <stdatomic.h>", "kernel/b.c:1"),
+            ("#\finclude <stdatomic.h>", "kernel/b.c:1"),
+            ("int q;\n/* a\n b */ #include <stdatomic.h>", "kernel/b.c:3"),
+            ('#include "b.h"', "kernel/b.h:1"),
+        ]
+        (t / "kernel/b.h").write_text("_Atomic int t0_hdr;\n", encoding="utf-8")
+        for body, where in cases:
+            (t / "kernel/b.c").write_text(body + "\n", encoding="utf-8")
+            probs, _ = cd.check_internal_units([unit("kernel/b.c")], t)
+            ok = (any(p.startswith(where + ":") for p in probs) if ":" in where
+                  else any(where in p for p in probs))
+            check(ok,
+                  "内部実装の %r を %s で拒否する (%r)" % (body, where, probs[:2]))
 
 
 # --------------------------------------------------------------------------
@@ -272,17 +300,37 @@ def case_real():
         sys.stdout.write(r.stderr)
     check(r.returncode == 0, "実物の木で check_c_dialect.py が rc=0")
     check("gnu89" in r.stdout and "gnu11" in r.stdout, "要約に gnu11 と gnu89 の翻訳単位の数を出す")
-    # 親の make のコマンドライン変数が子の make -n に伝わる (Codex P2-1)
-    env = dict(os.environ)
+    # 親の make の旗と変数指定は MAKEFLAGS のまま子の make -n に渡す (Codex P2-1、2 回目 1・2)
+    base = dict(os.environ)
     for k in ("MAKEFLAGS", "MFLAGS", "MAKELEVEL", "MAKEOVERRIDES"):
-        env.pop(k, None)
-    r = subprocess.run(["make", "--no-print-directory", "-C", str(ROOT), "check-c-dialect",
-                        "C_STD=-std=gnu89"], capture_output=True, text=True, env=env)
-    check(r.returncode != 0 and "gnu11 でなく gnu89" in r.stdout,
-          "make check-c-dialect C_STD=-std=gnu89 は落ちる (親の変数指定を子の make に渡す)")
-    r = subprocess.run(["make", "--no-print-directory", "-j4", "-C", str(ROOT), "check-c-dialect"],
-                       capture_output=True, text=True, env=env)
-    check(r.returncode == 0, "make -j4 check-c-dialect は通る (ジョブサーバを引き継がない)")
+        base.pop(k, None)
+    runs = [
+        ("make check-c-dialect C_STD=-std=gnu89", ["check-c-dialect", "C_STD=-std=gnu89"], {}, False),
+        ("C_STD=-std=gnu89 make -e check-c-dialect", ["-e", "check-c-dialect"],
+         {"C_STD": "-std=gnu89"}, False),
+        ("make check-c-dialect 'X=foo\\' C_STD=-std=gnu89",
+         ["check-c-dialect", "X=foo\\", "C_STD=-std=gnu89"], {}, False),
+        ("make check-c-dialect C_STD=-std=gnu89 'X=foo\\' (MAKEFLAGS では X が C_STD の前)",
+         ["check-c-dialect", "C_STD=-std=gnu89", "X=foo\\"], {}, False),
+        ("make check-c-dialect 'C_STD=$(MODE)' MODE=-std=gnu11",
+         ["check-c-dialect", "C_STD=$(MODE)", "MODE=-std=gnu11"], {}, True),
+        ("make check-c-dialect 'C_STD=$(MODE)' MODE=-std=gnu89",
+         ["check-c-dialect", "C_STD=$(MODE)", "MODE=-std=gnu89"], {}, False),
+        ("make check-c-dialect 'T0_TAB=a<TAB>b'", ["check-c-dialect", "T0_TAB=a\tb"], {}, True),
+        ("make check-c-dialect 'C_STD=-std=gnu11<TAB>'", ["check-c-dialect", "C_STD=-std=gnu11\t"], {}, True),
+        ("make -j4 check-c-dialect", ["-j4", "check-c-dialect"], {}, True),
+    ]
+
+    def go(item):
+        desc, args, extra, want_ok = item
+        r = subprocess.run(["make", "--no-print-directory", "-C", str(ROOT)] + args,
+                           capture_output=True, text=True, env=dict(base, **extra))
+        return desc, want_ok, r.returncode, (r.stdout + r.stderr).strip().splitlines()[-1:]
+    for desc, want_ok, rc, tail in mutpar.run_ordered(go, runs):
+        if want_ok:
+            check(rc == 0, "%s は通る (rc=%d %s)" % (desc, rc, tail))
+        else:
+            check(rc != 0, "%s は落ちる (rc=%d %s)" % (desc, rc, tail))
 
 
 # --------------------------------------------------------------------------
@@ -360,6 +408,14 @@ MUTANTS = [
                     "#include /* C11 */ <stdatomic.h>\natomic_int t0_atomic;\n")),
     ("内部実装に行継続で割った restrict (Codex P2-2 反例 b)", "RED",
      lambda: append("kernel/sysclk.c", "void t0_r(char *re\\\nstrict p) { (void)p; }\n")),
+    ("内部実装に \\ と改行の間に空白がある行継続で割った restrict (Codex 2 回目 反例 3)", "RED",
+     lambda: append("kernel/sysclk.c", "void t0_r2(char *re\\ \nstrict p) { (void)p; }\n")),
+    ("内部実装に #\\vinclude <stdatomic.h> (Codex 2 回目 反例 4、VT)", "RED",
+     lambda: append("kernel/sysclk.c", "#\vinclude <stdatomic.h>\n")),
+    ("内部実装に #\\finclude <stdatomic.h> (Codex 2 回目 反例 4、FF)", "RED",
+     lambda: append("kernel/sysclk.c", "#\finclude <stdatomic.h>\n")),
+    ("内部実装に複数行コメントの後ろの #include <stdatomic.h> (Codex 2 回目 P3)", "RED",
+     lambda: append("kernel/sysclk.c", "/* a\n b */ #include <stdatomic.h>\n")),
     # --- 対照 (C11 で許す書き方。落ちたら検査器が厳しすぎる) ---
     ("対照: 内部実装に // とブロック途中の宣言", "GREEN",
      lambda: append("kernel/sysclk.c",
