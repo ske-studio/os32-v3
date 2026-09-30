@@ -460,6 +460,8 @@ checks:
     - tools/check_manifests.py
     - CLAUDE.md
   check-packages-host:
+    - kernel/pgalloc.h
+    - kernel/physmem.h
     - apps               # サブモジュールの bump (毎回 full にしない)
     - game
     - userland/deploy.yaml
@@ -642,6 +644,8 @@ checks:
     - userland/libos32term_render/tests/render.rs
     - userland/libos32term_render/tests/rework.rs
   check-memory-host:
+    - gfx/gfx.h
+    - gfx/palette.h
     - exec/appslot.c
     - exec/appslot.h
     - exec/exec.c
@@ -653,6 +657,9 @@ checks:
     - kernel/paging.h
     - kernel/pgalloc.c
     - kernel/pgalloc.h
+    - kernel/ledger_pci.c
+    - drivers/pci.c
+    - drivers/pci_decode.c
     - kernel/physmem.c
     - kernel/physmem.h
     - kernel/sys.c
@@ -1243,6 +1250,8 @@ checks:
     - sdk/include/os32/os32_kapi_generated.h
     - sdk/include/os32/os32_kapi_shared.h
   check-bootlog-host:
+    - kernel/pgalloc.h
+    - kernel/physmem.h
     - include/console.h
     - fs/ext2_dir.c
     - fs/ext2_vfs.c
@@ -1461,6 +1470,8 @@ checks:
     - sdk/include/os32/os32_kapi_shared.h
     - sdk/include/os32/os32api.h
   check-sh-truncation-host:
+    - kernel/pgalloc.h
+    - kernel/physmem.h
     - drivers/pc98pt.c
     - drivers/pc98pt.h
     - drivers/pci_decode.c

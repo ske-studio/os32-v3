@@ -7,31 +7,6 @@
 
 #include "types.h"
 
-/* Internal reservation CORE only, not a device activation permission.
- * Trusted caller capability: IDLE attests master CR3, no live AS or CPL0 exec;
- * RAM_MAPPED attests the entire mapped PFN interval is stable supervisor
- * identity RW/cacheable RAM for kernel lifetime. No probe/map callback runs.
- * No current GUI/backend supplies this capability: integration is pending.
- * Owner is a nonzero kernel-lifetime ID, never a process/nesting ID.
- * Spans are PFN half-open intervals (4GiB end is representable). The normalized
- * whole set is immutable per owner; exact retries succeed without new claims.
- * RAM means newly acquired permanent RAM (BB), MMIO never proves RAM/mapping.
- * No release/reset API. Success means RESERVED, not prepared/enabled hardware.
- * Exact RAM placement is supplied by the trusted caller, then acquired in
- * this same transaction; this core does not search, lend low display windows,
- * whitelist device constants, authenticate capabilities, or activate devices.
- * The complete original legacy arena and current sys low fixed extent remain
- * protected, even when their pages are temporarily free. */
-#define SYS_DEVICE_MAX_SPANS 16
-#define SYS_DEVICE_MMIO 1
-#define SYS_DEVICE_RAM 2
-#define SYS_DEVICE_IDLE 1
-#define SYS_DEVICE_RAM_MAPPED 2
-struct sys_device_span { u32 first, end, kind; };
-struct sys_device_capability { u32 flags, mapped_first, mapped_end; };
-int sys_device_reserve_core(u32 owner, const struct sys_device_span *spans,
-                            u32 count, const struct sys_device_capability *cap);
-
 void sys_reboot(void);
 void sys_halt(void);
 void buz_on(void);

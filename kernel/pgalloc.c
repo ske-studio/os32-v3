@@ -43,8 +43,10 @@ volatile u32 kctx_irq_depth, kctx_exc_depth;
 u32 ledger_irq_ops, ledger_exc_ops;
 u32 ledger_irq_last[3], ledger_exc_last[3];
 u32 ledger_bad_free, ledger_retire_refused, ledger_claim_refused;
-u32 ledger_reclaim_pages, ledger_check_fail;
+u32 ledger_reclaim_pages, ledger_check_fail, ledger_res_overflow;
 const char *ledger_check_tag;
+/* ledger_reserve_set の一括 commit の通し番号 (区間の span_set)。 */
+static u8 ledger_span_sets;
 
 static const char ledger_fixed_names[LEDGER_OWNER_FIXED_LAST][LEDGER_NAME_LEN] = {
     "kernel", "boot", "bundle", "shlib", "gshell", "staging", "gfx"
@@ -622,10 +624,28 @@ done:
     return ok;
 }
 
+/* 区間の表の末尾に 1 本足す (res_mask / span_set は 0)。呼び手は IRQ 保存区間
+ * の中で検査を済ませ、空きがあることを確かめている。OUTSIDE は範囲から自動。 */
+static struct ledger_region *region_put(u32 type, u32 owner, u32 first, u32 end,
+                                        u32 cache, u32 rflags)
+{
+    struct ledger_region *r;
+    r = &ledger_regions[ledger_region_count++];
+    r->first = first;
+    r->end = end;
+    r->type = (u8)type;
+    r->owner = (u8)owner;
+    r->cache = (u8)cache;
+    r->flags = (u8)(rflags | (end > limit_pfn ? LEDGER_RF_OUTSIDE : 0));
+    r->res_mask = 0;
+    r->span_set = 0;
+    r->pad = 0;
+    return r;
+}
+
 int ledger_register_region(u32 type, u32 owner, u32 first, u32 end, u32 cache,
                            u32 rflags)
 {
-    struct ledger_region *r;
     u32 i;
     unsigned int flags;
     int ok;
@@ -639,16 +659,7 @@ int ledger_register_region(u32 type, u32 owner, u32 first, u32 end, u32 cache,
     for (i = 0; i < ledger_region_count; i++)
         if (first < ledger_regions[i].end && ledger_regions[i].first < end)
             goto done;
-    r = &ledger_regions[ledger_region_count++];
-    r->first = first;
-    r->end = end;
-    r->type = (u8)type;
-    r->owner = (u8)owner;
-    r->cache = (u8)cache;
-    r->flags = (u8)(rflags | (end > limit_pfn ? LEDGER_RF_OUTSIDE : 0));
-    r->res_mask = 0;
-    r->span_set = 0;
-    r->pad = 0;
+    region_put(type, owner, first, end, cache, rflags);
     ok = 1;
 done:
     irq_restore(flags);
@@ -658,7 +669,7 @@ done:
 int ledger_selfcheck(const char *tag)
 {
     u32 counts[LEDGER_MAX_OWNERS];
-    const struct ledger_region *r;
+    const struct ledger_region *r, *g;
     u32 p, i, j, o, live;
     unsigned int flags;
     int ok;
@@ -683,9 +694,15 @@ int ledger_selfcheck(const char *tag)
     for (i = 0; ok && i < ledger_region_count; i++) {
         r = &ledger_regions[i];
         if (!owner_ok(r->owner) || r->first >= r->end) ok = 0;
-        for (j = 0; j < i; j++)
-            if (r->first < ledger_regions[j].end &&
-                ledger_regions[j].first < r->end) ok = 0;
+        for (j = 0; j < i; j++) {
+            g = &ledger_regions[j];
+            /* 装置の予約は背景を細分してよい (§3-1 の BACKGROUND)。背景は
+             * 起動時の登録 (重なりを断る) なので、重なる DEVICE より必ず前に
+             * 並ぶ — 後ろの r が DEVICE、前の g が BACKGROUND の向きだけ許す。 */
+            if (r->first < g->end && g->first < r->end &&
+                !(r->type == LEDGER_R_DEVICE && g->type == LEDGER_R_BACKGROUND))
+                ok = 0;
+        }
     }
     for (i = 0; ok && i < LEDGER_MAX_SURFACES; i++)
         if (ledger_surfaces[i].npages && !owner_ok(ledger_surfaces[i].owner))
@@ -698,103 +715,127 @@ int ledger_selfcheck(const char *tag)
     return ok;
 }
 
-struct device_claim { u32 owner; struct sys_device_span span; };
-static struct device_claim device_ledger[SYS_DEVICE_MAX_SPANS];
-static u32 device_claims;
-
-int pgalloc_device_reserve(u32 owner, const struct sys_device_span *spans,
-                           u32 count, const struct sys_device_capability *cap,
-                           u32 fixed_end)
+/* ======================================================================== */
+/*  MMIO 登録と検証済み資源レコード (§3-1・§3-2、T1d、D33・X4)               */
+/*                                                                          */
+/*  予約権限は資源レコード (decode 範囲 + その根拠) から来る。生の {first,   */
+/*  end} だけでは予約できない。1 レコード = decode 区間 1 組 (B10)。         */
+/* ======================================================================== */
+int ledger_resource_add(const struct ledger_resource *rec, u32 *rid)
 {
-    u32 i, j, matches, p, n;
-    struct sys_device_span sorted[SYS_DEVICE_MAX_SPANS], tmp;
+    u32 i;
     unsigned int flags;
     int ok;
     flags = irq_save();
     ok = 0;
-    if (!initialized || !online || !owner || !spans || !cap ||
-        !(cap->flags & SYS_DEVICE_IDLE) || !count ||
-        count > SYS_DEVICE_MAX_SPANS) goto done;
-    /* Snapshot and normalize the complete input before inspecting ownership. */
-    for (i = 0; i < count; i++) {
-        tmp = spans[i];
-        if (tmp.first >= tmp.end || tmp.end > PHYSMEM_MAX_PFN ||
-            (tmp.kind != SYS_DEVICE_MMIO && tmp.kind != SYS_DEVICE_RAM)) goto done;
-        if (tmp.kind == SYS_DEVICE_RAM &&
-            (!(cap->flags & SYS_DEVICE_RAM_MAPPED) ||
-             cap->mapped_first >= cap->mapped_end ||
-             cap->mapped_end > PHYSMEM_MAX_PFN ||
-             tmp.first < cap->mapped_first || tmp.end > cap->mapped_end)) goto done;
-        j = i;
-        while (j && sorted[j - 1].first > tmp.first) {
-            sorted[j] = sorted[j - 1];
-            j--;
-        }
-        sorted[j] = tmp;
+    if (!rec || !rid || !rec->bus || rec->bus > LEDGER_BUS_FIXED ||
+        !rec->width_basis || rec->width_basis > LEDGER_WB_PROBE_UNVERIFIED ||
+        rec->decode_first > rec->decode_end || rec->decode_end > PHYSMEM_MAX_PFN ||
+        rec->map_first > rec->map_end ||
+        (rec->map_first < rec->map_end &&
+         (rec->map_first < rec->decode_first || rec->map_end > rec->decode_end)))
+        goto done;
+    for (i = 0; i < LEDGER_MAX_RESOURCES && ledger_resources[i].bus; i++) {}
+    if (i == LEDGER_MAX_RESOURCES) {
+        ledger_res_overflow++;
+        goto done;
     }
-    n = 0;
-    for (i = 0; i < count; i++) {
-        if (n && sorted[i].first <= sorted[n - 1].end &&
-            sorted[i].kind == sorted[n - 1].kind) {
-            if (sorted[i].end > sorted[n - 1].end) sorted[n - 1].end = sorted[i].end;
+    ledger_resources[i] = *rec;
+    *rid = i;
+    ok = 1;
+done:
+    irq_restore(flags);
+    return ok;
+}
+
+int ledger_reserve_set(u32 owner, const struct ledger_span *spans, u32 n)
+{
+    struct ledger_span s[LEDGER_MAX_SPANS], t;
+    const struct ledger_resource *rr;
+    const struct ledger_region *g;
+    struct ledger_region *r;
+    u32 i, j, k, p, mine, hit;
+    unsigned int flags;
+    int ok;
+    flags = irq_save();
+    ledger_note(LEDGER_OP_RESERVE, owner, LEDGER_CALLER());
+    ok = 0;
+    if (!online || !paging_boot_context() || !owner_ok(owner) ||
+        ledger_owners[owner].kind != LEDGER_KIND_DEVICE || !spans || !n ||
+        n > LEDGER_MAX_SPANS) goto done;
+    /* (e) 正規化の前に span ごとに自分の資源レコードと照合する (B10)。空きの
+     * レコードは width_basis 0 なのでここで落ちる。res は根拠のビットにして
+     * 先頭の順に並べる。 */
+    for (i = 0; i < n; i++) {
+        t = spans[i];
+        if (t.res >= LEDGER_MAX_RESOURCES) goto done;
+        rr = &ledger_resources[t.res];
+        if (!rr->width_basis || rr->width_basis > LEDGER_WB_GLUE_CONST ||
+            t.first >= t.end || t.first < rr->decode_first ||
+            t.end > rr->decode_end ||
+            (t.kind != LEDGER_SPAN_MMIO && t.kind != LEDGER_SPAN_RAM)) goto done;
+        /* 以後 kind は区間のキャッシュ属性で持つ (MMIO = UC、RAM = WB)。 */
+        t.kind = t.kind == LEDGER_SPAN_MMIO ? LEDGER_CACHE_UC : LEDGER_CACHE_WB;
+        t.res = 1UL << t.res;
+        for (j = i; j && s[j - 1].first > t.first; j--) s[j] = s[j - 1];
+        s[j] = t;
+    }
+    /* 正規化: 同種の重なる・接する span を併合 (根拠は和)、異種の重なりは拒否。 */
+    k = 0;
+    for (i = 0; i < n; i++) {
+        if (k && s[i].first <= s[k - 1].end && s[i].kind == s[k - 1].kind) {
+            if (s[i].end > s[k - 1].end) s[k - 1].end = s[i].end;
+            s[k - 1].res |= s[i].res;
         } else {
-            if (n && sorted[i].first < sorted[n - 1].end) goto done;
-            sorted[n++] = sorted[i];
+            if (k && s[i].first < s[k - 1].end) goto done;
+            s[k++] = s[i];
         }
     }
-    spans = sorted;
-    count = n;
-    matches = 0;
-    for (i = 0; i < count; i++) {
-        for (j = 0; j < device_claims; j++) {
-            if (device_ledger[j].owner == owner) {
-                if (device_ledger[j].span.first == spans[i].first &&
-                    device_ledger[j].span.end == spans[i].end &&
-                    device_ledger[j].span.kind == spans[i].kind) matches++;
-            } else if (spans[i].first < device_ledger[j].span.end &&
-                       device_ledger[j].span.first < spans[i].end) goto done;
+    n = k;
+    /* 区間の表との照合 (§3-1 の拒否規則 (a)〜(c))。自分の DEVICE 区間は
+     * 完全一致の判定に回す。 */
+    mine = hit = 0;
+    for (j = 0; j < ledger_region_count; j++) {
+        g = &ledger_regions[j];
+        if (g->type == LEDGER_R_DEVICE && g->owner == owner) {
+            mine++;
+            for (i = 0; i < n; i++)
+                if (g->first == s[i].first && g->end == s[i].end &&
+                    g->res_mask == s[i].res && g->cache == s[i].kind) hit++;
+            continue;
         }
+        if (g->type == LEDGER_R_BACKGROUND) continue;
+        for (i = 0; i < n; i++)
+            if (s[i].first < g->end && g->first < s[i].end) goto done;
     }
-    j = 0;
-    for (i = 0; i < device_claims; i++) if (device_ledger[i].owner == owner) j++;
-    if (j) { ok = matches == count && j == count; goto done; }
-    if (count > SYS_DEVICE_MAX_SPANS - device_claims) goto done;
-    for (i = 0; i < count; i++) {
-        /* Retain the whole original legacy arena, including the dynamic A/B
-         * hole and any boot top carve-out. Never shrink it for a device. */
-        if (spans[i].first < MEM_EXEC_LOAD_ADDR / PAGE_SIZE ||
-            spans[i].first < device_boot_map.legacy_ceiling ||
-            spans[i].first < fixed_end) goto done;
-        for (j = 0; j < device_boot_map.count; j++) {
-            const struct physmem_range *r;
-            r = &device_boot_map.ranges[j];
-            if (spans[i].first >= r->end || r->first >= spans[i].end) continue;
-            if (r->kind == PHYSMEM_RESERVED || r->kind == PHYSMEM_MMIO) goto done;
-            if (r->kind == PHYSMEM_RAM) {
-                u32 lo, hi;
-                lo = spans[i].first > r->first ? spans[i].first : r->first;
-                hi = spans[i].end < r->end ? spans[i].end : r->end;
-                for (p = lo; p < hi; p++) if (!bit(eligible, p)) goto done;
-            }
-        }
-        if (spans[i].kind == SYS_DEVICE_RAM) {
-            if (spans[i].end > limit_pfn) goto done;
-            for (p = spans[i].first; p < spans[i].end; p++)
-                if (!bit(eligible, p)) goto done;
-        }
-        for (p = spans[i].first; p < spans[i].end && p < limit_pfn; p++)
-            if (bit(bitmap, p)) goto done;
+    /* 同 owner は同一集合だけ冪等 (何も変えない)、部分一致は拒否。 */
+    if (mine) {
+        ok = hit == n && mine == n;
+        goto done;
+    }
+    if (n > LEDGER_MAX_REGIONS - ledger_region_count) goto done;
+    /* (d) 管理範囲の中: L2 に owner があれば拒否 (使用中のページ — allocated
+     * ⇔ owner ≠ 0 — と永久予約の両方)、RAM 種別 (WB) は全ページ eligible で
+     * 管理範囲の内側。 */
+    for (i = 0; i < n; i++) {
+        if (s[i].kind == LEDGER_CACHE_WB && s[i].end > limit_pfn) goto done;
+        for (p = s[i].first; p < s[i].end && p < limit_pfn; p++)
+            if (owner_map[p] ||
+                (s[i].kind == LEDGER_CACHE_WB && !bit(eligible, p))) goto done;
     }
     /* All fallible work is above this line. */
-    for (i = 0; i < count; i++) {
-        for (p = spans[i].first; p < spans[i].end && p < limit_pfn; p++) {
+    ledger_span_sets++;
+    for (i = 0; i < n; i++) {
+        for (p = s[i].first; p < s[i].end && p < limit_pfn; p++) {
             if (bit(eligible, p)) {
                 eligible[p / 32] &= ~(1UL << (p % 32));
                 total_pages--;
             }
         }
-        device_ledger[device_claims].owner = owner;
-        device_ledger[device_claims++].span = spans[i];
+        r = region_put(LEDGER_R_DEVICE, owner, s[i].first, s[i].end, s[i].kind,
+                       LEDGER_RF_PERMANENT);
+        r->res_mask = (u16)s[i].res;
+        r->span_set = ledger_span_sets;
     }
     ok = 1;
 done:

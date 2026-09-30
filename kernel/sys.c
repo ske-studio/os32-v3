@@ -13,23 +13,6 @@
 /* 管理する物理 RAM の末尾 (バイト)。legacy アリーナの上端そのもの。 */
 static u32 sys_phys_end(void);
 
-int sys_device_reserve_core(u32 owner, const struct sys_device_span *spans,
-                            u32 count, const struct sys_device_capability *cap)
-{
-    unsigned int flags;
-    u32 end;
-    int ok;
-    flags = irq_save();
-    /* sys low fixed extent の上端 = 管理する実 RAM の末尾。ホットデプロイ窓を
-     * 撤去した (2026-09-09) ので、その分の上乗せは無い。 */
-    end = sys_phys_end() / PAGE_SIZE;
-    ok = 0;
-    if (end && end <= PHYSMEM_MAX_PFN)
-        ok = pgalloc_device_reserve(owner, spans, count, cap, end);
-    irq_restore(flags);
-    return ok;
-}
-
 void sys_reboot(void)
 {
     /* PC-98 ハードウェアリセット (FreeBSD実装準拠) */

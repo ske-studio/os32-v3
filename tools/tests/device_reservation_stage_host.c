@@ -1,5 +1,6 @@
-/* Real staged sys -> allocator -> broker. Only privileged CPU I/O is replaced.
- * Synthetic RAM is not machine detection; inspect real PTEs for capability. */
+/* 実物の段つき起動 sys -> allocator -> 台帳の MMIO 登録 (T1d)。特権 CPU I/O
+ * だけを贋物にする。合成 RAM は機械の検出ではない。予約は ledger_reserve_set
+ * (DEVICE owner・検証済み資源レコード、TASK_T1_LEDGER §4-4)。 */
 #include "types.h"
 static u32 host_cr3;
 static unsigned int host_if = 0x202U;
@@ -30,14 +31,14 @@ static void report(const char *s, u32 n)
 void _start(void)
 {
     u32 args[6] = {0x800000, 0x800000, 3, 0x32, 0xffffffffUL, 0};
-    u32 result, p, total, free, i;
+    u32 result, p, total, free, i, rid, n0;
     struct physmem m;
     struct pgalloc_layout l;
-    struct sys_device_span s[2] = {{4096,4224,SYS_DEVICE_RAM},
-                                   {4400,4912,SYS_DEVICE_MMIO}};
-    struct sys_device_capability cap = {SYS_DEVICE_IDLE,4096,4224};
+    struct ledger_resource r = {0};
+    struct ledger_span s[2] = {{4096, 4224, LEDGER_SPAN_RAM, 0},
+                               {4400, 4912, LEDGER_SPAN_MMIO, 0}};
     static u32 old[512];
-    static struct device_claim ledger_before[SYS_DEVICE_MAX_SPANS];
+    static struct ledger_region before[LEDGER_MAX_REGIONS];
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
     CHECK(result == 0x800000);
     paging_init(16384);
@@ -50,33 +51,41 @@ void _start(void)
     l.workspace_end = l.metadata_first;
     l.workspace_first = l.workspace_end - 16;
     CHECK(sys_memory_bootstrap_model(&m,&l,paging_verify_identity));
-    CHECK(!sys_device_reserve_core(1,s,2,&cap));
+    r.bus = LEDGER_BUS_FIXED; r.width_basis = LEDGER_WB_DATASHEET;
+    r.decode_first = 4096; r.decode_end = 4912;
+    CHECK(ledger_resource_add(&r, &rid) && rid == 0);
+    CHECK(!ledger_reserve_set(LEDGER_OWNER_GFX,s,2));   /* BOOTSTRAP */
     CHECK(sys_memory_stage_online());
     CHECK(paging_boot_context());
     CHECK(paging_verify_identity(4096,128,(void *)(4096 * PAGE_SIZE)));
-    cap.flags |= SYS_DEVICE_RAM_MAPPED;
     CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, 4911, 4912, LEDGER_BOTTOM_UP, &p));
     total = pgalloc_total_pages(); free = pgalloc_free_pages();
+    n0 = ledger_region_count;
     for (i = 0; i < 512; i++) old[i] = ((u32 *)l.metadata)[i];
-    for (i = 0; i < SYS_DEVICE_MAX_SPANS; i++) ledger_before[i] = device_ledger[i];
-    CHECK(!sys_device_reserve_core(1,s,2,&cap));
-    CHECK(!device_claims && total == pgalloc_total_pages() && free == pgalloc_free_pages());
+    for (i = 0; i < LEDGER_MAX_REGIONS; i++) before[i] = ledger_regions[i];
+    /* 窓の最後のページが使用中 → RAM + 窓の全体が不変 */
+    CHECK(!ledger_reserve_set(LEDGER_OWNER_GFX,s,2));
+    CHECK(n0 == ledger_region_count && total == pgalloc_total_pages() && free == pgalloc_free_pages());
     for (i = 0; i < 512; i++) CHECK(old[i] == ((u32 *)l.metadata)[i]);
-    for (i = 0; i < SYS_DEVICE_MAX_SPANS; i++) {
-        CHECK(ledger_before[i].owner == device_ledger[i].owner);
-        CHECK(ledger_before[i].span.first == device_ledger[i].span.first);
-        CHECK(ledger_before[i].span.end == device_ledger[i].span.end);
-        CHECK(ledger_before[i].span.kind == device_ledger[i].span.kind);
+    for (i = 0; i < LEDGER_MAX_REGIONS; i++) {
+        CHECK(before[i].first == ledger_regions[i].first);
+        CHECK(before[i].end == ledger_regions[i].end);
+        CHECK(before[i].owner == ledger_regions[i].owner);
+        CHECK(before[i].type == ledger_regions[i].type);
     }
     CHECK(pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, p, 1));
-    CHECK(sys_device_reserve_core(1,s,2,&cap));
+    CHECK(ledger_reserve_set(LEDGER_OWNER_GFX,s,2));
+    CHECK(ledger_region_count == n0 + 2);
     CHECK(pgalloc_total_pages() == total - 640 && pgalloc_free_pages() == free + 1 - 640);
-    CHECK(sys_device_reserve_core(1,s,2,&cap));
+    CHECK(ledger_reserve_set(LEDGER_OWNER_GFX,s,2));
+    CHECK(ledger_region_count == n0 + 2);
     CHECK(!pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, 4096, 128));
     CHECK(!pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, 4911, 4912, LEDGER_BOTTOM_UP, &p));
+    /* 予約は写像を変えない (写像は T1e の ⑥ が予約の後に張る) */
     CHECK(paging_verify_identity(4096,128,(void *)(4096 * PAGE_SIZE)));
     CHECK(paging_verify_identity(4400,512,(void *)(4400 * PAGE_SIZE)));
-    report("PASS real ONLINE broker atomic BB+aperture; no device mapping\n",
-           sizeof("PASS real ONLINE broker atomic BB+aperture; no device mapping\n") - 1);
+    CHECK(ledger_selfcheck("stage"));
+    report("PASS real ONLINE ledger_reserve_set atomic RAM+aperture; no device mapping\n",
+           sizeof("PASS real ONLINE ledger_reserve_set atomic RAM+aperture; no device mapping\n") - 1);
     die(0);
 }
