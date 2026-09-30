@@ -1109,6 +1109,47 @@ static int app_map_region(struct addrspace *as, u32 vstart, u32 vend)
 }
 
 /* ======================================================================== */
+/*  exec_map_shared_bb — 共有のバックバッファをアプリ PD へ USER で写す      */
+/*                                                                          */
+/*  BB は恒等 (仮想 = 物理) で写す。PEGC の BB は sys_reserve_top が低位 RAM */
+/*  の末尾から切るので、8MB 機では [0x7B5000, 0x800000) = **アプリ帯の中**  */
+/*  (スタック 64 ページ + exec_heap の上端 10 ページと同じ仮想番地) に来る。 */
+/*  そこへ恒等写像を重ねると、アプリ固有 PT に張った私有ページの PTE を     */
+/*  上書きする — 私有ページ 74 枚は二度と辿れず (exec_teardown_app が返す   */
+/*  のは BB の物理で、pgalloc は予約済みとして黙って断る)、起動と終了の     */
+/*  たびに池が 74 ページずつ減り、スタックは共有の BB と同じ物理になる      */
+/*  (2026-09-30、8MB + PEGC で used_pages が 330 → 404 → 478 → NOMEM)。    */
+/*                                                                          */
+/*  アプリ帯 [MEM_APP_BAND_BASE, band_top) はアプリ固有 PT の領分なので、   */
+/*  BB のうち帯と重なる部分は写さない (帯の外の部分だけを写す)。重なった   */
+/*  ページ数は exec_bb_clipped_pages に残す (PM が emu_read_mem で読む)。  */
+/* ======================================================================== */
+volatile u32 exec_bb_clipped_pages = 0;
+
+static void exec_map_shared_bb(struct addrspace *as, u32 bb_base,
+                               u32 bb_size, u32 band_top)
+{
+    u32 bb_end, lo_end, hi_first, clip_lo, clip_hi;
+
+    exec_bb_clipped_pages = 0;
+    if (!bb_size || bb_base > ~0UL - bb_size) return;
+    bb_end = bb_base + bb_size;
+    /* 帯より下の部分 */
+    lo_end = (bb_end < MEM_APP_BAND_BASE) ? bb_end : MEM_APP_BAND_BASE;
+    if (bb_base < lo_end)
+        paging_addrspace_map_user_keep(as, bb_base, lo_end, PAGE_RW | PTE_USER);
+    /* 帯より上の部分 */
+    hi_first = (bb_base > band_top) ? bb_base : band_top;
+    if (hi_first < bb_end)
+        paging_addrspace_map_user_keep(as, hi_first, bb_end, PAGE_RW | PTE_USER);
+    /* 帯と重なって写さなかった部分 */
+    clip_lo = (bb_base > MEM_APP_BAND_BASE) ? bb_base : MEM_APP_BAND_BASE;
+    clip_hi = (bb_end < band_top) ? bb_end : band_top;
+    if (clip_lo < clip_hi)
+        exec_bb_clipped_pages = (clip_hi - clip_lo) / PAGE_SIZE;
+}
+
+/* ======================================================================== */
 /*  exec_teardown_app — CPL=3 アプリの物理とアドレス空間を返す (D1/D4)       */
 /*                                                                          */
 /*  **master CR3 に戻してから**呼ぶこと (破棄する PD がアクティブだと         */
@@ -1957,9 +1998,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
          * なく **_keep** — Cirrus のクライアント面は PCD 付きのデバイス窓で、
          * flags をそのまま書くと PCD が落ちる (レビュー #5 ②③)。 */
         gfx_bb_phys_range(&bb_base, &bb_size);
-        if (bb_size)
-            paging_addrspace_map_user_keep(&ctx->as,
-                bb_base, bb_base + bb_size, PAGE_RW | PTE_USER);
+        exec_map_shared_bb(&ctx->as, bb_base, bb_size, ctx->band_top);
         /* KAPI トランポリンページ (RO+USER, 全PD共有) */
         paging_addrspace_map_user(&ctx->as, ring3_tramp_page,
             ring3_tramp_page, PAGE_RO | PTE_USER);
