@@ -635,6 +635,53 @@ static void test_pool_model(void)
 }
 
 /* ------------------------------------------------------------------------ */
+/*  所有権台帳 (票 docs/tasks/v3/TASK_T1_LEDGER.md §4-2、T1b)                 */
+/*                                                                          */
+/*  (1) 通常文脈では割り込み / 例外の深さが 0 (§3-5。longjmp の控えの戻し  */
+/*      忘れや IRQ_LEAVE の抜けがあると 0 に戻らない)。                     */
+/*  (2) 不変条件 (eligible で allocated ⇔ owner ≠ 0、pages と L2 の一致、   */
+/*      区間の非重複) — ledger_selfcheck("boot")。                          */
+/*  (3) R5 (a): AS を作り、その owner でページを取り、壊して回収すると AS    */
+/*      owner のページが 0 になり、番号を返せる。                           */
+/*  (4) R5 (b): 永続 owner の総量はその間に変わらない。                     */
+/*  件数 (R1) は 1 行に出す。値そのものは kernel.map の番地で読む。          */
+/* ------------------------------------------------------------------------ */
+static u32 ledger_persist_total(void)
+{
+    u32 i, n = 0;
+    for (i = 1; i <= LEDGER_OWNER_FIXED_LAST; i++) n += ledger_owner_pages(i);
+    return n;
+}
+
+static void test_ledger(void)
+{
+    struct addrspace as;
+    u32 persist, owner, phys, left;
+    int ok;
+
+    check(kctx_irq_depth == 0 && kctx_exc_depth == 0, "ledger:ctx depth 0");
+    check(ledger_selfcheck("boot"), "ledger:selfcheck boot");
+    persist = ledger_persist_total();
+    ok = ledger_owner_new(LEDGER_KIND_AS, 0, "kstest", &owner);
+    check(ok, "ledger:AS owner new");
+    if (ok) {
+        ok = paging_addrspace_create(&as, owner) == 0;
+        phys = ok ? pgalloc_alloc_phys(owner, 2) : 0;
+        /* PD 1 + アプリ PT 1 + 2 ページ */
+        check(ok && phys && ledger_owner_pages(owner) == 4, "ledger:AS alloc");
+        if (ok) paging_addrspace_destroy(&as);
+        left = 0;
+        check(ledger_reclaim_owner(owner, &left) && left == (phys ? 2 : 0) &&
+              ledger_owner_pages(owner) == 0, "ledger:AS pages 0 (R5a)");
+        check(ledger_owner_retire(owner), "ledger:AS owner retire");
+    }
+    check(ledger_persist_total() == persist, "ledger:persist unchanged (R5b)");
+    check(ledger_selfcheck("boot"), "ledger:selfcheck after AS");
+    kprintf(0x07, "[ledger] irq_ops=%u exc_ops=%u check_fail=%u bad_free=%u\n",
+            ledger_irq_ops, ledger_exc_ops, ledger_check_fail, ledger_bad_free);
+}
+
+/* ------------------------------------------------------------------------ */
 /*  PCM (票 TASK_PCM_CS4231): 起動時の検出が走った後、driver が CLOSED で    */
 /*  待っていること。装置の有無は機種で変わるので**状態だけ**を見る           */
 /*  (NP21/W の既定構成には CS4231 が無い — 無くても壊れないのが要件)。       */
@@ -668,6 +715,7 @@ int kselftest_run_post_exec(void)
     test_memmap();
     test_memmap_pool_user();
     test_pool_model();
+    test_ledger();
     test_pcm();
 
     if (ksel_fail != before) {
