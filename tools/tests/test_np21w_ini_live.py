@@ -1,6 +1,13 @@
-"""Synthetic host tests by default; opt-in PowerShell uses temporary files only."""
+"""Synthetic host tests by default; opt-in PowerShell uses temporary files only.
+
+  python3 -B tools/tests/test_np21w_ini_live.py            # cases
+  python3 -B tools/tests/test_np21w_ini_live.py --mutate   # plus mutants (make check-np21w-ini-live-host)
+"""
 import copy
+import importlib.util
+import io
 import sys
+import tempfile
 from pathlib import Path
 import unittest
 
@@ -16,6 +23,18 @@ RAW = (b'; opaque \xff\r\n[NekoProject21]\r\nUSEGD5430=false\r\nGD5430TYPE=91\n'
 NEW = RAW.replace(b'USEGD5430=false', b'USEGD5430=true')
 PEGC_ON = RAW.replace(b'USEPEGCP=false', b'USEPEGCP=true')
 RAM_8MB = RAW.replace(b'ExMemory=16', b'ExMemory=7')
+# tools/np21w_ctl.py start: Start-Process -ArgumentList @('"/i<ini>"'[, '"<fd>"']);
+# measured 2026-09-30 as '"<exe>" "/i<ini>"' (plus ShellExecute's trailing blank).
+FD = r'C:\NP21\os32_boot.d88'
+CTL_COMMAND = '"' + TARGET['exe'] + '" "/i' + TARGET['ini'] + '" '
+CTL_FD_COMMAND = '"' + TARGET['exe'] + '" "/i' + TARGET['ini'] + '" "' + FD + '" '
+
+
+def launch_text(launch):
+    # Independent restatement of the expected restart arguments (not live.launch_arguments).
+    head = {'switch': '"/i', 'positional': '"'}[launch['form']]
+    tail = ' "' + launch['fd'] + '"' if launch['fd'] is not None else ''
+    return head + TARGET['ini'] + '"' + tail
 
 
 class Fake:
@@ -57,7 +76,10 @@ class Fake:
         if op == 'load':
             return copy.deepcopy(self.record)
         if op == 'start':
-            self.rows = [dict(ROW, pid=43, created='new')]
+            # What .NET Process.Start shows as CommandLine: "<FileName>" <Arguments>.
+            self.launch = copy.deepcopy(args.get('launch'))
+            self.rows = [dict(ROW, pid=43, created='new',
+                              command='"' + TARGET['exe'] + '" ' + launch_text(args['launch']))]
             return 43
         return True
 
@@ -643,6 +665,115 @@ class ReceiptAndPathBoundaries(unittest.TestCase):
         self.assertEqual(t.requests, [])
 
 
+class CtlLaunchShapes(unittest.TestCase):
+    """np21w_ctl.py start launches '"<exe>" "/i<ini>" ["<fd>"]' (2026-09-30).
+
+    Np2Arg::Parse (np21w-src win9x/np2arg.cpp) reads '/i' + rest as the ini;
+    milstr_getarg drops the quotes. The restart must reuse the same shape."""
+
+    def row(self, command):
+        return dict(ROW, command=command)
+
+    def test_accepts_ctl_switch_shapes(self):
+        for command, launch in (
+                (CTL_COMMAND, {'form': 'switch', 'fd': None}),
+                (CTL_COMMAND.rstrip(), {'form': 'switch', 'fd': None}),
+                (CTL_FD_COMMAND, {'form': 'switch', 'fd': FD}),
+                (ROW['command'], {'form': 'positional', 'fd': None})):
+            with self.subTest(command=command):
+                self.assertEqual(live.identify([self.row(command)], TARGET, 42), self.row(command))
+                self.assertEqual(live.launch_of(command, TARGET), launch)
+
+    def test_preview_of_ctl_launched_process(self):
+        for command in (CTL_COMMAND, CTL_FD_COMMAND):
+            f = Fake()
+            f.rows = [self.row(command)]
+            with self.subTest(command=command):
+                result = live.Live(f, TARGET).run('ram-8mb')
+                self.assertEqual(result['diff'], ['EXMEMORY: 16 -> 7'])
+                self.assertEqual(f.calls, ['query', 'snapshot', 'close'])
+
+    def test_restart_keeps_launch_shape(self):
+        for command, launch in ((CTL_COMMAND, {'form': 'switch', 'fd': None}),
+                                (CTL_FD_COMMAND, {'form': 'switch', 'fd': FD}),
+                                (ROW['command'], {'form': 'positional', 'fd': None})):
+            f = Fake()
+            f.rows = [self.row(command)]
+            with self.subTest(command=command):
+                result = live.Live(f, TARGET).run('ram-8mb', live_apply=True, exclusive=True)
+                self.assertEqual(result['pid'], 43)
+                self.assertEqual(f.launch, launch)
+                self.assertEqual(f.rows[0]['command'].rstrip(), command.rstrip())
+                self.assertEqual(f.snapshot['data'], RAM_8MB)
+
+    def test_restore_after_failed_start_uses_recorded_shape(self):
+        f = Fake()
+        f.rows = [self.row(CTL_FD_COMMAND)]
+        f.fail = 'start'
+        service = live.Live(f, TARGET)
+        with self.assertRaises(live.IniError):
+            service.run('ram-8mb', live_apply=True, exclusive=True)
+        self.assertEqual(f.rows, [])
+        f.fail = None
+        result = service.run('restore', receipt='a' * 32, live_apply=True, exclusive=True)
+        self.assertEqual(result['pid'], 43)
+        self.assertEqual(f.launch, {'form': 'switch', 'fd': FD})
+        self.assertEqual(f.snapshot['data'], RAW)
+
+    def test_restart_in_another_shape_is_rejected(self):
+        f = Fake()
+        f.rows = [self.row(CTL_COMMAND)]
+        def hook(op):
+            if op == 'query' and 'start' in f.calls:
+                f.rows = [dict(ROW, pid=43, created='new')]  # positional, not /i
+        f.hook = hook
+        with self.assertRaisesRegex(live.IniError, 'launch shape'):
+            live.Live(f, TARGET).run('ram-8mb', live_apply=True, exclusive=True)
+
+    def test_rejects_unsupported_variants(self):
+        exe, ini = '"' + TARGET['exe'] + '" ', TARGET['ini']
+        for command in (
+                exe + '"-i' + ini + '"',                      # '-i' (NP21/W accepts; ctl never emits)
+                exe + '"/I' + ini + '"',                      # upper-case switch
+                exe + '/i' + ini,                             # unquoted token
+                exe + '"/i' + ini + '" "/i' + ini + '"',      # /i twice
+                exe + '"/ichosen.ini"',                       # relative ini
+                exe + '"/i ' + ini + '"',                     # blank after /i
+                exe + '"/i' + ini + '" "/f"',                 # other switch
+                exe + '"/i' + ini + '" "/x"',                 # unknown switch
+                exe + '"/f" "/i' + ini + '"',                 # switch before the ini
+                exe + '"/i' + ini + '" "os32_boot.d88"',      # relative disk
+                exe + '"/i' + ini + '" "C:\\NP21\\a.iso"',    # CD, not FDD
+                exe + '"/i' + ini + '" "C:\\NP21\\b.ini"',    # second ini
+                exe + '"/i' + ini + '" "C:\\NP21\\c.np21cfg"',
+                exe + '"/i' + ini + '" "' + FD + '" "' + FD + '"',  # two disks
+                exe + '"' + ini + '" "' + FD + '"',           # disk with positional ini
+                exe + '"/iC:\\NP21\\other.ini"',              # another ini
+                exe + '"/i' + ini + '" ' + FD,                # unquoted disk
+                '"C:\\NP21\\other.exe" "/i' + ini + '"'):     # another exe
+            with self.subTest(command=command), self.assertRaises(live.IniError):
+                live.identify([self.row(command)], TARGET)
+
+    def test_executor_forwards_launch_to_fixed_start(self):
+        t = Transport({'ok': True, 'value': 43})
+        with live.WindowsExecutor(TARGET, t) as ex:
+            self.assertEqual(ex.call('start', process=ROW, launch={'form': 'switch', 'fd': FD}), 43)
+        self.assertEqual(t.requests[0]['args']['launch'], {'form': 'switch', 'fd': FD})
+
+    def test_powershell_start_rebuilds_same_shape(self):
+        for fragment in ("$l.form -ceq 'switch'", """$arg = '"/i' + $target.ini + '"'""",
+                         "$l.form -ceq 'positional'", "$l.form -cne 'switch'",
+                         'CheckPath $l.fd', "$arg += ' \"' + $l.fd + '\"'", '$si.Arguments=$arg'):
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, live.PS_SERVER)
+
+    def test_launch_arguments_match_restart_text(self):
+        for launch in ({'form': 'switch', 'fd': None}, {'form': 'switch', 'fd': FD},
+                       {'form': 'positional', 'fd': None}):
+            with self.subTest(launch=launch):
+                self.assertEqual(live.launch_arguments(TARGET, launch), launch_text(launch))
+
+
 WINDOWS_FIXTURES = '--windows-fixtures' in sys.argv
 if WINDOWS_FIXTURES:
     sys.argv.remove('--windows-fixtures')
@@ -697,5 +828,120 @@ try {
 
 
 
+# ---------------------------------------------------------------------------
+# Mutants (--mutate), in the style of test_np21w_ctl.py: each mutant is a copy
+# of np21w_ini_live.py in a temporary directory (the real source is only read);
+# the whole suite runs against it and at least one case must fail (RED).
+# A copy that cannot be imported is NOT COUNTED. The identity control must stay GREEN.
+# ---------------------------------------------------------------------------
+SRC = Path(__file__).resolve().parents[1] / 'np21w_ini_live.py'
+IDENTITY = ("INI_SWITCH = '/i'  # exactly what np21w_ctl.py emits",
+            "INI_SWITCH = '/i'  # exactly what np21w_ctl.py emits (identity)",
+            'identity control (comment only; must stay GREEN)')
+MUTATIONS = [
+    ("    if token.startswith(INI_SWITCH):",
+     "    if token[:2].lower() in ('/i', '-i'):",
+     "accept '-i' / '/I' as the ctl switch"),
+    ("    launch_of(row['command'], target)\n",
+     "",
+     "identify no longer checks the command-line shape"),
+    ("        if form != 'switch' or not path_key(fd).endswith(FD_EXTENSIONS):",
+     "        if not path_key(fd).endswith(FD_EXTENSIONS):",
+     "accept a disk argument with the positional ini"),
+    ("        if form != 'switch' or not path_key(fd).endswith(FD_EXTENSIONS):",
+     "        if form != 'switch':",
+     "accept a CD / cfg / ini file as the disk argument"),
+    ("FD_EXTENSIONS = ('.d88', ",
+     "FD_EXTENSIONS = (",
+     "reject ctl's default os32_boot.d88"),
+    ("COMMAND_RE = re.compile(r'\"([^\"\\r\\n]+)\"[ \\t]+\"([^\"\\r\\n]+)\"(?:[ \\t]+\"([^\"\\r\\n]+)\")?[ \\t]*')",
+     "COMMAND_RE = re.compile(r'\"([^\"\\r\\n]+)\"[ \\t]+\"([^\"\\r\\n]+)\"(?:[ \\t]+\"([^\"\\r\\n]+)\")*[ \\t]*')",
+     "accept any number of disk arguments"),
+    ("                started = ex.call('start', process=process, launch=launch)",
+     "                started = ex.call('start', process=process, launch={'form': 'positional', 'fd': None})",
+     "restart always in the positional shape"),
+    ("                started = ex.call('start', process=process, launch=launch)",
+     "                started = ex.call('start', process=process, launch=dict(launch, fd=None))",
+     "restart drops the FD argument"),
+    ("                if launch_of(first['command'], self.target) != launch:",
+     "                if False:",
+     "do not compare the restarted shape"),
+    ("""     if ($l.form -ceq 'switch') { $arg = '"/i' + $target.ini + '"' }""",
+     """     if ($l.form -ceq 'switch') { $arg = '"' + $target.ini + '"' }""",
+     "PS start drops /i"),
+    ("      CheckPath $l.fd\n",
+     "",
+     "PS start does not check the disk path for reparse points"),
+    ("      if ($l.form -cne 'switch' -or $l.fd -isnot [string] -or",
+     "      if ($l.fd -isnot [string] -or",
+     "PS start accepts a disk with the positional shape"),
+    ("    text = ('\"' + INI_SWITCH if launch['form'] == 'switch' else '\"') + target['ini'] + '\"'",
+     "    text = '\"' + target['ini'] + '\"'",
+     "launch_arguments (restart text reserved by the receipt bound) drops /i"),
+    ("def launch_of(command, target)",
+     "def launch_of(command, target",
+     "syntax error: an unimportable copy is NOT COUNTED"),
+]
+
+
+def _load(path):
+    spec = importlib.util.spec_from_file_location('np21w_ini_live_mut', str(path))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _suite_failures(mod):
+    global live
+    saved = live
+    live = mod
+    try:
+        suite = unittest.defaultTestLoader.loadTestsFromModule(sys.modules[__name__])
+        res = unittest.TextTestRunner(stream=io.StringIO(), verbosity=0).run(suite)
+        return len(res.failures) + len(res.errors)
+    finally:
+        live = saved
+
+
+def mutate():
+    original = SRC.read_text(encoding='utf-8')
+    bad = red = green = uncounted = 0
+    with tempfile.TemporaryDirectory(prefix='np21w-ini-live-mut-') as tmp:
+        for i, (old, new, why) in enumerate([IDENTITY] + MUTATIONS):
+            if original.count(old) != 1:
+                print('MUTATION %d NOT APPLICABLE (%d matches): %s' % (i, original.count(old), why))
+                bad += 1
+                continue
+            path = Path(tmp) / ('mut%d.py' % i)
+            path.write_text(original.replace(old, new), encoding='utf-8')
+            try:
+                mod = _load(path)
+            except Exception as exc:
+                print('MUTATION %d NOT COUNTED (import: %s): %s' % (i, type(exc).__name__, why))
+                uncounted += 1
+                continue
+            fails = _suite_failures(mod)
+            if i == 0:
+                ok = fails == 0
+                print('IDENTITY %s (%d failed): %s' % ('GREEN' if ok else '**RED (harness broken)**', fails, why))
+                bad += not ok
+                continue
+            if fails:
+                red += 1
+                print('MUTATION %d RED (%d): %s' % (i, fails, why))
+            else:
+                green += 1
+                bad += 1
+                print('MUTATION %d **GREEN (missed)**: %s' % (i, why))
+    print('MUTATION SUMMARY red=%d green=%d not_counted=%d identity=1' % (red, green, uncounted))
+    return bad
+
+
 if __name__ == '__main__':
-    unittest.main()
+    do_mutate = '--mutate' in sys.argv
+    argv = [a for a in sys.argv if a != '--mutate']
+    prog = unittest.main(argv=argv, exit=False)
+    rc = 0 if prog.result.wasSuccessful() else 1
+    if do_mutate and rc == 0:
+        rc = 1 if mutate() else 0
+    sys.exit(rc)

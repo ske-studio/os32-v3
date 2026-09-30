@@ -157,10 +157,18 @@ taskkill は ini を書き戻さないので使わない)。使い捨て NHD は
   WSL Python 3 と Windows PowerShell 5.1/.NET Framework、CIM のプロセス情報参照、
   対象 PID の終了、ローカル NTFS の読書き・ACL 設定、Global mutex の権限が必要。
 - 対応ソースの `src/win9x/np2arg.cpp` (`Np2Arg::Parse`)、`ini.cpp`
-  (`initgetfile`)、`common/milstr.c` (`milstr_getarg`) を根拠に、現在サポートする
-  コマンド行は **`"C:\...\np21x64w.exe" "C:\...\selected.ini"` の 2 トークンだけ**。
-  両方が引用されたドライブ絶対パスであること。相対パス、暗黙設定、`-i`/`/i`、
-  追加引数、異なる引用形、UNC、デバイスパスは未対応として拒否する。
+  (`initgetfile`)、`common/milstr.c` (`milstr_getarg`)、`np2.cpp` (コマンド行の
+  ディスクを FDD1〜4 へ) を根拠に、現在サポートするコマンド行は次の **3 形だけ**
+  (各トークンは引用されたドライブ絶対パス、末尾の空白は無視):
+  1. `"C:\...\np21x64w.exe" "C:\...\selected.ini"` (位置引数の ini)
+  2. `"C:\...\np21x64w.exe" "/iC:\...\selected.ini"` (`tools/np21w_ctl.py start --ini`)
+  3. `"C:\...\np21x64w.exe" "/iC:\...\selected.ini" "C:\...\os32_boot.d88"`
+     (`start --ini --fd`。3 語目は FD イメージの拡張子 `.d88/.88d/.d98/.98d/.fdi/.nfd/.hdm/.img` だけ)
+  **再起動 (適用・restore とも) は止めたプロセスと同じ形で起動し直す** (FD 引数付きなら同じ FD 引数も付ける)。
+  起動後のコマンド行の形が元と違えば失敗にする。
+  NP21/W 自体は受け付けても未対応として拒否するもの: `-i`・`/I`・引用の無い `/i`、`/i` の 2 回、
+  相対パス、`/f` など他のスイッチ・未知の引数、CD / cfg / 2 つ目の ini、FD 引数 2 個、
+  位置引数の ini + FD、UNC、デバイスパス。
   別名 exe や設定探索を推測しない。同名/別 checkout を含め、NP2/NP21 系プロセスが
   複数あれば拒否する。選んだバイナリがこのソースに対応することは PM が確認する。
 - 操作者はプレビューから再起動確認まで利用を専有し、他の起動・設定編集を防ぐ。
@@ -212,7 +220,8 @@ ini.cppのinitload/initsave。bare起動時の既定ini導出と現在の選択�
 5. 同じディレクトリの一時ファイルを作成・flush・検証。プロセス不在と元の内容/識別情報を
    直前に再確認し、`File.Replace` で置換。全バイト読み戻し・不在再確認後、レシートを保存。
    reparse point は親要素を含め拒否し、読み込むファイルの hardlink も拒否する。
-6. 再起動前にも不在・スナップショットを比較。同じ exe と明示 ini で起動し、
+6. 再起動前にも不在・スナップショットを比較。同じ exe と明示 ini を、止めたプロセスと同じ形
+   (位置引数 / `/i`、FD 引数) で起動し、
    起動した PID が 1 秒以内に終了していないことと、CIM による同一対象の 2 回の確認を行う。
    作業ディレクトリは exe の親。対応ソースも起動時に `file_setcd(modulefile)` を実行する。
 

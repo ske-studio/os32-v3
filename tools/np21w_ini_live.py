@@ -70,12 +70,64 @@ def check_derived_paths(ini):
         path_key(path)
 
 
+# Accepted launch command lines (CIM Win32_Process.CommandLine), source basis:
+# np21w-src src/win9x/np2arg.cpp Np2Arg::Parse tokenizes GetCommandLine() with
+# common/milstr.c milstr_getarg (blank separated, '"' toggles quoting and is
+# removed). An argument starting with '/' or '-' is a switch keyed by its second
+# character, case-folded ('i' -> ini path = rest of the token, last one wins);
+# any other argument is classified by extension: .ini (and cfg variants) -> ini,
+# CD image extensions -> CD, everything else -> FDD 1..4 in order
+# (np2.cpp WinMain: diskdrv_readyfdd for each disk(i)). initgetfile (ini.cpp)
+# then uses that ini path. Only these three shapes are accepted:
+#   "<exe>" "<ini>"                 positional ini (operator/earlier launches)
+#   "<exe>" "/i<ini>"               tools/np21w_ctl.py start --ini
+#   "<exe>" "/i<ini>" "<fd image>"  tools/np21w_ctl.py start --ini --fd
+# ctl builds them with Start-Process -ArgumentList @('"/i<abs ini>"', '"<abs fd>"').
+# Every path is a quoted drive-absolute path; trailing blanks are insignificant.
+# Everything else is rejected even where NP21/W would accept it: '-i', '/I',
+# an unquoted '/i' token, a second '/i', relative paths, other switches such as
+# '/f', a CD/cfg argument, more than one disk, or a disk with the positional form.
+COMMAND_RE = re.compile(r'"([^"\r\n]+)"[ \t]+"([^"\r\n]+)"(?:[ \t]+"([^"\r\n]+)")?[ \t]*')
+INI_SWITCH = '/i'  # exactly what np21w_ctl.py emits
+# fddfile.c: d88/88d/d98/98d (D88), fdi, nfd; anything else is a raw/BETA image
+# (OS32 ships os32_boot.d88 and os32_boot144.img). Keeps cfg/CD extensions out.
+FD_EXTENSIONS = ('.d88', '.88d', '.d98', '.98d', '.fdi', '.nfd', '.hdm', '.img')
+
+
+def launch_of(command, target):
+    """Parse an accepted launch command line into {'form', 'fd'} or reject it."""
+    match = COMMAND_RE.fullmatch(command) if isinstance(command, str) else None
+    if not match or path_key(match[1]) != path_key(target['exe']):
+        raise IniError('unsupported or mismatched explicit process/config identity')
+    token, fd = match[2], match[3]
+    if token.startswith(INI_SWITCH):
+        form, ini = 'switch', token[len(INI_SWITCH):]
+    elif token[0] in '/-':
+        raise IniError('unsupported or mismatched explicit process/config identity')
+    else:
+        form, ini = 'positional', token
+    if path_key(ini) != path_key(target['ini']):
+        raise IniError('unsupported or mismatched explicit process/config identity')
+    if fd is not None:
+        if form != 'switch' or not path_key(fd).endswith(FD_EXTENSIONS):
+            raise IniError('unsupported or mismatched explicit process/config identity')
+    return {'form': form, 'fd': fd}
+
+
+def launch_arguments(target, launch):
+    """Arguments string the restart passes (same text the PS 'start' builds)."""
+    text = ('"' + INI_SWITCH if launch['form'] == 'switch' else '"') + target['ini'] + '"'
+    if launch['fd'] is not None:
+        text += ' "' + launch['fd'] + '"'
+    return text
+
+
 def identify(rows, target, pid=None):
     """Conservative: require exactly one NP21-family process on this host.
 
-    Supported source shape: two fully quoted absolute tokens, exe and positional
-    .ini. Np2Arg::Parse in src/win9x/np2arg.cpp accepts that explicit ini token.
-    Reject switches, implicit paths, additional args, and unfamiliar quoting.
+    The command line must be one of the launch shapes listed at COMMAND_RE,
+    naming this exe and this ini. Reject switches, implicit paths, additional
+    args, and unfamiliar quoting.
     """
     if not isinstance(rows, list):
         raise IniError('process query failed or malformed')
@@ -94,10 +146,8 @@ def identify(rows, target, pid=None):
     # Real CreateProcess command lines end with a trailing blank after the last
     # quoted token (measured 2026-09-09). milstr_getarg tokenizes on blanks, so
     # trailing whitespace is insignificant; anything else is still rejected.
-    match = re.fullmatch(r'"([^"\r\n]+)"[ \t]+"([^"\r\n]+)"[ \t]*', row['command'])
-    if (not match or path_key(row['exe']) != path_key(target['exe']) or
-            path_key(match[1]) != path_key(target['exe']) or
-            path_key(match[2]) != path_key(target['ini']) or
+    launch_of(row['command'], target)
+    if (path_key(row['exe']) != path_key(target['exe']) or
             (pid is not None and row['pid'] != pid)):
         raise IniError('unsupported or mismatched explicit process/config identity')
     return row
@@ -130,7 +180,8 @@ def receipt_size_bound(record):
     for key in ('original', 'applied'):
         metadata[key] = {'data': '', 'signature': ''}
     restarted = {'pid': PROCESS_ID_MAX, 'exe': record['target']['exe'],
-                 'command': '"' + record['target']['exe'] + '" "' + record['target']['ini'] + '"',
+                 'command': '"' + record['target']['exe'] + '" ' + launch_arguments(
+                     record['target'], launch_of(record['process']['command'], record['target'])),
                  'created': '0' * PROCESS_CREATED_LENGTH}
     metadata['process'] = max((record['process'], restarted),
                               key=lambda row: len(json.dumps(row, ensure_ascii=True)))
@@ -225,10 +276,14 @@ class Live:
                 absent()
                 if checked_snapshot(ex.call('snapshot')) != applied:
                     raise IniError('changed before restart; retain backup')
-                started = ex.call('start', process=process)
+                # Restart in the shape the stopped process was launched with.
+                launch = launch_of(process['command'], self.target)
+                started = ex.call('start', process=process, launch=launch)
                 first = query(started)
                 if query(started) != first:
                     raise IniError('restart identity unstable')
+                if launch_of(first['command'], self.target) != launch:
+                    raise IniError('restart launch shape changed')
                 result.update(applied=True, pid=started)
                 return result
             except IniError as exc:
@@ -392,7 +447,18 @@ try {
      $si = [Diagnostics.ProcessStartInfo]::new()
      $si.UseShellExecute=$false
      $si.FileName=$target.exe
-     $si.Arguments='"' + $target.ini + '"'
+     # Same launch shape as the stopped process (launch_of / launch_arguments).
+     $l = $a.launch
+     if ($l.form -ceq 'switch') { $arg = '"/i' + $target.ini + '"' }
+     elseif ($l.form -ceq 'positional') { $arg = '"' + $target.ini + '"' }
+     else { throw 'invalid launch' }
+     if ($null -ne $l.fd) {
+      if ($l.form -cne 'switch' -or $l.fd -isnot [string] -or
+          $l.fd -cnotmatch '^[A-Za-z]:\\[^"\r\n]+$') { throw 'invalid launch' }
+      CheckPath $l.fd
+      $arg += ' "' + $l.fd + '"'
+     }
+     $si.Arguments=$arg
      $si.WorkingDirectory=[IO.Path]::GetDirectoryName($target.exe)
      $p = [Diagnostics.Process]::Start($si)
      try {
