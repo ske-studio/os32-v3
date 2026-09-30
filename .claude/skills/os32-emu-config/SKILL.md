@@ -123,6 +123,10 @@ taskkill は ini を書き戻さないので使わない)。使い捨て NHD は
   transport kill fallback だけを維持する。cleanup で既存の wait 例外を隠さない。
 - `python3 -B tools/tests/test_np21w_transport.py -v` で実ローカル pipe と偽 process の
   timeout・通常 EOF・遅延 EOF・CLI failure JSON の stage/process 保持を検査する。
+  live の CLI は、`start` で孫を起動する無害なホスト子プロセスで「孫が stdout を継承すると
+  receipt / PID を出さず cleanup timeout、継承しなければ receipt と PID を出して rc=0」を検査する
+  (孫は 1.5 秒で自然に終わる。kill しない)。EOF 未到達を失敗とする不変条件は変えず、
+  直すのは起動側 (PS の `start` を ShellExecute に) である。
   実エミュレータ、CIM、実 ini を使わない。Windows parser 試験は PS 本文をデータとして
   ParseInput に渡すだけであり、実ライフサイクルの合格とは区別する。
 
@@ -196,6 +200,39 @@ python3 tools/np21w_ini_live.py restore --exe 'C:\NP21\np21x64w.exe' --ini 'C:\N
 ```
 
 変更なしは停止・保存をしない。正常終了 0、拒否/失敗 2。
+
+**起動の形** (2026-10-01〜): `powershell.exe -EncodedCommand` に載せるのは固定のブートストラップ (約 1,000 字) だけ。
+本文 (PS_SERVER) は stdin の 1 行目で渡し、ブートストラップに焼き込んだ SHA-256 と一致したときだけ dot-source で
+実行する (違えば出力なしで exit 3)。本文を直接載せる旧形式は、2cd1156 で Windows のコマンド行の上限 32,767 字を超え、
+`powershell.exe: Invalid argument` で全部失敗した。起動の段だけの確認は、不正な JSON を 1 行送る形で
+`python3 -B tools/tests/test_np21w_ini_live.py --windows-fixtures RealPowerShellFixture.test_bootstrap_runs_the_fixed_body_up_to_request_parse`
+(`{"ok":false,"step":"request:parse",…}` が返る。ini・CIM・プロセス・mutex に触れない)。
+
+**失敗の読み方** (2026-10-01〜): PS 側の失敗は
+`Windows operation failed: <op> [<op>:<段>[.<手順>] <例外の型> win32=<N> hresult=0x<8 桁>]` の形で出る。
+例外の文言・パス・内容は出さない (出るのは固定の段名・.NET の型名・数値だけ)。段の例:
+`snapshot:ini.open` (ini を開けない)、`replace:candidate.*` (一時ファイルの作成と読み戻し)、
+`replace:expected.*` (置換直前の再確認)、`replace:File.Replace`、`replace:readback.open|fileid|read|changed|compare`、
+`replace:identity` (候補と別のファイル)、`replace:receipt.backup.*` / `replace:receipt.json.*` (レシート)、
+`replace:absent.after`、`start:launch` / `start:alive`、`request:parse`。手順は
+`checkpath` (reparse の検査)・`open`・`fileid`・`size`・`read`・`changed` (読む間の変化)・`compare`・
+`create`・`write`・`verify`。`win32=32` / `33` は共有違反・ロック違反 (4 秒まで待った後)、`5` は拒否、
+`2` / `3` はファイル / パスが無い。`RuntimeException win32=5377 hresult=0x80131501` はツール自身の検査
+(`throw '...'`) が止めたもので、段名が理由を表す。角括弧が無いのは PS が診断を返さなかったか、
+形が固定の語彙から外れたので捨てたとき。
+`...fileid.links` / `...reread.links` は **ファイルに二つ目の名前 (ハードリンク) がある**ので拒否した、という意味。
+これは正しい拒否で、道具では緩めない。2026-10-01 の実例は Google Drive for Desktop の一時リンク
+`Documents\np21w\.tmp.driveupload\<番号>` だった (Documents が同期対象)。
+名前の一覧は `fsutil hardlink list <ini>` で見られる (読むだけ)。
+対処は環境の側で行う: Drive を一時停止または終了し、一時リンクが消えて一覧が ini 1 行だけになってから実行する。
+恒久的には NP21/W のフォルダを同期の対象から外す (Documents の外へ移すなら、ctl・ini のパスの変更は [D2])。
+`...fileid.handleinfo` は情報の取得そのものの失敗で、Win32 エラーが HResult (0x8007xxxx) に入る。
+**NP21/W が ini を開く時間帯**: 起動直後の `initload` (GetPrivateProfileString の短い open/close の連続) と
+通常終了の `initsave` だけ (fsrescfg の解像度別設定・一部のダイアログは別)。ツールの `stop` は強制終了なので
+終了時の書き込みは無い。起動直後に実行すると、こちらの `FileShare.Read` の open と NP21/W の読み込みが
+重なりうる (NP21/W 側の読み込みが失敗すると既定値で起動しうる)。**実行は `np21w_ctl.py start --wait-ready` が
+返ってから**にする。`OpenShared` の 4 秒の再試行は NP21/W の読み込みの合間を待つには足りるが、逆向き
+(こちらが開いている間の NP21/W の読み込み) は防げないので、待つ場所は起動側である。
 初回適用は明示 ini で起動中の対象が必要。復元は、記録済みの起動情報と
 成功した不在照会があれば、再起動失敗後の停止状態からも可能。
 
@@ -232,8 +269,12 @@ ini.cppのinitload/initsave。bare起動時の既定ini導出と現在の選択�
    検査 (親要素を含む) は試行のたびと open の成功後にやり直す。
 6. 再起動前にも不在・スナップショットを比較。同じ exe と明示 ini を、止めたプロセスと同じ形
    (位置引数 / `/i`、FD 引数) で起動し、
-   起動した PID が 1 秒以内に終了していないことと、CIM による同一対象の 2 回の確認を行う。
-   作業ディレクトリは exe の親。対応ソースも起動時に `file_setcd(modulefile)` を実行する。
+   起動した PID が 1 秒後に終了していないこと (`Start-Sleep` + `HasExited`) と、CIM による同一対象の
+   2 回の確認を行う。作業ディレクトリは exe の親。対応ソースも起動時に `file_setcd(modulefile)` を実行する。
+   起動は **`UseShellExecute=$true`・リダイレクト無し** (trial の F3 と同じ)。`$false` だと .NET は
+   `CreateProcess(bInheritHandles=TRUE)` で起動し、NP21/W が PS の stdout パイプを持ち続けるので
+   reader が EOF に届かず、ini の置換・レシート・再起動が済んでいても最後が必ず
+   `Windows executor cleanup timeout` になっていた (2026-10-01、PM の実プロセス)。
 
 失敗時は自動巻き戻し・追加の起動をしない。置換後の失敗にはバックアップ ID を付ける。
 `replace` が成功した後の失敗は `receipt ID for restore: <ID>` — レシートがあり、停止状態のまま

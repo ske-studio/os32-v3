@@ -187,6 +187,98 @@ class TransportCleanup(unittest.TestCase):
                     self.assertFalse(channel.reader.is_alive())
                     self.assertTrue(process.stdout.closed)
 
+    def test_live_cli_restart_success_depends_on_launcher_not_passing_the_pipe(self):
+        """Reproduces the 2026-10-01 live symptom on host pipes, no PowerShell.
+
+        A benign host Python child stands in for the PS server: on 'start' it
+        launches a short-lived grandchild (sleep 1.5 s, then exits by itself;
+        never killed) with stdout inherited (UseShellExecute=$false) or not
+        (ShellExecute). The lifecycle stays the synthetic Fake of
+        test_np21w_ini_live; only 'start' and close() cross the real pipe.
+        Inherited: the ini work is done but the CLI reports only the cleanup
+        timeout (exit 2, no receipt / PID). Not inherited: exit 0 with both."""
+        from contextlib import redirect_stderr
+        from test_np21w_ini_live import Fake, TARGET
+        popen = subprocess.Popen
+        for inherit in (True, False):
+            with self.subTest(inherit=inherit):
+                script = (
+                    'import subprocess,sys\n'
+                    'sys.stdin.readline()  # the bootstrap body line\n'
+                    'for line in sys.stdin:\n'
+                    '    subprocess.Popen([sys.executable, "-B", "-c", "import time; time.sleep(1.5)"],\n'
+                    '                     stdin=subprocess.DEVNULL, stderr=subprocess.DEVNULL,\n'
+                    '                     stdout=' + ('None' if inherit else 'subprocess.DEVNULL') + ')\n'
+                    '    print(\'{"ok":true,"value":43}\', flush=True)\n')
+                process = popen([sys.executable, '-B', '-c', script], stdin=subprocess.PIPE,
+                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                with patch('subprocess.Popen', return_value=process):
+                    channel = live.PowerShellTransport()
+                class Launcher(Fake):
+                    def call(self, op, **args):
+                        value = super().call(op, **args)
+                        if op == 'start':
+                            self.started = channel.exchange({'op': 'start'})
+                        return value
+                    def __exit__(self, *exc):
+                        super().__exit__(*exc)
+                        channel.close()
+                fakes = []
+                def factory(target):
+                    fakes.append(Launcher())
+                    return fakes[-1]
+                out, err, codes = io.StringIO(), io.StringIO(), []
+                def run():
+                    with redirect_stdout(out), redirect_stderr(err):
+                        codes.append(live.main(['ram-8mb', '--exe', TARGET['exe'], '--ini', TARGET['ini'],
+                                                '--live-apply', '--exclusive-operator'], factory))
+                runner = threading.Thread(target=run, daemon=True)
+                try:
+                    runner.start()
+                    runner.join(timeout=4)
+                    self.assertFalse(runner.is_alive(), 'CLI exceeded the bounded cleanup')
+                    self.assertEqual(fakes[0].started, {'ok': True, 'value': 43})
+                    self.assertEqual(fakes[0].calls[-3:], ['query', 'query', 'close'])
+                    self.assertEqual(process.returncode, 0, 'child exits on stdin EOF, never killed')
+                    if inherit:
+                        self.assertEqual(codes, [2])
+                        self.assertIn('Windows executor cleanup timeout', err.getvalue())
+                        self.assertNotIn('receipt:', out.getvalue())
+                        self.assertNotIn('verified process PID:', out.getvalue())
+                    else:
+                        self.assertEqual(codes, [0], err.getvalue())
+                        self.assertEqual(err.getvalue(), '')
+                        self.assertIn('EXMEMORY: 16 -> 7', out.getvalue())
+                        self.assertIn('receipt: ' + 'a' * 32, out.getvalue())
+                        self.assertIn('verified process PID: 43', out.getvalue())
+                        self.assertTrue(process.stdout.closed)
+                finally:
+                    if process.poll() is None:
+                        process.kill()  # Test-owned benign child only.
+                    process.wait(timeout=2)
+                    # The grandchild exits by itself; its EOF lets the reader finish.
+                    channel.reader.join(timeout=3)
+                    runner.join(timeout=2)
+                self.assertFalse(channel.reader.is_alive())
+                self.assertTrue(process.stdout.closed)
+
+    def test_trial_transport_also_uses_the_stdin_bootstrap(self):
+        # trial reuses live's __init__ with its own PS_SERVER (29176 encoded
+        # characters in the old form, also close to the 32767 limit).
+        import base64
+        read_fd, write_fd = os.pipe()
+        process = Mock(stdin=Mock(), stdout=os.fdopen(read_fd, 'rb'))
+        try:
+            with patch('subprocess.Popen', return_value=process) as popen:
+                channel = trial.PowerShellTransport()
+            body = trial.PS_SERVER.encode('utf-8')
+            self.assertEqual(popen.call_args[0][0], live.bootstrap_argv(body)[0])
+            self.assertLess(len(subprocess.list2cmdline(popen.call_args[0][0])), 8192)
+            self.assertEqual(process.stdin.write.call_args_list[0][0][0], base64.b64encode(body) + b'\n')
+        finally:
+            os.close(write_fd)
+            channel.reader.join(timeout=2)
+
     def test_trial_cli_timeout_preserves_failure_json_and_completed_stages(self):
         from test_np21w_trial import Transport, EXE, BASE, CWD, CREATED, HDD, image_fixture
         images = image_fixture()

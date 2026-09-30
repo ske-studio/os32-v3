@@ -562,3 +562,160 @@ PS 側 (試行ごとの `CheckPath`・open 後の `CheckPath`・期限・`FileKe
 PS 5.1 での実行・構文解析は今回も行っていない。共有違反の実例外、`OpenShared` の待機と期限、`FileKey` の照合、
 `receipt.json` の実シリアライズ (`applied` の上書き)、読み戻しの失敗、試行中の差し替え (別ファイル・シンボリックリンク) は
 Windows 上で再現していない。
+
+## 実適用・restore が成功しても最後に cleanup timeout (2026-10-01)
+
+**症状** (PM の実プロセス): `ram-8mb --live-apply --exclusive-operator` で ini は置換、`receipt.json` も
+作られ、NP21/W は再起動して 8MB で動いていたのに、出力は `error: Windows executor cleanup timeout;
+inspect process state` だけ (`receipt:` / `verified process PID:` が出ない)。`restore` も同じ。プレビューは正常。
+
+**原因**: PS の `'start'` が `UseShellExecute=$false` で NP21/W を起動していた。.NET Framework はこの経路で
+`CreateProcess(bInheritHandles=TRUE)` を呼ぶので、NP21/W が PS の stdout パイプ (継承可能なハンドル) を持ち続ける。
+PS は stdin の EOF で終わる (`wait` は成功) が、reader は EOF に届かず、`_close_reader()` の 0.1 秒の
+bounded join が失敗して `IniError` (`PowerShellTransport._close_reader`、np21w_ini_live.py の旧 626 行) になる。
+`Live.run` は成功を返し終えているが、`with self.executor` の `__exit__` で投げられるので CLI には失敗だけが出る。
+NP21/W を起動しないプレビューでは起きない。trial は同じ原因を 2026-09-14 (実走 F3、`np21w_trial_tdd.md` 追記 6)
+に ShellExecute で直していたが、live には入っていなかった。
+
+**直し方** (`'start'` だけ、trial と同じ形): `$si.UseShellExecute=$true`、リダイレクト無し。exe・引数
+(`"/i<ini>"` / 位置引数、FD)・作業ディレクトリは不変。ShellExecute では `$p.Handle` が取れないことがあるので
+`$p` が無ければ失敗、PID (`$p.Id`) を要にし、生存確認は `Start-Sleep -Milliseconds 1000` + `$p.HasExited`
+(`WaitForExit(1000)` はやめた)。PID から先の照合 (CIM の exe / コマンド行の形 / 生成時刻を 2 回) は Python 側で不変。
+**変えないもの**: EOF 未到達・wait timeout を失敗とする transport の不変条件、live の kill fallback、
+kill / retry を足さないこと、成功の判定が PS の応答であること。
+
+**RED** (`python3 -B tools/tests/test_np21w_ini_live.py`、修正前): 71 tests, failures=2, skipped=1 —
+新試験 `test_powershell_start_does_not_hand_the_transport_pipe_to_the_emulator` (ShellExecute・リダイレクト無し・
+`$p` の検査 → `$p.Id` → 1 秒 → `HasExited` → `$value` の順) と、`$false` を要求していた既存の断片を `$true` に
+改めた `test_powershell_atomic_backup_identity_and_start_contract`。**GREEN**: 71 tests OK (skipped=1)。
+
+**再現** (`test_np21w_transport.py` の `test_live_cli_restart_success_depends_on_launcher_not_passing_the_pipe`):
+PS の代わりの無害なホスト Python 子が `start` で孫 (1.5 秒 sleep、kill しない) を起動し、継承あり / 無しで
+live の CLI 全体 (合成の Fake 経由のライフサイクル、`start` と close だけ実 pipe) を回す。継承ありで
+rc=2・`cleanup timeout`・`receipt:` / `verified process PID:` 無し (= PM の症状)、継承無しで rc=0 と両方の行。
+Python 側は変えていないので**この試験は最初から GREEN** (特性の固定であって、修正の RED ではない)。
+
+変異: 追加 5 本 (`$false` に戻す、`RedirectStandardOutput` を足す、`HasExited` の検査を消す、`$null` の検査を消す、
+1 秒の待ちを消す) を含め 39 本すべて RED、恒等 GREEN、構文 1 本 NOT COUNTED。5 本は PS 本文の静的検査で検出する
+だけ。PS 5.1 の ParseInput (データとして渡すだけ、ファイル・プロセス操作なし) で PS_SERVER の構文解析は通った。
+
+**未確認** [V4]: ShellExecute で起動した NP21/W が実際にパイプを継承しないこと、`HasExited` / `Id` が実プロセスで
+期待どおりに取れること、CIM の CommandLine が従来の照合 (末尾空白の許容) で通ること — trial の実走では
+同じ形が通っているが、live での実プロセス確認は PM 待ち。
+
+## 実走の段ごとの失敗を読むための診断 (2026-10-01、5793c75 の後)
+
+**経緯** (PM の実プロセス、`wt/inicleanup`): 1 回目は `replace` が失敗 (ini は置換済み・`receipt.json` 無し)、
+2 回目は止める前の `snapshot` が失敗。03:40 の main (4233715) では同じ操作が replace とレシートまで通った。
+PS は例外文を出さないので何が落ちたか分からなかった。
+
+**変更**:
+- PS: `$Op` (既知の操作名だけ、他は `request`)・`Step` (段)・`Detail` (手順) を固定の文字列で記録し、
+  catch は `FailureJson` で `{"ok":false,"step":"<op>:<段>[.<手順>]","type":"<最内の例外の型名>",
+  "win32":<HResult の下位 16 ビット>,"hresult":"0x<8 桁>"}` を返す (candidate-identity のときは `reason` も)。
+  例外の Message は candidate-identity との比較にだけ使い、写さない。整形自体が失敗したら従来の `{"ok":false}`。
+- Python: `failure_detail()` が固定の 4 項目 (+ `reason`) だけを受け、全項目が型・正規表現・`hresult` と
+  `win32` の整合に合うときだけ ` [step type win32=N hresult=0x...]` を失敗の文言に足す。余分な項目や外れた値は
+  捨てる (文言は従来どおり、何も写さない)。candidate-identity は診断つきでも認識する。
+
+**RED/GREEN の順序について**: この節は実装を先に書き、既存の試験 3 件が落ちたのを見て (旧 catch 行の断片・
+`CheckPath` の断片・candidate-identity の応答の形) 直し、その後に新しい試験を足した。新試験の RED は取っていない。
+代わりに変異 10 本 (下) で新試験が実装の各部を検出することを確かめた。
+
+**試験** (`FailureDiagnosis` 6 件 + opt-in 1 件): 正しい診断が文言に入る (snapshot / replace / candidate-identity)、
+余分な項目 (message)・パス入りの段・長すぎる段・空白入りの型・bool / 範囲外 / 文字列の win32・hresult と食い違う win32・
+余計な語のある hresult・欠けた項目は捨てられて素の文言になる、CLI の stderr に出る、PS のすべての `Step` / `Detail` の
+文字列が Python の正規表現に収まる、`replace` と `OpenShared` / `Snapshot` / `WriteReceipt` の段の順序、
+`FailureJson` が Message を写さないこと。
+opt-in `--windows-fixtures` の `test_failure_json_runs_under_windows_powershell` は PS_SERVER から `Step` / `Detail` /
+`FailureJson` だけを抜き出して **PS 5.1 で実行** (合成の例外だけ。ファイル・CIM・プロセス・ini に触らない):
+IOException(0x80070020) → `snapshot:ini.open IOException win32=32`、`[Convert]::FromBase64String` の失敗 →
+最内の `FormatException win32=5431 hresult=0x80131537`、`throw '...'` → `RuntimeException win32=5377
+hresult=0x80131501` (最初は 0x80131500 と見込んで外れ、実測で直した)。出力に例外文 (`secret`) が無いことも見る。
+全体の PS_SERVER は PS 5.1 の ParseInput で構文解析が通った (実行はしていない)。
+
+変異: 追加 10 本 (Message を写す、最内をたどらない、整形の失敗の受け皿が無い、`Detail 'open'` / `Step 'File.Replace'` /
+`Step 'readback'` を消す、Python が任意の段を通す・win32 と hresult の食い違いを通す・余分な項目を通す・診断を
+文言に入れない)、段名が入って形の変わった既存 4 本を追従。計 49 本すべて RED、恒等 GREEN、構文 1 本 NOT COUNTED。
+
+**PS 5.1 の観点での静的な見直し** (`OpenShared`・`FileKey`・`NewFile` の戻り値・`start`): 問題は見つからなかった。
+- 関数の戻り値への漏れ: `CheckPath`・`Step`・`Detail` は代入だけ、`NewFile` 内の `SetAccessRuleProtection` /
+  `AddAccessRule` / `Write` / `Flush` は void、`backup` と `WriteReceipt` の `NewFile` は `$null =`、`[void]CreateDirectory`。
+  `OpenShared` は FileStream (列挙されない) を返す。
+- API: `Exception.HResult` の getter は .NET 4.5 で public (PS 5.1 の前提)、`FileStream(path, mode, FileSystemRights, share,
+  size, options, FileSecurity)` と `Flush(bool)` は .NET Framework 4.x にある (Core には無い)、`-notin` / `-cin` は PS 3 以降。
+  `[Math]::Min(250, $left)` は long 同士に解決される。
+- 1 要素の配列: 応答の配列は `@(Query)`、件数は `@(Query).Count`。受け取った `record.diff` は ConvertFrom-Json の配列のまま
+  ConvertTo-Json に渡る。
+- `start`: ShellExecute の `Process.Start` は `hProcess` を持つので `Id` / `HasExited` は使える (trial で実績)。
+  `$null` の検査を足してある。
+**分からないままのこと**: 1 回目・2 回目の失敗の実体 (共有違反・拒否・読む間の変化など)。この版で再現すれば角括弧の中に出る。
+NP21/W が ini を開く時間帯 (np21w-src `win9x/np2.cpp` の `initload` / `initsave`、`win9x/ini.cpp` の
+GetPrivateProfileString) の検討はスキルの「失敗の読み方」に書いた — 起動直後は重なりうるので `--wait-ready` の後に実行する。
+GetPrivateProfileString が開くときの共有モードは確かめていない。
+
+## PS 本文を stdin で渡す (2026-10-01、2cd1156 の後)
+
+**症状と原因** (PM の実測で確定): 2cd1156 はプレビューから `Windows executor failed` (角括弧なし) で止まった。
+PS_SERVER を `-EncodedCommand` に載せる形では、コマンド行が 4233715 の 26,550 字 → 5793c75 の 28,242 字 → 2cd1156 の
+**33,154 字**と伸び、Windows の上限 32,767 字を超えていた。PM の確認: 不正な JSON を 1 行送る形で、4233715 は rc=0・
+`{"ok":false}`、2cd1156 は rc=1・stdout 空・stderr `powershell.exe: Invalid argument`。ParseInput の試験は本文を
+stdin で渡していたので、この上限を通らず見逃した。trial (同じ `__init__` を使う) も旧形式で 29,176 字だった。
+
+**直し方**: `-EncodedCommand` に載せるのは固定の 5 行のブートストラップ (`PS_BOOTSTRAP`) だけにした。
+ブートストラップは stdin の 1 行目を base64 として読み、SHA-256 をブートストラップに焼き込んだ値と照合する。
+焼き込む値は `bootstrap_argv(body)` が決まった本文 (live / trial それぞれの PS_SERVER) から作る。
+一致しなければ何も出さずに `exit 3`、一致すれば本文を **dot-source** する (`& ` だと子スコープになり、`$script:Phase`
+と本文の最上位の `$Phase` が別の変数に分かれる)。`PowerShellTransport.__init__` は reader を起動してから本文の行を
+最初に書く。起動の前に、コマンド行が `COMMAND_LINE_BUDGET` = 8,192 字未満であることを検査する (超えれば起動しない)。
+実測: ブートストラップのコマンド行は live・trial とも **998 字**、本文の行は live 16,545 字・trial 15,413 字。
+本文の長さに上限は無い (stdin の 1 行)。
+**変えないもの**: 要求と応答の規約、ロック、失敗時にセッションを閉じること、transport の cleanup の不変条件、kill しないこと。
+
+**試験** (`StdinBootstrap` 5 件 + transport 側の trial 1 件):
+- コマンド行が 8,192 字未満。本文が 1 B でも 1 MB でも長さは同じ。本文の行は base64 + 改行 1 つ。
+- 旧形式ではコマンド行が上限を超える (経緯の固定)。
+- ブートストラップ本文の 5 行を完全一致で固定 (digest の照合、`exit 3`、dot-source)。本文が違えば digest も違う。
+- 予算を超えれば Popen の前に IniError。
+- 起動の argv がブートストラップであること、stdin への最初の書き込みが本文の行であること (live・trial)。
+
+**Windows (opt-in `--windows-fixtures`、PM が許可した形だけ)**:
+- `test_bootstrap_runs_the_fixed_body_up_to_request_parse`: 本物の `PowerShellTransport` で起動し、不正な JSON を 1 行だけ送る。
+  結果は `{"ok":false,"step":"request:parse","win32":87,"hresult":"0x80070057","type":"ArgumentException"}`、PS の rc=0。
+  ini・CIM・プロセス・mutex には触れない。Add-Type のコンパイルは Windows の一時フォルダを使う。
+- `test_bootstrap_refuses_any_other_body`: digest の違う本文では rc=3・出力なし。本文は実行されない。
+- 既存の `test_failure_json_runs_under_windows_powershell` も GREEN。ファイルを書く既存の `test_parser_null_marshaling_and_file_replace` は今回回していない。
+- trial の本文は Windows で起動していない。
+
+**順序**: 実装が先で、試験は後から書いた (RED は取っていない)。変異 5 本 (digest 照合を消す、`&` にする、本文を送らない、
+予算検査を消す、trial でも live の digest を焼く) はすべて RED。計 54 本 RED、恒等 GREEN、構文 1 本 NOT COUNTED。
+
+## `snapshot:ini.fileid` の正体 — Google Drive の二つ目のハードリンク (2026-10-01、700b0b6 の後)
+
+**症状**: プレビューも適用も、止める前の段で
+`[snapshot:ini.fileid Exception win32=5376 hresult=0x80131500]` になった。`fileid` の中で素の `Exception` を投げる
+のは C# `FileIdentity.Read` の 1 か所だけで、`GetFileInformationByHandle` の失敗と `NumberOfLinks != 1` の
+両方が同じ例外になっていた (属性の reparse 検査は `checkpath`、volume の取得は別の検査ではなかった)。
+
+**読むだけの確認** (PM の許可、書き込み・プロセス・CIM・mutex には触れない):
+`C:\Users\hight\Documents\np21w\np21x64w.ini` を共有読みで開いて `GetFileInformationByHandle` を呼んだ結果は、
+呼び出し成功、attrs=0x20 (Archive)、**NumberOfLinks=2**、volume=3132786568、index=1769472:1300734。
+Get-Item の LinkType も HardLink だった。`FindFirstFileNameW` で名前を列挙すると、二つ目は
+**`C:\Users\hight\Documents\np21w\.tmp.driveupload\33702`** で、Google Drive for Desktop のアップロード用の一時リンクだった。
+Documents が Drive に同期されているので、ini が変わるたびに Drive が一時リンクを作り、アップロードの間それが残る。
+結果が回ごとに違ったこと (03:40 は通った、置換直後の `replace` の失敗、`snapshot` の失敗) はこれで説明がつく。
+ただし過去の各回を個別に確かめてはいない。
+
+**判断**: 二つ目の名前がある間は拒否するのが正しい (別のパスから同じバイト列が書き換えられうる)。道具では緩めない。
+直すのは環境の側 (スキルの「失敗の読み方」)。
+
+**変更 (診断だけ)**: C# は `FileIdentity.Get` (API の失敗は Win32 エラーの例外 = HResult 0x8007xxxx) と
+`FileIdentity.Signature` に分けた。PS の `Identity($f, $label)` が `<label>.handleinfo` → `<label>.links`
+(`throw 'hardlink'`) → `<label>.signature` の順に Detail を付ける。`Snapshot` は読む前に `fileid`、読んだ後に
+`reread` を付ける。修正後のコードの抜き出し (Add-Type・Step/Detail/FailureJson・CheckPath/OpenShared/Identity/Snapshot) で
+実 ini を読むだけの 1 回を実行し、`[snapshot:ini.fileid.links RuntimeException win32=5377 hresult=0x80131501]` を確認した
+(この実行は試験に入れていない。実 ini の状態に依存するため)。
+
+**試験**: `test_ps_identity_names_each_check` (順序、`GetExceptionForHR`、`FileIdentity]::Read(` が残っていないこと、
+全組み合わせの段名が Python の正規表現に収まること)。`Snapshot` の順序試験も追従した。
+変異は 3 本足した (links の拒否を消す、`.links` の Detail を消す、読んだ後の再取得をやめる)。計 57 本 RED、恒等 GREEN。
