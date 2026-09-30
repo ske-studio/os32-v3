@@ -689,3 +689,33 @@ stdin で渡していたので、この上限を通らず見逃した。trial (�
 
 **順序**: 実装が先で、試験は後から書いた (RED は取っていない)。変異 5 本 (digest 照合を消す、`&` にする、本文を送らない、
 予算検査を消す、trial でも live の digest を焼く) はすべて RED。計 54 本 RED、恒等 GREEN、構文 1 本 NOT COUNTED。
+
+## `snapshot:ini.fileid` の正体 — Google Drive の二つ目のハードリンク (2026-10-01、700b0b6 の後)
+
+**症状**: プレビューも適用も、止める前の段で
+`[snapshot:ini.fileid Exception win32=5376 hresult=0x80131500]` になった。`fileid` の中で素の `Exception` を投げる
+のは C# `FileIdentity.Read` の 1 か所だけで、`GetFileInformationByHandle` の失敗と `NumberOfLinks != 1` の
+両方が同じ例外になっていた (属性の reparse 検査は `checkpath`、volume の取得は別の検査ではなかった)。
+
+**読むだけの確認** (PM の許可、書き込み・プロセス・CIM・mutex には触れない):
+`C:\Users\hight\Documents\np21w\np21x64w.ini` を共有読みで開いて `GetFileInformationByHandle` を呼んだ結果は、
+呼び出し成功、attrs=0x20 (Archive)、**NumberOfLinks=2**、volume=3132786568、index=1769472:1300734。
+Get-Item の LinkType も HardLink だった。`FindFirstFileNameW` で名前を列挙すると、二つ目は
+**`C:\Users\hight\Documents\np21w\.tmp.driveupload\33702`** で、Google Drive for Desktop のアップロード用の一時リンクだった。
+Documents が Drive に同期されているので、ini が変わるたびに Drive が一時リンクを作り、アップロードの間それが残る。
+結果が回ごとに違ったこと (03:40 は通った、置換直後の `replace` の失敗、`snapshot` の失敗) はこれで説明がつく。
+ただし過去の各回を個別に確かめてはいない。
+
+**判断**: 二つ目の名前がある間は拒否するのが正しい (別のパスから同じバイト列が書き換えられうる)。道具では緩めない。
+直すのは環境の側 (スキルの「失敗の読み方」)。
+
+**変更 (診断だけ)**: C# は `FileIdentity.Get` (API の失敗は Win32 エラーの例外 = HResult 0x8007xxxx) と
+`FileIdentity.Signature` に分けた。PS の `Identity($f, $label)` が `<label>.handleinfo` → `<label>.links`
+(`throw 'hardlink'`) → `<label>.signature` の順に Detail を付ける。`Snapshot` は読む前に `fileid`、読んだ後に
+`reread` を付ける。修正後のコードの抜き出し (Add-Type・Step/Detail/FailureJson・CheckPath/OpenShared/Identity/Snapshot) で
+実 ini を読むだけの 1 回を実行し、`[snapshot:ini.fileid.links RuntimeException win32=5377 hresult=0x80131501]` を確認した
+(この実行は試験に入れていない。実 ini の状態に依存するため)。
+
+**試験**: `test_ps_identity_names_each_check` (順序、`GetExceptionForHR`、`FileIdentity]::Read(` が残っていないこと、
+全組み合わせの段名が Python の正規表現に収まること)。`Snapshot` の順序試験も追従した。
+変異は 3 本足した (links の拒否を消す、`.links` の Detail を消す、読んだ後の再取得をやめる)。計 57 本 RED、恒等 GREEN。

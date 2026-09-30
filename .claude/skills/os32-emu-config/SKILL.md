@@ -220,6 +220,13 @@ python3 tools/np21w_ini_live.py restore --exe 'C:\NP21\np21x64w.exe' --ini 'C:\N
 `2` / `3` はファイル / パスが無い。`RuntimeException win32=5377 hresult=0x80131501` はツール自身の検査
 (`throw '...'`) が止めたもので、段名が理由を表す。角括弧が無いのは PS が診断を返さなかったか、
 形が固定の語彙から外れたので捨てたとき。
+`...fileid.links` / `...reread.links` は **ファイルに二つ目の名前 (ハードリンク) がある**ので拒否した、という意味。
+これは正しい拒否で、道具では緩めない。2026-10-01 の実例は Google Drive for Desktop の一時リンク
+`Documents\np21w\.tmp.driveupload\<番号>` だった (Documents が同期対象)。
+名前の一覧は `fsutil hardlink list <ini>` で見られる (読むだけ)。
+対処は環境の側で行う: Drive を一時停止または終了し、一時リンクが消えて一覧が ini 1 行だけになってから実行する。
+恒久的には NP21/W のフォルダを同期の対象から外す (Documents の外へ移すなら、ctl・ini のパスの変更は [D2])。
+`...fileid.handleinfo` は情報の取得そのものの失敗で、Win32 エラーが HResult (0x8007xxxx) に入る。
 **NP21/W が ini を開く時間帯**: 起動直後の `initload` (GetPrivateProfileString の短い open/close の連続) と
 通常終了の `initsave` だけ (fsrescfg の解像度別設定・一部のダイアログは別)。ツールの `stop` は強制終了なので
 終了時の書き込みは無い。起動直後に実行すると、こちらの `FileShare.Read` の open と NP21/W の読み込みが

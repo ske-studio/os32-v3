@@ -28,7 +28,7 @@ RAM_8MB = RAW.replace(b'ExMemory=16', b'ExMemory=7')
 FD = r'C:\NP21\os32_boot.d88'
 CTL_COMMAND = '"' + TARGET['exe'] + '" "/i' + TARGET['ini'] + '" '
 CTL_FD_COMMAND = '"' + TARGET['exe'] + '" "/i' + TARGET['ini'] + '" "' + FD + '" '
-# FileIdentity.Read: Volume:IndexHigh:IndexLow:Creation:Write:SizeHigh:SizeLow.
+# FileIdentity.Signature: Volume:IndexHigh:IndexLow:Creation:Write:SizeHigh:SizeLow.
 # ReplaceFile keeps the replacement (candidate) file's volume/index.
 CANDIDATE_KEY = '1:0:2'
 REPLACED_SIG = CANDIDATE_KEY + ':3:4:0:5'
@@ -1151,11 +1151,32 @@ class FailureDiagnosis(unittest.TestCase):
         self.assertLess(opener.index("Detail 'open'"), opener.index('[IO.File]::Open('))
         snapshot = ReviewRetryRaces.function(self, 'Snapshot')
         order = [snapshot.index(fragment) for fragment in (
-            "Detail 'fileid'", "Detail 'size'", "Detail 'read'", '$f.CopyTo($mem)', "Detail 'changed'")]
+            "$sig = Identity $f 'fileid'", "Detail 'size'", "Detail 'read'", '$f.CopyTo($mem)',
+            "$again = Identity $f 'reread'", "Detail 'changed'", 'if ($again -cne $sig)')]
         self.assertEqual(order, sorted(order))
         receipt = ReviewRetryRaces.function(self, 'WriteReceipt')
         self.assertLess(receipt.index("Step 'receipt.backup'"), receipt.index("Step 'receipt.json'"))
         self.assertIn("'snapshot' { Step 'ini'; $value = Snapshot $target.ini }", live.PS_SERVER)
+
+    def test_ps_identity_names_each_check(self):
+        """2026-10-01: 'snapshot:ini.fileid Exception' could be the API call or
+        the hardlink refusal (it was the link: Google Drive's upload staging).
+        Each check now has its own detail; a failed API call carries its
+        Win32 error as the HResult."""
+        identity = ReviewRetryRaces.function(self, 'Identity')
+        order = [identity.index(fragment) for fragment in (
+            "Detail ($label + '.handleinfo')", '$i = [FileIdentity]::Get($f.SafeFileHandle)',
+            "Detail ($label + '.links')", "if ($i.NumberOfLinks -ne 1) { throw 'hardlink' }",
+            "Detail ($label + '.signature')", 'return [FileIdentity]::Signature($i)')]
+        self.assertEqual(order, sorted(order))
+        self.assertIn('throw Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error());', live.PS_SERVER)
+        self.assertNotIn('[FileIdentity]::Read(', live.PS_SERVER)
+        for op, phase in (('snapshot', 'ini'), ('replace', 'receipt.backup'), ('replace', 'receipt.json'),
+                          ('load', 'backup')):
+            for label in ('fileid', 'reread'):
+                for check in ('handleinfo', 'links', 'signature'):
+                    step = op + ':' + phase + '.' + label + '.' + check
+                    self.assertTrue(len(step) <= 64 and live.FAILURE_STEP_RE.fullmatch(step), step)
 
     def test_ps_failure_json_carries_no_message_text(self):
         failure = ReviewRetryRaces.function(self, 'FailureJson')
@@ -1541,6 +1562,16 @@ MUTATIONS = [
     ("    digest = hashlib.sha256(body).hexdigest().upper()",
      "    digest = hashlib.sha256(PS_SERVER.encode('utf-8')).hexdigest().upper()",
      "digest baked from live's body even for trial's"),
+    # 2026-10-01: fileid split (the real failure was a second hard link).
+    (" if ($i.NumberOfLinks -ne 1) { throw 'hardlink' }\n",
+     "",
+     "PS accepts a file with a second hard link"),
+    (" Detail ($label + '.links')\n",
+     "",
+     "PS reports the hardlink refusal as the API call"),
+    ("   $again = Identity $f 'reread'\n",
+     "   $again = $sig\n",
+     "PS does not re-read the identity after reading the bytes"),
     ("def launch_of(command, target)",
      "def launch_of(command, target",
      "syntax error: an unimportable copy is NOT COUNTED"),

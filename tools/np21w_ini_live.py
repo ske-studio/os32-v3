@@ -40,7 +40,7 @@ OPERATIONS = {'cirrus-on': {'USEGD5430': 'true', 'GD5430TYPE': '91'},
               'ram-15mb': {'EXMEMORY': '16'},
               'ram-32mb': {'EXMEMORY': '33'},
               'ram-128mb': {'EXMEMORY': '129'}}
-SIGNATURE_LIMIT = 256  # FileIdentity.Read: seven decimal integers + separators.
+SIGNATURE_LIMIT = 256  # FileIdentity.Signature: seven decimal integers + separators.
 SIGNATURE_JSON_BYTES = 12 * SIGNATURE_LIMIT  # Escaped UTF-16 surrogate pair per character.
 PROCESS_ID_MAX = 2147483647  # Query casts ProcessId to signed Int32.
 PROCESS_CREATED_LENGTH = 28  # Query: UTC DateTime.ToString('o').
@@ -183,7 +183,7 @@ def failure_detail(response):
 
 
 def file_key(signature):
-    """Volume:IndexHigh:IndexLow of a FileIdentity.Read signature.
+    """Volume:IndexHigh:IndexLow of a FileIdentity.Signature signature.
 
     ReplaceFile leaves the replacement (candidate) file's volume/index on the
     target name, so the post-replace readback must carry the candidate's key.
@@ -369,9 +369,13 @@ public static class FileIdentity {
  }
  [DllImport("kernel32.dll", SetLastError=true)]
  public static extern bool GetFileInformationByHandle(SafeFileHandle h, out Info info);
- public static string Read(SafeFileHandle h) {
-  Info i; if (!GetFileInformationByHandle(h, out i) || i.NumberOfLinks != 1)
-   throw new Exception("identity unavailable or hardlink");
+ // A failed query surfaces as the Win32 error's own exception (HResult 0x8007xxxx).
+ public static Info Get(SafeFileHandle h) {
+  Info i; if (!GetFileInformationByHandle(h, out i))
+   throw Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error());
+  return i;
+ }
+ public static string Signature(Info i) {
   return String.Join(":", new object[]{i.Volume,i.IndexHigh,i.IndexLow,i.Creation,
    i.Write,i.SizeHigh,i.SizeLow});
  }
@@ -450,19 +454,30 @@ function OpenShared($path) {
   return $f
  }
 }
+# Volume:IndexHigh:IndexLow:Creation:Write:SizeHigh:SizeLow of an open file.
+# More than one name is refused: another path could alias the bytes we
+# protect (2026-10-01: Google Drive's '.tmp.driveupload' staging link).
+function Identity($f, $label) {
+ Detail ($label + '.handleinfo')
+ $i = [FileIdentity]::Get($f.SafeFileHandle)
+ Detail ($label + '.links')
+ if ($i.NumberOfLinks -ne 1) { throw 'hardlink' }
+ Detail ($label + '.signature')
+ return [FileIdentity]::Signature($i)
+}
 function Snapshot($path) {
  $f = OpenShared $path
  try {
-  Detail 'fileid'
-  $sig = [FileIdentity]::Read($f.SafeFileHandle)
+  $sig = Identity $f 'fileid'
   Detail 'size'
   if ($f.Length -gt 4194304) { throw 'oversized file' }
   $mem = [IO.MemoryStream]::new()
   try {
    Detail 'read'
    $f.CopyTo($mem)
+   $again = Identity $f 'reread'
    Detail 'changed'
-   if ([FileIdentity]::Read($f.SafeFileHandle) -cne $sig) { throw 'changed during read' }
+   if ($again -cne $sig) { throw 'changed during read' }
    return @{data=[Convert]::ToBase64String($mem.ToArray()); signature=$sig}
   } finally { $mem.Dispose() }
  } finally { $f.Dispose() }
@@ -492,7 +507,7 @@ function NewFile($path, [byte[]]$bytes) {
  if ($s.data -cne [Convert]::ToBase64String($bytes)) { throw 'Readback failed' }
  return $s
 }
-# Volume:IndexHigh:IndexLow of a FileIdentity.Read signature (file_key).
+# Volume:IndexHigh:IndexLow of a FileIdentity.Signature string (file_key).
 function FileKey($sig) {
  if ($sig -cnotmatch '^[0-9]+(:[0-9]+){6}$') { throw 'invalid file identity' }
  $parts = $sig.Split(':')
