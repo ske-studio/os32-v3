@@ -78,9 +78,8 @@ reserved, never hardware-ready. `sys_device_span` uses PFN half-open intervals
 and MMIO/RAM kinds; 4GiB-exclusive PFN and checked oversized counts are supported.
 The bounded ledger holds 16 normalized spans total and has no reset/free API.
 The live truth is allocator eligibility plus the ledger; caller boot models are
-not modified as a device-reservation mechanism. `pgalloc_reserve_pfn` now also
-preflights its private PHYSMEM_MAX_RANGES provenance snapshot, including UNKNOWN
-claims, and can fail unchanged when that representation is full.
+not modified as a device-reservation mechanism. T1e P3 で `pgalloc_reserve_pfn` は撤去。使用中のページとの衝突は
+boot owner の確保を使って検査する。
 
 IDLE and RAM_MAPPED are **trusted internal caller attestations**, not an
 implemented authentication or exec-idle detector. No production caller currently

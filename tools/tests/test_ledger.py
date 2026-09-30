@@ -244,15 +244,29 @@ BODIES['refusals_keep_accounting'] = r'''
     CHECK(!pgalloc_alloc_n_owner(a, 1, 4095, 4097, 2, &n));
     CHECK(!pgalloc_alloc_n_owner(a, 1, 0, 1024, LEDGER_TOP_DOWN, &n)); /* 池の下は eligible でない */
     CHECK(n == 77);
-    /* 永久予約: PERSIST だけ、live と既に owner の付いたページには当てない */
-    CHECK(!pgalloc_reserve_pfn(a, 3000, 3001) && !pgalloc_reserve_pfn(d, 3000, 3001));
-    CHECK(!pgalloc_reserve_pfn(LEDGER_OWNER_BOOT, 2502, 2504));  /* live */
-    CHECK(same());
-    CHECK(pgalloc_reserve_pfn(LEDGER_OWNER_BOOT, 3000, 3002));
-    CHECK(owner_map[3000] == LEDGER_OWNER_BOOT && ledger_owner_pages(LEDGER_OWNER_BOOT) == 2);
-    CHECK(!pgalloc_reserve_pfn(LEDGER_OWNER_KERNEL, 3001, 3003)); /* 他の永久予約と重なる */
-    CHECK(!pgalloc_free_n_owner(LEDGER_OWNER_BOOT, 3000, 1));   /* 永久予約は返らない */
-    CHECK(!ledger_claim_fixed(a, 3000, 3002) || owner_map[3000] == LEDGER_OWNER_BOOT);
+    /* B11: boot で確保 → SURFACE 登録 → gshell へ L2 ごと移譲。 */
+    CHECK(!pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, 2, 2502, 2504,
+                                 LEDGER_BOTTOM_UP, &p) && same());
+    CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, 2, 3000, 3002,
+                                LEDGER_TOP_DOWN, &p) && p == 3000);
+    {
+        struct ledger_surface sf = { .first = 3000, .npages = 2,
+            .owner = LEDGER_OWNER_BOOT, .backing = LEDGER_SB_RAM,
+            .backend = LEDGER_SF_PEGC, .role = LEDGER_ROLE_CLIENT };
+        u32 sid;
+        CHECK(ledger_surface_create(&sf, &sid));
+        CHECK(ledger_surface_transfer(sid, LEDGER_OWNER_GSHELL));
+        CHECK(ledger_surfaces[sid].owner == LEDGER_OWNER_GSHELL);
+        CHECK(owner_map[3000] == LEDGER_OWNER_GSHELL &&
+              owner_map[3001] == LEDGER_OWNER_GSHELL);
+        CHECK(ledger_owner_pages(LEDGER_OWNER_BOOT) == 0 &&
+              ledger_owner_pages(LEDGER_OWNER_GSHELL) == 2);
+        snap();
+        CHECK(!pgalloc_alloc_n_owner(a, 1, 3000, 3002, LEDGER_TOP_DOWN, &p));
+        CHECK(!ledger_claim_fixed(a, 2999, 3002) && same());
+        CHECK(!pgalloc_free_n_owner(a, 3000, 2) && same());
+        CHECK(ledger_surface_transfer(sid, LEDGER_OWNER_GSHELL) && same());
+    }
     CHECK(ledger_reclaim_owner(a, &n) && n == 5);
     CHECK(ledger_owner_retire(a));
 '''
@@ -348,8 +362,8 @@ BODIES['r1_counting'] = r'''
           ledger_exc_last[0] == LEDGER_OP_CLAIM);
     CHECK(ledger_transfer(2500, 1, a, LEDGER_OWNER_KERNEL));
     CHECK(ledger_exc_ops == 3 && ledger_exc_last[0] == LEDGER_OP_TRANSFER);
-    CHECK(pgalloc_reserve_pfn(LEDGER_OWNER_BOOT, 3000, 3001));
-    CHECK(ledger_exc_ops == 4 && ledger_exc_last[0] == LEDGER_OP_RESERVE);
+    CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, 1, 3000, 3001, LEDGER_TOP_DOWN, &p));
+    CHECK(ledger_exc_ops == 4 && ledger_exc_last[0] == LEDGER_OP_ALLOC);
     kctx_exc_depth = 0;
     CHECK(pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, 2500, 1));
     CHECK(ledger_irq_ops == 4 && ledger_exc_ops == 4);           /* 通常文脈は数えない */

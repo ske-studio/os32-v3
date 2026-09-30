@@ -20,7 +20,7 @@
  *    CFG_KB      8192 (FIXED 型) / 17408 (低位 15MB + 高位 1MB) / 65536
  *    PREF        GFX_PREF_*          IS9821  BIOS ワーク 045Ch bit6
  *    PEGC_ID / CIRRUS_ID  各 backend の副作用のない識別の答え
- *    HW          probe に応える装置 (0 = 無し / LEDGER_SF_PEGC / _CIRRUS)
+ *    HW          模擬選択で使う装置 (0 = 無し / LEDGER_SF_PEGC / _CIRRUS)
  *    FAIL_MAP    写像を失敗させる窓 (0 / LEDGER_SF_PEGC / LEDGER_SF_CIRRUS)
  *    FAIL_BB     1 = アリーナを AS owner で埋めて BB を取れなくする
  *
@@ -28,21 +28,25 @@
  *    - 順序: 識別 → 予約 (1 回、owner = gfx) → 写像 (予約済みの窓だけ、
  *      supervisor + PCD) → BB → SURFACE → 凍結
  *    - 予約: 候補の窓が DEVICE (owner = gfx) で、併合後の res_mask。写像や BB
- *      や probe が落ちても予約は残る (永久保持)
+ *      の失敗や模擬選択によらず予約は残る (永久保持)
  *    - 写像: 写像範囲だけ (PEGC 512KB、Xe10 は 2MB で decode 4MB の残りは
- *      張らない)、失敗した窓の PTE は変わらない、probe が落ちても PTE は残る
+ *      張らない)、失敗した窓の PTE は変わらない、模擬選択後も PTE は残る
  *    - BB: 量は候補の最大 (PEGC が残れば 300KB、無ければ 0)、アリーナ内の
  *      上端 (8MB 0x7B5000 / 17MB 0xEB2000 / 64MB も低位、X14)、0 で埋まる、
  *      owner = boot。sys_usable_mem_end() は BB の下端 (§3-6)、BB が無ければ
  *      凍結した exec 上端のまま (ledger_arena_top() = pgalloc_arena_end())
  *    - SURFACE: planar は常に、PEGC の CLIENT (RAM)、Cirrus の CLIENT +
  *      DISPLAY (MMIO、UC、表示面は kernel)
- *    - probe の結果 (Cirrus → PEGC → PC98 の順、SURFACE の無い backend は
- *      落ちる) に対して gfx_bb_phys_range は選択中の CLIENT、⑨ の移譲は
+ *    - 模擬選択に対して gfx_bb_phys_range は選択中の CLIENT、⑨ の移譲は
  *      その CLIENT だけ (RAM は L2 のページごと、固定 RAM は SURFACE_BACKING
  *      区間も、MMIO は SURFACE だけ)、2 回目は無操作、ledger_selfcheck 0 件
  *
- *  C89 ([C1])。libc は使わない (-nostdlib で直接走る)。
+ *  保証範囲: backend の実物の選択処理・probe は呼ばず、HW と SURFACE の
+ *  存在から g_backend を代入する。予約・写像・確保・移譲と 14 変異は検証するが、
+ *  Cirrus probe 失敗 → PEGC 選択や fb->planes[0] までの統合は保証しない。
+ *  予約拒否・SURFACE 登録拒否は 17 構成に含めていない。
+ *
+ *  GNU11 ([C1])。libc は使わない (-nostdlib で直接走る)。
  * ======================================================================== */
 #include "types.h"
 static u32 host_cr3;
@@ -312,7 +316,7 @@ void _start(void)
     CHECK(ntrace == nw);
     for (i = 0; i < nw; i++) CHECK(trace[i] == want[i]);
 
-    /* 予約 (probe・写像・BB の成否によらず残る) */
+    /* 予約 (写像・BB の成否と模擬選択によらず残る) */
     CHECK(!pc == !gfx_region(PEGC_LINEAR_BASE / PAGE_SIZE,
                              (PEGC_LINEAR_BASE + PEGC_LINEAR_SIZE) / PAGE_SIZE));
     CHECK(!cc == !gfx_region(WAB_XE10_LINEARWIN_BASE / PAGE_SIZE,
@@ -377,7 +381,8 @@ void _start(void)
     }
     CHECK(ledger_check_fail == 0);
 
-    /* ⑦ probe: Cirrus → PEGC → PC98。SURFACE の無い backend は応えない。 */
+    /* ⑦ の模擬選択: HW と SURFACE の存在から代入する。
+     * 実物の選択処理・probe と fb->planes[0] までの統合は実行しない。 */
     sel = LEDGER_SF_PC98;
     if (HW == LEDGER_SF_CIRRUS && sc) sel = LEDGER_SF_CIRRUS;
     if (HW == LEDGER_SF_PEGC && se) sel = LEDGER_SF_PEGC;
@@ -417,7 +422,7 @@ void _start(void)
               ledger_surfaces[i].first == snap[i].first);
     gfx_bb_phys_range(&p, &size);
     CHECK(p == base);
-    /* 写像と予約は probe の結果によらず残る */
+    /* 写像と予約は模擬選択の後も残る */
     if (map_pegc) CHECK(mapped(PEGC_LINEAR_BASE, PEGC_LINEAR_SIZE));
     if (map_cirrus) CHECK(mapped(WAB_XE10_LINEARWIN_BASE, WAB_XE10_LINEARWIN_SIZE));
     CHECK(ledger_selfcheck("t") && ledger_check_fail == 0);

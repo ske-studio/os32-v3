@@ -30,6 +30,7 @@ class Integration(unittest.TestCase):
                 claim = 'static void exec_child_claim(' + claim.split('\n}', 1)[0] + '\n}\n'
                 source += '\n' + reserve + '\n' + claim
             pre = '''#include "types.h"
+int paging_boot_context(void) { return 1; }
 static void outp(unsigned int p, unsigned int v) { (void)p; (void)v; }
 #define NOINST __attribute__((no_instrument_function))
 static void host_verify_commit(void) NOINST;
@@ -180,7 +181,7 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     before = pgalloc_free_pages();
     CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, END - 4096, 4096, END, LEDGER_BOTTOM_UP, &p) && p == 4096);
     CHECK(pgalloc_free_pages() == before - (END - 4096));
-    CHECK(!pgalloc_reserve_pfn(LEDGER_OWNER_KERNEL, 4095, 4097));
+    CHECK(!pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, 2, 4095, 4097, LEDGER_BOTTOM_UP, &p));
     CHECK(pgalloc_free_pages() == before - (END - 4096));
     host_if = 2;
     CHECK(pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, p, END - 4096));
@@ -213,6 +214,9 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     CHECK(physmem_add_trusted(&m, 1048575, 1048576, PHYSMEM_SOURCE_SYNTHETIC));
     /* metadata (L1 + L2) of the 4GiB model is 320 pages: [3776, 4096). */
     CHECK(sys_memory_init_model(&m, backing, sizeof(backing), 3776, verified));
+    /* Before ONLINE, explicit high-PFN allocation is still gated. */
+    CHECK(!pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, 1048575, 1048576, LEDGER_BOTTOM_UP, &p));
+    @ONLINE@
     CHECK(sys_usable_mem_end() == 3776 * PAGE_SIZE);
     sys_mem_kb = 65536;
     CHECK(sys_usable_mem_end() == 3776 * PAGE_SIZE);
@@ -221,36 +225,35 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
        is the lowest PERSIST page inside [MEM_EXEC_LOAD_ADDR, arena end),
        frozen once at step 6. Before the freeze it is the arena end. */
     CHECK(ledger_arena_top() == 3776);
-    CHECK(pgalloc_reserve_pfn(LEDGER_OWNER_BOOT, 3775, 3776));
+    CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, 1, 3775, 3776, LEDGER_TOP_DOWN, &p));
     CHECK(sys_usable_mem_end() == 3776 * PAGE_SIZE);   /* not frozen yet */
     ledger_arena_freeze();
     CHECK(ledger_arena_top() == 3775);
     CHECK(sys_usable_mem_end() == 3775 * PAGE_SIZE);
     /* frozen once: a later PERSIST page lower in the arena changes nothing */
-    CHECK(pgalloc_reserve_pfn(LEDGER_OWNER_BOOT, 3000, 3001));
+    CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, 1, 3000, 3001, LEDGER_TOP_DOWN, &p));
     ledger_arena_freeze();
     CHECK(ledger_arena_top() == 3775 && sys_usable_mem_end() == 3775 * PAGE_SIZE);
     CHECK(owner_map[3775] == LEDGER_OWNER_BOOT && ledger_owner_pages(LEDGER_OWNER_BOOT) == 2);
     CHECK(!pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, 3775, 3776, LEDGER_BOTTOM_UP, &p));
-    CHECK(!pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, 1048575, 1048576, LEDGER_BOTTOM_UP, &p));
     CHECK(!sys_memory_init_model(&m, backing, sizeof(backing), 3776, verified));
-''', flags=('-DPHYSMEM_HOST_TEST=1', '-DPGALLOC_HOST_TEST=1'))
+''', flags=('-DPHYSMEM_HOST_TEST=1', '-DPGALLOC_HOST_TEST=1'), physical_core=True)
 
     def test_sys_low_stable(self):
         self.run_c('''
-    u32 base;
+    u32 base, p;
     sys_mem_kb = 0xffffffffUL;
     /* Retired hotdeploy window (2026-09-09): the arena ends at real RAM,
        clamped to PHYSMEM_LEGACY_MAX_PFN = 16MiB. */
     CHECK(sys_usable_mem_end() == 0x1000000UL);
     base = sys_usable_mem_end();
     host_pool_boot(16384);
-    /* only a PERSIST owner may hold a permanent reservation (T1b) */
-    CHECK(!pgalloc_reserve_pfn(0, 4095, 4096) &&
-          !pgalloc_reserve_pfn(LEDGER_OWNER_GFX, 4095, 4096));
+    /* invalid / DEVICE owners cannot allocate RAM */
+    CHECK(!pgalloc_alloc_n_owner(0, 1, 4095, 4096, LEDGER_TOP_DOWN, &p) &&
+          !pgalloc_alloc_n_owner(LEDGER_OWNER_GFX, 1, 4095, 4096, LEDGER_TOP_DOWN, &p));
     /* sys has not frozen a model here: the ledger's arena top is not used
        (T1e — sys_reserve_top is gone, nothing lowers this ceiling). */
-    CHECK(pgalloc_reserve_pfn(LEDGER_OWNER_BOOT, 4095, 4096));
+    CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, 1, 4095, 4096, LEDGER_TOP_DOWN, &p));
     ledger_arena_freeze();
     CHECK(sys_usable_mem_end() == base);
     CHECK(host_alloc_range(1, base - PAGE_SIZE, base) == 0);
@@ -289,7 +292,6 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     CHECK(!pgalloc_alloc_n_owner(K, 1, 1048575, 1048576, 7, &p)); /* unknown direction */
     CHECK(p == 99);
     CHECK(!pgalloc_free_n_owner(K, 1048575, 2));
-    CHECK(!pgalloc_reserve_pfn(K, 0, 1048577));
     CHECK(!pgalloc_alloc_n_owner(K, 4097, 8191, 12289, LEDGER_BOTTOM_UP, &p));
     CHECK(!pgalloc_alloc_n_owner(K, 4097, 8191, 12289, LEDGER_TOP_DOWN, &p));
     CHECK(!pgalloc_alloc_n_owner(K, 1, 1048575, 1048577, LEDGER_BOTTOM_UP, &p));
@@ -362,30 +364,38 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     }
 ''')
 
-    def test_mark_live_and_permanent_mixture(self):
+    def test_surface_and_live_mixed_claim(self):
         self.run_c('''
-    u32 p, baseline, total;
+    u32 p, allocated, sid, baseline, total;
+    struct ledger_surface sf = { .npages = 1, .owner = LEDGER_OWNER_BOOT,
+        .backing = LEDGER_SB_RAM, .backend = LEDGER_SF_PEGC,
+        .role = LEDGER_ROLE_CLIENT };
     host_pool_boot(16384);
     p = MEM_POOL_BASE / PAGE_SIZE;
-    CHECK(pgalloc_reserve_pfn(K, p + 1, p + 2));
+    CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, 1, p + 1, p + 2,
+                                LEDGER_TOP_DOWN, &allocated));
+    sf.first = allocated;
+    CHECK(ledger_surface_create(&sf, &sid));
+    CHECK(ledger_surface_transfer(sid, LEDGER_OWNER_GSHELL));
+    CHECK(owner_map[p + 1] == LEDGER_OWNER_GSHELL &&
+          ledger_surfaces[sid].owner == LEDGER_OWNER_GSHELL);
+    CHECK(ledger_owner_pages(LEDGER_OWNER_BOOT) == 0 &&
+          ledger_owner_pages(LEDGER_OWNER_GSHELL) == 1);
     total = pgalloc_total_pages();
     baseline = pgalloc_free_pages();
     CHECK(host_alloc_range(1, (p + 2) * PAGE_SIZE, (p + 3) * PAGE_SIZE));
-    CHECK(ledger_claim_fixed(K, p, p + 4));
-    CHECK(ledger_claim_fixed(K, p, p + 4));
-    CHECK(pgalloc_free_pages() == baseline - 3);
-    CHECK(pgalloc_total_pages() == total);
-    CHECK(!pgalloc_free_n_owner(K, p, 4)); /* permanent/live mixed free is atomic */
-    CHECK(pgalloc_free_pages() == baseline - 3);
-    CHECK(!pgalloc_reserve_pfn(K, p, p + 4)); /* live conflict is atomic */
-    CHECK(pgalloc_total_pages() == total);
-    CHECK(pgalloc_free_n_owner(K, p, 1));
-    CHECK(pgalloc_free_n_owner(K, p + 2, 2));
-    CHECK(!pgalloc_free_n_owner(K, p + 1, 1));
+    CHECK(!ledger_claim_fixed(K, p, p + 4)); /* other owner rejects atomically */
+    CHECK(owner_map[p] == 0 && owner_map[p + 3] == 0);
+    CHECK(pgalloc_free_pages() == baseline - 1);
+    CHECK(!pgalloc_alloc_n_owner(K, 1, p + 1, p + 2, LEDGER_BOTTOM_UP, &allocated));
+    CHECK(!pgalloc_free_n_owner(K, p + 1, 2));
+    CHECK(pgalloc_free_pages() == baseline - 1);
+    CHECK(pgalloc_free_n_owner(K, p + 2, 1));
     CHECK(pgalloc_free_pages() == baseline);
+    CHECK(ledger_surface_transfer(sid, LEDGER_OWNER_GSHELL)); /* GUI reentry */
+    CHECK(owner_map[p + 1] == LEDGER_OWNER_GSHELL && pgalloc_total_pages() == total);
     CHECK(ledger_claim_fixed(K, 0, p + 1)); /* boot-ineligible pages never resurrect */
     CHECK(pgalloc_free_pages() == baseline - 1);
-    CHECK(pgalloc_total_pages() == total);
     CHECK(!pgalloc_free_n_owner(K, 0, (int)p + 1));
     CHECK(pgalloc_free_n_owner(K, p, 1));
     CHECK(pgalloc_free_pages() == baseline);
@@ -420,13 +430,19 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     CHECK(p == 99);
 ''', flags=('-DPHYSMEM_HOST_TEST=1', '-DPGALLOC_HOST_TEST=1'))
 
-    def test_permanent_and_atomic_free(self):
+    def test_surface_and_atomic_free(self):
         self.run_c('''
-    u32 p, before;
+    u32 p, first, sid, before;
+    struct ledger_surface sf = { .npages = 1, .owner = LEDGER_OWNER_BOOT,
+        .backing = LEDGER_SB_RAM, .backend = LEDGER_SF_PEGC,
+        .role = LEDGER_ROLE_CLIENT };
     host_pool_boot(16384);
     p = MEM_POOL_BASE;
-    /* Permanent reservation is explicit, not the legacy releasable claim. */
-    CHECK(pgalloc_reserve_pfn(K, p / PAGE_SIZE, p / PAGE_SIZE + 1));
+    CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, 1, p / PAGE_SIZE,
+                                p / PAGE_SIZE + 1, LEDGER_TOP_DOWN, &first));
+    sf.first = first;
+    CHECK(ledger_surface_create(&sf, &sid));
+    CHECK(ledger_surface_transfer(sid, LEDGER_OWNER_GSHELL));
     before = pgalloc_free_pages();
     CHECK(!pgalloc_free_n_owner(K, p / PAGE_SIZE, 1));
     CHECK(pgalloc_free_pages() == before);

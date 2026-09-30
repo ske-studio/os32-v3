@@ -60,14 +60,6 @@ void pgalloc_free_pt(u32 phys);
 u32 pgalloc_metadata_bytes(const struct physmem *model);
 int pgalloc_init_model(struct physmem *model, void *backing, u32 backing_bytes,
                       u32 backing_pfn, int (*verify)(u32, u32, void *));
-/* Permanent exclusion from eligibility; free/claim cannot undo it.
- * Any live allocation in the range rejects the entire reservation.
- * owner must be PERSIST: the L2 byte of every page in the range becomes owner
- * and counts in its pages (B11). Since T1e (the BB moved to a pool
- * allocation) there is no boot-time caller; kept as the ledger primitive.
- * Fixed provenance is retained even for UNKNOWN pages; if its bounded
- * PHYSMEM_MAX_RANGES snapshot cannot represent the claim, fail unchanged. */
-int pgalloc_reserve_pfn(u32 owner, u32 first, u32 end);
 u32 pgalloc_limit_pfn(void);
 
 /* End PFN (exclusive) of the legacy arena — the contiguous low RAM from

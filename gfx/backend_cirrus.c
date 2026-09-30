@@ -347,7 +347,7 @@ static void cirrus_init(void)
         /* ここで諦めると gfx_core は 9801 へ落ち、以後 leave() も
          * shutdown() も呼ばれない。リレーは自分で 98 側へ戻しておく
          * (glue->init の FF82h が NP21/W ではリレーを倒しているため)。
-         * リニア窓も畳む — 使わない番地を present のまま残さない。 */
+         * ハードのリニア窓を閉じ、記述子を消す。PTE は保持する。 */
         cirrus_linear_off();
         s_glue->relay(0);
         s_probe_ok = 0;

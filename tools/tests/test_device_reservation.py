@@ -413,7 +413,7 @@ BODIES['retry_and_reclaim'] = r'''
     CHECK(ledger_reserve_set(GFX, &sp, 1) && ledger_selfcheck("reclaim"));
 '''
 
-# RAM 種別と使用中・永久予約との衝突 (旧 broker の RAM / live 衝突の流用)。
+# RAM 種別と使用中のページとの衝突 (旧 broker の RAM / live 衝突の流用)。
 BODIES['ram_and_live_collision'] = r'''
     u32 r, big, low, pfn, total, free, d2;
     struct ledger_span sp[2];
@@ -438,11 +438,11 @@ BODIES['ram_and_live_collision'] = r'''
     /* 種別を変えた同じ区間は別の集合 (部分一致で拒否) */
     sp[0].kind = MMIO;
     CHECK(!ledger_reserve_set(d2, sp, 2));
-    /* 管理範囲の外にかかる RAM、永久予約に重なる RAM / MMIO */
+    /* 管理範囲の外にかかる RAM、boot 確保に重なる RAM / MMIO */
     host_span(&sp[0], 2040, 2060, LEDGER_SPAN_RAM, big);
     snap2();
     CHECK(!ledger_reserve_set(GFX, sp, 1) && same2());
-    CHECK(pgalloc_reserve_pfn(K, 2010, 2011));
+    CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, 1, 2010, 2011, LEDGER_TOP_DOWN, &pfn));
     host_span(&sp[0], 2005, 2015, LEDGER_SPAN_RAM, big);
     snap2();
     CHECK(!ledger_reserve_set(GFX, sp, 1) && same2());

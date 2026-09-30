@@ -1,5 +1,12 @@
 # physmem → allocator 結合: 実行記録
 
+## T1e P3 の現行経路 (2026-10-01)
+
+`pgalloc_reserve_pfn` は本番の呼び手が無くなったため撤去。以下は過去の実行記録。
+現行の B11 の試験は boot owner で確保 → RAM SURFACE 登録 → gshell へ L2 ごと
+移譲 → 他 owner の確保・claim・free を全件不変で拒否、GUI 再入で所有を保持する形。
+model metadata の永久除外は従来どおり別に検査する。
+
 ## legacy mark/free 回帰の訂正（この節が旧移行方針に優先）
 
 旧記録の `mark = permanent` は互換 API の契約を誤って変更していた。
@@ -85,7 +92,7 @@ build は成功したが無警告ではない。範囲外既存コードに TVRA
 - `sys_memory_init_model(model, backing, capacity, first_pfn, verify)` → tail配置、mapping確認callback、allocator初期化、低位getter固定。旧 entry はまだこれを呼ばない。
 - `pgalloc_init_model(...)` → lower-level checked初期化。callerは最終exec arenaとmetadataの非重複を管理すること。
 - `pgalloc_alloc_n_pfn(n, first, end, &pfn)` / `pgalloc_free_n_pfn(first, n)` → explicit physical-only API。最終ページは `[1048575,1048576)`。
-- `pgalloc_reserve_pfn(first,end)` → permanent・live allocation衝突で全件拒否。デバイスowner/exec全arena衝突brokerの代替ではない。
+- `pgalloc_reserve_pfn(first,end)` → 当時の永久予約 API。T1e P3 で撤去 (冒頭の現行経路を参照)。
 - `pgalloc_limit_pfn()` → high-water。`total_pages()` はeligible union数でありアドレス上端ではない。
 
 paging担当は total由来の上端計算を廃止し、mapped-safe backing探索・追加PT workspace・RAM mapping完了後の一般高位公開を接続する。exec/shlib担当は旧 mark/free call site を永久claim所有へ移行する。GFX担当は destructive probe 前の予約brokerを接続する。これらを行う前に高位bootを有効化しない。
