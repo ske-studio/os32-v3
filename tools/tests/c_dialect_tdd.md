@@ -64,6 +64,39 @@ FileNotFoundError: [Errno 2] No such file or directory: '…/tools/check_c_diale
 | K5 | vendor の除外を外す | 「vendor は数えない」 |
 | K6 | userland の SQLite 単体を gnu89 の期待から外す | 「userland の SQLite 単体は gnu89」「実物の木で rc=0」 |
 
+## 否定側 (`--mutate`、段 5) — 実物の木の写しに変異を当てて検査器を回す
+
+`tools/tests/mutpar.py` の写しの木で、変異は写しにだけ当てる (実物は書き換えない)。C11 で許す書き方
+(`//`、ブロック途中の宣言) を内部実装に足す変異は**対照**で、通る (GREEN) のが期待。
+コンパイル拒否を期待するのは検査器の探りで、通常の実行変異試験 (コンパイル失敗 = 試験不成立) とは別。
+
+```
+$ OS32_MUT_JOBS=4 python3 -B tools/tests/test_c_dialect.py --mutate
+MUTATION 1 RED: 本体から -Werror=vla を外す (VLA が通る) -- check_c_dialect: FAIL (7 件)
+MUTATION 2 RED: 本体から -Werror=implicit-function-declaration を外す (暗黙宣言が通る) -- check_c_dialect: FAIL (7 件)
+MUTATION 3 RED: 本体から -Werror=implicit-int を外す -- check_c_dialect: FAIL (7 件)
+MUTATION 4 RED: 偽の STATIC_ASSERT (_Static_assert(1, …) で条件を消す) -- check_c_dialect: FAIL (7 件)
+MUTATION 5 RED: 本体を gnu89 に戻す -- check_c_dialect: FAIL (1 件)
+MUTATION 6 RED: SQLite を gnu11 にする -- check_c_dialect: FAIL (1 件)
+MUTATION 7 RED: SQLite の旗が本体の共通旗を継ぐ (§2 F2 の形に戻す) -- check_c_dialect: FAIL (1 件)
+MUTATION 8 RED: os32_sqlite_test.o を本体の言語指定で組む -- check_c_dialect: FAIL (1 件)
+MUTATION 9 RED: userland の SQLite 単体を gnu11 で組む -- check_c_dialect: FAIL (1 件)
+MUTATION 10 RED: ブートの旗から言語指定を落とす (コンパイラの既定になる) -- check_c_dialect: FAIL (1 件)
+MUTATION 11 RED: ブートの旗から拒否の旗を落とす -- check_c_dialect: FAIL (1 件)
+MUTATION 12 RED: 公開 SDK ヘッダに行コメント -- check_c_dialect: FAIL (2 件)
+MUTATION 13 RED: 公開 SDK ヘッダにブロック途中の宣言 -- check_c_dialect: FAIL (30 件)
+MUTATION 14 RED: 公開 SDK ヘッダに stdbool -- check_c_dialect: FAIL (1 件)
+MUTATION 15 RED: 公開 SDK ヘッダに指示付き初期化子 -- check_c_dialect: FAIL (30 件)
+MUTATION 16 RED: SDK が配るライブラリヘッダに for の中の宣言 (gnu89 のアプリで通らない) -- check_c_dialect: FAIL (3 件)
+MUTATION 17 RED: gnu89 の例 (sdk/example/hello) を gnu11 にする -- check_c_dialect: FAIL (1 件)
+MUTATION 18 RED: 内部実装に _Atomic -- check_c_dialect: FAIL (1 件)
+MUTATION 19 RED: 内部実装に restrict -- check_c_dialect: FAIL (1 件)
+MUTATION CONTROL 20 GREEN: 対照: 内部実装に // とブロック途中の宣言
+MUTATION CONTROL 21 GREEN: 対照: 公開 SDK ヘッダのコメントと文字列に // と restrict
+MUTATION CONTROL 22 GREEN: 対照: 恒等 (何も変えない)
+MUTATIONS 19/19 RED; CONTROLS 3/3 GREEN
+```
+
 ## 見ていないもの (既知の限界)
 
 - 非定数式の `STATIC_ASSERT` (旧 `tss.c:17` の形) は gnu11 の `_Static_assert` が GCC の畳み込みで通すことがあり、探りでは拒否を要求しない

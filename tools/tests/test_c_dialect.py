@@ -6,9 +6,15 @@
 検査器の部品 (字句の読み分け・コンパイル行の読み取り・実際に効いている言語モード・
 拒否の探り・公開 SDK ヘッダの検査) を小さな入力で固定し、実物の木が通ることも見る。
 
+--mutate は否定側: 実物の木の写し (tools/tests/mutpar.py の写しの木) に変異を当て、
+写しに対して検査器を回して **落ちる** (RED) ことを見る。C11 で許す書き方 (`//`、
+ブロック途中の宣言) を内部実装に足す変異は **対照** で、通る (GREEN) のが期待。
+
   python3 -B tools/tests/test_c_dialect.py            # 全ケース
+  python3 -B tools/tests/test_c_dialect.py --mutate   # 否定側も
 """
 import importlib.util
+import os
 import pathlib
 import subprocess
 import sys
@@ -16,6 +22,8 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SRC = ROOT / "tools/check_c_dialect.py"
+sys.path.insert(0, str(ROOT / "tools/tests"))
+import mutpar  # noqa: E402
 
 FAILED = []
 N = [0]
@@ -247,6 +255,124 @@ def case_real():
     check("gnu89" in r.stdout and "gnu11" in r.stdout, "要約に gnu11 と gnu89 の翻訳単位の数を出す")
 
 
+# --------------------------------------------------------------------------
+#  否定側 (写しの木に変異を当てて検査器を回す)
+# --------------------------------------------------------------------------
+
+def rep(rel, old, new):
+    """rel の old (ちょうど 1 か所) を new に替えた中身。当たらなければ None。"""
+    text = (ROOT / rel).read_text(encoding="utf-8")
+    if text.count(old) != 1:
+        return None
+    return {rel: text.replace(old, new)}
+
+
+def append(rel, extra):
+    text = (ROOT / rel).read_text(encoding="utf-8")
+    return {rel: text + extra}
+
+
+CFG = "build/config.mk"
+DIALECT = ("C_DIALECT_ERRORS = -Werror=implicit-function-declaration -Werror=implicit-int "
+           "-Werror=vla")
+
+# (説明, 期待 "RED"/"GREEN", 変異を作る関数)
+MUTANTS = [
+    ("本体から -Werror=vla を外す (VLA が通る)", "RED",
+     lambda: rep(CFG, DIALECT, DIALECT.replace(" -Werror=vla", ""))),
+    ("本体から -Werror=implicit-function-declaration を外す (暗黙宣言が通る)", "RED",
+     lambda: rep(CFG, DIALECT, DIALECT.replace(" -Werror=implicit-function-declaration", ""))),
+    ("本体から -Werror=implicit-int を外す", "RED",
+     lambda: rep(CFG, DIALECT, DIALECT.replace(" -Werror=implicit-int", ""))),
+    ("偽の STATIC_ASSERT (_Static_assert(1, …) で条件を消す)", "RED",
+     lambda: rep("include/types.h", "_Static_assert(cond, #name)", "_Static_assert(1, #name)")),
+    ("本体を gnu89 に戻す", "RED",
+     lambda: rep(CFG, "C_STD            = -std=gnu11", "C_STD            = -std=gnu89")),
+    ("SQLite を gnu11 にする", "RED",
+     lambda: rep(CFG, "C_STD_SQLITE     = -std=gnu89", "C_STD_SQLITE     = -std=gnu11")),
+    ("SQLite の旗が本体の共通旗を継ぐ (§2 F2 の形に戻す)", "RED",
+     lambda: rep(CFG, "CFLAGS_SQLITE = $(C_STD_SQLITE) $(CFLAGS_MACHINE) -Os",
+                 "CFLAGS_SQLITE = $(CFLAGS_COMMON) -Os")),
+    ("os32_sqlite_test.o を本体の言語指定で組む", "RED",
+     lambda: rep("build/kernel.mk", "$(CC) $(C_STD_SQLITE) -m32", "$(CC) $(C_STD) -m32")),
+    ("userland の SQLite 単体を gnu11 で組む", "RED",
+     lambda: rep("build/programs.mk", "SQLITE_SA_CFLAGS = $(C_STD_SQLITE)",
+                 "SQLITE_SA_CFLAGS = $(C_STD)")),
+    ("ブートの旗から言語指定を落とす (コンパイラの既定になる)", "RED",
+     lambda: rep("build/boot.mk", "CFLAGS_BOOT = $(C_STD) $(C_DIALECT_ERRORS)",
+                 "CFLAGS_BOOT = $(C_DIALECT_ERRORS)")),
+    ("ブートの旗から拒否の旗を落とす", "RED",
+     lambda: rep("build/boot.mk", "CFLAGS_BOOT = $(C_STD) $(C_DIALECT_ERRORS)",
+                 "CFLAGS_BOOT = $(C_STD)")),
+    ("公開 SDK ヘッダに行コメント", "RED",
+     lambda: append("sdk/include/os32/os32api.h", "extern int os32_t0_probe; // C11 only\n")),
+    ("公開 SDK ヘッダにブロック途中の宣言", "RED",
+     lambda: append("sdk/include/os32/os32api.h",
+                    "static __inline__ int os32_t0_f(void) { int a = 1; a++; int b = a; return b; }\n")),
+    ("公開 SDK ヘッダに stdbool", "RED",
+     lambda: append("sdk/include/os32/os32_gui_shared.h",
+                    "#include <stdbool.h>\nextern bool os32_t0_b;\n")),
+    ("公開 SDK ヘッダに指示付き初期化子", "RED",
+     lambda: append("sdk/include/os32/os32api.h",
+                    "struct os32_t0_s { int a; };\n"
+                    "static const struct os32_t0_s os32_t0_v = { .a = 1 };\n")),
+    ("SDK が配るライブラリヘッダに for の中の宣言 (gnu89 のアプリで通らない)", "RED",
+     lambda: append("userland/lib/gfx/libos32gfx.h",
+                    "static __inline__ void os32_t0_l(void) { for (int i = 0; i < 1; i++) { } }\n")),
+    ("gnu89 の例 (sdk/example/hello) を gnu11 にする", "RED",
+     lambda: rep("sdk/example/hello/Makefile", "CFLAGS = -std=gnu89", "CFLAGS = -std=gnu11")),
+    ("内部実装に _Atomic", "RED",
+     lambda: append("kernel/sysclk.c", "static _Atomic int t0_atomic;\n")),
+    ("内部実装に restrict", "RED",
+     lambda: append("kernel/sysclk.c", "void t0_r(char *restrict p);\n")),
+    # --- 対照 (C11 で許す書き方。落ちたら検査器が厳しすぎる) ---
+    ("対照: 内部実装に // とブロック途中の宣言", "GREEN",
+     lambda: append("kernel/sysclk.c",
+                    "// C11 で許す行コメント\n"
+                    "int t0_c11_ok(void) { int a = 0; a++; int b = a; return b; }\n")),
+    ("対照: 公開 SDK ヘッダのコメントと文字列に // と restrict", "GREEN",
+     lambda: append("sdk/include/os32/os32api.h",
+                    "/* restrict // _Bool */\n#define OS32_T0_STR \"a//b restrict\"\n")),
+    ("対照: 恒等 (何も変えない)", "GREEN",
+     lambda: append("sdk/include/os32/os32api.h", "")),
+]
+
+
+def mutate_one(item):
+    i, (desc, want, make) = item
+    edits = make()
+    if edits is None:
+        return (i, desc, want, "NOT_APPLIED", "")
+    with tempfile.TemporaryDirectory(prefix="c_dialect_mut_") as td:
+        real = set(edits) | {"tools/check_c_dialect.py"}
+        tree = mutpar.mutant_tree(ROOT, pathlib.Path(td) / "tree", edits, real=real)
+        r = run_checker(tree)
+        got = "GREEN" if r.returncode == 0 else "RED"
+        tail = (r.stdout + r.stderr).strip().splitlines()[-1:] if got == "RED" else []
+        return (i, desc, want, got, tail[0] if tail else "")
+
+
+def run_mutations():
+    print("== 否定側 (写しの木に変異を当てる) ==", flush=True)
+    bad = 0
+    red = green_ctl = 0
+    for i, desc, want, got, tail in mutpar.run_ordered(mutate_one, list(enumerate(MUTANTS, 1))):
+        ok = got == want
+        if not ok:
+            bad += 1
+        if want == "RED" and ok:
+            red += 1
+        if want == "GREEN" and ok:
+            green_ctl += 1
+        label = "MUTATION %d %s" % (i, got) if want == "RED" else "MUTATION CONTROL %d %s" % (i, got)
+        print("%s%s: %s%s" % ("" if ok else "UNEXPECTED ", label, desc,
+                                (" -- " + tail) if tail else ""), flush=True)
+    n_red = sum(1 for m in MUTANTS if m[1] == "RED")
+    n_ctl = len(MUTANTS) - n_red
+    print("MUTATIONS %d/%d RED; CONTROLS %d/%d GREEN" % (red, n_red, green_ctl, n_ctl), flush=True)
+    return bad == 0
+
+
 def main(argv):
     cd = load()
     case_lex(cd)
@@ -258,6 +384,8 @@ def main(argv):
     case_real()
     ok = not FAILED
     print("%d checks, %d failed" % (N[0], len(FAILED)), flush=True)
+    if "--mutate" in argv:
+        ok = run_mutations() and ok
     print("PASS" if ok else "FAIL", flush=True)
     return 0 if ok else 1
 
