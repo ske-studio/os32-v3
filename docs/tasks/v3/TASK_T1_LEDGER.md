@@ -493,6 +493,26 @@ static inline u32  V2P(const volatile void *va) { return (u32)(uptr)va; }
 | kselftest | 同じ最悪の並びを実機の池で (今の `kselftest.c:871-920` の dmap の組を置き換え)。`pa == (u32)va` の表明は `va == P2V(pa)` へ |
 | NP21/W 回帰 | PCM 再生 (TASK_PCM_CS4231 の E 試験のうち NP21/W で見られるもの)、FD の読み書き (FDC の DMA) |
 
+#### 4-3-R. T1c の実装結果 (2026-10-01、`wt/t1c`、コーダー `claude-opus-5-5`)
+
+**大きさ** (T1b 後の残り 6.7KB に対して): `.text` 0x4cb0e → 0x4d03e (**+1,328B**)、`.data` 0x7ec3 → 0x7edb (+24B)、`.bss` 0x3e504 のまま、計 **+1,352B**。`.bss` の先頭は 4KB 整列 (0x155000) なので **`__bss_end` は 0x193504 のまま** (カーネル本体 589.3KB、ASSERT で見る残りは 6.7KB のまま)。ただし `.data` の終わりから 0x155000 までの余白が 1,565B → **229B** に減った — 次に `.text` + `.data` が 229B を超えて増えると `.bss` が 4KB 進み、残りは 2.7KB になる。
+
+**実装したもの**: `kernel/dma_pool.[ch]` に `struct dma_buf {pa, va, size}` と `dma_alloc(size, align, limit, *out)` / `dma_free(const struct dma_buf *)` / `dma_mark_leaked(const struct dma_buf *)` (irq_save の殻)。中身は `kernel/dma_pool_math.c` の純粋関数 `dma_pool_state_alloc_buf` — **局所変数で受けて成功したときだけ `*out` を写す** (失敗時 `*out` 不変、`va = P2V(pa)`)。`dma_pool_state_alloc` に `limit` を足し、候補ごとの検査を `dma_crosses_64k` から **`dma_range_ok(addr, bytes, limit)`** (終端が `limit` 以下 + 64KB 非またぎ、`drivers/dma8237_math.c`) に替えた。旧 `dma_pool_alloc` / `dma_pool_free` / `dma_pool_mark_leaked` は撤去。呼び手: `pcm_open` は `dma_alloc(PCM_RING_BYTES, PCM_POOL_ALIGN, DMA_PHYS_LIMIT, &s_ring_buf)`、release は `dma_free` / `dma_mark_leaked(&s_ring_buf)` の後に組を 0 に。`drivers/fdc.c` は BSS の受け皿の置き場を変えず、窓の位置決め (`fdc_buf_layout`) の入力を `V2P(s_fdbuf)` に、装置へ渡す番地を `s_dma_pa = V2P(s_dma)` (3 か所の `(u32)dma_buffer` を置き換え)、窓を **`dma_range_ok(s_dma_pa, FDC_DMA_BUF_SIZE, DMA_PHYS_LIMIT)`** で検査 (落ちたら kprintf — 今と同じく言うだけ。`dma_chan_setup` が同じ条件で断るので転送は出ない)。
+
+**ホスト試験**: `test_dma_pool.py` に 4 ケース — `range_ok` (終端 = limit は通る・1 バイト越え / 先頭だけ内側 / limit 0 / size 0 / 巨大 size / 64KB またぎ)、`limit` (limit 未満だけに置く、先頭が内側でも終端が越えれば断る、越える候補は飛ばすだけで内側の隙間に置く、断ったとき表は不変)、`keep_out` (33KB・0 バイト・整列・limit 越え・枯渇・初期化前で `*out` の 3 項とも不変、out NULL は ERR_ARG で表不変、成功は `va == P2V(pa)`・`size` は要求のまま)、`worst` (**R4**: 池の先頭を 64KB バンクの中の 16 通りの 4KB 位置 — 今の 0x2E8000 の位置も T3 の 64KB 整列も含む — に置き、前置き 3 通り (空 / 8KB 使用中 / 8KB の穴 + 次の 8KB 使用中) × 順 2 通りで PCM 16KB + 82557 16KB が入り、重ならず、前置きとも重ならず、64KB をまたがず 16MB 未満で池の中)。`pcm_cs4231_host.c` の模型を `dma_alloc` の形に (16MB を越える limit は断る)。`fdc_track_host.c` は `drivers/dma8237_math.c` を取り込む (実物の `dma_range_ok`)。`tools/check_map.yaml` の `check-fdc-track-host` に `drivers/dma8237_math.c`。
+**変異**: `test_dma_pool.py --mutate` 15/15 RED (新規 6: `dma_range_ok` の 64KB 検査を外す・limit を先頭だけで見る・limit を見ない (以上 `dma8237_math.c`)、内部の出力を `*out` に直接つなぐ (Codex P3)、組の va を埋めない、呼び手の limit を捨てて 16MB で探す)。**組み立ての失敗は RED に数えない判定にした** — その結果、既存の「2 の冪でない整列を受ける」が以前は未使用関数のコンパイルエラーで RED になっていたことが分かり、`(void)dma_pool_align_ok(align);` を残す形に直して実行時の RED にした (limit を捨てる変異も `(void)limit;` を残す)。`test_pcm_cs4231.py --mutate` に 1 本 (リングを 16MB 上限で取らない → `open` が RED)。
+**kselftest** (`kselftest.c` の dmap の組を置き換え): `dmap:R4 worst fits` / `dmap:R4 disjoint` / `dmap:R4 all back` (実機の池で前置き 3 通りの最悪の並び)、`dmap:fail keeps out` (33KB)、`dmap:limit refused` (limit = 池の先頭、`*out` 不変)、`dmap:0 bytes refused`、`dmap:3x16KB fit` / `free middle` / `8KB reuses` / `mid ptr refused` / `bad free cnt` / `mark_leaked ok` / `leak cnt` / `leaked no free` / `empty again`。`pa == (u32)va` の表明は `va == P2V(pa)` (`dmap_buf_ok`) へ。
+
+**実装時の訂正** (設計と実物の食い違い):
+1. **`dma_pool_state_alloc` の引数に `limit` を足した** (§3-7 は「そのまま使う、足すのは `limit` の検査と組だけ」): `limit` を確保の後で見ると「確保 → 取り消し」になり §3-2 の「全部検査してから commit」に反する。候補ごとの検査に入れれば、断った候補の表は触らない。
+2. **`dma_range_ok` の置き場は `drivers/dma8237_math.c` (`dma8237.h`)**: `drivers/fdc.c` は `INC_DRIVERS` (`-Ikernel` なし) で組むので `kernel/` の関数は見えない。64KB の規則の正典 (`dma_crosses_64k`) も 8237 側にある。`dma_pool.h` は `dma8237.h` を取り込む。
+3. **組を作る部分は純粋関数 `dma_pool_state_alloc_buf`** (§3-2 の表に無い): 失敗時 `*out` 不変を実物のままホストで見るため。`dma_alloc` は irq_save の殻だけ。
+4. **`dma_free` / `dma_mark_leaked` は `b->pa` で span を引く** (表は物理で持つ — `base` は池の先頭の物理番地)。`b->size` は照合しない (§3-7 に規定が無い。span の先頭一致の規則はそのまま)。
+5. **PCM は `s_ring` / `s_ring_phys` を残し、組 `s_ring_buf` を足した** (リングを触る既存の行を変えないため)。
+6. **kselftest の `dmap:first at base` は外した**: 池の先頭の 16KB の中に 64KB 境界があれば落ちる (池の番地に依る)。82557 の量はドライバがまだ無いので定数 16KB。
+
+**Codex 実装レビュー (2026-10-01、gpt-6-astra、Approve)**: P1/P2 なし。実装時の訂正 6 件は妥当。P3 (後続で試験を強める、未着手): (1) `pcm_cs4231_host.c` の模型が解放を `va` で引く (実物は `pa`) — `pa` だけ壊れる変更を見逃す。reset なしの通常再 open と再 open の確保失敗も足す、(2) `fdc_track_host.c` の `dma_chan_setup` の模型は物理上限を見ず、P2V/V2P が恒等なので旧キャストへ戻す変異を区別できない — FDC 経路で 16MB 拒否と V2P を観測する試験を足す、(3) `test_pcm_cs4231.py` の変異の集計がコンパイル失敗も RED に数える — `test_dma_pool.py` と同じく除外する。`dma_free` は `pa` で span を引くので、別の使用中 span の先頭や解放・再割当後の古い組を渡すとその span を解放しうる (今の呼び手に経路は無い) — 呼び手の契約として残す。
+
 ### 4-4. T1d — MMIO 登録と検証済み資源レコード (D33・X4)
 
 | 項 | 内容 |

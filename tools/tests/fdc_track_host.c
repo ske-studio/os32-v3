@@ -21,6 +21,9 @@
 
 #include "../../drivers/fdc_decide.c"
 #include "../../drivers/fdc_track.c"
+/* fdc.c の DMA の窓の検査 (dma_range_ok) は dma_alloc と同じ関数 — 実物を通す
+ * (TASK_T1_LEDGER §4-3)。 */
+#include "../../drivers/dma8237_math.c"
 #include "../../drivers/fdc.c"
 #include "../../fs/fatfs/diskio.c"
 /* FatFs 本体も実物を通す (font_replay)。ff.c は外部のコードなので、試験側の

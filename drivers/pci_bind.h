@@ -15,7 +15,7 @@
 /*    (0) driver は自分の状態を STARTING にしてから装置に触る               */
 /*        (IRQ callback と tick フックはその状態を見て装置に触らない)       */
 /*    (1) Command の I/O Space Enable → (2) PORT selective reset + 10µs →   */
-/*    (3) dma_pool_alloc → (4) irq_register → (5) Bus Master Enable →       */
+/*    (3) dma_alloc → (4) irq_register → (5) Bus Master Enable →            */
 /*    (6) CU/RU 開始 → (7) **irq_save の短い区間で RUNNING へ**             */
 /*    (5) までの失敗は逆順に戻して DECLINE。ただし (2) の reset が Idle を   */
 /*    確立できなければ QUARANTINE (状態不明を次へ渡さない)。                */
@@ -157,7 +157,7 @@ u8   pci_bind_reason_get(void);
 /* ======================================================================== */
 
 /* 列挙表の全デバイスに対して pci_bind_one を回す。
- * **memory_boot_init と dma_pool_init の後**に呼ぶ (probe が dma_pool_alloc と
+ * **memory_boot_init と dma_pool_init の後**に呼ぶ (probe が dma_alloc と
  * irq_register を使うので)。戻り値 = BOUND になった台数。 */
 int pci_bind_all(const struct pci_driver *const *table, int n);
 

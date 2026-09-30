@@ -9,7 +9,8 @@
 /* ======================================================================== */
 
 #include "fdc.h"
-#include "dma8237.h"   /* 8237 の共通部 (票 TASK_HAL_WIRING §1-2) */
+#include "dma8237.h"   /* 8237 の共通部 (票 TASK_HAL_WIRING §1-2)、dma_range_ok */
+#include "memmap.h"    /* V2P (TASK_T1_LEDGER §3-4) */
 #include "io.h"
 #include "kstring.h"
 #include "kprintf.h"
@@ -50,9 +51,13 @@ static u8  s_init_0439_after = 0;
  * (FDC_TRACK_SLOTS 本) に割る。窓の位置は fdc_buf_layout() が**実行時に**
  * 決めるので、64KB 境界をまたがない ([HW2]) ことが揃え指定にも
  * リンク順にも依存しない。16KB 揃えにしていたころは最大 16KB の
- * 詰め物が .bss に出ていた。 */
+ * 詰め物が .bss に出ていた。
+ * 置き場は BSS のまま (DMA プールは使わない — fdc.h の注記)。装置へ渡す
+ * 物理番地は V2P で作り、16MB・64KB の検査は dma_alloc と**同じ関数**
+ * (dma_range_ok) で見る (TASK_T1_LEDGER §4-3)。 */
 static u8 s_fdbuf[FDC_BUF_BYTES];
 static u8 *s_dma = 0;       /* DMA の窓 (FDC_DMA_BUF_SIZE) */
+static u32 s_dma_pa = 0;    /* V2P(s_dma) — 装置へ渡す物理番地 */
 static u8 *s_slots = 0;     /* 先読みのスロット + セクタキャッシュ (連続) */
 
 static void fdc_buf_setup(void)
@@ -60,23 +65,32 @@ static void fdc_buf_setup(void)
     u32 dma_off, rest_off;
 
     if (s_dma) return;
-    if (fdc_buf_layout((u32)s_fdbuf, FDC_BUF_BYTES, FDC_DMA_BUF_SIZE,
+    if (fdc_buf_layout(V2P(s_fdbuf), FDC_BUF_BYTES, FDC_DMA_BUF_SIZE,
                        &dma_off, &rest_off) != 0) {
-        /* 起きない (領域は 64KB より短く、長さは窓の 3 倍) が、起きたら
-         * **黙って別の番地を壊さない** よう言う。 */
-        kprintf(0x07, "[fdc] no DMA window without crossing 64KB at %08x\n",
-                (u32)s_fdbuf);
         dma_off = 0;
         rest_off = FDC_DMA_BUF_SIZE;
     }
     s_dma = s_fdbuf + dma_off;
+    s_dma_pa = V2P(s_dma);
     s_slots = s_fdbuf + rest_off;
+    /* 起きない (領域は 64KB より短く、長さは窓の 3 倍で、カーネルは
+     * 16MB より下) が、起きたら**黙って別の番地を壊さない**よう言う
+     * (dma_chan_setup も同じ条件で断るので、転送は出ない)。 */
+    if (!dma_range_ok(s_dma_pa, FDC_DMA_BUF_SIZE, DMA_PHYS_LIMIT))
+        kprintf(0x07, "[fdc] DMA window %08x crosses 64KB or 16MB\n",
+                s_dma_pa);
 }
 
 static u8 *fdc_dma_buf(void)
 {
     fdc_buf_setup();
     return s_dma;
+}
+
+static u32 fdc_dma_phys(void)
+{
+    fdc_buf_setup();
+    return s_dma_pa;
 }
 #define dma_buffer (fdc_dma_buf())
 
@@ -745,7 +759,7 @@ int fdc_read_sector_geom(int drv, int cyl, int head, int sect,
 {
     u8 results[7];
     int n, retry;
-    u32 phys = (u32)dma_buffer;
+    u32 phys = fdc_dma_phys();
     u16 bps = g->bps;
     const char *phase = "seek";
     int have_results = 0;   /* results[] が埋まったか (診断の出し分け) */
@@ -848,7 +862,7 @@ int fdc_write_sector_geom(int drv, int cyl, int head, int sect,
 {
     u8 results[7];
     int n, retry;
-    u32 phys = (u32)dma_buffer;
+    u32 phys = fdc_dma_phys();
     u16 bps = g->bps;
     const char *phase = "seek";
     int have_results = 0;   /* results[] が埋まったか (診断の出し分け) */
@@ -967,7 +981,7 @@ int fdc_read_sectors(int drv, int cyl, int head, int sect, int count,
     u8 results[7];
     int n, eot;
     u32 bytes, timeout;
-    u32 phys = (u32)dma_buffer;
+    u32 phys = fdc_dma_phys();
     const char *phase = "seek";
     int have_results = 0;
     int dma_armed = 0;

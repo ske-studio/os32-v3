@@ -448,6 +448,7 @@ def host_build(tmp, mutated=None):
         for rel_ in ("drivers/fdc_track.c", "drivers/fdc_track.h",
                      "drivers/fdc.c", "drivers/fdc.h",
                      "drivers/fdc_decide.c", "drivers/fdc_decide.h",
+                     "drivers/dma8237_math.c",
                      "fs/fatfs/diskio.c"):
             (tree / rel_).write_text(
                 (ROOT / rel_).read_text(encoding="utf-8"), encoding="utf-8")

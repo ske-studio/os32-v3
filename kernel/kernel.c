@@ -563,7 +563,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     shm_init();
 
     /* DMA プール (票 §1-3)。paging_init が 0x2E8000-0x2F7FFF を present/RW で
-     * 張った後、**pci_bind_all より前**。probe が dma_pool_alloc を呼ぶ。 */
+     * 張った後、**pci_bind_all より前**。probe が dma_alloc を呼ぶ。 */
     dma_pool_init();
 
 
