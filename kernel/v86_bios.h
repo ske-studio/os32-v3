@@ -43,9 +43,9 @@
  *   0x90 = 2HD FDD / 0x30,0xB0 = 2DD FDD / 0x80,0x00 = SASI HDD
  * FDD イメージから起動するゲストに実機の値 (OS32 は NHD 起動なので
  * 0x80) を渡すと、DOS が「自分はハードディスク起動だ」と思い込む。
- * → docs/tasks/v86v2/08_dos5.md §2
+ * → docs/archive/v21/v86v2/08_dos5.md §2
  * HDD イメージから起動するときは逆に 0x80 を「意図的に」渡す。
- * → docs/tasks/v86v2/10_dos_hdd.md */
+ * → docs/archive/v21/v86v2/10_dos_hdd.md */
 #define V86_DAUA_FDD        0x90        /* 2HD FDD (上位ニブル) */
 #define V86_DAUA_HDD        0x80        /* SASI/IDE HDD (上位ニブル) */
 

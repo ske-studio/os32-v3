@@ -476,7 +476,7 @@ static int set_page_noflush(u32 virt_addr, u32 phys_addr, u32 flags)
      *
      * PDE を USER にしても、同じ PDE 配下の他のページは PTE 側が
      * supervisor のままなので保護は保たれる。カーネル帯を USER に
-     * しないこと (docs/tasks/v86v2/02_np21w_paging_analysis.md)。 */
+     * しないこと (docs/archive/v21/v86v2/02_np21w_paging_analysis.md)。 */
     if (flags & PTE_USER) {
         page_directory[pdi] |= PTE_USER;
     }

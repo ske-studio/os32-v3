@@ -294,6 +294,6 @@ Windows 3.1 が「シングルタスクの DOS 上で GUI シェルが協調マ�
 
 - 分析: [リング3か、Rustか](https://claude.ai/code/artifact/5b8de11b-83a8-4708-a466-541c633725e3)
 - GUI トラック: `docs/ROADMAP.md`
-- V86/VDM: `docs/tasks/v86v2/`、メモリ [[os32-vdm-dos-hdd]]
+- V86/VDM: `docs/archive/v21/v86v2/`、メモリ [[os32-vdm-dos-hdd]]
 - 制約の正典: `docs/CONSTRAINTS.md` ([ABI4] がリング 3 で消える)
 - 計測基盤: `kapi/kapi_profile.h` (`fa09721`)

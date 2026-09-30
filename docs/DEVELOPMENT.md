@@ -20,7 +20,7 @@
 | 日本語入力 (FEP) | [tasks/fep/00_INDEX.md](tasks/fep/00_INDEX.md) (進捗の正典) | `kernel/ime*.c` | メモリ os32-fep-testing の手順、`/api/key` |
 | GUI シェル | [tasks/gui/TASKS.md](tasks/gui/TASKS.md) (§7 = 経過の正典) → 各票、[API_CONTRACTS.md](tasks/gui/API_CONTRACTS.md) (凍結) | 票の排他ゾーン (§3) | `os32gui` → `/api/key` / `/api/mouse` (`ax/ay`) / `/api/screenshot`、`ring3_guard cirrus\|pegc\|bb`、`gfxmode` + reset で 3 バックエンド、Cirrus は ini の WAB ([D2]) |
 | CI / 静的ゲート | `.github/workflows/check.yml` (ツールチェーン不要の検査だけ) | `tools/check_*.py` | push で自動。本体ビルドと実機は WSL 側 |
-| V86 / DOS | [tasks/v86v2/README.md](tasks/v86v2/README.md) | `kernel/v86*.c` | `v86 -t` / `-b`、脱出は CTRL+STOP |
+| V86 / DOS | [archive/v21/v86v2/README.md](archive/v21/v86v2/README.md) | `kernel/v86*.c` | `v86 -t` / `-b`、脱出は CTRL+STOP |
 | LAN (LGY-98) | ドライバ [tasks/network/PLAN.md](tasks/network/PLAN.md) (M0〜M5、進捗 §9)、リンク層+Host Services [tasks/network/LINK_PLAN.md](tasks/network/LINK_PLAN.md) | `drivers/lgy98.c` `ne2000.c` `ne2000_ring.c` `ne2000_io.asm`、有効化は `make kernel-lgy98` (戻すのは `kernel-nolgy98`) | `make check` のホスト試験 (リング計算)、`make check-net-m2` (NP21/W で inject → 反射 → capture)、ini は [D2] |
 | ビルド・配備の仕組みを変える | [08_build.md](08_build.md) | `Makefile` `build/*.mk` `tools/*.py` | `make check`、`os32-cycle deploy` |
 | 障害を追う | [POLICY_DEBUG.md](POLICY_DEBUG.md) (§2 反映確認 → §4 教訓集 → §5 道具) | — | `tools/np21w_mcp/`、`/api/tvram` |
@@ -46,7 +46,7 @@
 | `con_sink.c` | console シンク — GUI モード中のカーネル出力を 8KB のリングに溜め、端末アプリが `con_sink_read` (KAPI v46) で吸う | [KAPI_SPEC v46 節](KAPI_SPEC.md)、[archive/gui_v13/TASK_K6C_console.md](archive/gui_v13/TASK_K6C_console.md) |
 | `kbd_inject.c` | 打鍵の注入リング (256B) — GUI モード中、端末アプリが `kbd_inject` (KAPI v47) で注ぎ、`kbd_getchar` は第 2 の park 点になる。注げるのは con_sink の読み手だけ | [KAPI_SPEC v47 節](KAPI_SPEC.md)、[archive/gui_v13/TASK_K7_input.md](archive/gui_v13/TASK_K7_input.md) |
 | `snd_engine.c` | FM/SSG シーケンサ (タイマ IRQ 駆動) | [05 §5-3](05_drivers.md) |
-| `v86*.c` | V86 モニタ、仮想 PIC、キー所有権、脱出キー | [tasks/v86v2/](tasks/v86v2/README.md) |
+| `v86*.c` | V86 モニタ、仮想 PIC、キー所有権、脱出キー | [archive/v21/v86v2/](archive/v21/v86v2/README.md) |
 | `kselftest.c` | ブート時セルフテスト (kstring / kmalloc / kprintf)。プリミティブを触ったら項目を足す | [POLICY_DEBUG §2](POLICY_DEBUG.md) |
 | `irq.c` `irq_math.c` | 割り込みの動的登録 (`irq_register`、共有 IRQ、storm の検出) — v2.1 | [tasks/v3/TASK_HAL_WIRING](tasks/v3/TASK_HAL_WIRING.md) §1-1 |
 | `dma_pool.c` `dma_pool_math.c` | DMA プール (0x2E8000 の 64KB 固定の穴。64KB 境界をまたがない配り方、[HW2]) — v2.1 | [tasks/v3/TASK_HAL_WIRING](tasks/v3/TASK_HAL_WIRING.md) §1-3、[02 §2-1](02_memory.md) |
@@ -110,8 +110,8 @@
 |---|---|---|
 | `gfx/gfx_core.c` `gfx_vram.c` `palette.c` | HAL の入口: バックエンド選択 (probe 順 Cirrus → PEGC → 9801 (auto で Cirrus を試すのは NP21/W の上だけ、Cirrus のリニア窓はデバイス窓の帯 0xFE000000〜 — v2.1)、`GFX=` の強制)、present (ページフリップ)、パレット、カウンタ (`gfx_stats`)、`gfx_bb_phys_range` | [05 §5-5](05_drivers.md) |
 | `gfx/backend_pc98.c` `backend_pegc.c` `backend_cirrus.c` `include/gfx_hal.h` | バックエンド表 `GfxBackend` (probe / init / query / present_rect / fill / blit / enter / leave / shutdown) と 3 実装: 9801 4 プレーン (主記憶 BB 0x6A000)、PEGC 640×480×256 (F00000h 窓、BB は物理末尾 300KB)、Cirrus GD5430 (01000000h リニア窓、表示面 + クライアント面、エンジン BLT) | [05 §5-5](05_drivers.md)、[02 §2-1](02_memory.md)、[tasks/gui/DESIGN.md](tasks/gui/DESIGN.md) |
-| `lib/sqlite3/os32_sqlite_vfs.c` `os32_sqlite_config.h` `sqlite_stack.asm` | カーネル内 SQLite (0x200000 帯、MEMSYS5 384KB、代替スタック) | [tasks/sqlite/](tasks/sqlite/00_INDEX.md) |
-| `boot/boot_*.asm` `loader_*.asm` `boot_main.c` `ext2_mini.c` `lz4_mini.c` | IPL、第 2 段ローダ (PM 遷移を含む、分割禁止)、LZ4 展開 | [01 §1-2](01_system.md)、[10 §10-2, §10-3](10_notes.md)、[tasks/boot_reform/](tasks/boot_reform/00_OVERVIEW.md) |
+| `lib/sqlite3/os32_sqlite_vfs.c` `os32_sqlite_config.h` `sqlite_stack.asm` | カーネル内 SQLite (0x200000 帯、MEMSYS5 384KB、代替スタック) | [archive/v21/sqlite/](archive/v21/sqlite/00_INDEX.md) |
+| `boot/boot_*.asm` `loader_*.asm` `boot_main.c` `ext2_mini.c` `lz4_mini.c` | IPL、第 2 段ローダ (PM 遷移を含む、分割禁止)、LZ4 展開 | [01 §1-2](01_system.md)、[10 §10-2, §10-3](10_notes.md)、[archive/v21/boot_reform/](archive/v21/boot_reform/00_OVERVIEW.md) |
 
 ### ユーザ空間 `userland/`
 

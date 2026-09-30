@@ -6,7 +6,7 @@
 > 以下は未凍結の設計案。S1/S2着手前に [v1.3 PLAN の S0](../gui/v13/PLAN.md) を完了する。
 > 「KAPI追加なし」は未成立の目標であり、通常NHD配備へのsettings.db登録は承認されていない。
 > 関連: [../gui/v12/CONTRACTS.md](../gui/v12/CONTRACTS.md) (S6 の `system.cfg` 更新)、
-> [../sqlite/00_INDEX.md](../sqlite/00_INDEX.md) (カーネル内 SQLite)、[../../02_memory.md](../../02_memory.md)
+> [../../archive/v21/sqlite/00_INDEX.md](../../archive/v21/sqlite/00_INDEX.md) (カーネル内 SQLite)、[../../02_memory.md](../../02_memory.md)
 > (SQLite 帯 0x200000、MEMSYS5 384KB)、[../../KAPI_SPEC.md](../../KAPI_SPEC.md) (`db_*` v42)
 
 Windows のレジストリに相当する「設定の置き場」を 1 つに決める。**KAPI は増やさない**

@@ -9,7 +9,7 @@
 >
 > この計画とは別に `archive/feat-vdm` および Windows 作業ツリーからの機能取り込みを
 > 実施した (KAPI v31 → v35)。経緯は
-> [`tasks/wintree_port/PORT_PLAN.md`](../tasks/wintree_port/PORT_PLAN.md) を参照。
+> [`tasks/wintree_port/PORT_PLAN.md`](v21/wintree_port/PORT_PLAN.md) を参照。
 
 ---
 

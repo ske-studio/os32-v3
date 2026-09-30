@@ -9,7 +9,7 @@ OS32 カーネル常駐型 FEP (日本語入力フロントエンドプロセッ
 - 実装状態の正典は**下表** (フェーズ別)。[`FEP_STATUS.md`](FEP_STATUS.md) は 2026-04-27 時点の
   アーキテクチャ説明 (辞書スキーマ / 入力フロー / 公開 API) で、進捗の判断には使わない
 - 元タスク一覧: [`FEP_FUTURE.md`](FEP_FUTURE.md)
-- SQLite カーネル統合: [`../sqlite/00_INDEX.md`](../sqlite/00_INDEX.md)
+- SQLite カーネル統合: [`../../archive/v21/sqlite/00_INDEX.md`](../../archive/v21/sqlite/00_INDEX.md)
 - 対象ソース: `kernel/ime.c` / `kernel/ime.h` / `kernel/ime_dict.c` / `kernel/ime_romkana.c`
 
 > **コーディング規約 (本設計のコードスケッチも準拠):**
@@ -37,7 +37,7 @@ P1→P2→P3 は独立して着手可能。P5 は描画バックエンド抽象�
 > **実装状況 (2026-08-07):** §1 の描画バックエンド抽象化 (`kernel/ime_render.h` +
 > `ime_render_tvram.c`) と P1 / P2 / P3 は実装され、本リポジトリ `main` に
 > 移植済み (KAPI v35)。経緯は
-> [`../wintree_port/PORT_PLAN.md`](../wintree_port/PORT_PLAN.md) フェーズ6 を参照。
+> [`../../archive/v21/wintree_port/PORT_PLAN.md`](../../archive/v21/wintree_port/PORT_PLAN.md) フェーズ6 を参照。
 >
 > **解決済み (2026-08-07):** 「漢字変換が候補ゼロになり SPACE がかな確定に
 > フォールバックする」不具合は、複合原因を特定して修正した。

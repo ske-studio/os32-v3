@@ -2,7 +2,7 @@
 /*  V86.H — 仮想8086モード ランタイム                                       */
 /*                                                                          */
 /*  16bit ゲスト (PC-98 ネイティブゲーム / DOS) を OS32 上で走らせるための   */
-/*  最小ランタイム。方式と根拠は docs/tasks/v86v2/00_approach_study.md。     */
+/*  最小ランタイム。方式と根拠は docs/archive/v21/v86v2/00_approach_study.md。     */
 /*                                                                          */
 /*  カーネルに置くのは以下だけ:                                             */
 /*    特権命令の発行 / #GP・#DB・#PF の一次受け / IRQ ISR 本体 /            */
@@ -26,7 +26,7 @@
  * INT n / CLI / STI / PUSHF / POPF / IRET が全て #GP に落ちる。
  * IOPL=3 ならこれらは素通りし、I/O だけが TSS の I/O 許可ビットマップで
  * 個別に制御される。実測ではこれで #GP レートが 5〜6 倍下がる
- * (docs/tasks/v86v2/00_approach_study.md §3.1)。
+ * (docs/archive/v21/v86v2/00_approach_study.md §3.1)。
  *
  * 代償はゲストの CLI が実 IF を落とすこと。暴走した場合の脱出手段が
  * 別途必要になる。

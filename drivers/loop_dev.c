@@ -674,7 +674,7 @@ int loop_dev_track_id_d88(int slot, u8 trk_cyl, u8 trk_head, u16 index,
  *
  * 実測: MS-DOS 5 が SASI 規約で投げた C=0/H=0/R=0 の読みに対して、
  * FAT 領域の中身を「成功」として返していた。
- * → docs/tasks/v86v2/08_dos5.md §2 */
+ * → docs/archive/v21/v86v2/08_dos5.md §2 */
 static int raw_chs_ok(const LoopSlot *s, u16 cyl, u8 head, u8 sect)
 {
     if (sect == 0 || (u32)sect > (u32)s->spt)   return 0;

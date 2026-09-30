@@ -94,7 +94,7 @@ int v86_mem_setup(void)
      * ROM 帯は読み取り専用で見せる。BIOS ROM も含めて実行可能にしておく —
      * 前回プロジェクトは ROM 実行を排除する「方法C」を実装した翌日に、
      * NP21/W のソースを読んで「ROM は CPU が直接実行するのが正しい」と
-     * 判明して全撤回している (docs/tasks/v86v2/01_prior_session_analysis.md)。
+     * 判明して全撤回している (docs/archive/v21/v86v2/01_prior_session_analysis.md)。
      * 同じ回り道はしない。 */
     {
         int mi;
