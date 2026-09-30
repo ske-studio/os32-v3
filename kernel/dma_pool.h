@@ -90,7 +90,7 @@ int dma_pool_state_mark_leaked(struct dma_pool_state *s, u32 virt);
 /*  唯一の池 (kernel/dma_pool.c)。全部 irq_save の短い区間                  */
 /* ------------------------------------------------------------------------ */
 
-/* paging_init と pgalloc_init の後、pci_bind_all の前に 1 回だけ。 */
+/* paging_init と memory_boot_init の後、pci_bind_all の前に 1 回だけ。 */
 void dma_pool_init(void);
 
 /* 取れたら先頭番地 (物理 = 仮想) を返す。取れなければ NULL + *phys_out = 0。

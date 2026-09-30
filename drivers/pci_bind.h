@@ -157,7 +157,7 @@ u8   pci_bind_reason_get(void);
 /* ======================================================================== */
 
 /* 列挙表の全デバイスに対して pci_bind_one を回す。
- * **pgalloc_init と dma_pool_init の後**に呼ぶ (probe が dma_pool_alloc と
+ * **memory_boot_init と dma_pool_init の後**に呼ぶ (probe が dma_pool_alloc と
  * irq_register を使うので)。戻り値 = BOUND になった台数。 */
 int pci_bind_all(const struct pci_driver *const *table, int n);
 

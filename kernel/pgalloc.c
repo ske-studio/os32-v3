@@ -6,20 +6,20 @@
 #include "memmap.h"
 #include "io.h"
 
-/* Old boot has no metadata provider yet. Small, kernel-owned compatibility
- * backing only; it does not set the capacity of the model-based allocator.
- * PHYSMEM_LEGACY_MAX_PFN bounds the OLD LOADER's reportable extent and the
- * contiguous legacy arena, never total RAM (K6-RAM): the model path sizes its
- * metadata from the detected limit and its workspace bitmap stays indexed by
- * arena PFNs, which init_model keeps below PHYSMEM_LEGACY_MAX_PFN. */
-#define LEGACY_WORDS ((PHYSMEM_LEGACY_MAX_PFN + 31) / 32)
-static u32 legacy_metadata[LEGACY_WORDS * 2];
+/* The workspace bitmap is indexed by arena PFNs: both backing kinds keep the
+ * workspace below PHYSMEM_LEGACY_MAX_PFN (ARENA_TOP: the low RAM tail;
+ * FIXED: [MEM_LEDGER_META_BASE, MEM_LEDGER_META_END) in the kernel band).
+ * There is no legacy allocator any more (T1a, TASK_T1_LEDGER §4-1): every
+ * configuration boots through the model path. */
+#define WORKSPACE_WORDS ((PHYSMEM_LEGACY_MAX_PFN + 31) / 32)
 static u32 *eligible, *bitmap;
 static u32 limit_pfn, generic_end, total_pages, used_pages;
 static int initialized;
 static int online, model_mode;
 static u32 workspace_first, workspace_end;
-static u32 workspace_used[LEGACY_WORDS];
+/* legacy arena end (PFN) after the model reserved its backing; frozen once. */
+static u32 arena_end;
+static u32 workspace_used[WORKSPACE_WORDS];
 /* Private fixed/permanent provenance, NOT the caller's live physmem model.
  * Unknown apertures may be claimed, generic reserved/MMIO may not. */
 static struct physmem device_boot_map;
@@ -87,12 +87,28 @@ u32 pgalloc_metadata_bytes(const struct physmem *m)
     bytes = ((limit + 31) / 32) * sizeof(u32) * 2;
     return (bytes + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
 }
+/* 全ページが L0 で RESERVED (RAM ではない) か。FIXED 型の backing の条件。 */
+static int all_reserved(const struct physmem *m, u32 first, u32 end)
+{
+    u32 count;
+    return physmem_count(m, first, end, PHYSMEM_RESERVED, &count) &&
+           count == end - first;
+}
+
+/* backing の種類で検証経路を分ける (TASK_T1_LEDGER §3-3、B2):
+ *   ARENA_TOP  低位 RAM の末尾。RAM から予約し、workspace はアプリ帯の最大
+ *              上端より上 (2 枚 PDE のアプリが master の PT を USER で恒等
+ *              写像できないこと)。metadata は exec のロード起点より上。
+ *   FIXED      [MEM_LEDGER_META_BASE, MEM_LEDGER_META_END)。L0 で RESERVED
+ *              (RAM ではない) なので予約はしない。PDE 0 (supervisor) の中なので
+ *              アプリの恒等写像は届かない。
+ * どちらも verify (実 PTE の検査) を通してから、失敗しうる処理の後に書く。 */
 static int init_model(struct physmem *m, void *backing, u32 capacity,
-                      u32 first, u32 ws_first, u32 ws_end,
+                      u32 first, u32 ws_first, u32 ws_end, u32 kind,
                       int (*verify)(u32, u32, void *))
 {
     struct physmem next;
-    u32 bytes, pages, limit, addr, model_addr;
+    u32 bytes, pages, limit, addr, model_addr, lo, hi;
     unsigned int flags;
     int ok;
     flags = irq_save();
@@ -106,30 +122,45 @@ static int init_model(struct physmem *m, void *backing, u32 capacity,
         addr > ~0UL - bytes || model_addr > ~0UL - sizeof(*m)) goto done;
     if (addr < model_addr + sizeof(*m) && model_addr < addr + bytes) goto done;
     pages = bytes / PAGE_SIZE;
-    if (first < MEM_EXEC_LOAD_ADDR / PAGE_SIZE ||
-        first >= PHYSMEM_LEGACY_MAX_PFN ||
-        pages > PHYSMEM_LEGACY_MAX_PFN - first ||
-        first + pages > physmem_legacy_end(m)) goto done;
+    if (kind == PGALLOC_BACKING_FIXED) {
+        lo = MEM_LEDGER_META_BASE / PAGE_SIZE;
+        hi = MEM_LEDGER_META_END / PAGE_SIZE;
+        if (first < lo || first >= hi || pages > hi - first ||
+            !all_reserved(m, first, first + pages)) goto done;
+    } else if (kind == PGALLOC_BACKING_ARENA_TOP) {
+        if (first < MEM_EXEC_LOAD_ADDR / PAGE_SIZE ||
+            first >= PHYSMEM_LEGACY_MAX_PFN ||
+            pages > PHYSMEM_LEGACY_MAX_PFN - first ||
+            first + pages > physmem_legacy_end(m)) goto done;
+    } else goto done;
 #if !defined(PGALLOC_HOST_TEST) || PGALLOC_HOST_TEST != 1 || defined(__KERNEL_BUILD__)
     if (addr != first * PAGE_SIZE) goto done;
 #endif
     next = *m;
-    if (!physmem_reserve_ram(&next, first, first + pages) ||
+    if ((kind == PGALLOC_BACKING_ARENA_TOP &&
+         !physmem_reserve_ram(&next, first, first + pages)) ||
         !verify(first, pages, backing)) goto done;
     if (ws_first || ws_end) {
-        if (ws_first < MEM_APP_BAND_MAX_TOP / PAGE_SIZE || ws_first >= ws_end ||
-            ws_end > first ||
+        if (ws_first >= ws_end ||
             (model_addr < ws_end * PAGE_SIZE &&
              ws_first * PAGE_SIZE < model_addr + sizeof(*m)) ||
-            (addr < ws_end * PAGE_SIZE && ws_first * PAGE_SIZE < addr + bytes) ||
-            !physmem_reserve_ram(&next, ws_first, ws_end) ||
-            !verify(ws_first, ws_end - ws_first, (void *)(ws_first * PAGE_SIZE)))
+            (addr < ws_end * PAGE_SIZE && ws_first * PAGE_SIZE < addr + bytes))
+            goto done;
+        if (kind == PGALLOC_BACKING_FIXED) {
+            if (ws_first < MEM_LEDGER_META_BASE / PAGE_SIZE ||
+                ws_end > MEM_LEDGER_META_END / PAGE_SIZE ||
+                (ws_first < first + pages && first < ws_end) ||
+                !all_reserved(&next, ws_first, ws_end)) goto done;
+        } else if (ws_first < MEM_APP_BAND_MAX_TOP / PAGE_SIZE || ws_end > first ||
+                   !physmem_reserve_ram(&next, ws_first, ws_end)) goto done;
+        if (!verify(ws_first, ws_end - ws_first, (void *)(ws_first * PAGE_SIZE)))
             goto done;
     }
     /* No fallible work follows. Never zero before reservation/checks succeed. */
     *m = next;
     init_core(&next, (u32 *)backing, limit);
     generic_end = physmem_legacy_end(&next);
+    arena_end = generic_end;
     workspace_first = ws_first;
     workspace_end = ws_end;
     model_mode = 1;
@@ -142,7 +173,8 @@ done:
 int pgalloc_init_model(struct physmem *m, void *backing, u32 capacity,
                        u32 first, int (*verify)(u32, u32, void *))
 {
-    return init_model(m, backing, capacity, first, 0, 0, verify);
+    return init_model(m, backing, capacity, first, 0, 0,
+                      PGALLOC_BACKING_ARENA_TOP, verify);
 }
 
 int pgalloc_init_layout(struct physmem *m, const struct pgalloc_layout *l,
@@ -150,7 +182,12 @@ int pgalloc_init_layout(struct physmem *m, const struct pgalloc_layout *l,
 {
     if (!l || !l->workspace_first || !l->workspace_end) return 0;
     return init_model(m, l->metadata, l->capacity, l->metadata_first,
-                      l->workspace_first, l->workspace_end, verify);
+                      l->workspace_first, l->workspace_end, l->kind, verify);
+}
+
+u32 pgalloc_arena_end(void)
+{
+    return model_mode ? arena_end : 0;
 }
 
 int pgalloc_model_state(void)
@@ -181,7 +218,7 @@ void pgalloc_free_pt(u32 phys)
 {
     u32 p;
     unsigned int flags;
-    if (!model_mode) { pgalloc_free_page(phys); return; }
+    if (!model_mode) return;
     flags = irq_save();
     p = phys / PAGE_SIZE;
     if (!(phys & (PAGE_SIZE - 1)) && p >= workspace_first && p < workspace_end)
@@ -227,24 +264,6 @@ done:
     return ok;
 }
 
-void pgalloc_init(u32 mem_kb)
-{
-    struct physmem m;
-    unsigned int flags;
-    u32 i, limit;
-    flags = irq_save();
-    if (!initialized) {
-        physmem_bootstrap_legacy(&m, mem_kb);
-        limit = PGALLOC_BASE / PAGE_SIZE;
-        for (i = 0; i < m.count; i++)
-            if (m.ranges[i].kind == PHYSMEM_RAM) limit = m.ranges[i].end;
-        init_core(&m, legacy_metadata, limit);
-        generic_end = limit;
-        online = 1;
-    }
-    irq_restore(flags);
-}
-
 static int alloc_n_pfn(int n, u32 first, u32 end, u32 *pfn)
 {
     u32 start, i;
@@ -279,18 +298,18 @@ int pgalloc_alloc_n_pfn(int n, u32 first, u32 end, u32 *pfn)
 u32 pgalloc_alloc_n_range(int n, u32 lo, u32 hi)
 {
     u32 pfn;
-    if (lo < PGALLOC_BASE || lo >= hi ||
+    if (lo < MEM_POOL_BASE || lo >= hi ||
         (lo & (PAGE_SIZE - 1)) || (hi & (PAGE_SIZE - 1))) return 0;
     if (!pgalloc_alloc_n_pfn(n, lo / PAGE_SIZE, hi / PAGE_SIZE, &pfn)) return 0;
     return pfn * PAGE_SIZE;
 }
 
-/* Legacy clients dereference returned addresses: MODEL publishes the full
- * eligible limit only after mapping; old boot retains its low mapped limit. */
+/* Clients dereference returned addresses: MODEL publishes the full eligible
+ * limit only after stage_online has mapped it. */
 u32 pgalloc_alloc_n(int n)
 {
     u32 pfn;
-    if (!pgalloc_alloc_n_pfn(n, PGALLOC_BASE / PAGE_SIZE, generic_end, &pfn)) return 0;
+    if (!pgalloc_alloc_n_pfn(n, MEM_POOL_BASE / PAGE_SIZE, generic_end, &pfn)) return 0;
     return pfn * PAGE_SIZE;
 }
 u32 pgalloc_alloc_page(void) { return pgalloc_alloc_n(1); }

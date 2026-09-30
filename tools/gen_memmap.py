@@ -241,8 +241,15 @@ def bands(m, sym):
     add(SQL, "DMA プール", v("MEM_DMA_POOL_BASE"), v("MEM_DMA_POOL_END"), "RW",
         "予約域に開けた穴。present / supervisor / R/W。**USER は立てない** "
         "(kselftest の MM 検査が MM_RW と MM_RWU を分けて見る)")
+    # 予約域の上側は「4KB のガード + 8KB の台帳 backing」に割れる
+    # (票 docs/tasks/v3/TASK_T1_LEDGER.md §3-3、T1a)。backing を張るのは
+    # FIXED 型 (低位 RAM の末尾に置けない 8MB・9MB・12MB) のときだけ。
     add(SQL, "カーネル予約 (上)", (v("MEM_DMA_POOL_END") or 0) + 1,
-        v("MEM_KERNEL_RESV_END"), "NP", "DMA プールの上側ガード")
+        (v("MEM_LEDGER_META_BASE") or 0) - 1, "NP", "DMA プールの上側ガード")
+    add(SQL, "台帳 backing (FIXED 型)", v("MEM_LEDGER_META_BASE"),
+        (v("MEM_LEDGER_META_END") or 0) - 1, "NP / RW",
+        "metadata 1 ページ + PT workspace 1 ページ。FIXED 型のときだけ "
+        "present / supervisor / R/W (USER なし)、ほかの構成では予約域 (NP) のまま")
     add(SQL, "カーネルスタックガード", v("MEM_STACK_GUARD"),
         v("MEM_STACK_GUARD_END"), "NP", "2026-09-17 に 0x1FB000 から移設 (決裁 D1)")
     add(SQL, "カーネルスタック", v("MEM_KSTACK_BASE"),
@@ -267,13 +274,27 @@ def bands(m, sym):
         (v("MEM_SHLIB_END") or 0) - 1, "RO+USER / RW+USER",
         ".text は全 PD 共有、.data/.bss はアプリごとの物理")
     add(APP, "外部プログラム空間", v("MEM_EXEC_LOAD_ADDR"), None, "RW+USER",
-        "code+bss → sbrk → ガード → exec_heap → スタック。上端は実行時に決まる")
+        "code+bss → sbrk → ガード → exec_heap → スタック。上端は実行時に決まる。"
+        "物理ページの池の下端は MEM_POOL_BASE")
+    add(APP, "集積域 (ブート時)", v("MEM_BOOT_STAGING_BASE"),
+        plus("MEM_BOOT_STAGING_BASE", "MEM_BOOT_STAGING_SIZE", -1), "池",
+        "圧縮画像の読み込み先 (T6b 以後)。展開が終われば池へ。T1 ではローダは未使用")
+    add(APP, "同梱域 (ブート時)", v("MEM_BOOT_BUNDLE_BASE"),
+        plus("MEM_BOOT_BUNDLE_BASE", "MEM_BOOT_BUNDLE_SIZE", -1), "池",
+        "ブート必須モジュールの展開先 (T5b 以後、台帳が owner=bundle で予約)。"
+        "T1 ではローダは未使用")
 
     add(DEV, "PC-98 システム空間 (PEGC リニア窓)", v("MEM_SYSTEM_SPACE_BASE"),
         (v("MEM_SYSTEM_SPACE_END") or 0) - 1, "NP / supervisor+PCD",
         "RAM として配らない")
-    add(DEV, "16MB 以上の実 RAM", v("MEM_HIGH_RAM_BASE"), None, "RW",
-        "検出量ぶんだけ pgalloc の池に入る (K6-RAM)")
+    ceiling = v("MEM_PHYS_RAM_CEILING")
+    add(DEV, "16MB 以上の実 RAM (の置き場)", v("MEM_HIGH_RAM_BASE"),
+        (ceiling - 1) if ceiling else None, "RW",
+        "検出量ぶんだけ pgalloc の池に入る (K6-RAM)。上端は MEM_PHYS_RAM_CEILING (D11)")
+    add(DEV, "RAM の登録上限 (2GB) 以上", v("MEM_PHYS_RAM_CEILING"), 0xFFFFFFFF,
+        "NP / supervisor+PCD",
+        "RAM として登録しない (D11)。PCI の BAR・デバイス窓の帯 (0xFE000000〜)・"
+        "最上位の ROM / MMIO")
     return rows
 
 

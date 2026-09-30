@@ -694,7 +694,7 @@ static int pegc_reserve_backbuffer(void)
         return 0;
     }
     /* pgalloc の管理域の末尾でもあるので、動的確保に配られないよう押さえる。
-     * (sys_usable_mem_end() は下がったが pgalloc_init は既に済んでいる) */
+     * (sys_usable_mem_end() は下がったが memory_boot_init は既に済んでいる) */
     pgalloc_mark_used(s_bb_phys, (int)((u32)MEM_GFX_BB8_SIZE / PAGE_SIZE));
     /* **予約した直後に 0 で埋める**。この面は exec が CPL=3 のアプリへ USER
      * で写す (exec/exec.c、gfx_bb_phys_range)。prepare は init と違って画面を

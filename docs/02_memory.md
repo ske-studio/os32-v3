@@ -91,7 +91,7 @@
 読み手に暗算させ、2026-09-17 の「SHM がカーネルスタックに食い込んでいた」穴を隠していた。
 
 ```
-__bss_end      = 0x191C20   (カーネル本体 583.0KB)
+__bss_end      = 0x191820   (カーネル本体 582.0KB)
 __sqlite_start = 0x200000
 __sqlite_end   = 0x2BC200   (SQLite 本体 752.5KB)
 
@@ -106,8 +106,8 @@ __sqlite_end   = 0x2BC200   (SQLite 本体 752.5KB)
 0x0F0000 - 0x0FFFFF 64KB     BIOS ROM                                                      RO
 
 [ カーネル帯域 (0x100000-0x1FFFFF) ]
-0x100000 - 0x191C1F 583.0KB  カーネル .text/.data/.bss  (kernel.map の __bss_end まで)     RW
-0x191C20 - 0x191FFF 992B     空き
+0x100000 - 0x19181F 582.0KB  カーネル .text/.data/.bss  (kernel.map の __bss_end まで)     RW
+0x191820 - 0x191FFF 2.0KB    空き
 0x192000 - 0x1C1FFF 192KB    カーネルヒープ (kmalloc)  (__bss_end を 4KB に切り上げた位置から) RW
 0x1C2000 - 0x1C2FFF 4KB      KernelAPI テーブル  (KAPI_ADDR)                               RW
 0x1C3000 - 0x1C3FFF 4KB      SHM 前方ガード                                                NP
@@ -122,7 +122,8 @@ __sqlite_end   = 0x2BC200   (SQLite 本体 752.5KB)
 0x2BD000 - 0x2DCFFF 128KB    SQLite 代替スタック                                           RW
 0x2DD000 - 0x2E7FFF 44KB     カーネル予約 (下)  (DMA プールの下側ガード)                   NP
 0x2E8000 - 0x2F7FFF 64KB     DMA プール  (予約域に開けた穴。present / supervisor / R/W。**USER は立てない** (kselftest の MM 検査が MM_RW と MM_RWU を分けて見る)) RW
-0x2F8000 - 0x2FAFFF 12KB     カーネル予約 (上)  (DMA プールの上側ガード)                   NP
+0x2F8000 - 0x2F8FFF 4KB      カーネル予約 (上)  (DMA プールの上側ガード)                   NP
+0x2F9000 - 0x2FAFFF 8KB      台帳 backing (FIXED 型)  (metadata 1 ページ + PT workspace 1 ページ。FIXED 型のときだけ present / supervisor / R/W (USER なし)、ほかの構成では予約域 (NP) のまま) NP / RW
 0x2FB000 - 0x2FBFFF 4KB      カーネルスタックガード  (2026-09-17 に 0x1FB000 から移設 (決裁 D1)) NP
 0x2FC000 - 0x2FFFFF 16KB     カーネルスタック  (ESP 初期値 = MEM_KSTACK_TOP (kentry.asm / TSS.ESP0)) RW
 
@@ -134,11 +135,14 @@ __sqlite_end   = 0x2BC200   (SQLite 本体 752.5KB)
 
 [ 共有ライブラリ / プログラム空間 (0x400000-) ]
 0x400000 - 0x4FFFFF 1MB      共有ライブラリ帯 (libos32gui.shlib)  (.text は全 PD 共有、.data/.bss はアプリごとの物理) RO+USER / RW+USER
-0x500000 -        動的     外部プログラム空間  (code+bss → sbrk → ガード → exec_heap → スタック。上端は実行時に決まる) RW+USER
+0x500000 -        動的     外部プログラム空間  (code+bss → sbrk → ガード → exec_heap → スタック。上端は実行時に決まる。物理ページの池の下端は MEM_POOL_BASE) RW+USER
+0x500000 - 0x5FFFFF 1MB      集積域 (ブート時)  (圧縮画像の読み込み先 (T6b 以後)。展開が終われば池へ。T1 ではローダは未使用) 池
+0x600000 - 0x6FFFFF 1MB      同梱域 (ブート時)  (ブート必須モジュールの展開先 (T5b 以後、台帳が owner=bundle で予約)。T1 ではローダは未使用) 池
 
 [ デバイス窓 (実 RAM ではない) ]
 0xF00000 - 0xFFFFFF 1MB      PC-98 システム空間 (PEGC リニア窓)  (RAM として配らない)      NP / supervisor+PCD
-0x1000000 -       動的     16MB 以上の実 RAM  (検出量ぶんだけ pgalloc の池に入る (K6-RAM)) RW
+0x1000000 - 0x7FFFFFFF 2032MB   16MB 以上の実 RAM (の置き場)  (検出量ぶんだけ pgalloc の池に入る (K6-RAM)。上端は MEM_PHYS_RAM_CEILING (D11)) RW
+0x80000000 - 0xFFFFFFFF 2048MB   RAM の登録上限 (2GB) 以上  (RAM として登録しない (D11)。PCI の BAR・デバイス窓の帯 (0xFE000000〜)・最上位の ROM / MMIO) NP / supervisor+PCD
 
   属性: RW=読み書き / RO=読み取り専用 / NP=Not-Present (ガード)
   USER=CPL=3 から見える。`<<<` の行は下の「地図の矛盾」に出る帯。
@@ -147,12 +151,12 @@ __sqlite_end   = 0x2BC200   (SQLite 本体 752.5KB)
 
 **地図の矛盾: 0 件** (重なりも逆転も無い。`--check` が毎回確かめる)
 
-**カーネル本体の予算**: 596KB 中 583.0KB を使用 (残り 13.0KB)。
+**カーネル本体の予算**: 596KB 中 582.0KB を使用 (残り 14.0KB)。
 
 **カーネルがあと何 KB 育つと何が壊れるか** (`__bss_end` が伸びると `KHEAP_BASE` 以降が芋づるで動く)
 
-- `__bss_end` +992B で KHEAP_BASE が 1 ページ上がる。0x192000 → 0x193000。以降の KAPI / SHM / ガードが全部 4KB 動く
-- `__bss_end` +13.0KB で **build/os32.ld の ASSERT がリンクを止める** (予算 MEM_KERNEL_IMAGE_MAX 超過)。止めるのが目的。超えたぶんだけ SHM 帯が カーネル帯域 0x1FFFFF を突き抜ける
+- `__bss_end` +2.0KB で KHEAP_BASE が 1 ページ上がる。0x192000 → 0x193000。以降の KAPI / SHM / ガードが全部 4KB 動く
+- `__bss_end` +14.0KB で **build/os32.ld の ASSERT がリンクを止める** (予算 MEM_KERNEL_IMAGE_MAX 超過)。止めるのが目的。超えたぶんだけ SHM 帯が カーネル帯域 0x1FFFFF を突き抜ける
 
 <!-- /生成: tools/gen_memmap.py -->
 
@@ -206,10 +210,10 @@ pgalloc_stage_online() が paging_map_phys() で張り、PT はブート workspa
 16MB 超で RAM が載っていない範囲は既定 Not-Present で、必要な範囲だけ paging_map_phys() で張る。
 **OS が番地を決めるデバイス窓は v3 のデバイス窓の帯 `[0xFE000000, 0xFF000000)`** (`MEM_DEVICE_APERTURE_*`、
 2026-09-29) に置く。RAM の量に関係なく RAM と重ならないよう物理地図で MMIO にし (RAM として登録できる上端 =
-`MEM_PHYS_RAM_CEILING`)、帯の先頭 4MB の PT を paging_init が**静的に 1 枚** (+4KB BSS) 持つ —
+`MEM_PHYS_RAM_CEILING` = 2GB、D11 — `[2GB, 4GB)` は窓の帯も含めて RAM にしない、T1a)、帯の先頭 4MB の PT を paging_init が**静的に 1 枚** (+4KB BSS) 持つ —
 新しい PDE は live AS が 0 の間しか足せないが、gfx の init は exec の後にも走るため。
 帯を物理地図で MMIO に登録するのは 16MB 超の RAM を登録する経路 (`memory_boot_add_high`) だけで、高位 RAM の無い
-構成 (legacy 経路) では帯は明示の MMIO 登録でなく UNKNOWN のまま — RAM にはならないので現状の RAM 判定・窓のマップには
+構成 (8MB〜15MB、台帳の置き場は FIXED / ARENA_TOP — TASK_T1_LEDGER §3-3) では帯は明示の MMIO 登録でなく UNKNOWN のまま — RAM にはならないので現状の RAM 判定・窓のマップには
 支障は無く、明示の登録は v3 の資源割当で引き継ぐ:
 
 ```

@@ -12,14 +12,15 @@ static void irq_restore(unsigned int flags) NOINST;
 #define IO_H
 #include "../../kernel/pgalloc.c"
 #include "../../kernel/physmem.c"
+#include "pgalloc_host_fixture.h"
 /* Each original case models a fresh boot. Production reinit is now refused;
- * reset only the private harness state, never add a product reset API. */
+ * reset only the private harness state, never add a product reset API.
+ * The legacy pgalloc_init is gone (T1a); the pool comes from the fixture. */
 static void test_boot(u32 kb)
 {
     initialized = 0;
-    pgalloc_init(kb);
+    host_pool_boot(kb);
 }
-#define pgalloc_init test_boot
 #define BITMAP_SIZE ((limit_pfn + 31) / 32)
 static u32 phys_to_idx(u32 phys) { return phys / PAGE_SIZE; }
 
@@ -86,7 +87,7 @@ static void basic(void)
     u32 before;
     CHECK(sizeof(u32) == 4 && sizeof(int) == 4);
     CHECK(pgalloc_alloc_n_range != 0);
-    pgalloc_init(MEM_HIGH_RAM_BASE / 1024);
+    test_boot(MEM_HIGH_RAM_BASE / 1024);
     before = pgalloc_free_pages();
     CHECK(pgalloc_alloc_n_range(2, lo, lo + 2 * PAGE_SIZE) == lo);
     CHECK(pgalloc_free_pages() == before - 2);
@@ -103,7 +104,7 @@ static void irq_atomic(void)
     int enabled;
 
     for (enabled = 1; enabled >= 0; enabled--) {
-        pgalloc_init(MEM_HIGH_RAM_BASE / 1024);
+        test_boot(MEM_HIGH_RAM_BASE / 1024);
         initial = 0x45U | (enabled ? TEST_IF : 0);
         test_flags = initial;
         saves = restores = 0;
@@ -122,7 +123,7 @@ static void irq_atomic(void)
     }
 }
 
-static u32 expected_bitmap[LEGACY_WORDS];
+static u32 expected_bitmap[WORKSPACE_WORDS];
 static u32 expected_used;
 static int checking_commit;
 
@@ -180,7 +181,7 @@ static void boundaries(void)
     u32 end;
     int enabled;
     for (enabled = 0; enabled <= 1; enabled++) {
-        pgalloc_init(MEM_HIGH_RAM_BASE / 1024);
+        test_boot(MEM_HIGH_RAM_BASE / 1024);
         end = pgalloc_limit_pfn() * PAGE_SIZE;
         test_flags = 0x45U | (enabled ? TEST_IF : 0);
         pgalloc_mark_used(lo + PAGE_SIZE, 1);
@@ -194,7 +195,7 @@ static void boundaries(void)
         range_expect(1, lo + PAGE_SIZE, lo, 0);
         range_expect(1, lo + 1, lo + PAGE_SIZE, 0);
         range_expect(1, lo, lo + PAGE_SIZE - 1, 0);
-        range_expect(1, PGALLOC_BASE - PAGE_SIZE, lo, 0);
+        range_expect(1, MEM_POOL_BASE - PAGE_SIZE, lo, 0);
         range_expect(1, 0, lo, 0);
         range_expect(1, lo, end + PAGE_SIZE, 0);
         range_expect(1, end, end + PAGE_SIZE, 0);
@@ -202,12 +203,12 @@ static void boundaries(void)
         range_expect(1, 0xfffff000UL, 0, 0);
         range_expect(1, lo, 0xffffffffUL, 0);
         range_expect(1, end - PAGE_SIZE, end, end - PAGE_SIZE);
-        range_expect(1, PGALLOC_BASE, PGALLOC_BASE + PAGE_SIZE, PGALLOC_BASE);
-        pgalloc_init(0);
-        range_expect(1, PGALLOC_BASE, PGALLOC_BASE + PAGE_SIZE, 0);
-        pgalloc_init((PGALLOC_BASE + PAGE_SIZE + 1024) / 1024);
-        range_expect(1, PGALLOC_BASE, PGALLOC_BASE + 2 * PAGE_SIZE, 0);
-        range_expect(1, PGALLOC_BASE, PGALLOC_BASE + PAGE_SIZE, PGALLOC_BASE);
+        range_expect(1, MEM_POOL_BASE, MEM_POOL_BASE + PAGE_SIZE, MEM_POOL_BASE);
+        test_boot(0);
+        range_expect(1, MEM_POOL_BASE, MEM_POOL_BASE + PAGE_SIZE, 0);
+        test_boot((MEM_POOL_BASE + PAGE_SIZE + 1024) / 1024);
+        range_expect(1, MEM_POOL_BASE, MEM_POOL_BASE + 2 * PAGE_SIZE, 0);
+        range_expect(1, MEM_POOL_BASE, MEM_POOL_BASE + PAGE_SIZE, MEM_POOL_BASE);
     }
 }
 
@@ -215,7 +216,7 @@ static void fragmentation(void)
 {
     u32 lo = MEM_APP_BAND_TOP + 29 * PAGE_SIZE;
     u32 end = lo + 8 * PAGE_SIZE;
-    pgalloc_init(MEM_HIGH_RAM_BASE / 1024);
+    test_boot(MEM_HIGH_RAM_BASE / 1024);
     pgalloc_mark_used(lo + PAGE_SIZE, 1);
     pgalloc_mark_used(lo + 4 * PAGE_SIZE, 1);
     range_expect(3, lo, end, lo + 5 * PAGE_SIZE);
@@ -223,7 +224,7 @@ static void fragmentation(void)
     range_expect(2, lo, end, lo + 2 * PAGE_SIZE);
     range_expect(1, lo, end, lo);
     range_expect(1, lo, end, 0);
-    CHECK(pgalloc_alloc_page() == PGALLOC_BASE); /* APP_BAND remains free */
+    CHECK(pgalloc_alloc_page() == MEM_POOL_BASE); /* APP_BAND remains free */
     pgalloc_free_n(lo + 5 * PAGE_SIZE, 3);
     range_expect(3, lo, end, lo + 5 * PAGE_SIZE);
 }
@@ -236,7 +237,7 @@ static void exhaustive(void)
     u32 expected;
     for (mask = 0; mask < 256; mask++) {
         for (n = 1; n <= 9; n++) {
-            pgalloc_init(MEM_HIGH_RAM_BASE / 1024);
+            test_boot(MEM_HIGH_RAM_BASE / 1024);
             for (j = 0; j < 8; j++) {
                 if (mask & (1U << j)) pgalloc_mark_used(lo + j * PAGE_SIZE, 1);
             }
@@ -259,8 +260,8 @@ static void exhaustive(void)
 
 static void generic_regression(void)
 {
-    u32 count, base = PGALLOC_BASE;
-    pgalloc_init(0xffffffffUL);
+    u32 count, base = MEM_POOL_BASE;
+    test_boot(0xffffffffUL);
     count = (MEM_HIGH_RAM_BASE - base) / PAGE_SIZE;
     CHECK(pgalloc_total_pages() == count && pgalloc_free_pages() == count);
     CHECK(pgalloc_alloc_n(0) == 0 && pgalloc_alloc_n(-1) == 0);
@@ -281,7 +282,7 @@ static void generic_regression(void)
     pgalloc_free_n(base + 2 * PAGE_SIZE, 2); /* double free stays harmless */
     CHECK(pgalloc_free_pages() == count);
     CHECK(pgalloc_total_pages() == count); /* marks do not remove eligibility */
-    pgalloc_init(0xffffffffUL); /* fresh-boot fixture for full-run regression */
+    test_boot(0xffffffffUL); /* fresh-boot fixture for full-run regression */
     CHECK(pgalloc_alloc_n((int)count) == base);
     CHECK(pgalloc_alloc_page() == 0 && pgalloc_alloc_n(1) == 0);
     range_expect(1, MEM_APP_BAND_TOP, MEM_APP_BAND_TOP + PAGE_SIZE, 0);
@@ -298,12 +299,12 @@ static void device_window_ram(void)
     u32 hi = MEM_HIGH_RAM_BASE / PAGE_SIZE;
 
     /* 8MiB: RAM が窓まで届かない = 窓は空いている (K6 以前と同じ判定)。 */
-    pgalloc_init(8192);
+    test_boot(8192);
     CHECK(!pgalloc_range_has_ram(lo, hi));
     CHECK(pgalloc_limit_pfn() * PAGE_SIZE <= MEM_SYSTEM_SPACE_BASE);
 
-    /* 16MiB を丸ごと RAM にした構成 (legacy 経路): 窓が RAM = 張れない。 */
-    pgalloc_init(MEM_HIGH_RAM_BASE / 1024);
+    /* 16MiB を丸ごと RAM にした構成 (試験用の池): 窓が RAM = 張れない。 */
+    test_boot(MEM_HIGH_RAM_BASE / 1024);
     CHECK(pgalloc_range_has_ram(lo, hi));
     /* 1 ページでも RAM が重なれば真 (部分一致で見落とさない)。 */
     CHECK(pgalloc_range_has_ram(hi - 1, hi));
@@ -313,7 +314,7 @@ static void device_window_ram(void)
     CHECK(pgalloc_range_has_ram(hi, lo));
     initialized = 0;
     CHECK(pgalloc_range_has_ram(lo, hi));
-    pgalloc_init(MEM_HIGH_RAM_BASE / 1024);
+    test_boot(MEM_HIGH_RAM_BASE / 1024);
 }
 
 void _start(void)

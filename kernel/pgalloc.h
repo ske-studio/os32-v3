@@ -18,8 +18,7 @@ int pgalloc_device_reserve(u32 owner, const struct sys_device_span *spans,
                            u32 fixed_end);
 #include "paging.h"
 
-/* 管理対象の開始アドレス (プログラム空間) */
-#define PGALLOC_BASE    0x400000UL
+/* 管理対象の開始アドレスは include/memmap.h の MEM_POOL_BASE (物理側の定数)。 */
 
 /* ======== API ======== */
 #include "physmem.h"
@@ -39,15 +38,23 @@ int pgalloc_device_reserve(u32 owner, const struct sys_device_span *spans,
 #define PGALLOC_BOOTSTRAP 1
 #define PGALLOC_ONLINE 2
 /* Model-only boot layout: [workspace_first,workspace_end) and metadata are
- * disjoint, mapped low RAM tails above final exec, up to real RAM end.
- * Workspace is permanently excluded from general allocation. */
+ * disjoint and permanently excluded from general allocation. Where they live
+ * is the backing kind (TASK_T1_LEDGER §3-3):
+ *   ARENA_TOP  mapped low RAM tails above final exec, up to real RAM end,
+ *              reserved from RAM; workspace at/above MEM_APP_BAND_MAX_TOP.
+ *   FIXED      [MEM_LEDGER_META_BASE, MEM_LEDGER_META_END) — not RAM in the
+ *              model (RESERVED), mapped supervisor RW only on this kind.
+ * kind 0 is ARENA_TOP so older positional initialisers keep their meaning. */
+#define PGALLOC_BACKING_ARENA_TOP 0
+#define PGALLOC_BACKING_FIXED     1
 struct pgalloc_layout {
     void *metadata;
     u32 capacity, metadata_first, workspace_first, workspace_end;
+    u32 kind;
 };
 int pgalloc_init_layout(struct physmem *model, const struct pgalloc_layout *layout,
                         int (*verify)(u32, u32, void *));
-/* 0 denotes the legacy/uninitialized path. No public setter or raw high-PFN
+/* 0 denotes the uninitialized allocator. No public setter or raw high-PFN
  * allocation escape hatch. Stage maps the frozen eligibility snapshot. */
 int pgalloc_model_state(void);
 int pgalloc_stage_online(void);
@@ -70,11 +77,13 @@ int pgalloc_free_n_pfn(u32 first, int n);
 int pgalloc_reserve_pfn(u32 first, u32 end);
 u32 pgalloc_limit_pfn(void);
 
-/* Legacy one-shot initialization after paging_init. Repeated calls are no-op.
- * Small kernel-owned backing, same PFN core; this fallback alone never admits
- * RAM above the old loader's reportable extent (PHYSMEM_LEGACY_MAX_PFN).
- * High RAM reaches the pool only through the model path (K6-RAM). */
-void pgalloc_init(u32 mem_kb);
+/* End PFN (exclusive) of the legacy arena — the contiguous low RAM from
+ * MEM_EXEC_LOAD_ADDR — after the model reserved its backing, frozen at init.
+ * ARENA_TOP: equals workspace_first. FIXED: the low RAM top (0x800 on 8MiB),
+ * independent of where the backing sits. 0 before the model is initialised.
+ * sys freezes the exec ceiling from this (sys_frozen_exec, B2). There is no
+ * legacy pgalloc_init any more: every configuration takes the model path. */
+u32 pgalloc_arena_end(void);
 
 /* 1ページ(4KB)確保。戻り値: 物理アドレス, 0=失敗 */
 u32  pgalloc_alloc_page(void);

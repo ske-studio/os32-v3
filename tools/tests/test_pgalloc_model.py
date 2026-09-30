@@ -17,6 +17,8 @@ class Integration(unittest.TestCase):
             source = (ROOT / 'kernel/pgalloc.c').read_text()
             source = source.replace('#include "io.h"', '')
             source += (ROOT / 'kernel/sys.c').read_text().replace('#include "io.h"', '')
+            # 旧 legacy pgalloc_init の代わりの足場 (T1a で製品から撤去)。
+            source += (ROOT / 'tools/tests/pgalloc_host_fixture.h').read_text()
             if exec_claim:
                 # Compile the actual layout helper, not a parallel test formula.
                 exec_source = (ROOT / 'exec/exec.c').read_text()
@@ -219,7 +221,7 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     base = sys_usable_mem_end();
     CHECK(!sys_reserve_top(0xffffffffUL));
     CHECK(sys_usable_mem_end() == base);
-    pgalloc_init(16384);
+    host_pool_boot(16384);
     CHECK(sys_reserve_top(PAGE_SIZE) == base - PAGE_SIZE);
     CHECK(sys_usable_mem_end() == base - PAGE_SIZE);
     CHECK(pgalloc_alloc_n_range(1, base - PAGE_SIZE, base) == 0);
@@ -265,12 +267,12 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     CHECK(host_if == 0x202 && saves == restores);
 ''', flags=('-DPHYSMEM_HOST_TEST=1', '-DPGALLOC_HOST_TEST=1'), physical_core=True)
 
-    def test_legacy_exec_child_claim_releases_exact_ab(self):
+    def test_pool_exec_child_claim_releases_exact_ab(self):
         self.run_c('''
     u32 a, b, baseline, total, gap, p;
     int na, nb, pass;
     sys_mem_kb = 16384;
-    pgalloc_init(sys_mem_kb);
+    host_pool_boot(sys_mem_kb);
     baseline = pgalloc_free_pages();
     total = pgalloc_total_pages();
     exec_child_claim(&a, &na, &b, &nb);
@@ -303,11 +305,11 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     }
 ''', exec_claim=True)
 
-    def test_legacy_shlib_failed_load_releases_one_mib(self):
+    def test_pool_shlib_failed_load_releases_one_mib(self):
         self.run_c('''
     u32 baseline, total;
     int pages, pass;
-    pgalloc_init(16384);
+    host_pool_boot(16384);
     baseline = pgalloc_free_pages();
     total = pgalloc_total_pages();
     pages = (int)(MEM_SHLIB_SIZE / PAGE_SIZE);
@@ -327,8 +329,8 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     def test_mark_live_and_permanent_mixture(self):
         self.run_c('''
     u32 p, baseline, total;
-    pgalloc_init(16384);
-    p = PGALLOC_BASE / PAGE_SIZE;
+    host_pool_boot(16384);
+    p = MEM_POOL_BASE / PAGE_SIZE;
     CHECK(pgalloc_reserve_pfn(p + 1, p + 2));
     total = pgalloc_total_pages();
     baseline = pgalloc_free_pages();
@@ -385,8 +387,8 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     def test_permanent_and_atomic_free(self):
         self.run_c('''
     u32 p, before;
-    pgalloc_init(16384);
-    p = PGALLOC_BASE;
+    host_pool_boot(16384);
+    p = MEM_POOL_BASE;
     /* Permanent reservation is explicit, not the legacy releasable claim. */
     CHECK(pgalloc_reserve_pfn(p / PAGE_SIZE, p / PAGE_SIZE + 1));
     before = pgalloc_free_pages();
@@ -400,7 +402,7 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     CHECK(pgalloc_free_pages() == before);
     pgalloc_free_n(p + PAGE_SIZE, 2);
     CHECK(pgalloc_free_pages() == before + 2);
-    pgalloc_init(8192);
+    host_pool_boot(8192);
     CHECK(pgalloc_free_pages() == before + 2);
     CHECK(host_if == 0x202 && saves == restores);
 ''')

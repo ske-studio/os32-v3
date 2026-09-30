@@ -279,7 +279,9 @@ void _start(void) {
     CHECK(WAB_XE10_LINEARWIN_BASE == MEM_DEVICE_APERTURE_BASE);
     CHECK(WAB_XE10_LINEARWIN_SIZE == 0x00200000UL);
     CHECK(xe_dec <= MEM_DEVICE_APERTURE_END / PHYSMEM_PAGE_SIZE);
-    CHECK(MEM_PHYS_RAM_CEILING == MEM_DEVICE_APERTURE_BASE);
+    /* D11: RAM の登録上限は 2GB。窓の帯はその上 (RAM にならない側) にある。 */
+    CHECK(MEM_PHYS_RAM_CEILING == 0x80000000UL);
+    CHECK(MEM_PHYS_RAM_CEILING <= MEM_DEVICE_APERTURE_BASE);
     /* Inactive apertures must not impose a default CUI RAM restriction. */
     CHECK(physmem_count(&m, guard, 4096, PHYSMEM_RAM, &count) && count == 256);
     CHECK(physmem_add_trusted(&m, xe, PHYSMEM_MAX_PFN, PHYSMEM_SOURCE_SYNTHETIC));

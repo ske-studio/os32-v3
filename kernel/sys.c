@@ -10,7 +10,7 @@
 #include "rtc.h"
 #include "os_time.h"
 
-/* 管理する物理 RAM の末尾 (バイト)。legacy 経路の上限そのもの。 */
+/* 管理する物理 RAM の末尾 (バイト)。legacy アリーナの上端そのもの。 */
 static u32 sys_phys_end(void);
 
 int sys_device_reserve_core(u32 owner, const struct sys_device_span *spans,
@@ -77,7 +77,7 @@ static int sys_model_staged;
 int sys_memory_bootstrap_model(struct physmem *m, const struct pgalloc_layout *l,
                                int (*verify)(u32, u32, void *))
 {
-    u32 top, bytes, count;
+    u32 top, bytes, count, minimum;
     struct pgalloc_layout layout;
     unsigned int flags;
     int ok;
@@ -90,18 +90,31 @@ int sys_memory_bootstrap_model(struct physmem *m, const struct pgalloc_layout *l
     l = &layout;
     top = physmem_legacy_end(m);
     bytes = pgalloc_metadata_bytes(m);
-    if (!bytes || top != m->legacy_ceiling || l->metadata_first >= top ||
-        bytes / PAGE_SIZE != top - l->metadata_first ||
-        l->workspace_end != l->metadata_first ||
-        l->workspace_first < (MEM_EXEC_LOAD_ADDR + MEM_EXEC_STACK_SIZE +
-            MEM_EXEC_SBRK_MIN + MEM_EXEC_HEAP_MIN) / PAGE_SIZE ||
-        top > PHYSMEM_LEGACY_MAX_PFN) goto done;
-    /* ホットデプロイ窓を撤去したので、legacy 上端の直上に予約帯は無い。
-     * 検証すべきは metadata / workspace の写像だけで、それは
+    minimum = (MEM_EXEC_LOAD_ADDR + MEM_EXEC_STACK_SIZE +
+               MEM_EXEC_SBRK_MIN + MEM_EXEC_HEAP_MIN) / PAGE_SIZE;
+    if (!bytes || top != m->legacy_ceiling || top > PHYSMEM_LEGACY_MAX_PFN)
+        goto done;
+    /* layout の検査は backing の種類で分ける (TASK_T1_LEDGER §3-3、B2)。
+     * ARENA_TOP: metadata は legacy 上端に接し、workspace はその直下で exec の
+     * 最小域より上。FIXED: 置き場は memmap.h の固定区間 (pgalloc が検査) で、
+     * exec はアリーナ全体 = 低位 RAM の上端まで使うので、その上端が exec の
+     * 最小域を満たすことだけを見る。 */
+    if (l->kind == PGALLOC_BACKING_ARENA_TOP) {
+        if (l->metadata_first >= top ||
+            bytes / PAGE_SIZE != top - l->metadata_first ||
+            l->workspace_end != l->metadata_first ||
+            l->workspace_first < minimum) goto done;
+    } else if (l->kind == PGALLOC_BACKING_FIXED) {
+        if (top < minimum) goto done;
+    } else goto done;
+    /* 検証すべきは metadata / workspace の写像だけで、それは
      * pgalloc_init_layout が verify を通して行う。 */
     (void)count;
     if (!pgalloc_init_layout(m, l, verify)) goto done;
-    sys_frozen_exec = l->workspace_first * PAGE_SIZE;
+    /* exec の上端はアリーナの上端から決める (B2)。ARENA_TOP では
+     * workspace_first と同じ値、FIXED では低位 RAM の上端 (backing の位置と
+     * 無関係)。 */
+    sys_frozen_exec = pgalloc_arena_end() * PAGE_SIZE;
     sys_frozen_end = top * PAGE_SIZE;
     sys_model_staged = 1;
     ok = 1;
@@ -134,7 +147,7 @@ int sys_memory_init_model(struct physmem *m, void *backing, u32 capacity,
         top > PHYSMEM_LEGACY_MAX_PFN) goto done;
     (void)count;
     if (!pgalloc_init_model(m, backing, capacity, first, verify)) goto done;
-    sys_frozen_exec = first * PAGE_SIZE;
+    sys_frozen_exec = pgalloc_arena_end() * PAGE_SIZE;
     sys_frozen_end = top * PAGE_SIZE;
     ok = 1;
 done:
@@ -171,9 +184,9 @@ u32 sys_usable_mem_end(void)
 /*  sys_usable_mem_end() はその分だけ下がるので、exec の子プロセス          */
 /*  (コード/ヒープ/スタック) はここへ伸びてこない。                         */
 /*                                                                          */
-/*  legacy 経路では上限 = ホットデプロイ窓の直下なので従来と同じ区間になる。 */
-/*  モデル経路では上限と窓の間に metadata / workspace が居るので、下げて     */
-/*  よいのは上限 (sys_frozen_exec) だけ。窓の位置は動かさない。             */
+/*  上限 = sys_frozen_exec (アリーナの上端、pgalloc_arena_end)。ARENA_TOP  */
+/*  型では上限の上に metadata / workspace が居るので、下げてよいのは上限だけ。 */
+/*  FIXED 型 (8MB 等) では上限 = 低位 RAM の上端で、旧 legacy 経路と同じ区間。 */
 /*                                                                          */
 /*  **exec_run より前 (ブート中) に 1 回だけ呼ぶこと。** 子プロセスが走って  */
 /*  いる最中に上限を動かすと、その子のレイアウトと pgalloc の予約範囲が      */
@@ -190,10 +203,9 @@ u32 sys_reserve_top(u32 bytes)
     result = 0;
     if (!bytes || bytes > ~0UL - (PAGE_SIZE - 1)) goto done;
     need = (bytes + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
-    /* Carve below the current usable ceiling, not below the hotdeploy window.
-     * On the model path metadata/workspace occupy the pages between the frozen
-     * exec ceiling and hotdeploy, so only the ceiling is safe to lower. Legacy
-     * has nothing in between, so both paths reduce to the same interval. */
+    /* Carve below the current usable ceiling. With ARENA_TOP backing the
+     * metadata/workspace sit above the frozen exec ceiling, so only the
+     * ceiling is safe to lower; FIXED backing has nothing above it. */
     ceiling = sys_usable_mem_end();
     if (sys_top_reserved) {
         if (sys_top_reserved == need) result = ceiling;
@@ -202,7 +214,7 @@ u32 sys_reserve_top(u32 bytes)
     minimum = MEM_EXEC_LOAD_ADDR + MEM_EXEC_STACK_SIZE +
               MEM_EXEC_SBRK_MIN + MEM_EXEC_HEAP_MIN;
     if (ceiling < minimum || need > ceiling - minimum) goto done;
-    /* Old boot calls after pgalloc_init. Never publish a numeric-only claim. */
+    /* Called after the model is ONLINE. Never publish a numeric-only claim. */
     if (!pgalloc_reserve_pfn((ceiling - need) / PAGE_SIZE,
                              ceiling / PAGE_SIZE)) goto done;
     sys_top_reserved = need;

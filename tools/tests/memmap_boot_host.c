@@ -37,6 +37,10 @@ static void report(const char *text, u32 len)
 
 void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 #include "pgalloc_host_source.c"
+/* pgalloc_host_source.c は irq_save() を 0 に置き換えてある。 */
+#define HOST_POOL_IRQ_SAVE() 0U
+#define HOST_POOL_IRQ_RESTORE(f) ((void)(f))
+#include "pgalloc_host_fixture.h"
 
 /* kernel/shm.c の shm_init() がページ表に対してやることの写し。
  *
@@ -95,7 +99,7 @@ void _start(void)
 
     /* ---- カーネルの起動順そのもの (kernel/kernel.c) ---- */
     paging_init(16384);
-    pgalloc_init(16384);
+    host_pool_boot(16384);
     paging_reclaim_conventional();
 
     /* SHM 後方予約は「空」(START == END + 1) なら呼ばれず、**逆転**
@@ -183,6 +187,21 @@ void _start(void)
         /* 撥ねた呼び出しは 1 ページも変えていない */
         CHECK(paging_is_present(0x2000));
     }
+
+    /* 台帳の backing (FIXED 型、TASK_T1_LEDGER §3-3 / T1-U1): 張る前は予約域
+     * (NP) を期待し、張った後は present / supervisor / RW を期待する。USER が
+     * 立てば MM 検査が 1 本の食い違いとして拾う。下の 0x2F8000 は NP のまま。 */
+    CHECK(!paging_is_present(MEM_LEDGER_META_BASE));
+    CHECK(paging_map_ledger_backing());
+    CHECK(paging_is_present(MEM_LEDGER_META_BASE));
+    CHECK(paging_is_present(MEM_LEDGER_META_END - PAGE_SIZE));
+    CHECK(!paging_is_present(MEM_LEDGER_META_BASE - PAGE_SIZE));
+    CHECK(!paging_is_present(MEM_LEDGER_META_END));
+    CHECK(paging_memmap_selftest(tramp) == bad);
+    CHECK(paging_poke_user_bit(MEM_LEDGER_META_BASE, 1) == 0);
+    CHECK(paging_memmap_selftest(tramp) == bad + 1);
+    (void)paging_poke_user_bit(MEM_LEDGER_META_BASE, 0);
+    CHECK(paging_memmap_selftest(tramp) == bad);
 
     SAY("PASS");
     die(0);

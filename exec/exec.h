@@ -151,7 +151,7 @@ int ring3_ptr_ok(u32 p);
  * (guard / sbrk 上限〜guard) をカーネルが写すと #PF になるが、それは既存の
  * フォールトガードが呼び手を kill する扱いで、kprintf の可変長 %s など他の
  * KAPI と同じ。表を歩こうとした実装は 2 度とも実機で誤判定した — PD と
- * アプリ PT が pgalloc (PGALLOC_BASE = アプリ帯 0x400000) から取られるため、
+ * アプリ PT が pgalloc (MEM_POOL_BASE = アプリ帯 0x400000) から取られるため、
  * syscall 中 (CR3 = アプリ PD) に物理 = 仮想で表を読むと per-app 物理へ
  * 張り替わった **アプリ自身のデータ** を読んでしまう。
  * 戻り値: 1 = 帯の中 / 0 = 拒否 (NULL・overflow・帯外)。 */

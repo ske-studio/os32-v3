@@ -43,6 +43,7 @@ void _start(void)
     paging_init(16384);
     physmem_bootstrap_legacy(&m,16384);
     CHECK(physmem_add_trusted(&m,4096,8192,PHYSMEM_SOURCE_SYNTHETIC));
+    l.kind = 0;   /* PGALLOC_BACKING_ARENA_TOP */
     l.capacity = pgalloc_metadata_bytes(&m);
     l.metadata_first = 4096 - l.capacity / PAGE_SIZE;
     l.metadata = (void *)(l.metadata_first * PAGE_SIZE);

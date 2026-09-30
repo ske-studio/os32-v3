@@ -25,7 +25,7 @@
 #include "types.h"
 #include "paging.h"
 
-/* 起動時に 1 回だけ呼ぶ (VFS 初期化後・シェル起動前、pgalloc_init 済み)。
+/* 起動時に 1 回だけ呼ぶ (VFS 初期化後・シェル起動前、memory_boot_init 済み)。
  * 戻り値: 0=ロード成功, -1=未ロード (ファイルが無い / 形式不正)。
  * -1 でも起動は続行してよい (GUI を使わないプログラムには影響しない)。 */
 int shlib_init(void);

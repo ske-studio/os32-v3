@@ -34,6 +34,7 @@ static void report(const char *s, u32 n)
 struct pgalloc_layout {
     void *metadata;
     u32 capacity, metadata_first, workspace_first, workspace_end;
+    u32 kind;
 };
 #endif
 extern int sys_memory_bootstrap_model(struct physmem *, const struct pgalloc_layout *,
@@ -56,6 +57,7 @@ void _start(void)
     CHECK(physmem_add_trusted(&m, 4096, TEST_END, PHYSMEM_SOURCE_SYNTHETIC));
     CHECK(physmem_exclude(&m, 5000, 5002, PHYSMEM_MMIO));
     CHECK(physmem_add_trusted(&m, 1048575, 1048576, PHYSMEM_SOURCE_SYNTHETIC));
+    l.kind = 0;   /* PGALLOC_BACKING_ARENA_TOP */
     l.capacity = pgalloc_metadata_bytes(&m);
     l.metadata_first = 4096 - l.capacity / PAGE_SIZE;
     l.metadata = (void *)(l.metadata_first * PAGE_SIZE);
@@ -140,7 +142,7 @@ void _start(void)
     CHECK(!page_tables[1023]);
 #ifndef TEST_LATE_OOM
     for (i = 8; i < TEST_END / PTE_COUNT; i++) CHECK(!page_tables[i] && !page_directory[i]);
-    for (i = 0; i < LEGACY_WORDS; i++) CHECK(!workspace_used[i]);
+    for (i = 0; i < WORKSPACE_WORDS; i++) CHECK(!workspace_used[i]);
 #else
     CHECK(paging_is_present((TEST_END - 1) * PAGE_SIZE));
 #endif
@@ -191,7 +193,7 @@ void _start(void)
     CHECK((u32)page_tables[1023] < l.workspace_end * PAGE_SIZE);
     CHECK(pgalloc_alloc_n_pfn(1, 1048575, 1048576, &p) && p == 1048575);
     CHECK(pgalloc_free_n_pfn(p, 1));
-    CHECK(pgalloc_reserve_pfn(PGALLOC_BASE / PAGE_SIZE, 4096));
+    CHECK(pgalloc_reserve_pfn(MEM_POOL_BASE / PAGE_SIZE, 4096));
     CHECK(pgalloc_alloc_page() == 4096 * PAGE_SIZE);
     CHECK(!sys_memory_stage_online());
     die(0);
