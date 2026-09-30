@@ -1,6 +1,6 @@
 # TASK_T1_LEDGER — T1: 物理地図と所有権台帳 (設計票)
 
-> 状態: **実装中 (2026-10-01) — T1a・T1b 着地 (main `d7ac7a0`)、次は T1c**。NP21/W 回帰の結果は §4-2-N。未確認: CTRL+STOP・#GP / #DE / #UD の kill・PCM 再生中の CTRL+STOP (NP21/W の構成に PCM が無い)、実機 Ra266 64MB (実機エージェントに依頼中)。
+> 状態: **実装中 (2026-10-01) — T1a・T1b 着地 (main `d7ac7a0`)、次は T1c**。NP21/W 回帰の結果は §4-2-N。CTRL+STOP・#GP / #DE / #UD の kill は 2026-10-01 に確認済み (§4-2-N の末尾)。未確認: PCM 再生中の CTRL+STOP (NP21/W の構成に PCM が無い)、実機 Ra266 64MB (実機エージェントに依頼中)。
 >
 > それまでの状態: **実装中 (2026-09-30) — T1b 実装済み、NP21/W 回帰は PM** (`wt/t1b`、コーダー `claude-opus-5-5`、結果は §4-2-R)。
 >
@@ -470,6 +470,19 @@ static inline u32  V2P(const volatile void *va) { return (u32)(uptr)va; }
 | 対照 | `faulttest loop 3` / `faulttest kloop 3` | 3 秒で自分から終わる。`loop` は先に `get_tick` で空回りの速さを較正し (`calibrated ...` の行)、本番の空回りでは KAPI を呼ばない | `loop done after N ticks` (N ≈ 300)、rc=0、カウンタは `ledger_*_ops` 以外動かない |
 
 `SURVIVED <kind>` が出て rc=2 なら保護が効いていない (不合格)。引数なしは使い方を出して rc=1。
+
+**未確認の取り直し (PM、2026-10-01、17MB、`faulttest` = main `168a47b`、カーネルは `d7ac7a0` のまま)**: 起動後の基準 `fault_kill_count`=0・`ledger_exc_ops`=0・`ledger_irq_ops`=0・`used_pages`=256。
+
+| 操作 | 結果 |
+|---|---|
+| `faulttest gp` (CPL=3 の `hlt`) | `[ring3] exception vec=0x0D … kill app` |
+| `faulttest de` (`divl` 0 除算) | `vec=0x00 … kill app` |
+| `faulttest ud` (`ud2`) | `vec=0x06 … kill app` |
+| 3 本の後 | `fault_kill_count`=3、`ledger_exc_ops`=0x906 (>0)、`kctx_exc_depth`=0、`used_pages`=256、`exec_as_leftover_pages`=0 |
+| `faulttest loop` (純ループ) 中に CTRL+STOP | `/api/key` は **`seq=CTRL%2BSTOP&hold=300`** で送る (MCP の `emu_key seq=CTRL+STOP` では効かなかった — 既知の罠)。EIP が 0x5002A0 (CPL=3) → カーネルへ戻り `[Process crashed]`。`ledger_irq_ops` 0 → 0x302 (IRQ 出口の `ring3_abort_check` で回収)、`kctx_irq_depth`=0、`used_pages`=256、leftover 0、`irq_ctx_violations`=1 のまま (起動時からの値)。`fault_kill_count` は 3 → 4 (CTRL+STOP も kill として数えられる) |
+| `faulttest kloop` (`get_tick` 連打) 中に CTRL+STOP | `[Process crashed]`。`ledger_irq_ops` は 0x302 のまま = syscall の入口で畳まれた経路。depth 0、`used_pages`=256、leftover 0 |
+
+残る未確認: PCM 再生中の CTRL+STOP → 再オープン・再生 (NP21/W のこの構成は `[pcm] none`、実機 Ra266 の CS4231 で)、実機 Ra266 64MB (実機エージェントに依頼中)。
 
 ### 4-3. T1c — `dma_alloc`
 
