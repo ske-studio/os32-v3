@@ -28,7 +28,7 @@ T0 は **「言語モードと検査の移行」に限定**する。旗を gnu89
 | 本体 (`kernel fs exec drivers gfx net lib include kapi arch platform`) | **gnu11** | `CFLAGS_COMMON` (`build/config.mk:112`) |
 | ブート (`boot/` の C) | **gnu11** | `CFLAGS_BOOT` (`build/boot.mk:15`) |
 | userland (`userland/`、`sdk/crt`) と SDK の**実装** (`userland/lib/`) | **gnu11** | `USER_CFLAGS` は `CFLAGS_COMMON` を継承 (`config.mk:152`) |
-| **公開 SDK ヘッダ** (`sdk/include/os32/*.h`、`include/os32_kapi_shared.h`) | **C89 互換のまま** (gnu89 と gnu11 の両方から使えること) | ユーザー決定済み (RUST_VS_C11 §5 C3 = (a)、TASK_MEMMAP_V3 D36)。apps/game (gnu89) が読む |
+| **公開 SDK ヘッダ** (`sdk/include/os32/*.h`。`sdk/include/os32/os32_kapi_shared.h` を含む) | **C89 互換のまま** (gnu89 と gnu11 の両方から使えること) | ユーザー決定済み (RUST_VS_C11 §5 C3 = (a)、TASK_MEMMAP_V3 D36)。apps/game (gnu89) が読む |
 | **SQLite 系** (`lib/sqlite3/sqlite3.c` `os32_sqlite_vfs.c` `os32_sqlite_test.c`、userland の SQLite 単体) | **gnu89 の専用規則** | amalgamation は C89。`CFLAGS_SQLITE` の分離が要る (§2) |
 | vendor (`lib/zlib/`、`fs/fatfs/`、`lib/microtar` 等) | gnu11 (旗を継承) | K&R 定義は vendor 例外 (§5)。`__STDC_VERSION__` 分岐を確認 |
 | apps / game / `sdk/example/hello` (submodule・サンプル) | **gnu89 のまま** (推奨、§8 の 3) | SDK の後方互換の検証例として残す |
@@ -185,7 +185,7 @@ replacements = {
 | A2 | `-Werror=implicit-function-declaration -Werror=implicit-int -Werror=vla` が本体・ブート・userland の旗に入り、`make clean` → `make all` が通る | `make clean && make all` rc=0 |
 | A3 | `STATIC_ASSERT` が `_Static_assert` 経由で、**101 呼出しがそのまま通る**。`tss.c:17` は `offsetof` | `grep -c STATIC_ASSERT(` の件数不変、`make all` |
 | A4 | 暗黙宣言 5 件が消えている (`kapi_generated.c` は再生成で) | 段 2 の gnu89 検査、`check-kapi-out` |
-| A5 | 公開 SDK ヘッダ (`sdk/include/os32/*.h`、`include/os32_kapi_shared.h`) が gnu89 と gnu11 の両方で取り込める | `check-c-dialect` の (c): 公開 SDK ヘッダを gnu89 (`-Wc90-c99-compat` ほか `-Werror`) と gnu11 で取り込む、SDK が配るライブラリヘッダを gnu89 / gnu11 で取り込む、in-tree の gnu89 の例 `sdk/example/hello` を gnu89 のまま in-tree の SDK ヘッダでコンパイルする。**apps/game は組まない** (ユーザー決定 2026-09-30、`make external` は T0 の検証に使わない) |
+| A5 | 公開 SDK ヘッダ (`sdk/include/os32/*.h`。`sdk/include/os32/os32_kapi_shared.h` を含む) が gnu89 と gnu11 の両方で取り込める | `check-c-dialect` の (c): 公開 SDK ヘッダを gnu89 (`-Wc90-c99-compat` ほか `-Werror`) と gnu11 で取り込む、SDK が配るライブラリヘッダを gnu89 / gnu11 で取り込む、in-tree の gnu89 の例 `sdk/example/hello` を gnu89 のまま in-tree の SDK ヘッダでコンパイルする。**apps/game は組まない** (ユーザー決定 2026-09-30、`make external` は T0 の検証に使わない) |
 | A6 | `make check` に `check-c-dialect` が入り、否定試験 (VLA / 暗黙宣言 / 偽 `_Static_assert` / SDK への C11 構文) が拒否される | `check-c-dialect-host` の TDD 記録、変異段 |
 | A7 | `check_constraints.py` の ID 検査が通り、[C1] の改訂が CONSTRAINTS / CLAUDE.md / POLICY_DEV §2 / AGENTS.md / 08_build.md に反映されている | `make check-constraints`、grep で `gnu89` の残りが SQLite 例外・apps/game・注記だけ |
 | A8 | 既存コードの宣言位置・コメント・型名を**変えていない** (差分は旗・マクロ・5 + 1 件の修正・検査器・文書だけ) | 差分の目視 (Codex レビュー) |
