@@ -387,3 +387,76 @@ PS5.1構文/C#、nullマーシャリング、実File.Replace、NewFile/Snapshot�
 NTFSパス境界のWindows fixture検証は残る。Python/fake executorの成功をWindows APIや
 ライブ試験の成功とはしない。ネットワーク、実ini、env/secret、実エミュレータ操作、
 配備、エージェント起動は未実施。全ini試験の一時合成ファイルのみを使用した。
+
+## np21w_ctl.py の起動形を受け付ける (2026-09-30)
+
+### 不具合
+
+`tools/np21w_ctl.py start --ini <name> [--fd <name>]` は
+`Start-Process -FilePath <exe> -ArgumentList @('"/i<ini の絶対パス>"'[, '"<fd の絶対パス>"'])`
+で起動する (`start()` の `args = ['/i' + win_of(ini)]`、`start_script()` が各要素を `"…"` で包む)。
+実測のコマンド行は `"<exe>" "/i<ini>" ` (末尾に空白)。旧 `identify()` の 2 トークンの正規表現は
+これに一致し、2 語目 `/iC:\…` を `path_key` に渡して `unsupported absolute Windows path` で
+止まっていた。プレビュー (読み取りのみ) も使えず、ctl で起動した NP21/W にメモリ量の切り替えができなかった。
+
+### NP21/W ソースの根拠 (`~/np21w-src/src`)
+
+- `win9x/np2arg.cpp` `Np2Arg::Parse`: `GetCommandLine()` を `milstr_getarg` で区切る。
+  `/` か `-` で始まる引数は 2 文字目を `_totlower` してスイッチ (`i` → ini = 3 文字目以降、
+  後勝ち。`f` → 全画面)。それ以外は拡張子で分類: `ini`/`npc`/`npcfg`/`np2cfg`/`np21cfg`/`np21wcfg` → ini、
+  `iso`/`cue`/`ccd`/`cdm`/`mds`/`nrg` → CD、残りはディスク (最大 4)。
+  ini が `:` を含まず `\` で始まらなければ現在のディレクトリを前に付ける。
+- `common/milstr.c` `milstr_getarg`: 引用の外の空白で区切り、`"` は取り除く
+  (`"/iC:\x.ini"` は `/iC:\x.ini` になる)。
+- `win9x/np2.cpp` (WinMain): コマンド行のディスク `disk(i)` を `diskdrv_readyfdd(i, …)` で FDD i+1 に入れる。
+- `win9x/ini.cpp` `initgetfile`: `iniFilename()` があればそれを使う。
+- `diskimage/fddfile.c`: d88/88d/d98/98d → D88、fdi、nfd、その他は生イメージ。
+
+### 受け付ける形 / 拒否する形
+
+受け付けるのは 3 形だけ (トークンはどれも引用されたドライブ絶対パス、末尾の空白は無視):
+`"<exe>" "<ini>"` (従来)、`"<exe>" "/i<ini>"`、`"<exe>" "/i<ini>" "<fd>"`
+(fd の拡張子は `.d88/.88d/.d98/.98d/.fdi/.nfd/.hdm/.img`)。`/i` は小文字だけ (ctl が出す形)。
+
+NP21/W が受け付けても拒否する: `-i`、`/I`、引用の無い `/i…`、`/i` 2 回、相対 ini、`/i` の後の空白、
+`/f`・未知のスイッチ、スイッチが ini より前、相対 fd、CD (`.iso`)・2 つ目の ini・cfg、fd 2 個、
+位置引数の ini + fd、別の ini、引用の無い fd、別の exe。
+
+### 再起動の形
+
+`Live.run` は止めたプロセスのコマンド行から `launch_of()` で `{'form': 'switch'|'positional', 'fd': …}` を作り、
+`start` に `launch` として渡す。固定 PS の `start` は `$target.ini` と `launch` だけから
+`"/i<ini>"` か `"<ini>"`、FD 付きなら ` "<fd>"` を組み立てる (fd は `^[A-Za-z]:\\[^"\r\n]+$` と `CheckPath`、
+位置引数の形との組み合わせは拒否)。.NET の `Process.Start` のコマンド行は `"<FileName>" <Arguments>`。
+起動後の CIM のコマンド行から `launch_of()` を取り直し、元と違えば `restart launch shape changed` で失敗
+(自動の巻き戻しはしない — 従来どおりレシート ID を付ける)。restore は停止中でもレシートに記録した
+`process` のコマンド行から同じ形を作る。**FD 引数付きで起動していたら同じ FD 引数で起動し直す**
+(ctl の `start --ini --fd` の再現。FD は ini の変更対象キーと無関係で、強制終了なので NP21/W は ini を書き戻さない)。
+`receipt_size_bound` の再起動行も同じ形の文字列 (`launch_arguments`) で見積もる。
+
+### RED → GREEN
+
+`L` = `python3 -B tools/tests/test_np21w_ini_live.py`。
+
+| 段階 | 結果 | 内容 |
+|---|---|---|
+| RED | 基点 e620f1e の `np21w_ini_live.py` の写し + 新しい試験: 56 tests, failures=9, errors=24 | 新クラス `CtlLaunchShapes` の 9 件中 7 件が失敗 (ctl 形の受理 (`launch_of` 不在を含む)・プレビュー・形の維持・restore の形・形の変化の検出・PS の組み立て・`launch_arguments`)。既存の errors は偽 executor の `start` が `launch` 引数を要求するようになった契約変更による |
+| GREEN | L: 56 tests, OK (skipped=1、既存の Windows fixture) | `launch_of` / `launch_arguments`、`start` への `launch`、再起動後の形の照合、PS の組み立て |
+
+`test_rejects_unsupported_variants` は基点でも GREEN (旧実装は 2 トークン以外を全部拒否していた)。
+受理範囲を広げた後も拒否が保たれることの回帰試験であり、固有の RED は主張しない。
+`test_executor_forwards_launch_to_fixed_start` も基点で GREEN (executor は引数をそのまま運ぶ)。
+契約の固定であり、固有の RED は主張しない。両者の否定側は変異で見る。
+
+### 変異 (`--mutate`、`make check-np21w-ini-live-host`)
+
+`test_np21w_ctl.py` と同じ作り (一時ディレクトリの写しに当て、実物は読むだけ)。13 本すべて RED、
+恒等の対照 GREEN、構文を壊す 1 本は NOT COUNTED。変異: `-i`/`/I` の受理、`identify` が形を見ない、
+位置引数 + fd の受理、fd の拡張子を見ない、`.d88` を拒否、fd を何個でも受理、再起動を常に位置引数の形で、
+再起動で fd を落とす、再起動後の形を比べない、PS が `/i` を落とす、PS が fd の `CheckPath` をしない、
+PS が位置引数 + fd を受理、`launch_arguments` が `/i` を落とす。
+
+### 未実施
+
+実 NP21/W・実 ini・Windows 側の起動は触っていない (ホスト限定の依頼)。PS の `start` の組み立ては
+静的な断片の検査だけで、.NET 上の実行は未検証。ctl で起動した実プロセスへのプレビュー・適用は PM が別途行う。

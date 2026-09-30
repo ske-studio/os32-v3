@@ -912,6 +912,10 @@ checks:
   check-np21w-ctl-host:
     - tools/np21w_ctl.py
     - tools/tests/test_np21w_ctl.py
+  check-np21w-ini-live-host:
+    - tools/np21w_ini_live.py
+    - tools/np21w_ini.py
+    - tools/tests/test_np21w_ini_live.py
   check-gshell-host:
     - userland/gshell/**
     - sdk/rust/os32api/**
