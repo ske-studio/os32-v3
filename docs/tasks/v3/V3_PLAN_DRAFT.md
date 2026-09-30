@@ -87,7 +87,7 @@
 | [tasks/gui/DESIGN.md §6](../gui/DESIGN.md) | HAL の下の 2 層 (チップドライバ + ボードグルー)。Trident はこの形に載る |
 | [archive/agents/HANDOVER_v14.md §3](../../archive/agents/HANDOVER_v14.md) | 保留 5 件 (F3a〜c / F2c / FEP_BOUNDARY / MEMORY_RAM_INTEGRATION / DEVICE_RESERVATION) — 「v3 本案の段で拾うかを決める」(ROADMAP §1 v1.3)。**2026-09-30 に U6 で決定「一部」** ([U6_PENDING_REVIEW](U6_PENDING_REVIEW.md)、TASK_MEMMAP_V3 D29〜D34) |
 | [tasks/network/PLAN.md](../network/PLAN.md) / [LINK_PLAN.md](../network/LINK_PLAN.md) / [HOST_SERVICES_PLAN.md](../network/HOST_SERVICES_PLAN.md) | リンク層と Host Services は NIC の上に載る (LGY-98 は回帰用に残す)。N5 は 82557 L-B に吸収 |
-| [tasks/hotdeploy/DESIGN.md](../hotdeploy/DESIGN.md) / [boot_reform](../boot_reform/00_OVERVIEW.md) / [v86v2](../v86v2/README.md) | 完了済みの領域。hotdeploy 窓は 2026-09-09 に撤去 (文書は archive 候補、HANDOVER の「文書の整理の第 2 陣」) |
+| [tasks/hotdeploy/DESIGN.md](../hotdeploy/DESIGN.md) / [boot_reform](../../archive/v21/boot_reform/00_OVERVIEW.md) / [v86v2](../../archive/v21/v86v2/README.md) | 完了済みの領域。hotdeploy 窓は 2026-09-09 に撤去 (文書は archive 候補、HANDOVER の「文書の整理の第 2 陣」) |
 
 ---
 

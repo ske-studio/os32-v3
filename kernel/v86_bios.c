@@ -301,7 +301,7 @@ void v86_bios_setup(void)
      * **渡すべきは「実機の状態」ではなく「仮想マシンの構成」。**
      * ここで作る仮想マシンは「2HD FDD 1 台 / HDD 無し / 拡張メモリ無し /
      * コンベンショナル 640KB」。
-     * → docs/tasks/v86v2/08_dos5.md §2, §3-1, §3-2
+     * → docs/archive/v21/v86v2/08_dos5.md §2, §3-1, §3-2
      *
      * アドレスの正本は np21w-src/src/bios/biosmem.h。
      * **0x0413 は IBM PC の流儀で PC-98 には無い。0x05AE は 1.44MB
@@ -428,7 +428,7 @@ static void bios_set_ah(u32 *frame, u32 ah)
  * 対しても「レディ」と答えていた。ゲストが 1 台しか無いはずのマシンで
  * 4 台のドライブとハードディスクを見つけてしまう。実測でも MS-DOS が
  * DA/UA 0x80 (SASI HDD) の SENSE に成功をもらい、その後 SASI 規約で
- * READ を投げてきた (docs/tasks/v86v2/08_dos5.md §2)。
+ * READ を投げてきた (docs/archive/v21/v86v2/08_dos5.md §2)。
  *
  * 上位ニブルが装置種別、下位 2bit がユニット番号
  * (np21w-src/src/bios/bios1b.c `bios0x1b()` の devtype = AL & 0xF0)。
@@ -677,7 +677,7 @@ static void disk_read_common(u32 *frame, int transfer)
              * **ここを素通りさせてはいけない。** N を見ていなかった頃は、
              * MS-DOS が SASI 規約で投げた「128B / セクタ 0」の読みに
              * FAT 領域のゴミを返して成功と答えていた
-             * (docs/tasks/v86v2/08_dos5.md §2)。
+             * (docs/archive/v21/v86v2/08_dos5.md §2)。
              * セクタ長を照合しておけば secbuf の溢れも同時に閉じる。 */
             if (seclen != (u32)bps) {
                 v86_disk_fail_n++; v86_disk_fail_why = 2;
@@ -1070,7 +1070,7 @@ static void bios_fdd_int1b(u32 *frame)
 /*  「偶然動く」型の事故が再発する。                                          */
 /*                                                                          */
 /*  正本: np21w-src/src/bios/sxsibios.c (sxsi_pos / sasifunc / sense)。      */
-/*  実測: docs/tasks/v86v2/10_dos_hdd.md §2 (2026-08-11 の 154 呼び出し)。   */
+/*  実測: docs/archive/v21/v86v2/10_dos_hdd.md §2 (2026-08-11 の 154 呼び出し)。   */
 /*                                                                          */
 /*  レジスタ規約 (FDD と違う点だけ):                                         */
 /*    CHS モード (AL bit7=1): CX=16bit シリンダ全体 / DH=ヘッド /            */

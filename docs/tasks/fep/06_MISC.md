@@ -45,7 +45,7 @@ if ((scancode == KEY_SPACE || scancode == KEY_XFER) && g_ime.kana_len > 0) {
 4. 根本原因が va_args ABI なら、該当呼び出しを `kputs` + 数値専用 `kput_hex` に分解。
 
 → [`03_DICT_COMMAND.md`](03_DICT_COMMAND.md) (辞書管理) でエラー表示を増やす前に切り分けておくこと。
-詳細は [`../sqlite/07_OBSTACLES.md`](../sqlite/07_OBSTACLES.md) と突き合わせる。
+詳細は [`../../archive/v21/sqlite/07_OBSTACLES.md`](../../archive/v21/sqlite/07_OBSTACLES.md) と突き合わせる。
 
 ---
 

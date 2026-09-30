@@ -33,7 +33,7 @@ u16 v86_io_last_port(void)  { return io_last_port; }
 /*                                                                          */
 /*  カウンタと「最後に触ったポート」だけでは、ポーリングループの中身が      */
 /*  分からない。INT 1Bh でも同じところで詰まり、呼び出しログを並べて初めて  */
-/*  原因が確定した (docs/tasks/v86v2/05 §4-2)。同じ手をここにも置く。       */
+/*  原因が確定した (docs/archive/v21/v86v2/05_disk_bios_plan.md §4-2)。同じ手をここにも置く。       */
 /*                                                                          */
 /*  同じ組み合わせは積まずに回数だけ数える。**直前 1 件だけ見るのでは       */
 /*  足りない。** ゲストの割り込みハンドラは                                 */
@@ -196,7 +196,7 @@ static void gfx_state_for_guest(void)
      * 400 ライン用 (LR=1) のままにしていたから。mode1 bit4 は
      * 「奇数ラスタを捨てる」で、GDC 側の行あたりラスタ数とセットでないと
      * 飛び越し表示になる。**この 2 つは必ず一緒に変える。**
-     * → docs/tasks/v86v2/07_gfx_state.md */
+     * → docs/archive/v21/v86v2/07_gfx_state.md */
 
     /* 表示を止めてから触る。ゲストが自分で A2h=0Dh を出して開始する。 */
     io_out(GDC_GFX_CMD, GDC_CMD_STOP);

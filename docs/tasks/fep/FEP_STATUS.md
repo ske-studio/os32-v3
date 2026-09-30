@@ -37,7 +37,7 @@ OS32 カーネル常駐型 FEP (日本語入力フロントエンドプロセッ
 - シングルタスク前提: FEP ON 時はアプリのメインループが停止
 
 SQLite カーネル統合の詳細は
-[docs/tasks/sqlite/](../sqlite/00_INDEX.md) を参照。
+[docs/tasks/sqlite/](../../archive/v21/sqlite/00_INDEX.md) を参照。
 
 ---
 

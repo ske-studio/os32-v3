@@ -353,7 +353,7 @@ int v86_gp_handler(u32 *frame)
 /*  Phase 0 の実測で、Ys が差し替えている割り込みは IRQ12 (INT 14h) ただ 1 本 */
 /*  で、FM の演奏はそれだけに依存していることが分かっている。前回の実装は    */
 /*  IRQ0/1/2 しか注入しておらず、ゲストが使う唯一の IRQ を落としていた       */
-/*  (docs/tasks/v86v2/03_ys_profile.md §4)。                                */
+/*  (docs/archive/v21/v86v2/03_ys_profile.md §4)。                                */
 /* ======================================================================== */
 
 static volatile u32 v86_irq_n = 0;
@@ -363,7 +363,7 @@ static volatile u32 v86_irq_n = 0;
  *
  * 注意: IOPL=3 ではゲストの CLI が実 IF を落とすため、ゲストが CLI した
  * まま暴走するとタイマ割り込み自体が来なくなり、この計測も止まる。
- * その場合の脱出手段は別途必要 (docs/tasks/v86v2/04_implementation_status.md §7)。 */
+ * その場合の脱出手段は別途必要 (docs/archive/v21/v86v2/04_implementation_status.md §7)。 */
 static volatile u32 v86_ticks = 0;
 static volatile u32 v86_tick_limit = 0;
 

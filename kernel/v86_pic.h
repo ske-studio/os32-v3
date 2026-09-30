@@ -5,7 +5,7 @@
 /*  とキーボードと rshell のシリアルを回している。素通しにしたらその瞬間に   */
 /*  OS32 が死ぬので、ここだけは完全仮想化しかない。                          */
 /*                                                                          */
-/*  実測 (docs/tasks/v86v2/06_pic_plan.md §1): Ys は                        */
+/*  実測 (docs/archive/v21/v86v2/06_pic_plan.md §1): Ys は                        */
 /*                                                                          */
 /*      0160:0DF3  OUT 08, 20     OCW2 非特定 EOI                           */
 /*      0160:0DF7  OUT 08, 0B     OCW3  ISR を読む指定                      */

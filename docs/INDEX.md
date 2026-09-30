@@ -9,14 +9,13 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 同じ事実を 2 か所で独立に更新する構造は必ず食い違う (2026-09-05 の診断で 6 件)。
 **変わりやすい数値・手順・進捗は下表の正典だけを更新し、他の文書は要約と参照に留める。**
 
-> **このリポジトリ (os32-v3) が現行の開発 (v3) で、文書の正典はここ。** os32 (v2.x、タグ `v2.1`、`main`) は **v2.1 時点の記録 (戻り先)** で、新機能は入れない (ユーザー決定 2026-09-29、正典は [ROADMAP.md §0-1](ROADMAP.md))。
+> **文書の正典はここ (このリポジトリ os32-v3、現行の開発 = v3)。** [os32](https://github.com/ske-studio/os32) (v2.x、タグ `v2.1`、`main`) は **v2.1 時点の記録・戻り先で、更新しない** — 新機能は入れず、手を入れるのは戻る必要が生じたときと致命的な不具合のときだけ (ユーザー決定 2026-09-29、正典は [ROADMAP.md §0-1](ROADMAP.md))。
 > fork は 2026-09-30 (os32 v2.1 `6ccc4049` + feat/gui `dfa97f57` から、新しい履歴で。段取りと持ってこなかったものは [tasks/v3/FORK_PLAN.md](tasks/v3/FORK_PLAN.md) §1・§3)。経緯の要約は [HISTORY.md](HISTORY.md)、普遍的な教訓は [CASE_STUDIES.md](CASE_STUDIES.md)。
-> os32 側の URL と、ROADMAP §0 / ROLES §0 / CLAUDE.md の体制欄の更新は FORK_PLAN §3 e で行う (初期コミットでは未着手)。
 
 | 情報単位 | 正典 (ここだけ更新) | 参照側 (要約 + リンクのみ) |
 |---|---|---|
 | 制約規則 [C/HW/ABI/V/D] | [CONSTRAINTS.md](CONSTRAINTS.md) | CLAUDE.md (ID 参照、`make check` が照合)。Hermes 用の SOUL.md は 2026-09-29 に `SOUL.md` (非公開・リポジトリ外、`.gitignore`) へ (効力なし) |
-| 引き継ぎ (次の PM への申し送り)・v2.1 時点の現在地と残件 | [tasks/agents/HANDOVER_2026-09-29.md](tasks/agents/HANDOVER_2026-09-29.md) (最新、表だけ) | 前回は [archive/agents/HANDOVER_2026-09-22.md](archive/agents/HANDOVER_2026-09-22.md) (09-22〜25 の日ごとの追記) |
+| 引き継ぎ (次の PM への申し送り)・v2.1 時点の現在地と残件 | [tasks/agents/HANDOVER_2026-09-29.md](tasks/agents/HANDOVER_2026-09-29.md) (fork 時点の申し送り、完了記録、表だけ。次の引き継ぎは os32-v3 で新しく起こす) | 前回は [archive/agents/HANDOVER_2026-09-22.md](archive/agents/HANDOVER_2026-09-22.md) (09-22〜25 の日ごとの追記) |
 | エージェント運用体制 (役割・起動・規約) | [tasks/agents/ROLES.md](tasks/agents/ROLES.md) (§0「現行の体制」が 1 節で現行、下は経緯) | CLAUDE.md (体制 1 段落 + リンク)。過去の快照は [archive/agents/RETROSPECTIVE_2026-09-09.md](archive/agents/RETROSPECTIVE_2026-09-09.md) |
 | 番地・帯域 | `include/memmap.h` (定義) → [02_memory.md §2-1](02_memory.md) の**生成ブロック** (`tools/gen_memmap.py --write`、地図はここ 1 か所だけ) | CLAUDE.md は帯の粒度のみ。`memmap.h` の先頭は生成先への案内。重なり・逆転・写しのずれは `make check` の `gen_memmap.py --check` が見る |
 | KAPI の一覧・オフセット・版 | `sdk/kapi.json` → [KAPI_SPEC.md §4](KAPI_SPEC.md) | README.md / このファイル / KAPI_SPEC.md の版番号 (`tools/check_kapi_version.py` が照合。CLAUDE.md は版数を持たない) |
@@ -35,7 +34,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | 描画方式 (ページフリップ、200 ライン) | [05_drivers.md §5-5](05_drivers.md) | CLAUDE.md「Graphics」(1 行) |
 | 落とし穴の経緯・検証記録 | [POLICY_DEBUG.md §4](POLICY_DEBUG.md) | CLAUDE.md「Known Gotchas」(2〜3 行の注意 + §番号) |
 | コーディング規約 (C89、kstring、三層定数、asm) | [POLICY_DEV.md §2](POLICY_DEV.md) | CONSTRAINTS [C1]〜[C4] (規則行) |
-| 進捗 | 各票の冒頭の状態行 (語彙は [POLICY_DEV.md §8](POLICY_DEV.md)、`make check-docs-status`) と、最新の引き継ぎの残件表 (上の「引き継ぎ」の行)。領域の中の進捗は領域別索引 ([tasks/fep/00_INDEX.md](tasks/fep/00_INDEX.md)、[tasks/v86v2/04](tasks/v86v2/04_implementation_status.md)) | [ROADMAP.md](ROADMAP.md) (計画)、[CHANGELOG.md](../CHANGELOG.md) (履歴)。[tasks/gui/TASKS.md](tasks/gui/TASKS.md) のゲートは v1.1 の記録 |
+| 進捗 | 各票の冒頭の状態行 (語彙は [POLICY_DEV.md §8](POLICY_DEV.md)、`make check-docs-status`) と、最新の引き継ぎの残件表 (上の「引き継ぎ」の行)。領域の中の進捗は領域別索引 ([tasks/fep/00_INDEX.md](tasks/fep/00_INDEX.md)、[archive/v21/v86v2/04](archive/v21/v86v2/04_implementation_status.md)) | [ROADMAP.md](ROADMAP.md) (計画)、[CHANGELOG.md](../CHANGELOG.md) (履歴)。[tasks/gui/TASKS.md](tasks/gui/TASKS.md) のゲートは v1.1 の記録 |
 | プログラムの一覧 | 各層の `deploy.yaml` (機械可読の正典)、コマンドは [07_shell.md §7-1](07_shell.md) | 09_exec / INDEX に表を持たない |
 | LAN の設計・進捗 | ドライバ = [tasks/network/PLAN.md](tasks/network/PLAN.md)、リンク層と Host Services = [tasks/network/LINK_PLAN.md](tasks/network/LINK_PLAN.md) | 05_drivers / DEVELOPMENT は要約 + リンク |
 | 設定の置き場 (system.cfg の残すキー、settings.db のスキーマ / API / リカバリ) | [tasks/settings/DESIGN.md](tasks/settings/DESIGN.md) (計画、v1.3) | ROADMAP は 1 行 |
@@ -145,7 +144,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 
 | ドキュメント | 内容 |
 |-------------|------|
-| [tasks/agents/HANDOVER_2026-09-29.md](tasks/agents/HANDOVER_2026-09-29.md) | **最新の引き継ぎ (2026-09-29、現行)** — v2.1 のタグの時点の現在地、v3 の fork の段取り (決定済み)、残件表、道具、罠。表だけ |
+| [tasks/agents/HANDOVER_2026-09-29.md](tasks/agents/HANDOVER_2026-09-29.md) | **fork 時点の申し送り (2026-09-29、完了記録)** — v2.1 のタグの時点の現在地、v3 の fork の段取り (決定済み、2026-09-30 に実施)、残件表、道具、罠。表だけ。次の引き継ぎは os32-v3 で新しく起こす |
 | [tasks/agents/ROLES.md](tasks/agents/ROLES.md) | **体制の正典** (現行) — §0 の 1 表が現行の体制、§1〜§5 が細則、末尾が経緯 |
 | [archive/agents/HANDOVER_2026-09-22.md](archive/agents/HANDOVER_2026-09-22.md) | 引き継ぎ 2026-09-22〜25 (完了記録) — 実機初日 (FD 起動・シリアル 115200・PCI 列挙・LAN の橋) から HDD 起動まで、日ごとの追記 |
 | [archive/agents/HANDOVER_2026-09-18.md](archive/agents/HANDOVER_2026-09-18.md) / [HANDOVER_2026-09-16.md](archive/agents/HANDOVER_2026-09-16.md) | それ以前の引き継ぎ (完了記録) — 09-16 は残件 (H2 / H4 / arch 移設 / kstring 判断 / ゲスト試験ランナー / ARM / LAN 実機 / 小物) の推奨順・決裁点 |
@@ -287,20 +286,23 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | [archive/kernel_v2/M1_RING3.md](archive/kernel_v2/M1_RING3.md) / [M2_KAPI_TRAMPOLINE.md](archive/kernel_v2/M2_KAPI_TRAMPOLINE.md) / [M3_VERIFY.md](archive/kernel_v2/M3_VERIFY.md) / [CONTRACTS.md](archive/kernel_v2/CONTRACTS.md) | 2.0 の設計 (リング 3 土台、KAPI トランポリン、検証、凍結契約)。完了記録 |
 | [archive/kernel_v2/TASK_coder1_M0b_privileged.md](archive/kernel_v2/TASK_coder1_M0b_privileged.md) / [TASK_coder1_M1_ring3.md](archive/kernel_v2/TASK_coder1_M1_ring3.md) / [TASK_coder2_libos32gui.md](archive/kernel_v2/TASK_coder2_libos32gui.md) | 2.0 のコーダー票。完了記録 |
 | [V4_GAME_PLATFORM_DRAFT.md](V4_GAME_PLATFORM_DRAFT.md) / [tasks/v4/README.md](tasks/v4/README.md) | ゲーム基盤 v4 の草案 (2026-09-07)。v3 の後 |
-| [tasks/boot_reform/00_OVERVIEW.md](tasks/boot_reform/00_OVERVIEW.md) | ブート刷新 (vmkernel.lz4 / ext2 ローダー) — 設計 (全 8 部) |
+| [archive/v21/boot_reform/00_OVERVIEW.md](archive/v21/boot_reform/00_OVERVIEW.md) | ブート刷新 (vmkernel.lz4 / ext2 ローダー) — 設計 (全 8 部) |
 
 ### FEP・V86・SQLite・ライブラリ
+
+V86・SQLite・タイルマップ・ライブラリ設計書 (と上の boot_reform、下の単発 2 本) は fork 時 (2026-09-30) に完了記録として
+[archive/v21/](archive/README.md) へ落とした (FORK_PLAN §4 J4)。
 
 | ドキュメント | 内容 |
 |-------------|------|
 | [tasks/fep/00_INDEX.md](tasks/fep/00_INDEX.md) | FEP (日本語入力) 拡張 — 詳細設計 P1〜P7 の索引 (実装状況付き) |
 | [tasks/fep/FEP_STATUS.md](tasks/fep/FEP_STATUS.md) / [FEP_FUTURE.md](tasks/fep/FEP_FUTURE.md) | FEP のアーキテクチャ説明 (2026-04-27 の快照) / 今後の拡張 |
 | [tasks/fep/TASK_DICT_META.md](tasks/fep/TASK_DICT_META.md) | FEP 辞書のメタ情報 (形式の版・dict_id・license/attribution・`mem_reserve_kb` 等) と学習データの別ファイル化 — **計画** (ユーザー決定 2026-09-30、着手は **v3 の後の方**。v3 P10)。学習データの移行は二段 (M6、Codex X8) |
-| [tasks/v86v2/README.md](tasks/v86v2/README.md) | **V86 サブシステム (再挑戦)** — 16bit ゲスト実行。進捗の正典は `04_implementation_status.md` |
-| [tasks/wintree_port/PORT_PLAN.md](tasks/wintree_port/PORT_PLAN.md) | feat/vdm 系作業ツリーの移植計画と実施結果 |
-| [tasks/sqlite/00_INDEX.md](tasks/sqlite/00_INDEX.md) | SQLite カーネル統合 — 設計・実装 (全 7 部) |
-| [tasks/tilemap/00_INDEX.md](tasks/tilemap/00_INDEX.md) | タイルマップ / ブリット最適化 — 設計・最適化・TODO の索引 (全 8 部) |
-| [tasks/libmath/LIBMATH_DESIGN.md](tasks/libmath/LIBMATH_DESIGN.md) / [tasks/libinput/LIBINPUT_DESIGN.md](tasks/libinput/LIBINPUT_DESIGN.md) / [tasks/libasset/LIBASSET_DESIGN.md](tasks/libasset/LIBASSET_DESIGN.md) / [tasks/libecs/LIBECS_DESIGN.md](tasks/libecs/LIBECS_DESIGN.md) / [tasks/libtext/LIBTEXT_DESIGN.md](tasks/libtext/LIBTEXT_DESIGN.md) | ライブラリ設計書 (math / input / asset / ecs / text) |
+| [archive/v21/v86v2/README.md](archive/v21/v86v2/README.md) | **V86 サブシステム (再挑戦)** — 16bit ゲスト実行 (完了記録)。到達点は `04_implementation_status.md` |
+| [archive/v21/wintree_port/PORT_PLAN.md](archive/v21/wintree_port/PORT_PLAN.md) | feat/vdm 系作業ツリーの移植計画と実施結果 |
+| [archive/v21/sqlite/00_INDEX.md](archive/v21/sqlite/00_INDEX.md) | SQLite カーネル統合 — 設計・実装 (全 7 部) |
+| [archive/v21/tilemap/00_INDEX.md](archive/v21/tilemap/00_INDEX.md) | タイルマップ / ブリット最適化 — 設計・最適化・TODO の索引 (全 8 部) |
+| [archive/v21/libmath/LIBMATH_DESIGN.md](archive/v21/libmath/LIBMATH_DESIGN.md) / [archive/v21/libinput/LIBINPUT_DESIGN.md](archive/v21/libinput/LIBINPUT_DESIGN.md) / [archive/v21/libasset/LIBASSET_DESIGN.md](archive/v21/libasset/LIBASSET_DESIGN.md) / [archive/v21/libecs/LIBECS_DESIGN.md](archive/v21/libecs/LIBECS_DESIGN.md) / [archive/v21/libtext/LIBTEXT_DESIGN.md](archive/v21/libtext/LIBTEXT_DESIGN.md) | ライブラリ設計書 (math / input / asset / ecs / text) |
 | `tasks/libai/` `libbattle/` `libboard/` `libecon/` `libevent/` `libinv/` `tilemap/` | 各ゲームライブラリの設計書群 (別リポジトリ `os32-game` に移った分は `os32-game:docs/...`) |
 | `os32-game:docs/game/GAME_PORT_PLAN.md` / `os32-game:docs/game/ENGINE_EXTENSION_PLAN.md` / `os32-game:docs/libchem/LIBCHEM_DESIGN.md` | 対戦スゴロク RPG の移植・エンジン拡張・化学エンジン (別リポジトリ ske-studio/os32-game) |
 
@@ -311,7 +313,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | [TESTS.md](TESTS.md) | **試験の一覧** (正典、生成) — `make check` の全ターゲット、`_tdd.md` と票の対応、改善提言 |
 | [archive/TEST_INVENTORY_2026-09-14.md](archive/TEST_INVENTORY_2026-09-14.md) | 試験の棚卸し (2026-09-14 の快照)。正典は `TESTS.md` へ移行 |
 | [archive/debug_kcg_load_font.md](archive/debug_kcg_load_font.md) | `kcg_load_font` クラッシュの仮説計画 (単発の障害記録) |
-| [tasks/cross_compiler_rebuild.md](tasks/cross_compiler_rebuild.md) / [tasks/ext2_dind_debug.md](tasks/ext2_dind_debug.md) | クロスコンパイラ再構築 / ext2 二重間接の障害記録 |
+| [archive/v21/cross_compiler_rebuild.md](archive/v21/cross_compiler_rebuild.md) / [archive/v21/ext2_dind_debug.md](archive/v21/ext2_dind_debug.md) | クロスコンパイラ再構築 / ext2 二重間接の障害記録 |
 
 ## man ページ
 

@@ -41,7 +41,7 @@ void tss_init(u32 kernel_esp0)
     kernel_tss.iomap_base = (u16)((u8 *)&kernel_tss.iomap - (u8 *)&kernel_tss);
 
     /* 既定は全ポート #GP。素通しにするポートは V86 セッション開始時に
-     * 明示的に開ける (docs/tasks/v86v2/00_approach_study.md §4.1)。 */
+     * 明示的に開ける (docs/archive/v21/v86v2/00_approach_study.md §4.1)。 */
     tss_iomap_deny_all();
 
     /* 番兵。CPU はビットマップの最終バイトを跨いで読むことがある。 */

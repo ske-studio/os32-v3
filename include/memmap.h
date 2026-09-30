@@ -85,7 +85,7 @@ extern u32 __bss_end;
 /*  16KB は実測の 5 倍強。**リング 3 のユーザプログラムを導入したら          */
 /*  ここが全プログラムの ISR ネストを受けることになるので、その時は          */
 /*  measure し直すこと。**                                                  */
-/*  → docs/tasks/v86v2/09_memmap.md                                         */
+/*  → docs/archive/v21/v86v2/09_memmap.md                                   */
 /* ====================================================================== */
 #define MEM_STACK_GUARD       0x2FB000UL
 #define MEM_STACK_GUARD_END   0x2FBFFFUL

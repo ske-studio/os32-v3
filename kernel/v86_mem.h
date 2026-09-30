@@ -13,7 +13,7 @@
 /*  実測で Ys は GVRAM へ CPU で直接書き込んで描画しており、GDC/GRCG/EGC の  */
 /*  コマンドポートを使っていなかった。VRAM を直マップすれば描画は           */
 /*  メモリアクセスのままなので #GP が一切発生しない — V86 方式が            */
-/*  386DX20 で成立する最大の理由 (docs/tasks/v86v2/03_ys_profile.md §3.3)。  */
+/*  386DX20 で成立する最大の理由 (docs/archive/v21/v86v2/03_ys_profile.md §3.3)。  */
 /* ======================================================================== */
 
 #ifndef __V86_MEM_H
@@ -33,7 +33,7 @@
  * かつてカーネルスタックが 0x90000-0x9FFFF に居た頃はここを 0x8F000 で
  * 止めるしかなく、ゲストに渡せる RAM は 572KB だった。PC-98 は 128KB 単位
  * でしか申告できないので、それは実質 512KB を意味していた。
- * → docs/tasks/v86v2/09_memmap.md */
+ * → docs/archive/v21/v86v2/09_memmap.md */
 #define V86_REMAP_START     0x00000UL
 #define V86_REMAP_END       MEM_CONV_END             /* 0xA0000 (含まず) */
 
