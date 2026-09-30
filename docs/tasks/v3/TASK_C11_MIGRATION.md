@@ -1,6 +1,8 @@
 # TASK_C11_MIGRATION — T0: C89 (gnu89) → C11 (gnu11) への移行 (言語モードと検査の移行)
 
-> 状態: **受入待ち (2026-09-30)** — 段 2〜6 と文書 (A7・A10) はブランチ `wt/t0-c11` に実装済み、`check-c-dialect` / `check-c-dialect-host` を `make check` の列に追加。残件: A8 の差分確認 (Codex レビュー)、A9 のゲスト回帰 (PM)。apps/game は組まない (ユーザー決定、A5 は `check-c-dialect` の (c) で代える)。
+> 状態: **受入完了 (2026-09-30)** — main `f5bcb35` に着地 (`make clean && make all`・`make check` rc=0)。A8 は Codex (gpt-6-astra) レビュー 3 往復 + ユーザー決定後の確認で Approve (検査器の限界 3 件は `tools/tests/c_dialect_tdd.md` に記録)。A9 は NP21/W で合格 (末尾の記録)。apps/game は組まない (ユーザー決定) ので A9 の apps/game は対象外。
+>
+> それまでの状態: **受入待ち (2026-09-30)** — 段 2〜6 と文書 (A7・A10) はブランチ `wt/t0-c11` に実装済み、`check-c-dialect` / `check-c-dialect-host` を `make check` の列に追加。残件: A8 の差分確認 (Codex レビュー)、A9 のゲスト回帰 (PM)。apps/game は組まない (ユーザー決定、A5 は `check-c-dialect` の (c) で代える)。
 >
 > それまでの状態: **計画 (2026-09-30)** — §8 の判断 3 点は同日にユーザー承認 (推奨どおり)、[C1] の改訂案 (§9) は文面確定、CONSTRAINTS.md の改訂は fork 後の T0 で。v3 の最初の票 T0 ([TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) §6、[V3_PLAN_DRAFT](V3_PLAN_DRAFT.md) §3 P0)。Codex (gpt-6-astra、読み取りのみ) の調査提案 (`x18/c11.md`、2026-09-30、基点 `d995e078`) を元に起票。**ユーザー判断が要る点 3 つ (§8) と [C1] の改訂文面 (§9) は未決** — 決定後に [CONSTRAINTS.md](../../CONSTRAINTS.md) を直し、設計票へ進む。コードは未着手。
 >
@@ -227,3 +229,12 @@ replacements = {
 - [PLAN](PLAN.md) §1 の 1 (C11 へ、SHM の記述は §2 F3 で訂正)
 - [CONSTRAINTS](../../CONSTRAINTS.md) [C1]、[POLICY_DEV](../../POLICY_DEV.md) §2、`tools/check_constraints.py`
 - Codex 提案: `scratchpad/x18/c11.md` (2026-09-30、gpt-6-astra、読み取りのみ。リポジトリには置かない)
+
+## A9 ゲスト回帰の記録 (2026-09-30、PM、NP21/W `np21x64w.ini` = PEGC)
+
+- 配備: NP21/W 停止 → `make deploy-kernel` (rc=0、作業イメージは Windows 側 NHD 2026-09-29 21:58 から取り込み) → 起動。`ver` = `API: v68`・`Commit: 7cc2af0` (T0 着地 `f5bcb35` + 文書 1 コミット)・`Image CRC 4c2645a2 (465296 bytes)` = 手元の `build/out/vmkernel.lz4` と同じ大きさ。
+- **HDD 起動**: `src=hdd`、`[selftest] 225/225 passed`、新しい `kernel.map` の `kselftest_fail` (0x16aae0) = 0、`[SQ] init rc=0`・`kernel test rc=0`、`[shlib] libos32gui.shlib v1 loaded: 119 funcs`。
+- **ゲスト試験一式** (`tools/guest_tests.py`): 16 件中 PASS 14 (klibc・math・mgx・ecs・asset・gui_call・input・db_v50・save・font_load・test2・stat_t・restest・db_test)、SKIP 2 (`e2test` の 372KB バッファ・`host_test` の host_agent 不在 — どちらも以前からの前提不足で、T0 と無関係)。
+- **GUI**: `tools/gui_gate.py v12g4 --h 480` RESULT: OK — gshell + gui_demo、Run の置き換え、アプリからの起動、CUI への確認ダイアログと戻りをスクリーンショットで確認。
+- **FD 起動**: `images/os32_boot.d88` (NP21/W 側と `cmp` 一致) を `--fd` で起動。`src=fd`、225/225 passed、`kselftest_fail` = 0。フォントと shlib が無いのは FD の中身から外した既定どおり。
+- 見たが T0 と無関係: `[EXT2] warning: mounting fs with errors` (9/29 の NHD から出ている。インストール後 e2fsck はしない決定のまま)。
