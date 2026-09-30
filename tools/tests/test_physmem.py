@@ -1,6 +1,6 @@
 """Synthetic host-only physical range tests; never evidence of machine RAM.
 Run: python3 tools/tests/test_physmem.py
-Uses real ILP32 types.h and GNU89 core, no libc/multilib runtime required.
+Uses real ILP32 types.h and GNU11 core, no libc/multilib runtime required.
 """
 import pathlib
 import subprocess
@@ -35,8 +35,8 @@ void _start(void) {
 }
 ''')
             result = subprocess.run([
-                'gcc', '-m32', '-std=gnu89', '-Wall', '-Wextra', '-Werror',
-                '-Wdeclaration-after-statement', '-ffreestanding', '-fno-builtin',
+                'gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
+                '-ffreestanding', '-fno-builtin',
                 '-fno-pie', '-fno-stack-protector', '-nostdlib', '-no-pie',
                 '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'kernel'),
                 str(src), str(ROOT / 'kernel/physmem.c'), '-o', str(exe)

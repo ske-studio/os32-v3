@@ -178,15 +178,15 @@ def build(tmp, sanitize):
     subprocess.run(["gcc", "-std=gnu89", "-O0", *san, "-include", CONFIG,
                     "-c", str(ROOT / "lib/sqlite3/sqlite3.c"), "-o", obj],
                    check=True)
-    subprocess.run(["gcc", "-std=gnu89", "-Wall", "-Wextra", "-Werror",
-                    "-Wdeclaration-after-statement", "-Wno-unused-parameter",
+    subprocess.run(["gcc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
+                    "-Wno-unused-parameter",
                     "-Wno-sign-compare", "-Wno-pointer-to-int-cast",
                     "-Wno-missing-field-initializers", "-D__cdecl=",
                     "-D__OS32_USERLAND__",
                     *san, "-I" + str(tmp), *INC,
                     str(ROOT / "tools/tests/cfg_host.c"), obj,
                     "-o", exe], check=True)
-    print("HOST GNU89 -Werror compile PASS "
+    print("HOST GNU11 -Werror compile PASS "
           "(real libos32cfg + real cfg.c + real kapi_db.c + bundled SQLite)",
           flush=True)
     return exe
@@ -194,10 +194,10 @@ def build(tmp, sanitize):
 
 def target_compile(tmp):
     """i386-elf でも同じソースが -Werror で通ること (票 §3)。"""
-    flags = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
+    flags = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
              "-fno-stack-protector", "-nostdlib", "-mno-red-zone", "-fcommon",
              "-O2", "-Wall", "-Wextra", "-Werror",
-             "-Wdeclaration-after-statement", "-D__OS32_USERLAND__",
+             "-D__OS32_USERLAND__",
              "-I.", "-Iinclude", "-Isdk/include", "-Isdk/include/os32",
              "-Iuserland/lib", "-I/usr/local/cross/i386-elf/include"]
     srcs = ["userland/lib/cfg/libos32cfg.c", "userland/lib/cfg/cfg_enum.c",
@@ -210,7 +210,7 @@ def target_compile(tmp):
         subprocess.run(["i386-elf-gcc", *flags, *extra, "-c", src,
                         "-o", str(tmp / (pathlib.Path(src).stem + ".target.o"))],
                        check=True, cwd=ROOT)
-    print("TARGET i386-elf GNU89 -Werror compile PASS", flush=True)
+    print("TARGET i386-elf GNU11 -Werror compile PASS", flush=True)
 
 
 def tsv_parity(exe):

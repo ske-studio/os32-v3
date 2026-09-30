@@ -46,8 +46,7 @@ SHARED_H = ROOT / 'sdk/include/os32/os32_kapi_shared.h'
 CONFIG_H = ROOT / 'include/config.h'
 HARNESS = ROOT / 'tools/tests/ver_about_host.c'
 
-HOST_FLAGS = ['-std=gnu89', '-Wall', '-Wextra', '-Werror',
-              '-Wdeclaration-after-statement',
+HOST_FLAGS = ['-std=gnu11', '-Wall', '-Wextra', '-Werror',
               '-D__cdecl=', '-D__OS32_USERLAND__']
 HOST_INC = ['-I' + str(ROOT / p) for p in
             ('.', 'include', 'sdk/include', 'sdk/include/os32',

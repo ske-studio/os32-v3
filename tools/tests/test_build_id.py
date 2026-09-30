@@ -66,7 +66,7 @@ def compiled_string(c_file, work):
                     'int main(void){ fputs(os32_build_commit, stdout); return 0; }\n',
                     encoding="utf-8")
     exe = pathlib.Path(work) / "m"
-    r = subprocess.run(["gcc", "-std=gnu89", "-Wall", "-Werror", str(main), str(c_file),
+    r = subprocess.run(["gcc", "-std=gnu11", "-Wall", "-Werror", str(main), str(c_file),
                         "-o", str(exe)], capture_output=True, text=True)
     if r.returncode != 0:
         raise Fail("生成した C が組めない: {}".format(r.stderr))

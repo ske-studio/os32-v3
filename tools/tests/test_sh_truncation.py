@@ -14,8 +14,8 @@
 の 3 つなので、それぞれをわざと壊した版を作って**試験が落ちること**を見る。
 GREEN のまま通ってしまう変異があれば、その規則を試験が見ていないということ。
 
-test_sh_shell.py と同じ様式 — ホスト ILP32 GNU89 で走らせ、同じソースが外部
-プログラムと同じ形の i386-elf-gcc でも通ることを別に見る ([C1] C89/GNU89)。
+test_sh_shell.py と同じ様式 — ホスト ILP32 GNU11 で走らせ、同じソースが外部
+プログラムと同じ形の i386-elf-gcc でも通ることを別に見る ([C1] GNU11)。
 Make・エミュレータは使わない。
 
 ホスト側は tools/tests/sh_truncation_host.c が userland/shell/main.c を
@@ -42,8 +42,8 @@ def fd_root_dev():
     return m.group(1)
 
 
-BASE_NOAPP = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
-              "-fno-stack-protector", "-Wall", "-Wdeclaration-after-statement",
+BASE_NOAPP = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
+              "-fno-stack-protector", "-Wall", 
               "-D__OS32_USERLAND__", '-DFD_ROOT_DEV="%s"' % fd_root_dev()]
 BASE = BASE_NOAPP + ["-DSHELL_AS_APP"]
 INCLUDES = ["-I" + str(ROOT / "sdk/include"), "-I" + str(ROOT / "sdk/include/os32"),
@@ -706,14 +706,14 @@ if __name__ == "__main__":
         failed = 0
 
         exe = build_host(tmp, shim, "sh_truncation")
-        print("HOST ILP32 GNU89 COMPILE PASS", flush=True)
+        print("HOST ILP32 GNU11 COMPILE PASS", flush=True)
         rc = subprocess.run([str(exe)], cwd=ROOT, timeout=30).returncode
 
         subprocess.run(["i386-elf-gcc", *BASE, "-O2", "-nostdlib",
                         "-mno-red-zone", "-fcommon", *shim, *INCLUDES,
                         "-c", str(HOST_SRC), "-o", str(tmp / "sh_truncation.o")],
                        cwd=ROOT, check=True)
-        print("TARGET i386-elf GNU89 COMPILE PASS", flush=True)
+        print("TARGET i386-elf GNU11 COMPILE PASS", flush=True)
         print("EXIT sh_truncation_host=%d" % rc, flush=True)
         failed += rc != 0
 

@@ -42,7 +42,7 @@ CROSS_DIR = pathlib.Path(os.environ.get("CROSS_DIR", str(pathlib.Path.home() / "
 TCC = "i386-elf-gcc"
 TLD = "i386-elf-ld"
 TOBJCOPY = "i386-elf-objcopy"
-TFLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
+TFLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
           "-fno-stack-protector", "-nostdlib", "-fcommon", "-O2", "-Wall",
           "-Werror", "-D__OS32_USERLAND__",
           "-I" + str(ROOT / "include"), "-I" + str(ROOT / "sdk/include"),
@@ -74,20 +74,20 @@ def run(cmd, **kw):
 def case_check_fn(tmp):
     print("== 1: exec / shlib / 常駐シェルの判定関数 ==", flush=True)
     exe = tmp / "os32x-layout"
-    r = run(["gcc", "-std=gnu89", "-Wall", "-Wextra", "-Werror",
-             "-Wdeclaration-after-statement", "-D__cdecl=",
+    r = run(["gcc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
+             "-D__cdecl=",
              "-I" + str(ROOT / "exec"), "-I" + str(ROOT / "sdk/include/os32"),
              str(ROOT / "tools/tests/os32x_layout_host.c"), "-o", str(exe)])
-    check(r.returncode == 0, "ホスト GNU89 -Werror でコンパイルできる")
+    check(r.returncode == 0, "ホスト GNU11 -Werror でコンパイルできる")
     if r.returncode != 0:
         print(r.stderr)
         return
     r = run([exe])
     sys.stdout.write(r.stdout)
     check(r.returncode == 0, "os32x_layout_host が全部通る")
-    r = run([TCC, "-std=gnu89", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
+    r = run([TCC, "-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
              "-fno-stack-protector", "-O2", "-Wall", "-Wextra", "-Werror",
-             "-Wdeclaration-after-statement", "-D__KERNEL_BUILD__",
+             "-D__KERNEL_BUILD__",
              "-I" + str(ROOT / "include"), "-I" + str(ROOT / "sdk/include/os32"),
              "-I" + str(ROOT / "exec"),
              "-c", str(ROOT / "exec/os32x_hdr.c"), "-o", str(tmp / "os32x_hdr.o")])
@@ -128,7 +128,7 @@ def case_capacity(tmp):
           "容量 R はトランポリン 1 ページに収まる (12R + 272 <= 4096)")
 
 
-KERNEL_CFLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
+KERNEL_CFLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
                  "-fno-stack-protector", "-nostdlib", "-mno-red-zone", "-fcommon",
                  "-fsigned-char", "-fno-short-enums", "-O2", "-Wall",
                  "-D__KERNEL_BUILD__"]

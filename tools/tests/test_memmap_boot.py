@@ -30,9 +30,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/memmap_boot_host.c"
 TARGET_SRCS = [ROOT / "kernel/paging.c"]
 SHM_SRC = ROOT / "kernel/shm.c"
-FLAGS = ['-m32', '-march=i386', '-std=gnu89', '-ffreestanding', '-fno-pie',
-         '-fno-stack-protector', '-Wall', '-Wextra', '-Werror',
-         '-Wdeclaration-after-statement']
+FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-ffreestanding', '-fno-pie',
+         '-fno-stack-protector', '-Wall', '-Wextra', '-Werror']
 # -O0 では KHEAP_BASE (&__bss_end 由来) が畳まれず、shm.c の STATIC_ASSERT が
 # 「variably modified at file scope」になる。出荷と同じ -O2 で組む。
 HOST_OPT = ['-O2']
@@ -171,7 +170,7 @@ def main():
     # -Werror は付けない — 本番が付けていないし、shm.c の STATIC_ASSERT は
     # (u32)&__bss_end を含むので "variably modified at file scope" の警告が出る
     # (コンパイラが畳めないだけで、値としては正しい)。
-    target = ['-std=gnu89', '-m32', '-march=i386', '-ffreestanding', '-fno-pie',
+    target = ['-std=gnu11', '-m32', '-march=i386', '-ffreestanding', '-fno-pie',
               '-fno-stack-protector', '-O2', '-Wall', '-D__KERNEL_BUILD__']
     with tempfile.TemporaryDirectory(prefix='os32-memmap-') as tmp:
         for src in ('kernel/paging.c', 'kernel/shm.c'):
@@ -181,7 +180,7 @@ def main():
                             '-c', str(ROOT / src),
                             '-o', str(pathlib.Path(tmp) / (src.replace('/', '_') + '.o'))],
                            check=True)
-    print('HOST ILP32 + TARGET GNU89 PASS')
+    print('HOST ILP32 + TARGET GNU11 PASS')
     return 0
 
 

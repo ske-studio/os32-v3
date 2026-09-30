@@ -45,8 +45,8 @@ SHIMS = {
     "exec.h": "int ring3_user_range_ok(u32 p, u32 len);\n",
 }
 
-HOST_FLAGS = ["-std=gnu89", "-Wall", "-Wextra", "-Werror",
-              "-Wdeclaration-after-statement", "-Wno-unused-parameter",
+HOST_FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
+              "-Wno-unused-parameter",
               "-Wno-sign-compare", "-Wno-pointer-to-int-cast",
               "-Wno-missing-field-initializers", "-D__cdecl="]
 
@@ -204,15 +204,15 @@ if __name__ == "__main__":
                         "-o", sqlite_obj], check=True)
         exe = build(tmp, "main", sqlite_obj, san)
         if exe is None:
-            sys.exit("HOST GNU89 -Werror compile FAILED")
-        print("HOST GNU89 -Werror compile PASS (real kapi_db.c + bundled SQLite)",
+            sys.exit("HOST GNU11 -Werror compile FAILED")
+        print("HOST GNU11 -Werror compile PASS (real kapi_db.c + bundled SQLite)",
               flush=True)
 
         if "--target" in sys.argv:
-            subprocess.run(["i386-elf-gcc", "-std=gnu89", "-m32", "-march=i386",
+            subprocess.run(["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                             "-ffreestanding", "-fno-pie", "-fno-stack-protector",
                             "-nostdlib", "-msoft-float", "-Os", "-Wall",
-                            "-Wdeclaration-after-statement", "-D__KERNEL_BUILD__",
+                            "-D__KERNEL_BUILD__",
                             "-I" + str(ROOT), "-I" + str(ROOT / "include"),
                             "-I" + str(ROOT / "arch/x86"),
                             "-I" + str(ROOT / "platform/pc98"),
@@ -225,7 +225,7 @@ if __name__ == "__main__":
                             "-I" + str(ROOT / "exec"), "-I" + str(ROOT / "gfx"),
                             "-c", str(ROOT / "kapi/kapi_db.c"),
                             "-o", str(tmp / "kapi_db.o")], check=True, cwd=ROOT)
-            print("TARGET i386-elf GNU89 compile PASS", flush=True)
+            print("TARGET i386-elf GNU11 compile PASS", flush=True)
 
         cases = [x for x in sys.argv[1:] if not x.startswith("--")] or CASES
         failed = run_cases(exe, cases)

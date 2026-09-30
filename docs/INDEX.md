@@ -33,7 +33,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | 実行モデル (ローダ、ネスト、リング3、資源回収、exec_run の分割壁) | [09_exec.md](09_exec.md) | [10 §10-9](10_notes.md)、`archive/kernel_v2/` (設計経緯) |
 | 描画方式 (ページフリップ、200 ライン) | [05_drivers.md §5-5](05_drivers.md) | CLAUDE.md「Graphics」(1 行) |
 | 落とし穴の経緯・検証記録 | [POLICY_DEBUG.md §4](POLICY_DEBUG.md) | CLAUDE.md「Known Gotchas」(2〜3 行の注意 + §番号) |
-| コーディング規約 (C89、kstring、三層定数、asm) | [POLICY_DEV.md §2](POLICY_DEV.md) | CONSTRAINTS [C1]〜[C4] (規則行) |
+| コーディング規約 (C11 (gnu11)、kstring、三層定数、asm) | [POLICY_DEV.md §2](POLICY_DEV.md) | CONSTRAINTS [C1]〜[C4] (規則行) |
 | 進捗 | 各票の冒頭の状態行 (語彙は [POLICY_DEV.md §8](POLICY_DEV.md)、`make check-docs-status`) と、最新の引き継ぎの残件表 (上の「引き継ぎ」の行)。領域の中の進捗は領域別索引 ([tasks/fep/00_INDEX.md](tasks/fep/00_INDEX.md)、[archive/v21/v86v2/04](archive/v21/v86v2/04_implementation_status.md)) | [ROADMAP.md](ROADMAP.md) (計画)、[CHANGELOG.md](../CHANGELOG.md) (履歴)。[tasks/gui/TASKS.md](tasks/gui/TASKS.md) のゲートは v1.1 の記録 |
 | プログラムの一覧 | 各層の `deploy.yaml` (機械可読の正典)、コマンドは [07_shell.md §7-1](07_shell.md) | 09_exec / INDEX に表を持たない |
 | LAN の設計・進捗 | ドライバ = [tasks/network/PLAN.md](tasks/network/PLAN.md)、リンク層と Host Services = [tasks/network/LINK_PLAN.md](tasks/network/LINK_PLAN.md) | 05_drivers / DEVELOPMENT は要約 + リンク |

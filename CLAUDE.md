@@ -64,7 +64,7 @@ waits for the image locks to clear before starting; a hand-typed `taskkill` → 
 [D1]〜[D3] の一部の操作には `.claude/settings.json` の `ask` / `deny` も設定している。
 これは包括的な保護ではない。NP21/W の停止確認や別コマンド経由の操作にも正典の規則を適用する。
 
-- **[C1]** C89 (GNU89) only — no `//` comments, declarations at block start, no C99 features.
+- **[C1]** C11 (GNU11) for internal code — kernel, boot, userland and SDK implementation build with `-std=gnu11`; public SDK headers stay C89/GNU89-compatible and SQLite keeps GNU89. No implicit declarations / implicit int / VLA; no new anonymous structs/unions, `restrict`, atomics, TLS or thread APIs.
 - **[C2]** In the kernel use `kstrncpy` / `kstrncat` / `kstrlen` / `kstrcmp` (`lib/kstring.h`), never libc.
 - **[C3]** Functions exposed to external programs need `__cdecl` wrappers in `kapi/`.
 - **[C4]** No hardcoded constants — follow the three-layer constant scheme.

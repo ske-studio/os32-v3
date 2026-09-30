@@ -9,7 +9,7 @@
 
   * 実物の lib/kstring_asm.asm を nasm -f elf32 で組み、objcopy で 13 本の
     シンボルを a_* に改名する。
-  * 実物の lib/kstring_c.c をホスト ILP32 GNU89 (-m32) でコンパイルし、同じ
+  * 実物の lib/kstring_c.c をホスト ILP32 GNU11 (-m32) でコンパイルし、同じ
     13 本を c_* に改名する。
   * 両方を 1 つの実行ファイルにリンクし、同じ入力で**戻り値とバッファの
     全内容 (前後の番兵を含む)** を突き合わせる。食い違ったら C 版が悪い
@@ -52,12 +52,11 @@ FUNCS = ["kmemcpy", "memcpy", "kmemset", "memset",
 
 # u32 は unsigned long (include/types.h) なので **必ず ILP32 で組む**。
 # build/config.mk の CFLAGS_COMMON と同じ素性 (-fsigned-char / -fno-short-enums
-# を含む) に -Wextra -Werror -Wdeclaration-after-statement を足したもの。
-COMMON_FLAGS = ["-std=gnu89", "-ffreestanding", "-fno-pie",
+# を含む) に -Wextra -Werror を足したもの。
+COMMON_FLAGS = ["-std=gnu11", "-ffreestanding", "-fno-pie",
                 "-fno-stack-protector", "-fcommon",
                 "-fsigned-char", "-fno-short-enums",
-                "-Wall", "-Wextra", "-Werror",
-                "-Wdeclaration-after-statement"]
+                "-Wall", "-Wextra", "-Werror"]
 X86_FLAGS = ["-m32", "-march=i386", "-mno-red-zone"]
 INCLUDES = ["-I" + str(ROOT / p)
             for p in ("include", "lib", "sdk/include/os32")]
@@ -146,7 +145,7 @@ def target_compile(tmp):
         run([cc, *COMMON_FLAGS, *X86_FLAGS, "-nostdlib", "-O2",
              "-D__KERNEL_BUILD__", *INCLUDES, "-c", str(C_SRC),
              "-o", str(obj)])
-        print("TARGET i386-elf GNU89 -Werror COMPILE PASS", flush=True)
+        print("TARGET i386-elf GNU11 -Werror COMPILE PASS", flush=True)
         nm = shutil.which("i386-elf-nm") or "nm"
         bad += check_symbol_set(obj, "i386-elf", nm)
 
@@ -158,7 +157,7 @@ def target_compile(tmp):
         run([cc, *COMMON_FLAGS, "-nostdlib", "-O2",
              "-D__KERNEL_BUILD__", *INCLUDES, "-c", str(C_SRC),
              "-o", str(obj)])
-        print("TARGET arm-none-eabi GNU89 -Werror COMPILE PASS", flush=True)
+        print("TARGET arm-none-eabi GNU11 -Werror COMPILE PASS", flush=True)
         nm = shutil.which("arm-none-eabi-nm") or "nm"
         bad += check_symbol_set(obj, "arm-none-eabi", nm)
 

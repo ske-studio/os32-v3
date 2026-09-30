@@ -107,7 +107,7 @@ make check-tests-inventory                      # 表が古くないか検査す
 | 23 | `check-privileged` | `python3 tools/check_privileged.py` | — | — | — | × |
 | 24 | `check-arch-asm` | `python3 tools/check_arch_asm.py` | — | — | — | ○ |
 | 25 | `check-le-access` | `python3 tools/check_le_access.py` | — | [`tools/tests/le_access_tdd.md`](../tools/tests/le_access_tdd.md) | [`docs/tasks/portability/ARM_GAUGE.md`](tasks/portability/ARM_GAUGE.md) | ○ |
-| 26 | `check-ne2000-ring` | `mkdir -p $(BUILD_OUT)`<br>`gcc -std=gnu89 -Wall -Wextra -DNE2K_HOST_TEST -Idrivers  -o $(BUILD_OUT)/ne2000_ring_test tools/tests/ne2000_ring_test.c drivers/ne2000_ring.c`<br>`$(BUILD_OUT)/ne2000_ring_test` | `drivers/ne2000_ring.c` | — | — | ○ |
+| 26 | `check-ne2000-ring` | `mkdir -p $(BUILD_OUT)`<br>`gcc $(C_STD) -Wall -Wextra -DNE2K_HOST_TEST -Idrivers  -o $(BUILD_OUT)/ne2000_ring_test tools/tests/ne2000_ring_test.c drivers/ne2000_ring.c`<br>`$(BUILD_OUT)/ne2000_ring_test` | `drivers/ne2000_ring.c` | — | — | ○ |
 | 27 | `check-shlib` | `python3 tools/mkshlib.py --check` | — | — | — | ○ |
 | 28 | `check-gui-proto` | `python3 tools/check_gui_proto.py` | — | — | — | ○ |
 | 29 | `check-term-model` | `cargo test --manifest-path userland/libos32term/Cargo.toml --target x86_64-unknown-linux-gnu --offline`<br>`cargo check --manifest-path userland/libos32term/Cargo.toml --lib --target x86_64-unknown-linux-gnu --offline` | `userland/libos32term/Cargo.toml` | — | — | × |

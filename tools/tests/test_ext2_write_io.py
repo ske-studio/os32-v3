@@ -16,11 +16,11 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 CASES = ["w512_new", "w512_existing", "w1_append", "seek_back",
          "tar_sequence", "read512", "write_through", "ns_invalidation",
          "sync_on_alloc", "meta_reaches_disk"]
-FLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
+FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
          "-fno-stack-protector", "-nostdlib", "-static", "-O1",
          "-Wall", "-Wextra", "-Werror",
          "-Wno-unused-parameter", "-Wno-sign-compare",
-         "-Wdeclaration-after-statement", "-D__cdecl=", "-DMTAR_NO_STDIO"]
+         "-D__cdecl=", "-DMTAR_NO_STDIO"]
 # mtar_freestanding は必ず先頭 — 32bit の glibc ヘッダが無い環境で
 # lib/microtar/microtar.c の <stdio.h> / <stdlib.h> / <string.h> を埋める。
 INCLUDES = ["-I" + str(ROOT / p)
@@ -37,23 +37,22 @@ if __name__ == "__main__":
         exe = tmp / "ext2-write-io"
         subprocess.run(["gcc", *FLAGS, *INCLUDES, str(SRC), "-o", str(exe)],
                        cwd=ROOT, check=True)
-        print("HOST GNU89 -Werror COMPILE PASS", flush=True)
+        print("HOST GNU11 -Werror COMPILE PASS", flush=True)
         failed = 0
         cases = sys.argv[1:] or CASES
         for case in cases:
             rc = subprocess.run([str(exe), case], cwd=ROOT).returncode
             print(f"EXIT {case}={rc}", flush=True)
             failed += rc != 0
-        # 実物と同じフラグでクロスコンパイルも通ること ([C1] C89/GNU89)
+        # 実物と同じフラグでクロスコンパイルも通ること ([C1] GNU11)
         for src in TARGET_SRCS:
-            subprocess.run(["i386-elf-gcc", "-std=gnu89", "-m32", "-march=i386",
+            subprocess.run(["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                             "-ffreestanding", "-fno-pie", "-fno-stack-protector",
                             "-Wall", "-Wextra", "-Werror",
-                            "-Wdeclaration-after-statement",
                             "-Wno-unused-parameter", "-Wno-sign-compare",
                             *INCLUDES, "-O2", "-c", str(ROOT / src),
                             "-o", str(tmp / (pathlib.Path(src).stem + ".o"))],
                            cwd=ROOT, check=True)
-        print("TARGET i386-elf GNU89 -Werror COMPILE PASS", flush=True)
+        print("TARGET i386-elf GNU11 -Werror COMPILE PASS", flush=True)
         print(f"SUMMARY {len(cases) - failed}/{len(cases)} PASS", flush=True)
         sys.exit(bool(failed))

@@ -23,7 +23,7 @@ mv の宛先 / rm) が**断りを出し、open / mkdir / rename / unlink を呼�
   python3 -B tools/tests/test_fs_kind_callers.py [--target] [--mutate]
 
 --target を付けると、実機と同じ i386-elf クロスコンパイラでも
-cmd_fs_shared.c / cmd_file.c が -Werror で通ることを確かめる ([C1] C89/GNU89)。
+cmd_fs_shared.c / cmd_file.c が -Werror で通ることを確かめる ([C1] GNU11)。
 --mutate は**否定側**。mkdir を収集の前へ戻した版 / 戻り値を見ない版 /
 EXIST を型を見ずに通す版 / 列挙の失敗を無視する版を作り、この試験が
 ちゃんと RED になることを見る。make・エミュレータ・実配備には一切触れない。
@@ -39,8 +39,7 @@ import mutpar                                                   # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
-HOST_FLAGS = ["-std=gnu89", "-Wall", "-Wextra", "-Werror",
-              "-Wdeclaration-after-statement",
+HOST_FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
               "-D__cdecl=", "-D__OS32_USERLAND__"]
 HOST_INC = ["-I" + str(ROOT / p) for p in
             (".", "include", "sdk/include", "sdk/include/os32",
@@ -52,11 +51,10 @@ if not CROSS_DIR.exists():
     if alt.exists():
         CROSS_DIR = alt
 
-TARGET_FLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding",
+TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-fno-pie", "-fno-stack-protector", "-nostdlib",
                 "-mno-red-zone", "-fcommon", "-O2",
                 "-Wall", "-Wextra", "-Werror",
-                "-Wdeclaration-after-statement",
                 "-D__OS32_USERLAND__", "-I.", "-Iinclude", "-Isdk/include",
                 "-Isdk/include/os32", "-Iuserland/lib", "-Iuserland/shell",
                 "-I" + str(CROSS_DIR / "i386-elf/include")]
@@ -146,7 +144,7 @@ if __name__ == "__main__":
         subprocess.run(["gcc", *HOST_FLAGS, *HOST_INC,
                         str(ROOT / "tools/tests/fs_kind_callers_host.c"),
                         "-o", str(exe)], cwd=ROOT, check=True)
-        print("HOST GNU89 -Werror COMPILE PASS "
+        print("HOST GNU11 -Werror COMPILE PASS "
               "(real cmd_fs_shared.c + cmd_file.c)", flush=True)
         rc = subprocess.run([str(exe)], cwd=ROOT, timeout=60).returncode
         print("EXIT fs_kind_callers_host=%d" % rc, flush=True)

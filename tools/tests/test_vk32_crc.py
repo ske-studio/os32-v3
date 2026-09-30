@@ -146,9 +146,8 @@ fat_check_c:
 def build(work, srcs, target, geom):
     work = pathlib.Path(work) / geom
     work.mkdir(exist_ok=True)
-    common = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding",
-              "-fno-stack-protector", "-fno-pie", "-Wall", "-Werror",
-              "-Wdeclaration-after-statement"]
+    common = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
+              "-fno-stack-protector", "-fno-pie", "-Wall", "-Werror"]
     if target:
         cc = "i386-elf-gcc"
         if shutil.which(cc) is None:
@@ -170,9 +169,9 @@ def build(work, srcs, target, geom):
     (work / "fat.asm").write_text(asm_fat(text, geom), encoding="utf-8")
     sh(["nasm", "-f", "elf32", str(work / "fat.asm"), "-o", str(work / "fat.o")])
 
-    sh(["gcc", "-std=gnu89", "-m32", "-ffreestanding", "-fno-pic", "-fno-pie",
+    sh(["gcc", "-std=gnu11", "-m32", "-ffreestanding", "-fno-pic", "-fno-pie",
         "-fno-stack-protector", "-fno-builtin", "-O2", "-Wall", "-Wextra",
-        "-Werror", "-Wdeclaration-after-statement",
+        "-Werror", 
         "-c", str(HARNESS), "-o", str(work / "harness.o")])
     exe = work / "vk32_host"
     sh(["ld", "-m", "elf_i386", "-static", "-e", "_start", "-o", str(exe),
@@ -621,7 +620,7 @@ def c_values(header, names, extra_inc=()):
         src.write_text('#include <stdio.h>\n#include "{}"\nint main(void){{\n{}return 0;}}\n'.format(
             header, body), encoding="utf-8")
         exe = pathlib.Path(d) / "v"
-        sh(["gcc", "-std=gnu89", "-w"] + ["-I" + str(i) for i in extra_inc]
+        sh(["gcc", "-std=gnu11", "-w"] + ["-I" + str(i) for i in extra_inc]
            + [str(src), "-o", str(exe)])
         r = sh([str(exe)])
     return {k: int(v) for k, v in (ln.split("=") for ln in r.stdout.decode().split())}

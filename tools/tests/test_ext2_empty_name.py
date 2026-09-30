@@ -33,18 +33,17 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
-HOST_FLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
+HOST_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
               "-fno-stack-protector", "-nostdlib", "-static", "-O1",
               "-Wall", "-Wextra", "-Werror",
               "-Wno-unused-parameter", "-Wno-sign-compare",
-              "-Wdeclaration-after-statement", "-D__cdecl="]
+              "-D__cdecl="]
 SRC = ROOT / "tools/tests/ext2_empty_name_host.c"
 TARGET_SRCS = ["fs/ext2_dir.c", "fs/ext2_file.c", "fs/ext2_vfs.c", "fs/vfs.c"]
-TARGET_FLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding",
+TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-fno-pie", "-fno-stack-protector", "-nostdlib",
                 "-mno-red-zone", "-fcommon", "-O2",
                 "-Wall", "-Wextra", "-Werror",
-                "-Wdeclaration-after-statement",
                 "-Wno-sign-compare", "-Wno-unused-parameter",
                 "-D__KERNEL_BUILD__", "-I.", "-Iinclude",
                 "-Iarch/x86", "-Iplatform/pc98", "-Isdk/include",
@@ -234,7 +233,7 @@ def main():
             print(err)
             print("BUILD FAIL")
             return 1
-        print("HOST GNU89 -m32 -Werror compile PASS (real ext2 + vfs + rt/pkg.c)")
+        print("HOST GNU11 -m32 -Werror compile PASS (real ext2 + vfs + rt/pkg.c)")
         imgdir = tmp / "img"
         imgdir.mkdir()
         ok, _ = run(exe, imgdir, pkgs, case=case, e2fsck=e2fsck)

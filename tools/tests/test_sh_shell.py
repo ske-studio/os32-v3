@@ -5,9 +5,9 @@
       exit が後続を止めない)
 記録: tools/tests/t9_tdd.md
 
-test_launch.py / test_sh_launch.py と同じ様式 — ホスト ILP32 GNU89 で走らせ、
+test_launch.py / test_sh_launch.py と同じ様式 — ホスト ILP32 GNU11 で走らせ、
 同じソースが外部プログラムと同じ形の i386-elf-gcc -Werror でも通ることを
-別に見る ([C1] C89/GNU89)。Make・エミュレータは使わない。
+別に見る ([C1] GNU11)。Make・エミュレータは使わない。
 
 ホスト側は tools/tests/sh_shell_host.c が userland/shell/sh_redraw.inc と
 userland/shell/cmd_script.c をそのまま #include する (模型ではない)。
@@ -20,8 +20,8 @@ import sys
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-BASE = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
-        "-fno-stack-protector", "-Wall", "-Wdeclaration-after-statement",
+BASE = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
+        "-fno-stack-protector", "-Wall", 
         "-D__OS32_USERLAND__", "-DSHELL_AS_APP"]
 INCLUDES = ["-I" + str(ROOT / "sdk/include/os32"), "-I" + str(ROOT / "include"),
             "-I" + str(ROOT / "userland/shell")]
@@ -65,13 +65,13 @@ if __name__ == "__main__":
         subprocess.run(["gcc", *BASE, "-O0", *shim, *INCLUDES,
                         "-nostdlib", "-static", "-no-pie",
                         str(HOST_SRC), "-o", str(exe)], cwd=ROOT, check=True)
-        print("HOST ILP32 GNU89 COMPILE PASS", flush=True)
+        print("HOST ILP32 GNU11 COMPILE PASS", flush=True)
         rc = subprocess.run([str(exe)], cwd=ROOT, timeout=30).returncode
 
         subprocess.run(["i386-elf-gcc", *BASE, "-O2", "-nostdlib",
                         "-mno-red-zone", "-fcommon", *shim, *INCLUDES,
                         "-c", str(HOST_SRC), "-o", str(tmp / "sh_shell.o")],
                        cwd=ROOT, check=True)
-        print("TARGET i386-elf GNU89 COMPILE PASS", flush=True)
+        print("TARGET i386-elf GNU11 COMPILE PASS", flush=True)
         print("EXIT sh_shell_host=%d" % rc, flush=True)
         sys.exit(rc)

@@ -12,7 +12,7 @@ BOOTINFO_INC = boot/bootinfo.inc boot/bootinfo_rm.inc
 boot/loader_fat_new.bin boot/loader_fat144.bin boot/loader_hdd.o: $(BOOTINFO_INC)
 
 # === 新HDDローダー (ASM + C リンク) ===
-CFLAGS_BOOT = -std=gnu89 -m32 -march=i386 -ffreestanding -fno-pie \
+CFLAGS_BOOT = $(C_STD) $(C_DIALECT_ERRORS) -m32 -march=i386 -ffreestanding -fno-pie \
               -fno-stack-protector -nostdlib -mno-red-zone -Os -Wall -fcommon \
               -Iboot
 

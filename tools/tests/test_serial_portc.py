@@ -44,8 +44,8 @@ def extract_buz(sys_c):
     if not m:
         raise SystemExit("kernel/sys.c に buz_on / buz_off が見つからない")
     return m.group(0)
-FLAGS = ["-std=gnu89", "-Wall", "-Wextra", "-Werror",
-         "-Wdeclaration-after-statement", "-D__cdecl=",
+FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
+         "-D__cdecl=",
          "-Wno-unused-function"]
 
 # include/io.h の契約をホストで満たす偽物。ポート I/O はハーネスの
@@ -209,7 +209,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-serial-portc-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU89 -Werror compile PASS (real drivers/serial.c)",
+        print("HOST GNU11 -Werror compile PASS (real drivers/serial.c)",
               flush=True)
         rc = run_cases(exe, [a for a in args if not a.startswith("--")] or CASES)
         if "--mutate" in args:

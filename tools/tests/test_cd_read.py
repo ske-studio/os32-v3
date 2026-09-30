@@ -55,8 +55,8 @@ WIDE_CASES = ["stream_4k", "stream_32k", "read_file", "multi_drq", "multi_fallba
               "np2_read", "np2_async", "np2_sel_lag", "np2_stuck"]
 PKG_CASES = ["aligned_chunks", "nomem", "open_fail_frees"]
 
-COMMON = ["-std=gnu89", "-Wall", "-Wextra", "-Werror",
-          "-Wdeclaration-after-statement", "-D__cdecl=",
+COMMON = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
+          "-D__cdecl=",
           "-Wno-unused-function", "-Wno-unused-parameter"]
 SAN = ["-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-g"]
 
@@ -599,10 +599,9 @@ def mutate(base):
 
 def build_target(tmp):
     """カーネル / ユーザーランドと同じ i386-elf で通す。"""
-    base = ["i386-elf-gcc", "-std=gnu89", "-m32", "-march=i386", "-ffreestanding",
+    base = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
             "-fno-pie", "-fno-stack-protector", "-nostdlib", "-mno-red-zone", "-fcommon",
-            "-fsigned-char", "-fno-short-enums", "-O2", "-Wall", "-Werror",
-            "-Wdeclaration-after-statement"]
+            "-fsigned-char", "-fno-short-enums", "-O2", "-Wall", "-Werror"]
     kinc = ["-D__KERNEL_BUILD__"] + ["-I" + str(ROOT / p) for p in
                                      (".", "include", "arch/x86", "platform/pc98",
                                       "sdk/include", "sdk/include/os32", "drivers", "fs",
@@ -615,7 +614,7 @@ def build_target(tmp):
                                            "userland/lib", "userland/lib/rt")]
     subprocess.run([*base, *uinc, "-c", str(ROOT / "userland/lib/rt/pkg.c"), "-o",
                     str(pathlib.Path(tmp) / "pkg.o")], cwd=ROOT, check=True)
-    print("TARGET i386-elf GNU89 -Werror PASS (atapi.c / iso9660.c / pkg.c)", flush=True)
+    print("TARGET i386-elf GNU11 -Werror PASS (atapi.c / iso9660.c / pkg.c)", flush=True)
 
 
 def main():
@@ -632,7 +631,7 @@ def main():
             sys.stderr.write(e.stderr.decode(errors="replace"))
             print("HOST COMPILE FAIL")
             sys.exit(1)
-        print("HOST COMPILE GNU89 -Werror (asan/ubsan) PASS", flush=True)
+        print("HOST COMPILE GNU11 -Werror (asan/ubsan) PASS", flush=True)
         if cases:
             failed = 0
             for c in cases:

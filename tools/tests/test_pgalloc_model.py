@@ -84,7 +84,7 @@ return 0;
 }
 void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"(r) : "memory"); for (;;) {} }
 ''')
-            cmd = ['gcc', '-m32', '-march=i386', '-std=gnu89', '-Wall', '-Wextra', '-Werror', '-Wdeclaration-after-statement', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie', '-ffunction-sections', '-finstrument-functions', '-Wl,--gc-sections']
+            cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie', '-ffunction-sections', '-finstrument-functions', '-Wl,--gc-sections']
             cmd += ['-I' + str(ROOT / p) for p in ('include', 'kernel', 'lib', 'drivers', 'sdk/include/os32')]
             subprocess.run(cmd + list(flags) + [str(tmp / 'test.c'), str(ROOT / 'kernel/physmem.c'), '-o', str(tmp / 'test')], check=True)
             result = subprocess.run([str(tmp / 'test')])

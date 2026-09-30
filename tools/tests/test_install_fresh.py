@@ -8,7 +8,7 @@
 
   python3 -B tools/tests/test_install_fresh.py [--target] [--sanitize] [case ...]
 
-`--target` は i386-elf-gcc で install.c を単体コンパイル ([C1] C89 / -Werror)。
+`--target` は i386-elf-gcc で install.c を単体コンパイル ([C1] GNU11 / -Werror)。
 """
 import pathlib
 import subprocess
@@ -51,8 +51,8 @@ def build(tmp, sanitize, extra=(), root=ROOT):
     exe = str(tmp / "installfresh")
     san = (["-fsanitize=address", "-fno-omit-frame-pointer"]
            if sanitize else [])
-    subprocess.run(["gcc", "-std=gnu89", "-Wall", "-Wextra", "-Werror",
-                    "-Wdeclaration-after-statement", "-Wno-unused-function",
+    subprocess.run(["gcc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
+                    "-Wno-unused-function",
                     "-Wno-pointer-to-int-cast", "-D__cdecl=",
                     "-D__OS32_USERLAND__", "-O0",
                     *san, *extra, "-I" + str(root / "userland/system"),
@@ -60,16 +60,16 @@ def build(tmp, sanitize, extra=(), root=ROOT):
                     str(ROOT / "tools/tests/install_fresh_host.c"),
                     *[str(root / f) for f in SHARED],
                     "-o", exe], check=True)
-    print("HOST GNU89 -Werror compile PASS (real install.c normal path)",
+    print("HOST GNU11 -Werror compile PASS (real install.c normal path)",
           flush=True)
     return exe
 
 
-TARGET_FLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding",
+TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-fno-pie", "-fno-stack-protector", "-nostdlib",
                 "-mno-red-zone", "-fcommon", "-O2", "-Wall", "-Wextra",
                 "-Werror", "-Wno-unused-function",
-                "-Wdeclaration-after-statement", "-D__OS32_USERLAND__",
+                "-D__OS32_USERLAND__",
                 "-I.", "-Iinclude", "-Isdk/include", "-Isdk/include/os32",
                 "-Iuserland/lib", "-I/usr/local/cross/i386-elf/include"]
 
@@ -85,7 +85,7 @@ typedef char ide_info_tail_at_92[
 
 
 def target_compile(tmp):
-    """i386-elf でも同じソースが通ること ([C1] C89、-Werror)。
+    """i386-elf でも同じソースが通ること ([C1] GNU11、-Werror)。
 
     `-Wno-unused-function` は install.c に元からある死んだ静的関数
     (`str_endswith_ci`) の分。あわせて IdeInfo が実型 (96 B、末尾 92) で
@@ -94,7 +94,7 @@ def target_compile(tmp):
     subprocess.run(["i386-elf-gcc", *TARGET_FLAGS, "-c",
                     "userland/system/install.c",
                     "-o", str(tmp / "install.o")], check=True, cwd=ROOT)
-    print("TARGET i386-elf GNU89 compile PASS (install.c)", flush=True)
+    print("TARGET i386-elf GNU11 compile PASS (install.c)", flush=True)
     src = tmp / "ide_layout_assert.c"
     src.write_text(LAYOUT_ASSERT)
     subprocess.run(["i386-elf-gcc", *TARGET_FLAGS, "-c", str(src),

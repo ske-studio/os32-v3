@@ -28,8 +28,8 @@ class DbOwnedTests(unittest.TestCase):
             (tmp / "kprintf.h").write_text("int kprintf(int color, const char *fmt, ...);\n")
             exe = tmp / "db-owned"
             subprocess.run([
-                "cc", "-std=gnu89", "-Wall", "-Wextra", "-Werror",
-                "-Wno-unused-parameter", "-Wdeclaration-after-statement", "-D__cdecl=",
+                "cc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
+                "-Wno-unused-parameter", "-D__cdecl=",
                 "-I" + str(tmp), "-I" + str(ROOT / "sdk/include/os32"),
                 "-I" + str(ROOT / "include"), "-I" + str(ROOT / "fs"),
                 "-I" + str(ROOT / "lib/sqlite3"),

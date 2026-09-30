@@ -365,7 +365,7 @@ userland/lib/gfx/ui.o: userland/lib/gfx/ui.c
 
 # === SQLite Standalone Test ===
 SQLITE_SA_DIR = userland/tests/sqlite_standalone
-SQLITE_SA_CFLAGS = -std=gnu89 -m32 -march=i386 -ffreestanding -fno-pie -fno-stack-protector -nostdlib -mno-red-zone -O1 -fcommon -Wno-long-long -w -I. -Iinclude $(SDK_INC) -Iuserland/lib -Ilib/sqlite3 -include lib/sqlite3/os32_sqlite_config.h -I$(CROSS_DIR)/i386-elf/include
+SQLITE_SA_CFLAGS = $(C_STD_SQLITE) -m32 -march=i386 -ffreestanding -fno-pie -fno-stack-protector -nostdlib -mno-red-zone -O1 -fcommon -Wno-long-long -w -I. -Iinclude $(SDK_INC) -Iuserland/lib -Ilib/sqlite3 -include lib/sqlite3/os32_sqlite_config.h -I$(CROSS_DIR)/i386-elf/include
 
 $(SQLITE_SA_DIR)/sqlite3_user.o: lib/sqlite3/sqlite3.c lib/sqlite3/os32_sqlite_config.h
 	$(CC) $(SQLITE_SA_CFLAGS) -c $< -o $@

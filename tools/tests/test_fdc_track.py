@@ -228,8 +228,8 @@ def prepare_font(tmp):
 # fdc.c の fdc_motor_off() は元から未使用の static (test_fdc_seek.py と同じ)。
 # tick_count の差し替えは「volatile u32 * を返す関数」の宣言になるので
 # -Wignored-qualifiers は出ないが、念のため戻り値の修飾は許す。
-FLAGS = ["-std=gnu89", "-Wall", "-Wextra", "-Werror",
-         "-Wdeclaration-after-statement", "-D__cdecl=",
+FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
+         "-D__cdecl=",
          "-Wno-unused-function", "-Wno-unused-parameter",
          "-Dtick_count=(*fdc_fake_tick_ptr())"]
 
@@ -480,10 +480,10 @@ def build_target(tmp):
     """カーネルと同じ i386-elf で通す。"""
     for rel in SOURCES:
         extra = ["-Wno-unused-function"] if rel == "drivers/fdc.c" else []
-        cmd = ["i386-elf-gcc", "-std=gnu89", "-m32", "-march=i386",
+        cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
                "-mno-red-zone", "-fcommon", "-fsigned-char", "-fno-short-enums",
-               "-O2", "-Wall", "-Werror", "-Wdeclaration-after-statement",
+               "-O2", "-Wall", "-Werror", 
                "-D__KERNEL_BUILD__",
                "-I" + str(ROOT), "-I" + str(ROOT / "include"),
                "-I" + str(ROOT / "arch/x86"), "-I" + str(ROOT / "platform/pc98"),
@@ -493,7 +493,7 @@ def build_target(tmp):
                *extra, "-c", str(ROOT / rel),
                "-o", str(pathlib.Path(tmp) / (rel.replace("/", "_") + ".o"))]
         subprocess.run(cmd, cwd=ROOT, check=True)
-    print("TARGET i386-elf GNU89 -Werror PASS", flush=True)
+    print("TARGET i386-elf GNU11 -Werror PASS", flush=True)
 
 
 def mutate(tmp):
@@ -539,7 +539,7 @@ if __name__ == "__main__":
     tmp_root = os.environ.get("TMPDIR") or None
     with tempfile.TemporaryDirectory(prefix="os32-fdc-track-", dir=tmp_root) as tmp:
         exe = host_build(tmp)
-        print("HOST GNU89 -Werror compile PASS (real fdc_track.c / fdc.c)",
+        print("HOST GNU11 -Werror compile PASS (real fdc_track.c / fdc.c)",
               flush=True)
         if "--target" in args:
             build_target(tmp)

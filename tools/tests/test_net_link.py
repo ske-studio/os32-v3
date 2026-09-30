@@ -12,7 +12,7 @@ Make・エミュレータ・ネットワークには触らない (Agent は --of
   python3 -B tools/tests/test_net_link.py [--target] [--sanitize] [ケース名 ...]
 
 --target は同じソースがカーネルと同じフラグの i386-elf-gcc -Werror でも通ることを
-別に見る ([C1] C89/GNU89)。
+別に見る ([C1] GNU11)。
 """
 import pathlib
 import re
@@ -28,14 +28,14 @@ GENERATED = ROOT / "kapi/kapi_generated.c"
 # **include ガードを先に define して**中身を自前のものに差し替える。
 INC = ["-I" + str(ROOT / p) for p in ("include", "net", "kapi", "lib", "kernel",
                                       "drivers", "exec", "fs", "sdk/include/os32")]
-FLAGS = ["-std=gnu89", "-O0", "-Wall", "-Wextra", "-Werror",
-         "-Wdeclaration-after-statement", "-Wno-pointer-to-int-cast",
+FLAGS = ["-std=gnu11", "-O0", "-Wall", "-Wextra", "-Werror",
+         "-Wno-pointer-to-int-cast",
          "-Wno-unused-parameter"]
 
-TARGET_FLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
+TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
                 "-fno-stack-protector", "-nostdlib", "-mno-red-zone", "-fcommon",
                 "-O2", "-Wall", "-Wextra", "-Werror",
-                "-Wdeclaration-after-statement", "-D__KERNEL_BUILD__"]
+                "-D__KERNEL_BUILD__"]
 # arch/x86 + platform/pc98: include/io.h は契約だけで、実装は固定名
 # arch_io.h / platform_io.h を引く (順序 3)。build/config.mk の INC_KERNEL と
 # 同じものをここでも渡す (ホスト側は LINK_HOST_TEST で io.h を外すので不要
@@ -108,14 +108,14 @@ if __name__ == "__main__":
                if "--sanitize" in sys.argv else [])
         subprocess.run(["gcc", *FLAGS, *san, *argptr_defines(), *INC,
                         str(HOST_SRC), "-o", exe], check=True, cwd=ROOT)
-        print("HOST GNU89 -Werror compile PASS (real net/link.c + kapi/kapi_host.c)",
+        print("HOST GNU11 -Werror compile PASS (real net/link.c + kapi/kapi_host.c)",
               flush=True)
         if "--target" in sys.argv:
             for src in (ROOT / "net/link.c", ROOT / "kapi/kapi_host.c"):
                 subprocess.run(["i386-elf-gcc", *TARGET_FLAGS, *TARGET_INC,
                                 "-c", str(src), "-o", str(tmp / (src.stem + ".o"))],
                                check=True, cwd=ROOT)
-            print("TARGET i386-elf GNU89 -Werror compile PASS", flush=True)
+            print("TARGET i386-elf GNU11 -Werror compile PASS", flush=True)
         cases = [x for x in sys.argv[1:] if not x.startswith("--")]
         rc = subprocess.run([exe, *cases], cwd=ROOT, timeout=600).returncode
         print("EXIT net_link_host=%d" % rc, flush=True)

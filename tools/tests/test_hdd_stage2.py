@@ -61,12 +61,12 @@ SHARED = ["userland/system/inst_disk.c", "drivers/pc98pt.c",
           "userland/shell/hdprep_plan.c", "fs/ext2_layout.c"]
 INS_SHARED = ["userland/system/inst_hdd.c"] + SHARED
 
-HOST = ["gcc", "-std=gnu89", "-Wall", "-Wextra", "-Werror",
-        "-Wdeclaration-after-statement", "-D__cdecl="]
-ILP32 = ["gcc", "-std=gnu89", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
+HOST = ["gcc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
+        "-D__cdecl="]
+ILP32 = ["gcc", "-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
          "-fno-stack-protector", "-fno-builtin", "-nostdlib", "-static", "-O1",
          "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter", "-Wno-sign-compare",
-         "-Wno-unused-function", "-Wdeclaration-after-statement", "-D__cdecl="]
+         "-Wno-unused-function", "-D__cdecl="]
 
 MIRROR = ["userland/system/inst_disk.c", "userland/system/inst_disk.h",
           "userland/system/inst_hdd.c", "userland/system/inst_hdd.h",
@@ -130,8 +130,8 @@ def _commands(tmp, root):
         "pure": [*HOST, *inc, str(_harness(PURE, tmp, root)),
                  *[str(root / f) for f in SHARED], "-o", str(tmp / "pure")],
         "cdi": [*ILP32, *cinc, str(_harness(CDI, tmp, root)), "-o", str(tmp / "cdi")],
-        "ins": ["gcc", "-std=gnu89", "-Wall", "-Wextra", "-Werror",
-                "-Wdeclaration-after-statement", "-Wno-unused-function",
+        "ins": ["gcc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
+                "-Wno-unused-function",
                 "-Wno-pointer-to-int-cast", "-D__cdecl=", "-D__OS32_USERLAND__", "-O0",
                 *iinc, str(_harness(INS, tmp, root)),
                 *[str(root / f) for f in INS_SHARED], "-o", str(tmp / "ins")],
@@ -347,9 +347,9 @@ def str_return_guard():
 
 
 def build_target(tmp):
-    base = ["i386-elf-gcc", "-std=gnu89", "-m32", "-march=i386", "-ffreestanding",
+    base = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
             "-fno-pie", "-fno-stack-protector", "-nostdlib", "-mno-red-zone", "-fcommon",
-            "-O2", "-Wall", "-Wextra", "-Werror", "-Wdeclaration-after-statement",
+            "-O2", "-Wall", "-Wextra", "-Werror", 
             "-D__OS32_USERLAND__", "-I.", "-Iinclude", "-Isdk/include", "-Isdk/include/os32",
             "-Iuserland/lib"]
     for rel in ("userland/system/inst_disk.c", "userland/system/inst_hdd.c",
@@ -357,10 +357,10 @@ def build_target(tmp):
         extra = ["-Wno-unused-function"] if rel.endswith("install.c") else []
         run([*base, *extra, "-c", rel, "-o", str(pathlib.Path(tmp) / (pathlib.Path(rel).stem + ".o"))],
             check=True)
-    run(["i386-elf-gcc", "-std=gnu89", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
+    run(["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
          "-fno-stack-protector", "-nostdlib", "-Os", "-Wall", "-Werror", "-Iboot", "-c",
          "boot/ext2_mini.c", "-o", str(pathlib.Path(tmp) / "em.o")], check=True)
-    print("TARGET i386-elf GNU89 -Werror COMPILE PASS", flush=True)
+    print("TARGET i386-elf GNU11 -Werror COMPILE PASS", flush=True)
 
 
 # ---- 否定側: (ファイル, 前, 後, 説明) -------------------------------------------

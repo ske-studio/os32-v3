@@ -9,9 +9,9 @@ CASES = ["explicit_owner", "direct_close", "owned_close", "protect",
          "verified_close", "stale_reuse", "validation", "count_members",
          "quarantine", "capacity_preflight", "generation_exhaustion",
          "invalid_open", "generic_regression", "failed_open", "quarantine_capacity"]
-FLAGS = ["-std=gnu89", "-Wall", "-Wextra", "-Werror",
+FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-Wno-unused-parameter", "-Wno-sign-compare",
-         "-Wdeclaration-after-statement", "-D__cdecl="]
+         "-D__cdecl="]
 INCLUDES = ["-I" + str(ROOT / p) for p in ("include", "fs", "drivers", "sdk/include/os32")]
 
 if __name__ == "__main__":
@@ -20,17 +20,17 @@ if __name__ == "__main__":
         command = ["gcc", *FLAGS, *INCLUDES,
                    str(ROOT / "tools/tests/vfs_fd_sqlite_host.c"), "-o", str(exe)]
         subprocess.run(command, cwd=ROOT, check=True)
-        print("COMPILE GNU89 -Werror PASS", flush=True)
+        print("COMPILE GNU11 -Werror PASS", flush=True)
         if "--target" in sys.argv[1:]:
             target_command = [
-                "i386-elf-gcc", "-std=gnu89", "-m32", "-march=i386",
+                "i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                 "-ffreestanding", "-fno-pie", "-fno-stack-protector",
                 "-nostdlib", "-mno-red-zone", "-fcommon", "-O2", "-Wall",
-                "-Werror", "-Wdeclaration-after-statement", "-D__KERNEL_BUILD__",
+                "-Werror", "-D__KERNEL_BUILD__",
                 *INCLUDES, "-c", str(ROOT / "fs/vfs_fd.c"),
                 "-o", str(pathlib.Path(tmp) / "vfs_fd.o")]
             subprocess.run(target_command, cwd=ROOT, check=True)
-            print("TARGET i386-elf GNU89 -Werror PASS", flush=True)
+            print("TARGET i386-elf GNU11 -Werror PASS", flush=True)
         failed = 0
         cases = [case for case in sys.argv[1:] if case != "--target"] or CASES
         for case in cases:

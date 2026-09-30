@@ -31,18 +31,17 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
-HOST_FLAGS = ["-std=gnu89", "-Wall", "-Wextra", "-Werror",
+HOST_FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
               "-Wno-unused-parameter", "-Wno-sign-compare",
-              "-Wdeclaration-after-statement", "-D__cdecl="]
+              "-D__cdecl="]
 HOST_INC = ["-I" + str(ROOT / p)
             for p in ("include", "fs", "lib", "kernel", "drivers",
                       "sdk/include/os32")]
 
-TARGET_FLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding",
+TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-fno-pie", "-fno-stack-protector", "-nostdlib",
                 "-mno-red-zone", "-fcommon", "-O2",
                 "-Wall", "-Wextra", "-Werror",
-                "-Wdeclaration-after-statement",
                 # fs/vfs_fd.c は元から出る 2 件 (vfs_fstat の sizeof 比較と
                 # vfs_sys_compat_shell_print の attr) なのでそこだけ外す
                 "-Wno-sign-compare", "-Wno-unused-parameter",
@@ -62,7 +61,7 @@ if __name__ == "__main__":
         subprocess.run(["gcc", *HOST_FLAGS, *HOST_INC,
                         str(ROOT / "tools/tests/vfs_kind_host.c"),
                         "-o", str(exe)], cwd=ROOT, check=True)
-        print("HOST GNU89 -Werror COMPILE PASS (real fs/vfs.c)", flush=True)
+        print("HOST GNU11 -Werror COMPILE PASS (real fs/vfs.c)", flush=True)
         rc = subprocess.run([str(exe)], cwd=ROOT, timeout=60).returncode
         print("EXIT vfs_kind_host=%d" % rc, flush=True)
 
