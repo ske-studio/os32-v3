@@ -36,6 +36,7 @@
 #include "v86_gcap_math.h"
 #include "v86.h"
 #include "v86_mem.h"
+#include "exec.h"       /* exec_ledger_owner: バッキングの台帳の owner */
 #include "v86_pic.h"
 #include "kmalloc.h"
 #include "kstring.h"
@@ -610,7 +611,7 @@ int v86_gdc_capture(int mode, V86Gcap *out)
     gcap_ops = (mode == V86G_MODE_SELFTEST) ? &gcap_dry_ops : &gcap_hw_ops;
     v86_gcap_rec = g;           /* ここから v86_io.c の方針が採取用になる */
 
-    if (v86_mem_setup() != 0) {
+    if (v86_mem_setup(exec_ledger_owner()) != 0) {
         g->status = V86G_ST_SETUP;
     } else {
         u32 i;

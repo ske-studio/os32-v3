@@ -673,7 +673,7 @@ u32 paging_app_band_pdes(u32 code_end, u32 heap_req, u32 ram_top)
     return n;
 }
 
-int paging_addrspace_create_n(struct addrspace *as, u32 pde_count)
+int paging_addrspace_create_n(struct addrspace *as, u32 owner, u32 pde_count)
 {
     u32 pd_phys;
     u32 pt_phys[MEM_APP_BAND_MAX_PDES];
@@ -687,6 +687,7 @@ int paging_addrspace_create_n(struct addrspace *as, u32 pde_count)
     as->app_pde = 0;
     as->app_pde_count = 0;
     for (k = 0; k < MEM_APP_BAND_MAX_PDES; k++) as->app_pt_phys[k] = 0;
+    as->owner = owner;
 
     if (pde_count < 1 || pde_count > MEM_APP_BAND_MAX_PDES) return -1;
 
@@ -700,18 +701,21 @@ int paging_addrspace_create_n(struct addrspace *as, u32 pde_count)
      * 領域から取られるので、そのまま物理=仮想で書き込める。
      * 途中で尽きたら **確保済みを全部返して** 何も変えずに失敗する。 */
     for (k = 0; k < pde_count; k++) pt_phys[k] = 0;
-    pd_phys = pgalloc_alloc_page();
+    pd_phys = pgalloc_alloc_phys(owner, 1);
     if (!pd_phys) return -1;
     for (k = 0; k < pde_count; k++) {
-        pt_phys[k] = pgalloc_alloc_page();
+        pt_phys[k] = pgalloc_alloc_phys(owner, 1);
         if (!pt_phys[k]) {
-            while (k > 0) { k--; pgalloc_free_page(pt_phys[k]); }
-            pgalloc_free_page(pd_phys);
+            while (k > 0) {
+                k--;
+                pgalloc_free_n_owner(owner, pt_phys[k] / PAGE_SIZE, 1);
+            }
+            pgalloc_free_n_owner(owner, pd_phys / PAGE_SIZE, 1);
             return -1;
         }
     }
 
-    new_pd = (u32 *)pd_phys;
+    new_pd = (u32 *)P2V(pd_phys);
 
     /* 全 PDE を master からコピー = カーネル帯域・SHM・VRAM を含む全域を
      * 共有する。共有 PDE は master と同じ PT (同一物理) を指す。
@@ -731,7 +735,7 @@ int paging_addrspace_create_n(struct addrspace *as, u32 pde_count)
      * 変わらない (V1)。CPL=3 用の USER overlay は M1c で行う。 */
     for (k = 0; k < pde_count; k++) {
         pdi = APP_BAND_PDE + k;
-        app_pt = (u32 *)pt_phys[k];
+        app_pt = (u32 *)P2V(pt_phys[k]);
         for (i = 0; i < PTE_COUNT; i++) {
             app_pt[i] = page_tables[pdi][i];
         }
@@ -748,9 +752,9 @@ int paging_addrspace_create_n(struct addrspace *as, u32 pde_count)
     return 0;
 }
 
-int paging_addrspace_create(struct addrspace *as)
+int paging_addrspace_create(struct addrspace *as, u32 owner)
 {
-    return paging_addrspace_create_n(as, 1);
+    return paging_addrspace_create_n(as, owner, 1);
 }
 
 void paging_addrspace_destroy(struct addrspace *as)
@@ -764,10 +768,11 @@ void paging_addrspace_destroy(struct addrspace *as)
         return;
     }
     for (k = 0; k < MEM_APP_BAND_MAX_PDES; k++) {
-        if (as->app_pt_phys[k]) pgalloc_free_page(as->app_pt_phys[k]);
+        if (as->app_pt_phys[k])
+            pgalloc_free_n_owner(as->owner, as->app_pt_phys[k] / PAGE_SIZE, 1);
         as->app_pt_phys[k] = 0;
     }
-    pgalloc_free_page(as->pd_phys);
+    pgalloc_free_n_owner(as->owner, as->pd_phys / PAGE_SIZE, 1);
     live_addrspaces--;
     as->pd_phys = 0;
     as->app_pde = 0;
@@ -918,14 +923,41 @@ u32 paging_addrspace_free_user_range(struct addrspace *as, u32 vstart,
             continue;                       /* 共有帯は触らない */
         pt = (u32 *)as->app_pt_phys[pdi - as->app_pde];
         if (!pt) continue;
-        if (pt[pti] & PTE_PRESENT) {
-            pgalloc_free_page(pt[pti] & 0xFFFFF000UL);
+        if ((pt[pti] & PTE_PRESENT) &&
+            pgalloc_free_n_owner(as->owner, pt[pti] >> PAGE_SHIFT, 1))
             freed++;
-        }
         pt[pti] = 0;
     }
     if (paging_current_cr3() == as->pd_phys) paging_load_cr3(as->pd_phys);
     return freed;
+}
+
+/* 自己診断の AS は試験用の AS owner で作る (TASK_T1_LEDGER §4-8、B12)。
+ * PD / PT も試験で張るページもその owner で確保・解放する — kernel で確保
+ * すると free_user_range (as->owner で返す) が拒否され、空きページ数の比較が
+ * 落ちる。解放の owner 検査は緩めない。 */
+static int selftest_as_begin(struct addrspace *as, u32 pdes)
+{
+    u32 owner;
+    if (!ledger_owner_new(LEDGER_KIND_AS, 0, "pgtest", &owner)) return -1;
+    if (paging_addrspace_create_n(as, owner, pdes) != 0) {
+        (void)ledger_owner_retire(owner);
+        return -1;
+    }
+    return 0;
+}
+
+/* 破棄して、owner のページが 0 なら番号を返す。残っていれば (失敗枝) 回収で
+ * 掃除してから返し、1 (= 呼び手が rc のビットを立てる) を返す。 */
+static int selftest_as_end(struct addrspace *as)
+{
+    u32 owner = as->owner, left = 0;
+    int bad;
+    paging_addrspace_destroy(as);
+    bad = ledger_owner_pages(owner) != 0;
+    (void)ledger_reclaim_owner(owner, &left);
+    if (!ledger_owner_retire(owner)) bad = 1;
+    return bad;
 }
 
 /* V1 自己診断用のプローブ。カーネル .bss (0x100000-0x1FFFFF, PDE 0) に置かれ、
@@ -941,7 +973,7 @@ int paging_pd_clone_selftest(void)
 
     if (!pg_enabled) return 0; /* ページング無効なら検証対象外 */
 
-    if (paging_addrspace_create(&as) != 0) return 1;
+    if (selftest_as_begin(&as, 1) != 0) return 1;
 
     saved_cr3 = paging_current_cr3();
 
@@ -965,7 +997,7 @@ int paging_pd_clone_selftest(void)
     if (seen != 0x12345678UL) rc |= 2;                 /* 新 PD から共有が見えない */
     if (pd_selftest_probe != 0xA5A5F00DUL) rc |= 4;    /* 新 PD の書込が master に反映されない */
 
-    paging_addrspace_destroy(&as);
+    if (selftest_as_end(&as)) rc |= 8;                 /* 試験用 owner のページが残った */
     return rc;
 }
 
@@ -1009,7 +1041,7 @@ int paging_map_user_keep_selftest(void)
     page_tables[pdi][pti_c] = (vclient & 0xFFFFF000UL) | PAGE_RW | PTE_PCD;
     page_tables[pdi][pti_v] = (vvisible & 0xFFFFF000UL) | PAGE_RW | PTE_PCD;
 
-    if (paging_addrspace_create(&as) != 0) {
+    if (selftest_as_begin(&as, 1) != 0) {
         page_tables[pdi][pti_c] = saved_c;
         page_tables[pdi][pti_v] = saved_v;
         page_directory[pdi] = saved_pde;
@@ -1032,7 +1064,7 @@ int paging_map_user_keep_selftest(void)
     if (page_directory[pdi] & PTE_USER) rc |= 128;          /* 4 (master) */
     if (!(app_pd[pdi] & PTE_USER))      rc |= 256;          /* 4 (アプリ PD) */
 
-    paging_addrspace_destroy(&as);
+    if (selftest_as_end(&as)) rc |= 512;    /* 試験用 owner のページが残った */
 
     page_tables[pdi][pti_c] = saved_c;
     page_tables[pdi][pti_v] = saved_v;
@@ -1076,8 +1108,8 @@ int paging_app_band_selftest(void)
     saved_pde = page_directory[pdi_last];
     before_free = pgalloc_free_pages();
 
-    if (paging_addrspace_create_n(&as, MEM_APP_BAND_MAX_PDES) != 0) return 2;
-    app_pd = (u32 *)as.pd_phys;
+    if (selftest_as_begin(&as, MEM_APP_BAND_MAX_PDES) != 0) return 2;
+    app_pd = (u32 *)P2V(as.pd_phys);
 
     if (as.app_pde != APP_BAND_PDE) rc |= 4;
     if (as.app_pde_count != MEM_APP_BAND_MAX_PDES) rc |= 4;
@@ -1108,7 +1140,7 @@ int paging_app_band_selftest(void)
     if (((u32 *)as.app_pt_phys[MEM_APP_BAND_MAX_PDES - 1])[pti] !=
         (vlast | PAGE_RW | PTE_USER)) rc |= 1024;
 
-    paging_addrspace_destroy(&as);
+    if (selftest_as_end(&as)) rc |= 2048;
 
     /* 5: 枚数分 + PD が返っている */
     if (pgalloc_free_pages() != before_free) rc |= 2048;
@@ -1121,7 +1153,7 @@ int paging_app_band_selftest(void)
         u32 *pt0;
         u32 base_free = pgalloc_free_pages();
 
-        if (paging_addrspace_create_n(&as, MEM_APP_BAND_MAX_PDES) != 0)
+        if (selftest_as_begin(&as, MEM_APP_BAND_MAX_PDES) != 0)
             return rc | 4096;
         pt0 = (u32 *)as.app_pt_phys[0];
 
@@ -1138,9 +1170,9 @@ int paging_app_band_selftest(void)
             page_tables[APP_BAND_PDE] != pt0) rc |= 4096;
 
         /* P1: 仮想 != 物理。帯の先頭 2 ページを別物理へ張る。 */
-        phys = pgalloc_alloc_n(2);
+        phys = pgalloc_alloc_phys(as.owner, 2);
         if (!phys) {
-            paging_addrspace_destroy(&as);
+            (void)selftest_as_end(&as);
             return rc | 8192;
         }
         if (paging_addrspace_map_user_range_phys(&as, MEM_APP_BAND_BASE,
@@ -1162,7 +1194,7 @@ int paging_app_band_selftest(void)
         if (paging_addrspace_free_user_range(&as, MEM_APP_BAND_BASE,
                 MEM_APP_BAND_BASE + 2 * PAGE_SIZE) != 2) rc |= 16384;
         if (pt0[0] != 0 || pt0[1] != 0) rc |= 16384;
-        paging_addrspace_destroy(&as);
+        if (selftest_as_end(&as)) rc |= 16384;
         if (pgalloc_free_pages() != base_free) rc |= 16384;
     }
     return rc;

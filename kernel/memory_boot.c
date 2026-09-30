@@ -38,9 +38,10 @@ STATIC_ASSERT(MEM_LEDGER_META_BASE == MEM_DMA_POOL_END + 1 + MEM_GUARD_SIZE,
               ledger_backing_keeps_dma_guard);
 STATIC_ASSERT(MEM_LEDGER_META_END == MEM_STACK_GUARD,
               ledger_backing_below_kstack_guard);
-/* 8MB 型の metadata (pgalloc の bitmap 2 面) は常に 1 ページに入る (T1-R2)。
- * 式は pgalloc_metadata_bytes と同じ。 */
-STATIC_ASSERT(((MEMORY_BOOT_FIXED_MAX_TOP + 31) / 32) * 4UL * 2UL <=
+/* 8MB 型の metadata (L1 の bitmap 2 面 + L2 の owner 1B/PFN) は常に 1 ページ
+ * に入る (T1-R2、上端 3,073 PFN で 776 + 3,073 = 3,849B)。式は
+ * pgalloc_metadata_bytes と同じ PGALLOC_META_BYTES。 */
+STATIC_ASSERT(PGALLOC_META_BYTES(MEMORY_BOOT_FIXED_MAX_TOP) <=
               MEMORY_BOOT_FIXED_META_PAGES * PAGE_SIZE,
               ledger_fixed_metadata_fits);
 /* Probe pattern is derived from the address, so any aliasing (24-bit wrap or
@@ -153,12 +154,11 @@ static u32 memory_boot_workspace_pages(u32 limit)
     return pages;
 }
 
-/* 表 (pgalloc の bitmap 2 面 + workspace) が要るページ数の合計。 */
+/* 表 (L1 の bitmap 2 面 + L2 の owner + workspace) が要るページ数の合計。 */
 static u32 memory_boot_table_pages(u32 limit)
 {
-    u32 words, pages;
-    words = (limit + 31) / 32;
-    pages = (words * 2 * (u32)sizeof(u32) + PAGE_SIZE - 1) / PAGE_SIZE;
+    u32 pages;
+    pages = (PGALLOC_META_BYTES(limit) + PAGE_SIZE - 1) / PAGE_SIZE;
     return pages + memory_boot_workspace_pages(limit);
 }
 
@@ -166,8 +166,9 @@ static u32 memory_boot_table_pages(u32 limit)
  * 空間より下」の低位 RAM だけ (workspace >= MEM_APP_BAND_MAX_TOP は、2 枚
  * PDE のアプリが master のページテーブルを USER で恒等マップして任意物理を
  * 書けてしまうのを防ぐ不変条件)。この帯の広さが、表で覆える RAM の量を
- * 決める。現行のレイアウト (3MB の帯) で約 2.8GB まで覆えるので、登録上限
- * MEM_PHYS_RAM_CEILING (2GB、D11) の方が先に効く。 */
+ * 決める。現行のレイアウト (3MB の帯) で約 2.3GB まで覆える (T1b で L2 の
+ * 1B/PFN が載った後の値) ので、登録上限 MEM_PHYS_RAM_CEILING (2GB、D11) の
+ * 方が先に効く。 */
 static u32 memory_boot_high_fit(u32 high_end, u32 top)
 {
     u32 room, base;
@@ -209,6 +210,105 @@ static u32 memory_boot_sum_kb(u32 admitted_kb, u32 high_end)
 u32 memory_boot_ram_kb(void)
 {
     return boot_ram_kb;
+}
+
+/* 区間の表に載せる固定用途 (TASK_T1_LEDGER §3-3 ③)。番地は memmap.h の
+ * 正典から引く。bootinfo (0x7E00) はフォントキャッシュの内側、固定 PT は
+ * カーネル帯 (BSS) の内側なので、それぞれ外側の区間に含まれる。 */
+#define MB_PFN(a) ((u16)((a) / PAGE_SIZE))
+static const struct {
+    u16 first, end;
+    u8 type, owner, cache, pad;
+} memory_boot_fixed[] = {
+    { 0, MB_PFN(MEM_NULL_GUARD_END + 1),
+      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
+    { MB_PFN(MEM_FONT_CACHE_BASE), MB_PFN(MEM_UNICODE_TABLE_BASE),
+      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
+    { MB_PFN(MEM_UNICODE_TABLE_BASE),
+      MB_PFN(MEM_UNICODE_TABLE_BASE + MEM_UNICODE_TABLE_SIZE),
+      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
+    /* planar BB: 固定の SURFACE の backing (owner boot → gshell は T1e) */
+    { MB_PFN(MEM_GFX_BB_BASE), MB_PFN(MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE),
+      LEDGER_R_SURFACE_BACKING, LEDGER_OWNER_BOOT, LEDGER_CACHE_WB, 0 },
+    /* 低位の残り (V86 の試験語・自動プレイの mailbox 0x90000・ブートスタック) */
+    { MB_PFN(MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE), MB_PFN(MEM_CONV_END),
+      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
+    /* VRAM と BIOS ROM */
+    { MB_PFN(MEM_CONV_END), MB_PFN(KERNEL_LOAD_ADDR),
+      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_UC, 0 },
+    { MB_PFN(KERNEL_LOAD_ADDR), MB_PFN(MEM_KERNEL_BAND_END + 1),
+      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
+    /* SQLite 帯 (DMA プールの下まで) */
+    { MB_PFN(MEM_KERNEL_BAND_END + 1), MB_PFN(MEM_DMA_POOL_BASE),
+      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
+    { MB_PFN(MEM_DMA_POOL_BASE), MB_PFN(MEM_DMA_POOL_END + 1),
+      LEDGER_R_DMA, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
+    /* DMA プールの上側ガード + 台帳の FIXED 型 backing */
+    { MB_PFN(MEM_DMA_POOL_END + 1), MB_PFN(MEM_STACK_GUARD),
+      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
+    /* カーネルスタックのガード + カーネルスタック */
+    { MB_PFN(MEM_STACK_GUARD), MB_PFN(MEM_SHELL_LOAD_ADDR),
+      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
+    { MB_PFN(MEM_SHELL_LOAD_ADDR), MB_PFN(MEM_SHELL_BAND_END + 1),
+      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
+};
+STATIC_ASSERT(MEM_SHELL_BAND_END + 1 == MEM_POOL_BASE, fixed_regions_end_at_pool);
+STATIC_ASSERT(MEM_SHELL_BAND_END / PAGE_SIZE < 0x10000UL, fixed_regions_fit_u16);
+
+/* ======================================================================== */
+/*  集積域・同梱域の規則 (TASK_T1_LEDGER §3-3 ③、TASK_MEMMAP_V3 §4-5)        */
+/*                                                                          */
+/*  [first, end) (PFN) はローダが bootinfo で申告した同梱エントリの範囲。     */
+/*  0, 0 = 申告なし。申告があれば同梱域 MEM_BOOT_BUNDLE_* を丸ごと owner =    */
+/*  bundle で押さえ、BUNDLE の区間を登録する (中身は後で ledger_transfer で  */
+/*  モジュールへ、R7)。申告が同梱域の外にかかれば拒否 (何も変えない)。       */
+/*  集積域 MEM_BOOT_STAGING_* はカーネルが走る時点で展開済みなので池へ返す   */
+/*  = 何もしない。T1 の時点ではローダがどちらも使わない (bootinfo に申告の欄 */
+/*  が無い) ので、起動では常に申告なし。規則はホスト試験で見る。1 = 成功。   */
+/* ======================================================================== */
+int memory_boot_boot_areas(u32 first, u32 end)
+{
+    u32 lo, hi, pfn;
+    lo = MEM_BOOT_BUNDLE_BASE / PAGE_SIZE;
+    hi = lo + MEM_BOOT_BUNDLE_SIZE / PAGE_SIZE;
+    if (!first && !end) return 1;
+    if (first >= end || first < lo || end > hi) return 0;
+    /* 同梱域の全ページが空きの RAM であるときだけ丸ごと取れる (取れた範囲が
+     * そのまま区間になるので、失敗時の巻き戻しも正確)。 */
+    if (!pgalloc_alloc_n_owner(LEDGER_OWNER_BUNDLE, (int)(hi - lo), lo, hi,
+                               LEDGER_BOTTOM_UP, &pfn)) return 0;
+    if (ledger_register_region(LEDGER_R_BUNDLE, LEDGER_OWNER_BUNDLE, lo, hi,
+                               LEDGER_CACHE_WB, 0)) return 1;
+    (void)pgalloc_free_n_owner(LEDGER_OWNER_BUNDLE, lo, (int)(hi - lo));
+    return 0;
+}
+
+/* 区間の表の初期化 (③ の最後、live AS 0)。top = 低位 RAM の上端 (PFN)、
+ * ws_first = ARENA_TOP の workspace の先頭 (0 = FIXED 型)。0 = 失敗。 */
+static int memory_boot_regions(u32 top, u32 ws_first)
+{
+    u32 i;
+    for (i = 0; i < sizeof(memory_boot_fixed) / sizeof(memory_boot_fixed[0]); i++)
+        if (!ledger_register_region(memory_boot_fixed[i].type,
+                                    memory_boot_fixed[i].owner,
+                                    memory_boot_fixed[i].first,
+                                    memory_boot_fixed[i].end,
+                                    memory_boot_fixed[i].cache,
+                                    LEDGER_RF_PERMANENT)) return 0;
+    /* ARENA_TOP 型の backing (workspace + metadata、低位 RAM の末尾) */
+    if (ws_first && !ledger_register_region(LEDGER_R_FIXED, LEDGER_OWNER_KERNEL,
+                                            ws_first, top, LEDGER_CACHE_WB,
+                                            LEDGER_RF_PERMANENT)) return 0;
+    /* RAM でない背景: 15〜16MB のシステム空間と [2GB, 4GiB) */
+    return ledger_register_region(LEDGER_R_BACKGROUND, LEDGER_OWNER_KERNEL,
+                                  MEM_SYSTEM_SPACE_BASE / PAGE_SIZE,
+                                  MEM_SYSTEM_SPACE_END / PAGE_SIZE,
+                                  LEDGER_CACHE_UC, LEDGER_RF_PERMANENT) &&
+           ledger_register_region(LEDGER_R_BACKGROUND, LEDGER_OWNER_KERNEL,
+                                  MEM_PHYS_RAM_CEILING / PAGE_SIZE,
+                                  PHYSMEM_MAX_PFN, LEDGER_CACHE_UC,
+                                  LEDGER_RF_PERMANENT) &&
+           memory_boot_boot_areas(0, 0);
 }
 
 int memory_boot_init(u32 mem_kb)
@@ -265,5 +365,7 @@ int memory_boot_init(u32 mem_kb)
      * Once attempted, failure is fatal (the caller fail-stops). */
     if (!sys_memory_bootstrap_model(&boot_memory, &layout, paging_verify_identity))
         return 0;
-    return sys_memory_stage_online();
+    if (!sys_memory_stage_online()) return 0;
+    return memory_boot_regions(top, layout.kind == PGALLOC_BACKING_ARENA_TOP ?
+                                    layout.workspace_first : 0);
 }

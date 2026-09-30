@@ -185,6 +185,10 @@ struct addrspace {
     u32 app_pde;       /* アプリ固有にした先頭 PDE インデックス */
     u32 app_pde_count; /* アプリ固有 PDE の枚数 (0=無効, 1..MAX_PDES) */
     u32 app_pt_phys[MEM_APP_BAND_MAX_PDES];  /* 各 PDE のアプリ PT 物理 */
+    /* この AS の台帳の owner (TASK_T1_LEDGER §4-8、T1b)。PD / PT と、
+     * free_user_range が返すページはこの owner のもの。取得と返却は呼び手
+     * (exec・自己診断) が行い、destroy は消さない (呼び手が回収・返却する)。 */
+    u32 owner;
 };
 
 /* カーネル (master) PD の物理アドレス。CR3 を戻すときに使う。 */
@@ -201,7 +205,8 @@ void paging_load_cr3(u32 pd_phys);
  * [APP_BAND_PDE, APP_BAND_PDE + pde_count) だけ新規確保したアプリ PT に
  * 差し替える。アプリ PT は master の同帯 PT と同一の identity で初期化する
  * (CPL=0 のまま CR3 を載せてもカーネルから見た番地が変わらない = V1)。
- * PD/PT のバッキングは pgalloc から取る (memory_boot_init 済みが前提)。
+ * PD/PT のバッキングは pgalloc から owner (呼び手が ledger_owner_new で
+ * 取った AS owner) で取る (memory_boot_init 済みが前提)。as->owner に控える。
  * pde_count は 1..MEM_APP_BAND_MAX_PDES。
  * 戻り値: 0=成功 (as を埋める), -1=引数不正 / 物理ページ不足 (何も確保しない)。
  *
@@ -209,11 +214,11 @@ void paging_load_cr3(u32 pd_phys);
  * アプリ AS へ写像してはならない。paging_map_phys() / paging_set_page() は
  * master の page_tables[] に書くので、アプリ固有 PDE の範囲に使っても
  * 走行中のアプリからは見えない。 */
-int paging_addrspace_create_n(struct addrspace *as, u32 pde_count);
+int paging_addrspace_create_n(struct addrspace *as, u32 owner, u32 pde_count);
 
-/* 枚数 1 の従来どおりの生成 (= paging_addrspace_create_n(as, 1))。
+/* 枚数 1 の従来どおりの生成 (= paging_addrspace_create_n(as, owner, 1))。
  * 自己診断など「帯を広げる必要がない」呼び出しはこちらを使う。 */
-int paging_addrspace_create(struct addrspace *as);
+int paging_addrspace_create(struct addrspace *as, u32 owner);
 
 /* アプリ用アドレス空間を破棄し PD/PT (枚数分) のバッキングページを解放する。
  * 破棄する PD がアクティブ (CR3) であってはならない — 先に
@@ -269,7 +274,8 @@ int paging_addrspace_map_user_range_phys(struct addrspace *as, u32 vstart,
  * 戻り値 0=成功, -1=AS 無効。 */
 int paging_addrspace_clear_app_band(struct addrspace *as);
 
-/* [vstart, vend) に張ってある **アプリ固有 PT の物理ページを pgalloc へ返し**、
+/* [vstart, vend) に張ってある **アプリ固有 PT の物理ページを as->owner で
+ * pgalloc へ返し** (他 owner のページは返さず ledger_bad_free に数える)、
  * PTE を 0 にする (K5b P6)。範囲はアプリ固有 PDE の中だけを見る — 共有 PT に
  * 掛かる部分は 1 ビットも触らない (VRAM/SHM/フォントを解放しないため)。
  * per-app 物理は連続とは限らない (断片化時はページ単位で張る) ので、

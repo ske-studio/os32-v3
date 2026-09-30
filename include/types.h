@@ -29,6 +29,13 @@ typedef signed long    i32;
 
 #endif /* OS32_KAPI_SHARED_H */
 
+/* ポインタ幅の整数 (P2V / V2P の中継ぎ、TASK_T1_LEDGER §3-4)。32 ビット限定の
+ * 決定 (2026-09-17) の範囲で u32 と同じ幅。「ポインタを整数で持つ」印。 */
+#ifndef OS32_UPTR_DEFINED
+#define OS32_UPTR_DEFINED
+typedef unsigned long uptr;
+#endif
+
 /* コンパイル時アサーション (C11 の _Static_assert、[C1])。
  * cond が偽だとコンパイルエラーになる。cond は整数定数式で書くこと — 規格外の式
  * (例: 旧 tss.c の &((T *)0)->m) でも GCC が畳み込めれば黙って通るので、拒否を

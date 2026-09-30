@@ -687,15 +687,15 @@ static void pegc_palette_init(void)
 static int pegc_reserve_backbuffer(void)
 {
     if (s_bb_phys != 0) return 1;
-    s_bb_phys = sys_reserve_top((u32)MEM_GFX_BB8_SIZE);
+    /* 永久予約の台帳の owner は boot (TASK_T1_LEDGER §4-8、B11)。予約は
+     * eligible を落とすので、旧版の直後の pgalloc_mark_used は無操作だった
+     * (T1b で撤去)。T1e で池からの確保 + SURFACE に置き換える。 */
+    s_bb_phys = sys_reserve_top(LEDGER_OWNER_BOOT, (u32)MEM_GFX_BB8_SIZE);
     if (s_bb_phys == 0) {
         kprintf(0xC1, "[pegc] backbuffer reserve failed (mem too small)\n");
         s_probe_ok = 0;
         return 0;
     }
-    /* pgalloc の管理域の末尾でもあるので、動的確保に配られないよう押さえる。
-     * (sys_usable_mem_end() は下がったが memory_boot_init は既に済んでいる) */
-    pgalloc_mark_used(s_bb_phys, (int)((u32)MEM_GFX_BB8_SIZE / PAGE_SIZE));
     /* **予約した直後に 0 で埋める**。この面は exec が CPL=3 のアプリへ USER
      * で写す (exec/exec.c、gfx_bb_phys_range)。prepare は init と違って画面を
      * クリアしないので、ここで埋めないと最初の gfx_init までの間、予約前の

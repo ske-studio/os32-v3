@@ -10,6 +10,7 @@
 #include "tss.h"
 #include "paging.h"
 #include "v86_mem.h"
+#include "exec.h"       /* exec_ledger_owner: バッキングの台帳の owner */
 #include "v86_io.h"
 #include "v86_pic.h"
 #include "v86_bios.h"
@@ -56,7 +57,7 @@ int v86_gui_refuse(void)
     return 1;
 }
 
-static u32 v86_jmpbuf[6];
+static u32 v86_jmpbuf[KSETJMP_BUF_LEN];
 static volatile int v86_active = 0;
 static volatile enum v86_exit_reason v86_exit_reason = V86_EXIT_NONE;
 static volatile int v86_exit_request = 0;
@@ -641,7 +642,7 @@ int v86_smoke_test(void)
 
     if (v86_gui_refuse()) return -1;    /* 票 T8-2 */
 
-    if (v86_mem_setup() != 0) {
+    if (v86_mem_setup(exec_ledger_owner()) != 0) {
         v86_smoke_result = 0x8001;
         return -1;
     }
@@ -782,7 +783,7 @@ int v86_disk_test(const char *path)
         return -1;
     }
 
-    if (v86_mem_setup() != 0) {
+    if (v86_mem_setup(exec_ledger_owner()) != 0) {
         v86_bios_detach_disk();
         v86_disk_result = 0x8003;
         return -1;
@@ -859,7 +860,7 @@ int v86_boot2(const char *path, const char *second)
         v86_bios_detach_disk();
         return -1;
     }
-    if (v86_mem_setup() != 0) {
+    if (v86_mem_setup(exec_ledger_owner()) != 0) {
         v86_bios_detach_disk();
         return -2;
     }

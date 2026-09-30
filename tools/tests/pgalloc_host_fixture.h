@@ -28,7 +28,8 @@
 #define HOST_POOL_IRQ_RESTORE(f) irq_restore(f)
 #endif
 
-static u32 host_pool_storage[((PHYSMEM_LEGACY_MAX_PFN + 31) / 32) * 2];
+/* L1 (2 bitmap) + L2 (owner 1B/PFN、T1b) の置き場。 */
+static u32 host_pool_storage[(PGALLOC_META_BYTES(PHYSMEM_LEGACY_MAX_PFN) + 3) / 4];
 
 static void __attribute__((unused)) host_pool_boot_ws(u32 kb, u32 ws_first,
                                                       u32 ws_end)
@@ -60,6 +61,16 @@ done:
 static void __attribute__((unused)) host_pool_boot(u32 kb)
 {
     host_pool_boot_ws(kb, 0, 0);
+}
+
+/* 旧 pgalloc_alloc_n_range (バイト範囲) の置き換え (T1b で撤去)。kernel
+ * owner で [lo, hi) (ページ境界のバイト番地) から下向きに 1 本取る。 */
+static u32 __attribute__((unused)) host_alloc_range(int n, u32 lo, u32 hi)
+{
+    u32 pfn;
+    if (!pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, n, lo / PAGE_SIZE,
+                               hi / PAGE_SIZE, LEDGER_BOTTOM_UP, &pfn)) return 0;
+    return pfn * PAGE_SIZE;
 }
 
 #endif /* PGALLOC_HOST_FIXTURE_H */

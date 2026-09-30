@@ -656,6 +656,17 @@ checks:
     - kernel/physmem.c
     - kernel/physmem.h
     - kernel/sys.c
+    - kernel/setjmp.asm
+    - kernel/isr_stub.asm
+    - kernel/irq.c
+    - include/ksetjmp.h
+    - kernel/v86.c
+    - kernel/v86_bios.h
+    - kernel/v86_gcap.h
+    - kernel/v86_io.h
+    - kernel/v86_mem.h
+    - kernel/v86_pic.h
+    - tools/tests/mutpar.py
     - tools/tests/app_band_pde_host.c
     - tools/tests/app_bb_overlap_host.c
     - tools/tests/device_reservation_stage_host.c
@@ -669,6 +680,7 @@ checks:
     - tools/tests/test_app_bb_overlap.py
     - tools/tests/test_device_reservation.py
     - tools/tests/test_highram_stage.py
+    - tools/tests/test_ledger.py
     - tools/tests/test_memory_boot.py
     - tools/tests/test_paging_bounds.py
     - tools/tests/test_pgalloc_model.py
@@ -2217,6 +2229,7 @@ checks:
     - kernel/v86.h
     - kernel/v86_mem.h
     - kernel/v86_pic.h
+    - exec/exec.h
     - include/gfx_hal.h
     - sdk/include/os32/os32_kapi_shared.h
     - arch/x86/arch_io.h

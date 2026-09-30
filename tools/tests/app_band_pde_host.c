@@ -104,7 +104,7 @@ void _start(void)
         u32 master_pde2 = page_directory[PDE2];
         u32 *pd;
 
-        CHECK(paging_addrspace_create(&as) == 0);
+        CHECK(paging_addrspace_create(&as, LEDGER_OWNER_KERNEL) == 0);
         pd = (u32 *)as.pd_phys;
         CHECK(as.app_pde == APP_BAND_PDE);
         CHECK(as.app_pde_count == 1);
@@ -140,7 +140,7 @@ void _start(void)
         u32 master_pt2_0 = page_tables[PDE2][0];
         u32 *pd, *pt1, *pt2;
 
-        CHECK(paging_addrspace_create_n(&as, 2) == 0);
+        CHECK(paging_addrspace_create_n(&as, LEDGER_OWNER_KERNEL, 2) == 0);
         CHECK(used == before + 3);      /* PD + PT 2 枚 */
         pd = (u32 *)as.pd_phys;
         pt1 = (u32 *)as.app_pt_phys[0];
@@ -192,9 +192,9 @@ void _start(void)
         struct addrspace as;
         u32 before = used;
 
-        CHECK(paging_addrspace_create_n(&as, 0) == -1);
-        CHECK(paging_addrspace_create_n(&as, MEM_APP_BAND_MAX_PDES + 1) == -1);
-        CHECK(paging_addrspace_create_n((struct addrspace *)0, 1) == -1);
+        CHECK(paging_addrspace_create_n(&as, LEDGER_OWNER_KERNEL, 0) == -1);
+        CHECK(paging_addrspace_create_n(&as, LEDGER_OWNER_KERNEL, MEM_APP_BAND_MAX_PDES + 1) == -1);
+        CHECK(paging_addrspace_create_n((struct addrspace *)0, LEDGER_OWNER_KERNEL, 1) == -1);
         CHECK(used == before);
         CHECK(live_addrspaces == 0);
 
@@ -204,18 +204,18 @@ void _start(void)
             u32 n = pgalloc_free_pages();
             u32 blob;
             CHECK(n > 2);
-            blob = pgalloc_alloc_n((int)(n - 2));
+            blob = pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, (int)(n - 2));
             CHECK(blob != 0);
             CHECK(pgalloc_free_pages() == 2);
-            CHECK(paging_addrspace_create_n(&as, 2) == -1);
+            CHECK(paging_addrspace_create_n(&as, LEDGER_OWNER_KERNEL, 2) == -1);
             CHECK(pgalloc_free_pages() == 2);
             CHECK(as.pd_phys == 0 && as.app_pde_count == 0);
             CHECK(live_addrspaces == 0);
             /* 1 枚なら通る (PD + PT の 2 ページちょうど) */
-            CHECK(paging_addrspace_create_n(&as, 1) == 0);
+            CHECK(paging_addrspace_create_n(&as, LEDGER_OWNER_KERNEL, 1) == 0);
             CHECK(pgalloc_free_pages() == 0);
             paging_addrspace_destroy(&as);
-            pgalloc_free_n(blob, (int)(n - 2));
+            CHECK(pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, blob / PAGE_SIZE, (int)(n - 2)));
             CHECK(used == before);
         }
     }
@@ -234,7 +234,7 @@ void _start(void)
         u32 master_pt1_0 = page_tables[APP_BAND_PDE][0];
         u32 *pd, *pt1, phys, i;
 
-        CHECK(paging_addrspace_create_n(&as, 1) == 0);
+        CHECK(paging_addrspace_create_n(&as, LEDGER_OWNER_KERNEL, 1) == 0);
         pd = (u32 *)as.pd_phys;
         pt1 = (u32 *)as.app_pt_phys[0];
 
@@ -252,7 +252,7 @@ void _start(void)
         CHECK(paging_addrspace_clear_app_band((struct addrspace *)0) == -1);
 
         /* P1: 別物理を固定仮想 MEM_EXEC_LOAD_ADDR へ 3 ページ張る */
-        phys = pgalloc_alloc_n(3);
+        phys = pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, 3);
         CHECK(phys != 0);
         CHECK(phys != MEM_EXEC_LOAD_ADDR);   /* 仮想 != 物理 であること */
         CHECK(paging_addrspace_map_user_range_phys(&as, MEM_EXEC_LOAD_ADDR,
@@ -320,7 +320,7 @@ void _start(void)
         CHECK(page_tables[pdi + 1] == 0 && page_directory[pdi + 1] == 0);
 
         /* アプリ AS が居る間 (live AS > 0) でも窓を張れる = 新 PDE が要らない */
-        CHECK(paging_addrspace_create(&as) == 0);
+        CHECK(paging_addrspace_create(&as, LEDGER_OWNER_KERNEL) == 0);
         CHECK(paging_map_phys(base, base, 0x200000UL / PAGE_SIZE,
                               PAGE_RW | PTE_PCD) == 0);
         CHECK(page_tables[pdi][0] == (base | PAGE_RW | PTE_PCD));
@@ -331,7 +331,7 @@ void _start(void)
         CHECK(page_tables[pdi + 1] == 0);
 
         /* 窓を張った後のアプリ AS は PDE ごと同じ PT を写す */
-        CHECK(paging_addrspace_create(&as2) == 0);
+        CHECK(paging_addrspace_create(&as2, LEDGER_OWNER_KERNEL) == 0);
         pd2 = (u32 *)as2.pd_phys;
         CHECK(pd2[pdi] == page_directory[pdi]);
         /* クライアント面だけ USER へ昇格。PCD は保つ、表示面は supervisor */

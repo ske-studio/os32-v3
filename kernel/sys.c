@@ -194,8 +194,11 @@ u32 sys_usable_mem_end(void)
 /*                                                                          */
 /*  戻り値: 予約領域の先頭物理アドレス。0 = 予約できなかった                 */
 /*  (メモリ不足、または既に別サイズで予約済み)。                             */
+/*                                                                          */
+/*  owner (T1b〜T1d の暫定、TASK_T1_LEDGER §4-8・B11): 永久予約したページの  */
+/*  L2 をこの owner にする (PERSIST だけ。PEGC の BB は boot)。T1e で撤去。  */
 /* ======================================================================== */
-u32 sys_reserve_top(u32 bytes)
+u32 sys_reserve_top(u32 owner, u32 bytes)
 {
     u32 ceiling, need, result, minimum;
     unsigned int flags;
@@ -215,7 +218,7 @@ u32 sys_reserve_top(u32 bytes)
               MEM_EXEC_SBRK_MIN + MEM_EXEC_HEAP_MIN;
     if (ceiling < minimum || need > ceiling - minimum) goto done;
     /* Called after the model is ONLINE. Never publish a numeric-only claim. */
-    if (!pgalloc_reserve_pfn((ceiling - need) / PAGE_SIZE,
+    if (!pgalloc_reserve_pfn(owner, (ceiling - need) / PAGE_SIZE,
                              ceiling / PAGE_SIZE)) goto done;
     sys_top_reserved = need;
     if (sys_frozen_end) sys_frozen_exec = ceiling - need;

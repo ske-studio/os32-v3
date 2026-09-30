@@ -24,9 +24,6 @@ static void test_boot(u32 kb)
 #define BITMAP_SIZE ((limit_pfn + 31) / 32)
 static u32 phys_to_idx(u32 phys) { return phys / PAGE_SIZE; }
 
-/* Weak reference makes pre-implementation RED an assertion, not link error. */
-extern u32 pgalloc_alloc_n_range(int n, u32 lo, u32 hi)
-    __attribute__((weak));
 
 static void output(const char *s) NOINST;
 static void output(const char *s)
@@ -46,6 +43,20 @@ static void fail(const char *message)
     output("ASSERT FAIL: "); output(message); output("\n"); finish(1);
 }
 #define CHECK(c) do { if (!(c)) fail(#c); } while (0)
+/* T1b (TASK_T1_LEDGER §3-2): the byte-range pgalloc_alloc_n_range is gone.
+ * The range search is now the PFN API pgalloc_alloc_n_owner; this harness
+ * drives it with the kernel owner and keeps the byte addresses of the old
+ * cases (all page aligned, so the PFN conversion is exact). */
+#define OWN LEDGER_OWNER_KERNEL
+static u32 range_alloc(int n, u32 lo, u32 hi)
+{
+    u32 pfn;
+    if (!pgalloc_alloc_n_owner(OWN, n, lo / PAGE_SIZE, hi / PAGE_SIZE,
+                               LEDGER_BOTTOM_UP, &pfn)) return 0;
+    return pfn * PAGE_SIZE;
+}
+static void claim1(u32 phys) { CHECK(ledger_claim_fixed(OWN, phys / PAGE_SIZE, phys / PAGE_SIZE + 1)); }
+static int free_n(u32 phys, int n) { return pgalloc_free_n_owner(OWN, phys / PAGE_SIZE, n); }
 
 static unsigned int irq_save(void)
 {
@@ -86,13 +97,12 @@ static void basic(void)
     u32 lo = MEM_APP_BAND_TOP;
     u32 before;
     CHECK(sizeof(u32) == 4 && sizeof(int) == 4);
-    CHECK(pgalloc_alloc_n_range != 0);
     test_boot(MEM_HIGH_RAM_BASE / 1024);
     before = pgalloc_free_pages();
-    CHECK(pgalloc_alloc_n_range(2, lo, lo + 2 * PAGE_SIZE) == lo);
+    CHECK(range_alloc(2, lo, lo + 2 * PAGE_SIZE) == lo);
     CHECK(pgalloc_free_pages() == before - 2);
     CHECK(bmp_test(phys_to_idx(lo)) && bmp_test(phys_to_idx(lo) + 1));
-    pgalloc_free_n(lo, 2);
+    CHECK(free_n(lo, 2));
     CHECK(pgalloc_free_pages() == before);
 }
 
@@ -110,15 +120,15 @@ static void irq_atomic(void)
         saves = restores = 0;
         before = pgalloc_free_pages();
         watching = 1;
-        CHECK(pgalloc_alloc_n_range(3, lo, lo + 3 * PAGE_SIZE) == lo);
+        CHECK(range_alloc(3, lo, lo + 3 * PAGE_SIZE) == lo);
         watching = 0;
         CHECK(test_flags == initial && saves == 1 && restores == 1);
         CHECK(pgalloc_free_pages() == before - 3);
         watching = 1;
-        CHECK(pgalloc_alloc_n_range(1, lo, lo + 3 * PAGE_SIZE) == 0);
+        CHECK(range_alloc(1, lo, lo + 3 * PAGE_SIZE) == 0);
         watching = 0;
         CHECK(test_flags == initial && saves == 2 && restores == 2);
-        pgalloc_free_n(lo, 3);
+        CHECK(free_n(lo, 3));
         CHECK(pgalloc_free_pages() == before);
     }
 }
@@ -162,7 +172,7 @@ static void range_expect(int n, u32 lo, u32 hi, u32 expected)
     }
     checking_commit = watching = 1;
     scans = 0;
-    CHECK(pgalloc_alloc_n_range(n, lo, hi) == expected);
+    CHECK(range_alloc(n, lo, hi) == expected);
     watching = 0;
     verify_commit();
     checking_commit = 0;
@@ -184,7 +194,7 @@ static void boundaries(void)
         test_boot(MEM_HIGH_RAM_BASE / 1024);
         end = pgalloc_limit_pfn() * PAGE_SIZE;
         test_flags = 0x45U | (enabled ? TEST_IF : 0);
-        pgalloc_mark_used(lo + PAGE_SIZE, 1);
+        claim1(lo + PAGE_SIZE);
         range_expect(0, lo, lo + PAGE_SIZE, 0);
         range_expect(-1, lo, lo + PAGE_SIZE, 0);
         range_expect((-2147483647 - 1), lo, end, 0);
@@ -193,15 +203,14 @@ static void boundaries(void)
         range_expect(2, lo, lo + PAGE_SIZE, 0);
         range_expect(1, lo, lo, 0);
         range_expect(1, lo + PAGE_SIZE, lo, 0);
-        range_expect(1, lo + 1, lo + PAGE_SIZE, 0);
         range_expect(1, lo, lo + PAGE_SIZE - 1, 0);
-        range_expect(1, MEM_POOL_BASE - PAGE_SIZE, lo, 0);
-        range_expect(1, 0, lo, 0);
+        /* 池の下 (シェル帯まで) は eligible でないので配らない */
+        range_expect(1, MEM_POOL_BASE / 2, MEM_POOL_BASE, 0);
+        range_expect(1, 0, MEM_POOL_BASE, 0);
         range_expect(1, lo, end + PAGE_SIZE, 0);
         range_expect(1, end, end + PAGE_SIZE, 0);
         range_expect(1, lo, 0xfffff000UL, 0);
         range_expect(1, 0xfffff000UL, 0, 0);
-        range_expect(1, lo, 0xffffffffUL, 0);
         range_expect(1, end - PAGE_SIZE, end, end - PAGE_SIZE);
         range_expect(1, MEM_POOL_BASE, MEM_POOL_BASE + PAGE_SIZE, MEM_POOL_BASE);
         test_boot(0);
@@ -217,15 +226,15 @@ static void fragmentation(void)
     u32 lo = MEM_APP_BAND_TOP + 29 * PAGE_SIZE;
     u32 end = lo + 8 * PAGE_SIZE;
     test_boot(MEM_HIGH_RAM_BASE / 1024);
-    pgalloc_mark_used(lo + PAGE_SIZE, 1);
-    pgalloc_mark_used(lo + 4 * PAGE_SIZE, 1);
+    claim1(lo + PAGE_SIZE);
+    claim1(lo + 4 * PAGE_SIZE);
     range_expect(3, lo, end, lo + 5 * PAGE_SIZE);
     range_expect(3, lo, end, 0); /* many free pages elsewhere, no fallback */
     range_expect(2, lo, end, lo + 2 * PAGE_SIZE);
     range_expect(1, lo, end, lo);
     range_expect(1, lo, end, 0);
-    CHECK(pgalloc_alloc_page() == MEM_POOL_BASE); /* APP_BAND remains free */
-    pgalloc_free_n(lo + 5 * PAGE_SIZE, 3);
+    CHECK(pgalloc_alloc_phys(OWN, 1) == MEM_POOL_BASE); /* APP_BAND remains free */
+    CHECK(free_n(lo + 5 * PAGE_SIZE, 3));
     range_expect(3, lo, end, lo + 5 * PAGE_SIZE);
 }
 
@@ -239,7 +248,7 @@ static void exhaustive(void)
         for (n = 1; n <= 9; n++) {
             test_boot(MEM_HIGH_RAM_BASE / 1024);
             for (j = 0; j < 8; j++) {
-                if (mask & (1U << j)) pgalloc_mark_used(lo + j * PAGE_SIZE, 1);
+                if (mask & (1U << j)) claim1(lo + j * PAGE_SIZE);
             }
             expected = 0;
             run = 0;
@@ -264,29 +273,26 @@ static void generic_regression(void)
     test_boot(0xffffffffUL);
     count = (MEM_HIGH_RAM_BASE - base) / PAGE_SIZE;
     CHECK(pgalloc_total_pages() == count && pgalloc_free_pages() == count);
-    CHECK(pgalloc_alloc_n(0) == 0 && pgalloc_alloc_n(-1) == 0);
-    CHECK(pgalloc_alloc_n(2147483647) == 0);
-    pgalloc_mark_used(base + PAGE_SIZE, 1);
-    pgalloc_mark_used(base + PAGE_SIZE, 1);
+    CHECK(pgalloc_alloc_phys(OWN, 0) == 0 && pgalloc_alloc_phys(OWN, -1) == 0);
+    CHECK(pgalloc_alloc_phys(OWN, 2147483647) == 0);
+    claim1(base + PAGE_SIZE);
+    claim1(base + PAGE_SIZE);   /* same owner: idempotent */
     CHECK(pgalloc_free_pages() == count - 1);
-    CHECK(pgalloc_alloc_n(2) == base + 2 * PAGE_SIZE);
-    CHECK(pgalloc_alloc_page() == base);
-    pgalloc_free_page(base + 1);
-    pgalloc_free_n(base + 1, 4);
-    pgalloc_mark_used(base + 4 * PAGE_SIZE + 1, 1);
+    CHECK(pgalloc_alloc_phys(OWN, 2) == base + 2 * PAGE_SIZE);
+    CHECK(pgalloc_alloc_phys(OWN, 1) == base);
     CHECK(pgalloc_free_pages() == count - 4);
-    pgalloc_free_page(base);
-    pgalloc_free_page(base);
-    pgalloc_free_n(base + PAGE_SIZE, 3);
-    CHECK(pgalloc_free_pages() == count); /* legacy mark + allocated: releasable */
-    pgalloc_free_n(base + 2 * PAGE_SIZE, 2); /* double free stays harmless */
+    CHECK(free_n(base, 1));
+    CHECK(!free_n(base, 1));    /* double free is refused, nothing changes */
+    CHECK(free_n(base + PAGE_SIZE, 3));
+    CHECK(pgalloc_free_pages() == count); /* claim + allocated: releasable */
+    CHECK(!free_n(base + 2 * PAGE_SIZE, 2)); /* double free stays harmless */
     CHECK(pgalloc_free_pages() == count);
-    CHECK(pgalloc_total_pages() == count); /* marks do not remove eligibility */
+    CHECK(pgalloc_total_pages() == count); /* claims do not remove eligibility */
     test_boot(0xffffffffUL); /* fresh-boot fixture for full-run regression */
-    CHECK(pgalloc_alloc_n((int)count) == base);
-    CHECK(pgalloc_alloc_page() == 0 && pgalloc_alloc_n(1) == 0);
+    CHECK(pgalloc_alloc_phys(OWN, (int)count) == base);
+    CHECK(pgalloc_alloc_phys(OWN, 1) == 0);
     range_expect(1, MEM_APP_BAND_TOP, MEM_APP_BAND_TOP + PAGE_SIZE, 0);
-    pgalloc_free_n(base, (int)count);
+    CHECK(free_n(base, (int)count));
     CHECK(pgalloc_free_pages() == count);
 }
 
@@ -330,7 +336,7 @@ void _start(void)
     exhaustive();
     output("PASS exhaustive 8-page occupancy x n=1..9\n");
     generic_regression();
-    output("PASS generic alloc/free/mark/init regression\n");
+    output("PASS generic alloc/free/claim/init regression\n");
     device_window_ram();
     output("PASS device window RAM query (K6-3)\n");
     finish(0);

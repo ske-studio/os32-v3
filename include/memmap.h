@@ -490,4 +490,20 @@ extern u32 __sqlite_end;
 /* ====================================================================== */
 #define PIT_HZ                100   /* タイマー割り込み周波数 (Hz) */
 
+/* ====================================================================== */
+/*  物理 ⇔ 仮想の変換 (TASK_T1_LEDGER §3-4、D20)                            */
+/*                                                                        */
+/*  v3 の恒等の supervisor 領域 (カーネル帯・シェル帯・池・低位・MMIO の    */
+/*  恒等窓) だけに使う。アプリ帯・lease 窓の番地は渡さない (T2 以降は       */
+/*  as_va_to_pa / SURFACE から引く)。T1b は台帳の呼び手で書き換えた行だけが */
+/*  使い、全面適用と検査 (check_p2v.py、[C5] 案) は T1f。                   */
+/*  P2V_CONST / P2V_IO_CONST は静的初期化子・マクロ定義など定数式が要る     */
+/*  場所だけ (B6)。関数の中では使わない。                                   */
+/* ====================================================================== */
+static inline void *P2V(u32 pa) { return (void *)(uptr)pa; }
+static inline volatile void *P2V_IO(u32 pa) { return (volatile void *)(uptr)pa; }
+static inline u32 V2P(const volatile void *va) { return (u32)(uptr)va; }
+#define P2V_CONST(pa)    ((void *)(uptr)(pa))
+#define P2V_IO_CONST(pa) ((volatile void *)(uptr)(pa))
+
 #endif /* MEMMAP_H */

@@ -53,7 +53,7 @@ class Broker(unittest.TestCase):
     def test_atomic_ram_and_later_live_collision(self):
         self.run_c('''
     struct physmem m;
-    static u32 backing[2048] __attribute__((aligned(4096)));
+    static u32 backing[4096] __attribute__((aligned(4096)));
     struct sys_device_span s[2] = {{4096, 4224, SYS_DEVICE_MMIO},
                                   {4500, 4502, SYS_DEVICE_MMIO}};
     struct sys_device_capability cap = {SYS_DEVICE_IDLE, 0, 0};
@@ -64,20 +64,20 @@ class Broker(unittest.TestCase):
     /* Ownership fixture only: mapping/publish is covered by highram_stage.
      * Broker must work on the actual allocator, not a changed model copy. */
     online = 1;
-    CHECK(pgalloc_alloc_n_pfn(1, 4501, 4502, &p));
+    CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, 4501, 4502, LEDGER_BOTTOM_UP, &p));
     total = pgalloc_total_pages(); free = pgalloc_free_pages();
     for (i = 0; i < 512; i++) old[i] = backing[i];
     CHECK(!sys_device_reserve_core(1, s, 2, &cap));
     CHECK(device_claims == 0);
     for (i = 0; i < 512; i++) CHECK(old[i] == backing[i]);
     CHECK(total == pgalloc_total_pages() && free == pgalloc_free_pages());
-    CHECK(pgalloc_free_n_pfn(p, 1));
+    CHECK(pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, p, 1));
     CHECK(sys_device_reserve_core(1, s, 2, &cap));
     CHECK(pgalloc_total_pages() == total - 130);
     CHECK(pgalloc_free_pages() == free + 1 - 130);
-    CHECK(!pgalloc_free_n_pfn(4096, 128));
-    pgalloc_mark_used(4096 * PAGE_SIZE, 128);
-    CHECK(!pgalloc_alloc_n_pfn(1, 4096, 4224, &p));
+    CHECK(!pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, 4096, 128));
+    ledger_claim_fixed(LEDGER_OWNER_KERNEL, (4096 * PAGE_SIZE) / PAGE_SIZE, (4096 * PAGE_SIZE) / PAGE_SIZE + (128));
+    CHECK(!pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, 4096, 4224, LEDGER_BOTTOM_UP, &p));
     CHECK(sys_device_reserve_core(1, s, 2, &cap));
     CHECK(pgalloc_total_pages() == total - 130);
 ''', flags=('-DPHYSMEM_HOST_TEST=1', '-DPGALLOC_HOST_TEST=1'))
@@ -98,7 +98,7 @@ class Broker(unittest.TestCase):
 ''')
         self.run_c('''
     struct physmem m;
-    static u32 backing[2048] __attribute__((aligned(4096)));
+    static u32 backing[4096] __attribute__((aligned(4096)));
     struct sys_device_span s = {4030, 4031, SYS_DEVICE_MMIO};
     struct sys_device_capability cap = {SYS_DEVICE_IDLE, 0, 0};
     struct pgalloc_layout l = {backing, sizeof(backing), 4030, 4000, 4030, 0};
@@ -118,7 +118,7 @@ class Broker(unittest.TestCase):
     CHECK(!sys_device_reserve_core(1, &s, 1, &cap));
     s.first = 6002; s.end = 6003;
     CHECK(!sys_device_reserve_core(1, &s, 1, &cap));
-    CHECK(pgalloc_reserve_pfn(6100, 6101));
+    CHECK(pgalloc_reserve_pfn(LEDGER_OWNER_KERNEL, 6100, 6101));
     s.first = 6100; s.end = 6101;
     CHECK(!sys_device_reserve_core(1, &s, 1, &cap));
     CHECK(pgalloc_total_pages() == total - 1 && device_claims == 0);
@@ -173,7 +173,7 @@ class Broker(unittest.TestCase):
     def test_bb_ram_capability_and_immutable_kind(self):
         self.run_c('''
     struct physmem m;
-    static u32 backing[2048] __attribute__((aligned(4096)));
+    static u32 backing[4096] __attribute__((aligned(4096)));
     struct sys_device_span s[2] = {{9000,9128,SYS_DEVICE_MMIO},
                                   {4096,4171,SYS_DEVICE_RAM}};
     struct sys_device_capability cap = {SYS_DEVICE_IDLE,4096,4171};
@@ -199,9 +199,9 @@ class Broker(unittest.TestCase):
     CHECK(!sys_device_reserve_core(2,s,2,&cap));
     s[1].kind = SYS_DEVICE_MMIO;
     CHECK(!sys_device_reserve_core(1,s,2,&cap));
-    CHECK(!pgalloc_free_n_pfn(4096,75));
-    pgalloc_mark_used(4096 * PAGE_SIZE,75);
-    CHECK(!pgalloc_alloc_n_pfn(1,4096,4171,&p));
+    CHECK(!pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, 4096, 75));
+    ledger_claim_fixed(LEDGER_OWNER_KERNEL, (4096 * PAGE_SIZE) / PAGE_SIZE, (4096 * PAGE_SIZE) / PAGE_SIZE + (75));
+    CHECK(!pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, 4096, 4171, LEDGER_BOTTOM_UP, &p));
     CHECK(pgalloc_total_pages() == total - 75);
 ''', flags=('-DPHYSMEM_HOST_TEST=1', '-DPGALLOC_HOST_TEST=1'))
 
@@ -215,21 +215,21 @@ class Broker(unittest.TestCase):
 ''')
         self.run_c('''
     struct physmem m;
-    static u32 backing[2048] __attribute__((aligned(4096)));
+    static u32 backing[4096] __attribute__((aligned(4096)));
     struct sys_device_span s = {8500,8501,SYS_DEVICE_MMIO};
     struct sys_device_capability cap = {SYS_DEVICE_IDLE,0,0};
     physmem_bootstrap_legacy(&m,16384);
     CHECK(physmem_add_trusted(&m,9000,9001,PHYSMEM_SOURCE_SYNTHETIC));
     CHECK(pgalloc_init_model(&m,backing,sizeof(backing),4030,verified));
     online = 1;
-    CHECK(pgalloc_reserve_pfn(8500,8501));
+    CHECK(pgalloc_reserve_pfn(LEDGER_OWNER_KERNEL, 8500, 8501));
     CHECK(!sys_device_reserve_core(1,&s,1,&cap));
 ''', flags=('-DPHYSMEM_HOST_TEST=1', '-DPGALLOC_HOST_TEST=1'))
 
     def test_capacity_rejects_whole_transaction(self):
         self.run_c('''
     struct physmem m;
-    static u32 backing[2048] __attribute__((aligned(4096)));
+    static u32 backing[4096] __attribute__((aligned(4096)));
     struct sys_device_span s[2] = {{10000,10001,SYS_DEVICE_MMIO},
                                   {11000,11001,SYS_DEVICE_MMIO}};
     struct sys_device_capability cap = {SYS_DEVICE_IDLE | SYS_DEVICE_RAM_MAPPED,4096,4097};
@@ -247,8 +247,8 @@ class Broker(unittest.TestCase):
     CHECK(!sys_device_reserve_core(100,s,2,&cap));
     CHECK(device_claims == SYS_DEVICE_MAX_SPANS - 1);
     CHECK(pgalloc_total_pages() == total && pgalloc_free_pages() == total);
-    CHECK(pgalloc_alloc_n_pfn(1,4096,4097,&p));
-    CHECK(pgalloc_free_n_pfn(p,1));
+    CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, 4096, 4097, LEDGER_BOTTOM_UP, &p));
+    CHECK(pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, p, 1));
     CHECK(sys_device_reserve_core(100,s,1,&cap)); /* last slot still available */
     CHECK(device_claims == SYS_DEVICE_MAX_SPANS && pgalloc_total_pages() == total - 1);
     CHECK(sys_device_reserve_core(100,s,1,&cap)); /* retry at capacity */

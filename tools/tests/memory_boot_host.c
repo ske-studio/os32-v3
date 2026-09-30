@@ -36,6 +36,21 @@ static int observed_stage(void)
 }
 #define sys_memory_bootstrap_model observed_bootstrap
 #define sys_memory_stage_online observed_stage
+#ifdef TEST_DETECT_CAP
+/* memory_boot_detect の BIOS ワーク (0594h) と 1MB ごとの書き込み検証を
+ * ホストの配列で受ける (run_case が本物の boot_ptr を boot_ptr_real に改名)。
+ * 16MB 以上は 1MB ごとに別の語 (別名なし)、24bit ラップの落ち先は 16 語。 */
+static u32 host_bda_word, host_cells[4096], host_low[16], host_max_probe;
+static void *boot_ptr(u32 addr)
+{
+    if (addr == BIOS_WORK_MEM_HIGH_MB) return &host_bda_word;
+    if (addr >= MEM_HIGH_RAM_BASE) {
+        if (addr > host_max_probe) host_max_probe = addr;
+        return &host_cells[((addr - MEM_HIGH_RAM_BASE) / MEM_1MB) % 4096];
+    }
+    return &host_low[(addr / MEM_1MB) % 16];
+}
+#endif
 #include "memory_boot_host_source.c"
 #undef sys_memory_bootstrap_model
 #undef sys_memory_stage_online
@@ -55,7 +70,7 @@ static void report(const char *s, u32 n)
 extern int memory_boot_init(u32) __attribute__((weak));
 static void host_failstop(void)
 {
-    CHECK(bootstrap_calls == 1 && !pgalloc_alloc_page());
+    CHECK(bootstrap_calls == 1 && !pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, 1));
 #ifdef TEST_BOOTSTRAP_FAIL
     CHECK(!initialized && !stage_calls && !sys_model_staged);
 #else
@@ -77,6 +92,20 @@ void _start(void)
     CHECK(result == 0x800000);
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(ledger) : "memory");
     CHECK(result == MEM_LEDGER_META_BASE);
+#ifdef TEST_DETECT_CAP
+    /* D11 (T1a の Codex P3 を T1b で): 0594h が 2GB を越える量を申告しても、
+     * プローブは MEM_PHYS_RAM_CEILING の手前で止まり、登録上限は 2GB。 */
+    host_bda_word = 4000;               /* 16MB + 4000MB を申告 */
+    result = memory_boot_detect(15360);
+    CHECK(result == MEM_PHYS_RAM_CEILING / 1024UL);
+    CHECK(boot_high_end == MEM_PHYS_RAM_CEILING / PAGE_SIZE);
+    CHECK(host_max_probe == MEM_PHYS_RAM_CEILING - MEM_1MB);
+    /* 申告が上限の内側ならそのまま (切り詰めない) */
+    boot_high_end = 0;
+    host_bda_word = 17;
+    CHECK(memory_boot_detect(15360) == (MEM_HIGH_RAM_BASE + 17UL * MEM_1MB) / 1024UL);
+    die(0);
+#endif
     paging_init(TEST_KB);
     sys_mem_kb = TEST_KB;
     CHECK(memory_boot_init != 0);
@@ -196,19 +225,19 @@ void _start(void)
         die(0);
     }
 #endif
-/* 15MiB clamp なので legacy 上端は 0xF00。窓の撤去 (2026-09-09) で
- * metadata が 0xEFF、workspace が 0xEFE に上がった (旧: 0xEBF / 0xEBE)。 */
+/* 15MiB clamp なので legacy 上端は 0xF00。T1b で metadata に L2 (1B/PFN) が
+ * 載って 2 ページ [0xEFE, 0xF00) になり、workspace は 0xEFD (旧: 0xEFF / 0xEFE)。 */
 #if defined(TEST_METADATA_PTE) || defined(TEST_WORKSPACE_PTE)
     *(u32 *)0xEFF000 = 0xA55AA55A;
 #ifdef TEST_METADATA_PTE
     page_tables[3][0xEFF % PTE_COUNT] |= PTE_USER;
 #endif
 #ifdef TEST_WORKSPACE_PTE
-    page_tables[3][0xEFE % PTE_COUNT] &= ~PTE_PRESENT;
+    page_tables[3][0xEFD % PTE_COUNT] &= ~PTE_PRESENT;
 #endif
     CHECK(!memory_boot_init(TEST_KB));
     CHECK(bootstrap_calls == 1 && !stage_calls);
-    CHECK(!initialized && !sys_model_staged && !pgalloc_alloc_page());
+    CHECK(!initialized && !sys_model_staged && !pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, 1));
     CHECK(*(u32 *)0xEFF000 == 0xA55AA55A);
     die(0);
 #endif
@@ -225,7 +254,99 @@ void _start(void)
 #endif
     /* K6-RAM (2): 未初期化のうちは「実 RAM 合計」を名乗らない。 */
     CHECK(!memory_boot_ram_kb());
+#ifdef TEST_MINIMUM_SHORT
+    /* exec の最小域 (ロード起点 + スタック + sbrk + exec_heap = 0x590000) に
+     * 1 ページ足りない低位 RAM は fail-stop (T1a の訂正 5、T1b で境界を直接)。
+     * 何も変えずに断る。 */
+    CHECK(TEST_KB * 1024UL + PAGE_SIZE == MEM_EXEC_LOAD_ADDR + MEM_EXEC_STACK_SIZE +
+          MEM_EXEC_SBRK_MIN + MEM_EXEC_HEAP_MIN);
+    CHECK(!memory_boot_init(TEST_KB));
+    CHECK(bootstrap_calls == 1 && !stage_calls);
+    CHECK(!initialized && !sys_model_staged && !sys_frozen_end);
+    CHECK(!ledger_region_count && host_if == 0x202U);
+    die(0);
+#endif
     CHECK(memory_boot_init(TEST_KB));
+    /* 区間の表 (T1b、§3-3 ③): 固定用途 12 本 + ARENA_TOP 型の backing +
+     * 背景 2 本。不変条件が成り立ち、背景は 15〜16MB と [2GB, 4GiB)。 */
+    {
+        u32 k, n, bg;
+        CHECK(ledger_selfcheck("boot"));
+        n = sizeof(memory_boot_fixed) / sizeof(memory_boot_fixed[0]);
+        CHECK(n == 12);
+        CHECK(ledger_region_count == n + 2 + (ledger_backing_mapped ? 0 : 1));
+        bg = 0;
+        for (k = 0; k < ledger_region_count; k++) {
+            const struct ledger_region *r = &ledger_regions[k];
+            CHECK(r->flags & LEDGER_RF_PERMANENT);
+            if (r->type == LEDGER_R_BACKGROUND) {
+                bg++;
+                CHECK(r->owner == LEDGER_OWNER_KERNEL && r->cache == LEDGER_CACHE_UC);
+                CHECK((r->first == MEM_SYSTEM_SPACE_BASE / PAGE_SIZE &&
+                       r->end == MEM_SYSTEM_SPACE_END / PAGE_SIZE) ||
+                      (r->first == MEM_PHYS_RAM_CEILING / PAGE_SIZE &&
+                       r->end == PHYSMEM_MAX_PFN &&
+                       (r->flags & LEDGER_RF_OUTSIDE)));
+            }
+            if (r->type == LEDGER_R_SURFACE_BACKING)
+                CHECK(r->owner == LEDGER_OWNER_BOOT &&
+                      r->first == MEM_GFX_BB_BASE / PAGE_SIZE);
+            if (r->type == LEDGER_R_DMA)
+                CHECK(r->first == MEM_DMA_POOL_BASE / PAGE_SIZE &&
+                      r->end == (MEM_DMA_POOL_END + 1) / PAGE_SIZE);
+            /* ARENA_TOP の backing は [workspace_first, 低位 RAM の上端) */
+            if (r->type == LEDGER_R_FIXED && r->first >= MEM_POOL_BASE / PAGE_SIZE)
+                CHECK(!ledger_backing_mapped && r->first == workspace_first);
+        }
+        CHECK(bg == 2);
+        /* 同梱の申告は無い (bootinfo に欄が無い): 同梱域も集積域も池のまま */
+        CHECK(!ledger_owner_pages(LEDGER_OWNER_BUNDLE));
+    }
+#ifdef TEST_MINIMUM
+    CHECK(TEST_KB * 1024UL == MEM_EXEC_LOAD_ADDR + MEM_EXEC_STACK_SIZE +
+          MEM_EXEC_SBRK_MIN + MEM_EXEC_HEAP_MIN);
+    CHECK(pgalloc_model_state() == PGALLOC_ONLINE && ledger_backing_mapped);
+    CHECK(sys_usable_mem_end() == TEST_KB * 1024UL);
+    die(0);
+#endif
+#ifdef TEST_BUNDLE
+    /* 集積域・同梱域の規則 (§3-3 ③): 申告なしは何もしない、同梱域の外に
+     * かかる申告は何も変えずに拒否、申告があれば同梱域を丸ごと owner =
+     * bundle で押さえて BUNDLE の区間を登録。集積域は池のまま。 */
+    {
+        u32 lo = MEM_BOOT_BUNDLE_BASE / PAGE_SIZE;
+        u32 hi = lo + MEM_BOOT_BUNDLE_SIZE / PAGE_SIZE;
+        u32 slo = MEM_BOOT_STAGING_BASE / PAGE_SIZE;
+        u32 shi = slo + MEM_BOOT_STAGING_SIZE / PAGE_SIZE;
+        u32 regions = ledger_region_count, used = pgalloc_total_pages() - pgalloc_free_pages();
+        u32 p;
+        CHECK(memory_boot_boot_areas(0, 0));
+        CHECK(!memory_boot_boot_areas(lo - 1, lo + 1));
+        CHECK(!memory_boot_boot_areas(lo, hi + 1));
+        CHECK(!memory_boot_boot_areas(lo + 5, lo + 3));
+        CHECK(!memory_boot_boot_areas(slo, slo + 1));      /* 集積域は同梱域ではない */
+        CHECK(ledger_region_count == regions && !ledger_owner_pages(LEDGER_OWNER_BUNDLE));
+        CHECK(pgalloc_total_pages() - pgalloc_free_pages() == used);
+        CHECK(memory_boot_boot_areas(lo, lo + 16));
+        CHECK(ledger_owner_pages(LEDGER_OWNER_BUNDLE) == hi - lo);
+        CHECK(ledger_region_count == regions + 1);
+        CHECK(ledger_regions[regions].type == LEDGER_R_BUNDLE &&
+              ledger_regions[regions].owner == LEDGER_OWNER_BUNDLE &&
+              ledger_regions[regions].first == lo && ledger_regions[regions].end == hi);
+        CHECK(owner_map[lo] == LEDGER_OWNER_BUNDLE && owner_map[hi - 1] == LEDGER_OWNER_BUNDLE);
+        /* 二度目は同梱域が埋まっているので何も変えずに断る */
+        CHECK(!memory_boot_boot_areas(lo, hi));
+        CHECK(ledger_region_count == regions + 1 &&
+              ledger_owner_pages(LEDGER_OWNER_BUNDLE) == hi - lo);
+        /* 集積域は展開済み = 池のまま (丸ごと取れる) */
+        CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, (int)(shi - slo), slo, shi,
+                                    LEDGER_BOTTOM_UP, &p) && p == slo);
+        CHECK(pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, slo, (int)(shi - slo)));
+        CHECK(ledger_selfcheck("bundle"));
+        CHECK(host_if == 0x202U);
+        die(0);
+    }
+#endif
 #ifdef TEST_RAMKB
     /* K6-RAM 決裁 (2) — 実 RAM 合計は「登録した span の合計」であって、
      * 上端 (sys_mem_kb) ではない。差は 15-16MiB のシステム空間ちょうど。 */
@@ -300,7 +421,7 @@ void _start(void)
         CHECK(physmem_count(&device_boot_map, hole, high, PHYSMEM_RESERVED, &count));
         CHECK(count == high - hole);
         p = 99;
-        CHECK(!pgalloc_alloc_n_pfn(1, hole, high, &p) && p == 99);
+        CHECK(!pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, hole, high, LEDGER_BOTTOM_UP, &p) && p == 99);
         /* 最上位の ROM / PCI MMIO 帯も RAM ではない */
         CHECK(physmem_count(&device_boot_map, MEM_PHYS_MMIO_TOP / PAGE_SIZE,
                             PHYSMEM_MAX_PFN, PHYSMEM_MMIO, &count));
@@ -316,8 +437,8 @@ void _start(void)
         CHECK(!pgalloc_range_has_ram(MEM_DEVICE_APERTURE_BASE / PAGE_SIZE,
                                      MEM_DEVICE_APERTURE_END / PAGE_SIZE));
         /* 検出量の最終ページまで配れる (切り詰めが無いことの証明) */
-        CHECK(pgalloc_alloc_n_pfn(1, limit - 1, limit, &p) && p == limit - 1);
-        CHECK(pgalloc_free_n_pfn(p, 1));
+        CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, limit - 1, limit, LEDGER_BOTTOM_UP, &p) && p == limit - 1);
+        CHECK(pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, p, 1));
         arena = workspace_first - MEM_APP_BAND_BASE / PAGE_SIZE;
         CHECK(pgalloc_total_pages() > arena);
         /* 連続アリーナ (exec のレイアウト) と表の置き場所は不変 (ARENA_TOP:
@@ -373,7 +494,7 @@ void _start(void)
         CHECK(pgalloc_alloc_pt() == MEM_LEDGER_META_BASE + PAGE_SIZE);
         CHECK(pgalloc_alloc_pt() == 0);
         pgalloc_free_pt(MEM_LEDGER_META_BASE + PAGE_SIZE);
-        CHECK(pgalloc_alloc_page() == MEM_POOL_BASE);
+        CHECK(pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, 1) == MEM_POOL_BASE);
     }
 #elif defined(TEST_ARENA)
     /* 低位の上端が 3,074 PFN 以上 (12MB + 8KB〜15MB)、高位 RAM なし:
@@ -385,8 +506,13 @@ void _start(void)
         CHECK(pgalloc_model_state() == PGALLOC_ONLINE);
         CHECK(!ledger_backing_mapped);
         CHECK(!paging_is_present(MEM_LEDGER_META_BASE));
-        CHECK(workspace_end == top - 1 && workspace_first == top - 2);
-        CHECK((u32)eligible == (top - 1) * PAGE_SIZE);
+        {
+            /* metadata = L1 + L2 (T1b): 3,074 PFN は 1 ページ、15MB は 2 ページ */
+            u32 mp = pgalloc_metadata_bytes(&device_boot_map) / PAGE_SIZE;
+            CHECK(mp == (PGALLOC_META_BYTES(top) + PAGE_SIZE - 1) / PAGE_SIZE);
+            CHECK(workspace_end == top - mp && workspace_first == top - mp - 1);
+            CHECK((u32)eligible == (top - mp) * PAGE_SIZE);
+        }
         CHECK(workspace_first >= MEM_APP_BAND_MAX_TOP / PAGE_SIZE);
         CHECK(pgalloc_arena_end() == workspace_first);
         CHECK(sys_usable_mem_end() == workspace_first * PAGE_SIZE);
@@ -394,10 +520,11 @@ void _start(void)
     }
 #else
     CHECK(pgalloc_model_state() == PGALLOC_ONLINE);
-    CHECK(sys_usable_mem_end() == 0xEFE000);
-    CHECK(pgalloc_arena_end() == 0xEFE);
-    CHECK(workspace_first == 0xEFE && workspace_end == 0xEFF);
-    CHECK((u32)eligible == 0xEFF000);
+    /* metadata (L1 + L2) は 960 + 3,840 = 4,800B = 2 ページ (T1b)。 */
+    CHECK(sys_usable_mem_end() == 0xEFD000);
+    CHECK(pgalloc_arena_end() == 0xEFD);
+    CHECK(workspace_first == 0xEFD && workspace_end == 0xEFE);
+    CHECK((u32)eligible == 0xEFE000);
     CHECK(!ledger_backing_mapped);
     CHECK(physmem_count(&device_boot_map, 0xF00, 0x100000, PHYSMEM_UNKNOWN, &count));
     CHECK(count == 0x100000 - 0xF00);
@@ -406,7 +533,7 @@ void _start(void)
     CHECK(pgalloc_limit_pfn() == 0xF00);
 #endif
     (void)count;
-    CHECK(pgalloc_alloc_page() != 0);
+    CHECK(pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, 1) != 0);
     CHECK(host_if == 0x202U);
     die(0);
 }

@@ -200,10 +200,9 @@ u32 paging_current_cr3(void) { return 1; }
 u32 paging_kernel_pd_phys(void) { return 2; }
 int paging_map_phys(u32 v, u32 p, u32 n, u32 f)
 { (void)v; (void)p; (void)n; (void)f; fail("paging_map_phys", __LINE__); return -1; }
-void pgalloc_mark_used(u32 s, int n) { (void)s; (void)n; fail("pgalloc_mark_used", __LINE__); }
 int pgalloc_range_has_ram(u32 f, u32 e) { (void)f; (void)e; return 1; }
 u32 sys_usable_mem_end(void) { return 0; }
-u32 sys_reserve_top(u32 b) { (void)b; return 0; }
+u32 sys_reserve_top(u32 o, u32 b) { (void)o; (void)b; return 0; }
 void palette_init(void) { }
 const PaletteEntry *palette_get_all(void) { return (const PaletteEntry *)0; }
 void palette_shadow_set(int i, u8 r, u8 g, u8 b) { (void)i; (void)r; (void)g; (void)b; }

@@ -42,6 +42,11 @@ int exec_run(const char *cmdline);
  * 記録を読むことはない。GUI 経路 (exec_start / exec_resume) の子は書かない。 */
 int exec_last_result(int *kind, int *code);
 
+/* 台帳の owner (TASK_T1_LEDGER §4-8、T1b): いま走っている CPL=3 アプリの
+ * AS owner、アプリの外 (カーネル・シェル・--cpl0 の子) なら kernel。
+ * V86 バッキングの確保 (v86_mem_setup) に渡す。 */
+u32 exec_ledger_owner(void);
+
 /* ---- アプリ 4 本の同時実行 (KAPI v44、票 docs/tasks/gui/v13) ----
  * 詳細は TASK_K5_multiapp.md の D4 / D8。呼べるのは owner 1 (シェル帯) だけ。 */
 
