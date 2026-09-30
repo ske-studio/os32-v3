@@ -70,9 +70,12 @@ class Fake:
             if self.snapshot != args['expected']:
                 raise live.IniError('changed')
             self.snapshot = {'data': args['data'], 'signature': 'replaced'}
+            # The fixed PS 'replace' writes receipt.json itself, right after the
+            # full readback, with 'applied' = that readback (2026-10-01).
+            if 'record' in args:
+                self.receipt_id = args.get('receipt')
+                self.record = dict(copy.deepcopy(args['record']), applied=copy.deepcopy(self.snapshot))
             return copy.deepcopy(self.snapshot)
-        if op == 'receipt':
-            self.record = copy.deepcopy(args['record'])
         if op == 'load':
             return copy.deepcopy(self.record)
         if op == 'start':
@@ -166,13 +169,20 @@ class Workflow(unittest.TestCase):
         self.assertEqual(result.get('pid'), 43)
         calls = self.f.calls
         for first, second in (('lock', 'query'), ('stop', 'backup'), ('backup', 'replace'),
-                              ('replace', 'receipt'), ('receipt', 'start')):
+                              ('replace', 'start')):
             self.assertLess(calls.index(first), calls.index(second))
+        # The receipt is written inside 'replace' (no separate executor step).
+        self.assertNotIn('receipt', calls)
+        self.assertEqual(self.f.receipt_id, result.get('receipt'))
+        self.assertEqual(self.f.record['applied'], self.f.snapshot)
         self.assertIn('query', calls[calls.index('stop')+1:calls.index('backup')])
         self.assertEqual(calls[-3:], ['query', 'query', 'close'])
 
     def test_queries_fail_closed_at_every_phase(self):
-        for index in range(1, 9):
+        clean = Fake()
+        live.Live(clean, TARGET).run('cirrus-on', live_apply=True, exclusive=True)
+        self.assertGreaterEqual(clean.calls.count('query'), 7)
+        for index in range(1, clean.calls.count('query') + 1):
             f = Fake()
             count = [0]
             def hook(op):
@@ -212,7 +222,7 @@ class Workflow(unittest.TestCase):
         self.assertNotIn('replace', self.f.calls)
 
     def test_backup_replace_readback_failures_never_restart(self):
-        for failure in ('backup', 'replace', 'receipt'):
+        for failure in ('backup', 'replace'):
             self.setUp()
             self.f.fail = failure
             with self.subTest(failure=failure), self.assertRaises(live.IniError):
@@ -460,6 +470,9 @@ class ReceiptAndPathBoundaries(unittest.TestCase):
             value = super().call(op, **args)
             if op == 'replace':
                 self.snapshot['signature'] = '9' * live.SIGNATURE_LIMIT
+                # PS 'replace' records its own readback in receipt.json.
+                if 'record' in args:
+                    self.record['applied'] = copy.deepcopy(self.snapshot)
                 return copy.deepcopy(self.snapshot)
             if op == 'start':
                 self.rows = [dict(ROW, pid=2147483647,
@@ -774,6 +787,129 @@ class CtlLaunchShapes(unittest.TestCase):
                 self.assertEqual(live.launch_arguments(TARGET, launch), launch_text(launch))
 
 
+class PostReplaceFailure(unittest.TestCase):
+    """PM incident 2026-10-01: ram-8mb --live-apply on a ctl-launched ("/i")
+    NP21/W stopped the process, saved original.bin and replaced the ini, then
+    the post-replace 'snapshot' failed (PS {"ok":false}). No receipt.json was
+    written, so 'restore' was unusable. Any failure after the replacement must
+    leave a receipt that restore accepts; nothing restarts automatically."""
+
+    def fail_after_replace(self, f, op, nth=1):
+        seen = [0]
+        def hook(name):
+            if name == op and 'replace' in f.calls[:-1]:
+                seen[0] += 1
+                if seen[0] == nth:
+                    raise live.IniError('Windows operation failed: ' + op)
+        f.hook = hook
+
+    def test_incident_snapshot_failure_after_replace_leaves_restorable_receipt(self):
+        f = Fake()
+        f.rows = [dict(ROW, command=CTL_COMMAND)]
+        self.fail_after_replace(f, 'snapshot')
+        service = live.Live(f, TARGET)
+        with self.assertRaises(live.IniError) as caught:
+            service.run('ram-8mb', live_apply=True, exclusive=True)
+        self.assertIn('a' * 32, str(caught.exception))
+        self.assertIn('receipt ID for restore', str(caught.exception))
+        self.assertNotIn('start', f.calls)
+        self.assertEqual(f.rows, [])
+        self.assertEqual(f.snapshot['data'], RAM_8MB)
+        self.assertEqual(f.saved, {'data': RAW, 'signature': 'initial'})
+        self.assertEqual(f.receipt_id, 'a' * 32)
+        self.assertEqual(f.record['applied'], f.snapshot)
+        self.assertEqual(f.record['original'], {'data': RAW, 'signature': 'initial'})
+        self.assertEqual(f.record['process'], dict(ROW, command=CTL_COMMAND))
+        # Operator restore from the stopped state, in the recorded "/i" shape.
+        f.hook = lambda op: None
+        result = service.run('restore', receipt='a' * 32, live_apply=True, exclusive=True)
+        self.assertEqual(f.snapshot['data'], RAW)
+        self.assertEqual(result['pid'], 43)
+        self.assertEqual(f.launch, {'form': 'switch', 'fd': None})
+
+    def test_every_failure_after_replace_keeps_receipt_and_never_restarts_twice(self):
+        for op, nth in (('query', 1), ('snapshot', 1), ('start', 1), ('query', 2), ('query', 3)):
+            f = Fake()
+            self.fail_after_replace(f, op, nth)
+            with self.subTest(op=op, nth=nth):
+                with self.assertRaises(live.IniError) as caught:
+                    live.Live(f, TARGET).run('cirrus-on', live_apply=True, exclusive=True)
+                self.assertIn('receipt ID for restore: ' + 'a' * 32, str(caught.exception))
+                self.assertEqual(f.record['applied'], f.snapshot)
+                self.assertLessEqual(f.calls.count('start'), 1)
+                self.assertNotIn('restore', f.calls)
+
+    def test_failure_before_or_during_replace_does_not_claim_a_receipt(self):
+        for failure in ('replace',):
+            f = Fake()
+            f.fail = failure
+            with self.subTest(failure=failure):
+                with self.assertRaises(live.IniError) as caught:
+                    live.Live(f, TARGET).run('cirrus-on', live_apply=True, exclusive=True)
+                self.assertIn('a' * 32, str(caught.exception))
+                self.assertNotIn('receipt ID for restore', str(caught.exception))
+                self.assertIn('receipt not confirmed', str(caught.exception))
+                self.assertFalse(hasattr(f, 'record'))
+                self.assertNotIn('start', f.calls)
+
+    def test_changed_after_replace_is_still_refused_before_restart(self):
+        f = Fake()
+        def hook(op):
+            if op == 'snapshot' and 'replace' in f.calls:
+                f.snapshot = dict(f.snapshot, signature='rescanned')
+        f.hook = hook
+        with self.assertRaises(live.IniError) as caught:
+            live.Live(f, TARGET).run('cirrus-on', live_apply=True, exclusive=True)
+        self.assertIn('receipt ID for restore', str(caught.exception))
+        self.assertNotIn('start', f.calls)
+
+    def test_executor_carries_receipt_id_and_record_into_replace(self):
+        import base64
+        applied = {'data': base64.b64encode(NEW).decode(), 'signature': 'replaced'}
+        t = Transport({'ok': True, 'value': applied})
+        record = {'target': TARGET, 'operation': 'cirrus-on',
+                  'original': {'data': RAW, 'signature': 'initial'},
+                  'applied': {'data': NEW, 'signature': 'pending'}, 'diff': [], 'process': ROW}
+        with live.WindowsExecutor(TARGET, t) as ex:
+            ex.call('replace', expected=record['original'], data=NEW, receipt='a' * 32, record=record)
+            self.assertNotIn('receipt', ex.OPS)
+        args = t.requests[0]['args']
+        self.assertEqual(args['receipt'], 'a' * 32)
+        self.assertEqual(args['record']['original']['data'], base64.b64encode(RAW).decode())
+
+    def block(self, name):
+        import re
+        return re.search(r"\n    '" + name + r"' \{\n(.*?)\n    \}\n", live.PS_SERVER, re.S).group(1)
+
+    def test_powershell_replace_writes_receipt_after_readback_before_absence_check(self):
+        body = self.block('replace')
+        order = [body.index(fragment) for fragment in (
+            '[IO.File]::Replace(', '$value = Snapshot $target.ini',
+            "if ($value.data -cne $a.data) { throw 'Readback failed' }",
+            'WriteReceipt $a.receipt $a.record $value')]
+        self.assertEqual(order, sorted(order))
+        self.assertLess(body.index('WriteReceipt'), body.rindex('AssertAbsent'))
+        self.assertIn("'backup changed'", live.PS_SERVER)
+        self.assertIn('$record.applied = $applied', live.PS_SERVER)
+        self.assertNotIn("\n    'receipt' {", live.PS_SERVER)
+
+    def test_powershell_snapshot_retries_only_bounded_sharing_violations(self):
+        import re
+        snapshot = re.search(r'function Snapshot\(\$path\) \{\n(.*?)\n\}\n', live.PS_SERVER, re.S).group(1)
+        self.assertIn('$f = OpenShared $path', snapshot)
+        self.assertNotIn('[IO.File]::Open(', snapshot)
+        opener = re.search(r'function OpenShared\(\$path\) \{\n(.*?)\n\}\n', live.PS_SERVER, re.S).group(1)
+        for fragment in ('[IO.FileAccess]::Read, [IO.FileShare]::Read', '-isnot [IO.IOException]',
+                         '-band 0xFFFF', '-notin @(32,33)', '$clock.ElapsedMilliseconds -ge $TransientMs',
+                         'throw', 'Start-Sleep -Milliseconds 250'):
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, opener)
+        budget = int(re.search(r'\$TransientMs = (\d+)\n', live.PS_SERVER).group(1))
+        # The heaviest request ('replace') opens up to five files through
+        # Snapshot; every retry budget must fit inside one transport exchange.
+        self.assertLessEqual(5 * budget + 5000, 1000 * live.EXCHANGE_TIMEOUT)
+
+
 WINDOWS_FIXTURES = '--windows-fixtures' in sys.argv
 if WINDOWS_FIXTURES:
     sys.argv.remove('--windows-fixtures')
@@ -878,6 +1014,40 @@ MUTATIONS = [
     ("    text = ('\"' + INI_SWITCH if launch['form'] == 'switch' else '\"') + target['ini'] + '\"'",
      "    text = '\"' + target['ini'] + '\"'",
      "launch_arguments (restart text reserved by the receipt bound) drops /i"),
+    # 2026-10-01: receipt written inside 'replace'; bounded sharing-violation retry.
+    ("                applied = checked_snapshot(ex.call('replace', expected=before, data=candidate,\n"
+     "                                                   receipt=backup, record=planned_record))",
+     "                applied = checked_snapshot(ex.call('replace', expected=before, data=candidate))",
+     "replace no longer carries the receipt (incident: no receipt.json after replace)"),
+    ("                replaced = True\n",
+     "",
+     "failure after replace is reported as 'receipt not confirmed'"),
+    ("                if checked_snapshot(ex.call('snapshot')) != applied:\n"
+     "                    raise IniError('changed after replacement; retain backup and stopped state')",
+     "                if False:\n"
+     "                    raise IniError('changed after replacement; retain backup and stopped state')",
+     "no snapshot comparison between replacement and restart"),
+    ("     WriteReceipt $a.receipt $a.record $value\n     AssertAbsent\n",
+     "     AssertAbsent\n",
+     "PS replace does not write the receipt"),
+    ("     WriteReceipt $a.receipt $a.record $value\n     AssertAbsent\n",
+     "     AssertAbsent\n     WriteReceipt $a.receipt $a.record $value\n",
+     "PS replace writes the receipt only after the absence check"),
+    (" $record.applied = $applied\n",
+     "",
+     "PS receipt keeps the 'pending' placeholder instead of the readback"),
+    (" $f = OpenShared $path\n",
+     " $f = [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)\n",
+     "PS Snapshot opens once (no transient retry)"),
+    ("   if ($e -isnot [IO.IOException] -or (($e.HResult -band 0xFFFF) -notin @(32,33)) -or",
+     "   if ($e -isnot [IO.IOException] -or",
+     "PS retries every IOException (missing file, disk errors)"),
+    ("       $clock.ElapsedMilliseconds -ge $TransientMs) { throw }",
+     "       $false) { throw }",
+     "PS retries sharing violations without a bound"),
+    ("$TransientMs = 4000\n",
+     "$TransientMs = 30000\n",
+     "retry budget exceeds one transport exchange"),
     ("def launch_of(command, target)",
      "def launch_of(command, target",
      "syntax error: an unimportable copy is NOT COUNTED"),

@@ -43,6 +43,7 @@ SIGNATURE_LIMIT = 256  # FileIdentity.Read: seven decimal integers + separators.
 SIGNATURE_JSON_BYTES = 12 * SIGNATURE_LIMIT  # Escaped UTF-16 surrogate pair per character.
 PROCESS_ID_MAX = 2147483647  # Query casts ProcessId to signed Int32.
 PROCESS_CREATED_LENGTH = 28  # Query: UTC DateTime.ToString('o').
+EXCHANGE_TIMEOUT = 30  # seconds per PS request (bounds PS_SERVER's $TransientMs retries).
 
 
 def path_key(path):
@@ -263,19 +264,25 @@ class Live:
             if checked_snapshot(ex.call('snapshot')) != before:
                 raise IniError('snapshot changed on exit; retain stopped state and review again')
             backup = ex.call('backup', snapshot=before)
+            replaced = False
             try:
                 absent()
                 if checked_snapshot(ex.call('snapshot')) != before:
                     raise IniError('intervening modification before replacement')
-                applied = checked_snapshot(ex.call('replace', expected=before, data=candidate))
-                absent()
-                if applied['data'] != candidate or checked_snapshot(ex.call('snapshot')) != applied:
-                    raise IniError('readback mismatch; retain backup and stopped state')
-                ex.call('receipt', receipt=backup, record=dict(planned_record, applied=applied))
+                # The fixed PS 'replace' writes receipt.json itself right after
+                # its full readback (applied = that readback), before any other
+                # check can fail, so every later failure leaves a receipt that
+                # restore accepts. A failed 'replace' ends the PS session, so
+                # Python could not write it afterwards (incident 2026-10-01).
+                applied = checked_snapshot(ex.call('replace', expected=before, data=candidate,
+                                                   receipt=backup, record=planned_record))
+                replaced = True
                 result['receipt'] = backup
+                if applied['data'] != candidate:
+                    raise IniError('readback mismatch; retain backup and stopped state')
                 absent()
                 if checked_snapshot(ex.call('snapshot')) != applied:
-                    raise IniError('changed before restart; retain backup')
+                    raise IniError('changed after replacement; retain backup and stopped state')
                 # Restart in the shape the stopped process was launched with.
                 launch = launch_of(process['command'], self.target)
                 started = ex.call('start', process=process, launch=launch)
@@ -287,7 +294,12 @@ class Live:
                 result.update(applied=True, pid=started)
                 return result
             except IniError as exc:
-                raise IniError(str(exc) + '; retained receipt ID: ' + backup) from exc
+                if replaced:
+                    raise IniError(str(exc) + '; receipt ID for restore: ' + backup) from exc
+                # original.bin exists; receipt.json only if 'replace' failed
+                # after writing it. restore refuses a bundle without a receipt.
+                raise IniError(str(exc) + '; retained backup ID (receipt not confirmed): ' +
+                               backup) from exc
 
 
 # Fixed program only; requests travel as JSON on stdin, never as PS source.
@@ -342,9 +354,27 @@ function CheckPath($path) {
   $part = [IO.Path]::GetDirectoryName($part)
  }
 }
+# Right after the kill / File.Replace another handle (an on-access scanner,
+# cf. POLICY_DEBUG 4-60) can briefly deny our FileShare.Read open. Retry only
+# ERROR_SHARING_VIOLATION (32) / ERROR_LOCK_VIOLATION (33), bounded per open;
+# 'replace' opens up to five files, all within one EXCHANGE_TIMEOUT.
+$TransientMs = 4000
+function OpenShared($path) {
+ $clock = [Diagnostics.Stopwatch]::StartNew()
+ while ($true) {
+  try { return [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read) }
+  catch {
+   $e = $_.Exception
+   while ($e.InnerException) { $e = $e.InnerException }
+   if ($e -isnot [IO.IOException] -or (($e.HResult -band 0xFFFF) -notin @(32,33)) -or
+       $clock.ElapsedMilliseconds -ge $TransientMs) { throw }
+   Start-Sleep -Milliseconds 250
+  }
+ }
+}
 function Snapshot($path) {
  CheckPath $path
- $f = [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+ $f = OpenShared $path
  try {
   $sig = [FileIdentity]::Read($f.SafeFileHandle)
   if ($f.Length -gt 4194304) { throw 'oversized file' }
@@ -377,6 +407,13 @@ function NewFile($path, [byte[]]$bytes) {
 function Bundle($id) {
  if ($id -cnotmatch '^[a-f0-9]{32}$') { throw 'invalid receipt id' }
  return $target.ini + '.np21w-live-' + $id
+}
+function WriteReceipt($id, $record, $applied) {
+ $dir = Bundle $id
+ if ((Snapshot ($dir + '\original.bin')).data -cne $record.original.data) { throw 'backup changed' }
+ $record.applied = $applied
+ $json = $record | ConvertTo-Json -Depth 20 -Compress
+ NewFile ($dir + '\receipt.json') ([Text.Encoding]::UTF8.GetBytes($json))
 }
 try {
  while ($null -ne ($line = [Console]::ReadLine())) {
@@ -427,13 +464,9 @@ try {
      [IO.File]::Replace($temp, $target.ini, [System.Management.Automation.Language.NullString]::Value)
      $value = Snapshot $target.ini
      if ($value.data -cne $a.data) { throw 'Readback failed' }
+     # Receipt first: a failure below (or any later request) ends the session.
+     WriteReceipt $a.receipt $a.record $value
      AssertAbsent
-    }
-    'receipt' {
-     $dir = Bundle $a.receipt
-     if ((Snapshot ($dir + '\original.bin')).data -cne $a.record.original.data) { throw 'backup changed' }
-     $json = $a.record | ConvertTo-Json -Depth 20 -Compress
-     NewFile ($dir + '\receipt.json') ([Text.Encoding]::UTF8.GetBytes($json))
     }
     'load' {
      $dir = Bundle $a.receipt
@@ -528,7 +561,7 @@ class PowerShellTransport:
         try:
             self.process.stdin.write(json.dumps(request).encode('ascii') + b'\n')
             self.process.stdin.flush()
-            line = self.queue.get(timeout=30)
+            line = self.queue.get(timeout=EXCHANGE_TIMEOUT)
             if not line or len(line) > 32 * LIMIT:
                 raise ValueError('missing/oversized response')
             if self.process.poll() not in (None, 0):
@@ -561,7 +594,7 @@ class PowerShellTransport:
 
 class WindowsExecutor:
     """Trusted adapter. Do not expose call() or construction to a model."""
-    OPS = {'lock', 'query', 'snapshot', 'stop', 'backup', 'replace', 'receipt', 'load', 'start'}
+    OPS = {'lock', 'query', 'snapshot', 'stop', 'backup', 'replace', 'load', 'start'}
 
     def __init__(self, target, transport=None):
         self.target, self.transport = dict(target), transport

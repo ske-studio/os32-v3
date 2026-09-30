@@ -460,3 +460,73 @@ PS が位置引数 + fd を受理、`launch_arguments` が `/i` を落とす。
 
 実 NP21/W・実 ini・Windows 側の起動は触っていない (ホスト限定の依頼)。PS の `start` の組み立ては
 静的な断片の検査だけで、.NET 上の実行は未検証。ctl で起動した実プロセスへのプレビュー・適用は PM が別途行う。
+
+## 置換後の失敗でレシートが残らない (2026-10-01)
+
+### 不具合 (PM が実プロセスで遭遇)
+
+ctl で `"<exe>" "/i<ini>"` の形で起動した NP21/W に `ram-8mb --live-apply --exclusive-operator` を当てると
+`Windows operation failed: snapshot; retain backup and verify process state; retained receipt ID: <ID>` で終わった。
+NP21/W は停止したまま、ini は `ExMemory=16 → 7` の 1 行だけ置換済み、バンドルには `original.bin` だけで
+**`receipt.json` が無く `restore` 不能**。直後の `np21w_ctl.py status` で `os32.nhd` が数秒 `locked`。
+
+### 原因
+
+- 失敗した段: 基点 5eca3b8 の `Live.run` 272 行 — `replace` の直後、レシートを書く前の `ex.call('snapshot')`。
+  PS が `{"ok":false}` を返した (`WindowsExecutor.call` の `Windows operation failed: snapshot`)。
+  273 行より前の段は置換前 (ini が変わっていない) か、`receipt` の後 (レシートがある) なので、症状と合うのはここだけ。
+- 何が失敗したか (推定): 同じ `Snapshot` を `replace` 要求の中で直前に通しているので、決定的な検査
+  (`CheckPath`・hardlink・サイズ) ではない。`[IO.File]::Open(..., FileShare.Read)` の**共有違反**が最有力
+  — 強制終了と `File.Replace` の直後に Windows 側 (Defender の走査など) がファイルを一時的に掴む。
+  NHD が停止の数秒後まで `locked` だったこと、§4-60 の同種の観測と合う。掴んだ主体は未確認 (実機で再現していない)。
+- 仮説 (b) `/i` 起動形 (9155860) は無関係: 置換後・再起動前の検査はコマンド行を見ない
+  (`launch_of` は再起動の直前に初めて使う)。偽 executor で `/i` 形の置換後失敗を再現しても同じ。
+- レシートが無い理由 (構造): レシートは置換の**後の別要求** (`receipt`) で書いていた。固定 PS は失敗した要求で
+  セッションを閉じる (`break`) ので、置換と `receipt` の間のどの失敗 (`query`・`snapshot`・読み戻しの不一致) でも
+  レシートは書かれず、Python からも書き直せない。
+
+### 直し
+
+1. **レシートは `replace` 要求の中で書く**: `File.Replace` → 全バイトの読み戻し → 一致したら `WriteReceipt`
+   (`original.bin` の照合、`applied` = 読み戻し、`receipt.json` を `NewFile`) → `AssertAbsent`。
+   Python は `replace` に `receipt=<backup ID>` と計画済みレシート (`applied` は `pending`) を渡す。
+   独立の `receipt` 操作は PS と `WindowsExecutor.OPS` から削除した。
+2. **置換後の確認を 1 回に**: `replace` の後は `applied['data'] == candidate`、不在、スナップショット一致を見て
+   再起動へ進む (従来のレシート前後 2 回の比較を、レシートが先に書かれた後の 1 回に統合)。
+3. **失敗の文言で復元の可否を分ける**: `replace` が成功した後の失敗は `receipt ID for restore: <ID>`、
+   その前は `retained backup ID (receipt not confirmed): <ID>`。
+4. **一時的な共有違反だけ待つ**: `Snapshot` のファイルを開く所を `OpenShared` にし、HRESULT の下位 16 ビットが
+   32 (共有違反) / 33 (ロック違反) の `IOException` だけを 250ms 間隔・1 回の open につき 4 秒まで再試行する
+   (`$TransientMs = 4000`)。ファイル無し・その他の I/O エラー・識別情報の変化は再試行しない。最も重い `replace` は
+   最大 5 回開くので 5 × 4 秒 + 余裕 5 秒 ≦ 1 要求の上限 `EXCHANGE_TIMEOUT` (30 秒) を試験で固定。
+
+保つ性質: 原本の保存と読み戻し、置換前の不在・内容・識別情報の再確認、別プロセス・別 ini を対象にしない、
+自動の巻き戻し・追加の起動・再試行による再起動はしない (再試行はファイルを開く 1 か所だけ)。
+読み戻しの不一致や読み戻し自体の失敗ではレシートを書かない (restore はどのみち `applied` の検証で拒否する) —
+その場合は従来どおり `original.bin` を残して操作者が調べる。
+
+### RED → GREEN
+
+`L` = `python3 -B tools/tests/test_np21w_ini_live.py`。
+
+| 段階 | 結果 | 内容 |
+|---|---|---|
+| RED | 基点 5eca3b8 の `np21w_ini_live.py` + 新しい試験: 63 tests, failures=11, errors=8 | 新クラス `PostReplaceFailure` の 7 件すべて (事故の再現: `/i` 形 + `ram-8mb` + 置換後の `snapshot` 失敗 → レシートあり・再起動なし・停止状態から `/i` 形で restore 可、置換後の各失敗点 (不在照会・snapshot・start・起動後の照会 2 回) でレシート、置換前の失敗は「未確認」、置換後の変化で再起動しない、executor が ID とレシートを `replace` に運ぶ、PS の順序、PS の再試行の範囲)。既存の errors は偽 executor のレシート記録を `replace` に移した契約変更による (restore 系) |
+| GREEN | L: 63 tests, OK (skipped=1、既存の Windows fixture) | 上記の直し |
+
+既存の `test_queries_fail_closed_at_every_phase` は照会の回数 (8 → 7) を成功時の実測から数えるように変えた。
+
+### 変異 (`--mutate`)
+
+追加 10 本 (合計 23 本) すべて RED、恒等の対照 GREEN、構文を壊す 1 本は NOT COUNTED:
+`replace` にレシートを渡さない、`replaced = True` を消す、置換後のスナップショット比較を消す、PS がレシートを
+書かない、PS がレシートを不在確認の後に書く、PS が `applied` を読み戻しで上書きしない、PS が再試行しない、
+PS が全 `IOException` を再試行する、PS が上限なしに再試行する、再試行の上限が 1 要求の上限を超える。
+
+### 未実施
+
+実 NP21/W・実 ini・Windows の PowerShell では動かしていない (ホスト限定の依頼、この環境に pwsh も無い)。
+PS の変更 (`OpenShared`・`WriteReceipt`・`replace` の順序) は静的な断片と順序の検査だけで、PS 5.1 での構文解析
+(`--windows-fixtures`) も未実行。原因の「共有違反」は推定で、実機で失敗時の例外を観測していない
+(PS は例外文を出さない設計)。再起動直後に NHD が掴まれている場合 (§4-60) の NP21/W 側の起動の失敗は、この道具は
+待たない (NHD のパスを知らない) — 別件。
