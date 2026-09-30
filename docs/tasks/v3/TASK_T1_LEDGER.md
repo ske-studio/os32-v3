@@ -1,6 +1,8 @@
 # TASK_T1_LEDGER — T1: 物理地図と所有権台帳 (設計票)
 
-> 状態: **実装中 (2026-09-30) — T1b 実装済み、NP21/W 回帰は PM** (`wt/t1b`、コーダー `claude-opus-5-5`、結果は §4-2-R)。
+> 状態: **実装中 (2026-10-01) — T1a・T1b 着地 (main `d7ac7a0`)、次は T1c**。NP21/W 回帰の結果は §4-2-N。未確認: CTRL+STOP・#GP / #DE / #UD の kill・PCM 再生中の CTRL+STOP (NP21/W の構成に PCM が無い)、実機 Ra266 64MB (実機エージェントに依頼中)。
+>
+> それまでの状態: **実装中 (2026-09-30) — T1b 実装済み、NP21/W 回帰は PM** (`wt/t1b`、コーダー `claude-opus-5-5`、結果は §4-2-R)。
 >
 > それまでの状態: **実装中 (2026-09-30) — T1a 実装済み、NP21/W 回帰は PM** (`wt/t1a`、コーダー `claude-opus-5-5`、結果は §4-1-R)。
 >
@@ -435,6 +437,25 @@ static inline u32  V2P(const volatile void *va) { return (u32)(uptr)va; }
 8. **CPL=0 の claim の owner は AS 種別の動的 owner "cpl0"** (最初の子で取り、最後の子で `ledger_reclaim_owner` → 返却)。release は A / B の `pgalloc_free_n_owner` でなく一括回収 (claim で取ったページは全部その owner のもの)。
 9. **AS の取り残しの件数は `exec_as_leftover_pages`** (teardown の最後の回収で返ったページの累計、0 が正常)。`ledger_reclaim_pages` は CPL=0 の release も含む全回収の累計。
 10. **資源の表と SURFACE の表は型と BSS の置き場だけ** (登録 API は T1d / T1e)。返却・回収・自己検査は SURFACE の表を見る。
+
+#### 4-2-N. T1a・T1b の NP21/W 回帰 (PM、2026-10-01、main `d7ac7a0` = T1a + BB 漏れの修正 + T1b)
+
+新しい `kernel.elf` の nm で引いた番地を `/api/mem?space=phys` で読んだ。8MB は `ExMemory=7` (切り替えは `np21w_ini_live.py ram-8mb`、原本は `np21x64w.ini.np21w-live-b0081b…/original.bin`。道具は ini の書き換えまで済んだが再起動直前の `snapshot` 段で失敗 — 道具の不具合として別に直す)、17MB は元の `ExMemory=16` (原本を戻して一致を確認)。PEGC、`GFX=auto`。
+
+| 構成 | 項目 | 結果 |
+|---|---|---|
+| 8MB | 起動 | `kselftest_fail`=0 (pass 252)、`ledger_check_fail`=0、`ledger_bad_free`=0、`sys_frozen_exec`=0x7B5000、`used_pages`=256 (`total_pages`=949)、`kctx_exc_depth`=0 |
+| 8MB | CPL=3 の往復 (`test2` ×2・`v86 -t`) | `used_pages`=256 のまま、`exec_as_leftover_pages`=0、`v86 -t` OK |
+| 8MB | `cpl0_probe` (CUI) | `cpl=0 usable_end=7b5000`、終了後 `g_cpl0_owner`=0、`ledger_claim_refused`=0 |
+| 8MB | #PF kill (`ring3_fault`) | `fault_kill_count` +1、`ledger_exc_ops`=414 (>0)、`kctx_exc_depth`=0 に戻る、`used_pages`=256・leftover 0 |
+| 8MB | `pegcchk 3` (CUI、全画面 gfx_init) | `pattern drawn`、`fault_kill_count` 増えず (BB 漏れの修正の確認) |
+| 8MB | GUI | gshell と gui_demo が開く (8MB で初めて)。2 本目は `out of memory` — 容量の上限 (v3 の最低条件の対象) |
+| 17MB | 起動 | `kselftest_fail`=0、`sys_frozen_exec`=0xEB2000 (§4-2-R の予告どおり 1 ページ下がる)、`used_pages`=256 (`total_pages`=2994)。`irq_ctx_violations`=1 は起動直後から (CTRL+STOP 由来ではない) |
+| 17MB | ゲスト試験一式 (`tools/guest_tests.py`) | 16 件中 PASS 14、SKIP 2 (`e2test` の 372KB、`host_test` の host_agent — 以前からの前提不足) |
+| 17MB | GUI (`gui_gate.py v12g4 --h 480`) | RESULT: OK、窓 4 本・アプリからの起動・CUI への戻りをスクリーンショットで確認 |
+| 17MB | 試験一式 + GUI の後 | `used_pages`=256、`exec_as_leftover_pages`=0 |
+
+**未確認** (次の段で取り直す): CUI のアプリ実行中の CTRL+STOP (`sleep 20` 中に `/api/key CTRL+STOP` を送ったが、送る時点が早すぎた可能性があり `ledger_irq_ops`=0 のまま — 専用の無限ループ試験バイナリと手順で)、#GP と #DE / #UD の kill (起こす試験バイナリが無い)、PCM 再生中の CTRL+STOP → 再オープン・再生 (NP21/W のこの構成は `[pcm] none` — 実機か PCM のある構成で)、実機 Ra266 64MB。
 
 ### 4-3. T1c — `dma_alloc`
 
