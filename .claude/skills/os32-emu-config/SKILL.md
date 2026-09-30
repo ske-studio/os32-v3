@@ -200,6 +200,25 @@ python3 tools/np21w_ini_live.py restore --exe 'C:\NP21\np21x64w.exe' --ini 'C:\N
 ```
 
 変更なしは停止・保存をしない。正常終了 0、拒否/失敗 2。
+
+**失敗の読み方** (2026-10-01〜): PS 側の失敗は
+`Windows operation failed: <op> [<op>:<段>[.<手順>] <例外の型> win32=<N> hresult=0x<8 桁>]` の形で出る。
+例外の文言・パス・内容は出さない (出るのは固定の段名・.NET の型名・数値だけ)。段の例:
+`snapshot:ini.open` (ini を開けない)、`replace:candidate.*` (一時ファイルの作成と読み戻し)、
+`replace:expected.*` (置換直前の再確認)、`replace:File.Replace`、`replace:readback.open|fileid|read|changed|compare`、
+`replace:identity` (候補と別のファイル)、`replace:receipt.backup.*` / `replace:receipt.json.*` (レシート)、
+`replace:absent.after`、`start:launch` / `start:alive`、`request:parse`。手順は
+`checkpath` (reparse の検査)・`open`・`fileid`・`size`・`read`・`changed` (読む間の変化)・`compare`・
+`create`・`write`・`verify`。`win32=32` / `33` は共有違反・ロック違反 (4 秒まで待った後)、`5` は拒否、
+`2` / `3` はファイル / パスが無い。`RuntimeException win32=5377 hresult=0x80131501` はツール自身の検査
+(`throw '...'`) が止めたもので、段名が理由を表す。角括弧が無いのは PS が診断を返さなかったか、
+形が固定の語彙から外れたので捨てたとき。
+**NP21/W が ini を開く時間帯**: 起動直後の `initload` (GetPrivateProfileString の短い open/close の連続) と
+通常終了の `initsave` だけ (fsrescfg の解像度別設定・一部のダイアログは別)。ツールの `stop` は強制終了なので
+終了時の書き込みは無い。起動直後に実行すると、こちらの `FileShare.Read` の open と NP21/W の読み込みが
+重なりうる (NP21/W 側の読み込みが失敗すると既定値で起動しうる)。**実行は `np21w_ctl.py start --wait-ready` が
+返ってから**にする。`OpenShared` の 4 秒の再試行は NP21/W の読み込みの合間を待つには足りるが、逆向き
+(こちらが開いている間の NP21/W の読み込み) は防げないので、待つ場所は起動側である。
 初回適用は明示 ini で起動中の対象が必要。復元は、記録済みの起動情報と
 成功した不在照会があれば、再起動失敗後の停止状態からも可能。
 

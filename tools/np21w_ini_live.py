@@ -156,6 +156,29 @@ def identify(rows, target, pid=None):
 
 FILE_KEY_RE = re.compile(r'[0-9]+(?::[0-9]+){6}')
 CANDIDATE_KEY_RE = re.compile(r'[0-9]+:[0-9]+:[0-9]+')
+# PS failure diagnosis (fixed vocabulary only; see FailureJson in PS_SERVER).
+FAILURE_STEP_RE = re.compile(r'[a-z]+:[A-Za-z]+(?:\.[A-Za-z]+){0,3}')
+FAILURE_TYPE_RE = re.compile(r'[A-Za-z_][A-Za-z0-9_`]{0,63}')
+FAILURE_HRESULT_RE = re.compile(r'0x[0-9A-F]{8}')
+
+
+def failure_detail(response):
+    """'[step type win32=N hresult=0x...]' from a PS failure, or '' if absent/invalid.
+
+    Only the fixed fields are accepted and every one must match; anything else
+    (a raw message, a path) is dropped instead of being echoed."""
+    if (not isinstance(response, dict) or response.get('ok') is not False or
+            not set(response) >= {'step', 'type', 'win32', 'hresult'} or
+            not set(response) <= {'ok', 'step', 'type', 'win32', 'hresult', 'reason'}):
+        return ''
+    step, kind, win32, hresult = (response[k] for k in ('step', 'type', 'win32', 'hresult'))
+    if (not isinstance(step, str) or len(step) > 64 or not FAILURE_STEP_RE.fullmatch(step) or
+            not isinstance(kind, str) or not FAILURE_TYPE_RE.fullmatch(kind) or
+            type(win32) is not int or not 0 <= win32 <= 0xFFFF or
+            not isinstance(hresult, str) or not FAILURE_HRESULT_RE.fullmatch(hresult) or
+            int(hresult, 16) & 0xFFFF != win32):
+        return ''
+    return ' [%s %s win32=%d hresult=%s]' % (step, kind, win32, hresult)
 
 
 def file_key(signature):
@@ -355,6 +378,25 @@ public static class FileIdentity {
 '@
 $locked = $false
 $mutex = $null
+# Failure diagnosis without echoing text: every failing request reports
+# '<op>:<phase>[.<detail>]' built only from the fixed literals below, plus the
+# innermost exception's type name and HResult (low 16 bits = Win32 error).
+$Op = 'request'
+$Phase = ''
+$Detail = ''
+function Step($phase) { $script:Phase = $phase; $script:Detail = '' }
+function Detail($detail) { $script:Detail = $detail }
+function FailureJson($err, $candidateIdentity) {
+ $f = @{ok=$false; step=($Op + ':' + $Phase)}
+ if ($Detail) { $f.step += '.' + $Detail }
+ $e = $err.Exception
+ while ($e.InnerException) { $e = $e.InnerException }
+ $f.type = $e.GetType().Name
+ $f.win32 = [int]($e.HResult -band 0xFFFF)
+ $f.hresult = '0x{0:X8}' -f $e.HResult
+ if ($e.Message -ceq $candidateIdentity) { $f.reason = 'candidate-identity' }
+ return ($f | ConvertTo-Json -Compress)
+}
 function Query {
  $rows = @(Get-CimInstance -ClassName Win32_Process -Filter "Name LIKE 'np21%' OR Name LIKE 'np2%'" -ErrorAction Stop)
  foreach ($p in $rows) {
@@ -373,6 +415,7 @@ function AssertProcess($p) {
      $rows[0].created -cne $p.created) { throw 'process changed' }
 }
 function CheckPath($path) {
+ Detail 'checkpath'
  $part = $path
  while ($part) {
   $item = Get-Item -LiteralPath $part -Force -ErrorAction Stop
@@ -391,6 +434,7 @@ function OpenShared($path) {
  $clock = [Diagnostics.Stopwatch]::StartNew()
  while ($true) {
   CheckPath $path
+  Detail 'open'
   try { $f = [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read) }
   catch {
    $e = $_.Exception
@@ -408,11 +452,15 @@ function OpenShared($path) {
 function Snapshot($path) {
  $f = OpenShared $path
  try {
+  Detail 'fileid'
   $sig = [FileIdentity]::Read($f.SafeFileHandle)
+  Detail 'size'
   if ($f.Length -gt 4194304) { throw 'oversized file' }
   $mem = [IO.MemoryStream]::new()
   try {
+   Detail 'read'
    $f.CopyTo($mem)
+   Detail 'changed'
    if ([FileIdentity]::Read($f.SafeFileHandle) -cne $sig) { throw 'changed during read' }
    return @{data=[Convert]::ToBase64String($mem.ToArray()); signature=$sig}
   } finally { $mem.Dispose() }
@@ -420,21 +468,26 @@ function Snapshot($path) {
 }
 function AssertSnapshot($expected) {
  $current = Snapshot $target.ini
+ Detail 'compare'
  if ($current.data -cne $expected.data -or $current.signature -cne $expected.signature) {
   throw 'intervening modification'
  }
 }
 function NewFile($path, [byte[]]$bytes) {
+ Detail 'size'
  if ($bytes.Length -gt 4194304) { throw 'oversized file' }
  CheckPath ([IO.Path]::GetDirectoryName($path))
+ Detail 'create'
  $security = [Security.AccessControl.FileSecurity]::new()
  $security.SetAccessRuleProtection($true,$false)
  $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User
  $security.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($sid,'FullControl','Allow'))
  $f = [IO.FileStream]::new($path, [IO.FileMode]::CreateNew, [Security.AccessControl.FileSystemRights]::Write,
   [IO.FileShare]::None, 4096, [IO.FileOptions]::WriteThrough, $security)
+ Detail 'write'
  try { $f.Write($bytes,0,$bytes.Length); $f.Flush($true) } finally { $f.Dispose() }
  $s = Snapshot $path
+ Detail 'verify'
  if ($s.data -cne [Convert]::ToBase64String($bytes)) { throw 'Readback failed' }
  return $s
 }
@@ -451,7 +504,9 @@ function Bundle($id) {
 }
 function WriteReceipt($id, $record, $applied) {
  $dir = Bundle $id
+ Step 'receipt.backup'
  if ((Snapshot ($dir + '\original.bin')).data -cne $record.original.data) { throw 'backup changed' }
+ Step 'receipt.json'
  $record.applied = $applied
  $json = $record | ConvertTo-Json -Depth 20 -Compress
  $null = NewFile ($dir + '\receipt.json') ([Text.Encoding]::UTF8.GetBytes($json))
@@ -459,33 +514,48 @@ function WriteReceipt($id, $record, $applied) {
 try {
  while ($null -ne ($line = [Console]::ReadLine())) {
   try {
+   $Op = 'request'
+   Step 'parse'
    $request = $line | ConvertFrom-Json -ErrorAction Stop
+   if ($request.op -cin @('lock','query','snapshot','stop','backup','replace','load','start')) { $Op = $request.op }
+   Step 'target'
    if (!$target) { $target = $request.target }
    if ($target.exe -cne $request.target.exe -or $target.ini -cne $request.target.ini) { throw 'target changed' }
    $a = $request.args
    $value = $true
+   Step 'locked'
    if ($request.op -notin @('query','snapshot','load','lock') -and !$locked) { throw 'lock required' }
+   Step 'dispatch'
    switch ($request.op) {
     'lock' {
+     Step 'mutex'
      $mutex = [System.Threading.Mutex]::new($false, 'Global\OS32.NP21W.Ini.Live')
      if (!$mutex.WaitOne(0)) { throw 'another controlled workflow owns lock' }
      $locked = $true
     }
-    'query' { $value=@(Query) }
-    'snapshot' { $value = Snapshot $target.ini }
+    'query' { Step 'cim'; $value=@(Query) }
+    'snapshot' { Step 'ini'; $value = Snapshot $target.ini }
     'stop' {
+     Step 'process'
      $p = [Diagnostics.Process]::GetProcessById([int]$a.process.pid)
      try {
       $handle = $p.Handle # pin process handle before identity recheck (PID reuse)
+      Step 'identity'
       AssertProcess $a.process
+      Step 'kill'
       $p.Kill()
+      Step 'wait'
       if (!$p.WaitForExit(10000)) { throw 'exit timeout' }
+      Step 'absent'
       AssertAbsent
      } finally { $p.Dispose() }
     }
     'backup' {
+     Step 'absent'
      AssertAbsent
+     Step 'expected'
      AssertSnapshot $a.snapshot
+     Step 'dir'
      $value = [Guid]::NewGuid().ToString('N')
      $dir = Bundle $value
      if ([IO.Directory]::Exists($dir)) { throw 'backup collision' }
@@ -495,32 +565,46 @@ try {
      $rule = [Security.AccessControl.FileSystemAccessRule]::new($sid,'FullControl','ContainerInherit,ObjectInherit','None','Allow')
      $acl.AddAccessRule($rule)
      [void][IO.Directory]::CreateDirectory($dir,$acl)
+     Step 'original'
      $null = NewFile ($dir + '\original.bin') ([Convert]::FromBase64String($a.snapshot.data))
     }
     'replace' {
+     Step 'candidate'
      $temp = $target.ini + '.pending-' + [Guid]::NewGuid().ToString('N')
      $candidate = NewFile $temp ([Convert]::FromBase64String($a.data))
+     Step 'absent'
      AssertAbsent
+     Step 'expected'
      AssertSnapshot $a.expected
+     Step 'File.Replace'
      [IO.File]::Replace($temp, $target.ini, [System.Management.Automation.Language.NullString]::Value)
+     Step 'readback'
      $applied = Snapshot $target.ini
+     Detail 'compare'
      if ($applied.data -cne $a.data) { throw 'Readback failed' }
      # ReplaceFile keeps the candidate's volume/index: same bytes from another
      # file (swapped while the open retried) is not our replacement.
+     Step 'identity'
      if ((FileKey $applied.signature) -cne (FileKey $candidate.signature)) { throw $CandidateIdentity }
      # Receipt first: a failure below (or any later request) ends the session.
      WriteReceipt $a.receipt $a.record $applied
+     Step 'absent.after'
      AssertAbsent
      $value = @{applied=$applied; candidate=(FileKey $candidate.signature)}
     }
     'load' {
+     Step 'receipt'
      $dir = Bundle $a.receipt
      $raw = Snapshot ($dir + '\receipt.json')
+     Step 'parse'
      $value = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($raw.data)) | ConvertFrom-Json
+     Step 'backup'
      if ((Snapshot ($dir + '\original.bin')).data -cne $value.original.data) { throw 'backup changed' }
     }
     'start' {
+     Step 'absent'
      AssertAbsent
+     Step 'exe'
      CheckPath $target.exe
      # ShellExecute, no redirection (as np21w_trial, F3): without it .NET
      # starts NP21/W via CreateProcess(bInheritHandles=TRUE), so it kept this
@@ -536,6 +620,7 @@ try {
      elseif ($l.form -ceq 'positional') { $arg = '"' + $target.ini + '"' }
      else { throw 'invalid launch' }
      if ($null -ne $l.fd) {
+      Step 'fd'
       if ($l.form -cne 'switch' -or $l.fd -isnot [string] -or
           $l.fd -cnotmatch '^[A-Za-z]:\\[^"\r\n]+$') { throw 'invalid launch' }
       CheckPath $l.fd
@@ -543,12 +628,14 @@ try {
      }
      $si.Arguments=$arg
      $si.WorkingDirectory=[IO.Path]::GetDirectoryName($target.exe)
+     Step 'launch'
      $p = [Diagnostics.Process]::Start($si)
      if ($null -eq $p) { throw 'no process started' }
      try {
       # ShellExecute may not expose $p.Handle: the PID is the key (Python
       # re-queries CIM for exe / command / created), liveness is HasExited.
       $startedPid = $p.Id
+      Step 'alive'
       Start-Sleep -Milliseconds 1000
       if ($p.HasExited) { throw 'started process exited' }
       $value = $startedPid
@@ -559,9 +646,11 @@ try {
    @{ok=$true; value=$value} | ConvertTo-Json -Depth 24 -Compress | ForEach-Object { [Console]::WriteLine($_) }
   } catch {
    # Never echo raw exception text, file bytes or command-line contents.
-   # ok=$false: explicit failure, never empty success; only fixed reason codes.
-   if ($_.Exception.Message -ceq $CandidateIdentity) { [Console]::WriteLine('{"ok":false,"reason":"candidate-identity"}') }
-   else { [Console]::WriteLine('{"ok":false}') }
+   # ok=$false: explicit failure, never empty success; only the fixed step,
+   # the exception type name, HResult and the fixed candidate-identity code.
+   $failure = '{"ok":false}'
+   try { $failure = FailureJson $_ $CandidateIdentity } catch { }
+   [Console]::WriteLine($failure)
    break
   }
  }
@@ -671,13 +760,17 @@ class WindowsExecutor:
             raise IniError('unsupported executor operation')
         try:
             response = self.transport.exchange({'op': op, 'target': self.target, 'args': wire(args)})
-            # The only failure detail PS reports: a fixed code, never raw text.
-            if op == 'replace' and response == {'ok': False, 'reason': 'candidate-identity'}:
-                raise IniError('Windows operation failed: replace; readback identity differs from '
-                               'the candidate (no receipt written); retain backup and verify process state')
+            # The only failure detail PS reports: fixed codes, never raw text.
+            detail = failure_detail(response)
+            if (op == 'replace' and isinstance(response, dict) and response.get('ok') is False and
+                    response.get('reason') == 'candidate-identity' and
+                    set(response) <= {'ok', 'reason', 'step', 'type', 'win32', 'hresult'}):
+                raise IniError('Windows operation failed: replace' + detail + '; readback identity differs '
+                               'from the candidate (no receipt written); retain backup and verify process state')
             if (not isinstance(response, dict) or set(response) != {'ok', 'value'} or
                     response['ok'] is not True):
-                raise IniError('Windows operation failed: ' + op + '; retain backup and verify process state')
+                raise IniError('Windows operation failed: ' + op + detail +
+                               '; retain backup and verify process state')
             value = wire(response['value'], decode=True)
             if op == 'query':
                 identify(value, self.target)

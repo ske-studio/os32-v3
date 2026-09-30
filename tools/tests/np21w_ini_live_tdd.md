@@ -602,3 +602,54 @@ Python 側は変えていないので**この試験は最初から GREEN** (特�
 **未確認** [V4]: ShellExecute で起動した NP21/W が実際にパイプを継承しないこと、`HasExited` / `Id` が実プロセスで
 期待どおりに取れること、CIM の CommandLine が従来の照合 (末尾空白の許容) で通ること — trial の実走では
 同じ形が通っているが、live での実プロセス確認は PM 待ち。
+
+## 実走の段ごとの失敗を読むための診断 (2026-10-01、5793c75 の後)
+
+**経緯** (PM の実プロセス、`wt/inicleanup`): 1 回目は `replace` が失敗 (ini は置換済み・`receipt.json` 無し)、
+2 回目は止める前の `snapshot` が失敗。03:40 の main (4233715) では同じ操作が replace とレシートまで通った。
+PS は例外文を出さないので何が落ちたか分からなかった。
+
+**変更**:
+- PS: `$Op` (既知の操作名だけ、他は `request`)・`Step` (段)・`Detail` (手順) を固定の文字列で記録し、
+  catch は `FailureJson` で `{"ok":false,"step":"<op>:<段>[.<手順>]","type":"<最内の例外の型名>",
+  "win32":<HResult の下位 16 ビット>,"hresult":"0x<8 桁>"}` を返す (candidate-identity のときは `reason` も)。
+  例外の Message は candidate-identity との比較にだけ使い、写さない。整形自体が失敗したら従来の `{"ok":false}`。
+- Python: `failure_detail()` が固定の 4 項目 (+ `reason`) だけを受け、全項目が型・正規表現・`hresult` と
+  `win32` の整合に合うときだけ ` [step type win32=N hresult=0x...]` を失敗の文言に足す。余分な項目や外れた値は
+  捨てる (文言は従来どおり、何も写さない)。candidate-identity は診断つきでも認識する。
+
+**RED/GREEN の順序について**: この節は実装を先に書き、既存の試験 3 件が落ちたのを見て (旧 catch 行の断片・
+`CheckPath` の断片・candidate-identity の応答の形) 直し、その後に新しい試験を足した。新試験の RED は取っていない。
+代わりに変異 10 本 (下) で新試験が実装の各部を検出することを確かめた。
+
+**試験** (`FailureDiagnosis` 6 件 + opt-in 1 件): 正しい診断が文言に入る (snapshot / replace / candidate-identity)、
+余分な項目 (message)・パス入りの段・長すぎる段・空白入りの型・bool / 範囲外 / 文字列の win32・hresult と食い違う win32・
+余計な語のある hresult・欠けた項目は捨てられて素の文言になる、CLI の stderr に出る、PS のすべての `Step` / `Detail` の
+文字列が Python の正規表現に収まる、`replace` と `OpenShared` / `Snapshot` / `WriteReceipt` の段の順序、
+`FailureJson` が Message を写さないこと。
+opt-in `--windows-fixtures` の `test_failure_json_runs_under_windows_powershell` は PS_SERVER から `Step` / `Detail` /
+`FailureJson` だけを抜き出して **PS 5.1 で実行** (合成の例外だけ。ファイル・CIM・プロセス・ini に触らない):
+IOException(0x80070020) → `snapshot:ini.open IOException win32=32`、`[Convert]::FromBase64String` の失敗 →
+最内の `FormatException win32=5431 hresult=0x80131537`、`throw '...'` → `RuntimeException win32=5377
+hresult=0x80131501` (最初は 0x80131500 と見込んで外れ、実測で直した)。出力に例外文 (`secret`) が無いことも見る。
+全体の PS_SERVER は PS 5.1 の ParseInput で構文解析が通った (実行はしていない)。
+
+変異: 追加 10 本 (Message を写す、最内をたどらない、整形の失敗の受け皿が無い、`Detail 'open'` / `Step 'File.Replace'` /
+`Step 'readback'` を消す、Python が任意の段を通す・win32 と hresult の食い違いを通す・余分な項目を通す・診断を
+文言に入れない)、段名が入って形の変わった既存 4 本を追従。計 49 本すべて RED、恒等 GREEN、構文 1 本 NOT COUNTED。
+
+**PS 5.1 の観点での静的な見直し** (`OpenShared`・`FileKey`・`NewFile` の戻り値・`start`): 問題は見つからなかった。
+- 関数の戻り値への漏れ: `CheckPath`・`Step`・`Detail` は代入だけ、`NewFile` 内の `SetAccessRuleProtection` /
+  `AddAccessRule` / `Write` / `Flush` は void、`backup` と `WriteReceipt` の `NewFile` は `$null =`、`[void]CreateDirectory`。
+  `OpenShared` は FileStream (列挙されない) を返す。
+- API: `Exception.HResult` の getter は .NET 4.5 で public (PS 5.1 の前提)、`FileStream(path, mode, FileSystemRights, share,
+  size, options, FileSecurity)` と `Flush(bool)` は .NET Framework 4.x にある (Core には無い)、`-notin` / `-cin` は PS 3 以降。
+  `[Math]::Min(250, $left)` は long 同士に解決される。
+- 1 要素の配列: 応答の配列は `@(Query)`、件数は `@(Query).Count`。受け取った `record.diff` は ConvertFrom-Json の配列のまま
+  ConvertTo-Json に渡る。
+- `start`: ShellExecute の `Process.Start` は `hProcess` を持つので `Id` / `HasExited` は使える (trial で実績)。
+  `$null` の検査を足してある。
+**分からないままのこと**: 1 回目・2 回目の失敗の実体 (共有違反・拒否・読む間の変化など)。この版で再現すれば角括弧の中に出る。
+NP21/W が ini を開く時間帯 (np21w-src `win9x/np2.cpp` の `initload` / `initsave`、`win9x/ini.cpp` の
+GetPrivateProfileString) の検討はスキルの「失敗の読み方」に書いた — 起動直後は重なりうるので `--wait-ready` の後に実行する。
+GetPrivateProfileString が開くときの共有モードは確かめていない。

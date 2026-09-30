@@ -1033,9 +1033,9 @@ class ReviewRetryRaces(unittest.TestCase):
             'AssertAbsent\n     $value = @{applied=$applied; candidate=(FileKey $candidate.signature)}')]
         self.assertEqual(order, sorted(order))
         self.assertIn("$CandidateIdentity = 'readback identity differs from the candidate'", live.PS_SERVER)
-        self.assertIn("if ($_.Exception.Message -ceq $CandidateIdentity) "
-                      "{ [Console]::WriteLine('{\"ok\":false,\"reason\":\"candidate-identity\"}') }",
-                      live.PS_SERVER)
+        failure = self.function('FailureJson')
+        self.assertIn("if ($e.Message -ceq $candidateIdentity) { $f.reason = 'candidate-identity' }", failure)
+        self.assertIn('try { $failure = FailureJson $_ $CandidateIdentity } catch { }', live.PS_SERVER)
         key = self.function('FileKey')
         self.assertIn("-cnotmatch '^[0-9]+(:[0-9]+){6}$'", key)
         self.assertIn("$parts[0] + ':' + $parts[1] + ':' + $parts[2]", key)
@@ -1062,6 +1062,115 @@ class ReviewRetryRaces(unittest.TestCase):
         self.assertIn('Start-Sleep -Milliseconds ([Math]::Min(250, $left))', body)
         self.assertIn('if ($clock.ElapsedMilliseconds -ge $TransientMs) { throw }', body)
         self.assertNotIn('Start-Sleep -Milliseconds 250\n', body)
+
+
+DIAG = {'ok': False, 'step': 'snapshot:ini.open', 'type': 'IOException',
+        'win32': 32, 'hresult': '0x80070020'}
+
+
+class FailureDiagnosis(unittest.TestCase):
+    """2026-10-01: real runs failed at 'replace' / 'snapshot' with no way to
+    tell why. PS now reports a fixed step, the innermost exception type and its
+    HResult; Python repeats exactly those and nothing else."""
+
+    def call(self, response, op='snapshot', **args):
+        with self.assertRaises(live.IniError) as caught:
+            with live.WindowsExecutor(TARGET, Transport(response)) as ex:
+                ex.call(op, **args)
+        return str(caught.exception)
+
+    def test_valid_diagnosis_is_part_of_the_failure(self):
+        message = self.call(DIAG)
+        self.assertIn('Windows operation failed: snapshot '
+                      '[snapshot:ini.open IOException win32=32 hresult=0x80070020]', message)
+        self.assertIn('retain backup and verify process state', message)
+        message = self.call(dict(DIAG, step='replace:readback.open'), 'replace',
+                            expected={'data': RAW, 'signature': 'id'}, data=NEW)
+        self.assertIn('[replace:readback.open IOException win32=32', message)
+        message = self.call(dict(DIAG, step='replace:identity', type='RuntimeException', win32=5377,
+                                 hresult='0x80131501', reason='candidate-identity'), 'replace',
+                            expected={'data': RAW, 'signature': 'id'}, data=NEW)
+        self.assertIn('[replace:identity RuntimeException win32=5377 hresult=0x80131501]', message)
+        self.assertIn('readback identity differs from the candidate', message)
+
+    def test_anything_outside_the_fixed_fields_is_dropped_not_echoed(self):
+        for bad in (dict(DIAG, message='C:\\secret\\chosen.ini'),
+                    dict(DIAG, step='snapshot:C:\\secret'), dict(DIAG, step='snapshot'),
+                    dict(DIAG, step='snapshot:' + 'a' * 60),
+                    dict(DIAG, type='IO Exception secret'), dict(DIAG, type=''),
+                    dict(DIAG, win32=True), dict(DIAG, win32=-1), dict(DIAG, win32=70000),
+                    dict(DIAG, win32='32'), dict(DIAG, win32=33),
+                    dict(DIAG, hresult='0x80070020 secret'), dict(DIAG, hresult='80070020'),
+                    dict(DIAG, ok=None), {k: v for k, v in DIAG.items() if k != 'hresult'},
+                    {'ok': False}, {'ok': False, 'reason': 'other'}):
+            with self.subTest(bad=bad):
+                message = self.call(bad)
+                self.assertEqual(message, 'Windows operation failed: snapshot; '
+                                          'retain backup and verify process state')
+        self.assertEqual(live.failure_detail({'ok': True, 'value': True}), '')
+        self.assertEqual(live.failure_detail([DIAG]), '')
+
+    def test_cli_prints_the_diagnosis(self):
+        import contextlib
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+            code = live.main(['ram-8mb', '--exe', TARGET['exe'], '--ini', TARGET['ini']],
+                             lambda target: live.WindowsExecutor(target, Transport(DIAG)))
+        self.assertEqual(code, 2)
+        self.assertIn('error: Windows operation failed: query '
+                      '[snapshot:ini.open IOException win32=32 hresult=0x80070020]', err.getvalue())
+
+    def ps_steps(self):
+        import re
+        return re.findall(r"\b(Step|Detail) '([^']*)'", live.PS_SERVER)
+
+    def test_every_ps_step_fits_the_python_pattern(self):
+        steps = self.ps_steps()
+        self.assertGreater(len(steps), 40)
+        ops = ('lock', 'query', 'snapshot', 'stop', 'backup', 'replace', 'load', 'start', 'request')
+        for kind, name in steps:
+            with self.subTest(kind=kind, name=name):
+                self.assertRegex(name, r'^[A-Za-z]+(\.[A-Za-z]+)?$')
+                for op in ops:
+                    full = op + ':' + name + '.checkpath'
+                    self.assertTrue(len(full) <= 64 and live.FAILURE_STEP_RE.fullmatch(full), full)
+        self.assertIn("$Op = 'request'", live.PS_SERVER)
+        self.assertIn("if ($request.op -cin @('lock','query','snapshot','stop','backup','replace','load','start')) "
+                      "{ $Op = $request.op }", live.PS_SERVER)
+
+    def test_ps_names_each_replace_and_open_step_in_order(self):
+        body = PostReplaceFailure.block(self, 'replace')
+        order = [body.index(fragment) for fragment in (
+            "Step 'candidate'", '$candidate = NewFile $temp', "Step 'absent'", 'AssertAbsent',
+            "Step 'expected'", 'AssertSnapshot $a.expected', "Step 'File.Replace'", '[IO.File]::Replace(',
+            "Step 'readback'", '$applied = Snapshot $target.ini', "Detail 'compare'",
+            "Step 'identity'", '(FileKey $applied.signature)', 'WriteReceipt $a.receipt',
+            "Step 'absent.after'")]
+        self.assertEqual(order, sorted(order))
+        opener = ReviewRetryRaces.function(self, 'OpenShared')
+        self.assertLess(opener.index("Detail 'open'"), opener.index('[IO.File]::Open('))
+        snapshot = ReviewRetryRaces.function(self, 'Snapshot')
+        order = [snapshot.index(fragment) for fragment in (
+            "Detail 'fileid'", "Detail 'size'", "Detail 'read'", '$f.CopyTo($mem)', "Detail 'changed'")]
+        self.assertEqual(order, sorted(order))
+        receipt = ReviewRetryRaces.function(self, 'WriteReceipt')
+        self.assertLess(receipt.index("Step 'receipt.backup'"), receipt.index("Step 'receipt.json'"))
+        self.assertIn("'snapshot' { Step 'ini'; $value = Snapshot $target.ini }", live.PS_SERVER)
+
+    def test_ps_failure_json_carries_no_message_text(self):
+        failure = ReviewRetryRaces.function(self, 'FailureJson')
+        for fragment in ('while ($e.InnerException) { $e = $e.InnerException }',
+                         '$f.type = $e.GetType().Name', '$f.win32 = [int]($e.HResult -band 0xFFFF)',
+                         "$f.hresult = '0x{0:X8}' -f $e.HResult",
+                         "$f = @{ok=$false; step=($Op + ':' + $Phase)}",
+                         "if ($Detail) { $f.step += '.' + $Detail }"):
+            self.assertIn(fragment, failure)
+        self.assertEqual(failure.count('Message'), 1, 'Message only compared, never copied')
+        self.assertNotIn('ToString()', failure)
+        self.assertNotIn('$err.', failure.replace('$e = $err.Exception', ''))
+        # The catch falls back to the bare failure if formatting itself fails.
+        self.assertIn("$failure = '{\"ok\":false}'\n   try { $failure = FailureJson $_ $CandidateIdentity } catch { }\n"
+                      "   [Console]::WriteLine($failure)\n   break", live.PS_SERVER)
 
 
 WINDOWS_FIXTURES = '--windows-fixtures' in sys.argv
@@ -1117,6 +1226,37 @@ try {
         self.assertIn(b'File.Replace fixture: PASS', result.stdout)
 
 
+
+    def test_failure_json_runs_under_windows_powershell(self):
+        """Runs only Step / Detail / FailureJson (extracted from PS_SERVER) on
+        synthetic exceptions: no files, CIM, processes, ini or emulator."""
+        import base64
+        import json
+        import re
+        import subprocess
+        functions = re.search(r"\nfunction Step\(\$phase\) \{[^\n]*\}\nfunction Detail\(\$detail\) \{[^\n]*\}\n",
+                              live.PS_SERVER).group() + \
+            re.search(r'\nfunction FailureJson\(.*?\n\}\n', live.PS_SERVER, re.S).group()
+        script = "$ErrorActionPreference = 'Stop'\n$Op = 'request'; $Phase = ''; $Detail = ''\n" + functions + r"""
+$Op = 'snapshot'; Step 'ini'; Detail 'open'
+try { throw [IO.IOException]::new('secret C:\x\chosen.ini', -2147024864) } catch { [Console]::WriteLine((FailureJson $_ 'cand')) }
+$Op = 'load'; Step 'parse'
+try { $null = [Convert]::FromBase64String('secret!') } catch { [Console]::WriteLine((FailureJson $_ 'cand')) }
+$Op = 'replace'; Step 'identity'
+try { throw 'cand' } catch { [Console]::WriteLine((FailureJson $_ 'cand')) }
+"""
+        command = base64.b64encode(script.encode('utf-16le')).decode('ascii')
+        result = subprocess.run(['powershell.exe', '-NoLogo', '-NoProfile', '-NonInteractive',
+                                 '-EncodedCommand', command], stdin=subprocess.DEVNULL,
+                                capture_output=True, timeout=60)
+        self.assertEqual(result.returncode, 0, result.stderr.decode('utf-8', errors='replace'))
+        lines = [json.loads(line) for line in result.stdout.decode('ascii').split()]
+        self.assertNotIn(b'secret', result.stdout)
+        self.assertEqual([live.failure_detail(line) for line in lines], [
+            ' [snapshot:ini.open IOException win32=32 hresult=0x80070020]',
+            ' [load:parse FormatException win32=5431 hresult=0x80131537]',
+            ' [replace:identity RuntimeException win32=5377 hresult=0x80131501]'])
+        self.assertEqual(lines[2]['reason'], 'candidate-identity')
 
 # ---------------------------------------------------------------------------
 # Mutants (--mutate), in the style of test_np21w_ctl.py: each mutant is a copy
@@ -1181,11 +1321,11 @@ MUTATIONS = [
      "                if False:\n"
      "                    raise IniError('changed after replacement; retain backup and stopped state')",
      "no snapshot comparison between replacement and restart"),
-    ("     WriteReceipt $a.receipt $a.record $applied\n     AssertAbsent\n",
-     "     AssertAbsent\n",
+    ("     WriteReceipt $a.receipt $a.record $applied\n     Step 'absent.after'\n     AssertAbsent\n",
+     "     Step 'absent.after'\n     AssertAbsent\n",
      "PS replace does not write the receipt"),
-    ("     WriteReceipt $a.receipt $a.record $applied\n     AssertAbsent\n",
-     "     AssertAbsent\n     WriteReceipt $a.receipt $a.record $applied\n",
+    ("     WriteReceipt $a.receipt $a.record $applied\n     Step 'absent.after'\n     AssertAbsent\n",
+     "     Step 'absent.after'\n     AssertAbsent\n     WriteReceipt $a.receipt $a.record $applied\n",
      "PS replace writes the receipt only after the absence check"),
     (" $record.applied = $applied\n",
      "",
@@ -1206,8 +1346,8 @@ MUTATIONS = [
     ("                if file_key(applied['signature']) != done['candidate']:",
      "                if False:",
      "accept a same-bytes readback of another file (runtime)"),
-    ("            if op == 'replace' and response == {'ok': False, 'reason': 'candidate-identity'}:",
-     "            if False:",
+    ("                    response.get('reason') == 'candidate-identity' and",
+     "                    False and",
      "candidate-identity failure reported as a generic failure (runtime)"),
     ("FILE_KEY_RE = re.compile(r'[0-9]+(?::[0-9]+){6}')",
      "FILE_KEY_RE = re.compile(r'.+')",
@@ -1218,8 +1358,8 @@ MUTATIONS = [
     ("                if replaced and operation == 'restore':",
      "                if False:",
      "a failed restore offers its own (unrestorable) receipt for restore (runtime)"),
-    ("  CheckPath $path\n  try { $f = [IO.File]::Open(",
-     "  try { $f = [IO.File]::Open(",
+    ("  CheckPath $path\n  Detail 'open'\n  try { $f = [IO.File]::Open(",
+     "  Detail 'open'\n  try { $f = [IO.File]::Open(",
      "PS does not recheck the path before each open attempt"),
     ("  try { CheckPath $path } catch { $f.Dispose(); throw }\n",
      "",
@@ -1233,9 +1373,40 @@ MUTATIONS = [
     ("     $null = NewFile ($dir + '\\original.bin')",
      "     NewFile ($dir + '\\original.bin')",
      "PS backup leaks NewFile's snapshot into the response"),
-    ("""   if ($_.Exception.Message -ceq $CandidateIdentity) { [Console]::WriteLine('{"ok":false,"reason":"candidate-identity"}') }\n""",
+    (" if ($e.Message -ceq $candidateIdentity) { $f.reason = 'candidate-identity' }\n",
      "",
      "PS never reports the candidate-identity reason"),
+    # 2026-10-01: fixed failure diagnosis (step, exception type, HResult).
+    (" $f.type = $e.GetType().Name\n",
+     " $f.type = $e.Message\n",
+     "PS failure echoes the exception message"),
+    (" while ($e.InnerException) { $e = $e.InnerException }\n $f.type",
+     " $f.type",
+     "PS failure reports the wrapper, not the innermost exception"),
+    ("   try { $failure = FailureJson $_ $CandidateIdentity } catch { }\n",
+     "   $failure = FailureJson $_ $CandidateIdentity\n",
+     "PS failure formatting has no bare fallback"),
+    ("  Detail 'open'\n",
+     "",
+     "PS open failure is not named"),
+    ("     Step 'File.Replace'\n",
+     "",
+     "PS File.Replace failure is reported as the preceding step"),
+    ("     Step 'readback'\n",
+     "",
+     "PS readback failure is reported as File.Replace"),
+    ("FAILURE_STEP_RE = re.compile(r'[a-z]+:[A-Za-z]+(?:\\.[A-Za-z]+){0,3}')",
+     "FAILURE_STEP_RE = re.compile(r'.+')",
+     "Python echoes any step text (paths) (runtime)"),
+    ("            int(hresult, 16) & 0xFFFF != win32):",
+     "            False):",
+     "Python accepts a win32 code that contradicts the HResult (runtime)"),
+    ("            not set(response) <= {'ok', 'step', 'type', 'win32', 'hresult', 'reason'}):",
+     "            False):",
+     "Python accepts extra (message) fields next to the diagnosis (runtime)"),
+    ("                raise IniError('Windows operation failed: ' + op + detail +",
+     "                raise IniError('Windows operation failed: ' + op +",
+     "Python drops the diagnosis from the failure (runtime)"),
     # 2026-10-01: restart must not hand PS's stdout pipe to NP21/W (cleanup timeout).
     ("     $si.UseShellExecute=$true\n",
      "     $si.UseShellExecute=$false\n",
