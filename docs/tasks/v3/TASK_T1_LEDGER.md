@@ -457,6 +457,20 @@ static inline u32  V2P(const volatile void *va) { return (u32)(uptr)va; }
 
 **未確認** (次の段で取り直す): CUI のアプリ実行中の CTRL+STOP (`sleep 20` 中に `/api/key CTRL+STOP` を送ったが、送る時点が早すぎた可能性があり `ledger_irq_ops`=0 のまま — 専用の無限ループ試験バイナリと手順で)、#GP と #DE / #UD の kill (起こす試験バイナリが無い)、PCM 再生中の CTRL+STOP → 再オープン・再生 (NP21/W のこの構成は `[pcm] none` — 実機か PCM のある構成で)、実機 Ra266 64MB。
 
+**未確認の取り直しの手順** (試験バイナリ `faulttest`、`userland/tests/faulttest.c`、`/usr/bin/` [test])。番地は毎回**新しい** `kernel.elf` の nm で引く (`used_pages` は `pgalloc.c` の static、`exec_as_leftover_pages` は `exec/exec.c`)。各段の前後で `fault_kill_count`・`ledger_exc_ops`・`kctx_exc_depth`・`ledger_irq_ops`・`kctx_irq_depth`・`used_pages`・`exec_as_leftover_pages` を読む。
+
+| 段 | コマンド (CUI) | 起こすもの | 合格 |
+|---|---|---|---|
+| #GP | `faulttest gp` | CPL=3 の `hlt` (CPL≠0 なら IOPL に関係なく #GP(0)。`cli` は OS32 が IOPL=0 で降ろすから #GP になるだけなので使わない) | `faulttest: raising #GP` の後にシリアルへ `[ring3] exception ... vec=0000000D`、`SURVIVED` が出ない、`fault_kill_count` +1、`ledger_exc_ops` 増、`kctx_exc_depth`=0 に戻る、`used_pages` が試験前と同じ・leftover 0 |
+| #DE | `faulttest de` | asm の `divl` で 0 除算 | 同上 (vec=00000000) |
+| #UD | `faulttest ud` | `ud2` | 同上 (vec=00000006) |
+| #PF | `faulttest pf` | カーネル帯 (`KERNEL_LOAD_ADDR`) へ書く — `ring3_fault` と同じ、比較用 | 同上 (`[ring3] #PF`) |
+| CTRL+STOP (純ループ) | `faulttest loop` → 画面に `faulttest: looping (CTRL+STOP to kill)` が出たのを `/api/tvram` か `/api/screenshot` で確かめてから `/api/key` で CTRL+STOP | KAPI を呼ばない CPL=3 の `jmp` ループ。止めるのは IRQ 出口の `ring3_abort_check` (`isr_stub.asm`、割り込まれた CS.RPL=3 のときだけ) | シェルに戻る、`ledger_irq_ops` 増 (IRQ の上での回収)、`kctx_irq_depth`=0 に戻る、`used_pages` 同じ・leftover 0。`fault_kill_count` は CTRL+STOP では増えない想定 (増えたら記録) |
+| CTRL+STOP (KAPI 連打) | `faulttest kloop` → `faulttest: kloop get_tick (CTRL+STOP to kill)` を確かめてから CTRL+STOP | `get_tick` の連打。KAPI の中で要求が立つと syscall 入口で畳むので、`ledger_irq_ops` は増えることも増えないこともある (どちらの経路かを記録) | シェルに戻る、`kctx_irq_depth`=0・`kctx_exc_depth`=0、`used_pages` 同じ・leftover 0 |
+| 対照 | `faulttest loop 3` / `faulttest kloop 3` | 3 秒で自分から終わる。`loop` は先に `get_tick` で空回りの速さを較正し (`calibrated ...` の行)、本番の空回りでは KAPI を呼ばない | `loop done after N ticks` (N ≈ 300)、rc=0、カウンタは `ledger_*_ops` 以外動かない |
+
+`SURVIVED <kind>` が出て rc=2 なら保護が効いていない (不合格)。引数なしは使い方を出して rc=1。
+
 ### 4-3. T1c — `dma_alloc`
 
 | 項 | 内容 |
