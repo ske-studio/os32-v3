@@ -42,6 +42,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | 試験の一覧 (`make check` のターゲット、`_tdd.md` と票の対応) | [TESTS.md](TESTS.md) (`tools/gen_tests_inventory.py` で生成、`make check-tests-inventory` が鮮度を照合) | 各票は自分の `_tdd.md` を指すだけ |
 | 移植性 (CPU / 機種の 2 軸、ARM 計測、順序 1〜4 の経過) | [tasks/portability/ARM_GAUGE.md](tasks/portability/ARM_GAUGE.md) (計測と経過)、[../arch/README.md](../arch/README.md) (足し方) | [tasks/portability/SURVEY_N1.md](tasks/portability/SURVEY_N1.md) (調査)、`tasks/arch_port/` は**別リポジトリ `pw-sh4-research` の調査の快照** (正典はそちら。本リポジトリでは更新しない)、[archive/portability/TASK_KSTRING_BENCH.md](archive/portability/TASK_KSTRING_BENCH.md) (kstring の速度実測 **完了 2026-09-17** — x86 は asm 維持、C 版は他 32 ビットアーキ向け。数字は ARM_GAUGE §9、語長の前提は §10) |
 | 版数 (カーネル 2.1 / GUI 1.4 で閉じた / 現行の開発 v3 / v4 草案) と v3 の fork の段取り | [ROADMAP.md §0](ROADMAP.md) | 各版の要約は [CHANGELOG.md](../CHANGELOG.md) (3〜5 行 + リリースノートへのリンク)、詳細は `RELEASE_vX.md` ([RELEASE_v2.1.md](RELEASE_v2.1.md))。`ver` の文字列、タグ |
+| v3 の目的・範囲・目標の 2 段・柱 (P0〜P10) と順序・v3 後半の票 | [tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md) (本案、2026-09-30 昇格) | ROADMAP.md の v3 の行、README.md (目的の一文)。メモリマップの決定の本文は TASK_MEMMAP_V3 (D 番号) |
 | 実機 Ra266 の画面ドライバ (内蔵 Trident 1023:9660) の設計・資料・段取り | [tasks/realhw/TASK_TRIDENT_DRIVER.md](tasks/realhw/TASK_TRIDENT_DRIVER.md) (設計中 — 設計票 v5 が Codex 5 回目で Approve、実装は未着手) | [tasks/realhw/PLAN.md](tasks/realhw/PLAN.md) §7、[ROADMAP.md](ROADMAP.md) (1 行) |
 | 実機 Ra266 の PEGC 640x480 (実機 ROM の OUT 列に合わせたモード設定と受け入れ) | [tasks/realhw/TASK_PEGC480_REALHW.md](tasks/realhw/TASK_PEGC480_REALHW.md) | [RELEASE_v2.1.md](RELEASE_v2.1.md) §2-1、[POLICY_DEBUG.md §4-62](POLICY_DEBUG.md)、`archive/realhw_v21/TASK_PEGC_RA266_TIMING.md` (起票の完了記録) |
 | 現行 / 未実装 / 過去 の区別 | 各文書の冒頭に「現行仕様」「計画」「YYYY-MM-DD 時点のスナップショット」を明記 | — |
@@ -178,15 +179,15 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | [archive/kernel_v21/TASK_EXT2_EMPTY_NAME.md](archive/kernel_v21/TASK_EXT2_EMPTY_NAME.md) / [TASK_VFS_FD_PATH.md](archive/kernel_v21/TASK_VFS_FD_PATH.md) | NHD のルートの名前の無いディレクトリ項目 / FD のパスの引き直しと長いパスの切り詰め (VFS の既存欠陥) — 受入完了 (2026-09-24) |
 | [archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md](archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md) / [TASK_KAPI_OUTPUT_GUARD.md](archive/kernel_v21/TASK_KAPI_OUTPUT_GUARD.md) | KAPI のデータ欄の固定 (v63) / 出力ポインタを受ける KAPI 43 本が RO ページに書けた件 — 受入完了 (2026-09-23〜24) |
 
-### v3 (現行の開発 — 本案をまとめる段)
+### v3 (現行の開発 — 本案は [tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md))
 
 版の線と fork の段取りは [ROADMAP.md §0](ROADMAP.md)。下の票のうち HAL_WIRING・PCM・KHEAP の切り直し・デバイス窓の帯は v2.1 に先行して着地した (残件があるので v3/ に残す)。
 
 | ドキュメント | 内容 |
 |-------------|------|
-| [tasks/v3/V3_PLAN_DRAFT.md](tasks/v3/V3_PLAN_DRAFT.md) | **v3 本案の草案 — 草案群のまとめ (2026-09-30、草案)** — 草案の一覧と振り分け (§1)、目的と範囲・**目標の 2 段** (§2、§2-1)、柱と順序の案 (§3)、**メモリマップの柱は決定済み** (§3-1 は要点と決着先、正典は TASK_MEMMAP_V3)、食い違いの一覧 (§4)、v2.x との互換 (§5)、fork の段取り (§6)、ユーザー判断と Codex の論点 (§7)。**§7-2 X1〜X8 は 2026-09-30 に Codex が回答しユーザーが承認 (結論と反映先は表)**。本案への昇格はユーザー判断と Codex の突き合わせの後 |
+| [tasks/v3/V3_PLAN_DRAFT.md](tasks/v3/V3_PLAN_DRAFT.md) | **v3 本案の草案 — 草案群のまとめ (2026-09-30、完了記録: 本案 V3_PLAN.md に昇格)** — 草案の一覧と振り分け (§1)、目的と範囲・**目標の 2 段** (§2、§2-1)、柱と順序の案 (§3)、**メモリマップの柱は決定済み** (§3-1 は要点と決着先、正典は TASK_MEMMAP_V3)、食い違いの一覧 (§4)、v2.x との互換 (§5)、fork の段取り (§6)、ユーザー判断と Codex の論点 (§7)。**§7-2 X1〜X8 は 2026-09-30 に Codex が回答しユーザーが承認 (結論と反映先は表)**。本案への昇格はユーザー判断と Codex の突き合わせの後 |
 | [tasks/v3/FORK_PLAN.md](tasks/v3/FORK_PLAN.md) | **os32-v3 への fork の段取り — 計画 (2026-09-30、ユーザー承認「準備を承認」)** — 持っていくものの一覧 (`git ls-files` 1,551 ファイルをディレクトリ単位で 持つ / 持たない / 要判断、§1)、経緯の要約とケーススタディの候補 (HISTORY / CASE_STUDIES / THIRD_PARTY、§1-4)、**公開前の監査 (秘密・著作権物・第三者ライセンス・実パス・ホスト名、コマンドと合格条件、2026-09-30 の結果、§2)**、手順 a〜g と [D2] の地点 (§3)、判断が要る点 J1〜J8 (§4)。リポジトリの作成・push は未実施 |
-| [tasks/v3/PLAN.md](tasks/v3/PLAN.md) | **v3 の計画 (2026-09-17)** — 機能を足す前に入れ物を作り直す (C11 → メモリマップ再配置 → ドライバの動的読み込み → PCI → 82557)。カーネル本体の大きさと残りは [02_memory.md §2-1](02_memory.md) (生成)。アプリへの払い出し §4、アイデア §5。**本案へ書き直す対象** |
+| [tasks/v3/PLAN.md](tasks/v3/PLAN.md) | **v3 の計画 (2026-09-17)** — 機能を足す前に入れ物を作り直す (C11 → メモリマップ再配置 → ドライバの動的読み込み → PCI → 82557)。カーネル本体の大きさと残りは [02_memory.md §2-1](02_memory.md) (生成)。アプリへの払い出し §4、アイデア §5。**完了記録 (2026-09-30): 策定時の計画。本案は V3_PLAN.md** |
 | [tasks/v3/TASK_MEMMAP_V3.md](tasks/v3/TASK_MEMMAP_V3.md) | **v3 のメモリマップ — 設計中 (方針確定 2026-09-30、3 者討論で決定、Codex Approve)**。決定 D1〜D35 (D29〜D34 = 保留 5 件 U6 の拾い方、**D35 = D7 の改訂: fork 時の KAPI 整理でスロット順を変えてよい、世代の識別と旧新混在試験が条件**、2026-09-30; システムは恒等のまま、アプリだけ 0x80000000〜、物理台帳、SQLite のモジュール化、低位 640KB を V86 へ、OpenType)、帯の表、票 T0〜T7、受入条件、**Codex X1〜X8 の補足の対応表 (§8-4)**、経緯。実装は未着手 |
 | [tasks/v3/U6_PENDING_REVIEW.md](tasks/v3/U6_PENDING_REVIEW.md) | **U6 の仕分け表 — 決裁済み (2026-09-30、ユーザーが 6 点すべて推奨どおりに決定 → TASK_MEMMAP_V3 D29〜D34)**: 保留 5 件 (F3a〜c / F2c / FEP_BOUNDARY / MEMORY_RAM_INTEGRATION / DEVICE_RESERVATION) の現状 (コードで確認)、TASK_MEMMAP_V3 の決定で置き換わった部分と残る部分、拾う先 (T2 / T4 / T5a の要件、P4、撤回)、判断点 6 つとその決定 |
 | [tasks/v3/PORT_CANDIDATES.md](tasks/v3/PORT_CANDIDATES.md) | **既存ソフトウェアの移植候補 — 計画 (2026-09-30、v3 後半・P9)** — 移植の前提となる基盤 (libc の穴・C++ 無し・x87・Video HAL・PCM・協調型・ライセンスの置き場)、候補 23 本の表 (ライブラリ / テキスト系 / 8bpp ゲーム / メディア / ワープロ・表計算)、**ZSNES の難度と障害**、推奨の挑戦順 (zlib → Lua → … → doomgeneric → Wolf4SDL → ZSNES)、未確認事項 |
@@ -196,7 +197,8 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | [tasks/v3/TASK_PCM_CS4231.md](tasks/v3/TASK_PCM_CS4231.md) | CS4231 (MATE-X PCM) の PCM 再生ドライバ **受入待ち** (E0〜E3 合格、残: E4・E5 は NP21/W、E6 は実機)。ini の SNDboard は [D2] |
 | [tasks/settings/DEVICE_RESERVATION.md](tasks/settings/DEVICE_RESERVATION.md) / [FEP_BOUNDARY.md](tasks/settings/FEP_BOUNDARY.md) / [F2_OWNERSHIP.md](tasks/settings/F2_OWNERSHIP.md) | v3 の入力になる設計提案 (計画 / 設計中 / 設計中)。**U6 決定 (2026-09-30) を状態行に注記**: DEVICE_RESERVATION は改訂して P4 (核は T1 の台帳)、FEP_BOUNDARY と F2 の残りは P1 の T2 / T4 / T5a の要件。MEMORY_RAM_INTEGRATION は撤回して [archive/settings/](archive/settings/MEMORY_RAM_INTEGRATION.md) へ |
 | [DESIGN_APP_FIRST.md](DESIGN_APP_FIRST.md) | **アプリケーション優先設計の草案** — 前景 1 アプリへ資源を集中する設計思想。640×480×16bit を高機能グラフィックスの境界とし、Video HAL / VESA2 的互換層 / SDL 等の判断基準を整理。ロードマップではない |
-| [AUXILIARY_CORE_SERVICE.md](AUXILIARY_CORE_SERVICE.md) / [LEGACY_LIVING_PRESERVATION.md](LEGACY_LIVING_PRESERVATION.md) | 草案 (2026-09-28) — 余剰コアを固定機能アクセラレータに / レガシー実機の動態保存と OS32・OS64・Host Service の役割分離。**OS64 は版数表に載せていない** (v3 本案の段で位置を決める) |
+| [AUXILIARY_CORE_SERVICE.md](AUXILIARY_CORE_SERVICE.md) / [LEGACY_LIVING_PRESERVATION.md](LEGACY_LIVING_PRESERVATION.md) | 草案 (2026-09-28) — 余剰コアを固定機能アクセラレータに / レガシー実機の動態保存と OS32・OS64・Host Service の役割分離。ACS は v3 の範囲外。**OS64 は OS32 とは別の 64 ビット OS の構想** (v3 / v4 の範囲外、版数表に載せない。定義は LEGACY の冒頭、2026-09-30) |
+| [tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md) | **v3 本案 — 実装中 (2026-09-30)** — 目的の一文 (§1)、範囲と v3 / v4 の外 (§2-1)、**目標の 2 段の正典** (§2-2)、柱 P0〜P10 と正典 (§3)、順序 (§4)、v3 後半の票 (§5)、持ち越した宿題 (§6)、決定と経緯の在りか (§7)。T0 受入完了、次は T1 |
 
 ### シェル・配備 (hsync)
 

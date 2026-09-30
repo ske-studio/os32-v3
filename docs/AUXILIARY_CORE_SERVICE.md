@@ -1,6 +1,6 @@
 # Auxiliary Core Service 設計草案
 
-> 状態: **草案 (2026-09-28)** — 設計思想の草案で、ロードマップ・実装契約ではない。v3 本案をまとめる段で位置を決める。
+> 状態: **草案 (2026-09-28)** — 設計思想の草案で、ロードマップ・実装契約ではない。位置は v3 本案 ([tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md) §2-1、2026-09-30) で決めた: **ACS は v3 の範囲に入れない** (v3 では HAL のバックエンド表に差し込み口を塞がないことだけ守る)。本文の「OS64」の定義は [LEGACY_LIVING_PRESERVATION.md](LEGACY_LIVING_PRESERVATION.md) の冒頭。
 
 ## 目的
 
@@ -126,7 +126,7 @@ Secondary core(s)  : graphics / audio / codec / host service
 
 という同じモデルを使用する。
 
-PS VitaのようなマルチコアARM機、ARM SBC、モバイルSoC、将来のOS64ホスト環境などでも同じ抽象を利用できることを設計目標とする。
+PS VitaのようなマルチコアARM機、ARM SBC、モバイルSoC、将来のOS64 (OS32 とは別の 64 ビット OS の構想。定義は [LEGACY_LIVING_PRESERVATION.md](LEGACY_LIVING_PRESERVATION.md) の冒頭) の環境などでも同じ抽象を利用できることを設計目標とする。
 
 big.LITTLE等の非対称構成についても、将来的には低性能コアをI/O/DSP、高性能コアを主処理またはRasterizerへ割り当てる余地がある。ただし初期実装では動的負荷分散を要求しない。
 
