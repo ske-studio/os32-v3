@@ -34,7 +34,8 @@
   ユーザー - システム - ユーザー   NG  (ユーザー帯に穴が開く)
   ```
 
-  末尾側の予約 (`sys_reserve_top`) はこの形を保つ限り問題ない。禁じるのは
+  末尾側の予約 (旧 `sys_reserve_top`、T1e 以後は起動時の ⑥ が池のアリーナ内の上端から
+  BB を取り `sys_usable_mem_end()` をその下に凍結する — TASK_T1_LEDGER §3-6) はこの形を保つ限り問題ない。禁じるのは
   **ユーザー帯の内側を割ること**。したがって予約は
   「使用可能上限の直下から連続して」取り、アプリ帯 (CPL=3 は 0x500000 から
   枚数ぶん、最大 0xC00000) に食い込ませない。食い込む構成は**その RAM 量を非対応とする**方が、
@@ -45,7 +46,7 @@
   装置が実際に占める帯 (PEGC の 0xF00000、Cirrus の 0x1000000) は装置側の事実なので
   `physmem` のモデルで MMIO として扱う。
 - **PEGC (640x480) を使う GUI の下限は物理 9MB** (2026-09-09 実測)。バックバッファ
-  300KB を `sys_reserve_top` が末尾から取るので、それがアプリ帯 (既定 1 枚なら
+  300KB を末尾から取る (当時は `sys_reserve_top`、今は ⑥ の池からの確保) ので、それがアプリ帯 (既定 1 枚なら
   0x500000〜0x800000) の外に収まる必要がある。8MB では収まらず食い込む (実測: 予約が 0x7B5000 から
   始まりアプリ帯と重なる)。9MB では 0x8B3000 から始まりアプリ帯の外
   (`hal_test` = `backend pegc 640x480 bpp=8`、`heap_test` の overlap check OK)。
@@ -91,7 +92,7 @@
 読み手に暗算させ、2026-09-17 の「SHM がカーネルスタックに食い込んでいた」穴を隠していた。
 
 ```
-__bss_end      = 0x1933E4   (カーネル本体 589.0KB)
+__bss_end      = 0x1943E4   (カーネル本体 593.0KB)
 __sqlite_start = 0x200000
 __sqlite_end   = 0x2BC200   (SQLite 本体 752.5KB)
 
@@ -106,15 +107,15 @@ __sqlite_end   = 0x2BC200   (SQLite 本体 752.5KB)
 0x0F0000 - 0x0FFFFF 64KB     BIOS ROM                                                      RO
 
 [ カーネル帯域 (0x100000-0x1FFFFF) ]
-0x100000 - 0x1933E3 589.0KB  カーネル .text/.data/.bss  (kernel.map の __bss_end まで)     RW
-0x1933E4 - 0x193FFF 3.0KB    空き
-0x194000 - 0x1C3FFF 192KB    カーネルヒープ (kmalloc)  (__bss_end を 4KB に切り上げた位置から) RW
-0x1C4000 - 0x1C4FFF 4KB      KernelAPI テーブル  (KAPI_ADDR)                               RW
-0x1C5000 - 0x1C5FFF 4KB      SHM 前方ガード                                                NP
-0x1C6000 - 0x1FDFFF 224KB    共有メモリ本体  (16KB x SHM_BLOCK_COUNT。CPL=3 アプリの起動時に USER へ昇格 (exec.c、PDE 0 は全 PD 共有)) RW
-0x1EE000 - 0x1FDFFF 64KB     GUI 予約 (末尾 4 ブロック)  (契約 T2。SDK の GUI_SHM_OFFSET = MEM_SHM_GUI_OFFSET) RW
-0x1FE000 - 0x1FEFFF 4KB      SHM 後方ガード                                                NP
-0x1FF000 - 0x1FFFFF 4KB      SHM 後方予約  (カーネルが予算いっぱいなら空になる (それは正しい)) NP
+0x100000 - 0x1943E3 593.0KB  カーネル .text/.data/.bss  (kernel.map の __bss_end まで)     RW
+0x1943E4 - 0x194FFF 3.0KB    空き
+0x195000 - 0x1C4FFF 192KB    カーネルヒープ (kmalloc)  (__bss_end を 4KB に切り上げた位置から) RW
+0x1C5000 - 0x1C5FFF 4KB      KernelAPI テーブル  (KAPI_ADDR)                               RW
+0x1C6000 - 0x1C6FFF 4KB      SHM 前方ガード                                                NP
+0x1C7000 - 0x1FEFFF 224KB    共有メモリ本体  (16KB x SHM_BLOCK_COUNT。CPL=3 アプリの起動時に USER へ昇格 (exec.c、PDE 0 は全 PD 共有)) RW
+0x1EF000 - 0x1FEFFF 64KB     GUI 予約 (末尾 4 ブロック)  (契約 T2。SDK の GUI_SHM_OFFSET = MEM_SHM_GUI_OFFSET) RW
+0x1FF000 - 0x1FFFFF 4KB      SHM 後方ガード                                                NP
+0x200000 - 0x1FFFFF **逆転** SHM 後方予約  (カーネルが予算いっぱいなら空になる (それは正しい)) NP
 
 [ SQLite 帯域 (0x200000-0x2FFFFF) ]
 0x200000 - 0x2BC1FF 752.5KB  SQLite code+BSS  (kernel.map の __sqlite_start / __sqlite_end) RW
@@ -151,12 +152,12 @@ __sqlite_end   = 0x2BC200   (SQLite 本体 752.5KB)
 
 **地図の矛盾: 0 件** (重なりも逆転も無い。`--check` が毎回確かめる)
 
-**カーネル本体の予算**: 596KB 中 589.0KB を使用 (残り 7.0KB)。
+**カーネル本体の予算**: 596KB 中 593.0KB を使用 (残り 3.0KB)。
 
 **カーネルがあと何 KB 育つと何が壊れるか** (`__bss_end` が伸びると `KHEAP_BASE` 以降が芋づるで動く)
 
-- `__bss_end` +3.0KB で KHEAP_BASE が 1 ページ上がる。0x194000 → 0x195000。以降の KAPI / SHM / ガードが全部 4KB 動く
-- `__bss_end` +7.0KB で **build/os32.ld の ASSERT がリンクを止める** (予算 MEM_KERNEL_IMAGE_MAX 超過)。止めるのが目的。超えたぶんだけ SHM 帯が カーネル帯域 0x1FFFFF を突き抜ける
+- `__bss_end` +3.0KB で KHEAP_BASE が 1 ページ上がる。0x195000 → 0x196000。以降の KAPI / SHM / ガードが全部 4KB 動く
+- `__bss_end` +3.0KB で **build/os32.ld の ASSERT がリンクを止める** (予算 MEM_KERNEL_IMAGE_MAX 超過)。止めるのが目的。超えたぶんだけ SHM 帯が カーネル帯域 0x1FFFFF を突き抜ける
 
 <!-- /生成: tools/gen_memmap.py -->
 
@@ -187,7 +188,10 @@ guard_a+4KB - heap_top             exec_heap (KAPI mem_alloc)                 R/
 ```
 
   ※ mem_end = `sys_usable_mem_end()`。PEGC/Cirrus の 8bpp バックバッファを使う構成では
-    `sys_reserve_top()` がここから ~300KB を引く (ホットデプロイ窓は 2026-09-09 に撤去)
+    起動時の ⑥ (`gfx_boot_reserve`) が PEGC の BB 300KB をアリーナの上端から池で確保し
+    (owner = boot → gshell、台帳の SURFACE)、`sys_usable_mem_end()` をその下端に凍結する
+    (`ledger_arena_top`、TASK_T1_LEDGER §3-6。旧 `sys_reserve_top` は T1e で撤去)。
+    Cirrus の面はリニア窓の中 (MMIO) なので引かない
   ※ カーネル帯域内の KAPI / SHM の番地は `__bss_end` を基点に動的算出される。
     **だから上の表は `kernel.map` を読まないと書けない** (票 TASK_KSTACK_USER §4-bis)
   ※ 入れ子起動は子として走り終了で親へ戻る (最大 4 段)。CPL=3 のプログラムは

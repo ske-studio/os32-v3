@@ -89,12 +89,12 @@ waits for the image locks to clear before starting; a hand-typed `taskkill` → 
 
 | Band | Contents |
 |---|---|
-| `0x00000–0x9FFFF` | Conventional — font cache, Unicode table (0x4A000), GFX backbuffer (0x6A000), hot-deploy block (0x8C000), autoplay mailbox (0x90000). Handed whole to the V86 guest |
+| `0x00000–0x9FFFF` | Conventional — font cache, Unicode table (0x4A000), GFX backbuffer (0x6A000), V86 test magic (0x8C000), autoplay mailbox (0x90000). Handed whole to the V86 guest |
 | `0xA0000–0xFFFFF` | VRAM (text + graphics planes) and BIOS ROM |
 | `0x100000–0x2FFFFF` | Kernel (binary + heap + KAPI + 224KB SHM), then SQLite from 0x200000; the 16KB kernel stack sits at the **top of the SQLite band** with its guard below it, and the DMA pool is a fixed 64KB hole at 0x2E8000 in the reserve below it. **The detailed map is generated — `docs/02_memory.md` §2-1 is the only copy** (`tools/gen_memmap.py`, checked by `make check`) |
 | `0x300000–0x4FFFFF` | Resident shell (two heaps: newlib sbrk, exec_heap at 0x380000), then the shared-library band — `libos32gui.shlib` `.text` is shared across PDs, `.data`/`.bss` per app |
 | `0x500000–` | External programs: code+bss → sbrk → guard → exec_heap → stack |
-| top (256KB+) | Hot-deploy staging, carved out by `sys_usable_mem_end()`; a PEGC/Cirrus 8bpp backbuffer adds ~300KB below it via `sys_reserve_top()`. exec and pgalloc must avoid the whole reservation |
+| arena top | The PEGC 8bpp backbuffer (300KB) — allocated at boot from the pool at the top of the CPL=0 arena (owner boot → gshell, a ledger SURFACE); `sys_usable_mem_end()` is frozen just below it (`ledger_arena_top`). Cirrus uses its linear window instead |
 | `0xFE000000–0xFEFFFFFF` | Device-window band (v3 layout, landed in v2.1): the Cirrus linear window lives here; the PT for the first 4MB of the band is static. Decide device windows from the physical map, never the RAM ceiling |
 
 **Subsystem map** — which file does what and which spec section covers it:
