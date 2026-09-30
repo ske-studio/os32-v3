@@ -2258,6 +2258,7 @@ checks:
     - tools/tests/fdc_track_host.c
     - tools/tests/test_fdc_track.py
     - drivers/dma8237.h
+    - drivers/dma8237_math.c
     - fs/fatfs/diskio_os32.h
     - fs/fatfs/ffconf.h
     - fs/vfs.h
