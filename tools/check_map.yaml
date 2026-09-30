@@ -308,6 +308,7 @@ checks:
     - include/bootinfo.h
     - tools/mkvmkernel.py
     - tools/tests/test_vk32_crc.py
+    - tools/tests/vk32_old_lz4_3e22825.asm
     - tools/tests/vk32_host.c
     - include/types.h
     - lib/crc32_core.inc

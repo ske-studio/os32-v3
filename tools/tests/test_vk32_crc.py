@@ -784,14 +784,16 @@ def replace_nth(text, pat, rep, nth):
 
 
 OLD_BASE = "3e22825"
+# 旧版の pm_lz4_decode の写し (os32 v2.x の OLD_BASE から切り出し)。os32-v3 は
+# 履歴を切って fork したので git show OLD_BASE が引けない。
+OLD_LZ4 = ROOT / "tools/tests/vk32_old_lz4_3e22825.asm"
 
 
 def with_old_lz4(text):
-    """今の pm_lz4_decode を基点の旧版 (git show) に差し替えた ASM を返す。"""
-    r = sh(["git", "-C", str(ROOT), "show", OLD_BASE + ":boot/loader_fat_new.asm"])
-    old = r.stdout.decode("utf-8")
+    """今の pm_lz4_decode を基点の旧版 (OLD_LZ4 の写し) に差し替えた ASM を返す。"""
+    old = OLD_LZ4.read_text(encoding="utf-8")
     a = old.index("pm_lz4_decode:")
-    b = old.index(";; ====", a)
+    b = len(old)
     na = text.index("pm_lz4_decode:")
     nb = text.index(";; CRC-32 nibble 表", na)
     return text[:na] + old[a:b] + text[nb:]
