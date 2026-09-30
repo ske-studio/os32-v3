@@ -269,7 +269,7 @@ v3 の新しい設計へ進む前に、現行系で判明した実機依存の�
   `pegc_apply_timing` をその順序と値に合わせた。画面を見ない条件 (ROM の OUT 列との一致・NP21/W 回帰・実機 `pegcchk`) で受け入れ
   ([RELEASE_v2.1.md](RELEASE_v2.1.md) §2-1、正典の票は [tasks/realhw/TASK_PEGC480_REALHW.md](tasks/realhw/TASK_PEGC480_REALHW.md)、起票は
   [archive/realhw_v21/TASK_PEGC_RA266_TIMING.md](archive/realhw_v21/TASK_PEGC_RA266_TIMING.md))。
-- **v2.1 の後に残った確認** (新機能ではない。v3 と並行、実機の前に居るときなど): PEGC の GUI の目視、KBD_NAV の K3、FD144 の実機、
+- **v2.1 の後に残った確認** (新機能ではない。v3 と並行、実機の前に居るときなど): ~~PEGC の GUI の目視~~ (2026-09-30 合格)、KBD_NAV の K3、FD144 の実機、
   HAL_WIRING の W7、PCM の E4〜E6、APP_BAND_PDE の §5 のゲスト受入。一覧は最新の引き継ぎ (INDEX 正典表の「引き継ぎ」) の残件表。
 
 ---
@@ -291,7 +291,7 @@ v3 では timer interrupt を利用したプリエンプティブ寄りの multi
 計画は [tasks/realhw/PLAN.md](tasks/realhw/PLAN.md) (実装中)。策定時 (2026-09-17) は「v1.x のあいだは着手しない」としたが、
 **v2.1 で FD 起動・CD からの HDD インストール・HDD 起動・シリアル 115200・SerialFS (シリアル越しの `/host`)・PCI 列挙まで到達した**
 ([RELEASE_v2.1.md](RELEASE_v2.1.md) §1)。実機は**エミュレータが嘘をついている箇所を暴くため**に使う (役割が違うので両方を取る)。
-残り (v3 の線): 82557 の L-B、PCM の E6、Trident、PEGC の目視。当時の鍵だった「ホスト側のシリアル実装」は
+残り (v3 の線): 82557 の L-B、PCM の E6、Trident (PEGC の目視は 2026-09-30 に合格)。当時の鍵だった「ホスト側のシリアル実装」は
 `tools/rshell_serial.py` と SerialFS で埋まった。
 
 **実機 LAN はオンボードの Intel 82557 を狙う** (ユーザー決裁 2026-09-17)。
