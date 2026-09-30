@@ -201,7 +201,8 @@ void _start(void)
     CHECK((u32)page_tables[1023] < l.workspace_end * PAGE_SIZE);
     CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, 1048575, 1048576, LEDGER_BOTTOM_UP, &p) && p == 1048575);
     CHECK(pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, p, 1));
-    CHECK(pgalloc_reserve_pfn(LEDGER_OWNER_KERNEL, MEM_POOL_BASE / PAGE_SIZE, 4096));
+    CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, (int)(pgalloc_arena_end() - MEM_POOL_BASE / PAGE_SIZE),
+                                MEM_POOL_BASE / PAGE_SIZE, pgalloc_arena_end(), LEDGER_TOP_DOWN, &p));
     CHECK(pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, 1) == 4096 * PAGE_SIZE);
     CHECK(!sys_memory_stage_online());
     die(0);

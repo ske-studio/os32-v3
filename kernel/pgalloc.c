@@ -544,9 +544,8 @@ int ledger_reclaim_owner(u32 owner, u32 *pages)
         if (sf->npages && sf->owner == owner &&
             (sf->lease_count || kind == LEDGER_KIND_AS)) goto done;
     }
-    /* 返し忘れが無ければ (pages == 0) 走査しない。AS / MODULE の L2 は
-     * 永久予約を持たない (pgalloc_reserve_pfn は PERSIST だけ) ので、
-     * この番号のページは全部 eligible かつ allocated。 */
+    /* 返し忘れが無ければ (pages == 0) 走査しない。AS / MODULE の L2 の
+     * ページは全部 eligible かつ allocated。 */
     n = 0;
     for (p = 0; ledger_owners[owner].pages && p < limit_pfn; p++) {
         if (!page_owned(p, owner)) continue;
@@ -583,38 +582,6 @@ int ledger_claim_fixed(u32 owner, u32 first, u32 end)
         if (bit(eligible, p) && !bit(bitmap, p)) {
             take_page(p, owner);
             used_pages++;
-            ledger_owners[owner].pages++;
-        }
-    }
-    ok = 1;
-done:
-    irq_restore(flags);
-    return ok;
-}
-
-/* Permanent reservation. Reject live allocations and any page that already
- * carries an owner atomically. Already ineligible pages stay ineligible (and
- * ownerless); this cannot manufacture RAM. */
-int pgalloc_reserve_pfn(u32 owner, u32 first, u32 end)
-{
-    struct physmem next;
-    u32 p;
-    unsigned int flags;
-    int ok;
-    flags = irq_save();
-    ledger_note(LEDGER_OP_RESERVE, owner, LEDGER_CALLER());
-    ok = 0;
-    if (!initialized || first >= end || end > limit_pfn || !owner_ok(owner) ||
-        ledger_owners[owner].kind != LEDGER_KIND_PERSIST) goto done;
-    for (p = first; p < end; p++) if (bit(bitmap, p) || owner_map[p]) goto done;
-    next = device_boot_map;
-    if (!physmem_exclude(&next, first, end, PHYSMEM_RESERVED)) goto done;
-    device_boot_map = next;
-    for (p = first; p < end; p++) {
-        if (bit(eligible, p)) {
-            eligible[p / 32] &= ~(1UL << (p % 32));
-            total_pages--;
-            owner_map[p] = (u8)owner;
             ledger_owners[owner].pages++;
         }
     }

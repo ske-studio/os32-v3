@@ -10,12 +10,17 @@ physmem.c を ILP32 で組み、段つき起動で台帳を ONLINE にしてか�
 gfx_client_to_gshell を 1 構成 1 プロセスで走らせる (見るものはそのファイルの
 冒頭)。切り出しは台帳・写像の呼び出しを記録係へ付け替えるだけで、記録係は
 順序を記録して実物へ渡す (写像は指定の窓で失敗させられる — T1d の Codex P3
-「map / probe を実際に失敗させて予約と写像 (PTE) が残る」)。
+「map を実際に失敗させて予約と写像 (PTE) が残る」の写像部分)。
 
 構成の表 (BB の量 = 候補の最大、§4-5 のホスト試験):
   GFX= auto / pegc / cirrus / pc98 × PEGC の識別あり / なし、9821 でない機械、
   8MB (FIXED 型) / 17MB / 64MB、PEGC・Xe10 の写像の失敗、BB 不足、
-  probe に応える装置 (Cirrus / PEGC / 無し = PC98 へ落ちる)。
+  模擬選択で使う装置 (Cirrus / PEGC / 無し = PC98)。
+
+保証範囲: 実物の backend 選択処理・probe は呼ばず、HW と SURFACE の存在から
+g_backend を代入する。予約・写像・確保・移譲と 14 変異の検証には有効だが、
+「Cirrus probe 失敗 → PEGC 選択」や fb->planes[0] までの統合は保証しない。
+予約拒否・SURFACE 登録拒否も 17 構成には含めていない。
 
 加えてテキストの検査: backend が自分で写像しない (paging_map_phys を呼ばない)、
 sys_reserve_top / sys_top_reserved が残っていない、kernel.c の順序
@@ -53,7 +58,7 @@ HOOKS = (
 PEGC, CIRRUS = 2, 3
 AUTO, PC98, PREF_PEGC, PREF_CIRRUS = 0, 1, 2, 3
 CASES = [
-    ('17m-auto-cirrus-fails-pegc', dict(CFG_KB=17408, HW=PEGC)),        # B3
+    ('17m-auto-mock-pegc', dict(CFG_KB=17408, HW=PEGC)),        # B3 の予約側 (probe は模擬)
     ('17m-auto-cirrus', dict(CFG_KB=17408, HW=CIRRUS)),
     ('17m-auto-no-hw-pc98', dict(CFG_KB=17408, HW=0)),
     ('64m-auto-pegc', dict(CFG_KB=65536, HW=PEGC)),                     # X14
