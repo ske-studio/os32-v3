@@ -85,6 +85,17 @@ static int fake_np2, fake_pref = GFX_PREF_AUTO, np2_calls;
 int np2_detect(void) { np2_calls++; return fake_np2; }
 int gfx_get_backend_pref(void) { return fake_pref; }
 
+/* 台帳の SURFACE (T1e): ⑥ (gfx_boot_reserve) が窓を予約・写像して Cirrus の
+ * CLIENT を登録したか。probe はそれが無ければ I/O に進まない。 */
+static int fake_surface = 1;
+static struct ledger_surface fake_client;
+struct ledger_surface *ledger_surface_find(u32 backend, u32 role)
+{
+    if (!fake_surface || backend != LEDGER_SF_CIRRUS || role != LEDGER_ROLE_CLIENT)
+        return (struct ledger_surface *)0;
+    return &fake_client;
+}
+
 /* ---- 贋のボードグルー ---- */
 static int glue_probe_calls;
 static int fake_glue_probe(void) { glue_probe_calls++; return 0; }
@@ -306,6 +317,22 @@ static void probe_stages(void)
     CHECK(cirrus_probe() == 0);
     CHECK(glue_probe_calls == 0);
     fake_pref = GFX_PREF_AUTO;
+
+    /* T1e: 識別は通るが ⑥ が SURFACE を登録していない (予約か写像に失敗) →
+     * probe は NP21/W 判定も ID も読まない (自分で予約・写像しない)。 */
+    cfg_15m_high1();
+    fake_pref = GFX_PREF_CIRRUS; fake_np2 = 1; np2_calls = 0; fake_surface = 0;
+    glue_reset(BANK, BANK_N, LIN, LIN_N);
+    CHECK(cirrus_identify());
+    CHECK(cirrus_probe() == 0);
+    CHECK(glue_probe_calls == 0 && np2_calls == 0);
+    fake_surface = 1;
+    /* 識別はポートを叩かない (NP21/W 判定も ID も読まない)。 */
+    glue_reset(BANK, BANK_N, LIN, LIN_N);
+    np2_calls = 0;
+    CHECK(cirrus_identify());
+    CHECK(glue_probe_calls == 0 && np2_calls == 0);
+    fake_pref = GFX_PREF_AUTO;
 }
 
 void _start(void)
@@ -324,6 +351,6 @@ void _start(void)
     window_bounds();
     output("PASS size 0 / 4GB end / overflow\n");
     probe_stages();
-    output("PASS probe stages (17MB reaches the ID on NP21/W only; GFX=cirrus forces; RAM blocks)\n");
+    output("PASS probe stages (17MB reaches the ID on NP21/W only; GFX=cirrus forces; RAM blocks; no SURFACE blocks)\n");
     finish(0);
 }

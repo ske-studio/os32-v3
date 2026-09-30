@@ -57,6 +57,27 @@ int appslot_gfx_owner(void) { return 1; }   /* APP_ID_SHELL = GFX_OWNER_WM */
 /* 票 T8-2 で門が拒否の理由を端末へ出すようになった (claim が常に通る上の
  * スタブでは呼ばれないが、リンクには要る)。 */
 void shell_print(const char *str, u8 color) { (void)str; (void)color; }
+/* 起動時の ⑥ / ⑨ (gfx_boot_reserve / gfx_client_to_gshell、TASK_T1_LEDGER
+ * §3-8) が引く台帳と写像。このハーネスは ⑥ を走らせない (試験は
+ * tools/tests/test_gfx_boot.py) ので、SURFACE は無い = gfx_bb_phys_range は 0。 */
+struct ledger_surface ledger_surfaces[LEDGER_MAX_SURFACES];
+struct ledger_surface *ledger_surface_find(u32 b, u32 r)
+{ (void)b; (void)r; return (struct ledger_surface *)0; }
+int ledger_surface_transfer(u32 sid, u32 to) { (void)sid; (void)to; return 0; }
+int ledger_surface_create(const struct ledger_surface *sf, u32 *sid)
+{ (void)sf; (void)sid; return 0; }
+int ledger_resource_add(const struct ledger_resource *rec, u32 *rid)
+{ (void)rec; (void)rid; return 0; }
+int ledger_reserve_set(u32 o, const struct ledger_span *s, u32 n)
+{ (void)o; (void)s; (void)n; return 0; }
+int ledger_selfcheck(const char *tag) { (void)tag; return 1; }
+void ledger_arena_freeze(void) { }
+u32 ledger_arena_top(void) { return 0; }
+u32 pgalloc_arena_end(void) { return 0; }
+int pgalloc_alloc_n_owner(u32 o, int n, u32 f, u32 e, u32 d, u32 *p)
+{ (void)o; (void)n; (void)f; (void)e; (void)d; (void)p; return 0; }
+int paging_map_phys(u32 v, u32 p, u32 n, u32 f) { (void)v; (void)p; (void)n; (void)f; return -1; }
+void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 void palette_init(void) { }
 void palette_set(int idx, u8 r, u8 g, u8 b)
 { (void)idx; (void)r; (void)g; (void)b; }

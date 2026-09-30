@@ -50,10 +50,6 @@ u32 sys_get_mem_kb(void)
     return sys_mem_kb;
 }
 
-/* 使用可能上限の直下にさらに固定予約した量 (バイト、ページ境界)。
- * 現状の唯一の利用者は PEGC 8bpp バックバッファ (H2)。9801 では 0 のまま
- * なので sys_usable_mem_end() は従来と同じ値を返す (回帰ゼロ)。 */
-static u32 sys_top_reserved = 0;
 static u32 sys_frozen_exec, sys_frozen_end;
 static int sys_model_staged;
 
@@ -66,7 +62,7 @@ int sys_memory_bootstrap_model(struct physmem *m, const struct pgalloc_layout *l
     int ok;
     flags = irq_save();
     ok = 0;
-    if (sys_frozen_end || sys_top_reserved || !m || !l || !verify ||
+    if (sys_frozen_end || !m || !l || !verify ||
         !paging_boot_context()) goto done;
     /* Backing is about to be zeroed; retain no borrowed layout pointer. */
     layout = *l;
@@ -119,7 +115,7 @@ int sys_memory_init_model(struct physmem *m, void *backing, u32 capacity,
     int ok;
     flags = irq_save();
     ok = 0;
-    if (sys_frozen_end || sys_top_reserved || !m || !verify) goto done;
+    if (sys_frozen_end || !m || !verify) goto done;
     bytes = pgalloc_metadata_bytes(m);
     if (!bytes) goto done;
     top = physmem_legacy_end(m);
@@ -139,8 +135,7 @@ done:
 }
 
 /* 管理する物理 RAM の末尾 (バイト)。ホットデプロイ窓を撤去した (2026-09-09)
- * ので、ここが legacy アリーナの上端そのもの。固定予約 (sys_top_reserved) には
- * 影響されない。 */
+ * ので、ここが legacy アリーナの上端そのもの。 */
 static u32 sys_phys_end(void)
 {
     u32 kb;
@@ -151,64 +146,17 @@ static u32 sys_phys_end(void)
     return (kb / (PAGE_SIZE / 1024)) * PAGE_SIZE;
 }
 
-/* 物理末尾から固定予約 (PEGC バックバッファ等) を除いた、割り当ててよい上限。
- * 子プロセスのスタックはここから下へ伸びる。 */
+/* 割り当ててよい上限 (バイト)。子プロセスのスタックはここから下へ伸びる。
+ * = min(凍結した exec 上端, CPL=0 子のアリーナの上端) (TASK_T1_LEDGER §3-6)。
+ * アリーナの上端は ⑥ で PEGC の BB (owner = boot) を池のアリーナ内の上端から
+ * 取った後に台帳が凍結する (ledger_arena_freeze) — 旧 sys_reserve_top が
+ * 上限を下げていた役はここが引き継ぐ (T1e で撤去)。 */
 u32 sys_usable_mem_end(void)
 {
-    if (sys_frozen_end) return sys_frozen_exec;
-    return sys_phys_end() - sys_top_reserved;
-}
-
-/* ======================================================================== */
-/*  sys_reserve_top — 物理末尾側に固定領域を切り出す (GUI v1.1 H2)          */
-/*                                                                          */
-/*  **現在の使用可能上限 (sys_usable_mem_end) の直下**から bytes バイト        */
-/*  (4KB 切り上げ) を予約し、その先頭物理アドレスを返す。以後               */
-/*  sys_usable_mem_end() はその分だけ下がるので、exec の子プロセス          */
-/*  (コード/ヒープ/スタック) はここへ伸びてこない。                         */
-/*                                                                          */
-/*  上限 = sys_frozen_exec (アリーナの上端、pgalloc_arena_end)。ARENA_TOP  */
-/*  型では上限の上に metadata / workspace が居るので、下げてよいのは上限だけ。 */
-/*  FIXED 型 (8MB 等) では上限 = 低位 RAM の上端で、旧 legacy 経路と同じ区間。 */
-/*                                                                          */
-/*  **exec_run より前 (ブート中) に 1 回だけ呼ぶこと。** 子プロセスが走って  */
-/*  いる最中に上限を動かすと、その子のレイアウトと pgalloc の予約範囲が      */
-/*  食い違う。同じサイズでの再呼び出しは冪等 (同じ先頭を返す)。             */
-/*                                                                          */
-/*  戻り値: 予約領域の先頭物理アドレス。0 = 予約できなかった                 */
-/*  (メモリ不足、または既に別サイズで予約済み)。                             */
-/*                                                                          */
-/*  owner (T1b〜T1d の暫定、TASK_T1_LEDGER §4-8・B11): 永久予約したページの  */
-/*  L2 をこの owner にする (PERSIST だけ。PEGC の BB は boot)。T1e で撤去。  */
-/* ======================================================================== */
-u32 sys_reserve_top(u32 owner, u32 bytes)
-{
-    u32 ceiling, need, result, minimum;
-    unsigned int flags;
-    flags = irq_save();
-    result = 0;
-    if (!bytes || bytes > ~0UL - (PAGE_SIZE - 1)) goto done;
-    need = (bytes + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
-    /* Carve below the current usable ceiling. With ARENA_TOP backing the
-     * metadata/workspace sit above the frozen exec ceiling, so only the
-     * ceiling is safe to lower; FIXED backing has nothing above it. */
-    ceiling = sys_usable_mem_end();
-    if (sys_top_reserved) {
-        if (sys_top_reserved == need) result = ceiling;
-        goto done;
-    }
-    minimum = MEM_EXEC_LOAD_ADDR + MEM_EXEC_STACK_SIZE +
-              MEM_EXEC_SBRK_MIN + MEM_EXEC_HEAP_MIN;
-    if (ceiling < minimum || need > ceiling - minimum) goto done;
-    /* Called after the model is ONLINE. Never publish a numeric-only claim. */
-    if (!pgalloc_reserve_pfn(owner, (ceiling - need) / PAGE_SIZE,
-                             ceiling / PAGE_SIZE)) goto done;
-    sys_top_reserved = need;
-    if (sys_frozen_end) sys_frozen_exec = ceiling - need;
-    result = ceiling - need;
-done:
-    irq_restore(flags);
-    return result;
+    u32 top;
+    if (!sys_frozen_end) return sys_phys_end();
+    top = ledger_arena_top() * PAGE_SIZE;
+    return top && top < sys_frozen_exec ? top : sys_frozen_exec;
 }
 
 os_time_t sys_time(void)

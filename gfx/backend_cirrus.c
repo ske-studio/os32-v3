@@ -80,6 +80,12 @@ STATIC_ASSERT((CIRRUS_CLIENT_OFF & (PAGE_SIZE - 1)) == 0,
               cirrus_client_page_aligned);
 STATIC_ASSERT((CIRRUS_SURFACE_SIZE & (PAGE_SIZE - 1)) == 0,
               cirrus_surface_page_multiple);
+/* 起動時の ⑥ (gfx_core.c gfx_boot_reserve) は probe を待たずに面を SURFACE へ
+ * 登録する (TASK_T1_LEDGER §3-8、B9)。そこでの位置と大きさ (リニア窓の先頭 +
+ * MEM_GFX_BB8_SIZE、同じ大きさ) がこの割り付けと一致すること。 */
+STATIC_ASSERT(CIRRUS_CLIENT_OFF == MEM_GFX_BB8_SIZE &&
+              CIRRUS_SURFACE_SIZE == MEM_GFX_BB8_SIZE && CIRRUS_VIS_OFF == 0,
+              cirrus_surfaces_match_ledger);
 
 /* パレット (契約 G8)。0〜15 はシステム色、16〜255 を貸す。 */
 #define CIRRUS_PAL_COUNT    256
@@ -108,7 +114,6 @@ static int      s_active   = 0;   /* init 済み = 拡張モード中か */
 static int      s_relay_on = 0;
 static u32      s_io_mark  = 0;   /* glue->io_count の前回値 */
 static u8      *s_lin      = (u8 *)0;  /* リニア窓の先頭 (= VRAM オフセット 0) */
-static u32      s_lin_pages = 0;  /* 張ったページ数 (shutdown で剥がす分) */
 
 /* グルーが出した I/O の本数を契約 G7 のカウンタへ移す。
  * 層をまたいで gfx_counters を触らせないための緩衝 (DESIGN §7-3)。 */
@@ -151,18 +156,15 @@ static void cirrus_cpu_write(u32 vram_off, const u8 *src, u32 len)
     kmemcpy(s_lin + vram_off, src, len);
 }
 
-/* リニア窓を畳む: ハードウェア側 (レジスタ 02h) を閉じ、ページを
- * Not-Present に戻す。NP21/W はレジスタへの 0 を捨てる (wab_xe10.h §4) ので
- * 実効的にはページを剥がす側が効く。窓の中を指したままの bb_base を
- * 残さないよう、記述子も同時に空にする。二度呼んでも無害。 */
-static void cirrus_linear_unmap(void)
+/* init 途中の失敗: ハードウェア側のリニア窓 (レジスタ 02h) を閉じ、記述子を
+ * 空にする。**ページは剥がさない** — 窓の予約と写像は起動時の ⑥ が 1 回だけ
+ * 行い、probe / init が失敗しても永久に保持する (TASK_T1_LEDGER §3-8、
+ * T1-R5)。NP21/W はレジスタへの 0 を捨てる (wab_xe10.h §4) が、窓の番地は
+ * 実 RAM の外 (装置の予約) なので present のまま残しても誰も踏まない。
+ * 二度呼んでも無害。 */
+static void cirrus_linear_off(void)
 {
     if (s_glue && s_glue->linear_enable) s_glue->linear_enable(0);
-    if (s_lin_pages) {
-        paging_map_phys(s_glue->lin_base, s_glue->lin_base, s_lin_pages,
-                        PAGE_NOT_PRESENT);
-        s_lin_pages = 0;
-    }
     s_lin = (u8 *)0;
     gfx_backend_cirrus.bb_base = (u8 *)0;
     gfx_backend_cirrus.bb_size = 0;
@@ -172,7 +174,10 @@ static void cirrus_linear_unmap(void)
 /*  probe — Xe10 内蔵 (ID 5Bh) + Cirrus チップが居るか                       */
 /*                                                                          */
 /*  段取り:                                                                 */
-/*    1. 窓を張れるか。窓に RAM が登録されていたら (物理地図で見る。RAM の   */
+/*    1. 副作用のない識別 (cirrus_identify、起動時の ⑥ も同じものを使う) と、 */
+/*       ⑥ が窓を予約・写像して面を SURFACE に登録していること (probe は    */
+/*       自分で予約も写像もしない、TASK_T1_LEDGER §3-8)。識別で見るのは:     */
+/*       窓を張れるか。窓に RAM が登録されていたら (物理地図で見る。RAM の   */
 /*       上端では決めない — POLICY_DEBUG §4-34) 張ってはいけないし、32bit   */
 /*       の物理空間に収まっていること。PEGC の                              */
 /*       probe と同じ理屈 (backend_pegc.c 段 2)。バンク窓 (F60000h、グルーが */
@@ -213,11 +218,13 @@ static int cirrus_win_usable(u32 base, u32 size)
     return !pgalloc_range_has_ram(base / PAGE_SIZE, last / PAGE_SIZE + 1);
 }
 
-static int cirrus_probe(void)
+/* 副作用のない識別 (TASK_T1_LEDGER §3-8)。物理地図とボードの表を見るだけで、
+ * ポートは叩かない (ID の読み出しは index OUT なので識別に使えない —
+ * **予約は存在の証明ではない**、DEVICE_RESERVATION §6)。機種が 9821 系で
+ * あることは ⑥ の呼び手 (gfx_core.c) が BIOS ワークエリアで見る。
+ * 1 = Cirrus (Xe10) の候補。 */
+int cirrus_identify(void)
 {
-    if (s_probed) return s_probe_ok;
-    s_probed = 1;
-    s_probe_ok = 0;
     s_glue = &wab_glue_xe10;
 
     if (!cirrus_win_usable(s_glue->win_base, s_glue->win_size)) return 0;
@@ -229,6 +236,17 @@ static int cirrus_probe(void)
      * 窓に収まること。ボードごとの値なので実行時に見る。 */
     if (s_glue->lin_base & (PAGE_SIZE - 1)) return 0;
     if (s_glue->lin_size < (u32)CIRRUS_VRAM_MIN) return 0;
+    return 1;
+}
+
+static int cirrus_probe(void)
+{
+    if (s_probed) return s_probe_ok;
+    s_probed = 1;
+    s_probe_ok = 0;
+
+    if (!cirrus_identify() ||
+        !ledger_surface_find(LEDGER_SF_CIRRUS, LEDGER_ROLE_CLIENT)) return 0;
 
     /* 段 2: auto では NP21/W の上でだけボードの ID を読む (上の段取りの注記)。 */
     if (gfx_get_backend_pref() != GFX_PREF_CIRRUS && !np2_detect()) return 0;
@@ -291,7 +309,6 @@ static void cirrus_palette_init(void)
 static void cirrus_init(void)
 {
     u8 pattern[CIRRUS_PATTERN_LEN];
-    u32 npages;
     int i;
 
     if (!cirrus_probe()) return;
@@ -308,41 +325,21 @@ static void cirrus_init(void)
      * ここで 0 に戻し、enter() に必ず書かせる。 */
     s_relay_on = 0;
 
-    /* リニア窓を master PD に張る (H はページテーブルを触らない: K の API
-     * 経由)。**supervisor + PCD** — USER は付けない (レビュー #5 ②)。
-     *   USER 無し: この窓のオフセット 0 は **表示面**。master に USER で張ると
-     *         paging_addrspace_create() が PDE を丸ごと写す先で CPL=3 アプリが
-     *         表示 VRAM へ直接書けてしまい、契約 G4 (commit 前の描画は表示面に
-     *         出ない) が崩れる。アプリに見せるのはクライアント面だけで、その
-     *         300KB は exec が gfx_bb_phys_range() を見て
-     *         paging_addrspace_map_user_keep() でアプリ PD ごとに昇格させる。
-     *   PCD : 書き込み専用に使うデバイス窓なのでキャッシュに載せない。CPU が
-     *         書いた画素を BLT エンジンが読むので、クライアント面を USER へ
-     *         昇格させたあとも PCD は残らなければならない (…map_user_keep が
-     *         既存 PTE の PCD/PWT を引き継ぐのはそのため)。
-     * paging_addrspace_create() は master の PDE を全部コピーするので、
-     * 物理そのものは以後に作られるアプリ PD からも見える (CPL=0 のみ、H3b)。 */
-    npages = (s_glue->lin_size + PAGE_SIZE - 1) / PAGE_SIZE;
-    /* 窓を張るのは **最初の init だけ** で、shutdown でも畳まない (下記)。
-     * 二度目以降の init で張り直すと、共有 PT の PTE を supervisor で上書きし、
-     * 起動中の CPL=3 アプリのために exec が立てたクライアント面の USER が
-     * 消える — 単独アプリ (gdi_test) は exec → gfx_init の順なので、まさに
-     * その順で #PF した (2026-09-06 実測 addr=0104B000h)。
-     * 失敗しても「範囲内の分は適用済み」で返ってくる (paging_map_range の
-     * 契約) ので、剥がす枚数は呼ぶ前に控えておく。 */
-    if (s_lin_pages == 0) {
-        s_lin_pages = npages;
-        if (paging_map_phys(s_glue->lin_base, s_glue->lin_base, npages,
-                            PAGE_RW | PTE_PCD) != 0) {
-            kprintf(0xC1, "[cirrus] linear window map failed\n");
-            cirrus_linear_unmap();
-            s_glue->relay(0);
-            s_probe_ok = 0;
-            cirrus_sync_io();
-            return;
-        }
-    }
-    s_lin = (u8 *)s_glue->lin_base;
+    /* リニア窓は起動時の ⑥ (gfx_core.c gfx_boot_reserve) が予約 → master PD
+     * への写像 (**supervisor + PCD**、写像範囲 = lin_size の 2MB だけ、decode
+     * 4MB は予約だけ) を probe より前に 1 回だけ済ませている (TASK_T1_LEDGER
+     * §3-8、T1-R5)。ここでは張らない — 二度目以降の init で張り直すと共有 PT
+     * の PTE を supervisor で上書きし、起動中の CPL=3 アプリのために exec が
+     * 立てたクライアント面の USER が消える (2026-09-06 実測 #PF
+     * addr=0104B000h)。
+     *   USER 無し: この窓のオフセット 0 は **表示面**。アプリに見せるのは
+     *         クライアント面だけで、その 300KB は exec が gfx_bb_phys_range()
+     *         を見て paging_addrspace_map_user_keep() でアプリ PD ごとに昇格
+     *         させる (契約 G4、レビュー #5 ②)。
+     *   PCD : CPU が書いた画素を BLT エンジンが読むので、USER へ昇格させた
+     *         あとも PCD は残らなければならない (…map_user_keep が既存 PTE の
+     *         PCD/PWT を引き継ぐのはそのため)。 */
+    s_lin = (u8 *)P2V(s_glue->lin_base);
 
     if (wab_cirrus_setup_8bpp(s_glue, CIRRUS_WIDTH, CIRRUS_HEIGHT,
                               (u32)CIRRUS_PITCH, CIRRUS_VIS_OFF) != 0) {
@@ -351,7 +348,7 @@ static void cirrus_init(void)
          * shutdown() も呼ばれない。リレーは自分で 98 側へ戻しておく
          * (glue->init の FF82h が NP21/W ではリレーを倒しているため)。
          * リニア窓も畳む — 使わない番地を present のまま残さない。 */
-        cirrus_linear_unmap();
+        cirrus_linear_off();
         s_glue->relay(0);
         s_probe_ok = 0;
         cirrus_sync_io();
@@ -381,9 +378,15 @@ static void cirrus_init(void)
      * クライアント面はリニア窓の中の非表示面。libos32gfx はここへ CPU で
      * 直接描き、commit (present_rect) がエンジン BLT で表示面へ運ぶ。
      * exec は gfx_bb_phys_range() でこの 300KB だけをアプリ PD で USER へ
-     * 昇格させる (表示面の PTE は supervisor のまま = 契約 G4)。 */
-    gfx_backend_cirrus.bb_base = s_lin + CIRRUS_CLIENT_OFF;
-    gfx_backend_cirrus.bb_size = (u32)CIRRUS_SURFACE_SIZE;
+     * 昇格させる (表示面の PTE は supervisor のまま = 契約 G4)。位置と大きさは
+     * ⑥ が登録した SURFACE (Cirrus の CLIENT) から引く — gfx_bb_phys_range と
+     * 同じ情報源 (B9)。probe が SURFACE の存在を確かめている。 */
+    {
+        const struct ledger_surface *sf =
+            ledger_surface_find(LEDGER_SF_CIRRUS, LEDGER_ROLE_CLIENT);
+        gfx_backend_cirrus.bb_base = P2V(sf->first * PAGE_SIZE);
+        gfx_backend_cirrus.bb_size = sf->npages * PAGE_SIZE;
+    }
 
     /* HAL 共通の状態。ハードウェアページ切替は使わない
      * (表と裏の入れ替えではなく、非表示面から表示面への BLT で commit する)。 */
@@ -578,11 +581,12 @@ static void cirrus_leave(void)
 /*  範囲をアプリ PD で USER へ昇格させるが、それは **アプリが gfx_init を     */
 /*  呼ぶ前** = 直前の shutdown の後。ここで窓を畳んで bb_base を NULL に      */
 /*  戻すと、単独アプリ (gdi_test / hello32) の exec 時点で昇格する範囲が無く、 */
-/*  gfx_init 後の最初の描画がクライアント面で #PF する。窓は起動時の最初の    */
-/*  init で一度だけ張り (supervisor + PCD)、以後は識別子として持ち続ける。    */
+/*  gfx_init 後の最初の描画がクライアント面で #PF する。窓は起動時の ⑥ が    */
+/*  一度だけ張り (supervisor + PCD)、以後は剥がさない (TASK_T1_LEDGER §3-8)。 */
 /*  ハードウェア側 (レジスタ 02h) は wab_cirrus_shutdown が閉じ、次の init の */
 /*  glue->init() が開き直す。窓の番地は実 RAM の外なので、present のまま      */
-/*  残しても誰も踏まない。畳むのは init 途中の失敗 (cirrus_linear_unmap) だけ。*/
+/*  残しても誰も踏まない。記述子を空にするのは init 途中の失敗                */
+/*  (cirrus_linear_off) だけ。                                               */
 /* ------------------------------------------------------------------------ */
 static void cirrus_shutdown(void)
 {
@@ -596,7 +600,7 @@ static void cirrus_shutdown(void)
 
 /* ------------------------------------------------------------------------ */
 /*  バックエンド表。                                                        */
-/*  bb_base / bb_size は init() が埋める (票 H3b): リニア窓の中の非表示面     */
+/*  bb_base / bb_size は init() が SURFACE から埋める (票 H3b・T1e): 非表示面 */
 /*  = FE000000h + 04B000h の 300KB。窓が張れるまでは値が決まらないので、      */
 /*  静的初期化子では NULL / 0 のまま置く (PEGC と同じ流儀)。                 */
 /*  最初の init() で決まったら shutdown() を挟んでも持ち続ける (exec が      */

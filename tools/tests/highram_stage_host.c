@@ -158,22 +158,30 @@ void _start(void)
     CHECK(sys_memory_stage_online());
     for (i = 0; i < 4096; i++) CHECK(low[i] == page_tables[i / PTE_COUNT][i % PTE_COUNT]);
 #ifdef TEST_RESERVE_TOP
-    /* PEGC 8bpp backbuffer (H2) must still be reservable on the model path.
-     * The model must carve below the frozen exec ceiling, since
-     * metadata/workspace sit above it (the hotdeploy window is gone). */
+    /* PEGC 8bpp backbuffer (H2) on the model path, T1e (TASK_T1_LEDGER §3-6・
+     * X14): step 6 takes it from the pool TOP_DOWN inside the CPL=0 child's
+     * arena [MEM_EXEC_LOAD_ADDR, pgalloc_arena_end()) with owner = boot, then
+     * freezes the arena top. It must land where the retired sys_reserve_top
+     * carved it (right under the frozen exec ceiling = workspace_first on
+     * ARENA_TOP), never in high RAM, and the usable end drops to its base. */
     {
         u32 ceiling = sys_usable_mem_end();
         u32 need = ((u32)MEM_GFX_BB8_SIZE + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
-        u32 base = sys_reserve_top(LEDGER_OWNER_BOOT, (u32)MEM_GFX_BB8_SIZE);
-        CHECK(base != 0);
+        u32 base, pfn;
+        CHECK(ceiling == l.workspace_first * PAGE_SIZE);
+        CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, (int)(need / PAGE_SIZE),
+                                    MEM_EXEC_LOAD_ADDR / PAGE_SIZE,
+                                    pgalloc_arena_end(), LEDGER_TOP_DOWN, &pfn));
+        base = pfn * PAGE_SIZE;
         CHECK(base == ceiling - need);
+        CHECK(base + need <= 4096 * PAGE_SIZE);        /* not in high RAM */
+        CHECK(sys_usable_mem_end() == ceiling);        /* not frozen yet */
+        ledger_arena_freeze();
         CHECK(sys_usable_mem_end() == base);
-        /* 予約の分だけ上限が下がる。窓は無いので workspace_first からちょうど need。 */
-        CHECK(base == l.workspace_first * PAGE_SIZE - need);
-        /* Idempotent for the same size, and the reserved pages never allocate. */
-        CHECK(sys_reserve_top(LEDGER_OWNER_BOOT, (u32)MEM_GFX_BB8_SIZE) == base);
-        CHECK(!sys_reserve_top(LEDGER_OWNER_BOOT, (u32)MEM_GFX_BB8_SIZE + PAGE_SIZE));
+        CHECK(ledger_owner_pages(LEDGER_OWNER_BOOT) == need / PAGE_SIZE);
+        /* The BB pages never allocate to anyone else. */
         CHECK(!pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, base / PAGE_SIZE, (base + need) / PAGE_SIZE, LEDGER_BOTTOM_UP, &p));
+        CHECK(ledger_selfcheck("t"));
         die(0);
     }
 #endif
