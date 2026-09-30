@@ -1183,6 +1183,7 @@ checks:
     - sdk/include/os32/os32_kapi_generated.h
     - sdk/include/os32/os32_kapi_shared.h
   check-con-sink-host:
+    - include/console.h
     - kernel/con_sink.c
     - kernel/console.c
     - tools/tests/con_sink_host.c
@@ -1205,6 +1206,7 @@ checks:
     - sdk/include/os32/os32_kapi_generated.h
     - sdk/include/os32/os32_kapi_shared.h
   check-bootlog-host:
+    - include/console.h
     - fs/ext2_dir.c
     - fs/ext2_vfs.c
     - fs/fatfs_vfs.c
