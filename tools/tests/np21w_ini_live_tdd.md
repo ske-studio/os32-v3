@@ -653,3 +653,39 @@ hresult=0x80131501` (最初は 0x80131500 と見込んで外れ、実測で直�
 NP21/W が ini を開く時間帯 (np21w-src `win9x/np2.cpp` の `initload` / `initsave`、`win9x/ini.cpp` の
 GetPrivateProfileString) の検討はスキルの「失敗の読み方」に書いた — 起動直後は重なりうるので `--wait-ready` の後に実行する。
 GetPrivateProfileString が開くときの共有モードは確かめていない。
+
+## PS 本文を stdin で渡す (2026-10-01、2cd1156 の後)
+
+**症状と原因** (PM の実測で確定): 2cd1156 はプレビューから `Windows executor failed` (角括弧なし) で止まった。
+PS_SERVER を `-EncodedCommand` に載せる形では、コマンド行が 4233715 の 26,550 字 → 5793c75 の 28,242 字 → 2cd1156 の
+**33,154 字**と伸び、Windows の上限 32,767 字を超えていた。PM の確認: 不正な JSON を 1 行送る形で、4233715 は rc=0・
+`{"ok":false}`、2cd1156 は rc=1・stdout 空・stderr `powershell.exe: Invalid argument`。ParseInput の試験は本文を
+stdin で渡していたので、この上限を通らず見逃した。trial (同じ `__init__` を使う) も旧形式で 29,176 字だった。
+
+**直し方**: `-EncodedCommand` に載せるのは固定の 5 行のブートストラップ (`PS_BOOTSTRAP`) だけにした。
+ブートストラップは stdin の 1 行目を base64 として読み、SHA-256 をブートストラップに焼き込んだ値と照合する。
+焼き込む値は `bootstrap_argv(body)` が決まった本文 (live / trial それぞれの PS_SERVER) から作る。
+一致しなければ何も出さずに `exit 3`、一致すれば本文を **dot-source** する (`& ` だと子スコープになり、`$script:Phase`
+と本文の最上位の `$Phase` が別の変数に分かれる)。`PowerShellTransport.__init__` は reader を起動してから本文の行を
+最初に書く。起動の前に、コマンド行が `COMMAND_LINE_BUDGET` = 8,192 字未満であることを検査する (超えれば起動しない)。
+実測: ブートストラップのコマンド行は live・trial とも **998 字**、本文の行は live 16,545 字・trial 15,413 字。
+本文の長さに上限は無い (stdin の 1 行)。
+**変えないもの**: 要求と応答の規約、ロック、失敗時にセッションを閉じること、transport の cleanup の不変条件、kill しないこと。
+
+**試験** (`StdinBootstrap` 5 件 + transport 側の trial 1 件):
+- コマンド行が 8,192 字未満。本文が 1 B でも 1 MB でも長さは同じ。本文の行は base64 + 改行 1 つ。
+- 旧形式ではコマンド行が上限を超える (経緯の固定)。
+- ブートストラップ本文の 5 行を完全一致で固定 (digest の照合、`exit 3`、dot-source)。本文が違えば digest も違う。
+- 予算を超えれば Popen の前に IniError。
+- 起動の argv がブートストラップであること、stdin への最初の書き込みが本文の行であること (live・trial)。
+
+**Windows (opt-in `--windows-fixtures`、PM が許可した形だけ)**:
+- `test_bootstrap_runs_the_fixed_body_up_to_request_parse`: 本物の `PowerShellTransport` で起動し、不正な JSON を 1 行だけ送る。
+  結果は `{"ok":false,"step":"request:parse","win32":87,"hresult":"0x80070057","type":"ArgumentException"}`、PS の rc=0。
+  ini・CIM・プロセス・mutex には触れない。Add-Type のコンパイルは Windows の一時フォルダを使う。
+- `test_bootstrap_refuses_any_other_body`: digest の違う本文では rc=3・出力なし。本文は実行されない。
+- 既存の `test_failure_json_runs_under_windows_powershell` も GREEN。ファイルを書く既存の `test_parser_null_marshaling_and_file_replace` は今回回していない。
+- trial の本文は Windows で起動していない。
+
+**順序**: 実装が先で、試験は後から書いた (RED は取っていない)。変異 5 本 (digest 照合を消す、`&` にする、本文を送らない、
+予算検査を消す、trial でも live の digest を焼く) はすべて RED。計 54 本 RED、恒等 GREEN、構文 1 本 NOT COUNTED。

@@ -204,6 +204,7 @@ class TransportCleanup(unittest.TestCase):
             with self.subTest(inherit=inherit):
                 script = (
                     'import subprocess,sys\n'
+                    'sys.stdin.readline()  # the bootstrap body line\n'
                     'for line in sys.stdin:\n'
                     '    subprocess.Popen([sys.executable, "-B", "-c", "import time; time.sleep(1.5)"],\n'
                     '                     stdin=subprocess.DEVNULL, stderr=subprocess.DEVNULL,\n'
@@ -260,6 +261,23 @@ class TransportCleanup(unittest.TestCase):
                     runner.join(timeout=2)
                 self.assertFalse(channel.reader.is_alive())
                 self.assertTrue(process.stdout.closed)
+
+    def test_trial_transport_also_uses_the_stdin_bootstrap(self):
+        # trial reuses live's __init__ with its own PS_SERVER (29176 encoded
+        # characters in the old form, also close to the 32767 limit).
+        import base64
+        read_fd, write_fd = os.pipe()
+        process = Mock(stdin=Mock(), stdout=os.fdopen(read_fd, 'rb'))
+        try:
+            with patch('subprocess.Popen', return_value=process) as popen:
+                channel = trial.PowerShellTransport()
+            body = trial.PS_SERVER.encode('utf-8')
+            self.assertEqual(popen.call_args[0][0], live.bootstrap_argv(body)[0])
+            self.assertLess(len(subprocess.list2cmdline(popen.call_args[0][0])), 8192)
+            self.assertEqual(process.stdin.write.call_args_list[0][0][0], base64.b64encode(body) + b'\n')
+        finally:
+            os.close(write_fd)
+            channel.reader.join(timeout=2)
 
     def test_trial_cli_timeout_preserves_failure_json_and_completed_stages(self):
         from test_np21w_trial import Transport, EXE, BASE, CWD, CREATED, HDD, image_fixture

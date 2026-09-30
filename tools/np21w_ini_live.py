@@ -8,6 +8,7 @@ both required for mutation. No HTTP, environment loader or deployment helper.
 """
 import argparse
 import base64
+import hashlib
 import json
 import ntpath
 import re
@@ -661,6 +662,34 @@ try {
 '''
 
 
+# The Windows command line is capped at 32767 characters; -EncodedCommand
+# doubles the text (UTF-16LE) and base64 adds a third, so PS_SERVER itself no
+# longer fits (2026-10-01: 33154 characters, 'powershell.exe: Invalid argument').
+# Only this fixed bootstrap travels on the command line. It reads the body as
+# one base64 line from stdin, runs it only if its SHA-256 is the one baked in
+# here from the fixed PS_SERVER, and dot-sources it so '$script:' is the same
+# scope as before. Any other body (or none) exits 3 without output.
+PS_BOOTSTRAP = r'''$ErrorActionPreference = 'Stop'
+$b = [Convert]::FromBase64String([Console]::In.ReadLine())
+$h = [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($b)).Replace('-','')
+if ($h -cne '@SHA256@') { exit 3 }
+. ([ScriptBlock]::Create([Text.Encoding]::UTF8.GetString($b)))
+'''
+COMMAND_LINE_BUDGET = 8192  # characters; far below the 32767 Windows limit
+
+
+def bootstrap_argv(body):
+    """(argv, stdin line) for a fixed PS body; argv length does not depend on it."""
+    import subprocess
+    digest = hashlib.sha256(body).hexdigest().upper()
+    script = PS_BOOTSTRAP.replace('@SHA256@', digest)
+    encoded = base64.b64encode(script.encode('utf-16le')).decode('ascii')
+    argv = ['powershell.exe', '-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', encoded]
+    if len(subprocess.list2cmdline(argv)) >= COMMAND_LINE_BUDGET:
+        raise IniError('PowerShell bootstrap exceeds the command-line budget')
+    return argv, base64.b64encode(body) + b'\n'
+
+
 def wire(value, decode=False):
     if isinstance(value, bytes):
         return base64.b64encode(value).decode('ascii')
@@ -683,11 +712,10 @@ class PowerShellTransport:
         import subprocess
         import threading
         self.queue = queue.Queue()
-        encoded = base64.b64encode(PS_SERVER.encode('utf-16le')).decode('ascii')
+        argv, body = bootstrap_argv(PS_SERVER.encode('utf-8'))
         try:
             self.process = subprocess.Popen(
-                ['powershell.exe', '-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', encoded],
-                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         except OSError as exc:
             raise IniError('Windows PowerShell unavailable') from exc
         def read():
@@ -701,6 +729,13 @@ class PowerShellTransport:
                 self.queue.put(b'')
         self.reader = threading.Thread(target=read, daemon=True)
         self.reader.start()
+        # The body line first; a failure surfaces as the first exchange's
+        # missing response (the bootstrap exits without output).
+        try:
+            self.process.stdin.write(body)
+            self.process.stdin.flush()
+        except OSError:
+            pass
 
     def exchange(self, request):
         import queue

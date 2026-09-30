@@ -1173,6 +1173,80 @@ class FailureDiagnosis(unittest.TestCase):
                       "   [Console]::WriteLine($failure)\n   break", live.PS_SERVER)
 
 
+class StdinBootstrap(unittest.TestCase):
+    """2026-10-01 (PM, real powershell.exe): 2cd1156's PS_SERVER made the
+    -EncodedCommand line 33152 characters; Windows caps it at 32767 and every
+    run failed with 'powershell.exe: Invalid argument' before any request.
+    Only a fixed bootstrap is on the command line; the body comes on stdin."""
+
+    def bootstrap_text(self, argv):
+        import base64
+        return base64.b64decode(argv[-1]).decode('utf-16le')
+
+    def test_command_line_is_short_and_independent_of_the_body(self):
+        import subprocess
+        argv, line = live.bootstrap_argv(live.PS_SERVER.encode('utf-8'))
+        self.assertEqual(argv[:5], ['powershell.exe', '-NoLogo', '-NoProfile', '-NonInteractive',
+                                    '-EncodedCommand'])
+        self.assertLess(len(subprocess.list2cmdline(argv)), 8192)
+        self.assertEqual(live.COMMAND_LINE_BUDGET, 8192)
+        self.assertNotIn('FailureJson', self.bootstrap_text(argv))
+        lengths = set()
+        for size in (1, 10 ** 4, 10 ** 6):
+            body = b'#' * size
+            argv, line = live.bootstrap_argv(body)
+            lengths.add(len(subprocess.list2cmdline(argv)))
+            self.assertEqual(line, __import__('base64').b64encode(body) + b'\n')
+            self.assertEqual(line.count(b'\n'), 1)
+        self.assertEqual(len(lengths), 1, 'command line must not grow with the body')
+
+    def test_the_old_form_is_over_the_windows_limit(self):
+        import base64
+        encoded = base64.b64encode(live.PS_SERVER.encode('utf-16le')).decode('ascii')
+        self.assertGreater(len(encoded), 32767 - 64, 'regression context: body alone no longer fits')
+
+    def test_bootstrap_runs_only_the_baked_digest_by_dot_sourcing(self):
+        import hashlib
+        body = live.PS_SERVER.encode('utf-8')
+        text = self.bootstrap_text(live.bootstrap_argv(body)[0])
+        digest = hashlib.sha256(body).hexdigest().upper()
+        lines = text.splitlines()
+        self.assertEqual(lines, [
+            "$ErrorActionPreference = 'Stop'",
+            "$b = [Convert]::FromBase64String([Console]::In.ReadLine())",
+            "$h = [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($b)).Replace('-','')",
+            "if ($h -cne '" + digest + "') { exit 3 }",
+            ". ([ScriptBlock]::Create([Text.Encoding]::UTF8.GetString($b)))"])
+        other = live.bootstrap_argv(body + b' ')[0]
+        self.assertNotIn(digest, self.bootstrap_text(other))
+
+    def test_budget_is_enforced_before_launch(self):
+        from unittest.mock import patch
+        with patch.object(live, 'COMMAND_LINE_BUDGET', 100), \
+                patch('subprocess.Popen') as popen, self.assertRaises(live.IniError):
+            live.PowerShellTransport()
+        popen.assert_not_called()
+
+    def test_transport_launches_the_bootstrap_and_sends_the_body_first(self):
+        import base64
+        import os
+        from unittest.mock import Mock, patch
+        read_fd, write_fd = os.pipe()
+        stdin = Mock()
+        process = Mock(stdin=stdin, stdout=os.fdopen(read_fd, 'rb'))
+        try:
+            with patch('subprocess.Popen', return_value=process) as popen:
+                channel = live.PowerShellTransport()
+            argv = popen.call_args[0][0]
+            self.assertEqual(argv, live.bootstrap_argv(live.PS_SERVER.encode('utf-8'))[0])
+            self.assertEqual(stdin.write.call_args_list[0][0][0],
+                             base64.b64encode(live.PS_SERVER.encode('utf-8')) + b'\n')
+            stdin.flush.assert_called()
+        finally:
+            os.close(write_fd)
+            channel.reader.join(timeout=2)
+
+
 WINDOWS_FIXTURES = '--windows-fixtures' in sys.argv
 if WINDOWS_FIXTURES:
     sys.argv.remove('--windows-fixtures')
@@ -1257,6 +1331,34 @@ try { throw 'cand' } catch { [Console]::WriteLine((FailureJson $_ 'cand')) }
             ' [load:parse FormatException win32=5431 hresult=0x80131537]',
             ' [replace:identity RuntimeException win32=5377 hresult=0x80131501]'])
         self.assertEqual(lines[2]['reason'], 'candidate-identity')
+
+    def test_bootstrap_runs_the_fixed_body_up_to_request_parse(self):
+        """The one real launch allowed (PM 2026-10-01): the production
+        transport, then a single invalid JSON line. PS_SERVER fails at
+        ConvertFrom-Json and ends; no ini, CIM, process or mutex is touched."""
+        import json
+        channel = live.PowerShellTransport()
+        try:
+            channel.process.stdin.write(b'not-json\n')
+            channel.process.stdin.flush()
+            line = channel.queue.get(timeout=60)
+        finally:
+            channel.close()
+        response = json.loads(line.decode('utf-8-sig'))
+        self.assertIs(response['ok'], False)
+        self.assertEqual(response['step'], 'request:parse')
+        self.assertTrue(live.failure_detail(response).startswith(' [request:parse '), response)
+        self.assertEqual(channel.process.returncode, 0)
+
+    def test_bootstrap_refuses_any_other_body(self):
+        """A body whose digest differs is never run: exit 3, no output."""
+        import base64
+        import subprocess
+        argv, _ = live.bootstrap_argv(live.PS_SERVER.encode('utf-8'))
+        other = base64.b64encode(live.PS_SERVER.encode('utf-8') + b'\n# changed') + b'\n'
+        result = subprocess.run(argv, input=other + b'not-json\n', capture_output=True, timeout=60)
+        self.assertEqual(result.returncode, 3)
+        self.assertEqual(result.stdout, b'')
 
 # ---------------------------------------------------------------------------
 # Mutants (--mutate), in the style of test_np21w_ctl.py: each mutant is a copy
@@ -1423,6 +1525,22 @@ MUTATIONS = [
     ("      Start-Sleep -Milliseconds 1000\n",
      "",
      "PS start checks liveness immediately (no settle pause)"),
+    # 2026-10-01: body on stdin behind a fixed, digest-checked bootstrap.
+    ("if ($h -cne '@SHA256@') { exit 3 }\n",
+     "",
+     "bootstrap runs any body (no digest check)"),
+    (". ([ScriptBlock]::Create(",
+     "& ([ScriptBlock]::Create(",
+     "bootstrap runs the body in a child scope ($script: splits)"),
+    ("            self.process.stdin.write(body)\n",
+     "",
+     "transport never sends the body"),
+    ("    if len(subprocess.list2cmdline(argv)) >= COMMAND_LINE_BUDGET:",
+     "    if False:",
+     "no command-line budget check before launch"),
+    ("    digest = hashlib.sha256(body).hexdigest().upper()",
+     "    digest = hashlib.sha256(PS_SERVER.encode('utf-8')).hexdigest().upper()",
+     "digest baked from live's body even for trial's"),
     ("def launch_of(command, target)",
      "def launch_of(command, target",
      "syntax error: an unimportable copy is NOT COUNTED"),

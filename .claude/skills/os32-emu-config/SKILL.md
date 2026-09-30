@@ -201,6 +201,13 @@ python3 tools/np21w_ini_live.py restore --exe 'C:\NP21\np21x64w.exe' --ini 'C:\N
 
 変更なしは停止・保存をしない。正常終了 0、拒否/失敗 2。
 
+**起動の形** (2026-10-01〜): `powershell.exe -EncodedCommand` に載せるのは固定のブートストラップ (約 1,000 字) だけ。
+本文 (PS_SERVER) は stdin の 1 行目で渡し、ブートストラップに焼き込んだ SHA-256 と一致したときだけ dot-source で
+実行する (違えば出力なしで exit 3)。本文を直接載せる旧形式は、2cd1156 で Windows のコマンド行の上限 32,767 字を超え、
+`powershell.exe: Invalid argument` で全部失敗した。起動の段だけの確認は、不正な JSON を 1 行送る形で
+`python3 -B tools/tests/test_np21w_ini_live.py --windows-fixtures RealPowerShellFixture.test_bootstrap_runs_the_fixed_body_up_to_request_parse`
+(`{"ok":false,"step":"request:parse",…}` が返る。ini・CIM・プロセス・mutex に触れない)。
+
 **失敗の読み方** (2026-10-01〜): PS 側の失敗は
 `Windows operation failed: <op> [<op>:<段>[.<手順>] <例外の型> win32=<N> hresult=0x<8 桁>]` の形で出る。
 例外の文言・パス・内容は出さない (出るのは固定の段名・.NET の型名・数値だけ)。段の例:
