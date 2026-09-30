@@ -494,12 +494,12 @@ gfx/backend_trident.c      GfxBackend (probe / prepare / init / query / present_
 
 ### 4-4. カーネルの大きさ
 
-- 予算の制限対象は **`__bss_end`** (`docs/02_memory.md` §2-1: +21.0KB で `build/os32.ld` の ASSERT がリンクを止める)。
+- 予算の制限対象は **`__bss_end`** (`docs/02_memory.md` §2-1 の生成ブロック「カーネルがあと何 KB 育つと何が壊れるか」: 残りぶんを超えると `build/os32.ld` の ASSERT がリンクを止める。2026-09-30 の `kernel.map` では残り 13.0KB)。
   バックエンドの `.text` だけでは判断できない — モード表 (.rodata)・状態領域 (.bss)・**共通の写像 / 復帰処理 (§3-5 R3/R4、§4-2 の記述子と paging の変種)**・
   **Trident の枠の追加 PT** (4KB × PDE 数。静的に持つなら `.bss`、T8 の境界で pgalloc から取るならカーネル像の外 — どちらかを見積もりに書く、Codex D7) も入る。
 - 参考値: Cirrus 系の `.text` は `wab_glue_xe10.o` 0x19C + `wab_cirrus.o` 0xDAD + `backend_cirrus.o` 0xB4B ≈ **6.6KB** (手元の `build/out/kernel.map`)。
   Trident は同程度〜それ以上 (モード表・クロック計算・PCI 結線)。
-- 「残り 21KB」は **2026-09-29 の文面**で、T7 の判断時点で**再計測**する数字。判断は**同じ構成の変更前後で `__bss_end` の全体増分**を測り、
+- 残りの数字は写し (票の初稿 2026-09-29 は「残り 21KB」、2026-09-30 の生成ブロックは 13.0KB) で、T7 の判断時点で**再計測**する。判断は**同じ構成の変更前後で `__bss_end` の全体増分**を測り、
   並行変更 (帯・broker・LAN) 込みの余裕とリンク ASSERT で見る。
 - 順序: **段 2 の準備・復帰支援に要るカーネル増分 (R3/R4 の口、記述子、paging の変種、GUI 境界の準備) を先に見積もる** — 診断を CPL0 アプリにしても
   この支援はカーネルに残る。Trident 本体 (backend + chip + glue) を静的に積むかは統合後の全体予算で決める (T7)。
