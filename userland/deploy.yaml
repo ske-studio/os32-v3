@@ -125,6 +125,10 @@ filesystem:
     - host: userland/tests/ring3_fault.bin
       guest: /usr/bin/
       tags: [test]
+    # --- faulttest (CPL=3 の #GP/#DE/#UD/#PF kill と CTRL+STOP、票 TASK_T1_LEDGER §4-2-N) ---
+    - host: userland/tests/faulttest.bin
+      guest: /usr/bin/
+      tags: [test]
     # --- ring3_guard (M3 heap/stack ガード検証) ---
     - host: userland/tests/ring3_guard.bin
       guest: /usr/bin/
