@@ -63,7 +63,8 @@ int pgalloc_init_model(struct physmem *model, void *backing, u32 backing_bytes,
 /* Permanent exclusion from eligibility; free/claim cannot undo it.
  * Any live allocation in the range rejects the entire reservation.
  * owner must be PERSIST: the L2 byte of every page in the range becomes owner
- * and counts in its pages (T1b: sys_reserve_top(boot, ...), B11).
+ * and counts in its pages (B11). Since T1e (the BB moved to a pool
+ * allocation) there is no boot-time caller; kept as the ledger primitive.
  * Fixed provenance is retained even for UNKNOWN pages; if its bounded
  * PHYSMEM_MAX_RANGES snapshot cannot represent the claim, fail unchanged. */
 int pgalloc_reserve_pfn(u32 owner, u32 first, u32 end);
@@ -262,6 +263,36 @@ u32 ledger_resource_import_pci(void);
  * MMIO は UC、RAM は WB。管理範囲外にかかれば OUTSIDE)。解除 API は無い。
  * 失敗時は L1・L2・L3・会計を全部不変。1 = 成功。 */
 int ledger_reserve_set(u32 owner, const struct ledger_span *spans, u32 n);
+/* ======== SURFACE と CPL=0 子のアリーナ (§3-1・§3-6・§3-8、T1e) ======== */
+/* SURFACE の backing / backend / role / perm_max。 */
+#define LEDGER_SB_RAM        1   /* 池から確保した PFN 区間 (PEGC の BB) */
+#define LEDGER_SB_FIXED_RAM  2   /* 固定の RAM (planar BB 0x6A000) */
+#define LEDGER_SB_VRAM       3
+#define LEDGER_SB_MMIO       4   /* 装置の窓の中 (Cirrus のクライアント面・表示面) */
+#define LEDGER_SF_PC98       1
+#define LEDGER_SF_PEGC       2
+#define LEDGER_SF_CIRRUS     3
+#define LEDGER_ROLE_CLIENT   1   /* アプリへ USER で貸す面 */
+#define LEDGER_ROLE_DISPLAY  2   /* 表示面 (supervisor のまま) */
+#define LEDGER_PERM_NONE     0
+#define LEDGER_PERM_RW       1
+/* SURFACE を表の空きに写す (起動時 = paging_boot_context だけ)。owner は生きて
+ * いて、npages > 0、範囲は 4GiB の内側、lease_count は 0。backing が RAM なら
+ * 全ページがその owner の確保済みであること。1 = 成功、*sid に番号 (NULL 可)。 */
+int ledger_surface_create(const struct ledger_surface *sf, u32 *sid);
+/* backend と role が一致する最初の SURFACE (無ければ NULL)。 */
+struct ledger_surface *ledger_surface_find(u32 backend, u32 role);
+/* SURFACE の owner を to へ (§3-1 の移譲の表)。RAM backing は L2 のページも
+ * ledger_transfer で一緒に、FIXED_RAM は同じ owner の SURFACE_BACKING 区間の
+ * owner も、MMIO は SURFACE の owner だけ。既に to なら何もしない。1 = 成功。 */
+int ledger_surface_transfer(u32 sid, u32 to);
+/* CPL=0 子の identity アリーナ [MEM_EXEC_LOAD_ADDR, pgalloc_arena_end()) の上端
+ * (PFN、T1 の間だけ)。アリーナ内の PERSIST owner のページの最下端を ⑥ で
+ * ledger_arena_freeze が 1 回だけ凍結する。凍結前・永続確保が無ければ
+ * pgalloc_arena_end()。sys_usable_mem_end = min(凍結した exec 上端, これ)。 */
+u32 ledger_arena_top(void);
+void ledger_arena_freeze(void);
+
 /* 不変条件 (eligible で allocated ⇔ owner ≠ 0、owner の pages と L2 の一致、
  * L2 の番号が生きていること、区間の非重複 (DEVICE と BACKGROUND の重なりだけ
  * 許す) と owner、SURFACE の owner) を任意の
