@@ -15,7 +15,7 @@
 エミュレータでの検証は現に機能している (2026-09-17 の 1 日でカーネル層の不具合を
 2 件検出・修正・受入した)。実機は**エミュレータが嘘をついている箇所**を暴くために使う。
 
-> **HDD 起動のままのカーネル更新 (ユーザー指摘 2026-09-30、それまで記録が無かった)**: 実機は **HDD 起動のまま、シリアル経由 (SerialFS + `hsync`) で `/boot` のカーネルを更新して再起動できる** (FD 起動は要らない)。下の CHECKLIST の「新しいカーネルの FD で起動して `hsync --root /hd0`」は v65 (SerialFS 以前) の前提。**手順の細部 (コマンド列・再起動のしかた) は次に実機エージェントへ頼む回にここへ記録する**。同日のユーザー指示: 実機の試験が要るなら実機エージェント (Ubuntu ノートの Remote Control セッション) に頼んでよい。画面確認はできない状態なので、実行ログで分かることだけを取る。
+> **HDD 起動のままのカーネル更新 (ユーザー指摘 2026-09-30、それまで記録が無かった)**: 実機は **HDD 起動のまま、シリアル経由 (SerialFS + `hsync`) で `/boot` のカーネルを更新して再起動できる** (FD 起動は要らない)。下の CHECKLIST の「新しいカーネルの FD で起動して `hsync --root /hd0`」は v65 (SerialFS 以前) の前提。**手順 (実機エージェントの報告 2026-10-01、v2.1 系で 3 回使った列)**: ノートで成果物の `hostdrv.tar.gz` を展開した先を `H` として `S="python3 tools/rshell_serial.py --port /dev/ttyUSB0 --fast 115200 --timeout 60 --serve-host $H"` → `$S cmd "sfs run hsync -n boot"` (試しに見るだけ) → `$S cmd "sfs run hsync boot"` (約 1 分、`/boot/vmkernel.old` ができる) → `python3 tools/rshell_serial.py --port /dev/ttyUSB0 --timeout 10 cmd reboot` (EOT は来ない) → 約 37 秒後に `cmd ver` が応答 → `$S cmd "sfs run hsync sys"` (約 1 分) → `$S cmd "sfs run hsync"` (初回の全体は約 21 分)。成果物は CI の artifact を `tools/ci_fetch.sh --sha <SHA>` で取る。同日のユーザー指示: 実機の試験が要るなら実機エージェント (Ubuntu ノートの Remote Control セッション) に頼んでよい。画面確認はできない状態なので、実行ログで分かることだけを取る。
 >
 > **次の実機の回の手順**: os32 リポジトリの `docs/archive/realhw_v21/CHECKLIST_2026-09-26.md` (入れ直しと v2.1 の確認、b8f76e0)。前回: 同 `CHECKLIST_2026-09-25.md` (HDD インストール、合格)、`CHECKLIST_2026-09-24.md` (いずれも os32-v3 には持ってこなかった日次記録)。
 
