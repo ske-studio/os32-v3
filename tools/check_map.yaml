@@ -441,8 +441,7 @@ checks:
     - tools/check_docs_orphans.py
   check-tests-inventory:
     - tools/tests/**
-    # CI の workflow (.github/workflows/*.yml) は os32-v3 では作り直す (FORK_PLAN §3 d)。
-    # 置いたらここに ".github/workflows/*.yml" を戻す (gen_tests_inventory.py の CI 列が読む)。
+    - ".github/workflows/*.yml"   # gen_tests_inventory.py の CI 列が読む (FORK_PLAN §3 d で作り直した)
     - docs/TESTS.md
     - tools/gen_tests_inventory.py
   check-manifests:

@@ -1,0 +1,152 @@
+# OS32 本体ビルド (os32-v3、2026-09-30、docs/tasks/v3/FORK_PLAN.md §3 d ②、docs/08_build.md §8-6)
+#
+# 素の clone から core (カーネル・起動 FD・インストール ISO・パッケージ) を作り、
+# `make check-fast` (静的ゲート check.yml に入らない、ツールチェーンと rustc が要る検査を含む) を
+# 回して、成果物を artifact に置く。実機に繋がったホストは tools/ci_fetch.sh で取りに来る。
+#
+# - i386-elf ツールチェーン (binutils 2.41 / GCC 13.2.0 / newlib 4.4.0 nano) は
+#   tools/ci/build_cross.sh でソースから作り、actions/cache に置く (初回とキーが変わったとき
+#   だけ約 25〜30 分。キーはスクリプトの hash と gcc / newlib の版)。
+# - IPAex フォント (ipaexg.ttf / ipaexm.ttf) はリポジトリに無く tools/fetch_fonts.py が
+#   IPA の公式配布から取る。取れた ttf は zip の SHA-256 を key にキャッシュする。
+# - apps/game (private submodule) は v3 の開発では組まない (ユーザー決定 2026-09-30)。
+#   必要になったら SUBMODULE_TOKEN で ⑥ (submodule 取得 + make external) を足す (FORK_PLAN §3 d ③)。
+name: build
+
+on:
+  push:
+    branches: [main, "wt/**"]
+    tags: ["v*"]
+    # 文書だけの push では回さない (文書の検査は check.yml が持つ)
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+      - ".claude/**"
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      # fetch-depth 1 で足りる: カーネルに埋める commit id (tools/gen_build_id.py) は
+      # `git rev-parse --short HEAD` だけで、履歴は要らない。
+      - uses: actions/checkout@v4
+
+      # Ubuntu の apt 依存 (Makefile / tools を grep して列挙、2026-09-30):
+      #   nasm (boot/、カーネルの .asm)、genisoimage (build/image.mk の ISO)、
+      #   build-essential (ホスト試験の gcc、ツールチェーンの構築)、e2fsprogs (ホスト試験の e2fsck / mke2fs)、
+      #   libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex (build_cross.sh: GCC / binutils の構築)。
+      #   FD イメージは tools/mkfat12.py (純 Python) なので mtools は要らない。
+      # Python の依存は requirements.txt (ビルドの必須は lz4 と PyYAML、フォント生成に Pillow)。
+      - name: Host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential nasm genisoimage e2fsprogs \
+            libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex
+          python3 -m pip install --quiet -r requirements.txt
+
+      # ② rust-toolchain.toml (nightly + rust-src) を rustup に解決させる。
+      #    rustup 1.28 以降は引数なしの install で toml を読む (古い rustup は `rustup show` で入る)。
+      - name: Rust toolchain (rust-toolchain.toml)
+        run: |
+          rustup toolchain install --no-self-update || rustup show
+          rustup show active-toolchain
+          rustc --version
+
+      # ① i386-elf ツールチェーン (~/opt/cross、tools/ci/build_cross.sh の既定と同じ)。
+      #    キー = OS + gcc / newlib の版 + スクリプトの hash。
+      - name: Toolchain cache key
+        id: crosskey
+        run: |
+          echo "CROSS_DIR=$HOME/opt/cross" >> "$GITHUB_ENV"
+          gcc="$(sed -n 's/^GCC_VER=//p' tools/ci/build_cross.sh)"
+          newlib="$(sed -n 's/^NEWLIB_VER=//p' tools/ci/build_cross.sh)"
+          echo "key=cross-i386-elf-${{ runner.os }}-gcc${gcc}-newlib${newlib}-${{ hashFiles('tools/ci/build_cross.sh') }}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache i386-elf toolchain
+        id: cross-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/opt/cross
+          key: ${{ steps.crosskey.outputs.key }}
+
+      - name: Build i386-elf toolchain (cache miss only)
+        if: steps.cross-cache.outputs.cache-hit != 'true'
+        run: tools/ci/build_cross.sh --prefix "$CROSS_DIR" --work "$RUNNER_TEMP/cross-work" --jobs "$(nproc)"
+
+      # フォント。key = ipaex-<配布 zip の SHA-256 (fetch_fonts.py に固定)>。
+      #    ヒットすれば fetch_fonts.py は SHA-256 を照合するだけで何も取らない。
+      - name: Font cache key
+        id: fontkey
+        run: echo "key=ipaex-$(python3 tools/fetch_fonts.py --print-zip-sha256)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache IPAex fonts
+        uses: actions/cache@v4
+        with:
+          path: |
+            assets/fonts/ipaexg.ttf
+            assets/fonts/ipaexm.ttf
+          key: ${{ steps.fontkey.outputs.key }}
+
+      # ③ core のビルド。OS32_ACCEPT_IPA_LICENSE=1 は、リポジトリ所有者が IPA Font License v1.0 に
+      #    同意している前提で CI では非対話に同意する (未取得のときだけ fetch_fonts.py が見る)。
+      #    NP21W_DIR は存在しない場所 (イメージのコピーは Warning で続行する)。
+      - name: Build core (make all)
+        env:
+          OS32_ACCEPT_IPA_LICENSE: "1"
+        run: |
+          export PATH="$CROSS_DIR/bin:$PATH"
+          i386-elf-gcc --version | head -1
+          make -j"$(nproc)" all CROSS_DIR="$CROSS_DIR" NP21W_DIR="$RUNNER_TEMP/np21w"
+
+      # ④ 変異なしの全検査 (成果物を読む check-manifests / check-packages-host / check-memmap と、
+      #    クロスコンパイルや rustc が要るホスト試験を含む)。
+      - name: make check-fast
+        run: |
+          export PATH="$CROSS_DIR/bin:$PATH"
+          make check-fast CROSS_DIR="$CROSS_DIR" NP21W_DIR="$RUNNER_TEMP/np21w"
+
+      # ⑤ 成果物: カーネル・起動 FD・インストール ISO・パッケージ。
+      #    BUILD_INFO.txt と SHA256SUMS は tools/ci_fetch.sh が読む。
+      - name: Artifact name
+        id: name
+        run: echo "artifact=os32-${GITHUB_REF_NAME//\//-}-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Collect outputs
+        run: |
+          set -euo pipefail
+          rm -rf out && mkdir -p out/packages
+          cp build/out/vmkernel.lz4 build/out/kernel.map out/
+          cp images/os32_boot.d88 images/os32_boot.img images/os32_boot144.img images/os32_install.iso out/
+          cp packages/*.PKG out/packages/
+          {
+            echo "commit:  $GITHUB_SHA"
+            echo "ref:     $GITHUB_REF_NAME"
+            echo "built:   $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "run:     $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "gcc:     $("$CROSS_DIR/bin/i386-elf-gcc" -dumpversion)"
+            echo "rustc:   $(rustc --version)"
+            echo "external: 0 (apps/game are not built in v3 CI)"
+            echo
+            echo "# size  path"
+            (cd out && find . -type f -printf '%s  %P\n' | sort -k2)
+          } > out/BUILD_INFO.txt
+          (cd out && find . -type f ! -name BUILD_INFO.txt ! -name SHA256SUMS -printf '%P\n' \
+             | sort | xargs sha256sum) > out/SHA256SUMS
+          cat out/BUILD_INFO.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.name.outputs.artifact }}
+          path: out/
+          retention-days: 30
+          if-no-files-found: error

@@ -1,0 +1,115 @@
+# OS32 静的ゲート (os32-v3、2026-09-30、docs/tasks/v3/FORK_PLAN.md §3 d ①)
+#
+# クロスツールチェーン (i386-elf-gcc) も rustc も無しで回せる検査だけを自動ゲートにする。
+# 集合は `make check-fast` の列 (build/sdk.mk CHECK_PAR_TARGETS) を CROSS_DIR 無し・
+# PATH に i386-elf-* と cargo が無い状態で 1 本ずつ回し、rc=0 のものを選んだ (2026-09-30)。
+# 入れなかったもの:
+#   - 末尾で i386-elf-gcc のクロスコンパイル確認をするホスト試験 (check-*-host の大半) と
+#     kernel.map / make all の成果物を読む検査 (check-memmap, check-manifests, check-packages-host,
+#     check-privileged) → build.yml の `make check-fast` が回す
+#   - rustc / cargo が要るもの (check-gshell-host, check-gui-host, check-t5a-host, check-term-*,
+#     check-edit-doc-host, check-tools-host) → 同じく build.yml
+#   - np21w-src が無いと SKIP になるもの (check-key-inject-host) → 緑でも意味が無いので載せない
+# 各行を `make <target>` の形で書く: tools/gen_tests_inventory.py がこのファイルを読んで
+# docs/TESTS.md の CI 列を埋める。
+name: check
+
+on:
+  push:
+    branches: [main, "wt/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # ホスト試験の外部コマンド: gcc (build-essential)、e2fsck / mke2fs (e2fsprogs)。
+      # Python は tools/check_select.py が PyYAML を、tools/mkvmkernel.py 系が lz4 を使う。
+      - name: Host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential e2fsprogs
+          python3 -m pip install --quiet PyYAML lz4
+
+      # tools/check_docs_links.py は lychee を PATH か ~/.cargo/bin に探し、無ければ SKIP (rc=0)
+      # で通ってしまう。CI では必ず入れて実際に検査させる (版と sha256 を固定した prebuilt binary)。
+      - name: Install lychee
+        env:
+          LYCHEE_VERSION: "0.24.2"
+          LYCHEE_SHA256: "73657a111819a30c47c08352896796f23d64e4eb2b3ed39b6d32149241566fc5"
+        run: |
+          mkdir -p "$RUNNER_TEMP/lychee"
+          curl --fail --location --retry 3 \
+            "https://github.com/lycheeverse/lychee/releases/download/lychee-v${LYCHEE_VERSION}/lychee-x86_64-unknown-linux-musl.tar.gz" \
+            -o "$RUNNER_TEMP/lychee.tar.gz"
+          echo "$LYCHEE_SHA256  $RUNNER_TEMP/lychee.tar.gz" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/lychee.tar.gz" --strip-components=1 -C "$RUNNER_TEMP/lychee"
+          echo "$RUNNER_TEMP/lychee" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/lychee/lychee" --version
+
+      # [ABI1] 生成物を手で触らない: kapi.json から作り直してコミット済みと突き合わせる
+      - name: KAPI (version, generated files, output guards)
+        run: |
+          make check-kapi-version
+          python3 sdk/gen_kapi.py
+          python3 sdk/kapi_rust_gen.py
+          git diff --exit-code -- sdk/include/os32/os32_kapi_generated.h \
+                                 sdk/include/os32/os32_kapi_slots.h \
+                                 kapi/kapi_generated.c \
+                                 exec/exec_kapi_init.inc \
+                                 sdk/rust/os32api/src/kapi_generated.rs
+          make check-kapi-out
+
+      - name: Source rules (constraints, shlib table, GUI protocol, arch/LE access)
+        run: |
+          make check-constraints
+          make check-shlib
+          make check-gui-proto
+          make check-arch-asm
+          make check-le-access
+
+      - name: Check map (check-changed selection table)
+        run: |
+          make check-map
+          make check-check-select-host
+
+      - name: Documents (links, orphans, status lines, test inventory)
+        run: |
+          lychee --version
+          make check-docs-links
+          make check-docs-orphans
+          make check-docs-status
+          make check-docs-status-host
+          make check-tests-inventory
+
+      - name: Host tests (gcc + python3 only)
+        run: |
+          make check-ne2000-ring
+          make check-boot-splash-host
+          make check-build-id-host
+          make check-cfg-host
+          make check-db-owned-host
+          make check-db-v50-host
+          make check-ext2-empty-name-host
+          make check-guest-host
+          make check-gui-gate-host
+          make check-host-agent
+          make check-install-recover-host
+          make check-lan-bridge-host
+          make check-np21w-ctl-host
+          make check-rshell-serial-host
+          make check-serial-portc-host
+          make check-sqlite-groups-host
+          make check-vfs-fd-path-host
+          make check-vfs-fd-sqlite-host

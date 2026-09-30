@@ -108,11 +108,15 @@ GUI アプリ      → libos32gui_stub (ジャンプ表への薄いスタブ) �
 ([§8-4 検査の 3 段](#検査の3段))。`emu_agent` (ローカル AI) の `make` は
 許可リスト (`tools/emu_agent/agent.py` の `MAKE_TARGETS`) に載ったターゲットしか実行しない。
 
-**GitHub Actions** (`.github/workflows/check.yml`、2026-09-06): push / PR で、クロスツールチェーン無しで
-回せる検査だけを自動ゲートにする — KAPI 版番号の一致、`sdk/kapi.json` からの生成物がコミット済みと
-一致すること ([ABI1])、CONSTRAINTS ⇄ CLAUDE.md、`mkshlib --check`、GUI プロトコルの C ⇄ Rust 照合
-(`check_gui_proto.py`)、ne2000 リングのホストテスト。
-`check-manifests` は `make all` の成果物を見るので対象外 (WSL 側の `make check` で回す)。
+**GitHub Actions** (`.github/workflows/check.yml`、os32-v3 で 2026-09-30 に作り直し): push / PR で、
+クロスツールチェーンも rustc も無しで回せる検査だけを自動ゲートにする — KAPI 版番号の一致、
+`sdk/kapi.json` からの生成物がコミット済みと一致すること ([ABI1])、`check-kapi-out`、CONSTRAINTS ⇄ CLAUDE.md、
+`mkshlib --check`、GUI プロトコルの C ⇄ Rust 照合 (`check_gui_proto.py`)、`check-arch-asm` / `check-le-access`、
+対応表 (`check-map` / `check-check-select-host`)、文書 (lychee のリンク・孤児・状態行・試験一覧)、
+ne2000 リングと gcc + python3 だけで回るホスト試験 17 本。どの検査が CI に載っているかは
+[TESTS.md](TESTS.md) の CI 列 (yml の `make <target>` 行から生成)。
+残り (末尾で `i386-elf-gcc` を使うホスト試験、rustc が要るもの、`check-manifests` / `check-packages-host` /
+`check-memmap` のように `make all` の成果物を読むもの) は `build.yml` の `make check-fast` が回す (§8-6)。
 
 **コンパイラとフラグ** (実体は `build/config.mk`。ここは読むための写しで、値は config.mk が正しい):
 
@@ -143,7 +147,7 @@ os32/
 ├── arch/           CPU 依存の実装 (x86/arch_io.h — 割り込み制御・CPU 停止・IDT ロード、x86/arch_cpu.h — CR3/CR0・リング降下、x86/x86_desc.h — GDT/TSS ロード)。`ARCH ?= x86` で選ぶ。足し方は arch/README.md
 ├── platform/       機種依存の実装 (pc98/platform_io.h — ポート I/O・I/O ウェイト)。`PLATFORM ?= pc98` で選ぶ
 ├── userland/       ユーザー空間 (shell/, gshell/ (GUI シェル, Rust), cmds/, system/, tests/, rust/ (libos32gui 等), lib/)
-├── .github/        GitHub Actions (workflows/check.yml: 静的ゲート)
+├── .github/        GitHub Actions (workflows/check.yml: 静的ゲート、workflows/build.yml: 本体ビルド + check-fast)
 ├── apps/           git submodule (ske-studio/os32-apps) — 標準アプリ。make external / make apps
 ├── game/           git submodule (ske-studio/os32-game) — 対戦スゴロク RPG。make external / make game
 ├── docs/hw/        PC-98 資料のローカルミラー (git 管理外、tools/sync_hwdocs.sh)
@@ -784,8 +788,9 @@ Windows 表記へ変換して使う。変換が合わない環境では環境変
 
 ### §8-6 GitHub Actions での本体ビルド
 
-`.github/workflows/build.yml` (workflow 名 `build`) が、素の clone から本体を完全ビルドして
-成果物を artifact に置く。静的ゲートの `check.yml` とは別で、`make check` (試験) は回さない。
+`.github/workflows/build.yml` (workflow 名 `build`、os32-v3 で 2026-09-30 に最小から作り直し —
+[FORK_PLAN §3 d](tasks/v3/FORK_PLAN.md)) が、素の clone から core を完全ビルドし、`make check-fast`
+を回して、成果物を artifact に置く。静的ゲートの `check.yml` とは別 (変異込みの `make check` は回さない)。
 
 **狙い**: 開発ホストの回線が従量課金のことがあるので、ホストからはソースを push する
 (小さい) だけにし、イメージの受け渡しは GitHub → 実機に繋がったホスト (Ubuntu ノート)
@@ -793,15 +798,17 @@ Windows 表記へ変換して使う。変換が合わない環境では環境変
 
 | 項目 | 内容 |
 |---|---|
-| 起動 | `main` / `feat/**` への push、tag `v*` の push、手動 (workflow_dispatch)。同じ ref の古い run は打ち切る |
-| ビルド | `make -j$(nproc) all [external] fd144` → `make deploy HOSTDRV_DIR=$RUNNER_TEMP/hostdrv NO_PRUNE=1`。`NP21W_DIR` は存在しない場所で、コピー失敗は Warning で続行する |
-| submodule | **`apps/` と `game/` は private repo** なので既定の `GITHUB_TOKEN` では clone できない (初回 run はここで落ちた、2026-09-23)。リポジトリの secret **`SUBMODULE_TOKEN`** (os32-apps / os32-game の Contents: read を持つ fine-grained PAT) があれば取って `make external` まで回し、**無ければ warning を出して core だけ作る** (FD・ISO・packages・配備ツリーの本体側は揃う。apps/game の .bin だけ配備ツリーに入らない)。2 つの repo を public にすれば secret は要らない。**ユーザー決定 (2026-09-23): apps/game は含めない (core だけ)** |
-| 文書だけの push | `docs/**`・`*.md`・`.claude/**` だけの push では回さない (`paths-ignore`)。同じ ref の run は 1 つ (`cancel-in-progress`) なので、**run の途中でその ref へ push すると打ち切られる** |
-| ツールチェーン | `tools/ci/build_cross.sh` (§8-5) で `~/opt/cross` に作り、`actions/cache` で保存。キーは `cross-i386-elf-<OS>-<build_cross.sh のハッシュ>` なので、**スクリプトを変えたときだけ作り直す**。初回 (とキャッシュが消えたとき) は約 +25 分 (**実測 2026-09-23: ツールチェーン 24.9 分、run 全体 27 分**、ubuntu-latest 4 vCPU)。**キャッシュが効く 2 回目以降は run 全体で約 2 分** (実測 1 分 50 秒、キャッシュ 335MB) |
-| Rust | `rust-toolchain.toml` を `rustup toolchain install` (引数なし) で解決。`Swatinem/rust-cache` で `target/` を保存 |
+| 起動 | `main` / `wt/**` への push、tag `v*` の push、手動 (workflow_dispatch)。同じ ref の古い run は打ち切る |
+| ビルド | `make -j$(nproc) all` (core。`all` は 2 種の起動 FD と ISO を含む) → `make check-fast`。`NP21W_DIR` は存在しない場所で、コピー失敗は Warning で続行する |
+| submodule | **`apps/` と `game/` (private submodule) は v3 の CI では組まない** (ユーザー決定 2026-09-30: 今回の開発に要らないので `SUBMODULE_TOKEN` は登録しない)。必要になったら secret `SUBMODULE_TOKEN` (os32-apps / os32-game の Contents: read を持つ fine-grained PAT) で submodule 取得 + `make external` の step を足す ([FORK_PLAN §3 d ③](tasks/v3/FORK_PLAN.md)) |
+| フォント | IPAex の TTF はリポジトリに無く `tools/fetch_fonts.py` が IPA の公式配布から取る (§8-2)。CI は `OS32_ACCEPT_IPA_LICENSE=1` で非対話に同意し (リポジトリ所有者が同意済みの前提)、取れた ttf を key `ipaex-<zip の SHA-256>` (`fetch_fonts.py --print-zip-sha256`) で `actions/cache` に置く |
+| 文書だけの push | `docs/**`・`*.md`・`.claude/**` だけの push では回さない (`paths-ignore`。文書の検査は `check.yml`)。同じ ref の run は 1 つ (`cancel-in-progress`) なので、**run の途中でその ref へ push すると打ち切られる** |
+| ツールチェーン | `tools/ci/build_cross.sh` (§8-5) で `~/opt/cross` に作り、`actions/cache` で保存。キーは `cross-i386-elf-<OS>-gcc<版>-newlib<版>-<build_cross.sh のハッシュ>` なので、**スクリプトか版を変えたときだけ作り直す**。os32 での実測 (2026-09-23): 初回はツールチェーン約 25 分、キャッシュが効けば run 全体で約 2 分 (ubuntu-latest 4 vCPU、キャッシュ 335MB)。os32-v3 での実走はまだ (最初の push で見る) |
+| Rust | `rust-toolchain.toml` (nightly + rust-src) を `rustup toolchain install` (引数なし) で解決。`target/` のキャッシュは無し (最小構成。遅ければ `Swatinem/rust-cache` を足す) |
+| apt | `build-essential nasm genisoimage e2fsprogs` + ツールチェーン構築の `libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex`。Python は `requirements.txt`。FD イメージは `tools/mkfat12.py` (純 Python) なので mtools は要らない |
 | 上限 | `timeout-minutes: 150` |
 
-**成果物** (artifact 名 `os32-<ブランチ名の / を - に>-<sha7>`、保持 30 日。初回の実物 `os32-feat-gui-527255b` は zip で 13.8MB):
+**成果物** (artifact 名 `os32-<ブランチ名の / を - に>-<sha7>`、保持 30 日):
 
 | ファイル | 中身 |
 |---|---|
@@ -810,28 +817,23 @@ Windows 表記へ変換して使う。変換が合わない環境では環境変
 | `os32_install.iso` | インストール ISO |
 | `packages/*.PKG` | パッケージ |
 | `vmkernel.lz4` / `kernel.map` | カーネルとシンボル (kselftest の番地はこの map で引く) |
-| `hostdrv.tar.gz` | `make deploy` の配備ツリー (HostDrv の `C:\os32` に相当) |
-| `BUILD_INFO.txt` / `SHA256SUMS` | コミット・ref・日時・ランナー・gcc / rustc の版・submodule・各ファイルのサイズと sha256 |
+| `BUILD_INFO.txt` / `SHA256SUMS` | コミット・ref・日時・run の URL・gcc / rustc の版・各ファイルのサイズと sha256 (`tools/ci_fetch.sh` が読む) |
+
+os32 の `build.yml` にあった配備ツリー (`hostdrv.tar.gz`)、埋め込み commit id の照合、tag → Release の job は
+最小構成に含めていない (要るときに足す)。
 
 **実機ホスト側の取り方** — `tools/ci_fetch.sh` (要 `gh`、`gh auth login` を 1 回。
 public repo でも artifact の API ダウンロードには認証が要る):
 
 ```bash
-tools/ci_fetch.sh                       # feat/gui の最新の成功 run
-tools/ci_fetch.sh --branch main
+tools/ci_fetch.sh                       # main の最新の成功 run (既定 --repo ske-studio/os32-v3)
+tools/ci_fetch.sh --branch wt/ci
 tools/ci_fetch.sh --sha 0a5247f         # そのコミットの run (短縮 SHA 可)
 tools/ci_fetch.sh --dry-run             # 選ばれる run と artifact を表示するだけ
 ```
 
 保存先は `./os32-ci/<artifact 名>/` (`--dir` で変更)。取得後に `BUILD_INFO.txt` を表示し、
 `SHA256SUMS` で全ファイルを照合する (不一致は終了 1、`gh` が無い / 未認証は終了 2)。
-
-**tag → Release**: tag `v*` を push したときだけ、別 job (`contents: write` はその job だけ)
-が同じファイルを GitHub Release に載せる。Release の asset は認証なしで取れる:
-
-```bash
-curl -fLO https://github.com/ske-studio/os32/releases/download/<tag>/os32_boot.d88
-```
 
 > ⚠️ artifact は「ビルドが通った」ことしか保証しない。NP21/W でも実機でも起動していない
 > ([V4])。実機へ入れたら kselftest の値を**その artifact の `kernel.map`** の番地で読む。

@@ -19,7 +19,7 @@
 | シェルを触る | [07_shell.md](07_shell.md) | `userland/shell/` | rshell から `/api/cmd`。パイプ・リダイレクトは `ext_cmd1 \| ext_cmd2` も |
 | 日本語入力 (FEP) | [tasks/fep/00_INDEX.md](tasks/fep/00_INDEX.md) (進捗の正典) | `kernel/ime*.c` | メモリ os32-fep-testing の手順、`/api/key` |
 | GUI シェル | [tasks/gui/TASKS.md](tasks/gui/TASKS.md) (§7 = 経過の正典) → 各票、[API_CONTRACTS.md](tasks/gui/API_CONTRACTS.md) (凍結) | 票の排他ゾーン (§3) | `os32gui` → `/api/key` / `/api/mouse` (`ax/ay`) / `/api/screenshot`、`ring3_guard cirrus\|pegc\|bb`、`gfxmode` + reset で 3 バックエンド、Cirrus は ini の WAB ([D2]) |
-| CI / 静的ゲート | `.github/workflows/check.yml` (ツールチェーン不要の検査だけ) | `tools/check_*.py` | push で自動。本体ビルドと実機は WSL 側 |
+| CI / 静的ゲート | `.github/workflows/check.yml` (ツールチェーンも rustc も不要の検査だけ)、`build.yml` (本体ビルド + `make check-fast`、[08_build.md §8-6](08_build.md)) | `tools/check_*.py` | push で自動。実機は WSL 側 |
 | V86 / DOS | [archive/v21/v86v2/README.md](archive/v21/v86v2/README.md) | `kernel/v86*.c` | `v86 -t` / `-b`、脱出は CTRL+STOP |
 | LAN (LGY-98) | ドライバ [tasks/network/PLAN.md](tasks/network/PLAN.md) (M0〜M5、進捗 §9)、リンク層+Host Services [tasks/network/LINK_PLAN.md](tasks/network/LINK_PLAN.md) | `drivers/lgy98.c` `ne2000.c` `ne2000_ring.c` `ne2000_io.asm`、有効化は `make kernel-lgy98` (戻すのは `kernel-nolgy98`) | `make check` のホスト試験 (リング計算)、`make check-net-m2` (NP21/W で inject → 反射 → capture)、ini は [D2] |
 | ビルド・配備の仕組みを変える | [08_build.md](08_build.md) | `Makefile` `build/*.mk` `tools/*.py` | `make check`、`os32-cycle deploy` |
