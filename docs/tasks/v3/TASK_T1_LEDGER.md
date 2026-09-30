@@ -513,6 +513,12 @@ static inline u32  V2P(const volatile void *va) { return (u32)(uptr)va; }
 
 **Codex 実装レビュー (2026-10-01、gpt-6-astra、Approve)**: P1/P2 なし。実装時の訂正 6 件は妥当。P3 (後続で試験を強める、未着手): (1) `pcm_cs4231_host.c` の模型が解放を `va` で引く (実物は `pa`) — `pa` だけ壊れる変更を見逃す。reset なしの通常再 open と再 open の確保失敗も足す、(2) `fdc_track_host.c` の `dma_chan_setup` の模型は物理上限を見ず、P2V/V2P が恒等なので旧キャストへ戻す変異を区別できない — FDC 経路で 16MB 拒否と V2P を観測する試験を足す、(3) `test_pcm_cs4231.py` の変異の集計がコンパイル失敗も RED に数える — `test_dma_pool.py` と同じく除外する。`dma_free` は `pa` で span を引くので、別の使用中 span の先頭や解放・再割当後の古い組を渡すとその span を解放しうる (今の呼び手に経路は無い) — 呼び手の契約として残す。
 
+#### 4-3-N. T1c の NP21/W 回帰と、T1a〜T1b の実機 Ra266 (2026-10-01)
+
+**NP21/W (PM、main `7d1133d` / `4233715`、17MB、PEGC)**: HDD 起動で `[selftest] 226/226 passed` (T1c の dmap の組を含む)、`kselftest_fail`=0、`[ledger] irq_ops=0 exc_ops=0 check_fail=0 bad_free=0`、起動ログに `[fdc] DMA window … crosses 64KB or 16MB` は出ない。**FD 起動** (`--fd os32_boot.d88`、カーネルと各ファイルを FDC の DMA で読む) も 226/226。**FD の DMA 書き込み → 読み戻し**: `/host/sbin/hsync.bin` (34,560 B) を FD の `/VAR/T1C.BIN` へ `cp` → `emu_reset` (キャッシュを捨てる) → FD から `/host` へ `cp` → ホストで `cmp` が一致。PCM は NP21/W のこの構成に無い (`[pcm] none`)。
+
+**実機 Ra266 64MB (実機エージェント、CI の成果物 `737f6e4` = カーネルは `d7ac7a0` と同じ、T1a + BB 漏れの修正 + T1b。T1c は未)**: HDD 起動のままシリアル経由で更新 (手順は realhw/PLAN.md §0、CI 待ちを除いて約 20 分)。`Commit 737f6e4`・`Image CRC b2183d98 (469305 bytes, HDD loader)`、`[selftest] 225/225 passed`、`[ledger] irq_ops=0 exc_ops=0 check_fail=0 bad_free=0`、`[pcm] CS4231 v=101 irq 10 dma 1`、`[pci] 7 devices`、`mem` = Physical 65536 KB / RAM 64512 KB、`cpl0_probe: load=50002c usable_end=ef2000 cpl=0 mem_kb=65536`、`test2` ×5 すべて `PASS 5/5`、`v86 -t` OK、NOMEM・panic・停止なし。`[pegc]` の行が無いのは実機の `/etc/system.cfg` が `GFX=pc98` (`hal_test`: `backend pc98 (planar 4bpp)`) のため。→ **D32 の受入 (64MB で model 経路・起動 kselftest 0 fail) を実機で確認**。model の内部値 (`online` など) は実機に `/api/mem` が無いので読んでいない (kselftest の `pool:model online` が通っていることで代える)。
+
 ### 4-4. T1d — MMIO 登録と検証済み資源レコード (D33・X4)
 
 | 項 | 内容 |
