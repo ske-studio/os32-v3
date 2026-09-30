@@ -490,7 +490,7 @@ fn k1_4_kana_bit_is_taken_from_each_raw() {
 }
 
 /* ================================================================ */
-/*  ⑤ 加速: 6 を make 20 回 → 7×1 + 8×4 + 5×8 = 79 ドット            */
+/*  ⑤ 加速: 6 を make 20 回 → 7×3 + 8×12 + 5×24 = 237 ドット         */
 /* ================================================================ */
 
 fn pointer_x(st: &GuiState, slot_i: usize) -> Option<i16> {
@@ -502,7 +502,7 @@ fn pointer_x(st: &GuiState, slot_i: usize) -> Option<i16> {
 }
 
 #[test]
-fn k1_5_numpad6_twenty_makes_move_79_dots() {
+fn k1_5_numpad6_twenty_makes_move_237_dots() {
     mocks::init();
     fep_off();
     let shm = mocks::Shm::new();
@@ -513,15 +513,15 @@ fn k1_5_numpad6_twenty_makes_move_79_dots() {
         r.push(NP_6 | DOWN | KANA);
     }
     run(&mut st, &r);
-    assert_eq!(st.mouse_x - x0, 79, "20 回の make で 79 ドットでない");
+    assert_eq!(st.mouse_x - x0, 237, "20 回の make で 237 ドットでない");
     let (cox, _) = st.windows[0].client_origin();
-    assert_eq!(pointer_x(&st, 0), Some((x0 + 79 - cox) as i16), "Pointer が最後の位置でない");
-    /* break で数え直し: 次の 1 回は 1 ドット。 */
+    assert_eq!(pointer_x(&st, 0), Some((x0 + 237 - cox) as i16), "Pointer が最後の位置でない");
+    /* break で数え直し: 次の 1 回は 3 ドット。 */
     run(&mut st, &[NP_6 | KANA, NP_6 | DOWN | KANA]);
-    assert_eq!(st.mouse_x - x0, 80, "break で数え直していない");
+    assert_eq!(st.mouse_x - x0, 240, "break で数え直していない");
     /* 止まっている実マウスで位置が巻き戻らない。 */
     input::capture(&mut st, input::Ctx::Wait);
-    assert_eq!(st.mouse_x - x0, 80, "止まった実マウスの値で巻き戻った");
+    assert_eq!(st.mouse_x - x0, 240, "止まった実マウスの値で巻き戻った");
 }
 
 /* ================================================================ */
@@ -529,7 +529,7 @@ fn k1_5_numpad6_twenty_makes_move_79_dots() {
 /* ================================================================ */
 
 #[test]
-fn k1_8_ctrl_numpad6_twenty_makes_move_39_dots_and_keep_the_half() {
+fn k1_8_ctrl_numpad6_twenty_makes_move_118_dots_and_keep_the_half() {
     mocks::init();
     fep_off();
     let shm = mocks::Shm::new();
@@ -540,17 +540,17 @@ fn k1_8_ctrl_numpad6_twenty_makes_move_39_dots_and_keep_the_half() {
         r.push(NP_6 | DOWN | KANA | CTRL);
     }
     run(&mut st, &r);
-    assert_eq!(st.mouse_x - x0, 39, "CTRL で半分 (79/2 = 39) にならない");
-    /* 端数 1/2 は持ち越す: 数え直した次の 1 回 (1/2 ドット) で整数になる。 */
+    assert_eq!(st.mouse_x - x0, 118, "CTRL で半分 (237/2 = 118) にならない");
+    /* 端数 1/2 は持ち越す: 数え直した次の 1 回 (3/2 ドット) と合わせて 2 ドット。 */
     run(&mut st, &[NP_6 | KANA | CTRL, NP_6 | DOWN | KANA | CTRL]);
-    assert_eq!(st.mouse_x - x0, 40, "端数 1/2 を捨てた");
-    /* 1 回目 (1/2) だけでは動かない。 */
+    assert_eq!(st.mouse_x - x0, 120, "端数 1/2 を捨てた");
+    /* 端数なしから 1 回目 (3/2) は 1 ドットだけ動き、1/2 が残る。 */
     run(&mut st, &[NP_6 | KANA | CTRL, NP_6 | DOWN | KANA | CTRL]);
-    assert_eq!(st.mouse_x - x0, 40, "1/2 ドットで動いた");
-    /* カナを切ると端数は捨てる。 */
+    assert_eq!(st.mouse_x - x0, 121, "3/2 ドットが 1 ドットにならない");
+    /* カナを切ると端数は捨てる (残っていれば 1/2 + 3/2 で 2 ドット動く)。 */
     run(&mut st, &[NP_6 | KANA | CTRL, SC_KANA | DOWN, SC_KANA | DOWN | KANA]);
     run(&mut st, &[NP_6 | DOWN | KANA | CTRL]);
-    assert_eq!(st.mouse_x - x0, 40, "モードが切れても端数が残った");
+    assert_eq!(st.mouse_x - x0, 122, "モードが切れても端数が残った");
 }
 
 /* ================================================================ */
@@ -578,8 +578,8 @@ fn k1_7_drag_by_numpad_moves_the_window_in_one_cycle() {
     r.push(NP_6 | KANA);
     r.extend_from_slice(&tap(NP_DOT, KANA));
     run(&mut st, &r);
-    /* 7×1 + 3×4 = 19 ドット。 */
-    assert_eq!((st.windows[0].x, st.windows[0].y), (59, 40), "離しで窓が移らない");
+    /* 7×3 + 3×12 = 57 ドット。 */
+    assert_eq!((st.windows[0].x, st.windows[0].y), (97, 40), "離しで窓が移らない");
     assert_eq!(st.drag_index, -1, "ドラッグが終わっていない");
     assert!(buttons(&st, 0).is_empty(), "タイトルバーの押下がアプリへ漏れた");
 }
@@ -600,10 +600,10 @@ fn k1_7_drag_frame_follows_numpad_moves() {
     }
     run(&mut st, &r);
     assert_eq!(st.drag_index, 0, "ドラッグが始まらない");
-    assert_eq!(st.drag_frame.x, 59, "枠が追従しない");
+    assert_eq!(st.drag_frame.x, 97, "枠が追従しない");
     assert_eq!(st.windows[0].x, 40, "離す前に窓が動いた");
     run(&mut st, &tap(NP_DOT, KANA));
-    assert_eq!(st.windows[0].x, 59);
+    assert_eq!(st.windows[0].x, 97);
 }
 
 /* ================================================================ */
@@ -1437,7 +1437,7 @@ fn drop_after_app_resize_erases_the_last_frame() {
     wm::flush_screen_dirty(&mut st);
     assert_eq!(st.drag_index, 1, "ドラッグが始まらない");
     let last = st.drag_frame;
-    assert_eq!((last.x, last.w), (39, 200), "前提: 枠が 19 ドット動いていない");
+    assert_eq!((last.x, last.w), (77, 200), "前提: 枠が 57 ドット動いていない");
     /* ドラッグ中にアプリが自分の窓を縮める */
     let wid = id(&st, 1);
     assert_eq!(wm::resize_window(&mut st, 3, wid, 80, 60), 0);
