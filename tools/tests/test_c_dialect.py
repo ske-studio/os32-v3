@@ -1,0 +1,266 @@
+"""tools/check_c_dialect.py (言語モードの検査、[C1]) のホスト試験。
+
+記録: tools/tests/c_dialect_tdd.md
+票:   docs/tasks/v3/TASK_C11_MIGRATION.md §6 段 4・段 5
+
+検査器の部品 (字句の読み分け・コンパイル行の読み取り・実際に効いている言語モード・
+拒否の探り・公開 SDK ヘッダの検査) を小さな入力で固定し、実物の木が通ることも見る。
+
+  python3 -B tools/tests/test_c_dialect.py            # 全ケース
+"""
+import importlib.util
+import pathlib
+import subprocess
+import sys
+import tempfile
+
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+SRC = ROOT / "tools/check_c_dialect.py"
+
+FAILED = []
+N = [0]
+
+
+def check(cond, what):
+    N[0] += 1
+    print("  %s %s" % ("ok  " if cond else "FAIL", what), flush=True)
+    if not cond:
+        FAILED.append(what)
+
+
+def load():
+    spec = importlib.util.spec_from_file_location("check_c_dialect_under_test", str(SRC))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+# --------------------------------------------------------------------------
+#  1. 字句: コメント・文字列を区別する
+# --------------------------------------------------------------------------
+
+def case_lex(cd):
+    print("== 1: 字句 (コメント・文字列・文字定数の読み分け) ==", flush=True)
+    code, lc = cd.strip_c('int a; // real\n')
+    check(lc == [1], "行コメント // を 1 行目に見つける")
+    check("real" not in code, "行コメントの中身はコードから消える")
+    code, lc = cd.strip_c('const char *s = "a // b";\n')
+    check(lc == [], "文字列の中の // は行コメントでない")
+    code, lc = cd.strip_c('/* x // y */ int b;\n')
+    check(lc == [], "ブロックコメントの中の // は行コメントでない")
+    code, lc = cd.strip_c("char c = '\"'; // after\n")
+    check(lc == [1], "文字定数の '\"' で文字列に入ったことにしない")
+    code, lc = cd.strip_c('const char *s = "\\" // still string";\n')
+    check(lc == [], "文字列の \\\" で文字列を抜けたことにしない")
+    code, lc = cd.strip_c('#define X a \\\n  // c\n')
+    check(lc == [2], "行継続の先の // も行番号どおりに見つける")
+    toks = cd.find_tokens('/* restrict */ int f(int *restrict p);\n', {"restrict"})
+    check(toks == [(1, "restrict")], "コメントの中の restrict は数えず、コードのものだけ数える")
+    toks = cd.find_tokens('const char *s = "_Atomic";\nint __restrict q;\n',
+                          {"_Atomic", "restrict"})
+    check(toks == [], "文字列の中の語と、語の一部 (__restrict) は数えない")
+    toks = cd.find_tokens('#include <stdbool.h>\n#include "threads.h"\n',
+                          {"<stdbool.h>", "threads.h"})
+    check(toks == [(1, "<stdbool.h>"), (2, "threads.h")],
+          "#include のヘッダ名 (<...> と \"...\") を見つける")
+
+
+# --------------------------------------------------------------------------
+#  2. コンパイル行の読み取りと期待する言語モード
+# --------------------------------------------------------------------------
+
+DRY = """\
+nasm -f elf32 -o kernel/entry.o kernel/entry.asm
+i386-elf-gcc -std=gnu11 -Werror=vla -m32 -MMD -MP -O2 -I. -Iinclude -c kernel/kernel.c -o kernel/kernel.o
+i386-elf-gcc -std=gnu89 -m32 -Os -include lib/sqlite3/os32_sqlite_config.h -Ilib/sqlite3 -c lib/sqlite3/sqlite3.c -o lib/sqlite3/sqlite3.o
+i386-elf-gcc -std=gnu11 -m32 -Iboot -c -o boot/boot_main.o boot/boot_main.c
+i386-elf-ld -m elf_i386 -o build/kernel.elf kernel/kernel.o
+"""
+
+
+def case_parse(cd):
+    print("== 2: コンパイル行の読み取り・期待する言語モード ==", flush=True)
+    units = cd.parse_compile_lines(DRY)
+    srcs = [u["src"] for u in units]
+    check(srcs == ["kernel/kernel.c", "lib/sqlite3/sqlite3.c", "boot/boot_main.c"],
+          "i386-elf-gcc の -c の行だけを拾い、元のソースを読む (-o が先でも)")
+    k = units[0]["sig"]
+    check("-Iinclude" not in k and "-MMD" not in k and "-c" not in k and "-o" not in k,
+          "旗の組から -I・依存生成・-c・-o を外す")
+    check("-std=gnu11" in k and "-Werror=vla" in k and "-O2" in k, "言語・警告・最適化の旗は残す")
+    s = units[1]["sig"]
+    check("-include" in s and "lib/sqlite3/os32_sqlite_config.h" in s, "-include とその引数は残す")
+    check(cd.expected_std("lib/sqlite3/sqlite3.c") == "gnu89", "SQLite 本体は gnu89")
+    check(cd.expected_std("lib/sqlite3/os32_sqlite_vfs.c") == "gnu89", "SQLite の VFS は gnu89")
+    check(cd.expected_std("lib/sqlite3/os32_sqlite_test.c") == "gnu89", "SQLite の試験は gnu89")
+    check(cd.expected_std("userland/tests/sqlite_standalone/sqlite_user_vfs.c") == "gnu89",
+          "userland の SQLite 単体は gnu89")
+    check(cd.expected_std("kernel/kernel.c") == "gnu11", "本体は gnu11")
+    check(cd.expected_std("boot/boot_main.c") == "gnu11", "ブートは gnu11")
+    check(cd.expected_std("userland/lib/gfx/gfx.c") == "gnu11", "userland は gnu11")
+
+
+# --------------------------------------------------------------------------
+#  3. 実際に効いている言語モード (コンパイラに聞く)
+# --------------------------------------------------------------------------
+
+def case_effective(cd):
+    print("== 3: 実際に効いている言語モード (__STDC_VERSION__ / __STRICT_ANSI__) ==", flush=True)
+    check(cd.effective_std(["-std=gnu11"], ROOT) == "gnu11", "-std=gnu11 → gnu11")
+    check(cd.effective_std(["-std=gnu89"], ROOT) == "gnu89", "-std=gnu89 → gnu89")
+    check(cd.effective_std(["-std=gnu89", "-std=gnu11"], ROOT) == "gnu11",
+          "-std を 2 つ並べると後ろが効く (文字列でなくコンパイラで判定する)")
+    check(cd.effective_std([], ROOT) not in ("gnu11", "gnu89"),
+          "-std 無しはコンパイラの既定 (gnu11 でも gnu89 でもない)")
+    check(cd.effective_std(["-std=c11"], ROOT) == "c11", "-std=c11 は GNU 拡張なし (c11) と読む")
+
+
+# --------------------------------------------------------------------------
+#  4. 拒否の探り (暗黙宣言・暗黙 int・VLA・偽の STATIC_ASSERT・非定数式)
+# --------------------------------------------------------------------------
+
+GOOD = ["-std=gnu11", "-Werror=implicit-function-declaration", "-Werror=implicit-int",
+        "-Werror=vla", "-m32", "-ffreestanding"]
+
+
+def case_probe(cd):
+    print("== 4: 拒否の探り ==", flush=True)
+    miss = cd.probe_rejects(GOOD, ROOT)
+    check(miss == [], "全部の旗があれば探りは全部拒否される (miss=%r)" % (miss,))
+    for flag, name in (("-Werror=vla", "vla"),
+                       ("-Werror=implicit-function-declaration", "implicit_decl"),
+                       ("-Werror=implicit-int", "implicit_int")):
+        miss = cd.probe_rejects([f for f in GOOD if f != flag], ROOT)
+        check(name in miss, "%s が無ければ %s の探りが通ってしまうと報告する" % (flag, name))
+    # 別の理由 (壊れた -include) で落ちた探りを「拒否された」と数えない
+    with tempfile.TemporaryDirectory(prefix="c_dialect_brk_") as td:
+        brk = pathlib.Path(td) / "broken.h"
+        brk.write_text("this is not C;\n", encoding="utf-8")
+        miss = cd.probe_rejects([f for f in GOOD if f != "-Werror=vla"] + ["-include", str(brk)],
+                                ROOT)
+        check("vla" in miss, "VLA の探りが別の理由で落ちても拒否と数えない (診断の文言まで見る)")
+    # 偽の STATIC_ASSERT (条件を捨てるマクロ) を持つ写しの include/types.h
+    with tempfile.TemporaryDirectory(prefix="c_dialect_sa_") as td:
+        t = pathlib.Path(td)
+        (t / "include").mkdir()
+        (t / "include/types.h").write_text(
+            "#define STATIC_ASSERT(cond, name) _Static_assert(1, #name)\n", encoding="utf-8")
+        miss = cd.probe_rejects(GOOD, t)
+        check("static_assert_false" in miss, "条件を捨てる STATIC_ASSERT を見逃さない")
+        (t / "include/types.h").write_text(
+            "#define STATIC_ASSERT(cond, name) typedef char sa_##name[(cond) ? 1 : -1]\n",
+            encoding="utf-8")
+        miss = cd.probe_rejects(GOOD, t)
+        check("static_assert_false" not in miss, "負サイズ配列の STATIC_ASSERT でも偽は拒否される")
+        (t / "include/types.h").write_text("/* STATIC_ASSERT が無い */\n", encoding="utf-8")
+        miss = cd.probe_rejects(GOOD, t)
+        check("static_assert_true" in miss, "STATIC_ASSERT(1) が通らない (マクロが無い) ことも報告する")
+
+
+# --------------------------------------------------------------------------
+#  5. 公開 SDK ヘッダ (gnu89 と gnu11 の両方、C99 以降の構文の混入)
+# --------------------------------------------------------------------------
+
+BASE_H = "#ifndef OS32_KAPI_SHARED_H\n#define OS32_KAPI_SHARED_H\ntypedef unsigned long u32;\n#endif\n"
+
+
+def sdk_tree(td, extra):
+    t = pathlib.Path(td)
+    d = t / "sdk/include/os32"
+    d.mkdir(parents=True)
+    (d / "os32_kapi_shared.h").write_text(BASE_H, encoding="utf-8")
+    for name, body in extra.items():
+        (d / name).write_text(body, encoding="utf-8")
+    return t
+
+
+def case_sdk(cd):
+    print("== 5: 公開 SDK ヘッダ ==", flush=True)
+    good = "/* ok */\n#define OS32_X \"a//b\"\nstatic __inline__ int os32_f(void) { int a = 1; return a; }\n"
+    with tempfile.TemporaryDirectory(prefix="c_dialect_sdk_") as td:
+        t = sdk_tree(td, {"x.h": good})
+        probs = cd.check_sdk_headers(t)
+        check(probs == [], "C89 の書き方だけのヘッダは通る (problems=%r)" % (probs,))
+    bad_cases = [
+        ("行コメント", "int os32_a; // x\n"),
+        ("ブロック途中の宣言", "static __inline__ int os32_f(void) { int a = 1; a++; int b = a; return b; }\n"),
+        ("for の中の宣言", "static __inline__ void os32_f(void) { for (int i = 0; i < 1; i++) { } }\n"),
+        ("_Bool", "extern _Bool os32_b;\n"),
+        ("stdbool", "#include <stdbool.h>\nextern bool os32_b;\n"),
+        ("指示付き初期化子", "struct os32_s { int a; };\nstatic const struct os32_s os32_v = { .a = 1 };\n"),
+        ("_Static_assert", "_Static_assert(1, \"x\");\n"),
+        ("restrict", "void os32_f(char *restrict p);\n"),
+        ("long long", "extern long long os32_ll;\n"),
+    ]
+    for what, body in bad_cases:
+        with tempfile.TemporaryDirectory(prefix="c_dialect_sdk_") as td:
+            t = sdk_tree(td, {"x.h": body})
+            probs = cd.check_sdk_headers(t)
+            check(any("x.h" in p for p in probs), "%s を混ぜたヘッダを拒否する" % what)
+    with tempfile.TemporaryDirectory(prefix="c_dialect_sdk_") as td:
+        t = pathlib.Path(td)
+        (t / "sdk/include/os32").mkdir(parents=True)
+        probs = cd.check_sdk_headers(t)
+        check(probs != [], "公開ヘッダが 1 本も無ければ落ちる (空の検査で通さない)")
+
+
+# --------------------------------------------------------------------------
+#  6. 内部実装の禁止トークン (T0 で新規導入しないもの) と vendor の除外
+# --------------------------------------------------------------------------
+
+def case_internal(cd):
+    print("== 6: 内部実装の禁止トークン ==", flush=True)
+    with tempfile.TemporaryDirectory(prefix="c_dialect_int_") as td:
+        t = pathlib.Path(td)
+        (t / "kernel").mkdir()
+        (t / "lib/sqlite3").mkdir(parents=True)
+        (t / "kernel/a.c").write_text(
+            "// C11 で許す行コメント\nint f(void) { int a = 0; a++; int b = a; return b; }\n"
+            "/* _Atomic はコメントなら可 */\nconst char *s = \"_Thread_local\";\n",
+            encoding="utf-8")
+        (t / "lib/sqlite3/v.c").write_text("int g(int *restrict p);\n", encoding="utf-8")
+        probs = cd.check_internal_tokens(t)
+        check(probs == [], "C11 で許す書き方・コメントと文字列の中・vendor は数えない (%r)" % (probs,))
+        for tok in ("_Atomic int x;", "_Thread_local int y;", "int h(int *restrict p);",
+                    "#include <threads.h>", "#include <stdatomic.h>"):
+            (t / "kernel/b.c").write_text(tok + "\n", encoding="utf-8")
+            probs = cd.check_internal_tokens(t)
+            check(any("kernel/b.c:1" in p for p in probs), "内部実装の %s を拒否する" % tok)
+
+
+# --------------------------------------------------------------------------
+#  7. 実物の木
+# --------------------------------------------------------------------------
+
+def run_checker(root):
+    return subprocess.run([sys.executable, "-B", str(root / "tools/check_c_dialect.py"),
+                           "--root", str(root)], capture_output=True, text=True)
+
+
+def case_real():
+    print("== 7: 実物の木 ==", flush=True)
+    r = run_checker(ROOT)
+    sys.stdout.write(r.stdout)
+    if r.returncode != 0:
+        sys.stdout.write(r.stderr)
+    check(r.returncode == 0, "実物の木で check_c_dialect.py が rc=0")
+    check("gnu89" in r.stdout and "gnu11" in r.stdout, "要約に gnu11 と gnu89 の翻訳単位の数を出す")
+
+
+def main(argv):
+    cd = load()
+    case_lex(cd)
+    case_parse(cd)
+    case_effective(cd)
+    case_probe(cd)
+    case_sdk(cd)
+    case_internal(cd)
+    case_real()
+    ok = not FAILED
+    print("%d checks, %d failed" % (N[0], len(FAILED)), flush=True)
+    print("PASS" if ok else "FAIL", flush=True)
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
