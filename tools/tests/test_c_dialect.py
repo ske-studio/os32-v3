@@ -71,6 +71,18 @@ def case_lex(cd):
                           {"<stdbool.h>", "threads.h"})
     check(toks == [(1, "<stdbool.h>"), (2, "threads.h")],
           "#include のヘッダ名 (<...> と \"...\") を見つける")
+    # 翻訳段階の順: 行継続を先に除き、コメントを空白にしてから判定する (Codex P2-2)
+    toks = cd.find_tokens('int a;\n#include /* C11 */ <stdatomic.h>\natomic_int x;\n',
+                          {"stdatomic.h"})
+    check(toks == [(2, "stdatomic.h")], "#include とヘッダ名の間のコメントを空白として読む")
+    toks = cd.find_tokens('#include /* a\n b */ <threads.h>\n', {"threads.h"})
+    check(toks == [(1, "threads.h")], "複数行のコメントを挟んだ #include も 1 行として読む")
+    toks = cd.find_tokens('int a;\nvoid t0_r(char *re\\\nstrict p);\n', {"restrict"})
+    check(toks == [(2, "restrict")], "行継続で割った restrict を見つけ、元の行番号で返す")
+    toks = cd.find_tokens('#inc\\\nlude <stdatomic.h>\n', {"stdatomic.h"})
+    check(toks == [(1, "stdatomic.h")], "行継続で割った #include も読む")
+    code, lc = cd.strip_c('int a; /\\\n/ c\nint b;\n')
+    check(lc == [1], "行継続で割った // も行コメント")
 
 
 # --------------------------------------------------------------------------
@@ -121,6 +133,11 @@ def case_effective(cd):
     check(cd.effective_std([], ROOT) not in ("gnu11", "gnu89"),
           "-std 無しはコンパイラの既定 (gnu11 でも gnu89 でもない)")
     check(cd.effective_std(["-std=c11"], ROOT) == "c11", "-std=c11 は GNU 拡張なし (c11) と読む")
+    ov = cd.make_overrides(" -j4 --jobserver-auth=fifo:/tmp/GMfifo1 -- B:=1 A=b\\ c C_STD=-std=gnu89")
+    check(ov == ["C_STD=-std=gnu89", "A=b c", "B:=1"],
+          "親の MAKEFLAGS から変数指定だけを元の順で取り出し、-j / jobserver は捨てる (%r)" % (ov,))
+    check(cd.make_overrides("-- X=1") == ["X=1"], "旗なしの MAKEFLAGS (-- で始まる) も読む")
+    check(cd.make_overrides(" -j4 --jobserver-auth=fifo:/tmp/x") == [], "変数指定が無ければ空")
 
 
 # --------------------------------------------------------------------------
@@ -230,7 +247,9 @@ def case_internal(cd):
         probs = cd.check_internal_tokens(t)
         check(probs == [], "C11 で許す書き方・コメントと文字列の中・vendor は数えない (%r)" % (probs,))
         for tok in ("_Atomic int x;", "_Thread_local int y;", "int h(int *restrict p);",
-                    "#include <threads.h>", "#include <stdatomic.h>"):
+                    "#include <threads.h>", "#include <stdatomic.h>",
+                    "#include /* C11 */ <stdatomic.h>\natomic_int t0_atomic;",
+                    "void t0_r(char *re\\\nstrict p) { (void)p; }"):
             (t / "kernel/b.c").write_text(tok + "\n", encoding="utf-8")
             probs = cd.check_internal_tokens(t)
             check(any("kernel/b.c:1" in p for p in probs), "内部実装の %s を拒否する" % tok)
@@ -253,6 +272,17 @@ def case_real():
         sys.stdout.write(r.stderr)
     check(r.returncode == 0, "実物の木で check_c_dialect.py が rc=0")
     check("gnu89" in r.stdout and "gnu11" in r.stdout, "要約に gnu11 と gnu89 の翻訳単位の数を出す")
+    # 親の make のコマンドライン変数が子の make -n に伝わる (Codex P2-1)
+    env = dict(os.environ)
+    for k in ("MAKEFLAGS", "MFLAGS", "MAKELEVEL", "MAKEOVERRIDES"):
+        env.pop(k, None)
+    r = subprocess.run(["make", "--no-print-directory", "-C", str(ROOT), "check-c-dialect",
+                        "C_STD=-std=gnu89"], capture_output=True, text=True, env=env)
+    check(r.returncode != 0 and "gnu11 でなく gnu89" in r.stdout,
+          "make check-c-dialect C_STD=-std=gnu89 は落ちる (親の変数指定を子の make に渡す)")
+    r = subprocess.run(["make", "--no-print-directory", "-j4", "-C", str(ROOT), "check-c-dialect"],
+                       capture_output=True, text=True, env=env)
+    check(r.returncode == 0, "make -j4 check-c-dialect は通る (ジョブサーバを引き継がない)")
 
 
 # --------------------------------------------------------------------------
@@ -325,6 +355,11 @@ MUTANTS = [
      lambda: append("kernel/sysclk.c", "static _Atomic int t0_atomic;\n")),
     ("内部実装に restrict", "RED",
      lambda: append("kernel/sysclk.c", "void t0_r(char *restrict p);\n")),
+    ("内部実装に #include /* C11 */ <stdatomic.h> と atomic_int (Codex P2-2 反例 a)", "RED",
+     lambda: append("kernel/sysclk.c",
+                    "#include /* C11 */ <stdatomic.h>\natomic_int t0_atomic;\n")),
+    ("内部実装に行継続で割った restrict (Codex P2-2 反例 b)", "RED",
+     lambda: append("kernel/sysclk.c", "void t0_r(char *re\\\nstrict p) { (void)p; }\n")),
     # --- 対照 (C11 で許す書き方。落ちたら検査器が厳しすぎる) ---
     ("対照: 内部実装に // とブロック途中の宣言", "GREEN",
      lambda: append("kernel/sysclk.c",

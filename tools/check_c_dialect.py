@@ -10,7 +10,7 @@ check_constraints.py の ID 検査とは別に、**実際の旗とコンパイ�
   (b) gnu11 の翻訳単位の旗の組それぞれで、暗黙の関数宣言・暗黙 int・VLA・偽の
       STATIC_ASSERT (include/types.h の実物のマクロ) が拒否され、真の STATIC_ASSERT は
       通ること (拒否は診断の文言まで確かめる — 別の理由の失敗を「拒否」と数えない)。
-  (c) 公開 SDK ヘッダ (sdk/include/os32/*.h、在れば include/os32_kapi_shared.h) を
+  (c) 公開 SDK ヘッダ (sdk/include/os32/*.h。os32_kapi_shared.h もここ) を
       gnu89 (C90 との差を警告・エラーにする) と gnu11 の両方で取り込めること、
       行コメントと C99/C11 の語を含まないこと。SDK が配る library ヘッダ
       (build/sdk.mk の SDK_LIB_HEADER_DIRS・rt・lib/utf8.h) は gnu89 と gnu11 で
@@ -64,7 +64,7 @@ INTERNAL_FORBIDDEN = ("_Atomic", "_Thread_local", "__thread", "restrict",
 
 # ---- 公開 SDK ヘッダ -------------------------------------------------------
 SDK_HDR_DIR = "sdk/include/os32"
-SDK_EXTRA_HDRS = ("include/os32_kapi_shared.h",)
+SDK_EXTRA_HDRS = ()  # 公開 SDK ヘッダは sdk/include/os32/ の下だけ (os32_kapi_shared.h もここ)
 SDK_FORBIDDEN = ("_Bool", "_Static_assert", "_Alignas", "_Alignof", "_Atomic", "_Generic",
                  "_Noreturn", "_Thread_local", "restrict",
                  "stdbool.h", "stdatomic.h", "stdalign.h", "stdnoreturn.h", "threads.h")
@@ -108,101 +108,132 @@ WORD = "A-Za-z0-9_"
 #  字句 (コメント・文字列・文字定数を区別する)
 # ==========================================================================
 
-def strip_c(text):
-    """(code, line_comments)。code はコメントと文字列・文字定数の中身を空白に
-    した本文 (改行と引用符は残すので行番号が保たれる)。line_comments は
-    行コメント (//) の始まる行番号 (1 起点) の並び。行継続 (\\ 改行) も扱う。"""
+def _splice(text):
+    """翻訳段階 2: 行継続 (\\ 改行) を取り除く。(本文, 各文字の元の行番号)。"""
     out = []
-    lc = []
+    lm = []
+    line = 1
     i = 0
     n = len(text)
-    line = 1
-    state = None  # None / "line" / "block" / '"' / "'"
     while i < n:
         c = text[i]
-        nx = text[i + 1] if i + 1 < n else ""
-        if c == "\\" and nx == "\n":
-            out.append("\\\n" if state is None else " \n")
+        if c == "\\":
+            j = i + 1
+            if j < n and text[j] == "\r":
+                j += 1
+            if j < n and text[j] == "\n":
+                line += 1
+                i = j + 1
+                continue
+        out.append(c)
+        lm.append(line)
+        if c == "\n":
             line += 1
-            i += 2
-            continue
+        i += 1
+    lm.append(line)  # 末尾の番兵
+    return "".join(out), lm
+
+
+def _lex(text):
+    """C の翻訳段階の順 (行継続の除去 → コメントを空白に) で読む。
+    (blank, nocom, lm, lc): blank はコメントと文字列・文字定数の中身を空白にした本文、
+    nocom はコメントだけを空白にした本文 (#include のヘッダ名を読む用)、lm は
+    各文字の元の行番号、lc は行コメント (//) の始まる元の行番号の並び。
+    コメントは改行も含めて 1 文字ずつ空白にする (論理行を割らない)。"""
+    s, lm = _splice(text)
+    blank = []
+    nocom = []
+    lc = []
+    i = 0
+    n = len(s)
+    state = None  # None / "line" / "block" / '"' / "'"
+    while i < n:
+        c = s[i]
+        nx = s[i + 1] if i + 1 < n else ""
         if state is None:
             if c == "/" and nx == "/":
-                lc.append(line)
+                lc.append(lm[i])
                 state = "line"
-                out.append("  ")
+                blank.append("  ")
+                nocom.append("  ")
                 i += 2
                 continue
             if c == "/" and nx == "*":
                 state = "block"
-                out.append("  ")
+                blank.append("  ")
+                nocom.append("  ")
                 i += 2
                 continue
             if c in "\"'":
                 state = c
-            out.append(c)
+            blank.append(c)
+            nocom.append(c)
         elif state == "line":
             if c == "\n":
                 state = None
-                out.append(c)
+                blank.append(c)
+                nocom.append(c)
             else:
-                out.append(" ")
+                blank.append(" ")
+                nocom.append(" ")
         elif state == "block":
             if c == "*" and nx == "/":
                 state = None
-                out.append("  ")
+                blank.append("  ")
+                nocom.append("  ")
                 i += 2
                 continue
-            out.append("\n" if c == "\n" else " ")
+            blank.append(" ")
+            nocom.append(" ")
         else:  # 文字列・文字定数
-            if c == "\\" and nx:
-                out.append("  " if nx != "\n" else " \n")
+            if c == "\\" and nx and nx != "\n":
+                blank.append("  ")
+                nocom.append(c + nx)
                 i += 2
                 continue
-            if c == state:
+            if c == state or c == "\n":  # 閉じない引用は行末で打ち切る
                 state = None
-                out.append(c)
-            elif c == "\n":  # 閉じない引用は行末で打ち切る (前処理の条件外の文字など)
-                state = None
-                out.append(c)
+                blank.append(c)
             else:
-                out.append(" ")
-        if c == "\n":
-            line += 1
+                blank.append(" ")
+            nocom.append(c)
         i += 1
-    return "".join(out), lc
+    return "".join(blank), "".join(nocom), lm, lc
+
+
+def strip_c(text):
+    """(code, line_comments)。code は行継続を除いたうえでコメントと文字列・
+    文字定数の中身を空白にした本文。line_comments は行コメント (//) の始まる
+    元のソースの行番号 (1 起点) の並び。"""
+    blank, _, _, lc = _lex(text)
+    return blank, lc
 
 
 INCLUDE_RE = re.compile(r'^[ \t]*#[ \t]*include[ \t]*([<"])([^>"\n]+)[>"]', re.M)
 
 
 def find_tokens(text, tokens):
-    """text のコード部分 (コメント・文字列を除く) に現れる tokens を
-    [(行, token)] で返す。語は前後が識別子の文字でないものだけ数える。
-    ヘッダ名 (`x.h`・`<x.h>`) は #include の行で探す (`<x.h>` は <> の形だけ)。"""
-    code, _ = strip_c(text)
+    """text のコード部分 (行継続を除き、コメント・文字列を除く) に現れる tokens を
+    [(元の行, token)] で返す。語は前後が識別子の文字でないものだけ数える。
+    ヘッダ名 (`x.h`・`<x.h>`) はコメントを空白にした後の #include で探す
+    (`<x.h>` は <> の形だけ)。"""
+    blank, nocom, lm, _ = _lex(text)
     hits = []
     words = [t for t in tokens if not t.endswith(".h") and not t.endswith(".h>")]
     for t in words:
-        for m in re.finditer(r"(?<![%s])%s(?![%s])" % (WORD, re.escape(t), WORD), code):
-            hits.append((code.count("\n", 0, m.start()) + 1, t))
+        for m in re.finditer(r"(?<![%s])%s(?![%s])" % (WORD, re.escape(t), WORD), blank):
+            hits.append((lm[m.start()], t))
     heads = [t for t in tokens if t not in words]
     if heads:
-        lines = text.split("\n")
-        codelines = code.split("\n")
-        for idx, cl in enumerate(codelines):
-            if not re.match(r"^[ \t]*#[ \t]*include\b", cl):
-                continue
-            m = INCLUDE_RE.match(lines[idx] if idx < len(lines) else "")
-            if not m:
-                continue
+        for m in INCLUDE_RE.finditer(nocom):
             delim, name = m.group(1), m.group(2).strip()
+            ln = lm[m.start()]
             for t in heads:
                 if t.startswith("<"):
                     if delim == "<" and "<%s>" % name == t:
-                        hits.append((idx + 1, t))
+                        hits.append((ln, t))
                 elif name == t or name.endswith("/" + t):
-                    hits.append((idx + 1, t))
+                    hits.append((ln, t))
     return sorted(hits)
 
 
@@ -504,7 +535,8 @@ def check_internal_tokens(root):
     probs = []
     for p in internal_sources(root):
         text = p.read_text(encoding="utf-8", errors="replace")
-        if not any(t in text for t in INTERNAL_FORBIDDEN):
+        spliced = re.sub(r"\\\r?\n", "", text)  # 行継続で割った語も前段で落とさない
+        if not any(t in spliced for t in INTERNAL_FORBIDDEN):
             continue
         for ln, t in find_tokens(text, INTERNAL_FORBIDDEN):
             probs.append("%s:%d: 内部実装に T0 で新規導入しない %s ([C1])"
@@ -516,13 +548,54 @@ def check_internal_tokens(root):
 #  (a)(b) 実際の旗
 # ==========================================================================
 
+def make_overrides(makeflags):
+    """親の make から MAKEFLAGS で来たコマンドラインの変数指定 (`--` の後ろ) を、
+    子の make に渡す引数の並びにする。-j や --jobserver-auth など旗の側は捨てる
+    (ジョブサーバの fd / fifo は子に引き継がない)。GNU make は変数指定を逆順に並べ、
+    値の空白を `\\ ` と書くので、順序を戻して空白を戻す。"""
+    mf = makeflags or ""
+    if mf.startswith("-- "):
+        rest = mf[3:]
+    elif " -- " in mf:
+        rest = mf.split(" -- ", 1)[1]
+    else:
+        return []
+    toks = []
+    cur = []
+    i = 0
+    while i < len(rest):
+        c = rest[i]
+        if c == "\\" and i + 1 < len(rest) and rest[i + 1] == " ":
+            cur.append(" ")
+            i += 2
+            continue
+        if c == " ":
+            if cur:
+                toks.append("".join(cur))
+                cur = []
+        else:
+            cur.append(c)
+        i += 1
+    if cur:
+        toks.append("".join(cur))
+    return [x for x in reversed(toks) if re.match(r"^[A-Za-z_][A-Za-z0-9_.-]*\s*[:+?!]?=", x)]
+
+
 def dry_run(root):
+    """`make -n -B all`。親の make のコマンドライン変数 (C_STD=… など、コンパイル条件を
+    変えるもの) は子に渡し、ジョブサーバの引き継ぎは切る。BUILD_OUT は一時
+    ディレクトリに向ける — config.mk の `$(shell mkdir -p $(BUILD_OUT) …)` は -n でも
+    走るので、そのままだと実物の木 (写しの木なら symlink の先) に build/out を作り得る。
+    利用者が BUILD_OUT を指定したときはそちらが勝つ (後ろに並べる)。"""
     env = dict(os.environ)
+    over = make_overrides(env.get("MAKEFLAGS", ""))
     for k in ("MAKEFLAGS", "MFLAGS", "MAKELEVEL", "MAKEOVERRIDES", "MAKE_TERMOUT",
               "MAKE_TERMERR"):
         env.pop(k, None)
-    r = subprocess.run(["make", "--no-print-directory", "-n", "-B"] + MAKE_TARGETS,
-                       cwd=str(root), capture_output=True, text=True, env=env)
+    with tempfile.TemporaryDirectory(prefix="c_dialect_out_") as tmp:
+        cmd = (["make", "--no-print-directory", "-n", "-B"] + MAKE_TARGETS
+               + ["BUILD_OUT=" + os.path.join(tmp, "out")] + over)
+        r = subprocess.run(cmd, cwd=str(root), capture_output=True, text=True, env=env)
     return r.returncode, r.stdout, r.stderr
 
 
