@@ -17,13 +17,15 @@
 
 #include "os32api.h"
 
+#define CPL0_PROBE_PAGE_MASK 0xFFFUL   /* 4KB ページの端数 (i386 のページ) */
+
 void main(int argc, char **argv, KernelAPI *api)
 {
     u32 esp, cs, usable_end;
     (void)argc; (void)argv;
     __asm__ volatile ("movl %%esp, %0" : "=r"(esp));
     __asm__ volatile ("movl %%cs, %0" : "=r"(cs));
-    usable_end = (esp + 0xFFFUL) & ~0xFFFUL;
+    usable_end = (esp + CPL0_PROBE_PAGE_MASK) & ~CPL0_PROBE_PAGE_MASK;
     api->kprintf(0x07, "cpl0_probe: load=%x usable_end=%x cpl=%d mem_kb=%d\n",
                  (u32)main, usable_end, (int)(cs & 3),
                  (int)api->sys_get_mem_kb());
