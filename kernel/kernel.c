@@ -29,6 +29,7 @@
 #include "sysclk.h"   /* 0000:0501h のクロック判定 (pit_init より前に呼ぶ) */
 #include "paging.h"
 #include "memory_boot.h"
+#include "pgalloc.h"     /* ledger_resource_import_pci (T1d ⑥-0) */
 #include "shlib.h"
 #include "shm.h"
 #include "utf8.h"
@@ -579,6 +580,11 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * 先に結線すると driver が取った span をそこで消してしまう。
      * 表はいまのところ空 (82557 の driver は別票 L-B) で、ここは
      * 「候補が 0 本でも安全に回る」ことを起動のたびに踏むための呼び出し。 */
+    /* ⑥-0 (TASK_T1_LEDGER §3-3、B4): pci_init は台帳より前に走るので、g_pci の
+     * メモリ BAR をここで資源表へ RAW (採取値、予約権限なし) として取り込む。
+     * 実機では [pci] の行のメモリ BAR の本数と raw= が一致し ovf=0 のこと。 */
+    kprintf(TATTR_WHITE, "[ledger] pci raw=%u ovf=%u\n",
+            ledger_resource_import_pci(), ledger_res_overflow);
     pci_bind_set_line_state_hook(kernel_pci_line_bits);
     pci_bind_all(pci_drivers, PCI_DRIVER_COUNT);
 

@@ -12,10 +12,6 @@
 
 #include "types.h"
 #include "sys.h"
-/* Allocator-internal broker entry; use sys_device_reserve_core. */
-int pgalloc_device_reserve(u32 owner, const struct sys_device_span *spans,
-                           u32 count, const struct sys_device_capability *cap,
-                           u32 fixed_end);
 #include "paging.h"
 
 /* 管理対象の開始アドレスは include/memmap.h の MEM_POOL_BASE (物理側の定数)。 */
@@ -89,8 +85,8 @@ u32 pgalloc_arena_end(void);
 /*  足し、不変条件 **eligible なページでは allocated ⇔ owner ≠ 0** を全     */
 /*  mutator が同じ IRQ 保存区間で守る (失敗なら両方不変、X11)。永久予約は    */
 /*  eligible を落とし、L2 に予約した owner を残す。                           */
-/*  L3 = 区間の表 (固定用途・背景・DMA など、BSS)。資源の表と SURFACE の表は */
-/*  型と置き場だけ (登録 API は T1d / T1e)。                                 */
+/*  L3 = 区間の表 (固定用途・背景・DMA・装置の予約、BSS)。資源の表の登録は  */
+/*  T1d、SURFACE の表は型と置き場だけ (登録 API は T1e)。                    */
 /*                                                                          */
 /*  全 mutator は「全部検査してから commit」。失敗時は L1・L2・L3・**会計**   */
 /*  (owner の pages、total/used、区間の本数)・出力引数を全部不変。**診断**   */
@@ -129,6 +125,21 @@ u32 pgalloc_arena_end(void);
 #define LEDGER_CACHE_UC      1
 #define LEDGER_RF_PERMANENT  1   /* 解除 API なし */
 #define LEDGER_RF_OUTSIDE    2   /* [0, limit_pfn) の外にかかる (登録時に自動) */
+/* 資源レコード (§3-1、X4) の bus と width_basis (decode 幅の根拠)。
+ * 予約権限になるのは SIZING / DATASHEET / GLUE_CONST だけ。RAW (列挙の採取値。
+ * 幅未確定) と PROBE_UNVERIFIED は表に載るが予約には使えない。 */
+#define LEDGER_BUS_PCI       1
+#define LEDGER_BUS_CBUS      2   /* C バスの窓 */
+#define LEDGER_BUS_FIXED     3   /* 機種固定 (PEGC) */
+#define LEDGER_WB_SIZING     1   /* BAR の sizing を実施 (T4 以降) */
+#define LEDGER_WB_DATASHEET  2
+#define LEDGER_WB_GLUE_CONST 3   /* glue の定数 (Xe10 は NP21/W の値、実機の実測ではない) */
+#define LEDGER_WB_RAW        4
+#define LEDGER_WB_PROBE_UNVERIFIED 5
+/* ledger_reserve_set の span の種別と 1 回の要求の上限 */
+#define LEDGER_SPAN_MMIO     1
+#define LEDGER_SPAN_RAM      2   /* 新たに取る永久 RAM (全ページ eligible・空き) */
+#define LEDGER_MAX_SPANS     16
 /* pgalloc_alloc_n_owner の探索の向き */
 #define LEDGER_BOTTOM_UP     0
 #define LEDGER_TOP_DOWN      1
@@ -163,6 +174,9 @@ struct ledger_resource {       /* 32B。u32 → u16 → u8 の順で詰め物な
     u16 bdf, vendor, device;
     u8  bus, revision, bar, width_basis, boot_gen, pad;
 };
+/* 予約の要求 1 本。first / end は PFN 半開 (end = 1048576 で 4GiB 端)、
+ * kind は LEDGER_SPAN_*、res はこの span の根拠の資源レコードの番号。 */
+struct ledger_span { u32 first, end, kind, res; };
 struct ledger_surface {        /* 24B。T1 は型と表だけ (登録は T1e) */
     u32 first, npages;         /* npages == 0 = 表の空き */
     u16 width, height, pitch;
@@ -186,7 +200,7 @@ extern u32 ledger_irq_last[3], ledger_exc_last[3];
 /* 他の診断: 他 owner 混在の解放 / 参照の残る返却 / 他 owner 混在の claim /
  * 回収で掃除したページの累計 / 自己検査の失敗件数と最後の地点。 */
 extern u32 ledger_bad_free, ledger_retire_refused, ledger_claim_refused;
-extern u32 ledger_reclaim_pages, ledger_check_fail;
+extern u32 ledger_reclaim_pages, ledger_check_fail, ledger_res_overflow;
 extern const char *ledger_check_tag;
 
 /* owner 番号の取得 (AS / MODULE / DEVICE。固定番号の後ろから空きを配る) と
@@ -219,12 +233,38 @@ int ledger_reclaim_owner(u32 owner, u32 *pages);
  * (ledger_claim_refused)。DEVICE owner は拒否。 */
 int ledger_claim_fixed(u32 owner, u32 first, u32 end);
 /* 区間の表への登録。起動時 (paging_boot_context = master CR3・live AS 0) だけ。
- * 既存の区間と重なれば拒否 (DEVICE の区間は T1d)。flags は PERMANENT だけを
- * 受け、OUTSIDE は範囲から自動で付く。 */
+ * 既存の区間と重なれば拒否 (DEVICE の区間は ledger_reserve_set だけが作る)。
+ * flags は PERMANENT だけを受け、OUTSIDE は範囲から自動で付く。 */
 int ledger_register_region(u32 type, u32 owner, u32 first, u32 end, u32 cache,
                            u32 flags);
+/* ======== MMIO 登録と検証済み資源レコード (§3-1・§3-2、T1d、D33・X4) ======== */
+/* 資源レコードを表の空きに写す。bus・width_basis が既知の値で、decode は
+ * [0, 4GiB] の中 (RAW は幅未確定なので decode_first == decode_end でよい)、
+ * 写像範囲は空か decode の内側。表が満杯なら ledger_res_overflow を数えて
+ * 断る。*rid に番号。1 = 成功。 */
+int ledger_resource_add(const struct ledger_resource *rec, u32 *rid);
+/* ⑥-0 (pci_bind_all の直前): g_pci のメモリ BAR を width_basis = RAW で
+ * 取り込む (採取値。予約権限にならない、B4)。載せた本数を返す。
+ * 実体は kernel/ledger_pci.c (drivers/pci.h を引くのはそちらだけ)。 */
+u32 ledger_resource_import_pci(void);
+/* MMIO / 永久 RAM の一括予約 (旧 DEVICE_RESERVATION の broker の核を載せ直した
+ * もの、D33)。起動時 (ONLINE・paging_boot_context) だけ、owner は
+ * DEVICE 種別。手順: (e) span ごとに資源レコード res の decode の内側で、
+ * width_basis が SIZING / DATASHEET / GLUE_CONST であることを**正規化の前**に
+ * 照合 (B10) → 正規化 (同種の重なる・接する span を併合し、根拠を res_mask の
+ * 和に。異種の重なりは拒否) → 区間の表と照合: FIXED / STAGING / BUNDLE / DMA /
+ * SURFACE_BACKING と交差したら拒否、他 owner の DEVICE と交差したら拒否、
+ * BACKGROUND は許可 → owner が既に DEVICE 区間を持っていれば、正規化後の区間
+ * 集合と res_mask (と種別) が完全に一致するときだけ成功 (冪等、何も変えない)。
+ * 部分一致は拒否 → PFN の管理範囲の中は allocated でないこと・L2 に owner が
+ * 無いこと (永久予約)・RAM 種別は全ページ eligible で範囲の内側 → 区間の表の
+ * 空き → 一括 commit (eligible を落とし、DEVICE 区間を PERMANENT で記録。
+ * MMIO は UC、RAM は WB。管理範囲外にかかれば OUTSIDE)。解除 API は無い。
+ * 失敗時は L1・L2・L3・会計を全部不変。1 = 成功。 */
+int ledger_reserve_set(u32 owner, const struct ledger_span *spans, u32 n);
 /* 不変条件 (eligible で allocated ⇔ owner ≠ 0、owner の pages と L2 の一致、
- * L2 の番号が生きていること、区間の非重複と owner、SURFACE の owner) を任意の
+ * L2 の番号が生きていること、区間の非重複 (DEVICE と BACKGROUND の重なりだけ
+ * 許す) と owner、SURFACE の owner) を任意の
  * 時点で検査する。失敗は ledger_check_fail と ledger_check_tag に残す。 */
 int ledger_selfcheck(const char *tag);
 
