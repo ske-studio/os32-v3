@@ -59,8 +59,10 @@ STATIC_ASSERT(((MEM_APP_BAND_TOP - 1) >> 22) == APP_BAND_PDE, app_band_top_in_pd
 
 ## 4. 決めること (実装者が票に書き戻す)
 
-1. **最大枚数**。上の共有帯とぶつからないこと。デバイス窓は Cirrus リニア窓
-   `0x1000000` (PDE 4)、PEGC リニア窓 `0xF00000` (PDE 3 の中) にある。
+1. **最大枚数**。上の共有帯とぶつからないこと。デバイス窓は PEGC リニア窓 `0xF00000` (PDE 3 の中)。
+   Cirrus リニア窓は策定時 (2026-09-10) は `0x1000000` (PDE 4) にあったが、2026-09-29 に
+   `MEM_DEVICE_APERTURE_BASE` = `0xFE000000` の帯へ移設 (`include/memmap.h`、[02_memory.md §2-1](../../02_memory.md)、
+   [DEVICE_RESERVATION](../settings/DEVICE_RESERVATION.md) §3)。
    したがってアプリ帯を伸ばせるのは **PDE 1〜2 (`0x400000`-`0xBFFFFF`) が安全**で、
    PDE 3 まで伸ばすと PEGC の窓と衝突する。**まず最大 2 枚**を推奨する。
 2. **PT のバッキングをどこから取るか**。枚数分の PT (4KB × 枚数) がアドレス空間ごとに

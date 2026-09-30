@@ -28,7 +28,7 @@
 
 | 文書 | 状態 | 要旨 | 提案 |
 |---|---|---|---|
-| [DESIGN_APP_FIRST.md](../../DESIGN_APP_FIRST.md) | 「設計思想の草案」(語彙外、§4 D19) | 前景 1 アプリへ資源を集中する。マルチタスクを主目的にしない。評価軸は「1 本にどこまで渡せるか」。640×480×16bit を高機能グラフィックスの境界とし、Video HAL / VESA2 的互換層 / SDL 1.2 の受け皿。ZSNES を負荷試験台に。判断基準 7 項目 (§12) | **v3 (思想の芯)**。§12 の判断基準を本案の「変更の受け入れ基準」に採る。Video HAL・互換層・SDL は **v3 後半** (§3 P9) |
+| [DESIGN_APP_FIRST.md](../../DESIGN_APP_FIRST.md) | 草案 (2026-09-26)。策定時の「設計思想の草案」は語彙外 → 2026-09-30 (手順 f) に揃えた (§4 D19) | 前景 1 アプリへ資源を集中する。マルチタスクを主目的にしない。評価軸は「1 本にどこまで渡せるか」。640×480×16bit を高機能グラフィックスの境界とし、Video HAL / VESA2 的互換層 / SDL 1.2 の受け皿。ZSNES を負荷試験台に。判断基準 7 項目 (§12) | **v3 (思想の芯)**。§12 の判断基準を本案の「変更の受け入れ基準」に採る。Video HAL・互換層・SDL は **v3 後半** (§3 P9) |
 | [AUXILIARY_CORE_SERVICE.md](../../AUXILIARY_CORE_SERVICE.md) | 草案 (2026-09-28) | 余剰 CPU コアを固定機能アクセラレータ (Graphics / Audio worker) として使う。SMP スケジューラは持たない。x86 AP / ARM で同一モデル。縮退モデル。実装段階案 1〜7 | **v4** (対象機に複数コアの PC-98 は無い。Ra266 は 1 コア)。v3 では HAL のバックエンド表に「補助コア / ホスト / 主コア」の差し込み口を**塞がない**ことだけ守る |
 | [LEGACY_LIVING_PRESERVATION.md](../../LEGACY_LIVING_PRESERVATION.md) | 草案 (2026-09-28) | 実機の動態保存。判断基準「実機で行う意味があるか」。時代依存の処理 (TLS / codec / AI) は Host Service / OS64 へ。レガシー側の契約は小さく安定させる。ACS と Host Service の役割分離 | **v3 (思想の芯)**。Host Services の延長 (§1-6 の 5-6 / 5-7) の根拠。**OS64** の語はここと ACS だけ (§4 D6、§7 U3) |
 | [V4_GAME_PLATFORM_DRAFT.md](../../V4_GAME_PLATFORM_DRAFT.md) / [tasks/v4/README.md](../v4/README.md) | 草案 (2026-09-07) | Portable API / Platform API の分離、`arch/` `platform/` の長期構造、Native / Hosted / Game Runtime、エンジン Core / Module、Rust は上位から、OS32 Fabric / OS32 Link、想定ターゲット表、Phase V4-0〜4 | **v4** (決定済み: v3 の後)。v3 で守るのは V4 §11 の 8 原則のうち 1・2・4・6 (PC-98 固有を portable 層へ流さない、HAL 境界、固定番地を契約にしない、platform-only は明示) |
@@ -191,17 +191,17 @@ PLAN §1 の「1 と 2 を同時に動かさない」「§5 を §1 に割り込
 
 | # | 食い違い | どこ |
 |---|---|---|
-| MD1 | 予算の数字: 「余り 134.2KiB (本体の伸び代)」(MEMMAP_V3 §0、09-23) / 「残り 21KB」(PLAN §5-5 P2、TRIDENT §4-4) / 「残り 25.4KB」(LAN_82557 §1) / 「予算が 6KB しか無い」(PCM 2-1) / **「残り 13.0KB」(02_memory §2-1、正典)** | 日付の違う写し |
+| MD1 | 予算の数字: 「余り 134.2KiB (本体の伸び代)」(MEMMAP_V3 §0、09-23) / 「残り 21KB」(PLAN §5-5 P2、TRIDENT §4-4) / 「残り 25.4KB」(LAN_82557 §1) / 「予算が 6KB しか無い」(PCM 2-1) / **「残り 13.0KB」(02_memory §2-1、正典)** | 日付の違う写し。**済 (2026-09-30、手順 f)**: LAN_82557 §1・§3、TRIDENT §4-4、PCM §2-1 (本文と末尾の「票からの逸脱」)、MEMMAP_V3 §0・§11-1 を正典を指す形に (数字を残した箇所は日付つき)。PLAN §0・§1 は既にその形 |
 | MD2 | C11 との順序: 「C11 が先」(PLAN §1、KSTACK §7-5) / 「2-2 は C11 の前の独立した段階」(MEMMAP_V3 冒頭の PM 判断) | PLAN vs MEMMAP_V3 |
 | MD3 | 着手の条件: 「134KB の余裕で PCM と 82557 は入るので 2-2 は急がない」(MEMMAP_V3) / 「13KB では静的に積めない」(PLAN §3、ROADMAP §2) | 数字が動いた後に前提が変わった |
-| MD4 | デバイス窓の番地: 「Cirrus リニア窓 0x1000000 (PDE 4)」(APP_BAND_PDE §4) / 「16MiB からの全 2MiB linear aperture」(MEMORY_RAM_INTEGRATION §7) / **`[0xFE000000, 0xFE200000)`** (memmap.h、DEVICE_RESERVATION §3、02_memory) | 09-29 の移設が未反映の票 |
-| MD5 | hotdeploy 窓: MEMORY_RAM_INTEGRATION §2・§4・§6 は hotdeploy descriptor と窓を前提に書く / 窓は 2026-09-09 に撤去 (02_memory、`kernel/hotdeploy.c` は無い) | 撤去前の票 |
-| MD6 | PCM のステージングの置き場: 「プールを暫定で使う (カーネル予算が 6KB)」(PCM 2-1) / 「KHEAP へ (暫定を解く)」(MEMMAP_V3 2-3、KAPI_SPEC v61) | PCM 票の本文が古い |
+| MD4 | デバイス窓の番地: 「Cirrus リニア窓 0x1000000 (PDE 4)」(APP_BAND_PDE §4) / 「16MiB からの全 2MiB linear aperture」(MEMORY_RAM_INTEGRATION §7) / **`[0xFE000000, 0xFE200000)`** (memmap.h、DEVICE_RESERVATION §3、02_memory) | 09-29 の移設が未反映の票。**済 (2026-09-30、手順 f)**: APP_BAND_PDE §4 を移設後の番地に。MEMORY_RAM_INTEGRATION は `docs/archive/settings/` (完了記録) なので本文は触らない |
+| MD5 | hotdeploy 窓: MEMORY_RAM_INTEGRATION §2・§4・§6 は hotdeploy descriptor と窓を前提に書く / 窓は 2026-09-09 に撤去 (02_memory、`kernel/hotdeploy.c` は無い) | 撤去前の票。**済 (2026-09-30、手順 f)**: 票は `docs/archive/settings/` (完了記録) なので本文は触らず、本行の注記で足りる |
+| MD6 | PCM のステージングの置き場: 「プールを暫定で使う (カーネル予算が 6KB)」(PCM 2-1) / 「KHEAP へ (暫定を解く)」(MEMMAP_V3 2-3、KAPI_SPEC v61) | PCM 票の本文が古い。**済 (2026-09-30、手順 f)**: PCM §2-1「メモリ」をステージング = `kmalloc` に (実装 `drivers/pcm_cs4231.c` と一致)、§2-1 末尾「票からの逸脱」3 の -Os 行に「596KB への合流で外した」を追記 |
 | MD7 | アプリ帯の天井の根拠: 「PDE 3 に PEGC の窓」(APP_BAND_PDE、02_memory) — 帯 2MB 案でアプリが 0x600000 から始まると PDE 1 開始のままでは仮想帯が 1MB 減る (MEMMAP_V3 B7) | 2-2 と APP_BAND の前提の衝突 (論点 M4) |
 | MD8 | 最低 RAM: 「設計上の下限は 9.6MB」「PEGC の GUI は 9MB」「8MB では EXEC_DYN_RESERVE がアプリ帯と重なる (既存)」(02_memory、APP_BAND 4-B) / MEMORY_RAM_INTEGRATION は「8MiB PEGC の動作維持を本票だけで達成したとしない」 | 下限の数字が 3 か所 |
-| MD9 | physmem の接続: 「`physmem.c` はまだ C_KERNEL にない」(MEMORY_RAM_INTEGRATION §2) / 現行 `build/kernel.mk` はリンクしている (K6-RAM、`memory_boot_add_high`) | 09-13 の票の根拠行 |
+| MD9 | physmem の接続: 「`physmem.c` はまだ C_KERNEL にない」(MEMORY_RAM_INTEGRATION §2) / 現行 `build/kernel.mk` はリンクしている (K6-RAM、`memory_boot_add_high`) | 09-13 の票の根拠行。**済 (2026-09-30、手順 f)**: 票は `docs/archive/settings/` (完了記録) なので本文は触らず、本行の注記で足りる |
 
-討論に渡した形: M1〜M15 を議題、MD1〜MD9 を「先に事実を揃える項目」とした (討論は済み、上の決着先を見る)。MD1・MD4・MD5・MD6・MD9 の古い写しを本文で直すか注記だけかは §7 U9 (未決)。
+討論に渡した形: M1〜M15 を議題、MD1〜MD9 を「先に事実を揃える項目」とした (討論は済み、上の決着先を見る)。MD1・MD4・MD5・MD6・MD9 の古い写しは §7 U9 のとおり本文で直した (2026-09-30、手順 f。archive/ の票は注記だけ)。
 
 ---
 
@@ -221,13 +221,13 @@ PLAN §1 の「1 と 2 を同時に動かさない」「§5 を §1 に割り込
 | D10 | **デバイス窓の番地・hotdeploy** (§3-1 MD4・MD5) | MEMORY_RAM_INTEGRATION、APP_BAND_PDE | 再棚卸し (P4 の最初) |
 | D11 | **physmem の接続** (§3-1 MD9) | MEMORY_RAM_INTEGRATION §2 | 同上 |
 | D12 | **動的 vs 静的**: PLAN §3「動的読み込み」/ LAN 決裁 (b)「静的で入れて後で外に出す」/ TRIDENT T7「段 3 着手時に決める」/ PLAN §5-5 P2「動的の最初の顧客 (82557 の次)」 | 4 票 | P2 で「外に出す順」を 1 表に: 合成器 (最初から外)、Trident (T7)、82557 (静的で入れてから外へ)、USB (外)。ブートに要るもの (IDE / コンソール / FDC) は静的 |
-| D13 | **実機の位置づけの古い行**: realhw PLAN §0「v1.x のあいだは着手しない」、§9「1.44MB の対応 (しない)」「Trident (しない)」 — どちらも票内で上書き済み | realhw PLAN | 本文は残してよい (状態行と追記が正)。fork 時に「策定時の記述」と注記済み |
+| D13 | **実機の位置づけの古い行**: realhw PLAN §0「v1.x のあいだは着手しない」、§9「1.44MB の対応 (しない)」「Trident (しない)」 — どちらも票内で上書き済み | realhw PLAN | 本文は残してよい (状態行と追記が正)。fork 時に「策定時の記述」と注記済み。**済 (2026-09-30、手順 f)**: §0 冒頭・§9 を現状 (v2.1 で HDD 起動済み、1.44MB・Trident は着手) に書き直し、v3/PLAN §0・§6 の同じ行も |
 | D14 | **ACS / Host Service / Fabric の 3 語**: LEGACY は ACS (同一機の余剰コア) と Host Service (現代ホスト) の 2 分、V4 は Fabric / OS32 Link (OS32 ノード同士、remote device)。同じ「外の計算資源」を 3 語で呼ぶ | LEGACY・ACS・V4 | v4 側で用語表を 1 つ (ACS = 同一機、Host Service = 現代ホスト、Fabric = OS32 ノード)。v3 では Host Service だけを使う |
 | D15 | **移植の範囲**: ARM_GAUGE §10「32 ビットのみ、16/64 は範囲外」(決定 09-17) vs V4 §10 の候補表に riscv64 / Z80・R800 (MSX2 系「Compact / Runtime」) / MIPS (Hosted) | ARM_GAUGE vs V4 (09-07、決定より前) | v4 草案の候補表に「32 ビット限定の決定 (09-17) より前の表」と注記。v3 は 32 ビット限定を維持 |
 | D16 | **1kHz tick**: PLAN §5-5「IRQ0 を 100Hz → 1kHz」、HAL_WIRING §4「1kHz と汎用 hz は別票」 — 票が無い | PLAN vs HAL_WIRING | P3 に票を起こす (実機と NP21/W で割り込み負荷を実測してから既定に、PLAN §5-5 の順序 (2)) |
 | D17 | **DEVICE_RESERVATION の対象**: 「初回は PEGC と Xe10 のみ、許可は既知候補の定数だけ」 vs TRIDENT §4-2「実測 BAR の検証済み範囲を渡す口を同票へ追加」 | DEVICE_RESERVATION vs TRIDENT | DEVICE_RESERVATION を改訂 (Trident の要求 1〜3 を取り込む)。**X4 の答え (2026-09-30、承認)**: 生の `{base, size}` ではなく**検証済み資源レコード** (BDF・ID・BAR 番号・確定 decode 幅と根拠・世代) を台帳に、予約 / 写像 / 面の範囲を分け、GUI 境界で装置の同一性を再確認、永久予約とモジュール回収を分離。Trident の今の採取値は未検証 (TASK_MEMMAP_V3 §8-4・T1) |
 | D18 | **面公開 API**: 現行 `gfx_bb_phys_range()` は仮想 = 物理を前提 (恒等)。TRIDENT §4-2 は高位仮想窓で壊れると指摘し、記述子 (`virt`/`phys`) と `paging_addrspace_map_user_range_phys_keep` を要件に | TRIDENT vs 02_memory「デバイス窓の貸し出し規則」 | P4 の要件として本案に載せる (Trident 専用ではなくカーネル共通)。**X3 の答え (2026-09-30、承認)**: `_phys_keep` (共有 PT の USER 昇格) は v3 では採らない — 面は AS ごとの私有 lease PT に張り、記述子は SURFACE 台帳への参照、lease の仮想番地は別に返す、キャッシュ属性は台帳から (TASK_MEMMAP_V3 §2-2、T2) |
-| D19 | **状態行の語彙**: DESIGN_APP_FIRST「設計思想の草案」(語彙外だが `docs/` 直下は検査対象外)、V4_GAME_PLATFORM_DRAFT に状態行が無い (tasks/v4/README にはある) | POLICY_DEV §8 | fork 時に「草案 (日付)」へ揃える (本文は変えない、状態行だけ) |
+| D19 | **状態行の語彙**: DESIGN_APP_FIRST「設計思想の草案」(語彙外だが `docs/` 直下は検査対象外)、V4_GAME_PLATFORM_DRAFT に状態行が無い (tasks/v4/README にはある) | POLICY_DEV §8 | fork 時に「草案 (日付)」へ揃える (本文は変えない、状態行だけ)。**済 (2026-09-30、手順 f)**: DESIGN_APP_FIRST「草案 (2026-09-26)」、V4_GAME_PLATFORM_DRAFT に「草案 (2026-09-07)」の状態行を追加 |
 | D20 | **GUI アプリ群の位置**: ROADMAP §1 v1.4「先送り (v3 以降)」、§2「協調型マルチタスクの拡張の後」 — v3 の柱には無い | ROADMAP | v3 後半の末尾か v4 (§2 の範囲外に置いた。決裁 §7 U7) |
 | D21 | **重複**: PLAN §3-1 (HAL の棚卸し) と HAL_WIRING §0 (なぜ要るか)、PLAN §5-5 (合成器の設計前提) と PCM 票 §0、realhw PLAN §5・§6 と LAN_82557 §1 — 同じ事実が 2 か所 | 4 組 | 本案では票側を正典にし、PLAN は 1 行 + リンクへ縮める |
 
@@ -312,7 +312,7 @@ PLAN §1 の「1 と 2 を同時に動かさない」「§5 を §1 に割り込
 | U6 | **保留 5 件** (F3a〜c / F2c / FEP_BOUNDARY / MEMORY_RAM_INTEGRATION / DEVICE_RESERVATION) を v3 で拾うか。**決定 (2026-09-30): 「一部」** — F3a / F3c → T4、F3b → TASK_DICT_META の後に「同一 DB の排他 open」、F2 の残り → T4 + T5a、FEP_BOUNDARY → T2 / T4 / T5a の要件 (旧 `db_exec` / `db_prepare` の 1024B 超は失敗に)、MEMORY_RAM_INTEGRATION → 撤回 (archive、残る 2 点は T1)、DEVICE_RESERVATION → 改訂して P4 (核は T1、識別 + 予約は起動時・probe + enable は GUI 境界、実測 BAR へ広げる → X4 を Codex へ)。仕分け表 [U6_PENDING_REVIEW.md](U6_PENDING_REVIEW.md) の推奨どおり (TASK_MEMMAP_V3 D29〜D34) | 拾う (P4・P10) / 一部 / 拾わない | HANDOVER_v14 §3、§1-3、U6_PENDING_REVIEW |
 | U7 | **GUI アプリ群と Video HAL / 互換層 (P9)** を v3 後半に置くか v4 に送るか。**決定 (2026-09-30): P8 / P9 は P1 から切り出した別の柱** (TASK_MEMMAP_V3 D19)。**時期も決定 (2026-09-30): v3 後半、基盤が整い次第**。ZSNES は移植する、難度の低いものから — 候補と挑戦順は [PORT_CANDIDATES.md](PORT_CANDIDATES.md) | v3 後半 / v4 | §4 D20、§3 P9 |
 | U8 | **KAPI / ABI の整理** (§5 C1〜C3): 追記のみ / fork で 1 回整理 / 16 本を切ったとき。SDK ヘッダの C89 互換。**決定 (2026-09-30): 後方互換は基本考えない** (TASK_MEMMAP_V3 D7 — 全再ビルド・旧形式拒否・互換層なし)。~~追記のみか 1 回整理するかの選択は残る~~ → **決定 (2026-09-30、TASK_MEMMAP_V3 D35): (b) fork で 1 回整理。スロットの順を変えてよいが、世代の識別 (形式版・KAPI ABI 世代・メモリ配置世代・shlib プロトコル) と旧新混在の試験を P7 の必須にする** (Codex X6) | (a)(b)(c) → (b) | §5、§3 P7 |
-| U9 | **古い写しの扱い**: MD1・MD4・MD5・MD6・MD9 の古い数字・番地を票の本文で直すか、注記だけ足すか (「草案の本文は書き換えない」の範囲) | 直す / 注記 | §3-1 |
+| U9 | **古い写しの扱い**: MD1・MD4・MD5・MD6・MD9 の古い数字・番地を票の本文で直すか、注記だけ足すか (「草案の本文は書き換えない」の範囲)。**済 (2026-09-30、手順 f): 直した** — 数字は書き直さず 02_memory §2-1 の生成ブロックを指す形に、残した数字には日付。archive/ の票は §3-1 の注記だけ | 直す / 注記 | §3-1、FORK_PLAN §3 f |
 | U10 | **決定 (2026-09-30): そのまま** (apps/game は個人で作ったアプリなので private の submodule をトークンが要る状態で参照する。NP21/W のフォークは submodule ではなく、ライセンスの判断で private のまま)。**submodule の公開範囲**: パブリックの os32-v3 が private の os32-apps / os32-game を指す形でよいか (clone で落ちる、CI は SUBMODULE_TOKEN) | そのまま / apps・game も公開 / os32-v3 では参照を外す | §6-1 |
 | U11 | **履歴の案** (A〜D) と **監査の実施者・方法** (§6-3) | A / B / C / D | §6-2 |
 

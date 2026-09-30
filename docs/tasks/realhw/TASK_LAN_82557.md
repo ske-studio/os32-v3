@@ -27,7 +27,7 @@
 | リンク層は NIC の上に載る。`drivers/lgy98.c` が `link_init(mac)` を呼び、IRQ スタブは `irq_stub_nic_3/5/6` | `drivers/lgy98.c` 122〜137 行 |
 | ホスト側 `tools/host_agent.py` は **TCP の FrameStream** (NP21/W の NP2NETSOCK が繋ぐ) しか話さない。実機では LAN の生フレームを FrameStream に橋渡しする道具が要る | `host_agent.py` `open_stream()` |
 | WSL2 (ミラーモード) は `eth3` (物理、f0:68:e3:fa:99:06) を見るが AF_PACKET は root 要 (sudoers に python は無い)。Windows 側には **Npcap 導入済み** (`System32\Npcap`)、scapy は未導入 (uv で入る) | 2026-09-22 実測 |
-| カーネル本体 442.6KB / 予算 468KB (**残り 25.4KB**)。予算は `MEM_KERNEL_IMAGE_MAX` = 帯 − KHEAP − KAPI − ガード − SHM。増やすなら SHM を 16KB 単位で削るか KHEAP を減らす | `docs/02_memory.md`、`include/memmap.h` 228 行 |
+| カーネル本体の大きさと残り予算は [`docs/02_memory.md`](../../02_memory.md) §2-1 の生成ブロックが正典 (策定時 2026-09-22 の写しは 442.6KB / 468KB、残り 25.4KB。2026-09-30 は 583.0KB / 596KB、残り 13.0KB — KHEAP の切り直しで予算が 596KB になった)。予算は `MEM_KERNEL_IMAGE_MAX` = 帯 − KHEAP − KAPI − ガード − SHM。増やすなら SHM を 16KB 単位で削るか KHEAP を減らす | `docs/02_memory.md` §2-1、`include/memmap.h` (`MEM_KERNEL_IMAGE_MAX`) |
 | v3 の順序は C11 → メモリマップ再配置 → **ドライバ動的読み込み → PCI → 82557** (「動かさない」)。理由は予算 (PCI 数 KB + 82557 十数 KB、USB は 100KB 超) | `../v3/PLAN.md` §1/§3 |
 
 ## 2. 段取り (案)
@@ -77,7 +77,7 @@ AF_PACKET の bind と `sendto` は実機の回で確かめる (§5-2)。
 
 ## 3. ユーザー決裁が要る点
 
-1. **予算と v3 の順序** — **決まった: (b)** (ユーザー、2026-09-22)。L-A (2〜3KB) は残り 25KB に収まる。L-B (10〜15KB) を静的リンクすると予算をほぼ使い切る。
+1. **予算と v3 の順序** — **決まった: (b)** (ユーザー、2026-09-22)。L-A (2〜3KB) は決裁時の残り 25KB に収まる (当時の写し。現在の残りは §1 の正典)。L-B (10〜15KB) を静的リンクすると予算をほぼ使い切る。
    v3 §1 は「ドライバ動的読み込み → PCI → 82557」の順を「動かさない」としている。選択肢:
    (a) 順序どおり: 先に v3 の 1〜3 (C11 / 再配置 / 動的読み込み) を片付ける (大きい、LAN は先送り)。
    (b) **PM の推奨**: L-A を先に (小さく、実機でしか検証できない土台を早く通す)、L-B は予算を測りながら静的で入れ、

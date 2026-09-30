@@ -1,5 +1,7 @@
 # OS32 v4 草案 — Portable Game OS / Multi-Architecture / OS32 Fabric
 
+> 状態: **草案 (2026-09-07)** — 実装契約ではない ([tasks/v4/README.md](tasks/v4/README.md) と同じ)。
+
 *草案策定: 2026-09-07*
 
 > 本書は v4 世代を見据えた長期設計のたたき台である。現行 PC-98 実装を直ちに置換する計画ではなく、
