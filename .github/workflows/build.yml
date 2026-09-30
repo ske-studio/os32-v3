@@ -115,11 +115,21 @@ jobs:
           export PATH="$CROSS_DIR/bin:$PATH"
           make check-fast CROSS_DIR="$CROSS_DIR" NP21W_DIR="$RUNNER_TEMP/np21w"
 
-      # ⑤ 成果物: カーネル・起動 FD・インストール ISO・パッケージ。
+      # ⑤ 成果物: カーネル・起動 FD・インストール ISO・パッケージ・実機更新用の配備元 (hostdrv.tar.gz)。
       #    BUILD_INFO.txt と SHA256SUMS は tools/ci_fetch.sh が読む。
       - name: Artifact name
         id: name
         run: echo "artifact=os32-${GITHUB_REF_NAME//\//-}-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      # 実機の HDD 起動のままシリアル経由で更新する配備元 (hsync の名札 .deploy/manifest.txt を含む)。
+      # v2 の CI にあった段を戻した (docs/tasks/realhw/PLAN.md の手順が hostdrv.tar.gz を展開して使う)。
+      - name: Deploy tree (make deploy into a temp HOSTDRV_DIR)
+        run: |
+          export PATH="$CROSS_DIR/bin:$PATH"
+          mkdir -p "$RUNNER_TEMP/hostdrv"
+          make deploy CROSS_DIR="$CROSS_DIR" NP21W_DIR="$RUNNER_TEMP/np21w" \
+            HOSTDRV_DIR="$RUNNER_TEMP/hostdrv" NO_PRUNE=1
+          test -f "$RUNNER_TEMP/hostdrv/.deploy/manifest.txt"
 
       - name: Collect outputs
         run: |
@@ -128,6 +138,7 @@ jobs:
           cp build/out/vmkernel.lz4 build/out/kernel.map out/
           cp images/os32_boot.d88 images/os32_boot.img images/os32_boot144.img images/os32_install.iso out/
           cp packages/*.PKG out/packages/
+          tar -C "$RUNNER_TEMP" -czf out/hostdrv.tar.gz hostdrv
           {
             echo "commit:  $GITHUB_SHA"
             echo "ref:     $GITHUB_REF_NAME"
