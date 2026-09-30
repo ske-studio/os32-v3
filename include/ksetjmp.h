@@ -1,7 +1,10 @@
 /* ======================================================================== */
 /*  KSETJMP.H — カーネル内 setjmp/longjmp (kernel/setjmp.asm)               */
 /*                                                                          */
-/*  ESP/EBP/EBX/ESI/EDI/戻り先 EIP の 6 ワードを保存/復元する。              */
+/*  ESP/EBP/EBX/ESI/EDI/戻り先 EIP の 6 ワードと、文脈の深さ               */
+/*  (kctx_irq_depth / kctx_exc_depth、TASK_T1_LEDGER §3-5) の 2 ワードを     */
+/*  保存/復元する。保存先は必ず KSETJMP_BUF_LEN 語で宣言すること (長さの     */
+/*  直書きは禁止 — v86.c の [6] が語 6・7 を越えて書いた、Codex B8)。        */
 /*  exec のネスト復帰と V86 セッション脱出が使う。                           */
 /*                                                                          */
 /*  注意:                                                                   */
@@ -15,7 +18,7 @@
 
 #include "types.h"
 
-#define KSETJMP_BUF_LEN 6
+#define KSETJMP_BUF_LEN 8
 
 int  exec_setjmp(u32 *buf);
 void exec_longjmp(u32 *buf);

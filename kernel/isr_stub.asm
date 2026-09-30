@@ -39,6 +39,39 @@ USER_DS     equ 0x2B
         mov     fs, ax
         mov     gs, ax
 %endmacro
+;; ============================================================
+;; 文脈の深さ (観測用、TASK_T1_LEDGER §3-5 / R1)。
+;;
+;; 台帳の操作が割り込み / 例外フレームの上で走った回数を数えるための深さ。
+;; **全部の IRQ スタブ** の入口で IRQ_ENTER、iretd で戻る直前に IRQ_LEAVE。
+;; **全部の例外の入口** (isr_common・#GP / #PF・V86 分岐) で EXC_ENTER、
+;; 復帰する経路 (popad → iretd) で EXC_LEAVE。longjmp で抜ける経路
+;; (ring3_abort_check・ring3_fault_kill・v86_exit_to_kernel) は LEAVE を通らず、
+;; exec_longjmp が jmpbuf の控えへ戻す (kernel/setjmp.asm)。
+;;
+;; **ss: で書く**: IRQ7 のスタブは RESTORE_KSEG をしない (DS は割り込まれた
+;; 側の値のまま)。SS は V86 / CPL=3 からの入口なら TSS の ss0 = 0x10、CPL=0
+;; からなら既存の flat SS 0x10 なので、どちらでも同じ flat 番地を指す。
+;; inc / dec はフラグを変えるので、test と jcc の間には置かない。
+;;
+;; irq_in_irq (irq.c、broker の IRQ_ERR_CTX 判定) とは別物で、あちらは
+;; 共通スタブ (irq_dispatch) の深さだけのまま (Codex B1)。
+;; ============================================================
+extern kctx_irq_depth
+extern kctx_exc_depth
+
+%macro IRQ_ENTER 0
+        inc     dword [ss:kctx_irq_depth]
+%endmacro
+%macro IRQ_LEAVE 0
+        dec     dword [ss:kctx_irq_depth]
+%endmacro
+%macro EXC_ENTER 0
+        inc     dword [ss:kctx_exc_depth]
+%endmacro
+%macro EXC_LEAVE 0
+        dec     dword [ss:kctx_exc_depth]
+%endmacro
 
 ;; ============================================================
 ;; IRETD_USER — CPL=3 (リング3) 対応の iretd。全復帰点で iretd の代わりに使う。
@@ -165,6 +198,7 @@ isr_stub_%1:
         jmp     isr_common
 
 %%from_v86:
+        EXC_ENTER               ;; 戻らない (v86_exit_to_kernel が longjmp)
         ;; #GP スタブと同じフレーム形にするため errcode 相当を積む
         push    0
         pushad
@@ -201,6 +235,7 @@ isr_stub_%1:
         jmp     isr_common
 
 %%from_v86:
+        EXC_ENTER               ;; 戻らない (v86_exit_to_kernel が longjmp)
         pushad
 
         RESTORE_KSEG
@@ -277,6 +312,7 @@ isr_stub_13:
         jmp     isr_common
 
 .from_v86:
+        EXC_ENTER
         pushad
 
         RESTORE_KSEG
@@ -287,9 +323,10 @@ isr_stub_13:
         add     esp, 4
 
         test    eax, eax
-        jnz     .v86_exit
+        jnz     .v86_exit               ;; 戻らない (longjmp が深さを戻す)
 
         ;; 0 が返った → V86 に復帰
+        EXC_LEAVE
         popad
         add     esp, 4                  ;; error_code をスキップ
         IRETD_USER
@@ -310,6 +347,7 @@ isr_stub_13:
 ;; exception_handler(u32 error_code, u32 vector, u32 fault_eip, u32 *regs)
 ;; ============================================================
 isr_common:
+        EXC_ENTER               ;; 全ベクタ (#DE / #UD / #GP ...) がここを通る
         pushad                  ;; 全汎用レジスタ保存 (32B)
         RESTORE_KSEG            ;; V86 由来だと DS/ES/FS/GS が null
                                 ;; ESP = base とする
@@ -334,9 +372,10 @@ isr_common:
         mov     eax, [esp + 12 + 32 + 4]     ;; base-12+48 = base+36 ✓
         push    eax             ;; ESP=base-16
 
-        call    exception_handler
+        call    exception_handler   ;; fault kill は longjmp で戻らない
         add     esp, 16
 
+        EXC_LEAVE
         popad
         add     esp, 8          ;; error_code + vector をスキップ
         IRETD_USER
@@ -356,6 +395,7 @@ isr_common:
 global isr_stub_14
 isr_stub_14:
         cli
+        EXC_ENTER               ;; 両分岐 (V86 は longjmp、通常は下の EXC_LEAVE)
         ;; V86 ゲストの #PF はカーネルのページフォルトではない。
         ;; 汎用ハンドラに渡すとカーネルのバグとして表示されてしまう。
         test    dword [esp + 12], 0x00020000  ;; EFLAGS.VM
@@ -397,6 +437,7 @@ isr_stub_14:
         call    page_fault_handler
         add     esp, 16
 
+        EXC_LEAVE
         popad
         add     esp, 4          ;; error_code をスキップ
         IRETD_USER
@@ -409,6 +450,8 @@ isr_stub_14:
 ;; ============================================================
 global isr_stub_default
 isr_stub_default:
+        EXC_ENTER
+        EXC_LEAVE
         IRETD_USER
 
 ;; ============================================================
@@ -433,12 +476,14 @@ extern irq_dispatch
 %macro IRQ_COMMON 1
 global irq_stub_common_%1
 irq_stub_common_%1:
+        IRQ_ENTER
         pushad
         RESTORE_KSEG
         cld
         push    dword %1                ;; IRQ 番号 (ベクタではない)
         call    irq_dispatch
         add     esp, 4
+        IRQ_LEAVE
         popad
         IRETD_USER
 %endmacro
@@ -457,6 +502,7 @@ IRQ_COMMON 15                   ;; INT 0x2F
 ;; ============================================================
 global irq_stub_0
 irq_stub_0:
+        IRQ_ENTER
         pushad
         RESTORE_KSEG
         cld                     ;; 割り込みの入口は DF を消さない (往復 3 B3)
@@ -483,6 +529,7 @@ irq_stub_0:
         call    v86_exit_to_kernel              ;; longjmp するので戻らない
 .no_timeout:
 
+        IRQ_LEAVE
         popad
         IRETD_USER
 
@@ -491,6 +538,7 @@ irq_stub_0:
 ;; ============================================================
 global irq_stub_1
 irq_stub_1:
+        IRQ_ENTER
         pushad
         RESTORE_KSEG
         cld                     ;; 同上 (C 呼び出しの前に DF=0)
@@ -538,6 +586,7 @@ irq_stub_1:
         call    ring3_abort_check               ;; 要求があれば longjmp (戻らない)
 .no_abort:
 
+        IRQ_LEAVE
         popad
         IRETD_USER
 
@@ -546,6 +595,7 @@ irq_stub_1:
 ;; ============================================================
 global irq_stub_4
 irq_stub_4:
+        IRQ_ENTER
         pushad
         RESTORE_KSEG
         cld
@@ -557,6 +607,7 @@ irq_stub_4:
         mov     al, OCW2_EOI
         out     PIC1_CMD, al
 
+        IRQ_LEAVE
         popad
         IRETD_USER
 
@@ -566,6 +617,7 @@ irq_stub_4:
 ;; ============================================================
 global irq_stub_7
 irq_stub_7:
+        IRQ_ENTER
         push    eax
         ;; ISR読み出しでスプリアスか確認
         mov     al, 0x0B        ;; OCW3: ISR読み出し指定
@@ -580,6 +632,7 @@ irq_stub_7:
         jnz     .real            ;; 本物の割り込みなら処理
 
         ;; スプリアス → EOIを送らずに無視
+        IRQ_LEAVE
         pop     eax
         IRETD_USER
 
@@ -587,6 +640,7 @@ irq_stub_7:
         ;; 本物のIR7割り込み (スレーブカスケード等)
         mov     al, OCW2_EOI
         out     PIC1_CMD, al
+        IRQ_LEAVE
         pop     eax
         IRETD_USER
 
@@ -595,6 +649,7 @@ irq_stub_7:
 ;; ============================================================
 global irq_stub_11
 irq_stub_11:
+        IRQ_ENTER
         pushad
         RESTORE_KSEG
         cld
@@ -608,6 +663,7 @@ irq_stub_11:
         ;; マスタPICにもEOI送出 (カスケード)
         out     PIC1_CMD, al
 
+        IRQ_LEAVE
         popad
         IRETD_USER
 
@@ -638,6 +694,7 @@ irq_stub_11:
 ;; ============================================================
 global irq_stub_2
 irq_stub_2:
+        IRQ_ENTER
         pushad
         RESTORE_KSEG
         cld                     ;; V86_REFLECT も C (v86_reflect_irq) を呼ぶ
@@ -648,11 +705,13 @@ irq_stub_2:
 
         V86_REFLECT 2           ;; IRQ2 (VSYNC)。既定では INT 0Ah に落ちる
 
+        IRQ_LEAVE
         popad
         IRETD_USER
 
 global irq_stub_12
 irq_stub_12:
+        IRQ_ENTER
         pushad
         RESTORE_KSEG
         cld                     ;; 同上
@@ -664,6 +723,7 @@ irq_stub_12:
 
         V86_REFLECT 12          ;; IRQ12 (サウンド)。既定では INT 14h に落ちる
 
+        IRQ_LEAVE
         popad
         IRETD_USER
 
@@ -672,6 +732,7 @@ irq_stub_12:
 ;; ============================================================
 global irq_stub_13
 irq_stub_13:
+        IRQ_ENTER
         pushad
         RESTORE_KSEG
         cld
@@ -685,6 +746,7 @@ irq_stub_13:
         ;; マスタPICにもEOI送出 (カスケード)
         out     PIC1_CMD, al
 
+        IRQ_LEAVE
         popad
         IRETD_USER
 
