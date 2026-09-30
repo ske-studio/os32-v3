@@ -314,6 +314,19 @@ userland/tests/faultprobe_r3.bin: userland/tests/faultprobe.elf
 faultprobe_r3: userland/tests/faultprobe_r3.bin
 .PHONY: faultprobe_r3
 
+# --- cpl0_probe (CPL=0 の子の受入、票 docs/tasks/v3/TASK_T1_LEDGER.md §4-1) ---
+# crt0 をリンクした通常の ELF (C_TESTS の汎用ルール) を --cpl0 で .bin にする。
+# 明示ルールなので汎用の userland/%.bin (app.conf を見る) より優先される。
+# CPL=0 の子の claim (exec_child_claim) と sys_usable_mem_end の実測に使う。
+# 撤去は T2 (--cpl0 ごと、TASK_T1_LEDGER §1-2)。
+userland/tests/cpl0_probe.bin: userland/tests/cpl0_probe.elf
+	$(OBJCOPY) -O binary $< userland/tests/cpl0_probe.raw
+	python3 sdk/mkos32x.py userland/tests/cpl0_probe.raw $@ --elf $< --api 39 --cpl0
+	@rm -f userland/tests/cpl0_probe.raw
+
+cpl0_probe: userland/tests/cpl0_probe.bin
+.PHONY: cpl0_probe
+
 # ---------------------------------------------------------------------------
 # DEFINE_TEST — テストプログラム定義テンプレート
 # $(1) = テスト名 (tests/ 以下のベース名)
