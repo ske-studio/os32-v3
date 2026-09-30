@@ -408,3 +408,8 @@ HDD に入っている 672f849 (9/29 に (C) を通したビルド、配備な�
 (ユーザー撮影の写真。写真はリポジトリに入れない)。GUI を抜けて **CUI にも正しく戻った** (ユーザー報告)。
 液晶の自動調整ボタンは押していない (押す必要が無かった)。480 ライン時の OSD (水平/垂直周波数) は未採取。
 → §0 の桁ずれは段 2 (SYNC の値と順序を実機 ROM に合わせた) で解消した。§2 の H1/H2 が原因だったと読む (H4・H5 は否定)。
+
+## v3 のカーネルでの実機ログ (2026-10-01、実機エージェント、`737f6e4`、画面は見ていない)
+
+`gfxmode pegc` → シリアルから `reboot`。boot.log `[pegc] hsync=24k 09a8=80 bios054c.b5=0 bios0459.b0=0` / `[pegc] gdcclk=2.5M clk1=0 clk2=0 bios054d.b2=0 pitch400=40`、`hal_test` = `backend pegc (packed 8bpp)` 640x480、`pegcchk 3` = `[pegc] enter 09a8=81 msk=0 dsp=1 lcd=1 clk=3 ext=1 800l=1 fifo_to=0 vs_to=0` / `[pegc] exit 09a8=80 … clk=0 ext=0 800l=0 fifo_to=0 vs_to=0` / `R mode 640x480 … pattern drawn` / `R back CUI after 334 ticks`。9/29 の記録 (起動時 `hsync=31k 09a8=81 bios054c.b5=1`、exit `09a8=81`) と違うのは、**この日の実機が 24kHz で起動していた**ため (起動時の `09A8h` bit0 = 0)。enter は 31kHz / 480 ラインへ入り、exit は起動時の値 (80) へ戻す — 段 2 の設計どおり。起動時のモードがなぜ 9/29 と違うか (ディップスイッチ・メモリスイッチ、9/30 の目視の手順) は未確認。実機は `GFX=pegc` のまま。
+
