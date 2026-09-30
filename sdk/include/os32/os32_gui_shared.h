@@ -22,8 +22,9 @@
 /* 基本型 (u8/u16/u32/i16/i32) と OS32_ERR_* / GFX_Stats の SSoT。 */
 #include "os32_kapi_shared.h"
 
-/* types.h の STATIC_ASSERT と同一。カーネル/ユーザランドどちらの経路でも
- * 自己完結させるためのフォールバック定義。 */
+/* types.h の STATIC_ASSERT (内部は C11 の _Static_assert) が無い経路のための
+ * フォールバック定義。公開 SDK ヘッダは gnu89 でも読める必要がある ([C1]) ので
+ * C89 の負サイズ配列で書く。呼び出しの形は types.h と同じ。 */
 #ifndef STATIC_ASSERT
 #define STATIC_ASSERT(cond, name) \
     typedef char static_assert_##name[(cond) ? 1 : -1]

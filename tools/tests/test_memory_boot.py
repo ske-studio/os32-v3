@@ -26,7 +26,7 @@ class MemoryBoot(unittest.TestCase):
                 '\n#undef kprintf\n#undef shm_init\n}\n')
             adapter = ROOT / 'kernel/memory_boot.c'
             (d / 'memory_boot_host_source.c').write_text(adapter.read_text() if adapter.exists() else '')
-            cmd = ['gcc', '-m32', '-march=i386', '-std=gnu89', '-Wall', '-Wextra', '-Werror', '-Wdeclaration-after-statement', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie', '-ffunction-sections', '-Wl,--gc-sections', f'-DTEST_{case.upper()}', f'-DTEST_KB={kb}UL'] + list(defines)
+            cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie', '-ffunction-sections', '-Wl,--gc-sections', f'-DTEST_{case.upper()}', f'-DTEST_KB={kb}UL'] + list(defines)
             # arch/x86 + platform/pc98: include/io.h / include/cpu.h は契約
             # だけで、実装は固定名 arch_io.h / arch_cpu.h / platform_io.h を
             # 引く (順序 3・5)。CR0 / CR3 を触る arch_cpu.h だけは、ホストでは

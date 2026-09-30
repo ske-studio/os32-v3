@@ -3,9 +3,9 @@
 票:   docs/archive/gui_v13/TASK_T9_sh.md §1 D3a (S 側 = シェル)
 記録: tools/tests/t9_tdd.md
 
-test_launch.py (K 側) と同じ様式 — ホスト ILP32 GNU89 で走らせたあと、
+test_launch.py (K 側) と同じ様式 — ホスト ILP32 GNU11 で走らせたあと、
 同じソースが外部プログラムと同じ形の i386-elf-gcc -Werror でも通ることを
-別に見る ([C1] C89/GNU89)。Make・エミュレータは使わない。
+別に見る ([C1] GNU11)。Make・エミュレータは使わない。
 
 ホスト側は tools/tests/sh_launch_host.c が sh_launch.inc をそのまま
 #include する (模型ではない)。差し替えるのは KernelAPI の 4 本
@@ -18,9 +18,8 @@ import sys
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-FLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding",
-         "-fno-pie", "-fno-stack-protector", "-Wall", "-Wextra", "-Werror",
-         "-Wdeclaration-after-statement"]
+FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
+         "-fno-pie", "-fno-stack-protector", "-Wall", "-Wextra", "-Werror"]
 INCLUDES = ["-I" + str(ROOT / "sdk/include/os32")]
 HOST_SRC = ROOT / "tools/tests/sh_launch_host.c"
 INC_SRC = ROOT / "userland/shell/sh_launch.inc"
@@ -43,19 +42,18 @@ if __name__ == "__main__":
         subprocess.run(["gcc", *FLAGS, "-O0", *INCLUDES,
                         "-nostdlib", "-static", "-no-pie",
                         str(HOST_SRC), "-o", str(exe)], cwd=ROOT, check=True)
-        print("HOST ILP32 GNU89 COMPILE PASS", flush=True)
+        print("HOST ILP32 GNU11 COMPILE PASS", flush=True)
         rc = subprocess.run([str(exe)], cwd=ROOT, timeout=30).returncode
 
         stub = tmp / "sh_launch_target.c"
         stub.write_text(TARGET_STUB)
-        subprocess.run(["i386-elf-gcc", "-std=gnu89", "-m32", "-march=i386",
+        subprocess.run(["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                         "-ffreestanding", "-fno-pie", "-fno-stack-protector",
                         "-nostdlib", "-mno-red-zone", "-fcommon",
                         "-O2", "-Wall", "-Wextra", "-Werror",
-                        "-Wdeclaration-after-statement",
                         "-D__OS32_USERLAND__", *INCLUDES, "-c", str(stub),
                         "-o", str(tmp / "sh_launch_target.o")],
                        cwd=ROOT, check=True)
-        print("TARGET i386-elf GNU89 -Werror COMPILE PASS", flush=True)
+        print("TARGET i386-elf GNU11 -Werror COMPILE PASS", flush=True)
         print("EXIT sh_launch_host=%d" % rc, flush=True)
         sys.exit(rc)

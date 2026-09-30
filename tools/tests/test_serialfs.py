@@ -75,8 +75,8 @@ GATE_CASES = ["gate_tx", "hold_overflow", "gate_rx", "gate_init_refused",
 SESSION_CASES = ["flow", "hello_fail_quiet", "hello_fail_flood", "end_late_hold",
                  "end_not_quiet"]
 
-FLAGS = ["-std=gnu89", "-Wall", "-Wextra", "-Werror",
-         "-Wdeclaration-after-statement", "-D_DEFAULT_SOURCE", "-D__cdecl=",
+FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
+         "-D_DEFAULT_SOURCE", "-D__cdecl=",
          "-Wno-unused-function"]
 
 def flags_for(mutated):
@@ -206,10 +206,10 @@ def run_exe_cases(exe, cases, quiet=False, tag="", first_fail=False, timeout=60)
 
 def build_target(tmp):
     """カーネルと同じ i386-elf で新しい実物を -Werror で通す。"""
-    base = ["i386-elf-gcc", "-std=gnu89", "-m32", "-march=i386",
+    base = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
             "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
             "-mno-red-zone", "-fcommon", "-fsigned-char", "-fno-short-enums",
-            "-O2", "-Wall", "-Werror", "-Wdeclaration-after-statement",
+            "-O2", "-Wall", "-Werror", 
             "-D__KERNEL_BUILD__"]
     inc = ["-I.", "-Iinclude", "-Iarch/x86", "-Iplatform/pc98", "-Isdk/include",
            "-Isdk/include/os32", "-Ikernel", "-Idrivers", "-Inet", "-Ifs",
@@ -220,7 +220,7 @@ def build_target(tmp):
         out = pathlib.Path(tmp) / (rel.replace("/", "_") + ".o")
         subprocess.run(base + inc + ["-c", rel, "-o", str(out)], cwd=ROOT,
                        check=True)
-    print("TARGET i386-elf GNU89 -Werror PASS (sfs_proto / sfs_client / "
+    print("TARGET i386-elf GNU11 -Werror PASS (sfs_proto / sfs_client / "
           "serialfs / serialfs_session / serial / serial_plan)", flush=True)
 
 
@@ -1718,7 +1718,7 @@ def main():
         exe = c_build(tmp)
         gexe = gate_build(tmp)
         sexe = session_build(tmp)
-        print("HOST GNU89 -Werror compile PASS (real fs/sfs_*.c, fs/serialfs.c, "
+        print("HOST GNU11 -Werror compile PASS (real fs/sfs_*.c, fs/serialfs.c, "
               "fs/serialfs_session.c, drivers/serial.c)", flush=True)
         if "--target" in args:
             build_target(tmp)

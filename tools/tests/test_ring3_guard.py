@@ -23,7 +23,7 @@ ring3_guard_active(in_syscall, wm_depth) に寄せること。
       0 に戻す**前**に ring3_wm_fault_count を数え、kernel/isr_handlers.c の
       2 つの kill の行が深さ 1 以上で " (in WM)" を足す (代行レビュー P3)
 
-test_ring3_str.py と同じ様式 — ホスト ILP32 GNU89 で走らせたあと、同じ
+test_ring3_str.py と同じ様式 — ホスト ILP32 GNU11 で走らせたあと、同じ
 ソースが i386-elf-gcc -Werror でも通ることを見る ([C1])。libc は使わない。
 
   python3 -B tools/tests/test_ring3_guard.py            # ホスト
@@ -37,9 +37,8 @@ import sys
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-FLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
-         "-fno-stack-protector", "-Wall", "-Wextra", "-Werror",
-         "-Wdeclaration-after-statement"]
+FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
+         "-fno-stack-protector", "-Wall", "-Wextra", "-Werror"]
 INC_DIRS = ("include", "kernel", "lib", "exec", "fs", "sdk/include/os32")
 HOST_SRC = ROOT / "tools/tests/ring3_guard_host.c"
 KERNEL_SRCS = [ROOT / "exec/ring3_str.c", ROOT / "kernel/gui.c", ROOT / "fs/fd_redirect.c"]
@@ -239,12 +238,12 @@ if __name__ == "__main__":
     with tempfile.TemporaryDirectory(prefix="os32-ring3-guard-") as tmp:
         tmp = pathlib.Path(tmp)
         rc = run_host(ROOT, tmp)
-        print("HOST ILP32 GNU89 EXIT ring3_guard_host=%d" % rc, flush=True)
+        print("HOST ILP32 GNU11 EXIT ring3_guard_host=%d" % rc, flush=True)
         if rc == 0 and "--target" in sys.argv:
             for src in KERNEL_SRCS:
                 subprocess.run(["i386-elf-gcc", *FLAGS, "-D__KERNEL_BUILD__",
                                 *includes(ROOT), "-O2", "-c", str(src),
                                 "-o", str(tmp / (src.stem + ".o"))],
                                cwd=ROOT, check=True)
-            print("TARGET i386-elf GNU89 -Werror COMPILE PASS", flush=True)
+            print("TARGET i386-elf GNU11 -Werror COMPILE PASS", flush=True)
         sys.exit(rc)

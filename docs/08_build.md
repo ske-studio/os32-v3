@@ -122,9 +122,11 @@ ne2000 リングと gcc + python3 だけで回るホスト試験 17 本。どの
 
 | 対象 | コンパイラ | 主なフラグ |
 |---|---|---|
-| カーネル | i386-elf-gcc | `-std=gnu89 -m32 -march=i386 -ffreestanding -fno-pie -fno-stack-protector -O2` |
-| SQLite | i386-elf-gcc | 上記 + `-Os -ffunction-sections -fdata-sections` (サイズ優先) |
-| 外部プログラム | i386-elf-gcc | 同じ基本フラグ + `sdk/link/app.ld` でリンク |
+| カーネル | i386-elf-gcc | `-std=gnu11 -Werror=implicit-function-declaration -Werror=implicit-int -Werror=vla -m32 -march=i386 -ffreestanding -fno-pie -fno-stack-protector -O2` (言語指定は `C_STD` / `C_DIALECT_ERRORS`、機械の旗は `CFLAGS_MACHINE`) |
+| ブートローダ (C) | i386-elf-gcc | 同じ言語指定 (`CFLAGS_BOOT`) + `-Os` |
+| SQLite | i386-elf-gcc | **`-std=gnu89`** (`C_STD_SQLITE`) + 機械の旗 + `-Os -ffunction-sections -fdata-sections` (サイズ優先)。userland の SQLite 単体も gnu89 |
+| userland・SDK の実装 | i386-elf-gcc | カーネルと同じ言語指定 + `sdk/link/app.ld` でリンク |
+| 外部プログラム (apps / game / `sdk/example/hello`) | i386-elf-gcc | 各 Makefile の `-std=gnu89` のまま (公開 SDK ヘッダの C89 互換の検証例) |
 | アセンブラ | NASM | `-f elf32` (カーネル) / `-f bin` (ブートセクタ) |
 
 クロスコンパイラは `$CROSS_DIR` (既定 `/usr/local/cross`)。構築手順は §8-5。

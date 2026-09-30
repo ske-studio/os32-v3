@@ -31,9 +31,9 @@ CASES = ["stat_invalid_name_is_notfound",
          "write_close_fail_is_error",
          "write_fail_wins_and_closes_once",
          "bootlog_close_fail_keeps_logs"]
-FLAGS = ["-std=gnu89", "-Wall", "-Wextra", "-Werror",
+FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-Wno-unused-parameter", "-Wno-sign-compare",
-         "-Wdeclaration-after-statement", "-D__cdecl=",
+         "-D__cdecl=",
          "-DBOOTLOG_NO_IRQ_LOCK"]     # kernel/bootlog.c の錠をホストで空にする
 INCLUDES = ["-I" + str(ROOT / p)
             for p in ("include", "fs", "lib", "kernel", "drivers",
@@ -46,7 +46,7 @@ if __name__ == "__main__":
                         str(ROOT / "tools/tests/fatfs_stat_host.c"),
                         "-o", str(exe)],
                        cwd=ROOT, check=True)
-        print("COMPILE GNU89 -Werror PASS", flush=True)
+        print("COMPILE GNU11 -Werror PASS", flush=True)
         failed = 0
         cases = sys.argv[1:] or CASES
         for case in cases:

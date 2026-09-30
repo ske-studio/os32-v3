@@ -49,11 +49,11 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 # u32 は unsigned long (include/types.h) なので **必ず ILP32 で組む**。
 # ext2 のオンディスク配置を実物の構造体で扱うため、ここは譲れない。
-HOST_FLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
+HOST_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
               "-fno-stack-protector", "-nostdlib", "-static", "-O1",
               "-Wall", "-Wextra", "-Werror",
               "-Wno-unused-parameter", "-Wno-sign-compare",
-              "-Wdeclaration-after-statement", "-D__cdecl="]
+              "-D__cdecl="]
 INCLUDES = ["-I" + str(ROOT / p)
             for p in ("include", "fs", "lib", "kernel", "drivers",
                       "sdk/include/os32")]
@@ -62,11 +62,10 @@ SRC = ROOT / "tools/tests/b8_open_host.c"
 # 票 B8 で触ったカーネル側。実ビルドと同じ素性で -Werror を通す ([C1])。
 TARGET_SRCS = ["fs/ext2_inode.c", "fs/ext2_dir.c", "fs/ext2_file.c",
                "fs/ext2_vfs.c", "fs/ext2_super.c", "fs/vfs.c", "fs/vfs_fd.c"]
-TARGET_FLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding",
+TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-fno-pie", "-fno-stack-protector", "-nostdlib",
                 "-mno-red-zone", "-fcommon", "-O2",
                 "-Wall", "-Wextra", "-Werror",
-                "-Wdeclaration-after-statement",
                 "-Wno-sign-compare", "-Wno-unused-parameter",
                 # arch/x86 + platform/pc98: include/io.h は契約だけで、実装は
                 # 固定名 arch_io.h / platform_io.h を引く (順序 3)。
@@ -257,7 +256,7 @@ if __name__ == "__main__":
         exe = tmp / "b8-open"
         subprocess.run(["gcc", *HOST_FLAGS, *INCLUDES, str(SRC), "-o", str(exe)],
                        cwd=ROOT, check=True)
-        print("HOST GNU89 -Werror COMPILE PASS (real fs/ext2_*.c + vfs.c + vfs_fd.c)",
+        print("HOST GNU11 -Werror COMPILE PASS (real fs/ext2_*.c + vfs.c + vfs_fd.c)",
               flush=True)
 
         e2fsck = None if "--no-e2fsck" in sys.argv else find_e2fsck()
@@ -279,6 +278,6 @@ if __name__ == "__main__":
                 subprocess.run(["i386-elf-gcc", *TARGET_FLAGS, "-c", src,
                                 "-o", str(tmp / (pathlib.Path(src).stem + ".o"))],
                                cwd=ROOT, check=True)
-            print("TARGET i386-elf GNU89 -Werror COMPILE PASS", flush=True)
+            print("TARGET i386-elf GNU11 -Werror COMPILE PASS", flush=True)
 
         sys.exit(1 if (rc != 0 or mismatch) else 0)

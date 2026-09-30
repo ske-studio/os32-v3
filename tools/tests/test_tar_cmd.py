@@ -27,8 +27,7 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SRC = ROOT / "userland/cmds/tar.c"
 MICROTAR = ROOT / "lib/microtar/microtar.c"
-FLAGS = ["-std=gnu89", "-Wall", "-Wextra", "-Werror",
-         "-Wdeclaration-after-statement",
+FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-DHOST_TEST", "-DMTAR_NO_STDIO"]
 INCLUDES = ["-I" + str(ROOT / "lib/microtar")]
 
@@ -50,21 +49,20 @@ def build(tmp):
     exe = tmp / "tar"
     subprocess.run(["gcc", *FLAGS, *INCLUDES, str(SRC), str(MICROTAR),
                     "-o", str(exe)], cwd=ROOT, check=True)
-    print("HOST GNU89 -Werror COMPILE PASS", flush=True)
+    print("HOST GNU11 -Werror COMPILE PASS", flush=True)
     return exe
 
 
 def build_target(tmp):
-    """実機と同じフラグでクロスコンパイルも通ること ([C1] C89/GNU89)。
+    """実機と同じフラグでクロスコンパイルも通ること ([C1] GNU11)。
 
     vendor の microtar.c は i386-elf でも 1 行も直さずに通る必要がある
     (README.OS32 の改変点はこの制約のためにある)。
     """
-    flags = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
+    flags = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
              "-fno-stack-protector", "-nostdlib", "-mno-red-zone", "-fcommon",
              "-O2", "-Wall", "-Wextra", "-Werror",
              "-Wno-unused-parameter", "-Wno-sign-compare",
-             "-Wdeclaration-after-statement",
              "-D__OS32_USERLAND__", "-DMTAR_NO_STDIO"]
     includes = ["-I" + str(ROOT / p) for p in
                 (".", "include", "sdk/include", "sdk/include/os32",
@@ -74,7 +72,7 @@ def build_target(tmp):
         subprocess.run(["i386-elf-gcc", *flags, *includes, "-c", str(src),
                         "-o", str(tmp / (src.stem + ".o"))],
                        cwd=ROOT, check=True)
-    print("TARGET i386-elf GNU89 -Werror COMPILE PASS", flush=True)
+    print("TARGET i386-elf GNU11 -Werror COMPILE PASS", flush=True)
 
 
 def run(exe, cwd, *args):

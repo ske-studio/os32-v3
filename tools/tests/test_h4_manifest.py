@@ -11,7 +11,7 @@ tools/tests/h4_manifest_host.c が userland/system/hsync.c を 1 行も写さず
   python3 -B tools/tests/test_h4_manifest.py [--target] [--mutate]
 
 --target は実機と同じ i386-elf クロスコンパイラでも userland/system/hsync.c が
--Werror で通ることの確認 ([C1] C89/GNU89)。
+-Werror で通ることの確認 ([C1] GNU11)。
 
 --mutate は**否定側**。この票の中心規則 (読めない名札を「一致」と扱わない /
 断るのは全体同期のときだけ / 名札を信じて内容比較を省かない / 大きすぎる
@@ -35,8 +35,7 @@ import mutpar                                                   # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
-HOST_FLAGS = ["-std=gnu89", "-Wall", "-Wextra", "-Werror",
-              "-Wdeclaration-after-statement",
+HOST_FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
               "-D__cdecl=", "-D__OS32_USERLAND__"]
 HOST_INC = ["-I" + str(ROOT / p) for p in
             (".", "include", "sdk/include", "sdk/include/os32",
@@ -48,11 +47,10 @@ if not CROSS_DIR.exists():
     if alt.exists():
         CROSS_DIR = alt
 
-TARGET_USER = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding",
+TARGET_USER = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                "-fno-pie", "-fno-stack-protector", "-nostdlib",
                "-mno-red-zone", "-fcommon", "-O2",
                "-Wall", "-Wextra", "-Werror",
-               "-Wdeclaration-after-statement",
                "-D__OS32_USERLAND__", "-I.", "-Iinclude", "-Isdk/include",
                "-Isdk/include/os32", "-Iuserland/lib",
                "-I" + str(CROSS_DIR / "i386-elf/include")]
@@ -134,7 +132,7 @@ def build_host(tmp, name, src="tools/tests/h4_manifest_host.c"):
     exe = tmp / name
     subprocess.run(["gcc", *HOST_FLAGS, *HOST_INC, str(ROOT / src),
                     "-o", str(exe)], cwd=ROOT, check=True)
-    print("HOST GNU89 -Werror COMPILE PASS (%s)" % src, flush=True)
+    print("HOST GNU11 -Werror COMPILE PASS (%s)" % src, flush=True)
     return exe
 
 
@@ -323,7 +321,7 @@ def one_mutation(item):
                 [host_cmd(exe)])
         except subprocess.CalledProcessError:
             return "MUTATE %-30s RED (コンパイルが通らない)" % name, 0
-        head = "HOST GNU89 -Werror COMPILE PASS (tools/tests/h4_manifest_host.c)\n"
+        head = "HOST GNU11 -Werror COMPILE PASS (tools/tests/h4_manifest_host.c)\n"
         rc = subprocess.run([str(exe)], cwd=str(tree), timeout=300,
                             capture_output=True).returncode
     if rc == 0:

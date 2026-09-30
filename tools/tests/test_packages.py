@@ -770,8 +770,8 @@ def run_boot_font(src_text, fat_name):
         inc = ['-I' + tmp] + ['-I' + os.path.join(ROOT, d)
                               for d in ('kernel', 'include', 'drivers', 'fs', 'lib',
                                         'sdk/include', 'sdk/include/os32')]
-        r = subprocess.run(['gcc', '-std=gnu89', '-Wall', '-Wextra', '-Werror',
-                            '-Wdeclaration-after-statement', '-D__cdecl=',
+        r = subprocess.run(['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
+                            '-D__cdecl=',
                             '-Wno-unused-function',   # 変異で遡りの関数が使われなくなる
                             '-DFAT_NAME="%s"' % fat_name, '-include',
                             os.path.join(ROOT, 'include', 'config.h'), *inc,
@@ -860,8 +860,8 @@ def run_install_fdset(install_src, fd_files):
                   ('userland/system/inst_hdd.c', 'userland/system/inst_disk.c',
                    'userland/shell/hdprep_plan.c', 'drivers/pc98pt.c',
                    'fs/ext2_layout.c')]
-        r = subprocess.run(['gcc', '-std=gnu89', '-Wall', '-Wextra', '-Werror',
-                            '-Wdeclaration-after-statement', '-Wno-unused-function',
+        r = subprocess.run(['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
+                            '-Wno-unused-function',
                             '-Wno-pointer-to-int-cast', '-D__cdecl=',
                             '-D__OS32_USERLAND__', '-O0', *inc,
                             os.path.join(hdir, 'install_fresh_host.c'), *shared,

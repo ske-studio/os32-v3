@@ -12,7 +12,7 @@ class NativeBootTest(unittest.TestCase):
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory(prefix="os32-boot-native-")
         cls.binary = Path(cls.tmp.name) / "boot-native"
-        command = ["gcc", "-std=gnu89", "-Wall", "-Wextra", "-Werror",
+        command = ["gcc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
                    "-Wno-unused-function", "-D__KERNEL_BUILD__"]
         command += ["-I" + str(ROOT / p) for p in
                     ("include", "sdk/include", "sdk/include/os32", "gfx", "lib", "kernel")]

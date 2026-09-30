@@ -42,6 +42,8 @@ docs_only:
 # 数えない (ツリーを丸ごと舐める glob に当たっただけで「表に無い → 全部変異」の
 # 安全側が発火しなくなるのを防ぐ)。変異込みで回す検査を選ぶ方には数える。
 broad:
+  - check-c-dialect
+  - check-c-dialect-host
   - check-arch-asm
   - check-privileged
   - check-le-access
@@ -308,6 +310,7 @@ checks:
     - include/bootinfo.h
     - tools/mkvmkernel.py
     - tools/tests/test_vk32_crc.py
+    - tools/tests/vk32_old_lz4_3e22825.asm
     - tools/tests/vk32_host.c
     - include/types.h
     - lib/crc32_core.inc
@@ -562,6 +565,20 @@ checks:
     - CLAUDE.md
     - docs/CONSTRAINTS.md
     - tools/check_constraints.py
+  check-c-dialect:
+    # 走査型 (make -n -B all の全コンパイル行・SDK ヘッダ・内部実装の全 .c/.h)
+    - "**/*.[ch]"
+    - "**/*.inc"
+    - sdk/example/hello/**
+    - tools/check_c_dialect.py
+  check-c-dialect-host:
+    # 検査器の試験は実物の木を丸ごと回し (7)、写しの木に変異を当てる
+    - "**/*.[ch]"
+    - "**/*.inc"
+    - sdk/example/hello/**
+    - tools/check_c_dialect.py
+    - tools/tests/test_c_dialect.py
+    - tools/tests/mutpar.py
   check-privileged:
     - userland/**
     - tools/check_privileged.py
@@ -1182,6 +1199,7 @@ checks:
     - sdk/include/os32/os32_kapi_generated.h
     - sdk/include/os32/os32_kapi_shared.h
   check-con-sink-host:
+    - include/console.h
     - kernel/con_sink.c
     - kernel/console.c
     - tools/tests/con_sink_host.c
@@ -1204,6 +1222,7 @@ checks:
     - sdk/include/os32/os32_kapi_generated.h
     - sdk/include/os32/os32_kapi_shared.h
   check-bootlog-host:
+    - include/console.h
     - fs/ext2_dir.c
     - fs/ext2_vfs.c
     - fs/fatfs_vfs.c

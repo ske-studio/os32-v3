@@ -60,21 +60,20 @@ import mkpkg  # noqa: E402  (lzss_encode と定数を借りる)
 sys.path.insert(0, str(ROOT / "tools/tests"))
 import mutpar  # noqa: E402  (tools/tests/mutpar.py)
 
-HOST_FLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
+HOST_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
               "-fno-stack-protector", "-nostdlib", "-static", "-O1",
               "-Wall", "-Wextra", "-Werror",
               "-Wno-unused-parameter", "-Wno-sign-compare",
-              "-Wdeclaration-after-statement", "-D__cdecl="]
+              "-D__cdecl="]
 SRC = ROOT / "tools/tests/vfs_fd_path_host.c"
 ERRNO_SRC = ROOT / "tools/tests/newlib_errno_host.c"
 SYSCALLS_SRC = ROOT / "sdk/crt/syscalls.c"
 TARGET_SRCS = ["fs/vfs.c", "fs/vfs_fd.c", "fs/ext2_vfs.c", "fs/ext2_file.c",
                "fs/fatfs_vfs.c", "fs/hostdrvfs.c", "fs/iso9660.c", "lib/kutf16.c"]
-TARGET_FLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding",
+TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-fno-pie", "-fno-stack-protector", "-nostdlib",
                 "-mno-red-zone", "-fcommon", "-O2",
                 "-Wall", "-Wextra", "-Werror",
-                "-Wdeclaration-after-statement",
                 "-Wno-sign-compare", "-Wno-unused-parameter",
                 "-Wno-address-of-packed-member",
                 "-D__KERNEL_BUILD__", "-I.", "-Iinclude",
@@ -373,8 +372,8 @@ def build_ime(tmp, ime_c=None, exe_name="ime", overrides=None):
         src.write_text(text, encoding="utf-8")
     exe = tmp / exe_name
     res = subprocess.run(
-        ["gcc", "-std=gnu89", "-Wall", "-Wextra", "-Werror", "-Wno-type-limits",
-         "-Wdeclaration-after-statement", "-Wno-unused-parameter",
+        ["gcc", "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-Wno-type-limits",
+         "-Wno-unused-parameter",
          "-Wno-sign-compare", "-Wno-pointer-to-int-cast",
          "-Wno-missing-field-initializers", "-D__cdecl=", "-I" + str(shim),
          *["-I" + str(ROOT / p) for p in ("include", "fs", "drivers",
@@ -667,7 +666,7 @@ def check_mkpkg(tmp):
 # ---------------------------------------------------------------------------
 
 def _ff_cmd(fsdir, ffo):
-    return ["gcc", "-std=gnu89", "-m32", "-march=i386", "-ffreestanding",
+    return ["gcc", "-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
             "-fno-pie", "-fno-stack-protector", "-O1", "-w",
             "-I" + str(fsdir / "fatfs"), "-I" + str(ROOT / "lib"),
             "-I" + str(ROOT / "include"), "-c",
@@ -758,7 +757,7 @@ def run_errno(tmp, syscalls=SYSCALLS_SRC, quiet=False):
         return True
     gccinc = subprocess.run(["gcc", "-m32", "-print-file-name=include"],
                             stdout=subprocess.PIPE).stdout.decode().strip()
-    flags = ["-std=gnu89", "-m32", "-ffreestanding", "-fno-pie",
+    flags = ["-std=gnu11", "-m32", "-ffreestanding", "-fno-pie",
              "-fno-stack-protector", "-nostdinc", "-isystem", gccinc,
              "-isystem", str(inc), "-I" + str(ROOT / "sdk/include/os32"),
              "-O1", "-Wall", "-Werror", "-Wno-unused-parameter",
@@ -930,7 +929,7 @@ def main():
                 print(err)
                 print("BUILD FAIL")
                 return 1
-            print("HOST GNU89 -m32 -Werror compile PASS (real ext2 + vfs + vfs_fd + rt/pkg.c)")
+            print("HOST GNU11 -m32 -Werror compile PASS (real ext2 + vfs + vfs_fd + rt/pkg.c)")
             imgdir = tmp / "img"
             imgdir.mkdir()
             r, _ = run_exe(exe, imgdir, pkgdir, case=case, e2fsck=e2fsck)

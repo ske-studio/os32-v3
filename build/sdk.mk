@@ -108,6 +108,22 @@ check-manifests:
 check-constraints:
 	@python3 tools/check_constraints.py
 
+# 言語モードの検査 ([C1]、票 docs/tasks/v3/TASK_C11_MIGRATION.md §6 段 4)。
+# check-constraints は ID の整合だけなので、こちらが**実際の旗とコンパイル結果**を見る:
+# make -n -B all のコンパイル行ごとに効いている言語モード (本体・ブート・userland は
+# gnu11、SQLite 系は gnu89)、暗黙宣言・暗黙 int・VLA・偽の STATIC_ASSERT の拒否、
+# 公開 SDK ヘッダを gnu89 と gnu11 の両方で取り込めること (C99 以降の構文の混入)、
+# 配布ライブラリヘッダと gnu89 の例 (sdk/example/hello)、内部実装の禁止トークン。
+# 要クロスコンパイラ (ビルドは要らない)。
+check-c-dialect:
+	@python3 -B tools/check_c_dialect.py
+
+# check-c-dialect の検査器の試験。--mutate は否定側: 実物の木の写し
+# (tools/tests/mutpar.py) に変異 (VLA・暗黙宣言・偽の _Static_assert・SDK ヘッダへの
+# C11 構文ほか) を当てて検査器が落ちることを見る。記録は tools/tests/c_dialect_tdd.md。
+check-c-dialect-host:
+	python3 -B tools/tests/test_c_dialect.py $(MUT)
+
 # ユーザランドの特権命令検査 (リング3 準備)。既定は警告のみ (exit 0) で
 # green ビルドを壊さない。リング3 導入後に --strict でゲートする。
 check-privileged:
@@ -1069,7 +1085,8 @@ CHECK_PAR_TARGETS := check-bootinfo-host check-hdd-stage1-host \
     check-kapi-version check-kapi-out check-docs-links check-docs-orphans \
     check-docs-status check-docs-status-host \
     check-tests-inventory check-manifests check-packages-host \
-    check-constraints check-privileged check-arch-asm check-le-access \
+    check-constraints check-c-dialect check-c-dialect-host \
+    check-privileged check-arch-asm check-le-access \
     check-ne2000-ring check-shlib check-gui-proto check-term-model \
     check-term-render check-t5a-host check-memory-host check-memmap-host \
     check-memmap check-boot-splash-host check-tools-host check-np21w-ctl-host \
@@ -1115,4 +1132,4 @@ check-edit-doc-host:
 clean-sdk:
 	rm -rf $(SDK_OUT) $(SDK_DIST_DIR)
 
-.PHONY: check-docs-status check-docs-status-host check-gui-gate-host check-v86-gcap-host check-fast check-changed check-map check-check-select-host check-par check-packages-host check-kapi-layout-host check-bootinfo-host check-hdd-stage1-host check-hdd-stage2-host check-vmkernel-lz4-host check-vk32-crc-host check-build-id-host check-kbd-status-host check-kbd-dlog-host check-pcm-cs4231-host check-kapi-out check-dma8237-host check-dma-pool-host check-pci-bind-host check-kprintf-attr-host check-edit-doc-host check-memmap check-memmap-host sdk sdk-dist clean-sdk check-fstat-redir-host check-vfs-excl-host check-hsync-h2-host check-h4-manifest-host check-kapi-version check-manifests check-constraints check-privileged check-arch-asm check-le-access check-gui-proto check-term-model check-term-render check-t5a-host check-memory-host check-memmap-host check-memmap check-boot-splash-host check-tools-host check-np21w-ctl-host check-gshell-host check-db-owned-host check-vfs-fd-sqlite-host check-fdc-seek-host check-serial-vfast-host check-serial-portc-host check-cpu-calibrate-host check-pit-clock-host check-dma8237-host check-dma-pool-host check-pci-bind-host check-rshell-serial-host check-serialfs-host check-vfs-mount-dev-host check-sqlite-groups-host check-con-sink-host check-bootlog-host check-kbd-inject-host check-launch-host check-ring3-str-host check-ring3-guard-host check-sh-launch-host check-sh-shell-host check-sh-truncation-host check-sh-status-host check-multiapp-model-host check-settings-protect-host check-hsync-h1-host check-hsync-h3-host check-hostdrv-list-host check-fs-kind-host check-fs-kind-callers-host check-cat-linenum-host check-vfs-kind-host check-b8-open-host check-ext2-empty-name-host check-vfs-fd-path-host check-db-v50-host check-db-errstr-host check-cfg-host check-gui-host check-install-recover-host check-install-fresh-host check-host-agent check-net-link-host check-host-lib-host check-kstring-c-host check-kstr-bench-host check-result-conv-host check-guest-host check-guest check-arm-compile check-docs-links check-tests-inventory check-docs-orphans check check-lan-bridge-host check-pci-decode-host check-irq-math-host check-time-math-host check-fdc-track-host check-cd-read-host
+.PHONY: check-c-dialect check-c-dialect-host check-docs-status check-docs-status-host check-gui-gate-host check-v86-gcap-host check-fast check-changed check-map check-check-select-host check-par check-packages-host check-kapi-layout-host check-bootinfo-host check-hdd-stage1-host check-hdd-stage2-host check-vmkernel-lz4-host check-vk32-crc-host check-build-id-host check-kbd-status-host check-kbd-dlog-host check-pcm-cs4231-host check-kapi-out check-dma8237-host check-dma-pool-host check-pci-bind-host check-kprintf-attr-host check-edit-doc-host check-memmap check-memmap-host sdk sdk-dist clean-sdk check-fstat-redir-host check-vfs-excl-host check-hsync-h2-host check-h4-manifest-host check-kapi-version check-manifests check-constraints check-privileged check-arch-asm check-le-access check-gui-proto check-term-model check-term-render check-t5a-host check-memory-host check-memmap-host check-memmap check-boot-splash-host check-tools-host check-np21w-ctl-host check-gshell-host check-db-owned-host check-vfs-fd-sqlite-host check-fdc-seek-host check-serial-vfast-host check-serial-portc-host check-cpu-calibrate-host check-pit-clock-host check-dma8237-host check-dma-pool-host check-pci-bind-host check-rshell-serial-host check-serialfs-host check-vfs-mount-dev-host check-sqlite-groups-host check-con-sink-host check-bootlog-host check-kbd-inject-host check-launch-host check-ring3-str-host check-ring3-guard-host check-sh-launch-host check-sh-shell-host check-sh-truncation-host check-sh-status-host check-multiapp-model-host check-settings-protect-host check-hsync-h1-host check-hsync-h3-host check-hostdrv-list-host check-fs-kind-host check-fs-kind-callers-host check-cat-linenum-host check-vfs-kind-host check-b8-open-host check-ext2-empty-name-host check-vfs-fd-path-host check-db-v50-host check-db-errstr-host check-cfg-host check-gui-host check-install-recover-host check-install-fresh-host check-host-agent check-net-link-host check-host-lib-host check-kstring-c-host check-kstr-bench-host check-result-conv-host check-guest-host check-guest check-arm-compile check-docs-links check-tests-inventory check-docs-orphans check check-lan-bridge-host check-pci-decode-host check-irq-math-host check-time-math-host check-fdc-track-host check-cd-read-host

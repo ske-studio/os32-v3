@@ -15,6 +15,7 @@
 #include "kstring.h"
 #include "con_sink.h"
 #include "bootlog.h"
+#include "console.h"
 #include "kbd_inject.h"
 
 /* V86 セッション中の画面描画抑止 (kernel/v86.c)。

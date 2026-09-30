@@ -71,6 +71,10 @@ void gfx_present_rect(int rx, int ry, int rw, int rh);
 void gfx_present_raster(GFX_RasterPalTable *table);
 /* VSYNC待ちなしVRAM転送 (自前フレームレート制御用) */
 void gfx_present_nosync(void);
+/* KAPI の実体 (gfx_core.c / gfx_vram.c)。kapi_generated.c の wrap_* が呼ぶ */
+void __cdecl gfx_get_framebuffer(GFX_Framebuffer *fb);
+void __cdecl gfx_add_dirty_rect(int x, int y, int w, int h);
+void __cdecl gfx_present_dirty(void);
 /* GUI HAL 枠 (KAPI v40): 能力の問い合わせと、アクセラレータ向けのハードウェア塗り/転送。
  * CPU バックエンド (9801 プレーン / PEGC) では hw_* は OS32_ERR_NOSYS を返し、
  * 共有ライブラリが CPU 実装へフォールバックする。 */

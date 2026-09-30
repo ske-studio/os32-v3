@@ -76,14 +76,14 @@ if __name__ == "__main__":
         subprocess.run(["gcc", "-std=gnu89", "-O0", *san, "-include", CONFIG,
                         "-c", str(ROOT / "lib/sqlite3/sqlite3.c"), "-o", obj],
                        check=True)
-        subprocess.run(["gcc", "-std=gnu89", "-Wall", "-Wextra", "-Werror",
-                        "-Wdeclaration-after-statement", "-Wno-unused-parameter",
+        subprocess.run(["gcc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
+                        "-Wno-unused-parameter",
                         "-Wno-sign-compare", "-Wno-pointer-to-int-cast",
                         "-Wno-missing-field-initializers", "-D__cdecl=",
                         *san, "-I" + str(tmp), *INC,
                         str(ROOT / "tools/tests/kapi_db_v50_host.c"), obj,
                         "-o", exe], check=True)
-        print("HOST GNU89 -Werror compile PASS (real kapi_db.c + bundled SQLite)",
+        print("HOST GNU11 -Werror compile PASS (real kapi_db.c + bundled SQLite)",
               flush=True)
         if "--target" in sys.argv:
             for src, extra in ((ROOT / "kapi/kapi_db.c",
@@ -94,10 +94,10 @@ if __name__ == "__main__":
                                 ["-Ikernel", "-Iexec", "-Ikapi", "-Igfx"]),
                                (ROOT / "kernel/kselftest.c",
                                 ["-Ikernel", "-Iexec", "-Ikapi", "-Igfx"])):
-                subprocess.run(["i386-elf-gcc", "-std=gnu89", "-m32", "-march=i386",
+                subprocess.run(["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                                 "-ffreestanding", "-fno-pie", "-fno-stack-protector",
                                 "-nostdlib", "-msoft-float", "-Os", "-Wall",
-                                "-Wdeclaration-after-statement", "-D__KERNEL_BUILD__",
+                                "-D__KERNEL_BUILD__",
                                 "-I" + str(ROOT), "-I" + str(ROOT / "include"),
                                 # include/io.h は契約だけで、実装は固定名
                                 # arch_io.h / platform_io.h を引く (順序 3)。
@@ -111,7 +111,7 @@ if __name__ == "__main__":
                                 *["-I" + str(ROOT / p[2:]) for p in extra],
                                 "-c", str(src), "-o", str(tmp / (src.stem + ".o"))],
                                check=True, cwd=ROOT)
-            print("TARGET i386-elf GNU89 compile PASS", flush=True)
+            print("TARGET i386-elf GNU11 compile PASS", flush=True)
         cases = [x for x in sys.argv[1:] if not x.startswith("--")] or CASES
         failed = 0
         for case in cases:

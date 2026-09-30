@@ -24,9 +24,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import mutpar                                                   # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-FLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
-         "-fno-stack-protector", "-Wall", "-Wextra", "-Werror",
-         "-Wdeclaration-after-statement"]
+FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
+         "-fno-stack-protector", "-Wall", "-Wextra", "-Werror"]
 # build/config.mk の INC_GFX と同じ探索先 (INC_COMMON + gfx drivers fs lib kernel)。
 INCLUDES = ["-I" + str(ROOT / p)
             for p in ("include", "arch/x86", "platform/pc98",
@@ -118,7 +117,7 @@ if __name__ == "__main__":
         tmp = pathlib.Path(tmp)
         exe = tmp / "cirrus-win"
         subprocess.run(host_cmd(exe), cwd=ROOT, check=True)
-        print("HOST ILP32 GNU89 COMPILE PASS (real gfx/backend_cirrus.c)",
+        print("HOST ILP32 GNU11 COMPILE PASS (real gfx/backend_cirrus.c)",
               flush=True)
         rc = subprocess.run([str(exe)], cwd=ROOT, timeout=60).returncode
         print("EXIT cirrus_win_host=%d" % rc, flush=True)
@@ -131,7 +130,7 @@ if __name__ == "__main__":
                         str(ROOT / "drivers/wab_glue_xe10.c"),
                         "-o", str(tmp / "wab_glue_xe10.o")], cwd=ROOT,
                        check=True)
-        print("TARGET i386-elf GNU89 -Werror COMPILE PASS "
+        print("TARGET i386-elf GNU11 -Werror COMPILE PASS "
               "(backend_cirrus.c + wab_glue_xe10.c)", flush=True)
         if "--mutate" in sys.argv:
             failed += mutpar.run_with_control(one_mutation, MUTATIONS,

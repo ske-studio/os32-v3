@@ -13,16 +13,15 @@ unit's cli/popfl for an empty lock: CPL=3 cannot execute them.
 
 Same shape as test_multiapp_model.py / test_pgalloc_range.py: build ILP32
 freestanding, run it, then prove the same source compiles with the cross
-compiler under the kernel's flags ([C1] C89/GNU89).
+compiler under the kernel's flags ([C1] GNU11).
 """
 import pathlib
 import subprocess
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-FLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
-         "-fno-stack-protector", "-Wall", "-Wextra", "-Werror",
-         "-Wdeclaration-after-statement"]
+FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
+         "-fno-stack-protector", "-Wall", "-Wextra", "-Werror"]
 INC = [str(ROOT / p) for p in ("include", "kernel", "lib", "exec", "fs",
                                "sdk/include/os32")]
 SRC = ROOT / "tools/tests/multiapp_impl_host.c"
@@ -36,10 +35,10 @@ if __name__ == "__main__":
                         "-DKBD_INJECT_NO_IRQ_LOCK",
                         *includes, str(SRC), "-o", str(exe)],
                        cwd=ROOT, check=True)
-        print("HOST ILP32 GNU89 COMPILE PASS", flush=True)
+        print("HOST ILP32 GNU11 COMPILE PASS", flush=True)
         subprocess.run([str(exe)], cwd=ROOT, check=True, timeout=60)
         subprocess.run(["i386-elf-gcc", *FLAGS, "-O2", *includes, "-c",
                         str(ROOT / "exec/appslot.c"),
                         "-o", str(tmp / "appslot.o")],
                        cwd=ROOT, check=True)
-        print("TARGET i386-elf GNU89 -Werror COMPILE PASS", flush=True)
+        print("TARGET i386-elf GNU11 -Werror COMPILE PASS", flush=True)

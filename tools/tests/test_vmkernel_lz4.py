@@ -86,7 +86,7 @@ def extract_asm(text):
 def build(work, srcs, target):
     """srcs: {'mini': path, 'lz4c': path, 'asm': path}。exe の path を返す。"""
     work = pathlib.Path(work)
-    common = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding",
+    common = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
               "-fno-stack-protector", "-fno-pie", "-Wall", "-Werror"]
     if target:
         cc = "i386-elf-gcc"
@@ -113,9 +113,9 @@ def build(work, srcs, target):
                    encoding="utf-8")
     sh(["nasm", "-f", "elf32", str(asm), "-o", str(work / "asm.o")])
 
-    sh(["gcc", "-std=gnu89", "-m32", "-ffreestanding", "-fno-pic", "-fno-pie",
+    sh(["gcc", "-std=gnu11", "-m32", "-ffreestanding", "-fno-pic", "-fno-pie",
         "-fno-stack-protector", "-fno-builtin", "-O2", "-Wall", "-Wextra",
-        "-Werror", "-Wdeclaration-after-statement",
+        "-Werror", 
         "-c", str(HARNESS), "-o", str(work / "harness.o")])
 
     exe = work / "vmkernel_lz4_host"

@@ -39,7 +39,7 @@
     python3 -B tools/tests/test_result_conv.py [--target] [--mutate]
 
 --target を付けると、適合させた試験が実機と同じ i386-elf クロスコンパイラでも
--Werror で通ることを確かめる ([C1] C89/GNU89)。
+-Werror で通ることを確かめる ([C1] GNU11)。
 
 --mutate は**否定側**。集計行を kprintf に戻す (fd 1 に出ない) / 短い書き込みを
 「書けた」ことにする / 行と終了コードを別々の呼び出しで作る / 集計行と終了コードを
@@ -86,8 +86,7 @@ WAVE1 = [
     "db_v50_test", "host_test", "input_test", "font_load_test",
 ]
 
-HOST_FLAGS = ["-std=gnu89", "-Wall", "-Wextra",
-              "-Wdeclaration-after-statement",
+HOST_FLAGS = ["-std=gnu11", "-Wall", "-Wextra",
               "-D__cdecl=", "-D__OS32_USERLAND__"]
 HOST_INC = ["-I" + str(ROOT / p) for p in
             (".", "include", "sdk/include", "sdk/include/os32", "userland/lib")]
@@ -98,12 +97,15 @@ if not CROSS_DIR.exists():
     if alt.exists():
         CROSS_DIR = alt
 
-TARGET_FLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding",
+# -Wno-shift-negative-value: gnu11 では -Wextra が負値の左シフトを警告する (gnu89 では
+# 出ない)。userland/lib/math/libos32math.h の FIX16_FROM_INT(負値) が当たる。GCC は
+# 2 の補数として定義しており、本番の旗 (USER_CFLAGS、-Wextra なし) では出ない。
+# マクロの書き換えは T0 の範囲外 (票 TASK_C11_MIGRATION §6 段 3 の結果)。
+TARGET_FLAGS = ["-std=gnu11", "-Wno-shift-negative-value", "-m32", "-march=i386", "-ffreestanding",
                 "-fno-pie", "-fno-stack-protector", "-nostdlib",
                 "-mno-red-zone", "-fcommon", "-fsigned-char",
                 "-fno-short-enums", "-O2",
                 "-Wall", "-Wextra", "-Werror",
-                "-Wdeclaration-after-statement",
                 "-D__OS32_USERLAND__", "-I.", "-Iinclude", "-Isdk/include",
                 "-Isdk/include/os32", "-Iuserland/lib", "-Iuserland/lib/math",
                 "-Iuserland/lib/ecs", "-Iuserland/lib/input",
@@ -608,7 +610,7 @@ if __name__ == "__main__":
         failed = 0
 
         exe = build_host(tmp, "result-conv")
-        print("HOST GNU89 -Werror COMPILE PASS "
+        print("HOST GNU11 -Werror COMPILE PASS "
               "(real rt/testresult.h + 5 real test programs)", flush=True)
         rc = subprocess.run([str(exe)], cwd=ROOT, timeout=300).returncode
         print("EXIT test_result_conv_host=%d" % rc, flush=True)

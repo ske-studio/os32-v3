@@ -19,7 +19,7 @@ Run images in NP21/W. Stop the emulator before `make deploy-kernel`, then restar
 
 ## Coding Style & Naming Conventions
 
-Match surrounding formatting; C typically uses four-space indentation, while Make recipes require tabs. C must use GNU89: declarations at block starts, `/* comments */`, and no C99 features. Use `snake_case` functions, uppercase constants, and `libos32*` library names. Use kernel `kstring` helpers instead of libc equivalents.
+Match surrounding formatting; C typically uses four-space indentation, while Make recipes require tabs. Internal C is GNU11 ([C1]): `//`, mid-block declarations, `_Static_assert` (via `STATIC_ASSERT`), `<stdbool.h>` for pure booleans and designated initializers are allowed, but do not mass-rewrite existing code; implicit declarations, implicit int and VLAs are errors. Public SDK headers (`sdk/include/os32/*.h`, including `sdk/include/os32/os32_kapi_shared.h`) must stay C89/GNU89-compatible, and SQLite keeps GNU89. Use `snake_case` functions, uppercase constants, and `libos32*` library names. Use kernel `kstring` helpers instead of libc equivalents.
 
 Never hand-edit generated KAPI files. Follow [docs/KAPI_SPEC.md](docs/KAPI_SPEC.md) for append-only API changes and regeneration; rebuild with `make clean` followed by `make all` after ABI changes.
 

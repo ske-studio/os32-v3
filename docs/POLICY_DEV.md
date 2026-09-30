@@ -58,15 +58,27 @@ KernelAPI・共有ライブラリの読み込みを指す。アプリ 1 本の�
 
 ## §2. コーディング規約
 
-### C89 (GNU89) 厳守
+### C11 (GNU11) を内部実装の基準とする ([C1])
 
-GCC 環境においても `-std=gnu89` を維持する。
+本体・ブート・userland・SDK の実装は `-std=gnu11` (`build/config.mk` の `C_STD`)。
+**公開 SDK ヘッダ** (`sdk/include/os32/*.h`。`sdk/include/os32/os32_kapi_shared.h` を含む) は gnu89 と gnu11 の
+両方から読めること (apps / game / `sdk/example/hello` は gnu89 のまま)。**SQLite 系**
+(`lib/sqlite3/` と userland の SQLite 単体) は `C_STD_SQLITE` (gnu89)。旗の実際の効き方は
+`make check-c-dialect` が確かめる。採用範囲の経緯は [TASK_C11_MIGRATION](tasks/v3/TASK_C11_MIGRATION.md) §4。
 
-| ルール | 例 |
-|--------|-----|
-| `//` コメント禁止 | `/* コメント */` を使用 |
-| 変数宣言はブロック先頭のみ | `for (int i = 0; ...)` は禁止 |
-| C99以降の構文は使用しない | `_Bool`, `restrict`, 可変長配列等は禁止 |
+| 機能 | 内部実装での扱い | 既存コード |
+|--------|-----|-----|
+| ブロック途中の宣言、`for` 内宣言 | 許可 | 移動しない (スコープ・初期化時点が変わる) |
+| `//` コメント | 許可 (公開 SDK ヘッダでは禁止) | `/* */` を書き換えない |
+| `_Static_assert` | `STATIC_ASSERT(式, 識別子)` (`include/types.h`) 経由で使う | 呼び出しはそのまま |
+| `<stdbool.h>` | **純粋な真偽値だけ**。エラー値・ビット集合・ABI の型には使わない | `int` を一括置換しない |
+| `<stdint.h>` | 外部形式・新規の独立パーサー・移植コードで可。OS32 の API と共有構造体は `u8/u16/u32/i32` のまま、同じ API 内で型名を混在させない | `u32` を置換しない。SDK・KAPI・Rust FFI の型は変えない |
+| 指示付き初期化子 | 内部のテーブルに可 | 一括変換しない (暗黙のゼロ初期化・条件付きメンバーの意味を保つ) |
+| 複合リテラル | 寿命が明確な場合に可 | 代入列から一括変換しない |
+| 暗黙の関数宣言・暗黙 int・VLA | **禁止** (`C_DIALECT_ERRORS` でエラー) | — |
+| 旧式 (K&R) の関数定義 | 自作コードで禁止。vendor (`lib/zlib/` 等) は例外 | vendor は触らない |
+| 匿名構造体・共用体、`restrict`、`_Atomic`、TLS、`<threads.h>` | T0 では新規導入しない (別設計) | — |
+| 引数なしの `f()` | C11 でも `f(void)` と同義ではない。新規は `f(void)` と書く | 機械置換しない |
 
 ### 呼び出し規約
 

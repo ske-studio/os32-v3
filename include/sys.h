@@ -60,6 +60,10 @@ int sys_memory_stage_online(void);
 int sys_memory_init_model(struct physmem *model, void *backing, u32 capacity,
                           u32 first_pfn, int (*verify)(u32, u32, void *));
 u32 sys_get_mem_kb(void);
+/* RTC の現在時刻 (UNIX 秒)。KAPI sys_time の実体 (kernel/sys.c)。定義側の戻り型は
+ * os_time_t (= u32、os32_kapi_shared.h)。ここは os32_kapi_shared.h を引かない
+ * (ホスト試験が sys.h だけを読む) ので同じ型の u32 で宣言する */
+u32 sys_time(void);
 u32 sys_usable_mem_end(void);
 
 /* 物理末尾側 (使用可能上限の直下) に bytes バイトを固定予約し、先頭物理を

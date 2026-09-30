@@ -30,14 +30,14 @@ SRC = ROOT / "kernel/bootlog.c"
 CASES = ["collect", "overflow", "utf8_latch", "stop", "header", "compose",
          "plan", "lock", "save", "save_mkdir", "write_rc", "reboots", "hardlink"]
 
-FLAGS = ["-std=gnu89", "-Wall", "-Wextra", "-Werror",
-         "-Wdeclaration-after-statement", "-D__cdecl=", "-DBOOTLOG_NO_IRQ_LOCK"]
+FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
+         "-D__cdecl=", "-DBOOTLOG_NO_IRQ_LOCK"]
 INCLUDES = ["-I" + str(ROOT / p) for p in ("include", "sdk/include/os32")]
 
-TARGET_FLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
+TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
                 "-fno-stack-protector", "-nostdlib", "-mno-red-zone", "-fcommon",
                 "-fsigned-char", "-fno-short-enums", "-O2", "-Wall", "-Wextra",
-                "-Werror", "-Wdeclaration-after-statement", "-D__KERNEL_BUILD__"]
+                "-Werror", "-D__KERNEL_BUILD__"]
 TARGET_INCLUDES = ["-I" + str(ROOT / p) for p in
                    (".", "include", "arch/x86", "platform/pc98", "sdk/include",
                     "sdk/include/os32", "kernel", "drivers", "fs", "exec", "lib",
@@ -166,7 +166,7 @@ def build_target(tmp):
                         str(ROOT / rel),
                         "-o", str(pathlib.Path(tmp) / (pathlib.Path(rel).stem + ".o"))],
                        cwd=ROOT, check=True)
-    print("TARGET i386-elf GNU89 -Wextra -Werror PASS (bootlog.c, bootlog_save.c)",
+    print("TARGET i386-elf GNU11 -Wextra -Werror PASS (bootlog.c, bootlog_save.c)",
           flush=True)
 
 
@@ -279,7 +279,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-bootlog-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU89 -Werror compile PASS (real kernel/bootlog.c)", flush=True)
+        print("HOST GNU11 -Werror compile PASS (real kernel/bootlog.c)", flush=True)
         if "--target" in args:
             build_target(tmp)
         rc = run_cases(exe, [a for a in args if not a.startswith("--")] or CASES)

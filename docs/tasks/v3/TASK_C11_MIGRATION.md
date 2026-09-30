@@ -1,6 +1,8 @@
 # TASK_C11_MIGRATION — T0: C89 (gnu89) → C11 (gnu11) への移行 (言語モードと検査の移行)
 
-> 状態: **計画 (2026-09-30)** — §8 の判断 3 点は同日にユーザー承認 (推奨どおり)、[C1] の改訂案 (§9) は文面確定、CONSTRAINTS.md の改訂は fork 後の T0 で。v3 の最初の票 T0 ([TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) §6、[V3_PLAN_DRAFT](V3_PLAN_DRAFT.md) §3 P0)。Codex (gpt-6-astra、読み取りのみ) の調査提案 (`x18/c11.md`、2026-09-30、基点 `d995e078`) を元に起票。**ユーザー判断が要る点 3 つ (§8) と [C1] の改訂文面 (§9) は未決** — 決定後に [CONSTRAINTS.md](../../CONSTRAINTS.md) を直し、設計票へ進む。コードは未着手。
+> 状態: **受入待ち (2026-09-30)** — 段 2〜6 と文書 (A7・A10) はブランチ `wt/t0-c11` に実装済み、`check-c-dialect` / `check-c-dialect-host` を `make check` の列に追加。残件: A8 の差分確認 (Codex レビュー)、A9 のゲスト回帰 (PM)。apps/game は組まない (ユーザー決定、A5 は `check-c-dialect` の (c) で代える)。
+>
+> それまでの状態: **計画 (2026-09-30)** — §8 の判断 3 点は同日にユーザー承認 (推奨どおり)、[C1] の改訂案 (§9) は文面確定、CONSTRAINTS.md の改訂は fork 後の T0 で。v3 の最初の票 T0 ([TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) §6、[V3_PLAN_DRAFT](V3_PLAN_DRAFT.md) §3 P0)。Codex (gpt-6-astra、読み取りのみ) の調査提案 (`x18/c11.md`、2026-09-30、基点 `d995e078`) を元に起票。**ユーザー判断が要る点 3 つ (§8) と [C1] の改訂文面 (§9) は未決** — 決定後に [CONSTRAINTS.md](../../CONSTRAINTS.md) を直し、設計票へ進む。コードは未着手。
 >
 > 発行: PM (Claude Code) の指示によりコーダー `claude-fable-5-1` (feat/gui `e8931cac`)。読んだもの: Codex 提案 `x18/c11.md`、V3_PLAN_DRAFT §3 P0 (根拠は X1 で改訂済み)・§6-4、[RUST_VS_C11](RUST_VS_C11.md) §1-1、[CONSTRAINTS](../../CONSTRAINTS.md) [C1]、`tools/check_constraints.py`、[POLICY_DEV](../../POLICY_DEV.md) §2、`build/config.mk` / `boot.mk` / `kernel.mk` / `programs.mk` の旗、`include/types.h`、`kernel/tss.c`、`kernel/shm.c`。**事実は `file:line` で示す。Codex の実測は §3・§5 の表の「実測」列に写した (再実行はしていない)。**
 
@@ -26,7 +28,7 @@ T0 は **「言語モードと検査の移行」に限定**する。旗を gnu89
 | 本体 (`kernel fs exec drivers gfx net lib include kapi arch platform`) | **gnu11** | `CFLAGS_COMMON` (`build/config.mk:112`) |
 | ブート (`boot/` の C) | **gnu11** | `CFLAGS_BOOT` (`build/boot.mk:15`) |
 | userland (`userland/`、`sdk/crt`) と SDK の**実装** (`userland/lib/`) | **gnu11** | `USER_CFLAGS` は `CFLAGS_COMMON` を継承 (`config.mk:152`) |
-| **公開 SDK ヘッダ** (`sdk/include/os32/*.h`、`include/os32_kapi_shared.h`) | **C89 互換のまま** (gnu89 と gnu11 の両方から使えること) | ユーザー決定済み (RUST_VS_C11 §5 C3 = (a)、TASK_MEMMAP_V3 D36)。apps/game (gnu89) が読む |
+| **公開 SDK ヘッダ** (`sdk/include/os32/*.h`。`sdk/include/os32/os32_kapi_shared.h` を含む) | **C89 互換のまま** (gnu89 と gnu11 の両方から使えること) | ユーザー決定済み (RUST_VS_C11 §5 C3 = (a)、TASK_MEMMAP_V3 D36)。apps/game (gnu89) が読む |
 | **SQLite 系** (`lib/sqlite3/sqlite3.c` `os32_sqlite_vfs.c` `os32_sqlite_test.c`、userland の SQLite 単体) | **gnu89 の専用規則** | amalgamation は C89。`CFLAGS_SQLITE` の分離が要る (§2) |
 | vendor (`lib/zlib/`、`fs/fatfs/`、`lib/microtar` 等) | gnu11 (旗を継承) | K&R 定義は vendor 例外 (§5)。`__STDC_VERSION__` 分岐を確認 |
 | apps / game / `sdk/example/hello` (submodule・サンプル) | **gnu89 のまま** (推奨、§8 の 3) | SDK の後方互換の検証例として残す |
@@ -171,7 +173,7 @@ replacements = {
 | 4 | **`make check` に言語モードの検査を新設** (`check-c-dialect`、仮) | (a) 全体に gnu11、SQLite に gnu89 が**実際に**適用されていること (旗の文字列でなく、`-v` / `-###` かコンパイル結果で); (b) 暗黙宣言・暗黙 int・VLA の拒否; (c) **SDK 公開ヘッダを gnu89 と gnu11 の両方で取り込めること** (SDK の gnu89 試験だけでは拡張の混入を見逃すので `-Wc90-c99-compat` 等と承認済み GNU 拡張の扱いを併用); (d) `//` や禁止トークンの検査は**文字列・コメントを区別**する; (e) `check_constraints.py` の ID 検査は維持 | 検査器のホスト試験 (`check-c-dialect-host`、TDD 記録 `tools/tests/*_tdd.md`) と `check` 列への追加、`docs/TESTS.md` の再生成 |
 | 5 | **変異試験の更新** | C11 で許可する宣言・コメントを「拒否すべき変異」に**しない**。代わりに **VLA、暗黙宣言、偽の静的アサーション (`_Static_assert(1, …)` で条件を消す)、SDK 公開ヘッダへの C11 専用構文の混入**を否定試験にする。コンパイル拒否を期待する検査器試験と、コンパイル失敗を試験不成立とする通常の実行変異試験は区別する。変異は既存方針どおり写しの木で (`tools/tests/mutpar.py`) | `make check` の変異段 (`check-par`) |
 | 6 | **生成器・ABI の検査** | 型・スロットを変えない T0 では Rust 生成器の変更や ABI 版更新は**原則不要** (C89 形式の生成コードは gnu11 でも使える)。再生成結果、`check-kapi-layout-host`、`check-kapi-version`、`check-gui-proto` を確認。**将来 `bool` / `uint*_t` を KAPI に入れるなら別票** — 現 `sdk/kapi_rust_gen.py:19-40` は未知型を `u32` に落とすので無条件で対応済みとは扱えない (D35 の「未知型は生成失敗に」と同じ論点) | 上記 3 検査 rc=0、生成物の差分 0 |
-| 7 | **完全再ビルド・外部ビルド・ゲスト回帰** | 言語旗の変更だけでは既存 `.o` が再生成されない可能性があるため `make clean` → `make all`。`make external` (apps/game を gnu89 のまま新 SDK で再ビルド = 後方互換の検証)。NP21/W 停止 → `make deploy-kernel` → 起動 ([D1]): 起動・kselftest、FS、SQLite (`db_*`)、GUI、共有ライブラリ、apps/game。**ブート旗も変えるので HDD / FD のブート経路も確認**。`tools/check_map.yaml:31` は `build/*.mk` を `full` にしているので旗変更の `check-changed` は全変異側になる | `make all` + `make check` rc=0、`make external` rc=0、ゲストの新成果物の反映確認 (POLICY_DEBUG §2) |
+| 7 | **完全再ビルド・外部ビルド・ゲスト回帰** | 言語旗の変更だけでは既存 `.o` が再生成されない可能性があるため `make clean` → `make all`。~~`make external`~~ (**apps/game は組まない** — ユーザー決定 2026-09-30。後方互換は `check-c-dialect` の (c) の公開 SDK ヘッダ・配布ライブラリヘッダ・`sdk/example/hello` の gnu89 検査で代える、A5)。NP21/W 停止 → `make deploy-kernel` → 起動 ([D1]): 起動・kselftest、FS、SQLite (`db_*`)、GUI、共有ライブラリ、apps/game。**ブート旗も変えるので HDD / FD のブート経路も確認**。`tools/check_map.yaml:31` は `build/*.mk` を `full` にしているので旗変更の `check-changed` は全変異側になる | `make all` + `make check` rc=0、ゲストの新成果物の反映確認 (POLICY_DEBUG §2) |
 
 ---
 
@@ -183,7 +185,7 @@ replacements = {
 | A2 | `-Werror=implicit-function-declaration -Werror=implicit-int -Werror=vla` が本体・ブート・userland の旗に入り、`make clean` → `make all` が通る | `make clean && make all` rc=0 |
 | A3 | `STATIC_ASSERT` が `_Static_assert` 経由で、**101 呼出しがそのまま通る**。`tss.c:17` は `offsetof` | `grep -c STATIC_ASSERT(` の件数不変、`make all` |
 | A4 | 暗黙宣言 5 件が消えている (`kapi_generated.c` は再生成で) | 段 2 の gnu89 検査、`check-kapi-out` |
-| A5 | 公開 SDK ヘッダ (`sdk/include/os32/*.h`、`include/os32_kapi_shared.h`) が gnu89 と gnu11 の両方で取り込める | `check-c-dialect` の (c)、`make external` (apps/game/hello は gnu89) rc=0 |
+| A5 | 公開 SDK ヘッダ (`sdk/include/os32/*.h`。`sdk/include/os32/os32_kapi_shared.h` を含む) が gnu89 と gnu11 の両方で取り込める | `check-c-dialect` の (c): 公開 SDK ヘッダを gnu89 (`-Wc90-c99-compat` ほか `-Werror`) と gnu11 で取り込む、SDK が配るライブラリヘッダを gnu89 / gnu11 で取り込む、in-tree の gnu89 の例 `sdk/example/hello` を gnu89 のまま in-tree の SDK ヘッダでコンパイルする。**apps/game は組まない** (ユーザー決定 2026-09-30、`make external` は T0 の検証に使わない) |
 | A6 | `make check` に `check-c-dialect` が入り、否定試験 (VLA / 暗黙宣言 / 偽 `_Static_assert` / SDK への C11 構文) が拒否される | `check-c-dialect-host` の TDD 記録、変異段 |
 | A7 | `check_constraints.py` の ID 検査が通り、[C1] の改訂が CONSTRAINTS / CLAUDE.md / POLICY_DEV §2 / AGENTS.md / 08_build.md に反映されている | `make check-constraints`、grep で `gnu89` の残りが SQLite 例外・apps/game・注記だけ |
 | A8 | 既存コードの宣言位置・コメント・型名を**変えていない** (差分は旗・マクロ・5 + 1 件の修正・検査器・文書だけ) | 差分の目視 (Codex レビュー) |
@@ -196,9 +198,9 @@ replacements = {
 
 | # | 論点 | 選択肢 | 推奨 | 決定 |
 |---|---|---|---|---|
-| J1 | **既存 OS32 型 (`u8/u16/u32/i32`) を維持し、全面的な stdint 化をしないか** | (a) 維持 — 新規の独立パーサー・外部形式だけ `uint32_t` 可、同じ API 内で混在させない / (b) 全面 `<stdint.h>` 化 | **(a) 維持**。32 ビット限定 (ARM_GAUGE §10) で `u32` = ポインタ幅の前提は残る。混在が最悪 (V3_PLAN_DRAFT P0) なので境界を §4 のとおり決める | **待ち** |
-| J2 | **内部コードで許す構文の範囲** | §4 の表 | **宣言位置・`//`・真偽型 (`<stdbool.h>`、純粋な真偽値だけ)・指示付き初期化子・寿命が明確な複合リテラル**を許可。**匿名構造体/共用体・`restrict`・`_Atomic`・TLS・`<threads.h>` は T0 では入れない** (別途) | **待ち** |
-| J3 | **apps / game (submodule) の旗も T0 で変えるか** | (a) gnu89 のまま、SDK 後方互換の検証対象にする / (b) gnu11 化 (各 submodule の別コミット + 親の参照更新) | **(a) gnu89 のまま**。apps/game の保守は当面 os32 側 (FORK_PLAN)、`sdk/example/hello` も gnu89 互換の検証例として残す | **待ち** |
+| J1 | **既存 OS32 型 (`u8/u16/u32/i32`) を維持し、全面的な stdint 化をしないか** | (a) 維持 — 新規の独立パーサー・外部形式だけ `uint32_t` 可、同じ API 内で混在させない / (b) 全面 `<stdint.h>` 化 | **(a) 維持**。32 ビット限定 (ARM_GAUGE §10) で `u32` = ポインタ幅の前提は残る。混在が最悪 (V3_PLAN_DRAFT P0) なので境界を §4 のとおり決める | **推奨どおり承認 (2026-09-30)** |
+| J2 | **内部コードで許す構文の範囲** | §4 の表 | **宣言位置・`//`・真偽型 (`<stdbool.h>`、純粋な真偽値だけ)・指示付き初期化子・寿命が明確な複合リテラル**を許可。**匿名構造体/共用体・`restrict`・`_Atomic`・TLS・`<threads.h>` は T0 では入れない** (別途) | **推奨どおり承認 (2026-09-30)** |
+| J3 | **apps / game (submodule) の旗も T0 で変えるか** | (a) gnu89 のまま、SDK 後方互換の検証対象にする / (b) gnu11 化 (各 submodule の別コミット + 親の参照更新) | **(a) gnu89 のまま**。apps/game の保守は当面 os32 側 (FORK_PLAN)、`sdk/example/hello` も gnu89 互換の検証例として残す | **推奨どおり承認 (2026-09-30)** |
 
 決定は [TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) §0 の決定表に D 番号で記録し、この表の「決定」列を埋める。
 

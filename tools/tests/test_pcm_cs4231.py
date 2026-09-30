@@ -37,8 +37,8 @@ CASES = ["cont", "refill", "drain", "drain_short", "start", "rate",
          "race_reclaim", "race_close_rs", "race_close_restart",
          "race_close_timeout", "race_volume", "clock", "write_contract"]
 
-FLAGS = ["-std=gnu89", "-Wall", "-Wextra", "-Werror",
-         "-Wdeclaration-after-statement", "-D__cdecl="]
+FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
+         "-D__cdecl="]
 # pcm_hostshim は**必ず先頭** — include/io.h を差し替えるため。
 INC_DIRS = ("tools/tests/pcm_hostshim", "include", "drivers", "kernel",
             "lib", "sdk/include/os32")
@@ -253,10 +253,10 @@ def run_cases(exe, cases, quiet=False):
 def build_target(tmp):
     """カーネルと同じ i386-elf で I/O を出す側 (pcm_cs4231.c) ごと通す。"""
     for rel in TARGET_SRCS:
-        cmd = ["i386-elf-gcc", "-std=gnu89", "-m32", "-march=i386",
+        cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
                "-mno-red-zone", "-fcommon", "-fsigned-char", "-fno-short-enums",
-               "-Os", "-Wall", "-Werror", "-Wdeclaration-after-statement",
+               "-Os", "-Wall", "-Werror", 
                "-D__KERNEL_BUILD__",
                "-I" + str(ROOT), "-I" + str(ROOT / "include"),
                "-I" + str(ROOT / "arch/x86"), "-I" + str(ROOT / "platform/pc98"),
@@ -265,7 +265,7 @@ def build_target(tmp):
                "-c", str(ROOT / rel),
                "-o", str(pathlib.Path(tmp) / (rel.replace("/", "_") + ".o"))]
         subprocess.run(cmd, cwd=ROOT, check=True)
-    print("TARGET i386-elf GNU89 -Werror PASS", flush=True)
+    print("TARGET i386-elf GNU11 -Werror PASS", flush=True)
 
 
 # 変異 1 本の 1 ケースにかける時間の上限。正常なケースは 1 本 0.01 秒未満
@@ -326,7 +326,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-pcm-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU89 -Werror compile PASS "
+        print("HOST GNU11 -Werror compile PASS "
               "(real drivers/pcm_cs4231{,_math}.c)", flush=True)
         if "--target" in args:
             build_target(tmp)

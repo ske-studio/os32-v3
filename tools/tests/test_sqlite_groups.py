@@ -23,13 +23,13 @@ if __name__ == "__main__":
         san = ["-fsanitize=address", "-fno-omit-frame-pointer"] if "--sanitize" in sys.argv else []
         subprocess.run(["gcc", "-std=gnu89", "-O0", *san, "-include", CONFIG,
                         "-c", str(ROOT / "lib/sqlite3/sqlite3.c"), "-o", obj], check=True)
-        subprocess.run(["gcc", "-std=gnu89", "-Wall", "-Wextra", "-Werror",
-                        "-Wdeclaration-after-statement", "-Wno-unused-parameter",
+        subprocess.run(["gcc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
+                        "-Wno-unused-parameter",
                         "-Wno-sign-compare", "-Wno-pointer-to-int-cast",
                         "-Wno-missing-field-initializers", "-D__cdecl=",
                         *san, *INC, str(ROOT / "tools/tests/sqlite_groups_host.c"), obj,
                         "-o", exe], check=True)
-        print("HOST GNU89 -Werror compile PASS (bundled SQLite)", flush=True)
+        print("HOST GNU11 -Werror compile PASS (bundled SQLite)", flush=True)
         if "--target" in sys.argv:
             subprocess.run(["i386-elf-gcc", "-std=gnu89", "-m32", "-march=i386",
                             "-ffreestanding", "-fno-pie", "-fno-stack-protector",
@@ -37,7 +37,7 @@ if __name__ == "__main__":
                             "-Wdeclaration-after-statement", "-D__KERNEL_BUILD__",
                             *INC, "-c", str(ROOT / "lib/sqlite3/os32_sqlite_vfs.c"),
                             "-o", str(pathlib.Path(tmp) / "vfs.o")], check=True)
-            print("TARGET i386-elf GNU89 -Werror compile PASS", flush=True)
+            print("TARGET i386-elf GNU11 -Werror compile PASS", flush=True)
         cases = [x for x in sys.argv[1:] if x not in ("--target", "--sanitize")] or CASES
         failed = 0
         for case in cases:

@@ -39,8 +39,8 @@ CASES = ["vfast_table", "compat_exact", "compat_inexact", "mode_choice",
          "refuse_inexact",
          "watchdog", "watchdog_leave", "real_hw_story"]
 
-FLAGS = ["-std=gnu89", "-Wall", "-Wextra", "-Werror",
-         "-Wdeclaration-after-statement", "-D__cdecl="]
+FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
+         "-D__cdecl="]
 # serial_plan.h は共有の契約ヘッダ (os32_kapi_shared.h) から
 # SER_MODE_* / SER_INIT_* を引くので sdk/include/os32 も要る。
 INCLUDES = ["-I" + str(ROOT / p)
@@ -193,10 +193,10 @@ def run_cases(exe, cases):
 def build_target(tmp):
     """カーネルと同じ i386-elf で drivers/serial.c ごと通す。"""
     for rel, extra in TARGET_SRCS:
-        cmd = ["i386-elf-gcc", "-std=gnu89", "-m32", "-march=i386",
+        cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
                "-mno-red-zone", "-fcommon", "-fsigned-char", "-fno-short-enums",
-               "-O2", "-Wall", "-Werror", "-Wdeclaration-after-statement",
+               "-O2", "-Wall", "-Werror", 
                "-D__KERNEL_BUILD__",
                "-I" + str(ROOT), "-I" + str(ROOT / "include"),
                "-I" + str(ROOT / "arch/x86"), "-I" + str(ROOT / "platform/pc98"),
@@ -205,7 +205,7 @@ def build_target(tmp):
                *extra, "-c", str(ROOT / rel),
                "-o", str(pathlib.Path(tmp) / (rel.replace("/", "_") + ".o"))]
         subprocess.run(cmd, cwd=ROOT, check=True)
-    print("TARGET i386-elf GNU89 -Werror PASS", flush=True)
+    print("TARGET i386-elf GNU11 -Werror PASS", flush=True)
 
 
 def mutate(tmp):
@@ -237,7 +237,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-serial-vfast-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU89 -Werror compile PASS (real drivers/serial_plan.c)",
+        print("HOST GNU11 -Werror compile PASS (real drivers/serial_plan.c)",
               flush=True)
         if "--target" in args:
             build_target(tmp)

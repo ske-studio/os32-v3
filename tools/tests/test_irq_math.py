@@ -34,8 +34,8 @@ TARGET_SRCS = [
 
 CASES = ["dispatch_two_pass", "register_rules", "storm", "eoi_plan"]
 
-FLAGS = ["-std=gnu89", "-Wall", "-Wextra", "-Werror",
-         "-Wdeclaration-after-statement", "-D__cdecl="]
+FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
+         "-D__cdecl="]
 INCLUDES = ["-I" + str(ROOT / p) for p in ("include", "kernel")]
 
 # 否定側。実装を 1 か所だけ壊して RED になることを見る。
@@ -113,10 +113,10 @@ def run_cases(exe, cases):
 def build_target(tmp):
     """カーネルと同じ i386-elf で kernel/irq.c ごと通す。"""
     for rel, extra in TARGET_SRCS:
-        cmd = ["i386-elf-gcc", "-std=gnu89", "-m32", "-march=i386",
+        cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
                "-mno-red-zone", "-fcommon", "-fsigned-char", "-fno-short-enums",
-               "-O2", "-Wall", "-Werror", "-Wdeclaration-after-statement",
+               "-O2", "-Wall", "-Werror", 
                "-D__KERNEL_BUILD__",
                "-I" + str(ROOT), "-I" + str(ROOT / "include"),
                "-I" + str(ROOT / "arch/x86"), "-I" + str(ROOT / "platform/pc98"),
@@ -125,7 +125,7 @@ def build_target(tmp):
                *extra, "-c", str(ROOT / rel),
                "-o", str(pathlib.Path(tmp) / (rel.replace("/", "_") + ".o"))]
         subprocess.run(cmd, cwd=ROOT, check=True)
-    print("TARGET i386-elf GNU89 -Werror PASS", flush=True)
+    print("TARGET i386-elf GNU11 -Werror PASS", flush=True)
 
 
 def mutate(tmp):
@@ -156,7 +156,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-irq-math-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU89 -Werror compile PASS (real kernel/irq_math.c)",
+        print("HOST GNU11 -Werror compile PASS (real kernel/irq_math.c)",
               flush=True)
         if "--target" in args:
             build_target(tmp)

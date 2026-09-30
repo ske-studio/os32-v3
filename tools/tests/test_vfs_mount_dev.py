@@ -12,9 +12,9 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 CASES = ["encode", "ext2_rejects_non_hd", "boot_sequence_has_one_ext2",
          "duplicate_device_refused", "stat_dev_identifies_mount",
          "stat_dev_on_synth_root"]
-FLAGS = ["-std=gnu89", "-Wall", "-Wextra", "-Werror",
+FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-Wno-unused-parameter", "-Wno-sign-compare",
-         "-Wdeclaration-after-statement", "-D__cdecl="]
+         "-D__cdecl="]
 INCLUDES = ["-I" + str(ROOT / p)
             for p in ("include", "fs", "lib", "kernel", "drivers", "sdk/include/os32")]
 
@@ -25,7 +25,7 @@ if __name__ == "__main__":
                         str(ROOT / "tools/tests/vfs_mount_dev_host.c"),
                         "-o", str(exe)],
                        cwd=ROOT, check=True)
-        print("COMPILE GNU89 -Werror PASS", flush=True)
+        print("COMPILE GNU11 -Werror PASS", flush=True)
         failed = 0
         cases = sys.argv[1:] or CASES
         for case in cases:

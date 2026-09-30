@@ -18,7 +18,7 @@ tools/tests/fstat_redir_host.c が実物の fs/vfs.c + fs/vfs_fd.c +
   python3 -B tools/tests/test_fstat_redir.py [--target] [--mutate]
 
 --target は実機と同じ i386-elf クロスコンパイラでも fs/vfs_fd.c /
-fs/fd_redirect.c が -Werror で通ることの確認 ([C1] C89/GNU89)。
+fs/fd_redirect.c が -Werror で通ることの確認 ([C1] GNU11)。
 
 --mutate は**否定側**。票 §3-1 の根は「判定が 2 か所にあった」ことなので、
 (1) fstat だけリダイレクトを見ない版 (2026-09-17 の不具合そのもの)、
@@ -44,18 +44,17 @@ import mutpar                                                   # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
-HOST_FLAGS = ["-std=gnu89", "-Wall", "-Wextra", "-Werror",
+HOST_FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
               "-Wno-unused-parameter", "-Wno-sign-compare",
-              "-Wdeclaration-after-statement", "-D__cdecl="]
+              "-D__cdecl="]
 HOST_INC = ["-I" + str(ROOT / p)
             for p in ("include", "fs", "lib", "kernel", "drivers",
                       "sdk/include/os32")]
 
-TARGET_FLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding",
+TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-fno-pie", "-fno-stack-protector", "-nostdlib",
                 "-mno-red-zone", "-fcommon", "-O2",
                 "-Wall", "-Wextra", "-Werror",
-                "-Wdeclaration-after-statement",
                 "-Wno-sign-compare", "-Wno-unused-parameter",
                 "-D__KERNEL_BUILD__", "-I.", "-Iinclude",
                 "-Iarch/x86", "-Iplatform/pc98", "-Isdk/include",
@@ -135,7 +134,7 @@ def build_host(tmp, name):
     subprocess.run(["gcc", *HOST_FLAGS, *HOST_INC,
                     str(ROOT / "tools/tests/fstat_redir_host.c"),
                     "-o", str(exe)], cwd=ROOT, check=True)
-    print("HOST GNU89 -Werror COMPILE PASS "
+    print("HOST GNU11 -Werror COMPILE PASS "
           "(real fs/vfs.c + fs/vfs_fd.c + fs/fd_redirect.c)", flush=True)
     return exe
 
@@ -191,7 +190,7 @@ def one_mutation(item):
                 [host_cmd(exe)])
         except subprocess.CalledProcessError:
             return "MUTATE %-20s RED (コンパイルが通らない)" % name, 0
-        head = ("HOST GNU89 -Werror COMPILE PASS "
+        head = ("HOST GNU11 -Werror COMPILE PASS "
                 "(real fs/vfs.c + fs/vfs_fd.c + fs/fd_redirect.c)\n")
         rc = subprocess.run([str(exe)], cwd=str(tree), timeout=120,
                             capture_output=True).returncode

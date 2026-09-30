@@ -55,13 +55,13 @@ PART_CASES = ["find_bios", "find_fail", "format_clamp", "format_at_16652",
 # e2fsck にかける format_at の大きさ (開始 2016、16/63 の RAM ディスク 64,512 セクタ)
 FSCK_SIZES = [16652, 20160, 36000, 62496]
 
-HOST_FLAGS = ["-std=gnu89", "-Wall", "-Wextra", "-Werror",
-              "-Wdeclaration-after-statement", "-D__cdecl="]
-PART_FLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
+HOST_FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
+              "-D__cdecl="]
+PART_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
               "-fno-stack-protector", "-nostdlib", "-static", "-O1",
               "-Wall", "-Wextra", "-Werror",
               "-Wno-unused-parameter", "-Wno-sign-compare",
-              "-Wdeclaration-after-statement", "-D__cdecl="]
+              "-D__cdecl="]
 PART_INC_DIRS = ["include", "fs", "lib", "kernel", "drivers", "sdk/include/os32"]
 
 # ---- 否定側 (C): (ファイル, 前, 後, 説明) -----------------------------------
@@ -810,9 +810,9 @@ def run_py(tools_dir, c_exe, quiet=False):
 # ======================================================================== #
 
 def build_target(tmp):
-    base = ["i386-elf-gcc", "-std=gnu89", "-m32", "-march=i386", "-ffreestanding",
+    base = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
             "-fno-pie", "-fno-stack-protector", "-nostdlib", "-mno-red-zone",
-            "-fcommon", "-O2", "-Wall", "-Werror", "-Wdeclaration-after-statement",
+            "-fcommon", "-O2", "-Wall", "-Werror", 
             "-D__KERNEL_BUILD__", "-I" + str(ROOT), "-I" + str(ROOT / "include"),
             "-I" + str(ROOT / "drivers"), "-I" + str(ROOT / "fs"),
             "-I" + str(ROOT / "sdk/include/os32"), "-I" + str(ROOT / "arch/x86"),
@@ -822,11 +822,11 @@ def build_target(tmp):
         out = pathlib.Path(tmp) / (pathlib.Path(rel).stem + ".o")
         run([*base, "-c", str(ROOT / rel), "-o", str(out)], check=True)
     # ローダと同じフラグ (-Os、-Iboot の型) でも共有部が通る
-    run(["i386-elf-gcc", "-std=gnu89", "-m32", "-march=i386", "-ffreestanding",
+    run(["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
          "-fno-pie", "-fno-stack-protector", "-nostdlib", "-mno-red-zone", "-Os",
          "-Wall", "-Werror", "-fcommon", "-Iboot", "-Idrivers", "-c",
          str(ROOT / "boot/boot_main.c"), "-o", str(pathlib.Path(tmp) / "bm.o")], check=True)
-    print("TARGET i386-elf GNU89 -Werror COMPILE PASS", flush=True)
+    print("TARGET i386-elf GNU11 -Werror COMPILE PASS", flush=True)
 
 
 # ======================================================================== #
@@ -984,13 +984,13 @@ def main(argv):
         if exe is None:
             print("BUILD FAIL (hdd_stage1_host.c)")
             return 1
-        print("HOST GNU89 -Werror COMPILE PASS (hdd_stage1_host.c)", flush=True)
+        print("HOST GNU11 -Werror COMPILE PASS (hdd_stage1_host.c)", flush=True)
         failed += run_cases(exe, PURE_CASES)
         pexe = build_part(tmp)
         if pexe is None:
             print("BUILD FAIL (ext2_part_host.c)")
             return 1
-        print("HOST ILP32 GNU89 -Werror COMPILE PASS (ext2_part_host.c)", flush=True)
+        print("HOST ILP32 GNU11 -Werror COMPILE PASS (ext2_part_host.c)", flush=True)
         failed += run_cases(pexe, PART_CASES)
         for size in FSCK_SIZES:
             failed += fsck_image(pexe, 2016, size, tmp)

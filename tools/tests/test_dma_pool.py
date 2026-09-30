@@ -29,8 +29,8 @@ TARGET_SRCS = ["kernel/dma_pool_math.c", "kernel/dma_pool.c"]
 CASES = ["layout", "sizes", "skip_boundary", "alignment", "frees",
          "leaked", "exhaust"]
 
-FLAGS = ["-std=gnu89", "-Wall", "-Wextra", "-Werror",
-         "-Wdeclaration-after-statement", "-D__cdecl="]
+FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
+         "-D__cdecl="]
 INCLUDES = ["-I" + str(ROOT / p)
             for p in ("include", "kernel", "drivers", "sdk/include/os32")]
 
@@ -102,10 +102,10 @@ def run_cases(exe, cases):
 
 def build_target(tmp):
     for rel in TARGET_SRCS:
-        cmd = ["i386-elf-gcc", "-std=gnu89", "-m32", "-march=i386",
+        cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
                "-mno-red-zone", "-fcommon", "-fsigned-char", "-fno-short-enums",
-               "-O2", "-Wall", "-Werror", "-Wdeclaration-after-statement",
+               "-O2", "-Wall", "-Werror", 
                "-D__KERNEL_BUILD__",
                "-I" + str(ROOT), "-I" + str(ROOT / "include"),
                "-I" + str(ROOT / "arch/x86"), "-I" + str(ROOT / "platform/pc98"),
@@ -114,7 +114,7 @@ def build_target(tmp):
                "-c", str(ROOT / rel),
                "-o", str(pathlib.Path(tmp) / (rel.replace("/", "_") + ".o"))]
         subprocess.run(cmd, cwd=ROOT, check=True)
-    print("TARGET i386-elf GNU89 -Werror PASS", flush=True)
+    print("TARGET i386-elf GNU11 -Werror PASS", flush=True)
 
 
 def mutate(tmp):
@@ -144,7 +144,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-dma-pool-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU89 -Werror compile PASS (real kernel/dma_pool_math.c)",
+        print("HOST GNU11 -Werror compile PASS (real kernel/dma_pool_math.c)",
               flush=True)
         if "--target" in args:
             build_target(tmp)

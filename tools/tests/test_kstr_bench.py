@@ -70,32 +70,29 @@ if not CROSS_DIR.exists():
 # build/config.mk の CFLAGS_COMMON と同じ素性 (ILP32 必須: u32 = unsigned long)。
 # -fno-builtin / -fno-tree-loop-distribute-patterns は **-nostdlib だから**要る
 # — GCC がバイトループを memcpy / memset の呼び出しに畳むと未解決になる。
-HOST_FLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding",
+HOST_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
               "-fno-pie", "-fno-stack-protector", "-fcommon",
               "-fsigned-char", "-fno-short-enums",
               "-O2", "-fno-builtin", "-fno-tree-loop-distribute-patterns",
-              "-Wall", "-Wextra", "-Werror",
-              "-Wdeclaration-after-statement"]
+              "-Wall", "-Wextra", "-Werror"]
 HOST_LINK = ["-nostdlib", "-static", "-no-pie", "-Wl,-z,noexecstack"]
 HOST_INC = ["-I" + str(ROOT / p)
             for p in (".", "include", "sdk/include", "sdk/include/os32")]
 
 # 実物の lib/kstring_c.c をホストで組むときのフラグ (tools/tests/test_kstring_c.py
 # と同じ)。kstring.h を引くので -Ilib が要る。
-KSTR_C_FLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding",
+KSTR_C_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-fno-pie", "-fno-stack-protector", "-fcommon",
                 "-fsigned-char", "-fno-short-enums", "-mno-red-zone", "-O2",
-                "-Wall", "-Wextra", "-Werror",
-                "-Wdeclaration-after-statement"]
+                "-Wall", "-Wextra", "-Werror"]
 KSTR_C_INC = ["-I" + str(ROOT / p) for p in ("include", "lib", "sdk/include/os32")]
 
 # 外部プログラム (build/config.mk の PROGRAM_FLAGS と同じ形)
-TARGET_USER = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding",
+TARGET_USER = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                "-fno-pie", "-fno-stack-protector", "-nostdlib",
                "-mno-red-zone", "-fcommon", "-fsigned-char",
                "-fno-short-enums", "-O2",
                "-Wall", "-Wextra", "-Werror",
-               "-Wdeclaration-after-statement",
                "-D__OS32_USERLAND__", "-I.", "-Iinclude", "-Isdk/include",
                "-Isdk/include/os32", "-Iuserland/lib",
                "-I" + str(CROSS_DIR / "i386-elf/include")]
@@ -515,7 +512,7 @@ def target_compile(tmp):
 
     run([cc] + TARGET_USER + ["-c", "userland/tests/kstr_bench.c",
                               "-o", str(tmp / "kstr_bench.o")])
-    print("TARGET i386-elf GNU89 -Werror COMPILE PASS (kstr_bench.c)", flush=True)
+    print("TARGET i386-elf GNU11 -Werror COMPILE PASS (kstr_bench.c)", flush=True)
 
     # 外部プログラムのフラグで組んだ lib/kstring_c.c に**未定義参照が無い**こと。
     # GCC がループを memcpy / memset の呼び出しに畳むと、a_/c_ へ改名した後に

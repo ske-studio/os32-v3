@@ -87,6 +87,21 @@ INC_SQLITE = $(INC_COMMON) -Ilib/sqlite3 -Ifs -Idrivers -Ilib -Ikernel
 #   同じ構造体を異なるレイアウトで扱う .o が混在して実行時に壊れる。
 DEPFLAGS = -MMD -MP
 
+# === 言語指定 ([C1]、票 docs/tasks/v3/TASK_C11_MIGRATION.md) ===
+# 言語指定は機械・ABI の旗 (CFLAGS_MACHINE) と分けて持つ。SQLite 系だけ別の
+# 言語指定 (C_STD_SQLITE) を使うので、共通旗に -std を入れて後ろの -std で
+# 打ち消す構成にはしない (どちらが効いたかが旗の並びに依存するため)。
+#   C_STD            本体・ブート・userland・SDK の実装。gnu11
+#   C_STD_SQLITE     SQLite 系 (amalgamation は C89)。gnu89
+#   C_DIALECT_ERRORS 暗黙の関数宣言・暗黙 int・VLA を拒否する。GCC 13 の gnu11 は
+#                    暗黙宣言を既定では警告にしかしない (既定のエラー化は GCC 14 から)
+#                    ので明示する。VLA は gnu89 でも拡張として通るので言語モードに
+#                    かかわらず要る (非定数式の STATIC_ASSERT もここで止まる)
+# 実際に効いている言語モードは make check-c-dialect が確かめる。
+C_STD            = -std=gnu11
+C_STD_SQLITE     = -std=gnu89
+C_DIALECT_ERRORS = -Werror=implicit-function-declaration -Werror=implicit-int -Werror=vla
+
 # カーネル空間とユーザー空間で共通の素性 (フリースタンディング i386 コード)。
 # ここには「どちらの空間か」を示すマクロを入れないこと。
 #
@@ -109,8 +124,9 @@ DEPFLAGS = -MMD -MP
 #                    共有する ABI ヘッダ**に enum があるため、enum の幅が
 #                    両側で食い違うと構造体のレイアウトごとずれる ([ABI1])。
 #                    int 幅に固定する。
-CFLAGS_COMMON = -std=gnu89 -m32 -march=i386 -ffreestanding -fno-pie -fno-stack-protector \
-                -nostdlib -mno-red-zone -fcommon -fsigned-char -fno-short-enums $(DEPFLAGS)
+CFLAGS_MACHINE = -m32 -march=i386 -ffreestanding -fno-pie -fno-stack-protector \
+                 -nostdlib -mno-red-zone -fcommon -fsigned-char -fno-short-enums $(DEPFLAGS)
+CFLAGS_COMMON = $(C_STD) $(C_DIALECT_ERRORS) $(CFLAGS_MACHINE)
 
 # カーネル空間。__KERNEL_BUILD__ は include/os32_kapi_shared.h が
 # memmap.h と KAPI_ADDR を出すかどうかの判定に使う。
@@ -155,7 +171,9 @@ USER_CFLAGS   = $(CFLAGS_COMMON) -O2 -Wall -D__OS32_USERLAND__
 CFLAGS_BASE = $(KERNEL_CFLAGS)
 
 # SQLite専用フラグ: -Os (サイズ最適化, -O0のスタック肥大化回避) + -Wno-long-long (int64リテラル)
-CFLAGS_SQLITE = $(CFLAGS_COMMON) -Os -ffunction-sections -fdata-sections \
+# 言語指定は C_STD_SQLITE (gnu89)。CFLAGS_COMMON を継承すると gnu11 になるので
+# 機械・ABI の旗 (CFLAGS_MACHINE) だけを継ぐ。
+CFLAGS_SQLITE = $(C_STD_SQLITE) $(CFLAGS_MACHINE) -Os -ffunction-sections -fdata-sections \
                 -Wno-long-long -w -DNDEBUG -D__KERNEL_BUILD__
 LDFLAGS = -m elf_i386 -T build/os32.ld -Map=$(BUILD_OUT)/kernel.map -nostdlib --nmagic --gc-sections \
 	-L$(shell $(CC) -print-libgcc-file-name | xargs dirname)

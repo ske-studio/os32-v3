@@ -2,6 +2,7 @@
 /*  TSS.C — タスクステートセグメントと I/O 許可ビットマップ                 */
 /* ======================================================================== */
 
+#include <stddef.h>     /* offsetof (整数定数式。旧式の &((T*)0)->m は定数式でない) */
 #include "tss.h"
 #include "kstring.h"
 #include "x86_desc.h"   /* x86_load_tr (arch/x86/、契約なし) */
@@ -14,7 +15,7 @@ STATIC_ASSERT(TSS_IOMAP_SIZE == 65536 / 8, tss_iomap_covers_all_ports);
  * オフセット直書きで更新している (NASM から C の構造体は見えない)。
  * ここがずれると V86 の #GP が拾えないスタックにフレームを積み、
  * 原因不明のトリプルフォルトになる。構造体を触ったらここで止まる。 */
-STATIC_ASSERT((u32)(&((struct tss_entry *)0)->esp0) == 4, tss_esp0_at_offset_4);
+STATIC_ASSERT(offsetof(struct tss_entry, esp0) == 4, tss_esp0_at_offset_4);
 
 /* GDT 側で TSS ディスクリプタを作るため公開する */
 struct tss_entry kernel_tss;

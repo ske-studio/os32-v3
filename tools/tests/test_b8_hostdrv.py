@@ -28,12 +28,12 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 # u32 は unsigned long (include/types.h)。Np2* 構造体のオフセットが変わるので
 # **必ず ILP32 で組む**。
-HOST_FLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
+HOST_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
               "-fno-stack-protector", "-nostdlib", "-static", "-O1",
               "-Wall", "-Wextra", "-Werror",
               "-Wno-unused-parameter", "-Wno-sign-compare",
               "-Wno-address-of-packed-member",
-              "-Wdeclaration-after-statement", "-D__cdecl="]
+              "-D__cdecl="]
 # hostdrv_hostshim は**必ず先頭** — include/io.h を差し替えるため。
 INCLUDES = ["-I" + str(ROOT / p)
             for p in ("tools/tests/hostdrv_hostshim",
@@ -41,7 +41,7 @@ INCLUDES = ["-I" + str(ROOT / p)
                       "sdk/include/os32")]
 SRC = ROOT / "tools/tests/b8_hostdrv_host.c"
 
-TARGET_FLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding",
+TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-fno-pie", "-fno-stack-protector", "-nostdlib",
                 "-mno-red-zone", "-fcommon", "-O2", "-Wall",
                 "-Wno-address-of-packed-member",
@@ -58,7 +58,7 @@ if __name__ == "__main__":
         exe = tmp / "b8-hostdrv"
         subprocess.run(["gcc", *HOST_FLAGS, *INCLUDES, str(SRC), "-o", str(exe)],
                        cwd=ROOT, check=True)
-        print("HOST GNU89 -Werror COMPILE PASS (real fs/hostdrvfs.c)", flush=True)
+        print("HOST GNU11 -Werror COMPILE PASS (real fs/hostdrvfs.c)", flush=True)
 
         rc = subprocess.run([str(exe)], cwd=ROOT, timeout=120).returncode
         print("EXIT b8_hostdrv_host=%d" % rc, flush=True)

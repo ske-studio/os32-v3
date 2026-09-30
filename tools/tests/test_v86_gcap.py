@@ -41,8 +41,7 @@ CASES = ["port_list", "insn", "record_order", "overflow", "in_table",
          "pass_ops", "decide", "mode_31k", "restore"]
 
 # -Wno-attributes: __cdecl は x86-64 のホストでは無視される (警告だけ)。
-FLAGS = ["-std=gnu89", "-Wall", "-Wextra", "-Werror", "-Wno-attributes",
-         "-Wdeclaration-after-statement"]
+FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror", "-Wno-attributes"]
 INCLUDES = ["-I" + str(ROOT / p) for p in ("sdk/include/os32", "kernel")]
 
 # 否定側。実装を 1 か所だけ壊して RED になることを見る。
@@ -239,10 +238,10 @@ def check_guest_bytes(tmp):
 
 def build_target(tmp):
     for rel in TARGET_SRCS:
-        cmd = ["i386-elf-gcc", "-std=gnu89", "-m32", "-march=i386",
+        cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
                "-mno-red-zone", "-fcommon", "-fsigned-char", "-fno-short-enums",
-               "-O2", "-Wall", "-Werror", "-Wdeclaration-after-statement",
+               "-O2", "-Wall", "-Werror", 
                "-D__KERNEL_BUILD__",
                *["-I" + str(ROOT / p) for p in (
                    ".", "include", "arch/x86", "platform/pc98", "sdk/include",
@@ -251,7 +250,7 @@ def build_target(tmp):
                "-c", str(ROOT / rel),
                "-o", str(pathlib.Path(tmp) / (rel.replace("/", "_") + ".o"))]
         subprocess.run(cmd, cwd=ROOT, check=True)
-    print("TARGET i386-elf GNU89 -Werror PASS", flush=True)
+    print("TARGET i386-elf GNU11 -Werror PASS", flush=True)
 
 
 def mutate(tmp):
@@ -283,7 +282,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-v86-gcap-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU89 -Werror compile PASS (real kernel/v86_gcap_math.c)",
+        print("HOST GNU11 -Werror compile PASS (real kernel/v86_gcap_math.c)",
               flush=True)
         rc = check_guest_bytes(tmp)
         if "--target" in args:

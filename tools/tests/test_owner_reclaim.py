@@ -54,8 +54,8 @@ class OwnerReclaimTests(unittest.TestCase):
                 "#include \"types.h\"\nvoid *kmalloc(u32 size);\nvoid kfree(void *p);\n")
             exe = tmp / "owner-reclaim"
             subprocess.run([
-                "cc", "-std=gnu89", "-Wall", "-Wextra", "-Werror",
-                "-Wno-unused-parameter", "-Wdeclaration-after-statement",
+                "cc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
+                "-Wno-unused-parameter", 
                 "-D__cdecl=",
                 "-I" + str(tmp),
                 "-I" + str(ROOT / "sdk/include/os32"),

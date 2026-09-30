@@ -29,13 +29,16 @@ typedef signed long    i32;
 
 #endif /* OS32_KAPI_SHARED_H */
 
-/* コンパイル時アサーション (C89)。
- * cond が偽だと「負サイズの配列」でコンパイルエラーになる。
+/* コンパイル時アサーション (C11 の _Static_assert、[C1])。
+ * cond が偽だとコンパイルエラーになる。cond は整数定数式で書くこと — 規格外の式
+ * (例: 旧 tss.c の &((T *)0)->m) でも GCC が畳み込めれば黙って通るので、拒否を
+ * 当てにしない (offsetof を使う)。呼び出しの形
+ * STATIC_ASSERT(式, 識別子) は C89 の負サイズ配列の頃のまま (識別子は文字列化して
+ * 診断に出す)。gnu89 で読む SQLite 系・ホスト試験でも GCC は _Static_assert を通す。
  * 二重定義に見える定数の一致 (SHM サイズ等) やレイアウトの隣接関係は
  * コメントでなくこれで担保する。 */
 #ifndef STATIC_ASSERT
-#define STATIC_ASSERT(cond, name) \
-    typedef char static_assert_##name[(cond) ? 1 : -1]
+#define STATIC_ASSERT(cond, name) _Static_assert(cond, #name)
 #endif
 
 #endif /* TYPES_H */

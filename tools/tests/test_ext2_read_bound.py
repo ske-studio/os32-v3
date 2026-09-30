@@ -17,9 +17,9 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CASES = ["bound_header", "bound_tail", "bound_aligned", "exec_bss_neighbour"]
-FLAGS = ["-std=gnu89", "-Wall", "-Wextra", "-Werror",
+FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-Wno-unused-parameter", "-Wno-sign-compare",
-         "-Wdeclaration-after-statement", "-D__cdecl="]
+         "-D__cdecl="]
 INCLUDES = ["-I" + str(ROOT / p)
             for p in ("include", "fs", "lib", "kernel", "drivers",
                       "sdk/include/os32")]
@@ -31,22 +31,21 @@ if __name__ == "__main__":
         exe = tmp / "ext2-read-bound"
         subprocess.run(["gcc", *FLAGS, *INCLUDES, str(SRC), "-o", str(exe)],
                        cwd=ROOT, check=True)
-        print("HOST GNU89 -Werror COMPILE PASS", flush=True)
+        print("HOST GNU11 -Werror COMPILE PASS", flush=True)
         failed = 0
         cases = sys.argv[1:] or CASES
         for case in cases:
             rc = subprocess.run([str(exe), case], cwd=ROOT).returncode
             print(f"EXIT {case}={rc}", flush=True)
             failed += rc != 0
-        # 実物と同じフラグでクロスコンパイルも通ること ([C1] C89/GNU89)
-        subprocess.run(["i386-elf-gcc", "-std=gnu89", "-m32", "-march=i386",
+        # 実物と同じフラグでクロスコンパイルも通ること ([C1] GNU11)
+        subprocess.run(["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                         "-ffreestanding", "-fno-pie", "-fno-stack-protector",
                         "-Wall", "-Wextra", "-Werror",
-                        "-Wdeclaration-after-statement",
                         "-Wno-unused-parameter", "-Wno-sign-compare",
                         *INCLUDES, "-O2", "-c", str(ROOT / "fs/ext2_file.c"),
                         "-o", str(tmp / "ext2_file.o")],
                        cwd=ROOT, check=True)
-        print("TARGET i386-elf GNU89 -Werror COMPILE PASS", flush=True)
+        print("TARGET i386-elf GNU11 -Werror COMPILE PASS", flush=True)
         print(f"SUMMARY {len(cases) - failed}/{len(cases)} PASS", flush=True)
         sys.exit(bool(failed))

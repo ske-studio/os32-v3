@@ -11,8 +11,8 @@
   定義なし       … 常駐シェル (exec_run + exec_last_result、KAPI v55)。
 
 種別ごとの写像はビルドで実装が違う (§2-2) ので、片方だけでは配線を見たことに
-ならない。ホスト ILP32 GNU89 で走らせ、同じソースが外部プログラムと同じ形の
-i386-elf-gcc でも通ることを別に見る ([C1] C89/GNU89)。
+ならない。ホスト ILP32 GNU11 で走らせ、同じソースが外部プログラムと同じ形の
+i386-elf-gcc でも通ることを別に見る ([C1] GNU11)。
 Make・エミュレータは使わない。
 
 --mutate は**否定側**。この票の中心規則は
@@ -38,8 +38,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import mutpar                                                   # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-BASE = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
-        "-fno-stack-protector", "-Wall", "-Wdeclaration-after-statement",
+BASE = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
+        "-fno-stack-protector", "-Wall", 
         "-D__OS32_USERLAND__"]
 INCLUDES = ["-I" + str(ROOT / "sdk/include"), "-I" + str(ROOT / "sdk/include/os32"),
             "-I" + str(ROOT / "include"), "-I" + str(ROOT / "userland/shell"),
@@ -368,7 +368,7 @@ if __name__ == "__main__":
 
         for vname, extra in VARIANTS:
             exe = build_host(tmp, shim, "sh_status-" + vname, extra)
-            print("HOST ILP32 GNU89 COMPILE PASS (%s)" % vname, flush=True)
+            print("HOST ILP32 GNU11 COMPILE PASS (%s)" % vname, flush=True)
             rc = subprocess.run([str(exe)], cwd=ROOT, timeout=60).returncode
             print("EXIT sh_status_host(%s)=%d" % (vname, rc), flush=True)
             failed += rc != 0
@@ -378,7 +378,7 @@ if __name__ == "__main__":
                             "-c", str(HOST_SRC),
                             "-o", str(tmp / ("sh_status-%s.o" % vname))],
                            cwd=ROOT, check=True)
-            print("TARGET i386-elf GNU89 COMPILE PASS (%s)" % vname, flush=True)
+            print("TARGET i386-elf GNU11 COMPILE PASS (%s)" % vname, flush=True)
 
         if "--mutate" in sys.argv:
             failed += run_mutations(tmp, shim)

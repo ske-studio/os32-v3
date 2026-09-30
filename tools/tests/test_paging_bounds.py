@@ -7,7 +7,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--rebuild', choices=['nonmaster', 'rollback', 'sparse', 'attrs', 'final'])
 args = parser.parse_args()
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-FLAGS = ['-m32', '-march=i386', '-std=gnu89', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-Wall', '-Wextra', '-Werror', '-Wdeclaration-after-statement']
+FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-Wall', '-Wextra', '-Werror']
 with tempfile.TemporaryDirectory(prefix='os32-paging-') as tmp:
     tmp = pathlib.Path(tmp)
     source = (ROOT / 'kernel/paging.c').read_text()
@@ -32,4 +32,4 @@ with tempfile.TemporaryDirectory(prefix='os32-paging-') as tmp:
     subprocess.run(['gcc', *FLAGS, *defines, '-nostdlib', '-static', '-no-pie', *host_includes, str(ROOT / 'tools/tests' / harness), str(ROOT / 'kernel/physmem.c'), '-o', str(exe)], check=True)
     subprocess.run([str(exe)], check=True, timeout=60)
     subprocess.run(['i386-elf-gcc', *FLAGS, '-O2', *includes, '-c', str(ROOT / 'kernel/paging.c'), '-o', str(tmp / 'paging.o')], check=True)
-    print('HOST ILP32 + TARGET GNU89 PASS')
+    print('HOST ILP32 + TARGET GNU11 PASS')

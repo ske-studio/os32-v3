@@ -107,7 +107,7 @@ net/%.o: net/%.c
 # I/O の実動作試験を代替しない (docs/tasks/network/PLAN.md §6)。
 check-ne2000-ring:
 	@mkdir -p $(BUILD_OUT)
-	@gcc -std=gnu89 -Wall -Wextra -DNE2K_HOST_TEST -Idrivers \
+	@gcc $(C_STD) -Wall -Wextra -DNE2K_HOST_TEST -Idrivers \
 	    -o $(BUILD_OUT)/ne2000_ring_test tools/tests/ne2000_ring_test.c drivers/ne2000_ring.c
 	@$(BUILD_OUT)/ne2000_ring_test
 
@@ -172,7 +172,7 @@ lib/sqlite3/os32_sqlite_vfs.o: lib/sqlite3/os32_sqlite_vfs.c lib/sqlite3/os32_sq
 	$(CC) $(CFLAGS_SQLITE) -include lib/sqlite3/os32_sqlite_config.h $(INC_SQLITE) -c $< -o $@
 
 lib/sqlite3/os32_sqlite_test.o: lib/sqlite3/os32_sqlite_test.c lib/sqlite3/os32_sqlite_vfs.h lib/sqlite3/os32_sqlite_config.h
-	$(CC) -std=gnu89 -m32 -march=i386 -ffreestanding -fno-pie -fno-stack-protector -nostdlib -mno-red-zone -O0 -fcommon -Wno-long-long -w $(DEPFLAGS) -include lib/sqlite3/os32_sqlite_config.h $(INC_SQLITE) -c $< -o $@
+	$(CC) $(C_STD_SQLITE) -m32 -march=i386 -ffreestanding -fno-pie -fno-stack-protector -nostdlib -mno-red-zone -O0 -fcommon -Wno-long-long -w $(DEPFLAGS) -include lib/sqlite3/os32_sqlite_config.h $(INC_SQLITE) -c $< -o $@
 
 # === カーネルリンク ===
 $(BUILD_OUT)/kernel.elf: $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(BUILD_ID_OBJ) $(C_SQLITE_OBJ) $(RUST_LZ4_LIB)

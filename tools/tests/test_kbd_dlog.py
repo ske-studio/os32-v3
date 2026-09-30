@@ -35,8 +35,8 @@ CASES = ["ring_basic", "ring_wrap", "irq_skip", "irq_mods", "irq_flags_api",
          "irq_locks", "watch_fmt", "watch_lost"]
 
 # -Wno-attributes: __cdecl は x86-64 のホストでは無視される (警告だけ)。
-FLAGS = ["-std=gnu89", "-Wall", "-Wextra", "-Werror", "-Wno-attributes",
-         "-Wno-unused-function", "-Wdeclaration-after-statement"]
+FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror", "-Wno-attributes",
+         "-Wno-unused-function"]
 
 # 否定側。実装を 1 か所だけ壊して RED になることを見る。
 # (対象ファイル, パターン, 置換, 説明)
@@ -149,12 +149,12 @@ def run_cases(exe, cases):
 
 def build_target(tmp):
     """カーネルと同じ i386-elf で通す (ホストで外した STATIC_ASSERT もここで効く)。
-    kbd_watch.c は常駐シェルの側だが、同じ GNU89 -Werror で通るかだけを見る。"""
+    kbd_watch.c は常駐シェルの側だが、同じ GNU11 -Werror で通るかだけを見る。"""
     for rel in ["drivers/kbd_dlog.c", "drivers/kbd.c", "userland/shell/kbd_watch.c"]:
-        cmd = ["i386-elf-gcc", "-std=gnu89", "-m32", "-march=i386",
+        cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
                "-mno-red-zone", "-fcommon", "-fsigned-char", "-fno-short-enums",
-               "-O2", "-Wall", "-Werror", "-Wdeclaration-after-statement",
+               "-O2", "-Wall", "-Werror", 
                "-D__KERNEL_BUILD__",
                "-I" + str(ROOT), "-I" + str(ROOT / "include"),
                "-I" + str(ROOT / "arch/x86"), "-I" + str(ROOT / "platform/pc98"),
@@ -163,7 +163,7 @@ def build_target(tmp):
                "-c", str(ROOT / rel),
                "-o", str(pathlib.Path(tmp) / (rel.replace("/", "_") + ".o"))]
         subprocess.run(cmd, cwd=ROOT, check=True)
-    print("TARGET i386-elf GNU89 -Werror PASS", flush=True)
+    print("TARGET i386-elf GNU11 -Werror PASS", flush=True)
 
 
 def mutate(tmp):
@@ -200,7 +200,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-kbd-dlog-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU89 -Werror compile PASS (real drivers/kbd_dlog.c + drivers/kbd.c"
+        print("HOST GNU11 -Werror compile PASS (real drivers/kbd_dlog.c + drivers/kbd.c"
               " + userland/shell/kbd_watch.c)", flush=True)
         if "--target" in args:
             build_target(tmp)

@@ -22,19 +22,19 @@ CASES = [
     "usage",      # 引数無し
 ]
 
-FLAGS = ["-std=gnu89", "-Wall", "-Wextra", "-Werror",
-         "-Wdeclaration-after-statement", "-D__cdecl=",
+FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
+         "-D__cdecl=",
          "-D__OS32_USERLAND__"]
 INCLUDES = ["-I" + str(ROOT / p) for p in ("include", "sdk/include",
                                            "sdk/include/os32")]
 
 # 実機と同じフラグ (build/config.mk の PROGRAM_FLAGS) でも通ること。
 CROSS_DIR = pathlib.Path(os.environ.get("CROSS_DIR", "/usr/local/cross"))
-TARGET_FLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding",
+TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-fno-pie", "-fno-stack-protector", "-nostdlib",
                 "-mno-red-zone", "-fcommon", "-O2",
                 "-Wall", "-Wextra", "-Werror",
-                "-Wdeclaration-after-statement", "-D__OS32_USERLAND__",
+                "-D__OS32_USERLAND__",
                 "-I.", "-Iinclude", "-Isdk/include", "-Isdk/include/os32",
                 "-Iuserland/lib", "-I" + str(CROSS_DIR / "i386-elf/include")]
 
@@ -44,7 +44,7 @@ def build(tmp):
     subprocess.run(["gcc", *FLAGS, *INCLUDES,
                     str(ROOT / "tools/tests/stat_cmd_host.c"), "-o", exe],
                    cwd=ROOT, check=True)
-    print("HOST GNU89 -Werror compile PASS (real userland/cmds/stat.c)",
+    print("HOST GNU11 -Werror compile PASS (real userland/cmds/stat.c)",
           flush=True)
     return exe
 
@@ -53,7 +53,7 @@ def target_compile(tmp):
     subprocess.run(["i386-elf-gcc", *TARGET_FLAGS, "-c",
                     "userland/cmds/stat.c", "-o", str(tmp / "stat.o")],
                    cwd=ROOT, check=True)
-    print("TARGET i386-elf GNU89 -Werror compile PASS (stat.c)", flush=True)
+    print("TARGET i386-elf GNU11 -Werror compile PASS (stat.c)", flush=True)
 
 
 if __name__ == "__main__":

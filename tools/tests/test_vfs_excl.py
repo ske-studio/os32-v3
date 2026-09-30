@@ -18,7 +18,7 @@ create_excl / get_file_size / write_file の戻り値と呼び出し回数を指
   python3 -B tools/tests/test_vfs_excl.py [--target] [--mutate]
 
 --target は実機と同じ i386-elf クロスコンパイラでも fs/vfs.c / fs/vfs_fd.c /
-fs/ext2_vfs.c が -Werror で通ることの確認 ([C1] C89/GNU89)。
+fs/ext2_vfs.c が -Werror で通ることの確認 ([C1] GNU11)。
 
 --mutate は**否定側**。この票の中心規則は「読めなかったを無いと読まない」と
 「非対応を先に断る」なので、それを崩した版で試験が確かに落ちることを見る。
@@ -37,18 +37,17 @@ import mutpar                                                   # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
-HOST_FLAGS = ["-std=gnu89", "-Wall", "-Wextra", "-Werror",
+HOST_FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
               "-Wno-unused-parameter", "-Wno-sign-compare",
-              "-Wdeclaration-after-statement", "-D__cdecl="]
+              "-D__cdecl="]
 HOST_INC = ["-I" + str(ROOT / p)
             for p in ("include", "fs", "lib", "kernel", "drivers",
                       "sdk/include/os32")]
 
-TARGET_FLAGS = ["-std=gnu89", "-m32", "-march=i386", "-ffreestanding",
+TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-fno-pie", "-fno-stack-protector", "-nostdlib",
                 "-mno-red-zone", "-fcommon", "-O2",
                 "-Wall", "-Wextra", "-Werror",
-                "-Wdeclaration-after-statement",
                 "-Wno-sign-compare", "-Wno-unused-parameter",
                 "-D__KERNEL_BUILD__", "-I.", "-Iinclude",
                 "-Iarch/x86", "-Iplatform/pc98", "-Isdk/include",
@@ -121,7 +120,7 @@ def build_host(tmp, name, src="tools/tests/vfs_excl_host.c"):
     exe = tmp / name
     subprocess.run(["gcc", *HOST_FLAGS, *HOST_INC, str(ROOT / src),
                     "-o", str(exe)], cwd=ROOT, check=True)
-    print("HOST GNU89 -Werror COMPILE PASS (real fs/vfs.c + fs/vfs_fd.c)",
+    print("HOST GNU11 -Werror COMPILE PASS (real fs/vfs.c + fs/vfs_fd.c)",
           flush=True)
     return exe
 
@@ -175,7 +174,7 @@ def one_mutation(item):
                 [host_cmd(exe)])
         except subprocess.CalledProcessError:
             return "MUTATE %-22s RED (コンパイルが通らない)" % name, 0
-        head = "HOST GNU89 -Werror COMPILE PASS (real fs/vfs.c + fs/vfs_fd.c)\n"
+        head = "HOST GNU11 -Werror COMPILE PASS (real fs/vfs.c + fs/vfs_fd.c)\n"
         rc = subprocess.run([str(exe)], cwd=str(tree), timeout=120,
                             capture_output=True).returncode
     if rc == 0:
