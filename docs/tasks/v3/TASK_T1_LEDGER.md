@@ -557,6 +557,12 @@ static inline u32  V2P(const volatile void *va) { return (u32)(uptr)va; }
 
 **PM が確かめること**: NP21/W (17MB / 8MB、PEGC と Cirrus) で起動 kselftest 0 fail、`[ledger] pci raw=0 ovf=0` (PCI 無し)、`ledger_check_fail` = 0、`ledger_region_count` が T1c と同じ (起動時の DEVICE 区間は無い)、GUI 起動と `v86 -t` が今までどおり (T1d は起動時の予約・写像の順を変えない)。実機 Ra266 (ログだけ): `[pci]` の行と並んで `[ledger] pci raw=5 ovf=0` (Trident 3 + 82557 2。ROM は数えない)、起動 kselftest 0 fail。
 
+#### 4-4-N. T1d の回帰 (2026-10-01)
+
+**NP21/W (PM、main `9e609b7`、17MB、PEGC)**: `[ledger] pci raw=0 ovf=0` (PCI 無し)、`[selftest] 226/226 passed`、`kselftest_fail`=0、`ledger_check_fail`=0、`v86 -t` OK、`gui_gate v12g4 --h 480` RESULT: OK。
+
+**実機 Ra266 64MB (実機エージェント、CI の成果物 `9e609b7`、HDD 起動のままシリアル経由で更新)**: `Image CRC 039e76c3 (470183 bytes)`、`[selftest] 226/226 passed`、**`[ledger] pci raw=6 ovf=0`**、`[ledger] irq_ops=0 exc_ops=0 check_fail=0 bad_free=0`、`[pcm] CS4231 v=101 irq 10 dma 1`、`[fdc] DMA window … crosses …` の行は無し、`test2` ×3 PASS、`v86 -t` OK、`pegcchk 3` は前回と同じ値 (`GFX=pegc`)。**raw=6 が正しい** — §4-4-R の期待値「5 本」は、9/25 から挿さっている TV チューナー (`0:13.0 1131:7164`、I-O DATA GV-MVP/HX2、`bar0 mem=0x20c00000`) を数え落としていた: Trident 3 + 82557 2 (bar0・bar2) + TV チューナー 1 = 6。`0:12.0` (HPT370、`1103:0004`) は I/O BAR だけ。
+
 ### 4-5. T1e — gfx の識別・予約・写像、BB の SURFACE、`sys_reserve_top` の撤去
 
 | 項 | 内容 |
