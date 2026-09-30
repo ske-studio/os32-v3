@@ -274,6 +274,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | [tasks/gui/v13/PLAN.md](tasks/gui/v13/PLAN.md) | **v1.3 計画と票の索引** (受入完了 2026-09-14) — K5b / K6 / K7 / T7〜T9、監査 (`AUDIT_2026-09-10.md`)、レビュー記録 (`archive/gui_v13_reviews/REVIEW_*.md`、完了記録) |
 | [archive/gui_v13/TASK_K6C_A_terminal.md](archive/gui_v13/TASK_K6C_A_terminal.md) / [TASK_T7_terminal_cmd.md](archive/gui_v13/TASK_T7_terminal_cmd.md) / [REVIEW_T5A_APP.md](archive/gui_v13_reviews/REVIEW_T5A_APP.md) | v1.3 の票のうち `PLAN.md` から直接辿れない 3 本 (端末アプリ、端末からの CUI 起動、T5a アプリのレビュー記録) |
 | [tasks/gui/TASK_KBD_NAV.md](tasks/gui/TASK_KBD_NAV.md) | マウスなしで GUI を操作する (WM のショートカット + マウスキー、Windows 98 の割り当て) **受入完了・実機確認待ち** (K1・K2 合格、残: K3 実機) |
+| [tasks/gui/TASK_CONTROL_PANEL.md](tasks/gui/TASK_CONTROL_PANEL.md) | コントロールパネル (設定を GUI で変えるアプリ、基準は Windows 98) **計画 (2026-09-30)** — 範囲・候補項目・設計で決めること (Q1〜Q8) だけ。設計票の作成は v3 後半 (T4・T5a と P8 の後) |
 | [archive/gui_v14/TASK_EDIT_GUI.md](archive/gui_v14/TASK_EDIT_GUI.md) | テキストエディタの GUI 版 **受入完了 (2026-09-18)** — v1.4 の最後の受入試験。API の退行検出を兼ねる (複数行の編集部品) |
 | [../tools/tests/gui_review_20260910_tdd.md](../tools/tests/gui_review_20260910_tdd.md) / [gui_review3_20260910_tdd.md](../tools/tests/gui_review3_20260910_tdd.md) | v1.3 レビュー往復 (2026-09-10) の試験記録 (完了記録) |
 
