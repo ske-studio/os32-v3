@@ -8,6 +8,8 @@
 
 検査器は旗の**文字列**でなく**コンパイル結果**で判定する。
 
+**位置づけ**: 誤って持ち込むことを防ぐ guard であり、わざと作った入力への耐性は目標にしない (ユーザー決定 2026-09-30、Codex レビュー 3 回目の後)。既知の限界は末尾の「見ていないもの」。
+
 1. `make -n -B all` のコンパイル行 (`i386-elf-gcc … -c`) を読み、旗の組 (−I・依存生成・`-c`・`-o`・ソースを除いたもの) ごとに
    `-E -dM` で `__STDC_VERSION__` / `__STRICT_ANSI__` を聞く。期待は SQLite 系 (`lib/sqlite3/{sqlite3,os32_sqlite_vfs,os32_sqlite_test}.c`、
    `userland/tests/sqlite_standalone/`) が gnu89、それ以外が gnu11。SQLite 系・`kernel/kernel.c`・`boot/boot_main.c` がコンパイル行に無ければ落ちる (空振りの番人)。
@@ -16,7 +18,8 @@
 3. 公開 SDK ヘッダ (`sdk/include/os32/*.h`。`os32_kapi_shared.h` もここ) は `-std=gnu89 -Wc90-c99-compat -Wc99-c11-compat
    -Wdeclaration-after-statement -Wlong-long -Werror` と `-std=gnu11 -Werror` の両方で取り込む (行コメント・宣言位置・`_Bool`・
    指示付き初期化子・`restrict`・`_Static_assert`・`long long` はコンパイラが拒否する)。加えて前処理後の出力 (下の 4 と同じ読み方) で、
-   SDK ヘッダが取り込む `<stdbool.h>` ほかと、SDK ヘッダ自身の行に残る C99/C11 の語を拒否する。
+   SDK ヘッダが取り込む `<stdbool.h>` ほかと、SDK ヘッダ自身の行に残る C99/C11 の語を拒否する。前処理は `-dD` で `#define` を
+   出力に残し、この木では展開されないマクロの置換列も見る (外部アプリが展開すれば到達するため)。
    SDK が配るライブラリヘッダ (`build/sdk.mk` の `SDK_LIB_HEADER_DIRS`・`rt`・`lib/utf8.h`) は gnu89 と gnu11 で取り込めること
    (`rt/dbgserial.h` の可変引数マクロは C99 の機能だが gnu89 の GNU 拡張で通るので、ここは「取り込める」までを見る)。
    `sdk/example/hello` は Makefile の `-std` が gnu89 のままで、in-tree の SDK ヘッダで gnu89 のままコンパイルできること
@@ -32,10 +35,11 @@
 `make -n` への引き継ぎ: 親の `MAKEFLAGS` から並列 make の引き継ぎ (`-j…`、`--jobs…`、`--jobserver-auth=…`、`--jobserver-fds=…`) だけを
 除き、残り (単文字旗の束の `e`、` -- ` 以降の変数指定) は**バイト列のまま**子の環境の `MAKEFLAGS` に渡す (エスケープの解釈は子の make に任せる)。
 `BUILD_OUT` はコマンドラインで一時ディレクトリに向ける (`build/config.mk` の `$(shell mkdir -p …)` は `-n` でも走るため。
-コマンドラインの指定が `MAKEFLAGS` から来た指定に勝つので、利用者の `BUILD_OUT` は使わない。`build/out/lgy98.flags` の試験カーネルの選択も
-見えず、LAN の `-D` は既定の組で読む — 言語モードには効かない)。
+コマンドラインの指定が `MAKEFLAGS` から来た指定に勝つので、利用者の `BUILD_OUT` は使わない)。ビルドの旗を変える保存設定
+(`build/*.mk` が `$(wildcard)` / `$(shell cat)` で `BUILD_OUT` から読むもの。確かめた範囲では `lgy98.flags` だけ) は実物の `build/out` から一時の
+`BUILD_OUT` に写してから `make -n` する (`make kernel-lgy98` の後は LAN の `-D` も実際の組で読む)。
 
-## 試験の区分 (80 チェック)
+## 試験の区分 (81 チェック)
 
 | 区分 | 何を固定したか |
 |---|---|
@@ -108,6 +112,19 @@ FileNotFoundError: [Errno 2] No such file or directory: '…/tools/check_c_diale
 | 変異 22 (`re\ ` 改行 `strict`)・23 (`#\vinclude`)・24 (`#\finclude`) | **UNEXPECTED GREEN** (`MUTATIONS 22/25 RED`) | RED |
 | 変異 25 (複数行コメントの後ろの `#include`) | RED (行番号は先行コメントの開始行) | RED、行は `#` の行 (区分 1・6 で固定) |
 
+### Codex レビュー 3 回目 (2026-09-30) — 直した 2 件
+
+往復の上限に達し、ユーザー決定で 5 件のうち 2 件を直し、3 件は「見ていないもの」に記録した。
+
+- **(1) 公開 SDK ヘッダの展開されないマクロ** — `#define OS32_ASSERT(x) _Static_assert(x, "x")` は gnu89 / gnu11 の取り込みも
+  前処理後の本文も通った。直し: SDK ヘッダの前処理に `-dD` (`#define` を行標識つきで出力に残す。行番号が元のヘッダと一致し、
+  置換列の文字列は他の行と同じく除けることを小さな入力で確認)。
+- **(5) 保存済みの LAN 設定** — `lgy98.flags=5` のとき `#if CONFIG_LGY98_FLAGS == 5` の中の `_Atomic` は、一時の `BUILD_OUT` が空で
+  既定値 0 で読まれて見逃した。直し: `SAVED_SETTINGS` (`lgy98.flags`) を一時の `BUILD_OUT` に写す。`build/*.mk` の `$(BUILD_OUT)` を
+  読む `$(wildcard)` / `$(shell cat)` / `include` を grep し、ほかに無いことを確認。
+- 修正前の検査器 (写しの木): 変異 25 (SDK のマクロ)・26 (`lgy98.flags=5` + `#if` の中の `_Atomic`) が **UNEXPECTED GREEN**
+  (`MUTATIONS 25/27 RED`)。修正後は RED。対照 30 (`lgy98.flags=0` なら同じ `#if` は組まれない)・31 (置換列の文字列の中の語) は GREEN。
+
 ## 否定側 (`--mutate`、段 5) — 実物の木の写しに変異を当てて検査器を回す
 
 `tools/tests/mutpar.py` の写しの木で、変異は写しにだけ当てる (実物は書き換えない)。C11 で許す書き方
@@ -140,11 +157,15 @@ MUTATION 21 RED: 内部実装に行継続で割った restrict (Codex P2-2 反�
 MUTATION 22 RED: 内部実装に \ と改行の間に空白がある行継続で割った restrict (Codex 2 回目 反例 3) -- check_c_dialect: FAIL (1 件)
 MUTATION 23 RED: 内部実装に #\vinclude <stdatomic.h> (Codex 2 回目 反例 4、VT) -- check_c_dialect: FAIL (1 件)
 MUTATION 24 RED: 内部実装に #\finclude <stdatomic.h> (Codex 2 回目 反例 4、FF) -- check_c_dialect: FAIL (1 件)
-MUTATION 25 RED: 内部実装に複数行コメントの後ろの #include <stdatomic.h> (Codex 2 回目 P3) -- check_c_dialect: FAIL (1 件)
-MUTATION CONTROL 26 GREEN: 対照: 内部実装に // とブロック途中の宣言
-MUTATION CONTROL 27 GREEN: 対照: 公開 SDK ヘッダのコメントと文字列に // と restrict
-MUTATION CONTROL 28 GREEN: 対照: 恒等 (何も変えない)
-MUTATIONS 25/25 RED; CONTROLS 3/3 GREEN
+MUTATION 25 RED: 公開 SDK ヘッダに展開されないマクロ #define OS32_ASSERT(x) _Static_assert(x, "x") (Codex 3 回目 (1)) -- check_c_dialect: FAIL (1 件)
+MUTATION 26 RED: 保存済み lgy98.flags=5 のときだけ組まれる #if CONFIG_LGY98_FLAGS == 5 の中の _Atomic (Codex 3 回目 (5)) -- check_c_dialect: FAIL (1 件)
+MUTATION 27 RED: 内部実装に複数行コメントの後ろの #include <stdatomic.h> (Codex 2 回目 P3) -- check_c_dialect: FAIL (1 件)
+MUTATION CONTROL 28 GREEN: 対照: 内部実装に // とブロック途中の宣言
+MUTATION CONTROL 29 GREEN: 対照: 公開 SDK ヘッダのコメントと文字列に // と restrict
+MUTATION CONTROL 30 GREEN: 対照: lgy98.flags=0 なら #if CONFIG_LGY98_FLAGS == 5 の中は組まれない
+MUTATION CONTROL 31 GREEN: 対照: 公開 SDK ヘッダのマクロ置換列の文字列の中の _Static_assert
+MUTATION CONTROL 32 GREEN: 対照: 恒等 (何も変えない)
+MUTATIONS 27/27 RED; CONTROLS 5/5 GREEN
 ```
 
 ## 見ていないもの (既知の限界)
@@ -156,4 +177,11 @@ MUTATIONS 25/25 RED; CONTROLS 3/3 GREEN
 - 内部実装の禁止語・禁止ヘッダは `make all` で組まれる翻訳単位を**実際の旗で**前処理した結果だけを見る。どの翻訳単位からも取り込まれない
   ヘッダ、`#if` で外れている部分 (別の設定・別の CPU 向け)、生成物のソースは数えない。
 - 行継続で割った `#include` 指令の行番号は、GCC の行標識のとおり指令の終わりの物理行になる。
+- **既知の限界 (Codex 3 回目、ユーザー決定で直さない)**:
+  - (2) 翻訳単位の実際の引数に前処理の出力形式を変える旗 (`-P`・`-dM`・`-C` など) が混ざると、行標識が無くなって検出が空になる、
+    またはコメントが残って誤検出になる。今の `build/*.mk` には無い。
+  - (3) `#line` で木の外の論理ファイル名を付けたコードは、木の外として除外され見逃す。
+  - (4) `_Pragma("region restrict")` のような pragma の引数は、前処理後に `#pragma region restrict` の行になり禁止語として誤検出する。
+  - (P3) raw string (C では無効)、拡張識別子 (`restrict$x` の `$` を識別子の文字と見ない)、`strip_jobserver` が正規化されていない
+    `MAKEFLAGS` (`-j 4` の分かれた形など) を扱わないこと — 親の make が正規化して渡すので通常の経路では起きない。
 - ホスト gcc で組む NE2K のホスト試験 (`build/kernel.mk` の `gcc $(C_STD)`) は `i386-elf-gcc` の行でないので数えない。

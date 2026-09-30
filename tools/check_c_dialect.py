@@ -23,6 +23,9 @@ check_constraints.py の ID 検査とは別に、**実際の旗とコンパイ�
 
   python3 tools/check_c_dialect.py [--root <木>]
 
+誤って持ち込むことを防ぐ guard であり、わざと作った入力への耐性は目標にしない
+(ユーザー決定 2026-09-30。既知の限界は tools/tests/c_dialect_tdd.md の「見ていないもの」)。
+
 終了コード: 0 = 合格、1 = 問題あり、2 = 実行できない (コンパイラ・make が無い)。
 試験は tools/tests/test_c_dialect.py (記録 tools/tests/c_dialect_tdd.md)。
 """
@@ -378,7 +381,9 @@ def check_sdk_headers(root, cc=None):
             # -Wc90-c99-compat -Werror がコンパイラの判定で拒否する)
             src = pathlib.Path(tmp) / "sdk_scan.c"
             src.write_text(body, encoding="utf-8")
-            args = SDK_BASE[1:] + SDK_MODES[0][1][:1]
+            # -dD: #define を出力に残す。外部アプリが展開すれば到達するので、この木で
+            # 展開されないマクロの置換列も禁止語の検査にかける (Codex 3 回目 (1))
+            args = SDK_BASE[1:] + SDK_MODES[0][1][:1] + ["-dD"]
             for d in incs:
                 args += ["-I", str(d)]
             rc, out, err = preprocess(cc, args + [str(src)], root)
@@ -520,6 +525,11 @@ def check_internal_units(units, root, jobs=None):
 #  (a)(b) 実際の旗
 # ==========================================================================
 
+# 実物の木の BUILD_OUT に保存され、ビルドの旗を変える設定 (build/*.mk が $(wildcard) /
+# $(shell cat) で読むもの)。一時の BUILD_OUT に写してから make -n する (Codex 3 回目 (5))。
+SAVED_SETTINGS = ("lgy98.flags",)
+REAL_BUILD_OUT = "build/out"
+
 JOBSERVER_RE = re.compile(r"^(-j\d*|--jobs(=\d+)?|--jobserver-(auth|fds)=.*)$")
 
 
@@ -543,7 +553,9 @@ def dry_run(root):
     子に渡し、ジョブサーバの引き継ぎだけを切る (strip_jobserver)。BUILD_OUT は一時
     ディレクトリに向ける — config.mk の `$(shell mkdir -p $(BUILD_OUT) …)` は -n でも
     走るので、そのままだと実物の木 (写しの木なら symlink の先) に build/out を作り得る
-    (コマンドラインの BUILD_OUT が MAKEFLAGS から来た指定より勝つ)。"""
+    (コマンドラインの BUILD_OUT が MAKEFLAGS から来た指定より勝つ)。旗を変える保存設定
+    (SAVED_SETTINGS、例: make kernel-lgy98 が残す lgy98.flags) は実物の build/out から
+    一時の BUILD_OUT に写す。"""
     env = dict(os.environ)
     mf = strip_jobserver(env.get("MAKEFLAGS", ""))
     for k in ("MAKEFLAGS", "MFLAGS", "MAKE_TERMOUT", "MAKE_TERMERR"):
@@ -551,6 +563,12 @@ def dry_run(root):
     if mf:
         env["MAKEFLAGS"] = mf
     with tempfile.TemporaryDirectory(prefix="c_dialect_out_") as tmp:
+        out_dir = os.path.join(tmp, "out")
+        os.makedirs(out_dir)
+        for name in SAVED_SETTINGS:
+            src = pathlib.Path(root, REAL_BUILD_OUT, name)
+            if src.is_file():
+                shutil.copyfile(str(src), os.path.join(out_dir, name))
         cmd = (["make", "--no-print-directory", "-n", "-B"] + MAKE_TARGETS
                + ["BUILD_OUT=" + os.path.join(tmp, "out")])
         r = subprocess.run(cmd, cwd=str(root), capture_output=True, text=True, env=env)

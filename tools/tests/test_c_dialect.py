@@ -221,6 +221,8 @@ def case_sdk(cd):
         ("restrict", "void os32_f(char *restrict p);\n"),
         ("long long", "extern long long os32_ll;\n"),
         ("行継続で割った //", "int os32_a; /\\\n/ x\n"),
+        ("展開されないマクロの置換列の _Static_assert (Codex 3 回目 (1))",
+         "#define OS32_A(x) _Static_assert(x, \"x\")\n"),
         ("#\\f で取り込む stdbool", "#\finclude <stdbool.h>\nextern int os32_b;\n"),
     ]
     for what, body in bad_cases:
@@ -414,6 +416,15 @@ MUTANTS = [
      lambda: append("kernel/sysclk.c", "#\vinclude <stdatomic.h>\n")),
     ("内部実装に #\\finclude <stdatomic.h> (Codex 2 回目 反例 4、FF)", "RED",
      lambda: append("kernel/sysclk.c", "#\finclude <stdatomic.h>\n")),
+    ("公開 SDK ヘッダに展開されないマクロ #define OS32_ASSERT(x) _Static_assert(x, \"x\") (Codex 3 回目 (1))",
+     "RED",
+     lambda: append("sdk/include/os32/os32api.h", "#define OS32_ASSERT(x) _Static_assert(x, \"x\")\n")),
+    ("保存済み lgy98.flags=5 のときだけ組まれる #if CONFIG_LGY98_FLAGS == 5 の中の _Atomic (Codex 3 回目 (5))",
+     "RED",
+     lambda: dict(append("kernel/sysclk.c",
+                         "#if defined(CONFIG_LGY98_FLAGS) && CONFIG_LGY98_FLAGS == 5\n"
+                         "static _Atomic int t0_lan;\n#endif\n"),
+                  **{"build/out/lgy98.flags": "5\n"})),
     ("内部実装に複数行コメントの後ろの #include <stdatomic.h> (Codex 2 回目 P3)", "RED",
      lambda: append("kernel/sysclk.c", "/* a\n b */ #include <stdatomic.h>\n")),
     # --- 対照 (C11 で許す書き方。落ちたら検査器が厳しすぎる) ---
@@ -424,6 +435,13 @@ MUTANTS = [
     ("対照: 公開 SDK ヘッダのコメントと文字列に // と restrict", "GREEN",
      lambda: append("sdk/include/os32/os32api.h",
                     "/* restrict // _Bool */\n#define OS32_T0_STR \"a//b restrict\"\n")),
+    ("対照: lgy98.flags=0 なら #if CONFIG_LGY98_FLAGS == 5 の中は組まれない", "GREEN",
+     lambda: dict(append("kernel/sysclk.c",
+                         "#if defined(CONFIG_LGY98_FLAGS) && CONFIG_LGY98_FLAGS == 5\n"
+                         "static _Atomic int t0_lan;\n#endif\n"),
+                  **{"build/out/lgy98.flags": "0\n"})),
+    ("対照: 公開 SDK ヘッダのマクロ置換列の文字列の中の _Static_assert", "GREEN",
+     lambda: append("sdk/include/os32/os32api.h", "#define OS32_T0_S \"_Static_assert restrict\"\n")),
     ("対照: 恒等 (何も変えない)", "GREEN",
      lambda: append("sdk/include/os32/os32api.h", "")),
 ]
