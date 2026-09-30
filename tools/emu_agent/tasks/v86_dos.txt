@@ -1,0 +1,7 @@
+# V86 (DOS 5.00A) セッションの操作。cmd_nowait → wait → tvram → key → CTRL+STOP。
+
+Boot MS-DOS under V86 with the command: v86 -b /host/dos5hd.nhd   (use cmd_nowait, it never returns).
+Wait about 20 seconds, then read the screen until the DOS prompt 'A>' appears.
+Type the DOS command dir (key text) followed by ENTER, wait 5 seconds, read the screen and
+report how many files DOS lists and how many bytes are free. Then leave DOS with the key
+CTRL+STOP, wait 5 seconds, run 'ver' with cmd and report its first line.

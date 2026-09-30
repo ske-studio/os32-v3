@@ -1,0 +1,132 @@
+# ============================================================================
+#  packages.yaml — CD インストール媒体 (.PKG) の構成
+#
+#  **中身は配備の正典 (build/core.yaml + userland/deploy.yaml) から生成する。**
+#  ここに書くのは「どのタグをどのパッケージに入れるか」と、配備マニフェストに
+#  載らない媒体だけの物 (ブートセクタ、settings.db) だけ。ファイルの一覧を
+#  ここに写さないこと — 2026-09-24 まで手書きの二重管理で、配備 179 本の
+#  うち 27 本 (gshell / libos32gui.shlib / 既定フォント …) が CD に入って
+#  いなかった。生成は tools/mkpkg.py --plan、検査は make check-packages-host。
+#
+#  振り分け (deploy マニフェストの各行の tags:):
+#    core      → MINIMAL  起動に要るもの (カーネル、unicode、shell、filetypes、
+#                         設定の初期値)
+#    base      → MINIMAL  入れる・直す・取ってくるためのコマンド: install / cdinst
+#                         (HDD へ入れる)、hsync (残りを /host から取ってくる)、
+#                         less / grep / hexdump (壊れたファイルを見る)、cfg (設定を
+#                         直す)
+#
+#  **MINIMAL =「起動して、HDD に入れて、壊れたときに直して、残りを取ってこられる」
+#  レスキュー兼インストーラ** (2026-09-25、ユーザー決定)。起動 FD と同じ集合なので
+#  2HD (1232KB) に収まる大きさに保つ。それ以外は NORMAL:
+#    - 既定フォント /sys/font/default.kcgfont (184KB、data)。無ければカーネルは
+#      `FONT..NG` を出して本体のフォント ROM で描く (kernel/boot_font.c、drivers/kcg.c)
+#    - more / find / sort / head / tail / wc / tee / touch / sleep / diff / du / cal /
+#      man / sndctl (programs)。直すには less / grep / hexdump とシェルの組み込みで足りる
+#    gui       → GUI      gshell、libos32gui.shlib、shlib を使うアプリ (filer /
+#                         edit_gui)。shlib を使う試験アプリは test (DEBUG) のまま
+#    programs  → NORMAL   コマンドとアプリ
+#    docs      → NORMAL   man ページ
+#    data      → NORMAL   既定フォント (KCG)、FEP 辞書、TTF、MGX サンプル
+#    test      → DEBUG    試験バイナリと試験用データ (userland/tests/ 由来は必ずこれ)
+#  1 行のタグはちょうど 1 つのパッケージに当たること (検査が見る)。
+#
+#  cdinst の選択肢との対応 (userland/system/cdinst.c)。展開は依存の順
+#  BOOT → MINIMAL → GUI → NORMAL → DEBUG:
+#    1. Minimal = BOOT + MINIMAL                (CUI のレスキュー兼インストーラ。起動 FD と同じ集合)
+#    2. Normal  = 1 + GUI + NORMAL
+#    3. Full    = 2 + DEBUG
+#
+#  **起動 FD (build/image.mk) の中身は BOOT + MINIMAL そのもの** (下の fd:)。
+#  FD だけに要る物と FAT の 8.3 に合わせた置き場所の違いだけを fd: に書く。
+#  core / base に足した物は FD にも入るので、FD の空き (docs/08_build.md) を見ること。
+#  **2HD の空きが FD_MIN_FREE_KB (tools/tests/test_packages.py) を切ると
+#  make check-packages-host が落ちる** — 2026-09-25 にカーネルの 4KB 増で 2HD が
+#  前触れなく作れなくなった (既定フォント 184KB と一般コマンドを NORMAL へ移して空けた)。
+#
+#  項目数 (ファイル + ディレクトリ) が消費側の上限 128 (userland/lib/rt/pkg.h
+#  PKG_MAX_ENTRIES) を超えるパッケージは mkpkg が NAME.PKG, NAME2.PKG, … に
+#  自動で分け、cdinst は連番を欠けるまで順に展開する。名前は ISO 9660 の
+#  8.3 に収めるため 7 文字以下 (連番 1 桁を足して 8)。
+#
+#  配備マニフェストの層は本体の 2 つだけ (tools/deploy_manifests.py
+#  CORE_MANIFEST_RELPATHS)。apps/ と game/ (private submodule) は `make all`
+#  では作られず CI では空なので、CD には入れない (hsync / make deploy で配る)。
+# ============================================================================
+
+packages:
+  # --- ブートセクタ (cdinst がセクタへ直接書く。配備マニフェストの boot: と同じ物) ---
+  boot:
+    type: boot
+    version: 1
+    lzss: false
+    files:
+      - host: boot/boot_hdd.bin
+        guest: /boot/boot_hdd.bin
+      - host: boot/loader_hdd.bin
+        guest: /boot/loader_hdd.bin
+
+  minimal:
+    version: 2
+    lzss: false
+    tags: [core, base]
+    # 媒体だけが持つ物 (通常配備は /etc/settings.tsv を配り、DB は作らない。
+    # 票 TASK_S0 §3。生成は build/assets.mk)
+    files:
+      - host: build/out/settings.db
+        guest: /etc/settings.db
+
+  gui:
+    version: 1
+    lzss: false
+    tags: [gui]
+
+  normal:
+    version: 2
+    lzss: false
+    tags: [programs, docs, data]
+
+  debug:
+    version: 2
+    lzss: false
+    tags: [test]
+
+# 配備マニフェストにあってもパッケージに入れない物。**理由を必ず書く。**
+# guest はゲストパス (glob 不可)。今は無い。
+exclude: []
+
+# ---------------------------------------------------------------------------
+# 起動 FD (build/image.mk の images/os32_boot.d88 と images/os32_boot144.img)。
+# 中身は from のパッケージと同じ集合で、足しも引きもしない (make
+# check-packages-host が実物のイメージで等しいことを見る)。違うのは:
+#   rename  FAT (FatFs は LFN なし) の 8.3 に収まらない名前と、FD 上の置き場所が
+#           HDD と違う物。guest は配備マニフェストのゲストパス、fd は FD 上のパス
+#   only    FD だけが要る起動用の物。host の {loader} は make が渡す
+#           (2HD: boot/loader_fat_new.bin、1.44MB: boot/loader_fat144.bin)
+# どれも reason: を必ず書く。install.bin (FD → HDD) はこの表を逆に当てて正規名で
+# 写す (userland/system/install.c の fd_renames / fd_only。足したら両方直す —
+# make check-packages-host の case 9 が突き合わせ、FD → install → HDD の集合が
+# MINIMAL と等しいことも見る)。
+# ---------------------------------------------------------------------------
+fd:
+  from: [boot, minimal]
+  rename:
+    - guest: /boot/vmkernel.lz4
+      fd: /VMKRNL.LZ4
+      reason: FAT ローダ (boot/loader_fat*.asm) はルートの VMKRNL.LZ4 を読む。install.bin は Phase 3 で /hd0/boot/vmkernel.lz4 へ写す (ディレクトリの写しでは扱わない)
+    - guest: /boot/boot_hdd.bin
+      fd: /sys/boot_hdd.bin
+      reason: install.bin (SRC_BOOT_HDD) が HDD の LBA 0 へ書く元。ファイルとしては HDD へ写さない (CD の BOOT.PKG と同じ扱い)
+    - guest: /boot/loader_hdd.bin
+      fd: /sys/loader_h.bin
+      reason: 8.3 に収まらない。install.bin (SRC_LOADER_H) が HDD の LBA 2 以降へ書く元。ファイルとしては HDD へ写さない
+    - guest: /etc/filetypes
+      fd: /etc/filetype
+      reason: 8.3 に収まらない。install.bin は正規名で HDD へ写す。シェルの filer は /etc/filetypes が開けず、/etc が FD のルート (FAT) のマウントにあるときだけ /etc/filetype を読む (userland/shell/cmd_filer.c)
+  only:
+    - fd: /LOADER.BIN
+      host: "{loader}"
+      reason: FAT の IPL (boot/boot_fat*.asm) が読む 2 段目。HDD の同等物は BOOT の loader_hdd.bin (ブート領域へ直接書く)。install.bin は写さない
+    - fd: /etc/profile
+      host: assets/profile_fdd
+      reason: FD 用の PATH (/bin:/sbin、/usr/bin を含めない) と起動の表示。install.bin は写さない。HDD の /etc/profile (assets/profile) は配備マニフェストに無い

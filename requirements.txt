@@ -1,0 +1,13 @@
+# tools/ のホスト側 Python スクリプトが import するパッケージ (2026-09-30 に git grep で確認)。
+# ビルドの必須は lz4 と PyYAML (make all)。残りは個別の道具だけが使う。
+# ゲストの配布物には入らない (ライセンスの一覧は THIRD_PARTY.md)。
+#   pip install -r requirements.txt   (Windows 専用の 2 つは環境マーカーで自動的に除かれる)
+lz4          # tools/mkvmkernel.py, gen_font16.py, gen_kcg_font.py, lz4_compress.py (make all)
+PyYAML       # tools/check_manifests.py, check_select.py, deploy_manifests.py, hostdrv_deploy.py, mkpkg.py, nhd_deploy.py
+Pillow       # tools/gen_font16.py, gen_kcg_font.py, gui_gate.py, img2mgx.py, img2vbz.py, screenshot.py, .claude/skills/run-os32/driver.py
+numpy        # tools/img2mgx.py, img2vbz.py
+zopfli       # tools/img2mgx.py
+pyserial     # tools/rshell_serial.py (実機のシリアル会話)
+pandas       # tools/fep_compiler.py (旧形式 fep.dic のみ)
+pywin32 ; sys_platform == "win32"     # tools/host_agent.py, os32_server.py (非推奨)
+pyautogui ; sys_platform == "win32"   # tools/screenshot.py (非推奨 — 内蔵 /api/screenshot を使う)

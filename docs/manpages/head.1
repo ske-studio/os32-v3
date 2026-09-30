@@ -1,0 +1,28 @@
+# head
+
+ファイルの先頭N行を表示する
+
+## SYNOPSIS
+
+`head [-n N] [FILE...]`
+
+## DESCRIPTION
+
+指定されたファイルの先頭から N 行を表示する。
+N が省略された場合は 10 行を表示する。
+パイプからの入力にも対応。
+
+## OPTIONS
+
+- `-n N` — 表示する行数を指定 (デフォルト: 10)
+- `-N` — `-n N` の短縮形
+
+## EXAMPLES
+
+- `head file.txt` — 先頭10行を表示
+- `head -n 5 file.txt` — 先頭5行を表示
+- `cat log.txt | head -20` — パイプから先頭20行
+
+## SEE ALSO
+
+tail, cat, grep, wc

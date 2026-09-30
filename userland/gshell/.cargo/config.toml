@@ -1,0 +1,11 @@
+# gshell 専用 cargo 設定 (userland/rust/.cargo/config.toml と同等)。
+#
+# ターゲット JSON は os32 リポジトリ root からの相対で解決する。
+# userland/gshell → ../../ = os32 root → sdk/rust/i686-os32-none.json。
+[build]
+target = "../../sdk/rust/i686-os32-none.json"
+
+[unstable]
+build-std = ["core", "alloc", "compiler_builtins"]
+build-std-features = ["compiler-builtins-mem"]
+json-target-spec = true

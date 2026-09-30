@@ -1,0 +1,27 @@
+zlib inflate (展開のみ) — 無改変で取り込んだもの
+================================================
+
+出所: zlib 1.2.x 公式ソース (gcc-13.2.0 同梱の zlib/ より)
+      Jean-loup Gailly and Mark Adler, zlib ライセンス
+ライセンス全文: zlib.h の冒頭
+
+取り込んでいるのは展開に必要な最小構成だけ:
+
+    inflate.c  inffast.c  inftrees.c  adler32.c  zutil.c
+    inflate.h  inffast.h  inftrees.h  inffixed.h  zutil.h  zlib.h  zconf.h
+
+deflate (圧縮) 側・gzip 入出力・crc32 は取り込んでいない。
+ゲスト側は展開のみを行い、圧縮はホスト側 (tools/img2mgx.py の zlib/zopfli) が担う。
+
+**これらのファイルは一切改変していない。** zlib ライセンスの条項 2 は改変版に
+その旨の明示を求めているので、手を入れる場合はここに記録すること。
+
+ビルドは build/libs.mk の ZLIB_INFLATE_OBJ ルール。-DNO_GZIP を付けて
+gzip ストリーム対応を落としている。
+
+利用者: programs/libos32mgx (MGX 画像デコーダ)
+
+なぜ puff.c から乗り換えたか:
+  puff.c (zlib contrib の参照実装) は速度より明快さを優先した実装で、
+  実機 (NP21/W) で 640x400 4bpp 1 ページの展開に 3,080 ms かかっていた。
+  こちらはテーブル駆動で約 4 倍速い。代償はコード +9KB。

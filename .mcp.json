@@ -1,0 +1,27 @@
+{
+  "mcpServers": {
+    "np21w": {
+      "command": "python3",
+      "args": [
+        "tools/np21w_mcp/server.py"
+      ],
+      "env": {}
+    },
+    "emu_agent": {
+      "command": "python3",
+      "args": [
+        "tools/emu_agent/mcp_server.py"
+      ],
+      "env": {}
+    },
+    "autoplay": {
+      "command": "python3",
+      "args": [
+        "../os32-game/tools/autoplay/mcp_server.py"
+      ],
+      "env": {
+        "FLM_MODEL": "gemma4-it:e4b"
+      }
+    }
+  }
+}

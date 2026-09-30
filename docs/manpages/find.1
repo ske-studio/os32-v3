@@ -1,0 +1,27 @@
+# find
+
+ファイル名を検索する
+
+## SYNOPSIS
+
+`find [PATH] [-name PATTERN]`
+
+## DESCRIPTION
+
+指定ディレクトリ以下を再帰的に走査し、条件に一致するファイルを
+フルパスで1行ずつ出力する。最大8階層まで探索する。
+
+## OPTIONS
+
+- `-name PATTERN` — ファイル名に PATTERN を含むものを検索 (部分一致)
+
+## EXAMPLES
+
+- `find /` — ルート以下の全ファイルを列挙
+- `find . -name config` — カレント以下で "config" を含むファイルを検索
+- `find /bin -name .bin` — /bin 以下の .bin ファイルを検索
+- `find / -name log | grep sys` — パイプとの組み合わせ
+
+## SEE ALSO
+
+ls, grep, du

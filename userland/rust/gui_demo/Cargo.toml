@@ -1,0 +1,18 @@
+# gui_demo — libos32gui の目視確認用デモプログラム
+#
+# libos32gui (rlib) を path 依存で取り込み、ウィンドウ 2 枚 + ボタンを出す。
+# os32api の panic_handler / global_allocator を単一実体として取り込むため、
+# このクレートだけが staticlib (最終リンク対象) になる。
+[package]
+name = "gui_demo"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+os32api = { path = "../../../sdk/rust/os32api" }
+# 票 C3: 本体は 0x400000 常駐の共有ライブラリ。アプリはスタブだけをリンクする
+# (名前は libos32gui のまま — アプリのソースは無変更)。
+libos32gui = { path = "../libos32gui_stub", package = "libos32gui_stub" }

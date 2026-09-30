@@ -1,0 +1,27 @@
+# tail
+
+ファイルの末尾N行を表示する
+
+## SYNOPSIS
+
+`tail [-n N] [FILE...]`
+
+## DESCRIPTION
+
+指定されたファイルの末尾から N 行を表示する。
+N が省略された場合は 10 行を表示する。
+パイプからの入力にも対応。
+
+## OPTIONS
+
+- `-n N` — 表示する行数を指定 (デフォルト: 10)
+- `-N` — `-n N` の短縮形
+
+## EXAMPLES
+
+- `tail file.txt` — 末尾10行を表示
+- `tail -n 20 log.txt` — 末尾20行を表示
+
+## SEE ALSO
+
+head, cat, grep, wc

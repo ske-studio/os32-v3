@@ -1,0 +1,9 @@
+[package]
+name = "libos32term"
+version = "0.1.0"
+edition = "2021"
+description = "Fixed-storage terminal display model for OS32 T4"
+
+[workspace]
+
+[dependencies]

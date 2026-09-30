@@ -1,0 +1,4 @@
+set PATH=/bin:/sbin
+set PROMPT=$P> 
+set HOME=/
+echo OS32 v1.0 (FDD Boot)

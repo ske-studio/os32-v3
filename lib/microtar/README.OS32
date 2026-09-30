@@ -1,0 +1,70 @@
+microtar — ustar の読み書き (vendor、票 S6)
+==========================================
+
+出所: https://github.com/rxi/microtar
+      src/microtar.c / src/microtar.h / LICENSE
+      取得 2026-09-14、master = 27076e1b9290e9c7842bb7890a54fcf172406c84
+      (2017-08-31 "Merge pull request #2 from deadcast/master")。
+      src/microtar.c の最終更新は d2c5a07 (2017-01-16)
+      Copyright (c) 2017 rxi、**MIT ライセンス** (LICENSE 全文を同梱)
+
+自作せず既製の単一ファイル実装を持ち込む方針 (「車輪の再発明を避ける」)。
+GNU tar は gnulib + autotools + GPL、busybox tar は GPLv2 なので採らない。
+
+利用者: `userland/cmds/tar.c` (`/bin/tar.bin`)。ビルド規則は
+`build/programs.mk` の `lib/microtar/microtar_prog.o` + `userland/cmds/tar.elf`
+(`lib/lz4_prog.o` と同じ形)。ホスト試験は `tools/tests/test_tar_cmd.py`。
+
+I/O は `mtar_t` の関数ポインタ (read/write/seek/close) なので、OS32 側は
+そこへ KAPI (`sys_open` / `sys_read` / `sys_write` / `sys_lseek` / `sys_close`)
+を挿すだけでよい。挿す側は `userland/cmds/tar.c`。
+
+
+改変点 (4 つだけ。ここ以外は上流そのまま)
+-----------------------------------------
+
+`microtar.h` は**無改変**。改変は `microtar.c` だけで、いずれも
+`/* --- OS32 追加 --- */` / `#ifndef MTAR_NO_STDIO` の印が付いている。
+
+1. **`MTAR_NO_STDIO`** — `file_read` / `file_write` / `file_seek` /
+   `file_close` と `mtar_open()` を `#ifndef MTAR_NO_STDIO` で囲った。
+   OS32 は `fopen` が VFS に繋がっていないので、このマクロを付けて
+   コンパイルし、呼び出し側が `mtar_t` の関数ポインタを自分で埋める。
+   (`mtar_open` の宣言は `microtar.h` に残したまま。OS32 で誤って
+   呼んだらリンクエラーになる。)
+
+2. **`sscanf(field, "%o", &v)` → `mtar_octal(field, len)`** — OS32 の
+   ユーザーランドは newlib の `sscanf` を一度も使っておらず (freestanding、
+   実績があるのは `printf` / `sprintf` だけ)、ustar の数値フィールドは
+   長さいっぱいだと NUL 終端が無い。フィールド長で必ず止まる octal 読みに
+   置き換えた。先頭・末尾の空白は読み飛ばす (旧式の tar が書く形)。
+
+3. **`strcpy(h->name, rh->name)` → `mtar_copy_field()`** — `name` /
+   `linkname` は 100 バイトちょうどだと NUL 終端が無く、同じ 100 バイトの
+   宛先を溢れさせる (上流のバグ)。長さで止め、終端できないときは
+   `MTAR_EFAILURE` を返す。`userland/cmds/tar.c` は作成時に 99 バイトを
+   超える名前を拒否するので、作る側と読む側で対称になる。
+
+4. **`write_null_bytes()` を 512 バイト単位に** — 上流は
+   `for (i = 0; i < n; i++) twrite(tar, &nul, 1);` で **1 バイトずつ**
+   書いていた。OS32 の ext2 は `sys_write` 1 回につき 10 セクタ前後の固定費が
+   あるので (パス解決 + inode の read-modify-write + データブロックの
+   read-modify-write)、15 バイトのファイル 1 本を束ねるだけでも padding 497 回
+   + 終端 1024 回 = 1521 回の `sys_write` になり、`tar c` が 15 秒を超えていた
+   (票 S6-P)。`static const char nul[512]` (.rodata) を使ってブロック単位で
+   書く。呼び出しは 1523 回 → **5 回**、セクタ I/O は 15258 → **78**。
+   書く中身 (ゼロ) も位置の勘定 (`twrite` が `tar->pos` を進める) も
+   上流と同じ。実測は `tools/tests/s6p_tdd.md`、診断は
+   `docs/archive/settings/TASK_S6P.md`。
+   `nul[]` を自動変数にしないこと — 外部プログラムのスタックは細い。
+
+
+形式について (ホストの Python `tarfile` との互換)
+-------------------------------------------------
+
+microtar が書くのは **ustar の magic 欄を持たない v7 形式のヘッダ**
+(512B、チェックサムは符号なし和 + 256)。欄の位置・意味は ustar と同じで、
+Python の `tarfile` はこれを読める (`tools/tests/test_tar_cmd.py` が
+毎回確かめる)。Python の `tarfile` が書いた ustar / GNU 形式も
+`mtar_read_header` で読める (prefix 欄・PAX 拡張・base-256 の巨大サイズ・
+100 バイトを超える名前は非対応 — 使わない)。

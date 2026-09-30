@@ -1,0 +1,45 @@
+IPAex フォント — 出所とライセンス
+=================================
+
+出所: IPAexフォント Ver.004.01 (IPAexfont00401.zip)
+      一般社団法人 文字情報技術促進協議会 (旧 独立行政法人 情報処理推進機構 (IPA) 配布)
+      https://moji.or.jp/ipafont/  (zip: https://moji.or.jp/wp-content/ipafont/IPAexfont/IPAexfont00401.zip、
+      SHA-256 bcf8374a…7974b、9,738,669 バイト。2026-09-30 に到達と SHA-256 を実測)
+
+リポジトリには含めない (ユーザー決定 2026-09-30):
+      `ipaexg.ttf` (ゴシック) / `ipaexm.ttf` (明朝) は git で追跡しない (`.gitignore`)。
+      ビルド時に `tools/fetch_fonts.py` (`make fonts`、`make all` からは `ipaexg16.kcgfont` 経由)
+      が上の zip を取得し、zip と各 ttf の SHA-256 (スクリプトに固定: ipaexg 3b9955a5…f400dd、
+      ipaexm 7a306386…3d71c7) を照合してこのディレクトリに置く。**取得の前にライセンスの
+      同意を聞く** (端末なら全文を出して y/N、端末が無ければ `OS32_ACCEPT_IPA_LICENSE=1` の
+      ときだけ同意。記録は `.license_accepted`、追跡しない)。手順は docs/08_build.md §8-1。
+      置かれる ttf は zip の中身と同一 (改変なし)。
+
+ライセンス: IPA Font License Agreement v1.0 (OSI 承認)。原文は同じディレクトリの
+`IPA_Font_License_Agreement_v1.0.txt` (zip に同梱のものをそのまま置いた。UTF-8 (BOM)、CRLF、
+日本語/英語。取得 2026-09-30。**リポジトリに同梱し、追跡する**。fetch_fonts.py はこの文の
+SHA-256 4c84dd52…517e54 が上流と一致することを確かめてから表示する)。
+ライセンスの解説ページ: https://moji.or.jp/ipafont/license/
+
+再配布のしかた (第 3 条):
+- `ipaexg.ttf` / `ipaexm.ttf` をそのまま配る場合 (3 条 2 項): 名前を変えない・改変しない・
+  本契約の写し (上記 txt) を添える。
+- 派生プログラム (3 条 1 項): `make all` が作る `*.kcgfont` (`tools/gen_font16.py`、16px
+  ビットマップ) は「許諾プログラムの一部から文字情報を取り出して作った」派生プログラムに
+  当たる。配布物に含めるときは (1) 派生プログラムの写しを提供できること、(2) オリジナルに
+  置き換える方法 (このファイルの出所 URL) を示すこと、(3) 同じライセンスで配ること、
+  (4) **プログラム名・フォント名・ファイル名に「IPA」を含む名前を使わない**こと、が要る。
+  ホスト側の生成物名 `ipaexg16.kcgfont` は (4) に**抵触する** — ディスクイメージや SDK に
+  同梱して配る前に改名すること (ゲスト側の `/sys/font/default.kcgfont` は問題ない)。
+  生成物は git に入れない (`.gitignore`)。
+
+TTF の扱い (ユーザー決定 2026-09-30):
+- **サブセット TTF (`tools/subset_font.py` が作っていた `ipaexg_subset.ttf`) は廃止**した。
+  TTF はゲストに配らない (`userland/deploy.yaml` にフォントの項目は無い) — 日本語 OpenType を
+  ゲストで使う人は、ビルドで取得したこのディレクトリの原本をそのまま `/data/ipaexg.ttf` に置く
+  (`font_test` が読む。明朝の試験は `/data/ipaexm.ttf`)。
+- **v3 (os32-v3) には TTF を持っていかない** (リポジトリに含めない点は同じ)。ライセンス文・
+  この README・`tools/fetch_fonts.py` は持っていき、v3 の OpenType 層はビルド時に取得した ttf を
+  配布物に入れる (同意した人がビルドした物。配布物にはライセンス文を添える)。CUI は
+  内蔵フォント (KCG ROM) だけで描き、内蔵フォントの無い移植先は寛容ライセンスの欧文 OpenType
+  (候補: Go fonts = 3-clause BSD、DejaVu = Bitstream Vera License。選定は T7b) で対応する。

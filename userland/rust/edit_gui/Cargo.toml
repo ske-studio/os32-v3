@@ -1,0 +1,16 @@
+# edit_gui — テキストエディタの GUI 版 (票 docs/archive/gui_v14/TASK_EDIT_GUI.md)
+#
+# filer と同じ構成: os32api の panic_handler / global_allocator を単一実体で
+# 取り込むため、このクレートだけが staticlib (最終リンク対象) になる。
+[package]
+name = "edit_gui"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+os32api = { path = "../../../sdk/rust/os32api" }
+# 票 C3: 本体は 0x400000 常駐の共有ライブラリ。アプリはスタブだけをリンクする。
+libos32gui = { path = "../libos32gui_stub", package = "libos32gui_stub" }

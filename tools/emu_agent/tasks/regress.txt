@@ -1,0 +1,19 @@
+# 配備後の定型回帰。1 タスク = 空行区切り。モデルは観測を転記するだけで、
+# 合否は steps.jsonl の obs を読む側 (人間 / 上位モデル) が判断する。
+
+Read the kernel self-test counters with the selftest action and report both numbers verbatim.
+
+Run the shell command 'klibc_test' on OS32, then run 'echo $?'. Report the final
+summary line verbatim (it looks like 'klibc_test: PASS <n>/<m>') and the value of $?.
+
+Run the shell command 'alloc_demo' on OS32, then run 'echo $?'. Report the final
+summary line verbatim (it looks like 'alloc_demo: PASS <n>/<m>') and the value of $?.
+
+Run the shell command 'ring3_fault' on OS32. It is expected to be killed by the kernel.
+Afterwards run 'ver' to confirm the shell is still alive. Report the last lines printed
+by ring3_fault and the first line of ver.
+
+Run this pipeline on OS32: ls / | wc -l   and then: echo abc | wc -c
+Report both numbers.
+
+Take a screenshot with the screenshot action and report the saved path and size verbatim.

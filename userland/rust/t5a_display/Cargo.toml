@@ -1,0 +1,13 @@
+[package]
+name = "t5a_display"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+os32api = { path = "../../../sdk/rust/os32api" }
+libos32gui = { path = "../libos32gui_stub", package = "libos32gui_stub" }
+libos32term = { path = "../../libos32term" }
+libos32term_render = { path = "../../libos32term_render" }

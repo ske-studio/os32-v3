@@ -1,0 +1,21 @@
+# send
+
+シリアルポートにテキストを送信する
+
+## SYNOPSIS
+
+`send TEXT...`
+
+## DESCRIPTION
+
+引数のテキストをRS-232Cシリアルポートに送信する。
+末尾にCR+LFが付加される。
+事前に `serial` コマンドでポートを初期化すること。
+
+## EXAMPLES
+
+- `send Hello World` — "Hello World" を送信
+
+## SEE ALSO
+
+serial, terminal, recv

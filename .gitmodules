@@ -1,0 +1,6 @@
+[submodule "apps"]
+	path = apps
+	url = https://github.com/ske-studio/os32-apps.git
+[submodule "game"]
+	path = game
+	url = https://github.com/ske-studio/os32-game.git

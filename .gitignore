@@ -1,0 +1,121 @@
+#AI Agents
+.agents
+# ビルド生成物
+*.o
+*.d
+*.bin
+*.elf
+*.raw
+*.shlib
+*.map
+*.img
+*.d88
+*.iso
+
+# パッケージビルド出力
+/packages/
+
+# ビルド成果物出力ディレクトリ (kernel.bin / sqlite.bin / vmkernel.lz4 /
+# unicode.bin / kernel.elf / kernel.map)
+/build/out/
+
+# SDK staging と配布 tarball (make sdk / make sdk-dist の出力)
+/build/sdk/
+/build/dist/
+
+# ゲームの生成データ (make game-data で game/data/ のスクリプトから作る)
+/game/build/
+
+# 派生アセット (make assets-all で assets/ の上流ファイルから生成する)
+# 上流 (ipadic/*.csv) と設定 (filetypes, profile) は追跡する。
+/assets/fonts/*.kcgfont
+# IPAex フォントの TTF は追跡しない — ビルド時に tools/fetch_fonts.py が IPA の
+# 公式配布から取る (ユーザー決定 2026-09-30)。ライセンス文と README.OS32 は追跡する。
+# .license_accepted はライセンスに同意した記録 (ホストごと)。
+/assets/fonts/*.ttf
+/assets/fonts/*.ttf.part
+/assets/fonts/.license_accepted
+/assets/fep.db
+/assets/fep_s.db
+/assets/fep_l.db
+/assets/fep.dic
+
+# 特定の生成ファイル
+/unicode.bin
+/tools/gen_unicode
+/tools/lzss_pack
+
+# パッケージ/ログ等
+*.log
+*.err
+*~
+*.swp
+
+# Pythonキャッシュ
+__pycache__/
+*.pyc
+
+# Rust/Cargo ビルド成果物
+**/target/
+
+# OS固有のファイル等
+Thumbs.db
+.DS_Store
+
+# 一時スクリプト・デバッグ用ファイル
+fix_*.py
+refactor_*.py
+repack_*.py
+update_*.py
+*.bmp
+screenshot*.png
+demo*_fixed.png
+kernel_objdump.txt
+test_rect.script
+
+# テスト用バイナリアセット
+*.vdp
+*.vqd
+*.vqi
+*.VQI
+rance.png
+
+# ルートのビルド成果物 (boot/ 配下は追跡対象)
+/boot.bin
+/boot_fat.bin
+/boot_hdd.bin
+/loader.bin
+/loader_hdd.bin
+/vmkernel.lz4
+/cat
+
+# 一時調査ファイル
+*.html
+
+# ワークエリア
+# (/sample/ /tasks/ /tests/ は追跡と食い違っていたので 2026-09-30 に外した —
+#  sample/ は VBZ の試験データとして持つ (sample/README.OS32)、tasks/ と tests/ は削除)
+/mount/
+/shared.vqd
+
+# 自動プレイの実行ログ (スクリーンショット・決定ログ)
+/game/tools/autoplay/logs/
+
+# 環境変数ファイル
+.env
+
+# NP21/W の設定 (ホストごとの値。リポジトリに入れない — [D2] の対象)
+*.ini
+
+# 個人的な設計思想ドキュメント（非公開）
+docs/DESIGN_PHILOSOPHY.md
+SOUL.md
+tools/emu_agent/logs/
+/build/nhd/
+
+# PC-98 ハードウェア資料のローカルミラー (著作権物。tools/sync_hwdocs.sh で写す。git に入れない)
+/docs/hw
+.claude/settings.local.json
+.claude/worktrees/
+.codex/
+/os32-ci/

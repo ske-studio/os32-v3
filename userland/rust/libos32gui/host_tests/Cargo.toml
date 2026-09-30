@@ -1,0 +1,19 @@
+# libos32gui のホスト TDD (票 S2-W)。
+#
+# ゲスト用の Cargo 設定 (userland/rust/.cargo/config.toml = i686-os32-none) を
+# 避けるため、`[workspace]` を自前に持つ独立クレートにしてある。t5a_display の
+# host_tests と同じ作法。
+#
+# `src/cfgro.rs` を `#[path]` で直に取り込み、C の libos32cfg の代わりに
+# 贋物 (`fake` モジュール) を並べて wrapper の分岐を固定する。描画も WM も
+# ジャンプ表も動かさない — 見るのは open / begin / set / commit / close の
+# 呼び順と戻り値の畳み方だけ。
+[package]
+name = "libos32gui_host_tests"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]

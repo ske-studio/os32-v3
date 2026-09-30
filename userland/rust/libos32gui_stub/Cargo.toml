@@ -1,0 +1,25 @@
+# libos32gui_stub — 共有ライブラリ libos32gui.shlib の**アプリ側スタブ** (票 C3)
+#
+# アプリは `libos32gui = { path = "../libos32gui_stub", package = "libos32gui_stub" }`
+# として依存する。名前が同じなので **アプリのソースは無変更**。
+#
+# ここに入るのは:
+#   - ジャンプ表 (`os32api::gui::stub`) を叩く薄い包み
+#   - 所有型 (`Window` / `Timer`) — 中身は WindowId だけで、Drop が表を呼ぶ
+#   - 値型 (`SizeSpec` / `GuiErr` / `WidgetEvent` / SCAN_*)
+#
+# ウィジェット木 / クリップスタック / サーフェス表 / U3 ループの状態は
+# **ライブラリ側 (.data/.bss、アプリごと物理ページ)**。ここには一切持たない。
+#
+# 依存の鉄則 (CONTRACTS C8): 外部クレート禁止。in-repo の os32api だけ。
+[package]
+name = "libos32gui_stub"
+version = "0.1.0"
+edition = "2021"
+description = "OS32 GUI shared-library stub (jump table + version check)"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+os32api = { path = "../../../sdk/rust/os32api" }

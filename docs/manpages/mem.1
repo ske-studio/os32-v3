@@ -1,0 +1,24 @@
+# mem
+
+メモリ情報を表示する
+
+## SYNOPSIS
+
+`mem`
+`heap`
+
+## DESCRIPTION
+
+システムのメモリ状態とメモリマップを表示する。
+`heap` はエイリアス。
+
+### 表示項目
+
+- `Physical` — 物理メモリ容量 (KB/MB)
+- `Paging` — ページング有効/無効
+- `Heap Tot/Used/Free` — カーネルヒープの合計/使用中/空き (バイト)
+- メモリマップ — 各領域のアドレス範囲と用途
+
+## SEE ALSO
+
+dev, ver

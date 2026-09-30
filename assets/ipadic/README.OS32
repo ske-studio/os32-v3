@@ -1,0 +1,24 @@
+IPADIC (MeCab 版) の CSV — 出所と配布条件
+==========================================
+
+出所: mecab-ipadic 2.7.0-20070801 (奈良先端科学技術大学院大学 松本研 / MeCab 配布)
+      https://github.com/taku910/mecab/tree/master/mecab-ipadic
+      (tarball: mecab-ipadic-2.7.0-20070801.tar.gz、`configure.in` の AM_INIT_AUTOMAKE)
+      文字コードは上流のまま EUC-JP。
+
+取り込んでいるのは 13 本 (Adj Adnominal Adverb Auxil Conjunction Noun.adjv Noun
+Noun.verbal Postp-col Postp Prefix Suffix Verb)。上流の Filler / Interjection /
+Others / Symbol と matrix.def・char.def 等は取り込んでいない。
+**13 本とも上流と同一** (2026-09-30 に GitHub の raw と sha256 で照合)。改変なし。
+
+配布条件: 同じディレクトリの `COPYING` (上流の mecab-ipadic/COPYING をそのまま同梱、
+EUC-JP、sha256 fca02d9adb601d101eccdf3131119abfff2d9c825ef5c759d7a89ebbaa972099。
+取得元 https://raw.githubusercontent.com/taku910/mecab/master/mecab-ipadic/COPYING、
+2026-09-30)。要点: NAIST の著作権表示と無保証の段落を写しに付けること、辞書項目の
+大半は ICOT Free Software 由来で、その条件 (第 3 条 NO WARRANTY を必ず添えて再配布)
+も適用される。
+
+利用: `tools/fep_to_sqlite.py` が `assets/fep.db` (FEP の辞書、ゲストの `/db/fep.db`)
+を生成する。生成物 (`fep*.db`、`fep.dic`) は git に入れない (`.gitignore`)。
+生成した辞書の `meta` に license / attribution を運ばせる件は
+`docs/tasks/fep/TASK_DICT_META.md` (M5)。

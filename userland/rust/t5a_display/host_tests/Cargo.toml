@@ -1,0 +1,11 @@
+[package]
+name = "t5a_display_host_tests"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+libos32term = { path = "../../../libos32term" }
+libos32term_render = { path = "../../../libos32term_render" }

@@ -1,0 +1,22 @@
+# tee
+
+標準入力をファイルと標準出力の両方に出力する
+
+## SYNOPSIS
+
+`tee FILE`
+
+## DESCRIPTION
+
+標準入力から読み取ったデータを、指定されたファイルと
+標準出力の両方に同時に書き出す。パイプラインの途中で
+データを分岐させるために使用する。
+
+## EXAMPLES
+
+- `ls | tee list.txt` — ls の結果をファイルに保存しつつ画面にも表示
+- `cat log.txt | grep error | tee errors.txt` — フィルタ結果を保存
+
+## SEE ALSO
+
+cat, echo

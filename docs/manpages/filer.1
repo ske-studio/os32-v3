@@ -1,0 +1,29 @@
+# filer
+
+CUI ファイラを起動する (シェル内蔵)
+
+## SYNOPSIS
+
+`filer [dir]`
+
+## DESCRIPTION
+
+テキスト VRAM ベースの全画面 CUI ファイラ。
+カーソルキーで移動し、Enter でディレクトリ移動またはファイルの実行/表示を行う。
+拡張子関連付け (`assets/filetypes`) により、テキストはビューア、
+.bin は実行、といった動作が自動選択される。
+
+## KEYS
+
+- `↑` / `↓` — カーソル移動
+- `Enter` — ディレクトリ移動 / ファイルを開く
+- `ESC` — 終了
+
+## EXAMPLES
+
+- `filer` — カレントディレクトリから起動
+- `filer /bin` — /bin から起動
+
+## SEE ALSO
+
+ls, cd, exec

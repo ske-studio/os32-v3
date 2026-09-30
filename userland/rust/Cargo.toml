@@ -1,0 +1,41 @@
+[workspace]
+members = [
+    # os32api は SDK 側 (sdk/rust/os32api) にあり、ワークスペース外なので
+    # members には入れない (cargo はワークスペース root の下しかメンバに
+    # できない)。各クレートからは path 依存として参照する。
+    "os32_math",
+    "hello_gfx",
+    "alloc_demo",
+    "math_test_rs",
+    "font_test",
+    # libos32gui = 共有ライブラリ本体 (0x400000 常駐、staticlib → libos32gui.shlib)
+    # libos32gui_stub = アプリ側スタブ (ジャンプ表を叩くだけ)。アプリは
+    #   `libos32gui = { path = "../libos32gui_stub", package = "libos32gui_stub" }`
+    #   で取り込むのでソースは無変更 (票 C3)。
+    "libos32gui",
+    "libos32gui_stub",
+    "gui_demo",
+    "gdi_test",
+    "lease_test",
+    "gui_bench",
+    # 票 C4: v1.2 デスクトップ client API (modal_result / file / input /
+    # session / icon16) の実機確認アプリ。
+    "v12_api_test",
+    "t5a_display",
+    # 票 C5: v1.2 ファイルマネージャ (/usr/bin/filer.bin、契約 V12-F)。
+    "filer",
+    # 票 TASK_EDIT_GUI: v1.4 の最後の受入試験 (/usr/bin/edit_gui.bin)。
+    "edit_gui",
+    # ROADMAP v1.4 About dialog: Start → About OS32 (/usr/bin/about.bin)。
+    "about",
+]
+resolver = "2"
+
+[profile.release]
+opt-level = 2
+lto = true
+panic = "abort"
+
+[profile.dev]
+panic = "abort"
+

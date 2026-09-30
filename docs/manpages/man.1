@@ -1,0 +1,29 @@
+# man
+
+マニュアルページを表示する
+
+## SYNOPSIS
+
+`man COMMAND`
+`man -l`
+`man -k KEYWORD`
+
+## DESCRIPTION
+
+指定されたコマンドのマニュアルページを表示する。
+マニュアルは `/usr/man/` ディレクトリに Markdown 形式で格納されている。
+
+## OPTIONS
+
+- `-l` — 利用可能な全マニュアルの一覧を表示
+- `-k KEYWORD` — キーワードでマニュアルを検索 (apropos相当)
+
+## EXAMPLES
+
+- `man cat` — cat コマンドのマニュアルを表示
+- `man -l` — 全マニュアル一覧
+- `man -k file` — "file" を含むマニュアルを検索
+
+## SEE ALSO
+
+help

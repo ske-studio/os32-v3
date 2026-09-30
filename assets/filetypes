@@ -1,0 +1,21 @@
+# OS32 File Type Associations
+# 形式: .拡張子=プログラムパス
+# ファイラでEnter押下時、拡張子に対応するプログラムで開く
+# プログラムにはファイルのフルパスが第1引数として渡される
+# '#' で始まる行と空行は無視される
+
+# テキスト系
+.txt=/usr/bin/edit.bin
+.c=/usr/bin/edit.bin
+.h=/usr/bin/edit.bin
+.sh=/usr/bin/edit.bin
+.bat=/usr/bin/edit.bin
+.cfg=/usr/bin/edit.bin
+.log=/usr/bin/edit.bin
+
+# ドキュメント
+.md=/usr/bin/mdview.bin
+
+# 画像
+.vbz=/usr/bin/vbzview.bin
+.vdp=/usr/bin/vdpview.bin

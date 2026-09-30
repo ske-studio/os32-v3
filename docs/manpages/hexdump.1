@@ -1,0 +1,27 @@
+# hexdump
+
+ファイルの16進ダンプを表示する
+
+## SYNOPSIS
+
+`hexdump [-n COUNT] [FILE]`
+
+## DESCRIPTION
+
+ファイルの内容を16進数とASCIIの並列表示で出力する。
+8バイトごとにスペースで区切り、1行16バイトを表示する。
+パイプ入力にも対応。
+
+## OPTIONS
+
+- `-n COUNT` — 表示するバイト数を制限
+
+## EXAMPLES
+
+- `hexdump kernel.bin` — kernel.binの16進ダンプを表示
+- `hexdump -n 64 data.bin` — 先頭64バイトのみ表示
+- `cat file | hexdump` — パイプ経由で表示
+
+## SEE ALSO
+
+cat, head

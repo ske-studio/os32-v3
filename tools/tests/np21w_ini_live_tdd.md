@@ -1,0 +1,389 @@
+# NP21/W live ini: 新規ホスト TDD 記録 (2026-09-08)
+
+変更対象は新規 `tools/np21w_ini_live.py`、新規
+`tools/tests/test_np21w_ini_live.py`、この記録、設定スキルの4ファイルのみ。
+既存 `np21w_ini.py` と `np21w_ini_tdd.md` は変更していない。
+既存20件の過去の追加テストについて、当時存在しなかった per-test RED を補記・捏造しない。
+
+## 今回実際に実行した RED/GREEN
+
+以下の `L` は実行した共通コマンド:
+
+```bash
+python3 -B -m unittest discover -s tools/tests -p test_np21w_ini_live.py -v
+```
+
+| 段階 | コマンド・結果 | 実装前の assertion と追加実装 |
+|---|---|---|
+| A RED | L: 17 tests, failures=41 | no-op skeleton に対して Identity 4件、Workflow 13件の全メソッドが assertion failure。例: bytes未変更、diffがNone、例外が発生しない。import error/skip は無し |
+| B RED | L: 17 tests, failures=3 | 制御実装後、`test_receipt_tampering_is_rejected` の target/original/operation 改変がすべて `IniError not raised`。最初のAではレシート不存在のassertionで止まったため、改変3ケースのREDをここで改めて確認 |
+| C GREEN | L: 17 tests, OK | レシートの対象・純粋変換再計算・原本・差分・起動情報を検証 |
+| D RED | L: 23 tests, failures=37 | WindowsExecutor/main のno-opと空PS_SERVERに対し WindowsContract 6件。空配列、失敗応答、バイト転送、CLI差分、PS契約のassertion RED |
+| E GREEN | L: 23 tests, OK | 固定PSプログラム、JSON/base64チャネル、Windows executor、CLIを追加 |
+| F RED | L: 27 tests, failures=6 | RecoveryAndBoundary 4件。失敗診断にIDなし、束縛入口なし、予約デバイス名3ケース未拒否、native構造体Pack=4なし |
+| G RED | L: 27 tests, failures=2 | 診断ID追加後、停止状態からの復元が実際に拒否されるassertion RED。Pack=4修正後、新規ファイルのアクセス権指定がないassertion RED |
+| H RED | L: 28 tests, failures=3 | Gの2件に加え、`test_mutating_model_binding_is_single_use` が2回目を拒否しないassertion RED |
+| I GREEN | L: 28 tests, OK | 成功した不在照会+記録済みprovenanceで復元、所有者専用FileSecurity、単回承認を実装 |
+| J RED | L: 30 tests, failures=1 | `test_bound_apply_requires_exact_operator_approved_request`: 操作者が具体的requestを束縛していないのに適用できるassertion RED。もう1件は既存再照会ガードの回帰例で初回からGREEN（下記） |
+| K GREEN | L: 30 tests, OK | `approved_request` の完全一致が必要。承認済み試行は1回のみ |
+| L RED | L: 31 tests, failures=1 | `test_nonzero_powershell_exit_overrides_success_frame`: 偽チャネルが成功JSONとexit3を返しても拒否しないassertion RED |
+| M GREEN | 全体コマンド: 51 tests, OK | transportで異常終了を確認。旧20+新31、skipなし |
+
+D以後のRED出力は作業中 `/tmp/np21w-live-red2.log` 〜 `red7.log` に保存して確認した。
+リポジトリに残す証拠はこの件数・対応表とテスト本体。REDコマンドはFAILED、
+ログ末尾を表示したシェル全体の終了値は `tail` の0になる場合があるため、
+その0をテスト成功として扱っていない。
+
+## テスト名と挙動の対応
+
+`test_` 接頭辞を省略。括弧内は実際のRED段階。
+
+| クラス | メソッド | 検証する挙動 |
+|---|---|---|
+| Identity | exact_identity (A) | PID、exe、コマンド行、明示iniの一致 |
+| Identity | absence_is_not_query_failure (A) | 成功空配列と不正/欠落照会を区別 |
+| Identity | reject_ambiguous_commandlines (A) | 暗黙、相対、追加引数、未対応-i形を拒否 |
+| Identity | wrong_pid_exe_config_or_multiple (A) | 別PID、別exe/ini、複数プロセス拒否 |
+| Workflow | dry_run_exact_diff_without_mutations (A) | 既定読取のみ、限定差分、原本保持 |
+| Workflow | bounded_operation_and_operator_gate (A) | 自由操作と専有前提なしを接触前に拒否 |
+| Workflow | exclusive_lock_before_any_contact (A) | lock失敗なら照会/保存なし |
+| Workflow | apply_order_bytes_backup_receipt_restart (A) | 停止→不在→backup→replace→readback/receipt→同一対象start |
+| Workflow | queries_fail_closed_at_every_phase (A) | 通常適用の8照会の各地点で失敗注入、後続を拒否 |
+| Workflow | stop_requires_exit_not_acknowledgement (A) | stopの成功応答だけで保存しない |
+| Workflow | pid_reuse_before_stop (A) | 同じPIDでも生成時刻が変わればstopしない |
+| Workflow | stop_save_or_external_change_aborts (A) | 停止中の識別情報変更を拒否 |
+| Workflow | backup_replace_readback_failures_never_restart (A) | backup/replace/receiptエラー、読み戻し不一致でstartなし |
+| Workflow | restart_requires_same_identity_and_observed_pid (A) | 戻り値PIDをCIM観測で確認、失敗時に自動復元しない |
+| Workflow | restore_dry_run_and_apply (A) | 逆差分プレビューと全バイト復元 |
+| Workflow | restore_rejects_intervening_identity_or_bytes (A) | 内容/識別情報の途中変更を停止前に拒否 |
+| Workflow | receipt_tampering_is_rejected (A,B) | 実際のレシート改変3ケースのREDはB |
+| WindowsContract | successful_empty_query_and_transport_cleanup (D) | 成功空配列、対象束縛、チャネルclose |
+| WindowsContract | query_error_malformed_output_fail_closed (D) | false/欠落/null/非配列/偽booleanを拒否 |
+| WindowsContract | byte_transport_and_no_arbitrary_executor_operation (D) | opaque bytesのbase64往復と自由shell拒否 |
+| WindowsContract | powershell_query_stop_lock_contract (D) | 固定PSのCIM/Stop/Wait/Handle/mutex/失敗応答を静的検査 |
+| WindowsContract | powershell_atomic_backup_identity_and_start_contract (D) | 固定PSのfile ID/link/create/flush/replace/再確認/startを静的検査 |
+| WindowsContract | cli_default_dry_run_and_explicit_apply (D) | 偽executorを使う実CLIパーサ、既定preview、明示apply、秘密非出力 |
+| RecoveryAndBoundary | restore_when_start_failed_and_query_proves_absence (F,G) | 診断IDと停止後のレシート復元。後者の実assertion REDはG |
+| RecoveryAndBoundary | model_binding_rejects_paths_shell_and_forged_authorization (F) | 返すcallableの限定requestと信頼側の設定 |
+| RecoveryAndBoundary | reserved_device_paths_are_not_operator_targets (F) | CON/NUL/COM1パス拒否 |
+| RecoveryAndBoundary | windows_native_identity_layout_and_private_new_files (F,G) | Win32構造体Pack=4、新規ファイルのACL付きconstructor |
+| RecoveryAndBoundary | mutating_model_binding_is_single_use (H) | 次の操作に承認を再利用できない |
+| RecoveryAndBoundary | bound_apply_requires_exact_operator_approved_request (J) | 具体的requestを承認側で束縛するまで書き込めない |
+| RecoveryAndBoundary | intervening_start_during_backup_or_readback_aborts | Aの再照会ガードに対する追加の回帰入力。初回GREEN。新しい実装挙動を追加しておらず、このテスト固有のREDを主張しない |
+| ChannelFailure | nonzero_powershell_exit_overrides_success_frame (L) | 成功JSONに見えても異常プロセス終了は拒否 |
+
+Pythonの制御順序・障害分岐は偽プロセス/ファイルexecutorで検証した。
+PSの静的契約テストは、Windows API実行の代替ではない。Win32/.NET呼び出しを
+実機で検証済みとは主張しない。
+
+## 根拠を実際に読んだ範囲
+
+非機密の対応ソースを読み、実iniは読んでいない。
+最初の探索先 `.../windows/np2.cpp` 等は不存在。その後以下を確認した:
+
+- `~/np21w-src/src/win9x/np2arg.cpp:40`:
+  `Np2Arg::Parse()` はGetCommandLine→milstr_getarg、位置引数 `.ini` を採用する。
+- 同 `ini.cpp:943`: `initgetfile()` は指定されたiniを使用。未指定時の探索は今回未対応。
+- 同 `np2.cpp:4402`: modulefile設定と `file_setcd(modulefile)` 後に引数解析・ini読込。
+- `~/np21w-src/src/common/milstr.c:618`: 引用符を除去し、引用外空白で区切る。
+  実装は安全に理解できる2つの完全引用絶対パストークンに限定した。
+
+PowerShell/.NETの根拠（Microsoft一次資料、2026-09-08参照）:
+
+- [Get-CimInstance](https://learn.microsoft.com/en-us/powershell/module/cimcmdlets/get-ciminstance):
+  Win32_Processとフィルタ、共通ErrorAction。
+  [ErrorAction](https://devblogs.microsoft.com/powershell/erroraction-and-errorvariable/):
+  Stopでエラーを終了扱いにする。成功空配列を明示的JSON配列として返す設計。
+- [WaitForExit](https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.process.waitforexit):
+  ミリ秒指定の終了待ちの戻り値を確認し、さらにCIM不在を確認する。
+- [File.Replace](https://learn.microsoft.com/en-us/dotnet/api/system.io.file.replace):
+  同じボリューム上の候補で既存ファイルを置換する。前もって別の固有バックアップを保存。
+- [BY_HANDLE_FILE_INFORMATION](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/ns-fileapi-by_handle_file_information):
+  volume/file index、FILETIME、サイズ、link数の配置。NTFSを前提としReFS等の保証はしない。
+- [FileStream constructors](https://learn.microsoft.com/en-us/dotnet/api/system.io.filestream.-ctor?view=netframework-4.8.1):
+  CreateNew/FileSystemRights/FileSecurityの.NET Framework overloadを使用。
+- [Mutex](https://learn.microsoft.com/en-us/dotnet/api/system.threading.mutex?view=netframework-4.8.1):
+  Windows Global named mutexで協調ワークフローを排他。
+
+## 最終検査と境界
+
+実行したホスト検査:
+
+```bash
+python3 -B -m unittest discover -s tools/tests -p 'test_*.py' -v
+PYTHONPYCACHEPREFIX=/tmp/os32-np21w-live-pycache python3 -m py_compile tools/np21w_ini_live.py tools/tests/test_np21w_ini_live.py tools/np21w_ini.py tools/tests/test_np21w_ini.py
+python3 -B ~/.codex/skills/.system/skill-creator/scripts/quick_validate.py .claude/skills/os32-emu-config
+python3 -B tools/np21w_ini_live.py --help
+```
+
+結果: **51 tests / OK、skipなし**。Python構文検査exit0、スキル検査
+`Skill is valid!`、help exit0。カーネル等は変更せず、OSビルド/配備/ゲスト試験は範囲外。
+
+追加でWindows PowerShellの **Parser.ParseInputだけ** を実行しようとした。
+固定PS_SERVERをUTF-8/base64のデータとして渡し、次の式で構文を解析するだけで、
+スクリプト本文を実行する経路は渡していない:
+
+```powershell
+$source = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('PS_SERVERのbase64'))
+$tokens = $null; $errors = $null
+$null = [Management.Automation.Language.Parser]::ParseInput($source, [ref]$tokens, [ref]$errors)
+Write-Output ('syntax errors: ' + $errors.Count)
+if ($errors.Count) { $errors | ForEach-Object { Write-Output $_.Message }; exit 1 }
+```
+
+`powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand <上記のUTF16LE/base64>`
+は **exit1: `WSL ERROR: UtilBindVsockAnyPort:309: socket failed 1`** で起動できず、
+PS構文解析と埋め込みC#のコンパイルは未確認。Python構文成功をPS構文成功と混同しない。
+この制限を迂回する実機操作や権限昇格はしていない。
+
+実エミュレータ/CIM照会、実iniの読書き、実プロセスの停止・起動、環境変数ファイル/
+資格情報/docs/hw読込、配備、commit、エージェント起動はすべて未実施。
+
+残るライブ前提は **PMがソース対応を確認して選んだ明示起動対象、操作者の専有と
+当該差分・強制停止の承認、利用可能なWSL→Windows PowerShell 5.1/CIM/NTFS権限**。
+その環境でPS構文/C#と実制御を検証し、起動後にゲストbackendを観測する。
+CLIと限定callable、停止検証器の実装は存在する。既存emu_agentへの自動登録は
+今回の4ファイルの範囲外であり、PMホストがcallableを接続するかCLIを直接使う。
+外部非協調プロセスの任意の競合を完全に防げるとは主張しない。
+
+## 独立レビュー3件の修正 (2026-09-09)
+
+この追補の変更は `tools/np21w_ini_live.py`、
+`tools/tests/test_np21w_ini_live.py`、このTDD記録の3ファイルのみ。
+既存の他作業者ファイルと並行作業中のplaybook実装は編集していない。
+上記2026-09-08の実行記録は履歴として保持する。
+
+### 指摘の確認と修正
+
+- **File.Replace**: 修正前の固定PS本文は第3引数が `$null` だった。
+  [.NET File.Replace](https://learn.microsoft.com/en-us/dotnet/api/system.io.file.replace?view=netframework-4.8.1)
+  は追加バックアップ不要時にnullを要求する。
+  [NullString](https://learn.microsoft.com/en-us/dotnet/api/system.management.automation.language.nullstring?view=powershellsdk-7.4.0)
+  は.NETのstring引数にnullを渡すための型で、資料にはPowerShell 5.1参照アセンブリも載っている。
+  この契約に従い `[System.Management.Automation.Language.NullString]::Value` に修正。
+  当環境で旧 `$null` が空文字列になることを実測できたとは主張しない。
+- **レシートサイズ**: `Snapshot` の4 MiB制限がini、原本、レシート読み戻し・loadに
+  共通適用され、旧コードの`NewFile`は書き込んだ後にこの制限で失敗する構造を確認した。
+  2,097,199 bytesの合成入力から、このテストのメタデータを含むPython JSONは
+  **5,592,924 bytes**。レビュアーの5,592,619 bytesと完全一致するfixtureではないが、
+  同じ上限超過を確認した。停止前に両データのbase64長とメタデータの保守的上限を検査する。
+  メタデータはASCII JSON長の6倍、未取得の適用後file signatureは256文字を予約。
+  実際の`FileIdentity.Read`は8整数と区切り文字だけでこの予約に収まる。
+  `checked_snapshot`もsignatureの上限を検査する。候補ini自体のサイズ増加も停止前に拒否。
+  `NewFile`にも書き込み前の4 MiBガードを追加した。
+  上限は引き上げず、プレビュー可能でも適用時には保守的に拒否する場合がある。
+- **派生パス**: 入力227文字にbundle/receipt suffixの57文字を加えると284文字になる。
+  旧コードでは入力だけを検査し、GUID付きbundle、original.bin、receipt.json、pending
+  の検査が無かった。
+  [Windowsのパス長制限](https://learn.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation)
+  を踏まえ、全派生パスに既存の保守的な「240未満」をUTF-16単位で適用する。
+  これにより全componentも255以下、bundle directoryもlegacy directory制限内になる。
+  最長suffixを含めたini上限は182 UTF-16単位。183は拒否する。
+  検査はLive構築時なので、停止だけでなく実行器の起動・lock・照会にも先行する。
+  ASCIIと非BMP文字で境界を試験し、単なるPython文字数の検査にしない。
+
+### 実際のRED → GREEN
+
+実装は最初に現行ソースを読み、ReviewBlockersの3メソッドを追加してから変更した。
+次のコマンドの終了値はREDが1、GREENが0。ログを表示するtailの終了値とは区別した。
+
+```bash
+python3 -B -m unittest discover -s tools/tests -p test_np21w_ini_live.py -v
+```
+
+修正前（`/tmp/np21w-review-red.log`、最初の実行も同じ5 failures。
+パスfixtureのprocess commandを合成targetに合わせて再実行した最終RED）:
+
+```text
+Ran 34 tests in 0.065s
+
+FAILED (failures=5)
+```
+
+| defect / assertion | 修正前に観測した失敗 |
+|---|---|
+| `test_replace_uses_true_null_string` | `[IO.File]::Replace($temp, $target.ini, $null)` が期待するNullString式と不一致（1 failure）。静的契約assertionでありWindows APIのREDではない |
+| `test_large_receipt_rejected_before_stop_or_write` | 2,097,199 / 4,194,304 bytesの各入力で `AssertionError: IniError not raised`（2 failures） |
+| `test_derived_paths_rejected_before_executor_contact` | ASCII 227文字 / 非BMP文字の各targetで、callsが空であるべきassertionに失敗。旧処理はstop/backup/replace/receipt/startまで進んでから合成restart identity不一致で終了（2 failures）。preflight拒否ではないことをcallsで確認 |
+
+3件修正後（`/tmp/np21w-review-green.log`）:
+
+```text
+Ran 34 tests in 0.074s
+
+OK
+```
+
+追加した境界・統合回帰5件は初回からGREEN。これら固有のREDは主張しない。
+
+- `test_receipt_last_accepted_and_first_rejected_byte_sizes`:
+  同一メタデータで許容端を探索し、最後の許容入力と次の1 byteを実ワークフローで確認。
+  このfixtureでは入力1,571,424 bytesで上限計算4,194,304、実Python JSON4,190,856。
+  入力1,571,425 bytesは上限計算4,194,308となり停止前拒否。
+  許容側は合成レシートをJSON/base64往復後、restoreの検証まで通す。
+- メタデータ巨大化、cirrus-offによる候補の1 byte増加も停止前拒否。
+- 全派生パスの182/183 UTF-16単位境界をASCII/非BMP双方で検査。
+- `test_executor_integration_preflight_failure_order`:
+  Live → 本物のPython WindowsExecutor → **偽transport** の構成。
+  サイズ失敗時は正確に `lock, query, snapshot` だけを送ってclose。
+  パス失敗時は送信ゼロ。stop/backup/replace/receipt/startを送るとテスト自体が失敗する。
+  Windows APIの実行検証ではない。
+
+### PowerShell一時fixture検証と残るプラットフォーム制約
+
+`RealPowerShellFixture` は通常のdiscoveryではskip、次の明示コマンドだけで起動する。
+固定PS_SERVERはstdinのデータとして**構文解析のみ**。本文全体は実行しない。
+別の最小C#関数でstringへのnullマーシャリングを検査し、
+`C:\Windows\Temp\np21w-live-fixture-<GUID>` の新規binファイル2個だけで、
+ソースから抽出した実際のFile.Replace式、内容、候補消滅を検査してfinallyで清掃する。
+既存ini・エミュレータ・CIM・環境変数へのアクセス経路は渡していない。
+
+```bash
+python3 -B tools/tests/test_np21w_ini_live.py --windows-fixtures RealPowerShellFixture -v
+```
+
+最終実行（`/tmp/np21w-review-windows-final.log`）はexit1:
+
+```text
+AssertionError: 1 != 0 : <3>WSL (4 - ) ERROR: UtilBindVsockAnyPort:309: socket failed 1
+
+Ran 1 test in 0.018s
+
+FAILED (failures=1)
+```
+
+先行実行も同じWSLエラーで `Ran 1 test in 0.016s / FAILED (failures=1)`。
+後で固定PS本文をEncodedCommand内のbase64からstdin入力へ移し、Windowsコマンドライン
+長の余裕を確保して再実行したが、同じ起動失敗だった。fixtureファイル作成には到達していない。
+これは環境による起動失敗であり、欠陥のTDD REDやAPIの成功として数えない。
+PS5.1での構文解析、stringマーシャリング、File.Replaceの実動作、
+実NewFile/Snapshotによるレシートの保存・load、NTFS上のパス境界は未検証。
+これらは利用可能なWindows環境でのfixture実行が残る。権限昇格や制限回避はしていない。
+
+### 全新旧テストの最終出力
+
+```bash
+python3 -B -m unittest discover -s tools/tests -p 'test_*.py' -v
+```
+
+`/tmp/np21w-review-all-final.log`、exit0:
+
+```text
+Ran 90 tests in 0.545s
+
+OK (skipped=1)
+```
+
+内訳はoffline既存20、live既存31 + 今回追加9（実PS fixtureのskip1を含む）、
+その時点のplaybook30。playbookの実装・テストは編集していない。
+全体の先行実行も `Ran 90 tests in 0.542s / OK (skipped=1)`。
+Pythonの`compile(..., 'exec')`による対象2ファイルの構文検査も
+`Python syntax: OK (2 files)`、exit0（コード実行・pycache書き込みなし）。
+
+実エミュレータ/ini/env/secret読取、ライブプロセス操作、配備、agent起動は未実施。
+OSカーネル等は変更しておらず、OSビルド・ゲスト試験は実施対象外。
+
+## 再レビュー: apply → restore のレシート予約 (2026-09-09)
+
+変更は `tools/np21w_ini_live.py`、`tools/tests/test_np21w_ini_live.py`、
+この記録だけ。他作業者の変更は保持した。前節の境界試験はrestoreのpreviewまでで、
+restore applyの成功を証明していなかった。前節の数値は修正前の履歴である。
+
+### ソース確認と反例の実行
+
+旧 `receipt_size_bound` は `applied.signature` だけ256文字を予約し、
+`original.signature` は現在長を使っていた。`Live.run('restore')` は適用後snapshotを
+次の `planned_record.original` に入れるので、その識別情報が長くなると再予約量が増える。
+また再起動後のPIDと生成時刻も変わる。固定PSソースの `Query` はPIDをInt32にcastし、
+UTC生成時刻を `ToString('o')` で返す。`FileIdentity.Read` は実際には7整数を連結する
+（従来コメントの8を訂正）。PS本文は実行していない。
+
+修正前に合成executorで1,571,320 bytes、元signature 53文字、置換後256文字を実行。
+53文字はこのテストのtarget/process/diffでレビューの数値を再現するための合成値。
+実Windowsの識別情報を取得したものではない。実際の出力（exit0、拒否例外は捕捉）:
+
+```text
+input bytes: 1571320 apply bound: 4194304
+apply applied: True
+restore refusal: receipt exceeds snapshot size limit; refusing before stop
+restore calls: ['lock', 'query', 'snapshot', 'load', 'close']
+```
+
+### RED → GREEN
+
+先に境界試験を変更し、保存レシートをJSON/base64往復後、署名256文字・PID最大値・
+UTC生成時刻28文字への増加を伴う **`restore(..., live_apply=True, exclusive=True)`**
+を実行させた。別途、上記固定反例を最初のstop前に拒否するassertionを追加。
+
+```bash
+python3 -B tools/tests/test_np21w_ini_live.py ReceiptAndPathBoundaries -v
+```
+
+修正前の実出力、exit1:
+
+```text
+ERROR: test_receipt_last_accepted_and_first_rejected_byte_sizes
+np21w_ini.IniError: receipt exceeds snapshot size limit; refusing before stop
+FAIL: test_review_counterexample_rejected_before_first_stop
+AssertionError: IniError not raised
+Ran 6 tests in 0.414s
+FAILED (failures=1, errors=1)
+```
+
+ERRORはimport等の準備失敗ではなく、適用成功・レシート往復後のrestore apply本体が
+サイズ検査で拒否したもの。実装修正後、同じコマンドはexit0:
+
+```text
+Ran 6 tests in 0.541s
+OK
+```
+
+### 予約の根拠と追加検証
+
+- 両signatureをmetadataから空文字にし、各々 `12 * SIGNATURE_LIMIT` bytesを別枠予約。
+  `checked_snapshot` の最大256 Unicode文字は、1文字あたり最大12 ASCII bytes
+  （JSONのescaped UTF-16 surrogate pair）で収まる。数値署名だけでなく、引用符、
+  backslash、制御文字、BMP/非BMP文字を含む許容snapshotも覆う。
+- processは現在のJSON長と、束縛targetの起動コマンド・Int32最大PID・28文字のUTC時刻を
+  持つ再起動時の予約用rowのJSON長の大きい方を使う。その他metadataの6倍予約は保持。
+  固定Query/Start経路で変わるPID/時刻を初回から見込む。dataのbase64長の和は交換しても
+  不変、diffの逆転も同長、operationは `cirrus-on/off` から `restore` へ短くなる。
+  この固定executorのapply→restoreで、既知の可変metadataによる再予約増加を防ぐ。
+- 境界の許容側はrestore applyの `applied=True`、原本全bytes、stop/replace/start各1回、
+  restoreレシートのサイズとJSON/base64往復を検査。拒否側は
+  `lock, query, snapshot, close` のみ、backup無し、snapshot不変を検査。
+- 両cirrus操作について各種escaped signatureと再起動metadataで、実JSON長が予約以下、
+  restoreの予約量が初回以下である追加試験を実行。これは初回GREENであり固有REDはない。
+
+修正後の境界探索と合成apply/restoreの実出力（exit0）:
+
+```text
+input bytes: 1569661 bound: 4194302
+input bytes: 1569662 bound: 4194306
+apply JSON bytes: 4186404
+restore applied: True restore bound: 4194290 restore JSON bytes: 4186673
+```
+
+### 全ini試験・pycompile・未検証範囲
+
+```bash
+python3 -B -m unittest discover -s tools/tests -p 'test_np21w_ini*.py' -v
+```
+
+実出力、exit0:
+
+```text
+Ran 62 tests in 0.639s
+OK (skipped=1)
+```
+
+`py_compile.compile(..., doraise=True)` をoffline/liveのソース・テスト4ファイルに実行。
+`cfile` は `/tmp` のTemporaryDirectory内に指定し、終了時に清掃。
+実出力は `py_compile: OK (4 files)`、exit0。環境変数の読取・変更はしていない。
+
+skip1はopt-in `RealPowerShellFixture`。今回はWindows fixtureを起動していない。
+前節に記録されたWSL `UtilBindVsockAnyPort:309: socket failed 1` の制限は未解消・未再検証。
+PS5.1構文/C#、nullマーシャリング、実File.Replace、NewFile/Snapshotのreceipt保存/load、
+NTFSパス境界のWindows fixture検証は残る。Python/fake executorの成功をWindows APIや
+ライブ試験の成功とはしない。ネットワーク、実ini、env/secret、実エミュレータ操作、
+配備、エージェント起動は未実施。全ini試験の一時合成ファイルのみを使用した。

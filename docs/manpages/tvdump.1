@@ -1,0 +1,19 @@
+# tvdump
+
+テキストVRAMの内容をシリアルでダンプする
+
+## SYNOPSIS
+
+`tvdump`
+
+## DESCRIPTION
+
+PC-98のテキストVRAM (0xA0000-0xA1FFF) とアトリビュートRAMの
+内容をRS-232Cシリアルポートに送信する。
+ホスト側でスクリーンショットとして復元可能。
+
+事前に `serial` コマンドでポートを初期化すること。
+
+## SEE ALSO
+
+serial, rshell

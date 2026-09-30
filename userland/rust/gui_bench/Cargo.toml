@@ -1,0 +1,20 @@
+# gui_bench — 契約 P2 の測定器 (票 C2 作業 10)
+#
+# `/api/key` からの入力について、その `serial` の**取り込み tick** (WM がスロットの
+# 予備領域に記録) から `commit` 完了までの差と `gfx_stats` の差分を、代表操作ごとに
+# tvram へ出す。NP21/W では転送量を、実機では遅延を読む。
+#
+# os32api の panic_handler / global_allocator を単一実体として取り込むため staticlib。
+[package]
+name = "gui_bench"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+os32api = { path = "../../../sdk/rust/os32api" }
+# 票 C3: 本体は 0x400000 常駐の共有ライブラリ。アプリはスタブだけをリンクする
+# (名前は libos32gui のまま — アプリのソースは無変更)。
+libos32gui = { path = "../libos32gui_stub", package = "libos32gui_stub" }

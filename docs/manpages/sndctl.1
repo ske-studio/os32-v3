@@ -1,0 +1,39 @@
+sndctl - Sound Engine Control
+
+SYNOPSIS
+  sndctl play "MML"     Start BGM (non-blocking)
+  sndctl stop           Stop BGM
+  sndctl status         Show playback status
+  sndctl se <id>        Play sound effect
+  sndctl mute           Master mute
+  sndctl unmute         Master unmute
+
+DESCRIPTION
+  Control the OS32 background sound engine.
+  BGM plays in the background using the timer
+  interrupt (100Hz), allowing other programs
+  to execute simultaneously.
+
+  SE (sound effects) temporarily borrow FM Ch2
+  or SSG ChC from BGM. After SE finishes, BGM
+  resumes on that channel automatically.
+
+MML SYNTAX
+  T120   Tempo (BPM)
+  O4     Octave (1-8)
+  L4     Default note length (4=quarter)
+  A-G    Notes (+/# for sharp)
+  R      Rest
+  > <    Octave up/down
+  [...]  Loop
+  @C0    Channel (0-2=FM, 3-5=SSG)
+  @T0    Tone number
+
+SE IDS
+  0: Cursor   1: Select   2: Cancel
+  3: Error    4: Coin     5: Beep
+
+EXAMPLES
+  sndctl play "T120 O4 L4 [CDEFGAB>C<]"
+  sndctl se 1
+  sndctl stop

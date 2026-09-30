@@ -1,0 +1,35 @@
+# grep
+
+パターンにマッチする行を検索・表示する
+
+## SYNOPSIS
+
+`grep [-invc] PATTERN [FILE...]`
+
+## DESCRIPTION
+
+指定されたファイル (またはパイプ入力) から、
+PATTERN を含む行を検索して表示する。
+複数ファイル指定時はファイル名も表示する。
+
+## OPTIONS
+
+- `-i` — 大文字小文字を区別しない
+- `-n` — 行番号を表示
+- `-v` — マッチしなかった行を表示 (反転)
+- `-c` — マッチ行数のみ表示
+
+オプションは結合可能 (例: `-inv`)
+
+## EXAMPLES
+
+- `grep error log.txt` — log.txt から "error" を含む行を表示
+- `grep -i Error log.txt` — 大文字小文字を無視して検索
+- `grep -n TODO main.c` — 行番号付きで表示
+- `grep -v ok result.txt` — "ok" を含まない行を表示
+- `grep -c error *.log` — ファイルごとのマッチ行数を表示
+- `cat log.txt | grep warning` — パイプ経由で検索
+
+## SEE ALSO
+
+head, tail, wc, cat

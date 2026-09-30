@@ -1,0 +1,75 @@
+# ゲストで一括実行する試験の一覧 (票 docs/archive/test/TASK_TEST_RUNNER.md §2-3)
+#
+# 走らせるものは**票ではなくこのファイル**に持つ。ランナー
+# (tools/guest_tests.py) がここから平らなスクリプトを組み立てて
+# `source /host/test/runtests.sh` する。
+#
+#   書き方   1 行 1 件。行の**最初の語**が名前 (集計行 `<名前>: PASS n/m` の
+#            名前と同じでなければならない)。行全体がゲストに打たせる 1 行。
+#   例       restest all   → 名前 restest、命令 `restest all`
+#   `#` から行末はコメント、空行は無視。
+#
+# **入れてよいのは「勝手に走って勝手に終わり、合否を終了コードと集計行の
+# 両方で言う」試験だけ。** 画面デモ・対話・キー待ちは入れない (下の §除外)。
+# 新しく入れるときは TASK_TEST_RESULT.md §2 の約束事に適合させてから。
+
+# --- 第 1 陣 (TASK_TEST_RESULT.md §4 の 16 本。2026-09-17 にゲストで実測済み) ---
+
+klibc_test              # PASS 49/49  kstring / kprintf などの基本
+math_test               # PASS 110/110
+mgx_test                # PASS 76/76
+ecs_test                # PASS 45/45
+asset_test              # PASS 23/23
+gui_call_test           # PASS 2/2
+input_test              # PASS 29/29
+db_v50_test             # PASS 41/41
+save_test               # PASS 15/15  /host を使う (このランナーの前提と同じ)
+font_load_test          # PASS 1/1
+test2                   # PASS 5/5
+stat_t                  # PASS 5/5
+restest all             # PASS 3/3  引数が要る (argc < 2 で使い方を出して終わる)
+e2test                  # SKIP 372KB のバッファが取れない構成では 2 で抜ける
+host_test               # SKIP ホスト側の Agent が走っていなければ 2 で抜ける
+db_test                 # 下の「確かめていない 1 件」
+
+# --- 確かめていない 1 件 ([V4]) ---
+#
+# db_test は 2026-09-17 のゲスト受入で **139 (例外で畳んだ)** だった
+# (TASK_TEST_RESULT.md §9)。原因は `db_last_error()` がカーネル番地の
+# ポインタを返していたこと (同 §10) で、**これは同じ日に
+# docs/archive/kernel_v21/TASK_DB_ERRSTR.md で直っている** (kapi/kapi_db.c は今は
+# 共有メモリを指す。POLICY_DEBUG §4-13)。
+# したがって今は通るはずだが、**直った後の db_test はゲストで測り直して
+# いない**。一覧から外さないのは、外すと「黙って合格にした」ことになるから
+# ([V4])。まだ 139 のままなら、それはカーネル層の残件として先に直す
+# (POLICY_DEV §1)。
+
+# --- 入れなかったもの (前段 §8 の分類。理由を必ず書く) ---
+#
+# (c) 画面デモ — 描くのが目的で合否を言わない。終わりも人が見て決める。
+#     asset_demo / blit_test2 / demo_tile / gfx200_test / gfx_demo200 /
+#     rotate_test
+#
+# (e) 対話・キー待ち — 末尾で入力を待つので**ランナーが必ず固まる**。
+#     自動回帰に載せるには `--batch` 相当が要る = 別の判断 (前段 §8)。
+#     kbd_echo / mouse_test / blit_test / tile_bench
+#     (gfx200_test は (c) と (e) の両方)
+#
+# (b) 計測・ベンチ — 合否ではなく**数字を出すのが目的**なので約束事の対象外。
+#     cfg_bench / kstr_bench
+#
+# (d) 落ちるのが正解 — マーカー番地と fault_kill_count で判定する別方式。
+#     終了コード方式に載らない (TASK_TEST_RESULT.md §5-2)。
+#     ring3_fault / ring3_guard / crash
+#
+# 合否を色でしか区別しない — 文字列は成功も失敗も `hal_test done`。
+#     第 2 陣で扱う (前段 §8)。
+#     hal_test
+#
+# 約束事に未適合 — 集計行も終了コードも出さない道具・断片。適合させてから
+# ここへ足すこと (前段 §8 の「44 本すべての適合は次の票」)。
+#     args / dbq / e2seek / gui_busy / heap_test / hello / libc_test / nop /
+#     ring3_hello / t_exit / test3 / test4
+#
+# Rust の alloc_demo は書式を testresult.h に揃えてあるが、配備の名前が
+# 別系統 (userland/rust/) なので第 2 陣で足す。

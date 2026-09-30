@@ -1,0 +1,9 @@
+[package]
+name = "libos32term_render"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[dependencies]
+libos32term = { path = "../libos32term" }

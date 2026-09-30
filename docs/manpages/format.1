@@ -1,0 +1,28 @@
+# format
+
+ドライブをext2でフォーマットする
+
+## SYNOPSIS
+
+`format DRIVE [SECTORS]`
+
+## DESCRIPTION
+
+指定されたドライブをext2ファイルシステムでフォーマットする。
+セクタ数を省略した場合は2880セクタ (FDD相当) でフォーマットする。
+
+> **注意**: ドライブ上のデータは全て消去される。
+
+## OPTIONS
+
+- `DRIVE` — ドライブ番号 (0-3)
+- `SECTORS` — 総セクタ数 (省略時: 2880)
+
+## EXAMPLES
+
+- `format 0` — ドライブ0を2880セクタでフォーマット
+- `format 0 65536` — ドライブ0を65536セクタでフォーマット
+
+## SEE ALSO
+
+ide, dev, mount

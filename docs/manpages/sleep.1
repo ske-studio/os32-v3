@@ -1,0 +1,22 @@
+# sleep
+
+指定した秒数だけ待機する
+
+## SYNOPSIS
+
+`sleep SECONDS`
+
+## DESCRIPTION
+
+指定した秒数だけプログラムの実行を一時停止する。
+シェルスクリプトでのタイミング制御に使用する。
+待機中はCPUをhlt命令でスリープさせ、消費電力を抑える。
+
+## EXAMPLES
+
+- `sleep 3` — 3秒間待機
+- `echo start; sleep 5; echo done` — 5秒後にメッセージ表示
+
+## SEE ALSO
+
+time, echo

@@ -1,0 +1,19 @@
+# rshell
+
+リモートシェルホストを起動する
+
+## SYNOPSIS
+
+`rshell`
+
+## DESCRIPTION
+
+RS-232C経由でリモートからのシェルコマンド実行を受け付けるモードに入る。
+ホスト側の `os32_server.py` と連携して使用する。
+
+ESCキーまたは `exit` コマンドで終了。
+事前に `serial` コマンドでポートを初期化すること。
+
+## SEE ALSO
+
+serial, terminal, send

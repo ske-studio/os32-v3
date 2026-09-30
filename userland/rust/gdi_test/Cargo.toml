@@ -1,0 +1,18 @@
+# gdi_test — G 描画 API (票 C1) の目視確認 + ゲート G1 用テストプログラム
+#
+# libos32gui の G API だけで 16 色見本・Style フラグ・文字・クリップ入れ子を描く。
+# libos32gfx を直接叩かない (FFI は libos32gui の中に隠れている)。
+# os32api の panic_handler / global_allocator を単一実体として取り込むため staticlib。
+[package]
+name = "gdi_test"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+os32api = { path = "../../../sdk/rust/os32api" }
+# 票 C3: 本体は 0x400000 常駐の共有ライブラリ。アプリはスタブだけをリンクする
+# (名前は libos32gui のまま — アプリのソースは無変更)。
+libos32gui = { path = "../libos32gui_stub", package = "libos32gui_stub" }

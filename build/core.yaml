@@ -1,0 +1,46 @@
+# ============================================================================
+#  core.yaml — カーネル層の配備定義 (Platform が所有)
+#
+#  ブートローダー、カーネルイメージ、ゲスト側ディレクトリ構造。
+#  ユーザーランドとゲームの定義はそれぞれ
+#  userland/deploy.yaml / game/deploy.yaml にある。
+#  nhd_deploy.py / hostdrv_deploy.py は全層を、mkpkg.py --plan (CD の
+#  パッケージ) は本体の 2 層 (ここと userland/deploy.yaml) をマージして読む。
+#  tags: が CD のパッケージの振り分けを決める (build/packages.yaml)。
+#
+#  ここには自層の成果物しか書かないこと。他層のパスが混ざると、
+#  リポジトリを分割したときにそのままでは動かなくなる。
+# ============================================================================
+# ブート領域 (ext2外、NHD直接書き込み)
+# ローダーのみrawセクタ書き込み。カーネルはext2経由。
+boot:
+  loader: boot/loader_hdd.bin
+
+# ext2 ファイルシステム
+filesystem:
+  # ゲスト側ディレクトリ構造 (自動作成)
+  directories:
+    - /boot       # vmkernel.lz4 配置先
+    - /sys
+    - /bin
+    - /sbin
+    - /usr
+    - /usr/bin
+    - /usr/man
+    - /data
+    - /db         # SQLite DB ファイル格納ディレクトリ
+    - /etc
+    - /home
+    - /home/user
+    - /tmp
+
+  # ファイルデプロイ定義
+  files:
+    # --- カーネルイメージ (LZ4圧縮) ---
+    - host: build/out/vmkernel.lz4
+      guest: /boot/vmkernel.lz4
+      tags: [core]
+    # --- カーネルデータ ---
+    - host: build/out/unicode.bin
+      guest: /sys/unicode.bin
+      tags: [core]

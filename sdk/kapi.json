@@ -1,0 +1,1694 @@
+{
+  "version": 68,
+  "func_capacity": 300,
+  "crt_kapi_symbol": "os32_kapi_v63",
+  "data_fields": [
+    {
+      "name": "sbrk_heap_limit",
+      "type": "u32",
+      "comment": "newlib _sbrk\u7528\u30d2\u30fc\u30d7\u4e0a\u9650\u30a2\u30c9\u30ec\u30b9 (exec_run\u3067\u30bb\u30c3\u30c8\u3055\u308c\u308b)"
+    },
+    {
+      "name": "shm_base",
+      "type": "u32",
+      "comment": "\u5171\u6709\u30e1\u30e2\u30ea (MEM_SHM_BASE) \u306e\u5148\u982d\u30a2\u30c9\u30ec\u30b9\u3002DB\u7d50\u679c\u53d7\u3051\u6e21\u3057\u306b\u4f7f\u7528 (exec_init\u3067\u30bb\u30c3\u30c8)"
+    }
+  ],
+  "includes": [
+    "gfx.h",
+    "palette.h",
+    "kbd.h",
+    "exec_heap.h",
+    "kmalloc.h",
+    "paging.h",
+    "rtc.h",
+    "exec.h",
+    "fm.h",
+    "np2sysp.h",
+    "ide.h",
+    "path.h",
+    "tvram.h",
+    "vfs.h",
+    "ext2.h",
+    "serial.h",
+    "console.h",
+    "dev.h",
+    "kcg.h",
+    "sys.h",
+    "kprintf.h",
+    "io.h",
+    "shm.h",
+    "ime.h",
+    "fd_redirect.h",
+    "pipe_buffer.h",
+    "snd_engine.h",
+    "mouse.h",
+    "kapi_db.h",
+    "loop_dev.h",
+    "v86.h",
+    "gui.h",
+    "con_sink.h",
+    "kbd_inject.h",
+    "memory_boot.h",
+    "launch.h",
+    "kapi_host.h",
+    "pci.h", "pcm_cs4231.h", "bootinfo.h", "serialfs.h", "v86_gcap.h"
+  ],
+  "externs": [
+    "extern volatile u32 tick_count;",
+    "extern void kapi_sys_exit(int status);",
+    "extern void kapi_sys_get_build_info(char *buf, int size);",
+    "extern int gfx_stats(void *out);",
+    "extern int gfx_lease_palette(int first, int count, const u8 *rgb);",
+    "extern int kapi_sys_set_mtime(const char *path, u32 mtime);",
+    "extern int kapi_sys_time_now(u32 *lo, u32 *hi);",
+    "extern int kapi_pci_bind_info(u32 idx, void *out);",
+    "extern int kapi_serial_diag(SerialDiag *out);"
+  ],
+  "api": [
+    {
+      "name": "gfx_init",
+      "ret": "void",
+      "args": [],
+      "target": "gfx_kapi_init"
+    },
+    {
+      "name": "gfx_init_200",
+      "ret": "void",
+      "args": [],
+      "target": "gfx_kapi_init_200"
+    },
+    {
+      "name": "gfx_shutdown",
+      "ret": "void",
+      "args": []
+    },
+    {
+      "name": "gfx_present",
+      "ret": "void",
+      "args": []
+    },
+    {
+      "name": "kbd_trygetchar",
+      "ret": "int",
+      "args": []
+    },
+    {
+      "name": "mem_alloc",
+      "ret": "void *",
+      "args": [
+        "u32 size"
+      ],
+      "target": "exec_heap_alloc"
+    },
+    {
+      "name": "mem_free",
+      "out": "none",
+      "ret": "void",
+      "args": [
+        "void *ptr"
+      ],
+      "target": "exec_heap_free"
+    },
+    {
+      "name": "get_tick",
+      "ret": "u32",
+      "args": [],
+      "body": "return tick_count;"
+    },
+    {
+      "name": "kprintf",
+      "ret": "void",
+      "args": [
+        "u8 attr",
+        "const char *fmt",
+        "..."
+      ],
+      "direct": true,
+      "target": "kprintf"
+    },
+    {
+      "name": "sys_unlink",
+      "ret": "int",
+      "args": [
+        "const char *path"
+      ],
+      "target": "vfs_rm"
+    },
+    {
+      "name": "sys_rename",
+      "ret": "int",
+      "args": [
+        "const char *oldpath",
+        "const char *newpath"
+      ],
+      "target": "vfs_rename"
+    },
+    {
+      "name": "sys_mkdir",
+      "ret": "int",
+      "args": [
+        "const char *path"
+      ],
+      "target": "vfs_mkdir"
+    },
+    {
+      "name": "sys_ls",
+      "out": "none",
+      "ret": "int",
+      "args": [
+        "const char *path",
+        "void *cb",
+        "void *ctx"
+      ],
+      "body": "return vfs_ls(path, (vfs_dir_cb)cb, ctx);"
+    },
+    {
+      "name": "kmalloc_total",
+      "ret": "u32",
+      "args": []
+    },
+    {
+      "name": "kmalloc_used",
+      "ret": "u32",
+      "args": []
+    },
+    {
+      "name": "kmalloc_free",
+      "ret": "u32",
+      "args": []
+    },
+    {
+      "name": "paging_enabled",
+      "ret": "int",
+      "args": []
+    },
+    {
+      "name": "rtc_read",
+      "out": [{"arg": "rtc_time", "size": "sizeof(RTC_Time)"}],
+      "ret": "void",
+      "args": [
+        "void *rtc_time"
+      ],
+      "body": "rtc_read((RTC_Time *)rtc_time);"
+    },
+    {
+      "name": "tvram_clear",
+      "ret": "void",
+      "args": []
+    },
+    {
+      "name": "tvram_putchar_at",
+      "ret": "void",
+      "args": [
+        "int x",
+        "int y",
+        "char ch",
+        "u8 attr"
+      ]
+    },
+    {
+      "name": "tvram_putkanji_at",
+      "ret": "void",
+      "args": [
+        "int x",
+        "int y",
+        "u16 jis",
+        "u8 attr"
+      ]
+    },
+    {
+      "name": "tvram_scroll",
+      "ret": "void",
+      "args": []
+    },
+    {
+      "name": "kbd_getchar",
+      "ret": "int",
+      "args": []
+    },
+    {
+      "name": "kbd_getkey",
+      "ret": "int",
+      "args": []
+    },
+    {
+      "name": "kbd_trygetkey",
+      "ret": "int",
+      "args": []
+    },
+    {
+      "name": "sys_mount",
+      "ret": "int",
+      "args": [
+        "const char *prefix",
+        "const char *dev",
+        "const char *fs"
+      ],
+      "target": "vfs_mount"
+    },
+    {
+      "name": "sys_umount",
+      "ret": "void",
+      "args": [
+        "const char *prefix"
+      ],
+      "target": "vfs_umount"
+    },
+    {
+      "name": "sys_is_mounted",
+      "ret": "int",
+      "args": [
+        "const char *prefix"
+      ],
+      "target": "vfs_is_mounted"
+    },
+    {
+      "name": "sys_chdir",
+      "ret": "int",
+      "args": [
+        "const char *path"
+      ],
+      "target": "vfs_chdir"
+    },
+    {
+      "name": "sys_getcwd",
+      "ret": "const char *",
+      "args": [],
+      "target": "vfs_cwd_user"
+    },
+    {
+      "name": "vfs_devname",
+      "ret": "const char *",
+      "args": [
+        "const char *prefix"
+      ],
+      "target": "vfs_devname_user"
+    },
+    {
+      "name": "vfs_sync",
+      "ret": "int",
+      "args": []
+    },
+    {
+      "name": "sys_rmdir",
+      "ret": "int",
+      "args": [
+        "const char *path"
+      ],
+      "target": "vfs_rmdir"
+    },
+    {
+      "name": "serial_init",
+      "ret": "void",
+      "args": [
+        "u32 baud"
+      ]
+    },
+    {
+      "name": "serial_puts",
+      "ret": "void",
+      "args": [
+        "const char *s"
+      ]
+    },
+    {
+      "name": "serial_getchar",
+      "ret": "int",
+      "args": []
+    },
+    {
+      "name": "serial_putchar",
+      "ret": "int",
+      "args": [
+        "u8 ch"
+      ]
+    },
+    {
+      "name": "serial_trygetchar",
+      "ret": "int",
+      "args": []
+    },
+    {
+      "name": "serial_is_initialized",
+      "ret": "int",
+      "args": []
+    },
+    {
+      "name": "exec_run",
+      "ret": "int",
+      "args": [
+        "const char *path"
+      ]
+    },
+    {
+      "name": "dev_count",
+      "ret": "int",
+      "args": []
+    },
+    {
+      "name": "dev_get_info",
+      "out": [{"arg": "name", "len": "nm"}, {"arg": "type", "size": "sizeof(int)"}, {"arg": "sects", "size": "sizeof(u32)"}],
+      "ret": "int",
+      "args": [
+        "int idx",
+        "char *name",
+        "int nm",
+        "int *type",
+        "u32 *sects"
+      ],
+      "body": "{ if (!name || nm <= 0) return -1; return dev_api_get_info(idx, name, nm, type, sects); }"
+    },
+    {
+      "name": "fm_startup_sound",
+      "ret": "void",
+      "args": []
+    },
+    {
+      "name": "fm_play_mml",
+      "ret": "void",
+      "args": [
+        "const char *mml"
+      ]
+    },
+    {
+      "name": "np2_detect",
+      "ret": "int",
+      "args": []
+    },
+    {
+      "name": "np2_get_version",
+      "out": [{"arg": "buf", "len": "size"}],
+      "ret": "void",
+      "args": [
+        "char *buf",
+        "int size"
+      ]
+    },
+    {
+      "name": "np2_get_cpu",
+      "out": [{"arg": "buf", "len": "size"}],
+      "ret": "void",
+      "args": [
+        "char *buf",
+        "int size"
+      ]
+    },
+    {
+      "name": "np2_get_clock",
+      "out": [{"arg": "buf", "len": "size"}],
+      "ret": "void",
+      "args": [
+        "char *buf",
+        "int size"
+      ]
+    },
+    {
+      "name": "np2_check_hostdrv",
+      "out": [{"arg": "buf", "len": "size"}],
+      "ret": "int",
+      "args": [
+        "char *buf",
+        "int size"
+      ]
+    },
+    {
+      "name": "ide_init",
+      "ret": "void",
+      "args": []
+    },
+    {
+      "name": "ide_drive_present",
+      "ret": "int",
+      "args": [
+        "int drv"
+      ]
+    },
+    {
+      "name": "ide_identify",
+      "out": [{"arg": "info", "size": "sizeof(IdeInfo)"}],
+      "ret": "int",
+      "args": [
+        "int drv",
+        "void *info"
+      ],
+      "body": "return ide_identify(drv, (IdeInfo *)info);"
+    },
+    {
+      "name": "ide_read_sector",
+      "out": [{"arg": "buf", "size": 512}],
+      "ret": "int",
+      "args": [
+        "int drv",
+        "u32 lba",
+        "void *buf"
+      ]
+    },
+    {
+      "name": "path_get_drive",
+      "ret": "const char *",
+      "args": [],
+      "target": "path_get_drive_user"
+    },
+    {
+      "name": "path_get_cwd",
+      "ret": "const char *",
+      "args": [],
+      "target": "path_get_cwd_user"
+    },
+    {
+      "name": "path_set_drive",
+      "ret": "int",
+      "args": [
+        "const char *d"
+      ]
+    },
+    {
+      "name": "path_set_cwd",
+      "ret": "void",
+      "args": [
+        "const char *p"
+      ]
+    },
+    {
+      "name": "path_parse",
+      "out": [{"arg": "result", "size": "sizeof(ParsedPath)"}],
+      "ret": "void",
+      "args": [
+        "const char *input",
+        "void *result"
+      ],
+      "body": "path_parse(input, (ParsedPath *)result);"
+    },
+    {
+      "name": "ext2_format",
+      "ret": "int",
+      "args": [
+        "int drv",
+        "u32 sectors"
+      ]
+    },
+    {
+      "name": "kcg_init",
+      "ret": "void",
+      "args": []
+    },
+    {
+      "name": "kcg_set_scale",
+      "ret": "void",
+      "args": [
+        "int s"
+      ]
+    },
+    {
+      "name": "buz_on",
+      "ret": "void",
+      "args": []
+    },
+    {
+      "name": "buz_off",
+      "ret": "void",
+      "args": []
+    },
+    {
+      "name": "rshell_set_active",
+      "ret": "void",
+      "args": [
+        "int active"
+      ],
+      "body": "rshell_active = active;"
+    },
+    {
+      "name": "ide_write_sector",
+      "ret": "int",
+      "args": [
+        "int drv",
+        "u32 lba",
+        "const void *buf"
+      ]
+    },
+    {
+      "name": "ide_write_sectors",
+      "ret": "int",
+      "args": [
+        "int drv",
+        "u32 lba",
+        "u32 cnt",
+        "const void *buf"
+      ]
+    },
+    {
+      "name": "sys_reboot",
+      "ret": "void",
+      "args": []
+    },
+    {
+      "name": "sys_halt",
+      "ret": "void",
+      "args": []
+    },
+    {
+      "name": "shell_putchar",
+      "ret": "void",
+      "args": [
+        "char ch",
+        "u8 attr"
+      ]
+    },
+    {
+      "name": "shell_print_utf8",
+      "ret": "void",
+      "args": [
+        "const char *utf8_str",
+        "u8 color"
+      ]
+    },
+    {
+      "name": "console_get_cursor_x",
+      "ret": "int",
+      "args": []
+    },
+    {
+      "name": "console_get_cursor_y",
+      "ret": "int",
+      "args": []
+    },
+    {
+      "name": "console_set_cursor",
+      "ret": "void",
+      "args": [
+        "int x",
+        "int y"
+      ]
+    },
+    {
+      "name": "sys_open",
+      "ret": "int",
+      "args": [
+        "const char *path",
+        "int mode"
+      ],
+      "target": "vfs_open"
+    },
+    {
+      "name": "sys_close",
+      "ret": "void",
+      "args": [
+        "int fd"
+      ],
+      "target": "vfs_close"
+    },
+    {
+      "name": "sys_read",
+      "out": [{"arg": "buf", "len": "size"}],
+      "ret": "int",
+      "args": [
+        "int fd",
+        "void *buf",
+        "u32 size"
+      ],
+      "target": "vfs_read_fd"
+    },
+    {
+      "name": "sys_write",
+      "ret": "int",
+      "args": [
+        "int fd",
+        "const void *buf",
+        "u32 size"
+      ],
+      "target": "vfs_write_fd"
+    },
+    {
+      "name": "sys_lseek",
+      "ret": "int",
+      "args": [
+        "int fd",
+        "int offset",
+        "int whence"
+      ],
+      "target": "vfs_seek"
+    },
+    {
+      "name": "console_get_size",
+      "out": [{"arg": "w", "size": "sizeof(int)"}, {"arg": "h", "size": "sizeof(int)"}],
+      "ret": "void",
+      "args": [
+        "int *w",
+        "int *h"
+      ]
+    },
+    {
+      "name": "kbd_get_modifiers",
+      "ret": "u32",
+      "args": []
+    },
+    {
+      "name": "sys_get_mem_kb",
+      "ret": "u32",
+      "args": []
+    },
+    {
+      "name": "sys_time",
+      "ret": "os_time_t",
+      "args": []
+    },
+    {
+      "name": "gfx_hardware_scroll",
+      "ret": "void",
+      "args": [
+        "int lines"
+      ]
+    },
+    {
+      "name": "gfx_present_rect",
+      "ret": "void",
+      "args": [
+        "int x",
+        "int y",
+        "int w",
+        "int h"
+      ]
+    },
+    {
+      "name": "sys_exit",
+      "ret": "void",
+      "args": [
+        "int status"
+      ],
+      "target": "kapi_sys_exit"
+    },
+    {
+      "name": "sys_isatty",
+      "ret": "int",
+      "args": [
+        "int fd"
+      ],
+      "target": "vfs_isatty"
+    },
+    {
+      "name": "sys_stat",
+      "out": [{"arg": "buf", "size": "sizeof(OS32_Stat)"}],
+      "ret": "int",
+      "args": [
+        "const char *path",
+        "OS32_Stat *buf"
+      ],
+      "target": "vfs_stat"
+    },
+    {
+      "name": "sys_fstat",
+      "out": [{"arg": "buf", "size": "sizeof(OS32_Stat)"}],
+      "ret": "int",
+      "args": [
+        "int fd",
+        "OS32_Stat *buf"
+      ],
+      "target": "vfs_fstat"
+    },
+    {
+      "name": "gfx_set_palette",
+      "ret": "void",
+      "args": [
+        "int idx",
+        "u8 r",
+        "u8 g",
+        "u8 b"
+      ],
+      "target": "gfx_set_palette_hal"
+    },
+    {
+      "name": "gfx_get_palette",
+      "out": [{"arg": "r", "size": "sizeof(u8)"}, {"arg": "g", "size": "sizeof(u8)"}, {"arg": "b", "size": "sizeof(u8)"}],
+      "ret": "void",
+      "args": [
+        "int idx",
+        "u8 *r",
+        "u8 *g",
+        "u8 *b"
+      ],
+      "target": "palette_get"
+    },
+    {
+
+      "name": "gfx_get_framebuffer",
+      "out": [{"arg": "fb", "size": "sizeof(GFX_Framebuffer)"}],
+      "ret": "void",
+      "args": [
+        "void *fb"
+      ]
+    },
+    {
+      "name": "gfx_add_dirty_rect",
+      "ret": "void",
+      "args": [
+        "int x",
+        "int y",
+        "int w",
+        "int h"
+      ]
+    },
+    {
+      "name": "gfx_present_dirty",
+      "ret": "void",
+      "args": []
+    },
+    {
+      "name": "gfx_present_nosync",
+      "ret": "void",
+      "args": []
+    },
+    {
+      "name": "gfx_present_raster",
+      "out": "none",
+      "ret": "void",
+      "args": [
+        "void *table"
+      ],
+      "body": "gfx_present_raster((GFX_RasterPalTable *)table);"
+    },
+    {
+      "name": "kcg_read_ank",
+      "out": [{"arg": "buf", "size": "KCG_ANK_H"}],
+      "ret": "void",
+      "args": [
+        "u8 ch",
+        "u8 *buf"
+      ]
+    },
+    {
+      "name": "kcg_read_kanji",
+      "out": [{"arg": "buf", "size": "(KCG_KANJI_H * 2)"}],
+      "ret": "void",
+      "args": [
+        "u16 jis_code",
+        "u8 *buf"
+      ]
+    },
+    {
+      "name": "sys_shm_alloc",
+      "ret": "void *",
+      "args": [
+        "int blocks"
+      ],
+      "target": "shm_alloc"
+    },
+    {
+      "name": "sys_shm_lock",
+      "out": "none",
+      "ret": "int",
+      "args": [
+        "void *ptr"
+      ],
+      "target": "shm_lock"
+    },
+    {
+      "name": "sys_shm_free",
+      "out": "none",
+      "ret": "int",
+      "args": [
+        "void *ptr"
+      ],
+      "target": "shm_free"
+    },
+    {
+      "name": "ime_getchar",
+      "ret": "int",
+      "args": []
+    },
+    {
+      "name": "ime_trygetchar",
+      "ret": "int",
+      "args": []
+    },
+    {
+      "name": "ime_toggle",
+      "ret": "void",
+      "args": []
+    },
+    {
+      "name": "ime_is_active",
+      "ret": "int",
+      "args": []
+    },
+    {
+      "name": "ime_set_mode",
+      "ret": "void",
+      "args": [
+        "int mode"
+      ]
+    },
+    {
+      "name": "ime_get_mode",
+      "ret": "int",
+      "args": []
+    },
+    {
+      "name": "ime_getkey",
+      "ret": "int",
+      "args": []
+    },
+    {
+      "name": "sys_redirect_fd",
+      "ret": "int",
+      "args": [
+        "int fd",
+        "const char *path",
+        "int mode"
+      ],
+      "target": "fd_redirect_to_file"
+    },
+    {
+      "name": "sys_reset_redirect",
+      "ret": "void",
+      "args": [
+        "int fd"
+      ],
+      "target": "fd_redirect_reset"
+    },
+    {
+      "name": "sys_is_redirected",
+      "ret": "int",
+      "args": [
+        "int fd"
+      ],
+      "target": "fd_is_redirected"
+    },
+    {
+      "name": "sys_pipe_alloc",
+      "ret": "int",
+      "args": [],
+      "target": "pipe_alloc"
+    },
+    {
+      "name": "sys_pipe_free",
+      "ret": "void",
+      "args": [
+        "int id"
+      ],
+      "target": "pipe_free"
+    },
+    {
+      "name": "sys_pipe_get_buf",
+      "ret": "u8 *",
+      "args": [
+        "int id"
+      ],
+      "target": "pipe_get_buf"
+    },
+    {
+      "name": "sys_pipe_get_len",
+      "ret": "u32",
+      "args": [
+        "int id"
+      ],
+      "target": "pipe_get_len"
+    },
+    {
+      "name": "sys_pipe_clear",
+      "ret": "void",
+      "args": [
+        "int id"
+      ],
+      "target": "pipe_clear"
+    },
+    {
+      "name": "sys_redirect_fd_buf",
+      "out": [{"arg": "buf", "len": "size"}],
+      "ret": "int",
+      "args": [
+        "int fd",
+        "u8 *buf",
+        "u32 size",
+        "u32 len"
+      ],
+      "body": "{ if (len > size) return -1; return fd_redirect_to_buffer(fd, buf, size, len); }"
+    },
+    {
+      "name": "sys_redirect_get_buf_len",
+      "ret": "u32",
+      "args": [
+        "int fd"
+      ],
+      "target": "fd_redirect_get_buf_len"
+    },
+    {
+      "name": "paging_is_present",
+      "ret": "int",
+      "args": [
+        "u32 addr"
+      ]
+    },
+    {
+      "name": "snd_bgm_play",
+      "ret": "void",
+      "args": [
+        "const char *mml"
+      ]
+    },
+    {
+      "name": "snd_bgm_stop",
+      "ret": "void",
+      "args": []
+    },
+    {
+      "name": "snd_bgm_is_playing",
+      "ret": "int",
+      "args": []
+    },
+    {
+      "name": "snd_se_play",
+      "ret": "void",
+      "args": [
+        "int se_id"
+      ]
+    },
+    {
+      "name": "snd_se_play_raw",
+      "ret": "void",
+      "args": [
+        "int note",
+        "int duration_ticks",
+        "int tone"
+      ]
+    },
+    {
+      "name": "snd_set_master",
+      "ret": "void",
+      "args": [
+        "int enable"
+      ]
+    },
+    {
+      "name": "snd_bgm_set_persist",
+      "ret": "void",
+      "args": [
+        "int persist"
+      ]
+    },
+    {
+      "name": "kbd_is_pressed",
+      "ret": "int",
+      "args": [
+        "int scancode"
+      ]
+    },
+    {
+      "name": "fm_note_on",
+      "ret": "void",
+      "args": [
+        "int ch",
+        "int note"
+      ]
+    },
+    {
+      "name": "fm_note_off",
+      "ret": "void",
+      "args": [
+        "int ch"
+      ]
+    },
+    {
+      "name": "fm_set_tone_num",
+      "ret": "void",
+      "args": [
+        "int ch",
+        "int tone_num"
+      ]
+    },
+    {
+      "name": "ssg_tone",
+      "ret": "void",
+      "args": [
+        "int ch",
+        "u16 period"
+      ]
+    },
+    {
+      "name": "ssg_volume",
+      "ret": "void",
+      "args": [
+        "int ch",
+        "u8 vol"
+      ],
+      "body": "ssg_volume(ch, (uchar)vol);"
+    },
+    {
+      "name": "ssg_all_off",
+      "ret": "void",
+      "args": []
+    },
+    {
+      "name": "mouse_poll",
+      "out": [{"arg": "info", "size": "sizeof(MouseState)"}],
+      "ret": "void",
+      "args": [
+        "void *info"
+      ],
+      "body": "mouse_poll((MouseState *)info);"
+    },
+    {
+      "name": "mouse_available",
+      "ret": "int",
+      "args": []
+    },
+    {
+      "name": "mouse_set_bounds",
+      "ret": "void",
+      "args": [
+        "i16 x_min",
+        "i16 y_min",
+        "i16 x_max",
+        "i16 y_max"
+      ]
+    },
+    {
+      "name": "tvram_readchar_at",
+      "out": [{"arg": "code", "size": "sizeof(u16)"}, {"arg": "attr", "size": "sizeof(u8)"}],
+      "ret": "void",
+      "args": [
+        "int x",
+        "int y",
+        "u16 *code",
+        "u8 *attr"
+      ]
+    },
+    {
+      "name": "tvram_reverse_cell",
+      "ret": "int",
+      "args": [
+        "int x",
+        "int y"
+      ]
+    },
+    {
+      "name": "mouse_cursor_set_mode",
+      "ret": "void",
+      "args": [
+        "int mode"
+      ]
+    },
+    {
+      "name": "mouse_cursor_show",
+      "ret": "void",
+      "args": []
+    },
+    {
+      "name": "mouse_cursor_hide",
+      "ret": "void",
+      "args": []
+    },
+    {
+      "name": "db_open",
+      "ret": "int",
+      "args": ["const char *path"],
+      "target": "kapi_db_open"
+    },
+    {
+      "name": "db_close",
+      "ret": "int",
+      "args": ["int handle"],
+      "target": "kapi_db_close"
+    },
+    {
+      "name": "db_exec",
+      "ret": "int",
+      "args": ["int handle", "const char *sql"],
+      "target": "kapi_db_exec"
+    },
+    {
+      "name": "db_prepare",
+      "ret": "int",
+      "args": ["int handle", "const char *sql"],
+      "target": "kapi_db_prepare"
+    },
+    {
+      "name": "db_step",
+      "ret": "int",
+      "args": ["int handle"],
+      "target": "kapi_db_step"
+    },
+    {
+      "name": "db_column_int",
+      "ret": "int",
+      "args": ["int handle", "int col"],
+      "target": "kapi_db_column_int"
+    },
+    {
+      "name": "db_column_text",
+      "ret": "const char *",
+      "args": ["int handle", "int col"],
+      "target": "kapi_db_column_text"
+    },
+    {
+      "name": "db_finalize",
+      "ret": "int",
+      "args": ["int handle"],
+      "target": "kapi_db_finalize"
+    },
+    {
+      "name": "db_last_error",
+      "ret": "const char *",
+      "args": ["int handle"],
+      "target": "kapi_db_last_error"
+    },
+    {
+      "name": "db_mem_used",
+      "ret": "u32",
+      "args": [],
+      "target": "kapi_db_mem_used"
+    },
+    {
+      "name": "kcg_load_font",
+      "ret": "int",
+      "args": ["const char *path"]
+    },
+    {
+      "name": "ide_get_info",
+      "out": [{"arg": "info", "size": "sizeof(IdeInfo)"}],
+      "ret": "int",
+      "args": ["int drv", "void *info"],
+      "body": "return ide_get_info(drv, (IdeInfo *)info);"
+    },
+    {
+      "name": "sys_get_build_info",
+      "out": [{"arg": "buf", "len": "size"}],
+      "ret": "void",
+      "args": ["char *buf", "int size"],
+      "target": "kapi_sys_get_build_info"
+    },
+    {
+      "name": "loop_attach",
+      "ret": "int",
+      "args": ["const char *path", "int slot"],
+      "target": "loop_dev_attach"
+    },
+    {
+      "name": "loop_detach",
+      "ret": "void",
+      "args": ["int slot"],
+      "target": "loop_dev_detach"
+    },
+    {
+      "name": "loop_status",
+      "out": [{"arg": "total", "size": "sizeof(u32)"}, {"arg": "bps", "size": "sizeof(int)"}],
+      "ret": "int",
+      "args": ["int slot", "u32 *total", "int *bps"],
+      "target": "loop_dev_status"
+    },
+    {
+      "name": "dev_blk_read",
+      "out": "target",
+      "ret": "int",
+      "args": ["const char *dev_name", "u32 lba", "int count", "void *buf"],
+      "body": "{ Device *d = dev_find(dev_name); if (!d) return -1; if (count < 0) return -1; if (count > 0 && buf && d->sect_size > 0) { if ((u32)count > 0xFFFFFFFFu / (u32)d->sect_size) return -1; if (!ring3_user_ranges_writable((u32)buf, (u32)count * (u32)d->sect_size, 0, 0)) ring3_fault_kill(); } return dev_blk_read_lba(d, lba, count, buf); }"
+    },
+    {
+      "name": "dev_blk_write",
+      "ret": "int",
+      "args": ["const char *dev_name", "u32 lba", "int count", "const void *buf"],
+      "body": "{ Device *d = dev_find(dev_name); if (!d) return -1; return dev_blk_write_lba(d, lba, count, buf); }"
+    },
+    {
+      "name": "ime_switch_dict",
+      "ret": "int",
+      "args": ["int variant"]
+    },
+    {
+      "name": "ime_user_list",
+      "out": [{"arg": "out", "len": "max", "unit": "sizeof(IME_UserEntry)"}],
+      "ret": "int",
+      "args": ["const char *yomi_prefix", "void *out", "int max"],
+      "target": "ime_user_list_facade"
+    },
+    {
+      "name": "ime_user_delete",
+      "ret": "int",
+      "args": ["const char *yomi", "const char *kanji"],
+      "target": "ime_user_delete_facade"
+    },
+    {
+      "name": "ime_user_export",
+      "ret": "int",
+      "args": ["const char *path"],
+      "target": "ime_user_export_facade"
+    },
+    {
+      "name": "ime_user_clear",
+      "ret": "int",
+      "args": [],
+      "target": "ime_user_clear_facade"
+    },
+    {
+      "name": "ime_trygetkey",
+      "ret": "int",
+      "args": []
+    },
+    {
+      "name": "v86_selftest",
+      "ret": "int",
+      "args": [],
+      "target": "v86_smoke_test"
+    },
+    {
+      "name": "v86_disktest",
+      "ret": "int",
+      "args": [
+        "const char *path"
+      ],
+      "target": "v86_disk_test"
+    },
+    {
+      "name": "v86_boot",
+      "ret": "int",
+      "args": [
+        "const char *path"
+      ]
+    },
+    {
+      "name": "v86_boot2",
+      "ret": "int",
+      "args": [
+        "const char *path",
+        "const char *second"
+      ]
+    },
+    {
+      "name": "gfx_screen_info",
+      "out": [{"arg": "out", "size": "sizeof(GFX_ScreenInfo)"}],
+      "ret": "void",
+      "args": ["void *out"]
+    },
+    {
+      "name": "gfx_hw_fill_rect",
+      "ret": "int",
+      "args": ["int x", "int y", "int w", "int h", "u8 color"]
+    },
+    {
+      "name": "gfx_hw_blit",
+      "ret": "int",
+      "args": ["int dx", "int dy", "int sx", "int sy", "int w", "int h"]
+    },
+    {
+      "name": "gui_call",
+      "ret": "int",
+      "args": ["u32 op", "u32 arg"]
+    },
+    {
+      "name": "gui_register",
+      "out": "none",
+      "ret": "int",
+      "args": ["void *handler", "void *pump"]
+    },
+    {
+      "name": "gfx_stats",
+      "out": [{"arg": "out", "size": "sizeof(GFX_Stats)"}],
+      "ret": "int",
+      "args": ["void *out"]
+    },
+    {
+      "name": "gfx_lease_palette",
+      "ret": "int",
+      "args": ["int first", "int count", "const u8 *rgb"]
+    },
+    {
+      "name": "sys_switch_shell",
+      "ret": "int",
+      "args": ["const char *path"]
+    },
+    {
+      "name": "kbd_dropped_count",
+      "ret": "u32",
+      "args": []
+    },
+    {
+      "name": "kbd_trygetrawkey",
+      "ret": "int",
+      "args": []
+    },
+    {
+      "name": "ime_feed_key",
+      "ret": "int",
+      "args": ["int keydata"]
+    },
+    {
+      "name": "ime_set_render",
+      "out": "none",
+      "ret": "void",
+      "args": ["void *table"],
+      "target": "gui_ime_set_render"
+    },
+    {
+      "name": "exec_start",
+      "ret": "i32",
+      "args": ["const char *cmdline"]
+    },
+    {
+      "name": "exec_resume",
+      "ret": "i32",
+      "args": ["i32 app_id", "i32 wait_ret"]
+    },
+    {
+      "name": "exec_park",
+      "ret": "i32",
+      "args": []
+    },
+    {
+      "name": "exec_kill",
+      "ret": "i32",
+      "args": ["i32 app_id"]
+    },
+    {
+      "name": "exec_app_state",
+      "ret": "i32",
+      "args": ["i32 app_id"]
+    },
+    {
+      "name": "snd_focus",
+      "ret": "i32",
+      "args": ["int app_id"]
+    },
+    {
+      "name": "exec_abort_clear",
+      "ret": "i32",
+      "args": []
+    },
+    {
+      "name": "con_sink_read",
+      "out": [{"arg": "buf", "len": "cap"}],
+      "ret": "i32",
+      "args": [
+        "void *buf",
+        "u32 cap"
+      ]
+    },
+    {
+      "name": "con_sink_stat",
+      "out": [{"arg": "pending", "size": "sizeof(u32)"}, {"arg": "dropped", "size": "sizeof(u32)"}],
+      "ret": "i32",
+      "args": [
+        "u32 *pending",
+        "u32 *dropped"
+      ]
+    },
+    {
+      "name": "sys_ram_kb",
+      "ret": "u32",
+      "args": [],
+      "target": "memory_boot_ram_kb"
+    },
+    {
+      "name": "kbd_inject",
+      "ret": "i32",
+      "args": [
+        "const u8 *utf8",
+        "u32 len"
+      ]
+    },
+    {
+      "name": "kbd_inject_pending",
+      "ret": "u32",
+      "args": []
+    },
+    {
+      "name": "gfx_screen_owner",
+      "ret": "i32",
+      "args": []
+    },
+    {
+      "name": "launch_req",
+      "ret": "i32",
+      "args": ["const char *cmdline"]
+    },
+    {
+      "name": "launch_pending",
+      "ret": "i32",
+      "args": []
+    },
+    {
+      "name": "launch_take",
+      "out": [{"arg": "buf", "len": "cap"}, {"arg": "requester", "size": "sizeof(i32)"}, {"arg": "kind", "size": "sizeof(i32)"}, {"arg": "arg", "size": "sizeof(i32)"}],
+      "ret": "i32",
+      "args": ["char *buf", "u32 cap", "i32 *requester", "i32 *kind", "i32 *arg"]
+    },
+    {
+      "name": "launch_report",
+      "ret": "i32",
+      "args": ["i32 token", "i32 rc"]
+    },
+    {
+      "name": "launch_poll",
+      "out": [{"arg": "status", "size": "sizeof(i32)"}],
+      "ret": "i32",
+      "args": ["i32 token", "i32 *status"]
+    },
+    {
+      "name": "launch_cancel",
+      "ret": "i32",
+      "args": ["i32 token"]
+    },
+    {
+      "name": "launch_child",
+      "ret": "i32",
+      "args": ["i32 id"]
+    },
+    {
+      "name": "sys_yield",
+      "ret": "i32",
+      "args": [],
+      "target": "exec_sys_yield"
+    },
+    {
+      "name": "db_open_existing",
+      "ret": "int",
+      "args": ["const char *path", "int writable"],
+      "target": "kapi_db_open_existing"
+    },
+    {
+      "name": "db_prepare_only",
+      "ret": "int",
+      "args": ["int handle", "const char *sql"],
+      "target": "kapi_db_prepare_only"
+    },
+    {
+      "name": "db_bind_int",
+      "ret": "int",
+      "args": ["int handle", "int index", "int value"],
+      "target": "kapi_db_bind_int"
+    },
+    {
+      "name": "db_bind_text",
+      "ret": "int",
+      "args": ["int handle", "int index", "const char *text", "int length"],
+      "target": "kapi_db_bind_text"
+    },
+    {
+      "name": "db_bind_blob",
+      "ret": "int",
+      "args": ["int handle", "int index", "const void *data", "int length"],
+      "target": "kapi_db_bind_blob"
+    },
+    {
+      "name": "db_bind_null",
+      "ret": "int",
+      "args": ["int handle", "int index"],
+      "target": "kapi_db_bind_null"
+    },
+    {
+      "name": "db_error_code",
+      "ret": "int",
+      "args": ["int handle"],
+      "target": "kapi_db_error_code"
+    },
+    {
+      "name": "host_open",
+      "ret": "i32",
+      "args": ["const char *req", "u32 len"],
+      "target": "kapi_host_open"
+    },
+    {
+      "name": "host_status",
+      "out": [{"arg": "status", "size": "sizeof(u32)"}, {"arg": "length", "size": "sizeof(u32)"}],
+      "ret": "i32",
+      "args": ["i32 h", "u32 *status", "u32 *length"],
+      "target": "kapi_host_status"
+    },
+    {
+      "name": "host_read",
+      "out": [{"arg": "buf", "len": "cap"}],
+      "ret": "i32",
+      "args": ["i32 h", "void *buf", "u32 cap"],
+      "target": "kapi_host_read"
+    },
+    {
+      "name": "host_write",
+      "ret": "i32",
+      "args": ["i32 h", "const void *buf", "u32 len"],
+      "target": "kapi_host_write"
+    },
+    {
+      "name": "host_close",
+      "ret": "i32",
+      "args": ["i32 h"],
+      "target": "kapi_host_close"
+    },
+    {
+      "name": "sys_set_mtime",
+      "ret": "int",
+      "args": ["const char *path", "u32 mtime"],
+      "target": "kapi_sys_set_mtime"
+    },
+    {
+      "name": "kbd_peekkey",
+      "ret": "int",
+      "args": []
+    },
+    {
+      "name": "exec_last_result",
+      "out": [{"arg": "kind", "size": "sizeof(int)"}, {"arg": "code", "size": "sizeof(int)"}],
+      "ret": "int",
+      "args": ["int *kind", "int *code"]
+    },
+    {
+      "name": "serial_init_vfast",
+      "ret": "int",
+      "args": ["u32 baud"]
+    },
+    {
+      "name": "serial_get_status",
+      "out": [{"arg": "mode", "size": "sizeof(u32)"}, {"arg": "baud", "size": "sizeof(u32)"}, {"arg": "fifo", "size": "sizeof(u32)"}],
+      "ret": "int",
+      "args": ["u32 *mode", "u32 *baud", "u32 *fifo"]
+    },
+    {
+      "name": "kbd_trygetchar_local",
+      "ret": "int",
+      "args": []
+    },
+    {
+      "name": "pci_count",
+      "ret": "int",
+      "args": []
+    },
+    {
+      "name": "pci_get",
+      "out": [{"arg": "out", "size": "PCI_DEV_STRUCT_SIZE"}],
+      "ret": "int",
+      "args": ["u32 idx", "void *out"]
+    },
+    {
+      "name": "pci_cfg_read32",
+      "ret": "u32",
+      "args": ["u32 bus", "u32 dev", "u32 fn", "u32 reg"]
+    },
+    {
+      "name": "sys_time_now",
+      "out": "target",
+      "ret": "int",
+      "args": ["u32 *lo", "u32 *hi"],
+      "target": "kapi_sys_time_now"
+    },
+    {
+      "name": "pci_bind_info",
+      "out": "target",
+      "ret": "int",
+      "args": ["u32 idx", "void *out"],
+      "target": "kapi_pci_bind_info"
+    },
+    {
+      "name": "pcm_open",
+      "ret": "int",
+      "args": ["u32 rate"]
+    },
+    {
+      "name": "pcm_write",
+      "ret": "int",
+      "args": ["const void *buf", "u32 bytes"],
+      "body": "{ u32 a = (u32)buf;\n  int rc = pcm_write_check();\n  if (rc != 0) return rc;\n  if (buf == 0) return OS32_ERR_INVAL;\n  if (a + bytes < a) return OS32_ERR_INVAL;\n  if (!ring3_user_range_ok(a, bytes)) return OS32_ERR_INVAL;\n  if (bytes < PCM_FRAME_BYTES) return 0;\n  return pcm_write(buf, bytes); }"
+    },
+    {
+      "name": "pcm_status",
+      "out": [{"arg": "free_bytes", "size": "sizeof(u32)"}, {"arg": "counters", "size": "sizeof(u32)"}],
+      "ret": "int",
+      "args": ["u32 *free_bytes", "u32 *counters"]
+    },
+    {
+      "name": "pcm_close",
+      "ret": "int",
+      "args": []
+    },
+    {
+      "name": "pcm_set_volume",
+      "ret": "int",
+      "args": ["u32 percent"]
+    },
+    {
+      "name": "kbd_diag",
+      "out": [{"arg": "out", "size": "sizeof(KbdDiag)"}],
+      "ret": "int",
+      "args": ["KbdDiag *out"]
+    },
+    {
+      "name": "ext2_format_at",
+      "ret": "int",
+      "args": ["int drv", "u32 start_lba", "u32 length"]
+    },
+    {
+      "name": "dev_mount_count",
+      "ret": "int",
+      "args": ["int drv"],
+      "target": "vfs_dev_mount_count"
+    },
+    {
+      "name": "sys_umount_checked",
+      "ret": "int",
+      "args": ["const char *prefix"],
+      "target": "vfs_umount_checked"
+    },
+    {
+      "name": "hdd_geom_info",
+      "out": [{"arg": "out", "size": "sizeof(HddGeom)"}],
+      "ret": "int",
+      "args": ["int drv", "HddGeom *out"],
+      "body": "return hdd_geom_info(drv, (void *)out);"
+    },
+    {
+      "name": "boot_image_info",
+      "out": [{"arg": "out", "size": "sizeof(BootImageInfo)"}],
+      "ret": "int",
+      "args": ["BootImageInfo *out"],
+      "body": "return boot_image_info((void *)out);"
+    },
+    {
+      "name": "sfs_begin",
+      "ret": "int",
+      "args": [],
+      "target": "serialfs_session_begin"
+    },
+    {
+      "name": "sfs_end",
+      "ret": "int",
+      "args": ["int exit_code"],
+      "target": "serialfs_session_end"
+    },
+    {
+      "name": "serial_diag",
+      "out": [{"arg": "out", "size": "sizeof(SerialDiag)"}],
+      "ret": "int",
+      "args": ["SerialDiag *out"],
+      "body": "return kapi_serial_diag(out);"
+    },
+    {
+      "name": "kbd_diag_log",
+      "out": [{"arg": "out", "len": "max", "unit": "sizeof(KbdDiagLogEnt)"}],
+      "ret": "int",
+      "args": ["u32 after_seq", "KbdDiagLogEnt *out", "int max"]
+    },
+    {
+      "name": "v86_gdc_capture",
+      "out": [{"arg": "out", "size": "sizeof(V86Gcap)"}],
+      "ret": "int",
+      "args": ["int mode", "V86Gcap *out"]
+    }
+  ]
+}

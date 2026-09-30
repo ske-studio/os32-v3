@@ -1,0 +1,27 @@
+# cp
+
+ファイルをコピーする
+
+## SYNOPSIS
+
+`cp [-r] SRC DST`
+`cp [-r] SRC... DIR`
+
+## DESCRIPTION
+
+ファイルをコピーする。
+宛先がディレクトリの場合はそのディレクトリ内にコピーする。
+
+## OPTIONS
+
+- `-r` — ディレクトリを再帰的にコピー
+
+## EXAMPLES
+
+- `cp file.txt backup.txt` — ファイルをコピー
+- `cp file1.txt file2.txt /tmp/` — 複数ファイルをディレクトリにコピー
+- `cp -r /home/user /tmp/backup` — ディレクトリを再帰コピー
+
+## SEE ALSO
+
+mv, rm, mkdir

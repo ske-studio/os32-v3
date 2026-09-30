@@ -1,0 +1,11 @@
+[package]
+name = "os32_math"
+version = "0.1.0"
+edition = "2021"
+description = "OS32 integer math library - Q16.16 fixed-point, trig LUT, CORDIC, easing"
+
+[lib]
+
+[dependencies]
+
+[dev-dependencies]

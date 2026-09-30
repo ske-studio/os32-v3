@@ -1,0 +1,15 @@
+[package]
+name = "os32_lz4"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]
+
+[profile.release]
+opt-level = 2
+lto = true
+panic = "abort"
+
+[profile.dev]
+panic = "abort"

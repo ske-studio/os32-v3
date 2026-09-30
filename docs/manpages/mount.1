@@ -1,0 +1,38 @@
+# mount
+
+ファイルシステムをマウントする
+
+## SYNOPSIS
+
+`mount PREFIX DEVICE FS_TYPE`
+
+## DESCRIPTION
+
+指定されたデバイスのファイルシステムを指定のプレフィックスにマウントする。
+
+## OPTIONS
+
+- `PREFIX` — マウントポイント (例: `/mnt`)
+- `DEVICE` — デバイス名 (例: `hd0`, `fd0`, `cd0`, `COM1`, `hostdrv`)
+- `FS_TYPE` — ファイルシステム種別:
+  - `ext2` — ext2ファイルシステム (HDD)
+  - `fat` — FAT12/FAT16/FAT32 (FDD/HDD汎用)
+  - `iso9660` — CD-ROM
+  - `hostdrv` — NP21/W HostDrv
+  - `serialfs` — **単独ではマウントできない**。シリアル越しの `/host` は `sfs run`
+    のセッションの中だけで付く (`sfs` を参照)
+
+同じ PREFIX への二重のマウントは断る (`/host` に HostDrv が居るところへ重ねない)。
+引数は 3 つちょうど (余分な引数は断る)。
+
+## EXAMPLES
+
+- `mount / fd0 fat` — FDDのFAT12をルートにマウント
+- `mount /mnt hd0 ext2` — HDD#0のext2をマウント
+- `mount /mnt hd0 fat` — HDD#0のFATパーティションをマウント
+- `mount /cd0 cd0 iso9660` — CD-ROMをマウント
+- `mount /host hostdrv hostdrv` — HostDrvをマウント
+
+## SEE ALSO
+
+umount, dev

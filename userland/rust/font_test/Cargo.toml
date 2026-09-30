@@ -1,0 +1,12 @@
+[package]
+name = "font_test"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+os32api = { path = "../../../sdk/rust/os32api" }
+ttf-parser = { version = "0.21", default-features = false }
+ab_glyph_rasterizer = { version = "0.1", default-features = false, features = ["libm"] }

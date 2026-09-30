@@ -1,0 +1,9 @@
+sample/ — VBZ (ベクター画像) の試験データ
+=========================================
+
+- `Gemini_Generated_Image_*.jpg` (3 枚): Google Gemini で生成した画像 (2026-04、自作のプロンプト)。
+  第三者の作品ではない。中身は 犬 (2d9f…)、機械の竜 (2sdh…)、走る少年 (dm5n…)。
+- `dog.vbz` `dragon.vbz` `runner.vbz`: 上の 3 枚を `tools/img2vbz.py` (Potrace でトレース →
+  PC-98 16 色のベジェ曲線) で変換したもの。`dragon8` / `runner8` は `--colors 8`、
+  `dragon_hb` / `runner_hb` は半輝度版の変換。
+- 用途: VBZ の表示・変換の試験 (2026-04-13 の VBZ 対応時のデータ)。ビルドには使わない。

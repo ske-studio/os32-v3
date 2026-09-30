@@ -1,0 +1,38 @@
+# gshell — OS32 GUI シェル (ウィンドウマネージャ本体、票 W1)
+#
+# シェル帯 (0x300000, CPL=0) に常駐する WM。shell.bin と排他 (契約 T9)。
+# userland/rust/ ワークスペースの外 (userland/gshell/) に置くため、
+# 自前の独立ワークスペースとして立てる。ビルドは PM が build/programs.mk に
+# 登録する (0x300000 リンク = app_sys.ld、crt0 + libos32gfx とリンク)。
+#
+# 依存の鉄則 (TASKS §6 / v2 C8):
+#   - 外部クレート (crates.io) は一切追加しない。in-repo の os32api のみ。
+#   - no_std / panic=abort。状態は固定長配列 (alloc 不使用)。
+#   - 描画は libos32gfx を FFI (os32api::gfx) で呼ぶ。Rust で再実装しない。
+[package]
+name = "gshell"
+version = "0.1.0"
+edition = "2021"
+description = "OS32 GUI shell / window manager (resident at 0x300000, CPL=0)"
+
+[lib]
+# staticlib: crt0 + libos32gfx.a と最終リンクして /bin/gshell.bin を作る。
+crate-type = ["staticlib"]
+
+[dependencies]
+# in-repo クレートのみ。os32api が KernelAPI バインディング / GUI 共有定義
+# (os32api::gui::proto) / libos32gfx の extern "C" 宣言 / panic_handler /
+# global_allocator を単一実体で供給する。
+os32api = { path = "../../sdk/rust/os32api" }
+
+# gshell 自身を独立ワークスペースにして userland/rust の workspace に
+# 吸われないようにする (userland/rust は別ディレクトリツリー)。
+[workspace]
+
+[profile.release]
+opt-level = 2
+lto = true
+panic = "abort"
+
+[profile.dev]
+panic = "abort"

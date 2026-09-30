@@ -1,0 +1,101 @@
+OS32 Pager Test File
+====================
+
+This file is used to test the 'more' and 'less' pager commands.
+It contains enough lines to span multiple screen pages.
+
+Line 001: The quick brown fox jumps over the lazy dog.
+Line 002: Pack my box with five dozen liquor jugs.
+Line 003: How vexingly quick daft zebras jump.
+Line 004: The five boxing wizards jump quickly.
+Line 005: Jinxed wizards pluck ivy from the big quilt.
+Line 006: Crazy Frederick bought many very exquisite opal jewels.
+Line 007: We promptly judged antique ivory buckles for the next prize.
+Line 008: A mad boxer shot a quick, gloved jab to the jaw of his dizzy opponent.
+Line 009: The lazy major was fixing Cupid's broken quiver.
+Line 010: Sixty zippers were quickly picked from the woven jute bag.
+Line 011: -------- Section 1: Numbers --------
+Line 012: 0123456789 ABCDEF 0x1234 0b1010 0o777
+Line 013: Pi = 3.14159265358979323846
+Line 014: E  = 2.71828182845904523536
+Line 015: Avogadro = 6.022e23
+Line 016: Speed of light = 299792458 m/s
+Line 017: Planck constant = 6.626e-34 J*s
+Line 018: Boltzmann = 1.381e-23 J/K
+Line 019: Gravitational = 6.674e-11 N*m2/kg2
+Line 020: Electron mass = 9.109e-31 kg
+Line 021: -------- Section 2: ASCII Art --------
+Line 022:   /\_/\
+Line 023:  ( o.o )
+Line 024:   > ^ <
+Line 025:  /|   |\
+Line 026: (_|   |_)
+Line 027:
+Line 028:     ___
+Line 029:    /   \
+Line 030:   | O O |
+Line 031:   |  ^  |
+Line 032:    \___/
+Line 033:
+Line 034: -------- Section 3: PC-9801 Info --------
+Line 035: NEC PC-9801 Series (1982-2003)
+Line 036: CPU: Intel 8086/8088 -> i386 -> Pentium
+Line 037: Resolution: 640x400 (text) / 640x400 (graphics)
+Line 038: Text VRAM: 0xA0000-0xA3FFF
+Line 039: Graphic VRAM: 0xA8000-0xBFFFF (4 planes)
+Line 040: I/O Keyboard: Port 0x41 (data), 0x43 (status)
+Line 041: PIC Master: Port 0x00, 0x02
+Line 042: PIC Slave: Port 0x08, 0x0A
+Line 043: Timer 8253: Port 0x71-0x77
+Line 044: FDC uPD765: Port 0x90-0x94
+Line 045: Serial 8251: Port 0x30-0x32
+Line 046: -------- Section 4: OS32 Features --------
+Line 047: - 32-bit protected mode kernel
+Line 048: - Ext2 filesystem with double-indirect blocks
+Line 049: - FAT12 floppy disk support
+Line 050: - ISO 9660 CD-ROM support (ATAPI)
+Line 051: - Virtual filesystem (VFS) layer
+Line 052: - External program loader (OS32X format)
+Line 053: - KernelAPI for system calls
+Line 054: - Japanese input (FEP/SKK)
+Line 055: - Serial console (rshell)
+Line 056: - GFX subsystem (640x400, 16 colors)
+Line 057: - Sound engine (FM synthesis via OPN)
+Line 058: -------- Section 5: Search Test --------
+Line 059: This section contains SEARCHWORD for testing / command.
+Line 060: Another line without the keyword.
+Line 061: Yet another line without it.
+Line 062: Here is SEARCHWORD again on this line.
+Line 063: More filler text between matches.
+Line 064: Nothing special here.
+Line 065: And SEARCHWORD appears one more time.
+Line 066: -------- Section 6: Long Lines --------
+Line 067: ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz!@#$%^&*()ABCDEFGHIJKLMNOPQRSTUVWXYZ01234
+Line 068: This line is exactly eighty characters long, matching the PC-98 console width..
+Line 069: Short.
+Line 070: -------- Section 7: More Filler --------
+Line 071: Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+Line 072: Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+Line 073: Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.
+Line 074: Duis aute irure dolor in reprehenderit in voluptate velit esse.
+Line 075: Excepteur sint occaecat cupidatat non proident.
+Line 076: Sunt in culpa qui officia deserunt mollit anim id est laborum.
+Line 077: Curabitur pretium tincidunt lacus.
+Line 078: Nulla gravida orci a odio.
+Line 079: Nullam varius, turpis et commodo pharetra.
+Line 080: Est eros bibendum elit, nec luctus magna felis sollicitudin mauris.
+Line 081: Integer in mauris eu nibh euismod gravida.
+Line 082: Duis ac tellus et risus vulputate vehicula.
+Line 083: Donec lobortis risus a elit.
+Line 084: Etiam tempor.
+Line 085: Ut ullamcorper, ligula ut dictum pharetra.
+Line 086: Nunc ut erat id mauris vulputate elementum.
+Line 087: Nullam dictum felis eu pede mollis pretium.
+Line 088: Integer tincidunt.
+Line 089: Cras dapibus.
+Line 090: Vivamus elementum semper nisi.
+Line 091: -------- Section 8: Final --------
+Line 092: This is the end of the test file.
+Line 093: If you can see this line, the pager scrolled to the bottom.
+Line 094: Press 'q' to quit, or 'g' to go back to the top (less only).
+Line 095: === END OF FILE ===

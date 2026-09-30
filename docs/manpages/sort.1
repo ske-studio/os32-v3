@@ -1,0 +1,31 @@
+# sort
+
+行をソートして出力する
+
+## SYNOPSIS
+
+`sort [-rn] [FILE]`
+
+## DESCRIPTION
+
+ファイルまたは標準入力から全行を読み込み、ソートして出力する。
+デフォルトは辞書順（ASCII順）でソートする。
+
+## OPTIONS
+
+- `-r` — 逆順でソート
+- `-n` — 数値としてソート (行頭の数値を比較)
+
+オプションは結合可能 (例: `-rn`)
+
+## EXAMPLES
+
+- `sort names.txt` — names.txt を辞書順でソート
+- `sort -r scores.txt` — 逆順でソート
+- `sort -n data.txt` — 数値ソート
+- `ls -l | sort` — パイプ経由でソート
+- `du -s / | sort -rn` — ディスク使用量の大きい順にソート
+
+## SEE ALSO
+
+grep, head, tail, wc

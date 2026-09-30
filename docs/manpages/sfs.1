@@ -1,0 +1,82 @@
+# sfs
+
+シリアル越しの /host (SerialFS) で 1 コマンドを走らせる
+
+## SYNOPSIS
+
+`sfs run COMMAND...`
+
+## DESCRIPTION
+
+実機でファイルを入れる口 (票 TASK_SERIAL_HOSTFS 部品 B)。**常駐シェルだけ**が持ち、
+**ホストが rshell へ送った 1 行が丸ごと `sfs run ...` のときだけ**動く (本体の
+キーボードから打った行・`a && sfs run b` のような入れ子は断る)。
+
+ホスト (ノート) で:
+
+    rshell_serial.py --port /dev/ttyUSB0 --fast 115200 --serve-host ./hostdrv cmd sfs run hsync boot
+
+**行全体を rshell が引き受ける** ので、`sfs run` の後ろのコマンド行の中のパイプや
+リダイレクト (`sfs run ls /host | more`) はセッションの中で動く (後段がセッションの
+外でもう一度走ることはない)。
+
+rshell は ESC を含む行 (フレームの断片・化けた行) を実行しない。その拒否は**本当の
+行末 (改行) まで**続き、沈黙では解けない — 閉じるのはホストの次の行の改行 (その行も
+拒否のまま EOT を 1 つ返す。ホストは送り直す) か本体キーボードの Enter、本体の ESC は
+rshell を抜ける。
+
+ゲストの流れ: `/host` が空いているか確かめる → 送受信のゲートを上げる → HELLO
+(ホストがセッション ID を返す) → `/host` に SerialFS をマウント → COMMAND →
+(どう終わっても) BYE → アンマウント → 受信を捨てて線が 500ms 静まるのを待つ
+(上限 5 秒。越えたら警告して進む) → 溜めた出力と `sfs: exit=N` を長さ付きの
+フレームで送る → ゲートを下ろす → rshell の EOT。
+
+- セッション中の出力は画面に出るが、シリアルへは直接出ない (カーネルに 8KB 溜めて
+  最後に送る。溢れたら古い方を捨てて `sfs: log dropped N bytes` と出す)。EXIT を
+  送ってからゲートを下ろすまでに入った文字も捨てず、下ろした後に生で流れる
+- HELLO に答えが無かった回 (`sfs: no answer to HELLO`) も、相手がセッションを
+  始めている可能性を前提に同じ隔離 (500ms、上限 5 秒) を済ませてからゲートを
+  下ろし、溜めた文字を生で流す。ホストはそれを `sfs run` の行の EOT までの
+  出力として出す (`sfs: session did not run (no EXIT frame)`)
+- セッション中は `serial_getchar` (ブロッキング) も待たずに -1 を返す (KAPI_SPEC)
+- `/host` に HostDrv など別の FS が付いていれば断る (NP21/W では先に `umount /host`)
+- 時間切れは今の速度から決める (1 試行 = 2 秒 + 最大フレームの 2 倍 + 0.5 秒)。
+  同じ番号で 3 回まで再送し、要求が 3 つ続けて届かなければ線を死んだと見なして
+  以後の要求を即座に失敗させる
+- シリアル越しの読み書きは遅い。`hsync` の全体同期ではなく `hsync boot` /
+  `hsync bin` と範囲を絞って使う
+
+## ホスト側の規則 (tools/rshell_serial.py --serve-host)
+
+- **書き込みは既定で禁止**。ゲストが書けるのは `--allow-write <ルート相対のパス>`
+  (複数可、その下も含む) だけで、それ以外の書き込み・mkdir・rmdir・unlink・rename は
+  `OS32_ERR_ROFS` (-15) で断る。`push` の宛先はここに含める。`hsync` は読むだけ。
+  `--allow-write /` は根の全体 (明示したときだけ)。`..` を含む指定は起動時に断る
+- パスは `/` 始まりのルート相対。`..` / `.` / `\` / NUL の要素は断る
+- **POSIX のホスト (ノートの Ubuntu)** は起動時に根のディレクトリを `O_NOFOLLOW` で
+  開いた fd を起点に、1 段ずつ `O_NOFOLLOW` で開いて操作する (openat 相当。根そのものを
+  後から差し替えても元のディレクトリを見続ける)。**symlink は根の中を指すものも辿らない**
+  (列挙では種別不明、開くと断る)。検査と操作の間に symlink を差し替えられても根の外へ
+  出ない。書き込みの許可も辿らない名前で当たるので、リンク越しに `--allow-write` の外へ
+  書く道は無い
+- **Windows のホスト** には dir_fd が無いので、realpath を取って根と要素単位で比べて
+  から操作する。書き込みの許可は wire の名前と **解決した実体の両方**に当てる
+  (`out\link → protected` のとき `/out/link/f` は ROFS)。**検査と操作の間に symlink /
+  junction を差し替えられる競合は残る** (根の中に他人が書けるディレクトリを置かない
+  こと)。`:` (代替データストリーム) は断る
+- ホストの `pwrite` が一部しか書かなかったときは全部書けるまでくり返す (進まなければ IO)
+- 行が終わると受信スレッドを止め、**終わったことを確かめてから**次の行へ進む
+  (pyserial / NP21/W の口は `cancel_read` で待ちを切る)
+- 応答は、要求の**到着から** 2 秒を過ぎたら送らない (実行もしない)。同じセッションの
+  BYE か行末の EOT が届いていれば送らない。受信は別のスレッドで常に回す
+
+## EXAMPLES
+
+- `sfs run hsync boot` — カーネルを更新 (起動した版なら `/boot/vmkernel.old` を残す)
+- `sfs run ls /host` — ホストのディレクトリを見る
+- `sfs run push /tmp/log.txt host:/log.txt` — ゲストのファイルをホストへ
+  (ホストは `--allow-write log.txt` が要る)
+
+## SEE ALSO
+
+rshell, serial, hsync, mount

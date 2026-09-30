@@ -1,0 +1,28 @@
+# cat
+
+ファイル内容を表示する
+
+## SYNOPSIS
+
+`cat [-n] FILE...`
+
+## DESCRIPTION
+
+指定されたファイルの内容を標準出力に表示する。
+複数ファイルを指定した場合は連結して出力する。
+パイプからの入力にも対応。
+
+## OPTIONS
+
+- `-n` — 各行に行番号を付けて表示する
+
+## EXAMPLES
+
+- `cat readme.txt` — ファイルの内容を表示
+- `cat -n main.c` — 行番号付きで表示
+- `cat file1.txt file2.txt` — 複数ファイルを連結表示
+- `cat file.txt > copy.txt` — ファイルをコピー (リダイレクト)
+
+## SEE ALSO
+
+head, tail, grep, echo

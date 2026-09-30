@@ -1,0 +1,51 @@
+# mdview
+
+GFXグラフィカルMarkdownビューア
+
+## SYNOPSIS
+
+`mdview FILE`
+
+## DESCRIPTION
+
+640x400ピクセルのGFXモードでMarkdownファイルをカラー表示するビューア。
+KCGフォントスケーリングにより、見出しを大きなフォントサイズで描画する。
+
+対応する書式:
+
+- `# H1` — 48px ゴールド文字 + 下線
+- `## H2` — 32px スカイブルー文字 + 下線
+- `### H3` — 16px エメラルド文字 + 左装飾
+- 通常テキスト — 16px 白文字
+- `- リスト` — bullet付き
+- `` `code` `` — ラベンダー色
+- `**bold**` — サーモン色
+- ` ``` ` コードブロック — 背景色付き
+- `---` 水平線 — 破線
+
+## OPTIONS
+
+引数は表示するファイルのパスのみ。
+`.md` ファイルおよび `.1` manページファイルに対応。
+
+## KEYS
+
+- `Space` / `ROLLDOWN` — 次ページ
+- `b` / `ROLLUP` — 前ページ
+- `↑` / `↓` — 行スクロール (20px単位)
+- `HOME` — 先頭にジャンプ
+- `/` — テキスト検索 (大文字小文字無視)
+- `n` — 次の検索結果
+- `t` — 目次ジャンプ (H1/H2一覧)
+- `q` / `ESC` — 終了
+
+## EXAMPLES
+
+```
+exec mdview.bin /usr/man/grep.1
+exec mdview.bin /readme.md
+```
+
+## SEE ALSO
+
+`more`, `man`, `cat`

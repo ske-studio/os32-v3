@@ -1,0 +1,65 @@
+# cdinst
+
+CD-ROM (ISO9660) からパッケージをインストールする
+
+## SYNOPSIS
+
+`cdinst`
+
+## DESCRIPTION
+
+ATAPI CD-ROM 上のインストール ISO (`os32_install.iso`) から
+OS32 パッケージ (.PKG) を読み込み、HDD を ext2 でフォーマットして展開する。
+BOOT.PKG はブートセクタへ直接書く。インストールの型は 3 つ:
+
+- `1. Minimal` — BOOT + MINIMAL (CUI のレスキュー兼インストーラ: シェル、install /
+  cdinst / hsync、less / grep / hexdump / cfg、設定)。起動 FD と同じ中身。既定フォントは
+  無く、字は本体のフォント ROM で出る
+- `2. Normal` — 1 + GUI + NORMAL (GUI シェルと GUI アプリ、コマンド、アプリ、man、
+  既定フォント、FEP 辞書、データ)
+- `3. Full` — 2 + DEBUG (試験プログラムと試験データ)
+
+展開は依存の順 BOOT → MINIMAL → GUI → NORMAL → DEBUG。Minimal だけの HDD は
+`/etc/system.cfg` が GUI=1 でも GUI シェルが無いので CUI で上がる。
+
+128 項目を超えるパッケージは NORMAL.PKG, NORMAL2.PKG, … に分かれていて、
+連番を欠けるまで順に展開する。どれかの展開に失敗したら止め、完了とは言わない。
+
+## HDD の扱い
+
+入れる先は hd0 (IDE 0 = BIOS DA 80h) だけ。書く前に全部を検査し (幾何・区画表・マウント・
+パッケージの大きさと容量)、確認画面の後の `y` でだけ書く。区画表が空のディスクには OS32 の区域
+(開始は LBA 1632 以上の最初のシリンダ境界、256MB まで) を作り、OS32 の区域が 1 つだけのディスクは
+作り直す (中のファイルは消える)。
+
+それ以外 (他の OS の区画・区画が 2 つ以上・LBA 0 に 55AA・開始の違う・壊れた OS32 の項目) には
+そのままでは入れない。このとき LBA 0/1 の要約 (55AA の有無、各区画の mid・sid・名前・開始と終了の
+シリンダ) を出し、消した後の空のディスクとみなして残りの検査 (大きさ・容量・マウント) と確認画面まで
+進む。確認画面には「y の後に ERASE を打てば区画表 (LBA 0 と 1) を消して入れる、hd0 の中身は全部
+失われる」と出る。`y` の後に `Type ERASE:` と聞くので、`ERASE` (大文字 5 文字、完全一致) と Enter を
+打つと LBA 0 と 1 を 0 で埋めて読み戻し、空のディスクとして入れる (**hd0 の他の区画も全部失われる**)。
+`y` の後の最初の行末 (CR・LF・CRLF — 端末が `y` と一緒に送る分も、後から押した Enter も) は `y` の
+行末として読み捨てるので、「`y` + Enter → `ERASE` + Enter」で進む。`[0-3]` の選択も同じで、選択の後の
+最初の行末は選択の行末として捨てる (「`1` + Enter → `y` + Enter」。`Continue? [y/N]` に Enter だけを打てば
+取り消し、`1` の後に Enter を押していなければ 2 回目の Enter)。`Type ERASE:` に Enter だけを
+打てば取り消し (`y` の後に Enter を押していなければ 2 回目の Enter)。
+それ以外の入力 (`N`、`ERASE` でない行、NUL などの制御文字を含む行) は何も書かずに終える。消すのは
+全検査と `y` の後なので、大きさや容量で断るときは区画表も残る。hd0 がルートや `/hd0` 以外に
+マウントされていれば確認の前に断り、`/hd0` にだけマウントされていれば `ERASE` の後に外してから消す。
+`ERASE` の入力を待つ間にマウントが変わった (`/hd0` の相手が替わった・別の場所にマウントされた) など、
+umount を呼ぶ前に断るときは `Nothing was written` のまま。umount を実行した後の失敗・外した後もマウントが
+残るときは消さず format もせずに断り、`Nothing was erased or formatted` と出す — 外す処理 (umount) は
+外す前にファイルシステムを書き出す (sync) ので、`Nothing was written` (1 セクタも書いていない) とは言えない。
+消した後で止まったとき (format の失敗) は `INCOMPLETE` と出し、もう一度実行すれば空のディスクとして
+入れられると案内する。
+
+パッケージはホスト側の `tools/mkpkg.py --plan build/packages.yaml` が
+配備マニフェストのタグから生成する (無圧縮)。
+
+## EXAMPLES
+
+- `cdinst` — 対話形式でインストールを開始
+
+## SEE ALSO
+
+install, mount, format

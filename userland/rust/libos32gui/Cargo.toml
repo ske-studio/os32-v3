@@ -1,0 +1,21 @@
+# libos32gui — Win32 風 GUI ライブラリ (Rust, no_std)
+#
+# 依存の鉄則 (CONTRACTS C8):
+#   - 外部クレート (crates.io) は一切追加しない。
+#   - dependencies は in-repo の os32api (KernelAPI バインディング + libos32gfx の
+#     extern "C" 宣言) のみ。描画は libos32gfx を FFI で呼ぶ。Rust で再実装しない。
+#   - no_std / panic=abort / std・alloc 不使用 (状態は固定長配列とスライスのみ)。
+[package]
+name = "libos32gui"
+version = "0.1.0"
+edition = "2021"
+description = "OS32 Win32-style GUI library (windows / z-order / focus / message dispatch / widgets)"
+
+[lib]
+# staticlib: 将来 C の gshell が liblibos32gui.a を直接リンクして extern \"C\" API を叩く
+# rlib:      Rust のデモ/アプリ (gui_demo) が path 依存として取り込む
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+# in-repo クレートのみ。crates.io からの外部依存はゼロ。
+os32api = { path = "../../../sdk/rust/os32api" }

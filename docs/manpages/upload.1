@@ -1,0 +1,23 @@
+# upload
+
+シリアル経由でファイルをアップロードする
+
+## SYNOPSIS
+
+`upload FILE HEXSIZE`
+
+## DESCRIPTION
+
+RS-232C経由でHEXエンコードされたデータを受信し、
+指定されたファイル名で保存する。サイズは16進数で指定。
+最大64KBまで対応。
+
+ホスト側のスクリプトと連携して使用する。
+
+## EXAMPLES
+
+- `upload test.bin 1000` — 4096バイトのファイルを受信
+
+## SEE ALSO
+
+serial, recv, send

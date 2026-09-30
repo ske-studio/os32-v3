@@ -1,0 +1,388 @@
+# ============================================================================
+#  userland/deploy.yaml — 標準ユーザーランドの配備定義
+#
+#  シェル、コマンド、標準アプリ、テスト、man ページ、および OS 側の
+#  アセット (フォント / FEP 辞書 / filetypes / profile)。
+#
+#  ここに載せ忘れたバイナリは NHD 上で古いまま残る。KAPI レイアウトが
+#  変わると旧バイナリの KAPI 呼び出しが別関数へ飛び、exit 後の jmp $ で
+#  永久スピンして rshell ごと沈黙する。make check-manifests で検査できる。
+#
+#  **tags: は CD のパッケージの振り分けも決める** (build/packages.yaml、
+#  tools/mkpkg.py --plan)。core / base → MINIMAL、gui → GUI、
+#  programs / docs / data → NORMAL、test → DEBUG。MINIMAL は FD の中身と同じ
+#  集合 (FD も同じ構成から作る。core / base に足すと FD にも入る)。userland/tests/ 由来の行は必ず [test] にする (make
+#  check-packages-host が検査する)。行ごとにタグは 1 つ。
+# ============================================================================
+
+filesystem:
+  files:
+    # --- シェル (カーネルは /shell をロードする: config.h SYS_SHELL_BIN) ---
+    - host: userland/shell.bin
+      guest: /sys/shell.bin
+      tags: [core]
+    # --- sh (常駐シェルと同じソースの CPL=3 版、端末から起動する。票 T9 D1) ---
+    - host: userland/sh.bin
+      guest: /bin/
+      tags: [programs]
+    # --- GUI シェル (WM 常駐、config.h SYS_GSHELL_BIN、K4 の起動ループが読む) ---
+    #     GUI.PKG (タグ gui)。Minimal だけの導入では無く、system.cfg の GUI=1 でも
+    #     カーネルが "gshell load failed -> CUI shell" で CUI に落ちる
+    - host: userland/gshell.bin
+      guest: /bin/gshell.bin
+      tags: [gui]
+    # --- GUI 共有ライブラリ (0x400000 常駐、config.h SYS_SHLIB_GUI、K3 のローダが起動時に読む) ---
+    - host: userland/libos32gui.shlib
+      guest: /sys/lib/libos32gui.shlib
+      tags: [gui]
+    # --- システム管理プログラム → /sbin/ ---
+    - host: userland/system/install.bin
+      guest: /sbin/
+      tags: [base]
+    - host: userland/tests/crash.bin
+      guest: /sbin/
+      tags: [test]
+    - host: userland/tests/bench.bin
+      guest: /sbin/
+      tags: [test]
+    - host: userland/tests/restest.bin
+      guest: /sbin/
+      tags: [test]
+    # 終了コードを返すだけの試験バイナリ (票 TASK_EXIT_STATUS §4-2)。
+    # **/usr/bin ではなく /sbin に 1 本だけ**置く — 受入 S2b が
+    # 「1 コピーで実行回数 1」を数えるので、2 か所に置かない。
+    - host: userland/tests/t_exit.bin
+      guest: /sbin/
+      tags: [test]
+    - host: userland/system/cdinst.bin
+      guest: /sbin/
+      tags: [base]
+    # hsync は base (MINIMAL = 起動 FD)。MINIMAL で入れた機械が後から残りを
+    # 取ってこられるように (2026-09-25、MINIMAL = レスキュー兼インストーラ)。
+    # 同期元は /host (HostDrv) なので、今は NP21/W の上でだけ役に立つ
+    - host: userland/system/hsync.bin
+      guest: /sbin/
+      tags: [base]
+    - host: userland/tests/bench_scale2x.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/gfx200_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/gfx_demo200.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/mouse_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/gui_call_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    # --- K2 の完了条件アプリ (計算中の syscall 境界ポンプ、--nokapi で CTRL+STOP 脱出) ---
+    - host: userland/tests/gui_busy.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/blit_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/blit_test2.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/demo_tile.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/tile_bench.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/rotate_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/klibc_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/db_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/dbq.bin
+      guest: /usr/bin/
+      tags: [test]
+    # --- stat_t / test2 (第 1 陣の試験。ビルドはされていたが [V2] の登録が
+    #     漏れていて、ゲストで走らせられなかった。TASK_TEST_RESULT §4) ---
+    - host: userland/tests/stat_t.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/test2.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/faultprobe.bin
+      guest: /usr/bin/
+      tags: [test]
+    # --- ring3_hello (CPL=3 検証, v2 M1) ---
+    - host: userland/tests/ring3_hello.bin
+      guest: /usr/bin/
+      tags: [test]
+    # --- ring3_fault (CPL=3 フォールト kill 検証, v2 M1e) ---
+    - host: userland/tests/ring3_fault.bin
+      guest: /usr/bin/
+      tags: [test]
+    # --- ring3_guard (M3 heap/stack ガード検証) ---
+    - host: userland/tests/ring3_guard.bin
+      guest: /usr/bin/
+      tags: [test]
+    # --- heap_test (子プロセス帯レイアウト検証: sbrk / exec_heap の位置と重なり) ---
+    - host: userland/tests/heap_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    # --- hal_test (KAPI v40 GUI HAL 枠: screen_info / hw_* の NOSYS 確認) ---
+    - host: userland/tests/hal_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    # --- pegcchk (PEGC 640x480 の出入りを画面を見ずに確かめる、票 TASK_PEGC480_REALHW §5) ---
+    - host: userland/tests/pegcchk.bin
+      guest: /usr/bin/
+      tags: [test]
+    # --- hello_r3 (M2 KAPI トランポリン検証, ソース無変更 hello の CPL=3 版) ---
+    - host: userland/tests/hello_r3.bin
+      guest: /usr/bin/
+      tags: [test]
+    # --- faultprobe_r3 (M2e KAPI 版 [ABI4] 検証, faultprobe の CPL=3 版) ---
+    - host: userland/tests/faultprobe_r3.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/math_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/input_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    # --- kbd_echo (票 K7 の I1/I2/I3 — 打鍵を 1 バイトずつ表示する CUI 試験) ---
+    - host: userland/tests/kbd_echo.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/cfg_bench.bin
+      guest: /usr/bin/
+      tags: [test]
+    # --- time_test (票 TASK_HAL_WIRING §1-5 / 受入 W4: µs 時計 sys_time_now の
+    #     CPL=3 受入。カーネル側 kselftest は CPL=0 なのでポインタ契約を踏めない。
+    #     `time_test ro` は**わざとアプリを殺す**ので既定では走らない) ---
+    - host: userland/tests/time_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    # --- pcm_test (票 TASK_PCM_CS4231 §3 E3 / E5: CS4231 再生の CPL=3 受入。
+    #     左 = 1kHz 正弦 / 右 = frame 番号なので、採った PCM から左右の
+    #     取り違えと欠落が見分けられる。`short` / `nodev` の引数あり) ---
+    - host: userland/tests/pcm_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    # --- kout_test (票 TASK_KAPI_OUTPUT_GUARD 受入 G2/G4: 出力ポインタの
+    #     書き込み可検査の CPL=3 受入。正常系 (スタック / ヒープ) が通ることと、
+    #     NULL の意味が変わっていないことを代表 6 本で見る。
+    #     **読み取り専用の shlib .text を渡す**試験はアプリ側から安全に作れない
+    #     ので含まない (PM が NP21/W で手で見る)) ---
+    - host: userland/tests/kout_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    # --- kstr_bench (票 TASK_KSTRING_BENCH: kstring の asm 版と C 版を実機で測る。
+    #     出力は `KSTR ...` の固定書式で、集計は tools/kstr_bench_report.py) ---
+    - host: userland/tests/kstr_bench.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/db_v50_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    # --- host_test (票 N1: KAPI v51 の CPL=3 受入。host_agent.py v2 が対向) ---
+    - host: userland/tests/host_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/asset_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/asset_demo.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/ecs_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/save_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/mgx_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/hello_gfx.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/alloc_demo.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/math_test_rs.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/e2test.bin
+      guest: /sbin/
+      tags: [test]
+    - host: userland/tests/sqlite_standalone/sqlite_standalone.bin
+      guest: /usr/bin/sqlite_standalone.bin
+      tags: [test]
+    # --- LZ4 圧縮/展開コマンド → /bin/ ---
+    - host: userland/system/lz4.bin
+      guest: /bin/lz4.bin
+      tags: [programs]
+    # --- サウンド制御/テスト → /bin/ ---
+    # deploy.yaml に無いバイナリは NHD 上で stale 化し、KAPI レイアウトが
+    # 変わった時に旧バイナリが別関数へ飛んでハングする (2026-08-13 実測)。
+    # PKG 配布物でも起動対象になるものは必ずここに載せること。
+    - host: userland/system/sndctl.bin
+      guest: /bin/sndctl.bin
+      tags: [programs]
+    - host: userland/system/sndtest.bin
+      guest: /bin/sndtest.bin
+      tags: [programs]
+    - host: userland/system/sndtest2.bin
+      guest: /bin/sndtest2.bin
+      tags: [programs]
+    # --- MINIMAL のコマンド (タグ base → CD の MINIMAL = 起動 FD) ---
+    # MINIMAL は「起動して、HDD に入れて、壊れたときに直して、残りを取ってこられる」
+    # レスキュー兼インストーラ (2026-09-25、ユーザー決定)。ここに挙げるのは直すときに
+    # 中身を見る less / grep / hexdump と設定を直す cfg だけ (install / cdinst / hsync は
+    # /sbin の行)。more / find / sort / head / tail / wc / tee / touch / sleep / diff / du /
+    # cal / man は下の glob (programs = NORMAL) に入る。2HD の起動 FD の空きのため
+    # (docs/08_build.md の「起動 FD と MINIMAL」)。
+    # 下の glob から exclude: で外し、ここで 1 本ずつ挙げる。足すときは両方直す
+    # (両方に残れば make check-packages-host がゲストパスの重複で、両方から
+    # 消えれば make check-manifests の 3 が「配備に無いバイナリ」で知らせる)。
+    - host: userland/cmds/less.bin
+      guest: /bin/less.bin
+      tags: [base]
+    - host: userland/cmds/grep.bin
+      guest: /bin/grep.bin
+      tags: [base]
+    - host: userland/cmds/hexdump.bin
+      guest: /bin/hexdump.bin
+      tags: [base]
+    - host: userland/cmds/cfg.bin
+      guest: /bin/cfg.bin
+      tags: [base]
+    # --- 一般プログラム → /bin/ ---
+    - host: "userland/cmds/*.bin"
+      guest: /bin/
+      type: glob
+      exclude:
+        - less.bin  # base (上で個別)
+        - grep.bin  # base (上で個別)
+        - hexdump.bin  # base (上で個別)
+        - cfg.bin  # base (上で個別)
+        - shell.bin
+        - install.bin
+        - cdinst.bin
+        - crash.bin
+        - bench.bin
+        - restest.bin
+        - edit.bin
+        - gfx_demo.bin
+        - demo1.bin
+        - ekakiuta.bin
+        - vbzview.bin
+        - vdpview.bin
+        - mgxview.bin
+        - spr_test.bin
+        - raster.bin
+        - mdview.bin
+      tags: [programs]
+    # --- マニュアルページ → /usr/man/ ---
+    - host: "docs/manpages/*.1"
+      guest: /usr/man/
+      type: glob
+      tags: [docs]
+    # --- ファイルタイプ関連付け ---
+    - host: assets/filetypes
+      guest: /etc/filetypes
+      tags: [core]
+    # --- 設定レジストリの初期値 (正典 tsv。DB は媒体だけが持つ、票 S0-T) ---
+    - host: assets/settings/defaults.tsv
+      guest: /etc/settings.tsv
+      tags: [core]
+    # --- 版 2 の試験 fixture (票 S4 G5)。保護対象でない名前で置き、ゲストで
+    #     `cp /etc/settings.v2.fixture /etc/settings.db` して VERSION 状態を作る ---
+    - host: build/out/settings.v2.fixture
+      guest: /etc/settings.v2.fixture
+      tags: [test]
+    # --- FEP辞書 (SQLite DB) ---
+    - host: assets/fep.db
+      guest: /db/fep.db
+      tags: [data]
+    # --- テスト用ファイル ---
+    - host: userland/tests/data/test.txt
+      guest: /home/user/test.txt
+      tags: [test]
+    - host: userland/tests/data/test_utf8.txt
+      guest: /home/user/test_utf8.txt
+      tags: [test]
+    - host: userland/tests/data/test_pager.txt
+      guest: /home/user/test_pager.txt
+      tags: [test]
+    - host: userland/tests/data/test_script.bat
+      guest: /home/user/test_script.bat
+      tags: [test]
+    - host: userland/tests/data/hello.sh
+      guest: /test/hello.sh
+      tags: [test]
+
+    # --- ビットマップフォント (KCG キャッシュ形式) ---
+    # カーネルが起動時に /sys/font/default.kcgfont を読む
+    # (kernel.c の kcg_load_font)。tools/gen_font16.py で生成する。
+    # **data (NORMAL)。MINIMAL と起動 FD には入れない** (ユーザー決定 2026-09-25)。
+    # 無くても起動は止まらない — 画面に `FONT..NG` と `[KCG] kernel-init load
+    # failed: -1` が出て、漢字・ANK は本体のフォント ROM から読む (drivers/kcg.c。
+    # テキスト画面の文字は元から ROM)。184KB あり、入れていたころは 2HD の FD が
+    # カーネルの 4KB 増で溢れた (docs/08_build.md の「起動 FD と MINIMAL」)。
+    # FD (FAT) に置くなら 8.3 の /sys/font/default.kcg (kernel/boot_font.c)。
+    - host: assets/fonts/ipaexg16.kcgfont
+      guest: /sys/font/default.kcgfont
+      tags: [data]
+    # --- TrueType フォントは配らない (ユーザー決定 2026-09-30) ---
+    # 日本語 OpenType は配布物に同梱せず、使う人が assets/fonts/ipaexg.ttf を
+    # hsync などで /data/ipaexg.ttf に置く (font_test が読む)。サブセット TTF は廃止。
+    # --- フォントテスト ---
+    - host: userland/tests/font_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    # --- GUI デモ (libos32gui) ---
+    - host: userland/tests/gui_demo.bin
+      guest: /usr/bin/
+      tags: [test]
+    # --- GUI v1.2 client API 試験 (C4: modal_result / session_launch / icon16) ---
+    - host: userland/tests/v12_api_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    # --- 端末アプリ (K6C-A: con_sink を吸って端末窓に描く) ---
+    - host: userland/tests/t5a_display.bin
+      guest: /usr/bin/
+      tags: [test]
+    # --- GUI v1.2 File Manager (C5、Start → File Manager が起動する) ---
+    - host: userland/system/filer.bin
+      guest: /usr/bin/
+      tags: [gui]
+    # --- GUI v1.4 テキストエディタ (票 TASK_EDIT_GUI)。CUI 版 edit とは別物 ---
+    - host: userland/system/edit_gui.bin
+      guest: /usr/bin/
+      tags: [gui]
+    # --- GUI v1.4 About OS32 (Start → Programs の about.bin) ---
+    - host: userland/system/about.bin
+      guest: /usr/bin/
+      tags: [gui]
+    # --- GUI G1 ゲート描画テスト (libos32gui) ---
+    - host: userland/tests/gdi_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    # --- GUI C2: パレットリース検証 (W2) と入力→表示の測定器 (契約 P2) ---
+    - host: userland/tests/lease_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/gui_bench.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/font_load_test.bin
+      guest: /usr/bin/
+      tags: [test]
+

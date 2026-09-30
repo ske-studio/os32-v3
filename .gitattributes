@@ -1,0 +1,3 @@
+# ライセンス原文は上流のバイト列のまま保つ (改行コードも変換しない)
+assets/fonts/IPA_Font_License_Agreement_v1.0.txt -text
+assets/ipadic/COPYING -text

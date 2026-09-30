@@ -1,0 +1,20 @@
+# lease_test — パレットのリース (契約 G8) の検証用プログラム (票 C2 作業 9)
+#
+# W2 が `OP_LEASE_PALETTE` を実装するまで WM 側は `OS32_ERR_NOSYS` を返す。
+# ここでは「構造だけ」= フォーカス取得でリースを試み、`Palette{active}` に
+# 応じて自前パレットの絵 / 代替色の絵を描き分けるところまでを作る。
+#
+# os32api の panic_handler / global_allocator を単一実体として取り込むため staticlib。
+[package]
+name = "lease_test"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+os32api = { path = "../../../sdk/rust/os32api" }
+# 票 C3: 本体は 0x400000 常駐の共有ライブラリ。アプリはスタブだけをリンクする
+# (名前は libos32gui のまま — アプリのソースは無変更)。
+libos32gui = { path = "../libos32gui_stub", package = "libos32gui_stub" }

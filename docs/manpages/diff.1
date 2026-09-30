@@ -1,0 +1,24 @@
+# diff
+
+2つのファイルの差分を表示する
+
+## SYNOPSIS
+
+`diff FILE1 FILE2`
+
+## DESCRIPTION
+
+2つのファイルを行単位で比較し、差異のある行を表示する。
+削除された行は `-` で、追加された行は `+` で表示される。
+
+差異がない場合は何も出力せず、終了コード 0 を返す。
+差異がある場合は終了コード 1 を返す。
+
+## EXAMPLES
+
+- `diff old.txt new.txt` — 2ファイルの差分を表示
+- `diff config.bak config` — 設定ファイルの変更点を確認
+
+## SEE ALSO
+
+cat, grep

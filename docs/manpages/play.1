@@ -1,0 +1,30 @@
+# play
+
+MML (Music Macro Language) でFM音源を演奏する
+
+## SYNOPSIS
+
+`play MML`
+
+## DESCRIPTION
+
+FM音源 (YM2203/OPN) を使ってMMLで記述された楽曲を演奏する。
+MML文字列を引数として渡す。
+
+### MML構文
+
+- `CDEFGAB` — 音符 (ド〜シ)
+- `+` / `-` — シャープ / フラット
+- `O4` — オクターブ設定
+- `L8` — デフォルト音長 (8分音符)
+- `T120` — テンポ設定
+- `R` — 休符
+
+## EXAMPLES
+
+- `play CDEFGAB` — ドレミファソラシを演奏
+- `play T120L8O4CCDDEEFF` — テンポ120で演奏
+
+## SEE ALSO
+
+beep

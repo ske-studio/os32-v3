@@ -1,0 +1,23 @@
+# OS32 設定レジストリ 初期値の正典 (assets/settings/defaults.tsv)
+#
+# 書式: scope<TAB>key<TAB>type<TAB>value  — タブ区切りの厳密 4 列。
+#   行全体を strip しない (末尾の空欄はそのまま「空の text」として入る)。
+#   空行と '#' で始まる行は無視する (行頭の判定だけ。行中の '#' は値の一部)。
+#   改行は LF のみ。CR を含む行は拒否する。
+#
+# 規則 (tools/mk_settings_db.py と S2 の C 側 reader が同じ規則で読む):
+#   scope : system / gshell / user / app:<name> (<name> は [a-z0-9_]+)、63B 以内、NUL 不可
+#   key   : [a-z0-9_]+(/[a-z0-9_]+)* の階層名、63B 以内
+#   type  : int / text / blob
+#   value : int  = -?[0-9]+ で int32 の範囲 (-2147483648〜2147483647)
+#           text = UTF-8 として妥当、埋め込み NUL 無し、255B 以内 (空でよい)
+#           blob = hex (偶数桁、空白なし、大文字小文字可、8192 文字 = 4096B 以内)
+#   (scope, key) の重複は拒否する。
+#
+# ここは「初期値の正典」であり、生成した settings.db はインストール媒体 (FDD / CD)
+# だけが持つ。既存システムにはこの tsv を /etc/settings.tsv として通常配備し、
+# DB の生成は `cfg init` (S2) の明示操作だけが行う。
+
+gshell	desktop/color	int	12
+gshell	desktop/wallpaper	text	
+gshell	taskbar/clock_24h	int	1
