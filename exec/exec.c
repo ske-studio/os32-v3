@@ -245,7 +245,9 @@ static u32 *g_cur_frame = 0;
  * 1 枚 = 従来と完全に同じレイアウトになる。
  *
  * RING3_USTACK_TOP 以下は**実行時の値**を返すマクロ。定数式が要る文脈
- * (配列長・static 初期化子・case ラベル) では使えないので注意。 */
+ * (配列長・static 初期化子・case ラベル) では使えないので注意。
+ * RING3_USTACK_TOP は「帯の上端」ではなく「私有領域の上端」(g_ring3_band_top
+ * の注釈): 共有 BB が帯の中にある 8MB + PEGC ではその下 (0x7B5000) になる。 */
 #define RING3_USTACK_TOP     g_ring3_band_top
 /* ユーザスタックサイズ。旧 CPL=0 子プロセスの MEM_EXEC_STACK_SIZE (256KB) に
  * 合わせる (ring3 デフォルト化での深いスタック使用の回帰を避ける)。
@@ -268,19 +270,42 @@ static u32 *g_cur_frame = 0;
 #define RING3_HEAP_TOP_MAX   (RING3_USTACK_TOP_MAX - RING3_USTACK_SIZE - \
                               RING3_GUARD_SIZE)
 
-/* 現在の (= いま起動中/実行中の) CPL=3 アプリのアプリ帯上端。
+/* 現在の (= いま起動中/実行中の) CPL=3 アプリの **私有領域の上端**。
  * 既定は 1 枚ぶん = MEM_APP_BAND_TOP で、CPL=3 アプリが居ない間は必ずこの値。
  * ring3_ptr_ok / argv 積み / USER 写像がすべてここを見るので、
- * 起動失敗・fault kill・正常終了のいずれでも必ず既定へ戻すこと。 */
+ * 起動失敗・fault kill・正常終了のいずれでも必ず既定へ戻すこと。
+ *
+ * **帯の上端 (PDE の所有範囲 = g_ring3_band_pdes 枚 × 4MB) とは別の値**
+ * (2026-09-30)。私有領域 (本体 / sbrk / exec_heap / ガード / スタック) は
+ * 帯の上端と sys_usable_mem_end() の**低い方**までしか使わない。PEGC の
+ * バックバッファ (BB) は sys_reserve_top() が低位 RAM の末尾から切るので、
+ * 8MB 機では [0x7B5000, 0x800000) = 帯 1 枚の中に来る。BB は全アプリ共有で
+ * 恒等 (仮想 = 物理) に写す約束 (gfx_get_framebuffer / pegc_init が同じ
+ * 番地を使う) なので、私有領域の方が BB の下で止まる — 以前は帯の上端
+ * 0x800000 まで私有ページを張ってから BB を恒等で重ねていたため、スタック
+ * 64 + exec_heap 上端 10 = 74 ページの PTE が BB の物理で上書きされ、
+ * teardown で戻らず (起動・終了のたびに used_pages +74、4 本目で NOMEM)、
+ * 走っているアプリのスタックが共有の BB と同じ物理になっていた。
+ * 17MB (BB = 0xEB3000、帯の上) や 9801 planar (BB = 0x6A000、帯の下)、
+ * Cirrus (BB = デバイス窓) では sys_usable_mem_end() >= 帯の上端なので値は
+ * 変わらない。CPL=0 の子のスタック上端 (exec_launch の stack_top = mem_end)
+ * と同じ天井を見ることになる。 */
 static u32 g_ring3_band_top = MEM_APP_BAND_TOP;
 static u32 g_ring3_band_pdes = 1;
 
 static void ring3_band_set(u32 pdes)
 {
+    u32 top, cap;
     if (pdes < 1) pdes = 1;
     if (pdes > MEM_APP_BAND_MAX_PDES) pdes = MEM_APP_BAND_MAX_PDES;
     g_ring3_band_pdes = pdes;
-    g_ring3_band_top = MEM_APP_BAND_BASE + pdes * MEM_APP_BAND_PDE_SIZE;
+    top = MEM_APP_BAND_BASE + pdes * MEM_APP_BAND_PDE_SIZE;
+    /* 私有領域は「割り当ててよい物理の上限」より上へ伸ばさない。BB を含む
+     * 末尾の固定予約 (sys_reserve_top) はこの上にある。ブート後は動かない
+     * 値なので、restore (exec_restore_context) で呼び直しても同じになる。 */
+    cap = sys_usable_mem_end() & ~(u32)(PAGE_SIZE - 1);
+    if (cap < top) top = cap;
+    g_ring3_band_top = top;
 }
 
 /* いま走っている CPL=3 アプリのスロット (0 = 居ない)。かつての
@@ -1111,42 +1136,38 @@ static int app_map_region(struct addrspace *as, u32 vstart, u32 vend)
 /* ======================================================================== */
 /*  exec_map_shared_bb — 共有のバックバッファをアプリ PD へ USER で写す      */
 /*                                                                          */
-/*  BB は恒等 (仮想 = 物理) で写す。PEGC の BB は sys_reserve_top が低位 RAM */
-/*  の末尾から切るので、8MB 機では [0x7B5000, 0x800000) = **アプリ帯の中**  */
-/*  (スタック 64 ページ + exec_heap の上端 10 ページと同じ仮想番地) に来る。 */
-/*  そこへ恒等写像を重ねると、アプリ固有 PT に張った私有ページの PTE を     */
-/*  上書きする — 私有ページ 74 枚は二度と辿れず (exec_teardown_app が返す   */
-/*  のは BB の物理で、pgalloc は予約済みとして黙って断る)、起動と終了の     */
-/*  たびに池が 74 ページずつ減り、スタックは共有の BB と同じ物理になる      */
-/*  (2026-09-30、8MB + PEGC で used_pages が 330 → 404 → 478 → NOMEM)。    */
+/*  BB は**恒等 (仮想 = 物理) のまま丸ごと**写す — gfx_get_framebuffer() が   */
+/*  返す番地・pegc_init のクリア・libos32gfx / shlib の Painter が全部この    */
+/*  番地で BB を触るので、番地を変えたり一部を写さなかったりはできない。     */
+/*  map_user_range ではなく **_keep** — Cirrus のクライアント面は PCD 付きの  */
+/*  デバイス窓で、flags をそのまま書くと PCD が落ちる (レビュー #5 ②③)。     */
 /*                                                                          */
-/*  アプリ帯 [MEM_APP_BAND_BASE, band_top) はアプリ固有 PT の領分なので、   */
-/*  BB のうち帯と重なる部分は写さない (帯の外の部分だけを写す)。重なった   */
-/*  ページ数は exec_bb_clipped_pages に残す (PM が emu_read_mem で読む)。  */
+/*  BB が私有領域 [MEM_APP_BAND_BASE, user_top) と重なるなら写さずに -1。     */
+/*  ring3_band_set が私有領域の上端を sys_usable_mem_end() で止めているので   */
+/*  通常は起きない (8MB + PEGC の BB [0x7B5000, 0x800000) は user_top の上)。 */
+/*  重なったまま写すと私有ページの PTE を BB の物理で上書きし、teardown で   */
+/*  戻らなくなる (2026-09-30 の 74 ページ漏れ) ので、黙って写すより断る。    */
+/*  帯の中でも私有領域の上 (8MB + PEGC) はアプリ固有 PT に、帯の外はその PD  */
+/*  が master と共有する PT に書く — どちらも teardown が返す 3 領域の外。   */
 /* ======================================================================== */
-volatile u32 exec_bb_clipped_pages = 0;
-
-static void exec_map_shared_bb(struct addrspace *as, u32 bb_base,
-                               u32 bb_size, u32 band_top)
+static int exec_bb_overlaps_user(u32 bb_base, u32 bb_size, u32 user_top)
 {
-    u32 bb_end, lo_end, hi_first, clip_lo, clip_hi;
-
-    exec_bb_clipped_pages = 0;
-    if (!bb_size || bb_base > ~0UL - bb_size) return;
+    u32 bb_end;
+    if (!bb_size || bb_base > ~0UL - bb_size) return 0;
     bb_end = bb_base + bb_size;
-    /* 帯より下の部分 */
-    lo_end = (bb_end < MEM_APP_BAND_BASE) ? bb_end : MEM_APP_BAND_BASE;
-    if (bb_base < lo_end)
-        paging_addrspace_map_user_keep(as, bb_base, lo_end, PAGE_RW | PTE_USER);
-    /* 帯より上の部分 */
-    hi_first = (bb_base > band_top) ? bb_base : band_top;
-    if (hi_first < bb_end)
-        paging_addrspace_map_user_keep(as, hi_first, bb_end, PAGE_RW | PTE_USER);
-    /* 帯と重なって写さなかった部分 */
-    clip_lo = (bb_base > MEM_APP_BAND_BASE) ? bb_base : MEM_APP_BAND_BASE;
-    clip_hi = (bb_end < band_top) ? bb_end : band_top;
-    if (clip_lo < clip_hi)
-        exec_bb_clipped_pages = (clip_hi - clip_lo) / PAGE_SIZE;
+    return (bb_base < user_top && bb_end > MEM_APP_BAND_BASE) ? 1 : 0;
+}
+
+static int exec_map_shared_bb(struct addrspace *as, u32 user_top)
+{
+    u32 bb_base = 0, bb_size = 0;
+
+    gfx_bb_phys_range(&bb_base, &bb_size);
+    if (exec_bb_overlaps_user(bb_base, bb_size, user_top)) return -1;
+    if (bb_size)
+        paging_addrspace_map_user_keep(as, bb_base, bb_base + bb_size,
+                                       PAGE_RW | PTE_USER);
+    return 0;
 }
 
 /* ======================================================================== */
@@ -1161,7 +1182,9 @@ static void exec_map_shared_bb(struct addrspace *as, u32 bb_base,
 /*  ガードページ (guard_a / guard_b) は「張っていない = 非 present」なので     */
 /*  返すものが無い。共有帯 (VRAM / SHM / フォント / GFX / トランポリン) は     */
 /*  paging_addrspace_free_user_range がアプリ固有 PDE の外を触らないので       */
-/*  巻き添えにならない。 */
+/*  巻き添えにならない。band_top は**私有領域の上端** (ring3_band_set) で、    */
+/*  帯の中でもその上にある共有 BB (8MB + PEGC の [0x7B5000, 0x800000)) は     */
+/*  3 領域のどれにも入らない — PTE を辿って BB の物理を返そうとはしない。    */
 /* ======================================================================== */
 static void exec_teardown_app(AppSlot *a)
 {
@@ -1940,8 +1963,6 @@ static int exec_launch(const char *cmdline, int gui_arg)
 
     /* ======== CPL=3: アドレス空間と per-app 物理 (D1) ======== */
     if (want_ring3) {
-        u32 bb_base = 0, bb_size = 0;
-
         if (paging_addrspace_create_n(&ctx->as, g_ring3_band_pdes) != 0) {
             shell_print("Error: ring3 addrspace create failed\n", ATTR_RED);
             exec_restore_band(launcher_id);
@@ -1994,11 +2015,13 @@ static int exec_launch(const char *cmdline, int gui_arg)
             (u32)MEM_GFX_BB_BASE,
             (u32)MEM_GFX_BB_BASE + (u32)MEM_GFX_BB_SIZE,
             PAGE_RW | PTE_USER);
-        /* いま選ばれているバックエンド固有の面を足す。map_user_range では
-         * なく **_keep** — Cirrus のクライアント面は PCD 付きのデバイス窓で、
-         * flags をそのまま書くと PCD が落ちる (レビュー #5 ②③)。 */
-        gfx_bb_phys_range(&bb_base, &bb_size);
-        exec_map_shared_bb(&ctx->as, bb_base, bb_size, ctx->band_top);
+        /* いま選ばれているバックエンド固有の面 (gfx_bb_phys_range) を恒等の
+         * まま丸ごと足す (exec_map_shared_bb の注釈)。私有領域と重なるなら
+         * 起動を断る — 重ねて写すと私有ページの PTE が消える。 */
+        if (exec_map_shared_bb(&ctx->as, ctx->band_top) != 0) {
+            shell_print("Error: backbuffer overlaps app area\n", ATTR_RED);
+            return exec_launch_abort(launcher_id, id, EXEC_ERR_NOMEM);
+        }
         /* KAPI トランポリンページ (RO+USER, 全PD共有) */
         paging_addrspace_map_user(&ctx->as, ring3_tramp_page,
             ring3_tramp_page, PAGE_RO | PTE_USER);
