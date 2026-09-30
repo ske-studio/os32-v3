@@ -5,8 +5,8 @@
 # artifact の API ダウンロードには認証が要る)。
 #
 # 使い方:
-#   tools/ci_fetch.sh [--branch feat/gui] [--sha SHA] [--dir DIR] [--repo OWNER/REPO] [--dry-run]
-#     --branch  最新の成功した run をこのブランチから選ぶ (既定 feat/gui)
+#   tools/ci_fetch.sh [--branch main] [--sha SHA] [--dir DIR] [--repo OWNER/REPO] [--dry-run]
+#     --branch  最新の成功した run をこのブランチから選ぶ (既定 main)
 #     --sha     このコミットの成功 run を選ぶ (短縮 SHA 可。--branch と併用すると両方で絞る)
 #     --dir     保存先の親 (既定 ./os32-ci)。中に artifact 名のディレクトリを作る
 #     --dry-run 選んだ run と artifact を表示するだけでダウンロードしない
@@ -15,9 +15,9 @@
 #             2 = gh が無い / 未認証 / 引数誤り
 set -euo pipefail
 
-REPO="ske-studio/os32"
+REPO="ske-studio/os32-v3"
 WORKFLOW="build.yml"
-BRANCH="feat/gui"
+BRANCH="main"
 BRANCH_SET=0
 SHA=""
 DIR="./os32-ci"
