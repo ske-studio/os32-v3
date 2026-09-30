@@ -1,6 +1,8 @@
 # TASK_T1_LEDGER — T1: 物理地図と所有権台帳 (設計票)
 
-> 状態: **設計中 (2026-09-30) — 設計承認、T1a の実装待ち**。Codex (gpt-6-astra) の設計レビュー 3 往復 + ユーザー決定 (上限到達、残り 2 件を Codex の示した形で直し差分だけ確認) の確認で **Approve** (2026-09-30、`5ef0087`)。
+> 状態: **実装中 (2026-09-30) — T1a 実装済み、NP21/W 回帰は PM** (`wt/t1a`、コーダー `claude-opus-5-5`、結果は §4-1-R)。
+>
+> それまでの状態: **設計中 (2026-09-30) — 設計承認、T1a の実装待ち**。Codex (gpt-6-astra) の設計レビュー 3 往復 + ユーザー決定 (上限到達、残り 2 件を Codex の示した形で直し差分だけ確認) の確認で **Approve** (2026-09-30、`5ef0087`)。
 >
 > それまでの状態: **設計中 (2026-09-30) — Codex 3 回目の 2 件を反映、差分確認待ち**。3 回目の B10 継続・B12 と P3 を Codex が示した形で反映 (往復の上限に達したため、ユーザー決定 2026-09-30: 差分だけを Codex に確認させて確定)。P1 メモリマップ再構築の 2 番目の票 T1 の設計票。ユーザーが T1 の着手を承認 (2026-09-30)。範囲は [TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) §6 の **T1 の行**で、決定 D1〜D36 は再議論しない。段の分割は T1a〜T1f (§4、**Codex B5 で T1a と T1b の順を入れ替えた**: モデル経路の一本化が先、台帳の核が後)。Codex との突き合わせは 3 回目まで済み (§6-2 / §6-3 / §6-4 に所見と対応)、3 回目の反映の差分確認待ち。コードは未着手。
 >
@@ -377,6 +379,24 @@ static inline u32  V2P(const volatile void *va) { return (u32)(uptr)va; }
 | 変異 | 置き場の境界を 1 ページずらす → リンク ASSERT か地図検査 (`gen_memmap.py --check`) か試験が止める (§7 全構成の行)。`sys_frozen_exec` を `workspace_first` に戻す → 8MB のホスト試験が止める |
 | NP21/W / 実機 | **8MB (`ram-8mb`) で planar と PEGC の両方** GUI 起動と GUI アプリ 1 本、**8MB で `sys_usable_mem_end() == 0x800000` を番地で読み、CPL=3 アプリ (`v86 -t` は CPL=3 なのでこちら) と CPL=0 の子 `cpl0_probe` (CUI から) が起動する** (B2。`v86 -t` は CPL=0 claim の受入にならない — Codex 2 回目 P3)、17MB (`ram-15mb`)、32MB / 128MB (`ram-32mb` / `ram-128mb`)、**Ra266 64MB** で起動 kselftest 0 fail と model ONLINE を番地で読む (D32 の受入) |
 | 大きさ | カーネル本体の増分を測って票に書く (予算 13.0KB、§5 T1-R1)。`legacy_metadata` 1KB と `pgalloc_init` の撤去で減る側 |
+
+#### 4-1-R. T1a の実装結果 (2026-09-30、`wt/t1a`、コーダー `claude-opus-5-5`)
+
+**大きさ** (予算 13.0KB に対して): `__bss_end` 0x191C20 → **0x191820 (−1,024B)**、カーネル本体 583.0KB → **582.0KB (残り 14.0KB)**。内訳は `.text` +432B (FIXED 型の検証経路・`paging_map_ledger_backing`・`pgalloc_arena_end`・kselftest 2 件)、`.data` +40B、`.bss` −1,024B (`legacy_metadata`)。`pgalloc_init` の撤去で減った分は `.text` の中で相殺。
+
+**U24 (0594h) の照合**: `docs/hw` の UNDOCUMENTED (`undocumented/memsys.md`) は 0000:0594h (WORD) を「1000000h (16MB) 以降の使用可能プロテクトモードメモリの容量、単位 MB」とし、有効な機種を PC-H98・PC-9821Af 以降の PC-9821・PC-9801BA2/BS2/BX2/BA3/BX3/BX4 としている — `memory_boot_detect` の読み方 (MB 単位、16MB 以降) と**一致**。Bible (`PC9800Bible/`) には 0594h の記載が無い (矛盾なし)。注意点が 2 つ: (1) 16MB 超対応の HIMEM.SYS は組み込み時にここを 0000h にする (一部の非対応版も 0 にする) — OS32 は自前のローダで起動し HIMEM を通らないので影響しない。(2) 上の機種以外では値の意味が保証されない — 書き込み検証 (1MB ごと + 別名の 2 巡目) があるので「無かった RAM」側にしか切り詰めない。**登録源は変えない** (0594h + 書き込み検証のまま)。あわせて 0401h の最大は 70h (14MB)、「16MB システム空間を使用しない」設定のときだけ 78h (15MB) — 15〜16MB を常にシステム空間として扱う今の設計と矛盾しない。
+
+**ホスト試験** (`test_memory_boot.py`): FIXED = 8MB・9MB・12MB・3,073 PFN、ARENA_TOP = 3,074 PFN・15MB・16MB、高位 = 17MB・32MB・33MB・64MB・128MB、D11 = 3GB の申告 (登録は 2GB で頭打ち、`[2GB, 4GB)` は MMIO)。全部 model で ONLINE。FIXED は backing が `[0x2F9000, 0x2FB000)` で L0 RESERVED、`pgalloc_arena_end()` = 低位 RAM の上端 (8MB で `sys_usable_mem_end() == 0x800000`)、ARENA_TOP は `pgalloc_arena_end() == workspace_first`。FIXED の拒否 (RAM 側・範囲外 2 通り・ws 範囲外・metadata と ws の重なり・知らない種類・8MB の ARENA_TOP・置き場が模型で RAM (metadata 側 / ws 側)) は全件不変。grep 検査: legacy の関数・`legacy_metadata`・`PGALLOC_BASE` が無い、`reserve_table` が workspace だけ、`physmem_add_trusted` の呼び手は `memory_boot.c` の 1 か所 (`PHYSMEM_SOURCE_MACHINE`)。集積域・同梱域は定数の関係 (1MB ずつ・整列・隣接・8MB 内・shlib 帯より上) だけ (下の訂正 3)。
+**変異** (`test_memory_boot.py --mutate`、`check-memory-host` で `$(MUT)`): §4-1 の 2 本 (置き場の境界を 1 ページずらす — BASE / END の 2 通り、STATIC_ASSERT でコンパイル不可 / `sys_frozen_exec` を `workspace_first` に戻す — 8MB で fail) + FIXED/ARENA_TOP 境界 ±1・backing の張り忘れ・FIXED の RAM 拒否 2 本 = **7/7 RED**。`test_memmap_boot.py --mutate` に `ledger-blind` (backing の期待値を NP のまま) を足して 5/5 RED。
+**kselftest**: `pool:model online` (`pgalloc_model_state() == PGALLOC_ONLINE`)、`pool:exec range` (`sys_usable_mem_end()` ≥ exec の最小域)。backing の RW / USER なしは MM 検査 (`memmap_want_at` が FIXED のときだけ MM_RW を期待、T1-U1)。
+
+**実装時の訂正** (設計と実物の食い違い):
+1. **backing を張る時点**: §3-3 ② は `paging_init` と書いたが、FIXED / ARENA_TOP の判定は ③ (`memory_boot_init`) で決まるので、③ の中で bootstrap の直前に `paging_map_ledger_backing()` で張る (ブート文脈 = master CR3・live AS 0 の中、`paging_init` の後)。効果は同じ (FIXED のときだけ present、0x2F8000 は NP)。
+2. **`MEM_HIGH_RAM_BASE` は既存** (K6)。`MEM_PHYS_RAM_CEILING` も既存で `MEM_DEVICE_APERTURE_BASE` (0xFE000000) の別名だったのを 0x80000000 に変えた (`test_physmem.py` の等式も直した)。
+3. **集積域・同梱域の規則の試験 (bootinfo の申告あり / なし / 範囲外)** は T1a では書けない: bootinfo に同梱の申告欄が無く、規則そのもの (owner=bundle の予約) は §1-1 #7 で T1b の区間の登録。T1a は定数と静的な関係の試験だけ。規則と申告ありの試験は T1b へ。
+4. **ホスト試験の足場**: 8 本のハーネスが旧 `pgalloc_init` を「メモリ量 kb の池を作る」足場に使っていたので `tools/tests/pgalloc_host_fixture.h` (試験の私有状態を直接組む、製品に口は足さない) に置き換えた。`paging_rebuild_host.c` の sparse / attrs / final (撤去した legacy の探索だけを突く、`make check` 未結線) は撤去し、nonmaster / rollback は workspace で組み直した。
+5. **exec の最小域に満たない機械** (低位 RAM の上端 < 0x590000) は fail-stop になる (旧 legacy は小さな池で起動していた)。8MB 以上は影響なし。
+6. **`cpl0_probe` は `sys_usable_mem_end()` を KAPI で読めない** (その KAPI は無く、足さない)。CPL=0 の子のスタック上端 = `sys_usable_mem_end()` (`exec.c` の `stack_top = mem_end`) なので、ESP をページへ切り上げた値を `usable_end` として表示する。
 
 ### 4-2. T1b — 台帳の核: owner・区間の表・R1 の計数・R5 / R7 (旧 T1a)
 
