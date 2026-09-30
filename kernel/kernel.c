@@ -583,8 +583,13 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     /* ⑥-0 (TASK_T1_LEDGER §3-3、B4): pci_init は台帳より前に走るので、g_pci の
      * メモリ BAR をここで資源表へ RAW (採取値、予約権限なし) として取り込む。
      * 実機では [pci] の行のメモリ BAR の本数と raw= が一致し ovf=0 のこと。 */
-    kprintf(TATTR_WHITE, "[ledger] pci raw=%u ovf=%u\n",
-            ledger_resource_import_pci(), ledger_res_overflow);
+    {
+        /* 取り込みを先に済ませてから溢れを読む (引数の評価順は決まっていない)。 */
+        u32 pci_raw;
+        pci_raw = ledger_resource_import_pci();
+        kprintf(TATTR_WHITE, "[ledger] pci raw=%u ovf=%u\n",
+                pci_raw, ledger_res_overflow);
+    }
     pci_bind_set_line_state_hook(kernel_pci_line_bits);
     pci_bind_all(pci_drivers, PCI_DRIVER_COUNT);
 

@@ -11,9 +11,10 @@ kernel/ledger_pci.c を丸ごと、drivers/pci.c からは読み口 pci_get だ�
 irq_restore の度に L1 / L2 の不変条件を全ページ検査する — test_ledger.py と同じ
 足場)。見るもの:
 
-  - X4 の 6 項目: 第二 span の衝突、台帳満杯 (区間の表・資源の表)、同 owner の
-    部分一致の拒否、丸めによる衝突、map / probe 失敗後の永久保持、モジュール
-    回収後の予約保持
+  - X4 の項目: 第二 span の衝突、台帳満杯 (区間の表・資源の表)、同 owner の
+    部分一致の拒否、丸めによる衝突、モジュール回収後の予約保持。「map / probe
+    失敗後の永久保持」はここでは予約の側 (解除口が無く再試行が冪等) だけで、
+    実際に map / probe を失敗させて予約と写像が残ることは T1e の統合試験で見る
   - BACKGROUND (15〜16MB、2GB〜4GiB) に重なる予約は通り、FIXED / STAGING /
     BUNDLE / DMA / SURFACE_BACKING に重なる予約は拒否 (P3)
   - B3: PEGC と Xe10 の実範囲を同 owner で 1 回に入れると併合されて通り、
@@ -24,7 +25,8 @@ irq_restore の度に L1 / L2 の不変条件を全ページ検査する — tes
   - Trident 型 (資源 4 本・1 owner) と 82557 型 (資源 2 本) の合成要求
   - RAW / PROBE_UNVERIFIED は予約権限にならない
   - 合成 g_pci からの取り込み (メモリ BAR だけ、I/O と 0 を除く、64 ビットの
-    上位、ブリッヂの 18h 以降、溢れは res_overflow、RAW は予約に使えない、B4)
+    上位、ブリッヂの 18h 以降、未知のヘッダ型、溢れは res_overflow、RAW は予約に
+    使えない、B4) と、kernel.c の実物の表示の経路 (取り込みの後の溢れを出す)
   - 失敗時は L1・L2・区間の表・資源の表・会計が全部不変 (表は中身まで比べる)
   - 実 paging + sys + pgalloc の段つき起動で RAM + 窓の一括予約 (段の試験)
 
@@ -43,7 +45,8 @@ import test_ledger as L  # noqa: E402
 
 ROOT = L.ROOT
 SOURCES = ('kernel/pgalloc.c', 'tools/tests/pgalloc_host_fixture.h',
-           'kernel/ledger_pci.c', 'drivers/pci.c', 'kernel/paging.c', 'kernel/sys.c')
+           'kernel/ledger_pci.c', 'drivers/pci.c', 'kernel/paging.c', 'kernel/sys.c',
+           'kernel/kernel.c')
 
 
 def load(mutation=None):
@@ -63,6 +66,13 @@ def pci_reader(pci_c):
     return head + body.split('\n}\n', 1)[0] + '\n}\n'
 
 
+def print_path(kernel_c):
+    """kernel/kernel.c の ⑥-0 (取り込み + [ledger] の 1 行) の塊を切り出す。"""
+    head = '    {\n        /* 取り込みを先に済ませてから溢れを読む'
+    body = kernel_c.split(head, 1)[1]
+    return head + body.split('\n    }\n', 1)[0] + '\n    }\n'
+
+
 # 合成 g_pci・切り出した列挙・台帳の取り込み・試験の足場 (ファイル有効範囲)
 EXTRA = r'''
 #include "pci.h"
@@ -70,6 +80,15 @@ static struct pci_dev g_pci[PCI_MAX_DEVS];
 static int g_pci_count;
 @PCI_READER@
 @LEDGER_PCI@
+/* kernel.c の ⑥-0 の塊を実物のまま走らせ、表示に渡った値を控える */
+#define TATTR_WHITE 0
+static u32 kp_raw, kp_ovf, kp_calls;
+static void kprintf(int attr, const char *fmt, u32 raw, u32 ovf) {
+    (void)attr; (void)fmt; kp_raw = raw; kp_ovf = ovf; kp_calls++;
+}
+static void host_print_path(void) {
+@PRINT_PATH@
+}
 static struct ledger_region snap_reg[LEDGER_MAX_REGIONS];
 static struct ledger_resource snap_res[LEDGER_MAX_RESOURCES];
 static void snap2(void) {
@@ -364,8 +383,10 @@ BODIES['region_table_full'] = r'''
     CHECK(ledger_reserve_set(GFX, sp, 1));      /* 満杯でも完全一致は冪等 */
 '''
 
-# map / probe 失敗後の永久保持と、モジュール回収後の予約保持。
-BODIES['permanent_after_failure_and_reclaim'] = r'''
+# 予約の冪等な再試行 (解除口が無いこと) と、モジュール回収後の予約保持。
+# map / probe を実際に失敗させる経路と写像 (PTE) の保持は、予約の呼び手ができる
+# T1e の統合試験で見る (ここは予約の側だけ — Codex P3)。
+BODIES['retry_and_reclaim'] = r'''
     u32 r, m, pfn, got, total;
     struct ledger_span sp;
     host_pool_boot(8192);
@@ -377,8 +398,8 @@ BODIES['permanent_after_failure_and_reclaim'] = r'''
     total = pgalloc_total_pages();
     CHECK(ledger_reserve_set(GFX, &sp, 1));
     CHECK(pgalloc_total_pages() == total - 100);
-    /* 写像 (paging_map_phys) や probe が失敗したとしても予約を戻す口は無い:
-     * 区間は残り、再試行は完全一致で冪等 */
+    /* 予約を戻す口は無く、再試行は完全一致で冪等 (map / probe の失敗そのもの
+     * は T1e の統合試験) */
     snap2();
     CHECK(ledger_reserve_set(GFX, &sp, 1) && same2());
     CHECK(!pgalloc_alloc_n_owner(K, 1, 1600, 1700, LEDGER_BOTTOM_UP, &pfn));
@@ -495,7 +516,9 @@ BODIES['import_pci'] = r'''
     g_pci[2].dev = 11; g_pci[2].fn = 1; g_pci[2].vendor = 0x8086; g_pci[2].device = 0x1229;
     g_pci[2].bar[0] = 0x30000004UL; g_pci[2].bar[1] = 1; g_pci[2].bar[2] = 0x8;
     g_pci[2].bar[3] = 0x20A00006UL; g_pci[2].bar[4] = 0x20410000UL;
-    g_pci_count = 3;
+    /* 0:12.0: 未知のヘッダ型 (0x05) は BAR を読まない */
+    g_pci[3].dev = 12; g_pci[3].header = 0x05; g_pci[3].bar[0] = 0x20B00000UL;
+    g_pci_count = 4;
     CHECK(ledger_resource_import_pci() == 4 && host_resources() == 4 && ledger_res_overflow == 0);
     q = &ledger_resources[0];
     CHECK(q->bus == LEDGER_BUS_PCI && q->width_basis == LEDGER_WB_RAW && q->bar == 1);
@@ -516,7 +539,9 @@ BODIES['import_pci'] = r'''
     rec.bus = LEDGER_BUS_FIXED; rec.width_basis = LEDGER_WB_DATASHEET;
     for (i = host_resources(); i < LEDGER_MAX_RESOURCES - 1; i++)
         CHECK(ledger_resource_add(&rec, &rid));
-    CHECK(ledger_resource_import_pci() == 1 && ledger_res_overflow == 3);
+    /* 起動の表示の経路 (kernel.c の実物): 取り込みの後の溢れを出す (Codex P2) */
+    host_print_path();
+    CHECK(kp_calls == 1 && kp_raw == 1 && kp_ovf == 3 && ledger_res_overflow == 3);
     CHECK(host_resources() == LEDGER_MAX_RESOURCES);
     /* PCI が無い (NP21/W) なら 0 本 */
     g_pci_count = 0;
@@ -527,7 +552,8 @@ BODIES['import_pci'] = r'''
 def run_c(texts, body):
     """本体を組んで実行し、(成功, 出力) を返す。"""
     extra = (EXTRA.replace('@PCI_READER@', pci_reader(texts['drivers/pci.c']))
-             .replace('@LEDGER_PCI@', texts['kernel/ledger_pci.c']))
+             .replace('@LEDGER_PCI@', texts['kernel/ledger_pci.c'])
+             .replace('@PRINT_PATH@', print_path(texts['kernel/kernel.c'])))
     post = L.POST.replace('static int test(void) {', extra + 'static int test(void) {', 1)
     with tempfile.TemporaryDirectory(prefix='os32-devres-') as tmp:
         tmp = pathlib.Path(tmp)
@@ -614,8 +640,8 @@ class DeviceReservation(unittest.TestCase):
     def test_region_table_full(self):
         self.run_body('region_table_full')
 
-    def test_permanent_after_failure_and_reclaim(self):
-        self.run_body('permanent_after_failure_and_reclaim')
+    def test_retry_and_reclaim(self):
+        self.run_body('retry_and_reclaim')
 
     def test_ram_and_live_collision(self):
         self.run_body('ram_and_live_collision')
@@ -698,8 +724,17 @@ MUTATIONS = [
      '            if (k == PCI_BAR_MEM64 && (b + 1 >= nb || d.bar[++b])) continue;',
      '            if (k == PCI_BAR_MEM64 && (b + 1 >= nb || !d.bar[++b])) continue;'),
     ('import-bridge-all-six', 'kernel/ledger_pci.c',
-     '             layout == PCI_HDR_LAYOUT_BRIDGE ? 2 : 1;',
-     '             layout == PCI_HDR_LAYOUT_BRIDGE ? PCI_CFG_BAR_COUNT : 1;'),
+     '    PCI_CFG_BAR_COUNT, 2, 1\n', '    PCI_CFG_BAR_COUNT, PCI_CFG_BAR_COUNT, 1\n'),
+    ('import-unknown-header-read', 'kernel/ledger_pci.c',
+     'ledger_pci_bars[layout] : 0;', 'ledger_pci_bars[layout] : 1;'),
+    ('print-overflow-before-import', 'kernel/kernel.c',
+     '        pci_raw = ledger_resource_import_pci();\n'
+     '        kprintf(TATTR_WHITE, "[ledger] pci raw=%u ovf=%u\\n",\n'
+     '                pci_raw, ledger_res_overflow);\n',
+     '        u32 early = ledger_res_overflow;\n'
+     '        pci_raw = ledger_resource_import_pci();\n'
+     '        kprintf(TATTR_WHITE, "[ledger] pci raw=%u ovf=%u\\n",\n'
+     '                pci_raw, early);\n'),
     ('import-overflow-counted-as-added', 'kernel/ledger_pci.c',
      '            if (ledger_resource_add(&r, &rid)) n++;',
      '            ledger_resource_add(&r, &rid); n++;'),

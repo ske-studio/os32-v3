@@ -18,11 +18,16 @@
  * 1 本ずつ RAW のレコードにする。I/O BAR・生値 0・予約種別は飛ばす。64 ビット
  * BAR は次の BAR が上位 32 ビットなので、上位が 0 のときだけ取り、次の BAR を
  * 飛ばす (4GiB 以上は表せない)。BAR の本数はヘッダの型で Type 0 = 6、
- * ブリッヂ = 2、他 (CardBus) = 1 (ブリッヂの 18h 以降はバス番号と窓の設定で
- * BAR ではない)。RAW は幅が未確定なので decode は空 (decode_first ==
+ * ブリッヂ = 2、CardBus = 1、未知の型は 0 (ブリッヂの 18h 以降はバス番号と
+ * 窓の設定で BAR ではない)。RAW は幅が未確定なので decode は空 (decode_first ==
  * decode_end = BAR の先頭 PFN)、写像範囲も空。revision は g_pci に無いので 0。
  * 表が溢れた分は ledger_resource_add が ledger_res_overflow に数える。
  * 載せた本数を返す。 */
+/* ヘッダの型 (PCI_HDR_LAYOUT_DEVICE / BRIDGE / CARDBUS) ごとの BAR の本数。 */
+static const u8 ledger_pci_bars[PCI_HDR_LAYOUT_CARDBUS + 1] = {
+    PCI_CFG_BAR_COUNT, 2, 1
+};
+
 u32 ledger_resource_import_pci(void)
 {
     struct pci_dev d;
@@ -32,8 +37,7 @@ u32 ledger_resource_import_pci(void)
     n = 0;
     for (i = 0; pci_get(i, &d) == 0; i++) {
         layout = pci_header_layout(d.header);
-        nb = layout == PCI_HDR_LAYOUT_DEVICE ? PCI_CFG_BAR_COUNT :
-             layout == PCI_HDR_LAYOUT_BRIDGE ? 2 : 1;
+        nb = layout <= PCI_HDR_LAYOUT_CARDBUS ? ledger_pci_bars[layout] : 0;
         for (b = 0; b < nb; b++) {
             idx = b;
             raw = d.bar[b];
