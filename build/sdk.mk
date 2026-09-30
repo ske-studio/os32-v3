@@ -182,6 +182,7 @@ check-memory-host:
 	python3 -B tools/tests/test_memory_boot.py $(MUT)
 	python3 -B tools/tests/test_device_reservation.py
 	python3 -B tools/tests/test_sbrk_tier.py
+	python3 -B tools/tests/test_app_bb_overlap.py $(MUT)
 
 # 記録: tools/tests/memmap_tdd.md (票 docs/archive/kernel_v21/TASK_KSTACK_USER.md)
 #

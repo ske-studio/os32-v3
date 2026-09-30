@@ -657,6 +657,7 @@ checks:
     - kernel/physmem.h
     - kernel/sys.c
     - tools/tests/app_band_pde_host.c
+    - tools/tests/app_bb_overlap_host.c
     - tools/tests/device_reservation_stage_host.c
     - tools/tests/highram_stage_host.c
     - tools/tests/host_arch/arch_cpu.h
@@ -665,6 +666,7 @@ checks:
     - tools/tests/pgalloc_range_host.c
     - tools/tests/sbrk_tier_host.c
     - tools/tests/test_app_band_pde.py
+    - tools/tests/test_app_bb_overlap.py
     - tools/tests/test_device_reservation.py
     - tools/tests/test_highram_stage.py
     - tools/tests/test_memory_boot.py
@@ -696,6 +698,7 @@ checks:
     - kernel/sysconfig.h
     - kernel/tss.h
     - kernel/v86.h
+    - kernel/v86_mem.h
     - arch/x86/arch_cpu.h
     - arch/x86/arch_io.h
     - drivers/atapi.h
