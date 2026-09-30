@@ -530,3 +530,35 @@ PS の変更 (`OpenShared`・`WriteReceipt`・`replace` の順序) は静的な�
 (`--windows-fixtures`) も未実行。原因の「共有違反」は推定で、実機で失敗時の例外を観測していない
 (PS は例外文を出さない設計)。再起動直後に NHD が掴まれている場合 (§4-60) の NP21/W 側の起動の失敗は、この道具は
 待たない (NHD のパスを知らない) — 別件。
+
+### Codex レビュー (296a360、Request changes) への対応
+
+- **P2-1 同じバイト列の別ファイルを適用結果として採る**: 置換後の読み戻しが共有違反で待っている間に、
+  同じバイト列でファイル ID の違う B に差し替わると、バイトの一致だけで合格し、B の識別情報が `applied` になっていた。
+  → PS の `NewFile` が読み戻しのスナップショットを返すようにし、`replace` は候補 (一時ファイル) の
+  volume:IndexHigh:IndexLow (`FileKey`) と置換後の読み戻しのそれを照合する (`ReplaceFile` は候補の ID を残す)。
+  違えばレシートを書かずに固定の理由コード `{"ok":false,"reason":"candidate-identity"}` を返す
+  (例外文は従来どおり出さない)。`WindowsExecutor` はそれを `readback identity differs from the candidate
+  (no receipt written)` に訳す。`replace` の戻り値は `{applied, candidate}` になり、Python 側も
+  `file_key(applied.signature) == candidate` を実行時に再確認する (PS の検査が壊れていても再起動・receipt 案内に進まない)。
+  他の `NewFile` の呼び手は `$null =` で戻り値を捨てる (応答への混入を防ぐ)。
+- **P2-2 待機中に入った reparse point を追う**: `CheckPath` を `OpenShared` のループの各試行の前と、open 成功後
+  (失敗なら handle を閉じて失敗) に移した。
+- **P3**: restore 自体が置換後に失敗したときは `restore-operation receipt ID (not restorable; investigate)`
+  (そのレシートは `operation=restore` で restore できない)。4 秒の期限は厳密に: 残り時間 `$left` が 0 以下なら
+  眠らずに失敗、眠るのは `min(250, $left)`、眠った後に期限を過ぎていれば次の open をしない。
+
+RED (296a360 の実装 + 新しい試験): 70 tests, failures=13, errors=19 (新クラス `ReviewRetryRaces` 7 件すべてと、
+`replace` の戻り値の契約変更に伴う既存の偽 executor 経由の試験)。GREEN: 70 tests OK (skipped=1)。
+
+変異: 追加 11 本 (計 34 本) すべて RED、恒等 GREEN、構文 1 本 NOT COUNTED。**実行時に検出するのは Python 側の 5 本**
+(同じバイト列の別ファイルを採る、理由コードを一般の失敗に落とす、`file_key` が不正な識別情報を通す、
+executor が不正な候補キーを通す、失敗した restore が自分のレシートを restore に案内する)。
+PS 側 (試行ごとの `CheckPath`・open 後の `CheckPath`・期限・`FileKey` の照合・`$null = NewFile`・理由コードの出力、
+および前節の PS 変異) は PS 本文の断片と順序の静的検査で検出するだけで、**34 本の RED は PS の実行を保証しない**。
+
+### 未実施 (追記)
+
+PS 5.1 での実行・構文解析は今回も行っていない。共有違反の実例外、`OpenShared` の待機と期限、`FileKey` の照合、
+`receipt.json` の実シリアライズ (`applied` の上書き)、読み戻しの失敗、試行中の差し替え (別ファイル・シンボリックリンク) は
+Windows 上で再現していない。

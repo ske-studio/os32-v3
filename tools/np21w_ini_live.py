@@ -154,6 +154,21 @@ def identify(rows, target, pid=None):
     return row
 
 
+FILE_KEY_RE = re.compile(r'[0-9]+(?::[0-9]+){6}')
+CANDIDATE_KEY_RE = re.compile(r'[0-9]+:[0-9]+:[0-9]+')
+
+
+def file_key(signature):
+    """Volume:IndexHigh:IndexLow of a FileIdentity.Read signature.
+
+    ReplaceFile leaves the replacement (candidate) file's volume/index on the
+    target name, so the post-replace readback must carry the candidate's key.
+    """
+    if not isinstance(signature, str) or not FILE_KEY_RE.fullmatch(signature):
+        raise IniError('invalid file identity')
+    return ':'.join(signature.split(':')[:3])
+
+
 def checked_snapshot(value):
     if (not isinstance(value, dict) or set(value) != {'data', 'signature'} or
             not isinstance(value['data'], bytes) or len(value['data']) > LIMIT or
@@ -274,8 +289,15 @@ class Live:
                 # check can fail, so every later failure leaves a receipt that
                 # restore accepts. A failed 'replace' ends the PS session, so
                 # Python could not write it afterwards (incident 2026-10-01).
-                applied = checked_snapshot(ex.call('replace', expected=before, data=candidate,
-                                                   receipt=backup, record=planned_record))
+                done = ex.call('replace', expected=before, data=candidate,
+                               receipt=backup, record=planned_record)
+                applied = checked_snapshot(done['applied'])
+                # PS already refuses this before writing the receipt; a
+                # readback of another file with the same bytes (swapped while
+                # the open retried) must never become the restorable state.
+                if file_key(applied['signature']) != done['candidate']:
+                    raise IniError('readback identity differs from the candidate; '
+                                   'do not restore this bundle')
                 replaced = True
                 result['receipt'] = backup
                 if applied['data'] != candidate:
@@ -294,6 +316,10 @@ class Live:
                 result.update(applied=True, pid=started)
                 return result
             except IniError as exc:
+                if replaced and operation == 'restore':
+                    # Its receipt has operation 'restore', which restore refuses.
+                    raise IniError(str(exc) + '; restore-operation receipt ID '
+                                   '(not restorable; investigate): ' + backup) from exc
                 if replaced:
                     raise IniError(str(exc) + '; receipt ID for restore: ' + backup) from exc
                 # original.bin exists; receipt.json only if 'replace' failed
@@ -357,23 +383,29 @@ function CheckPath($path) {
 # Right after the kill / File.Replace another handle (an on-access scanner,
 # cf. POLICY_DEBUG 4-60) can briefly deny our FileShare.Read open. Retry only
 # ERROR_SHARING_VIOLATION (32) / ERROR_LOCK_VIOLATION (33), bounded per open;
-# 'replace' opens up to five files, all within one EXCHANGE_TIMEOUT.
+# 'replace' opens up to five files, all within one EXCHANGE_TIMEOUT. The path
+# is rechecked (reparse points, parents included) before every attempt and
+# after the successful open: it may be swapped while we wait.
 $TransientMs = 4000
 function OpenShared($path) {
  $clock = [Diagnostics.Stopwatch]::StartNew()
  while ($true) {
-  try { return [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read) }
+  CheckPath $path
+  try { $f = [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read) }
   catch {
    $e = $_.Exception
    while ($e.InnerException) { $e = $e.InnerException }
-   if ($e -isnot [IO.IOException] -or (($e.HResult -band 0xFFFF) -notin @(32,33)) -or
-       $clock.ElapsedMilliseconds -ge $TransientMs) { throw }
-   Start-Sleep -Milliseconds 250
+   $left = $TransientMs - $clock.ElapsedMilliseconds
+   if ($e -isnot [IO.IOException] -or (($e.HResult -band 0xFFFF) -notin @(32,33)) -or $left -le 0) { throw }
+   Start-Sleep -Milliseconds ([Math]::Min(250, $left))
+   if ($clock.ElapsedMilliseconds -ge $TransientMs) { throw }
+   continue
   }
+  try { CheckPath $path } catch { $f.Dispose(); throw }
+  return $f
  }
 }
 function Snapshot($path) {
- CheckPath $path
  $f = OpenShared $path
  try {
   $sig = [FileIdentity]::Read($f.SafeFileHandle)
@@ -402,8 +434,17 @@ function NewFile($path, [byte[]]$bytes) {
  $f = [IO.FileStream]::new($path, [IO.FileMode]::CreateNew, [Security.AccessControl.FileSystemRights]::Write,
   [IO.FileShare]::None, 4096, [IO.FileOptions]::WriteThrough, $security)
  try { $f.Write($bytes,0,$bytes.Length); $f.Flush($true) } finally { $f.Dispose() }
- if ((Snapshot $path).data -cne [Convert]::ToBase64String($bytes)) { throw 'Readback failed' }
+ $s = Snapshot $path
+ if ($s.data -cne [Convert]::ToBase64String($bytes)) { throw 'Readback failed' }
+ return $s
 }
+# Volume:IndexHigh:IndexLow of a FileIdentity.Read signature (file_key).
+function FileKey($sig) {
+ if ($sig -cnotmatch '^[0-9]+(:[0-9]+){6}$') { throw 'invalid file identity' }
+ $parts = $sig.Split(':')
+ return $parts[0] + ':' + $parts[1] + ':' + $parts[2]
+}
+$CandidateIdentity = 'readback identity differs from the candidate'
 function Bundle($id) {
  if ($id -cnotmatch '^[a-f0-9]{32}$') { throw 'invalid receipt id' }
  return $target.ini + '.np21w-live-' + $id
@@ -413,7 +454,7 @@ function WriteReceipt($id, $record, $applied) {
  if ((Snapshot ($dir + '\original.bin')).data -cne $record.original.data) { throw 'backup changed' }
  $record.applied = $applied
  $json = $record | ConvertTo-Json -Depth 20 -Compress
- NewFile ($dir + '\receipt.json') ([Text.Encoding]::UTF8.GetBytes($json))
+ $null = NewFile ($dir + '\receipt.json') ([Text.Encoding]::UTF8.GetBytes($json))
 }
 try {
  while ($null -ne ($line = [Console]::ReadLine())) {
@@ -454,19 +495,23 @@ try {
      $rule = [Security.AccessControl.FileSystemAccessRule]::new($sid,'FullControl','ContainerInherit,ObjectInherit','None','Allow')
      $acl.AddAccessRule($rule)
      [void][IO.Directory]::CreateDirectory($dir,$acl)
-     NewFile ($dir + '\original.bin') ([Convert]::FromBase64String($a.snapshot.data))
+     $null = NewFile ($dir + '\original.bin') ([Convert]::FromBase64String($a.snapshot.data))
     }
     'replace' {
      $temp = $target.ini + '.pending-' + [Guid]::NewGuid().ToString('N')
-     NewFile $temp ([Convert]::FromBase64String($a.data))
+     $candidate = NewFile $temp ([Convert]::FromBase64String($a.data))
      AssertAbsent
      AssertSnapshot $a.expected
      [IO.File]::Replace($temp, $target.ini, [System.Management.Automation.Language.NullString]::Value)
-     $value = Snapshot $target.ini
-     if ($value.data -cne $a.data) { throw 'Readback failed' }
+     $applied = Snapshot $target.ini
+     if ($applied.data -cne $a.data) { throw 'Readback failed' }
+     # ReplaceFile keeps the candidate's volume/index: same bytes from another
+     # file (swapped while the open retried) is not our replacement.
+     if ((FileKey $applied.signature) -cne (FileKey $candidate.signature)) { throw $CandidateIdentity }
      # Receipt first: a failure below (or any later request) ends the session.
-     WriteReceipt $a.receipt $a.record $value
+     WriteReceipt $a.receipt $a.record $applied
      AssertAbsent
+     $value = @{applied=$applied; candidate=(FileKey $candidate.signature)}
     }
     'load' {
      $dir = Bundle $a.receipt
@@ -504,7 +549,9 @@ try {
    @{ok=$true; value=$value} | ConvertTo-Json -Depth 24 -Compress | ForEach-Object { [Console]::WriteLine($_) }
   } catch {
    # Never echo raw exception text, file bytes or command-line contents.
-   [Console]::WriteLine('{"ok":false}') # ok=$false: explicit failure, never empty success
+   # ok=$false: explicit failure, never empty success; only fixed reason codes.
+   if ($_.Exception.Message -ceq $CandidateIdentity) { [Console]::WriteLine('{"ok":false,"reason":"candidate-identity"}') }
+   else { [Console]::WriteLine('{"ok":false}') }
    break
   }
  }
@@ -614,14 +661,24 @@ class WindowsExecutor:
             raise IniError('unsupported executor operation')
         try:
             response = self.transport.exchange({'op': op, 'target': self.target, 'args': wire(args)})
+            # The only failure detail PS reports: a fixed code, never raw text.
+            if op == 'replace' and response == {'ok': False, 'reason': 'candidate-identity'}:
+                raise IniError('Windows operation failed: replace; readback identity differs from '
+                               'the candidate (no receipt written); retain backup and verify process state')
             if (not isinstance(response, dict) or set(response) != {'ok', 'value'} or
                     response['ok'] is not True):
                 raise IniError('Windows operation failed: ' + op + '; retain backup and verify process state')
             value = wire(response['value'], decode=True)
             if op == 'query':
                 identify(value, self.target)
-            elif op in ('snapshot', 'replace'):
+            elif op == 'snapshot':
                 checked_snapshot(value)
+            elif op == 'replace':
+                if (not isinstance(value, dict) or set(value) != {'applied', 'candidate'} or
+                        not isinstance(value['candidate'], str) or
+                        not CANDIDATE_KEY_RE.fullmatch(value['candidate'])):
+                    raise IniError('invalid replace result')
+                checked_snapshot(value['applied'])
             elif op == 'backup':
                 if not isinstance(value, str) or not re.fullmatch('[a-f0-9]{32}', value):
                     raise IniError('invalid backup receipt ID')

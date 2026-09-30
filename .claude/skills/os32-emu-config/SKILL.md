@@ -218,14 +218,18 @@ ini.cppのinitload/initsave。bare起動時の既定ini導出と現在の選択�
    ini に隣接する固有の `*.np21w-live-ID/original.bin` に原本を保存し、
    `Flush(true)` と読み戻しを完了してから置換へ進む。バックアップは所有者専用 ACL。
 5. 同じディレクトリの一時ファイルを作成・flush・検証。プロセス不在と元の内容/識別情報を
-   直前に再確認し、`File.Replace` で置換。全バイトを読み戻して一致したら、**同じ `replace` 要求の中で
-   ただちにレシートを保存** (`applied` = その読み戻し)、それから不在を再確認する。PS は失敗した要求で
+   直前に再確認し、`File.Replace` で置換。全バイトを読み戻して一致し、**読み戻したファイルの
+   volume / file ID が候補 (一時ファイル) のものと同じ** (`ReplaceFile` は候補の ID を残す) なら、
+   **同じ `replace` 要求の中でただちにレシートを保存** (`applied` = その読み戻し)、それから不在を再確認する。
+   ID が違えば (同じバイト列の別ファイル) レシートを書かずに失敗する
+   (`readback identity differs from the candidate`、`original.bin` は残る)。PS は失敗した要求で
    セッションを閉じるので、置換後に別の要求で書く形だと、置換後のどの失敗でもレシートが残らない
    (2026-10-01 の実害: `snapshot` 段の失敗で `receipt.json` が無く `restore` 不能)。
    reparse point は親要素を含め拒否し、読み込むファイルの hardlink も拒否する。
-   ファイルを開くときの共有違反・ロック違反 (Win32 32/33) だけは、1 回の open につき 4 秒まで 250ms 間隔で
-   再試行する (強制終了や `File.Replace` の直後に走査ソフトなどが一時的に掴む。§4-60 と同種、主体は未確認)。
-   それ以外の I/O エラーは再試行しない。
+   ファイルを開くときの共有違反・ロック違反 (Win32 32/33) だけは、1 回の open につき 4 秒 (厳密な期限) まで
+   250ms 間隔で再試行する (強制終了や `File.Replace` の直後に走査ソフトなどが一時的に掴む。§4-60 と同種、
+   主体は未確認)。それ以外の I/O エラーは再試行しない。待つ間にパスが差し替わりうるので、reparse point の
+   検査 (親要素を含む) は試行のたびと open の成功後にやり直す。
 6. 再起動前にも不在・スナップショットを比較。同じ exe と明示 ini を、止めたプロセスと同じ形
    (位置引数 / `/i`、FD 引数) で起動し、
    起動した PID が 1 秒以内に終了していないことと、CIM による同一対象の 2 回の確認を行う。
@@ -233,7 +237,9 @@ ini.cppのinitload/initsave。bare起動時の既定ini導出と現在の選択�
 
 失敗時は自動巻き戻し・追加の起動をしない。置換後の失敗にはバックアップ ID を付ける。
 `replace` が成功した後の失敗は `receipt ID for restore: <ID>` — レシートがあり、停止状態のまま
-(再起動が失敗した場合も) `restore` で原本に戻せる。`replace` が成功を返す前の失敗は
+(再起動が失敗した場合も) `restore` を試せる (ini がその後変わっていれば restore は拒否する)。
+**restore 自体**が置換後に失敗した場合は `restore-operation receipt ID (not restorable; investigate): <ID>`
+— そのレシートは `operation=restore` なので restore できない。`replace` が成功を返す前の失敗は
 `retained backup ID (receipt not confirmed): <ID>` — ini は置換前か、置換されたが読み戻しか
 レシートの保存が済んでいない。
 バックアップやレシートが未完成なら通常の復元は拒否し、原本を残して操作者が調査する
