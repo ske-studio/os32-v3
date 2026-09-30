@@ -40,7 +40,7 @@ static int last_rc;
 static u32 A(u32 bytes, u32 align)
 {
     u32 out = 0xDEADBEEFUL;
-    last_rc = dma_pool_state_alloc(&P, bytes, align, &out);
+    last_rc = dma_pool_state_alloc(&P, bytes, align, DMA_PHYS_LIMIT, &out);
     return (last_rc == 0) ? out : 0;
 }
 
@@ -283,6 +283,171 @@ static void exhaust(void)
     CHECK(P.bad_free == 0);              /* 未初期化は「不正解放」に数えない */
 }
 
+/* ------------------------------------------------------------------ */
+/*  T1c: 装置に渡してよい範囲 (dma_range_ok — FDC の BSS もこれで見る)  */
+/* ------------------------------------------------------------------ */
+static void range_ok(void)
+{
+    /* 終端がちょうど limit は通る、1 バイト越えは断る。 */
+    CHECK(dma_range_ok(0xFFC000UL, KB(16), 0x1000000UL) == 1);
+    CHECK(dma_range_ok(0xFFC000UL, KB(16) + 1, 0x1000000UL) == 0);
+    /* **先頭だけでなく終端**を見る (0xFFF000 + 8KB)。 */
+    CHECK(dma_range_ok(0xFFF000UL, KB(8), 0x1000000UL) == 0);
+    CHECK(dma_range_ok(0x1000000UL, KB(4), 0x1000000UL) == 0);
+    /* 64KB またぎは limit と無関係に断る。 */
+    CHECK(dma_range_ok(POOL_BANK - KB(4), KB(8), 0x1000000UL) == 0);
+    CHECK(dma_range_ok(POOL_BANK - KB(4), KB(4), 0x1000000UL) == 1);
+    /* 0 バイトは断る、limit 0 は何も通さない。 */
+    CHECK(dma_range_ok(POOL_BANK, 0, 0x1000000UL) == 0);
+    CHECK(dma_range_ok(0, KB(4), 0) == 0);
+    /* 引き算で見る: 巨大な size で終端が巻いても通さない。 */
+    CHECK(dma_range_ok(KB(4), 0xFFFFFFFFUL, 0x1000000UL) == 0);
+    /* 8237 の上限は 16MB。 */
+    CHECK(DMA_PHYS_LIMIT == 0x1000000UL);
+}
+
+/* ------------------------------------------------------------------ */
+/*  T1c: limit 未満にだけ置く                                          */
+/* ------------------------------------------------------------------ */
+static void limit(void)
+{
+    u32 base = (u32)MEM_DMA_POOL_BASE, out;
+
+    /* 終端がちょうど limit なら通り、その先は無い。 */
+    fresh();
+    out = 0;
+    CHECK(dma_pool_state_alloc(&P, KB(16), 0, base + KB(16), &out) == 0);
+    CHECK(out == base);
+    CHECK(dma_pool_state_alloc(&P, KB(4), 0, base + KB(16), &out) ==
+          DMA_POOL_ERR_NOSPC);
+    /* 先頭は limit の内側でも、終端が越えるなら断る。 */
+    fresh();
+    CHECK(dma_pool_state_alloc(&P, KB(32), 0, base + KB(16), &out) ==
+          DMA_POOL_ERR_NOSPC);
+    /* limit が池の先頭なら何も置けない。**表は触らない**。 */
+    CHECK(dma_pool_state_alloc(&P, KB(4), 0, base, &out) ==
+          DMA_POOL_ERR_NOSPC);
+    CHECK(spans_in(DMA_SPAN_USED) == 0);
+    /* 越える候補は**飛ばすだけ**: limit の内側の後ろの隙間には置ける。 */
+    fresh();
+    CHECK(A(KB(8), 0) == base);
+    CHECK(dma_pool_state_alloc(&P, KB(8), 0, base + KB(16), &out) == 0);
+    CHECK(out == base + KB(8));
+    CHECK(out + KB(8) <= base + KB(16));
+}
+
+/* ------------------------------------------------------------------ */
+/*  T1c: 失敗時 *out は不変 (内部の *out = 0 が漏れない)               */
+/* ------------------------------------------------------------------ */
+static int buf_is(const struct dma_buf *b, u32 pa, void *va, u32 size)
+{
+    return b->pa == pa && b->va == va && b->size == size;
+}
+
+static void keep_out(void)
+{
+    struct dma_buf b;
+    void *sent = (void *)&b;
+    u32 i;
+
+    fresh();
+    b.pa = 0xA5A5A000UL; b.va = sent; b.size = 0x77;
+    /* 引数が悪い (33KB / 0 バイト / 整列) */
+    CHECK(dma_pool_state_alloc_buf(&P, KB(33), 0, DMA_PHYS_LIMIT, &b) ==
+          DMA_POOL_ERR_ARG);
+    CHECK(buf_is(&b, 0xA5A5A000UL, sent, 0x77));
+    CHECK(dma_pool_state_alloc_buf(&P, 0, 0, DMA_PHYS_LIMIT, &b) < 0);
+    CHECK(buf_is(&b, 0xA5A5A000UL, sent, 0x77));
+    CHECK(dma_pool_state_alloc_buf(&P, KB(4), 3, DMA_PHYS_LIMIT, &b) < 0);
+    CHECK(buf_is(&b, 0xA5A5A000UL, sent, 0x77));
+    /* limit を越える */
+    CHECK(dma_pool_state_alloc_buf(&P, KB(4), 0, (u32)MEM_DMA_POOL_BASE, &b)
+          == DMA_POOL_ERR_NOSPC);
+    CHECK(buf_is(&b, 0xA5A5A000UL, sent, 0x77));
+    /* 枯渇 */
+    for (i = 0; i < DMA_POOL_PAGES; i++) CHECK(A(KB(4), 0) != 0);
+    CHECK(dma_pool_state_alloc_buf(&P, KB(4), 0, DMA_PHYS_LIMIT, &b) ==
+          DMA_POOL_ERR_NOSPC);
+    CHECK(buf_is(&b, 0xA5A5A000UL, sent, 0x77));
+    /* 初期化前 */
+    memset(&P, 0, sizeof(P));
+    CHECK(dma_pool_state_alloc_buf(&P, KB(4), 0, DMA_PHYS_LIMIT, &b) ==
+          DMA_POOL_ERR_STATE);
+    CHECK(buf_is(&b, 0xA5A5A000UL, sent, 0x77));
+    /* out が NULL */
+    fresh();
+    CHECK(dma_pool_state_alloc_buf(&P, KB(4), 0, DMA_PHYS_LIMIT, 0) ==
+          DMA_POOL_ERR_ARG);
+    CHECK(spans_in(DMA_SPAN_USED) == 0);
+
+    /* 成功は組で返る: va = P2V(pa)、size は要求のまま。 */
+    fresh();
+    CHECK(dma_pool_state_alloc_buf(&P, KB(16) - 100, 0, DMA_PHYS_LIMIT, &b)
+          == 0);
+    CHECK(b.pa == (u32)MEM_DMA_POOL_BASE);
+    CHECK(b.va == P2V(b.pa));
+    CHECK(b.size == KB(16) - 100);
+    CHECK(dma_pool_state_free(&P, b.pa) == 0);
+}
+
+/* ------------------------------------------------------------------ */
+/*  T1c / R4: PCM リング 16KB + 82557 ≒16KB の最悪の並び               */
+/*                                                                    */
+/*  **池の番地を焼かない**: 池の先頭を 64KB バンクの中の 16 通りの     */
+/*  4KB 位置 (今の 0x2E8000 = 半ば、T3 の 0x3E0000 = 先頭を含む) に    */
+/*  置いて全部で見る。前置きは 0 = 空 / 1 = 先頭に 8KB 使用中 /        */
+/*  2 = 先頭に 8KB の穴 (次の 8KB は使用中)。順は PCM が先 / 82557 が   */
+/*  先の両方。                                                          */
+/* ------------------------------------------------------------------ */
+#define PCM_BYTES  KB(16)   /* PCM_RING_BYTES */
+#define NIC_BYTES  KB(16)   /* 82557 CB/RFD ≒16KB */
+#define OVERLAP(a, an, b, bn)  ((a) < (b) + (bn) && (b) < (a) + (an))
+
+static void worst(void)
+{
+    u32 k, pre, order, h1, h2, r, n, nb, rb;
+
+    for (k = 0; k < 16; k++) {
+        u32 base = 0x3E0000UL + k * KB(4);
+        for (pre = 0; pre < 3; pre++) {
+            for (order = 0; order < 2; order++) {
+                memset(&P, 0, sizeof(P));
+                dma_pool_state_init(&P, base, DMA_POOL_PAGES);
+                h1 = h2 = 0;
+                /* 前置きは最初適合の置き場のまま (先頭の近くがまたぐ
+                 * 位置なら飛ばされた先) — 番地は決め打ちしない。 */
+                if (pre >= 1) { h1 = A(KB(8), 0); CHECK(h1 != 0); }
+                if (pre == 2) {
+                    h2 = A(KB(8), 0);
+                    CHECK(h2 != 0);
+                    CHECK(dma_pool_state_free(&P, h1) == 0);
+                    h1 = 0;
+                }
+                rb = order ? NIC_BYTES : PCM_BYTES;
+                nb = order ? PCM_BYTES : NIC_BYTES;
+                r = A(rb, 4096);
+                n = A(nb, 0);
+                if (!r || !n)
+                    fprintf(stderr, "worst: k=%lu pre=%lu order=%lu\n",
+                            (unsigned long)k, (unsigned long)pre,
+                            (unsigned long)order);
+                CHECK(r != 0 && n != 0);
+                CHECK(dma_range_ok(r, rb, DMA_PHYS_LIMIT));
+                CHECK(dma_range_ok(n, nb, DMA_PHYS_LIMIT));
+                CHECK(!dma_crosses_64k(r, rb) && !dma_crosses_64k(n, nb));
+                CHECK(OVERLAP(r, rb, n, nb) == 0);           /* 重ならない */
+                CHECK(r >= base && r + rb <= base + KB(64)); /* 池の中 */
+                CHECK(n >= base && n + nb <= base + KB(64));
+                /* 使用中の前置きと重ならない */
+                if (h1) CHECK(OVERLAP(r, rb, h1, KB(8)) == 0 &&
+                              OVERLAP(n, nb, h1, KB(8)) == 0);
+                if (h2) CHECK(OVERLAP(r, rb, h2, KB(8)) == 0 &&
+                              OVERLAP(n, nb, h2, KB(8)) == 0);
+            }
+        }
+    }
+}
+
 int main(int argc, char **argv)
 {
     const char *c = (argc > 1) ? argv[1] : "";
@@ -294,6 +459,10 @@ int main(int argc, char **argv)
     else if (!strcmp(c, "frees"))         frees();
     else if (!strcmp(c, "leaked"))        leaked();
     else if (!strcmp(c, "exhaust"))       exhaust();
+    else if (!strcmp(c, "range_ok"))      range_ok();
+    else if (!strcmp(c, "limit"))         limit();
+    else if (!strcmp(c, "keep_out"))      keep_out();
+    else if (!strcmp(c, "worst"))         worst();
     else { fprintf(stderr, "unknown case: %s\n", c); return 2; }
     return failed ? 1 : 0;
 }

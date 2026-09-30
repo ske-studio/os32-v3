@@ -3,12 +3,12 @@
 /*                                                                          */
 /*  ここにあるのは「1 つしかない池」と irq_save の殻だけ。探索も表の更新も   */
 /*  動的確保を挟まないので、**割り込み文脈から呼べる** (82557 の巻き戻しは   */
-/*  IRQ callback の中から dma_pool_free / mark_leaked を呼ぶ)。             */
+/*  IRQ callback の中から dma_free / dma_mark_leaked を呼ぶ)。              */
 /*                                                                          */
 /*  写像は kernel/paging.c が張る (present / RW / supervisor)。ここは        */
 /*  番地を配るだけで CR3 にも PTE にも触らない。                            */
 /*                                                                          */
-/*  票: docs/tasks/v3/TASK_HAL_WIRING.md §1-3                               */
+/*  票: docs/tasks/v3/TASK_HAL_WIRING.md §1-3、TASK_T1_LEDGER §3-7          */
 /* ======================================================================== */
 
 #include "dma_pool.h"
@@ -27,45 +27,38 @@ void dma_pool_init(void)
     irq_restore(flags);
 }
 
-void *dma_pool_alloc(u32 bytes, u32 align, u32 *phys_out)
-{
-    unsigned int flags;
-    u32 addr = 0;
-    int rc;
-
-    if (phys_out) *phys_out = 0;
-
-    flags = irq_save();
-    rc = dma_pool_state_alloc(&s_pool, bytes, align, &addr);
-    irq_restore(flags);
-
-    if (rc != 0) return (void *)0;
-    /* 恒等写像なので物理 = 仮想。両方返すのは呼び手に「どちらを装置へ
-     * 渡すのか」を考えさせないため。 */
-    if (phys_out) *phys_out = addr;
-    return (void *)addr;
-}
-
-int dma_pool_free(void *virt)
+/* 失敗時 *out は不変 (中身は dma_pool_state_alloc_buf、TASK_T1_LEDGER §3-7)。 */
+int dma_alloc(u32 size, u32 align, u32 limit, struct dma_buf *out)
 {
     unsigned int flags;
     int rc;
 
-    if (!virt) return DMA_POOL_ERR_ARG;
     flags = irq_save();
-    rc = dma_pool_state_free(&s_pool, (u32)virt);
+    rc = dma_pool_state_alloc_buf(&s_pool, size, align, limit, out);
     irq_restore(flags);
     return rc;
 }
 
-int dma_pool_mark_leaked(void *virt)
+int dma_free(const struct dma_buf *b)
 {
     unsigned int flags;
     int rc;
 
-    if (!virt) return DMA_POOL_ERR_ARG;
+    if (!b) return DMA_POOL_ERR_ARG;
     flags = irq_save();
-    rc = dma_pool_state_mark_leaked(&s_pool, (u32)virt);
+    rc = dma_pool_state_free(&s_pool, b->pa);
+    irq_restore(flags);
+    return rc;
+}
+
+int dma_mark_leaked(const struct dma_buf *b)
+{
+    unsigned int flags;
+    int rc;
+
+    if (!b) return DMA_POOL_ERR_ARG;
+    flags = irq_save();
+    rc = dma_pool_state_mark_leaked(&s_pool, b->pa);
     irq_restore(flags);
     return rc;
 }

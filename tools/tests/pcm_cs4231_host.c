@@ -24,6 +24,7 @@
 #include "types.h"
 #include "pcm_cs4231.h"
 #include "dma8237.h"    /* DMA_DIR_* / DMA_MODE_* (実物の定数を使う) */
+#include "dma_pool.h"   /* struct dma_buf / dma_alloc の宣言 (実物の型を使う) */
 #include "irq_math.h"   /* irq_handler_fn / IRQ_* (実物の定数を使う) */
 
 #define CHECK(x) do { if (!(x)) { \
@@ -160,41 +161,46 @@ static int pool_freed[2];
 static int pool_leaked[2];
 static int pool_fail;
 
-void *dma_pool_alloc(u32 bytes, u32 align, u32 *phys_out)
+/* 物理の上限を受けて、8237 が届かない (16MB を越える) 上限を渡されたら
+ * 断る — driver が ISA の上限を渡していることもここで見る。
+ * **失敗時 *out は触らない** (実物の dma_alloc の約束)。 */
+int dma_alloc(u32 size, u32 align, u32 limit, struct dma_buf *out)
 {
     int i;
 
     (void)align;
-    if (pool_fail) return (void *)0;
+    if (pool_fail || limit > DMA_PHYS_LIMIT) return OS32_ERR_NOSPC;
     for (i = 0; i < 2; i++) {
         if (!pool_used[i]) {
             pool_used[i] = 1;
-            if (phys_out) *phys_out = (u32)(0x2E8000UL + (u32)i * bytes);
-            return pool_mem[i];
+            out->pa = (u32)(0x2E8000UL + (u32)i * size);
+            out->va = pool_mem[i];
+            out->size = size;
+            return 0;
         }
     }
-    return (void *)0;
+    return OS32_ERR_NOSPC;
 }
 
-static int pool_index(void *p)
+static int pool_index(const struct dma_buf *b)
 {
-    if (p == pool_mem[0]) return 0;
-    if (p == pool_mem[1]) return 1;
+    if (b->va == pool_mem[0]) return 0;
+    if (b->va == pool_mem[1]) return 1;
     return -1;
 }
 
-int dma_pool_free(void *virt)
+int dma_free(const struct dma_buf *b)
 {
-    int i = pool_index(virt);
+    int i = pool_index(b);
     if (i < 0) return OS32_ERR_INVAL;
     pool_freed[i]++;
     pool_used[i] = 0;
     return 0;
 }
 
-int dma_pool_mark_leaked(void *virt)
+int dma_mark_leaked(const struct dma_buf *b)
 {
-    int i = pool_index(virt);
+    int i = pool_index(b);
     if (i < 0) return OS32_ERR_INVAL;
     pool_leaked[i]++;
     return 0;
@@ -408,6 +414,7 @@ static void reset_all(void)
     s_ring = 0;
     s_stg = 0;
     s_ring_phys = 0;
+    memset(&s_ring_buf, 0, sizeof(s_ring_buf));
     s_owner = 0;
     s_irq_reg = 0;
     s_present = 0;

@@ -70,12 +70,12 @@ void dma_pool_state_init(struct dma_pool_state *s, u32 base, u32 npages)
 }
 
 /* ------------------------------------------------------------------------ */
-/*  最初適合。**候補ごとに 64KB またぎを見る** — 池は 0x2F0000 をまたぐ     */
-/*  ので、空いていても置けない場所がある。またぐ候補は飛ばすだけで、        */
+/*  最初適合。**候補ごとに 64KB またぎと limit を見る** — 池は 0x2F0000 を  */
+/*  またぐので、空いていても置けない場所がある。またぐ候補は飛ばすだけで、  */
 /*  そこで諦めない (後半にまだ置ける)。                                     */
 /* ------------------------------------------------------------------------ */
 int dma_pool_state_alloc(struct dma_pool_state *s, u32 bytes, u32 align,
-                         u32 *out)
+                         u32 limit, u32 *out)
 {
     u32 need, page, i, addr;
     int slot;
@@ -93,8 +93,9 @@ int dma_pool_state_alloc(struct dma_pool_state *s, u32 bytes, u32 align,
     for (page = 0; page + need <= s->npages; page++) {
         addr = s->base + page * DMA_POOL_PAGE_SIZE;
         if (addr % align != 0) continue;
-        /* **またぐ候補は飛ばす** (諦めない)。 */
-        if (dma_crosses_64k(addr, bytes)) continue;
+        /* **またぐ候補・limit を越える候補は飛ばす** (諦めない)。
+         * 検査は commit の前 — 飛ばした候補の表は触らない。 */
+        if (!dma_range_ok(addr, bytes, limit)) continue;
         for (i = 0; i < need; i++) {
             if (s->used[page + i]) break;
         }
@@ -116,20 +117,42 @@ int dma_pool_state_alloc(struct dma_pool_state *s, u32 bytes, u32 align,
 }
 
 /* ------------------------------------------------------------------------ */
+/*  dma_alloc の中身 — **失敗時 *out は不変**                                */
+/*                                                                          */
+/*  dma_pool_state_alloc は失敗時にも出力へ 0 を書くので、その出力を *out    */
+/*  に直接つながない。局所変数で受けて、成功したときだけ組を写す            */
+/*  (TASK_T1_LEDGER §3-7、Codex P3)。                                        */
+/* ------------------------------------------------------------------------ */
+int dma_pool_state_alloc_buf(struct dma_pool_state *s, u32 size, u32 align,
+                             u32 limit, struct dma_buf *out)
+{
+    u32 pa = 0;
+    int rc;
+
+    if (!out) return DMA_POOL_ERR_ARG;
+    rc = dma_pool_state_alloc(s, size, align, limit, &pa);
+    if (rc != 0) return rc;
+    out->pa = pa;
+    out->va = P2V(pa);
+    out->size = size;
+    return 0;
+}
+
+/* ------------------------------------------------------------------------ */
 /*  解放 — **span の先頭と一致するときだけ**                                */
 /*                                                                          */
 /*  隣り合う span を「番地が池の中」だけで解放すると、16KB の次に置いた      */
 /*  8KB の先頭を渡されたときにどちらを外すかが決まらない。先頭一致に        */
 /*  限ることで、途中ポインタも二重解放も同じ 1 本の規則で弾ける。           */
 /* ------------------------------------------------------------------------ */
-int dma_pool_state_free(struct dma_pool_state *s, u32 virt)
+int dma_pool_state_free(struct dma_pool_state *s, u32 pa)
 {
     u32 off, page, i;
     int slot;
 
     if (!s || !s->ready) return DMA_POOL_ERR_STATE;
-    if (virt < s->base) { s->bad_free++; return DMA_POOL_ERR_ARG; }
-    off = virt - s->base;
+    if (pa < s->base) { s->bad_free++; return DMA_POOL_ERR_ARG; }
+    off = pa - s->base;
     if (off >= s->npages * DMA_POOL_PAGE_SIZE) {
         s->bad_free++;
         return DMA_POOL_ERR_ARG;
@@ -153,14 +176,14 @@ int dma_pool_state_free(struct dma_pool_state *s, u32 virt)
 }
 
 /* ------------------------------------------------------------------------ */
-int dma_pool_state_mark_leaked(struct dma_pool_state *s, u32 virt)
+int dma_pool_state_mark_leaked(struct dma_pool_state *s, u32 pa)
 {
     u32 off, page;
     int slot;
 
     if (!s || !s->ready) return DMA_POOL_ERR_STATE;
-    if (virt < s->base) { s->bad_free++; return DMA_POOL_ERR_ARG; }
-    off = virt - s->base;
+    if (pa < s->base) { s->bad_free++; return DMA_POOL_ERR_ARG; }
+    off = pa - s->base;
     if (off >= s->npages * DMA_POOL_PAGE_SIZE) {
         s->bad_free++;
         return DMA_POOL_ERR_ARG;

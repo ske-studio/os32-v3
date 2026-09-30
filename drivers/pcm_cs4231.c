@@ -42,8 +42,9 @@ u32 pcm_diag_deadline = 0;         /* s_deadline の写し */
 u32 pcm_diag_entry_tick = 0;       /* stop_entry を呼んだ tick */
 u32 pcm_diag_drs = 0;              /* 最後に読んだ I11 */
 
-static u8  *s_ring;                /* DMA リング 16KB */
-static u32  s_ring_phys;
+static u8  *s_ring;                /* DMA リング 16KB (s_ring_buf.va) */
+static u32  s_ring_phys;           /* s_ring_buf.pa (装置へ渡す物理) */
+static struct dma_buf s_ring_buf;  /* dma_alloc の組 (返すときに渡す) */
 static u8  *s_stg;                 /* ステージング 16KB (KHEAP。DMA しない) */
 static int  s_owner;
 static int  s_irq_reg;
@@ -471,15 +472,16 @@ static void pcm_release(int leak)
      * リングが「止まった証拠」を取れなかった (leak) かどうかと独立。 */
     if (s_stg) kfree(s_stg);
     if (leak) {
-        if (s_ring) dma_pool_mark_leaked(s_ring);
+        if (s_ring) dma_mark_leaked(&s_ring_buf);
         pcm_enter_faulted(PCM_DIAG_FAULT_RECLAIM);
     } else {
-        if (s_ring) dma_pool_free(s_ring);
+        if (s_ring) dma_free(&s_ring_buf);
         g_pcm.state = PCM_ST_CLOSED;
     }
     s_ring = 0;
     s_stg = 0;
     s_ring_phys = 0;
+    kmemset(&s_ring_buf, 0, sizeof(s_ring_buf));
     s_owner = 0;
     s_mce_busy = 0;
 }
@@ -504,7 +506,6 @@ int pcm_open(u32 rate)
 {
     struct pcm_op ops[PCM_SEQ_MAX];
     const struct pcm_op *tbl;
-    u32 phys = 0;
     u8 fmt = 0;
     int rc;
 
@@ -521,9 +522,14 @@ int pcm_open(u32 rate)
     if (!pcm_detect()) return pcm_open_fail(OS32_ERR_NOSYS);
 
     /* **DMA するのはリングだけ**。プールは 64KB しかなく 82557 と分け合う
-     * ので、DMA しないステージングは KHEAP から取る (PM 2026-09-23)。 */
-    s_ring = (u8 *)dma_pool_alloc(PCM_RING_BYTES, PCM_POOL_ALIGN, &phys);
-    s_ring_phys = phys;
+     * ので、DMA しないステージングは KHEAP から取る (PM 2026-09-23)。
+     * 8237 はバンク 8bit なので物理の上限は 16MB (DMA_PHYS_LIMIT)。
+     * 失敗時 s_ring_buf は不変 (release で 0 にしてある)。 */
+    if (dma_alloc(PCM_RING_BYTES, PCM_POOL_ALIGN, DMA_PHYS_LIMIT,
+                  &s_ring_buf) == 0) {
+        s_ring = (u8 *)s_ring_buf.va;
+        s_ring_phys = s_ring_buf.pa;
+    }
     s_stg = (u8 *)kmalloc(PCM_STG_BYTES);
     if (!s_ring || !s_stg) return pcm_open_fail(PCM_ERR_NOMEM);
     kmemset(s_ring, 0, PCM_RING_BYTES);

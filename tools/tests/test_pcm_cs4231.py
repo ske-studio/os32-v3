@@ -202,6 +202,9 @@ DRIVER_MUTATIONS = [
      "(FAULTED の後に装置へ書く — blocker 5)"),
     ([(r"    if \(!buf\) return OS32_ERR_INVAL;\n", "")],
      "write が NULL を断らない (CPL=0 の直呼びで NULL から写す)"),
+    ([(r"    if \(dma_alloc\(PCM_RING_BYTES, PCM_POOL_ALIGN, DMA_PHYS_LIMIT,",
+       "    if (dma_alloc(PCM_RING_BYTES, PCM_POOL_ALIGN, 0xFFFFFFFFUL,")],
+     "リングを 8237 の上限 (16MB) で取らない (T1c: バンク 8bit の外を渡す)"),
 ]
 
 
