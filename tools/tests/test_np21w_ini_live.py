@@ -337,7 +337,7 @@ class WindowsContract(unittest.TestCase):
         for fragment in ('GetFileInformationByHandle', 'NumberOfLinks', 'ReparsePoint',
                          'CreateNew', 'Flush($true)', '[IO.File]::Replace(',
                          'AssertAbsent', 'AssertSnapshot', 'Readback',
-                         'UseShellExecute=$false', '.Arguments=', '.FileName=',
+                         'UseShellExecute=$true', '.Arguments=', '.FileName=',
                          '[Diagnostics.Process]::Start(', 'original.bin', 'receipt.json'):
             with self.subTest(fragment=fragment):
                 self.assertIn(fragment, live.PS_SERVER)
@@ -893,6 +893,34 @@ class PostReplaceFailure(unittest.TestCase):
         import re
         return re.search(r"\n    '" + name + r"' \{\n(.*?)\n    \}\n", live.PS_SERVER, re.S).group(1)
 
+    def test_powershell_start_does_not_hand_the_transport_pipe_to_the_emulator(self):
+        """Generated-text check only (PowerShell is not run here).
+
+        2026-10-01 (PM, real process): apply and restore finished (ini replaced,
+        receipt.json written, NP21/W restarted) yet always ended in 'Windows
+        executor cleanup timeout'. UseShellExecute=$false starts NP21/W through
+        CreateProcess(bInheritHandles=TRUE), so it holds PS's stdout pipe and
+        the reader never sees EOF. Same cause and cure as np21w_trial (F3):
+        ShellExecute, no redirection; exe / arguments / cwd unchanged."""
+        body = self.block('start')
+        self.assertIn('$si.UseShellExecute=$true', body)
+        self.assertNotIn('UseShellExecute=$false', live.PS_SERVER)
+        self.assertNotIn('RedirectStandard', live.PS_SERVER)
+        for fragment in ('$si.FileName=$target.exe', '$si.Arguments=$arg',
+                         '$si.WorkingDirectory=[IO.Path]::GetDirectoryName($target.exe)',
+                         '$p = [Diagnostics.Process]::Start($si)'):
+            self.assertIn(fragment, body)
+        # ShellExecute may not expose $p.Handle: the PID is the key and liveness
+        # is HasExited after a fixed pause (as np21w_trial), never WaitForExit.
+        order = [body.index(fragment) for fragment in (
+            '$p = [Diagnostics.Process]::Start($si)',
+            "if ($null -eq $p) { throw 'no process started' }",
+            '$startedPid = $p.Id', 'Start-Sleep -Milliseconds 1000',
+            "if ($p.HasExited) { throw 'started process exited' }",
+            '$value = $startedPid', '} finally { $p.Dispose() }')]
+        self.assertEqual(order, sorted(order))
+        self.assertNotIn('WaitForExit(1000)', body)
+
     def test_powershell_replace_writes_receipt_after_readback_before_absence_check(self):
         body = self.block('replace')
         order = [body.index(fragment) for fragment in (
@@ -1208,6 +1236,22 @@ MUTATIONS = [
     ("""   if ($_.Exception.Message -ceq $CandidateIdentity) { [Console]::WriteLine('{"ok":false,"reason":"candidate-identity"}') }\n""",
      "",
      "PS never reports the candidate-identity reason"),
+    # 2026-10-01: restart must not hand PS's stdout pipe to NP21/W (cleanup timeout).
+    ("     $si.UseShellExecute=$true\n",
+     "     $si.UseShellExecute=$false\n",
+     "PS start via CreateProcess: NP21/W inherits the transport pipe"),
+    ("     $si.UseShellExecute=$true\n",
+     "     $si.UseShellExecute=$true\n     $si.RedirectStandardOutput=$true\n",
+     "PS start redirects the emulator's stdout"),
+    ("      if ($p.HasExited) { throw 'started process exited' }\n",
+     "",
+     "PS start reports a PID for a process that already exited"),
+    ("     if ($null -eq $p) { throw 'no process started' }\n",
+     "",
+     "PS start does not refuse a missing process object"),
+    ("      Start-Sleep -Milliseconds 1000\n",
+     "",
+     "PS start checks liveness immediately (no settle pause)"),
     ("def launch_of(command, target)",
      "def launch_of(command, target",
      "syntax error: an unimportable copy is NOT COUNTED"),

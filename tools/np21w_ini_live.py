@@ -522,8 +522,13 @@ try {
     'start' {
      AssertAbsent
      CheckPath $target.exe
+     # ShellExecute, no redirection (as np21w_trial, F3): without it .NET
+     # starts NP21/W via CreateProcess(bInheritHandles=TRUE), so it kept this
+     # session's stdout pipe and the host reader never saw EOF: every apply /
+     # restore that restarted it ended in 'cleanup timeout' (2026-10-01).
+     # Executable, arguments and working directory are unchanged.
      $si = [Diagnostics.ProcessStartInfo]::new()
-     $si.UseShellExecute=$false
+     $si.UseShellExecute=$true
      $si.FileName=$target.exe
      # Same launch shape as the stopped process (launch_of / launch_arguments).
      $l = $a.launch
@@ -539,9 +544,14 @@ try {
      $si.Arguments=$arg
      $si.WorkingDirectory=[IO.Path]::GetDirectoryName($target.exe)
      $p = [Diagnostics.Process]::Start($si)
+     if ($null -eq $p) { throw 'no process started' }
      try {
-      if ($p.WaitForExit(1000)) { throw 'started process exited' }
-      $value = $p.Id
+      # ShellExecute may not expose $p.Handle: the PID is the key (Python
+      # re-queries CIM for exe / command / created), liveness is HasExited.
+      $startedPid = $p.Id
+      Start-Sleep -Milliseconds 1000
+      if ($p.HasExited) { throw 'started process exited' }
+      $value = $startedPid
      } finally { $p.Dispose() }
     }
     default { throw 'unknown operation' }

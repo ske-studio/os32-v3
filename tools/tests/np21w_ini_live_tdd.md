@@ -562,3 +562,43 @@ PS 側 (試行ごとの `CheckPath`・open 後の `CheckPath`・期限・`FileKe
 PS 5.1 での実行・構文解析は今回も行っていない。共有違反の実例外、`OpenShared` の待機と期限、`FileKey` の照合、
 `receipt.json` の実シリアライズ (`applied` の上書き)、読み戻しの失敗、試行中の差し替え (別ファイル・シンボリックリンク) は
 Windows 上で再現していない。
+
+## 実適用・restore が成功しても最後に cleanup timeout (2026-10-01)
+
+**症状** (PM の実プロセス): `ram-8mb --live-apply --exclusive-operator` で ini は置換、`receipt.json` も
+作られ、NP21/W は再起動して 8MB で動いていたのに、出力は `error: Windows executor cleanup timeout;
+inspect process state` だけ (`receipt:` / `verified process PID:` が出ない)。`restore` も同じ。プレビューは正常。
+
+**原因**: PS の `'start'` が `UseShellExecute=$false` で NP21/W を起動していた。.NET Framework はこの経路で
+`CreateProcess(bInheritHandles=TRUE)` を呼ぶので、NP21/W が PS の stdout パイプ (継承可能なハンドル) を持ち続ける。
+PS は stdin の EOF で終わる (`wait` は成功) が、reader は EOF に届かず、`_close_reader()` の 0.1 秒の
+bounded join が失敗して `IniError` (`PowerShellTransport._close_reader`、np21w_ini_live.py の旧 626 行) になる。
+`Live.run` は成功を返し終えているが、`with self.executor` の `__exit__` で投げられるので CLI には失敗だけが出る。
+NP21/W を起動しないプレビューでは起きない。trial は同じ原因を 2026-09-14 (実走 F3、`np21w_trial_tdd.md` 追記 6)
+に ShellExecute で直していたが、live には入っていなかった。
+
+**直し方** (`'start'` だけ、trial と同じ形): `$si.UseShellExecute=$true`、リダイレクト無し。exe・引数
+(`"/i<ini>"` / 位置引数、FD)・作業ディレクトリは不変。ShellExecute では `$p.Handle` が取れないことがあるので
+`$p` が無ければ失敗、PID (`$p.Id`) を要にし、生存確認は `Start-Sleep -Milliseconds 1000` + `$p.HasExited`
+(`WaitForExit(1000)` はやめた)。PID から先の照合 (CIM の exe / コマンド行の形 / 生成時刻を 2 回) は Python 側で不変。
+**変えないもの**: EOF 未到達・wait timeout を失敗とする transport の不変条件、live の kill fallback、
+kill / retry を足さないこと、成功の判定が PS の応答であること。
+
+**RED** (`python3 -B tools/tests/test_np21w_ini_live.py`、修正前): 71 tests, failures=2, skipped=1 —
+新試験 `test_powershell_start_does_not_hand_the_transport_pipe_to_the_emulator` (ShellExecute・リダイレクト無し・
+`$p` の検査 → `$p.Id` → 1 秒 → `HasExited` → `$value` の順) と、`$false` を要求していた既存の断片を `$true` に
+改めた `test_powershell_atomic_backup_identity_and_start_contract`。**GREEN**: 71 tests OK (skipped=1)。
+
+**再現** (`test_np21w_transport.py` の `test_live_cli_restart_success_depends_on_launcher_not_passing_the_pipe`):
+PS の代わりの無害なホスト Python 子が `start` で孫 (1.5 秒 sleep、kill しない) を起動し、継承あり / 無しで
+live の CLI 全体 (合成の Fake 経由のライフサイクル、`start` と close だけ実 pipe) を回す。継承ありで
+rc=2・`cleanup timeout`・`receipt:` / `verified process PID:` 無し (= PM の症状)、継承無しで rc=0 と両方の行。
+Python 側は変えていないので**この試験は最初から GREEN** (特性の固定であって、修正の RED ではない)。
+
+変異: 追加 5 本 (`$false` に戻す、`RedirectStandardOutput` を足す、`HasExited` の検査を消す、`$null` の検査を消す、
+1 秒の待ちを消す) を含め 39 本すべて RED、恒等 GREEN、構文 1 本 NOT COUNTED。5 本は PS 本文の静的検査で検出する
+だけ。PS 5.1 の ParseInput (データとして渡すだけ、ファイル・プロセス操作なし) で PS_SERVER の構文解析は通った。
+
+**未確認** [V4]: ShellExecute で起動した NP21/W が実際にパイプを継承しないこと、`HasExited` / `Id` が実プロセスで
+期待どおりに取れること、CIM の CommandLine が従来の照合 (末尾空白の許容) で通ること — trial の実走では
+同じ形が通っているが、live での実プロセス確認は PM 待ち。

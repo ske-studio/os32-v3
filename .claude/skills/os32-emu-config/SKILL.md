@@ -123,6 +123,10 @@ taskkill は ini を書き戻さないので使わない)。使い捨て NHD は
   transport kill fallback だけを維持する。cleanup で既存の wait 例外を隠さない。
 - `python3 -B tools/tests/test_np21w_transport.py -v` で実ローカル pipe と偽 process の
   timeout・通常 EOF・遅延 EOF・CLI failure JSON の stage/process 保持を検査する。
+  live の CLI は、`start` で孫を起動する無害なホスト子プロセスで「孫が stdout を継承すると
+  receipt / PID を出さず cleanup timeout、継承しなければ receipt と PID を出して rc=0」を検査する
+  (孫は 1.5 秒で自然に終わる。kill しない)。EOF 未到達を失敗とする不変条件は変えず、
+  直すのは起動側 (PS の `start` を ShellExecute に) である。
   実エミュレータ、CIM、実 ini を使わない。Windows parser 試験は PS 本文をデータとして
   ParseInput に渡すだけであり、実ライフサイクルの合格とは区別する。
 
@@ -232,8 +236,12 @@ ini.cppのinitload/initsave。bare起動時の既定ini導出と現在の選択�
    検査 (親要素を含む) は試行のたびと open の成功後にやり直す。
 6. 再起動前にも不在・スナップショットを比較。同じ exe と明示 ini を、止めたプロセスと同じ形
    (位置引数 / `/i`、FD 引数) で起動し、
-   起動した PID が 1 秒以内に終了していないことと、CIM による同一対象の 2 回の確認を行う。
-   作業ディレクトリは exe の親。対応ソースも起動時に `file_setcd(modulefile)` を実行する。
+   起動した PID が 1 秒後に終了していないこと (`Start-Sleep` + `HasExited`) と、CIM による同一対象の
+   2 回の確認を行う。作業ディレクトリは exe の親。対応ソースも起動時に `file_setcd(modulefile)` を実行する。
+   起動は **`UseShellExecute=$true`・リダイレクト無し** (trial の F3 と同じ)。`$false` だと .NET は
+   `CreateProcess(bInheritHandles=TRUE)` で起動し、NP21/W が PS の stdout パイプを持ち続けるので
+   reader が EOF に届かず、ini の置換・レシート・再起動が済んでいても最後が必ず
+   `Windows executor cleanup timeout` になっていた (2026-10-01、PM の実プロセス)。
 
 失敗時は自動巻き戻し・追加の起動をしない。置換後の失敗にはバックアップ ID を付ける。
 `replace` が成功した後の失敗は `receipt ID for restore: <ID>` — レシートがあり、停止状態のまま

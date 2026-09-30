@@ -59,3 +59,12 @@ OK
 transport shutdown の fail-closed と待機上限の試験であり、実 Windows 子の継承 pipe / WSL wait 問題の解消や emulator lifecycle 成功を証明しない。reader は継承 writer が EOF を出すまで daemon として残り、その EOF で自分の stdout を閉じる。永久に writer が残る場合の即時資源回収は保証しない。stdin write/flush/close の一般的な backpressure 問題は今回の reader-lock 修正対象外。
 
 実 emulator/PID34864、CIM、実 ini、API/network、env/secrets、docs/hw、build/deploy、agent 起動、commit は操作していない。live の既存 kill semantics と trial の no-kill、承認 gate、ini 変換、PS lifecycle 本文は変更しない。
+
+## 2026-10-01 追記 — live の再起動後の cleanup timeout
+
+live の実適用・restore が、成功しても最後に `Windows executor cleanup timeout` を返していた。原因は transport ではなく
+PS `'start'` の `UseShellExecute=$false` (NP21/W が stdout パイプを継承)。直したのは起動側だけで、この節の
+不変条件 (EOF 未到達は失敗、wait timeout を成功にしない、trial は kill しない、live は元の kill fallback のみ) は不変。
+`test_live_cli_restart_success_depends_on_launcher_not_passing_the_pipe` が、孫が stdout を継承する / しない場合の
+live CLI の出力 (失敗のみ / receipt と PID) を実ローカル pipe で固定する。詳細は
+[`np21w_ini_live_tdd.md`](np21w_ini_live_tdd.md) の同日の節。
