@@ -683,7 +683,9 @@ try {
 # Only this fixed bootstrap travels on the command line. It reads the body as
 # one base64 line from stdin, runs it only if its SHA-256 is the one baked in
 # here from the fixed PS_SERVER, and dot-sources it so '$script:' is the same
-# scope as before. Any other body (or none) exits 3 without output.
+# scope as before. A body with another digest exits 3 without output; a
+# missing line or bad base64 ends in a conversion exception instead (the body
+# is still never run, stderr is discarded, and the caller sees a failure).
 PS_BOOTSTRAP = r'''$ErrorActionPreference = 'Stop'
 $b = [Convert]::FromBase64String([Console]::In.ReadLine())
 $h = [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($b)).Replace('-','')
