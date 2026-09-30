@@ -271,7 +271,9 @@ static u32 *g_cur_frame = 0;
                               RING3_GUARD_SIZE)
 
 /* 現在の (= いま起動中/実行中の) CPL=3 アプリの **私有領域の上端**。
- * 既定は 1 枚ぶん = MEM_APP_BAND_TOP で、CPL=3 アプリが居ない間は必ずこの値。
+ * 既定は 1 枚ぶん (ring3_band_set(1) の値) で、CPL=3 アプリが居ない間は必ずこの値。
+ * 通常は MEM_APP_BAND_TOP、8MB + PEGC のように BB が帯の中にあるときは
+ * sys_usable_mem_end() (= BB の下端) まで下がる。
  * ring3_ptr_ok / argv 積み / USER 写像がすべてここを見るので、
  * 起動失敗・fault kill・正常終了のいずれでも必ず既定へ戻すこと。
  *
