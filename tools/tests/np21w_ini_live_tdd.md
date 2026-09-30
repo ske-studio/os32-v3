@@ -545,7 +545,7 @@ PS の変更 (`OpenShared`・`WriteReceipt`・`replace` の順序) は静的な�
 - **P2-2 待機中に入った reparse point を追う**: `CheckPath` を `OpenShared` のループの各試行の前と、open 成功後
   (失敗なら handle を閉じて失敗) に移した。
 - **P3**: restore 自体が置換後に失敗したときは `restore-operation receipt ID (not restorable; investigate)`
-  (そのレシートは `operation=restore` で restore できない)。4 秒の期限は厳密に: 残り時間 `$left` が 0 以下なら
+  (そのレシートは `operation=restore` で restore できない)。再試行の待ちの予算は 4 秒 (Codex 2 回目 P3: 期限の直前に始めた CheckPath と同期の open そのものは期限を越えうるので「厳密な期限」ではない): 残り時間 `$left` が 0 以下なら
   眠らずに失敗、眠るのは `min(250, $left)`、眠った後に期限を過ぎていれば次の open をしない。
 
 RED (296a360 の実装 + 新しい試験): 70 tests, failures=13, errors=19 (新クラス `ReviewRetryRaces` 7 件すべてと、
