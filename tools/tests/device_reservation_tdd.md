@@ -1,5 +1,11 @@
 # Device reservation CORE — TDD / host evidence
 
+> **2026-10-01 (T1d) 以降、この記録は履歴。** 核は台帳の `ledger_reserve_set`
+> (検証済み資源レコード・区間の表、`kernel/pgalloc.c`) に載せ直し、
+> `sys_device_reserve_core` / `pgalloc_device_reserve` は撤去した。今の試験と
+> 変異は `tools/tests/test_device_reservation.py` の docstring、結果は
+> [`docs/tasks/v3/TASK_T1_LEDGER.md`](../../docs/tasks/v3/TASK_T1_LEDGER.md) §4-4-R。
+
 ## Scope
 
 Changes are limited to `kernel/sys.c`, `include/sys.h`, `kernel/pgalloc.c`,
