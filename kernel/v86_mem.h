@@ -103,9 +103,10 @@ static inline int v86_guest_read_ok(u32 linear, u32 len)
 
 /* ======== API ======== */
 
-/* バッキング RAM を確保して低位アドレスをリマップする。
- * 0 で成功、負でエラー。 */
-int  v86_mem_setup(void);
+/* バッキング RAM を owner で確保して低位アドレスをリマップする
+ * (owner: KAPI 経由なら呼び手の AS、カーネルからなら kernel —
+ * exec_ledger_owner()、TASK_T1_LEDGER §4-8)。0 で成功、負でエラー。 */
+int  v86_mem_setup(u32 owner);
 
 /* アイデンティティマッピングに戻し、バッキング RAM を解放する。 */
 void v86_mem_teardown(void);

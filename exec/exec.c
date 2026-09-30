@@ -978,26 +978,47 @@ static u32 ring3_band_ram_top(void)
  * **CPL=0 の子が 1 本も居なくなったとき**。段の深さでは決められない
  * (GUI アプリが CPL=0 の子を持てるため) ので本数で数える。 */
 static int g_cpl0_children = 0;
+/* claim の台帳の owner (T2 まで の暫定、TASK_T1_LEDGER §3-6・§4-8)。最初の子
+ * で取り、最後の子が居なくなったら返して番号を返却する。 */
+static u32 g_cpl0_owner;
 
-static void exec_cpl0_claim(void)
+/* 固定帯を owner 付きで押さえる。**他 owner のページが 1 つでも混じれば
+ * 何も押さえずに -1** (claim は入口判定 appslot_cpl0_admit の後ろの第二の
+ * 防御線で、呼び手はロードを始める前に EXEC_ERR_NOMEM で断る)。 */
+static int exec_cpl0_claim(int id)
 {
-    u32 ca_start, cb_start;
+    u32 ca_start, cb_start, owner;
     int ca_pages, cb_pages;
-    if (g_cpl0_children++ > 0) return;
+    if (g_cpl0_children > 0) {
+        g_cpl0_children++;
+        return 0;
+    }
+    if (!ledger_owner_new(LEDGER_KIND_AS, (u32)id, "cpl0", &owner)) return -1;
     exec_child_claim(&ca_start, &ca_pages, &cb_start, &cb_pages);
-    pgalloc_mark_used(ca_start, ca_pages);
-    pgalloc_mark_used(cb_start, cb_pages);
+    if (!ledger_claim_fixed(owner, ca_start / PAGE_SIZE,
+                            ca_start / PAGE_SIZE + (u32)ca_pages)) {
+        (void)ledger_owner_retire(owner);
+        return -1;
+    }
+    if (!ledger_claim_fixed(owner, cb_start / PAGE_SIZE,
+                            cb_start / PAGE_SIZE + (u32)cb_pages)) {
+        (void)ledger_reclaim_owner(owner, 0);
+        (void)ledger_owner_retire(owner);
+        return -1;
+    }
+    g_cpl0_owner = owner;
+    g_cpl0_children = 1;
+    return 0;
 }
 
 static void exec_cpl0_release(void)
 {
-    u32 ca_start, cb_start;
-    int ca_pages, cb_pages;
     if (g_cpl0_children <= 0) return;
     if (--g_cpl0_children > 0) return;
-    exec_child_claim(&ca_start, &ca_pages, &cb_start, &cb_pages);
-    pgalloc_free_n(ca_start, ca_pages);
-    pgalloc_free_n(cb_start, cb_pages);
+    /* claim で取ったページは全部この owner のもの (A と B)。一括で返す。 */
+    (void)ledger_reclaim_owner(g_cpl0_owner, 0);
+    (void)ledger_owner_retire(g_cpl0_owner);
+    g_cpl0_owner = 0;
 }
 
 /* ======================================================================== */
@@ -1087,21 +1108,21 @@ static int app_map_region(struct addrspace *as, u32 vstart, u32 vend)
     if (vstart >= vend) return 0;
     pages = (vend - vstart) / PAGE_SIZE;
 
-    phys = pgalloc_alloc_n((int)pages);
+    phys = pgalloc_alloc_phys(as->owner, (int)pages);
     if (phys) {
         if (paging_addrspace_map_user_range_phys(as, vstart, vend, phys,
                                                  PAGE_RW | PTE_USER) == 0) {
             return 0;
         }
-        pgalloc_free_n(phys, (int)pages);
+        pgalloc_free_n_owner(as->owner, phys / PAGE_SIZE, (int)pages);
         return -1;
     }
 
     for (v = vstart; v < vend; v += PAGE_SIZE) {
-        phys = pgalloc_alloc_page();
+        phys = pgalloc_alloc_phys(as->owner, 1);
         if (!phys) return -1;
         if (paging_addrspace_map_user(as, v, phys, PAGE_RW | PTE_USER) != 0) {
-            pgalloc_free_page(phys);
+            pgalloc_free_n_owner(as->owner, phys / PAGE_SIZE, 1);
             return -1;
         }
     }
@@ -1122,8 +1143,13 @@ static int app_map_region(struct addrspace *as, u32 vstart, u32 vend)
 /*  paging_addrspace_free_user_range がアプリ固有 PDE の外を触らないので       */
 /*  巻き添えにならない。 */
 /* ======================================================================== */
+/* 取り残し (3 領域の外に張られたまま返らなかったページ) の累計。R5 (a) の
+ * 診断で、0 のままが正常 (カーネルシンボル。KAPI にはしない)。 */
+u32 exec_as_leftover_pages;
+
 static void exec_teardown_app(AppSlot *a)
 {
+    u32 left;
     if (!a || !a->cpl3 || !a->as.pd_phys) return;
     /* 共有ライブラリの .data 複製ページを返す (PD 破棄の前, K3) */
     shlib_addrspace_detach(&a->as);
@@ -1138,7 +1164,22 @@ static void exec_teardown_app(AppSlot *a)
                                          a->band_top - RING3_USTACK_SIZE,
                                          a->band_top);
     paging_addrspace_destroy(&a->as);
+    /* 最後に AS owner の取り残しを台帳から掃除し (件数は診断へ)、番号を返す
+     * (TASK_T1_LEDGER §3-2、R5 (a))。 */
+    left = 0;
+    if (ledger_reclaim_owner(a->as.owner, &left))
+        exec_as_leftover_pages += left;
+    (void)ledger_owner_retire(a->as.owner);
+    a->as.owner = 0;
     a->cpl3 = 0;
+}
+
+/* V86 バッキングの owner (TASK_T1_LEDGER §4-8): KAPI 経由 (CPL=3 アプリの
+ * syscall の中) なら呼び手の AS、カーネルの中からなら kernel。 */
+u32 exec_ledger_owner(void)
+{
+    return (g_cur_app && g_cur_app->cpl3) ? g_cur_app->as.owner
+                                         : LEDGER_OWNER_KERNEL;
 }
 
 /* ======================================================================== */
@@ -1901,7 +1942,19 @@ static int exec_launch(const char *cmdline, int gui_arg)
     if (want_ring3) {
         u32 bb_base = 0, bb_size = 0;
 
-        if (paging_addrspace_create_n(&ctx->as, g_ring3_band_pdes) != 0) {
+        u32 as_owner;
+
+        /* AS owner は AS 作成の直前に取り、struct addrspace に持つ
+         * (TASK_T1_LEDGER §4-8)。返却は exec_teardown_app。 */
+        if (!ledger_owner_new(LEDGER_KIND_AS, (u32)id, "app", &as_owner)) {
+            shell_print("Error: ring3 addrspace create failed\n", ATTR_RED);
+            exec_restore_band(launcher_id);
+            return EXEC_ERR_NOMEM;
+        }
+        if (paging_addrspace_create_n(&ctx->as, as_owner,
+                                      g_ring3_band_pdes) != 0) {
+            (void)ledger_owner_retire(as_owner);
+            ctx->as.owner = 0;
             shell_print("Error: ring3 addrspace create failed\n", ATTR_RED);
             exec_restore_band(launcher_id);
             return EXEC_ERR_NOMEM;
@@ -2002,8 +2055,13 @@ static int exec_launch(const char *cmdline, int gui_arg)
     if (want_ring3) {
         paging_load_cr3(ctx->as.pd_phys);
     } else if (!is_shell) {
-        /* CPL=0 の子は従来どおり identity。固定帯を pgalloc に予約させる。 */
-        exec_cpl0_claim();
+        /* CPL=0 の子は従来どおり identity。固定帯を台帳に owner 付きで
+         * 押さえる。他 owner のページが混じれば **読み込みを始める前に**
+         * 断る (claim_refused、TASK_T1_LEDGER §3-6。入口判定は変えない)。 */
+        if (exec_cpl0_claim(id) != 0) {
+            shell_print("Error: program space is in use\n", ATTR_RED);
+            return EXEC_ERR_NOMEM;
+        }
     }
 
     file_buf = (u8 *)load_base;

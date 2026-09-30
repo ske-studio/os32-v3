@@ -55,7 +55,7 @@ void _start(void)
     CHECK(paging_boot_context());
     CHECK(paging_verify_identity(4096,128,(void *)(4096 * PAGE_SIZE)));
     cap.flags |= SYS_DEVICE_RAM_MAPPED;
-    CHECK(pgalloc_alloc_n_pfn(1,4911,4912,&p));
+    CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, 4911, 4912, LEDGER_BOTTOM_UP, &p));
     total = pgalloc_total_pages(); free = pgalloc_free_pages();
     for (i = 0; i < 512; i++) old[i] = ((u32 *)l.metadata)[i];
     for (i = 0; i < SYS_DEVICE_MAX_SPANS; i++) ledger_before[i] = device_ledger[i];
@@ -68,12 +68,12 @@ void _start(void)
         CHECK(ledger_before[i].span.end == device_ledger[i].span.end);
         CHECK(ledger_before[i].span.kind == device_ledger[i].span.kind);
     }
-    CHECK(pgalloc_free_n_pfn(p,1));
+    CHECK(pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, p, 1));
     CHECK(sys_device_reserve_core(1,s,2,&cap));
     CHECK(pgalloc_total_pages() == total - 640 && pgalloc_free_pages() == free + 1 - 640);
     CHECK(sys_device_reserve_core(1,s,2,&cap));
-    CHECK(!pgalloc_free_n_pfn(4096,128));
-    CHECK(!pgalloc_alloc_n_pfn(1,4911,4912,&p));
+    CHECK(!pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, 4096, 128));
+    CHECK(!pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, 4911, 4912, LEDGER_BOTTOM_UP, &p));
     CHECK(paging_verify_identity(4096,128,(void *)(4096 * PAGE_SIZE)));
     CHECK(paging_verify_identity(4400,512,(void *)(4400 * PAGE_SIZE)));
     report("PASS real ONLINE broker atomic BB+aperture; no device mapping\n",

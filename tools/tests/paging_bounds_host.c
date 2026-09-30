@@ -16,11 +16,11 @@ static void report(const char *text, u32 len)
 }
 #define SAY(s) report(s "\n", sizeof(s "\n") - 1)
 #define CHECK(x) do { if (!(x)) { SAY("FAIL: " #x); die(1); } } while (0)
-#define pgalloc_alloc_n_pfn actual_alloc_n_pfn
+#define pgalloc_alloc_phys actual_alloc_phys
 #define pgalloc_alloc_pt actual_alloc_pt
 #define pgalloc_free_pt actual_free_pt
 #include "pgalloc_host_source.c"
-#undef pgalloc_alloc_n_pfn
+#undef pgalloc_alloc_phys
 #undef pgalloc_alloc_pt
 #undef pgalloc_free_pt
 /* pgalloc_host_source.c は irq_save() を 0 に置き換えてある。 */
@@ -31,11 +31,12 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 /* master の動的 PT は workspace からだけ来る (T1a で legacy の探索を撤去)。
  * 使用中の workspace ページ数を数え、used に含める。 */
 static u32 ws_used;
-int pgalloc_alloc_n_pfn(int n, u32 first, u32 end, u32 *pfn)
+/* AS の PD / PT (paging_addrspace_create_n) の確保。枯渇の注入だけで、
+ * calls (master の PT の要求回数) には数えない。 */
+u32 pgalloc_alloc_phys(u32 owner, int n)
 {
-    calls++;
     if (used_pages + ws_used >= limit) return 0;
-    return actual_alloc_n_pfn(n, first, end, pfn);
+    return actual_alloc_phys(owner, n);
 }
 u32 pgalloc_alloc_pt(void)
 {
@@ -98,7 +99,7 @@ void _start(void)
     {
         struct addrspace as;
         u32 before = used, before_calls;
-        CHECK(paging_addrspace_create(&as) == 0);
+        CHECK(paging_addrspace_create(&as, LEDGER_OWNER_KERNEL) == 0);
         before_calls = calls;
         CHECK(paging_map_phys(0x2000000, 0, 1, PAGE_RW) == -1);
         CHECK(calls == before_calls);
@@ -118,7 +119,7 @@ void _start(void)
     {
         struct addrspace as;
         u32 saved;
-        CHECK(paging_addrspace_create(&as) == 0);
+        CHECK(paging_addrspace_create(&as, LEDGER_OWNER_KERNEL) == 0);
         CHECK(paging_addrspace_map_user_range(&as, 0x4000, 0x2000, PAGE_RW | PTE_USER) == -1);
         saved = page_tables[8][1023];
         CHECK(paging_addrspace_map_user_range(&as, 0x23FF000, 0x2401000, PAGE_RW | PTE_USER) == -1);
@@ -149,8 +150,8 @@ void _start(void)
     {
         struct addrspace a, b;
         u32 before = used, c = calls;
-        CHECK(paging_addrspace_create(&a) == 0);
-        CHECK(paging_addrspace_create(&b) == 0);
+        CHECK(paging_addrspace_create(&a, LEDGER_OWNER_KERNEL) == 0);
+        CHECK(paging_addrspace_create(&b, LEDGER_OWNER_KERNEL) == 0);
         paging_addrspace_destroy(&a);
         CHECK(paging_set_page(0x2800000, 0, PAGE_RW) == -1);
         CHECK(calls == c);
@@ -197,7 +198,7 @@ void _start(void)
         u32 *pt = page_tables[1023];
         u32 pte = pt[1023], pde = page_directory[1023];
         u32 before, before_calls, cr3, live;
-        CHECK(paging_addrspace_create(&as) == 0);
+        CHECK(paging_addrspace_create(&as, LEDGER_OWNER_KERNEL) == 0);
         host_cr3 = as.pd_phys;
         before = used;
         before_calls = calls;
@@ -235,7 +236,7 @@ void _start(void)
         u32 *app_pt;
 
         CHECK(MEM_POOL_BASE == MEM_APP_BAND_BASE);
-        CHECK(paging_addrspace_create_n(&as, 1) == 0);
+        CHECK(paging_addrspace_create_n(&as, LEDGER_OWNER_KERNEL, 1) == 0);
         CHECK(as.app_pde == APP_BAND_PDE && as.app_pde_count == 1);
         pt_phys = as.app_pt_phys[0];
         CHECK(paging_addrspace_clear_app_band(&as) == 0);

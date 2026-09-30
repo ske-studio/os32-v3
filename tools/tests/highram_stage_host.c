@@ -113,10 +113,10 @@ void _start(void)
     CHECK(sys_memory_bootstrap_model(&m, &l, paging_verify_identity));
 #endif
     CHECK(sys_usable_mem_end() == l.workspace_first * PAGE_SIZE);
-    CHECK(!pgalloc_alloc_page());
+    CHECK(!pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, 1));
     p = 99;
-    CHECK(!pgalloc_alloc_n_pfn(1, 4096, TEST_END, &p) && p == 99);
-    CHECK(!pgalloc_alloc_n_range(1, l.workspace_first * PAGE_SIZE, l.workspace_end * PAGE_SIZE));
+    CHECK(!pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, 4096, TEST_END, LEDGER_BOTTOM_UP, &p) && p == 99);
+    CHECK(!pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, l.workspace_first, l.workspace_end, LEDGER_BOTTOM_UP, &p));
 #if defined(TEST_NONMASTER) || defined(TEST_LIVE)
     /* Simulate the CR3/live-AS state that the stage must reject, even though
      * bootstrap intentionally prevents creating a new AS through alloc. */
@@ -127,7 +127,7 @@ void _start(void)
 #endif
     CHECK(!sys_memory_stage_online());
     CHECK(!page_tables[4][0] && !page_tables[8] && !page_tables[1023]);
-    CHECK(pgalloc_model_state() == PGALLOC_BOOTSTRAP && !pgalloc_alloc_page());
+    CHECK(pgalloc_model_state() == PGALLOC_BOOTSTRAP && !pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, 1));
     for (i = 0; i < 4096; i++) CHECK(low[i] == page_tables[i / PTE_COUNT][i % PTE_COUNT]);
     die(0);
 #endif
@@ -138,7 +138,7 @@ void _start(void)
 #if defined(TEST_OOM) || defined(TEST_LATE_OOM) || defined(TEST_UNMAPPED_WS)
     CHECK(!sys_memory_stage_online());
     CHECK(pgalloc_model_state() == PGALLOC_BOOTSTRAP);
-    CHECK(!pgalloc_alloc_page() && !pgalloc_alloc_n_pfn(1, 4096, TEST_END, &p));
+    CHECK(!pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, 1) && !pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, 4096, TEST_END, LEDGER_BOTTOM_UP, &p));
     CHECK(!page_tables[1023]);
 #ifndef TEST_LATE_OOM
     for (i = 8; i < TEST_END / PTE_COUNT; i++) CHECK(!page_tables[i] && !page_directory[i]);
@@ -152,7 +152,7 @@ void _start(void)
     page_directory[4] |= PTE_PCD;
     CHECK(!sys_memory_stage_online());
     CHECK(pgalloc_model_state() == PGALLOC_BOOTSTRAP);
-    CHECK(!pgalloc_alloc_page());
+    CHECK(!pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, 1));
     die(0);
 #endif
     CHECK(sys_memory_stage_online());
@@ -164,16 +164,16 @@ void _start(void)
     {
         u32 ceiling = sys_usable_mem_end();
         u32 need = ((u32)MEM_GFX_BB8_SIZE + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
-        u32 base = sys_reserve_top((u32)MEM_GFX_BB8_SIZE);
+        u32 base = sys_reserve_top(LEDGER_OWNER_BOOT, (u32)MEM_GFX_BB8_SIZE);
         CHECK(base != 0);
         CHECK(base == ceiling - need);
         CHECK(sys_usable_mem_end() == base);
         /* 予約の分だけ上限が下がる。窓は無いので workspace_first からちょうど need。 */
         CHECK(base == l.workspace_first * PAGE_SIZE - need);
         /* Idempotent for the same size, and the reserved pages never allocate. */
-        CHECK(sys_reserve_top((u32)MEM_GFX_BB8_SIZE) == base);
-        CHECK(!sys_reserve_top((u32)MEM_GFX_BB8_SIZE + PAGE_SIZE));
-        CHECK(!pgalloc_alloc_n_range(1, base, base + need));
+        CHECK(sys_reserve_top(LEDGER_OWNER_BOOT, (u32)MEM_GFX_BB8_SIZE) == base);
+        CHECK(!sys_reserve_top(LEDGER_OWNER_BOOT, (u32)MEM_GFX_BB8_SIZE + PAGE_SIZE));
+        CHECK(!pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, base / PAGE_SIZE, (base + need) / PAGE_SIZE, LEDGER_BOTTOM_UP, &p));
         die(0);
     }
 #endif
@@ -182,19 +182,19 @@ void _start(void)
     CHECK(!paging_is_present(TEST_END * PAGE_SIZE));
     CHECK(paging_is_present(0xffffffffUL));
     CHECK(pgalloc_model_state() == PGALLOC_ONLINE);
-    CHECK(!pgalloc_alloc_n_pfn(1, l.workspace_first, 4096, &p));
-    CHECK(!pgalloc_free_n_pfn(l.workspace_first, 1));
-    CHECK(!pgalloc_free_n_pfn(l.metadata_first, 1));
+    CHECK(!pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, l.workspace_first, 4096, LEDGER_BOTTOM_UP, &p));
+    CHECK(!pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, l.workspace_first, 1));
+    CHECK(!pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, l.metadata_first, 1));
     for (i = 8; i < TEST_END / PTE_COUNT; i++) {
         CHECK((u32)page_tables[i] >= l.workspace_first * PAGE_SIZE);
         CHECK((u32)page_tables[i] < l.workspace_end * PAGE_SIZE);
     }
     CHECK((u32)page_tables[1023] >= l.workspace_first * PAGE_SIZE);
     CHECK((u32)page_tables[1023] < l.workspace_end * PAGE_SIZE);
-    CHECK(pgalloc_alloc_n_pfn(1, 1048575, 1048576, &p) && p == 1048575);
-    CHECK(pgalloc_free_n_pfn(p, 1));
-    CHECK(pgalloc_reserve_pfn(MEM_POOL_BASE / PAGE_SIZE, 4096));
-    CHECK(pgalloc_alloc_page() == 4096 * PAGE_SIZE);
+    CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, 1048575, 1048576, LEDGER_BOTTOM_UP, &p) && p == 1048575);
+    CHECK(pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, p, 1));
+    CHECK(pgalloc_reserve_pfn(LEDGER_OWNER_KERNEL, MEM_POOL_BASE / PAGE_SIZE, 4096));
+    CHECK(pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, 1) == 4096 * PAGE_SIZE);
     CHECK(!sys_memory_stage_online());
     die(0);
 }

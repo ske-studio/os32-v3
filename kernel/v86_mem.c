@@ -9,6 +9,8 @@
 #include "v86_bios.h"
 
 static u32 backing_phys = 0;
+/* バッキングの台帳の owner (setup の引数。teardown が同じ owner で返す)。 */
+static u32 backing_owner = 0;
 
 u32 v86_mem_backing_phys(void) { return backing_phys; }
 
@@ -31,7 +33,7 @@ static const struct v86_ident_ent {
 #define V86_IDENT_MAP_N \
     ((int)(sizeof(v86_ident_map) / sizeof(v86_ident_map[0])))
 
-int v86_mem_setup(void)
+int v86_mem_setup(u32 owner)
 {
     if (backing_phys) {
         return -1;              /* 二重セットアップ */
@@ -41,7 +43,8 @@ int v86_mem_setup(void)
      * ゲストはこれを引き継いで初めてまともに動ける。 */
     v86_bios_save_real();
 
-    backing_phys = pgalloc_alloc_n(V86_BACKING_PAGES);
+    backing_phys = pgalloc_alloc_phys(owner, V86_BACKING_PAGES);
+    backing_owner = owner;
     if (!backing_phys) {
         return -2;              /* 連続領域が取れない */
     }
@@ -162,6 +165,8 @@ void v86_mem_teardown(void)
     /* ゲストに開けたポートを全部塞ぐ */
     v86_io_reset_policy();
 
-    pgalloc_free_n(backing_phys, V86_BACKING_PAGES);
+    pgalloc_free_n_owner(backing_owner, backing_phys / PAGE_SIZE,
+                         V86_BACKING_PAGES);
     backing_phys = 0;
+    backing_owner = 0;
 }

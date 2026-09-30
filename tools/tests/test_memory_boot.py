@@ -41,6 +41,20 @@ MUTATIONS = [
      "        top - pages - ws_pages >= MEM_APP_BAND_MAX_TOP / PAGE_SIZE) {",
      "        top - pages - ws_pages > MEM_APP_BAND_MAX_TOP / PAGE_SIZE) {",
      ("arena", 12296)),
+    # D11 (T1a の Codex P3、T1b で追加): プローブの上限を外す (2GB を越えて数える)。
+    ("detect-cap-removed", "kernel/memory_boot.c",
+     "    if (reported > (MEM_PHYS_RAM_CEILING - MEM_HIGH_RAM_BASE) / MEM_1MB)\n"
+     "        reported = (MEM_PHYS_RAM_CEILING - MEM_HIGH_RAM_BASE) / MEM_1MB;\n",
+     "", ("detect_cap", 16384)),
+    # exec の最小域の fail-stop の境界を 1 ページずらす (0x58F000 で起動してしまう)。
+    ("minimum-off-by-page", "kernel/sys.c",
+     "    } else if (l->kind == PGALLOC_BACKING_FIXED) {\n        if (top < minimum) goto done;",
+     "    } else if (l->kind == PGALLOC_BACKING_FIXED) {\n        if (top + 1 < minimum) goto done;",
+     ("minimum_short", 5692)),
+    # 同梱域の申告の範囲検査を外す (同梱域の外の申告を受け付けてしまう)。
+    ("bundle-range-blind", "kernel/memory_boot.c",
+     "    if (first >= end || first < lo || end > hi) return 0;",
+     "    if (first >= end) return 0;", ("bundle", 16384)),
     # FIXED のとき backing を張り忘れる (verify が落ちて 8MB が起動しない)。
     ("backing-unmapped", "kernel/memory_boot.c",
      "        if (!paging_map_ledger_backing()) return 0;\n",
@@ -83,7 +97,12 @@ def run_case(case='default', kb=16384, defines=(), mutation=None):
             'static void __attribute__((unused)) host_kernel_boot(u32 mem_kb) {\n'
             '#define kprintf(...) ((void)0)\n#define shm_init() die(7)\n' + gate +
             '\n#undef kprintf\n#undef shm_init\n}\n')
-        (d / 'memory_boot_host_source.c').write_text(texts['kernel/memory_boot.c'])
+        mb = texts['kernel/memory_boot.c']
+        if case == 'detect_cap':
+            # BIOS ワークと書き込み検証をホストの配列で受ける (memory_boot_host.c)。
+            mb = mb.replace('static void *boot_ptr(u32 addr)',
+                            '__attribute__((unused)) static void *boot_ptr_real(u32 addr)', 1)
+        (d / 'memory_boot_host_source.c').write_text(mb)
         cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie', '-ffunction-sections', '-Wl,--gc-sections', f'-DTEST_{case.upper()}', f'-DTEST_KB={kb}UL'] + list(defines)
         # arch/x86 + platform/pc98: include/io.h / include/cpu.h は契約
         # だけで、実装は固定名 arch_io.h / arch_cpu.h / platform_io.h を
@@ -212,6 +231,23 @@ class MemoryBoot(unittest.TestCase):
 
     def test_fixed_backing_rejects_ram_and_out_of_range(self):
         self.run_case('fixed_reject', 8192)
+
+    def test_detect_probe_cap_d11(self):
+        # T1a の Codex P3 (T1b で追加): 0594h の申告が 2GB を越えてもプローブと
+        # 登録は MEM_PHYS_RAM_CEILING で止まる。
+        self.run_case('detect_cap', 16384)
+
+    def test_exec_minimum_failstop_boundary(self):
+        # T1a の訂正 5 (T1b で追加): 低位 RAM 0x590000 ちょうどは起動し、
+        # 1 ページ足りなければ何も変えずに fail-stop。
+        self.run_case('minimum', 0x590000 // 1024)
+        self.run_case('minimum_short', 0x58F000 // 1024)
+
+    def test_bundle_staging_rule(self):
+        # 集積域・同梱域の規則 (§3-3 ③、T1b): 申告あり / なし / 範囲外。
+        for kb in (8192, 16384):
+            with self.subTest(kb=kb):
+                self.run_case('bundle', kb)
 
     def test_ram_kb_is_the_registered_total_not_the_top(self):
         # K6-RAM decision (2). (top-of-RAM KiB from the detector, real RAM KiB).

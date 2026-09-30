@@ -15,7 +15,7 @@
 /*  原本を帯域の末尾に置くのは、pgalloc から取ると子プロセスの claim         */
 /*  (exec_child_claim が [MEM_EXEC_LOAD_ADDR, ...) をまとめて mark/free する) */
 /*  と衝突して、子の終了時に道連れで解放されてしまうため。帯域はロード成功時に */
-/*  まるごと pgalloc_mark_used() で押さえ、以後解放しない。                   */
+/*  まるごと ledger_claim_fixed(shlib) で押さえ、以後解放しない。             */
 /* ======================================================================== */
 
 #include "shlib.h"
@@ -91,14 +91,20 @@ int shlib_init(void)
     }
 
     /* 先に帯域を押さえてから読む。読み込み中に他所が pgalloc から
-     * ここを取ることは無いが、失敗経路で必ず戻すので順序を固定する。 */
-    pgalloc_mark_used(MEM_SHLIB_BASE, band_pages);
+     * ここを取ることは無いが、失敗経路で必ず戻すので順序を固定する。
+     * 台帳の owner は shlib (TASK_T1_LEDGER §4-8)。他 owner のページが
+     * 混じっていたら押さえずに断る (固定帯を ③ で永久除外しない、X9)。 */
+    if (!ledger_claim_fixed(LEDGER_OWNER_SHLIB, MEM_SHLIB_BASE / PAGE_SIZE,
+                            MEM_SHLIB_END / PAGE_SIZE)) {
+        kprintf(0xC1, "[shlib] band %x is in use\n", (u32)MEM_SHLIB_BASE);
+        return -1;
+    }
 
     sz = vfs_read(SYS_SHLIB_GUI, buf, MEM_SHLIB_SIZE);
     if (sz <= 0) {
         /* 未ロード。GUI を使わないプログラムには影響しないので静かに戻る。 */
         kprintf(0x07, "[shlib] %s not found (GUI shlib disabled)\n", SYS_SHLIB_GUI);
-        pgalloc_free_n(MEM_SHLIB_BASE, band_pages);
+        pgalloc_free_n_owner(LEDGER_OWNER_SHLIB, MEM_SHLIB_BASE / PAGE_SIZE, band_pages);
         return -1;
     }
 
@@ -109,7 +115,7 @@ int shlib_init(void)
         oh->header_size > (u32)sz) {
         kprintf(0xC1, "[shlib] bad OS32X header (magic=%x hsize=%u)\n",
                 oh->magic, oh->header_size);
-        pgalloc_free_n(MEM_SHLIB_BASE, band_pages);
+        pgalloc_free_n_owner(LEDGER_OWNER_SHLIB, MEM_SHLIB_BASE / PAGE_SIZE, band_pages);
         return -1;
     }
     /* ---- 要求する KAPI 版 (exec のヘッダ検査と同じ条件) ----
@@ -122,7 +128,7 @@ int shlib_init(void)
         kprintf(0xC1, "[shlib] %s: needs KAPI v%u > kernel v%u - "
                 "update the kernel first (GUI shlib disabled)\n",
                 SYS_SHLIB_GUI, oh->min_api_ver, (u32)KAPI_VERSION);
-        pgalloc_free_n(MEM_SHLIB_BASE, band_pages);
+        pgalloc_free_n_owner(LEDGER_OWNER_SHLIB, MEM_SHLIB_BASE / PAGE_SIZE, band_pages);
         return -1;
     }
     /* ---- KAPI データ欄の配置 (票 TASK_KAPI_DATA_FIELDS、ヘッダ v3) ----
@@ -135,20 +141,20 @@ int shlib_init(void)
             g_reject = SHLIB_REJECT_LAYOUT;
             kprintf(0xC1, "[shlib] %s: %s - rebuild required (GUI shlib disabled)\n",
                     SYS_SHLIB_GUI, os32x_layout_reason(lrc));
-            pgalloc_free_n(MEM_SHLIB_BASE, band_pages);
+            pgalloc_free_n_owner(LEDGER_OWNER_SHLIB, MEM_SHLIB_BASE / PAGE_SIZE, band_pages);
             return -1;
         }
     }
     if ((oh->flags & OS32X_FLAG_SHLIB) == 0) {
         kprintf(0xC1, "[shlib] not a shared library (flags=%x)\n", oh->flags);
-        pgalloc_free_n(MEM_SHLIB_BASE, band_pages);
+        pgalloc_free_n_owner(LEDGER_OWNER_SHLIB, MEM_SHLIB_BASE / PAGE_SIZE, band_pages);
         return -1;
     }
     image_size = oh->text_size + oh->bss_size;
     if (oh->text_size + oh->header_size > (u32)sz || image_size > MEM_SHLIB_SIZE) {
         kprintf(0xC1, "[shlib] image too large (text=%u bss=%u)\n",
                 oh->text_size, oh->bss_size);
-        pgalloc_free_n(MEM_SHLIB_BASE, band_pages);
+        pgalloc_free_n_owner(LEDGER_OWNER_SHLIB, MEM_SHLIB_BASE / PAGE_SIZE, band_pages);
         return -1;
     }
 
@@ -173,19 +179,19 @@ int shlib_init(void)
     sh = (OS32ShlibHeader *)buf;
     if (sh->magic != OS32_SHLIB_MAGIC) {
         kprintf(0xC1, "[shlib] bad jump table magic %x\n", sh->magic);
-        pgalloc_free_n(MEM_SHLIB_BASE, band_pages);
+        pgalloc_free_n_owner(LEDGER_OWNER_SHLIB, MEM_SHLIB_BASE / PAGE_SIZE, band_pages);
         return -1;
     }
     if (sh->nfunc > (u32)OS32_SHLIB_MAX_FUNC) {
         kprintf(0xC1, "[shlib] nfunc %u > %u\n",
                 sh->nfunc, (u32)OS32_SHLIB_MAX_FUNC);
-        pgalloc_free_n(MEM_SHLIB_BASE, band_pages);
+        pgalloc_free_n_owner(LEDGER_OWNER_SHLIB, MEM_SHLIB_BASE / PAGE_SIZE, band_pages);
         return -1;
     }
     if (sh->text_pages == 0 ||
         sh->text_pages > MEM_SHLIB_SIZE / PAGE_SIZE) {
         kprintf(0xC1, "[shlib] bad text_pages %u\n", sh->text_pages);
-        pgalloc_free_n(MEM_SHLIB_BASE, band_pages);
+        pgalloc_free_n_owner(LEDGER_OWNER_SHLIB, MEM_SHLIB_BASE / PAGE_SIZE, band_pages);
         return -1;
     }
     text_end = MEM_SHLIB_BASE + sh->text_pages * PAGE_SIZE;
@@ -200,7 +206,7 @@ int shlib_init(void)
         data_end + sh->data_pages * PAGE_SIZE > MEM_SHLIB_END) {
         kprintf(0xC1, "[shlib] bad data range (vaddr=%x pages=%u)\n",
                 sh->data_vaddr, sh->data_pages);
-        pgalloc_free_n(MEM_SHLIB_BASE, band_pages);
+        pgalloc_free_n_owner(LEDGER_OWNER_SHLIB, MEM_SHLIB_BASE / PAGE_SIZE, band_pages);
         return -1;
     }
 
@@ -218,7 +224,7 @@ int shlib_init(void)
     if (paging_map_range(MEM_SHLIB_BASE, text_end, MEM_SHLIB_BASE,
                          PAGE_RO | PTE_USER) != 0) {
         kprintf(0xC1, "[shlib] text mapping failed\n");
-        pgalloc_free_n(MEM_SHLIB_BASE, band_pages);
+        pgalloc_free_n_owner(LEDGER_OWNER_SHLIB, MEM_SHLIB_BASE / PAGE_SIZE, band_pages);
         return -1;
     }
     /* .data/.bss と原本は master では identity RW / USER なし のまま。
@@ -275,14 +281,14 @@ int shlib_addrspace_attach(struct addrspace *as)
     /* アプリ専用の物理ページ。この時点で exec は子プロセス帯
      * [MEM_EXEC_LOAD_ADDR, ...) を mark_used 済みなので、pgalloc は
      * その上の動的確保リザーブ (EXEC_DYN_RESERVE の穴) から返す。 */
-    phys = pgalloc_alloc_n((int)g_data_pages);
+    phys = pgalloc_alloc_phys(as->owner, (int)g_data_pages);
     if (phys == 0) {
         kprintf(0xC1, "[shlib] no memory for %u data pages\n", g_data_pages);
         return -1;
     }
 
     /* 原本を複製 (identity マッピングなので物理=仮想で書ける)。 */
-    kmemcpy((void *)phys, (const void *)g_data_master,
+    kmemcpy(P2V(phys), (const void *)g_data_master,
             g_data_pages * PAGE_SIZE);
 
     for (i = 0; i < g_data_pages; i++) {
@@ -308,7 +314,8 @@ void shlib_addrspace_detach(struct addrspace *as)
     if (!as) return;
     for (i = 0; i < SHLIB_MAX_ATTACH; i++) {
         if (g_attach[i].as == as) {
-            pgalloc_free_n(g_attach[i].phys, (int)g_attach[i].pages);
+            pgalloc_free_n_owner(as->owner, g_attach[i].phys / PAGE_SIZE,
+                                 (int)g_attach[i].pages);
             g_attach[i].as = 0;
             g_attach[i].phys = 0;
             g_attach[i].pages = 0;
