@@ -9,14 +9,13 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 同じ事実を 2 か所で独立に更新する構造は必ず食い違う (2026-09-05 の診断で 6 件)。
 **変わりやすい数値・手順・進捗は下表の正典だけを更新し、他の文書は要約と参照に留める。**
 
-> **このリポジトリ (os32-v3) が現行の開発 (v3) で、文書の正典はここ。** os32 (v2.x、タグ `v2.1`、`main`) は **v2.1 時点の記録 (戻り先)** で、新機能は入れない (ユーザー決定 2026-09-29、正典は [ROADMAP.md §0-1](ROADMAP.md))。
+> **文書の正典はここ (このリポジトリ os32-v3、現行の開発 = v3)。** [os32](https://github.com/ske-studio/os32) (v2.x、タグ `v2.1`、`main`) は **v2.1 時点の記録・戻り先で、更新しない** — 新機能は入れず、手を入れるのは戻る必要が生じたときと致命的な不具合のときだけ (ユーザー決定 2026-09-29、正典は [ROADMAP.md §0-1](ROADMAP.md))。
 > fork は 2026-09-30 (os32 v2.1 `6ccc4049` + feat/gui `dfa97f57` から、新しい履歴で。段取りと持ってこなかったものは [tasks/v3/FORK_PLAN.md](tasks/v3/FORK_PLAN.md) §1・§3)。経緯の要約は [HISTORY.md](HISTORY.md)、普遍的な教訓は [CASE_STUDIES.md](CASE_STUDIES.md)。
-> os32 側の URL と、ROADMAP §0 / ROLES §0 / CLAUDE.md の体制欄の更新は FORK_PLAN §3 e で行う (初期コミットでは未着手)。
 
 | 情報単位 | 正典 (ここだけ更新) | 参照側 (要約 + リンクのみ) |
 |---|---|---|
 | 制約規則 [C/HW/ABI/V/D] | [CONSTRAINTS.md](CONSTRAINTS.md) | CLAUDE.md (ID 参照、`make check` が照合)。Hermes 用の SOUL.md は 2026-09-29 に `SOUL.md` (非公開・リポジトリ外、`.gitignore`) へ (効力なし) |
-| 引き継ぎ (次の PM への申し送り)・v2.1 時点の現在地と残件 | [tasks/agents/HANDOVER_2026-09-29.md](tasks/agents/HANDOVER_2026-09-29.md) (最新、表だけ) | 前回は [archive/agents/HANDOVER_2026-09-22.md](archive/agents/HANDOVER_2026-09-22.md) (09-22〜25 の日ごとの追記) |
+| 引き継ぎ (次の PM への申し送り)・v2.1 時点の現在地と残件 | [tasks/agents/HANDOVER_2026-09-29.md](tasks/agents/HANDOVER_2026-09-29.md) (fork 時点の申し送り、完了記録、表だけ。次の引き継ぎは os32-v3 で新しく起こす) | 前回は [archive/agents/HANDOVER_2026-09-22.md](archive/agents/HANDOVER_2026-09-22.md) (09-22〜25 の日ごとの追記) |
 | エージェント運用体制 (役割・起動・規約) | [tasks/agents/ROLES.md](tasks/agents/ROLES.md) (§0「現行の体制」が 1 節で現行、下は経緯) | CLAUDE.md (体制 1 段落 + リンク)。過去の快照は [archive/agents/RETROSPECTIVE_2026-09-09.md](archive/agents/RETROSPECTIVE_2026-09-09.md) |
 | 番地・帯域 | `include/memmap.h` (定義) → [02_memory.md §2-1](02_memory.md) の**生成ブロック** (`tools/gen_memmap.py --write`、地図はここ 1 か所だけ) | CLAUDE.md は帯の粒度のみ。`memmap.h` の先頭は生成先への案内。重なり・逆転・写しのずれは `make check` の `gen_memmap.py --check` が見る |
 | KAPI の一覧・オフセット・版 | `sdk/kapi.json` → [KAPI_SPEC.md §4](KAPI_SPEC.md) | README.md / このファイル / KAPI_SPEC.md の版番号 (`tools/check_kapi_version.py` が照合。CLAUDE.md は版数を持たない) |
@@ -145,7 +144,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 
 | ドキュメント | 内容 |
 |-------------|------|
-| [tasks/agents/HANDOVER_2026-09-29.md](tasks/agents/HANDOVER_2026-09-29.md) | **最新の引き継ぎ (2026-09-29、現行)** — v2.1 のタグの時点の現在地、v3 の fork の段取り (決定済み)、残件表、道具、罠。表だけ |
+| [tasks/agents/HANDOVER_2026-09-29.md](tasks/agents/HANDOVER_2026-09-29.md) | **fork 時点の申し送り (2026-09-29、完了記録)** — v2.1 のタグの時点の現在地、v3 の fork の段取り (決定済み、2026-09-30 に実施)、残件表、道具、罠。表だけ。次の引き継ぎは os32-v3 で新しく起こす |
 | [tasks/agents/ROLES.md](tasks/agents/ROLES.md) | **体制の正典** (現行) — §0 の 1 表が現行の体制、§1〜§5 が細則、末尾が経緯 |
 | [archive/agents/HANDOVER_2026-09-22.md](archive/agents/HANDOVER_2026-09-22.md) | 引き継ぎ 2026-09-22〜25 (完了記録) — 実機初日 (FD 起動・シリアル 115200・PCI 列挙・LAN の橋) から HDD 起動まで、日ごとの追記 |
 | [archive/agents/HANDOVER_2026-09-18.md](archive/agents/HANDOVER_2026-09-18.md) / [HANDOVER_2026-09-16.md](archive/agents/HANDOVER_2026-09-16.md) | それ以前の引き継ぎ (完了記録) — 09-16 は残件 (H2 / H4 / arch 移設 / kstring 判断 / ゲスト試験ランナー / ARM / LAN 実機 / 小物) の推奨順・決裁点 |
