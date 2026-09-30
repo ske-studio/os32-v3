@@ -484,6 +484,8 @@ static inline u32  V2P(const volatile void *va) { return (u32)(uptr)va; }
 5. **PCM は `s_ring` / `s_ring_phys` を残し、組 `s_ring_buf` を足した** (リングを触る既存の行を変えないため)。
 6. **kselftest の `dmap:first at base` は外した**: 池の先頭の 16KB の中に 64KB 境界があれば落ちる (池の番地に依る)。82557 の量はドライバがまだ無いので定数 16KB。
 
+**Codex 実装レビュー (2026-10-01、gpt-6-astra、Approve)**: P1/P2 なし。実装時の訂正 6 件は妥当。P3 (後続で試験を強める、未着手): (1) `pcm_cs4231_host.c` の模型が解放を `va` で引く (実物は `pa`) — `pa` だけ壊れる変更を見逃す。reset なしの通常再 open と再 open の確保失敗も足す、(2) `fdc_track_host.c` の `dma_chan_setup` の模型は物理上限を見ず、P2V/V2P が恒等なので旧キャストへ戻す変異を区別できない — FDC 経路で 16MB 拒否と V2P を観測する試験を足す、(3) `test_pcm_cs4231.py` の変異の集計がコンパイル失敗も RED に数える — `test_dma_pool.py` と同じく除外する。`dma_free` は `pa` で span を引くので、別の使用中 span の先頭や解放・再割当後の古い組を渡すとその span を解放しうる (今の呼び手に経路は無い) — 呼び手の契約として残す。
+
 ### 4-4. T1d — MMIO 登録と検証済み資源レコード (D33・X4)
 
 | 項 | 内容 |
