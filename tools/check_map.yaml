@@ -686,6 +686,20 @@ checks:
     - tools/tests/test_app_band_pde.py
     - tools/tests/test_app_bb_overlap.py
     - tools/tests/test_device_reservation.py
+    - tools/tests/test_gfx_boot.py
+    - tools/tests/gfx_boot_host.c
+    - gfx/gfx_core.c
+    - gfx/backend_pegc.c
+    - gfx/backend_cirrus.c
+    - include/pegc.h
+    - include/wab_xe10.h
+    - drivers/np2sysp.h
+    - drivers/wab_cirrus.h
+    - drivers/wab_glue.h
+    - drivers/wab_glue_xe10.h
+    - gfx/gfx_internal.h
+    - kapi/kapi_db.h
+    - kapi/kapi_host.h
     - tools/tests/test_highram_stage.py
     - tools/tests/test_ledger.py
     - tools/tests/test_memory_boot.py
@@ -848,6 +862,13 @@ checks:
   check-boot-splash-host:
     - gfx/backend_pc98.c
     - gfx/gfx_core.c
+    - include/kprintf.h
+    - include/pegc.h
+    - include/sys.h
+    - include/wab_xe10.h
+    - kernel/paging.h
+    - kernel/pgalloc.h
+    - kernel/physmem.h
     - kernel/boot_splash.c
     - kernel/boot_splash.h
     - tools/tests/boot_splash_native_host.c

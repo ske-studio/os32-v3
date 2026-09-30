@@ -13,8 +13,9 @@
 /*  ポート・MMIO・BIOS ワークエリアの番地と出典は **すべて include/pegc.h**。 */
 /*  このファイルには生の番号を書かない ([C4] / 票 H2 の鉄則)。               */
 /*                                                                          */
-/*  ページテーブルは触らない。リニア窓は K の paging_map_phys() に張らせる。  */
-/*  バックバッファは物理メモリ末尾から sys_reserve_top() で切り出す。        */
+/*  ページテーブルも台帳も触らない。リニア窓の予約・写像とバックバッファの  */
+/*  確保は起動時の ⑥ (gfx_core.c gfx_boot_reserve、TASK_T1_LEDGER §3-8) が  */
+/*  probe より前に済ませ、ここは台帳の SURFACE (PEGC の CLIENT) を受け取る。 */
 /*                                                                          */
 /*  票 H2c (NP21/W 実機で出た 3 点を修正。根拠は NP21/W のソース):            */
 /*    1. パレットがほぼ黒 → KAPI の輝度は 0〜15、PEGC の 256 色パレット      */
@@ -504,21 +505,47 @@ static u8 pegc_restore_hsync(void)
 /*  probe — 9821 の PEGC が使えるか (9801 では必ず 0)                        */
 /*                                                                          */
 /*  段取り (どれか 1 つでも落ちたら 0 を返し、H1 の 9801 実装に落ちる):      */
-/*    1. BIOS ワークエリアの機種判別 2 バイト。9801 はここで確実に落ちる     */
-/*       ので、以降のポート叩きは 9801 では一切走らない = 回帰ゼロ。         */
-/*    2. リニア窓 F00000h が「張れる」か。16MB システム空間に OS32 の RAM が */
-/*       登録されていたら (= 043Bh bit2=1 の 16MB 構成) 使ってはいけない。   */
-/*       ページングの管理上限 (16MB) に収まることも見る。                     */
+/*    1. 副作用のない識別 (pegc_identify、起動時の ⑥ も同じものを使う)。   */
+/*       9801 はここで確実に落ちるので、以降のポート叩きは 9801 では一切    */
+/*       走らない = 回帰ゼロ。                                              */
+/*    2. ⑥ がリニア窓を予約・写像し、BB を池から確保して SURFACE (PEGC の   */
+/*       CLIENT) に登録していること (pegc_reserve_backbuffer が受け取る)。   */
 /*    3. 043Bh bit2 を読む (診断用)。PC-9801-61 型 SIMM 機ではこのポートは   */
 /*       SIMM ソケットステータスなので、これだけでは決めない。書き込みもしない。*/
 /*    4. 09A0h の解錠フラグが 6Ah の施錠/解錠に追随するか。open bus で常に   */
 /*       FFh を返す機種 (As2 の設定 / Ts はポート自体が無い) を弾くために、   */
 /*       「1 が返る」ではなく「0→1 が切り替わる」ことを見る。                */
-/*    5. 実際に拡張モードへ入り、リニア窓を張って書き込み読み戻し試験。       */
+/*    5. 実際に拡張モードへ入り、⑥ が張ったリニア窓で書き込み読み戻し試験。 */
 /*       終わったら **必ず標準グラフィックモードへ戻す** (probe は副作用を    */
 /*       残さない)。本番のモード設定は init() が行う。                       */
 /* ------------------------------------------------------------------------ */
 static int pegc_linear_selftest(void);
+static int pegc_reserve_backbuffer(void);
+
+/* ページングは先頭 16MB しか固定の PT を持たない。窓の末尾まで入ること。 */
+STATIC_ASSERT(PEGC_LINEAR_BASE + PEGC_LINEAR_SIZE <= PAGING_MAP_SIZE,
+              pegc_window_in_boot_map);
+
+/* 副作用のない識別 (TASK_T1_LEDGER §3-8)。BIOS ワークエリアの 2 バイトと
+ * 物理地図を読むだけで、ポートも VRAM も触らない。起動時の ⑥
+ * (gfx_core.c gfx_boot_reserve) が予約・写像・BB の前に呼び、probe も
+ * 最初に呼ぶ。1 = PEGC の候補。
+ *   - 機種判別 (BIOS ワークエリア, [US] memsys.md)。
+ *   - 15-16MB のシステム空間に OS32 が RAM を登録しているなら、そこは通常
+ *     RAM (043Bh bit2=1 の構成)。PEGC VRAM は F00000h には出ないし、張ったら
+ *     自分の RAM を潰す。**RAM の上端 (sys_get_mem_kb) では決めない** —
+ *     K6-RAM (2026-09-11) で上端の定義が「RAM の上端アドレス / 1024」になり、
+ *     15MB 構成 (ExMemory 16) でも高位 RAM 16-17MB のぶん 17408 になる。
+ *     見るべきは「窓に RAM が登録されているか」で、検出器は 15-16MB を RAM に
+ *     しない (memory_boot.c の MEMORY_BOOT_LEGACY_END クランプ +
+ *     PHYSMEM_RESERVED)。8MB 構成は窓まで RAM が届かないので通る。 */
+int pegc_identify(void)
+{
+    if (!(bios_flag(PEGC_BIOS_ARCH_FLAG) & PEGC_BIOS_ARCH_EXTGFX)) return 0;
+    if (!(bios_flag(PEGC_BIOS_MODE_FLAG) & PEGC_BIOS_MODE_EXTGFX)) return 0;
+    return !pgalloc_range_has_ram(MEM_SYSTEM_SPACE_BASE / PAGE_SIZE,
+                                  MEM_HIGH_RAM_BASE / PAGE_SIZE);
+}
 
 static int pegc_probe(void)
 {
@@ -528,25 +555,9 @@ static int pegc_probe(void)
     s_probed = 1;
     s_probe_ok = 0;
 
-    /* --- 1. 機種判別 (BIOS ワークエリア, [US] memsys.md) --- */
-    if (!(bios_flag(PEGC_BIOS_ARCH_FLAG) & PEGC_BIOS_ARCH_EXTGFX)) return 0;
-    if (!(bios_flag(PEGC_BIOS_MODE_FLAG) & PEGC_BIOS_MODE_EXTGFX)) return 0;
-
-    /* --- 2. リニア窓が張れるか --- */
-    /* 15-16MB のシステム空間に OS32 が RAM を登録しているなら、そこは通常
-     * RAM (043Bh bit2=1 の構成)。PEGC VRAM は F00000h には出ないし、張ったら
-     * 自分の RAM を潰す。
-     * **RAM の上端 (sys_get_mem_kb) では決めない** — K6-RAM (2026-09-11) で
-     * 上端の定義が「RAM の上端アドレス / 1024」になり、15MB 構成 (ExMemory
-     * 16) でも高位 RAM 16-17MB のぶん 17408 になる。上端で見ると窓が空いて
-     * いるのに 9801 へ落ちた。見るべきは上端ではなく「窓に RAM が登録されて
-     * いるか」で、検出器は 15-16MB を RAM にしない (memory_boot.c の
-     * MEMORY_BOOT_LEGACY_END クランプ + PHYSMEM_RESERVED)。
-     * 8MB 構成は窓まで RAM が届かないので従来どおり通る。 */
-    if (pgalloc_range_has_ram(MEM_SYSTEM_SPACE_BASE / PAGE_SIZE,
-                              MEM_HIGH_RAM_BASE / PAGE_SIZE)) return 0;
-    /* ページングは先頭 16MB しか PT を持たない。窓の末尾まで入ること。 */
-    if (PEGC_LINEAR_BASE + (u32)PEGC_FB_SIZE_480 > PAGING_MAP_SIZE) return 0;
+    /* --- 1〜2. 副作用のない識別 (pegc_identify) と、⑥ が窓を予約・写像して
+     * BB を確保済みであること (SURFACE)。probe は自分で予約も写像もしない。 */
+    if (!pegc_identify() || !pegc_reserve_backbuffer()) return 0;
 
     /* --- 3. 16MB 空間の設定 (診断用。判定は 5 の実測で行う) --- */
     s_sys16m_ram = (_in(PEGC_SYS16M_PORT) & PEGC_SYS16M_NORMAL_RAM) ? 1 : 0;
@@ -564,12 +575,13 @@ static int pegc_probe(void)
     return s_probe_ok;
 }
 
-/* 拡張モードへ一時的に入り、リニア窓を張って読み書きできるか確かめる。
- * 戻り値 1 = 使える。終了時はハードもページングも呼び出し前の状態に戻す。 */
+/* 拡張モードへ一時的に入り、リニア窓で読み書きできるか確かめる。
+ * 戻り値 1 = 使える。終了時はハードを呼び出し前の状態に戻す。窓の写像は ⑥ が
+ * 張ったもの (supervisor + PCD) で、失敗しても剥がさない (予約・写像は永久
+ * 保持、TASK_T1_LEDGER §3-8)。 */
 static int pegc_linear_selftest(void)
 {
     volatile u8 *fb = (volatile u8 *)PEGC_LINEAR_BASE;
-    u32 npages = (u32)(PEGC_FB_SIZE_480 + PAGE_SIZE - 1) / PAGE_SIZE;
     int ok = 0;
     u8 s0, s1;
 
@@ -579,13 +591,6 @@ static int pegc_linear_selftest(void)
 
     mmio_w8(PEGC_MMIO_PIXFMT, PEGC_PIXFMT_PACKED);
     mmio_w16(PEGC_MMIO_LINEAR, PEGC_LINEAR_ON);
-
-    /* K のページング API で master PD に張る (H はページテーブルを触らない)。
-     * USER は付けない — init() の本採用でも同じ supervisor + PCD (表示面を
-     * CPL=3 に見せないため。レビュー #5 ②)。 */
-    if (paging_map_phys(PEGC_LINEAR_BASE, PEGC_LINEAR_BASE, npages,
-                        PAGE_RW | PTE_PCD) != 0)
-        goto disable_linear;
 
     /* 2 か所に別の値を書いて読み戻す。同じ値が両方から返る (エイリアス) /
      * 何も返らない (open bus) を弾く。試験に使うのは表示されない末尾側。 */
@@ -597,9 +602,6 @@ static int pegc_linear_selftest(void)
     fb[0] = s0;
     fb[PEGC_FB_SIZE_480 - 1] = s1;
 
-    if (!ok) paging_map_phys(PEGC_LINEAR_BASE, PEGC_LINEAR_BASE, npages, 0);
-
-disable_linear:
     mmio_w16(PEGC_MMIO_LINEAR, PEGC_LINEAR_OFF);
 restore_mode:
     ff2_locked_write(PEGC_FF2_STD_GFX);
@@ -678,51 +680,27 @@ static void pegc_palette_init(void)
 /*  gfx_init() が「probe で選ばれた直後」に 1 回だけ呼ぶ (H1 レビュー ⑤)。   */
 /*  9801 の GDC / プレーン初期化は走らない (あちらは init が NULL)。         */
 /* ------------------------------------------------------------------------ */
-/* バックバッファ (300KB) を物理メモリ末尾から切り出す。済んでいれば何もしない。
- * 0x400000-0x7FFFFF は PD ごとに差し替わる帯なので共有面を置けず、
- * それ以外の 0x500000〜mem_end は CPL=0 の子プロセスが
- * sys_usable_mem_end() まで使い切る。上限そのものを下げるのが唯一の道。
- * ホットデプロイ窓 (さらに上) は sys_hotdeploy_base() 側なので侵さない。
- * 戻り値 1 = 使える。失敗したら probe を取り下げる (9801 へ落ちる)。 */
+/* バックバッファ (300KB) を台帳から受け取る。済んでいれば何もしない。
+ * 確保は起動時の ⑥ (gfx_core.c gfx_boot_reserve) が池の CPL=0 子のアリーナの
+ * 上端から owner = boot で行い、確保の直後に 0 で埋めて (この面は exec が
+ * CPL=3 のアプリへ USER で写すので前の中身を見せない) SURFACE (PEGC の
+ * CLIENT) に登録している。アリーナの上端はその下に凍結されるので、CPL=0 の
+ * 子もここへは伸びてこない (旧 sys_reserve_top の役、TASK_T1_LEDGER §3-6)。
+ * bb_base / bb_size も SURFACE から引く (gfx_bb_phys_range と同じ情報源)。
+ * 戻り値 1 = 使える。無ければ probe を取り下げる (9801 へ落ちる)。 */
 static int pegc_reserve_backbuffer(void)
 {
+    const struct ledger_surface *sf;
     if (s_bb_phys != 0) return 1;
-    /* 永久予約の台帳の owner は boot (TASK_T1_LEDGER §4-8、B11)。予約は
-     * eligible を落とすので、旧版の直後の pgalloc_mark_used は無操作だった
-     * (T1b で撤去)。T1e で池からの確保 + SURFACE に置き換える。 */
-    s_bb_phys = sys_reserve_top(LEDGER_OWNER_BOOT, (u32)MEM_GFX_BB8_SIZE);
-    if (s_bb_phys == 0) {
-        kprintf(0xC1, "[pegc] backbuffer reserve failed (mem too small)\n");
+    sf = ledger_surface_find(LEDGER_SF_PEGC, LEDGER_ROLE_CLIENT);
+    if (!sf) {
         s_probe_ok = 0;
         return 0;
     }
-    /* **予約した直後に 0 で埋める**。この面は exec が CPL=3 のアプリへ USER
-     * で写す (exec/exec.c、gfx_bb_phys_range)。prepare は init と違って画面を
-     * クリアしないので、ここで埋めないと最初の gfx_init までの間、予約前の
-     * 物理ページの残り (カーネルのデータを含みうる) がアプリから見える
-     * (レビュー往復 1)。 */
-    kmemset((u8 *)s_bb_phys, 0, (u32)MEM_GFX_BB8_SIZE);
-    gfx_backend_pegc.bb_base = (u8 *)s_bb_phys;
-    gfx_backend_pegc.bb_size = (u32)MEM_GFX_BB8_SIZE;
+    s_bb_phys = sf->first * PAGE_SIZE;
+    gfx_backend_pegc.bb_base = P2V(s_bb_phys);
+    gfx_backend_pegc.bb_size = sf->npages * PAGE_SIZE;
     return 1;
-}
-
-/* リニア窓を master PD に張る (**supervisor** + RW + キャッシュ無効)。
- * 何度呼んでも同じ写像になる。
- *
- * H2 の初版はここに PTE_USER を付けていた。理由は「paging_addrspace_create
- * が master の PDE を写すので全アプリ PD で共有される」— つまりアプリから
- * 見えるようにするため、だった。だが F00000h は **表示面そのもの** で、
- * PEGC のバックバッファは主記憶側 (sys_reserve_top の 300KB) にある。
- * アプリが要るのはそちらだけで、exec が gfx_bb_phys_range() 経由で
- * USER マップする。表示面を USER にすると CPL=3 が commit を経ずに画面へ
- * 書けてしまい契約 G4 が崩れるので外した (レビュー #5 ②、2026-09-06)。
- * PCD: VRAM は書き込み専用に使うデバイス窓なのでキャッシュに載せない。 */
-static void pegc_map_linear(void)
-{
-    u32 npages = (u32)(PEGC_FB_SIZE_480 + PAGE_SIZE - 1) / PAGE_SIZE;
-    paging_map_phys(PEGC_LINEAR_BASE, PEGC_LINEAR_BASE, npages,
-                    PAGE_RW | PTE_PCD);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -730,9 +708,8 @@ static void pegc_map_linear(void)
 /*                                                                          */
 /*  **表示のモードも同期も変えない**。やるのは                               */
 /*    1. 起動時の同期状態の記録 (と診断の 1 行)                              */
-/*    2. バックバッファの予約 (アプリが走る前でないと取れない)               */
-/*    3. リニア窓の写像 (master PD。以後に作るアプリ PD へ PDE が写る)       */
-/*  だけ。かつては init → shutdown で済ませていたため、CUI しか使わない      */
+/*  だけ (窓の予約・写像と BB は起動時の ⑥ が probe より前に済ませている)。 */
+/*  かつては init → shutdown で済ませていたため、CUI しか使わない      */
 /*  起動でも 31kHz/480 ラインへ入って 24kHz/400 ラインの標準 SYNC で戻して   */
 /*  いた。実機 (PC-9821Ra266 + 液晶 LCD172VXM) ではテキストが 1 行ごとに     */
 /*  1 文字ずつ右へずれ、GFX=pc98 (PEGC を選ばない) で消えた                  */
@@ -756,8 +733,6 @@ static void pegc_prepare(void)
 {
     if (!pegc_probe()) return;
     pegc_boot_sync_record();
-    if (!pegc_reserve_backbuffer()) return;
-    pegc_map_linear();
 }
 
 /* 480 ラインへ入るポート操作の全部 (MMIO の前まで)。ホスト試験
@@ -820,8 +795,6 @@ static void pegc_init(void)
      * 記録しておく — 31kHz を書いた後では読み戻しが意味を失う。 */
     pegc_boot_sync_record();
 
-    if (!pegc_reserve_backbuffer()) return;
-
     /* --- 表示モード ---
      * 実機 Ra266 の ROM (INT 18h AH=30h) と同じ列 (pegc_apply_timing、票
      * TASK_PEGC480_REALHW §3-3): 拡張グラフィックモード → 表示停止 → GDC
@@ -839,9 +812,11 @@ static void pegc_init(void)
     mmio_w8(PEGC_MMIO_PIXFMT, PEGC_PIXFMT_PACKED);
     mmio_w16(PEGC_MMIO_LINEAR, PEGC_LINEAR_ON);
 
-    /* リニア窓を master PD に張る (属性と理由は pegc_map_linear)。
-     * probe の pegc_linear_selftest() と同じ属性 = 本採用でも USER は付けない。 */
-    pegc_map_linear();
+    /* リニア窓は ⑥ が master PD に supervisor + PCD で張ってある (USER は
+     * 付けない — F00000h は表示面そのもの。BB は主記憶側で、exec が
+     * gfx_bb_phys_range() 経由でアプリ PD に USER で写す。表示面を USER に
+     * すると CPL=3 が commit を経ずに画面へ書けて契約 G4 が崩れる、レビュー
+     * #5 ②)。 */
 
     /* --- 画面をクリア --- */
     kmemset((u8 *)s_bb_phys, 0, (u32)MEM_GFX_BB8_SIZE);

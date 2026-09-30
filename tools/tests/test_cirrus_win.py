@@ -11,7 +11,7 @@ tools/tests/cirrus_win_host.c が実物の gfx/backend_cirrus.c を 1 行も写�
 --mutate は否定側。判定を壊した版 (上端で見る旧判定に戻す / 物理地図を
 見ない / 窓の末尾ページを落とす / 窓の前のページまで広げる / 32bit の末尾越えを
 見ない / auto で NP21/W 判定を飛ばす / GFX=cirrus を無視する / 窓より先に判定を
-読む / リニア窓を旧番地へ戻す) を写しの木で組み、この試験が RED になることを見る。
+読む / リニア窓を旧番地へ戻す / probe が ⑥ の SURFACE を確かめない) を写しの木で組み、この試験が RED になることを見る。
 make・エミュレータ・配備には触れない。
 """
 import os
@@ -79,6 +79,12 @@ MUTATIONS = [
      "    if (!cirrus_win_usable(s_glue->win_base, s_glue->win_size)) return 0;\n",
      "    if (gfx_get_backend_pref() != GFX_PREF_CIRRUS && !np2_detect()) return 0;\n"
      "    if (!cirrus_win_usable(s_glue->win_base, s_glue->win_size)) return 0;\n"),
+    # 10 = probe が ⑥ の SURFACE (予約・写像済み) を確かめずに I/O へ進む
+    #      (T1e、TASK_T1_LEDGER §3-8: probe は自分で予約も写像もしない)。
+    ("no_surface_gate", MUT_TARGET,
+     "    if (!cirrus_identify() ||\n"
+     "        !ledger_surface_find(LEDGER_SF_CIRRUS, LEDGER_ROLE_CLIENT)) return 0;\n",
+     "    if (!cirrus_identify()) return 0;\n"),
     # 9 = リニア窓を 16MB 直上 (旧番地) へ戻す。高位 RAM の構成で probe が落ちる
     #     (帯の外なので STATIC_ASSERT でも止まる)。
     ("old_linear_sel", "include/wab_xe10.h",

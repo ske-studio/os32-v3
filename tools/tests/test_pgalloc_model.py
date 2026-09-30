@@ -216,15 +216,21 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     CHECK(sys_usable_mem_end() == 3776 * PAGE_SIZE);
     sys_mem_kb = 65536;
     CHECK(sys_usable_mem_end() == 3776 * PAGE_SIZE);
-    /* The model path must still honour sys_reserve_top: the PEGC 8bpp
-       backbuffer (H2) is its only caller and refusing it disables PEGC.
-       Metadata/workspace sit above the frozen exec ceiling, so the carve
-       lowers that ceiling. The hotdeploy window was retired 2026-09-09,
-       so the arena now ends at real RAM. */
-    CHECK(sys_reserve_top(LEDGER_OWNER_BOOT, PAGE_SIZE) == 3775 * PAGE_SIZE);
+    /* sys_reserve_top was retired in T1e (TASK_T1_LEDGER §3-6): the usable
+       end is min(frozen exec ceiling, ledger_arena_top()), and the arena top
+       is the lowest PERSIST page inside [MEM_EXEC_LOAD_ADDR, arena end),
+       frozen once at step 6. Before the freeze it is the arena end. */
+    CHECK(ledger_arena_top() == 3776);
+    CHECK(pgalloc_reserve_pfn(LEDGER_OWNER_BOOT, 3775, 3776));
+    CHECK(sys_usable_mem_end() == 3776 * PAGE_SIZE);   /* not frozen yet */
+    ledger_arena_freeze();
+    CHECK(ledger_arena_top() == 3775);
     CHECK(sys_usable_mem_end() == 3775 * PAGE_SIZE);
-    /* the permanent page carries the boot owner in L2 (B11) */
-    CHECK(owner_map[3775] == LEDGER_OWNER_BOOT && ledger_owner_pages(LEDGER_OWNER_BOOT) == 1);
+    /* frozen once: a later PERSIST page lower in the arena changes nothing */
+    CHECK(pgalloc_reserve_pfn(LEDGER_OWNER_BOOT, 3000, 3001));
+    ledger_arena_freeze();
+    CHECK(ledger_arena_top() == 3775 && sys_usable_mem_end() == 3775 * PAGE_SIZE);
+    CHECK(owner_map[3775] == LEDGER_OWNER_BOOT && ledger_owner_pages(LEDGER_OWNER_BOOT) == 2);
     CHECK(!pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, 3775, 3776, LEDGER_BOTTOM_UP, &p));
     CHECK(!pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, 1048575, 1048576, LEDGER_BOTTOM_UP, &p));
     CHECK(!sys_memory_init_model(&m, backing, sizeof(backing), 3776, verified));
@@ -238,14 +244,15 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
        clamped to PHYSMEM_LEGACY_MAX_PFN = 16MiB. */
     CHECK(sys_usable_mem_end() == 0x1000000UL);
     base = sys_usable_mem_end();
-    CHECK(!sys_reserve_top(LEDGER_OWNER_BOOT, 0xffffffffUL));
-    CHECK(sys_usable_mem_end() == base);
     host_pool_boot(16384);
     /* only a PERSIST owner may hold a permanent reservation (T1b) */
-    CHECK(!sys_reserve_top(0, PAGE_SIZE) && !sys_reserve_top(LEDGER_OWNER_GFX, PAGE_SIZE));
+    CHECK(!pgalloc_reserve_pfn(0, 4095, 4096) &&
+          !pgalloc_reserve_pfn(LEDGER_OWNER_GFX, 4095, 4096));
+    /* sys has not frozen a model here: the ledger's arena top is not used
+       (T1e — sys_reserve_top is gone, nothing lowers this ceiling). */
+    CHECK(pgalloc_reserve_pfn(LEDGER_OWNER_BOOT, 4095, 4096));
+    ledger_arena_freeze();
     CHECK(sys_usable_mem_end() == base);
-    CHECK(sys_reserve_top(LEDGER_OWNER_BOOT, PAGE_SIZE) == base - PAGE_SIZE);
-    CHECK(sys_usable_mem_end() == base - PAGE_SIZE);
     CHECK(host_alloc_range(1, base - PAGE_SIZE, base) == 0);
 ''')
 

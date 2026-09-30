@@ -603,6 +603,37 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     /* パイプバッファ初期化 */
     pipe_buffer_init();
 
+    /* グラフィクスバックエンドの強制指定 (票 H2b、契約 G5)。
+     * /etc/system.cfg の GFX= を **⑥ (gfx_boot_reserve) より前** に読んで HAL
+     * へ渡す — 予約・写像・BB の候補は GFX= と識別で決まる (TASK_T1_LEDGER
+     * §3-3 ⑥、T1e で exec_init の前へ前倒し。依存は vfs_read だけで、ルートは
+     * マウント済み)。
+     *   GFX=pc98   9801 プレーン強制 (NP21/W でプレーン経路を回帰試験する)
+     *   GFX=pegc   PEGC 強制 (probe が通らなければ 9801)
+     *   GFX=cirrus Cirrus GD54xx 強制 (probe が通らなければ 9801、票 H3)
+     *   未指定     auto = probe 順 (Cirrus → PEGC → 9801)
+     * K4 の GUI= と同じ流儀: ここで読み、サブシステム側の変数へ渡す。 */
+    {
+        char gfxmode[16];
+        if (sysconfig_get_str(SYS_SYSTEM_CFG, "GFX", gfxmode, (int)sizeof(gfxmode)) > 0) {
+            if (kstrcmp(gfxmode, "pc98") == 0) {
+                gfx_set_backend_pref(GFX_PREF_PC98);
+            } else if (kstrcmp(gfxmode, "pegc") == 0) {
+                gfx_set_backend_pref(GFX_PREF_PEGC);
+            } else if (kstrcmp(gfxmode, "cirrus") == 0) {
+                gfx_set_backend_pref(GFX_PREF_CIRRUS);
+            } else {
+                gfx_set_backend_pref(GFX_PREF_AUTO);   /* auto / 未知の値 */
+            }
+        }
+    }
+
+    /* ⑥ gfx の識別 → 候補の窓の一括予約 (owner = DEVICE gfx) → 写像 → PEGC の
+     * BB (池のアリーナ内の上端、owner = boot) → SURFACE → CPL=0 子のアリーナの
+     * 上端の凍結 → ledger_selfcheck("gfx") (TASK_T1_LEDGER §3-3・§3-8)。
+     * live AS 0 の起動文脈で、exec_init より前。probe は ⑦ のまま。 */
+    gfx_boot_reserve();
+
     /* プログラムローダー初期化 (KernelAPIテーブル構築) */
     tvram_print(48, 2, "EXEC...", TATTR_GREEN);
     exec_init();
@@ -680,29 +711,6 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     /* autoexec: シェルスクリプト(/etc/autoexec.bat)に移行済み。
      * シェル起動後に ui.c から script_source_file() で実行される。 */
 
-    /* グラフィクスバックエンドの強制指定 (票 H2b、契約 G5)。
-     * /etc/system.cfg の GFX= を **最初の gfx_init より前** に読んで HAL へ
-     * 渡す (この直後の boot_splash が gfx_init を呼ぶ)。
-     *   GFX=pc98   9801 プレーン強制 (NP21/W でプレーン経路を回帰試験する)
-     *   GFX=pegc   PEGC 強制 (probe が通らなければ 9801)
-     *   GFX=cirrus Cirrus GD54xx 強制 (probe が通らなければ 9801、票 H3)
-     *   未指定     auto = probe 順 (Cirrus → PEGC → 9801)
-     * K4 の GUI= と同じ流儀: ここで読み、サブシステム側の変数へ渡す。 */
-    {
-        char gfxmode[16];
-        if (sysconfig_get_str(SYS_SYSTEM_CFG, "GFX", gfxmode, (int)sizeof(gfxmode)) > 0) {
-            if (kstrcmp(gfxmode, "pc98") == 0) {
-                gfx_set_backend_pref(GFX_PREF_PC98);
-            } else if (kstrcmp(gfxmode, "pegc") == 0) {
-                gfx_set_backend_pref(GFX_PREF_PEGC);
-            } else if (kstrcmp(gfxmode, "cirrus") == 0) {
-                gfx_set_backend_pref(GFX_PREF_CIRRUS);
-            } else {
-                gfx_set_backend_pref(GFX_PREF_AUTO);   /* auto / 未知の値 */
-            }
-        }
-    }
-
     /* ブートスプラッシュ表示 (カーネル内蔵) */
     boot_splash();
 
@@ -710,11 +718,10 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * probe のキャッシュ温めはここで 1 回だけ、**カーネル文脈 (master PD)** で
      * 行う。PEGC の probe は BIOS ワークエリア 0x045C / 0x0597 を読み、そこは
      * アプリ PD に写像が無いので、初回 probe をアプリに繰り延べると CPL=3 で
-     * #PF が起きてアプリが死ぬ (2026-09-09 に gdi_test で実測)。さらに
-     * PEGC のバックバッファは主記憶の物理末尾側から取る予約なので、アプリが
-     * 走っている時点ではそのスタック/ヒープに阻まれて必ず失敗する
-     * (Cirrus の面はカード VRAM のリニア窓内で、予約は使わない)。
-     * init まで済ませたら表示はテキストへ戻る。 */
+     * #PF が起きてアプリが死ぬ (2026-09-09 に gdi_test で実測)。窓の予約・
+     * 写像と PEGC の BB は ⑥ (gfx_boot_reserve) が済ませてあり、probe はそれを
+     * 使うだけ (⑦、TASK_T1_LEDGER §3-3)。init まで済ませたら表示はテキストへ
+     * 戻る。 */
     gfx_prepare_backend();
 
     /* 共有ライブラリ (0x400000 帯) を常駐させる — シェルを載せる **前** に
@@ -794,6 +801,9 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
 
             /* GUI は全画面 GFX を握るのでテキストカーソルを消す。CUI は出す。 */
             if (is_gui) {
+                /* ⑨ 選択中 backend の CLIENT を boot → gshell へ (2 回目以降は
+                 * 無操作) → ledger_selfcheck("gui")。TASK_T1_LEDGER §3-3 ⑨。 */
+                gfx_client_to_gshell();
                 console_text_gdc_stop();
                 tvram_print(0, 0, "Loading gshell...", TATTR_GRAY);
             } else {

@@ -843,6 +843,100 @@ done:
     return ok;
 }
 
+/* ======================================================================== */
+/*  SURFACE (§3-1・§3-8) と CPL=0 子のアリーナの上端 (§3-6)、T1e            */
+/*                                                                          */
+/*  T1 は型と表と登録・移譲だけ (lease の付け外しは T2、lease_count は 0)。  */
+/*  登録・移譲は起動時と GUI の開始にしか走らないので cold (大きさで組ま   */
+/*  せる、カーネルの予算 §4-5-R)。                                         */
+/* ======================================================================== */
+int __attribute__((cold))
+ledger_surface_create(const struct ledger_surface *sf, u32 *sid)
+{
+    u32 i, p;
+    unsigned int flags;
+    int ok;
+    flags = irq_save();
+    ok = 0;
+    if (!sf || !paging_boot_context() || !owner_ok(sf->owner) || !sf->npages ||
+        sf->first >= PHYSMEM_MAX_PFN || sf->npages > PHYSMEM_MAX_PFN - sf->first ||
+        sf->lease_count || !sf->backing || sf->backing > LEDGER_SB_MMIO) goto done;
+    /* 池の面は、登録する owner が全ページを確保済みであること。 */
+    if (sf->backing == LEDGER_SB_RAM)
+        for (p = sf->first; p < sf->first + sf->npages; p++)
+            if (p >= limit_pfn || !page_owned(p, sf->owner)) goto done;
+    for (i = 0; i < LEDGER_MAX_SURFACES && ledger_surfaces[i].npages; i++) {}
+    if (i == LEDGER_MAX_SURFACES) goto done;
+    ledger_surfaces[i] = *sf;
+    if (sid) *sid = i;
+    ok = 1;
+done:
+    irq_restore(flags);
+    return ok;
+}
+
+struct ledger_surface *ledger_surface_find(u32 backend, u32 role)
+{
+    u32 i;
+    for (i = 0; i < LEDGER_MAX_SURFACES; i++)
+        if (ledger_surfaces[i].npages && ledger_surfaces[i].backend == backend &&
+            ledger_surfaces[i].role == role) return &ledger_surfaces[i];
+    return 0;
+}
+
+int __attribute__((cold)) ledger_surface_transfer(u32 sid, u32 to)
+{
+    struct ledger_surface *sf;
+    struct ledger_region *r;
+    u32 i, from;
+    unsigned int flags;
+    int ok;
+    flags = irq_save();
+    ok = 0;
+    if (sid >= LEDGER_MAX_SURFACES || !owner_ram(to) ||
+        !ledger_surfaces[sid].npages) goto done;
+    sf = &ledger_surfaces[sid];
+    from = sf->owner;
+    /* 2 回目以降 (GUI → CUI → GUI) は同じ owner なので何もしない (R5 (b))。
+     * RAM の面はページの L2 ごと移す (全ページが from のものでなければ拒否)。 */
+    ok = from == to || sf->backing != LEDGER_SB_RAM ||
+         ledger_transfer(sf->first, (int)sf->npages, from, to);
+    if (!ok || from == to) goto done;
+    /* 固定 RAM の面は、それを含む同じ owner の SURFACE_BACKING 区間も移す。
+     * MMIO の面は SURFACE の owner だけ (装置の DEVICE 区間は gfx のまま)。 */
+    for (i = 0; sf->backing == LEDGER_SB_FIXED_RAM && i < ledger_region_count; i++) {
+        r = &ledger_regions[i];
+        if (r->type == LEDGER_R_SURFACE_BACKING && r->owner == from &&
+            r->first <= sf->first && sf->first + sf->npages <= r->end)
+            r->owner = (u8)to;
+    }
+    sf->owner = (u8)to;
+done:
+    irq_restore(flags);
+    return ok;
+}
+
+/* 0 = 未凍結。凍結は ⑥ の 1 回だけ (§3-6)。 */
+static u32 arena_top;
+
+void ledger_arena_freeze(void)
+{
+    u32 p, o;
+    unsigned int flags;
+    flags = irq_save();
+    for (p = MEM_EXEC_LOAD_ADDR / PAGE_SIZE; !arena_top && p < arena_end; p++) {
+        o = owner_map[p];
+        if (o && ledger_owners[o].kind == LEDGER_KIND_PERSIST) arena_top = p;
+    }
+    if (!arena_top) arena_top = arena_end;
+    irq_restore(flags);
+}
+
+u32 ledger_arena_top(void)
+{
+    return arena_top ? arena_top : pgalloc_arena_end();
+}
+
 int pgalloc_range_has_ram(u32 first, u32 end)
 {
     u32 pages;

@@ -129,7 +129,7 @@ GUI もアプリも 400 ライン / 16 色 / プレーンを決め打ちしな�
 | バックエンド | 画面 | バックバッファ (CPU が描く面) | 表示面へ | 能力ビット |
 |---|---|---|---|---|
 | `backend_pc98.c` (9801) | 640×400×16 (4 プレーン) | 主記憶 0x6A000 (128KB、`MEM_GFX_BB_BASE`) | CPU 転送 + ページフリップ | TEXT_OVERLAY, PAGE_FLIP |
-| `backend_pegc.c` (9821 PEGC) | 640×480×256 (PACKED8) | 主記憶末尾から 300KB (`sys_reserve_top`) | CPU 転送 (F00000h リニア窓、09A8h・GDC クロック・SYNC・PITCH・SCROLL を明示して 480 ライン) | TEXT_OVERLAY (合成ありと実測) |
+| `backend_pegc.c` (9821 PEGC) | 640×480×256 (PACKED8) | 主記憶 300KB (起動時の ⑥ が池のアリーナ内の上端から確保、台帳の SURFACE — TASK_T1_LEDGER §3-8) | CPU 転送 (F00000h リニア窓、09A8h・GDC クロック・SYNC・PITCH・SCROLL を明示して 480 ライン) | TEXT_OVERLAY (合成ありと実測) |
 | `backend_cirrus.c` (CL-GD5430、Xe10 内蔵) | 640×480×256 | カード VRAM のクライアント面 (リニア窓 01000000h + 04B000h、300KB) | エンジン BLT (`present_rect` = 非表示面 → 表示面)。塗り / 転送も HW、256 画素以下は CPU 直書き | HW_FILL, HW_BLT (映像はリレーで切替、TEXT_OVERLAY 無し) |
 
 デバイス窓は master PD に **supervisor + PCD** で張り、CPL=3 に見せるのはクライアント面だけ

@@ -682,6 +682,55 @@ static void test_ledger(void)
 }
 
 /* ------------------------------------------------------------------------ */
+/*  gfx の予約・BB・SURFACE (票 docs/tasks/v3/TASK_T1_LEDGER.md §4-5、T1e)    */
+/*                                                                          */
+/*  ⑥ (gfx_boot_reserve) の後・⑦ (probe) の前に走るので、選択中の backend  */
+/*  はまだ決まっていない — 候補ごとに見る。                                  */
+/*  (1) 3 地点のうち boot / gfx の ledger_selfcheck が落ちていない。         */
+/*  (2) planar の固定 SURFACE (0x6A000、FIXED_RAM、owner = boot) が常にある。 */
+/*  (3) sys_usable_mem_end() <= ledger_arena_top() (§3-6)。                 */
+/*  (4) PEGC 候補なら BB は池の RAM で owner = boot、アリーナの上端より上、   */
+/*      PEGC の窓が gfx の DEVICE 区間に入っている。                        */
+/*  (5) Cirrus 候補なら CLIENT + DISPLAY の 2 本 (MMIO、UC、表示面は kernel)、 */
+/*      どちらも gfx の DEVICE 区間 (Xe10-linear) の中。                     */
+/* ------------------------------------------------------------------------ */
+static int gfx_dev_covers(u32 pfn)
+{
+    const struct ledger_region *r;
+    u32 i;
+    for (i = 0; i < ledger_region_count; i++) {
+        r = &ledger_regions[i];
+        if (r->type == LEDGER_R_DEVICE && r->owner == LEDGER_OWNER_GFX &&
+            r->first <= pfn && pfn < r->end) return 1;
+    }
+    return 0;
+}
+
+static void __attribute__((cold)) test_gfx_ledger(void)
+{
+    const struct ledger_surface *p, *e, *c, *d;
+    u32 top = ledger_arena_top() * PAGE_SIZE;
+    p = ledger_surface_find(LEDGER_SF_PC98, LEDGER_ROLE_CLIENT);
+    e = ledger_surface_find(LEDGER_SF_PEGC, LEDGER_ROLE_CLIENT);
+    c = ledger_surface_find(LEDGER_SF_CIRRUS, LEDGER_ROLE_CLIENT);
+    d = ledger_surface_find(LEDGER_SF_CIRRUS, LEDGER_ROLE_DISPLAY);
+    check(ledger_check_fail == 0, "gfx:selfcheck boot+gfx");
+    check(p && p->first * PAGE_SIZE == MEM_GFX_BB_BASE &&
+          p->backing == LEDGER_SB_FIXED_RAM && p->owner == LEDGER_OWNER_BOOT,
+          "gfx:planar surface");
+    check(sys_usable_mem_end() <= top, "gfx:usable <= arena top");
+    check(!e || (e->owner == LEDGER_OWNER_BOOT && e->backing == LEDGER_SB_RAM &&
+                 e->first * PAGE_SIZE >= top &&
+                 gfx_dev_covers(MEM_SYSTEM_SPACE_BASE / PAGE_SIZE)), "gfx:pegc bb");
+    check(!c == !d && (!c || (c->backing == LEDGER_SB_MMIO &&
+                              d->backing == LEDGER_SB_MMIO &&
+                              c->cache == LEDGER_CACHE_UC && d->cache == LEDGER_CACHE_UC &&
+                              d->owner == LEDGER_OWNER_KERNEL &&
+                              gfx_dev_covers(c->first) && gfx_dev_covers(d->first))),
+          "gfx:cirrus client+display");
+}
+
+/* ------------------------------------------------------------------------ */
 /*  PCM (票 TASK_PCM_CS4231): 起動時の検出が走った後、driver が CLOSED で    */
 /*  待っていること。装置の有無は機種で変わるので**状態だけ**を見る           */
 /*  (NP21/W の既定構成には CS4231 が無い — 無くても壊れないのが要件)。       */
@@ -716,6 +765,7 @@ int kselftest_run_post_exec(void)
     test_memmap_pool_user();
     test_pool_model();
     test_ledger();
+    test_gfx_ledger();
     test_pcm();
 
     if (ksel_fail != before) {

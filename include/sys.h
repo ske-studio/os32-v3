@@ -42,11 +42,6 @@ u32 sys_get_mem_kb(void);
 u32 sys_time(void);
 u32 sys_usable_mem_end(void);
 
-/* 物理末尾側 (使用可能上限の直下) に bytes バイトを固定予約し、先頭物理を
- * 返す。以後 sys_usable_mem_end() はその分下がる。ブート中に 1 回だけ。
- * 予約したページの台帳の owner は owner (PERSIST、T1b〜T1d の暫定)。
- * 戻り値 0 = 予約できなかった。→ kernel/sys.c の説明 */
-u32 sys_reserve_top(u32 owner, u32 bytes);
 
 /* ======================================================================== */
 /*  sys_time_now — 起動からの経過を µs で (票 TASK_HAL_WIRING §1-5)         */

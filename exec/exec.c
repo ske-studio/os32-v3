@@ -280,15 +280,17 @@ static u32 *g_cur_frame = 0;
  * **帯の上端 (PDE の所有範囲 = g_ring3_band_pdes 枚 × 4MB) とは別の値**
  * (2026-09-30)。私有領域 (本体 / sbrk / exec_heap / ガード / スタック) は
  * 帯の上端と sys_usable_mem_end() の**低い方**までしか使わない。PEGC の
- * バックバッファ (BB) は sys_reserve_top() が低位 RAM の末尾から切るので、
- * 8MB 機では [0x7B5000, 0x800000) = 帯 1 枚の中に来る。BB は全アプリ共有で
+ * バックバッファ (BB) は起動時の ⑥ が池の CPL=0 子のアリーナの上端から取り、
+ * sys_usable_mem_end() はその下に凍結される (T1e、TASK_T1_LEDGER §3-6 — 旧
+ * sys_reserve_top と同じ区間) ので、8MB 機では [0x7B5000, 0x800000) = 帯
+ * 1 枚の中に来る。BB は全アプリ共有で
  * 恒等 (仮想 = 物理) に写す約束 (gfx_get_framebuffer / pegc_init が同じ
  * 番地を使う) なので、私有領域の方が BB の下で止まる — 以前は帯の上端
  * 0x800000 まで私有ページを張ってから BB を恒等で重ねていたため、スタック
  * 64 + exec_heap 上端 10 = 74 ページの PTE が BB の物理で上書きされ、
  * teardown で戻らず (起動・終了のたびに used_pages +74、4 本目で NOMEM)、
  * 走っているアプリのスタックが共有の BB と同じ物理になっていた。
- * 17MB (BB = 0xEB3000、帯の上) や 9801 planar (BB = 0x6A000、帯の下)、
+ * 17MB (BB = 0xEB2000、帯の上) や 9801 planar (BB = 0x6A000、帯の下)、
  * Cirrus (BB = デバイス窓) では sys_usable_mem_end() >= 帯の上端なので値は
  * 変わらない。CPL=0 の子のスタック上端 (exec_launch の stack_top = mem_end)
  * と同じ天井を見ることになる。 */
@@ -302,8 +304,8 @@ static void ring3_band_set(u32 pdes)
     if (pdes > MEM_APP_BAND_MAX_PDES) pdes = MEM_APP_BAND_MAX_PDES;
     g_ring3_band_pdes = pdes;
     top = MEM_APP_BAND_BASE + pdes * MEM_APP_BAND_PDE_SIZE;
-    /* 私有領域は「割り当ててよい物理の上限」より上へ伸ばさない。BB を含む
-     * 末尾の固定予約 (sys_reserve_top) はこの上にある。ブート後は動かない
+    /* 私有領域は「割り当ててよい物理の上限」より上へ伸ばさない。BB (起動時の
+     * ⑥ が確保、owner = boot → gshell) はこの上にある。ブート後は動かない
      * 値なので、restore (exec_restore_context) で呼び直しても同じになる。 */
     cap = sys_usable_mem_end() & ~(u32)(PAGE_SIZE - 1);
     if (cap < top) top = cap;

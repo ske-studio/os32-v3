@@ -57,8 +57,9 @@ typedef struct GfxBackend {
     u8  *bb_base;
     u32  bb_pitch;
     u8   bb_format;   /* GFX_BB_* */
-    u32  bb_size;     /* バックバッファ全体のバイト数。CPL=3 へ USER マップする
-                       * 範囲でもある (exec が gfx_bb_phys_range() で取る)。
+    u32  bb_size;     /* バックバッファ全体のバイト数。PEGC / Cirrus は台帳の
+                       * SURFACE から埋める (exec が gfx_bb_phys_range() で取る
+                       * USER マップの範囲と同じ情報源、TASK_T1_LEDGER §3-8)。
                        * pitch×height から計算できない (9801 は 4 プレーン +
                        * 端数パディングで 128KB) ので明示的に持つ。
                        * **表示面を含めてはならない** — CPL=3 に見せてよいのは
@@ -66,8 +67,9 @@ typedef struct GfxBackend {
 
     /* 起動時の下ごしらえ (gfx_prepare_backend が 1 回だけ呼ぶ)。NULL なら
      * 従来どおり init() → shutdown() で済ませる。
-     * **表示のモードも同期も変えない** のが約束: 予約 (sys_reserve_top)・
-     * 窓の写像・起動時の状態の記録だけを行う。init/shutdown で済ませると、
+     * **表示のモードも同期も変えない** のが約束: probe と起動時の状態の
+     * 記録だけを行う (窓の予約・写像と BB は起動時の ⑥ gfx_boot_reserve が
+     * 済ませている、TASK_T1_LEDGER §3-8)。init/shutdown で済ませると、
      * CUI しか使わない起動でも 09A8h とテキスト GDC の SYNC を送り直す。
      * 実機 (Ra266 + 液晶) でテキストが 1 行 1 文字ずつ右へずれたのは、この
      * 送り直しが原因だという **仮説** (GFX=pc98 で消えたことからの推定。
@@ -102,8 +104,9 @@ extern const GfxBackend *g_backend;
 extern const GfxBackend gfx_backend_pc98;
 
 /* 9821 PEGC 256 色バックエンド (gfx/backend_pegc.c, H2)。
- * **const ではない**: バックバッファは物理メモリ末尾から実行時に切り出すので、
- * bb_base / bb_size を init() が埋める (9801 はコンパイル時定数で済む)。
+ * **const ではない**: バックバッファは起動時の ⑥ が池から確保する (台帳の
+ * SURFACE) ので、bb_base / bb_size を probe が SURFACE から埋める (9801 は
+ * コンパイル時定数で済む)。
  *
  * **weak 宣言**: gfx/backend_pegc.c を build/kernel.mk の C_KERNEL に入れて
  * いないビルドではこのシンボルは 0 になり、バックエンド表の該当要素が NULL に
@@ -160,11 +163,25 @@ int  gfx_get_backend_pref(void);
 void gfx_prepare_backend(void);
 
 /* 現在のバックエンドのバックバッファの物理範囲を返す (base は 4KB 境界)。
- * exec が CPL=3 アプリへ USER マップする範囲。まだ init() が済んでいない
- * (= 面が決まっていない) バックエンドでは *size に 0 が入る。
- *   9801  : 常に (MEM_GFX_BB_BASE, MEM_GFX_BB_SIZE) = 従来と同じ
- *   PEGC  : 物理末尾から切り出した 300KB (主記憶)
- *   Cirrus: リニア窓の中の非表示面 300KB (カード VRAM, H3b) */
+ * exec が CPL=3 アプリへ USER マップする範囲。= 台帳の **選択中 backend の
+ * CLIENT の SURFACE** (TASK_T1_LEDGER §3-8)。⑥ より前・面の無い backend
+ * では *size に 0 が入る。
+ *   9801  : (MEM_GFX_BB_BASE, MEM_GFX_BB_SIZE) の固定面 = 従来と同じ
+ *   PEGC  : ⑥ が池の CPL=0 子のアリーナ内の上端から確保した 300KB (主記憶)
+ *   Cirrus: リニア窓の中の非表示面 300KB (カード VRAM, H3b、MMIO) */
 void gfx_bb_phys_range(u32 *base, u32 *size);
+
+/* ⑥ (TASK_T1_LEDGER §3-3・§3-8): 副作用のない識別 → 候補の窓の一括予約
+ * (owner = DEVICE gfx) → 写像 → PEGC の BB の確保 → SURFACE の登録 → CPL=0
+ * 子のアリーナの上端の凍結。起動時 (exec_init より前、live AS 0)、GFX= を
+ * gfx_set_backend_pref() へ渡した後に 1 回だけ。probe は呼ばない。 */
+void gfx_boot_reserve(void);
+/* ⑨: GUI の開始 (gshell の exec の直前) に選択中 backend の CLIENT を
+ * boot → gshell へ移し、ledger_selfcheck("gui")。2 回目以降は無操作。 */
+void gfx_client_to_gshell(void);
+/* backend の副作用のない識別 (⑥ と各 probe の最初が使う)。BIOS ワークと
+ * 物理地図・ボードの表を読むだけ。weak: backend を入れないビルドでは 0。 */
+int pegc_identify(void) __attribute__((weak));
+int cirrus_identify(void) __attribute__((weak));
 
 #endif /* __GFX_HAL_H */

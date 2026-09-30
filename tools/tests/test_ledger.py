@@ -16,7 +16,7 @@
   - 会計 (L1・L2・owner の pages・used/total・区間の本数) は失敗時不変
   - R1: 割り込み / 例外の深さが立っている間の操作だけを数える
   - 区間の表 (重なり拒否・OUTSIDE・起動時だけ) と ledger_selfcheck
-  - 永久予約 (PERSIST だけ、L2 に owner が残る — sys_reserve_top(boot)、B11)
+  - 永久予約 (PERSIST だけ、L2 に owner が残る — B11。T1e で呼び手の sys_reserve_top は撤去)
   - asm: 全 IRQ スタブの IRQ_ENTER / IRQ_LEAVE、全例外入口の EXC_ENTER と
     復帰点の EXC_LEAVE (静的)、exec_setjmp / exec_longjmp の深さの控えと
     復元 (nasm で組んで実行)、jmpbuf の長さの直書きが無いこと (B8)、

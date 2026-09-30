@@ -102,7 +102,7 @@ void shlib_addrspace_detach(struct addrspace *as) { (void)as; }
 
 #include "v86_mem.h"         /* V86_BACKING_PAGES */
 
-/* 8MB + PEGC の実測値 (PM 2026-09-30): sys_top_reserved = 0x4B000 */
+/* 8MB + PEGC の実測値 (PM 2026-09-30): BB = 0x4B000 (75 ページ) を低位 RAM の上端から */
 #define T_RAM_KB      8192UL
 #define T_RAM_END     0x800000UL
 #define T_BB_SIZE     0x4B000UL
@@ -250,16 +250,25 @@ void _start(void)
 
     paging_init(T_RAM_KB);
     host_pool_boot(T_RAM_KB);
-    /* 起動時の姿: shlib 帯を押さえ、PEGC の BB を池の末尾から切る
-     * (sys_reserve_top → pgalloc_reserve_pfn と同じ)。 */
+    /* 起動時の姿: shlib 帯を押さえ、PEGC の BB を ⑥ と同じく池の CPL=0 子の
+     * アリーナ内の上端から owner = boot で取って、アリーナの上端を凍結する
+     * (T1e、TASK_T1_LEDGER §3-6・§3-8。旧 sys_reserve_top と同じ区間)。 */
     CHECK(ledger_claim_fixed(LEDGER_OWNER_SHLIB, MEM_SHLIB_BASE / PAGE_SIZE,
                              MEM_EXEC_LOAD_ADDR / PAGE_SIZE));
-    CHECK(pgalloc_reserve_pfn(LEDGER_OWNER_BOOT, T_BB_BASE / PAGE_SIZE,
-                              T_RAM_END / PAGE_SIZE));
+    CHECK(pgalloc_arena_end() == T_RAM_END / PAGE_SIZE);
+    CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, (int)T_BB_PAGES,
+                                MEM_EXEC_LOAD_ADDR / PAGE_SIZE, pgalloc_arena_end(),
+                                LEDGER_TOP_DOWN, &va));
+    CHECK(va == T_BB_BASE / PAGE_SIZE);
+    ledger_arena_freeze();
+    /* 私有領域の上端を決める値 = sys_usable_mem_end() = min(凍結した exec
+     * 上端, ledger_arena_top()) (kernel/sys.c)。8MB (FIXED 型) の exec 上端は
+     * 0x800000 なので、アリーナの上端 = BB の下端が効く。 */
+    CHECK(ledger_arena_top() * PAGE_SIZE == T_BB_BASE);
     base_used = used_pages;
 
     /* ---- (a)〜(e): 8MB + PEGC、10 回の起動と終了 ------------------------ */
-    t_usable_end = T_BB_BASE;              /* sys_reserve_top の後の上限 */
+    t_usable_end = ledger_arena_top() * PAGE_SIZE;   /* = T_BB_BASE */
     t_bb_base = T_BB_BASE;
     t_bb_size = T_BB_SIZE;
     for (round = 0; round < T_ROUNDS; round++) {
