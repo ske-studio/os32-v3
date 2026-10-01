@@ -109,7 +109,7 @@ make check-tests-inventory                      # 表が古くないか検査す
 | 25 | `check-c-dialect` | `python3 -B tools/check_c_dialect.py` | `lib/sqlite3/sqlite3.c`<br>`lib/sqlite3/os32_sqlite_vfs.c`<br>`lib/sqlite3/os32_sqlite_test.c` | [`tools/tests/c_dialect_tdd.md`](../tools/tests/c_dialect_tdd.md) | [`docs/tasks/v3/TASK_C11_MIGRATION.md`](tasks/v3/TASK_C11_MIGRATION.md) | × |
 | 26 | `check-c-dialect-host` | `python3 -B tools/tests/test_c_dialect.py --mutate` | `tools/check_c_dialect.py` | [`tools/tests/c_dialect_tdd.md`](../tools/tests/c_dialect_tdd.md) | [`docs/tasks/v3/TASK_C11_MIGRATION.md`](tasks/v3/TASK_C11_MIGRATION.md) | × |
 | 27 | `check-privileged` | `python3 tools/check_privileged.py` | — | — | — | × |
-| 28 | `check-arch-asm` | `python3 tools/check_arch_asm.py` | — | — | — | ○ |
+| 28 | `check-arch-asm` | `python3 tools/check_arch_asm.py`<br>`python3 tools/tests/test_clang_ast.py --mutate` | — | — | — | ○ |
 | 29 | `check-le-access` | `python3 tools/check_le_access.py` | — | [`tools/tests/le_access_tdd.md`](../tools/tests/le_access_tdd.md) | [`docs/tasks/portability/ARM_GAUGE.md`](tasks/portability/ARM_GAUGE.md) | ○ |
 | 30 | `check-ne2000-ring` | `mkdir -p $(BUILD_OUT)`<br>`gcc $(C_STD) -Wall -Wextra -DNE2K_HOST_TEST -Idrivers  -o $(BUILD_OUT)/ne2000_ring_test tools/tests/ne2000_ring_test.c drivers/ne2000_ring.c`<br>`$(BUILD_OUT)/ne2000_ring_test` | `drivers/ne2000_ring.c` | — | — | ○ |
 | 31 | `check-shlib` | `python3 tools/mkshlib.py --check` | — | — | — | ○ |

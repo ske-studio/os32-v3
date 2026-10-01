@@ -657,34 +657,54 @@ mkpkg が先に断る)。**`core` / `base` に足した物は FD にも入る** 
 `apps/` `game/` は staged SDK 側でそれぞれの `Makefile` が `mkos32x` を呼ぶので、
 そちらの GFX プログラムには各リポジトリで `--gfx` を付ける。
 
-#### `tools/audit_cast_align.sh`
-非整列アクセス候補の洗い出し (他アーキテクチャ移植の事前監査)。ホストの `gcc -m32` と
-`-Wcast-align=strict` で「アラインメント要件を上げるポインタキャスト」を列挙する。
-i386-elf クロスコンパイラは不要、`-fsyntax-only` なので成果物も作らない。`make check` には組み込んでいない。
+#### C ソース検査 (clang)
+
+`tools/clang_ast/` が `make -n -B all` の実際の翻訳単位・旗を取得し、
+i386 向け libclang AST を作る。ビルド自体は引き続き i386-elf GCC。
+ホストには `clang libclang-dev llvm-dev python3-clang` (Ubuntu apt) が必要。
+全 TypeLoc を辿る C++ 補助器の組み立てには LLVM 開発ヘッダと `libLLVM`、
+`libclang-cpp` が必要で、clang/libclang/resource header と同じ版を使う。
+導入後はリポジトリのルートでロードと組み立てを確認する:
 
 ```bash
-tools/audit_cast_align.sh kernel   # kernel/ drivers/ gfx/ fs/ exec/ kapi/ lib/
-tools/audit_cast_align.sh user     # userland/ (newlib ヘッダが要るため網羅率は低い)
+python3 -c 'import clang.cindex; clang.cindex.Index.create()'
+PYTHONPATH=tools python3 -c 'from clang_ast.type_occurrences import visitor_binary; print(visitor_binary())'
 ```
-警告が出た = 必ず壊れる、ではない。仕分けの手順と結果は
+
+クロス GCC を導入しない静的 CI では、C AST 検査の標準ヘッダを Ubuntu の
+`libnewlib-dev` (`/usr/include/newlib`) から取る。クロス newlib があればそちらを優先する。
+clang の解析失敗・不足入力は非0で終了する。`make all` の後に検査する。
+実ビルドで選ばれたソースとそこから取り込むヘッダが対象で、未使用ヘッダ・
+非選択の `#if` 分岐は対象外。旗の読み替え・判定・比較の詳細は
+[TASK_CLANG_CHECKS](tasks/v3/TASK_CLANG_CHECKS.md) §4・§6。
+
+- `make check-p2v`: canonical type とマクロ展開で物理キャスト・物理引数、
+  user/lease の V2P、関数内 CONST を検査。[C5] の file:function:reason は
+  `tools/check_p2v_allow.txt` (65件) を引き継ぐ。
+- `make check-c-dialect`: GCC の実効言語モード・拒否探りを保持し、内部の
+  atomic/TLS/restrict/VLA/匿名メンバー/旧式定義は clang の型・宣言・診断で検査。
+  公開 SDK は gnu89/gnu11 診断と libclang token でも確認する。
+- `make check-arch-asm`: AST の asm template (マクロ・連結文字列も含む) から
+  hlt/cli/sti を検査。arch/*/arch_*.h と ARCH-ASM-OK の例外を保持。
+- `make check-le-access`: ext2 / ISO9660 / KCG / utf8 の9ファイルの
+  pointee alignment が上がる cast を canonical type で検査。
+  外部形式は `include/endian_le.h` の le16/le32 アクセサを通す。
+
+#### `tools/audit_cast_align.sh`
+
+同じ AST 判定で全実ビルド TU の整列要件が上がる cast を列挙する手動監査。
+`make check` の外で、人が候補を仕分ける。解析失敗は非0、候補があっても終了0。
+
+```bash
+tools/audit_cast_align.sh kernel   # userland/・SDK 以外の実ビルド TU
+tools/audit_cast_align.sh user     # userland/・SDK の実ビルド TU
+tools/audit_cast_align.sh all
+```
+
+候補が出ても実際に壊れるとは限らない。仕分けの記録は
 [tasks/arch_port/M0_PORTABILITY_AUDIT.md](tasks/arch_port/M0_PORTABILITY_AUDIT.md)。
-
-#### `tools/check_le_access.py`
-外部形式 (媒体・書庫の上に並ぶバイト列) への直アクセスの番人 (移植準備の順序 4-a、
-`make check` の `check-le-access`)。対象は ext2 / ISO9660 / KCG フォント書庫を読み書きする
-9 ファイルで、`*(u32 *)&buf[off]` の形が無いことを見る**文字列検査**と、実ビルドと同じ
-`i386-elf-gcc` に `-Wcast-align=strict` を足して単体コンパイル (`-fsyntax-only`) し警告 0 で
-あることを見る**コンパイル検査**の 2 段。文字列検査をすり抜ける書き方
-(`u32 *p = (u32 *)buf;` と 2 行に分ける等) は後段が捕まえる。外部形式は
-`include/endian_le.h` の `le16_rd` / `le16_wr` / `le32_rd` / `le32_wr` を通すこと —
-直アクセスは「x86 は LE」「x86 は非アラインを許す」の 2 つに同時に寄りかかる書き方で、
-ARM では落ち、BE では値が化ける。クロスコンパイラが無い環境では後段だけ SKIP する。
-
-`audit_cast_align.sh` と `check_le_access.py` は目的が違う — 前者は**ホストの gcc で
-リポジトリ全域の候補を列挙する監査** (`make check` の外、人が仕分ける)、後者は**実ビルドの
-コンパイラで対象 9 ファイルだけを検査する番人** (`make check` の中、落ちたら直す)。
-対象の選び方と経緯は [tasks/portability/ARM_GAUGE.md](tasks/portability/ARM_GAUGE.md) §9 と
-[tasks/portability/SURVEY_N1.md](tasks/portability/SURVEY_N1.md) (a)。
+旧5本は比較専用に `tools/legacy_checks/` に保存し、make の検査経路からは呼ばない。
+重複していた `create_fat12_d88.py` は撤去。FD生成は `tools/mkfat12.py` を使う。
 
 #### `tools/check_docs_links.py`
 文書のリンク切れ検査 (`make check` の `check-docs-links`)。`lychee` (Rust 製のリンク検査器) を

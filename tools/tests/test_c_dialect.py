@@ -18,6 +18,7 @@ import os
 import pathlib
 import subprocess
 import sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -58,9 +59,9 @@ def case_lex(cd):
         return cd.scan_c_text(text, ROOT, W, H)
     check(sc('/* restrict */ int f(int *restrict p);\n') == [(1, "restrict")],
           "コメントの中の restrict は数えず、コードのものだけ数える")
-    check(sc('const char *s = "_Atomic";\nint __restrict q;\nchar c = \'"\'; int *restrict r;\n')
-          == [(3, "restrict")],
-          "文字列の中の語・語の一部 (__restrict) は数えず、文字定数の '\"' で文字列に入らない")
+    check(sc('const char *s = "_Atomic";\nint *__restrict q;\nchar c = \'"\'; int *restrict r;\n')
+          == [(2, "restrict"), (3, "restrict")],
+          "文字列の語は数えず、__restrict も型として数え、文字定数の '\"' で文字列に入らない")
     check(sc('const char *s = "\\" restrict";\n') == [], "文字列の \\\" で文字列を抜けたことにしない")
     check(sc('#include <stdbool.h>\n#include <stdatomic.h>\n') == [(1, "stdbool.h"), (2, "stdatomic.h")],
           "#include のヘッダを取り込んだ行で見つける")
@@ -76,8 +77,8 @@ def case_lex(cd):
           "バックスラッシュと改行の間にタブがある行継続")
     check(sc('#\vinclude <stdatomic.h>\n') == [(1, "stdatomic.h")], "#\\vinclude (VT、Codex 2 回目 反例 4)")
     check(sc('#\finclude <stdbool.h>\n') == [(1, "stdbool.h")], "#\\finclude (FF)")
-    check(sc('#inc\\\nlude <stdatomic.h>\n') == [(2, "stdatomic.h")],
-          "行継続で割った #include (行は指令の終わりの物理行 — GCC の行標識のとおり)")
+    check(sc('#inc\\\nlude <stdatomic.h>\n') == [(1, "stdatomic.h")],
+          "行継続で割った #include (行は clang の物理開始行)")
     check(sc('#define X _Atomic\nX int y;\n') == [(2, "_Atomic")], "マクロで隠した _Atomic も展開後に数える")
     check(sc('#if 0\n_Atomic int z;\n#endif\nint w;\n') == [],
           "実際の旗で組まれない部分 (#if 0) は数えない (コンパイラの判定に従う)")
@@ -283,6 +284,10 @@ def case_internal(cd):
                   else any(where in p for p in probs))
             check(ok,
                   "内部実装の %r を %s で拒否する (%r)" % (body, where, probs[:2]))
+        (t / 'lib/sqlite3/v.c').write_text('this is not C;\n')
+        probs,n = cd.check_internal_units([unit('lib/sqlite3/v.c')],t)
+        check(n == 0 and any('clang parse failure' in p for p in probs),
+              'vendor は規則免除でも解析失敗を飛ばさない (fail closed、変異REDには数えない)')
 
 
 # --------------------------------------------------------------------------
@@ -326,7 +331,7 @@ def case_real():
     def go(item):
         desc, args, extra, want_ok = item
         r = subprocess.run(["make", "--no-print-directory", "-C", str(ROOT)] + args,
-                           capture_output=True, text=True, env=dict(base, **extra))
+                           capture_output=True, text=True, env=dict(base, **extra), stdin=subprocess.DEVNULL)
         return desc, want_ok, r.returncode, (r.stdout + r.stderr).strip().splitlines()[-1:]
     for desc, want_ok, rc, tail in mutpar.run_ordered(go, runs):
         if want_ok:
@@ -457,6 +462,8 @@ def mutate_one(item):
         tree = mutpar.mutant_tree(ROOT, pathlib.Path(td) / "tree", edits, real=real)
         r = run_checker(tree)
         got = "GREEN" if r.returncode == 0 else "RED"
+        if want == 'RED' and ('clang parse failure' in r.stdout or r.returncode != 1):
+            got = 'PARSE_FAILURE_NOT_COUNTED'
         tail = (r.stdout + r.stderr).strip().splitlines()[-1:] if got == "RED" else []
         return (i, desc, want, got, tail[0] if tail else "")
 

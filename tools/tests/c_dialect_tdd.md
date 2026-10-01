@@ -168,7 +168,7 @@ MUTATION CONTROL 32 GREEN: 対照: 恒等 (何も変えない)
 MUTATIONS 27/27 RED; CONTROLS 5/5 GREEN
 ```
 
-## 見ていないもの (既知の限界)
+## 旧版が見ていなかったもの (2026-10-01 の clang 版以前)
 
 - 非定数式の `STATIC_ASSERT` (旧 `tss.c:17` の形) は gnu11 の `_Static_assert` が GCC の畳み込みで通すことがあり、探りでは拒否を要求しない
   (票 §5 の「`_Static_assert` の限界」— 実物は段 2 で `offsetof` にした)。
@@ -185,3 +185,14 @@ MUTATIONS 27/27 RED; CONTROLS 5/5 GREEN
   - (P3) raw string (C では無効)、拡張識別子 (`restrict$x` の `$` を識別子の文字と見ない)、`strip_jobserver` が正規化されていない
     `MAKEFLAGS` (`-j 4` の分かれた形など) を扱わないこと — 親の make が正規化して渡すので通常の経路では起きない。
 - ホスト gcc で組む NE2K のホスト試験 (`build/kernel.mk` の `gcc $(C_STD)`) は `i386-elf-gcc` の行でないので数えない。
+
+
+## clang 版の回帰 (2026-10-01)
+
+過去の反例は `test_c_dialect.py` で維持し、`test_clang_ast.py` で
+`-P/-dM/-C/-CC`、外部名を付ける `#line`、pragma 内の restrict、`restrict$x`、
+匿名メンバー・K&R 定義・typedef の禁止型を追加確認する。
+行継続 include の報告は clang の物理開始行 (旧GCC行標識は終端行)。
+内部 `__restrict` も型として restrict と判定する。
+不正な C / ヘッダ不足は解析失敗として fail closed、変異の RED には数えない。
+具体的な件数・コマンド・差分は [TASK_CLANG_CHECKS](../../docs/tasks/v3/TASK_CLANG_CHECKS.md) §6。

@@ -121,7 +121,7 @@ check-p2v:
 # make -n -B all のコンパイル行ごとに効いている言語モード (本体・ブート・userland は
 # gnu11、SQLite 系は gnu89)、暗黙宣言・暗黙 int・VLA・偽の STATIC_ASSERT の拒否、
 # 公開 SDK ヘッダを gnu89 と gnu11 の両方で取り込めること (C99 以降の構文の混入)、
-# 配布ライブラリヘッダと gnu89 の例 (sdk/example/hello)、内部実装の禁止トークン。
+# 配布ライブラリヘッダと gnu89 の例 (sdk/example/hello)、内部実装の AST 型・宣言・include。
 # 要クロスコンパイラ (ビルドは要らない)。
 check-c-dialect:
 	@python3 -B tools/check_c_dialect.py
@@ -144,12 +144,13 @@ check-privileged:
 # 理由を書く。
 check-arch-asm:
 	@python3 tools/check_arch_asm.py
+	@python3 tools/tests/test_clang_ast.py $(MUT)
 
 # 外部形式 (LE) の直アクセス検査 (移植性の準備、順序 4-a)。媒体・書庫の上の
 # バイト列は include/endian_le.h の le16_rd / le16_wr / le32_rd / le32_wr を
 # 通す。`*(u32 *)&buf[off]` は「x86 は LE」「x86 は非アラインを許す」の 2 つに
 # 同時に寄りかかる書き方で、ARM では落ち、BE では値が化ける。
-# 文字列検査 (コンパイラ不要) と -Wcast-align=strict の 2 段で見る。
+# 実ビルドの旗で libclang の canonical type と alignment を見る (解析失敗は NG)。
 check-le-access:
 	@python3 tools/check_le_access.py
 
