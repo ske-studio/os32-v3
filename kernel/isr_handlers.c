@@ -55,8 +55,8 @@ static void sput_hex32(u32 val)
 }
 
 /* テキストVRAM直接アクセス (ベアメタル) — tvram.h のマクロを使用 */
-#define TVRAM_CHAR  ((volatile u16 *)TVRAM_BASE)
-#define TVRAM_ATRP  ((volatile u16 *)TVRAM_ATTR)
+#define TVRAM_CHAR  ((volatile u16 *)P2V_IO_CONST(TVRAM_BASE))
+#define TVRAM_ATRP  ((volatile u16 *)P2V_IO_CONST(TVRAM_ATTR))
 
 /* ------------------------------------------------------------------------ */
 /*  tvram_puts_at — テキストVRAMに文字列を直接書き込み                     */

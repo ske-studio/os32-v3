@@ -36,6 +36,7 @@
 /*  にならない = 契約 G4 (レビュー #5 ②③、2026-09-06)。                      */
 /* ======================================================================== */
 
+#include "memmap.h"
 #include "gfx_internal.h"   /* gfx.h, pc98.h, memmap.h */
 #include "gfx_hal.h"
 #include "paging.h"

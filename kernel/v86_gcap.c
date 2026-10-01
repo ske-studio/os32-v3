@@ -32,6 +32,7 @@
 /*  書くので (bios18.c)、ROM の採取では記録器を試験できない (票 B4)。         */
 /* ======================================================================== */
 
+#include "memmap.h"
 #include "v86_gcap.h"
 #include "v86_gcap_math.h"
 #include "v86.h"
@@ -551,8 +552,8 @@ static void gcap_out(unsigned int port, unsigned int v)
 static void tv_save(u16 *buf)
 {
     u32 i;
-    volatile u16 *ch = (volatile u16 *)TVRAM_CHAR_BASE;
-    volatile u16 *at = (volatile u16 *)TVRAM_ATTR_BASE;
+    volatile u16 *ch = (volatile u16 *)P2V_IO(TVRAM_CHAR_BASE);
+    volatile u16 *at = (volatile u16 *)P2V_IO(TVRAM_ATTR_BASE);
     for (i = 0; i < GCAP_TV_CELLS; i++) {
         buf[i] = ch[i];
         buf[GCAP_TV_CELLS + i] = at[i];
@@ -562,8 +563,8 @@ static void tv_save(u16 *buf)
 static void tv_restore(const u16 *buf)
 {
     u32 i;
-    volatile u16 *ch = (volatile u16 *)TVRAM_CHAR_BASE;
-    volatile u16 *at = (volatile u16 *)TVRAM_ATTR_BASE;
+    volatile u16 *ch = (volatile u16 *)P2V_IO(TVRAM_CHAR_BASE);
+    volatile u16 *at = (volatile u16 *)P2V_IO(TVRAM_ATTR_BASE);
     for (i = 0; i < GCAP_TV_CELLS; i++) {
         ch[i] = buf[i];
         at[i] = buf[GCAP_TV_CELLS + i];

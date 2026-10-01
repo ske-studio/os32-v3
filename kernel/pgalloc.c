@@ -177,7 +177,7 @@ static int init_model(struct physmem *m, void *backing, u32 capacity,
             first + pages > physmem_legacy_end(m)) goto done;
     } else goto done;
 #if !defined(PGALLOC_HOST_TEST) || PGALLOC_HOST_TEST != 1 || defined(__KERNEL_BUILD__)
-    if (addr != first * PAGE_SIZE) goto done;
+    if (backing != P2V(first * PAGE_SIZE)) goto done;
 #endif
     next = *m;
     if ((kind == PGALLOC_BACKING_ARENA_TOP &&
@@ -196,7 +196,7 @@ static int init_model(struct physmem *m, void *backing, u32 capacity,
                 !all_reserved(&next, ws_first, ws_end)) goto done;
         } else if (ws_first < MEM_APP_BAND_MAX_TOP / PAGE_SIZE || ws_end > first ||
                    !physmem_reserve_ram(&next, ws_first, ws_end)) goto done;
-        if (!verify(ws_first, ws_end - ws_first, (void *)(ws_first * PAGE_SIZE)))
+        if (!verify(ws_first, ws_end - ws_first, P2V(ws_first * PAGE_SIZE)))
             goto done;
     }
     /* No fallible work follows. Never zero before reservation/checks succeed. */
@@ -247,7 +247,7 @@ u32 pgalloc_alloc_pt(void)
     if (model_mode) {
         for (p = workspace_first; p < workspace_end; p++) {
             if (bit(workspace_used, p) ||
-                !paging_verify_identity(p, 1, (void *)(p * PAGE_SIZE))) continue;
+                !paging_verify_identity(p, 1, P2V(p * PAGE_SIZE))) continue;
             workspace_used[p / 32] |= 1UL << (p % 32);
             result = p * PAGE_SIZE;
             break;
@@ -288,7 +288,7 @@ int pgalloc_stage_online(void)
     if (!boot_end) goto done;
     for (p = 0; p < limit_pfn && p < boot_end; p++)
         if (bit(eligible, p) &&
-            !paging_verify_identity(p, 1, (void *)(p * PAGE_SIZE))) goto done;
+            !paging_verify_identity(p, 1, P2V(p * PAGE_SIZE))) goto done;
     p = boot_end;
     while (p < limit_pfn) {
         if (!bit(eligible, p)) { p++; continue; }
@@ -296,7 +296,7 @@ int pgalloc_stage_online(void)
         do { p++; } while (p < limit_pfn && bit(eligible, p));
         if (paging_map_phys(first * PAGE_SIZE, first * PAGE_SIZE,
                             p - first, PAGE_RW) != 0 ||
-            !paging_verify_identity(first, p - first, (void *)(first * PAGE_SIZE)))
+            !paging_verify_identity(first, p - first, P2V(first * PAGE_SIZE)))
             goto done;
     }
     generic_end = limit_pfn;

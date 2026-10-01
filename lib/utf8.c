@@ -29,7 +29,7 @@
  * (kernel/kernel.c の vfs_read)。表の番地は 2 バイト整列なのでアラインの
  * 心配は無いが、`u16 *` で引くと BE の CPU で値が入れ替わる。だから
  * バイト列として持ち、引くときに le16_rd() でバイト順を当てる。 */
-static const u8 *unicode_jis_table = (const u8 *)MEM_UNICODE_TABLE_BASE;
+static const u8 *unicode_jis_table = (const u8 *)P2V_CONST(MEM_UNICODE_TABLE_BASE);
 
 static u16 jis_table_lookup(u32 cp)
 {

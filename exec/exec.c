@@ -1,3 +1,4 @@
+#include "memmap.h"
 #include "exec.h"
 #include "os32x_hdr.h"
 #include "appslot.h"
@@ -826,8 +827,8 @@ static int ring3_range_refuse(u32 why, u32 p, u32 page)
 /*     確かめる → **元の CR3 に戻す** → IF を戻す。                         */
 /*     **master に居るあいだはユーザー出力に 1 バイトも書かない。**          */
 /*                                                                          */
-/*  ビットの判定表そのもの (`ring3_pde_walkable_ok` / `ring3_pte_writable_ok`)*/
-/*  は exec/ring3_str.c にあり、ホストで組合せを網羅している。               */
+/*  表歩きと USER / RW の判定は paging.c の as_va_to_pa に集約し、          */
+/*  ホストで実ソースの組合せを網羅している。                                */
 /*  戻り値: 1 = 書いてよい / 0 = 書いてはいけない (呼び手は kill する)。      */
 /* ======================================================================== */
 
@@ -841,22 +842,17 @@ static int ring3_pd_range_writable(u32 pd_phys, u32 p, u32 len)
      * wrap_mouse_poll で kill されても ring3_range_reject_count が 0 のまま
      * だった。ここは master CR3 の下 (カーネル帯は恒等写像) なので書ける。 */
     if (!pd_phys) return ring3_range_refuse(RING3_RANGE_WR_TABLE, p, 0);
-    /* 表そのものが読めなければ判定しない (安全側で拒否)。 */
-    if (!paging_is_present(pd_phys))
+    if (!paging_is_present((uptr)P2V(pd_phys)))
         return ring3_range_refuse(RING3_RANGE_WR_TABLE, p, pd_phys);
-
     last_page = (p + len - 1u) & ~(u32)(PAGE_SIZE - 1);
     for (page = p & ~(u32)(PAGE_SIZE - 1); ; page += PAGE_SIZE) {
-        u32 pde = ((const volatile u32 *)pd_phys)[page >> 22];
-        u32 pt_phys, pte;
-
-        if (!ring3_pde_walkable_ok(pde))
-            return ring3_range_refuse(RING3_RANGE_WR_PDE, p, page);
-        pt_phys = pde & ~(u32)0xFFFu;
-        if (!paging_is_present(pt_phys))
+        u32 pa;
+        int why = as_va_to_pa(pd_phys, page, &pa);
+        if (why == AS_VA_TABLE)
             return ring3_range_refuse(RING3_RANGE_WR_TABLE, p, page);
-        pte = ((const volatile u32 *)pt_phys)[(page >> 12) & 0x3FFu];
-        if (!ring3_pte_writable_ok(pte))
+        if (why == AS_VA_PDE)
+            return ring3_range_refuse(RING3_RANGE_WR_PDE, p, page);
+        if (why == AS_VA_PTE)
             return ring3_range_refuse(RING3_RANGE_WR_PTE, p, page);
 
         if (page >= last_page) break;
@@ -2081,7 +2077,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
         }
         /* KAPI トランポリンページ (RO+USER, 全PD共有) */
         paging_addrspace_map_user(&ctx->as, ring3_tramp_page,
-            ring3_tramp_page, PAGE_RO | PTE_USER);
+            V2P((const void *)ring3_tramp_page), PAGE_RO | PTE_USER);
 
         /* --- K3: 共有ライブラリ帯域 (0x400000-0x4FFFFF) ---
          * .text/.rodata は RO+USER、.data/.bss は同じ仮想番地にこのアプリ

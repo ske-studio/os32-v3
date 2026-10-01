@@ -1,3 +1,4 @@
+#include "memmap.h"
 #include "gfx_internal.h"
 #include "gfx_hal.h"
 #include "os32_kapi_shared.h"
@@ -19,10 +20,10 @@ extern int appslot_gfx_owner(void);
 /* ======================================================================== */
 /*  バックバッファ (拡張メモリ固定アドレス, 128KB)                          */
 /* ======================================================================== */
-u8 *bb_b = (u8 *)MEM_GFX_BB_BASE;
-u8 *bb_r = (u8 *)(MEM_GFX_BB_BASE + GFX_PLANE_SZ);
-u8 *bb_g = (u8 *)(MEM_GFX_BB_BASE + GFX_PLANE_SZ * 2);
-u8 *bb_i = (u8 *)(MEM_GFX_BB_BASE + GFX_PLANE_SZ * 3);
+u8 *bb_b = (u8 *)P2V_CONST(MEM_GFX_BB_BASE);
+u8 *bb_r = (u8 *)P2V_CONST((MEM_GFX_BB_BASE + GFX_PLANE_SZ));
+u8 *bb_g = (u8 *)P2V_CONST((MEM_GFX_BB_BASE + GFX_PLANE_SZ * 2));
+u8 *bb_i = (u8 *)P2V_CONST((MEM_GFX_BB_BASE + GFX_PLANE_SZ * 3));
 
 int gfx_current_height = GFX_HEIGHT;  /* 200 or 400 */
 
@@ -432,8 +433,8 @@ int gfx_get_height(void)
 static void _gfx_common_init(int plane_sz)
 {
     int i;
-    volatile u16 *tvram_char = (volatile u16 *)TVRAM_CHAR_BASE;
-    volatile u8  *tvram_attr = (volatile u8  *)TVRAM_ATTR_BASE;
+    volatile u16 *tvram_char = (volatile u16 *)P2V_IO(TVRAM_CHAR_BASE);
+    volatile u8  *tvram_attr = (volatile u8  *)P2V_IO(TVRAM_ATTR_BASE);
 
     bb[0] = bb_b; bb[1] = bb_r; bb[2] = bb_g; bb[3] = bb_i;
     dirty_queue.count = 0;
@@ -551,16 +552,16 @@ void gfx_init(void)
 
     /* ページフリッピング有効化: 両ページのVRAMをゼロクリア */
     _out(GDC_ACCESS_PAGE, 0x00);
-    kmemset((u8 *)VRAM_PLANE_B, 0, GFX_PLANE_SZ);
-    kmemset((u8 *)VRAM_PLANE_R, 0, GFX_PLANE_SZ);
-    kmemset((u8 *)VRAM_PLANE_G, 0, GFX_PLANE_SZ);
-    kmemset((u8 *)VRAM_PLANE_I, 0, GFX_PLANE_SZ);
+    kmemset((u8 *)P2V(VRAM_PLANE_B), 0, GFX_PLANE_SZ);
+    kmemset((u8 *)P2V(VRAM_PLANE_R), 0, GFX_PLANE_SZ);
+    kmemset((u8 *)P2V(VRAM_PLANE_G), 0, GFX_PLANE_SZ);
+    kmemset((u8 *)P2V(VRAM_PLANE_I), 0, GFX_PLANE_SZ);
 
     _out(GDC_ACCESS_PAGE, 0x01);
-    kmemset((u8 *)VRAM_PLANE_B, 0, GFX_PLANE_SZ);
-    kmemset((u8 *)VRAM_PLANE_R, 0, GFX_PLANE_SZ);
-    kmemset((u8 *)VRAM_PLANE_G, 0, GFX_PLANE_SZ);
-    kmemset((u8 *)VRAM_PLANE_I, 0, GFX_PLANE_SZ);
+    kmemset((u8 *)P2V(VRAM_PLANE_B), 0, GFX_PLANE_SZ);
+    kmemset((u8 *)P2V(VRAM_PLANE_R), 0, GFX_PLANE_SZ);
+    kmemset((u8 *)P2V(VRAM_PLANE_G), 0, GFX_PLANE_SZ);
+    kmemset((u8 *)P2V(VRAM_PLANE_I), 0, GFX_PLANE_SZ);
 
     /* ページ0を表示、ページ1に描画 */
     _out(GDC_DISP_PAGE, 0x00);
@@ -598,16 +599,16 @@ void gfx_init_200(void)
 
     /* ページフリッピング有効化: 両ページのVRAMをゼロクリア */
     _out(GDC_ACCESS_PAGE, 0x00);
-    kmemset((u8 *)VRAM_PLANE_B, 0, GFX_PLANE_SZ_200);
-    kmemset((u8 *)VRAM_PLANE_R, 0, GFX_PLANE_SZ_200);
-    kmemset((u8 *)VRAM_PLANE_G, 0, GFX_PLANE_SZ_200);
-    kmemset((u8 *)VRAM_PLANE_I, 0, GFX_PLANE_SZ_200);
+    kmemset((u8 *)P2V(VRAM_PLANE_B), 0, GFX_PLANE_SZ_200);
+    kmemset((u8 *)P2V(VRAM_PLANE_R), 0, GFX_PLANE_SZ_200);
+    kmemset((u8 *)P2V(VRAM_PLANE_G), 0, GFX_PLANE_SZ_200);
+    kmemset((u8 *)P2V(VRAM_PLANE_I), 0, GFX_PLANE_SZ_200);
 
     _out(GDC_ACCESS_PAGE, 0x01);
-    kmemset((u8 *)VRAM_PLANE_B, 0, GFX_PLANE_SZ_200);
-    kmemset((u8 *)VRAM_PLANE_R, 0, GFX_PLANE_SZ_200);
-    kmemset((u8 *)VRAM_PLANE_G, 0, GFX_PLANE_SZ_200);
-    kmemset((u8 *)VRAM_PLANE_I, 0, GFX_PLANE_SZ_200);
+    kmemset((u8 *)P2V(VRAM_PLANE_B), 0, GFX_PLANE_SZ_200);
+    kmemset((u8 *)P2V(VRAM_PLANE_R), 0, GFX_PLANE_SZ_200);
+    kmemset((u8 *)P2V(VRAM_PLANE_G), 0, GFX_PLANE_SZ_200);
+    kmemset((u8 *)P2V(VRAM_PLANE_I), 0, GFX_PLANE_SZ_200);
 
     /* ページ0を表示、ページ1に描画 */
     _out(GDC_DISP_PAGE, 0x00);

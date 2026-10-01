@@ -5,6 +5,7 @@
 /*  ローマ字変換は ime_romkana.c、辞書検索は ime_dict.c に分離               */
 /* ======================================================================== */
 
+#include "memmap.h"
 #include "ime.h"
 #include "kbd.h"
 #include "tvram.h"
@@ -103,8 +104,8 @@ static void candlist_restore(void)
     for (y = 0; y < rows; y++) {
         for (x = 0; x < TVRAM_COLS; x++) {
             u32 offset = (u32)(top + y) * TVRAM_BPR + (u32)x * 2;
-            *(volatile u16 *)(TVRAM_BASE + offset) = g_cand_save_text[y * CANDLIST_SAVE_COLS + x];
-            *(volatile u8 *)(TVRAM_ATTR + offset) = g_cand_save_attr[y * CANDLIST_SAVE_COLS + x];
+            *(volatile u16 *)P2V_IO(TVRAM_BASE + offset) = g_cand_save_text[y * CANDLIST_SAVE_COLS + x];
+            *(volatile u8 *)P2V_IO(TVRAM_ATTR + offset) = g_cand_save_attr[y * CANDLIST_SAVE_COLS + x];
         }
     }
     g_cand_has_saved = 0;

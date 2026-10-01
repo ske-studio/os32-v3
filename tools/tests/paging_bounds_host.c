@@ -78,6 +78,36 @@ void _start(void)
     CHECK(((unsigned long)(void *)pt_raw & (PAGE_SIZE - 1)) == 0);
     CHECK(sizeof(pd_raw) == PAGE_SIZE);
     CHECK(((unsigned long)(void *)pd_raw & (PAGE_SIZE - 1)) == 0);
+    {
+        u32 *pd = P2V(0x600000UL), *pt = P2V(0x601000UL);
+        u32 d, t, pa, va = 0x412345UL;
+        CHECK(as_va_to_pa(0, va, &pa) == AS_VA_TABLE);
+        for (d = 0; d < 4; d++) {
+            for (t = 0; t < 4; t++) {
+                u32 df = PTE_PRESENT | ((d & 1) ? PTE_USER : 0) |
+                         ((d & 2) ? PTE_RW : 0);
+                u32 tf = PTE_PRESENT | ((t & 1) ? PTE_USER : 0) |
+                         ((t & 2) ? PTE_RW : 0);
+                pd[va >> 22] = 0x601000UL | df;
+                pt[(va >> 12) & (PTE_COUNT - 1)] = 0x800000UL | tf;
+                pa = 0x12345678UL;
+                CHECK(as_va_to_pa(0x600000UL, va, &pa) ==
+                      (d != 3 ? AS_VA_PDE : t != 3 ? AS_VA_PTE : 0));
+                CHECK(pa == (d == 3 && t == 3 ? 0x800345UL : 0x12345678UL));
+            }
+        }
+        pd[va >> 22] |= PTE_PS;
+        CHECK(as_va_to_pa(0x600000UL, va, &pa) == AS_VA_PDE);
+        pd[va >> 22] = 0x601000UL | PTE_RW | PTE_USER;
+        CHECK(as_va_to_pa(0x600000UL, va, &pa) == AS_VA_PDE);
+        pd[va >> 22] |= PTE_PRESENT;
+        pt[(va >> 12) & (PTE_COUNT - 1)] &= ~PTE_PRESENT;
+        CHECK(as_va_to_pa(0x600000UL, va, &pa) == AS_VA_PTE);
+        CHECK(as_va_to_pa(0, va, &pa) == AS_VA_TABLE);
+        CHECK(as_va_to_pa(0x1000000UL, va, &pa) == AS_VA_TABLE);
+        pd[va >> 22] = 0x1000000UL | PTE_PRESENT | PTE_USER | PTE_RW;
+        CHECK(as_va_to_pa(0x600000UL, va, &pa) == AS_VA_TABLE);
+    }
     host_pool_boot_ws(16384, HOST_WS_FIRST, HOST_WS_END);
     CHECK(paging_map_phys(0xFFFFF000UL, 0xFFFFF000UL, 1, PAGE_RW | PTE_PCD) == 0);
     CHECK(paging_is_present(0xFFFFFFFFUL));

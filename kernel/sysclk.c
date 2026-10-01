@@ -7,6 +7,7 @@
 /* ======================================================================== */
 
 #include "sysclk.h"
+#include "memmap.h"
 #include "pc98.h"
 
 /* 未判定のときの既定は従来どおり 1.9968MHz (NP21/W と 8MHz 系の値)。
@@ -26,7 +27,7 @@ void sysclk_detect(void)
     if (s_detected) {
         return;
     }
-    v = *(volatile u8 *)a;
+    v = *(volatile u8 *)P2V_IO(a);
     s_is_8mhz = (u8)((v & BIOS_SYSCLK_8MHZ) ? 1 : 0);
     s_hz = s_is_8mhz ? (unsigned long)SYSCLK_1997 : (unsigned long)SYSCLK_2458;
     s_detected = 1;

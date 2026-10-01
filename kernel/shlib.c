@@ -74,7 +74,7 @@ static struct {
 int shlib_init(void)
 {
     const int band_pages = (int)(MEM_SHLIB_SIZE / PAGE_SIZE);
-    u8 *buf = (u8 *)MEM_SHLIB_BASE;
+    u8 *buf = (u8 *)P2V(MEM_SHLIB_BASE);
     OS32Header *oh;
     OS32ShlibHeader *sh;
     u32 image_size;
@@ -213,7 +213,7 @@ int shlib_init(void)
     /* ---- .data/.bss の原本を帯域末尾に退避 (アプリごとの複製元) ---- */
     master = MEM_SHLIB_END - sh->data_pages * PAGE_SIZE;
     if (sh->data_pages > 0) {
-        kmemcpy((void *)master, (const void *)sh->data_vaddr,
+        kmemcpy(P2V(master), (const void *)sh->data_vaddr,
                 sh->data_pages * PAGE_SIZE);
     }
 
@@ -288,7 +288,7 @@ int shlib_addrspace_attach(struct addrspace *as)
     }
 
     /* 原本を複製 (identity マッピングなので物理=仮想で書ける)。 */
-    kmemcpy(P2V(phys), (const void *)g_data_master,
+    kmemcpy(P2V(phys), P2V(g_data_master),
             g_data_pages * PAGE_SIZE);
 
     for (i = 0; i < g_data_pages; i++) {

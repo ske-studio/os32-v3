@@ -100,8 +100,9 @@ def run_case(case='default', kb=16384, defines=(), mutation=None):
         mb = texts['kernel/memory_boot.c']
         if case == 'detect_cap':
             # BIOS ワークと書き込み検証をホストの配列で受ける (memory_boot_host.c)。
-            mb = mb.replace('static void *boot_ptr(u32 addr)',
-                            '__attribute__((unused)) static void *boot_ptr_real(u32 addr)', 1)
+            if mb.count('P2V_BOOT(') != 4:
+                raise AssertionError('P2V_BOOT probe sites changed')
+            mb = mb.replace('P2V_BOOT(', 'host_boot_ptr(')
         (d / 'memory_boot_host_source.c').write_text(mb)
         cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie', '-ffunction-sections', '-Wl,--gc-sections', f'-DTEST_{case.upper()}', f'-DTEST_KB={kb}UL'] + list(defines)
         # arch/x86 + platform/pc98: include/io.h / include/cpu.h は契約
@@ -261,15 +262,23 @@ class MemoryBoot(unittest.TestCase):
 
 def mutate():
     red = 0
+    compiled = 0
+    compile_errors = 0
     for m in MUTATIONS:
         case, kb = m[4]
         result = run_case(case, kb, mutation=m)
+        if 'compile' in result:
+            compiled += 1
+            print('  変異 %-18s NOT COUNTED (compile)' % m[0])
+            if m[0] not in ('ledger-base-shift', 'ledger-end-shift'):
+                compile_errors += 1
+            continue
         ok = result != 'ok'
         print('  変異 %-18s %s' % (m[0], 'RED (%s %d: %s)' % (case, kb, result) if ok
                                    else '**GREEN — 試験が穴を見逃した**'))
         red += ok
-    print('%d/%d の変異が RED' % (red, len(MUTATIONS)))
-    return 0 if red == len(MUTATIONS) else 1
+    print('%d/%d の変異が実行時 RED; コンパイル拒否 %d 本は数えない' % (red, len(MUTATIONS) - compiled, compiled))
+    return 0 if not compile_errors and red == len(MUTATIONS) - compiled else 1
 
 
 if __name__ == '__main__':

@@ -42,6 +42,7 @@ docs_only:
 # 数えない (ツリーを丸ごと舐める glob に当たっただけで「表に無い → 全部変異」の
 # 安全側が発火しなくなるのを防ぐ)。変異込みで回す検査を選ぶ方には数える。
 broad:
+  - check-p2v
   - check-c-dialect
   - check-c-dialect-host
   - check-arch-asm
@@ -93,15 +94,6 @@ notest:
       - userland/cmds/stat.c
       - userland/cmds/tar.c
       - userland/cmds/wget.c
-  # カーネルの描画。ホスト試験が組むのは backend_pc98.c / gfx_core.c
-  # (check-boot-splash-host) と backend_cirrus.c (check-cirrus-win-host)、
-  # backend_pegc.c (check-pegc-mode-host) だけで、残りはヘッダ (-Igfx) しか読まない。
-  - glob: gfx/*.c
-    except:
-      - gfx/backend_cirrus.c
-      - gfx/backend_pc98.c
-      - gfx/backend_pegc.c
-      - gfx/gfx_core.c
   # man ページ。hsync.1 は test_hsync_h2 / test_h4_manifest が読む。
   # check-manifests / check-packages-host は docs/manpages/** で当たる。
   - glob: docs/manpages/*.1
@@ -109,6 +101,20 @@ notest:
       - docs/manpages/hsync.1
 
 checks:
+  check-p2v:
+    - tools/check_p2v.py
+    - tools/check_p2v_allow.txt
+    - tools/tests/test_p2v.py
+    - tools/tests/mutpar.py
+    - kernel/**
+    - drivers/**
+    - gfx/**
+    - fs/**
+    - exec/**
+    - kapi/**
+    - lib/**
+    - include/memmap.h
+    - include/types.h
   check-bootinfo-host:
     - boot/bootinfo.inc
     - drivers/ide.c
@@ -704,6 +710,7 @@ checks:
     - tools/tests/test_ledger.py
     - tools/tests/test_memory_boot.py
     - tools/tests/test_paging_bounds.py
+    - tools/tests/paging_bounds_host.c
     - tools/tests/test_pgalloc_model.py
     - tools/tests/test_pgalloc_range.py
     - tools/tests/test_physmem.py

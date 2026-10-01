@@ -56,7 +56,7 @@ static int s_captured;
 
 void bootinfo_capture(void)
 {
-    volatile u8 *low = (volatile u8 *)MEM_BOOTINFO_BASE;
+    volatile u8 *low = (volatile u8 *)P2V_IO(MEM_BOOTINFO_BASE);
     unsigned int i;
 
     if (s_captured) return;

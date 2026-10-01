@@ -2,6 +2,7 @@
 /*  V86_BIOS.C — ゲスト BIOS の HLE                                         */
 /* ======================================================================== */
 
+#include "memmap.h"
 #include "v86_bios.h"
 #include "v86.h"
 #include "kstring.h"
@@ -262,7 +263,7 @@ void v86_bios_save_real(void)
      * この後 v86_mem_setup() がページ 0 をバッキング RAM に張り替え、
      * teardown が R/O に戻すので、ここで R/O にしておくのが一貫している。 */
     paging_set_page(0, 0, PAGE_RO);
-    kmemcpy(real_lowmem, (const void *)0, REAL_SNAPSHOT_SIZE);
+    kmemcpy(real_lowmem, P2V(0), REAL_SNAPSHOT_SIZE);
     real_saved = 1;
 }
 
@@ -275,7 +276,7 @@ void v86_bios_restore_real(void)
         return;
     }
     paging_set_page(0, 0, PAGE_RW);
-    kmemcpy((void *)0, real_lowmem, REAL_SNAPSHOT_SIZE);
+    kmemcpy(P2V(0), real_lowmem, REAL_SNAPSHOT_SIZE);
 }
 
 void v86_bios_setup(void)
