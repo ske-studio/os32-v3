@@ -15,6 +15,9 @@ FILES = {
     'redir_access': 'exec/redir_access.c',
 }
 MUTANTS = [
+    ('access_walk', 'as_va_to_pa(as->pd_phys, va, &result)', 'as_va_to_pa(paging_current_cr3(), va, &result)', 'registrant PD write'),
+    ('access_walk', 'as_va_to_pa_read(as->pd_phys, va, &result)', 'as_va_to_pa_read(paging_current_cr3(), va, &result)', 'registrant PD read'),
+    ('access_walk', 'va - (u32)MEM_SHM_BASE < MEM_SHM_SIZE', '1', 'SHM upper bound'),
     ('access_walk', '(sf->backing != LEDGER_SB_RAM && sf->backing != LEDGER_SB_FIXED_RAM)', '0', 'valid MMIO/VRAM lease'),
     ('access_walk', 'if (d & PTE_PS) return 0;', '', 'PS in both walk layers'),
     ('access_walk', '!ledger_surface_validate(sf)', '0', 'fixed RAM ledger'),

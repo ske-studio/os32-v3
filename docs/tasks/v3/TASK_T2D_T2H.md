@@ -897,8 +897,11 @@ surface世代・参照数・ページ数・権限・台帳・offsetと照合す�
 IRQ保存から利用までを囲む。cstrのNUL/overflow/cap、bytesの全範囲preflight、
 copyoutの全byte不変はd4。DB3入口、既存のread/outputガードのmaster往復撤去、
 有効leaseの早期分類はd5の入口接続で行う。古い `as_va_to_pa*` 単体の利用側を
-B1完成済みとは扱わない。未使用のcaller primitiveは現在のkernelリンクでは
-GCされるため、d4のsizeには接続時の増分も計上する。boot自己診断/最終size確定はd6。
+B1完成済みとは扱わない。kernelは `-ffunction-sections` なしでリンクするため、
+未使用の `caller_access_page` もGCされず、d3のkernelに152 B含まれている
+(`kernel.map` / nm: `0x146e5c`、size `0x98`)。d4のsize見積もりではこの既計上分を
+接続時の増分として再加算せず、撤去による節約としても二重に差し引かない。
+boot自己診断/最終size確定はd6。
 
 ホストは `test_access_walk.py` / `access_walk_host.c` を追加し、実paging・
 allocator・shlib登録・redir/callerを1つのILP32 fixtureで実行。高位VAと低位PAを
@@ -956,6 +959,73 @@ d3は20/20実行時RED、redir/callerは各24/24実行時RED、C方言は27/27 R
 ログ: `/home/hight/os32-tmp/d3-check-changed.log`。
 最終buildログ: `/home/hight/os32-tmp/d3-all-final.log`。
 検査中はソースを変更せず、終了後はこの結果の追記だけ。
+
+### d3 独立レビュー (Opus 5.5、Approve) の P2-1 / P3-1 / P3-3 対応 (2026-10-02)
+
+モデル: GPT-6。基点 `6efb0bf`、worktree `wt/t2d3`。
+P2-1: master CR3下で登録者の `MEM_EXEC_LOAD_ADDR` の1 Bをread/writeとも許可する
+正常対照をIF=0/1で追加。現在callerの同じアクセスは拒否し、CR3/IFは不変。
+実物 `exec/access_walk.c` のwrite/readそれぞれの `as->pd_phys` を
+`paging_current_cr3()` に置き換える2変異を追加した。d0a側の2変異は
+代用 `as_access_page` を書き換える変異であるとコードと表示名に明記した。
+
+P3-1: SHM_ENDより上の `MEM_DEVICE_APERTURE_BASE` (Cirrus窓) に恒等USER/RW
+ページを作り、実 `as_va_to_pa` では翻訳成功する正常対照を確認したうえで、
+caller walkのread/write両方を拒否するprobeを追加。共有master/登録PTの照合は通る
+足場であり、SHM上限式を `1` にする実物への変異を検出する。
+walkは正常GREEN、新規3本を含む **23/23コンパイル成功後の実行時RED**。
+P3-3: 上記caller primitiveのGC説明を訂正した。実装コードの変更はない。
+
+**d4 / d5 / d6 / e への申し送り (記録のみ、今回のコード変更なし)**:
+
+- **P3-2 → d6**: 生き残る多重防御の変異は、trampolineの `!write`、leaseの
+  `!sf->lease_count` / `sf->npages != l->npages` / `l->sid`上限 /
+  `perm_max == NONE`、`shlib_read_page` のSHLIB owner / `page < g_text_pages`、
+  master PDEのP / PS、PDの整列、`caller_access_page` の `appslot_cur()` 照合。
+  d6で残すものと不要なものを仕分け、残すものは正常対照と目的別負例を用意する。
+- **P3-4 → d5**: trampoline scratchで `ring3_ptr_ok` と
+  `ring3_user_range_ok` (`exec.c:700/915`、d3時点) が食い違い、getcwdの結果を
+  db_openなどの入力に渡すとINVALになる。d5の入口接続でwalkへ揃える。
+- **P3-5 → d4**: `caller_access_page` (`redir_access.c:140`、d3時点) の
+  TRUSTEDには帯・長さ・NULLの制限がない。d4の受入にredirと同じ帯の制限
+  (`< MEM_APP_BAND_BASE`) とcap/NUL検査を含める。
+- **P3-6 → d5前**: leaseではページごとの `ledger_surface_validate` をIRQ停止中に
+  呼ぶため `O(npages × regions)`。入口接続前に計測するか、世代と参照数の一致だけで
+  済む形を検討する。
+- **P3-7 → e**: 共有帯の `result != va` / `frame == exec_tramp_page_addr()` は
+  恒等写像に依存する。低位USER撤去時に見直す。
+
+| 同一cross toolchain実測 | レビュー修正前 (clean build_id) | 修正後 (-dirty) | 差分 |
+|---|---:|---:|---:|
+| kernel.bin | 362,224 B | 362,232 B | +8 B |
+| vmkernel.lz4 | 480,065 B | 480,070 B | +5 B |
+| 本体占有 (`__bss_end - 0x100000`) | 573,072 B | 573,072 B | 0 B |
+| `__bss_end` | `0x18BE90` | `0x18BE90` | 0 B |
+| リンカASSERT残り (596 KiB枠) | 37,232 B | 37,232 B | 0 B |
+| d枠残り (5,888 B) | 2,620 B | 2,620 B | 0 B |
+
+kernel実装は変更しておらず、kernel.binの8 B増分はbuild_idのdirty化による。
+caller primitiveの152 Bはこの前後両方に含まれる。ASSERTは緩和していない。
+
+実行環境: `PATH=/home/hight/opt/cross/bin:$PATH`、
+`CROSS_DIR=/home/hight/opt/cross`、`TMPDIR=/home/hight/os32-tmp`。
+ILP32試験は既存 `PYTHONPATH=/home/hight/os32-tmp/d0b-host-runner` のqemu-i386経由、
+`OS32_MUT_JOBS=4`。作業前 `make kernel < /dev/null` rc=0。
+`python3 tools/tests/test_access_walk.py --mutate` rc=0 (23/23 runtime RED)、
+`python3 tools/tests/test_fd_redirect_d0a.py --mutate` rc=0 (24/24 runtime RED)。
+`NP21W_DIR=/home/hight/os32-tmp/d3-review-image-output make all < /dev/null` rc=0。
+FDコピー先は未作成の一時パスに限定し、コピー警告あり。既存Rust / GNU-stack / RWX
+警告あり。ログ: `/home/hight/os32-tmp/d3-review-{before,walk,redir,all}.log`。
+NP21/W・NHD・配備・ini・commit/pushは未操作。ゲスト確認は未実施、PM受入へ渡す。
+
+`python3 tools/gen_memmap.py --write` rc=0 (生成地図の差分なし)。最終
+`CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp
+make check-changed < /dev/null` は上記PATH/PYTHONPATHで **1回だけ実行しrc=0**。
+選択器が基点 `191f3d33c77d` (mainとのmerge-base) からのbuild規則の変更を検出し、
+full (全変異込み) へ拡張した。C方言27/27 RED・正常対照5/5 GREENも成功。
+既存Windows opt-in試験は単独4件・集約5件がskip。
+ログ: `/home/hight/os32-tmp/d3-review-check-changed.log`。
+検査中はソースを変更せず、終了後は本結果の追記だけ。
 
 ## 11. 独立レビュー 2 回目 (Opus 5.5、Approve) の P3 — 実装時の注記
 

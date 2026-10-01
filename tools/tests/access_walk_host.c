@@ -153,7 +153,16 @@ void _start(void)
     CHECK(!paging_addrspace_map_user(&space, MEM_SHM_BASE, MEM_SHM_BASE, PAGE_RW | PTE_USER));
     CHECK(!paging_addrspace_map_user(&space, exec_tramp_page_addr(), exec_tramp_page_addr(), PAGE_RO | PTE_USER));
     CHECK(!paging_addrspace_map_user(&space, 0xA0000, 0xA0000, PAGE_RW | PTE_USER));
+    /* Cirrus identity USER window is above SHM_END, but is not copy payload.
+     * Keep a valid shared master/registered PT so only the band rejects it. */
+    CHECK(MEM_DEVICE_APERTURE_BASE > MEM_SHM_END);
+    CHECK(!paging_addrspace_map_user(&space, MEM_DEVICE_APERTURE_BASE,
+          MEM_DEVICE_APERTURE_BASE, PAGE_RW | PTE_USER));
     host_cr3 = space.pd_phys;
+    CHECK(!as_va_to_pa(space.pd_phys, MEM_DEVICE_APERTURE_BASE, &result));
+    CHECK(result == MEM_DEVICE_APERTURE_BASE);
+    probe(MEM_DEVICE_APERTURE_BASE, 0, 0, 0);
+    probe(MEM_DEVICE_APERTURE_BASE, 1, 0, 0);
     probe(MEM_SHM_BASE + 7, 1, 1, MEM_SHM_BASE + 7);
     probe(exec_tramp_page_addr() + 17, 0, 1, exec_tramp_page_addr() + 17);
     probe(exec_tramp_page_addr(), 1, 0, 0);
@@ -241,8 +250,15 @@ void _start(void)
     }
     /* Current caller is stricter than a live registrant under another root. */
     host_cr3 = paging_kernel_pd_phys();
-    probe(MEM_EXEC_LOAD_ADDR, 0, 0, 0);
-    CHECK(redir_access_check(&caller, MEM_EXEC_LOAD_ADDR, 1, 0));
+    for (i = 0; i < 2; i++) {
+        u32 root = host_cr3;
+        host_arch_if = i ? 0x202 : 2;
+        probe(MEM_EXEC_LOAD_ADDR, 0, 0, 0);
+        probe(MEM_EXEC_LOAD_ADDR, 1, 0, 0);
+        CHECK(redir_access_check(&caller, MEM_EXEC_LOAD_ADDR, 1, 0));
+        CHECK(redir_access_check(&caller, MEM_EXEC_LOAD_ADDR, 1, 1));
+        CHECK(host_cr3 == root && host_arch_if == (i ? 0x202U : 2U));
+    }
     host_cr3 = space.pd_phys;
     current = 3; probe(MEM_EXEC_LOAD_ADDR, 0, 0, 0); current = 2;
     caller.generation++; probe(MEM_EXEC_LOAD_ADDR, 0, 0, 0);

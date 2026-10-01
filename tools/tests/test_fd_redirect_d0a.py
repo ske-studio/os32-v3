@@ -21,8 +21,10 @@ MUTATIONS = [
     ("exec/redir_access.c", " || a.pd_phys != paging_current_cr3()", "", "capture CR3 mismatch"),
     ("exec/redir_access.c", "(va > MEM_APP_BAND_BASE || len > MEM_APP_BAND_BASE - va)", "0", "trusted range"),
     ("fs/fd_redirect.c", "if (rc < 0 || (u32)rc < count) redir_refuse_count++;", "if (0) redir_refuse_count++;", "refusal counter"),
-    ("tools/tests/fd_redirect_d0a_host.c", "as_va_to_pa(as->pd_phys, va, pa)", "as_va_to_pa(paging_current_cr3(), va, pa)", "current PD write"),
-    ("tools/tests/fd_redirect_d0a_host.c", "as_va_to_pa_read(as->pd_phys, va, pa)", "as_va_to_pa_read(paging_current_cr3(), va, pa)", "current PD read"),
+    # These mutate the substitute as_access_page, not the production walk.
+    # Production registrant-PD mutations live in test_access_walk.py (d3).
+    ("tools/tests/fd_redirect_d0a_host.c", "as_va_to_pa(as->pd_phys, va, pa)", "as_va_to_pa(paging_current_cr3(), va, pa)", "substitute current PD write"),
+    ("tools/tests/fd_redirect_d0a_host.c", "as_va_to_pa_read(as->pd_phys, va, pa)", "as_va_to_pa_read(paging_current_cr3(), va, pa)", "substitute current PD read"),
     ("exec/redir_access.c", "kmemcpy(P2V(pa), bytes + done, n)", "kmemcpy((void *)(uptr)va, bytes + done, n)", "VA write"),
     ("exec/redir_access.c", "kmemcpy(bytes + done, P2V(pa), n)", "kmemcpy(bytes + done, (void *)(uptr)va, n)", "VA read"),
     ("exec/redir_access.c", "slot->as->generation == a->generation", "1", "generation reuse"),
