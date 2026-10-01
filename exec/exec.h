@@ -173,12 +173,9 @@ int ring3_user_range_writable(u32 p, u32 len);
  * 2 本目が不要なら pb = 0, lb = 0。 */
 int ring3_user_ranges_writable(u32 pa, u32 la, u32 pb, u32 lb);
 
-/* 同じ表の歩きを**呼び手の文脈を見ずに必ず**行う変種 (2026-09-26、代行レビュー
- * P2)。上の 3 つの門は「いまの呼び出しがアプリ由来か」(ring3_guard_active) で
- * 素通しを決めるが、**アプリが登録しておいたポインタ** (fd_redirect_to_buffer
- * のバッファ) を後でカーネルが書くときは、書く瞬間の文脈 (WM の中かどうか) は
- * ポインタの由来と関係が無い。門は「ポインタの由来」で決める — その側だけが
- * これを使う。PD はいまの CR3 (アプリの PD) を歩く。 */
+/* 現在 CR3 の表を呼び手の文脈に関係なく歩く。
+ * 登録済み redirect ポインタには使わない: 登録者 PD の redir_access を使う。
+ * この関数は「いま渡されたポインタ」の既存出力ガード用。 */
 int ring3_user_ranges_writable_always(u32 pa, u32 la, u32 pb, u32 lb);
 
 /* いまの呼び出しが CPL=3 のアプリ由来か (= ring3_guard_active(ring3_in_syscall,

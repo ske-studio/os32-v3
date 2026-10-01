@@ -65,6 +65,7 @@ void console_write(const char *buf, u32 size, u8 color)
 
 #include "../../fs/vfs_fd.c"
 #include "../../fs/fd_redirect.c"
+#include "redir_access_stub.h"
 
 /* fs/fd_redirect.c の書き込み時の再検査 (票 TASK_KAPI_OUTPUT_GUARD) が引く exec/exec.c
  * の 5 本。ホストではユーザ帯の番地は無いので ring3_ptr_ok は常に 0 (= 再検査を通らない)。 */

@@ -12,13 +12,6 @@
 #include "vfs.h"
 #include "os32_kapi_shared.h"
 
-/* exec/exec.c の出力保護 (fs/ はカーネルヘッダを見ない作法なので extern) */
-extern int ring3_ptr_ok(u32 p);
-extern int ring3_user_ranges_writable(u32 pa, u32 la, u32 pb, u32 lb);
-extern int ring3_user_ranges_writable_always(u32 pa, u32 la, u32 pb, u32 lb);
-extern int ring3_call_from_user(void);
-extern void ring3_fault_kill(void);
-
 /* FD 0/1/2 のリダイレクト状態テーブル */
 static FdRedirect redir_table[3];
 
@@ -43,7 +36,7 @@ void fd_redirect_init(void)
         redir_table[i].buf_pos = 0;
         redir_table[i].buf_len = 0;
         redir_table[i].owner = 0;
-        redir_table[i].user_origin = 0;
+        redir_table[i].access = (RedirAccess){0};
     }
 }
 
@@ -87,24 +80,20 @@ int fd_redirect_to_file(int fd, const char *path, int mode)
     redir_table[fd].buf_pos = 0;
     redir_table[fd].buf_len = 0;
     redir_table[fd].owner = cur_res_owner;
-    redir_table[fd].user_origin = 0;
+    redir_table[fd].access = (RedirAccess){0};
 
     return 0;
 }
 
 int fd_redirect_to_buffer(int fd, u8 *buf, u32 size, u32 len)
 {
-    int user;
+    RedirAccess access;
 
     if (fd < 0 || fd > 2) return -1;
-    if (!buf || size == 0) return -1;
-
-    /* 由来はいま決める (あとで書くときの文脈 — WM の中かどうか — は由来と
-     * 関係が無い)。アプリが張るなら、ここでも表を歩いて RW + USER を確かめる
-     * (KAPI ラッパの出力検査と二重の守り。断るときは表を変えない)。 */
-    user = ring3_call_from_user();
-    if (user && !ring3_user_ranges_writable_always((u32)buf, size, 0, 0))
+    if (!buf || size == 0 || len > size || size - 1 > ~(u32)0 - (u32)(uptr)buf)
         return -1;
+    if (!redir_access_capture(&access) ||
+        !redir_access_check(&access, (u32)(uptr)buf, size, 1)) return -1;
 
     /* 既存のリダイレクトを解除 */
     fd_redirect_reset(fd);
@@ -116,7 +105,7 @@ int fd_redirect_to_buffer(int fd, u8 *buf, u32 size, u32 len)
     redir_table[fd].buf_pos = 0;
     redir_table[fd].buf_len = len;
     redir_table[fd].owner = cur_res_owner;
-    redir_table[fd].user_origin = user;
+    redir_table[fd].access = access;
 
     return 0;
 }
@@ -143,7 +132,7 @@ void fd_redirect_reset(int fd)
     redir_table[fd].buf_pos = 0;
     redir_table[fd].buf_len = 0;
     redir_table[fd].owner = 0;
-    redir_table[fd].user_origin = 0;
+    redir_table[fd].access = (RedirAccess){0};
 }
 
 void fd_redirect_reset_owned(int owner)
@@ -205,19 +194,12 @@ int fd_redirect_read(int fd, void *buf, u32 size)
     }
 
     if (r->target_type == FD_TARGET_BUFFER) {
-        /* バッファからの読み込み */
-        u32 avail = r->buf_len - r->buf_pos;
-        u32 to_read;
-        u32 i;
-        u8 *dst = (u8 *)buf;
-
-        if (avail == 0) return 0; /* EOF */
-        to_read = (size < avail) ? size : avail;
-        for (i = 0; i < to_read; i++) {
-            dst[i] = r->buffer[r->buf_pos + i];
-        }
-        r->buf_pos += to_read;
-        return (int)to_read;
+        u32 avail, count;
+        if (r->buf_pos > r->buf_len || r->buf_len > r->buf_capacity) return -1;
+        avail = r->buf_len - r->buf_pos;
+        count = (size < avail) ? size : avail;
+        return redir_access_copy(&r->access, r->buffer, &r->buf_pos,
+                                 buf, count, 0);
     }
 
     return -1; /* コンソールモードでは呼ばれないはず */
@@ -225,20 +207,11 @@ int fd_redirect_read(int fd, void *buf, u32 size)
 
 int fd_redirect_buf_write_ok(const FdRedirect *r, u32 to_write)
 {
-    u32 dst;
-
-    if (!r || to_write == 0) return 1;
-    dst = (u32)(r->buffer + r->buf_len);
-    /* アプリが登録したバッファ: 書く瞬間の文脈 (WM の中でも) に関係なく歩く。
-     * 登録時の検査の後でページ属性が変わり得る (sys_shm_lock で RO になる
-     * など。CR0.WP=0 なのでカーネルの書きは止まらない)。 */
-    if (r->user_origin)
-        return ring3_user_ranges_writable_always(dst, to_write, 0, 0);
-    /* 常駐側が登録したバッファ: ユーザ帯の番地だけ文脈つきの門で見る
-     * (カーネル帯・シェル帯のバッファは対象外 — 従来どおり)。 */
-    if (ring3_ptr_ok(dst))
-        return ring3_user_ranges_writable(dst, to_write, 0, 0);
-    return 1;
+    if (!r || r->buf_len > r->buf_capacity ||
+        to_write > r->buf_capacity - r->buf_len ||
+        r->buf_len > ~(u32)0 - (u32)(uptr)r->buffer) return 0;
+    return redir_access_check(&r->access, (u32)(uptr)r->buffer + r->buf_len,
+                              to_write, 1);
 }
 
 int fd_redirect_write(int fd, const void *buf, u32 size)
@@ -254,24 +227,12 @@ int fd_redirect_write(int fd, const void *buf, u32 size)
     }
 
     if (r->target_type == FD_TARGET_BUFFER) {
-        /* バッファへの書き込み */
-        u32 space = r->buf_capacity - r->buf_len;
-        u32 to_write;
-        u32 i;
-        const u8 *src = (const u8 *)buf;
-
-        to_write = (size < space) ? size : space;
-        /* 書く前に毎回確かめる (票 TASK_KAPI_OUTPUT_GUARD、実装レビュー 4 の
-         * 「最後の砦」)。判定は fd_redirect_buf_write_ok — アプリが登録した
-         * バッファは WM の文脈でも素通しにしない (2026-09-26、代行レビュー P2)。 */
-        if (!fd_redirect_buf_write_ok(r, to_write)) {
-            ring3_fault_kill();   /* 戻らない */
-        }
-        for (i = 0; i < to_write; i++) {
-            r->buffer[r->buf_len + i] = src[i];
-        }
-        r->buf_len += to_write;
-        return (int)to_write;
+        u32 space, count;
+        if (r->buf_pos > r->buf_len || r->buf_len > r->buf_capacity) return -1;
+        space = r->buf_capacity - r->buf_len;
+        count = (size < space) ? size : space;
+        return redir_access_copy(&r->access, r->buffer, &r->buf_len,
+                                 (void *)buf, count, 1);
     }
 
     return -1;
@@ -307,7 +268,7 @@ static void redir_entry_clear(FdRedirect *r)
     r->buf_pos = 0;
     r->buf_len = 0;
     r->owner = 0;
-    r->user_origin = 0;
+    r->access = (RedirAccess){0};
 }
 
 void fd_redirect_save(FdRedirectState *out)

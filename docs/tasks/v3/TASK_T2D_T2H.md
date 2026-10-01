@@ -128,7 +128,7 @@ d0bでrecipeの同flagを外し、登録者ASのwalk/copy境界の足場を追�
 | 小段 (各45〜75分目安) | 成果 / その場で閉じる試験 |
 |---|---|
 | d0a | ゲスト試験 `d0a_test`・同VA別backingの実fd_redirectホスト試験を作成。§1-2の判定でPMが `ls \| cat`・同VA/別PFNを受入 (ゲスト未実施) |
-| d0b | 登録者記述子とPA copyを最小実装。死んだ登録者/slot再利用/RO化/入れ子・park保存復元、子の内容不変。修正後guest回帰 |
+| d0b | 登録者記述子とPA copyを最小実装。死んだ登録者/slot再利用/RO化/入れ子・park保存復元、子の内容不変。実装・ホスト結果は §10-3、修正後guest回帰はPM待ち |
 | d1 | caller記述子と入口/正常出口。USER/trusted/入れ子とCR3不一致拒否 |
 | d2 | park/longjmp/WMの寿命配線。実exec R1足場で古い記述子不使用 |
 | d3 | read/write walkと管理frame検証。RO入力成功・RW出力・PS/偽PT拒否 |
@@ -462,6 +462,70 @@ d0a: child_status kind=1 code=10 rc=10 result_rc=0 bytes=17
 ```
 
 **指摘の再現を確認した**: 子の出力 17 バイトは親の登録バッファに届かず、子自身の同じ VA (0x80102940) を書き換えた (子は自己点検で code=10)。ホストの実ソース試験 (`tools/tests/test_fd_redirect_d0a.py`) も同じく RED (XFAIL として登録)。カーネル層の既知の不具合として、**d0b の修正を T2d の新機能より先に行う** (POLICY_DEV §1)。
+
+## 10-3. d0b の実装結果 (コーダー、2026-10-01)
+
+`fs/fd_redirect` に登録時の `{origin, app_id, AS, pd_phys, owner, generation}` を値保存する
+`RedirAccess` を追加。`exec/redir_access.c` は live AppSlot を引き直してから AS の同一性を
+照合し、登録 PD の read/write walk が返す PA を `P2V` でコピーする。現在 CR3 との一致は
+登録時だけ要求する。登録者の終了・世代/owner/PD/AS 不一致・RO 出力は -1 で拒否し、
+子を kill しない。len/capacity/位置/番地の桁あふれも拒否する。
+
+全範囲を先に検査して通常の拒否ではデータ・位置を不変とし、コピー時にもページごとに
+「生存確認→walk→copy→位置更新」を IRQ 保存内で行う。ページの間で入口 IF を戻す。
+この間に allocation/callback/yield はなく、AS 回収は R1 の通常文脈だけ。ページ途中で
+防御的な再検査が失敗した場合は、既にコピーしたバイト数を返す。AS generation は生成時に
+単調採番し、上限到達後は生成拒否して周回させない。trusted の kernel/WM buffer は従来の
+恒等写像を使う。syscall caller 保存の一般化や管理 frame walk の強化 (d1〜d3) は今回の対象外。
+
+保存構造体に記述子を含めるので、exec_run の継承・子 owner だけの回収、および appslot の
+park/resume の値保存で登録者を保持する。ホストは実物 fd_redirect + redir_access、同VA/別backing
+で親出力・子全byte不変・登録者PDからの読取りを確認。死んだ登録者、同slot/AS/owner/PDの
+世代再利用、AS/owner/PD不一致、RO出力拒否/RO入力許可、入れ子とparkの保存復元、
+次ページ拒否時の全byte不変、非整列のページ跨ぎ、IF=0/1、容量とoverflowも確認した。
+実物 appslot の既存試験には記述子全フィールドの park/resume 保持検査を追加した。
+`test_fd_redirect_d0a.py` の XFAIL 受理と make の `--expect-known-bug` 登録は撤去した。
+
+対象試験: `test_fd_redirect_d0a.py --mutate` は GREEN + **16/16 実行時RED**、
+`test_paging_bounds.py --mutate` は実物 AS の再利用・周回拒否が GREEN + **2/2 実行時RED**。
+どちらも compile 失敗は RED に数えない。既存 ring3_guard / fstat_redir / owner_reclaim /
+multiapp_impl の対象試験も成功。kselftest に AS 世代の再利用拒否と登録者なしの早期拒否を反映。
+この環境では ILP32 native 実行が SIGSYS になるため、ディスク上の一時 `sitecustomize.py` で
+ホスト ELF32 のみ `qemu-i386` を経由した (NP21/W ではない)。
+
+| ILP32 実測 | 修正前 | 修正後 |
+|---|---:|---:|
+| AS | 688 B | 692 B |
+| AppSlot | 192 B | 192 B |
+| FdRedirect / State (3本) | 32 / 96 B | 52 / 156 B |
+| redirect現在表 + 6退避枠 | 672 B | 1,092 B |
+| 管理合計 (親票のAS/slot/台帳会計、redirect別) | 7,488 B | 7,504 B |
+| kernel.bin | 359,424 B | 360,596 B |
+| 本体 `.text/.data/.bss` (`__bss_end - 0x100000`) | 569,772 B | 571,404 B |
+| `__bss_end` | `0x18B1AC` | `0x18B80C` |
+| リンカ ASSERT 残り (596 KiB枠) | 40,532 B | 38,900 B |
+
+修正後は未コミットの `-dirty` build_id を含む。生成地図は
+`python3 tools/gen_memmap.py --write` で同期した。
+`CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp make all < /dev/null` は rc=0。
+make all の FD image 出力先は `NP21W_DIR=/home/hight/os32-tmp/d0b-image-output` に設定し、
+NP21/W・NHD・ini・実環境への配備・commit/push は実施していない。
+最終 `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp
+make check-changed < /dev/null` は **rc=2**。原因は `docs/TESTS.md` の生成忘れ
+(`check-tests-inventory` だけが失敗)。`python3 tools/gen_tests_inventory.py --write` で
+修正し、同鮮度検査は rc=0。そこで未実行になった `check-constraints` 以降の選択済み
+ターゲットと `check-tests-inventory` を `make -k ... MUTATE=1 < /dev/null` で続行し、
+**rc=0**。両回のソース不変検査も rc=0。本体の `check-changed` は依頼の1回指定に従い
+再実行していないため、**同コマンド rc=0 の完了条件は未確認としてPMへ申し送る**。
+環境は上記 TMPDIR、cross/bin の PATH、ELF32 用一時ランナーの PYTHONPATH を使用。
+ログは `/home/hight/os32-tmp/d0b-check-changed.log` と `d0b-remaining-checks.log`。
+既存 Windows opt-in fixture は単独試験4件・集約試験5件が skip、ゲスト受入は未実施。
+初回 `make all` の既定 FD コピーは Warning で失敗し、以降は上記の一時出力先に隔離した。
+
+PM の NP21/W 受入は未実施。新しい `d0a_test.bin` の期待結果は
+`d0a: parent_buffer=OK`、`d0a: child_value=OK`、
+`d0a: child_status kind=1 code=0 rc=0 result_rc=0 bytes=17`。
+CPL=3 の sh 内で `ls | cat` を単独 `ls` と比較し、8MB/17MBの回帰とkill差分を確認する。
 
 ## 11. 独立レビュー 2 回目 (Opus 5.5、Approve) の P3 — 実装時の注記
 

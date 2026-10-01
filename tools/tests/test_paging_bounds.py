@@ -4,6 +4,7 @@ import subprocess
 import tempfile
 import argparse
 parser = argparse.ArgumentParser()
+parser.add_argument('--mutate', action='store_true')
 parser.add_argument('--rebuild', choices=['nonmaster', 'rollback'])
 args = parser.parse_args()
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -29,7 +30,24 @@ with tempfile.TemporaryDirectory(prefix='os32-paging-') as tmp:
     defines = ['-DPHYSMEM_HOST_TEST=1']
     if args.rebuild:
         defines.append('-DTEST_' + args.rebuild.upper())
-    subprocess.run(['gcc', *FLAGS, *defines, '-nostdlib', '-static', '-no-pie', *host_includes, str(ROOT / 'tools/tests' / harness), str(ROOT / 'kernel/physmem.c'), '-o', str(exe)], check=True)
+    build = ['gcc', *FLAGS, *defines, '-nostdlib', '-static', '-no-pie', *host_includes, str(ROOT / 'tools/tests' / harness), str(ROOT / 'kernel/physmem.c'), '-o', str(exe)]
+    subprocess.run(build, check=True)
     subprocess.run([str(exe)], check=True, timeout=60)
     subprocess.run(['i386-elf-gcc', *FLAGS, '-O2', *includes, '-c', str(ROOT / 'kernel/paging.c'), '-o', str(tmp / 'paging.o')], check=True)
     print('HOST ILP32 + TARGET GNU11 PASS')
+
+    if args.mutate:
+        assert not args.rebuild
+        mutants = [
+            ('generation reused', 'as->generation = ++as_generation;', 'as->generation = 1;'),
+            ('generation wrap', 'as_generation == ~(u32)0', '0'),
+        ]
+        for name, old, new in mutants:
+            assert source.count(old) == 1
+            (tmp / 'paging_host_source.c').write_text(source.replace(old, new))
+            subprocess.run(build, check=True)  # Compile errors are not RED.
+            result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=60)
+            assert result.returncode != 0, name + ' survived'
+            assert 'FAIL:' in result.stdout, result.stdout + result.stderr
+            print('RED (runtime): ' + name)
+        print('MUTATIONS 2/2 runtime RED')

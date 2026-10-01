@@ -659,7 +659,7 @@ static void test_ledger(void)
     struct addrspace as;
     enum { data_pages = 2 };
     const u32 expected_pages = PDE_COUNT * sizeof(u32) / PAGE_SIZE + data_pages;
-    u32 persist, owner, phys, left;
+    u32 persist, owner, phys, left, generation;
     int ok;
 
     check(kctx_irq_depth == 0 && kctx_exc_depth == 0, "ledger:ctx depth 0");
@@ -674,7 +674,14 @@ static void test_ledger(void)
          * 疎確保なので 0。create() は lease 先頭 PT も 0 (起動用の
          * create_lease() だけが 1 枚事前確保)。AS 制御はここでは stack。 */
         check(ok && phys && ledger_owner_pages(owner) == expected_pages, "ledger:AS alloc");
-        if (ok) paging_addrspace_destroy(&as);
+        if (ok) {
+            generation = as.generation;
+            paging_addrspace_destroy(&as);
+            ok = paging_addrspace_create(&as, owner) == 0;
+            check(ok && generation && as.generation > generation,
+                  "ledger:AS generation not reused");
+            if (ok) paging_addrspace_destroy(&as);
+        }
         left = 0;
         check(ledger_reclaim_owner(owner, &left) && left == (phys ? data_pages : 0) &&
               ledger_owner_pages(owner) == 0, "ledger:AS pages 0 (R5a)");
@@ -1805,7 +1812,7 @@ static void test_fd_redirect_origin_guard(void)
     r.buffer = kbuf;
     r.buf_capacity = sizeof(kbuf);
     r.owner = 2;                        /* アプリ (ID 2) が張った */
-    r.user_origin = 1;
+    r.access.origin = 1;
 
     ring3_in_syscall = 1;               /* ディスパッチ中を装う */
     ring3_wm_depth = 0;
@@ -1814,15 +1821,14 @@ static void test_fd_redirect_origin_guard(void)
 
     check(fd_redirect_buf_write_ok(&r, 1u) == 0,
           "origin-guard: app-registered buffer refused at depth 1");
-    check(ring3_range_reject_count == base + 1u &&
-          ring3_range_reject_addr == (u32)kbuf,
-          "origin-guard: refusal walked and counted");
+    check(ring3_range_reject_count == base,
+          "origin-guard: missing registration refused before walk");
 
     /* 同じ番地でも WM (常駐側) が張ったものなら深さ 1 では素通し。 */
-    r.user_origin = 0;
+    r.access.origin = 0;
     r.owner = 1;
     check(fd_redirect_buf_write_ok(&r, 1u) == 1 &&
-          ring3_range_reject_count == base + 1u,
+          ring3_range_reject_count == base,
           "origin-guard: WM-registered buffer passes at depth 1");
     ring3_wm_leave();
 

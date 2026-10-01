@@ -91,6 +91,7 @@ void test_shm_memset(void *d, int c, unsigned long n)
 }
 
 #include "../../fs/fd_redirect.c"
+#include "redir_access_stub.h"
 #include "../../fs/pipe_buffer.c"
 #include "../../kernel/shm.c"
 

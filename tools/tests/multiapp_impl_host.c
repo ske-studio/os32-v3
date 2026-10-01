@@ -101,6 +101,7 @@ int vfs_write_fd(int fd, const void *buf, u32 size)
 }
 
 #include "fd_redirect.c"
+#include "redir_access_stub.h"
 
 /* fd_redirect.c の書き込み時の再検査 (票 TASK_KAPI_OUTPUT_GUARD、実装レビュー 4)
  * が引く exec/exec.c の 5 本。ホストではユーザ帯の番地は無いので
@@ -1824,6 +1825,13 @@ static void case_redirect_context(void)
     check(fd_redirect_write(1, "ab", 2) == 2, "24o sh がバッファへ 2 バイト");
     check(fd_redirect_get_buf_len(1) == 2, "24p sys_redirect_get_buf_len が 2");
 
+    /* d0b: exercise the real appslot park/resume wiring with a value identity. */
+    redir_table[1].access.origin = REDIR_USER;
+    redir_table[1].access.app_id = a2;
+    redir_table[1].access.as = (struct addrspace *)pipebuf;
+    redir_table[1].access.pd_phys = 0x400000;
+    redir_table[1].access.owner = 11;
+    redir_table[1].access.generation = 123;
     check(ma_park_yield() == 0, "24q sh が park する");
     check(fd_is_redirected(1) == 0, "24r バッファも枠へ移る");
     check(ma_resume_poll(a3) == 0, "24s 別アプリを起こす");
@@ -1834,6 +1842,13 @@ static void case_redirect_context(void)
     check(ma_park_yield() == 0, "24v 別アプリが譲る");
     check(ma_resume_poll(a2) == 0, "24w sh を起こす");
     check(fd_redirect_get_buf_len(1) == 2, "24x sh のバッファ長は 2 のまま");
+    check(redir_table[1].access.origin == REDIR_USER &&
+          redir_table[1].access.app_id == a2 &&
+          redir_table[1].access.as == (struct addrspace *)pipebuf &&
+          redir_table[1].access.pd_phys == 0x400000 &&
+          redir_table[1].access.owner == 11 &&
+          redir_table[1].access.generation == 123,
+          "24x2 park/resume preserves the entire registered identity");
 
     /* --- 回収: park したまま畳まれた ID は枠の中を閉じる ---------------- */
     ma_init(4096);

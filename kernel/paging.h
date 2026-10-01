@@ -185,6 +185,7 @@ struct as_lease {
 };
 struct lease_mapping { u32 base, phys, npages, flags, slot, token, sid, generation; };
 struct addrspace {
+    u32 generation;    /* AS lifetime; never reused, even if owner/PD repeat. */
     u32 pd_phys;       /* 新 PD の物理アドレス (CR3 に載せる値)。0=無効 */
     u32 app_pde;       /* アプリ固有にした先頭 PDE インデックス */
     u32 app_pde_count; /* アプリ固有 PDE の枚数 (0=無効, 1..MAX_PDES) */

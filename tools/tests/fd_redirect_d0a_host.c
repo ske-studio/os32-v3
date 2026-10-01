@@ -1,7 +1,5 @@
-/* T2d d0a: real redirect code; Linux mappings stand in for CR3 switching.
- * Two distinct memfd backings, one VA, plus stable aliases for observation.
- * Permission/exec/VFS boundaries are stubs; no redirect logic is duplicated.
- */
+/* Real fd_redirect + saved-AS copy. MMU/slot/IRQ boundaries are instrumented;
+ * mmap changes the active VA backing, while P2V aliases stay stable. */
 #define _GNU_SOURCE
 #include <assert.h>
 #include <stdio.h>
@@ -9,103 +7,168 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include "appslot.h"
+#define IO_H
+static unsigned int irq_enabled = 1, saves, restores;
+static unsigned int irq_save(void) { unsigned int f = irq_enabled; irq_enabled = 0; saves++; return f; }
+static void irq_restore(unsigned int f) { assert(!irq_enabled); irq_enabled = f; restores++; }
 #include "../../fs/fd_redirect.c"
+#include "../../exec/redir_access.c"
 
-#define PROBE_BYTES 64
-#define PARENT_FILL 0xA5
-#define CHILD_FILL 0x5A
-#define PARENT_OWNER 2
-#define CHILD_OWNER 3
-
-static u8 *current_va;
-static int checks;
+#define BYTES (PAGE_SIZE * 2)
+static AppSlot slots[APP_SLOT_COUNT];
+static struct addrspace spaces[APP_SLOT_COUNT];
+static u8 *current_va, *aliases[APP_SLOT_COUNT];
+static int current_id = 2, user_call = 1, denied_page = -1, read_denied;
+static u32 walk_count;
 static const char payload[] = "d0a child stdout\n";
-
-int ring3_ptr_ok(u32 p) { return p == (u32)current_va; }
-int ring3_call_from_user(void) { return 1; }
-int ring3_user_ranges_writable_always(u32 pa, u32 la, u32 pb, u32 lb)
+AppSlot *appslot_get(int id) { assert(!irq_enabled); return id > 0 && id < APP_SLOT_COUNT && slots[id].state ? &slots[id] : NULL; }
+int appslot_cur(void) { return current_id; }
+int ring3_call_from_user(void) { return user_call; }
+u32 paging_kernel_pd_phys(void) { return 0x1000; }
+u32 paging_current_cr3(void) { return spaces[current_id].pd_phys; }
+static int walk(u32 pd, u32 va, u32 *pa, int write)
 {
-    checks++;
-    assert(pb == 0 && lb == 0);
-    return pa >= (u32)current_va && pa - (u32)current_va <= PROBE_BYTES &&
-           la <= PROBE_BYTES - (pa - (u32)current_va);
+    assert(!irq_enabled);
+    walk_count++;
+    if (va < (u32)(uptr)current_va || va - (u32)(uptr)current_va >= BYTES) return 1;
+    u32 off = va - (u32)(uptr)current_va;
+    if ((int)(off / PAGE_SIZE) == denied_page && (write || read_denied)) return 1;
+    for (int id = 2; id <= 3; id++) if (pd == spaces[id].pd_phys) {
+        *pa = (u32)(uptr)(aliases[id] + off);
+        return 0;
+    }
+    return 1;
 }
-int ring3_user_ranges_writable(u32 pa, u32 la, u32 pb, u32 lb)
-{ return ring3_user_ranges_writable_always(pa, la, pb, lb); }
-void ring3_fault_kill(void) { abort(); }
+int as_va_to_pa(u32 pd, u32 va, u32 *pa) { return walk(pd, va, pa, 1); }
+int as_va_to_pa_read(u32 pd, u32 va, u32 *pa) { return walk(pd, va, pa, 0); }
 int vfs_open(const char *p, int m) { (void)p; (void)m; abort(); }
 void vfs_close(int fd) { (void)fd; abort(); }
 int vfs_seek(int fd, int o, int w) { (void)fd; (void)o; (void)w; abort(); }
 int vfs_read_fd(int fd, void *b, u32 n) { (void)fd; (void)b; (void)n; abort(); }
 int vfs_write_fd(int fd, const void *b, u32 n) { (void)fd; (void)b; (void)n; abort(); }
 
-static u8 *map_backing(int fd, size_t bytes, void *va)
+static u8 *map_backing(int fd, void *va)
 {
-    void *p = mmap(va, bytes, PROT_READ | PROT_WRITE,
-                   MAP_SHARED | (va ? MAP_FIXED : 0), fd, 0);
-    assert(p != MAP_FAILED);
-    if (va) assert(p == va);
+    void *p = mmap(va, BYTES, PROT_READ | PROT_WRITE,
+                   MAP_SHARED | (va ? MAP_FIXED : MAP_32BIT), fd, 0);
+    assert(p != MAP_FAILED && (uptr)p <= 0xffffffffUL);
     return p;
 }
-
+static void unchanged(u8 *p, u32 n, u8 value)
+{ for (u32 i = 0; i < n; i++) assert(p[i] == value); }
+static void refuse_write(void)
+{
+    u32 old = redir_table[1].buf_len;
+    assert(fd_redirect_write(1, payload, 17) == -1);
+    assert(redir_table[1].buf_len == old);
+    unchanged(aliases[2], BYTES, 0xA5);
+    unchanged(aliases[3], BYTES, 0x5A);
+}
 int main(void)
 {
-    size_t page = (size_t)sysconf(_SC_PAGESIZE);
-    int parent_fd = memfd_create("d0a-parent", 0);
-    int child_fd = memfd_create("d0a-child", 0);
-    u8 *parent, *child;
-    int parent_ok, child_ok, exact_child_write;
-    assert(parent_fd >= 0 && child_fd >= 0 && page >= PROBE_BYTES);
-    assert(ftruncate(parent_fd, page) == 0 && ftruncate(child_fd, page) == 0);
-    parent = map_backing(parent_fd, page, NULL);
-    child = map_backing(child_fd, page, NULL);
-    current_va = map_backing(parent_fd, page, NULL);
-
-    /* Normal control: the registered process writes in its own AS. */
-    fd_redirect_init();
-    res_owner_set(PARENT_OWNER);
-    memset(current_va, PARENT_FILL, PROBE_BYTES);
-    assert(fd_redirect_to_buffer(1, current_va, PROBE_BYTES, 0) == 0);
-    assert(fd_redirect_write(1, payload, sizeof(payload) - 1) == sizeof(payload) - 1);
-    assert(memcmp(parent, payload, sizeof(payload) - 1) == 0);
-    for (size_t i = sizeof(payload) - 1; i < PROBE_BYTES; i++) assert(parent[i] == PARENT_FILL);
-    assert(fd_redirect_get_buf_len(1) == sizeof(payload) - 1);
-    fd_redirect_reset(1);
+    int fds[4] = {0};
+    for (int id = 2; id <= 3; id++) {
+        fds[id] = memfd_create("d0b", 0);
+        assert(fds[id] >= 0 && ftruncate(fds[id], BYTES) == 0);
+        aliases[id] = map_backing(fds[id], NULL);
+        spaces[id].owner = 10 + id; spaces[id].generation = 20 + id;
+        spaces[id].pd_phys = (u32)id * PAGE_SIZE;
+        slots[id].as = &spaces[id]; slots[id].cpl3 = 1;
+        slots[id].state = APP_STATE_RUNNING;
+    }
+    current_va = map_backing(fds[2], NULL);
+    fd_redirect_init(); res_owner_set(2);
+    assert(fd_redirect_to_buffer(1, current_va, 64, 0) == 0);
+    assert(fd_redirect_write(1, payload, 17) == 17);
+    assert(!memcmp(aliases[2], payload, 17));
     puts("d0a: same_as=OK");
+    memset(aliases[2], 0xA5, BYTES); memset(aliases[3], 0x5A, BYTES);
+    assert(fd_redirect_to_buffer(1, current_va, BYTES, 0) == 0);
+    /* Failed registrations preserve an already installed redirect. */
+    res_owner_set(3);
+    assert(fd_redirect_to_buffer(1, current_va, 16, 0) == -1);
+    assert(redir_table[1].access.app_id == 2);
+    res_owner_set(2);
+    current_id = 3; res_owner_set(3); map_backing(fds[3], current_va);
+    assert(fd_redirect_write(1, payload, 17) == 17);
+    assert(!memcmp(aliases[2], payload, 17)); unchanged(aliases[2] + 17, BYTES - 17, 0xA5);
+    unchanged(aliases[3], BYTES, 0x5A);
+    fd_redirect_reset_owned(3);
+    assert(fd_redirect_get_buf_len(1) == 17);
+    puts("d0a: parent_buffer=OK\nd0a: child_value=OK");
+    u8 out[BYTES]; memset(out, 0xCC, sizeof(out));
+    assert(fd_redirect_read(1, out, 17) == 17 && !memcmp(out, payload, 17));
 
-    /* Register in parent -> switch backing -> child writes/self-checks -> exit
-     * only child-owned resources -> restore parent backing -> parent checks. */
-    memset(current_va, PARENT_FILL, PROBE_BYTES);
-    memset(child, CHILD_FILL, PROBE_BYTES);
-    assert(fd_redirect_to_buffer(1, current_va, PROBE_BYTES, 0) == 0);
-    map_backing(child_fd, page, current_va);
-    assert(current_va[0] == CHILD_FILL && parent[0] == PARENT_FILL);
-    res_owner_set(CHILD_OWNER);
-    assert(fd_redirect_write(1, payload, sizeof(payload) - 1) == sizeof(payload) - 1);
-    child_ok = 1;
-    exact_child_write = memcmp(child, payload, sizeof(payload) - 1) == 0;
-    for (size_t i = 0; i < PROBE_BYTES; i++) {
-        if (current_va[i] != CHILD_FILL) child_ok = 0;
-        if (i >= sizeof(payload) - 1 && child[i] != CHILD_FILL) exact_child_write = 0;
+    /* Value snapshots survive nested save/restore and park transfer, and the
+     * inherited table still belongs to the parent on a child's exit. */
+    FdRedirectState parent, nested, parked;
+    fd_redirect_save(&parent);
+    assert(!fd_is_redirected(1));
+    assert(fd_redirect_to_buffer(1, current_va, BYTES, 0) == 0);
+    fd_redirect_save(&nested); fd_redirect_restore(&parent);
+    fd_redirect_clear_state(&parent);
+    fd_redirect_save(&parked); fd_redirect_restore(&nested);
+    fd_redirect_clear_state(&nested);
+    assert(fd_redirect_write(1, "C", 1) == 1 && aliases[3][0] == 'C');
+    fd_redirect_reset_owned(3);
+    fd_redirect_restore(&parked); fd_redirect_clear_state(&parked);
+    assert(fd_redirect_write(1, "P", 1) == 1 && aliases[2][17] == 'P');
+    assert(redir_table[1].access.app_id == 2 && redir_table[1].access.generation == 22);
+
+    redir_table[1].buf_len = redir_table[1].buf_pos = 0;
+    memset(aliases[2], 0xA5, BYTES); memset(aliases[3], 0x5A, BYTES);
+    /* Poison old pointer: lookup must fail before dereferencing a dead AS. */
+    struct addrspace *saved = redir_table[1].access.as;
+    slots[2].state = APP_STATE_FREE; redir_table[1].access.as = (void *)1;
+    refuse_write();
+    slots[2].state = APP_STATE_RUNNING;
+    refuse_write(); redir_table[1].access.as = saved;
+    spaces[2].generation++; refuse_write(); spaces[2].generation--;
+    spaces[2].owner++; refuse_write(); spaces[2].owner--;
+    redir_table[1].access.pd_phys = spaces[3].pd_phys;
+    refuse_write(); redir_table[1].access.pd_phys = spaces[2].pd_phys;
+    slots[2].state = APP_STATE_FAULT_PENDING; refuse_write(); slots[2].state = APP_STATE_RUNNING;
+    denied_page = 0; refuse_write();
+    /* RO still readable; absent read page rejects without touching output. */
+    redir_table[1].buf_len = 17; read_denied = 1;
+    memset(out, 0xCC, sizeof(out));
+    assert(fd_redirect_read(1, out, 17) == -1 && redir_table[1].buf_pos == 0);
+    unchanged(out, sizeof(out), 0xCC);
+    read_denied = 0;
+    assert(fd_redirect_read(1, out, 17) == 17); unchanged(out, 17, 0xA5);
+    denied_page = -1;
+
+    /* Full-range preflight before any byte; copy/position bounded per page.
+     * IRQ restore occurs between each page, for both incoming IF values. */
+    for (unsigned int f = 0; f <= 1; f++) {
+        irq_enabled = f;
+        redir_table[1].buf_len = redir_table[1].buf_pos = 0;
+        denied_page = 1; memset(out, 0x42, sizeof(out));
+        assert(fd_redirect_write(1, out, BYTES) == -1);
+        unchanged(aliases[2], BYTES, 0xA5); assert(redir_table[1].buf_len == 0);
+        denied_page = -1;
+        unsigned int before = saves;
+        assert(fd_redirect_write(1, out, BYTES) == BYTES);
+        assert(saves == before + 4 && saves == restores && irq_enabled == f);
+        unchanged(aliases[2], BYTES, 0x42); unchanged(aliases[3], BYTES, 0x5A);
+        memset(aliases[2], 0xA5, BYTES);
     }
-    fd_redirect_reset_owned(CHILD_OWNER);
-    map_backing(parent_fd, page, current_va);
-    res_owner_set(PARENT_OWNER);
-    assert(fd_is_redirected(1) && fd_redirect_get_buf_len(1) == sizeof(payload) - 1);
-    parent_ok = memcmp(current_va, payload, sizeof(payload) - 1) == 0;
-    int parent_untouched = 1;
-    for (size_t i = 0; i < PROBE_BYTES; i++) {
-        if (current_va[i] != PARENT_FILL) parent_untouched = 0;
-        if (i >= sizeof(payload) - 1 && current_va[i] != PARENT_FILL) parent_ok = 0;
-    }
-    assert(checks == 4); /* registration + write, for each case */
-    fd_redirect_reset(1);
-    printf("d0a: parent_buffer=%s\n", parent_ok ? "OK" : "MISSING");
-    printf("d0a: child_value=%s\n", child_ok ? "OK" : "CHANGED");
-    munmap(current_va, page); munmap(parent, page); munmap(child, page);
-    close(parent_fd); close(child_fd);
-    if (parent_ok && child_ok) return 0;
-    /* Only this observed failure is expected; arbitrary failures are errors. */
-    if (parent_untouched && !child_ok && exact_child_write) return 1;
-    return 2;
+    irq_enabled = 1;
+    /* Unaligned tail crosses into the next page in both directions. */
+    redir_table[1].buf_len = PAGE_SIZE - 5;
+    redir_table[1].buf_pos = PAGE_SIZE - 5;
+    assert(fd_redirect_write(1, payload, 17) == 17);
+    assert(fd_redirect_read(1, out, 17) == 17 && !memcmp(out, payload, 17));
+    unchanged(aliases[3], BYTES, 0x5A);
+    redir_table[1].buf_len = BYTES + 1;
+    assert(fd_redirect_write(1, payload, 17) == -1);
+    assert(fd_redirect_read(1, out, 1) == -1);
+    assert(fd_redirect_to_buffer(1, current_va, 16, 17) == -1);
+    assert(fd_redirect_to_buffer(1, (u8 *)(uptr)0xfffffff0U, 32, 0) == -1);
+    assert(saves == restores && walk_count);
+    puts("d0b: lifetime/reuse/RO/read/nest/park/pages/IF/bounds=OK");
+    for (int id = 2; id <= 3; id++) { munmap(aliases[id], BYTES); close(fds[id]); }
+    munmap(current_va, BYTES);
+    return 0;
 }

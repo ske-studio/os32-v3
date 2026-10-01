@@ -752,11 +752,14 @@ u32 paging_app_band_pdes(u32 code_end, u32 heap_req, u32 ram_top)
     return n;
 }
 
+static u32 as_generation; /* Saturate: never reuse a registered AS identity. */
+
 int paging_addrspace_create_n(struct addrspace *as, u32 owner, u32 pde_count)
 {
     u32 pd_phys, i;
     u32 *pd;
-    if (!as || !owner || !pde_count || pde_count > MEM_APP_BAND_MAX_PDES) return -1;
+    if (!as || !owner || !pde_count || pde_count > MEM_APP_BAND_MAX_PDES ||
+        as_generation == ~(u32)0) return -1;
     for (i = 0; i < sizeof(*as) / sizeof(u32); i++) ((u32 *)as)[i] = 0;
     as->owner = owner;
     pd_phys = pgalloc_alloc_phys(owner, 1);
@@ -765,6 +768,7 @@ int paging_addrspace_create_n(struct addrspace *as, u32 owner, u32 pde_count)
     for (i = 0; i < PDE_COUNT; i++) pd[i] = page_directory[i];
     /* Never inherit a high user/device mapping into unused private bands. */
     for (i = APP_BAND_PDE; i < (MEM_LEASE_END >> 22); i++) pd[i] = 0;
+    as->generation = ++as_generation;
     as->pd_phys = pd_phys;
     as->app_pde = APP_BAND_PDE;
     as->app_pde_count = MEM_APP_BAND_MAX_PDES;

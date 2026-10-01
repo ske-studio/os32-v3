@@ -61,19 +61,7 @@ MUTATIONS = [
      "        ring3_wm_enter();\n        g_gui_handler(GUI_OP_OWNER_EXIT, 0, owner);\n",
      "        g_gui_handler(GUI_OP_OWNER_EXIT, 0, owner);\n",
      "owner_exit が印を立てない"),
-    # 代行レビュー P2 (2026-09-26): 門はポインタの由来で決める。
-    ("fs/fd_redirect.c",
-     "        return ring3_user_ranges_writable_always(dst, to_write, 0, 0);\n",
-     "        return ring3_user_ranges_writable(dst, to_write, 0, 0);\n",
-     "アプリが登録したバッファの書きを文脈つきの門に戻す (= 直す前)"),
-    ("fs/fd_redirect.c",
-     "    redir_table[fd].user_origin = user;\n",
-     "    redir_table[fd].user_origin = 0;\n",
-     "登録の由来を記録しない"),
-    ("fs/fd_redirect.c",
-     "    if (user && !ring3_user_ranges_writable_always((u32)buf, size, 0, 0))\n        return -1;\n",
-     "",
-     "登録時の二重の守りを外す"),
+    # Registered-buffer mutations now live in test_fd_redirect_d0a.py.
     # 代行レビュー P2 (2026-09-26): ime_set_render は常駐側だけ。
     ("kernel/gui.c",
      "    if (res_owner_get() != GUI_SHELL_OWNER || ring3_call_from_user()) {\n        gui_ime_render_rejected++;\n",
