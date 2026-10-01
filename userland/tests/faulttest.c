@@ -2,6 +2,7 @@
  *  FAULTTEST.C — CPL=3 の例外 kill と CTRL+STOP を起こす試験バイナリ
  *
  *  票: docs/tasks/v3/TASK_T1_LEDGER.md §4-2-N (T1b の NP21/W 回帰の未確認)
+ *      docs/tasks/v3/TASK_T2_APPBAND.md §5-1 (T2a: park → resume 後の fault/STOP)
  *
  *  使い方:
  *    faulttest gp          #GP を起こす (CPL=3 からの hlt)
@@ -10,6 +11,11 @@
  *    faulttest pf          #PF を起こす (カーネル帯へ書く。ring3_fault と同じ比較用)
  *    faulttest loop [秒]   KAPI を呼ばない CPL=3 の無限ループ (CTRL+STOP 用)
  *    faulttest kloop [秒]  KAPI (get_tick) を連打するループ
+ *    faulttest wait <gp|de|ud|pf|loop|kloop> [秒]  1 文字待ってから実行
+ *
+ *  wait は待機の 1 行を出して kbd_getchar で 1 文字待つ。GUI (gshell) では
+ *  APP_STATE_WAIT_KEY で park し、キーで resume された後に既存の処理へ進む
+ *  (exec_resume の setjmp 着地の試験)。CUI でも同じ KAPI でキーを待つ。
  *
  *  fault 系は起こす前に 1 行出す。kill されればシェルに `[ring3] ...` の行が
  *  出て、この後ろには来ない。戻ってきたら `faulttest: SURVIVED <kind>` を出して
@@ -30,10 +36,12 @@
  * ======================================================================== */
 #include "os32api.h"
 #include "memmap.h"     /* KERNEL_LOAD_ADDR / PIT_HZ ([C4]) */
+#include <stdbool.h>
 
 #define CAL_MIN_TICKS   10u             /* 較正の 1 塊がこれ以上かかるまで倍にする */
 #define CAL_START_ITERS 0x10000u
 #define CAL_MAX_ITERS   0x40000000u
+#define WAIT_ATTR       0x07
 
 static int streq(const char *a, const char *b);
 static unsigned parse_uint(const char *s);
@@ -46,24 +54,40 @@ static int do_kloop(KernelAPI *api, unsigned sec);
 int main(int argc, char **argv, KernelAPI *api)
 {
     unsigned sec = 0;
+    int mode_arg = 1;
+    const char *kind;
+    bool wait_key, fault_mode;
 
     if (argc < 2) {
         usage(api);
         return 1;
     }
-    if (argc > 2) sec = parse_uint(argv[2]);
+    wait_key = streq(argv[mode_arg], "wait");
+    if (wait_key) mode_arg++;
+    if (argc <= mode_arg) {
+        usage(api);
+        return 1;
+    }
+    kind = argv[mode_arg];
+    if (argc > mode_arg + 1) sec = parse_uint(argv[mode_arg + 1]);
 
-    if (streq(argv[1], "gp") || streq(argv[1], "de") ||
-        streq(argv[1], "ud") || streq(argv[1], "pf"))
-        return do_fault(api, argv[1]);
-    if (streq(argv[1], "loop"))
+    fault_mode = streq(kind, "gp") || streq(kind, "de") ||
+                 streq(kind, "ud") || streq(kind, "pf");
+    if (!fault_mode && !streq(kind, "loop") && !streq(kind, "kloop")) {
+        api->kprintf(0x0C, "faulttest: unknown mode '%s'\n", kind);
+        usage(api);
+        return 1;
+    }
+    if (wait_key) {
+        api->kprintf(WAIT_ATTR, "faulttest: waiting for a key (then %s)\n", kind);
+        (void)api->kbd_getchar();
+    }
+
+    if (fault_mode)
+        return do_fault(api, kind);
+    if (streq(kind, "loop"))
         return do_loop(api, sec);
-    if (streq(argv[1], "kloop"))
-        return do_kloop(api, sec);
-
-    api->kprintf(0x0C, "faulttest: unknown mode '%s'\n", argv[1]);
-    usage(api);
-    return 1;
+    return do_kloop(api, sec);
 }
 
 static int streq(const char *a, const char *b)
@@ -87,7 +111,8 @@ static void usage(KernelAPI *api)
     api->kprintf(0x07, "%s",
         "usage: faulttest gp|de|ud|pf\n"
         "       faulttest loop [sec]   pure CPL=3 loop (no KAPI)\n"
-        "       faulttest kloop [sec]  get_tick loop\n");
+        "       faulttest kloop [sec]  get_tick loop\n"
+        "       faulttest wait <gp|de|ud|pf|loop|kloop> [sec]  wait for a key first\n");
 }
 
 /* 空回り n 回 (n >= 1)。コンパイラに消させないため asm で書く。 */
