@@ -139,6 +139,7 @@ int ring3_call_from_user(void) { return ring3_in_syscall && !ring3_wm_depth; }
 u32 paging_current_cr3(void) { return cr3; }
 int as_va_to_pa(u32 pd, u32 va, u32 *pa) { (void)pd; *pa = va; return 0; }
 int as_va_to_pa_read(u32 pd, u32 va, u32 *pa) { return as_va_to_pa(pd, va, pa); }
+int as_access_page(const struct addrspace *as, u32 va, int write, u32 *pa) { return !(write ? as_va_to_pa(as->pd_phys, va, pa) : as_va_to_pa_read(as->pd_phys, va, pa)); }
 '''
 D2_PRE = r'''
 static void check_invalid_caller(void) { CHECK(!caller_frame.valid); }

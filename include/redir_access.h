@@ -30,6 +30,9 @@ int caller_access_get_user(struct caller_access *out);
 void caller_access_save(volatile CallerAccessFrame *out);
 void caller_access_invalidate(void);
 
+/* Caller holds IRQs from live identity validation through use of returned PA. */
+int caller_access_page(const struct caller_access *a, u32 va, int write, u32 *pa);
+
 int redir_access_capture(RedirAccess *out);
 int redir_access_check(const RedirAccess *a, u32 va, u32 len, int write);
 /* Preflight the entire range, then copy with a fresh live/walk check per page.

@@ -33,6 +33,8 @@ u32 shlib_version(void);
 
 /* .text/.rodata の終端 (exclusive)。未ロードなら MEM_SHLIB_BASE。 */
 u32 shlib_text_end(void);
+/* B1: exact registered RO backing, not merely the shlib owner. */
+int shlib_read_page(u32 va, u32 frame);
 
 /* attach 1 回あたり pgalloc から取る .data/.bss の複製ページ数。未ロードなら 0。
  * exec が「3 領域の外で per-app に取るページ」を勘定するのに使う (K7)。

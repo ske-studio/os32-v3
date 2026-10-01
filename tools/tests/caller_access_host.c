@@ -30,6 +30,7 @@ u32 paging_kernel_pd_phys(void) { return 0x1000; }
 u32 paging_current_cr3(void) { return cr3; }
 int as_va_to_pa(u32 pd, u32 va, u32 *pa) { (void)pd; *pa = va; return 0; }
 int as_va_to_pa_read(u32 pd, u32 va, u32 *pa) { return as_va_to_pa(pd, va, pa); }
+int as_access_page(const struct addrspace *as, u32 va, int write, u32 *pa) { return !(write ? as_va_to_pa(as->pd_phys, va, pa) : as_va_to_pa_read(as->pd_phys, va, pa)); }
 static u32 host_kapi_table[KAPI_FUNC_COUNT + 2];
 #define KAPI_ADDR host_kapi_table
 #define RING3_USTACK_TOP MEM_APP_STACK_TOP

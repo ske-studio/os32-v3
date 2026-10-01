@@ -131,7 +131,7 @@ d0bでrecipeの同flagを外し、登録者ASのwalk/copy境界の足場を追�
 | d0b | 登録者記述子とPA copyを最小実装。死んだ登録者/slot再利用/RO化/入れ子・park保存復元、子の内容不変。実装・ホスト結果は §10-3、修正後guest回帰はPM待ち |
 | d1 | caller記述子と入口/正常出口。USER/trusted/入れ子とCR3不一致拒否。実装・ホスト・予算結果は §10-5、d2 の寿命配線は未実装 |
 | d2 | park/longjmp/WMの寿命配線。実exec R1足場で古い記述子不使用。実装・P3対応・ホスト・予算は §10-7 |
-| d3 | read/write walkと管理frame検証。RO入力成功・RW出力・PS/偽PT拒否 |
+| d3 | read/write walkと管理frame検証。RO入力成功・RW出力・PS/偽PT拒否。実装・ホスト・予算結果は §10-9 |
 | d4 | cstr/copyout。page末NUL、次NP、未終端、overflow、IF両値、out不変 |
 | d5 | 上記DB3入口と既存出力ガード接続。実wrapper→実copy、SQLiteは入口だけ記録 |
 | d6 | 対象変異・結線・小さなboot自己診断、size記録を別依頼で確定 |
@@ -868,6 +868,164 @@ R1 24/24実行時RED、ring3_guard 14/14 RED、C方言27/27 RED・対照5/5 GREE
 独立レビュー Opus 5.5 は P1・P2 なしで Approve (網羅性の要求つき)。P3-1 (inline の重複、-324B)・P3-2 (R1 の save 欠落・移動の変異)・P3-4 (§10-7 の注記) は着地前にコーダー (sol) が対応、P3-3 (caller_access_get の WM TRUSTED 分岐の使う側が無い 34B) は d4/d5 まで据え置き。予算は §6-1 の決定のとおり d の枠を拡大。
 
 ゲスト (17MB、今の ini — §12): kselftest 0 fail、`klibc_test` 49/49、`alloc_demo` 16/16、`ring3_fault` kill、`ls / | wc -l` = 54、`echo abc | wc -c` = 4、`d0a_test` 全行 OK (CPL=3 の親 → exec_run の子 → 親へ戻る経路を含む)、faulttest 一式・V86・GUI (gui_demo → CUI) 従来どおり。**`ring3_caller_reject_count` = 0** (入口の誤拒否なし)、kill 8 件はすべて意図したもの、取り残し 0、深さ 0。P3-5 (毎回の syscall のコスト) は体感で差なし (計測は未実施)。
+
+## 10-9. d3 実装結果 (2026-10-02)
+
+モデル: GPT-6。基点 `191f3d3`、worktree `wt/t2d3`。状態行・親票・
+TASK_MEMMAP_V3 は変更していない。d4〜d6 の実装は含めない。
+
+`exec/access_walk.c` の `as_access_page` は、生存確認済みASとIRQ保存区間を
+前提に、PDの整列/owner、APP/lease PT控えとowner、共有PTのmaster PDEと
+`page_tables`登録frameを**表の読取り前**に確認する。既存の
+`as_va_to_pa` / `as_va_to_pa_read` を再利用してPDE/PTEのP/Uと出力RWを検査し、
+PSを拒否する。失敗時のPA出力は不変。masterへのCR3往復は追加していない。
+
+PFNは私有RAM (同ownerのPD/PTをpayloadとして許可しない)、恒等SHM、
+shlibの登録済みtext/rodata原本と台帳owner、live RAM/FIXED_RAM leaseの
+surface世代・参照数・ページ数・権限・台帳・offsetと照合する。MMIO/VRAMは
+一般copy対象外。trampolineは登録済み恒等backingかつRO PTEの場合だけ入力可。
+`ring3_ptr_ok` にscratchの先頭〜末尾の早期分類も追加した。
+`redir_page` をこのwalkへ接続し、`caller_access_page` は同じ処理に加えて
+現在slot/owner/CR3の一致を要求する (明示USERはWM中もUSERのまま)。
+
+判断の補足: closingなsurfaceでも既存leaseは従来どおりreleaseまで有効なので、
+世代と参照が生きているRAM leaseのread/writeを許可する。SHMは現行の共有帯全体を
+許可し、block所有者による新しい制限は追加しない。trampolineはROページ単位で
+許可し、早期分類で追加するのは返却scratch内だけ。これらは現行挙動の維持。
+
+**d4/d5へ渡す穴**: `caller_access_page` はページ1枚の内部primitiveで、呼び手が
+IRQ保存から利用までを囲む。cstrのNUL/overflow/cap、bytesの全範囲preflight、
+copyoutの全byte不変はd4。DB3入口、既存のread/outputガードのmaster往復撤去、
+有効leaseの早期分類はd5の入口接続で行う。古い `as_va_to_pa*` 単体の利用側を
+B1完成済みとは扱わない。kernelは `-ffunction-sections` なしでリンクするため、
+未使用の `caller_access_page` もGCされず、d3のkernelに152 B含まれている
+(`kernel.map` / nm: `0x146e5c`、size `0x98`)。d4のsize見積もりではこの既計上分を
+接続時の増分として再加算せず、撤去による節約としても二重に差し引かない。
+boot自己診断/最終size確定はd6。
+
+ホストは `test_access_walk.py` / `access_walk_host.c` を追加し、実paging・
+allocator・shlib登録・redir/callerを1つのILP32 fixtureで実行。高位VAと低位PAを
+分離し、RO入力/RW出力、NP、PDE/PTEのP/U/RW、PS、present RAMの偽PT、
+別ownerのPD/PT/PFN、PD/PTのpayload化、偽共有PT/master PDE、SHMの非恒等PFN、
+trampolineのRO/出力拒否、shlibの原本取り違え、RAM/FIXED_RAM lease、世代/失効/
+RO権限/MMIO拒否、currentとregistrantのCR3契約差、IF両値/CR3/拒否時PA不変を確認。
+新規20変異はすべて**コンパイル成功後の実行時RED**。単独実測0.39〜0.45秒/本
+(OS32_MUT_JOBS=4)、全木コピーや変異ごとのmakeは使わない。
+既存redirは24/24、callerは24/24、exec R1は24/24実行時RED。
+app-band試験にはscratch両端と直前/直後の早期分類を追加しGREEN。
+検査列・対応表・生成TESTS一覧へ登録した。
+
+失敗履歴: 初回native ILP32実行は成功せず、既存のqemu-i386 runnerへ切替。
+新fixtureのsurface登録時CR3設定漏れを直した後GREEN。
+shared-PFN変異が一度生存したため、偽masterを戻す足場でPDE USERが落ちていた点を
+修正し正常対照を追加、その後20/20 RED。既存redirのRO変異は引数が未使用になる
+コンパイルエラーを修正してから実行時REDを確認。MMIO fixture追加時の定数名誤記も
+コンパイル時に修正。これらをRED本数へ算入しない。
+
+| 同一cross toolchain実測 | 作業前 (clean build_id) | d3 (-dirty) | 差分 |
+|---|---:|---:|---:|
+| access_walk.o text | 0 B | 964 B | +964 B |
+| redir_access.o text | 1,428 B | 1,461 B | +33 B |
+| exec.o text | 19,889 B | 19,765 B | -124 B |
+| paging.o text | 9,740 B | 9,760 B | +20 B |
+| shlib.o text | 1,200 B | 1,292 B | +92 B |
+| kernel.bin | 361,264 B | 362,232 B | +968 B |
+| vmkernel.lz4 | 479,369 B | 480,070 B | +701 B |
+| 本体占有 (`__bss_end - 0x100000`) | 572,112 B | 573,072 B | +960 B |
+| `__bss_end` | `0x18BAD0` | `0x18BE90` | +960 B |
+| リンカASSERT残り (596 KiB枠) | 38,192 B | 37,232 B | -960 B |
+| d枠残り (拡大後5,888 B) | 3,580 B | 2,620 B | -960 B |
+
+AS/AppSlot/BSS追加なし。ASSERTは緩和していない。d枠消費は基準から3,268 B。
+圧縮上限520,192 Bまで40,122 B。kernel.bin差分はbuild_idのdirty化も含む。
+
+実行環境: `CROSS_DIR=/home/hight/opt/cross`、`TMPDIR=/home/hight/os32-tmp`、
+PATHにcross/bin、ILP32は `PYTHONPATH=/home/hight/os32-tmp/d0b-host-runner`。
+作業前 `make kernel < /dev/null` rc=0。対象の `python3 tools/tests/test_access_walk.py
+--mutate`、`test_fd_redirect_d0a.py --mutate`、`test_caller_access.py --mutate`、
+`test_exec_r1.py --mutate`、`test_app_bb_overlap.py` は各rc=0。
+`CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp
+NP21W_DIR=/home/hight/os32-tmp/d3-image-output make all < /dev/null` rc=0。
+FDコピー先は存在しない一時パスへ限定し、コピー警告あり。既存GNU-stack/RWX警告あり。
+`python3 tools/gen_memmap.py --write`、`python3 tools/check_select.py --lint`、
+`python3 tools/gen_tests_inventory.py --write` は各rc=0。
+ログは `/home/hight/os32-tmp/d3-{before,all,walk,redir,caller,r1,app}.log`。
+NP21/W・NHD・配備・ini・commit/pushは未操作。ゲスト受入と独立レビューはPMへ。
+最終 `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp
+make check-changed < /dev/null` は上記PATH/PYTHONPATHで**1回だけ実行しrc=0**。
+`build/kernel.mk` の翻訳単位追加により選択器が全変異 (full) に拡張した。
+d3は20/20実行時RED、redir/callerは各24/24実行時RED、C方言は27/27 REDと
+正常対照5/5 GREENを含め成功。既存Windows opt-inは単独4件・集約5件がskip。
+ログ: `/home/hight/os32-tmp/d3-check-changed.log`。
+最終buildログ: `/home/hight/os32-tmp/d3-all-final.log`。
+検査中はソースを変更せず、終了後はこの結果の追記だけ。
+
+### d3 独立レビュー (Opus 5.5、Approve) の P2-1 / P3-1 / P3-3 対応 (2026-10-02)
+
+モデル: GPT-6。基点 `6efb0bf`、worktree `wt/t2d3`。
+P2-1: master CR3下で登録者の `MEM_EXEC_LOAD_ADDR` の1 Bをread/writeとも許可する
+正常対照をIF=0/1で追加。現在callerの同じアクセスは拒否し、CR3/IFは不変。
+実物 `exec/access_walk.c` のwrite/readそれぞれの `as->pd_phys` を
+`paging_current_cr3()` に置き換える2変異を追加した。d0a側の2変異は
+代用 `as_access_page` を書き換える変異であるとコードと表示名に明記した。
+
+P3-1: SHM_ENDより上の `MEM_DEVICE_APERTURE_BASE` (Cirrus窓) に恒等USER/RW
+ページを作り、実 `as_va_to_pa` では翻訳成功する正常対照を確認したうえで、
+caller walkのread/write両方を拒否するprobeを追加。共有master/登録PTの照合は通る
+足場であり、SHM上限式を `1` にする実物への変異を検出する。
+walkは正常GREEN、新規3本を含む **23/23コンパイル成功後の実行時RED**。
+P3-3: 上記caller primitiveのGC説明を訂正した。実装コードの変更はない。
+
+**d4 / d5 / d6 / e への申し送り (記録のみ、今回のコード変更なし)**:
+
+- **P3-2 → d6**: 生き残る多重防御の変異は、trampolineの `!write`、leaseの
+  `!sf->lease_count` / `sf->npages != l->npages` / `l->sid`上限 /
+  `perm_max == NONE`、`shlib_read_page` のSHLIB owner / `page < g_text_pages`、
+  master PDEのP / PS、PDの整列、`caller_access_page` の `appslot_cur()` 照合。
+  d6で残すものと不要なものを仕分け、残すものは正常対照と目的別負例を用意する。
+- **P3-4 → d5**: trampoline scratchで `ring3_ptr_ok` と
+  `ring3_user_range_ok` (`exec.c:700/915`、d3時点) が食い違い、getcwdの結果を
+  db_openなどの入力に渡すとINVALになる。d5の入口接続でwalkへ揃える。
+- **P3-5 → d4**: `caller_access_page` (`redir_access.c:140`、d3時点) の
+  TRUSTEDには帯・長さ・NULLの制限がない。d4の受入にredirと同じ帯の制限
+  (`< MEM_APP_BAND_BASE`) とcap/NUL検査を含める。
+- **P3-6 → d5前**: leaseではページごとの `ledger_surface_validate` をIRQ停止中に
+  呼ぶため `O(npages × regions)`。入口接続前に計測するか、世代と参照数の一致だけで
+  済む形を検討する。
+- **P3-7 → e**: 共有帯の `result != va` / `frame == exec_tramp_page_addr()` は
+  恒等写像に依存する。低位USER撤去時に見直す。
+
+| 同一cross toolchain実測 | レビュー修正前 (clean build_id) | 修正後 (-dirty) | 差分 |
+|---|---:|---:|---:|
+| kernel.bin | 362,224 B | 362,232 B | +8 B |
+| vmkernel.lz4 | 480,065 B | 480,070 B | +5 B |
+| 本体占有 (`__bss_end - 0x100000`) | 573,072 B | 573,072 B | 0 B |
+| `__bss_end` | `0x18BE90` | `0x18BE90` | 0 B |
+| リンカASSERT残り (596 KiB枠) | 37,232 B | 37,232 B | 0 B |
+| d枠残り (5,888 B) | 2,620 B | 2,620 B | 0 B |
+
+kernel実装は変更しておらず、kernel.binの8 B増分はbuild_idのdirty化による。
+caller primitiveの152 Bはこの前後両方に含まれる。ASSERTは緩和していない。
+
+実行環境: `PATH=/home/hight/opt/cross/bin:$PATH`、
+`CROSS_DIR=/home/hight/opt/cross`、`TMPDIR=/home/hight/os32-tmp`。
+ILP32試験は既存 `PYTHONPATH=/home/hight/os32-tmp/d0b-host-runner` のqemu-i386経由、
+`OS32_MUT_JOBS=4`。作業前 `make kernel < /dev/null` rc=0。
+`python3 tools/tests/test_access_walk.py --mutate` rc=0 (23/23 runtime RED)、
+`python3 tools/tests/test_fd_redirect_d0a.py --mutate` rc=0 (24/24 runtime RED)。
+`NP21W_DIR=/home/hight/os32-tmp/d3-review-image-output make all < /dev/null` rc=0。
+FDコピー先は未作成の一時パスに限定し、コピー警告あり。既存Rust / GNU-stack / RWX
+警告あり。ログ: `/home/hight/os32-tmp/d3-review-{before,walk,redir,all}.log`。
+NP21/W・NHD・配備・ini・commit/pushは未操作。ゲスト確認は未実施、PM受入へ渡す。
+
+`python3 tools/gen_memmap.py --write` rc=0 (生成地図の差分なし)。最終
+`CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp
+make check-changed < /dev/null` は上記PATH/PYTHONPATHで **1回だけ実行しrc=0**。
+選択器が基点 `191f3d33c77d` (mainとのmerge-base) からのbuild規則の変更を検出し、
+full (全変異込み) へ拡張した。C方言27/27 RED・正常対照5/5 GREENも成功。
+既存Windows opt-in試験は単独4件・集約5件がskip。
+ログ: `/home/hight/os32-tmp/d3-review-check-changed.log`。
+検査中はソースを変更せず、終了後は本結果の追記だけ。
 
 ## 11. 独立レビュー 2 回目 (Opus 5.5、Approve) の P3 — 実装時の注記
 

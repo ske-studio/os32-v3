@@ -697,6 +697,8 @@ static void ring3_gui_pump(void)
 int ring3_ptr_ok(u32 p)
 {
     if (p == 0) return 1;                         /* NULL は wrap 側が処理 */
+    if (exec_tramp_page_addr() && p >= exec_tramp_page_addr() + RING3_USTR_OFF &&
+        p - (exec_tramp_page_addr() + RING3_USTR_OFF) < RING3_USTR_CAP) return 1;
     if (p >= MEM_SHLIB_BASE && p < RING3_HEAP_TOP) return 1;
         /* 共有ライブラリ帯 (K3: .rodata の文字列や .data の構造体を KAPI に
          * 渡せる) + アプリの code/data/bss/heap (ガード直下まで)。
