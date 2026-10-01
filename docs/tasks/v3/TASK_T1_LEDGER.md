@@ -615,7 +615,9 @@ static inline u32  V2P(const volatile void *va) { return (u32)(uptr)va; }
 | 17MB・Cirrus (`np21w_ini_live cirrus-on`、`GFX=auto`) | `hal_test` = `backend cirrus (packed 8bpp)` 640x480、`[gfx] ledger cand=3 ok=3 bb=eb2000` (実装時の訂正 5 のとおり PEGC の BB も確保)、`gui_gate --h 480` OK |
 | 8MB・PEGC (`ram-8mb`) | `[gfx] ledger cand=3 ok=3 bb=7b5000 top=7b5000`、`cpl0_probe usable_end=7b5000`、`test2` PASS、`v86 -t` OK、`pegcchk 3` pattern drawn |
 
-ini は切り替え道具のレシートで元 (`ExMemory=16`、`USEGD5430=false`) に戻した。未実施: `cirrus-off` + `GFX=cirrus` (予約と写像が残って PC98 で起動)、実機 Ra266 (`[gfx] ledger` の行と `cpl0_probe` の `usable_end`)。
+ini は切り替え道具のレシートで元 (`ExMemory=16`、`USEGD5430=false`) に戻した。未実施: `cirrus-off` + `GFX=cirrus` (予約と写像が残って PC98 で起動)。
+
+**実機 Ra266 64MB (実機エージェント、CI の成果物 `0fedc76` — 直後の `e5a0a3e` は文書だけで CI の build が走らない、カーネルは同じ、`GFX=pegc`)**: `Image CRC caca2046 (471229 bytes)`、`[selftest] 226/226 passed`、**`[gfx] ledger cand=1 ok=1 bb=ea7000 top=ea7000`**、`[ledger] pci raw=6 ovf=0`、`[ledger] irq_ops=0 exc_ops=0 check_fail=0 bad_free=0`、`cpl0_probe usable_end=ea7000`、`hal_test` = `backend pegc (packed 8bpp)`、`pegcchk 3` は前回と同じ値、`test2` ×3 PASS、`v86 -t` OK。`usable_end` = `ea7000` は設計どおり (PM の期待値 `ef2000` は `GFX=pc98` で起動していた `737f6e4` の回の値で、比べる相手を誤っていた): PEGC の BB 300KB (0x4B000) を上端から取るので `0xEF2000 − 0x4B000 = 0xEA7000`。T1e の前も PEGC のときは `sys_reserve_top` で同じ量を引いていた (NP21/W 17MB で 0xEFE000 → 0xEB3000)。
 
 ### 4-6. T1f — P2V / V2P の全面適用と検査
 
