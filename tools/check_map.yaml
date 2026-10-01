@@ -2957,3 +2957,15 @@ checks:
     - include/types.h
     - sdk/include/os32/*.h
     - fs/vfs.h
+
+  check-fd-redirect-d0a-host:
+    - tools/tests/test_fd_redirect_d0a.py
+    - tools/tests/fd_redirect_d0a_host.c
+    - fs/fd_redirect.c
+    - fs/fd_redirect.h
+    - fs/vfs.h
+    - include/types.h
+    - include/memmap.h
+    - sdk/include/os32/os32_kapi_shared.h
+    - sdk/include/os32/os32_generations.h
+    - sdk/include/os32/os32_kapi_generated.h

@@ -1133,6 +1133,7 @@ CHECK_PAR_TARGETS := check-shlib-high-host check-bootinfo-host check-hdd-stage1-
     check-sh-status-host check-hsync-h3-host check-hsync-h2-host \
     check-h4-manifest-host check-vfs-excl-host check-fs-kind-callers-host \
     check-cat-linenum-host check-result-conv-host check-guest-host \
+    check-fd-redirect-d0a-host \
     check-cirrus-win-host check-pegc-mode-host
 check-par: $(CHECK_PAR_TARGETS)
 
@@ -1160,3 +1161,9 @@ check-shlib-high-host:
 	@python3 -B tools/tests/test_shlib_high.py $(MUT)
 
 .PHONY: check-shlib-high-host
+
+# T2d d0a: known failure is explicit XFAIL until d0b fixes registered-AS copy.
+check-fd-redirect-d0a-host:
+	python3 -B tools/tests/test_fd_redirect_d0a.py --expect-known-bug
+
+.PHONY: check-fd-redirect-d0a-host

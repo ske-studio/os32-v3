@@ -133,6 +133,10 @@ filesystem:
     - host: userland/tests/ring3_guard.bin
       guest: /usr/bin/
       tags: [test]
+    # --- T2d d0a: parent/child private buffers at the same VA ---
+    - host: userland/tests/d0a_test.bin
+      guest: /usr/bin/
+      tags: [test]
     # --- heap_test (子プロセス帯レイアウト検証: sbrk / exec_heap の位置と重なり) ---
     - host: userland/tests/heap_test.bin
       guest: /usr/bin/
