@@ -527,6 +527,18 @@ PM の NP21/W 受入は未実施。新しい `d0a_test.bin` の期待結果は
 `d0a: child_status kind=1 code=0 rc=0 result_rc=0 bytes=17`。
 CPL=3 の sh 内で `ls | cat` を単独 `ls` と比較し、8MB/17MBの回帰とkill差分を確認する。
 
+## 10-4. d0b のゲスト受入 (PM、2026-10-01、NP21/W 17MB、main `26bf6da`)
+
+独立レビュー Opus 5.5 は P1・P2 なしで Approve (P3 6 件は wt/t2d0b-p3 で対応中)。NHD へ配備 (停止 → nhd-pull → deploy-kernel → deploy → 起動)。
+
+```
+d0a: parent_buffer=OK
+d0a: child_value=OK
+d0a: child_status kind=1 code=0 rc=0 result_rc=0 bytes=17
+```
+
+**修正を確認した** (d0a の MISSING / CHANGED が OK に)。kselftest 0 fail、faulttest 一式・V86・GUI (gui_demo → CUI) の回帰も従来どおり (取り残し 0、深さ 0)。未実施: CPL=3 の sh での `ls | cat` (rshell から入れ子の sh を操作できない既知の制約)、8MB、Ra266。
+
 ## 11. 独立レビュー 2 回目 (Opus 5.5、Approve) の P3 — 実装時の注記
 
 2026-10-01、`3180a51` の差分に対して Approve (P1 2 件・P2 11 件はすべて閉)。以下の 5 件は設計の変更ではなく、実装時に従う注記 (PM 記入)。
