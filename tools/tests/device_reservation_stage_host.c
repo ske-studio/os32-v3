@@ -41,6 +41,7 @@ void _start(void)
     static struct ledger_region before[LEDGER_MAX_REGIONS];
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
     CHECK(result == 0x800000);
+    host_map_fixed_paging();
     paging_init(16384);
     physmem_bootstrap_legacy(&m,16384);
     CHECK(physmem_add_trusted(&m,4096,8192,PHYSMEM_SOURCE_SYNTHETIC));

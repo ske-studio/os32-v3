@@ -331,6 +331,37 @@ broker は `kctx_irq_depth` を直接読み、独自の `irq_in_irq` 加減算/�
 **未実施 — park → resume 後の fault / STOP**: GUI の Run... は引数を渡せず (`modal.rs:784`)、アプリが 1 本のときは park しない (D11-3、`lib.rs`)。そこで `faulttest` に `wait <kind>` (`250de46`) と引数なしの 1 キー選択 (`9a596fc`) を足した。ただし Run... から起動した CUI プログラムはスロットも窓も持たず、キーは手前の窓へ配られ、注入リングに届かない。キーを渡せるのは端末アプリから起動した場合だけ (`multiapp.rs:576`) で、その端末アプリはこの木に無い (`apps/` は空、凍結した os32 の apps にも無い)。そのため resume させられず、`exec_resume` の setjmp 着地を NP21/W では通していない。着地そのものはホストの `test_exec_r1.py` (実 `setjmp.asm`) が見ている。**T2c の GUI 回帰 (park / fault を含む) の前に、注入リングへキーを渡す手段 (端末アプリ、またはゲスト側の注入) を用意して通す**。
 **未実施 — 別の故障ゲストでの R1 panic** (IRQ / 例外の上の池操作が `R1 context` で止まること) と **Ra266 の PCM 再生中 STOP → 再 open / 再生**。前者はホストの `test_ledger.py` が会計変更前の停止を見ている。
 
+#### T2a′-R. X15 前倒しの実装結果 (2026-10-01、`wt/t2a2`、GPT-6 / Codex)
+
+**実装**: `include/memmap.h` の導出式で shell exec_heap を `[0x380000,0x3F1000)` (452KiB) に縮小し、固定 PD / boot PT8枚 / device PT を `[0x3F1000,0x3FB000)` に画像外化した。`page_tables[1024]` と動的 PT は従来どおり。`memory_boot_fixed` は shell 行を3区間へ分割 (12→14行)、中央10枚と上端5枚を kernel/WB/PERMANENT/FIXED として登録し、pool 開始は0x400000を維持する。SQLite/DMA/metadata/kstack は移動しない。exec の shell 初期化は既存の `MEM_SHELL_HEAP_SIZE` を参照しており、親復元は保存した base/size/used を使うため、呼出側の変更は不要だった。
+
+`paging_init` は irq_save → 再初期化ガード → P2V_BOOT で全10枚を構築 → heap末尾をNP → 固定10枚を明示再写像 → frame/属性とSQLite・DMA・stack・heap・残余NPの照合 → CR3/PG → pg_enabled → 入口IF復元。再呼出しとPG前の失敗もIFを復元し、失敗時はPGを立てず既存のmemory_bootゲートで停止する。`paging_memmap_selftest` は固定10枚のframe/CR3/cache/実効supervisorと上端NPを照合する。`build/os32.ld` の絶対シンボルとASSERT、`tools/gen_memmap.py` のMIRRORS/境界検査/生成行を一組で追加した。削除したalign4096のP2V例外を除去。ホストの画像外backing/IF模型と既存pagingハーネスを追従させ、check_mapを登録した。02_memory §2-1はビルド後に生成器で更新。T2b以後・KAPI・SDK ABIは変更していない。
+
+**大きさ**: 同じ `/home/hight/opt/cross` の `readelf -SW` / `nm -Sn` / `size -A` / kernel.map で測定。T2a前の列は上のT2a-Rの既存記録 (今回は再ビルドしていない)、T2a後/T2a′後はこのworktreeの前後実測。
+
+| 観測 | T2a前 (既存記録) | T2a後 (今回の変更前) | T2a′後 | 今回の増分 |
+|---|---:|---:|---:|---:|
+| `.text` 開始 / サイズ | 0x100000 / 316,942B | 0x100000 / 317,678B | 0x100000 / 318,398B | +720B |
+| `.data` 開始 / サイズ | 0x14D620 / 32,755B | 0x14D900 / 32,767B | 0x14DBC0 / 32,803B | +36B |
+| `.bss` 開始 / サイズ | 0x156000 / 254,948B | 0x156000 / 254,948B | 0x155C00 / 208,964B | 開始−1,024B / サイズ−45,984B |
+| `__bss_end` | 0x1943E4 | 0x1943E4 | 0x188C44 | −47,008B |
+| ASSERT 0x195000まで | 3,100B | 3,100B | 50,108B | +47,008B |
+| `.got.plt` 末尾→`.bss`余白 | 2,528B | 1,780B | 16B | −1,764B |
+| 圧縮 `vmkernel.lz4` | 471,626B | 472,003B | 472,447B | +444B |
+| 固定PD/PT backing | BSS内40,960B | BSS内40,960B | 画像外40,960B | 実占有不変 |
+
+**実装時の訂正**: §6-1の「BSS開始の4KB整列」はリンカスクリプト自身の指定ではなく、除去した3配列のaligned(4096)属性によるものだった。除去後の `.bss` は32B整列となり、内部パディングも5,024B減った。配列40,960Bの単純減算と正味実測は一致しない。設計の番地/枚数/ASSERT予算は変更せず、この事実だけを記録する。今回のT2a後は既存T2a-Rの `.data` より4B小さく、BSS前余白が4B大きく、圧縮画像が1B大きい (原因未断定)。SQLite末尾は前後とも0x2BC200、代替stack [0x2BD000,0x2DD000)、下予約44KiBは保持。ASSERT残り50,108BにはT2bのtext/data見込み6KiBと追加管理表1KiBを引いても42,940B残る (後続の実測を代替しない)。BSS前余白16Bはこの残りと加算しない。508KiB圧縮上限まで47,745B。
+
+**ホスト検証**: `test_memmap_boot.py` は8/17/64MB×入口IF=0/1で構築時IF=0、CR3/PG前照合、IF復元、再呼出し時のlive AS/別CR3/表内容の不変を検査。失敗出口も入口IF双方で検査した。実exec_heap/kheapで452KiB末端までの割当・枯渇・親保存/復元を通し、固定表と残余のhash不変を確認。通常ASでは固定10枚のUSER翻訳を拒否し、destroy後もbacking不変。地図の典型/予算ちょうど/1ページ超過の既存3場面も維持。動作変異 **13/13コンパイル成功後の実行時RED** (再写像欠落・USER・frame違い・PCD・失敗時IF復元欠落・再初期化・irq_save欠落・無条件stiを含む)。`test_memmap_gen.py` は512KiB heap復活/非整列/1ページ重複/PT枚数変更を地図と実リンカの両方で拒否し、固定PDの写しずれも拒否。SQLite末尾0x2C0000 (旧PT案の成長上限越え)はリンク許可、0x2C7001は既存DMA ASSERTで拒否。生成器の変異 **5/5実行時RED**。ASSERT拒否は動作変異のREDへ数えない。
+
+`test_memory_boot.py` は **19試験PASS**、追加の8/17/64MBで専用FIXED区間・WB/PERMANENT・FIXED/ARENA_TOPを照合し、池の全配布/返却で固定10枚と残余が配られずhash不変。既存の64MB high試験で32MB超のPTがworkspace由来であることも確認 (固定10枚と別勘定)。起動時のmaster動的PT実占有は8/17MB=0枚、64MB=8枚32KiB。8MBの台帳backingはmetadata1+workspace1、17MBはmetadata2+workspace1、64MBはmetadata5+workspace9 (metadata枚数は上端PFNに対するPGALLOC_META_BYTESの丸め)。固定10枚の画像外化によるpool freeの増加とは数えない。
+
+**コマンドと結果**: 変更前および変更後の `CROSS_DIR=/home/hight/opt/cross make all < /dev/null` はrc=0、最終ログ `/tmp/t2ap-final3-all.log`。NP21/W向け画像コピー失敗の警告は依頼どおり許容。`python3 tools/gen_tests_inventory.py --write` (MUT結線に追従)、`python3 tools/gen_memmap.py --write` / `--check` / `--headroom`、`python3 tools/check_select.py --lint`、`python3 tools/check_p2v.py`、`git diff --check` はrc=0。最初のcheck-changedはrc=2 (削除済みalign4096の例外登録残存)。二回目もrc=2 (既存試験のpd_raw/aperture_pt_raw参照残存と、追加AS検査がas_va_to_paの成功0/拒否理由という戻り値を逆に判定)。試験を固定番地と既存API契約へ追従させた。地図2本は従来makeレシピがMUTを渡していなかったため、今回の変異もcheck-changedで実行するようbuild/sdk.mkへ結線し、TESTSを再生成した。**最終 `PYTHONPATH=/tmp/t2ap-python CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null` はrc=0** (`/tmp/t2ap-check-changed-final3.log`、build/sdk.mk変更により全108検査を変異込みで選択)。ソース不変検査も成功。対象を絞った `make check-memmap-host check-memory-host MUT=--mutate < /dev/null` もrc=0 (`/tmp/t2ap-focused-mut.log`)。既存の台帳配置境界2本はコンパイル拒否としてNOT COUNTED、memory_bootの残り8/8は実行時RED。生成器5/5・paging13/13は最終全検査でも再確認した。最初の素のILP32実行は環境の32bit syscall制限でSIGSYSとなったため、T2aと同じ `/tmp` のsitecustomizeでqemu-i386を実行補助 (`PYTHONPATH=/tmp/t2ap-python`)。途中の試験追加でowner種別名の宣言誤りとリンカfixtureの空SQLite object不足を修正した。いずれもREDへ数えていない。前後測定は `/tmp/t2ap-{before,after}-{sections,nm}.txt` とkernel.map、検証ログは `/tmp/t2ap-*.log`。
+
+**PMへの未実施受入**: 独立実装レビュー、NP21/W8/17MBの新画像boot/selftest/GUI・CUI操作/gshell/16本/V86往復/fault/STOP (T2aのpark→resumeと故障ゲストpanicの未実施を含む)、Ra26664MBのONLINE・32MB超恒等写像・PCM STOP→再open。452KiB heapのピーク/ENOMEMとPT整合を観測し、固定10枚を配らないことを確認する。64MB実機未確認なのでT2a′受入完了とはしない。コミット/push/配備/NP21/W/NHD/ini/Windows側の直接操作は未実施。
+
+今回のELFで見る記号: `kselftest_fail=0x160E40` (0)、`kselftest_pass=0x160E44`、`paging_memmap_bad_count=0x183AE0` (0)、`ledger_check_fail=0x184730` (0)、`ledger_region_count=0x184734`、`irq_ctx_violations=0x161784` (T2aと同じ起動時1を基準、操作差分0)、`ledger_exc_ops=0x183B00` / `ledger_irq_ops=0x184334` / `exec_as_leftover_pages=0x188C40` (0)。`page_directory` pointerは0x159840 (内容0x3F1000)、`page_tables` pointer表は0x158840 (先頭8要素0x3F2000〜0x3F9000、PDE1016用0x3FA000)。master CR3=0x3F1000、PDのPDE0〜7 frame=0x3F2000〜0x3F9000、PDE1016 frame=0x3FA000、固定10枚のaliasはP/RW・USER/PCD/PWTなし、[0x3FB000,0x400000)はNP。`workspace_first=0x159F08` / `workspace_end=0x159F04` はPFN、64MBのPDE8〜15 frameはその内側、固定域とは別。A/D bitはCPUの更新を許す。PMが再ビルドしたら必ずそのELF/map/nmで番地を引き直す。
+
 ### 5-2. 検査3段と lease 回帰 (d)
 
 | 検査 | 具体的な期待値 |

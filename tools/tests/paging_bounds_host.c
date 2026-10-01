@@ -63,6 +63,7 @@ void _start(void)
     u32 result;
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
     CHECK(result == 0x400000);
+    host_map_fixed_paging();
     paging_init(16384);
     /* K6-RAM: paging_init が張るのは「ブート窓の内側 x 検出量」だけで、
      * RAM の上限ではない。16MiB 報告ならそこまで (従来と同じ)。 */
@@ -72,12 +73,12 @@ void _start(void)
     CHECK(!paging_is_present(0xFFFFFFFFUL));
     CHECK(paging_set_page(0xFFFFF000UL, 0, PAGE_RW) == -1);
     CHECK(used == 0);
-    /* 2026-09-23: aligned(4096) にして +4095 の捨てを無くした (TASK_MEMMAP_V3 2-3)。
-     * 大きさは表そのもの、先頭は 4KB 境界。 */
-    CHECK(sizeof(pt_raw) == 8 * PAGE_SIZE);
-    CHECK(((unsigned long)(void *)pt_raw & (PAGE_SIZE - 1)) == 0);
-    CHECK(sizeof(pd_raw) == PAGE_SIZE);
-    CHECK(((unsigned long)(void *)pd_raw & (PAGE_SIZE - 1)) == 0);
+    /* T2a′: 画像外の1/8/1枚、固定番地と4KB整列。 */
+    CHECK(MEM_FIXED_APERTURE_PT_BASE - MEM_FIXED_BOOT_PT_BASE == 8 * PAGE_SIZE);
+    CHECK(!(MEM_FIXED_BOOT_PT_BASE & (PAGE_SIZE - 1)));
+    CHECK(MEM_FIXED_BOOT_PT_BASE - MEM_FIXED_PD_BASE == PAGE_SIZE);
+    CHECK(!(MEM_FIXED_PD_BASE & (PAGE_SIZE - 1)));
+    CHECK(V2P(page_directory) == MEM_FIXED_PD_BASE);
     {
         u32 *pd = P2V(0x600000UL), *pt = P2V(0x601000UL);
         u32 d, t, pa, va = 0x412345UL;
@@ -234,6 +235,7 @@ void _start(void)
         before_calls = calls;
         cr3 = host_cr3;
         live = live_addrspaces;
+        host_map_fixed_paging();
         paging_init(1024);
         CHECK(page_tables[1023] == pt);
         CHECK(pt[1023] == pte && page_directory[1023] == pde);

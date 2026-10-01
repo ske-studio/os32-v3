@@ -29,7 +29,6 @@ kernel/kmalloc.c:kheap_init:ヒープ内の仮想ポインタ算術 (整数幅�
 kernel/kmalloc.c:kheap_alloc:ヒープ内の仮想ポインタ算術 (整数幅・整列)
 kernel/kmalloc.c:kheap_free:ヒープ内の仮想ポインタ算術 (整数幅・整列)
 kernel/kmalloc.c:kheap_reset:ヒープ内の仮想ポインタ算術 (整数幅・整列)
-kernel/paging.c:align4096:静的 PD/PT 配列の仮想ポインタを整列。PDE/CR3 へは V2P を通す
 exec/exec.c:exec_init:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
 exec/exec.c:ring3_trampoline_init:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
 exec/exec.c:exec_kapi_layout_selftest:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P

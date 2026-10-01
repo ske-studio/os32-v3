@@ -14,8 +14,14 @@
  *                  「典型」「予算いっぱい」「予算超過」の 3 通りを回す。
  * ======================================================================== */
 #include "types.h"
-static u32 host_cr3;
+static u32 host_cr3, host_loads, host_enables;
+static void *host_boot_paging_ptr(u32 addr);
+static void host_load_check(u32 root);
+static void host_enable_check(void);
+#define HOST_MMU_LOAD_CHECK(root) host_load_check(root)
+#define HOST_MMU_ENABLE_CHECK() host_enable_check()
 #include "paging_host_source.c"
+#include "exec_heap.h"
 
 #define QUOTE_(x) #x
 #define QUOTE(x) QUOTE_(x)
@@ -34,6 +40,58 @@ static void report(const char *text, u32 len)
 }
 #define SAY(s) report(s "\n", sizeof(s "\n") - 1)
 #define CHECK(x) do { if (!(x)) { SAY("FAIL: " #x); die(1); } } while (0)
+
+static void *host_boot_paging_ptr(u32 addr)
+{
+    CHECK(!_irq_enabled() && !pg_enabled);
+    CHECK(addr >= MEM_FIXED_PAGING_BASE && addr < MEM_FIXED_PAGING_END);
+    return (void *)addr;
+}
+static void host_load_check(u32 root)
+{
+    CHECK(!_irq_enabled());
+    CHECK(root == MEM_FIXED_PD_BASE && fixed_paging_valid());
+    CHECK(!pg_enabled);
+    host_loads++;
+}
+static void host_enable_check(void)
+{
+    CHECK(!_irq_enabled() && host_cr3 == MEM_FIXED_PD_BASE);
+    CHECK(fixed_paging_valid() && !pg_enabled);
+    host_enables++;
+}
+
+static u32 fixed_hash(void)
+{
+    u32 a, hash = 0;
+    for (a = MEM_FIXED_PAGING_BASE; a < MEM_POOL_BASE; a += sizeof(u32))
+        hash = hash * 33U + *(u32 *)a;
+    return hash;
+}
+
+static void shell_heap_test(void)
+{
+    void *parent, *child;
+    u32 used, hash = fixed_hash();
+    CHECK(MEM_SHELL_HEAP_SIZE == 452UL * 1024);
+    exec_heap_init_at(MEM_SHELL_HEAP_BASE, MEM_SHELL_HEAP_SIZE);
+    parent = exec_heap_alloc(MEM_SHELL_HEAP_SIZE - 8);
+    CHECK(parent && (u32)parent + MEM_SHELL_HEAP_SIZE - 8 == MEM_SHELL_HEAP_END);
+    *(u32 *)parent = 0x12345678;
+    CHECK(!exec_heap_alloc(1));
+    CHECK(exec_heap_total() == MEM_SHELL_HEAP_SIZE);
+    exec_heap_save_state(&used);
+    exec_heap_init_at(0x500000, PAGE_SIZE);
+    child = exec_heap_alloc(64);
+    CHECK(child);
+    exec_heap_free(child);
+    exec_heap_restore_state(MEM_SHELL_HEAP_BASE, MEM_SHELL_HEAP_SIZE, used);
+    CHECK(exec_heap_total() == MEM_SHELL_HEAP_SIZE && exec_heap_used() == used);
+    CHECK(*(u32 *)parent == 0x12345678 && !exec_heap_alloc(1));
+    exec_heap_free(parent);
+    CHECK(!exec_heap_used() && exec_heap_alloc(MEM_SHELL_HEAP_SIZE - 8) == parent);
+    CHECK(fixed_hash() == hash && fixed_paging_valid());
+}
 
 void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 #include "pgalloc_host_source.c"
@@ -90,17 +148,55 @@ static void say_run(u32 start, u32 end, u32 code)
 
 void _start(void)
 {
-    u32 args[6] = {0x400000, 0xC00000, 3, 0x32, 0xFFFFFFFF, 0};
+    u32 args[6] = {0x380000, 0xC80000, 3, 0x32, 0xFFFFFFFF, 0};
     u32 result, i, tramp;
     int bad;
 
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
-    CHECK(result == 0x400000);
+    CHECK(result == 0x380000);
 
     /* ---- カーネルの起動順そのもの (kernel/kernel.c) ---- */
-    paging_init(16384);
+    host_map_fixed_paging();
+    host_arch_if = HOST_INITIAL_IF;
+    paging_init(HOST_RAM_KB);
+    CHECK(host_arch_if == HOST_INITIAL_IF);
+    if (HOST_EXPECT_INIT_FAIL) {
+        CHECK(!host_loads && !host_enables && !pg_enabled && !host_cr3);
+        CHECK(!live_addrspaces);
+        SAY("PASS: pre-PG failure restores IF");
+        die(0);
+    }
+    CHECK(host_loads == 1 && host_enables == 1 && pg_enabled);
+    CHECK(fixed_paging_valid() && host_cr3 == MEM_FIXED_PD_BASE);
+    {
+        u32 i, hash = fixed_hash();
+        for (i = MEM_FIXED_PAGING_BASE / PAGE_SIZE; i < MEM_FIXED_PAGING_END / PAGE_SIZE; i++)
+            CHECK((page_tables[0][i] & (PTE_USER | PTE_PCD | PTE_PWT)) == 0);
+        for (i = MEM_FIXED_PAGING_END / PAGE_SIZE; i < MEM_POOL_BASE / PAGE_SIZE; i++)
+            CHECK(!(page_tables[0][i] & PTE_PRESENT));
+        /* live AS + 非master CR3 の再呼出しは全状態を保つ。 */
+        live_addrspaces = 1;
+        host_cr3 = 0x123000;
+        paging_init(1024);
+        CHECK(host_arch_if == HOST_INITIAL_IF && fixed_hash() == hash);
+        CHECK(live_addrspaces == 1 && host_cr3 == 0x123000);
+        CHECK(host_loads == 1 && host_enables == 1);
+        live_addrspaces = 0;
+        host_cr3 = MEM_FIXED_PD_BASE;
+    }
+    shell_heap_test();
     host_pool_boot(16384);
     paging_reclaim_conventional();
+    {
+        struct addrspace as;
+        u32 a, pa, hash = fixed_hash();
+        CHECK(paging_addrspace_create(&as, LEDGER_OWNER_KERNEL) == 0);
+        CHECK((((u32 *)as.pd_phys)[0] & ~(u32)(PAGE_SIZE - 1)) == MEM_FIXED_BOOT_PT_BASE);
+        for (a = MEM_FIXED_PAGING_BASE; a < MEM_FIXED_PAGING_END; a += PAGE_SIZE)
+            CHECK(as_va_to_pa(as.pd_phys, a, &pa) != 0);
+        paging_addrspace_destroy(&as);
+        CHECK(!live_addrspaces && fixed_hash() == hash && fixed_paging_valid());
+    }
 
     /* SHM 後方予約は「空」(START == END + 1) なら呼ばれず、**逆転**
      * (START > END + 1) のときだけ撥ねた数に入る。空と逆転を混ぜない

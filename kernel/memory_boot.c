@@ -202,8 +202,8 @@ u32 memory_boot_ram_kb(void)
 }
 
 /* 区間の表に載せる固定用途 (TASK_T1_LEDGER §3-3 ③)。番地は memmap.h の
- * 正典から引く。bootinfo (0x7E00) はフォントキャッシュの内側、固定 PT は
- * カーネル帯 (BSS) の内側なので、それぞれ外側の区間に含まれる。 */
+ * 正典から引く。bootinfo (0x7E00) はフォントキャッシュの内側、固定 PD/PT は
+ * shell heap 後方の画像外区間として専用の行に登録する。 */
 #define MB_PFN(a) ((u16)((a) / PAGE_SIZE))
 static const struct {
     u16 first, end;
@@ -238,7 +238,11 @@ static const struct {
     /* カーネルスタックのガード + カーネルスタック */
     { MB_PFN(MEM_STACK_GUARD), MB_PFN(MEM_SHELL_LOAD_ADDR),
       LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
-    { MB_PFN(MEM_SHELL_LOAD_ADDR), MB_PFN(MEM_SHELL_BAND_END + 1),
+    { MB_PFN(MEM_SHELL_LOAD_ADDR), MB_PFN(MEM_FIXED_PAGING_BASE),
+      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
+    { MB_PFN(MEM_FIXED_PAGING_BASE), MB_PFN(MEM_FIXED_PAGING_END),
+      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
+    { MB_PFN(MEM_FIXED_PAGING_END), MB_PFN(MEM_SHELL_BAND_END + 1),
       LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
 };
 STATIC_ASSERT(MEM_SHELL_BAND_END + 1 == MEM_POOL_BASE, fixed_regions_end_at_pool);

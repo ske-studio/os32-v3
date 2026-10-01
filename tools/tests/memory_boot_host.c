@@ -106,6 +106,7 @@ void _start(void)
     CHECK(memory_boot_detect(15360) == (MEM_HIGH_RAM_BASE + 17UL * MEM_1MB) / 1024UL);
     die(0);
 #endif
+    host_map_fixed_paging();
     paging_init(TEST_KB);
     sys_mem_kb = TEST_KB;
     CHECK(memory_boot_init != 0);
@@ -246,7 +247,7 @@ void _start(void)
     host_kernel_boot(TEST_KB);
     CHECK(0);
 #endif
-#if defined(TEST_HIGH) || defined(TEST_RAMKB) || defined(TEST_CEILING)
+#if defined(TEST_HIGH) || defined(TEST_RAMKB) || defined(TEST_CEILING) || defined(TEST_FIXED_PAGING)
     /* The detector is the only source of a high attestation; the host cannot
      * touch the BIOS work area, so stand in for it with the same value. */
     if (TEST_KB > MEM_HIGH_RAM_BASE / 1024UL)
@@ -273,7 +274,7 @@ void _start(void)
         u32 k, n, bg;
         CHECK(ledger_selfcheck("boot"));
         n = sizeof(memory_boot_fixed) / sizeof(memory_boot_fixed[0]);
-        CHECK(n == 12);
+        CHECK(n == 14);
         CHECK(ledger_region_count == n + 2 + (ledger_backing_mapped ? 0 : 1));
         bg = 0;
         for (k = 0; k < ledger_region_count; k++) {
@@ -302,6 +303,41 @@ void _start(void)
         /* 同梱の申告は無い (bootinfo に欄が無い): 同梱域も集積域も池のまま */
         CHECK(!ledger_owner_pages(LEDGER_OWNER_BUNDLE));
     }
+#ifdef TEST_FIXED_PAGING
+    {
+        static u32 pages[65536UL * 1024 / PAGE_SIZE];
+        u32 i, first = MEM_FIXED_PAGING_BASE / PAGE_SIZE;
+        u32 end = MEM_FIXED_PAGING_END / PAGE_SIZE;
+        u32 n = 0, free_before = pgalloc_free_pages(), owner, hash = 0, after = 0;
+        int found = 0;
+        CHECK(fixed_paging_valid() && host_if == 0x202U);
+        CHECK(ledger_backing_mapped == (TEST_KB == 8192));
+        for (i = 0; i < ledger_region_count; i++) {
+            const struct ledger_region *r = &ledger_regions[i];
+            if (r->first == first && r->end == end) {
+                CHECK(r->type == LEDGER_R_FIXED && r->owner == LEDGER_OWNER_KERNEL &&
+                      r->cache == LEDGER_CACHE_WB && (r->flags & LEDGER_RF_PERMANENT));
+                found++;
+            }
+        }
+        CHECK(found == 1);
+        CHECK(ledger_owner_new(LEDGER_KIND_AS, 99, "paging-test", &owner));
+        for (i = MEM_FIXED_PAGING_BASE; i < MEM_POOL_BASE; i += sizeof(u32))
+            hash = hash * 33U + *(u32 *)i;
+        while ((pages[n] = pgalloc_alloc_phys(owner, 1)) != 0) {
+            CHECK(pages[n] >= MEM_POOL_BASE && ++n < sizeof(pages) / sizeof(pages[0]));
+        }
+        CHECK(n == free_before && !pgalloc_free_pages());
+        for (i = 0; i < n; i++) CHECK(pgalloc_free_n_owner(owner, pages[i] / PAGE_SIZE, 1));
+        CHECK(pgalloc_free_pages() == free_before && ledger_owner_retire(owner));
+        for (i = MEM_FIXED_PAGING_BASE; i < MEM_POOL_BASE; i += sizeof(u32))
+            after = after * 33U + *(u32 *)i;
+        CHECK(hash == after && fixed_paging_valid() && ledger_selfcheck("paging-test"));
+        CHECK(!pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, first, end, LEDGER_BOTTOM_UP, &i));
+        report("PASS fixed paging reservation + pool roundtrip\n", sizeof("PASS fixed paging reservation + pool roundtrip\n") - 1);
+        die(0);
+    }
+#endif
 #ifdef TEST_MINIMUM
     CHECK(TEST_KB * 1024UL == MEM_EXEC_LOAD_ADDR + MEM_EXEC_STACK_SIZE +
           MEM_EXEC_SBRK_MIN + MEM_EXEC_HEAP_MIN);
