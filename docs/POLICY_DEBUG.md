@@ -227,7 +227,7 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
 
 - **現象**: `ls > file` の化け、`pipe: out of memory`、double-free 警告
 - **原因**: newlib の sbrk (malloc / stdio) と KAPI `mem_alloc` の exec_heap が両方 BSS 終端から始まり互いを上書き
-- **対策** (2026-09-03): exec_heap を `MEM_SHELL_HEAP_BASE` (0x380000, 512KB) へ分離。`kernel/paging.c` は 0x380000〜0x3FFFFF を present に保つ (以前は NP ギャップ)。番地は [02_memory.md](02_memory.md)
+- **対策** (2026-09-03): exec_heap を `MEM_SHELL_HEAP_BASE` (0x380000, 512KB) へ分離。`kernel/paging.c` は 0x380000〜0x3FFFFF を present に保つ (以前は NP ギャップ。**2026-10-01 の T2a′ で heap は 0x380000〜0x3F0FFF の 452KB に縮み、0x3F1000〜0x3FAFFF は固定 PD/PT、0x3FB000〜0x3FFFFF は NP**)。番地は [02_memory.md](02_memory.md)
 
 ### 4-17. NHD 作業イメージが `/tmp` にあり、消えても deploy が exit 0 で返っていた
 
