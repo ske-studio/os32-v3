@@ -75,7 +75,7 @@ make check-tests-inventory                      # 表が古くないか検査す
 `TARGET_SRCS` など) にある `ROOT / "…"`。どちらにも現れないものは空欄になる
 (Rust は `--manifest-path` を代わりに出す)。
 
-## 2. `make check` の列 (109 ターゲット)
+## 2. `make check` の列 (110 ターゲット)
 
 `build/sdk.mk` の `CHECK_PAR_TARGETS` (`check-par` の依存) が
 正典。この表はその列をそのまま展開したもの。コマンド列は `make check` (変異込み) の形。
@@ -189,8 +189,9 @@ make check-tests-inventory                      # 表が古くないか検査す
 | 105 | `check-cat-linenum-host` | `python3 -B tools/tests/test_cat_linenum.py --target --mutate` | `userland/shell/cmd_fs_shared.c`<br>`userland/shell/cmd_file.c` | [`tools/tests/cat_linenum_tdd.md`](../tools/tests/cat_linenum_tdd.md) | — | × |
 | 106 | `check-result-conv-host` | `python3 -B tools/tests/test_result_conv.py --target --mutate` | `userland/tests/stat_t.c`<br>`userland/tests/restest.c`<br>`userland/tests/test2.c`<br>`userland/tests/klibc_test.c`<br>`userland/tests/font_load_test.c`<br>`userland/rust/alloc_demo/src/lib.rs` | [`tools/tests/result_conv_tdd.md`](../tools/tests/result_conv_tdd.md) | [`docs/archive/test/TASK_TEST_RESULT.md`](archive/test/TASK_TEST_RESULT.md) | × |
 | 107 | `check-guest-host` | `python3 -B tools/tests/test_guest_tests.py --mutate` | — | [`tools/tests/guest_tests_tdd.md`](../tools/tests/guest_tests_tdd.md) | [`docs/archive/test/TASK_TEST_RUNNER.md`](archive/test/TASK_TEST_RUNNER.md) | ○ |
-| 108 | `check-cirrus-win-host` | `python3 -B tools/tests/test_cirrus_win.py --mutate` | `gfx/backend_cirrus.c`<br>`drivers/wab_glue_xe10.c` | [`tools/tests/cirrus_win_tdd.md`](../tools/tests/cirrus_win_tdd.md) | — | × |
-| 109 | `check-pegc-mode-host` | `python3 -B tools/tests/test_pegc_mode.py --mutate` | `gfx/backend_pegc.c`<br>`kernel/console.c` | [`tools/tests/pegc_mode_tdd.md`](../tools/tests/pegc_mode_tdd.md) | [`docs/tasks/realhw/TASK_PEGC480_REALHW.md`](tasks/realhw/TASK_PEGC480_REALHW.md) | × |
+| 108 | `check-fd-redirect-d0a-host` | `python3 -B tools/tests/test_fd_redirect_d0a.py --expect-known-bug` | `fs/fd_redirect.c` | — | — | × |
+| 109 | `check-cirrus-win-host` | `python3 -B tools/tests/test_cirrus_win.py --mutate` | `gfx/backend_cirrus.c`<br>`drivers/wab_glue_xe10.c` | [`tools/tests/cirrus_win_tdd.md`](../tools/tests/cirrus_win_tdd.md) | — | × |
+| 110 | `check-pegc-mode-host` | `python3 -B tools/tests/test_pegc_mode.py --mutate` | `gfx/backend_pegc.c`<br>`kernel/console.c` | [`tools/tests/pegc_mode_tdd.md`](../tools/tests/pegc_mode_tdd.md) | [`docs/tasks/realhw/TASK_PEGC480_REALHW.md`](tasks/realhw/TASK_PEGC480_REALHW.md) | × |
 
 ## 3. `check` の列に**入っていない** `check-*` ターゲット (9)
 

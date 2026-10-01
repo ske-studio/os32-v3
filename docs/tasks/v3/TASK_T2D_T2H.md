@@ -88,11 +88,46 @@ walkはT2cの低位恒等backingをP2Vで参照し、**dではmaster往復を除
 
 DB接続は `kapi_db.c:512` / `:974` / `:1116` の3呼出箇所 (db_open / db_open_existing / db_prepare_only)とその補助だけ。copy失敗では既存rcを返し、SQLite入口カウンタ差分0、旧stmt/FDに副作用なし。B3/B4やFEP全体を安全化したとは報告しない。
 
+**d0a の試験と判定 (2026-10-01、ゲスト未実施)**:
+`userland/tests/d0a_test.c` を既定の CPL=3 でビルドし、`userland/deploy.yaml` に
+`/usr/bin/d0a_test.bin` として登録した [V2]。同一バイナリを親/子に使い、親の
+volatile BSS 64B を 0xA5 で埋めて stdout に登録 → `exec_run` で自分を `--child`
+付きで起動 → 子は引数の親VAと自身のBSS VAの一致と CPL=3 を確認し、同VAを
+0x5Aで埋める → `sys_write(1, "d0a child stdout\n", 17)` → 子自身の64Bを
+自己点検して終了 → 親は長さ17・payload全byte・未使用47Bの0xA5を確認する。
+子の終了codeは0=値不変、10=値変更、11=write不完全、12=VA不一致、13=CPL不一致。
+親はリダイレクト解除後に結果を出し、全正常なら0、それ以外は1で終了する。
+
+PMは健全な試験媒体に今回のバイナリを反映したことを確認 [V1] し、8MB/17MBで
+`/usr/bin/d0a_test.bin` を実行する (外側にパイプ/リダイレクトを付けない)。
+正しい実装なら `d0a: parent_buffer=OK`、`d0a: child_value=OK`、
+`d0a: child_status kind=1 code=0 rc=0 result_rc=0 bytes=17` が各1行。
+**`parent_buffer=MISSING` と `child_value=CHANGED`、かつ
+`child_status kind=1 code=10 rc=10 result_rc=0 bytes=17` の組なら、同VAの子を
+書換えたという指摘が当たり、d0bの修正対象と判断する。** `MISSING`単独は
+登録/継承/起動失敗などでも起きるので確定根拠にしない。子の異常終了/起動失敗/
+自己点検未完は `child_value=UNVERIFIED` と終了状態を出し、CHANGEDと偽らない。
+この場合は条件差として記録し候補を消さない。追加で CPL=3 の `sh` 内から
+`ls | cat` を実行し、単独 `ls` と比較する。画面・buffer VA・新kernel.mapから
+引いた親/子CR3・同VAの別PFN・kill差分もPMが記録する (本fixtureはCR3/PAを読む
+公開口を追加しない)。ゲストの別PFN/CR3と画面結果は未確認であり、ホスト結果を
+ゲスト再現として扱わない。
+
+ホストは `tools/tests/test_fd_redirect_d0a.py` と `fd_redirect_d0a_host.c`。
+実物 `fs/fd_redirect.c` をincludeし、Linuxの別memfd backingを同VAに順にmapして
+上の登録→切替→write→自己点検→子owner回収→親復帰を模擬する。MMU/権限検査/VFS
+境界は足場で、実exec/KAPI/CR3は検証しない。同AS正常対照はOK、親子ケースは
+`MISSING/CHANGED` (親64B不変・子payload一致・残り不変) を観測した。
+既定実行は契約に対してRED (rc=1)。全体checkには
+`check-fd-redirect-d0a-host` の `--expect-known-bug` でこの厳密な失敗のみをXFAIL
+(rc=0)として登録し、compile error/kill/別失敗/XPASSは失敗にする。
+d0bでrecipeの同flagを外し、登録者ASのwalk/copy境界の足場を追加してGREENにする。
+
 ### 1-3. 分割・試験・受入
 
 | 小段 (各45〜75分目安) | 成果 / その場で閉じる試験 |
 |---|---|
-| d0a | 既存fd_redirect候補のゲスト再現確認。`ls \| cat`、親子同VA/別PFN、親buffer/子heapの比較 |
+| d0a | ゲスト試験 `d0a_test`・同VA別backingの実fd_redirectホスト試験を作成。§1-2の判定でPMが `ls \| cat`・同VA/別PFNを受入 (ゲスト未実施) |
 | d0b | 登録者記述子とPA copyを最小実装。死んだ登録者/slot再利用/RO化/入れ子・park保存復元、子の内容不変。修正後guest回帰 |
 | d1 | caller記述子と入口/正常出口。USER/trusted/入れ子とCR3不一致拒否 |
 | d2 | park/longjmp/WMの寿命配線。実exec R1足場で古い記述子不使用 |
