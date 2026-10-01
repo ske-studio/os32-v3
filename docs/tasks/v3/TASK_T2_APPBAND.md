@@ -1,6 +1,6 @@
 # TASK_T2_APPBAND — T2: アプリ帯 + lease 窓 (設計票)
 
-> 状態: **実装中 (2026-10-01)** — 独立レビュー (Fable 5.1) Approve、固定 PT の置き場は 0x3F1000 (ユーザー決定・PM の実測)。**T2a 着地** (`ce5a2a9`、NP21/W 8/17MB の受入は §5-1 T2a — park → resume 後と R1 panic の故障ゲスト、Ra266 PCM は未実施)。次は T2a′。D1〜D36 を変更せず、T2a〜T2h の間に T2a′ を加える (§5)。
+> 状態: **実装中 (2026-10-01)** — 独立レビュー (Fable 5.1) Approve、固定 PT の置き場は 0x3F1000 (ユーザー決定・PM の実測)。**T2a・T2a′ 着地** (`ce5a2a9`・`279272d`、NP21/W 8/17MB の受入は §5-1 — park → resume 後、R1 panic の故障ゲスト、Ra266 64MB / PCM は未実施)。次は T2b。D1〜D36 を変更せず、T2a〜T2h の間に T2a′ を加える (§5)。
 >
 > 発行・改訂: GPT-6-astra / Codex (設計者)。初稿調査基点 `b5cd920`、1 回目の確認基点 `705a227`、2 回目の改訂 GPT-6 / Codex、確認基点 `8a7bf4c` (`wt/t2-design`)。以下の `file:line` は初回の実コード調査を引き継ぎ、2 回目の対象箇所は `8a7bf4c` で再確認した。今回の作業はこの worktree の文書だけ、commit / push・配備・NP21/W・NHD・ini・Windows 側の操作なし。
 > 決定の正典: [TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) §0・§2-2・§2-3 ⑥・§3-5・§6 T2・§7・§8-4。位置づけ: [V3_PLAN](V3_PLAN.md) P1 / P7。引継ぎ: [TASK_T1_LEDGER](TASK_T1_LEDGER.md) §1-2・§4-1-R〜§4-6-N。B1: [FEP_BOUNDARY](../settings/FEP_BOUNDARY.md) §4 (D31 で T2 に移管)。
@@ -361,6 +361,17 @@ broker は `kctx_irq_depth` を直接読み、独自の `irq_in_irq` 加減算/�
 **PMへの未実施受入**: 独立実装レビュー、NP21/W8/17MBの新画像boot/selftest/GUI・CUI操作/gshell/16本/V86往復/fault/STOP (T2aのpark→resumeと故障ゲストpanicの未実施を含む)、Ra26664MBのONLINE・32MB超恒等写像・PCM STOP→再open。452KiB heapのピーク/ENOMEMとPT整合を観測し、固定10枚を配らないことを確認する。64MB実機未確認なのでT2a′受入完了とはしない。コミット/push/配備/NP21/W/NHD/ini/Windows側の直接操作は未実施。
 
 今回のELFで見る記号: `kselftest_fail=0x160E40` (0)、`kselftest_pass=0x160E44`、`paging_memmap_bad_count=0x183AE0` (0)、`ledger_check_fail=0x184730` (0)、`ledger_region_count=0x184734`、`irq_ctx_violations=0x161784` (T2aと同じ起動時1を基準、操作差分0)、`ledger_exc_ops=0x183B00` / `ledger_irq_ops=0x184334` / `exec_as_leftover_pages=0x188C40` (0)。`page_directory` pointerは0x159840 (内容0x3F1000)、`page_tables` pointer表は0x158840 (先頭8要素0x3F2000〜0x3F9000、PDE1016用0x3FA000)。master CR3=0x3F1000、PDのPDE0〜7 frame=0x3F2000〜0x3F9000、PDE1016 frame=0x3FA000、固定10枚のaliasはP/RW・USER/PCD/PWTなし、[0x3FB000,0x400000)はNP。`workspace_first=0x159F08` / `workspace_end=0x159F04` はPFN、64MBのPDE8〜15 frameはその内側、固定域とは別。A/D bitはCPUの更新を許す。PMが再ビルドしたら必ずそのELF/map/nmで番地を引き直す。
+
+**T2a′ 着地と PM の NP21/W 受入 (2026-10-01)**: 独立実装レビュー Codex `gpt-6-astra` は P1・P2 なしで Approve。P3 (CLAUDE.md の「0x380000–0x3FFFFF を present に保つ」が NP 予約と矛盾) は PM が CLAUDE.md と POLICY_DEBUG §4-15 を直した。`279272d` を NHD へ配備 (停止 → nhd-pull → deploy-kernel → deploy → 起動)。
+
+| 構成 | 見たもの | 結果 |
+|---|---|---|
+| 17MB (`ver` Commit `279272d`) | 起動・番地 | `kselftest_fail`=0 (pass 258)、`paging_memmap_bad_count`=0、`ledger_check_fail`=0 (`ledger_region_count`=19)、**CR3=0x3F1000**。master PD の PDE0 → 0x3F2000 (0x27)、PDE1 → 0x3F3000、PDE2 → 0x3F4000 (0x03)。PT0 の 0x3F1000〜0x3FA000 の 10 PTE はすべて `…063` (P・RW・A・D、**U/S=0**)、0x3FB000〜0x3FF000 の 5 PTE は `…002` (**NP**) |
+| 17MB | faulttest gp/de/ud/pf、loop・kloop + CTRL+STOP、`v86 -t` | T2a と同じ (kill 6・回収 7、`ledger_*_ops`=0、深さ 0、取り残し 0、`irq_ctx_violations`=1 のまま、V86 OK) |
+| 17MB GUI (PEGC 480) | `os32gui` → Run... gui_demo → ESC → Start → CUI mode | GUI に入り窓が描かれ、CUI へ戻る (回収 8、取り残し 0) |
+| 8MB (`ram-8mb`、終了後 `restore`) | 上の CUI 一式と GUI | 17MB と同じ (Physical 8192KB) |
+
+**未実施**: 452KiB heap のピーク / ENOMEM の観測 (常駐シェルを枯渇まで使う手段を用意していない — ホストの `test_memmap_boot.py` が実 exec_heap / kheap で末端までの割当・枯渇・親の保存 / 復元を見ている)、gshell の 16 本、Ra266 64MB (ONLINE・32MB 超の恒等写像・動的 PT 併存・PCM)。T2a の未実施 (park → resume 後、R1 panic の故障ゲスト) も残る。
 
 ### 5-2. 検査3段と lease 回帰 (d)
 
