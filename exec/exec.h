@@ -230,5 +230,7 @@ extern volatile u32 ring3_wm_depth_underflow;
 /* WM の文脈 (深さ 1 以上) でアプリをフォールトで畳んだ回数 (exec.c の注記)。
  * WM の中で落ちるとアプリの kill として畳まれるので、それを見分ける印。 */
 extern volatile u32 ring3_wm_fault_count;
+/* Entry identity mismatch, separate from ordinary pointer/fault kills. */
+extern volatile u32 ring3_caller_reject_count;
 
 #endif /* __EXEC_H */

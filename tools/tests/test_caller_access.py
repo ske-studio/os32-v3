@@ -11,6 +11,11 @@ from mutpar import run_ordered
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 MUTATIONS = [
+    ("access", "if (ring3_wm_depth > 0)", "if (0)", "WM trusted scope"),
+    ("access", "if (user_only && a->origin != CALLER_USER)", "if (0 && user_only)", "saved USER only"),
+    ("access", "caller_frame.valid = 0;", ";", "invalidation"),
+    ("dispatch", "ring3_caller_reject_count++;", ";", "entry rejection counter"),
+    ("wm", "ring3_wm_depth--;", ";", "WM trusted leakage"),
     ("access", " || a.pd_phys != paging_current_cr3()", "", "entry CR3"),
     ("access", "res_owner_get() != a.app_id", "0", "entry owner"),
     ("access", "a->pd_phys == paging_current_cr3()", "1", "current CR3"),
@@ -33,12 +38,17 @@ MUTATIONS = [
 ]
 
 
+def function(source, name):
+    start = source.index("void " + name + "(void)\n{")
+    return source[start:source.index("\n}", start) + 2]
+
 def sources():
     s = (ROOT / "exec/exec.c").read_text()
     a = s.index("void __cdecl ring3_syscall_dispatch(u32 *frame)")
     b = s.index("\n}", a) + 2
     return {"access": (ROOT / "exec/redir_access.c").read_text(),
             "dispatch": s[a:b],
+            "wm": function(s, "ring3_wm_enter") + "\n" + function(s, "ring3_wm_leave"),
             "host": (ROOT / "tools/tests/caller_access_host.c").read_text()}
 
 
@@ -51,6 +61,7 @@ def run(src, quiet=False):
         host = tmp / "tools/tests/caller_access_host.c"
         host.write_text(src["host"])
         (host.parent / "dispatcher.inc").write_text(src["dispatch"])
+        (host.parent / "wm.inc").write_text(src["wm"])
         exe = tmp / "caller"
         result = subprocess.run([
             "cc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",

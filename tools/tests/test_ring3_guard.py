@@ -90,8 +90,8 @@ MUTATIONS = [
      "gui_register の門が top-level の正当な登録を断る (過剰)"),
     # 代行レビュー P3 (2026-09-26): WM の中で落ちた観測点 (静的検査)。
     ("exec/exec.c",
-     "    if (kind == EXEC_KIND_FAULT && ring3_wm_depth > 0) {\n        ring3_wm_fault_count++;     /* 深さを 0 に戻す前に数える */\n    }\n    ring3_in_syscall = 0;   /* syscall 途中で畳む場合も必ずガードを下ろす */\n    ring3_wm_depth = 0;",
-     "    ring3_in_syscall = 0;   /* syscall 途中で畳む場合も必ずガードを下ろす */\n    ring3_wm_depth = 0;\n    if (kind == EXEC_KIND_FAULT && ring3_wm_depth > 0) {\n        ring3_wm_fault_count++;     /* 深さを 0 に戻す前に数える */\n    }",
+     "    if (kind == EXEC_KIND_FAULT && ring3_wm_depth > 0) {\n        ring3_wm_fault_count++;     /* 深さを 0 に戻す前に数える */\n    }",
+     "    ring3_context_clear();\n    if (kind == EXEC_KIND_FAULT && ring3_wm_depth > 0) {\n        ring3_wm_fault_count++;     /* 深さを 0 に戻す前に数える */\n    }",
      "ring3_wm_fault_count を深さを 0 に戻した後で数える (常に 0)"),
     ("exec/exec.c",
      "        ring3_wm_fault_count++;     /* 深さを 0 に戻す前に数える */\n",
@@ -137,7 +137,11 @@ def static_checks(root, quiet=False):
     exec_c = (root / "exec/exec.c").read_text(encoding="utf-8")
     body = _func_body(exec_c, "static void ring3_kill_kind(int kind)")
     c = body.find(WM_FAULT_COUNT)
-    r = body.find(WM_DEPTH_RESET)
+    # d2 P3: clear is shared by exec_exit / exec_pending_transfer. Count before
+    # either call, and also reject any early reset reintroduced in this body.
+    resets = [body.find(token) for token in (WM_DEPTH_RESET, "ring3_context_clear();",
+                                           "exec_exit(", "exec_pending_transfer(")]
+    r = min((pos for pos in resets if pos >= 0), default=-1)
     if c < 0:
         bad.append("ring3_kill_kind が ring3_wm_fault_count を数えない")
     elif r < 0 or c > r:

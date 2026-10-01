@@ -7,6 +7,7 @@
 #include "kstring.h"
 
 extern int ring3_call_from_user(void);
+extern volatile int ring3_wm_depth;
 
 /* Called only with IRQs saved. Never dereference the saved AS pointer. */
 static int redir_live(const RedirAccess *a)
@@ -51,8 +52,7 @@ fail:
     return 0;
 }
 
-/* No pointer into a potentially abandoned syscall stack is retained. The
- * value still needs explicit invalidation at d2 nonlocal-return boundaries. */
+/* Only values survive across nested calls. Nonlocal exits invalidate them. */
 static CallerAccessFrame caller_frame;
 
 int caller_access_enter(CallerAccessFrame *previous, enum caller_origin origin)
@@ -69,18 +69,19 @@ int caller_access_enter(CallerAccessFrame *previous, enum caller_origin origin)
     return ok;
 }
 
-void caller_access_leave(const CallerAccessFrame *previous)
+void caller_access_leave(const volatile CallerAccessFrame *previous)
 {
     unsigned int flags = irq_save();
     caller_frame = *previous;
     irq_restore(flags);
 }
 
-int caller_access_get(struct caller_access *out)
+static int caller_access_saved_get(struct caller_access *out, int user_only)
 {
     unsigned int flags = irq_save();
     const struct caller_access *a = &caller_frame.access;
     int ok = caller_frame.valid && redir_live(a);
+    if (user_only && a->origin != CALLER_USER) ok = 0;
     if (ok && a->origin == CALLER_USER)
         ok = a->app_id == appslot_cur() && res_owner_get() == a->app_id &&
              a->pd_phys == paging_current_cr3();
@@ -89,11 +90,39 @@ int caller_access_get(struct caller_access *out)
     return ok;
 }
 
+void caller_access_save(volatile CallerAccessFrame *out)
+{
+    unsigned int flags = irq_save();
+    *out = caller_frame;
+    irq_restore(flags);
+}
+
+void caller_access_invalidate(void)
+{
+    unsigned int flags = irq_save();
+    caller_frame.valid = 0;
+    irq_restore(flags);
+}
+
+int caller_access_get_user(struct caller_access *out)
+{
+    return caller_access_saved_get(out, 1);
+}
+
+int caller_access_get(struct caller_access *out)
+{
+    /* Only explicit WM enter/leave grants this scope. Preserve the USER value
+     * underneath; current CPL, pointer address and master CR3 grant nothing. */
+    if (ring3_wm_depth > 0) return access_capture(out, CALLER_TRUSTED);
+    return caller_access_saved_get(out, 0);
+}
+
 int redir_access_capture(RedirAccess *out)
 {
-    /* Keep the d0b source-of-origin contract until d2 lifetime wiring is ready.
-     * Registration stores a value; it must not retain the current frame. */
-    return access_capture(out, ring3_call_from_user() ? REDIR_USER : REDIR_TRUSTED);
+    /* USER registration consumes the fixed entry identity. CPL0/WM direct
+     * registration keeps its existing explicit trusted calling convention. */
+    if (ring3_call_from_user()) return caller_access_get_user(out);
+    return access_capture(out, CALLER_TRUSTED);
 }
 
 static int redir_page(const RedirAccess *a, u32 va, int write, u32 *pa)

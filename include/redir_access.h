@@ -15,18 +15,20 @@ typedef struct caller_access {
     u32 pd_phys, owner, generation;
 } RedirAccess;
 
-/* Value snapshots, not links to dispatch stack frames. d1 wires normal entry /
- * return only. Before using this in copy/redirect consumers, d2 must invalidate
- * on launch/resume longjmp landings and wire explicit WM trusted scopes. */
+/* Value snapshots; never retain a pointer into an abandoned dispatch stack. */
 typedef struct {
     struct caller_access access;
     int valid;
 } CallerAccessFrame;
 int caller_access_enter(CallerAccessFrame *previous, enum caller_origin origin);
-void caller_access_leave(const CallerAccessFrame *previous);
+void caller_access_leave(const volatile CallerAccessFrame *previous);
 /* Copies the fixed entry identity only if it still matches the live caller.
  * No implicit trusted fallback; rejection leaves out unchanged. */
 int caller_access_get(struct caller_access *out);
+/* WM uses this explicitly for the suspended USER's pointers, never TRUSTED. */
+int caller_access_get_user(struct caller_access *out);
+void caller_access_save(volatile CallerAccessFrame *out);
+void caller_access_invalidate(void);
 
 int redir_access_capture(RedirAccess *out);
 int redir_access_check(const RedirAccess *a, u32 va, u32 len, int write);

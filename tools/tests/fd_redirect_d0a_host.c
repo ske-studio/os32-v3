@@ -16,6 +16,7 @@ static unsigned int irq_save(void) { unsigned int f = irq_enabled; irq_enabled =
 static void irq_restore(unsigned int f) { assert(!irq_enabled); irq_enabled = f; restores++; }
 #include "../../fs/fd_redirect.c"
 #include "../../exec/redir_access.c"
+volatile int ring3_wm_depth;
 
 #define BYTES (PAGE_SIZE * 2)
 static AppSlot slots[APP_SLOT_COUNT];
@@ -83,12 +84,19 @@ int main(void)
     }
     current_va = map_backing(fds[2], NULL);
     fd_redirect_init(); res_owner_set(2);
+    CallerAccessFrame previous;
+    assert(caller_access_enter(&previous, CALLER_USER));
     assert(fd_redirect_to_buffer(1, current_va, 64, 0) == 0);
     assert(fd_redirect_write(1, payload, 17) == 17);
     assert(!memcmp(aliases[2], payload, 17));
     puts("d0a: same_as=OK");
     memset(aliases[2], 0xA5, BYTES); memset(aliases[3], 0x5A, BYTES);
     assert(fd_redirect_to_buffer(1, current_va, BYTES, 0) == 0);
+    /* Registration must use the saved entry, not recapture a new generation. */
+    spaces[2].generation++;
+    assert(fd_redirect_to_buffer(1, current_va, 16, 0) == -1);
+    assert(redir_table[1].access.generation == 22);
+    spaces[2].generation--;
     /* Failed registrations preserve an already installed redirect. */
     res_owner_set(3);
     assert(fd_redirect_to_buffer(1, current_va, 16, 0) == -1);
@@ -96,12 +104,15 @@ int main(void)
     res_owner_set(2);
     u32 saved_pd = spaces[2].pd_phys;
     spaces[2].pd_phys = spaces[3].pd_phys;
+    assert(!caller_access_enter(&previous, CALLER_USER));
     /* Current CR3 is independently fixed, not derived from the changed AS. */
     assert(fd_redirect_to_buffer(1, current_va, 16, 0) == -1);
     assert(redir_table[1].access.pd_phys == saved_pd);
     spaces[2].pd_phys = saved_pd;
     current_id = 3; res_owner_set(3); map_backing(fds[3], current_va);
+    ring3_wm_depth = 2; user_call = 0;
     assert(fd_redirect_write(1, payload, 17) == 17);
+    ring3_wm_depth = 0; user_call = 1;
     assert(!memcmp(aliases[2], payload, 17)); unchanged(aliases[2] + 17, BYTES - 17, 0xA5);
     unchanged(aliases[3], BYTES, 0x5A);
     fd_redirect_reset_owned(3);
@@ -115,6 +126,7 @@ int main(void)
     FdRedirectState parent, nested, parked;
     fd_redirect_save(&parent);
     assert(!fd_is_redirected(1));
+    assert(caller_access_enter(&previous, CALLER_USER));
     assert(fd_redirect_to_buffer(1, current_va, BYTES, 0) == 0);
     fd_redirect_save(&nested); fd_redirect_restore(&parent);
     fd_redirect_clear_state(&parent);
@@ -134,6 +146,14 @@ int main(void)
     refuse_write();
     slots[2].state = APP_STATE_RUNNING;
     refuse_write(); redir_table[1].access.as = saved;
+    /* Both saved and live values zero: equality alone must not authorize. */
+    u32 generation = spaces[2].generation;
+    spaces[2].generation = redir_table[1].access.generation = 0;
+    refuse_write();
+    spaces[2].generation = redir_table[1].access.generation = generation;
+    spaces[2].pd_phys = redir_table[1].access.pd_phys = 0;
+    refuse_write();
+    spaces[2].pd_phys = redir_table[1].access.pd_phys = saved_pd;
     spaces[2].generation++; refuse_write(); spaces[2].generation--;
     spaces[2].owner++; refuse_write(); spaces[2].owner--;
     redir_table[1].access.pd_phys = spaces[3].pd_phys;

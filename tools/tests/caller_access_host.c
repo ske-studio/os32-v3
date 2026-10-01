@@ -1,5 +1,5 @@
-/* Actual dispatcher + access implementation; slot/CR3/IRQ/KAPI boundaries only
- * are host fixtures. No park/longjmp lifetime claim (d2). */
+/* Actual dispatcher/access/WM functions; slot/CR3/IRQ/KAPI are boundaries.
+ * Nonlocal lifetime coverage lives in the real exec R1 fixture. */
 #define _GNU_SOURCE
 #include <assert.h>
 #include <setjmp.h>
@@ -17,7 +17,9 @@ static AppSlot slots[APP_SLOT_COUNT], *g_cur_app;
 static struct addrspace spaces[APP_SLOT_COUNT];
 static int cur = 2, owner = 2, user_call = 1;
 static u32 cr3 = 0x2000, tick_count;
-static int ring3_in_syscall, ring3_wm_depth, invoked, nesting;
+static int ring3_in_syscall, invoked, nesting;
+volatile int ring3_wm_depth;
+volatile u32 ring3_caller_reject_count, ring3_wm_depth_underflow;
 static u32 *g_cur_frame;
 static jmp_buf killed;
 AppSlot *appslot_get(int id) { assert(!host_if); return id > 0 && id < APP_SLOT_COUNT && slots[id].state ? &slots[id] : NULL; }
@@ -41,6 +43,7 @@ static void ring3_fault_kill(void) { longjmp(killed, 1); }
 static u32 kapi_invoke(void *fn, const void *args, u32 n);
 /* The runner inserts the unmodified ring3_syscall_dispatch definition here. */
 #include "dispatcher.inc"
+#include "wm.inc"
 static u32 kapi_invoke(void *fn, const void *args, u32 n)
 {
     struct caller_access a, b;
@@ -128,13 +131,31 @@ int main(void)
         ring3_syscall_dispatch(frame);
         assert(caller_access_get(&out) && !memcmp(&a, &out, sizeof(a)));
         caller_access_leave(&previous);
+        /* Nested explicit WM scopes preserve the USER descriptor and IF/PD. */
+        assert(caller_access_enter(&previous, CALLER_USER));
+        assert(caller_access_get_user(&a));
+        ring3_wm_enter(); ring3_wm_enter();
+        assert(caller_access_get(&out) && out.origin == CALLER_TRUSTED);
+        assert(caller_access_get_user(&out) && !memcmp(&a, &out, sizeof(a)));
+        ring3_wm_leave();
+        assert(caller_access_get(&out) && out.origin == CALLER_TRUSTED);
+        ring3_wm_leave();
+        assert(caller_access_get(&out) && !memcmp(&a, &out, sizeof(a)));
+        caller_access_invalidate();
+        assert(!caller_access_get_user(&out) && !caller_access_get(&out));
+        caller_access_leave(&previous);
+        assert(caller_access_enter(&previous, CALLER_TRUSTED));
+        assert(!caller_access_get_user(&out));
+        caller_access_leave(&previous);
         int before = invoked;
+        u32 rejects = ring3_caller_reject_count;
         cr3 = paging_kernel_pd_phys();
         if (!setjmp(killed)) { ring3_syscall_dispatch(frame); assert(0); }
+        assert(ring3_caller_reject_count == rejects + 1);
         assert(invoked == before && !caller_access_get(&out) && host_if == f);
         /* The kill fixture does not emulate d2 landing; reset only test state. */
         select_parent(); g_cur_frame = NULL;
     }
-    puts("caller d1: actual dispatcher, USER/TRUSTED/nesting/rejection/IF PASS");
+    puts("caller d2: actual dispatcher, USER/TRUSTED/WM/nesting/rejection/IF PASS");
     return 0;
 }
