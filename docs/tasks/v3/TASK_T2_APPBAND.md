@@ -444,6 +444,8 @@ P3は§6のとおり静的保持を継続し、KHEAP化をT2cの生成/破棄切
 
 #### T2c-R. 着手調査・停止記録 (2026-10-01、`wt/t2c`、GPT-6 / Codex)
 
+**PM の決定 (2026-10-01、再開指示)**: §4-6の共通正典は未作成でP7票も未発行。T2cで `sdk/kapi.json` にOS32X形式版・KAPI ABI世代・メモリ配置世代・shlibプロトコルを独立した4欄として新設し、既存KAPI生成器を拡張してC/SDK/Python/Rustへ生成する。番号を各道具へ手書きしない。P7も同じ正典を使用し、T2cではスロット整理をしない。[ABI1]〜[ABI3]に従い版上げとclean→allを行う。前回の正典不在による停止理由はこの決定で解消。
+
 **未実装**。基点 `59c4285` で §4・§5-1・§6・§7-1、T2a/T2a′/T2b-R と PM 受入、上位 D35 を確認した。形式・配置・shlib・CRT は同時更新、旧低位共有 USER は T2d まで維持、heap は T2f で一括、AS 制御ブロックの固定 KHEAP 化は T2c という境界を維持する。コード・ABI・生成物を変更せず、コミット/配備も行っていない。
 
 **実装時の訂正 (参照先の確認)**: §4-6 は「具体的な世代値は P7 と共通の正典から生成」と指定しているが、この基点の追跡対象と `.claude/skills/` を調査した範囲では、KAPI ABI 世代・メモリ配置世代・shlib プロトコルの値/生成元の定義を確認できなかった。`sdk/kapi.json` は機能版 `version=68`、`sdk/os32x_hdr.py` と公開ヘッダは OS32X v3 と `kapi_data_off` の定義を持ち、D35 の3世代欄はまだ無い。`V3_PLAN` P7 と `FORK_PLAN` は D35 を参照するが、共通生成元の所在/値を定めていない。これは設計の決定を変更する訂正ではなく、現在の実物に参照先が見つからないという調査事実である。
@@ -467,6 +469,16 @@ T2b-R 最終記録と比べ、今回の `.data` は4B小さく、BSS前余白は
 **PM 向け**: 今回の成果物は T2b までの旧配置で、T2c のゲスト受入には使わない。T2c 実装後の一式と新しい map/nm で、8/17MB と Ra26664MB の §5-1 T2c (CUI/GUI/入れ子/park/fault、256/512KB stack、旧CPL0/shell/shlib拒否) を確認する。高位 entry は0x80100000〜、shlib は0x80000000〜、stack 上端0x90000000、master高位APP PDEは空を確認する。今回の旧配置 ELF の観測番地は `kselftest_fail=0x162E60` / `kselftest_pass=0x162E64` / `lease_selftest_result=0x18B864` / `exec_as_leftover_pages=0x18B860` / `ledger_irq_ops=0x186D14` / `ledger_exc_ops=0x1864E0`。T2c 実装後には必ず引き直す。NP21/W/NHD/配備/ini/Windows/実機には触っていない。
 
 **検証と rc (現基点の確認であり、T2c 実装の合格ではない)**: 初回 `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null` は rc=2 (`/tmp/t2c-doc-check-changed.log`)。sandbox の32bit Linux syscall制限により既存 vmkernel-lz4/vk32-crc/HDD-stage1/stage2 のホスト実行が SIGSYS (exit -31) になった。T2b で使った既存の実行足場を適用し、`PYTHONPATH=/tmp/t2ap-python CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null` は **rc=0** (`/tmp/t2c-check-changed-qemu.log`)。既定基点が HEAD~1 になり、前のコミットの build 入力変更を含めて全検査を変異込みで選択した。ソース不変検査も成功。既存 T2b lease は10/10実行時RED・コンパイル失敗0。既存配置境界2件のコンパイル拒否および構文破壊2件はNOT COUNTED、実行時REDへ数えない。T2c固有のホスト/変異試験は未実装・未実施。ビルド後の `python3 tools/gen_memmap.py --check` / `--headroom` と `git diff --check` はrc=0。地図とTESTS一覧は最新で、生成ブロックの変更は不要だった。最終結果はソース不変検査の完了後に本票だけへ追記した。
+
+**再開調査・解釈確認のため停止 (2026-10-01)**: PMの正典新設指示は上記に記録し、前回の世代正典不在は解消済み。今回の停止はそれとは別で、§5-1末尾の暫定heap予算の解釈確認である。同節は「T1の起動時予算計算を物理専用の暫定helperとして残し、旧配置のcode/stack/guardを引いた容量から得たbyte数だけを新しい仮想予約へ写す」と指定する。実物の `paging_app_band_pdes` は `MEM_APP_BAND_MAX_PDES=2` で枚数を打ち切り、`ring3_band_set` はその上端と `sys_usable_mem_end()` の小さい方を使う。旧容量上限も暫定helper内に保持するのか、現在の池の空きで容量を算出し直すのかで、64MB機の大きな明示heap要求の起動可否が変わる。前者は旧上端0x00C00000による拒否を継続し、後者は起動時の容量方針も変更する。新しい仮想配置64 PDEと疎PTそのものの制限とは区別する。**PMへこの2択を確認中**。指定の「解釈に迷ったら止めて報告」に従い、どちらも実装せず停止した。これは設計の変更・矛盾の断定ではない。
+
+**実装時の訂正 (実物の調査事実)**: 暫定heap helperは単なるRAM上端の減算ではなく、旧アプリ帯の既定1 PDE/最大2 PDEによる容量制限と、物理空きによるsbrk二段選択を含む (`paging_app_band_pdes` / `ring3_band_set` / `exec_sbrk_pick_tier`)。高位VAを物理計算へ入れてはいけない点は確定している。今回コード・KAPI・SDK・CRT・生成物は未変更、T2cは未実装であり、成果物はT2bまでの旧配置。状態行・D番号・受入条件は不変。
+
+**今回の測定と検証**: `CROSS_DIR=/home/hight/opt/cross NP21W_DIR=/tmp/t2c-images make all < /dev/null` はrc=0 (`/tmp/t2c-baseline-all.log`、画像コピー失敗2件は警告のみ)。測定は `/tmp/t2c-baseline-sections.txt` / `/tmp/t2c-baseline-nm.txt`。前後は同値で、text開始0x100000/326,462B、data開始0x14FB40/32,971B、bss開始0x157C20/212,040B、`__bss_end=0x18B868`、ASSERT 0x195000まで38,808B、got.plt末尾→bss余白8B、圧縮477,781B。最初にルートの `kernel.elf` を指定したreadelf/nmはrc=1、正しい `build/out/kernel.elf` で測定し直してrc=0。`python3 tools/gen_memmap.py --check` / `--headroom` と `git diff --check` はrc=0。地図生成ブロックとTESTSは最新なので書換え不要。
+
+`PYTHONPATH=/tmp/t2ap-python CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null` はrc=0 (`/tmp/t2c-restart-check.log`)。文書のみの選択10検査、docs statusの13/13試験と14/14実行時RED (Python変異でコンパイル失敗をREDへ数えない)、package検査が通った。32bit実行には既存qemu-i386足場を使用。これは既存基点/文書の確認で、T2c固有の変異・起動失敗・高位AS・旧.o混入試験は未実装/未実施。ABI未変更のためclean→allは未実施。apps/gameは空で外部アプリ移行/再ビルド/監査は未実施。
+
+**PMのゲスト確認は実装後へ**: 今回の旧配置をT2c受入に使わない。実装後の一式と新mapで8/17MBおよびRa26664MBのCUI/GUI/入れ子/park→resume/fault/STOP、256/512KB stack、旧CPL0/shell/shlib/未知版/旧.o混在の入口前拒否を確認する。予定番地はshlib0x80000000、exec0x80100000、stack上端0x90000000、master高位APP PDEは空。今回の既存ELFの診断番地は `kselftest_fail=0x162E60`、`kselftest_pass=0x162E64`、`lease_selftest_result=0x18B864`、`exec_as_leftover_pages=0x18B860`、`ledger_irq_ops=0x186D14`、`ledger_exc_ops=0x1864E0`。実装/PM再ビルド後に必ず引き直す。コミット/push/配備/NP21/W/NHD/ini/Windows/実機は未操作。
 
 ### 5-2. 検査3段と lease 回帰 (d)
 
