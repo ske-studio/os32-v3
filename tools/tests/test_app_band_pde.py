@@ -1,7 +1,7 @@
 """Actual paging.c/pgalloc.c/physmem.c, ILP32; only privileged asm replaced.
 
-Covers docs/tasks/memory/APP_BAND_PDE.md: the app band grows in 4MB (PDE)
-steps. Same harness shape as test_paging_bounds.py.
+Covers TASK_T2_APPBAND: sparse high PTs and the actual kselftest ledger
+procedure on 8/17MB pools; retains the legacy physical byte-budget tests.
 """
 import pathlib
 import subprocess
@@ -16,16 +16,25 @@ MUTATIONS = [
  ('master-USER', '        pd[pdi] |= PTE_USER;', '        page_directory[pdi] |= PTE_USER;'),
  ('PT-destroy-leak', '        if (as->app_pt_phys[k])\n            pgalloc_free_n_owner', '        if (0)\n            pgalloc_free_n_owner'),
  ('partial-PT-leak', '        while (n) {', '        while (0) {'),
+ ('kselftest-old-AS-count', 'PDE_COUNT * sizeof(u32) / PAGE_SIZE + data_pages', '(PDE_COUNT + PTE_COUNT) * sizeof(u32) / PAGE_SIZE + data_pages'),
 ]
 def run(mutation=None):
     with tempfile.TemporaryDirectory(prefix='os32-appband-') as tmp:
         tmp = pathlib.Path(tmp)
         source = (ROOT / 'kernel/paging.c').read_text()
+        kselftest = (ROOT / 'kernel/kselftest.c').read_text()
+        ledger = kselftest[kselftest.index('static u32 ledger_persist_total(void)'):kselftest.index('/*  gfx の予約・BB・SURFACE')]
+        ledger = ledger[:ledger.rfind('/* ------------------------------------------------------------------------ */')]
         if mutation:
             old, new = mutation[1:]
-            if old not in source: raise RuntimeError("missing mutant: " + mutation[0])
-            source = source.replace(old, new, 1)
+            if mutation[0].startswith('kselftest-'):
+                if old not in ledger: raise RuntimeError('missing mutant: ' + mutation[0])
+                ledger = ledger.replace(old, new, 1)
+            else:
+                if old not in source: raise RuntimeError('missing mutant: ' + mutation[0])
+                source = source.replace(old, new, 1)
         (tmp / 'paging_host_source.c').write_text(source)
+        (tmp / 'kselftest_ledger_source.c').write_text(ledger)
         allocator = (ROOT / 'kernel/pgalloc.c').read_text()
         allocator = allocator.replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags')
         (tmp / 'pgalloc_host_source.c').write_text(allocator)
@@ -46,7 +55,11 @@ def run(mutation=None):
             if mutation: return 'compile'
             raise RuntimeError('host compile failed')
         result = subprocess.run([str(exe)], capture_output=bool(mutation), timeout=60)
-        if mutation: return 'runtime' if result.returncode else 'green'
+        if mutation:
+            if mutation[0].startswith('kselftest-'):
+                if result.returncode != 1 or b'ledger:AS alloc\n' not in result.stdout:
+                    return 'wrong-failure' if result.returncode else 'green'
+            return 'runtime' if result.returncode else 'green'
         if result.returncode: raise RuntimeError('host execution failed')
         subprocess.run(['i386-elf-gcc', *FLAGS, '-O2', *includes, '-c',
                         str(ROOT / 'kernel/paging.c'), '-o', str(tmp / 'paging.o')], check=True)
@@ -58,4 +71,4 @@ if '--mutate' in sys.argv:
         result = run(mutation)
         print(mutation[0] + ': ' + result)
         if result != 'runtime': raise SystemExit(1)
-    print('4/4 runtime RED; compile failures 0')
+    print('5/5 runtime RED; compile failures 0')
