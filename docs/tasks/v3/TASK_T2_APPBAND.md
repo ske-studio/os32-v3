@@ -1,6 +1,6 @@
 # TASK_T2_APPBAND — T2: アプリ帯 + lease 窓 (設計票)
 
-> 状態: **実装中 (2026-10-01)** — 独立レビュー (Fable 5.1) Approve、固定 PT の置き場は 0x3F1000 (ユーザー決定・PM の実測)。**T2a・T2a′ 着地** (`ce5a2a9`・`279272d`、NP21/W 8/17MB の受入は §5-1 — park → resume 後、R1 panic の故障ゲスト、Ra266 64MB / PCM は未実施)。次は T2b。D1〜D36 を変更せず、T2a〜T2h の間に T2a′ を加える (§5)。
+> 状態: **実装中 (2026-10-01)** — 独立レビュー (Fable 5.1) Approve、固定 PT の置き場は 0x3F1000 (ユーザー決定・PM の実測)。**T2a・T2a′・T2b 着地** (`ce5a2a9`・`279272d`・`c06df8d`、NP21/W 8/17MB の受入は §5-1 — park → resume 後、R1 panic の故障ゲスト、Ra266 64MB / PCM は未実施)。次は T2c。D1〜D36 を変更せず、T2a〜T2h の間に T2a′ を加える (§5)。
 >
 > 発行・改訂: GPT-6-astra / Codex (設計者)。初稿調査基点 `b5cd920`、1 回目の確認基点 `705a227`、2 回目の改訂 GPT-6 / Codex、確認基点 `8a7bf4c` (`wt/t2-design`)。以下の `file:line` は初回の実コード調査を引き継ぎ、2 回目の対象箇所は `8a7bf4c` で再確認した。今回の作業はこの worktree の文書だけ、commit / push・配備・NP21/W・NHD・ini・Windows 側の操作なし。
 > 決定の正典: [TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) §0・§2-2・§2-3 ⑥・§3-5・§6 T2・§7・§8-4。位置づけ: [V3_PLAN](V3_PLAN.md) P1 / P7。引継ぎ: [TASK_T1_LEDGER](TASK_T1_LEDGER.md) §1-2・§4-1-R〜§4-6-N。B1: [FEP_BOUNDARY](../settings/FEP_BOUNDARY.md) §4 (D31 で T2 に移管)。
@@ -430,6 +430,17 @@ P3は§6のとおり静的保持を継続し、KHEAP化をT2cの生成/破棄切
 **レビュー対応の検証記録**: `CROSS_DIR=/home/hight/opt/cross make all < /dev/null` はrc=0 (`/tmp/t2br-all.log`)。既定NP21W_DIRは存在せず、FD画像のコピー失敗警告2件のみ (NP21/W/配備先を変更していない)。`PYTHONPATH=/tmp/t2ap-python python3 tools/tests/test_lease.py --mutate` の10変異を実行。初回check-changedはrc=2 (`/tmp/t2br-check1.log`)、pgalloc単体足場にCR3 stubがなく2件リンク失敗。pgalloc/ledger単体足場にmaster文脈stubを追加し、pgalloc12試験はrc=0。2回目はrc=2 (`/tmp/t2br-check-final.log`)、新しいincludeの変更検査マップに6件の依存漏れを検出し、`tools/check_map.yaml`へ追加 (lint漏れ0件)。並行検査中のSerialFS恒等対照にも1件の失敗が出たが、同じ20秒制限の単独対照は全ケースrc=0 (`/tmp/t2br-serialfs-control.log`)。関連 `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-memory-host < /dev/null` はrc=0 (`/tmp/t2br-memory.log`)。検査の並行重複を解消して全検査を再実行する。32bit Linux実行には既存qemu-i386足場を使用、MMU/IRQはホスト模型。commit/push/NP21/W/NHD/配備/iniは未操作。
 
 **レビュー対応の最終結果**: `CROSS_DIR=/home/hight/opt/cross make all < /dev/null` はrc=0 (`/tmp/t2br-all-final.log`)。`CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null` は **rc=0** (`/tmp/t2br-check3.log`)。実行環境ではcrossのbinをPATHに、既存のqemu-i386足場を `PYTHONPATH=/tmp/t2ap-python` に設定した。全108検査を変異込みで選択し、SerialFS恒等対照を含む86変異もERROR/見逃し0、lease10/10実行時RED、変更検査マップ漏れ0、最後のソース不変検査も成功。ソースを固定して単独実行し、この結果の文書追記だけをその後に行った。状態行は不変。NP21/W/実機/実TLB受入は未実施。
+
+**T2b 着地と PM の NP21/W 受入 (2026-10-01)**: 独立実装レビュー Codex `gpt-6-astra` は P1 なし・P2 2 件・P3 1 件で Request changes → コーダーが対応 (`b7fe58e`) → 確認レビューは体制の変更 (Fable 枯渇、ROLES §0) により Opus 5.5 サブエージェントが差分だけを見て Approve (3 件とも閉じた、変異 10/10 実行時 RED、TLB の 2 変異は順序違反そのもので rc=2)。`c06df8d` で main に入れ、NHD へ配備 (停止 → nhd-pull → deploy-kernel → deploy → 起動)。
+
+| 構成 | 見たもの | 結果 |
+|---|---|---|
+| 17MB (`ver` Commit `c06df8d`) | 起動 | `kselftest_fail`=0、**`lease_selftest_result`=0** |
+| 17MB | faulttest gp/de/ud/pf、loop・kloop + CTRL+STOP、`v86 -t` | T2a / T2a′ と同じ (kill 6・回収 7、`ledger_*_ops`=0、深さ 0、取り残し 0、`irq_ctx_violations`=1 のまま、V86 OK) |
+| 17MB GUI (PEGC 480) | `os32gui` → Run... gui_demo → ESC → Start → CUI mode | 窓 2 枚が描かれ (画面で確認)、CUI へ戻る (回収 8、取り残し 0) |
+| 8MB (`ram-8mb`、終了後 `restore`) | 上の CUI 一式と GUI | 17MB と同じ |
+
+公開 caller は未切替なので、新しい lease 窓の実使用は T2c 以降。未実施は T2a / T2a′ と同じ (park → resume 後、R1 panic の故障ゲスト、Ra266 64MB)。
 
 ### 5-2. 検査3段と lease 回帰 (d)
 
