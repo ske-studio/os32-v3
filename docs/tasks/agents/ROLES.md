@@ -3,14 +3,14 @@
 状態: **現行 (2026-09-29 夕に §0 を「現行の体制」1 節へ畳み直した)**。**現行の体制は §0 だけを読めばよい**。§1〜§5 は役割の細則・起動・規約、
 末尾の「経緯」は日付つきの過去の指示 (上書きされたもの) の記録。体制の快照は [RETROSPECTIVE_2026-09-09.md](../../archive/agents/RETROSPECTIVE_2026-09-09.md)。
 
-## 0. 現行の体制 (2026-10-01 更新、ユーザー指示の積み重ねを 1 表に)
+## 0. 現行の体制 (2026-10-01 夕 更新 — Fable 枯渇でレビュアーを Opus へ、ユーザー指示の積み重ねを 1 表に)
 
 | 項目 | 現行 |
 |---|---|
 | **PM** | Claude Code 対話セッション **Opus 5.5** (`claude-opus-5-5`、2026-09-29 夕に戻した)。分解・受入判定・git 操作・[D1]〜[D3] の承認取得・エミュレータの観測 |
-| **コーダー** | **Codex `gpt-6.1-sol` (sol6.1) が既定** (ユーザー指示 2026-10-01、それまでは Claude Code の Opus 5.5 サブエージェント)。worktree 隔離 (PM が基点を指定して切る) で `codex exec -m gpt-6.1-sol -c service_tier='"priority"' -s workspace-write -C <worktree> --add-dir /home/hight/os32-v3/.git -c sandbox_workspace_write.network_access=true "<依頼文>" < /dev/null` (**ファストモード** = service tier `priority`、表示名 Fast「2x speed, increased usage」— ユーザー指示 2026-10-01。起動の見出しに tier は出ないので効いたかは表示では確かめられない) (`network_access` が無いとソケットを使う既存の試験が落ちる。**`--add-dir .git` を付けても Codex のサンドボックスは `.git` を読み取り専用にする** (`index.lock` の作成が `Read-only file system`、2026-10-01 に 2 回確認) — **sol はコミットまで行わず、PM が worktree の差分をコミットする** (コミットの末尾は `Co-Authored-By: Codex gpt-6.1-sol <noreply@openai.com>`)) を `run_in_background` で起動し、出力の `model:` 行で `gpt-6.1-sol` を確かめる。**Codex が重大 (P1 / major) と判定した指摘を含む修正は、これまでどおり Fable 5.1** (`Agent(model: "fable")`)。Claude のサブエージェントのときは起動時にモデル ID を報告させて確かめる |
-| **設計票** | **Codex `gpt-6-astra` が書く** (ユーザー指示 2026-10-01)。`codex exec -m gpt-6-astra -s workspace-write -C <worktree> "<依頼文>" < /dev/null`、コミットは PM。**astra が書いた設計票のレビューは Fable 5.1** (`Agent(model: "fable")`、読むだけ — 書き手と同じモデルに見させないための PM の決定) |
-| **レビュアー** | **Codex だけ** (`codex exec -s read-only`)。レビューの冒頭で**モデル名を名乗らせ** (出力の `model:` 行でも確かめる)、**`astra` (gpt-6-astra) でなければそのセッションでは Codex を休ませ、Fable 5.1 サブエージェントが代行** (読むだけ、コーダーの報告は渡さず独立に読ませる)。Fable / Opus による追加のレビューはしない |
+| **コーダー** | **Codex `gpt-6.1-sol` (sol6.1) が既定** (ユーザー指示 2026-10-01、それまでは Claude Code の Opus 5.5 サブエージェント)。worktree 隔離 (PM が基点を指定して切る) で `codex exec -m gpt-6.1-sol -c service_tier='"priority"' -s workspace-write -C <worktree> --add-dir /home/hight/os32-v3/.git -c sandbox_workspace_write.network_access=true "<依頼文>" < /dev/null` (**ファストモード** = service tier `priority`、表示名 Fast「2x speed, increased usage」— ユーザー指示 2026-10-01。起動の見出しに tier は出ないので効いたかは表示では確かめられない) (`network_access` が無いとソケットを使う既存の試験が落ちる。**`--add-dir .git` を付けても Codex のサンドボックスは `.git` を読み取り専用にする** (`index.lock` の作成が `Read-only file system`、2026-10-01 に 2 回確認) — **sol はコミットまで行わず、PM が worktree の差分をコミットする** (コミットの末尾は `Co-Authored-By: Codex gpt-6.1-sol <noreply@openai.com>`)) を `run_in_background` で起動し、出力の `model:` 行で `gpt-6.1-sol` を確かめる。**レビューが重大 (P1 / major) と判定した指摘を含む修正は Codex `gpt-6-astra`** (上位モデル、同じ `codex exec` の形で `-m gpt-6-astra`。ユーザー指示 2026-10-01 夕 — それまでは Fable 5.1)。Claude のサブエージェントのときは起動時にモデル ID を報告させて確かめる |
+| **設計票** | **Codex `gpt-6-astra` が書く** (ユーザー指示 2026-10-01)。`codex exec -m gpt-6-astra -s workspace-write -C <worktree> "<依頼文>" < /dev/null`、コミットは PM。**astra が書いた設計票のレビューは Opus 5.5 サブエージェント** (`Agent(model: "opus")`、読むだけ。2026-10-01 夕〜、それまでは Fable 5.1) |
+| **レビュアー** | **Opus 5.5 サブエージェント** (`Agent(model: "opus")`、読み取りだけ — ファイルを変えない・コミットしない、コーダーの報告は渡さず独立に読ませる、冒頭でモデル ID を名乗らせる)。ユーザー指示 2026-10-01 夕: **Fable が枯渇してきたので PM 以外の仕事は Codex の astra と sol に振り分け、必然的にレビュアーは Opus**。書き手 (sol / astra) と別のモデルに見させる。それまでは Codex astra (`codex exec -s read-only`) が実装レビュー、Fable が代行 |
 | **ドライバ設計** | **レビューは必ず Codex と突き合わせる** (代行だけで閉じない) |
 | **テスター** | ローカル AI (`tools/emu_agent/`、スキル `os32-local-ai`) — 配備・エミュレータの回帰・台本つきの実機操作。合否の判断はしない (§4) |
 | **検査の段** | コーダーは作業中 `make check-fast`、**完了報告の条件は `make check-changed` の rc=0**。PM は着地 (`main` への取り込み) で `make all` と **`make check` (全部) を 1 回**流し、rc を読んでから push |
@@ -18,7 +18,7 @@
 | **決裁** | PM の推奨は**基本的に承認** (その範囲で止まらずに進める)。**[D2] の操作と実機の物理操作 (媒体の出し入れ・電源・配線など) は個別に承認**を取る |
 | **争点** | **3 ラリーで決着しない争点はユーザーへ** |
 | **開発の場所** | **現行の開発は v3、場所はこのリポジトリ os32-v3** (https://github.com/ske-studio/os32-v3、パブリック、2026-09-30 に os32 から fork)。**os32 (https://github.com/ske-studio/os32) の v2.x (タグ `v2.1`、`main`) は戻り先として保つ** — 新機能は入れず、戻る必要が生じたとき・致命的な不具合のときだけ手を入れる。文書の正典は os32-v3。段取りの正典は [ROADMAP.md §0-1](../../ROADMAP.md) |
-| **ini** | NP21/W の ini を変更してよいのは PM だけ (操作ごとに [D2]、スキル `os32-emu-config`) |
+| **ini** | NP21/W の ini を変更してよいのは PM だけ。**ユーザーが権限を付与** (2026-10-01) — 個別承認は不要だが、原本を残す経路 (`np21w_ini_live.py --live-apply` + `restore`、または停止中にバイト単位で控えてから) を既定にし、終わったら戻す (スキル `os32-emu-config`) |
 
 レビュアーが尽きたとき (Codex のクォータ切れ・代行の Fable も上限) の順は、下の「経緯」の在庫表 (2026-09-16) と
 スキル **`os32-local-review`** (ローカルモデルの補助レビュー) による。尽きたらレビューが要る地点で止まってユーザーに報告する (§3 の 1)。

@@ -8,8 +8,8 @@ AI コーディングアシスタント共通の入口。**置くのは指示と
 
 **現行の体制の正典は [`docs/tasks/agents/ROLES.md`](docs/tasks/agents/ROLES.md) §0** (1 表。ここは要約)。
 PM = Claude Code (**`claude-opus-5-5`**、2026-09-29 夕〜)、コーダー = worktree 隔離で既定 **Codex `gpt-6.1-sol`** (2026-10-01〜、
-`codex exec -m gpt-6.1-sol -s workspace-write`)、**Codex が重大 (P1 / major) と判定した指摘を含む修正は Fable 5.1**、レビュアー = **Codex だけ** (`codex exec -s read-only`。
-モデルを名乗らせ、**astra でなければそのセッションは休ませて Fable 5.1 が代行**)、**ドライバ設計のレビューは必ず Codex と突き合わせる**。
+`codex exec -m gpt-6.1-sol -s workspace-write`)、**レビューが重大 (P1 / major) と判定した指摘を含む修正と設計票は Codex `gpt-6-astra`** (上位モデル)、
+レビュアー = **Opus 5.5 サブエージェント** (読み取りだけ、2026-10-01 夕〜 — Fable 枯渇のため。それまでは Codex astra)、**ドライバ設計のレビューは必ず Opus と Codex を突き合わせる**。
 テスター = ローカル AI (`tools/emu_agent/`、スキル `os32-local-ai`)。コーダーの完了条件は `make check-changed` の rc=0、
 PM は着地で `make all` + `make check` を 1 回。**PM の推奨は基本的に承認、[D2] と実機の物理操作は個別承認**。
 **3 ラリーで決着しない争点はユーザーへ**。
