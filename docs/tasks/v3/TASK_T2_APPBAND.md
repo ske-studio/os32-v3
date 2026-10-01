@@ -1,6 +1,6 @@
 # TASK_T2_APPBAND — T2: アプリ帯 + lease 窓 (設計票)
 
-> 状態: **設計中 (2026-10-01)** — 独立レビュー (Fable 5.1) Approve、固定 PT の置き場は 0x3F1000 (ユーザー決定・PM の実測)。実装・ゲスト検証は未着手。D1〜D36 を変更せず、T2a〜T2h の間に T2a′ を加える (§5)。
+> 状態: **実装中 (2026-10-01)** — 独立レビュー (Fable 5.1) Approve、固定 PT の置き場は 0x3F1000 (ユーザー決定・PM の実測)。**T2a 着地** (`ce5a2a9`、NP21/W 8/17MB の受入は §5-1 T2a — park → resume 後と R1 panic の故障ゲスト、Ra266 PCM は未実施)。次は T2a′。D1〜D36 を変更せず、T2a〜T2h の間に T2a′ を加える (§5)。
 >
 > 発行・改訂: GPT-6-astra / Codex (設計者)。初稿調査基点 `b5cd920`、1 回目の確認基点 `705a227`、2 回目の改訂 GPT-6 / Codex、確認基点 `8a7bf4c` (`wt/t2-design`)。以下の `file:line` は初回の実コード調査を引き継ぎ、2 回目の対象箇所は `8a7bf4c` で再確認した。今回の作業はこの worktree の文書だけ、commit / push・配備・NP21/W・NHD・ini・Windows 側の操作なし。
 > 決定の正典: [TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) §0・§2-2・§2-3 ⑥・§3-5・§6 T2・§7・§8-4。位置づけ: [V3_PLAN](V3_PLAN.md) P1 / P7。引継ぎ: [TASK_T1_LEDGER](TASK_T1_LEDGER.md) §1-2・§4-1-R〜§4-6-N。B1: [FEP_BOUNDARY](../settings/FEP_BOUNDARY.md) §4 (D31 で T2 に移管)。
@@ -315,6 +315,21 @@ broker は `kctx_irq_depth` を直接読み、独自の `irq_in_irq` 加減算/�
 **コマンドと結果**: 前後の `CROSS_DIR=/home/hight/opt/cross make all < /dev/null` は rc=0 (実行環境 `NP21W_DIR=/tmp/t2a-images`、FD コピー2件は警告・失敗。Windows側へのコピーなし)。`PYTHONPATH=/tmp/t2a-python` で ELF32 の実行だけ qemu-i386 へ送った。直接実行の ledger 試験はサンドボックスの SIGSYS (rc=-31) で失敗、qemu 経由は上記の PASS。途中の `make check-memory-host` は rc=2 (既存ハーネスの `_stop` 宣言不足、次回は panic 無効化変異の unused-function でコンパイル失敗) を修正し、コンパイル失敗を RED に数えていない。`python3 tools/gen_tests_inventory.py --write` / `python3 tools/gen_memmap.py --check` / `git diff --check` は rc=0。最初の `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null` は **rc=2**: 全変異選択で、既存 `test_kapi_db_v50.py` の回収順静的検査が関数分割後の DB/FD 文を旧 helper 内に探して失敗した。他の検査は終了まで実行し、T2a 専用/台帳変異も PASS。検査を新しい資源回収 helper と通知前の呼出順へ追従させた。修正後の `CROSS_DIR=/home/hight/opt/cross make check-db-v50-host < /dev/null` は **rc=0、24/24 PASS**。最終再ビルド (`/tmp/t2a-final3-all.log`) も **rc=0**、上表はその ELF の値 (`/tmp/t2a-final3-{sections,nm}.txt`)。二回目の全検査も **rc=2**: 後続の `test_net_link.py` にも同じ旧 helper 内への直接呼出しを前提にした静的検査があり、通知 helper の参照へ追従させた。関数分割を参照する既存 Python 検査を全検索した。Host Services の修正後 `make check-net-link-host` は **rc=0、35/35 PASS**。三回目の全検査は **rc=2**: `check-map` が新しい header/link 入力の5件の漏れを検出した。irq.c の不要な pgalloc.h include を除去し、check-memory-host に irq_math.c を登録した。修正後の `make check-map` は **rc=0、108検査の入力漏れ0**。WM kill を含む最終 host trace / 7変異と再ビルドも **rc=0**。**最終 `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null` は rc=0** (`PYTHONPATH=/tmp/t2a-python`、ログ `/tmp/t2a-check-changed-final3.log`)。build/sdk.mk の変更により全108ターゲットを変異込みで選択し、末尾のソース不変検査も成功。既存の T1 配置境界2本のコンパイル拒否は NOT COUNTED、コンパイルエラーを RED に数えていない。NP21/W/実機の受入は引き続き未実施。ログ/測定は `/tmp/t2a-*.log`、`/tmp/t2a-{before,after}-{sections,nm}.txt`。
 
 **PM の受入 (未実施)**: 新しい kernel.map から `g_pending_id` / `g_pending_kind` / `g_longjmp_reason` / `kctx_irq_depth` / `kctx_exc_depth` / `ledger_irq_ops` / `ledger_exc_ops` / `ledger_check_tag` / `irq_ctx_violations` / `exec_as_leftover_pages` / `used_pages` / `ledger_owners` / `appslot_reclaim_count` / `fault_kill_count` を読む。8/17MB で faulttest gp/de/ud/pf と loop・kloop + CTRL+STOP、park → resume 後にも fault/STOP を別に通し、終了種別・pending0・深さ0・owner/free baseline・取り残し0・STOPによる broker violations差分0、続く起動・V86 往復を確認する。boot broker自己診断の violationsは別勘定。別の故障ゲスト起動では IRQ/例外上の池操作が `R1 context` と op/owner/EIP を残して会計変更前に停止することを確認する。NP21/W に PCM が無いので音の PASS にせず、host trace の PCM 回収位置/IF/深さと既存 CS4231 模擬試験を代替の呼出境界証拠に限定する。Ra266 では PCM 再生中 STOP → tick進行 → IRQ解除 (violations差分0)・DMA/owner返却 → 再open/再生を確認する。配備・NP21/W・NHD・ini・Windows側・実機は本作業で触っていない。commit/push なし、PM の独立実装レビュー待ち。
+
+**T2a 着地と PM の NP21/W 受入 (2026-10-01)**: 独立実装レビュー Codex `gpt-6-astra` は P1〜P3 なしで Approve。`ce5a2a9` で main に入れ、PM の `make all` / `make check` は rc=0 (配備を挟まない流し直しで。途中の rc=2 は 3 回とも T2a 外 — 並行負荷の下で `check-serialfs-host` / `check-lan-bridge-host` が落ち、単独では通る。もう 1 回は検査中の `deploy-kernel` がカーネルを組み直して ISO/FD が古くなった `check-packages-host`)。`g_pending_*` / `g_longjmp_reason` は static で map に無く、`used_pages` は関数なので、読んだのは残りの記号。
+
+| 構成 | 試験 | 結果 |
+|---|---|---|
+| 17MB (`ver` Commit `ce5a2a9`) | 起動 | `kselftest_fail`=0 (pass 258)。`irq_ctx_violations`=1 は kselftest 自身の +1 (`kselftest.c:1377`、T1 と同じ起動時の値) |
+| 17MB | `faulttest gp` / `de` / `ud` / `pf` | 各 `[ring3] ... -> kill app` → `[Process crashed]`。`fault_kill_count` と `appslot_reclaim_count` が 1 ずつ増えて 4、**`ledger_exc_ops`=0** (T1 では > 0 — 例外の上の回収が着地点へ移った)、`kctx_irq_depth` / `kctx_exc_depth`=0、`exec_as_leftover_pages`=0、`irq_ctx_violations`=1 のまま |
+| 17MB | `faulttest loop` + CTRL+STOP (`/api/key` を **POST** で `seq=CTRL%2BSTOP&hold=300`) | CS=0x23 EIP=0x5002A0 から kill。**`ledger_irq_ops`=0** (T1 は 0x302)、kill / 回収 5、深さ 0、取り残し 0、violations 1 のまま |
+| 17MB | `faulttest kloop` + CTRL+STOP | CS=0x08 (get_tick の中) から kill。`ledger_irq_ops`=0、kill / 回収 6、深さ 0、取り残し 0 |
+| 17MB | `v86 -t` | `result : OK`、`$?`=0、回収 7 (kill は増えない)、`ledger_irq_ops`=0 |
+| 8MB (`ram-8mb`、終了後 `restore` で 16 へ) | 上の 7 本すべて | 17MB と同じ (kill / 回収 4 → 6、V86 で回収 7、深さ 0、取り残し 0、`ledger_*_ops`=0、violations 1) |
+| 17MB GUI (PEGC 480) | gui_demo + Run... で `faulttest` (引数なし) → Start → CUI mode | CUI へ戻る途中の WM の kill で回収 6 → 9 (gshell・gui_demo・park 中の faulttest)、取り残し 0、深さ 0 — **park 中のアプリの WM kill 回収は通った** |
+
+**未実施 — park → resume 後の fault / STOP**: GUI の Run... は引数を渡せず (`modal.rs:784`)、アプリが 1 本のときは park しない (D11-3、`lib.rs`)。そこで `faulttest` に `wait <kind>` (`250de46`) と引数なしの 1 キー選択 (`9a596fc`) を足した。ただし Run... から起動した CUI プログラムはスロットも窓も持たず、キーは手前の窓へ配られ、注入リングに届かない。キーを渡せるのは端末アプリから起動した場合だけ (`multiapp.rs:576`) で、その端末アプリはこの木に無い (`apps/` は空、凍結した os32 の apps にも無い)。そのため resume させられず、`exec_resume` の setjmp 着地を NP21/W では通していない。着地そのものはホストの `test_exec_r1.py` (実 `setjmp.asm`) が見ている。**T2c の GUI 回帰 (park / fault を含む) の前に、注入リングへキーを渡す手段 (端末アプリ、またはゲスト側の注入) を用意して通す**。
+**未実施 — 別の故障ゲストでの R1 panic** (IRQ / 例外の上の池操作が `R1 context` で止まること) と **Ra266 の PCM 再生中 STOP → 再 open / 再生**。前者はホストの `test_ledger.py` が会計変更前の停止を見ている。
 
 ### 5-2. 検査3段と lease 回帰 (d)
 
