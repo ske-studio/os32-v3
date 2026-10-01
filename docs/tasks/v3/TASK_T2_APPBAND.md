@@ -1,8 +1,8 @@
 # TASK_T2_APPBAND — T2: アプリ帯 + lease 窓 (設計票)
 
-> 状態: **設計中 (2026-10-01)** — ユーザーが着手を承認 (2026-10-01)。設計を記述した段階、独立レビューは未実施。実装・ゲスト検証は未着手。D1〜D36 を変更せず、P1 の 3 番目の票 T2 を T2a〜T2h に分ける (§5)。
+> 状態: **設計中 (2026-10-01)** — 独立レビュー (Fable 5.1) 1 回目を反映、X15 前倒しはユーザー決定。実装・ゲスト検証は未着手。D1〜D36 を変更せず、T2a〜T2h の間に T2a′ を加える (§5)。
 >
-> 発行: GPT-6 / Codex (設計者)。調査基点 `b5cd920` (`wt/t2-design`、T1 受入完了後の main HEAD)。以下の `file:line` はこの基点。今回の作業はこの worktree の文書だけ、commit / push・配備・NP21/W・NHD・ini・Windows 側の操作なし。
+> 発行・改訂: GPT-6-astra / Codex (設計者)。初稿調査基点 `b5cd920`、レビュー反映時の確認基点 `705a227` (`wt/t2-design`)。以下の `file:line` は `705a227` の実コードで再確認した箇所を記す。今回の作業はこの worktree の文書だけ、commit / push・配備・NP21/W・NHD・ini・Windows 側の操作なし。
 > 決定の正典: [TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) §0・§2-2・§2-3 ⑥・§3-5・§6 T2・§7・§8-4。位置づけ: [V3_PLAN](V3_PLAN.md) P1 / P7。引継ぎ: [TASK_T1_LEDGER](TASK_T1_LEDGER.md) §1-2・§4-1-R〜§4-6-N。B1: [FEP_BOUNDARY](../settings/FEP_BOUNDARY.md) §4 (D31 で T2 に移管)。
 > 番地の正典は `include/memmap.h`、実装後の地図は [02_memory](../../02_memory.md) §2-1 (生成)。本票は T2 の実装契約・段・受入を持ち、上位の決定本文を置き換えない。[C1]〜[C5]・[ABI1]〜[ABI3] は [CONSTRAINTS](../../CONSTRAINTS.md)、状態行は [POLICY_DEV](../../POLICY_DEV.md) §8。
 
@@ -39,13 +39,13 @@
 - **8MB + PEGC の修正を取り消す順序**: T1 は `ring3_band_set` の私有上端を `min(帯上端, sys_usable_mem_end())` にし、BB が私有 PTE を上書きする 74 ページの漏れを閉じた。T2c で私有帯を高位へ移した後にこの物理上端依存を外し、T2e で BB の旧共有写像を lease に替える。先に切り詰めだけ外す段は作らない。
 - T1f の [C5] を維持。恒等の backing は P2V / P2V_IO、PD/PT の物理は V2P、アプリ / lease の仮想は **AS / SURFACE による翻訳**。`as_va_to_pa` は現状 USER+RW 用であり、B1 の RO 入力にはそのまま使えない。
 
-T1 の残件は消さない: PCM STOP → 再 open は実機で未確認、`cirrus-off` + `GFX=cirrus` 未実施、T1f 実機未実施、HostDrv の番地解釈 24 件未確認。前 3 件は T2a / T2e / T2h の回帰でも追う。HostDrv は例外一覧を継承し、T2 の非恒等ポインタが渡る経路を別に監査する (§6)。
+T1 の残件は消さない: PCM STOP → 再 open は実機で未確認、`cirrus-off` + `GFX=cirrus` 未実施、T1f 実機未実施、HostDrv の番地解釈 24 件の実機確認未実施。前 3 件は T2a / T2e / T2h の回帰でも追う。HostDrv の非恒等ユーザー VA をハイパーコールへ渡す懸念はコード監査で閉じた (§6 R2)。既存例外一覧と実機未確認を、コード上の欠陥疑いとは分けて継承する。
 
 ### 1-3. 後続との境界
 
 | 後続 | T2 が渡すもの | T2 では行わないこと |
 |---|---|---|
-| T3 カーネル帯 | 高位アプリと物理池の分離、サイズ実測 | カーネル 3MB 化、shell 0x400000、KERNEL_SLACK、DMA 0x3E0000、固定 PT の画像外化。ただし X15 は §6-1 |
+| T3 カーネル帯 | 高位アプリと物理池の分離、**T2a′ で済ませる X15 固定 PD/PT 40KiB の画像外化**、暫定配置と実測 (§6-1) | カーネル 3MB 化、shell 0x400000、KERNEL_SLACK、DMA 0x3E0000、SQLite 連結、Unicode 組表。固定 PD/PT は画像外化を再実装せず、T3 最終固定域 (0x3F1000 起点) への再配置・地図/初期化/予算の再検証を引き継ぐ |
 | T4 SQLite | B1 の共通 copy、R1 通常文脈回収、世代検査部品 | モジュールローダ、MEMSYS5 512KB / FEP 予約、F2 / F3、B3 の旧 db_exec/prepare 結線・copy-before-finalize、B4 の engine in-flight fail-stop |
 | T5a FEP | B1 の API と失敗時未公開バッファ | B2 の staging → finalize → copyout、RESIDENT 接続 2 本 |
 | T5b / T6b | 物理 staging / bundle 定数を仮想定数から切り離す | 起動順・ローダ区間表・同梱・508KiB 解除。T2 の圧縮画像は現上限以内 |
@@ -56,7 +56,7 @@ T1 の残件は消さない: PCM STOP → 再 open は実機で未確認、`cirr
 | P7 | T2c の4世代検査、コンパイル単位の識別、混在試験 | 全 KAPI の整理を独自に広げない。fork 時の並替えは P7 と一組でのみ行う |
 | サーフェス層 / P8 / P9 | (b) gshell の CLIENT と全画面 lease | (c) 私有面 + WM 合成、Video HAL、SDL、音・入力の層 |
 
-## 2. 現状調査 (実コード、基点 b5cd920)
+## 2. 現状調査 (実コード、確認基点 705a227)
 
 `0x500000` は exec のロード位置で、**現アプリ PDE の開始は 0x400000** (先頭 1MB が shlib)。定数の置換だけでは動かない。
 
@@ -76,16 +76,21 @@ T1 の残件は消さない: PCM STOP → 再 open は実機で未確認、`cirr
 | `kernel/paging.h:181`・`:183`、`kernel/paging.c:108`・`:121`・`:127`・`:132` | APP_BAND_PDE=1、PT 配列2本、bootstrap PT 数 / DEVICE_FLOOR / 32MB 未満の ASSERT。高位・疎な私有 PT の ASSERT へ |
 | `kernel/paging.c:686`・`:714`・`:755` | RAM 量で仮想帯を制限、master の同帯 PT 必須、identity PTE 複写。高位 PT はゼロから作る |
 | `kernel/paging.c:805`・`:820`・`:826`・`:845` | app 外なら共有 page_tables を書き、keep_cache は宛先 PTE から読む。通常 API では拒否し SURFACE 属性を指定 |
-| `kernel/paging.c:415`、`kernel/pgalloc.c:174`・`:197`・`:894`、`kernel/memory_boot.c:28`・`:165`・`:333`、`kernel/sys.c:72`・`:122` | **物理 metadata / workspace / 最低量 / BB 凍結まで APP/EXEC 定数に依存**。高位化の前に物理専用の境界へ。T1 の FIXED/ARENA_TOP 経路を維持する |
+| `kernel/paging.c:415`、`kernel/pgalloc.c:174`・`:197`・`:894`、`kernel/memory_boot.c:28`・`:165`・`:333`、`kernel/sys.c:72`・`:122`、`gfx/gfx_core.c:265`、`kernel/kselftest.c:633`、`kernel/physmem.c:97`・`:103`・`:111`・`:119` | **物理 metadata / workspace / L0 RAM / 最低量 / BB 探索・凍結 / 起動試験まで APP/EXEC 定数に依存**。T2c で物理専用の境界へ。PEGC BB は下限 PFN が 0x80100 になると確保不能で候補落ちし、pool:exec range も毎起動 fail になる。L0 の供給開始も仮想帯へ動かさない。T1 の FIXED/ARENA_TOP 経路を維持する |
 | `kernel/shlib.c:76`・`:97`・`:214`・`:224`・`:258`・`:284`・`:317` | 1MB 全域 claim、末尾の data 原本、master USER text、連続 data 複製、detach で先に free。ページ単位の池 + 私有 PT、unmap/TLB 後 free へ |
-| `exec/exec.c:1619`・`:1476`、`exec/appslot.c:609`・`:643`、`kernel/pgalloc.c:348`、`kernel/irq.c:23` | fault/STOP は深さを下げる前に exec_exit の回収。計数と irq_in_irq は別。T2a で移譲 / 通常回収へ |
+| `exec/exec.c:1621`・`:1629`・`:1483`、`exec/appslot.c:609`・`:643`、`kernel/pgalloc.c:348`、`kernel/irq.c:23` | fault/STOP は深さを下げる前に exec_exit の回収。計数と irq_in_irq は別。T2a で移譲 / 通常回収へ |
 | `exec/ring3_str.c:18`・`:36`・`:42`・`:63`、`kernel/paging.c:622`、`kapi/kapi_db.c:210` | ring3_str は返却文字列と RW 判定。db_user_str_copy は1 byteごとだが帯中心の検査。共通 copy は caller PD と RO/RW を区別する |
 | `gfx/gfx_core.c:23`・`:30`・`:119`・`:130`・`:135`・`:439` | planar の bb_b/r/g/i 固定初期値、fb は kernel ポインタをそのまま返す。SURFACE 由来の kernel pointer と AS lease VA を分離 |
 | `gfx/gfx_core.c:183`・`:297`、`kernel/pgalloc.h:173`、`kernel/pgalloc.c:821`・`:854` | T1 の SURFACE は24B・8本、gen/lease_count は8bit、create は boot 限定。T2 で寿命・属性・ページ占有を強化 |
 | `userland/lib/gfx/libos32gfx_core.c:25`、`userland/gshell/src/lib.rs:138`・`:446`・`:644`、`userland/gshell/src/handler.rs:358` | attach で返った fb を保存、WM 復帰で gfx_init、OP_WAIT 内にも WM がある。再 init の revoke と再 attach、trim の安全な配送点が必要 |
 | `lib/utf8.c:32`・`:65`、`userland/lib/gfx/text/gfx_kcg.c:32`・`:50`・`:98` | Unicode 表の低位直読は実在 (lib/utf8.c はユーザー側にもリンク)。字形は kcg_read_* KAPI で取得。USER を消すだけでは日本語が fault |
 | `userland/lib/gfx/text/lconsole.c:297`、`userland/lib/filer/filer_draw.c:33` | lconsole はローカル配列から gfx 描画、filer は tvram_* KAPI。名前やコメントと異なり、この2経路に TVRAM 物理直書きは無い (U20 の部分調査) |
-| `userland/lib/rt/dbgserial.c:287` | 0x500000〜0x500FFF のアドレス判定。高位化の監査対象に含める (U8) |
+| `kernel/paging.c:1113`〜`:1213` | 帯定数で AS を作り、master の恒等 PT の複写を期待する selftest。T2c で高位・空 PT・非恒等 backing の試験へ変更し、master 不変 / owner 回収は維持 |
+| `exec/exec.c:668`・`:1540`・`:1594` | abort_req 判定 / dispatcher 入口の user_esp 取得 / 引数コピー窓の stack 上端依存。T2a で移譲、T2c で窓を caller AppSlot.stack_top で切り B1 の全範囲検査と併用 (関数定義自体は :665 / :1537) |
+| `kernel/isr_handlers.c:353`、`include/config.h:52`、`userland/shell/cmd_sys.c:60`、`exec/appslot.h:173`・`:188`、`exec/exec_heap.h:4`、`userland/lib/rt/dbgserial.c:287` | shlib 障害診断 / 常駐注記 / mem の旧帯表示 / CPL0・固定帯の注記 / 0x500000〜0x500FFF 判定。T2c の変更対象。注記も仮想帯と物理 backing を分け、dbgserial は実際の guard 配置に従う (U8) |
+| `userland/shell/rshell.c:877`、`userland/tests/nop.c:12`、`userland/tests/ring3_hello.c:39`・`ring3_fault.c:39`・`ring3_guard.c:63` | tvdump は SHELL_AS_APP の除外外で sh.bin にも入り、TVRAM 0xA0000/0xA2000 を直読。nop は同 TVRAM に OK を直書き、ring3 3本は 0xA8000 マーカー。T2e で tvdump を KAPI、試験マーカーを SHM へ。ring3 3本は deploy.yaml 登録済み、nop は未登録なので受入に使う段で登録 [V2] |
+
+T2c の物理専用境界は、L0供給開始に既存 `MEM_POOL_BASE=0x400000`、BB探索/legacy arena最低位置に物理floorの新定数案 `MEM_PHYS_EXEC_FLOOR=0x500000`、metadata/workspaceの旧最大帯境界に `MEM_PHYS_WORKSPACE_FLOOR=0xC00000` を使い、仮想APP/EXEC定数の別名にはしない。sys/kselftestの最低量は物理floor+必要byte数として検査する。T2c〜eの暫定heap予算helperもこの物理側だけを使う。実装時は §2 の各ファイルとhost試験を一組で検索し、残る APP/EXEC 参照を仮想用途として説明できることを受入条件にする [C4]。
 
 `EXEC_DYN_RESERVE` は `exec/exec.c:176` の256ページの定義と `:972`・`:1751` のCPL=0用レイアウト計算に残る。claimと一緒にT2cで撤去し、残存検査を行う。`tools/mkos32x.py` ではなく **`sdk/mkos32x.py`**、stub は **`sdk/rust/os32api/src/gui/stub.rs`** が現実の場所。
 
@@ -143,6 +148,8 @@ owner が返却を要求した面は新規貸与を拒否する状態にし、�
 - kernel の bb_b/r/g/i と bb[] は選択 CLIENT の backing + plane offset から毎回設定する。planar の plane stride は **pitch × height** (400行なら32000B) で、ページ境界ごとに勝手に丸めない。128KB の占有と有効画素範囲は別。packed は plane0 のみ。kernel は P2V/P2V_IO、アプリは lease_base+offset。
 - T2 の planar backing は低位固定のまま (移動は T7a)。それでも固定初期値への依存を消し、再 init / 200行・400行の変更で pointer と geometry が一致するようにする。PEGC の連続 BB は起動時確保を維持。gshell への移譲前の CUI 全画面 / スプラッシュは boot owner の面を借り、終了で lease だけ返す。
 - 再 init は **新規貸与停止 → 全関連 lease revoke → TLB → refcount0 → backend 初期化/geometry更新 → generation更新 → 面公開**。失敗時は失効した旧 token を復活させず、予約済み fallback の面を新世代として公開する。GUI → CUI → GUI でも RAM backing の確保し直しは不要。SDK は保存済み framebuffer を捨て、resume / attach 時に再取得してから描く。生ポインタの失効を魔法で検出できるとはしない: 旧 mapping は NP、旧 token での操作は拒否、後の VA 再利用は通常の解放後ポインタと同じ禁止契約。
+- **libos32gfx の2実体**: アプリ静的リンク側と libos32gui.shlib 内側は保存状態が別 (`userland/lib/gfx/libos32gfx_core.c:25`、`userland/rust/libos32gui/src/shlib.rs:422` → `client.rs:185`)。両方を使う GUI アプリは同一 AS の CLIENT lease を **2本**消費し、8本/AS の内数。token の再利用は各実体内で行う。Unicode の各実体分も含め容量を検査し、満杯時は一括巻戻し。再 init / resume 後は両方の保存 pointer/token を捨て、双方を再 attach してから各描画経路を再開する。受入は両方で描画し、片方だけ再取得する変異を検出する。
+- **U20 の確定対象**: tvdump は TVRAM の文字/属性を値で返す checked-copy KAPI に置換し、`tools/tvdump_recv.py` の TVDM 形式を保つ。通常 GUI の権限を広げず、CUI 全画面所有者だけへ提供 (非所有者は明示拒否)。nop / ring3_hello / ring3_fault / ring3_guard の判定用マーカーは、テストに割り当てた SHM 枠へ移す。SHM の番地取得・初期化を CRT 非依存試験にも用意し、観測側も同時に更新。保護違反を試す VRAM アクセス自体は残し、直前マーカーと目的の fault を区別する。
 - **Unicode の移行穴を閉じる**: `lib/utf8.c` のユーザー用ビルドは、低位固定表でなく起動時取得した **RO lease** のポインタを使う (CRT と shlib 初期化の両方)。kernel 版は恒等のまま。表128KBは kernel 所有の固定 RAM SURFACE とし、T7 の新表 / 廃止までの橋とする。これは共有グリフキャッシュ U21 の採用ではない。字形は既存 `kcg_read_*` を用い、フォント低位全域の USER を消す。apps/game を含め直読が残るなら同じ移行段で直す。
 
 ## 4. exec / 仮想メモリの設計
@@ -162,7 +169,7 @@ owner が返却を要求した面は新規貸与を拒否する状態にし、�
 
 上記 heap の分け目は T2 の仮想配置方針として `memmap.h` に置き、リンカ / Rust の写しは生成か一致検査で管理 [C4]。2MB は私有総量の受入例で上限ではない。64 PDE 全部の PT は確保せず、image・heap最小・stack が触る分だけ作る。metadata / workspace は T1 の物理配置を維持する独立定数 (旧12MB境界など) にして、0x90000000 との比較をさせない。将来の T3 で物理配置方針を改める。
 
-OS32X の新形式に `stack_size` (byte、0=256KB) を追加し、0以外はページへ切り上げ、最低16KB、最大は仮想配置に収まる量とする。負数相当・加算/切上げ overflow・image/heap/guard との重複を拒否。指定量は起動時に全 map し、demand paging / stack 自動成長はしない。argv / alignment / entry frame が stack 内に収まることも先に検査。AppSlot は `stack_base, stack_size, stack_top` を保存し、全 kill / park / resume / teardown でその値を使う。
+OS32Header の**既存欄 `stack_size` (offset 0x20、byte) を有効化**する (`sdk/include/os32/os32_kapi_shared.h:196`、現包装は `sdk/os32x_hdr.py:266` で予約値0)。0=256KB の既定はそのまま、0以外はページへ切り上げ、最低16KB、最大は仮想配置に収まる量とする。負数相当・加算/切上げ overflow・image/heap/guard との重複を拒否。指定量は起動時に全 map し、demand paging / stack 自動成長はしない。argv / alignment / entry frame が stack 内に収まることも先に検査。AppSlot は `stack_base, stack_size, stack_top` を保存し、全 kill / park / resume / teardown でその値を使う。
 
 `heap_size==0` は exec_heap 64KB、libc sbrk の初期追加量は1ページ (BSS末尾の端数は利用可)。指定 heap は切り上げた指定量 (最低64KB)。旧「空きの半分」・sbrk 先取り二段を撤去。初期物理不足なら完全に巻き戻して起動拒否し、起動用の予約は設けない。CPL=0 は常駐シェルだけとし、通常アプリのフラグで昇格できない。
 
@@ -179,7 +186,7 @@ master の高位アプリ PDE は **空**。CPL=0 の gshell は現コードで�
 T2a は高位化より先に旧配置で着地できる。
 
 1. IRQ の要求は `abort_req` と理由だけ。EOI 済みかつ被割込み CS.RPL=3 の脱出点で状態を ABORT_PENDING にし、対象ID/終了種別/復帰点を控えて longjmp する。**FD・PCM・shlib・lease・AS・池・kfree をここで触らない**。カーネルの KAPI 実行中は要求を残し、安全点まで移譲しない。
-2. exec_launch の setjmp 着地 (exec_run / start / resume からの全入口) は trusted stack / CR3 / owner を整え、jmpbuf の深さ復元を確認し **IF=1 に戻してから**既存 `exec_exit` 相当の共通回収へ。再 longjmp で同じ pending を処理しないよう先に一度だけ消費する。正常 sys_exit / WM exec_kill は通常文脈からこの回収へ直行する。
+2. **exec_launch の setjmp 着地 (`exec/exec.c:2094`、exec_run / exec_start) と、exec_resume が取り直す別の setjmp 着地 (`:2648`) の2か所**を共通の pending 回収 helper に接続する。両方で trusted stack / CR3 / owner を整え、jmpbuf の深さ復元を確認し **IF=1 に戻してから**既存 `exec_exit` 相当の共通回収へ。park と ABORT_PENDING / FAULT_PENDING を分岐し、park では回収しない。再 longjmp で同じ pending を処理しないよう先に一度だけ消費する。正常 sys_exit / WM exec_kill は通常文脈からこの回収へ直行する。
 3. #PF/#GP だけでなく #DE/#UD 等、**従来 app-kill と分類していた全例外**も FAULT_PENDING の移譲 → 着地回収にする。kernel の障害を一律 app-kill に変えない。B4 の engine fail-stop は T4 の境界で、SQLite の途中を安全に巻き戻せると T2 では主張しない。
 4. 回収は対象 owner を明示: 装置停止・IRQ解除・FD等の利用終了、lease revoke、shlib detach (PTE消去/TLB→data free)、全 private extent / stack / image free、PT/PD破棄、owner pages=0 / retire。WM通知は parent の文脈で行う。既存 cleanup の実順と依存を T2a の trace 試験で固定する。永続 boot/gshell/shlib/DEVICE owner は返さない。
 5. 深さは全 IRQ / 全例外の `kctx_*_depth` に一本化。broker の `irq_register/unregister` も全 IRQ 深さを見る。`irq_in_irq` を別の真実として残さず、診断互換が必要なら同じ深さの読み口にする。**経路の移譲が完了してから** `ledger_note` の違反を panic に変える。IF=0 は深さの代用にしない (通常の短い IRQ 保存区間は許可)。boot の broker 自己診断による violations と STOP による差分を区別する。
@@ -208,6 +215,8 @@ int mem_unmap(void *base, u32 bytes);
 
 SDK の GUI イベントループが、安全な既存 park / resume の配送で trim event を受け、malloc の末尾空きページと未使用map arenaを返す。任意キャッシュ解放 hook は allocator が操作中でないときだけ1回呼び、再入bitで二重配送を防ぐ。応答しないアプリを待たない。front の SDK は map失敗後、allocatorの操作を終えて安全に yield できる GUI 文脈なら **1巡だけ yield → 1回再試行**し、できない文脈ならそのまま ENOMEM。retry のための新しいメモリ KAPI は作らない。
 
+**端末配下の CUI 前景**では D24 の帰結として、裏 GUI が park したままなら通知を記録してもその場で返却させられず、前景に ENOMEM を返す。CUI の失敗を隠す同期 WM pump は追加しない。CUI が戻って次の安全点で裏 GUI が配送を受けること、応答後の別要求は成功し得ることを T2g で受け入れる。
+
 trim 専用の要求・配送・完了を別々に記録し、KAPI 全体の更新中を示す状態と `ring3_wm_depth` を混同しない。syscall出口でも未完の caller wrapper / allocator がある間は他ASを実行させず、既存の安全な park に戻してから配送する。これは P6 の「KAPI内でASを切り替えない」の実装要件。pool 0 のときも bit・イベントの受け皿・閉じる/STOP経路は既確保。起動予約は無し (D25)。
 
 ### 4-6. D35 / P7: 世代と全再ビルド
@@ -221,11 +230,11 @@ trim 専用の要求・配送・完了を別々に記録し、KAPI 全体の更�
 | メモリ配置世代 | high app / lease / stack契約を識別、完全一致。T3 の shell 再配置時も改訂 |
 | shlib プロトコル | GUI/shlib 呼出規約とentry配置の世代を完全一致。依存しないバイナリは明示の「依存なし」、依存があるのに0は拒否 |
 
-T2c で OS32X 次版 (現v3の次) に3世代欄と stack_size を追加する。具体的な世代値は P7 と共通の正典から生成し、番号を別々のツールに手書きしない。image種別ごとに load_addr と entry範囲を検査し、**shellも `!is_shell` の外で照合**、load_addr=0 の警告続行を廃止。全拒否は entry を呼ぶ前、できるだけAS確保前。shlib は公開前。常駐shell不一致は起動停止と再構築案内で、旧shellから更新する想定を置かない。
+T2c で OS32X 次版 (現v3の次) に3世代欄を追加し、既存 stack_size 欄を有効化する。具体的な世代値は P7 と共通の正典から生成し、番号を別々のツールに手書きしない。image種別ごとに load_addr と entry範囲を検査し、**shellも `!is_shell` の外で照合**、load_addr=0 の警告続行を廃止。全拒否は entry を呼ぶ前、できるだけAS確保前。shlib は公開前。常駐shell不一致は起動停止と再構築案内で、旧shellから更新する想定を置かない。
 
 各 C コンパイル単位へ世代付き参照と note、Rust の各 crate / codegen object へ同等の識別をビルドから強制付与。CRT1個のstampだけで済ませない。リンクに使った object / archive member の欠落・旧値・混在を入力検査し、KEEPした最終ELFの印・旧シンボル・配置と包装時に再照合する。未使用memberと実際に取り込んだmemberを区別し、vendor newlib等の世代非依存部品はビルド台帳で列挙する。asm CRT・LTOも対象。**新SDKで旧.oを包む**テストを必須にする。Rust生成器の未知非ポインタ型は生成失敗、構造体戻り値は追加せず int/u32 + checked out pointer (EAX戻り) に揃える。
 
-各 ABI 変更後は `make clean` → `make all`、さらに **clean-external を明示して apps/game を再ビルド** (`make clean` だけでは消えない)。kernel・loader・SDK・CRT・ライブラリ・shell・shlib・その段で存在するモジュール・in-tree・apps/game のビルドID / 4世代 / hash を一組のmanifestにする。private submoduleを取得できなければ完全な成果物とは報告しない。
+各 ABI 変更後は `make clean` → `make all`、さらに **clean-external を明示して apps/game を再ビルド** (`make clean` だけでは消えない)。kernel・loader・SDK・CRT・ライブラリ・shell・shlib・その段で存在するモジュール・in-tree・apps/game のビルドID / 4世代 / hash を一組のmanifestにする。**CPL=3 の `userland/sh.bin` と `userland/tests/*.bin` も列挙**し、常駐 shell.bin / gshell.bin で代用しない。private submoduleを取得できなければ完全な成果物とは報告しない。
 
 v2戻り先とv3の成果物/配備先を分離し、PMが停止中に一組を更新してから起動する [D1][D2][V1]。既存 settings/辞書/ユーザーデータを保つ。T2の今回作業では配備しない。P7との共有受入は **旧アプリ / 旧shell / 旧shlib / 新SDK+旧.o / v2 SDK製apps/game / HostDrvとNHD食違い / 未知形式版**。入口直前の到達カウンタ0で拒否を確認し、単にクラッシュしたことを拒否の証拠にしない。旧.kcgfontの廃止はT7a、モジュール世代の実ローダ適用はT4以降。
 
@@ -236,6 +245,7 @@ v2戻り先とv3の成果物/配備先を分離し、PMが停止中に一組を�
 `ring3_ptr_ok` は NULL (個別APIが判定)、新app/shlib/stack/SHMと**現在のASに存在する許可済みlease**を早期分類する。これだけで読み書き可能とはしない。B1 の文字列・DB/FEPのデータコピーは通常RAMとSHMを対象とし、MMIO/VRAM lease を拒否 (一般のgfxポインタと別の方針)。RO RAM lease / shlib rodata は入力可、出力不可。
 
 - `[start,start+len)` は `len > limit-start` 等で **加算前**に検査。NULL非ゼロ長・件数積・page丸め overflow・帯跨ぎを拒否。保存したcaller PDと実行時CR3の一致、PD/PT frameが管理下でpresent、PDEのPS拒否、PDE/PTEのPRESENT|USER、出力は両方RWを確認。T1fのRW専用walkはread/writeモードを分離し、既存出力ガードを弱めない。
+- T2c 以後は低位の物理 backing が全 AS で恒等 supervisor のため、現 `ring3_user_range_writable` の master CR3 往復 (`exec/exec.c:913`・`:919`) は不要。T2d で caller PD の walk を直接行う形に整理できる。過渡的に残しても権限検査を省略せず、IF/CR3 を必ず復元する。
 - NULまで **1バイトずつ検証してから読む**。page末NULなら次pageを触らない。容量はNUL込み、未終端/長過ぎは失敗し切り捨てない。未完成bufferはSQLite/VFSへ渡さない。trustedでも容量とNULは確認する。
 - 短いwalk/copyだけEFLAGS保存→cli→入口IF復元、全エラー出口を同じ規約にする。allocation / callback / GUI pump / SQLite / VFSは区間外。copyoutは全範囲検証後に書き、通常の範囲エラーで部分出力しない。IF=0のI/O facade拒否はT4/T5aの責務。
 - T2d は **既にdb_user_str_copyを使う入口**を共通関数に置換し、正常と不正の両方を実callerで試験する。旧db_exec/db_prepareの全結線と旧stmt finalize前コピーはT4 B3、FEP facade全体はT5a B2。T2の受入「SQLite進入中の#PFにならない」はB1を通る対象入口についての保証で、未移行の全APIへの保証としない。
@@ -248,13 +258,14 @@ v2戻り先とv3の成果物/配備先を分離し、PMが停止中に一組を�
 
 | 段 / 依存 | 主な変更ファイル (実装時) | kselftest・ホスト・変異の受入 | NP21/W / 実機の受入 |
 |---|---|---|---|
-| **T2a R1** / T1 | exec/exec.c、appslot.[ch]、kernel/isr_stub.asm・isr_handlers.c・setjmp.asm・irq.[ch]・pgalloc.c、PCM回収の呼出境界 | 移譲traceでfree/cleanup=0、着地IF=1/depth0・対象ID/親復元・二重回収なし、全例外と全longjmp入口。kselftest通常深さ0/owner往復、panicはホスト捕捉と別故障起動。変異: IRQ中teardown、IF復帰削除、brokerの旧深さ、pending再消費 | 8/17MB旧配置でfaulttest pf/gp/de/ud/loop/kloop、STOP後free baseline。Ra266 PCM STOP→tick進行→再open/再生、irq_ctx_violations差分0。V86往復 |
-| **T2b 私有lease基盤** / a | kernel/paging.[ch]・pgalloc.[ch]、新 exec/lease.[ch]、kselftest、gfxのSURFACE型板 | 公開callerはまだ切替えず合成ASで新lease窓だけを試す。先頭PT1枚、追加PT、属性/ページ端/世代/権限/8本満杯/複数plane一括。master+他ASのPTE全比較。変異: sharedPT書込、PCD落とし、TLB前free、途中rollback欠落、世代無視。kselftest S/T/Uの2AS往復 | 17MBの既存GUI/CUI/V86回帰、新boot selftest fail0。旧USER経路はまだ利用中なので最終地図検査とは数えない |
-| **T2c 高位配置と形式切替** / b | memmap.h、paging・pgalloc・memory_boot・sys・shlib、exec/appslot、OS32X共有ヘッダ・os32x_hdr、sdk/crt、sdk/link/3本、sdk/mkos32x.py、tools/mkshlib.py、Rust stub/shlib、生成器・build・app.conf・cpl0_probe撤去 | 物理定数切離し、疎PT、可変stack、shlib page供給、D35の全入口。kselftest高位AS/owner、hostで断片化pool・2PDE超・shell load照合・旧.o混入・起動失敗全段。変異: RAM上限でVA判定、固定stack teardown、master高位写像、未知形式受入 | 全再ビルド一式で8/17MB CUI/GUI/入れ子/park/fault、256/512KB stack。旧CPL0/旧shell/旧shlib拒否。**T2c〜T2dは旧低位共有USERを継続** (旧gfx consumerの回帰を保つ)。最終T2保護の受入はT2e |
+| **T2a R1** / T1 | exec/exec.c、appslot.[ch]、kernel/isr_stub.asm・isr_handlers.c・setjmp.asm・irq.[ch]・pgalloc.c、PCM回収の呼出境界 | 移譲traceでfree/cleanup=0、着地IF=1/depth0・対象ID/親復元・二重回収なし、全例外と全longjmp入口。初回 launch と park→resume 後の fault/STOP を別々に通す。kselftest通常深さ0/owner往復、panicはホスト捕捉と別故障起動。変異: IRQ中teardown、IF復帰削除、brokerの旧深さ、pending再消費 | 8/17MB旧配置でfaulttest pf/gp/de/ud/loop/kloop、STOP後free baseline。Ra266 PCM STOP→tick進行→再open/再生、irq_ctx_violations差分0。V86往復 |
+| **T2a′ X15 前倒し** / a | memmap.h、build/os32.ld、paging.[ch]、memory_boot.cの固定区間、tools/gen_memmap.py・地図host試験、02_memory §2-1生成ブロック | §6-1。PD1+boot PT8+device PT1を画像外へ、10枚の恒久予約・sup/RW/WB・CR3/PDE物理照合・NP後再写像・再初期化禁止。SQLite成長/非整列/重複/写しずれをASSERT/地図変異で拒否。前後size実測が必須、合格前にbへ進まない | 8/17MB旧配置でboot/selftest/GUI/CUI/V86/STOP、8MB FIXED台帳2枚が無傷。64MBは実機でboot/ONLINE/32MB超写像と動的PT併存、全構成で固定10枚が配布されない。ホスト8/17/64地図も必須 (guest代用不可) |
+| **T2b 私有lease基盤** / a′ | kernel/paging.[ch]・pgalloc.[ch]、新 exec/lease.[ch]、kselftest、gfxのSURFACE型板 | 公開callerはまだ切替えず合成ASで新lease窓だけを試す。先頭PT1枚、追加PT、属性/ページ端/世代/権限/8本満杯/複数plane一括。master+他ASのPTE全比較。変異: sharedPT書込、PCD落とし、TLB前free、途中rollback欠落、世代無視。kselftest S/T/Uの2AS往復 | 17MBの既存GUI/CUI/V86回帰、新boot selftest fail0。旧USER経路はまだ利用中なので最終地図検査とは数えない |
+| **T2c 高位配置と形式切替** / b | memmap.h、paging (帯 selftest 含む)・physmem・pgalloc・memory_boot・sys・kselftest・gfx_core・shlib、exec/appslot/exec_heap.h、isr_handlers・config.h・cmd_sys・dbgserial、OS32X共有ヘッダ・os32x_hdr、sdk/crt、sdk/link/3本、sdk/mkos32x.py、tools/mkshlib.py、Rust stub/shlib、生成器・build・app.conf・cpl0_probe撤去 | 物理定数切離し、疎PT、可変stack、shlib page供給、D35の全入口。kselftest高位AS/owner、hostで断片化pool・2PDE超・shell load照合・旧.o混入・起動失敗全段。変異: RAM上限でVA判定、固定stack teardown、master高位写像、未知形式受入 | 全再ビルド一式で8/17MB CUI/GUI/入れ子/park/fault、256/512KB stack。旧CPL0/旧shell/旧shlib拒否。**T2c〜T2dは旧低位共有USERを継続** (旧gfx consumerの回帰を保つ)。最終T2保護の受入はT2e |
 | **T2d B1 共通copy** / c | exec/ring3_str.[ch]・exec.c、kernel/paging.[ch]、kapi/kapi_db.cの既存checked入口、関連host | §4-7。kselftest RO入力/RW出力、hostでcaller/master相違・page末NUL・次NP・未終端・全overflow・PS・MMIO・IF両値・失敗out不変。変異:masterで検査、RW条件欠落、NUL後先読み、先にstrlen、無条件sti | 未終端/跨ぎ入力KAPIが失敗しSQLite entry0、既存正常DB/FEP・GUI描画。帯外dispatcher killとcopy失敗を区別 |
-| **T2e gfx/低位USER切替** / d | gfx/gfx_core.c・backend3本、exec/exec.c・lease、paging共有経路撤去、sdk/kapi.json・生成物、userland/lib/gfx、lib/utf8.cユーザー版、CRT・Rust shlib初期化、gshell lib/handler、kselftest | §3のAPI/BB再取得/Unicode RO lease、SHM/tramp事前作成、3段検査全適用。hostは実backend選択→fb出力まで (T1eの模擬選択だけで済ませない)、予約/登録/写像失敗・fallback/reinit。変異:旧bb pointer、plane offset誤り、revoke他AS、余白別owner露出、無条件VRAM授権 | 8MB planar/PEGC、17MB planar/PEGC/Cirrusで描画/present/日本語、GFX全画面とGUI、通常GUIのVRAM kill、片方revoke、GUI→CUI→GUI、cirrus-off強制指定fallback、V86後復元 |
+| **T2e gfx/低位USER切替** / d | gfx/gfx_core.c・backend3本、exec/exec.c・lease、paging共有経路撤去・v86_mem.cの通常PDE権限復元、sdk/kapi.json・生成物、userland/lib/gfx、lib/utf8.cユーザー版、CRT・Rust shlib初期化、gshell lib/handler、rshell.c・tests/nop・ring3_hello/fault/guard・マーカー観測側・deploy.yaml、kselftest | §3のAPI/BB再取得 (gfx両実体)/Unicode RO lease、tvdump KAPI/SHMマーカー、SHM/tramp事前作成、3段検査全適用。hostは実backend選択→fb出力まで (T1eの模擬選択だけで済ませない)、予約/登録/写像失敗・fallback/reinit。変異:旧bb pointer、plane offset誤り、revoke他AS、余白別owner露出、無条件VRAM授権 | 8MB planar/PEGC、17MB planar/PEGC/Cirrusで描画/present/日本語、GFX全画面とGUI、通常GUIのVRAM kill、片方revoke、GUI→CUI→GUI、cirrus-off強制指定fallback、V86後復元 |
 | **T2f map/allocator** / e | 新exec/appmem.[ch]、exec/exec_heap.[ch]・exec.c・appslot、paging、sdk/kapi.json・CRT syscalls・malloc接続・Rust allocator、kselftest、memコマンド | §4-4。kselftest map/unmap/owner0、hostで各ページ/PT/extent不足注入、partial unmap、hint衝突・非連続arena、64KB境界3値、calloc/realloc、可変stack残存。変異:別owner free、zero省略、失敗heap上端更新、初期reserve追加 | 8/17MB伸長→unmap→終了、物理枯渇/VA断片化を区別、pool0でもSTOP/閉じる→再起動。複数ASで片方free後もう片方が内容保持 |
-| **T2g trim** / f | exec/appslot・appmem、安全点、GUI proto/SDKイベントループ・allocator、gshell handler/WM、関連host | §4-5。固定bit合成・backだけ配送・再入拒否・一巡一再試行・未応答/終了AS。kselftest要求管理の無確保性、hostでA map途中にB hookが入らないtrace。変異:mem_map中pump、常時trim、CUI配送、無制限retry | 8MBでbackが末尾を返しfrontの再試行成功、返せなければENOMEM、trim配送中STOPでもowner0・WM生存。pool0から閉じる経路 |
+| **T2g trim** / f | exec/appslot・appmem、安全点、GUI proto/SDKイベントループ・allocator、gshell handler/WM、関連host | §4-5。固定bit合成・backだけ配送・再入拒否・一巡一再試行・未応答/終了AS。kselftest要求管理の無確保性、hostでA map途中にB hookが入らないtrace。変異:mem_map中pump、常時trim、CUI配送、無制限retry | 8MBでbackが末尾を返しfrontの再試行成功、返せなければENOMEM、端末配下CUI前景は裏GUIを同期実行せずENOMEM→CUI復帰後の配送、trim配送中STOPでもowner0・WM生存。pool0から閉じる経路 |
 | **T2h 統合受入** / g | guest試験・deploy.yaml・host検査の結線・本票の結果追記・正典の実装説明/生成地図 | 全段のkselftestとhost/変異、§5-2地図、D35混在セット、[C5]走査、target sizeofとsize予算。新機能の一括追加段にはしない | §5-3の構成表、R5、旧新混在、T1回帰の残件を結果付きで閉じるか理由付き残件に。未検証をPASSとしない |
 
 T2b の新APIは内部のみ、T2c の旧共有USERは既存機能を保つ過渡状態で、T2e 完了まで最終隔離の合格を宣言しない。T2c の形式・配置・shlib・CRT切替は相互依存する **最小の同時更新単位**。準備のhost検証はファイル群ごとに分けられるが、半分だけの成果物を配備しない。T2c以降もABI変更のたびに世代/機能版と成果物を一式で揃える。
@@ -265,10 +276,12 @@ T2b の新APIは内部のみ、T2c の旧共有USERは既存機能を保つ過�
 
 | 検査 | 具体的な期待値 |
 |---|---|
-| (a) master | 台帳からRAM / FIXED / DEVICEを引き、低位〜池上端と高位窓を走査。USERはSHM/trampolineだけ。登録MMIOはsup+PCD、15〜16MBの未登録部分はNP、APP/LEASE PDEは空 |
+| (a) master | 台帳からRAM / FIXED / DEVICEを引き、低位〜池上端と高位窓を走査。**present PTE の USER**はSHM/trampolineだけ (PDE単体のUSERは違反に数えない)。登録MMIOはsup+PCD、15〜16MBの未登録部分はNP、APP/LEASE PDEは空 |
 | (b) AS生成/変更後 | PDE0〜511はmasterと同一。512〜959は当該AS ownerのPTEだけ (shlib textはshlib owner ROのみ例外)、未使用帯はNP。960〜1015は当該ASの有効leaseと全page一致。1016以後の共有窓はmasterの権限/物理を維持 |
 | (c) 毎起動 | gfx予約/写像、exec trampoline初期化が済んだ後のpost-exec地点で(a)+合成ASの(b)+S/T/U隔離を実行し全部返す。probe前の候補検査とprobe後の選択面検査を区別し、GUI移譲後にもledger_selfcheck。V86中は止め、終了時復元後に(a) |
 | (d) lease | 物理対応・全aliasのcache一致、masterと第三ASのPDE/PTE(権限も)不変、3backendで実描画/present、PT/lease表枯渇と途中失敗全rollback、片側revoke、終了/起動失敗時回収、再initのgenerationと旧token拒否 |
+
+master の PDE 0 は SHM/trampoline を通すため USER が立ち得る (`kernel/paging.c:477`)。V86 復元の `paging_pde_clear_user` (`kernel/v86_mem.c:163`) 後は、通常状態に必要な SHM/trampoline の PDE 権限も復元してから (a) を行う。個々の低位 PTE に USER が漏れないことと、許可された PTE への実効権限 (PDE/PTE の積) の両方を検査する。
 
 比較対象はPTEの物理番号だけでなく P/U/RW/PCD/PWT と owner/参照数。失敗時のbyte比較から診断カウンタの増分だけを除き、会計変化を診断として免除しない。変異で境界を1ページずらすケースはリンクASSERT・地図検査・実動作試験のどれが止めたか記録する。
 
@@ -308,23 +321,55 @@ T1 §4-0 と同じ道具を使う。実施は後日PM/テスター、今回の�
 | T2f/T2g map / trim / 回収 | 3〜6KiB | 各AS32extent、要求bit。SDK allocatorの大部分はuserland |
 | kselftest/診断の追加 | 1〜3KiB | 本番同梱、削って帳尻を合わせない |
 
-合計 **約10.5〜23.5KiB**、削除前の概算。現予算2.5KiBを大きく超える可能性が高い。`AppSlot`に大きな固定表を直に足すとBSSも超えるため、AS制御ブロックは起動/AS生成時に固定KHEAPから確保し、実行中は固定容量とする。失敗すれば起動を拒否、終了で返す。暫定目標: PT控え480B + lease8×32B + extent32×16B +制御128B = **1,376B/AS以下** (最大4通常ASで5,504B)。SURFACEはplane offsetを含む **64B以下×16=1,024B**、T1のowner/region/resource表2,816B、AppSlot等を含む所有権/写像管理の合計 **16KiB以下**をtarget sizeofで検査する (U1/U9)。extentは `{base,end,kind,flags}`、PFNはPTEを正とし二重の巨大配列を置かない。lease32Bはref/token/base/end/perm等を持ち、plane値はSURFACEから計算する。PD/PTページの実占有はこの16KiBとは別に計上。KHEAP192KBの他顧客と同居するピークも測る。
+合計 **約10.5〜23.5KiB**、削除前の概算。現予算2.5KiBを大きく超えるため、T2a′を必須とする。`AppSlot`に大きな固定表を直に足すとBSSも超えるため、AS制御ブロックは起動/AS生成時に固定KHEAPから確保し、実行中は固定容量とする。失敗すれば起動を拒否、終了で返す。暫定目標: PT控え480B + lease8×32B + extent32×16B +制御128B = **1,376B/AS以下** (最大4通常ASで5,504B)。SURFACEはplane offsetを含む **64B以下×16=1,024B**、T1のowner/region/resource表2,816B、AppSlot等を含む所有権/写像管理の合計 **16KiB以下**をtarget sizeofで検査する (U1/U9)。extentは `{base,end,kind,flags}`、PFNはPTEを正とし二重の巨大配列を置かない。lease32Bはref/token/base/end/perm等を持ち、plane値はSURFACEから計算する。PD/PTページの実占有はこの16KiBとは別に計上。KHEAP192KBの他顧客と同居するピークも測る。
 
-**X15 の扱い**: T2aから各段でreadelf -SW / nm -S / kernel.map / sizeを保存し、text/data・bss・bss前余白・ASSERT残り・圧縮サイズを測る。残り1.5KiB未満、または次段の最小実装が入らない実測が出たら、その段の着地前にPMからユーザーへ **「T3の固定PT画像外化だけを前倒し」** を具体差分と測定で上げる。順序変更なので自動承認と解釈しない。前倒しする場合は予約・写像・初期化・リンカ/地図検査を一組にし、T1の8MB metadata固定域や現スタックと重ならない位置を別途設計する。最終T3の0x3F1000を現shell帯へ無条件に置かない。診断削除・ASSERT緩和・無断のカーネル帯拡張で回避しない。**本票は前倒し済みを前提としない**。
+**X15 の前倒し (ユーザー決定 2026-10-01)**: T3 の「固定 PT をカーネルイメージの外へ」を **T2a → T2a′ → T2b** の必須ゲートへ移す。TASK_MEMMAP_V3 §6 の T3 行および D 番号の本文は変更しない。前倒しで完了する範囲と T3 の残りは §1-3。T2a + T2b の見込みだけで現 text/data 余白 2,524B を超えるため、容量不足後の相談にはしない。T2a 自体が予算を超えたら同段を未受入とし、診断削除・ASSERT緩和・帯拡張で通さない。
+
+#### T2a′ の配置 (半開区間、実装時に memmap.h を正典にする)
+
+現 `kernel/paging.c:155`・`:156`・`:174` の `pd_raw` 1枚 + `pt_raw` 8枚 + `aperture_pt_raw` 1枚、計 **40,960B (40KiB)** を対象とする。`page_tables[1024]` のポインタ表や動的 PT は移設対象外。現地図 [02_memory §2-1](../../02_memory.md) は SQLite 本体末尾 `0x2BC200`、代替スタック `[0x2BD000,0x2DD000)`、続く未使用予約 `[0x2DD000,0x2E8000)` が44KiB。ここを分割し、**SQLite が使用する帯の上限を 0x2DD000 に固定**する。大分類の「SQLite帯域 0x200000–0x2FFFFF」の内部にあるが、SQLite 本体・代替スタックの占有域を借用するものではない。
+
+| 用途 | 新定数案 / 半開区間 | 属性・境界 |
+|---|---|---|
+| master PD | MEM_FIXED_PD_BASE = 0x2DD000、[0x2DD000,0x2DE000) | 恒等 present / supervisor / RW / WB |
+| bootstrap PT 8枚 | MEM_FIXED_BOOT_PT_BASE = 0x2DE000、[0x2DE000,0x2E6000) | 同上、PDE0〜7用 (32MBの初期窓) |
+| device aperture PT 1枚 | MEM_FIXED_APERTURE_PT_BASE = 0x2E6000、[0x2E6000,0x2E7000) | PT backing 自体はWB。写すMMIOのPTEは従来どおりPCD/PWT |
+| 固定PD/PT全体 | MEM_FIXED_PAGING_BASE = 0x2DD000、MEM_FIXED_PAGING_END = 0x2E7000 | 10枚、owner=kernel、恒久 FIXED、全RAM構成共通 |
+| DMA下側ガード | [0x2E7000,0x2E8000) | 1枚NPを維持 |
+
+カーネル帯 `[0x100000,0x200000)`、SQLite 使用域 (上限0x2DD000)、DMA `[0x2E8000,0x2F8000)`、DMA上側ガード、8MB の `MEM_LEDGER_META_*` `[0x2F9000,0x2FB000)`、kstack guard `[0x2FB000,0x2FC000)` と stack `[0x2FC000,0x300000)`、shell `[0x300000,0x400000)` のいずれとも重ねない。T3 の最終起点 0x3F1000 は現 shell heap なので使わない。SQLite は現値で代替スタック末尾が新PD直前に接する。追加の下側guardは設けず、SQLiteの成長をリンク時に止める (現在のページ丸め内の余白以外に伸び代はない)。
+
+**予約・写像・初期化**:
+
+1. L0 は現 `kernel/physmem.c:97`〜`:103` の4MB未満 RESERVED を維持。`memory_boot_fixed` の「SQLiteからDMA直前」区間 (`kernel/memory_boot.c:230` 付近) を SQLite/残余予約・固定PD/PT・DMA下側guard に分割し、PD/PTを owner=kernel、WB、PERMANENT の FIXED として記録する。重なる FIXED 行の二重登録はしない。池の40KiB確保や台帳 workspace の流用をせず、L1/L2の配布対象にならないことを検査。T2cでL0の開始を物理定数へ分離してもこの予約は不変。
+2. `paging_init` が **PG=0 / IF=0** で固定領域を明示的にゼロ化する (画像のBSS clearに頼らない)。P2VでPD/PTポインタを作り、既存の初期PTE・PDEを構築。apertureのPTEは全NP、PDEはその固定PTをV2Pで指す。既存の一度だけ初期化するガードを維持し、live AS/動的PTを再初期化しない。固定領域を `.bss` や大きなNOLOADセクションとして再び画像サイズに含めず、絶対番地定数/リンカシンボルで扱う。
+3. 現 `paging_init` の予約域NP化 (`kernel/paging.c:291`) はそのまま行い、**NP化の後に固定10枚を恒等sup/RW/WBで張り直す**。DMA・kstack・SQLiteの写像と全ガードを確認してから CR3=V2P(master PD) → CR0.PG。PG=0の間にNP化するため構築中は安全で、PG=1になる前に自分のPD/PTのaliasも必ずpresent。写像失敗はPGを立てずboot失敗にする。T1のFIXED metadataはこれとは別に後段の `paging_map_ledger_backing` で有効化。
+4. 32MB超のmaster動的PTは従来のT1 workspaceから供給し、固定10枚と会計を分離。ASは低位のこのbackingをsupervisorとして共有するが、private PD/PTの解放で固定領域を返さない。
+
+**リンカ・地図・実動作を一組にする**:
+
+- `build/os32.ld` に定数の写しと絶対シンボル、ASSERTを追加し、`gen_memmap.py` の写し一致検査へ登録 [C4]。少なくとも `ALIGN(__sqlite_end, 4096) + MEM_SQLITE_STACK_SIZE <= MEM_FIXED_PAGING_BASE`、全境界4KB整列、各領域の1/8/1枚と隙間なし、`MEM_FIXED_PAGING_END + 0x1000 == MEM_DMA_POOL_BASE`、カーネル上端以下でないこと、DMA/metadata/kstack/shellとの非重複を検査。既存のカーネル画像予算ASSERTとSQLite対DMA ASSERTは保持し、SQLite対PDの厳しい条件を加える。bootstrap PT枚数変更はサイズ一致ASSERTで止める。
+- `tools/gen_memmap.py` は旧「カーネル予約 (下)」を SQLite末尾後の残余NP (空なら省略)・PD・boot PT・aperture PT・DMA下側guard に分割。kernel.mapの実値で重複/逆転/予算/写しを検査し、`--write` で **02_memory §2-1 の生成ブロック**を更新、`--check` / `--headroom` で確認する。今回は未実装なので生成ブロックを未来の数値で手書きしない。
+- `paging_memmap_selftest` の期待属性は一般予約NPより先に固定10枚をRWとして判定し、CR3/PDEが所定のframeを指すこととPTEにUSERがないことを検査する。hostで非整列・1ページ重複・SQLite成長・NP後再写像欠落・誤USER・再初期化をそれぞれ注入し、リンク拒否/地図拒否/動作失敗を区別する。
+- §5-1 の **8MB / 17MB / 64MB** で固定10枚の内容・sup/RW/WBと台帳予約を確認し、poolの全配布/返却でも対象PFNを配らない。8MBはFIXED metadata+workspaceの2枚を照合、17/64MBはARENA_TOPと動的PTの別勘定を照合。旧配置のGUI/CUI・V86復帰・fault/STOP後に同じ検査を行う。64MB実機未確認ならT2a′の受入完了とはしない。
+
+**空く量は見積もりと実測を分ける**: 生配列の削除は40,960B。T1fの `__bss_end=0x1943E4` から単純に引けば `0x18A3E4`、旧上限0x195000まで44,060Bとなるが、これは配置・コード増分・整列不変の仮算。BSS開始の4KB整列、T2a/初期化コード、固定台帳の追加行、selftestを含む正味の増減は **T2a前 / T2a後 / T2a′後**の同一toolchainビルドで `readelf -SW` / `nm -S` / kernel.map / size を保存して求める。`.text/.data/.bss`、BSS前余白、`__bss_end`、ASSERT残り、固定10枚と動的PTの実占有、圧縮画像サイズを表で報告。T2bの3〜6KiB見込みと管理データを差し引いてもリンク可能なことをゲートにする。
+
+全T2の削除前見込み10.5〜23.5KiBに対し、移設40KiBからの粗い差額は16.5〜29.5KiB (T2a′固有増分・整列・固定データ前)。これはtextが40KiB減る意味でも、圧縮画像が40KiB減る意味でもない。40KiBは非配布予約域へ移り、空くのは主に**カーネル帯のリンク容量**。KHEAP/SHMの浮動配置が下がるだけで、T2a′単独ではpoolのfreeが40KiB増えるとは数えない。削除効果は各段の実測でのみ差し引き、508KiB制約も維持する。
 
 ### 6-2. リスクと未確認の台帳
 
 | ID | リスク / 未確認 | 閉じる段・証拠 |
 |---|---|---|
 | R1 | IRQ移譲時のEOI・スタック・全longjmp経路、再入cleanup | T2a、asm実行試験+guest全fault/STOP。PCMは実機証拠が要る |
-| R2 | 0x80000000以上をsigned intで扱う隠れた比較 (U8)、HostDrvが非恒等user bufferを物理と誤認 | T2c/T2h、SDK・lib・apps/gameも検索し、VFSのkernel bufferとの境界で翻訳。HostDrv24件の意味は未確認、該当経路をゲストで試す |
+| R2 | 0x80000000以上をsigned intで扱う隠れた比較 (U8)、HostDrv の I/O 回帰 | T2c/T2h、signed 比較は SDK・lib・apps/game も検索。**非恒等 VA のハイパーコール渡しの懸念はコード監査で解消**: fs/hostdrvfs.c:146・:147・:381 は kernel の g_databuf、:398 / :418 の kmemcpy だけが read/write の caller buf を触る。loader は §4-2 の backing、実行中 I/O は caller AS 上の有効 VA を使う。高位 buffer の read/write と24件の実機確認は別の未実施回帰として残す |
 | R3 | metadata / BB探索の物理条件へ新APP定数が混ざり8MB全停止 | T2c、T1の8/12境界/17/64の足場で物理配置が維持されること |
 | R4 | Cirrus CLIENTとDISPLAY混同、planar geometry変更、ページ端露出、fallback後古いfb | T2e、実backendからSDK描画まで通す。T1eの模擬選択の証拠だけでは足りない |
 | R5 | 8bit世代の周回・slot/token再利用・参照数overflow | T2b、u32世代/周回拒否、別AS tokenと二重free。生ポインタの使用期限は§3-4 |
 | R6 | static表/KHEAP/コード予算不足 (U1/U9/U15) | §6-1の各段実測。gshellは現shell帯のimage+二heap+stackのピークを測り、BB実ページを二重加算しない |
-| R7 | newlib MORECOREが非連続を受けない、exec_heapのtrimで生存データ破壊 | T2fで実allocatorを試す。模型mallocだけでは受入不可。TLSF採否は未確定 |
+| R7 | nano malloc と _sbrk の接続、exec_heapのtrimで生存データ破壊 | nano は要求ごとの chunk と隣接検査を持つため、非連続 arena を上位で扱う接続確認は小さく切り出せる。ただし sbrk_aligned の追加整列要求と末尾 free chunk 拡張は連続性を要するので、§4-4 の EXACT _sbrk を維持。確認した newlib 4.4.0.20231231 の nano-mallocr.c の sbrk_aligned / nano_malloc を基に、T2fで実allocatorの穴・整列・trimを試す。模型だけで済ませずTLSF採否は未確定 |
 | R8 | trim時にWMを同期で回してcurrent ownerを取り違える | T2g、要求記録と配送のtrace、再入・未応答・STOP、無確保性 |
-| R9 | source互換bridgeがlease失敗を隠す、Unicode低位直読が残る、TVRAM直書きU20 | T2e全再ビルド/日本語/再attach。確認済みlconsole/filer以外とprivate apps/gameは未監査 |
+| R9 | source互換bridgeがlease失敗を隠す、Unicode低位直読が残る、TVRAM直書きU20 | T2e全再ビルド/日本語/再attach。tvdump・nop・ring3 3本は§2/§3-4で移行を確定。残るprivate apps/gameは未監査 |
 | R10 | D35のstampがCRTだけ / 欠落objectを見逃す、最終ELFに古いslotが残る | T2c/P7、旧.o/旧archive/asm/Rust/LTOを含む混在試験。private submodule不在は未完 |
 | R11 | master空の高位shlibをshell/WMが呼ぶ、子終了のparent heapが別CR3 | T2cの静的参照禁止と親子/WM回帰。将来のshell shlib利用は本契約外 |
 | R12 | PCI BARが高位app/lease仮想と衝突 (上位U10) | 恒等に置ける2GB未満のみ直写し。高位BARはdevice窓へ別名、実装未対応なら予約しても公開拒否、重ねて写さない。sizing/汎用配置はP4 |
@@ -332,7 +377,7 @@ T1 §4-0 と同じ道具を使う。実施は後日PM/テスター、今回の�
 
 ## 7. 独立レビューに突き合わせる論点
 
-対象は本票と基点 `b5cd920` の §2 掲載ファイル。要旨は「高位ASとSURFACE leaseの契約を具体化し、T1のR1/所有権を接続する」。判定基準は [ROLES](../agents/ROLES.md) §5: **到達可能な反例を伴う現契約違反**をブロックとして示す。設計者による本票の整合確認は独立レビューの代用ではない。
+2回目の対象は `705a227` からの本票差分と §2 の参照コード。前回と同じ Fable 5.1 に、下記のうち変更した論点8・9と所見対応の確認を依頼する。要旨は「高位ASとSURFACE leaseの契約を具体化し、T1のR1/所有権を接続する」。判定基準は [ROLES](../agents/ROLES.md) §5: **到達可能な反例を伴う現契約違反**をブロックとして示す。設計者による本票の整合確認は独立レビューの代用ではない。
 
 1. **X3 / ページ占有** — 連続SURFACE・不連続planar4面の一括操作・Cirrus CLIENTの例外・cache一致で、未貸与物理や表示面を露出する反例がないか。通常map拒否だけでなくmaster変更口も閉じるか。
 2. **lease寿命** — prepare/commit/rollback、active/非active TLB、片側revoke、全終了経路、owner返却待ち、再init世代とtoken周回、SDK再attachの契約が整合するか。
@@ -342,14 +387,37 @@ T1 §4-0 と同じ道具を使う。実施は後日PM/テスター、今回の�
 6. **B1 / D31** — caller出自、RO入力/RW出力、overflow、page末NUL、IF復元、MMIO拒否、T4 B3/B4・T5a B2との保証範囲の境界。
 7. **D35 / X6** — 4世代の独立性、shellも入口前拒否、各コンパイル単位の欠落検出、旧新混在試験、T2途中段/P7の機能版と世代の使分け。
 8. **T1引継ぎと段の切替** — 8MB BB漏れ修正を外す時点、物理metadata定数の残留、shellは静的リンク、低位Unicodeの橋、T2cの過渡共有USER→T2e全面撤去に回帰不能な中間状態がないか。
-9. **容量 / X15** — 16KiB管理予算・KHEAPピーク・2.5KiBのリンク予算、X15を要する判断時点と前倒し時の衝突。概算を測定済みの数字として扱っていないか。
+9. **容量 / X15** — 16KiB管理予算・KHEAPピーク・2.5KiBのリンク予算、必須T2a′の0x2DD000配置・SQLite上限・PG=0→NP後再写像→PGの順・FIXED台帳との非重複。概算を測定済みの数字として扱っていないか。
 10. **受入の証拠** — 3 backend描画、S/T/Uの意味、8/17/64MB・実機PCM・P7混在の試験が実装の穴を検出するか。最終P1の容量条件をT2だけで達成済みと誤認しないか。
 
-既知の未確認は §6-2。コード・ビルド・ホスト挙動試験・変異・NP21/W・実機は今回未実施。独立レビューをPMが依頼する前提で本票を渡す (本セッションは設計役)。
+既知の未確認は §6-2。コード変更・ビルド・ホスト挙動試験・変異・NP21/W・実機は今回未実施。2回目の独立レビューをPMが依頼する前提で本票を渡す (本セッションは設計役)。
+
+### 7-1. 独立レビューの所見と対応
+
+Fable 5.1、1回目 (2026-10-01)、**Request changes (P2×2)**。PM転記の `fable_t2_r1.md` 全文を読み、`705a227` のコードと照合した。本表の「反映」は設計票への反映であり、実装完了・2回目のApproveを意味しない。
+
+| 所見 | 確認結果と対応 | 反映先 / 受入 |
+|---|---|---|
+| P2-1 物理APP定数の漏れ | PEGC BB探索下限とpool selftestを追加。追加走査でphysmemのL0供給境界にも依存を確認。高位化で物理PFNへ混入させない。pagingの帯selftestも書換え対象 | §2・§4-1・T2c、8MB PEGC候補維持/起動fail0/物理台帳維持 |
+| P2-2 T2bのリンク予算 | X15を必須T2a′へ。ユーザー決定2026-10-01、予約域0x2DD000に10枚、SQLite上限ASSERT・地図・8/17/64MB受入・正味実測。上位D本文/T3行は変更なし | §1-3・§5-1・§6-1。T3は画像外化済みの最終再配置を引継ぐ |
+| P3-1 stack_size | offset 0x20の既存欄を有効化、包装の予約0と既定256KBを維持。「追加」を訂正 | §4-1・§4-6、0/512KB/不正指定 |
+| P3-2 U20/受入道具 | sh.binのtvdumpをKAPI、nopとring3 3本のマーカーをSHMへ。レビューの細部は訂正: nopはTVRAM直書きで現deploy未登録、ring3 3本は0xA8000で登録済み | §2・§3-4・T2e、TVDM互換・SHMマーカー・狙ったfault確認 |
+| P3-3 gfxの2実体 | アプリ静的リンクとshlib内でCLIENT lease2本 (8本の内数)、両方の再attachを明示 | §3-4・T2e、両描画経路/片側だけ更新する変異 |
+| P3-4 R1着地点 | launch :2094 と resume :2648 の別setjmpを共通回収へ接続、park理由は回収しない | §4-3・T2a、初回とresume後それぞれfault/STOP/二重回収なし |
+| P3-5 行番号 | execの実行文/関数定義を照合。kill :1621/:1629、teardown :1483、abort判定 :668 (定義:665)、dispatcher user_esp :1540 (定義:1537) と意味も区別 | §2、レビューの行番号を機械的にずらさない |
+| P3-6 帯依存小漏れ | 引数窓→AppSlot.stack_top、shlib診断/config注記/mem表示/appslot・exec_heap注記/dbgserialを列挙 | §2・T2c、仮想と物理の残存検索 |
+| P3-7 master USER基準 | (a)はpresent PTEのUSERで検査、PDE0のUSER単独を違反に数えない。V86後の通常PDE権限復元も対象 | §5-2・T2e、SHM/trampolineの実効権限と低位漏れの両方 |
+| P3-8 HostDrv | g_databuf経由を確認し非恒等VAをハイパーコールへ渡す懸念を閉じた。caller bufへのコピー時のAS契約と実機回帰は残す | §1-2・§6 R2、read/writeの高位buffer試験 |
+| P3-9 CUI前景ENOMEM | 端末配下CUIは裏GUIの返却をその場で待てずENOMEM、同期pumpなし。復帰後の配送を確認 | §4-5・T2g、D24の帰結として受入 |
+| 補足 master往復 | T2c以後は低位backingを直接walkできる。不要なCR3往復の整理をT2dへ、残す過渡形も許可 | §4-7、caller PD/IF/CR3保持 |
+| 補足 nano malloc | nanoのchunk/隣接確認から接続試験は小さく切出せる。整列追加/末尾拡張の連続性は必要で_sbrk EXACTを維持 | §6 R7・T2f、実nanoの穴/整列/trim試験 |
+| 補足 manifest | 常駐shellと別にsh.bin・userland/tests/*.binを明記 | §4-6・T2c/P7、4世代/hash/旧新混在 |
+
+2回目は特に **P2-1の物理境界の列挙とT2c変更集合、P2-2のT2a′配置・SQLite成長拒否・初期化順・容量実測ゲート**を確認してほしい。P3/補足の差分も全件追跡する。今回の差分経路ごとに見た/見ていないを明記し、見つかる到達可能な欠陥をすべて挙げる (1件で止めない)。新しい領域の指摘なら前回見えなかった理由も記録する。既知の未確認は§6-2と今回未実施の実装受入 (§5)。
 
 ## 8. ユーザー判断と今回の文書検査
 
-既決D番号の変更を求める点はない。追加のユーザー判断が必要になるのは、**サイズ不足の実測を受けたX15の順序変更**、NP21/Wの64MB preset追加が必要な場合、各受入時の[D2]操作/実機物理操作。lease/API/trim/段の案は本票の独立レビューに出し、争点が3ラリーで決着しなければユーザーへ上げる。今はこれらの追加操作を承認済みとは扱わない。
+既決D番号の変更を求める点はない。**X15のT2aとT2bの間への前倒しはユーザー決定 (2026-10-01)** として記録し、再承認を待つ未決事項から外す。追加のユーザー判断が必要になるのは、NP21/Wの64MB preset追加が必要な場合、各受入時の[D2]操作/実機物理操作。lease/API/trim/段の案は本票の独立レビューに出し、争点が3ラリーで決着しなければユーザーへ上げる。今はこれらの追加操作を承認済みとは扱わない。
 
 今回の完了条件は文書検査のみ:
 
@@ -357,4 +425,4 @@ T1 §4-0 と同じ道具を使う。実施は後日PM/テスター、今回の�
 make check-docs-links check-docs-orphans check-docs-status check-tests-inventory check-constraints < /dev/null
 ```
 
-**2026-10-01 実行結果: rc=0**。文書リンク (0 Errors)、orphan (0件)、状態行、試験一覧の最新性、制約17件の整合がすべて通った。`git diff --check` も rc=0。将来の実装受入は §5 と分けて記録する。
+**2026-10-01 レビュー反映後の実行結果: rc=0**。文書リンク (0 Errors)、orphan (0件)、状態行、試験一覧の最新性、制約17件の整合がすべて通った。`git diff --check` も rc=0。初回実行時に既存 `/tmp/GMfifo4` に対する jobserver の `File exists` 警告が出たが、全5ターゲットが完走しmakeの終了値は0。将来の実装受入は §5 と分けて記録する。
