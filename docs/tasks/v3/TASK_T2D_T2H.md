@@ -527,6 +527,82 @@ PM の NP21/W 受入は未実施。新しい `d0a_test.bin` の期待結果は
 `d0a: child_status kind=1 code=0 rc=0 result_rc=0 bytes=17`。
 CPL=3 の sh 内で `ls | cat` を単独 `ls` と比較し、8MB/17MBの回帰とkill差分を確認する。
 
+### レビュー (Opus) の P3 の対応 (2026-10-01)
+
+基点 `26bf6da`、worktree `wt/t2d0b-p3`。独立レビュー Opus 5.5 Approve の P3 6件を対応した。
+
+1. ホストに ABORT_PENDING、登録者 cpl3=0、登録時CR3不一致、TRUSTED (user_call=0、pa=va) を追加。
+   最初の3条件を消す変異を登録し、既存PAコピー変異を kmemcpy の形へ更新した。
+2. kselftest の名称・注記を「登録者なしの早期拒否」「CPL0 slot の USER capture 拒否」に合わせ、
+   origin は REDIR_USER / REDIR_TRUSTED にした。CPL=3 の d0a_test は RO+USER の KAPI
+   トランポリン表への登録を専用子 `--ro-child` で試す。KAPI の出力guardが先にwalkして
+   fault終了するため、これは **登録者PDの redir_access walk のゲスト試験ではない**。
+   そのwalkのRO拒否は実物 redir_access のホスト試験で確認する。
+3. TRUSTED は桁あふれを避けた減算比較で `va + len <= MEM_APP_BAND_BASE` を要求。
+   PAは `V2P((const void *)(uptr)va)`。上限ちょうどの成功、帯外・跨ぎ・overflowの拒否と変異を追加。
+4. IRQ保存内のページ単位コピーを lib/kstring.h の kmemcpy に変更。ページ間のIF復元は維持。
+5. ring3_str.h / exec.h の旧 user_origin・現在CR3 walk の注記を RedirAccess / redir_access へ更新。
+6. カーネルシンボル `redir_refuse_count` (volatile u32、KAPIなし) を追加。
+   fd_redirect_write のバッファ書込みが位置/容量整合性やアクセス検査で断られるたびに1加算し、
+   ページ再検査で途中終了した場合も1加算する。容量による通常の短い書込み、読取り、登録拒否は数えない。
+   ホストは拒否1回ごとの増分を確認し、カウンタ加算を撤去した変異も実行時RED。
+
+対象ホストは GREEN、変異は **21/21 実行時RED** (compile失敗はREDに数えない)。
+ring3_guard、fstat_redir、owner_reclaim、multiapp_impl の対象回帰も rc=0。
+ILP32ホスト試験は既存の一時 sitecustomize.py で ELF32 のみ qemu-i386 経由。
+ゲスト未実施 (依頼でNP21/W・NHD・配備・iniは禁止)。新 d0a_test の期待出力は
+`d0a: ro_registration=OK`、`d0a: parent_buffer=OK`、`d0a: child_value=OK`、
+`d0a: child_status kind=1 code=0 rc=0 result_rc=0 bytes=17`、プログラムrc=0。
+RO子だけは kind=2 / code=-2 / rc=-2 が期待値で、fault_kill_count の増分 **+1** は意図した拒否。
+PMは新kernel.mapの redir_refuse_count と kselftest を読み、通常の親子出力では拒否増分0を確認する。
+従来の `ls | cat` 比較と8MB/17MB回帰も受入時に行う。
+
+同一toolchainで基点を `make kernel` (rc=0) してから変更後を測定した。
+基点はclean build_id、変更後は `-dirty` を含む (従来票のd0b計測もdirtyなので基点kernel.binは8B小さい)。
+
+| 大きさ | 基点 26bf6da | P3対応後 | 差分 |
+|---|---:|---:|---:|
+| kernel.bin | 360,588 B | 360,696 B | +108 B |
+| vmkernel.lz4 (SQLite含むVK32) | 478,777 B | 478,899 B | +122 B |
+| 本体占有 (`__bss_end - 0x100000`) | 571,404 B | 571,504 B | +100 B |
+| `__bss_end` | `0x18B80C` | `0x18B870` | +100 B |
+| リンカ ASSERT 残り (596 KiB枠) | 38,900 B | 38,800 B | -100 B |
+| AS / AppSlot / FdRedirect / State | 692 / 192 / 52 / 156 B | 同左 | 0 B |
+| 診断カウンタ | 0 B | 4 B | +4 B |
+
+新kernel.mapの redir_refuse_count は `0x18B860` (4B)。アドレスは今回の成果物の値で、
+受入時は配備した成果物と対応するmapを使う。圧縮上限520,192Bまで41,293B。
+初回の対象変異実行は、kmemcpy化で同じ宣言が2か所になった変異アンカー検査で停止 (rc=1)。
+コピー側のwhileを含む一意なアンカーに直して再実行し21/21実行時RED (rc=0)。
+生成地図は `python3 tools/gen_memmap.py --write` (rc=0) でdirty成果物に同期した。
+`python3 tools/gen_tests_inventory.py --write` もrc=0 (内容変更なし)。
+
+`CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp
+NP21W_DIR=/home/hight/os32-tmp/d0bp3-image-output make all < /dev/null` は **rc=0**。
+FDコピー先を一時ディレクトリに限定し、NP21/W・NHD・配備・ini・commit/push は未実施。
+既存の GNU-stack / RWX リンク警告は出たがビルドは成功。d0a_test.bin は10,848B。
+ログ: `/home/hight/os32-tmp/d0bp3-all.log`。
+最終ゲートは `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp
+make check-changed < /dev/null` (PATH=cross/bin、PYTHONPATH=一時ELF32ランナー) を1回だけ実行する。
+既定の基点選択がHEAD~1に戻り build/kernel.mk / build/sdk.mk を含むため、今回はfullを選択する。
+最終 `make check-changed` は **rc=2**。kmemcpy用の新しい入力 `lib/kstring.h` を
+`tools/check_map.yaml` の check-fd-redirect-d0a-host 欄へ足し忘れたため、check-map と
+check-check-select-host の case_lint_real が失敗した。これはコーダーの登録漏れ。
+終了後に同欄へ1行追加し、
+`CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp
+make check-map check-check-select-host MUTATE=0 < /dev/null` は **rc=0** (25/25 PASS)。
+修正前のゲート実行中にソースを変えていないことは `check_tree_unchanged.py --verify chg1` で確認した。
+ログ: `/home/hight/os32-tmp/d0bp3-check-changed.log`、`d0bp3-map-fix.log`。
+依頼の「最後に1回」に従い check-changed 本体は再実行していない。
+したがって **同コマンドrc=0の完了条件は未達**。PM側で修正後の最終ゲートを確認する必要がある。
+check-mapの後続にある kapi_layout / edit_doc / fstat_redir / kstring_c / kstr_bench /
+sh_status / hsync_h3 / hsync_h2 / h4_manifest / vfs_excl / fs_kind_callers / cat_linenum /
+result_conv / guest / fd_redirect_d0a / cirrus_win / pegc_mode のゲート内実行は未実施。
+fstat_redir と fd_redirect_d0a は前述の対象単独試験では成功している。
+Windows opt-in fixture は単独試験4件・集約試験5件がskip。
+C方言は変異27/27 RED・対照5/5 GREEN、P2Vは12/12実行時RED (compile失敗0) まで成功。
+修正後の生成票更新と `git diff --check` もrc=0。
+
 ## 11. 独立レビュー 2 回目 (Opus 5.5、Approve) の P3 — 実装時の注記
 
 2026-10-01、`3180a51` の差分に対して Approve (P1 2 件・P2 11 件はすべて閉)。以下の 5 件は設計の変更ではなく、実装時に従う注記 (PM 記入)。

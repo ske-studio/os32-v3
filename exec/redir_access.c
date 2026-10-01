@@ -5,6 +5,7 @@
 #include "appslot.h"
 #include "fd_redirect.h"
 #include "io.h"
+#include "kstring.h"
 
 extern int ring3_call_from_user(void);
 
@@ -54,7 +55,7 @@ static int redir_page(const RedirAccess *a, u32 va, int write, u32 *pa)
 {
     if (!redir_live(a)) return 0;
     if (a->origin == REDIR_TRUSTED) {
-        *pa = va; /* Kernel/WM buffers are in the permanent identity mapping. */
+        *pa = V2P((const void *)(uptr)va);
         return 1;
     }
     return (write ? as_va_to_pa(a->pd_phys, va, pa) :
@@ -64,6 +65,8 @@ static int redir_page(const RedirAccess *a, u32 va, int write, u32 *pa)
 int redir_access_check(const RedirAccess *a, u32 va, u32 len, int write)
 {
     if (len && (!va || len - 1 > ~(u32)0 - va)) return 0;
+    if (a->origin == REDIR_TRUSTED &&
+        (va > MEM_APP_BAND_BASE || len > MEM_APP_BAND_BASE - va)) return 0;
     while (len) {
         u32 pa, n = PAGE_SIZE - (va & (PAGE_SIZE - 1));
         unsigned int flags = irq_save();
@@ -87,17 +90,15 @@ int redir_access_copy(const RedirAccess *a, u8 *base, u32 *pos,
     va += *pos;
     if (!redir_access_check(a, va, len, write)) return -1;
     while (done < len) {
-        u32 pa, i, n = PAGE_SIZE - (va & (PAGE_SIZE - 1));
+        u32 pa, n = PAGE_SIZE - (va & (PAGE_SIZE - 1));
         unsigned int flags = irq_save();
         if (!redir_page(a, va, write, &pa)) {
             irq_restore(flags);
             return done ? (int)done : -1;
         }
         if (n > len - done) n = len - done;
-        for (i = 0; i < n; i++) {
-            if (write) ((u8 *)P2V(pa))[i] = bytes[done + i];
-            else bytes[done + i] = ((const u8 *)P2V(pa))[i];
-        }
+        if (write) kmemcpy(P2V(pa), bytes + done, n);
+        else kmemcpy(bytes + done, P2V(pa), n);
         *pos += n;
         irq_restore(flags);
         done += n;

@@ -2993,6 +2993,7 @@ checks:
     - include/redir_access.h
     - include/ksetjmp.h
     - include/io.h
+    - lib/kstring.h
     - exec/redir_access.c
     - exec/appslot.h
     - tools/tests/test_fd_redirect_d0a.py

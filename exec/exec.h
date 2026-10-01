@@ -180,7 +180,7 @@ int ring3_user_ranges_writable_always(u32 pa, u32 la, u32 pb, u32 lb);
 
 /* いまの呼び出しが CPL=3 のアプリ由来か (= ring3_guard_active(ring3_in_syscall,
  * ring3_wm_depth))。ポインタを**あとで使うために控える** KAPI が、控える時点で
- * 由来を記録するのに使う (fs/fd_redirect.c の user_origin)。 */
+ * 由来を記録するのに使う (redir_access_capture の RedirAccess)。 */
 int ring3_call_from_user(void);
 
 /* CPL=3 アプリを fault として畳む (fault_kill_count++ → master CR3 復帰 →
