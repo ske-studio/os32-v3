@@ -26,7 +26,7 @@ int main(int argc, char **argv, KernelAPI *api)
     unsigned short cs;
     char command[128];
     int i, rc, result_rc, kind = EXEC_KIND_NONE, code = -1;
-    int parent_ok = 1, child_ok;
+    int parent_ok = 1, child_ok, ro_ok;
     u32 len;
 
     __asm__ volatile ("mov %%cs, %0" : "=r"(cs));
@@ -37,6 +37,18 @@ int main(int argc, char **argv, KernelAPI *api)
     if (argc > 1 && strcmp(argv[1], "--child") == 0)
         return child_main(argc, argv, api);
 
+    /* The KAPI output guard walks before redir_access; an RO registration
+     * kills this disposable child. The saved-AS walk is covered on the host. */
+    if (argc > 1 && strcmp(argv[1], "--ro-child") == 0) {
+        api->sys_redirect_fd_buf(2, (u8 *)api, 1, 0); /* RO+USER trampoline table */
+        api->sys_reset_redirect(2);
+        return 1; /* Returning at all is a failed guard, regardless of rc. */
+    }
+    rc = api->exec_run(CHILD_PATH " --ro-child");
+    result_rc = api->exec_last_result(&kind, &code);
+    ro_ok = rc == EXEC_ERR_FAULT && result_rc == 0 &&
+            kind == EXEC_KIND_FAULT && code == EXEC_ERR_FAULT;
+    api->kprintf(REPORT_ATTR, "d0a: ro_registration=%s\n", ro_ok ? "OK" : "FAIL");
     for (i = 0; i < PROBE_BYTES; i++) probe[i] = PARENT_FILL;
     snprintf(command, sizeof(command), "%s --child %lu", CHILD_PATH, (u32)probe);
     api->kprintf(REPORT_ATTR, "d0a: cpl=3 buffer_va=0x%lx\n", (u32)probe);
@@ -62,7 +74,7 @@ int main(int argc, char **argv, KernelAPI *api)
                   "CHANGED" : "UNVERIFIED"));
     api->kprintf(REPORT_ATTR, "d0a: child_status kind=%d code=%d rc=%d result_rc=%d bytes=%lu\n",
                  kind, code, rc, result_rc, len);
-    return parent_ok && child_ok ? 0 : 1;
+    return parent_ok && child_ok && ro_ok ? 0 : 1;
 }
 
 static int child_main(int argc, char **argv, KernelAPI *api)

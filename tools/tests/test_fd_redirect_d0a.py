@@ -11,10 +11,15 @@ from mutpar import run_ordered
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 MUTATIONS = [
+    ("exec/redir_access.c", "slot->state == APP_STATE_ABORT_PENDING ||", "", "abort pending"),
+    ("exec/redir_access.c", "!slot || !slot->cpl3 || !slot->as || slot->as != a->as", "!slot || !slot->as || slot->as != a->as", "non-CPL3 registrant"),
+    ("exec/redir_access.c", " || a.pd_phys != paging_current_cr3()", "", "capture CR3 mismatch"),
+    ("exec/redir_access.c", "(va > MEM_APP_BAND_BASE || len > MEM_APP_BAND_BASE - va)", "0", "trusted range"),
+    ("fs/fd_redirect.c", "if (rc < 0 || (u32)rc < count) redir_refuse_count++;", "if (0) redir_refuse_count++;", "refusal counter"),
     ("exec/redir_access.c", "as_va_to_pa(a->pd_phys, va, pa)", "as_va_to_pa(paging_current_cr3(), va, pa)", "current PD write"),
     ("exec/redir_access.c", "as_va_to_pa_read(a->pd_phys, va, pa)", "as_va_to_pa_read(paging_current_cr3(), va, pa)", "current PD read"),
-    ("exec/redir_access.c", "((u8 *)P2V(pa))[i] =", "((u8 *)(uptr)va)[i] =", "VA write"),
-    ("exec/redir_access.c", "((const u8 *)P2V(pa))[i]", "((const u8 *)(uptr)va)[i]", "VA read"),
+    ("exec/redir_access.c", "kmemcpy(P2V(pa), bytes + done, n)", "kmemcpy((void *)(uptr)va, bytes + done, n)", "VA write"),
+    ("exec/redir_access.c", "kmemcpy(bytes + done, P2V(pa), n)", "kmemcpy(bytes + done, (void *)(uptr)va, n)", "VA read"),
     ("exec/redir_access.c", "slot->as->generation == a->generation", "1", "generation reuse"),
     ("exec/redir_access.c", "slot->as->owner == a->owner", "1", "owner mismatch"),
     ("exec/redir_access.c", "slot->as->pd_phys == a->pd_phys", "1", "PD mismatch"),
@@ -23,7 +28,7 @@ MUTATIONS = [
     ("exec/redir_access.c", "as_va_to_pa(a->pd_phys, va, pa)", "as_va_to_pa_read(a->pd_phys, va, pa)", "RO output"),
     ("exec/redir_access.c", "if (!redir_access_check(a, va, len, write)) return -1;", "if (0 && !redir_access_check(a, va, len, write)) return -1;", "no preflight"),
     ("exec/redir_access.c", "irq_restore(flags);\n        done += n;", "irq_restore(1);\n        done += n;", "IF forced on"),
-    ("exec/redir_access.c", "u32 pa, i, n = PAGE_SIZE - (va & (PAGE_SIZE - 1));", "u32 pa, i, n = len - done;", "unbounded IRQ copy"),
+    ("exec/redir_access.c", "while (done < len) {\n        u32 pa, n = PAGE_SIZE - (va & (PAGE_SIZE - 1));", "while (done < len) {\n        u32 pa, n = len - done;", "unbounded IRQ copy"),
     ("fs/fd_redirect.c", "out->fd[fd] = redir_table[fd];", "out->fd[fd] = redir_table[fd]; out->fd[fd].access = (RedirAccess){0};", "save loses identity"),
     ("fs/fd_redirect.c", "redir_table[fd] = in->fd[fd];", "redir_table[fd] = in->fd[fd]; redir_table[fd].access = (RedirAccess){0};", "restore loses identity"),
     ("fs/fd_redirect.c", "redir_table[fd].access = access;", "redir_table[fd].access = access; redir_table[fd].access.origin = REDIR_TRUSTED;", "origin lost"),

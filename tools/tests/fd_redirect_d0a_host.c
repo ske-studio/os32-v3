@@ -8,6 +8,8 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include "appslot.h"
+#define __KSTRING_H
+void *kmemcpy(void *dst, const void *src, u32 n) { return memcpy(dst, src, n); }
 #define IO_H
 static unsigned int irq_enabled = 1, saves, restores;
 static unsigned int irq_save(void) { unsigned int f = irq_enabled; irq_enabled = 0; saves++; return f; }
@@ -26,7 +28,7 @@ AppSlot *appslot_get(int id) { assert(!irq_enabled); return id > 0 && id < APP_S
 int appslot_cur(void) { return current_id; }
 int ring3_call_from_user(void) { return user_call; }
 u32 paging_kernel_pd_phys(void) { return 0x1000; }
-u32 paging_current_cr3(void) { return spaces[current_id].pd_phys; }
+u32 paging_current_cr3(void) { return (u32)current_id * PAGE_SIZE; }
 static int walk(u32 pd, u32 va, u32 *pa, int write)
 {
     assert(!irq_enabled);
@@ -60,8 +62,10 @@ static void unchanged(u8 *p, u32 n, u8 value)
 static void refuse_write(void)
 {
     u32 old = redir_table[1].buf_len;
+    u32 refused = redir_refuse_count;
     assert(fd_redirect_write(1, payload, 17) == -1);
     assert(redir_table[1].buf_len == old);
+    assert(redir_refuse_count == refused + 1);
     unchanged(aliases[2], BYTES, 0xA5);
     unchanged(aliases[3], BYTES, 0x5A);
 }
@@ -90,6 +94,12 @@ int main(void)
     assert(fd_redirect_to_buffer(1, current_va, 16, 0) == -1);
     assert(redir_table[1].access.app_id == 2);
     res_owner_set(2);
+    u32 saved_pd = spaces[2].pd_phys;
+    spaces[2].pd_phys = spaces[3].pd_phys;
+    /* Current CR3 is independently fixed, not derived from the changed AS. */
+    assert(fd_redirect_to_buffer(1, current_va, 16, 0) == -1);
+    assert(redir_table[1].access.pd_phys == saved_pd);
+    spaces[2].pd_phys = saved_pd;
     current_id = 3; res_owner_set(3); map_backing(fds[3], current_va);
     assert(fd_redirect_write(1, payload, 17) == 17);
     assert(!memcmp(aliases[2], payload, 17)); unchanged(aliases[2] + 17, BYTES - 17, 0xA5);
@@ -129,6 +139,8 @@ int main(void)
     redir_table[1].access.pd_phys = spaces[3].pd_phys;
     refuse_write(); redir_table[1].access.pd_phys = spaces[2].pd_phys;
     slots[2].state = APP_STATE_FAULT_PENDING; refuse_write(); slots[2].state = APP_STATE_RUNNING;
+    slots[2].state = APP_STATE_ABORT_PENDING; refuse_write(); slots[2].state = APP_STATE_RUNNING;
+    slots[2].cpl3 = 0; refuse_write(); slots[2].cpl3 = 1;
     denied_page = 0; refuse_write();
     /* RO still readable; absent read page rejects without touching output. */
     redir_table[1].buf_len = 17; read_denied = 1;
@@ -166,6 +178,28 @@ int main(void)
     assert(fd_redirect_read(1, out, 1) == -1);
     assert(fd_redirect_to_buffer(1, current_va, 16, 17) == -1);
     assert(fd_redirect_to_buffer(1, (u8 *)(uptr)0xfffffff0U, 32, 0) == -1);
+    /* TRUSTED uses permanent identity addresses and never an AS walk. */
+    u8 *trusted = mmap((void *)(uptr)(MEM_APP_BAND_BASE - PAGE_SIZE), PAGE_SIZE,
+                      PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0);
+    assert(trusted != MAP_FAILED);
+    user_call = 0;
+    u32 before_walk = walk_count;
+    assert(fd_redirect_to_buffer(1, trusted, PAGE_SIZE, 0) == 0);
+    assert(redir_table[1].access.origin == REDIR_TRUSTED);
+    assert(fd_redirect_write(1, payload, 17) == 17 && !memcmp(trusted, payload, 17));
+    assert(fd_redirect_read(1, out, 17) == 17 && !memcmp(out, payload, 17));
+    assert(walk_count == before_walk);
+    assert(fd_redirect_to_buffer(1, trusted + PAGE_SIZE - 8, 16, 0) == -1);
+    assert(fd_redirect_to_buffer(1, (u8 *)(uptr)MEM_APP_BAND_BASE, 16, 0) == -1);
+    RedirAccess access = redir_table[1].access;
+    assert(!redir_access_check(&access, ~(u32)0 - 7, 16, 1));
+    assert(!redir_access_check(&access, MEM_APP_BAND_BASE - 8, ~(u32)0, 1));
+    redir_table[1].buffer = (u8 *)(uptr)MEM_APP_BAND_BASE;
+    redir_table[1].buf_len = 0;
+    u32 refused = redir_refuse_count;
+    assert(fd_redirect_write(1, payload, 17) == -1);
+    assert(redir_refuse_count == refused + 1);
+    munmap(trusted, PAGE_SIZE);
     assert(saves == restores && walk_count);
     puts("d0b: lifetime/reuse/RO/read/nest/park/pages/IF/bounds=OK");
     for (int id = 2; id <= 3; id++) { munmap(aliases[id], BYTES); close(fds[id]); }

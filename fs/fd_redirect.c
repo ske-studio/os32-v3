@@ -15,6 +15,10 @@
 /* FD 0/1/2 のリダイレクト状態テーブル */
 static FdRedirect redir_table[3];
 
+/* Buffer write refusals (including a failed per-page recheck), not capacity
+ * truncation or read/registration failures. Diagnostic only; no KAPI. */
+volatile u32 redir_refuse_count;
+
 /* 現在のリソース所有者 (exec ネスト深度)。exec.c がレベル遷移時に更新する */
 static int cur_res_owner = 0;
 
@@ -228,11 +232,17 @@ int fd_redirect_write(int fd, const void *buf, u32 size)
 
     if (r->target_type == FD_TARGET_BUFFER) {
         u32 space, count;
-        if (r->buf_pos > r->buf_len || r->buf_len > r->buf_capacity) return -1;
+        int rc;
+        if (r->buf_pos > r->buf_len || r->buf_len > r->buf_capacity) {
+            redir_refuse_count++;
+            return -1;
+        }
         space = r->buf_capacity - r->buf_len;
         count = (size < space) ? size : space;
-        return redir_access_copy(&r->access, r->buffer, &r->buf_len,
-                                 (void *)buf, count, 1);
+        rc = redir_access_copy(&r->access, r->buffer, &r->buf_len,
+                               (void *)buf, count, 1);
+        if (rc < 0 || (u32)rc < count) redir_refuse_count++;
+        return rc;
     }
 
     return -1;

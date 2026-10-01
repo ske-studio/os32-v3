@@ -119,8 +119,8 @@ int ring3_range_overlaps(u32 p, u32 len, u32 base, u32 end);
 /*     (gshell は `arg` をポインタとして解釈しない — 入力は SHM のスロット経由)。*/
 /*   - **アプリが登録したポインタは深さに関係なく歩く** — 前に控えたアプリの  */
 /*     ポインタ (fd_redirect_to_buffer のバッファ) を WM の文脈で書くときは、  */
-/*     この判定を通さず ring3_user_ranges_writable_always で表を歩く          */
-/*     (fs/fd_redirect.c の user_origin、2026-09-26 代行レビュー P2)。         */
+/*     RedirAccess を保存し、redir_access が登録者の生存・同一性を検査して   */
+/*     登録者 PD を歩き、返された PA 経由でコピーする。                     */
 /*  longjmp で WM を抜けた (park / kill) ときの深さの立ち直しは exec/exec.c   */
 /*  (ディスパッチャの入口で 0 に戻す)。                                       */
 /*                                                                          */
