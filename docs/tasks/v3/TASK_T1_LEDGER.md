@@ -1,6 +1,6 @@
 # TASK_T1_LEDGER — T1: 物理地図と所有権台帳 (設計票)
 
-> 状態: **受入完了 (2026-10-01)** — T1a〜T1f を main に着地 (T1f = `73bdf43`)。NP21/W (8MB・17MB、PEGC・planar・Cirrus、HDD / FD 起動) と実機 Ra266 64MB (T1a〜T1e) で回帰 (§4-2-N・§4-3-N・§4-4-N・§4-5-N、T1f は下の §4-6-N)。**残件 (理由つき)**: PCM 再生中の CTRL+STOP → 再オープン・再生 (NP21/W のこの構成に PCM が無い — 実機 Ra266 の CS4231 で、画面不要だが音の確認は人が要る)、`cirrus-off` + `GFX=cirrus` の構成 (未実施)、HostDrv の 24 件の番地の解釈 (T1-U6、NP21/W 側の未確認)。check_p2v は正規表現の guard (限界は §4-6-R) — clang の構文木での作り直しは [TASK_CLANG_CHECKS](TASK_CLANG_CHECKS.md)。
+> 状態: **受入完了 (2026-10-01)** — T1a〜T1f を main に着地 (T1f = `73bdf43`)。NP21/W (8MB・17MB、PEGC・planar・Cirrus、HDD / FD 起動) と実機 Ra266 64MB (T1a〜T1e) で回帰 (§4-2-N・§4-3-N・§4-4-N・§4-5-N、T1f は下の §4-6-N)。**残件 (理由つき)**: PCM 再生中の CTRL+STOP → 再オープン・再生は NP21/W の PC-9801-118 (CS4231) 構成で 3 回通した (§4-6-N2) — 残るのは実機 Ra266 の CS4231 での同じ試験 (音の確認は人が要る)。`cirrus-off` + `GFX=cirrus` は NP21/W で通した (§4-6-N2、予約と写像が残って PC98 で起動・GUI)。HostDrv の 24 件の番地の解釈 (T1-U6) は**決着** — NP21/W は線形番地を現 CR3 越しに読む (§5-3、`c48d90b`)、ゲストでの読み書きの回帰は T2c の前に。check_p2v は正規表現の guard (限界は §4-6-R) — clang の構文木での作り直しは [TASK_CLANG_CHECKS](TASK_CLANG_CHECKS.md)。
 >
 > それまでの状態: **実装中 (2026-10-01) — T1a・T1b 着地 (main `d7ac7a0`)、次は T1c**。NP21/W 回帰の結果は §4-2-N。CTRL+STOP・#GP / #DE / #UD の kill は 2026-10-01 に確認済み (§4-2-N の末尾)。未確認: PCM 再生中の CTRL+STOP (NP21/W の構成に PCM が無い)、実機 Ra266 64MB (実機エージェントに依頼中)。
 >
@@ -680,6 +680,33 @@ ini は切り替え道具のレシートで元 (`ExMemory=16`、`USEGD5430=false
 HDD 起動: `[selftest] 226/226 passed`、`[gfx] ledger cand=3 ok=3 bb=eb2000`、`[ledger] irq_ops=0 exc_ops=0 check_fail=0 bad_free=0`、`[HDRV] HostDrv(NT) mounted on /host` (`ls /host/bin` で一覧が読める)、`test2` PASS、`v86 -t` OK、`cpl0_probe usable_end=eb2000`。ゲスト試験一式 16 件中 PASS 14・SKIP 2 (以前からの前提不足)、`gui_gate v12g4 --h 480` OK。FD 起動 (`--fd os32_boot.d88`): `src=fd`、226/226、DMA の窓の警告なし。
 
 **実機 Ra266 64MB (実機エージェント、CI の成果物 `c90eed8` = T1f、`GFX=pegc`)**: `Image CRC cd40ec93 (471626 bytes)`、boot.log は `0fedc76` と比べて日時・CRC・時間計測の行だけが違い、`[selftest] 226/226 passed`・`[gfx] ledger cand=1 ok=1 bb=ea7000 top=ea7000`・`[ledger] pci raw=6 ovf=0`・`[ledger] irq_ops=0 exc_ops=0 check_fail=0 bad_free=0` は同じ。`cpl0_probe usable_end=ea7000`、`hal_test` `backend pegc`、`pegcchk 3` は前回と同じ値、`test2` ×3 PASS、`v86 -t` OK。**`faulttest gp` / `de` / `ud` / `pf`** は 4 本とも `[ring3] exception … vec=0x0D / 0x00 / 0x06` と `#PF addr=0x00100000` で kill されシェルへ戻り (`SURVIVED` なし)、その後の `test2` も PASS、`mem` の Heap は起動直後と同じ。
+
+#### 4-6-N2. 残件の取り直し — PCM 再生中の CTRL+STOP と `cirrus-off` + `GFX=cirrus` (検証担当 `claude-opus-5-5`、2026-10-01、17MB)
+
+ゲストのカーネルは `ver` で `Commit: 279272d`・`Image CRC: c02dc716 (472431 bytes, HDD loader)` (T2a′ まで。以後の main は文書・道具と `fs/hostdrvfs.c` のコメントだけ)。番地は同じコードの `build/out/kernel.map` で引き、`/api/mem?space=phys` で読んだ。起動直後の基準: `kselftest_fail`=0、`irq_ctx_violations`=1 (kselftest 自身の分)、`ledger_irq_ops`=`ledger_exc_ops`=0、`kctx_irq_depth`=`kctx_exc_depth`=0、`exec_as_leftover_pages`=0、`fault_kill_count`=0。
+
+**PCM (NP21/W の ini は `SNDboard=8` = PC-9801-118)**: 118 の CS4231 は WSS が 0F40h〜 (`cs4231io.c:231`)、0F43h の WSS ID = 0x04 (`:443-444`)、I12 = 0xCA (`:251`)、I25 = 0xA2 (= CS4231A、`:314-317`)。ini の `opt118ip=12` / `opt118dm=3` は起動時の初期値だけで、OS32 が 0F40h に `PCM_ROUTE_INT41_DMA1` (0x1A) を書くとその場で IRQ10 / DMA #1 に付け替わる (`cs4231io.c:388-392`、表は `:12-13`。いずれも `~/np21w-src/src/cbus/`) — OS32 の probe・経路と合うので ini の他のキーは触っていない。起動ログ `[pcm] CS4231 v=101 irq 10 dma 1 fmt 0x5B`、`[selftest] 226/226 passed`。
+
+| 操作 | 結果 |
+|---|---|
+| `pcm_test` (5 秒、対照) | `pcm_open(44100) OK`、t=1〜5s すべて `under=0 rep=0 resync=0`、`wrote 220500 frames (5 s)`、`pcm_close -> 0`。`/api/sound` の cs4231: `route=0x1a dmach=1 dmairq=10`、PI 累積 +109 (= 5 × 44100 / 2048)、終了後 PEN=0 / IEN=0 |
+| 再生中の CTRL+STOP × 3 (`/api/cmd` に `echo` → `pcm_test` → (`sleep 3`) → `pcm_test` の複数行を送って即座に返させ、`/api/sound` で PEN=1・IEN=1・PI が開始から +20 (≒1 秒) 進んだのを確かめてから `/api/key` を POST で `seq=CTRL%2BSTOP&hold=300`) | 3 回とも `t=1s ...` の後に `[Process crashed]`。kill の後 (2・3 回目は `sleep 3` の間に観測): PEN=0・IEN=0、PI は止まる (+23 のまま)、スレーブ PIC の IMR 0xF3 → **0xF7 (IRQ10 がマスク = `irq_unregister`)**。`fault_kill_count` と `appslot_reclaim_count` が 1 回ごとに +1、**`ledger_irq_ops`=0・`ledger_exc_ops`=0** (T2a の後なので回収は IRQ の上ではない)、`kctx_irq_depth`=`kctx_exc_depth`=0、`exec_as_leftover_pages`=0、**`irq_ctx_violations`=1 のまま (基準から増えない)**、`sleep 3` が戻る (tick 進行) |
+| kill の直後の再オープン・再生 (同じ `/api/cmd` の次の行の `pcm_test`) × 3 | 3 回とも `pcm_open(44100) OK` → 5 秒 `under=0 rep=0 resync=0` → `wrote 220500 frames` → `pcm_close -> 0`、PI +109 (2・3 回目)、終了後 PEN=0 / IEN=0、`route=0x1a dmach=1` |
+| 全部の後 | DMA プール (`kernel/dma_pool.o` の `.bss` 0x159860 の `s_pool`): 16 ページ全部空き、`leaked`=0、`bad_free`=0。上の各カウンタも同じ |
+
+判定は rc・ログ・カウンタと NP21/W の CS4231 の状態だけ (音は聞いていない)。`pcm_test` は `void main` なので `$?` は意味を持たない (対照の後の `echo $?` は 7)。1 回目の試し (`pcm_test` 2 行を送った回) は `/api/cmd` が最初の行の終わりまで返らず、CTRL+STOP が 2 本目の `pcm_open` の直後 (PI が 1 つも来ないうち) に入った — これも `[Process crashed]` → 次の `pcm_test` が 5 秒通ったが、再生中の kill としては数えない。NP21/W の CS4231 の DMA 経路は 8237 の TC も auto-init も実機と同じではない (TASK_PCM_CS4231 §1) ので、実機 Ra266 の同じ試験は残す。
+
+**`cirrus-off` + `GFX=cirrus`**: ini は元から `USEGD5430=false` (= `cirrus-off`) なので変えていない。ゲストで `gfxmode cirrus` (元は `GFX=auto`) → `/api/reset`。
+
+| 項目 | 結果 |
+|---|---|
+| 起動 | 止まらない。`[gfx] ledger cand=2 ok=2 bb=0 top=efd000` (候補は Cirrus だけ、PEGC の BB は確保しない — §4-5-R の 5 のとおり)、`[selftest] 226/226 passed`、`[ledger] irq_ops=0 exc_ops=0 check_fail=0 bad_free=0`、`kselftest_fail`=0、`ledger_check_fail`=0 |
+| 予約と写像 (probe 失敗後も残る) | `ledger_regions`: owner 7 (gfx) の DEVICE 区間 `[0xF60000, 0xF68000)` (`res_mask`=0x1 = Xe10-bank) と `[0xFE000000, 0xFE400000)` (`res_mask`=0x2 = Xe10-linear)。master PD (CR3 0x3F1000) の PDE 0x3F8 → PTE(0xFE000000) = 0xFE000013・PTE(0xFE1FF000) = 0xFE1FF013 (P・RW・PCD、U なし)、PTE(0xFE200000) = 0 (写像 2MB / decode 4MB の分離どおり)。SURFACE: planar (0x6A、32 ページ)・Cirrus CLIENT (0xFE04B、75 ページ、owner boot)・DISPLAY (0xFE000、owner kernel、perm none) |
+| backend | `hal_test` 1 行目 `backend pc98 (planar 4bpp)` (640x400 bpp=4)。boot.log に Cirrus の行は出ない |
+| GUI | `gui_gate v12g4 --h 400` が `RESULT: OK` (`scrn_ymax 400 grph_disp 1 wab_relay 0`、撮影 4 枚とも `src=pc98 640x400`、窓・タスクバー・アプリからの起動・CUI への戻りを画像で確認)。GUI の後も `ledger_check_fail`=0、予約と写像は同じ、planar の SURFACE の owner が gshell (5) へ |
+| 戻し | `gfxmode auto` → `/api/reset` → `[gfx] ledger cand=3 ok=3 bb=eb2000 top=eb2000`、`hal_test` `backend pegc (packed 8bpp)` 640x480 (= `cirrus-off` + `GFX=auto` で PEGC、B3)。`/etc/system.cfg` は `GUI=0` / `GFX=auto` (行の順だけ元と逆) |
+
+auto のときの低位区間は `[0xF00000, 0xF80000)` (`res_mask`=0x3 = PEGC + Xe10-bank を併合) で、`GFX=cirrus` では Xe10-bank の 8 ページだけになる — §3-8 の候補ごとの予約どおり。
 
 ### 4-7. T1 全体の受入 (TASK_MEMMAP_V3 §6 T1 の受入の要点との対応)
 
