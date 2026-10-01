@@ -208,6 +208,7 @@ static void boot(void)
     struct pgalloc_layout l;
     u32 low_kb = CFG_KB > 15360 ? 15360 : CFG_KB;
     u32 limit = CFG_KB / 4, top;
+    host_map_fixed_paging();
     paging_init(CFG_KB);
     physmem_bootstrap_legacy(&m, low_kb);
     if (CFG_KB > 16384)

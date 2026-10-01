@@ -132,6 +132,11 @@ class MemoryBoot(unittest.TestCase):
     def run_case(self, case='default', kb=16384, defines=()):
         run_case(case, kb, defines)
 
+    def test_fixed_paging_reservation_all_ram_shapes(self):
+        for kb in (8192, 17408, 65536):
+            with self.subTest(kb=kb):
+                self.run_case('fixed_paging', kb)
+
     def test_huge_hint_no_promotion(self):
         self.run_case('online', 0xffffffff)
 

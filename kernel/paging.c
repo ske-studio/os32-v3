@@ -140,20 +140,36 @@ STATIC_ASSERT(MEM_APP_BAND_MAX_TOP <= PAGING_BOOT_MAP_SIZE,
 STATIC_ASSERT(PAGING_PFN_COUNT == PDE_COUNT * PTE_COUNT, full_pfn_space);
 STATIC_ASSERT((PAGING_BOOT_MAP_SIZE % (PTE_COUNT * PAGE_SIZE)) == 0,
               map_size_pde_aligned);
-/* ======== ページテーブル (BSS配置, 4096バイトアライン必須) ======== */
-/* Open Watcomでは __declspec(align(4096)) が使えないため、
- * 手動でアライメントを確保する。
- * 実際のテーブルサイズ + 4095バイトのパディングを確保し、
- * 4096境界に切り上げたアドレスを使用する。 */
-
-/* ページテーブルは 1 本の連続バッファから切り出す。かつては 1 枚ごとに
- * 4095 バイトのパディングを持たせていたが (u8[N][4096+4095])、H3b で枚数が
- * 4 → 8 になると捨てるぶんも倍 (32KB) になる。先頭だけ 4096 境界に上げれば
- * 以降の 4KB 刻みは自動的に境界に乗るので、増分は表そのものの +16KB で済む。 */
-/* 4KB 整列を属性で保証し、+4095 の捨て (合計 8KB) を無くす (2026-09-23、TASK_MEMMAP_V3 2-3)。
- * align4096() はそのまま (整列済みなので恒等)。 */
-static u8 pd_raw[4096] __attribute__((aligned(4096)));      /* ページディレクトリ用生バッファ */
-static u8 pt_raw[PAGING_BOOT_PT_COUNT * 4096] __attribute__((aligned(4096)));  /* ページテーブル用生バッファ */
+/* T2a′: PD/PT backing は画像外の恒久 FIXED。ポインタ表だけを BSS に置く。 */
+STATIC_ASSERT(MEM_FIXED_BOOT_PT_COUNT == 8 &&
+              MEM_FIXED_PAGING_END - MEM_FIXED_PAGING_BASE == 10 * PAGE_SIZE,
+              fixed_paging_ten_pages);
+STATIC_ASSERT(((MEM_FIXED_PAGING_BASE | MEM_FIXED_PD_BASE |
+                MEM_FIXED_BOOT_PT_BASE | MEM_FIXED_APERTURE_PT_BASE |
+                MEM_FIXED_PAGING_END | MEM_SHELL_HEAP_BASE | MEM_SHELL_HEAP_END |
+                (MEM_SHELL_BAND_END + 1)) & (PAGE_SIZE - 1)) == 0,
+              fixed_paging_page_aligned);
+STATIC_ASSERT(MEM_FIXED_PD_BASE == MEM_FIXED_PAGING_BASE &&
+              MEM_FIXED_BOOT_PT_BASE == MEM_FIXED_PD_BASE + PAGE_SIZE &&
+              MEM_FIXED_APERTURE_PT_BASE == MEM_FIXED_BOOT_PT_BASE +
+                  PAGING_BOOT_PT_COUNT * PAGE_SIZE &&
+              MEM_FIXED_PAGING_END == MEM_FIXED_APERTURE_PT_BASE + PAGE_SIZE,
+              fixed_paging_contiguous);
+STATIC_ASSERT(MEM_SHELL_STACK_TOP <= MEM_SHELL_HEAP_BASE &&
+              MEM_SHELL_HEAP_BASE < MEM_SHELL_HEAP_END &&
+              MEM_SHELL_HEAP_BASE + MEM_SHELL_HEAP_SIZE == MEM_SHELL_HEAP_END &&
+              MEM_SHELL_HEAP_END == MEM_FIXED_PAGING_BASE,
+              shell_heap_below_fixed_paging);
+STATIC_ASSERT(MEM_FIXED_PAGING_END <= MEM_SHELL_BAND_END + 1 &&
+              MEM_SHELL_BAND_END + 1 == MEM_POOL_BASE &&
+              MEM_POOL_BASE - MEM_FIXED_PAGING_END == 5 * PAGE_SIZE,
+              fixed_paging_tail_reserved);
+STATIC_ASSERT(MEM_KERNEL_BAND_END < MEM_SHELL_LOAD_ADDR &&
+              MEM_DMA_POOL_END < MEM_SHELL_LOAD_ADDR &&
+              MEM_LEDGER_META_END <= MEM_STACK_GUARD &&
+              MEM_KSTACK_TOP < MEM_SHELL_LOAD_ADDR &&
+              MEM_SHELL_LOAD_ADDR <= MEM_SHELL_HEAP_BASE,
+              fixed_paging_above_kernel_regions);
 
 /* OS が割り当てるデバイス窓の帯 (memmap.h MEM_DEVICE_APERTURE_*) の先頭 4MB を
  * 覆う PT。**静的に 1 枚** 持つ (2026-09-29、Cirrus のリニア窓 FE000000h)。
@@ -171,7 +187,7 @@ STATIC_ASSERT(MEM_DEVICE_APERTURE_BASE + MEM_DEVICE_APERTURE_PDE_SIZE <=
               MEM_DEVICE_APERTURE_END, aperture_pt_inside_band);
 STATIC_ASSERT(PAGING_APERTURE_PDI >= PAGING_BOOT_PT_COUNT &&
               PAGING_APERTURE_PDI < PAGING_PT_COUNT, aperture_pdi_static_free);
-static u8 aperture_pt_raw[4096] __attribute__((aligned(4096)));
+
 
 static u32 *page_directory;          /* アライン済みポインタ */
 static u32 *page_tables[PAGING_PT_COUNT];
@@ -190,12 +206,45 @@ u32 paging_range_reject_count = 0;
 /* paging_init が実際に恒等マップした範囲の上端 PFN (exclusive)。 */
 static u32 boot_identity_end;
 
-/* 4096バイト境界に切り上げ */
-static u32 *align4096(void *p)
+/* CR3/PDE frame と固定10枚の恒等 sup/RW/WB を照合。A/D bit は無視する。
+ * PDE0 の USER 単独は SHM/trampoline のため許可し、実効権限は PTE で拒否。 */
+static int fixed_paging_valid(void)
 {
-    u32 addr = (u32)p;
-    addr = (addr + 4095) & ~4095UL;
-    return (u32 *)addr;
+    u32 i, a, entry;
+    u32 mask = ~(u32)(PAGE_SIZE - 1);
+    if (V2P(page_directory) != MEM_FIXED_PD_BASE) return 0;
+    for (i = 0; i < PAGING_BOOT_PT_COUNT; i++) {
+        a = MEM_FIXED_BOOT_PT_BASE + i * PAGE_SIZE;
+        entry = page_directory[i];
+        if (V2P(page_tables[i]) != a ||
+            (entry & (mask | PAGE_RW | PTE_PS | PTE_PCD | PTE_PWT)) !=
+            (a | PAGE_RW)) return 0;
+    }
+    entry = page_directory[PAGING_APERTURE_PDI];
+    if (V2P(page_tables[PAGING_APERTURE_PDI]) != MEM_FIXED_APERTURE_PT_BASE ||
+        (entry & (mask | PAGE_RW | PTE_USER | PTE_PS | PTE_PCD | PTE_PWT)) !=
+        (MEM_FIXED_APERTURE_PT_BASE | PAGE_RW)) return 0;
+    for (a = MEM_FIXED_PAGING_BASE; a < MEM_FIXED_PAGING_END; a += PAGE_SIZE) {
+        entry = page_tables[0][a / PAGE_SIZE];
+        if ((entry & (mask | PAGE_RW | PTE_USER | PTE_PCD | PTE_PWT)) !=
+            (a | PAGE_RW)) return 0;
+    }
+    return 1;
+}
+
+/* PG を立てる前に現在の stack/heap と予約境界の PTE を確認する。 */
+static int boot_range_valid(u32 first, u32 end, int present)
+{
+    u32 a, entry;
+    u32 mask = ~(u32)(PAGE_SIZE - 1);
+    for (a = first; a < end; a += PAGE_SIZE) {
+        entry = page_tables[a / (PTE_COUNT * PAGE_SIZE)][(a / PAGE_SIZE) % PTE_COUNT];
+        if (present) {
+            if ((entry & (mask | PAGE_RW | PTE_USER | PTE_PCD | PTE_PWT)) !=
+                (a | PAGE_RW)) return 0;
+        } else if (entry & PTE_PRESENT) return 0;
+    }
+    return 1;
 }
 
 /* ======================================================================== */
@@ -203,14 +252,16 @@ static u32 *align4096(void *p)
 /* ======================================================================== */
 void paging_init(u32 mem_kb)
 {
+    extern u32 __sqlite_start;
     int i, j;
     u32 phys;
     u32 pd_phys;
     u32 max_mem_bytes;
     u32 *pt_base;
+    unsigned int flags = irq_save();
 
     /* 一度だけ初期化する。動的 PT / live AS / 現在 CR3 を破壊しない。 */
-    if (pg_enabled) return;
+    if (pg_enabled) { irq_restore(flags); return; }
 
     /* ここで頭打ちにするのは **静的 bootstrap PT が覆う範囲** であって
      * 「OS32 が RAM として面倒を見る上限」ではない (K6-RAM)。これより上の
@@ -221,8 +272,8 @@ void paging_init(u32 mem_kb)
     boot_identity_end = max_mem_bytes / PAGE_SIZE;
 
     /* アライン済みポインタを取得 (先頭だけ上げれば以降は 4KB 刻みで乗る) */
-    page_directory = align4096(pd_raw);
-    pt_base = align4096(pt_raw);
+    page_directory = (u32 *)P2V_BOOT(MEM_FIXED_PD_BASE);
+    pt_base = (u32 *)P2V_BOOT(MEM_FIXED_BOOT_PT_BASE);
     for (i = 0; i < PAGING_PT_COUNT; i++) {
         page_tables[i] = i < PAGING_BOOT_PT_COUNT ?
             pt_base + (u32)i * PTE_COUNT : 0;
@@ -255,7 +306,7 @@ void paging_init(u32 mem_kb)
 
     /* デバイス窓の帯の PT (静的 1 枚)。中身は全 Not-Present、PDE は present。
      * 窓を張るのは gfx バックエンドの paging_map_phys (supervisor + PCD)。 */
-    page_tables[PAGING_APERTURE_PDI] = (u32 *)aperture_pt_raw;
+    page_tables[PAGING_APERTURE_PDI] = (u32 *)P2V_BOOT(MEM_FIXED_APERTURE_PT_BASE);
     for (j = 0; j < PTE_COUNT; j++)
         page_tables[PAGING_APERTURE_PDI][j] = PAGE_NOT_PRESENT;
     page_directory[PAGING_APERTURE_PDI] =
@@ -306,17 +357,13 @@ void paging_init(u32 mem_kb)
     /* シェルスタックガード: Not-Present */
     paging_set_not_present(MEM_SHELL_GUARD, MEM_SHELL_GUARD + PAGE_SIZE - 1);
 
-    /* シェル帯域後方 (MEM_SHELL_HEAP_BASE 0x380000 - 0x3FFFFF) はシェルの
-     * exec_heap (KAPI mem_alloc) として present R/W のまま使う。かつては
-     * Not-Present の空白帯だったが、シェルの exec_heap を newlib の sbrk
-     * (BSS 直後) から分離するためにここへ移した (include/memmap.h 参照)。
-     * PTE に USER は立てないので CPL=3 のアプリからは触れない */
+    /* heap の末尾を一旦 NP にし、固定10枚だけを最後に張り直す。 */
+    paging_set_not_present(MEM_SHELL_HEAP_END, MEM_SHELL_BAND_END);
 
     /* SQLite帯域 + 代替スタック (0x200000〜): 強制R/W
      * ブートローダーが sqlite.bin を 0x200000 にロード済み。
      * 代替スタックも含めメモリプローブ結果に関係なく R/W を保証する。 */
     {
-        extern u32 __sqlite_start;
         u32 sq_start = PAGE_ALIGN_DOWN((u32)&__sqlite_start);
         u32 sq_end   = PAGE_ALIGN_DOWN(MEM_SQLITE_STACK_TOP + PAGE_SIZE);
         paging_map_range(sq_start, sq_end, sq_start, PAGE_RW);
@@ -328,11 +375,27 @@ void paging_init(u32 mem_kb)
     /* ========================================================
      *  変換表の根 (CR3) にページディレクトリをセット → 変換を有効化 (CR0.PG)
      * ======================================================== */
+    if (paging_map_range(MEM_FIXED_PAGING_BASE, MEM_FIXED_PAGING_END,
+                         MEM_FIXED_PAGING_BASE, PAGE_RW) != 0 ||
+        !fixed_paging_valid() ||
+        !boot_range_valid(PAGE_ALIGN_DOWN((u32)&__sqlite_start),
+                          PAGE_ALIGN_DOWN(MEM_SQLITE_STACK_TOP + PAGE_SIZE), 1) ||
+        !boot_range_valid(MEM_DMA_POOL_BASE, MEM_DMA_POOL_END + 1, 1) ||
+        !boot_range_valid(MEM_LEDGER_META_BASE, MEM_LEDGER_META_END, 0) ||
+        !boot_range_valid(MEM_STACK_GUARD, MEM_KSTACK_BASE, 0) ||
+        !boot_range_valid(MEM_KSTACK_BASE, MEM_SHELL_LOAD_ADDR, 1) ||
+        !boot_range_valid(MEM_SHELL_GUARD, MEM_SHELL_GUARD + PAGE_SIZE, 0) ||
+        !boot_range_valid(MEM_SHELL_HEAP_BASE, MEM_SHELL_HEAP_END, 1) ||
+        !boot_range_valid(MEM_FIXED_PAGING_END, MEM_POOL_BASE, 0)) {
+        irq_restore(flags);
+        return; /* PG は立てない。後段の memory_boot_init が fail-stop。 */
+    }
     pd_phys = V2P(page_directory);
     arch_mmu_load_root(pd_phys);
     arch_mmu_enable();
 
     pg_enabled = 1;
+    irq_restore(flags);
 }
 
 /* ======================================================================== */
@@ -1291,7 +1354,8 @@ static u8 memmap_want_at(u32 a, u32 tramp)
     /* シェル常駐帯域 */
     if (a < MEM_SHELL_GUARD) return MM_RW;
     if (a < MEM_SHELL_GUARD + PAGE_SIZE) return MM_NP;
-    return MM_RW;                               /* スタック + exec_heap */
+    if (a >= MEM_FIXED_PAGING_END) return MM_NP;
+    return MM_RW;                               /* スタック + heap + 固定PD/PT */
 }
 
 static u8 memmap_seen_at(u32 pte)
@@ -1329,7 +1393,8 @@ int paging_memmap_selftest(u32 tramp_page)
     int runs = 0;
 
     paging_memmap_bad_count = 0;
-    if (!pg_enabled || !page_tables[0]) return -1;
+    if (!pg_enabled || !page_tables[0] || !fixed_paging_valid() ||
+        paging_current_cr3() != MEM_FIXED_PD_BASE) return -1;
 
     i = 0;
     while (i < PTE_COUNT) {

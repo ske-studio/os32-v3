@@ -26,6 +26,8 @@
 """
 import argparse
 import pathlib
+import re
+import importlib.util
 import shutil
 import subprocess
 import sys
@@ -44,6 +46,8 @@ MAP_TEMPLATE = (
     "                0x002bc060                        __sqlite_end = .\n")
 
 MUTATIONS = {
+    "no-fixed-bounds": ("    if m is not None:\n        names = (",
+                        "    if False:\n        names = ("),
     "no-overlap": ("""    good = [r for r in concrete(rows) if r["start"] <= r["end"]]""",
                    """    good = []"""),
     "no-reversed": ("""    return [r for r in concrete(rows) if r["start"] > r["end"] + 1]""",
@@ -194,7 +198,76 @@ def cases(script):
               "--write/--check 以外でも止まること")
         log.append("NOMAP   --check = %d (推測せず止まる)" % out.returncode)
 
+    log.extend(fixed_paging_cases(script))
     return log
+
+
+def fixed_paging_cases(script):
+    """地図と実リンカを一緒に検査。Cのコンパイル拒否をREDに数えない。"""
+    spec = importlib.util.spec_from_file_location('genmm_test', script)
+    gen = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gen)
+    changes = (
+        ('old-512k-heap', 'MEM_SHELL_HEAP_SIZE', '0x080000UL'),
+        ('unaligned-paging', 'MEM_FIXED_PAGING_BASE', '0x3F1001UL'),
+        ('one-page-overlap', 'MEM_SHELL_HEAP_END', '(MEM_FIXED_PAGING_BASE + MEM_GUARD_SIZE)'),
+        ('boot-count', 'MEM_FIXED_BOOT_PT_COUNT', '7'),
+    )
+    for label, name, expr in changes:
+        with tempfile.TemporaryDirectory(prefix='os32-fixed-map-') as tmp:
+            root = make_tree(tmp, CLEAN)
+            header = root / 'include/memmap.h'
+            header.write_text(re.sub(r'(^#define\s+' + name + r'\s+).*$',
+                                     lambda m: m[1] + expr, header.read_text(), flags=re.M))
+            # 写し一致の偶然の拒否で済ませず、境界の検査だけでも拒否させる。
+            macros = gen.Macros(gen.read_defines(header), {'__bss_end': CLEAN,
+                                '__sqlite_start': 0x200000, '__sqlite_end': 0x2bc060})
+            ld = root / 'build/os32.ld'
+            text = ld.read_text()
+            for rel, pattern, macro in gen.MIRRORS:
+                if rel == 'build/os32.ld':
+                    text = re.sub(pattern, lambda m: f'{macro} = 0x{macros.get(macro):X};', text, flags=re.M)
+            ld.write_text(text)
+            check(run(script, root, '--write').returncode == 0, 'write failed')
+            out = run(script, root, '--check')
+            check(out.returncode != 0 and '固定paging:' in out.stdout, label + ' escaped map checks')
+            link = link_fixture(root)
+            check(link.returncode != 0 and ('fixed paging' in link.stderr or 'shell heap' in link.stderr),
+                  label + ' escaped linker ASSERT: ' + link.stderr)
+    with tempfile.TemporaryDirectory(prefix='os32-fixed-link-') as tmp:
+        root = make_tree(tmp, CLEAN)
+        check(link_fixture(root).returncode == 0, 'baseline linker failed')
+        # SQLite 末尾が旧PD案0x2DD000への上限を越えても、既存DMA予算内は許可。
+        check(link_fixture(root, sqlite_end=0x2c0000).returncode == 0, 'SQLite growth restricted')
+        out = link_fixture(root, sqlite_end=0x2c7001)
+        check(out.returncode != 0 and 'SQLite band overruns DMA pool' in out.stderr,
+              'SQLite exceeded DMA budget without rejection')
+        ld = root / 'build/os32.ld'
+        ld.write_text(ld.read_text().replace('MEM_FIXED_PD_BASE = 0x3F1000;',
+                                             'MEM_FIXED_PD_BASE = 0x3F2000;'))
+        check(run(script, root, '--write').returncode == 0, 'write failed')
+        out = run(script, root, '--check')
+        check(out.returncode != 0 and '写しのずれ' in out.stdout, 'fixed paging mirror mismatch escaped')
+    return ['FIXED   map/link rejected 512KiB heap / unaligned / overlap / count; mirror rejected',
+            'SQLITE  growth past old PT limit accepted; DMA budget excess rejected']
+
+
+def link_fixture(root, sqlite_end=0x2bc060):
+    """本物のos32.ldに最小入力を与え、ASSERTを実際に評価する。"""
+    cc = 'i386-elf-gcc'
+    ld = 'i386-elf-ld'
+    for rel, asm in (('kernel/kentry', '.text\n.globl kentry\nkentry: nop\n.bss\n.space 16\n'),
+                     ('lib/sqlite3/sqlite3', f'.bss\n.space {sqlite_end - 0x200000}\n'),
+                     ('lib/sqlite3/os32_sqlite_vfs', '.text\n'),
+                     ('lib/sqlite3/os32_sqlite_test', '.text\n')):
+        src = root / (rel + '.s')
+        src.parent.mkdir(parents=True, exist_ok=True)
+        src.write_text(asm)
+        subprocess.run([str(cc), '-c', str(src), '-o', str(root / (rel + '.o'))], check=True,
+                       capture_output=True)
+    return subprocess.run([str(ld), '-T', 'build/os32.ld', 'kernel/kentry.o',
+                           'lib/sqlite3/sqlite3.o', '-o', 'build/out/fixture.elf'],
+                          cwd=root, capture_output=True, text=True)
 
 
 def main():

@@ -92,7 +92,7 @@
 読み手に暗算させ、2026-09-17 の「SHM がカーネルスタックに食い込んでいた」穴を隠していた。
 
 ```
-__bss_end      = 0x1943E4   (カーネル本体 593.0KB)
+__bss_end      = 0x188C44   (カーネル本体 547.1KB)
 __sqlite_start = 0x200000
 __sqlite_end   = 0x2BC200   (SQLite 本体 752.5KB)
 
@@ -107,15 +107,15 @@ __sqlite_end   = 0x2BC200   (SQLite 本体 752.5KB)
 0x0F0000 - 0x0FFFFF 64KB     BIOS ROM                                                      RO
 
 [ カーネル帯域 (0x100000-0x1FFFFF) ]
-0x100000 - 0x1943E3 593.0KB  カーネル .text/.data/.bss  (kernel.map の __bss_end まで)     RW
-0x1943E4 - 0x194FFF 3.0KB    空き
-0x195000 - 0x1C4FFF 192KB    カーネルヒープ (kmalloc)  (__bss_end を 4KB に切り上げた位置から) RW
-0x1C5000 - 0x1C5FFF 4KB      KernelAPI テーブル  (KAPI_ADDR)                               RW
-0x1C6000 - 0x1C6FFF 4KB      SHM 前方ガード                                                NP
-0x1C7000 - 0x1FEFFF 224KB    共有メモリ本体  (16KB x SHM_BLOCK_COUNT。CPL=3 アプリの起動時に USER へ昇格 (exec.c、PDE 0 は全 PD 共有)) RW
-0x1EF000 - 0x1FEFFF 64KB     GUI 予約 (末尾 4 ブロック)  (契約 T2。SDK の GUI_SHM_OFFSET = MEM_SHM_GUI_OFFSET) RW
-0x1FF000 - 0x1FFFFF 4KB      SHM 後方ガード                                                NP
-0x200000 - 0x1FFFFF **逆転** SHM 後方予約  (カーネルが予算いっぱいなら空になる (それは正しい)) NP
+0x100000 - 0x188C43 547.1KB  カーネル .text/.data/.bss  (kernel.map の __bss_end まで)     RW
+0x188C44 - 0x188FFF 956B     空き
+0x189000 - 0x1B8FFF 192KB    カーネルヒープ (kmalloc)  (__bss_end を 4KB に切り上げた位置から) RW
+0x1B9000 - 0x1B9FFF 4KB      KernelAPI テーブル  (KAPI_ADDR)                               RW
+0x1BA000 - 0x1BAFFF 4KB      SHM 前方ガード                                                NP
+0x1BB000 - 0x1F2FFF 224KB    共有メモリ本体  (16KB x SHM_BLOCK_COUNT。CPL=3 アプリの起動時に USER へ昇格 (exec.c、PDE 0 は全 PD 共有)) RW
+0x1E3000 - 0x1F2FFF 64KB     GUI 予約 (末尾 4 ブロック)  (契約 T2。SDK の GUI_SHM_OFFSET = MEM_SHM_GUI_OFFSET) RW
+0x1F3000 - 0x1F3FFF 4KB      SHM 後方ガード                                                NP
+0x1F4000 - 0x1FFFFF 48KB     SHM 後方予約  (カーネルが予算いっぱいなら空になる (それは正しい)) NP
 
 [ SQLite 帯域 (0x200000-0x2FFFFF) ]
 0x200000 - 0x2BC1FF 752.5KB  SQLite code+BSS  (kernel.map の __sqlite_start / __sqlite_end) RW
@@ -132,7 +132,11 @@ __sqlite_end   = 0x2BC200   (SQLite 本体 752.5KB)
 0x300000 - 0x374FFF 468KB    シェル .text/.data/.bss + newlib sbrk  (MEM_SHELL_MAX_SIZE が上限 = sbrk の天井) RW
 0x375000 - 0x375FFF 4KB      シェルスタックガード                                          NP
 0x376000 - 0x37FFFF 40KB     シェルスタック  (下向き成長)                                  RW
-0x380000 - 0x3FFFFF 512KB    シェル exec_heap (KAPI mem_alloc)  (newlib の sbrk とは別領域 (2026-09-03)) RW
+0x380000 - 0x3F0FFF 452KB    シェル exec_heap (KAPI mem_alloc)  (newlib の sbrk とは別領域 (2026-09-03)) RW
+0x3F1000 - 0x3F1FFF 4KB      固定 master PD  (恒久FIXED / supervisor / WB)                 RW
+0x3F2000 - 0x3F9FFF 32KB     固定 bootstrap PT (8枚)  (恒久FIXED / supervisor / WB)        RW
+0x3FA000 - 0x3FAFFF 4KB      固定 device aperture PT  (backing は WB、MMIO PTE は PCD/PWT) RW
+0x3FB000 - 0x3FFFFF 20KB     上端残余予約  (恒久FIXED、T3 の guard+kstack 用)              NP
 
 [ 共有ライブラリ / プログラム空間 (0x400000-) ]
 0x400000 - 0x4FFFFF 1MB      共有ライブラリ帯 (libos32gui.shlib)  (.text は全 PD 共有、.data/.bss はアプリごとの物理) RO+USER / RW+USER
@@ -152,12 +156,12 @@ __sqlite_end   = 0x2BC200   (SQLite 本体 752.5KB)
 
 **地図の矛盾: 0 件** (重なりも逆転も無い。`--check` が毎回確かめる)
 
-**カーネル本体の予算**: 596KB 中 593.0KB を使用 (残り 3.0KB)。
+**カーネル本体の予算**: 596KB 中 547.1KB を使用 (残り 48.9KB)。
 
 **カーネルがあと何 KB 育つと何が壊れるか** (`__bss_end` が伸びると `KHEAP_BASE` 以降が芋づるで動く)
 
-- `__bss_end` +3.0KB で KHEAP_BASE が 1 ページ上がる。0x195000 → 0x196000。以降の KAPI / SHM / ガードが全部 4KB 動く
-- `__bss_end` +3.0KB で **build/os32.ld の ASSERT がリンクを止める** (予算 MEM_KERNEL_IMAGE_MAX 超過)。止めるのが目的。超えたぶんだけ SHM 帯が カーネル帯域 0x1FFFFF を突き抜ける
+- `__bss_end` +956B で KHEAP_BASE が 1 ページ上がる。0x189000 → 0x18A000。以降の KAPI / SHM / ガードが全部 4KB 動く
+- `__bss_end` +48.9KB で **build/os32.ld の ASSERT がリンクを止める** (予算 MEM_KERNEL_IMAGE_MAX 超過)。止めるのが目的。超えたぶんだけ SHM 帯が カーネル帯域 0x1FFFFF を突き抜ける
 
 <!-- /生成: tools/gen_memmap.py -->
 

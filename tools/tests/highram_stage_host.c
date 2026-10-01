@@ -50,6 +50,7 @@ void _start(void)
     static u32 low[4096];
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
     CHECK(result == 0x800000);
+    host_map_fixed_paging();
     paging_init(16384);
     CHECK(sys_memory_stage_online != 0);
     CHECK(sys_memory_bootstrap_model != 0 && paging_verify_identity != 0);

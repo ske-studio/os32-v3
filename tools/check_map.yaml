@@ -650,6 +650,7 @@ checks:
     - userland/libos32term_render/tests/render.rs
     - userland/libos32term_render/tests/rework.rs
   check-memory-host:
+    - tools/tests/host_arch/arch_io.h
     - gfx/gfx.h
     - gfx/palette.h
     - exec/appslot.c
@@ -687,6 +688,7 @@ checks:
     - tools/tests/highram_stage_host.c
     - tools/tests/host_arch/arch_cpu.h
     - tools/tests/memory_boot_host.c
+    - tools/tests/paging_rebuild_host.c
     - tools/tests/pgalloc_host_fixture.h
     - tools/tests/pgalloc_range_host.c
     - tools/tests/sbrk_tier_host.c
@@ -800,6 +802,11 @@ checks:
     - sdk/include/os32/os32_kapi_generated.h
     - sdk/include/os32/os32_kapi_shared.h
   check-memmap-host:
+    - exec/exec_heap.c
+    - exec/exec_heap.h
+    - include/kprintf.h
+    - kernel/kmalloc.c
+    - tools/tests/host_arch/arch_io.h
     - boot/boot_defs.h
     - boot/bootinfo.inc
     - boot/loader_fat_new.asm

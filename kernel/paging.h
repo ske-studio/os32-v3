@@ -47,7 +47,7 @@
  * No optional device guard policy is introduced here. */
 #define PAGING_PFN_COUNT 1048576UL
 #define PAGING_PT_COUNT PDE_COUNT
-#define PAGING_BOOT_PT_COUNT 8
+#define PAGING_BOOT_PT_COUNT MEM_FIXED_BOOT_PT_COUNT
 #define PAGING_BOOT_MAP_SIZE (PAGING_BOOT_PT_COUNT * PTE_COUNT * PAGE_SIZE)
 /* Legacy backend aperture checks still use the bootstrap window size.
  * Not the mapping API ceiling: use PAGING_PFN_COUNT for address spans. */
