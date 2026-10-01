@@ -1106,6 +1106,64 @@ make check-changed < /dev/null` は上記PATH/PYTHONPATHで**1回だけ実行し
 ログ: `/home/hight/os32-tmp/d4-check-changed.log`。
 検査中はソース変更なし。終了後は本結果の追記だけ。
 
+### d4 独立レビュー (Opus 5.5、Approve) の P3 対応 (2026-10-02)
+
+基点 `7fac1ed`、`wt/t2d4`。今回の P3 番号は上記の d3 からの申し送りと別。
+カーネル実装は変更せず、試験と記録を補強した。
+
+- **P3-1**: RO の次ページを含む範囲について
+  `CHECK(!check_caller_write_range(&caller, (void *)va, 8))` を IF 両値で追加。
+  `caller_range(c, (u32)(uptr)dst, len, 1)` の末尾を `0` にする変異を
+  `test_caller_copy.py` に追加した。補強前は変異が生存して試験器 rc=1、
+  補強後はコンパイル成功後の実行時 RED。正常対照 PASS、全変異 **17/17 runtime RED**。
+- **P3-2**: copyout の次ページ NP 拒否前に、写し先の先頭 4 byte を input と
+  異なる `0x55` で埋め、拒否後も全 4 byte が `0x55` のままと確認する。
+  部分書込みを input と同じ初期値で見逃す穴を閉じた。
+
+**d5 接続前の申し送り (P3-3〜5、コード変更なし)**:
+
+- **P3-3**: cstr は 1 byte ごとに walk 全体を走らせ、範囲全体を 1 つの
+  IRQ 保存区間で処理する (`exec/redir_access.c:259-268`、
+  `exec/access_walk.c:34-53`)。lease 上では各 byte の
+  `ledger_surface_validate` が npages 回検査するため、割込み禁止時間は
+  cap × npages に比例する (例: SQL の cap 1024 × 75 ページの面で約 77k 回)。
+  **d5 の接続前に lease 上の終端なし 1024 byte の時間を測定するか、
+  「ページ先頭で 1 回 walk → ページ内は PA+off」へ変更する**。
+  後者を採る場合は §1-2 の「その1 byteの権限確認」に、同一 IRQ 保存区間内で
+  確認済みページの権限を再利用する旨を注記し、NUL 後を検査しない契約を保つ。
+- **P3-4**: helper 自身は len / cap の上限を持たない
+  (`exec/redir_access.c:197 / :221 / :255`)。
+  **d5 の各 wrapper で上限を明示し、レビューで確認する**。
+- **P3-5**: `kmemcpy` は重なりを保証しない。
+  **d5 の staging は SHM に置かず**、caller の写し元・写し先と非重複にする。
+
+| 同一cross toolchain実測 | P3対応前 (clean build_id) | P3対応後 (-dirty) | 差分 |
+|---|---:|---:|---:|
+| kernel.bin | 362,832 B | 362,840 B | +8 B |
+| vmkernel.lz4 | 480,466 B | 480,477 B | +11 B |
+| 本体占有 (`__bss_end - 0x100000`) | 573,680 B | 573,680 B | 0 B |
+| `__bss_end` | `0x18C0F0` | `0x18C0F0` | 0 B |
+| リンカASSERT残り (596 KiB枠) | 36,624 B | 36,624 B | 0 B |
+| d枠残り (5,888 B) | 2,012 B | 2,012 B | 0 B |
+
+本体増分はなく、ファイル増分は build_id の dirty 化による。
+`CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp make kernel < /dev/null`
+(対応前)、`python3 tools/tests/test_caller_copy.py --mutate` (補強後) は rc=0。
+`NP21W_DIR=/home/hight/os32-tmp/d4-p3-unused-image-destination
+CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp make all < /dev/null` は rc=0。
+FDコピー先は存在しない一時パスへ限定し、copy 警告を確認した。
+PATH / PYTHONPATH は上記と同じ。ログは
+`/home/hight/os32-tmp/d4-p3-{before,red,copy,all}.log`。
+NP21/W・NHD・配備・ini・commit/push は未操作。ゲスト確認と性能測定は未実施。
+`python3 tools/gen_memmap.py --write` は rc=0 (生成差分なし)。最終
+`CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp
+make check-changed < /dev/null` は上記 PATH / PYTHONPATH で **1 回だけ実行し rc=0**。
+基点以降の `build/sdk.mk` の変更で選択器が full へ拡張した。
+caller-copy は 17/17 runtime RED、C 方言は 27/27 RED・正常対照 5/5 GREEN。
+既存 Windows opt-in は単独 4 件・集約 5 件 skip。
+ログ: `/home/hight/os32-tmp/d4-p3-check-changed.log`。
+検査中はソース変更なし。終了後は本結果の記録だけ。
+
 
 
 ## 11. 独立レビュー 2 回目 (Opus 5.5、Approve) の P3 — 実装時の注記

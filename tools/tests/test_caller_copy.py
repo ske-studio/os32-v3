@@ -16,6 +16,7 @@ MUTANTS = [
     ('dst[i] = *(const char *)P2V(pa);', 'dst[i] = *(const char *)P2V(pa); if (i == 0) { u32 ahead; if (!caller_access_page(c, va + cap - 1, 0, &ahead)) goto out; }', 'preflight cap beyond NUL'),
     ('len - 1 > ~(u32)0 - va', '0', 'range overflow'),
     ('(!len || staging) && caller_range(c, va, len, write)', '(!len || staging)', 'copy before full preflight'),
+    ('caller_range(c, (u32)(uptr)dst, len, 1)', 'caller_range(c, (u32)(uptr)dst, len, 0)', 'write range ignores RW'),
     ('caller_range(c, va, len, write)', 'caller_range(c, va, len, 0)', 'copyout preflight ignores RW'),
     ('if (write) kmemcpy(P2V(pa), bytes, n);', 'if (write) kmemcpy(P2V(pa), bytes, 1);', 'short copyout'),
     ('else kmemcpy(bytes, P2V(pa), n);', 'else kmemcpy(bytes, P2V(pa), 1);', 'short copyin'),

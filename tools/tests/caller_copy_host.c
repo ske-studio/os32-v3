@@ -37,8 +37,9 @@ static void caller_copy_tests(void)
         /* Reject second-page NP before changing either destination. */
         RESET();
         CHECK(!copy_caller_bytes(&caller, (void *)va, out, 8)); UNCHANGED(); SAME();
+        for (u32 j = 0; j < 4; j++) p[PAGE_SIZE - 4 + j] = 0x55;
         CHECK(!copy_to_caller(&caller, (void *)va, input, 8));
-        for (u32 j = 0; j < 4; j++) CHECK(p[PAGE_SIZE - 4 + j] == (u8)input[j]);
+        for (u32 j = 0; j < 4; j++) CHECK(p[PAGE_SIZE - 4 + j] == 0x55);
         SAME();
         CHECK(!check_caller_write_range(&caller, (void *)va, 8)); SAME();
         RESET();
@@ -64,6 +65,7 @@ static void caller_copy_tests(void)
         RESET(); CHECK(copy_caller_cstr(&caller, (void *)va, out, 8));
         CHECK(copy_probes == 8 && out[7] == 0); SAME();
         pt[index + 1] &= ~PTE_RW;
+        CHECK(!check_caller_write_range(&caller, (void *)va, 8)); SAME();
         CHECK(!copy_to_caller(&caller, (void *)va, "XXXXXXXX", 8));
         CHECK(p[PAGE_SIZE - 4] == 'a' && p[0] == 'e'); SAME();
         CHECK(copy_caller_bytes(&caller, (void *)va, out, 8)); SAME();
