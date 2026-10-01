@@ -92,7 +92,7 @@
 読み手に暗算させ、2026-09-17 の「SHM がカーネルスタックに食い込んでいた」穴を隠していた。
 
 ```
-__bss_end      = 0x18B868   (カーネル本体 558.1KB)
+__bss_end      = 0x18B1CC   (カーネル本体 556.4KB)
 __sqlite_start = 0x200000
 __sqlite_end   = 0x2BC200   (SQLite 本体 752.5KB)
 
@@ -107,8 +107,8 @@ __sqlite_end   = 0x2BC200   (SQLite 本体 752.5KB)
 0x0F0000 - 0x0FFFFF 64KB     BIOS ROM                                                      RO
 
 [ カーネル帯域 (0x100000-0x1FFFFF) ]
-0x100000 - 0x18B867 558.1KB  カーネル .text/.data/.bss  (kernel.map の __bss_end まで)     RW
-0x18B868 - 0x18BFFF 1.9KB    空き
+0x100000 - 0x18B1CB 556.4KB  カーネル .text/.data/.bss  (kernel.map の __bss_end まで)     RW
+0x18B1CC - 0x18BFFF 3.6KB    空き
 0x18C000 - 0x1BBFFF 192KB    カーネルヒープ (kmalloc)  (__bss_end を 4KB に切り上げた位置から) RW
 0x1BC000 - 0x1BCFFF 4KB      KernelAPI テーブル  (KAPI_ADDR)                               RW
 0x1BD000 - 0x1BDFFF 4KB      SHM 前方ガード                                                NP
@@ -138,30 +138,31 @@ __sqlite_end   = 0x2BC200   (SQLite 本体 752.5KB)
 0x3FA000 - 0x3FAFFF 4KB      固定 device aperture PT  (backing は WB、MMIO PTE は PCD/PWT) RW
 0x3FB000 - 0x3FFFFF 20KB     上端残余予約  (恒久FIXED、T3 の guard+kstack 用)              NP
 
-[ 共有ライブラリ / プログラム空間 (0x400000-) ]
-0x400000 - 0x4FFFFF 1MB      共有ライブラリ帯 (libos32gui.shlib)  (.text は全 PD 共有、.data/.bss はアプリごとの物理) RO+USER / RW+USER
-0x500000 -        動的     外部プログラム空間  (code+bss → sbrk → ガード → exec_heap → スタック。上端は実行時に決まる。物理ページの池の下端は MEM_POOL_BASE) RW+USER
+[ 仮想アプリ帯 (0x80000000-) ]
+0x80000000 - 0x800FFFFF 1MB      共有ライブラリ帯 (libos32gui.shlib)  (.text は全 PD 共有、.data/.bss はアプリごとの物理) RO+USER / RW+USER
+0x80100000 -       動的     外部プログラム空間  (image/sbrk、exec_heap は 0x88000000、可変 stack は 0x90000000 直下。物理ページの池の下端は MEM_POOL_BASE) RW+USER
+
+[ 物理 RAM とデバイス窓 ]
 0x500000 - 0x5FFFFF 1MB      集積域 (ブート時)  (圧縮画像の読み込み先 (T6b 以後)。展開が終われば池へ。T1 ではローダは未使用) 池
 0x600000 - 0x6FFFFF 1MB      同梱域 (ブート時)  (ブート必須モジュールの展開先 (T5b 以後、台帳が owner=bundle で予約)。T1 ではローダは未使用) 池
-
-[ デバイス窓 (実 RAM ではない) ]
+0x700000 - 0xEFFFFF 8MB      空き
 0xF00000 - 0xFFFFFF 1MB      PC-98 システム空間 (PEGC リニア窓)  (RAM として配らない)      NP / supervisor+PCD
 0x1000000 - 0x7FFFFFFF 2032MB   16MB 以上の実 RAM (の置き場)  (検出量ぶんだけ pgalloc の池に入る (K6-RAM)。上端は MEM_PHYS_RAM_CEILING (D11)) RW
 0x80000000 - 0xFFFFFFFF 2048MB   RAM の登録上限 (2GB) 以上  (RAM として登録しない (D11)。PCI の BAR・デバイス窓の帯 (0xFE000000〜)・最上位の ROM / MMIO) NP / supervisor+PCD
 
   属性: RW=読み書き / RO=読み取り専用 / NP=Not-Present (ガード)
   USER=CPL=3 から見える。`<<<` の行は下の「地図の矛盾」に出る帯。
-  アプリ固有 PDE (0x400000 から 4MB 単位) は最大 0xC00000 まで伸びる。
+  アプリ固有 PDE (0x80000000 から 4MB 単位) は最大 0x90000000 まで伸びる。
 ```
 
 **地図の矛盾: 0 件** (重なりも逆転も無い。`--check` が毎回確かめる)
 
-**カーネル本体の予算**: 596KB 中 558.1KB を使用 (残り 37.9KB)。
+**カーネル本体の予算**: 596KB 中 556.4KB を使用 (残り 39.6KB)。
 
 **カーネルがあと何 KB 育つと何が壊れるか** (`__bss_end` が伸びると `KHEAP_BASE` 以降が芋づるで動く)
 
-- `__bss_end` +1.9KB で KHEAP_BASE が 1 ページ上がる。0x18C000 → 0x18D000。以降の KAPI / SHM / ガードが全部 4KB 動く
-- `__bss_end` +37.9KB で **build/os32.ld の ASSERT がリンクを止める** (予算 MEM_KERNEL_IMAGE_MAX 超過)。止めるのが目的。超えたぶんだけ SHM 帯が カーネル帯域 0x1FFFFF を突き抜ける
+- `__bss_end` +3.6KB で KHEAP_BASE が 1 ページ上がる。0x18C000 → 0x18D000。以降の KAPI / SHM / ガードが全部 4KB 動く
+- `__bss_end` +39.6KB で **build/os32.ld の ASSERT がリンクを止める** (予算 MEM_KERNEL_IMAGE_MAX 超過)。止めるのが目的。超えたぶんだけ SHM 帯が カーネル帯域 0x1FFFFF を突き抜ける
 
 <!-- /生成: tools/gen_memmap.py -->
 

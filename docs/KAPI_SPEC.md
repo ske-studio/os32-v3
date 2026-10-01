@@ -1,4 +1,4 @@
-# KernelAPI v68 仕様書
+# KernelAPI v69 仕様書
 
 外部プログラム (OS32X) がカーネル機能を利用するためのAPIテーブル仕様。
 
@@ -8,16 +8,16 @@
 
 | 項目 | 値 |
 |------|------|
-| バイナリ形式 | OS32X (ヘッダ v3 = 48 バイト + フラットバイナリ。§4-0) |
+| バイナリ形式 | OS32X (ヘッダ v4 = 60 バイト + フラットバイナリ。§4-0) |
 | ヘッダマジック | 0x4F533332 ('OS32') |
 | KAPIテーブルアドレス | 動的算出 (KHEAP_BASE + KHEAP_SIZE) |
 | KAPIマジック | 0x4B415049 ('KAPI') |
-| プログラムロード先 | 0x400000 |
-| 最大プログラムサイズ | 1MB |
+| プログラムロード先 | 0x80100000 (shlib 0x80000000、常駐 shell 0x300000) |
+| 最大プログラムサイズ | image と暫定 heap 予算を起動時に検査 ([TASK_T2_APPBAND](tasks/v3/TASK_T2_APPBAND.md) §4) |
 | プログラム専用ヒープ | 動的配置 (sbrk_heap_limit, exec_heap 管理下) |
 | プログラム専用スタック | 動的配置 (メモリ終端付近、下向き展開) |
-| 現在のバージョン | **64** |
-| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 234・予約 66) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
+| 現在のバージョン | **69** |
+| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 240・予約 60) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
 
 ---
 
@@ -166,6 +166,8 @@ CPL=3 が出力引数に渡した**読み取り専用の USER ページ** — �
 既知の穴: `dev_blk_read` の `unit` は**最小のセクタ長 512** で見る。1024 (FD) / 2048 (CD) の
 デバイスでは後ろ半分以上が未検査のまま (帯検査は効く)。`dev->sect_size` はラッパからは引けない。
 
+| v69 | **実装済み (2026-10-01、手元ビルド・ホスト試験)** | T2c: OS32X v4 / 4 世代の正典・高位配置・可変 stack。KAPI slot の追加・並べ替えなし | [tasks/v3/TASK_T2_APPBAND.md](tasks/v3/TASK_T2_APPBAND.md) §4-6・T2c-R |
+
 ---
 
 ## §4 KernelAPI 構造体レイアウト
@@ -211,6 +213,29 @@ Rust の os32api が ELF の**非ロード**のセクション `.os32_kapi_layou
 v62 以前にコンパイルしたオブジェクトは `kapi` を参照したままなので、新しい crt と
 リンクすると未定義参照で落ちる。名前は `sdk/kapi.json` の `crt_kapi_symbol` で、
 配置が変わるときにだけ変える。
+
+### T2c: OS32X v4 と生成する世代 (KAPI v69)
+
+現在のヘッダは **60B**。v3 の先頭48Bを保ち、0x30 `kapi_abi_generation`、
+0x34 `memory_layout_generation`、0x38 `shlib_protocol` を加えた。
+上の v3 の緩い版照合は旧実装の説明で、現在は magic・version・header_size・
+KAPI配置・ABI世代・メモリ世代が完全一致、読込長60B以上、既知flagだけを要求する。
+shlibプロトコルは完全一致、非依存アプリだけ0。min_api_verは同じ世代内で機能版以下。
+`stack_size=0` は256KiB、明示値はページ切上げ・最低16KiB。signed overflow、
+帯の容量超過、argvフレームが収まらない要求を拒否する。
+
+`sdk/kapi.json` の `generations` が4世代の唯一の正典。
+`sdk/gen_kapi.py` は C (`os32_generations.h` / `os32_unit_stamp.h`)、
+Python (`os32_generations.py`)、NASM (`crt/generations.inc`)、リンカ契約、
+Rust (`generations.rs`) を生成する。生成物を手で変更しない。
+C はコンパイル時に `-include os32_unit_stamp.h`、asm は生成した note/ref、
+Rust は `RUSTC_WRAPPER=.../rustc_stamp.py` で crate/hash を LTO 前に検査する。
+`link_guard.py i386-elf-ld ...` は実際に選択された .o / archive member を照合し、
+`.inputs.json` を作る。包装器はその hash と最終ELFのnoteを照合する。
+世代非依存の newlib/libgcc は正確な toolchain パスを台帳に残す。
+配布 SDK の hello の Makefile に、このコンパイル・リンク規則の使用例がある。
+`make all` は `build/out/generations-manifest.json` に成果物群の build ID・4世代・
+hash・リンク入力を記録する。空の apps/game は除外と明記し、外部も再ビルド済みとはしない。
 
 ### ヘッダ
 

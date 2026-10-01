@@ -13,7 +13,7 @@ mkos32x.py - フラットバイナリに OS32X ヘッダを付加する
     --entry OFF    エントリポイントオフセット (デフォルト: 0)
     --gfx          GFXフラグを設定
     --ring3        CPL=3 (リング3) フラグを設定 (v2 M1)
-    --cpl0         CPL=0 強制フラグを設定 (ring3 デフォルト化後のエスケープ, v2 M3)
+    --stack SIZE   stack 要求 (0=256KiB、ページ切上げ、最低16KiB)
     --shlib        共有ライブラリフラグを設定 (MEM_SHLIB_BASE 常駐, GUI v1.1 K3)
     --cui-only     CUI 専用フラグを設定 (GUI からの起動を断る, 票 T8-2)
     --launcher     起動要求 (launch_req) を出してよい宣言 (票 T9 D3)
@@ -37,7 +37,6 @@ import os32x_hdr as H  # noqa: E402
 
 OS32X_FLAG_GFX = H.OS32X_FLAG_GFX
 OS32X_FLAG_RING3 = H.OS32X_FLAG_RING3
-OS32X_FLAG_FORCE_CPL0 = H.OS32X_FLAG_FORCE_CPL0
 OS32X_FLAG_SHLIB = H.OS32X_FLAG_SHLIB
 OS32X_FLAG_CUI_ONLY = H.OS32X_FLAG_CUI_ONLY
 OS32X_FLAG_LAUNCHER = H.OS32X_FLAG_LAUNCHER
@@ -53,7 +52,7 @@ def main():
         print("  --entry OFF   エントリポイントオフセット")
         print("  --gfx         GFXフラグ設定")
         print("  --ring3       CPL=3 リング3フラグ設定")
-        print("  --cpl0        CPL=0 強制フラグ設定")
+        print("  --stack SIZE  stack 要求 (0=既定)")
         print("  --shlib       共有ライブラリフラグ設定")
         print("  --cui-only    CUI 専用フラグ設定 (GUI から起動しない)")
         print("  --launcher    起動要求フラグ設定 (launch_req を呼べる, 票 T9)")
@@ -64,6 +63,7 @@ def main():
     output_path = sys.argv[2]
 
     # オプション解析
+    stack_size = 0
     heap_size = 0
     bss_size = 0
     min_api_ver = 1
@@ -74,7 +74,10 @@ def main():
 
     i = 3
     while i < len(sys.argv):
-        if sys.argv[i] == '--heap' and i + 1 < len(sys.argv):
+        if sys.argv[i] == '--stack' and i + 1 < len(sys.argv):
+            stack_size = int(sys.argv[i + 1], 0)
+            i += 2
+        elif sys.argv[i] == '--heap' and i + 1 < len(sys.argv):
             heap_size = int(sys.argv[i + 1], 0)
             i += 2
         elif sys.argv[i] == '--bss' and i + 1 < len(sys.argv):
@@ -96,8 +99,7 @@ def main():
             flags |= OS32X_FLAG_RING3
             i += 1
         elif sys.argv[i] == '--cpl0':
-            flags |= OS32X_FLAG_FORCE_CPL0
-            i += 1
+            raise SystemExit("--cpl0 removed; rebuild as CPL=3")
         elif sys.argv[i] == '--shlib':
             flags |= OS32X_FLAG_SHLIB
             i += 1
@@ -131,11 +133,11 @@ def main():
         # 手動指定されていなければ ELF の値を使う。
         text_addr = elf.text_addr()
         if text_addr is None:
-            print(f"  警告: .text セクションが見つかりません ({elf_path})")
+            raise H.HeaderError("missing .text")
         else:
             elf_entry = elf.e_entry - text_addr
             if elf_entry < 0:
-                print(f"  警告: エントリポイントが .text より前にあります ({elf_path})")
+                raise H.HeaderError("entry before .text")
             else:
                 if entry_offset == 0:
                     entry_offset = elf_entry
@@ -152,10 +154,19 @@ def main():
             code_data = f.read()
         H.check_raw_matches_elf(elf, code_data, input_path)
 
+        if load_addr != text_addr or load_addr not in (H.OS32X_SHELL_LOAD_ADDR, H.OS32X_APP_LOAD_ADDR):
+            raise H.HeaderError("load address differs from ELF/image contract")
         text_size = len(code_data)
+        if stack_size < 0 or stack_size > 0x7fffffff or heap_size < 0 or heap_size > 0xffffffff:
+            raise H.HeaderError("invalid heap/stack size")
+        if not 0 <= entry_offset < text_size:
+            raise H.HeaderError("entry outside image")
+        shlib_dependency = '__os32_shlib_dependency' in elf.symbols
+        if shlib_dependency and load_addr != H.OS32X_APP_LOAD_ADDR:
+            raise H.HeaderError("resident shell must be statically linked")
         eff_api = H.effective_min_api(min_api_ver)
         header = H.build_header(flags, entry_offset, text_size, bss_size,
-                                heap_size, min_api_ver, load_addr, kapi_data_off)
+                                heap_size, min_api_ver, load_addr, kapi_data_off, stack_size, H.OS32_SHLIB_PROTOCOL if shlib_dependency else 0)
     except H.HeaderError as e:
         print(f"mkos32x: {e}", file=sys.stderr)
         sys.exit(1)

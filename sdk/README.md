@@ -99,3 +99,15 @@ OS 側の `docs/KAPI_SPEC.md` の「API関数」の注記。)
 新しい API を追加するたびに上がる。古い SDK でビルドしたアプリは
 新しいカーネルでも動くが、逆は動かない (exec がヘッダの最低 API
 バージョンを見て弾く)。
+
+## T2c の世代契約
+
+OS32X v4 は60Bのヘッダで、アプリは0x80100000にリンクする。
+旧SDKの .o / .a / Rust crate は新CRTと混ぜず、全て作り直す。
+C の全コンパイル単位には `-include $(OS32_SDK)/include/os32/os32_unit_stamp.h`、
+asm には `-p $(OS32_SDK)/crt/generations.inc` を付ける。
+リンクは `python3 $(OS32_SDK)/bin/link_guard.py i386-elf-ld ...`、Rust は
+`RUSTC_WRAPPER=$(OS32_SDK)/bin/rustc_stamp.py` を使う。
+生成器が記録した `.inputs.json` / `.generations.json` もビルド成果物として保つ。
+`example/hello/Makefile` が C の最小例。4世代の正典と形式は
+OS ソースツリーの `docs/KAPI_SPEC.md` §4-0。

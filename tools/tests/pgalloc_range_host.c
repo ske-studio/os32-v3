@@ -96,7 +96,7 @@ void __cyg_profile_func_exit(void *fn, void *caller)
 
 static void basic(void)
 {
-    u32 lo = MEM_APP_BAND_TOP;
+    u32 lo = (MEM_LEGACY_APP_BASE + MEM_APP_BAND_PDE_SIZE);
     u32 before;
     CHECK(sizeof(u32) == 4 && sizeof(int) == 4);
     test_boot(MEM_HIGH_RAM_BASE / 1024);
@@ -111,7 +111,7 @@ static void basic(void)
 static void irq_atomic(void)
 {
     unsigned int initial;
-    u32 lo = MEM_APP_BAND_TOP;
+    u32 lo = (MEM_LEGACY_APP_BASE + MEM_APP_BAND_PDE_SIZE);
     u32 before;
     int enabled;
 
@@ -189,7 +189,7 @@ static void range_expect(int n, u32 lo, u32 hi, u32 expected)
 
 static void boundaries(void)
 {
-    u32 lo = MEM_APP_BAND_TOP;
+    u32 lo = (MEM_LEGACY_APP_BASE + MEM_APP_BAND_PDE_SIZE);
     u32 end;
     int enabled;
     for (enabled = 0; enabled <= 1; enabled++) {
@@ -225,7 +225,7 @@ static void boundaries(void)
 
 static void fragmentation(void)
 {
-    u32 lo = MEM_APP_BAND_TOP + 29 * PAGE_SIZE;
+    u32 lo = (MEM_LEGACY_APP_BASE + MEM_APP_BAND_PDE_SIZE) + 29 * PAGE_SIZE;
     u32 end = lo + 8 * PAGE_SIZE;
     test_boot(MEM_HIGH_RAM_BASE / 1024);
     claim1(lo + PAGE_SIZE);
@@ -244,7 +244,7 @@ static void exhaustive(void)
 {
     unsigned int mask;
     int n, j, run, start;
-    u32 lo = MEM_APP_BAND_TOP + 29 * PAGE_SIZE;
+    u32 lo = (MEM_LEGACY_APP_BASE + MEM_APP_BAND_PDE_SIZE) + 29 * PAGE_SIZE;
     u32 expected;
     for (mask = 0; mask < 256; mask++) {
         for (n = 1; n <= 9; n++) {
@@ -293,7 +293,7 @@ static void generic_regression(void)
     test_boot(0xffffffffUL); /* fresh-boot fixture for full-run regression */
     CHECK(pgalloc_alloc_phys(OWN, (int)count) == base);
     CHECK(pgalloc_alloc_phys(OWN, 1) == 0);
-    range_expect(1, MEM_APP_BAND_TOP, MEM_APP_BAND_TOP + PAGE_SIZE, 0);
+    range_expect(1, (MEM_LEGACY_APP_BASE + MEM_APP_BAND_PDE_SIZE), (MEM_LEGACY_APP_BASE + MEM_APP_BAND_PDE_SIZE) + PAGE_SIZE, 0);
     CHECK(free_n(base, (int)count));
     CHECK(pgalloc_free_pages() == count);
 }

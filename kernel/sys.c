@@ -69,7 +69,7 @@ int sys_memory_bootstrap_model(struct physmem *m, const struct pgalloc_layout *l
     l = &layout;
     top = physmem_legacy_end(m);
     bytes = pgalloc_metadata_bytes(m);
-    minimum = (MEM_EXEC_LOAD_ADDR + MEM_EXEC_STACK_SIZE +
+    minimum = (MEM_PHYS_EXEC_FLOOR + MEM_EXEC_STACK_SIZE +
                MEM_EXEC_SBRK_MIN + MEM_EXEC_HEAP_MIN) / PAGE_SIZE;
     if (!bytes || top != m->legacy_ceiling || top > PHYSMEM_LEGACY_MAX_PFN)
         goto done;
@@ -119,7 +119,7 @@ int sys_memory_init_model(struct physmem *m, void *backing, u32 capacity,
     bytes = pgalloc_metadata_bytes(m);
     if (!bytes) goto done;
     top = physmem_legacy_end(m);
-    minimum = (MEM_EXEC_LOAD_ADDR + MEM_EXEC_STACK_SIZE +
+    minimum = (MEM_PHYS_EXEC_FLOOR + MEM_EXEC_STACK_SIZE +
                MEM_EXEC_SBRK_MIN + MEM_EXEC_HEAP_MIN) / PAGE_SIZE;
     if (top != m->legacy_ceiling || first < minimum || first >= top ||
         bytes / PAGE_SIZE != top - first ||

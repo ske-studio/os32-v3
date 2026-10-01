@@ -396,7 +396,14 @@ MUTATIONS = [
 def os32x_blob(version, kapi_off, body=b"\x90" * 32):
     """OS32X のヘッダを付けた最小の中身。version 2 は 44 バイト (kapi 無し)。"""
     import struct
-    if version >= 3:
+    if version == hd.os32x_hdr.OS32X_HDR_VERSION:
+        h = hd.os32x_hdr
+        hdr = struct.pack("<15I", h.OS32X_MAGIC, h.OS32X_HDR_SIZE,
+                          h.OS32X_HDR_VERSION, 0, 0, len(body), 0, 0, 0,
+                          h.OS32X_MIN_API, h.OS32X_APP_LOAD_ADDR, kapi_off,
+                          h.OS32_KAPI_ABI_GENERATION,
+                          h.OS32_MEMORY_LAYOUT_GENERATION, 0)
+    elif version >= 3:
         hdr = struct.pack("<12I", 0x4F533332, 48, 3, 0, 0, len(body), 0, 0, 0,
                           63, 0x500000, kapi_off)
     else:
@@ -409,19 +416,19 @@ def case_kapi(tmp):
     print("== K: 名札の kapi= は配備した OS32X のヘッダから取る ==")
     off, ver = hd.kapi_json_layout()
 
-    # K1: v3 で配置が一致 -> kapi= に書く
+    # K1: 現行形式で配置が一致 -> kapi= に書く
     with Bench(tmp / "k1") as b:
-        pathlib.Path(b.proj / b.files[0]["host"]).write_bytes(os32x_blob(3, off))
-        pathlib.Path(b.proj / b.files[1]["host"]).write_bytes(os32x_blob(3, off))
+        pathlib.Path(b.proj / b.files[0]["host"]).write_bytes(os32x_blob(hd.os32x_hdr.OS32X_HDR_VERSION, off))
+        pathlib.Path(b.proj / b.files[1]["host"]).write_bytes(os32x_blob(hd.os32x_hdr.OS32X_HDR_VERSION, off))
         ok = hd.do_sync()
-        check(ok is True, "K1 v3・一致なら配備は成功する")
+        check(ok is True, "K1 現行形式・一致なら配備は成功する")
         kv, _lines = parse(b.man_text()) if b.man().is_file() else ({}, None)
         check(kv.get("kapi") == str(off), "K1 kapi=%d" % off)
 
     # K2: v2 の成果物が混ざる -> 名札を書かない (配備失敗)
     with Bench(tmp / "k2") as b:
         b.put_stale()
-        pathlib.Path(b.proj / b.files[0]["host"]).write_bytes(os32x_blob(3, off))
+        pathlib.Path(b.proj / b.files[0]["host"]).write_bytes(os32x_blob(hd.os32x_hdr.OS32X_HDR_VERSION, off))
         pathlib.Path(b.proj / b.files[1]["host"]).write_bytes(os32x_blob(2, 0))
         ok = hd.do_sync()
         check(ok is False, "K2 旧ヘッダ (v2) が混ざれば配備は失敗")
@@ -429,15 +436,15 @@ def case_kapi(tmp):
 
     # K3: 配置の食い違い -> 名札を書かない
     with Bench(tmp / "k3") as b:
-        pathlib.Path(b.proj / b.files[0]["host"]).write_bytes(os32x_blob(3, off))
-        pathlib.Path(b.proj / b.files[1]["host"]).write_bytes(os32x_blob(3, off - 4))
+        pathlib.Path(b.proj / b.files[0]["host"]).write_bytes(os32x_blob(hd.os32x_hdr.OS32X_HDR_VERSION, off))
+        pathlib.Path(b.proj / b.files[1]["host"]).write_bytes(os32x_blob(hd.os32x_hdr.OS32X_HDR_VERSION, off - 4))
         ok = hd.do_sync()
         check(ok is False, "K3 配置が食い違えば配備は失敗")
         check(not b.man().is_file(), "K3 名札を書かない")
 
     # K4: 全部同じでも kapi.json と違う -> 名札を書かない
     with Bench(tmp / "k4") as b:
-        pathlib.Path(b.proj / b.files[0]["host"]).write_bytes(os32x_blob(3, off + 4))
+        pathlib.Path(b.proj / b.files[0]["host"]).write_bytes(os32x_blob(hd.os32x_hdr.OS32X_HDR_VERSION, off + 4))
         ok = hd.do_sync()
         check(ok is False, "K4 sdk/kapi.json と違う配置なら配備は失敗")
         check(not b.man().is_file(), "K4 名札を書かない")

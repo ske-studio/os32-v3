@@ -93,7 +93,7 @@ void _start(void)
             if (i == 0) bad.capacity--;
             if (i == 1) bad.workspace_first = bad.workspace_end;
             if (i == 2) bad.workspace_end++;
-            if (i == 3) bad.workspace_first = MEM_EXEC_LOAD_ADDR / PAGE_SIZE;
+            if (i == 3) bad.workspace_first = MEM_PHYS_EXEC_FLOOR / PAGE_SIZE;
             if (i == 4) page_tables[l.workspace_first / PTE_COUNT][l.workspace_first % PTE_COUNT] &= ~PTE_PRESENT;
             if (i == 5) page_tables[l.workspace_first / PTE_COUNT][l.workspace_first % PTE_COUNT] |= PTE_USER;
             if (i == 6) page_tables[l.workspace_first / PTE_COUNT][l.workspace_first % PTE_COUNT] |= PTE_PCD;
@@ -161,7 +161,7 @@ void _start(void)
 #ifdef TEST_RESERVE_TOP
     /* PEGC 8bpp backbuffer (H2) on the model path, T1e (TASK_T1_LEDGER §3-6・
      * X14): step 6 takes it from the pool TOP_DOWN inside the CPL=0 child's
-     * arena [MEM_EXEC_LOAD_ADDR, pgalloc_arena_end()) with owner = boot, then
+     * arena [MEM_PHYS_EXEC_FLOOR, pgalloc_arena_end()) with owner = boot, then
      * freezes the arena top. It must land where the retired sys_reserve_top
      * carved it (right under the frozen exec ceiling = workspace_first on
      * ARENA_TOP), never in high RAM, and the usable end drops to its base. */
@@ -171,7 +171,7 @@ void _start(void)
         u32 base, pfn;
         CHECK(ceiling == l.workspace_first * PAGE_SIZE);
         CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, (int)(need / PAGE_SIZE),
-                                    MEM_EXEC_LOAD_ADDR / PAGE_SIZE,
+                                    MEM_PHYS_EXEC_FLOOR / PAGE_SIZE,
                                     pgalloc_arena_end(), LEDGER_TOP_DOWN, &pfn));
         base = pfn * PAGE_SIZE;
         CHECK(base == ceiling - need);

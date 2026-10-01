@@ -28,10 +28,11 @@ extern int  res_owner_get(void);
 STATIC_ASSERT(APP_ID_SHELL == 1, appslot_shell_id_is_gui_shell_owner);
 STATIC_ASSERT(APP_ID_MAX < APP_SLOT_COUNT, appslot_table_holds_id_max);
 
-/* TASK_T2_APPBAND §6: count embedded AS once, including unused slot 0 and
- * shell; T2c moves control blocks to KHEAP and must retain this total gate.
+/* TASK_T2_APPBAND §6: all six slots plus four KHEAP AS control blocks.
  * PFN metadata and actual PD/PT backing have separate physical budgets. */
+STATIC_ASSERT(sizeof(struct addrspace) <= 1376, as_control_within_1376);
 STATIC_ASSERT(sizeof(AppSlot) * APP_SLOT_COUNT +
+              sizeof(struct addrspace) * (APP_ID_MAX - APP_ID_SHELL) +
               sizeof(struct ledger_owner) * LEDGER_MAX_OWNERS +
               sizeof(struct ledger_region) * LEDGER_MAX_REGIONS +
               sizeof(struct ledger_resource) * LEDGER_MAX_RESOURCES +
@@ -167,32 +168,6 @@ int appslot_alloc_id(void)
 /* ======================================================================== */
 /*  起動 (D4)                                                               */
 /* ======================================================================== */
-
-/* アプリ帯を使うのは「シェルでない」かつ「--cpl0 でない」ものだけ。
- * ここが exec_launch の want_ring3 と ID の池の唯一の分かれ道 (宣言側の
- * 注記を参照)。判定材料はヘッダの flags だけで、物理の空きは見ない —
- * シェルの起動が pgalloc の空きに左右されてはいけないため。 */
-int appslot_launch_is_app(int is_shell, u32 hdr_flags)
-{
-    if (is_shell) return 0;
-    if (hdr_flags & OS32X_FLAG_FORCE_CPL0) return 0;
-    return 1;
-}
-
-/* --cpl0 の子は帯を丸ごと押さえる (exec_cpl0_claim)。生きているアプリの
- * per-app 物理と正面衝突するので、1 本でも居たら起動そのものを断る
- * (決裁 2026-09-11)。ここは判定だけで、claim も alloc もまだ行わない。
- *
- * 票 T8 D1 でこの条件を広げた: GUI からの起動 (gui=1) は生存アプリの有無に
- * 関わらず断る。--cpl0 は VRAM を直接触る (v86 / VDM) ので、GUI 中に走ると
- * 画面の所有者 (D1) の外側で画面を壊し、WM が復帰する手がかりを失う。 */
-int appslot_cpl0_admit(int is_shell, int gui)
-{
-    if (is_shell) return 0;             /* シェル帯はアプリ帯を使わない */
-    if (gui) return OS32_ERR_INVAL;     /* GUI からは常に不可 (T8 D1) */
-    if (appslot_live() > 0) return OS32_ERR_FULL;
-    return 0;
-}
 
 /* CUI 専用の宣言 (票 T8-2)。v86 は CPL=3 なので --cpl0 の網には掛からない —
  * 宣言ビットを見る枝をここに 1 本足して、GUI からの起動だけを断つ。 */
@@ -752,7 +727,7 @@ int appslot_gfx_claim_check(int gui_mode, int caller, int cpl3, u32 hdr_flags)
      * ここを通る。 */
     if (caller < APP_ID_MIN || caller > APP_ID_MAX) return 0;
     /* CPL=0 の子 (--cpl0) は所有者を取らない。GUI からの起動は
-     * appslot_cpl0_admit が既に断っているので、ここへは来ない。 */
+     * 非シェルはローダが CPL=3 のみ許可する。 */
     if (!cpl3) return 0;
     /* 宣言 (mkos32x --gfx) が無ければ画面を渡さない (D1a)。黙って
      * 画面を壊させるより、gfx_init を呼ばずに断る。 */

@@ -33,6 +33,7 @@ KAPI_JSON = ROOT / "sdk/kapi.json"
 # 合成した最小の kapi.json。実物の並びに依存せず解釈だけを見る。
 SYNTH = {
     "version": 1,
+    "generations": json.loads((ROOT / "sdk/kapi.json").read_text())["generations"],
     # 票 TASK_KAPI_DATA_FIELDS (v63) で必須になった関数表の容量と crt の kapi の実名。
     # この試験は `out` の解釈だけを見るので、関数数より十分大きい値にしておく。
     "func_capacity": 32,
@@ -71,7 +72,7 @@ def gen(tmp, data, args=()):
     生成器の書き出し先は相対パスなので、実物の生成物には触らない。
     戻り: (rc, stdout+stderr, その一時ディレクトリ)"""
     d = pathlib.Path(tempfile.mkdtemp(dir=tmp))
-    for sub in ("sdk/include/os32", "kapi", "exec", "sdk/rust/os32api/src"):
+    for sub in ("sdk/include/os32", "kapi", "exec", "sdk/rust/os32api/src", "sdk/crt", "sdk/link"):
         (d / sub).mkdir(parents=True, exist_ok=True)
     jp = d / "in.json"
     jp.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")

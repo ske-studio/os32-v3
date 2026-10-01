@@ -15,7 +15,7 @@
 #define MEMORY_BOOT_WORKSPACE_PAGES 1UL
 /* FIXED 型の置き場 (TASK_T1_LEDGER §3-3): [MEM_LEDGER_META_BASE,
  * MEM_LEDGER_META_END) = metadata 1 ページ + workspace 1 ページ。低位 RAM の
- * 末尾に metadata + workspace を置くと下端が MEM_APP_BAND_MAX_TOP を割る構成
+ * 末尾に metadata + workspace を置くと下端が MEM_PHYS_WORKSPACE_FLOOR を割る構成
  * (低位 RAM の上端が MEMORY_BOOT_FIXED_MAX_TOP 以下 = 8MB・9MB・12MB) だけが
  * ここを使う。高位 RAM は無い (低位が 15MB 未満なら高位は存在しない)。 */
 #define MEMORY_BOOT_FIXED_META_PAGES 1UL
@@ -25,7 +25,7 @@
 #define MEMORY_BOOT_FIXED_WS_END     (MEM_LEDGER_META_END / PAGE_SIZE)
 /* FIXED になる低位上端 (PFN) の最大。1 つ上から ARENA_TOP に入る
  * (3,073 / 3,074 PFN の境界、§3-3)。 */
-#define MEMORY_BOOT_FIXED_MAX_TOP    (MEM_APP_BAND_MAX_TOP / PAGE_SIZE + \
+#define MEMORY_BOOT_FIXED_MAX_TOP    (MEM_PHYS_WORKSPACE_FLOOR / PAGE_SIZE + \
                                       MEMORY_BOOT_FIXED_META_PAGES + \
                                       MEMORY_BOOT_WORKSPACE_PAGES - 1)
 STATIC_ASSERT((MEM_LEDGER_META_BASE & (PAGE_SIZE - 1)) == 0 &&
@@ -152,7 +152,7 @@ static u32 memory_boot_table_pages(u32 limit)
 }
 
 /* 高位 RAM を覆う表を置けるのは「アプリ帯の最大上端より上、15MB システム
- * 空間より下」の低位 RAM だけ (workspace >= MEM_APP_BAND_MAX_TOP は、2 枚
+ * 空間より下」の低位 RAM だけ (workspace >= MEM_PHYS_WORKSPACE_FLOOR は、2 枚
  * PDE のアプリが master のページテーブルを USER で恒等マップして任意物理を
  * 書けてしまうのを防ぐ不変条件)。この帯の広さが、表で覆える RAM の量を
  * 決める。現行のレイアウト (3MB の帯) で約 2.3GB まで覆える (T1b で L2 の
@@ -162,8 +162,8 @@ static u32 memory_boot_high_fit(u32 high_end, u32 top)
 {
     u32 room, base;
     base = MEM_HIGH_RAM_BASE / PAGE_SIZE;
-    if (top <= MEM_APP_BAND_MAX_TOP / PAGE_SIZE) return 0;
-    room = top - MEM_APP_BAND_MAX_TOP / PAGE_SIZE;
+    if (top <= MEM_PHYS_WORKSPACE_FLOOR / PAGE_SIZE) return 0;
+    room = top - MEM_PHYS_WORKSPACE_FLOOR / PAGE_SIZE;
     while (high_end > base && memory_boot_table_pages(high_end) > room)
         high_end -= PTE_COUNT;
     return high_end > base ? high_end : 0;
@@ -329,12 +329,12 @@ int memory_boot_init(u32 mem_kb)
     if (!pages) return 0;
     /* 置き場の 2 択 (TASK_T1_LEDGER §3-3)。legacy の pgalloc_init への
      * fallback は撤去した (D32): どの構成もモデル経路を通る。
-     * ARENA_TOP: 低位 RAM の末尾に置いても下端が MEM_APP_BAND_MAX_TOP 以上
+     * ARENA_TOP: 低位 RAM の末尾に置いても下端が MEM_PHYS_WORKSPACE_FLOOR 以上
      * (2 枚 PDE のアプリが workspace を USER で恒等写像できない — 帯は 4MB
      * 単位で伸びるので、既定の上端 0x800000 ではなく最大の上端で見る)。
      * FIXED: それ以外 (低位の上端が MEMORY_BOOT_FIXED_MAX_TOP 以下)。 */
     if (top >= pages + ws_pages &&
-        top - pages - ws_pages >= MEM_APP_BAND_MAX_TOP / PAGE_SIZE) {
+        top - pages - ws_pages >= MEM_PHYS_WORKSPACE_FLOOR / PAGE_SIZE) {
         layout.kind = PGALLOC_BACKING_ARENA_TOP;
         layout.metadata_first = top - pages;
         layout.metadata = P2V(layout.metadata_first * PAGE_SIZE);

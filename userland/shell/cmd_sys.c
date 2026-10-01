@@ -56,8 +56,8 @@ static int cmd_mem(int argc, char **argv)
     g_api->kprintf(ATTR_WHITE, "%s", "  0x2FB000-0x2FBFFF  NP (kernel stack guard)\n");
     g_api->kprintf(ATTR_WHITE, "%s", "  0x2FC000-0x2FFFFF  Kernel Stack (16KB)\n");
     g_api->kprintf(ATTR_WHITE, "%s", "  0x300000-0x3FFFFF  Shell Band (1MB)\n");
-    g_api->kprintf(ATTR_WHITE, "%s", "  0x400000-0x4FFFFF  Shared Library Band (1MB)\n");
-    g_api->kprintf(ATTR_WHITE, "%s", "  0x500000-          Program Space\n");
+    g_api->kprintf(ATTR_WHITE, "%s", "  0x80000000-0x800FFFFF  Shared Library Band (1MB)\n");
+    g_api->kprintf(ATTR_WHITE, "%s", "  0x80100000-          Program Space\n");
     return 0;
 }
 

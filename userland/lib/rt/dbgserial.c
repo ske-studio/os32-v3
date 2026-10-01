@@ -284,7 +284,8 @@ static int _dbg_is_blacklisted(u32 addr)
     /* シェル帯域後の予約 */
     if (addr >= 0x380000UL && addr <= 0x3FFFFFUL) return 1;
     /* GUARD A (sbrk上限ガード) */
-    if (addr >= 0x500000UL && addr <= 0x500FFFUL) return 1;
+    if (dbg_api && addr >= dbg_api->sbrk_heap_limit &&
+        addr - dbg_api->sbrk_heap_limit < 4096UL) return 1;
     return 0;
 }
 

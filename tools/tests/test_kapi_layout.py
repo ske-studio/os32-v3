@@ -1,4 +1,4 @@
-"""KAPI データ欄の固定配置と OS32X ヘッダ v3 (票 TASK_KAPI_DATA_FIELDS)。
+"""KAPI データ欄の固定配置と OS32X ヘッダ v4 (票 TASK_KAPI_DATA_FIELDS)。
 
 票:   docs/archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md (方針 v2 / v3 / ユーザー決裁)
 
@@ -7,10 +7,10 @@
      tools/tests/os32x_layout_host.c が実物を #include して踏む
      (v2 → 断る / v3 値違い → 断る / 一致 → 通す、長さの境界)。
   2. sdk/gen_kapi.py が関数表の容量 (func_capacity) を超えたら生成を拒否する。
-  3. sdk/mkos32x.py がヘッダ v3 を焼き、kapi_data_off が ELF の
+  3. sdk/mkos32x.py がヘッダ v4 を焼き、kapi_data_off が ELF の
      .os32_kapi_layout と一致する。刻印が無い / 食い違う / .raw と .elf の
      世代が違う (大きさ、または同じ大きさで PT_LOAD の中身) / --elf が無い、
-     は失敗する。min_api_ver は 63 に引き上がる。
+     は失敗する。min_api_ver は 69 に引き上がる。
      刻印は平らなバイナリに入らない (非ロード)。
   4. tools/mkshlib.py (ビルド済みの libos32gui.elf があれば) も v3 を焼き、
      刻印を剥がした ELF は断る。無ければ SKIP と表示する。
@@ -42,7 +42,7 @@ CROSS_DIR = pathlib.Path(os.environ.get("CROSS_DIR", str(pathlib.Path.home() / "
 TCC = "i386-elf-gcc"
 TLD = "i386-elf-ld"
 TOBJCOPY = "i386-elf-objcopy"
-TFLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
+TFLAGS = ["-include", str(ROOT / "sdk/include/os32/os32_unit_stamp.h"),"-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
           "-fno-stack-protector", "-nostdlib", "-fcommon", "-O2", "-Wall",
           "-Werror", "-D__OS32_USERLAND__",
           "-I" + str(ROOT / "include"), "-I" + str(ROOT / "sdk/include"),
@@ -174,7 +174,7 @@ def case_capacity_full(tmp, kj):
 
 
 # --------------------------------------------------------------------------
-#  3. mkos32x.py のヘッダ v3
+#  3. mkos32x.py のヘッダ v4
 # --------------------------------------------------------------------------
 
 START_C = r'''
@@ -198,13 +198,13 @@ def build_elf(tmp, name, stamp=True, extra_asm=None, pad=0, fill=1):
         raise SystemExit("compile failed: " + r.stderr)
     if extra_asm:
         a = tmp / (name + "_x.s")
-        a.write_text(extra_asm, encoding="utf-8")
+        a.write_text(extra_asm + "\n.section .os32_generations\n.long " + ",".join(str(x) for x in (H.OS32X_HDR_VERSION, H.OS32_KAPI_ABI_GENERATION, H.OS32_MEMORY_LAYOUT_GENERATION, H.OS32_SHLIB_PROTOCOL)) + "\n", encoding="utf-8")
         objs.append(tmp / (name + "_x.o"))
         r = run([TCC, "-m32", "-c", a, "-o", objs[-1]])
         if r.returncode != 0:
             raise SystemExit("asm failed: " + r.stderr)
     elf = tmp / (name + ".elf")
-    r = run([TLD, *LDFLAGS, "-u", "keep_" + name if pad else "_start",
+    r = run([sys.executable, "sdk/link_guard.py", TLD, *LDFLAGS, "-u", "keep_" + name if pad else "_start",
              "-o", elf, *objs])
     if r.returncode != 0:
         raise SystemExit("link failed: " + r.stderr)
@@ -221,7 +221,7 @@ def mkos32x(raw, out, elf=None, api=39):
 
 
 def case_mkos32x(tmp):
-    print("== 3: mkos32x.py はヘッダ v3 を ELF の刻印から焼く ==", flush=True)
+    print("== 3: mkos32x.py はヘッダ v4 を ELF の刻印から焼く ==", flush=True)
     elf, raw = build_elf(tmp, "stamped")
     out = tmp / "stamped.bin"
     r = mkos32x(raw, out, elf)
@@ -231,21 +231,71 @@ def case_mkos32x(tmp):
         return
     blob = out.read_bytes()
     h = H.parse_header(blob)
-    check(h["version"] == 3 and h["header_size"] == 48, "ヘッダ v3 / 48 バイト")
+    check(h["version"] == H.OS32X_HDR_VERSION and h["header_size"] == H.OS32X_HDR_SIZE, "ヘッダ v4 / 60 バイト")
     sec = H.Elf32(str(elf)).section(".os32_kapi_layout")
     val = struct.unpack_from("<I", H.Elf32(str(elf)).section_bytes(sec), 0)[0]
     check(h.get("kapi_data_off") == val == 0x4B8,
           "kapi_data_off (0x%X) = ELF の .os32_kapi_layout (0x%X) = 0x4B8"
           % (h.get("kapi_data_off", 0), val))
     check(not (sec["flags"] & H.SHF_ALLOC), "刻印のセクションは非ロード (alloc でない)")
-    check(h["min_api_ver"] == 63, "--api 39 は 63 に引き上がる (旧カーネルが受け入れない)")
-    check(h["text_size"] == len(raw.read_bytes()) == len(blob) - 48,
+    check(h["min_api_ver"] == H.OS32X_MIN_API, "--api 39 は 69 に引き上がる (旧カーネルが受け入れない)")
+    check(h["text_size"] == len(raw.read_bytes()) == len(blob) - H.OS32X_HDR_SIZE,
           "本文は .raw そのまま (刻印は平らなバイナリに入らない)")
-    check(h.get("load_addr") == 0x500000, "load_addr は ELF の .text")
+    check(h.get("load_addr") == 0x80100000, "load_addr は ELF の .text")
 
     r = mkos32x(raw, tmp / "api70.bin", elf, api=70)
     check(r.returncode == 0 and H.parse_header((tmp / "api70.bin").read_bytes())
           ["min_api_ver"] == 70, "--api 70 はそのまま 70")
+
+    check(h['kapi_abi_generation'] == H.OS32_KAPI_ABI_GENERATION and
+          h['memory_layout_generation'] == H.OS32_MEMORY_LAYOUT_GENERATION and
+          h['shlib_protocol'] == 0, "独立の世代欄と依存なし")
+    r = run([sys.executable, 'sdk/mkos32x.py', raw, tmp / 'stack.bin', '--elf', elf, '--stack', '524288'])
+    check(r.returncode == 0 and H.parse_header((tmp / 'stack.bin').read_bytes())['stack_size'] == 524288,
+          "明示 512KiB stack を保存")
+    # A new CRT must not make an old selected object acceptable, even with gc-sections.
+    old = tmp / 'old.o'
+    run([TOBJCOPY, '--remove-section', '.os32_generations', tmp / 'stamped.o', old])
+    fresh = tmp / 'fresh.c'; fresh.write_text('void fresh(void) {}')
+    run([TCC, *TFLAGS, '-c', fresh, '-o', tmp / 'fresh.o'])
+    def guarded(inputs, name):
+        return run([sys.executable, 'sdk/link_guard.py', TLD, *LDFLAGS,
+                    '-o', tmp / (name + '.elf'), *inputs])
+    check(guarded([old, tmp / 'fresh.o'], 'old_direct').returncode != 0,
+          "新SDK + 旧.o の欠落刻印をリンク入力で拒否")
+    archive = tmp / 'old.a'; run(['i386-elf-ar', 'rcs', archive, old])
+    check(guarded([tmp / 'fresh.o', '-u', '_start', archive], 'old_archive').returncode != 0,
+          "取り込んだ旧 archive member も拒否")
+    check(guarded([tmp / 'stamped.o', archive], 'unused_archive').returncode == 0,
+          "未使用の旧 member を取り込んだものと区別")
+    # Copies of actual compiler archives outside CROSS_DIR, without its environment.
+    vendor = tmp / 'alternate-toolchain'; vendor.mkdir()
+    shutil.copyfile(CROSS_DIR / 'i386-elf/lib/libc.a', vendor / 'libc.a')
+    gcc_archive = next((CROSS_DIR / 'lib/gcc/i386-elf').glob('*/libgcc.a'))
+    shutil.copyfile(gcc_archive, vendor / 'libgcc.a')
+    env = dict(os.environ); env.pop('CROSS_DIR', None)
+    r = subprocess.run([sys.executable, 'sdk/link_guard.py', TLD, *LDFLAGS,
+                       '-L', str(vendor), '-o', str(tmp / 'vendor.elf'),
+                       str(tmp / 'stamped.o'), '-u', 'strlen', '-u', '__udivdi3', '-lc', '-lgcc'],
+                       cwd=ROOT, env=env, capture_output=True, text=True)
+    check(r.returncode == 0, 'CROSS_DIRなし・別位置のnewlib/libgcc実memberはリンク可能: ' + r.stderr)
+    if r.returncode == 0:
+        evidence = json.loads((tmp / 'vendor.inputs.json').read_text())
+        check(set(evidence['vendor']) == {str((vendor / 'libc.a').resolve()),
+                                       str((vendor / 'libgcc.a').resolve())},
+              'vendor免除はldが選択した正確なarchive pathを記録')
+    note = tmp / 'old.note'
+    note.write_bytes(struct.pack('<4I', H.OS32X_HDR_VERSION - 1, H.OS32_KAPI_ABI_GENERATION,
+                                 H.OS32_MEMORY_LAYOUT_GENERATION, H.OS32_SHLIB_PROTOCOL))
+    stale = tmp / 'stale.o'
+    run([TOBJCOPY, '--update-section', '.os32_generations=' + str(note), tmp / 'stamped.o', stale])
+    check(guarded([stale, tmp / 'fresh.o'], 'mixed_generation').returncode != 0,
+          "形式世代の旧値と新単位の混在を拒否")
+    # rustc wrapper must reject legacy metadata before launching the compiler/LTO.
+    dep = tmp / 'old.rlib'; dep.write_bytes(b'old bitcode')
+    r = run([sys.executable, 'sdk/rustc_stamp.py', '/bin/true', '--crate-name', 'test',
+             '--out-dir', tmp, '--emit=link', '--extern', 'old=' + str(dep)])
+    check(r.returncode != 0, "旧 Rust crate は LTO 前に拒否")
 
     # 刻印の無い ELF (crt0 を付けずにリンクした) → 失敗
     elf2, raw2 = build_elf(tmp, "nostamp", stamp=False)
@@ -308,7 +358,7 @@ def case_mkos32x(tmp):
 # --------------------------------------------------------------------------
 
 def case_mkshlib(tmp):
-    print("== 4: mkshlib.py もヘッダ v3 ==", flush=True)
+    print("== 4: mkshlib.py もヘッダ v4 ==", flush=True)
     elf = ROOT / "userland/libos32gui.elf"
     raw = ROOT / "userland/libos32gui.raw"
     if not elf.is_file():
@@ -328,11 +378,11 @@ def case_mkshlib(tmp):
         print(r.stdout, r.stderr)
         return
     h = H.parse_header(out.read_bytes())
-    check(h["version"] == 3 and h["header_size"] == 48, "shlib もヘッダ v3")
+    check(h["version"] == H.OS32X_HDR_VERSION and h["header_size"] == H.OS32X_HDR_SIZE, "shlib もヘッダ v4")
     check(h.get("kapi_data_off") == H.read_kapi_layout(H.Elf32(str(elf))) == 0x4B8,
           "shlib の kapi_data_off = os32api の刻印 = 0x4B8")
     check(h["flags"] & H.OS32X_FLAG_SHLIB, "OS32X_FLAG_SHLIB が立つ")
-    check(h["min_api_ver"] == 63, "shlib の --api 51 も 63 に引き上がる")
+    check(h["min_api_ver"] == H.OS32X_MIN_API, "shlib の --api 51 も 69 に引き上がる")
     stripped = tmp / "lib_nostamp.elf"
     run([TOBJCOPY, "--remove-section", ".os32_kapi_layout", elf, stripped])
     r = run([sys.executable, "-B", "tools/mkshlib.py", rawtmp, tmp / "x.shlib",
@@ -404,12 +454,12 @@ def case_rename(tmp):
             raise SystemExit("compile %s failed: %s" % (name, r.stderr))
         objs[name] = o
 
-    r = run([TLD, *LDFLAGS, "-u", "use_kapi", "-o", tmp / "fresh.elf",
+    r = run([sys.executable, "sdk/link_guard.py", TLD, *LDFLAGS, "-u", "use_kapi", "-o", tmp / "fresh.elf",
              objs["stub"], crt, objs["fresh"]])
     check(r.returncode == 0, "作り直した .o は新しい crt とリンクできる")
     if r.returncode != 0:
         print(r.stderr)
-    r = run([TLD, *LDFLAGS, "-u", "use_kapi", "-o", tmp / "stale.elf",
+    r = run([sys.executable, "sdk/link_guard.py", TLD, *LDFLAGS, "-u", "use_kapi", "-o", tmp / "stale.elf",
              objs["stub"], crt, objs["stale"]])
     check(r.returncode != 0, "作り直し忘れの .o (kapi を参照) はリンクで落ちる")
     check("kapi" in r.stderr and "undefined" in r.stderr,
@@ -422,14 +472,11 @@ def case_rename(tmp):
 
 MUTATIONS = [
     ("exec/os32x_hdr.c", "mismatch_accepted",
-     "    if (hdr->kapi_data_off != kernel_off) return OS32X_LAYOUT_MISMATCH;\n",
-     ""),
-    ("exec/os32x_hdr.c", "old_header_accepted",
-     "    if (hdr->version < 3u) return OS32X_LAYOUT_OLD;\n",
-     ""),
+     "        return OS32X_LAYOUT_MISMATCH;", "        return OS32X_LAYOUT_OK;"),
     ("exec/os32x_hdr.c", "short_read_trusted",
-     "    if (!hdr || read_len < (u32)OS32X_HDR_V3_SIZE) {",
-     "    if (!hdr) {"),
+     "    if (!hdr || read_len < OS32X_HDR_SIZE)", "    if (!hdr)"),
+    ("exec/os32x_hdr.c", "unknown_format_accepted",
+     "hdr->version != OS32X_HDR_VERSION", "hdr->version < OS32X_HDR_VERSION"),
     ("sdk/gen_kapi.py", "capacity_not_enforced",
      "    if n > cap:",
      "    if False:"),
@@ -440,7 +487,7 @@ MUTATIONS = [
      "    if len(uniq) != 1:",
      "    if False:"),
     ("sdk/os32x_hdr.py", "min_api_not_raised",
-     "    return max(int(min_api), OS32X_HDR_V3_MIN_API)",
+     "    return max(int(min_api), OS32X_MIN_API)",
      "    return int(min_api)"),
     ("sdk/os32x_hdr.py", "raw_elf_mismatch_ignored",
      "    if len(raw) != want:",
@@ -451,9 +498,14 @@ MUTATIONS = [
     ("sdk/os32x_hdr.py", "raw_elf_segments_skipped",
      "        if seg['type'] != PT_LOAD or seg['filesz'] == 0:",
      "        if True:"),
-    ("exec/exec.c", "reserved_ref_unguarded",
-     "#if KAPI_FUNC_RESERVED > 0\n    for (i = 0; i < (u32)KAPI_FUNC_RESERVED; i++) {",
-     "#if 1\n    for (i = 0; i < (u32)KAPI_FUNC_RESERVED; i++) {"),
+    ("exec/os32x_hdr.c", "abi_generation_unchecked",
+     "hdr->kapi_abi_generation != OS32_KAPI_ABI_GENERATION", "0"),
+    ("exec/os32x_hdr.c", "memory_generation_unchecked",
+     "hdr->memory_layout_generation != OS32_MEMORY_LAYOUT_GENERATION", "0"),
+    ("exec/os32x_hdr.c", "shlib_protocol_unchecked",
+     "(hdr->shlib_protocol && hdr->shlib_protocol != OS32_SHLIB_PROTOCOL)", "0"),
+    ("sdk/link_guard.py", "per_unit_note_unchecked",
+     "def check_note(elf):", "def check_note(elf):\n    return"),
     ("sdk/gen_kapi.py", "crt_symbol_not_renamed",
      "#define kapi {CRT_KAPI_SYMBOL}",
      "#define os32_kapi_unused {CRT_KAPI_SYMBOL}"),

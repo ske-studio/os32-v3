@@ -50,7 +50,7 @@ def c_type_to_rust(c_type):
     # ポインタ型の汎用処理
     if c_type.endswith("*"):
         return "*mut u8"
-    return "u32"
+    raise ValueError("Unknown non-pointer KAPI type: " + c_type)
 
 
 # Rust のキーワードのうち、**C の識別子として現れ得る**もの。C 自身の

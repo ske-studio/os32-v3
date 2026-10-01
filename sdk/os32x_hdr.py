@@ -6,20 +6,23 @@ os32x_hdr.py — OS32X ヘッダの生成を 1 か所にまとめた共通モジ
 `tools/mkshlib.py` (共有ライブラリ) の両方がここを import する。
 ヘッダの並びは `sdk/include/os32/os32_kapi_shared.h` の OS32Header と一致させる。
 
-ヘッダ v3 (票 docs/archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md、KAPI v63):
+ヘッダ v4 (T2c、旧v3の先頭48Bを保つ。票 docs/archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md、KAPI v63):
 
     0x00 magic          'OS32'
-    0x04 header_size    48
-    0x08 version        3
+    0x04 header_size    60
+    0x08 version        4
     0x0C flags
     0x10 entry_offset
     0x14 text_size
     0x18 bss_size
     0x1C heap_size
-    0x20 stack_size     (予約 0)
-    0x24 min_api_ver    v3 では 63 以上に引き上げる (旧カーネルが受け入れない)
+    0x20 stack_size     0=256KiB、明示値はページ切上げ・最低16KiB
+    0x24 min_api_ver    正典の最低機能版以上 (世代とは別)
     0x28 load_addr      (v2) ELF の .text の番地
-    0x2C kapi_data_off  (v3) ELF の .os32_kapi_layout (crt0 / os32api の刻印)
+    0x2C kapi_data_off  ELF の .os32_kapi_layout
+    0x30 kapi_abi_generation
+    0x34 memory_layout_generation
+    0x38 shlib_protocol  0=依存なし
 
 `kapi_data_off` は**包装時の値ではなくコードが実際に使った配置**から取る:
 crt0 (`sdk/crt/crt0_c.c`) と Rust の os32api が非ロードのセクション
@@ -35,13 +38,16 @@ OS32X_MAGIC = 0x4F533332          # 'OS32'
 OS32X_HDR_V1_SIZE = 40
 OS32X_HDR_V2_SIZE = 44
 OS32X_HDR_V3_SIZE = 48
-OS32X_HDR_VERSION = 3
+from os32_generations import *
+OS32X_HDR_SIZE = 60
+# Address mirrors checked against include/memmap.h by gen_memmap.py.
+OS32X_APP_LOAD_ADDR = 0x80100000
+OS32X_SHELL_LOAD_ADDR = 0x300000
 # v3 のバイナリが要求する最低 KAPI 版 (OS32X_HDR_V3_MIN_API)。
 OS32X_HDR_V3_MIN_API = 63
 
 OS32X_FLAG_GFX = 0x0001
 OS32X_FLAG_RING3 = 0x0002
-OS32X_FLAG_FORCE_CPL0 = 0x0004
 OS32X_FLAG_SHLIB = 0x0008
 OS32X_FLAG_CUI_ONLY = 0x0010
 OS32X_FLAG_LAUNCHER = 0x0020
@@ -189,6 +195,17 @@ def read_kapi_layout(elf):
             "make clean で作り直す")
     if uniq[0] == 0:
         raise HeaderError(f"{elf.path}: KAPI 配置の刻印が 0")
+    from link_guard import check_note
+    check_note(elf)
+    from pathlib import Path
+    import json, hashlib
+    manifest = Path(elf.path).with_suffix('.inputs.json')
+    if not manifest.exists():
+        raise HeaderError(f"{elf.path}: missing validated link inputs; use link_guard.py")
+    inputs = json.loads(manifest.read_text())
+    if inputs.get('elf_sha256') != hashlib.sha256(elf.data).hexdigest():
+        raise HeaderError(f"{elf.path}: ELF differs from validated link inputs")
+
     return uniq[0]
 
 
@@ -246,28 +263,31 @@ def check_raw_matches_elf(elf, raw, what='raw'):
 
 def effective_min_api(min_api):
     """v3 のバイナリは OS32X_HDR_V3_MIN_API 以上を要求する。"""
-    return max(int(min_api), OS32X_HDR_V3_MIN_API)
+    return max(int(min_api), OS32X_MIN_API)
 
 
 def build_header(flags, entry_offset, text_size, bss_size, heap_size,
-                 min_api_ver, load_addr, kapi_data_off):
-    """ヘッダ v3 (48 バイト) を返す。min_api_ver は 63 未満なら引き上げる。"""
+                 min_api_ver, load_addr, kapi_data_off, stack_size=0, shlib_protocol=0):
+    """現行形式を返す。世代と最低機能版は生成した正典から読む。"""
     if kapi_data_off is None or kapi_data_off == 0:
         raise HeaderError("kapi_data_off が無い (刻印を読めていない)")
-    hdr = struct.pack('<12I',
+    hdr = struct.pack('<15I',
                       OS32X_MAGIC,
-                      OS32X_HDR_V3_SIZE,
+                      OS32X_HDR_SIZE,
                       OS32X_HDR_VERSION,
                       flags,
                       entry_offset,
                       text_size,
                       bss_size,
                       heap_size,
-                      0,                          # stack_size (予約)
+                      stack_size,
                       effective_min_api(min_api_ver),
                       load_addr,
-                      kapi_data_off)
-    assert len(hdr) == OS32X_HDR_V3_SIZE
+                      kapi_data_off,
+                      OS32_KAPI_ABI_GENERATION,
+                      OS32_MEMORY_LAYOUT_GENERATION,
+                      shlib_protocol)
+    assert len(hdr) == OS32X_HDR_SIZE
     return hdr
 
 
@@ -283,4 +303,6 @@ def parse_header(blob):
         (h['load_addr'],) = struct.unpack_from('<I', blob, 40)
     if h['header_size'] >= OS32X_HDR_V3_SIZE and len(blob) >= OS32X_HDR_V3_SIZE:
         (h['kapi_data_off'],) = struct.unpack_from('<I', blob, 44)
+    if h['header_size'] >= OS32X_HDR_SIZE and len(blob) >= OS32X_HDR_SIZE:
+        h.update(zip(('kapi_abi_generation', 'memory_layout_generation', 'shlib_protocol'), struct.unpack_from('<3I', blob, 48)))
     return h

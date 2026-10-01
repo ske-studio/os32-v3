@@ -1,3 +1,6 @@
+/* GENERATED GENERATION REF BEGIN */
+__os32_abi_1_mem_1_fmt_4 = 0;
+/* GENERATED GENERATION REF END */
 ENTRY(_start)
 SECTIONS
 {
@@ -32,6 +35,9 @@ SECTIONS
     .os32_kapi_layout 0 (INFO) : {
         KEEP(*(.os32_kapi_layout))
     }
+
+    .os32_generations 0 (INFO) : { KEEP(*(.os32_generations)) }
+    .os32_generation_ref 0 (INFO) : { KEEP(*(.os32_generation_ref)) }
 
     /DISCARD/ : {
         *(.note.gnu.build-id)

@@ -263,8 +263,8 @@ class ExecR1(unittest.TestCase):
 
 MUTATIONS = (
     ('wm-notify-before-as',
-     '    exec_reclaim_resources(id);\n    if (!a->cpl3) exec_cpl0_release();\n    exec_teardown_app(a);\n    appslot_reclaim(id);\n    exec_notify_owned(id);',
-     '    exec_reclaim_owned(id);\n    if (!a->cpl3) exec_cpl0_release();\n    exec_teardown_app(a);\n    appslot_reclaim(id);'),
+     '    exec_reclaim_resources(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);\n    exec_notify_owned(id);',
+     '    exec_reclaim_owned(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);'),
     ('irq-teardown', '    g_pending_id = id;', '    exec_teardown_app(a);\n    g_pending_id = id;'),
     ('landing-if-missing', '    _enable();\n    exec_finish(id,', '    exec_finish(id,'),
     ('pending-consumed-twice', '    g_pending_id = 0;             /* callback',

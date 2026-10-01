@@ -38,8 +38,8 @@ MUTATIONS = [
      ("fixed", 8192)),
     # FIXED / ARENA_TOP の境界を 1 PFN ずらす (3,074 PFN が FIXED に落ちる)。
     ("arena-boundary", "kernel/memory_boot.c",
-     "        top - pages - ws_pages >= MEM_APP_BAND_MAX_TOP / PAGE_SIZE) {",
-     "        top - pages - ws_pages > MEM_APP_BAND_MAX_TOP / PAGE_SIZE) {",
+     "        top - pages - ws_pages >= MEM_PHYS_WORKSPACE_FLOOR / PAGE_SIZE) {",
+     "        top - pages - ws_pages > MEM_PHYS_WORKSPACE_FLOOR / PAGE_SIZE) {",
      ("arena", 12296)),
     # D11 (T1a の Codex P3、T1b で追加): プローブの上限を外す (2GB を越えて数える)。
     ("detect-cap-removed", "kernel/memory_boot.c",

@@ -14,6 +14,7 @@
 # しておく (前者は ../..、後者は make sdk が配置し直すので同じ)。
 OS32_SDK  ?= ../..
 CROSS_DIR ?= /usr/local/cross
+export CROSS_DIR
 APP      ?= hello
 
 # このアプリが要求する最低 KernelAPI バージョン。
@@ -22,13 +23,15 @@ API_VER   ?= $(shell cat $(OS32_SDK)/KAPI_VERSION)
 HEAP      ?= 262144
 
 CC = i386-elf-gcc
-LD = i386-elf-ld
+LD = python3 $(OS32_SDK)/bin/link_guard.py i386-elf-ld
 OBJCOPY = i386-elf-objcopy
 
 CFLAGS = -std=gnu89 -m32 -march=i386 -ffreestanding -fno-pie -fno-stack-protector \
          -nostdlib -mno-red-zone -fcommon -O2 -Wall -D__OS32_USERLAND__ \
          -I$(OS32_SDK)/include -I$(OS32_SDK)/include/os32 \
          -I$(CROSS_DIR)/i386-elf/include
+
+CFLAGS += -include $(OS32_SDK)/include/os32/os32_unit_stamp.h
 
 LDFLAGS = -m elf_i386 -T $(OS32_SDK)/link/app.ld -nostdlib --nmagic --gc-sections \
           -L$(OS32_SDK)/lib -L$(CROSS_DIR)/i386-elf/lib \

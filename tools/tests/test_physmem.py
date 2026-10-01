@@ -325,7 +325,7 @@ void _start(void) {
     /* 4GiB machine: nothing is truncated except the top MMIO band. */
     CHECK(physmem_add_trusted(&m, high, top, PHYSMEM_SOURCE_MACHINE));
     CHECK(physmem_count(&m, 0, PHYSMEM_MAX_PFN, PHYSMEM_RAM, &count));
-    CHECK(count == (hole - MEM_APP_BAND_BASE / PHYSMEM_PAGE_SIZE) + (top - high));
+    CHECK(count == (hole - MEM_POOL_BASE / PHYSMEM_PAGE_SIZE) + (top - high));
     CHECK(physmem_count(&m, top, PHYSMEM_MAX_PFN, PHYSMEM_MMIO, &count));
     CHECK(count == PHYSMEM_MAX_PFN - top);
     CHECK(physmem_legacy_end(&m) == hole);

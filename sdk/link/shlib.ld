@@ -1,9 +1,12 @@
+/* GENERATED GENERATION REF BEGIN */
+__os32_abi_1_mem_1_fmt_4 = 0;
+/* GENERATED GENERATION REF END */
 /*
  * shlib.ld — 共有ライブラリ (OS32X_FLAG_SHLIB) のリンカスクリプト。票 C3。
  *
  * 配置 (正典: include/memmap.h の MEM_SHLIB_BASE、K3):
  *
- *   0x400000  .shlib_hdr   ちょうど 1 ページ。OS32ShlibHeader (32B) + entry[]。
+ *   0x80000000  .shlib_hdr   ちょうど 1 ページ。OS32ShlibHeader (32B) + entry[]。
  *                          カーネルはここを読んで版とページ数を知る。
  *   +0x1000   .text .rodata  read-only + USER。全プロセスの PD に同じ物理ページを貼る。
  *   (ページ境界) .data .bss   read/write。**アプリごとに別の物理ページ**にする。
@@ -17,7 +20,7 @@
 ENTRY(__os32_shlib_header)
 SECTIONS
 {
-    . = 0x400000;
+    . = 0x80000000;
 
     /* --- 先頭ページ: ヘッダ + ジャンプ表 (ちょうど 4KB に切り上げる) --- */
     .shlib_hdr : {
@@ -61,7 +64,7 @@ SECTIONS
     _end = .;
 
     /* ヘッダに埋める値 (絶対シンボル)。 */
-    __shlib_text_pages = ABSOLUTE((__shlib_data_start - 0x400000) / 4096);
+    __shlib_text_pages = ABSOLUTE((__shlib_data_start - 0x80000000) / 4096);
     __shlib_data_pages = ABSOLUTE((__shlib_data_end - __shlib_data_start) / 4096);
 
     /* KAPI データ欄の配置の刻印 (票 TASK_KAPI_DATA_FIELDS、ヘッダ v3)。
@@ -70,6 +73,9 @@ SECTIONS
     .os32_kapi_layout 0 (INFO) : {
         KEEP(*(.os32_kapi_layout))
     }
+
+    .os32_generations 0 (INFO) : { KEEP(*(.os32_generations)) }
+    .os32_generation_ref 0 (INFO) : { KEEP(*(.os32_generation_ref)) }
 
     /DISCARD/ : {
         *(.note.gnu.build-id)

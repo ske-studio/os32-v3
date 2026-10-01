@@ -170,15 +170,15 @@ u32 paging_pte_flags(u32 virt_addr);
 /*  新 PD に載せてもカーネルは動き続ける (V1)。CPL=3 用の USER マッピングは    */
 /*  M1c で overlay する。 */
 
-/* アプリ帯域の **先頭** PDE インデックス (= MEM_APP_BAND_BASE >> 22 = 1)。
+/* アプリ帯域の **先頭** PDE インデックス (= MEM_APP_BAND_BASE >> 22 = 512)。
  * 共有ライブラリ帯域 (0x400000-0x4FFFFF)・プログラム本体
- * (MEM_EXEC_LOAD_ADDR 0x500000-)・ヒープ・ユーザスタックがここから載る。
+ * (MEM_EXEC_LOAD_ADDR 0x80100000-)・ヒープ・ユーザスタックがここから載る。
  *
  * 2026-09-10 (票 docs/tasks/memory/APP_BAND_PDE.md): アプリ固有 PDE は
  * 1 枚固定ではなく [APP_BAND_PDE, APP_BAND_PDE + count) の連続 count 枚。
  * count は 1〜MEM_APP_BAND_MAX_PDES で、要求量に応じて exec が決める。
  * 整合は kernel/paging.c の STATIC_ASSERT が検査する。 */
-#define APP_BAND_PDE   1
+#define APP_BAND_PDE   (MEM_APP_BAND_BASE >> 22)
 
 struct as_lease {
     u32 token, sid, generation, base, npages, flags;
@@ -196,7 +196,7 @@ struct addrspace {
     u32 lease_pt_phys[MEM_LEASE_MAX_PDES];
     struct as_lease leases[MEM_LEASE_MAX];
 };
-/* T2b internal path; legacy public callers keep create_n until T2c. */
+/* T2c launch path: sparse app PTs and the first lease PT. */
 int paging_addrspace_create_lease(struct addrspace *as, u32 owner);
 int paging_lease_map(struct addrspace *as, const struct lease_mapping *maps, u32 n);
 int paging_lease_unmap(struct addrspace *as, u32 base, u32 npages);
@@ -218,6 +218,8 @@ void paging_load_cr3(u32 pd_phys);
 #define AS_VA_PDE   2
 #define AS_VA_PTE   3
 int as_va_to_pa(u32 pd_phys, u32 va, u32 *pa);
+/* Read translation accepts RO user pages; failure leaves pa untouched. */
+int as_va_to_pa_read(u32 pd_phys, u32 va, u32 *pa);
 
 /* アプリ用アドレス空間を 1 つ作る (アプリ固有 PDE を pde_count 枚)。
  * master の全 PDE をコピーしてカーネル帯域を共有し、
