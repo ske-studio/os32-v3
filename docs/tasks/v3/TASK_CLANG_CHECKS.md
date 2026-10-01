@@ -364,3 +364,5 @@ arch asm 違反0・解析失敗0。共通20試験・12/12 runtime RED・コン�
 main...HEAD 相当の全差分を確認し、rc=0・空白の指摘なし。
 commitしないため、HEADだけのmain...HEADには修正前の末尾空行が残る。
 この結果追記は全体検査の終了後に行った。
+
+2026-10-01 CI 修正: 共通変異12本の有効モードを明記し、GCC predefined macros 取り込みを外す1本だけを `test_review_gcc_branches` と共通の限定モード条件・理由で SKIP、残り11本は runtime RED 必須とした (クロスありは12本すべて必須)。

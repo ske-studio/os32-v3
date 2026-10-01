@@ -20,6 +20,13 @@ from clang_ast.asm import templates
 from mutpar import mutant_tree, run_ordered
 
 
+GCC_BRANCH_SKIP_REASON = 'limited cross-free CI: GCC branch equivalence unverified'
+
+
+def limited_mode():
+    return os.environ.get('OS32_CLANG_CROSS_FREE') == '1'
+
+
 class ClangTest(unittest.TestCase):
     def tu(self, body, flags=()):
         return a.parse('kernel/clang_probe.c', ['-std=gnu11','-ffreestanding']+list(flags),
@@ -65,8 +72,8 @@ class ClangTest(unittest.TestCase):
 
     def test_review_gcc_branches(self):
         # CI's explicit limited mode cannot make this equivalence claim.
-        if os.environ.get('OS32_CLANG_CROSS_FREE') == '1':
-            self.skipTest('limited cross-free CI: GCC branch equivalence unverified')
+        if limited_mode():
+            self.skipTest(GCC_BRANCH_SKIP_REASON)
         tu = self.tu('#if __GNUC__ >= 5\nint *restrict p;\n#endif\n'
                      '#if defined(__clang__) || defined(__llvm__) || defined(__has_feature) || '
                      'defined(__has_embed) || defined(__has_constexpr_builtin)\n'
@@ -294,7 +301,12 @@ class ClangTest(unittest.TestCase):
 
 
 def mutant(case):
-    path,old,new = case
+    mode,path,old,new = case
+    if mode not in ('all modes', 'cross GCC only'):
+        raise AssertionError('unknown mutation mode: ' + mode)
+    label = f'{path} [{mode}] {old}'
+    if mode == 'cross GCC only' and limited_mode():
+        return 'SKIP: ' + label + ': ' + GCC_BRANCH_SKIP_REASON
     original = (ROOT/path).read_text()
     if original.count(old) != 1:
         raise AssertionError('mutation point changed: '+path)
@@ -307,8 +319,8 @@ def mutant(case):
         r = subprocess.run([sys.executable,str(tree/'tools/tests/test_clang_ast.py')],
                            cwd=tree,capture_output=True,text=True,stdin=subprocess.DEVNULL)
         if r.returncode != 1 or 'AssertionError' not in r.stderr or 'ERROR:' in r.stderr:
-            raise AssertionError(f'not runtime RED: {path}\n{r.stdout}{r.stderr}')
-        return 'runtime RED: '+path
+            raise AssertionError(f'not runtime RED: {label}\n{r.stdout}{r.stderr}')
+        return 'runtime RED: ' + label
 
 
 def main():
@@ -316,27 +328,35 @@ def main():
     if not unittest.TextTestRunner().run(unittest.defaultTestLoader.loadTestsFromTestCase(ClangTest)).wasSuccessful():
         return 1
     if args.mutate:
-        cases = [('tools/clang_ast/type_occurrences.cpp',
+        # Every mutant declares its coverage; GCC-only coverage follows the
+        # same predicate and reason as test_review_gcc_branches.
+        cases = [('all modes', 'tools/clang_ast/type_occurrences.cpp',
                   'if (array->getIndexTypeQualifiers().hasRestrict())', 'if (false)'),
-                 ('tools/clang_ast/__init__.py','return a > 0 and b > a','return False'),
-                 ('tools/check_arch_asm.py',"hits.add((rel,c.location.line,match[1]))",'pass'),
-                 ('tools/clang_ast/type_occurrences.cpp', 'if (type->isAtomicType())', 'if (false)'),
-                 ('tools/check_p2v.py',"add('physical-cast')",'pass'),
-                 ('tools/check_p2v.py',"'paging_addrspace_map_user_range_phys': {3}",
+                 ('all modes', 'tools/clang_ast/__init__.py','return a > 0 and b > a','return False'),
+                 ('all modes', 'tools/check_arch_asm.py',"hits.add((rel,c.location.line,match[1]))",'pass'),
+                 ('all modes', 'tools/clang_ast/type_occurrences.cpp', 'if (type->isAtomicType())', 'if (false)'),
+                 ('all modes', 'tools/check_p2v.py',"add('physical-cast')",'pass'),
+                 ('all modes', 'tools/check_p2v.py',"'paging_addrspace_map_user_range_phys': {3}",
                   "'paging_addrspace_map_user_range_phys': set()"),
-                 ('tools/check_p2v.py',"if ast.pointer(c.type) and ast.integer(operand.type) and not converted(c):",
+                 ('all modes', 'tools/check_p2v.py',"if ast.pointer(c.type) and ast.integer(operand.type) and not converted(c):",
                   "if ast.pointer(c.type) and ast.integer(operand.type) and not converted(c) and not any(x.spelling in CONVERSIONS for x in expression_nodes(operand)):"),
-                 ('tools/clang_ast/__init__.py',"out += gcc_predefines(cross, tuple(argv), str(root))",'pass'),
-                 ('tools/check_le_access.py',"ast.integer(pointee) and pointee.get_size() > 1",'False'),
-                 ('tools/clang_ast/dialect.py',"hits = {hit for hit in type_occurrences(tu, root) if hit[2] in words}",
+                 ('cross GCC only', 'tools/clang_ast/__init__.py',"out += gcc_predefines(cross, tuple(argv), str(root))",'pass'),
+                 ('all modes', 'tools/check_le_access.py',"ast.integer(pointee) and pointee.get_size() > 1",'False'),
+                 ('all modes', 'tools/clang_ast/dialect.py',"hits = {hit for hit in type_occurrences(tu, root) if hit[2] in words}",
                   'hits = set()'),
-                 ('tools/clang_ast/type_occurrences.cpp', 'visitor.TraverseDecl(context.getTranslationUnitDecl());',
+                 ('all modes', 'tools/clang_ast/type_occurrences.cpp', 'visitor.TraverseDecl(context.getTranslationUnitDecl());',
                   '(void)visitor;'),
-                 ('tools/clang_ast/type_occurrences.py', 'os.path.abspath(root / file)',
+                 ('all modes', 'tools/clang_ast/type_occurrences.py', 'os.path.abspath(root / file)',
                   'os.path.abspath(file)')]
+        red = skipped = 0
         for result in run_ordered(mutant,cases):
             print(result)
-        print(f'Clang rules: {len(cases)}/{len(cases)} runtime RED; compile failures: 0')
+            if result.startswith('SKIP:'):
+                skipped += 1
+            else:
+                red += 1
+        print(f'Clang rules: {red}/{len(cases) - skipped} runtime RED; '
+              f'skipped: {skipped}; compile failures: 0')
     return 0
 
 if __name__ == '__main__':
