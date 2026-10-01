@@ -109,6 +109,28 @@ class ClangTest(unittest.TestCase):
         self.assertEqual(dialect(self.tu('int f(void) { return sizeof(int *); }'),
                                  ROOT,{'restrict','_Atomic'},set()),[])
 
+    def test_array_parameter_restrict(self):
+        contexts = [
+            'int f(int a[{qual}]);',
+            'int f(int a[{qual}]) {{ return a[0]; }}',
+            'typedef int F(int a[{qual}]);',
+            'enum {{ E = sizeof(int (*)(int a[{qual}])) }};',
+        ]
+        for context in contexts:
+            for qual in ('restrict 3', 'restrict', 'static restrict 3',
+                         'const volatile restrict 3'):
+                with self.subTest(context=context, qualifier=qual):
+                    hits = dialect(self.tu(context.format(qual=qual)),
+                                   ROOT, {'restrict'}, set())
+                    self.assertIn('restrict', [rule for _, _, rule in hits])
+            for qual in ('3', 'static 3', 'const', 'volatile 3',
+                         'static const volatile 3'):
+                with self.subTest(context=context, qualifier=qual):
+                    self.assertEqual(dialect(self.tu(context.format(qual=qual)),
+                                             ROOT, {'restrict'}, set()), [])
+        self.assertTrue(dialect(self.tu(
+            '#define R restrict\nint f(int a[R 3]);'), ROOT, {'restrict'}, set()))
+
     def test_review_all_type_occurrences(self):
         # Each TU must parse successfully before policy assertions can be RED.
         contexts = [
@@ -294,7 +316,9 @@ def main():
     if not unittest.TextTestRunner().run(unittest.defaultTestLoader.loadTestsFromTestCase(ClangTest)).wasSuccessful():
         return 1
     if args.mutate:
-        cases = [('tools/clang_ast/__init__.py','return a > 0 and b > a','return False'),
+        cases = [('tools/clang_ast/type_occurrences.cpp',
+                  'if (array->getIndexTypeQualifiers().hasRestrict())', 'if (false)'),
+                 ('tools/clang_ast/__init__.py','return a > 0 and b > a','return False'),
                  ('tools/check_arch_asm.py',"hits.add((rel,c.location.line,match[1]))",'pass'),
                  ('tools/clang_ast/type_occurrences.cpp', 'if (type->isAtomicType())', 'if (false)'),
                  ('tools/check_p2v.py',"add('physical-cast')",'pass'),

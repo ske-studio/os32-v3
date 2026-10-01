@@ -603,7 +603,16 @@ mkpkg が先に断る)。**`core` / `base` に足した物は FD にも入る** 
 
 `tools/clang_ast/` が `make -n -B all` の実際の翻訳単位・旗を取得し、
 i386 向け libclang AST を作る。ビルド自体は引き続き i386-elf GCC。
-ホストには `clang libclang-dev python3-clang` (Ubuntu apt) が必要。
+ホストには `clang libclang-dev llvm-dev python3-clang` (Ubuntu apt) が必要。
+全 TypeLoc を辿る C++ 補助器の組み立てには LLVM 開発ヘッダと `libLLVM`、
+`libclang-cpp` が必要で、clang/libclang/resource header と同じ版を使う。
+導入後はリポジトリのルートでロードと組み立てを確認する:
+
+```bash
+python3 -c 'import clang.cindex; clang.cindex.Index.create()'
+PYTHONPATH=tools python3 -c 'from clang_ast.type_occurrences import visitor_binary; print(visitor_binary())'
+```
+
 クロス GCC を導入しない静的 CI では、C AST 検査の標準ヘッダを Ubuntu の
 `libnewlib-dev` (`/usr/include/newlib`) から取る。クロス newlib があればそちらを優先する。
 clang の解析失敗・不足入力は非0で終了する。`make all` の後に検査する。

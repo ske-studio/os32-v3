@@ -129,4 +129,3 @@ def dry_run(root):
                + ["BUILD_OUT=" + os.path.join(tmp, "out")])
         r = subprocess.run(cmd, cwd=str(root), capture_output=True, text=True, env=env, stdin=subprocess.DEVNULL)
     return r.returncode, r.stdout, r.stderr
-

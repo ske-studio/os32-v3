@@ -324,3 +324,43 @@ P2V 違反0・例外65、LE 9ファイルで違反0、arch asm 違反0・解析�
 共通19試験・11/11 runtime RED・コンパイル失敗0、既存 C dialect 82チェック失敗0・
 27/27 RED・対照5/5 GREEN。既存ホスト試験の4件+5件SKIPは維持。
 全体検証中はソース/票を変更せず、この結果だけ終了後に追記した。
+
+
+### レビュー 3 回目の対応 (2026-10-01、Codex GPT-6)
+
+基点 `33f0214`、独立レビュー Codex astra の P2 / P3 への対応。状態行は維持。
+
+配列引数の角括弧内の修飾は QualType ではなく ArrayType にあるため、全 TypeLoc の
+再帰中に `getIndexTypeQualifiers().hasRestrict()` も検査する。[C1] で禁止されている
+restrict だけを拾い、禁止されていない static / const / volatile は拾わない。
+宣言・定義・関数 typedef・sizeof 内の関数 pointer 型の4文脈で、restrict と
+他の修飾との組合せを否定例、通常の配列および static / const / volatile を対照とした。
+macro の restrict も検査する。この index qualifier 判定だけを外す C++ 変異を追加し、
+コンパイル・解析成功後の AssertionError による runtime RED を要求する。
+
+INSTALL.md と docs/08_build.md のホスト依存へ Ubuntu の llvm-dev を追記し、
+LLVM 開発ヘッダ・libLLVM・libclang-cpp と clang/libclang/resource header の版を
+揃えることを明記した。導入確認を Python binding のロードだけでなく
+`visitor_binary()` による C++ 補助器の組み立てまで広げた。両確認コマンドは rc=0。
+build.py の末尾空行も削除した。
+
+検証は `CROSS_DIR=/home/hight/opt/cross`、make は全て `< /dev/null`。
+`make all` は rc=0 (`/tmp/clang-review3-all.log`)。
+前回と同じ補助環境を使用: NP21W_DIR は worktree 内の build/clang-local-images、
+check-changed の PYTHONPATH は /tmp/clang-test-env (ELF32 ホスト試験の qemu 補助)。
+実木を凍結して check-changed を実行し、結果は完了後に追記する。
+NP21/W・NHD・配備・ini・Windows・ゲスト/実機試験は対象外、commit / push はしない。
+
+
+最終 `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null`
+は **rc=0**、full の108ターゲットと実木変更ガードを完了
+(`/tmp/clang-review3-check-changed.log`)。上記補助環境を使用し、実行中の編集なし。
+実木は P2V 違反0・例外65、C dialect 内部333TUでOK、LE 9ファイルで違反0、
+arch asm 違反0・解析失敗0。共通20試験・12/12 runtime RED・コンパイル失敗0、
+既存 C dialect 27/27 RED・対照5/5 GREEN。既存ホスト試験の4件+5件SKIPは維持。
+単独の `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 python3 tools/tests/test_clang_ast.py --mutate`
+も rc=0 (`/tmp/clang-review3-common.log`)。
+未コミット修正を含む `git diff --check "$(git merge-base main HEAD)"` で
+main...HEAD 相当の全差分を確認し、rc=0・空白の指摘なし。
+commitしないため、HEADだけのmain...HEADには修正前の末尾空行が残る。
+この結果追記は全体検査の終了後に行った。

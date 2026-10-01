@@ -142,16 +142,24 @@ NHDに比べて搭載できるプログラムが限られます。
 ### C ソース静的検査の clang 依存
 
 ビルドは i386-elf GCC のまま。`make check` の C 検査には libclang の
-Python バインディングも必要:
+Python バインディングと、全 TypeLoc を辿る C++ 補助器用の LLVM 開発ヘッダ・
+libLLVM も必要:
 
 ```bash
-sudo apt-get install clang libclang-dev python3-clang
+sudo apt-get install clang libclang-dev llvm-dev python3-clang
 ```
 
-`python3 -c 'import clang.cindex; clang.cindex.Index.create()'` で確認する。
+リポジトリのルートで、バインディングのロードと補助器の組み立てまで確認する:
+
+```bash
+python3 -c 'import clang.cindex; clang.cindex.Index.create()'
+PYTHONPATH=tools python3 -c 'from clang_ast.type_occurrences import visitor_binary; print(visitor_binary())'
+```
+
+補助器は初回に `clang++` でコンパイルし、`libclang-cpp` と `libLLVM` にリンクする。
 CI の setup-python では共通部が apt の `/usr/lib/python3/dist-packages` を参照する。
 詳細は [docs/08_build.md](docs/08_build.md) §8-4。
 
 クロスツールチェーンを使わない静的 CI (`check.yml`) では、`libnewlib-dev` の
 `/usr/include/newlib` を解析用に使う。ローカルのクロス newlib があればそちらを優先する。
-clang 本体・libclang・resource header は同じ版を使う。
+clang 本体・libclang・LLVM 開発ヘッダ・libLLVM・resource header は同じ版を使う。

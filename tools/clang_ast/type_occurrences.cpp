@@ -26,6 +26,11 @@ public:
         };
         if (type.isRestrictQualified())
             report("restrict");
+        // Array parameter bracket qualifiers belong to ArrayType, not QualType.
+        if (const auto *array = llvm::dyn_cast<clang::ArrayType>(type.getTypePtr())) {
+            if (array->getIndexTypeQualifiers().hasRestrict())
+                report("restrict");
+        }
         if (type->isAtomicType())
             report("_Atomic");
         return clang::RecursiveASTVisitor<TypeVisitor>::TraverseTypeLoc(loc);
