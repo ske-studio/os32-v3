@@ -72,6 +72,9 @@ static void irq_restore(unsigned int f) { host_verify_commit(); restores++; host
 POST = r'''
 #include "pgalloc_host_fixture.h"
 int paging_boot_context(void) { return host_boot_ctx; }
+/* Ledger-only fixture has a master identity alias even after boot. */
+u32 paging_current_cr3(void) { return 1; }
+u32 paging_kernel_pd_phys(void) { return 1; }
 static void host_bad_irq(void) __attribute__((noreturn, no_instrument_function));
 static void host_bad_irq(void) {
     __asm__ volatile("int $0x80" : : "a"(1), "b"(250) : "memory"); for (;;) {}
@@ -270,6 +273,7 @@ BODIES['refusals_keep_accounting'] = r'''
                                 LEDGER_TOP_DOWN, &p) && p == 3000);
     {
         struct ledger_surface sf = { .first = 3000, .npages = 2,
+            .width = 1, .height = 2, .pitch = PAGE_SIZE, .planes = 1,
             .owner = LEDGER_OWNER_BOOT, .backing = LEDGER_SB_RAM,
             .backend = LEDGER_SF_PEGC, .role = LEDGER_ROLE_CLIENT };
         u32 sid;

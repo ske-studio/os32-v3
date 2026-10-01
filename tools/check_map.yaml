@@ -650,6 +650,10 @@ checks:
     - userland/libos32term_render/tests/render.rs
     - userland/libos32term_render/tests/rework.rs
   check-memory-host:
+    - tools/tests/lease_host.c
+    - tools/tests/test_lease.py
+    - exec/lease.c
+    - exec/lease.h
     - tools/tests/host_arch/arch_io.h
     - gfx/gfx.h
     - gfx/palette.h
@@ -1396,6 +1400,9 @@ checks:
     - sdk/include/os32/os32_kapi_generated.h
     - sdk/include/os32/os32_kapi_shared.h
   check-launch-host:
+    - include/sys.h
+    - kernel/pgalloc.h
+    - kernel/physmem.h
     - exec/launch.c
     - tools/tests/launch_host.c
     - tools/tests/test_launch.py
@@ -1586,6 +1593,9 @@ checks:
     - sdk/include/os32/os32api.h
     - userland/lib/filer/filer_draw.h
   check-multiapp-model-host:
+    - include/sys.h
+    - kernel/pgalloc.h
+    - kernel/physmem.h
     - exec/appslot.c
     - exec/appslot.h
     - fs/fd_redirect.c
@@ -1898,6 +1908,7 @@ checks:
     - userland/system/inst_disk.c
     - userland/system/inst_hdd.c
   check-db-v50-host:
+    - exec/lease.h
     - exec/exec.c
     - exec/exec.h
     - fs/vfs_fd.c

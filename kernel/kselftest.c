@@ -20,6 +20,7 @@
 #include "kprintf.h"
 #include "kmalloc.h"
 #include "paging.h"
+#include "lease.h"
 #include "con_sink.h"
 #include "pc98.h"
 #include "tvram.h"
@@ -1847,6 +1848,7 @@ int kselftest_run(void)
     test_ring3_pd();
     test_map_user_keep();
     test_app_band_pde();
+    check(lease_selftest() == 0, "private lease S/T/U, master unchanged, owner zero");
     test_con_sink();
     test_con_sink_render_gate();
     test_kbd_inject();

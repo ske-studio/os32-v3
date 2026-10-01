@@ -104,7 +104,7 @@ u32 pgalloc_arena_end(void);
 #define LEDGER_MAX_OWNERS    64
 #define LEDGER_MAX_REGIONS   48
 #define LEDGER_MAX_RESOURCES 16
-#define LEDGER_MAX_SURFACES  8
+#define LEDGER_MAX_SURFACES  16
 #define LEDGER_NAME_LEN      8
 /* 区間の種別 (§3-1 の type)。 */
 #define LEDGER_R_FIXED       1
@@ -170,11 +170,12 @@ struct ledger_resource {       /* 32B。u32 → u16 → u8 の順で詰め物な
 /* 予約の要求 1 本。first / end は PFN 半開 (end = 1048576 で 4GiB 端)、
  * kind は LEDGER_SPAN_*、res はこの span の根拠の資源レコードの番号。 */
 struct ledger_span { u32 first, end, kind, res; };
-struct ledger_surface {        /* 24B。T1 は型と表だけ (登録は T1e) */
+struct ledger_surface {        /* T2b: whole-page occupancy and stable references */
     u32 first, npages;         /* npages == 0 = 表の空き */
+    u32 gen, plane_offset[4];
+    u16 lease_count;
     u16 width, height, pitch;
-    u8  owner, backing, backend, role, format, planes, cache, perm_max, gen,
-        lease_count;
+    u8  owner, backing, backend, role, format, planes, cache, perm_max, closing;
 };
 extern struct ledger_owner ledger_owners[LEDGER_MAX_OWNERS];
 extern struct ledger_region ledger_regions[LEDGER_MAX_REGIONS];
@@ -217,7 +218,7 @@ int pgalloc_free_n_owner(u32 owner, u32 pfn, int n);
 /* 全ページが from のものなら一括で to へ (会計 pages も動く)。 */
 int ledger_transfer(u32 pfn, int n, u32 from, u32 to);
 /* owner のページを全部返す (R5 の AS 終了、R7 のモジュール失敗)。DEVICE /
- * PERSIST は拒否、SURFACE を持つ AS・lease の残る SURFACE を持つ owner も
+ * PERSIST は拒否、SURFACE を持つ owner も
  * 拒否。*pages に返した数 (ledger_reclaim_pages にも足す)。 */
 int ledger_reclaim_owner(u32 owner, u32 *pages);
 /* 固定番地 [first, end) (PFN) を owner で押さえる (旧 pgalloc_mark_used)。
@@ -267,10 +268,17 @@ int ledger_reserve_set(u32 owner, const struct ledger_span *spans, u32 n);
 #define LEDGER_ROLE_CLIENT   1   /* アプリへ USER で貸す面 */
 #define LEDGER_ROLE_DISPLAY  2   /* 表示面 (supervisor のまま) */
 #define LEDGER_PERM_NONE     0
+#define LEDGER_PERM_RO       2
 #define LEDGER_PERM_RW       1
-/* SURFACE を表の空きに写す (起動時 = paging_boot_context だけ)。owner は生きて
- * いて、npages > 0、範囲は 4GiB の内側、lease_count は 0。backing が RAM なら
- * 全ページがその owner の確保済みであること。1 = 成功、*sid に番号 (NULL 可)。 */
+/* Internal table ownership check (PD/PT preparation and rollback). */
+int pgalloc_page_owned(u32 pfn, u32 owner);
+/* Validate geometry, whole-page ownership/resource coverage and cache. */
+int ledger_surface_validate(const struct ledger_surface *sf);
+/* Stop lending; RAM is returned after the last lease, DEVICE stays reserved. */
+int ledger_surface_release(u32 sid);
+/* Normal-context registration. Reject overlap; zero RAM padding; increment
+ * u32 generation. Exhausted generations permanently retire that slot.
+ * Success=1, *sid is changed only on success (NULL allowed). */
 int ledger_surface_create(const struct ledger_surface *sf, u32 *sid);
 /* backend と role が一致する最初の SURFACE (無ければ NULL)。 */
 struct ledger_surface *ledger_surface_find(u32 backend, u32 role);

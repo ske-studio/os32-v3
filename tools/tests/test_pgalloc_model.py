@@ -31,6 +31,9 @@ class Integration(unittest.TestCase):
                 source += '\n' + reserve + '\n' + claim
             pre = '''#include "types.h"
 int paging_boot_context(void) { return 1; }
+/* Allocator-only fixture runs in the master identity context. */
+u32 paging_current_cr3(void) { return 1; }
+u32 paging_kernel_pd_phys(void) { return 1; }
 static void outp(unsigned int p, unsigned int v) { (void)p; (void)v; }
 #define NOINST __attribute__((no_instrument_function))
 static void host_verify_commit(void) NOINST;
@@ -368,7 +371,8 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     def test_surface_and_live_mixed_claim(self):
         self.run_c('''
     u32 p, allocated, sid, baseline, total;
-    struct ledger_surface sf = { .npages = 1, .owner = LEDGER_OWNER_BOOT,
+    struct ledger_surface sf = { .width = 1, .height = 1, .pitch = PAGE_SIZE,
+        .planes = 1, .npages = 1, .owner = LEDGER_OWNER_BOOT,
         .backing = LEDGER_SB_RAM, .backend = LEDGER_SF_PEGC,
         .role = LEDGER_ROLE_CLIENT };
     host_pool_boot(16384);
@@ -434,7 +438,8 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     def test_surface_and_atomic_free(self):
         self.run_c('''
     u32 p, first, sid, before;
-    struct ledger_surface sf = { .npages = 1, .owner = LEDGER_OWNER_BOOT,
+    struct ledger_surface sf = { .width = 1, .height = 1, .pitch = PAGE_SIZE,
+        .planes = 1, .npages = 1, .owner = LEDGER_OWNER_BOOT,
         .backing = LEDGER_SB_RAM, .backend = LEDGER_SF_PEGC,
         .role = LEDGER_ROLE_CLIENT };
     host_pool_boot(16384);

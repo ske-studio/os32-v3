@@ -35,7 +35,7 @@ u32 ledger_region_count;
 STATIC_ASSERT(sizeof(struct ledger_owner) == 24, ledger_owner_24);
 STATIC_ASSERT(sizeof(struct ledger_region) == 16, ledger_region_16);
 STATIC_ASSERT(sizeof(struct ledger_resource) == 32, ledger_resource_32);
-STATIC_ASSERT(sizeof(struct ledger_surface) == 24, ledger_surface_24);
+STATIC_ASSERT(sizeof(struct ledger_surface) == 48, ledger_surface_48);
 STATIC_ASSERT(LEDGER_MAX_OWNERS <= 256, ledger_owner_fits_u8);
 
 /* R1 の観測 (§3-5)。深さは isr_stub.asm / setjmp.asm が書く。 */
@@ -329,6 +329,11 @@ static int __attribute__((noinline)) page_owned(u32 p, u32 owner)
 {
     return bit(eligible, p) && bit(bitmap, p) && owner_map[p] == owner;
 }
+int pgalloc_page_owned(u32 pfn, u32 owner)
+{
+    return pfn < limit_pfn && owner_ok(owner) && page_owned(pfn, owner);
+}
+
 /* [pfn, pfn + n) が PFN の管理範囲 [0, limit_pfn) に収まるか (n > 0)。 */
 static int __attribute__((noinline)) pfn_span_ok(u32 pfn, int n)
 {
@@ -495,6 +500,12 @@ int pgalloc_free_n_owner(u32 owner, u32 pfn, int n)
     ledger_note(LEDGER_OP_FREE, owner, LEDGER_CALLER());
     ok = 0;
     if (!owner_ok(owner) || !pfn_span_ok(pfn, n)) goto bad;
+    for (i = 0; i < LEDGER_MAX_SURFACES; i++) {
+        const struct ledger_surface *sf = &ledger_surfaces[i];
+        if (sf->npages && (!sf->closing || sf->lease_count) &&
+            pfn < sf->first + sf->npages &&
+            sf->first < pfn + (u32)n) goto bad;
+    }
     for (i = 0; i < (u32)n; i++)
         if (!page_owned(pfn + i, owner)) goto bad;
     for (i = 0; i < (u32)n; i++) give_page(pfn + i);
@@ -543,8 +554,7 @@ int ledger_reclaim_owner(u32 owner, u32 *pages)
     if (kind == LEDGER_KIND_DEVICE || kind == LEDGER_KIND_PERSIST) goto done;
     for (i = 0; i < LEDGER_MAX_SURFACES; i++) {
         sf = &ledger_surfaces[i];
-        if (sf->npages && sf->owner == owner &&
-            (sf->lease_count || kind == LEDGER_KIND_AS)) goto done;
+        if (sf->npages && sf->owner == owner) goto done;
     }
     /* 返し忘れが無ければ (pages == 0) 走査しない。AS / MODULE の L2 の
      * ページは全部 eligible かつ allocated。 */
@@ -819,25 +829,101 @@ done:
 /*  登録・移譲は起動時と GUI の開始にしか走らないので cold (大きさで組ま   */
 /*  せる、カーネルの予算 §4-5-R)。                                         */
 /* ======================================================================== */
+int ledger_surface_validate(const struct ledger_surface *sf)
+{
+    u32 p, i, bytes, plane_bytes;
+    if (!sf || !owner_ok(sf->owner) || !sf->npages ||
+        sf->first >= PHYSMEM_MAX_PFN || sf->npages > PHYSMEM_MAX_PFN - sf->first ||
+        sf->npages > 0xffffffffUL / PAGE_SIZE ||
+        !sf->backing || sf->backing > LEDGER_SB_MMIO ||
+        !sf->planes || sf->planes > 4 || !sf->width || !sf->height || !sf->pitch ||
+        sf->perm_max > LEDGER_PERM_RO) return 0;
+    bytes = sf->npages * PAGE_SIZE;
+    plane_bytes = (u32)sf->pitch * sf->height;
+    for (i = 0; i < sf->planes; i++)
+        if (sf->plane_offset[i] > bytes || plane_bytes > bytes - sf->plane_offset[i])
+            return 0;
+    if (sf->cache != (sf->backing <= LEDGER_SB_FIXED_RAM ?
+                      LEDGER_CACHE_WB : LEDGER_CACHE_UC)) return 0;
+    for (p = sf->first; p < sf->first + sf->npages; p++) {
+        if (sf->backing == LEDGER_SB_RAM) {
+            if (p >= limit_pfn || !page_owned(p, sf->owner)) return 0;
+        } else {
+            for (i = 0; i < ledger_region_count; i++) {
+                const struct ledger_region *r = &ledger_regions[i];
+                if (r->first <= p && p < r->end && r->cache == sf->cache &&
+                    ((sf->backing == LEDGER_SB_FIXED_RAM &&
+                      r->type == LEDGER_R_SURFACE_BACKING && r->owner == sf->owner) ||
+                     (sf->backing == LEDGER_SB_VRAM && r->type == LEDGER_R_FIXED &&
+                      r->owner == sf->owner) ||
+                     (sf->backing >= LEDGER_SB_VRAM && r->type == LEDGER_R_DEVICE))) break;
+            }
+            if (i == ledger_region_count) return 0;
+            if (sf->backing >= LEDGER_SB_VRAM && ledger_regions[i].type == LEDGER_R_DEVICE) {
+                const struct ledger_region *r = &ledger_regions[i];
+                for (i = 0; i < LEDGER_MAX_RESOURCES; i++)
+                    if ((r->res_mask & (1U << i)) &&
+                        ledger_resources[i].map_first <= p &&
+                        p < ledger_resources[i].map_end) break;
+                if (i == LEDGER_MAX_RESOURCES) return 0;
+            }
+        }
+    }
+    return 1;
+}
+
 int __attribute__((cold))
 ledger_surface_create(const struct ledger_surface *sf, u32 *sid)
 {
-    u32 i, p;
-    unsigned int flags;
-    int ok;
-    flags = irq_save();
-    ok = 0;
-    if (!sf || !paging_boot_context() || !owner_ok(sf->owner) || !sf->npages ||
-        sf->first >= PHYSMEM_MAX_PFN || sf->npages > PHYSMEM_MAX_PFN - sf->first ||
-        sf->lease_count || !sf->backing || sf->backing > LEDGER_SB_MMIO) goto done;
-    /* 池の面は、登録する owner が全ページを確保済みであること。 */
-    if (sf->backing == LEDGER_SB_RAM)
-        for (p = sf->first; p < sf->first + sf->npages; p++)
-            if (p >= limit_pfn || !page_owned(p, sf->owner)) goto done;
-    for (i = 0; i < LEDGER_MAX_SURFACES && ledger_surfaces[i].npages; i++) {}
+    u32 i, p, used_bytes;
+    unsigned int flags = irq_save();
+    int ok = 0;
+    /* Padding uses the master identity alias until T2c. Reject before writes. */
+    if (paging_current_cr3() != paging_kernel_pd_phys() ||
+        kctx_irq_depth || kctx_exc_depth ||
+        !ledger_surface_validate(sf) || sf->lease_count || sf->closing) goto done;
+    for (i = 0; i < LEDGER_MAX_SURFACES; i++) {
+        const struct ledger_surface *other = &ledger_surfaces[i];
+        if (other->npages && sf->first < other->first + other->npages &&
+            other->first < sf->first + sf->npages) goto done;
+    }
+    for (i = 0; i < LEDGER_MAX_SURFACES; i++)
+        if (!ledger_surfaces[i].npages && ledger_surfaces[i].gen != 0xffffffffUL) break;
     if (i == LEDGER_MAX_SURFACES) goto done;
+    p = ledger_surfaces[i].gen + 1;
     ledger_surfaces[i] = *sf;
+    ledger_surfaces[i].gen = p;
+    /* RAM padding belongs to this surface, and is never disclosed dirty. */
+    if (sf->backing <= LEDGER_SB_FIXED_RAM) {
+        used_bytes = (u32)sf->pitch * sf->height;
+        for (p = 0; p < sf->npages * PAGE_SIZE; p++) {
+            u32 n;
+            for (n = 0; n < sf->planes; n++)
+                if (p >= sf->plane_offset[n] && p - sf->plane_offset[n] < used_bytes) break;
+            if (n == sf->planes) ((u8 *)P2V(sf->first * PAGE_SIZE))[p] = 0;
+        }
+    }
     if (sid) *sid = i;
+    ok = 1;
+done:
+    irq_restore(flags);
+    return ok;
+}
+
+int ledger_surface_release(u32 sid)
+{
+    struct ledger_surface *sf;
+    unsigned int flags = irq_save();
+    int ok = 0;
+    if (kctx_irq_depth || kctx_exc_depth ||
+        sid >= LEDGER_MAX_SURFACES || !ledger_surfaces[sid].npages) goto done;
+    sf = &ledger_surfaces[sid];
+    sf->closing = 1;
+    if (!sf->lease_count) {
+        if (sf->backing == LEDGER_SB_RAM &&
+            !pgalloc_free_n_owner(sf->owner, sf->first, (int)sf->npages)) goto done;
+        sf->npages = 0;
+    }
     ok = 1;
 done:
     irq_restore(flags);
