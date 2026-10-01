@@ -703,7 +703,7 @@ tools/audit_cast_align.sh all
 
 候補が出ても実際に壊れるとは限らない。仕分けの記録は
 [tasks/arch_port/M0_PORTABILITY_AUDIT.md](tasks/arch_port/M0_PORTABILITY_AUDIT.md)。
-旧5本は比較専用に `tools/legacy_checks/` に保存し、make の検査経路からは呼ばない。
+旧5本 (正規表現版) は比較のあと撤去した (ユーザー決定 2026-10-01、git の履歴 `8612b06` 以前とリポジトリ外のバックアップに残る)。
 重複していた `create_fat12_d88.py` は撤去。FD生成は `tools/mkfat12.py` を使う。
 
 #### `tools/check_docs_links.py`
