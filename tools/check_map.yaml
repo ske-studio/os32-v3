@@ -672,6 +672,7 @@ checks:
     - kernel/setjmp.asm
     - kernel/isr_stub.asm
     - kernel/irq.c
+    - kernel/irq_math.c
     - include/ksetjmp.h
     - kernel/v86.c
     - kernel/v86_bios.h
@@ -708,6 +709,7 @@ checks:
     - kapi/kapi_host.h
     - tools/tests/test_highram_stage.py
     - tools/tests/test_ledger.py
+    - tools/tests/test_exec_r1.py
     - tools/tests/test_memory_boot.py
     - tools/tests/test_paging_bounds.py
     - tools/tests/paging_bounds_host.c

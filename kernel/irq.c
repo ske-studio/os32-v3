@@ -22,7 +22,6 @@ u32 irq_unexpected = 0;
 u32 irq_storm_masked = 0;
 u32 irq_line_quarantined = 0;
 u32 irq_ctx_violations = 0;
-volatile int irq_in_irq = 0;
 int irq_test_quiet = 0;   /* 試験専用 (irq.h の注記) */
 
 /* ------------------------------------------------------------------------ */
@@ -53,7 +52,7 @@ int irq_register(unsigned int irq, irq_handler_fn fn, void *arg,
     ln = (idx >= 0) ? &irq_lines[idx] : 0;
 
     saved = irq_save();
-    slot = irq_register_check(irq, ln, fn, arg, flags, irq_in_irq);
+    slot = irq_register_check(irq, ln, fn, arg, flags, kctx_irq_depth);
     if (slot < 0) {
         if (slot == IRQ_ERR_CTX) irq_ctx_violations++;
         irq_restore(saved);
@@ -79,7 +78,7 @@ int irq_unregister(unsigned int irq, irq_handler_fn fn, void *arg)
     ln = (idx >= 0) ? &irq_lines[idx] : 0;
 
     saved = irq_save();
-    slot = irq_unregister_find(irq, ln, fn, arg, irq_in_irq);
+    slot = irq_unregister_find(irq, ln, fn, arg, kctx_irq_depth);
     if (slot < 0) {
         if (slot == IRQ_ERR_CTX) irq_ctx_violations++;
         irq_restore(saved);
@@ -129,8 +128,6 @@ void irq_dispatch(unsigned int irq)
     int idx;
     int handled = 0;
 
-    irq_in_irq++;
-
     idx = irq_dyn_index(irq);
     if (idx >= 0) {
         ln = &irq_lines[idx];
@@ -149,7 +146,6 @@ void irq_dispatch(unsigned int irq)
     if (!handled) irq_unexpected++;
 
     irq_finish(irq, handled);
-    irq_in_irq--;
 }
 
 /* ------------------------------------------------------------------------ */

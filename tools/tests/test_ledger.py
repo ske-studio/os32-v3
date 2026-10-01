@@ -14,13 +14,13 @@
   - R7: 合成モジュールの init 途中失敗 → 一括回収で 0、bundle → モジュール
     移譲の後の失敗は当該 owner だけ回収され bundle の残りは不変
   - 会計 (L1・L2・owner の pages・used/total・区間の本数) は失敗時不変
-  - R1: 割り込み / 例外の深さが立っている間の操作だけを数える
+  - R1: 割り込み / 例外の操作を診断して panic、変更前に停止
   - 区間の表 (重なり拒否・OUTSIDE・起動時だけ) と ledger_selfcheck
   - 永久予約 (PERSIST だけ、L2 に owner が残る — B11。T1e で呼び手の sys_reserve_top は撤去)
   - asm: 全 IRQ スタブの IRQ_ENTER / IRQ_LEAVE、全例外入口の EXC_ENTER と
     復帰点の EXC_LEAVE (静的)、exec_setjmp / exec_longjmp の深さの控えと
     復元 (nasm で組んで実行)、jmpbuf の長さの直書きが無いこと (B8)、
-    broker の判定が irq_in_irq のまま (B1)
+    broker の判定も全 IRQ 深さ (T2a R1)
 
 --mutate は §4-2 の変異 (owner 検査を外す / IRQ_LEAVE を 1 本抜く / 例外の
 復帰点の -1 を 1 つ抜く / 回収で DEVICE を拒否しない / exec_longjmp の深さ
@@ -55,6 +55,14 @@ PRE = r'''#include "types.h"
 static void host_verify_commit(void) NOINST;
 static unsigned int host_if = 0x202, saves, restores;
 static int host_boot_ctx = 1;
+static int host_expect_panic;
+static void host_panic_check(void) NOINST;
+static void _stop(void) __attribute__((unused)) NOINST;
+static void _stop(void) {
+    host_panic_check();
+    __asm__ volatile("int $0x80" : : "a"(1), "b"(250) : "memory");
+    for (;;) {}
+}
 static unsigned int irq_save(void) NOINST;
 static void irq_restore(unsigned int f) NOINST;
 static unsigned int irq_save(void) { unsigned int f = host_if; host_if &= ~0x200U; saves++; return f; }
@@ -125,6 +133,17 @@ static int same(void) {
             return 0;
     return snap_used == used_pages && snap_total == total_pages &&
            snap_regions == ledger_region_count;
+}
+static void host_panic_check(void) {
+    if (host_expect_panic && !(host_if & 0x200U) &&
+        ledger_check_tag && ledger_check_tag[0] == 'R' &&
+        ledger_check_tag[1] == '1' &&
+        ledger_irq_ops == (kctx_irq_depth != 0) &&
+        ledger_exc_ops == (kctx_exc_depth != 0) &&
+        ledger_owner_pages(LEDGER_OWNER_FIXED_LAST + 1) == 1) {
+        host_verify_commit();
+        __asm__ volatile("int $0x80" : : "a"(1), "b"(0) : "memory");
+    }
 }
 static int test(void) {
 '''
@@ -335,40 +354,23 @@ BODIES['r7_module_and_bundle'] = r'''
     CHECK(pgalloc_free_n_owner(LEDGER_OWNER_BUNDLE, lo + 24, (int)(hi - lo - 24)));
 '''
 
-BODIES['r1_counting'] = r'''
-    u32 a, p, n;
+for name, irq, exc, call in (
+    ('r1_irq_alloc_panic', 1, 0, 'pgalloc_alloc_n_owner(a, 1, 2048, 3072, LEDGER_BOTTOM_UP, &p)'),
+    ('r1_exc_free_panic', 0, 1, 'pgalloc_free_n_owner(a, p, 1)'),
+    ('r1_nested_reclaim_panic', 1, 1, 'ledger_reclaim_owner(a, &n)'),
+):
+    BODIES[name] = r'''
+    u32 a, p, n = 0;
+    (void)n;
     host_pool_boot(16384);
     CHECK(ledger_owner_new(LEDGER_KIND_AS, 2, "app", &a));
     CHECK(pgalloc_alloc_n_owner(a, 1, 2048, 3072, LEDGER_BOTTOM_UP, &p));
-    CHECK(ledger_irq_ops == 0 && ledger_exc_ops == 0);          /* 通常文脈 */
-    kctx_irq_depth = 1;                                          /* IRQ の上 */
-    CHECK(pgalloc_alloc_n_owner(a, 1, 2048, 3072, LEDGER_BOTTOM_UP, &p));
-    CHECK(ledger_irq_ops == 1 && ledger_exc_ops == 0);
-    CHECK(ledger_irq_last[0] == LEDGER_OP_ALLOC && ledger_irq_last[1] == a &&
-          ledger_irq_last[2] != 0);
-    CHECK(ledger_owners[a].alloc_irq == 1 && ledger_owners[a].free_irq == 0);
-    CHECK(pgalloc_free_n_owner(a, p, 1));
-    CHECK(ledger_irq_ops == 2 && ledger_irq_last[0] == LEDGER_OP_FREE &&
-          ledger_owners[a].free_irq == 1);
-    CHECK(!pgalloc_free_n_owner(a, p, 1));                 /* 失敗も数える (診断) */
-    CHECK(ledger_irq_ops == 3);
-    kctx_exc_depth = 1;                                          /* IRQ の中で例外 */
-    CHECK(ledger_reclaim_owner(a, &n) && n == 1);
-    CHECK(ledger_irq_ops == 4 && ledger_exc_ops == 1 &&
-          ledger_exc_last[0] == LEDGER_OP_RECLAIM && ledger_exc_last[1] == a);
-    kctx_irq_depth = 0;                                          /* 例外だけ */
-    CHECK(ledger_claim_fixed(a, 2500, 2501));
-    CHECK(ledger_irq_ops == 4 && ledger_exc_ops == 2 &&
-          ledger_exc_last[0] == LEDGER_OP_CLAIM);
-    CHECK(ledger_transfer(2500, 1, a, LEDGER_OWNER_KERNEL));
-    CHECK(ledger_exc_ops == 3 && ledger_exc_last[0] == LEDGER_OP_TRANSFER);
-    CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, 1, 3000, 3001, LEDGER_TOP_DOWN, &p));
-    CHECK(ledger_exc_ops == 4 && ledger_exc_last[0] == LEDGER_OP_ALLOC);
-    kctx_exc_depth = 0;
-    CHECK(pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, 2500, 1));
-    CHECK(ledger_irq_ops == 4 && ledger_exc_ops == 4);           /* 通常文脈は数えない */
-    CHECK(ledger_owner_retire(a));
-'''
+    CHECK(ledger_irq_ops == 0 && ledger_exc_ops == 0);
+    kctx_irq_depth = %d; kctx_exc_depth = %d;
+    host_expect_panic = 1;
+    (void)%s;
+    CHECK(0); /* panic は必ず変更前に止める */
+''' % (irq, exc, call)
 
 BODIES['regions_and_selfcheck'] = r'''
     u32 i, a, fail;
@@ -560,14 +562,13 @@ def jmpbuf_hardcoded():
 
 
 def broker_problems(irq_c):
-    """B1: broker の IRQ_ERR_CTX 判定は irq_in_irq (共通スタブの深さ) のまま。"""
+    """T2a R1: 固定 IRQ を含む全 IRQ 深さに統一する。"""
     bad = []
-    if not re.search(r'irq_register_check\([^;]*irq_in_irq\)', irq_c):
-        bad.append('irq_register の判定が irq_in_irq でない')
-    if not re.search(r'irq_unregister_find\([^;]*irq_in_irq\)', irq_c):
-        bad.append('irq_unregister の判定が irq_in_irq でない')
-    if 'kctx_irq_depth' in irq_c:
-        bad.append('irq.c が kctx_irq_depth を判定に使う')
+    for name in ('irq_register_check', 'irq_unregister_find'):
+        if not re.search(name + r'\([^;]*kctx_irq_depth\)', irq_c):
+            bad.append(name + ': 全 IRQ 深さでない')
+    if re.search(r'irq_in_irq\s*(?:=|\+\+|--)', irq_c):
+        bad.append('broker が別の深さを保持')
     return bad
 
 
@@ -608,7 +609,8 @@ class Ledger(unittest.TestCase):
         self.run_body('r7_module_and_bundle')
 
     def test_r1_counting(self):
-        self.run_body('r1_counting')
+        for name in ('r1_irq_alloc_panic', 'r1_exc_free_panic', 'r1_nested_reclaim_panic'):
+            self.run_body(name)
 
     def test_regions_and_selfcheck(self):
         self.run_body('regions_and_selfcheck')
@@ -639,6 +641,8 @@ class Ledger(unittest.TestCase):
 
 # 変異 (§4-2)。当て先は load() の写し (実物は書き換えない)。
 MUTATIONS = [
+    ('r1-panic-removed', 'kernel/pgalloc.c',
+     '    for (;;) { _stop(); }', '    return;'),
     ('owner-check-removed', 'kernel/pgalloc.c',
      '    return bit(eligible, p) && bit(bitmap, p) && owner_map[p] == owner;',
      '    (void)owner;\n    return bit(eligible, p) && bit(bitmap, p);'),

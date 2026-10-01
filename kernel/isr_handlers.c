@@ -249,7 +249,7 @@ void exception_handler(u32 error_code, u32 vector, u32 fault_eip,
      * CS.RPL==3 なら CPL=3 由来 = リング3 アプリのフォールト。カーネル
      * (CPL=0) 自身のフォールトは CS.RPL==0 なので従来どおり停止させる
      * (ここを取り違えるとカーネルのバグを握り潰す)。ring3_fault_kill は
-     * master CR3 に戻して longjmp するので戻らない。 */
+     * 資源を触らず longjmp し、着地点で master CR3 / IF=1 に戻して回収。 */
     if ((regs[11] & 3) == 3 || ring3_in_syscall) {
         sputs("\n[ring3] exception (CPL=3 / syscall) vec=");
         sput_hex32(vector);

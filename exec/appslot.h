@@ -53,6 +53,9 @@
  * **常に ready** (ただし優先度は最下位)。
  * 値の追加なので exec_app_state の既存の 0/1/2/3 は 1 つも動かない。 */
 #define APP_STATE_WAIT_POLL 4
+/* R1: フレームを捨てた後、通常文脈の回収を待つ内部状態。 */
+#define APP_STATE_ABORT_PENDING 5
+#define APP_STATE_FAULT_PENDING 6
 
 /* 暴走 (KAPI を呼ばない計算ループ) の逃げ道 (票 T9 §12 S6)。GUI 中の IRQ1 は
  * 「走っている ID が最後に **カーネルへ入って** からこの tick 数以上経った」

@@ -46,20 +46,23 @@ SHIMS = {
 
 
 def check_reclaim_order():
-    """exec_reclaim_owned が DB を FD より先に回収しているか (票 §1c)。
+    """exec_reclaim_resources が DB を FD より先に回収しているか (票 §1c)。
 
     並び自体は exec/exec.c の中の 1 か所にしかない。ホストでは exec.c を
     そのままリンクできないので、ここは**本文の並び**を読んで固定する。
     順序が入れ替わったら気付ける最小の番人。
     """
     src = (ROOT / "exec/exec.c").read_text(encoding="utf-8")
-    m = re.search(r"static void exec_reclaim_owned\(int id\)\s*\{(.*?)\n\}",
+    m = re.search(r"static void exec_reclaim_resources\(int id\)\s*\{(.*?)\n\}",
                   src, re.S)
-    assert m, "exec_reclaim_owned が見つからない"
+    assert m, "exec_reclaim_resources が見つからない"
     body = m.group(1)
     db = body.index("db_cleanup_owned(id);")
     fd = body.index("vfs_close_owned(id);")
-    assert db < fd, "exec_reclaim_owned: db_cleanup_owned は vfs_close_owned より先"
+    assert db < fd, "exec_reclaim_resources: db_cleanup_owned は vfs_close_owned より先"
+    m = re.search(r"static void exec_reclaim_owned\(int id\)\s*\{(.*?)\n\}", src, re.S)
+    assert m, "exec_reclaim_owned が見つからない"
+    assert m.group(1).index("exec_reclaim_resources(id);") < m.group(1).index("exec_notify_owned(id);")
     print("ORDER SOURCE: db_cleanup_owned before vfs_close_owned PASS", flush=True)
 
 
