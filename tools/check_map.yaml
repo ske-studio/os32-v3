@@ -722,6 +722,10 @@ checks:
     - kernel/v86_mem.h
     - kernel/v86_pic.h
     - tools/tests/mutpar.py
+    - kernel/kselftest.c
+    - kernel/cpu_calibrate_math.h
+    - kernel/ktime.h
+    - kernel/time_math.h
     - tools/tests/app_band_pde_host.c
     - tools/tests/app_bb_overlap_host.c
     - tools/tests/device_reservation_stage_host.c

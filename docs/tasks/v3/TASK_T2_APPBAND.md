@@ -546,6 +546,18 @@ sbrkの逆戻し変異は `build/sdk.mk` の `$(MUT)` / `--mutate` へ接続し�
 **T2c-R 最終全体検査**: `PYTHONPATH=/tmp/t2ap-python CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null` は **rc=0** (`/tmp/t2cr-changed4.log`)。mainとのmerge-base `8612b06ebc87` を基点に全109検査を変異込みで実行し、対応表の漏れ0。clang AST版のp2v/C方言/LE access/arch asmは違反0、例外一覧の追加なし。C方言検査器は通常82件失敗0、変異27/27 RED・対照5/5 GREEN。新しいsbrk境界/RO argv/可変stack guard/shell拒否の回帰と実行時RED変異、CROSS_DIRなしの別配置vendor実リンクも成功。最終のclean→allも上記clean4/all4でrc=0、測定サイズは表のまま。実装・試験を固定して全体検査を完了し、その後は本結果の文書追記のみ。足場なしのrc=2を成功扱いせず、qemu-i386はILP32ホスト試験の実行にだけ使用した。状態行は不変、NP21/W・実機の受入は未実施。
 
 
+**T2c-R 追補 — PM の受入で見つかった kselftest の失敗と対応 (2026-10-01、基点 `11e1c9d`)**:
+
+PM の NP21/W 17MB 起動 (API v69) は post-exec の `ledger:AS alloc` だけ失敗し、pass=258 / fail=1、ledger の irq/exc/check_fail/bad_free は全て0。既存 `test_app_band_pde.py` の ILP32 足場へ実 `kselftest.c` の `ledger_persist_total` / `test_ledger` 本文を取り込み、実 paging/pgalloc/physmem と合成8/17MBで再現した。`paging_addrspace_create` は **rc=0**、owner pagesは **3** (PD=1、lease先頭PT=0、高位PT=0、データ=2)。修正前は同じ `ledger:AS alloc` が実行時RED。CR3/owner/KHEAP/admitの拒否ではない: この自己診断はmaster下の通常文脈・有効AS ownerでPDだけを生成し、AS制御はstack上に置き、KHEAP確保とexec admitを呼ばない。
+
+§4・§5-1 T2c/T2c-R・§6とT2b-Rの契約を照合し、**旧期待値を修正、ページング実装は変更しない**。T2cの高位PTは写像時の疎確保、lease先頭PTは起動用 `paging_addrspace_create_lease` の事前確保で、plain `create` には無い。期待枚数は `PDE_COUNT * sizeof(u32) / PAGE_SIZE + data_pages` とし、PD/lease/高位PTの内訳をコメントへ記録。データ枚数は確保・回収の検査でも共通の試験定数を使う。
+
+kselftest.cのAS/paging/exec検査と呼出先を見直し、他の実行時期待値の追随漏れは見つからなかった。`test_app_band_pde` と呼出先 `paging_app_band_selftest` の旧identity/eager PT説明、`paging.h` のAS生成契約の説明は高位/疎PTへ更新。PD共有/USER・cache隔離/高位stackの写像回収/memmap/trampoline/exec状態検査は現契約を維持する。試験はplain ASと起動用lease ASを区別し、後者のPD+lease先頭PT=2枚も確認、destroy/reclaim後owner0・永続owner不変・pool復元を検査する。変更時選択へkselftest.cとその入力headerを登録。
+
+回帰試験の旧式 `(PDE_COUNT + PTE_COUNT) * sizeof(u32) / PAGE_SIZE + data_pages` (=4) への変異はコンパイル成功後の **実行時RED**。既存4変異と合わせ **5/5 runtime RED、コンパイル失敗0**。最初の直接ILP32実行は環境のSIGSYSで失敗し、既存と同じqemu-i386補助を `/home/hight/os32-tmp/t2cks/python/sitecustomize.py` に置いて実行。初期変異案の未使用変数によるコンパイル拒否はREDへ数えず、旧計算式を戻す変異に訂正した。一時診断を製品ソースへ追加していない。ログ/一時ファイルは `/home/hight/os32-tmp/t2cks/`。NP21/W/NHD/配備/ini/実機/commit/pushは未操作、ゲスト再受入はPMへ。
+
+**T2c-R kselftest 追補の最終検証**: `CROSS_DIR=/home/hight/opt/cross make all < /dev/null` は **rc=0** (`/home/hight/os32-tmp/t2cks/all-final.log`)、`CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null` は **rc=0** (`/home/hight/os32-tmp/t2cks/check-changed.log`)。共通環境は `TMPDIR=/home/hight/os32-tmp`、ILP32実行補助の `PYTHONPATH=/home/hight/os32-tmp/t2cks/python`、FD自動コピーを防ぐ存在しない `NP21W_DIR=/home/hight/os32-tmp/t2cks/no-deploy`。FDコピー2件は警告/失敗で、配備していない。check-changedは既定基点HEAD~1 (`31870465ce18`)から全109検査を変異込みで選択。追加回帰5/5 runtime RED、compile failures 0、C方言検査器27/27 RED・対照5/5 GREEN。`python3 tools/gen_memmap.py --check` / `--headroom`、`python3 tools/check_select.py --lint`、`git diff --check` もrc=0。TESTS生成結果は既存と同じ。検査中はソースを変更せず、終了後はこの結果の文書追記のみ。ゲスト再受入は未実施。
+
 ### 5-2. 検査3段と lease 回帰 (d)
 
 | 検査 | 具体的な期待値 |

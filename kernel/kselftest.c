@@ -361,8 +361,8 @@ static void test_map_user_keep(void)
 }
 
 /* ------------------------------------------------------------------------ */
-/*  アプリ帯の可変 PDE 化 (票 docs/tasks/memory/APP_BAND_PDE.md): 帯を 4MB    */
-/*  単位で伸ばしたとき、増えた PDE がアプリ固有 PT に差し替わり、USER が      */
+/*  T2c の高位アプリ帯 (票 docs/tasks/v3/TASK_T2_APPBAND.md): 未使用 PDE は  */
+/*  空のまま、写像時に必要なアプリ固有 PT を疎確保する。USER が              */
 /*  master の PDE/PT へ漏れないこと。ここが壊れると CPL=3 アプリが master の  */
 /*  ページテーブルを書き換えられる (= 任意物理への読み書き) が、動いている    */
 /*  ように見えてしまうので毎回ブート時に見る。                                */
@@ -657,6 +657,8 @@ static u32 ledger_persist_total(void)
 static void test_ledger(void)
 {
     struct addrspace as;
+    enum { data_pages = 2 };
+    const u32 expected_pages = PDE_COUNT * sizeof(u32) / PAGE_SIZE + data_pages;
     u32 persist, owner, phys, left;
     int ok;
 
@@ -667,12 +669,14 @@ static void test_ledger(void)
     check(ok, "ledger:AS owner new");
     if (ok) {
         ok = paging_addrspace_create(&as, owner) == 0;
-        phys = ok ? pgalloc_alloc_phys(owner, 2) : 0;
-        /* PD 1 + アプリ PT 1 + 2 ページ */
-        check(ok && phys && ledger_owner_pages(owner) == 4, "ledger:AS alloc");
+        phys = ok ? pgalloc_alloc_phys(owner, data_pages) : 0;
+        /* T2c: PD (PDE_COUNT entries) + data_pages。高位 PT は map 時の
+         * 疎確保なので 0。create() は lease 先頭 PT も 0 (起動用の
+         * create_lease() だけが 1 枚事前確保)。AS 制御はここでは stack。 */
+        check(ok && phys && ledger_owner_pages(owner) == expected_pages, "ledger:AS alloc");
         if (ok) paging_addrspace_destroy(&as);
         left = 0;
-        check(ledger_reclaim_owner(owner, &left) && left == (phys ? 2 : 0) &&
+        check(ledger_reclaim_owner(owner, &left) && left == (phys ? data_pages : 0) &&
               ledger_owner_pages(owner) == 0, "ledger:AS pages 0 (R5a)");
         check(ledger_owner_retire(owner), "ledger:AS owner retire");
     }

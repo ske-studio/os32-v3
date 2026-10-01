@@ -221,24 +221,19 @@ int as_va_to_pa(u32 pd_phys, u32 va, u32 *pa);
 /* Read translation accepts RO user pages; failure leaves pa untouched. */
 int as_va_to_pa_read(u32 pd_phys, u32 va, u32 *pa);
 
-/* アプリ用アドレス空間を 1 つ作る (アプリ固有 PDE を pde_count 枚)。
- * master の全 PDE をコピーしてカーネル帯域を共有し、
- * [APP_BAND_PDE, APP_BAND_PDE + pde_count) だけ新規確保したアプリ PT に
- * 差し替える。アプリ PT は master の同帯 PT と同一の identity で初期化する
- * (CPL=0 のまま CR3 を載せてもカーネルから見た番地が変わらない = V1)。
- * PD/PT のバッキングは pgalloc から owner (呼び手が ledger_owner_new で
- * 取った AS owner) で取る (memory_boot_init 済みが前提)。as->owner に控える。
- * pde_count は 1..MEM_APP_BAND_MAX_PDES。
- * 戻り値: 0=成功 (as を埋める), -1=引数不正 / 物理ページ不足 (何も確保しない)。
- *
- * 注意 (票 §2): この関数と paging_addrspace_map_user*() 以外で
- * アプリ AS へ写像してはならない。paging_map_phys() / paging_set_page() は
- * master の page_tables[] に書くので、アプリ固有 PDE の範囲に使っても
- * 走行中のアプリからは見えない。 */
+/* T2c: 高位アプリ帯が空の疎 AS を作る (PD のみ確保)。低位カーネル帯と
+ * デバイス窓は master と共有し、APP/lease の PDE は継承しない。
+ * 高位 PT は paging_addrspace_map_user*() が必要時に owner で確保する。
+ * PD/PT のバッキングは pgalloc から AS owner で取得する。
+ * pde_count は互換引数 (1..MEM_APP_BAND_MAX_PDES を検査) であり、生成後は
+ * 全 MEM_APP_BAND_MAX_PDES が利用可能。起動用の lease 先頭 PT 事前確保は
+ * paging_addrspace_create_lease() を使う。
+ * 戻り値: 0=成功、-1=引数不正 / PD の物理ページ不足。
+ * master の paging_map_phys() / paging_set_page() では私有 PT を変更できない。 */
 int paging_addrspace_create_n(struct addrspace *as, u32 owner, u32 pde_count);
 
-/* 枚数 1 の従来どおりの生成 (= paging_addrspace_create_n(as, owner, 1))。
- * 自己診断など「帯を広げる必要がない」呼び出しはこちらを使う。 */
+/* 疎 AS の生成 (= paging_addrspace_create_n(as, owner, 1))。
+ * lease を使わない自己診断はこちらを使う。 */
 int paging_addrspace_create(struct addrspace *as, u32 owner);
 
 /* アプリ用アドレス空間を破棄し PD/PT (枚数分) のバッキングページを解放する。
@@ -257,7 +252,7 @@ void paging_addrspace_destroy(struct addrspace *as);
 u32 paging_app_band_pdes(u32 code_end, u32 heap_req, u32 ram_top);
 
 /* アプリ AS の 1 ページを USER でマップする (M1c)。
- *   - virt が 0x400000 帯 (app_pde) なら、アプリ固有 PT に書く
+ *   - virt が高位アプリ帯 (app_pde..app_pde_count) なら、疎確保した私有 PT に書く
  *     (このアプリの PD からしか見えない)。
  *   - それ以外の共有帯 (VRAM 0xA8000 / SHM 等、C2 で全 PD 共有 + USER と
  *     定めた領域) なら共有 PT の PTE に USER を立てる。共有 PT は master と
@@ -343,15 +338,10 @@ int paging_pd_clone_selftest(void);
  * 戻り値: 0=全通過。非0 はビットフラグで失敗内容を示す。 */
 int paging_map_user_keep_selftest(void);
 
-/* アプリ帯の可変 PDE 化の自己診断 (票 docs/tasks/memory/APP_BAND_PDE.md §5)。
- * 最大枚数のアドレス空間を作り、CPL=0 のまま次を確かめる:
- *   1. 枚数分の PDE がアプリ固有 PT に差し替わり、それぞれ別物である
- *   2. アプリ PT は master の同帯 PT と同一 identity で始まる
- *   3. 帯の 2 枚目以降へ USER を張っても master の PT / PDE が汚れない
- *   4. USER は当該アプリ PD の PDE にだけ伝播する
- *   5. 破棄で PD と PT (枚数分) がきっちり返る
- * ハードウェアには依存しない (CR3 は載せ替えない)。
- * 戻り値: 0=全通過。非0 はビットフラグで失敗内容を示す。 */
+/* T2c の高位アプリ帯の自己診断 (票 docs/tasks/v3/TASK_T2_APPBAND.md §5-1)。
+ * 未使用 APP PDE/PT と master の高位 APP PDE が空であること、高位 stack
+ * ページの写像時に疎 PT を確保でき、回収で owner と池が元へ戻ることを見る。
+ * CR3 は載せ替えない。戻り値: 0=全通過、非0 はビットフラグ。 */
 int paging_app_band_selftest(void);
 
 /* ------------------------------------------------------------------------ */

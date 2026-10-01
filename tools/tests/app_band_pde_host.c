@@ -1,21 +1,11 @@
 /* ========================================================================
- *  app_band_pde_host.c — アプリ帯の可変 PDE 化 (docs/tasks/memory/APP_BAND_PDE.md)
+ *  app_band_pde_host.c — T2c の疎な高位 AS と boot ledger の回帰
+ *  (docs/tasks/v3/TASK_T2_APPBAND.md §4 / §5-1)
  *
- *  実物の kernel/paging.c + kernel/pgalloc.c + kernel/physmem.c を ILP32 で
- *  そのままコンパイルし、特権 asm だけホスト用に差し替えて動かす
- *  (tools/tests/paging_bounds_host.c と同じ作り)。
- *
- *  見るもの:
- *    A. 枚数計算 paging_app_band_pdes() が票 §4-1 の規則どおりか
- *    B. 枚数 1 のとき現行と完全に同じレイアウトか (回帰ゼロ = 最重要)
- *    C. 枚数 2 のとき 2 枚目の PDE がアプリ固有 PT に差し替わるか
- *    D. USER が当該アプリの PD にだけ伝播し master へ漏れないか (票 §2)
- *    E. 引数不正・物理ページ不足で master も pgalloc も汚さずに失敗するか
- *    F. destroy が枚数分の PT + PD をきっちり返すか
- *    G. paging_app_band_selftest() (ブート時 kselftest に載せるもの)
- *    H. v3 のデバイス窓の帯 (FE000000h、Cirrus のリニア窓) の PT が
- *       paging_init で静的に用意され、アプリ AS が居る間でも窓を張れ、
- *       クライアント面だけが USER + PCD でアプリ PD に見えること
+ *  実 paging.c / pgalloc.c / physmem.c と kselftest の ledger 手順を ILP32 で
+ *  実行し、特権命令だけホスト用に差し替える。
+ *  旧物理 byte 予算、高位の3つの疎 PDE、master USER 隔離、確保失敗の
+ *  巻戻し、PT/PD の返却、8/17MB の boot ledger と先頭 lease PT を検査。
  * ======================================================================== */
 #include "types.h"
 static u32 host_cr3;
@@ -54,15 +44,80 @@ u32 test_failphys(u32 owner, int n) {
     return pgalloc_alloc_phys(owner, n);
 }
 
+/* Execute the actual boot ledger test, including its expectation and cleanup. */
+static u32 ledger_test_failures;
+static void check(int ok, const char *name)
+{
+    if (!ok) {
+        u32 n = 0;
+        while (name[n]) n++;
+        report(name, n); SAY("");
+        ledger_test_failures++;
+    }
+}
+#include "kselftest_ledger_source.c"
+
+static void say_number(u32 n)
+{
+    char buf[10];
+    u32 len = 0, i;
+    do { buf[len++] = '0' + n % 10; n /= 10; } while (n);
+    for (i = 0; i < len / 2; i++) {
+        char c = buf[i]; buf[i] = buf[len - i - 1]; buf[len - i - 1] = c;
+    }
+    report(buf, len);
+}
+#define FIELD(s, n) do { report(s, sizeof(s) - 1); say_number(n); } while (0)
+static void ledger_boot_regression(u32 kb)
+{
+    struct addrspace as;
+    u32 owner, phys, i, app_pts = 0, lease_pts = 0, left = 0;
+    u32 before;
+    int rc;
+    initialized = 0; /* fixture: each memory size starts a fresh pool */
+    paging_init(kb);
+    host_pool_boot(kb);
+    before = pgalloc_free_pages();
+    CHECK(ledger_owner_new(LEDGER_KIND_AS, 0, "kstest", &owner));
+    rc = paging_addrspace_create(&as, owner);
+    CHECK(rc == 0);
+    phys = pgalloc_alloc_phys(owner, 2);
+    CHECK(phys);
+    for (i = 0; i < MEM_APP_BAND_MAX_PDES; i++) app_pts += !!as.app_pt_phys[i];
+    for (i = 0; i < MEM_LEASE_MAX_PDES; i++) lease_pts += !!as.lease_pt_phys[i];
+    FIELD("ledger boot: KB=", kb); FIELD(" create_rc=", (u32)rc);
+    FIELD(" owner_pages=", ledger_owner_pages(owner)); FIELD(" PD=", !!as.pd_phys);
+    FIELD(" lease_PT=", lease_pts); FIELD(" high_PT=", app_pts); SAY(" data=2");
+    CHECK(ledger_owner_pages(owner) == PDE_COUNT * sizeof(u32) / PAGE_SIZE + 2);
+    CHECK(!app_pts && !lease_pts);
+    paging_addrspace_destroy(&as);
+    CHECK(ledger_reclaim_owner(owner, &left) && left == 2);
+    CHECK(ledger_owner_retire(owner));
+    CHECK(pgalloc_free_pages() == before);
+    test_ledger();
+    CHECK(!ledger_test_failures);
+    CHECK(pgalloc_free_pages() == before);
+    /* Launch construction additionally preallocates the first lease PT. */
+    CHECK(ledger_owner_new(LEDGER_KIND_AS, 0, "lease-test", &owner));
+    CHECK(!paging_addrspace_create_lease(&as, owner));
+    CHECK(as.lease_pt_phys[0]);
+    CHECK(ledger_owner_pages(owner) == (PDE_COUNT + PTE_COUNT) * sizeof(u32) / PAGE_SIZE);
+    CHECK(!selftest_as_end(&as));
+    CHECK(pgalloc_free_pages() == before && ledger_selfcheck("boot-regression"));
+}
+
 void _start(void)
 {
-    /* 恒等で読み書きできる実メモリを 0x400000 から 12MB 張る (paging_bounds と同じ) */
-    u32 args[6] = {0x400000, 0xC00000, 3, 0x32, 0xFFFFFFFF, 0};
+    /* 17MB 構成の pool backing を恒等で読み書きできるよう張る。 */
+    u32 args[6] = {0x400000, 0xD00000, 3, 0x32, 0xFFFFFFFF, 0};
     u32 result;
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
     CHECK(result == 0x400000);
 
     host_map_fixed_paging();
+    ledger_boot_regression(17408);
+    ledger_boot_regression(8192);
+    initialized = 0;
     paging_init(16384);
     host_pool_boot(16384);
 
