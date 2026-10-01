@@ -208,6 +208,13 @@ static void boot(void)
     struct pgalloc_layout l;
     u32 low_kb = CFG_KB > 15360 ? 15360 : CFG_KB;
     u32 limit = CFG_KB / 4, top;
+    {
+        u32 low_args[6] = {MEM_GFX_BB_BASE, MEM_GFX_BB_SIZE, 3, 0x32, 0xffffffffUL, 0};
+        u32 low_result;
+        __asm__ volatile("int $0x80" : "=a"(low_result) : "a"(90), "b"(low_args) : "memory");
+        CHECK(low_result == MEM_GFX_BB_BASE);
+    }
+    host_map_fixed_paging();
     paging_init(CFG_KB);
     physmem_bootstrap_legacy(&m, low_kb);
     if (CFG_KB > 16384)

@@ -187,6 +187,8 @@ check-memory-host:
 	python3 -B tools/tests/test_highram_stage.py
 	python3 -B tools/tests/test_memory_boot.py $(MUT)
 	python3 -B tools/tests/test_ledger.py $(MUT)
+	python3 -B tools/tests/test_lease.py $(MUT)
+	python3 -B tools/tests/test_exec_r1.py $(MUT)
 	python3 -B tools/tests/test_device_reservation.py $(MUT)
 	python3 -B tools/tests/test_sbrk_tier.py
 	python3 -B tools/tests/test_app_bb_overlap.py $(MUT)
@@ -203,8 +205,8 @@ check-memory-host:
 #                      番地に依存しないので、番地を動かしても腐らない。
 # 2026-09-17 (決裁 D1/D2) の配置で両方とも緑になったので check: の列に入れた。
 check-memmap-host:
-	python3 -B tools/tests/test_memmap_gen.py
-	python3 -B tools/tests/test_memmap_boot.py
+	python3 -B tools/tests/test_memmap_gen.py $(MUT)
+	python3 -B tools/tests/test_memmap_boot.py $(MUT)
 
 check-memmap:
 	python3 tools/gen_memmap.py --check
@@ -1070,8 +1072,9 @@ check-map:
 
 # check-changed の選び方の試験 (代行レビュー P2-1〜P2-3 の筋書き: .inc の取り込み、
 # 裸の文書名、docs だけの変更で文書の検査を常に回す、走査型 glob の保険、
-# feat/gui の上でコミットした後の基点)。--mutate は check_select.py の写しに
-# 当てるので並列 (check-par) で回せる。
+# feat/gui の上でコミットした後の基点。Makefile / build/*.mk の「新しい試験を足す形」
+# の型の一致と、独立レビューの反例が全部に倒れること)。--mutate は check_select.py の
+# 写しに当てるので並列 (check-par) で回せる。
 check-check-select-host:
 	python3 -B tools/tests/test_check_select.py $(MUT)
 

@@ -219,6 +219,8 @@ static volatile int g_last_code = 0;
  * 見分けるために使う (D4)。exec_run は終了しか受け取らない。 */
 #define EXEC_LJ_EXIT   1
 #define EXEC_LJ_PARK   2
+#define EXEC_LJ_PENDING 3
+static volatile int g_pending_id, g_pending_kind;
 static volatile int g_longjmp_reason = EXEC_LJ_EXIT;
 static volatile int g_longjmp_id = 0;      /* park した ID (resume の戻り値) */
 
@@ -658,9 +660,8 @@ void ring3_abort_request(void)
 /*    - kernel/isr_stub.asm の IRQ1 スタブ (EOI と V86 反射の後、割り込まれた */
 /*      文脈が CPL=3 のときだけ)。KAPI を呼ばない計算ループはここで死ぬ。     */
 /*    - ring3_syscall_dispatch の入口 (wrap に入る前)。                      */
-/*  ring3_fault_kill は master CR3 復帰 → AS 破棄 → longjmp で戻らない。      */
-/*  longjmp 先の exec_run は復帰点で _enable() するので、割り込みゲート経由で */
-/*  IF=0 のまま来ても割り込みは戻る。                                        */
+/*  IRQ 上では資源を触らず移譲し、launch/resume の着地点で IF=1 にして回収。*/
+/*  syscall 入口の通常の安全点では共通回収へ直行する (T2a R1)。            */
 /* ======================================================================== */
 void ring3_abort_check(void)
 {
@@ -1299,7 +1300,7 @@ static void exec_restore_context(int id)
 /*  ここを段のまま残すと、アプリ A の終了がアプリ B の SHM や DB 接続を       */
 /*  巻き上げる (4 本同時では実際に起きる)。                                   */
 /* ======================================================================== */
-static void exec_reclaim_owned(int id)
+static void exec_reclaim_resources(int id)
 {
     /* (1) SQLite DB リソース (P5: cleanup_all → cleanup_owned)。
      * **FD 回収より先** (票 S0-K §1c / F2 の順序修正)。close は未 commit の
@@ -1324,8 +1325,12 @@ static void exec_reclaim_owned(int id)
     snd_owner_exit(id);
     /* (6b) PCM: この ID が鳴らしていれば待たずに止めて資源を返す
      * (票 TASK_PCM_CS4231 §2-1「所有と回収」)。保存した owner と id だけを
-     * 照合する — ここでは g_cur_app はもう親に戻っている。 */
+     * 照合する — 現在 owner に依存せず、私有ページ返却の前に止める。 */
     pcm_reclaim(id);
+}
+
+static void exec_notify_owned(int id)
+{
     /* (7) GUI リソース回収 (契約 T4 / U8)。WM がこの owner のウィンドウ・
      * サーフェス・タイマ・スロットを回収する。畳む 3 経路すべてが
      * ここを通るので、WM は 1 か所で回収できる。 */
@@ -1358,8 +1363,8 @@ static void exec_reclaim_owned(int id)
         }
     }
     /* (9b) 起動要求表 (票 T9 D3)。**ID だけを使う** — 正常終了は AppSlot を
-     * 解放した後、exec_kill は解放の前にここへ来るので、スロットの欄を読むと
-     * 経路ごとに違うものが見える。
+     * 解放した後にここへ来る (exec_kill も同じ)。空のスロットの欄を
+     * 回収通知に使ってはいけない。
      *   child == id の表  : その要求は終わった (DONE + child = 0)
      *   requester == id の表: 要求者が退場した。子が残っていれば「孤児回収」
      *     (KILL の PENDING) として WM の top-level に渡す — カーネルはここから
@@ -1380,6 +1385,12 @@ static void exec_reclaim_owned(int id)
      * WM は exec_start / exec_resume から戻った直後に gfx_screen_owner()
      * を見て、1 に戻っていれば復帰の描き直しに入る。 */
     appslot_gfx_owner_exit(id);
+}
+
+static void exec_reclaim_owned(int id)
+{
+    exec_reclaim_resources(id);
+    exec_notify_owned(id);
 }
 
 /* ======================================================================== */
@@ -1426,9 +1437,8 @@ static u32 g_exit_jmpbuf[KSETJMP_BUF_LEN];
 /*  畳むのは常に「いま走っている 1 本」だけ (D4)。正常終了・fault・          */
 /*  CTRL+STOP の 3 経路が全部ここを通る。 */
 /* ======================================================================== */
-void exec_exit(int status, int kind)
+static void exec_finish(int id, int status, int kind)
 {
-    int id = appslot_cur();
     AppSlot *a = appslot_get(id);
     int parent;
     u32 k;
@@ -1464,7 +1474,7 @@ void exec_exit(int status, int kind)
 
     for (k = 0; k < KSETJMP_BUF_LEN; k++) g_exit_jmpbuf[k] = a->jmpbuf[k];
 
-    /* **回収より先に**親の文脈へ戻す。回収の最後に呼ぶ gui_owner_exit() は
+    /* WM 通知より先に親の文脈へ戻す。gui_owner_exit() は
      * WM (gshell) のコードで、そこで KAPI の mem_alloc を踏むと exec_heap が
      * 「畳んだアプリの仮想ヒープ」を指したままになる — その物理はもう
      * pgalloc へ返しているので、master CR3 の下で他人のページを書きに行く。
@@ -1480,23 +1490,59 @@ void exec_exit(int status, int kind)
     } else {
         if (!a->cpl3) exec_cpl0_release();
         parent = appslot_return_target(id);
+        /* 装置・FD の利用終了を私有ページの返却より先に済ませる (R1)。 */
+        exec_reclaim_resources(id);
         exec_teardown_app(a);
         appslot_reclaim(id);
         /* 終了に伴う master 復帰は「生存アプリの集合が変わる瞬間」= G7 の
          * 切替ではない。appslot_switch_to が transition_count で別勘定する。 */
         appslot_switch_to(parent);
         exec_restore_context(parent);
-        exec_reclaim_owned(id);
+        exec_notify_owned(id);
     }
+}
 
+void exec_exit(int status, int kind)
+{
+    exec_finish(appslot_cur(), status, kind);
     g_longjmp_reason = EXEC_LJ_EXIT;
     g_longjmp_id = 0;
     exec_longjmp(g_exit_jmpbuf);
 }
 
+/* IRQ/例外では資源に触れず、対象と種別を控えて trusted stack へ移譲。 */
+static void exec_pending_transfer(int kind)
+{
+    int id = appslot_cur();
+    AppSlot *a = appslot_get(id);
+    if (!a || g_pending_id) { for (;;) { _stop(); } }
+    g_pending_id = id;
+    g_pending_kind = kind;
+    a->state = kind == EXEC_KIND_ABORTED ? APP_STATE_ABORT_PENDING :
+                                         APP_STATE_FAULT_PENDING;
+    g_longjmp_reason = EXEC_LJ_PENDING;
+    exec_longjmp(a->jmpbuf);
+}
+
+/* launch と resume の両 setjmp 着地からだけ呼ぶ。park は消費しない。 */
+static void exec_pending_finish(void)
+{
+    int id, kind;
+    if (g_longjmp_reason != EXEC_LJ_PENDING) return;
+    if (kctx_irq_depth || kctx_exc_depth) { for (;;) { _stop(); } }
+    id = g_pending_id;
+    kind = g_pending_kind;
+    g_pending_id = 0;             /* callback / 再 longjmp より先に一度だけ消費 */
+    g_longjmp_reason = EXEC_LJ_EXIT;
+    g_longjmp_id = 0;
+    paging_load_cr3(paging_kernel_pd_phys());
+    _enable();
+    exec_finish(id, EXEC_ERR_FAULT, kind);
+}
+
 void exec_fault_recover(void)
 {
-    exec_exit(EXEC_ERR_FAULT, EXEC_KIND_FAULT);
+    exec_pending_transfer(EXEC_KIND_FAULT);
 }
 
 void __cdecl kapi_sys_exit(int status)
@@ -1614,8 +1660,7 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
 /*  #PF/#GP ハンドラ (kernel/isr_handlers.c) がフォールトフレームの         */
 /*  CS.RPL=3 (= CPL=3 由来) を検出したときに呼ぶ。カーネルを巻き込まず       */
 /*  **その ID だけ**を畳んでシェル (WM) に戻す (D4)。                        */
-/*  後始末は正常終了と同一 — exec_exit が master CR3 復帰 → per-app 物理の   */
-/*  返却 → AS 破棄 → ID 別回収 → longjmp までを 1 か所で行う。               */
+/*  資源を触らず longjmp。両着地点の exec_pending_finish が通常文脈で回収。 */
 /*  この関数は longjmp するので戻らない。                                    */
 /* ======================================================================== */
 static void ring3_kill_kind(int kind)
@@ -1626,7 +1671,11 @@ static void ring3_kill_kind(int kind)
     }
     ring3_in_syscall = 0;   /* syscall 途中で畳む場合も必ずガードを下ろす */
     ring3_wm_depth = 0;     /* WM の中から畳んだ場合も深さを戻す (出口を通らない) */
-    exec_exit(EXEC_ERR_FAULT, kind);   /* longjmp するので戻らない */
+    /* syscall 入口などの通常の安全点は回収へ直行。IRQ/例外だけ移譲。 */
+    if (!kctx_irq_depth && !kctx_exc_depth)
+        exec_exit(EXEC_ERR_FAULT, kind);
+    else
+        exec_pending_transfer(kind);
 }
 
 void ring3_fault_kill(void)
@@ -2099,9 +2148,10 @@ static int exec_launch(const char *cmdline, int gui_arg)
          * フォルト経由の復帰では例外ゲートが IF をクリアしたまま longjmp
          * してくる (exec_longjmp は EFLAGS を復元しない)。呼び出し元は常に
          * 割り込み有効で動いているので、ここで無条件に開けてよい。 */
+        exec_pending_finish();
         _enable();
         /* 畳み (終了 / fault / CTRL+STOP) も park も、戻す作業は
-         * exec_exit / exec_park の側で済んでいる。ここは値を返すだけ。 */
+         * exec_exit / exec_pending_finish / exec_park で済んでいる。 */
         if (g_longjmp_reason == EXEC_LJ_PARK) {
             return g_longjmp_id;      /* app_id (2〜5) — まだ生きている */
         }
@@ -2647,6 +2697,7 @@ i32 exec_resume(i32 app_id, i32 wait_ret)
 
     if (exec_setjmp(a->jmpbuf) != 0) {
         /* park / 終了 / fault / kill で戻ってきた。ローカルは当てにしない。 */
+        exec_pending_finish();
         _enable();
         if (g_longjmp_reason == EXEC_LJ_PARK) return g_longjmp_id;
         return 0;
@@ -2678,10 +2729,11 @@ static void exec_kill_one(int id)
     if (!a) return;
     /* 走っていないので CR3 は master のまま。owner も 1 のまま動かさない
      * — 回収は全部 ID を明示して呼ぶ (D3)。 */
-    exec_reclaim_owned(id);
+    exec_reclaim_resources(id);
     if (!a->cpl3) exec_cpl0_release();
     exec_teardown_app(a);
     appslot_reclaim(id);
+    exec_notify_owned(id);
     /* 生存アプリの集合が変わる瞬間 = transition。G7 の switch ではない。 */
     ring3_transition_count++;
 }

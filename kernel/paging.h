@@ -47,7 +47,7 @@
  * No optional device guard policy is introduced here. */
 #define PAGING_PFN_COUNT 1048576UL
 #define PAGING_PT_COUNT PDE_COUNT
-#define PAGING_BOOT_PT_COUNT 8
+#define PAGING_BOOT_PT_COUNT MEM_FIXED_BOOT_PT_COUNT
 #define PAGING_BOOT_MAP_SIZE (PAGING_BOOT_PT_COUNT * PTE_COUNT * PAGE_SIZE)
 /* Legacy backend aperture checks still use the bootstrap window size.
  * Not the mapping API ceiling: use PAGING_PFN_COUNT for address spans. */
@@ -180,6 +180,10 @@ u32 paging_pte_flags(u32 virt_addr);
  * 整合は kernel/paging.c の STATIC_ASSERT が検査する。 */
 #define APP_BAND_PDE   1
 
+struct as_lease {
+    u32 token, sid, generation, base, npages, flags;
+};
+struct lease_mapping { u32 base, phys, npages, flags, slot, token, sid, generation; };
 struct addrspace {
     u32 pd_phys;       /* 新 PD の物理アドレス (CR3 に載せる値)。0=無効 */
     u32 app_pde;       /* アプリ固有にした先頭 PDE インデックス */
@@ -189,7 +193,15 @@ struct addrspace {
      * free_user_range が返すページはこの owner のもの。取得と返却は呼び手
      * (exec・自己診断) が行い、destroy は消さない (呼び手が回収・返却する)。 */
     u32 owner;
+    u32 lease_pt_phys[MEM_LEASE_MAX_PDES];
+    struct as_lease leases[MEM_LEASE_MAX];
 };
+/* T2b internal path; legacy public callers keep create_n until T2c. */
+int paging_addrspace_create_lease(struct addrspace *as, u32 owner);
+int paging_lease_map(struct addrspace *as, const struct lease_mapping *maps, u32 n);
+int paging_lease_unmap(struct addrspace *as, u32 base, u32 npages);
+u32 paging_lease_pte(const struct addrspace *as, u32 va);
+
 
 /* カーネル (master) PD の物理アドレス。CR3 を戻すときに使う。 */
 u32 paging_kernel_pd_phys(void);

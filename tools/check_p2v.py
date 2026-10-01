@@ -126,6 +126,8 @@ def findings(tu, root=ROOT):
                 if literal or any(PHYS.fullmatch(n) or n in OTHER_PHYS for n in names):
                     add('physical-cast')
             if ast.integer(c.type) and ast.pointer(operand.type):
+                # HostDrv's hypercall ABI uses CR3-relative linear addresses
+                # (T1-U6, hostdrvnt.c:945); retain function-scoped exceptions.
                 if any(HOST.fullmatch(x.spelling) for x in expression_nodes(operand)
                        if x.kind == K.DECL_REF_EXPR):
                     add('physical-sink')

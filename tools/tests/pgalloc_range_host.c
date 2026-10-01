@@ -9,6 +9,8 @@ static void verify_commit(void) NOINST;
 static void fail(const char *message) NOINST;
 static unsigned int irq_save(void) NOINST;
 static void irq_restore(unsigned int flags) NOINST;
+static void _stop(void) NOINST;
+static void _stop(void) { fail("unexpected R1 panic"); }
 #define IO_H
 #include "../../kernel/pgalloc.c"
 #include "../../kernel/physmem.c"

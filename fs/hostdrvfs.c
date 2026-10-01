@@ -101,7 +101,12 @@ int hostdrvfs_detect(void)
     return 0;
 }
 
-/* ハイパーバイザーコール: invoke_info のアドレスを送信し処理実行 */
+/* ハイパーバイザーコール: invoke_info の線形アドレスを送信し処理実行。
+ * NP21/W IA32: generic/hostdrvnt.c:3779-3784 → ia32/paging.h:360-371 は
+ * 現 CR3 で supervisor 線形アクセスする。埋め込むポインタも V2P しない
+ * ([C5] の例外、tools/check_p2v_allow.txt / TASK_T1_LEDGER §5-3)。
+ * 通信バッファは master / アプリ AS 共通のカーネル帯に置き、caller の
+ * read/write バッファは g_databuf との CPU コピーだけで触る。 */
 static void hostdrv_hypercall(void)
 {
     u32 addr = (u32)&g_invoke;

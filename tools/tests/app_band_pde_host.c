@@ -54,6 +54,7 @@ void _start(void)
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
     CHECK(result == 0x400000);
 
+    host_map_fixed_paging();
     paging_init(16384);
     host_pool_boot(16384);
 
@@ -312,7 +313,7 @@ void _start(void)
         u32 i, nonzero = 0;
 
         CHECK(pdi == 0x3F8);
-        CHECK(page_tables[pdi] == (u32 *)aperture_pt_raw);
+        CHECK(page_tables[pdi] == (u32 *)P2V(MEM_FIXED_APERTURE_PT_BASE));
         CHECK(page_directory[pdi] == ((u32)page_tables[pdi] | PAGE_RW));
         for (i = 0; i < PTE_COUNT; i++) nonzero |= page_tables[pdi][i];
         CHECK(nonzero == 0);                    /* 既定は全 Not-Present */
@@ -349,7 +350,7 @@ void _start(void)
         CHECK(paging_map_phys(base, base, 0x200000UL / PAGE_SIZE,
                               PAGE_NOT_PRESENT) == 0);
         /* 剥がしても PT と PDE は残る (次の init で張り直せる) */
-        CHECK(page_tables[pdi] == (u32 *)aperture_pt_raw);
+        CHECK(page_tables[pdi] == (u32 *)P2V(MEM_FIXED_APERTURE_PT_BASE));
         CHECK(page_directory[pdi] == ((u32)page_tables[pdi] | PAGE_RW));
         CHECK(used == before);
     }

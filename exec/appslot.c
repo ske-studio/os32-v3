@@ -13,6 +13,7 @@
 /* ======================================================================== */
 
 #include "appslot.h"
+#include "pgalloc.h"       /* §6 ownership/mapping management target sizeof */
 #include "os32_kapi_shared.h"   /* OS32_ERR_* / EXEC_ERR_* */
 #include "fd_redirect.h"       /* T9 §12 T1: リダイレクト表を ID の文脈にする */
 
@@ -26,6 +27,16 @@ extern int  res_owner_get(void);
  * gui.h を include すると exec/ が -Ikernel に依存するので値で固定する。 */
 STATIC_ASSERT(APP_ID_SHELL == 1, appslot_shell_id_is_gui_shell_owner);
 STATIC_ASSERT(APP_ID_MAX < APP_SLOT_COUNT, appslot_table_holds_id_max);
+
+/* TASK_T2_APPBAND §6: count embedded AS once, including unused slot 0 and
+ * shell; T2c moves control blocks to KHEAP and must retain this total gate.
+ * PFN metadata and actual PD/PT backing have separate physical budgets. */
+STATIC_ASSERT(sizeof(AppSlot) * APP_SLOT_COUNT +
+              sizeof(struct ledger_owner) * LEDGER_MAX_OWNERS +
+              sizeof(struct ledger_region) * LEDGER_MAX_REGIONS +
+              sizeof(struct ledger_resource) * LEDGER_MAX_RESOURCES +
+              sizeof(struct ledger_surface) * LEDGER_MAX_SURFACES <= 16UL * 1024,
+              ownership_mapping_management_within_16k);
 
 /* 標準 FD のリダイレクト表 (fs/fd_redirect.c) の **ID ごとの枠** (票 T9 §12 T1)。
  * 表は FD 0/1/2 の 3 本しかなく全アプリ共有だったので、park してある sh の

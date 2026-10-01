@@ -69,6 +69,29 @@ MUTATIONS = {
                      "        return ledger_backing_mapped ? MM_RW : MM_NP;",
                      "        return MM_NP;"),
     # 食い違いを 1 本にまとめない = 区間の本数が意味を失う
+    "fixed-remap-missing": ("kernel/paging.c",
+        "paging_map_range(MEM_FIXED_PAGING_BASE, MEM_FIXED_PAGING_END,",
+        "paging_map_range(MEM_FIXED_PAGING_BASE, MEM_FIXED_PAGING_BASE,"),
+    "fixed-user": ("kernel/paging.c",
+        "MEM_FIXED_PAGING_BASE, PAGE_RW) != 0 ||",
+        "MEM_FIXED_PAGING_BASE, PAGE_RW | PTE_USER) != 0 ||"),
+    "fixed-wrong-frame": ("kernel/paging.c",
+        "page_directory[i] = V2P(page_tables[i]) | PAGE_RW;",
+        "page_directory[i] = (V2P(page_tables[i]) + PAGE_SIZE) | PAGE_RW;"),
+    "fixed-not-wb": ("kernel/paging.c",
+        "MEM_FIXED_PAGING_BASE, PAGE_RW) != 0 ||",
+        "MEM_FIXED_PAGING_BASE, PAGE_RW | PTE_PCD) != 0 ||"),
+    "fixed-failure-if-lost": ("kernel/paging.c",
+        "        irq_restore(flags);\n        return; /* PG",
+        "        (void)flags;\n        return; /* PG"),
+    "fixed-reinit": ("kernel/paging.c",
+        "if (pg_enabled) { irq_restore(flags); return; }",
+        "if (0) { irq_restore(flags); return; }"),
+    "fixed-no-irq-save": ("kernel/paging.c",
+        "unsigned int flags = irq_save();", "unsigned int flags = 0x202U;"),
+    "fixed-unconditional-sti": ("kernel/paging.c",
+        "    pg_enabled = 1;\n    irq_restore(flags);",
+        "    pg_enabled = 1;\n    _enable();"),
     "no-coalesce": ("kernel/paging.c",
                     "        for (j = i + 1; j < PTE_COUNT; j++) {",
                     "        for (j = i + 1; j < i + 1; j++) {"),
@@ -93,7 +116,7 @@ def check_shm_replay():
                          % (calls, replay))
 
 
-def build_and_run(tmp, case, mutation=None):
+def build_and_run(tmp, case, mutation=None, kb=8192, initial_if=0x202):
     name, bss, reject, bad = case
     tmp = pathlib.Path(tmp)
     sources = {}
@@ -106,6 +129,13 @@ def build_and_run(tmp, case, mutation=None):
         if old not in text:
             raise SystemExit("変異 %s の当て先が見つからない: %s" % (mutation, rel))
         sources[path] = text.replace(old, new)
+    path = ROOT / 'kernel/paging.c'
+    sources[path] = sources[path].replace('P2V_BOOT(', 'host_boot_paging_ptr(')
+    if case[0] == 'PG-failure':
+        path = ROOT / 'kernel/paging.c'
+        sources[path] = sources[path].replace(
+            "paging_map_range(MEM_FIXED_PAGING_BASE, MEM_FIXED_PAGING_END,",
+            "paging_map_range(MEM_FIXED_PAGING_BASE, MEM_FIXED_PAGING_BASE,")
     (tmp / "paging_host_source.c").write_text(sources[ROOT / "kernel/paging.c"],
                                               encoding="utf-8")
     alloc = sources[ROOT / "kernel/pgalloc.c"]
@@ -113,15 +143,17 @@ def build_and_run(tmp, case, mutation=None):
     (tmp / "pgalloc_host_source.c").write_text(alloc, encoding="utf-8")
 
     includes = ['-I' + str(ROOT / p) for p in
-                ('include', 'arch/x86', 'platform/pc98', 'kernel', 'lib')]
+                ('include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec')]
     includes = ['-I' + str(ROOT / 'tools/tests/host_arch'), '-I' + str(tmp)] + includes
     exe = tmp / ("memmap_" + re.sub(r"\W", "", str(bss)))
     defines = ['-DPHYSMEM_HOST_TEST=1',
                '-DHOST_BSS_END=0x%X' % bss,
                '-DHOST_EXPECT_REJECT=%d' % reject,
-               '-DHOST_EXPECT_BAD=%d' % bad]
+               '-DHOST_EXPECT_BAD=%d' % bad, f'-DHOST_RAM_KB={kb}', f'-DHOST_INITIAL_IF={initial_if}', f'-DHOST_EXPECT_INIT_FAIL={int(case[0] == "PG-failure")}']
     subprocess.run(['gcc', *FLAGS, *HOST_OPT, *defines, '-nostdlib', '-static', '-no-pie',
-                    *includes, str(HARNESS), str(ROOT / 'kernel/physmem.c'),
+                    *includes, '-ffunction-sections', '-Wl,--gc-sections', str(HARNESS),
+                    str(ROOT / 'kernel/physmem.c'), str(ROOT / 'kernel/kmalloc.c'),
+                    str(ROOT / 'exec/exec_heap.c'),
                     '-o', str(exe)], check=True)
     return subprocess.run([str(exe)], capture_output=True, timeout=60)
 
@@ -141,22 +173,37 @@ def main():
             # (resv-blind は「予算ちょうど」でしか差が出ない)。
             ok = True
             where = ''
-            for case in CASES:
+            for case in CASES + [("IF=0", *CASES[0][1:]), ("PG-failure", *CASES[0][1:])]:
                 with tempfile.TemporaryDirectory(prefix='os32-memmap-') as tmp:
                     try:
-                        out = build_and_run(tmp, case, mutation=name)
+                        out = build_and_run(tmp, case, mutation=name, initial_if=2 if case[0] == "IF=0" else 0x202)
                         if out.returncode != 0:
                             ok, where = False, case[0]
                             break
                     except subprocess.CalledProcessError:
-                        ok, where = False, case[0] + ' (コンパイル不可)'
-                        break
+                        print('NOT COUNTED: compile failure', name)
+                        return 1
             print('  変異 %-14s %s' % (name, 'RED (%s で落ちた)' % where if not ok
                                        else '**GREEN — 試験が穴を見逃した**'))
             if not ok:
                 red += 1
         print('%d/%d の変異が RED' % (red, len(MUTATIONS)))
         return 0 if red == len(MUTATIONS) else 1
+
+    for kb in (8192, 17408, 65536):
+        for initial_if in (2, 0x202):
+            with tempfile.TemporaryDirectory(prefix='os32-fixed-paging-') as tmp:
+                out = build_and_run(tmp, CASES[0], kb=kb, initial_if=initial_if)
+                if out.returncode:
+                    raise SystemExit(f'FAILED {kb}KB IF={initial_if}: {out.stdout!r} rc={out.returncode}')
+            print(f'fixed paging + shell heap PASS {kb}KB IF={initial_if}')
+
+    for initial_if in (2, 0x202):
+        with tempfile.TemporaryDirectory(prefix='os32-fixed-fail-') as tmp:
+            out = build_and_run(tmp, ('PG-failure', *CASES[0][1:]), initial_if=initial_if)
+            if out.returncode:
+                raise SystemExit(f'FAILED pre-PG failure IF={initial_if}: {out.stdout!r}')
+        print(f'pre-PG failure restores IF={initial_if} PASS')
 
     for case in CASES:
         with tempfile.TemporaryDirectory(prefix='os32-memmap-') as tmp:
@@ -181,7 +228,7 @@ def main():
         for src in ('kernel/paging.c', 'kernel/shm.c'):
             subprocess.run(['i386-elf-gcc', *target,
                             *['-I' + str(ROOT / p) for p in
-                              ('include', 'arch/x86', 'platform/pc98', 'kernel', 'lib')],
+                              ('include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec')],
                             '-c', str(ROOT / src),
                             '-o', str(pathlib.Path(tmp) / (src.replace('/', '_') + '.o'))],
                            check=True)

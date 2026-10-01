@@ -2,6 +2,12 @@
 # -*- coding: utf-8 -*-
 """check_select.py — 変更したファイルから「変異込みで回す検査」を選ぶ (make check-changed)。
 
+**check-changed の絞り込みは作業中の近道 (目安) で、取りこぼしの保証はしない。** 保証は
+取り込み (PM) の `make check` (全部を変異込み) が担う。そのため絞り込みの型 (Makefile の
+許可リストも対応表も) は保守的な許可リストにとどめ、わざと作った入力への耐性は目標に
+しない。全体の検査はマシンが空いているときに流す (並行負荷で落ちる時間依存の試験が
+ある)。(ユーザー承認 2026-10-01)
+
 `make check` は全部の検査を変異込みで回すので約 10 分かかる (2026-09-26 実測)。
 変異試験 (否定側) が意味を持つのは**その試験が見ているソースを変えたとき**だけ
 なので、変更したファイルに関係する検査だけ変異込みで回し、残りは変異なしで回す。
@@ -21,6 +27,21 @@
     した後) なら HEAD~1
   * 変更が無い                     → 全部を変異なし (= check-fast)
   * `full:` に当たる変更がある     → 全部を変異込み (= check)
+    ただし Makefile / build/*.mk (MAKE_INPUT_GLOBS) は **「新しい試験を足す形」だけ**を
+    決まった型との完全一致で絞る (make_narrow の docstring、ユーザー決定 2026-10-01 —
+    Makefile の変更の安全性を一般に証明するのはやめた。make は呼ばない)。基点
+    (merge-base) との差分が「追加だけ」(削除・変更行が 0) で、足した行が全部
+    次の型に完全一致するときだけ: (a) CHECK_PAR_TARGETS の列への検査名の追加
+    (語の集合で比べる)、(b) 新しい検査の規則 `check-<name>:` + 型どおりの recipe 行、
+    (c) 列にある既存の検査の recipe への型どおりの行の追加、(d) コメント行と空行。
+    選ぶのは (b) の新しい検査と (c) の行を足した検査。
+    置き場所も限る: 新しい規則はファイル末尾の塊だけ、既存の検査への行はその recipe が
+    規則行の直後から連続する tab 行だけのときにその連続の中か直後だけ、コメント・空行は
+    末尾の塊か基点の tab 行に接しない場所だけ (持ち主が変わる配置を締め出す)。
+    それ以外の差分 (削除・変更行、型に合わない行 (`.PHONY:` も)、define / 条件の中、
+    継続行の途中、列の移動、追加・削除・改名されたファイル、`--files` (基点なし)) は
+    全部 (理由を出す)。
+    sdk/kapi.json は生成物を介して試験の中身が変わるので全部のまま。
   * どの検査の glob にも `docs_only:` にも `notest:` にも当たらない変更がある
                                    → 全部を変異込み (= check)。表の漏れで
                                      否定側を落とさないため。`broad:` の検査の
@@ -59,9 +80,6 @@ import yaml
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MAP_PATH = os.path.join(ROOT, "tools", "check_map.yaml")
-MAKEFILES = ["Makefile"] + sorted(
-    os.path.join("build", f) for f in os.listdir(os.path.join(ROOT, "build"))
-    if f.endswith(".mk"))
 
 
 # ---------------------------------------------------------------- 共通
@@ -155,10 +173,29 @@ def is_notest(path, cnotest):
 
 
 # ---------------------------------------------------------------- Makefile
+# make の入力のうち、基点版との差分を型で絞るもの (`full:` の中の Makefile)。
+MAKE_INPUT_GLOBS = ("Makefile", "build/*.mk")
+
+
+def makefile_paths():
+    """ROOT にある MAKE_INPUT_GLOBS のファイル (追跡外も含む)。"""
+    out = []
+    if os.path.isfile(os.path.join(ROOT, "Makefile")):
+        out.append("Makefile")
+    bdir = os.path.join(ROOT, "build")
+    if os.path.isdir(bdir):
+        out += sorted("build/" + f for f in os.listdir(bdir) if f.endswith(".mk"))
+    return out
+
+
 def read_makefiles():
-    """{検査名: [recipe 行]} と {変数名: 値} を返す (check-* の規則だけ)。"""
+    """{検査名: [recipe 行]} と {変数名: 値} を返す (check-* の規則だけ)。
+
+    --lint / --inputs / --suggest が recipe から試験スクリプトを辿るための
+    字面の読みで、make の意味論は持たない (検査列の名前と、タブ行の字面だけ)。
+    変異の選び方で build/*.mk の差を判定するのはここではなく make_narrow (型の一致)。"""
     rules, vars_ = {}, {}
-    for mf in MAKEFILES:
+    for mf in makefile_paths():
         with open(os.path.join(ROOT, mf), encoding="utf-8") as f:
             lines = f.read().split("\n")
         i, cur = 0, None
@@ -193,6 +230,415 @@ def check_lists(vars_):
                          "変異は写しの木に当てて CHECK_PAR_TARGETS へ "
                          "(docs/archive/tools/TASK_CHECK_MUT_PARALLEL.md §5)")
     return par
+
+
+# ---------------------------------------------------------------- Makefile の絞り込み (厳格な型)
+# Makefile / build/*.mk の変更の安全性を一般に証明するのはやめた (ユーザー決定 2026-10-01。
+# 自前の make 解析は独立レビューで 2 回 P1、make -n の比較も 3 回目で P1 — export 変数・
+# .ONESHELL・recipe の `-` で展開が同じでも意味が変わる、-j の独立性は順・逆順の一致で
+# 保証できない、$(MAKE) / $(shell) の副作用)。絞るのは **「新しい試験を足す形」** だけで、
+# 基点 (merge-base) との差分が「追加だけ」で、足した行の 1 本 1 本が下の型に完全一致する
+# ときに限る。make は呼ばない (副作用の問題が消える)。
+#
+# 差分の条件 (全部満たさなければ全部に倒す。理由は stderr):
+#   * 変更した make ファイルは基点にも作業中にもある (追加・削除・改名は全部)
+#   * 検査の列 (LIST_VAR の `:=` の論理行。基点・作業中とも make ファイル全体で 1 つ、
+#     同じファイル、define / 条件の外) の物理行を **1 つの固定マーカー行に畳んだ** 基点の
+#     行の列が、同じく畳んだ作業中の行の列の **部分列** になっている = 削除・変更行が 0
+#     (git diff の `-` 行 0) で、列の位置も既存行に対して動いていない (同じファイル内の
+#     移動も全部 — 独立レビュー P2)。列の物理行は継続 `\` の付け替えで字面が変わるので、
+#     **語の集合**で比べる: 基点の語 ⊆ 作業中の語、重複なし、語は全部 NAME_RE。
+#     増えた語 = 新しい検査の名前
+#   * 作業中にだけある行 (足した行) は、それぞれ 1 行で 1 論理行 (継続行の途中ではない)、
+#     define / 条件の外 (make の読み方と、字下げを無視する読み方の **両方**で深さ 0)、
+#     そして次のどれかに完全一致:
+#       (a)  (列の物理行は上の語集合の比較で見る)
+#       (b)  TPL_HEADER_RE  `check-<name>:` — 前提なし。name は列に足した新しい名前で、
+#            基点のどの make ファイルにも現れない。規則は 1 つだけ、recipe は 1 行以上。
+#            **ファイル末尾の塊** (基点の最後の行より後ろ) にだけ置ける — 規則とその recipe・
+#            コメント・空行がそこに続く。基点の行のあいだに入った新規則は全部
+#       (c)  TPL_RECIPE_RE  `\tpython3 -B tools/tests/<file>.py [--flag ...] [$(MUT)|$(MUTS)]`
+#            — 持ち主は、上へ tab 行だけを辿って着く基点の列にある検査の基点の規則の行
+#            `check-<name>:…` (`=` を含まない)。その検査の recipe は **規則行の直後から連続する
+#            tab 行だけ** (途中に基点のコメント・空行・条件ディレクティブなど非 tab 行を含まず、
+#            連続の後ろにそれらを挟んで tab 行が続かない — make はそれらで recipe を切らない)。
+#            足す位置はその連続の中か直後。script は作業中の木にあり、対応表の当該検査の
+#            glob に当たる。末尾の塊の新しい規則の後ろの recipe 行はその規則のもの
+#       (d)  空行 (完全に空) と `#` 始まりのコメント行 (末尾 `\` なし) — 末尾の塊の中か、
+#            前後どちらにも基点の tab 行が接していない基点の 2 行のあいだだけ (recipe の途中・
+#            規則と recipe のあいだには入れない)
+#     `.PHONY:` の行は型に入れない (独立レビュー 1 回目 P1: 既存の規則の行と recipe の間に
+#     `.PHONY: check-new` を挟むと既存の recipe が .PHONY の所属になる。新しい検査を
+#     .PHONY に載せたいなら全部に倒れるのを受け入れる — 載っていない前例はある)。
+#     (b)(c)(d) の置き場所の制限は「持ち主が変わる配置を型から締め出す」(ユーザー決定
+#     2026-10-01、独立レビュー 2〜3 回目: 基点のコメント・空行・ifeq 越しの横取り)
+#   * 列に足した名前の集合 = (b) の規則の名前の集合
+#   * 作業中の make ファイルに `.ONESHELL` が無い (recipe を 1 つの shell で回すと、
+#     足した行で既存の行の終了状態の扱いが変わる)
+# 選ぶのは (b) の新しい検査と (c) で行を足した検査。他の変更ファイルの glob の選択と合算。
+# 型に入れないもの (全部に倒す): cargo / unittest discover / tools/*.py の検査器の行、
+# `$(MUT)` の後ろの旗 (check-fdc-track-host の形)、前提つきの規則、`-B` 無しの python3。
+LIST_VAR = "CHECK_PAR_TARGETS"
+NAME = r"check-[a-z0-9-]+"
+NAME_RE = re.compile(r"^%s$" % NAME)
+# 型 (1 か所。docs/08_build.md §8-4 に同じものを書いてある)
+TPL_RECIPE_RE = re.compile(
+    r"^\tpython3 -B tools/tests/([a-z0-9_]+\.py)((?: --[a-z][a-z-]*)*)( \$\((?:MUT|MUTS)\))?$")
+TPL_HEADER_RE = re.compile(r"^(%s):$" % NAME)
+TPL_COMMENT_RE = re.compile(r"^#(?:.*[^\\])?$")
+# 列の論理行 (継続を結合した後) と、列への代入に見える行 (これが 2 つ以上なら読まない)
+LIST_HEAD_RE = re.compile(r"^%s :=(?: (.*))?$" % LIST_VAR)
+LIST_ANY_RE = re.compile(r"^\s*(?:override\s+)?%s\s*[:+?!]*=" % LIST_VAR)
+# 列の物理行を畳む固定マーカー (NUL を含むので実物の行にはならない)
+LIST_MARKER = "\0" + LIST_VAR + "\0"
+# (c) の持ち主になれる基点の規則の行
+OWNER_RE = re.compile(r"^(%s):(?![:=])" % NAME)
+# define / 条件の深さを見る語
+DEFINE_OPEN = re.compile(r"^(?:override\s+)?define\b")
+DEFINE_CLOSE = re.compile(r"^endef\b")
+COND_OPEN = re.compile(r"^(?:ifeq|ifneq|ifdef|ifndef)\b")
+COND_CLOSE = re.compile(r"^endif\b")
+
+
+class Reject(Exception):
+    """型に合わない — 全部に倒す理由。"""
+
+
+# 足した行に許さない制御文字 (LF 以外の行境界に見える文字 — VT / FF / CR / \x1c-\x1e /
+# NEL / LS / PS — と、その他の制御文字。tab は型の先頭にだけ現れる)
+CTRL_RE = re.compile("[\x00-\x08\x0b-\x1f\x7f\x85\u2028\u2029]")
+
+
+def split_lf(data):
+    """bytes を LF ('\\n') だけで行に分ける (str.splitlines() は VT / FF / CR / \x1c-\x1e /
+    NEL なども行境界にして実際の行の変更を消す — 独立レビュー 4 回目)。末尾の LF 1 つは
+    行に数えない (末尾の改行の有無は差に数えない)。"""
+    text = data.decode("utf-8", "replace")
+    if text.endswith("\n"):
+        text = text[:-1]
+    return text.split("\n")
+
+
+def continued(text):
+    """make の継続規則: 末尾の `\\` が奇数個なら次の物理行と結ぶ (recipe の行も同じ)。"""
+    n = len(text) - len(text.rstrip("\\"))
+    return n % 2 == 1
+
+
+def logical_lines(lines):
+    """物理行の列を make の論理行 [(start, end, 結合した文字列)] にする (continued())。"""
+    out, i = [], 0
+    while i < len(lines):
+        s, text = i, lines[i]
+        while continued(text) and i + 1 < len(lines):
+            i += 1
+            text = text[:-1] + " " + lines[i].strip()
+        out.append((s, i, text))
+        i += 1
+    return out
+
+
+def depth_flags(llines):
+    """各論理行の **手前** で define / 条件の深さが 0 か (= その行は型の判定の対象になれるか)。
+
+    2 通りの読みの両方で 0 のときだけ True: (1) make の読み方 — tab で始まらない行の最初の
+    語だけを見て、define の中では条件を数えない。(2) 字下げを無視する読み方 — 先頭の
+    空白 / tab を落として全部数える (独立レビューの反例: define の中の endif、タブ付き
+    endef、`\\` 継続の次の endef。どちらの読みでも深さ 0 の場所だけ許す)。
+    どちらかの読みで深さが負になったら、それ以降は全部 False (構造が読めない)。"""
+    flags = []
+    d_make = c_make = d_naive = c_naive = 0
+    broken = False
+    for _, _, text in llines:
+        flags.append(not broken and d_make == c_make == d_naive == c_naive == 0)
+        if not text.startswith("\t"):
+            tok = text.strip()
+            if DEFINE_OPEN.match(tok):
+                d_make += 1
+            elif DEFINE_CLOSE.match(tok) and d_make > 0:
+                d_make -= 1
+            elif d_make == 0 and COND_OPEN.match(tok):
+                c_make += 1
+            elif d_make == 0 and COND_CLOSE.match(tok):
+                c_make -= 1
+        tok = text.strip()
+        if DEFINE_OPEN.match(tok):
+            d_naive += 1
+        elif DEFINE_CLOSE.match(tok):
+            d_naive -= 1
+        elif COND_OPEN.match(tok):
+            c_naive += 1
+        elif COND_CLOSE.match(tok):
+            c_naive -= 1
+        if min(d_make, c_make, d_naive, c_naive) < 0:
+            broken = True
+    return flags
+
+
+def find_list(texts):
+    """{相対パス: 行の列} から検査の列を探す。(ファイル, 物理行の集合, 語の列) を返す。
+    列は make ファイル全体で 1 つだけ、define / 条件の外、語は全部 NAME_RE で重複なし。"""
+    found = []
+    for rel in sorted(texts):
+        ll = logical_lines(texts[rel])
+        ok = depth_flags(ll)
+        for k, (s, e, text) in enumerate(ll):
+            if LIST_ANY_RE.match(text):
+                found.append((rel, s, e, text, ok[k]))
+    if len(found) != 1:
+        raise Reject("%s の代入が %d か所 (1 か所だけ読む)" % (LIST_VAR, len(found)))
+    rel, s, e, text, ok = found[0]
+    m = LIST_HEAD_RE.match(text)
+    if not m or not ok:
+        raise Reject("%s の列の形が読めない (%s)" % (LIST_VAR, rel))
+    words = (m.group(1) or "").split()
+    bad = [w for w in words if not NAME_RE.match(w)]
+    if bad:
+        raise Reject("%s の列に検査名でない語がある: %s" % (LIST_VAR, bad[0]))
+    if len(words) != len(set(words)):
+        raise Reject("%s の列に重複がある" % LIST_VAR)
+    return rel, set(range(s, e + 1)), words
+
+
+def collapse_list(lines, lset):
+    """列の物理行 (lset) を 1 つのマーカー行に畳む: [(元の行番号 または None, 行)]。
+    既存行に対する列の位置はそのまま残る。"""
+    out, done = [], False
+    for i, l in enumerate(lines):
+        if i in lset:
+            if not done:
+                out.append((None, LIST_MARKER))
+            done = True
+        else:
+            out.append((i, l))
+    return out
+
+
+def inserted_lines(base, work, lset_b, lset_w):
+    """列を畳んだ基点の行の列が、畳んだ作業中の行の列の部分列なら、作業中にだけある
+    行の番号の列。部分列でない (削除・変更行がある、列の位置が動いた) なら None。"""
+    bs, ws = collapse_list(base, lset_b), collapse_list(work, lset_w)
+    j, matched = 0, set()
+    for _, bl in bs:
+        while j < len(ws) and ws[j][1] != bl:
+            j += 1
+        if j == len(ws):
+            return None
+        matched.add(j)
+        j += 1
+    if any(k not in matched and i is None for k, (i, _) in enumerate(ws)):
+        return None                      # 作業中の列が基点の列と対応しない
+    return [i for k, (i, _) in enumerate(ws) if k not in matched and i is not None]
+
+
+def _is_skippable(text):
+    return text.strip() == "" or text.lstrip().startswith("#")
+
+
+# make が recipe を切らずに飛ばす (または飛ばすかもしれない) 非 tab 行。(2) の「recipe が
+# 連続する tab 行だけ」の判定で、連続の後ろにこれらを挟んで tab 行が続けば recipe が続いて
+# いると見なす (多めに数える = 全部に倒す側)。
+RECIPE_PASS_RE = re.compile(
+    r"^(?:ifeq|ifneq|ifdef|ifndef|else|endif|export|unexport|vpath|undefine|override|"
+    r"define|endef|-?include|sinclude)\b")
+
+
+def _passes_recipe(text):
+    return _is_skippable(text) or RECIPE_PASS_RE.match(text.strip()) is not None
+
+
+def classify_file(rel, work, inserted, base_words, new_names, m_checks):
+    """1 ファイルの足した行を型に当てる。{検査名: [script]} ((b) は新しい名前、(c) は
+    基点の列の名前) と {新しい名前: 規則の数} を返す。合わなければ Reject。
+    inserted は inserted_lines() の戻り (列の物理行は入っていない)。
+
+    持ち主が変わる配置を型から締め出す (ユーザー決定 2026-10-01、独立レビュー 3 回目):
+      (1) 新しい規則 (b) とその recipe・コメント・空行は **ファイル末尾の塊** (基点の最後の
+          行より後ろに続く足した行) だけ。基点の行のあいだに入った新規則は全部
+      (2) 既存の検査への行 (c) は、その検査の recipe が **規則行の直後から連続する tab 行
+          だけ** (途中に基点のコメント・空行・条件ディレクティブなど非 tab 行を含まず、連続の
+          後ろにそれらを挟んで tab 行が続かない) のときだけ。足す位置はその連続の中か直後
+      (3) コメント・空行 (d) は、(1) の末尾の塊の中か、前後どちらにも基点の tab 行が接して
+          いない基点の 2 行のあいだだけ"""
+    ll = logical_lines(work)
+    ok = depth_flags(ll)
+    phys2log = {}
+    for k, (s, e, _) in enumerate(ll):
+        for i in range(s, e + 1):
+            phys2log[i] = k
+    ins = set(inserted)
+    kept = [i for i in range(len(work)) if i not in ins]
+    tail_start = (kept[-1] + 1) if kept else 0      # ここから後ろは全部足した行
+    picked, headers = {}, {}
+    cur_new = None          # 末尾の塊で直前に足した新しい規則 (以後の recipe 行の持ち主)
+
+    def single_inserted(k):
+        s, e, _ = ll[k]
+        return s == e and s in ins
+
+    for i in sorted(ins):
+        line = work[i]
+        where = "%s:%d" % (rel, i + 1)
+        k = phys2log[i]
+        if not single_inserted(k):
+            raise Reject("%s: 継続行の途中に足している" % where)
+        if not ok[k]:
+            raise Reject("%s: define / 条件の中に足している" % where)
+        if CTRL_RE.search(line):
+            raise Reject("%s: 制御文字を含む行" % where)
+        in_tail = i >= tail_start
+        if line == "" or TPL_COMMENT_RE.match(line):
+            if not in_tail:
+                p = max((j for j in kept if j < i), default=None)
+                n = min((j for j in kept if j > i), default=None)
+                if (p is not None and work[p].startswith("\t")) or \
+                        (n is not None and work[n].startswith("\t")):
+                    raise Reject("%s: 基点の recipe 行に接してコメント / 空行を足している" % where)
+            continue
+        mh = TPL_HEADER_RE.match(line)
+        mr = TPL_RECIPE_RE.match(line)
+        if mh:
+            name = mh.group(1)
+            if not in_tail:
+                raise Reject("%s: 新しい規則 %s がファイル末尾の塊にない (基点の行のあいだ)"
+                             % (where, name))
+            if name not in new_names:
+                raise Reject("%s: 規則 %s の名前が列に足した新しい名前でない" % (where, name))
+            headers[name] = headers.get(name, 0) + 1
+            picked.setdefault(name, [])
+            cur_new = name
+        elif mr:
+            if cur_new is not None:
+                name = cur_new                      # (1) 末尾の塊の新しい規則の recipe
+            else:
+                # (2) 持ち主: 上へ tab 行だけを辿って基点の検査の規則の行に着く
+                j = i - 1
+                while j >= 0 and work[j].startswith("\t"):
+                    j -= 1
+                t = work[j] if j >= 0 else ""
+                mo = OWNER_RE.match(t)
+                if j < 0 or j in ins or not mo or "=" in t:
+                    raise Reject("%s: 持ち主が基点の検査の規則の行でない (recipe は規則行の直後から"
+                                 "連続する tab 行だけ): %r" % (where, t[:60]))
+                # 規則行は基点の独立した論理行の先頭 (直前の物理行が継続で終わっていない —
+                # `\t@echo \\` の次の `check-a:` は echo の続き。独立レビュー 4 回目) で、
+                # それ自身も継続で終わらない
+                if (j > 0 and continued(work[j - 1])) or continued(t):
+                    raise Reject("%s: 持ち主候補 %r が継続行の途中" % (where, t[:60]))
+                name = mo.group(1)
+                if name not in base_words:
+                    raise Reject("%s: 持ち主 %s が基点の列にない" % (where, name))
+                # 連続の後ろ: make が recipe を切らない行を挟んで tab 行が続けば recipe が続く
+                j = i + 1
+                while j < len(work) and work[j].startswith("\t"):
+                    j += 1
+                while j < len(work) and _passes_recipe(work[j]):
+                    j += 1
+                if j < len(work) and work[j].startswith("\t"):
+                    raise Reject("%s: %s の recipe がコメント・空行・ディレクティブ越しに続いている"
+                                 % (where, name))
+            script = "tools/tests/" + mr.group(1)
+            if not os.path.isfile(os.path.join(ROOT, script)):
+                raise Reject("%s: %s が木に無い" % (where, script))
+            if not matches(script, m_checks.get(name, [])):
+                raise Reject("%s: %s が対応表の %s の glob に入っていない" % (where, script, name))
+            picked.setdefault(name, []).append(script)
+        else:
+            raise Reject("%s: 型に合わない行: %r" % (where, line[:60]))
+    for name in headers:
+        if not picked.get(name):
+            raise Reject("%s: 規則 %s に recipe が無い" % (rel, name))
+    return picked, headers
+
+
+def _base_texts(ancestor):
+    """基点のコミットにある MAKE_INPUT_GLOBS のファイル {相対パス: 行の列}。
+    行は split_lf() (LF だけで分け、末尾の改行の有無は差に数えない)。"""
+    mk = compile_globs(MAKE_INPUT_GLOBS)
+    p = subprocess.run(["git", "-C", ROOT, "ls-tree", "-r", "--name-only", ancestor,
+                        "--", "Makefile", "build"], capture_output=True, text=True)
+    if p.returncode != 0:
+        raise Reject("基点 %s の木を読めない" % ancestor[:12])
+    rels = [rel for rel in p.stdout.splitlines() if matches(rel, mk)]
+    # 1 回の cat-file --batch で全部読む (ファイルごとの git show より速い)
+    q = subprocess.run(["git", "-C", ROOT, "cat-file", "--batch"], capture_output=True,
+                       input="".join("%s:%s\n" % (ancestor, rel) for rel in rels).encode())
+    if q.returncode != 0:
+        raise Reject("基点 %s の版を読めない" % ancestor[:12])
+    out, data, pos = {}, q.stdout, 0
+    for rel in rels:
+        nl = data.find(b"\n", pos)
+        head = data[pos:nl].split()
+        if nl < 0 or len(head) != 3 or head[1] != b"blob":
+            raise Reject("基点版 %s を読めない" % rel)
+        size = int(head[2])
+        out[rel] = split_lf(data[nl + 1:nl + 1 + size])
+        pos = nl + 1 + size + 1
+    return out
+
+
+def _work_texts():
+    out = {}
+    for rel in makefile_paths():
+        with open(os.path.join(ROOT, rel), "rb") as f:
+            out[rel] = split_lf(f.read())
+    return out
+
+
+def make_narrow(base, mk_hits, m_checks):
+    """Makefile / build/*.mk の変更 (mk_hits) を型の完全一致で絞る。
+
+    (変異込みにする検査の集合 または None, 理由) を返す。None は全部。
+    基点は changed_files と同じ merge-base(base, HEAD)。規則は上の節の注釈。"""
+    if base is None:
+        return None, "基点版なし (--files)"
+    p = subprocess.run(["git", "-C", ROOT, "merge-base", base, "HEAD"],
+                       capture_output=True, text=True)
+    ancestor = p.stdout.strip()
+    if p.returncode != 0 or not ancestor:
+        return None, "基点 %s と HEAD の merge-base を決められない" % base
+    try:
+        bt, wt = _base_texts(ancestor), _work_texts()
+        for rel in mk_hits:
+            if rel not in bt or rel not in wt:
+                raise Reject("%s は追加・削除・改名されたファイル" % rel)
+        for rel, lines in wt.items():
+            if any(".ONESHELL" in l for l in lines):
+                raise Reject("%s に .ONESHELL がある" % rel)
+        lrel_b, lset_b, bw = find_list(bt)
+        lrel_w, lset_w, ww = find_list(wt)
+        # 列が別のファイルへ動いた (消して足した) のはマーカーの不一致で「削除・変更行」になる
+        base_words, work_words = set(bw), set(ww)
+        if not base_words <= work_words:
+            raise Reject("%s の列から消えた名前がある: %s"
+                         % (LIST_VAR, " ".join(sorted(base_words - work_words))))
+        new_names = work_words - base_words
+        for name in sorted(new_names):
+            rx = re.compile(r"(?<![\w-])%s(?![\w-])" % re.escape(name))
+            for rel, lines in bt.items():
+                if any(rx.search(l) for l in lines):
+                    raise Reject("新しい名前 %s が基点の %s に既にある" % (name, rel))
+        picked, headers = {}, {}
+        for rel in sorted(mk_hits):
+            ins = inserted_lines(bt[rel], wt[rel],
+                                 lset_b if rel == lrel_b else set(),
+                                 lset_w if rel == lrel_w else set())
+            if ins is None:
+                raise Reject("%s に削除・変更行がある" % rel)
+            pk, hd = classify_file(rel, wt[rel], ins, base_words, new_names, m_checks)
+            for t, s in pk.items():
+                picked.setdefault(t, []).extend(s)
+            for t, n in hd.items():
+                headers[t] = headers.get(t, 0) + n
+        if set(headers) != new_names or any(n != 1 for n in headers.values()):
+            raise Reject("列に足した名前 (%s) と新しい規則 (%s) が一致しない"
+                         % (" ".join(sorted(new_names)) or "なし",
+                            " ".join(sorted(headers)) or "なし"))
+    except Reject as e:
+        return None, "型に合わない: %s" % e
+    why = "型に一致: 新しい検査 %d 本、recipe に行を足した検査 %d 本" % (
+        len(new_names), len(set(picked) - new_names))
+    return set(picked), why
 
 
 # ---------------------------------------------------------------- 入力の抽出
@@ -497,8 +943,11 @@ def default_base():
     return head, "HEAD (feat/gui / main が見つからない)"
 
 
-def plan(files):
-    """変更の一覧から (mode, stage, mut, 説明の行) を決める。git は見ない。
+def plan(files, base=None):
+    """変更の一覧から (mode, stage, mut, 説明の行) を決める。
+
+    base があるときだけ Makefile / build/*.mk の基点版を git から読んで型に当てる
+    (make_narrow)。
 
     stage は回す検査 (make の目標)、mut はそのうち変異込みで回す検査。"""
     m = load_map()
@@ -508,6 +957,7 @@ def plan(files):
     full = compile_globs(m["full"])
     docs = compile_globs(m["docs_only"])
     notest = compile_notest(m["notest"])
+    mk = compile_globs(MAKE_INPUT_GLOBS)
     broad = set(m["broad"])
     checks = {t: compile_globs(g) for t, g in m["checks"].items()}
     # 走査型の検査 (broad:) の `**` を含む glob は「表に載っている」の判定に数えない
@@ -517,18 +967,36 @@ def plan(files):
              for t, cg in checks.items()}
     changed = [f for f in files if not matches(f, ign)]
 
-    hit, unmatched, full_hits, notest_hits = set(), [], [], []
+    lines = []
+    hit, unmatched, full_hits, notest_hits, mk_hits = set(), [], [], [], []
     for f in changed:
         hit |= {t for t, cg in checks.items() if matches(f, cg)}
         if matches(f, full):
-            full_hits.append(f)
+            if matches(f, mk):
+                mk_hits.append(f)
+            else:
+                full_hits.append(f)
+                lines.append("%s: 全部 — 全体に影響するファイル" % f)
         elif is_notest(f, notest):
             notest_hits.append(f)
         elif not matches(f, docs) and \
                 not any(matches(f, cg) for cg in cover.values()):
             unmatched.append(f)
+    if mk_hits and not full_hits and not unmatched:
+        # Makefile / build/*.mk は「新しい試験を足す形」だけ型の完全一致で絞る
+        # (1 回で全部の変更ファイルを見る)。
+        narrowed, why = make_narrow(base, mk_hits, checks)
+        if narrowed is None:
+            full_hits += mk_hits
+            lines.append("%s: 全部 — %s" % (" ".join(mk_hits), why))
+        else:
+            hit |= narrowed & set(par)
+            lines.append("%s: 絞り込み — %s (%s)" %
+                         (" ".join(mk_hits), why,
+                          " ".join(sorted(narrowed & set(par))) or "追加選択なし"))
+    elif mk_hits:
+        full_hits += mk_hits          # 他の理由で全部になるので make は回さない
 
-    lines = []
     if not changed:
         mode, st, mu = "fast", list(par), []
         lines.append("変更なし → 全部を変異なしで回す (= check-fast)")
@@ -548,7 +1016,7 @@ def plan(files):
     elif not hit:
         mode, st, mu = "fast", list(par), []
         lines += ["notest: に当たる: %s" % f for f in notest_hits[:10]]
-        lines.append("→ どのホスト試験の入力でもない変更だけ: 全部を変異なしで回す "
+        lines.append("→ 変異の選び方に足す変更が無い: 全部を変異なしで回す "
                      "(= check-fast)")
     else:
         mode = "sel"
@@ -567,7 +1035,8 @@ def select(base, files=None, base_note=""):
         committed, work = changed_files(base)
     else:
         committed, work = [], list(files)
-    mode, st, mu, lines = plan(sorted(set(committed) | set(work)))
+    mode, st, mu, lines = plan(sorted(set(committed) | set(work)),
+                               base=None if files is not None else base)
     summary = ("check-changed: 基点 %s (%s)、コミット済みの変更 %d 件 + 未コミット %d 件 → %s"
                % (base[:12], base_note or "指定", len(committed), len(work), mode))
     for l in lines:

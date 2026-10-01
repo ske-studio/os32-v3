@@ -27,6 +27,9 @@ class OwnerReclaimTests(unittest.TestCase):
             # STATIC_ASSERTs need a constant expression, so keep the real
             # numeric shape. Nothing is dereferenced: kmemset is a recording
             # no-op and paging_map_range is stubbed in the host file.
+            lease_defines = "\n".join(line for line in
+                (ROOT / "include/memmap.h").read_text().splitlines()
+                if line.startswith("#define MEM_LEASE_")) + "\n"
             (tmp / "memmap.h").write_text(
                 "#ifndef OS32_TEST_MEMMAP_H\n"
                 "#define OS32_TEST_MEMMAP_H\n"
@@ -44,7 +47,7 @@ class OwnerReclaimTests(unittest.TestCase):
                 # kernel/paging.h (included by shm.c from its own directory,
                 # so the real header always wins) needs this one constant.
                 "#define MEM_APP_BAND_MAX_PDES 2UL\n"
-                "#endif\n")
+                + lease_defines + "#endif\n")
             (tmp / "kstring.h").write_text(
                 "#include <string.h>\n"
                 "void test_shm_memset(void *d, int c, unsigned long n);\n"

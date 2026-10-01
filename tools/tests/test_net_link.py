@@ -62,16 +62,16 @@ def argptr_defines():
 
 
 def check_reclaim_has_host_owner_exit():
-    """exec_reclaim_owned が host_owner_exit を呼んでいるか (票 N1 段 3)。
+    """exec_notify_owned が host_owner_exit を呼んでいるか (票 N1 段 3)。
 
     並びは exec/exec.c の 1 か所にしかなく、ホストではリンクできない。
     con_sink_owner_exit / launch_owner_exit と同じ位置にあることを本文で見る。
     """
     src = (ROOT / "exec/exec.c").read_text(encoding="utf-8")
-    m = re.search(r"static void exec_reclaim_owned\(int id\)\s*\{(.*?)\n\}", src, re.S)
-    assert m, "exec_reclaim_owned が見つからない"
+    m = re.search(r"static void exec_notify_owned\(int id\)\s*\{(.*?)\n\}", src, re.S)
+    assert m, "exec_notify_owned が見つからない"
     body = m.group(1)
-    assert "host_owner_exit(id);" in body, "exec_reclaim_owned に host_owner_exit が無い"
+    assert "host_owner_exit(id);" in body, "exec_notify_owned に host_owner_exit が無い"
     assert body.index("launch_owner_exit(id);") < body.index("host_owner_exit(id);") \
         < body.index("con_sink_owner_exit(id);"), \
         "host_owner_exit は launch_owner_exit と con_sink_owner_exit の間に置く"

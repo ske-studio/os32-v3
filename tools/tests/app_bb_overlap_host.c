@@ -248,6 +248,7 @@ void _start(void)
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
     CHECK(result == 0x400000);
 
+    host_map_fixed_paging();
     paging_init(T_RAM_KB);
     host_pool_boot(T_RAM_KB);
     /* 起動時の姿: shlib 帯を押さえ、PEGC の BB を ⑥ と同じく池の CPL=0 子の

@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools'))
@@ -124,6 +125,39 @@ void probe(void) {
             'void probe(void) { submit((u32)(&g_iostatus)); }')])
         self.assertEqual(checker.scan(
             'void probe(void) { status((unsigned long)g_iostatus.Status); }'), [])
+
+    def test_hostdrv_linear_exceptions_remain_scoped(self):
+        # Exercise the real 24 address casts: audited linear ABI exceptions
+        # must cover only the 12 named functions, not a new unaudited caller.
+        source = (ROOT / 'fs/hostdrvfs.c').read_text()
+        entries = [line for line in (ROOT / 'tools/check_p2v_allow.txt').read_text().splitlines()
+                   if line.startswith('fs/hostdrvfs.c:')]
+        self.assertEqual(len(entries), 12)
+        with tempfile.TemporaryDirectory(prefix='os32-hostdrv-p2v-') as tmp:
+            root = mutant_tree(ROOT, pathlib.Path(tmp) / 'tree', {},
+                               real={'fs/hostdrvfs.c', 'tools/check_p2v_allow.txt'})
+            target = root / 'fs/hostdrvfs.c'
+            target.write_text(source)
+            allow = root / 'tools/check_p2v_allow.txt'
+            allow.write_text('\n'.join(entries) + '\n')
+            # Parse the real HostDrv TU with its build flags and headers.
+            # Limit this focused audit to HostDrv; other units retain their
+            # own allowances in the full-tree test.
+            unit = next(u for u in checker.ast.units(root) if u['src'] == 'fs/hostdrvfs.c')
+            def audit_hostdrv():
+                with patch.object(checker.ast, 'units', return_value=[unit]):
+                    return checker.audit(root)
+            self.assertEqual(audit_hostdrv(), ([], 12))
+            target.write_text(source + '\nvoid submit(u32);\nvoid unaudited(void) { submit((u32)&g_invoke); }\n')
+            errors, _ = audit_hostdrv()
+            self.assertEqual(len(errors), 1)
+            self.assertIn(':unaudited: physical-sink', errors[0])
+            target.write_text(source)
+            allow.write_text('')
+            errors, _ = audit_hostdrv()
+            self.assertEqual(len(errors), 24)
+            self.assertEqual({e.split(':')[2] for e in errors},
+                             {e.split(':')[1] for e in entries})
 
     def test_real_tree(self):
         self.assertEqual(checker.audit(ROOT)[0], [])

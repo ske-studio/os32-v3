@@ -51,7 +51,9 @@ extern u32 irq_unexpected;         /* 誰も受けなかったディスパッチ
 extern u32 irq_storm_masked;       /* ストームでマスクした線のビット (sticky) */
 extern u32 irq_line_quarantined;   /* 隔離した線のビット (sticky) */
 extern u32 irq_ctx_violations;     /* ISR 文脈からの登録・解除を断った回数 */
-extern volatile int irq_in_irq;    /* 共通スタブの入れ子深さ (契約の検査用) */
+/* R1: 診断互換名も全 IRQ スタブの同じ深さを読む。 */
+extern volatile u32 kctx_irq_depth;
+#define irq_in_irq kctx_irq_depth
 
 /* 数えたものの読み口 (添字を知らなくてよい)。不明な線は 0。 */
 u32 irq_deferred_count(unsigned int irq);

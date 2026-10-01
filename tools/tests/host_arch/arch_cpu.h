@@ -17,6 +17,23 @@
 #ifndef ARCH_CPU_H
 #define ARCH_CPU_H
 
+#include "memmap.h"
+/* 画像外 PD/PT を Linux の実メモリにも置く。カーネル画像/BSSの代用にしない。 */
+static inline void host_map_fixed_paging(void)
+{
+    static int mapped;
+    u32 result;
+    u32 args[6] = {MEM_FIXED_PAGING_BASE,
+                   MEM_POOL_BASE - MEM_FIXED_PAGING_BASE, 3, 0x32, 0xffffffffUL, 0};
+    if (mapped) return;
+    __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
+    if (result != MEM_FIXED_PAGING_BASE) {
+        __asm__ volatile("int $0x80" : : "a"(1), "b"(98));
+        for (;;) {}
+    }
+    mapped = 1;
+}
+
 static inline u32 arch_mmu_current_root(void)
 {
     return host_cr3;
@@ -24,6 +41,9 @@ static inline u32 arch_mmu_current_root(void)
 
 static inline void arch_mmu_load_root(u32 root_phys)
 {
+#ifdef HOST_MMU_LOAD_CHECK
+    HOST_MMU_LOAD_CHECK(root_phys);
+#endif
     host_cr3 = root_phys;
 }
 
@@ -35,6 +55,9 @@ static inline void arch_mmu_flush_tlb(void)
 /* 実機では CR0.PG を立てる。ホストでは観測点が無いので何もしない。 */
 static inline void arch_mmu_enable(void)
 {
+#ifdef HOST_MMU_ENABLE_CHECK
+    HOST_MMU_ENABLE_CHECK();
+#endif
 }
 
 /* 特権境界はホストで再現できない。呼ばれたらその場で止める

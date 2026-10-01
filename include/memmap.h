@@ -326,7 +326,15 @@ extern u32 __sqlite_end;
 #define MEM_SHELL_STACK_TOP   0x380000UL  /* シェルスタック先頭 (下向き成長) */
 #define MEM_SHELL_STACK_SIZE  0x00A000UL  /* シェルスタックサイズ (40KB) */
 #define MEM_SHELL_HEAP_BASE   0x380000UL  /* シェル exec_heap 先頭 (mem_alloc) */
-#define MEM_SHELL_HEAP_SIZE   0x080000UL  /* シェル exec_heap サイズ (512KB) */
+#define MEM_SHELL_HEAP_END    MEM_FIXED_PAGING_BASE
+#define MEM_SHELL_HEAP_SIZE   (MEM_SHELL_HEAP_END - MEM_SHELL_HEAP_BASE) /* 452KiB */
+/* T2a′: 画像外の固定 PD 1 + boot PT 8 + device PT 1 (恒久予約)。 */
+#define MEM_FIXED_PAGING_BASE 0x3F1000UL
+#define MEM_FIXED_BOOT_PT_COUNT 8
+#define MEM_FIXED_PD_BASE     MEM_FIXED_PAGING_BASE
+#define MEM_FIXED_BOOT_PT_BASE (MEM_FIXED_PD_BASE + MEM_GUARD_SIZE)
+#define MEM_FIXED_APERTURE_PT_BASE (MEM_FIXED_BOOT_PT_BASE + MEM_FIXED_BOOT_PT_COUNT * MEM_GUARD_SIZE)
+#define MEM_FIXED_PAGING_END  (MEM_FIXED_APERTURE_PT_BASE + MEM_GUARD_SIZE)
 #define MEM_SHELL_BAND_END    0x3FFFFFUL  /* シェル帯域終端 */
 
 /* ====================================================================== */
@@ -513,5 +521,11 @@ static inline volatile void *P2V_BOOT(u32 pa) { return P2V_IO(pa); }
 static inline u32 V2P(const volatile void *va) { return (u32)(uptr)va; }
 #define P2V_CONST(pa)    ((void *)(uptr)(pa))
 #define P2V_IO_CONST(pa) ((volatile void *)(uptr)(pa))
+
+/* T2b: private lease VA, independent of physical/device boundaries. */
+#define MEM_LEASE_BASE        0xF0000000UL
+#define MEM_LEASE_END         0xFE000000UL
+#define MEM_LEASE_MAX_PDES    ((MEM_LEASE_END - MEM_LEASE_BASE) >> 22)
+#define MEM_LEASE_MAX         8
 
 #endif /* MEMMAP_H */

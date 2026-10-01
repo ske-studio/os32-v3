@@ -270,6 +270,15 @@ def bands(m, sym):
         plus("MEM_SHELL_HEAP_BASE", "MEM_SHELL_HEAP_SIZE", -1), "RW",
         "newlib の sbrk とは別領域 (2026-09-03)")
 
+    add(SHELL, "固定 master PD", v("MEM_FIXED_PD_BASE"),
+        (v("MEM_FIXED_BOOT_PT_BASE") or 0) - 1, "RW", "恒久FIXED / supervisor / WB")
+    add(SHELL, "固定 bootstrap PT (8枚)", v("MEM_FIXED_BOOT_PT_BASE"),
+        (v("MEM_FIXED_APERTURE_PT_BASE") or 0) - 1, "RW", "恒久FIXED / supervisor / WB")
+    add(SHELL, "固定 device aperture PT", v("MEM_FIXED_APERTURE_PT_BASE"),
+        (v("MEM_FIXED_PAGING_END") or 0) - 1, "RW", "backing は WB、MMIO PTE は PCD/PWT")
+    add(SHELL, "上端残余予約", v("MEM_FIXED_PAGING_END"), v("MEM_SHELL_BAND_END"),
+        "NP", "恒久FIXED、T3 の guard+kstack 用")
+
     add(APP, "共有ライブラリ帯 (libos32gui.shlib)", v("MEM_SHLIB_BASE"),
         (v("MEM_SHLIB_END") or 0) - 1, "RO+USER / RW+USER",
         ".text は全 PD 共有、.data/.bss はアプリごとの物理")
@@ -366,6 +375,24 @@ def budget(m, sym):
 # C のヘッダを読めない相手 (リンカスクリプト / NASM) と、SDK として外へ出る
 # 写しにだけ許し、一致は必ずここで見る ([C4])。
 MIRRORS = (
+    ("build/os32.ld", r"^\s*MEM_FIXED_PAGING_BASE\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_FIXED_PAGING_BASE"),
+    ("build/os32.ld", r"^\s*MEM_FIXED_PD_BASE\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_FIXED_PD_BASE"),
+    ("build/os32.ld", r"^\s*MEM_FIXED_BOOT_PT_BASE\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_FIXED_BOOT_PT_BASE"),
+    ("build/os32.ld", r"^\s*MEM_FIXED_BOOT_PT_COUNT\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_FIXED_BOOT_PT_COUNT"),
+    ("build/os32.ld", r"^\s*MEM_FIXED_APERTURE_PT_BASE\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_FIXED_APERTURE_PT_BASE"),
+    ("build/os32.ld", r"^\s*MEM_FIXED_PAGING_END\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_FIXED_PAGING_END"),
+    ("build/os32.ld", r"^\s*MEM_SHELL_HEAP_BASE\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_SHELL_HEAP_BASE"),
+    ("build/os32.ld", r"^\s*MEM_SHELL_HEAP_END\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_SHELL_HEAP_END"),
+    ("build/os32.ld", r"^\s*MEM_SHELL_HEAP_SIZE\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_SHELL_HEAP_SIZE"),
+    ("build/os32.ld", r"^\s*MEM_SHELL_BAND_END\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_SHELL_BAND_END"),
+    ("build/os32.ld", r"^\s*MEM_POOL_BASE\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_POOL_BASE"),
+    ("build/os32.ld", r"^\s*MEM_SHELL_STACK_TOP\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_SHELL_STACK_TOP"),
+    ("build/os32.ld", r"^\s*MEM_SHELL_LOAD_ADDR\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_SHELL_LOAD_ADDR"),
+    ("build/os32.ld", r"^\s*MEM_KERNEL_BAND_END\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_KERNEL_BAND_END"),
+    ("build/os32.ld", r"^\s*MEM_LEDGER_META_END\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_LEDGER_META_END"),
+    ("build/os32.ld", r"^\s*MEM_STACK_GUARD\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_STACK_GUARD"),
+    ("build/os32.ld", r"^\s*MEM_DMA_POOL_END\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_DMA_POOL_END"),
+
     ("build/os32.ld", r"^\s*KERNEL_LOAD_ADDR\s*=\s*(0x[0-9A-Fa-f]+)\s*;",
      "KERNEL_LOAD_ADDR"),
     ("build/os32.ld", r"^\s*MEM_KSTACK_TOP\s*=\s*(0x[0-9A-Fa-f]+)\s*;",
@@ -458,6 +485,24 @@ def defects(rows, m=None, sym=None, root=None):
             lines.append("予算超過: カーネル本体 %s > 予算 %s (超過 %s)。"
                          "KHEAP_BASE から上が丸ごと押し上げられる"
                          % (human(b[1]), human(b[0]), human(b[1] - b[0])))
+    if m is not None:
+        names = ("MEM_FIXED_PAGING_BASE", "MEM_FIXED_PD_BASE", "MEM_FIXED_BOOT_PT_BASE",
+                 "MEM_FIXED_BOOT_PT_COUNT", "MEM_FIXED_APERTURE_PT_BASE", "MEM_FIXED_PAGING_END",
+                 "MEM_SHELL_HEAP_BASE", "MEM_SHELL_HEAP_END", "MEM_SHELL_HEAP_SIZE",
+                 "MEM_SHELL_BAND_END", "MEM_POOL_BASE", "MEM_SHELL_STACK_TOP")
+        v = {n: m.get(n) for n in names}
+        if any(x is None for x in v.values()):
+            lines.append("固定paging: 境界定数を解けない")
+        else:
+            b, pd, pt, count, apt, end, hb, he, size, band, pool, stack = (v[n] for n in names)
+            if any(a % PAGE for a in (b, pd, pt, apt, end, hb, he, band + 1, pool, stack)):
+                lines.append("固定paging: 境界が4KB非整列")
+            if not (pd == b and pt == pd + PAGE and count == 8 and apt == pt + count * PAGE
+                    and end == apt + PAGE and end - b == 10 * PAGE):
+                lines.append("固定paging: 連続1/8/1枚ではない")
+            if not (stack <= hb < he == b and hb + size == he and end <= band + 1 == pool
+                    and pool - end == 5 * PAGE):
+                lines.append("固定paging: shell heap/上端予約の境界不一致")
     for r in reversed_ranges(rows):
         lines.append("逆転: %s  開始 0x%06X > 終端 0x%06X "
                      "(範囲指定が空振りする)" % (r["name"], r["start"], r["end"]))
