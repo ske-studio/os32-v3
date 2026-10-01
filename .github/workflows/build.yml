@@ -50,7 +50,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential nasm genisoimage e2fsprogs \
+            build-essential nasm genisoimage e2fsprogs clang libclang-dev llvm-dev python3-clang \
             libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex
           python3 -m pip install --quiet -r requirements.txt
 
@@ -111,8 +111,12 @@ jobs:
       # ④ 変異なしの全検査 (成果物を読む check-manifests / check-packages-host / check-memmap と、
       #    クロスコンパイルや rustc が要るホスト試験を含む)。
       - name: make check-fast
+        env:
+          OS32_CLANG_CROSS_FREE: "0"
         run: |
           export PATH="$CROSS_DIR/bin:$PATH"
+          test -x "$CROSS_DIR/bin/i386-elf-gcc"
+          test -f "$CROSS_DIR/i386-elf/include/stdio.h"
           make check-fast CROSS_DIR="$CROSS_DIR" NP21W_DIR="$RUNNER_TEMP/np21w"
 
       # ⑤ 成果物: カーネル・起動 FD・インストール ISO・パッケージ・実機更新用の配備元 (hostdrv.tar.gz)。

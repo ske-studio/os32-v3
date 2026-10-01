@@ -102,3 +102,13 @@ x86 のホストで見張るには **`=strict` が要る**。フラグとイン�
 - **ビッグエンディアンで実際に動くことの証明ではない。** BE の実機も
   エミュレータも回していない。この検査が言えるのは「LE 前提とアライン前提を
   ソースから消した」ことまで。
+
+
+## 6. clang への置換 (2026-10-01)
+
+上記 §2〜§4 は旧版の記録。現行は実ビルドの旗で libclang を解析し、
+pointer cast の canonical pointee alignment が増えるかを見る。
+解析失敗の SKIP は撤去。`test_clang_ast.py` は typedef・複数修飾子・
+文字列連結 asm・マクロ asm と対照を有効な C で確認し、検査規則を壊す変異を
+Python の構文確認後に実行して runtime RED を要求する。
+比較の実数は [TASK_CLANG_CHECKS](../../docs/tasks/v3/TASK_CLANG_CHECKS.md) §6。

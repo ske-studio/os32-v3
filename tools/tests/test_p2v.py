@@ -7,12 +7,39 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools'))
 import check_p2v as checker
+AST_SCAN = checker.scan
+PREAMBLE = '''
+typedef unsigned char u8; typedef unsigned short u16; typedef unsigned int u32;
+typedef signed char i8; typedef short i16; typedef int i32; typedef unsigned int uptr;
+#define MEM_BOOTINFO_BASE 0x90000u
+#define MEM_GFX_BB_BASE 0x6a000u
+#define TVRAM_CHAR_BASE 0xa0000u
+#define RING3_HEAP_TOP 0x500000u
+#define P2V(x) ((void *)(uptr)(x))
+#define P2V_IO(x) ((void *)(uptr)(x))
+#define P2V_CONST(x) ((void *)(uptr)(x))
+#define P2V_IO_CONST(x) ((void *)(uptr)(x))
+#define V2P(x) ((uptr)(x))
+struct bootinfo { int x; }; struct sample { void *p; };
+struct status_t { u32 Status; }; struct status_t g_iostatus;
+u32 pa, paddr, buffer_phys, user_va;
+u8 buffer[512], table[4096];
+void paging_load_cr3(u32); void dma_chan_setup(int,u32,int,int); void submit(u32); void status(u32);
+u32 get_phys(void *); void *wrap(void *, void *);
+'''
+
+def scan_valid(source):
+    offset = PREAMBLE.count('\n')
+    return [(ln-offset,f,r) for ln,f,r in AST_SCAN(PREAMBLE + source)]
+
+checker.scan = scan_valid
 sys.path.insert(0, str(ROOT / 'tools/tests'))
-from mutpar import run_ordered
+from mutpar import run_ordered, mutant_tree
 
 
 class ScannerTest(unittest.TestCase):
@@ -22,6 +49,7 @@ class ScannerTest(unittest.TestCase):
                 '(volatile u8 *)(uptr)MEM_BOOTINFO_BASE',
                 '(const volatile struct bootinfo *)(unsigned long)((MEM_BOOTINFO_BASE))',
                 '(signed char * const)((uptr)(MEM_BOOTINFO_BASE))',
+                '(volatile u8 * const volatile)(uptr const)MEM_BOOTINFO_BASE',
                 '(u8 *)(unsigned int)(uptr)((MEM_BOOTINFO_BASE))'):
             with self.subTest(value=value):
                 hits = checker.scan('void probe(void) { volatile u8 *low = ' + value + '; }')
@@ -68,14 +96,18 @@ static const struct sample s = {
 void probe(void) {
     u32 *p = (u32 *)P2V(pa);
     volatile u8 *v = (volatile u8 *)P2V_IO(pa);
-    volatile u8 *w = (volatile unsigned char *)(uptr)(P2V_IO(MEM_BOOTINFO_BASE));
-    const struct sample *s = (const struct sample *)((P2V(pa)));
+    const struct sample *sample = (const struct sample *)((P2V(pa)));
     paging_load_cr3((u32)(V2P(p)));
     paging_load_cr3((u32)(pa));
     paging_load_cr3((u32)(paddr));
 }
 '''
         self.assertEqual(checker.scan(source), [])
+        # An explicit pointer -> integer -> pointer round trip is not an
+        # outer P2V expression under the tightened review rule.
+        self.assertIn('physical-cast', [h[2] for h in checker.scan(
+            'void probe(void) { volatile u8 *w = '
+            '(volatile unsigned char *)(uptr)(P2V_IO(MEM_BOOTINFO_BASE)); }')])
 
     def test_inverse_and_nested_user_expression(self):
         self.assertIn('physical-sink', [h[2] for h in checker.scan(
@@ -102,21 +134,27 @@ void probe(void) {
                    if line.startswith('fs/hostdrvfs.c:')]
         self.assertEqual(len(entries), 12)
         with tempfile.TemporaryDirectory(prefix='os32-hostdrv-p2v-') as tmp:
-            root = pathlib.Path(tmp)
-            (root / 'fs').mkdir()
-            (root / 'tools').mkdir()
+            root = mutant_tree(ROOT, pathlib.Path(tmp) / 'tree', {},
+                               real={'fs/hostdrvfs.c', 'tools/check_p2v_allow.txt'})
             target = root / 'fs/hostdrvfs.c'
             target.write_text(source)
             allow = root / 'tools/check_p2v_allow.txt'
             allow.write_text('\n'.join(entries) + '\n')
-            self.assertEqual(checker.audit(root), ([], 12))
-            target.write_text(source + '\nvoid unaudited(void) { submit((u32)&g_invoke); }\n')
-            errors, _ = checker.audit(root)
+            # Parse the real HostDrv TU with its build flags and headers.
+            # Limit this focused audit to HostDrv; other units retain their
+            # own allowances in the full-tree test.
+            unit = next(u for u in checker.ast.units(root) if u['src'] == 'fs/hostdrvfs.c')
+            def audit_hostdrv():
+                with patch.object(checker.ast, 'units', return_value=[unit]):
+                    return checker.audit(root)
+            self.assertEqual(audit_hostdrv(), ([], 12))
+            target.write_text(source + '\nvoid submit(u32);\nvoid unaudited(void) { submit((u32)&g_invoke); }\n')
+            errors, _ = audit_hostdrv()
             self.assertEqual(len(errors), 1)
             self.assertIn(':unaudited: physical-sink', errors[0])
             target.write_text(source)
             allow.write_text('')
-            errors, _ = checker.audit(root)
+            errors, _ = audit_hostdrv()
             self.assertEqual(len(errors), 24)
             self.assertEqual({e.split(':')[2] for e in errors},
                              {e.split(':')[1] for e in entries})
@@ -129,15 +167,7 @@ def mutant(case):
     name, body, rule = case
     with tempfile.TemporaryDirectory(prefix='os32-p2v-') as tmp:
         root = pathlib.Path(tmp)
-        for directory in checker.ROOTS:
-            for p in (ROOT / directory).rglob('*'):
-                if p.suffix not in ('.c', '.h') or checker.EXCLUDED.intersection(p.parts):
-                    continue
-                target = root / p.relative_to(ROOT)
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(p, target)
-        (root / 'tools').mkdir()
-        shutil.copyfile(ROOT / 'tools/check_p2v_allow.txt', root / 'tools/check_p2v_allow.txt')
+        root = mutant_tree(ROOT, root / 'tree', {}, real={'kernel/bootinfo.c','kernel/sysclk.c'})
         if name.startswith('bootinfo-'):
             target = root / 'kernel/bootinfo.c'
             original = 'volatile u8 *low = (volatile u8 *)P2V_IO(MEM_BOOTINFO_BASE);'
@@ -147,13 +177,20 @@ def mutant(case):
             target.write_text(source.replace(original, body))
             expected = f'bootinfo_capture: {rule}'
         else:
-            # p is a declared pointer parameter, including for the CR3 mutant.
+            target = root / 'kernel/sysclk.c'
             params = 'void *p' if name == 'grouped-cr3-pointer' else 'void'
-            (root / 'kernel/p2v_mutant.c').write_text('void p2v_mutant(' + params + ')\n{\n' + body + '\n}\n')
+            target.write_text(target.read_text() + '\n'
+                + '#define RING3_HEAP_TOP 0x800000u\nu32 buffer_phys; void paging_load_cr3(u32 pd_phys);\n'
+                + 'void p2v_mutant(' + params + ') {\n' + body + '\n}\n')
             expected = f'p2v_mutant: {rule}'
+        # A parse error must never satisfy the runtime RED assertion.
+        import clang_ast
+        for u in clang_ast.units(root):
+            if u['src'] == str(target.relative_to(root)):
+                clang_ast.parse(u['src'],u['argv'],root)
         result = subprocess.run([sys.executable, str(ROOT / 'tools/check_p2v.py'), '--root', str(root)],
                                 capture_output=True, text=True)
-        if result.returncode != 1 or expected not in result.stdout:
+        if result.returncode != 1 or expected not in result.stdout or 'clang parse failure' in result.stdout:
             raise AssertionError(f'{name}: expected runtime rejection, rc={result.returncode}\n{result.stdout}{result.stderr}')
         return f'RED: {name} (scanner ran, rc=1)'
 
@@ -175,6 +212,8 @@ def main():
             ('bootinfo-intermediate-cast', 'volatile u8 *low = (volatile u8 *)(uptr)MEM_BOOTINFO_BASE;', 'physical-cast'),
             ('bootinfo-signed-cast', 'volatile u8 *low = (volatile u8 *)(i32)MEM_BOOTINFO_BASE;', 'physical-cast'),
             ('grouped-cr3-pointer', '    paging_load_cr3((u32)(p));', 'physical-sink'),
+            ('bootinfo-qualified-pointer', 'volatile u8 *low = (volatile u8 * const volatile)MEM_BOOTINFO_BASE;', 'physical-cast'),
+            ('bootinfo-qualified-int', 'volatile u8 *low = (volatile u8 *)(uptr const)MEM_BOOTINFO_BASE;', 'physical-cast'),
         ]
         for result in run_ordered(mutant, cases):
             print(result)

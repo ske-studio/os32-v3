@@ -112,6 +112,8 @@ notest:
 
 checks:
   check-p2v:
+    - tools/clang_ast/**
+    - tools/tests/test_clang_ast.py
     - tools/check_p2v.py
     - tools/check_p2v_allow.txt
     - tools/tests/test_p2v.py
@@ -584,12 +586,16 @@ checks:
     - docs/CONSTRAINTS.md
     - tools/check_constraints.py
   check-c-dialect:
+    - tools/clang_ast/**
+    - tools/tests/test_clang_ast.py
     # 走査型 (make -n -B all の全コンパイル行・SDK ヘッダ・内部実装の全 .c/.h)
     - "**/*.[ch]"
     - "**/*.inc"
     - sdk/example/hello/**
     - tools/check_c_dialect.py
   check-c-dialect-host:
+    - tools/clang_ast/**
+    - tools/tests/test_clang_ast.py
     # 検査器の試験は実物の木を丸ごと回し (7)、写しの木に変異を当てる
     - "**/*.[ch]"
     - "**/*.inc"
@@ -601,6 +607,12 @@ checks:
     - userland/**
     - tools/check_privileged.py
   check-arch-asm:
+    - tools/check_le_access.py
+    - tools/check_p2v.py
+    - tools/check_p2v_allow.txt
+    - tools/tests/mutpar.py
+    - tools/clang_ast/**
+    - tools/tests/test_clang_ast.py
     - kernel/**
     - drivers/**
     - exec/**
@@ -614,6 +626,8 @@ checks:
     - platform/**
     - tools/check_arch_asm.py
   check-le-access:
+    - tools/clang_ast/**
+    - tools/tests/test_clang_ast.py
     - drivers/**/*.[ch]
     - fs/**/*.[ch]
     - lib/**/*.[ch]
