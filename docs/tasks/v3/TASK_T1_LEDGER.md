@@ -1,6 +1,6 @@
 # TASK_T1_LEDGER — T1: 物理地図と所有権台帳 (設計票)
 
-> 状態: **受入完了 (2026-10-01)** — T1a〜T1f を main に着地 (T1f = `73bdf43`)。NP21/W (8MB・17MB、PEGC・planar・Cirrus、HDD / FD 起動) と実機 Ra266 64MB (T1a〜T1e) で回帰 (§4-2-N・§4-3-N・§4-4-N・§4-5-N、T1f は下の §4-6-N)。**残件 (理由つき)**: PCM 再生中の CTRL+STOP → 再オープン・再生 (NP21/W のこの構成に PCM が無い — 実機 Ra266 の CS4231 で、画面不要だが音の確認は人が要る)、`cirrus-off` + `GFX=cirrus` の構成 (未実施)、T1f の実機 Ra266、HostDrv の 24 件の番地の解釈 (T1-U6、NP21/W 側の未確認)。check_p2v は正規表現の guard (限界は §4-6-R) — clang の構文木での作り直しは [TASK_CLANG_CHECKS](TASK_CLANG_CHECKS.md)。
+> 状態: **受入完了 (2026-10-01)** — T1a〜T1f を main に着地 (T1f = `73bdf43`)。NP21/W (8MB・17MB、PEGC・planar・Cirrus、HDD / FD 起動) と実機 Ra266 64MB (T1a〜T1e) で回帰 (§4-2-N・§4-3-N・§4-4-N・§4-5-N、T1f は下の §4-6-N)。**残件 (理由つき)**: PCM 再生中の CTRL+STOP → 再オープン・再生 (NP21/W のこの構成に PCM が無い — 実機 Ra266 の CS4231 で、画面不要だが音の確認は人が要る)、`cirrus-off` + `GFX=cirrus` の構成 (未実施)、HostDrv の 24 件の番地の解釈 (T1-U6、NP21/W 側の未確認)。check_p2v は正規表現の guard (限界は §4-6-R) — clang の構文木での作り直しは [TASK_CLANG_CHECKS](TASK_CLANG_CHECKS.md)。
 >
 > それまでの状態: **実装中 (2026-10-01) — T1a・T1b 着地 (main `d7ac7a0`)、次は T1c**。NP21/W 回帰の結果は §4-2-N。CTRL+STOP・#GP / #DE / #UD の kill は 2026-10-01 に確認済み (§4-2-N の末尾)。未確認: PCM 再生中の CTRL+STOP (NP21/W の構成に PCM が無い)、実機 Ra266 64MB (実機エージェントに依頼中)。
 >
@@ -678,6 +678,8 @@ ini は切り替え道具のレシートで元 (`ExMemory=16`、`USEGD5430=false
 #### 4-6-N. T1f の NP21/W 回帰 (PM、2026-10-01、main `c90eed8` = T1f + 票、17MB・PEGC)
 
 HDD 起動: `[selftest] 226/226 passed`、`[gfx] ledger cand=3 ok=3 bb=eb2000`、`[ledger] irq_ops=0 exc_ops=0 check_fail=0 bad_free=0`、`[HDRV] HostDrv(NT) mounted on /host` (`ls /host/bin` で一覧が読める)、`test2` PASS、`v86 -t` OK、`cpl0_probe usable_end=eb2000`。ゲスト試験一式 16 件中 PASS 14・SKIP 2 (以前からの前提不足)、`gui_gate v12g4 --h 480` OK。FD 起動 (`--fd os32_boot.d88`): `src=fd`、226/226、DMA の窓の警告なし。
+
+**実機 Ra266 64MB (実機エージェント、CI の成果物 `c90eed8` = T1f、`GFX=pegc`)**: `Image CRC cd40ec93 (471626 bytes)`、boot.log は `0fedc76` と比べて日時・CRC・時間計測の行だけが違い、`[selftest] 226/226 passed`・`[gfx] ledger cand=1 ok=1 bb=ea7000 top=ea7000`・`[ledger] pci raw=6 ovf=0`・`[ledger] irq_ops=0 exc_ops=0 check_fail=0 bad_free=0` は同じ。`cpl0_probe usable_end=ea7000`、`hal_test` `backend pegc`、`pegcchk 3` は前回と同じ値、`test2` ×3 PASS、`v86 -t` OK。**`faulttest gp` / `de` / `ud` / `pf`** は 4 本とも `[ring3] exception … vec=0x0D / 0x00 / 0x06` と `#PF addr=0x00100000` で kill されシェルへ戻り (`SURVIVED` なし)、その後の `test2` も PASS、`mem` の Heap は起動直後と同じ。
 
 ### 4-7. T1 全体の受入 (TASK_MEMMAP_V3 §6 T1 の受入の要点との対応)
 
