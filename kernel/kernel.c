@@ -92,8 +92,8 @@ static void tvram_print(int x, int y, const char *str, u8 color)
         if (x >= TVRAM_COLS) { x = 0; y++; }
         if (y >= TVRAM_ROWS) break;
         offset = (u32)y * TVRAM_BPR + (u32)x * 2;
-        *(volatile u16 *)(TVRAM_BASE + offset) = (u16)(u8)*str;
-        *(volatile u8 *)(TVRAM_ATTR + offset) = color;
+        *(volatile u16 *)P2V_IO(TVRAM_BASE + offset) = (u16)(u8)*str;
+        *(volatile u8 *)P2V_IO(TVRAM_ATTR + offset) = color;
         str++; x++;
     }
 }
@@ -647,7 +647,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     kprintf(0x07, "[BOOT] UNI load: dst=%x size=%x\n",
             (unsigned)MEM_UNICODE_TABLE_BASE, (unsigned)MEM_UNICODE_TABLE_SIZE);
     {
-        int bytes = vfs_read(SYS_UNICODE_BIN, (void *)MEM_UNICODE_TABLE_BASE, MEM_UNICODE_TABLE_SIZE);
+        int bytes = vfs_read(SYS_UNICODE_BIN, (void *)P2V(MEM_UNICODE_TABLE_BASE), MEM_UNICODE_TABLE_SIZE);
         kprintf(0x07, "[BOOT] UNI load: bytes=%d\n", bytes);
         if (bytes == (int)MEM_UNICODE_TABLE_SIZE) {
             utf8_set_jis_table_ready(1);

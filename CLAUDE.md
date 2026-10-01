@@ -68,6 +68,7 @@ waits for the image locks to clear before starting; a hand-typed `taskkill` → 
 - **[C2]** In the kernel use `kstrncpy` / `kstrncat` / `kstrlen` / `kstrcmp` (`lib/kstring.h`), never libc.
 - **[C3]** Functions exposed to external programs need `__cdecl` wrappers in `kapi/`.
 - **[C4]** No hardcoded constants — follow the three-layer constant scheme.
+- **[C5]** Physical addresses become pointers through `P2V` / `P2V_IO` (`P2V_CONST` / `P2V_IO_CONST` only for constant initializers); pointers passed to device/PTE/CR3 use `V2P`. App/lease virtual addresses use AS/SURFACE translation. Exceptions are recorded in `tools/check_p2v_allow.txt`.
 - **[HW1]** Never use EGC / GRCG / GDC drawing commands. The CPU writes straight to VRAM at `0xA8000`.
 - **[HW2]** DMA buffers must not straddle a 64KB boundary.
 - **[ABI1]** `sdk/kapi.json` is the single source of truth. Never hand-edit the generated files.

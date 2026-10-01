@@ -9,6 +9,7 @@
 /*  記録: tools/tests/dma_pool_tdd.md                                       */
 /* ======================================================================== */
 
+#include "memmap.h"
 #include "dma_pool.h"
 #include "dma8237.h"   /* dma_crosses_64k — 境界の規則は 8237 側が正典 */
 

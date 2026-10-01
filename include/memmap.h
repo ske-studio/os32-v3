@@ -495,13 +495,21 @@ extern u32 __sqlite_end;
 /*                                                                        */
 /*  v3 の恒等の supervisor 領域 (カーネル帯・シェル帯・池・低位・MMIO の    */
 /*  恒等窓) だけに使う。アプリ帯・lease 窓の番地は渡さない (T2 以降は       */
-/*  as_va_to_pa / SURFACE から引く)。T1b は台帳の呼び手で書き換えた行だけが */
-/*  使い、全面適用と検査 (check_p2v.py、[C5] 案) は T1f。                   */
+/*  as_va_to_pa / SURFACE から引く)。物理アクセスは [C5] と */
+/*  check_p2v.py で検査する。                   */
 /*  P2V_CONST / P2V_IO_CONST は静的初期化子・マクロ定義など定数式が要る     */
 /*  場所だけ (B6)。関数の中では使わない。                                   */
 /* ====================================================================== */
 static inline void *P2V(u32 pa) { return (void *)(uptr)pa; }
-static inline volatile void *P2V_IO(u32 pa) { return (volatile void *)(uptr)pa; }
+static inline volatile void *P2V_IO(u32 pa)
+{
+    volatile void *p = (volatile void *)(uptr)pa;
+    /* 低位物理へのアクセスを GCC の NULL 近傍解析から隠す。 */
+    __asm__ volatile ("" : "+r"(p));
+    return p;
+}
+/* paging_init 前の恒等アクセスの印。v3 では P2V_IO と同じ。 */
+static inline volatile void *P2V_BOOT(u32 pa) { return P2V_IO(pa); }
 static inline u32 V2P(const volatile void *va) { return (u32)(uptr)va; }
 #define P2V_CONST(pa)    ((void *)(uptr)(pa))
 #define P2V_IO_CONST(pa) ((volatile void *)(uptr)(pa))

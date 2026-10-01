@@ -5,6 +5,7 @@
 /*  shell.cから分離。外部プログラム(shell.bin含む)はKernelAPI経由で利用。    */
 /* ======================================================================== */
 
+#include "memmap.h"
 #include "types.h"
 #include "serial.h"
 #include "utf8.h"
@@ -93,7 +94,7 @@ void tvram_set_scroll_reserve(int rows)
 
 void tvram_clear(void)
 {
-    volatile u16 *text = (volatile u16 *)TVRAM_TEXT;
+    volatile u16 *text = (volatile u16 *)P2V_IO(TVRAM_TEXT);
     volatile u8  *attr;
     int i;
     con_sink_push_clear();      /* 票 K6C: 画面クリアの経路 (CLEAR レコード) */
@@ -102,7 +103,7 @@ void tvram_clear(void)
     if (con_sink_is_enabled()) return;
     for (i = 0; i < TVRAM_COLS * TVRAM_ROWS; i++) {
         text[i] = 0x0020;
-        attr = (volatile u8 *)(TVRAM_ATTR + (u32)i * 2);
+        attr = (volatile u8 *)P2V_IO((TVRAM_ATTR + (u32)i * 2));
         *attr = ATTR_WHITE;
     }
     cursor_x = 0;
@@ -113,16 +114,16 @@ void tvram_clear(void)
 void tvram_putchar_at(int x, int y, char ch, u8 color)
 {
     u32 offset = (u32)y * TVRAM_BPR + (u32)x * 2;
-    *(volatile u16 *)(TVRAM_TEXT + offset) = (u16)(u8)ch;
-    *(volatile u8 *)(TVRAM_ATTR + offset) = color;
+    *(volatile u16 *)P2V_IO(TVRAM_TEXT + offset) = (u16)(u8)ch;
+    *(volatile u8 *)P2V_IO(TVRAM_ATTR + offset) = color;
 }
 
 /* TVRAM 1セル読み取り (文字コード + 属性) */
 void tvram_readchar_at(int x, int y, u16 *code, u8 *attr)
 {
     u32 offset = (u32)y * TVRAM_BPR + (u32)x * 2;
-    if (code) *code = *(volatile u16 *)(TVRAM_TEXT + offset);
-    if (attr) *attr = *(volatile u8 *)(TVRAM_ATTR + offset);
+    if (code) *code = *(volatile u16 *)P2V_IO((TVRAM_TEXT + offset));
+    if (attr) *attr = *(volatile u8 *)P2V_IO((TVRAM_ATTR + offset));
 }
 
 /* TVRAM 反転トグル (漢字対応)
@@ -140,13 +141,13 @@ int tvram_reverse_cell(int x, int y)
     rx = x;
 
     /* 漢字判定: 右半分 (bit7セット) なら左半分に揃える */
-    code = *(volatile u16 *)(TVRAM_TEXT + (u32)y * TVRAM_BPR + (u32)rx * 2);
+    code = *(volatile u16 *)P2V_IO((TVRAM_TEXT + (u32)y * TVRAM_BPR + (u32)rx * 2));
     if ((code >> 8) != 0 && (code & 0x80)) {
         if (rx > 0) rx--;
     }
 
     /* 左半分の文字コードで幅を判定 */
-    code = *(volatile u16 *)(TVRAM_TEXT + (u32)y * TVRAM_BPR + (u32)rx * 2);
+    code = *(volatile u16 *)P2V_IO((TVRAM_TEXT + (u32)y * TVRAM_BPR + (u32)rx * 2));
     if ((code >> 8) != 0 && !(code & 0x80) && rx < TVRAM_COLS - 1) {
         width = 2;  /* 漢字 */
     } else {
@@ -156,7 +157,7 @@ int tvram_reverse_cell(int x, int y)
     /* 反転ビットをトグル */
     for (i = 0; i < width; i++) {
         u32 offset = (u32)y * TVRAM_BPR + (u32)(rx + i) * 2;
-        volatile u8 *p = (volatile u8 *)(TVRAM_ATTR + offset);
+        volatile u8 *p = (volatile u8 *)P2V_IO((TVRAM_ATTR + offset));
         *p ^= 0x04;
     }
 
@@ -165,8 +166,8 @@ int tvram_reverse_cell(int x, int y)
 
 void tvram_scroll(void)
 {
-    volatile u16 *text = (volatile u16 *)TVRAM_TEXT;
-    volatile u16 *attr = (volatile u16 *)TVRAM_ATTR;
+    volatile u16 *text = (volatile u16 *)P2V_IO(TVRAM_TEXT);
+    volatile u16 *attr = (volatile u16 *)P2V_IO(TVRAM_ATTR);
     int rows = TVRAM_ROWS - g_scroll_reserve;
     int i;
 
@@ -189,10 +190,10 @@ void tvram_putkanji_at(int x, int y, u16 jis, u8 color)
     u32 offset = (u32)y * TVRAM_BPR + (u32)x * 2;
     u8 jh = (u8)((jis >> 8) & 0xFF);
     u8 jl = (u8)(jis & 0xFF);
-    *(volatile u16 *)(TVRAM_TEXT + offset) = (u16)(jh - 0x20) | ((u16)jl << 8);
-    *(volatile u8 *)(TVRAM_ATTR + offset) = color;
-    *(volatile u16 *)(TVRAM_TEXT + offset + 2) = (u16)(jh - 0x20 + 0x80) | ((u16)jl << 8);
-    *(volatile u8 *)(TVRAM_ATTR + offset + 2) = color;
+    *(volatile u16 *)P2V_IO(TVRAM_TEXT + offset) = (u16)(jh - 0x20) | ((u16)jl << 8);
+    *(volatile u8 *)P2V_IO(TVRAM_ATTR + offset) = color;
+    *(volatile u16 *)P2V_IO(TVRAM_TEXT + offset + 2) = (u16)(jh - 0x20 + 0x80) | ((u16)jl << 8);
+    *(volatile u8 *)P2V_IO(TVRAM_ATTR + offset + 2) = color;
 }
 
 /* ======================================================================== */

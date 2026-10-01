@@ -250,7 +250,7 @@ void paging_init(u32 mem_kb)
             }
         }
         /* ページディレクトリにテーブルを登録 */
-        page_directory[i] = (u32)page_tables[i] | PAGE_RW;
+        page_directory[i] = V2P(page_tables[i]) | PAGE_RW;
     }
 
     /* デバイス窓の帯の PT (静的 1 枚)。中身は全 Not-Present、PDE は present。
@@ -259,7 +259,7 @@ void paging_init(u32 mem_kb)
     for (j = 0; j < PTE_COUNT; j++)
         page_tables[PAGING_APERTURE_PDI][j] = PAGE_NOT_PRESENT;
     page_directory[PAGING_APERTURE_PDI] =
-        (u32)page_tables[PAGING_APERTURE_PDI] | PAGE_RW;
+        V2P(page_tables[PAGING_APERTURE_PDI]) | PAGE_RW;
 
     /* ========================================================
      *  保護属性の設定
@@ -328,7 +328,7 @@ void paging_init(u32 mem_kb)
     /* ========================================================
      *  変換表の根 (CR3) にページディレクトリをセット → 変換を有効化 (CR0.PG)
      * ======================================================== */
-    pd_phys = (u32)page_directory;
+    pd_phys = V2P(page_directory);
     arch_mmu_load_root(pd_phys);
     arch_mmu_enable();
 
@@ -375,7 +375,7 @@ int paging_verify_identity(u32 first, u32 count, void *identity)
     u32 mask = ~(u32)(PAGE_SIZE - 1);
     u32 *table;
     if (!pg_enabled || !count || first >= PAGING_PFN_COUNT ||
-        count > PAGING_PFN_COUNT - first || (u32)identity != first * PAGE_SIZE)
+        count > PAGING_PFN_COUNT - first || identity != P2V(first * PAGE_SIZE))
         return 0;
     for (p = first; p < first + count; p++) {
         index = p / PTE_COUNT;
@@ -383,7 +383,7 @@ int paging_verify_identity(u32 first, u32 count, void *identity)
         if (!table) return 0;
         entry = page_directory[index];
         if ((entry & (mask | PAGE_RW | PTE_PS | PTE_PCD | PTE_PWT)) !=
-            ((u32)table | PAGE_RW)) return 0;
+            (V2P(table) | PAGE_RW)) return 0;
         entry = table[p % PTE_COUNT];
         if ((entry & (mask | PAGE_RW | PTE_USER | PTE_PCD | PTE_PWT)) !=
             (p * PAGE_SIZE | PAGE_RW)) return 0;
@@ -414,7 +414,7 @@ int paging_map_ledger_backing(void)
  * FIXED: PDE 0 の中) は pgalloc_init_layout が見る。 */
 static u32 *reserve_table(void)
 {
-    return (u32 *)pgalloc_alloc_pt();
+    return (u32 *)P2V(pgalloc_alloc_pt());
 }
 
 /* 未公開 PT 自身を一時リストに使う。成功まで master は一切変更しない。 */
@@ -435,23 +435,23 @@ static int prepare_tables(u32 first, u32 count)
         table = reserve_table();
         if (!table) {
             while (pending) {
-                next = (u32 *)pending[0];
-                pgalloc_free_pt((u32)pending);
+                next = (u32 *)P2V(pending[0]);
+                pgalloc_free_pt(V2P(pending));
                 pending = next;
             }
             return -1;
         }
-        table[0] = (u32)pending;
+        table[0] = V2P(pending);
         table[1] = pdi;
         pending = table;
     }
     while (pending) {
         table = pending;
-        pending = (u32 *)table[0];
+        pending = (u32 *)P2V(table[0]);
         pdi = table[1];
         for (i = 0; i < PTE_COUNT; i++) table[i] = 0;
         page_tables[pdi] = table;
-        page_directory[pdi] = (u32)table | PAGE_RW;
+        page_directory[pdi] = V2P(table) | PAGE_RW;
     }
     return 0;
 }
@@ -617,10 +617,28 @@ u32 paging_pte_flags(u32 virt_addr)
 /*  載せた後もそれらのページは自分自身を identity で見られる。               */
 /* ======================================================================== */
 
+/* 表の物理ポインタを触る口を paging に集約する (T1f)。
+ * exec の旧判定と同じく PDE / PTE の両方に PRESENT・USER・RW が必要。 */
+int as_va_to_pa(u32 pd_phys, u32 va, u32 *pa)
+{
+    const u32 need = PTE_PRESENT | PTE_RW | PTE_USER;
+    u32 pde, pt_phys, pte;
+    if (!pd_phys || !paging_is_present((uptr)P2V(pd_phys)))
+        return AS_VA_TABLE;
+    pde = ((const volatile u32 *)P2V_IO(pd_phys))[va >> 22];
+    if ((pde & need) != need || (pde & PTE_PS)) return AS_VA_PDE;
+    pt_phys = pde & ~(u32)(PAGE_SIZE - 1);
+    if (!paging_is_present((uptr)P2V(pt_phys))) return AS_VA_TABLE;
+    pte = ((const volatile u32 *)P2V_IO(pt_phys))[(va >> 12) & (PTE_COUNT - 1)];
+    if ((pte & need) != need) return AS_VA_PTE;
+    *pa = (pte & ~(u32)(PAGE_SIZE - 1)) | (va & (PAGE_SIZE - 1));
+    return 0;
+}
+
 u32 paging_kernel_pd_phys(void)
 {
     /* identity マッピングなので page_directory の仮想アドレス = 物理。 */
-    return (u32)page_directory;
+    return V2P(page_directory);
 }
 
 u32 paging_current_cr3(void)
@@ -793,12 +811,12 @@ static int addrspace_map_user_page(struct addrspace *as, u32 virt, u32 phys,
     u32 *pt;
 
     if (!as || !as->pd_phys || !as->app_pde_count) return -1;
-    pd = (u32 *)as->pd_phys;
+    pd = (u32 *)P2V(as->pd_phys);
 
     if (pdi >= as->app_pde && pdi < as->app_pde + as->app_pde_count) {
         /* アプリ固有 PT (このアプリの PD からしか見えない)。
          * 枚数分の連続 PDE のどれに落ちるかで PT を選ぶ。 */
-        pt = (u32 *)as->app_pt_phys[pdi - as->app_pde];
+        pt = (u32 *)P2V(as->app_pt_phys[pdi - as->app_pde]);
     } else {
         /* 共有 PT (master と同一)。VRAM/SHM 等 C2 で共有 + USER の領域用。 */
         if (!page_tables[pdi] || !(pd[pdi] & PTE_PRESENT)) return -1;
@@ -835,7 +853,7 @@ static int addrspace_map_user_range(struct addrspace *as, u32 vstart,
     if (phys_base & (u32)(PAGE_SIZE - 1)) return -1;
     first = vstart >> PAGE_SHIFT;
     count = ((vend - 1) >> PAGE_SHIFT) - first + 1;
-    pd = (u32 *)as->pd_phys;
+    pd = (u32 *)P2V(as->pd_phys);
     /* Validate the complete request before changing any PTE or PDE USER bit. */
     for (pfn = first; pfn < first + count; pfn++) {
         pdi = pfn / PTE_COUNT;
@@ -888,10 +906,10 @@ int paging_addrspace_clear_app_band(struct addrspace *as)
     u32 *pd;
 
     if (!as || !as->pd_phys || !as->app_pde_count) return -1;
-    pd = (u32 *)as->pd_phys;
+    pd = (u32 *)P2V(as->pd_phys);
     for (k = 0; k < as->app_pde_count; k++) {
         u32 pdi = as->app_pde + k;
-        u32 *pt = (u32 *)as->app_pt_phys[k];
+        u32 *pt = (u32 *)P2V(as->app_pt_phys[k]);
         if (!pt) continue;
         for (i = 0; i < PTE_COUNT; i++) pt[i] = 0;
         /* PDE は PT を指したまま present/RW。USER は張り直しで立てる。 */
@@ -921,7 +939,7 @@ u32 paging_addrspace_free_user_range(struct addrspace *as, u32 vstart,
         u32 *pt;
         if (pdi < as->app_pde || pdi >= as->app_pde + as->app_pde_count)
             continue;                       /* 共有帯は触らない */
-        pt = (u32 *)as->app_pt_phys[pdi - as->app_pde];
+        pt = (u32 *)P2V(as->app_pt_phys[pdi - as->app_pde]);
         if (!pt) continue;
         if ((pt[pti] & PTE_PRESENT) &&
             pgalloc_free_n_owner(as->owner, pt[pti] >> PAGE_SHIFT, 1))
@@ -1048,7 +1066,7 @@ int paging_map_user_keep_selftest(void)
         arch_mmu_flush_tlb();
         return 2;
     }
-    app_pd = (u32 *)as.pd_phys;
+    app_pd = (u32 *)P2V(as.pd_phys);
 
     /* exec が bb 範囲に対して行う操作そのもの。 */
     if (paging_addrspace_map_user_keep(&as, vclient, vclient + PAGE_SIZE,
@@ -1123,10 +1141,10 @@ int paging_app_band_selftest(void)
         if (app_pd[pdi] & PTE_USER) rc |= 8;         /* 生成直後は USER 無し */
         /* 1: master 側は無傷 (同じ PT を指したままで USER も付かない) */
         if ((page_directory[pdi] & 0xFFFFF000UL) !=
-            ((u32)page_tables[pdi] & 0xFFFFF000UL)) rc |= 16;
+            (V2P(page_tables[pdi]) & 0xFFFFF000UL)) rc |= 16;
         /* 2: identity のコピーで始まる */
-        if (((u32 *)pt)[0] != page_tables[pdi][0]) rc |= 32;
-        if (((u32 *)pt)[PTE_COUNT - 1] != page_tables[pdi][PTE_COUNT - 1]) rc |= 32;
+        if (((u32 *)P2V(pt))[0] != page_tables[pdi][0]) rc |= 32;
+        if (((u32 *)P2V(pt))[PTE_COUNT - 1] != page_tables[pdi][PTE_COUNT - 1]) rc |= 32;
         /* 1: 枚どうしが別物 */
         if (k > 0 && pt == as.app_pt_phys[k - 1]) rc |= 8;
     }
@@ -1137,7 +1155,7 @@ int paging_app_band_selftest(void)
     if (page_tables[pdi_last][pti] != saved_pte) rc |= 128;      /* master PT */
     if (page_directory[pdi_last] & PTE_USER) rc |= 256;          /* master PDE */
     if (!(app_pd[pdi_last] & PTE_USER)) rc |= 512;               /* アプリ PD */
-    if (((u32 *)as.app_pt_phys[MEM_APP_BAND_MAX_PDES - 1])[pti] !=
+    if (((u32 *)P2V(as.app_pt_phys[MEM_APP_BAND_MAX_PDES - 1]))[pti] !=
         (vlast | PAGE_RW | PTE_USER)) rc |= 1024;
 
     if (selftest_as_end(&as)) rc |= 2048;
@@ -1155,12 +1173,12 @@ int paging_app_band_selftest(void)
 
         if (selftest_as_begin(&as, MEM_APP_BAND_MAX_PDES) != 0)
             return rc | 4096;
-        pt0 = (u32 *)as.app_pt_phys[0];
+        pt0 = (u32 *)P2V(as.app_pt_phys[0]);
 
         /* P2: 帯の PTE が全部 0 になる (I6 = 素通しの identity を落とす) */
         if (paging_addrspace_clear_app_band(&as) != 0) rc |= 4096;
         for (k2 = 0; k2 < MEM_APP_BAND_MAX_PDES; k2++) {
-            u32 *pt = (u32 *)as.app_pt_phys[k2];
+            u32 *pt = (u32 *)P2V(as.app_pt_phys[k2]);
             for (i = 0; i < PTE_COUNT; i++) {
                 if (pt[i] != 0) { rc |= 4096; break; }
             }

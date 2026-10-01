@@ -200,6 +200,13 @@ u32 paging_current_cr3(void);
 /* CR3 に PD をロードする (= アドレス空間切り替え + TLB フラッシュ)。 */
 void paging_load_cr3(u32 pd_phys);
 
+/* master CR3 の下でアプリ PD を歩き、USER + RW の物理番地を返す。
+ * 失敗時 *pa は不変。戻り値は 0 / 下の拒否理由 (診断を呼び手へ渡す)。 */
+#define AS_VA_TABLE 1
+#define AS_VA_PDE   2
+#define AS_VA_PTE   3
+int as_va_to_pa(u32 pd_phys, u32 va, u32 *pa);
+
 /* アプリ用アドレス空間を 1 つ作る (アプリ固有 PDE を pde_count 枚)。
  * master の全 PDE をコピーしてカーネル帯域を共有し、
  * [APP_BAND_PDE, APP_BAND_PDE + pde_count) だけ新規確保したアプリ PT に

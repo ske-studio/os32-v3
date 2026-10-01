@@ -40,7 +40,7 @@ MUTATIONS = [
     (r"    if \(bytes > \(u32\)\(DMA_BANK_SIZE - off\)\) return 1;",
      "    if (bytes > (u32)(DMA_BANK_SIZE - off) + 1) return 1;",
      "またぎ判定が 1 バイトぶん緩い (末尾 1 バイトが別バンクへ折り返す)"),
-    (r"    if \(c1 > limit \|\| c2 > limit\) return 0;\n", "",
+    (r"    if \(c1 > limit \|\| c2 > limit\) return 0;\n", "    (void)limit;\n",
      "設定長を超えた読みを採用する (TC 後の FFFFh を残量と読む)"),
     (r"    if \(c1 < c2\) return 0;",
      "    if (c1 < c2) return 1;",
@@ -126,7 +126,8 @@ def mutate(tmp):
         try:
             exe = host_build(tmp, mutated)
         except subprocess.CalledProcessError:
-            print(f"MUTATION {i} RED (compile): {why}", flush=True)
+            print(f"MUTATION {i} NOT COUNTED (compile): {why}", flush=True)
+            bad += 1
             continue
         hits = sum(subprocess.run([str(exe), c], cwd=ROOT,
                                   stderr=subprocess.DEVNULL).returncode != 0

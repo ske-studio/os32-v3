@@ -1,0 +1,66 @@
+# file:function:reason (function-scoped; line numbers intentionally omitted)
+kernel/kselftest.c:test_heap:無効な仮想ポインタを渡すヒープ否定試験
+kernel/v86.c:v86_ptr:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
+kernel/v86.c:v86_do_int:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
+kernel/v86.c:v86_smoke_test:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
+kernel/v86.c:v86_disk_test:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
+kernel/v86.c:v86_boot2:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
+kernel/v86_bios.c:v86_bios_setup:V86 ゲスト線形番地・ゲストページ 0 (リマップ先は backing)
+kernel/v86_bios.c:sasi_init:V86 ゲスト線形番地・ゲストページ 0 (リマップ先は backing)
+kernel/v86_bios.c:disk_read_common:V86 ゲスト線形番地・ゲストページ 0 (リマップ先は backing)
+kernel/v86_bios.c:disk_write:V86 ゲスト線形番地・ゲストページ 0 (リマップ先は backing)
+kernel/v86_bios.c:sasi_rw:V86 ゲスト線形番地・ゲストページ 0 (リマップ先は backing)
+kernel/v86_gcap.c:gd_get:V86 ゲスト線形の IVT / コード / magic (リマップ済み)
+kernel/v86_gcap.c:gd_set:V86 ゲスト線形の IVT / コード / magic (リマップ済み)
+kernel/v86_gcap.c:gcap_rom:V86 ゲスト線形の IVT / コード / magic (リマップ済み)
+kernel/v86_gcap.c:v86_gdc_capture:V86 ゲスト線形の IVT / コード / magic (リマップ済み)
+kernel/v86_mem.c:v86_mem_setup:ゲスト VA のリマップ検証。backing 物理は別に保持
+kapi/kapi_db.c:<file>:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
+kapi/kapi_db.c:db_v50_selftest:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
+kapi/kapi_db.c:db_shm_empty:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
+kapi/kapi_db.c:db_shm_diag:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
+kapi/kapi_db.c:shm_write_error_text:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
+kapi/kapi_db.c:shm_write_row:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
+kapi/kapi_db.c:kapi_db_column_text:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
+kernel/kernel.c:kernel_main:KHEAP_BASE は __bss_end 由来の仮想ポインタ
+kernel/isr_handlers.c:exc_dump_stack_trace:例外時の仮想スタック番地。物理への変換をしない
+kernel/isr_handlers.c:exc_dump_stack:例外時の仮想スタック番地。物理への変換をしない
+kernel/kmalloc.c:kheap_init:ヒープ内の仮想ポインタ算術 (整数幅・整列)
+kernel/kmalloc.c:kheap_alloc:ヒープ内の仮想ポインタ算術 (整数幅・整列)
+kernel/kmalloc.c:kheap_free:ヒープ内の仮想ポインタ算術 (整数幅・整列)
+kernel/kmalloc.c:kheap_reset:ヒープ内の仮想ポインタ算術 (整数幅・整列)
+kernel/paging.c:align4096:静的 PD/PT 配列の仮想ポインタを整列。PDE/CR3 へは V2P を通す
+exec/exec.c:exec_init:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
+exec/exec.c:ring3_trampoline_init:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
+exec/exec.c:exec_kapi_layout_selftest:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
+exec/exec.c:exec_tramp_user_selftest:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
+exec/exec.c:exec_restore_context:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
+exec/exec.c:ring3_syscall_dispatch:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
+exec/exec.c:exec_launch:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
+exec/exec.c:tramp_copy:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
+exec/exec_heap.c:exec_heap_init_at:アプリ/シェルの仮想ヒープ先頭 (物理変換しない)
+exec/exec_heap.c:exec_heap_restore_state:アプリ/シェルの仮想ヒープ先頭 (物理変換しない)
+lib/kstring_c.c:kmemcpy:受け取った仮想ポインタの型変換 (文字列/メモリ操作)
+lib/kstring_c.c:kmemset:受け取った仮想ポインタの型変換 (文字列/メモリ操作)
+lib/kstring_c.c:memcmp:受け取った仮想ポインタの型変換 (文字列/メモリ操作)
+lib/kstring.c:memmove:受け取った仮想ポインタの型変換
+drivers/fdc.c:fdc_read_sector_geom:呼び手の仮想バッファへの型変換。DMA は s_dma_pa
+drivers/fdc.c:fdc_write_sector_geom:呼び手の仮想バッファへの型変換。DMA は s_dma_pa
+drivers/atapi.c:atapi_packet_read:呼び手の仮想バッファ。PIO の CPU コピー
+fs/hostdrvfs.c:hostdrv_hypercall:NP21/W が線形で読むか物理で読むか未確認 (T1-U6、計24件を保持)
+fs/hostdrvfs.c:session_begin:NP21/W が線形で読むか物理で読むか未確認 (T1-U6、計24件を保持)
+fs/hostdrvfs.c:session_set_path:NP21/W が線形で読むか物理で読むか未確認 (T1-U6、計24件を保持)
+fs/hostdrvfs.c:setup_create:NP21/W が線形で読むか物理で読むか未確認 (T1-U6、計24件を保持)
+fs/hostdrvfs.c:setup_cleanup:NP21/W が線形で読むか物理で読むか未確認 (T1-U6、計24件を保持)
+fs/hostdrvfs.c:setup_close:NP21/W が線形で読むか物理で読むか未確認 (T1-U6、計24件を保持)
+fs/hostdrvfs.c:setup_write:NP21/W が線形で読むか物理で読むか未確認 (T1-U6、計24件を保持)
+fs/hostdrvfs.c:setup_set_info:NP21/W が線形で読むか物理で読むか未確認 (T1-U6、計24件を保持)
+fs/hostdrvfs.c:setup_read:NP21/W が線形で読むか物理で読むか未確認 (T1-U6、計24件を保持)
+fs/hostdrvfs.c:setup_query_info:NP21/W が線形で読むか物理で読むか未確認 (T1-U6、計24件を保持)
+fs/hostdrvfs.c:setup_query_dir:NP21/W が線形で読むか物理で読むか未確認 (T1-U6、計24件を保持)
+fs/hostdrvfs.c:hostdrv_set_info:NP21/W が線形で読むか物理で読むか未確認 (T1-U6、計24件を保持)
+fs/hostdrvfs.c:hostdrv_read:NP21/W が線形で読むか物理で読むか未確認 (T1-U6、計24件を保持)
+kapi/kapi_db.c:kapi_db_exec:MEM_SHM_BASE はリンカ由来の仮想 (DB_SHM_PTR の型変換)
+kapi/kapi_db.c:kapi_db_prepare:MEM_SHM_BASE はリンカ由来の仮想 (DB_SHM_PTR の型変換)
+kapi/kapi_db.c:kapi_db_step:MEM_SHM_BASE はリンカ由来の仮想 (DB_SHM_PTR の型変換)
+drivers/pci.c:pci_get:呼び手の仮想出力ポインタの型変換

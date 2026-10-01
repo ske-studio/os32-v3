@@ -50,17 +50,6 @@ STATIC_ASSERT(PGALLOC_META_BYTES(MEMORY_BOOT_FIXED_MAX_TOP) <=
 /* 24bit (16MiB) アドレスラップの落ち先を作るマスク。 */
 #define MEMORY_BOOT_WRAP_MASK 0x00FFFFFFUL
 
-/* 絶対番地のポインタを GCC の「ほぼ NULL の参照」解析から隠す。
- * BIOS ワークエリア (0594h) も 24bit ラップの落ち先 (最小 0) も実在する
- * 物理番地で、paging_init より前に素の物理アドレスとして触る。
- * これを挟まないと -Wall の -Warray-bounds が誤検出する。 */
-static void *boot_ptr(u32 addr)
-{
-    void *p = (void *)addr;
-    __asm__ volatile ("" : "+r"(p));
-    return p;
-}
-
 /* Small boot-owned model: never publish a caller's stack object. */
 static struct physmem boot_memory;
 /* End PFN (exclusive) of RAM that memory_boot_detect actually CONFIRMED above
@@ -107,7 +96,7 @@ u32 memory_boot_detect(u32 mem_kb)
     volatile u32 *cell;
     volatile u32 *low;
 
-    reported = *(volatile u16 *)boot_ptr(BIOS_WORK_MEM_HIGH_MB);
+    reported = *(volatile u16 *)P2V_BOOT(BIOS_WORK_MEM_HIGH_MB);
     /* 最上位の ROM / PCI MMIO 帯は RAM にならないので、そこまでで頭打ち。
      * これは人為的な上限ではなく、デバイスが居る番地の除外である。 */
     if (reported > (MEM_PHYS_RAM_CEILING - MEM_HIGH_RAM_BASE) / MEM_1MB)
@@ -117,8 +106,8 @@ u32 memory_boot_detect(u32 mem_kb)
         addr = MEM_HIGH_RAM_BASE + k * MEM_1MB;
         pattern = addr ^ MEMORY_BOOT_PROBE_XOR;
         wrap = addr & MEMORY_BOOT_WRAP_MASK;
-        cell = (volatile u32 *)boot_ptr(addr);
-        low = (volatile u32 *)boot_ptr(wrap);
+        cell = (volatile u32 *)P2V_BOOT(addr);
+        low = (volatile u32 *)P2V_BOOT(wrap);
         saved = *low;
         *cell = pattern;
         if (*low != saved) {
@@ -132,7 +121,7 @@ u32 memory_boot_detect(u32 mem_kb)
     /* 2 巡目: 後の書き込みで前の番地が壊れていれば別名 (実装量の水増し)。 */
     for (k = 0; k < accepted; k++) {
         addr = MEM_HIGH_RAM_BASE + k * MEM_1MB;
-        if (*(volatile u32 *)boot_ptr(addr) != (addr ^ MEMORY_BOOT_PROBE_XOR)) {
+        if (*(volatile u32 *)P2V_BOOT(addr) != (addr ^ MEMORY_BOOT_PROBE_XOR)) {
             accepted = k;
             break;
         }
@@ -344,7 +333,7 @@ int memory_boot_init(u32 mem_kb)
         top - pages - ws_pages >= MEM_APP_BAND_MAX_TOP / PAGE_SIZE) {
         layout.kind = PGALLOC_BACKING_ARENA_TOP;
         layout.metadata_first = top - pages;
-        layout.metadata = (void *)(layout.metadata_first * PAGE_SIZE);
+        layout.metadata = P2V(layout.metadata_first * PAGE_SIZE);
         layout.workspace_end = layout.metadata_first;
         layout.workspace_first = layout.workspace_end - ws_pages;
     } else {
@@ -357,7 +346,7 @@ int memory_boot_init(u32 mem_kb)
         if (!paging_map_ledger_backing()) return 0;
         layout.kind = PGALLOC_BACKING_FIXED;
         layout.metadata_first = MEMORY_BOOT_FIXED_FIRST;
-        layout.metadata = (void *)MEM_LEDGER_META_BASE;
+        layout.metadata = P2V(MEM_LEDGER_META_BASE);
         layout.workspace_first = MEMORY_BOOT_FIXED_WS_FIRST;
         layout.workspace_end = MEMORY_BOOT_FIXED_WS_END;
     }

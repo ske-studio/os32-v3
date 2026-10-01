@@ -1,3 +1,4 @@
+#include "memmap.h"
 #include "gfx_internal.h"
 #include "gfx_hal.h"
 #include "os32_kapi_shared.h"
@@ -147,10 +148,10 @@ void __cdecl gfx_add_dirty_rect(int x, int y, int w, int h)
 static void _flush_dirty_queue(void)
 {
     int i, row;
-    u8 *vb_base = (u8 *)VRAM_PLANE_B;
-    u8 *vr_base = (u8 *)VRAM_PLANE_R;
-    u8 *vg_base = (u8 *)VRAM_PLANE_G;
-    u8 *vi_base = (u8 *)VRAM_PLANE_I;
+    u8 *vb_base = (u8 *)P2V(VRAM_PLANE_B);
+    u8 *vr_base = (u8 *)P2V(VRAM_PLANE_R);
+    u8 *vg_base = (u8 *)P2V(VRAM_PLANE_G);
+    u8 *vi_base = (u8 *)P2V(VRAM_PLANE_I);
 
     for (i = 0; i < dirty_queue.count; i++) {
         GFX_Rect *r = &dirty_queue.rects[i];
@@ -286,10 +287,10 @@ void __cdecl gfx_present_rect(int rx, int ry, int rw, int rh)
 static void _flush_dirty_line(int line)
 {
     int i;
-    u8 *vb_base = (u8 *)VRAM_PLANE_B;
-    u8 *vr_base = (u8 *)VRAM_PLANE_R;
-    u8 *vg_base = (u8 *)VRAM_PLANE_G;
-    u8 *vi_base = (u8 *)VRAM_PLANE_I;
+    u8 *vb_base = (u8 *)P2V(VRAM_PLANE_B);
+    u8 *vr_base = (u8 *)P2V(VRAM_PLANE_R);
+    u8 *vg_base = (u8 *)P2V(VRAM_PLANE_G);
+    u8 *vi_base = (u8 *)P2V(VRAM_PLANE_I);
 
     for (i = 0; i < dirty_queue.count; i++) {
         GFX_Rect *r = &dirty_queue.rects[i];

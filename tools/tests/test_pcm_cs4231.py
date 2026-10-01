@@ -74,13 +74,13 @@ MUTATIONS = [
     # --- 連続性と補充 ---
     (r"    if \(p1 >= p0\) return PCM_CONT_SAME;\n"
      r"    return PCM_CONT_LOST;",
-     "    return PCM_CONT_SAME;",
+     "    (void)p0; (void)p1; return PCM_CONT_SAME;",
      "同じ半分で戻った観測 (1 周 = 2 境界) を「境界なし」と読む"),
     (r"    if \(h0 != h1\) return PCM_CONT_SWITCH;",
      "    if (h0 != h1) return (p1 >= p0) ? PCM_CONT_SWITCH : PCM_CONT_LOST;",
      "1 → 0 の折り返し (p が戻って見える) を喪失と読む"),
     (r"    return \(end - p1\) >= PCM_REFILL_MARGIN;",
-     "    return 1;",
+     "    (void)end; return 1;",
      "補充の余裕を見ない (書いている最中に装置が追い越して古い音が出る)"),
     # --- 切り替え・underrun・drain ---
     (r"        changed = \(h1 != \(u32\)c->half\);\n"
@@ -122,7 +122,7 @@ MUTATIONS = [
      r"        pcm_fail\(c, act\);\n    \}", "",
      "番犬を持たない (IRQ も tick も来なくなった装置に気付かない)"),
     (r"        if \(progressed\) c->last_progress = now;",
-     "        c->last_progress = now;",
+     "        (void)progressed; c->last_progress = now;",
      "位置が進まなくても番犬の基準を進める (止まった装置を見逃す)"),
     # --- ステージング ---
     (r"u32 pcm_stg_free\(const struct pcm_stg \*s\)\n\{\n"
@@ -132,7 +132,7 @@ MUTATIONS = [
      "                          : (s->r - s->w);\n}",
      "空きを w/r の差で出す (4096 消費した直後の空きが 0 に見える)"),
     (r"    head = PCM_STG_FRAMES - off;\n    if \(n < head\) head = n;",
-     "    head = n;",
+     "    (void)off; head = n;",
      "物理末尾を跨ぐ写しを 2 分割しない (先頭へ回り込むぶんを踏み外す)"),
     # --- pcm_start の配り方 ---
     (r"    \*drain_stage = \(b > 0U\) \? PCM_DRAIN_WAIT : PCM_DRAIN_IN;",
@@ -316,7 +316,8 @@ def mutate(tmp):
         try:
             exe = host_build(tmp, math_text, drv_text)
         except subprocess.CalledProcessError:
-            print(f"MUTATION {i} RED (compile): {why}", flush=True)
+            print(f"MUTATION {i} NOT COUNTED (compile): {why}", flush=True)
+            bad += 1
             continue
         hit = run_mutant(exe)
         status = f"RED ({hit})" if hit else "**GREEN (見逃し)**"

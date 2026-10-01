@@ -260,7 +260,7 @@ MUTATIONS = [
     # 変異 3: 時刻の保存を省く版。A03 / A04 が落ちなければ保存を見ていない。
     ("no_set_mtime",
      "    rc = api->sys_set_mtime(target, src_mtime);",
-     "    rc = 0;"),
+     "    (void)target; rc = 0;"),
     # 変異 4: FILETIME の起点差を足し忘れる (1601 起点のまま返す) 版。
     ("filetime_no_epoch_shift",
      "    secs = (ft - HDRV_FT_EPOCH_DIFF_100NS) / HDRV_FT_PER_SEC;",
@@ -299,7 +299,7 @@ def one_mutation(item):
             tree = mutpar.build_in_tree(
                 ROOT, td, {rel: original.replace(old, new, 1)}, [cmd])
         except subprocess.CalledProcessError:
-            return "MUTATE %-26s RED (コンパイルが通らない)" % name, 0
+            return "MUTATE %-26s NOT COUNTED (コンパイルが通らない)" % name, 1
         head = "HOST GNU11 -Werror COMPILE PASS (%s)\n" % src
         rc = subprocess.run([str(exe)], cwd=str(tree), timeout=120,
                             capture_output=True).returncode

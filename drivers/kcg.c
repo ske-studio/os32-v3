@@ -49,10 +49,10 @@ static void kcg_wait(void)
 #define KANJI_FETCHED_SIZE (94 * 94)        /*   8,836 Bytes */
 #define ANK_CACHE_SIZE     (16 * 256)       /*   4,096 Bytes */
 
-static u8 *kanji_cache   = (u8 *)(MEM_FONT_CACHE_BASE);
-static u8 *kanji_fetched = (u8 *)(MEM_FONT_CACHE_BASE + KANJI_CACHE_SIZE);
-static u8 *ank_cache     = (u8 *)(MEM_FONT_CACHE_BASE + KANJI_CACHE_SIZE + KANJI_FETCHED_SIZE);
-static u8 *ank_fetched   = (u8 *)(MEM_FONT_CACHE_BASE + KANJI_CACHE_SIZE + KANJI_FETCHED_SIZE + ANK_CACHE_SIZE);
+static u8 *kanji_cache   = (u8 *)P2V_CONST((MEM_FONT_CACHE_BASE));
+static u8 *kanji_fetched = (u8 *)P2V_CONST((MEM_FONT_CACHE_BASE + KANJI_CACHE_SIZE));
+static u8 *ank_cache     = (u8 *)P2V_CONST((MEM_FONT_CACHE_BASE + KANJI_CACHE_SIZE + KANJI_FETCHED_SIZE));
+static u8 *ank_fetched   = (u8 *)P2V_CONST((MEM_FONT_CACHE_BASE + KANJI_CACHE_SIZE + KANJI_FETCHED_SIZE + ANK_CACHE_SIZE));
 
 void kcg_init(void)
 {
@@ -212,7 +212,7 @@ void kcg_read_kanji(u16 jis_code, u8 *buf)
  * 上限は VRAM の直前 (MEM_CONV_END)。カーネルスタックを 0x1FC000 へ
  * 退避する前は 0x8F000 (スタックガード) で頭打ちだった。
  */
-#define LZ4_TEMP_BUF     ((u8 *)MEM_UNICODE_TABLE_BASE)
+#define LZ4_TEMP_BUF     ((u8 *)P2V_CONST(MEM_UNICODE_TABLE_BASE))
 #define LZ4_TEMP_MAX     (MEM_CONV_END - MEM_UNICODE_TABLE_BASE)  /* 344KB */
 
 /*

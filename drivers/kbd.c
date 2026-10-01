@@ -19,6 +19,7 @@
 #include "kbd.h"
 #include "io.h"
 #include "kprintf.h"
+#include "memmap.h"
 #include "pc98.h"        /* TATTR_WHITE */
 #include "serial.h"
 #include "kbd_inject.h"   /* K7: GUI 中の打鍵は注入リングから来る */
@@ -261,7 +262,7 @@ static u8 kbd_bios_shift_peek(void) { return kbd_host_bios_shift; }
 static u8 kbd_bios_shift_peek(void)
 {
     volatile u32 a = BIOS_WORK_KB_SHIFT;
-    return *(volatile u8 *)a;
+    return *(volatile u8 *)P2V_IO(a);
 }
 #endif
 

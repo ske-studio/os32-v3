@@ -15,6 +15,7 @@
 /*  この表にもう 1 枚ずつ足す (H2 / H3)。                                     */
 /* ======================================================================== */
 
+#include "memmap.h"
 #include "gfx_internal.h"   /* gfx.h, pc98.h, palette.h, 内部変数, _out 等 */
 #include "gfx_hal.h"
 #include "os32_kapi_shared.h"
@@ -151,7 +152,7 @@ const GfxBackend gfx_backend_pc98 = {
     pc98_leave,
     (int (*)(int, int, int, int, u8))0,        /* fill_rect: CPU 実装へ */
     (int (*)(int, int, int, int, int, int))0,  /* blit:      CPU 実装へ */
-    (u8 *)MEM_GFX_BB_BASE,   /* bb_base: プレーン 0 (青) 先頭 */
+    (u8 *)P2V_CONST(MEM_GFX_BB_BASE),   /* bb_base: プレーン 0 (青) 先頭 */
     (u32)GFX_BPL,            /* bb_pitch: 80 バイト/ライン */
     GFX_BB_PLANAR4,
     (u32)MEM_GFX_BB_SIZE,    /* bb_size: 4 プレーン分 128KB (0x6A000-0x89FFF) */

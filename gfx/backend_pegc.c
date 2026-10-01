@@ -30,6 +30,7 @@
 /*       (io/gdc.c gdc_work, vram/scrndraw.c scrndraw_draw)                  */
 /* ======================================================================== */
 
+#include "memmap.h"
 #include "gfx_internal.h"   /* gfx.h (PAL_*_PORT), pc98.h, memmap.h, _out/_in */
 #include "gfx_hal.h"
 #include "pegc.h"
@@ -105,13 +106,13 @@ u32 pegc_vsync_timeouts = 0;
 /* ------------------------------------------------------------------------ */
 static void mmio_w8(u32 addr, u8 val)
 {
-    *(volatile u8 *)addr = val;
+    *(volatile u8 *)P2V_IO(addr) = val;
     gfx_counters.io_accesses++;
 }
 
 static void mmio_w16(u32 addr, u16 val)
 {
-    *(volatile u16 *)addr = val;
+    *(volatile u16 *)P2V_IO(addr) = val;
     gfx_counters.io_accesses++;
 }
 
@@ -132,7 +133,7 @@ static u8 bios_flag(u32 addr)
      * 誤診断する (-Warray-bounds)。ここは BIOS ワークエリアの実アドレス。 */
     volatile u32 a = addr;
     if (!in_master_addrspace()) return 0;
-    return *(volatile u8 *)a;
+    return *(volatile u8 *)P2V_IO(a);
 }
 
 /* モード F/F2 の読み戻し ([B] 表3-3): 番号を 09A0h に書いて同じ番号から読む。 */
@@ -392,8 +393,8 @@ static const PegcTiming s_timing_480 = {
  * (NP21/W vram/sdrawex.mcr pex_2 はテキスト画素優先)。 */
 static void pegc_tvram_clear(int row0, int row1)
 {
-    volatile u16 *tvram_char = (volatile u16 *)TVRAM_CHAR_BASE;
-    volatile u8  *tvram_attr = (volatile u8  *)TVRAM_ATTR_BASE;
+    volatile u16 *tvram_char = (volatile u16 *)P2V_IO(TVRAM_CHAR_BASE);
+    volatile u8  *tvram_attr = (volatile u8  *)P2V_IO(TVRAM_ATTR_BASE);
     int i;
     int from = TVRAM_COLS * row0;
     int to   = TVRAM_COLS * row1;
@@ -581,7 +582,7 @@ static int pegc_probe(void)
  * 保持、TASK_T1_LEDGER §3-8)。 */
 static int pegc_linear_selftest(void)
 {
-    volatile u8 *fb = (volatile u8 *)PEGC_LINEAR_BASE;
+    volatile u8 *fb = (volatile u8 *)P2V_IO(PEGC_LINEAR_BASE);
     int ok = 0;
     u8 s0, s1;
 
@@ -819,8 +820,8 @@ static void pegc_init(void)
      * #5 ②)。 */
 
     /* --- 画面をクリア --- */
-    kmemset((u8 *)s_bb_phys, 0, (u32)MEM_GFX_BB8_SIZE);
-    kmemset((u8 *)PEGC_LINEAR_BASE, 0, (u32)PEGC_FB_SIZE_480);
+    kmemset((u8 *)P2V(s_bb_phys), 0, (u32)MEM_GFX_BB8_SIZE);
+    kmemset((u8 *)P2V(PEGC_LINEAR_BASE), 0, (u32)PEGC_FB_SIZE_480);
 
     /* テキスト VRAM もクリアする (9801 の _gfx_common_init と同じ扱い)。
      * 480 ラインでは 30 行ぶんが見えるので 25 行では足りない (票 H2c)。
@@ -904,8 +905,8 @@ static void pegc_present_rect(int x, int y, int w, int h)
     if (y + h > PEGC_HEIGHT_480) h = PEGC_HEIGHT_480 - y;
     if (w <= 0 || h <= 0) return;
 
-    src = (u8 *)s_bb_phys + (u32)y * PEGC_PITCH + (u32)x;
-    dst = (u8 *)PEGC_LINEAR_BASE + (u32)y * PEGC_PITCH + (u32)x;
+    src = (u8 *)P2V(s_bb_phys) + (u32)y * PEGC_PITCH + (u32)x;
+    dst = (u8 *)P2V(PEGC_LINEAR_BASE) + (u32)y * PEGC_PITCH + (u32)x;
     bytes = (u32)w;
 
     for (row = 0; row < h; row++) {

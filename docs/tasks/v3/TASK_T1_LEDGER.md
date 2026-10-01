@@ -616,6 +616,38 @@ static inline u32  V2P(const volatile void *va) { return (u32)(uptr)va; }
 | 対象外の扱い | V86 のゲスト線形・ページ 0 の二重の意味 (`v86_bios.c:283,1207` の `guest = (u8 *)0` はゲスト線形であり物理でもある) は例外一覧に理由付きで。HostDrv の 24 件は §5 T1-U6 の確認まで例外一覧 (「NP21/W が線形で読むか物理で読むか未確認」) |
 | NP21/W 回帰 | 17MB で起動 kselftest 0 fail、GUI・CUI・V86・FD・HostDrv の一巡 |
 
+#### 4-6-R. T1f の実装結果 (2026-10-01、`wt/t1f`、コーダー GPT-6 / Codex)
+
+**変更・件数**: 恒等写像と owner は T1e のまま。物理からの直接キャスト・PDE / CR3 の物理引数・恒等表明を変換口へ集約した。**変換呼び出しは純増 124 か所** (対象 C のコメントを除いた呼び出し数で、実装前 13 → 137。内訳 P2V 60、P2V_IO 37、P2V_BOOT 4、P2V_CONST 11、P2V_IO_CONST 2、V2P 10。定義そのものは数えない)。静的初期化子 **10 か所**はその場所で置換し、マクロは **2 ファイルの 3 定義** (`TVRAM_CHAR` / `TVRAM_ATRP` / `LZ4_TEMP_BUF`) を置換。`uptr` と定数式マクロは T1b で既に導入済み。実ページ 0 の IVT/BDA 退避・復元は P2V(0)、リマップ後のゲスト線形は変換しない。
+
+**例外一覧**: `tools/check_p2v_allow.txt` **65 エントリ** (file:関数:理由。行数とキャスト数は異なる)。**HostDrv は 13 関数にある元の 24 件を保持** (T1-U6、NP21/W が線形で読むか物理で読むか未確認)。ほかは V86 のゲスト線形・ページ 0、リンカ由来の SHM / ヒープ / KAPI、仮想スタック・アプリ / シェルのヒープ、ポインタ算術・仮想バッファの型変換・無効ポインタの試験。走査対象は §2-3 の 7 ディレクトリの C / ヘッダ、vendor (SQLite の `lib/sqlite3/` を含む)・userland は除外。別名や間接呼び出しを型として解決する検査ではないので、以後の変更にも目視監査が要る。
+
+**表歩き**: `as_va_to_pa(pd_phys, va, *pa)` を paging.c に置き、master CR3 の下で PDE / PTE の PRESENT・USER・RW と PDE の PS 拒否を検査する。失敗時 `*pa` 不変。exec は範囲の反復・CR3 の切替と復元・IF 保存・拒否理由と番地の記録を従来どおり持つ。`test_paging_bounds.py` の実 paging.c ハーネスで **PDE の USER/RW 4 通り × PTE の 4 通り = 16 組**、物理番地+オフセット、PRESENT 欠落・PS・PD/PT の非 present・失敗時出力不変を確認。
+
+**機械語・初期値の比較**: 変更前 `make all` rc=0 の kernel.elf を `.t1f-baseline/` に保存。さらに HEAD の原本を同じクロスコンパイラ・同じ旗で組み、変更対象 **23 オブジェクト**を `objdump -d` と `objdump -s -j .data` で比較した。`.text` は **12/23 が一致**。不一致の 11 本は (1) `exec.o` / `paging.o`: 表歩きの移動・物理番地の返却・呼び出しと分岐、(2) `pgalloc.o`: 整数の比較から `backing == P2V(first × PAGE_SIZE)` にしたことによる最適化・スタック一時領域の割付、(3) `backend_pegc.o` / `gfx_core.o` / `bootinfo.o` / `console.o` / `ime.o` / `kernel.o` / `kselftest.o` / `v86_gcap.o`: P2V_IO の空 asm (入出力レジスタ制約) によるアドレスのレジスタ化・命令/配置の変化。memory_boot.o は boot_ptr → P2V_BOOT を含め **一致**。
+
+オブジェクトの `.data` は **22/23 一致**、backend_pegc.o の差は移動した関数へのポインタ (セクション内の再配置加数)。静的初期化子 10 か所のある 4 オブジェクトの `.data` 比較は一致。kcg の 4 本と utf8 の 1 本は最適化され `.text` に定数が入り、両オブジェクトの機械語も一致。残る **実際に出力された 5 本**はリンク後の `.data` からシンボルで読んで一致を確認: bb_b/r/g/i = 0x6A000 / 0x71D00 / 0x79A00 / 0x81700、gfx_backend_pc98.bb_base = 0x6A000 (定数式の初期値を初期化処理へ移していない)。**kernel.elf 全体の objdump は -d / .data とも不一致**: 上の実命令差、リンク番地の移動、関数/文字列ポインタ、ビルド識別情報の dirty・時刻による差。全体一致を受入証拠とせず、定数式の初期値と権限判定を別に検証した。
+
+**大きさ** (リンク後、SQLite を除く本体): `.text` **316,590 → 316,942B (+352B)**、`.data` (rodata を含む) **32,755 → 32,759B (+4B)**、`.got.plt` 12B 不変、`.bss` **254,948B 不変**。`.bss` 直前の余白 **2,880 → 2,524B (−356B)**。`__bss_start` 0x156000 / `__bss_end` 0x1943E4 は不変、本体の終端まで **607,204B (約 593.0KiB)**、ASSERT の残り **3,100B 不変**。SQLite 込み `size`: text 687,636 → 687,988、data 36,663 → 36,667、bss 650,532 → 650,532。
+
+**検査**: [C5] を CONSTRAINTS と CLAUDE に同時追加。`check-p2v` は CHECK_PAR_TARGETS に入り、通常 check と変更時 check の両方から到達する。文字列検査は 0 件、例外は重複・存在しない関数も検査。改行したキャストも検査し、CONST の関数内使用とアプリ/lease の V2P は例外では免除しない。`test_p2v.py --mutate` は **4/4 実行時 RED、コンパイル失敗 0** (定数キャスト、改行した *_phys キャスト、V2P(RING3_…)、関数内 P2V_CONST。写しの木で検査器を実行)。scanner の正側 5 試験も PASS。
+
+**実行したコマンドと rc**: `CROSS_DIR=/home/hight/opt/cross make all NP21W_DIR="$PWD/.t1f-baseline/np21w" < /dev/null` **0** (変更前と変更後)、`CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-p2v check-constraints check-map check-check-select-host < /dev/null` **0**、`PATH=/home/hight/opt/cross/bin:$PATH python3 tools/tests/test_paging_bounds.py` **0**、`test_memory_boot.py --mutate` **0** (18 正側、8 実行時 RED、下記の 2 本は非集計)、`test_pcm_cs4231.py --mutate` **0** (31 実行時 RED)、`test_dma8237.py --mutate` **0** (8 実行時 RED)、`test_hsync_h3.py --target --mutate` **0** (5 実行時 RED)、`python3 tools/gen_tests_inventory.py --write` **0**。`PYTHONPATH="$PWD/.t1f-baseline" CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null` の最終結果 **rc=0** (全 108 ターゲットへ到達、全変異込み。実ツリーの内容が検査の前後で不変)。最終ビルドも **rc=0**。結果追記後の `make check-docs-links check-docs-orphans check-docs-status check-tests-inventory check-constraints < /dev/null` と `git diff --check` も **rc=0**。
+
+**失敗・環境差**: 最初の変更後ビルドは console.c の memmap.h 不足で rc=2 (追加して修正)。Linux ILP32 ハーネスを直接起動するとこの実行環境の seccomp により SIGSYS (試験ランナー rc=1)。**検証時だけ** `.t1f-baseline/sitecustomize.py` を PYTHONPATH に足し、Linux ELF32 の subprocess を **qemu-i386** 経由にした (クロスコンパイルは本物の i386-elf GCC)。ハーネス・試験の期待値・ゲスト成果物は変更しない。この環境設定で変更時チェックも実行する。途中の `make check-changed` は rc=2 が 2 回: (1) memory_boot の旧 boot_ptr 差し替えが未追従、(2) 新しい走査型 check-p2v を check_map の broad に登録していなかったため既存の選択器試験 `case_broad_only` が sel になった。いずれも修正して再検査。
+
+**実装時の訂正** (設計と実物の食い違い):
+1. §2-3 の 161 は古い基点の見積り。T1f の実数は上の変換呼び出し純増で集計した。HostDrv は書き換え数に含めず 24 件を例外として保持した。
+2. §3-4 の `as` 引数は現在の exec が控える **PD 物理番地**とし、戻り値を TABLE / PDE / PTE の拒否理由にした (診断を保持するため)。汎用の読み取り可能性ではなく従来の USER+RW 判定。AS owner と回収経路は変更しない。
+3. 定数式の使用位置はインデントでなく関数本体の範囲で判定した。必須対象の backend_pc98 は **const GfxBackend の初期化子**であり、設計文言の `static const struct` 限定では取りこぼすため。マクロ「2 か所」はファイル数で、定義数は 3。
+4. 依頼の `.bss` 手前の「2,876B」に対し、この worktree の変更前 make all 直後の実測は **2,880B**だった (4B の差の由来は未確認)。比較は `.got.plt` の後から `.bss` までに統一した。
+5. boot_ptr 撤去に合わせて既存のメモリ検出ハーネスは **4 か所の P2V_BOOT の呼び手**を差し替える (変更数が違えば試験を落とす)。変更時チェックが拾うよう paging_bounds_host.c も check_map へ明記。
+6. 受入条件「コンパイルエラーを RED に数えない」に従い、全検査で判明した **既存の 6 変異** (PCM 4、8237 1、hsync H3 1) は未使用変数の `(void)` を残す変異に訂正し、すべて実行時に RED。各ランナーもコンパイル失敗を RED に数えない形へ。T1a の配置境界ずらし 2 本は設計どおり STATIC_ASSERT がコンパイル拒否するので **NOT COUNTED**、実行時の 8 本だけを RED とし、それ以外の想定外のコンパイル失敗は試験失敗にする (製品コードの PCM / 8237 / hsync は変更していない)。
+
+**コミット時の環境制約**: `git add` と `git commit --file .t1f-baseline/commit-tests.txt < /dev/null` は **rc=128**。`/home/hight/os32-v3/.git/worktrees/os32-v3-wt-t1f/index.lock` の作成が `Read-only file system` で拒否された。コミットは未作成、変更と検証結果は worktree に保存済み。指定の末尾 2 行を付けたコミット文を `.t1f-baseline/commit-tests.txt` / `commit-t1f.txt` に用意し、管理領域が書き込み可能になるのを待つ。
+
+**未確認 / PM の回帰**: NP21/W・NHD・配備・ini・Windows 側は触っていない。**17MB で新カーネルの起動 kselftest 0 fail、GUI 描画/present → CUI → V86 → FD の読み書き → HostDrv の読み書き**を確認し、KAPI 出力の正常 USER+RW の許可と supervisor / RO の拒否、fault_kill_count・ledger_check_fail・irq/exc 診断を新しい map で読む。T1-U6 の HostDrv 番地解釈は未確認のまま (例外を解消するには NP21/W 側の根拠が要る)。実機 / PCM / 非恒等写像は未検証。Linux ILP32 は qemu 上でのホスト試験であり、NP21/W や実機の代替証拠ではない。
+
 ### 4-7. T1 全体の受入 (TASK_MEMMAP_V3 §6 T1 の受入の要点との対応)
 
 | T1 の受入の要点 (§6) | 段 |

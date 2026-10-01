@@ -904,7 +904,7 @@ static void test_bootinfo(void)
     /* kernel_main の最初で写している (NONE のままなら呼び忘れ)。 */
     check(bootinfo_get()->status != BOOTINFO_ERR_NONE, "bootinfo:captured");
     /* 写した後は低位の magic を消している (次の起動で残りを読まない)。 */
-    check(*(volatile u32 *)MEM_BOOTINFO_BASE != BOOTINFO_MAGIC,
+    check(*(volatile u32 *)P2V_IO(MEM_BOOTINFO_BASE) != BOOTINFO_MAGIC,
           "bootinfo:low magic cleared");
     /* 有効な域なら、使えると言ったドライブの幾何が取れる。 */
     if (bootinfo_get()->status == BOOTINFO_OK &&
