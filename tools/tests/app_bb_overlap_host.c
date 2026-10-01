@@ -97,227 +97,125 @@ int host_free_hook(u32 owner, u32 pfn, int n)
 void shlib_addrspace_detach(struct addrspace *as);
 void shlib_addrspace_detach(struct addrspace *as) { (void)as; }
 
-/* exec/exec.c から切り出した本物のテキスト (test_app_bb_overlap.py が生成)。 */
+#include "os32_kapi_shared.h"
+#include "kmalloc.h"
+#include "lease.h"
+int lease_revoke_all(struct addrspace *as) { (void)as; return 0; }
+void *kmemset(void *dst, int c, u32 n) { u8 *p = dst; while (n--) *p++ = (u8)c; return dst; }
+void *kmemcpy(void *dst, const void *src, u32 n) { u8 *p = dst; const u8 *q = src; while (n--) *p++ = *q++; return dst; }
+static u32 app_fail_at, app_alloc_calls;
+static u32 app_fail_alloc(u32 owner, int n) {
+    if (app_fail_at) {
+        if (n != 1) return 0; /* exercise the fragmented fallback */
+        if (++app_alloc_calls >= app_fail_at) return 0;
+    }
+    return pgalloc_alloc_phys(owner, n);
+}
 #include "exec_bb_overlap.inc"
-
-#include "v86_mem.h"         /* V86_BACKING_PAGES */
-
-/* 8MB + PEGC の実測値 (PM 2026-09-30): BB = 0x4B000 (75 ページ) を低位 RAM の上端から */
-#define T_RAM_KB      8192UL
-#define T_RAM_END     0x800000UL
-#define T_BB_SIZE     0x4B000UL
-#define T_BB_BASE     (T_RAM_END - T_BB_SIZE)       /* 0x7B5000 */
-#define T_CODE_END    0x510000UL
-#define T_SBRK_END    (T_CODE_END + MEM_EXEC_SBRK_MIN)
-#define T_ROUNDS      10
-#define T_BB_PAGES    (T_BB_SIZE / PAGE_SIZE)       /* 75 */
-#define T_PTE_ADDR    0xFFFFF000UL
-
-static u32 app_pte(const struct addrspace *as, u32 va)
-{
-    u32 pdi = va >> 22;
-    const u32 *pt;
-    if (pdi < as->app_pde || pdi >= as->app_pde + as->app_pde_count) return 0;
-    pt = (const u32 *)as->app_pt_phys[pdi - as->app_pde];
-    return pt[(va >> PAGE_SHIFT) % PTE_COUNT];
+static u8 heap[192 * 1024];
+static u32 pte(struct addrspace *as, u32 va) {
+    u32 pt = as->app_pt_phys[(va >> 22) - as->app_pde];
+    return pt ? ((u32 *)P2V(pt))[(va >> 12) & 1023] : 0;
 }
-
-/* 共有 PT (master と同一) の PTE。 */
-static u32 *shared_pte(u32 va)
-{
-    return &page_tables[va >> 22][(va >> PAGE_SHIFT) % PTE_COUNT];
-}
-
-/* exec_launch の CPL=3 の起動 (exec.c の同じ順・同じ式) を 1 本ぶん。
- * heap_size 無指定 (二段構えの段 1 = avail / 2)。戻り値は exec_map_shared_bb。 */
-static int launch(AppSlot *a)
-{
-    u32 heap_top, avail, owner;
-
-    ring3_band_set(paging_app_band_pdes(T_CODE_END, 0, sys_usable_mem_end()));
-    heap_top = RING3_HEAP_TOP;
-    CHECK(heap_top > T_CODE_END);
-    CHECK(heap_top - T_CODE_END >= MEM_EXEC_SBRK_MIN + PAGE_SIZE + MEM_EXEC_HEAP_MIN);
-    avail = heap_top - T_CODE_END - MEM_EXEC_SBRK_MIN - PAGE_SIZE;
-
-    a->load_addr = MEM_EXEC_LOAD_ADDR;
-    a->sbrk_heap_limit = T_SBRK_END;
-    a->exec_heap_size = (avail / 2) & ~(PAGE_SIZE - 1);
-    a->exec_heap_base = heap_top - a->exec_heap_size;
-    a->guard_a = a->exec_heap_base - PAGE_SIZE;
-    a->guard_b = RING3_GUARD_BASE;
-    a->stack_top = RING3_USTACK_TOP;
-    a->band_top = g_ring3_band_top;
-    a->band_pdes = g_ring3_band_pdes;
-    /* AS owner は AS 作成の直前に取る (exec_launch と同じ、T1b) */
-    CHECK(ledger_owner_new(LEDGER_KIND_AS, 2, "app", &owner));
-    CHECK(paging_addrspace_create_n(&a->as, owner, g_ring3_band_pdes) == 0);
-    a->cpl3 = 1;
-    CHECK(paging_addrspace_clear_app_band(&a->as) == 0);
-    CHECK(app_map_region(&a->as, MEM_EXEC_LOAD_ADDR, T_SBRK_END) == 0);
-    CHECK(app_map_region(&a->as, a->exec_heap_base,
-                         a->exec_heap_base + a->exec_heap_size) == 0);
-    CHECK(app_map_region(&a->as, RING3_STACK_BOTTOM, RING3_USTACK_TOP) == 0);
-    return exec_map_shared_bb(&a->as, a->band_top);
-}
-
-/* (b) 私有 PTE: present、恒等でない、BB の物理でない。 */
-static void check_private(const AppSlot *a, u32 lo, u32 hi)
-{
-    u32 va;
-    for (va = lo; va < hi; va += PAGE_SIZE) {
-        u32 e = app_pte(&a->as, va);
-        u32 phys = e & T_PTE_ADDR;
-        CHECK(e & PTE_PRESENT);
-        CHECK(e & PTE_USER);
-        CHECK(phys != va);
-        CHECK(phys < t_bb_base || phys - t_bb_base >= t_bb_size);
-    }
-}
-
-/* 私有領域 3 つ + ガード 2 つ。 */
-static void check_layout(const AppSlot *a)
-{
-    check_private(a, a->load_addr, a->sbrk_heap_limit);
-    check_private(a, a->exec_heap_base, a->exec_heap_base + a->exec_heap_size);
-    check_private(a, a->band_top - RING3_USTACK_SIZE, a->band_top);
-    CHECK(!(app_pte(&a->as, a->guard_a) & PTE_PRESENT));
-    CHECK(!(app_pte(&a->as, a->guard_b) & PTE_PRESENT));
-    CHECK(a->stack_top == a->band_top);
-    CHECK(a->as.app_pde_count == a->band_pdes);
-}
-
-static void teardown(AppSlot *a, u32 base_used)
-{
-    u32 owner = a->as.owner;
-    exec_teardown_app(a);
-    CHECK(a->as.pd_phys == 0);
-    CHECK(used_pages == base_used);        /* (a) 1 枚も漏れない */
-    CHECK(bb_free_attempts == 0);          /* (e) BB の物理を返そうとしない */
-    /* (a)(e) T1b: 回収で掃除された取り残しも、断られた解放も無い */
-    CHECK(exec_as_leftover_pages == 0);
-    CHECK(ledger_bad_free == 0);
-    CHECK(a->as.owner == 0 && ledger_owners[owner].kind == 0);   /* 番号は返った */
-}
-
-/* (g) 帯の外の BB: 共有 PT に恒等 + USER で写り、既存の属性 (PCD) を保つ。
- * 起動前に PTE を preset (デバイス窓は supervisor + PCD で張ってある) し、
- * 終了後に元へ戻す。 */
-static u32 saved_pte[T_BB_PAGES];
-
-static void run_outside_band(u32 usable_end, u32 bb_base, u32 preset,
-                             u32 base_used)
-{
-    static AppSlot slot;
-    u32 i, va, pdi = bb_base >> 22;
-    u32 saved_pde = page_directory[pdi];
-
-    t_usable_end = usable_end;
-    t_bb_base = bb_base;
-    t_bb_size = T_BB_SIZE;
-    for (i = 0; i < T_BB_PAGES; i++) {
-        va = bb_base + i * PAGE_SIZE;
-        saved_pte[i] = *shared_pte(va);
-        *shared_pte(va) = preset ? (va | preset) : saved_pte[i];
-    }
-    CHECK(launch(&slot) == 0);
-    /* 私有領域の上端は従来の帯の上端のまま */
-    CHECK(slot.band_top == MEM_APP_BAND_TOP);
-    CHECK(slot.band_pdes == 1);
-    check_layout(&slot);
-    /* (c) BB は共有 PT に恒等 + USER、preset の属性 (PCD) はそのまま */
-    for (i = 0; i < T_BB_PAGES; i++) {
-        va = bb_base + i * PAGE_SIZE;
-        CHECK(*shared_pte(va) == (va | PAGE_RW | PTE_USER | (preset & PTE_PCD)));
-    }
-    /* USER はこのアプリの PDE にだけ伝播し、master の PDE は触らない */
-    CHECK(((u32 *)slot.as.pd_phys)[pdi] & PTE_USER);
-    CHECK(page_directory[pdi] == saved_pde);
-    teardown(&slot, base_used);
-    for (i = 0; i < T_BB_PAGES; i++)
-        *shared_pte(bb_base + i * PAGE_SIZE) = saved_pte[i];
-    page_directory[pdi] = saved_pde;
-}
-
-void _start(void)
-{
-    /* 恒等で読み書きできる実メモリを 0x400000 から 12MB 張る */
+void _start(void) {
     u32 args[6] = {0x400000, 0xC00000, 3, 0x32, 0xFFFFFFFF, 0};
-    u32 result, base_used, round, va, v86;
-    static AppSlot slot;
+    u32 result, before, round, i, owner;
+    AppSlot a;
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
     CHECK(result == 0x400000);
-
-    host_map_fixed_paging();
-    paging_init(T_RAM_KB);
-    host_pool_boot(T_RAM_KB);
-    /* 起動時の姿: shlib 帯を押さえ、PEGC の BB を ⑥ と同じく池の CPL=0 子の
-     * アリーナ内の上端から owner = boot で取って、アリーナの上端を凍結する
-     * (T1e、TASK_T1_LEDGER §3-6・§3-8。旧 sys_reserve_top と同じ区間)。 */
-    CHECK(ledger_claim_fixed(LEDGER_OWNER_SHLIB, MEM_SHLIB_BASE / PAGE_SIZE,
-                             MEM_EXEC_LOAD_ADDR / PAGE_SIZE));
-    CHECK(pgalloc_arena_end() == T_RAM_END / PAGE_SIZE);
-    CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, (int)T_BB_PAGES,
-                                MEM_EXEC_LOAD_ADDR / PAGE_SIZE, pgalloc_arena_end(),
-                                LEDGER_TOP_DOWN, &va));
-    CHECK(va == T_BB_BASE / PAGE_SIZE);
-    ledger_arena_freeze();
-    /* 私有領域の上端を決める値 = sys_usable_mem_end() = min(凍結した exec
-     * 上端, ledger_arena_top()) (kernel/sys.c)。8MB (FIXED 型) の exec 上端は
-     * 0x800000 なので、アリーナの上端 = BB の下端が効く。 */
-    CHECK(ledger_arena_top() * PAGE_SIZE == T_BB_BASE);
-    base_used = used_pages;
-
-    /* ---- (a)〜(e): 8MB + PEGC、10 回の起動と終了 ------------------------ */
-    t_usable_end = ledger_arena_top() * PAGE_SIZE;   /* = T_BB_BASE */
-    t_bb_base = T_BB_BASE;
-    t_bb_size = T_BB_SIZE;
-    for (round = 0; round < T_ROUNDS; round++) {
-        CHECK(launch(&slot) == 0);
-        /* (d) 私有領域の上端は BB の下 (= sys_usable_mem_end)、PDE は帯 1 枚 */
-        CHECK(slot.band_top == T_BB_BASE);
-        CHECK(slot.band_top < MEM_APP_BAND_TOP);
-        CHECK(slot.band_pdes == 1);
-        CHECK(RING3_USTACK_TOP == T_BB_BASE);
-        CHECK(RING3_HEAP_TOP < T_BB_BASE);
-        /* (b) 私有 PTE は BB を指さない */
-        check_layout(&slot);
-        /* (c) BB の仮想番地 (帯の中、アプリ固有 PT) は BB の物理を恒等で指す */
-        for (va = T_BB_BASE; va < T_RAM_END; va += PAGE_SIZE)
-            CHECK(app_pte(&slot.as, va) == (va | PAGE_RW | PTE_USER));
-        CHECK(((u32 *)slot.as.pd_phys)[MEM_APP_BAND_BASE >> 22] & PTE_USER);
-        CHECK(used_pages > base_used);
-        teardown(&slot, base_used);
+    host_map_fixed_paging(); paging_init(8192); host_pool_boot(8192);
+    kmalloc_init(heap, sizeof(heap)); before = used_pages;
+    {
+        u32 bytes;
+        CHECK(!exec_stack_bytes(0, 0, &bytes) && bytes == MEM_EXEC_STACK_SIZE);
+        CHECK(!exec_stack_bytes(1, 0, &bytes) && bytes == MEM_APP_STACK_MIN);
+        CHECK(!exec_stack_bytes(65537, 0, &bytes) && bytes == 69632);
+        CHECK(exec_stack_bytes(0x80000000UL, 0, &bytes) == -1);
+        CHECK(exec_stack_bytes(0xFFFFFFFFUL, 0, &bytes) == -1);
+        CHECK(exec_stack_bytes(0, MEM_EXEC_STACK_SIZE, &bytes) == -1);
     }
-
-    /* V86 の backing (159 の連続) が取れる */
-    v86 = pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, V86_BACKING_PAGES);
-    CHECK(v86 != 0);
-    CHECK(pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, v86 / PAGE_SIZE, V86_BACKING_PAGES));
-    CHECK(used_pages == base_used);
-
-    /* ---- (f): 上端が下がっていないのに BB が帯の中 → 起動を断る --------- */
-    t_usable_end = T_RAM_END;
-    CHECK(launch(&slot) == -1);
-    CHECK(slot.band_top == MEM_APP_BAND_TOP);
-    /* 断った起動は私有 PTE を 1 枚も BB で上書きしていない */
-    check_layout(&slot);
-    for (va = T_BB_BASE; va < T_RAM_END; va += PAGE_SIZE)
-        CHECK((app_pte(&slot.as, va) & T_PTE_ADDR) != va);
-    teardown(&slot, base_used);
-
-    /* ---- (g): BB が帯の外にある構成 ------------------------------------ */
-    /* 17MB + PEGC: BB = 0xEB3000 (PDE 3、共有 PT)、上限も帯の上 */
-    run_outside_band(0xEB3000UL, 0xEB3000UL, 0, base_used);
-    /* 12MB + PEGC: BB = 0xBB5000 (PDE 2、共有 PT) */
-    run_outside_band(0xBB5000UL, 0xBB5000UL, 0, base_used);
-    /* 9801 planar (8MB): 主記憶 BB 0x6A000 (PDE 0)、上限は 0x800000 のまま */
-    run_outside_band(T_RAM_END, MEM_GFX_BB_BASE, 0, base_used);
-    /* Cirrus: クライアント面はデバイス窓 (supervisor + PCD で張ってある)。
-     * _keep で USER に昇格しても PCD が落ちない */
-    run_outside_band(T_RAM_END, MEM_DEVICE_APERTURE_BASE + 0x100000UL,
-                     PAGE_RW | PTE_PCD, base_used);
-
-    SAY("app_bb_overlap: PASS");
-    die(0);
+    {
+        struct addrspace *controls[4];
+        for (i = 0; i < 4; i++) { controls[i] = kmalloc(sizeof(*controls[i])); CHECK(controls[i]); }
+        CHECK(kmalloc_used() == 4 * (((sizeof(struct addrspace) + 7) & ~7UL) + 8));
+        for (i = 0; i < 4; i++) kfree(controls[i]);
+        CHECK(!kmalloc_used());
+    }
+    t_bb_base = 0x7B5000; t_bb_size = 0x4B000;
+    CHECK(ledger_claim_fixed(LEDGER_OWNER_BOOT, t_bb_base / PAGE_SIZE, 0x800000 / PAGE_SIZE));
+    before = used_pages;
+    for (round = 0; round < 10; round++) {
+        kmemset(&a, 0, sizeof(a));
+        CHECK(ledger_owner_new(LEDGER_KIND_AS, 2, "app", &owner));
+        a.as = kmalloc(sizeof(*a.as)); CHECK(a.as);
+        CHECK(!paging_addrspace_create_lease(a.as, owner)); a.cpl3 = 1;
+        a.load_addr = MEM_EXEC_LOAD_ADDR; a.sbrk_heap_limit = a.load_addr + 2 * PAGE_SIZE;
+        a.exec_heap_base = MEM_EXEC_HEAP_BASE; a.exec_heap_size = 16 * PAGE_SIZE;
+        a.stack_size = round % 2 ? 0x80000 : MEM_EXEC_STACK_SIZE;
+        a.stack_top = MEM_APP_STACK_TOP; a.stack_base = a.stack_top - a.stack_size;
+        CHECK(!app_map_region(a.as, a.load_addr, a.sbrk_heap_limit));
+        CHECK(!app_map_region(a.as, a.exec_heap_base, a.exec_heap_base + a.exec_heap_size));
+        CHECK(!app_map_region(a.as, a.stack_base, a.stack_top));
+        CHECK(!exec_map_shared_bb(a.as, MEM_APP_STACK_TOP));
+        for (i = 0; i < t_bb_size; i += PAGE_SIZE)
+            CHECK(page_tables[(t_bb_base + i) >> 22][((t_bb_base + i) >> 12) & 1023] == ((t_bb_base + i) | PAGE_RW | PTE_USER));
+        CHECK(!(pte(a.as, a.stack_base - PAGE_SIZE) & PTE_PRESENT));
+        CHECK(!(pte(a.as, a.exec_heap_base - PAGE_SIZE) & PTE_PRESENT));
+        CHECK(!page_directory[MEM_EXEC_LOAD_ADDR >> 22]);
+        CHECK(!page_directory[MEM_EXEC_HEAP_BASE >> 22]);
+        CHECK(!page_directory[(MEM_APP_STACK_TOP - 1) >> 22]);
+        CHECK(*(u32 *)P2V(pte(a.as, a.load_addr) & ~0xFFFUL) == 0);
+        *(u32 *)P2V(pte(a.as, a.load_addr) & ~0xFFFUL) = 0xBAD;
+        exec_teardown_app(&a);
+        CHECK(!a.as && !a.cpl3); CHECK(kmalloc_used() == 0);
+        CHECK(used_pages == before); CHECK(!exec_as_leftover_pages);
+        CHECK(!ledger_bad_free && !bb_free_attempts && !ledger_owners[owner].kind);
+    }
+    {
+        u32 pa;
+        kmemset(&a, 0, sizeof(a));
+        CHECK(ledger_owner_new(LEDGER_KIND_AS, 2, "copy", &owner));
+        a.as = kmalloc(sizeof(*a.as)); CHECK(a.as);
+        CHECK(!paging_addrspace_create_lease(a.as, owner)); a.cpl3 = 1;
+        a.load_addr = MEM_EXEC_LOAD_ADDR; a.sbrk_heap_limit = a.load_addr + 2 * PAGE_SIZE;
+        CHECK(!app_map_region(a.as, a.load_addr, a.sbrk_heap_limit));
+        CHECK(!app_store(&a, a.load_addr + PAGE_SIZE - 2, "abcd", 4));
+        CHECK(launch_read_byte(a.as->pd_phys, (const char *)(a.load_addr + PAGE_SIZE)) == 'c');
+        CHECK(!as_va_to_pa(a.as->pd_phys, a.load_addr, &pa));
+        CHECK(*(u8 *)P2V(pa + PAGE_SIZE - 2) == 'a');
+        CHECK(app_store(&a, a.sbrk_heap_limit, "x", 1) == -1);
+        CHECK(paging_current_cr3() == paging_kernel_pd_phys());
+        exec_teardown_app(&a); CHECK(used_pages == before && !kmalloc_used());
+    }
+    /* Every fragmented image/heap/stack allocation failure unwinds normally. */
+    for (round = 1; round <= 2 + 16 + MEM_EXEC_STACK_SIZE / PAGE_SIZE; round++) {
+        int rc;
+        kmemset(&a, 0, sizeof(a));
+        CHECK(ledger_owner_new(LEDGER_KIND_AS, 2, "fail", &owner));
+        a.as = kmalloc(sizeof(*a.as)); CHECK(a.as);
+        CHECK(!paging_addrspace_create_lease(a.as, owner)); a.cpl3 = 1;
+        a.load_addr = MEM_EXEC_LOAD_ADDR; a.sbrk_heap_limit = a.load_addr + 2 * PAGE_SIZE;
+        a.exec_heap_base = MEM_EXEC_HEAP_BASE; a.exec_heap_size = 16 * PAGE_SIZE;
+        a.stack_top = MEM_APP_STACK_TOP; a.stack_base = a.stack_top - MEM_EXEC_STACK_SIZE;
+        app_fail_at = round; app_alloc_calls = 0;
+        rc = app_map_region(a.as, a.load_addr, a.sbrk_heap_limit);
+        if (!rc) rc = app_map_region(a.as, a.exec_heap_base, a.exec_heap_base + a.exec_heap_size);
+        if (!rc) rc = app_map_region(a.as, a.stack_base, a.stack_top);
+        CHECK(rc == -1); app_fail_at = 0;
+        exec_teardown_app(&a);
+        CHECK(used_pages == before && !kmalloc_used() && !exec_as_leftover_pages);
+        CHECK(!ledger_bad_free && !ledger_owners[owner].kind);
+    }
+    CHECK(exec_bb_overlaps_user(MEM_EXEC_LOAD_ADDR, PAGE_SIZE, MEM_APP_STACK_TOP));
+    t_bb_base = MEM_EXEC_LOAD_ADDR; t_bb_size = PAGE_SIZE;
+    CHECK(exec_map_shared_bb(0, MEM_APP_STACK_TOP) == -1);
+    t_bb_base = MEM_DEVICE_APERTURE_BASE + 0x100000; t_bb_size = PAGE_SIZE;
+    page_tables[t_bb_base >> 22][(t_bb_base >> 12) & 1023] = t_bb_base | PAGE_RW | PTE_PCD;
+    CHECK(ledger_owner_new(LEDGER_KIND_AS, 2, "PCD", &owner));
+    a.as = kmalloc(sizeof(*a.as)); CHECK(a.as); CHECK(!paging_addrspace_create_lease(a.as, owner));
+    a.cpl3 = 1; a.load_addr = a.sbrk_heap_limit = 0; a.exec_heap_size = 0; a.stack_base = a.stack_top = 0;
+    CHECK(!exec_map_shared_bb(a.as, MEM_APP_STACK_TOP));
+    CHECK(page_tables[t_bb_base >> 22][(t_bb_base >> 12) & 1023] & PTE_PCD);
+    exec_teardown_app(&a); CHECK(!kmalloc_used() && used_pages == before);
+    SAY("app_bb_overlap: PASS high private image/heap/variable stack, shared low BB, KHEAP and owner0"); die(0);
 }

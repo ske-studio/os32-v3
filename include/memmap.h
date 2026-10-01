@@ -337,40 +337,20 @@ extern u32 __sqlite_end;
 #define MEM_FIXED_PAGING_END  (MEM_FIXED_APERTURE_PT_BASE + MEM_GUARD_SIZE)
 #define MEM_SHELL_BAND_END    0x3FFFFFUL  /* シェル帯域終端 */
 
-/* ====================================================================== */
-/*  アプリ帯域 (先頭は APP_BAND_PDE = PDE 1, 0x400000-)                     */
-/*                                                                          */
-/*  ここだけが「PD ごと」の帯域 (kernel/paging.h の CONTRACTS C2)。          */
-/*  先頭 1MB を共有ライブラリに、残りを外部プログラム本体・ヒープ・          */
-/*  ユーザスタックに割り当てる。PDE 単位で切り替わるので、境界を PDE を      */
-/*  またぐ位置へ動かしてはならない (paging.c の STATIC_ASSERT が検査する)。  */
-/*                                                                          */
-/*  2026-09-10 (票 docs/tasks/memory/APP_BAND_PDE.md): 1 枚 (4MB) 固定を     */
-/*  やめ、**要求量に応じて 4MB 単位で増やせる**ようにした。                  */
-/*                                                                          */
-/*    MEM_APP_BAND_TOP      既定 (1 枚) の上端。ここまでは従来と同一で、     */
-/*                          heap_size を明示しないプログラムは必ずこの形。   */
-/*    MEM_APP_BAND_MAX_TOP  最大枚数まで伸ばしたときの上端 (exclusive)。     */
-/*                                                                          */
-/*  最大枚数の根拠 (票 §4-1): デバイス窓とぶつからない範囲。PEGC のリニア窓  */
-/*  が MEM_APP_BAND_DEVICE_FLOOR (= include/pegc.h の PEGC_LINEAR_BASE) に   */
-/*  あり、そこは PDE 3 (0xC00000-0xFFFFFF) の中なので、アプリ帯を伸ばせる    */
-/*  のは PDE 1〜2 (0x400000-0xBFFFFF) まで。                                 */
-/* ====================================================================== */
-#define MEM_APP_BAND_BASE     0x400000UL  /* PDE 1 の先頭 */
-#define MEM_APP_BAND_PDE_SIZE 0x400000UL  /* PDE 1 枚 = 4MB */
-#define MEM_APP_BAND_MAX_PDES 2UL         /* 最大枚数 (PDE 1〜2) */
+/* T2c: private virtual bands; physical supply has separate policy below. */
+#define MEM_APP_BAND_BASE     0x80000000UL
+#define MEM_APP_BAND_PDE_SIZE 0x400000UL
+#define MEM_APP_BAND_MAX_PDES 64UL
 #define MEM_APP_BAND_TOP      (MEM_APP_BAND_BASE + MEM_APP_BAND_PDE_SIZE)
-                                          /* 0x800000: 既定 (1 枚) の上端 */
-#define MEM_APP_BAND_MAX_TOP  (MEM_APP_BAND_BASE + \
-                               MEM_APP_BAND_MAX_PDES * MEM_APP_BAND_PDE_SIZE)
-                                          /* 0xC00000: 最大まで伸ばした上端 */
-
-/* アプリ帯を伸ばしてよい絶対の天井。9821 の PEGC リニア窓 (16MB システム
- * 空間の先頭) がここに出るので、帯がこれ以上へ伸びると窓を USER で踏む。
- * 値の正典は include/pegc.h の PEGC_LINEAR_BASE で、一致は
- * gfx/backend_pegc.c の STATIC_ASSERT が検査する ([C4] 三層定数)。 */
-#define MEM_APP_BAND_DEVICE_FLOOR 0x00F00000UL
+#define MEM_APP_BAND_MAX_TOP  (MEM_APP_BAND_BASE + MEM_APP_BAND_MAX_PDES * MEM_APP_BAND_PDE_SIZE)
+#define MEM_EXEC_HEAP_BASE    0x88000000UL
+#define MEM_APP_STACK_TOP     MEM_APP_BAND_MAX_TOP
+#define MEM_APP_STACK_MIN     0x4000UL
+/* T2c--T2e: preserve the old startup byte budget until T2f. */
+#define MEM_PHYS_EXEC_FLOOR   0x500000UL
+#define MEM_PHYS_WORKSPACE_FLOOR 0xC00000UL
+#define MEM_LEGACY_APP_BASE   MEM_POOL_BASE
+#define MEM_LEGACY_APP_PDES   2UL
 
 /* ====================================================================== */
 /*  物理 RAM の地図 (K6-RAM, 2026-09-11)                                    */
@@ -402,7 +382,7 @@ extern u32 __sqlite_end;
 /*  RAM として登録してよい上端は MEM_PHYS_RAM_CEILING (2GB、D11)。          */
 /*  それより上 [2GB, 4GB) は窓の帯も含めて RAM にしない。                   */
 /* ====================================================================== */
-#define MEM_SYSTEM_SPACE_BASE MEM_APP_BAND_DEVICE_FLOOR /* 0x00F00000 (15MB) */
+#define MEM_SYSTEM_SPACE_BASE 0x00F00000UL /* 0x00F00000 (15MB) */
 #define MEM_SYSTEM_SPACE_END  0x01000000UL              /* 16MB */
 #define MEM_HIGH_RAM_BASE     MEM_SYSTEM_SPACE_END      /* 16MB */
 #define MEM_PHYS_MMIO_TOP     0xFF000000UL              /* 4GB - 16MB */
@@ -442,41 +422,17 @@ extern u32 __sqlite_end;
 /*  カーネル (kernel/shlib.c) が /sys/lib/libos32gui.shlib を起動時にここへ  */
 /*  読み、レイアウトは先頭ページの OS32ShlibHeader が決める:                 */
 /*                                                                          */
-/*    0x400000                          ジャンプ表 (OS32_SHLIB_HDR_SIZE=4KB) */
-/*    +.. text_pages ページ             .text/.rodata — read-only + USER。   */
-/*                                      master PD に張るので全 PD で共有。   */
-/*    data_vaddr .. +data_pages ページ  .data/.bss — 同じ仮想番地に          */
-/*                                      **アプリごとの物理ページ**を張る。    */
-/*    帯域末尾 data_pages ページ         .data/.bss の原本 (複製元)。          */
-/*                                      pgalloc の管理外に置くため帯域内。    */
-/*                                                                          */
-/*  帯域全体はロード成功時に pgalloc_mark_used() で予約する (子プロセスの     */
-/*  claim は MEM_EXEC_LOAD_ADDR からなので、ここは別に押さえないと            */
-/*  PD/PT や V86 バッキングに持っていかれる)。未ロードなら予約しない。        */
+/*  T2c: 高位 VA に位置依存で置く。原本は池から非連続の実ページを確保。 */
+/*  master の高位 APP PDE は空。各 AS に text RO と data 私有複製を張る。 */
 /* ====================================================================== */
-#define MEM_SHLIB_BASE        MEM_APP_BAND_BASE   /* 0x400000 */
+#define MEM_SHLIB_BASE        MEM_APP_BAND_BASE   /* 0x80000000 */
 #define MEM_SHLIB_SIZE        0x100000UL          /* 1MB */
-#define MEM_SHLIB_END         (MEM_SHLIB_BASE + MEM_SHLIB_SIZE)  /* 0x500000 */
+#define MEM_SHLIB_END         (MEM_SHLIB_BASE + MEM_SHLIB_SIZE)
 
-/* ====================================================================== */
-/*  外部プログラムロード関連 (子プロセス用: 0x500000〜)                      */
-/*  シェル常駐帯域とは完全に分離。アイデンティティマッピング。               */
-/*  スタック/ヒープは exec_run() にてシステムメモリ量から動的に計算される      */
-/*                                                                          */
-/*  2026-09-05 (K3): 共有ライブラリ帯域を下に挿し込んだので 0x400000 →       */
-/*  0x500000 へ 1MB 上がった。sdk/link/app.ld と mkos32x の load_addr、      */
-/*  および exec の旧バイナリ判定がこの値に追従する。                          */
-/* ====================================================================== */
-#define MEM_EXEC_LOAD_ADDR    MEM_SHLIB_END
-/* 子プロセス帯のレイアウト (2026-09-04 に固定 1MB 上限を撤廃):
- *   [load .. code_end)            code + data + bss
- *   [code_end .. guard_a)         newlib sbrk (少なくとも MEM_EXEC_SBRK_MIN)
- *   [guard_a]                     ガードページ (非present)
- *   [exec_heap_base .. heap_top)  KAPI mem_alloc (exec_heap)。ヘッダ heap_size
- *                                 指定があればその大きさ、0 なら空きを折半
- *   heap_top = スタックガード直下 (CPL=3: RING3_HEAP_TOP / CPL=0: guard_b
- *              から動的確保リザーブを引いた位置)
- * 本体の上限は heap_top - MEM_EXEC_SBRK_MIN - ガード - MEM_EXEC_HEAP_MIN で決まる。 */
+/* 外部アプリ image/sbrk は高位、heap と可変 stack は別予約。 */
+#define MEM_EXEC_LOAD_ADDR    MEM_SHLIB_END       /* 0x80100000 */
+/* T2c--T2e は旧物理予算から得た byte 数だけを高位 VA へ写す。
+ * 起動時 heap 最小化・map allocator への変更は T2f。 */
 #define MEM_EXEC_SBRK_MIN     0x40000UL          /* sbrk に最低限残す 256KB */
 #define MEM_EXEC_HEAP_MIN     0x10000UL          /* exec_heap の最小 64KB */
 #define MEM_EXEC_STACK_SIZE   0x40000UL          /* スタックサイズ 256KB (-O0 SQLite対応) */

@@ -1,5 +1,6 @@
 {
-  "version": 68,
+  "generations": {"os32x_format": 4, "kapi_abi": 1, "memory_layout": 1, "shlib_protocol": 1},
+  "version": 69,
   "func_capacity": 300,
   "crt_kapi_symbol": "os32_kapi_v63",
   "data_fields": [

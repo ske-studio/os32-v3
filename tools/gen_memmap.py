@@ -163,8 +163,8 @@ CONV = "コンベンショナルメモリ (0x00000-0xFFFFF)"
 KERN = "カーネル帯域 (0x100000-0x1FFFFF)"
 SQL = "SQLite 帯域 (0x200000-0x2FFFFF)"
 SHELL = "シェル常駐帯域 (0x300000-0x3FFFFF)"
-APP = "共有ライブラリ / プログラム空間 (0x400000-)"
-DEV = "デバイス窓 (実 RAM ではない)"
+APP = "仮想アプリ帯 (0x80000000-)"
+DEV = "物理 RAM とデバイス窓"
 
 
 def bands(m, sym):
@@ -283,12 +283,12 @@ def bands(m, sym):
         (v("MEM_SHLIB_END") or 0) - 1, "RO+USER / RW+USER",
         ".text は全 PD 共有、.data/.bss はアプリごとの物理")
     add(APP, "外部プログラム空間", v("MEM_EXEC_LOAD_ADDR"), None, "RW+USER",
-        "code+bss → sbrk → ガード → exec_heap → スタック。上端は実行時に決まる。"
+        "image/sbrk、exec_heap は 0x88000000、可変 stack は 0x90000000 直下。"
         "物理ページの池の下端は MEM_POOL_BASE")
-    add(APP, "集積域 (ブート時)", v("MEM_BOOT_STAGING_BASE"),
+    add(DEV, "集積域 (ブート時)", v("MEM_BOOT_STAGING_BASE"),
         plus("MEM_BOOT_STAGING_BASE", "MEM_BOOT_STAGING_SIZE", -1), "池",
         "圧縮画像の読み込み先 (T6b 以後)。展開が終われば池へ。T1 ではローダは未使用")
-    add(APP, "同梱域 (ブート時)", v("MEM_BOOT_BUNDLE_BASE"),
+    add(DEV, "同梱域 (ブート時)", v("MEM_BOOT_BUNDLE_BASE"),
         plus("MEM_BOOT_BUNDLE_BASE", "MEM_BOOT_BUNDLE_SIZE", -1), "池",
         "ブート必須モジュールの展開先 (T5b 以後、台帳が owner=bundle で予約)。"
         "T1 ではローダは未使用")
@@ -336,6 +336,9 @@ def overlaps(rows):
     for i in range(len(good)):
         for j in range(i + 1, len(good)):
             a, b = good[i], good[j]
+            # High app VA and physical RAM/device addresses are distinct spaces.
+            if {a["section"], b["section"]} == {APP, DEV}:
+                continue
             if a["parent"] == b["name"] or b["parent"] == a["name"]:
                 continue
             lo = max(a["start"], b["start"])
@@ -375,6 +378,13 @@ def budget(m, sym):
 # C のヘッダを読めない相手 (リンカスクリプト / NASM) と、SDK として外へ出る
 # 写しにだけ許し、一致は必ずここで見る ([C4])。
 MIRRORS = (
+    ("sdk/os32x_hdr.py", r"OS32X_APP_LOAD_ADDR = (0x[0-9A-Fa-f]+)", "MEM_EXEC_LOAD_ADDR"),
+    ("sdk/os32x_hdr.py", r"OS32X_SHELL_LOAD_ADDR = (0x[0-9A-Fa-f]+)", "MEM_SHELL_LOAD_ADDR"),
+    ("tools/mkshlib.py", r"MEM_SHLIB_BASE = (0x[0-9A-Fa-f]+)", "MEM_SHLIB_BASE"),
+    ("sdk/link/app.ld", r"\. = (0x[0-9A-Fa-f]+);", "MEM_EXEC_LOAD_ADDR"),
+    ("sdk/link/shlib.ld", r"\. = (0x[0-9A-Fa-f]+);", "MEM_SHLIB_BASE"),
+    ("sdk/rust/os32api/src/gui/stub.rs", r"MEM_SHLIB_BASE: u32 = (0x[0-9A-Fa-f_]+);", "MEM_SHLIB_BASE"),
+
     ("build/os32.ld", r"^\s*MEM_FIXED_PAGING_BASE\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_FIXED_PAGING_BASE"),
     ("build/os32.ld", r"^\s*MEM_FIXED_PD_BASE\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_FIXED_PD_BASE"),
     ("build/os32.ld", r"^\s*MEM_FIXED_BOOT_PT_BASE\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_FIXED_BOOT_PT_BASE"),

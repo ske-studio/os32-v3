@@ -176,7 +176,7 @@ void _start(void)
         CHECK(used == before);
         host_cr3 = paging_kernel_pd_phys();
         CHECK(paging_set_page(0x2400000, 0, PAGE_RW) == 0);
-        CHECK((u32)page_tables[9] >= MEM_APP_BAND_TOP);
+        CHECK((u32)page_tables[9] >= MEM_PHYS_WORKSPACE_FLOOR);
     }
     {
         struct addrspace a, b;
@@ -245,7 +245,7 @@ void _start(void)
         CHECK(((u32 *)as.pd_phys)[1023] == pde);
         host_cr3 = paging_kernel_pd_phys();
         paging_addrspace_destroy(&as);
-        CHECK(live_addrspaces == 0 && used == before - 2);
+        CHECK(live_addrspaces == 0 && used == before - 1);
     }
     {
         /* 票 S0-K / 実機 K2 (2026-09-13): **アプリの PD を、そのアプリの
@@ -267,36 +267,19 @@ void _start(void)
         u32 pt_phys, pdi, pti;
         u32 *app_pt;
 
-        CHECK(MEM_POOL_BASE == MEM_APP_BAND_BASE);
+        CHECK(MEM_POOL_BASE < MEM_APP_BAND_BASE);
         CHECK(paging_addrspace_create_n(&as, LEDGER_OWNER_KERNEL, 1) == 0);
-        CHECK(as.app_pde == APP_BAND_PDE && as.app_pde_count == 1);
-        pt_phys = as.app_pt_phys[0];
-        CHECK(paging_addrspace_clear_app_band(&as) == 0);
+        CHECK(as.app_pde == APP_BAND_PDE && as.app_pde_count == MEM_APP_BAND_MAX_PDES);
+        code = MEM_EXEC_LOAD_ADDR; sbrk_end = code + 2 * PAGE_SIZE;
         CHECK(paging_addrspace_map_user_range_phys(&as, code, sbrk_end,
                                                    0x900000, PAGE_RW | PTE_USER) == 0);
-
-        /* アプリ PT の物理がアプリ帯に入っているなら、アプリ PD の下で
-         * その仮想番地は **PT ではないもの** を指す (or 非 present)。
-         * 入っていない構成でも「歩いてよい」ことにはならないので、
-         * 入っているときだけ強い主張をする。 */
-        if (pt_phys >= MEM_APP_BAND_BASE && pt_phys < MEM_APP_BAND_TOP) {
-            pdi = pt_phys >> 22;
-            pti = (pt_phys >> 12) & 0x3FF;
-            CHECK(pdi >= as.app_pde && pdi < as.app_pde + as.app_pde_count);
-            app_pt = (u32 *)as.app_pt_phys[pdi - as.app_pde];
-            /* clear_app_band の後に張ったのは [code, sbrk_end) だけなので、
-             * PT 自身の番地は非 present か、per-app 物理 (PT ではない) を指す。*/
-            if (app_pt[pti] & PTE_PRESENT) {
-                CHECK((app_pt[pti] & 0xFFFFF000UL) != pt_phys);
-            }
-        }
-
-        /* master の下では従来どおり identity で読める (create_n が書けたのも
-         * これのおかげ)。歩いてよいのは master CR3 の下だけ、という証拠。 */
-        CHECK(paging_current_cr3() == paging_kernel_pd_phys());
-        CHECK(paging_pte_flags(pt_phys) & PTE_PRESENT);
-
+        pt_phys = as.app_pt_phys[0];
+        pdi = pt_phys >> 22; pti = (pt_phys >> 12) & 0x3ff;
+        app_pt = page_tables[pdi];
+        CHECK(app_pt[pti] >> 12 == pt_phys >> 12);
+        CHECK(((u32 *)P2V(as.pd_phys))[pdi] == page_directory[pdi]);
         paging_addrspace_destroy(&as);
+
     }
     SAY("PASS: one-shot init preserves dynamic PT, live AS, CR3, allocator");
     SAY("PASS: final-page, virtual/physical overflow, range preflight");

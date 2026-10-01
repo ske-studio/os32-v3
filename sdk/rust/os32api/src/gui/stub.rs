@@ -61,7 +61,7 @@ pub const SIZE_ABSOLUTE: u32 = 2;
 /* ================================================================ */
 
 /// 共有ライブラリの常駐先 (正典: `include/memmap.h` の `MEM_SHLIB_BASE`、K3)。
-pub const MEM_SHLIB_BASE: u32 = 0x0040_0000;
+pub const MEM_SHLIB_BASE: u32 = 0x8000_0000;
 
 /// `'SLIB'` (リトルエンディアン)。正典: `os32_kapi_shared.h` `OS32_SHLIB_MAGIC`。
 pub const OS32_SHLIB_MAGIC: u32 = 0x4249_4C53;
@@ -617,6 +617,14 @@ fn refuse(msg: &[u8], got: i32, want: i32) -> ! {
 /// `MEM_SHLIB_BASE` のヘッダを照合してジャンプ表を捕まえ、`shlib_init` を呼ぶ。
 ///
 /// 2 回目以降は何もしない。`os32_init()` の後に呼ぶこと (KAPI をライブラリへ渡す)。
+/* Retained only when the stub is used; packaging checks this symbol after LTO. */
+#[no_mangle]
+#[inline(never)]
+pub extern "C" fn __os32_shlib_dependency() -> u32 {
+    static PROTOCOL: u32 = crate::generations::OS32_SHLIB_PROTOCOL;
+    unsafe { core::ptr::read_volatile(&PROTOCOL) }
+}
+
 pub fn bind() {
     unsafe {
         let slot = TABLE.0.get();
@@ -624,7 +632,7 @@ pub fn bind() {
             return;
         }
         let h = core::ptr::read_volatile(MEM_SHLIB_BASE as *const ShlibHeader);
-        if h.magic != OS32_SHLIB_MAGIC {
+        if h._rsvd[0] != __os32_shlib_dependency() || h.magic != OS32_SHLIB_MAGIC {
             refuse(b"bad magic at MEM_SHLIB_BASE", h.magic as i32, OS32_SHLIB_MAGIC as i32);
         }
         if h.version != GUI_PROTO_VERSION as u32 {

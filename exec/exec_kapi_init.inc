@@ -241,7 +241,7 @@ extern int __cdecl wrap_v86_gdc_capture(int mode, V86Gcap *out);
 extern i32 __cdecl kapi_reserved_nosys(void);
 
 kapi->magic = 0x4B415049UL;
-kapi->version = 68;
+kapi->version = 69;
 
     kapi->gfx_init = wrap_gfx_init;
     kapi->gfx_init_200 = wrap_gfx_init_200;

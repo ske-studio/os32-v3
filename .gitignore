@@ -119,3 +119,7 @@ tools/emu_agent/logs/
 .claude/worktrees/
 .codex/
 /os32-ci/
+
+# Validated linker input and Rust generation ledgers (build artifacts)
+*.inputs.json
+*.generations.json

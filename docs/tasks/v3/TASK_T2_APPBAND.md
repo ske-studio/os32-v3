@@ -442,9 +442,13 @@ P3は§6のとおり静的保持を継続し、KHEAP化をT2cの生成/破棄切
 
 公開 caller は未切替なので、新しい lease 窓の実使用は T2c 以降。未実施は T2a / T2a′ と同じ (park → resume 後、R1 panic の故障ゲスト、Ra266 64MB)。
 
-#### T2c-R. 着手調査・停止記録 (2026-10-01、`wt/t2c`、GPT-6 / Codex)
+#### T2c-R. 調査・停止履歴と実装記録 (2026-10-01、`wt/t2c`、GPT-6 / Codex)
 
 **PM の決定 (2026-10-01、再開指示)**: §4-6の共通正典は未作成でP7票も未発行。T2cで `sdk/kapi.json` にOS32X形式版・KAPI ABI世代・メモリ配置世代・shlibプロトコルを独立した4欄として新設し、既存KAPI生成器を拡張してC/SDK/Python/Rustへ生成する。番号を各道具へ手書きしない。P7も同じ正典を使用し、T2cではスロット整理をしない。[ABI1]〜[ABI3]に従い版上げとclean→allを行う。前回の正典不在による停止理由はこの決定で解消。
+
+**PM の決定 2 (2026-10-01、再開指示)**: T2c〜T2e の暫定 heap は旧計算の byte 数と上限をそのまま保持する。既定1/最大2 PDE・上端0x00C00000、`ring3_band_set` の旧物理上端切詰め、`exec_sbrk_pick_tier` の二段選択を物理専用計算に残す。64MBで旧上限を超える明示heapを断るのは既存挙動。上限撤去・map allocator・最小初期量はT2fで一括。以後、暫定段の曖昧さは **PM判断待ちでなく、挙動維持の解釈で実装** し、高位VAを物理helperへ渡さない。
+
+以下の「未実装」「停止」は再開前の履歴。今回の実装・検証は本節末尾の結果記録を参照。
 
 **未実装**。基点 `59c4285` で §4・§5-1・§6・§7-1、T2a/T2a′/T2b-R と PM 受入、上位 D35 を確認した。形式・配置・shlib・CRT は同時更新、旧低位共有 USER は T2d まで維持、heap は T2f で一括、AS 制御ブロックの固定 KHEAP 化は T2c という境界を維持する。コード・ABI・生成物を変更せず、コミット/配備も行っていない。
 
@@ -479,6 +483,40 @@ T2b-R 最終記録と比べ、今回の `.data` は4B小さく、BSS前余白は
 `PYTHONPATH=/tmp/t2ap-python CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null` はrc=0 (`/tmp/t2c-restart-check.log`)。文書のみの選択10検査、docs statusの13/13試験と14/14実行時RED (Python変異でコンパイル失敗をREDへ数えない)、package検査が通った。32bit実行には既存qemu-i386足場を使用。これは既存基点/文書の確認で、T2c固有の変異・起動失敗・高位AS・旧.o混入試験は未実装/未実施。ABI未変更のためclean→allは未実施。apps/gameは空で外部アプリ移行/再ビルド/監査は未実施。
 
 **PMのゲスト確認は実装後へ**: 今回の旧配置をT2c受入に使わない。実装後の一式と新mapで8/17MBおよびRa26664MBのCUI/GUI/入れ子/park→resume/fault/STOP、256/512KB stack、旧CPL0/shell/shlib/未知版/旧.o混在の入口前拒否を確認する。予定番地はshlib0x80000000、exec0x80100000、stack上端0x90000000、master高位APP PDEは空。今回の既存ELFの診断番地は `kselftest_fail=0x162E60`、`kselftest_pass=0x162E64`、`lease_selftest_result=0x18B864`、`exec_as_leftover_pages=0x18B860`、`ledger_irq_ops=0x186D14`、`ledger_exc_ops=0x1864E0`。実装/PM再ビルド後に必ず引き直す。コミット/push/配備/NP21/W/NHD/ini/Windows/実機は未操作。
+
+**実装結果 (2026-10-01、同じworktree、未コミット)**:
+
+- `sdk/kapi.json` をKAPI **69**へ。`generations` に OS32X形式 **4**・KAPI ABI **1**・メモリ配置 **1**・shlibプロトコル **1** の独立欄を新設。slot追加/並替えなし。既存生成器からC/Python/Rust/NASM・リンカ世代参照を生成する。OS32X v4は60B、完全な読込・形式/サイズ/世代/KAPI配置の完全一致・既知flag・image種別ごとのload/entryを入口前に検査する。常駐shellも検査し、不一致の停止案内を有効にする。`--cpl0` / FORCE_CPL0 / `cpl0_probe` の実行入口を廃止。
+- app/shlibのVAを **0x80100000 / 0x80000000**、heap予約を **0x88000000**、stack上端を **0x90000000**へ。masterの高位APP PDEは空。ASはPD+lease先頭PTのみから始め、触るAPP PDEのPTを疎に確保し、準備失敗を巻き戻す。既存の低位共有USER・VRAM/SHM/BB/フォント/トランポリンはT2eまでの暫定契約を保つ。物理計算は `MEM_POOL_BASE` / `MEM_PHYS_EXEC_FLOOR` / `MEM_PHYS_WORKSPACE_FLOOR` と旧予算定数に分離。
+- `stack_size=0` は256KiB。明示値はページ切上げ・最低16KiB、signed/丸めoverflow・予約超過・argvフレーム不足を拒否。実際のstack_base/sizeをAppSlotに控え、budget/map/guard/argv/終了・fault・kill・park/resumeで使う。image/BSS/argvはmaster下で実ページを翻訳して書き込む。親のcmdlineも保存した親PDのbackingから読む。新しいコマンド長上限は設けない。
+- shlib原本はSHLIB ownerの非連続の実ページ。公開前に外/内ヘッダ、プロトコル、text/data境界と全entryを検査。ASのtextはRO、dataは原本から私有複製し、途中失敗で返す。masterに高位shlib aliasを置かない。Rust stubにはLTO後にも残る依存symbolを持たせ、包装器が依存なし0と依存ありを区別する。常駐shellのshlib依存は拒否し、静的リンクを維持。
+- AS制御をAppSlot埋込みから固定KHEAP確保へ。target **addrspace=688B (≤1376B)**、**AppSlot=192B**、全6slot+通常4AS+台帳/SURFACEの計 **7,488B (≤16,384B)**。4AS制御のallocator header込み実占有 **2,784B**をホストで測定し、終了時0へ戻る。これは他のKHEAP顧客とのゲスト総ピークの代用ではない。
+- C全単位 (kernel/SQLite/SDK/userland)、asm CRT/kernel、Rust出力へnote/refまたはcrate/member hashを強制付与。リンクの実選択 `.o` / archive memberを検査し、未使用memberを区別する。RustはcrateをLTO前に照合。新SDK+旧.o/旧値混在を拒否し、包装時に最終ELF・raw・検証済みリンク入力hashを再照合する。newlib/libgccの正確なvendorパスを台帳へ記録。`make all` が **build/out/generations-manifest.json** にkernel/loader/SDK/CRT/libs/shell/shlib/全in-tree (sh.binとtests/*.binを含む) の一組のID・4世代・hashを列挙する。apps/gameは空として明記し、完全な外部成果物セットとはしない。外部は新しいSDKのforced include/link guard/Rust wrapperへ追従し、clean-externalを明示して再ビルドする必要がある。
+
+**実装時の訂正 (事実のみ)**: 旧heap helperには1/2 PDE上限と物理空きによる二段選択が実在するため、PM決定2どおり旧byte予算として残した。生成地図は従来VA/物理を恒等とみなして一律に重なりを比較していたので、高位APP VAと物理RAM/デバイスの数値一致を衝突と数えないよう分離した。kernel.mapは世代検査wrapperの一時mapで置換してはならず、呼出元指定のmap出力を保存する。旧 `make clean` はgshell Rust targetを消していなかったためclean-programsに含めた。D番号・状態行・T2d以降の設計を変更していない。
+
+**カーネル実測** (同じ構成、kernel ELFのreadelf/nm、生成器のheadroom。SQLite/非ロード世代noteは本体3節に含めない):
+
+| 観測 | 変更前 (T2b) | T2c |
+|---|---:|---:|
+| `.text` 開始 / サイズ | 0x100000 / 326,462B | 0x100000 / 325,998B |
+| `.data` 開始 / サイズ | 0x14FB40 / 32,971B | 0x14F980 / 31,943B |
+| `.bss` 開始 / サイズ | 0x157C20 / 212,040B | 0x157660 / 210,348B |
+| `__bss_end` | 0x18B868 | 0x18AC0C |
+| ASSERT 0x195000までの残り | 38,808B | 41,972B |
+| `.got.plt`末尾→`.bss`手前 | 8B | 12B |
+| VK32圧縮一式 | 477,781B | 477,105B |
+
+余白12BとASSERT残り41,972Bは加算しない。固定PD/PT起点0x3F1000、SQLite/DMA境界とASSERTは変更していない。
+
+**検証記録 (最終全体検査は下へ追記)**: `CROSS_DIR=/home/hight/opt/cross make clean < /dev/null` → `make all < /dev/null` はrc=0 (最終cleanのログ `/tmp/t2c-clean13.log`、all `/tmp/t2c-all13.log`、最新all `/tmp/t2c-all16.log`)。画像コピー失敗警告のみ許容し、NP21W_DIRは変更していない。`make external` は対象外、外部アプリ移行の実証なし。既存qemu-i386足場 `PYTHONPATH=/tmp/t2ap-python` とtoolchain PATHでホスト32bitを実行する。関連 `make check-memory-host` rc=0 (`/tmp/t2c-memory3.log`)、高位ASの4/4、BB/可変stack/argv/返却の11/11、shlib断片化・失敗巻戻しの4/4が実行時RED、これらのコンパイル失敗0。既存lease10/10、R1移譲・回収も再実行済み。全体check-changed初回はrc=2 (`/tmp/t2c-changed1.log`)、旧claim/shlib予約試験とC89検査変異の当て先が旧形だったため修正。メモリ地図/TESTSはビルド後に生成器で更新した。
+
+**PM の未実施ゲスト受入**: 本セッションは配備/NP21/W/NHD/ini/Windows/実機/commit/pushを操作していない。PMが停止中にmanifestの一組を揃え、NP21/W 8/17MB とRa266 64MBで CUI/GUI・入れ子exec・park→resume・通常終了/#PF/#GP/STOP/WM kill、256/512KiB stack、pool不足と固定KHEAP不足からの起動拒否・次アプリ再起動を確認する。`owner pages=0`、`exec_as_leftover_pages` / `ledger_bad_free` / IRQ・例外中allocator操作の差分0、KHEAP総ピークと返却を確認。旧app/shell/shlib/未知形式/世代不一致はentry前拒否し、`exec_entry_calls`の差分0 (旧shellは最初の入口0) を見る。64MBの旧上限超え明示heapは拒否継続が正しい。HostDrv/NHDのhash食違い、v2 SDK製apps/gameもPMの外部再構築後に確認する。
+
+現在のELFの診断番地: `kselftest_fail=0x162C60` / `kselftest_pass=0x162C64` / `lease_selftest_result=0x18AC08` / `exec_as_leftover_pages=0x18AC00` / `exec_entry_calls=0x18AC04` / `ledger_bad_free=0x1866F8` / `ledger_irq_ops=0x1860B4` / `ledger_exc_ops=0x185880` / `kmalloc_peak_bytes=0x15C3C8` / `exec_sbrk_tier_last=0x17CFD0`。master PD実体 **0x3F1000** のPDE512〜575 (`0x3F1800`〜`0x3F18FC`) は0、高位entry **0x80100000**、shlib **0x80000000**、stack上端 **0x90000000**、stack guardは要求サイズ直下。`g_pages=0x15BE00` は実PFN原本の控え、masterの高位aliasではない。PMの再ビルド後はnmで引き直す。
+
+
+**最終全体検査 (T2c、2026-10-01)**: 最終 `PATH=/home/hight/opt/cross/bin:$PATH PYTHONPATH=/tmp/t2ap-python CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null` は **rc=0** (`/tmp/t2c-changed3.log`)。全109検査を変異込みで選択し、最後のソース不変検査も成功。高位AS4/4、BB/可変stack/argv/回収11/11、shlib4/4、形式/世代/旧単位混入14/14はコンパイル成功後の実行時RED、コンパイル失敗0。既存lease10/10も成功。既存配置境界・構文破壊のコンパイル拒否はNOT COUNTEDで、実行時REDへ数えていない。二回目 (`/tmp/t2c-changed2.log`) のrc=2は、配布manifest試験の正常fixtureが旧48B/v3のまま、およびkstr_benchの要求API版68と現行69の不一致。正常fixtureを生成定数による現行60Bへ追従し、kstr_benchを69へ更新した。最新 `CROSS_DIR=/home/hight/opt/cross make all < /dev/null` はrc=0 (`/tmp/t2c-all17.log`)、上のELF測定値は不変。ビルド後に `python3 tools/gen_memmap.py --write`、試験一覧を `python3 tools/gen_tests_inventory.py --write` で更新済み。実装・生成物を固定して全検査を完了し、その後は本結果の文書追記だけを行った。状態行は変更していない。ゲスト/実機/外部アプリの未実施項目は上記のとおり。
 
 ### 5-2. 検査3段と lease 回帰 (d)
 

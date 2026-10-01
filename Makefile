@@ -63,7 +63,7 @@ DEPFILES := $(shell find boot kernel drivers gfx fs exec kapi lib programs sdk \
 	$(AS) -f bin $< -o $@
 
 %.o: %.asm
-	$(AS) -f elf32 $< -o $@
+	$(AS) -p sdk/crt/generations.inc -f elf32 $< -o $@
 
 # === 主要ターゲット ===
 # ゲームは SDK 経由でビルドするので、programs (= SDK のもとになる
@@ -72,6 +72,7 @@ DEPFILES := $(shell find boot kernel drivers gfx fs exec kapi lib programs sdk \
 # 足した物が FD の容量に収まらなければここで落ちる (build/image.mk)。
 all: boot $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/sqlite.bin $(BUILD_OUT)/vmkernel.lz4 \
      images/os32_boot.d88 images/os32_boot144.img programs sdk assets-deployed iso
+	@python3 tools/gen_generation_manifest.py
 
 # === 外部リポジトリ (git submodule) ===
 # apps/ = ske-studio/os32-apps、game/ = ske-studio/os32-game。どちらも SDK だけで
@@ -109,3 +110,6 @@ clean-deps:
 .PHONY: docs-win
 docs-win:
 	sh tools/sync_docs_to_win.sh
+
+# D35: retain the checked link inputs and final ELF for packaging/manifest.
+.PRECIOUS: %.elf

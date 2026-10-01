@@ -37,3 +37,5 @@ _start:
 
 ; 非実行可能スタック宣言 (リンカ警告抑制)
 section .note.GNU-stack noalloc noexec nowrite progbits
+
+%include "sdk/crt/generations.inc"

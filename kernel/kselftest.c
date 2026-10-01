@@ -631,7 +631,7 @@ static void test_memmap_pool_user(void)
 static void test_pool_model(void)
 {
     check(pgalloc_model_state() == PGALLOC_ONLINE, "pool:model online");
-    check(sys_usable_mem_end() >= MEM_EXEC_LOAD_ADDR + MEM_EXEC_STACK_SIZE +
+    check(sys_usable_mem_end() >= MEM_PHYS_EXEC_FLOOR + MEM_EXEC_STACK_SIZE +
           MEM_EXEC_SBRK_MIN + MEM_EXEC_HEAP_MIN, "pool:exec range");
 }
 

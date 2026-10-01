@@ -7,7 +7,7 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 class Integration(unittest.TestCase):
-    def run_c(self, body, flags=(), exec_claim=False, physical_core=False):
+    def run_c(self, body, flags=(), physical_core=False):
         # Arithmetic/ownership unit tests intentionally exercise the private core;
         # staged public high-PFN behavior is tested with real paging separately.
         if physical_core:
@@ -21,14 +21,6 @@ class Integration(unittest.TestCase):
             source += (ROOT / 'kernel/sys.c').read_text().replace('#include "io.h"', '')
             # 旧 legacy pgalloc_init の代わりの足場 (T1a で製品から撤去)。
             source += (ROOT / 'tools/tests/pgalloc_host_fixture.h').read_text()
-            if exec_claim:
-                # Compile the actual layout helper, not a parallel test formula.
-                exec_source = (ROOT / 'exec/exec.c').read_text()
-                reserve = next(line for line in exec_source.splitlines()
-                               if line.startswith('#define EXEC_DYN_RESERVE '))
-                claim = exec_source.split('static void exec_child_claim(', 1)[1]
-                claim = 'static void exec_child_claim(' + claim.split('\n}', 1)[0] + '\n}\n'
-                source += '\n' + reserve + '\n' + claim
             pre = '''#include "types.h"
 int paging_boot_context(void) { return 1; }
 /* Allocator-only fixture runs in the master identity context. */
@@ -226,7 +218,7 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     CHECK(sys_usable_mem_end() == 3776 * PAGE_SIZE);
     /* sys_reserve_top was retired in T1e (TASK_T1_LEDGER §3-6): the usable
        end is min(frozen exec ceiling, ledger_arena_top()), and the arena top
-       is the lowest PERSIST page inside [MEM_EXEC_LOAD_ADDR, arena end),
+       is the lowest PERSIST page inside [MEM_PHYS_EXEC_FLOOR, arena end),
        frozen once at step 6. Before the freeze it is the arena end. */
     CHECK(ledger_arena_top() == 3776);
     CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, 1, 3775, 3776, LEDGER_TOP_DOWN, &p));
@@ -306,62 +298,42 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     CHECK(host_if == 0x202 && saves == restores);
 ''', flags=('-DPHYSMEM_HOST_TEST=1', '-DPGALLOC_HOST_TEST=1'), physical_core=True)
 
-    def test_pool_exec_child_claim_releases_exact_ab(self):
+    def test_pool_private_frames_leave_other_owner_live(self):
         self.run_c('''
-    u32 a, b, baseline, total, gap, p;
-    int na, nb, pass;
-    sys_mem_kb = 16384;
-    host_pool_boot(sys_mem_kb);
-    baseline = pgalloc_free_pages();
-    total = pgalloc_total_pages();
-    exec_child_claim(&a, &na, &b, &nb);
-    /* 窓の撤去 (2026-09-09) で mem_end が 0xfc0000 -> 0x1000000 に伸びた。 */
-    CHECK(a == 0x500000UL && na == 2495);
-    CHECK(b == 0xfbf000UL && nb == 65);
-    CHECK(b + nb * PAGE_SIZE == 0x1000000UL);
-    gap = a + na * PAGE_SIZE;
-    CHECK(b - gap == EXEC_DYN_RESERVE);
-    for (pass = 0; pass < 2; pass++) {
-        host_if = pass ? 2 : 0x202;
-        /* Live dynamic allocation in the intentional A/B hole survives exit. */
-        CHECK(host_alloc_range(1, gap, b) == gap);
-        CHECK(ledger_claim_fixed(K, a / PAGE_SIZE, a / PAGE_SIZE + na));
-        CHECK(ledger_claim_fixed(K, b / PAGE_SIZE, b / PAGE_SIZE + nb));
-        /* same owner: idempotent (nested claims) */
-        CHECK(ledger_claim_fixed(K, a / PAGE_SIZE, a / PAGE_SIZE + na));
-        CHECK(ledger_claim_fixed(K, b / PAGE_SIZE, b / PAGE_SIZE + nb));
-        CHECK(pgalloc_free_pages() == baseline - na - nb - 1);
-        p = 99;
-        CHECK(!pgalloc_alloc_n_owner(K, 1, a / PAGE_SIZE, (a / PAGE_SIZE) + na, LEDGER_BOTTOM_UP, &p));
-        CHECK(!pgalloc_alloc_n_owner(K, 1, b / PAGE_SIZE, (b / PAGE_SIZE) + nb, LEDGER_BOTTOM_UP, &p));
-        CHECK(p == 99);
-        CHECK(pgalloc_free_n_owner(K, a / PAGE_SIZE, na));
-        CHECK(pgalloc_free_n_owner(K, b / PAGE_SIZE, nb));
-        CHECK(pgalloc_free_pages() == baseline - 1);
-        CHECK(pgalloc_total_pages() == total);
-        CHECK(pgalloc_free_n_owner(K, gap / PAGE_SIZE, 1));
-        CHECK(pgalloc_free_pages() == baseline);
-        CHECK(host_if == (pass ? 2U : 0x202U) && saves == restores);
-    }
-''', exec_claim=True)
+    u32 owner, a, b, live, before, left;
+    host_pool_boot(16384); before = pgalloc_free_pages();
+    live = pgalloc_alloc_phys(K, 1); CHECK(live);
+    CHECK(ledger_owner_new(LEDGER_KIND_AS, 2, "private", &owner));
+    a = pgalloc_alloc_phys(owner, 2); b = pgalloc_alloc_phys(owner, 3);
+    CHECK(a && b && ledger_owner_pages(owner) == 5);
+    CHECK(pgalloc_free_n_owner(owner, a / PAGE_SIZE, 2));
+    CHECK(pgalloc_free_n_owner(owner, b / PAGE_SIZE, 3));
+    CHECK(ledger_reclaim_owner(owner, &left) && !left && ledger_owner_retire(owner));
+    CHECK(pgalloc_free_pages() == before - 1);
+    CHECK(pgalloc_free_n_owner(K, live / PAGE_SIZE, 1));
+    CHECK(pgalloc_free_pages() == before);
+''')
 
     def test_pool_shlib_failed_load_releases_one_mib(self):
         self.run_c('''
-    u32 baseline, total;
-    int pages, pass;
+    u32 baseline, total, frames[256];
+    int pages, pass, i;
     host_pool_boot(16384);
     baseline = pgalloc_free_pages();
     total = pgalloc_total_pages();
     pages = (int)(MEM_SHLIB_SIZE / PAGE_SIZE);
-    CHECK(MEM_SHLIB_BASE == 0x400000UL && pages == 256);
+    CHECK(MEM_SHLIB_BASE == 0x80000000UL && pages == 256);
     for (pass = 0; pass < 2; pass++) {
         host_if = pass ? 2 : 0x202;
-        /* shlib_init: claim before vfs_read, free on failed load/validation. */
-        CHECK(ledger_claim_fixed(LEDGER_OWNER_SHLIB, MEM_SHLIB_BASE / PAGE_SIZE,
-                                 MEM_SHLIB_END / PAGE_SIZE));
+        /* T2c originals use actual pool frames, not the high virtual band. */
+        for (i = 0; i < pages; i++) {
+            frames[i] = pgalloc_alloc_phys(LEDGER_OWNER_SHLIB, 1);
+            CHECK(frames[i] && frames[i] < MEM_APP_BAND_BASE);
+        }
         CHECK(pgalloc_free_pages() == baseline - pages);
         CHECK(ledger_owner_pages(LEDGER_OWNER_SHLIB) == (u32)pages);
-        CHECK(pgalloc_free_n_owner(LEDGER_OWNER_SHLIB, MEM_SHLIB_BASE / PAGE_SIZE, pages));
+        for (i = 0; i < pages; i++)
+            CHECK(pgalloc_free_n_owner(LEDGER_OWNER_SHLIB, frames[i] / PAGE_SIZE, 1));
         CHECK(pgalloc_free_pages() == baseline);
         CHECK(pgalloc_total_pages() == total);
         CHECK(host_if == (pass ? 2U : 0x202U) && saves == restores);

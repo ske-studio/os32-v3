@@ -145,13 +145,13 @@ void _start(void) {
     CHECK(ledger_owner_new(LEDGER_KIND_AS,0,"B",&ob));
     CHECK(ledger_owner_new(LEDGER_KIND_AS,0,"SF",&owner));
     /* Initial PT exhaustion rolls back PD/app PT too. */
-    fail_after=2;
+    fail_after=1;
     CHECK(paging_addrspace_create_lease(&a,oa)); CHECK(used_pages==before);
     fail_after=-1;
     CHECK(!paging_addrspace_create_lease(&a,oa));
     CHECK(!paging_addrspace_create_lease(&b,ob));
     watched_roots[0]=a.pd_phys; watched_roots[1]=b.pd_phys;
-    CHECK(ledger_owner_pages(oa)==3 && a.lease_pt_phys[0]);
+    CHECK(ledger_owner_pages(oa)==2 && a.lease_pt_phys[0]);
     pa=pgalloc_alloc_phys(owner,1); CHECK(pa); sf.owner=(u8)owner; sf.first=pa/PAGE_SIZE;
     for(i=0;i<PAGE_SIZE;i++) ((u8 *)P2V(pa))[i]=0xab;
     /* Nonidentity active AS: pa aliases another owned page. Rejection leaves

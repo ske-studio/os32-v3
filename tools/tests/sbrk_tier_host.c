@@ -89,7 +89,7 @@ static void check(int cond, const char *name)
  *  exec_launch() が heap_size 未指定の CPL=3 プログラムに対して組む
  *  レイアウトを、そのままの式で 1 つ作る。帯は既定の 1 枚 (4MB)。
  *
- *    band_top   = MEM_APP_BAND_TOP
+ *    band_top   = (MEM_LEGACY_APP_BASE + MEM_APP_BAND_PDE_SIZE)
  *    heap_top   = band_top - スタック - ガード          (= RING3_HEAP_TOP)
  *    code_end   = ページ境界へ切り上げた text+bss の終端
  *    avail      = heap_top - code_end - 最低分 - ガード
@@ -106,13 +106,13 @@ typedef struct {
 
 static int layout_make(Layout *L, u32 text_bss, u32 band_pdes)
 {
-    u32 band_top = MEM_APP_BAND_BASE + band_pdes * MEM_APP_BAND_PDE_SIZE;
+    u32 band_top = MEM_LEGACY_APP_BASE + band_pdes * MEM_APP_BAND_PDE_SIZE;
     u32 heap_top = band_top - RING3_USTACK_SIZE - PAGE_SIZE;
     u32 avail;
 
-    L->load_base = MEM_EXEC_LOAD_ADDR;
+    L->load_base = MEM_PHYS_EXEC_FLOOR;
     L->band_pdes = band_pdes;
-    L->code_end = PAGE_ALIGN_UP(MEM_EXEC_LOAD_ADDR + text_bss);
+    L->code_end = PAGE_ALIGN_UP(MEM_PHYS_EXEC_FLOOR + text_bss);
     if (heap_top < L->code_end) return 0;
     if (heap_top - L->code_end < MEM_EXEC_SBRK_MIN + PAGE_SIZE + MEM_EXEC_HEAP_MIN)
         return 0;
@@ -269,7 +269,7 @@ static void case_nomem_leaves_others(void)
 /*  性質 4 — 3 領域の外で per-app に取る付随ページ (K7)                    */
 /*                                                                        */
 /*  8MB 構成 (CUI の最低動作環境) のアプリ帯の空きは                       */
-/*    (MEM_APP_BAND_TOP - MEM_EXEC_LOAD_ADDR) / PAGE_SIZE = 768 ページ。   */
+/*    ((MEM_LEGACY_APP_BASE + MEM_APP_BAND_PDE_SIZE) - MEM_PHYS_EXEC_FLOOR) / PAGE_SIZE = 768 ページ。   */
 /*  段 1 の 3 領域 + PD + アプリ PT はここへ **ちょうど** 収まる            */
 /*  (帯 768 - ガード 2 + PD 1 + PT 1)。よって段 1 を採ると空きが 0 になり、 */
 /*  直後の shlib_addrspace_attach() の 4 ページが取れず、gui_demo が        */
@@ -290,7 +290,7 @@ static void case_extra_pages_k7(void)
 
     report("case 4: 付随ページ (shlib data) を勘定に入れる (K7)\n");
     (void)layout_make(&L, 0x10000UL, 1);
-    free_8mb = (MEM_APP_BAND_TOP - MEM_EXEC_LOAD_ADDR) / PAGE_SIZE;
+    free_8mb = ((MEM_LEGACY_APP_BASE + MEM_APP_BAND_PDE_SIZE) - MEM_PHYS_EXEC_FLOOR) / PAGE_SIZE;
 
     host_shlib_pages = 0;
     need_hi_bare = pages_at(&L, L.guard_a);

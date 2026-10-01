@@ -171,7 +171,7 @@ static int init_model(struct physmem *m, void *backing, u32 capacity,
         if (first < lo || first >= hi || pages > hi - first ||
             !all_reserved(m, first, first + pages)) goto done;
     } else if (kind == PGALLOC_BACKING_ARENA_TOP) {
-        if (first < MEM_EXEC_LOAD_ADDR / PAGE_SIZE ||
+        if (first < MEM_PHYS_EXEC_FLOOR / PAGE_SIZE ||
             first >= PHYSMEM_LEGACY_MAX_PFN ||
             pages > PHYSMEM_LEGACY_MAX_PFN - first ||
             first + pages > physmem_legacy_end(m)) goto done;
@@ -194,7 +194,7 @@ static int init_model(struct physmem *m, void *backing, u32 capacity,
                 ws_end > MEM_LEDGER_META_END / PAGE_SIZE ||
                 (ws_first < first + pages && first < ws_end) ||
                 !all_reserved(&next, ws_first, ws_end)) goto done;
-        } else if (ws_first < MEM_APP_BAND_MAX_TOP / PAGE_SIZE || ws_end > first ||
+        } else if (ws_first < MEM_PHYS_WORKSPACE_FLOOR / PAGE_SIZE || ws_end > first ||
                    !physmem_reserve_ram(&next, ws_first, ws_end)) goto done;
         if (!verify(ws_first, ws_end - ws_first, P2V(ws_first * PAGE_SIZE)))
             goto done;
@@ -979,7 +979,7 @@ void ledger_arena_freeze(void)
     u32 p, o;
     unsigned int flags;
     flags = irq_save();
-    for (p = MEM_EXEC_LOAD_ADDR / PAGE_SIZE; !arena_top && p < arena_end; p++) {
+    for (p = MEM_PHYS_EXEC_FLOOR / PAGE_SIZE; !arena_top && p < arena_end; p++) {
         o = owner_map[p];
         if (o && ledger_owners[o].kind == LEDGER_KIND_PERSIST) arena_top = p;
     }

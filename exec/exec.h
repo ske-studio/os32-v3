@@ -28,7 +28,6 @@
  * 旧 MAX_EXEC_NEST は K5b で参照が消えたため削除した (2026-09-11)。 */
 
 /* プログラムのロード先 (固定) */
-#define EXEC_LOAD_ADDR    MEM_EXEC_LOAD_ADDR
 /* ======== API ======== */
 void exec_init(void);
 

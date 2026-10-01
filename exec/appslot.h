@@ -114,6 +114,7 @@ typedef struct {
     u32  exec_heap_used;
     u32  load_addr;
     u32  stack_top;
+    u32  stack_base, stack_size;
 
     /* CPL=3 アプリ固有 (I10: 切替のたびに差し替える「現在のアプリ」の値)。
      * band_top は**私有領域の上端** (= ユーザスタックの上端。exec.c の
@@ -121,7 +122,7 @@ typedef struct {
      * PDE の所有範囲は band_pdes (= as.app_pde_count) が別に持つ。 */
     u32  band_top;
     u32  band_pdes;
-    struct addrspace as;
+    struct addrspace *as;
     u32  pages;               /* この ID が握っている物理ページ数 (D5) */
 
     /* 起動した OS32X ヘッダの flags (票 T8 D1a)。exec_launch が写す。

@@ -16,6 +16,7 @@
 #include "paging.h"
 #include "pgalloc.h"
 #include "shlib.h"
+#include "lease.h"
 #include "fd_redirect.h"
 #include "pipe_buffer.h"
 #include "shm.h"
@@ -162,19 +163,6 @@ static void ring3_trampoline_init(void)
 /* スタックを4バイト境界に揃えるためのマスク */
 #define STACK_ALIGN_MASK 3
 
-/* 動的確保リザーブ (1MB)。
- *
- * 子プロセスの空間はコード+ヒープ+スタックで pgalloc の管理域
- * (0x400000〜mem_end) をほぼ使い切る。かつてはコード 1MB しか
- * pgalloc_mark_used していなかったため、子の実行中に v86_mem_setup() の
- * pgalloc_alloc_n(160) が「空いている」ヒープ領域 0x500000〜 を確保して
- * 636KB を memset(0) し、起動元プログラムのヒープを破壊していた。
- *
- * 対策: 子の exec ヒープをこのぶんだけ縮め、ヒープ末尾とスタックガードの
- * 間に pgalloc 専用の穴を残す。V86 バッキング RAM (160 ページ = 640KB
- * 連続) はここから取れる。 */
-#define EXEC_DYN_RESERVE  (256UL * PAGE_SIZE)
-
 /* ======================================================================== */
 /*  コンテキストは exec/appslot.{h,c} の AppSlot 表 (K5b、票 D2/I14)         */
 /*                                                                          */
@@ -236,83 +224,18 @@ static u32 *g_cur_frame = 0;
 /*  がここを参照して master PD へ戻し AS を破棄する。                        */
 /* ======================================================================== */
 
-/* リング3 ユーザスタック: アプリ帯 (APP_BAND_PDE から始まる帯) の上端に置く
- * (M1_RING3 §5)。プログラム (code + sbrk + exec_heap) は MEM_EXEC_LOAD_ADDR
- * からスタックガード直下まで (レイアウトは include/memmap.h の子プロセス帯の
- * 説明を参照)。K3 でロードアドレスが 1MB 上がったが、**帯の上端は
- * MEM_EXEC_LOAD_ADDR から導かない** — 帯そのものの定数から導く。
- *
- * 2026-09-10 (票 docs/tasks/memory/APP_BAND_PDE.md): 帯の上端は固定ではなく
- * 「アプリ固有 PDE の枚数 × 4MB」。枚数は exec_run がヘッダの heap_size から
- * 決める (paging_app_band_pdes)。heap_size を指定しないプログラムは必ず
- * 1 枚 = 従来と完全に同じレイアウトになる。
- *
- * RING3_USTACK_TOP 以下は**実行時の値**を返すマクロ。定数式が要る文脈
- * (配列長・static 初期化子・case ラベル) では使えないので注意。
- * RING3_USTACK_TOP は「帯の上端」ではなく「私有領域の上端」(g_ring3_band_top
- * の注釈): 共有 BB が帯の中にある 8MB + PEGC ではその下 (0x7B5000) になる。 */
-#define RING3_USTACK_TOP     g_ring3_band_top
-/* ユーザスタックサイズ。旧 CPL=0 子プロセスの MEM_EXEC_STACK_SIZE (256KB) に
- * 合わせる (ring3 デフォルト化での深いスタック使用の回帰を避ける)。
- * スタック帯 [上端-256KB, 上端) はプログラム帯 (0x500000-) と
- * 共有ライブラリ帯 (0x400000-0x4FFFFF) より十分上。 */
-#define RING3_USTACK_SIZE    MEM_EXEC_STACK_SIZE
-
-/* ヒープとスタックの間に 1 ページのガードを挟む (v2 M3 ハードニング)。
- * ヒープのオーバーラン / スタックのアンダーフローがガード(非present)に当たり
- * #PF → ring3_fault_kill でアプリのみ kill。相互の静かな破壊を防ぐ。 */
-#define RING3_GUARD_SIZE     PAGE_SIZE
-#define RING3_STACK_BOTTOM   (RING3_USTACK_TOP - RING3_USTACK_SIZE)
-#define RING3_GUARD_BASE     (RING3_STACK_BOTTOM - RING3_GUARD_SIZE)
-#define RING3_HEAP_TOP       RING3_GUARD_BASE   /* heap 上限=ガード直下 */
-
-/* 帯を最大まで伸ばしたときの上端 / ヒープ上限 (定数)。
- * ファイル読み込みの上限を決めるのに使う — 実際の枚数はヘッダを読むまで
- * 決まらないので、読み込み段階では最大側で見積もる。 */
-#define RING3_USTACK_TOP_MAX MEM_APP_BAND_MAX_TOP
-#define RING3_HEAP_TOP_MAX   (RING3_USTACK_TOP_MAX - RING3_USTACK_SIZE - \
-                              RING3_GUARD_SIZE)
-
-/* 現在の (= いま起動中/実行中の) CPL=3 アプリの **私有領域の上端**。
- * 既定は 1 枚ぶん (ring3_band_set(1) の値) で、CPL=3 アプリが居ない間は必ずこの値。
- * 通常は MEM_APP_BAND_TOP、8MB + PEGC のように BB が帯の中にあるときは
- * sys_usable_mem_end() (= BB の下端) まで下がる。
- * ring3_ptr_ok / argv 積み / USER 写像がすべてここを見るので、
- * 起動失敗・fault kill・正常終了のいずれでも必ず既定へ戻すこと。
- *
- * **帯の上端 (PDE の所有範囲 = g_ring3_band_pdes 枚 × 4MB) とは別の値**
- * (2026-09-30)。私有領域 (本体 / sbrk / exec_heap / ガード / スタック) は
- * 帯の上端と sys_usable_mem_end() の**低い方**までしか使わない。PEGC の
- * バックバッファ (BB) は起動時の ⑥ が池の CPL=0 子のアリーナの上端から取り、
- * sys_usable_mem_end() はその下に凍結される (T1e、TASK_T1_LEDGER §3-6 — 旧
- * sys_reserve_top と同じ区間) ので、8MB 機では [0x7B5000, 0x800000) = 帯
- * 1 枚の中に来る。BB は全アプリ共有で
- * 恒等 (仮想 = 物理) に写す約束 (gfx_get_framebuffer / pegc_init が同じ
- * 番地を使う) なので、私有領域の方が BB の下で止まる — 以前は帯の上端
- * 0x800000 まで私有ページを張ってから BB を恒等で重ねていたため、スタック
- * 64 + exec_heap 上端 10 = 74 ページの PTE が BB の物理で上書きされ、
- * teardown で戻らず (起動・終了のたびに used_pages +74、4 本目で NOMEM)、
- * 走っているアプリのスタックが共有の BB と同じ物理になっていた。
- * 17MB (BB = 0xEB2000、帯の上) や 9801 planar (BB = 0x6A000、帯の下)、
- * Cirrus (BB = デバイス窓) では sys_usable_mem_end() >= 帯の上端なので値は
- * 変わらない。CPL=0 の子のスタック上端 (exec_launch の stack_top = mem_end)
- * と同じ天井を見ることになる。 */
-static u32 g_ring3_band_top = MEM_APP_BAND_TOP;
-static u32 g_ring3_band_pdes = 1;
-
+/* T2c virtual stack. The caller slot carries its actual size. */
+#define RING3_USTACK_TOP MEM_APP_STACK_TOP
+#define RING3_USTACK_SIZE MEM_EXEC_STACK_SIZE
+#define RING3_HEAP_TOP (MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE - PAGE_SIZE)
+#define RING3_STACK_BOTTOM (g_cur_app ? g_cur_app->stack_base : MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE)
+static u32 g_ring3_band_top = MEM_APP_STACK_TOP;
+static u32 g_ring3_band_pdes = MEM_APP_BAND_MAX_PDES;
 static void ring3_band_set(u32 pdes)
 {
-    u32 top, cap;
-    if (pdes < 1) pdes = 1;
-    if (pdes > MEM_APP_BAND_MAX_PDES) pdes = MEM_APP_BAND_MAX_PDES;
-    g_ring3_band_pdes = pdes;
-    top = MEM_APP_BAND_BASE + pdes * MEM_APP_BAND_PDE_SIZE;
-    /* 私有領域は「割り当ててよい物理の上限」より上へ伸ばさない。BB (起動時の
-     * ⑥ が確保、owner = boot → gshell) はこの上にある。ブート後は動かない
-     * 値なので、restore (exec_restore_context) で呼び直しても同じになる。 */
-    cap = sys_usable_mem_end() & ~(u32)(PAGE_SIZE - 1);
-    if (cap < top) top = cap;
-    g_ring3_band_top = top;
+    (void)pdes;
+    g_ring3_band_top = MEM_APP_STACK_TOP;
+    g_ring3_band_pdes = MEM_APP_BAND_MAX_PDES;
 }
 
 /* いま走っている CPL=3 アプリのスロット (0 = 居ない)。かつての
@@ -518,8 +441,10 @@ u32 exec_kapi_layout_selftest(void)
     h.header_size = OS32X_HDR_V2_SIZE;
     if (os32x_layout_check(&h, 4096u, KAPI_DATA_FIELDS_OFF) != OS32X_LAYOUT_OLD)
         bad |= 1u << 3;
-    h.version = 3;
-    h.header_size = OS32X_HDR_V3_SIZE;
+    h.version = OS32X_HDR_VERSION;
+    h.header_size = OS32X_HDR_SIZE;
+    h.kapi_abi_generation = OS32_KAPI_ABI_GENERATION;
+    h.memory_layout_generation = OS32_MEMORY_LAYOUT_GENERATION;
     h.kapi_data_off = (u32)KAPI_DATA_FIELDS_OFF - 4u;
     if (os32x_layout_check(&h, 4096u, KAPI_DATA_FIELDS_OFF) != OS32X_LAYOUT_MISMATCH)
         bad |= 1u << 3;
@@ -902,7 +827,7 @@ int ring3_user_ranges_writable_always(u32 pa, u32 la, u32 pb, u32 lb)
      * master を往復すると、時計 1 回あたり CR3 の書き込みが 4 回になる。 */
     saved = irq_save();
     /* CR3 は**この場で自分で読む** — KAPI 入口に控えを取る機構は無く、
-     * `g_cur_app->as.pd_phys` は入口で走っていた CR3 とは別物であり得る
+     * `g_cur_app->as->pd_phys` は入口で走っていた CR3 とは別物であり得る
      * (Approve 後の注意 1)。共有グローバルには書かない。 */
     app_cr3 = paging_current_cr3() & ~(u32)0xFFFu;
     master  = paging_kernel_pd_phys() & ~(u32)0xFFFu;
@@ -950,102 +875,6 @@ int ring3_user_range_ok(u32 p, u32 len)
 }
 
 #include "ksetjmp.h"
-
-/* ======================================================================== */
-/*  exec_child_claim — 子プロセスが占有する物理ページ範囲を求める            */
-/*                                                                          */
-/*  範囲 A: コード + guard_a + exec ヒープ (動的確保リザーブの手前まで)      */
-/*  範囲 B: guard_b + スタック (mem_end まで)                               */
-/*  A と B の間の穴 (EXEC_DYN_RESERVE) は pgalloc の動的確保用に残す。       */
-/*                                                                          */
-/*  mark (exec_run) と free (setjmp 復帰) の双方から同じ式で計算する。       */
-/*  グローバル (sys_mem_kb) と定数だけから求めるのは、setjmp 後に書き換わる  */
-/*  ローカル変数を longjmp 復帰側で参照しないため。                          */
-/* ======================================================================== */
-static void exec_child_claim(u32 *a_start, int *a_pages,
-                             u32 *b_start, int *b_pages)
-{
-    u32 mem_end = sys_usable_mem_end();  /* 末尾はホットデプロイ用に予約 */
-    u32 guard_b = mem_end - MEM_EXEC_STACK_SIZE - PAGE_SIZE;
-    u32 a_end = guard_b;
-
-    if (guard_b > MEM_EXEC_LOAD_ADDR &&
-        (guard_b - MEM_EXEC_LOAD_ADDR) > EXEC_DYN_RESERVE * 2) {
-        a_end = guard_b - EXEC_DYN_RESERVE;
-    }
-    *a_start = MEM_EXEC_LOAD_ADDR;
-    *a_pages = (int)((a_end - MEM_EXEC_LOAD_ADDR) / PAGE_SIZE);
-    *b_start = guard_b;
-    *b_pages = (int)((mem_end - guard_b) / PAGE_SIZE);
-}
-
-/* ======================================================================== */
-/*  ring3_band_ram_top — アプリ帯を伸ばしてよい物理上限                      */
-/*                                                                          */
-/*  子プロセスの claim 範囲 A の末尾。そこまでは exec_child_claim が          */
-/*  pgalloc に予約させるので、帯を伸ばしてもアプリのヒープと pgalloc の       */
-/*  動的確保 (V86 バッキング・PD/PT) が同じページを二重に使うことがない。     */
-/*  8MB 構成では帯 1 枚ぶんにも届かないが、paging_app_band_pdes() が          */
-/*  最低 1 枚を返すので従来の挙動 (帯 = 0x400000-0x7FFFFF) は変わらない。     */
-/* ======================================================================== */
-static u32 ring3_band_ram_top(void)
-{
-    /* K5b (D1/I4): CPL=3 アプリはもう [0x500000, mem_end) を丸ごと押さえない。
-     * 物理は pgalloc から必要枚数だけ取るので、帯を伸ばしてよい上限は
-     * 「実 RAM の上端」そのもの。入らなければ pgalloc が失敗し、exec が
-     * EXEC_ERR_NOMEM で拒否する (切り詰めない・スワップしない、D5)。 */
-    return sys_usable_mem_end();
-}
-
-
-/* CPL=0 の子 (mkos32x --cpl0) は従来どおり identity で走り、固定帯
- * [MEM_EXEC_LOAD_ADDR, mem_end) を exec_child_claim で押さえる (D7)。
- * CPL=3 アプリはもう押さえないので、claim を返してよいのは
- * **CPL=0 の子が 1 本も居なくなったとき**。段の深さでは決められない
- * (GUI アプリが CPL=0 の子を持てるため) ので本数で数える。 */
-static int g_cpl0_children = 0;
-/* claim の台帳の owner (T2 まで の暫定、TASK_T1_LEDGER §3-6・§4-8)。最初の子
- * で取り、最後の子が居なくなったら返して番号を返却する。 */
-static u32 g_cpl0_owner;
-
-/* 固定帯を owner 付きで押さえる。**他 owner のページが 1 つでも混じれば
- * 何も押さえずに -1** (claim は入口判定 appslot_cpl0_admit の後ろの第二の
- * 防御線で、呼び手はロードを始める前に EXEC_ERR_NOMEM で断る)。 */
-static int exec_cpl0_claim(int id)
-{
-    u32 ca_start, cb_start, owner;
-    int ca_pages, cb_pages;
-    if (g_cpl0_children > 0) {
-        g_cpl0_children++;
-        return 0;
-    }
-    if (!ledger_owner_new(LEDGER_KIND_AS, (u32)id, "cpl0", &owner)) return -1;
-    exec_child_claim(&ca_start, &ca_pages, &cb_start, &cb_pages);
-    if (!ledger_claim_fixed(owner, ca_start / PAGE_SIZE,
-                            ca_start / PAGE_SIZE + (u32)ca_pages)) {
-        (void)ledger_owner_retire(owner);
-        return -1;
-    }
-    if (!ledger_claim_fixed(owner, cb_start / PAGE_SIZE,
-                            cb_start / PAGE_SIZE + (u32)cb_pages)) {
-        (void)ledger_reclaim_owner(owner, 0);
-        (void)ledger_owner_retire(owner);
-        return -1;
-    }
-    g_cpl0_owner = owner;
-    g_cpl0_children = 1;
-    return 0;
-}
-
-static void exec_cpl0_release(void)
-{
-    if (g_cpl0_children <= 0) return;
-    if (--g_cpl0_children > 0) return;
-    /* claim で取ったページは全部この owner のもの (A と B)。一括で返す。 */
-    (void)ledger_reclaim_owner(g_cpl0_owner, 0);
-    (void)ledger_owner_retire(g_cpl0_owner);
-    g_cpl0_owner = 0;
-}
 
 /* ======================================================================== */
 /*  sbrk 物理の二段構え (ユーザー決裁 2026-09-11)                            */
@@ -1136,6 +965,7 @@ static int app_map_region(struct addrspace *as, u32 vstart, u32 vend)
 
     phys = pgalloc_alloc_phys(as->owner, (int)pages);
     if (phys) {
+        kmemset(P2V(phys), 0, pages * PAGE_SIZE);
         if (paging_addrspace_map_user_range_phys(as, vstart, vend, phys,
                                                  PAGE_RW | PTE_USER) == 0) {
             return 0;
@@ -1147,6 +977,7 @@ static int app_map_region(struct addrspace *as, u32 vstart, u32 vend)
     for (v = vstart; v < vend; v += PAGE_SIZE) {
         phys = pgalloc_alloc_phys(as->owner, 1);
         if (!phys) return -1;
+        kmemset(P2V(phys), 0, PAGE_SIZE);
         if (paging_addrspace_map_user(as, v, phys, PAGE_RW | PTE_USER) != 0) {
             pgalloc_free_n_owner(as->owner, phys / PAGE_SIZE, 1);
             return -1;
@@ -1172,6 +1003,43 @@ static int app_map_region(struct addrspace *as, u32 vstart, u32 vend)
 /*  帯の中でも私有領域の上 (8MB + PEGC) はアプリ固有 PT に、帯の外はその PD  */
 /*  が master と共有する PT に書く — どちらも teardown が返す 3 領域の外。   */
 /* ======================================================================== */
+/* Copy launch data through physical backing while the master PD is active. */
+/* Read the launcher's bytes after switching to master; no high-VA dereference. */
+static int exec_stack_bytes(u32 requested, u32 command_bytes, u32 *bytes)
+{
+    u32 size = MEM_EXEC_STACK_SIZE;
+    if (requested) {
+        if (requested > 0x7fffffffUL - (PAGE_SIZE - 1)) return -1;
+        size = PAGE_ALIGN_UP(requested);
+        if (size < MEM_APP_STACK_MIN) size = MEM_APP_STACK_MIN;
+    }
+    if (size > MEM_APP_STACK_TOP - MEM_EXEC_HEAP_BASE - PAGE_SIZE ||
+        command_bytes > size - OS32_MAX_ARGS * sizeof(u32) - 64) return -1;
+    *bytes = size;
+    return 0;
+}
+
+static u8 launch_read_byte(u32 pd, const char *p)
+{
+    u32 pa = (u32)p;
+    if ((u32)p >= MEM_APP_BAND_BASE && (u32)p < MEM_LEASE_END &&
+        as_va_to_pa(pd, (u32)p, &pa)) return 0;
+    return *(const u8 *)P2V(pa);
+}
+
+static int app_store(AppSlot *a, u32 va, const void *src, u32 len)
+{
+    const u8 *p = src;
+    while (len) {
+        u32 pa = va, n = PAGE_SIZE - (va & (PAGE_SIZE - 1));
+        if (n > len) n = len;
+        if (a->cpl3 && as_va_to_pa(a->as->pd_phys, va, &pa)) return -1;
+        kmemcpy(P2V(pa), p, n);
+        va += n; p += n; len -= n;
+    }
+    return 0;
+}
+
 static int exec_bb_overlaps_user(u32 bb_base, u32 bb_size, u32 user_top)
 {
     u32 bb_end;
@@ -1211,31 +1079,31 @@ static int exec_map_shared_bb(struct addrspace *as, u32 user_top)
 /* 取り残し (3 領域の外に張られたまま返らなかったページ) の累計。R5 (a) の
  * 診断で、0 のままが正常 (カーネルシンボル。KAPI にはしない)。 */
 u32 exec_as_leftover_pages;
+u32 exec_entry_calls; /* D35: rejected images leave this counter unchanged. */
 
 static void exec_teardown_app(AppSlot *a)
 {
     u32 left;
-    if (!a || !a->cpl3 || !a->as.pd_phys) return;
+    if (!a || !a->cpl3 || !a->as || !a->as->pd_phys) return;
     /* 共有ライブラリの .data 複製ページを返す (PD 破棄の前, K3) */
-    shlib_addrspace_detach(&a->as);
+    lease_revoke_all(a->as);
+    shlib_addrspace_detach(a->as);
     if (a->sbrk_heap_limit > a->load_addr)
-        paging_addrspace_free_user_range(&a->as, a->load_addr,
+        paging_addrspace_free_user_range(a->as, a->load_addr,
                                          a->sbrk_heap_limit);
     if (a->exec_heap_size)
-        paging_addrspace_free_user_range(&a->as, a->exec_heap_base,
+        paging_addrspace_free_user_range(a->as, a->exec_heap_base,
                                          a->exec_heap_base + a->exec_heap_size);
-    if (a->band_top > RING3_USTACK_SIZE)
-        paging_addrspace_free_user_range(&a->as,
-                                         a->band_top - RING3_USTACK_SIZE,
-                                         a->band_top);
-    paging_addrspace_destroy(&a->as);
+    paging_addrspace_free_user_range(a->as, a->stack_base, a->stack_top);
+    paging_addrspace_destroy(a->as);
     /* 最後に AS owner の取り残しを台帳から掃除し (件数は診断へ)、番号を返す
      * (TASK_T1_LEDGER §3-2、R5 (a))。 */
     left = 0;
-    if (ledger_reclaim_owner(a->as.owner, &left))
+    if (ledger_reclaim_owner(a->as->owner, &left))
         exec_as_leftover_pages += left;
-    (void)ledger_owner_retire(a->as.owner);
-    a->as.owner = 0;
+    (void)ledger_owner_retire(a->as->owner);
+    kfree(a->as);
+    a->as = 0;
     a->cpl3 = 0;
 }
 
@@ -1243,7 +1111,7 @@ static void exec_teardown_app(AppSlot *a)
  * syscall の中) なら呼び手の AS、カーネルの中からなら kernel。 */
 u32 exec_ledger_owner(void)
 {
-    return (g_cur_app && g_cur_app->cpl3) ? g_cur_app->as.owner
+    return (g_cur_app && g_cur_app->cpl3) ? g_cur_app->as->owner
                                          : LEDGER_OWNER_KERNEL;
 }
 
@@ -1263,10 +1131,10 @@ static void exec_restore_context(int id)
     AppSlot *a = appslot_at(id);
     if (!a) return;
 
-    if (a->cpl3 && a->as.pd_phys) {
+    if (a->cpl3 && a->as->pd_phys) {
         g_cur_app = a;
         ring3_band_set(a->band_pdes);
-        paging_load_cr3(a->as.pd_phys);
+        paging_load_cr3(a->as->pd_phys);
     } else {
         g_cur_app = 0;
         ring3_band_set(1);
@@ -1440,7 +1308,7 @@ static u32 g_exit_jmpbuf[KSETJMP_BUF_LEN];
 static void exec_finish(int id, int status, int kind)
 {
     AppSlot *a = appslot_get(id);
-    int parent;
+    int parent = APP_ID_SHELL;
     u32 k;
 
     if (!a) return;
@@ -1488,7 +1356,6 @@ static void exec_finish(int id, int status, int kind)
         res_owner_set(0);
         exec_reclaim_owned(id);
     } else {
-        if (!a->cpl3) exec_cpl0_release();
         parent = appslot_return_target(id);
         /* 装置・FD の利用終了を私有ページの返却より先に済ませる (R1)。 */
         exec_reclaim_resources(id);
@@ -1638,8 +1505,8 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
      * 上端でクランプして over-read #PF を避ける。 */
     window = (nbytes < RING3_ARG_WINDOW) ? RING3_ARG_WINDOW : nbytes;
     if ((u32)args_src < RING3_USTACK_TOP &&
-        (u32)args_src + window > RING3_USTACK_TOP) {
-        window = RING3_USTACK_TOP - (u32)args_src;
+        window > g_cur_app->stack_top - (u32)args_src) {
+        window = g_cur_app->stack_top - (u32)args_src;
     }
 
     /* 本物の wrap を呼ぶ (現 CR3 = アプリ PD)。戻り値を eax スロットへ。
@@ -1720,14 +1587,14 @@ static int exec_launch(const char *cmdline, int gui_arg)
     u32 exec_heap_base, exec_heap_size;
     u32 sbrk_end;            /* 実際に物理を張る sbrk の上端 (= sbrk 上限) */
     int sbrk_tier = 0;       /* sbrk 物理の段 (1 = 従来式 / 2 = 最低分、0 = 非CPL3) */
-    u32 heap_top_cpl0 = 0;
+    u32 stack_size = MEM_EXEC_STACK_SIZE;
+    u32 legacy_pdes = 1;
     int is_shell;
     int launcher_id;
     int id;
     u32 need_pages;
 
-    u32 mem_end = sys_usable_mem_end();  /* 末尾はホットデプロイ用に予約 */
-    u8 *file_buf;
+    u32 mem_end = sys_usable_mem_end();
     u8 *load_addr;
     OS32Header *hdr;
     int sz;
@@ -1743,7 +1610,9 @@ static int exec_launch(const char *cmdline, int gui_arg)
     /* ヘッダだけを先に読むカーネル側バッファ。本体を読む先の物理は、
      * ヘッダの text_size / bss_size / heap_size を見るまで決まらない
      * (D1 の「起動時の順序」手順 2)。 */
-    static u8 hdrbuf[OS32X_HDR_V3_SIZE + 64];
+    static u8 hdrbuf[OS32X_HDR_SIZE];
+    u32 launcher_pd = paging_current_cr3();
+    int launch_cmd_len = kstrlen(cmdline);
     const char *p = cmdline;
     int i = 0;
 
@@ -1788,25 +1657,11 @@ static int exec_launch(const char *cmdline, int gui_arg)
         exec_heap_base = 0;
         exec_heap_size = 0;
     } else {
-        /* 子プロセス: 0x500000〜。guard_a / exec_heap はヘッダを見てから。 */
-        u32 child_stack_bottom;
-        u32 read_top;
         load_base = MEM_EXEC_LOAD_ADDR;
-        stack_top = mem_end;
-        child_stack_bottom = stack_top - MEM_EXEC_STACK_SIZE;
-        guard_b   = child_stack_bottom - PAGE_SIZE;
-        heap_top_cpl0 = guard_b;
-        if (guard_b > MEM_EXEC_LOAD_ADDR &&
-            (guard_b - MEM_EXEC_LOAD_ADDR) > EXEC_DYN_RESERVE * 2) {
-            heap_top_cpl0 = guard_b - EXEC_DYN_RESERVE;
-        }
-        read_top = (heap_top_cpl0 < RING3_HEAP_TOP_MAX) ?
-                   heap_top_cpl0 : RING3_HEAP_TOP_MAX;
-        max_size = read_top - load_base - MEM_EXEC_SBRK_MIN - PAGE_SIZE - MEM_EXEC_HEAP_MIN;
-        guard_a = 0;
-        sbrk_end = 0;
-        exec_heap_base = 0;
-        exec_heap_size = 0;
+        stack_top = MEM_APP_STACK_TOP;
+        guard_a = guard_b = sbrk_end = exec_heap_base = exec_heap_size = 0;
+        max_size = MEM_EXEC_HEAP_BASE - load_base;
+
     }
 
     load_addr = (u8 *)load_base;
@@ -1848,12 +1703,6 @@ static int exec_launch(const char *cmdline, int gui_arg)
 
     hdr = (OS32Header *)hdrbuf;
 
-    if (hdr->magic != OS32X_MAGIC || hdr->header_size < OS32X_HDR_V1_SIZE ||
-        hdr->min_api_ver > KAPI_VERSION) {
-        shell_print("Error: invalid OS32X binary\n", ATTR_RED);
-        return EXEC_ERR_INVALID;
-    }
-
     /* ---- KAPI データ欄の配置の照合 (票 TASK_KAPI_DATA_FIELDS、ヘッダ v3) ----
      * v62 以前のバイナリはデータ欄 (sbrk_heap_limit / shm_base) を別の
      * オフセットで読む。走らせると malloc が全部 ENOMEM になったり共有メモリの
@@ -1872,25 +1721,14 @@ static int exec_launch(const char *cmdline, int gui_arg)
         }
     }
 
-    /* ---- ロードアドレスの照合 (K3) ---- */
-    if (!is_shell) {
-        if (hdr->version < OS32X_HDR_VERSION ||
-            hdr->header_size < OS32X_HDR_V2_SIZE) {
-            shell_print("Error: old OS32X binary (no load_addr) - rebuild required\n",
-                        ATTR_RED);
-            return EXEC_ERR_INVALID;
-        }
-        if (hdr->load_addr == 0) {
-            kprintf(0xE1, "[exec] warning: %s has no load_addr\n", path);
-        } else if (hdr->load_addr != load_base) {
-            kprintf(0xC1, "[exec] load addr mismatch: bin=%x expected=%x\n",
-                    hdr->load_addr, load_base);
-            shell_print("Error: OS32X load address mismatch - rebuild required\n",
-                        ATTR_RED);
-            return EXEC_ERR_INVALID;
-        }
+    if (hdr->load_addr != load_base || (hdr->flags & OS32X_FLAG_SHLIB) ||
+        !hdr->text_size || hdr->entry_offset >= hdr->text_size ||
+        hdr->text_size > max_size || hdr->bss_size > max_size - hdr->text_size) {
+        if (is_shell) g_layout_reject = 1;
+        return EXEC_ERR_INVALID;
     }
 
+    if (hdr->shlib_protocol && !shlib_loaded()) return EXEC_ERR_INVALID;
     code_off  = hdr->header_size;
     text_sz   = hdr->text_size;
     bss_sz    = hdr->bss_size;
@@ -1909,95 +1747,47 @@ static int exec_launch(const char *cmdline, int gui_arg)
         return OS32_ERR_INVAL;
     }
 
-    /* v2 M3a: ring3 をデフォルト化。シェルは CPL=0 のまま。それ以外の全
-     * プログラムを CPL=3 で起動する。稀に CPL=3 で動かせないものは
-     * OS32X_FLAG_FORCE_CPL0 (mkos32x --cpl0) で CPL=0 に落とす。 */
-    want_ring3 = appslot_launch_is_app(is_shell, hdr->flags);
+    want_ring3 = !is_shell;
     if (want_ring3) {
-        u32 code_end_est = PAGE_ALIGN_UP(load_base + text_sz + bss_sz);
-        ring3_band_set(paging_app_band_pdes(code_end_est, heap_sz,
-                                            ring3_band_ram_top()));
-        stack_top = RING3_USTACK_TOP;
-    } else {
-        /* --cpl0 の子はアプリ帯を丸ごと identity で押さえる (D7)。生きている
-         * CPL=3 アプリの per-app 物理を上書きし、終了時に他人のページを
-         * 解放してしまうので、1 本でも居たら起動しない (決裁 2026-09-11)。
-         * さらに票 T8 D1 で「GUI からの起動 (exec_start) は生存アプリの
-         * 有無に関わらず断る」— VRAM を直接触るので画面の所有者の外側で
-         * 画面を壊す。CUI の exec_run は従来どおり。
-         * exec_cpl0_claim() より前 — claim も alloc もまだ何もしていない。 */
-        int cpl0_rc = appslot_cpl0_admit(is_shell, gui);
-        if (cpl0_rc < 0) {
-            if (cpl0_rc == OS32_ERR_INVAL) {
-                shell_print("Error: cui only - run this from CUI mode\n",
-                            ATTR_RED);
-            } else {
-                shell_print("Error: close GUI apps before running a --cpl0 program\n",
-                            ATTR_RED);
-            }
-            return cpl0_rc;
-        }
+        if (exec_stack_bytes(hdr->stack_size, (u32)launch_cmd_len, &stack_size))
+            return EXEC_ERR_INVALID;
+        guard_b = stack_top - stack_size - PAGE_SIZE;
     }
 
     if (!is_shell) {
         /* 子プロセス帯のレイアウト確定 (include/memmap.h 参照):
          *   [load..code_end) 本体 / [code_end..guard_a) sbrk / [guard_a] ガード /
          *   [exec_heap_base..heap_top) exec_heap */
-        u32 heap_top = want_ring3 ? RING3_HEAP_TOP : heap_top_cpl0;
-        u32 code_end = (load_base + text_sz + bss_sz + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
-        u32 need = MEM_EXEC_SBRK_MIN + PAGE_SIZE + MEM_EXEC_HEAP_MIN;
-        u32 avail;
-
-        if (heap_top < code_end || heap_top - code_end < need) {
-            shell_print("[DBG] NOMEM: text=", 0xE1);
-            shell_print_dec(text_sz, 0xE1);
-            shell_print(" bss=", 0xE1);
-            shell_print_dec(bss_sz, 0xE1);
-            shell_print(" max=", 0xE1);
-            shell_print_dec((heap_top > load_base + need) ? heap_top - need - load_base : 0, 0xE1);
-            shell_print("\n", 0xE1);
-            exec_restore_band(launcher_id);   /* 帯を起動元の値へ戻す */
+        u32 code_end = PAGE_ALIGN_UP(MEM_PHYS_EXEC_FLOOR + text_sz + bss_sz);
+        u32 heap_top, avail, old_exec, old_guard, old_sbrk;
+        legacy_pdes = paging_app_band_pdes(code_end, heap_sz, mem_end);
+        heap_top = MEM_LEGACY_APP_BASE + legacy_pdes * MEM_APP_BAND_PDE_SIZE;
+        if (mem_end < heap_top) heap_top = mem_end & ~(u32)(PAGE_SIZE - 1);
+        if (heap_top < MEM_EXEC_STACK_SIZE + PAGE_SIZE) return EXEC_ERR_NOMEM;
+        heap_top -= MEM_EXEC_STACK_SIZE + PAGE_SIZE;
+        if (heap_top < code_end || heap_top - code_end < MEM_EXEC_SBRK_MIN + PAGE_SIZE + MEM_EXEC_HEAP_MIN)
             return EXEC_ERR_NOMEM;
-        }
         avail = heap_top - code_end - MEM_EXEC_SBRK_MIN - PAGE_SIZE;
-        if (heap_sz > 0) {
-            exec_heap_size = (heap_sz + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+        if (heap_sz) {
+            if (heap_sz > 0xffffffffUL - (PAGE_SIZE - 1)) return EXEC_ERR_INVALID;
+            exec_heap_size = PAGE_ALIGN_UP(heap_sz);
             if (exec_heap_size < MEM_EXEC_HEAP_MIN) exec_heap_size = MEM_EXEC_HEAP_MIN;
-            /* 要求に足りないときは**黙って切り詰めず拒否する** (2026-09-10 方針)。*/
-            if (exec_heap_size > avail) {
-                shell_print("[DBG] NOMEM: heap request=", 0xE1);
-                shell_print_dec(heap_sz, 0xE1);
-                shell_print(" avail=", 0xE1);
-                shell_print_dec(avail, 0xE1);
-                shell_print("\n", 0xE1);
-                exec_restore_band(launcher_id);
-                return EXEC_ERR_NOMEM;
-            }
+            if (exec_heap_size > avail) return EXEC_ERR_NOMEM;
         } else {
-            exec_heap_size = (avail / 2) & ~(PAGE_SIZE - 1);
+            exec_heap_size = (avail / 2) & ~(u32)(PAGE_SIZE - 1);
             if (exec_heap_size < MEM_EXEC_HEAP_MIN) exec_heap_size = MEM_EXEC_HEAP_MIN;
         }
-        exec_heap_base = heap_top - exec_heap_size;
-        guard_a = exec_heap_base - PAGE_SIZE;
-
-        /* sbrk に **物理を張る**範囲を決める。per-app 物理では張ったぶんしか
-         * 無いので、張らない [sbrk_end, guard_a) は穴のままにし、sbrk 上限も
-         * sbrk_end に下げる — こうすると足りないとき newlib の sbrk が素直に
-         * 失敗し (malloc が NULL を返す)、静かな #PF にならない。
-         * CPL=0 の子は従来どおり帯を丸ごと identity で押さえるので guard_a。 */
-        if (!want_ring3) {
-            sbrk_end = guard_a;
-        } else if (heap_sz > 0) {
-            /* heap_size 明示は K5b-K のまま最低分に固定 (段の分岐なし)。 */
-            sbrk_end = code_end + MEM_EXEC_SBRK_MIN;
-            if (sbrk_end > guard_a) sbrk_end = guard_a;
-            sbrk_tier = (sbrk_end >= guard_a) ? 1 : 2;
-        } else {
-            /* heap_size 未指定は二段構え (決裁 2026-09-11)。 */
-            sbrk_tier = exec_sbrk_pick_tier(load_base, code_end, guard_a,
-                                            exec_heap_size, g_ring3_band_pdes,
-                                            pgalloc_free_pages(), &sbrk_end);
-        }
+        old_exec = heap_top - exec_heap_size;
+        old_guard = old_exec - PAGE_SIZE;
+        if (heap_sz) { old_sbrk = code_end + MEM_EXEC_SBRK_MIN; sbrk_tier = 2; }
+        else sbrk_tier = exec_sbrk_pick_tier(MEM_PHYS_EXEC_FLOOR, code_end, old_guard,
+                                           exec_heap_size, legacy_pdes, pgalloc_free_pages(), &old_sbrk);
+        if (!sbrk_tier) return EXEC_ERR_NOMEM;
+        sbrk_end = MEM_EXEC_LOAD_ADDR + (old_sbrk - MEM_PHYS_EXEC_FLOOR);
+        exec_heap_base = MEM_EXEC_HEAP_BASE;
+        guard_a = sbrk_end;
+        if (sbrk_end + PAGE_SIZE > exec_heap_base || exec_heap_size > guard_b - exec_heap_base)
+            return EXEC_ERR_NOMEM;
     } else if (text_sz + bss_sz > max_size) {
         shell_print("[DBG] NOMEM: text=", 0xE1);
         shell_print_dec(text_sz, 0xE1);
@@ -2012,8 +1802,12 @@ static int exec_launch(const char *cmdline, int gui_arg)
     /* ======== 物理の勘定 (D5)。入らなければ拒否、切り詰めない ======== */
     need_pages = 0;
     if (want_ring3) {
-        need_pages = exec_ring3_pages(load_base, sbrk_end, exec_heap_size,
-                                      g_ring3_band_pdes);
+        need_pages = (sbrk_end - load_base + exec_heap_size + stack_size) / PAGE_SIZE
+                   + 2 /* PD + first lease PT */
+                   + ((sbrk_end - 1) >> 22) - (load_base >> 22) + 1
+                   + ((exec_heap_base + exec_heap_size - 1) >> 22) - (exec_heap_base >> 22) + 1
+                   + ((stack_top - 1) >> 22) - ((stack_top - stack_size) >> 22) + 1
+                   + exec_ring3_extra_pages();
         if (appslot_start_admit(gui, need_pages, pgalloc_free_pages()) < 0) {
             shell_print("[DBG] NOMEM: need pages=", 0xE1);
             shell_print_dec(need_pages, 0xE1);
@@ -2037,6 +1831,8 @@ static int exec_launch(const char *cmdline, int gui_arg)
     ctx = appslot_at(id);
     ctx->load_addr = load_base;
     ctx->stack_top = stack_top;
+    ctx->stack_size = stack_size;
+    ctx->stack_base = stack_top - stack_size;
     ctx->guard_a = guard_a;
     ctx->guard_b = guard_b;
     ctx->exec_heap_base = exec_heap_base;
@@ -2062,12 +1858,13 @@ static int exec_launch(const char *cmdline, int gui_arg)
             exec_restore_band(launcher_id);
             return EXEC_ERR_NOMEM;
         }
-        if (paging_addrspace_create_n(&ctx->as, as_owner,
-                                      g_ring3_band_pdes) != 0) {
+        paging_load_cr3(paging_kernel_pd_phys());
+        ctx->as = kmalloc(sizeof(*ctx->as));
+        if (!ctx->as || paging_addrspace_create_lease(ctx->as, as_owner) != 0) {
+            if (ctx->as) kfree(ctx->as);
+            ctx->as = 0;
             (void)ledger_owner_retire(as_owner);
-            ctx->as.owner = 0;
-            shell_print("Error: ring3 addrspace create failed\n", ATTR_RED);
-            exec_restore_band(launcher_id);
+            exec_restore_context(launcher_id);
             return EXEC_ERR_NOMEM;
         }
         ctx->cpl3 = 1;
@@ -2076,14 +1873,14 @@ static int exec_launch(const char *cmdline, int gui_arg)
          * 落とし忘れると物理 0x5xxxxx が素通しで見え、他アプリのページや
          * pgalloc の作業域が CPL=3 から読める。ここが本設計で最も静かに
          * 壊れる箇所なので、per-app 物理を張る前に必ず全部 0 にする。 */
-        paging_addrspace_clear_app_band(&ctx->as);
+        paging_addrspace_clear_app_band(ctx->as);
 
         /* 3 領域を per-app 物理で張る。連続が取れなければページ単位へ倒す
          * (D10 の断片化の申し送り)。ガードは張らない = 非 present のまま。 */
-        if (app_map_region(&ctx->as, load_base, sbrk_end) != 0 ||
-            app_map_region(&ctx->as, exec_heap_base,
+        if (app_map_region(ctx->as, load_base, sbrk_end) != 0 ||
+            app_map_region(ctx->as, exec_heap_base,
                            exec_heap_base + exec_heap_size) != 0 ||
-            app_map_region(&ctx->as, RING3_STACK_BOTTOM, RING3_USTACK_TOP) != 0) {
+            app_map_region(ctx->as, ctx->stack_base, ctx->stack_top) != 0) {
             shell_print("Error: out of physical memory for app\n", ATTR_RED);
             return exec_launch_abort(launcher_id, id, EXEC_ERR_NOMEM);
         }
@@ -2095,37 +1892,37 @@ static int exec_launch(const char *cmdline, int gui_arg)
         }
 
         /* VRAM (テキスト 0xA0000 + グラフィック 0xA8000) — C2: 全PD共有+USER */
-        paging_addrspace_map_user_range(&ctx->as,
+        paging_addrspace_map_user_range(ctx->as,
             0xA0000UL, 0xC0000UL, PAGE_RW | PTE_USER);
         /* SHM (アプリ間データ受け渡し) — C2: 全PD共有+USER */
-        paging_addrspace_map_user_range(&ctx->as,
+        paging_addrspace_map_user_range(ctx->as,
             (u32)MEM_SHM_BASE, (u32)MEM_SHM_BASE + (u32)MEM_SHM_SIZE,
             PAGE_RW | PTE_USER);
         /* フォントキャッシュ (0x01000-0x49FFF): kcg フォントビットマップ直読 */
-        paging_addrspace_map_user_range(&ctx->as,
+        paging_addrspace_map_user_range(ctx->as,
             (u32)MEM_FONT_CACHE_BASE, (u32)MEM_UNICODE_TABLE_BASE,
             PAGE_RW | PTE_USER);
         /* Unicode-JIS 変換表 (0x4A000, 128KB): unicode_to_jis() 直読 */
-        paging_addrspace_map_user_range(&ctx->as,
+        paging_addrspace_map_user_range(ctx->as,
             (u32)MEM_UNICODE_TABLE_BASE,
             (u32)MEM_UNICODE_TABLE_BASE + (u32)MEM_UNICODE_TABLE_SIZE,
             PAGE_RW | PTE_USER);
         /* 9801 の主記憶バックバッファ (0x6A000, 128KB) は **常に** USER に
          * する (レビュー #6)。Cirrus の setup 失敗で 9801 へ落ちたとき、
          * 最初の CPU 描画が #PF になるのを防ぐ。 */
-        paging_addrspace_map_user_range(&ctx->as,
+        paging_addrspace_map_user_range(ctx->as,
             (u32)MEM_GFX_BB_BASE,
             (u32)MEM_GFX_BB_BASE + (u32)MEM_GFX_BB_SIZE,
             PAGE_RW | PTE_USER);
         /* いま選ばれているバックエンド固有の面 (gfx_bb_phys_range) を恒等の
          * まま丸ごと足す (exec_map_shared_bb の注釈)。私有領域と重なるなら
          * 起動を断る — 重ねて写すと私有ページの PTE が消える。 */
-        if (exec_map_shared_bb(&ctx->as, ctx->band_top) != 0) {
+        if (exec_map_shared_bb(ctx->as, ctx->band_top) != 0) {
             shell_print("Error: backbuffer overlaps app area\n", ATTR_RED);
             return exec_launch_abort(launcher_id, id, EXEC_ERR_NOMEM);
         }
         /* KAPI トランポリンページ (RO+USER, 全PD共有) */
-        paging_addrspace_map_user(&ctx->as, ring3_tramp_page,
+        paging_addrspace_map_user(ctx->as, ring3_tramp_page,
             V2P((const void *)ring3_tramp_page), PAGE_RO | PTE_USER);
 
         /* --- K3: 共有ライブラリ帯域 (0x400000-0x4FFFFF) ---
@@ -2133,7 +1930,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
          * 専用の物理ページ (原本から複製)。**master CR3 のまま**行う —
          * 原本 g_data_master は共有ライブラリ帯の末尾 = アプリ固有 PDE の
          * 中にあり、アプリ CR3 の下では別物を指す (I11)。 */
-        if (shlib_addrspace_attach(&ctx->as) < 0) {
+        if (shlib_addrspace_attach(ctx->as) < 0) {
             shell_print("Error: shlib data attach failed (out of memory)\n", ATTR_RED);
             return exec_launch_abort(launcher_id, id, EXEC_ERR_NOMEM);
         }
@@ -2160,53 +1957,29 @@ static int exec_launch(const char *cmdline, int gui_arg)
 
     entry = (ExecEntry)(load_addr + entry_off);
 
-    /* ======== ここから先は「このアプリの文脈」========
-     * CR3 をアプリ PD に載せ、本体を読み込み、argv を積む (I1/I2/I3)。
-     * VFS / kmalloc / ドライバ / ISR はすべて PDE 0 = 全 PD 共有なので、
-     * この間もカーネルは普通に動く。 */
-    if (want_ring3) {
-        paging_load_cr3(ctx->as.pd_phys);
-    } else if (!is_shell) {
-        /* CPL=0 の子は従来どおり identity。固定帯を台帳に owner 付きで
-         * 押さえる。他 owner のページが混じれば **読み込みを始める前に**
-         * 断る (claim_refused、TASK_T1_LEDGER §3-6。入口判定は変えない)。 */
-        if (exec_cpl0_claim(id) != 0) {
-            shell_print("Error: program space is in use\n", ATTR_RED);
-            return EXEC_ERR_NOMEM;
-        }
-    }
-
-    file_buf = (u8 *)load_base;
+    /* Read directly into physical backing under the master PD. */
     {
-        /* 読み込みの上限は **実際に物理を張った範囲** で頭打ちにする。
-         * per-app 物理では [sbrk_end, guard_a) は張っていない穴なので、
-         * max_size のまま読ませるとカーネル (CPL=0) が穴に書いて #PF になる
-         * — アプリの fault ではなくカーネルが飛ぶ。
-         * レイアウトの検査が guard_a - code_end >= MEM_EXEC_SBRK_MIN を
-         * 保証しているので、ヘッダ + text はこの範囲に必ず収まる。 */
-        u32 read_max = max_size + OS32X_HDR_V3_SIZE;
-        if (want_ring3 && (sbrk_end - load_base) < read_max) {
-            read_max = sbrk_end - load_base;
+        int fd = vfs_open(resolved, 0);
+        u32 pos = 0;
+        if (fd < 0) return exec_launch_abort(launcher_id, id, EXEC_ERR_NOT_FOUND);
+        if (vfs_seek(fd, (int)code_off, 0) < 0) {
+            vfs_close(fd);
+            return exec_launch_abort(launcher_id, id, EXEC_ERR_INVALID);
         }
-        sz = vfs_read(resolved, file_buf, (int)read_max);
-    }
-    if (sz <= 0) {
-        if (want_ring3) {
-            return exec_launch_abort(launcher_id, id, EXEC_ERR_NOT_FOUND);
+        while (pos < text_sz) {
+            u32 pa, n = PAGE_SIZE - ((load_base + pos) & (PAGE_SIZE - 1));
+            if (n > text_sz - pos) n = text_sz - pos;
+            if (want_ring3) {
+                if (as_va_to_pa(ctx->as->pd_phys, load_base + pos, &pa)) break;
+            } else pa = load_base + pos;
+            if (vfs_read_fd(fd, P2V(pa), n) != (int)n) break;
+            pos += n;
         }
-        /* claim したのは CPL=0 の**子**だけ (シェルは identity の常駐帯で、
-         * exec_cpl0_claim を通っていない)。左右を揃えないと、シェルの
-         * 読み込み失敗が子の本数勘定を触る。 */
-        if (!is_shell) exec_cpl0_release();
-        return EXEC_ERR_NOT_FOUND;
+        vfs_close(fd);
+        if (pos != text_sz) return exec_launch_abort(launcher_id, id, EXEC_ERR_INVALID);
     }
-
-    {
-        /* ヘッダ分だけ前方へ詰めるオーバーラップコピー。kmemcpy は
-         * オーバーラップ時の動作を保証しないので memmove を使う。 */
-        memmove(load_addr, load_addr + code_off, text_sz);
-        kmemset(load_addr + text_sz, 0, bss_sz);
-    }
+    /* app_map_region zeroes all pages, including BSS and padding. */
+    if (!want_ring3) kmemset(load_addr + text_sz, 0, bss_sz);
 
     /* ヒープ・ガードページ設定 */
     if (is_shell) {
@@ -2221,31 +1994,21 @@ static int exec_launch(const char *cmdline, int gui_arg)
         kapi->sbrk_heap_limit = guard_b;
     }
 
-    if (exec_heap_size > 0) {
-        exec_heap_init_at(exec_heap_base, exec_heap_size);
-    }
 
     if (!is_shell) {
         kapi->sbrk_heap_limit = sbrk_end;
-        if (!want_ring3) {
-            /* CPL=0 の子のガードは master の identity ページ。CPL=3 アプリの
-             * ガードは「アプリ PT に張っていない」= 非 present がそのまま
-             * ガードになるので、master を触らない (I8)。 */
-            if (paging_set_not_present(guard_a, guard_a + PAGE_SIZE - 1) != 0 ||
-                paging_set_not_present(guard_b, guard_b + PAGE_SIZE - 1) != 0) {
-                kprintf(0xC1, "[exec] guard page setup failed (a=%x b=%x)\n",
-                        guard_a, guard_b);
-            }
-        }
+
     }
 
     {
-        char *str_area;
-        char **argv_area;
+        u32 launch_argv[OS32_MAX_ARGS];
+        u32 str_addr, argv_addr;
+        u32 frame[4];
         int argc = 0;
-        int cmd_len = kstrlen(cmdline);
+        int cmd_len = launch_cmd_len;
         const char *s = cmdline;
-        char *d;
+        u32 d;
+        int copy_failed = 0;
         u32 new_esp;
         u32 u_esp;   /* ring3: iret に渡すユーザ ESP (ダミー retaddr 込み) */
         /* 呼び出し元 ESP の退避先。ローカルにしないのは、子のスタックへ
@@ -2255,70 +2018,80 @@ static int exec_launch(const char *cmdline, int gui_arg)
 
         stack_top -= (cmd_len + 1);
         stack_top &= ~((u32)STACK_ALIGN_MASK);
-        str_area = (char *)stack_top;
+        str_addr = stack_top;
 
         stack_top -= sizeof(char *) * OS32_MAX_ARGS;
-        argv_area = (char **)stack_top;
+        argv_addr = stack_top;
 
         s = cmdline;
-        d = str_area;
-        while (*s) {
+        d = str_addr;
+        while (launch_read_byte(launcher_pd, s)) {
             char quote;
 
             /* 引数間の空白をスキップ */
-            while (*s == ' ') s++;
-            if (!*s) break;
+            while (launch_read_byte(launcher_pd, s) == ' ') s++;
+            if (!launch_read_byte(launcher_pd, s)) break;
 
             /* 新しい引数を開始 */
-            if (argc < OS32_MAX_ARGS - 1) argv_area[argc++] = d;
+            if (argc < OS32_MAX_ARGS - 1) launch_argv[argc++] = d;
 
             /* クォート対応トークナイザ */
-            while (*s && *s != ' ') {
-                if (*s == '"' || *s == '\'') {
-                    quote = *s++;
-                    while (*s && *s != quote) {
-                        if (*s == '\\' && quote == '"' && *(s + 1)) {
+            while (launch_read_byte(launcher_pd, s) && launch_read_byte(launcher_pd, s) != ' ') {
+                if (launch_read_byte(launcher_pd, s) == '"' || launch_read_byte(launcher_pd, s) == '\'') {
+                    quote = launch_read_byte(launcher_pd, s++);
+                    while (launch_read_byte(launcher_pd, s) && launch_read_byte(launcher_pd, s) != quote) {
+                        if (launch_read_byte(launcher_pd, s) == '\\' && quote == '"' && launch_read_byte(launcher_pd, s + 1)) {
                             s++;
                         }
-                        *d++ = *s++;
+                        { u8 ch = launch_read_byte(launcher_pd, s++); copy_failed |= app_store(ctx, d++, &ch, 1); }
                     }
-                    if (*s == quote) s++;  /* 閉じクォートをスキップ */
-                } else if (*s == '\\' && *(s + 1)) {
+                    if (launch_read_byte(launcher_pd, s) == quote) s++;  /* 閉じクォートをスキップ */
+                } else if (launch_read_byte(launcher_pd, s) == '\\' && launch_read_byte(launcher_pd, s + 1)) {
                     s++;
-                    *d++ = *s++;
+                    { u8 ch = launch_read_byte(launcher_pd, s++); copy_failed |= app_store(ctx, d++, &ch, 1); }
                 } else {
-                    *d++ = *s++;
+                    { u8 ch = launch_read_byte(launcher_pd, s++); copy_failed |= app_store(ctx, d++, &ch, 1); }
                 }
             }
-            *d++ = '\0';
+            { u8 ch = 0; copy_failed |= app_store(ctx, d++, &ch, 1); }
         }
-        argv_area[argc] = NULL;
+        launch_argv[argc] = 0;
+        if (copy_failed || app_store(ctx, argv_addr, launch_argv, (argc + 1) * sizeof(u32)))
+            return exec_launch_abort(launcher_id, id, EXEC_ERR_INVALID);
 
         /* ---- 呼び出しフレームを子スタック上に自分で組む ----
          * ExecEntry は __cdecl (int argc, char **argv, KernelAPI *api) なので
          * 低位から argc, argv, kapi の順に並べる。call 時点で ESP を 16 バイト
          * 境界に揃えるのは SysV i386 ABI の要求。 */
         new_esp = (stack_top - 3 * sizeof(u32)) & ~(u32)15;
-        ((u32 *)new_esp)[0] = (u32)argc;
-        ((u32 *)new_esp)[1] = (u32)argv_area;
-        ((u32 *)new_esp)[2] = (u32)kapi;
+        frame[1] = (u32)argc;
+        frame[2] = argv_addr;
+        frame[3] = (u32)kapi;
 
         if (want_ring3) {
             /* --- M2c: CPL=3 アプリには本物の表でなくトランポリン表を渡す ---
              * CPL=3 の sbrk 上限は guard_a (exec_heap の直下のガード)。 */
             ((u32 *)ring3_tramp_page)[KAPI_DATA_IDX_SBRK_HEAP_LIMIT] = sbrk_end;
             ((u32 *)ring3_tramp_page)[KAPI_DATA_IDX_SHM_BASE] = kapi->shm_base;
-            ((u32 *)new_esp)[2] = ring3_tramp_page;   /* api = トランポリン */
+            frame[3] = ring3_tramp_page;   /* api = トランポリン */
 
             /* --- crt0 スタック規約合わせ (retaddr ズレ修正) ---
              * ring3 は iret でエントリへ飛ぶため call が無く retaddr が
              * 積まれない。iret に渡す ESP を argc の 1 スロット下にし、
              * そこにダミー retaddr を置いて call 経路と同一に揃える。 */
             u_esp = new_esp - sizeof(u32);
-            ((u32 *)u_esp)[0] = 0;   /* ダミー retaddr */
+            frame[0] = 0;   /* ダミー retaddr */
 
             g_cur_app = ctx;
         }
+
+        if (app_store(ctx, want_ring3 ? u_esp : new_esp,
+                      want_ring3 ? frame : frame + 1,
+                      (want_ring3 ? 4 : 3) * sizeof(u32)))
+            return exec_launch_abort(launcher_id, id, EXEC_ERR_INVALID);
+        /* The heap header needs its user VA; switch only after image and argv. */
+        if (want_ring3) paging_load_cr3(ctx->as->pd_phys);
+        if (exec_heap_size) exec_heap_init_at(exec_heap_base, exec_heap_size);
 
         /* ======== ここで初めて「走っているのはこの ID」になる ======== */
         if (is_shell) {
@@ -2339,9 +2112,11 @@ static int exec_launch(const char *cmdline, int gui_arg)
              * arch/x86/arch_cpu.h)。CPL=3 実行中の割り込み / int 0x80 の
              * フレームはこの直下に積まれ、setjmp フレームを踏まない。
              * ここから通常 return しない — 終了は int 0x80 → longjmp。 */
-            arch_enter_user(ctx->as.pd_phys, u_esp, (u32)entry);
+            exec_entry_calls++;
+            arch_enter_user(ctx->as->pd_phys, u_esp, (u32)entry);
             /* iret 後はここへ戻らない */
         } else {
+            exec_entry_calls++;
             arch_call_on_stack(saved_esp_stack[id], new_esp, entry);
         }
         /* CPL=0 プログラムから普通に戻ってきた = 正常終了 (§1 事実 15)。 */
@@ -2668,7 +2443,7 @@ i32 exec_resume(i32 app_id, i32 wait_ret)
     if (rc < 0) return rc;
 
     a = appslot_get((int)app_id);
-    if (!a->cpl3 || !a->as.pd_phys) return OS32_ERR_INVAL;
+    if (!a->cpl3 || !a->as->pd_phys) return OS32_ERR_INVAL;
     src = appslot_resume_source((int)app_id);
     if (src == APP_RESUME_SRC_YIELD) {
         /* 票 T9 D5: 明示的な譲り (sys_yield) は **注入リングを読まない**。
@@ -2708,7 +2483,7 @@ i32 exec_resume(i32 app_id, i32 wait_ret)
     exec_restore_context((int)app_id);
     /* cli → TSS.ESP0 → CR3 → popad; iretd を割り込み禁止で一続きに。
      * iretd が保存済み EFLAGS (IF=1) を復元するのでアプリ側の IF は変わらない。 */
-    ring3_resume(a->frame, a->as.pd_phys, &kernel_tss);
+    ring3_resume(a->frame, a->as->pd_phys, &kernel_tss);
     return 0;   /* 到達しない */
 }
 
@@ -2730,7 +2505,6 @@ static void exec_kill_one(int id)
     /* 走っていないので CR3 は master のまま。owner も 1 のまま動かさない
      * — 回収は全部 ID を明示して呼ぶ (D3)。 */
     exec_reclaim_resources(id);
-    if (!a->cpl3) exec_cpl0_release();
     exec_teardown_app(a);
     appslot_reclaim(id);
     exec_notify_owned(id);

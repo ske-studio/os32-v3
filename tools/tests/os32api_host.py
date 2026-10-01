@@ -49,6 +49,7 @@ use core::cell::UnsafeCell;
         ]
         + source[source.index("pub mod gfx {") :]
     )
+    adapter = adapter.replace("pub mod generations;", f'#[path="{SDK / "generations.rs"}"] pub mod generations;')
     adapter += (
         '\nunsafe extern "C" fn unexpected() { panic!("unmocked KAPI reached"); }\n'
         "pub fn mock_api() -> KernelAPI { unsafe { KernelAPI {"

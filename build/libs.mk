@@ -118,7 +118,7 @@ userland/lib/gfx/geom/%.o: userland/lib/gfx/geom/%.c
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32gfx) -Ilib -c $< -o $@
 
 userland/lib/gfx/asm/%.o: userland/lib/gfx/asm/%.asm userland/lib/gfx/asm/gfx_const.inc
-	$(AS) -f elf32 -Iuserland/lib/gfx/asm/ $< -o $@
+	$(AS) -p sdk/crt/generations.inc -f elf32 -Iuserland/lib/gfx/asm/ $< -o $@
 
 lib-libos32gfx: $(LIBDIR)/libos32gfx.a
 .PHONY: lib-libos32gfx
@@ -184,7 +184,7 @@ userland/lib/tilemap/%.o: userland/lib/tilemap/%.c
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32tilemap) -c $< -o $@
 
 userland/lib/tilemap/%.o: userland/lib/tilemap/%.asm
-	$(AS) -f elf32 $< -o $@
+	$(AS) -p sdk/crt/generations.inc -f elf32 $< -o $@
 
 lib-libos32tilemap: $(LIBDIR)/libos32tilemap.a
 .PHONY: lib-libos32tilemap

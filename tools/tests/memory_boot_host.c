@@ -119,7 +119,7 @@ void _start(void)
     {
         u32 top, room, fit, huge;
         top = MEM_SYSTEM_SPACE_BASE / PAGE_SIZE;      /* 15MiB: アリーナ上端 */
-        room = top - MEM_APP_BAND_MAX_TOP / PAGE_SIZE;
+        room = top - MEM_PHYS_WORKSPACE_FLOOR / PAGE_SIZE;
         /* 32MiB / 128MiB は丸ごと通る (切り詰め無し)。 */
         CHECK(memory_boot_high_fit(0x2000, top) == 0x2000);
         CHECK(memory_boot_table_pages(0x2000) <= room);
@@ -139,7 +139,7 @@ void _start(void)
         CHECK(fit > 0x80000);
         /* 置き場所が無い構成は 0 (高位 RAM は登録しない — 表は FIXED 型の
          * 固定区間に置くが、そこは高位を覆えない)。でっち上げはしない。 */
-        CHECK(memory_boot_high_fit(huge, MEM_APP_BAND_MAX_TOP / PAGE_SIZE) == 0);
+        CHECK(memory_boot_high_fit(huge, MEM_PHYS_WORKSPACE_FLOOR / PAGE_SIZE) == 0);
         /* FIXED / ARENA_TOP の境界 (§3-3): 3,073 PFN までが FIXED。 */
         CHECK(MEMORY_BOOT_FIXED_MAX_TOP == 3073UL);
         /* D11: 0594h の申告は 2GB で頭打ち (16MB から 2032MB)。 */
@@ -155,7 +155,7 @@ void _start(void)
         CHECK(MEM_BOOT_STAGING_BASE + MEM_BOOT_STAGING_SIZE == MEM_BOOT_BUNDLE_BASE);
         CHECK(MEM_BOOT_BUNDLE_BASE + MEM_BOOT_BUNDLE_SIZE <= 0x800000UL);
         CHECK(MEM_BOOT_STAGING_BASE >= MEM_POOL_BASE &&
-              MEM_BOOT_STAGING_BASE >= MEM_SHLIB_END);
+              MEM_BOOT_STAGING_BASE >= MEM_PHYS_EXEC_FLOOR);
         CHECK(MEM_POOL_BASE == 0x400000UL);
         CHECK(host_if == 0x202U);
         die(0);
@@ -191,7 +191,7 @@ void _start(void)
         TRY(meta, meta, meta + 1, PGALLOC_BACKING_FIXED, 0);
         /* 知らない種類 */
         TRY(meta, meta + 1, meta + 2, 7, 0);
-        /* 8MB で ARENA_TOP は通らない (workspace が MEM_APP_BAND_MAX_TOP 未満) */
+        /* 8MB で ARENA_TOP は通らない (workspace が MEM_PHYS_WORKSPACE_FLOOR 未満) */
         TRY(top - 1, top - 2, top - 1, PGALLOC_BACKING_ARENA_TOP, 0);
         /* 置き場の番地は正しくても、模型でそこが RAM なら拒否 (RESERVED で
          * なければならない — RAM なら池の 1 ページと二重に使われる)。 */
@@ -259,7 +259,7 @@ void _start(void)
     /* exec の最小域 (ロード起点 + スタック + sbrk + exec_heap = 0x590000) に
      * 1 ページ足りない低位 RAM は fail-stop (T1a の訂正 5、T1b で境界を直接)。
      * 何も変えずに断る。 */
-    CHECK(TEST_KB * 1024UL + PAGE_SIZE == MEM_EXEC_LOAD_ADDR + MEM_EXEC_STACK_SIZE +
+    CHECK(TEST_KB * 1024UL + PAGE_SIZE == MEM_PHYS_EXEC_FLOOR + MEM_EXEC_STACK_SIZE +
           MEM_EXEC_SBRK_MIN + MEM_EXEC_HEAP_MIN);
     CHECK(!memory_boot_init(TEST_KB));
     CHECK(bootstrap_calls == 1 && !stage_calls);
@@ -339,7 +339,7 @@ void _start(void)
     }
 #endif
 #ifdef TEST_MINIMUM
-    CHECK(TEST_KB * 1024UL == MEM_EXEC_LOAD_ADDR + MEM_EXEC_STACK_SIZE +
+    CHECK(TEST_KB * 1024UL == MEM_PHYS_EXEC_FLOOR + MEM_EXEC_STACK_SIZE +
           MEM_EXEC_SBRK_MIN + MEM_EXEC_HEAP_MIN);
     CHECK(pgalloc_model_state() == PGALLOC_ONLINE && ledger_backing_mapped);
     CHECK(sys_usable_mem_end() == TEST_KB * 1024UL);
@@ -475,7 +475,7 @@ void _start(void)
         /* 検出量の最終ページまで配れる (切り詰めが無いことの証明) */
         CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, limit - 1, limit, LEDGER_BOTTOM_UP, &p) && p == limit - 1);
         CHECK(pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, p, 1));
-        arena = workspace_first - MEM_APP_BAND_BASE / PAGE_SIZE;
+        arena = workspace_first - MEM_POOL_BASE / PAGE_SIZE;
         CHECK(pgalloc_total_pages() > arena);
         /* 連続アリーナ (exec のレイアウト) と表の置き場所は不変 (ARENA_TOP:
          * アリーナの上端 = workspace_first、B2 の等式) */
@@ -483,9 +483,9 @@ void _start(void)
         CHECK(pgalloc_arena_end() == workspace_first);
         CHECK(sys_usable_mem_end() == workspace_first * PAGE_SIZE);
         CHECK((u32)eligible == workspace_end * PAGE_SIZE);
-        CHECK((u32)eligible >= MEM_APP_BAND_MAX_TOP);
+        CHECK((u32)eligible >= MEM_PHYS_WORKSPACE_FLOOR);
         CHECK((u32)eligible < MEM_SYSTEM_SPACE_BASE);
-        CHECK(workspace_first >= MEM_APP_BAND_MAX_TOP / PAGE_SIZE);
+        CHECK(workspace_first >= MEM_PHYS_WORKSPACE_FLOOR / PAGE_SIZE);
         CHECK(workspace_end <= MEM_SYSTEM_SPACE_BASE / PAGE_SIZE);
         /* ブート窓より上の identity PT は workspace (RAM) から動的に取る */
         for (i = PAGING_BOOT_PT_COUNT; i < limit / PTE_COUNT; i++) {
@@ -518,7 +518,7 @@ void _start(void)
          * 0x800000。backing の位置 (0x2F9000) とは無関係。 */
         CHECK(pgalloc_arena_end() == top);
         CHECK(sys_usable_mem_end() == TEST_KB * 1024UL);
-        CHECK(sys_usable_mem_end() >= MEM_EXEC_LOAD_ADDR + MEM_EXEC_STACK_SIZE +
+        CHECK(sys_usable_mem_end() >= MEM_PHYS_EXEC_FLOOR + MEM_EXEC_STACK_SIZE +
               MEM_EXEC_SBRK_MIN + MEM_EXEC_HEAP_MIN);
         /* backing は present / supervisor / RW、下のガードは NP のまま */
         CHECK(paging_verify_identity(meta, 2, (void *)MEM_LEDGER_META_BASE));
@@ -549,7 +549,7 @@ void _start(void)
             CHECK(workspace_end == top - mp && workspace_first == top - mp - 1);
             CHECK((u32)eligible == (top - mp) * PAGE_SIZE);
         }
-        CHECK(workspace_first >= MEM_APP_BAND_MAX_TOP / PAGE_SIZE);
+        CHECK(workspace_first >= MEM_PHYS_WORKSPACE_FLOOR / PAGE_SIZE);
         CHECK(pgalloc_arena_end() == workspace_first);
         CHECK(sys_usable_mem_end() == workspace_first * PAGE_SIZE);
         CHECK(pgalloc_limit_pfn() == top);

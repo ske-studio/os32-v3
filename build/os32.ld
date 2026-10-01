@@ -160,6 +160,12 @@ SECTIONS
            MEM_SHELL_LOAD_ADDR <= MEM_SHELL_HEAP_BASE,
         "fixed paging overlaps kernel/SQLite/DMA/metadata/stack")
 
+    .os32_generations 0 (INFO) : { KEEP(*(.os32_generations)) }
+    .os32_generation_ref 0 (INFO) : { KEEP(*(.os32_generation_ref)) }
+    /* GENERATED GENERATION REF BEGIN */
+__os32_abi_1_mem_1_fmt_4 = 0;
+/* GENERATED GENERATION REF END */
+
     /DISCARD/ : {
         *(.note.gnu.build-id)
         *(.eh_frame)

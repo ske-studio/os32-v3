@@ -37,7 +37,7 @@ PLATFORM ?= pc98
 CC = i386-elf-gcc
 AR = i386-elf-ar
 AS = nasm
-LD = i386-elf-ld
+LD = python3 sdk/link_guard.py i386-elf-ld
 OBJCOPY = i386-elf-objcopy
 
 # === インクルードパス (モジュール別) ===
@@ -130,7 +130,7 @@ CFLAGS_COMMON = $(C_STD) $(C_DIALECT_ERRORS) $(CFLAGS_MACHINE)
 
 # カーネル空間。__KERNEL_BUILD__ は include/os32_kapi_shared.h が
 # memmap.h と KAPI_ADDR を出すかどうかの判定に使う。
-KERNEL_CFLAGS = $(CFLAGS_COMMON) -O2 -Wall -D__KERNEL_BUILD__
+KERNEL_CFLAGS = -include sdk/include/os32/os32_unit_stamp.h $(CFLAGS_COMMON) -O2 -Wall -D__KERNEL_BUILD__
 # 計測やデバッグ用の一時フラグをコマンドラインから足す口。
 #   例: make kernel KERNEL_CFLAGS_EXTRA=-DKAPI_PROFILE
 KERNEL_CFLAGS += $(KERNEL_CFLAGS_EXTRA)
@@ -165,7 +165,7 @@ endif
 
 # ユーザー空間。__KERNEL_BUILD__ を付けないので KAPI テーブルの固定アドレスは
 # 見えない。外部プログラムは main() の第3引数で KernelAPI を受け取る。
-USER_CFLAGS   = $(CFLAGS_COMMON) -O2 -Wall -D__OS32_USERLAND__
+USER_CFLAGS   = -include sdk/include/os32/os32_unit_stamp.h $(CFLAGS_COMMON) -O2 -Wall -D__OS32_USERLAND__
 
 # 旧名。既存の参照が残っている間の互換のために残す。
 CFLAGS_BASE = $(KERNEL_CFLAGS)
@@ -209,3 +209,5 @@ DBG_OBJ  = userland/lib/rt/dbgserial.o
 HOSTDRV_DIR ?= /mnt/c/os32
 NHD_DEPLOY = env NP21W_DIR='$(NP21W_DIR)' python3 tools/nhd_deploy.py
 HOSTDRV_DEPLOY = env HOSTDRV_DIR='$(HOSTDRV_DIR)' python3 tools/hostdrv_deploy.py
+
+CFLAGS_SQLITE += -include sdk/include/os32/os32_unit_stamp.h

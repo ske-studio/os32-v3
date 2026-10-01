@@ -37,7 +37,7 @@
  * disjoint and permanently excluded from general allocation. Where they live
  * is the backing kind (TASK_T1_LEDGER §3-3):
  *   ARENA_TOP  mapped low RAM tails above final exec, up to real RAM end,
- *              reserved from RAM; workspace at/above MEM_APP_BAND_MAX_TOP.
+ *              reserved from RAM; workspace at/above MEM_PHYS_WORKSPACE_FLOOR.
  *   FIXED      [MEM_LEDGER_META_BASE, MEM_LEDGER_META_END) — not RAM in the
  *              model (RESERVED), mapped supervisor RW only on this kind.
  * kind 0 is ARENA_TOP so older positional initialisers keep their meaning. */
@@ -63,7 +63,7 @@ int pgalloc_init_model(struct physmem *model, void *backing, u32 backing_bytes,
 u32 pgalloc_limit_pfn(void);
 
 /* End PFN (exclusive) of the legacy arena — the contiguous low RAM from
- * MEM_EXEC_LOAD_ADDR — after the model reserved its backing, frozen at init.
+ * MEM_PHYS_EXEC_FLOOR — after the model reserved its backing, frozen at init.
  * ARENA_TOP: equals workspace_first. FIXED: the low RAM top (0x800 on 8MiB),
  * independent of where the backing sits. 0 before the model is initialised.
  * sys freezes the exec ceiling from this (sys_frozen_exec, B2). There is no
@@ -286,7 +286,7 @@ struct ledger_surface *ledger_surface_find(u32 backend, u32 role);
  * ledger_transfer で一緒に、FIXED_RAM は同じ owner の SURFACE_BACKING 区間の
  * owner も、MMIO は SURFACE の owner だけ。既に to なら何もしない。1 = 成功。 */
 int ledger_surface_transfer(u32 sid, u32 to);
-/* CPL=0 子の identity アリーナ [MEM_EXEC_LOAD_ADDR, pgalloc_arena_end()) の上端
+/* 旧起動予算の物理アリーナ [MEM_PHYS_EXEC_FLOOR, pgalloc_arena_end()) の上端
  * (PFN、T1 の間だけ)。アリーナ内の PERSIST owner のページの最下端を ⑥ で
  * ledger_arena_freeze が 1 回だけ凍結する。凍結前・永続確保が無ければ
  * pgalloc_arena_end()。sys_usable_mem_end = min(凍結した exec 上端, これ)。 */

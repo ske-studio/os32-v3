@@ -45,7 +45,7 @@ OS32_SHLIB_HDR_SIZE = 4096
 OS32_SHLIB_ENTRY_OFF = 32
 OS32_SHLIB_MAX_FUNC = (OS32_SHLIB_HDR_SIZE - OS32_SHLIB_ENTRY_OFF) // 4
 
-MEM_SHLIB_BASE = 0x00400000
+MEM_SHLIB_BASE = 0x80000000
 PAGE = 4096
 
 SHLIB_RS = os.path.join(REPO, 'userland', 'rust', 'libos32gui', 'src', 'shlib.rs')
@@ -249,7 +249,7 @@ def main():
     dpages = fix('data_pages', dpages, data_pages)
     tpages = fix('text_pages', tpages, text_pages)
     struct.pack_into('<8I', raw, 0, OS32_SHLIB_MAGIC, version, nfunc,
-                     vaddr, dpages, tpages, r0, r1)
+                     vaddr, dpages, tpages, H.OS32_SHLIB_PROTOCOL, r1)
 
     # --- entry[i] が i 番目のシンボルのアドレスか ---
     bad = []
@@ -281,7 +281,7 @@ def main():
         kapi_data_off = H.read_kapi_layout(elf)
         H.check_raw_matches_elf(elf, raw_as_read, in_path)
         header = H.build_header(OS32X_FLAG_SHLIB, 0, len(raw), bss, 0,
-                                min_api, MEM_SHLIB_BASE, kapi_data_off)
+                                min_api, MEM_SHLIB_BASE, kapi_data_off, shlib_protocol=H.OS32_SHLIB_PROTOCOL)
     except H.HeaderError as e:
         die(str(e))
     with open(out_path, 'wb') as f:

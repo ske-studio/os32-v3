@@ -274,7 +274,7 @@ void __attribute__((cold)) gfx_boot_reserve(void)
     /* 4. BB は候補の最大 (PEGC が残れば 300KB)。アリーナ内の上端から。 */
     if ((m & GFX_CAND_PEGC) &&
         pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, (int)GFX_PFN(MEM_GFX_BB8_SIZE),
-                              GFX_PFN(MEM_EXEC_LOAD_ADDR), pgalloc_arena_end(),
+                              GFX_PFN(MEM_PHYS_EXEC_FLOOR), pgalloc_arena_end(),
                               LEDGER_TOP_DOWN, &pfn))
         kmemset(P2V(pfn * PAGE_SIZE), 0, (u32)MEM_GFX_BB8_SIZE);
     else

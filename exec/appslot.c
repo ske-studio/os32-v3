@@ -28,10 +28,11 @@ extern int  res_owner_get(void);
 STATIC_ASSERT(APP_ID_SHELL == 1, appslot_shell_id_is_gui_shell_owner);
 STATIC_ASSERT(APP_ID_MAX < APP_SLOT_COUNT, appslot_table_holds_id_max);
 
-/* TASK_T2_APPBAND §6: count embedded AS once, including unused slot 0 and
- * shell; T2c moves control blocks to KHEAP and must retain this total gate.
+/* TASK_T2_APPBAND §6: all six slots plus four KHEAP AS control blocks.
  * PFN metadata and actual PD/PT backing have separate physical budgets. */
+STATIC_ASSERT(sizeof(struct addrspace) <= 1376, as_control_within_1376);
 STATIC_ASSERT(sizeof(AppSlot) * APP_SLOT_COUNT +
+              sizeof(struct addrspace) * (APP_ID_MAX - APP_ID_SHELL) +
               sizeof(struct ledger_owner) * LEDGER_MAX_OWNERS +
               sizeof(struct ledger_region) * LEDGER_MAX_REGIONS +
               sizeof(struct ledger_resource) * LEDGER_MAX_RESOURCES +

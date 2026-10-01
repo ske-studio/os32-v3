@@ -117,7 +117,7 @@ GSHELL_DIR = userland/gshell
 GSHELL_LIB = $(GSHELL_DIR)/target/i686-os32-none/release/libgshell.a
 
 $(GSHELL_LIB): FORCE $(RUST_KAPI_RS)
-	cd $(GSHELL_DIR) && cargo build --release
+	cd $(GSHELL_DIR) && RUSTC_WRAPPER=$(CURDIR)/sdk/rustc_stamp.py cargo build --release
 
 userland/gshell.elf: sdk/link/app_sys.ld $(CRT0_OBJ) $(GSHELL_LIB) $(GFX_OBJ) $(LIBCFG_OBJ)
 	$(LD) -m elf_i386 -T sdk/link/app_sys.ld -nostdlib --nmagic --gc-sections --allow-multiple-definition \
@@ -314,18 +314,6 @@ userland/tests/faultprobe_r3.bin: userland/tests/faultprobe.elf
 faultprobe_r3: userland/tests/faultprobe_r3.bin
 .PHONY: faultprobe_r3
 
-# --- cpl0_probe (CPL=0 の子の受入、票 docs/tasks/v3/TASK_T1_LEDGER.md §4-1) ---
-# crt0 をリンクした通常の ELF (C_TESTS の汎用ルール) を --cpl0 で .bin にする。
-# 明示ルールなので汎用の userland/%.bin (app.conf を見る) より優先される。
-# CPL=0 の子の claim (exec_child_claim) と sys_usable_mem_end の実測に使う。
-# 撤去は T2 (--cpl0 ごと、TASK_T1_LEDGER §1-2)。
-userland/tests/cpl0_probe.bin: userland/tests/cpl0_probe.elf
-	$(OBJCOPY) -O binary $< userland/tests/cpl0_probe.raw
-	python3 sdk/mkos32x.py userland/tests/cpl0_probe.raw $@ --elf $< --api 39 --cpl0
-	@rm -f userland/tests/cpl0_probe.raw
-
-cpl0_probe: userland/tests/cpl0_probe.bin
-.PHONY: cpl0_probe
 
 # ---------------------------------------------------------------------------
 # DEFINE_TEST — テストプログラム定義テンプレート
@@ -379,6 +367,7 @@ userland/lib/gfx/ui.o: userland/lib/gfx/ui.c
 # === SQLite Standalone Test ===
 SQLITE_SA_DIR = userland/tests/sqlite_standalone
 SQLITE_SA_CFLAGS = $(C_STD_SQLITE) -m32 -march=i386 -ffreestanding -fno-pie -fno-stack-protector -nostdlib -mno-red-zone -O1 -fcommon -Wno-long-long -w -I. -Iinclude $(SDK_INC) -Iuserland/lib -Ilib/sqlite3 -include lib/sqlite3/os32_sqlite_config.h -I$(CROSS_DIR)/i386-elf/include
+SQLITE_SA_CFLAGS += -include sdk/include/os32/os32_unit_stamp.h
 
 $(SQLITE_SA_DIR)/sqlite3_user.o: lib/sqlite3/sqlite3.c lib/sqlite3/os32_sqlite_config.h
 	$(CC) $(SQLITE_SA_CFLAGS) -c $< -o $@
@@ -438,7 +427,7 @@ KSTR_BENCH_FUNCS = kmemcpy memcpy kmemset memset kstrlen strlen kstrcmp \
                    strcmp kstrncmp strncmp kstrcpy kstrncpy memcmp
 
 userland/tests/kstr_asm_a.o: lib/kstring_asm.asm
-	$(AS) -f elf32 $< -o userland/tests/kstr_asm_raw.o
+	$(AS) -p sdk/crt/generations.inc -f elf32 $< -o userland/tests/kstr_asm_raw.o
 	@for f in $(KSTR_BENCH_FUNCS); do echo "$$f a_$$f"; done > userland/tests/kstr_ren_a.txt
 	$(OBJCOPY) --redefine-syms=userland/tests/kstr_ren_a.txt userland/tests/kstr_asm_raw.o $@
 	@rm -f userland/tests/kstr_asm_raw.o userland/tests/kstr_ren_a.txt
@@ -582,7 +571,7 @@ $(RUST_KAPI_RS): sdk/kapi.json sdk/kapi_rust_gen.py
 # ---------------------------------------------------------------------------
 define DEFINE_RUST_PROGRAM
 $(RUST_TARGET_DIR)/lib$(1).a: FORCE $(RUST_KAPI_RS)
-	cd $(RUST_PROGRAMS_DIR) && cargo build --release -p $(1)
+	cd $(RUST_PROGRAMS_DIR) && RUSTC_WRAPPER=$(CURDIR)/sdk/rustc_stamp.py cargo build --release -p $(1)
 
 $(2)/$(1).elf: sdk/link/app.ld $$(CRT0_OBJ) $(RUST_TARGET_DIR)/lib$(1).a $(3)
 	$$(LD) $$(PROGRAM_LDFLAGS) --allow-multiple-definition \
@@ -629,7 +618,7 @@ $(eval $(call DEFINE_RUST_PROGRAM,gui_bench,userland/tests,))
 SHLIB_GUI_LIB = $(RUST_TARGET_DIR)/liblibos32gui.a
 
 $(SHLIB_GUI_LIB): FORCE $(RUST_KAPI_RS)
-	cd $(RUST_PROGRAMS_DIR) && cargo build --release -p libos32gui
+	cd $(RUST_PROGRAMS_DIR) && RUSTC_WRAPPER=$(CURDIR)/sdk/rustc_stamp.py cargo build --release -p libos32gui
 
 # libos32host.a (票 N4) も静的リンク: 表 105..=110 の host_* が呼ぶ。`kapi` は
 # libos32cfg (cfg_backend.c) と共用で SHLIB_GUI_LIB (cfgro.rs) が供給する
@@ -676,7 +665,7 @@ userland/%.o: $(SDK_KAPI_HDR)
 $(shell find userland -name '*.o' 2>/dev/null): $(SDK_KAPI_HDR)
 
 # === プログラムクリーン ===
-clean-programs: clean-rust
+clean-programs: clean-rust clean-gshell
 	rm -f userland/cmds/*.o userland/cmds/*.elf userland/cmds/*.raw userland/cmds/*.bin
 	rm -f userland/tests/*.o userland/tests/*.elf userland/tests/*.raw userland/tests/*.bin
 	rm -f userland/tests/kstr_ren_a.txt userland/tests/kstr_ren_c.txt userland/tests/kstr_c_raw.d
