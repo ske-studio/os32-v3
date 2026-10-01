@@ -809,7 +809,7 @@ int ring3_user_ranges_writable(u32 pa, u32 la, u32 pb, u32 lb)
      * syscall の中で走るので ring3_in_syscall だけでは区別できない
      * (2026-09-26、ring3_wm_depth の注記)。
      * これは**いま渡されたポインタ**の門。アプリが**前に登録した**ポインタは
-     * 文脈に関係なく _always で歩く (fs/fd_redirect.c、exec.h の注記)。 */
+     * 登録者 PD を使う redir_access で扱う (T2d d0b)。 */
     if (!ring3_guard_active(ring3_in_syscall, ring3_wm_depth)) return 1;
     return ring3_user_ranges_writable_always(pa, la, pb, lb);
 }

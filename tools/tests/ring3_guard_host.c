@@ -137,6 +137,7 @@ int vfs_write_fd(int fd, const void *buf, u32 size) { (void)fd; (void)buf; (void
 #include "ring3_str.c"
 #include "gui.c"
 #include "fd_redirect.c"
+#include "redir_access_stub.h"
 
 /* ---- 最小の報告系 (libc 無し) ------------------------------------------ */
 
@@ -337,7 +338,7 @@ static void case_registered_ptr(void)
     host_page_rw = 1;
     walks0 = host_walks;
     check(fd_redirect_to_buffer(1, app_page, 16u, 0) == 0, "4a app registers its page");
-    check(redir_table[1].user_origin == 1 && redir_table[1].owner == 2,
+    check(redir_table[1].access.origin == 1 && redir_table[1].owner == 2,
           "4b entry is marked app-origin (owner 2)");
     check(host_walks == walks0 + 1, "4c registration walks the table");
 
@@ -354,20 +355,20 @@ static void case_registered_ptr(void)
     (void)gui_call(GUI_OP_WAIT, 0);
     check(wm_seen_depth == 1, "4e the write runs with depth 1 (WM context)");
     check(host_walks == walks0 + 1, "4f depth 1 still walks the table (always)");
-    check(host_kills == kills0 + 1, "4g RO app page is refused even inside WM");
+    check(host_kills == kills0 && wm_wrote_rc == -1, "4g RO app page is refused even inside WM");
 
     /* 4h 同じ筋書きでページが書けるなら素通しに書ける (過剰に殺さない)。 */
     host_page_rw = 1;
     kills0 = host_kills;
     (void)gui_call(GUI_OP_WAIT, 0);
-    check(host_kills == kills0 && wm_wrote_rc == 1 && app_page[1] == 'Z',
+    check(host_kills == kills0 && wm_wrote_rc == 1 && app_page[0] == 'Z',
           "4h writable app page is written inside WM");
 
     /* 4i 深さ 0 (アプリ自身の syscall) の RO も従来どおり断る。 */
     host_page_rw = 0;
     kills0 = host_kills;
-    (void)fd_redirect_write(1, "Q", 1);
-    check(host_kills == kills0 + 1, "4i depth 0 RO app page is refused (unchanged)");
+    check(fd_redirect_write(1, "Q", 1) == -1, "4i error returned");
+    check(host_kills == kills0, "4i depth 0 RO app page is refused (unchanged)");
 
     /* 4j-4k 登録時の二重の守り: アプリが RO / 帯外のページを張ろうとすると断り、
      * 表は変えない。 */
@@ -382,7 +383,7 @@ static void case_registered_ptr(void)
     walks0 = host_walks;
     kills0 = host_kills;
     check(fd_redirect_to_buffer(2, wm_buf, 16u, 0) == 0 &&
-          redir_table[2].user_origin == 0, "4m WM registers its own buffer (not app-origin)");
+          redir_table[2].access.origin == 0, "4m WM registers its own buffer (not app-origin)");
     check(fd_redirect_write(2, "W", 1) == 1 && wm_buf[0] == 'W' &&
           host_kills == kills0, "4n WM buffer written inside WM");
     check(host_walks == walks0, "4o WM buffer is not walked");
@@ -392,14 +393,14 @@ static void case_registered_ptr(void)
     {
         FdRedirectState st;
         fd_redirect_save(&st);
-        check(st.fd[1].user_origin == 1, "4p save keeps app-origin mark");
+        check(st.fd[1].access.origin == 1, "4p save keeps app-origin mark");
         fd_redirect_restore(&st);
-        check(redir_table[1].user_origin == 1, "4q restore keeps app-origin mark");
+        check(redir_table[1].access.origin == 1, "4q restore keeps app-origin mark");
     }
 
     /* 4r 解除すると印も落ちる。 */
     fd_redirect_reset(1);
-    check(redir_table[1].user_origin == 0, "4r reset clears the mark");
+    check(redir_table[1].access.origin == 0, "4r reset clears the mark");
 
     host_in_syscall = 0;
     res_owner_set(1);

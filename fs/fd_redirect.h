@@ -10,6 +10,7 @@
 #define FD_REDIRECT_H
 
 #include "types.h"
+#include "redir_access.h"
 #include "os32_kapi_shared.h"   /* OS_S_IF* (fd_redirect_ifmt の戻り値) */
 
 /* リダイレクトターゲットの種類 */
@@ -31,10 +32,7 @@ typedef struct {
     u32 buf_pos;            /* 現在の読み書き位置 */
     u32 buf_len;            /* バッファ内の有効データ長 */
     int owner;              /* 設定した実行レベル (res_owner_get() の値) */
-    int user_origin;        /* 1 = バッファを CPL=3 のアプリが登録した
-                             *     (登録時の ring3_call_from_user())。
-                             *     書く前の検査を**文脈に関係なく**行う印
-                             *     (fd_redirect_buf_write_ok)。 */
+    RedirAccess access;     /* Registration identity, copied with nest/park state. */
 } FdRedirect;
 
 /* ======== リソース所有者タグ ======== */
@@ -72,22 +70,13 @@ int fd_redirect_to_file(int fd, const char *path, int mode);
  * 戻り値: 0=成功, 負=エラー
  * 呼び手が CPL=3 のアプリ (ring3_call_from_user() が 1) なら、[buf, buf+size)
  * が present + RW + USER であることを表を歩いて確かめ、だめなら -1 (表は
- * 変えない)。KAPI ラッパの出力検査と二重の守り。登録の由来は user_origin に
+ * 変えない)。KAPI ラッパの出力検査と二重の守り。登録の由来と AS の寿命は access に
  * 残す。**カーネル内部からカーネル帯のバッファを張る用途には使えない**
  * (アプリの syscall の中で呼ぶと由来がアプリになる)。いまの呼び手は
  * KAPI の sys_redirect_fd_buf だけ。 */
 int fd_redirect_to_buffer(int fd, u8 *buf, u32 size, u32 len);
 
-/* バッファ型のリダイレクト r へ、いま to_write バイト書いてよいか。
- *   1 = 書いてよい / 0 = 書かずに畳む (fd_redirect_write が ring3_fault_kill)。
- * **門はポインタの由来で決める** (2026-09-26、代行レビュー P2):
- *   - r->user_origin (アプリが登録した) → ring3_user_ranges_writable_always で
- *     **必ず**表を歩く。WM (gshell) の文脈 (ring3_wm_depth >= 1) で書かれても
- *     素通しにしない — アプリが fd 1 を RO ページへ向けてから gui_call し、
- *     WM が fd 1 へ書くと、CR0.WP=0 のカーネルがアプリ指定の番地へ書くため。
- *   - それ以外 (常駐シェル / WM / --cpl0 が登録) → 従来どおり、ユーザ帯の
- *     番地だけを文脈つきの門 (ring3_user_ranges_writable) で見る。
- * 書き込みはしない (kselftest が kill せずに叩けるように分けてある)。 */
+/* 登録者の生存と全出力ページを検査。失敗は 0、書込みも kill もしない。 */
 int fd_redirect_buf_write_ok(const FdRedirect *r, u32 to_write);
 
 /* FD 0/1/2 のリダイレクトを解除 (コンソールモードに戻す)

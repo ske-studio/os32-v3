@@ -192,6 +192,7 @@ checks:
     - kernel/kmalloc.h
     - lib/kstring.h
   check-hdd-stage2-host:
+    - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - exec/lease.h
     - kernel/v86_gcap.h
@@ -486,6 +487,7 @@ checks:
     - tools/check_manifests.py
     - CLAUDE.md
   check-packages-host:
+    - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - kernel/pgalloc.h
     - kernel/physmem.h
@@ -684,6 +686,7 @@ checks:
     - userland/libos32term_render/tests/render.rs
     - userland/libos32term_render/tests/rework.rs
   check-memory-host:
+    - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - kernel/kmalloc.c
     - tools/tests/lease_host.c
@@ -846,6 +849,8 @@ checks:
     - sdk/include/os32/os32_kapi_generated.h
     - sdk/include/os32/os32_kapi_shared.h
   check-memmap-host:
+    - tools/tests/redir_access_stub.h
+    - include/redir_access.h
     - userland/rust/libos32gui/src/shlib.rs
     - tools/mkshlib.py
     - sdk/os32x_hdr.py
@@ -902,6 +907,8 @@ checks:
     - lib/kstring.h
     - platform/pc98/platform_io.h
   check-memmap:
+    - tools/tests/redir_access_stub.h
+    - include/redir_access.h
     - userland/rust/libos32gui/src/shlib.rs
     - tools/mkshlib.py
     - sdk/os32x_hdr.py
@@ -1040,6 +1047,7 @@ checks:
     - sdk/rust/os32api/**
     - tools/tests/os32api_host.py
   check-db-owned-host:
+    - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - kapi/kapi_db.c
     - kapi/kapi_db.h
@@ -1057,6 +1065,7 @@ checks:
     - sdk/include/os32/os32_kapi_shared.h
     - sdk/include/os32/os32_kapi_slots.h
   check-vfs-fd-sqlite-host:
+    - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - fs/vfs_fd.c
     - tools/tests/test_vfs_fd_sqlite.py
@@ -1311,6 +1320,7 @@ checks:
     - sdk/include/os32/os32_kapi_generated.h
     - sdk/include/os32/os32_kapi_shared.h
   check-sqlite-groups-host:
+    - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - fs/vfs_fd.c
     - lib/sqlite3/os32_sqlite_config.h
@@ -1359,6 +1369,7 @@ checks:
     - sdk/include/os32/os32_kapi_generated.h
     - sdk/include/os32/os32_kapi_shared.h
   check-bootlog-host:
+    - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - kernel/pgalloc.h
     - kernel/physmem.h
@@ -1470,6 +1481,7 @@ checks:
     - sdk/include/os32/os32_kapi_generated.h
     - sdk/include/os32/os32_kapi_shared.h
   check-launch-host:
+    - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - include/sys.h
     - kernel/pgalloc.h
@@ -1490,6 +1502,8 @@ checks:
     - sdk/include/os32/os32_kapi_generated.h
     - sdk/include/os32/os32_kapi_shared.h
   check-ring3-guard-host:
+    - tools/tests/redir_access_stub.h
+    - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - exec/lease.h
     - drivers/kbd.h
@@ -1670,6 +1684,8 @@ checks:
     - sdk/include/os32/os32api.h
     - userland/lib/filer/filer_draw.h
   check-multiapp-model-host:
+    - tools/tests/redir_access_stub.h
+    - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - include/sys.h
     - kernel/pgalloc.h
@@ -1792,6 +1808,7 @@ checks:
     - sdk/include/os32/os32_kapi_shared.h
     - sdk/include/os32/os32api.h
   check-vfs-kind-host:
+    - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - fs/vfs.c
     - fs/vfs.h
@@ -1809,6 +1826,7 @@ checks:
     - sdk/include/os32/os32_kapi_generated.h
     - sdk/include/os32/os32_kapi_shared.h
   check-b8-open-host:
+    - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - drivers/pc98pt.c
     - drivers/pc98pt.h
@@ -1861,6 +1879,7 @@ checks:
     - sdk/include/os32/os32_kapi_generated.h
     - sdk/include/os32/os32_kapi_shared.h
   check-ext2-empty-name-host:
+    - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - build/core.yaml
     - drivers/pc98pt.c
@@ -1905,6 +1924,7 @@ checks:
     - kernel/kmalloc.h
     - lib/kstring.h
   check-vfs-fd-path-host:
+    - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - tools/tests/mutpar.py
     - build/core.yaml
@@ -1994,6 +2014,7 @@ checks:
     - userland/system/inst_disk.c
     - userland/system/inst_hdd.c
   check-db-v50-host:
+    - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - exec/lease.h
     - exec/exec.c
@@ -2075,6 +2096,7 @@ checks:
     - sdk/include/os32/os32_kapi_shared.h
     - sdk/include/os32/os32_kapi_slots.h
   check-db-errstr-host:
+    - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - fs/vfs_fd.c
     - kapi/kapi_db.c
@@ -2103,6 +2125,7 @@ checks:
     - sdk/include/os32/os32_kapi_shared.h
     - sdk/include/os32/os32_kapi_slots.h
   check-cfg-host:
+    - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - assets/settings/defaults.tsv
     - fs/vfs_fd.c
@@ -2151,6 +2174,7 @@ checks:
     - userland/rust/libos32gui/src/hostsvc.rs
     - userland/rust/libos32gui/src/utf8core.rs
   check-install-recover-host:
+    - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - fs/vfs_fd.c
     - kapi/kapi_db.c
@@ -2208,6 +2232,7 @@ checks:
     - tools/host_agent.py
     - tools/tests/test_host_agent.py
   check-net-link-host:
+    - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - exec/lease.h
     - kernel/v86_gcap.h
@@ -2471,6 +2496,7 @@ checks:
     - CLAUDE.md
     - README.md
   check-kapi-layout-host:
+    - include/redir_access.h
     - sdk/rustc_stamp.py
     - sdk/link_guard.py
     - sdk/include/os32/os32_unit_stamp.h
@@ -2552,6 +2578,8 @@ checks:
     - userland/rust/libos32gui/src/widget.rs
     - tools/tests/mutpar.py
   check-fstat-redir-host:
+    - tools/tests/redir_access_stub.h
+    - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - fs/fd_redirect.c
     - fs/fd_redirect.h
@@ -2739,6 +2767,7 @@ checks:
     - sdk/include/os32/os32api.h
     - tools/tests/mutpar.py
   check-vfs-excl-host:
+    - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - fs/ext2_dir.c
     - fs/ext2_file.c
@@ -2959,6 +2988,13 @@ checks:
     - fs/vfs.h
 
   check-fd-redirect-d0a-host:
+    - tools/tests/mutpar.py
+    - kernel/paging.h
+    - include/redir_access.h
+    - include/ksetjmp.h
+    - include/io.h
+    - exec/redir_access.c
+    - exec/appslot.h
     - tools/tests/test_fd_redirect_d0a.py
     - tools/tests/fd_redirect_d0a_host.c
     - fs/fd_redirect.c

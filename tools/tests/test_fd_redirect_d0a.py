@@ -1,44 +1,76 @@
-"""T2d d0a: same VA / distinct backing with the real fs/fd_redirect.c.
-
-Default is the desired contract (currently RED, rc=1). The check target uses
---expect-known-bug: accept only the exact MISSING/CHANGED fingerprint as XFAIL.
-Compiler errors, signals, other failures and XPASS fail the check. In d0b remove
-that flag from the recipe and extend the harness for the saved-AS copy boundary.
-Linux mmap replaces CR3; this does not establish real guest paging correctness.
+"""T2d d0b: actual redirect and saved-AS copy, same VA / different backing.
+MMU, live slots and IRQ primitives are instrumented host boundaries.
+Mutants must compile successfully and then fail at runtime (never compile RED).
 """
 import argparse
 import pathlib
+import shutil
 import subprocess
 import tempfile
+from mutpar import run_ordered
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
+MUTATIONS = [
+    ("exec/redir_access.c", "as_va_to_pa(a->pd_phys, va, pa)", "as_va_to_pa(paging_current_cr3(), va, pa)", "current PD write"),
+    ("exec/redir_access.c", "as_va_to_pa_read(a->pd_phys, va, pa)", "as_va_to_pa_read(paging_current_cr3(), va, pa)", "current PD read"),
+    ("exec/redir_access.c", "((u8 *)P2V(pa))[i] =", "((u8 *)(uptr)va)[i] =", "VA write"),
+    ("exec/redir_access.c", "((const u8 *)P2V(pa))[i]", "((const u8 *)(uptr)va)[i]", "VA read"),
+    ("exec/redir_access.c", "slot->as->generation == a->generation", "1", "generation reuse"),
+    ("exec/redir_access.c", "slot->as->owner == a->owner", "1", "owner mismatch"),
+    ("exec/redir_access.c", "slot->as->pd_phys == a->pd_phys", "1", "PD mismatch"),
+    ("exec/redir_access.c", "!slot || !slot->cpl3 || !slot->as || slot->as != a->as", "!slot || !slot->cpl3 || !slot->as", "AS identity"),
+    ("exec/redir_access.c", "if (!redir_live(a)) return 0;", "if (0 && !redir_live(a)) return 0;", "dead registrant"),
+    ("exec/redir_access.c", "as_va_to_pa(a->pd_phys, va, pa)", "as_va_to_pa_read(a->pd_phys, va, pa)", "RO output"),
+    ("exec/redir_access.c", "if (!redir_access_check(a, va, len, write)) return -1;", "if (0 && !redir_access_check(a, va, len, write)) return -1;", "no preflight"),
+    ("exec/redir_access.c", "irq_restore(flags);\n        done += n;", "irq_restore(1);\n        done += n;", "IF forced on"),
+    ("exec/redir_access.c", "u32 pa, i, n = PAGE_SIZE - (va & (PAGE_SIZE - 1));", "u32 pa, i, n = len - done;", "unbounded IRQ copy"),
+    ("fs/fd_redirect.c", "out->fd[fd] = redir_table[fd];", "out->fd[fd] = redir_table[fd]; out->fd[fd].access = (RedirAccess){0};", "save loses identity"),
+    ("fs/fd_redirect.c", "redir_table[fd] = in->fd[fd];", "redir_table[fd] = in->fd[fd]; redir_table[fd].access = (RedirAccess){0};", "restore loses identity"),
+    ("fs/fd_redirect.c", "redir_table[fd].access = access;", "redir_table[fd].access = access; redir_table[fd].access.origin = REDIR_TRUSTED;", "origin lost"),
+]
+
+
+def run(root, tmp, quiet=False):
+    exe = tmp / "d0b"
+    subprocess.run([
+        "cc", "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-D__cdecl=",
+        *["-I" + str(root / d) for d in ("include", "kernel", "exec", "fs", "lib", "sdk/include/os32")],
+        str(root / "tools/tests/fd_redirect_d0a_host.c"), "-o", str(exe),
+    ], check=True, capture_output=True, text=True)
+    result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=10)
+    if not quiet:
+        print(result.stdout + result.stderr, end="")
+    return result.returncode
+
+
+def mutant(item):
+    rel, old, new, name = item
+    with tempfile.TemporaryDirectory(prefix="os32-d0b-mut-") as tmp:
+        tmp = pathlib.Path(tmp)
+        for d in ("include", "kernel", "exec", "fs", "lib", "sdk/include/os32", "tools/tests"):
+            shutil.copytree(ROOT / d, tmp / d, ignore=shutil.ignore_patterns("*.o", "*.a", "target", "__pycache__"))
+        src = tmp / rel
+        text = src.read_text()
+        assert text.count(old) == 1, (name, text.count(old))
+        src.write_text(text.replace(old, new))
+        rc = run(tmp, tmp, quiet=True)  # Compilation failure raises: never counted RED.
+        return name, rc != 0
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--expect-known-bug", action="store_true")
+    parser.add_argument("--mutate", action="store_true")
     args = parser.parse_args()
-    with tempfile.TemporaryDirectory(prefix="os32-d0a-") as tmp:
-        exe = pathlib.Path(tmp) / "d0a"
-        subprocess.run([
-            "cc", "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-D__cdecl=",
-            "-I" + str(ROOT / "include"),
-            "-I" + str(ROOT / "sdk/include/os32"),
-            str(ROOT / "tools/tests/fd_redirect_d0a_host.c"), "-o", str(exe),
-        ], check=True)
-        result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=10)
-    print(result.stdout, end="")
-    print(result.stderr, end="")
-    if args.expect_known_bug:
-        fingerprint = ("d0a: same_as=OK\n"
-                       "d0a: parent_buffer=MISSING\n"
-                       "d0a: child_value=CHANGED\n")
-        if result.returncode == 1 and result.stdout == fingerprint and not result.stderr:
-            print("XFAIL: registered parent buffer resolved in child AS (d0b pending)")
-            return 0
-        print("FAIL: unexpected result (including XPASS); revisit d0b registration")
-        return 1
-    return 0 if result.returncode == 0 else 1
+    with tempfile.TemporaryDirectory(prefix="os32-d0b-") as tmp:
+        if run(ROOT, pathlib.Path(tmp)) != 0:
+            return 1
+    if args.mutate:
+        results = list(run_ordered(mutant, MUTATIONS))
+        for name, red in results:
+            print(f"{'RED (runtime)' if red else 'SURVIVED'}: {name}")
+        print(f"MUTATIONS {sum(red for _, red in results)}/{len(results)} runtime RED")
+        return 0 if all(red for _, red in results) else 1
+    return 0
 
 
 if __name__ == "__main__":

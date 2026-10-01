@@ -183,7 +183,7 @@ check-multiapp-model-host:
 
 check-memory-host:
 	python3 -B tools/tests/test_physmem.py
-	python3 -B tools/tests/test_paging_bounds.py
+	python3 -B tools/tests/test_paging_bounds.py $(MUT)
 	python3 -B tools/tests/test_app_band_pde.py $(MUT)
 	python3 -B tools/tests/test_pgalloc_model.py
 	python3 -B tools/tests/test_pgalloc_range.py
@@ -1164,6 +1164,6 @@ check-shlib-high-host:
 
 # T2d d0a: known failure is explicit XFAIL until d0b fixes registered-AS copy.
 check-fd-redirect-d0a-host:
-	python3 -B tools/tests/test_fd_redirect_d0a.py --expect-known-bug
+	python3 -B tools/tests/test_fd_redirect_d0a.py $(MUT)
 
 .PHONY: check-fd-redirect-d0a-host

@@ -281,6 +281,22 @@ void _start(void)
         paging_addrspace_destroy(&as);
 
     }
+    /* d0b: same AS storage/owner/PD reuse must get a new lifetime, and the
+     * generation counter must saturate rather than wrap to an old token. */
+    {
+        struct addrspace as;
+        u32 generation, pd;
+        CHECK(paging_addrspace_create(&as, LEDGER_OWNER_KERNEL) == 0);
+        generation = as.generation; pd = as.pd_phys;
+        CHECK(generation != 0);
+        paging_addrspace_destroy(&as);
+        CHECK(paging_addrspace_create(&as, LEDGER_OWNER_KERNEL) == 0);
+        CHECK(as.pd_phys == pd && as.generation > generation);
+        paging_addrspace_destroy(&as);
+        as_generation = ~(u32)0;
+        CHECK(paging_addrspace_create(&as, LEDGER_OWNER_KERNEL) == -1);
+        CHECK(as.pd_phys == 0);
+    }
     SAY("PASS: one-shot init preserves dynamic PT, live AS, CR3, allocator");
     SAY("PASS: final-page, virtual/physical overflow, range preflight");
     SAY("PASS: sparse NP, attribute flags, USER/PCD, user-range preflight");
