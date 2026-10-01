@@ -123,3 +123,12 @@ x1は履歴とソースの調査結果だけ。x2の媒体診断・修復・ゲ�
 追加したMarkdownリンク5先の存在確認も成功。`TMPDIR=/home/hight/os32-tmp`、bytecode生成なし。
 `make check-changed` / 全体ビルド・試験は未実施 (今回は読む調査と文書追記だけ。全体チェックの画像・成果物検査は実行範囲に含めない)。
 変更は本票の追記だけで、原因を確定した扱いにはしない。
+
+### 4-4. x2 の結果 — 保全コピーの読取り診断 (PM、2026-10-01)
+
+- **保全**: NP21/W を `np21w_ctl.py stop` で止め、`C:\Users\hight\Documents\np21w\os32.nhd` を `/home/hight/os32-tmp/ext2-x2/os32.nhd.copy` へ複製してから起動 (原本・`build/nhd/os32.nhd` は上書きしていない、`nhd-pull` は使っていない)。複製は 209,662,464 バイト、sha256 `ebc6d1d55d4591ee82aca1d9845be1e1ae676aa8266e40f012dfd4de298078a7`。この時点の NHD は T2c (`6aacf43`) を配備した後。
+- **区画の抽出**: 起動ログの `[EXT2] hd0: partition LBA 1632 +407864` とヘッダ 512 バイトから、オフセット 836,096 バイト・407,864 セクタを `ext2.img` へ (sha256 `5ddd03d5272f2f23be2b8f0249b0bb9f57d0d153b499bff1c0510a607c1ea7c9`)。
+- **superblock** (`dumpe2fs -h`): Filesystem state = **not clean with errors**、Errors behavior = Remount read-only、Mount count = 33、Last write time = 2026-10-01 19:35:40 (ホストの配備の書込み)、Last checked = 1970-01-01 (一度も検査されていない)。First/Last error の欄は無い (OS32 の ext2 は記録しない)。
+- **`e2fsck -fn`** (e2fsprogs 1.47.2、読むだけ): Pass 1〜5 で**指摘 0 件、rc=0**。319/51000 files、38313/203932 blocks。診断全文は `/home/hight/os32-tmp/ext2-x2/e2fsck_n.txt`。
+- **判定**: **現在の構造は健全で、errors の印だけが残っている**。x1 のとおり印は 9/29 以前から持ち越しており、過去の一時的なメタデータ I/O 失敗または rename の中断で立って、消す経路が無いまま残ったと考えるのが自然 (原因の発生時点は未確定)。T1 / T2 の変更による構造の破壊を示す証拠は無い。
+- **残り**: 印を消すには NHD の superblock を書き換える必要があり ([D2] の承認対象)。承認後は保全コピーを残したまま、停止中の NHD に対して e2fsck (修復) を 1 回かけ、前後の hash・診断・起動ログの警告の消失を記録する。原因の発生時点を突き止める x3 (別の像で操作を再生) は、印が再び立つかを監視する形に切り替えるかを PM が判断する。
