@@ -4,12 +4,14 @@ Mutants must compile successfully and then fail at runtime (never compile RED).
 """
 import argparse
 import pathlib
-import shutil
 import subprocess
 import tempfile
 from mutpar import run_ordered
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
+# Read only the mutated implementation and fixture once, not a tree per variant.
+SOURCE_FILES = ("exec/redir_access.c", "fs/fd_redirect.c",
+                "tools/tests/fd_redirect_d0a_host.c")
 MUTATIONS = [
     ("exec/redir_access.c", "slot->state == APP_STATE_ABORT_PENDING ||", "", "abort pending"),
     ("exec/redir_access.c", "!slot || !slot->cpl3 || !slot->as || slot->as != a->as", "!slot || !slot->as || slot->as != a->as", "non-CPL3 registrant"),
@@ -39,7 +41,7 @@ def run(root, tmp, quiet=False):
     exe = tmp / "d0b"
     subprocess.run([
         "cc", "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-D__cdecl=",
-        *["-I" + str(root / d) for d in ("include", "kernel", "exec", "fs", "lib", "sdk/include/os32")],
+        *["-I" + str(ROOT / d) for d in ("include", "kernel", "exec", "fs", "lib", "sdk/include/os32")],
         str(root / "tools/tests/fd_redirect_d0a_host.c"), "-o", str(exe),
     ], check=True, capture_output=True, text=True)
     result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=10)
@@ -48,12 +50,14 @@ def run(root, tmp, quiet=False):
     return result.returncode
 
 
-def mutant(item):
+def mutant(item, sources):
     rel, old, new, name = item
     with tempfile.TemporaryDirectory(prefix="os32-d0b-mut-") as tmp:
         tmp = pathlib.Path(tmp)
-        for d in ("include", "kernel", "exec", "fs", "lib", "sdk/include/os32", "tools/tests"):
-            shutil.copytree(ROOT / d, tmp / d, ignore=shutil.ignore_patterns("*.o", "*.a", "target", "__pycache__"))
+        for path, content in sources.items():
+            dst = tmp / path
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.write_text(content)
         src = tmp / rel
         text = src.read_text()
         assert text.count(old) == 1, (name, text.count(old))
@@ -70,7 +74,8 @@ def main():
         if run(ROOT, pathlib.Path(tmp)) != 0:
             return 1
     if args.mutate:
-        results = list(run_ordered(mutant, MUTATIONS))
+        sources = {path: (ROOT / path).read_text() for path in SOURCE_FILES}
+        results = list(run_ordered(lambda item: mutant(item, sources), MUTATIONS))
         for name, red in results:
             print(f"{'RED (runtime)' if red else 'SURVIVED'}: {name}")
         print(f"MUTATIONS {sum(red for _, red in results)}/{len(results)} runtime RED")

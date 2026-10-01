@@ -1134,6 +1134,7 @@ CHECK_PAR_TARGETS := check-shlib-high-host check-bootinfo-host check-hdd-stage1-
     check-h4-manifest-host check-vfs-excl-host check-fs-kind-callers-host \
     check-cat-linenum-host check-result-conv-host check-guest-host \
     check-fd-redirect-d0a-host \
+    check-caller-access-host \
     check-cirrus-win-host check-pegc-mode-host
 check-par: $(CHECK_PAR_TARGETS)
 
@@ -1167,3 +1168,9 @@ check-fd-redirect-d0a-host:
 	python3 -B tools/tests/test_fd_redirect_d0a.py $(MUT)
 
 .PHONY: check-fd-redirect-d0a-host
+
+# T2d d1: shared identity and actual syscall entry / normal return.
+check-caller-access-host:
+	python3 -B tools/tests/test_caller_access.py $(MUT)
+
+.PHONY: check-caller-access-host

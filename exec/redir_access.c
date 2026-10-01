@@ -1,6 +1,5 @@
-/* T2d d0b: saved redirect buffers belong to the registrant, not current CR3.
- * This is deliberately separate from the future syscall caller context (d1).
- */
+/* Shared caller/registrant identity. Saved redirects allow a different current
+ * CR3; current syscall callers additionally require current slot/owner/CR3. */
 #include "redir_access.h"
 #include "appslot.h"
 #include "fd_redirect.h"
@@ -24,12 +23,13 @@ static int redir_live(const RedirAccess *a)
            slot->as->pd_phys == a->pd_phys && a->pd_phys != 0;
 }
 
-int redir_access_capture(RedirAccess *out)
+static int access_capture(RedirAccess *out, enum caller_origin origin)
 {
     unsigned int flags = irq_save();
     AppSlot *slot;
     RedirAccess a = {0};
-    a.origin = ring3_call_from_user() ? REDIR_USER : REDIR_TRUSTED;
+    if (origin != CALLER_USER && origin != CALLER_TRUSTED) goto fail;
+    a.origin = origin;
     a.app_id = appslot_cur();
     a.owner = (u32)res_owner_get();
     a.pd_phys = paging_kernel_pd_phys();
@@ -49,6 +49,51 @@ int redir_access_capture(RedirAccess *out)
 fail:
     irq_restore(flags);
     return 0;
+}
+
+/* No pointer into a potentially abandoned syscall stack is retained. The
+ * value still needs explicit invalidation at d2 nonlocal-return boundaries. */
+static CallerAccessFrame caller_frame;
+
+int caller_access_enter(CallerAccessFrame *previous, enum caller_origin origin)
+{
+    unsigned int flags = irq_save();
+    struct caller_access a;
+    int ok = access_capture(&a, origin);
+    if (ok) {
+        *previous = caller_frame;
+        caller_frame.access = a;
+        caller_frame.valid = 1;
+    }
+    irq_restore(flags);
+    return ok;
+}
+
+void caller_access_leave(const CallerAccessFrame *previous)
+{
+    unsigned int flags = irq_save();
+    caller_frame = *previous;
+    irq_restore(flags);
+}
+
+int caller_access_get(struct caller_access *out)
+{
+    unsigned int flags = irq_save();
+    const struct caller_access *a = &caller_frame.access;
+    int ok = caller_frame.valid && redir_live(a);
+    if (ok && a->origin == CALLER_USER)
+        ok = a->app_id == appslot_cur() && res_owner_get() == a->app_id &&
+             a->pd_phys == paging_current_cr3();
+    if (ok) *out = *a;
+    irq_restore(flags);
+    return ok;
+}
+
+int redir_access_capture(RedirAccess *out)
+{
+    /* Keep the d0b source-of-origin contract until d2 lifetime wiring is ready.
+     * Registration stores a value; it must not retain the current frame. */
+    return access_capture(out, ring3_call_from_user() ? REDIR_USER : REDIR_TRUSTED);
 }
 
 static int redir_page(const RedirAccess *a, u32 va, int write, u32 *pa)
