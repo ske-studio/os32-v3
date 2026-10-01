@@ -1,9 +1,19 @@
 # tools/check_map.yaml — 検査 → 入力のパス (glob) の対応表 (make check-changed)
 #
+# check-changed の絞り込みは**作業中の近道 (目安)** で、取りこぼしの保証はしない。保証は
+# 取り込み (PM) の `make check` (全部を変異込み) が担う。そのため絞り込みの型は保守的な
+# 許可リストにとどめ、わざと作った入力への耐性は目標にしない (ユーザー承認 2026-10-01)。
+#
 # 読むのは tools/check_select.py。規則はそこの docstring と docs/08_build.md §8-4:
 #   * 変更が checks: の glob に当たった検査 → 変異込み、当たらなかった検査 → 変異なし
 #   * full: に当たる変更、または どの glob にも docs_only: にも notest: にも当たらない
 #     変更 → 全部を変異込み (= make check)。表の漏れで否定側を落とさないための安全側。
+#     例外: Makefile / build/*.mk は「新しい試験を足す形」だけを決まった型との完全一致で
+#     絞る (基点 = merge-base 版との差分が追加だけで、足した行が全部 型 — 列への検査名、
+#     `check-<name>:` の新しい規則、`python3 -B tools/tests/<file>.py [--flag] [$(MUT)]`
+#     の recipe 行、コメント・空行 — に一致し、既存の規則と recipe の間に挟まず、列の
+#     位置も動かさないときだけ。新しい検査と行を足した検査を変異込み)。それ以外の差分・--files は全部 (docs/08_build.md §8-4)。make は
+#     呼ばない。sdk/kapi.json は生成物を介するので全部のまま。
 #     broad: の検査の `**` glob はこの判定に数えない
 #   * 変更が全部 docs_only: に当たる → 当たった検査 + docs_always: だけを回す
 #   * notest: (どのホスト試験の入力でもない場所) の変更は何も足さない。それだけなら
@@ -25,7 +35,7 @@ ignore:
   - docs/hw/**
   - .claude/**
 
-# ここに当たる変更は recipe や全体の前提を変えるので全部を変異込みで回す。
+# ここに当たる変更は全部を変異込み。ただし build/*.mk の検査だけの変更は上記の例外。
 full:
   - Makefile
   - build/*.mk
@@ -2733,6 +2743,7 @@ checks:
     - docs/08_build.md
     - tools/check_map.yaml
     - tools/check_select.py
+    - tools/tests/mutpar.py
     - tools/tests/test_check_select.py
     - userland/shell/sh_pipe.inc
     - userland/system/hsync_protect.inc
