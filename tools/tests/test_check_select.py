@@ -37,7 +37,10 @@ Makefile / build/*.mk の変更は **「新しい試験を足す形」だけを�
     独立レビュー (7745a75) の P1: `.PHONY:` は型に無い、足した非 recipe 行 (規則・
     コメント・空行) の直後に基点の recipe 行が来る配置は全部。P2: 列を同じファイル内で
     動かしても (末尾・途中へ) 全部。59234b5 の P1: 基点のコメント・空行越しの横取り
-    (規則だけ / 規則 + 足した recipe / コメントだけ / 空行だけ) も全部
+    (規則だけ / 規則 + 足した recipe / コメントだけ / 空行だけ) も全部。d5dbb6e の P1
+    (基点の ifeq 越し) → ユーザー決定: 新規則はファイル末尾の塊だけ、既存の検査への行は
+    recipe が規則行の直後から連続する tab 行だけのときだけ、コメント・空行は末尾の塊か
+    基点の tab 行に接しない場所だけ (それぞれの条件を外す変異が RED)
   * 実物の Makefile を基点 = HEAD で比べると差が無い。実物の make ファイルを基点にして
     check-memory-host に型どおりの行を足すとその 1 本 (main の e241312 / f4989ee の形)
   * 逐次の 2 段目 (CHECK_MUT_TARGETS) は無い — 列は 1 本で全部並列
@@ -433,13 +436,6 @@ def case_mk_recipe_add(cs):
         fx.edit("Makefile", "check-b:\n" + B_LINE, "check-b:\n" + B2 + B_LINE)
         _only(fx.plan(), "check-a", "check-b")
     with fixture(cs) as fx:
-        fx.edit("Makefile", "check-b:\n" + B_LINE, "check-b:\n" + B_LINE + "\n# note\n" + B2)
-        _only(fx.plan(), "check-b")
-    with fixture(cs, files={"build/sdk.mk": FX_SDK.replace("check-a:\n" + A_LINE, "check-a:\n# base\n\n" + A_LINE)}) as fx:
-        # 基点のコメント・空行が規則と recipe の間にあっても、末尾への追加はその 1 本
-        fx.append("build/sdk.mk", A2)
-        _only(fx.plan(), "check-a")
-    with fixture(cs) as fx:
         # 列の位置はそのまま、列の手前と後ろにコメントを足すのは型の中
         fx.edit("build/sdk.mk", "CHECK_PAR_TARGETS :=", "# list\nCHECK_PAR_TARGETS :=")
         fx.edit("build/sdk.mk", LIST_OLD, LIST_OLD + "# after\n")
@@ -582,18 +578,44 @@ def _neg_cases():
                     fx.edit("build/sdk.mk", "check-a:\n" + A_LINE, "check-a:\n.PHONY: check-c\n" + A_LINE),
                     fx.append("build/sdk.mk", C_RULE)))
     neg("コメントを規則と recipe の間に", lambda fx: fx.edit("build/sdk.mk", "check-a:\n" + A_LINE, "check-a:\n# c\n" + A_LINE),
-        None, "直後に基点の recipe 行")
+        None, "接して")
     neg("空行を規則と recipe の間に", lambda fx: fx.edit("build/sdk.mk", "check-a:\n" + A_LINE, "check-a:\n\n" + A_LINE),
-        None, "直後に基点の recipe 行")
+        None, "接して")
     neg("コメントを recipe と recipe の間に", lambda fx: fx.edit("Makefile", B_LINE + B2, B_LINE + "# c\n" + B2),
-        {"Makefile": FX_MAKEFILE.replace("check-b:\n" + B_LINE, "check-b:\n" + B_LINE + B2)}, "直後に基点の recipe 行")
+        {"Makefile": FX_MAKEFILE.replace("check-b:\n" + B_LINE, "check-b:\n" + B_LINE + B2)}, "接して")
     neg("新規則 + コメント + 空行の後に既存の recipe",
         lambda fx: (fx.edit("build/sdk.mk", LIST_OLD, LIST_NEW),
                     fx.edit("build/sdk.mk", "check-a:\n" + A_LINE, "check-a:\n" + C_RULE + "# c\n\n" + A_LINE)),
-        None, "規則 check-c の recipe に基点の行")
+        None, "末尾の塊にない")
+    # ユーザー決定 (3 回目): 持ち主が変わる配置を締め出す
+    IFEQ = "ifeq (1,1)\n\ttest \"$@\" != check-a\nendif\n"
+    neg("astra 3 回目: 基点の ifeq 越しの横取り (新規則を check-a: の直後に)",
+        lambda fx: (fx.edit("build/sdk.mk", LIST_OLD, LIST_NEW),
+                    fx.edit("build/sdk.mk", "check-a:\n" + IFEQ, "check-a:\n" + C_RULE + IFEQ)),
+        {"build/sdk.mk": FX_SDK.replace("check-a:\n" + A_LINE, "check-a:\n" + IFEQ)}, "末尾の塊にない")
+    neg("新規則を基点の行のあいだに (recipe つき)",
+        lambda fx: (fx.edit("build/sdk.mk", LIST_OLD, LIST_NEW),
+                    fx.edit("build/sdk.mk", "MUTATE ?= 1\n", C_RULE + "\nMUTATE ?= 1\n")),
+        None, "末尾の塊にない")
+    neg("新規則を Makefile の途中に", lambda fx: fx.add_c(where="Makefile", rule=""),
+        {"Makefile": FX_MAKEFILE}, "列に足した名前")
+    neg("recipe の途中に基点のコメントがある検査への追加 (末尾)",
+        lambda fx: fx.append("build/sdk.mk", A2),
+        {"build/sdk.mk": FX_SDK.replace("check-a:\n" + A_LINE, "check-a:\n# base\n\n" + A_LINE)}, "持ち主が基点の検査の規則の行でない")
+    neg("recipe の途中に基点のコメントがある検査への追加 (先頭)",
+        lambda fx: fx.edit("build/sdk.mk", "check-a:\n", "check-a:\n" + A2),
+        {"build/sdk.mk": FX_SDK.replace("check-a:\n" + A_LINE, "check-a:\n" + A_LINE + "# mid\n" + A_LINE.replace("test_a", "test_a2"))},
+        "越しに続いている")
+    neg("recipe の連続の後ろに基点の ifeq + tab 行がある検査への追加",
+        lambda fx: fx.edit("build/sdk.mk", A_LINE, A_LINE + A2),
+        {"build/sdk.mk": FX_SDK + IFEQ}, "越しに続いている")
+    neg("recipe の連続の後ろに基点の空行 + tab 行がある検査への追加",
+        lambda fx: fx.edit("build/sdk.mk", A_LINE, A_LINE + A2),
+        {"build/sdk.mk": FX_SDK + "\n\tpython3 -B tools/tests/test_a2.py\n"}, "越しに続いている")
     # 独立レビュー P1 の 2 回目: 基点のコメント・空行越しの横取り。基点の check-a: と recipe の
-    # 間にコメント / 空行 / 複数行の混在がある版で、(A) 規則の行だけ、(B) 規則 + 足した recipe、
-    # (C) コメントだけ、(D) 空行だけ を check-a: の直後に挟む → 全部
+    # 間にコメント / 空行 / 複数行の混在がある版で、(A) 規則の行だけ、(B) 規則 + 足した recipe
+    # を check-a: の直後に挟む → 全部 (新規則は末尾の塊だけ)。コメント・空行だけを基点の
+    # 非 tab 行のあいだに挟むのは (3) で許す (make は無視する) — 上の「接して」の反例とは別
     for tag, gap in (("コメント", "# base comment\n"), ("空行", "\n"), ("混在", "# c1\n\n# c2\n\n")):
         base = {"build/sdk.mk": FX_SDK.replace("check-a:\n" + A_LINE, "check-a:\n" + gap + A_LINE)}
         neg("基点の%s越し: 規則の行だけ" % tag,
@@ -602,12 +624,6 @@ def _neg_cases():
         neg("基点の%s越し: 規則 + 足した recipe" % tag,
             lambda fx, gap=gap: (fx.edit("build/sdk.mk", LIST_OLD, LIST_NEW),
                                  fx.edit("build/sdk.mk", "check-a:\n" + gap, "check-a:\n" + C_RULE + gap)), base)
-        neg("基点の%s越し: コメントだけ" % tag,
-            lambda fx, gap=gap: fx.edit("build/sdk.mk", "check-a:\n" + gap, "check-a:\n# added\n" + gap), base,
-            "直後に基点の recipe 行")
-        neg("基点の%s越し: 空行だけ" % tag,
-            lambda fx, gap=gap: fx.edit("build/sdk.mk", "check-a:\n" + gap, "check-a:\n\n" + gap), base,
-            "直後に基点の recipe 行")
     # 独立レビュー P2: 列の移動 (同じファイル内) は位置が変わるので全部
     neg("列を末尾へ", lambda fx: (fx.edit("build/sdk.mk", "CHECK_PAR_TARGETS := check-a \\\n    check-b\n", ""),
                               fx.append("build/sdk.mk", "CHECK_PAR_TARGETS := check-a \\\n    check-b\n")),
@@ -799,24 +815,28 @@ MK_MUTATIONS = [
      "make の読み方 (tab 行は endef にならない) を外して字下げを無視する読みだけにする"),
     ('        if not single_inserted(k):', '        if False:',
      "継続行の途中への挿入を見ない"),
-    ('            elif ll[k2][0] in ins or name not in base_words:', '            elif False:',
+    ('                if name not in base_words:\n                    raise Reject("%s: 持ち主 %s が基点の列にない"',
+     '                if False:\n                    raise Reject("%s: 持ち主 %s が基点の列にない"',
      "持ち主が基点の列にある検査でなくても recipe の追加と見なす"),
-    ('            if not mo or "=" in t:', '            if not mo:',
+    ('                if j < 0 or j in ins or not mo or "=" in t:', '                if j < 0 or j in ins or not mo:',
      "target-specific 変数の行 (check-a: V = …) を持ち主にできる"),
     ('            if not os.path.isfile(os.path.join(ROOT, script)):', '            if False:',
      "script が木に無くても選ぶ"),
     ('            if not matches(script, m_checks.get(name, [])):', '            if False:',
      "script が対応表の当該検査の glob に無くても選ぶ"),
-    ('            if n == 0:\n                raise Reject', '            if False:\n                raise Reject',
+    ('        if not picked.get(name):', '        if False:',
      "recipe の無い新規則を許す"),
-    ('            if j < len(work) and j not in ins and work[j].startswith("\\t"):', '            if False:',
-     "足した非 recipe 行の直後に基点の recipe 行が来る配置を見ない (P1: 所属の変更)"),
-    ('            while j < len(work) and (_is_skippable(work[j]) or (j in ins and not work[j].startswith("\\t"))):',
-     '            while j < len(work) and (j in ins and not work[j].startswith("\\t")):',
-     "直後の走査で基点のコメント・空行を飛ばさない (P1 の 2 回目: コメント越しの横取り)"),
-    ('                if not single_inserted(k2) or not TPL_RECIPE_RE.match(t):',
-     '                if not TPL_RECIPE_RE.match(t):',
-     "新しい規則の配下の tab 行に足した行であることを要求しない (P1 の 2 回目: 基点の recipe を取り込む)"),
+    ('            if not in_tail:\n                raise Reject("%s: 新しい規則', '            if False:\n                raise Reject("%s: 新しい規則',
+     "(1) 新しい規則をファイル末尾の塊に限らない (基点の ifeq / コメント越しの横取り)"),
+    ('                while j >= 0 and work[j].startswith("\\t"):\n                    j -= 1',
+     '                while j >= 0 and (work[j].startswith("\\t") or _is_skippable(work[j])):\n                    j -= 1',
+     "(2) 持ち主へ辿るときに基点のコメント・空行を飛ばす (recipe が連続でなくても足せる)"),
+    ('                if j < len(work) and work[j].startswith("\\t"):\n                    raise Reject("%s: %s の recipe が',
+     '                if False:\n                    raise Reject("%s: %s の recipe が',
+     "(2) recipe の連続の後ろにディレクティブ・空行越しの tab 行が続いても見ない"),
+    ('                if (p is not None and work[p].startswith("\\t")) or \\\n                        (n is not None and work[n].startswith("\\t")):',
+     '                if False:',
+     "(3) 基点の tab 行に接するコメント・空行を許す"),
     ('                out.append((None, LIST_MARKER))', '                pass',
      "列の物理行を除くだけで位置を保たない (P2: 同じファイル内の列の移動が追加だけに見える)"),
     ('        if set(headers) != new_names or any(n != 1 for n in headers.values()):',

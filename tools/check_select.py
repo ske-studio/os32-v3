@@ -29,9 +29,12 @@
     (語の集合で比べる)、(b) 新しい検査の規則 `check-<name>:` + 型どおりの recipe 行、
     (c) 列にある既存の検査の recipe への型どおりの行の追加、(d) コメント行と空行。
     選ぶのは (b) の新しい検査と (c) の行を足した検査。
+    置き場所も限る: 新しい規則はファイル末尾の塊だけ、既存の検査への行はその recipe が
+    規則行の直後から連続する tab 行だけのときにその連続の中か直後だけ、コメント・空行は
+    末尾の塊か基点の tab 行に接しない場所だけ (持ち主が変わる配置を締め出す)。
     それ以外の差分 (削除・変更行、型に合わない行 (`.PHONY:` も)、define / 条件の中、
-    継続行の途中、足した非 recipe 行の直後に基点の recipe 行が来る配置、列の移動、
-    追加・削除・改名されたファイル、`--files` (基点なし)) は全部 (理由を出す)。
+    継続行の途中、列の移動、追加・削除・改名されたファイル、`--files` (基点なし)) は
+    全部 (理由を出す)。
     sdk/kapi.json は生成物を介して試験の中身が変わるので全部のまま。
   * どの検査の glob にも `docs_only:` にも `notest:` にも当たらない変更がある
                                    → 全部を変異込み (= check)。表の漏れで
@@ -245,20 +248,24 @@ def check_lists(vars_):
 #     そして次のどれかに完全一致:
 #       (a)  (列の物理行は上の語集合の比較で見る)
 #       (b)  TPL_HEADER_RE  `check-<name>:` — 前提なし。name は列に足した新しい名前で、
-#            基点のどの make ファイルにも現れない。規則は 1 つだけ。続く tab 行は
-#            次の非 tab 行 (コメント・空行は基点のものも飛ばす) まで**全部足した行**で
-#            型どおり、1 行以上 (基点のコメント越しの既存 recipe の横取りを拒む)
+#            基点のどの make ファイルにも現れない。規則は 1 つだけ、recipe は 1 行以上。
+#            **ファイル末尾の塊** (基点の最後の行より後ろ) にだけ置ける — 規則とその recipe・
+#            コメント・空行がそこに続く。基点の行のあいだに入った新規則は全部
 #       (c)  TPL_RECIPE_RE  `\tpython3 -B tools/tests/<file>.py [--flag ...] [$(MUT)|$(MUTS)]`
-#            — 持ち主 (上へ向かって tab 行・コメント・空行を飛ばした最初の行) が、
-#            基点の列にある検査の基点の規則の行 `check-<name>:…` (`=` を含まない) か、
-#            (b) の新しい規則。script は作業中の木にあり、対応表の当該検査の glob に当たる
-#       (d)  空行 (完全に空) と `#` 始まりのコメント行 (末尾 `\` なし)
-#     `.PHONY:` の行は型に入れない (独立レビュー P1: 既存の規則の行と recipe の間に
+#            — 持ち主は、上へ tab 行だけを辿って着く基点の列にある検査の基点の規則の行
+#            `check-<name>:…` (`=` を含まない)。その検査の recipe は **規則行の直後から連続する
+#            tab 行だけ** (途中に基点のコメント・空行・条件ディレクティブなど非 tab 行を含まず、
+#            連続の後ろにそれらを挟んで tab 行が続かない — make はそれらで recipe を切らない)。
+#            足す位置はその連続の中か直後。script は作業中の木にあり、対応表の当該検査の
+#            glob に当たる。末尾の塊の新しい規則の後ろの recipe 行はその規則のもの
+#       (d)  空行 (完全に空) と `#` 始まりのコメント行 (末尾 `\` なし) — 末尾の塊の中か、
+#            前後どちらにも基点の tab 行が接していない基点の 2 行のあいだだけ (recipe の途中・
+#            規則と recipe のあいだには入れない)
+#     `.PHONY:` の行は型に入れない (独立レビュー 1 回目 P1: 既存の規則の行と recipe の間に
 #     `.PHONY: check-new` を挟むと既存の recipe が .PHONY の所属になる。新しい検査を
-#     .PHONY に載せたいなら全部に倒れるのを受け入れる — 載っていない前例はある)
-#   * 足した非 recipe 行 (規則・コメント・空行) の **直後 (コメント・空行は基点のものも
-#     飛ばす) に基点由来の tab 行が来る** 配置は全部 (既存の規則と recipe の間に挟むと
-#     所属が変わる。コメント・空行は make の上では変えないが、同じ配置はまとめて拒否する)
+#     .PHONY に載せたいなら全部に倒れるのを受け入れる — 載っていない前例はある)。
+#     (b)(c)(d) の置き場所の制限は「持ち主が変わる配置を型から締め出す」(ユーザー決定
+#     2026-10-01、独立レビュー 2〜3 回目: 基点のコメント・空行・ifeq 越しの横取り)
 #   * 列に足した名前の集合 = (b) の規則の名前の集合
 #   * 作業中の make ファイルに `.ONESHELL` が無い (recipe を 1 つの shell で回すと、
 #     足した行で既存の行の終了状態の扱いが変わる)
@@ -403,10 +410,31 @@ def _is_skippable(text):
     return text.strip() == "" or text.lstrip().startswith("#")
 
 
+# make が recipe を切らずに飛ばす (または飛ばすかもしれない) 非 tab 行。(2) の「recipe が
+# 連続する tab 行だけ」の判定で、連続の後ろにこれらを挟んで tab 行が続けば recipe が続いて
+# いると見なす (多めに数える = 全部に倒す側)。
+RECIPE_PASS_RE = re.compile(
+    r"^(?:ifeq|ifneq|ifdef|ifndef|else|endif|export|unexport|vpath|undefine|override|"
+    r"define|endef|-?include|sinclude)\b")
+
+
+def _passes_recipe(text):
+    return _is_skippable(text) or RECIPE_PASS_RE.match(text.strip()) is not None
+
+
 def classify_file(rel, work, inserted, base_words, new_names, m_checks):
     """1 ファイルの足した行を型に当てる。{検査名: [script]} ((b) は新しい名前、(c) は
     基点の列の名前) と {新しい名前: 規則の数} を返す。合わなければ Reject。
-    inserted は inserted_lines() の戻り (列の物理行は入っていない)。"""
+    inserted は inserted_lines() の戻り (列の物理行は入っていない)。
+
+    持ち主が変わる配置を型から締め出す (ユーザー決定 2026-10-01、独立レビュー 3 回目):
+      (1) 新しい規則 (b) とその recipe・コメント・空行は **ファイル末尾の塊** (基点の最後の
+          行より後ろに続く足した行) だけ。基点の行のあいだに入った新規則は全部
+      (2) 既存の検査への行 (c) は、その検査の recipe が **規則行の直後から連続する tab 行
+          だけ** (途中に基点のコメント・空行・条件ディレクティブなど非 tab 行を含まず、連続の
+          後ろにそれらを挟んで tab 行が続かない) のときだけ。足す位置はその連続の中か直後
+      (3) コメント・空行 (d) は、(1) の末尾の塊の中か、前後どちらにも基点の tab 行が接して
+          いない基点の 2 行のあいだだけ"""
     ll = logical_lines(work)
     ok = depth_flags(ll)
     phys2log = {}
@@ -414,7 +442,10 @@ def classify_file(rel, work, inserted, base_words, new_names, m_checks):
         for i in range(s, e + 1):
             phys2log[i] = k
     ins = set(inserted)
+    kept = [i for i in range(len(work)) if i not in ins]
+    tail_start = (kept[-1] + 1) if kept else 0      # ここから後ろは全部足した行
     picked, headers = {}, {}
+    cur_new = None          # 末尾の塊で直前に足した新しい規則 (以後の recipe 行の持ち主)
 
     def single_inserted(k):
         s, e, _ = ll[k]
@@ -428,60 +459,52 @@ def classify_file(rel, work, inserted, base_words, new_names, m_checks):
             raise Reject("%s: 継続行の途中に足している" % where)
         if not ok[k]:
             raise Reject("%s: define / 条件の中に足している" % where)
-        if not line.startswith("\t"):
-            # 足した非 recipe 行の直後 — コメント・空行 (基点のものも。make は recipe を
-            # 切らない) と足した非 tab 行を飛ばした最初の行 — が基点の tab 行なら、既存の
-            # 規則と recipe の間に挟んでいる (独立レビュー P1、2 回目は基点のコメント越し)
-            j = i + 1
-            while j < len(work) and (_is_skippable(work[j]) or (j in ins and not work[j].startswith("\t"))):
-                j += 1
-            if j < len(work) and j not in ins and work[j].startswith("\t"):
-                raise Reject("%s: 足した行の直後に基点の recipe 行が来る (所属が変わる)" % where)
+        in_tail = i >= tail_start
         if line == "" or TPL_COMMENT_RE.match(line):
+            if not in_tail:
+                p = max((j for j in kept if j < i), default=None)
+                n = min((j for j in kept if j > i), default=None)
+                if (p is not None and work[p].startswith("\t")) or \
+                        (n is not None and work[n].startswith("\t")):
+                    raise Reject("%s: 基点の recipe 行に接してコメント / 空行を足している" % where)
             continue
         mh = TPL_HEADER_RE.match(line)
         mr = TPL_RECIPE_RE.match(line)
         if mh:
             name = mh.group(1)
+            if not in_tail:
+                raise Reject("%s: 新しい規則 %s がファイル末尾の塊にない (基点の行のあいだ)"
+                             % (where, name))
             if name not in new_names:
                 raise Reject("%s: 規則 %s の名前が列に足した新しい名前でない" % (where, name))
             headers[name] = headers.get(name, 0) + 1
-            n = 0
-            for k2 in range(k + 1, len(ll)):
-                t = ll[k2][2]
-                if _is_skippable(t):
-                    continue
-                if not t.startswith("\t"):
-                    break
-                # 基点のコメント・空行越しに基点の recipe 行が続いても新しい規則の所属に
-                # なる — 配下の tab 行は全部足した行であること (独立レビュー P1 の 2 回目)
-                if not single_inserted(k2) or not TPL_RECIPE_RE.match(t):
-                    raise Reject("%s: 規則 %s の recipe に基点の行か型に合わない行がある"
-                                 % (where, name))
-                n += 1
-            if n == 0:
-                raise Reject("%s: 規則 %s に recipe が無い" % (where, name))
             picked.setdefault(name, [])
+            cur_new = name
         elif mr:
-            owner = None
-            for k2 in range(k - 1, -1, -1):
-                t = ll[k2][2]
-                if _is_skippable(t) or t.startswith("\t"):
-                    continue
-                owner = (k2, t)
-                break
-            if owner is None:
-                raise Reject("%s: recipe 行の持ち主が無い" % where)
-            k2, t = owner
-            mo = OWNER_RE.match(t)
-            if not mo or "=" in t:
-                raise Reject("%s: 持ち主が検査の規則の行でない: %r" % (where, t[:60]))
-            name = mo.group(1)
-            if single_inserted(k2):
-                if name not in new_names or not TPL_HEADER_RE.match(t):
-                    raise Reject("%s: 持ち主 %s が型に合わない新しい規則" % (where, name))
-            elif ll[k2][0] in ins or name not in base_words:
-                raise Reject("%s: 持ち主 %s が基点の列にある検査の基点の規則でない" % (where, name))
+            if cur_new is not None:
+                name = cur_new                      # (1) 末尾の塊の新しい規則の recipe
+            else:
+                # (2) 持ち主: 上へ tab 行だけを辿って基点の検査の規則の行に着く
+                j = i - 1
+                while j >= 0 and work[j].startswith("\t"):
+                    j -= 1
+                t = work[j] if j >= 0 else ""
+                mo = OWNER_RE.match(t)
+                if j < 0 or j in ins or not mo or "=" in t:
+                    raise Reject("%s: 持ち主が基点の検査の規則の行でない (recipe は規則行の直後から"
+                                 "連続する tab 行だけ): %r" % (where, t[:60]))
+                name = mo.group(1)
+                if name not in base_words:
+                    raise Reject("%s: 持ち主 %s が基点の列にない" % (where, name))
+                # 連続の後ろ: make が recipe を切らない行を挟んで tab 行が続けば recipe が続く
+                j = i + 1
+                while j < len(work) and work[j].startswith("\t"):
+                    j += 1
+                while j < len(work) and _passes_recipe(work[j]):
+                    j += 1
+                if j < len(work) and work[j].startswith("\t"):
+                    raise Reject("%s: %s の recipe がコメント・空行・ディレクティブ越しに続いている"
+                                 % (where, name))
             script = "tools/tests/" + mr.group(1)
             if not os.path.isfile(os.path.join(ROOT, script)):
                 raise Reject("%s: %s が木に無い" % (where, script))
@@ -490,11 +513,15 @@ def classify_file(rel, work, inserted, base_words, new_names, m_checks):
             picked.setdefault(name, []).append(script)
         else:
             raise Reject("%s: 型に合わない行: %r" % (where, line[:60]))
+    for name in headers:
+        if not picked.get(name):
+            raise Reject("%s: 規則 %s に recipe が無い" % (rel, name))
     return picked, headers
 
 
 def _base_texts(ancestor):
-    """基点のコミットにある MAKE_INPUT_GLOBS のファイル {相対パス: 行の列}。"""
+    """基点のコミットにある MAKE_INPUT_GLOBS のファイル {相対パス: 行の列}。
+    行は splitlines() (末尾の改行の有無は差に数えない — 末尾の塊の判定を乱さないため)。"""
     mk = compile_globs(MAKE_INPUT_GLOBS)
     p = subprocess.run(["git", "-C", ROOT, "ls-tree", "-r", "--name-only", ancestor,
                         "--", "Makefile", "build"], capture_output=True, text=True)
@@ -507,7 +534,7 @@ def _base_texts(ancestor):
                                capture_output=True)
             if q.returncode != 0:
                 raise Reject("基点版 %s を読めない" % rel)
-            out[rel] = q.stdout.decode("utf-8", "replace").split("\n")
+            out[rel] = q.stdout.decode("utf-8", "replace").splitlines()
     return out
 
 
@@ -515,7 +542,7 @@ def _work_texts():
     out = {}
     for rel in makefile_paths():
         with open(os.path.join(ROOT, rel), encoding="utf-8", errors="replace") as f:
-            out[rel] = f.read().split("\n")
+            out[rel] = f.read().splitlines()
     return out
 
 
