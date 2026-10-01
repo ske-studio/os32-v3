@@ -450,6 +450,19 @@ P3は依頼文の列挙順に番号を付す。反映済みは文書の修正を
 | P3-7 | §9。check-constraintsを追加 |
 | P3-8 | §6-1。eを16KiBへ再見積り、全枠消費後6,708B、実測ゲート維持 |
 
+## 10-2. d0a の結果 (PM、2026-10-01、NP21/W 17MB、main `e641e9c`)
+
+`/usr/bin/d0a_test.bin` (CPL=3、`hsync` で配備、10,560 バイト):
+
+```
+d0a: cpl=3 buffer_va=0x80102940
+d0a: parent_buffer=MISSING
+d0a: child_value=CHANGED
+d0a: child_status kind=1 code=10 rc=10 result_rc=0 bytes=17
+```
+
+**指摘の再現を確認した**: 子の出力 17 バイトは親の登録バッファに届かず、子自身の同じ VA (0x80102940) を書き換えた (子は自己点検で code=10)。ホストの実ソース試験 (`tools/tests/test_fd_redirect_d0a.py`) も同じく RED (XFAIL として登録)。カーネル層の既知の不具合として、**d0b の修正を T2d の新機能より先に行う** (POLICY_DEV §1)。
+
 ## 11. 独立レビュー 2 回目 (Opus 5.5、Approve) の P3 — 実装時の注記
 
 2026-10-01、`3180a51` の差分に対して Approve (P1 2 件・P2 11 件はすべて閉)。以下の 5 件は設計の変更ではなく、実装時に従う注記 (PM 記入)。
