@@ -307,7 +307,7 @@ static inline u32  V2P(const volatile void *va) { return (u32)(uptr)va; }
 - **走査は新しい `tools/check_p2v.py`** (`make check-p2v`、`check` と `check-changed` の依存へ)。形は既存の `tools/check_le_access.py` と同じ 2 段:
   1. **文字列検査** — `kernel/ drivers/ gfx/ fs/ exec/ kapi/ lib/` で、ポインタ型へのキャスト `(T *)` / `(volatile T *)` / `(void *)` が (a) `include/memmap.h` の番地定数 (`MEM_*_BASE`、`MEM_*_ADDR`、`TVRAM_*`、`VRAM_PLANE_*`、`PEGC_*_BASE`、`BIOS_WORK_*`) か、(b) 名前が `*_phys` / `phys` / `pa` / `paddr` / `pfn` の式に当たっていたら、`P2V(` / `P2V_CONST(` の引数でない限り違反。`P2V_CONST` は上の場所以外で違反。逆向き: `(u32)` へのキャストが PTE / CR3 / DMA の口 (`paging_*` の物理引数、`dma_chan_setup`、`dma_setup`、`arch_mmu_load_root`) に直接渡っていたら違反。**アプリ帯・lease 窓の名前** (`RING3_*`、`MEM_EXEC_LOAD_ADDR`、`MEM_APP_BAND_*`、`MEM_LEASE_*`、`uva`、`user_*`) を `V2P(` に渡したら違反 (X7-3)。
   2. **例外一覧** — `tools/check_p2v_allow.txt` に `file:関数:理由` で列挙 (V86 のゲスト線形、リンカ由来の仮想 (`MEM_SHM_BASE`、`KHEAP_BASE`)、`kmalloc` の算術など §2-3 の「対象外」)。行番号でなく関数名で持つ (行がずれても壊れない)。
-- 文字列検査は取りこぼし得る (2 行に分けたキャスト)。それは T1f の受入の**変異試験**で測る: 既知の違反 4 形 (定数キャスト・`*_phys` キャスト・`V2P(RING3_…)`・**関数内の `P2V_CONST`**) を写しの木に注入して検査が落ちることを見る (`tools/tests/mutpar.py` の流儀、実物のソースは書き換えない)。
+- 文字列検査は取りこぼし得る (2 行に分けたキャスト)。それは T1f の受入の**変異試験**で測る: 既知の違反 7 形 (定数キャスト・`*_phys` キャスト・`V2P(RING3_…)`・**関数内の `P2V_CONST`**・複数語のポインタ型・中間キャスト・括弧付き CR3 オペランド、後ろ 3 形は実装レビュー P2 で追加) を写しの木に注入して検査が落ちることを見る (`tools/tests/mutpar.py` の流儀、実物のソースは書き換えない)。
 
 ### 3-5. 割り込み中の確保・解放を数える (R1)
 
@@ -612,7 +612,7 @@ static inline u32  V2P(const volatile void *va) { return (u32)(uptr)va; }
 |---|---|
 | 変更 | §2-3 の 161 件 (T1b〜T1e で書き換え済みの分を除く。1 件ずつ分類する)、静的初期化子 10 か所 + マクロ 2 か所を `P2V_CONST` / `P2V_IO_CONST` に (B6)、`exec.c:816-829` の表歩きを `paging.c` の `as_va_to_pa` 系へ、`paging_verify_identity` と kselftest の恒等表明の書き直し、`tools/check_p2v.py` + `tools/check_p2v_allow.txt` + `build/sdk.mk` (`check-p2v` を `check` と `check-changed` へ)、`docs/CONSTRAINTS.md` と `CLAUDE.md` (新 ID、同じコミットで — `check_constraints.py` が整合を見る) |
 | 受入の芯 | **コード列の同一は補助証拠** (Codex P3): 恒等なので、書き換えの前後で `objdump -d` の `.text` が一致すること (差が出たら理由を列挙 — `static inline` の展開順や定数の畳み方) に加えて、(a) **静的初期化子は `objdump -s -j .data` の初期値が一致**、(b) **表歩きの移動 (`as_va_to_pa`) はホスト試験で USER・RW の判定を 4 通り** (P2V 化とは別に検証する)。NP21/W の回帰は軽くてよい |
-| 検査 | `make check-p2v` が 0 件 (**アプリ帯・lease 窓の番地に `V2P` を当てた箇所も 0、関数の中の `P2V_CONST` も 0**、§3-4)。変異: 4 形の違反の注入でそれぞれ落ちる。`make check` と `make check-changed` の両方から到達する (X16) |
+| 検査 | `make check-p2v` が 0 件 (**アプリ帯・lease 窓の番地に `V2P` を当てた箇所も 0、関数の中の `P2V_CONST` も 0**、§3-4)。変異: 7 形の違反の注入でそれぞれ落ちる (実装レビュー P2 の 3 形を含む)。`make check` と `make check-changed` の両方から到達する (X16) |
 | 対象外の扱い | V86 のゲスト線形・ページ 0 の二重の意味 (`v86_bios.c:283,1207` の `guest = (u8 *)0` はゲスト線形であり物理でもある) は例外一覧に理由付きで。HostDrv の 24 件は §5 T1-U6 の確認まで例外一覧 (「NP21/W が線形で読むか物理で読むか未確認」) |
 | NP21/W 回帰 | 17MB で起動 kselftest 0 fail、GUI・CUI・V86・FD・HostDrv の一巡 |
 
@@ -624,7 +624,7 @@ static inline u32  V2P(const volatile void *va) { return (u32)(uptr)va; }
 
 **表歩き**: `as_va_to_pa(pd_phys, va, *pa)` を paging.c に置き、master CR3 の下で PDE / PTE の PRESENT・USER・RW と PDE の PS 拒否を検査する。失敗時 `*pa` 不変。exec は範囲の反復・CR3 の切替と復元・IF 保存・拒否理由と番地の記録を従来どおり持つ。`test_paging_bounds.py` の実 paging.c ハーネスで **PDE の USER/RW 4 通り × PTE の 4 通り = 16 組**、物理番地+オフセット、PRESENT 欠落・PS・PD/PT の非 present・失敗時出力不変を確認。
 
-**機械語・初期値の比較**: 変更前 `make all` rc=0 の kernel.elf を `.t1f-baseline/` に保存。さらに HEAD の原本を同じクロスコンパイラ・同じ旗で組み、変更対象 **23 オブジェクト**を `objdump -d` と `objdump -s -j .data` で比較した。`.text` は **12/23 が一致**。不一致の 11 本は (1) `exec.o` / `paging.o`: 表歩きの移動・物理番地の返却・呼び出しと分岐、(2) `pgalloc.o`: 整数の比較から `backing == P2V(first × PAGE_SIZE)` にしたことによる最適化・スタック一時領域の割付、(3) `backend_pegc.o` / `gfx_core.o` / `bootinfo.o` / `console.o` / `ime.o` / `kernel.o` / `kselftest.o` / `v86_gcap.o`: P2V_IO の空 asm (入出力レジスタ制約) によるアドレスのレジスタ化・命令/配置の変化。memory_boot.o は boot_ptr → P2V_BOOT を含め **一致**。
+**機械語・初期値の比較**: 変更前 `make all` rc=0 の kernel.elf を `.t1f-baseline/` に保存。さらに HEAD の原本を同じクロスコンパイラ・同じ旗で組み、変更対象 **23 オブジェクト**を `objdump -d` と `objdump -s -j .data` で比較した。`.text` は **12/23 が一致**。不一致の 11 本は (1) `exec.o` / `paging.o`: 表歩きの移動・物理番地の返却・呼び出しと分岐、(2) `pgalloc.o`: 整数の比較から `backing == P2V(first × PAGE_SIZE)` にしたことによる最適化・スタック一時領域の割付、(3) `backend_pegc.o` / `gfx_core.o` / `bootinfo.o` / `console.o` / `ime.o` / `kernel.o` / `kselftest.o` / `v86_gcap.o`: P2V_IO の空 asm (入出力レジスタ制約) によるアドレスのレジスタ化・命令/配置の変化。ただし `backend_pegc.o` の `pegc_present_rect` は空 asm だけでなく、P2V 化に伴うコピー元ポインタのループ計算も変化している。アクセス先・反復範囲に不一致はない (Codex 実装レビュー P3 の補足)。memory_boot.o は boot_ptr → P2V_BOOT を含め **一致**。
 
 オブジェクトの `.data` は **22/23 一致**、backend_pegc.o の差は移動した関数へのポインタ (セクション内の再配置加数)。静的初期化子 10 か所のある 4 オブジェクトの `.data` 比較は一致。kcg の 4 本と utf8 の 1 本は最適化され `.text` に定数が入り、両オブジェクトの機械語も一致。残る **実際に出力された 5 本**はリンク後の `.data` からシンボルで読んで一致を確認: bb_b/r/g/i = 0x6A000 / 0x71D00 / 0x79A00 / 0x81700、gfx_backend_pc98.bb_base = 0x6A000 (定数式の初期値を初期化処理へ移していない)。**kernel.elf 全体の objdump は -d / .data とも不一致**: 上の実命令差、リンク番地の移動、関数/文字列ポインタ、ビルド識別情報の dirty・時刻による差。全体一致を受入証拠とせず、定数式の初期値と権限判定を別に検証した。
 
@@ -643,6 +643,12 @@ static inline u32  V2P(const volatile void *va) { return (u32)(uptr)va; }
 4. 依頼の `.bss` 手前の「2,876B」に対し、この worktree の変更前 make all 直後の実測は **2,880B**だった (4B の差の由来は未確認)。比較は `.got.plt` の後から `.bss` までに統一した。
 5. boot_ptr 撤去に合わせて既存のメモリ検出ハーネスは **4 か所の P2V_BOOT の呼び手**を差し替える (変更数が違えば試験を落とす)。変更時チェックが拾うよう paging_bounds_host.c も check_map へ明記。
 6. 受入条件「コンパイルエラーを RED に数えない」に従い、全検査で判明した **既存の 6 変異** (PCM 4、8237 1、hsync H3 1) は未使用変数の `(void)` を残す変異に訂正し、すべて実行時に RED。各ランナーもコンパイル失敗を RED に数えない形へ。T1a の配置境界ずらし 2 本は設計どおり STATIC_ASSERT がコンパイル拒否するので **NOT COUNTED**、実行時の 8 本だけを RED とし、それ以外の想定外のコンパイル失敗は試験失敗にする (製品コードの PCM / 8237 / hsync は変更していない)。
+
+**実装レビュー修正 (2026-10-01、GPT-6.1-Sol、P2 / P3)**: 検査器のポインタ型を複数語の指定子 (`const` / `volatile` / `unsigned` / `signed` / `struct` など) とポインタ修飾子に対応させた。式解析は連続キャスト・括弧付きオペランド・フィールド/添字/呼出しを辿り、物理キャストと物理引数の両方でキャスト・外側の括弧を除いて元の値を検査する。整数キャストは組込み指定子と本ツリーの整数 typedef を認識する (任意の typedef の型解決・別名追跡・間接呼出しは引き続き対象外)。HostDrv の構造体アドレスと整数メンバー `g_iostatus.Status` を区別する否定/正側試験も追加。実ツリーの再走査は **0 violations / 65 exceptions**、新たな実違反・例外追加なし、製品コード変更なし (機械語・`.data` の再比較は不要)。上記の PEGC の差分分類を補足した。
+
+追加の反例 `(volatile unsigned char *)MEM_BOOTINFO_BASE` / `(volatile u8 *)(uptr)MEM_BOOTINFO_BASE` / `paging_load_cr3((u32)(p))` を否定試験・変異に追加。前二者は写しの実ツリーの `bootinfo_capture` の初期化を差し替え、後者は例外のない関数へ注入し、検査器全体の実行で該当規則と **rc=1** を要求する。`OS32_MUT_JOBS=4 python3 tools/tests/test_p2v.py --mutate` **rc=0、8 試験 PASS、7/7 実行時 RED、コンパイル失敗 0**。
+
+今回のコマンド: `python3 tools/check_p2v.py` **rc=0**、`CROSS_DIR=/home/hight/opt/cross make all < /dev/null` **rc=0**、`CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-p2v < /dev/null` **rc=0**。ビルドの既定 `/tmp/np21w` への FD 画像コピーは 2 件とも警告・失敗、配備・ゲスト試験は未実施 (依頼の対象外)。変更時検査では保存済み `.t1f-baseline/sitecustomize.py` を `export PYTHONPATH="$PWD/.t1f-baseline"` で読み、ELF32 ホスト試験を qemu-i386 で実行した。最初の `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null` は全ターゲットの試験 PASS 後に **rc=2**: コーダーが検査中に本票と変異の関数宣言を編集し、末尾のソース不変検査が 2 ファイルの変化を検出したため。検査中の編集を止め、同じコマンドの再実行は **rc=0** (main との merge-base を基点に全 108 ターゲットを変異込みで実行、ソース不変検査も PASS)。ログは `/tmp/t1f-review-make-all.log` / `/tmp/t1f-review-check-changed-final.log`。
 
 **コミット時の環境制約**: `git add` と `git commit --file .t1f-baseline/commit-tests.txt < /dev/null` は **rc=128**。`/home/hight/os32-v3/.git/worktrees/os32-v3-wt-t1f/index.lock` の作成が `Read-only file system` で拒否された。コミットは未作成、変更と検証結果は worktree に保存済み。指定の末尾 2 行を付けたコミット文を `.t1f-baseline/commit-tests.txt` / `commit-t1f.txt` に用意し、管理領域が書き込み可能になるのを待つ。
 
@@ -717,7 +723,7 @@ static inline u32  V2P(const volatile void *va) { return (u32)(uptr)va; }
 | T1-U4 | Xe10 に副作用のない識別手段が無い — 予約を `GFX=` と機種だけで決めてよいか | 予約は存在の証明ではない (DEVICE_RESERVATION §6)。候補群 `gfx` の予約 (§3-8)。予約した窓に RAM 登録が無いことだけ確かめる | T1e |
 | T1-U5 | `paging_map_phys` の失敗時の契約 | **解消** (§2-2 の 7.): 全件不変。`backend_cirrus.c:327-329` のコメントが古い。T1e で直す | T1e |
 | T1-U6 | HostDrv の hypercall (`fs/hostdrvfs.c`) が渡すポインタを NP21/W が線形番地で読むか物理番地で読むか | NP21/W ai-debug フォーク (`~/np21w-src`) の HostDrv 実装で確かめる。T1f では例外一覧に置く | T1f |
-| T1-U7 | 文字列検査 (`check_p2v.py`) の取りこぼし率 | 変異試験で 4 形を測る。`-Wcast-align=strict` のようなコンパイラ側の検出手段は無い (恒等なので型が同じ) | T1f |
+| T1-U7 | 文字列検査 (`check_p2v.py`) の取りこぼし率 | 変異試験で 7 形を測る (実装レビュー P2 の 3 形を含む)。`-Wcast-align=strict` のようなコンパイラ側の検出手段は無い (恒等なので型が同じ) | T1f |
 | T1-U8 | (撤回 — Codex 2 回目 P3: GUI からの `--cpl0` は `appslot_cpl0_admit` が入口で `OS32_ERR_INVAL` にしている、試験 20A〜20E) | — | — |
 | T1-U9 | 実機 Xe10 のリニア窓の decode 幅・銀行窓の位置 (今の定数は NP21/W の窓) | T1 では扱わない (T1-R9)。P4 の実測 BAR と一緒に | P4 |
 

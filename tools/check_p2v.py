@@ -11,7 +11,16 @@ import re
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 ROOTS = ('kernel', 'drivers', 'gfx', 'fs', 'exec', 'kapi', 'lib')
 EXCLUDED = {'third_party', 'sqlite', 'sqlite3', 'fatfs', 'zlib', 'microtar', 'os32_lz4'}
-CAST = re.compile(r'\(\s*(?:(?:const|volatile)\s+)*(?:struct\s+)?\w+\s*\*\s*\)\s*')
+# A pointer type is unambiguous without resolving typedefs. Scalar casts use
+# built-in specifiers and the integer typedefs used by this tree, so (p) remains
+# an operand rather than being mistaken for a type name.
+POINTER_TYPE = r'(?:\w+\s+)*\w+\s*(?:\*\s*(?:(?:const|volatile)\s*)?)+'
+SCALAR_WORD = r'(?:const|volatile|unsigned|signed|short|long|int|char)'
+SCALAR_TYPE = (r'(?:(?:const|volatile)\s+)*(?:' + SCALAR_WORD +
+               r'(?:\s+' + SCALAR_WORD + r')*|[us](?:8|16|32|64)|uptr|uintptr_t|intptr_t|size_t)')
+CAST = re.compile(r'\(\s*' + POINTER_TYPE + r'\)\s*')
+ANY_CAST = re.compile(r'\(\s*(?:' + POINTER_TYPE + '|' + SCALAR_TYPE + r')\s*\)\s*')
+INTEGER_CAST = re.compile(r'\(\s*(?:' + SCALAR_TYPE + r')\s*\)\s*')
 PHYS = re.compile(r'\b(?:MEM_\w*(?:BASE|ADDR)|TVRAM_\w+|VRAM_PLANE_\w+|PEGC_\w*_BASE|BIOS_WORK_\w+|KHEAP_BASE|KAPI_ADDR|V86_(?:TEST_\w+_ADDR|IPL_ADDR|REMAP_START)|DB_SHM_PTR|\w*_phys|phys|pa|paddr|pfn)\b')
 USER = re.compile(r'\b(?:RING3_\w+|MEM_EXEC_LOAD_ADDR|MEM_APP_BAND_\w+|MEM_LEASE_\w+|uva|user_\w+)\b')
 FUNCTION = re.compile(r'^\w[^;{}\n]*?\b(\w+)\s*\([^;{}]*?\)\s*\{', re.M)
@@ -25,18 +34,59 @@ def code_only(source):
 
 
 def expression(code, start):
-    """One cast operand, including field/index suffixes or parentheses."""
+    """One unary operand: casts, grouping, and field/index/call suffixes."""
     i = start
-    if i < len(code) and code[i] == '(':
-        depth = 1
+    while i < len(code) and code[i].isspace():
         i += 1
-        while i < len(code) and depth:
-            depth += (code[i] == '(') - (code[i] == ')')
-            i += 1
+    cast = ANY_CAST.match(code, i)
+    if cast:
+        _, end = expression(code, cast.end())
+        return code[start:end], end
+    if i < len(code) and code[i] in '&*+-~!':
+        _, end = expression(code, i + 1)
+        return code[start:end], end
+    if i < len(code) and code[i] == '(':
+        i = balanced_end(code, i)
     else:
-        m = re.match(r'(?:&\s*)?(?:0[xX][0-9a-fA-F]+[uUlL]*|\w+)(?:(?:->|\.)\w+|\[[^\]]*\])*', code[i:])
+        m = re.match(r'(?:0[xX][0-9a-fA-F]+[uUlL]*|\w+)', code[i:])
         i += len(m[0]) if m else 0
+    while i < len(code):
+        suffix = re.match(r'\s*(?:->|\.)\s*\w+', code[i:])
+        if suffix:
+            i += len(suffix[0])
+            continue
+        j = i
+        while j < len(code) and code[j].isspace():
+            j += 1
+        if j < len(code) and code[j] in '([':
+            i = balanced_end(code, j)
+        else:
+            break
     return code[start:i], i
+
+
+def balanced_end(code, start):
+    opening = code[start]
+    closing = ')' if opening == '(' else ']'
+    depth, i = 1, start + 1
+    while i < len(code) and depth:
+        depth += (code[i] == opening) - (code[i] == closing)
+        i += 1
+    return i
+
+
+def operand(expr):
+    """Remove leading casts and enclosing groups, preserving the real value."""
+    expr = expr.strip()
+    while expr:
+        cast = ANY_CAST.match(expr)
+        if cast:
+            expr = expr[cast.end():].strip()
+        elif expr.startswith('(') and balanced_end(expr, 0) == len(expr):
+            expr = expr[1:-1].strip()
+        else:
+            break
+    return expr
 
 
 def functions(code):
@@ -63,6 +113,7 @@ def scan(source):
         found.append((code.count('\n', 0, pos) + 1, context(spans, pos), rule))
     for m in CAST.finditer(code):
         expr, _ = expression(code, m.end())
+        expr = operand(expr)
         if re.match(r'(?:P2V(?:_IO|_BOOT)?(?:_CONST)?|V2P)\s*\(', expr):
             continue
         if PHYS.search(expr) or re.match(r'(?:addr[01]?|ebp|aligned|base|page|load_base|stack_top|new_esp|u_esp|user_esp|ring3_tramp_page|guest|ivt18|dst|src)\b', expr) or re.search(r'\b0[xX](?!0\b)[0-9a-fA-F]+', expr):
@@ -79,12 +130,20 @@ def scan(source):
         args, _ = expression(code, m.end() - 1)
         # Integer casts directly passed into physical interfaces. Nested V2P
         # already states intent; pointer arithmetic elsewhere is not a sink.
-        direct = re.findall(r'\(\s*u32\s*\)\s*(?:&\s*)?(\w+)', args)
-        if any(name in pointer_names for name in direct) or re.search(
-                r'\(\s*u32\s*\)\s*(?:&\s*\w+|\w*(?:buffer|buf|table|directory|ptr)\w*\b)', args):
+        for cast in INTEGER_CAST.finditer(args):
+            expr, _ = expression(args, cast.end())
+            expr = operand(expr)
+            if re.match(r'V2P\s*\(', expr):
+                continue
+            if (pointer_names.intersection(re.findall(r'\b\w+\b', expr)) or
+                    re.search(r'&\s*\w+|\b\w*(?:buffer|buf|table|directory|ptr)\w*\b', expr)):
+                add(m.start(), 'physical-sink')
+                break
+    for m in INTEGER_CAST.finditer(code):
+        expr, _ = expression(code, m.end())
+        # Status members are integers, not the HostDrv structures' addresses.
+        if re.fullmatch(r'(?:&\s*)?g_(?:invoke|stack|iostatus|databuf|sop|fsctx|fobj|namebuf|secctx)', operand(expr)):
             add(m.start(), 'physical-sink')
-    for m in re.finditer(r'\(\s*u32\s*\)\s*(?:&\s*)?g_(?:invoke|stack|iostatus|databuf|sop|fsctx|fobj|namebuf|secctx)\b', code):
-        add(m.start(), 'physical-sink')
     return found
 
 
