@@ -206,6 +206,8 @@ u32 paging_lease_pte(const struct addrspace *as, u32 va);
 
 /* カーネル (master) PD の物理アドレス。CR3 を戻すときに使う。 */
 u32 paging_kernel_pd_phys(void);
+/* Registered master PT frame (0 for an absent table). */
+u32 paging_registered_pt(u32 va);
 
 /* 現在の CR3 (= 現在アクティブな PD 物理アドレス) を読む。 */
 u32 paging_current_cr3(void);
@@ -219,6 +221,9 @@ void paging_load_cr3(u32 pd_phys);
 #define AS_VA_PDE   2
 #define AS_VA_PTE   3
 int as_va_to_pa(u32 pd_phys, u32 va, u32 *pa);
+/* B1: live AS and IRQ exclusion are supplied by caller. No CR3 changes.
+ * Validate managed tables and RAM payload; 1=success, 0=refusal, pa unchanged. */
+int as_access_page(const struct addrspace *as, u32 va, int write, u32 *pa);
 /* Read translation accepts RO user pages; failure leaves pa untouched. */
 int as_va_to_pa_read(u32 pd_phys, u32 va, u32 *pa);
 

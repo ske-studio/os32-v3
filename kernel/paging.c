@@ -696,6 +696,11 @@ int as_va_to_pa_read(u32 pd_phys, u32 va, u32 *pa)
     return as_va_to_pa_flags(pd_phys, va, pa, PTE_PRESENT | PTE_USER);
 }
 
+u32 paging_registered_pt(u32 va)
+{
+    return V2P(page_tables[va >> 22]);
+}
+
 u32 paging_kernel_pd_phys(void)
 {
     /* identity マッピングなので page_directory の仮想アドレス = 物理。 */

@@ -85,6 +85,14 @@ u32 shlib_version(void) { return g_loaded ? g_version : 0; }
 u32 shlib_text_end(void) { return MEM_SHLIB_BASE + g_text_pages * PAGE_SIZE; }
 u32 shlib_data_pages(void) { return g_loaded ? g_data_pages : 0; }
 
+int shlib_read_page(u32 va, u32 frame)
+{
+    u32 page = (va - MEM_SHLIB_BASE) / PAGE_SIZE;
+    return g_loaded && va >= MEM_SHLIB_BASE && page < g_text_pages &&
+           g_pages[page] == frame &&
+           pgalloc_page_owned(frame / PAGE_SIZE, LEDGER_OWNER_SHLIB);
+}
+
 int shlib_addrspace_attach(struct addrspace *as)
 {
     u32 i, phys;

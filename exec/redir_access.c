@@ -132,8 +132,17 @@ static int redir_page(const RedirAccess *a, u32 va, int write, u32 *pa)
         *pa = V2P((const void *)(uptr)va);
         return 1;
     }
-    return (write ? as_va_to_pa(a->pd_phys, va, pa) :
-                    as_va_to_pa_read(a->pd_phys, va, pa)) == 0;
+    return as_access_page(a->as, va, write, pa);
+}
+
+/* d4 uses this inside its whole-range IRQ interval. Explicit USER contexts
+ * remain USER during WM; current slot/owner/root must still match. */
+int caller_access_page(const struct caller_access *a, u32 va, int write, u32 *pa)
+{
+    if (a->origin == CALLER_USER &&
+        (a->app_id != appslot_cur() || res_owner_get() != a->app_id ||
+         a->pd_phys != paging_current_cr3())) return 0;
+    return redir_page(a, va, write, pa);
 }
 
 int redir_access_check(const RedirAccess *a, u32 va, u32 len, int write)

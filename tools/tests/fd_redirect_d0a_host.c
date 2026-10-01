@@ -45,6 +45,7 @@ static int walk(u32 pd, u32 va, u32 *pa, int write)
 }
 int as_va_to_pa(u32 pd, u32 va, u32 *pa) { return walk(pd, va, pa, 1); }
 int as_va_to_pa_read(u32 pd, u32 va, u32 *pa) { return walk(pd, va, pa, 0); }
+int as_access_page(const struct addrspace *as, u32 va, int write, u32 *pa) { return !(write ? as_va_to_pa(as->pd_phys, va, pa) : as_va_to_pa_read(as->pd_phys, va, pa)); }
 int vfs_open(const char *p, int m) { (void)p; (void)m; abort(); }
 void vfs_close(int fd) { (void)fd; abort(); }
 int vfs_seek(int fd, int o, int w) { (void)fd; (void)o; (void)w; abort(); }

@@ -44,6 +44,9 @@
  *  C89 ([C1])。libc は使わない (-nostdlib で直接走る)。
  * ======================================================================== */
 #include "types.h"
+#include "ring3_str.h"
+static u32 test_tramp;
+u32 exec_tramp_page_addr(void) { return test_tramp; }
 static u32 host_cr3;
 /* (e): paging.c が返す物理を数える口。pgalloc.h の宣言も同じ名に変わるので、
  * paging.c の呼び出しは全部この関数へ来る (本物へ転送する)。 */
@@ -217,6 +220,12 @@ void _start(void) {
         h.entry_offset = 0; h.bss_size = 0x100000;
         CHECK(exec_image_reject_reason(&h, 1, MEM_SHELL_LOAD_ADDR, 0x100000));
         g_cur_app = &a; a.stack_base = MEM_APP_STACK_TOP - 512UL * 1024;
+        test_tramp = 0x100000UL + PAGE_SIZE;
+        CHECK(ring3_ptr_ok(test_tramp + RING3_USTR_OFF));
+        CHECK(ring3_ptr_ok(test_tramp + RING3_USTR_OFF + RING3_USTR_CAP - 1));
+        CHECK(!ring3_ptr_ok(test_tramp + RING3_USTR_OFF - 1));
+        CHECK(!ring3_ptr_ok(test_tramp + RING3_USTR_OFF + RING3_USTR_CAP));
+        test_tramp = 0;
         CHECK(!ring3_ptr_ok(a.stack_base - PAGE_SIZE));
         CHECK(!ring3_ptr_ok(a.stack_base - 1));
         CHECK(ring3_ptr_ok(a.stack_base));

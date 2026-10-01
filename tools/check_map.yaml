@@ -3056,3 +3056,44 @@ checks:
   - tools/tests/caller_access_host.c
   - tools/tests/mutpar.py
   - tools/tests/test_caller_access.py
+
+  check-access-walk-host:
+  - arch/x86/arch_cpu.h
+  - arch/x86/arch_io.h
+  - exec/access_walk.c
+  - exec/appslot.h
+  - exec/exec.h
+  - exec/os32x_hdr.h
+  - exec/redir_access.c
+  - fs/fd_redirect.h
+  - fs/vfs.h
+  - include/config.h
+  - include/cpu.h
+  - include/io.h
+  - include/kprintf.h
+  - include/ksetjmp.h
+  - include/memmap.h
+  - include/redir_access.h
+  - include/sys.h
+  - include/types.h
+  - kernel/gdt.h
+  - kernel/paging.c
+  - kernel/paging.h
+  - kernel/pgalloc.c
+  - kernel/pgalloc.h
+  - kernel/physmem.c
+  - kernel/physmem.h
+  - kernel/shlib.c
+  - kernel/shlib.h
+  - kernel/tss.h
+  - lib/kstring.h
+  - platform/pc98/platform_io.h
+  - sdk/include/os32/os32_generations.h
+  - sdk/include/os32/os32_kapi_generated.h
+  - sdk/include/os32/os32_kapi_shared.h
+  - tools/tests/access_walk_host.c
+  - tools/tests/host_arch/arch_cpu.h
+  - tools/tests/host_arch/arch_io.h
+  - tools/tests/mutpar.py
+  - tools/tests/pgalloc_host_fixture.h
+  - tools/tests/test_access_walk.py
