@@ -132,3 +132,9 @@ x1は履歴とソースの調査結果だけ。x2の媒体診断・修復・ゲ�
 - **`e2fsck -fn`** (e2fsprogs 1.47.2、読むだけ): Pass 1〜5 で**指摘 0 件、rc=0**。319/51000 files、38313/203932 blocks。診断全文は `/home/hight/os32-tmp/ext2-x2/e2fsck_n.txt`。
 - **判定**: **現在の構造は健全で、errors の印だけが残っている**。x1 のとおり印は 9/29 以前から持ち越しており、過去の一時的なメタデータ I/O 失敗または rename の中断で立って、消す経路が無いまま残ったと考えるのが自然 (原因の発生時点は未確定)。T1 / T2 の変更による構造の破壊を示す証拠は無い。
 - **残り**: 印を消すには NHD の superblock を書き換える必要があり ([D2] の承認対象)。承認後は保全コピーを残したまま、停止中の NHD に対して e2fsck (修復) を 1 回かけ、前後の hash・診断・起動ログの警告の消失を記録する。原因の発生時点を突き止める x3 (別の像で操作を再生) は、印が再び立つかを監視する形に切り替えるかを PM が判断する。
+
+### 4-5. 修復 (ユーザー承認 2026-10-01「エラーを消して。事の経緯は記録」)
+
+- **保全**: NP21/W を `np21w_ctl.py stop` で止め、修復の直前の NHD を `/home/hight/os32-tmp/ext2-repair/os32.nhd.pre-repair` に複製 (sha256 `36656e0085f75e2cd860891f409b62d4c958df3cba95285bdf9f2981100894b3`)。
+- **区画の修復 (写しの上)**: 複製からオフセット 1633 セクタ (836,096 バイト)・407,864 セクタを `/home/hight/os32-tmp/ext2-repair/ext2.img` に取り出し、`e2fsck -fy` (e2fsprogs 1.47.2) を 1 回。rc=1 (修正あり)。変更は 3 つ: superblock の state を **clean** に (errors の印を消す)、**UUID の生成** (OS32 の ext2 は UUID をゼロで作る)、**`/lost+found` の作成** (inode 1・ブロック 1、配備の道具 `tools/deploy_protect.py:73`・`tools/hostdrv_deploy.py:620` はルート直下の lost+found を飛ばす)。Pass 1〜5 の構造の指摘は 0 件のまま。修復後の `e2fsck -fn` は rc=0。診断の全文は `/home/hight/os32-tmp/ext2-repair/e2fsck_fy.txt`・`e2fsck_after_n.txt`。
+- **NHD への書き戻しは未実施**: 修復した区画を NHD の同じ位置 (`dd ... seek=1633 conv=notrunc`) へ書き戻すコマンドが、Claude Code の自動モードの安全判定 (取り返しのつかないローカルの破壊) で拒否された。NHD は修復前のまま (NP21/W は起動し直した)。書き戻しはユーザーの手で行うか、権限の設定を変えてから PM が行う。
