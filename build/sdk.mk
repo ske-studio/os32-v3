@@ -1136,6 +1136,7 @@ CHECK_PAR_TARGETS := check-shlib-high-host check-bootinfo-host check-hdd-stage1-
     check-fd-redirect-d0a-host \
     check-caller-access-host \
     check-access-walk-host \
+    check-caller-copy-host \
     check-cirrus-win-host check-pegc-mode-host
 check-par: $(CHECK_PAR_TARGETS)
 
@@ -1181,3 +1182,9 @@ check-access-walk-host:
 	python3 -B tools/tests/test_access_walk.py $(MUT)
 
 .PHONY: check-access-walk-host
+
+# T2d d4: bounded copies through the real managed walk.
+check-caller-copy-host:
+	python3 -B tools/tests/test_caller_copy.py $(MUT)
+
+.PHONY: check-caller-copy-host

@@ -84,6 +84,9 @@ static void probe(u32 va, int write, int ok, u32 expected)
     CHECK(pa == (ok ? expected : 0x12345678));
     CHECK(host_cr3 == root && host_arch_if == f);
 }
+#ifdef HOST_CALLER_COPY_TEST
+static void caller_copy_tests(void);
+#endif
 void _start(void)
 {
     u32 args[6] = {0x100000, 0xF00000, 3, 0x32, 0xFFFFFFFF, 0};
@@ -106,6 +109,9 @@ void _start(void)
     host_cr3 = space.pd_phys;
     caller = (struct caller_access){CALLER_USER, 2, &space, space.pd_phys, owner, space.generation};
     pd = P2V(space.pd_phys); pt = P2V(space.app_pt_phys[0]);
+#ifdef HOST_CALLER_COPY_TEST
+    caller_copy_tests();
+#endif
     for (i = 0; i < 2; i++) {
         host_arch_if = i ? 0x202 : 2;
         probe(MEM_EXEC_LOAD_ADDR + 13, 0, 1, payload + 13);

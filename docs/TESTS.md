@@ -75,7 +75,7 @@ make check-tests-inventory                      # 表が古くないか検査す
 `TARGET_SRCS` など) にある `ROOT / "…"`。どちらにも現れないものは空欄になる
 (Rust は `--manifest-path` を代わりに出す)。
 
-## 2. `make check` の列 (112 ターゲット)
+## 2. `make check` の列 (113 ターゲット)
 
 `build/sdk.mk` の `CHECK_PAR_TARGETS` (`check-par` の依存) が
 正典。この表はその列をそのまま展開したもの。コマンド列は `make check` (変異込み) の形。
@@ -192,8 +192,9 @@ make check-tests-inventory                      # 表が古くないか検査す
 | 108 | `check-fd-redirect-d0a-host` | `python3 -B tools/tests/test_fd_redirect_d0a.py --mutate` | `fs/fd_redirect.c`<br>`exec/redir_access.c` | — | — | × |
 | 109 | `check-caller-access-host` | `python3 -B tools/tests/test_caller_access.py --mutate` | `exec/exec.c`<br>`exec/redir_access.c` | — | — | × |
 | 110 | `check-access-walk-host` | `python3 -B tools/tests/test_access_walk.py --mutate` | — | — | — | × |
-| 111 | `check-cirrus-win-host` | `python3 -B tools/tests/test_cirrus_win.py --mutate` | `gfx/backend_cirrus.c`<br>`drivers/wab_glue_xe10.c` | [`tools/tests/cirrus_win_tdd.md`](../tools/tests/cirrus_win_tdd.md) | — | × |
-| 112 | `check-pegc-mode-host` | `python3 -B tools/tests/test_pegc_mode.py --mutate` | `gfx/backend_pegc.c`<br>`kernel/console.c` | [`tools/tests/pegc_mode_tdd.md`](../tools/tests/pegc_mode_tdd.md) | [`docs/tasks/realhw/TASK_PEGC480_REALHW.md`](tasks/realhw/TASK_PEGC480_REALHW.md) | × |
+| 111 | `check-caller-copy-host` | `python3 -B tools/tests/test_caller_copy.py --mutate` | — | — | — | × |
+| 112 | `check-cirrus-win-host` | `python3 -B tools/tests/test_cirrus_win.py --mutate` | `gfx/backend_cirrus.c`<br>`drivers/wab_glue_xe10.c` | [`tools/tests/cirrus_win_tdd.md`](../tools/tests/cirrus_win_tdd.md) | — | × |
+| 113 | `check-pegc-mode-host` | `python3 -B tools/tests/test_pegc_mode.py --mutate` | `gfx/backend_pegc.c`<br>`kernel/console.c` | [`tools/tests/pegc_mode_tdd.md`](../tools/tests/pegc_mode_tdd.md) | [`docs/tasks/realhw/TASK_PEGC480_REALHW.md`](tasks/realhw/TASK_PEGC480_REALHW.md) | × |
 
 ## 3. `check` の列に**入っていない** `check-*` ターゲット (9)
 
