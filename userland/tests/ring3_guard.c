@@ -6,12 +6,12 @@
 /*  引数で 2 つのケースを選ぶ (どちらも「書いたら kill される」ことの確認)。  */
 /*                                                                           */
 /*    ring3_guard          ケース A: ヒープ/スタック間のガードページ          */
-/*                         (0x7BF000, 非present) へ書き込む                   */
-/*    ring3_guard shlib    ケース B: 共有ライブラリ帯域の .text (0x400000)    */
+/*                         (0x8FFBF000, 非present) へ書き込む                   */
+/*    ring3_guard shlib    ケース B: 共有ライブラリ帯域の .text (0x80000000)    */
 /*                         へ書き込む。K3 でここは read-only + USER になった  */
 /*                         ので保護違反 (#PF err bit0=1,bit1=1,bit2=1)。       */
 /*                         ライブラリ未ロードでも USER が立っていないので     */
-/*                         同じく #PF になる (どちらでも kill が正解)。       */
+/*                         #PF になる。RO 検証はロード済みで err=7 を確認。       */
 /*    ring3_guard cirrus   ケース C: Cirrus のリニア窓オフセット 0 = 表示面    */
 /*                         (01000000h) へ書き込む。窓は master に supervisor   */
 /*                         + PCD で張られ、アプリ PD で USER になるのは         */
@@ -36,8 +36,8 @@
 /*       =保護無効)                                                          */
 /*                                                                           */
 /*  PM 検証: fault_kill_count +1、0xA8000="GRD?"(または "SLB?") かつ          */
-/*           0xA8004≠"SURV"、シリアルに [ring3] #PF ... addr=0x007BF000       */
-/*           (ケース B は addr=0x00400000 と " [shlib band, WRITE]")、        */
+/*           0xA8004≠"SURV"、シリアルに [ring3] #PF ... addr=0x8FFBF000       */
+/*           (ケース B は addr=0x80000000 と " [shlib band, WRITE]")、        */
 /*           カーネル生存。                                                   */
 /*                                                                           */
 /*  引数は exec_run が CPL=3 のユーザスタックに call 互換で積む               */
@@ -48,6 +48,7 @@
 
 /* スロット番号だけの生成ヘッダ (型に依存しないので自己完結のまま include できる)。 */
 #include "os32_kapi_slots.h"
+#include "memmap.h"
 
 /* crt0 を使わないので KAPI データ欄の配置の刻印を自分で置く (ヘッダ v3、票
  * TASK_KAPI_DATA_FIELDS)。mkos32x.py は刻印の無い ELF を断る。この試験は
@@ -61,10 +62,10 @@ void _start(int argc, char **argv)
     volatile unsigned short *tvram = (volatile unsigned short *)0x000A0000UL;
     volatile unsigned short *avram = (volatile unsigned short *)0x000A2000UL;
     volatile unsigned long  *mark  = (volatile unsigned long  *)0x000A8000UL;
-    volatile unsigned int   *guard = (volatile unsigned int   *)0x007BF000UL;
+    volatile unsigned int   *guard = (volatile unsigned int   *)(MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE - MEM_GUARD_SIZE);
     /* 共有ライブラリ帯域の先頭ページ = ジャンプ表 (.text/.rodata と同じ RO)。
-     * include/memmap.h の MEM_SHLIB_BASE。カーネルヘッダは引けないので直値。 */
-    volatile unsigned int   *shtext = (volatile unsigned int *)0x00400000UL;
+     * include/memmap.h の MEM_SHLIB_BASE。memmap.h の正典定数を使用。 */
+    volatile unsigned int   *shtext = (volatile unsigned int *)MEM_SHLIB_BASE;
     /* 表示面 (レビュー #5 ②)。Cirrus はグルーの lin_base (include/wab_xe10.h、
      * 01000000h)、PEGC は PEGC_LINEAR_BASE (F00000h)。直値なのは上と同じ理由。 */
     volatile unsigned int   *cirrus_vis = (volatile unsigned int *)0x01000000UL;

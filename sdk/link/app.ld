@@ -5,7 +5,7 @@ ENTRY(_start)
 SECTIONS
 {
     /* 外部プログラムのロードアドレス (= include/memmap.h の MEM_EXEC_LOAD_ADDR)。
-     * 0x80000000-0x4FFFFF は共有ライブラリ帯域 (MEM_SHLIB_BASE) になったので
+     * 0x80000000-0x800FFFFF は共有ライブラリ帯域 (MEM_SHLIB_BASE) になったので
      * 2026-09-05 (GUI v1.1 K3) に 1MB 上へ移動した。ここを変えたら
      * memmap.h と mkos32x.py の load_addr 判定も必ず合わせること。 */
     . = 0x80100000;

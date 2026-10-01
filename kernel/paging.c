@@ -671,9 +671,8 @@ u32 paging_pte_flags(u32 virt_addr)
 
 /* 表の物理ポインタを触る口を paging に集約する (T1f)。
  * exec の旧判定と同じく PDE / PTE の両方に PRESENT・USER・RW が必要。 */
-int as_va_to_pa(u32 pd_phys, u32 va, u32 *pa)
+static int as_va_to_pa_flags(u32 pd_phys, u32 va, u32 *pa, u32 need)
 {
-    const u32 need = PTE_PRESENT | PTE_RW | PTE_USER;
     u32 pde, pt_phys, pte;
     if (!pd_phys || !paging_is_present((uptr)P2V(pd_phys)))
         return AS_VA_TABLE;
@@ -685,6 +684,16 @@ int as_va_to_pa(u32 pd_phys, u32 va, u32 *pa)
     if ((pte & need) != need) return AS_VA_PTE;
     *pa = (pte & ~(u32)(PAGE_SIZE - 1)) | (va & (PAGE_SIZE - 1));
     return 0;
+}
+
+int as_va_to_pa(u32 pd_phys, u32 va, u32 *pa)
+{
+    return as_va_to_pa_flags(pd_phys, va, pa, PTE_PRESENT | PTE_USER | PTE_RW);
+}
+
+int as_va_to_pa_read(u32 pd_phys, u32 va, u32 *pa)
+{
+    return as_va_to_pa_flags(pd_phys, va, pa, PTE_PRESENT | PTE_USER);
 }
 
 u32 paging_kernel_pd_phys(void)

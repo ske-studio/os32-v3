@@ -218,6 +218,8 @@ void paging_load_cr3(u32 pd_phys);
 #define AS_VA_PDE   2
 #define AS_VA_PTE   3
 int as_va_to_pa(u32 pd_phys, u32 va, u32 *pa);
+/* Read translation accepts RO user pages; failure leaves pa untouched. */
+int as_va_to_pa_read(u32 pd_phys, u32 va, u32 *pa);
 
 /* アプリ用アドレス空間を 1 つ作る (アプリ固有 PDE を pde_count 枚)。
  * master の全 PDE をコピーしてカーネル帯域を共有し、

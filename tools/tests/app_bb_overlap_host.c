@@ -111,6 +111,9 @@ static u32 app_fail_alloc(u32 owner, int n) {
     }
     return pgalloc_alloc_phys(owner, n);
 }
+static AppSlot *g_cur_app;
+static int host_shlib_loaded;
+int shlib_loaded(void) { return host_shlib_loaded; }
 #include "exec_bb_overlap.inc"
 static u8 heap[192 * 1024];
 static u32 pte(struct addrspace *as, u32 va) {
@@ -180,12 +183,45 @@ void _start(void) {
         a.load_addr = MEM_EXEC_LOAD_ADDR; a.sbrk_heap_limit = a.load_addr + 2 * PAGE_SIZE;
         CHECK(!app_map_region(a.as, a.load_addr, a.sbrk_heap_limit));
         CHECK(!app_store(&a, a.load_addr + PAGE_SIZE - 2, "abcd", 4));
-        CHECK(launch_read_byte(a.as->pd_phys, (const char *)(a.load_addr + PAGE_SIZE)) == 'c');
+        int read_failed = 0;
+        ((u32 *)P2V((((u32 *)P2V(a.as->pd_phys))[a.load_addr >> 22] & ~0xFFFUL)))[(a.load_addr >> 12) & 1023] &= ~PTE_RW;
+        ((u32 *)P2V((((u32 *)P2V(a.as->pd_phys))[a.load_addr >> 22] & ~0xFFFUL)))[((a.load_addr + PAGE_SIZE) >> 12) & 1023] &= ~PTE_RW;
+        CHECK(launch_read_byte(a.as->pd_phys, (const char *)(a.load_addr + PAGE_SIZE), &read_failed) == 'c');
+        CHECK(!read_failed);
+        CHECK(launch_read_byte(a.as->pd_phys, (const char *)a.sbrk_heap_limit, &read_failed) == 0);
+        CHECK(read_failed);
+        ((u32 *)P2V((((u32 *)P2V(a.as->pd_phys))[a.load_addr >> 22] & ~0xFFFUL)))[(a.load_addr >> 12) & 1023] |= PTE_RW;
+        ((u32 *)P2V((((u32 *)P2V(a.as->pd_phys))[a.load_addr >> 22] & ~0xFFFUL)))[((a.load_addr + PAGE_SIZE) >> 12) & 1023] |= PTE_RW;
         CHECK(!as_va_to_pa(a.as->pd_phys, a.load_addr, &pa));
         CHECK(*(u8 *)P2V(pa + PAGE_SIZE - 2) == 'a');
         CHECK(app_store(&a, a.sbrk_heap_limit, "x", 1) == -1);
         CHECK(paging_current_cr3() == paging_kernel_pd_phys());
         exec_teardown_app(&a); CHECK(used_pages == before && !kmalloc_used());
+    }
+    {
+        OS32Header h = {0};
+        h.load_addr = MEM_EXEC_LOAD_ADDR; h.text_size = PAGE_SIZE;
+        CHECK(!exec_image_reject_reason(&h, 0, MEM_EXEC_LOAD_ADDR, 0x100000));
+        h.shlib_protocol = OS32_SHLIB_PROTOCOL;
+        CHECK(exec_image_reject_reason(&h, 0, MEM_EXEC_LOAD_ADDR, 0x100000));
+        host_shlib_loaded = 1;
+        CHECK(!exec_image_reject_reason(&h, 0, MEM_EXEC_LOAD_ADDR, 0x100000));
+        h.load_addr = MEM_SHELL_LOAD_ADDR;
+        CHECK(exec_image_reject_reason(&h, 1, MEM_SHELL_LOAD_ADDR, 0x100000));
+        h.shlib_protocol = 0;
+        CHECK(!exec_image_reject_reason(&h, 1, MEM_SHELL_LOAD_ADDR, 0x100000));
+        h.flags = OS32X_FLAG_SHLIB;
+        CHECK(exec_image_reject_reason(&h, 1, MEM_SHELL_LOAD_ADDR, 0x100000));
+        h.flags = 0; h.entry_offset = h.text_size;
+        CHECK(exec_image_reject_reason(&h, 1, MEM_SHELL_LOAD_ADDR, 0x100000));
+        h.entry_offset = 0; h.bss_size = 0x100000;
+        CHECK(exec_image_reject_reason(&h, 1, MEM_SHELL_LOAD_ADDR, 0x100000));
+        g_cur_app = &a; a.stack_base = MEM_APP_STACK_TOP - 512UL * 1024;
+        CHECK(!ring3_ptr_ok(a.stack_base - PAGE_SIZE));
+        CHECK(!ring3_ptr_ok(a.stack_base - 1));
+        CHECK(ring3_ptr_ok(a.stack_base));
+        CHECK(ring3_ptr_ok(a.stack_base - PAGE_SIZE - 1));
+        g_cur_app = 0;
     }
     /* Every fragmented image/heap/stack allocation failure unwinds normally. */
     for (round = 1; round <= 2 + 16 + MEM_EXEC_STACK_SIZE / PAGE_SIZE; round++) {

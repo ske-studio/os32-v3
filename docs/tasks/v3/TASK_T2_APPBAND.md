@@ -518,6 +518,34 @@ T2b-R 最終記録と比べ、今回の `.data` は4B小さく、BSS前余白は
 
 **最終全体検査 (T2c、2026-10-01)**: 最終 `PATH=/home/hight/opt/cross/bin:$PATH PYTHONPATH=/tmp/t2ap-python CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null` は **rc=0** (`/tmp/t2c-changed3.log`)。全109検査を変異込みで選択し、最後のソース不変検査も成功。高位AS4/4、BB/可変stack/argv/回収11/11、shlib4/4、形式/世代/旧単位混入14/14はコンパイル成功後の実行時RED、コンパイル失敗0。既存lease10/10も成功。既存配置境界・構文破壊のコンパイル拒否はNOT COUNTEDで、実行時REDへ数えていない。二回目 (`/tmp/t2c-changed2.log`) のrc=2は、配布manifest試験の正常fixtureが旧48B/v3のまま、およびkstr_benchの要求API版68と現行69の不一致。正常fixtureを生成定数による現行60Bへ追従し、kstr_benchを69へ更新した。最新 `CROSS_DIR=/home/hight/opt/cross make all < /dev/null` はrc=0 (`/tmp/t2c-all17.log`)、上のELF測定値は不変。ビルド後に `python3 tools/gen_memmap.py --write`、試験一覧を `python3 tools/gen_tests_inventory.py --write` で更新済み。実装・生成物を固定して全検査を完了し、その後は本結果の文書追記だけを行った。状態行は変更していない。ゲスト/実機/外部アプリの未実施項目は上記のとおり。
 
+**レビュー 1 回目の対応 (T2c-R、2026-10-01、GPT-6 / Codex、基点 `efb40d6`、未コミット)**:
+
+- P2-1: 段選びと `appslot_start_admit` の `need_pages` を `exec_ring3_pages` へ統一。実際の stack_size、本体/heap/stack の疎 PT、PD と lease先頭PT、shlib dataを数える。PM決定2の暫定heap byte予算 (旧1/2 PDE上限・既定stackを引いた容量・折半) は維持。8MB・512KiB stackは段1が835枚 (旧768枚)、67枚の不足範囲とちょうど835枚の境界を回帰試験し、不足範囲で段2の実admitが通ることを確認。固定256KiB stackとPTの3枚過小計上を戻す変異はコンパイル成功後の実行時RED。
+- P2-2: `ring3_guard` A/B の番地を memmap の `MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE - MEM_GUARD_SIZE` / `MEM_SHLIB_BASE` に統一し、fault addrと `ring3_hello` 注記を更新。PMは **A: addr=0x8FFBF000**、**B: addr=0x80000000** を照合する。Aは当該ASのPTE非present (CPL3 writeのPF errorは6)、Bはshlibロード済みの当該ASでPTE present/USER/RO (PF errorは7) を確認する。シリアルのBは `[shlib band, WRITE]`。それぞれ `fault_kill_count` +1、`GRD?` / `SLB?`、`SURV`なし、カーネル生存。未ロードでのBのkillはRO保護の合格へ数えない。512KiB要求のアプリのstack guardは **0x8FF7F000** (この既定stack試験binary自体は256KiB)。ゲストの確認はPMへ、今回は未実施。
+- P2-3: link_guard のホームパス既定を撤去。ldに渡した `-L` と `-l` の順序から解決したnewlib/libgccの正確なarchive pathだけをvendorとして記録し、ld mapの実選択入力と照合する。config/SDK例はCROSS_DIRをexport。実際のlibc.a/libgcc.aを別の一時ディレクトリへコピーし、CROSS_DIR環境変数なしで実memberを選択したリンクとvendor証跡の完全一致をホスト試験 (KAPI layout計58件) で確認。
+- P3: deploy.yamlの重複キーを撤去。load/種別/entry・range/未ロードshlib/常駐shellのshlib依存拒否に理由別1行の案内を追加し、形式・KAPI配置・ABI世代・memory世代・shlib protocol・要求API版の案内を分けた。読み取りwalkはPDE/PTEのPRESENT|USERを要求しROも許可、argvの翻訳失敗を終端から区別して起動拒否。早期pointer検証は実stack_baseからguardを除外。死んだCPL0判定2関数とFORCE_CPL0定義/別名、旧成功を期待したホストケースを撤去 (旧flag 0x0004の拒否試験は維持)。指定された配置/60Bヘッダ/v69注記を更新。RAM上端とheap/stackのPDEがAPP帯内というSTATIC_ASSERTを追加。常駐shellはローダでもshlib_protocol=0を要求。
+
+**T2c-R の大きさ** (基点T2c → レビュー対応後、同じ構成):
+
+| 観測 | 対応前 | 対応後 |
+|---|---:|---:|
+| `.text` 開始 / サイズ | 0x100000 / 325,998B | 0x100000 / 327,070B |
+| `.data` 開始 / サイズ | 0x14F980 / 31,943B | 0x14FDA0 / 32,347B |
+| `.bss` 開始 / サイズ | 0x157660 / 210,348B | 0x157C20 / 210,348B |
+| `__bss_end` | 0x18AC0C | 0x18B1CC |
+| ASSERT 0x195000までの残り | 41,972B | 40,500B |
+| `.got.plt`末尾→`.bss`手前 | 12B | 24B |
+| VK32圧縮一式 | 477,105B | 477,998B |
+
+AppSlot / addrspace の構造体は変更なし (192B / 688B)。診断の最新nm: `kselftest_fail=0x163220` / `kselftest_pass=0x163224` / `lease_selftest_result=0x18B1C8` / `exec_as_leftover_pages=0x18B1C0` / `exec_entry_calls=0x18B1C4` / `ledger_bad_free=0x186CB8` / `ledger_irq_ops=0x186674` / `ledger_exc_ops=0x185E40` / `kmalloc_peak_bytes=0x15C988` / `exec_sbrk_tier_last=0x17D590`。PMの再ビルド後に引き直す。
+
+**T2c-R 再検証**: `CROSS_DIR=/home/hight/opt/cross make clean < /dev/null` → 同環境で `make all < /dev/null` は最終いずれもrc=0 (`/tmp/t2cr-clean4.log` / `/tmp/t2cr-all4.log`)。初回の足場なし `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null` はrc=2 (`/tmp/t2cr-changed1.log`)、既存ILP32ホスト試験のSIGSYS (exit -31)。前回と同じ `PYTHONPATH=/tmp/t2ap-python` のqemu-i386足場で再検証する。二回目は既存ring3ホスト変異試験の全木コピーがRustの `target/` まで変異ごとに累積保持して/tmpを枯渇させ、ring3/HDD2/VK32試験が停止 (`/tmp/t2cr-changed2.log`)。同試験を変異ごとに一時木を破棄・target除外へ修正し、単独rc=0、17/17 RED (`/tmp/t2cr-ring3-host.log`) を確認。既存の失敗を合格へ数えず、全体を再実行する。clang AST版のp2vは違反0、例外63で不変 (例外追加なし)。追加のホスト回帰を含むapp/BB/argv/guard/shell試験は15/15実行時RED・コンパイル失敗0 (`/tmp/t2cr-bb4.log`)、sbrk勘定の逆戻し変異もコンパイル成功後の実行時RED (`/tmp/t2cr-sbrk-wired.log`、`--mutate`)。状態行・D番号・暫定heap方針は変更なし。commit/push/NP21/W/NHD/配備/ini/実機/外部アプリは未操作。
+
+sbrkの逆戻し変異は `build/sdk.mk` の `$(MUT)` / `--mutate` へ接続し、check-fastでは走らないことも確認 (`/tmp/t2cr-sbrk-fast.log`、rc=0)。予備試験では新署名・旧段1期待値・RO fixtureの写像方法・定数名の追随で失敗を修正し、コンパイル落ちはREDへ数えなかった。二回目の失敗確定後、残る長時間の検査器試験を中断 (rc=130)。三回目は製品/回帰/構文木検査に失敗なし (`/tmp/t2cr-changed3.log`)、C方言の通常82件も通ったが、sbrkのcheck-fast変異配線を修正するため中断 (rc=130)。最終の配線で全体を再実行する。
+
+**T2c-R 最終全体検査**: `PYTHONPATH=/tmp/t2ap-python CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null` は **rc=0** (`/tmp/t2cr-changed4.log`)。mainとのmerge-base `8612b06ebc87` を基点に全109検査を変異込みで実行し、対応表の漏れ0。clang AST版のp2v/C方言/LE access/arch asmは違反0、例外一覧の追加なし。C方言検査器は通常82件失敗0、変異27/27 RED・対照5/5 GREEN。新しいsbrk境界/RO argv/可変stack guard/shell拒否の回帰と実行時RED変異、CROSS_DIRなしの別配置vendor実リンクも成功。最終のclean→allも上記clean4/all4でrc=0、測定サイズは表のまま。実装・試験を固定して全体検査を完了し、その後は本結果の文書追記のみ。足場なしのrc=2を成功扱いせず、qemu-i386はILP32ホスト試験の実行にだけ使用した。状態行は不変、NP21/W・実機の受入は未実施。
+
+
 ### 5-2. 検査3段と lease 回帰 (d)
 
 | 検査 | 具体的な期待値 |

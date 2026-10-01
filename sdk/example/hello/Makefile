@@ -14,6 +14,7 @@
 # しておく (前者は ../..、後者は make sdk が配置し直すので同じ)。
 OS32_SDK  ?= ../..
 CROSS_DIR ?= /usr/local/cross
+export CROSS_DIR
 APP      ?= hello
 
 # このアプリが要求する最低 KernelAPI バージョン。

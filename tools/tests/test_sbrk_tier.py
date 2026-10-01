@@ -41,8 +41,7 @@ def slice_out(source, signature):
     return signature + body.split("\n}", 1)[0] + "\n}\n"
 
 
-def extract():
-    source = (ROOT / "exec/exec.c").read_text()
+def extract(source):
     define = next((line for line in source.splitlines()
                    if line.startswith("#define RING3_USTACK_SIZE ")), None)
     if define is None:
@@ -53,8 +52,8 @@ def extract():
     return "\n".join(parts) + "\n"
 
 
-def main():
-    inc = extract()
+def run(source, mutant=False):
+    inc = extract(source)
     includes = ["-I" + p for p in INC]
     with tempfile.TemporaryDirectory(prefix="os32-sbrk-tier-") as tmp:
         tmp = pathlib.Path(tmp)
@@ -64,11 +63,27 @@ def main():
                         "-I" + str(tmp), *includes, str(SRC), "-o", str(exe)],
                        cwd=ROOT, check=True)
         print("HOST ILP32 GNU11 COMPILE PASS", flush=True)
-        subprocess.run([str(exe)], cwd=ROOT, check=True, timeout=60)
+        result = subprocess.run([str(exe)], cwd=ROOT, timeout=60, capture_output=mutant)
+        if mutant:
+            if result.returncode == 0: raise SystemExit("budget mismatch mutant survived")
+            print("budget mismatch mutant: runtime RED (compile success)", flush=True)
+            return
+        result.check_returncode()
         subprocess.run(["i386-elf-gcc", *FLAGS, "-O2", *includes, "-c",
                         str(ROOT / "exec/appslot.c"), "-o", str(tmp / "appslot.o")],
                        cwd=ROOT, check=True)
         print("TARGET i386-elf GNU11 -Werror COMPILE PASS", flush=True)
+
+
+def main():
+    source = (ROOT / 'exec/exec.c').read_text()
+    run(source)
+    if '--mutate' in sys.argv:
+        old = 'exec_heap_size, stack_size)\n            <= free_pages'
+        assert old in source
+        # Restore the exact 8MB underestimate: 64 missing stack pages + 3 PT pages.
+        run(source.replace(old, 'exec_heap_size, ((void)stack_size, MEM_EXEC_STACK_SIZE)) - 3\n            <= free_pages', 1), True)
+
 
 
 if __name__ == "__main__":

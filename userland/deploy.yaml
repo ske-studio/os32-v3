@@ -133,8 +133,6 @@ filesystem:
     - host: userland/tests/ring3_guard.bin
       guest: /usr/bin/
       tags: [test]
-      guest: /usr/bin/
-      tags: [test]
     # --- heap_test (子プロセス帯レイアウト検証: sbrk / exec_heap の位置と重なり) ---
     - host: userland/tests/heap_test.bin
       guest: /usr/bin/

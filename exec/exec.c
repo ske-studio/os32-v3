@@ -92,6 +92,11 @@ void exec_init(void) {
 /* 写し場 (票 T9 §12 R1) はスタブの後ろに置く。KAPI が増えて 1 ページに
  * 収まらなくなったら **ここでビルドが落ちる** — 実機では「cd の直後に
  * pwd が化ける」としか見えないので、静的に止める。 */
+STATIC_ASSERT(MEM_PHYS_RAM_CEILING <= MEM_APP_BAND_BASE, ram_below_app_band);
+STATIC_ASSERT((MEM_EXEC_HEAP_BASE >> 22) >= (MEM_APP_BAND_BASE >> 22) &&
+              (MEM_EXEC_HEAP_BASE >> 22) < (MEM_APP_BAND_MAX_TOP >> 22), heap_pde_in_app_band);
+STATIC_ASSERT(((MEM_APP_STACK_TOP - 1) >> 22) >= (MEM_APP_BAND_BASE >> 22) &&
+              ((MEM_APP_STACK_TOP - 1) >> 22) < (MEM_APP_BAND_MAX_TOP >> 22), stack_pde_in_app_band);
 STATIC_ASSERT(RING3_USTR_OFF + RING3_USTR_CAP <= (u32)PAGE_SIZE,
               ring3_ustr_fits_in_trampoline_page);
 
@@ -175,9 +180,8 @@ static void ring3_trampoline_init(void)
 /*                                                                          */
 /*  シェル常駐モデル (レイアウトは 1 バイトも変わっていない):                */
 /*    ID 1 (シェル): 0x300000 に常駐。CPL=0、AS は作らない                    */
-/*    ID 2〜5 (子) : 0x500000 にロード。CPL=3 なら **アプリごとの物理**を     */
-/*                   固定仮想 0x500000〜 へ写す (D1)。--cpl0 の子は従来の     */
-/*                   アイデンティティのまま (D7)。                           */
+/*    ID 2〜5 (子) : MEM_EXEC_LOAD_ADDR、CPL=3、アプリごとの物理を使う。      */
+/*                   高位の固定仮想 MEM_EXEC_LOAD_ADDR〜 へ写す (D1)。      */
 /* ======================================================================== */
 
 /* ======================================================================== */
@@ -227,7 +231,7 @@ static u32 *g_cur_frame = 0;
 /* T2c virtual stack. The caller slot carries its actual size. */
 #define RING3_USTACK_TOP MEM_APP_STACK_TOP
 #define RING3_USTACK_SIZE MEM_EXEC_STACK_SIZE
-#define RING3_HEAP_TOP (MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE - PAGE_SIZE)
+#define RING3_HEAP_TOP (RING3_STACK_BOTTOM - PAGE_SIZE)
 #define RING3_STACK_BOTTOM (g_cur_app ? g_cur_app->stack_base : MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE)
 static u32 g_ring3_band_top = MEM_APP_STACK_TOP;
 static u32 g_ring3_band_pdes = MEM_APP_BAND_MAX_PDES;
@@ -904,7 +908,7 @@ int ring3_user_range_ok(u32 p, u32 len)
  *
  * いまは共有ライブラリの .data/.bss 複製 (shlib_addrspace_attach) だけ。
  * PD とアプリ PT は paging_addrspace_create_n が取るが、それは
- * exec_ring3_pages が別に数えている (1 + band_pdes)。GFX のバックバッファは
+ * exec_ring3_pages が疎 PT と lease PT を別に数えている。GFX のバックバッファは
  * 全アプリ共有 (gfx_bb_phys_range) で per-app には取らないので入らない。
  *
  * K7 の実測 (8MB 構成、PM 2026-09-11): アプリ帯の空き 768 ページに対し、
@@ -919,24 +923,26 @@ static u32 exec_ring3_extra_pages(void)
 }
 
 static u32 exec_ring3_pages(u32 load_base, u32 sbrk_end, u32 exec_heap_size,
-                            u32 band_pdes)
+                            u32 stack_size)
 {
-    return (sbrk_end - load_base) / PAGE_SIZE       /* 本体 + sbrk */
-         + exec_heap_size / PAGE_SIZE               /* exec_heap */
-         + RING3_USTACK_SIZE / PAGE_SIZE            /* ユーザスタック */
-         + 1 + band_pdes                            /* PD + アプリ PT */
-         + exec_ring3_extra_pages();                /* shlib の .data 複製 */
+    return (sbrk_end - load_base + exec_heap_size + stack_size) / PAGE_SIZE
+         + 2 /* PD + first lease PT */
+         + ((sbrk_end - 1) >> 22) - (load_base >> 22) + 1
+         + ((MEM_EXEC_HEAP_BASE + exec_heap_size - 1) >> 22) - (MEM_EXEC_HEAP_BASE >> 22) + 1
+         + ((MEM_APP_STACK_TOP - 1) >> 22) - ((MEM_APP_STACK_TOP - stack_size) >> 22) + 1
+         + exec_ring3_extra_pages();
 }
 
 /* 選んだ段 (1 or 2) を返し、*sbrk_end に sbrk の上端を書く。 */
 static int exec_sbrk_pick_tier(u32 load_base, u32 code_end, u32 guard_a,
-                               u32 exec_heap_size, u32 band_pdes,
+                               u32 exec_heap_size, u32 stack_size,
                                u32 free_pages, u32 *sbrk_end)
 {
     u32 lo = code_end + MEM_EXEC_SBRK_MIN;
 
     if (lo > guard_a) lo = guard_a;
-    if (exec_ring3_pages(load_base, guard_a, exec_heap_size, band_pdes)
+    if (exec_ring3_pages(MEM_EXEC_LOAD_ADDR,
+            MEM_EXEC_LOAD_ADDR + guard_a - load_base, exec_heap_size, stack_size)
             <= free_pages) {
         *sbrk_end = guard_a;
         return 1;
@@ -1005,6 +1011,22 @@ static int app_map_region(struct addrspace *as, u32 vstart, u32 vend)
 /* ======================================================================== */
 /* Copy launch data through physical backing while the master PD is active. */
 /* Read the launcher's bytes after switching to master; no high-VA dereference. */
+static const char *exec_image_reject_reason(const OS32Header *hdr, int is_shell,
+                                            u32 load_base, u32 max_size)
+{
+    const char *reason = 0;
+    if (hdr->load_addr != load_base) reason = "Error: invalid image load address\n";
+    else if (hdr->flags & OS32X_FLAG_SHLIB) reason = "Error: shared library is not executable\n";
+    else if (!hdr->text_size || hdr->entry_offset >= hdr->text_size ||
+             hdr->text_size > max_size || hdr->bss_size > max_size - hdr->text_size)
+        reason = "Error: invalid image entry or range\n";
+    else if (is_shell && hdr->shlib_protocol)
+        reason = "Error: resident shell must have shlib_protocol=0\n";
+    else if (hdr->shlib_protocol && !shlib_loaded())
+        reason = "Error: required shared library is not loaded\n";
+    return reason;
+}
+
 static int exec_stack_bytes(u32 requested, u32 command_bytes, u32 *bytes)
 {
     u32 size = MEM_EXEC_STACK_SIZE;
@@ -1019,11 +1041,14 @@ static int exec_stack_bytes(u32 requested, u32 command_bytes, u32 *bytes)
     return 0;
 }
 
-static u8 launch_read_byte(u32 pd, const char *p)
+static u8 launch_read_byte(u32 pd, const char *p, int *failed)
 {
     u32 pa = (u32)p;
     if ((u32)p >= MEM_APP_BAND_BASE && (u32)p < MEM_LEASE_END &&
-        as_va_to_pa(pd, (u32)p, &pa)) return 0;
+        as_va_to_pa_read(pd, (u32)p, &pa)) {
+        *failed = 1;
+        return 0;
+    }
     return *(const u8 *)P2V(pa);
 }
 
@@ -1612,7 +1637,15 @@ static int exec_launch(const char *cmdline, int gui_arg)
      * (D1 の「起動時の順序」手順 2)。 */
     static u8 hdrbuf[OS32X_HDR_SIZE];
     u32 launcher_pd = paging_current_cr3();
-    int launch_cmd_len = kstrlen(cmdline);
+    int launch_cmd_len = 0, launch_read_failed = 0;
+    while (launch_read_byte(launcher_pd, cmdline + launch_cmd_len, &launch_read_failed)) {
+        if ((u32)launch_cmd_len == 0x7fffffffUL) return EXEC_ERR_INVALID;
+        launch_cmd_len++;
+    }
+    if (launch_read_failed) {
+        shell_print("Error: unreadable launch command\n", ATTR_RED);
+        return EXEC_ERR_INVALID;
+    }
     const char *p = cmdline;
     int i = 0;
 
@@ -1716,19 +1749,28 @@ static int exec_launch(const char *cmdline, int gui_arg)
                     os32x_layout_reason(lrc),
                     (lrc == OS32X_LAYOUT_MISMATCH) ? hdr->kapi_data_off : 0u,
                     (u32)KAPI_DATA_FIELDS_OFF);
-            shell_print("Error: rebuild required (KAPI data layout)\n", ATTR_RED);
+            const char *reason = os32x_layout_reason(lrc);
+            if (lrc == OS32X_LAYOUT_MISMATCH) {
+                if (hdr->kapi_data_off != KAPI_DATA_FIELDS_OFF) reason = "KAPI data layout mismatch";
+                else if (hdr->kapi_abi_generation != OS32_KAPI_ABI_GENERATION) reason = "KAPI ABI generation mismatch";
+                else if (hdr->memory_layout_generation != OS32_MEMORY_LAYOUT_GENERATION) reason = "memory layout generation mismatch";
+                else if (hdr->min_api_ver > KAPI_VERSION) reason = "required KAPI version is newer than kernel";
+                else reason = "shared library protocol mismatch";
+            }
+            shell_print(reason, ATTR_RED);
+            shell_print("; rebuild required\n", ATTR_RED);
             return EXEC_ERR_INVALID;
         }
     }
 
-    if (hdr->load_addr != load_base || (hdr->flags & OS32X_FLAG_SHLIB) ||
-        !hdr->text_size || hdr->entry_offset >= hdr->text_size ||
-        hdr->text_size > max_size || hdr->bss_size > max_size - hdr->text_size) {
-        if (is_shell) g_layout_reject = 1;
-        return EXEC_ERR_INVALID;
+    {
+        const char *reason = exec_image_reject_reason(hdr, is_shell, load_base, max_size);
+        if (reason) {
+            if (is_shell) g_layout_reject = 1;
+            shell_print(reason, ATTR_RED);
+            return EXEC_ERR_INVALID;
+        }
     }
-
-    if (hdr->shlib_protocol && !shlib_loaded()) return EXEC_ERR_INVALID;
     code_off  = hdr->header_size;
     text_sz   = hdr->text_size;
     bss_sz    = hdr->bss_size;
@@ -1781,7 +1823,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
         old_guard = old_exec - PAGE_SIZE;
         if (heap_sz) { old_sbrk = code_end + MEM_EXEC_SBRK_MIN; sbrk_tier = 2; }
         else sbrk_tier = exec_sbrk_pick_tier(MEM_PHYS_EXEC_FLOOR, code_end, old_guard,
-                                           exec_heap_size, legacy_pdes, pgalloc_free_pages(), &old_sbrk);
+                                           exec_heap_size, stack_size, pgalloc_free_pages(), &old_sbrk);
         if (!sbrk_tier) return EXEC_ERR_NOMEM;
         sbrk_end = MEM_EXEC_LOAD_ADDR + (old_sbrk - MEM_PHYS_EXEC_FLOOR);
         exec_heap_base = MEM_EXEC_HEAP_BASE;
@@ -1802,12 +1844,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
     /* ======== 物理の勘定 (D5)。入らなければ拒否、切り詰めない ======== */
     need_pages = 0;
     if (want_ring3) {
-        need_pages = (sbrk_end - load_base + exec_heap_size + stack_size) / PAGE_SIZE
-                   + 2 /* PD + first lease PT */
-                   + ((sbrk_end - 1) >> 22) - (load_base >> 22) + 1
-                   + ((exec_heap_base + exec_heap_size - 1) >> 22) - (exec_heap_base >> 22) + 1
-                   + ((stack_top - 1) >> 22) - ((stack_top - stack_size) >> 22) + 1
-                   + exec_ring3_extra_pages();
+        need_pages = exec_ring3_pages(load_base, sbrk_end, exec_heap_size, stack_size);
         if (appslot_start_admit(gui, need_pages, pgalloc_free_pages()) < 0) {
             shell_print("[DBG] NOMEM: need pages=", 0xE1);
             shell_print_dec(need_pages, 0xE1);
@@ -2025,32 +2062,32 @@ static int exec_launch(const char *cmdline, int gui_arg)
 
         s = cmdline;
         d = str_addr;
-        while (launch_read_byte(launcher_pd, s)) {
+        while (launch_read_byte(launcher_pd, s, &copy_failed)) {
             char quote;
 
             /* 引数間の空白をスキップ */
-            while (launch_read_byte(launcher_pd, s) == ' ') s++;
-            if (!launch_read_byte(launcher_pd, s)) break;
+            while (launch_read_byte(launcher_pd, s, &copy_failed) == ' ') s++;
+            if (!launch_read_byte(launcher_pd, s, &copy_failed)) break;
 
             /* 新しい引数を開始 */
             if (argc < OS32_MAX_ARGS - 1) launch_argv[argc++] = d;
 
             /* クォート対応トークナイザ */
-            while (launch_read_byte(launcher_pd, s) && launch_read_byte(launcher_pd, s) != ' ') {
-                if (launch_read_byte(launcher_pd, s) == '"' || launch_read_byte(launcher_pd, s) == '\'') {
-                    quote = launch_read_byte(launcher_pd, s++);
-                    while (launch_read_byte(launcher_pd, s) && launch_read_byte(launcher_pd, s) != quote) {
-                        if (launch_read_byte(launcher_pd, s) == '\\' && quote == '"' && launch_read_byte(launcher_pd, s + 1)) {
+            while (launch_read_byte(launcher_pd, s, &copy_failed) && launch_read_byte(launcher_pd, s, &copy_failed) != ' ') {
+                if (launch_read_byte(launcher_pd, s, &copy_failed) == '"' || launch_read_byte(launcher_pd, s, &copy_failed) == '\'') {
+                    quote = launch_read_byte(launcher_pd, s++, &copy_failed);
+                    while (launch_read_byte(launcher_pd, s, &copy_failed) && launch_read_byte(launcher_pd, s, &copy_failed) != quote) {
+                        if (launch_read_byte(launcher_pd, s, &copy_failed) == '\\' && quote == '"' && launch_read_byte(launcher_pd, s + 1, &copy_failed)) {
                             s++;
                         }
-                        { u8 ch = launch_read_byte(launcher_pd, s++); copy_failed |= app_store(ctx, d++, &ch, 1); }
+                        { u8 ch = launch_read_byte(launcher_pd, s++, &copy_failed); copy_failed |= app_store(ctx, d++, &ch, 1); }
                     }
-                    if (launch_read_byte(launcher_pd, s) == quote) s++;  /* 閉じクォートをスキップ */
-                } else if (launch_read_byte(launcher_pd, s) == '\\' && launch_read_byte(launcher_pd, s + 1)) {
+                    if (launch_read_byte(launcher_pd, s, &copy_failed) == quote) s++;  /* 閉じクォートをスキップ */
+                } else if (launch_read_byte(launcher_pd, s, &copy_failed) == '\\' && launch_read_byte(launcher_pd, s + 1, &copy_failed)) {
                     s++;
-                    { u8 ch = launch_read_byte(launcher_pd, s++); copy_failed |= app_store(ctx, d++, &ch, 1); }
+                    { u8 ch = launch_read_byte(launcher_pd, s++, &copy_failed); copy_failed |= app_store(ctx, d++, &ch, 1); }
                 } else {
-                    { u8 ch = launch_read_byte(launcher_pd, s++); copy_failed |= app_store(ctx, d++, &ch, 1); }
+                    { u8 ch = launch_read_byte(launcher_pd, s++, &copy_failed); copy_failed |= app_store(ctx, d++, &ch, 1); }
                 }
             }
             { u8 ch = 0; copy_failed |= app_store(ctx, d++, &ch, 1); }

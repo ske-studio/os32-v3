@@ -24,7 +24,7 @@ int main(void)
     h.version++; CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF));
     h.version = OS32X_HDR_VERSION - 1; CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF));
     h = valid(); h.header_size++; CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF));
-    h = valid(); h.flags = OS32X_FLAG_FORCE_CPL0; CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF));
+    h = valid(); h.flags = 0x0004 /* retired flag must be rejected */; CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF));
     h = valid(); h.flags = 0x8000; CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF));
     h = valid(); h.kapi_abi_generation++; CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF));
     h = valid(); h.memory_layout_generation++; CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF));

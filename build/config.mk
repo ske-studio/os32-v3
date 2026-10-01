@@ -18,6 +18,7 @@ NP21W_DIR ?= /tmp/np21w
 
 # クロスコンパイラパス
 CROSS_DIR ?= /usr/local/cross
+export CROSS_DIR
 
 # Directories
 PROJDIR = .

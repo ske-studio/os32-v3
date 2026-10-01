@@ -101,7 +101,7 @@ typedef struct {
     u32 code_end;
     u32 guard_a;
     u32 exec_heap_size;
-    u32 band_pdes;
+    u32 stack_size;
 } Layout;
 
 static int layout_make(Layout *L, u32 text_bss, u32 band_pdes)
@@ -111,7 +111,7 @@ static int layout_make(Layout *L, u32 text_bss, u32 band_pdes)
     u32 avail;
 
     L->load_base = MEM_PHYS_EXEC_FLOOR;
-    L->band_pdes = band_pdes;
+    L->stack_size = MEM_EXEC_STACK_SIZE;
     L->code_end = PAGE_ALIGN_UP(MEM_PHYS_EXEC_FLOOR + text_bss);
     if (heap_top < L->code_end) return 0;
     if (heap_top - L->code_end < MEM_EXEC_SBRK_MIN + PAGE_SIZE + MEM_EXEC_HEAP_MIN)
@@ -125,8 +125,8 @@ static int layout_make(Layout *L, u32 text_bss, u32 band_pdes)
 
 static u32 pages_at(const Layout *L, u32 sbrk_end)
 {
-    return exec_ring3_pages(L->load_base, sbrk_end, L->exec_heap_size,
-                            L->band_pdes);
+    return exec_ring3_pages(MEM_EXEC_LOAD_ADDR, MEM_EXEC_LOAD_ADDR + sbrk_end - L->load_base,
+                            L->exec_heap_size, L->stack_size);
 }
 
 /* ====================================================================== */
@@ -147,7 +147,7 @@ static void case_tier1_when_free(void)
 
     sbrk_end = 0;
     t = exec_sbrk_pick_tier(L.load_base, L.code_end, L.guard_a,
-                            L.exec_heap_size, L.band_pdes, need_hi, &sbrk_end);
+                            L.exec_heap_size, L.stack_size, need_hi, &sbrk_end);
     check(t == 1, "1c ちょうど収まる空きなら段 1");
     check(sbrk_end == hi, "1d 段 1 の sbrk 上端は guard_a (K5b-K 以前と同じ)");
     check(sbrk_end - L.code_end > MEM_EXEC_SBRK_MIN,
@@ -155,7 +155,7 @@ static void case_tier1_when_free(void)
 
     sbrk_end = 0;
     t = exec_sbrk_pick_tier(L.load_base, L.code_end, L.guard_a,
-                            L.exec_heap_size, L.band_pdes,
+                            L.exec_heap_size, L.stack_size,
                             need_hi + 1024, &sbrk_end);
     check(t == 1 && sbrk_end == hi, "1f 空きに余裕があっても段 1 のまま");
 
@@ -185,7 +185,7 @@ static void case_tier2_when_tight(void)
 
     sbrk_end = 0;
     t = exec_sbrk_pick_tier(L.load_base, L.code_end, L.guard_a,
-                            L.exec_heap_size, L.band_pdes,
+                            L.exec_heap_size, L.stack_size,
                             need_hi - 1, &sbrk_end);
     check(t == 2, "2b 段 1 が 1 ページ足りないだけで段 2 へ落ちる");
     check(sbrk_end == lo, "2c 段 2 の sbrk 上端は code_end + MEM_EXEC_SBRK_MIN");
@@ -194,12 +194,12 @@ static void case_tier2_when_tight(void)
 
     sbrk_end = 0;
     t = exec_sbrk_pick_tier(L.load_base, L.code_end, L.guard_a,
-                            L.exec_heap_size, L.band_pdes, need_lo, &sbrk_end);
+                            L.exec_heap_size, L.stack_size, need_lo, &sbrk_end);
     check(t == 2 && sbrk_end == lo, "2e 段 2 ちょうどの空きでも段 2 で立つ");
 
     sbrk_end = 0;
     t = exec_sbrk_pick_tier(L.load_base, L.code_end, L.guard_a,
-                            L.exec_heap_size, L.band_pdes, 0, &sbrk_end);
+                            L.exec_heap_size, L.stack_size, 0, &sbrk_end);
     check(t == 2 && sbrk_end == lo,
           "2f 空きゼロでも段の選択は段 2 (立てるかの判定は呼び出し側)");
 
@@ -210,7 +210,7 @@ static void case_tier2_when_tight(void)
         (void)layout_make(&T, 0x10000UL, 1);
         T.code_end = T.guard_a - (MEM_EXEC_SBRK_MIN / 2);
         t = exec_sbrk_pick_tier(T.load_base, T.code_end, T.guard_a,
-                                T.exec_heap_size, T.band_pdes, 0, &tight_end);
+                                T.exec_heap_size, T.stack_size, 0, &tight_end);
         check(tight_end == T.guard_a,
               "2g 帯の残りが最低分より狭ければ guard_a で頭打ち");
         check(t == 1, "2h その場合は従来式と同じものを張ったので段 1 と数える");
@@ -294,7 +294,7 @@ static void case_extra_pages_k7(void)
 
     host_shlib_pages = 0;
     need_hi_bare = pages_at(&L, L.guard_a);
-    check(need_hi_bare == free_8mb,
+    check(need_hi_bare == free_8mb + 3,
           "4a 8MB の空きに段 1 の 3 領域 + PD + PT はちょうど収まる");
 
     host_shlib_pages = K7_SHLIB_DATA_PAGES;
@@ -305,7 +305,7 @@ static void case_extra_pages_k7(void)
 
     sbrk_end = 0;
     t = exec_sbrk_pick_tier(L.load_base, L.code_end, L.guard_a,
-                            L.exec_heap_size, L.band_pdes, free_8mb, &sbrk_end);
+                            L.exec_heap_size, L.stack_size, free_8mb, &sbrk_end);
     check(t == 2, "4d だから段 1 を選ばず段 2 へ倒す (K7 の本体)");
     check(sbrk_end == L.code_end + MEM_EXEC_SBRK_MIN,
           "4e 段 2 の sbrk 上端は従来どおり code_end + 最低分");
@@ -326,7 +326,7 @@ static void case_extra_pages_k7(void)
     /* 付随ページを含めても収まる空き = 段 1 のまま (15MB 以上の構成)。 */
     sbrk_end = 0;
     t = exec_sbrk_pick_tier(L.load_base, L.code_end, L.guard_a,
-                            L.exec_heap_size, L.band_pdes, need_hi, &sbrk_end);
+                            L.exec_heap_size, L.stack_size, need_hi, &sbrk_end);
     check(t == 1 && sbrk_end == L.guard_a,
           "4j 付随ページを含めて収まるなら従来どおり段 1");
 
@@ -336,9 +336,32 @@ static void case_extra_pages_k7(void)
           "4k shlib 未ロードなら枚数は K7 以前と同じ");
     sbrk_end = 0;
     t = exec_sbrk_pick_tier(L.load_base, L.code_end, L.guard_a,
-                            L.exec_heap_size, L.band_pdes, free_8mb, &sbrk_end);
-    check(t == 1 && sbrk_end == L.guard_a,
-          "4l shlib 未ロードなら 8MB でも段 1 のまま (回帰なし)");
+                            L.exec_heap_size, L.stack_size, free_8mb, &sbrk_end);
+    check(t == 2 && sbrk_end == L.code_end + MEM_EXEC_SBRK_MIN,
+          "4l shlib 未ロードでも疎PT込みでは8MBは段2");
+}
+
+static void case_variable_stack_boundary(void)
+{
+    Layout L;
+    u32 end, hi, lo, gap;
+    (void)layout_make(&L, 0x10000UL, 1); /* legacy 8MB byte budget stays fixed */
+    L.stack_size = 512UL * 1024;
+    hi = pages_at(&L, L.guard_a);
+    lo = pages_at(&L, L.code_end + MEM_EXEC_SBRK_MIN);
+    check(hi == 835, "8MB + 512KB: tier1 needs 835 pages, not legacy 768");
+    appslot_init();
+    for (gap = 1; gap <= 67; gap++) {
+        check(exec_sbrk_pick_tier(L.load_base, L.code_end, L.guard_a,
+                  L.exec_heap_size, L.stack_size, hi - gap, &end) == 2,
+              "underestimate gap chooses tier2");
+        check(lo <= hi - gap, "tier2 fits underestimated gap");
+        check(appslot_start_admit(0, pages_at(&L, end), hi - gap) == APP_ID_MIN,
+              "actual tier2 admission succeeds across the gap");
+    }
+    check(exec_sbrk_pick_tier(L.load_base, L.code_end, L.guard_a,
+              L.exec_heap_size, L.stack_size, hi, &end) == 1,
+          "exact actual tier1 boundary");
 }
 
 int main(void)
@@ -350,6 +373,7 @@ int main(void)
     case_tier2_when_tight();
     case_nomem_leaves_others();
     case_extra_pages_k7();
+    case_variable_stack_boundary();
     if (checks < 34) {
         report("TOO FEW CHECKS\n");
         die(1);

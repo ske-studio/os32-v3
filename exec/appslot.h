@@ -127,8 +127,7 @@ typedef struct {
 
     /* 起動した OS32X ヘッダの flags (票 T8 D1a)。exec_launch が写す。
      * 見るのは OS32X_FLAG_GFX (全画面 GFX を使う宣言) だけで、
-     * OS32X_FLAG_FORCE_CPL0 の判定は起動前 (appslot_launch_is_app /
-     * appslot_cpl0_admit) に済んでいる。構造体の末尾に足すので、
+     * 非シェルの CPL=0 起動はローダが拒否する。構造体の末尾に足すので、
      * 旧 ExecContext 由来の欄の並びは 1 バイトも動かない (I12/I13)。 */
     u32  hdr_flags;
 } AppSlot;
@@ -174,45 +173,11 @@ int appslot_live(void);
 int appslot_alloc_id(void);
 
 /* ---- 起動 (D4) -------------------------------------------------------- */
-/* この起動が **アプリ帯 (CPL=3、per-app 物理、0x500000〜)** を使うか。
- * 1 = アプリ帯 / 0 = そうでない (シェル帯の常駐 CPL=0、または --cpl0 の子)。
- *
- * is_shell (= exec ネスト段 0) は shell.bin でも gshell.bin でも **必ず 0**。
- * 常駐シェルは 0x300000 の MEM_SHELL_* 帯に identity で載る CPL=0 プログラム
- * で、per-app 物理化・ID の池・枚数勘定のどれにも掛からない (K5a 設計 D7
- * 「変えないもの」)。2026-09-11 の差し戻しで、この境界をホストで押さえる
- * ようにした (tools/tests/multiapp_impl_host.c ケース 18)。
- * hdr_flags は OS32X ヘッダの flags (OS32X_FLAG_FORCE_CPL0 を見る)。 */
-int appslot_launch_is_app(int is_shell, u32 hdr_flags);
-
-/* --cpl0 の子 (アプリ帯を identity で丸ごと押さえる CPL=0 の子) を起動して
- * よいか。**状態は 1 つも変えない**。
- *
- * 決裁 2026-09-11 (申し送り A1): --cpl0 の子は exec_cpl0_claim() で
- * [MEM_EXEC_LOAD_ADDR, mem_end) を丸ごと pgalloc_mark_used し、終了時に
- * 丸ごと free する。K5b-K 以後は CPL=3 アプリの per-app 物理も同じ pgalloc
- * から取るので、生きているアプリ (走行中 / park 中) が 1 本でも居ると、
- * その物理を上書きし、終了時に他人のページを解放してしまう。
- * 枚数で刻む機構は増やさず、**生存アプリが 1 本でも居たら拒否**する
- * (特権が要る例外用途なので、GUI のアプリを閉じてから使えば足りる)。
- *
- * 決裁 2026-09-12 (票 T8 D1): --cpl0 のプログラムは VRAM を直接触るので、
- * **GUI からの起動 (gui=1 = exec_start) は生存アプリの有無に関わらず拒否**
- * する。GUI 中に画面を丸ごと持っていかれると WM が復帰できない (画面の所有者
- * は gfx_init を呼ぶ CPL=3 アプリしか取らない)。CUI の exec_run (gui=0) は
- * 従来どおり「生存アプリが居なければ通す」のまま。
- *
- * 戻り値: 0 = 起動してよい / OS32_ERR_INVAL = GUI からは不可 (T8 D1) /
- *         OS32_ERR_FULL = 生存アプリが居るので不可。
- * シェル (exec ネスト段 0) はそもそもアプリ帯を使わないので対象外 —
- * 呼び出し側が appslot_launch_is_app() と同じく is_shell を渡す。 */
-int appslot_cpl0_admit(int is_shell, int gui);
-
 /* CUI 専用の宣言 (OS32X_FLAG_CUI_ONLY、mkos32x --cui-only / app.conf 4 列目
  * `cui`) を持つプログラムを起動してよいか。**純関数 — 状態は 1 つも変えない**。
  *
  * 票 T8-2 (受入 F5 の不合格を受けて、2026-09-12)。T8 D1 の砦は
- * appslot_cpl0_admit だけだったが、`userland/cmds/v86.bin` の flags は 0x0 —
+ * 旧 CPL=0 判定だけだったが、`userland/cmds/v86.bin` の flags は 0x0 —
  * v86 は **CPL=3 のプログラム**で、V86 へは KAPI (v86_selftest / v86_disktest /
  * v86_boot / v86_boot2) を通してカーネル側から入る。FORCE_CPL0 では捕まらない
  * ので、宣言ビットを 1 つ増やして GUI からの起動そのものを断つ。

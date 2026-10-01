@@ -193,12 +193,13 @@ def run_host(root, tmp, quiet=False):
 def mutate():
     """実物の写し (一時ディレクトリ) に変異を当てて、ホスト試験が落ちることを見る。"""
     red = 0
-    with tempfile.TemporaryDirectory(prefix="os32-ring3-guard-mut-") as tmp:
-        tmp = pathlib.Path(tmp)
-        for i, (rel, old, new, why) in enumerate(MUTATIONS, 1):
-            copy = tmp / ("m%d" % i)
+    # Each mutant owns one source copy; Rust build outputs are not test inputs.
+    for i, (rel, old, new, why) in enumerate(MUTATIONS, 1):
+        with tempfile.TemporaryDirectory(prefix="os32-ring3-guard-mut-") as tmp:
+            copy = pathlib.Path(tmp)
             for d in INC_DIRS + ("tools/tests",):
-                shutil.copytree(ROOT / d, copy / d, dirs_exist_ok=True)
+                shutil.copytree(ROOT / d, copy / d, dirs_exist_ok=True,
+                                ignore=shutil.ignore_patterns("target"))
             src = copy / rel
             text = src.read_text(encoding="utf-8")
             if text.count(old) != 1:

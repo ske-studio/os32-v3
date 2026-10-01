@@ -193,7 +193,7 @@ check-memory-host:
 	python3 -B tools/tests/test_lease.py $(MUT)
 	python3 -B tools/tests/test_exec_r1.py $(MUT)
 	python3 -B tools/tests/test_device_reservation.py $(MUT)
-	python3 -B tools/tests/test_sbrk_tier.py
+	python3 -B tools/tests/test_sbrk_tier.py $(MUT)
 	python3 -B tools/tests/test_app_bb_overlap.py $(MUT)
 	python3 -B tools/tests/test_gfx_boot.py $(MUT)
 

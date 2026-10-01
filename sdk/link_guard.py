@@ -19,6 +19,35 @@ def check_note(elf):
         raise H.HeaderError(f'{elf.path}: incompatible per-unit generations; rebuild')
 
 
+def vendor_inputs(args):
+    """Resolve compiler/newlib -l inputs from the same ordered -L search as ld."""
+    dirs, libraries = [], []
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if arg == '-L':
+            i += 1
+            dirs.append(pathlib.Path(args[i]))
+        elif arg.startswith('-L'):
+            dirs.append(pathlib.Path(arg[2:]))
+        elif arg == '-l':
+            i += 1
+            libraries.append(args[i])
+        elif arg.startswith('-l'):
+            libraries.append(arg[2:])
+        i += 1
+    resolved = set()
+    for lib in libraries:
+        if lib not in ('c', 'm', 'gcc'):
+            continue
+        for directory in dirs:
+            path = directory / ('lib' + lib + '.a')
+            if path.is_file():
+                resolved.add(path.resolve())
+                break
+    return resolved
+
+
 def main():
     linker, *args = sys.argv[1:]
     if not any('app.ld' in a or 'app_sys.ld' in a or 'shlib.ld' in a or 'os32.ld' in a for a in args):
@@ -26,6 +55,7 @@ def main():
     out = pathlib.Path(args[args.index('-o') + 1])
     # The exact vendor inputs are recorded; a basename alone is not an exemption.
     exempt = set()
+    vendor = vendor_inputs(args)
     with tempfile.TemporaryDirectory(prefix='os32-link-') as tmp:
         requested = next((a.split('=', 1)[1] for a in args if a.startswith('-Map=')), None)
         if '-Map' in args:
@@ -46,8 +76,7 @@ def main():
                 if not path.exists() or (path.suffix == '.a' and not match) or (not match and path.suffix != '.o'):
                     continue
                 # Compiler/newlib components are generation independent, not OS32 SDK code.
-                vendor_root = pathlib.Path(__import__('os').environ.get('CROSS_DIR', '/home/hight/opt/cross')).resolve()
-                if path.resolve().is_relative_to(vendor_root) and path.name in ('libc.a', 'libm.a', 'libgcc.a'):
+                if path.resolve() in vendor:
                     exempt.add(str(path.resolve()))
                     continue
                 if match:

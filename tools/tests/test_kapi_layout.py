@@ -268,6 +268,22 @@ def case_mkos32x(tmp):
           "取り込んだ旧 archive member も拒否")
     check(guarded([tmp / 'stamped.o', archive], 'unused_archive').returncode == 0,
           "未使用の旧 member を取り込んだものと区別")
+    # Copies of actual compiler archives outside CROSS_DIR, without its environment.
+    vendor = tmp / 'alternate-toolchain'; vendor.mkdir()
+    shutil.copyfile(CROSS_DIR / 'i386-elf/lib/libc.a', vendor / 'libc.a')
+    gcc_archive = next((CROSS_DIR / 'lib/gcc/i386-elf').glob('*/libgcc.a'))
+    shutil.copyfile(gcc_archive, vendor / 'libgcc.a')
+    env = dict(os.environ); env.pop('CROSS_DIR', None)
+    r = subprocess.run([sys.executable, 'sdk/link_guard.py', TLD, *LDFLAGS,
+                       '-L', str(vendor), '-o', str(tmp / 'vendor.elf'),
+                       str(tmp / 'stamped.o'), '-u', 'strlen', '-u', '__udivdi3', '-lc', '-lgcc'],
+                       cwd=ROOT, env=env, capture_output=True, text=True)
+    check(r.returncode == 0, 'CROSS_DIRなし・別位置のnewlib/libgcc実memberはリンク可能: ' + r.stderr)
+    if r.returncode == 0:
+        evidence = json.loads((tmp / 'vendor.inputs.json').read_text())
+        check(set(evidence['vendor']) == {str((vendor / 'libc.a').resolve()),
+                                       str((vendor / 'libgcc.a').resolve())},
+              'vendor免除はldが選択した正確なarchive pathを記録')
     note = tmp / 'old.note'
     note.write_bytes(struct.pack('<4I', H.OS32X_HDR_VERSION - 1, H.OS32_KAPI_ABI_GENERATION,
                                  H.OS32_MEMORY_LAYOUT_GENERATION, H.OS32_SHLIB_PROTOCOL))

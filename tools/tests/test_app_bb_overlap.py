@@ -12,11 +12,15 @@ FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-ffreestanding', '-fno-pie',
 SRC = ROOT / 'tools/tests/app_bb_overlap_host.c'
 
 # 1 行の #define (順に並べる。RING3_USTACK_TOP が g_ring3_band_top を指す)
-DEFINES = ()
-WANTED = ('static int exec_stack_bytes(', 'static u8 launch_read_byte(', 'static int app_store(', 'static int app_map_region(', 'static int exec_bb_overlaps_user(',
+DEFINES = ('#define RING3_USTACK_TOP ', '#define RING3_STACK_BOTTOM ', '#define RING3_HEAP_TOP ')
+WANTED = ('int ring3_ptr_ok(', 'static const char *exec_image_reject_reason(', 'static int exec_stack_bytes(', 'static u8 launch_read_byte(', 'static int app_store(', 'static int app_map_region(', 'static int exec_bb_overlaps_user(',
           'static int exec_map_shared_bb(', 'u32 exec_as_leftover_pages;',
           'static void exec_teardown_app(')
 MUTATIONS = [
+ ('guard-fixed-stack', '#define RING3_HEAP_TOP (RING3_STACK_BOTTOM - PAGE_SIZE)', '#define RING3_HEAP_TOP (MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE - PAGE_SIZE)'),
+ ('shell-shlib-accepted', 'else if (is_shell && hdr->shlib_protocol)', 'else if (((void)is_shell, 0) && hdr->shlib_protocol)'),
+ ('argv-RO-rejected', 'as_va_to_pa_read(pd, (u32)p, &pa)', 'as_va_to_pa(pd, (u32)p, &pa)'),
+ ('argv-failure-hidden', '        *failed = 1;', '        (void)failed;'),
  ('stack-default-wrong', '    u32 size = MEM_EXEC_STACK_SIZE;', '    u32 size = MEM_APP_STACK_MIN;'),
  ('stack-sign-unchecked', 'requested > 0x7fffffffUL - (PAGE_SIZE - 1)', '0'),
  ('stack-min-unchecked', '        if (size < MEM_APP_STACK_MIN) size = MEM_APP_STACK_MIN;', '        (void)size;'),
