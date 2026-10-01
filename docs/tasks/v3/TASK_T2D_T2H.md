@@ -863,6 +863,12 @@ R1 24/24実行時RED、ring3_guard 14/14 RED、C方言27/27 RED・対照5/5 GREE
 ログ: `/home/hight/os32-tmp/d2-p3-check-changed.log`。
 検査中はソースを変更せず、終了後は本結果の追記だけ。ゲスト未実施・commit/push未実施。
 
+## 10-8. d2 の着地とゲスト受入 (PM、2026-10-02、NP21/W 17MB、main `d975016`)
+
+独立レビュー Opus 5.5 は P1・P2 なしで Approve (網羅性の要求つき)。P3-1 (inline の重複、-324B)・P3-2 (R1 の save 欠落・移動の変異)・P3-4 (§10-7 の注記) は着地前にコーダー (sol) が対応、P3-3 (caller_access_get の WM TRUSTED 分岐の使う側が無い 34B) は d4/d5 まで据え置き。予算は §6-1 の決定のとおり d の枠を拡大。
+
+ゲスト (17MB、今の ini — §12): kselftest 0 fail、`klibc_test` 49/49、`alloc_demo` 16/16、`ring3_fault` kill、`ls / | wc -l` = 54、`echo abc | wc -c` = 4、`d0a_test` 全行 OK (CPL=3 の親 → exec_run の子 → 親へ戻る経路を含む)、faulttest 一式・V86・GUI (gui_demo → CUI) 従来どおり。**`ring3_caller_reject_count` = 0** (入口の誤拒否なし)、kill 8 件はすべて意図したもの、取り残し 0、深さ 0。P3-5 (毎回の syscall のコスト) は体感で差なし (計測は未実施)。
+
 ## 11. 独立レビュー 2 回目 (Opus 5.5、Approve) の P3 — 実装時の注記
 
 2026-10-01、`3180a51` の差分に対して Approve (P1 2 件・P2 11 件はすべて閉)。以下の 5 件は設計の変更ではなく、実装時に従う注記 (PM 記入)。
