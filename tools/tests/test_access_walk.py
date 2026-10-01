@@ -42,7 +42,7 @@ MUTANTS = [
 ]
 
 
-def run(sources, mutant=None):
+def run(sources, mutant=None, fixture="access_walk_host.c"):
     with tempfile.TemporaryDirectory(prefix='os32-d3-') as directory:
         tmp = pathlib.Path(directory)
         for key, body in sources.items():
@@ -60,7 +60,7 @@ def run(sources, mutant=None):
                '-static', '-no-pie', '-Wl,--gc-sections',
                *['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'include',
                   'arch/x86', 'platform/pc98', 'kernel', 'exec', 'fs', 'lib', 'sdk/include/os32')],
-               '-I' + str(tmp), str(ROOT / 'tools/tests/access_walk_host.c'),
+               '-I' + str(tmp), str(ROOT / 'tools/tests' / fixture),
                str(ROOT / 'kernel/physmem.c'), '-o', str(exe)]
         subprocess.run(cmd, check=True, capture_output=True, text=True)
         return subprocess.run([str(exe)], capture_output=True, text=True, timeout=10)

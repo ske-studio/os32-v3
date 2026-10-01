@@ -139,6 +139,8 @@ static int redir_page(const RedirAccess *a, u32 va, int write, u32 *pa)
  * remain USER during WM; current slot/owner/root must still match. */
 int caller_access_page(const struct caller_access *a, u32 va, int write, u32 *pa)
 {
+    if (!a || !va || (a->origin == CALLER_TRUSTED && va >= MEM_APP_BAND_BASE))
+        return 0;
     if (a->origin == CALLER_USER &&
         (a->app_id != appslot_cur() || res_owner_get() != a->app_id ||
          a->pd_phys != paging_current_cr3())) return 0;
@@ -188,4 +190,83 @@ int redir_access_copy(const RedirAccess *a, u8 *base, u32 *pos,
         if (done < len) va += n;
     }
     return (int)done;
+}
+
+/* Bounded current-caller copies (T2d d4). No allocation/callback while IRQs
+ * are saved. Kernel staging is valid, nonoverlapping and sized by the caller. */
+static int caller_range(const struct caller_access *c, u32 va, u32 len, int write)
+{
+    if (len && (!va || len - 1 > ~(u32)0 - va)) return 0;
+    if (len && c && c->origin == CALLER_TRUSTED &&
+        (va >= MEM_APP_BAND_BASE || len > MEM_APP_BAND_BASE - va)) return 0;
+    while (len) {
+        u32 pa, n = PAGE_SIZE - (va & (PAGE_SIZE - 1));
+        if (!caller_access_page(c, va, write, &pa)) return 0;
+        if (n > len) n = len;
+        len -= n;
+        if (len) va += n;
+    }
+    return 1;
+}
+
+int check_caller_write_range(const struct caller_access *c, void *dst, u32 len)
+{
+    unsigned int flags = irq_save();
+    int ok = caller_range(c, (u32)(uptr)dst, len, 1);
+    irq_restore(flags);
+    return ok;
+}
+
+static int caller_copy(const struct caller_access *c, u32 va, void *staging,
+                       u32 len, int write)
+{
+    unsigned int flags = irq_save();
+    u8 *bytes = staging;
+    int ok = (!len || staging) && caller_range(c, va, len, write);
+    if (!ok) goto out;
+    while (len) {
+        u32 pa, n = PAGE_SIZE - (va & (PAGE_SIZE - 1));
+        /* Same IRQ interval as preflight: no AS/map mutation can intervene. */
+        if (!caller_access_page(c, va, write, &pa)) { ok = 0; goto out; }
+        if (n > len) n = len;
+        if (write) kmemcpy(P2V(pa), bytes, n);
+        else kmemcpy(bytes, P2V(pa), n);
+        bytes += n;
+        len -= n;
+        if (len) va += n;
+    }
+out:
+    irq_restore(flags);
+    return ok;
+}
+
+int copy_to_caller(const struct caller_access *c, void *dst,
+                   const void *src, u32 len)
+{
+    return caller_copy(c, (u32)(uptr)dst, (void *)src, len, 1);
+}
+
+int copy_caller_bytes(const struct caller_access *c, const void *src,
+                      void *dst, u32 len)
+{
+    return caller_copy(c, (u32)(uptr)src, dst, len, 0);
+}
+
+int copy_caller_cstr(const struct caller_access *c, const char *src,
+                     char *dst, u32 cap)
+{
+    u32 va = (u32)(uptr)src;
+    unsigned int flags = irq_save();
+    int ok = 0;
+    if (!va || !dst || !cap) goto out;
+    for (u32 i = 0; i < cap; i++) {
+        u32 pa;
+        if (i > ~(u32)0 - va) goto out;
+        if (!caller_access_page(c, va + i, 0, &pa)) goto out;
+        dst[i] = *(const char *)P2V(pa);
+        if (!dst[i]) { ok = 1; break; }
+    }
+out:
+    irq_restore(flags);
+    return ok;
 }

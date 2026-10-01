@@ -132,7 +132,7 @@ d0bでrecipeの同flagを外し、登録者ASのwalk/copy境界の足場を追�
 | d1 | caller記述子と入口/正常出口。USER/trusted/入れ子とCR3不一致拒否。実装・ホスト・予算結果は §10-5、d2 の寿命配線は未実装 |
 | d2 | park/longjmp/WMの寿命配線。実exec R1足場で古い記述子不使用。実装・P3対応・ホスト・予算は §10-7 |
 | d3 | read/write walkと管理frame検証。RO入力成功・RW出力・PS/偽PT拒否。実装・ホスト・予算結果は §10-9 |
-| d4 | cstr/copyout。page末NUL、次NP、未終端、overflow、IF両値、out不変 |
+| d4 | cstr/copyout。page末NUL、次NP、未終端、overflow、IF両値、out不変。実装・ホスト・予算は §10-11 |
 | d5 | 上記DB3入口と既存出力ガード接続。実wrapper→実copy、SQLiteは入口だけ記録 |
 | d6 | 対象変異・結線・小さなboot自己診断、size記録を別依頼で確定 |
 
@@ -1032,6 +1032,81 @@ full (全変異込み) へ拡張した。C方言27/27 RED・正常対照5/5 GREE
 独立レビュー Opus 5.5 は P1 なしで Approve、P2-1 (実物の walk への「登録者 PD → 現在 CR3」の変異が生き残る — 試験の強さの低下) と P3-1・P3-3 をコーダー (sol) が直し (`ca14075`)、同じレビュアーが差分で Approve (walk の変異 23/23 実行時 RED)。残りの P3 は §10-9 の申し送り (P3-2 → d6、P3-4 → d5、P3-5 → d4、P3-6 → d5 の前、P3-7 → e)。予算: d の枠の残り 2,620B (d4〜d6 の見込み 1.0〜1.8KB)。
 
 ゲスト (17MB、今の ini — §12): kselftest 0 fail、`klibc_test` 49/49、`alloc_demo` 16/16、`ring3_fault` kill、`ls / | wc -l` = 54、`echo abc | wc -c` = 4、`d0a_test` 全行 OK、faulttest 一式・V86・GUI (gui_demo → CUI) 従来どおり。`ring3_caller_reject_count` = 0、`redir_refuse_count` = 0、kill 8 件はすべて意図したもの、取り残し 0、深さ 0。
+
+## 10-11. d4 の実装結果 (2026-10-02)
+
+モデル: GPT-6。基点 `17756a9`、worktree `wt/t2d4`。d4のみ。
+`exec/redir_access.c` / `include/redir_access.h` に §1-2 の4 helperを追加した。
+d3の生存照合/walkと同じ翻訳単位に置き、既存の返却scratchの寿命は変えない。
+cstrはcap=NUL込み、cap0/NULL拒否、整数加算前のoverflow検査、1 byteずつ
+walk→PA読取→NUL判定。NULの先のpageを検査しない。失敗したstagingは使用禁止。
+bytes/copyoutは範囲全体をpreflightしてからPA経由でpage単位にcopyし、その全体を
+1つのIRQ保存区間で囲む。通常の拒否では出力全byte不変、IF/CR3も不変。
+allocation/callback等は呼ばず、kernelで確定した非重複stagingを要求する。
+
+P3-5を反映し、`caller_access_page` はNULL/0番地とTRUSTEDの
+`va >= MEM_APP_BAND_BASE` を拒否する。固定長では帯末をまたぐ長さもpreflightで
+拒否し、cstrはNULまでの各byteに同じ帯制限を適用する (cap全体の帯内性は要求せず、
+帯末NULを許す)。固定長のlen0はNULLを含め無アクセスで成功する。
+既存redir同様の帯制限であり、TRUSTEDにUSER権限walkを新設しない。
+単独checkは予約ではない。複数出力は全検査から全書戻しまで呼出側のIRQ保存が必要。
+
+ホストは `test_caller_copy.py` / `caller_copy_host.c` を追加し、d3の実paging/
+pgalloc/shlib/walk/caller足場を共用する。物理恒等backingと高位VAを分離し、
+次のVA pageを別のPA位置へ張って、page末NUL/次NP、cap末NUL/未終端、NULL、
+len0、整数overflow、RO入力/出力拒否、2pageのコピーと拒否時不変、古い世代/
+CR3不一致、WM中の明示USER、TRUSTED帯末/cap/NULをIF両値で確認した。
+実primitiveの入口を観測し、IRQ停止とNULまでの検査回数、overflow/帯外rangeの
+事前拒否もassertする。MMU/IRQはホスト代用で、実CR3/TLBの合格ではない。
+
+変異16/16は全てコンパイル成功後の実行時RED (1.43〜2.06秒/本、4並列)。
+IRQ区間除去、NUL後probe/read、cap0/overread/未終端成功、NUL前のcap先読み、
+overflow検査除去、preflight除去/RW無視、copy長/offset、無条件STI、TRUSTEDの
+上端/全長検査を対象にした。写しの固定source closureだけを使用し全木copyなし。
+実walkの23/23変異も実行時RED。初回fixtureとcap0変異のmisleading-indentation
+コンパイル失敗は修正後に再実行し、REDに算入していない。
+検査列・check_map・生成TESTSに新規試験を登録した。
+
+| 同一cross toolchain実測 | 作業前 (clean build_id) | d4 (-dirty) | 差分 |
+|---|---:|---:|---:|
+| kernel.bin | 362,224 B | 362,840 B | +616 B |
+| vmkernel.lz4 | 480,065 B | 480,477 B | +412 B |
+| 本体占有 (`__bss_end - 0x100000`) | 573,072 B | 573,680 B | +608 B |
+| `__bss_end` | `0x18BE90` | `0x18C0F0` | +608 B |
+| リンカASSERT残り (596 KiB枠) | 37,232 B | 36,624 B | -608 B |
+| d枠残り (5,888 B) | 2,620 B | 2,012 B | -608 B |
+
+既リンクのcaller primitive約152 Bは再計上していない。新helperもkernelに
+リンク済み (nmで確認)、ASSERTは変更なし。kernel.bin差分のうち8 Bはdirty化。
+
+**d5へ渡す穴**: DB3入口と既存read/outputガードへの接続は未実施。
+trampoline scratchの早期分類とrange判定の食い違い (P3-4)、有効lease分類、
+master往復撤去はd5へ。P3-6のlease検査コストは入口接続前に測定/検討が必要。
+新helperのlen/capはwrapperが有限のDB/構造体サイズへ制限する。複数出力の
+全検査を先に行う配線もd5の責任。d6の自己診断・変異残件・最終size確定は未実施。
+ゲスト/独立レビューはPMへ渡す。NP21/W・NHD・配備・ini・commit/pushは未操作。
+
+実行環境は `PATH=/home/hight/opt/cross/bin:$PATH`、
+`CROSS_DIR=/home/hight/opt/cross`、`TMPDIR=/home/hight/os32-tmp`、
+ILP32は既存 `PYTHONPATH=/home/hight/os32-tmp/d0b-host-runner` のqemu-i386経由。
+`make kernel < /dev/null` (前後)、`python3 tools/tests/test_caller_copy.py --mutate`、
+`python3 tools/tests/test_access_walk.py --mutate`、`python3 tools/check_select.py --lint`、
+`python3 tools/gen_tests_inventory.py --write`、`python3 tools/gen_memmap.py --write` はrc=0。
+対象ログ: `/home/hight/os32-tmp/d4-{before,kernel,copy,walk}.log`。
+`python3 tools/tests/test_caller_access.py` / `test_fd_redirect_d0a.py` はrc=0。
+`NP21W_DIR=/home/hight/os32-tmp/d4-unused-image-destination
+CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp make all < /dev/null` はrc=0。
+FDコピー先は存在しない一時パスへ限定し、copy警告を確認。NP21/Wへは書いていない。
+既存Rust / GNU-stack / RWX警告あり。ログ: `/home/hight/os32-tmp/d4-all.log`。
+最終 `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp
+make check-changed < /dev/null` は上記PATH/PYTHONPATHで**1回だけ実行しrc=0**。
+`build/sdk.mk` の検査追加で選択器がfullへ拡張した。d4の16/16、walkの23/23は
+実行時RED、C方言27/27 RED・正常対照5/5 GREEN。P2V違反0件。
+既存Windows opt-inは単独4件・集約5件skip。ゲスト確認は未実施。
+ログ: `/home/hight/os32-tmp/d4-check-changed.log`。
+検査中はソース変更なし。終了後は本結果の追記だけ。
+
+
 
 ## 11. 独立レビュー 2 回目 (Opus 5.5、Approve) の P3 — 実装時の注記
 

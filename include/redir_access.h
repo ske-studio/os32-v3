@@ -33,6 +33,21 @@ void caller_access_invalidate(void);
 /* Caller holds IRQs from live identity validation through use of returned PA. */
 int caller_access_page(const struct caller_access *a, u32 va, int write, u32 *pa);
 
+/* cap includes NUL; failed cstr staging must not be consumed. Every byte is
+ * checked before reading, with no probe after NUL. TRUSTED stays below APP.
+ * Fixed-size copies preflight all pages; refusal leaves output unchanged.
+ * len=0 succeeds without access (including NULL). Kernel staging must be
+ * nonoverlapping and large enough. Use only bounded wrapper sizes.
+ * All helpers preserve IF/CR3. A separate check is not a reservation: multiple
+ * outputs require a caller-held IRQ interval across all checks and writes. */
+int copy_caller_cstr(const struct caller_access *c, const char *src,
+                     char *dst, u32 cap);
+int copy_caller_bytes(const struct caller_access *c, const void *src,
+                      void *dst, u32 len);
+int check_caller_write_range(const struct caller_access *c, void *dst, u32 len);
+int copy_to_caller(const struct caller_access *c, void *dst,
+                    const void *src, u32 len);
+
 int redir_access_capture(RedirAccess *out);
 int redir_access_check(const RedirAccess *a, u32 va, u32 len, int write);
 /* Preflight the entire range, then copy with a fresh live/walk check per page.
