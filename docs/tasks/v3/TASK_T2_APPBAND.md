@@ -442,6 +442,32 @@ P3は§6のとおり静的保持を継続し、KHEAP化をT2cの生成/破棄切
 
 公開 caller は未切替なので、新しい lease 窓の実使用は T2c 以降。未実施は T2a / T2a′ と同じ (park → resume 後、R1 panic の故障ゲスト、Ra266 64MB)。
 
+#### T2c-R. 着手調査・停止記録 (2026-10-01、`wt/t2c`、GPT-6 / Codex)
+
+**未実装**。基点 `59c4285` で §4・§5-1・§6・§7-1、T2a/T2a′/T2b-R と PM 受入、上位 D35 を確認した。形式・配置・shlib・CRT は同時更新、旧低位共有 USER は T2d まで維持、heap は T2f で一括、AS 制御ブロックの固定 KHEAP 化は T2c という境界を維持する。コード・ABI・生成物を変更せず、コミット/配備も行っていない。
+
+**実装時の訂正 (参照先の確認)**: §4-6 は「具体的な世代値は P7 と共通の正典から生成」と指定しているが、この基点の追跡対象と `.claude/skills/` を調査した範囲では、KAPI ABI 世代・メモリ配置世代・shlib プロトコルの値/生成元の定義を確認できなかった。`sdk/kapi.json` は機能版 `version=68`、`sdk/os32x_hdr.py` と公開ヘッダは OS32X v3 と `kapi_data_off` の定義を持ち、D35 の3世代欄はまだ無い。`V3_PLAN` P7 と `FORK_PLAN` は D35 を参照するが、共通生成元の所在/値を定めていない。これは設計の決定を変更する訂正ではなく、現在の実物に参照先が見つからないという調査事実である。
+
+共通正典を T2c で新設する意図なのか、別の P7 成果物を参照する意図なのかを確定できていない。ユーザーの「設計の解釈に迷ったら止めて報告」に従い、番号と生成元を推測して ABI を切り替える前に停止した。再開に必要なのは共通正典の場所と3世代値、または T2c でそれらを新設する指示。状態行・D35・T2c の受入条件は変更していない。
+
+**変更前測定** (`CROSS_DIR=/home/hight/opt/cross make all < /dev/null`、rc=0、ログ `/tmp/t2c-before-all.log`; `readelf -SW` / `nm -n` / `gen_memmap.py --headroom`):
+
+| 観測 | 今回の変更前 | 停止時 (コード変更なし) |
+|---|---:|---:|
+| `.text` 開始 / サイズ | 0x100000 / 326,462B | 同左 |
+| `.data` 開始 / サイズ | 0x14FB40 / 32,971B | 同左 |
+| `.bss` 開始 / サイズ | 0x157C20 / 212,040B | 同左 |
+| `__bss_end` | 0x18B868 | 同左 |
+| ASSERT 0x195000 まで | 38,808B | 同左 |
+| `.got.plt` 末尾 → `.bss` の余白 | 8B | 同左 |
+| 圧縮 `vmkernel.lz4` | 477,781B | 同左 |
+
+T2b-R 最終記録と比べ、今回の `.data` は4B小さく、BSS前余白は4B大きく、圧縮画像は7B小さい。原因は断定しない。text/BSS/ASSERT残りは一致し、今回の測定を高位配置の実装後測定とは扱わない。既定の NP21/W 向け FD コピー2件は失敗警告のみ。外部 apps/game は空であり、外部アプリの再ビルド・新世代への移行・監査は未実施。
+
+**PM 向け**: 今回の成果物は T2b までの旧配置で、T2c のゲスト受入には使わない。T2c 実装後の一式と新しい map/nm で、8/17MB と Ra26664MB の §5-1 T2c (CUI/GUI/入れ子/park/fault、256/512KB stack、旧CPL0/shell/shlib拒否) を確認する。高位 entry は0x80100000〜、shlib は0x80000000〜、stack 上端0x90000000、master高位APP PDEは空を確認する。今回の旧配置 ELF の観測番地は `kselftest_fail=0x162E60` / `kselftest_pass=0x162E64` / `lease_selftest_result=0x18B864` / `exec_as_leftover_pages=0x18B860` / `ledger_irq_ops=0x186D14` / `ledger_exc_ops=0x1864E0`。T2c 実装後には必ず引き直す。NP21/W/NHD/配備/ini/Windows/実機には触っていない。
+
+**検証と rc (現基点の確認であり、T2c 実装の合格ではない)**: 初回 `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null` は rc=2 (`/tmp/t2c-doc-check-changed.log`)。sandbox の32bit Linux syscall制限により既存 vmkernel-lz4/vk32-crc/HDD-stage1/stage2 のホスト実行が SIGSYS (exit -31) になった。T2b で使った既存の実行足場を適用し、`PYTHONPATH=/tmp/t2ap-python CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null` は **rc=0** (`/tmp/t2c-check-changed-qemu.log`)。既定基点が HEAD~1 になり、前のコミットの build 入力変更を含めて全検査を変異込みで選択した。ソース不変検査も成功。既存 T2b lease は10/10実行時RED・コンパイル失敗0。既存配置境界2件のコンパイル拒否および構文破壊2件はNOT COUNTED、実行時REDへ数えない。T2c固有のホスト/変異試験は未実装・未実施。ビルド後の `python3 tools/gen_memmap.py --check` / `--headroom` と `git diff --check` はrc=0。地図とTESTS一覧は最新で、生成ブロックの変更は不要だった。最終結果はソース不変検査の完了後に本票だけへ追記した。
+
 ### 5-2. 検査3段と lease 回帰 (d)
 
 | 検査 | 具体的な期待値 |
