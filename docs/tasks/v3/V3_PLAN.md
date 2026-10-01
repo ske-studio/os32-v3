@@ -51,7 +51,7 @@ OS32 側の契約は小さく保つ。*
 | 柱 | 中身 | 正典 (決定・票) | 状態 |
 |---|---|---|---|
 | **P0 規約と道具** | C11 (gnu11) への移行、型は固定長のまま、fork 先の検査・CI・文書 | [TASK_C11_MIGRATION.md](TASK_C11_MIGRATION.md) (T0) | **受入完了** (2026-09-30、`f5bcb35`) |
-| **P1 メモリマップの再構築** | システムは恒等写像のまま、アプリだけ 0x80000000〜 の私有写像、物理地図 + 所有権台帳、固定帯はカーネル 3MB + シェル 1MB、SQLite・FEP 等をモジュールに、低位 640KB を V86 へ、OpenType | TASK_MEMMAP_V3 (決定 §0、帯 §2-1、票 T1〜T7 §6、受入 §7) | **T1 受入完了** (2026-10-01、[TASK_T1_LEDGER](TASK_T1_LEDGER.md))、次は T2 |
+| **P1 メモリマップの再構築** | システムは恒等写像のまま、アプリだけ 0x80000000〜 の私有写像、物理地図 + 所有権台帳、固定帯はカーネル 3MB + シェル 1MB、SQLite・FEP 等をモジュールに、低位 640KB を V86 へ、OpenType | TASK_MEMMAP_V3 (決定 §0、帯 §2-1、票 T1〜T7 §6、受入 §7) | **T1 受入完了** (2026-10-01、[TASK_T1_LEDGER](TASK_T1_LEDGER.md))、次は [T2 アプリ帯 + lease 窓](TASK_T2_APPBAND.md) |
 | **P2 ドライバの置き場** | 専用のモジュールローダ (ロード時検証、信頼する配布物だけ、IRQ 登録と初期化状態の結び付け、停止を証明できない失敗は隔離) | TASK_MEMMAP_V3 §4-7、票 T4〜T5c・T6b | P1 の中で |
 | **P3 HAL の結線** | HAL_WIRING の残 (W7)、NIC 境界 (L-C)、音源バックエンド、1kHz tick | [TASK_HAL_WIRING.md](TASK_HAL_WIRING.md)、[realhw/TASK_LAN_82557.md](../realhw/TASK_LAN_82557.md) | 一部着地 (v2.1)。1kHz tick は票が無い |
 | **P4 デバイス窓の資源割当** | 予約の核は T1 の台帳の MMIO 登録、P4 には順序契約 (識別 → 予約 → 写像 → probe / enable → 面公開) と検証済み資源レコード (実測 BAR) | TASK_MEMMAP_V3 D33・§4-5、[settings/DEVICE_RESERVATION.md](../settings/DEVICE_RESERVATION.md) (改訂は P4 着手時) | T1 / T2 の後 |
