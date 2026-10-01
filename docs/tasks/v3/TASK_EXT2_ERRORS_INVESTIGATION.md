@@ -1,6 +1,6 @@
 # TASK_EXT2_ERRORS_INVESTIGATION — NHD ext2 errors印の原因調査
 
-> 状態: **計画 (2026-10-01)** — 調査計画。原因未確定、修復・ゲスト再現は未実施。
+> 状態: **受入完了 (2026-10-01)** — 再インストールで印を解消、原因の発生時点は未確定 (§4-6)。それまでの状態: 計画 (2026-10-01) — 調査計画。原因未確定、修復・ゲスト再現は未実施。
 > 起票: GPT-6 / Codex。観測の正典: [T2親票](TASK_T2_APPBAND.md) §5-1 T2c-R末尾。
 > 順序: [T2d〜h詳細](TASK_T2D_T2H.md) §0・§5・§8。PMが調査担当と媒体を指定し、dと並行に着手、T2h受入より前に§3を閉じる。
 
@@ -138,3 +138,11 @@ x1は履歴とソースの調査結果だけ。x2の媒体診断・修復・ゲ�
 - **保全**: NP21/W を `np21w_ctl.py stop` で止め、修復の直前の NHD を `/home/hight/os32-tmp/ext2-repair/os32.nhd.pre-repair` に複製 (sha256 `36656e0085f75e2cd860891f409b62d4c958df3cba95285bdf9f2981100894b3`)。
 - **区画の修復 (写しの上)**: 複製からオフセット 1633 セクタ (836,096 バイト)・407,864 セクタを `/home/hight/os32-tmp/ext2-repair/ext2.img` に取り出し、`e2fsck -fy` (e2fsprogs 1.47.2) を 1 回。rc=1 (修正あり)。変更は 3 つ: superblock の state を **clean** に (errors の印を消す)、**UUID の生成** (OS32 の ext2 は UUID をゼロで作る)、**`/lost+found` の作成** (inode 1・ブロック 1、配備の道具 `tools/deploy_protect.py:73`・`tools/hostdrv_deploy.py:620` はルート直下の lost+found を飛ばす)。Pass 1〜5 の構造の指摘は 0 件のまま。修復後の `e2fsck -fn` は rc=0。診断の全文は `/home/hight/os32-tmp/ext2-repair/e2fsck_fy.txt`・`e2fsck_after_n.txt`。
 - **NHD への書き戻しは未実施**: 修復した区画を NHD の同じ位置 (`dd ... seek=1633 conv=notrunc`) へ書き戻すコマンドが、Claude Code の自動モードの安全判定 (取り返しのつかないローカルの破壊) で拒否された。NHD は修復前のまま (NP21/W は起動し直した)。書き戻しはユーザーの手で行うか、権限の設定を変えてから PM が行う。
+
+### 4-6. 再インストールで解消 (ユーザー決定 2026-10-01「いや、再インストールでいいです」「CDで」)
+
+- **経緯**: 4-5 の写しの上の修復を NHD へ書き戻す操作は自動モードの安全判定で拒否され、ユーザーの判断で「印を消す」から「NP21/W 上で CD から再インストール」に切り替えた。
+- **保全**: 止めた状態の NHD を `/home/hight/os32-tmp/reinstall/os32.nhd.before-reinstall` に複製 (sha256 `a7fd379241cb7f5569be95ede3d0bd67eab079640ccc6ce68262cbc3e11178b5`)。
+- **手順**: 最新の `images/os32_install.iso`・`images/os32_boot.d88` を NP21/W のフォルダへ写す → `tools/mk_blank_nhd.py --out .../os32.nhd --size-mb 200 --force` (C=3011) → `np21w_ctl.py start --fd os32_boot.d88` + `np21w_ctl.py cd os32_install.iso` → CUI で `cdinst` → **Full (3)** (試験プログラムを含む — 開発機の回帰に要る) → `y`。インストーラは空のディスクに OS32 の区画 (LBA 1632..409495) を作り、OS32 自身の `ext2_format_at` で整形、IPL・ローダを書き、MINIMAL 18・GUI 10・NORMAL 101・DEBUG 72 ファイルを展開して「Installation Complete」。ISO はブート可能 (El Torito) ではないので、起動は FD から。
+- **確認**: 停止 → `make nhd-pull` → 区画を取り出して `e2fsck -fn` は**指摘 0 件、rc=0** (204/51000 files、15631/203932 blocks)。state は "not clean" (マウント中に止めた通常の状態) で **errors の印は無い**。NHD の sha256 `aae806ecc359dbc6f6abccedc9ca34caee74bb1546a203d19f0c586257bef01a`。HDD 起動で API v69・Commit `479a239`、起動ログに **`[EXT2] warning: mounting fs with errors` は出ない**、kselftest 227/227、`d0a_test` は 3 行とも OK、faulttest 一式・V86 も従来どおり。
+- **結論**: 印は解消。**原因の発生時点は未確定のまま** (x1: 9/29 以前から持ち越し、x2: 構造は健全で印だけ)。ゲスト側のデータ (設定・辞書の学習) は再インストールで初期化された。今後また印が立てば、それは新しい事象として調べる (起動ログの警告で分かる)。§3 の T2h 前のゲートはこれで閉じる。
