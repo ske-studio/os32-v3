@@ -124,6 +124,7 @@ def parse(src, argv=(), root=ROOT, text=None):
     errors = [str(d) for d in tu.diagnostics if d.severity >= cx.Diagnostic.Error]
     if errors:
         raise ParseError('\n'.join(errors))
+    tu.os32_parse_input = (src, args, text if text is not None else pathlib.Path(src).read_text())
     return tu
 
 def units(root=ROOT):

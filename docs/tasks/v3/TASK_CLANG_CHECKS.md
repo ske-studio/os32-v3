@@ -265,3 +265,62 @@ C dialectは346コンパイル行 (gnu11=340、gnu89=6)、内部333TU、違反0�
 今回の共通/P2V回帰はSKIP 0。手動alignの候補数は今回再集計していない。
 最終版を凍結した再実行ではソース/票を編集せず、実木変更ガードもrc=0。
 結果の追記はそのコマンド終了後に行った。
+
+
+### レビュー 2 回目の対応 (2026-10-01、Codex GPT-6)
+
+基点 `58d370b`、独立レビュー Codex astra の残り P2 1 件への対応。状態行は維持。
+
+`FUNCTION_DECL` / `VAR_DECL` に限った表示による補足検査を撤去し、Clang C++ API の
+`RecursiveASTVisitor` で翻訳単位全体の **全 TypeLoc** を辿る補助器へ置換した。
+libclang が公開しない型式と、定数化された配列長の元の式も訪問する。
+修飾付き TypeLoc は既定の visitor が VisitTypeLoc を呼ばずに剥ぐため、
+TraverseTypeLoc で剥ぐ前の restrict / atomic を判定し、基底の再帰を継続する。
+宣言・式の個別種別は列挙しない。既存 canonical type / VLA の検査も維持。
+
+補助器は解析済み TU と同じソース・GCC 定義込みの旗を使用し、マクロを Clang で
+展開する。診断位置は SourceManager の物理ファイル・物理行で取得し、#line の
+論理位置を使わない。相対 include は検査ルートを基準にし、.. を正規化して
+vendor の既存除外と整合させる。別ルートのヘッダを回帰に追加した。補助器のコンパイル失敗・再解析失敗は検査失敗として扱う。
+補助器は /tmp のユーザー別キャッシュへソース内容・LLVM パスをキーに生成し、
+一時出力の完成後に置換する。CI の両 workflow に llvm-dev を追加した。
+製品 C / ABI / クロスコンパイラは変更しない。
+
+回帰にはレビューのファイルスコープ3例を含む14文脈で restrict / atomic を拒否し、
+通常の int pointer を対照 GREEN とした。静的アサート、列挙定数、フィールドの
+ビット幅と配列長、typedef 配列長 / typeof、alignof、generic 選択、関数引数と
+戻り値、関数ポインタ typedef も含む。マクロ・貼り合わせの否定例と、文字列・
+コメントの対照例も確認した。既存 cast / sizeof / 複合リテラルの回帰を維持。
+初期案の「全宣言を表示」でも Clang が配列長を数値に畳んで8否定例を見逃すことを
+実行時に確認し、表示への依存をなくした。
+
+`CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 python3 tools/tests/test_clang_ast.py --mutate`
+は rc=0、19試験、11/11 runtime RED、コンパイル失敗0
+(`/tmp/clang-review2-native-final.log`)。補足経路を呼ばない変異と、全 TypeLoc の再帰を
+無効にする C++ 変異の両方で AssertionError を要求する。コンパイル・解析の
+ERROR は RED と認めない。atomic 変異も新補助器の atomic 判定を無効にする。
+
+`NP21W_DIR=/home/hight/os32-v3-wt-clang/build/clang-local-images`
+を指定した `CROSS_DIR=/home/hight/opt/cross make all < /dev/null` は rc=0
+(`/tmp/clang-review2-all.log`)。生成 FD のコピー先は worktree 内の隔離ディレクトリ。
+最終 `check-changed` も前回と同じ PYTHONPATH=/tmp/clang-test-env の qemu 補助と
+この隔離先を使用し、票を含め実木を凍結して実行する。実行結果は完了報告で示す。
+NP21/W・NHD・配備・ini・Windows・ゲスト試験・実機には触れず、commit / push はしない。
+
+
+初回 check-changed は rc=2: 既存 LAN bridge の SIGUSR1 競合変異が GREEN、
+新補助器の未正規化 `kernel/../lib/sqlite3` パスによる vendor の誤検出が1件。
+LAN はソース無変更の単独再実行で全5変異 RED / rc=0
+(`/tmp/clang-review2-lan-retry.log`)。後者は上記のルート基準・.. 正規化で修正し、
+相対パス解決を無効にする追加変異も runtime RED を要求する。
+初回でも既存 C dialect 変異27/27 RED・対照5/5 GREEN、P2V違反0・例外65。
+
+
+最終版の `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null`
+は **rc=0**、full の108ターゲット、実木変更ガードも成功
+(`/tmp/clang-review2-check-changed-final.log`)。
+補助環境は上記 NP21W_DIR と PYTHONPATH。実木は C dialect 333TU で OK、
+P2V 違反0・例外65、LE 9ファイルで違反0、arch asm 違反0・解析失敗0。
+共通19試験・11/11 runtime RED・コンパイル失敗0、既存 C dialect 82チェック失敗0・
+27/27 RED・対照5/5 GREEN。既存ホスト試験の4件+5件SKIPは維持。
+全体検証中はソース/票を変更せず、この結果だけ終了後に追記した。

@@ -109,6 +109,63 @@ class ClangTest(unittest.TestCase):
         self.assertEqual(dialect(self.tu('int f(void) { return sizeof(int *); }'),
                                  ROOT,{'restrict','_Atomic'},set()),[])
 
+    def test_review_all_type_occurrences(self):
+        # Each TU must parse successfully before policy assertions can be RED.
+        contexts = [
+            '_Static_assert(sizeof(TYPE) == 4, "ok");',
+            'enum E { X = sizeof(TYPE) };',
+            'struct S { unsigned x : sizeof(TYPE); };',
+            'typedef int A[sizeof(TYPE)];',
+            'struct S { int a[sizeof(TYPE)]; };',
+            'void f(int a[sizeof(TYPE)]);',
+            'typedef int (*Fn)(int a[sizeof(TYPE)]);',
+            'typedef __typeof__(sizeof(TYPE)) Size;',
+            'enum E { X = _Alignof(TYPE) };',
+            'int f(void) { return _Generic(0, TYPE: 1, default: 0); }',
+            'void f(void (*arg)(TYPE));',
+            'TYPE f(void);',
+            'struct S { TYPE x; };',
+            'typedef TYPE A;',
+        ]
+        for context in contexts:
+            for typ, rule in [('int *restrict', 'restrict'), ('_Atomic(int)', '_Atomic')]:
+                with self.subTest(context=context, typ=typ):
+                    body = context.replace('TYPE', typ)
+                    self.assertIn(rule, [w for _,_,w in dialect(
+                        self.tu(body), ROOT, {rule}, set())])
+            with self.subTest(context=context, typ='int *'):
+                self.assertEqual(dialect(self.tu(context.replace('TYPE', 'int *')),
+                    ROOT, {'restrict', '_Atomic'}, set()), [])
+        for body in [
+            '#define R restrict\n_Static_assert(sizeof(int *R) == 4, "ok");',
+            '#define JOIN(a,b) a ## b\nenum E { X = sizeof(int *JOIN(re,strict)) };',
+            '#define A _Atomic(int)\n_Static_assert(sizeof(A) == 4, "ok");',
+        ]:
+            self.assertTrue(dialect(self.tu(body), ROOT, {'restrict', '_Atomic'}, set()))
+        self.assertEqual(dialect(self.tu(
+            '_Static_assert(sizeof(int *) == 4, "restrict _Atomic");'
+            'enum E { X = sizeof(int *) /* restrict _Atomic */ };'),
+            ROOT, {'restrict', '_Atomic'}, set()), [])
+
+    def test_type_occurrences_header_root(self):
+        # SourceManager may return relative include paths; resolve against the
+        # requested root, and normalize .. before policy/vendor filtering.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / 'kernel').mkdir()
+            (root / 'headers').mkdir()
+            for typ, rule in [('int *restrict', 'restrict'), ('_Atomic(int)', '_Atomic')]:
+                (root / 'headers/probe.h').write_text(
+                    '_Static_assert(sizeof(' + typ + ') == 4, "ok");\n')
+                tu = a.parse('kernel/probe.c', ['-std=gnu11', '-I.'], root,
+                    text='#include <headers/probe.h>\n')
+                self.assertIn(('headers/probe.h', 1, rule),
+                    dialect(tu, root, {rule}, set()))
+                tu = a.parse('kernel/probe.c', ['-std=gnu11'], root,
+                    text='#include "../headers/probe.h"\n')
+                self.assertIn(('headers/probe.h', 1, rule),
+                    dialect(tu, root, {rule}, set()))
+
     def test_dialect_past_limits(self):
         for flags in ([],['-P'],['-dM'],['-C'],['-CC']):
             tu = self.tu('#line 12 "/outside/hidden.c"\nint *restrict p;\n',flags)
@@ -223,7 +280,8 @@ def mutant(case):
         tree = mutant_tree(ROOT,pathlib.Path(tmp)/'tree',{path:original.replace(old,new)},
                           real={path,'tools/tests/test_clang_ast.py'})
         # Python compilation is separate, never counted as RED.
-        compile((tree/path).read_text(),str(tree/path),'exec')
+        if path.endswith('.py'):
+            compile((tree/path).read_text(),str(tree/path),'exec')
         r = subprocess.run([sys.executable,str(tree/'tools/tests/test_clang_ast.py')],
                            cwd=tree,capture_output=True,text=True,stdin=subprocess.DEVNULL)
         if r.returncode != 1 or 'AssertionError' not in r.stderr or 'ERROR:' in r.stderr:
@@ -238,7 +296,7 @@ def main():
     if args.mutate:
         cases = [('tools/clang_ast/__init__.py','return a > 0 and b > a','return False'),
                  ('tools/check_arch_asm.py',"hits.add((rel,c.location.line,match[1]))",'pass'),
-                 ('tools/clang_ast/dialect.py',"if typ.kind == T.ATOMIC:\n        result.add('_Atomic')",'if typ.kind == T.ATOMIC:\n        pass'),
+                 ('tools/clang_ast/type_occurrences.cpp', 'if (type->isAtomicType())', 'if (false)'),
                  ('tools/check_p2v.py',"add('physical-cast')",'pass'),
                  ('tools/check_p2v.py',"'paging_addrspace_map_user_range_phys': {3}",
                   "'paging_addrspace_map_user_range_phys': set()"),
@@ -246,7 +304,12 @@ def main():
                   "if ast.pointer(c.type) and ast.integer(operand.type) and not converted(c) and not any(x.spelling in CONVERSIONS for x in expression_nodes(operand)):"),
                  ('tools/clang_ast/__init__.py',"out += gcc_predefines(cross, tuple(argv), str(root))",'pass'),
                  ('tools/check_le_access.py',"ast.integer(pointee) and pointee.get_size() > 1",'False'),
-                 ('tools/clang_ast/dialect.py',"features |= printed_type_features(c)",'pass')]
+                 ('tools/clang_ast/dialect.py',"hits = {hit for hit in type_occurrences(tu, root) if hit[2] in words}",
+                  'hits = set()'),
+                 ('tools/clang_ast/type_occurrences.cpp', 'visitor.TraverseDecl(context.getTranslationUnitDecl());',
+                  '(void)visitor;'),
+                 ('tools/clang_ast/type_occurrences.py', 'os.path.abspath(root / file)',
+                  'os.path.abspath(file)')]
         for result in run_ordered(mutant,cases):
             print(result)
         print(f'Clang rules: {len(cases)}/{len(cases)} runtime RED; compile failures: 0')

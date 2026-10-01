@@ -43,7 +43,7 @@ jobs:
       - name: Host dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends build-essential e2fsprogs clang libclang-dev python3-clang libnewlib-dev
+          sudo apt-get install -y --no-install-recommends build-essential e2fsprogs clang libclang-dev llvm-dev python3-clang libnewlib-dev
           python3 -m pip install --quiet PyYAML lz4
 
       # tools/check_docs_links.py は lychee を PATH か ~/.cargo/bin に探し、無ければ SKIP (rc=0)
