@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Clang regressions: every policy mutant is valid C, and must fail at runtime."""
 import argparse
+import contextlib
+import io
 import os
 from unittest import mock
 import pathlib
@@ -24,7 +26,7 @@ GCC_BRANCH_SKIP_REASON = 'limited cross-free CI: GCC branch equivalence unverifi
 
 
 def limited_mode():
-    return os.environ.get('OS32_CLANG_CROSS_FREE') == '1'
+    return not a.cross_compiler()
 
 
 class ClangTest(unittest.TestCase):
@@ -38,9 +40,49 @@ class ClangTest(unittest.TestCase):
             (inc/'stdio.h').write_text('#define OS32_NEWLIB_SENTINEL 123\n')
             with mock.patch.object(a,'SYSTEM_NEWLIB',inc), \
                     mock.patch.object(a.shutil,'which',return_value=None), \
-                    mock.patch.dict(os.environ,{'CROSS_DIR':str(inc/'missing-cross'), 'OS32_CLANG_CROSS_FREE':'1'}):
+                    mock.patch.dict(os.environ,{'CROSS_DIR':str(inc/'missing-cross'), 'OS32_CLANG_CROSS_FREE':'1'}), \
+                    contextlib.redirect_stderr(io.StringIO()):
                 self.tu('#include <stdio.h>\n'
                         '_Static_assert(OS32_NEWLIB_SENTINEL == 123,"newlib");')
+
+    def test_p2v_cross_header_alias(self):
+        # LLVM 18 returns no tokens for casts spanning distinct macro files.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / 'conversion.h').write_text(
+                'typedef unsigned int uptr;\n'
+                '#define P2V_CONST(x) ((void *)(uptr)(x))\n'
+                '#define P2V_IO_CONST(x) ((volatile void *)(uptr)(x))\n')
+            (root / 'probe.c').write_text(
+                '#include "conversion.h"\n'
+                '#define GOOD ((char *)P2V_CONST(0x100000))\n'
+                '#define IO ((volatile char *)P2V_IO_CONST(0xa0000))\n'
+                '#define BAD ((char *)(0x100000 + (uptr)P2V_CONST(0x100000)))\n'
+                'void good(void) { GOOD[0]=0; IO[0]=0; }\n'
+                'void bad(void) { BAD[0]=0; }\n')
+            tu = a.parse('probe.c', ['-std=gnu11'], root)
+            for c, function in a.walk(tu.cursor):
+                children = list(c.get_children())
+                if function == 'good' and c.kind == a.K.CSTYLE_CAST_EXPR and \
+                        a.pointer(c.type) and children and a.integer(children[-1].type):
+                    location = a.first_token_location(c)
+                    self.assertIsNotNone(location)
+                    file, _ = a.spelling_position(location)
+                    self.assertEqual((root / file).resolve(), root / 'conversion.h')
+            hits, _ = p2v.findings(tu, root)
+            self.assertEqual([(f,r) for _,_,f,r in hits], [('bad','physical-cast')])
+
+    def test_cross_headers_fail_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / 'bin').mkdir()
+            compiler = root / 'bin/i386-elf-gcc'
+            compiler.touch()
+            compiler.chmod(0o700)
+            with mock.patch.object(a.shutil,'which',return_value=str(compiler)), \
+                    mock.patch.dict(os.environ,{'OS32_CLANG_CROSS_FREE':'1'}):
+                with self.assertRaisesRegex(a.ParseError, 'newlib'):
+                    a.flags([])
 
     def test_review_physical_api_position(self):
         # Use the real header, including the pstart spelling from the review.
@@ -332,6 +374,8 @@ def main():
         # same predicate and reason as test_review_gcc_branches.
         cases = [('all modes', 'tools/clang_ast/type_occurrences.cpp',
                   'if (array->getIndexTypeQualifiers().hasRestrict())', 'if (false)'),
+                 ('all modes', 'tools/clang_ast/__init__.py',
+                  'token = get(cursor._tu, cursor.extent.start)', 'token = None'),
                  ('all modes', 'tools/clang_ast/__init__.py','return a > 0 and b > a','return False'),
                  ('all modes', 'tools/check_arch_asm.py',"hits.add((rel,c.location.line,match[1]))",'pass'),
                  ('all modes', 'tools/clang_ast/type_occurrences.cpp', 'if (type->isAtomicType())', 'if (false)'),

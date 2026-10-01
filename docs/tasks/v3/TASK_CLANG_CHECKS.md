@@ -366,3 +366,70 @@ commitしないため、HEADだけのmain...HEADには修正前の末尾空行�
 この結果追記は全体検査の終了後に行った。
 
 2026-10-01 CI 修正: 共通変異12本の有効モードを明記し、GCC predefined macros 取り込みを外す1本だけを `test_review_gcc_branches` と共通の限定モード条件・理由で SKIP、残り11本は runtime RED 必須とした (クロスありは12本すべて必須)。
+
+### 6-8. build CI run 36819190065 の P2V 偽陽性 (2026-10-01、Codex GPT-6)
+
+run の全文ログを確認した。runner は Ubuntu 24.04、apt の libclang / Python binding は
+18.1.3、GCC は13.2.0。`LIMITED` 行は `check-arch-asm` 内の共通単体試験
+`test_cross_free_newlib_headers` が PATH 探索を mock し、CROSS_DIR を存在しない
+一時パス、OS32_CLANG_CROSS_FREE を1にして出した通知だった。build.yml 自体に
+限定モード指定はなく、この行は本検査が限定モードへ落ちた証拠ではない。
+CI の実コンパイラは `/home/runner/opt/cross/bin/i386-elf-gcc`、newlib は
+`/home/runner/opt/cross/i386-elf/include`。build_cross.sh も両ファイルの存在を検証する。
+手元は同じ配置で prefix が `/home/hight/opt/cross`、libclang は21.1.8。
+
+4件の原因は LLVM 18 の位置情報差。別ファイルの `P2V_CONST` / `P2V_IO_CONST`
+を `LZ4_TEMP_BUF` / `TVRAM_CHAR` / `TVRAM_ATRP` 経由で展開したキャストは、
+cursor の spelling location が呼出し位置へ縮退し、`cursor.get_tokens()` も空になる。
+クロスあり・なし双方で再現するため、限定モード特有の選択分岐の問題ではない。
+clang21 の限定モードでは4件とも出ず、clang18では同じ4件が出た。
+
+§4の「変換済み式の出所で判定」に沿い (a) を選択した。
+`clang_getToken` でキャスト開始位置の単一トークンを取り、その物理定義位置が
+P2V系定義内か判定する。異なるファイルにまたがるトークン範囲を必要とせず、
+式の一部だけがP2Vである不正な足し算は引き続き拒否する。例外一覧の追加なし。
+別ヘッダを実ファイルとして読む GOOD / IO / BAD の回帰試験を追加し、
+LLVM18で修正前AssertionError (runtime RED)、修正後GREENを確認した。
+単一トークン取得を無効にする共通変異も追加した。
+
+クロス探索は PATH の実行可能GCC、次に CROSS_DIR/bin (未指定時は従来の手元prefix)。
+見つかったGCCの実パスからnewlibを求め、stdio.hが欠けたらsystem newlibへ
+逃げずエラー。FULL通知にGCC/newlibパスを出し、模擬限定モード単体試験の通知は
+捕捉して本検査の通知と混ぜない。build.ymlはOS32_CLANG_CROSS_FREE=0を明示し、
+クロス実行ファイル/newlib存在を事前確認する。GCC分岐試験・変異のSKIP条件も
+環境変数単独ではなく実際のクロス可否に揃えた (クロスがあれば限定指定でもFULL)。
+
+CI互換確認にはaptのclang18 / libclang18 / Python binding / LLVM開発パッケージを
+`/tmp/os32-clang18` に展開した。Ubuntu24.04全体・CIツールチェーン再構築は行わず、
+手元の同系GCC13.2.0/newlibとclang18.1.8で再現する。全てのmakeのstdinは/dev/null。
+NP21/W・NHD・配備・iniは触らず、commit / pushはしない。最終検証結果は下記。
+
+最終検証結果 (実木を凍結して実行し、終了後にこの表を追記):
+
+- 完全モード: `CROSS_DIR=/home/hight/opt/cross OS32_CLANG_CROSS_FREE=0`。
+- 限定モード: `PATH=/usr/bin:/bin CROSS_DIR=/tmp/os32-missing-cross OS32_CLANG_CROSS_FREE=1`。
+- 両モードで `OS32_MUT_JOBS=4`。clang18の補助環境だけは、上記PATHの先頭へ
+  `/tmp/os32-clang18/root/usr/lib/llvm-18/bin` を追加し、展開したPython bindingと
+  libclang/libLLVMをPYTHONPATH/LD_LIBRARY_PATHで指定した。
+
+| コマンド (makeは `< /dev/null`) | clang21 完全 | clang21 限定 | clang18 完全 | clang18 限定 |
+|---|---|---|---|---|
+| `make check-p2v check-arch-asm check-le-access` | 0 | 0 | 0 (再実行) | 0 |
+| `python3 tools/tests/test_clang_ast.py --mutate` | 0、22試験・13/13 RED | 0、22試験中1 SKIP・12/12 RED・変異1 SKIP | 0、22試験・13/13 RED | 0、22試験中1 SKIP・12/12 RED・変異1 SKIP |
+| `python3 tools/tests/test_p2v.py --mutate` | 0、11試験・10/10 RED | 0、11試験・10/10 RED | 0、11試験・10/10 RED | 0、11試験・10/10 RED |
+
+全ての実ソース検査はP2V違反0/例外65、arch asm違反0/解析失敗0、LE違反0/9ファイル。
+変異は全てruntime RED、コンパイル失敗0。限定側のSKIPはGCC分岐同等性のみ。
+ログは `/tmp/clang-ci-{full,limited,18-full,18-limited}-{0,1,2}.log`。
+clang18完全モードの初回makeだけは **rc=2**: 展開したUbuntu26.04のLLVM18パッケージに
+補助器が探す `libLLVM.so*` の名前がなく、type visitorが明示エラーになった。
+`/tmp` 内に同じlibLLVMへのリンクを補い、再実行 **rc=0** を確認した
+(`/tmp/clang-ci-18-full-make-retry.log`)。この環境不備を変異のREDには数えない。
+
+`PYTHONPATH=/tmp/clang-test-env CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null`
+は **rc=0**、fullの108ターゲットと実木変更ガードを完了
+(`/tmp/clang-ci-check-changed.log`)。既存のELF32ホスト試験用qemu補助を使用した。
+C dialectは333TU、27/27 RED・対照5/5 GREEN。既存ホスト試験の4件+5件SKIPは維持。
+クロスが存在する状態で `OS32_CLANG_CROSS_FREE=1` としてもFULL/GCC定義/クロスnewlib
+になること、別prefix `/tmp/os32-ci-runner/opt/cross` とCI同様のPATH先頭指定でも
+GCC/newlibを認識することもrc=0で確認した。GitHub上のCI再実行は未実施。

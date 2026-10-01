@@ -76,14 +76,28 @@ def cross_free_notice():
           'are NOT verified (clang defaults, system newlib).', file=sys.stderr)
 
 
-def flags(argv, root=ROOT, cc=None):
-    root = pathlib.Path(root).resolve()
-    out = ['--target=i386-unknown-none-elf','-Wgnu-folding-constant']
+def cross_compiler(cc=None):
     compiler = cc or os.environ.get('OS32_CC', 'i386-elf-gcc')
     cross = shutil.which(compiler)
     if not cross:
         cross = str(pathlib.Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross')) / 'bin/i386-elf-gcc')
-    if pathlib.Path(cross).is_file():
+    return cross if os.access(cross, os.X_OK) and pathlib.Path(cross).is_file() else None
+
+
+@functools.lru_cache(maxsize=4)
+def cross_notice(cross, inc):
+    print(f'clang AST: FULL cross mode; GCC={cross}; newlib={inc}', file=sys.stderr)
+
+
+def flags(argv, root=ROOT, cc=None):
+    root = pathlib.Path(root).resolve()
+    out = ['--target=i386-unknown-none-elf','-Wgnu-folding-constant']
+    cross = cross_compiler(cc)
+    if cross:
+        inc = pathlib.Path(cross).resolve().parents[1] / 'i386-elf/include'
+        if not (inc / 'stdio.h').is_file():
+            raise ParseError('missing cross newlib headers: ' + str(inc))
+        cross_notice(cross, str(inc))
         # Clang's generic ELF target rejects GCC i386's __float128 (stddef.h).
         # The Linux i386 frontend accepts it; -undef + GCC definitions select
         # bare-metal branches and -nostdinc prevents all host libc headers.
@@ -96,16 +110,14 @@ def flags(argv, root=ROOT, cc=None):
         out += gcc_predefines(cross, tuple(argv), str(root))
         out += ['-isystem', gcc_include(cross)]
     elif os.environ.get('OS32_CLANG_CROSS_FREE') == '1':
+        inc = SYSTEM_NEWLIB
         cross_free_notice()
     else:
-        raise ParseError('cross GCC unavailable: ' + cross +
+        raise ParseError('cross GCC unavailable; CROSS_DIR=' + os.environ.get('CROSS_DIR', '<default>') +
                          '; use OS32_CLANG_CROSS_FREE=1 only for limited static CI')
     out += [a for a in argv if a not in DROP]
-    inc = pathlib.Path(cross).resolve().parents[1] / 'i386-elf/include'
     resource = resource_dir()
     out += ['-isystem', resource + '/include', '-working-directory=' + str(root)]
-    if not inc.is_dir() and SYSTEM_NEWLIB.is_dir():
-        inc = SYSTEM_NEWLIB  # Ubuntu's libnewlib-dev for cross-free static CI.
     if inc.is_dir():
         out += ['-isystem', str(inc)]
     return out
@@ -189,3 +201,21 @@ def spelling_position(location):
     cx.conf.lib.clang_getSpellingLocation(location, ctypes.byref(file),
         ctypes.byref(line), ctypes.byref(column), ctypes.byref(offset))
     return (cx.File(ctypes.cast(file, cx.c_object_p)).name if file.value else None, offset.value)
+
+
+def first_token_location(cursor):
+    """Get the single spelling token even when LLVM 18 cannot tokenize a range.
+
+    Nested macros in different files may give a range with incompatible ends;
+    clang_getToken still resolves its starting macro location correctly.
+    """
+    get = cx.conf.lib.clang_getToken
+    get.argtypes = [cx.TranslationUnit, cx.SourceLocation]
+    get.restype = ctypes.POINTER(cx.Token)
+    token = get(cursor._tu, cursor.extent.start)
+    if not token:
+        return None
+    try:
+        return cx.conf.lib.clang_getTokenLocation(cursor._tu, token.contents)
+    finally:
+        cx.conf.lib.clang_disposeTokens(cursor._tu, token, 1)

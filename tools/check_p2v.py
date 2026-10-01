@@ -74,11 +74,11 @@ def findings(tu, root=ROOT):
         # Nested alias expansions collapse their source extent to the alias.
         # Their spelling position still identifies the actual outer P2V cast.
         locations = [c.extent.start]
-        # LLVM 18 collapses cursor spelling positions too; its first token
-        # retains the outer cast's physical definition location.
-        first = next(iter(c.get_tokens()), None)
+        # LLVM 18 can return an empty token range for cross-header aliases.
+        # A single token preserves the outer cast's physical definition.
+        first = ast.first_token_location(c)
         if first is not None:
-            locations.append(first.location)
+            locations.append(first)
         for location in locations:
             file, offset = ast.spelling_position(location)
             if any(str(d.location.file) == file and
