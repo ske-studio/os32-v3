@@ -129,7 +129,7 @@ d0bでrecipeの同flagを外し、登録者ASのwalk/copy境界の足場を追�
 |---|---|
 | d0a | ゲスト試験 `d0a_test`・同VA別backingの実fd_redirectホスト試験を作成。§1-2の判定でPMが `ls \| cat`・同VA/別PFNを受入 (ゲスト未実施) |
 | d0b | 登録者記述子とPA copyを最小実装。死んだ登録者/slot再利用/RO化/入れ子・park保存復元、子の内容不変。実装・ホスト結果は §10-3、修正後guest回帰はPM待ち |
-| d1 | caller記述子と入口/正常出口。USER/trusted/入れ子とCR3不一致拒否 |
+| d1 | caller記述子と入口/正常出口。USER/trusted/入れ子とCR3不一致拒否。実装・ホスト・予算結果は §10-5、d2 の寿命配線は未実装 |
 | d2 | park/longjmp/WMの寿命配線。実exec R1足場で古い記述子不使用 |
 | d3 | read/write walkと管理frame検証。RO入力成功・RW出力・PS/偽PT拒否 |
 | d4 | cstr/copyout。page末NUL、次NP、未終端、overflow、IF両値、out不変 |
@@ -614,6 +614,88 @@ d0a: child_status kind=1 code=0 rc=0 result_rc=0 bytes=17
 ```
 
 **修正を確認した** (d0a の MISSING / CHANGED が OK に)。kselftest 0 fail、faulttest 一式・V86・GUI (gui_demo → CUI) の回帰も従来どおり (取り残し 0、深さ 0)。未実施: CPL=3 の sh での `ls | cat` (rshell から入れ子の sh を操作できない既知の制約)、8MB、Ra266。
+
+## 10-5. d1 の実装結果 (コーダー、2026-10-02)
+
+基点 `babca79` (d0b P3 対応着地)、worktree `wt/t2d1`。状態行・親票 §4-7・
+TASK_MEMMAP_V3 の決定は変更していない。
+
+`include/redir_access.h` の既存 24B 記述子を `struct caller_access` として共用し、
+`RedirAccess` は同じ型の別名とした。origin は USER/TRUSTED の内部列挙。
+`exec/redir_access.c` の capture と live AppSlot→AS 同一性検査を共用し、
+登録済み buffer 用の別実装・別 generation 台帳は作っていない。
+現在 caller は値の `CallerAccessFrame` (記述子+valid、28B) を保持し、
+入口で前の値をローカルへ退避、正常出口で戻す。stack へのリンクは保持しない。
+`caller_access_get` は入口の記述子を取り直さず、USER の slot/owner/AS/generation/PD
+生存と現在 CR3 一致を再確認して値を返す。拒否時 out は不変で、trusted への fallback はない。
+TRUSTED は kernel 内部の明示した `caller_access_enter(..., CALLER_TRUSTED)` のみ。
+
+実 `ring3_syscall_dispatch` は callback より前に USER を capture し、不一致なら
+既存の `ring3_fault_kill` へ渡して wrapper 進入を拒否する。正常出口は caller と
+従来の frame を復元し、`ring3_in_syscall` も入口値へ戻して入れ子を保つ。
+IRQ 保存・復元以外に CR3 を操作しない。KAPI/SDK の公開 ABI・形式は変更なし。
+
+**d2 へ渡す穴**: park/kill/exit の longjmp と launch/resume 着地点での無効化、
+WM enter/leave の TRUSTED scope と保存 USER の明示利用、実 exec R1 足場での
+古い記述子不使用は未実装。値保持なので捨てられた stack の dangling pointer は
+作らないが、非局所出口後の古い値の失効を保証したものではない。
+既存 redirect は d0b の `ring3_call_from_user` による登録時 capture を継続する。
+copy/出力 guard/DB はまだ保存 caller を消費しない。これらを d2 の寿命保証前に
+新 caller へ切り替えない。WM 深さの配線は d2、walk 強化は d3、copy は d4〜d5、
+小さな boot 自己診断の確定は d6 に残す。これは §0 の分割に従い、未配線の間は
+既存 consumer の挙動を保つ解釈である。
+
+ホスト `test_caller_access.py` は実 dispatcher 本文を抽出して、実 redir_access と
+同じ TU で実行する (AppSlot/CR3/IRQ/KAPI invoke は足場)。USER→USER、USER→TRUSTED、
+TRUSTED→USER の正常復帰、入口 CR3/owner 不一致、使用時 CR3/slot/owner 不一致、
+同フィールドの別 AS、generation/PD/owner 変更、dead/pending/CPL0、origin 不正、
+拒否時 out 不変、IF=0/1 と CR3 不変を検査。master CR3 でも USER は拒否する。
+19/19 変異が **コンパイル成功後の実行時 RED**。初回は fixture の KAPI 型・定数で
+compile 失敗 (RED に算入せず)、AS 同一性変異は最初 SURVIVED だったため
+同フィールド別 AS のケースを足し、再実行で RED にした。
+d0b の実 redirect 回帰は GREEN + **21/21 実行時 RED**。
+両試験とも変異対象の C と fixture だけを写し、ヘッダは元の木から参照する。
+変異ごとのツリー複製・全木走査は行わない。
+ring3_guard (既存変異14/14を含む)、実 exec R1、実 AppSlot の回帰も成功。
+ILP32 fixture のみ既存一時 sitecustomize.py で qemu-i386 を経由した。
+
+| ILP32 実測 | 基点 (clean build_id) | d1 後 (-dirty) | 差分 |
+|---|---:|---:|---:|
+| AS / AppSlot | 692 / 192 B | 同左 | 0 B |
+| RedirAccess / FdRedirect / State | 24 / 52 / 156 B | 同左 | 0 B |
+| caller 現在値 / 各入口の退避値 | 0 / 0 B | 28 / 28 B | BSS +28 B、各 dispatch stack +28 B |
+| kernel.bin | 360,688 B | 361,048 B | +360 B |
+| vmkernel.lz4 (SQLite 含む) | 478,893 B | 479,125 B | +232 B |
+| 本体占有 (`__bss_end - 0x100000`) | 571,504 B | 571,888 B | +384 B |
+| `__bss_end` | `0x18B870` | `0x18B9F0` | +384 B |
+| リンカ ASSERT 残り (596 KiB 枠) | 38,800 B | 38,416 B | -384 B |
+
+圧縮上限まで 41,067B。§6-1 の T2c-R 基準 40,500B からの消費は 2,084B、
+d の計画枠 3,072B の残りは 988B (d2〜d6 が収まると保証しない。超過時は再見積り)。
+入口にはこのほか guard 退避の int 1 個を追加。stack の数値は C の保存値サイズであり、
+compiler の spill/整列込み最大 stack 使用量の測定ではない。
+
+実行環境: `CROSS_DIR=/home/hight/opt/cross`、`TMPDIR=/home/hight/os32-tmp`、
+PATH に cross/bin、ILP32 用 `PYTHONPATH=/home/hight/os32-tmp/d0b-host-runner`。
+make はすべて `< /dev/null`。`make kernel` (変更前) は rc=0。
+`NP21W_DIR=/home/hight/os32-tmp/d1-image-output make all` は **rc=0**。
+FD のコピー先は一時出力先に限定。既存 GNU-stack/RWX 警告あり。
+`OS32_MUT_JOBS=4 python3 tools/tests/test_caller_access.py --mutate` と
+`test_fd_redirect_d0a.py --mutate` はともに rc=0。
+対象 make の初回は存在しない `check-exec-r1-host` を指定し rc=2。
+`python3 tools/tests/test_exec_r1.py` と `test_multiapp_impl.py` を直接実行して rc=0、
+ring3_guard は同 make 内で成功。`gen_memmap.py --write`、`gen_tests_inventory.py --write`
+で生成物を同期し rc=0。
+最終 `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp
+make check-changed < /dev/null` は **1回実行して rc=0** (上記 PATH/PYTHONPATH)。
+新 Make 規則の `.PHONY` 行が選択実行の許可形式に合わず、安全側の full
+(全検査・全変異) が選ばれた。C 方言27/27 RED・対照5/5 GREEN、d1 19/19 と
+redir 21/21 実行時 RED を含め成功し、最後のソース不変検査も成功。
+ログは `/home/hight/os32-tmp/d1-check-changed.log`。
+既存 Windows opt-in fixture は単独4件・集約5件が skip。
+ゲート終了後の変更はこの結果の票への追記だけで、コード・試験は変更していない。
+ログは `/home/hight/os32-tmp/d1-all.log`、`d1-targets.log`、`d1-r1.log`、`d1-multiapp.log`。
+NP21/W・NHD・配備・ini・commit/push は未実施。guest/実機は未検証。
 
 ## 11. 独立レビュー 2 回目 (Opus 5.5、Approve) の P3 — 実装時の注記
 

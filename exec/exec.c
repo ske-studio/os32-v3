@@ -1479,7 +1479,15 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
     u32 window;
     u32 wrapptr;
     u32 *prev_frame = g_cur_frame;
+    int prev_in_syscall = ring3_in_syscall;
+    CallerAccessFrame prev_caller;
 
+    /* Capture before callbacks. d2 handles nonlocal exits; no copy consumer
+     * uses this frame until that lifetime wiring is complete. */
+    if (!caller_access_enter(&prev_caller, CALLER_USER)) {
+        ring3_fault_kill();
+        return;
+    }
     g_cur_frame = frame;
     /* WM の文脈の深さは **CPL=3 の syscall の入口で必ず 0** (不変条件)。
      * WM を longjmp で抜けた (park / kill) 後に 1 が残っていても、ここで
@@ -1539,7 +1547,8 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
     frame[7] = kapi_invoke((void *)wrapptr, args_src, window);
 
     /* 正常復帰: ガードを下ろす */
-    ring3_in_syscall = 0;
+    caller_access_leave(&prev_caller);
+    ring3_in_syscall = prev_in_syscall;
     g_cur_frame = prev_frame;
 
     /* --- 出口でも CTRL+STOP を見る (契約 T6、v1.2 G2 で実測した隙間) --- */
