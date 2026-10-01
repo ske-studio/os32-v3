@@ -133,7 +133,7 @@
 | ポインタ → PDE / CR3 / 恒等比較 | V2P | 10 | `paging.c:253,262,331,386,413,442,457,626,1097`、`pgalloc.c:103,114` |
 | カーネル静的ポインタを PTE の物理に | V2P | 3 | `exec.c:158,1964` (トランポリン)、`gfx_core.c:148` (`bb_base`) |
 | DMA へ渡すポインタ | V2P | 6 | `fdc.c:63,748,851,970` (BSS `s_fdbuf`)、`dma_pool.c:56,68` |
-| HostDrv の hypercall に渡すポインタ | V2P (要確認) | 24 | `fs/hostdrvfs.c:107,144-381` — NP21/W が線形番地と物理番地のどちらで読むかはコードに書かれていない (§5 T1-U6) |
+| HostDrv の hypercall に渡すポインタ | 線形 VA の例外 (V2P 不要) | 24 | `fs/hostdrvfs.c` の 12 関数 (元の一覧は 13) — NP21/W IA32 は現 CR3 越しに読む/書く。根拠・非 IA32 分岐は §5-3 T1-U6 |
 | 恒等写像の呼び出し (virt と phys に同じ値) | 見直し | 33 | `paging.c`、`shm.c`、`shlib.c`、`v86_mem.c`、`v86_bios.c`、`pgalloc.c:217`、`backend_pegc.c`、`backend_cirrus.c`、`exec.c:1352-1964` |
 | **仮想なので変えないもの** | — | ≈35 | V86 のゲスト線形 (`v86.c:98 v86_ptr` ほか)、リンカ由来 (`KHEAP_BASE`、`MEM_SHM_BASE`、トランポリン)、ユーザ / シェル帯、ポインタ算術 |
 
@@ -628,7 +628,7 @@ ini は切り替え道具のレシートで元 (`ExMemory=16`、`USEGD5430=false
 | 変更 | §2-3 の 161 件 (T1b〜T1e で書き換え済みの分を除く。1 件ずつ分類する)、静的初期化子 10 か所 + マクロ 2 か所を `P2V_CONST` / `P2V_IO_CONST` に (B6)、`exec.c:816-829` の表歩きを `paging.c` の `as_va_to_pa` 系へ、`paging_verify_identity` と kselftest の恒等表明の書き直し、`tools/check_p2v.py` + `tools/check_p2v_allow.txt` + `build/sdk.mk` (`check-p2v` を `check` と `check-changed` へ)、`docs/CONSTRAINTS.md` と `CLAUDE.md` (新 ID、同じコミットで — `check_constraints.py` が整合を見る) |
 | 受入の芯 | **コード列の同一は補助証拠** (Codex P3): 恒等なので、書き換えの前後で `objdump -d` の `.text` が一致すること (差が出たら理由を列挙 — `static inline` の展開順や定数の畳み方) に加えて、(a) **静的初期化子は `objdump -s -j .data` の初期値が一致**、(b) **表歩きの移動 (`as_va_to_pa`) はホスト試験で USER・RW の判定を 4 通り** (P2V 化とは別に検証する)。NP21/W の回帰は軽くてよい |
 | 検査 | `make check-p2v` が 0 件 (**アプリ帯・lease 窓の番地に `V2P` を当てた箇所も 0、関数の中の `P2V_CONST` も 0**、§3-4)。変異: 8 形の違反の注入でそれぞれ落ちる (実装レビュー P2 の 3 形を含む)。`make check` と `make check-changed` の両方から到達する (X16) |
-| 対象外の扱い | V86 のゲスト線形・ページ 0 の二重の意味 (`v86_bios.c:283,1207` の `guest = (u8 *)0` はゲスト線形であり物理でもある) は例外一覧に理由付きで。HostDrv の 24 件は §5 T1-U6 の確認まで例外一覧 (「NP21/W が線形で読むか物理で読むか未確認」) |
+| 対象外の扱い | V86 のゲスト線形・ページ 0 の二重の意味 (`v86_bios.c:283,1207` の `guest = (u8 *)0` はゲスト線形であり物理でもある) は例外一覧に理由付きで。HostDrv の 24 件は線形 VA の例外一覧 (NP21/W IA32 の現 CR3 越しのアクセス、根拠は §5-3 T1-U6) |
 | NP21/W 回帰 | 17MB で起動 kselftest 0 fail、GUI・CUI・V86・FD・HostDrv の一巡 |
 
 #### 4-6-R. T1f の実装結果 (2026-10-01、`wt/t1f`、コーダー GPT-6 / Codex)
@@ -749,10 +749,46 @@ HDD 起動: `[selftest] 226/226 passed`、`[gfx] ledger cand=3 ok=3 bb=eb2000`�
 | T1-U3 | 例外フレームの中の回収 (fault kill、全ベクタ) を R1 と同じ扱いにするか | 数えて報告 (§3-5)。扱いは T2 で決める (Codex X12) | T1b → T2 |
 | T1-U4 | Xe10 に副作用のない識別手段が無い — 予約を `GFX=` と機種だけで決めてよいか | 予約は存在の証明ではない (DEVICE_RESERVATION §6)。候補群 `gfx` の予約 (§3-8)。予約した窓に RAM 登録が無いことだけ確かめる | T1e |
 | T1-U5 | `paging_map_phys` の失敗時の契約 | **解消** (§2-2 の 7.): 全件不変。`backend_cirrus.c:327-329` のコメントが古い。T1e で直す | T1e |
-| T1-U6 | HostDrv の hypercall (`fs/hostdrvfs.c`) が渡すポインタを NP21/W が線形番地で読むか物理番地で読むか | NP21/W ai-debug フォーク (`~/np21w-src`) の HostDrv 実装で確かめる。T1f では例外一覧に置く | T1f |
+| T1-U6 | HostDrv の hypercall (`fs/hostdrvfs.c`) が渡すポインタを NP21/W が線形番地で読むか物理番地で読むか | **ソースで確定**: IA32 は線形 (現 CR3)、V2P 不要。24 件 / 12 関数の例外を根拠付きで維持 (元の 13 関数との差は §5-3)。経路・CR3・PM 回帰は §5-3 | T1f / T1-U6 |
 | T1-U7 | 文字列検査 (`check_p2v.py`) の取りこぼし率 | 変異試験で 8 形を測る (実装レビュー P2 の 3 形を含む)。`-Wcast-align=strict` のようなコンパイラ側の検出手段は無い (恒等なので型が同じ) | T1f |
 | T1-U8 | (撤回 — Codex 2 回目 P3: GUI からの `--cpl0` は `appslot_cpl0_admit` が入口で `OS32_ERR_INVAL` にしている、試験 20A〜20E) | — | — |
 | T1-U9 | 実機 Xe10 のリニア窓の decode 幅・銀行窓の位置 (今の定数は NP21/W の窓) | T1 では扱わない (T1-R9)。P4 の実測 BAR と一緒に | P4 |
+
+---
+
+### 5-3. T1-U6 — HostDrv のポインタ解釈 (2026-10-01、wt/t1u6、GPT-6 / Codex)
+
+**結論**: OS32 が使う HostDrv(NT) の IA32 実装は、渡されたポインタを **線形番地として現 CR3 で supervisor アクセス**する。`V2P` は使わない。[C5] の例外 24 件 / 12 関数を維持し、理由を根拠付きに更新した。冒頭の状態行・残件の扱いは PM が決めるので変更していない。§4-6-R の「未確認」は T1f 時点の記録であり、本節がソース調査の結論。
+
+**NP21/W の根拠** (以下のパスは `/home/hight/np21w-src/src/` 基準、読むだけ):
+
+| 経路 | file:line / 番地の意味 |
+|---|---|
+| ポート → invoke | `generic/hostdrvnt.c:3971-3974` で 4 バイトの番地を組み立て、`:4014-4020` で同期実行。`:4073-4080` が 07ECh / 07EEh を登録。`io/np2sysp.c:1024-1025` も NT / 9x の独立ポートを明記 |
+| invoke / stack / データ等 | `generic/hostdrvnt.c:3779-3784` が `cpu_kmemoryread_d` で invoke の各ポインタを読み、stack は `hostdrvNT_memread` へ。`:945-983` の read/write は dword と端数 byte の `cpu_kmemoryread*` / `cpu_kmemorywrite*`。名前・fileObject は `:986-995`、CREATE の SecurityContext は `:1595-1597` |
+| READ / WRITE / query / set / status | READ `generic/hostdrvnt.c:3497` は memwrite、WRITE `:3642` は memread。query 出力 `:1011`、set 入力 `:1059`、directory 出力 `:2241,2287,2319` も同じ helper。status は各 IRP 内で `cpu_kmemorywrite_d` (例 `:3900-3908`)、戻りの status 読みは `:3919`。FsContext の read/write は `:1532,1978`。SOP は invoke から番地を読むが、SOP の内容を dereference する箇所は無い |
+| IA32 の変換 | `i386c/ia32/paging.h:360-371` が supervisor 線形アクセスを定義。`:243-248,313-320` は PG=1 なら `cpu_linear_memory_*`。`paging.c:798-805,1191-1199` はページ跨ぎも次ページを変換。`:1493-1494,1520-1521` が PDE/PTE を読む。`ia32.c:316` が `CPU_STAT_PDE_BASE = CPU_CR3 & CPU_CR3_PD_MASK`。Windows PC9821 ビルドは `win9x/compiler.h:161-163` で CPUCORE_IA32 を選ぶ |
+| 別分岐 | 非 IA32 は `generic/hostdrvnt.c:40-47` で **物理** `memp_read8/16/32` / write へ置換。IA32 でも PG=0 は変換なし。OS32 のページング付き 32bit 実行の対象は IA32。HAXM 分岐も同じ線形 helper を通り、`paging.c:1464-1474` でエミュレータ TLB を省いて walk する |
+| 別プロトコル (OS32 は呼ばない) | 9x は `generic/hostdrv9x.c:201-215` の cpu_kmemory helper → IA32 線形 / 非 IA32 物理 (`:76-82`)、登録 `:3029-3030`。DOS は `io/np2sysp.c:912-915` → `generic/hostdrv.c:518,546` の MEMR_READS/WRITES。IA32 の `i386c/cpumem.h:175-178` → `cpumem.c:3163-3207` は seg:off を線形化し PG=1 なら physicaladdr でページ毎に変換してから memp に渡す |
+
+**呼出し時の CR3 とアプリバッファ**: `kernel/ring3_entry.asm:32-54` の int80 入口は CR3 を変えず、`exec/exec.c:1645` も wrap 呼出し時はアプリ PD と明記。出力範囲検査が一時 master を使っても `exec/exec.c:914-920` で元へ戻す。`kernel/paging.c:801-812` の PD 作成は master の PDE をコピーし、カーネル帯 PT を共有するため、通信バッファは master / アプリ AS のどちらでも同じ番地で読める。shell / 起動時の I/O も master の同帯を使う。
+
+KAPI `wrap_sys_read/write` (`kapi/kapi_generated.c:1074-1089`) → `fs/vfs_fd.c:408-409,441-446` → `hdrv_read_stream/write_stream` → `hostdrv_read/write`。caller buf は `fs/hostdrvfs.c` の CPU `kmemcpy` (`:403,423`、T1f 時点は `:398,418`) だけが触り、hypercall に渡る read/write データは常に `g_databuf`。パスも `g_namebuf` へ変換される。**CPL=3 アプリのバッファを直接 hypercall へ渡す経路は無い**。T2 の [TASK_T2_APPBAND](TASK_T2_APPBAND.md) §6 R2 / §4 の caller AS 上でのコピー契約と一致し、物理連続 bounce の追加は不要。T2c/T2h の高位・非恒等・ページ跨ぎ buffer 回帰は引き続き必要。
+
+**一覧の実数補正**: 元の 13 エントリのうち `hostdrv_set_info` にはポインタ→整数キャストが無く、不要な例外を削除した。24 件は残る 12 関数にある (一覧全体は基点の 64 から 63 エントリ)。過去の T1f 記録の数値は当時の記録として保持する。
+
+**OS32 の変更・試験**: `fs/hostdrvfs.c` に線形 ABI と CR3 のコメントを追加 (コードの動作は変更なし)。例外理由を更新し、`check_p2v.py` は HostDrv のキャストも監査済み例外が必要な候補として引き続き検出する。`test_p2v.py` は実ソース 24 件 / 12 関数を例外で受理、一覧を外すと全件を検出、新規関数には例外が効かないことを検証する。
+
+**検証結果** (基点 `c27640d`、commit / push なし):
+
+- `CROSS_DIR=/home/hight/opt/cross make all < /dev/null`: **rc=0**。既存のリンク警告 (GNU-stack / RWX) あり。`build/image.mk:24-25` の既存 recipe が FD を `/tmp/np21w` へコピーしようとして失敗警告を出した。配備成功ではない。
+- `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null`: **rc=2**。初回はビルドとの並行実行による未生成成果物の失敗もあり、ビルド完了後に再実行。再実行の失敗は ILP32 ハーネスの `-31` = **SIGSYS**。
+- `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make -k check-changed < /dev/null`: **rc=2**。全 108 ターゲットを実行し **84 成功 / 24 失敗**。失敗は ILP32 実行の sandbox 制限 (lz4 / CRC / HDD stage1,2 / kbd-inject / ring3-str,guard / con-sink / launch / memmap / sh-launch / memory / multiapp / sh-shell,truncation,status / vfs-mount-dev / ext2-empty-name / b8-open / kstring / cirrus-win / pegc-mode / vfs-fd-path / kstr-bench)。終了値を表示しない ext2-empty-name / vfs-fd-path も、`subprocess.run` の戻り値を表示する一時 Python ラッパーで **SIGSYS (-31)** を確認 (元の試験ソースは変更なし)。今回の HostDrv / P2V / 文書検査、マニフェスト・packages 等は成功。
+- `python3 tools/check_p2v.py`: **rc=0、0 violations / 63 exceptions**。`python3 tools/tests/test_p2v.py --mutate`: **rc=0、12 tests / 8 mutants runtime RED、compile failures 0**。`git diff --check` と `python3 tools/check_tree_unchanged.py --verify chg1`: **rc=0**。
+
+ログは `/tmp/t1u6-make-all.log`、`/tmp/t1u6-check-changed-after-build.log`、`/tmp/t1u6-check-changed-keep-going.log`、`/tmp/t1u6-silent-ilp32.log`。
+
+**PM の NP21/W 回帰**: master (shell) とアプリ AS (CPL=3) の双方で `/host` の一覧・読み出し・書き込み・再読み出しを行い、4096 バイト超とページ跨ぎのデータをバイト列で比較する。NP21/W の操作・NHD 配備・ini 編集・ゲスト試験は未実施 (make all の FD コピー失敗警告は上記)。
 
 ---
 
