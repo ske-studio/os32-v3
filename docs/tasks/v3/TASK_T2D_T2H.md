@@ -1,6 +1,6 @@
 # TASK_T2D_T2H — T2d〜T2h 詳細設計
 
-> 状態: **設計中 (2026-10-01)** — 実装前。Opus 5.5のRequest changes (P1 2件 / P2 11件 / P3 8件)を反映、差分の独立再レビュー待ち。
+> 状態: **設計中 (2026-10-01)** — 実装前。独立レビュー Opus 5.5 は 1 回目 Request changes (P1 2件 / P2 11件 / P3 8件) → 反映 → **2 回目 Approve** (P3 5件は §11 の実装時の注記)。次は d0a (fd_redirect のゲスト再現) と ext2 調査票の x1 (並行)。
 > 作成: GPT-6 / Codex。調査基点: main / docs/t2d-h-design 共通 **9ae6073406c2027fd50938e3870a3fb3888cd7f6**。
 > 計画文書。下記のAPI名・内部構造・分割は実装契約案であり、未実装のものを現行仕様とはしない。
 > 決定の正典は [TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) D1〜D36 と [TASK_T2_APPBAND](TASK_T2_APPBAND.md) §1〜§4・§6。本票は決定を変更しない詳細化。食い違いは§8へ。番地の定義は `include/memmap.h`、地図は [02_memory](../../02_memory.md) §2-1、ABIは `sdk/kapi.json`、規則は [CONSTRAINTS](../../CONSTRAINTS.md)。
