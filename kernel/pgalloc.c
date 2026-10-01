@@ -878,7 +878,9 @@ ledger_surface_create(const struct ledger_surface *sf, u32 *sid)
     u32 i, p, used_bytes;
     unsigned int flags = irq_save();
     int ok = 0;
-    if (kctx_irq_depth || kctx_exc_depth ||
+    /* Padding uses the master identity alias until T2c. Reject before writes. */
+    if (paging_current_cr3() != paging_kernel_pd_phys() ||
+        kctx_irq_depth || kctx_exc_depth ||
         !ledger_surface_validate(sf) || sf->lease_count || sf->closing) goto done;
     for (i = 0; i < LEDGER_MAX_SURFACES; i++) {
         const struct ledger_surface *other = &ledger_surfaces[i];

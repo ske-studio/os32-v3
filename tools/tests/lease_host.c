@@ -1,6 +1,10 @@
 #include "types.h"
 #include "tvram.h"
 static u32 host_cr3;
+static void host_sync(u32 root);
+static void host_pte_clear(u32 va);
+static void *host_surface_pointer(u32 pa);
+#define HOST_MMU_LOAD_CHECK(root) host_sync(root)
 static u32 host_lease_alloc(u32 owner, int n);
 static int host_lease_free(u32 owner, u32 pfn, int n);
 #include "paging_host_source.c"
@@ -30,6 +34,44 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 #include "lease_host_source.c"
 void *kmemcpy(void *dst, const void *src, u32 n) {
     u8 *d = dst; const u8 *s = src; while (n--) *d++ = *s++; return dst;
+}
+/* One timeline for CR3 synchronization, PTE removal and both kinds of free.
+ * Seed stale translation when active+closing+last lease is released. */
+enum host_event_kind { EV_SYNC, EV_CLEAR, EV_PT_FREE, EV_BACKING_FREE };
+static struct { u32 kind, value; } events[PTE_COUNT + 16];
+static u32 event_count, watch_pt, watch_backing;
+static int watching, stale_translation;
+static void event(u32 kind, u32 value) {
+    if (!watching) return;
+    CHECK(event_count < sizeof(events) / sizeof(events[0]));
+    events[event_count].kind = kind; events[event_count++].value = value;
+}
+static void host_sync(u32 root) {
+    event(EV_SYNC, root);
+    /* 386 CR3 reload discards all nonglobal translations. */
+    stale_translation = 0;
+}
+static void host_pte_clear(u32 va) { event(EV_CLEAR, va); }
+int pgalloc_free_n_owner(u32 owner, u32 pfn, int n) {
+    if (watching && (pfn == watch_pt || pfn == watch_backing)) {
+        event(pfn == watch_pt ? EV_PT_FREE : EV_BACKING_FREE, pfn);
+        if (stale_translation) {
+            SAY("ORDER: free before TLB synchronization");
+            if (pfn == watch_pt) SAY("ORDER kind: PT");
+            else SAY("ORDER kind: backing");
+            die(2);
+        }
+    }
+    return host_pgalloc_free_n_owner(owner, pfn, n);
+}
+/* Emulate the active alias for the padding store only; ledger PFNs remain
+ * physical. This makes a removed master guard actually hit the other page. */
+static void *host_surface_pointer(u32 pa) {
+    u32 *pd = P2V(host_cr3), d = pd[pa >> 22];
+    CHECK(d & PTE_PRESENT);
+    u32 e = ((u32 *)P2V(d & ~0xfffUL))[(pa >> PAGE_SHIFT) % PTE_COUNT];
+    CHECK(e & PTE_PRESENT);
+    return P2V((e & ~0xfffUL) | (pa & (PAGE_SIZE - 1)));
 }
 static u32 watched_roots[2];
 static int host_lease_free(u32 owner, u32 pfn, int n) {
@@ -65,6 +107,25 @@ static void image_pd(u32 root, u32 bank, int compare) {
         }
     }
 }
+static u8 ledger_snapshot[sizeof(ledger_owners) + sizeof(ledger_regions) +
+    sizeof(ledger_resources) + sizeof(ledger_surfaces) + sizeof(host_pool_storage) +
+    PHYSMEM_LEGACY_MAX_PFN];
+static void snapshot_bytes(u32 *pos, const void *ptr, u32 n, int compare) {
+    const u8 *bytes = ptr;
+    for (u32 i = 0; i < n; i++, (*pos)++) {
+        CHECK(*pos < sizeof(ledger_snapshot));
+        if (compare) CHECK(ledger_snapshot[*pos] == bytes[i]);
+        else ledger_snapshot[*pos] = bytes[i];
+    }
+}
+static void snapshot_ledger(int compare) {
+    u32 pos = 0;
+#define SNAP(table) snapshot_bytes(&pos, table, sizeof(table), compare)
+    SNAP(ledger_owners); SNAP(ledger_regions); SNAP(ledger_resources);
+    SNAP(ledger_surfaces); SNAP(host_pool_storage);
+#undef SNAP
+    snapshot_bytes(&pos, owner_map, limit_pfn, compare);
+}
 void _start(void) {
     u32 args[6] = {MEM_POOL_BASE, 0x4000000, 3, 0x32, 0xffffffffUL, 0}, result;
     struct addrspace a, b;
@@ -93,6 +154,23 @@ void _start(void) {
     CHECK(ledger_owner_pages(oa)==3 && a.lease_pt_phys[0]);
     pa=pgalloc_alloc_phys(owner,1); CHECK(pa); sf.owner=(u8)owner; sf.first=pa/PAGE_SIZE;
     for(i=0;i<PAGE_SIZE;i++) ((u8 *)P2V(pa))[i]=0xab;
+    /* Nonidentity active AS: pa aliases another owned page. Rejection leaves
+     * backing, alias, output, all ledger tables and allocator metadata intact. */
+    u32 alias = pgalloc_alloc_phys(owner, 1); CHECK(alias);
+    for (i = 0; i < PAGE_SIZE; i++) ((u8 *)P2V(alias))[i] = 0xcd;
+    CHECK(!paging_addrspace_map_user(&a, pa, alias, PAGE_RW | PTE_USER));
+    snapshot_ledger(0); count = used_pages; sid = 0x11223344;
+    paging_load_cr3(a.pd_phys);
+    CHECK(!ledger_surface_create(&sf, &sid));
+    CHECK(paging_current_cr3() == a.pd_phys && sid == 0x11223344);
+    snapshot_ledger(1); CHECK(used_pages == count);
+    for (i = 0; i < PAGE_SIZE; i++) {
+        CHECK(((u8 *)P2V(pa))[i] == 0xab);
+        CHECK(((u8 *)P2V(alias))[i] == 0xcd);
+    }
+    paging_load_cr3(paging_kernel_pd_phys());
+    CHECK(!paging_addrspace_map_user(&a, pa, pa, PAGE_RW));
+    CHECK(pgalloc_free_n_owner(owner, alias / PAGE_SIZE, 1));
     CHECK(ledger_surface_create(&sf,&sid));
     CHECK(((u8 *)P2V(pa))[0]==0xab && ((u8 *)P2V(pa))[PAGE_SIZE-1]==0);
     CHECK(!pgalloc_free_n_owner(owner,pa/PAGE_SIZE,1));
@@ -159,10 +237,28 @@ void _start(void) {
     CHECK(a.lease_pt_phys[1] && !lease_check(&a));
     paging_load_cr3(a.pd_phys);
     CHECK(!lease_check(&a)); CHECK(paging_current_cr3()==a.pd_phys);
+    CHECK(ledger_surface_release(sid));
+    CHECK(ledger_surfaces[sid].closing && ledger_surfaces[sid].lease_count == 1);
+    watch_pt = a.lease_pt_phys[1] / PAGE_SIZE; watch_backing = pa / PAGE_SIZE;
+    event_count = 0; watching = stale_translation = 1;
     CHECK(!lease_release(&a,v[0].token)); CHECK(paging_current_cr3()==a.pd_phys);
+    watching = 0;
+    CHECK(event_count == PTE_COUNT + 5);
+    CHECK(events[0].kind == EV_SYNC && events[0].value == paging_kernel_pd_phys());
+    for (i = 0; i < PTE_COUNT + 1; i++) {
+        CHECK(events[i + 1].kind == EV_CLEAR);
+        CHECK(events[i + 1].value == v[0].base + i * PAGE_SIZE);
+    }
+    CHECK(events[PTE_COUNT + 2].kind == EV_PT_FREE);
+    CHECK(events[PTE_COUNT + 2].value == watch_pt);
+    CHECK(events[PTE_COUNT + 3].kind == EV_BACKING_FREE);
+    CHECK(events[PTE_COUNT + 3].value == watch_backing);
+    CHECK(events[PTE_COUNT + 4].kind == EV_SYNC && events[PTE_COUNT + 4].value == a.pd_phys);
+    CHECK(!ledger_surfaces[sid].npages && !ledger_surfaces[sid].lease_count);
+    CHECK(!pgalloc_page_owned(watch_backing, owner));
+    SAY("active closing last lease: sync -> PTE clear -> PT free -> backing free -> CR3 restore PASS");
     paging_load_cr3(paging_kernel_pd_phys());
     CHECK(!a.lease_pt_phys[1] && a.lease_pt_phys[0]);
-    CHECK(ledger_surface_release(sid));
     /* UC backing and mismatch with supervisor alias. */
     sf.first=MEM_LEASE_END/PAGE_SIZE; sf.npages=1; sf.backing=LEDGER_SB_MMIO; sf.cache=LEDGER_CACHE_UC;
     ledger_resources[0].map_first=sf.first; ledger_resources[0].map_end=sf.first+1;

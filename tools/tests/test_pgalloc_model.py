@@ -31,6 +31,9 @@ class Integration(unittest.TestCase):
                 source += '\n' + reserve + '\n' + claim
             pre = '''#include "types.h"
 int paging_boot_context(void) { return 1; }
+/* Allocator-only fixture runs in the master identity context. */
+u32 paging_current_cr3(void) { return 1; }
+u32 paging_kernel_pd_phys(void) { return 1; }
 static void outp(unsigned int p, unsigned int v) { (void)p; (void)v; }
 #define NOINST __attribute__((no_instrument_function))
 static void host_verify_commit(void) NOINST;
