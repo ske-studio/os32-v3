@@ -697,6 +697,12 @@ redir 21/21 実行時 RED を含め成功し、最後のソース不変検査も
 ログは `/home/hight/os32-tmp/d1-all.log`、`d1-targets.log`、`d1-r1.log`、`d1-multiapp.log`。
 NP21/W・NHD・配備・ini・commit/push は未実施。guest/実機は未検証。
 
+## 10-6. d1 の着地とゲスト受入 (PM、2026-10-02、NP21/W 17MB、main `be303d4`)
+
+独立レビュー Opus 5.5 は P1・P2 なしで Approve (網羅性の要求つき、経路の一覧あり)。入口の kill の新設で正当な CPL=3 の syscall が断られる到達可能な筋書きは無し、d2 へ回した穴は今の段で誤動作しない。**P3 5 件は d2 へ申し送る**: P3-1 `exec.c:1551` の入れ子保存は正常復帰のみで子の CPL=3 実行中に `ring3_in_syscall=1` が残る (意図を票に明記、d2 で sys_exit・kill・着地点に入れ子の復元)、P3-2 入れ子試験 (`caller_access_host.c:51-68`) の形が実物と違う (d2 の R1 足場で実物の形を固定)、P3-3 入口の拒否の専用カウンタ (例 `ring3_caller_reject_count`) を足してゲスト回帰で 0 を確認、P3-4 `redir_access.c:21,23` の `generation != 0` / `pd_phys != 0` を外す変異が生き残る (d0b から持越し — 0 の登録者を拒否するケースを足す)、P3-5 毎回の syscall のコスト増 (ゲスト回帰で体感・`gfx_counters` を見る)。
+
+ゲスト (17MB、今の ini — §12): kselftest 0 fail、`klibc_test` 49/49、`alloc_demo` 16/16、`ring3_fault` kill、`ls / | wc -l` = 54、`echo abc | wc -c` = 4、`d0a_test` 全行 OK、faulttest 一式・V86・GUI (gui_demo → CUI) 従来どおり。kill 8 件はすべて意図したもの (d0a の RO 子 1・ring3_fault 1・faulttest 6) で、入口の誤拒否の形跡なし。構成依存の確認は §12 のとおり T2h へ。
+
 ## 11. 独立レビュー 2 回目 (Opus 5.5、Approve) の P3 — 実装時の注記
 
 2026-10-01、`3180a51` の差分に対して Approve (P1 2 件・P2 11 件はすべて閉)。以下の 5 件は設計の変更ではなく、実装時に従う注記 (PM 記入)。
