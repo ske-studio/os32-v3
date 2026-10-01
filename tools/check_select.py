@@ -21,13 +21,17 @@
     した後) なら HEAD~1
   * 変更が無い                     → 全部を変異なし (= check-fast)
   * `full:` に当たる変更がある     → 全部を変異込み (= check)
-    ただし Makefile / build/*.mk (MAKE_INPUT_GLOBS) は **make 自身に展開させて比べる**
-    (make_narrow の docstring): 基点の木と作業中の木で各検査の展開済み recipe を
-    `make -n -B --trace` で取り、変わった検査 + 列に足した検査だけ変異込み、列から消えた
-    検査は回さない。ビルド (`all`) の展開が変わった、検査をまたぐ影響 (順序依存) が
-    ある、make が失敗した、出力を読めない、基点を用意できない、検査の列の読みが
-    合わない、`--files` (基点なし) は全部。sdk/kapi.json は生成物を介して試験の中身が
-    変わり make -n に現れないので全部のまま。
+    ただし Makefile / build/*.mk (MAKE_INPUT_GLOBS) は **「新しい試験を足す形」だけ**を
+    決まった型との完全一致で絞る (make_narrow の docstring、ユーザー決定 2026-10-01 —
+    Makefile の変更の安全性を一般に証明するのはやめた。make は呼ばない)。基点
+    (merge-base) との差分が「追加だけ」(削除・変更行が 0) で、足した行が全部
+    次の型に完全一致するときだけ: (a) CHECK_PAR_TARGETS の列への検査名の追加
+    (語の集合で比べる)、(b) 新しい検査の規則 `check-<name>:` + 型どおりの recipe 行、
+    (c) 列にある既存の検査の recipe への型どおりの行の追加、(d) コメント行と空行、
+    (e) `.PHONY: check-<new>`。選ぶのは (b) の新しい検査と (c) の行を足した検査。
+    それ以外の差分 (削除・変更行、型に合わない行、define / 条件の中、継続行の途中、
+    追加・削除・改名されたファイル、`--files` (基点なし)) は全部 (理由を出す)。
+    sdk/kapi.json は生成物を介して試験の中身が変わるので全部のまま。
   * どの検査の glob にも `docs_only:` にも `notest:` にも当たらない変更がある
                                    → 全部を変異込み (= check)。表の漏れで
                                      否定側を落とさないため。`broad:` の検査の
@@ -56,13 +60,11 @@
       試験が notest の場所を読むようになったら「notest なのに入力になっている」
       と言って落ちる — notest を狭める (`except:` に足す) か外す。
 """
-import concurrent.futures
 import os
 import re
 import shlex
 import subprocess
 import sys
-import tempfile
 
 import yaml
 
@@ -161,14 +163,8 @@ def is_notest(path, cnotest):
 
 
 # ---------------------------------------------------------------- Makefile
-# make の入力のうち、基点版と作業中の版を取り替えて比べるもの (`full:` の中の Makefile)。
-# `build/` の .mk 以外 (out/、os32.ld、packages.yaml …) と他のディレクトリは両方の
-# 木で同じ実体 (記号リンク) を見る。
+# make の入力のうち、基点版との差分を型で絞るもの (`full:` の中の Makefile)。
 MAKE_INPUT_GLOBS = ("Makefile", "build/*.mk")
-# 展開を比べるビルドの目標。検査が読む成果物はこれで作る (docs/08_build.md §8-4)。
-MAKE_BUILD_GOALS = ("all",)
-# make 1 回の時間上限 (秒)。超えたら解析不能 = 全部。
-MAKE_TIMEOUT = 120
 
 
 def makefile_paths():
@@ -187,7 +183,7 @@ def read_makefiles():
 
     --lint / --inputs / --suggest が recipe から試験スクリプトを辿るための
     字面の読みで、make の意味論は持たない (検査列の名前と、タブ行の字面だけ)。
-    変異の選び方で build/*.mk の差を判定するのはここではなく make 自身 (make_narrow)。"""
+    変異の選び方で build/*.mk の差を判定するのはここではなく make_narrow (型の一致)。"""
     rules, vars_ = {}, {}
     for mf in makefile_paths():
         with open(os.path.join(ROOT, mf), encoding="utf-8") as f:
@@ -226,157 +222,280 @@ def check_lists(vars_):
     return par
 
 
-# ---------------------------------------------------------------- Makefile の絞り込み (make に判定させる)
-# make の構文を自前で解釈しない (2 回の独立レビューで P1 — define の終端、$(call eval)、
-# 組み込み名の再定義、target-specific / 計算名の定義、?= とコマンド行上書き、別ファイルの
-# .SECONDEXPANSION。ユーザー決定 2026-10-01: make 自身に判定させる)。
+# ---------------------------------------------------------------- Makefile の絞り込み (厳格な型)
+# Makefile / build/*.mk の変更の安全性を一般に証明するのはやめた (ユーザー決定 2026-10-01。
+# 自前の make 解析は独立レビューで 2 回 P1、make -n の比較も 3 回目で P1 — export 変数・
+# .ONESHELL・recipe の `-` で展開が同じでも意味が変わる、-j の独立性は順・逆順の一致で
+# 保証できない、$(MAKE) / $(shell) の副作用)。絞るのは **「新しい試験を足す形」** だけで、
+# 基点 (merge-base) との差分が「追加だけ」で、足した行の 1 本 1 本が下の型に完全一致する
+# ときに限る。make は呼ばない (副作用の問題が消える)。
 #
-# 基点の木と作業中の木で **make に各検査の recipe を展開させ** (`make -n -B --trace`)、
-# 展開済みの文字列を比べる。define / eval / call / target-specific 変数 / ?= /
-# コマンド行上書き / 二次展開は、make が処理した結果として展開に現れる。
-#
-# 木の用意: 一時ディレクトリに ROOT の各エントリへの記号リンクを張り、MAKE_INPUT_GLOBS
-# (Makefile / build/*.mk) だけ実体で置く — 基点の木は merge-base の版 (git show)、作業中の
-# 木は今のファイル (追跡外も)。それ以外の入力 (sdk/kapi.json、.env、生成物、$(wildcard)
-# が見るソース) は両方の木で同じ実体なので、差は Makefile の差だけから生まれる。
-# .env は make が両方の木で同じものを読む — 選択器は中身を読まない ([D3])。
-# 記号リンク越しなので `$(shell find …)` は降りない ($(DEPFILES) の .d は両方で空。
-# -B で全部を作り直す扱いなので展開には影響しない)。$(CURDIR) / $(abspath) の一時
-# ディレクトリの番地は "<ROOT>" に正規化して比べる。
-#
-# 展開の取り方 (両方の木で同じ環境・MAKEFLAGS — 選択器を呼ぶ make から継承 — で、
-# -j1 --no-print-directory MUTATE=1 を足す):
-#   list     `--eval 'cc_sel_list: ; @echo $(CHECK_PAR_TARGETS)'` で検査の列を make に言わせる
-#   single   検査ごとに `make -n -B --trace <検査>` (並列)。--trace の行で目標ごとに切る
-#   fwd/rev  全検査をまとめて列の順 / 逆順で 1 回ずつ
-#   build    `make -n -B --trace all` (検査が読む成果物の作り方)
-# `$(MAKE)` を含む recipe 行は -n でも実行される (再帰 make が自分の dry-run を出す) —
-# その出力も展開の一部として比べる。recipe の中の $(shell) も展開時に走る (通常の
-# make -n と同じ)。
-#
-# 判定 (どれかが成り立たなければ全部):
-#   * 両方の木で make が全部 rc=0、出力が --trace の行で切れる、検査の列が読める、
-#     作業中の木の列が build/sdk.mk の字面の列 (check_lists) と一致する
-#   * ビルド (all) の展開が両方の木で同じ
-#   * 検査をまたぐ影響が無い: 各木で、各検査の単独の展開 (その検査が作る目標ごと) が、
-#     まとめて展開した fwd / rev の同じ目標の展開と一致する (recipe の $(eval) や二次展開の
-#     $$(call eval) が別の検査の展開を変えるなら、順序で結果が変わるので一致しない。
-#     並列の実行では順序が決まらないので全部に倒す)
-#   変異込み = 単独の展開が基点と違う検査 + 列に足された検査。列から消えた検査は回さない。
-TRACE_RE = re.compile(r"^.*?:\d+: (?:update target '([^']*)' due to: |target '([^']*)' does not exist$)")
+# 差分の条件 (全部満たさなければ全部に倒す。理由は stderr):
+#   * 変更した make ファイルは基点にも作業中にもある (追加・削除・改名は全部)
+#   * 検査の列 (LIST_VAR の `:=` の論理行。基点・作業中とも make ファイル全体で 1 つ、
+#     同じファイル、define / 条件の外) を除いた基点の行の列が、作業中の行の列の
+#     **部分列** になっている = 削除・変更行が 0 (git diff の `-` 行 0)。列の物理行は
+#     継続 `\` の付け替えで字面が変わるので、**語の集合**で比べる: 基点の語 ⊆ 作業中の語、
+#     重複なし、語は全部 NAME_RE。増えた語 = 新しい検査の名前
+#   * 作業中にだけある行 (足した行) は、それぞれ 1 行で 1 論理行 (継続行の途中ではない)、
+#     define / 条件の外 (make の読み方と、字下げを無視する読み方の **両方**で深さ 0)、
+#     そして次のどれかに完全一致:
+#       (a)  (列の物理行は上の語集合の比較で見る)
+#       (b)  TPL_HEADER_RE  `check-<name>:` — 前提なし。name は列に足した新しい名前で、
+#            基点のどの make ファイルにも現れない。規則は 1 つだけ。続く tab 行は
+#            次の非 tab 行 (コメント・空行は飛ばす) まで全部足した行 (既存の recipe を
+#            横取りしない) で 1 行以上
+#       (c)  TPL_RECIPE_RE  `\tpython3 -B tools/tests/<file>.py [--flag ...] [$(MUT)|$(MUTS)]`
+#            — 持ち主 (上へ向かって tab 行・コメント・空行を飛ばした最初の行) が、
+#            基点の列にある検査の基点の規則の行 `check-<name>:…` (`=` を含まない) か、
+#            (b) の新しい規則。script は作業中の木にあり、対応表の当該検査の glob に当たる
+#       (d)  空行 (完全に空) と `#` 始まりのコメント行 (末尾 `\` なし)
+#       (e)  TPL_PHONY_RE   `.PHONY: check-<new> …` — 名前は全部 (b) の新しい名前。
+#            (b) の規則を .PHONY にする行をその場に書けるようにするため (意味は目標を
+#            phony にするだけ)。既存の `.PHONY:` 行への追記は変更行なので全部
+#   * 列に足した名前の集合 = (b) の規則の名前の集合
+#   * 作業中の make ファイルに `.ONESHELL` が無い (recipe を 1 つの shell で回すと、
+#     足した行で既存の行の終了状態の扱いが変わる)
+# 選ぶのは (b) の新しい検査と (c) で行を足した検査。他の変更ファイルの glob の選択と合算。
+# 型に入れないもの (全部に倒す): cargo / unittest discover / tools/*.py の検査器の行、
+# `$(MUT)` の後ろの旗 (check-fdc-track-host の形)、前提つきの規則、`-B` 無しの python3。
 LIST_VAR = "CHECK_PAR_TARGETS"
+NAME = r"check-[a-z0-9-]+"
+NAME_RE = re.compile(r"^%s$" % NAME)
+# 型 (1 か所。docs/08_build.md §8-4 に同じものを書いてある)
+TPL_RECIPE_RE = re.compile(
+    r"^\tpython3 -B tools/tests/([a-z0-9_]+\.py)((?: --[a-z][a-z-]*)*)( \$\((?:MUT|MUTS)\))?$")
+TPL_HEADER_RE = re.compile(r"^(%s):$" % NAME)
+TPL_PHONY_RE = re.compile(r"^\.PHONY:((?: %s)+)$" % NAME)
+TPL_COMMENT_RE = re.compile(r"^#(?:.*[^\\])?$")
+# 列の論理行 (継続を結合した後) と、列への代入に見える行 (これが 2 つ以上なら読まない)
+LIST_HEAD_RE = re.compile(r"^%s :=(?: (.*))?$" % LIST_VAR)
+LIST_ANY_RE = re.compile(r"^\s*(?:override\s+)?%s\s*[:+?!]*=" % LIST_VAR)
+# (c) の持ち主になれる基点の規則の行
+OWNER_RE = re.compile(r"^(%s):(?![:=])" % NAME)
+# define / 条件の深さを見る語
+DEFINE_OPEN = re.compile(r"^(?:override\s+)?define\b")
+DEFINE_CLOSE = re.compile(r"^endef\b")
+COND_OPEN = re.compile(r"^(?:ifeq|ifneq|ifdef|ifndef)\b")
+COND_CLOSE = re.compile(r"^endif\b")
 
 
-class MakeError(Exception):
-    pass
+class Reject(Exception):
+    """型に合わない — 全部に倒す理由。"""
 
 
-def _make(cwd, goals, extra, timeout=None):
-    """make を cwd で回し stdout を返す (失敗は MakeError)。環境は継承 (MAKEFLAGS も)。"""
-    cmd = ["make", "-C", cwd, "-j1", "--no-print-directory"] + list(extra) + list(goals)
-    try:
-        p = subprocess.run(cmd, capture_output=True, stdin=subprocess.DEVNULL,
-                           timeout=timeout or MAKE_TIMEOUT)
-    except (OSError, subprocess.SubprocessError) as e:
-        raise MakeError("make %s: %s" % (" ".join(goals), e.__class__.__name__))
-    if p.returncode != 0:
-        err = p.stderr.decode("utf-8", "replace").strip().splitlines()
-        raise MakeError("make %s が rc=%d: %s" % (" ".join(goals), p.returncode,
-                                                 (err[-1] if err else "")[:200]))
-    return p.stdout.decode("utf-8", "replace")
+def logical_lines(lines):
+    """物理行の列を make の論理行 [(start, end, 結合した文字列)] にする。
+    末尾が `\\` の行は次の行と結ぶ (make は奇数個の `\\` だけ結ぶが、ここは末尾が `\\` なら
+    全部結ぶ = 足した行を「継続行の途中」と見る側に多めに倒す)。"""
+    out, i = [], 0
+    while i < len(lines):
+        s, text = i, lines[i]
+        while text.endswith("\\") and i + 1 < len(lines):
+            i += 1
+            text = text[:-1] + " " + lines[i].strip()
+        out.append((s, i, text))
+        i += 1
+    return out
 
 
-def make_dry_run(cwd, goals):
-    """展開済みの recipe を {目標: [行]} で返す。cwd の番地は "<ROOT>" に正規化。"""
-    text = _make(cwd, goals, ["-n", "-B", "--trace", "MUTATE=1"]).replace(cwd, "<ROOT>")
-    blocks, cur = {"": []}, ""
-    for line in text.splitlines():
-        m = TRACE_RE.match(line)
-        if m:
-            cur = m.group(1) if m.group(1) is not None else m.group(2)
-            blocks.setdefault(cur, [])
+def depth_flags(llines):
+    """各論理行の **手前** で define / 条件の深さが 0 か (= その行は型の判定の対象になれるか)。
+
+    2 通りの読みの両方で 0 のときだけ True: (1) make の読み方 — tab で始まらない行の最初の
+    語だけを見て、define の中では条件を数えない。(2) 字下げを無視する読み方 — 先頭の
+    空白 / tab を落として全部数える (独立レビューの反例: define の中の endif、タブ付き
+    endef、`\\` 継続の次の endef。どちらの読みでも深さ 0 の場所だけ許す)。
+    どちらかの読みで深さが負になったら、それ以降は全部 False (構造が読めない)。"""
+    flags = []
+    d_make = c_make = d_naive = c_naive = 0
+    broken = False
+    for _, _, text in llines:
+        flags.append(not broken and d_make == c_make == d_naive == c_naive == 0)
+        if not text.startswith("\t"):
+            tok = text.strip()
+            if DEFINE_OPEN.match(tok):
+                d_make += 1
+            elif DEFINE_CLOSE.match(tok) and d_make > 0:
+                d_make -= 1
+            elif d_make == 0 and COND_OPEN.match(tok):
+                c_make += 1
+            elif d_make == 0 and COND_CLOSE.match(tok):
+                c_make -= 1
+        tok = text.strip()
+        if DEFINE_OPEN.match(tok):
+            d_naive += 1
+        elif DEFINE_CLOSE.match(tok):
+            d_naive -= 1
+        elif COND_OPEN.match(tok):
+            c_naive += 1
+        elif COND_CLOSE.match(tok):
+            c_naive -= 1
+        if min(d_make, c_make, d_naive, c_naive) < 0:
+            broken = True
+    return flags
+
+
+def find_list(texts):
+    """{相対パス: 行の列} から検査の列を探す。(ファイル, 物理行の集合, 語の列) を返す。
+    列は make ファイル全体で 1 つだけ、define / 条件の外、語は全部 NAME_RE で重複なし。"""
+    found = []
+    for rel in sorted(texts):
+        ll = logical_lines(texts[rel])
+        ok = depth_flags(ll)
+        for k, (s, e, text) in enumerate(ll):
+            if LIST_ANY_RE.match(text):
+                found.append((rel, s, e, text, ok[k]))
+    if len(found) != 1:
+        raise Reject("%s の代入が %d か所 (1 か所だけ読む)" % (LIST_VAR, len(found)))
+    rel, s, e, text, ok = found[0]
+    m = LIST_HEAD_RE.match(text)
+    if not m or not ok:
+        raise Reject("%s の列の形が読めない (%s)" % (LIST_VAR, rel))
+    words = (m.group(1) or "").split()
+    bad = [w for w in words if not NAME_RE.match(w)]
+    if bad:
+        raise Reject("%s の列に検査名でない語がある: %s" % (LIST_VAR, bad[0]))
+    if len(words) != len(set(words)):
+        raise Reject("%s の列に重複がある" % LIST_VAR)
+    return rel, set(range(s, e + 1)), words
+
+
+def inserted_lines(base, work, exempt_b, exempt_w):
+    """基点の行 (exempt_b を除く) が作業中の行 (exempt_w を除く) の部分列なら、作業中に
+    だけある行の番号の列。部分列でなければ None (削除・変更行がある)。"""
+    wi = [i for i in range(len(work)) if i not in exempt_w]
+    j, matched = 0, set()
+    for b in range(len(base)):
+        if b in exempt_b:
+            continue
+        while j < len(wi) and work[wi[j]] != base[b]:
+            j += 1
+        if j == len(wi):
+            return None
+        matched.add(wi[j])
+        j += 1
+    return [i for i in wi if i not in matched]
+
+
+def _is_skippable(text):
+    return text.strip() == "" or text.lstrip().startswith("#")
+
+
+def classify_file(rel, work, inserted, base_words, new_names, m_checks):
+    """1 ファイルの足した行を型に当てる。{検査名: [script]} ((b) は新しい名前、(c) は
+    基点の列の名前) と {新しい名前: 規則の数} を返す。合わなければ Reject。"""
+    ll = logical_lines(work)
+    ok = depth_flags(ll)
+    phys2log = {}
+    for k, (s, e, _) in enumerate(ll):
+        for i in range(s, e + 1):
+            phys2log[i] = k
+    ins = set(inserted)
+    picked, headers = {}, {}
+
+    def single_inserted(k):
+        s, e, _ = ll[k]
+        return s == e and s in ins
+
+    for i in sorted(ins):
+        line = work[i]
+        where = "%s:%d" % (rel, i + 1)
+        k = phys2log[i]
+        if not single_inserted(k):
+            raise Reject("%s: 継続行の途中に足している" % where)
+        if not ok[k]:
+            raise Reject("%s: define / 条件の中に足している" % where)
+        if line == "" or TPL_COMMENT_RE.match(line):
+            continue
+        mh = TPL_HEADER_RE.match(line)
+        mp = TPL_PHONY_RE.match(line)
+        mr = TPL_RECIPE_RE.match(line)
+        if mh:
+            name = mh.group(1)
+            if name not in new_names:
+                raise Reject("%s: 規則 %s の名前が列に足した新しい名前でない" % (where, name))
+            headers[name] = headers.get(name, 0) + 1
+            n = 0
+            for k2 in range(k + 1, len(ll)):
+                t = ll[k2][2]
+                if _is_skippable(t):
+                    continue
+                if not t.startswith("\t"):
+                    break
+                if not single_inserted(k2) or not TPL_RECIPE_RE.match(t):
+                    raise Reject("%s: 規則 %s の recipe に既存の行か型に合わない行がある"
+                                 % (where, name))
+                n += 1
+            if n == 0:
+                raise Reject("%s: 規則 %s に recipe が無い" % (where, name))
+            picked.setdefault(name, [])
+        elif mp:
+            for name in mp.group(1).split():
+                if name not in new_names:
+                    raise Reject("%s: .PHONY の %s が列に足した新しい名前でない" % (where, name))
+        elif mr:
+            owner = None
+            for k2 in range(k - 1, -1, -1):
+                t = ll[k2][2]
+                if _is_skippable(t) or t.startswith("\t"):
+                    continue
+                owner = (k2, t)
+                break
+            if owner is None:
+                raise Reject("%s: recipe 行の持ち主が無い" % where)
+            k2, t = owner
+            mo = OWNER_RE.match(t)
+            if not mo or "=" in t:
+                raise Reject("%s: 持ち主が検査の規則の行でない: %r" % (where, t[:60]))
+            name = mo.group(1)
+            if single_inserted(k2):
+                if name not in new_names or not TPL_HEADER_RE.match(t):
+                    raise Reject("%s: 持ち主 %s が型に合わない新しい規則" % (where, name))
+            elif ll[k2][0] in ins or name not in base_words:
+                raise Reject("%s: 持ち主 %s が基点の列にある検査の基点の規則でない" % (where, name))
+            script = "tools/tests/" + mr.group(1)
+            if not os.path.isfile(os.path.join(ROOT, script)):
+                raise Reject("%s: %s が木に無い" % (where, script))
+            if not matches(script, m_checks.get(name, [])):
+                raise Reject("%s: %s が対応表の %s の glob に入っていない" % (where, script, name))
+            picked.setdefault(name, []).append(script)
         else:
-            blocks.setdefault(cur, []).append(line)
-    return blocks
+            raise Reject("%s: 型に合わない行: %r" % (where, line[:60]))
+    return picked, headers
 
 
-def make_check_list(cwd):
-    """make に検査の列 ($(CHECK_PAR_TARGETS)) を言わせる。"""
-    out = _make(cwd, ["cc_sel_list"],
-                ["-s", "--eval", "cc_sel_list: ; @echo $(%s)" % LIST_VAR])
-    lines = [l for l in out.splitlines() if l.strip() and not TRACE_RE.match(l)]
-    if len(lines) != 1:
-        raise MakeError("検査の列を読めない (%d 行)" % len(lines))
-    names = lines[0].split()
-    if not names or len(names) != len(set(names)):
-        raise MakeError("検査の列が空か重複がある")
-    return names
-
-
-def _overlay(dst, texts):
-    """dst に ROOT の写し (エントリごとの記号リンク) を作り、texts {相対パス: bytes}
-    の Makefile だけ実体で置く。`build/` は実体のディレクトリで .mk 以外を記号リンク。"""
-    os.makedirs(os.path.join(dst, "build"))
-    for e in os.listdir(ROOT):
-        if e not in (".git", "Makefile", "build"):
-            os.symlink(os.path.join(ROOT, e), os.path.join(dst, e))
-    bdir = os.path.join(ROOT, "build")
-    if os.path.isdir(bdir):
-        for e in os.listdir(bdir):
-            if not e.endswith(".mk"):
-                os.symlink(os.path.join(bdir, e), os.path.join(dst, "build", e))
-    for rel, data in texts.items():
-        with open(os.path.join(dst, rel), "wb") as f:
-            f.write(data)
-
-
-def _base_makefiles(ancestor):
-    """基点のコミットにある MAKE_INPUT_GLOBS のファイル {相対パス: bytes}。"""
+def _base_texts(ancestor):
+    """基点のコミットにある MAKE_INPUT_GLOBS のファイル {相対パス: 行の列}。"""
     mk = compile_globs(MAKE_INPUT_GLOBS)
     p = subprocess.run(["git", "-C", ROOT, "ls-tree", "-r", "--name-only", ancestor,
                         "--", "Makefile", "build"], capture_output=True, text=True)
     if p.returncode != 0:
-        raise MakeError("基点 %s の木を読めない" % ancestor[:12])
+        raise Reject("基点 %s の木を読めない" % ancestor[:12])
     out = {}
     for rel in p.stdout.splitlines():
         if matches(rel, mk):
             q = subprocess.run(["git", "-C", ROOT, "show", "%s:%s" % (ancestor, rel)],
                                capture_output=True)
             if q.returncode != 0:
-                raise MakeError("基点版 %s を読めない" % rel)
-            out[rel] = q.stdout
+                raise Reject("基点版 %s を読めない" % rel)
+            out[rel] = q.stdout.decode("utf-8", "replace").split("\n")
     return out
 
 
-def _work_makefiles():
+def _work_texts():
     out = {}
     for rel in makefile_paths():
-        with open(os.path.join(ROOT, rel), "rb") as f:
-            out[rel] = f.read()
+        with open(os.path.join(ROOT, rel), encoding="utf-8", errors="replace") as f:
+            out[rel] = f.read().split("\n")
     return out
 
 
-def _independent(singles, fwd, rev):
-    """単独の展開がまとめた展開 (順・逆順) と目標ごとに一致するか。違えば理由。"""
-    seen = set()
-    for t, blocks in singles.items():
-        for u, lines in blocks.items():
-            seen.add(u)
-            for name, combined in (("順", fwd), ("逆順", rev)):
-                if combined.get(u) != lines:
-                    return "%s の展開が%sにまとめたときと違う (目標 %s)" % (t, name, u or "(前置き)")
-    for name, combined in (("順", fwd), ("逆順", rev)):
-        extra = set(combined) - seen
-        if extra:
-            return "まとめて展開すると単独に無い目標が出る (%s)" % sorted(extra)[0]
-    return None
-
-
-def make_narrow(base, par):
-    """Makefile / build/*.mk の変更を make の dry-run 比較で絞る。
+def make_narrow(base, mk_hits, m_checks):
+    """Makefile / build/*.mk の変更 (mk_hits) を型の完全一致で絞る。
 
     (変異込みにする検査の集合 または None, 理由) を返す。None は全部。
-    基点は changed_files と同じ merge-base(base, HEAD)。判定の規則は上の節の注釈。"""
+    基点は changed_files と同じ merge-base(base, HEAD)。規則は上の節の注釈。"""
     if base is None:
         return None, "基点版なし (--files)"
     p = subprocess.run(["git", "-C", ROOT, "merge-base", base, "HEAD"],
@@ -384,52 +503,49 @@ def make_narrow(base, par):
     ancestor = p.stdout.strip()
     if p.returncode != 0 or not ancestor:
         return None, "基点 %s と HEAD の merge-base を決められない" % base
-    if subprocess.run(["make", "--version"], capture_output=True).returncode != 0:
-        return None, "make を起動できない"
     try:
-        texts = {"base": _base_makefiles(ancestor), "work": _work_makefiles()}
-    except (MakeError, OSError) as e:
-        return None, "版の取得不能: %s" % e
-    with tempfile.TemporaryDirectory(prefix="os32-cksel-") as td:
-        trees = {}
-        try:
-            for side in ("base", "work"):
-                trees[side] = os.path.join(td, side)
-                _overlay(trees[side], texts[side])
-            with concurrent.futures.ThreadPoolExecutor(os.cpu_count() or 2) as ex:
-                lists = {s: ex.submit(make_check_list, trees[s]) for s in trees}
-                lists = {s: f.result() for s, f in lists.items()}
-                if lists["work"] != list(par):
-                    return None, ("make の検査の列と build/sdk.mk の字面の列が一致しない "
-                                  "(%d 本 / %d 本)" % (len(lists["work"]), len(par)))
-                jobs = {}
-                for s, d in trees.items():
-                    jobs[s, "build"] = ex.submit(make_dry_run, d, MAKE_BUILD_GOALS)
-                    jobs[s, "fwd"] = ex.submit(make_dry_run, d, lists[s])
-                    jobs[s, "rev"] = ex.submit(make_dry_run, d, lists[s][::-1])
-                    for t in lists[s]:
-                        jobs[s, t] = ex.submit(make_dry_run, d, [t])
-                res = {k: f.result() for k, f in jobs.items()}
-        except MakeError as e:
-            return None, "make の展開を比べられない: %s" % e
-        except OSError as e:
-            return None, "基点の木を用意できない: %s" % e
-    if res["base", "build"] != res["work", "build"]:
-        diff = sorted(u for u in set(res["base", "build"]) | set(res["work", "build"])
-                      if res["base", "build"].get(u) != res["work", "build"].get(u))
-        return None, "ビルド (%s) の展開が変わった (目標 %s)" % (" ".join(MAKE_BUILD_GOALS), diff[0])
-    for s in trees:
-        why = _independent({t: res[s, t] for t in lists[s]}, res[s, "fwd"], res[s, "rev"])
-        if why:
-            return None, "検査をまたぐ影響 (%s の木): %s" % (s, why)
-    old, new = set(lists["base"]), set(lists["work"])
-    added, removed = new - old, old - new
-    changed = {t for t in old & new if res["base", t] != res["work", t]}
-    why = "make の展開の比較: 変わった %d 本、列に足した %d 本、列から消えた %d 本" % (
-        len(changed), len(added), len(removed))
-    if removed:
-        why += " (消えた: %s)" % " ".join(sorted(removed))
-    return changed | added, why
+        bt, wt = _base_texts(ancestor), _work_texts()
+        for rel in mk_hits:
+            if rel not in bt or rel not in wt:
+                raise Reject("%s は追加・削除・改名されたファイル" % rel)
+        for rel, lines in wt.items():
+            if any(".ONESHELL" in l for l in lines):
+                raise Reject("%s に .ONESHELL がある" % rel)
+        lrel_b, lset_b, bw = find_list(bt)
+        lrel_w, lset_w, ww = find_list(wt)
+        if lrel_b != lrel_w:
+            raise Reject("%s の列が別のファイルへ動いた" % LIST_VAR)
+        base_words, work_words = set(bw), set(ww)
+        if not base_words <= work_words:
+            raise Reject("%s の列から消えた名前がある: %s"
+                         % (LIST_VAR, " ".join(sorted(base_words - work_words))))
+        new_names = work_words - base_words
+        for name in sorted(new_names):
+            rx = re.compile(r"(?<![\w-])%s(?![\w-])" % re.escape(name))
+            for rel, lines in bt.items():
+                if any(rx.search(l) for l in lines):
+                    raise Reject("新しい名前 %s が基点の %s に既にある" % (name, rel))
+        picked, headers = {}, {}
+        for rel in sorted(mk_hits):
+            ins = inserted_lines(bt[rel], wt[rel],
+                                 lset_b if rel == lrel_b else set(),
+                                 lset_w if rel == lrel_w else set())
+            if ins is None:
+                raise Reject("%s に削除・変更行がある" % rel)
+            pk, hd = classify_file(rel, wt[rel], ins, base_words, new_names, m_checks)
+            for t, s in pk.items():
+                picked.setdefault(t, []).extend(s)
+            for t, n in hd.items():
+                headers[t] = headers.get(t, 0) + n
+        if set(headers) != new_names or any(n != 1 for n in headers.values()):
+            raise Reject("列に足した名前 (%s) と新しい規則 (%s) が一致しない"
+                         % (" ".join(sorted(new_names)) or "なし",
+                            " ".join(sorted(headers)) or "なし"))
+    except Reject as e:
+        return None, "型に合わない: %s" % e
+    why = "型に一致: 新しい検査 %d 本、recipe に行を足した検査 %d 本" % (
+        len(new_names), len(set(picked) - new_names))
+    return set(picked), why
 
 
 # ---------------------------------------------------------------- 入力の抽出
@@ -737,8 +853,8 @@ def default_base():
 def plan(files, base=None):
     """変更の一覧から (mode, stage, mut, 説明の行) を決める。
 
-    base があるときだけ Makefile / build/*.mk の基点版を git から読んで make に
-    展開させる (make_narrow)。
+    base があるときだけ Makefile / build/*.mk の基点版を git から読んで型に当てる
+    (make_narrow)。
 
     stage は回す検査 (make の目標)、mut はそのうち変異込みで回す検査。"""
     m = load_map()
@@ -774,8 +890,9 @@ def plan(files, base=None):
                 not any(matches(f, cg) for cg in cover.values()):
             unmatched.append(f)
     if mk_hits and not full_hits and not unmatched:
-        # Makefile / build/*.mk は make に展開させて比べる (1 回で全部の変更ファイルを見る)。
-        narrowed, why = make_narrow(base, par)
+        # Makefile / build/*.mk は「新しい試験を足す形」だけ型の完全一致で絞る
+        # (1 回で全部の変更ファイルを見る)。
+        narrowed, why = make_narrow(base, mk_hits, checks)
         if narrowed is None:
             full_hits += mk_hits
             lines.append("%s: 全部 — %s" % (" ".join(mk_hits), why))

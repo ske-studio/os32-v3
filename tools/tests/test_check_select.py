@@ -20,19 +20,22 @@
     変異込み (glob が勝つ)。`except:` に書いたものは notest に数えない
   * notest の番人: 拾えた入力が notest に当たると --lint が落ちる
 
-Makefile / build/*.mk の変更は **make 自身に展開させて比べる** (ユーザー決定 2026-10-01、
-自前の構文解析は独立レビューで 2 回 P1 → 撤去)。一時の git リポジトリに小さな
-Makefile を置き、基点のコミットと作業中の版で plan() を回す:
-  * recipe に 1 行足した / 列に 1 本足した → その 1 本だけ変異込み。列から消した検査は
-    回さない。コメントだけ → 全部を変異なし。ビルド (all) の recipe が変わった → 全部
-  * 独立レビュー (Codex astra) の反例: define の中の endif・タブ付き endef・バックスラッシュ継続の
-    次の endef、$(call eval,…)、組み込み名 MAKE の再定義、target-specific 変数、
-    計算名の代入、?= / 条件付き定義とコマンド行上書き (MAKEFLAGS)、別ファイルの
-    .SECONDEXPANSION + $$(call eval,…) — 影響を受ける検査が変異込みになる (または全部)
-  * 検査をまたぐ影響 (recipe の $(eval) が別の検査を変える) は順・逆順・単独の展開の
-    不一致で全部に倒す。順だけ・逆順だけ・単独だけで見える形をそれぞれ置く
-  * make が失敗した、基点が無い、検査の列の読みが合わない、--files (基点なし) → 全部
-  * 実物の Makefile を基点 = HEAD で比べると差が無い (dry-run できる、列が一致する)
+Makefile / build/*.mk の変更は **「新しい試験を足す形」だけを決まった型との完全一致で
+絞る** (ユーザー決定 2026-10-01 — 自前の構文解析は独立レビューで 2 回、make -n の比較は
+3 回目で P1 → Makefile の変更の安全性を一般に証明するのをやめた。make は呼ばない)。
+一時の git リポジトリに小さな Makefile を置き、基点のコミットと作業中の版で plan() を回す:
+  * 正側: 列 + 規則で新しい検査を足した → その 1 本。既存の検査の recipe に型どおりの行を
+    足した → その 1 本。コメント・空行だけ → 何も足さない (全部を変異なし)
+  * 負側 (全部): 独立レビュー (Codex astra) 3 回分の反例 — define の中の endif・タブ付き
+    endef・`\\` 継続の次の endef、$(call eval)、MAKE の再定義、target-specific、計算名、?=、
+    .SECONDEXPANSION、export 変数の値の変更、.ONESHELL の追加、recipe の `-` の削除、
+    遅延前提の eval、$(MAKE) の行、$(shell) の行、config.mk の空白の変更。
+    型の境界 — $(MUT) 以外の `$`、`;` `>` `|` `&` バッククォート、旗の文字種、末尾の空白、
+    タブ以外の字下げ、列以外への名前の追加、既存名と同じ名前の新規則、列に足さない新規則、
+    列に足したが規則が無い、既存の recipe の横取り、継続行の途中、列からの削除・重複、
+    script が木に無い / 対応表に無い、追加・削除・改名された .mk、--files (基点なし)
+  * 実物の Makefile を基点 = HEAD で比べると差が無い。実物の make ファイルを基点にして
+    check-memory-host に型どおりの行を足すとその 1 本 (main の e241312 / f4989ee の形)
   * 逐次の 2 段目 (CHECK_MUT_TARGETS) は無い — 列は 1 本で全部並列
 
   python3 -B tools/tests/test_check_select.py            # 筋書き
@@ -265,42 +268,64 @@ def case_lint_real(cs):
     assert rc == 0, err.getvalue()[:2000]
 
 
-# ---------------------------------------------------------------- Makefile: make の dry-run 比較
+# ---------------------------------------------------------------- Makefile: 厳格な型の一致
 # 一時の git リポジトリ。基点 (main) のコミットに置く小さな Makefile と build/sdk.mk。
-# check-b は Makefile 側に置く (Makefile の変更も同じ比較で絞れる)。$(abspath .) は
-# 一時ディレクトリの番地の正規化、$(MUT) は MUTATE=1 で展開させることの確認。
+# check-b は Makefile 側に置く (Makefile の変更も同じ型で絞れる)。check-z は列に無い規則、
+# `# planned: check-x` は基点の字面に現れる名前 (新しい名前の重複の反例)。
 FX_MAKEFILE = (
     "include build/sdk.mk\n"
     "all: gen.txt\n"
     "gen.txt:\n"
     "\techo old > $@\n"
+    "# planned: check-x\n"
     ".PHONY: check-b\n"
     "check-b:\n"
-    "\tpython3 b.py $(abspath .)\n"
+    "\tpython3 -B tools/tests/test_b.py\n"
+    "check-z:\n"
+    "\tpython3 -B tools/tests/test_z.py\n"
 )
 FX_SDK = (
-    "CHECK_PAR_TARGETS := check-a check-b\n"
+    "CHECK_PAR_TARGETS := check-a \\\n"
+    "    check-b\n"
     "MUTATE ?= 1\n"
     "MUT = $(if $(filter 1,$(MUTATE)),--mutate)\n"
-    ".PHONY: check-a\n"
+    "MUTS = $(if $(filter 1,$(MUTATE)),--mutants)\n"
+    "export FOO = old\n"
     "check-a:\n"
-    "\tpython3 a.py $(MUT)\n"
+    "\tpython3 -B tools/tests/test_a.py $(MUT)\n"
 )
+FX_CONFIG = "C_STD = -std=gnu11\n"
+FX_SCRIPTS = ["tools/tests/test_%s.py" % n
+              for n in ("a", "a2", "b", "b2", "c", "c2", "x", "z", "zz")]
+# check-z は列に無いが対応表には glob がある (持ち主が列に無い検査の反例を対応表の検査で
+# 隠さないため)
 FX_MAP = dict(ignore=[], full=["Makefile", "build/*.mk", "sdk/kapi.json"],
               docs_only=["**/*.md"], notest=[], broad=[], docs_always=[],
-              checks={"check-a": ["src/a.py"], "check-b": ["src/b.py"]})
+              checks={"check-a": ["tools/tests/test_a*.py"],
+                      "check-b": ["tools/tests/test_b*.py"],
+                      "check-c": ["tools/tests/test_c*.py"],
+                      "check-x": ["tools/tests/test_x*.py"],
+                      "check-z": ["tools/tests/test_z*.py"]})
+A_LINE = "\tpython3 -B tools/tests/test_a.py $(MUT)\n"
+A2 = "\tpython3 -B tools/tests/test_a2.py $(MUT)\n"
+B_LINE = "\tpython3 -B tools/tests/test_b.py\n"
+B2 = "\tpython3 -B tools/tests/test_b2.py --quick $(MUTS)\n"
+C_RULE = "check-c:\n\tpython3 -B tools/tests/test_c.py $(MUT)\n"
+LIST_OLD = "    check-b\n"
+LIST_NEW = "    check-b \\\n    check-c\n"
 
 
 class Fixture:
-    """基点のコミット (main) を持つ一時リポジトリ。write() は作業中の変更 (未コミット)。"""
+    """基点のコミット (main) を持つ一時リポジトリ。write() / edit() / append() は作業中の
+    変更 (未コミット)。"""
 
-    def __init__(self, cs, files=None, extra=None):
+    def __init__(self, cs, files=None):
         self.cs = cs
         self.d = tempfile.mkdtemp(prefix="os32-ckmk-")
-        base = {"Makefile": FX_MAKEFILE, "build/sdk.mk": FX_SDK, "src/a.py": "", "src/b.py": "",
+        base = {"Makefile": FX_MAKEFILE, "build/sdk.mk": FX_SDK, "build/config.mk": FX_CONFIG,
                 "sdk/kapi.json": "{}", "gen.txt": "x\n"}
+        base.update({s: "" for s in FX_SCRIPTS})
         base.update(files or {})
-        base.update(extra or {})
         git(self.d, "init", "-q", "-b", "main")
         git(self.d, "config", "user.email", "t@example.invalid")
         git(self.d, "config", "user.name", "t")
@@ -319,11 +344,20 @@ class Fixture:
         assert text.count(old) == 1, (rel, old)
         self.write(rel, text.replace(old, new))
 
-    def plan(self, base="main", files=None):
+    def append(self, rel, text):
+        self.write(rel, pathlib.Path(self.d, rel).read_text() + text)
+
+    def add_c(self, where="build/sdk.mk", rule=C_RULE, phony=".PHONY: check-c\n"):
+        """新しい検査 check-c: 列に足し、規則 (+ .PHONY) を where の末尾に置く。"""
+        self.edit("build/sdk.mk", LIST_OLD, LIST_NEW)
+        self.append(where, phony + rule)
+
+    def plan(self, base="main", files=None, map_=None):
         """(mode, [stage], [mut], 行)。files 無しなら git の変更 (基点...HEAD + 未コミット)。"""
         cs = self.cs
         saved = cs.ROOT, cs._TRACKED, cs.load_map
-        cs.ROOT, cs._TRACKED, cs.load_map = self.d, None, lambda: dict(FX_MAP)
+        m = dict(map_ or FX_MAP)
+        cs.ROOT, cs._TRACKED, cs.load_map = self.d, None, lambda: m
         try:
             if files is None:
                 committed, work = cs.changed_files(base)
@@ -345,15 +379,10 @@ def fixture(cs, **kw):
         fx.close()
 
 
-def _affected(result, *names):
-    """影響を受ける検査が変異込みに選ばれる (または全部)。"""
-    mode, st, mu, lines = result
-    assert mode == "full" or set(names) <= set(mu), (mode, mu, lines)
-
-
 def _only(result, *names):
     mode, st, mu, lines = result
     assert mode == "sel" and set(mu) == set(names), (mode, mu, lines)
+    assert any("型に一致" in l for l in lines), lines
 
 
 def _fast(result, stage=None):
@@ -370,193 +399,54 @@ def _full(result, why=None):
         assert any(why in l for l in lines), (why, lines)
 
 
-def case_mk_recipe_line(cs):
-    # recipe に 1 行足しただけ → その検査だけ。Makefile 側の検査も同じ
+def case_mk_new_check(cs):
+    # (a)+(b)+(e): 列に足した新しい検査 1 本だけ。規則は sdk.mk でも Makefile でも、
+    # 旗・$(MUTS)・2 行の recipe・途中のコメントと空行・.PHONY なし、どれも型の中
     with fixture(cs) as fx:
-        fx.edit("build/sdk.mk", "\tpython3 a.py $(MUT)\n", "\tpython3 a.py $(MUT)\n\tpython3 a2.py\n")
-        r = fx.plan()
-        _only(r, "check-a")
-        assert r[1] == ["check-a", "check-b"], r[1]
-        assert any("絞り込み" in l for l in r[3]), r[3]
-        fx.edit("Makefile", "python3 b.py", "python3 b.py --more")
-        _only(fx.plan(), "check-a", "check-b")
-    with fixture(cs) as fx:
-        fx.edit("Makefile", "python3 b.py", "python3 b.py --more")
-        _only(fx.plan(), "check-b")
-
-
-def case_mk_add_remove(cs):
-    with fixture(cs) as fx:
-        fx.edit("build/sdk.mk", "check-a check-b\n", "check-a check-b check-c\n")
-        fx.write("build/sdk.mk", pathlib.Path(fx.d, "build/sdk.mk").read_text() +
-                 ".PHONY: check-c\ncheck-c:\n\tpython3 c.py\n")
+        fx.add_c()
         r = fx.plan()
         _only(r, "check-c")
         assert r[1] == ["check-a", "check-b", "check-c"], r[1]
     with fixture(cs) as fx:
-        fx.edit("build/sdk.mk", "check-a check-b\n", "check-a\n")
-        _fast(fx.plan(), ["check-a"])
-        # 消した検査の規則も消す (make には無い目標)
-        fx.edit("Makefile", ".PHONY: check-b\ncheck-b:\n\tpython3 b.py $(abspath .)\n", "")
-        _fast(fx.plan(), ["check-a"])
+        fx.add_c(where="Makefile")
+        _only(fx.plan(), "check-c")
+    with fixture(cs) as fx:
+        fx.add_c(rule="check-c:\n\tpython3 -B tools/tests/test_c.py --quick --no-image $(MUTS)\n"
+                      "\n# second\n\tpython3 -B tools/tests/test_c2.py\n", phony="")
+        _only(fx.plan(), "check-c")
+    with fixture(cs) as fx:
+        # 列の同じ物理行に足す (継続の付け替えは字面でなく語の集合で見る)
+        fx.edit("build/sdk.mk", LIST_OLD, "    check-b check-c\n")
+        fx.append("build/sdk.mk", C_RULE)
+        _only(fx.plan(), "check-c")
+
+
+def case_mk_recipe_add(cs):
+    # (c): 既存の検査の recipe に型どおりの行 (末尾・途中・空行やコメントの後) → その 1 本
+    with fixture(cs) as fx:
+        fx.append("build/sdk.mk", A2)
+        _only(fx.plan(), "check-a")
+        fx.edit("Makefile", "check-b:\n" + B_LINE, "check-b:\n" + B2 + B_LINE)
+        _only(fx.plan(), "check-a", "check-b")
+    with fixture(cs) as fx:
+        fx.edit("Makefile", "check-b:\n" + B_LINE, "check-b:\n" + B_LINE + "\n# note\n" + B2)
+        _only(fx.plan(), "check-b")
 
 
 def case_mk_comment_only(cs):
     with fixture(cs) as fx:
-        fx.write("build/sdk.mk", "# comment\n" + FX_SDK)
-        _fast(fx.plan(), ["check-a", "check-b"])
-
-
-def case_mk_build_recipe(cs):
-    # 検査が読む成果物の作り方 (all から辿れる recipe) が変わった → 全部
-    with fixture(cs) as fx:
-        fx.edit("Makefile", "echo old > $@", "echo new > $@")
-        _full(fx.plan(), "ビルド")
-
-
-def case_mk_prereq_file(cs):
-    # 検査の前提のファイルが木にあっても (-B) その recipe の変更を見る
-    sdk = FX_SDK.replace("check-a:\n", "check-a: stamp.txt\n") + "stamp.txt:\n\techo old > $@\n"
-    with fixture(cs, files={"build/sdk.mk": sdk, "stamp.txt": "x\n"}) as fx:
-        fx.edit("build/sdk.mk", "echo old", "echo new")
-        _only(fx.plan(), "check-a")
-
-
-def case_mk_mut_flag(cs):
-    # 展開は MUTATE=1 で取る (変異ありの recipe を比べる)
-    sdk = FX_SDK.replace("MUTATE ?= 1", "MUTATE ?= 0")
-    with fixture(cs, files={"build/sdk.mk": sdk}) as fx:
-        fx.edit("build/sdk.mk", "--mutate)", "--mutants)")
-        _only(fx.plan(), "check-a")
-
-
-def case_mk_define_state(cs):
-    # 独立レビュー P1-1: define の中の endif / タブ付き endef / `\` 継続の次の endef は本文。
-    # check-b が BODY を読むので old → new は check-b を変える。
-    body = ("CHECK_PAR_TARGETS := check-b\n"
-            "define BODY\nendif\ncheck-a:\n\techo old\nendef\n"
-            ".PHONY: check-b\ncheck-b:\n\t@echo $(findstring old,$(BODY))\n")
-    mk = FX_MAKEFILE.replace(".PHONY: check-b\ncheck-b:\n\tpython3 b.py $(abspath .)\n", "")
-    for v in (body, body.replace("endif\n", "\tendef\n"),
-              body.replace("endif\n", "foo \\\nendef\n")):
-        with fixture(cs, files={"Makefile": mk, "build/sdk.mk": v}) as fx:
-            fx.edit("build/sdk.mk", "echo old", "echo new")
-            _affected(fx.plan(), "check-b")
-
-
-def case_mk_call_eval(cs):
-    # 独立レビュー P1-2: $(call eval,…) が別の検査の変数を変える → 順序依存 → 全部
-    sdk = FX_SDK.replace("\tpython3 a.py $(MUT)\n", "\t@echo a$(call eval,FLAGS := old)\n")
-    mk = FX_MAKEFILE.replace("python3 b.py $(abspath .)", "@echo $(FLAGS)")
-    with fixture(cs, files={"Makefile": mk, "build/sdk.mk": sdk}) as fx:
-        fx.edit("build/sdk.mk", "FLAGS := old", "FLAGS := new")
+        fx.write("build/sdk.mk", "# comment\n\n" + FX_SDK + "\n# tail\n")
+        fx.edit("Makefile", "check-b:\n", "# before b\ncheck-b:\n")
         r = fx.plan()
-        _affected(r, "check-b")
-        assert r[0] == "full" and any("またぐ" in l for l in r[3]), r[3]
-
-
-def case_mk_builtin_make(cs):
-    # 独立レビュー 2 回目: 組み込み名 MAKE の再定義。$(MAKE) を使う検査は全部変わる
-    sdk = ("MAKE := echo old\n" + FX_SDK.replace("python3 a.py $(MUT)", "@$(MAKE) a"))
-    mk = FX_MAKEFILE.replace("python3 b.py $(abspath .)", "@$(MAKE) b")
-    with fixture(cs, files={"Makefile": mk, "build/sdk.mk": sdk}) as fx:
-        fx.edit("build/sdk.mk", "echo old", "echo new")
-        _affected(fx.plan(), "check-a", "check-b")
-
-
-def case_mk_target_specific(cs):
-    # target-specific 変数: 値を変えればその検査、eval を介して別の検査に及べば全部
-    sdk = FX_SDK.replace("check-a:\n\tpython3 a.py $(MUT)\n",
-                         "check-a: V = old\ncheck-a:\n\t@echo $(V)\n")
-    with fixture(cs, files={"build/sdk.mk": sdk}) as fx:
-        fx.edit("build/sdk.mk", "V = old", "V = new")
-        _only(fx.plan(), "check-a")
-    sdk = FX_SDK.replace("check-a:\n\tpython3 a.py $(MUT)\n",
-                         "check-a: V = $(call eval,FLAGS := old)\ncheck-a:\n\t@echo $(V)\n")
-    mk = FX_MAKEFILE.replace("python3 b.py $(abspath .)", "@echo $(FLAGS)")
-    with fixture(cs, files={"Makefile": mk, "build/sdk.mk": sdk}) as fx:
-        fx.edit("build/sdk.mk", "FLAGS := old", "FLAGS := new")
-        _affected(fx.plan(), "check-b")
-
-
-def case_mk_computed_name(cs):
-    sdk = "N := FLAGS\n$(N) = old\n" + FX_SDK.replace("python3 a.py $(MUT)", "@echo $(FLAGS)")
-    with fixture(cs, files={"build/sdk.mk": sdk}) as fx:
-        fx.edit("build/sdk.mk", "$(N) = old", "$(N) = new")
-        _only(fx.plan(), "check-a")
-
-
-def case_mk_default_override(cs):
-    # ?= / 条件付き定義: 既定値の変更はその検査。コマンド行 (MAKEFLAGS) で上書きされて
-    # いれば実効値は変わらない → 変異なし。選択器を呼ぶ make と同じ環境で両方の木を展開する
-    for defn in ("FLAGS ?= old\n", "ifeq ($(origin FLAGS),undefined)\nFLAGS = old\nendif\n"):
-        sdk = defn + FX_SDK.replace("python3 a.py $(MUT)", "@echo $(FLAGS)")
-        with fixture(cs, files={"build/sdk.mk": sdk}) as fx:
-            fx.edit("build/sdk.mk", "FLAGS ?= old" if "?=" in defn else "FLAGS = old",
-                    "FLAGS ?= new" if "?=" in defn else "FLAGS = new")
-            _only(fx.plan(), "check-a")
-            saved = os.environ.get("MAKEFLAGS")
-            os.environ["MAKEFLAGS"] = " -- FLAGS=cli"
-            try:
-                _fast(fx.plan(), ["check-a", "check-b"])
-            finally:
-                if saved is None:
-                    del os.environ["MAKEFLAGS"]
-                else:
-                    os.environ["MAKEFLAGS"] = saved
-
-
-def case_mk_secondexpansion(cs):
-    # 別ファイルの .SECONDEXPANSION + 前提の $$(call eval,…)。列は check-b が先なので
-    # 順の展開では見えず、逆順の展開で check-b が変わる → 全部
-    mk = (".SECONDEXPANSION:\ndefine SET\nFLAGS := $(1)\nendef\n" +
-          FX_MAKEFILE.replace("python3 b.py $(abspath .)", "@echo $(FLAGS)"))
-    sdk = FX_SDK.replace("check-a check-b", "check-b check-a").replace(
-        "check-a:\n", "check-a: $$(call eval,$$(call SET,old))\n")
-    with fixture(cs, files={"Makefile": mk, "build/sdk.mk": sdk}) as fx:
-        fx.edit("build/sdk.mk", "SET,old", "SET,new")
-        r = fx.plan()
-        _affected(r, "check-b")
-        assert r[0] == "full", r[3]
-
-
-def case_mk_order_cancel(cs):
-    # 順でも逆順でも同じ値に見えるが単独では違う (a と c が同じ値、d が別の値、b が読む)。
-    # 単独の展開と突き合わせて初めて順序依存と分かる → 全部
-    sdk = ("CHECK_PAR_TARGETS := check-a check-b check-c check-d\n"
-           ".PHONY: check-a check-b check-c check-d\n"
-           "check-a:\n\t@echo a$(eval X := 1)\n"
-           "check-b:\n\t@echo $(X)\n"
-           "check-c:\n\t@echo c$(eval X := 1)\n"
-           "check-d:\n\t@echo d$(eval X := 2)\n")
-    mk = FX_MAKEFILE.replace(".PHONY: check-b\ncheck-b:\n\tpython3 b.py $(abspath .)\n", "")
-    with fixture(cs, files={"Makefile": mk, "build/sdk.mk": sdk}) as fx:
-        fx.edit("build/sdk.mk", "X := 2", "X := 3")
-        r = fx.plan()
-        _affected(r, "check-b")
-        assert r[0] == "full", r[3]
-
-
-def case_mk_failures(cs):
-    # make が失敗 (missing separator)、基点が無い、列の読みが合わない、--files → 全部
-    with fixture(cs) as fx:
-        fx.edit("build/sdk.mk", "\tpython3 a.py", "  python3 a.py")
-        _full(fx.plan(), "make")
-    with fixture(cs) as fx:
-        fx.edit("build/sdk.mk", "a.py", "a2.py")
-        _full(fx.plan(base="no-such-ref", files=["build/sdk.mk"]), "基点")
-        _full(fx.plan(files=["build/sdk.mk"], base=None), "基点版なし")
-    with fixture(cs) as fx:
-        fx.edit("build/sdk.mk", "CHECK_PAR_TARGETS := check-a check-b",
-                "CHECK_PAR_TARGETS := $(filter-out check-b,check-a check-b)")
-        _full(fx.plan(), "一致しない")
+        _fast(r, ["check-a", "check-b"])
+        assert any("追加選択なし" in l for l in r[3]), r[3]
 
 
 def case_mk_mixed(cs):
     # 他の変更ファイルの選択と合算。sdk/kapi.json は生成物を介するので全部のまま
     with fixture(cs) as fx:
-        fx.edit("build/sdk.mk", "a.py", "a2.py")
-        fx.write("src/b.py", "changed\n")
+        fx.append("build/sdk.mk", A2)
+        fx.write("tools/tests/test_b.py", "changed\n")
         _only(fx.plan(), "check-a", "check-b")
         fx.write("sdk/kapi.json", '{"v": 2}')
         _full(fx.plan(), "全体に影響")
@@ -568,7 +458,7 @@ def case_mk_git_versions(cs):
     with fixture(cs) as fx:
         d = fx.d
         git(d, "checkout", "-q", "-b", "work")
-        fx.edit("build/sdk.mk", "a.py", "committed.py")
+        fx.append("build/sdk.mk", A2)
         git(d, "add", ".")
         git(d, "commit", "-q", "-m", "recipe")
         git(d, "checkout", "-q", "main")
@@ -587,20 +477,180 @@ def case_mk_git_versions(cs):
             cs.ROOT, cs._TRACKED, cs.load_map = cs_root, cs_trk, cs_map
         assert "CC_MODE=sel\n" in out.getvalue() and "CC_MUT1=check-a\n" in out.getvalue(), \
             out.getvalue()
-        fx.edit("Makefile", "python3 b.py", "python3 b.py --staged")
+        fx.edit("Makefile", "check-b:\n" + B_LINE, "check-b:\n" + B_LINE + B2)
         git(d, "add", ".")
         _only(fx.plan(), "check-a", "check-b")
         fx.edit("Makefile", "echo old > $@", "echo work > $@")
-        _full(fx.plan(), "ビルド")
+        _full(fx.plan(), "削除・変更行")
+
+
+def _neg_cases():
+    """全部に倒す反例。(名前, fixture の files, 作業中の変更 fn(fx), 理由の一部)。
+    独立レビュー (Codex astra) 3 回分の反例と型の境界。"""
+    D = "define BODY\nendif\ncheck-a:\nendef\n"
+    TAB_ENDEF = "define BODY\n\tendef\ncheck-a:\nendef\n"
+    BS_ENDEF = "define BODY\nfoo \\\nendef\ncheck-a:\nendef\n"
+    out = []
+
+    def neg(name, fn, files=None, why="型に合わない"):
+        out.append((name, files, fn, why))
+
+    # astra の反例
+    neg("define 内 endif", lambda fx: fx.edit("build/sdk.mk", "endif\ncheck-a:\n", "endif\ncheck-a:\n" + A2),
+        {"build/sdk.mk": FX_SDK + D}, "define / 条件の中")
+    neg("タブ付き endef", lambda fx: fx.edit("build/sdk.mk", "\tendef\ncheck-a:\n", "\tendef\ncheck-a:\n" + A2),
+        {"build/sdk.mk": FX_SDK + TAB_ENDEF}, "define / 条件の中")
+    neg("継続の次の endef", lambda fx: fx.edit("build/sdk.mk", "endef\ncheck-a:\n", "endef\ncheck-a:\n" + A2),
+        {"build/sdk.mk": FX_SDK + BS_ENDEF}, "define / 条件の中")
+    neg("ifeq の中", lambda fx: fx.edit("build/sdk.mk", "check-a:\n" + A_LINE, "check-a:\n" + A_LINE + A2),
+        {"build/sdk.mk": FX_SDK.replace("check-a:\n" + A_LINE, "ifeq (1,1)\ncheck-a:\n" + A_LINE + "endif\n")},
+        "define / 条件の中")
+    neg("$(call eval)", lambda fx: fx.append("build/sdk.mk", "\t@echo $(call eval,FLAGS := new)\n"))
+    neg("MAKE の再定義", lambda fx: fx.append("build/sdk.mk", "MAKE := echo\n"))
+    neg("target-specific", lambda fx: fx.append("build/sdk.mk", "check-a: V = new\n"))
+    neg("計算名", lambda fx: fx.append("build/sdk.mk", "N := FLAGS\n$(N) = new\n"))
+    neg("?= の追加", lambda fx: fx.append("build/sdk.mk", "FLAGS ?= new\n"))
+    neg("?= の変更", lambda fx: fx.edit("build/sdk.mk", "MUTATE ?= 1", "MUTATE ?= 0"), None, "削除・変更行")
+    neg(".SECONDEXPANSION", lambda fx: fx.append("build/sdk.mk", ".SECONDEXPANSION:\n"))
+    neg("export の値の変更", lambda fx: fx.edit("build/sdk.mk", "export FOO = old", "export FOO = new"),
+        None, "削除・変更行")
+    neg("export の追加", lambda fx: fx.append("build/sdk.mk", "export BAR = new\n"))
+    neg(".ONESHELL の追加", lambda fx: fx.append("build/sdk.mk", ".ONESHELL:\n"))
+    neg(".ONESHELL の下で型の行", lambda fx: fx.append("build/sdk.mk", A2),
+        {"build/sdk.mk": ".ONESHELL:\n" + FX_SDK}, ".ONESHELL")
+    neg("recipe の - の削除", lambda fx: fx.edit("build/sdk.mk", "\t-python3", "\tpython3"),
+        {"build/sdk.mk": FX_SDK.replace("\tpython3", "\t-python3")}, "削除・変更行")
+    neg("遅延前提の eval", lambda fx: fx.add_c(rule="check-c: $$(call eval,FLAGS := new)\n"
+                                                      "\tpython3 -B tools/tests/test_c.py\n"))
+    neg("$(MAKE) の行", lambda fx: fx.append("build/sdk.mk", "\t$(MAKE) check-b\n"))
+    neg("$(shell) の行", lambda fx: fx.append("build/sdk.mk", "\tpython3 -B tools/tests/test_a.py $(shell echo --x)\n"))
+    neg("$(shell) の代入", lambda fx: fx.append("build/sdk.mk", "X := $(shell touch gen.txt)\n"))
+    neg("config.mk の空白", lambda fx: fx.edit("build/config.mk", "C_STD = ", "C_STD            = "),
+        None, "削除・変更行")
+    neg("既存の行への $(MUT)", lambda fx: fx.edit("Makefile", B_LINE, "\tpython3 -B tools/tests/test_b.py $(MUT)\n"),
+        None, "削除・変更行")
+    neg("既存の行の変更 (ファイル末尾)", lambda fx: fx.edit("build/sdk.mk", A_LINE, "\tpython3 -B tools/tests/test_a.py --more $(MUT)\n"),
+        None, "削除・変更行")
+    # 型の境界
+    for bad in ("\tpython3 -B tools/tests/test_a.py $(FOO)\n",
+                "\tpython3 -B tools/tests/test_a.py $(MUT) $(MUT)\n",
+                "\tpython3 -B tools/tests/test_a.py $(MUT) --after\n",
+                "\tpython3 -B tools/tests/test_a.py; rm -rf x\n",
+                "\tpython3 -B tools/tests/test_a.py > out\n",
+                "\tpython3 -B tools/tests/test_a.py | cat\n",
+                "\tpython3 -B tools/tests/test_a.py &\n",
+                "\tpython3 -B tools/tests/test_a.py `id`\n",
+                "\tpython3 -B tools/tests/test_a.py --Quick\n",
+                "\tpython3 -B tools/tests/test_a.py --x1\n",
+                "\tpython3 -B tools/tests/test_a.py --x_y\n",
+                "\tpython3 -B tools/tests/test_a.py -x\n",
+                "\tpython3 -B tools/tests/test_a.py \n",
+                "\tpython3 tools/tests/test_a.py\n",
+                "\tpython3 -B tools/tests/Test_A.py\n",
+                "\tpython3 -B ../tools/tests/test_a.py\n",
+                "  python3 -B tools/tests/test_a.py\n",
+                "\t\tpython3 -B tools/tests/test_a.py\n",
+                "\t@python3 -B tools/tests/test_a.py\n",
+                "\tcargo test --manifest-path x/Cargo.toml\n",
+                " \n",
+                "# comment \\\n",
+                "OTHER := check-c\n"):
+        neg("境界 %r" % bad, lambda fx, bad=bad: fx.append("build/sdk.mk", bad))
+    neg("規則の末尾の空白", lambda fx: fx.add_c(rule="check-c: \n\tpython3 -B tools/tests/test_c.py\n"))
+    neg(".PHONY の末尾の空白", lambda fx: fx.add_c(phony=".PHONY: check-c \n"))
+    neg("既存の .PHONY 行への追記", lambda fx: (fx.add_c(phony=""),
+                                               fx.edit("Makefile", ".PHONY: check-b", ".PHONY: check-b check-c")),
+        None, "削除・変更行")
+    neg(".PHONY だけ (列に無い)", lambda fx: fx.append("build/sdk.mk", ".PHONY: check-c\n"))
+    neg(".PHONY に既存の名前", lambda fx: fx.add_c(phony=".PHONY: check-c check-a\n"))
+    neg("既存名と同じ名前の新規則", lambda fx: fx.append("build/sdk.mk", "check-a:\n" + A2))
+    neg("列に足さない新規則", lambda fx: fx.append("build/sdk.mk", C_RULE))
+    neg("列に足したが規則が無い", lambda fx: fx.edit("build/sdk.mk", LIST_OLD, LIST_NEW))
+    neg("列と規則の名前が違う", lambda fx: (fx.edit("build/sdk.mk", LIST_OLD, LIST_NEW),
+                                         fx.append("build/sdk.mk", "check-c2:\n\tpython3 -B tools/tests/test_c2.py\n")))
+    neg("新規則が 2 つ", lambda fx: fx.add_c(rule=C_RULE + C_RULE))
+    neg("基点の字面にある名前", lambda fx: (fx.edit("build/sdk.mk", LIST_OLD, "    check-b \\\n    check-x\n"),
+                                       fx.append("build/sdk.mk", "check-x:\n\tpython3 -B tools/tests/test_x.py\n")),
+        None, "既にある")
+    neg("既存の recipe の横取り", lambda fx: (fx.edit("build/sdk.mk", LIST_OLD, LIST_NEW),
+                                          fx.edit("build/sdk.mk", "check-a:\n" + A_LINE, "check-a:\n" + C_RULE + A_LINE)))
+    neg("recipe の無い新規則", lambda fx: fx.add_c(rule="check-c:\n"))
+    neg("検査でない規則への recipe", lambda fx: fx.edit("Makefile", "\techo old > $@\n", "\techo old > $@\n" + A2))
+    neg(".PHONY の後の recipe", lambda fx: fx.edit("Makefile", ".PHONY: check-b\n", ".PHONY: check-b\n" + B2))
+    neg("列に無い検査への recipe", lambda fx: fx.append("Makefile", "\tpython3 -B tools/tests/test_z.py\n"))
+    neg("include の後の recipe", lambda fx: fx.edit("Makefile", "include build/sdk.mk\n", "include build/sdk.mk\n" + A2))
+    neg("target-specific の後の recipe", lambda fx: fx.edit("build/sdk.mk", "check-a: V = old\n", "check-a: V = old\n" + A2),
+        {"build/sdk.mk": FX_SDK.replace("check-a:\n", "check-a: V = old\ncheck-a:\n")})
+    neg("継続行の途中 (recipe)", lambda fx: fx.edit("build/sdk.mk", "test_a.py \\\n", "test_a.py \\\n" + A2),
+        {"build/sdk.mk": FX_SDK.replace(A_LINE, "\tpython3 -B tools/tests/test_a.py \\\n\t  $(MUT)\n")},
+        "継続行の途中")
+    neg("継続行の途中 (コメント)", lambda fx: fx.edit("build/sdk.mk", "test_a.py \\\n", "test_a.py \\\n# c\n"),
+        {"build/sdk.mk": FX_SDK.replace(A_LINE, "\tpython3 -B tools/tests/test_a.py \\\n\t  $(MUT)\n")},
+        "継続行の途中")
+    neg("列の := を +=", lambda fx: fx.edit("build/sdk.mk", "CHECK_PAR_TARGETS :=", "CHECK_PAR_TARGETS +="))
+    neg("列からの削除", lambda fx: fx.edit("build/sdk.mk", "check-a \\\n    check-b", "check-b"), None, "消えた")
+    neg("列の重複", lambda fx: fx.edit("build/sdk.mk", LIST_OLD, "    check-b check-b\n"), None, "重複")
+    neg("列への 2 つ目の代入", lambda fx: fx.append("build/sdk.mk", "CHECK_PAR_TARGETS += check-c\n"))
+    neg("列を別ファイルへ", lambda fx: (fx.edit("build/sdk.mk", "CHECK_PAR_TARGETS := check-a \\\n    check-b\n", ""),
+                                     fx.append("Makefile", "CHECK_PAR_TARGETS := check-a check-b\n")))
+    neg("script が木に無い", lambda fx: fx.append("build/sdk.mk", "\tpython3 -B tools/tests/test_a9.py $(MUT)\n"),
+        None, "木に無い")
+    neg("script が対応表の glob に無い", lambda fx: fx.append("build/sdk.mk", "\tpython3 -B tools/tests/test_zz.py\n"),
+        None, "glob に入っていない")
+    neg("新しい検査が対応表に無い", lambda fx: fx.add_c(rule="check-c:\n\tpython3 -B tools/tests/test_zz.py\n"),
+        None, "glob に入っていない")
+    neg("追加した .mk", lambda fx: (fx.edit("build/sdk.mk", LIST_OLD, LIST_NEW), fx.write("build/extra.mk", C_RULE)),
+        None, "追加・削除・改名")
+    neg("削除した .mk", lambda fx: os.unlink(os.path.join(fx.d, "build/config.mk")), None, "追加・削除・改名")
+    neg("改名した .mk", lambda fx: os.rename(os.path.join(fx.d, "build/config.mk"), os.path.join(fx.d, "build/cfg.mk")),
+        None, "追加・削除・改名")
+    return out
+
+
+def case_mk_negative(cs):
+    # 全部に倒すか、選択器が断る (SystemExit — 列の字面が読めない `+=` など。make
+    # check-changed が rc≠0 で止まる = 安全側) のどちらか
+    bad = []
+    for name, files, fn, why in _neg_cases():
+        with fixture(cs, files=files) as fx:
+            fn(fx)
+            try:
+                _full(fx.plan(), why)
+            except SystemExit:
+                pass
+            except AssertionError as e:
+                bad.append("%s: %s" % (name, str(e)[:300]))
+    assert not bad, "\n".join(bad)
+
+
+def case_mk_no_base(cs):
+    # --files (基点なし)、基点が無い → 全部
+    with fixture(cs) as fx:
+        fx.append("build/sdk.mk", A2)
+        _full(fx.plan(base="no-such-ref", files=["build/sdk.mk"]), "基点")
+        _full(fx.plan(files=["build/sdk.mk"], base=None), "基点版なし")
 
 
 def case_mk_real_tree(cs):
-    # 実物の Makefile を基点 = HEAD で比べる: dry-run できて、列が字面の読みと一致し、差が無い
-    _, vars_ = cs.read_makefiles()
-    par = cs.check_lists(vars_)
-    got, why = cs.make_narrow("HEAD", par)
-    assert got == set(), (got, why)
-    assert "変わった 0 本" in why, why
+    # 実物の make ファイル (作業中の版) を基点に置いた一時リポジトリ: 列が読めて差が無い
+    # (追加選択なし)。check-memory-host に型どおりの行を足す (main の e241312 / f4989ee の形)
+    # → その 1 本。tools/ は実物を指す (script の存在)。実物の木を HEAD と比べないのは、
+    # 作業中に make ファイルを直しているあいだ (= check-changed の出番) にこの試験が落ちないため
+    m = cs.load_map()
+    files = {rel: pathlib.Path(cs.ROOT, rel).read_text(encoding="utf-8")
+             for rel in cs.makefile_paths()}
+    with fixture(cs, files=files) as fx:
+        shutil.rmtree(os.path.join(fx.d, "tools"))
+        os.symlink(os.path.join(cs.ROOT, "tools"), os.path.join(fx.d, "tools"))
+        r = fx.plan(files=["build/sdk.mk", "Makefile"], map_=m)
+        _fast(r)
+        assert any("新しい検査 0 本" in l and "追加選択なし" in l for l in r[3]), r[3]
+        fx.edit("build/sdk.mk", "\tpython3 -B tools/tests/test_ledger.py $(MUT)\n",
+                "\tpython3 -B tools/tests/test_ledger.py $(MUT)\n"
+                "\tpython3 -B tools/tests/test_ledger.py --again $(MUT)\n")
+        r = fx.plan(files=["build/sdk.mk"], map_=m)
+        _only(r, "check-memory-host")
+        assert len(r[1]) == len(cs.check_lists(cs.read_makefiles()[1])), r[1]
 
 
 CASES = [case_inc_extract, case_hsync_protect, case_sh_pipe, case_bare_extract,
@@ -608,12 +658,8 @@ CASES = [case_inc_extract, case_hsync_protect, case_sh_pipe, case_bare_extract,
          case_submodule, case_nothing, case_single_stage, case_inc_dir_extract,
          case_notest_fast, case_notest_glob_wins, case_notest_guard,
          case_featgui_commit, case_lint_real,
-         case_mk_recipe_line, case_mk_add_remove, case_mk_comment_only,
-         case_mk_build_recipe, case_mk_prereq_file, case_mk_mut_flag,
-         case_mk_define_state, case_mk_call_eval, case_mk_builtin_make,
-         case_mk_target_specific, case_mk_computed_name, case_mk_default_override,
-         case_mk_secondexpansion, case_mk_order_cancel, case_mk_failures,
-         case_mk_mixed, case_mk_git_versions, case_mk_real_tree]
+         case_mk_new_check, case_mk_recipe_add, case_mk_comment_only, case_mk_mixed,
+         case_mk_git_versions, case_mk_negative, case_mk_no_base, case_mk_real_tree]
 
 
 def run_cases(cs, quiet=False, cases=None):
@@ -622,7 +668,7 @@ def run_cases(cs, quiet=False, cases=None):
         try:
             c(cs)
             ok = True
-        except Exception as e:           # noqa: BLE001 — 変異で何が起きても RED
+        except (Exception, SystemExit) as e:   # noqa: BLE001 — 変異で何が起きても RED
             ok = False
             if not quiet:
                 print("FAIL %s: %r" % (c.__name__, e), flush=True)
@@ -636,7 +682,7 @@ def run_cases(cs, quiet=False, cases=None):
 
 
 # ------------------------------------------------------------------ 否定側
-MUTATIONS = [
+GLOB_MUTATIONS = [
     ('            self.pending.append(rel)\n', '            pass\n',
      "実装の .c / .inc の #include を辿らない (P2-1: .inc が表から落ちる)"),
     ('if "/" in s or s.endswith(BARE_EXTS):', 'if "/" in s:',
@@ -670,51 +716,68 @@ MUTATIONS = [
      "notest の except: を無視する"),
     ('    for f in changed:\n        hit |=', '    for f in changed[:0]:\n        hit |=',
      "変更を検査に突き合わせない"),
-    # make の dry-run 比較 (2026-10-01)
-    ('texts = {"base": _base_makefiles(ancestor), "work": _work_makefiles()}',
-     'texts = {"base": _work_makefiles(), "work": _work_makefiles()}',
-     "片側 (作業中の木) だけ展開して比べる"),
-    ('    if res["base", "build"] != res["work", "build"]:', '    if False:',
-     "ビルド (all) の展開を比べない"),
-    ('            for name, combined in (("順", fwd), ("逆順", rev)):\n                if combined.get(u) != lines:',
-     '            for name, combined in (("逆順", rev),):\n                if combined.get(u) != lines:',
-     "順の展開と突き合わせない (逆順だけ)"),
-    ('            for name, combined in (("順", fwd), ("逆順", rev)):\n                if combined.get(u) != lines:',
-     '            for name, combined in (("順", fwd),):\n                if combined.get(u) != lines:',
-     "逆順の展開と突き合わせない (順だけ)"),
-    ('                if combined.get(u) != lines:', '                if combined.get(u) != lines and u != t:',
-     "検査自身の目標は単独とまとめの不一致に数えない (順・逆順で同じ値に見える順序依存を見逃す)"),
-    ('        if why:\n            return None, "検査をまたぐ影響', '        if False:\n            return None, "検査をまたぐ影響',
-     "検査をまたぐ影響を全部に倒さない"),
-    ('        except MakeError as e:\n            return None,', '        except MakeError as e:\n            return set(),',
-     "make の失敗を全部に倒さない"),
-    ('    return changed | added, why', '    return changed, why',
-     "列に足した検査を変異込みにしない"),
-    ('                if lists["work"] != list(par):', '                if False:',
-     "make の検査の列と字面の列の不一致を見ない"),
-    ('.replace(cwd, "<ROOT>")', '',
-     "一時ディレクトリの番地を正規化しない ($(abspath) の違いで全部が変わって見える)"),
-    ('        p = subprocess.run(cmd, capture_output=True, stdin=subprocess.DEVNULL,\n',
-     '        p = subprocess.run(cmd, capture_output=True, stdin=subprocess.DEVNULL, env={"PATH": os.environ["PATH"]},\n',
-     "選択器を呼ぶ make の環境 (MAKEFLAGS のコマンド行変数) を引き継がない"),
-    ('["-n", "-B", "--trace", "MUTATE=1"]', '["-n", "--trace", "MUTATE=1"]',
-     "-B を付けない (木にある前提ファイルの recipe の変更を見ない)"),
-    ('["-n", "-B", "--trace", "MUTATE=1"]', '["-n", "-B", "--trace"]',
-     "MUTATE=1 で展開しない (変異ありの recipe を比べない)"),
-    ('        m = TRACE_RE.match(line)\n        if m:', '        m = None\n        if m:',
-     "--trace の行で目標ごとに切らない"),
-    ('    changed = {t for t in old & new if res["base", t] != res["work", t]}',
-     '    changed = set()',
-     "展開が変わった検査を選ばない"),
+]
+# Makefile の型の一致 (2026-10-01)。どれも make の筋書き (case_mk_*) で RED になる
+MK_MUTATIONS = [
+    ('        if j == len(wi):\n            return None', '        if j == len(wi):\n            break',
+     "削除・変更行を見ない (基点の行が作業中に無くても追加だけと見なす)"),
+    ('((?: --[a-z][a-z-]*)*)', '(.*)',
+     "recipe の型を緩める (旗の後ろに何でも許す — `;` `>` `$(FOO)`)"),
+    ('( \\$\\((?:MUT|MUTS)\\))?$', '( \\$\\(\\w+\\))?$',
+     "$(MUT) / $(MUTS) 以外の $(...) を許す"),
+    ('                if any(rx.search(l) for l in lines):', '                if False:',
+     "新しい名前が基点の make ファイルに既にあっても見ない"),
+    ('        if not base_words <= work_words:', '        if False:',
+     "列の集合比較を外す (列から消えた名前を見ない)"),
+    ('    if len(words) != len(set(words)):', '    if False:',
+     "列の重複を見ない"),
+    ('        if lrel_b != lrel_w:', '        if False:',
+     "列が別のファイルへ動いても (消して足しても) 見ない"),
+    ('        if not ok[k]:', '        if False:',
+     "define / 条件の深さを見ない"),
+    ('        if not text.startswith("\\t"):', '        if False:',
+     "make の読み方 (tab 行は endef にならない) を外して字下げを無視する読みだけにする"),
+    ('        if not single_inserted(k):', '        if False:',
+     "継続行の途中への挿入を見ない"),
+    ('                if not single_inserted(k2) or not TPL_RECIPE_RE.match(t):',
+     '                if not TPL_RECIPE_RE.match(t):',
+     "新しい規則が既存の recipe の行を横取りしても見ない"),
+    ('            elif ll[k2][0] in ins or name not in base_words:', '            elif False:',
+     "持ち主が基点の列にある検査でなくても recipe の追加と見なす"),
+    ('            if not mo or "=" in t:', '            if not mo:',
+     "target-specific 変数の行 (check-a: V = …) を持ち主にできる"),
+    ('            if not os.path.isfile(os.path.join(ROOT, script)):', '            if False:',
+     "script が木に無くても選ぶ"),
+    ('            if not matches(script, m_checks.get(name, [])):', '            if False:',
+     "script が対応表の当該検査の glob に無くても選ぶ"),
+    ('            for name in mp.group(1).split():\n                if name not in new_names:',
+     '            for name in mp.group(1).split():\n                if False:',
+     ".PHONY の名前が新しい名前でなくても許す"),
+    ('            if n == 0:\n                raise Reject', '            if False:\n                raise Reject',
+     "recipe の無い新規則を許す"),
+    ('        if set(headers) != new_names or any(n != 1 for n in headers.values()):',
+     '        if False:',
+     "列に足した名前と新しい規則の集合を突き合わせない"),
+    ('            if any(".ONESHELL" in l for l in lines):', '            if False:',
+     ".ONESHELL の下でも絞る"),
+    ('            if rel not in bt or rel not in wt:', '            if False:',
+     "追加・削除・改名されたファイルを見ない"),
     ('    ancestor = p.stdout.strip()\n    if p.returncode != 0 or not ancestor:',
      '    ancestor = base\n    if p.returncode != 0 or not ancestor:',
      "分岐した基点と直接比較する (merge-base でない)"),
+    ('    if base is None:\n        return None, "基点版なし (--files)"', '    if False:\n        return None, ""',
+     "--files (基点なし) を全部に倒さない"),
+    ('    return set(picked), why', '    return new_names, why',
+     "recipe に行を足した既存の検査を選ばない"),
+    ('    return set(picked), why', '    return set(picked) - new_names, why',
+     "列に足した新しい検査を選ばない"),
     ('            if matches(f, mk):\n                mk_hits.append(f)',
      '            if matches(f, mk) or f.endswith(".json"):\n                mk_hits.append(f)',
-     "sdk/kapi.json も make の比較で絞る (生成物を介した変化は make -n に現れない)"),
+     "sdk/kapi.json も型で絞る (生成物を介した変化は字面に現れない)"),
     ('base=None if files is not None else base)', 'base=None)',
      "select から基点を渡さず絞り込めない"),
 ]
+MUTATIONS = GLOB_MUTATIONS + MK_MUTATIONS
 
 
 def mutate():
@@ -730,7 +793,7 @@ def mutate():
         try:
             cs = load(original.replace(old, new))
             # make の変異は fixture (速い) を先に、実物の木の lint は後ろに
-            cases = mk_cases + glob_cases if i > 13 else glob_cases + mk_cases
+            cases = mk_cases + glob_cases if i > len(GLOB_MUTATIONS) else glob_cases + mk_cases
             failed = run_cases(cs, quiet=True, cases=cases)
         except Exception as e:           # noqa: BLE001
             print("MUTATION %d INVALID (load): %r" % (i, e), flush=True)

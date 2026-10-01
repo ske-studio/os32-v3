@@ -4,12 +4,12 @@
 #   * 変更が checks: の glob に当たった検査 → 変異込み、当たらなかった検査 → 変異なし
 #   * full: に当たる変更、または どの glob にも docs_only: にも notest: にも当たらない
 #     変更 → 全部を変異込み (= make check)。表の漏れで否定側を落とさないための安全側。
-#     例外: Makefile / build/*.mk は make 自身に展開させて比べる (基点 = merge-base 版と
-#     作業中の版の木で `make -n -B --trace` の展開済み recipe を検査ごとに比較)。
-#     展開が変わった検査 + 列に足した検査だけ変異込み、列から消えた検査は回さない。
-#     ビルド (all) の展開が変わった・検査をまたぐ影響 (順序依存)・make の失敗・
-#     基点の木を用意できない・列の読みが合わない・--files は全部 (docs/08_build.md §8-4)。
-#     sdk/kapi.json は生成物を介するので全部のまま。
+#     例外: Makefile / build/*.mk は「新しい試験を足す形」だけを決まった型との完全一致で
+#     絞る (基点 = merge-base 版との差分が追加だけで、足した行が全部 型 — 列への検査名、
+#     `check-<name>:` の新しい規則、`python3 -B tools/tests/<file>.py [--flag] [$(MUT)]`
+#     の recipe 行、コメント・空行、.PHONY — に一致するときだけ。新しい検査と行を足した
+#     検査を変異込み)。それ以外の差分・--files は全部 (docs/08_build.md §8-4)。make は
+#     呼ばない。sdk/kapi.json は生成物を介するので全部のまま。
 #     broad: の検査の `**` glob はこの判定に数えない
 #   * 変更が全部 docs_only: に当たる → 当たった検査 + docs_always: だけを回す
 #   * notest: (どのホスト試験の入力でもない場所) の変更は何も足さない。それだけなら
