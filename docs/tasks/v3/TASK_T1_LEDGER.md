@@ -612,7 +612,7 @@ static inline u32  V2P(const volatile void *va) { return (u32)(uptr)va; }
 |---|---|
 | 変更 | §2-3 の 161 件 (T1b〜T1e で書き換え済みの分を除く。1 件ずつ分類する)、静的初期化子 10 か所 + マクロ 2 か所を `P2V_CONST` / `P2V_IO_CONST` に (B6)、`exec.c:816-829` の表歩きを `paging.c` の `as_va_to_pa` 系へ、`paging_verify_identity` と kselftest の恒等表明の書き直し、`tools/check_p2v.py` + `tools/check_p2v_allow.txt` + `build/sdk.mk` (`check-p2v` を `check` と `check-changed` へ)、`docs/CONSTRAINTS.md` と `CLAUDE.md` (新 ID、同じコミットで — `check_constraints.py` が整合を見る) |
 | 受入の芯 | **コード列の同一は補助証拠** (Codex P3): 恒等なので、書き換えの前後で `objdump -d` の `.text` が一致すること (差が出たら理由を列挙 — `static inline` の展開順や定数の畳み方) に加えて、(a) **静的初期化子は `objdump -s -j .data` の初期値が一致**、(b) **表歩きの移動 (`as_va_to_pa`) はホスト試験で USER・RW の判定を 4 通り** (P2V 化とは別に検証する)。NP21/W の回帰は軽くてよい |
-| 検査 | `make check-p2v` が 0 件 (**アプリ帯・lease 窓の番地に `V2P` を当てた箇所も 0、関数の中の `P2V_CONST` も 0**、§3-4)。変異: 7 形の違反の注入でそれぞれ落ちる (実装レビュー P2 の 3 形を含む)。`make check` と `make check-changed` の両方から到達する (X16) |
+| 検査 | `make check-p2v` が 0 件 (**アプリ帯・lease 窓の番地に `V2P` を当てた箇所も 0、関数の中の `P2V_CONST` も 0**、§3-4)。変異: 8 形の違反の注入でそれぞれ落ちる (実装レビュー P2 の 3 形を含む)。`make check` と `make check-changed` の両方から到達する (X16) |
 | 対象外の扱い | V86 のゲスト線形・ページ 0 の二重の意味 (`v86_bios.c:283,1207` の `guest = (u8 *)0` はゲスト線形であり物理でもある) は例外一覧に理由付きで。HostDrv の 24 件は §5 T1-U6 の確認まで例外一覧 (「NP21/W が線形で読むか物理で読むか未確認」) |
 | NP21/W 回帰 | 17MB で起動 kselftest 0 fail、GUI・CUI・V86・FD・HostDrv の一巡 |
 
@@ -649,6 +649,12 @@ static inline u32  V2P(const volatile void *va) { return (u32)(uptr)va; }
 追加の反例 `(volatile unsigned char *)MEM_BOOTINFO_BASE` / `(volatile u8 *)(uptr)MEM_BOOTINFO_BASE` / `paging_load_cr3((u32)(p))` を否定試験・変異に追加。前二者は写しの実ツリーの `bootinfo_capture` の初期化を差し替え、後者は例外のない関数へ注入し、検査器全体の実行で該当規則と **rc=1** を要求する。`OS32_MUT_JOBS=4 python3 tools/tests/test_p2v.py --mutate` **rc=0、8 試験 PASS、7/7 実行時 RED、コンパイル失敗 0**。
 
 今回のコマンド: `python3 tools/check_p2v.py` **rc=0**、`CROSS_DIR=/home/hight/opt/cross make all < /dev/null` **rc=0**、`CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-p2v < /dev/null` **rc=0**。ビルドの既定 `/tmp/np21w` への FD 画像コピーは 2 件とも警告・失敗、配備・ゲスト試験は未実施 (依頼の対象外)。変更時検査では保存済み `.t1f-baseline/sitecustomize.py` を `export PYTHONPATH="$PWD/.t1f-baseline"` で読み、ELF32 ホスト試験を qemu-i386 で実行した。最初の `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null` は全ターゲットの試験 PASS 後に **rc=2**: コーダーが検査中に本票と変異の関数宣言を編集し、末尾のソース不変検査が 2 ファイルの変化を検出したため。検査中の編集を止め、同じコマンドの再実行は **rc=0** (main との merge-base を基点に全 108 ターゲットを変異込みで実行、ソース不変検査も PASS)。ログは `/tmp/t1f-review-make-all.log` / `/tmp/t1f-review-check-changed-final.log`。
+
+**実装レビュー2回目への対応 (2026-10-01、GPT-6、ユーザー決定)**: 検査器は誤って持ち込むことを防ぐ guard で、わざと作った型表記への耐性は目標にしない (ユーザー決定 2026-10-01、T0 の check-c-dialect と同じ扱い)。既知の限界は、`* const volatile` のように `*` の後に修飾子が2個以上ある型、`(uptr const)` のように整数 typedef の後ろに修飾子が付く型、任意の typedef の型解決。検査器冒頭にも同じ範囲を記載した。P2V 専用の TDD 記録ファイルはなく、本節に経過を記録する。
+
+現実的な2件を修正: physical-sink の名前検索では式中のどの位置でも V2P と関数呼び出しの引数を除外する。`4096 + V2P(p)` / `V2P(p) + 4096` / `get_phys(p)` と入れ子呼び出しを肯定試験に追加し、呼び出し外に残る未変換の `p` は検出する。整数型は `include/types.h` の組込み整数型からの直接 typedef を読み取り、全7型 (`u8/u16/u32/i8/i16/i32/uptr`) を認識する。全7型の否定試験と `(volatile u8 *)(i32)MEM_BOOTINFO_BASE` の実ツリー複写変異を追加した。
+
+追加試験は修正前 **11試験中8 subtest が失敗**、修正後 **11試験 PASS、8/8 実行時 RED、コンパイル失敗0**。変異は検査器 CLI の **rc=1 と対象関数・規則**を要求する。実物の木は **0 violations / 65 exceptions**、例外追加なし。今回の検証: `CROSS_DIR=/home/hight/opt/cross make check-p2v < /dev/null` **rc=0**、`CROSS_DIR=/home/hight/opt/cross make all < /dev/null` **rc=0**、`CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null` **rc=0** (main との merge-base `0fedc76affaf` から全108ターゲットを変異込みで実行、ソース不変検査も PASS)。ビルド前に `export NP21W_DIR="$PWD/.t1f-baseline/build-images"` を設定し、FD画像のコピー先をこの worktree 内に限定した。変更時検査前には保存済み `export PYTHONPATH="$PWD/.t1f-baseline"` も設定し、前回同様 Linux ELF32 ホスト試験を qemu-i386 経由で実行した。ログ: `/tmp/t1f2-red.log` / `/tmp/t1f2-make-all.log` / `/tmp/t1f2-check-changed.log`。`python3 tools/gen_tests_inventory.py --write` **rc=0** (生成結果に差分なし)。NP21/W・NHD・配備・ini・Windows側・ゲスト試験は対象外で未実施。コミット・push は行っていない。
 
 **コミット時の環境制約**: `git add` と `git commit --file .t1f-baseline/commit-tests.txt < /dev/null` は **rc=128**。`/home/hight/os32-v3/.git/worktrees/os32-v3-wt-t1f/index.lock` の作成が `Read-only file system` で拒否された。コミットは未作成、変更と検証結果は worktree に保存済み。指定の末尾 2 行を付けたコミット文を `.t1f-baseline/commit-tests.txt` / `commit-t1f.txt` に用意し、管理領域が書き込み可能になるのを待つ。
 
@@ -723,7 +729,7 @@ static inline u32  V2P(const volatile void *va) { return (u32)(uptr)va; }
 | T1-U4 | Xe10 に副作用のない識別手段が無い — 予約を `GFX=` と機種だけで決めてよいか | 予約は存在の証明ではない (DEVICE_RESERVATION §6)。候補群 `gfx` の予約 (§3-8)。予約した窓に RAM 登録が無いことだけ確かめる | T1e |
 | T1-U5 | `paging_map_phys` の失敗時の契約 | **解消** (§2-2 の 7.): 全件不変。`backend_cirrus.c:327-329` のコメントが古い。T1e で直す | T1e |
 | T1-U6 | HostDrv の hypercall (`fs/hostdrvfs.c`) が渡すポインタを NP21/W が線形番地で読むか物理番地で読むか | NP21/W ai-debug フォーク (`~/np21w-src`) の HostDrv 実装で確かめる。T1f では例外一覧に置く | T1f |
-| T1-U7 | 文字列検査 (`check_p2v.py`) の取りこぼし率 | 変異試験で 7 形を測る (実装レビュー P2 の 3 形を含む)。`-Wcast-align=strict` のようなコンパイラ側の検出手段は無い (恒等なので型が同じ) | T1f |
+| T1-U7 | 文字列検査 (`check_p2v.py`) の取りこぼし率 | 変異試験で 8 形を測る (実装レビュー P2 の 3 形を含む)。`-Wcast-align=strict` のようなコンパイラ側の検出手段は無い (恒等なので型が同じ) | T1f |
 | T1-U8 | (撤回 — Codex 2 回目 P3: GUI からの `--cpl0` は `appslot_cpl0_admit` が入口で `OS32_ERR_INVAL` にしている、試験 20A〜20E) | — | — |
 | T1-U9 | 実機 Xe10 のリニア窓の decode 幅・銀行窓の位置 (今の定数は NP21/W の窓) | T1 では扱わない (T1-R9)。P4 の実測 BAR と一緒に | P4 |
 

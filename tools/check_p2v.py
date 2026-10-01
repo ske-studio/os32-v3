@@ -3,6 +3,11 @@
 
 Text scanner, not a C type checker: multiline casts are supported, but aliases
 and indirect calls still require review. Exceptions use file:function:reason.
+This is a guard against accidental introductions, not a defense against
+intentionally crafted type spellings (user decision 2026-10-01, like T0's
+check-c-dialect). Known limits: two or more qualifiers after a pointer star
+(e.g. * const volatile), qualifiers after an integer typedef (e.g. uptr const),
+and arbitrary typedef resolution.
 """
 import argparse
 import pathlib
@@ -16,8 +21,15 @@ EXCLUDED = {'third_party', 'sqlite', 'sqlite3', 'fatfs', 'zlib', 'microtar', 'os
 # an operand rather than being mistaken for a type name.
 POINTER_TYPE = r'(?:\w+\s+)*\w+\s*(?:\*\s*(?:(?:const|volatile)\s*)?)+'
 SCALAR_WORD = r'(?:const|volatile|unsigned|signed|short|long|int|char)'
+# Read direct built-in integer typedefs; resolving arbitrary aliases is out of scope.
+INTEGER_TYPEDEFS = set(re.findall(
+    r'\btypedef\s+(?:(?:unsigned|signed|short|long|int|char)\s+)+(\w+)\s*;',
+    (ROOT / 'include/types.h').read_text()))
+INTEGER_TYPEDEFS.update(('u64', 's8', 's16', 's32', 's64',
+                         'uintptr_t', 'intptr_t', 'size_t'))
+INTEGER_NAMES = '|'.join(re.escape(name) for name in sorted(INTEGER_TYPEDEFS))
 SCALAR_TYPE = (r'(?:(?:const|volatile)\s+)*(?:' + SCALAR_WORD +
-               r'(?:\s+' + SCALAR_WORD + r')*|[us](?:8|16|32|64)|uptr|uintptr_t|intptr_t|size_t)')
+               r'(?:\s+' + SCALAR_WORD + r')*|' + INTEGER_NAMES + r')')
 CAST = re.compile(r'\(\s*' + POINTER_TYPE + r'\)\s*')
 ANY_CAST = re.compile(r'\(\s*(?:' + POINTER_TYPE + '|' + SCALAR_TYPE + r')\s*\)\s*')
 INTEGER_CAST = re.compile(r'\(\s*(?:' + SCALAR_TYPE + r')\s*\)\s*')
@@ -89,6 +101,20 @@ def operand(expr):
     return expr
 
 
+def without_call_arguments(expr):
+    """Names inside calls are inputs, not the value being cast to an integer."""
+    result, start = [], 0
+    while True:
+        call = re.search(r'\b\w+\s*\(', expr[start:])
+        if not call:
+            result.append(expr[start:])
+            return ''.join(result)
+        opening = start + call.end() - 1
+        result.append(expr[start:opening + 1])
+        result.append(')')
+        start = balanced_end(expr, opening)
+
+
 def functions(code):
     result = []
     for m in FUNCTION.finditer(code):
@@ -132,9 +158,7 @@ def scan(source):
         # already states intent; pointer arithmetic elsewhere is not a sink.
         for cast in INTEGER_CAST.finditer(args):
             expr, _ = expression(args, cast.end())
-            expr = operand(expr)
-            if re.match(r'V2P\s*\(', expr):
-                continue
+            expr = without_call_arguments(operand(expr))
             if (pointer_names.intersection(re.findall(r'\b\w+\b', expr)) or
                     re.search(r'&\s*\w+|\b\w*(?:buffer|buf|table|directory|ptr)\w*\b', expr)):
                 add(m.start(), 'physical-sink')

@@ -34,6 +34,28 @@ class ScannerTest(unittest.TestCase):
                 hits = checker.scan('void probe(void *p) { paging_load_cr3(' + value + '); }')
                 self.assertIn(('probe', 'physical-sink'), [(h[1], h[2]) for h in hits])
 
+    def test_converted_physical_sink_expressions(self):
+        for value in ('(u32)(4096 + V2P(p))', '(u32)(V2P(p) + 4096)',
+                      '(u32)get_phys(p)', '(u32)(4096 + get_phys(p))',
+                      '(u32)(get_phys(wrap(p, table)) + V2P(p))'):
+            with self.subTest(value=value):
+                self.assertEqual(checker.scan(
+                    'void probe(void *p) { paging_load_cr3(' + value + '); }'), [])
+
+    def test_pointer_outside_call_arguments(self):
+        for value in ('(u32)(V2P(p) + p)', '(u32)(get_phys(p) + p)',
+                      '(u32)(p + get_phys(p))'):
+            with self.subTest(value=value):
+                self.assertIn('physical-sink', [h[2] for h in checker.scan(
+                    'void probe(void *p) { paging_load_cr3(' + value + '); }')])
+
+    def test_tree_integer_typedef_casts(self):
+        for typename in ('u8', 'u16', 'u32', 'i8', 'i16', 'i32', 'uptr'):
+            with self.subTest(typename=typename):
+                self.assertIn('physical-cast', [h[2] for h in checker.scan(
+                    'void probe(void) { volatile u8 *low = '
+                    '(volatile u8 *)(' + typename + ')MEM_BOOTINFO_BASE; }')])
+
     def test_multiline_and_function_context(self):
         hits = checker.scan('void probe(void)\n{\n u8 *p = (u8 *)\n MEM_GFX_BB_BASE;\n}\n')
         self.assertEqual([(h[1], h[2]) for h in hits], [('probe', 'physical-cast')])
@@ -124,6 +146,7 @@ def main():
             ('function-const', '    u8 *p = P2V_CONST(MEM_GFX_BB_BASE);', 'function-const'),
             ('bootinfo-multiword-type', 'volatile u8 *low = (volatile unsigned char *)MEM_BOOTINFO_BASE;', 'physical-cast'),
             ('bootinfo-intermediate-cast', 'volatile u8 *low = (volatile u8 *)(uptr)MEM_BOOTINFO_BASE;', 'physical-cast'),
+            ('bootinfo-signed-cast', 'volatile u8 *low = (volatile u8 *)(i32)MEM_BOOTINFO_BASE;', 'physical-cast'),
             ('grouped-cr3-pointer', '    paging_load_cr3((u32)(p));', 'physical-sink'),
         ]
         for result in run_ordered(mutant, cases):
