@@ -1,4 +1,5 @@
 """Actual build flags and fail-closed libclang parsing for OS32 checks."""
+import ctypes
 import functools
 import os
 import pathlib
@@ -35,17 +36,71 @@ def resource_dir():
                           check=True).stdout.strip()
 
 
+@functools.lru_cache(maxsize=128)
+def gcc_predefines(compiler, argv, root):
+    # Remove source/include/user macros: collect only compiler definitions, then
+    # apply the original -D/-U/-include arguments after them in flags().
+    options = []
+    it = iter(argv)
+    for arg in it:
+        if arg in ('-I', '-isystem', '-iquote', '-idirafter', '-include', '-imacros', '-D', '-U'):
+            next(it, None)
+        elif not arg.startswith(('-I', '-D', '-U')) and arg not in DROP:
+            options.append(arg)
+    r = subprocess.run([compiler, *options, '-dM', '-E', '-x', 'c', '-'],
+                       input='', capture_output=True, text=True, cwd=root)
+    if r.returncode:
+        raise ParseError('GCC predefines failed: ' + r.stderr)
+    definitions = []
+    for line in r.stdout.splitlines():
+        if line.startswith('#define '):
+            name, _, value = line[8:].partition(' ')
+            definitions.append('-D' + name + '=' + value)
+    if not definitions:
+        raise ParseError('GCC predefines: empty result')
+    return definitions
+
+@functools.lru_cache(maxsize=4)
+def gcc_include(compiler):
+    r = subprocess.run([compiler, '-print-file-name=include'],
+                       capture_output=True, text=True, check=True)
+    include = pathlib.Path(r.stdout.strip())
+    if not include.is_dir():
+        raise ParseError('missing GCC builtin headers: ' + str(include))
+    return str(include)
+
+
+@functools.lru_cache(maxsize=1)
+def cross_free_notice():
+    print('clang AST: LIMITED cross-free mode; GCC predefined macros/branches '
+          'are NOT verified (clang defaults, system newlib).', file=sys.stderr)
+
+
 def flags(argv, root=ROOT, cc=None):
     root = pathlib.Path(root).resolve()
     out = ['--target=i386-unknown-none-elf','-Wgnu-folding-constant']
-    for a in argv:
-        if a in DROP:
-            continue
-        out.append(a)
     compiler = cc or os.environ.get('OS32_CC', 'i386-elf-gcc')
     cross = shutil.which(compiler)
     if not cross:
         cross = str(pathlib.Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross')) / 'bin/i386-elf-gcc')
+    if pathlib.Path(cross).is_file():
+        # Clang's generic ELF target rejects GCC i386's __float128 (stddef.h).
+        # The Linux i386 frontend accepts it; -undef + GCC definitions select
+        # bare-metal branches and -nostdinc prevents all host libc headers.
+        out[0] = '--target=i386-unknown-linux-gnu'
+        out += ['-nostdinc']
+        out += ['-undef', '-Wno-builtin-macro-redefined',
+                '-U__has_feature', '-U__has_extension', '-U__has_warning',
+                '-U__is_identifier', '-U__building_module', '-U__has_declspec_attribute',
+                '-U__has_constexpr_builtin', '-U__has_embed']
+        out += gcc_predefines(cross, tuple(argv), str(root))
+        out += ['-isystem', gcc_include(cross)]
+    elif os.environ.get('OS32_CLANG_CROSS_FREE') == '1':
+        cross_free_notice()
+    else:
+        raise ParseError('cross GCC unavailable: ' + cross +
+                         '; use OS32_CLANG_CROSS_FREE=1 only for limited static CI')
+    out += [a for a in argv if a not in DROP]
     inc = pathlib.Path(cross).resolve().parents[1] / 'i386-elf/include'
     resource = resource_dir()
     out += ['-isystem', resource + '/include', '-working-directory=' + str(root)]
@@ -124,3 +179,12 @@ def alignment_cast(cursor):
     a = children[-1].type.get_pointee().get_canonical().get_align()
     b = cursor.type.get_pointee().get_canonical().get_align()
     return a > 0 and b > a
+
+
+def spelling_position(location):
+    """Physical macro-definition position, rather than expansion call position."""
+    file = ctypes.c_void_p()
+    line, column, offset = ctypes.c_uint(), ctypes.c_uint(), ctypes.c_uint()
+    cx.conf.lib.clang_getSpellingLocation(location, ctypes.byref(file),
+        ctypes.byref(line), ctypes.byref(column), ctypes.byref(offset))
+    return (cx.File(ctypes.cast(file, cx.c_object_p)).name if file.value else None, offset.value)

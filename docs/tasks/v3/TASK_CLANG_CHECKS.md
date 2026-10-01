@@ -169,3 +169,99 @@ LLVM 18 + LLVM 21 resourceの混在もstdint.hで解析失敗 (rc=1) と確認�
 (/tmp/clang18-arch-matched.log)。CIのaptは同版を導入する。
 NP21/W・NHD・配備・ini・Windows・ゲスト試験・実機・GitHub Actionsの実行は未確認。
 コミット・pushは行わない。独立レビューとCI受入はPMへ渡す。
+
+
+### レビュー 1 回目の対応 (2026-10-01、Codex GPT-6)
+
+基点 `36c4a1d`、独立レビュー Codex astra の P2 5 件への対応。状態行は維持。
+
+| 指摘 | 修正 | 回帰・変異 |
+|---|---|---|
+| 1 物理引数の漏れ | 既存 paging/CR3/DMA API の物理入力位置を `PHYSICAL_ARGS` へ明記。表にない paging API だけ仮引数名の推測を使用 | 実際の `kernel/paging.h` の宣言をincludeし、第4引数 `(u32)p` を拒否。名前省略の宣言も拒否。位置表の該当エントリを空にする変異がruntime RED |
+| 2 部分式による免除 | 括弧・暗黙変換を剥いだ最外式がP2V系の呼出し/展開の場合だけ免除。V2Pを逆方向の免除に使わない。別名macroで範囲が潰れる場合はclangのspelling位置でP2V定義由来を確認 | レビューの `(char *)(phys + V2P(p))`、P2V/P2V_IO部分式の算術、別名内の算術を拒否。最外P2Vと定数別名は対照GREEN。部分式まで免除する変異がruntime RED |
+| 3 GCCとの分岐差 | 実クロスGCC 13.2.0の `-dM -E -x c -` を実旗で取得。include/利用者の-D/-Uは抽出時だけ外し、GCC定義の後に元の順序で適用。clangの `-undef` とclang専用feature照会macroの-Uでclang定義を除去 | `#if __GNUC__ >= 5` 内のrestrictを拒否、`__clang__`/`__llvm__`/`__has_feature` 分岐が消えることを確認。GCC定義取り込みを外す変異がruntime RED。クロス不在・限定モード未指定は明示エラー |
+| 4 LEと整列の混同 | 対象9ファイルの多バイト整数pointerへのpointer castをLE直アクセスとして独立判定。整列増加は別規則、手動align監査は整列規則のみ。整数NULLの型付けは媒体アクセスに数えない | `u32 *disk` の `*(u32 *)&disk[1]` は整列候補0でもLE違反。typedef、macro、分割castも拒否。LE独立判定を無効にする変異がruntime RED |
+| 5 宣言以外の禁止型 | 全cursorのcanonical typeを検査。libclangが落とすcastのrestrict/sizeof型は解析済みASTの宣言表示をclang lexerで補足。sizeofの非定数評価でVLA型も検出 | 通常/macroの `(int *restrict)p`、sizeofのrestrict/atomic/VLA、restrictの複合リテラルを解析成功後に拒否。表示による補足を無効にする変異がruntime RED |
+
+`test_clang_ast.py --mutate` は17試験、9/9 runtime RED、解析・コンパイル失敗0。
+追加5変異も写しの木の検査器を変え、Python構文確認後のAssertionErrorを要求する。
+atomic複合リテラルという初期fixtureはclangで無効だったため、解析失敗をREDに
+数えず、合法なrestrict pointerの複合リテラルへ変更した。
+
+クロス無しCIは `OS32_CLANG_CROSS_FREE=1` をcheck.ymlに明記し、各検査のstderrへ
+「LIMITED」「GCC predefined macros/branches are NOT verified」を出す。
+このモードはclang既定とsystem newlibによる選択分岐の静的検査に限定し、
+GCC分岐同等性を合格としない。GCC条件分岐試験はそのモードで明示SKIP。
+build.ymlのクロスあり経路は実GCC定義で検査する。
+
+clang固有分岐を持つヘッダはクロスnewlibの `sys/features.h`、`sys/cdefs.h`、
+`ssp/string.h`。リポジトリ内の自作ヘッダには該当なし。
+vendorの `lib/sqlite3/sqlite3.c` は `__clang__`/`__has_feature`/`__has_extension` 分岐を持つ。
+これらもクロスありではGCC側を選ぶ。定義の一致はGCCとclangの構文・builtin意味論の
+完全同等性を保証しない。非選択#if・未使用header、対象9ファイル外のLE形式は検査範囲外。
+補足表示で見つけた型機能の診断行は包含宣言の開始行。
+
+検証時の補助環境は前回と同じ: `NP21W_DIR` はworktree内の
+`build/clang-local-images`、`PYTHONPATH=/tmp/clang-test-env` はELF32ホスト試験を
+qemu-i386経由にするsitecustomize (製品/試験期待値は変更しない)。
+最初の `make all` はrc=0だったが、既存FDレシピの `/tmp/np21w` へのcopyが
+失敗の警告を出した。worktree内出力先を指定した再実行もrc=0。
+初回check-changedではP2V別名4件の誤検出と、共通試験にLE検査器を追加したことによる
+check-map入力漏れを検出。上記spelling位置の補正とmap追記で修正した。
+NP21/W・NHD・配備・ini・ゲスト/実機試験・GitHub Actions実行は対象外。
+コミット・pushは行わない。確認レビューはPMから前回レビュアーへ渡す。
+
+追加の互換性対応: clang専用feature macroを-Uした際、clang resourceのstddef.hが
+`__has_feature` を無条件に呼び、解析失敗することを全検査で検出した。
+クロスありではGCCの `-print-file-name=include` の標準ヘッダを先に使う。
+GCCのi386 stddef.hはmax_align_tに__float128を含むため、解析targetを
+`i386-unknown-linux-gnu` にする (generic none-elfはclangで__float128を拒否する)。
+`-undef` + GCC定義でLinux/clang条件分岐を排除し、`-nostdinc` と明示includeで
+ホストlibcを排除する。製品のGCC target/旗/ABIは変えない。
+stddef.h/stdatomic.hが解析でき、size_tが4バイトである回帰も追加。
+この途中のcheck-changedの解析失敗もREDの数には含めない。
+クロス無しを再現したLE/arch検査は両方rc=0、限定範囲の通知を確認
+(`/tmp/clang-review-cross-free.log`)。
+
+LLVM 18の同版binding/libLLVM/resourceでの共通回帰も17試験rc=0。
+初回の補助起動はmutparのimport path/libLLVMの探索が不足して失敗し、
+環境を揃えて再実行した。LLVM 18ではcursorのspelling位置も別名呼出しへ潰れるため、
+先頭tokenの物理位置も使う補正を追加 (算術別名の拒否は維持)。
+sizeof(pointer-to-VLA)/_Alignof(VLA)は式自体が定数になるので、
+型オペランドの非定数な配列寸法もclangの評価で検出する。
+macroのtoken貼り合わせで生成したrestrictもAST表示後のlexerで拒否する。
+
+旧P2V試験の明示的pointer→integer→pointer往復は、今回の「括弧・暗黙変換だけ剥ぐ」
+要件では変換済みの最外式にならないため、GREENからphysical-castの拒否期待へ移した。
+実木の製品コード・65例外は変更しない。
+
+Clang 21の追加照会macro `__has_embed`/`__has_constexpr_builtin` もGCC 13に無いことを
+両コンパイラで確認して除去し、GCC分岐回帰に加えた。
+`-dM` に載らない特殊照会builtinの全応答まで一致させる方式ではない
+(例えばGNU Cでの `__has_cpp_attribute` の有無に差がある)。この限界は
+定義済みmacroの一致と区別する。実木にこの照会による分岐は無い。
+
+最終検査の途中でコーダーが追加編集したため、検査自体の全PASSの後に
+check_tree_unchangedが4ファイルの変化を検出し、check-changedはrc=2になった。
+試験による実木改変ではなく、実行中の追加修正/票追記が原因。
+差分を戻さず、最終版を凍結してcheck-changedを再実行する。
+
+
+凍結した最終版での完了結果 (makeは全てstdin=/dev/null):
+
+| コマンド | rc / 結果 |
+|---|---|
+| `CROSS_DIR=/home/hight/opt/cross make all < /dev/null` | 0、`/tmp/clang-review-all-final.log` |
+| `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null` | 0、fullの108ターゲット、実木変更ガードも成功、`/tmp/clang-review-check-changed-frozen.log` |
+| `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 python3 tools/tests/test_clang_ast.py --mutate` | 0、17試験・9/9 runtime RED・コンパイル失敗0、`/tmp/clang-review-common-final.log`。同内容を凍結したcheck-changed内でも確認 |
+| `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 python3 tools/tests/test_p2v.py --mutate` | 0、11試験・10/10 runtime RED・コンパイル失敗0、`/tmp/clang-review-p2v-tests.log`。凍結したcheck-changed内でも確認 |
+| 同版LLVM 18のbinding/libLLVM/resourceで共通回帰 | 0、17試験、`/tmp/clang-review-llvm18-complete.log` |
+
+上記makeの補助環境は `NP21W_DIR=/home/hight/os32-v3-wt-clang/build/clang-local-images`、
+check-changedはさらに `PYTHONPATH=/tmp/clang-test-env` (上記qemu補助) を指定。
+P2Vは実木の違反0・例外65を維持。LE対象9ファイルで違反0、arch asm違反0・解析失敗0。
+C dialectは346コンパイル行 (gnu11=340、gnu89=6)、内部333TU、違反0。
+既存C dialect変異27/27 RED・対照5/5 GREEN。既存ホスト試験は4件+5件SKIP、
+今回の共通/P2V回帰はSKIP 0。手動alignの候補数は今回再集計していない。
+最終版を凍結した再実行ではソース/票を編集せず、実木変更ガードもrc=0。
+結果の追記はそのコマンド終了後に行った。

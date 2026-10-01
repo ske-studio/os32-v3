@@ -39,6 +39,61 @@ def type_features(typ, seen=None):
     return result
 
 
+def runtime_sizeof(c):
+    # In valid C sizeof(type) is nonconstant only for a variably sized type.
+    if c.kind != K.CXX_UNARY_EXPR:
+        return False
+    evaluate = cx.conf.lib.clang_Cursor_Evaluate
+    evaluate.argtypes, evaluate.restype = [cx.Cursor], ctypes.c_void_p
+    def nonconstant(cursor):
+        result = evaluate(cursor)
+        if not result:
+            return True
+        dispose = cx.conf.lib.clang_EvalResult_dispose
+        dispose.argtypes = [ctypes.c_void_p]
+        dispose(result)
+        return False
+    if nonconstant(c):
+        return True
+    # sizeof(pointer-to-VLA) and _Alignof(VLA) are themselves constant.
+    # Type operands expose their array dimensions as direct expression children;
+    # ordinary sizeof(expr) instead has a PAREN_EXPR child.
+    return any(x.kind.is_expression() and x.kind != K.PAREN_EXPR and nonconstant(x)
+               for x in c.get_children())
+
+
+def printed_type_features(c):
+    """libclang erases cast qualifiers and sizeof(type) operand types.
+
+    Print the enclosing declaration from the parsed AST (macros expanded),
+    then use clang's lexer for keywords. The extra buffer is lexer-only.
+    """
+    from .asm import api, string
+    _, _, get_policy, pretty, dispose = api()
+    policy = get_policy(c)
+    try:
+        text = string(pretty(c, policy))
+    finally:
+        dispose(policy)
+    if not text:
+        from . import ParseError
+        raise ParseError('clang could not print type-expression declaration')
+    name = '/tmp/os32-type-lexer.c'
+    buffer = cx.Index.create().parse(name, args=['-std=gnu11'], unsaved_files=[(name,text)])
+    file = buffer.get_file(name)
+    extent = cx.SourceRange.from_locations(cx.SourceLocation.from_offset(buffer,file,0),
+        cx.SourceLocation.from_offset(buffer,file,len(text.encode())))
+    result = set()
+    for token in buffer.get_tokens(extent=extent):
+        if token.kind != cx.TokenKind.KEYWORD:
+            continue
+        if token.spelling in ('restrict', '__restrict', '__restrict__'):
+            result.add('restrict')
+        elif token.spelling == '_Atomic':
+            result.add('_Atomic')
+    return result
+
+
 def findings(tu, root, words, headers, public=False):
     hits = set()
     nodes = list(walk(tu.cursor))
@@ -58,10 +113,15 @@ def findings(tu, root, words, headers, public=False):
         rel = relpath(c,root)
         if not rel:
             continue
-        features = (type_features(c.type) if c.kind in
-                    (K.VAR_DECL,K.FIELD_DECL,K.PARM_DECL,K.TYPEDEF_DECL) else set())
+        features = type_features(c.type)
+        if runtime_sizeof(c):
+            features.add('VLA')
         if c.kind == K.FUNCTION_DECL:
             features |= type_features(c.type.get_result())
+        if c.kind in (K.FUNCTION_DECL, K.VAR_DECL) and any(
+                x.kind in (K.CSTYLE_CAST_EXPR, K.CXX_UNARY_EXPR, K.COMPOUND_LITERAL_EXPR)
+                for x,_ in walk(c)):
+            features |= printed_type_features(c)
         if c.kind == K.VAR_DECL and c.tls_kind.value:
             # Use tokens only to distinguish the two spellings in diagnostics.
             features.add('__thread' if any(t.spelling == '__thread' for t in c.get_tokens())

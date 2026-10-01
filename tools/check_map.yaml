@@ -597,6 +597,7 @@ checks:
     - userland/**
     - tools/check_privileged.py
   check-arch-asm:
+    - tools/check_le_access.py
     - tools/check_p2v.py
     - tools/check_p2v_allow.txt
     - tools/tests/mutpar.py

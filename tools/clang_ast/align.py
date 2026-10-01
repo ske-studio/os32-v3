@@ -1,4 +1,4 @@
-"""Manual alignment audit, with the same flags and AST predicate as the LE gate."""
+"""Manual alignment audit, independent of the LE multibyte direct-access rule."""
 import argparse
 from . import ROOT, units, parse, walk, relpath, alignment_cast
 

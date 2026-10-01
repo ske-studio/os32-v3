@@ -95,7 +95,6 @@ static const struct sample s = {
 void probe(void) {
     u32 *p = (u32 *)P2V(pa);
     volatile u8 *v = (volatile u8 *)P2V_IO(pa);
-    volatile u8 *w = (volatile unsigned char *)(uptr)(P2V_IO(MEM_BOOTINFO_BASE));
     const struct sample *sample = (const struct sample *)((P2V(pa)));
     paging_load_cr3((u32)(V2P(p)));
     paging_load_cr3((u32)(pa));
@@ -103,6 +102,11 @@ void probe(void) {
 }
 '''
         self.assertEqual(checker.scan(source), [])
+        # An explicit pointer -> integer -> pointer round trip is not an
+        # outer P2V expression under the tightened review rule.
+        self.assertIn('physical-cast', [h[2] for h in checker.scan(
+            'void probe(void) { volatile u8 *w = '
+            '(volatile unsigned char *)(uptr)(P2V_IO(MEM_BOOTINFO_BASE)); }')])
 
     def test_inverse_and_nested_user_expression(self):
         self.assertIn('physical-sink', [h[2] for h in checker.scan(

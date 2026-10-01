@@ -15,6 +15,7 @@ import clang_ast as a
 from clang_ast.dialect import findings as dialect
 import check_arch_asm as arch
 import check_p2v as p2v
+import check_le_access as le
 from clang_ast.asm import templates
 from mutpar import mutant_tree, run_ordered
 
@@ -30,9 +31,83 @@ class ClangTest(unittest.TestCase):
             (inc/'stdio.h').write_text('#define OS32_NEWLIB_SENTINEL 123\n')
             with mock.patch.object(a,'SYSTEM_NEWLIB',inc), \
                     mock.patch.object(a.shutil,'which',return_value=None), \
-                    mock.patch.dict(os.environ,{'CROSS_DIR':str(inc/'missing-cross')}):
+                    mock.patch.dict(os.environ,{'CROSS_DIR':str(inc/'missing-cross'), 'OS32_CLANG_CROSS_FREE':'1'}):
                 self.tu('#include <stdio.h>\n'
                         '_Static_assert(OS32_NEWLIB_SENTINEL == 123,"newlib");')
+
+    def test_review_physical_api_position(self):
+        # Use the real header, including the pstart spelling from the review.
+        tu = self.tu('#include "kernel/paging.h"\n'
+            'void probe(struct addrspace *as, void *p) { '
+            'paging_addrspace_map_user_range_phys(as, 0, 0, (u32)p, 0); }',
+            ['-I.','-Iinclude'])
+        self.assertIn('physical-sink',[r for _,_,_,r in p2v.findings(tu)[0]])
+        body = ('typedef unsigned int u32; struct addrspace; '
+            'int paging_addrspace_map_user_range_phys(struct addrspace *,u32,u32,u32,u32);'
+            'void f(struct addrspace *as,void *p) {'
+            'paging_addrspace_map_user_range_phys(as,0,0,(u32)p,0); }')
+        self.assertIn('physical-sink',[r for _,_,r in p2v.scan(body)])
+
+    def test_review_conversion_scope(self):
+        prefix = ('typedef unsigned int u32; u32 V2P(void *); '
+                  'void *P2V(u32); void *P2V_IO(u32); ')
+        for expr in ('phys + V2P(p)', 'phys + (u32)P2V(phys)',
+                     'phys + (u32)P2V_IO(phys)'):
+            self.assertIn('physical-cast',[r for _,_,r in p2v.scan(prefix +
+                'void f(u32 phys,void *p) { char *q = (char *)('+expr+'); (void)q; }')])
+        self.assertEqual(p2v.scan(prefix +
+            'void f(u32 phys) { char *q = (char *)((P2V(phys))); (void)q; }'),[])
+        macro = ('#define P2V_CONST(x) ((void *)(unsigned int)(x))\n'
+                 '#define GOOD ((char *)P2V_CONST(0x100000))\n'
+                 '#define BAD ((char *)(0x100000 + (unsigned int)P2V_CONST(0x100000)))\n')
+        self.assertEqual(p2v.scan(macro + 'char *q = GOOD;'),[])
+        self.assertIn('physical-cast',[r for _,_,r in p2v.scan(macro + 'char *q = BAD;')])
+
+    def test_review_gcc_branches(self):
+        # CI's explicit limited mode cannot make this equivalence claim.
+        if os.environ.get('OS32_CLANG_CROSS_FREE') == '1':
+            self.skipTest('limited cross-free CI: GCC branch equivalence unverified')
+        tu = self.tu('#if __GNUC__ >= 5\nint *restrict p;\n#endif\n'
+                     '#if defined(__clang__) || defined(__llvm__) || defined(__has_feature) || '
+                     'defined(__has_embed) || defined(__has_constexpr_builtin)\n'
+                     '#error clang branch must be disabled\n#endif')
+        self.assertIn('restrict',[w for _,_,w in dialect(tu,ROOT,{'restrict'},set())])
+        self.tu('#include <stddef.h>\n#include <stdatomic.h>\n'
+                '_Static_assert(sizeof(size_t) == 4, "i386");')
+        # Missing compiler fails closed unless the caller explicitly opts in.
+        with mock.patch.object(a.shutil,'which',return_value=None), \
+                mock.patch.dict(os.environ,{'CROSS_DIR':'/missing-cross',
+                                           'OS32_CLANG_CROSS_FREE':'0'}):
+            with self.assertRaises(a.ParseError):
+                self.tu('int x;')
+
+    def test_review_aligned_le_access(self):
+        tu = self.tu('typedef unsigned int u32; '
+                     'u32 f(u32 *disk) { return *(u32 *)&disk[1]; }')
+        casts = [c for c,_ in a.walk(tu.cursor) if c.kind == a.K.CSTYLE_CAST_EXPR]
+        self.assertFalse(any(a.alignment_cast(c) for c in casts))
+        self.assertTrue(any(le.direct_access(c) for c in casts))
+        for body in ('typedef unsigned int U; U f(U *disk) { U *p=(U *)&disk[1]; return *p; }',
+                     '#define RD(p) (*(unsigned int *)(p))\n'
+                     'unsigned int f(unsigned int *disk) { return RD(&disk[1]); }'):
+            self.assertTrue(any(le.direct_access(c) for c,_ in a.walk(self.tu(body).cursor)))
+
+    def test_review_expression_types(self):
+        for body,rule in [
+            ('int *f(void *p) { return (int *restrict)p; }','restrict'),
+            ('#define R restrict\nint *f(void *p) { return (int *R)p; }','restrict'),
+            ('#define JOIN(a,b) a ## b\n'
+             'int *f(void *p) { return (int *JOIN(re,strict))p; }','restrict'),
+            ('int f(void) { return sizeof(int *restrict); }','restrict'),
+            ('int f(int n) { return sizeof(int[n]); }','VLA'),
+            ('int f(int n) { return sizeof(int (*)[n]); }','VLA'),
+            ('int f(int n) { return _Alignof(int[n]); }','VLA'),
+            ('#define ARR(n) int[n]\nint f(int n) { return sizeof(ARR(n)); }','VLA'),
+            ('#define A _Atomic(int)\nint f(void) { return sizeof(A); }','_Atomic'),
+            ('int *f(void) { return (int *restrict){0}; }','restrict')]:
+            self.assertIn(rule,[w for _,_,w in dialect(self.tu(body),ROOT,{rule},set())])
+        self.assertEqual(dialect(self.tu('int f(void) { return sizeof(int *); }'),
+                                 ROOT,{'restrict','_Atomic'},set()),[])
 
     def test_dialect_past_limits(self):
         for flags in ([],['-P'],['-dM'],['-C'],['-CC']):
@@ -163,8 +238,15 @@ def main():
     if args.mutate:
         cases = [('tools/clang_ast/__init__.py','return a > 0 and b > a','return False'),
                  ('tools/check_arch_asm.py',"hits.add((rel,c.location.line,match[1]))",'pass'),
-                 ('tools/clang_ast/dialect.py',"result.add('_Atomic')",'pass'),
-                 ('tools/check_p2v.py',"add('physical-cast')",'pass')]
+                 ('tools/clang_ast/dialect.py',"if typ.kind == T.ATOMIC:\n        result.add('_Atomic')",'if typ.kind == T.ATOMIC:\n        pass'),
+                 ('tools/check_p2v.py',"add('physical-cast')",'pass'),
+                 ('tools/check_p2v.py',"'paging_addrspace_map_user_range_phys': {3}",
+                  "'paging_addrspace_map_user_range_phys': set()"),
+                 ('tools/check_p2v.py',"if ast.pointer(c.type) and ast.integer(operand.type) and not converted(c):",
+                  "if ast.pointer(c.type) and ast.integer(operand.type) and not converted(c) and not any(x.spelling in CONVERSIONS for x in expression_nodes(operand)):"),
+                 ('tools/clang_ast/__init__.py',"out += gcc_predefines(cross, tuple(argv), str(root))",'pass'),
+                 ('tools/check_le_access.py',"ast.integer(pointee) and pointee.get_size() > 1",'False'),
+                 ('tools/clang_ast/dialect.py',"features |= printed_type_features(c)",'pass')]
         for result in run_ordered(mutant,cases):
             print(result)
         print(f'Clang rules: {len(cases)}/{len(cases)} runtime RED; compile failures: 0')

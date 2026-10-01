@@ -27,6 +27,9 @@ jobs:
   static-check:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      # Limited AST coverage: no GCC predefined-macro/branch equivalence.
+      OS32_CLANG_CROSS_FREE: "1"
     steps:
       - uses: actions/checkout@v4
 

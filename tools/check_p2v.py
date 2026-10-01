@@ -16,6 +16,14 @@ OTHER_PHYS = {'addr','addr0','addr1','ebp','aligned','base','page','load_base','
               'new_esp','u_esp','user_esp','ring3_tramp_page','guest','ivt18','dst','src'}
 HOST = re.compile(r'^g_(?:invoke|stack|iostatus|databuf|sop|fsctx|fobj|namebuf|secctx)$')
 CONVERSIONS = {'P2V','P2V_IO','P2V_BOOT','P2V_CONST','P2V_IO_CONST','V2P'}
+# Zero-based physical input positions from the existing API declarations.
+PHYSICAL_ARGS = {
+    'paging_verify_identity': {0}, 'paging_set_page': {1},
+    'paging_map_range': {2}, 'paging_map_phys': {1},
+    'paging_load_cr3': {0}, 'paging_addrspace_map_user': {2},
+    'paging_addrspace_map_user_range_phys': {3},
+    'dma_chan_setup': {1}, 'dma_setup': {0}, 'arch_mmu_load_root': {0},
+}
 K = ast.K
 
 
@@ -51,9 +59,36 @@ def findings(tu, root=ROOT):
             return False
         seen.add(name)
         return any(macro_converted(n,seen) for n in definitions.get(name,()) if n != name)
+    conversion_definitions = [c for c,_ in nodes if c.kind == K.MACRO_DEFINITION
+                              and c.spelling in CONVERSIONS - {'V2P'}]
     def converted(c):
-        return any(macro_converted(m.spelling) for m in inside(c)) or any(
-            x.kind == K.CALL_EXPR and x.spelling in CONVERSIONS for x in expression_nodes(c))
+        # Only the outer expression can justify integer -> pointer conversion.
+        while c.kind in (K.PAREN_EXPR, K.UNEXPOSED_EXPR):
+            children = list(c.get_children())
+            if len(children) != 1:
+                break
+            c = children[0]
+        pointer_conversions = CONVERSIONS - {'V2P'}
+        if c.kind == K.CALL_EXPR:
+            return c.spelling in pointer_conversions
+        # Nested alias expansions collapse their source extent to the alias.
+        # Their spelling position still identifies the actual outer P2V cast.
+        locations = [c.extent.start]
+        # LLVM 18 collapses cursor spelling positions too; its first token
+        # retains the outer cast's physical definition location.
+        first = next(iter(c.get_tokens()), None)
+        if first is not None:
+            locations.append(first.location)
+        for location in locations:
+            file, offset = ast.spelling_position(location)
+            if any(str(d.location.file) == file and
+                   d.extent.start.offset <= offset < d.extent.end.offset
+                   for d in conversion_definitions):
+                return True
+        # An expansion must cover the whole expression, not just a summand.
+        return any(m.spelling in pointer_conversions and
+                   m.extent.start.offset == c.extent.start.offset and
+                   m.extent.end.offset >= c.extent.end.offset for m in inside(c))
     def raw_pointer(c):
         for x in expression_nodes(c):
             if not ast.pointer(x.type):
@@ -103,9 +138,7 @@ def findings(tu, root=ROOT):
         if c.kind == K.CALL_EXPR and (c.spelling.startswith('paging_') or
                 c.spelling in ('dma_chan_setup','dma_setup','arch_mmu_load_root')):
             params = list(c.referenced.get_arguments()) if c.referenced else []
-            explicit = {'paging_load_cr3': {0}, 'dma_chan_setup': {1},
-                        'dma_setup': {0}, 'arch_mmu_load_root': {0}}
-            physical = explicit.get(c.spelling, {i for i,p in enumerate(params)
+            physical = PHYSICAL_ARGS.get(c.spelling, {i for i,p in enumerate(params)
                 if 'phys' in p.spelling or p.spelling in ('pa','paddr','pfn')})
             for i,arg in enumerate(c.get_arguments()):
                 if i not in physical:
