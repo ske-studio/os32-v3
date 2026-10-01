@@ -1,6 +1,6 @@
 # TASK_CLANG_CHECKS — C ソースの静的検査を clang の構文木で作り直す
 
-> 状態: **実装中 (2026-10-01)** — ユーザー指示 (2026-10-01「現在の検査器をバックアップして作り直し」)。clang 21.1.8 と python3-clang (libclang) はホストに導入済み (ユーザーが `apt install clang libclang-dev python3-clang`)。コーダー Codex `gpt-6.1-sol`、レビュー Codex `gpt-6-astra`。
+> 状態: **受入完了 (2026-10-01)** — ユーザー指示 (2026-10-01「現在の検査器をバックアップして作り直し」)。clang 21.1.8 と python3-clang (libclang) はホストに導入済み (ユーザーが `apt install clang libclang-dev python3-clang`)。コーダー Codex `gpt-6.1-sol`、レビュー Codex `gpt-6-astra`。
 >
 > 発行: PM (Claude Code `claude-opus-5-5`、2026-10-01)。関係: [TASK_C11_MIGRATION.md](TASK_C11_MIGRATION.md) (`check-c-dialect`、Codex 3 往復)、[TASK_T1_LEDGER.md](TASK_T1_LEDGER.md) §4-6 (`check-p2v`、Codex 3 往復)、[POLICY_DEV.md](../../POLICY_DEV.md)。
 
@@ -433,3 +433,62 @@ C dialectは333TU、27/27 RED・対照5/5 GREEN。既存ホスト試験の4件+5
 クロスが存在する状態で `OS32_CLANG_CROSS_FREE=1` としてもFULL/GCC定義/クロスnewlib
 になること、別prefix `/tmp/os32-ci-runner/opt/cross` とCI同様のPATH先頭指定でも
 GCC/newlibを認識することもrc=0で確認した。GitHub上のCI再実行は未実施。
+
+
+### 6-9. 着地とレビュー (Opus) の残り対応 (2026-10-01、Codex gpt-6.1-sol → gpt-6-astra)
+
+着地は `8612b06`。CI の check / build は成功、独立レビュー Opus 5.5 は Approve。
+`tools/legacy_checks/` の撤去はユーザー判断待ち。
+
+**例外数の補正**: §6 の取り込み前の記録 (323、358、421行付近を含む「例外65」)
+は当時の数。着地後の現在の例外は **63件**。今回、例外一覧には追加・変更していない。
+
+ヘッダで定義した生キャストの後退を修正した。INTEGER_LITERAL の値は
+`clang_Cursor_Evaluate` で読み、異なるファイルのtoken範囲が空でも判定する。
+分類は従来の非ゼロの16進リテラルまたは物理名を維持し、16進の綴りはliteralのtokenと
+展開macroの定義から得る。macro展開は使用位置に加えて綴り側のファイルでも収集し、
+詳細前処理記録に独立の展開cursorが出ない入れ子はmacro定義を循環防止付きで辿る。
+別ファイルのヘッダに `P2V_CONST` 経由のGOOD、生の `0x400` キャストのBADを置く
+回帰を追加。数値literalに依存しない物理名のBADも含める。
+評価の結線とmacro名の収集をそれぞれ外す変異は、Python構文確認後のAssertionErrorを
+要求し、解析ERRORをruntime REDに数えない。clang21 / 手元clang18の両方でruntime REDを確認した。
+
+P3-1は、既存 `test_p2v_cross_header_alias` で第1位置のspelling情報だけを
+呼出し位置へ縮退させるmockを追加。単一tokenから得た第2位置を使わなければ
+GOODが拒否されることを版によらず固定し、`locations.append(first)` を外す
+変異を共通の全モード必須の変異表に追加した。
+
+初期の値非ゼロだけの分類では実木に偽陽性5件が出た: leaseの配列添字2件、
+HostDrvの `(void *)1` センチネル1件、SQLiteの `SQLITE_TRANSIENT` 2件。
+物理番地ではないことをコードで確認し、上記の従来分類を維持する修正で除く。
+配列添字・decimalセンチネル・ゼロliteralのGREEN回帰も追加した。
+初期の単一token案はclang18でliteral位置も縮退してBADを見逃したため、評価方式に変更。
+途中の回帰失敗・実木の偽陽性を合格や変異REDには数えない。
+
+最終確認は引き継いだ未コミット差分を維持して gpt-6-astra が実行した。
+全コマンドの `TMPDIR` は `/home/hight/os32-tmp/clang-p3-astra/tmp`。
+`make all` のFDコピー先は `NP21W_DIR=/home/hight/os32-tmp/clang-p3-astra/images`
+に隔離し、`check-changed` のELF32ホスト試験には既存
+`PYTHONPATH=/tmp/clang-test-env` のqemu-i386補助を使用した。
+
+| 実行コマンド | rc / 結果 |
+|---|---|
+| `CROSS_DIR=/home/hight/opt/cross make all < /dev/null` | 0 |
+| `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null` | 0。P2V 14試験GREEN・12/12 runtime RED、共通clang変異14/14 runtime RED (skip 0)、C言語モード27/27 RED・対照5/5 GREEN |
+| `PATH=/usr/bin:/bin CROSS_DIR=/tmp/os32-missing-cross OS32_CLANG_CROSS_FREE=1 make check-p2v < /dev/null` | 0。違反0・例外63、14試験GREEN・12/12 runtime RED |
+| 同じ限定環境 + `OS32_MUT_JOBS=4 python3 tools/tests/test_p2v.py --mutate` | 0。14試験GREEN・12/12 runtime RED |
+| clang18完全環境 + `OS32_MUT_JOBS=4 python3 tools/tests/test_p2v.py --mutate` | 0。14試験GREEN・12/12 runtime RED |
+| clang18完全環境で `test_p2v_cross_header_alias` と `locations.append(first)` 除去変異 | 0。対照GREEN、変異runtime RED |
+
+clang21は21.1.8、clang18は18.1.8。clang18環境は§6-8と同じ展開済みのもの:
+`PATH=/tmp/os32-clang18/root/usr/lib/llvm-18/bin:/usr/bin:/bin`、
+`PYTHONPATH=/tmp/os32-clang18/python:/tmp/os32-clang18/root/usr/lib/python3/dist-packages`、
+`LD_LIBRARY_PATH=/tmp/os32-clang18/root/usr/lib/x86_64-linux-gnu:/tmp/os32-clang18/root/usr/lib/llvm-18/lib`、
+`CROSS_DIR=/home/hight/opt/cross`。
+
+実木は完全・限定とも **違反0・例外63**。新規の実違反はなく、例外一覧の変更もない。
+既存ホスト試験のskipは4件+5件 (今回のclang/P2V試験のskipではない)。
+限定make開始時に共有TMPDIRのjobserver FIFO既存警告が1件出たが、検査は完走してrc=0。
+ログは `/home/hight/os32-tmp/clang-p3-astra/` の `all.log`、`check-changed.log`、
+`limited-check.log`、`limited-mutate.log`、`clang18-mutate.log`、`clang18-wiring.log`。
+ゲスト試験は指示により未実施。NP21/W・NHD・配備・iniには触れず、commit / pushしていない。
