@@ -60,7 +60,9 @@ T3 で Unicode 組表を kernel `.rodata` と二分探索へ移す。既存 `lib
 
 T2 の暫定 Unicode RO lease は全同梱 caller が KAPI へ移行してから撤去する。apps/game は現行ビルド対象外のため変更要件を引き渡し、再ビルド再開時の受入ゲートとする。`unicode.bin` 読込・ready/4点照合・暫定RO leaseは同一差分で撤去し、leaseだけ残して未初期化領域を読ませない。
 
-`kcg.c` のLZ4 scratchはT7aまで旧低位FIXED領域に保持し、専用定数 `MEM_KCG_LZ4_TEMP_BASE/END` (従来の0x4A000〜MEM_CONV_END、344KiB) でUnicodeから名前を分離する。poolの追加確保・常駐予算追加はしない。ただしこの範囲はplanar BBとmailboxを重ねるため、**旧kcg_load_fontの実行はboot時のBB公開/host操作/V86開始より前に限定**する。bootフェーズを閉じた後の旧KAPI呼出しはNOSYSで副作用なし (D7の意味変更)。実行中の再ロードを温存してGUIやmailboxを上書きしない。scratchが有効なboot期間は通常AS/USER leaseがゼロ。boot期間終了でscratchを失効させ、重なるplanar BBは全消去・初期化してからT2のSURFACE/leaseとして公開する。公開後の低位BB leaseはscratchの漏出とは数えず、kcgからの上書きを禁止する。mailboxもhost操作開始前に初期化する。T7aまではV86の現行636KiB backingによる扱いを維持し、低位を直接渡さない。T7aで旧scratch/BB用途を撤去してV86へ専有を移す。低位の占有を解いて V86 へ専有を引き渡すのは T7a (一般池へは返さない)。旧 `kcg_load_font` の意味変更と同じ差分で `userland/tests/font_load_test.c` を **期待NOSYSのPASS試験 (BB/mailbox不変はhost読取またはkselftestで別に照合し、未貸与mailboxをCPL=3試験が直読しない)** へ変更し、`tools/tests/guest_tests.txt` と `tools/tests/test_result_conv_host.c` の成功経路期待も更新する。SKIPで回帰を隠さない。`sdk/kapi.json` の説明はboot専用内部読込/公開口NOSYSを明記し、T3のUnicode追加と一組でKAPI版を上げる (追加とは別に二重加算しない)。生成・clean再ビルドは [KAPI_SPEC §3-1](../../KAPI_SPEC.md) と [ABI1]〜[ABI3]。
+boot後の旧 `kcg_load_font` NOSYS化・bootフェーズ制限・font_load_test/台本/host期待値/公開説明の変更は [T2e8b](TASK_T2D_T2H.md) §2-3へ前倒しする (実装は未着手)。公開Unicode/BBの実行中上書きをT2eの受入前に防ぐためで、D7は変更しない。T3はこの契約の継承確認と次のscratch定数整理を行う。
+
+`kcg.c` のLZ4 scratchはT7aまで旧低位FIXED領域に保持し、専用定数 `MEM_KCG_LZ4_TEMP_BASE/END` (従来の0x4A000〜MEM_CONV_END、344KiB) でUnicodeから名前を分離する。poolの追加確保・常駐予算追加はしない。ただしこの範囲はplanar BBとmailboxを重ねるため、**旧kcg_load_fontの実行はboot時のBB公開/host操作/V86開始より前に限定**する。bootフェーズを閉じた後の旧KAPI呼出しはNOSYSで副作用なし (D7の意味変更)。実行中の再ロードを温存してGUIやmailboxを上書きしない。scratchが有効なboot期間は通常AS/USER leaseがゼロ。boot期間終了でscratchを失効させ、重なるplanar BBは全消去・初期化してからT2のSURFACE/leaseとして公開する。公開後の低位BB leaseはscratchの漏出とは数えず、kcgからの上書きを禁止する。mailboxもhost操作開始前に初期化する。T7aまではV86の現行636KiB backingによる扱いを維持し、低位を直接渡さない。T7aで旧scratch/BB用途を撤去してV86へ専有を移す。低位の占有を解いて V86 へ専有を引き渡すのは T7a (一般池へは返さない)。T2e8bの意味変更と同じ差分で `userland/tests/font_load_test.c` を **期待NOSYSのPASS試験 (BB/mailbox不変はhost読取またはkselftestで別に照合し、未貸与mailboxをCPL=3試験が直読しない)** へ変更し、`tools/tests/guest_tests.txt` と `tools/tests/test_result_conv_host.c` の成功経路期待も更新する。SKIPで回帰を隠さない。`sdk/kapi.json` の説明はboot専用内部読込/公開口NOSYSを明記し、説明/NOSYS化のKAPI版更新はT2eの一式で行い、T3ではUnicode追加分を更新する (同じ意味変更を二重計上しない)。生成・clean再ビルドは [KAPI_SPEC §3-1](../../KAPI_SPEC.md) と [ABI1]〜[ABI3]。
 
 KAPI 追加は [ABI1]〜[ABI3]、番号予約は [KAPI_SPEC §3-2](../../KAPI_SPEC.md) に従い、D35 の世代を勝手に別定義しない。
 
@@ -97,7 +99,7 @@ T3aでは `boot/loader_fat_new.asm` のVK32_LOAD_END写しと `tools/mkvmkernel.
 
 | 指摘 | 最終追記 |
 |---|---|
-| N1 caller/NOSYS | §3にfont_load_test・guest台本・host期待値・kapi.json説明の同時変更、T3のKAPI版更新を明記 |
+| N1 caller/NOSYS | §3にfont_load_test・guest台本・host期待値・kapi.json説明の同時変更を明記。後続レビューでNOSYS化はT2eへ前倒し、T3はUnicode追加分を更新 |
 | N2 backing写像順 | §2-2で全機種ともPG開始時present、FIXED専用入口は既存写像検査へ。旧NP期待をhost試験でも変更 |
 | N3 実装注記 | symbol由来区間のruntime構築、gen_memmap/変異のELF対応、heap_szの下詰めと上限を明記 |
 | 自己点検 scratch寿命 | 低位BBと重なるscratchはboot中のみ有効、失効→BB全初期化→lease公開の順。公開後のBB leaseを禁止しない |
