@@ -185,7 +185,7 @@ extern u32 ledger_region_count;
 /* 観測用の文脈の深さ (§3-5、B1)。全 IRQ スタブ / 全例外スタブの入口で +1、
  * 復帰点で -1 (isr_stub.asm の IRQ_ENTER 等、ss: で書く)。longjmp で抜ける
  * 経路は exec_setjmp の控え (jmpbuf の語 6・7) へ exec_longjmp が戻す。
- * irq_in_irq (broker の IRQ_ERR_CTX 判定) とは別物で、あちらは触らない。 */
+ * broker の IRQ_ERR_CTX 判定も同じ kctx_irq_depth を使う (T2a R1)。 */
 extern volatile u32 kctx_irq_depth, kctx_exc_depth;
 /* R1 の計数 (診断)。last = {op, owner, 呼び出し元 EIP} の最後の 1 件。 */
 extern u32 ledger_irq_ops, ledger_exc_ops;

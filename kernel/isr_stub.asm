@@ -54,8 +54,7 @@ USER_DS     equ 0x2B
 ;; からなら既存の flat SS 0x10 なので、どちらでも同じ flat 番地を指す。
 ;; inc / dec はフラグを変えるので、test と jcc の間には置かない。
 ;;
-;; irq_in_irq (irq.c、broker の IRQ_ERR_CTX 判定) とは別物で、あちらは
-;; 共通スタブ (irq_dispatch) の深さだけのまま (Codex B1)。
+;; T2a R1: broker も kctx_irq_depth を読む。irq_in_irq はその互換名。
 ;; ============================================================
 extern kctx_irq_depth
 extern kctx_exc_depth

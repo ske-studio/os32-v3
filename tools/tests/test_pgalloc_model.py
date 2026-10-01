@@ -44,6 +44,7 @@ static void irq_restore(unsigned int f) { host_verify_commit(); restores++; host
  * (本物は hlt。ホストで実行すると CPL=3 で #GP になる)。 */
 static void _halt(void) NOINST;
 static void _halt(void) { }
+static void _stop(void) { __asm__ volatile("int $0x80" : : "a"(1), "b"(250)); }
 void kprintf(unsigned char a, const char *f, ...) { (void)a; (void)f; }
 '''
             (tmp / 'test.c').write_text(pre + source + '''

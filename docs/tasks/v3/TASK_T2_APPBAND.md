@@ -284,6 +284,38 @@ T2b の新APIは内部のみ、T2c の旧共有USERは既存機能を保つ過�
 
 **heapの切替はT2fで一括**: T2c〜T2eでは実行中の伸長がまだ無いので、初期量を64KB/1ページへ縮めない。T1の起動時予算計算を物理専用の暫定helperとして残し、旧配置のcode/stack/guardを引いた容量から得たsbrk/exec_heapの「byte数」だけを新しい仮想予約へ写す (256MBの仮想余白を半分にして物理を先取りしてはいけない)。高位VAをこの予算helperへ入力しない。T2fでmap・allocatorと最小初期量を同時に有効化し、この暫定helperと旧二段先取りを撤去する。これは旧バイナリ互換層ではなく、各段の起動を維持する実装順序である。
 
+#### T2a-R. R1 の実装結果 (2026-10-01、`wt/t2a`、GPT-6 / Codex)
+
+**実装**: `exec_pending_transfer` は対象 ID / 終了種別 / 当該 AppSlot の復帰点を保持し、ABORT_PENDING / FAULT_PENDING にして longjmp するだけ。`ring3_kill_kind` と従来の `exec_fault_recover` を接続した。IRQ/例外上では FD・PCM・shlib・AS・池・kfree を触らない。通常の syscall 入口の STOP 安全点、正常 sys_exit は共通 `exec_finish` へ直行する。例外の app-kill / 従来の CPL=0 recovery / halt の分類は変更していない。
+
+launch と resume の両 setjmp 着地が `exec_pending_finish` を呼ぶ。深さ 0 を検査し、pending を一度だけ消費して master CR3 / IF=1 に戻してから、明示した ID を回収する。park は回収しない。回収は DB → redirects → FD → pipe → SHM → sound → PCM の利用終了を私有ページ返却より先へ移し、既存の shlib detach → image/heap/stack → PD/PT → owner 回収/retire、その後の親 CR3/owner/heap 復元 → WM 通知を維持する。WM exec_kill も資源利用終了 → AS/owner/slot 回収 → WM 文脈の通知の順に揃え、現在の WM CR3/owner を切り替えない。永続 owner・T1 の BB 保護は変更なし。
+
+broker は `kctx_irq_depth` を直接読み、独自の `irq_in_irq` 加減算/記憶域を撤去した。ソース互換名は同じ深さへのマクロ。全 IRQ/全例外の入口・復帰と全 longjmp の深さ復元は T1 の asm / 8語 jmpbuf をそのまま使う。`ledger_note` は診断 (op/owner/EIP・irq/exc 件数) を残して `ledger_check_tag="R1 context"` とし、会計変更前に `_stop` (cli/hlt) で panic。通常文脈の短い IF=0 は禁止しない。既存 kselftest の通常深さ 0 / AS owner 往復と IRQ broker 故障診断を維持し、panic は host の停止捕捉で試験した (故障ゲスト起動は PM 未実施)。
+
+**大きさ** (同じ `CROSS_DIR=/home/hight/opt/cross` で前後ビルド、`readelf -SW` / `nm` / `gen_memmap --headroom`):
+
+| 観測 | T2a 前 | T2a 後 | 増分 |
+|---|---:|---:|---:|
+| `.text` | 316,942B | 317,678B | +736B |
+| `.data` | 32,755B | 32,771B | +16B |
+| `.data` 開始 | 0x14D620 | 0x14D900 | +736B |
+| `.bss` 開始 | 0x156000 | 0x156000 | 0 |
+| `.bss` サイズ | 254,948B | 254,948B | 0 |
+| `__bss_end` | 0x1943E4 | 0x1943E4 | 0 |
+| ASSERT 0x195000 まで | 3,100B | 3,100B | 0 |
+| `.got.plt` 末尾 → `.bss` | 2,528B | 1,776B | −752B |
+| 圧縮 `vmkernel.lz4` | 471,626B | 472,002B | +376B |
+
+画像外 PT 移設・ASSERT 緩和・帯変更・診断削除なしで現予算内。T2a′ 以降は未着手。
+
+**ホスト検証**: `test_exec_r1.py` は実 exec の移譲・両着地・共通回収関数と実 `setjmp.asm` を ILP32 で実行し、移譲時 cleanup/free=0、対象 ID、IF=1/depth0、親復元、park 非回収、二重消費なし、正常 sys_exit / syscall STOP / 従来 recovery、実 broker の固定 IRQ 深さによる拒否を検査する。資源/CR3/IF は記録用の足場で、PCM 実機や loader 全体を模擬して合格とはしない。T2a 変異 (IRQ 中 teardown / IF 復帰削除 / pending 再消費 / launch・resume の各着地欠落 / broker 旧深さ / WM kill 通知先行) **7/7 コンパイル成功後の実行時 RED**。`test_ledger.py` は panic を IRQ alloc / 例外 free / 入れ子 reclaim の会計変更前に捕捉、**11試験 PASS、7/7 RED、コンパイル失敗0** (既存の入口/復帰欠落2本は asm の静的検査で検出)。新試験を `check-memory-host` / 変更時選択 / TESTS 生成へ結線した。
+
+**実装時の訂正**: §6-1 の基準 `.data` 32,759B / BSS 前余白 2,524B に対し、この worktree の変更前ビルドは 32,755B / 2,528B (4B 差)。`.text` / BSS / ASSERT は一致。設計・上限を変更せず今回の実測を上表に記録する。PCM の既存コメントに IF=0 fault 回収とあったが、今回は呼出境界を通常文脈へ移した。装置 abort 自体の実装は変更しない。既存 WM exec_kill は通知が AS 破棄より先だったため、§4-3 の共通回収順へ揃えた。追加 host trace は変更前の実コードで実行失敗、順序を揃えた写しで PASS。
+
+**コマンドと結果**: 前後の `CROSS_DIR=/home/hight/opt/cross make all < /dev/null` は rc=0 (実行環境 `NP21W_DIR=/tmp/t2a-images`、FD コピー2件は警告・失敗。Windows側へのコピーなし)。`PYTHONPATH=/tmp/t2a-python` で ELF32 の実行だけ qemu-i386 へ送った。直接実行の ledger 試験はサンドボックスの SIGSYS (rc=-31) で失敗、qemu 経由は上記の PASS。途中の `make check-memory-host` は rc=2 (既存ハーネスの `_stop` 宣言不足、次回は panic 無効化変異の unused-function でコンパイル失敗) を修正し、コンパイル失敗を RED に数えていない。`python3 tools/gen_tests_inventory.py --write` / `python3 tools/gen_memmap.py --check` / `git diff --check` は rc=0。最初の `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null` は **rc=2**: 全変異選択で、既存 `test_kapi_db_v50.py` の回収順静的検査が関数分割後の DB/FD 文を旧 helper 内に探して失敗した。他の検査は終了まで実行し、T2a 専用/台帳変異も PASS。検査を新しい資源回収 helper と通知前の呼出順へ追従させた。修正後の `CROSS_DIR=/home/hight/opt/cross make check-db-v50-host < /dev/null` は **rc=0、24/24 PASS**。最終再ビルド (`/tmp/t2a-final3-all.log`) も **rc=0**、上表はその ELF の値 (`/tmp/t2a-final3-{sections,nm}.txt`)。二回目の全検査も **rc=2**: 後続の `test_net_link.py` にも同じ旧 helper 内への直接呼出しを前提にした静的検査があり、通知 helper の参照へ追従させた。関数分割を参照する既存 Python 検査を全検索した。Host Services の修正後 `make check-net-link-host` は **rc=0、35/35 PASS**。三回目の全検査は **rc=2**: `check-map` が新しい header/link 入力の5件の漏れを検出した。irq.c の不要な pgalloc.h include を除去し、check-memory-host に irq_math.c を登録した。修正後の `make check-map` は **rc=0、108検査の入力漏れ0**。WM kill を含む最終 host trace / 7変異と再ビルドも **rc=0**。**最終 `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null` は rc=0** (`PYTHONPATH=/tmp/t2a-python`、ログ `/tmp/t2a-check-changed-final3.log`)。build/sdk.mk の変更により全108ターゲットを変異込みで選択し、末尾のソース不変検査も成功。既存の T1 配置境界2本のコンパイル拒否は NOT COUNTED、コンパイルエラーを RED に数えていない。NP21/W/実機の受入は引き続き未実施。ログ/測定は `/tmp/t2a-*.log`、`/tmp/t2a-{before,after}-{sections,nm}.txt`。
+
+**PM の受入 (未実施)**: 新しい kernel.map から `g_pending_id` / `g_pending_kind` / `g_longjmp_reason` / `kctx_irq_depth` / `kctx_exc_depth` / `ledger_irq_ops` / `ledger_exc_ops` / `ledger_check_tag` / `irq_ctx_violations` / `exec_as_leftover_pages` / `used_pages` / `ledger_owners` / `appslot_reclaim_count` / `fault_kill_count` を読む。8/17MB で faulttest gp/de/ud/pf と loop・kloop + CTRL+STOP、park → resume 後にも fault/STOP を別に通し、終了種別・pending0・深さ0・owner/free baseline・取り残し0・STOPによる broker violations差分0、続く起動・V86 往復を確認する。boot broker自己診断の violationsは別勘定。別の故障ゲスト起動では IRQ/例外上の池操作が `R1 context` と op/owner/EIP を残して会計変更前に停止することを確認する。NP21/W に PCM が無いので音の PASS にせず、host trace の PCM 回収位置/IF/深さと既存 CS4231 模擬試験を代替の呼出境界証拠に限定する。Ra266 では PCM 再生中 STOP → tick進行 → IRQ解除 (violations差分0)・DMA/owner返却 → 再open/再生を確認する。配備・NP21/W・NHD・ini・Windows側・実機は本作業で触っていない。commit/push なし、PM の独立実装レビュー待ち。
+
 ### 5-2. 検査3段と lease 回帰 (d)
 
 | 検査 | 具体的な期待値 |

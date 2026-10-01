@@ -341,8 +341,8 @@ static void note_last(u32 *last, u32 op, u32 owner, void *eip)
     last[1] = owner;
     last[2] = (u32)(uptr)eip;
 }
-/* R1 (§3-5): 割り込み / 例外フレームの上で走った台帳操作を数える。失敗した
- * 操作でも数える (診断)。DMA プールの内側の割当はここを通らない (R4)。
+/* R1 (§3-5、T2a): IRQ / 例外上の台帳操作を診断し、変更前に panic。
+ * 失敗する要求も禁止。DMA プール内の割当はここを通らない (R4)。
  * 呼び手は IRQ 保存区間の中。 */
 static void ledger_note(u32 op, u32 owner, void *eip)
 {
@@ -361,6 +361,8 @@ static void ledger_note(u32 op, u32 owner, void *eip)
         else
             ledger_owners[owner].alloc_irq++;
     }
+    ledger_check_tag = "R1 context";
+    for (;;) { _stop(); }
 }
 #define LEDGER_CALLER() __builtin_return_address(0)
 
