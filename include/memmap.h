@@ -522,4 +522,10 @@ static inline u32 V2P(const volatile void *va) { return (u32)(uptr)va; }
 #define P2V_CONST(pa)    ((void *)(uptr)(pa))
 #define P2V_IO_CONST(pa) ((volatile void *)(uptr)(pa))
 
+/* T2b: private lease VA, independent of physical/device boundaries. */
+#define MEM_LEASE_BASE        0xF0000000UL
+#define MEM_LEASE_END         0xFE000000UL
+#define MEM_LEASE_MAX_PDES    ((MEM_LEASE_END - MEM_LEASE_BASE) >> 22)
+#define MEM_LEASE_MAX         8
+
 #endif /* MEMMAP_H */

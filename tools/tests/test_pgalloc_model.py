@@ -368,7 +368,8 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     def test_surface_and_live_mixed_claim(self):
         self.run_c('''
     u32 p, allocated, sid, baseline, total;
-    struct ledger_surface sf = { .npages = 1, .owner = LEDGER_OWNER_BOOT,
+    struct ledger_surface sf = { .width = 1, .height = 1, .pitch = PAGE_SIZE,
+        .planes = 1, .npages = 1, .owner = LEDGER_OWNER_BOOT,
         .backing = LEDGER_SB_RAM, .backend = LEDGER_SF_PEGC,
         .role = LEDGER_ROLE_CLIENT };
     host_pool_boot(16384);
@@ -434,7 +435,8 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
     def test_surface_and_atomic_free(self):
         self.run_c('''
     u32 p, first, sid, before;
-    struct ledger_surface sf = { .npages = 1, .owner = LEDGER_OWNER_BOOT,
+    struct ledger_surface sf = { .width = 1, .height = 1, .pitch = PAGE_SIZE,
+        .planes = 1, .npages = 1, .owner = LEDGER_OWNER_BOOT,
         .backing = LEDGER_SB_RAM, .backend = LEDGER_SF_PEGC,
         .role = LEDGER_ROLE_CLIENT };
     host_pool_boot(16384);

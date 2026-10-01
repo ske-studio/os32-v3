@@ -226,7 +226,7 @@ MUTATIONS = [
      '    if (g_backend_pref == GFX_PREF_PC98 ||\n', '    if (0 ||\n'),
     # 表示面を貸せる権限にする (契約 G4)
     ('display-lendable', 'gfx/gfx_core.c',
-     'LEDGER_CACHE_UC, LEDGER_PERM_NONE, 0, 0 }', 'LEDGER_CACHE_UC, LEDGER_PERM_RW, 0, 0 }'),
+     '.perm_max = LEDGER_PERM_NONE', '.perm_max = LEDGER_PERM_RW'),
     # gfx_bb_phys_range が選択中の backend を見ない
     ('phys-range-not-selected', 'gfx/gfx_core.c',
      '        ledger_surface_find(gfx_sf_backend(), LEDGER_ROLE_CLIENT);\n    if (base)',

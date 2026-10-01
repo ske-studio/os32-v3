@@ -270,6 +270,7 @@ BODIES['refusals_keep_accounting'] = r'''
                                 LEDGER_TOP_DOWN, &p) && p == 3000);
     {
         struct ledger_surface sf = { .first = 3000, .npages = 2,
+            .width = 1, .height = 2, .pitch = PAGE_SIZE, .planes = 1,
             .owner = LEDGER_OWNER_BOOT, .backing = LEDGER_SB_RAM,
             .backend = LEDGER_SF_PEGC, .role = LEDGER_ROLE_CLIENT };
         u32 sid;

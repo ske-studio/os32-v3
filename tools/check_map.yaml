@@ -650,6 +650,10 @@ checks:
     - userland/libos32term_render/tests/render.rs
     - userland/libos32term_render/tests/rework.rs
   check-memory-host:
+    - tools/tests/lease_host.c
+    - tools/tests/test_lease.py
+    - exec/lease.c
+    - exec/lease.h
     - tools/tests/host_arch/arch_io.h
     - gfx/gfx.h
     - gfx/palette.h
@@ -1898,6 +1902,7 @@ checks:
     - userland/system/inst_disk.c
     - userland/system/inst_hdd.c
   check-db-v50-host:
+    - exec/lease.h
     - exec/exec.c
     - exec/exec.h
     - fs/vfs_fd.c

@@ -373,6 +373,40 @@ broker は `kctx_irq_depth` を直接読み、独自の `irq_in_irq` 加減算/�
 
 **未実施**: 452KiB heap のピーク / ENOMEM の観測 (常駐シェルを枯渇まで使う手段を用意していない — ホストの `test_memmap_boot.py` が実 exec_heap / kheap で末端までの割当・枯渇・親の保存 / 復元を見ている)、gshell の 16 本、Ra266 64MB (ONLINE・32MB 超の恒等写像・動的 PT 併存・PCM)。T2a の未実施 (park → resume 後、R1 panic の故障ゲスト) も残る。
 
+#### T2b-R. 私有 lease 基盤の実装結果 (2026-10-01、`wt/t2b`、GPT-6 / Codex)
+
+基点は `c27640d` (T2a/T2a′とPMの8/17MB受入記録を含む)。`include/memmap.h` に物理帯とは独立した `[0xF0000000,0xFE000000)` / 56 PT / 8 lease の定数を追加。既存の公開callerは変更せず、合成AS用の内部 `paging_addrspace_create_lease` が旧配置ASと先頭lease PT1枚を一組で生成し、途中不足では全返却する。T2cが既存callerをこの生成経路へ接続する。通常の旧map/USER経路、形式、配置、KAPI/SDK ABIは切り替えていない。
+
+`exec/lease.[ch]` は kernel 内で確定した AS・owner/backend/role 授権と `{sid,generation}` を照合する。whole-page first-fit、RO/RW、固定8本、boot単調u32 token (周回後拒否)、複数面のslot/PT準備→短いIRQ保存区間でPTE/表/refcount一括公開、成功後だけoutを更新。追加PT不足では準備PTを全部返し、既存PTE/表/会計/out/tokenは不変。低位アプリ帯がPT backingと重なる過渡期なので、active ASは入口でmasterへ切替え、通常文脈でwalk/準備し、出口で保存CR3を再ロードする (386のTLB反映)。IRQ保存はCR3切替と公開/解除に限り、準備中のcallback/AS schedulingはない。非active ASは次のCR3ロードで反映される。解除はPTE/PDE NP→TLB隔離→追加PT free→表失効/refcount減算。先頭PTはAS終了まで保持し、未revokeのAS破棄を拒否する。
+
+SURFACEは16本、48B/本、gen=u32、lease_count=u16、plane offsetとclosingを追加。RAMの全PFN owner、FIXED_RAMの専用区間、native VRAMの恒久FIXED/UC owner区間、DEVICEの検証済みresourceのmap範囲、geometry/plane端/overflow、cache一致、SURFACE間のページ占有重複を検査する。RAM paddingを公開前にゼロ化し、未releaseのbackingを直接free/reclaimできないようにした。owner返却要求は新規貸与を止め、参照0後にRAMだけを返す。MMIO予約/kernel aliasは保持。slot再登録でgenを増やし、u32最大世代のslotは再利用しない。gfx型板は指定初期化子と実plane stride (`pitch×height`)へ追従しただけで、公開framebufferのcallerは切り替えていない。
+
+**検査部品**: `lease_check` がlease窓の全56 PDE/全PTE、private PT owner、SURFACE世代/参照を比較。毎bootの `lease_selftest` はSをA、TをB、Uを両方へ貸し、masterと他ASの全present PT/PDEを写して照合 (CPUのA/Dだけ除外)、片側解除/別AS token/二重解除/全owner0を確認する。guestではAのU aliasへ書き、BのRO aliasから読む実CR3往復も実行する。これは部品の追加であり、旧USERが残るT2bを§5-2の最終地図検査合格とは数えない。
+
+**大きさ**: 同一toolchainのreadelf/nm/mapによる実測。SQLite末尾0x2BC200は不変。
+
+| 項目 | 前 (`c27640d`) | T2b後 | 差分 |
+|---|---|---|---|
+| `.text` 開始 / サイズ | 0x100000 / 318,398B | 0x100000 / 326,446B | +8,048B |
+| `.data` 開始 / サイズ | 0x14DBC0 / 32,799B | 0x14FB40 / 32,975B | +176B |
+| `.bss` 開始 / サイズ | 0x155C00 / 208,964B | 0x157C20 / 212,040B | +3,076B |
+| `__bss_end` | 0x188C44 | 0x18B868 | +11,300B |
+| ASSERT 0x195000まで | 50,108B | 38,808B | −11,300B |
+| `.got.plt` 末尾→`.bss`余白 | 20B | 4B | −16B |
+| 圧縮 `vmkernel.lz4` | 472,437B | 477,767B | +5,330B |
+
+**実装時の訂正**: §6のT2b/T2e 3〜6KiBは見込みであり、T2b単独の正味実測は11,300B (自己診断と固定管理表を含む)。`struct addrspace` は24→440B、SURFACE表は192→768B。残り38,808Bの範囲でリンクし、予算/配置の設計自体は変更していない。前のdata/余白はT2a′-Rの記録と4B異なるため、本作業の前後実測を使用した。公開caller未切替という段の境界に合わせ、事前確保は新しい内部AS生成口で試し、従来の生成口はT2cまで維持する。既存の低位VRAM master PTEはWBで、台帳はUCであることも確認した。新leaseはcache不一致を拒否し、合成試験だけでUC alias一致を試す。実VRAM caller/aliasの切替はT2eへ渡し、T2bで旧master属性を変更していない。
+
+**ホスト/変異**: 実paging/pgalloc/physmem/leaseをILP32で実行する `test_lease.py` を `check-memory-host` と変更時選択/TESTSに結線。S/T/U、master+他ASの全PDE/PTE比較、先頭PT枯渇、追加PT2枚目の枯渇/全巻戻し、8本満杯、4本の不連続plane一括と最後の参照拒否、RO/RW/role/旧世代、padding/plane端/cache、参照数overflow、token/世代周回、pending返却、active CR3保存/復帰、追加PT free時のPDE NPを検査する。leaseの変異は **8/8コンパイル成功後の実行時RED、コンパイル失敗0** (sharedPT、PCD、rollback、世代、plane端、権限、active TLB隔離、PDE失効前free)。ハーネス開発中のcompile errorと、二重検査の片方だけを壊したSURVIVEDはREDに数えず、両検査を対象に修正して最終実行を通した。既存のSURFACE fixtureにgeometryを明記し、gfx hostの固定padding backingと型板変異を追従させた。
+
+**コマンドとrc**: 変更前 `CROSS_DIR=/home/hight/opt/cross NP21W_DIR=/tmp/t2b-images make all < /dev/null` はrc=0。最終同コマンドはrc=0 (`/tmp/t2b-final-native-all.log`)、NP21/W画像コピー2件の失敗警告だけを許容。`PATH=/home/hight/opt/cross/bin:$PATH PYTHONPATH=/tmp/t2ap-python python3 tools/tests/test_lease.py --mutate` はrc=0。ILP32実行は既存の `/tmp/t2ap-python/sitecustomize.py` によりqemu-i386へ送った (sandboxの32bit syscall制限を回避、実物の特権MMU/IRQ/HWはhost足場)。初回 `make check-memory-host MUT=--mutate < /dev/null` はrc=2 (旧SURFACE fixtureのgeometry不足)、追従後はrc=0。`python3 tools/gen_tests_inventory.py --write`、ビルド後の `python3 tools/gen_memmap.py --write` / `--check` / `--headroom`、`python3 tools/check_select.py --lint`、`python3 tools/check_p2v.py`、`git diff --check` はrc=0。初回check-changedはrc=2 (`/tmp/t2b-check-changed1.log`): `test_owner_reclaim.py` のmemmap足場に新しいlease定数が無く、paging.hの配列宣言でコンパイル失敗した。足場へ実memmapのlease定義を読み込ませ、数値の写しを増やさずに修正した。コンパイル失敗はREDに数えない。二回目もrc=2 (`/tmp/t2b-check-changed-final.log`): 全108検査は成功したが、私自身が検査中にnative VRAMのFIXED/UC検証と票/生成地図を更新したため、最後のソース不変検査が3件を検出した (変異による実物の破損ではない)。`make check-multiapp-model-host < /dev/null` と文書/地図/パッケージの最終個別検査はrc=0。実装/測定を確定し、編集を止めた三回目の全検査結果を末尾に記録する。
+
+**PMの未実施受入**: 独立実装レビュー、NP21/W 8/17MBで新画像boot (`lease_selftest_result=0`, `kselftest_fail=0`)、既存GUI/CUI/V86、fault/STOP、park→resume後、pool/owner baselineと取り残し0。Ra26664MBで同じ新boot自己診断、ONLINE/32MB超恒等写像と動的PT併存、PEGC、PCM STOP→tick進行→IRQ解除→再open/再生。T2a/T2a′の未実施項目を消していない。hostのCR3模型では実TLB/権限fault/描画/HWを検証済みとしない。配備・NP21/W・NHD・ini・Windows側・実機・commit/pushは本作業で触っていない。
+
+今回のELFの観測番地: `lease_selftest_result=0x18B864`、`kselftest_fail=0x162E60`、`kselftest_pass=0x162E64`、`paging_memmap_bad_count=0x1864C0`、`ledger_check_fail=0x187350`、`ledger_surfaces=0x186D20` (48B×16)、`ledger_irq_ops=0x186D14` / `ledger_exc_ops=0x1864E0`、`exec_as_leftover_pages=0x18B860`。selftestの後は試験SURFACEのnpages/refcountと試験owner pagesが0 (世代は残す)、master lease PDE960〜1015は空、固定CR3/10枚はT2a′の0x3F1000〜0x3FA000、上端5枚NPを維持。PMが再ビルドしたらそのELF/map/nmから引き直す。
+
+**最終全検査**: `PYTHONPATH=/tmp/t2ap-python CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 NP21W_DIR=/tmp/t2b-images make check-changed < /dev/null` は **rc=0** (`/tmp/t2b-check-changed-final3.log`)。build入力の変更により全108検査を変異込みで選択。lease 8/8、gfx 14/14、memory_boot実行時8/8ほか全検査と最後のソース不変検査が成功。既存の配置境界2本のコンパイル拒否はNOT COUNTED。実装/測定を固定してから実行し、本結果の文書追記だけをその後に行った。状態行は変更していない。
+
 ### 5-2. 検査3段と lease 回帰 (d)
 
 | 検査 | 具体的な期待値 |

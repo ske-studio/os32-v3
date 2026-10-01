@@ -187,26 +187,38 @@ static const struct ledger_resource gfx_res[3] = {
       0, 0, 0, LEDGER_BUS_CBUS, 0, 0, LEDGER_WB_GLUE_CONST, 0, 0 }
 };
 
-/* SURFACE の型板。並びは first, npages, width, height, pitch, owner, backing,
- * backend, role, format, planes, cache, perm_max, gen, lease_count。
+/* SURFACE の型板。plane offset は pitch × height (ページ丸めなし)。
  * PEGC の first は確保した PFN で埋める。Cirrus の面の割り付け (表示面 = 窓の
  * 先頭、クライアント面 = その直後、同じ 300KB) は backend_cirrus.c の
  * STATIC_ASSERT が突き合わせる。 */
 static const struct ledger_surface gfx_sf[4] = {
-    { GFX_PFN(MEM_GFX_BB_BASE), GFX_PFN(MEM_GFX_BB_SIZE), GFX_WIDTH, GFX_HEIGHT,
-      GFX_BPL, LEDGER_OWNER_BOOT, LEDGER_SB_FIXED_RAM, LEDGER_SF_PC98,
-      LEDGER_ROLE_CLIENT, GFX_BB_PLANAR4, 4, LEDGER_CACHE_WB, LEDGER_PERM_RW, 0, 0 },
-    { 0, GFX_PFN(MEM_GFX_BB8_SIZE), MEM_GFX_BB8_WIDTH, MEM_GFX_BB8_HEIGHT,
-      MEM_GFX_BB8_PITCH, LEDGER_OWNER_BOOT, LEDGER_SB_RAM, LEDGER_SF_PEGC,
-      LEDGER_ROLE_CLIENT, GFX_BB_PACKED8, 1, LEDGER_CACHE_WB, LEDGER_PERM_RW, 0, 0 },
-    { GFX_PFN(WAB_XE10_LINEARWIN_BASE + MEM_GFX_BB8_SIZE), GFX_PFN(MEM_GFX_BB8_SIZE),
-      MEM_GFX_BB8_WIDTH, MEM_GFX_BB8_HEIGHT, MEM_GFX_BB8_PITCH, LEDGER_OWNER_BOOT,
-      LEDGER_SB_MMIO, LEDGER_SF_CIRRUS, LEDGER_ROLE_CLIENT, GFX_BB_PACKED8, 1,
-      LEDGER_CACHE_UC, LEDGER_PERM_RW, 0, 0 },
-    { GFX_PFN(WAB_XE10_LINEARWIN_BASE), GFX_PFN(MEM_GFX_BB8_SIZE),
-      MEM_GFX_BB8_WIDTH, MEM_GFX_BB8_HEIGHT, MEM_GFX_BB8_PITCH, LEDGER_OWNER_KERNEL,
-      LEDGER_SB_MMIO, LEDGER_SF_CIRRUS, LEDGER_ROLE_DISPLAY, GFX_BB_PACKED8, 1,
-      LEDGER_CACHE_UC, LEDGER_PERM_NONE, 0, 0 }
+    { .first = GFX_PFN(MEM_GFX_BB_BASE), .npages = GFX_PFN(MEM_GFX_BB_SIZE),
+      .width = GFX_WIDTH, .height = GFX_HEIGHT, .pitch = GFX_BPL,
+      .owner = LEDGER_OWNER_BOOT, .backing = LEDGER_SB_FIXED_RAM,
+      .backend = LEDGER_SF_PC98, .role = LEDGER_ROLE_CLIENT,
+      .format = GFX_BB_PLANAR4, .planes = 4, .cache = LEDGER_CACHE_WB,
+      .perm_max = LEDGER_PERM_RW,
+      .plane_offset = {0, GFX_BPL * GFX_HEIGHT, 2 * GFX_BPL * GFX_HEIGHT,
+                       3 * GFX_BPL * GFX_HEIGHT} },
+    { .npages = GFX_PFN(MEM_GFX_BB8_SIZE), .width = MEM_GFX_BB8_WIDTH,
+      .height = MEM_GFX_BB8_HEIGHT, .pitch = MEM_GFX_BB8_PITCH,
+      .owner = LEDGER_OWNER_BOOT, .backing = LEDGER_SB_RAM,
+      .backend = LEDGER_SF_PEGC, .role = LEDGER_ROLE_CLIENT,
+      .format = GFX_BB_PACKED8, .planes = 1, .cache = LEDGER_CACHE_WB,
+      .perm_max = LEDGER_PERM_RW },
+    { .first = GFX_PFN(WAB_XE10_LINEARWIN_BASE + MEM_GFX_BB8_SIZE),
+      .npages = GFX_PFN(MEM_GFX_BB8_SIZE), .width = MEM_GFX_BB8_WIDTH,
+      .height = MEM_GFX_BB8_HEIGHT, .pitch = MEM_GFX_BB8_PITCH,
+      .owner = LEDGER_OWNER_BOOT, .backing = LEDGER_SB_MMIO,
+      .backend = LEDGER_SF_CIRRUS, .role = LEDGER_ROLE_CLIENT,
+      .format = GFX_BB_PACKED8, .planes = 1, .cache = LEDGER_CACHE_UC,
+      .perm_max = LEDGER_PERM_RW },
+    { .first = GFX_PFN(WAB_XE10_LINEARWIN_BASE), .npages = GFX_PFN(MEM_GFX_BB8_SIZE),
+      .width = MEM_GFX_BB8_WIDTH, .height = MEM_GFX_BB8_HEIGHT,
+      .pitch = MEM_GFX_BB8_PITCH, .owner = LEDGER_OWNER_KERNEL,
+      .backing = LEDGER_SB_MMIO, .backend = LEDGER_SF_CIRRUS,
+      .role = LEDGER_ROLE_DISPLAY, .format = GFX_BB_PACKED8,
+      .planes = 1, .cache = LEDGER_CACHE_UC, .perm_max = LEDGER_PERM_NONE }
 };
 
 /* 資源レコード i (と SURFACE の型板 i + 1) がどの候補のものか。 */

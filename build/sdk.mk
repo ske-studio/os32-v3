@@ -186,6 +186,7 @@ check-memory-host:
 	python3 -B tools/tests/test_highram_stage.py
 	python3 -B tools/tests/test_memory_boot.py $(MUT)
 	python3 -B tools/tests/test_ledger.py $(MUT)
+	python3 -B tools/tests/test_lease.py $(MUT)
 	python3 -B tools/tests/test_exec_r1.py $(MUT)
 	python3 -B tools/tests/test_device_reservation.py $(MUT)
 	python3 -B tools/tests/test_sbrk_tier.py
