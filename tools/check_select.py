@@ -21,12 +21,13 @@
     した後) なら HEAD~1
   * 変更が無い                     → 全部を変異なし (= check-fast)
   * `full:` に当たる変更がある     → 全部を変異込み (= check)
-    ただし build/*.mk は基点版と現行版を構文単位で比べ、検査列の名前と
-    登録済み検査の前提・recipe だけの変更なら当該検査だけ変異込み (許可リスト
-    方式 — 絞れるのは証明できるものだけ、narrow_make_change の docstring)。
-    define の中・境界、条件分岐の中、検査列以外の改行継続、変更行の `$` 参照に
-    eval / call / shell / file などの副作用や中身を追えない変数 (定義が無い、
-    `!=`、define 定義) を含むもの、未対応構文、版の比較不能は全部。
+    ただし Makefile / build/*.mk (MAKE_INPUT_GLOBS) は **make 自身に展開させて比べる**
+    (make_narrow の docstring): 基点の木と作業中の木で各検査の展開済み recipe を
+    `make -n -B --trace` で取り、変わった検査 + 列に足した検査だけ変異込み、列から消えた
+    検査は回さない。ビルド (`all`) の展開が変わった、検査をまたぐ影響 (順序依存) が
+    ある、make が失敗した、出力を読めない、基点を用意できない、検査の列の読みが
+    合わない、`--files` (基点なし) は全部。sdk/kapi.json は生成物を介して試験の中身が
+    変わり make -n に現れないので全部のまま。
   * どの検査の glob にも `docs_only:` にも `notest:` にも当たらない変更がある
                                    → 全部を変異込み (= check)。表の漏れで
                                      否定側を落とさないため。`broad:` の検査の
@@ -55,20 +56,18 @@
       試験が notest の場所を読むようになったら「notest なのに入力になっている」
       と言って落ちる — notest を狭める (`except:` に足す) か外す。
 """
-import difflib
+import concurrent.futures
 import os
 import re
 import shlex
 import subprocess
 import sys
+import tempfile
 
 import yaml
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MAP_PATH = os.path.join(ROOT, "tools", "check_map.yaml")
-MAKEFILES = ["Makefile"] + sorted(
-    os.path.join("build", f) for f in os.listdir(os.path.join(ROOT, "build"))
-    if f.endswith(".mk"))
 
 
 # ---------------------------------------------------------------- 共通
@@ -162,10 +161,35 @@ def is_notest(path, cnotest):
 
 
 # ---------------------------------------------------------------- Makefile
+# make の入力のうち、基点版と作業中の版を取り替えて比べるもの (`full:` の中の Makefile)。
+# `build/` の .mk 以外 (out/、os32.ld、packages.yaml …) と他のディレクトリは両方の
+# 木で同じ実体 (記号リンク) を見る。
+MAKE_INPUT_GLOBS = ("Makefile", "build/*.mk")
+# 展開を比べるビルドの目標。検査が読む成果物はこれで作る (docs/08_build.md §8-4)。
+MAKE_BUILD_GOALS = ("all",)
+# make 1 回の時間上限 (秒)。超えたら解析不能 = 全部。
+MAKE_TIMEOUT = 120
+
+
+def makefile_paths():
+    """ROOT にある MAKE_INPUT_GLOBS のファイル (追跡外も含む)。"""
+    out = []
+    if os.path.isfile(os.path.join(ROOT, "Makefile")):
+        out.append("Makefile")
+    bdir = os.path.join(ROOT, "build")
+    if os.path.isdir(bdir):
+        out += sorted("build/" + f for f in os.listdir(bdir) if f.endswith(".mk"))
+    return out
+
+
 def read_makefiles():
-    """{検査名: [recipe 行]} と {変数名: 値} を返す (check-* の規則だけ)。"""
+    """{検査名: [recipe 行]} と {変数名: 値} を返す (check-* の規則だけ)。
+
+    --lint / --inputs / --suggest が recipe から試験スクリプトを辿るための
+    字面の読みで、make の意味論は持たない (検査列の名前と、タブ行の字面だけ)。
+    変異の選び方で build/*.mk の差を判定するのはここではなく make 自身 (make_narrow)。"""
     rules, vars_ = {}, {}
-    for mf in MAKEFILES:
+    for mf in makefile_paths():
         with open(os.path.join(ROOT, mf), encoding="utf-8") as f:
             lines = f.read().split("\n")
         i, cur = 0, None
@@ -202,389 +226,210 @@ def check_lists(vars_):
     return par
 
 
-# ---------------------------------------------------------------- build/*.mk の絞り込み
-# 許可リスト方式: 「検査列 (CHECK_PAR_TARGETS) への名前の追加・削除」と「登録済み検査の
-# 前提・recipe」の変更だけを、その検査に閉じていると**証明できる範囲**で絞る。
-# 証明できないものは全部 (None) に倒す。何を証明済みとみなすかは下の各関数の docstring。
+# ---------------------------------------------------------------- Makefile の絞り込み (make に判定させる)
+# make の構文を自前で解釈しない (2 回の独立レビューで P1 — define の終端、$(call eval)、
+# 組み込み名の再定義、target-specific / 計算名の定義、?= とコマンド行上書き、別ファイルの
+# .SECONDEXPANSION。ユーザー決定 2026-10-01: make 自身に判定させる)。
 #
-# make の読み方で模倣するのは次だけ (GNU make 4.4 の read.c と突き合わせ、2026-10-01):
-#   * 行末の `\` (奇数個) は次の物理行と 1 つの論理行 (define の中でも同じ)
-#   * define … endef: 中の行はタブで始まれば何でも本文、そうでなければ先頭の語が
-#     `define` で入れ子が 1 つ深く、`endef` で 1 つ浅くなる。`endif` は本文
-#   * ifeq / ifneq / ifdef / ifndef … else … endif: 中の行は全部 1 行ずつ不透明
-#   * タブで始まる行が make の指令 (define / endef / if* / else / endif) に見えたら
-#     recipe 行か指令かを決められないので判別不能 (全部)
-MAKE_DIRECTIVE = re.compile(
-    r"^(?:(?:override|export|private|unexport)[ \t]+)*"
-    r"(define|endef|ifeq|ifneq|ifdef|ifndef|else|endif)\b")
-MAKE_ASSIGN = re.compile(
-    r"^(?:(?:override|export|private|unexport)[ \t]+)*"
-    r"([A-Za-z_][\w.-]*)[ \t]*(:::=|::=|:=|\?=|\+=|!=|=)(.*)$", re.S)
-MAKE_INCLUDE = re.compile(r"^[ \t]*(?:-include|sinclude|include)[ \t]+(.*)$", re.S)
-# 許す include の引数。追跡されている Makefile / build/*.mk 以外で読み込まれるのは
-# この 2 つだけ。どちらも**読まない** — ここにしか定義の無い変数を検査規則が参照したら
-# 「定義が無い」として全部に倒す:
-#   .env         ローカルの秘密 (追跡外、[D3] — 検査器が秘密のファイルを読む経路を作らない)
-#   $(DEPFILES)  gcc -MMD が生成する依存 (.d)。規則の前提だけで変数は定義しない
-TRUSTED_INCLUDES = {".env", "$(DEPFILES)"}
-# 副作用が無く、引数を文字列として扱うだけの make 関数 (引数の中の $-参照は別に見る)。
-# ここに無い関数 (eval / call / shell / file / foreach / let / error / value / guile …)
-# は変数の定義や生成を起こしうる、または中身を追えないので判別不能。
-PURE_FUNCS = {
-    "if", "or", "and", "filter", "filter-out", "subst", "patsubst", "strip",
-    "findstring", "sort", "word", "words", "wordlist", "firstword", "lastword",
-    "dir", "notdir", "suffix", "basename", "addsuffix", "addprefix", "join",
-    "wildcard", "realpath", "abspath", "origin", "flavor", "info", "warning",
-}
-# 自動変数 ($@ $< …、$(@D) $(@F) …) と、make 自身が持つ文字列だけの変数。
-AUTO_VARS = set("@<^+*?%|") | {c + s for c in "@<^+*?%" for s in "DF"}
-BUILTIN_PLAIN = {"MAKE", "MAKEFLAGS", "MAKECMDGOALS", "MAKELEVEL", "CURDIR",
-                 "MAKEFILE_LIST", "MAKE_VERSION", "SHELL"}
+# 基点の木と作業中の木で **make に各検査の recipe を展開させ** (`make -n -B --trace`)、
+# 展開済みの文字列を比べる。define / eval / call / target-specific 変数 / ?= /
+# コマンド行上書き / 二次展開は、make が処理した結果として展開に現れる。
+#
+# 木の用意: 一時ディレクトリに ROOT の各エントリへの記号リンクを張り、MAKE_INPUT_GLOBS
+# (Makefile / build/*.mk) だけ実体で置く — 基点の木は merge-base の版 (git show)、作業中の
+# 木は今のファイル (追跡外も)。それ以外の入力 (sdk/kapi.json、.env、生成物、$(wildcard)
+# が見るソース) は両方の木で同じ実体なので、差は Makefile の差だけから生まれる。
+# .env は make が両方の木で同じものを読む — 選択器は中身を読まない ([D3])。
+# 記号リンク越しなので `$(shell find …)` は降りない ($(DEPFILES) の .d は両方で空。
+# -B で全部を作り直す扱いなので展開には影響しない)。$(CURDIR) / $(abspath) の一時
+# ディレクトリの番地は "<ROOT>" に正規化して比べる。
+#
+# 展開の取り方 (両方の木で同じ環境・MAKEFLAGS — 選択器を呼ぶ make から継承 — で、
+# -j1 --no-print-directory MUTATE=1 を足す):
+#   list     `--eval 'cc_sel_list: ; @echo $(CHECK_PAR_TARGETS)'` で検査の列を make に言わせる
+#   single   検査ごとに `make -n -B --trace <検査>` (並列)。--trace の行で目標ごとに切る
+#   fwd/rev  全検査をまとめて列の順 / 逆順で 1 回ずつ
+#   build    `make -n -B --trace all` (検査が読む成果物の作り方)
+# `$(MAKE)` を含む recipe 行は -n でも実行される (再帰 make が自分の dry-run を出す) —
+# その出力も展開の一部として比べる。recipe の中の $(shell) も展開時に走る (通常の
+# make -n と同じ)。
+#
+# 判定 (どれかが成り立たなければ全部):
+#   * 両方の木で make が全部 rc=0、出力が --trace の行で切れる、検査の列が読める、
+#     作業中の木の列が build/sdk.mk の字面の列 (check_lists) と一致する
+#   * ビルド (all) の展開が両方の木で同じ
+#   * 検査をまたぐ影響が無い: 各木で、各検査の単独の展開 (その検査が作る目標ごと) が、
+#     まとめて展開した fwd / rev の同じ目標の展開と一致する (recipe の $(eval) や二次展開の
+#     $$(call eval) が別の検査の展開を変えるなら、順序で結果が変わるので一致しない。
+#     並列の実行では順序が決まらないので全部に倒す)
+#   変異込み = 単独の展開が基点と違う検査 + 列に足された検査。列から消えた検査は回さない。
+TRACE_RE = re.compile(r"^.*?:\d+: (?:update target '([^']*)' due to: |target '([^']*)' does not exist$)")
+LIST_VAR = "CHECK_PAR_TARGETS"
 
 
-def _continues(line):
-    """物理行が `\\` + 改行で次の行に続くか (奇数個の `\\` のときだけ)。"""
-    body = line.rstrip("\r\n")
-    n = len(body) - len(body.rstrip("\\"))
-    return n % 2 == 1 and line.endswith("\n")
+class MakeError(Exception):
+    pass
 
 
-def _logical_end(lines, i):
-    """lines[i] から始まる論理行の終わり (次の論理行の先頭の添字)。"""
-    while i < len(lines) and _continues(lines[i]):
-        i += 1
-    return min(i + 1, len(lines))
-
-
-def _join_logical(raw):
-    """`\\` + 改行 + 続く空白を 1 つの空白にする (recipe 以外の行の make の規則)。"""
-    return re.sub(r"\\\r?\n[ \t]*", " ", raw)
-
-
-def make_logical_lines(text):
-    """論理行を (start, end, raw, in_define, directive) で順に返す。
-
-    start / end は物理行 (splitlines) の添字の範囲。in_define は define 本文
-    (開始行と endef 行を含む) のとき真。directive は define 本文の外で行頭が make の
-    指令だったときその語、それ以外は None。タブで始まる行が指令に見えたら
-    ValueError (recipe 行か指令か決められない)。"""
-    lines = text.splitlines(keepends=True)
-    i, define_level = 0, 0
-    while i < len(lines):
-        start, i = i, _logical_end(lines, i)
-        raw = "".join(lines[start:i])
-        first = lines[start]
-        if define_level:
-            if not first.startswith("\t"):
-                tok = _join_logical(raw).lstrip(" \t")
-                if re.match(r"define(?:\s|$)", tok):
-                    define_level += 1
-                elif re.match(r"endef(?:\s|$)", tok):
-                    define_level -= 1
-            yield start, i, raw, True, None
-            continue
-        m = MAKE_DIRECTIVE.match(first.lstrip(" \t"))
-        if m:
-            if first.startswith("\t"):
-                raise ValueError("タブで始まる make 指令 (%s) は recipe か指令か判別不能"
-                                 % m.group(1))
-            if m.group(1) == "define":
-                define_level = 1
-                yield start, i, raw, True, "define"
-                continue
-            yield start, i, raw, False, m.group(1)
-            continue
-        yield start, i, raw, False, None
-
-
-def make_units(text):
-    """build/*.mk を構文単位に切る。(units, 検査列の名前) を返す。
-
-    単位は ("list", 代入記号, 名前の組) / ("rule", 検査名, 原文) / ("comment", "", 原文)
-    / ("opaque", "", 原文)。list は CHECK_PAR_TARGETS への `:=` / `=` で右辺が
-    check-* の名前だけのもの (`\\` 継続を許す)。rule は行頭の `check-*:` に続く
-    前提 (`= : ; % \\` を含まない) と、その後のタブ行・空行・コメント行。
-    define 本文・条件分岐の中・それ以外は 1 論理行ずつ opaque (両版で一致が必要)。
-    判別できない構文は ValueError。"""
-    units, names = [], []
-    cond_depth = 0
-    phys = text.splitlines(keepends=True)
-    logical = list(make_logical_lines(text))
-    k = 0
-    while k < len(logical):
-        start, end, raw, in_define, directive = logical[k]
-        k += 1
-        if in_define:
-            units.append(("opaque", "", raw))
-            continue
-        if directive:
-            units.append(("opaque", "", raw))
-            if directive in ("ifeq", "ifneq", "ifdef", "ifndef"):
-                cond_depth += 1
-            elif directive == "endif":
-                cond_depth = max(cond_depth - 1, 0)
-            continue
-        if cond_depth:
-            units.append(("opaque", "", raw))
-            continue
-        logical_text = _join_logical(raw).strip()
-        if (re.match(r"^(?:(?:override|export|private)[ \t]+)*CHECK_PAR_TARGETS[ \t]*[:+?!]*=",
-                     logical_text) and not raw.startswith("\t")):
-            m = re.fullmatch(r"CHECK_PAR_TARGETS\s*(:=|=)\s*(.*)", logical_text)
-            if not (m and all(re.fullmatch(r"check[\w-]*", t) for t in m[2].split())):
-                raise ValueError("検査列の代入が名前の列でない")
-            names.extend(m[2].split())
-            units.append(("list", m[1], tuple(m[2].split())))
-            continue
-        m = re.fullmatch(r"(check[\w-]*):\s*([^\n]*)\n?", raw)
-        if m and not any(c in m[2] for c in "=:;%\\"):
-            # 空行とコメント行は recipe の所属を切らない (make の規則)。
-            j = end
-            while j < len(phys) and (phys[j].startswith("\t") or
-                                     not phys[j].strip() or phys[j].startswith("#")):
-                j += 1
-            # 吸収した物理行ぶん、論理行の列も進める (継続で跨いだ論理行を含む)。
-            while k < len(logical) and logical[k][0] < j:
-                if logical[k][1] > j:
-                    # 吸収の境界が論理行の途中 (コメント行の `\` 継続など) — 判別不能
-                    raise ValueError("検査規則の末尾が改行継続の途中で終わる")
-                k += 1
-            units.append(("rule", m[1], "".join(phys[start:j])))
-        elif end - start == 1 and (not raw.strip() or raw.startswith("#")):
-            units.append(("comment", "", raw))
-        else:
-            units.append(("opaque", "", raw))
-    return units, names
-
-
-def collect_make_defs(texts, known_paths=()):
-    """{変数名: [(代入記号, 値)]} と include の問題の一覧を返す。
-
-    texts は {パス: 本文}。define 本文の中は定義に数えず、`define NAME` 自体は
-    ("define", None) として記録する (本文は追えないので不透明)。条件分岐の中の代入も
-    全部数える (どの枝が生きるかは追わない = 多めに数える)。タブで始まる行の代入も
-    数える (recipe 行か代入かは追わない = 多めに数える)。include の引数は
-    known_paths (追跡されている Makefile / build/*.mk) か TRUSTED_INCLUDES だけを許す。"""
-    defs, problems = {}, []
-    for path, text in texts.items():
-        try:
-            lines = list(make_logical_lines(text))
-        except ValueError as e:
-            problems.append("%s: %s" % (path, e))
-            continue
-        for _, _, raw, in_define, directive in lines:
-            logical = _join_logical(raw).rstrip("\r\n")
-            if in_define:
-                if directive == "define":
-                    m = re.match(r"^(?:(?:override|export|private)[ \t]+)*define[ \t]+([^\s=:+?!]+)",
-                                 logical.lstrip(" \t"))
-                    if m:
-                        defs.setdefault(m.group(1), []).append(("define", None))
-                    else:
-                        problems.append("%s: 名前の無い define" % path)
-                continue
-            if directive:
-                continue
-            m = MAKE_INCLUDE.match(logical)
-            if m:
-                for arg in m.group(1).split("#")[0].split():
-                    if arg not in known_paths and arg not in TRUSTED_INCLUDES:
-                        problems.append("%s: include %s の中身を追えない" % (path, arg))
-                continue
-            m = MAKE_ASSIGN.match(logical.lstrip(" \t"))
-            if m:
-                defs.setdefault(m.group(1), []).append((m.group(2), m.group(3).strip()))
-    return defs, problems
-
-
-def make_refs(text):
-    """make が展開する `$` 参照の中身を順に返す (`$$` は読み飛ばす)。
-    括弧が閉じない・末尾の `$` は ValueError。"""
-    i = 0
-    while True:
-        j = text.find("$", i)
-        if j < 0:
-            return
-        if j + 1 >= len(text):
-            raise ValueError("行末の `$`")
-        c = text[j + 1]
-        if c == "$":
-            i = j + 2
-            continue
-        if c in "({":
-            close = ")" if c == "(" else "}"
-            depth, k = 1, j + 2
-            while k < len(text) and depth:
-                if text[k] == c:
-                    depth += 1
-                elif text[k] == close:
-                    depth -= 1
-                k += 1
-            if depth:
-                raise ValueError("括弧が閉じない `$` 参照")
-            yield text[j + 2:k - 1]
-            i = k
-        else:
-            yield c
-            i = j + 2
-
-
-def check_make_pure(text, defs, stack=()):
-    """text の `$` 参照が全部、副作用無く中身の分かるものだけなら何もしない。
-    そうでなければ ValueError (理由つき)。
-
-    許すもの: `$$`、自動変数 (AUTO_VARS)、make 自身の文字列変数 (BUILTIN_PLAIN)、
-    PURE_FUNCS の関数 (引数も再帰して見る)、`$(VAR:a=b)` の置換参照、
-    そして defs にある変数で各定義が次のどれかのもの:
-      `:=` `::=` `:::=`  読み込み時に展開済みなので参照に副作用が無い
-      `=` `?=` `+=`      参照時に展開されるので値を再帰して見る (循環は不可)
-    定義が無い変数 (環境・コマンド行・.env の値は見ない)、`!=` (結果が再帰展開される)、
-    define で定義した変数、計算された名前 (`$($(X))`)、位置引数 (`$(1)`)、
-    それ以外の関数は不可。"""
-    for ref in make_refs(text):
-        if ref in AUTO_VARS:
-            continue
-        m = re.fullmatch(r"([A-Za-z_][\w.-]*)[ \t]+(.*)", ref, re.S)
-        if m:
-            if m.group(1) not in PURE_FUNCS:
-                raise ValueError("関数 %s は許可リストに無い" % m.group(1))
-            check_make_pure(m.group(2), defs, stack)
-            continue
-        m = re.fullmatch(r"([A-Za-z_][\w.-]*)(?::([^=]*)=(.*))?", ref, re.S)
-        if not m:
-            raise ValueError("参照 `$(%s)` の形を追えない" % ref[:40])
-        name = m.group(1)
-        if m.group(2) is not None:
-            check_make_pure(m.group(2) + m.group(3), defs, stack)
-        if name in BUILTIN_PLAIN:
-            continue
-        if name in stack:
-            raise ValueError("変数 %s が循環している" % name)
-        if name not in defs:
-            raise ValueError("変数 %s の定義が追跡されている Makefile に無い" % name)
-        for op, value in defs[name]:
-            if op in (":=", "::=", ":::="):
-                continue
-            if op == "!=":
-                raise ValueError("変数 %s は `!=` (結果が再帰展開される)" % name)
-            if op == "define":
-                raise ValueError("変数 %s は define で定義されている" % name)
-            check_make_pure(value, defs, stack + (name,))
-
-
-def narrow_make_change(before, after, old_par, par, defs=None):
-    """(影響を受ける現行の検査の集合 または None, 理由)。make は評価しない。
-
-    hunk ではなく両版の全体を構文単位 (make_units) に切って比べる — hunk だけでは
-    recipe の所属や define の文脈が欠けるため。絞れるのは次が全部成り立つときだけ:
-      * 両版とも make_units で切れる (define / 条件分岐 / タブ指令の判別不能は全部)
-      * 両版とも .RECIPEPREFIX / .SECONDEXPANSION / `$(eval` を含まない
-      * 検査規則の重複・検査列の多重代入・重複名・並べ替え・代入記号の変更が無い
-      * 差のある単位が list (名前の列) / comment / 登録済み検査の rule だけ
-      * 差のある rule の原文 (前提 + recipe) の `$` 参照が全部 check_make_pure を通る
-        (defs は追跡されている Makefile 全部から集める。None なら after から。
-        .env は読まない — そこにしか定義の無い変数は「定義が無い」で全部)
-      * include の引数が全部、追跡されている Makefile か TRUSTED_INCLUDES
-    それ以外は None (全部)。"""
+def _make(cwd, goals, extra, timeout=None):
+    """make を cwd で回し stdout を返す (失敗は MakeError)。環境は継承 (MAKEFLAGS も)。"""
+    cmd = ["make", "-C", cwd, "-j1", "--no-print-directory"] + list(extra) + list(goals)
     try:
-        old, old_names = make_units(before)
-        new, new_names = make_units(after)
-    except ValueError as e:
-        return None, "未対応構文: %s" % e
-    if defs is None:
-        defs, problems = collect_make_defs({"(after)": after})
-        if problems:
-            return None, "include を追えない: %s" % problems[0]
-    listed = set(old_par) | set(par)
-    # A custom recipe prefix, secondary expansion, eval or duplicate rule can
-    # change ownership or generate additional rules. Do not model those.
-    for text, units in ((before, old), (after, new)):
-        if re.search(r"\.RECIPEPREFIX|\.SECONDEXPANSION|\$[({]\s*eval\b", text):
-            return None, "recipe prefix / secondary expansion / eval は判別不能"
-        targets = [u[1] for u in units if u[0] == "rule"]
-        if len(targets) != len(set(targets)):
-            return None, "重複規則は判別不能"
-        if sum(1 for u in units if u[0] == "list") > 1:
-            return None, "検査列の多重代入は判別不能"
-    if [u[1] for u in old if u[0] == "list"] != [u[1] for u in new if u[0] == "list"]:
-        return None, "検査列の代入形式の変更"
-    if len(old_names) != len(set(old_names)) or len(new_names) != len(set(new_names)):
-        return None, "検査列の重複名"
-    common = set(old_names) & set(new_names)
-    if [t for t in old_names if t in common] != [t for t in new_names if t in common]:
-        return None, "検査列の並べ替え"
-    affected = set(old_names) ^ set(new_names)
-    for tag, a, b, c, d in difflib.SequenceMatcher(a=old, b=new, autojunk=False).get_opcodes():
-        if tag == "equal":
-            continue
-        for kind, key, value in old[a:b] + new[c:d]:
-            if kind == "list" or kind == "comment":
-                continue
-            if kind != "rule" or key not in listed:
-                return None, "変数・非検査規則・未対応構文の変更"
-            if "\\\n" in value or "\\\r\n" in value:
-                return None, "検査規則の改行継続は判別不能"
-            # 行頭 `#` は make のコメント (展開されない)。タブ行は recipe で展開される。
-            body = "".join(l for l in value.splitlines(keepends=True)
-                           if not l.startswith("#"))
-            try:
-                check_make_pure(body, defs)
-            except ValueError as e:
-                return None, "%s の %s" % (key, e)
-            affected.add(key)
-    if not affected <= listed:
-        return None, "検査列に未登録の名前"
-    return affected & set(par), "検査列の名前と登録済み検査の前提・recipe だけの変更"
+        p = subprocess.run(cmd, capture_output=True, stdin=subprocess.DEVNULL,
+                           timeout=timeout or MAKE_TIMEOUT)
+    except (OSError, subprocess.SubprocessError) as e:
+        raise MakeError("make %s: %s" % (" ".join(goals), e.__class__.__name__))
+    if p.returncode != 0:
+        err = p.stderr.decode("utf-8", "replace").strip().splitlines()
+        raise MakeError("make %s が rc=%d: %s" % (" ".join(goals), p.returncode,
+                                                 (err[-1] if err else "")[:200]))
+    return p.stdout.decode("utf-8", "replace")
 
 
-def makefile_paths():
-    """ROOT の Makefile + build/*.mk (今あるもの)。"""
-    out = []
-    if os.path.isfile(os.path.join(ROOT, "Makefile")):
-        out.append("Makefile")
+def make_dry_run(cwd, goals):
+    """展開済みの recipe を {目標: [行]} で返す。cwd の番地は "<ROOT>" に正規化。"""
+    text = _make(cwd, goals, ["-n", "-B", "--trace", "MUTATE=1"]).replace(cwd, "<ROOT>")
+    blocks, cur = {"": []}, ""
+    for line in text.splitlines():
+        m = TRACE_RE.match(line)
+        if m:
+            cur = m.group(1) if m.group(1) is not None else m.group(2)
+            blocks.setdefault(cur, [])
+        else:
+            blocks.setdefault(cur, []).append(line)
+    return blocks
+
+
+def make_check_list(cwd):
+    """make に検査の列 ($(CHECK_PAR_TARGETS)) を言わせる。"""
+    out = _make(cwd, ["cc_sel_list"],
+                ["-s", "--eval", "cc_sel_list: ; @echo $(%s)" % LIST_VAR])
+    lines = [l for l in out.splitlines() if l.strip() and not TRACE_RE.match(l)]
+    if len(lines) != 1:
+        raise MakeError("検査の列を読めない (%d 行)" % len(lines))
+    names = lines[0].split()
+    if not names or len(names) != len(set(names)):
+        raise MakeError("検査の列が空か重複がある")
+    return names
+
+
+def _overlay(dst, texts):
+    """dst に ROOT の写し (エントリごとの記号リンク) を作り、texts {相対パス: bytes}
+    の Makefile だけ実体で置く。`build/` は実体のディレクトリで .mk 以外を記号リンク。"""
+    os.makedirs(os.path.join(dst, "build"))
+    for e in os.listdir(ROOT):
+        if e not in (".git", "Makefile", "build"):
+            os.symlink(os.path.join(ROOT, e), os.path.join(dst, e))
     bdir = os.path.join(ROOT, "build")
     if os.path.isdir(bdir):
-        out += sorted("build/" + f for f in os.listdir(bdir) if f.endswith(".mk"))
+        for e in os.listdir(bdir):
+            if not e.endswith(".mk"):
+                os.symlink(os.path.join(bdir, e), os.path.join(dst, "build", e))
+    for rel, data in texts.items():
+        with open(os.path.join(dst, rel), "wb") as f:
+            f.write(data)
+
+
+def _base_makefiles(ancestor):
+    """基点のコミットにある MAKE_INPUT_GLOBS のファイル {相対パス: bytes}。"""
+    mk = compile_globs(MAKE_INPUT_GLOBS)
+    p = subprocess.run(["git", "-C", ROOT, "ls-tree", "-r", "--name-only", ancestor,
+                        "--", "Makefile", "build"], capture_output=True, text=True)
+    if p.returncode != 0:
+        raise MakeError("基点 %s の木を読めない" % ancestor[:12])
+    out = {}
+    for rel in p.stdout.splitlines():
+        if matches(rel, mk):
+            q = subprocess.run(["git", "-C", ROOT, "show", "%s:%s" % (ancestor, rel)],
+                               capture_output=True)
+            if q.returncode != 0:
+                raise MakeError("基点版 %s を読めない" % rel)
+            out[rel] = q.stdout
     return out
 
 
-def makefile_texts():
-    """{パス: 本文} — makefile_paths() のものだけ。.env など追跡外の include は読まない。"""
-    texts = {}
-    for mf in makefile_paths():
-        with open(os.path.join(ROOT, mf), encoding="utf-8") as f:
-            texts[mf] = f.read()
-    return texts
+def _work_makefiles():
+    out = {}
+    for rel in makefile_paths():
+        with open(os.path.join(ROOT, rel), "rb") as f:
+            out[rel] = f.read()
+    return out
 
 
-def make_change(path, base, par):
+def _independent(singles, fwd, rev):
+    """単独の展開がまとめた展開 (順・逆順) と目標ごとに一致するか。違えば理由。"""
+    seen = set()
+    for t, blocks in singles.items():
+        for u, lines in blocks.items():
+            seen.add(u)
+            for name, combined in (("順", fwd), ("逆順", rev)):
+                if combined.get(u) != lines:
+                    return "%s の展開が%sにまとめたときと違う (目標 %s)" % (t, name, u or "(前置き)")
+    for name, combined in (("順", fwd), ("逆順", rev)):
+        extra = set(combined) - seen
+        if extra:
+            return "まとめて展開すると単独に無い目標が出る (%s)" % sorted(extra)[0]
+    return None
+
+
+def make_narrow(base, par):
+    """Makefile / build/*.mk の変更を make の dry-run 比較で絞る。
+
+    (変異込みにする検査の集合 または None, 理由) を返す。None は全部。
+    基点は changed_files と同じ merge-base(base, HEAD)。判定の規則は上の節の注釈。"""
     if base is None:
         return None, "基点版なし (--files)"
+    p = subprocess.run(["git", "-C", ROOT, "merge-base", base, "HEAD"],
+                       capture_output=True, text=True)
+    ancestor = p.stdout.strip()
+    if p.returncode != 0 or not ancestor:
+        return None, "基点 %s と HEAD の merge-base を決められない" % base
+    if subprocess.run(["make", "--version"], capture_output=True).returncode != 0:
+        return None, "make を起動できない"
     try:
-        # changed_files uses base...HEAD; use the same merge-base for contents.
-        ancestor = git("merge-base", base, "HEAD")[0]
-        def show(p):
-            result = subprocess.run(["git", "-C", ROOT, "show", ancestor + ":" + p],
-                                    capture_output=True, text=True)
-            if result.returncode:
-                raise ValueError("基点版を読めない")
-            return result.stdout
-        before = show(path)
-        with open(os.path.join(ROOT, path), encoding="utf-8") as f:
-            after = f.read()
-        _, old_par = make_units(show("build/sdk.mk"))
-        if not old_par:
-            raise ValueError("基点版の検査列を判別できない")
-        # 変数の定義は現行の木の追跡されている Makefile 全部から集める — 別ファイルの
-        # 変数を介した間接的な eval も、参照した変数の定義まで辿って判別する。
-        # .env は読まない ([D3])。.env にしか定義の無い変数は「定義が無い」で全部。
-        texts = makefile_texts()
-        defs, problems = collect_make_defs(texts, set(texts))
-        if problems:
-            return None, "include を追えない: %s" % problems[0]
-        return narrow_make_change(before, after, old_par, par, defs)
-    except (OSError, UnicodeError, ValueError, IndexError) as e:
-        return None, "版の比較不能: %s" % e
+        texts = {"base": _base_makefiles(ancestor), "work": _work_makefiles()}
+    except (MakeError, OSError) as e:
+        return None, "版の取得不能: %s" % e
+    with tempfile.TemporaryDirectory(prefix="os32-cksel-") as td:
+        trees = {}
+        try:
+            for side in ("base", "work"):
+                trees[side] = os.path.join(td, side)
+                _overlay(trees[side], texts[side])
+            with concurrent.futures.ThreadPoolExecutor(os.cpu_count() or 2) as ex:
+                lists = {s: ex.submit(make_check_list, trees[s]) for s in trees}
+                lists = {s: f.result() for s, f in lists.items()}
+                if lists["work"] != list(par):
+                    return None, ("make の検査の列と build/sdk.mk の字面の列が一致しない "
+                                  "(%d 本 / %d 本)" % (len(lists["work"]), len(par)))
+                jobs = {}
+                for s, d in trees.items():
+                    jobs[s, "build"] = ex.submit(make_dry_run, d, MAKE_BUILD_GOALS)
+                    jobs[s, "fwd"] = ex.submit(make_dry_run, d, lists[s])
+                    jobs[s, "rev"] = ex.submit(make_dry_run, d, lists[s][::-1])
+                    for t in lists[s]:
+                        jobs[s, t] = ex.submit(make_dry_run, d, [t])
+                res = {k: f.result() for k, f in jobs.items()}
+        except MakeError as e:
+            return None, "make の展開を比べられない: %s" % e
+        except OSError as e:
+            return None, "基点の木を用意できない: %s" % e
+    if res["base", "build"] != res["work", "build"]:
+        diff = sorted(u for u in set(res["base", "build"]) | set(res["work", "build"])
+                      if res["base", "build"].get(u) != res["work", "build"].get(u))
+        return None, "ビルド (%s) の展開が変わった (目標 %s)" % (" ".join(MAKE_BUILD_GOALS), diff[0])
+    for s in trees:
+        why = _independent({t: res[s, t] for t in lists[s]}, res[s, "fwd"], res[s, "rev"])
+        if why:
+            return None, "検査をまたぐ影響 (%s の木): %s" % (s, why)
+    old, new = set(lists["base"]), set(lists["work"])
+    added, removed = new - old, old - new
+    changed = {t for t in old & new if res["base", t] != res["work", t]}
+    why = "make の展開の比較: 変わった %d 本、列に足した %d 本、列から消えた %d 本" % (
+        len(changed), len(added), len(removed))
+    if removed:
+        why += " (消えた: %s)" % " ".join(sorted(removed))
+    return changed | added, why
 
 
 # ---------------------------------------------------------------- 入力の抽出
@@ -892,7 +737,8 @@ def default_base():
 def plan(files, base=None):
     """変更の一覧から (mode, stage, mut, 説明の行) を決める。
 
-    base があるときだけ build/*.mk の基点版を git から読む。
+    base があるときだけ Makefile / build/*.mk の基点版を git から読んで make に
+    展開させる (make_narrow)。
 
     stage は回す検査 (make の目標)、mut はそのうち変異込みで回す検査。"""
     m = load_map()
@@ -902,6 +748,7 @@ def plan(files, base=None):
     full = compile_globs(m["full"])
     docs = compile_globs(m["docs_only"])
     notest = compile_notest(m["notest"])
+    mk = compile_globs(MAKE_INPUT_GLOBS)
     broad = set(m["broad"])
     checks = {t: compile_globs(g) for t, g in m["checks"].items()}
     # 走査型の検査 (broad:) の `**` を含む glob は「表に載っている」の判定に数えない
@@ -912,24 +759,33 @@ def plan(files, base=None):
     changed = [f for f in files if not matches(f, ign)]
 
     lines = []
-    hit, unmatched, full_hits, notest_hits = set(), [], [], []
+    hit, unmatched, full_hits, notest_hits, mk_hits = set(), [], [], [], []
     for f in changed:
         hit |= {t for t, cg in checks.items() if matches(f, cg)}
         if matches(f, full):
-            narrowed, why = (make_change(f, base, par) if re.fullmatch(r"build/[^/]+\.mk", f)
-                             else (None, "全体に影響するファイル"))
-            if narrowed is None:
-                full_hits.append(f)
-                lines.append("%s: 全部 — %s" % (f, why))
+            if matches(f, mk):
+                mk_hits.append(f)
             else:
-                hit |= narrowed
-                lines.append("%s: 絞り込み — %s (%s)" %
-                             (f, why, " ".join(sorted(narrowed)) or "削除のみ、追加選択なし"))
+                full_hits.append(f)
+                lines.append("%s: 全部 — 全体に影響するファイル" % f)
         elif is_notest(f, notest):
             notest_hits.append(f)
         elif not matches(f, docs) and \
                 not any(matches(f, cg) for cg in cover.values()):
             unmatched.append(f)
+    if mk_hits and not full_hits and not unmatched:
+        # Makefile / build/*.mk は make に展開させて比べる (1 回で全部の変更ファイルを見る)。
+        narrowed, why = make_narrow(base, par)
+        if narrowed is None:
+            full_hits += mk_hits
+            lines.append("%s: 全部 — %s" % (" ".join(mk_hits), why))
+        else:
+            hit |= narrowed & set(par)
+            lines.append("%s: 絞り込み — %s (%s)" %
+                         (" ".join(mk_hits), why,
+                          " ".join(sorted(narrowed & set(par))) or "追加選択なし"))
+    elif mk_hits:
+        full_hits += mk_hits          # 他の理由で全部になるので make は回さない
 
     if not changed:
         mode, st, mu = "fast", list(par), []
@@ -950,7 +806,7 @@ def plan(files, base=None):
     elif not hit:
         mode, st, mu = "fast", list(par), []
         lines += ["notest: に当たる: %s" % f for f in notest_hits[:10]]
-        lines.append("→ どのホスト試験の入力でもない変更だけ: 全部を変異なしで回す "
+        lines.append("→ 変異の選び方に足す変更が無い: 全部を変異なしで回す "
                      "(= check-fast)")
     else:
         mode = "sel"
