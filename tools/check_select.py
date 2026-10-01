@@ -27,9 +27,10 @@
     (merge-base) との差分が「追加だけ」(削除・変更行が 0) で、足した行が全部
     次の型に完全一致するときだけ: (a) CHECK_PAR_TARGETS の列への検査名の追加
     (語の集合で比べる)、(b) 新しい検査の規則 `check-<name>:` + 型どおりの recipe 行、
-    (c) 列にある既存の検査の recipe への型どおりの行の追加、(d) コメント行と空行、
-    (e) `.PHONY: check-<new>`。選ぶのは (b) の新しい検査と (c) の行を足した検査。
-    それ以外の差分 (削除・変更行、型に合わない行、define / 条件の中、継続行の途中、
+    (c) 列にある既存の検査の recipe への型どおりの行の追加、(d) コメント行と空行。
+    選ぶのは (b) の新しい検査と (c) の行を足した検査。
+    それ以外の差分 (削除・変更行、型に合わない行 (`.PHONY:` も)、define / 条件の中、
+    継続行の途中、足した非 recipe 行の直後に基点の recipe 行が来る配置、列の移動、
     追加・削除・改名されたファイル、`--files` (基点なし)) は全部 (理由を出す)。
     sdk/kapi.json は生成物を介して試験の中身が変わるので全部のまま。
   * どの検査の glob にも `docs_only:` にも `notest:` にも当たらない変更がある
@@ -233,26 +234,31 @@ def check_lists(vars_):
 # 差分の条件 (全部満たさなければ全部に倒す。理由は stderr):
 #   * 変更した make ファイルは基点にも作業中にもある (追加・削除・改名は全部)
 #   * 検査の列 (LIST_VAR の `:=` の論理行。基点・作業中とも make ファイル全体で 1 つ、
-#     同じファイル、define / 条件の外) を除いた基点の行の列が、作業中の行の列の
-#     **部分列** になっている = 削除・変更行が 0 (git diff の `-` 行 0)。列の物理行は
-#     継続 `\` の付け替えで字面が変わるので、**語の集合**で比べる: 基点の語 ⊆ 作業中の語、
-#     重複なし、語は全部 NAME_RE。増えた語 = 新しい検査の名前
+#     同じファイル、define / 条件の外) の物理行を **1 つの固定マーカー行に畳んだ** 基点の
+#     行の列が、同じく畳んだ作業中の行の列の **部分列** になっている = 削除・変更行が 0
+#     (git diff の `-` 行 0) で、列の位置も既存行に対して動いていない (同じファイル内の
+#     移動も全部 — 独立レビュー P2)。列の物理行は継続 `\` の付け替えで字面が変わるので、
+#     **語の集合**で比べる: 基点の語 ⊆ 作業中の語、重複なし、語は全部 NAME_RE。
+#     増えた語 = 新しい検査の名前
 #   * 作業中にだけある行 (足した行) は、それぞれ 1 行で 1 論理行 (継続行の途中ではない)、
 #     define / 条件の外 (make の読み方と、字下げを無視する読み方の **両方**で深さ 0)、
 #     そして次のどれかに完全一致:
 #       (a)  (列の物理行は上の語集合の比較で見る)
 #       (b)  TPL_HEADER_RE  `check-<name>:` — 前提なし。name は列に足した新しい名前で、
 #            基点のどの make ファイルにも現れない。規則は 1 つだけ。続く tab 行は
-#            次の非 tab 行 (コメント・空行は飛ばす) まで全部足した行 (既存の recipe を
-#            横取りしない) で 1 行以上
+#            次の非 tab 行 (コメント・空行は飛ばす) まで型どおりの行で 1 行以上 (既存の
+#            recipe の横取りは下の「直後に基点の tab 行」で全部)
 #       (c)  TPL_RECIPE_RE  `\tpython3 -B tools/tests/<file>.py [--flag ...] [$(MUT)|$(MUTS)]`
 #            — 持ち主 (上へ向かって tab 行・コメント・空行を飛ばした最初の行) が、
 #            基点の列にある検査の基点の規則の行 `check-<name>:…` (`=` を含まない) か、
 #            (b) の新しい規則。script は作業中の木にあり、対応表の当該検査の glob に当たる
 #       (d)  空行 (完全に空) と `#` 始まりのコメント行 (末尾 `\` なし)
-#       (e)  TPL_PHONY_RE   `.PHONY: check-<new> …` — 名前は全部 (b) の新しい名前。
-#            (b) の規則を .PHONY にする行をその場に書けるようにするため (意味は目標を
-#            phony にするだけ)。既存の `.PHONY:` 行への追記は変更行なので全部
+#     `.PHONY:` の行は型に入れない (独立レビュー P1: 既存の規則の行と recipe の間に
+#     `.PHONY: check-new` を挟むと既存の recipe が .PHONY の所属になる。新しい検査を
+#     .PHONY に載せたいなら全部に倒れるのを受け入れる — 載っていない前例はある)
+#   * 足した非 recipe 行 (規則・コメント・空行) の **直後に基点由来の tab 行が来る** 配置は
+#     全部 (既存の規則と recipe の間に挟むと所属が変わる。コメント・空行は make の上では
+#     変えないが、同じ配置はまとめて拒否する)
 #   * 列に足した名前の集合 = (b) の規則の名前の集合
 #   * 作業中の make ファイルに `.ONESHELL` が無い (recipe を 1 つの shell で回すと、
 #     足した行で既存の行の終了状態の扱いが変わる)
@@ -266,11 +272,12 @@ NAME_RE = re.compile(r"^%s$" % NAME)
 TPL_RECIPE_RE = re.compile(
     r"^\tpython3 -B tools/tests/([a-z0-9_]+\.py)((?: --[a-z][a-z-]*)*)( \$\((?:MUT|MUTS)\))?$")
 TPL_HEADER_RE = re.compile(r"^(%s):$" % NAME)
-TPL_PHONY_RE = re.compile(r"^\.PHONY:((?: %s)+)$" % NAME)
 TPL_COMMENT_RE = re.compile(r"^#(?:.*[^\\])?$")
 # 列の論理行 (継続を結合した後) と、列への代入に見える行 (これが 2 つ以上なら読まない)
 LIST_HEAD_RE = re.compile(r"^%s :=(?: (.*))?$" % LIST_VAR)
 LIST_ANY_RE = re.compile(r"^\s*(?:override\s+)?%s\s*[:+?!]*=" % LIST_VAR)
+# 列の物理行を畳む固定マーカー (NUL を含むので実物の行にはならない)
+LIST_MARKER = "\0" + LIST_VAR + "\0"
 # (c) の持ち主になれる基点の規則の行
 OWNER_RE = re.compile(r"^(%s):(?![:=])" % NAME)
 # define / 条件の深さを見る語
@@ -361,21 +368,35 @@ def find_list(texts):
     return rel, set(range(s, e + 1)), words
 
 
-def inserted_lines(base, work, exempt_b, exempt_w):
-    """基点の行 (exempt_b を除く) が作業中の行 (exempt_w を除く) の部分列なら、作業中に
-    だけある行の番号の列。部分列でなければ None (削除・変更行がある)。"""
-    wi = [i for i in range(len(work)) if i not in exempt_w]
+def collapse_list(lines, lset):
+    """列の物理行 (lset) を 1 つのマーカー行に畳む: [(元の行番号 または None, 行)]。
+    既存行に対する列の位置はそのまま残る。"""
+    out, done = [], False
+    for i, l in enumerate(lines):
+        if i in lset:
+            if not done:
+                out.append((None, LIST_MARKER))
+            done = True
+        else:
+            out.append((i, l))
+    return out
+
+
+def inserted_lines(base, work, lset_b, lset_w):
+    """列を畳んだ基点の行の列が、畳んだ作業中の行の列の部分列なら、作業中にだけある
+    行の番号の列。部分列でない (削除・変更行がある、列の位置が動いた) なら None。"""
+    bs, ws = collapse_list(base, lset_b), collapse_list(work, lset_w)
     j, matched = 0, set()
-    for b in range(len(base)):
-        if b in exempt_b:
-            continue
-        while j < len(wi) and work[wi[j]] != base[b]:
+    for _, bl in bs:
+        while j < len(ws) and ws[j][1] != bl:
             j += 1
-        if j == len(wi):
+        if j == len(ws):
             return None
-        matched.add(wi[j])
+        matched.add(j)
         j += 1
-    return [i for i in wi if i not in matched]
+    if any(k not in matched and i is None for k, (i, _) in enumerate(ws)):
+        return None                      # 作業中の列が基点の列と対応しない
+    return [i for k, (i, _) in enumerate(ws) if k not in matched and i is not None]
 
 
 def _is_skippable(text):
@@ -384,7 +405,8 @@ def _is_skippable(text):
 
 def classify_file(rel, work, inserted, base_words, new_names, m_checks):
     """1 ファイルの足した行を型に当てる。{検査名: [script]} ((b) は新しい名前、(c) は
-    基点の列の名前) と {新しい名前: 規則の数} を返す。合わなければ Reject。"""
+    基点の列の名前) と {新しい名前: 規則の数} を返す。合わなければ Reject。
+    inserted は inserted_lines() の戻り (列の物理行は入っていない)。"""
     ll = logical_lines(work)
     ok = depth_flags(ll)
     phys2log = {}
@@ -406,10 +428,17 @@ def classify_file(rel, work, inserted, base_words, new_names, m_checks):
             raise Reject("%s: 継続行の途中に足している" % where)
         if not ok[k]:
             raise Reject("%s: define / 条件の中に足している" % where)
+        if not line.startswith("\t"):
+            # 足した非 recipe 行の直後 (足した行を飛ばして次の基点の行) が tab 行なら、
+            # 既存の規則と recipe の間に挟んでいる (独立レビュー P1)
+            j = i + 1
+            while j < len(work) and j in ins:
+                j += 1
+            if j < len(work) and work[j].startswith("\t"):
+                raise Reject("%s: 足した行の直後に基点の recipe 行が来る (所属が変わる)" % where)
         if line == "" or TPL_COMMENT_RE.match(line):
             continue
         mh = TPL_HEADER_RE.match(line)
-        mp = TPL_PHONY_RE.match(line)
         mr = TPL_RECIPE_RE.match(line)
         if mh:
             name = mh.group(1)
@@ -423,17 +452,12 @@ def classify_file(rel, work, inserted, base_words, new_names, m_checks):
                     continue
                 if not t.startswith("\t"):
                     break
-                if not single_inserted(k2) or not TPL_RECIPE_RE.match(t):
-                    raise Reject("%s: 規則 %s の recipe に既存の行か型に合わない行がある"
-                                 % (where, name))
+                if not TPL_RECIPE_RE.match(t):
+                    raise Reject("%s: 規則 %s の recipe に型に合わない行がある" % (where, name))
                 n += 1
             if n == 0:
                 raise Reject("%s: 規則 %s に recipe が無い" % (where, name))
             picked.setdefault(name, [])
-        elif mp:
-            for name in mp.group(1).split():
-                if name not in new_names:
-                    raise Reject("%s: .PHONY の %s が列に足した新しい名前でない" % (where, name))
         elif mr:
             owner = None
             for k2 in range(k - 1, -1, -1):
@@ -513,8 +537,7 @@ def make_narrow(base, mk_hits, m_checks):
                 raise Reject("%s に .ONESHELL がある" % rel)
         lrel_b, lset_b, bw = find_list(bt)
         lrel_w, lset_w, ww = find_list(wt)
-        if lrel_b != lrel_w:
-            raise Reject("%s の列が別のファイルへ動いた" % LIST_VAR)
+        # 列が別のファイルへ動いた (消して足した) のはマーカーの不一致で「削除・変更行」になる
         base_words, work_words = set(bw), set(ww)
         if not base_words <= work_words:
             raise Reject("%s の列から消えた名前がある: %s"

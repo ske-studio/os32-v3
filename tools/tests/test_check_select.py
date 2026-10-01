@@ -33,7 +33,10 @@ Makefile / build/*.mk の変更は **「新しい試験を足す形」だけを�
     型の境界 — $(MUT) 以外の `$`、`;` `>` `|` `&` バッククォート、旗の文字種、末尾の空白、
     タブ以外の字下げ、列以外への名前の追加、既存名と同じ名前の新規則、列に足さない新規則、
     列に足したが規則が無い、既存の recipe の横取り、継続行の途中、列からの削除・重複、
-    script が木に無い / 対応表に無い、追加・削除・改名された .mk、--files (基点なし)
+    script が木に無い / 対応表に無い、追加・削除・改名された .mk、--files (基点なし)。
+    独立レビュー (7745a75) の P1: `.PHONY:` は型に無い、足した非 recipe 行 (規則・
+    コメント・空行) の直後に基点の recipe 行が来る配置は全部。P2: 列を同じファイル内で
+    動かしても (末尾・途中へ) 全部
   * 実物の Makefile を基点 = HEAD で比べると差が無い。実物の make ファイルを基点にして
     check-memory-host に型どおりの行を足すとその 1 本 (main の e241312 / f4989ee の形)
   * 逐次の 2 段目 (CHECK_MUT_TARGETS) は無い — 列は 1 本で全部並列
@@ -347,8 +350,8 @@ class Fixture:
     def append(self, rel, text):
         self.write(rel, pathlib.Path(self.d, rel).read_text() + text)
 
-    def add_c(self, where="build/sdk.mk", rule=C_RULE, phony=".PHONY: check-c\n"):
-        """新しい検査 check-c: 列に足し、規則 (+ .PHONY) を where の末尾に置く。"""
+    def add_c(self, where="build/sdk.mk", rule=C_RULE, phony=""):
+        """新しい検査 check-c: 列に足し、規則 (+ phony の行) を where の末尾に置く。"""
         self.edit("build/sdk.mk", LIST_OLD, LIST_NEW)
         self.append(where, phony + rule)
 
@@ -400,8 +403,8 @@ def _full(result, why=None):
 
 
 def case_mk_new_check(cs):
-    # (a)+(b)+(e): 列に足した新しい検査 1 本だけ。規則は sdk.mk でも Makefile でも、
-    # 旗・$(MUTS)・2 行の recipe・途中のコメントと空行・.PHONY なし、どれも型の中
+    # (a)+(b): 列に足した新しい検査 1 本だけ。規則は sdk.mk でも Makefile でも、
+    # 旗・$(MUTS)・2 行の recipe・途中のコメントと空行、どれも型の中 (.PHONY は書かない)
     with fixture(cs) as fx:
         fx.add_c()
         r = fx.plan()
@@ -412,7 +415,7 @@ def case_mk_new_check(cs):
         _only(fx.plan(), "check-c")
     with fixture(cs) as fx:
         fx.add_c(rule="check-c:\n\tpython3 -B tools/tests/test_c.py --quick --no-image $(MUTS)\n"
-                      "\n# second\n\tpython3 -B tools/tests/test_c2.py\n", phony="")
+                      "\n# second\n\tpython3 -B tools/tests/test_c2.py\n")
         _only(fx.plan(), "check-c")
     with fixture(cs) as fx:
         # 列の同じ物理行に足す (継続の付け替えは字面でなく語の集合で見る)
@@ -431,6 +434,12 @@ def case_mk_recipe_add(cs):
     with fixture(cs) as fx:
         fx.edit("Makefile", "check-b:\n" + B_LINE, "check-b:\n" + B_LINE + "\n# note\n" + B2)
         _only(fx.plan(), "check-b")
+    with fixture(cs) as fx:
+        # 列の位置はそのまま、列の手前と後ろにコメントを足すのは型の中
+        fx.edit("build/sdk.mk", "CHECK_PAR_TARGETS :=", "# list\nCHECK_PAR_TARGETS :=")
+        fx.edit("build/sdk.mk", LIST_OLD, LIST_OLD + "# after\n")
+        fx.append("build/sdk.mk", A2)
+        _only(fx.plan(), "check-a")
 
 
 def case_mk_comment_only(cs):
@@ -557,12 +566,36 @@ def _neg_cases():
                 "OTHER := check-c\n"):
         neg("境界 %r" % bad, lambda fx, bad=bad: fx.append("build/sdk.mk", bad))
     neg("規則の末尾の空白", lambda fx: fx.add_c(rule="check-c: \n\tpython3 -B tools/tests/test_c.py\n"))
-    neg(".PHONY の末尾の空白", lambda fx: fx.add_c(phony=".PHONY: check-c \n"))
-    neg("既存の .PHONY 行への追記", lambda fx: (fx.add_c(phony=""),
+    # 独立レビュー P1: .PHONY は型に無い。既存の規則と recipe の間に挟む配置は全部
+    neg(".PHONY の追加 (末尾)", lambda fx: fx.add_c(phony=".PHONY: check-c\n"), None, "型に合わない行")
+    neg("既存の .PHONY 行への追記", lambda fx: (fx.add_c(),
                                                fx.edit("Makefile", ".PHONY: check-b", ".PHONY: check-b check-c")),
         None, "削除・変更行")
     neg(".PHONY だけ (列に無い)", lambda fx: fx.append("build/sdk.mk", ".PHONY: check-c\n"))
-    neg(".PHONY に既存の名前", lambda fx: fx.add_c(phony=".PHONY: check-c check-a\n"))
+    neg(".PHONY を規則と recipe の間に (astra の反例)",
+        lambda fx: (fx.edit("build/sdk.mk", LIST_OLD, LIST_NEW),
+                    fx.edit("build/sdk.mk", "check-a:\n" + A_LINE, "check-a:\n.PHONY: check-c\n" + A_LINE),
+                    fx.append("build/sdk.mk", C_RULE)))
+    neg("コメントを規則と recipe の間に", lambda fx: fx.edit("build/sdk.mk", "check-a:\n" + A_LINE, "check-a:\n# c\n" + A_LINE),
+        None, "直後に基点の recipe 行")
+    neg("空行を規則と recipe の間に", lambda fx: fx.edit("build/sdk.mk", "check-a:\n" + A_LINE, "check-a:\n\n" + A_LINE),
+        None, "直後に基点の recipe 行")
+    neg("コメントを recipe と recipe の間に", lambda fx: fx.edit("Makefile", B_LINE + B2, B_LINE + "# c\n" + B2),
+        {"Makefile": FX_MAKEFILE.replace("check-b:\n" + B_LINE, "check-b:\n" + B_LINE + B2)}, "直後に基点の recipe 行")
+    neg("新規則 + コメント + 空行の後に既存の recipe",
+        lambda fx: (fx.edit("build/sdk.mk", LIST_OLD, LIST_NEW),
+                    fx.edit("build/sdk.mk", "check-a:\n" + A_LINE, "check-a:\n" + C_RULE + "# c\n\n" + A_LINE)),
+        None, "直後に基点の recipe 行")
+    # 独立レビュー P2: 列の移動 (同じファイル内) は位置が変わるので全部
+    neg("列を末尾へ", lambda fx: (fx.edit("build/sdk.mk", "CHECK_PAR_TARGETS := check-a \\\n    check-b\n", ""),
+                              fx.append("build/sdk.mk", "CHECK_PAR_TARGETS := check-a \\\n    check-b\n")),
+        None, "削除・変更行")
+    neg("列を途中へ", lambda fx: (fx.edit("build/sdk.mk", "CHECK_PAR_TARGETS := check-a \\\n    check-b\n", ""),
+                              fx.edit("build/sdk.mk", "MUTATE ?= 1\n", "MUTATE ?= 1\nCHECK_PAR_TARGETS := check-a check-b\n")),
+        None, "削除・変更行")
+    neg("列を末尾へ + 名前の追加", lambda fx: (fx.edit("build/sdk.mk", "CHECK_PAR_TARGETS := check-a \\\n    check-b\n", ""),
+                                       fx.append("build/sdk.mk", "CHECK_PAR_TARGETS := check-a check-b check-c\n" + C_RULE)),
+        None, "削除・変更行")
     neg("既存名と同じ名前の新規則", lambda fx: fx.append("build/sdk.mk", "check-a:\n" + A2))
     neg("列に足さない新規則", lambda fx: fx.append("build/sdk.mk", C_RULE))
     neg("列に足したが規則が無い", lambda fx: fx.edit("build/sdk.mk", LIST_OLD, LIST_NEW))
@@ -645,6 +678,13 @@ def case_mk_real_tree(cs):
         r = fx.plan(files=["build/sdk.mk", "Makefile"], map_=m)
         _fast(r)
         assert any("新しい検査 0 本" in l and "追加選択なし" in l for l in r[3]), r[3]
+        # 実物の列を末尾へ移す (astra の P2 の反例) → 全部
+        sdk = pathlib.Path(fx.d, "build/sdk.mk").read_text(encoding="utf-8")
+        a = sdk.index("CHECK_PAR_TARGETS :=")
+        b = sdk.index("check-par: $(CHECK_PAR_TARGETS)")
+        fx.write("build/sdk.mk", sdk[:a] + sdk[b:] + sdk[a:b])
+        _full(fx.plan(files=["build/sdk.mk"], map_=m), "削除・変更行")
+        fx.write("build/sdk.mk", sdk)
         fx.edit("build/sdk.mk", "\tpython3 -B tools/tests/test_ledger.py $(MUT)\n",
                 "\tpython3 -B tools/tests/test_ledger.py $(MUT)\n"
                 "\tpython3 -B tools/tests/test_ledger.py --again $(MUT)\n")
@@ -719,7 +759,7 @@ GLOB_MUTATIONS = [
 ]
 # Makefile の型の一致 (2026-10-01)。どれも make の筋書き (case_mk_*) で RED になる
 MK_MUTATIONS = [
-    ('        if j == len(wi):\n            return None', '        if j == len(wi):\n            break',
+    ('        if j == len(ws):\n            return None', '        if j == len(ws):\n            break',
      "削除・変更行を見ない (基点の行が作業中に無くても追加だけと見なす)"),
     ('((?: --[a-z][a-z-]*)*)', '(.*)',
      "recipe の型を緩める (旗の後ろに何でも許す — `;` `>` `$(FOO)`)"),
@@ -731,17 +771,12 @@ MK_MUTATIONS = [
      "列の集合比較を外す (列から消えた名前を見ない)"),
     ('    if len(words) != len(set(words)):', '    if False:',
      "列の重複を見ない"),
-    ('        if lrel_b != lrel_w:', '        if False:',
-     "列が別のファイルへ動いても (消して足しても) 見ない"),
     ('        if not ok[k]:', '        if False:',
      "define / 条件の深さを見ない"),
     ('        if not text.startswith("\\t"):', '        if False:',
      "make の読み方 (tab 行は endef にならない) を外して字下げを無視する読みだけにする"),
     ('        if not single_inserted(k):', '        if False:',
      "継続行の途中への挿入を見ない"),
-    ('                if not single_inserted(k2) or not TPL_RECIPE_RE.match(t):',
-     '                if not TPL_RECIPE_RE.match(t):',
-     "新しい規則が既存の recipe の行を横取りしても見ない"),
     ('            elif ll[k2][0] in ins or name not in base_words:', '            elif False:',
      "持ち主が基点の列にある検査でなくても recipe の追加と見なす"),
     ('            if not mo or "=" in t:', '            if not mo:',
@@ -750,11 +785,12 @@ MK_MUTATIONS = [
      "script が木に無くても選ぶ"),
     ('            if not matches(script, m_checks.get(name, [])):', '            if False:',
      "script が対応表の当該検査の glob に無くても選ぶ"),
-    ('            for name in mp.group(1).split():\n                if name not in new_names:',
-     '            for name in mp.group(1).split():\n                if False:',
-     ".PHONY の名前が新しい名前でなくても許す"),
     ('            if n == 0:\n                raise Reject', '            if False:\n                raise Reject',
      "recipe の無い新規則を許す"),
+    ('            if j < len(work) and work[j].startswith("\\t"):', '            if False:',
+     "足した非 recipe 行の直後に基点の recipe 行が来る配置を見ない (P1: 所属の変更)"),
+    ('                out.append((None, LIST_MARKER))', '                pass',
+     "列の物理行を除くだけで位置を保たない (P2: 同じファイル内の列の移動が追加だけに見える)"),
     ('        if set(headers) != new_names or any(n != 1 for n in headers.values()):',
      '        if False:',
      "列に足した名前と新しい規則の集合を突き合わせない"),
