@@ -235,6 +235,10 @@ KernelAPI の構造体を変えたときは `make clean` → `make all` が必�
 - **変異の切り替え**: recipe は `--mutate` / `--mutants` の代わりに `$(MUT)` / `$(MUTS)` と書く。
   `MUTATE=1` (既定) で付く、`MUTATE=0` で付かない、`MUTATE=sel` なら `MUTATE_TARGETS` に
   名前のある検査だけ付く。新しい変異試験を足すときもこの書き方にする。
+- **`check-changed` は作業中の近道 (目安) で、取りこぼしの保証はしない** (ユーザー承認 2026-10-01)。
+  保証は取り込み (PM) の `make check` (全部を変異込み) が担う。そのため絞り込みの型 (対応表の glob も
+  Makefile の許可リストも) は保守的な許可リストにとどめ、わざと作った入力への耐性は目標にしない。
+  全体の検査はマシンが空いているときに流す (並行負荷で落ちる時間依存の試験がある)。
 - **`check-changed` の選び方** (`tools/check_select.py`、対応表は `tools/check_map.yaml`):
   変更 = `git diff --name-only --no-renames $(BASE)...HEAD` + 未コミット + 追跡外。`BASE` の既定は
   `feat/gui` との merge-base。**`feat/gui` の上でコミットした後は merge-base == HEAD になるので
@@ -250,6 +254,8 @@ KernelAPI の構造体を変えたときは `make clean` → `make all` が必�
     `-j` の独立性を保証できない、`$(MAKE)` / `$(shell)` の副作用が実物の木に及ぶ) で撤去。**make は
     呼ばない**ので副作用の問題が消える):
     - **差分の条件**: 基点 (merge-base) との差分が**追加だけ** (削除・変更行が 0 = `git diff` の `-` 行 0)。
+      行は **LF だけ**で分ける (`splitlines()` は VT / FF / CR / NEL なども境界にして変更を消す)。末尾の LF の
+      有無は差に数えない。足した行に制御文字 (CR・VT など) があれば全部。
       検査の列 `CHECK_PAR_TARGETS :=` の物理行だけは継続 `\` の付け替えで字面が変わるので、
       両版とも 1 つの固定マーカー行に畳んでから部分列を見て (既存行に対する**位置**は保つ — 同じ
       ファイル内で列を動かすのも全部)、中身は**語の集合**で比べる (基点の語 ⊆ 今の語、重複なし。
@@ -267,7 +273,9 @@ KernelAPI の構造体を変えたときは `make clean` → `make all` が必�
         ものは全部拒否。持ち主は、上へ **tab 行だけ**を辿って着く基点の列にある検査の**基点の**規則の行
         (`check-<name>:…`、`=` を含まない)。**その検査の recipe は規則行の直後から連続する tab 行だけ**
         (途中に基点のコメント・空行・条件ディレクティブなど非 tab 行を含まず、連続の後ろにそれらを挟んで
-        tab 行が続かない — make はそれらで recipe を切らない)。足す位置はその連続の中 (行のあいだ) か直後。
+        tab 行が続かない — make はそれらで recipe を切らない)。規則の行は基点の独立した論理行 (直前の物理行が
+        奇数個の `\` で終わっていない — `\t@echo \` の次の `check-a:` は echo の続き — で、それ自身も継続で
+        終わらない)。足す位置はその連続の中 (行のあいだ) か直後。
         末尾の塊の新しい規則の後ろの recipe 行はその規則のもの。script は木にあり、
         対応表 (`tools/check_map.yaml`) の当該検査の glob に当たる (当たらなければ全部)
       - (d) 空行 (完全に空) と `#` 始まりのコメント行 (末尾 `\` なし) — 末尾の塊の中か、**前後どちらにも基点の
@@ -311,8 +319,9 @@ KernelAPI の構造体を変えたときは `make clean` → `make all` が必�
   辿り方は静的なので、ツリーを舐める検査器 (`check-arch-asm` など) は glob を手で広く書いてある。
   表が欠けても `sel` の場合は**試験そのものは変異なしで必ず回る** — 落とすのは否定側だけ。
   docs だけの変更では当たらない検査は回らないので、文書を読む検査は `docs_always:` に入れておく。
-  選び方そのものの試験は `make check-check-select-host` (`tools/tests/test_check_select.py`、変異 41 本 —
-  Makefile の反例は一時の git リポジトリ + 小さい Makefile で再現する)。
+  選び方そのものの試験は `make check-check-select-host` (`tools/tests/test_check_select.py`、変異 44 本 —
+  Makefile の反例は一時の git リポジトリ + 小さい Makefile で再現する。変異は `mutpar` (`OS32_MUT_JOBS`) で
+  並列、fixture のリポジトリは基点の内容ごとに 1 回作って写す。`OS32_MUT_JOBS=4` で約 1 分)。
 - 新しい検査を列に足したら `python3 tools/check_select.py --suggest <検査名>` の出力を
   下書きにして対応表へ足す (`make check-map` が足りないと言う)。
 - `tools/check_tree_unchanged.py` の番人 ([POLICY_DEBUG §4-40](POLICY_DEBUG.md)) は 3 通りとも段の前後で回る。

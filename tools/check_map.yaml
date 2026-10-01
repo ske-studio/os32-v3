@@ -1,5 +1,9 @@
 # tools/check_map.yaml — 検査 → 入力のパス (glob) の対応表 (make check-changed)
 #
+# check-changed の絞り込みは**作業中の近道 (目安)** で、取りこぼしの保証はしない。保証は
+# 取り込み (PM) の `make check` (全部を変異込み) が担う。そのため絞り込みの型は保守的な
+# 許可リストにとどめ、わざと作った入力への耐性は目標にしない (ユーザー承認 2026-10-01)。
+#
 # 読むのは tools/check_select.py。規則はそこの docstring と docs/08_build.md §8-4:
 #   * 変更が checks: の glob に当たった検査 → 変異込み、当たらなかった検査 → 変異なし
 #   * full: に当たる変更、または どの glob にも docs_only: にも notest: にも当たらない
@@ -2719,6 +2723,7 @@ checks:
     - docs/08_build.md
     - tools/check_map.yaml
     - tools/check_select.py
+    - tools/tests/mutpar.py
     - tools/tests/test_check_select.py
     - userland/shell/sh_pipe.inc
     - userland/system/hsync_protect.inc

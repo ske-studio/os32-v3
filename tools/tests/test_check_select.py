@@ -40,7 +40,9 @@ Makefile / build/*.mk の変更は **「新しい試験を足す形」だけを�
     (規則だけ / 規則 + 足した recipe / コメントだけ / 空行だけ) も全部。d5dbb6e の P1
     (基点の ifeq 越し) → ユーザー決定: 新規則はファイル末尾の塊だけ、既存の検査への行は
     recipe が規則行の直後から連続する tab 行だけのときだけ、コメント・空行は末尾の塊か
-    基点の tab 行に接しない場所だけ (それぞれの条件を外す変異が RED)
+    基点の tab 行に接しない場所だけ (それぞれの条件を外す変異が RED)。15f335c の P1:
+    継続行の後半 (`\t@echo \\` の次の `check-a:`) を持ち主にしない、LF だけで行を分ける
+    (VT / CR で 2 行を 1 行にした変更を消さない)、制御文字を含む足した行は全部
   * 実物の Makefile を基点 = HEAD で比べると差が無い。実物の make ファイルを基点にして
     check-memory-host に型どおりの行を足すとその 1 本 (main の e241312 / f4989ee の形)
   * 逐次の 2 段目 (CHECK_MUT_TARGETS) は無い — 列は 1 本で全部並列
@@ -49,8 +51,10 @@ Makefile / build/*.mk の変更は **「新しい試験を足す形」だけを�
   python3 -B tools/tests/test_check_select.py --mutate   # 否定側 (選び方を壊して RED か)
 
 変異は check_select.py の**写しの文字列**に当てて exec するので、実物は書き換えない
-(check-par で回せる)。
+(check-par で回せる)。変異は mutpar (OS32_MUT_JOBS、プロセス) で並列に回し、fixture の
+一時リポジトリは基点の内容ごとに 1 回作って写す。
 """
+import atexit
 import contextlib
 import io
 import os
@@ -60,6 +64,9 @@ import subprocess
 import sys
 import tempfile
 import types
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import mutpar  # noqa: E402  (tools/tests/mutpar.py、同じディレクトリ — 変異の並列)
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SRC = ROOT / "tools/check_select.py"
@@ -322,24 +329,48 @@ LIST_OLD = "    check-b\n"
 LIST_NEW = "    check-b \\\n    check-c\n"
 
 
+_TEMPLATES = {}          # 基点の内容 → 作った一時リポジトリ (git init + commit は内容ごとに 1 回)
+_TEMPLATE_ROOT = None
+
+
+def _template_for(base):
+    """基点の内容が同じ fixture はリポジトリを 1 回だけ作り、以後は写しで済ます
+    (約 90 本の反例で git init + commit が支配的だった — 2026-10-01 実測)。
+    プロセスごとに別の置き場 (変異の並列はプロセス)。終了時に消す。"""
+    global _TEMPLATE_ROOT
+    key = tuple(sorted(base.items()))
+    d = _TEMPLATES.get(key)
+    if d is None:
+        if _TEMPLATE_ROOT is None:
+            _TEMPLATE_ROOT = tempfile.mkdtemp(prefix="os32-ckmk-tpl-")
+            atexit.register(shutil.rmtree, _TEMPLATE_ROOT, True)
+        d = tempfile.mkdtemp(prefix="t", dir=_TEMPLATE_ROOT)
+        git(d, "init", "-q", "-b", "main")
+        git(d, "config", "user.email", "t@example.invalid")
+        git(d, "config", "user.name", "t")
+        for rel, text in base.items():
+            p = pathlib.Path(d, rel)
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(text)
+        git(d, "add", ".")
+        git(d, "commit", "-q", "-m", "base")
+        _TEMPLATES[key] = d
+    return d
+
+
 class Fixture:
-    """基点のコミット (main) を持つ一時リポジトリ。write() / edit() / append() は作業中の
-    変更 (未コミット)。"""
+    """基点のコミット (main) を持つ一時リポジトリ (雛形の写し)。write() / edit() / append()
+    は作業中の変更 (未コミット)。"""
 
     def __init__(self, cs, files=None):
         self.cs = cs
-        self.d = tempfile.mkdtemp(prefix="os32-ckmk-")
         base = {"Makefile": FX_MAKEFILE, "build/sdk.mk": FX_SDK, "build/config.mk": FX_CONFIG,
                 "sdk/kapi.json": "{}", "gen.txt": "x\n"}
         base.update({s: "" for s in FX_SCRIPTS})
         base.update(files or {})
-        git(self.d, "init", "-q", "-b", "main")
-        git(self.d, "config", "user.email", "t@example.invalid")
-        git(self.d, "config", "user.name", "t")
-        for rel, text in base.items():
-            self.write(rel, text)
-        git(self.d, "add", ".")
-        git(self.d, "commit", "-q", "-m", "base")
+        self.d = tempfile.mkdtemp(prefix="os32-ckmk-")
+        os.rmdir(self.d)
+        shutil.copytree(_template_for(base), self.d, symlinks=True)
 
     def write(self, rel, text):
         p = pathlib.Path(self.d, rel)
@@ -609,6 +640,19 @@ def _neg_cases():
     neg("recipe の連続の後ろに基点の ifeq + tab 行がある検査への追加",
         lambda fx: fx.edit("build/sdk.mk", A_LINE, A_LINE + A2),
         {"build/sdk.mk": FX_SDK + IFEQ}, "越しに続いている")
+    # 独立レビュー 4 回目: 継続行の後半を規則行と誤認しない / LF 以外を行境界にしない
+    CONT = "check-b:\n\t@echo \\\ncheck-a:\n\t@true\n"
+    neg("継続行の後半 check-a: を持ち主にしない (astra 4 回目)",
+        lambda fx: fx.edit("build/sdk.mk", "\t@true\n", "\t@true\n" + A2),
+        {"build/sdk.mk": FX_SDK.replace("check-a:\n" + A_LINE, CONT)}, "継続行の途中")
+    neg("持ち主の規則行が継続で終わる", lambda fx: fx.edit("build/sdk.mk", "\tdep\n", "\tdep\n" + A2),
+        {"build/sdk.mk": FX_SDK.replace("check-a:\n" + A_LINE, "check-a: \\\n\tdep\n")}, "継続行の途中")
+    neg("VT で 2 行を 1 行にする (astra 4 回目: splitlines なら差が消える)",
+        lambda fx: fx.edit("build/sdk.mk", "check-a:\n" + A_LINE, "check-a:\x0b" + A_LINE), None, "削除・変更行")
+    neg("CR で 2 行を 1 行にする", lambda fx: fx.edit("build/sdk.mk", "check-a:\n" + A_LINE, "check-a:\r" + A_LINE),
+        None, "削除・変更行")
+    neg("CR を含むコメント (末尾の塊)", lambda fx: fx.append("build/sdk.mk", "# c\r\n"), None, "制御文字")
+    neg("VT を含む recipe 行", lambda fx: fx.append("build/sdk.mk", "\tpython3 -B tools/tests/test_a2.py\x0b$(MUT)\n"), None, "制御文字")
     neg("recipe の連続の後ろに基点の空行 + tab 行がある検査への追加",
         lambda fx: fx.edit("build/sdk.mk", A_LINE, A_LINE + A2),
         {"build/sdk.mk": FX_SDK + "\n\tpython3 -B tools/tests/test_a2.py\n"}, "越しに続いている")
@@ -678,6 +722,9 @@ def _neg_cases():
     return out
 
 
+_QUIET = False           # 変異の中 (run_cases(quiet=True)) — 反例は最初の 1 件で打ち切る
+
+
 def case_mk_negative(cs):
     # 全部に倒すか、選択器が断る (SystemExit — 列の字面が読めない `+=` など。make
     # check-changed が rc≠0 で止まる = 安全側) のどちらか
@@ -691,6 +738,8 @@ def case_mk_negative(cs):
                 pass
             except AssertionError as e:
                 bad.append("%s: %s" % (name, str(e)[:300]))
+                if _QUIET:
+                    break
     assert not bad, "\n".join(bad)
 
 
@@ -741,6 +790,8 @@ CASES = [case_inc_extract, case_hsync_protect, case_sh_pipe, case_bare_extract,
 
 
 def run_cases(cs, quiet=False, cases=None):
+    global _QUIET
+    _QUIET = quiet
     failed = []
     for c in CASES if cases is None else cases:
         try:
@@ -820,6 +871,12 @@ MK_MUTATIONS = [
      "持ち主が基点の列にある検査でなくても recipe の追加と見なす"),
     ('                if j < 0 or j in ins or not mo or "=" in t:', '                if j < 0 or j in ins or not mo:',
      "target-specific 変数の行 (check-a: V = …) を持ち主にできる"),
+    ('                if (j > 0 and continued(work[j - 1])) or continued(t):', '                if False:',
+     "継続行の後半 (`\\t@echo \\\\` の次の check-a:) を持ち主の規則行と誤認する (4 回目 P1)"),
+    ('    return text.split("\\n")', '    return text.splitlines()',
+     "LF 以外 (VT / FF / CR …) も行境界にして実際の行の変更を消す (4 回目 P1)"),
+    ('        if CTRL_RE.search(line):', '        if False:',
+     "制御文字 (CR など) を含む足した行を許す"),
     ('            if not os.path.isfile(os.path.join(ROOT, script)):', '            if False:',
      "script が木に無くても選ぶ"),
     ('            if not matches(script, m_checks.get(name, [])):', '            if False:',
@@ -864,29 +921,39 @@ MK_MUTATIONS = [
 MUTATIONS = GLOB_MUTATIONS + MK_MUTATIONS
 
 
-def mutate():
+def _run_mutation(i):
+    """変異 i (1 始まり) を check_select.py の写しの文字列に当てて筋書きを回す。
+    (i, 状態, 最初に落ちたケース名または例外の repr)。mutpar の processes=True で
+    プロセスごとに回す (fixture の一時リポジトリはプロセスごとに別、実物は読むだけ)。"""
     original = SRC.read_text(encoding="utf-8")
-    bad = 0
+    old, new, why = MUTATIONS[i - 1]
+    if original.count(old) != 1:
+        return i, "NOT APPLICABLE", ""
     glob_cases = [c for c in CASES if not c.__name__.startswith("case_mk_")]
     mk_cases = [c for c in CASES if c.__name__.startswith("case_mk_")]
-    for i, (old, new, why) in enumerate(MUTATIONS, 1):
-        if original.count(old) != 1:
-            print("MUTATION %d NOT APPLICABLE: %s" % (i, why), flush=True)
-            bad += 1
-            continue
-        try:
-            cs = load(original.replace(old, new))
-            # make の変異は fixture (速い) を先に、実物の木の lint は後ろに
-            cases = mk_cases + glob_cases if i > len(GLOB_MUTATIONS) else glob_cases + mk_cases
-            failed = run_cases(cs, quiet=True, cases=cases)
-        except Exception as e:           # noqa: BLE001
-            print("MUTATION %d INVALID (load): %r" % (i, e), flush=True)
-            bad += 1
-            continue
-        if failed:
-            print("MUTATION %d RED (%s): %s" % (i, failed[0], why), flush=True)
-        else:
+    try:
+        cs = load(original.replace(old, new))
+        # make の変異は fixture (速い) を先に、実物の木の lint は後ろに
+        cases = mk_cases + glob_cases if i > len(GLOB_MUTATIONS) else glob_cases + mk_cases
+        failed = run_cases(cs, quiet=True, cases=cases)
+    except Exception as e:           # noqa: BLE001
+        return i, "INVALID", repr(e)
+    return i, ("RED" if failed else "GREEN"), (failed[0] if failed else "")
+
+
+def mutate():
+    """変異を並列に回す (mutpar、OS32_MUT_JOBS)。結果は変異の番号順に出す。"""
+    bad = 0
+    for i, status, info in mutpar.run_ordered(_run_mutation, range(1, len(MUTATIONS) + 1),
+                                              processes=True):
+        why = MUTATIONS[i - 1][2]
+        if status == "RED":
+            print("MUTATION %d RED (%s): %s" % (i, info, why), flush=True)
+        elif status == "GREEN":
             print("MUTATION %d **GREEN (見逃し)**: %s" % (i, why), flush=True)
+            bad += 1
+        else:
+            print("MUTATION %d %s%s: %s" % (i, status, " (load): " + info if info else "", why), flush=True)
             bad += 1
     return bad
 

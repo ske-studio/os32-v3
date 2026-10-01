@@ -2,6 +2,12 @@
 # -*- coding: utf-8 -*-
 """check_select.py — 変更したファイルから「変異込みで回す検査」を選ぶ (make check-changed)。
 
+**check-changed の絞り込みは作業中の近道 (目安) で、取りこぼしの保証はしない。** 保証は
+取り込み (PM) の `make check` (全部を変異込み) が担う。そのため絞り込みの型 (Makefile の
+許可リストも対応表も) は保守的な許可リストにとどめ、わざと作った入力への耐性は目標に
+しない。全体の検査はマシンが空いているときに流す (並行負荷で落ちる時間依存の試験が
+ある)。(ユーザー承認 2026-10-01)
+
 `make check` は全部の検査を変異込みで回すので約 10 分かかる (2026-09-26 実測)。
 変異試験 (否定側) が意味を持つのは**その試験が見ているソースを変えたとき**だけ
 なので、変更したファイルに関係する検査だけ変異込みで回し、残りは変異なしで回す。
@@ -298,14 +304,33 @@ class Reject(Exception):
     """型に合わない — 全部に倒す理由。"""
 
 
+# 足した行に許さない制御文字 (LF 以外の行境界に見える文字 — VT / FF / CR / \x1c-\x1e /
+# NEL / LS / PS — と、その他の制御文字。tab は型の先頭にだけ現れる)
+CTRL_RE = re.compile("[\x00-\x08\x0b-\x1f\x7f\x85\u2028\u2029]")
+
+
+def split_lf(data):
+    """bytes を LF ('\\n') だけで行に分ける (str.splitlines() は VT / FF / CR / \x1c-\x1e /
+    NEL なども行境界にして実際の行の変更を消す — 独立レビュー 4 回目)。末尾の LF 1 つは
+    行に数えない (末尾の改行の有無は差に数えない)。"""
+    text = data.decode("utf-8", "replace")
+    if text.endswith("\n"):
+        text = text[:-1]
+    return text.split("\n")
+
+
+def continued(text):
+    """make の継続規則: 末尾の `\\` が奇数個なら次の物理行と結ぶ (recipe の行も同じ)。"""
+    n = len(text) - len(text.rstrip("\\"))
+    return n % 2 == 1
+
+
 def logical_lines(lines):
-    """物理行の列を make の論理行 [(start, end, 結合した文字列)] にする。
-    末尾が `\\` の行は次の行と結ぶ (make は奇数個の `\\` だけ結ぶが、ここは末尾が `\\` なら
-    全部結ぶ = 足した行を「継続行の途中」と見る側に多めに倒す)。"""
+    """物理行の列を make の論理行 [(start, end, 結合した文字列)] にする (continued())。"""
     out, i = [], 0
     while i < len(lines):
         s, text = i, lines[i]
-        while text.endswith("\\") and i + 1 < len(lines):
+        while continued(text) and i + 1 < len(lines):
             i += 1
             text = text[:-1] + " " + lines[i].strip()
         out.append((s, i, text))
@@ -459,6 +484,8 @@ def classify_file(rel, work, inserted, base_words, new_names, m_checks):
             raise Reject("%s: 継続行の途中に足している" % where)
         if not ok[k]:
             raise Reject("%s: define / 条件の中に足している" % where)
+        if CTRL_RE.search(line):
+            raise Reject("%s: 制御文字を含む行" % where)
         in_tail = i >= tail_start
         if line == "" or TPL_COMMENT_RE.match(line):
             if not in_tail:
@@ -493,6 +520,11 @@ def classify_file(rel, work, inserted, base_words, new_names, m_checks):
                 if j < 0 or j in ins or not mo or "=" in t:
                     raise Reject("%s: 持ち主が基点の検査の規則の行でない (recipe は規則行の直後から"
                                  "連続する tab 行だけ): %r" % (where, t[:60]))
+                # 規則行は基点の独立した論理行の先頭 (直前の物理行が継続で終わっていない —
+                # `\t@echo \\` の次の `check-a:` は echo の続き。独立レビュー 4 回目) で、
+                # それ自身も継続で終わらない
+                if (j > 0 and continued(work[j - 1])) or continued(t):
+                    raise Reject("%s: 持ち主候補 %r が継続行の途中" % (where, t[:60]))
                 name = mo.group(1)
                 if name not in base_words:
                     raise Reject("%s: 持ち主 %s が基点の列にない" % (where, name))
@@ -521,28 +553,35 @@ def classify_file(rel, work, inserted, base_words, new_names, m_checks):
 
 def _base_texts(ancestor):
     """基点のコミットにある MAKE_INPUT_GLOBS のファイル {相対パス: 行の列}。
-    行は splitlines() (末尾の改行の有無は差に数えない — 末尾の塊の判定を乱さないため)。"""
+    行は split_lf() (LF だけで分け、末尾の改行の有無は差に数えない)。"""
     mk = compile_globs(MAKE_INPUT_GLOBS)
     p = subprocess.run(["git", "-C", ROOT, "ls-tree", "-r", "--name-only", ancestor,
                         "--", "Makefile", "build"], capture_output=True, text=True)
     if p.returncode != 0:
         raise Reject("基点 %s の木を読めない" % ancestor[:12])
-    out = {}
-    for rel in p.stdout.splitlines():
-        if matches(rel, mk):
-            q = subprocess.run(["git", "-C", ROOT, "show", "%s:%s" % (ancestor, rel)],
-                               capture_output=True)
-            if q.returncode != 0:
-                raise Reject("基点版 %s を読めない" % rel)
-            out[rel] = q.stdout.decode("utf-8", "replace").splitlines()
+    rels = [rel for rel in p.stdout.splitlines() if matches(rel, mk)]
+    # 1 回の cat-file --batch で全部読む (ファイルごとの git show より速い)
+    q = subprocess.run(["git", "-C", ROOT, "cat-file", "--batch"], capture_output=True,
+                       input="".join("%s:%s\n" % (ancestor, rel) for rel in rels).encode())
+    if q.returncode != 0:
+        raise Reject("基点 %s の版を読めない" % ancestor[:12])
+    out, data, pos = {}, q.stdout, 0
+    for rel in rels:
+        nl = data.find(b"\n", pos)
+        head = data[pos:nl].split()
+        if nl < 0 or len(head) != 3 or head[1] != b"blob":
+            raise Reject("基点版 %s を読めない" % rel)
+        size = int(head[2])
+        out[rel] = split_lf(data[nl + 1:nl + 1 + size])
+        pos = nl + 1 + size + 1
     return out
 
 
 def _work_texts():
     out = {}
     for rel in makefile_paths():
-        with open(os.path.join(ROOT, rel), encoding="utf-8", errors="replace") as f:
-            out[rel] = f.read().splitlines()
+        with open(os.path.join(ROOT, rel), "rb") as f:
+            out[rel] = split_lf(f.read())
     return out
 
 
