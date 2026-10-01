@@ -1027,6 +1027,12 @@ full (全変異込み) へ拡張した。C方言27/27 RED・正常対照5/5 GREE
 ログ: `/home/hight/os32-tmp/d3-review-check-changed.log`。
 検査中はソースを変更せず、終了後は本結果の追記だけ。
 
+## 10-10. d3 の着地とゲスト受入 (PM、2026-10-02、NP21/W 17MB、main `1c00078`)
+
+独立レビュー Opus 5.5 は P1 なしで Approve、P2-1 (実物の walk への「登録者 PD → 現在 CR3」の変異が生き残る — 試験の強さの低下) と P3-1・P3-3 をコーダー (sol) が直し (`ca14075`)、同じレビュアーが差分で Approve (walk の変異 23/23 実行時 RED)。残りの P3 は §10-9 の申し送り (P3-2 → d6、P3-4 → d5、P3-5 → d4、P3-6 → d5 の前、P3-7 → e)。予算: d の枠の残り 2,620B (d4〜d6 の見込み 1.0〜1.8KB)。
+
+ゲスト (17MB、今の ini — §12): kselftest 0 fail、`klibc_test` 49/49、`alloc_demo` 16/16、`ring3_fault` kill、`ls / | wc -l` = 54、`echo abc | wc -c` = 4、`d0a_test` 全行 OK、faulttest 一式・V86・GUI (gui_demo → CUI) 従来どおり。`ring3_caller_reject_count` = 0、`redir_refuse_count` = 0、kill 8 件はすべて意図したもの、取り残し 0、深さ 0。
+
 ## 11. 独立レビュー 2 回目 (Opus 5.5、Approve) の P3 — 実装時の注記
 
 2026-10-01、`3180a51` の差分に対して Approve (P1 2 件・P2 11 件はすべて閉)。以下の 5 件は設計の変更ではなく、実装時に従う注記 (PM 記入)。
