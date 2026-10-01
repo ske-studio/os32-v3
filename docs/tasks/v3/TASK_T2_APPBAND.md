@@ -1,6 +1,6 @@
 # TASK_T2_APPBAND — T2: アプリ帯 + lease 窓 (設計票)
 
-> 状態: **実装中 (2026-10-01)** — 独立レビュー (Fable 5.1) Approve、固定 PT の置き場は 0x3F1000 (ユーザー決定・PM の実測)。**T2a・T2a′・T2b 着地** (`ce5a2a9`・`279272d`・`c06df8d`、NP21/W 8/17MB の受入は §5-1 — park → resume 後、R1 panic の故障ゲスト、Ra266 64MB / PCM は未実施)。次は T2c。D1〜D36 を変更せず、T2a〜T2h の間に T2a′ を加える (§5)。
+> 状態: **実装中 (2026-10-01)** — 独立レビュー (Fable 5.1) Approve、固定 PT の置き場は 0x3F1000 (ユーザー決定・PM の実測)。**T2a・T2a′・T2b・T2c 着地** (`ce5a2a9`・`279272d`・`c06df8d`・`6aacf43`、NP21/W 8/17MB の受入は §5-1 — park → resume 後、R1 panic の故障ゲスト、Ra266 64MB は未実施)。**ここで一旦止め、T2d〜T2h の詳細設計書を Codex astra が書いてから実装する** (ユーザー指示 2026-10-01)。D1〜D36 を変更せず、T2a〜T2h の間に T2a′ を加える (§5)。
 >
 > 発行・改訂: GPT-6-astra / Codex (設計者)。初稿調査基点 `b5cd920`、1 回目の確認基点 `705a227`、2 回目の改訂 GPT-6 / Codex、確認基点 `8a7bf4c` (`wt/t2-design`)。以下の `file:line` は初回の実コード調査を引き継ぎ、2 回目の対象箇所は `8a7bf4c` で再確認した。今回の作業はこの worktree の文書だけ、commit / push・配備・NP21/W・NHD・ini・Windows 側の操作なし。
 > 決定の正典: [TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) §0・§2-2・§2-3 ⑥・§3-5・§6 T2・§7・§8-4。位置づけ: [V3_PLAN](V3_PLAN.md) P1 / P7。引継ぎ: [TASK_T1_LEDGER](TASK_T1_LEDGER.md) §1-2・§4-1-R〜§4-6-N。B1: [FEP_BOUNDARY](../settings/FEP_BOUNDARY.md) §4 (D31 で T2 に移管)。
@@ -557,6 +557,18 @@ kselftest.cのAS/paging/exec検査と呼出先を見直し、他の実行時期�
 回帰試験の旧式 `(PDE_COUNT + PTE_COUNT) * sizeof(u32) / PAGE_SIZE + data_pages` (=4) への変異はコンパイル成功後の **実行時RED**。既存4変異と合わせ **5/5 runtime RED、コンパイル失敗0**。最初の直接ILP32実行は環境のSIGSYSで失敗し、既存と同じqemu-i386補助を `/home/hight/os32-tmp/t2cks/python/sitecustomize.py` に置いて実行。初期変異案の未使用変数によるコンパイル拒否はREDへ数えず、旧計算式を戻す変異に訂正した。一時診断を製品ソースへ追加していない。ログ/一時ファイルは `/home/hight/os32-tmp/t2cks/`。NP21/W/NHD/配備/ini/実機/commit/pushは未操作、ゲスト再受入はPMへ。
 
 **T2c-R kselftest 追補の最終検証**: `CROSS_DIR=/home/hight/opt/cross make all < /dev/null` は **rc=0** (`/home/hight/os32-tmp/t2cks/all-final.log`)、`CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 make check-changed < /dev/null` は **rc=0** (`/home/hight/os32-tmp/t2cks/check-changed.log`)。共通環境は `TMPDIR=/home/hight/os32-tmp`、ILP32実行補助の `PYTHONPATH=/home/hight/os32-tmp/t2cks/python`、FD自動コピーを防ぐ存在しない `NP21W_DIR=/home/hight/os32-tmp/t2cks/no-deploy`。FDコピー2件は警告/失敗で、配備していない。check-changedは既定基点HEAD~1 (`31870465ce18`)から全109検査を変異込みで選択。追加回帰5/5 runtime RED、compile failures 0、C方言検査器27/27 RED・対照5/5 GREEN。`python3 tools/gen_memmap.py --check` / `--headroom`、`python3 tools/check_select.py --lint`、`git diff --check` もrc=0。TESTS生成結果は既存と同じ。検査中はソースを変更せず、終了後はこの結果の文書追記のみ。ゲスト再受入は未実施。
+
+**T2c 着地と PM の NP21/W 受入 (2026-10-01)**: 独立実装レビュー Opus 5.5 は P1 なし・P2 3 件で Request changes → 対応 (`1e1712e`) → 同じレビュアーが差分で Approve。main を取り込み (`efb40d6`)、`11e1c9d` で着地、[ABI3] どおり `make clean` → `make all` → NHD へ一式配備 (deploy-kernel は全成果物を同期 — 新しい常駐シェルごと入れ替わる)。**受入で kselftest 1 件の失敗** (`ledger:AS alloc`、期待値 4 が T2b までの式のまま — 素の `paging_addrspace_create` は T2c で PD 1 枚だけ、lease 先頭 PT はアプリ起動の `create_lease()` だけが持つ) を発見 → コーダーが期待値を設計の定数から導く形に直し (`6aacf43`)、再配備。
+
+| 構成 | 見たもの | 結果 |
+|---|---|---|
+| 17MB (`ver` API v69、Commit `6aacf43`) | 起動 | `kselftest_fail`=0、`lease_selftest_result`=0、取り残し 0 |
+| 17MB | faulttest gp/de/ud/pf、loop・kloop + CTRL+STOP、`v86 -t` | 例外の EIP は **0x801xxxxx (高位帯)**、kill 6・回収 7、`ledger_*_ops`=0、深さ 0、取り残し 0、V86 OK |
+| 17MB | `ring3_guard` A〜E | A: `#PF addr=0x8FFBF000` (既定 256KB スタックのガード) で kill、B: `addr=0x80000000 [shlib band, WRITE]` で kill (CUI では shlib 未ロードなので RO = err 7 の確認にはなっていない)、C: 0x01000000・D: 0x00F00000 (表示面) で kill、E: 生き残り `BB??SURV` (正解) |
+| 17MB GUI (PEGC 480) | Run... gui_demo (libos32gui を 0x80000000 へ) → ESC → CUI mode | 窓 2 枚が描かれ (画面で確認)、CUI へ戻る |
+| 8MB (`ram-8mb`、終了後 `restore`) | 上の CUI 一式、ring3_guard A・B・E、GUI | 17MB と同じ。`exec_sbrk_tier_last`=1 |
+
+**未実施**: 512KB スタックの実アプリ (ヘッダの stack_size を指定したバイナリが無い — ホストの境界試験だけ)、旧形式 (旧 shell / 旧 shlib / 未知版 / 新 SDK + 旧 .o) の入口前拒否のゲスト確認 (`exec_entry_calls` を使う) — T2h の統合受入でまとめて、Ra266 64MB、T2a からの未実施 (park → resume 後、R1 panic の故障ゲスト)。NHD の ext2 にエラーの印 (`[EXT2] warning: mounting fs with errors`) が T2b の起動から出ている — T2 の変更とは別件として調べる。
 
 ### 5-2. 検査3段と lease 回帰 (d)
 
