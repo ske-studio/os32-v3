@@ -219,3 +219,20 @@ def first_token_location(cursor):
         return cx.conf.lib.clang_getTokenLocation(cursor._tu, token.contents)
     finally:
         cx.conf.lib.clang_disposeTokens(cursor._tu, token, 1)
+
+
+def integer_literal_value(cursor):
+    """Evaluate an integer literal even when its macro token locations collapse."""
+    evaluate = cx.conf.lib.clang_Cursor_Evaluate
+    evaluate.argtypes, evaluate.restype = [cx.Cursor], ctypes.c_void_p
+    result = evaluate(cursor)
+    if not result:
+        raise ParseError('cannot evaluate integer literal: ' + str(cursor.location))
+    value = cx.conf.lib.clang_EvalResult_getAsUnsigned
+    value.argtypes, value.restype = [ctypes.c_void_p], ctypes.c_ulonglong
+    dispose = cx.conf.lib.clang_EvalResult_dispose
+    dispose.argtypes = [ctypes.c_void_p]
+    try:
+        return value(result)
+    finally:
+        dispose(result)

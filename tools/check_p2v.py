@@ -45,12 +45,33 @@ def findings(tu, root=ROOT):
     for entries in macro_files.values():
         entries.sort(key=lambda x:x[0])
     def inside(c):
-        entries = macro_files[str(c.location.file)]
-        start = bisect.bisect_left(entries,(c.extent.start.offset,),key=None)
-        end = bisect.bisect_left(entries,(c.extent.end.offset,),key=None)
-        return [m for _,m in entries[start:end]]
+        ranges = [(str(c.location.file), c.extent.start.offset, c.extent.end.offset)]
+        # Include expansions in the physical spelling file (e.g. a header).
+        file, start = ast.spelling_position(c.extent.start)
+        end_file, end = ast.spelling_position(c.extent.end)
+        if file == end_file:
+            ranges.append((file, start, end))
+        result = []
+        for file, start, end in ranges:
+            entries = macro_files[file]
+            left = bisect.bisect_left(entries, (start,))
+            right = bisect.bisect_left(entries, (end,))
+            result.extend(m for _, m in entries[left:right])
+        return result
     definitions = {c.spelling: {t.spelling for t in c.get_tokens()}
                    for c,_ in nodes if c.kind == K.MACRO_DEFINITION}
+    def macro_names(c):
+        # Nested expansions in a macro replacement list are not necessarily
+        # exposed as MACRO_INSTANTIATION cursors; follow their definitions too.
+        names = {m.spelling for m in inside(c)}
+        pending = list(names)
+        while pending:
+            for name in definitions.get(pending.pop(), ()):
+                if name not in names:
+                    names.add(name)
+                    pending.append(name)
+        return names
+
     def macro_converted(name, seen=None):
         if name in CONVERSIONS:
             return True
@@ -119,10 +140,14 @@ def findings(tu, root=ROOT):
             if ast.pointer(c.type) and ast.integer(operand.type) and not converted(c):
                 values = list(expression_nodes(operand))
                 names = [x.spelling for x in values if x.kind in (K.DECL_REF_EXPR,K.MEMBER_REF_EXPR,K.CALL_EXPR)]
-                names += [m.spelling for m in inside(c)]
-                literal = any(x.kind == K.INTEGER_LITERAL and any(
-                    t.spelling.lower().startswith('0x') and int(t.spelling.rstrip('uUlL'),16) != 0
-                    for t in x.get_tokens()) for x in values)
+                names += macro_names(c)
+                # Preserve the hexadecimal-address heuristic: decimal array
+                # indices and integer sentinels are not physical addresses.
+                literal = any(x.kind == K.INTEGER_LITERAL and
+                    ast.integer_literal_value(x) != 0 and any(
+                        token.lower().startswith('0x') for token in
+                        [t.spelling for t in x.get_tokens()] + list(macro_names(c)))
+                    for x in values)
                 if literal or any(PHYS.fullmatch(n) or n in OTHER_PHYS for n in names):
                     add('physical-cast')
             if ast.integer(c.type) and ast.pointer(operand.type):

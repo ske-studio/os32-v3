@@ -159,6 +159,36 @@ void probe(void) {
             self.assertEqual({e.split(':')[2] for e in errors},
                              {e.split(':')[1] for e in entries})
 
+    def test_header_macro_casts(self):
+        with tempfile.TemporaryDirectory(prefix='os32-p2v-header-') as tmp:
+            root = pathlib.Path(tmp)
+            (root / 'kernel').mkdir()
+            (root / 'kernel/x.h').write_text(
+                '#define P2V_CONST(x) ((void *)(unsigned int)(x))\n'
+                '#define GOOD P2V_CONST(0x400)\n'
+                '#define BIOS_PTR ((unsigned char *)0x400)\n'
+                'extern unsigned char layout;\n'
+                '#define MEM_TEST_BASE ((unsigned int)&layout)\n'
+                '#define NAMED_PTR ((unsigned char *)MEM_TEST_BASE)\n'
+                'static unsigned char *named = (unsigned char *)MEM_TEST_BASE;\n')
+            (root / 'kernel/probe.c').write_text(
+                '#include "x.h"\n'
+                'unsigned char *good = GOOD;\n'
+                'void probe(void) { unsigned char *p = BIOS_PTR; (void)p; }\n'
+                'void named_probe(void) { unsigned char *p = NAMED_PTR; (void)p; }\n')
+            tu = checker.ast.parse('kernel/probe.c', ['-std=gnu11'], root)
+            hits, _ = checker.findings(tu, root)
+            self.assertEqual([(rel, f, rule) for rel, _, f, rule in hits],
+                             [('kernel/probe.c', 'probe', 'physical-cast'),
+                              ('kernel/probe.c', 'named_probe', 'physical-cast'),
+                              ('kernel/x.h', '<file>', 'physical-cast')])
+
+    def test_nonphysical_literal_operands(self):
+        self.assertEqual(checker.scan(
+            'void probe(void) { unsigned int planes[2]; '
+            'void *p = (void *)planes[1]; void *sentinel = (void *)1; '
+            'void *null = (void *)0x0; }'), [])
+
     def test_real_tree(self):
         self.assertEqual(checker.audit(ROOT)[0], [])
 
@@ -195,6 +225,26 @@ def mutant(case):
         return f'RED: {name} (scanner ran, rc=1)'
 
 
+def checker_mutant(case):
+    old, new = case
+    path = 'tools/check_p2v.py'
+    source = (ROOT / path).read_text()
+    if source.count(old) != 1:
+        raise AssertionError('checker mutation point changed: ' + old)
+    with tempfile.TemporaryDirectory(prefix='os32-p2v-rule-') as tmp:
+        root = mutant_tree(ROOT, pathlib.Path(tmp) / 'tree',
+                           {path: source.replace(old, new)},
+                           real={path, 'tools/tests/test_p2v.py'})
+        compile((root / path).read_text(), path, 'exec')
+        result = subprocess.run(
+            [sys.executable, '-m', 'unittest', 'discover', '-s', 'tools/tests',
+             '-p', 'test_p2v.py', '-k', 'header_macro'], cwd=root,
+            capture_output=True, text=True, stdin=subprocess.DEVNULL)
+        if result.returncode != 1 or 'AssertionError' not in result.stderr or 'ERROR:' in result.stderr:
+            raise AssertionError(f'not runtime RED: {old}\n{result.stdout}{result.stderr}')
+        return 'runtime RED: ' + old
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
@@ -217,7 +267,14 @@ def main():
         ]
         for result in run_ordered(mutant, cases):
             print(result)
-        print(f'P2V mutants: {len(cases)}/{len(cases)} runtime RED; compile failures: 0')
+        rules = [
+            ('ast.integer_literal_value(x)', '0'),
+            ('                names += macro_names(c)', '                names += [m.spelling for m in inside(c)]'),
+        ]
+        for result in run_ordered(checker_mutant, rules):
+            print(result)
+        total = len(cases) + len(rules)
+        print(f'P2V mutants: {total}/{total} runtime RED; compile failures: 0')
     return 0
 
 

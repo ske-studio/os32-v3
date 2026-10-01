@@ -71,6 +71,26 @@ class ClangTest(unittest.TestCase):
                     self.assertEqual((root / file).resolve(), root / 'conversion.h')
             hits, _ = p2v.findings(tu, root)
             self.assertEqual([(f,r) for _,_,f,r in hits], [('bad','physical-cast')])
+            # Simulate LLVM 18 collapsing the first position to the call site.
+            # Keep single-token positions real, so the second-location wiring
+            # is required even when the host clang normally preserves both.
+            spelling = a.spelling_position
+            collapse_next = False
+            def first_token(cursor):
+                nonlocal collapse_next
+                collapse_next = True
+                return real_first_token(cursor)
+            def collapsed(location):
+                nonlocal collapse_next
+                if collapse_next:
+                    collapse_next = False
+                    return str(root / 'probe.c'), 0
+                return spelling(location)
+            real_first_token = a.first_token_location
+            with mock.patch.object(a, 'first_token_location', side_effect=first_token), \
+                    mock.patch.object(a, 'spelling_position', side_effect=collapsed):
+                hits, _ = p2v.findings(tu, root)
+            self.assertEqual([(f,r) for _,_,f,r in hits], [('bad','physical-cast')])
 
     def test_cross_headers_fail_closed(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -372,7 +392,9 @@ def main():
     if args.mutate:
         # Every mutant declares its coverage; GCC-only coverage follows the
         # same predicate and reason as test_review_gcc_branches.
-        cases = [('all modes', 'tools/clang_ast/type_occurrences.cpp',
+        cases = [('all modes', 'tools/check_p2v.py',
+                  'locations.append(first)', 'pass'),
+                 ('all modes', 'tools/clang_ast/type_occurrences.cpp',
                   'if (array->getIndexTypeQualifiers().hasRestrict())', 'if (false)'),
                  ('all modes', 'tools/clang_ast/__init__.py',
                   'token = get(cursor._tu, cursor.extent.start)', 'token = None'),
