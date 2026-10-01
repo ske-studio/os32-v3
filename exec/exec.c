@@ -334,6 +334,10 @@ typedef struct {
     int in_syscall, wm_depth;
 } Ring3CallContext;
 
+static void ring3_context_save(volatile Ring3CallContext *out) __attribute__((noinline));
+static void ring3_context_clear(void) __attribute__((noinline));
+static void ring3_context_restore(const volatile Ring3CallContext *saved) __attribute__((noinline));
+
 static void ring3_context_save(volatile Ring3CallContext *out)
 {
     caller_access_save(&out->caller);
@@ -1479,8 +1483,6 @@ void __cdecl kapi_sys_exit(int status)
     /* CPL=3 (リング3) アプリからの正常終了 (トランポリン経由, v2 M2)。
      * master CR3 復帰・AS 破棄・per-app 物理の返却は exec_exit が ID 単位で
      * 行う。CPL=0 プログラム (シェル等) は g_cur_app が 0 なので従来どおり。 */
-    ring3_in_syscall = 0;   /* syscall(sys_exit) を抜ける — ガードを下ろす */
-    ring3_wm_depth = 0;
     exec_exit(status, EXEC_KIND_EXITED);
 }
 
@@ -1607,8 +1609,6 @@ static void ring3_kill_kind(int kind)
     if (kind == EXEC_KIND_FAULT && ring3_wm_depth > 0) {
         ring3_wm_fault_count++;     /* 深さを 0 に戻す前に数える */
     }
-    ring3_in_syscall = 0;   /* syscall 途中で畳む場合も必ずガードを下ろす */
-    ring3_wm_depth = 0;     /* WM の中から畳んだ場合も深さを戻す (出口を通らない) */
     /* syscall 入口などの通常の安全点は回収へ直行。IRQ/例外だけ移譲。 */
     if (!kctx_irq_depth && !kctx_exc_depth)
         exec_exit(EXEC_ERR_FAULT, kind);
@@ -2325,10 +2325,7 @@ i32 exec_park(void)
     for (k = 0; k < APP_FRAME_WORDS; k++) a->frame[k] = g_cur_frame[k];
 
     exec_heap_save_state(&a->exec_heap_used);
-    ring3_in_syscall = 0;       /* この syscall はここで終わる */
-    ring3_wm_depth = 0;         /* OP_WAIT の中から longjmp する — 出口を通らない */
-    g_cur_frame = 0;
-    caller_access_invalidate();
+    ring3_context_clear();     /* この syscall はここで終わる — WM の出口も通らない */
 
     /* master へ戻してから状態を切り替える (WM は master の下で走る)。 */
     paging_load_cr3(paging_kernel_pd_phys());
@@ -2378,10 +2375,7 @@ int exec_park_kbd(void)
     for (k = 0; k < APP_FRAME_WORDS; k++) a->frame[k] = g_cur_frame[k];
 
     exec_heap_save_state(&a->exec_heap_used);
-    ring3_in_syscall = 0;       /* この syscall はここで終わる */
-    ring3_wm_depth = 0;         /* OP_WAIT の中から longjmp する — 出口を通らない */
-    g_cur_frame = 0;
-    caller_access_invalidate();
+    ring3_context_clear();     /* この syscall はここで終わる — WM の出口も通らない */
 
     paging_load_cr3(paging_kernel_pd_phys());
     appslot_park_kbd_commit();  /* WAIT_KEY + 印 + owner 1 へ */
@@ -2438,10 +2432,7 @@ int exec_park_poll(u32 now_tick)
     for (k = 0; k < APP_FRAME_WORDS; k++) a->frame[k] = g_cur_frame[k];
 
     exec_heap_save_state(&a->exec_heap_used);
-    ring3_in_syscall = 0;       /* この syscall はここで終わる */
-    ring3_wm_depth = 0;         /* OP_WAIT の中から longjmp する — 出口を通らない */
-    g_cur_frame = 0;
-    caller_access_invalidate();
+    ring3_context_clear();     /* この syscall はここで終わる — WM の出口も通らない */
 
     paging_load_cr3(paging_kernel_pd_phys());
     appslot_park_poll_commit();          /* WAIT_POLL + 印 + owner 1 へ */
@@ -2497,10 +2488,7 @@ i32 exec_sys_yield(void)
     for (k = 0; k < APP_FRAME_WORDS; k++) a->frame[k] = g_cur_frame[k];
 
     exec_heap_save_state(&a->exec_heap_used);
-    ring3_in_syscall = 0;       /* この syscall はここで終わる */
-    ring3_wm_depth = 0;         /* OP_WAIT の中から longjmp する — 出口を通らない */
-    g_cur_frame = 0;
-    caller_access_invalidate();
+    ring3_context_clear();     /* この syscall はここで終わる — WM の出口も通らない */
 
     paging_load_cr3(paging_kernel_pd_phys());
     appslot_park_yield_commit();         /* WAIT_POLL + 印 + owner 1 へ */

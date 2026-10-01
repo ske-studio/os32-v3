@@ -92,7 +92,7 @@
 読み手に暗算させ、2026-09-17 の「SHM がカーネルスタックに食い込んでいた」穴を隠していた。
 
 ```
-__bss_end      = 0x18BC10   (カーネル本体 559.0KB)
+__bss_end      = 0x18BAD0   (カーネル本体 558.7KB)
 __sqlite_start = 0x200000
 __sqlite_end   = 0x2BC200   (SQLite 本体 752.5KB)
 
@@ -107,8 +107,8 @@ __sqlite_end   = 0x2BC200   (SQLite 本体 752.5KB)
 0x0F0000 - 0x0FFFFF 64KB     BIOS ROM                                                      RO
 
 [ カーネル帯域 (0x100000-0x1FFFFF) ]
-0x100000 - 0x18BC0F 559.0KB  カーネル .text/.data/.bss  (kernel.map の __bss_end まで)     RW
-0x18BC10 - 0x18BFFF 1008B    空き
+0x100000 - 0x18BACF 558.7KB  カーネル .text/.data/.bss  (kernel.map の __bss_end まで)     RW
+0x18BAD0 - 0x18BFFF 1.3KB    空き
 0x18C000 - 0x1BBFFF 192KB    カーネルヒープ (kmalloc)  (__bss_end を 4KB に切り上げた位置から) RW
 0x1BC000 - 0x1BCFFF 4KB      KernelAPI テーブル  (KAPI_ADDR)                               RW
 0x1BD000 - 0x1BDFFF 4KB      SHM 前方ガード                                                NP
@@ -157,12 +157,12 @@ __sqlite_end   = 0x2BC200   (SQLite 本体 752.5KB)
 
 **地図の矛盾: 0 件** (重なりも逆転も無い。`--check` が毎回確かめる)
 
-**カーネル本体の予算**: 596KB 中 559.0KB を使用 (残り 37.0KB)。
+**カーネル本体の予算**: 596KB 中 558.7KB を使用 (残り 37.3KB)。
 
 **カーネルがあと何 KB 育つと何が壊れるか** (`__bss_end` が伸びると `KHEAP_BASE` 以降が芋づるで動く)
 
-- `__bss_end` +1008B で KHEAP_BASE が 1 ページ上がる。0x18C000 → 0x18D000。以降の KAPI / SHM / ガードが全部 4KB 動く
-- `__bss_end` +37.0KB で **build/os32.ld の ASSERT がリンクを止める** (予算 MEM_KERNEL_IMAGE_MAX 超過)。止めるのが目的。超えたぶんだけ SHM 帯が カーネル帯域 0x1FFFFF を突き抜ける
+- `__bss_end` +1.3KB で KHEAP_BASE が 1 ページ上がる。0x18C000 → 0x18D000。以降の KAPI / SHM / ガードが全部 4KB 動く
+- `__bss_end` +37.3KB で **build/os32.ld の ASSERT がリンクを止める** (予算 MEM_KERNEL_IMAGE_MAX 超過)。止めるのが目的。超えたぶんだけ SHM 帯が カーネル帯域 0x1FFFFF を突き抜ける
 
 <!-- /生成: tools/gen_memmap.py -->
 

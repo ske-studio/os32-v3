@@ -802,6 +802,65 @@ R1 20/20の実行時RED、C方言27/27 RED・対照5/5 GREENを含め成功。
 検査完了後はこの結果の票への追記だけで、コード・試験は変更していない。
 commit/pushは未実施。
 
+
+### d2 独立レビュー P3-1 / P3-2 / P3-4 の対応 (2026-10-02)
+
+モデル: GPT-6。基点 `dffd625`、worktree `wt/t2d2`。P3-1 は save / clear /
+restore の前方宣言に `__attribute__((noinline))` を付け、R1 が抽出する定義の形は
+維持した。4 park の代入3本 + invalidate を `ring3_context_clear()` へ集約し、
+kapi_sys_exit / ring3_kill_kind の直後の exit / pending transfer と重複するゼロ書きを
+削除した。WM fault の計数は clear より前のまま。P3-3 の WM TRUSTED 分岐は維持した。
+
+P3-2 は R1 の着地抽出を `volatile Ring3CallContext caller_context;` から始め、
+実ソースの save を含めた。save 欠落 / setjmp 後の着地側へ save を移す2種類を
+launch / resume 両方に追加 (4変異)。park 変異も共通 clear の除去へ変更した。
+既存 ring3_guard の WM fault 計数の静的検査・変異アンカーは、共通 clear を行う
+exec_exit / exec_pending_transfer より前で数える形へ追従させた。
+
+入れ子の exec_run から戻った後、親の wrapper の残りは着地点で
+`ring3_in_syscall=1` に戻る (d2 の前は 0 のまま CPL0 扱いで走っていた)。
+その区間の #PF は親アプリの kill になり、3つの門 (`ring3_user_range_ok` /
+`ring3_user_ranges_writable` / `tramp_copy`) が働く。正しい方向の変化で、
+WM の深さも正しく復元されるようになった。ゲスト回帰では
+**sh → exec_run → 戻った後の親 wrapper の経路**を確認する。
+今回は NP21/W 操作禁止のためゲスト確認は未実施、PM受入へ持ち越す。
+
+| 同一 cross toolchain 実測 | P3修正前 (clean build_id) | P3修正後 (-dirty) | 差分 |
+|---|---:|---:|---:|
+| exec.o text | 20,213 B | 19,889 B | -324 B |
+| kernel.bin | 361,584 B | 361,272 B | -312 B |
+| 本体占有 (`__bss_end - 0x100000`) | 572,432 B | 572,112 B | -320 B |
+| `__bss_end` | `0x18BC10` | `0x18BAD0` | -320 B |
+| リンカ ASSERT 残り (596 KiB枠) | 37,872 B | 38,192 B | +320 B |
+| §6-1 d枠の残り (3,072 B) | 444 B | 764 B | +320 B |
+
+作業前 `make kernel` で基点の clean build_id に揃えたため、上のd2作業時の
+kernel.bin 361,592 B (-dirty) と8 B異なる。exec.o のd1からのtext増分は
++400 B → +76 B。kernel本体は整列込みで320 B減少し、kernel.binの差分は
+build_idのdirty化も含む。d枠の消費はT2c-R基準から2,308 Bとなった。
+ASSERTは緩和していない。d3以降の再見積りゲートは維持する。
+
+検証環境: `CROSS_DIR=/home/hight/opt/cross`、`TMPDIR=/home/hight/os32-tmp`、
+PATHにcross/bin、ILP32 fixtureのみ既存の
+`PYTHONPATH=/home/hight/os32-tmp/d0b-host-runner` で qemu-i386 を経由。
+R1 は GREEN + **24/24 コンパイル成功後の実行時RED** (新規4本を含む)。
+編集直後のR1実行はPythonの連結記号漏れでSyntaxError (rc=1) となり、修正後rc=0。
+共通clearへの追従前のring3_guardは旧静的アンカーでrc=1、追従後はrc=0、
+既存14/14 RED (静的検査を含む)。
+失敗はRED本数へ算入しない。
+`CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp
+NP21W_DIR=/home/hight/os32-tmp/d2-p3-image-output make all < /dev/null` は **rc=0**。
+FDコピー先は一時パスへ限定し、未作成パスへのコピー警告と既存GNU-stack / RWX等の
+警告が出たがbuildは成功。NP21/W・NHD・配備・ini・commit/pushは未操作。
+ログ: `/home/hight/os32-tmp/d2-p3-{before,all,r1,guard}.log`。
+生成地図は `python3 tools/gen_memmap.py --write` rc=0、対応表lintと試験一覧生成もrc=0。
+最終 `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp
+make check-changed < /dev/null` は上記PATH/PYTHONPATHで **1回だけ実行し rc=0**。
+R1 24/24実行時RED、ring3_guard 14/14 RED、C方言27/27 RED・対照5/5 GREENを含め成功。
+既存Windows opt-in fixtureは単独4件・集約5件がskip。
+ログ: `/home/hight/os32-tmp/d2-p3-check-changed.log`。
+検査中はソースを変更せず、終了後は本結果の追記だけ。ゲスト未実施・commit/push未実施。
+
 ## 11. 独立レビュー 2 回目 (Opus 5.5、Approve) の P3 — 実装時の注記
 
 2026-10-01、`3180a51` の差分に対して Approve (P1 2 件・P2 11 件はすべて閉)。以下の 5 件は設計の変更ではなく、実装時に従う注記 (PM 記入)。

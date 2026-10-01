@@ -21,12 +21,13 @@ def function(s, name):
 
 
 def landing(s, start, buf, name):
-    a = s.index('    if (exec_setjmp(' + buf + ') != 0)', s.index(start))
-    b = s.index('\n    }', a) + len('\n    }')
+    a = s.index('    volatile Ring3CallContext caller_context;', s.index(start))
+    jump = s.index('    if (exec_setjmp(' + buf + ') != 0)', a)
+    b = s.index('\n    }', jump) + len('\n    }')
     return ('static int ' + name + '(void) {\n'
             '    AppSlot *a = &slots[2], *ctx = a; int gui = host_gui;\n'
             '    (void)ctx; (void)gui;\n'
-            '    volatile Ring3CallContext caller_context; ring3_context_save(&caller_context);\n' + s[a:b] + '\n'
+            + s[a:b] + '\n'
             '    simulate(); return 99;\n}\n')
 
 
@@ -376,6 +377,14 @@ class ExecR1(unittest.TestCase):
 
 
 MUTATIONS = (
+    ('launch-save-missing', '    ring3_context_save(&caller_context);\n    if (exec_setjmp(ctx->jmpbuf) != 0) {',
+     '    if (exec_setjmp(ctx->jmpbuf) != 0) {'),
+    ('launch-save-after-setjmp', '    ring3_context_save(&caller_context);\n    if (exec_setjmp(ctx->jmpbuf) != 0) {',
+     '    if (exec_setjmp(ctx->jmpbuf) != 0) {\n        ring3_context_save(&caller_context);'),
+    ('resume-save-missing', '    ring3_context_save(&caller_context);\n    if (exec_setjmp(a->jmpbuf) != 0) {',
+     '    if (exec_setjmp(a->jmpbuf) != 0) {'),
+    ('resume-save-after-setjmp', '    ring3_context_save(&caller_context);\n    if (exec_setjmp(a->jmpbuf) != 0) {',
+     '    if (exec_setjmp(a->jmpbuf) != 0) {\n        ring3_context_save(&caller_context);'),
     ('launch-landing-invalidate', '    if (exec_setjmp(ctx->jmpbuf) != 0) {\n        ring3_context_clear();',
      '    if (exec_setjmp(ctx->jmpbuf) != 0) {'),
     ('resume-landing-invalidate', '    if (exec_setjmp(a->jmpbuf) != 0) {\n        ring3_context_clear();',
@@ -421,7 +430,7 @@ if __name__ == '__main__':
 
         for name in ('exec_park', 'exec_park_kbd', 'exec_park_poll', 'exec_sys_yield'):
             original = function(source, name)
-            changed = original.replace('    caller_access_invalidate();', '')
+            changed = original.replace('    ring3_context_clear();', '')
             assert changed != original
             status, log = run(source.replace(original, changed))
             print(name + '-invalidate: ' + status)
