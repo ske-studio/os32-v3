@@ -94,6 +94,33 @@ void probe(void) {
         self.assertEqual(checker.scan(
             'void probe(void) { status((unsigned long)g_iostatus.Status); }'), [])
 
+    def test_hostdrv_linear_exceptions_remain_scoped(self):
+        # Exercise the real 24 address casts: audited linear ABI exceptions
+        # must cover only the 12 named functions, not a new unaudited caller.
+        source = (ROOT / 'fs/hostdrvfs.c').read_text()
+        entries = [line for line in (ROOT / 'tools/check_p2v_allow.txt').read_text().splitlines()
+                   if line.startswith('fs/hostdrvfs.c:')]
+        self.assertEqual(len(entries), 12)
+        with tempfile.TemporaryDirectory(prefix='os32-hostdrv-p2v-') as tmp:
+            root = pathlib.Path(tmp)
+            (root / 'fs').mkdir()
+            (root / 'tools').mkdir()
+            target = root / 'fs/hostdrvfs.c'
+            target.write_text(source)
+            allow = root / 'tools/check_p2v_allow.txt'
+            allow.write_text('\n'.join(entries) + '\n')
+            self.assertEqual(checker.audit(root), ([], 12))
+            target.write_text(source + '\nvoid unaudited(void) { submit((u32)&g_invoke); }\n')
+            errors, _ = checker.audit(root)
+            self.assertEqual(len(errors), 1)
+            self.assertIn(':unaudited: physical-sink', errors[0])
+            target.write_text(source)
+            allow.write_text('')
+            errors, _ = checker.audit(root)
+            self.assertEqual(len(errors), 24)
+            self.assertEqual({e.split(':')[2] for e in errors},
+                             {e.split(':')[1] for e in entries})
+
     def test_real_tree(self):
         self.assertEqual(checker.audit(ROOT)[0], [])
 

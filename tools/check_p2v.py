@@ -165,6 +165,8 @@ def scan(source):
                 break
     for m in INTEGER_CAST.finditer(code):
         expr, _ = expression(code, m.end())
+        # HostDrv address candidates also need an audited exception: IA32's
+        # hypercall ABI uses CR3-relative linear addresses (T1-U6), not V2P.
         # Status members are integers, not the HostDrv structures' addresses.
         if re.fullmatch(r'(?:&\s*)?g_(?:invoke|stack|iostatus|databuf|sop|fsctx|fobj|namebuf|secctx)', operand(expr)):
             add(m.start(), 'physical-sink')
