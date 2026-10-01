@@ -137,3 +137,21 @@ NHDに比べて搭載できるプログラムが限られます。
 ### 文字化け
 
 - NP21/Wのフォント設定でPC-98用フォントが選択されているか確認
+
+
+### C ソース静的検査の clang 依存
+
+ビルドは i386-elf GCC のまま。`make check` の C 検査には libclang の
+Python バインディングも必要:
+
+```bash
+sudo apt-get install clang libclang-dev python3-clang
+```
+
+`python3 -c 'import clang.cindex; clang.cindex.Index.create()'` で確認する。
+CI の setup-python では共通部が apt の `/usr/lib/python3/dist-packages` を参照する。
+詳細は [docs/08_build.md](docs/08_build.md) §8-4。
+
+クロスツールチェーンを使わない静的 CI (`check.yml`) では、`libnewlib-dev` の
+`/usr/include/newlib` を解析用に使う。ローカルのクロス newlib があればそちらを優先する。
+clang 本体・libclang・resource header は同じ版を使う。

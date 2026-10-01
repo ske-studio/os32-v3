@@ -35,11 +35,12 @@ jobs:
           python-version: "3.12"
 
       # ホスト試験の外部コマンド: gcc (build-essential)、e2fsck / mke2fs (e2fsprogs)。
+      # C AST の vendor include は libnewlib-dev のヘッダで解析する (クロス GCC は不要)。
       # Python は tools/check_select.py が PyYAML を、tools/mkvmkernel.py 系が lz4 を使う。
       - name: Host dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends build-essential e2fsprogs
+          sudo apt-get install -y --no-install-recommends build-essential e2fsprogs clang libclang-dev python3-clang libnewlib-dev
           python3 -m pip install --quiet PyYAML lz4
 
       # tools/check_docs_links.py は lychee を PATH か ~/.cargo/bin に探し、無ければ SKIP (rc=0)
