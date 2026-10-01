@@ -19,6 +19,9 @@
   * `notest:` の変更でも検査の glob (走査型の ** を含む) に当たればその検査は
     変異込み (glob が勝つ)。`except:` に書いたものは notest に数えない
   * notest の番人: 拾えた入力が notest に当たると --lint が落ちる
+  * build/*.mk は検査列の名前と登録済み検査の前提・recipe だけの変更なら
+    当該検査だけ変異込み。列の削除、混在、基点の分岐、未コミット版も確認する。
+    変数・非検査規則・define・条件分岐・列以外の改行継続は安全側へ倒す。
   * 逐次の 2 段目 (CHECK_MUT_TARGETS) は無い — 列は 1 本で全部並列
 
   python3 -B tools/tests/test_check_select.py            # 筋書き
@@ -248,16 +251,180 @@ def case_lint_real(cs):
     assert rc == 0, err.getvalue()[:2000]
 
 
+# ---------------------------------------------------------------- make syntax / conservative fallback
+MAKE_BEFORE = "CHECK_PAR_TARGETS := check-a check-b\ncheck-a: input\n\tpython3 a.py\ncheck-b:\n\tpython3 b.py\nFLAGS := old\nnormal:\n\techo old\n"
+
+
+def make_fixture_plan(cs, before, after, extra=(), second=None):
+    originals = cs.load_map, cs.read_makefiles, cs.make_change
+    _, names = cs.make_units(after)
+    cs.load_map = lambda: dict(ignore=[], full=["build/*.mk", "Makefile", "sdk/kapi.json"],
+                               docs_only=["**/*.md"], notest=[], broad=[], docs_always=[],
+                               checks={"check-a": ["src/a.c"], "check-b": ["src/b.c"]})
+    cs.read_makefiles = lambda: ({}, {"CHECK_PAR_TARGETS": names})
+    def compare(path, base, par):
+        if base is None:
+            return None, "base missing"
+        pair = second if path == "build/other.mk" else (before, after)
+        return cs.narrow_make_change(*pair, ["check-a", "check-b"], par)
+    cs.make_change = compare
+    try:
+        return cs.plan(["build/sdk.mk", *extra], base="fixture")
+    finally:
+        cs.load_map, cs.read_makefiles, cs.make_change = originals
+
+
+def case_make_add(cs):
+    after = MAKE_BEFORE.replace("check-a check-b", "check-a check-b check-c") + \
+        "check-c: new-input\n\tpython3 c.py\n"
+    mode, st, mu, lines = make_fixture_plan(cs, MAKE_BEFORE, after)
+    assert mode == "sel" and mu == ["check-c"], (mode, mu)
+    assert st == ["check-a", "check-b", "check-c"]
+    assert any("絞り込み" in l for l in lines), lines
+
+
+def case_make_recipe(cs):
+    for after in (MAKE_BEFORE.replace("a.py", "changed.py"),
+                  MAKE_BEFORE.replace("check-a: input", "check-a: other"),
+                  MAKE_BEFORE.replace("check-a: input\n\tpython3 a.py\n", "")):
+        mode, _, mu, _ = make_fixture_plan(cs, MAKE_BEFORE, after)
+        assert mode == "sel" and mu == ["check-a"], (mode, mu)
+
+
+def case_make_remove(cs):
+    after = MAKE_BEFORE.replace("check-a check-b", "check-a")
+    mode, st, mu, _ = make_fixture_plan(cs, MAKE_BEFORE, after)
+    assert mode == "fast" and st == ["check-a"] and not mu, (mode, st, mu)
+    after = after.replace("check-b:\n\tpython3 b.py\n", "")
+    assert make_fixture_plan(cs, MAKE_BEFORE, after)[2] == []
+
+
+def case_make_variable(cs):
+    after = MAKE_BEFORE.replace("FLAGS := old", "FLAGS := new")
+    mode, st, mu, lines = make_fixture_plan(cs, MAKE_BEFORE, after)
+    assert mode == "full" and mu == st, (mode, mu)
+    assert any("全部" in l and "変数" in l for l in lines), lines
+
+
+def case_make_noncheck(cs):
+    after = MAKE_BEFORE.replace("echo old", "echo new")
+    assert make_fixture_plan(cs, MAKE_BEFORE, after)[0] == "full"
+    after = MAKE_BEFORE + "check-unlisted:\n\techo new\n"
+    assert make_fixture_plan(cs, MAKE_BEFORE, after)[0] == "full"
+
+
+def case_make_unsupported(cs):
+    # Only the literal check-name column may span physical lines.
+    before = MAKE_BEFORE.replace("check-a check-b", "check-a \\\n    check-b")
+    after = before.replace("check-b\n", "check-b check-c\n", 1) + "check-c:\n\techo c\n"
+    assert make_fixture_plan(cs, before, after)[2] == ["check-c"]
+    pairs = [
+        (MAKE_BEFORE, MAKE_BEFORE.replace("a.py", "a.py \\\n\t--new")),
+        (MAKE_BEFORE + "FLAGS += old \\\n    tail\n",
+         MAKE_BEFORE + "FLAGS += new \\\n    tail\n"),
+        (MAKE_BEFORE + "define BODY\ncheck-a:\n\techo old\nendef\n",
+         MAKE_BEFORE + "define BODY\ncheck-a:\n\techo new\nendef\n"),
+        (MAKE_BEFORE + "ifeq (x,x)\ncheck-a:\n\techo old\nendif\n",
+         MAKE_BEFORE + "ifeq (x,x)\ncheck-a:\n\techo new\nendif\n"),
+        (MAKE_BEFORE, MAKE_BEFORE + "include new.mk\n"),
+        (MAKE_BEFORE + "\tCHECK_PAR_TARGETS := check-a check-b\n",
+         MAKE_BEFORE + "\tCHECK_PAR_TARGETS := check-a\n"),
+        (MAKE_BEFORE, MAKE_BEFORE + "%.o: %.c\n\techo pattern\n"),
+        (MAKE_BEFORE, MAKE_BEFORE.replace("check-a: input", "check-a: FLAGS=new")),
+        (MAKE_BEFORE, MAKE_BEFORE.replace("CHECK_PAR_TARGETS :=", "CHECK_PAR_TARGETS =")),
+        (MAKE_BEFORE, MAKE_BEFORE + "# swallowed \\\ninclude new.mk\n"),
+    ]
+    for prefix in ("define BODY", "  define BODY", "override export define BODY", "  ifdef FLAG"):
+        end = "endif" if "ifdef" in prefix else "endef"
+        body = MAKE_BEFORE.replace("check-a: input\n\tpython3 a.py\n", "")
+        pairs.append((body + prefix + "\ncheck-a:\n\techo old\n" + end + "\n",
+                      body + prefix + "\ncheck-a:\n\techo new\n" + end + "\n"))
+    pairs.extend([
+        (MAKE_BEFORE, MAKE_BEFORE.replace("check-a check-b", "check-b check-a")),
+        (MAKE_BEFORE, MAKE_BEFORE.replace("check-a check-b", "check-a check-b check-b")),
+        (MAKE_BEFORE, MAKE_BEFORE + "check-a:\n\techo duplicate\n"),
+        (MAKE_BEFORE, MAKE_BEFORE + ".RECIPEPREFIX := >\n"),
+        (MAKE_BEFORE, MAKE_BEFORE + "$(eval generated)\n"),
+    ])
+    for before, after in pairs:
+        result = make_fixture_plan(cs, before, after)
+        assert result[0] == "full", (before, after, result)
+
+
+def case_make_mixed(cs):
+    after = MAKE_BEFORE.replace("a.py", "changed.py")
+    assert set(make_fixture_plan(cs, MAKE_BEFORE, after, ["src/b.c"])[2]) == {"check-a", "check-b"}
+    pair = ("check-b:\n\techo old\n", "check-b:\n\techo new\n")
+    assert set(make_fixture_plan(cs, MAKE_BEFORE, after, ["build/other.mk"], pair)[2]) == {"check-a", "check-b"}
+    for extra in (["Makefile"], ["sdk/kapi.json"], ["unknown"]):
+        assert make_fixture_plan(cs, MAKE_BEFORE, after, extra)[0] == "full"
+    pair = ("FLAGS := old\n", "FLAGS := new\n")
+    assert make_fixture_plan(cs, MAKE_BEFORE, after, ["build/other.mk"], pair)[0] == "full"
+    assert cs.plan(["build/sdk.mk"])[0] == "full", "--files has no versions"
+
+
+def case_make_git_versions(cs):
+    # A branch whose base diverged: compare merge-base, and read the working
+    # copy (both staged and unstaged), not just HEAD or the diff hunk.
+    with tempfile.TemporaryDirectory(prefix="os32-ckmake-") as d:
+        git(d, "init", "-q", "-b", "main")
+        git(d, "config", "user.email", "t@example.invalid")
+        git(d, "config", "user.name", "t")
+        pathlib.Path(d, "build").mkdir()
+        path = pathlib.Path(d, "build/sdk.mk")
+        path.write_text(MAKE_BEFORE)
+        git(d, "add", ".")
+        git(d, "commit", "-q", "-m", "fixture")
+        git(d, "checkout", "-q", "-b", "work")
+        path.write_text(MAKE_BEFORE.replace("a.py", "committed.py"))
+        git(d, "add", ".")
+        git(d, "commit", "-q", "-m", "recipe")
+        git(d, "checkout", "-q", "main")
+        path.write_text(MAKE_BEFORE.replace("FLAGS := old", "FLAGS := base-new"))
+        git(d, "add", ".")
+        git(d, "commit", "-q", "-m", "diverged base")
+        git(d, "checkout", "-q", "work")
+        old_root = cs.ROOT
+        cs.ROOT = d
+        try:
+            got, _ = cs.make_change("build/sdk.mk", "main", ["check-a", "check-b"])
+            assert got == {"check-a"}, got
+            old_map, old_make = cs.load_map, cs.read_makefiles
+            cs.load_map = lambda: dict(ignore=[], full=["build/*.mk"], docs_only=[],
+                                       notest=[], broad=[], docs_always=[], checks={})
+            cs.read_makefiles = lambda: ({}, {"CHECK_PAR_TARGETS": ["check-a", "check-b"]})
+            out = io.StringIO()
+            try:
+                with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                    assert cs.select("main") == 0
+                assert "CC_MODE=sel\n" in out.getvalue(), out.getvalue()
+                assert "CC_MUT1=check-a\n" in out.getvalue(), out.getvalue()
+            finally:
+                cs.load_map, cs.read_makefiles = old_map, old_make
+            path.write_text(path.read_text().replace("b.py", "staged.py"))
+            git(d, "add", ".")
+            assert cs.make_change("build/sdk.mk", "main", ["check-a", "check-b"])[0] == {"check-a", "check-b"}
+            path.write_text(path.read_text().replace("FLAGS := old", "FLAGS := work-new"))
+            assert cs.make_change("build/sdk.mk", "main", ["check-a", "check-b"])[0] is None
+            path.unlink()
+            assert cs.make_change("build/sdk.mk", "main", ["check-a", "check-b"])[0] is None
+            assert cs.make_change("build/new.mk", "main", ["check-a", "check-b"])[0] is None
+        finally:
+            cs.ROOT = old_root
+
+
 CASES = [case_inc_extract, case_hsync_protect, case_sh_pipe, case_bare_extract,
          case_readme, case_claude, case_docs_always, case_broad_only,
          case_submodule, case_nothing, case_single_stage, case_inc_dir_extract,
          case_notest_fast, case_notest_glob_wins, case_notest_guard,
-         case_featgui_commit, case_lint_real]
+         case_featgui_commit, case_lint_real, case_make_add, case_make_recipe,
+         case_make_remove, case_make_variable, case_make_noncheck,
+         case_make_unsupported, case_make_mixed, case_make_git_versions]
 
 
-def run_cases(cs, quiet=False):
+def run_cases(cs, quiet=False, cases=None):
     failed = []
-    for c in CASES:
+    for c in CASES if cases is None else cases:
         try:
             c(cs)
             ok = True
@@ -309,6 +476,24 @@ MUTATIONS = [
      "notest の except: を無視する"),
     ('    for f in changed:\n        hit |=', '    for f in changed[:0]:\n        hit |=',
      "変更を検査に突き合わせない"),
+    ('            if kind != "rule" or key not in listed:\n'
+     '                return None, "変数・非検査規則・未対応構文の変更"',
+     '            if kind != "rule" or key not in listed:\n                continue', "変数・非検査規則を絞り込む (安全側を外す)"),
+    ('            if "\\\\\\n" in value or "\\\\\\r\\n" in value:',
+     '            if False:', "recipe の改行継続を絞り込む"),
+    ('        if depth:', '        if False:',
+     "define・条件分岐内を通常の検査規則として絞る"),
+    ('elif i == start + 1 and (not line.strip() or line.startswith("#")):',
+     'elif not line.strip() or line.startswith("#"):',
+     "改行継続コメントが飲み込む行を無視する"),
+    ('    return affected & set(par),', '    return set(),',
+     "変更した検査の変異を選ばない"),
+    ('ancestor = git("merge-base", base, "HEAD")[0]', 'ancestor = base',
+     "分岐した基点と直接比較する"),
+    ('base=None if files is not None else base)', 'base=None)',
+     "select から基点を渡さず絞り込めない"),
+    ('            after = f.read()', '            after = show(path)',
+     "未コミット版を無視する"),
 ]
 
 
@@ -322,9 +507,14 @@ def mutate():
             continue
         try:
             cs = load(original.replace(old, new))
-            failed = run_cases(cs, quiet=True)
+            # New selection mutants should hit the make fixtures before the
+            # expensive real-tree lint; keep all cases as a backstop.
+            cases = sorted(CASES, key=lambda c: not c.__name__.startswith("case_make_")) if i > 13 else CASES
+            failed = run_cases(cs, quiet=True, cases=cases)
         except Exception as e:           # noqa: BLE001
-            failed = ["load: %r" % e]
+            print("MUTATION %d INVALID (load): %r" % (i, e), flush=True)
+            bad += 1
+            continue
         if failed:
             print("MUTATION %d RED (%s): %s" % (i, failed[0], why), flush=True)
         else:

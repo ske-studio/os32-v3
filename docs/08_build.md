@@ -243,6 +243,13 @@ KernelAPI の構造体を変えたときは `make clean` → `make all` が必�
   - 変更なし → 全部を変異なし (= `check-fast`)
   - `full:` (`Makefile` `build/*.mk` `sdk/kapi.json`) に当たる変更、または**対応表のどの
     glob にも当たらない変更** → 全部を変異込み (= `check`)。表の漏れで否定側を落とさないための安全側。
+    ただし `build/*.mk` は基点 (merge-base) 版と作業中の版を構文単位で比較し、
+    `CHECK_PAR_TARGETS` の名前の追加・削除と、登録済み検査の前提・recipe の追加・変更・削除だけなら
+    その検査だけを変異込みにする (列から消えた検査は回さない)。他の変更ファイルによる選択は合算する。
+    hunk だけでは recipe の所属や `define` の文脈が欠けるため、両版全体を読む。
+    検査列の名前の列だけは `\` 継続を許可する。それ以外の改行継続、`define`・条件分岐内の変更、
+    変数・旗・include・パターン規則・非検査ターゲット・未対応構文・版の取得不能は全部。
+    `FILES=` は基点版を持たないのでこの例外を適用しない。絞り込み／全部の理由も stderr に出る。
     走査型の検査 (`broad:` — `check-arch-asm` など) の `**` glob はこの判定に**数えない**
     (ツリー全体の glob に当たっただけで安全側が消えるのを防ぐ)
   - 変更が全部 `docs_only:` (`**/*.md` など) → 当たった検査 + **文書を読む検査 (`docs_always:` —
@@ -263,7 +270,7 @@ KernelAPI の構造体を変えたときは `make clean` → `make all` が必�
   辿り方は静的なので、ツリーを舐める検査器 (`check-arch-asm` など) は glob を手で広く書いてある。
   表が欠けても `sel` の場合は**試験そのものは変異なしで必ず回る** — 落とすのは否定側だけ。
   docs だけの変更では当たらない検査は回らないので、文書を読む検査は `docs_always:` に入れておく。
-  選び方そのものの試験は `make check-check-select-host` (`tools/tests/test_check_select.py`、変異 13 本)。
+  選び方そのものの試験は `make check-check-select-host` (`tools/tests/test_check_select.py`、変異 21 本)。
 - 新しい検査を列に足したら `python3 tools/check_select.py --suggest <検査名>` の出力を
   下書きにして対応表へ足す (`make check-map` が足りないと言う)。
 - `tools/check_tree_unchanged.py` の番人 ([POLICY_DEBUG §4-40](POLICY_DEBUG.md)) は 3 通りとも段の前後で回る。

@@ -21,6 +21,9 @@
     した後) なら HEAD~1
   * 変更が無い                     → 全部を変異なし (= check-fast)
   * `full:` に当たる変更がある     → 全部を変異込み (= check)
+    ただし build/*.mk は基点版と現行版を構文単位で比べ、検査列の名前と
+    登録済み検査の前提・recipe だけの変更なら当該検査だけ変異込み。
+    検査列以外の改行継続・define・未対応構文・版の比較不能は全部。
   * どの検査の glob にも `docs_only:` にも `notest:` にも当たらない変更がある
                                    → 全部を変異込み (= check)。表の漏れで
                                      否定側を落とさないため。`broad:` の検査の
@@ -49,6 +52,7 @@
       試験が notest の場所を読むようになったら「notest なのに入力になっている」
       と言って落ちる — notest を狭める (`except:` に足す) か外す。
 """
+import difflib
 import os
 import re
 import shlex
@@ -193,6 +197,112 @@ def check_lists(vars_):
                          "変異は写しの木に当てて CHECK_PAR_TARGETS へ "
                          "(docs/archive/tools/TASK_CHECK_MUT_PARALLEL.md §5)")
     return par
+
+
+# Narrow only syntax we can prove local to the check column. Everything else
+# stays an opaque unit and must be byte-identical, including its ordering.
+def make_units(text):
+    units, names = [], []
+    lines = text.splitlines(keepends=True)
+    i, depth = 0, 0
+    while i < len(lines):
+        line = lines[i]
+        start = i
+        i += 1
+        if re.match(r"^[ \t]*(?:(?:override|export|private)\s+)*define\b|^[ \t]*if(?:eq|neq|def|ndef)\b", line):
+            depth += 1
+        if depth:
+            units.append(("opaque", "", line))
+            if re.match(r"^[ \t]*(?:endef|endif)\b", line):
+                depth -= 1
+            continue
+        while lines[i - 1].rstrip("\r\n").endswith("\\") and i < len(lines):
+            i += 1
+        raw = "".join(lines[start:i])
+        logical = re.sub(r"\\\r?\n\s*", " ", raw).strip()
+        m = re.fullmatch(r"CHECK_PAR_TARGETS\s*(:=|=)\s*(.*)", logical)
+        if m and not raw.startswith("\t") and all(re.fullmatch(r"check[\w-]*", t) for t in m[2].split()):
+            names.extend(m[2].split())
+            units.append(("list", m[1], tuple(m[2].split())))
+            continue
+        m = re.fullmatch(r"(check[\w-]*):\s*([^\n]*)\n?", raw)
+        if m and not any(c in m[2] for c in "=:;%\\"):
+            # Blank lines and comments do not end make's recipe association.
+            while i < len(lines) and (lines[i].startswith("\t") or
+                                     not lines[i].strip() or lines[i].startswith("#")):
+                i += 1
+            raw = "".join(lines[start:i])
+            units.append(("rule", m[1], raw))
+        elif i == start + 1 and (not line.strip() or line.startswith("#")):
+            units.append(("comment", "", raw))
+        else:
+            units.append(("opaque", "", raw))
+    return units, names
+
+
+def narrow_make_change(before, after, old_par, par):
+    """Return (affected current checks or None, reason); no make evaluation.
+
+    Comparing whole versions retains recipe ownership / define context that a
+    diff hunk can omit. Continued check columns are literal name lists; other
+    changed continuations, directives and unrecognized syntax fail closed.
+    """
+    old, old_names = make_units(before)
+    new, new_names = make_units(after)
+    listed = set(old_par) | set(par)
+    # A custom recipe prefix, eval or duplicate rule can change ownership or
+    # generate additional rules. Do not try to model those make features.
+    for text, units in ((before, old), (after, new)):
+        if re.search(r"\.RECIPEPREFIX|\$[({]\s*eval\b", text):
+            return None, "recipe prefix / eval は判別不能"
+        targets = [u[1] for u in units if u[0] == "rule"]
+        if len(targets) != len(set(targets)):
+            return None, "重複規則は判別不能"
+    if [u[1] for u in old if u[0] == "list"] != [u[1] for u in new if u[0] == "list"]:
+        return None, "検査列の代入形式の変更"
+    if len(old_names) != len(set(old_names)) or len(new_names) != len(set(new_names)):
+        return None, "検査列の重複名"
+    common = set(old_names) & set(new_names)
+    if [t for t in old_names if t in common] != [t for t in new_names if t in common]:
+        return None, "検査列の並べ替え"
+    affected = set(old_names) ^ set(new_names)
+    for tag, a, b, c, d in difflib.SequenceMatcher(a=old, b=new, autojunk=False).get_opcodes():
+        if tag == "equal":
+            continue
+        for kind, key, value in old[a:b] + new[c:d]:
+            if kind == "list" or kind == "comment":
+                continue
+            if kind != "rule" or key not in listed:
+                return None, "変数・非検査規則・未対応構文の変更"
+            if "\\\n" in value or "\\\r\n" in value:
+                return None, "検査規則の改行継続は判別不能"
+            affected.add(key)
+    if not affected <= listed:
+        return None, "検査列に未登録の名前"
+    return affected & set(par), "検査列の名前と登録済み検査の前提・recipe だけの変更"
+
+
+def make_change(path, base, par):
+    if base is None:
+        return None, "基点版なし (--files)"
+    try:
+        # changed_files uses base...HEAD; use the same merge-base for contents.
+        ancestor = git("merge-base", base, "HEAD")[0]
+        def show(p):
+            result = subprocess.run(["git", "-C", ROOT, "show", ancestor + ":" + p],
+                                    capture_output=True, text=True)
+            if result.returncode:
+                raise ValueError("基点版を読めない")
+            return result.stdout
+        before = show(path)
+        with open(os.path.join(ROOT, path), encoding="utf-8") as f:
+            after = f.read()
+        _, old_par = make_units(show("build/sdk.mk"))
+        if not old_par:
+            raise ValueError("基点版の検査列を判別できない")
+        return narrow_make_change(before, after, old_par, par)
+    except (OSError, UnicodeError, ValueError, IndexError) as e:
+        return None, "版の比較不能: %s" % e
 
 
 # ---------------------------------------------------------------- 入力の抽出
@@ -497,8 +607,10 @@ def default_base():
     return head, "HEAD (feat/gui / main が見つからない)"
 
 
-def plan(files):
-    """変更の一覧から (mode, stage, mut, 説明の行) を決める。git は見ない。
+def plan(files, base=None):
+    """変更の一覧から (mode, stage, mut, 説明の行) を決める。
+
+    base があるときだけ build/*.mk の基点版を git から読む。
 
     stage は回す検査 (make の目標)、mut はそのうち変異込みで回す検査。"""
     m = load_map()
@@ -517,18 +629,26 @@ def plan(files):
              for t, cg in checks.items()}
     changed = [f for f in files if not matches(f, ign)]
 
+    lines = []
     hit, unmatched, full_hits, notest_hits = set(), [], [], []
     for f in changed:
         hit |= {t for t, cg in checks.items() if matches(f, cg)}
         if matches(f, full):
-            full_hits.append(f)
+            narrowed, why = (make_change(f, base, par) if re.fullmatch(r"build/[^/]+\.mk", f)
+                             else (None, "全体に影響するファイル"))
+            if narrowed is None:
+                full_hits.append(f)
+                lines.append("%s: 全部 — %s" % (f, why))
+            else:
+                hit |= narrowed
+                lines.append("%s: 絞り込み — %s (%s)" %
+                             (f, why, " ".join(sorted(narrowed)) or "削除のみ、追加選択なし"))
         elif is_notest(f, notest):
             notest_hits.append(f)
         elif not matches(f, docs) and \
                 not any(matches(f, cg) for cg in cover.values()):
             unmatched.append(f)
 
-    lines = []
     if not changed:
         mode, st, mu = "fast", list(par), []
         lines.append("変更なし → 全部を変異なしで回す (= check-fast)")
@@ -567,7 +687,8 @@ def select(base, files=None, base_note=""):
         committed, work = changed_files(base)
     else:
         committed, work = [], list(files)
-    mode, st, mu, lines = plan(sorted(set(committed) | set(work)))
+    mode, st, mu, lines = plan(sorted(set(committed) | set(work)),
+                               base=None if files is not None else base)
     summary = ("check-changed: 基点 %s (%s)、コミット済みの変更 %d 件 + 未コミット %d 件 → %s"
                % (base[:12], base_note or "指定", len(committed), len(work), mode))
     for l in lines:
