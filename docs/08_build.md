@@ -247,9 +247,24 @@ KernelAPI の構造体を変えたときは `make clean` → `make all` が必�
     `CHECK_PAR_TARGETS` の名前の追加・削除と、登録済み検査の前提・recipe の追加・変更・削除だけなら
     その検査だけを変異込みにする (列から消えた検査は回さない)。他の変更ファイルによる選択は合算する。
     hunk だけでは recipe の所属や `define` の文脈が欠けるため、両版全体を読む。
-    検査列の名前の列だけは `\` 継続を許可する。それ以外の改行継続、`define`・条件分岐内の変更、
-    変数・旗・include・パターン規則・非検査ターゲット・未対応構文・版の取得不能は全部。
-    `FILES=` は基点版を持たないのでこの例外を適用しない。絞り込み／全部の理由も stderr に出る。
+    **許可リスト方式** (絞るのは証明できるものだけ、独立レビュー P1 2026-10-01):
+    - `define … endef` は GNU make の終端規則どおりに別の状態で追う (タブで始まる行は何でも本文、
+      中の `endif` も本文、`\` 継続の次の `endef` も本文、入れ子の `define` は深くなる)。
+      define の中と境界に触れる変更、条件分岐 (`ifeq` …) の中の変更、タブで始まる make 指令
+      (recipe か指令か決められない) は全部。
+    - 絞る対象の変更行 (検査規則の前提 + recipe) の `$` 参照は、`$$`・自動変数・`$(MAKE)` など
+      make 自身の文字列変数・引数を文字列として扱うだけの関数 (`if` `or` `filter` `subst` `strip` … —
+      `PURE_FUNCS`)・置換参照・**定義を追える変数**だけ。変数の定義は追跡されている `Makefile` +
+      `build/*.mk` の全部から集め (`.env` は読まない — [D3]。そこにしか定義の無い変数は「定義が無い」で全部)、`:=` は読み込み時に展開済みとして通し、`=` `?=` `+=` は
+      値の中まで再帰して見る。`eval` `call` `shell` `file` `foreach` `error` `value` など許可リストに
+      無い関数、定義の無い変数 (環境・コマンド行の値は追えない)、`!=` (結果が再帰展開される)、
+      `define` で定義した変数、計算された名前 (`$($(F))`)、循環、追跡されていない `include`
+      (`.env` と gcc が生成する `$(DEPFILES)` だけ許し、どちらも読まない)、`.SECONDEXPANSION` は全部。
+    検査列の名前の列だけは `\` 継続を許可する。それ以外の改行継続、
+    変数・旗・include・パターン規則・非検査ターゲット・検査列の多重代入や `+=`・未対応構文・版の
+    取得不能は全部。`FILES=` は基点版を持たないのでこの例外を適用しない。絞り込み／全部の理由も stderr に出る。
+    残る限界: recipe が shell で起こす副作用 (別の検査が読むファイルを書くなど) は make の
+    意味論の外で、段の前後の `check_tree_unchanged.py` だけが見る。
     走査型の検査 (`broad:` — `check-arch-asm` など) の `**` glob はこの判定に**数えない**
     (ツリー全体の glob に当たっただけで安全側が消えるのを防ぐ)
   - 変更が全部 `docs_only:` (`**/*.md` など) → 当たった検査 + **文書を読む検査 (`docs_always:` —
@@ -270,7 +285,7 @@ KernelAPI の構造体を変えたときは `make clean` → `make all` が必�
   辿り方は静的なので、ツリーを舐める検査器 (`check-arch-asm` など) は glob を手で広く書いてある。
   表が欠けても `sel` の場合は**試験そのものは変異なしで必ず回る** — 落とすのは否定側だけ。
   docs だけの変更では当たらない検査は回らないので、文書を読む検査は `docs_always:` に入れておく。
-  選び方そのものの試験は `make check-check-select-host` (`tools/tests/test_check_select.py`、変異 21 本)。
+  選び方そのものの試験は `make check-check-select-host` (`tools/tests/test_check_select.py`、変異 39 本)。
 - 新しい検査を列に足したら `python3 tools/check_select.py --suggest <検査名>` の出力を
   下書きにして対応表へ足す (`make check-map` が足りないと言う)。
 - `tools/check_tree_unchanged.py` の番人 ([POLICY_DEBUG §4-40](POLICY_DEBUG.md)) は 3 通りとも段の前後で回る。

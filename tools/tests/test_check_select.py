@@ -22,6 +22,10 @@
   * build/*.mk は検査列の名前と登録済み検査の前提・recipe だけの変更なら
     当該検査だけ変異込み。列の削除、混在、基点の分岐、未コミット版も確認する。
     変数・非検査規則・define・条件分岐・列以外の改行継続は安全側へ倒す。
+  * 独立レビュー P1 (2026-10-01): define は GNU make の終端規則どおりに追う
+    (中の endif / タブ付き endef / `\` 継続の次の endef は本文)、絞る変更行の
+    `$` 参照は許可リスト (eval / call / shell / file、定義の無い変数、`!=`、
+    define 定義、別ファイルの変数を介した間接的な eval は全部)。
   * 逐次の 2 段目 (CHECK_MUT_TARGETS) は無い — 列は 1 本で全部並列
 
   python3 -B tools/tests/test_check_select.py            # 筋書き
@@ -255,9 +259,14 @@ def case_lint_real(cs):
 MAKE_BEFORE = "CHECK_PAR_TARGETS := check-a check-b\ncheck-a: input\n\tpython3 a.py\ncheck-b:\n\tpython3 b.py\nFLAGS := old\nnormal:\n\techo old\n"
 
 
-def make_fixture_plan(cs, before, after, extra=(), second=None):
+def make_fixture_plan(cs, before, after, extra=(), second=None, defs=None):
+    """fixture の前後 2 版で plan() を回す。defs は別ファイルの変数定義の代わり
+    ({名前: [(代入記号, 値)]}、None なら after から集める)。"""
     originals = cs.load_map, cs.read_makefiles, cs.make_change
-    _, names = cs.make_units(after)
+    try:
+        _, names = cs.make_units(after)
+    except ValueError:
+        names = ["check-a", "check-b"]
     cs.load_map = lambda: dict(ignore=[], full=["build/*.mk", "Makefile", "sdk/kapi.json"],
                                docs_only=["**/*.md"], notest=[], broad=[], docs_always=[],
                                checks={"check-a": ["src/a.c"], "check-b": ["src/b.c"]})
@@ -266,7 +275,7 @@ def make_fixture_plan(cs, before, after, extra=(), second=None):
         if base is None:
             return None, "base missing"
         pair = second if path == "build/other.mk" else (before, after)
-        return cs.narrow_make_change(*pair, ["check-a", "check-b"], par)
+        return cs.narrow_make_change(*pair, ["check-a", "check-b"], par, defs)
     cs.make_change = compare
     try:
         return cs.plan(["build/sdk.mk", *extra], base="fixture")
@@ -363,6 +372,124 @@ def case_make_mixed(cs):
     assert cs.plan(["build/sdk.mk"])[0] == "full", "--files has no versions"
 
 
+MAKE_LIST = "CHECK_PAR_TARGETS := check-a check-b\n"
+
+
+def _full(cs, before, after, **kw):
+    result = make_fixture_plan(cs, before, after, **kw)
+    assert result[0] == "full", (before, after, result)
+
+
+def _only_a(cs, before, after, **kw):
+    result = make_fixture_plan(cs, before, after, **kw)
+    assert result[0] == "sel" and result[2] == ["check-a"], (before, after, result)
+
+
+def case_make_define_state(cs):
+    # 独立レビュー P1-1 (2026-10-01): define の中の `endif` は値の一部 (GNU make)。
+    # check-a の recipe に見える行は共有変数 BODY の本文で、check-b が BODY を読む
+    # → echo old → new は check-b も変える → 全部。
+    body = ("define BODY\nendif\ncheck-a:\n\techo old\nendef\n"
+            ".PHONY: check-a check-b\ncheck-b:\n\t@echo $(findstring old,$(BODY))\n")
+    variants = [
+        body,                                            # endif は本文
+        body.replace("endif\n", "\tendef\n"),            # タブ付き endef は本文
+        body.replace("endif\n", "foo \\\nendef\n"),      # `\` 継続の次の endef は本文
+        body.replace("endif\n", "  define X\nendef\n"),  # 入れ子の define を閉じただけ
+        body.replace("endif\n", "ifeq (x,x)\nendif\n"),  # 条件分岐の語も本文
+    ]
+    for v in variants:
+        units, _ = cs.make_units(MAKE_LIST + v)
+        assert not any(u[0] == "rule" and u[1] == "check-a" for u in units), v
+        _full(cs, MAKE_LIST + v, MAKE_LIST + v.replace("echo old", "echo new"))
+    # endef で閉じた後の check-a は規則 (過剰に全部へ倒れない)
+    closed = "define BODY\nendif\nendef\ncheck-a:\n\techo old\ncheck-b:\n\techo b\n"
+    _only_a(cs, MAKE_LIST + closed, MAKE_LIST + closed.replace("echo old", "echo new"))
+    # define の境界に触れる変更 (endef の追加・移動) は全部
+    _full(cs, MAKE_LIST + closed, MAKE_LIST + closed.replace("endif\nendef\n", "endif\n"))
+    # タブで始まる make 指令は recipe か指令か決められない → 全部 (条件分岐の中で
+    # `\tendif` を閉じ括弧と誤読すると check-b が規則に見える)
+    cond = ("ifeq (x,x)\ncheck-a:\n\tpython3 a.py\n\tendif\ncheck-b:\n\tpython3 b.py\nendif\n")
+    _full(cs, MAKE_LIST + cond, MAKE_LIST + cond.replace("b.py", "c.py"))
+    tab_if = "check-a:\n\tifeq (x,x)\n\tpython3 a.py\ncheck-b:\n\tpython3 b.py\n"
+    _full(cs, MAKE_LIST + tab_if, MAKE_LIST + tab_if.replace("a.py", "c.py"))
+
+
+def case_make_side_effects(cs):
+    # 独立レビュー P1-2 (2026-10-01): 絞る対象の変更行の `$` 参照は許可リストだけ。
+    # $(call eval,…) / $(call $(F),…) / 別ファイルの変数を介した間接的な eval は
+    # 変更ファイルだけでは証明できない → 全部。
+    plain = "check-a:\n\tpython3 a.py\ncheck-b:\n\tpython3 b.py\n"
+    direct = ("check-a:\n\t$(call eval,FLAGS := old)\n\t@echo a\ncheck-b:\n\t@echo $(FLAGS)\n")
+    _full(cs, MAKE_LIST + direct, MAKE_LIST + direct.replace("FLAGS := old", "FLAGS := new"))
+    via_f = ("F := eval\ncheck-a:\n\t$(call $(F),FLAGS := old)\ncheck-b:\n\t@echo $(FLAGS)\n")
+    _full(cs, MAKE_LIST + via_f, MAKE_LIST + via_f.replace("FLAGS := old", "FLAGS := new"))
+    for bad in ("$(shell touch x)", "$(file >x,y)", "$(foreach d,a b,$(d))", "$(error x)",
+                "$(value FLAGS)", "$(let x,1,$(x))", "$(1)", "$($(F))", "$(X", "$"):
+        _full(cs, MAKE_LIST + plain, MAKE_LIST + plain.replace("a.py", "a.py " + bad))
+    # 別ファイルの変数 (defs): 再帰展開の値は中まで見る、`:=` は読み込み時に展開済み
+    ref = MAKE_LIST + plain.replace("a.py", "a.py $(GEN)")
+    _full(cs, MAKE_LIST + plain, ref, defs={"GEN": [("=", "$(call eval,FLAGS := new)")]})
+    _full(cs, MAKE_LIST + plain, ref, defs={"GEN": [("=", "x"), ("+=", "$(shell y)")]})
+    _full(cs, MAKE_LIST + plain, ref, defs={"GEN": [("!=", "echo x")]})
+    _full(cs, MAKE_LIST + plain, ref, defs={"GEN": [("define", None)]})
+    _full(cs, MAKE_LIST + plain, ref, defs={"GEN": [("=", "$(GEN2)")], "GEN2": [("=", "$(GEN)")]})
+    _full(cs, MAKE_LIST + plain, ref, defs={})                 # 定義が無い (環境は見えない)
+    _only_a(cs, MAKE_LIST + plain, ref, defs={"GEN": [(":=", "$(shell parse-time)")]})
+    _only_a(cs, MAKE_LIST + plain, ref,
+            defs={"GEN": [("=", "$(if $(mut_on),--mutate)")], "MUTATE": [("?=", "1")],
+                  "MUTATE_TARGETS": [("?=", "")],
+                  "mut_on": [("=", "$(or $(filter 1,$(MUTATE)),$(filter $@,$(MUTATE_TARGETS)))")]})
+    # 同じファイルの変数も同じ規則 (defs 無し → after から集める)
+    same = "V != echo x\n" + plain
+    _full(cs, MAKE_LIST + same, MAKE_LIST + same.replace("a.py", "a.py $(V)"))
+    same = "V := $(shell echo x)\n" + plain
+    _only_a(cs, MAKE_LIST + same, MAKE_LIST + same.replace("a.py", "a.py $(V:.c=.o)"))
+    # 副作用の無いもの: $$ (shell の $)、自動変数、make 自身の変数
+    _only_a(cs, MAKE_LIST + plain,
+            MAKE_LIST + plain.replace("a.py", "a.py $$HOME $@ $(@D) $(MAKE) $(strip $(MAKECMDGOALS))"))
+    # 行頭 `#` は make のコメントで展開されない (タブ行の `#` は shell に渡る前に展開される)
+    _only_a(cs, MAKE_LIST + plain, MAKE_LIST + plain.replace("a.py\n", "a.py\n# $(shell x)\n"))
+    _full(cs, MAKE_LIST + plain, MAKE_LIST + plain.replace("a.py\n", "a.py\n\t# $(shell x)\n"))
+    # 追跡されていない include、二次展開、検査列の多重代入・`+=` は判別不能
+    inc = "include other.mk\n" + plain
+    _full(cs, MAKE_LIST + inc, MAKE_LIST + inc.replace("a.py", "c.py"))
+    sec = ".SECONDEXPANSION:\n" + plain
+    _full(cs, MAKE_LIST + sec, MAKE_LIST + sec.replace("a.py", "c.py"))
+    multi = "CHECK_PAR_TARGETS := check-a\n" + plain + "CHECK_PAR_TARGETS := check-b\n"
+    _full(cs, multi, multi.replace("a.py", "c.py"))
+    plus = MAKE_LIST + plain + "CHECK_PAR_TARGETS += check-c\n"
+    _full(cs, plus, plus.replace("a.py", "c.py"))
+
+
+def case_make_defs_collect(cs):
+    # collect_make_defs: define 本文の中は定義に数えず define 自体を記録、条件分岐と
+    # タブ行の代入は多めに数える、include は追跡されている Makefile か .env / $(DEPFILES)
+    text = ("A := 1\ndefine B\nC := 2\nendef\nifeq (x,x)\nD ?= 3\nelse\nD = 4\nendif\n"
+            "\tE += 5\n-include .env\n-include $(DEPFILES)\ninclude build/x.mk\n"
+            "include other.mk\n")
+    defs, problems = cs.collect_make_defs({"m": text}, {"build/x.mk"})
+    assert defs["A"] == [(":=", "1")] and defs["B"] == [("define", None)], defs
+    assert "C" not in defs and defs["D"] == [("?=", "3"), ("=", "4")], defs
+    assert defs["E"] == [("+=", "5")], defs
+    assert problems == ["m: include other.mk の中身を追えない"], problems
+    # 実物: 追跡されている Makefile 全部で include が全部追える。.env は読まない ([D3])
+    paths = cs.makefile_paths()
+    assert "Makefile" in paths and "build/sdk.mk" in paths, paths
+    texts = cs.makefile_texts()
+    assert set(texts) == set(paths) and ".env" not in texts, sorted(texts)
+    defs, problems = cs.collect_make_defs(texts, set(paths))
+    assert not problems, problems
+    # .env にしか定義の無い変数 (ここでは defs に無い名前) を参照したら全部
+    plain = "check-a:\n\tpython3 a.py\ncheck-b:\n\tpython3 b.py\n"
+    _full(cs, MAKE_LIST + plain, MAKE_LIST + plain.replace("a.py", "a.py $(ONLY_IN_DOTENV)"),
+          defs=defs)
+    # 実物の検査の recipe が参照する変数は全部、許可リストを通る (絞り込みが効く)
+    rules, vars_ = cs.read_makefiles()
+    for t in cs.check_lists(vars_):
+        cs.check_make_pure("\n".join(rules.get(t, [])), defs)
+
+
 def case_make_git_versions(cs):
     # A branch whose base diverged: compare merge-base, and read the working
     # copy (both staged and unstaged), not just HEAD or the diff hunk.
@@ -419,7 +546,8 @@ CASES = [case_inc_extract, case_hsync_protect, case_sh_pipe, case_bare_extract,
          case_notest_fast, case_notest_glob_wins, case_notest_guard,
          case_featgui_commit, case_lint_real, case_make_add, case_make_recipe,
          case_make_remove, case_make_variable, case_make_noncheck,
-         case_make_unsupported, case_make_mixed, case_make_git_versions]
+         case_make_unsupported, case_make_mixed, case_make_define_state,
+         case_make_side_effects, case_make_defs_collect, case_make_git_versions]
 
 
 def run_cases(cs, quiet=False, cases=None):
@@ -481,11 +609,58 @@ MUTATIONS = [
      '            if kind != "rule" or key not in listed:\n                continue', "変数・非検査規則を絞り込む (安全側を外す)"),
     ('            if "\\\\\\n" in value or "\\\\\\r\\n" in value:',
      '            if False:', "recipe の改行継続を絞り込む"),
-    ('        if depth:', '        if False:',
-     "define・条件分岐内を通常の検査規則として絞る"),
-    ('elif i == start + 1 and (not line.strip() or line.startswith("#")):',
-     'elif not line.strip() or line.startswith("#"):',
+    ('        if cond_depth:\n            units.append(("opaque", "", raw))\n            continue\n',
+     '',
+     "条件分岐内を通常の検査規則として絞る"),
+    ('elif end - start == 1 and (not raw.strip() or raw.startswith("#")):',
+     'elif not raw.strip() or raw.startswith("#"):',
      "改行継続コメントが飲み込む行を無視する"),
+    # 独立レビュー P1-1 (define の終端規則) と P1-2 (副作用の許可リスト)、2026-10-01
+    ('                elif re.match(r"endef(?:\\s|$)", tok):',
+     '                elif re.match(r"end(?:ef|if)(?:\\s|$)", tok):',
+     "define の中の endif で define を閉じる (P1-1)"),
+    ('            if not first.startswith("\\t"):\n                tok = _join_logical(raw)',
+     '            if True:\n                tok = _join_logical(raw)',
+     "define の中のタブ付き endef で閉じる (P1-1)"),
+    ('    return n % 2 == 1 and line.endswith("\\n")\n', '    return False\n',
+     "`\\` 継続を論理行に数えない (define の中の `foo \\` + endef で閉じる)"),
+    ('            if first.startswith("\\t"):\n                raise ValueError("タブで始まる',
+     '            if False:\n                raise ValueError("タブで始まる',
+     "タブで始まる make 指令を指令として読む (条件分岐の中の `\\tendif` で閉じる)"),
+    ('    "if", "or", "and", "filter",', '    "if", "or", "and", "call", "filter",',
+     "call を許可リストに入れる (P1-2: $(call eval,…))"),
+    ('            if m.group(1) not in PURE_FUNCS:\n                raise',
+     '            if False:\n                raise',
+     "関数の許可リストを外す (shell / file / foreach …)"),
+    ('        if name not in defs:\n            raise', '        if name not in defs:\n            continue  #',
+     "定義の無い変数を素通しする"),
+    ('            if op == "!=":\n                raise', '            if op == "!=":\n                continue  #',
+     "`!=` の変数を素通しする"),
+    ('            if op == "define":\n                raise', '            if op == "define":\n                continue  #',
+     "define で定義した変数を素通しする"),
+    ('            check_make_pure(value, defs, stack + (name,))\n', '            pass\n',
+     "再帰展開の変数の値を見ない (別ファイルの変数を介した eval を見逃す)"),
+    ('        if name in stack:\n            raise', '        if name in stack:\n            continue  #',
+     "循環する変数を素通しする"),
+    ('            try:\n                check_make_pure(body, defs)\n', '            try:\n                pass\n',
+     "変更した検査規則の `$` 参照を見ない"),
+    ('            body = "".join(l for l in value.splitlines(keepends=True)\n'
+     '                           if not l.startswith("#"))',
+     '            body = "".join(l for l in value.splitlines(keepends=True)\n'
+     '                           if not l.lstrip().startswith("#"))',
+     "タブ行の `#` も make のコメント扱いにして展開を見ない"),
+    ('        if problems:\n            return None, "include を追えない: %s" % problems[0]\n    listed',
+     '        if False:\n            return None, "include を追えない: %s" % problems[0]\n    listed',
+     "追跡されていない include を素通しする"),
+    ('                    if arg not in known_paths and arg not in TRUSTED_INCLUDES:',
+     '                    if False:',
+     "include の引数を見ない"),
+    ('r"\\.RECIPEPREFIX|\\.SECONDEXPANSION|\\$[({]\\s*eval\\b"', 'r"\\.RECIPEPREFIX|\\$[({]\\s*eval\\b"',
+     "二次展開 (.SECONDEXPANSION) を判別不能にしない"),
+    ('        if sum(1 for u in units if u[0] == "list") > 1:', '        if False:',
+     "検査列の多重代入を絞る"),
+    ('                raise ValueError("検査列の代入が名前の列でない")', '                continue',
+     "検査列への `+=` などを無視する"),
     ('    return affected & set(par),', '    return set(),',
      "変更した検査の変異を選ばない"),
     ('ancestor = git("merge-base", base, "HEAD")[0]', 'ancestor = base',

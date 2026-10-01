@@ -22,8 +22,11 @@
   * 変更が無い                     → 全部を変異なし (= check-fast)
   * `full:` に当たる変更がある     → 全部を変異込み (= check)
     ただし build/*.mk は基点版と現行版を構文単位で比べ、検査列の名前と
-    登録済み検査の前提・recipe だけの変更なら当該検査だけ変異込み。
-    検査列以外の改行継続・define・未対応構文・版の比較不能は全部。
+    登録済み検査の前提・recipe だけの変更なら当該検査だけ変異込み (許可リスト
+    方式 — 絞れるのは証明できるものだけ、narrow_make_change の docstring)。
+    define の中・境界、条件分岐の中、検査列以外の改行継続、変更行の `$` 参照に
+    eval / call / shell / file などの副作用や中身を追えない変数 (定義が無い、
+    `!=`、define 定義) を含むもの、未対応構文、版の比較不能は全部。
   * どの検査の glob にも `docs_only:` にも `notest:` にも当たらない変更がある
                                    → 全部を変異込み (= check)。表の漏れで
                                      否定側を落とさないため。`broad:` の検査の
@@ -199,65 +202,310 @@ def check_lists(vars_):
     return par
 
 
-# Narrow only syntax we can prove local to the check column. Everything else
-# stays an opaque unit and must be byte-identical, including its ordering.
-def make_units(text):
-    units, names = [], []
-    lines = text.splitlines(keepends=True)
-    i, depth = 0, 0
-    while i < len(lines):
-        line = lines[i]
-        start = i
+# ---------------------------------------------------------------- build/*.mk の絞り込み
+# 許可リスト方式: 「検査列 (CHECK_PAR_TARGETS) への名前の追加・削除」と「登録済み検査の
+# 前提・recipe」の変更だけを、その検査に閉じていると**証明できる範囲**で絞る。
+# 証明できないものは全部 (None) に倒す。何を証明済みとみなすかは下の各関数の docstring。
+#
+# make の読み方で模倣するのは次だけ (GNU make 4.4 の read.c と突き合わせ、2026-10-01):
+#   * 行末の `\` (奇数個) は次の物理行と 1 つの論理行 (define の中でも同じ)
+#   * define … endef: 中の行はタブで始まれば何でも本文、そうでなければ先頭の語が
+#     `define` で入れ子が 1 つ深く、`endef` で 1 つ浅くなる。`endif` は本文
+#   * ifeq / ifneq / ifdef / ifndef … else … endif: 中の行は全部 1 行ずつ不透明
+#   * タブで始まる行が make の指令 (define / endef / if* / else / endif) に見えたら
+#     recipe 行か指令かを決められないので判別不能 (全部)
+MAKE_DIRECTIVE = re.compile(
+    r"^(?:(?:override|export|private|unexport)[ \t]+)*"
+    r"(define|endef|ifeq|ifneq|ifdef|ifndef|else|endif)\b")
+MAKE_ASSIGN = re.compile(
+    r"^(?:(?:override|export|private|unexport)[ \t]+)*"
+    r"([A-Za-z_][\w.-]*)[ \t]*(:::=|::=|:=|\?=|\+=|!=|=)(.*)$", re.S)
+MAKE_INCLUDE = re.compile(r"^[ \t]*(?:-include|sinclude|include)[ \t]+(.*)$", re.S)
+# 許す include の引数。追跡されている Makefile / build/*.mk 以外で読み込まれるのは
+# この 2 つだけ。どちらも**読まない** — ここにしか定義の無い変数を検査規則が参照したら
+# 「定義が無い」として全部に倒す:
+#   .env         ローカルの秘密 (追跡外、[D3] — 検査器が秘密のファイルを読む経路を作らない)
+#   $(DEPFILES)  gcc -MMD が生成する依存 (.d)。規則の前提だけで変数は定義しない
+TRUSTED_INCLUDES = {".env", "$(DEPFILES)"}
+# 副作用が無く、引数を文字列として扱うだけの make 関数 (引数の中の $-参照は別に見る)。
+# ここに無い関数 (eval / call / shell / file / foreach / let / error / value / guile …)
+# は変数の定義や生成を起こしうる、または中身を追えないので判別不能。
+PURE_FUNCS = {
+    "if", "or", "and", "filter", "filter-out", "subst", "patsubst", "strip",
+    "findstring", "sort", "word", "words", "wordlist", "firstword", "lastword",
+    "dir", "notdir", "suffix", "basename", "addsuffix", "addprefix", "join",
+    "wildcard", "realpath", "abspath", "origin", "flavor", "info", "warning",
+}
+# 自動変数 ($@ $< …、$(@D) $(@F) …) と、make 自身が持つ文字列だけの変数。
+AUTO_VARS = set("@<^+*?%|") | {c + s for c in "@<^+*?%" for s in "DF"}
+BUILTIN_PLAIN = {"MAKE", "MAKEFLAGS", "MAKECMDGOALS", "MAKELEVEL", "CURDIR",
+                 "MAKEFILE_LIST", "MAKE_VERSION", "SHELL"}
+
+
+def _continues(line):
+    """物理行が `\\` + 改行で次の行に続くか (奇数個の `\\` のときだけ)。"""
+    body = line.rstrip("\r\n")
+    n = len(body) - len(body.rstrip("\\"))
+    return n % 2 == 1 and line.endswith("\n")
+
+
+def _logical_end(lines, i):
+    """lines[i] から始まる論理行の終わり (次の論理行の先頭の添字)。"""
+    while i < len(lines) and _continues(lines[i]):
         i += 1
-        if re.match(r"^[ \t]*(?:(?:override|export|private)\s+)*define\b|^[ \t]*if(?:eq|neq|def|ndef)\b", line):
-            depth += 1
-        if depth:
-            units.append(("opaque", "", line))
-            if re.match(r"^[ \t]*(?:endef|endif)\b", line):
-                depth -= 1
-            continue
-        while lines[i - 1].rstrip("\r\n").endswith("\\") and i < len(lines):
-            i += 1
+    return min(i + 1, len(lines))
+
+
+def _join_logical(raw):
+    """`\\` + 改行 + 続く空白を 1 つの空白にする (recipe 以外の行の make の規則)。"""
+    return re.sub(r"\\\r?\n[ \t]*", " ", raw)
+
+
+def make_logical_lines(text):
+    """論理行を (start, end, raw, in_define, directive) で順に返す。
+
+    start / end は物理行 (splitlines) の添字の範囲。in_define は define 本文
+    (開始行と endef 行を含む) のとき真。directive は define 本文の外で行頭が make の
+    指令だったときその語、それ以外は None。タブで始まる行が指令に見えたら
+    ValueError (recipe 行か指令か決められない)。"""
+    lines = text.splitlines(keepends=True)
+    i, define_level = 0, 0
+    while i < len(lines):
+        start, i = i, _logical_end(lines, i)
         raw = "".join(lines[start:i])
-        logical = re.sub(r"\\\r?\n\s*", " ", raw).strip()
-        m = re.fullmatch(r"CHECK_PAR_TARGETS\s*(:=|=)\s*(.*)", logical)
-        if m and not raw.startswith("\t") and all(re.fullmatch(r"check[\w-]*", t) for t in m[2].split()):
+        first = lines[start]
+        if define_level:
+            if not first.startswith("\t"):
+                tok = _join_logical(raw).lstrip(" \t")
+                if re.match(r"define(?:\s|$)", tok):
+                    define_level += 1
+                elif re.match(r"endef(?:\s|$)", tok):
+                    define_level -= 1
+            yield start, i, raw, True, None
+            continue
+        m = MAKE_DIRECTIVE.match(first.lstrip(" \t"))
+        if m:
+            if first.startswith("\t"):
+                raise ValueError("タブで始まる make 指令 (%s) は recipe か指令か判別不能"
+                                 % m.group(1))
+            if m.group(1) == "define":
+                define_level = 1
+                yield start, i, raw, True, "define"
+                continue
+            yield start, i, raw, False, m.group(1)
+            continue
+        yield start, i, raw, False, None
+
+
+def make_units(text):
+    """build/*.mk を構文単位に切る。(units, 検査列の名前) を返す。
+
+    単位は ("list", 代入記号, 名前の組) / ("rule", 検査名, 原文) / ("comment", "", 原文)
+    / ("opaque", "", 原文)。list は CHECK_PAR_TARGETS への `:=` / `=` で右辺が
+    check-* の名前だけのもの (`\\` 継続を許す)。rule は行頭の `check-*:` に続く
+    前提 (`= : ; % \\` を含まない) と、その後のタブ行・空行・コメント行。
+    define 本文・条件分岐の中・それ以外は 1 論理行ずつ opaque (両版で一致が必要)。
+    判別できない構文は ValueError。"""
+    units, names = [], []
+    cond_depth = 0
+    phys = text.splitlines(keepends=True)
+    logical = list(make_logical_lines(text))
+    k = 0
+    while k < len(logical):
+        start, end, raw, in_define, directive = logical[k]
+        k += 1
+        if in_define:
+            units.append(("opaque", "", raw))
+            continue
+        if directive:
+            units.append(("opaque", "", raw))
+            if directive in ("ifeq", "ifneq", "ifdef", "ifndef"):
+                cond_depth += 1
+            elif directive == "endif":
+                cond_depth = max(cond_depth - 1, 0)
+            continue
+        if cond_depth:
+            units.append(("opaque", "", raw))
+            continue
+        logical_text = _join_logical(raw).strip()
+        if (re.match(r"^(?:(?:override|export|private)[ \t]+)*CHECK_PAR_TARGETS[ \t]*[:+?!]*=",
+                     logical_text) and not raw.startswith("\t")):
+            m = re.fullmatch(r"CHECK_PAR_TARGETS\s*(:=|=)\s*(.*)", logical_text)
+            if not (m and all(re.fullmatch(r"check[\w-]*", t) for t in m[2].split())):
+                raise ValueError("検査列の代入が名前の列でない")
             names.extend(m[2].split())
             units.append(("list", m[1], tuple(m[2].split())))
             continue
         m = re.fullmatch(r"(check[\w-]*):\s*([^\n]*)\n?", raw)
         if m and not any(c in m[2] for c in "=:;%\\"):
-            # Blank lines and comments do not end make's recipe association.
-            while i < len(lines) and (lines[i].startswith("\t") or
-                                     not lines[i].strip() or lines[i].startswith("#")):
-                i += 1
-            raw = "".join(lines[start:i])
-            units.append(("rule", m[1], raw))
-        elif i == start + 1 and (not line.strip() or line.startswith("#")):
+            # 空行とコメント行は recipe の所属を切らない (make の規則)。
+            j = end
+            while j < len(phys) and (phys[j].startswith("\t") or
+                                     not phys[j].strip() or phys[j].startswith("#")):
+                j += 1
+            # 吸収した物理行ぶん、論理行の列も進める (継続で跨いだ論理行を含む)。
+            while k < len(logical) and logical[k][0] < j:
+                if logical[k][1] > j:
+                    # 吸収の境界が論理行の途中 (コメント行の `\` 継続など) — 判別不能
+                    raise ValueError("検査規則の末尾が改行継続の途中で終わる")
+                k += 1
+            units.append(("rule", m[1], "".join(phys[start:j])))
+        elif end - start == 1 and (not raw.strip() or raw.startswith("#")):
             units.append(("comment", "", raw))
         else:
             units.append(("opaque", "", raw))
     return units, names
 
 
-def narrow_make_change(before, after, old_par, par):
-    """Return (affected current checks or None, reason); no make evaluation.
+def collect_make_defs(texts, known_paths=()):
+    """{変数名: [(代入記号, 値)]} と include の問題の一覧を返す。
 
-    Comparing whole versions retains recipe ownership / define context that a
-    diff hunk can omit. Continued check columns are literal name lists; other
-    changed continuations, directives and unrecognized syntax fail closed.
-    """
-    old, old_names = make_units(before)
-    new, new_names = make_units(after)
+    texts は {パス: 本文}。define 本文の中は定義に数えず、`define NAME` 自体は
+    ("define", None) として記録する (本文は追えないので不透明)。条件分岐の中の代入も
+    全部数える (どの枝が生きるかは追わない = 多めに数える)。タブで始まる行の代入も
+    数える (recipe 行か代入かは追わない = 多めに数える)。include の引数は
+    known_paths (追跡されている Makefile / build/*.mk) か TRUSTED_INCLUDES だけを許す。"""
+    defs, problems = {}, []
+    for path, text in texts.items():
+        try:
+            lines = list(make_logical_lines(text))
+        except ValueError as e:
+            problems.append("%s: %s" % (path, e))
+            continue
+        for _, _, raw, in_define, directive in lines:
+            logical = _join_logical(raw).rstrip("\r\n")
+            if in_define:
+                if directive == "define":
+                    m = re.match(r"^(?:(?:override|export|private)[ \t]+)*define[ \t]+([^\s=:+?!]+)",
+                                 logical.lstrip(" \t"))
+                    if m:
+                        defs.setdefault(m.group(1), []).append(("define", None))
+                    else:
+                        problems.append("%s: 名前の無い define" % path)
+                continue
+            if directive:
+                continue
+            m = MAKE_INCLUDE.match(logical)
+            if m:
+                for arg in m.group(1).split("#")[0].split():
+                    if arg not in known_paths and arg not in TRUSTED_INCLUDES:
+                        problems.append("%s: include %s の中身を追えない" % (path, arg))
+                continue
+            m = MAKE_ASSIGN.match(logical.lstrip(" \t"))
+            if m:
+                defs.setdefault(m.group(1), []).append((m.group(2), m.group(3).strip()))
+    return defs, problems
+
+
+def make_refs(text):
+    """make が展開する `$` 参照の中身を順に返す (`$$` は読み飛ばす)。
+    括弧が閉じない・末尾の `$` は ValueError。"""
+    i = 0
+    while True:
+        j = text.find("$", i)
+        if j < 0:
+            return
+        if j + 1 >= len(text):
+            raise ValueError("行末の `$`")
+        c = text[j + 1]
+        if c == "$":
+            i = j + 2
+            continue
+        if c in "({":
+            close = ")" if c == "(" else "}"
+            depth, k = 1, j + 2
+            while k < len(text) and depth:
+                if text[k] == c:
+                    depth += 1
+                elif text[k] == close:
+                    depth -= 1
+                k += 1
+            if depth:
+                raise ValueError("括弧が閉じない `$` 参照")
+            yield text[j + 2:k - 1]
+            i = k
+        else:
+            yield c
+            i = j + 2
+
+
+def check_make_pure(text, defs, stack=()):
+    """text の `$` 参照が全部、副作用無く中身の分かるものだけなら何もしない。
+    そうでなければ ValueError (理由つき)。
+
+    許すもの: `$$`、自動変数 (AUTO_VARS)、make 自身の文字列変数 (BUILTIN_PLAIN)、
+    PURE_FUNCS の関数 (引数も再帰して見る)、`$(VAR:a=b)` の置換参照、
+    そして defs にある変数で各定義が次のどれかのもの:
+      `:=` `::=` `:::=`  読み込み時に展開済みなので参照に副作用が無い
+      `=` `?=` `+=`      参照時に展開されるので値を再帰して見る (循環は不可)
+    定義が無い変数 (環境・コマンド行・.env の値は見ない)、`!=` (結果が再帰展開される)、
+    define で定義した変数、計算された名前 (`$($(X))`)、位置引数 (`$(1)`)、
+    それ以外の関数は不可。"""
+    for ref in make_refs(text):
+        if ref in AUTO_VARS:
+            continue
+        m = re.fullmatch(r"([A-Za-z_][\w.-]*)[ \t]+(.*)", ref, re.S)
+        if m:
+            if m.group(1) not in PURE_FUNCS:
+                raise ValueError("関数 %s は許可リストに無い" % m.group(1))
+            check_make_pure(m.group(2), defs, stack)
+            continue
+        m = re.fullmatch(r"([A-Za-z_][\w.-]*)(?::([^=]*)=(.*))?", ref, re.S)
+        if not m:
+            raise ValueError("参照 `$(%s)` の形を追えない" % ref[:40])
+        name = m.group(1)
+        if m.group(2) is not None:
+            check_make_pure(m.group(2) + m.group(3), defs, stack)
+        if name in BUILTIN_PLAIN:
+            continue
+        if name in stack:
+            raise ValueError("変数 %s が循環している" % name)
+        if name not in defs:
+            raise ValueError("変数 %s の定義が追跡されている Makefile に無い" % name)
+        for op, value in defs[name]:
+            if op in (":=", "::=", ":::="):
+                continue
+            if op == "!=":
+                raise ValueError("変数 %s は `!=` (結果が再帰展開される)" % name)
+            if op == "define":
+                raise ValueError("変数 %s は define で定義されている" % name)
+            check_make_pure(value, defs, stack + (name,))
+
+
+def narrow_make_change(before, after, old_par, par, defs=None):
+    """(影響を受ける現行の検査の集合 または None, 理由)。make は評価しない。
+
+    hunk ではなく両版の全体を構文単位 (make_units) に切って比べる — hunk だけでは
+    recipe の所属や define の文脈が欠けるため。絞れるのは次が全部成り立つときだけ:
+      * 両版とも make_units で切れる (define / 条件分岐 / タブ指令の判別不能は全部)
+      * 両版とも .RECIPEPREFIX / .SECONDEXPANSION / `$(eval` を含まない
+      * 検査規則の重複・検査列の多重代入・重複名・並べ替え・代入記号の変更が無い
+      * 差のある単位が list (名前の列) / comment / 登録済み検査の rule だけ
+      * 差のある rule の原文 (前提 + recipe) の `$` 参照が全部 check_make_pure を通る
+        (defs は追跡されている Makefile 全部から集める。None なら after から。
+        .env は読まない — そこにしか定義の無い変数は「定義が無い」で全部)
+      * include の引数が全部、追跡されている Makefile か TRUSTED_INCLUDES
+    それ以外は None (全部)。"""
+    try:
+        old, old_names = make_units(before)
+        new, new_names = make_units(after)
+    except ValueError as e:
+        return None, "未対応構文: %s" % e
+    if defs is None:
+        defs, problems = collect_make_defs({"(after)": after})
+        if problems:
+            return None, "include を追えない: %s" % problems[0]
     listed = set(old_par) | set(par)
-    # A custom recipe prefix, eval or duplicate rule can change ownership or
-    # generate additional rules. Do not try to model those make features.
+    # A custom recipe prefix, secondary expansion, eval or duplicate rule can
+    # change ownership or generate additional rules. Do not model those.
     for text, units in ((before, old), (after, new)):
-        if re.search(r"\.RECIPEPREFIX|\$[({]\s*eval\b", text):
-            return None, "recipe prefix / eval は判別不能"
+        if re.search(r"\.RECIPEPREFIX|\.SECONDEXPANSION|\$[({]\s*eval\b", text):
+            return None, "recipe prefix / secondary expansion / eval は判別不能"
         targets = [u[1] for u in units if u[0] == "rule"]
         if len(targets) != len(set(targets)):
             return None, "重複規則は判別不能"
+        if sum(1 for u in units if u[0] == "list") > 1:
+            return None, "検査列の多重代入は判別不能"
     if [u[1] for u in old if u[0] == "list"] != [u[1] for u in new if u[0] == "list"]:
         return None, "検査列の代入形式の変更"
     if len(old_names) != len(set(old_names)) or len(new_names) != len(set(new_names)):
@@ -276,10 +524,37 @@ def narrow_make_change(before, after, old_par, par):
                 return None, "変数・非検査規則・未対応構文の変更"
             if "\\\n" in value or "\\\r\n" in value:
                 return None, "検査規則の改行継続は判別不能"
+            # 行頭 `#` は make のコメント (展開されない)。タブ行は recipe で展開される。
+            body = "".join(l for l in value.splitlines(keepends=True)
+                           if not l.startswith("#"))
+            try:
+                check_make_pure(body, defs)
+            except ValueError as e:
+                return None, "%s の %s" % (key, e)
             affected.add(key)
     if not affected <= listed:
         return None, "検査列に未登録の名前"
     return affected & set(par), "検査列の名前と登録済み検査の前提・recipe だけの変更"
+
+
+def makefile_paths():
+    """ROOT の Makefile + build/*.mk (今あるもの)。"""
+    out = []
+    if os.path.isfile(os.path.join(ROOT, "Makefile")):
+        out.append("Makefile")
+    bdir = os.path.join(ROOT, "build")
+    if os.path.isdir(bdir):
+        out += sorted("build/" + f for f in os.listdir(bdir) if f.endswith(".mk"))
+    return out
+
+
+def makefile_texts():
+    """{パス: 本文} — makefile_paths() のものだけ。.env など追跡外の include は読まない。"""
+    texts = {}
+    for mf in makefile_paths():
+        with open(os.path.join(ROOT, mf), encoding="utf-8") as f:
+            texts[mf] = f.read()
+    return texts
 
 
 def make_change(path, base, par):
@@ -300,7 +575,14 @@ def make_change(path, base, par):
         _, old_par = make_units(show("build/sdk.mk"))
         if not old_par:
             raise ValueError("基点版の検査列を判別できない")
-        return narrow_make_change(before, after, old_par, par)
+        # 変数の定義は現行の木の追跡されている Makefile 全部から集める — 別ファイルの
+        # 変数を介した間接的な eval も、参照した変数の定義まで辿って判別する。
+        # .env は読まない ([D3])。.env にしか定義の無い変数は「定義が無い」で全部。
+        texts = makefile_texts()
+        defs, problems = collect_make_defs(texts, set(texts))
+        if problems:
+            return None, "include を追えない: %s" % problems[0]
+        return narrow_make_change(before, after, old_par, par, defs)
     except (OSError, UnicodeError, ValueError, IndexError) as e:
         return None, "版の比較不能: %s" % e
 
