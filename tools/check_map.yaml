@@ -686,6 +686,7 @@ checks:
     - userland/libos32term_render/tests/render.rs
     - userland/libos32term_render/tests/rework.rs
   check-memory-host:
+    - exec/redir_access.c
     - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - kernel/kmalloc.c

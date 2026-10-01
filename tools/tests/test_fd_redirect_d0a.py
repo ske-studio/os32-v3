@@ -13,6 +13,9 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 SOURCE_FILES = ("exec/redir_access.c", "fs/fd_redirect.c",
                 "tools/tests/fd_redirect_d0a_host.c")
 MUTATIONS = [
+    ("exec/redir_access.c", "if (ring3_call_from_user()) return caller_access_get_user(out);", "if (ring3_call_from_user()) return access_capture(out, CALLER_USER);", "registration recapture"),
+    ("exec/redir_access.c", " && a->generation != 0", "", "zero generation"),
+    ("exec/redir_access.c", " && a->pd_phys != 0", "", "zero PD"),
     ("exec/redir_access.c", "slot->state == APP_STATE_ABORT_PENDING ||", "", "abort pending"),
     ("exec/redir_access.c", "!slot || !slot->cpl3 || !slot->as || slot->as != a->as", "!slot || !slot->as || slot->as != a->as", "non-CPL3 registrant"),
     ("exec/redir_access.c", " || a.pd_phys != paging_current_cr3()", "", "capture CR3 mismatch"),

@@ -325,6 +325,41 @@ void ring3_wm_leave(void)
     }
 }
 
+/* A launch/resume stack survives the child's longjmp; dispatch stacks do not.
+ * Capture before setjmp and never modify the snapshot afterwards. Volatile
+ * prevents stack-slot reuse: our assembly setjmp has no returns_twice attribute. */
+typedef struct {
+    CallerAccessFrame caller;
+    u32 *frame;
+    int in_syscall, wm_depth;
+} Ring3CallContext;
+
+static void ring3_context_save(volatile Ring3CallContext *out)
+{
+    caller_access_save(&out->caller);
+    out->frame = g_cur_frame;
+    out->in_syscall = ring3_in_syscall;
+    out->wm_depth = ring3_wm_depth;
+}
+
+static void ring3_context_clear(void)
+{
+    caller_access_invalidate();
+    g_cur_frame = 0;
+    ring3_in_syscall = 0;
+    ring3_wm_depth = 0;
+}
+
+static void ring3_context_restore(const volatile Ring3CallContext *saved)
+{
+    caller_access_leave(&saved->caller);
+    g_cur_frame = saved->frame;
+    ring3_in_syscall = saved->in_syscall;
+    ring3_wm_depth = saved->wm_depth;
+}
+
+volatile u32 ring3_caller_reject_count = 0;
+
 int ring3_call_from_user(void)
 {
     return ring3_guard_active(ring3_in_syscall, ring3_wm_depth);
@@ -1396,6 +1431,7 @@ static void exec_finish(int id, int status, int kind)
 
 void exec_exit(int status, int kind)
 {
+    ring3_context_clear();
     exec_finish(appslot_cur(), status, kind);
     g_longjmp_reason = EXEC_LJ_EXIT;
     g_longjmp_id = 0;
@@ -1408,6 +1444,7 @@ static void exec_pending_transfer(int kind)
     int id = appslot_cur();
     AppSlot *a = appslot_get(id);
     if (!a || g_pending_id) { for (;;) { _stop(); } }
+    ring3_context_clear();
     g_pending_id = id;
     g_pending_kind = kind;
     a->state = kind == EXEC_KIND_ABORTED ? APP_STATE_ABORT_PENDING :
@@ -1482,9 +1519,9 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
     int prev_in_syscall = ring3_in_syscall;
     CallerAccessFrame prev_caller;
 
-    /* Capture before callbacks. d2 handles nonlocal exits; no copy consumer
-     * uses this frame until that lifetime wiring is complete. */
+    /* Capture before callbacks; nonlocal exits clear at transfer and landing. */
     if (!caller_access_enter(&prev_caller, CALLER_USER)) {
+        ring3_caller_reject_count++;
         ring3_fault_kill();
         return;
     }
@@ -1611,7 +1648,8 @@ extern void ring3_resume(const u32 *frame, u32 pd_phys, void *tss);
 /* ======================================================================== */
 static int exec_launch(const char *cmdline, int gui_arg)
 {
-    /* longjmp の復帰側で読む唯一のローカル。volatile でフレーム上に固定する
+    /* longjmp 復帰側で読む gui。caller_context は setjmp 前の値から不変。
+     * volatile でフレーム上に固定する
      * — レジスタに置かれると longjmp で失われる (他は全部グローバルで判断)。 */
     volatile int gui = gui_arg;
     u32 load_base;
@@ -1983,15 +2021,19 @@ static int exec_launch(const char *cmdline, int gui_arg)
     }
 
     /* ======== setjmp — この ID の呼び出し元へ帰る点 ======== */
+    volatile Ring3CallContext caller_context;
+    ring3_context_save(&caller_context);
     if (exec_setjmp(ctx->jmpbuf) != 0) {
+        ring3_context_clear();
         /* ======== longjmp復帰ポイント ========
          * ローカル変数は当てにできない (setjmp 後に書き換わったものが
-         * 復帰側では読めない)。判断材料はグローバルだけに限る。
+         * 復帰側では読めない)。caller_context は setjmp 前から不変。
          *
          * フォルト経由の復帰では例外ゲートが IF をクリアしたまま longjmp
          * してくる (exec_longjmp は EFLAGS を復元しない)。呼び出し元は常に
          * 割り込み有効で動いているので、ここで無条件に開けてよい。 */
         exec_pending_finish();
+        ring3_context_restore(&caller_context);
         _enable();
         /* 畳み (終了 / fault / CTRL+STOP) も park も、戻す作業は
          * exec_exit / exec_pending_finish / exec_park で済んでいる。 */
@@ -2286,6 +2328,7 @@ i32 exec_park(void)
     ring3_in_syscall = 0;       /* この syscall はここで終わる */
     ring3_wm_depth = 0;         /* OP_WAIT の中から longjmp する — 出口を通らない */
     g_cur_frame = 0;
+    caller_access_invalidate();
 
     /* master へ戻してから状態を切り替える (WM は master の下で走る)。 */
     paging_load_cr3(paging_kernel_pd_phys());
@@ -2338,6 +2381,7 @@ int exec_park_kbd(void)
     ring3_in_syscall = 0;       /* この syscall はここで終わる */
     ring3_wm_depth = 0;         /* OP_WAIT の中から longjmp する — 出口を通らない */
     g_cur_frame = 0;
+    caller_access_invalidate();
 
     paging_load_cr3(paging_kernel_pd_phys());
     appslot_park_kbd_commit();  /* WAIT_KEY + 印 + owner 1 へ */
@@ -2397,6 +2441,7 @@ int exec_park_poll(u32 now_tick)
     ring3_in_syscall = 0;       /* この syscall はここで終わる */
     ring3_wm_depth = 0;         /* OP_WAIT の中から longjmp する — 出口を通らない */
     g_cur_frame = 0;
+    caller_access_invalidate();
 
     paging_load_cr3(paging_kernel_pd_phys());
     appslot_park_poll_commit();          /* WAIT_POLL + 印 + owner 1 へ */
@@ -2455,6 +2500,7 @@ i32 exec_sys_yield(void)
     ring3_in_syscall = 0;       /* この syscall はここで終わる */
     ring3_wm_depth = 0;         /* OP_WAIT の中から longjmp する — 出口を通らない */
     g_cur_frame = 0;
+    caller_access_invalidate();
 
     paging_load_cr3(paging_kernel_pd_phys());
     appslot_park_yield_commit();         /* WAIT_POLL + 印 + owner 1 へ */
@@ -2516,9 +2562,13 @@ i32 exec_resume(i32 app_id, i32 wait_ret)
         a->frame[APP_FRAME_EAX] = (u32)wait_ret;
     }
 
+    volatile Ring3CallContext caller_context;
+    ring3_context_save(&caller_context);
     if (exec_setjmp(a->jmpbuf) != 0) {
+        ring3_context_clear();
         /* park / 終了 / fault / kill で戻ってきた。ローカルは当てにしない。 */
         exec_pending_finish();
+        ring3_context_restore(&caller_context);
         _enable();
         if (g_longjmp_reason == EXEC_LJ_PARK) return g_longjmp_id;
         return 0;

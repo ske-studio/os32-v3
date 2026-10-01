@@ -130,7 +130,7 @@ d0bでrecipeの同flagを外し、登録者ASのwalk/copy境界の足場を追�
 | d0a | ゲスト試験 `d0a_test`・同VA別backingの実fd_redirectホスト試験を作成。§1-2の判定でPMが `ls \| cat`・同VA/別PFNを受入 (ゲスト未実施) |
 | d0b | 登録者記述子とPA copyを最小実装。死んだ登録者/slot再利用/RO化/入れ子・park保存復元、子の内容不変。実装・ホスト結果は §10-3、修正後guest回帰はPM待ち |
 | d1 | caller記述子と入口/正常出口。USER/trusted/入れ子とCR3不一致拒否。実装・ホスト・予算結果は §10-5、d2 の寿命配線は未実装 |
-| d2 | park/longjmp/WMの寿命配線。実exec R1足場で古い記述子不使用 |
+| d2 | park/longjmp/WMの寿命配線。実exec R1足場で古い記述子不使用。実装・P3対応・ホスト・予算は §10-7 |
 | d3 | read/write walkと管理frame検証。RO入力成功・RW出力・PS/偽PT拒否 |
 | d4 | cstr/copyout。page末NUL、次NP、未終端、overflow、IF両値、out不変 |
 | d5 | 上記DB3入口と既存出力ガード接続。実wrapper→実copy、SQLiteは入口だけ記録 |
@@ -702,6 +702,105 @@ NP21/W・NHD・配備・ini・commit/push は未実施。guest/実機は未検�
 独立レビュー Opus 5.5 は P1・P2 なしで Approve (網羅性の要求つき、経路の一覧あり)。入口の kill の新設で正当な CPL=3 の syscall が断られる到達可能な筋書きは無し、d2 へ回した穴は今の段で誤動作しない。**P3 5 件は d2 へ申し送る**: P3-1 `exec.c:1551` の入れ子保存は正常復帰のみで子の CPL=3 実行中に `ring3_in_syscall=1` が残る (意図を票に明記、d2 で sys_exit・kill・着地点に入れ子の復元)、P3-2 入れ子試験 (`caller_access_host.c:51-68`) の形が実物と違う (d2 の R1 足場で実物の形を固定)、P3-3 入口の拒否の専用カウンタ (例 `ring3_caller_reject_count`) を足してゲスト回帰で 0 を確認、P3-4 `redir_access.c:21,23` の `generation != 0` / `pd_phys != 0` を外す変異が生き残る (d0b から持越し — 0 の登録者を拒否するケースを足す)、P3-5 毎回の syscall のコスト増 (ゲスト回帰で体感・`gfx_counters` を見る)。
 
 ゲスト (17MB、今の ini — §12): kselftest 0 fail、`klibc_test` 49/49、`alloc_demo` 16/16、`ring3_fault` kill、`ls / | wc -l` = 54、`echo abc | wc -c` = 4、`d0a_test` 全行 OK、faulttest 一式・V86・GUI (gui_demo → CUI) 従来どおり。kill 8 件はすべて意図したもの (d0a の RO 子 1・ring3_fault 1・faulttest 6) で、入口の誤拒否の形跡なし。構成依存の確認は §12 のとおり T2h へ。
+
+## 10-7. d2 の実装結果 (コーダー、2026-10-02)
+
+モデル: GPT-6。基点 `1a75fc3`、worktree `wt/t2d2`。状態行・親票・
+TASK_MEMMAP_V3 は変更しない。公開 ABI / 形式 / エラー / park 条件は従来どおり。
+
+- launch / resume の setjmp 前に caller 値・`g_cur_frame`・`ring3_in_syscall`・
+  WM 深さを `Ring3CallContext` へ値保存する。戻り先 stack は生存するので、
+  longjmp の両着地点で子の文脈を無効化→pending 回収→親の文脈を復元する。
+  snapshot は setjmp 後に書き換えず、独自 setjmp が returns_twice 宣言を持たない
+  ため volatile にして compiler の stack slot 再利用も防ぐ。
+- sys_exit / 通常 kill は共通 `exec_exit`、IRQ/例外 kill と fault recover は
+  `exec_pending_transfer` で回収・移譲より先に無効化する。OP_WAIT / kbd / poll /
+  sys_yield の4 park もフレーム保存後、master 切替より先に無効化する。
+  捨てた dispatch stack の pointer は保持しない。
+- WM の明示 enter/leave の深さが正の間だけ `caller_access_get` は TRUSTED を返す。
+  下にある USER 値は変更しない。保存 app pointer 用の `caller_access_get_user` は
+  WM 中も USER の同一性・現在 slot/owner/CR3 を要求し、TRUSTED へ fallback しない。
+  USER redirect 登録をこの保存値へ接続し、途中の generation 変化を取り直して
+  許可しない。登録済み buffer は従来の登録者 PD / 値保存を維持する。
+
+**P3 対応と挙動維持の判断**:
+P3-1/2 は、子の通常 syscall が返ると親の記述子と `in_syscall=1` に戻ったまま
+子が CPL=3 で走る既存の形を維持する。この瞬間は現 slot/CR3 が子なので
+親 USER の取得は拒否する。次の子 syscall は子を新規 capture する。
+子の exit/kill の longjmp は子を失効させ、着地点で親 USER と guard/frame/WM
+深さを復元する。正常 dispatch 出口の WM 深さは従来どおり0、親 WM 深さの復元は
+launch/resume 着地点で行う。実 R1 足場でこの形を固定した。
+P3-3 は `ring3_caller_reject_count` (BSS 4B) を入口 identity 拒否だけで増やす。
+ホストで wrapper 進入なし・差分+1を確認。ゲストで正常操作の差分0はPM未確認。
+P3-4 は登録値と生存 AS の **両方**を generation=0 / pd_phys=0 に揃え、
+データ・位置不変で拒否するケースを追加。非0検査除去の2変異は実行時 RED。
+P3-5 の guest 時間 / gfx_counters は測定していない (NP21/W 操作禁止)。
+成功 syscall の入口 capture/正常復元は d1 と同じで、追加カウンタは拒否時のみ。
+ホスト足場時間を PC-98 の syscall コストとは扱わず、最適化は加えていない。
+
+**d3 以降へ渡す穴**: read/write walk・管理 frame/PFN 検査は未変更。
+WM が保持する app pointer には `caller_access_get_user`、WM 自身の pointer には
+`caller_access_get` を使えるが、既存 `_always` / copy / DB 入口の切替は d4/d5。
+保存 caller API のホスト検証を、それら consumer の安全化済みとは扱わない。
+ゲスト/実機・構成依存回帰は未実施、PM受入と §12 の一括確認へ持越し。
+
+ホスト試験は実 `redir_access.c` / dispatcher / WM enter/leave と、実 exec の
+exit/kill/4 park/両着地・実 `setjmp.asm` を使用する。R1 は AppSlot/CR3/IF と
+資源境界だけを足場にし、loader 全体・実 CPL 遷移は実行しない。子の正常 syscall と
+次の終了 syscall を実 dispatcher で実行し、longjmp 前の無効化、回収前の失効、
+両着地の親復元を確認する。着地へ stale 値を注入するケースもあり、転送側と
+着地側の無効化を独立に検証する。IF両値・拒否時out不変、WM入れ子と USER 不変、
+親子同VA別backing・WMから登録済み親bufferへの書込みも検査する。
+
+対象変異は caller **24/24**、redirect **24/24**、R1 **20/20** が
+コンパイル成功後の **実行時 RED**。ツリー複製なし、対象 TU と fixture の写しのみ。
+R1 は正常 compile/run 約0.3〜0.5秒、20変異一式は約10秒。
+R1拡張の初回は `ring3_ptr_ok` の足場の static 宣言が実headerと衝突し compile失敗
+(rc=1)、修正後GREEN。RED本数には含めない。
+ring3_guard は既存 **14/14 RED** (静的検査を含む、上記実行時68本とは別勘定)、
+実 AppSlot 回帰は host/target とも成功。
+対応表の初回 lint は caller 試験から R1 helper を import した依存7件の不足で rc=1。
+不要な import を除き、実際の R1→redir_access 依存だけを追加して rc=0。
+
+| ILP32 実測 | 作業前 (clean build_id) | d2 後 (-dirty) | 差分 |
+|---|---:|---:|---:|
+| AS / AppSlot | 692 / 192 B | 同左 | 0 B |
+| RedirAccess / FdRedirect / State | 24 / 52 / 156 B | 同左 | 0 B |
+| caller 現在値 / dispatch 退避値 | 28 / 28 B | 同左 | 0 B |
+| launch/resume の寿命 snapshot | 0 B | 各40 B | 各stack +40 B |
+| kernel.bin | 361,040 B | 361,592 B | +552 B |
+| vmkernel.lz4 (SQLite含む) | 479,116 B | 479,367 B | +251 B |
+| 本体占有 (`__bss_end - 0x100000`) | 571,888 B | 572,432 B | +544 B |
+| `__bss_end` | `0x18B9F0` | `0x18BC10` | +544 B |
+| リンカ ASSERT 残り (596 KiB枠) | 38,416 B | 37,872 B | -544 B |
+
+型サイズは ILP32 R1 fixture の sizeof assert、画像は同一 cross toolchain の
+nm / ファイルサイズで確認。stack はCの保存値のサイズで spill/整列込みの最大値ではない。
+圧縮上限残り40,825B。§6-1のT2c-R基準から2,628B消費、d計画枠3,072Bの残りは
+**444B**。d3〜d6のwalk/copy/自己診断まで収まる根拠はなく、後続で実装前に再見積りする。
+ASSERTは緩和していない。
+
+実行環境は `CROSS_DIR=/home/hight/opt/cross`、`TMPDIR=/home/hight/os32-tmp`、
+PATHにcross/bin、ILP32は既存の `PYTHONPATH=/home/hight/os32-tmp/d0b-host-runner`
+で qemu-i386 を使用 (native int80 を拒否するホスト環境への適合)。
+make は全て `< /dev/null`。
+`make kernel` (作業前) rc=0、`NP21W_DIR=/home/hight/os32-tmp/d2-image-output make all`
+rc=0。FDコピー先を一時パスに限定し、その未作成パスへのコピー警告が出たが
+build 自体は成功。既存GNU-stack/RWX警告あり。実NP21/W・NHD・配備・iniは未操作。
+`python3 tools/tests/test_caller_access.py --mutate`、
+`test_fd_redirect_d0a.py --mutate`、`test_exec_r1.py --mutate`、
+`test_ring3_guard.py --mutate`、`test_multiapp_impl.py` は各 rc=0。
+`python3 tools/check_select.py --lint`、`gen_memmap.py --write`、
+`gen_tests_inventory.py --write` は rc=0。
+ログは `/home/hight/os32-tmp/d2-{before,all,caller,redir,r1,guard,multiapp}.log`。
+最終 `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp
+make check-changed < /dev/null` は **1回だけ実行して rc=0** (上記PATH/PYTHONPATH)。
+変更関連40ターゲットは変異込み、残り71は変異なし。caller 24/24・redirect 24/24・
+R1 20/20の実行時RED、C方言27/27 RED・対照5/5 GREENを含め成功。
+ログは `/home/hight/os32-tmp/d2-check-changed.log`。
+既存 Windows opt-in fixture は単独4件・集約5件が skip。
+検査完了後はこの結果の票への追記だけで、コード・試験は変更していない。
+commit/pushは未実施。
 
 ## 11. 独立レビュー 2 回目 (Opus 5.5、Approve) の P3 — 実装時の注記
 
