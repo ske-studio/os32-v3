@@ -246,8 +246,8 @@ def check_lists(vars_):
 #       (a)  (列の物理行は上の語集合の比較で見る)
 #       (b)  TPL_HEADER_RE  `check-<name>:` — 前提なし。name は列に足した新しい名前で、
 #            基点のどの make ファイルにも現れない。規則は 1 つだけ。続く tab 行は
-#            次の非 tab 行 (コメント・空行は飛ばす) まで型どおりの行で 1 行以上 (既存の
-#            recipe の横取りは下の「直後に基点の tab 行」で全部)
+#            次の非 tab 行 (コメント・空行は基点のものも飛ばす) まで**全部足した行**で
+#            型どおり、1 行以上 (基点のコメント越しの既存 recipe の横取りを拒む)
 #       (c)  TPL_RECIPE_RE  `\tpython3 -B tools/tests/<file>.py [--flag ...] [$(MUT)|$(MUTS)]`
 #            — 持ち主 (上へ向かって tab 行・コメント・空行を飛ばした最初の行) が、
 #            基点の列にある検査の基点の規則の行 `check-<name>:…` (`=` を含まない) か、
@@ -256,9 +256,9 @@ def check_lists(vars_):
 #     `.PHONY:` の行は型に入れない (独立レビュー P1: 既存の規則の行と recipe の間に
 #     `.PHONY: check-new` を挟むと既存の recipe が .PHONY の所属になる。新しい検査を
 #     .PHONY に載せたいなら全部に倒れるのを受け入れる — 載っていない前例はある)
-#   * 足した非 recipe 行 (規則・コメント・空行) の **直後に基点由来の tab 行が来る** 配置は
-#     全部 (既存の規則と recipe の間に挟むと所属が変わる。コメント・空行は make の上では
-#     変えないが、同じ配置はまとめて拒否する)
+#   * 足した非 recipe 行 (規則・コメント・空行) の **直後 (コメント・空行は基点のものも
+#     飛ばす) に基点由来の tab 行が来る** 配置は全部 (既存の規則と recipe の間に挟むと
+#     所属が変わる。コメント・空行は make の上では変えないが、同じ配置はまとめて拒否する)
 #   * 列に足した名前の集合 = (b) の規則の名前の集合
 #   * 作業中の make ファイルに `.ONESHELL` が無い (recipe を 1 つの shell で回すと、
 #     足した行で既存の行の終了状態の扱いが変わる)
@@ -429,12 +429,13 @@ def classify_file(rel, work, inserted, base_words, new_names, m_checks):
         if not ok[k]:
             raise Reject("%s: define / 条件の中に足している" % where)
         if not line.startswith("\t"):
-            # 足した非 recipe 行の直後 (足した行を飛ばして次の基点の行) が tab 行なら、
-            # 既存の規則と recipe の間に挟んでいる (独立レビュー P1)
+            # 足した非 recipe 行の直後 — コメント・空行 (基点のものも。make は recipe を
+            # 切らない) と足した非 tab 行を飛ばした最初の行 — が基点の tab 行なら、既存の
+            # 規則と recipe の間に挟んでいる (独立レビュー P1、2 回目は基点のコメント越し)
             j = i + 1
-            while j < len(work) and j in ins:
+            while j < len(work) and (_is_skippable(work[j]) or (j in ins and not work[j].startswith("\t"))):
                 j += 1
-            if j < len(work) and work[j].startswith("\t"):
+            if j < len(work) and j not in ins and work[j].startswith("\t"):
                 raise Reject("%s: 足した行の直後に基点の recipe 行が来る (所属が変わる)" % where)
         if line == "" or TPL_COMMENT_RE.match(line):
             continue
@@ -452,8 +453,11 @@ def classify_file(rel, work, inserted, base_words, new_names, m_checks):
                     continue
                 if not t.startswith("\t"):
                     break
-                if not TPL_RECIPE_RE.match(t):
-                    raise Reject("%s: 規則 %s の recipe に型に合わない行がある" % (where, name))
+                # 基点のコメント・空行越しに基点の recipe 行が続いても新しい規則の所属に
+                # なる — 配下の tab 行は全部足した行であること (独立レビュー P1 の 2 回目)
+                if not single_inserted(k2) or not TPL_RECIPE_RE.match(t):
+                    raise Reject("%s: 規則 %s の recipe に基点の行か型に合わない行がある"
+                                 % (where, name))
                 n += 1
             if n == 0:
                 raise Reject("%s: 規則 %s に recipe が無い" % (where, name))

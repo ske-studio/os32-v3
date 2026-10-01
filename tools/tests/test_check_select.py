@@ -36,7 +36,8 @@ Makefile / build/*.mk の変更は **「新しい試験を足す形」だけを�
     script が木に無い / 対応表に無い、追加・削除・改名された .mk、--files (基点なし)。
     独立レビュー (7745a75) の P1: `.PHONY:` は型に無い、足した非 recipe 行 (規則・
     コメント・空行) の直後に基点の recipe 行が来る配置は全部。P2: 列を同じファイル内で
-    動かしても (末尾・途中へ) 全部
+    動かしても (末尾・途中へ) 全部。59234b5 の P1: 基点のコメント・空行越しの横取り
+    (規則だけ / 規則 + 足した recipe / コメントだけ / 空行だけ) も全部
   * 実物の Makefile を基点 = HEAD で比べると差が無い。実物の make ファイルを基点にして
     check-memory-host に型どおりの行を足すとその 1 本 (main の e241312 / f4989ee の形)
   * 逐次の 2 段目 (CHECK_MUT_TARGETS) は無い — 列は 1 本で全部並列
@@ -434,6 +435,10 @@ def case_mk_recipe_add(cs):
     with fixture(cs) as fx:
         fx.edit("Makefile", "check-b:\n" + B_LINE, "check-b:\n" + B_LINE + "\n# note\n" + B2)
         _only(fx.plan(), "check-b")
+    with fixture(cs, files={"build/sdk.mk": FX_SDK.replace("check-a:\n" + A_LINE, "check-a:\n# base\n\n" + A_LINE)}) as fx:
+        # 基点のコメント・空行が規則と recipe の間にあっても、末尾への追加はその 1 本
+        fx.append("build/sdk.mk", A2)
+        _only(fx.plan(), "check-a")
     with fixture(cs) as fx:
         # 列の位置はそのまま、列の手前と後ろにコメントを足すのは型の中
         fx.edit("build/sdk.mk", "CHECK_PAR_TARGETS :=", "# list\nCHECK_PAR_TARGETS :=")
@@ -585,7 +590,24 @@ def _neg_cases():
     neg("新規則 + コメント + 空行の後に既存の recipe",
         lambda fx: (fx.edit("build/sdk.mk", LIST_OLD, LIST_NEW),
                     fx.edit("build/sdk.mk", "check-a:\n" + A_LINE, "check-a:\n" + C_RULE + "# c\n\n" + A_LINE)),
-        None, "直後に基点の recipe 行")
+        None, "規則 check-c の recipe に基点の行")
+    # 独立レビュー P1 の 2 回目: 基点のコメント・空行越しの横取り。基点の check-a: と recipe の
+    # 間にコメント / 空行 / 複数行の混在がある版で、(A) 規則の行だけ、(B) 規則 + 足した recipe、
+    # (C) コメントだけ、(D) 空行だけ を check-a: の直後に挟む → 全部
+    for tag, gap in (("コメント", "# base comment\n"), ("空行", "\n"), ("混在", "# c1\n\n# c2\n\n")):
+        base = {"build/sdk.mk": FX_SDK.replace("check-a:\n" + A_LINE, "check-a:\n" + gap + A_LINE)}
+        neg("基点の%s越し: 規則の行だけ" % tag,
+            lambda fx, gap=gap: (fx.edit("build/sdk.mk", LIST_OLD, LIST_NEW),
+                                 fx.edit("build/sdk.mk", "check-a:\n" + gap, "check-a:\ncheck-c:\n" + gap)), base)
+        neg("基点の%s越し: 規則 + 足した recipe" % tag,
+            lambda fx, gap=gap: (fx.edit("build/sdk.mk", LIST_OLD, LIST_NEW),
+                                 fx.edit("build/sdk.mk", "check-a:\n" + gap, "check-a:\n" + C_RULE + gap)), base)
+        neg("基点の%s越し: コメントだけ" % tag,
+            lambda fx, gap=gap: fx.edit("build/sdk.mk", "check-a:\n" + gap, "check-a:\n# added\n" + gap), base,
+            "直後に基点の recipe 行")
+        neg("基点の%s越し: 空行だけ" % tag,
+            lambda fx, gap=gap: fx.edit("build/sdk.mk", "check-a:\n" + gap, "check-a:\n\n" + gap), base,
+            "直後に基点の recipe 行")
     # 独立レビュー P2: 列の移動 (同じファイル内) は位置が変わるので全部
     neg("列を末尾へ", lambda fx: (fx.edit("build/sdk.mk", "CHECK_PAR_TARGETS := check-a \\\n    check-b\n", ""),
                               fx.append("build/sdk.mk", "CHECK_PAR_TARGETS := check-a \\\n    check-b\n")),
@@ -787,8 +809,14 @@ MK_MUTATIONS = [
      "script が対応表の当該検査の glob に無くても選ぶ"),
     ('            if n == 0:\n                raise Reject', '            if False:\n                raise Reject',
      "recipe の無い新規則を許す"),
-    ('            if j < len(work) and work[j].startswith("\\t"):', '            if False:',
+    ('            if j < len(work) and j not in ins and work[j].startswith("\\t"):', '            if False:',
      "足した非 recipe 行の直後に基点の recipe 行が来る配置を見ない (P1: 所属の変更)"),
+    ('            while j < len(work) and (_is_skippable(work[j]) or (j in ins and not work[j].startswith("\\t"))):',
+     '            while j < len(work) and (j in ins and not work[j].startswith("\\t")):',
+     "直後の走査で基点のコメント・空行を飛ばさない (P1 の 2 回目: コメント越しの横取り)"),
+    ('                if not single_inserted(k2) or not TPL_RECIPE_RE.match(t):',
+     '                if not TPL_RECIPE_RE.match(t):',
+     "新しい規則の配下の tab 行に足した行であることを要求しない (P1 の 2 回目: 基点の recipe を取り込む)"),
     ('                out.append((None, LIST_MARKER))', '                pass',
      "列の物理行を除くだけで位置を保たない (P2: 同じファイル内の列の移動が追加だけに見える)"),
     ('        if set(headers) != new_names or any(n != 1 for n in headers.values()):',

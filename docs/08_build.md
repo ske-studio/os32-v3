@@ -258,7 +258,7 @@ KernelAPI の構造体を変えたときは `make clean` → `make all` が必�
       - (a) 列への検査名の追加 (上の語集合の比較)
       - (b) 新しい検査の規則 `check-<name>:` (`^(check-[a-z0-9-]+):$` — 前提なし)。name は列に足した新しい
         名前で、**基点のどの make ファイルの字面にも現れない**。規則は 1 つ。続く tab 行は次の非 tab 行まで
-        型どおりの行で 1 行以上 (既存の recipe の横取りは下の「直後に基点の tab 行」で全部)
+        **全部足した行**で型どおり、1 行以上 (基点のコメント・空行越しの既存 recipe の横取りを拒む)
       - (c) 列にある既存の検査の recipe への行の追加。recipe 行の型は
         `^\tpython3 -B tools/tests/([a-z0-9_]+\.py)((?: --[a-z][a-z-]*)*)( \$\((?:MUT|MUTS)\))?$`
         — `python3 -B tools/tests/<file>.py` + 任意の `--<小文字と->` 旗 + 任意で末尾 ` $(MUT)` / ` $(MUTS)`。
@@ -271,8 +271,9 @@ KernelAPI の構造体を変えたときは `make clean` → `make all` が必�
         を挟むと既存の recipe が `.PHONY` の所属になる)。新しい検査は `.PHONY` に載せなくてよい
         (`check-cirrus-win-host` などの前例)。載せるなら全部に倒れる
       - 足した行はそれぞれ 1 行で 1 論理行 (継続行の途中ではない)、define / 条件の**外** (make の読み方と
-        字下げを無視する読み方の両方で深さ 0)。**足した非 recipe 行 (規則・コメント・空行) の直後に基点の
-        tab 行が来る配置は全部** (既存の規則と recipe の間に挟んで所属を変えない)。列に足した名前の
+        字下げを無視する読み方の両方で深さ 0)。**足した非 recipe 行 (規則・コメント・空行) の直後 — コメント・
+        空行は基点のものも飛ばす (make は recipe を切らない) — に基点の tab 行が来る配置は全部** (既存の規則と
+        recipe の間に挟んで所属を変えない。新しい規則の配下の tab 行は全部足した行であること)。列に足した名前の
         集合 = (b) の規則の名前の集合。作業中の make ファイルに `.ONESHELL` が無い
     - **判定**: 条件を全部満たせば、(b) の新しい検査と (c) で行を足した検査を変異込み。他の変更ファイルの
       glob の選択と合算。満たさなければ全部 (理由は stderr の `型に合わない: …`)。
@@ -305,7 +306,7 @@ KernelAPI の構造体を変えたときは `make clean` → `make all` が必�
   辿り方は静的なので、ツリーを舐める検査器 (`check-arch-asm` など) は glob を手で広く書いてある。
   表が欠けても `sel` の場合は**試験そのものは変異なしで必ず回る** — 落とすのは否定側だけ。
   docs だけの変更では当たらない検査は回らないので、文書を読む検査は `docs_always:` に入れておく。
-  選び方そのものの試験は `make check-check-select-host` (`tools/tests/test_check_select.py`、変異 38 本 —
+  選び方そのものの試験は `make check-check-select-host` (`tools/tests/test_check_select.py`、変異 40 本 —
   Makefile の反例は一時の git リポジトリ + 小さい Makefile で再現する)。
 - 新しい検査を列に足したら `python3 tools/check_select.py --suggest <検査名>` の出力を
   下書きにして対応表へ足す (`make check-map` が足りないと言う)。
