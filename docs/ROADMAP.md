@@ -9,7 +9,7 @@
 | **カーネル** | **2.1 — 完了 (os32、戻り先)** (タグ `v2.1`、2026-09-29、KernelAPI v68。os32-v3 の初期コミットはこの時点の写し) | 2.0 (2026-09-03) はリング 3 (CPL=3) ネイティブ。2.1 は **v3 へ進む前の区切り** — 実機 PC-9821Ra266 で FD 起動・CD からの HDD インストール・HDD 起動まで通し、Ra266 の PEGC 640x480 を画面を見ない条件で受け入れた (ユーザー決定 2026-09-29) | [RELEASE_v2.1.md](RELEASE_v2.1.md)、[CHANGELOG.md](../CHANGELOG.md)、[archive/kernel_v2/PLAN.md](archive/kernel_v2/PLAN.md) |
 | **GUI シェル** | **1.4 で閉じた** (2026-09-29) | 1.1〜1.4 は本書 §1。1.4 の範囲 (Host Services N1〜N4、エディタ GUI 版、About、R2 計測) はすべて v2.1 に入った。N5 (実機 LAN) は実機の内蔵 82557 の票 (L-B) に吸収。**GUI の版はここで閉じ、以後の GUI の作業は v3 の線で扱う** (ユーザー決定 2026-09-29) | §1 |
 | **v3** | **現行** (2026-09-30〜、このリポジトリ os32-v3。**本案は 2026-09-30 に確定、T0 (C11) 受入完了、次は T1**) | 機能を足す前に入れ物を作り直す版。本案 (目的・範囲・目標・柱と順序) は [tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md)、票は INDEX の「v3」節。一部の票 (HAL_WIRING・PCM・KHEAP の切り直し・デバイス窓の帯) は v2.1 に先行して着地した。**2026-09-15 のユーザー決裁で「v2」ではなく v3 と呼ぶ** (出荷済み 2.0 と衝突するため) | §2 |
-| ゲーム基盤 | v4 (草案) | [V4_GAME_PLATFORM_DRAFT.md](V4_GAME_PLATFORM_DRAFT.md)。v3 の後 | — |
+| ゲーム基盤 | v4 (草案) | [V4_GAME_PLATFORM_DRAFT.md](archive/v4/V4_GAME_PLATFORM_DRAFT.md)。v3 の後 | — |
 
 **OS64** (草案 [LEGACY_LIVING_PRESERVATION.md](LEGACY_LIVING_PRESERVATION.md)・[AUXILIARY_CORE_SERVICE.md](AUXILIARY_CORE_SERVICE.md) に出る語) は**版数表に載せない** (ユーザー決定 2026-09-29) — OS32 とは別の 64 ビット OS の構想で、v3 / v4 の範囲に入れない (ユーザー決定 2026-09-30)。語の定義は LEGACY_LIVING_PRESERVATION.md の冒頭。
 
@@ -148,14 +148,14 @@ API は Win16 の再現ではなく、その欠点を 386 で払える範囲の�
 
 ### v1.2 — 「デスクトップ環境」
 
-> **状況 (2026-09-07)**: main へマージ済み (`d739494`)。G0〜G5 の検証記録と既知の検証上の制約は [tasks/gui/v12/TASKS.md](tasks/gui/v12/TASKS.md) §10 を参照。ESC 即時切替と上部バーは撤去済み (`DEBUG_SHORTCUTS`)。
+> **状況 (2026-09-07)**: main へマージ済み (`d739494`)。G0〜G5 の検証記録と既知の検証上の制約は [archive/gui_v12/TASKS.md](archive/gui_v12/TASKS.md) §10 を参照。ESC 即時切替と上部バーは撤去済み (`DEBUG_SHORTCUTS`)。
 
 **ゴール**: taskbar・Start・File Manager・launcher が揃い、GUIだけで基本操作が完結する。app 置換、CUI 切替、system halt を現在の single-foreground-app model を壊さず実現する。
 
 正式設計:
 
 - [tasks/gui/v12/CONTRACTS.md](tasks/gui/v12/CONTRACTS.md)
-- [tasks/gui/v12/TASKS.md](tasks/gui/v12/TASKS.md)
+- [archive/gui_v12/TASKS.md](archive/gui_v12/TASKS.md)
 
 **KAPI v42 は維持。v43 は network / Host Services 用予約。** GUI wire protocol と shlib jump table の末尾追記で進める。
 
@@ -352,7 +352,7 @@ v3 で行う。**この 2 つは同時に動かさない** — どちらも全�
 
 移植 (例: ARM) は v1.x の範囲外だが、**新しい層を実装するたびに CPU 依存の調査を票に含める**
 (ユーザー指示 2026-09-14)。最初は Host Services N1 (ワイヤ v2 / `link.c` / KAPI v51) で
-`docs/tasks/portability/SURVEY_N1.md` に記す (観点は `docs/archive/network/TASK_N1.md` §0 段 7)。
+`docs/archive/portability/SURVEY_N1.md` に記す (観点は `docs/archive/network/TASK_N1.md` §0 段 7)。
 以後の票も同じ観点で `docs/tasks/portability/` に追記する。**移植準備の 4 段は 2026-09-15 に着地した**
 (ARM コンパイル計測 `make check-arm-compile` 55/93、`hlt`/`cli`/`sti` を `io.h` 経由に、`arch/x86` + `platform/pc98`
 の骨格、kstring の C 版、LE アクセサ `include/endian_le.h`。基準値と経過は [tasks/portability/ARM_GAUGE.md](tasks/portability/ARM_GAUGE.md))。

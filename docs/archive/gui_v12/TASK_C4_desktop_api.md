@@ -2,7 +2,7 @@
 
 > 発行: PM (2026-09-06) / 状態: **受入完了 (2026-09-07)**
 > レーン: C / 前提: K5。W4 と並行可、結合試験は W4 後  
-> 親: [TASKS.md](../../tasks/gui/v12/TASKS.md) / 契約: [CONTRACTS.md](../../tasks/gui/v12/CONTRACTS.md) V12-C / V12-I  
+> 親: [TASKS.md](TASKS.md) / 契約: [CONTRACTS.md](../../tasks/gui/v12/CONTRACTS.md) V12-C / V12-I  
 > 排他: `userland/rust/libos32gui/**`、`sdk/rust/os32api/src/gui/stub.rs`
 
 ## ゴール

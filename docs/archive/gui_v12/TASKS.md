@@ -1,9 +1,9 @@
 # GUI シェル v1.2 — 作業分担票
 
 > 発行: PM (2026-09-06) / 状態: **受入完了 (2026-09-07)**  
-> 親: [../DESIGN.md](../DESIGN.md)  
-> 基底契約: [../API_CONTRACTS.md](../API_CONTRACTS.md)  
-> v1.2 追加契約: [CONTRACTS.md](CONTRACTS.md)  
+> 親: [../DESIGN.md](../../tasks/gui/DESIGN.md)  
+> 基底契約: [../API_CONTRACTS.md](../../tasks/gui/API_CONTRACTS.md)  
+> v1.2 追加契約: [CONTRACTS.md](../../tasks/gui/v12/CONTRACTS.md)  
 > 前提: GUI v1.1 G1〜G5 完了
 
 ---
@@ -26,11 +26,11 @@ v1.1 で問題になった「X4 で重い処理」「暗黙 ABI 変更」「共�
 
 | レーン | 言語 / 場所 | 票 | 内容 |
 |---|---|---|---|
-| **K** protocol | C / Rust, `sdk/include/os32/`, `sdk/rust/os32api/src/gui/` | [TASK_K5_v12_proto.md](../../../archive/gui_v12/TASK_K5_v12_proto.md) | op 65/66、Modal result、Session request、Quit reason。KAPI追加なし |
-| **W** WM | Rust, `userland/gshell/` | [TASK_W3_desktop_session.md](../../../archive/gui_v12/TASK_W3_desktop_session.md) | taskbar / Start / clock / launcher / session state machine / halt |
-| | | [TASK_W4_dialogs.md](../../../archive/gui_v12/TASK_W4_dialogs.md) | message / file-open / input dialog、completed result、sticky Modal |
-| **C** library | Rust, `userland/rust/libos32gui/` | [TASK_C4_desktop_api.md](../../../archive/gui_v12/TASK_C4_desktop_api.md) | modal/session API、Icon16、shlib entry 95〜100 |
-| **C** app | Rust, `userland/rust/filer/` | [TASK_C5_filer.md](../../../archive/gui_v12/TASK_C5_filer.md) | File Manager |
+| **K** protocol | C / Rust, `sdk/include/os32/`, `sdk/rust/os32api/src/gui/` | [TASK_K5_v12_proto.md](TASK_K5_v12_proto.md) | op 65/66、Modal result、Session request、Quit reason。KAPI追加なし |
+| **W** WM | Rust, `userland/gshell/` | [TASK_W3_desktop_session.md](TASK_W3_desktop_session.md) | taskbar / Start / clock / launcher / session state machine / halt |
+| | | [TASK_W4_dialogs.md](TASK_W4_dialogs.md) | message / file-open / input dialog、completed result、sticky Modal |
+| **C** library | Rust, `userland/rust/libos32gui/` | [TASK_C4_desktop_api.md](TASK_C4_desktop_api.md) | modal/session API、Icon16、shlib entry 95〜100 |
+| **C** app | Rust, `userland/rust/filer/` | [TASK_C5_filer.md](TASK_C5_filer.md) | File Manager |
 | **H** HAL | C, `gfx/`, `drivers/` | 新規票なし | 9801 / PEGC / Cirrus regression のみ |
 | **PM / 検証** | Python / NP21/W | 本書 §5 | 既存 `/api/mouse` を使う自動 gate、契約照合、ROADMAP 更新 |
 
@@ -120,7 +120,7 @@ GUI_QUIT_REASON_SHUTDOWN    = 3
 
 `GUI_PROTO_VERSION=1` / KAPI v42 を維持。
 
-詳細: [TASK_K5_v12_proto.md](../../../archive/gui_v12/TASK_K5_v12_proto.md)
+詳細: [TASK_K5_v12_proto.md](TASK_K5_v12_proto.md)
 
 ### W3 — desktop / session
 
@@ -135,7 +135,7 @@ GUI_QUIT_REASON_SHUTDOWN    = 3
 - CUI cfg 更新失敗時の rollback
 - `for (;;) sys_halt()` の terminal halt
 
-詳細: [TASK_W3_desktop_session.md](../../../archive/gui_v12/TASK_W3_desktop_session.md)
+詳細: [TASK_W3_desktop_session.md](TASK_W3_desktop_session.md)
 
 ### W4 — dialogs
 
@@ -147,7 +147,7 @@ GUI_QUIT_REASON_SHUTDOWN    = 3
 - Input dialog + FEP
 - owner cleanup
 
-詳細: [TASK_W4_dialogs.md](../../../archive/gui_v12/TASK_W4_dialogs.md)
+詳細: [TASK_W4_dialogs.md](TASK_W4_dialogs.md)
 
 ### C4 — client API
 
@@ -168,7 +168,7 @@ AppVTable は変更しない。File/Input は非同期。
 
 Icon16 は 160B (`4bpp pixels 128B + 1bpp mask 32B`)。
 
-詳細: [TASK_C4_desktop_api.md](../../../archive/gui_v12/TASK_C4_desktop_api.md)
+詳細: [TASK_C4_desktop_api.md](TASK_C4_desktop_api.md)
 
 ### C5 — File Manager
 
@@ -182,7 +182,7 @@ Icon16 は 160B (`4bpp pixels 128B + 1bpp mask 32B`)。
 
 KAPI v42 の既存 `sys_ls/stat/mkdir/rename/unlink/rmdir/open/read/write/close` だけを使う。
 
-詳細: [TASK_C5_filer.md](../../../archive/gui_v12/TASK_C5_filer.md)
+詳細: [TASK_C5_filer.md](TASK_C5_filer.md)
 
 ---
 

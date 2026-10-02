@@ -44,7 +44,7 @@ TooWideが保留中の同じ1列モデルでは後続入力を消費しないが
 - M2: C0/ESCの生セル保存はANSI非解釈の範囲。統合時に未対応制御文字の表示方針を決める。
   CSI除去を勝手に必須化しない。
 - M3: Cellのhost実寸はsize 8B / align 4B。tests/model.rsのhost限定試験で確認。
-  [MEMORY_BUDGET.md](../../tasks/gui/v13/MEMORY_BUDGET.md)の案と一致するが、guest配置やRust ABIの保証ではない。
+  [MEMORY_BUDGET.md](../gui_v13/MEMORY_BUDGET.md)の案と一致するが、guest配置やRust ABIの保証ではない。
 - M4: i64演算のguestリンクは未検証。ヘルパ未解決が起こるとは未確認なので断定しない。
   クロスリンクを統合前ゲートとし、解決目的だけでi32化しない。
 - L1: x == colsはset_cursorへ戻せない。READMEとAPIコメントに位置指定と完全状態復元の違いを明記済み。

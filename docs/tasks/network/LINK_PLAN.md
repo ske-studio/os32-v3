@@ -230,7 +230,7 @@ Host Services    HTTP / File / RPC を KAPI 末尾追加。Host Agent を実装
   実 Agent をサブプロセス)。ケース名と TASK_N0 §3 の指摘番号の対応表・決めたこと・
   既存 `check-net-l0`〜`l3` が読むシンボルの v2 での意味は
   [`tools/tests/n1_tdd.md`](../../../tools/tests/n1_tdd.md)。
-  移植性調査は [`docs/tasks/portability/SURVEY_N1.md`](../portability/SURVEY_N1.md)。
+  移植性調査は [`docs/archive/portability/SURVEY_N1.md`](../../archive/portability/SURVEY_N1.md)。
   **未実施** (PM / テスターの受入): `make clean` → `make all` → `make check`、
   `kernel-lgy98-link` の配備、`userland/tests/host_test.c` の実機実行、
   `check-net-l0`〜`l3` と `check-net-m2` の回帰。

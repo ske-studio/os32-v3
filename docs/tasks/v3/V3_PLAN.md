@@ -32,7 +32,7 @@ OS32 側の契約は小さく保つ。*
 | | 内容 |
 |---|---|
 | **v3 に入れる** | 柱 P0〜P7 (§3)。v3 後半に P8〜P10 と §5 の票 — **GUI アプリ群は範囲外から外して v3 後半に入れる** (U4 の修正、U7 の決定。コントロールパネル・多言語対応・移植アプリはここ) |
-| **v3 に入れない** | 多機種・多アーキテクチャ ([V4_GAME_PLATFORM_DRAFT.md](../../V4_GAME_PLATFORM_DRAFT.md))、OS32 Fabric / Link (V4)、補助コア ACS ([AUXILIARY_CORE_SERVICE.md](../../AUXILIARY_CORE_SERVICE.md))、SMP、16bit DOS 移植スキーム (ROADMAP §2)、USB / IEEE 1394 (realhw/PLAN §9)、スワップ、**カーネルの仮想アドレス化 (高位カーネル) — v4 以降の候補** (TASK_MEMMAP_V3 D20。v3 は恒等写像のまま P2V/V2P の集約だけ) |
+| **v3 に入れない** | 多機種・多アーキテクチャ ([V4_GAME_PLATFORM_DRAFT.md](../../archive/v4/V4_GAME_PLATFORM_DRAFT.md))、OS32 Fabric / Link (V4)、補助コア ACS ([AUXILIARY_CORE_SERVICE.md](../../AUXILIARY_CORE_SERVICE.md))、SMP、16bit DOS 移植スキーム (ROADMAP §2)、USB / IEEE 1394 (realhw/PLAN §9)、スワップ、**カーネルの仮想アドレス化 (高位カーネル) — v4 以降の候補** (TASK_MEMMAP_V3 D20。v3 は恒等写像のまま P2V/V2P の集約だけ) |
 | **v3 / v4 の外** | **OS64** — OS32 とは別の 64 ビット OS の構想 (U3、2026-09-30)。語の定義は [LEGACY_LIVING_PRESERVATION.md](../../LEGACY_LIVING_PRESERVATION.md) の冒頭。移植は 32 ビット限定 ([ARM_GAUGE.md §10](../portability/ARM_GAUGE.md)) と「別物」として両立する |
 | **v3 で守る v4 の原則** | V4 §11 の 8 原則のうち 1・2・4・6 (PC-98 固有を portable 層へ流さない、HAL 境界、固定番地を契約にしない、platform-only は明示)。ACS は HAL のバックエンド表に「補助コア / ホスト / 主コア」の差し込み口を**塞がない**ことだけ |
 

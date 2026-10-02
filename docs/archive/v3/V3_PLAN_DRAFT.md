@@ -32,7 +32,7 @@
 | [DESIGN_APP_FIRST.md](../../DESIGN_APP_FIRST.md) | 草案 (2026-09-26)。策定時の「設計思想の草案」は語彙外 → 2026-09-30 (手順 f) に揃えた (§4 D19) | 前景 1 アプリへ資源を集中する。マルチタスクを主目的にしない。評価軸は「1 本にどこまで渡せるか」。640×480×16bit を高機能グラフィックスの境界とし、Video HAL / VESA2 的互換層 / SDL 1.2 の受け皿。ZSNES を負荷試験台に。判断基準 7 項目 (§12) | **v3 (思想の芯)**。§12 の判断基準を本案の「変更の受け入れ基準」に採る。Video HAL・互換層・SDL は **v3 後半** (§3 P9) |
 | [AUXILIARY_CORE_SERVICE.md](../../AUXILIARY_CORE_SERVICE.md) | 草案 (2026-09-28) | 余剰 CPU コアを固定機能アクセラレータ (Graphics / Audio worker) として使う。SMP スケジューラは持たない。x86 AP / ARM で同一モデル。縮退モデル。実装段階案 1〜7 | **v4** (対象機に複数コアの PC-98 は無い。Ra266 は 1 コア)。v3 では HAL のバックエンド表に「補助コア / ホスト / 主コア」の差し込み口を**塞がない**ことだけ守る |
 | [LEGACY_LIVING_PRESERVATION.md](../../LEGACY_LIVING_PRESERVATION.md) | 草案 (2026-09-28) | 実機の動態保存。判断基準「実機で行う意味があるか」。時代依存の処理 (TLS / codec / AI) は Host Service / OS64 へ。レガシー側の契約は小さく安定させる。ACS と Host Service の役割分離 | **v3 (思想の芯)**。Host Services の延長 (§1-6 の 5-6 / 5-7) の根拠。**OS64** の語はここと ACS だけ (§4 D6、§7 U3) |
-| [V4_GAME_PLATFORM_DRAFT.md](../../V4_GAME_PLATFORM_DRAFT.md) / [tasks/v4/README.md](../../tasks/v4/README.md) | 草案 (2026-09-07) | Portable API / Platform API の分離、`arch/` `platform/` の長期構造、Native / Hosted / Game Runtime、エンジン Core / Module、Rust は上位から、OS32 Fabric / OS32 Link、想定ターゲット表、Phase V4-0〜4 | **v4** (決定済み: v3 の後)。v3 で守るのは V4 §11 の 8 原則のうち 1・2・4・6 (PC-98 固有を portable 層へ流さない、HAL 境界、固定番地を契約にしない、platform-only は明示) |
+| [V4_GAME_PLATFORM_DRAFT.md](../v4/V4_GAME_PLATFORM_DRAFT.md) / [tasks/v4/README.md](../../tasks/v4/README.md) | 草案 (2026-09-07) | Portable API / Platform API の分離、`arch/` `platform/` の長期構造、Native / Hosted / Game Runtime、エンジン Core / Module、Rust は上位から、OS32 Fabric / OS32 Link、想定ターゲット表、Phase V4-0〜4 | **v4** (決定済み: v3 の後)。v3 で守るのは V4 §11 の 8 原則のうち 1・2・4・6 (PC-98 固有を portable 層へ流さない、HAL 境界、固定番地を契約にしない、platform-only は明示) |
 
 ### 1-3. 設定・メモリの設計提案 (`docs/tasks/settings/`、v1.3 の残り。v3 の入力)
 
@@ -61,8 +61,8 @@
 | 文書 | 状態 | 要旨 | 提案 |
 |---|---|---|---|
 | [portability/ARM_GAUGE.md](../../tasks/portability/ARM_GAUGE.md) | 計測記録 (55/93、2026-09-15) | ARM コンパイル計測。**§10: 移植は 32 ビットのみ (ユーザー決定 2026-09-17)、64 ビット対応の抽象化は足さない**、`u32` = ポインタ幅 | **v3 の前提** (固定長維持、§3 P0 の「`u32` か `<stdint.h>` か」の根拠)。ARM 実装そのものは **v3 の後** (再配置の後、KSTACK §7-5 の 4) |
-| [portability/SURVEY_N1.md](../../tasks/portability/SURVEY_N1.md) | 調査 (2026-09-14) | N1 で触れた CPU 依存 (LE アクセサ、`cli`/`sti`/`hlt`、直列化)。新しい層ごとに同じ観点で追記する規則 | **記録** + 規則は v3 でも維持 (新しい層の票に移植性の節) |
-| [arch_port/00_INDEX.md](../../tasks/arch_port/00_INDEX.md) (+ M0 監査、Brain i.MX28) | 計画 (2026-09-08、**別リポジトリの快照**) | 他アーキ移植調査の索引。M0: 非整列 3 か所・キャッシュ前提 (ロードしたコードへ飛ぶ経路・ページ表操作)。§3 の 3「ISA 非依存化の切り分け」は未実施 | **v4** (快照は更新しない)。M0 の「ロードしたコードへ飛ぶ経路」は §3 P2 (動的読み込み) の設計に効く |
+| [portability/SURVEY_N1.md](../portability/SURVEY_N1.md) | 調査 (2026-09-14) | N1 で触れた CPU 依存 (LE アクセサ、`cli`/`sti`/`hlt`、直列化)。新しい層ごとに同じ観点で追記する規則 | **記録** + 規則は v3 でも維持 (新しい層の票に移植性の節) |
+| [arch_port/00_INDEX.md](../arch_port/00_INDEX.md) (+ M0 監査、Brain i.MX28) | 計画 (2026-09-08、**別リポジトリの快照**) | 他アーキ移植調査の索引。M0: 非整列 3 か所・キャッシュ前提 (ロードしたコードへ飛ぶ経路・ページ表操作)。§3 の 3「ISA 非依存化の切り分け」は未実施 | **v4** (快照は更新しない)。M0 の「ロードしたコードへ飛ぶ経路」は §3 P2 (動的読み込み) の設計に効く |
 | [arch/README.md](../../../arch/README.md) | 現行 | `arch/<arch>/` (CPU) と `platform/<platform>/` (機種) の 2 軸。足す手順 | **記録** (現行仕様)。V4 §4 の長期構造と同じ形 |
 | [ROADMAP.md §2](../../ROADMAP.md) | 計画 | 長期: 協調型 → **v3 でプリエンプティブ寄りを検討**、実機、v3 の全体計画、再配置と C11 の順序、着手の前に決めること 3 点、他アーキ、GUI アプリ群 (先送り)、16bit DOS 移植スキーム | **v3** (§3 P6・P0)。「プリエンプティブ寄り」は APP_FIRST と衝突 (§4 D3)。DOS 移植スキームは **v4** か捨てる (V86 が既にあり、INT 21h → KAPI 変換の需要が票に無い) |
 

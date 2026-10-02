@@ -108,7 +108,7 @@ ROADMAPの「terminal app」との差異は未決であり、外部terminalか�
 T0 (claude-opus-5) とT1 (Codex) の読み取り専用設計を受領済み。
 PMレビューのR1〜R5をT0修正版が反映。統合の安全条件が未解決のため契約凍結は保留。S0は未発注。
 判定と次のゲートは [REVIEW_T0_T1.md](../../../archive/gui_v13_reviews/REVIEW_T0_T1.md) を参照。
-メモリのホスト測定は [MEMORY_BUDGET.md](MEMORY_BUDGET.md)。ゲスト実行時の空きは未測定。
+メモリのホスト測定は [MEMORY_BUDGET.md](../../../archive/gui_v13/MEMORY_BUDGET.md)。ゲスト実行時の空きは未測定。
 T0とS0を同一エージェントへ同時発注しない。共有ファイルの編集はPMが直列化する。
 
 ## 4. S0で凍結する事項

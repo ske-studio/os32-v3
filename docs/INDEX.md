@@ -40,7 +40,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | 設定の置き場 (system.cfg の残すキー、settings.db のスキーマ / API / リカバリ) | [tasks/settings/DESIGN.md](tasks/settings/DESIGN.md) (計画、v1.3) | ROADMAP は 1 行 |
 | アプリ帯の広さ (1 アプリに渡せる量) | [tasks/memory/APP_BAND_PDE.md](tasks/memory/APP_BAND_PDE.md) (実装済み `b8dab24`、v2.1 に同梱、kselftest で毎起動検証。**§5 のゲスト受入は未記録** = 受入待ち、2026-09-29 に確認) | 02_memory.md は方針と帯の表 |
 | 試験の一覧 (`make check` のターゲット、`_tdd.md` と票の対応) | [TESTS.md](TESTS.md) (`tools/gen_tests_inventory.py` で生成、`make check-tests-inventory` が鮮度を照合) | 各票は自分の `_tdd.md` を指すだけ |
-| 移植性 (CPU / 機種の 2 軸、ARM 計測、順序 1〜4 の経過) | [tasks/portability/ARM_GAUGE.md](tasks/portability/ARM_GAUGE.md) (計測と経過)、[../arch/README.md](../arch/README.md) (足し方) | [tasks/portability/SURVEY_N1.md](tasks/portability/SURVEY_N1.md) (調査)、`tasks/arch_port/` は**別リポジトリ `pw-sh4-research` の調査の快照** (正典はそちら。本リポジトリでは更新しない)、[archive/portability/TASK_KSTRING_BENCH.md](archive/portability/TASK_KSTRING_BENCH.md) (kstring の速度実測 **完了 2026-09-17** — x86 は asm 維持、C 版は他 32 ビットアーキ向け。数字は ARM_GAUGE §9、語長の前提は §10) |
+| 移植性 (CPU / 機種の 2 軸、ARM 計測、順序 1〜4 の経過) | [tasks/portability/ARM_GAUGE.md](tasks/portability/ARM_GAUGE.md) (計測と経過)、[../arch/README.md](../arch/README.md) (足し方) | [archive/portability/SURVEY_N1.md](archive/portability/SURVEY_N1.md) (調査)、`archive/arch_port/` は**別リポジトリ `pw-sh4-research` の調査の快照** (正典はそちら。本リポジトリでは更新しない)、[archive/portability/TASK_KSTRING_BENCH.md](archive/portability/TASK_KSTRING_BENCH.md) (kstring の速度実測 **完了 2026-09-17** — x86 は asm 維持、C 版は他 32 ビットアーキ向け。数字は ARM_GAUGE §9、語長の前提は §10) |
 | 版数 (カーネル 2.1 / GUI 1.4 で閉じた / 現行の開発 v3 / v4 草案) と v3 の fork の段取り | [ROADMAP.md §0](ROADMAP.md) | 各版の要約は [CHANGELOG.md](../CHANGELOG.md) (3〜5 行 + リリースノートへのリンク)、詳細は `RELEASE_vX.md` ([RELEASE_v2.1.md](RELEASE_v2.1.md))。`ver` の文字列、タグ |
 | v3 の目的・範囲・目標の 2 段・柱 (P0〜P10) と順序・v3 後半の票 | [tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md) (本案、2026-09-30 昇格) | ROADMAP.md の v3 の行、README.md (目的の一文)。メモリマップの決定の本文は TASK_MEMMAP_V3 (D 番号) |
 | v3 T2d〜T2h の詳細な実装契約・分割・受入 | [T2d〜T2h詳細](tasks/v3/TASK_T2D_T2H.md) (設計中。決定はTASK_MEMMAP_V3とTASK_T2_APPBAND、先行段の実績は後者§5-1) | TASK_T2_APPBAND §5-1は段の要約とリンク |
@@ -121,7 +121,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | 籠 | 何の票か | 完了 |
 |---|---|---|
 | [archive/gui_v11/](archive/gui_v11/TASK_H1_hal_backend.md) | GUI シェル v1.1 の票 12 本 (H1〜H3 / K1〜K4 / W1 W2 / C1〜C3)。索引は [tasks/gui/TASKS.md](tasks/gui/TASKS.md) | 2026-09-06 |
-| [archive/gui_v12/](archive/gui_v12/TASK_K5_v12_proto.md) | GUI シェル v1.2 の票 5 本 (K5 / W3 W4 / C4 C5)。索引は [tasks/gui/v12/TASKS.md](tasks/gui/v12/TASKS.md) | 2026-09-07 (`d739494`) |
+| [archive/gui_v12/](archive/gui_v12/TASK_K5_v12_proto.md) | GUI シェル v1.2 の票 5 本 (K5 / W3 W4 / C4 C5)。索引は [archive/gui_v12/TASKS.md](archive/gui_v12/TASKS.md) | 2026-09-07 (`d739494`) |
 | [archive/gui_v13_reviews/](archive/gui_v13_reviews/REVIEW_T0_T1.md) | GUI シェル v1.3 のレビュー記録 5 本 + [限定クロスリンク](archive/gui_v13_reviews/CROSS_LINK_T4.md) + [途中保存](archive/gui_v13_reviews/VERIFICATION_PROGRESS.md)。票そのものは `tasks/gui/v13/` に残る | 2026-09-14 |
 | [archive/settings/](archive/settings/TASK_S2.md) | 設定レジストリの票 5 本 (S2 / S3 / S3I2 / S4 / S5)。S0 / S6 / S6P と設計文書は `tasks/settings/` に残る。撤回した MEMORY_RAM_INTEGRATION (2026-09-30) もここ | 2026-09-13〜14 |
 | [archive/network/](archive/network/TASK_N0.md) | Host Services の票 5 本 (N0〜N4)。計画 3 本は `tasks/network/` に残る | 2026-09-14〜15 |
@@ -149,7 +149,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | ドキュメント | 内容 |
 |-------------|------|
 | [tasks/agents/HANDOVER_2026-09-30.md](tasks/agents/HANDOVER_2026-09-30.md) | **引き継ぎ 2026-09-30 (現行)** — os32-v3 の初日: fork 手順 a〜f 完了、CI success、T0 (C11) は worktree `wt/t0-c11` で段 3 まで、次の PM の手順、09-30 の決定 (manga・フォント・apps/game)、v3 側の道具と罠 |
-| [tasks/agents/HANDOVER_2026-09-29.md](tasks/agents/HANDOVER_2026-09-29.md) | **fork 時点の申し送り (2026-09-29、完了記録)** — v2.1 のタグの時点の現在地、v3 の fork の段取り (決定済み、2026-09-30 に実施)、残件表、道具、罠。表だけ。次の引き継ぎは os32-v3 で新しく起こす |
+| [archive/agents/HANDOVER_2026-09-29.md](archive/agents/HANDOVER_2026-09-29.md) | **fork 時点の申し送り (2026-09-29、完了記録)** — v2.1 のタグの時点の現在地、v3 の fork の段取り (決定済み、2026-09-30 に実施)、残件表、道具、罠。表だけ。次の引き継ぎは os32-v3 で新しく起こす |
 | [tasks/agents/ROLES.md](tasks/agents/ROLES.md) | **体制の正典** (現行) — §0 の 1 表が現行の体制、§1〜§5 が細則、末尾が経緯 |
 | [archive/agents/HANDOVER_2026-09-22.md](archive/agents/HANDOVER_2026-09-22.md) | 引き継ぎ 2026-09-22〜25 (完了記録) — 実機初日 (FD 起動・シリアル 115200・PCI 列挙・LAN の橋) から HDD 起動まで、日ごとの追記 |
 | [archive/agents/HANDOVER_2026-09-18.md](archive/agents/HANDOVER_2026-09-18.md) / [HANDOVER_2026-09-16.md](archive/agents/HANDOVER_2026-09-16.md) | それ以前の引き継ぎ (完了記録) — 09-16 は残件 (H2 / H4 / arch 移設 / kstring 判断 / ゲスト試験ランナー / ARM / LAN 実機 / 小物) の推奨順・決裁点 |
@@ -195,6 +195,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | [archive/v3/U6_PENDING_REVIEW.md](archive/v3/U6_PENDING_REVIEW.md) | **U6 の仕分け表 — 決裁済み (2026-09-30、ユーザーが 6 点すべて推奨どおりに決定 → TASK_MEMMAP_V3 D29〜D34)**: 保留 5 件 (F3a〜c / F2c / FEP_BOUNDARY / MEMORY_RAM_INTEGRATION / DEVICE_RESERVATION) の現状 (コードで確認)、TASK_MEMMAP_V3 の決定で置き換わった部分と残る部分、拾う先 (T2 / T4 / T5a の要件、P4、撤回)、判断点 6 つとその決定 |
 | [archive/v3/TASK_T1_LEDGER.md](archive/v3/TASK_T1_LEDGER.md) | **T1: 物理地図と所有権台帳 — 受入完了 (2026-10-01、T1a〜T1f 着地、残件は状態行)** — TASK_MEMMAP_V3 §6 T1 の範囲と T2 以降との境界 (§1)、物理メモリの確保・予約・写像の現状一覧と P2V / V2P の監査見積り 161 件 (§2)、台帳の 4 層 (地図・割当可否・owner・区間の表)、owner の種別 (AS / 永続 / モジュール / device)、検証済み資源レコード (X4、span ごとの資源と `res_mask`)、SURFACE の型 (Cirrus の CLIENT / DISPLAY を含む)、API、起動順 (8MB 型の backing と exec 上端、PCI 採取値の取り込み)、P2V / V2P / `P2V_CONST` と `check_p2v.py`、R1 の計数 (観測用の深さと broker の判定を分ける、jmpbuf の 3 保存先)、`dma_alloc`、gfx の識別 → 予約 → 写像 (候補群 1 owner) (§3)、段 T1a (モデル経路) 〜 T1f と受入・8MB / 17MB / 64MB の確かめ方・段の境目の owner 表 (§4)、リスクと未確認 (§5)、Codex の論点 X9〜X16 と 1 回目 B1〜B7 / 2 回目 B8〜B11 の対応表 (§6) |
 | [archive/v3/TASK_T2D_RESULTS.md](archive/v3/TASK_T2D_RESULTS.md) | **T2d (B1 checked copy) d0a〜d6 の実装結果と受入 — 完了記録 (2026-10-02)** — [TASK_T2D_T2H](tasks/v3/TASK_T2D_T2H.md) の §10-2〜§10-16 をそのまま移したもの (節番号は元のまま)。各段のコーダーの実装結果・レビュー対応・PM のゲスト受入、d6 の変異の仕分けと size 確定 |
+| [archive/v3/TASK_T2ABC_RESULTS.md](archive/v3/TASK_T2ABC_RESULTS.md) | 完了記録 — T2 親票 §5-1 の T2a〜T2c 実装・受入結果 (未実施・残件を含む)。設計・受入条件は TASK_T2_APPBAND に残す |
 | [tasks/v3/TASK_T2_APPBAND.md](tasks/v3/TASK_T2_APPBAND.md) | **T2: アプリ帯 + lease 窓 — 設計中 (2026-10-01)**。SURFACE lease 契約、現状調査、高位 AS・可変スタック・R1/R2/R3-e・B1・D35、T2a〜T2h の受入、サイズ予算と独立レビュー論点 |
 | [archive/v3/TASK_CLANG_CHECKS.md](archive/v3/TASK_CLANG_CHECKS.md) | C ソースの静的検査 5 本 (check-p2v・check-c-dialect・check-le-access・check-arch-asm・audit_cast_align) を clang の構文木で作り直した。旧版 (`tools/legacy_checks/`) は撤去 (ユーザー決定 2026-10-01、リポジトリ外にバックアップ) **着地 (2026-10-01、`8612b06`)** |
 | [tasks/v3/PORT_CANDIDATES.md](tasks/v3/PORT_CANDIDATES.md) | **既存ソフトウェアの移植候補 — 計画 (2026-09-30、v3 後半・P9)** — 移植の前提となる基盤 (libc の穴・C++ 無し・x87・Video HAL・PCM・協調型・ライセンスの置き場)、候補 23 本の表 (ライブラリ / テキスト系 / 8bpp ゲーム / メディア / ワープロ・表計算)、**ZSNES の難度と障害**、推奨の挑戦順 (zlib → Lua → … → doomgeneric → Wolf4SDL → ZSNES)、未確認事項 |
@@ -260,10 +261,10 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | ドキュメント | 内容 |
 |-------------|------|
 | [tasks/portability/ARM_GAUGE.md](tasks/portability/ARM_GAUGE.md) | **ARM コンパイル計測の基準値と経過** — `make check-arm-compile` (計測、合否ではない)。順序 1〜4 の前後表 (§9)。2026-09-15 時点 55/93 |
-| [tasks/portability/SURVEY_N1.md](tasks/portability/SURVEY_N1.md) | 移植性調査 (N1 起点) — 直列化とアライメント、`cli`/`sti`/`hlt` の一覧、順序 2 / 4-a の実施記録 |
+| [archive/portability/SURVEY_N1.md](archive/portability/SURVEY_N1.md) | 移植性調査 (N1 起点) — 直列化とアライメント、`cli`/`sti`/`hlt` の一覧、順序 2 / 4-a の実施記録 |
 | [archive/portability/TASK_KSTRING_BENCH.md](archive/portability/TASK_KSTRING_BENCH.md) | kstring の速度実測 **受入完了 (2026-09-17)** — x86 は asm 維持、C 版は他 32 ビットアーキ向け |
 | [../arch/README.md](../arch/README.md) | **`arch/` と `platform/` の正典** — 移植の 2 軸 (CPU / 機種)、`ARCH` `PLATFORM` の選び方、新アーキテクチャの足し方 |
-| [tasks/arch_port/00_INDEX.md](tasks/arch_port/00_INDEX.md) | 他アーキテクチャ移植調査の索引 — **別リポジトリ `pw-sh4-research` で進む調査の快照 (2026-09-08〜09、本リポジトリでは更新しない)**。M0 監査 (`tools/audit_cast_align.sh`)、SHARP Brain (i.MX28) のハード調査 |
+| [archive/arch_port/00_INDEX.md](archive/arch_port/00_INDEX.md) | 他アーキテクチャ移植調査の索引 — **別リポジトリ `pw-sh4-research` で進む調査の快照 (2026-09-08〜09、本リポジトリでは更新しない)**。M0 監査 (`tools/audit_cast_align.sh`)、SHARP Brain (i.MX28) のハード調査 |
 
 ### GUI シェル (v1.1〜v1.4、GUI の版は 1.4 で閉じた)
 
@@ -279,7 +280,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | [tasks/gui/DESIGN.md](tasks/gui/DESIGN.md) | **GUI シェル v1.x 設計記録** (2026-09-04) — 再描画モデル、HAL/バックエンド表 |
 | [tasks/gui/API_CONTRACTS.md](tasks/gui/API_CONTRACTS.md) | libos32gui 凍結インターフェース契約 (2026-09-04 凍結) |
 | [tasks/gui/TASKS.md](tasks/gui/TASKS.md) | v1.1 作業分担票とゲート表 — v1.1 の票 (`archive/gui_v11/TASK_*.md` 12 本) の索引 |
-| `archive/gui_v12/` | v1.2 の票 5 本 (受入完了 2026-09-07 `d739494`)。索引は [tasks/gui/v12/TASKS.md](tasks/gui/v12/TASKS.md) |
+| `archive/gui_v12/` | v1.2 の票 5 本 (受入完了 2026-09-07 `d739494`)。索引は [archive/gui_v12/TASKS.md](archive/gui_v12/TASKS.md) |
 | [tasks/gui/v13/PLAN.md](tasks/gui/v13/PLAN.md) | **v1.3 計画と票の索引** (受入完了 2026-09-14) — K5b / K6 / K7 / T7〜T9、監査 (`AUDIT_2026-09-10.md`)、レビュー記録 (`archive/gui_v13_reviews/REVIEW_*.md`、完了記録) |
 | [archive/gui_v13/TASK_K6C_A_terminal.md](archive/gui_v13/TASK_K6C_A_terminal.md) / [TASK_T7_terminal_cmd.md](archive/gui_v13/TASK_T7_terminal_cmd.md) / [REVIEW_T5A_APP.md](archive/gui_v13_reviews/REVIEW_T5A_APP.md) | v1.3 の票のうち `PLAN.md` から直接辿れない 3 本 (端末アプリ、端末からの CUI 起動、T5a アプリのレビュー記録) |
 | [tasks/gui/TASK_KBD_NAV.md](tasks/gui/TASK_KBD_NAV.md) | マウスなしで GUI を操作する (WM のショートカット + マウスキー、Windows 98 の割り当て) **受入完了・実機確認待ち** (K1・K2 合格、残: K3 実機) |
@@ -297,7 +298,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | [archive/kernel_v2/PLAN.md](archive/kernel_v2/PLAN.md) | **カーネル 2.0 の計画 (完了記録)** — リング 3 / Rust の適用範囲 / KAPI 呼び出し実測。M1〜M3 は 2026-09-03 完了、タグ `v2.0`。版数の対応は [ROADMAP.md §0](ROADMAP.md) |
 | [archive/kernel_v2/M1_RING3.md](archive/kernel_v2/M1_RING3.md) / [M2_KAPI_TRAMPOLINE.md](archive/kernel_v2/M2_KAPI_TRAMPOLINE.md) / [M3_VERIFY.md](archive/kernel_v2/M3_VERIFY.md) / [CONTRACTS.md](archive/kernel_v2/CONTRACTS.md) | 2.0 の設計 (リング 3 土台、KAPI トランポリン、検証、凍結契約)。完了記録 |
 | [archive/kernel_v2/TASK_coder1_M0b_privileged.md](archive/kernel_v2/TASK_coder1_M0b_privileged.md) / [TASK_coder1_M1_ring3.md](archive/kernel_v2/TASK_coder1_M1_ring3.md) / [TASK_coder2_libos32gui.md](archive/kernel_v2/TASK_coder2_libos32gui.md) | 2.0 のコーダー票。完了記録 |
-| [V4_GAME_PLATFORM_DRAFT.md](V4_GAME_PLATFORM_DRAFT.md) / [tasks/v4/README.md](tasks/v4/README.md) | ゲーム基盤 v4 の草案 (2026-09-07)。v3 の後 |
+| [V4_GAME_PLATFORM_DRAFT.md](archive/v4/V4_GAME_PLATFORM_DRAFT.md) / [tasks/v4/README.md](tasks/v4/README.md) | ゲーム基盤 v4 の草案 (2026-09-07)。v3 の後 |
 | [archive/v21/boot_reform/00_OVERVIEW.md](archive/v21/boot_reform/00_OVERVIEW.md) | ブート刷新 (vmkernel.lz4 / ext2 ローダー) — 設計 (全 8 部) |
 
 ### FEP・V86・SQLite・ライブラリ
@@ -335,3 +336,9 @@ V86・SQLite・タイルマップ・ライブラリ設計書 (と上の boot_ref
 ## ソースツリー概要
 
 [08_build.md §8-3](08_build.md) を参照 (複製しない。CLAUDE.md「Source Tree」も同じ表)。
+
+- [TASK_MEMMAP_V3_RESULTS](archive/v3/TASK_MEMMAP_V3_RESULTS.md) — TASK_MEMMAP_V3 から切り出した完了段の記録 (未確認事項は元票に保持)。
+
+- [TASK_HAL_WIRING_RESULTS](archive/v3/TASK_HAL_WIRING_RESULTS.md) — TASK_HAL_WIRING から切り出した完了段の記録 (未確認事項は元票に保持)。
+
+- [TASK_PCM_CS4231_RESULTS](archive/v3/TASK_PCM_CS4231_RESULTS.md) — TASK_PCM_CS4231 から切り出した完了段の記録 (未確認事項は元票に保持)。

@@ -1,6 +1,6 @@
 # OS32 v4 草案 — Portable Game OS / Multi-Architecture / OS32 Fabric
 
-> 状態: **草案 (2026-09-07)** — 実装契約ではない ([tasks/v4/README.md](tasks/v4/README.md) と同じ)。
+> 状態: **草案 (2026-09-07)** — 実装契約ではない ([tasks/v4/README.md](../../tasks/v4/README.md) と同じ)。
 
 *草案策定: 2026-09-07*
 
