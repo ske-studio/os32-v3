@@ -1,4 +1,5 @@
 """A0 real-source ILP32 harness; no Make, emulator, deployment or libc needed."""
+import host32
 import pathlib
 import subprocess
 import tempfile
@@ -21,7 +22,7 @@ if __name__ == "__main__":
                         *INCLUDES, str(ROOT / "tools/tests/pgalloc_range_host.c"),
                         "-o", str(exe)], cwd=ROOT, check=True)
         print("HOST ILP32 GNU11 COMPILE PASS", flush=True)
-        subprocess.run([str(exe)], cwd=ROOT, check=True, timeout=60)
+        host32.run([str(exe)], cwd=ROOT, check=True, timeout=60)
         subprocess.run(["i386-elf-gcc", *FLAGS, "-O2", *INCLUDES,
                         "-c", str(ROOT / "kernel/pgalloc.c"),
                         "-o", str(pathlib.Path(tmp) / "pgalloc.o")],

@@ -12,6 +12,7 @@ test_launch.py と同じ様式 — ホスト ILP32 GNU11 で走らせたあと�
 カーネルと同じフラグの i386-elf-gcc -Werror でも通ることを別に見る
 ([C1] GNU11)。Make・エミュレータ・libc は使わない。
 """
+import host32
 import pathlib
 import subprocess
 import sys
@@ -33,7 +34,7 @@ if __name__ == "__main__":
                         "-nostdlib", "-static", "-no-pie",
                         str(HOST_SRC), "-o", str(exe)], cwd=ROOT, check=True)
         print("HOST ILP32 GNU11 COMPILE PASS", flush=True)
-        rc = subprocess.run([str(exe)], cwd=ROOT, timeout=30).returncode
+        rc = host32.run([str(exe)], cwd=ROOT, timeout=30).returncode
         subprocess.run(["i386-elf-gcc", *FLAGS, "-D__KERNEL_BUILD__",
                         *INCLUDES, "-O2", "-c", str(KERNEL_SRC),
                         "-o", str(tmp / "ring3_str.o")], cwd=ROOT, check=True)

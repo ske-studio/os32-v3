@@ -20,6 +20,7 @@ tools/tests/vmkernel_lz4_host.c は libc なしの 32bit 静的 ELF で、ASM �
   python3 -B tools/tests/test_vmkernel_lz4.py --target   # デコーダを i386-elf-gcc (ローダと同じ) で組む
   python3 -B tools/tests/test_vmkernel_lz4.py --mutate   # 否定側 (写しの上で変異 → RED)
 """
+import host32
 import os
 import pathlib
 import random
@@ -127,7 +128,7 @@ def build(work, srcs, target):
 
 def decode(exe, mode, comp, raw):
     data = struct.pack("<3I", mode, len(comp), raw) + comp
-    r = subprocess.run([str(exe)], input=data, capture_output=True, timeout=60)
+    r = host32.run([str(exe)], input=data, capture_output=True, timeout=60)
     if r.returncode == 3:
         return None, "展開先の後ろ (番兵) を書き越した"
     if r.returncode != 0:

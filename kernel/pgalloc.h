@@ -267,6 +267,8 @@ int ledger_reserve_set(u32 owner, const struct ledger_span *spans, u32 n);
 #define LEDGER_SF_CIRRUS     3
 #define LEDGER_ROLE_CLIENT   1   /* アプリへ USER で貸す面 */
 #define LEDGER_ROLE_DISPLAY  2   /* 表示面 (supervisor のまま) */
+#define LEDGER_ROLE_TVRAM    3   /* テキスト VRAM 面 (supervisor のまま) */
+#define LEDGER_ROLE_UNICODE  4   /* Unicode テーブル面 (読み取り専用) */
 #define LEDGER_PERM_NONE     0
 #define LEDGER_PERM_RO       2
 #define LEDGER_PERM_RW       1

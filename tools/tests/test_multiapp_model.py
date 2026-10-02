@@ -8,6 +8,7 @@ freestanding ILP32 binary, run it, then prove the same source also compiles
 with the cross compiler under the kernel's flags so it can be lifted into
 kernel/ in stage K5b without a dialect surprise ([C1] GNU11).
 """
+import host32
 import pathlib
 import subprocess
 import tempfile
@@ -24,7 +25,7 @@ if __name__ == "__main__":
         subprocess.run(["gcc", *FLAGS, "-O0", "-nostdlib", "-static", "-no-pie",
                         str(SRC), "-o", str(exe)], cwd=ROOT, check=True)
         print("HOST ILP32 GNU11 COMPILE PASS", flush=True)
-        subprocess.run([str(exe)], cwd=ROOT, check=True, timeout=60)
+        host32.run([str(exe)], cwd=ROOT, check=True, timeout=60)
         subprocess.run(["i386-elf-gcc", *FLAGS, "-O2", "-c", str(SRC),
                         "-o", str(tmp / "multiapp_model.o")],
                        cwd=ROOT, check=True)

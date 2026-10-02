@@ -57,6 +57,7 @@ Makefile / build/*.mk の変更は **「新しい試験を足す形」だけを�
 import atexit
 import contextlib
 import io
+import json
 import os
 import pathlib
 import shutil
@@ -102,6 +103,17 @@ def git(d, *args):
 
 
 # ------------------------------------------------------------------ 筋書き
+def case_recipe_semicolon(cs):
+    rules, _ = cs.read_makefiles()
+    script = 'tools/tests/' + 'test_access_walk.py'
+    rules['check-semicolon'] = [
+        '@set -e; for runner in $(HOST32_RUNNERS); do '
+        'python3 -B ' + script + '; done']
+    inputs = cs.extract(rules, 'check-semicolon')
+    assert script in inputs, inputs
+    assert 'exec/' + 'access_walk.c' in inputs, inputs
+
+
 def case_inc_extract(cs):
     rules, _ = cs.read_makefiles()
     for t in ("check-hsync-h2-host", "check-settings-protect-host"):
@@ -247,6 +259,10 @@ def case_featgui_commit(cs):
         git(d, "init", "-q", "-b", "feat/gui")
         git(d, "config", "user.email", "t@example.invalid")
         git(d, "config", "user.name", "t")
+        # CI may enable maintenance globally. A background git process can
+        # remove maintenance.lock while copytree copies this template.
+        git(d, "config", "maintenance.auto", "false")
+        git(d, "config", "gc.auto", "0")
         pathlib.Path(d, "a.txt").write_text("a\n")
         git(d, "add", "a.txt")
         git(d, "commit", "-q", "-m", "a")
@@ -348,6 +364,10 @@ def _template_for(base):
         git(d, "init", "-q", "-b", "main")
         git(d, "config", "user.email", "t@example.invalid")
         git(d, "config", "user.name", "t")
+        # CI may enable maintenance globally. A background git process can
+        # remove maintenance.lock while copytree copies this template.
+        git(d, "config", "maintenance.auto", "false")
+        git(d, "config", "gc.auto", "0")
         for rel, text in base.items():
             p = pathlib.Path(d, rel)
             p.parent.mkdir(parents=True, exist_ok=True)
@@ -751,9 +771,34 @@ def case_mk_no_base(cs):
         _full(fx.plan(files=["build/sdk.mk"], base=None), "基点版なし")
 
 
+def case_mk_maintenance_disabled(cs):
+    # A globally enabled maintenance must not outlive the template commit.
+    # Fresh base avoids the template cache, so this tests initialization too.
+    from unittest.mock import patch
+    with tempfile.TemporaryDirectory(prefix="os32-ckgit-") as d:
+        config = pathlib.Path(d, "gitconfig")
+        config.write_text("[maintenance]\n\tauto = true\n[gc]\n\tauto = 1\n")
+        trace = pathlib.Path(d, "trace.jsonl")
+        with patch.dict(os.environ, {"GIT_CONFIG_GLOBAL": str(config),
+                                     "GIT_TRACE2_EVENT": str(trace)}):
+            with fixture(cs, files={"maintenance-test.txt": "fresh\n"}) as fx:
+                for name, want in (("maintenance.auto", "false"), ("gc.auto", "0")):
+                    r = subprocess.run(["git", "-C", fx.d, "config", "--get", name],
+                                       check=True, capture_output=True, text=True)
+                    assert r.stdout.strip() == want, (name, r.stdout)
+                assert not pathlib.Path(fx.d, ".git/objects/maintenance.lock").exists()
+                events = [json.loads(line) for line in trace.read_text().splitlines()]
+                assert any(e.get('event') == 'start' and 'commit' in e.get('argv', [])
+                           for e in events), 'fixture commit missing from trace'
+                children = [e.get('argv', []) for e in events
+                            if e.get('event') == 'child_start']
+                assert not any('maintenance' in argv or 'gc' in argv
+                               for argv in children), children
+
+
 def case_mk_real_tree(cs):
     # 実物の make ファイル (作業中の版) を基点に置いた一時リポジトリ: 列が読めて差が無い
-    # (追加選択なし)。check-memory-host に型どおりの行を足す (main の e241312 / f4989ee の形)
+    # (追加選択なし)。check-time-math-host に型どおりの行を足す (main の e241312 / f4989ee の形)
     # → その 1 本。tools/ は実物を指す (script の存在)。実物の木を HEAD と比べないのは、
     # 作業中に make ファイルを直しているあいだ (= check-changed の出番) にこの試験が落ちないため
     m = cs.load_map()
@@ -772,21 +817,21 @@ def case_mk_real_tree(cs):
         fx.write("build/sdk.mk", sdk[:a] + sdk[b:] + sdk[a:b])
         _full(fx.plan(files=["build/sdk.mk"], map_=m), "削除・変更行")
         fx.write("build/sdk.mk", sdk)
-        fx.edit("build/sdk.mk", "\tpython3 -B tools/tests/test_ledger.py $(MUT)\n",
-                "\tpython3 -B tools/tests/test_ledger.py $(MUT)\n"
-                "\tpython3 -B tools/tests/test_ledger.py --again $(MUT)\n")
+        fx.edit("build/sdk.mk", "\tpython3 -B tools/tests/test_time_math.py --target $(MUT)\n",
+                "\tpython3 -B tools/tests/test_time_math.py --target $(MUT)\n"
+                "\tpython3 -B tools/tests/test_time_math.py --target --again $(MUT)\n")
         r = fx.plan(files=["build/sdk.mk"], map_=m)
-        _only(r, "check-memory-host")
+        _only(r, "check-time-math-host")
         assert len(r[1]) == len(cs.check_lists(cs.read_makefiles()[1])), r[1]
 
 
-CASES = [case_inc_extract, case_hsync_protect, case_sh_pipe, case_bare_extract,
+CASES = [case_recipe_semicolon, case_inc_extract, case_hsync_protect, case_sh_pipe, case_bare_extract,
          case_readme, case_claude, case_docs_always, case_broad_only,
          case_submodule, case_nothing, case_single_stage, case_inc_dir_extract,
          case_notest_fast, case_notest_glob_wins, case_notest_guard,
          case_featgui_commit, case_lint_real,
          case_mk_new_check, case_mk_recipe_add, case_mk_comment_only, case_mk_mixed,
-         case_mk_git_versions, case_mk_negative, case_mk_no_base, case_mk_real_tree]
+         case_mk_git_versions, case_mk_negative, case_mk_no_base, case_mk_real_tree, case_mk_maintenance_disabled]
 
 
 def run_cases(cs, quiet=False, cases=None):
@@ -941,9 +986,32 @@ def _run_mutation(i):
     return i, ("RED" if failed else "GREEN"), (failed[0] if failed else "")
 
 
+def mutation_maintenance_order():
+    """Move fixture suppression past commit; trace must catch the child git."""
+    import inspect
+    from unittest.mock import patch
+    text = inspect.getsource(_template_for)
+    settings = ('        git(d, "config", "maintenance.auto", "false")\n'
+                '        git(d, "config", "gc.auto", "0")\n')
+    commit = '        git(d, "commit", "-q", "-m", "base")\n'
+    assert text.count(settings) == text.count(commit) == 1
+    text = text.replace(settings, '').replace(commit, commit + settings)
+    namespace = dict(globals(), _TEMPLATES={}, _TEMPLATE_ROOT=None)
+    exec(compile(text, __file__, 'exec'), namespace)
+    with patch.dict(globals(), {'_template_for': namespace['_template_for']}):
+        try:
+            case_mk_maintenance_disabled(load())
+        except AssertionError as error:
+            assert 'maintenance' in str(error) or "'gc'" in str(error), error
+            print('MUTATION maintenance config after commit RED (trace child_start)', flush=True)
+            return 0
+    print('MUTATION maintenance config after commit **GREEN (見逃し)**', flush=True)
+    return 1
+
+
 def mutate():
     """変異を並列に回す (mutpar、OS32_MUT_JOBS)。結果は変異の番号順に出す。"""
-    bad = 0
+    bad = mutation_maintenance_order()
     for i, status, info in mutpar.run_ordered(_run_mutation, range(1, len(MUTATIONS) + 1),
                                               processes=True):
         why = MUTATIONS[i - 1][2]

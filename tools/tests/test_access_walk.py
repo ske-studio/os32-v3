@@ -6,12 +6,11 @@ TARGET_SRC = ['exec/access_walk.c', 'exec/redir_access.c', 'kernel/paging.c', 'k
 import argparse
 import hashlib
 import pathlib
-import shutil
-import signal
 import subprocess
 import tempfile
 import time
 from mutpar import run_ordered
+import host32
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 FILES = {
     'paging': 'kernel/paging.c', 'pgalloc': 'kernel/pgalloc.c',
@@ -57,13 +56,20 @@ MUTANTS = [
 ]
 
 
-def run(sources, mutant=None, fixture="access_walk_host.c", high_stack=False):
+def run_host32(exe, runner):
+    result = host32.run([str(exe)], runner=runner, capture_output=True,
+                        text=True, timeout=10)
+    return result
+
+
+def run(sources, mutant=None, fixture="access_walk_host.c", high_stack=False, runner="native"):
     with tempfile.TemporaryDirectory(prefix='os32-d3-') as directory:
         tmp = pathlib.Path(directory)
         for key, body in sources.items():
             if key == 'boot':
                 body = body[body.index('static void test_caller_boot('):body.index('static void test_ledger(void)')]
             if mutant and mutant[3] == 'PS in both walk layers' and key == 'paging':
+                assert body.count(' || (pde & PTE_PS)') == 1
                 body = body.replace(' || (pde & PTE_PS)', '')
             if mutant and key == mutant[0]:
                 _, old, new, _ = mutant
@@ -81,33 +87,27 @@ def run(sources, mutant=None, fixture="access_walk_host.c", high_stack=False):
                '-I' + str(tmp), str(ROOT / 'tools/tests' / fixture),
                str(ROOT / 'kernel/physmem.c'), '-o', str(exe)]
         subprocess.run(cmd, check=True, capture_output=True, text=True)
-        result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=10)
-        # Some sandboxes forbid native int 0x80. Only SIGSYS permits this
-        # compatibility retry; assertion failures/signals must remain RED.
-        if result.returncode == -signal.SIGSYS:
-            qemu = shutil.which('qemu-i386')
-            if not qemu:
-                raise RuntimeError('native i386 syscalls blocked (SIGSYS); qemu-i386 required')
-            result = subprocess.run([qemu, str(exe)], capture_output=True, text=True, timeout=10)
-        return result
+        return run_host32(exe, runner)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--runner', choices=['native', 'qemu'], default='native')
     args = parser.parse_args()
     sources = {k: (ROOT / v).read_text() for k, v in FILES.items()}
     hashes = {p: hashlib.sha256((ROOT / p).read_bytes()).digest() for p in FILES.values()}
-    result = run(sources)
+    result = run(sources, runner=args.runner)
     print(result.stdout + result.stderr, end='')
     assert result.returncode == 0
-    result = run(sources, high_stack=True)
+    result = run(sources, high_stack=True, runner=args.runner)
     assert result.returncode == 0, (result.stdout, result.stderr)
+    print(f'PASS runner={args.runner}')
     print('PASS: boot buffers on low fixture stack with high initial stack')
     if args.mutate:
         def one(m):
             start = time.monotonic()
-            r = run(sources, m, high_stack=True)
+            r = run(sources, m, high_stack=True, runner=args.runner)
             assert r.returncode != 0 and 'FAIL:' in r.stdout, (m[3], r.stdout, r.stderr)
             if m[3] == 'boot copyout moves bytes':
                 assert 'caller:boot copyout' in r.stdout, r.stdout

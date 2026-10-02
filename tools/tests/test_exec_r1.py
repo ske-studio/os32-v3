@@ -3,6 +3,7 @@
 AppSlot/CR3/IF と資源利用終了は記録する足場。全 loader/PCM 実機の代替ではない。
 写しだけを変異し、コンパイル成功後の実行失敗だけを RED とする。
 """
+import host32
 import pathlib
 import subprocess
 import sys
@@ -367,7 +368,7 @@ def run(source=None, irq=None):
                            capture_output=True, text=True)
         if r.returncode:
             return 'compile', r.stderr
-        r = subprocess.run([str(tmp / 't')], capture_output=True, text=True, timeout=30)
+        r = host32.run([str(tmp / 't')], capture_output=True, text=True, timeout=30)
         return ('pass' if r.returncode == 0 else 'runtime'), "rc=%d " % r.returncode + r.stdout + r.stderr
 
 

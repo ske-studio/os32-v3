@@ -30,6 +30,7 @@ test_ring3_str.py と同じ様式 — ホスト ILP32 GNU11 で走らせたあ�
   python3 -B tools/tests/test_ring3_guard.py --target   # + i386-elf の -Werror
   python3 -B tools/tests/test_ring3_guard.py --mutate   # 否定側 (写しの上で変異)
 """
+import host32
 import pathlib
 import shutil
 import subprocess
@@ -178,7 +179,7 @@ def run_host(root, tmp, quiet=False):
         if not quiet:
             sys.stdout.write(p.stdout + p.stderr)
         return p.returncode
-    return subprocess.run([str(exe)], cwd=root, timeout=30,
+    return host32.run([str(exe)], cwd=root, timeout=30,
                           stdout=subprocess.DEVNULL if quiet else None).returncode
 
 

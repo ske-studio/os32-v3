@@ -150,6 +150,7 @@ checks:
     - sdk/include/os32/os32_kapi_generated.h
     - sdk/include/os32/os32_kapi_shared.h
   check-hdd-stage1-host:
+    - tools/tests/host32.py
     - sdk/include/os32/os32_generations.h
     - tools/tests/mutpar.py
     - boot/boot_main.c
@@ -192,6 +193,7 @@ checks:
     - kernel/kmalloc.h
     - lib/kstring.h
   check-hdd-stage2-host:
+    - tools/tests/host32.py
     - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - exec/lease.h
@@ -315,6 +317,7 @@ checks:
     - sdk/include/os32/os32_gui_shared.h
     - sdk/include/os32/os32api.h
   check-vmkernel-lz4-host:
+    - tools/tests/host32.py
     - boot/boot_defs.h
     - boot/loader_fat_new.asm
     - boot/lz4_mini.c
@@ -325,6 +328,7 @@ checks:
     - tools/tests/vmkernel_lz4_host.c
     - include/types.h
   check-vk32-crc-host:
+    - tools/tests/host32.py
     - tools/tests/mutpar.py
     - boot/boot_defs.h
     - boot/loader_fat_new.asm
@@ -686,6 +690,7 @@ checks:
     - userland/libos32term_render/tests/render.rs
     - userland/libos32term_render/tests/rework.rs
   check-memory-host:
+    - tools/tests/host32.py
     - exec/redir_access.c
     - include/redir_access.h
     - sdk/include/os32/os32_generations.h
@@ -850,6 +855,7 @@ checks:
     - sdk/include/os32/os32_kapi_generated.h
     - sdk/include/os32/os32_kapi_shared.h
   check-memmap-host:
+    - tools/tests/host32.py
     - tools/tests/redir_access_stub.h
     - include/redir_access.h
     - userland/rust/libos32gui/src/shlib.rs
@@ -1266,6 +1272,7 @@ checks:
     - lib/kstring.h
     - platform/pc98/platform_io.h
   check-vfs-mount-dev-host:
+    - tools/tests/host32.py
     - sdk/include/os32/os32_generations.h
     - drivers/pc98pt.c
     - drivers/pc98pt.h
@@ -1347,6 +1354,7 @@ checks:
     - sdk/include/os32/os32_kapi_generated.h
     - sdk/include/os32/os32_kapi_shared.h
   check-con-sink-host:
+    - tools/tests/host32.py
     - sdk/include/os32/os32_generations.h
     - include/console.h
     - kernel/con_sink.c
@@ -1468,6 +1476,7 @@ checks:
     - sdk/include/os32/os32_kapi_generated.h
     - sdk/include/os32/os32_kapi_shared.h
   check-kbd-inject-host:
+    - tools/tests/host32.py
     - sdk/include/os32/os32_generations.h
     - kernel/kbd_inject.c
     - tools/tests/kbd_inject_host.c
@@ -1483,6 +1492,7 @@ checks:
     - sdk/include/os32/os32_kapi_generated.h
     - sdk/include/os32/os32_kapi_shared.h
   check-launch-host:
+    - tools/tests/host32.py
     - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - include/sys.h
@@ -1504,6 +1514,7 @@ checks:
     - sdk/include/os32/os32_kapi_generated.h
     - sdk/include/os32/os32_kapi_shared.h
   check-ring3-guard-host:
+    - tools/tests/host32.py
     - tools/tests/redir_access_stub.h
     - include/redir_access.h
     - sdk/include/os32/os32_generations.h
@@ -1561,6 +1572,7 @@ checks:
     - tools/tests/ring3_guard_host.c
     - tools/tests/test_ring3_guard.py
   check-ring3-str-host:
+    - tools/tests/host32.py
     - sdk/include/os32/os32_generations.h
     - exec/ring3_str.c
     - exec/ring3_str.h
@@ -1573,6 +1585,7 @@ checks:
     - sdk/include/os32/os32_kapi_generated.h
     - sdk/include/os32/os32_kapi_shared.h
   check-sh-launch-host:
+    - tools/tests/host32.py
     - sdk/include/os32/os32_generations.h
     - tools/tests/sh_launch_host.c
     - tools/tests/test_sh_launch.py
@@ -1581,6 +1594,7 @@ checks:
     - sdk/include/os32/os32_kapi_shared.h
     - sdk/include/os32/os32api.h
   check-sh-shell-host:
+    - tools/tests/host32.py
     - sdk/include/os32/os32_generations.h
     - tools/tests/sh_shell_host.c
     - tools/tests/test_sh_shell.py
@@ -1606,6 +1620,7 @@ checks:
     - sdk/include/os32/os32_kapi_shared.h
     - sdk/include/os32/os32api.h
   check-sh-truncation-host:
+    - tools/tests/host32.py
     - sdk/include/os32/os32_generations.h
     - kernel/pgalloc.h
     - kernel/physmem.h
@@ -1686,6 +1701,7 @@ checks:
     - sdk/include/os32/os32api.h
     - userland/lib/filer/filer_draw.h
   check-multiapp-model-host:
+    - tools/tests/host32.py
     - tools/tests/redir_access_stub.h
     - include/redir_access.h
     - sdk/include/os32/os32_generations.h
@@ -1828,6 +1844,7 @@ checks:
     - sdk/include/os32/os32_kapi_generated.h
     - sdk/include/os32/os32_kapi_shared.h
   check-b8-open-host:
+    - tools/tests/host32.py
     - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - drivers/pc98pt.c
@@ -1881,6 +1898,7 @@ checks:
     - sdk/include/os32/os32_kapi_generated.h
     - sdk/include/os32/os32_kapi_shared.h
   check-ext2-empty-name-host:
+    - tools/tests/host32.py
     - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - build/core.yaml
@@ -1926,6 +1944,7 @@ checks:
     - kernel/kmalloc.h
     - lib/kstring.h
   check-vfs-fd-path-host:
+    - tools/tests/host32.py
     - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - tools/tests/mutpar.py
@@ -2605,6 +2624,7 @@ checks:
     - lib/kstring.h
     - tools/tests/mutpar.py
   check-kstring-c-host:
+    - tools/tests/host32.py
     - lib/kstring_asm.asm
     - lib/kstring_c.c
     - tools/tests/kstring_c_host.c
@@ -2613,6 +2633,7 @@ checks:
     - include/types.h
     - tools/tests/mutpar.py
   check-kstr-bench-host:
+    - tools/tests/host32.py
     - sdk/include/os32/os32_generations.h
     - build/app.conf
     - lib/kstring_asm.asm
@@ -2629,6 +2650,7 @@ checks:
     - sdk/include/os32/os32api.h
     - tools/tests/mutpar.py
   check-sh-status-host:
+    - tools/tests/host32.py
     - sdk/include/os32/os32_generations.h
     - drivers/pc98pt.c
     - drivers/pc98pt.h
@@ -2893,6 +2915,7 @@ checks:
     - sdk/include/os32/os32_kapi_shared.h
     - sdk/include/os32/os32api.h
   check-cirrus-win-host:
+    - tools/tests/host32.py
     - sdk/include/os32/os32_generations.h
     - arch/x86/arch_io.h
     - drivers/np2sysp.h
@@ -2923,6 +2946,7 @@ checks:
     - tools/tests/mutpar.py
     - tools/tests/test_cirrus_win.py
   check-pegc-mode-host:
+    - tools/tests/host32.py
     - sdk/include/os32/os32_generations.h
     - arch/x86/arch_io.h
     - drivers/serial.h
@@ -2960,6 +2984,7 @@ checks:
     - tools/tests/test_pegc_mode.py
 
   check-shlib-high-host:
+    - tools/tests/host32.py
     - platform/pc98/platform_io.h
     - lib/kstring.h
     - kernel/tss.h
@@ -3063,6 +3088,8 @@ checks:
   - tools/tests/test_caller_access.py
 
   check-access-walk-host:
+  - tools/tests/host32.py
+  - tools/tests/test_host32.py
   - drivers/kbd.h
   - drivers/kbd_status.h
   - exec/lease.h
@@ -3132,6 +3159,7 @@ checks:
   - tools/tests/test_access_walk.py
 
   check-caller-copy-host:
+  - tools/tests/host32.py
   - drivers/kbd.h
   - drivers/kbd_status.h
   - exec/lease.h
@@ -3203,6 +3231,7 @@ checks:
   - tools/tests/test_caller_copy.py
 
   check-db-caller-host:
+  - tools/tests/host32.py
   - include/bootlog.h
   - include/pc98.h
   - kernel/cpu_calibrate.h
@@ -3303,3 +3332,77 @@ checks:
   - kernel/snd_engine.h
   - lib/path.h
   - sdk/include/os32/os32_gui_shared.h
+
+  check-surface-query-host:
+  - tools/tests/host32.py
+  - arch/x86/arch_cpu.h
+  - arch/x86/arch_io.h
+  - drivers/kbd.h
+  - drivers/kbd_status.h
+  - exec/access_walk.c
+  - exec/appslot.h
+  - exec/exec.h
+  - exec/lease.h
+  - exec/os32x_hdr.h
+  - exec/redir_access.c
+  - exec/surface_query.c
+  - exec/surface_query.h
+  - fs/fd_redirect.h
+  - fs/vfs.h
+  - include/bootinfo.h
+  - include/bootlog.h
+  - include/con_sink.h
+  - include/config.h
+  - include/console.h
+  - include/cpu.h
+  - include/io.h
+  - include/kbd.h
+  - include/kbd_inject.h
+  - include/kprintf.h
+  - include/ksetjmp.h
+  - include/launch.h
+  - include/memmap.h
+  - include/pc98.h
+  - include/redir_access.h
+  - include/sys.h
+  - include/tvram.h
+  - include/types.h
+  - kapi/kapi_db.h
+  - kernel/cpu_calibrate.h
+  - kernel/cpu_calibrate_math.h
+  - kernel/dma_pool.h
+  - kernel/gdt.h
+  - kernel/gui.h
+  - kernel/idt.h
+  - kernel/irq.h
+  - kernel/irq_math.h
+  - kernel/kmalloc.h
+  - kernel/kselftest.c
+  - kernel/kselftest.h
+  - kernel/ktime.h
+  - kernel/paging.c
+  - kernel/paging.h
+  - kernel/pgalloc.c
+  - kernel/pgalloc.h
+  - kernel/physmem.c
+  - kernel/physmem.h
+  - kernel/pit_math.h
+  - kernel/shlib.c
+  - kernel/shlib.h
+  - kernel/sysclk.h
+  - kernel/time_math.h
+  - kernel/tss.h
+  - lib/kstring.h
+  - platform/pc98/platform_io.h
+  - sdk/include/os32/os32_generations.h
+  - sdk/include/os32/os32_gui_shared.h
+  - sdk/include/os32/os32_kapi_generated.h
+  - sdk/include/os32/os32_kapi_shared.h
+  - tools/tests/host_arch/arch_cpu.h
+  - tools/tests/host_arch/arch_io.h
+  - tools/tests/mutpar.py
+  - tools/tests/test_access_walk.py
+  - tools/tests/test_surface_query.py
+  - tools/tests/surface_query_host.c
+  - tools/tests/access_walk_host.c
+  - tools/tests/pgalloc_host_fixture.h

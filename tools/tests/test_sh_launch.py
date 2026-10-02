@@ -12,6 +12,7 @@ test_launch.py (K 側) と同じ様式 — ホスト ILP32 GNU11 で走らせた
 (launch_req / launch_poll / sys_yield / kprintf) だけで、DONE / FAILED /
 STALE / FULL の 4 経路と「待ちの間 kbd_* / ime_* を呼ばない」を見る。
 """
+import host32
 import pathlib
 import subprocess
 import sys
@@ -43,7 +44,7 @@ if __name__ == "__main__":
                         "-nostdlib", "-static", "-no-pie",
                         str(HOST_SRC), "-o", str(exe)], cwd=ROOT, check=True)
         print("HOST ILP32 GNU11 COMPILE PASS", flush=True)
-        rc = subprocess.run([str(exe)], cwd=ROOT, timeout=30).returncode
+        rc = host32.run([str(exe)], cwd=ROOT, timeout=30).returncode
 
         stub = tmp / "sh_launch_target.c"
         stub.write_text(TARGET_STUB)

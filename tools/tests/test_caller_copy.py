@@ -33,6 +33,7 @@ MUTANTS = [
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--runner', choices=['native', 'qemu'], default='native')
     args = parser.parse_args()
     sources = {k: (walk.ROOT / p).read_text() for k, p in walk.FILES.items()}
     paths = [walk.ROOT / p for p in walk.FILES.values()] + [
@@ -56,19 +57,22 @@ int caller_access_page(const struct caller_access *a, u32 va, int write, u32 *pa
 }
 '''
     sources['redir_access'] = body
-    result = walk.run(sources, fixture='caller_copy_host.c')
+    result = walk.run(sources, fixture='caller_copy_host.c', runner=args.runner)
     print(result.stdout + result.stderr, end='')
     assert result.returncode == 0, result.returncode
+    print(f'PASS runner={args.runner}')
     if args.mutate:
         def one(m):
             old, new, name = m
             modified = dict(sources)
-            assert old in body, name
+            # These named mutations intentionally cover all exits of one contract.
+            expected = {'missing IRQ interval': 10, 'range overflow': 2, 'unconditional STI': 4, 'trusted range preflight': 2}.get(name, 1)
+            assert body.count(old) == expected, (name, body.count(old))
             # IRQ restore mutation intentionally covers every copy exit;
             # shared range bound mutation also hits redirect's same contract.
             modified['redir_access'] = body.replace(old, new)
             start = time.monotonic()
-            r = walk.run(modified, fixture='caller_copy_host.c')
+            r = walk.run(modified, fixture='caller_copy_host.c', runner=args.runner)
             assert r.returncode != 0 and 'FAIL:' in r.stdout, (name, r.returncode, r.stdout, r.stderr)
             return name, time.monotonic() - start
         for name, seconds in run_ordered(one, MUTANTS):

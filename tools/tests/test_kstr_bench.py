@@ -31,6 +31,7 @@ tools/tests/kstr_bench_host.c が実物の userland/tests/kstr_bench.c を 1 行
 
 make・エミュレータ・実配備には一切触れない。
 """
+import host32
 import os
 import pathlib
 import re
@@ -255,7 +256,7 @@ def build_real(tmp):
 
 
 def execute(exe):
-    p = subprocess.run([str(exe)], cwd=str(ROOT), timeout=900,
+    p = host32.run([str(exe)], cwd=str(ROOT), timeout=900,
                        capture_output=True, text=True)
     return p.returncode, p.stdout, p.stderr
 

@@ -2,6 +2,7 @@
 Run: python3 tools/tests/test_physmem.py
 Uses real ILP32 types.h and GNU11 core, no libc/multilib runtime required.
 """
+import host32
 import pathlib
 import subprocess
 import tempfile
@@ -42,7 +43,7 @@ void _start(void) {
                 str(src), str(ROOT / 'kernel/physmem.c'), '-o', str(exe)
             ] + list(flags), capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
-            result = subprocess.run([str(exe)])
+            result = host32.run([str(exe)])
             self.assertEqual(result.returncode, 0,
                              'C CHECK failed at line ' + str(result.returncode)
                              + '\n' + src.read_text())

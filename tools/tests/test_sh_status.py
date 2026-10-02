@@ -28,6 +28,7 @@ Make・エミュレータは使わない。
 なので、それぞれをわざと壊した版を作って**試験が落ちること**を見る。
 GREEN のまま通ってしまう変異があれば、その規則を試験が見ていないということ。
 """
+import host32
 import os
 import pathlib
 import subprocess
@@ -109,7 +110,7 @@ def run_variants(tmp, shim, prefix):
     bad = 0
     for vname, extra in VARIANTS:
         exe = build_host(tmp, shim, "%s-%s" % (prefix, vname), extra)
-        rc = subprocess.run([str(exe)], cwd=ROOT, timeout=60).returncode
+        rc = host32.run([str(exe)], cwd=ROOT, timeout=60).returncode
         if rc != 0:
             bad += 1
     return bad
@@ -342,7 +343,7 @@ def one_mutation(item):
                 red = True
                 continue
             compiled = True
-            rc = subprocess.run([str(exe)], cwd=str(tree), timeout=60,
+            rc = host32.run([str(exe)], cwd=str(tree), timeout=60,
                                 capture_output=True).returncode
             if rc != 0:
                 red = True
@@ -369,7 +370,7 @@ if __name__ == "__main__":
         for vname, extra in VARIANTS:
             exe = build_host(tmp, shim, "sh_status-" + vname, extra)
             print("HOST ILP32 GNU11 COMPILE PASS (%s)" % vname, flush=True)
-            rc = subprocess.run([str(exe)], cwd=ROOT, timeout=60).returncode
+            rc = host32.run([str(exe)], cwd=ROOT, timeout=60).returncode
             print("EXIT sh_status_host(%s)=%d" % (vname, rc), flush=True)
             failed += rc != 0
 

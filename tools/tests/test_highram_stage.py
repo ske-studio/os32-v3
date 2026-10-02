@@ -1,6 +1,7 @@
 """Real model + allocator + paging + sys; only privileged I/O substituted.
 32/64 here denote modeled MiB; execution uses real target ILP32 types.
 """
+import host32
 import pathlib
 import subprocess
 import tempfile
@@ -23,7 +24,7 @@ class Stage(unittest.TestCase):
             cmd += ['-I' + str(ROOT / 'tools/tests/host_arch')]
             cmd += ['-I' + str(ROOT / p) for p in ('include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'drivers', 'sdk/include/os32')] + ['-I' + str(d)]
             subprocess.run(cmd + [str(ROOT / 'tools/tests/highram_stage_host.c'), str(ROOT / 'kernel/physmem.c'), '-o', str(d / 'test')], check=True)
-            subprocess.run([str(d / 'test')], check=True, timeout=60)
+            host32.run([str(d / 'test')], check=True, timeout=60)
 
     def test_irq_off(self):
         self.run_case('irq_off')

@@ -1,6 +1,7 @@
 """T2c high private image/heap/variable stack and low shared BB; actual paging,
 ledger and fixed KHEAP. Mutants must compile and fail during execution.
 """
+import host32
 import pathlib
 import subprocess
 import sys
@@ -97,7 +98,7 @@ def run(mutation=None):
             if mutation:
                 return 'compile'
             raise subprocess.CalledProcessError(build.returncode, cmd)
-        out = subprocess.run([str(exe)], timeout=60, capture_output=bool(mutation))
+        out = host32.run([str(exe)], timeout=60, capture_output=bool(mutation))
         if mutation:
             return 'ok' if out.returncode == 0 else 'fail'
         if out.returncode != 0:

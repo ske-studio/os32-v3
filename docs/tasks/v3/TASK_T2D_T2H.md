@@ -45,6 +45,7 @@ T2a / T2a′ / T2b / T2c の実装結果、レビュー対応、PM受入は親�
 ### 0-2. 全段で固定する判断
 
 - D35の4世代は上記JSONから全言語へ生成。追記APIの機能版は着地時の正典に対して上げ、番号の未来予約を本票で作らない。スロット整理はP7、構造体返却は使わずint/u32とchecked out。公開構造体はC89 [ABI1]〜[ABI3]。
+- **ユーザー決定 (2026-10-02)**: T2e の query 等の公開 KAPI は **e11 でまとめて公開**する。e1〜e10 は既存経路につながないカーネル内部の準備として単独着地可。上の「追記APIの機能版は着地時」は T2e では **e11 の着地時**と読む。`sdk/kapi.json` の登録・機能版更新は e11 の全切替で1回、memory 世代更新も従来どおり e11。e11 の「単独で部分配備しない」は公開切替を指し、未接続の準備の着地を禁じない。
 - T2d〜T2eのheapは**PM決定2の挙動維持**。旧1/2 PDE、旧物理上端、sbrk二段選択を残す。fの公開切替だけで撤去する。高位VAを旧物理予算へ渡さない。
 - T2e前の共有USERは移行期間、最終隔離の合格ではない。低位の物理配置はeで動かさない。T2f前に初期heapを縮めない。
 - 公開エラーは既存 `OS32_ERR_INVAL` (不正/権限)、`OS32_ERR_STALE` (-11、既存番号。識別可能な旧generation/失効token)、`OS32_ERR_FULL` (固定表)、`OS32_ERR_NOSPC` (物理/PT不足)へ対応させる。**OS32_ERR_NOMEMは現正典に無い**。内部LEASE_NOMEMと公開番号を同一視しない。mapはNULL、SDKはENOMEM。内部には物理不足/VA不足/表不足/不正の理由を残し、gの通知判定に使う。
@@ -195,7 +196,7 @@ Unicodeはkernel所有FIXED_RAM/RO SURFACE。ユーザー版utf8だけsetterでl
 
 | 小段 (各45〜75分) | 成果 / 閉じる試験 |
 |---|---|
-| e1 | 公開desc/エラー/授権とquery。偽owner/旧ref/GUI DISPLAY拒否 |
+| e1 | 公開予定desc/エラー/授権とqueryの内部準備。偽owner/旧ref/GUI DISPLAY拒否。実装・試験・サイズ・単独着地の扱いは下記「e1 実装結果」 |
 | e2 | 単面公開lease + copyout rollback。`lease.c:158 walk_enter/leave`のmaster往復を除去、保存caller/管理PD/PTをP2VでwalkしIF/CR3不変。FULL/PT不足/out不変 |
 | e3 | DISPLAY4面束 + native UC。最後の面失敗で全巻戻し、cache全alias一致 |
 | e4 | backend→kernel fb/geometry。実3backendの選択と200/400行 |
@@ -214,6 +215,200 @@ Unicodeはkernel所有FIXED_RAM/RO SURFACE。ユーザー版utf8だけsetterでl
 実ソース `test_lease.py` / `test_gfx_boot.py` とSDK呼出しを連結し、backendを選ぶだけの模型で終えない。変異は旧bb pointer、plane stride丸め、片実体だけ再attach、GUI DISPLAY許可、UC落ち、共有PT書込み許可、revoke前free、V86後PDE USER復元欠落、teardownのPCD欠落、SHM lock/free/回収後USER欠落、束generation照合削除、fontのboot終了ガード除去。既存10 lease変異の意図も保持。
 
 NP21/Wは8MB planar/PEGC、17MB planar/PEGC/Cirrus。日本語/描画/present、GUI→CUI→GUI、全画面DISPLAY、通常GUIの低位VRAMとdevice直書きkill、S/T/Uと片側revoke、cirrus-off強制指定fallback、V86復元後のalias_cache一致とDISPLAY/TVRAM再lease、SHMの2本目書込み、boot後font_load_testのNOSYS/表・BB不変を確認。ring3_guard旧Eの「低位BB生存」はここから**拒否へ更新**し、正規CLIENT leaseで生存する対照を追加。Bはshlib実ロード後にPTE P/U/ROかつPF error=7、Aは実stack直下NPかつerror=6を確認する。Ra266のPEGC/日本語/全画面とUCはhへ。予算は§6のe枠。
+
+### e1 実装結果 (コーダー、2026-10-02)
+
+モデル: GPT-6 (Codex)。基点 `531baf4`、worktree `wt/t2e1`。
+`exec/surface_query.[ch]` に公開予定の値の記述子 (60B、4面の結果244B)、
+既存エラーへの変換、共通授権、ref照合、B1 queryを追加した。
+公開型はまだSDKに出さず、ポインタ/物理/owner/cacheを含めないu32欄だけ。
+queryは参照数もASのlease表も変えない。
+
+**今の挙動を保つ具体化**: e4/e5/e8のpublisherがまだ無いため、
+内部だけの `surface_query_source` に選択backend・ready・role・順序付きrefを渡す。
+ユーザー入力ではなく、将来のkernel publisherが呼出し直前に作る値である。
+e1はpublisher、初期化/再init経路、KAPI呼出しを追加しない。
+ready=0/未登録/NONE面は拒否。TVRAM/Unicodeはbackend=0、UnicodeはROのみ。
+CLIENT/DISPLAYは選択backendと台帳のrole/backendを一致させる。
+通常CLIENTは1記録 (planarでも4planeを内包)、planar DISPLAYのquery結果は4記録。
+このsnapshot検査はe1の値の準備で、4面のlease取得・登録はe3へ残す。
+CUI前景は保存callerとcurrent slot/resource owner/CR3が一致するRUNNING USERと解釈し、
+WMの `g_gfx_owner` をCUIの授権条件にしない。物理ownerと利用者を分離する。
+GUIではGFX宣言付きCLIENTとDISPLAYにFを要求し、通常GUI CLIENTにはG不要。
+bootで通常AS開始前の要求、TRUSTED、WM代理、park中、失効callerを拒否する。
+旧generation/closing/登録解除はSTALE、範囲外sid/面欠落/重複/現行の別束/権限違反はINVAL。
+範囲内の未使用slotはSTALE (generation=0の入力はINVAL)。
+入力の範囲/gen≠0/重複を先に検査する。sidが変わった旧refも台帳の
+世代不一致/closing/npages=0ならSTALE、現行の別面が混ざればINVAL。
+再initでsid不変とは約束しない。
+
+**単独着地・配備**: 既存の呼出し経路に接続していないため、既存GUI/CUI/アプリの
+挙動は変更しない。buildに追加した新TUはコンパイルされるが、未参照なので
+`--gc-sections` が本体から除去する (map/nmで確認)。KAPI slot、機能版69、
+形式/ABI/memory/shlib世代、SDKと生成物は無変更。ABI変更によるcleanや外部再ビルドは
+e1では不要。e11で[ABI1]〜[ABI3]の生成・版更新・clean→allを行う。
+これは未配備のコード経路上の判断で、ゲスト動作確認の合格ではない。
+
+**e2以降への穴**: e2はUSER refsをB1でstagingへコピーしてから
+`surface_query_refs` を使い、同じ保存caller/sourceで取得・copyout・失敗時rollbackを
+行う。今のhelperはkernel staging専用で、任意owner/ASの公開引数を作らない。
+既存leaseのmaster往復、枯渇理由の内訳、token失効は未変更。
+e3のDISPLAY登録/束取得、e4以降の実backend/ready publisher、e5のモード切替と世代、
+e8のUnicode/TVRAM登録、e11のKAPI wrapper/SDK公開は未実装。
+sourceの生成からsnapshot/取得完了までcallback/schedulingを挟まない契約を引き継ぐ。
+
+**試験**: `tools/tests/test_surface_query.py` は実query + T2d caller/copy/walk +
+paging/pgallocを実行。MMU/IRQだけを既存host足場に置換し、低位固定64KiBスタックへ
+切替える (高位entry stackの正常対照)。正常な台帳登録から作る4面、GUI/CUI×role×G/F、
+3backend、ready/boot/gshell owner、偽caller owner/旧AS generation/別current/park/WM、
+旧ref・最後の面・重複・RO、B1のNULL/overflow/RO/次NPとout不変、会計/IF/CR3不変を確認。
+初稿版 (最初の独立レビュー前) はqemu-i386正常対照rc=0、
+**22/22がコンパイル成功後のruntime RED**。今回のRequest changes対応版は
+正常対照rc=0・**33/33 runtime RED** (明示qemu、PYTHONPATHなし)。
+通常の実ソース閉包を一組で1回だけコンパイルし、変異は新TUだけを再コンパイル/リンク。
+初稿の中央値0.23秒、最大0.28秒、全木コピー・変異ごとのmakeなし。
+最初の足場は台帳createをUSER CR3のまま呼んでrc=1、登録時だけmasterへ戻して修正。
+初回のTRUSTED拒否削除はB1の別防御で生存したのでREDに数えず、
+共通ref授権への直接負例を追加して22本すべてruntime REDを確認した。
+**Linux nativeはSIGSYS (signal 31、sandboxのint 0x80制限)で実行不可**。
+qemuへの自動fallbackでnative合格に見せず、`--runner native` は明示失敗する。
+PMが制限のないLinuxで **PYTHONPATHのqemu補助を外して** native正常対照PASS・
+変異23/23 runtime REDを確認した (PM報告、最初の独立レビュー対応版)。
+これは今回の33本の版とは異なる。旧版のnative/qemu両方PASSは達成済み。
+今回の追加分のnative実行は未確認。ゲスト/構成依存は§12の方針を継承。
+
+| 同一cross toolchain実測 | 基点clean | e1未コミット (-dirty) |
+|---|---:|---:|
+| kernel.bin | 363,216 B | 363,220 B |
+| vmkernel.lz4 | 480,677 B | 480,697 B |
+| __bss_end | 0x18C270 | 0x18C270 |
+| 本体占有 | 574,064 B | 574,064 B |
+| ASSERT残り | 36,240 B | 36,240 B |
+| e枠の実消費 / 残り | 0 / 16,384 B | 0 / 16,384 B |
+
+新objectはtext 1,255B・data/BSS 0B。未参照除去による実消費0を将来の無料実装と
+扱わず、e11の接続時に少なくともこのtextと整列を再計上する
+(1,255Bを見込んだe残枠は15,129B、接続時の実測は未実施)。
+AS/AppSlot/SURFACEの常駐サイズは無変更。ASSERT緩和なし。
+
+`CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp
+NP21W_DIR=/home/hight/os32-tmp/e1-unused-destination make all < /dev/null` は
+基点・e1ともrc=0。FDコピー先は存在しない一時パスに限定し、コピー警告を確認。
+通常のGNU-stack/RWX等の既存警告あり。実NP21/W・NHD・配備・ini・commit/pushは未操作。
+検査を `build/sdk.mk` / `tools/check_map.yaml` / 生成 `docs/TESTS.md` に結線し、
+`make check-map` は115検査・漏れ0件、rc=0。`gen_memmap.py --write` はrc=0で差分なし。
+親票、TASK_MEMMAP_V3、状態行は変更していない。
+ログは `/home/hight/os32-tmp/e1-{baseline,all,query,mutations,native}.log`。
+
+**初稿版の最終検査 (過去の記録)**: PATHにcross/bin、既存のELF32用qemu補助
+`PYTHONPATH=/home/hight/os32-tmp/d0b-host-runner`、上記NP21W_DIRを設定し、
+`CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp
+make check-changed < /dev/null` を**最後に1回だけ実行しrc=0**。
+`build/kernel.mk`のソース一覧変更で選択器はfullとなり、全検査・全変異を実行した。
+初稿版のe1は22/22 runtime RED (全体並行時の中央値1.12秒・最大1.30秒)、
+C方言27/27 RED・正常対照5/5 GREEN。既存Windows opt-inは単独4件・集約5件skip。
+ログ: `/home/hight/os32-tmp/e1-check-changed.log`。
+検査中はソース無変更、終了後はこの結果の記録だけを追記した。
+**旧版のall/check-changedとnative/qemu両方PASSは達成済み**
+(nativeは上記PMの実行結果。コーダーのsandboxでのSIGSYSとは分けて記録する)。
+
+**e2への申し送り (e1レビューP3-3)**: `lease_acquire` はgeneration不一致を
+LEASE_INVALで返し、`surface_query_error` はSTALEを作れない。
+`surface_query_refs` は出口でIRQを戻すため、e2はrefs照合からacquireまで
+同じIRQ保存区間に入れるか、acquire側でSTALEを区別すること。
+`surface_query_authorize` の返すcallerも呼び手のIRQ保存区間内でだけ有効。
+**e2への申し送り (e1の3回目のレビューN-1、P3)**: 'IF restore' の変異は`surface_query()`の出口だけに
+絞られ、`surface_query_refs()`の出口 (`done:` の `irq_restore(flags)`) のIF復元を壊す変異が無い。
+e2でrefsの出口を結線し直すときに、その出口に一意に当たる変異を足し、refsの後のIF確認でREDになることを見る。
+
+**e1レビュー修正 (2026-10-02、基点6080946)**: P2-1は下位slotが空いた実台帳で
+release→createしてsid変更を作り、旧束STALE・旧/現行別面の混在INVALを確認。
+入力重複・範囲外sid・gen=0はINVAL (範囲内の未使用slotはSTALE)。P3-1のsystem role定数は`kernel/pgalloc.h`の
+LEDGER_ROLE_*へ移動。P3-4のCLIENT/DISPLAY backend上下限、system backend≠0、
+PEGC DISPLAY count=4の負例と変異を追加した。前回レビュー対応版は
+qemu正常対照rc=0、28/28 runtime RED。今回版は5変異追加で33/33 runtime RED。
+途中の変異1本は未使用変数のコンパイルエラーでREDに数えず、変異を直して再実行した。
+P2-2は`HOST32_RUNNERS ?= native qemu`でT2d/T2eの4試験だけ全runnerを正常対照、先頭だけ変異とし、
+access_walkも同じ方式へ変更 (qemu正常対照rc=0、33/33 runtime RED)。自動fallbackなし。
+CIのaptへqemu-userを追加。CodexではHOST32_RUNNERS=qemuを明示する。
+
+**main CIの赤**: d6ログはcase_mk_new_checkの`shutil.copytree`中に
+`.git/objects/maintenance.lock`が消える競合で、case_mk_real_treeはPASS。
+履歴を使う試験は既に自前fixtureなのでfetch-depth=1を維持する。
+fixtureのcommit前にmaintenance.auto=false/gc.auto=0を設定し、global設定からの
+隔離も回帰試験へ追加。depth 1 clone (`--is-shallow-repository=true`)は修正前25/25・rc=0、
+修正後26/26・rc=0。コピー時のlock消失を決定的に注入すると修正前rc=1
+(提供CIと同じENOENT)、修正後rc=0。
+ログは `/home/hight/os32-tmp/e1r-{shallow-before,shallow-after,race-before,race-after}.log`。
+取得したActionsログでもd3はcase_mk_real_tree、d5はcase_mk_negativeの同じlock消失、
+d4は25/25 PASSが2回だった。失敗箇所が変わる競合で、d4では発生しなかった。
+履歴不足による失敗ではない (run 36939542806 / 36953762147 / 36945743667)。
+
+**3回目レビュー対応 (PMの範囲限定)**: 全runnerの正常対照は
+check-access-walk-host / check-caller-copy-host / check-db-caller-host /
+check-surface-query-host の4本だけ。既存試験はexportされた先頭runnerで1回実行する。
+check.ymlは4本を呼ばないためqemu-user不要、build.ymlはqemu-userを導入する。
+recipe末尾の`;`を入力抽出時に除去し、回帰試験とhost32.pyの入力globを追加。
+kstring_cのILP32呼出しもhost32化。nativeは読めるbinfmt_miscに有効なi386 ELF登録があれば拒否する。
+SIGSYSだけrunner不備、他signalは `signal N (runner=…)` と負の終了値で試験失敗を伝える。
+closingのsnapshot側と別sid側は独立した変異にし、4試験の置換当たり数を固定した。
+複数出口を意図的に壊すcaller_copy/db_callerの変異には期待数を明記する。
+qemu正常対照の壁時計 (コンパイル込み、秒): access_walk 0.62、caller_copy 0.35、
+db_caller 0.42、surface_query 0.41。変異は順に33/18/15/33本、すべて実行時RED。
+
+**Request changes対応 (P2-A、P3-a〜h)**: caller_copy/db_callerにもrunner引数を
+渡し、4試験とも正常対照はHOST32_RUNNERSの全runner、変異は先頭で実行する。
+共通host32.py (walk.run_host32からも呼ぶ) はnative時にsubprocess.run/Popenの実装ファイルを標準ライブラリと
+照合し、sitecustomize等による差し替えを拒否する (差し替え拒否の補助確認rc=0)。
+PYTHONPATH除去で既存ILP32試験にもSIGSYSが見つかったため、既存ILP32試験の
+実行呼び出し (b8のストリームPopenを含む) にも同じrunnerを適用した。
+既存試験のrecipeは単純なpython3呼出しに戻し、正常対照・変異ともexportしたHOST32_RUNNERSの先頭だけで実行する。全runnerの正常対照は上記4試験に限定する。subprocess差し替えなし。
+別sidのclosing=1/npages>0/世代一致と世代不一致を負例へ追加し、sid上限・gen=0・
+世代一致・closing・npagesの単独変異を追加。sid変更のstale変異は分岐の1か所だけ。
+旧sidの現行別面への再利用をCHECK(fourth == old.sid)で固定した。
+maintenance回帰はGIT_TRACE2_EVENTでfixture commitの実行とmaintenance/gc子プロセス
+不在を確認し、設定をcommit後へ動かす変異1本がRED。build_idの一時repoと
+サブモジュールにもmaintenance.auto=false/gc.auto=0をcommit前に設定する。
+HOST32_RUNNERSの運用はdocs/08_build.md §8-4に明記。生成器がMUTATE=1の条件分岐を
+展開してdocs/TESTS.mdを再生成した (生成物の手編集なし)。
+
+**e11への申し送り (e1レビューP3-g)**: STALEとINVALの違いから任意の(sid, gen)が
+現行かを推測できる。lease取得にはsource一致も必要なので権限昇格にはならない。
+e11の公開KAPI文書へこの情報の違いを注記すること。
+
+**今回の最終検証と未達条件**: 全コマンドでPYTHONPATHを除去、
+CROSS_DIR=/home/hight/opt/cross、TMPDIR=/home/hight/os32-tmp、PATHにcross/bin、
+NP21W_DIRは存在しない一時コピー先 `/home/hight/os32-tmp/e1rr-unused-destination`。
+`CROSS_DIR=/home/hight/opt/cross make all < /dev/null` はrc=0 (最終allもrc=0)。
+最初のenv起動はPATH空白の引用漏れでrc=127・make未起動、引用を直して実行した。
+`python3 tools/gen_memmap.py --write` はrc=0・追跡差分なし。
+`CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp
+HOST32_RUNNERS=qemu make check-changed < /dev/null` は2回ともrc=2。
+初回は既存vmkernel_lz4/vk32_crc/shlib_high/hdd_stage2の直接native実行によるSIGSYS。
+2回目は追加したhost32.py/test_host32.pyのcheck_map登録漏れ20件が唯一の失敗。
+漏れを修正し、事後の `python3 tools/check_select.py --lint` は115検査・漏れ0件・rc=0。
+全体検査は指定上限2回に達したので、修正後の3回目は未実行・追加承認待ち。
+したがって**今回版の全体check-changed rc=0条件は未達**。
+2回目の実行済みC方言検査は27/27 RED・正常対照5/5 GREEN。
+
+事後の4試験一括検証 (`make check-access-walk-host check-caller-copy-host
+check-db-caller-host check-surface-query-host < /dev/null`、明示qemu、補助PYTHONPATHなし)
+はrc=0。正常対照PASS、walk 33/33・caller_copy 18/18・db_caller 15/15・
+surface_query 33/33が全てコンパイル成功後のruntime RED (計99本)。
+host32のrunner/差し替え拒否/signal回帰は5/5 PASS。
+選択器の事後補助検査 `python3 -B tools/tests/test_check_select.py --mutate` は
+rc=0、正常対照26/26 PASS・既存44変異＋maintenance順序変異1本がRED。
+runner化により古いledger recipeの文字列を参照した実物fixtureが25/26 PASSで失敗したため、
+同じ型の単純recipeが残るtime_mathへ試験対象を更新した (選択器本体の判定は無変更)。
+補助check-fastはrc=2 (highramの直接実行とb8のstream Popenを補修)。
+共通runner導入中のgfx変異でsignal判定の差を検出し、補助check-memory-hostはrc=2。
+当時は今回4試験の全signalを拒否していた。3回目レビュー対応ではSIGSYSだけをrunner不備とし、他のsignalは負のreturncodeを返す試験失敗へ統一した (4試験の変異は引き続きFAIL出力が必要)。
+b8補助再検査rc=0、gfx正常対照18/18 PASS・14/14変異RED・rc=0。
+今回版のnativeはsandboxのSIGSYS制限のため未実行でPMへ委ねる。
+commit/push・実NP21/W・NHD・配備・iniは未操作。
+ログ: `/home/hight/os32-tmp/e1rr-{all-final,check-changed-final,four-final,
+select-final-fixed,fast,legacy-fixes,b8,gfx}.log`。
+
 
 ## 3. T2f — map/unmapとallocator、暫定heap終了
 

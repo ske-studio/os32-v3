@@ -19,6 +19,7 @@
 ことを見る。中心は「浮動番地の規則を固定番地の境界より優先させない」こと —
 そこを崩すと自己診断そのものが穴を隠す。
 """
+import host32
 import argparse
 import pathlib
 import re
@@ -155,7 +156,7 @@ def build_and_run(tmp, case, mutation=None, kb=8192, initial_if=0x202):
                     str(ROOT / 'kernel/physmem.c'), str(ROOT / 'kernel/kmalloc.c'),
                     str(ROOT / 'exec/exec_heap.c'),
                     '-o', str(exe)], check=True)
-    return subprocess.run([str(exe)], capture_output=True, timeout=60)
+    return host32.run([str(exe)], capture_output=True, timeout=60)
 
 
 def main():

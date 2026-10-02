@@ -13,6 +13,7 @@ ILP32 freestanding でコンパイルして走らせる。tools/tests/test_pgall
 最後に同じ exec/exec.c がクロスコンパイラのカーネルフラグで通ることも確かめる
 ([C1] GNU11)。
 """
+import host32
 import pathlib
 import subprocess
 import sys
@@ -63,7 +64,7 @@ def run(source, mutant=False):
                         "-I" + str(tmp), *includes, str(SRC), "-o", str(exe)],
                        cwd=ROOT, check=True)
         print("HOST ILP32 GNU11 COMPILE PASS", flush=True)
-        result = subprocess.run([str(exe)], cwd=ROOT, timeout=60, capture_output=mutant)
+        result = host32.run([str(exe)], cwd=ROOT, timeout=60, capture_output=mutant)
         if mutant:
             if result.returncode == 0: raise SystemExit("budget mismatch mutant survived")
             print("budget mismatch mutant: runtime RED (compile success)", flush=True)

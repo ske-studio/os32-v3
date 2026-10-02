@@ -14,6 +14,7 @@ userland/shell/cmd_script.c をそのまま #include する (模型ではない)
 libc は使わない (-nostdlib) ので、shell.h が引く <string.h> だけ一時
 ディレクトリに薄いシムを置く (test_owner_reclaim.py と同じやり方)。
 """
+import host32
 import pathlib
 import subprocess
 import sys
@@ -66,7 +67,7 @@ if __name__ == "__main__":
                         "-nostdlib", "-static", "-no-pie",
                         str(HOST_SRC), "-o", str(exe)], cwd=ROOT, check=True)
         print("HOST ILP32 GNU11 COMPILE PASS", flush=True)
-        rc = subprocess.run([str(exe)], cwd=ROOT, timeout=30).returncode
+        rc = host32.run([str(exe)], cwd=ROOT, timeout=30).returncode
 
         subprocess.run(["i386-elf-gcc", *BASE, "-O2", "-nostdlib",
                         "-mno-red-zone", "-fcommon", *shim, *INCLUDES,

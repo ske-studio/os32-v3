@@ -1,4 +1,5 @@
 """Real ILP32 allocator/model integration; privileged IRQ only is substituted."""
+import host32
 import pathlib
 import subprocess
 import tempfile
@@ -95,7 +96,7 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
             cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie', '-ffunction-sections', '-finstrument-functions', '-Wl,--gc-sections']
             cmd += ['-I' + str(ROOT / p) for p in ('include', 'kernel', 'lib', 'drivers', 'sdk/include/os32')]
             subprocess.run(cmd + list(flags) + [str(tmp / 'test.c'), str(ROOT / 'kernel/physmem.c'), '-o', str(tmp / 'test')], check=True)
-            result = subprocess.run([str(tmp / 'test')])
+            result = host32.run([str(tmp / 'test')])
             self.assertEqual(result.returncode, 0, 'C CHECK failure (250 = IRQ/commit invariant): ' + str(result.returncode) + '\n' + (tmp / 'test.c').read_text())
 
     def test_metadata_failure_transactions(self):

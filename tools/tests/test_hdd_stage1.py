@@ -23,6 +23,7 @@
   python3 -B tools/tests/test_hdd_stage1.py --target   # + i386-elf -Werror で新しいソース
   python3 -B tools/tests/test_hdd_stage1.py --mutate   # 否定側 (変異が RED になるか)
 """
+import host32
 import hashlib
 import importlib.util
 import os
@@ -226,7 +227,7 @@ PY_MUTATIONS = [
 
 
 def run(cmd, **kw):
-    return subprocess.run(cmd, cwd=ROOT, **kw)
+    return host32.run(cmd, cwd=ROOT, **kw)
 
 
 # ======================================================================== #
@@ -292,7 +293,7 @@ def fsck_image(exe, start, size, tmp, quiet=False):
     """format_at の像を書き出して e2fsck -fn。clean なら 0。"""
     img = pathlib.Path(tmp) / f"fa_{size}.img"
     with open(img, "wb") as f:
-        r = subprocess.run([str(exe), "dump", str(start), str(size)], stdout=f)
+        r = host32.run([str(exe), "dump", str(start), str(size)], stdout=f)
     if r.returncode != 0:
         if not quiet:
             print(f"  dump {size}: exit {r.returncode}")
