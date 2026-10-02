@@ -2,7 +2,7 @@
 
 > 発行: PM (2026-09-06) / 状態: **受入完了 (2026-09-07)**
 > レーン: C / 前提: C4 + W4 + W3 session request  
-> 親: [TASKS.md](../../tasks/gui/v12/TASKS.md) / 契約: [CONTRACTS.md](../../tasks/gui/v12/CONTRACTS.md) V12-F  
+> 親: [TASKS.md](TASKS.md) / 契約: [CONTRACTS.md](../../tasks/gui/v12/CONTRACTS.md) V12-F  
 > 排他: `userland/rust/filer/**`、必要な build/deploy 登録は PM 経由
 
 ## ゴール

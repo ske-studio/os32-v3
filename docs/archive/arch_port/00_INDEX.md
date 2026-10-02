@@ -65,5 +65,5 @@ PC-9801/9821 のハードウェアに密着している。
 | [../../CONSTRAINTS.md](../../CONSTRAINTS.md) | [HW1] [HW2] [V1]〜[V3] は PC-98 と NP21/W に固有。移植先では別の規則に置き換わる ([C1]〜[C4] は維持できる) |
 | [../../02_memory.md](../../02_memory.md) | 現行の番地体系。軸 B の比較対象 |
 | [../../09_exec.md](../../09_exec.md) | 実行モデルと KAPI 呼び出し。軸 A の比較対象 |
-| [../gui/DESIGN.md](../gui/DESIGN.md) | GFX の HAL / バックエンド構成。軸 C で新バックエンドを足す枠組み |
-| [../../archive/v21/v86v2/README.md](../../archive/v21/v86v2/README.md) | V86 サブシステム。x86 以外では原理的に回収できない資産 |
+| [../gui/DESIGN.md](../../tasks/gui/DESIGN.md) | GFX の HAL / バックエンド構成。軸 C で新バックエンドを足す枠組み |
+| [../../archive/v21/v86v2/README.md](../v21/v86v2/README.md) | V86 サブシステム。x86 以外では原理的に回収できない資産 |

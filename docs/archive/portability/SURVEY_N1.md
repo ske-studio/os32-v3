@@ -1,6 +1,6 @@
 # SURVEY_N1 — N1 で触れた / 見つけた CPU アーキテクチャ依存
 
-発行: コーダー (2026-09-14、票 [TASK_N1](../../archive/network/TASK_N1.md) 段 7、ユーザー指示)。
+発行: コーダー (2026-09-14、票 [TASK_N1](../network/TASK_N1.md) 段 7、ユーザー指示)。
 
 対象は **N1 の実装で実際に触れた場所と、その周辺を grep して見つけた場所**だけ。
 移植そのものは行っていないので、ここに書くのは「N1 で直した」「残っている (場所と理由)」
@@ -391,4 +391,4 @@ wrap を引く)。番地の固定自体は (f) の話。
 `kernel/gdt.c` / `kernel/tss.c` / `kernel/paging.c` の `cr0`/`cr3`、
 `gfx/gfx_internal.h:52` の移設は、移設の単位 (関数かファイルか) と移設先の
 判断が要るので次の票へ送った。ARM 計測で (a) に残っている 5 本がそれ
-([`ARM_GAUGE.md`](ARM_GAUGE.md) §9)。
+([`ARM_GAUGE.md`](../../tasks/portability/ARM_GAUGE.md) §9)。

@@ -2,7 +2,7 @@
 
 > 発行: PM (2026-09-06) / 状態: **受入完了 (2026-09-07)**
 > レーン: W / 前提: K5  
-> 親: [TASKS.md](../../tasks/gui/v12/TASKS.md) / 契約: [CONTRACTS.md](../../tasks/gui/v12/CONTRACTS.md) V12-S / V12-D  
+> 親: [TASKS.md](TASKS.md) / 契約: [CONTRACTS.md](../../tasks/gui/v12/CONTRACTS.md) V12-S / V12-D  
 > 排他: `userland/gshell/**`
 
 ## ゴール

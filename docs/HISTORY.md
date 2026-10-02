@@ -149,7 +149,7 @@ v3 に先行して着地したもの: 結線の土台 (HAL_WIRING)、PCM CS4231�
 | 2026-09-24 | **v3 分岐前の区切りをタグ v2.1 にする**。**既存アプリは全部自作なので旧バイナリ互換より全再ビルド + 安い検出** (互換層は作らない) | ROADMAP §0、`docs/archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md` |
 | 2026-09-25 | MINIMAL を「起動・HDD への導入・回復」に絞る (フォントと一般コマンドは NORMAL へ)。インストール後の実機 HDD の e2fsck は行わない。レビュアーは Codex だけ | RELEASE_v2.1 §4、ROLES §0 |
 | 2026-09-26 | 検査の 3 段 (コーダーの完了条件は `check-changed` rc=0、PM は着地で `check` を 1 回)。P3 だけの直しにレビューを回さない | ROLES §0 |
-| 2026-09-29 | **v2.1 確定** — Ra266 の PEGC は画面を見ない条件で受け入れ (v3 を遅らせない)。**GUI の版は 1.4 で閉じる**。OS64 は版数表に載せない。資料不足は FreeBSD を参照。**fork の決定群**: 現行の開発は v3 / 別リポジトリ **os32-v3** (ブランチではない) / **パブリック** / os32 の v2.x は戻り先 (新機能は入れない) / submodule は引き継ぐが当面の保守は os32 側 / CI は作り直す / 文書の正典は os32-v3 / `tools/` と NP21/W フォークは共有だが動作保証は v3 だけ | ROADMAP §0-1、`docs/tasks/agents/HANDOVER_2026-09-29.md` §2 |
+| 2026-09-29 | **v2.1 確定** — Ra266 の PEGC は画面を見ない条件で受け入れ (v3 を遅らせない)。**GUI の版は 1.4 で閉じる**。OS64 は版数表に載せない。資料不足は FreeBSD を参照。**fork の決定群**: 現行の開発は v3 / 別リポジトリ **os32-v3** (ブランチではない) / **パブリック** / os32 の v2.x は戻り先 (新機能は入れない) / submodule は引き継ぐが当面の保守は os32 側 / CI は作り直す / 文書の正典は os32-v3 / `tools/` と NP21/W フォークは共有だが動作保証は v3 だけ | ROADMAP §0-1、`docs/archive/agents/HANDOVER_2026-09-29.md` §2 |
 | 2026-09-30 | **メモリマップの方針** (3 者討論): 8MB 機は GUI + 私有 2MB のアプリ、バイナリ互換は捨てる (ソース互換は極力)、アプリ帯 0x80000000、`--cpl0` 廃止、SQLite はカーネルの機能だが同一リンクにしない、低位 640KB は V86 へ、OpenType / KCG 廃止の検討、同時使用はしない (快適の判定は前景 1 本)、池の運用規則 (口は `mem_map` / `mem_unmap` の 2 つ、閾値 64KB)、MEMSYS5 512KB、SQLite と FEP は常に読み込む (例外は MINIMAL)。D35: fork 時の KAPI 整理でスロット順を変えてよい。D36: Rust で作る部品も 386 下限を守る (最終成果物の検査を必須の工程に)。保留 5 件 (U6) の仕分け、Rust vs C11 (U5、IRQ 文脈の合成器は Rust 可)、T0 = C11 化。**fork の準備を承認** (J1〜J8 は推奨どおり: LICENSE は MIT のまま、THIRD_PARTY.md はルート、TDD 記録と設計記録は持つ、CI は静的ゲート + 本体ビルドから) | `docs/tasks/v3/TASK_MEMMAP_V3.md` §0・§11、`RUST_VS_C11.md`、`U6_PENDING_REVIEW.md`、`FORK_PLAN.md` |
 
 ---
@@ -196,7 +196,7 @@ FatFs (`fs/fatfs/`)、`assets/` (IPADIC・IPAex・常用漢字表) と、gitigno
 | v2.0 (リング 3) の判断と完了記録 | `docs/archive/kernel_v2/PLAN.md` |
 | GUI 1.1〜1.4 の設計・契約・票 | `docs/tasks/gui/DESIGN.md`、`API_CONTRACTS.md`、`docs/archive/gui_v11/`〜`gui_v14/` |
 | 実機 Ra266 の票と判定 | `docs/archive/realhw_v21/` (CHECKLIST_2026-09-24/25/26、TASK_FDC_REALHW、TASK_SERIAL_VFAST、TASK_SERIAL_HOSTFS、TASK_HDD_INSTALL ほか)、`docs/tasks/realhw/` |
-| 引き継ぎ (日ごとの記録) | `docs/tasks/agents/HANDOVER_2026-09-29.md`、`docs/archive/agents/HANDOVER_2026-09-{16,18,22}.md` |
+| 引き継ぎ (日ごとの記録) | `docs/archive/agents/HANDOVER_2026-09-29.md`、`docs/archive/agents/HANDOVER_2026-09-{16,18,22}.md` |
 | 体制の推移 | `docs/tasks/agents/ROLES.md` (§0 現行、末尾に経緯)、`docs/archive/agents/RETROSPECTIVE_2026-09-09.md` |
 | 教訓 (障害の経緯と検証) | `docs/POLICY_DEBUG.md` §4 (§4-1〜§4-62)。普遍的なものの抜粋は [CASE_STUDIES.md](CASE_STUDIES.md) |
 | v3 の草案・決定 | `docs/tasks/v3/` (V3_PLAN_DRAFT、TASK_MEMMAP_V3、RUST_VS_C11、U6_PENDING_REVIEW、TASK_C11_MIGRATION、FORK_PLAN) |

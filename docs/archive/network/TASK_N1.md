@@ -13,7 +13,7 @@
 | 3 | KAPI v51: `sdk/kapi.json` に 5 本を末尾追記 (`host_open` / `host_status` / `host_read` / `host_write` / `host_close`、スキル `os32-kapi-add` の手順、生成物は生成器で)、`kapi/kapi_host.c` に `__cdecl` ラッパー (ポインタ検査は `ring3_user_range_ok`、出力ポインタは全部検証してから書く)、`exec_reclaim_owned` に `host_owner_exit` (`launch_owner_exit` / `con_sink_owner_exit` と同じ位置)、`docs/KAPI_SPEC.md` §3-2 の v51 行を「実装済み」に | 段 4 のハーネスがラッパー経由 + ディスパッチャの早期検査 (`kapi_argptr`) 経由の両方で叩く |
 | 4 | `tools/tests/net_link_host.c`: `net/link.c` を `#include`、NIC (RX キュー、TX 受理可否 = 1 tick 1 フレームの条件、tick) と `cli` / `sti` を贋物に、**実 Agent** (段 1 を UNIX ソケットでサブプロセス起動)。N0 §3 の全項目 (往復 2 の R1〜R10、往復 3 の B1〜B8、往復 4 の R1〜R4、その他) を**個別のケース名**で | `build/sdk.mk` に `check-net-link-host` を足し `check` の列に登録 |
 | 5 | `userland/tests/host_test.c` (N0 §3 のゲスト項目: `GET /pattern/65536` の AGAIN ループと内容一致、`GET /notfound` = 404、`TIME`、`ECHO 5` + write、Agent 再起動 → STALE → close → open)、`build/programs.mk` / `build/app.conf` (api 51) / `userland/deploy.yaml` | ゲスト受入は PM / テスター (コーダーは触らない) |
-| 7 | **移植性調査** `docs/tasks/portability/SURVEY_N1.md` (ユーザー指示 2026-09-14): ワイヤ v2 と `link.c` / KAPI v51 の実装で触れた・見つけた **CPU アーキテクチャ依存** (他アーキテクチャ、例えば ARM への移行時の注意点) を**詳細に**調査して記す。観点: (a) 直列化とアライメント (ワイヤ / ディスク上の構造を LE アクセサで読んでいるか、構造体キャスト・非アラインアクセスの残存箇所を `net/` `drivers/ne2000.c` `fs/` `kapi/` で grep して列挙)、(b) 割込み制御 (`cli` / `sti` / `hlt` の直書きの箇所と抽象化の有無)、(c) ポート I/O (`in` / `out` の箇所 = ARM では MMIO)、(d) メモリ順序とキャッシュ (NIC リング・DMA バッファ・共有バッファで x86 の強い順序に依存している箇所、[HW2] の 64KB 境界)、(e) システムコールの引数渡し (`int 0x80` + ユーザースタックからの引数コピー、`kapi_argptr` の早期検査 = レジスタ渡しの ISA でどう変わるか)、(f) 物理番地の前提 (`memmap.h` 以外に絶対番地を書いた箇所)、(g) タイマと割込みコントローラ (100Hz `link_tick` の前提)、(h) エンディアンと型幅 (`u16` / `u32` の仮定、`int` の幅)。各項目に「N1 で直した」「残っている (場所と理由)」「移植時にやること」を書く。調査は**コードを grep して具体的な行を挙げる** (推測で書かない) | — |
+| 7 | **移植性調査** `docs/archive/portability/SURVEY_N1.md` (ユーザー指示 2026-09-14): ワイヤ v2 と `link.c` / KAPI v51 の実装で触れた・見つけた **CPU アーキテクチャ依存** (他アーキテクチャ、例えば ARM への移行時の注意点) を**詳細に**調査して記す。観点: (a) 直列化とアライメント (ワイヤ / ディスク上の構造を LE アクセサで読んでいるか、構造体キャスト・非アラインアクセスの残存箇所を `net/` `drivers/ne2000.c` `fs/` `kapi/` で grep して列挙)、(b) 割込み制御 (`cli` / `sti` / `hlt` の直書きの箇所と抽象化の有無)、(c) ポート I/O (`in` / `out` の箇所 = ARM では MMIO)、(d) メモリ順序とキャッシュ (NIC リング・DMA バッファ・共有バッファで x86 の強い順序に依存している箇所、[HW2] の 64KB 境界)、(e) システムコールの引数渡し (`int 0x80` + ユーザースタックからの引数コピー、`kapi_argptr` の早期検査 = レジスタ渡しの ISA でどう変わるか)、(f) 物理番地の前提 (`memmap.h` 以外に絶対番地を書いた箇所)、(g) タイマと割込みコントローラ (100Hz `link_tick` の前提)、(h) エンディアンと型幅 (`u16` / `u32` の仮定、`int` の幅)。各項目に「N1 で直した」「残っている (場所と理由)」「移植時にやること」を書く。調査は**コードを grep して具体的な行を挙げる** (推測で書かない) | — |
 | 6 | `tools/tests/n1_tdd.md` (RED → GREEN の記録、ケース名と N0 の指摘番号の対応表)、`docs/tasks/network/LINK_PLAN.md` §5-1 の進捗、本票 §3 の自己申告 | — |
 
 既存の `check-net-l0`〜`l3` (`tools/net_l*_test.py`、ゲスト観測) は v2 で回帰させる (PM がゲストで実行)。`check-net-m2` の反射試験は回帰対象。
@@ -33,7 +33,7 @@
 段 1〜7 を実装した。TDD の記録 (RED → GREEN、ケース名 ↔ TASK_N0 §3 の指摘番号の対応表、
 決めたこと、既存 `check-net-l0`〜`l3` が読むシンボルの v2 での意味) は
 [`tools/tests/n1_tdd.md`](../../../tools/tests/n1_tdd.md)、移植性調査 (段 7) は
-[`docs/tasks/portability/SURVEY_N1.md`](../../tasks/portability/SURVEY_N1.md)。
+[`docs/archive/portability/SURVEY_N1.md`](../portability/SURVEY_N1.md)。
 
 **試験で確認したこと** (全部コーダーの手元で実行、出力は n1_tdd.md §5):
 

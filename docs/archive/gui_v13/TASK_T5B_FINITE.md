@@ -136,7 +136,7 @@ PM: Hermes。実装担当予定: Codex。独立レビュー: 実装担当とは�
 | 入出力とセルだけの合計 | 49408 B |
 
 これは管理構造、モデル状態、allocator header、比較用参照BIN/読取scratch、コード、alignmentを除く下限。
-[MEMORY_BUDGET](../../tasks/gui/v13/MEMORY_BUDGET.md)の静的空間は実行時空きではない。参照BINを含む最終ELF/BSS/heap/stackを再測定する。
+[MEMORY_BUDGET](MEMORY_BUDGET.md)の静的空間は実行時空きではない。参照BINを含む最終ELF/BSS/heap/stackを再測定する。
 
 1. PreparingでFD0/1/2のすべてが非redirectであることを確認。1本でも既存redirectがあれば、
    設定もresetもせず拒否。既存FDを保存したつもりで上書きしない (復元用APIはない)。

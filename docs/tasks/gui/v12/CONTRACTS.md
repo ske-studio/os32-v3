@@ -3,7 +3,7 @@
 > 発行: PM (2026-09-06)  
 > 親契約: [../API_CONTRACTS.md](../API_CONTRACTS.md)  
 > 親設計: [../DESIGN.md](../DESIGN.md)  
-> 作業分担: [TASKS.md](TASKS.md)
+> 作業分担: [TASKS.md](../../../archive/gui_v12/TASKS.md)
 >
 > v1.1 の G / T / U 契約は変更しない。本書は v1.2 で必要な事項だけを追加する。  
 > 原則: 既存番号・構造体・共有ライブラリのジャンプ表は変更せず、**末尾追記のみ**。
