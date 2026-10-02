@@ -728,6 +728,9 @@ STOP最終増分は予告1152Bではなく1344B。ASSERT/診断は削らず、�
 (残る P3: 予定形の記述 → 上で結果に訂正、exec/lease.c:6 の gfx.h の相対 include は害が無いので据え置き)。PM のホスト
 (既定 `HOST32_RUNNERS=native qemu`) で `make all`・lint・`check-changed` rc=0 (修正前・修正後の版とも、`/home/hight/os32-tmp/pm{,2}-e3-{all,cc}.log`)。
 
+**e3 の着地とゲスト受入 (PM、2026-10-03、main `5a47990`、NP21/W 17MB・今の ini)**: f1b と同時期の取り込みで build/sdk.mk・check_map.yaml が競合 → 両方を残して解消、TESTS.md と 02_memory.md を再生成。コミット済みの木で `make all`・`make check` rc=0。停止 → `nhd-pull` → `deploy-kernel` → `deploy` → 起動。`ver` の Commit `5a47990`、`/boot/vmkernel.lz4` 481,837 B 一致。**kselftest pass 272 / fail 0** (e3 の 2 項目を含む)、db・klibc・alloc・d0a・faulttest 4 種・loop/kloop + STOP・`v86 -t` OK、GUI (gui_demo → CUI) OK。**アプリ起動と `v86 -t` を通った後に master の低位 PT (物理 0x3F2000) を直接読み、PCD を照合**: TVRAM A0000-A3FFF・B/R/G A8000-BFFFF・E E0000-E7FFF は全ページ PCD=1、CG 窓 A4000-A7FFF・ROM C0000-DFFFF / E8000-FFFFF は PCD=0、全ページ present・恒等の frame — 塞いだ 2 経路 (exec の共有 USER 化、V86 teardown) を実物で確認。
+- **既存の表示の不具合 (e3 とは無関係、記録)**: `v86 -t` の後でグラフィック表示がオンのまま残り (`grph_disp` 0→1)、VRAM に残っていた起動スプラッシュの「OS32」ロゴが CUI の背後に見える。e3 の直前のカーネル (`85ffa38`、f1b の worktree のビルド) でも同じ — 前からの挙動。kernel/boot_splash.c は「VRAM クリア → テキストモード復帰」と書くが VRAM のロゴが残っており、V86 の自己試験の後始末もグラフィック表示を止めていない。CUI の見た目だけの不具合で回収・資源には影響しない。直す段は PM が後で決める (候補: V86 の自己試験の出口でグラフィック GDC を停止 / スプラッシュの終わりで VRAM を実際に消す)。GUI を往復すると grph_disp=0 に戻る。
+
 
 ## 3. T2f — map/unmapとallocator、暫定heap終了
 
