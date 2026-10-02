@@ -75,6 +75,7 @@ int ring3_user_range_ok(u32 p, u32 len)
 /* SHM の置き場。末尾に番兵を置いて「16KB を 1 バイトも越えない」を見る。 */
 #define SHM_CANARY 256
 static unsigned char test_shm[DB_SHM_BLOCK_SIZE + SHM_CANARY];
+#include "db_copy_shim.h"
 #include "../../kapi/kapi_db.c"
 
 /* ========================================================================= */

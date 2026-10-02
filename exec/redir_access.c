@@ -194,14 +194,18 @@ int redir_access_copy(const RedirAccess *a, u8 *base, u32 *pos,
 
 /* Bounded current-caller copies (T2d d4). No allocation/callback while IRQs
  * are saved. Kernel staging is valid, nonoverlapping and sized by the caller. */
-static int caller_range(const struct caller_access *c, u32 va, u32 len, int write)
+static int caller_range(const struct caller_access *c, u32 va, u32 len, int write,
+                         int per_page_irq)
 {
     if (len && (!va || len - 1 > ~(u32)0 - va)) return 0;
     if (len && c && c->origin == CALLER_TRUSTED &&
         (va >= MEM_APP_BAND_BASE || len > MEM_APP_BAND_BASE - va)) return 0;
     while (len) {
         u32 pa, n = PAGE_SIZE - (va & (PAGE_SIZE - 1));
-        if (!caller_access_page(c, va, write, &pa)) return 0;
+        unsigned int flags = per_page_irq ? irq_save() : 0;
+        int ok = caller_access_page(c, va, write, &pa);
+        if (per_page_irq) irq_restore(flags);
+        if (!ok) return 0;
         if (n > len) n = len;
         len -= n;
         if (len) va += n;
@@ -211,10 +215,8 @@ static int caller_range(const struct caller_access *c, u32 va, u32 len, int writ
 
 int check_caller_write_range(const struct caller_access *c, void *dst, u32 len)
 {
-    unsigned int flags = irq_save();
-    int ok = caller_range(c, (u32)(uptr)dst, len, 1);
-    irq_restore(flags);
-    return ok;
+    /* Inspection is not a reservation: bound each IRQ interval to one page. */
+    return caller_range(c, (u32)(uptr)dst, len, 1, 1);
 }
 
 static int caller_copy(const struct caller_access *c, u32 va, void *staging,
@@ -222,7 +224,7 @@ static int caller_copy(const struct caller_access *c, u32 va, void *staging,
 {
     unsigned int flags = irq_save();
     u8 *bytes = staging;
-    int ok = (!len || staging) && caller_range(c, va, len, write);
+    int ok = (!len || staging) && caller_range(c, va, len, write, 0);
     if (!ok) goto out;
     while (len) {
         u32 pa, n = PAGE_SIZE - (va & (PAGE_SIZE - 1));
@@ -258,11 +260,15 @@ int copy_caller_cstr(const struct caller_access *c, const char *src,
     u32 va = (u32)(uptr)src;
     unsigned int flags = irq_save();
     int ok = 0;
+    u32 pa = 0;
     if (!va || !dst || !cap) goto out;
     for (u32 i = 0; i < cap; i++) {
-        u32 pa;
         if (i > ~(u32)0 - va) goto out;
-        if (!caller_access_page(c, va + i, 0, &pa)) goto out;
+        /* Maps/identity cannot change in this IRQ interval. Reuse this page's
+         * checked translation, never probe the next page before seeing NUL. */
+        if (!i || !((va + i) & (PAGE_SIZE - 1))) {
+            if (!caller_access_page(c, va + i, 0, &pa)) goto out;
+        } else pa++;
         dst[i] = *(const char *)P2V(pa);
         if (!dst[i]) { ok = 1; break; }
     }

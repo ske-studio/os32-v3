@@ -45,6 +45,7 @@
  * ======================================================================== */
 #include "types.h"
 #include "ring3_str.h"
+#include "redir_access.h"
 static u32 test_tramp;
 u32 exec_tramp_page_addr(void) { return test_tramp; }
 static u32 host_cr3;
@@ -117,6 +118,21 @@ static u32 app_fail_alloc(u32 owner, int n) {
 static AppSlot *g_cur_app;
 static int host_shlib_loaded;
 int shlib_loaded(void) { return host_shlib_loaded; }
+/* This legacy image/BB fixture never supplies lease pointers. d5 added a
+ * caller dependency to the real early classifier; trap unexpected use here.
+ * The actual lease/caller path is exercised in db_caller_host.c. */
+int caller_access_get_user(struct caller_access *out)
+{
+    (void)out;
+    CHECK(0);
+    return 0;
+}
+int caller_access_page(const struct caller_access *c, u32 va, int write, u32 *pa)
+{
+    (void)c; (void)va; (void)write; (void)pa;
+    CHECK(0);
+    return 0;
+}
 #include "exec_bb_overlap.inc"
 static u8 heap[192 * 1024];
 static u32 pte(struct addrspace *as, u32 va) {

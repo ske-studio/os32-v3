@@ -1,0 +1,202 @@
+/* Actual DB wrapper + caller copy + managed paging. SQLite/VFS only record
+ * entry; this test never executes an engine or touches a host database. */
+#define HOST_DB_CALLER_TEST
+#define HOST_CALLER_COPY_TEST
+#include "access_walk_host.c"
+#include "ring3_str.h"
+volatile int ring3_in_syscall = 1;
+static AppSlot *g_cur_app;
+#include "guards_host_source.c"
+#include "db_host_source.c"
+
+static u32 sqlite_calls, vfs_calls;
+static const char *expected_input;
+static u32 expected_if;
+static void sql_entry(void) {
+    CHECK(host_arch_if == expected_if);
+    sqlite_calls++;
+}
+static void copied(const char *s) {
+    CHECK(s != expected_input);
+    if (kstrcmp(s, expected_input)) { report(s, kstrlen(s)); SAY(" != expected"); }
+    CHECK(!kstrcmp(s, expected_input));
+    CHECK((uptr)s < MEM_SHM_BASE || (uptr)s >= MEM_SHM_BASE + MEM_SHM_SIZE);
+}
+int sqlite3_open(const char *s, sqlite3 **out) {
+    sql_entry(); copied(s); *out = (sqlite3 *)1; return SQLITE_OK;
+}
+int sqlite3_open_v2(const char *s, sqlite3 **out, int f, const char *v) {
+    (void)f; (void)v; return sqlite3_open(s, out);
+}
+int sqlite3_prepare_v2(sqlite3 *db, const char *s, int n, sqlite3_stmt **out, const char **tail) {
+    (void)db; (void)n; sql_entry(); copied(s); *out = (sqlite3_stmt *)2;
+    if (tail) *tail = s + kstrlen(s);
+    return SQLITE_OK;
+}
+int sqlite3_exec(sqlite3 *db, const char *s, int (*cb)(void *, int, char **, char **), void *a, char **e) {
+    (void)db; (void)s; (void)cb; (void)a; (void)e; sql_entry(); return SQLITE_OK;
+}
+int sqlite3_finalize(sqlite3_stmt *s) { (void)s; sql_entry(); return SQLITE_OK; }
+int sqlite3_close(sqlite3 *db) { (void)db; sql_entry(); return SQLITE_OK; }
+int sqlite3_get_autocommit(sqlite3 *db) { (void)db; sql_entry(); return 1; }
+int sqlite3_extended_errcode(sqlite3 *db) { (void)db; sql_entry(); return SQLITE_OK; }
+const char *sqlite3_errmsg(sqlite3 *db) { (void)db; sql_entry(); return "error"; }
+const char *sqlite3_errstr(int rc) { (void)rc; sql_entry(); return "error"; }
+int sqlite3_step(sqlite3_stmt *s) { (void)s; sql_entry(); return SQLITE_DONE; }
+const unsigned char *sqlite3_column_text(sqlite3_stmt *s, int c) {
+    (void)s; (void)c; sql_entry(); return (const unsigned char *)"delete";
+}
+int sqlite3_bind_parameter_count(sqlite3_stmt *s) { (void)s; sql_entry(); return 1; }
+int sqlite3_bind_text(sqlite3_stmt *s, int i, const char *t, int n, void (*d)(void *)) {
+    (void)s; (void)i; (void)d; sql_entry();
+    CHECK(n == 4 && t[0] == 'a' && t[3] == 'd'); return SQLITE_OK;
+}
+int sqlite3_bind_blob(sqlite3_stmt *s, int i, const void *t, int n, void (*d)(void *)) {
+    return sqlite3_bind_text(s, i, t, n, d);
+}
+const char *vfs_cwd(void) { vfs_calls++; return "/"; }
+int vfs_resolve_path(const char *s, char *out, int cap) {
+    vfs_calls++; CHECK(host_arch_if == expected_if);
+    kstrncpy(out, s, cap); return VFS_OK;
+}
+int vfs_stat(const char *s, OS32_Stat *st) {
+    vfs_calls++; CHECK(host_arch_if == expected_if);
+    if (kstrlen(s) > 8) return OS32_ERR_NOTFOUND;
+    st->st_size = PAGE_SIZE; return 0;
+}
+/* Real ring3_str.c is independently tested; guard predicate is its real body. */
+#include "str_host_source.c"
+
+static void reset_db(void) {
+    kmemset(db_slots, 0, sizeof(db_slots));
+    db_slots[0].in_use = 1; db_slots[0].owner = current;
+    db_slots[0].db = (sqlite3 *)1; db_slots[0].active_stmt = (sqlite3_stmt *)3;
+    db_slots[0].bindable = 1;
+    sqlite_calls = vfs_calls = 0;
+}
+static void caller_copy_tests(void)
+{
+    CallerAccessFrame prev;
+    u32 va = MEM_EXEC_LOAD_ADDR + PAGE_SIZE - 4;
+    u8 *p = P2V(payload);
+    u32 *pt = P2V(space.app_pt_phys[0]);
+    u32 index = (MEM_EXEC_LOAD_ADDR >> PAGE_SHIFT) % PTE_COUNT;
+    u32 args[6] = {MEM_EXEC_LOAD_ADDR, PAGE_SIZE, 3, 0x32, 0xffffffff, 0}, mapped;
+    __asm__ volatile("int $0x80" : "=a"(mapped) : "a"(90), "b"(args) : "memory");
+    CHECK(mapped == MEM_EXEC_LOAD_ADDR);
+    kmemcpy((void *)va, "bad", 4); /* VA is accessible but different from PA. */
+    expected_input = "abc";
+    CHECK(caller_access_enter(&prev, CALLER_USER));
+    for (u32 f = 0; f < 2; f++) {
+        expected_if = host_arch_if = f ? 0x202 : 2;
+        u32 root = host_cr3;
+        for (int entry = 0; entry < 3; entry++) {
+            reset_db(); kmemcpy(p + PAGE_SIZE - 4, "abcd", 4);
+            CHECK(ring3_ptr_ok(va));
+            int rc = entry == 0 ? kapi_db_open((void *)va) : entry == 1 ?
+                kapi_db_open_existing((void *)va, 0) : kapi_db_prepare_only(0, (void *)va);
+            CHECK(rc == -1 && sqlite_calls == (entry == 2 ? 1u : 0u) && !vfs_calls);
+            if (entry == 2) {
+                CHECK(!db_slots[0].active_stmt && !db_slots[0].bindable);
+            } else {
+                CHECK(db_slots[0].active_stmt == (sqlite3_stmt *)3 && db_slots[0].bindable);
+            }
+            CHECK(host_arch_if == expected_if && host_cr3 == root);
+            p[PAGE_SIZE - 1] = 0; expected_input = "abc";
+            rc = entry == 0 ? kapi_db_open((void *)va) : entry == 1 ?
+                kapi_db_open_existing((void *)va, 0) : kapi_db_prepare_only(0, (void *)va);
+            CHECK(rc >= 0 && sqlite_calls);
+            CHECK(host_arch_if == expected_if && host_cr3 == root);
+        }
+        reset_db(); kmemcpy(p + PAGE_SIZE - 4, "abcd", 4);
+        CHECK(kapi_db_bind_text(0, 1, (void *)va, 5) == -1);
+        CHECK(kapi_db_bind_blob(0, 1, (void *)va, 5) == -1);
+        CHECK(kapi_db_bind_blob(0, 1, 0, 0) == -1);
+        /* Parameter count is checked before copying, as in the old wrapper. */
+        sqlite_calls = 0;
+        CHECK(!kapi_db_bind_text(0, 1, (void *)va, 4));
+        CHECK(!kapi_db_bind_blob(0, 1, (void *)va, 4));
+        CHECK(ring3_user_range_ok(va, 4));
+        CHECK(!ring3_user_range_ok(va, 5));
+        CHECK(ring3_user_ranges_writable(va, 4, va, 4));
+        CHECK(!ring3_user_ranges_writable(va, 4, va + 1, 4));
+        CHECK(ring3_range_reject_addr == va + 1);
+        CHECK(!ring3_user_range_ok(~(u32)0 - 1, 4));
+        pt[index] &= ~PTE_RW;
+        CHECK(ring3_user_range_ok(va, 4));
+        CHECK(!ring3_user_range_writable(va, 4));
+        pt[index] |= PTE_RW;
+        ((u32 *)P2V(space.pd_phys))[APP_BAND_PDE] &= ~PTE_RW;
+        CHECK(!ring3_user_range_writable(va, 4));
+        ((u32 *)P2V(space.pd_phys))[APP_BAND_PDE] |= PTE_RW;
+        ring3_wm_depth = 1;
+        CHECK(ring3_user_ranges_writable(1, 4, 1, 4));
+        CHECK(ring3_user_range_ok(1, 4));
+        CHECK(!ring3_user_ranges_writable_always(va, 4, va, 5));
+        CHECK(ring3_user_ranges_writable_always(va, 4, va, 4));
+        ring3_wm_depth = 0;
+        /* Return scratch from getcwd: RO USER trampoline, actual string copy. */
+        u32 tramp = exec_tramp_page_addr(), scratch = tramp + RING3_USTR_OFF;
+        u32 *shared = P2V(paging_registered_pt(tramp));
+        shared[(tramp >> PAGE_SHIFT) % PTE_COUNT] = tramp | PTE_PRESENT | PTE_USER;
+        ((u32 *)P2V(space.pd_phys))[tramp >> 22] |= PTE_USER;
+        kmemcpy(P2V(scratch), "abc", 4); expected_input = "abc";
+        CHECK(ring3_ptr_ok(scratch) && ring3_user_range_ok(scratch, 4));
+        CHECK(!ring3_user_range_writable(scratch, 4));
+        reset_db(); CHECK(kapi_db_open((void *)scratch) >= 0 && sqlite_calls);
+        /* Explicit direct CPL0 and WM calls use bounded trusted copies. */
+        kmemcpy(p, "abc", 4);
+        ring3_in_syscall = 0; reset_db();
+        CHECK(kapi_db_open((void *)p) >= 0 && sqlite_calls);
+        ring3_in_syscall = 1; ring3_wm_depth = 1; reset_db();
+        CHECK(kapi_db_open((void *)p) >= 0 && sqlite_calls);
+        ring3_wm_depth = 0;
+        caller_access_invalidate(); reset_db();
+        CHECK(kapi_db_open((void *)va) == -1 && !sqlite_calls);
+        /* Boot kselftest analogue: dispatch flag set, saved caller invalid. */
+        u32 base = ring3_range_reject_count;
+        CHECK(!ring3_user_range_writable(va, 1));
+        CHECK(ring3_range_reject_count == base + 1 &&
+              ring3_range_reject_last == RING3_RANGE_WR_TABLE &&
+              ring3_range_reject_addr == va && ring3_range_reject_page == 0);
+        CHECK(!ring3_user_range_ok(va, 1));
+        CHECK(ring3_range_reject_count == base + 2 &&
+              ring3_range_reject_last == RING3_RANGE_BAND);
+        for (int mode = 0; mode < 2; mode++) {
+            reset_db();
+            CHECK(kapi_db_prepare_only(0, mode ? (void *)va : 0) == -1);
+            CHECK(sqlite_calls == 1 && !db_slots[0].active_stmt && !db_slots[0].bindable);
+        }
+        CHECK(caller_access_enter(&prev, CALLER_USER));
+        CHECK(host_arch_if == expected_if && host_cr3 == root);
+    }
+    struct ledger_surface sf = {.first = payload / PAGE_SIZE, .npages = 1,
+        .owner = space.owner, .backing = LEDGER_SB_RAM, .width = 1, .height = 1,
+        .pitch = 1, .planes = 1, .backend = LEDGER_SF_PC98,
+        .role = LEDGER_ROLE_CLIENT, .perm_max = LEDGER_PERM_RO};
+    u32 sid;
+    host_cr3 = paging_kernel_pd_phys();
+    CHECK(ledger_surface_create(&sf, &sid));
+    host_cr3 = space.pd_phys;
+    struct ledger_surface *live = &ledger_surfaces[sid];
+    live->lease_count = 1;
+    space.leases[0] = (struct as_lease){1, sid, live->gen, MEM_LEASE_BASE, 1, PAGE_RO | PTE_USER};
+    ((u32 *)P2V(space.lease_pt_phys[0]))[0] = payload | PAGE_RO | PTE_USER;
+    CHECK(ring3_ptr_ok(MEM_LEASE_BASE));
+    CHECK(ring3_user_range_ok(MEM_LEASE_BASE, 4));
+    CHECK(!ring3_user_range_writable(MEM_LEASE_BASE, 4));
+    kmemcpy(p, "abc", 4); reset_db(); expected_input = "abc";
+    CHECK(kapi_db_open((void *)MEM_LEASE_BASE) >= 0 && sqlite_calls);
+    live->gen++;
+    CHECK(!ring3_ptr_ok(MEM_LEASE_BASE));
+    CHECK(!ring3_user_range_ok(MEM_LEASE_BASE, 4));
+    SAY("PASS: d5 real DB/copy/walk, NP no prepare/old stmt finalized, RO/scratch/output/WM/IF/CR3");
+    die(0);
+}
+
+void *kmemset(void *d, int v, u32 n) { u8 *p = d; while (n--) *p++ = v; return d; }
+u32 kstrlen(const char *s) { u32 n = 0; while (s[n]) n++; return n; }
+int kstrcmp(const char *a, const char *b) { while (*a && *a == *b) { a++; b++; } return (u8)*a - (u8)*b; }
+int kstrncmp(const char *a, const char *b, u32 n) { while (n && *a && *a == *b) { a++; b++; n--; } return n ? (u8)*a - (u8)*b : 0; }
+char *kstrncpy(char *d, const char *s, u32 n) { u32 i = 0; if (n) { for (; i + 1 < n && s[i]; i++) d[i] = s[i]; d[i] = 0; } return d; }
+char *kstrncat(char *d, const char *s, u32 n) { u32 count = kstrlen(d); if (count < n) kstrncpy(d + count, s, n - count); return d; }

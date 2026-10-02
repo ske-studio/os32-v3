@@ -1,5 +1,7 @@
 #define HOST_CALLER_COPY_TEST
 static unsigned int copy_probes;
+static unsigned int check_irq_epoch, check_irq_seen;
+static int observing_check;
 #include "access_walk_host.c"
 
 static void caller_copy_tests(void)
@@ -23,7 +25,7 @@ static void caller_copy_tests(void)
         kmemcpy(p + PAGE_SIZE - 4, "abc", 4);
         RESET();
         CHECK(copy_caller_cstr(&caller, (void *)va, out, sizeof(out)));
-        CHECK(copy_probes == 4 && out[0] == 'a' && out[2] == 'c' && out[3] == 0 && out[4] == 0x55); SAME();
+        CHECK(copy_probes == 1 && out[0] == 'a' && out[2] == 'c' && out[3] == 0 && out[4] == 0x55); SAME();
         /* NUL at cap-1 is success; a smaller cap is not truncation success. */
         CHECK(copy_caller_cstr(&caller, (void *)va, out, 4)); SAME();
         CHECK(!copy_caller_cstr(&caller, (void *)va, out, 3)); SAME();
@@ -62,8 +64,13 @@ static void caller_copy_tests(void)
         RESET(); CHECK(copy_caller_bytes(&caller, (void *)va, out, 8));
         for (u32 j = 0; j < 8; j++) CHECK(out[j] == input[j]);
         SAME();
+        copy_probes = check_irq_epoch = check_irq_seen = 0;
+        observing_check = 1;
+        CHECK(check_caller_write_range(&caller, (void *)va, 8));
+        observing_check = 0;
+        CHECK(check_irq_epoch == 2); SAME();
         RESET(); CHECK(copy_caller_cstr(&caller, (void *)va, out, 8));
-        CHECK(copy_probes == 8 && out[7] == 0); SAME();
+        CHECK(copy_probes == 2 && out[7] == 0); SAME();
         pt[index + 1] &= ~PTE_RW;
         CHECK(!check_caller_write_range(&caller, (void *)va, 8)); SAME();
         CHECK(!copy_to_caller(&caller, (void *)va, "XXXXXXXX", 8));
@@ -95,6 +102,32 @@ static void caller_copy_tests(void)
         CHECK(!copy_caller_cstr(&trusted, 0, out, 2)); SAME();
         CHECK(!copy_caller_cstr(&trusted, (void *)low, out, 0)); SAME();
     }
+    /* d5 P3-3/P3-6: worst stated SQL cap on a 75-page RAM lease. Count
+     * actual page walks, not host wall time presented as PC-98 IRQ latency. */
+    u32 backing = pgalloc_alloc_phys(space.owner, 75), sid;
+    CHECK(backing);
+    struct ledger_surface sf = {.first = backing / PAGE_SIZE, .npages = 75,
+        .owner = space.owner, .backing = LEDGER_SB_RAM, .width = 1, .height = 1,
+        .pitch = 1, .planes = 1, .backend = LEDGER_SF_PC98,
+        .role = LEDGER_ROLE_CLIENT, .perm_max = LEDGER_PERM_RO};
+    host_arch_if = 0x202;
+    host_cr3 = paging_kernel_pd_phys();
+    CHECK(ledger_surface_create(&sf, &sid));
+    host_cr3 = space.pd_phys;
+    struct ledger_surface *live = &ledger_surfaces[sid];
+    live->lease_count = 1;
+    space.leases[0] = (struct as_lease){1, sid, live->gen, MEM_LEASE_BASE, 75, PAGE_RO | PTE_USER};
+    ((u32 *)P2V(space.lease_pt_phys[0]))[0] = backing | PAGE_RO | PTE_USER;
+    static char sql[1024];
+    for (u32 i = 0; i < sizeof(sql); i++) ((char *)P2V(backing))[i] = 'x';
+    for (u32 f = 0; f < 2; f++) {
+        host_arch_if = f ? 0x202 : 2;
+        copy_probes = 0;
+        CHECK(!copy_caller_cstr(&caller, (void *)MEM_LEASE_BASE, sql, sizeof(sql)));
+        CHECK(copy_probes == 1 && host_arch_if == (f ? 0x202U : 2U));
+        for (u32 i = 0; i < sizeof(sql); i++) CHECK(sql[i] == 'x');
+    }
+    SAY("PASS: d5 1024-byte unterminated cstr on 75-page lease: one walk, IF preserved");
     SAY("PASS: d4 real walk/copies, NUL/NP/cap/overflow, trusted band, atomic refusal, IF/CR3");
     die(0);
 }

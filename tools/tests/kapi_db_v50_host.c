@@ -140,6 +140,7 @@ static int host_ext_errcode(sqlite3 *db)
 #define sqlite3_column_text host_column_text
 #define sqlite3_errcode host_errcode
 #define sqlite3_extended_errcode host_ext_errcode
+#include "db_copy_shim.h"
 #include "../../kapi/kapi_db.c"
 #undef sqlite3_column_blob
 #undef sqlite3_column_text
@@ -502,26 +503,8 @@ static void user_range(void)
     CHECK(inband != NULL);
     memset(inband, 'q', 64);
 
-    /* CPL=0 の呼び手は帯を見ない (NULL と長さだけ) */
-    host_cpl3 = 0;
-    CHECK(db_user_range_ok(inband, 8));
-    CHECK(!db_user_range_ok(NULL, 1));
-    /* 加算 overflow。include/types.h の u32 はホストでは 64bit (unsigned long)
-     * なので、ホスト幅の端で同じ経路を踏む。 */
-    CHECK(!db_user_range_ok((const void *)~(u32)0xFF, 0x200u));
-
-    /* CPL=3: 帯の外、帯の末尾をまたぐ、ガードをまたぐ、overflow */
-    host_cpl3 = 1;
-    CHECK(db_user_range_ok((const void *)BAND_LO, 16));
-    CHECK(!db_user_range_ok((const void *)(BAND_LO - 1), 2));
-    CHECK(!db_user_range_ok((const void *)(BAND_HI - 1), 2));
-    CHECK(db_user_range_ok((const void *)(BAND_HI - 2), 2));
-    /* 帯の中は PTE を見ないので通る。実機ではここを写すと #PF → 呼び手を
-     * kill (票 §1a の改定、2026-09-13)。「-1 が返る」とは主張しない。 */
-    CHECK(db_user_range_ok((const void *)(GUARD_PAGE - 1), 2));
-    CHECK(db_user_range_ok((const void *)(GUARD_PAGE + 8), 2));
-    CHECK(!db_user_range_ok((const void *)~(u32)0x0F, 0x20u));
-    CHECK(!db_user_range_ok(NULL, 0));
+    /* B1 range/NP/overflow now lives in the real db_caller_host.c test.
+     * This suite retains only the SQLite-engine boundary shim. */
     host_cpl3 = 0;
 
     /* NUL の無い path は上限まで探して拒否 (切り捨てて開かない) */
@@ -934,9 +917,9 @@ static void prepare_replaces(void)
         else CHECK(kapi_db_prepare_only(h, (const char *)0) == -1);
         CHECK(kapi_db_error_code(h) == SQLITE_MISUSE);
 
-        /* 旧 stmt は捨てられているので step は何も実行しない。 */
+        /* Every refusal discards the previous stmt, including copy refusal. */
         CHECK(kapi_db_step(h) == DB_STATUS_DONE);
-        CHECK(kapi_db_bind_int(h, 1, 1) == -1);      /* bind もできない */
+        CHECK(kapi_db_bind_int(h, 1, 1) == -1);
 
         CHECK(kapi_db_prepare_only(h, "SELECT count(*) FROM t") == 0);
         CHECK(kapi_db_step(h) == DB_STATUS_ROW);
@@ -1261,7 +1244,7 @@ static void resolve_depth(void)
 
 /* ---- 22. CPL=3 の規則を通した open / prepare (実機 K2 の回帰) ----------- */
 /*  これまでのケースは `host_cpl3 = 0` (= CPL=0 の直呼び) で走っていたので、
- *  `db_user_str_copy` → `ring3_user_range_ok` の経路が **1 度も踏まれて
+ *  `db_copy_input` → caller-boundary shim の経路が **1 度も踏まれて
  *  いなかった**。実機 K2 で `db_open_existing` が SQLITE_MISUSE を返した
  *  (= 検証が path を拒否した) のはこの穴。ここで両側を固定する:
  *    - 読める範囲に居る path / sql はそのまま通る

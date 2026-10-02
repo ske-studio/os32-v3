@@ -19,7 +19,7 @@
 #include "memmap.h"
 #include "fd_redirect.h"
 #include "vfs.h"          /* v50: open 前の vfs_stat (本体 size / journal) */
-#include "exec.h"         /* v50: ring3_user_range_ok (ユーザポインタ検証) */
+#include "redir_access.h"
 
 /* kapi_db.c はリンカスクリプトで EXCLUDE_FILE に含まれていないため、
  * 通常の .text に配置される。sqlite3_exec 等は .sqlite_text にあるが、
@@ -188,35 +188,15 @@ static void open_fail_set(int code)
     db_open_fail[owner] = code;
 }
 
-/* ======================================================================== */
-/*  ヘルパー: ユーザポインタの検証とコピー (票 S0-K §1a)                      */
-/*                                                                          */
-/*  ディスパッチャの早期検証は先頭番地しか見ない。長さ付き / NUL 終端の       */
-/*  引数はここで範囲を確かめてから **カーネル側のスクラッチへ写す**。         */
-/*  CPL=0 の呼び手 (常駐シェル / gshell の直呼び) では ring3_user_range_ok が  */
-/*  素通しになるので、NULL と長さと容量だけを見ることになる。                 */
-/* ======================================================================== */
-static int db_user_range_ok(const void *p, u32 len)
+/* Direct CPL0/WM calls use the existing explicit trusted convention; USER
+ * calls consume the fixed dispatcher identity. Staging is kernel BSS, not SHM.
+ * Caps: paths 256 incl. NUL, SQL 1024 incl. NUL; binds retain DB_BIND_*_MAX. */
+static int db_copy_input(const void *src, void *dst, u32 size, int cstr)
 {
-    u32 a = (u32)p;
-    if (!p) return 0;
-    if (a + len < a) return 0;            /* 加算 overflow */
-    return ring3_user_range_ok(a, len);
-}
-
-/* 上限 cap (NUL 込み) の中で NUL を探しながら dst へ写す。
- * 1 バイトずつ検証するので、途中のページが非 present でもそこで止まる。
- * 戻り値: 1 = 写した / 0 = NULL・帯外・cap 内に NUL が無い (切り捨てない)。 */
-static int db_user_str_copy(const char *src, char *dst, u32 cap)
-{
-    u32 i;
-    if (!src) return 0;
-    for (i = 0; i < cap; i++) {
-        if (!db_user_range_ok(src + i, 1)) return 0;
-        dst[i] = src[i];
-        if (dst[i] == '\0') return 1;
-    }
-    return 0;
+    struct caller_access c;
+    if (!src || !redir_access_capture(&c)) return 0;
+    return cstr ? copy_caller_cstr(&c, src, dst, size) :
+                  copy_caller_bytes(&c, src, dst, size);
 }
 
 /* prepare_only の pzTail が「次の statement を含まない」か (票 §1a)。
@@ -509,7 +489,7 @@ int __cdecl kapi_db_open(const char *path)
      * **切り詰めない** (票 TASK_VFS_FD_PATH v3 の追記)。以前は kstrncpy で
      * 254 バイトに切っていたので、長い名前は別の DB (と別のジャーナル) を
      * 開いた。上限内に NUL が無ければ断る。 */
-    if (!db_user_str_copy(path, path_copy_buf, PATH_COPY_BUF_SIZE)) {
+    if (!db_copy_input(path, path_copy_buf, PATH_COPY_BUF_SIZE, 1)) {
         open_fail_set(SQLITE_CANTOPEN);
         shm_write_error_text("path too long or unreadable");
         return -1;
@@ -971,7 +951,7 @@ int __cdecl kapi_db_open_existing(const char *path, int writable)
      * SQLITE_MISUSE だが、実機で切り分けられないと原因に辿りつけない
      * (K2 の「21 が返る」がまさにこれ)。SHM のエラー文を分けて
      * db_last_error() で見分けられるようにする。 */
-    if (!db_user_str_copy(path, path_copy_buf, PATH_COPY_BUF_SIZE)) {
+    if (!db_copy_input(path, path_copy_buf, PATH_COPY_BUF_SIZE, 1)) {
         open_fail_set(SQLITE_MISUSE);
         shm_write_error_text("path pointer rejected by the range check");
         return -1;
@@ -1103,17 +1083,14 @@ int __cdecl kapi_db_prepare_only(int handle, const char *sql)
         return -1;
     }
 
-    /* **入口で必ず**旧 stmt を捨てる (Codex 往復 2 の B2)。§1a の「旧 stmt は
-     * finalize して置換」は拒否理由に依らない — 引数検査で弾いたときに旧 stmt を
-     * 残すと、bind 済みの前の statement が次の db_step で実行されてしまう
-     * (呼び手からは「prepare は失敗したのに INSERT が走った」に見える)。 */
+    /* Public prepare_only contract: discard the old stmt even on copy refusal. */
     if (slot->active_stmt) {
         slot_note_teardown(slot, sqlite3_finalize(slot->active_stmt));
         slot->active_stmt = (sqlite3_stmt *)0;
     }
     slot->bindable = 0;
 
-    if (!db_user_str_copy(sql, sql_copy_buf, SQL_COPY_BUF_SIZE)) {
+    if (!db_copy_input(sql, sql_copy_buf, SQL_COPY_BUF_SIZE, 1)) {
         slot_note(slot, SQLITE_MISUSE);
         shm_write_error_text("sql pointer rejected by the range check");
         return -1;
@@ -1180,11 +1157,10 @@ int __cdecl kapi_db_bind_text(int handle, int index, const char *text, int lengt
     DbSlot *slot = bind_slot(handle, index);
     if (!slot) return -1;
     if (length < 0 || length > DB_BIND_TEXT_MAX ||
-        !db_user_range_ok(text, (u32)length)) {
+        !db_copy_input(text, text_copy_buf, (u32)length, 0)) {
         slot_note(slot, SQLITE_MISUSE);
         return -1;
     }
-    if (length > 0) kmemcpy(text_copy_buf, text, (u32)length);
     text_copy_buf[length] = '\0';
     /* 0B でも非 NULL の空値。SQLITE_TRANSIENT なので SQLite が写す。 */
     return bind_done(slot, sqlite3_bind_text(slot->active_stmt, index,
@@ -1197,11 +1173,10 @@ int __cdecl kapi_db_bind_blob(int handle, int index, const void *data, int lengt
     DbSlot *slot = bind_slot(handle, index);
     if (!slot) return -1;
     if (length < 0 || length > DB_BIND_BLOB_MAX ||
-        !db_user_range_ok(data, (u32)length)) {
+        !db_copy_input(data, blob_copy_buf, (u32)length, 0)) {
         slot_note(slot, SQLITE_MISUSE);
         return -1;
     }
-    if (length > 0) kmemcpy(blob_copy_buf, data, (u32)length);
     return bind_done(slot, sqlite3_bind_blob(slot->active_stmt, index,
                                              blob_copy_buf, length,
                                              SQLITE_TRANSIENT));
@@ -1292,8 +1267,8 @@ u32 db_v50_selftest(void)
     if (shm_row_fits_n(-1, 0)) bad |= 1u << 1;
 
     /* (2) ポインタ検証の NULL / overflow (帯と PTE は CPL=3 側でしか踏めない) */
-    if (db_user_range_ok((const void *)0, 1u)) bad |= 1u << 2;
-    if (db_user_range_ok((const void *)0xFFFFFF00UL, 0x200u)) bad |= 1u << 2;
+    if (db_copy_input((const void *)0, path_copy_buf, 1u, 0)) bad |= 1u << 2;
+    if (db_copy_input((const void *)0xFFFFFF00UL, sql_copy_buf, 0x200u, 0)) bad |= 1u << 2;
 
     /* (3) journal 名の容量規則 (票 §1a / Codex 往復 2 の B4)。
      * 末尾判定は SQLite 自身にさせるので接続が要る = ブート時には踏めない。

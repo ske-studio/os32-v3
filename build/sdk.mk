@@ -1137,6 +1137,7 @@ CHECK_PAR_TARGETS := check-shlib-high-host check-bootinfo-host check-hdd-stage1-
     check-caller-access-host \
     check-access-walk-host \
     check-caller-copy-host \
+    check-db-caller-host \
     check-cirrus-win-host check-pegc-mode-host
 check-par: $(CHECK_PAR_TARGETS)
 
@@ -1188,3 +1189,9 @@ check-caller-copy-host:
 	python3 -B tools/tests/test_caller_copy.py $(MUT)
 
 .PHONY: check-caller-copy-host
+
+# T2d d5: actual DB wrappers and output guards through caller copy/walk.
+check-db-caller-host:
+	python3 -B tools/tests/test_db_caller.py $(MUT)
+
+.PHONY: check-db-caller-host

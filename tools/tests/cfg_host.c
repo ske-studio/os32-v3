@@ -89,6 +89,7 @@ int ring3_user_range_ok(u32 p, u32 len)
 
 #define SHM_CANARY 256
 static unsigned char test_shm[DB_SHM_BLOCK_SIZE + SHM_CANARY];
+#include "db_copy_shim.h"
 #include "../../kapi/kapi_db.c"
 
 /* ========================================================================= */

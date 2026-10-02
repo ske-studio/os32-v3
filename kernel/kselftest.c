@@ -1701,11 +1701,10 @@ static void test_ring3_wm_guard(void)
     check(ring3_user_range_writable((u32)&local, sizeof(u32)) == 0,
           "wm-guard: app-origin kernel ptr refused");
     check(ring3_range_reject_count == base + 1u &&
-          (ring3_range_reject_last == RING3_RANGE_WR_PDE ||
-           ring3_range_reject_last == RING3_RANGE_WR_PTE) &&
+          ring3_range_reject_last != 0 &&
           ring3_range_reject_addr == (u32)&local,
           "wm-guard: write-side refusal is counted");
-    /* 読み側の門も同じ (起動中は g_cur_app が無いので NO_APP で断る)。 */
+    /* 起動中は保存callerが無効。writeはWR_TABLE、readはBANDで断る。 */
     check(ring3_user_range_ok((u32)&local, sizeof(u32)) == 0 &&
           ring3_range_reject_count == base + 2u,
           "wm-guard: app-origin read range refused");

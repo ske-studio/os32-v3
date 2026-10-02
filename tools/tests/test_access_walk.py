@@ -59,7 +59,7 @@ def run(sources, mutant=None, fixture="access_walk_host.c"):
                '-Wall', '-Wextra', '-Werror', '-DPHYSMEM_HOST_TEST=1', '-nostdlib',
                '-static', '-no-pie', '-Wl,--gc-sections',
                *['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'include',
-                  'arch/x86', 'platform/pc98', 'kernel', 'exec', 'fs', 'lib', 'sdk/include/os32')],
+                  'arch/x86', 'platform/pc98', 'kernel', 'exec', 'fs', 'lib', 'kapi', 'lib/sqlite3', 'sdk/include/os32')],
                '-I' + str(tmp), str(ROOT / 'tools/tests' / fixture),
                str(ROOT / 'kernel/physmem.c'), '-o', str(exe)]
         subprocess.run(cmd, check=True, capture_output=True, text=True)
