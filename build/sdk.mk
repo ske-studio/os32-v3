@@ -1141,6 +1141,7 @@ CHECK_PAR_TARGETS := check-shlib-high-host check-bootinfo-host check-hdd-stage1-
     check-surface-query-host \
     check-nano-inputs-host \
     check-surface-lease-host \
+    check-h3-park-resume-host \
     check-cirrus-win-host check-pegc-mode-host \
     check-h2-fixtures-host
 check-par: $(CHECK_PAR_TARGETS)
@@ -1228,3 +1229,7 @@ check-surface-lease-host:
 .PHONY: check-h2-fixtures-host
 check-h2-fixtures-host:
 	python3 -B tools/tests/test_h2_fixtures.py $(MUT)
+
+# T2h/h3 fixtures and PM script, entirely offline.
+check-h3-park-resume-host:
+	python3 -B tools/tests/test_h3_park_resume.py $(MUT)

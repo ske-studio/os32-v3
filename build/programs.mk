@@ -708,3 +708,7 @@ userland/tests/h2_stack512.bin: userland/tests/h2_stack512.raw userland/tests/h2
 .PHONY: h2-fixtures
 h2-fixtures: userland/tests/h2_stack.bin userland/shell.bin userland/libos32gui.shlib userland/tests/gui_demo.bin
 	python3 tools/gen_h2_fixtures.py --out $(BUILD_OUT)/h2-isolated
+
+# T2h/h3 shared fixture code (the generic rule does not include userland .d).
+userland/tests/h3a.o: userland/tests/h3a.c userland/tests/h3/fixture.inc userland/tests/h3/state.inc userland/tests/h3/protocol.h
+userland/tests/h3b.o: userland/tests/h3b.c userland/tests/h3/fixture.inc userland/tests/h3/state.inc userland/tests/h3/protocol.h

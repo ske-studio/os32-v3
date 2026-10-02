@@ -3516,3 +3516,27 @@ checks:
   - tools/tests/surface_lease_host.c
   - tools/tests/test_access_walk.py
   - tools/tests/test_surface_lease.py
+
+  check-h3-park-resume-host:
+  # Layout validates current ELF calling convention and abort/landing sites.
+  - exec/exec.c
+  - kernel/isr_stub.asm
+  - exec/appslot.h
+  - include/ksetjmp.h
+  - include/memmap.h
+  - include/sys.h
+  - include/types.h
+  - kernel/paging.h
+  - kernel/pgalloc.h
+  - kernel/physmem.h
+  - kernel/shm.h
+  - tools/h3_layout.c
+  - tools/h3_park_resume.py
+  - tools/tests/h3_state_host.c
+  - tools/tests/host32.py
+  - tools/tests/test_h3_park_resume.py
+  - userland/tests/h3/fixture.inc
+  - userland/tests/h3/protocol.h
+  - userland/tests/h3/state.inc
+  - userland/tests/h3a.c
+  - userland/tests/h3b.c
