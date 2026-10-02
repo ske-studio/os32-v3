@@ -36,6 +36,7 @@
 #include "v86_gcap.h"
 #include "v86_gcap_math.h"
 #include "v86.h"
+#include "v86_io.h"
 #include "v86_mem.h"
 #include "exec.h"       /* exec_ledger_owner: バッキングの台帳の owner */
 #include "v86_pic.h"
@@ -543,12 +544,6 @@ static void gcap_selftest(V86Gcap *g)
 /*  出す — bios18.c)、テキスト VRAM は採取前の 30 行ぶんへ、カーソル形状は   */
 /*  OS32 のもの (DOS 由来の形を残さない、console_hw_cursor_enable)。          */
 /* ------------------------------------------------------------------------ */
-static void gcap_out(unsigned int port, unsigned int v)
-{
-    outp(port, v);
-    io_wait();
-}
-
 static void tv_save(u16 *buf)
 {
     u32 i;
@@ -573,9 +568,7 @@ static void tv_restore(const u16 *buf)
 
 static void gcap_cui_rebuild(const u16 *tv)
 {
-    gcap_out(GDC_GFX_CMD, GDC_CMD_STOP);
-    gcap_out(MODE_FF1_PORT, MFF1_DISP_ON);
-    gcap_out(GDC_TEXT_CMD, GDC_CMD_START);
+    v86_cui_display_restore();
     tv_restore(tv);
     console_hw_cursor_enable();
 }

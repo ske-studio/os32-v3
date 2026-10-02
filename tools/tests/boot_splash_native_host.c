@@ -8,18 +8,45 @@
 
 #define __cdecl
 #define IO_H
-static unsigned int inp(unsigned int port) { (void)port; return 0; }
+static unsigned int inp(unsigned int port) { return port == 0x60 ? 0x20 : 0; }
+static unsigned int irq_save(void) { return 0; }
+static void irq_restore(unsigned int flags) { (void)flags; }
 static void outp(unsigned int port, unsigned int value);
 #include "../../gfx/gfx_core.c"
 #include "../../gfx/backend_pc98.c"
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-variable" /* existing bottom in gfx_vram.c */
+#include "../../gfx/gfx_vram.c"
+#pragma GCC diagnostic pop
 #include "../../kernel/boot_splash.c"
 
 volatile u32 tick_count;
+int vram_scroll_y;
 static int cirrus_probes, pegc_probes, optional_inits;
 static int cirrus_ok = 1, pegc_ok = 1, init_fail;
 static int raster_frames, text_clears, stops, starts;
 static int expected_pref;
 static int native_state_fault;
+static unsigned char pages[2][4][GFX_PLANE_SZ];
+static unsigned int access_page;
+static unsigned int painted_pages;
+static const u32 planes[4] = { VRAM_PLANE_B, VRAM_PLANE_R, VRAM_PLANE_G, VRAM_PLANE_I };
+static void bank_sync(void)
+{
+    for (int p = 0; p < 4; p++)
+        memcpy(pages[access_page][p], (void *)(unsigned long)planes[p], GFX_PLANE_SZ);
+}
+static void check_clear(const char *reason, int plane_size)
+{
+    bank_sync();
+    for (int page = 0; page < 2; page++)
+        for (int p = 0; p < 4; p++)
+            for (int i = 0; i < plane_size; i++)
+                if (pages[page][p][i]) {
+                    fprintf(stderr, "FAIL: %s page=%d plane=%d byte=%d\n", reason, page, p, i);
+                    exit(1);
+                }
+}
 
 #define CHECK(c, msg) do { if (!(c)) { \
     fprintf(stderr, "FAIL: %s (line %d)\n", msg, __LINE__); exit(1); \
@@ -42,6 +69,18 @@ GfxBackend gfx_backend_pegc = {
 };
 static void outp(unsigned int port, unsigned int value)
 {
+    if (port == GDC_ACCESS_PAGE) {
+        bank_sync();
+        access_page = value;
+        for (int p = 0; p < 4; p++)
+            memcpy((void *)(unsigned long)planes[p], pages[access_page][p], GFX_PLANE_SZ);
+    }
+    if (port == GDC_DISP_PAGE && gfx_flip_enabled) {
+        bank_sync();
+        for (int p = 0; p < 4; p++)
+            for (int i = 0; i < GFX_PLANE_SZ; i++)
+                if (pages[value][p][i]) painted_pages |= 1U << value;
+    }
     if (port == GDC_GFX_CMD && value == GDC_CMD_STOP) stops++;
     if (port == GDC_GFX_CMD && value == GDC_CMD_START) starts++;
 }
@@ -87,18 +126,14 @@ void gfx_scroll_init(void)
     if (native_state_fault) bb[2] = (u8 *)0;
 }
 void tvram_clear(void) { text_clears++; }
-void gfx_add_dirty_rect(int x, int y, int w, int h)
-{ (void)x; (void)y; (void)w; (void)h; }
-void gfx_present_dirty(void) { }
-void gfx_present(void) { }
-void gfx_present_raster(GFX_RasterPalTable *table)
+void cpu_delay_us(u32 us)
 {
-    (void)table;
+    (void)us;
     CHECK(g_backend == &gfx_backend_pc98, "raster uses native PC98");
     CHECK(gfx_get_backend_pref() == expected_pref,
           "configured GUI preference restored before drawing");
     raster_frames++;
-    tick_count += 100;
+    tick_count++;
 }
 static void map_region(u32 base, u32 size)
 {
@@ -117,6 +152,22 @@ int main(int argc, char **argv)
     map_region(TVRAM_BASE, VRAM_PLANE_B - TVRAM_BASE);
     map_region(VRAM_PLANE_B, 0x18000);
     map_region(VRAM_PLANE_I, 0x8000);
+    if (argc == 3 && (!strcmp(argv[2], "init400") || !strcmp(argv[2], "init200"))) {
+        memset(pages, 0xA5, sizeof(pages));
+        for (int p = 0; p < 4; p++)
+            memset((void *)(unsigned long)planes[p], 0xA5, GFX_PLANE_SZ);
+        gfx_set_backend_pref(GFX_PREF_PC98);
+        if (!strcmp(argv[2], "init200")) {
+            gfx_init_200();
+            check_clear("gfx_init_200 residual", GFX_PLANE_SZ_200);
+        } else {
+            gfx_init();
+            check_clear("gfx_init residual", GFX_PLANE_SZ);
+        }
+        gfx_shutdown();
+        puts("PASS: native init clears both pages");
+        return 0;
+    }
     gfx_set_backend_pref(pref);
     if (argc == 3) {
         native_state_fault = 1;
@@ -131,6 +182,8 @@ int main(int argc, char **argv)
         stops = starts = text_clears = 0;
     }
     boot_splash();
+    CHECK(painted_pages == 3, "real raster transfer painted both pages");
+    check_clear("residual logo", GFX_PLANE_SZ);
     CHECK(cirrus_probes == 0 && pegc_probes == 0 && optional_inits == 0,
           "boot must not probe or initialize optional devices");
     CHECK(starts == 1 && raster_frames > 0, "boot actually renders native splash");
@@ -139,6 +192,7 @@ int main(int argc, char **argv)
           gfx_current_height == GFX_HEIGHT, "shutdown restores native state");
     CHECK(gfx_get_backend_pref() == pref, "boot preserves GUI configuration");
     boot_splash();
+    check_clear("residual logo", GFX_PLANE_SZ);
     CHECK(starts == 2 && stops == 2, "repeat boot lifecycle");
     CHECK(!cirrus_probes && !pegc_probes, "repeat boot never probes options");
     want = pref == GFX_PREF_PC98 ? &gfx_backend_pc98 :

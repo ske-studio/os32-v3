@@ -32,6 +32,8 @@ extern DirtyRectQueue dirty_queue;
 extern DirtyRectQueue prev_dirty;  /* 前フレームdirty (ステイルページ対策) */
 
 void gfx_scroll_init(void);
+/* PC98 planar の初期化・スプラッシュ終了専用 (戻りの描画ページは1)。 */
+void gfx_clear_planar_pages(u32 plane_size);
 
 /* ======================================================================== */
 /*  I/O・メモリ操作インライン                                               */

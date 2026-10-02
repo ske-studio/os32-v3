@@ -562,6 +562,24 @@ void gfx_prepare_backend(void)
     if (g_backend->shutdown) g_backend->shutdown();
 }
 
+/* 標準 planar モード専用。CPU 直書きで両ページの表示領域を消す [HW1]。
+ * UNDOCUMENTED io_disp.md「VRAMプレーン切り換え」: A6h が CPU の書込先。
+ * 戻りは描画ページ1。呼び手は初期化を続けるか直ちに shutdown する。 */
+void gfx_clear_planar_pages(u32 plane_size)
+{
+    _out(GDC_ACCESS_PAGE, GDC_PAGE_0);
+    kmemset((u8 *)P2V(VRAM_PLANE_B), 0, plane_size);
+    kmemset((u8 *)P2V(VRAM_PLANE_R), 0, plane_size);
+    kmemset((u8 *)P2V(VRAM_PLANE_G), 0, plane_size);
+    kmemset((u8 *)P2V(VRAM_PLANE_I), 0, plane_size);
+
+    _out(GDC_ACCESS_PAGE, GDC_PAGE_1);
+    kmemset((u8 *)P2V(VRAM_PLANE_B), 0, plane_size);
+    kmemset((u8 *)P2V(VRAM_PLANE_R), 0, plane_size);
+    kmemset((u8 *)P2V(VRAM_PLANE_G), 0, plane_size);
+    kmemset((u8 *)P2V(VRAM_PLANE_I), 0, plane_size);
+}
+
 void gfx_init(void)
 {
     /* ⑤: GDC 初期化より前にバックエンドを決める */
@@ -583,22 +601,11 @@ void gfx_init(void)
 
     _out(GDC_GFX_CMD, GDC_CMD_START);
 
-    /* ページフリッピング有効化: 両ページのVRAMをゼロクリア */
-    _out(GDC_ACCESS_PAGE, 0x00);
-    kmemset((u8 *)P2V(VRAM_PLANE_B), 0, GFX_PLANE_SZ);
-    kmemset((u8 *)P2V(VRAM_PLANE_R), 0, GFX_PLANE_SZ);
-    kmemset((u8 *)P2V(VRAM_PLANE_G), 0, GFX_PLANE_SZ);
-    kmemset((u8 *)P2V(VRAM_PLANE_I), 0, GFX_PLANE_SZ);
-
-    _out(GDC_ACCESS_PAGE, 0x01);
-    kmemset((u8 *)P2V(VRAM_PLANE_B), 0, GFX_PLANE_SZ);
-    kmemset((u8 *)P2V(VRAM_PLANE_R), 0, GFX_PLANE_SZ);
-    kmemset((u8 *)P2V(VRAM_PLANE_G), 0, GFX_PLANE_SZ);
-    kmemset((u8 *)P2V(VRAM_PLANE_I), 0, GFX_PLANE_SZ);
+    gfx_clear_planar_pages(GFX_PLANE_SZ);
 
     /* ページ0を表示、ページ1に描画 */
-    _out(GDC_DISP_PAGE, 0x00);
-    _out(GDC_ACCESS_PAGE, 0x01);
+    _out(GDC_DISP_PAGE, GDC_PAGE_0);
+    _out(GDC_ACCESS_PAGE, GDC_PAGE_1);
     gfx_flip_enabled = 1;
 
     palette_init();
@@ -630,22 +637,11 @@ void gfx_init_200(void)
 
     _out(GDC_GFX_CMD, GDC_CMD_START);
 
-    /* ページフリッピング有効化: 両ページのVRAMをゼロクリア */
-    _out(GDC_ACCESS_PAGE, 0x00);
-    kmemset((u8 *)P2V(VRAM_PLANE_B), 0, GFX_PLANE_SZ_200);
-    kmemset((u8 *)P2V(VRAM_PLANE_R), 0, GFX_PLANE_SZ_200);
-    kmemset((u8 *)P2V(VRAM_PLANE_G), 0, GFX_PLANE_SZ_200);
-    kmemset((u8 *)P2V(VRAM_PLANE_I), 0, GFX_PLANE_SZ_200);
-
-    _out(GDC_ACCESS_PAGE, 0x01);
-    kmemset((u8 *)P2V(VRAM_PLANE_B), 0, GFX_PLANE_SZ_200);
-    kmemset((u8 *)P2V(VRAM_PLANE_R), 0, GFX_PLANE_SZ_200);
-    kmemset((u8 *)P2V(VRAM_PLANE_G), 0, GFX_PLANE_SZ_200);
-    kmemset((u8 *)P2V(VRAM_PLANE_I), 0, GFX_PLANE_SZ_200);
+    gfx_clear_planar_pages(GFX_PLANE_SZ_200);
 
     /* ページ0を表示、ページ1に描画 */
-    _out(GDC_DISP_PAGE, 0x00);
-    _out(GDC_ACCESS_PAGE, 0x01);
+    _out(GDC_DISP_PAGE, GDC_PAGE_0);
+    _out(GDC_ACCESS_PAGE, GDC_PAGE_1);
     gfx_flip_enabled = 1;
     gfx_display_page = 0;
     prev_dirty.count = 0;

@@ -48,6 +48,29 @@ using MAP_FIXED_NOREPLACE. Thus dispatch, software drawing, and PC98 shutdown
 execute; actual hardware display, timing, device reservation, or optional
 hardware initialization are **not** verified.
 
+## Banked planar cleanup extension (2026-10-03)
+
+For the display cleanup fix in 票
+[TASK_T2D_T2H.md](../../docs/tasks/v3/TASK_T2D_T2H.md), the harness now includes
+real `gfx_vram.c` in addition to splash/core/PC98 code. Raster presentation is
+no longer stubbed: A6h switches a two-page, four-plane host memory model, and
+A4h records that real raster transfers painted both pages. Timing, port I/O,
+optional-device operations and the other hardware edges remain substitutes;
+actual hardware display and GRCG/EGC/PEGC modes are not covered.
+
+RED → GREEN: the previous coder recorded the baseline splash failing all eight
+preference/retry cases with logo bytes remaining on page 0. Restoring the old
+single-present cleanup in the current temporary tree reproduces
+`FAIL: residual logo page=0`. The shared CPU cleanup makes both pages zero;
+all eight splash controls pass. P3 additionally seeds both pages before native
+400/200-line initialization and checks the visible regions immediately after
+each call. Removing either cleanup call produces its own init-residual failure.
+`python3 tools/tests/test_display_cleanup.py --mutate` returned rc=0 with
+13 controls and 16 runtime RED mutants (details in
+[display_cleanup_tdd.md](display_cleanup_tdd.md)). This section extends the
+original dispatch evidence above; it does not turn the earlier hardware or
+optional-backend exclusions into verified results.
+
 ## Target compile and isolation
 
 `i386-elf-gcc` compiled `kernel/boot_splash.c` and unchanged `gfx/gfx_core.c` to a

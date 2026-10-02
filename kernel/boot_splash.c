@@ -5,7 +5,7 @@
 /*  スクロールアニメーションを3秒間表示する。                                  */
 /*                                                                          */
 /*  カーネルのGFXサブシステムとバックバッファを直接操作する。                  */
-/*  GFX初期化→描画→アニメーション→VRAMクリア→テキストモード復帰を完結。     */
+/*  GFX初期化→描画→アニメーション→両ページ消去→テキストモード復帰を完結。     */
 /* ======================================================================== */
 
 #include "gfx.h"
@@ -335,9 +335,7 @@ void boot_splash(void)
     }
 
     /* クリーンアップ: VRAM全クリア → テキストモード復帰 */
-    bb_clear(0);
-    gfx_add_dirty_rect(0, 0, GFX_WIDTH, GFX_HEIGHT);
-    gfx_present();
+    gfx_clear_planar_pages(GFX_PLANE_SZ);
     gfx_shutdown();
     palette_init();
     tvram_clear();

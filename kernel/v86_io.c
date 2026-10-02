@@ -230,12 +230,20 @@ static void gfx_state_for_guest(void)
     io_out(PAL_R_PORT,   0x26);
     io_out(PAL_B_PORT,   0x04);
 
-    io_out(GDC_DISP_PAGE, 0x00);
-    io_out(GDC_ACCESS_PAGE, 0x00);
+    io_out(GDC_DISP_PAGE, GDC_PAGE_0);
+    io_out(GDC_ACCESS_PAGE, GDC_PAGE_0);
 }
 
-/* OS32 の描画環境を戻す。gfx_init() の末尾と同じ設定にする
- * (VRAM は消さない — ゲストが描いた内容を残すため)。 */
+/* UNDOCUMENTED io_disp.md: I/O 00A2h / モードF/F1 DISP ENABLE。
+ * CUI の表示順序を通常の V86 と ROM 採取の出口で共有する。 */
+void v86_cui_display_restore(void)
+{
+    io_out(GDC_GFX_CMD, GDC_CMD_STOP);
+    io_out(MODE_FF1_PORT, MFF1_DISP_ON);
+    io_out(GDC_TEXT_CMD, GDC_CMD_START);
+}
+
+/* OS32 の CUI に戻す。ゲストの VRAM 内容は保持するが表示は止める。 */
 static void gfx_state_for_os32(void)
 {
     u32 i;
@@ -259,9 +267,9 @@ static void gfx_state_for_os32(void)
         io_out(GDC_GFX_PARAM, pram_400[i]);
     }
 
-    io_out(GDC_GFX_CMD, GDC_CMD_START);
-    io_out(GDC_DISP_PAGE, 0x00);
-    io_out(GDC_ACCESS_PAGE, 0x01);
+    v86_cui_display_restore();
+    io_out(GDC_DISP_PAGE, GDC_PAGE_0);
+    io_out(GDC_ACCESS_PAGE, GDC_PAGE_0);
 
     /* 16 色に戻した後でないとアナログパレットとして書き込まれない */
     palette_init();

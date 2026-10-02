@@ -731,6 +731,67 @@ STOP最終増分は予告1152Bではなく1344B。ASSERT/診断は削らず、�
 **e3 の着地とゲスト受入 (PM、2026-10-03、main `5a47990`、NP21/W 17MB・今の ini)**: f1b と同時期の取り込みで build/sdk.mk・check_map.yaml が競合 → 両方を残して解消、TESTS.md と 02_memory.md を再生成。コミット済みの木で `make all`・`make check` rc=0。停止 → `nhd-pull` → `deploy-kernel` → `deploy` → 起動。`ver` の Commit `5a47990`、`/boot/vmkernel.lz4` 481,837 B 一致。**kselftest pass 272 / fail 0** (e3 の 2 項目を含む)、db・klibc・alloc・d0a・faulttest 4 種・loop/kloop + STOP・`v86 -t` OK、GUI (gui_demo → CUI) OK。**アプリ起動と `v86 -t` を通った後に master の低位 PT (物理 0x3F2000) を直接読み、PCD を照合**: TVRAM A0000-A3FFF・B/R/G A8000-BFFFF・E E0000-E7FFF は全ページ PCD=1、CG 窓 A4000-A7FFF・ROM C0000-DFFFF / E8000-FFFFF は PCD=0、全ページ present・恒等の frame — 塞いだ 2 経路 (exec の共有 USER 化、V86 teardown) を実物で確認。
 - **既存の表示の不具合 (e3 とは無関係、記録)**: `v86 -t` の後でグラフィック表示がオンのまま残り (`grph_disp` 0→1)、VRAM に残っていた起動スプラッシュの「OS32」ロゴが CUI の背後に見える。e3 の直前のカーネル (`85ffa38`、f1b の worktree のビルド) でも同じ — 前からの挙動。kernel/boot_splash.c は「VRAM クリア → テキストモード復帰」と書くが VRAM のロゴが残っており、V86 の自己試験の後始末もグラフィック表示を止めていない。CUI の見た目だけの不具合で回収・資源には影響しない。直す段は PM が後で決める (候補: V86 の自己試験の出口でグラフィック GDC を停止 / スプラッシュの終わりで VRAM を実際に消す)。GUI を往復すると grph_disp=0 に戻る。
 
+  **表示不具合の修正 (2026-10-03、基点 `e4fc688`、wt/dispfix、コーダー Codex gpt-6-astra (P3 対応は Codex gpt-6.1-sol))**:
+
+  - 原因A: `gfx_state_for_os32` が CUI への出口でグラフィック GDC を START し、表示ページ0を見せていた。
+    原因B: スプラッシュの終了時の `gfx_present` は flip の描画ページ1だけを黒にし、ページ0にロゴを残していた。
+  - ユーザー決定 (§5、PM の参照資料): `v86 -t/-d/-b` の出口は常に CUI。
+    `v86_cui_display_restore` に STOP → 68h表示可 → テキストSTARTを共通化し、通常出口と
+    `gcap_cui_rebuild` から呼ぶ。通常出口の A4h/A6h はともに0。16色・400ライン・CSRFORM・
+    SCROLL・パレット・カーソル復帰は保持、SYNCは追加しない。旧設計 `07_gfx_state.md` の
+    「残す」は VRAM の内容保持と解釈し、V86終了時に消去せず表示だけ止める。
+  - `gfx_clear_planar_pages` を `gfx_init` / `gfx_init_200` / スプラッシュ終了で共有。
+    A6hで0/1を選び、4プレーンの表示領域をCPUで消去 ([HW1])。400ラインは各32000 bytes、
+    200ライン初期化は従来どおり各16000 bytes。スプラッシュはPC98標準planar経路に限定済みで、
+    shutdown直前に両ページを消す。ページ番号を定数化し、`pc98.h` の4Bh注記をCSRFORMへ訂正。
+  - ハードウェア根拠 (本文の転載なし): `/mnt/c/WATCOM/docs/undocumented/io_disp.md`
+    「グラフィックGDC」I/O 00A2h、「モードフリップフロップ1」DISP ENABLE、
+    「VRAMプレーン切り換え」I/O 00A4h/00A6h。
+    `PC9800Bible/2-7_グラフィック.md` §2-7-2・§2-7-3・§2-7-4、
+    `PC9800Bible/3-2_グラフィック256色表示.md` §3-2-3・表3-4。
+    A6hはCPUの書込先、68h表示可は両画面共通、グラフィック停止にはGDC STOPが必要。
+    PEGC拡張時のE0000hはMMIOなのでplanar消去を拡張経路に流さない。
+    Bibleとの不一致はUNDOCUMENTEDを優先。worktreeに `docs/hw/` が無いため指定の別置き資料で照合した。
+  - **変更前の既存試験棚卸し**: `rg` で実物の取り込み・関数切り出しを調査。
+    `test_boot_splash_native.py` / `boot_splash_native_host.c` の片ページ模型・転送スタブを
+    両ページ模型と実物 `gfx_vram.c` に変更。設定4種×正常/異常後再試行の8条件について、
+    既存のSTART/STOP回数、設定保持、optional機器非初期化、反復・失敗復帰の期待は維持し、
+    両ページへの描画実績と消去を追加。既存の合格期待を弱める変更はない。
+    `test_gfx_boot.py` は予約関数の切り出しで今回の初期化本体を含まない。
+    `test_v86_gcap.py` は数理部分、`test_gui_gate.py` はGUI判定のため期待変更なし。
+    `gui_gate.py` の判定は変更しない。
+  - **回帰/変異**: 新設 `test_display_cleanup.py` はV86実物関数のOUT列・採取迂回・gcap復帰の3条件と
+    スプラッシュ8条件、計11条件成功。14変異を写しの木で実施し、全14件が実行時RED
+    (START復活、アクセス/表示ページ1、表示可/テキストSTART欠落、gcap共通復帰欠落、
+    旧スプラッシュ終了処理、同ページ二度消去2種、半面消去、各プレーン欠落4種)。
+    置換一致数は各1、プレーン欠落のみ各2に固定。コンパイル失敗・signalは検出数に含めない。
+    基点のスプラッシュは8条件ともページ0残留でRED、基点のV86通常出口はOUT列でRED
+    (採取迂回とgcapの2条件は成功)。修正後は既存2テスト/8条件も成功。
+    足場作成中の未使用変数警告・未定義スタブは修正済み。32bit libcヘッダが無いため新設の
+    libc依存足場は既存スプラッシュと同じLP64で実行し、ILP32の代用結果とは扱わない。
+    実行口は `host32.run`、最終検査のILP32は `HOST32_RUNNERS=qemu` に固定する。
+    `check-display-cleanup-host` を `tools/check_map.yaml` と生成 `docs/TESTS.md` に登録。
+  - **サイズ** (同じcross、build ID差を含む): ELF text 703316→703108 (-208)、data 36731→36731、
+    bss 606484→606484、kernel.bin 365124→364900 (-224)、vmkernel.lz4 481821→481696 (-125) bytes。
+    ABI・KAPI版・リンカASSERTの変更なし。
+  - **検証コマンド**: 共通環境 `CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp PYTHONPATH=`、
+    `HOST32_RUNNERS=qemu`。`make all NP21W_DIR=/dev/null < /dev/null` は基点初回のみ
+    未配置フォントでrc=2。本線の取得済みTTF2本をworktreeへコピー後の基点と修正後はrc=0。
+    `/dev/null` 宛の任意D88コピー警告あり (NP21/Wへの配備はしていない)。
+    `python3 tools/tests/test_display_cleanup.py --mutate`、`test_boot_splash_native.py` はrc=0。
+    `python3 tools/gen_memmap.py --write`、`python3 tools/gen_tests_inventory.py --write`、
+    `python3 tools/check_select.py --lint` はrc=0 (対応表漏れ0)。
+    最終 `OS32_MUT_JOBS=4 HOST32_RUNNERS=qemu make check-changed NP21W_DIR=/dev/null < /dev/null`
+    は本記録を書き終えてから実行し、実行中はソース/票を固定する。終了rcはコーダー最終報告と
+    `/home/hight/os32-tmp/disp-check-changed.log` で確認する。
+  - **未確認/実機受入**: 配備・NP21/W・NHD・ini・実機・commit/pushは未実施。
+    PMが起動直後と `v86 -t/-d/-b` 後のグラフィック停止、text_on、A4h/A6h=0、ロゴ残留なし、
+    GUI往復・`v86 -g -t`・9801でのgui_gate誤判定なしを確認する。
+    Ra266ではCUIを撮影して確認し、31kHz機の200/400ライン往復、STOP1/STOP2の差、
+    PEGC/planar VRAMの関係はh最終一式へ。GRCG/EGCをV86終了時に無効化しない件は
+    未観測のまま記録のみ (今回変更しない)。A6h=1/flip無効の不一致は通常出口のA6h=0で解消。
+
+
 
 ## 3. T2f — map/unmapとallocator、暫定heap終了
 
@@ -1900,3 +1961,15 @@ P3は依頼文の列挙順に番号を付す。反映済みは文書の修正を
 - **d〜g の各段の NP21/W 受入は、今の構成 (17MB、今の `np21x64w.ini`) だけで行う。** ini を切り替えない。
 - 本票の各段にある **8MB、planar / PEGC / Cirrus の切替、音源 (PC-9801-118 の PCM) など構成を変える確認は、受入記録に「構成依存は一括確認へ持越し」と書いて溜め、T2h の統合受入でまとめて行う** (§5 の h1〜h4 に加える)。Ra266 64MB も T2h。
 - ゲスト側の設定 (`gfxmode` など) で済む確認は、構成の変更に当たらない — 段の受入で行ってよい。
+  - V86 の出口は 6Ah の標準/拡張 (20h/21h) も戻さない — 9821 でゲストが拡張モードのまま戻ると A6h が効かず E0000h が MMIO のまま ([U] 00A6h)。未対処・未観測。
+  - **P3 対応**: 変異ごとの期待FAIL文言をstderrで照合し、V86の失敗理由を分離。
+    `gfx_init` / `gfx_init_200` の消去欠落2変異と両ページの初期化直後検査を追加し、
+    計13正常条件成功・16/16変異runtime RED。定数統一で増えた置換候補は通常出口だけに限定。
+    `TARGET_SRCS` を目録生成器へ公開し、規則はsdk.mk末尾、PHONY列へ追加。
+    近い試験の語幹一致の慣例に合わせて
+    [display_cleanup_tdd.md](../../../tools/tests/display_cleanup_tdd.md) を置き、V86/初期化の
+    変異記録をまとめる。既存splashの足場拡張は
+    [boot_splash_native_tdd.md](../../../tools/tests/boot_splash_native_tdd.md) に追記。
+    shutdown/ゲスト入口のA4h/A6hもGDC_PAGE_0へ統一し、定数に資料注記、余分な空行を削除。
+    最終検査は記録/ソースを固定して実行し、rcは最終報告と
+    `/home/hight/os32-tmp/disp-p3-check-changed.log` に残す。
