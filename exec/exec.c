@@ -713,45 +713,20 @@ int ring3_ptr_ok(u32 p)
          * は不許可 (ここを指すポインタは早期検証で kill)。 */
     if (p >= (u32)MEM_SHM_BASE &&
         p <  (u32)MEM_SHM_BASE + (u32)MEM_SHM_SIZE) return 1;  /* SHM */
+    if (p >= MEM_LEASE_BASE && p < MEM_LEASE_END) {
+        struct caller_access c;
+        u32 pa;
+        unsigned int saved = irq_save();
+        int ok = caller_access_get_user(&c) && caller_access_page(&c, p, 0, &pa);
+        irq_restore(saved);
+        return ok;
+    }
     if (p >= 0xA0000UL && p < 0xC0000UL) return 1;/* VRAM (テキスト/グラフィック) */
     return 0;
 }
 
-/* ======================================================================== */
-/*  ring3_user_range_ok — 長さまで見るユーザポインタ検証 (票 S0-K §1a)       */
-/*                                                                          */
-/*  ディスパッチャの早期検証 (kapi_argptr + ring3_ptr_ok) は先頭番地しか見ず、*/
-/*  先頭が帯外なら wrap に入る前に kill する (既存挙動。ここでは変えない)。   */
-/*  先頭が通った後の「どこまで読んでよいか」はこの関数が決める:              */
-/*                                                                          */
-/*    - CPL=3 由来 (ring3_in_syscall) のときだけ帯と PTE を見る。常駐シェル / */
-/*      gshell の直呼び (CPL=0、ディスパッチャを通らない) は素通し。          */
-/*    - 見るのは **帯だけ**。許可帯の中の非 present なページ (guard / sbrk     */
-/*      上限〜guard) をカーネルが写すと #PF になるが、それは既存の            */
-/*      フォールトガード (ring3_in_syscall) が呼び手を kill する — kprintf の  */
-/*      可変長 %s など、他の KAPI と同じ既定の扱い。契約 (FOUNDATION §2-6 の   */
-/*      「untrusted pointer / 長さ / 境界を CPL3 経路で検証」) は帯 + 長さで    */
-/*      満たす。                                                              */
-/*                                                                            */
-/*    **PTE (present / USER) は見ない** (2026-09-13、実機 K2 で 2 回失敗):     */
-/*      カーネルはページテーブルを「物理番地 = 仮想番地」で読む。ところが      */
-/*      PD もアプリ PT も pgalloc から取られ (`MEM_POOL_BASE` は 0x400000 で   */
-/*      **アプリ帯そのもの**)、アプリの PD では その仮想番地が per-app 物理へ  */
-/*      張り替わっている。つまり syscall 中 (CR3 = アプリ PD) に表を辿ると、    */
-/*      PT のつもりでアプリ自身のデータを読む — #PF も起きないまま「非 present」*/
-/*      と答える。`AppSlot.as` の控えから引いても、PDE から引いても同じ物理を  */
-/*      指すので結果は同じだった。表を正しく歩けるのは master CR3 の下だけで、  */
-/*      syscall の途中で CR3 を差し替えるのは割に合わない。                    */
-/* ======================================================================== */
-/* ---- 検証が断った理由の観測点 (実機 K2 の切り分け、2026-09-13) ----------
- * KAPI にはしない。fault_kill_count と同じくカーネルシンボルとして公開し、
- * `emu_read_mem` で読む。実機で `db_open_existing` が MISUSE を返したとき、
- * 「どのサブ条件で断ったか」がここを読むだけで分かる。
- *   count  : 断った回数
- *   last   : 直前の理由 (RING3_RANGE_*)
- *   addr   : 直前に断ったポインタ / ページ
- *   flags  : そのとき ring3_ptr_ok が見た帯の上端 (RING3_HEAP_TOP)
- * 正常系では 1 バイトも増えない (断ったときだけ書く)。 */
+/* B1 guards walk the saved caller's managed tables without a CR3 switch.
+ * Diagnostic symbols remain available to PM guest probes. */
 volatile u32 ring3_range_reject_count = 0;
 volatile u32 ring3_range_reject_last = 0;
 volatile u32 ring3_range_reject_addr = 0;
@@ -768,80 +743,7 @@ static int ring3_range_refuse(u32 why, u32 p, u32 page)
     return 0;
 }
 
-/* ======================================================================== */
-/*  ring3_user_range_writable — CPL=3 へ**書き込む**前の最後の砦            */
-/*                              (票 TASK_HAL_WIRING、Codex 往復 10 / 11)    */
-/*                                                                          */
-/*  OS32 は **CR0.WP = 0** で走る (`arch/x86/arch_cpu.h` の MMU 有効化。     */
-/*  `kernel/shlib.c` が「カーネルからは RO ページにも書ける」ことに依存)。   */
-/*  そのため CPL=0 の KAPI ラッパは、アプリが出力引数として渡した**読み取り  */
-/*  専用の USER ページ** — 共有ライブラリの `.text` / `.rodata`、全アプリで  */
-/*  同じ物理 — にも #PF を起こさずに書けてしまう。早期検査                   */
-/*  (`kapi_argptr` → `ring3_ptr_ok`) は帯しか見ないのでここは素通りする。    */
-/*  (`ring3_ptr_ok` の「.text への書き込みは PTE が RO なので #PF で捕まる」 */
-/*   という注記は CR0.WP = 0 では成り立たない。)                            */
-/*                                                                          */
-/*  **表の歩き方** (往復 11 で固定):                                        */
-/*   - 見るのは**いまのアプリの PD**。`paging_pte_flags()` は master の      */
-/*     `page_tables[]` を引くので使えない — アプリでは RW + USER の shlib    */
-/*     `.data`/`.bss` が master では USER 無しに見え、**正常な出力を誤って   */
-/*     拒否する**。                                                          */
-/*   - かといって CR3 = アプリ PD のまま PD/PT の物理番地をポインタとして    */
-/*     辿ってもいけない。PD もアプリ PT も pgalloc から取られ               */
-/*     (`MEM_POOL_BASE` は 0x400000 = **アプリ帯そのもの**)、アプリの PD では */
-/*     その仮想番地が per-app 物理へ張り替わっているので、表のつもりで       */
-/*     **アプリ自身のデータ**を読む (2026-09-13、実機 K2 で 2 回失敗。       */
-/*     この上の `ring3_user_range_ok` の記録と kernel/paging.h を参照)。     */
-/*   - したがって: IF=0 → 現在の CR3 を控える → **master へ切り替える**     */
-/*     (master は低位物理を恒等写像しているので、控えたアプリ PD の物理番地を */
-/*     そのまま読める) → アプリ PD の PDE → PT の PTE を範囲の全ページで     */
-/*     確かめる → **元の CR3 に戻す** → IF を戻す。                         */
-/*     **master に居るあいだはユーザー出力に 1 バイトも書かない。**          */
-/*                                                                          */
-/*  表歩きと USER / RW の判定は paging.c の as_va_to_pa に集約し、          */
-/*  ホストで実ソースの組合せを網羅している。                                */
-/*  戻り値: 1 = 書いてよい / 0 = 書いてはいけない (呼び手は kill する)。      */
-/* ======================================================================== */
-
-/* master CR3 の下でだけ呼ぶこと。pd_phys はアプリ PD の物理先頭。 */
-static int ring3_pd_range_writable(u32 pd_phys, u32 p, u32 len)
-{
-    u32 page, last_page;
-
-    /* 断った理由は ring3_range_refuse で数える (RING3_RANGE_WR_*)。読み側の
-     * ring3_user_range_ok と同じ観測点 — 2026-09-26 まで書き側は数えておらず、
-     * wrap_mouse_poll で kill されても ring3_range_reject_count が 0 のまま
-     * だった。ここは master CR3 の下 (カーネル帯は恒等写像) なので書ける。 */
-    if (!pd_phys) return ring3_range_refuse(RING3_RANGE_WR_TABLE, p, 0);
-    if (!paging_is_present((uptr)P2V(pd_phys)))
-        return ring3_range_refuse(RING3_RANGE_WR_TABLE, p, pd_phys);
-    last_page = (p + len - 1u) & ~(u32)(PAGE_SIZE - 1);
-    for (page = p & ~(u32)(PAGE_SIZE - 1); ; page += PAGE_SIZE) {
-        u32 pa;
-        int why = as_va_to_pa(pd_phys, page, &pa);
-        if (why == AS_VA_TABLE)
-            return ring3_range_refuse(RING3_RANGE_WR_TABLE, p, page);
-        if (why == AS_VA_PDE)
-            return ring3_range_refuse(RING3_RANGE_WR_PDE, p, page);
-        if (why == AS_VA_PTE)
-            return ring3_range_refuse(RING3_RANGE_WR_PTE, p, page);
-
-        if (page >= last_page) break;
-    }
-    return 1;
-}
-
-/* 引数の早い段階の門番。1 = 見るまでもなく可 / 0 = 見るまでもなく不可 /
- * -1 = 表を歩いて確かめる。 */
-static int ring3_writable_trivial(u32 p, u32 len)
-{
-    if (len == 0) return 1;
-    if (p == 0) return 0;
-    if (p + len < p) return 0;            /* 加算の桁あふれ */
-    return -1;
-}
-
-int ring3_user_ranges_writable(u32 pa, u32 la, u32 pb, u32 lb)
+int ring3_user_ranges_writable(u32 va, u32 la, u32 vb, u32 lb)
 {
     /* **CPL=0 の直呼びは対象外** (常駐シェル / gshell はローカル変数を渡す)。
      * 判定は「呼び出し経路」で決める — CR3 が master かどうかで代用しない
@@ -852,45 +754,20 @@ int ring3_user_ranges_writable(u32 pa, u32 la, u32 pb, u32 lb)
      * これは**いま渡されたポインタ**の門。アプリが**前に登録した**ポインタは
      * 登録者 PD を使う redir_access で扱う (T2d d0b)。 */
     if (!ring3_guard_active(ring3_in_syscall, ring3_wm_depth)) return 1;
-    return ring3_user_ranges_writable_always(pa, la, pb, lb);
+    return ring3_user_ranges_writable_always(va, la, vb, lb);
 }
 
-int ring3_user_ranges_writable_always(u32 pa, u32 la, u32 pb, u32 lb)
+int ring3_user_ranges_writable_always(u32 va, u32 la, u32 vb, u32 lb)
 {
-    unsigned int saved;
-    u32 app_cr3, master;
-    int ok, ta, tb;
-
-    ta = ring3_writable_trivial(pa, la);
-    tb = ring3_writable_trivial(pb, lb);
-    if (ta == 0 || tb == 0)
-        return ring3_range_refuse(RING3_RANGE_WR_TRIVIAL,
-                                  (ta == 0) ? pa : pb, 0);
-    if (ta == 1 && tb == 1) return 1;
-
-    /* **2 本を 1 回の往復でまとめて見る** (Approve 後の注意 3)。出力ごとに
-     * master を往復すると、時計 1 回あたり CR3 の書き込みが 4 回になる。 */
-    saved = irq_save();
-    /* CR3 は**この場で自分で読む** — KAPI 入口に控えを取る機構は無く、
-     * `g_cur_app->as->pd_phys` は入口で走っていた CR3 とは別物であり得る
-     * (Approve 後の注意 1)。共有グローバルには書かない。 */
-    app_cr3 = paging_current_cr3() & ~(u32)0xFFFu;
-    master  = paging_kernel_pd_phys() & ~(u32)0xFFFu;
-
-    if (app_cr3 == master) {
-        ok = (ta != -1 || ring3_pd_range_writable(app_cr3, pa, la)) &&
-             (tb != -1 || ring3_pd_range_writable(app_cr3, pb, lb));
-    } else {
-        paging_load_cr3(master);
-        ok = (ta != -1 || ring3_pd_range_writable(app_cr3, pa, la)) &&
-             (tb != -1 || ring3_pd_range_writable(app_cr3, pb, lb));
-        /* **CR3 を戻してから IF を戻す** (Approve 後の注意 1)。
-         * この区間は表を読むだけで、ユーザー出力には 1 バイトも書かない。
-         * 検査に落ちたときの kill も、復元を終えた呼び手が行う (注意 5)。 */
-        paging_load_cr3(app_cr3);
-    }
+    unsigned int saved = irq_save();
+    struct caller_access c;
+    int ok = (!la && !lb) ||
+        (caller_access_get_user(&c) &&
+         check_caller_write_range(&c, (void *)(uptr)va, la) &&
+         check_caller_write_range(&c, (void *)(uptr)vb, lb));
     irq_restore(saved);
-    return ok;
+    if (!ok) return ring3_range_refuse(RING3_RANGE_WR_TABLE, va, 0);
+    return 1;
 }
 
 int ring3_user_range_writable(u32 p, u32 len)
@@ -900,22 +777,25 @@ int ring3_user_range_writable(u32 p, u32 len)
 
 int ring3_user_range_ok(u32 p, u32 len)
 {
-    u32 page, last_page;
-
-    /* CPL=0 の直呼び、または WM の文脈 (ring3_wm_depth の注記) */
+    struct caller_access c;
+    unsigned int saved;
+    int ok;
     if (!ring3_guard_active(ring3_in_syscall, ring3_wm_depth)) return 1;
-    if (p == 0) return ring3_range_refuse(RING3_RANGE_NULL, p, 0);
-    if (len == 0) return 1;               /* 0 バイトは読まない */
-    if (p + len < p) return ring3_range_refuse(RING3_RANGE_OVERFLOW, p, 0);
-    if (!g_cur_app)
-        return ring3_range_refuse(RING3_RANGE_NO_APP, p, 0);
-
-    last_page = (p + len - 1u) & ~(u32)(PAGE_SIZE - 1);
-    for (page = p & ~(u32)(PAGE_SIZE - 1); ; page += PAGE_SIZE) {
-        if (page == 0 || !ring3_ptr_ok(page))
-            return ring3_range_refuse(RING3_RANGE_BAND, p, page);
-        if (page >= last_page) break;
+    if (!p) return ring3_range_refuse(RING3_RANGE_NULL, p, 0);
+    if (!len) return 1;
+    if (len - 1 > ~(u32)0 - p)
+        return ring3_range_refuse(RING3_RANGE_OVERFLOW, p, 0);
+    saved = irq_save();
+    ok = caller_access_get_user(&c);
+    for (u32 va = p, left = len; ok && left;) {
+        u32 pa, n = PAGE_SIZE - (va & (PAGE_SIZE - 1));
+        ok = caller_access_page(&c, va, 0, &pa);
+        if (n > left) n = left;
+        left -= n;
+        if (left) va += n;
     }
+    irq_restore(saved);
+    if (!ok) return ring3_range_refuse(RING3_RANGE_BAND, p, 0);
     return 1;
 }
 

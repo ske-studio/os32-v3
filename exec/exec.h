@@ -147,36 +147,26 @@ int exec_layout_rejected(void);
  * NULL は 1 (wrap 側が意味を決める)。ディスパッチャの早期検証と同じ規則。 */
 int ring3_ptr_ok(u32 p);
 
-/* [p, p+len) のすべてのページが **許可帯** にあるか。**CPL=3 由来の呼び出し
- * (ring3_in_syscall) のときだけ** 見る。CPL=0 の直呼び (常駐シェル / gshell)
- * は素通しで 1。
- *
- * **PTE (present / USER) は見ない**。許可帯の中の非 present なページ
- * (guard / sbrk 上限〜guard) をカーネルが写すと #PF になるが、それは既存の
- * フォールトガードが呼び手を kill する扱いで、kprintf の可変長 %s など他の
- * KAPI と同じ。表を歩こうとした実装は 2 度とも実機で誤判定した — PD と
- * アプリ PT が pgalloc (MEM_POOL_BASE = アプリ帯 0x400000) から取られるため、
- * syscall 中 (CR3 = アプリ PD) に物理 = 仮想で表を読むと per-app 物理へ
- * 張り替わった **アプリ自身のデータ** を読んでしまう。
- * 戻り値: 1 = 帯の中 / 0 = 拒否 (NULL・overflow・帯外)。 */
+/* Read permission through the fixed caller's managed page walk (PDE/PTE
+ * PRESENT|USER and registered backing). No CR3 switch. CPL0/WM direct calls
+ * retain their explicit trusted convention. NULL/overflow/NP refuse. */
 int ring3_user_range_ok(u32 p, u32 len);
 
 /* 出力引数として渡された CPL=3 の番地に**書いてよいか**。
  * OS32 は CR0.WP = 0 なので、読み取り専用の USER ページ (共有ライブラリの
  * .text) への CPL=0 からの書き込みは #PF にならない — 帯の検証だけでは
  * 止められない (Codex 往復 10)。戻り 0 のときは書かずに kill する。
- * 詳しい理由と 2 段判定の根拠は exec/exec.c の関数冒頭。 */
+ * B1 の管理frame walkで PDE/PTE 両方の RW を確認する。 */
 int ring3_user_range_writable(u32 p, u32 len);
 
-/* 同じことを**2 本まとめて 1 回の往復で**。出力引数が 2 本ある KAPI は
- * こちらを使う — 1 本ずつ呼ぶと呼び出し 1 回で CR3 の書き込みが 4 回になる。
- * 2 本目が不要なら pb = 0, lb = 0。 */
-int ring3_user_ranges_writable(u32 pa, u32 la, u32 pb, u32 lb);
+/* Two outputs preflighted in one IRQ interval, without switching CR3.
+ * A zero length needs no output. Checking is not a reservation across yield. */
+int ring3_user_ranges_writable(u32 va, u32 la, u32 vb, u32 lb);
 
-/* 現在 CR3 の表を呼び手の文脈に関係なく歩く。
+/* 保存済み USER caller で検査する。WM 中も trusted にはしない。
  * 登録済み redirect ポインタには使わない: 登録者 PD の redir_access を使う。
  * この関数は「いま渡されたポインタ」の既存出力ガード用。 */
-int ring3_user_ranges_writable_always(u32 pa, u32 la, u32 pb, u32 lb);
+int ring3_user_ranges_writable_always(u32 va, u32 la, u32 vb, u32 lb);
 
 /* いまの呼び出しが CPL=3 のアプリ由来か (= ring3_guard_active(ring3_in_syscall,
  * ring3_wm_depth))。ポインタを**あとで使うために控える** KAPI が、控える時点で

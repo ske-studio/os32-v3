@@ -258,11 +258,15 @@ int copy_caller_cstr(const struct caller_access *c, const char *src,
     u32 va = (u32)(uptr)src;
     unsigned int flags = irq_save();
     int ok = 0;
+    u32 pa = 0;
     if (!va || !dst || !cap) goto out;
     for (u32 i = 0; i < cap; i++) {
-        u32 pa;
         if (i > ~(u32)0 - va) goto out;
-        if (!caller_access_page(c, va + i, 0, &pa)) goto out;
+        /* Maps/identity cannot change in this IRQ interval. Reuse this page's
+         * checked translation, never probe the next page before seeing NUL. */
+        if (!i || !((va + i) & (PAGE_SIZE - 1))) {
+            if (!caller_access_page(c, va + i, 0, &pa)) goto out;
+        } else pa++;
         dst[i] = *(const char *)P2V(pa);
         if (!dst[i]) { ok = 1; break; }
     }

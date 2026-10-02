@@ -1053,6 +1053,7 @@ checks:
     - kapi/kapi_db.c
     - kapi/kapi_db.h
     - tools/tests/kapi_db_owned_host.c
+    - tools/tests/db_copy_shim.h
     - tools/tests/test_kapi_db_owned.py
     - fs/fd_redirect.h
     - fs/vfs.h
@@ -2033,6 +2034,7 @@ checks:
     - lib/sqlite3/sqlite3.c
     - lib/sqlite3/sqlite3.h
     - tools/tests/kapi_db_v50_host.c
+    - tools/tests/db_copy_shim.h
     - tools/tests/sqlite_groups_backend.h
     - tools/tests/test_kapi_db_v50.py
     - tools/tests/vfs_fd_sqlite_host.c
@@ -2108,6 +2110,7 @@ checks:
     - lib/sqlite3/sqlite3.c
     - lib/sqlite3/sqlite3.h
     - tools/tests/db_errstr_host.c
+    - tools/tests/db_copy_shim.h
     - tools/tests/sqlite_groups_backend.h
     - tools/tests/test_db_errstr.py
     - tools/tests/vfs_fd_sqlite_host.c
@@ -2139,6 +2142,7 @@ checks:
     - lib/sqlite3/sqlite3.h
     - tools/mk_settings_db.py
     - tools/tests/cfg_host.c
+    - tools/tests/db_copy_shim.h
     - tools/tests/sqlite_groups_backend.h
     - tools/tests/test_cfg.py
     - tools/tests/vfs_fd_sqlite_host.c
@@ -2186,6 +2190,7 @@ checks:
     - lib/sqlite3/sqlite3.c
     - lib/sqlite3/sqlite3.h
     - tools/tests/install_recover_host.c
+    - tools/tests/db_copy_shim.h
     - tools/tests/sqlite_groups_backend.h
     - tools/tests/test_install_recover.py
     - tools/tests/vfs_fd_sqlite_host.c
@@ -3140,3 +3145,75 @@ checks:
   - tools/tests/test_access_walk.py
   - tools/tests/caller_copy_host.c
   - tools/tests/test_caller_copy.py
+
+  check-db-caller-host:
+  - arch/x86/arch_cpu.h
+  - arch/x86/arch_io.h
+  - exec/access_walk.c
+  - exec/appslot.h
+  - exec/exec.h
+  - exec/os32x_hdr.h
+  - exec/redir_access.c
+  - fs/fd_redirect.h
+  - fs/vfs.h
+  - include/config.h
+  - include/cpu.h
+  - include/io.h
+  - include/kprintf.h
+  - include/ksetjmp.h
+  - include/memmap.h
+  - include/redir_access.h
+  - include/sys.h
+  - include/types.h
+  - kernel/gdt.h
+  - kernel/paging.c
+  - kernel/paging.h
+  - kernel/pgalloc.c
+  - kernel/pgalloc.h
+  - kernel/physmem.c
+  - kernel/physmem.h
+  - kernel/shlib.c
+  - kernel/shlib.h
+  - kernel/tss.h
+  - lib/kstring.h
+  - platform/pc98/platform_io.h
+  - sdk/include/os32/os32_generations.h
+  - sdk/include/os32/os32_kapi_generated.h
+  - sdk/include/os32/os32_kapi_shared.h
+  - tools/tests/access_walk_host.c
+  - tools/tests/host_arch/arch_cpu.h
+  - tools/tests/host_arch/arch_io.h
+  - tools/tests/mutpar.py
+  - tools/tests/pgalloc_host_fixture.h
+  - tools/tests/test_access_walk.py
+
+  - exec/exec.c
+  - exec/ring3_str.c
+  - exec/ring3_str.h
+  - kapi/kapi_db.c
+  - kapi/kapi_db.h
+  - lib/sqlite3/os32_sqlite_config.h
+  - lib/sqlite3/os32_sqlite_vfs.h
+  - lib/sqlite3/sqlite3.h
+  - sdk/include/os32/os32_kapi_slots.h
+  - tools/tests/db_caller_host.c
+  - tools/tests/test_db_caller.py
+  - drivers/kbd.h
+  - drivers/kbd_status.h
+  - exec/exec_heap.h
+  - exec/exec_kapi_init.inc
+  - exec/lease.h
+  - fs/pipe_buffer.h
+  - include/con_sink.h
+  - include/console.h
+  - include/gfx_hal.h
+  - include/kbd.h
+  - include/kbd_inject.h
+  - include/launch.h
+  - kapi/kapi_host.h
+  - kernel/gui.h
+  - kernel/kmalloc.h
+  - kernel/shm.h
+  - kernel/snd_engine.h
+  - lib/path.h
+  - sdk/include/os32/os32_gui_shared.h

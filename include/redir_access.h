@@ -34,7 +34,8 @@ void caller_access_invalidate(void);
 int caller_access_page(const struct caller_access *a, u32 va, int write, u32 *pa);
 
 /* cap includes NUL; failed cstr staging must not be consumed. Every byte is
- * checked before reading, with no probe after NUL. TRUSTED stays below APP.
+ * checked before reading (page rights reused in the same IRQ interval),
+ * with no probe after NUL. TRUSTED stays below APP.
  * Fixed-size copies preflight all pages; refusal leaves output unchanged.
  * len=0 succeeds without access (including NULL). Kernel staging must be
  * nonoverlapping and large enough. Use only bounded wrapper sizes.

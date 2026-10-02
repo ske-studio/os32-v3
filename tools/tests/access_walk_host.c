@@ -66,7 +66,14 @@ static int current = 2;
 volatile int ring3_wm_depth;
 int appslot_cur(void) { return current; }
 int res_owner_get(void) { return current; }
-int ring3_call_from_user(void) { return 1; }
+int ring3_call_from_user(void) {
+#ifdef HOST_DB_CALLER_TEST
+    extern volatile int ring3_in_syscall;
+    return ring3_in_syscall && ring3_wm_depth <= 0;
+#else
+    return 1;
+#endif
+}
 AppSlot *appslot_get(int id) { return id == 2 && slot.state ? &slot : 0; }
 u32 exec_tramp_page_addr(void) { return 0x170000; }
 void *kmemcpy(void *d, const void *s, u32 n) {

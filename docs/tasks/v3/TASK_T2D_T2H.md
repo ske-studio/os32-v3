@@ -76,7 +76,7 @@ int copy_to_caller(const struct caller_access *c, void *dst,
 
 固定長ref/desc用のcopy_caller_bytesも同じread walkで全範囲確認してからkernel stagingへ写す。入力stagingをそのまま公開結果として返さない。
 
-cstrはcapがNUL込み。cap0/NULLを拒否し、整数番地で加算前にoverflowを確認して、**その1 byteの権限確認→読取→NUL判定**。page末NULの次pageは調べも読まない。失敗時dstは未完成stagingであり使用禁止 (dst不変までは保証しない)。trustedでも容量・NUL検査を行う。copyoutはlen0で書込みなし、NULL+非0拒否。srcはkernelで確定済みの非重複staging、ユーザー同士のmemmoveには使わない。
+cstrはcapがNUL込み。cap0/NULLを拒否し、整数番地で加算前にoverflowを確認して、**その1 byteの権限確認→読取→NUL判定**。page末NULの次pageは調べも読まない。d5では同一IRQ保存区間内の確認済みページの権限・PAを再利用し、次ページはNUL未検出時にだけwalkする。失敗時dstは未完成stagingであり使用禁止 (dst不変までは保証しない)。trustedでも容量・NUL検査を行う。copyoutはlen0で書込みなし、NULL+非0拒否。srcはkernelで確定済みの非重複staging、ユーザー同士のmemmoveには使わない。
 
 **今渡されたポインタ**のUSER walkは保存PD=現在CR3、現slotのAS/owner/generation一致を要求。**登録済みポインタ**は別契約で、登録時に `{app_id, AS, pd_phys, owner, generation, origin}` をkernelのredir記録へ値保存し、呼出フレームへのpointerは保持しない。generationはAS寿命の単調識別子 (slot/owner/PD再利用と区別、周回時は再利用拒否)。redirのnest/park保存・復元にも付随させる。使用時に生存台帳から登録者ASを引き直し、失効したAS pointerをdereferenceする前に同一性を検査する。登録者が死んだ/世代不一致なら失敗し、書き手の子を登録者と取り違えてkillしない。書込みは登録者PDをwalkしたPAへ `P2V(pa)` でpageごとに行う。現在CR3への一致条件は課さず、元のVAへ直接書かない。読取り側も登録者PDからcopyし、今渡された出力bufferとは別に検査する。容量/位置のoverflowとlen<=capacityを確認し、検査失敗ではデータ・位置不変。生存確認→全範囲walk→copyの間は短いIRQ保存区間でAS回収/切替を防ぐ。
 
@@ -133,7 +133,7 @@ d0bでrecipeの同flagを外し、登録者ASのwalk/copy境界の足場を追�
 | d2 | park/longjmp/WMの寿命配線。実exec R1足場で古い記述子不使用。実装・P3対応・ホスト・予算は §10-7 |
 | d3 | read/write walkと管理frame検証。RO入力成功・RW出力・PS/偽PT拒否。実装・ホスト・予算結果は §10-9 |
 | d4 | cstr/copyout。page末NUL、次NP、未終端、overflow、IF両値、out不変。実装・ホスト・予算は §10-11 |
-| d5 | 上記DB3入口と既存出力ガード接続。実wrapper→実copy、SQLiteは入口だけ記録 |
+| d5 | 上記DB3入口と既存出力ガード接続。実wrapper→実copy、SQLiteは入口だけ記録。実装・試験・PM手順は §10-13 |
 | d6 | 対象変異・結線・小さなboot自己診断、size記録を別依頼で確定 |
 
 ホストは `test_ring3_str.py` / `test_ring3_guard.py` / `test_kapi_db_v50.py` と実paging/execの組合せ。読み側を真似た模型だけで済ませず、物理恒等と高位VAが異なるfixtureを使う。変異: master PDで検査、PDE RW無視、管理frame確認除去、NUL後先読み、事前strlen、無条件sti、WM復帰後trusted漏れ、redir登録PDを現在CR3へ置換、PA copyをVA直書きへ戻す、登録generation照合削除。各々狙ったデータ/順序assertでREDにする。
@@ -1171,6 +1171,161 @@ caller-copy は 17/17 runtime RED、C 方言は 27/27 RED・正常対照 5/5 GRE
 独立レビュー Opus 5.5 は P1・P2 なしで Approve (d5 で接続したときに到達する反例もなし)。P3-1 (RO の write-range 拒否の試験の穴) と P3-2 (NP 拒否の写し先の不変の確認) はコーダー (sol) が対応 (変異 17/17 実行時 RED)、P3-3〜5 は §10-11 の d5 への申し送り (cstr の IRQ 区間の長さの計測、len / cap の上限をラッパーごとに明示、staging を SHM に置かない)。予算: d の枠の残り 2,012B、ASSERT 残り 36,624B。新しい 4 関数は d5 まで呼び出し元が無い。
 
 ゲスト (17MB、今の ini — §12): kselftest 0 fail、`klibc_test` 49/49、`alloc_demo` 16/16、`ring3_fault` kill、`ls / | wc -l` = 54、`echo abc | wc -c` = 4、`d0a_test` 全行 OK、faulttest 一式・V86・GUI (gui_demo → CUI) 従来どおり。`ring3_caller_reject_count` = 0、`redir_refuse_count` = 0、kill 8 件はすべて意図したもの、取り残し 0、深さ 0。
+
+## 10-13. d5 の実装結果 (2026-10-02)
+
+モデル: GPT-6。基点 `47397cb`、worktree `wt/t2d5`。d5のみ。
+`db_open` / `db_open_existing` / `db_prepare_only` の文字列を実
+`copy_caller_cstr` へ接続。USERは保存caller、CPL0直呼び/WMは既存の明示trusted
+経路を使う。前2入口のcapは `PATH_COPY_BUF_SIZE = OS32_MAX_PATH = 256`
+(NUL込み)、SQLは `SQL_COPY_BUF_SIZE = DB_SQL_MAX_BYTES = 1024` (NUL込み)。
+既存kernel BSS stagingを再利用し、SHMにstagingを新設していない。
+
+`db_user_str_copy` / `db_user_range_ok` を撤去。後者の既存consumerである
+bind_text/blobの「検査→直接kmemcpy」も、同じ入力補助の固定長分岐から
+`copy_caller_bytes` へ置換した (text最大255 B、blob最大4096 B、NULLはlen0も
+従来どおり拒否、非NULLのlen0は空値)。bindのindex検査順序・TRANSIENT・rcは維持。
+既存 `db_v50_selftest` のNULL/overflow 2呼出だけ撤去補助から新補助へ付替えた。
+d6のboot自己診断追加はしていない。
+
+§1-2で指定されたcopy失敗時のSQLite進入0・旧stmt不変を満たすため、
+prepare_onlyはcopyを旧stmtのfinalizeより前へ移した。NULL/未終端/NP等の
+**copy拒否では旧stmt/bindableを残す**。空SQL・複数statementなどコピー成功後の
+意味検査は従来どおり旧stmtを捨てる。旧ホスト試験の「NULL/未終端でも破棄」は
+この設計契約へ更新し、コピー拒否後は明示finalizeして旧SQLを実行しない対照にした。
+公開slot・引数・エラー値 (open=-1/CANTOPEN、existing/prepare=-1/MISUSE) は不変。
+SQLite engine、旧db_exec/db_prepare、FEP facadeには入っていない。
+
+既存 `ring3_user_range_ok` / `ring3_user_ranges_writable[_always]` は保存callerの
+管理walkへ統一。PDE/PTEのPRESENT/USER、出力は両方RW、管理frame/backingを検査。
+`ring3_pd_range_writable` / trivial補助 / master CR3往復を撤去した。
+2出力は1つのIRQ保存区間で全検査し、`_always` はWM内も保存USERを使う。
+単独checkは予約ではなく、既存出力wrapperが検査後yieldしない契約を保つ。
+汎用ガードは従来のlenを検査するだけで新たな無制限copyを追加しない。
+DB結果は既存固定SHM形式であり、3入口にcaller出力引数はないため
+`copy_to_caller` の架空の呼出箇所を作らない。d4の実copyout試験を回帰する。
+内部拒否診断は新walkの失敗をread=BAND / write=WR_TABLEへ集約 (pageは0)。
+
+**申し送り対応**:
+
+- d3 P3-4: trampoline RO scratchの入力をread walkへ揃えた。
+  `ring3_ptr_ok` のscratch分類を維持し、有効RAM leaseの分類を追加。
+  scratch/RO leaseへの出力は拒否し、世代違いleaseは早期分類でも拒否する。
+- d3 P3-6 / d4 P3-3: cstrを「ページ初回walk→ページ内PA+off」へ変更。
+  同じIRQ区間内でAS/mapが変わらない条件を利用し、NUL後のページを触らない。
+  世代/参照数だけへの弱化は採らず、`ledger_surface_validate` の管理backing照合を
+  維持した。75ページRAM面の未終端1024 Bで実walk **1024回→1回**
+  (ページ整列時。非整列で跨げば最大2回) をIF=0/1でassert。
+  面全体の検査は75ページ分が残るが、cap倍の反復はなくなる。
+  PC-98のIRQ停止時間は未計測であり、ホスト時間を実機時間としない。
+- d4 P3-4 / P3-5: 上記cap/len上限をwrapperで保持、stagingは既存kernel BSS。
+  app/lease/SHM入力と非重複。TRUSTEDには内部callerの非重複staging契約を適用。
+
+ホスト `test_db_caller.py` は実 `kapi_db.c` 全文、exec.cの実ガード関数群
+(定義/本文を無改変で抽出)、実caller/copy/paging/pgalloc/shlib/walkをリンク。
+MMU/IRQ/VFS/SQLite境界のみ足場、SQLiteは入口呼出を数えてstaging内容を照合する。
+高位VAに異なるdecoy、低位PAに本物の入力を置き、3入口のpage末NUL対照/
+次NP拒否→次操作成功、SQLite/VFS進入0、旧stmt不変、RO入力/出力拒否、
+2本目拒否、PDE RW、WMの通常/always、CPL0直呼び、失効caller、scratch、lease、
+IF/CR3不変を確認。カウンタはホスト境界のもの、製品KAPIを追加していない。
+既存SQLite-engine試験5本は共通caller境界shimへ更新し、実walk試験と区別した。
+
+変異は固定source closureの写しだけで、全木copy/SQLite engine再ビルドをせず実施。
+d5の9本 (PA→VA、lease早期拒否、path/SQLをbytesに置換、拒否時finalize、
+WM trusted漏れ、先/後出力検査除去、RO入力拒否) とd4の17本が対象。
+初回fixtureのコンパイル失敗、75ページ面作成時のmaster条件不足、padding初期化で
+文字列が消えた正常対照失敗、変異のunused変数コンパイル失敗/NULL期待値による
+signal終了は試験器側を修正し、実行時RED本数には算入していない。
+
+| 同一cross toolchain実測 | 作業前 (clean build_id) | d5 (-dirty) | 差分 |
+|---|---:|---:|---:|
+| kernel.bin | 362,832 B | 362,136 B | -696 B |
+| vmkernel.lz4 | 480,466 B | 480,064 B | -402 B |
+| 本体占有 (`__bss_end - 0x100000`) | 573,680 B | 572,976 B | -704 B |
+| `__bss_end` | `0x18C0F0` | `0x18BE30` | -704 B |
+| リンカASSERT残り (596 KiB枠) | 36,624 B | 37,328 B | +704 B |
+| d枠残り (5,888 B) | 2,012 B | 2,716 B | +704 B |
+
+旧補助撤去で704 Bを戻した。ASSERT変更なし。kernel.bin差分にはdirty化の8 Bを含む。
+AS/AppSlot/台帳のサイズは不変。copy4口はnmでリンク済み。d6の最終size確定とは別の
+今回の実測であり、d枠は2,716 Bを残す。
+
+実行環境は `PATH=/home/hight/opt/cross/bin:$PATH`、
+`CROSS_DIR=/home/hight/opt/cross`、`TMPDIR=/home/hight/os32-tmp`。
+ILP32は既存 `PYTHONPATH=/home/hight/os32-tmp/d0b-host-runner` のqemu-i386経由、
+`OS32_MUT_JOBS=4`。`make kernel < /dev/null` (前後)、
+`python3 tools/tests/test_db_caller.py --mutate` (9/9 runtime RED、0.31〜0.38秒/本)、
+`python3 tools/tests/test_caller_copy.py --mutate` (17/17 runtime RED、0.41〜0.49秒/本)、
+`python3 tools/tests/test_kapi_db_v50.py` (24/24)、
+`python3 tools/tests/test_kapi_db_owned.py`、`python3 tools/tests/test_caller_access.py`、
+`python3 tools/check_select.py --lint`、
+`python3 tools/gen_tests_inventory.py --write` はrc=0。
+`NP21W_DIR=/home/hight/os32-tmp/d5-unused-image-destination
+CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp make all < /dev/null` はrc=0。
+FDコピー先は存在しない一時パスへ限定しcopy警告を確認。既存のRust/GNU-stack/RWX/
+未使用変数等の警告あり。ログは `/home/hight/os32-tmp/d5-{before,kernel,db,copy,v50,owned,caller,all,all-final}.log`。
+初回check-mapのYAML字下げ/19依存漏れは修正してlint=0。
+P2V初回は既存名paを物理と判定する1件を検出したため、実態どおりcaller VAの
+引数名va/vbへ改めた (例外追加なし)。
+
+**PMのゲスト手順 (未実施)**: 現構成17MB/現iniのまま、新kernel.elf/mapと画像の
+hash/size、kselftestを確認 [V1]。構成依存は一括確認へ持越し (§12)。
+
+1. `/usr/bin/db_test.bin` で正常DBを確認する。`db_v50_test /tmp/d5.db` は
+   旧 `BAND_TOP=0x800000` の帯外pointerを含むため、そのまま全件PASSを要求しない。
+   PMの一時fixtureでは当該旧帯負例を除いた既存の正常列
+   (open_existing→prepare_only→bind→step→close) を実行し、次操作も成功を記録。
+   元guest試験の高位帯追随は未実施で、d6/PMのfixture整備へ明示して残す。
+   FEPはSHIFT+SPACE→既知の読み1語→SPACE変換→ENTER確定、GUI→CUIも回帰。
+2. 負例は既存db_v50_testの各3入口で1回ずつデバッガ停止する。現在ASの未使用
+   heap末page (RW/USER、次pageはNP) を選び末尾4 Bへ非NULを書き、
+   当該syscallのユーザー引数領域の文字列pointerだけを末尾4 BのVAに差替える
+   (open/existingの第1引数、prepare_onlyの第2引数。元の値/4 Bを控える)。
+   dispatcherの早期分類前で差替え、帯内判定を通過することも確認する。
+   新nmのsqlite3_open/open_v2/prepare_v2/finalize等の入口breakpointで当該wrapper
+   の呼出区間を数え、全て0、rc=-1、kill差分0を確認。prepare_onlyは有効handleに
+   旧stmtを用意し、同stmt/bindable/FD数が変わらないことを観測する。
+   診断はopen=CANTOPEN、existing/prepare=MISUSE。引数/4 Bを復元し、
+   新しい正常prepare/DB操作が成功することまで記録する。page末をNULへ変えた
+   対照では次NPを読まずSQLite入口へ進む (SQL/path内容の意味エラーは別)。
+3. CPL3の短い呼出列 `p = api->sys_getcwd(); h = api->db_open(p);` を確認する。
+   次の返却文字列KAPIを間に呼ばずscratchの寿命を守る。入口でpが新nmのtrampoline
+   scratch内、P/U/ROであることを確認し、sqlite3_open入口が1回となることを記録。
+   getcwdはディレクトリ名なのでSQLite側CANTOPENはあり得る。**open成功を条件にせず**、
+   入力copy拒否文が出ないこととSQLiteに同じcwd文字列を渡したことを受入とする。
+   RO scratchへの出力拒否は別の出力ガード回帰で確認する。
+
+**d6へ渡す穴**: §10-9 P3-2の多重防御変異仕分け、小さなboot自己診断、最終size
+確定は未実施。ゲストの実CR3/TLB/画面/IRQ時間、独立レビューはPMへ。
+T4へは旧db_exec/db_prepare/FEP全体の未移行を残す。d3 P3-7の恒等依存はe。
+親票/TASK_MEMMAP_V3/本票状態行は変更なし。commit/push/NP21/W/NHD/配備/iniは未操作。
+
+**最終全体検査と補修**:
+`PATH=/home/hight/opt/cross/bin:$PATH
+PYTHONPATH=/home/hight/os32-tmp/d0b-host-runner
+CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp
+make check-changed < /dev/null` は **1回だけ実行しrc=2**。
+`build/sdk.mk` の検査追加によりfullへ拡張した。唯一の失敗targetは
+`check-memory-host` の `test_app_bb_overlap.py --mutate`。
+実 `ring3_ptr_ok` を切り出す旧fixtureが新しいcaller型/2関数を持たず、15変異とも
+compile失敗 (REDに算入しない)。通常実行でも同じコンパイル失敗を再現した。
+
+`app_bb_overlap_host.c` にヘッダと未使用lease経路の足場を追加した。
+その経路に入ると `CHECK(0)` で失敗させ、判定を偽って素通しにしない。
+実lease/callerの結合試験はd5側が担当。補修後
+`python3 tools/tests/test_app_bb_overlap.py --mutate` は **rc=0、正常対照PASS、
+15/15コンパイル成功後の実行時RED**。停止したrecipeの後続
+`python3 tools/tests/test_gfx_boot.py --mutate` も個別実行して **rc=0、18試験PASS、
+14/14 RED**。`python3 tools/check_select.py --lint` / `git diff --check` はrc=0。
+補修は試験足場だけでkernel画像・上表のサイズは不変。
+
+全体検査内のd5 9/9・copy 17/17・walk 23/23はruntime RED、
+C方言27/27 RED・正常対照5/5 GREEN、P2V違反0件。
+既存Windows opt-inは単独4件・集約5件skip。
+ログ: `/home/hight/os32-tmp/d5-check-changed.log`、
+`d5-app-bb-before.log`、`d5-app-bb.log`、`d5-gfx.log` (同ディレクトリ)。
+**ユーザーの「最後に1回」に従いcheck-changedは再実行していない。
+対象失敗は修正済みだが、完了条件のcheck-changed rc=0は未達で、PMの再確認に残る。**
 
 ## 11. 独立レビュー 2 回目 (Opus 5.5、Approve) の P3 — 実装時の注記
 
