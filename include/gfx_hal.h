@@ -101,12 +101,11 @@ extern const GfxBackend *g_backend;
 
 /* 9801 プレーンバックエンド (gfx/backend_pc98.c)。
  * H3 (Cirrus) はこの表にもう 1 枚足す。 */
-extern const GfxBackend gfx_backend_pc98;
+extern GfxBackend gfx_backend_pc98;
 
 /* 9821 PEGC 256 色バックエンド (gfx/backend_pegc.c, H2)。
  * **const ではない**: バックバッファは起動時の ⑥ が池から確保する (台帳の
- * SURFACE) ので、bb_base / bb_size を probe が SURFACE から埋める (9801 は
- * コンパイル時定数で済む)。
+ * SURFACE) から埋める。9801 も gfx_core の共通設定で CLIENT に結び付ける。
  *
  * **weak 宣言**: gfx/backend_pegc.c を build/kernel.mk の C_KERNEL に入れて
  * いないビルドではこのシンボルは 0 になり、バックエンド表の該当要素が NULL に

@@ -112,6 +112,10 @@ notest:
 
 checks:
   check-display-cleanup-host:
+  - exec/exec.h
+  - include/redir_access.h
+  - exec/surface_query.h
+  - exec/lease.h
   - gfx/backend_pc98.c
   - gfx/gfx.h
   - gfx/gfx_core.c
@@ -1028,6 +1032,9 @@ checks:
     - sdk/include/os32/os32_kapi_shared.h
     - kernel/kmalloc.h
   check-boot-splash-host:
+    - include/redir_access.h
+    - exec/surface_query.h
+    - exec/lease.h
     - gfx/gfx_vram.c
     - kernel/cpu_calibrate.h
     - sdk/include/os32/os32_generations.h
@@ -2118,6 +2125,7 @@ checks:
     - userland/system/inst_disk.c
     - userland/system/inst_hdd.c
   check-db-v50-host:
+    - include/pegc.h
     - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - exec/lease.h
@@ -3175,6 +3183,8 @@ checks:
   - tools/tests/test_caller_access.py
 
   check-access-walk-host:
+  - include/pegc.h
+  - include/gfx_hal.h
   - tools/tests/host32.py
   - tools/tests/test_host32.py
   - drivers/kbd.h
@@ -3246,6 +3256,8 @@ checks:
   - tools/tests/test_access_walk.py
 
   check-caller-copy-host:
+  - include/pegc.h
+  - include/gfx_hal.h
   - tools/tests/host32.py
   - drivers/kbd.h
   - drivers/kbd_status.h
@@ -3318,6 +3330,7 @@ checks:
   - tools/tests/test_caller_copy.py
 
   check-db-caller-host:
+  - include/pegc.h
   - tools/tests/host32.py
   - include/bootlog.h
   - include/pc98.h
@@ -3421,6 +3434,8 @@ checks:
   - sdk/include/os32/os32_gui_shared.h
 
   check-surface-query-host:
+  - include/pegc.h
+  - include/gfx_hal.h
   - tools/tests/host32.py
   - arch/x86/arch_cpu.h
   - arch/x86/arch_io.h
@@ -3506,6 +3521,8 @@ checks:
     - build/programs.mk
 
   check-surface-lease-host:
+  - include/pegc.h
+  - include/gfx_hal.h
   - gfx/gfx.h
   - arch/x86/arch_cpu.h
   - arch/x86/arch_io.h
@@ -3616,6 +3633,7 @@ checks:
     - tools/tests/host32.py
 
   check-surface-bundle-host:
+  - include/pegc.h
   - gfx/gfx.h
   - arch/x86/arch_cpu.h
   - arch/x86/arch_io.h
@@ -3705,3 +3723,70 @@ checks:
   - tools/tests/test_access_walk.py
   - tools/tests/test_surface_bundle.py
   - tools/tests/test_surface_lease.py
+  check-gfx-kernel-fb-host:
+  - arch/x86/arch_cpu.h
+  - arch/x86/arch_io.h
+  - drivers/np2sysp.h
+  - drivers/rtc.h
+  - drivers/wab_cirrus.h
+  - drivers/wab_glue.h
+  - drivers/wab_glue_xe10.h
+  - exec/access_walk.c
+  - exec/appslot.h
+  - exec/exec.h
+  - exec/lease.c
+  - exec/lease.h
+  - exec/os32x_hdr.h
+  - exec/redir_access.c
+  - exec/surface_query.c
+  - exec/surface_query.h
+  - fs/fd_redirect.h
+  - fs/vfs.h
+  - gfx/backend_cirrus.c
+  - gfx/backend_pc98.c
+  - gfx/backend_pegc.c
+  - gfx/gfx.h
+  - gfx/gfx_core.c
+  - gfx/gfx_internal.h
+  - gfx/gfx_scroll.c
+  - gfx/gfx_vram.c
+  - gfx/palette.h
+  - include/con_sink.h
+  - include/config.h
+  - include/console.h
+  - include/cpu.h
+  - include/gfx_hal.h
+  - include/io.h
+  - include/kprintf.h
+  - include/ksetjmp.h
+  - include/memmap.h
+  - include/os_time.h
+  - include/pc98.h
+  - include/pegc.h
+  - include/redir_access.h
+  - include/sys.h
+  - include/types.h
+  - include/wab_xe10.h
+  - kernel/cpu_calibrate.h
+  - kernel/gdt.h
+  - kernel/paging.c
+  - kernel/paging.h
+  - kernel/pgalloc.c
+  - kernel/pgalloc.h
+  - kernel/physmem.c
+  - kernel/physmem.h
+  - kernel/shlib.c
+  - kernel/shlib.h
+  - kernel/sys.c
+  - kernel/tss.h
+  - lib/kstring.h
+  - platform/pc98/platform_io.h
+  - sdk/include/os32/os32_generations.h
+  - sdk/include/os32/os32_kapi_generated.h
+  - sdk/include/os32/os32_kapi_shared.h
+  - tools/tests/gfx_kernel_fb_host.c
+  - tools/tests/host32.py
+  - tools/tests/host_arch/arch_cpu.h
+  - tools/tests/host_arch/arch_io.h
+  - tools/tests/mutpar.py
+  - tools/tests/test_gfx_kernel_fb.py

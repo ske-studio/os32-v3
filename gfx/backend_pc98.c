@@ -140,7 +140,7 @@ static void pc98_leave(void) { }
 /* ------------------------------------------------------------------------ */
 /*  バックエンド表。fill_rect / blit は NULL = CPU 共通実装へフォールバック。 */
 /* ------------------------------------------------------------------------ */
-const GfxBackend gfx_backend_pc98 = {
+GfxBackend gfx_backend_pc98 = {
     "pc98-planar",
     pc98_probe,
     (void (*)(void))0,   /* init: 9801 は GDC/プレーンを gfx_init が済ませるので別 hw-init 不要 */
@@ -152,7 +152,7 @@ const GfxBackend gfx_backend_pc98 = {
     pc98_leave,
     (int (*)(int, int, int, int, u8))0,        /* fill_rect: CPU 実装へ */
     (int (*)(int, int, int, int, int, int))0,  /* blit:      CPU 実装へ */
-    (u8 *)P2V_CONST(MEM_GFX_BB_BASE),   /* bb_base: プレーン 0 (青) 先頭 */
+    (u8 *)0,                /* bound from the registered CLIENT */
     (u32)GFX_BPL,            /* bb_pitch: 80 バイト/ライン */
     GFX_BB_PLANAR4,
     (u32)MEM_GFX_BB_SIZE,    /* bb_size: 4 プレーン分 128KB (0x6A000-0x89FFF) */

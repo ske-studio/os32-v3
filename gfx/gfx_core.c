@@ -10,6 +10,7 @@
 #include "pegc.h"         /* PEGC の窓と BIOS ワークの番地 (⑥ の資源レコード) */
 #include "wab_xe10.h"     /* Xe10 の窓の定数 (同上) */
 #include "kprintf.h"
+#include "../exec/surface_query.h"
 
 /* 画面の所有者の表は exec/appslot.c にある (判定材料が AppSlot にあり、
  * ホストで試験できるため)。gfx/ は -Iexec を持たないので、kernel/con_sink.c
@@ -20,10 +21,7 @@ extern int appslot_gfx_owner(void);
 /* ======================================================================== */
 /*  バックバッファ (拡張メモリ固定アドレス, 128KB)                          */
 /* ======================================================================== */
-u8 *bb_b = (u8 *)P2V_CONST(MEM_GFX_BB_BASE);
-u8 *bb_r = (u8 *)P2V_CONST((MEM_GFX_BB_BASE + GFX_PLANE_SZ));
-u8 *bb_g = (u8 *)P2V_CONST((MEM_GFX_BB_BASE + GFX_PLANE_SZ * 2));
-u8 *bb_i = (u8 *)P2V_CONST((MEM_GFX_BB_BASE + GFX_PLANE_SZ * 3));
+u8 *bb_b, *bb_r, *bb_g, *bb_i;
 
 int gfx_current_height = GFX_HEIGHT;  /* 200 or 400 */
 
@@ -56,6 +54,8 @@ static const GfxBackend *const g_backend_list[] = {
 /* 起動設定 (/etc/system.cfg GFX=) から渡される希望バックエンド (票 H2b)。
  * kernel.c が gfx_init より前に gfx_set_backend_pref() で設定する。 */
 static int g_backend_pref = GFX_PREF_AUTO;
+static int gfx_started;
+static void gfx_bind_client(void);
 
 void gfx_set_backend_pref(int pref)
 {
@@ -117,25 +117,81 @@ static void gfx_select_backend(void)
 /* ======================================================================== */
 /*  KAPI: フレームバッファ取得                                              */
 /* ======================================================================== */
+/* Internal backing is separate from the future public value/lease ABI.
+ * Before init (including prepare), the framebuffer is the boot PC98 CLIENT. */
+STATIC_ASSERT(GFX_FMT_PLANAR4 == GFX_BB_PLANAR4, gfx_planar_format_matches);
+STATIC_ASSERT(GFX_FMT_PACKED8 == GFX_BB_PACKED8, gfx_packed_format_matches);
+
+static int gfx_client_framebuffer(struct gfx_kernel_fb *out, int selected)
+{
+    struct gfx_kernel_fb fb = {0};
+    const struct ledger_surface *sf;
+    GFX_ScreenInfo si;
+    u8 *base;
+    u32 i;
+    if (!out) return OS32_ERR_INVAL;
+    sf = ledger_surface_find(selected ? gfx_sf_backend() : LEDGER_SF_PC98,
+                             LEDGER_ROLE_CLIENT);
+    fb.width = GFX_WIDTH;
+    fb.height = GFX_HEIGHT;
+    fb.pitch = GFX_BPL;
+    fb.format = GFX_BB_PLANAR4;
+    if (sf && !sf->closing) {
+        fb.width = sf->width;
+        fb.height = sf->height;
+        fb.pitch = sf->pitch;
+        fb.format = sf->format;
+        if (selected && g_backend->query && !g_backend->query(&si)) {
+            fb.width = si.width;
+            fb.height = si.height;
+            fb.pitch = g_backend->bb_pitch; /* query has no pitch field */
+            fb.format = si.format;
+        }
+        base = (sf->backing == LEDGER_SB_MMIO || sf->backing == LEDGER_SB_VRAM)
+             ? (u8 *)P2V_IO(sf->first * PAGE_SIZE) : (u8 *)P2V(sf->first * PAGE_SIZE);
+        for (i = 0; i < sf->planes; i++) fb.planes[i] = base + sf->plane_offset[i];
+    }
+    *out = fb;
+    return fb.planes[0] ? 0 : OS32_ERR_INVAL;
+}
+
+int gfx_kernel_framebuffer(struct gfx_kernel_fb *out)
+{
+    return gfx_client_framebuffer(out, gfx_started);
+}
+
+/* e11 installs the USER lease bridge. Keep both current callers on aliases. */
 void __cdecl gfx_get_framebuffer(GFX_Framebuffer *fb)
 {
+    struct gfx_kernel_fb kernel;
+    int i;
     if (!fb) return;
-    fb->width = GFX_WIDTH;
-    fb->height = gfx_current_height;
-    /* ピッチと先頭はバックエンドの記述子から取る (9801 は 80B/ライン ×
-     * 4 プレーンで従来と同じ値、PEGC は 640B/ライン のパックド 1 面)。
-     * 決め打ちにするとパックド系で嘘のピッチを返す。 */
-    fb->pitch = (int)(g_backend ? g_backend->bb_pitch : (u32)GFX_BPL);
-    if (g_backend && g_backend->bb_format == GFX_BB_PACKED8) {
-        fb->planes[0] = g_backend->bb_base;
-        fb->planes[1] = (u8 *)0;
-        fb->planes[2] = (u8 *)0;
-        fb->planes[3] = (u8 *)0;
-    } else {
-        fb->planes[0] = bb[0];
-        fb->planes[1] = bb[1];
-        fb->planes[2] = bb[2];
-        fb->planes[3] = bb[3];
+    (void)gfx_client_framebuffer(&kernel, 1);
+    fb->width = kernel.width;
+    fb->height = kernel.height;
+    fb->pitch = kernel.pitch;
+    for (i = 0; i < 4; i++) fb->planes[i] = kernel.planes[i];
+}
+
+/* All legacy planar pointers and the selected backend descriptor share one
+ * binding point. Missing CLIENT must erase pointers from the previous mode. */
+static void gfx_bind_client(void)
+{
+    const struct ledger_surface *sf = ledger_surface_find(gfx_sf_backend(), LEDGER_ROLE_CLIENT);
+    GfxBackend *backend = gfx_sf_backend() == LEDGER_SF_PEGC ? &gfx_backend_pegc :
+                          gfx_sf_backend() == LEDGER_SF_CIRRUS ? &gfx_backend_cirrus : &gfx_backend_pc98;
+    u8 *base = 0;
+    u32 i;
+    if (sf && !sf->closing)
+        base = (sf->backing == LEDGER_SB_MMIO || sf->backing == LEDGER_SB_VRAM)
+             ? (u8 *)P2V_IO(sf->first * PAGE_SIZE) : (u8 *)P2V(sf->first * PAGE_SIZE);
+    for (i = 0; i < 4; i++) bb[i] = base && i < sf->planes ? base + sf->plane_offset[i] : 0;
+    bb_b = bb[0]; bb_r = bb[1]; bb_g = bb[2]; bb_i = bb[3];
+    backend->bb_base = bb[0];
+    backend->bb_size = base ? sf->npages * PAGE_SIZE : 0;
+    if (base) {
+        backend->bb_pitch = sf->pitch;
+        backend->bb_format = sf->format;
     }
 }
 
@@ -237,6 +293,15 @@ static const struct ledger_surface gfx_planar_display = {
     .perm_max = LEDGER_PERM_RW
 };
 
+static const struct ledger_surface gfx_pegc_display = {
+    .first = GFX_PFN(PEGC_LINEAR_BASE), .npages = GFX_PFN(PEGC_FB_SIZE_480),
+    .width = MEM_GFX_BB8_WIDTH, .height = MEM_GFX_BB8_HEIGHT, .pitch = MEM_GFX_BB8_PITCH,
+    .owner = LEDGER_OWNER_KERNEL, .backing = LEDGER_SB_VRAM,
+    .backend = LEDGER_SF_PEGC, .role = LEDGER_ROLE_DISPLAY,
+    .format = GFX_BB_PACKED8, .planes = 1, .cache = LEDGER_CACHE_UC,
+    .perm_max = LEDGER_PERM_RW
+};
+
 /* 資源レコード i (と SURFACE の型板 i + 1) がどの候補のものか。 */
 static u32 gfx_cand_of(u32 i)
 {
@@ -287,6 +352,9 @@ void __attribute__((cold)) gfx_boot_reserve(void)
                             r->map_end - r->map_first, PAGE_RW | PTE_PCD) != 0)
             m &= ~gfx_cand_of(i);
     }
+    /* DISPLAY depends on reservation + mapping, not CLIENT allocation. */
+    if ((m & GFX_CAND_PEGC) && !ledger_surface_create(&gfx_pegc_display, 0))
+        display_fail++;
     /* 4. BB は候補の最大 (PEGC が残れば 300KB)。アリーナ内の上端から。 */
     if ((m & GFX_CAND_PEGC) &&
         pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, (int)GFX_PFN(MEM_GFX_BB8_SIZE),
@@ -301,6 +369,7 @@ void __attribute__((cold)) gfx_boot_reserve(void)
         sf = gfx_sf[i];
         if (i == 1) sf.first = pfn;
         if (!ledger_surface_create(&sf, 0) && i) m &= ~gfx_cand_of(i - 1);
+        if (!i) gfx_bind_client();
     }
     for (i = 0; i < 4; i++) {
         sf = gfx_planar_display;
@@ -320,6 +389,38 @@ u32 gfx_sf_backend(void)
     if (g_backend == &gfx_backend_pegc) return LEDGER_SF_PEGC;
     if (g_backend == &gfx_backend_cirrus) return LEDGER_SF_CIRRUS;
     return LEDGER_SF_PC98;
+}
+
+/* Normal context: source construction through snapshot/acquire completion
+ * must not cross a callback or scheduling point (T2e e1/e3 contract).
+ * Dormant until e5/e11; TVRAM/Unicode are supplied in e8. */
+__attribute__((section(".text.gfx_surface_source")))
+int gfx_surface_source(u32 role, struct surface_query_source *out)
+{
+    struct surface_query_source source = {0};
+    u32 i, plane, count;
+    if (!out) return OS32_ERR_INVAL;
+    source.role = role;
+    source.backend = gfx_sf_backend();
+    *out = source;
+    if (!gfx_started || (role != LEDGER_ROLE_CLIENT && role != LEDGER_ROLE_DISPLAY))
+        return OS32_ERR_INVAL;
+    count = role == LEDGER_ROLE_DISPLAY && source.backend == LEDGER_SF_PC98 ? 4 : 1;
+    for (plane = 0; plane < count; plane++) {
+        for (i = 0; i < LEDGER_MAX_SURFACES; i++) {
+            const struct ledger_surface *sf = &ledger_surfaces[i];
+            if (!sf->npages || sf->closing || sf->backend != source.backend ||
+                sf->role != role || sf->perm_max == LEDGER_PERM_NONE) continue;
+            if (count == 4 && sf->first != GFX_PFN(gfx_display_planes[plane])) continue;
+            source.refs[plane] = (struct surface_ref){i, sf->gen};
+            break;
+        }
+        if (i == LEDGER_MAX_SURFACES) return OS32_ERR_INVAL;
+    }
+    source.count = count;
+    source.ready = 1;
+    *out = source;
+    return 0;
 }
 
 /* ======================================================================== */
@@ -362,9 +463,8 @@ void __cdecl gfx_screen_info(void *out)
     if (!out) return;
     /* 決め打ちせずバックエンドに問い合わせる (契約 G5)。9801 だけの現状でも
      * 400/200 ラインやフリップ有無はバックエンドが正直に申告する。 */
-    if (g_backend && g_backend->query) {
+    if (g_backend && g_backend->query)
         g_backend->query((GFX_ScreenInfo *)out);
-    }
 }
 
 /* ======================================================================== */
@@ -469,7 +569,7 @@ static void _gfx_common_init(int plane_sz)
     volatile u16 *tvram_char = (volatile u16 *)P2V_IO(TVRAM_CHAR_BASE);
     volatile u8  *tvram_attr = (volatile u8  *)P2V_IO(TVRAM_ATTR_BASE);
 
-    bb[0] = bb_b; bb[1] = bb_r; bb[2] = bb_g; bb[3] = bb_i;
+    if (!bb_b || !bb_r || !bb_g || !bb_i) return;
     dirty_queue.count = 0;
 
     /* テキストVRAMクリア */
@@ -503,6 +603,7 @@ static void _gfx_common_init(int plane_sz)
 /* ======================================================================== */
 static int gfx_select_and_init_backend(void)
 {
+    gfx_started = 0;
     gfx_select_backend();
     if (g_backend && g_backend->init) {
         g_backend->init();
@@ -510,6 +611,7 @@ static int gfx_select_and_init_backend(void)
          * (バックバッファが取れない等)。 */
         if (g_backend->probe && !g_backend->probe()) {
             g_backend = &gfx_backend_pc98;
+            gfx_bind_client(); /* bind init failure fallback */
             return 0;
         }
         return 1;
@@ -541,15 +643,19 @@ static int gfx_select_and_init_backend(void)
 /* ======================================================================== */
 void gfx_prepare_backend(void)
 {
+    gfx_started = 0;
     gfx_select_backend();
+    gfx_bind_client();
     if (!g_backend) return;
     /* 下ごしらえを別に持つバックエンド (PEGC) は表示に触らずに済ませる。
      * init → shutdown で済ませると CUI しか使わない起動でも同期を送り直す
      * (実機 Ra266 + 液晶の桁ズレの原因という仮説、TASK_FDC_REALHW §9-1)。 */
     if (g_backend->prepare) {
         g_backend->prepare();
-        if (g_backend->probe && !g_backend->probe())
+        if (g_backend->probe && !g_backend->probe()) {
             g_backend = &gfx_backend_pc98;
+            gfx_bind_client();
+        }
         return;
     }
     if (!g_backend->init) return;
@@ -557,6 +663,7 @@ void gfx_prepare_backend(void)
     /* init が失敗して probe が取り下げられたら 9801 へ落とす (gfx_init と同じ)。 */
     if (g_backend->probe && !g_backend->probe()) {
         g_backend = &gfx_backend_pc98;
+        gfx_bind_client();
         return;
     }
     if (g_backend->shutdown) g_backend->shutdown();
@@ -584,6 +691,8 @@ void gfx_init(void)
 {
     /* ⑤: GDC 初期化より前にバックエンドを決める */
     if (gfx_select_and_init_backend()) {
+        gfx_bind_client(); /* bind packed init */
+        gfx_started = bb[0] != 0;
         if (g_backend->enter) g_backend->enter();
         return;   /* 9821 等: モード設定もバックバッファも init() が済ませた */
     }
@@ -592,6 +701,8 @@ void gfx_init(void)
     gfx_display_page = 0;
     prev_dirty.count = 0;
 
+    gfx_bind_client();
+    if (!bb[0]) return;
     _gfx_common_init(GFX_PLANE_SZ);
 
     /* GDC CSRFORM: L/R=0 (400ライン) */
@@ -610,6 +721,7 @@ void gfx_init(void)
 
     palette_init();
     gfx_scroll_init();
+    gfx_started = 1;
 
     /* 表示出力を有効化 (9801 の enter は空)。バックエンドの選択は先頭で済み。 */
     if (g_backend && g_backend->enter) g_backend->enter();
@@ -622,12 +734,16 @@ void gfx_init_200(void)
      * ときはそのバックエンドのネイティブ解像度で立ち上げる (200 ラインの
      * 縦 2 倍表示は 16 色プレーンの機能で、PEGC には対応物が無い)。 */
     if (gfx_select_and_init_backend()) {
+        gfx_bind_client();
+        gfx_started = bb[0] != 0;
         if (g_backend->enter) g_backend->enter();
         return;
     }
 
     gfx_current_height = GFX_HEIGHT_200;  /* 200ラインモード */
 
+    gfx_bind_client(); /* rebind for init_200, keeping registered plane offsets */
+    if (!bb[0]) return;
     _gfx_common_init(GFX_PLANE_SZ_200);
 
     /* GDC CSRFORM: L/R=1 (各ライン2倍表示 → 200ライン) */
@@ -648,6 +764,7 @@ void gfx_init_200(void)
 
     palette_init();
     gfx_scroll_init();
+    gfx_started = 1;
 
     /* 表示出力を有効化 (9801 の enter は空)。バックエンドの選択は先頭で済み。 */
     if (g_backend && g_backend->enter) g_backend->enter();
@@ -698,6 +815,7 @@ i32 gfx_screen_owner(void)
 
 void gfx_shutdown(void)
 {
+    gfx_started = 0;
     /* 表示出力を戻し (leave)、バックエンドのハードウェア終了処理へ。
      * 9801 では leave は空、shutdown がフリップ解除 + GDC 表示停止を行う
      * (旧 gfx_shutdown の本体は backend_pc98.c の pc98_shutdown に移設)。 */

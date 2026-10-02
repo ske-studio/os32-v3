@@ -43,6 +43,13 @@
 /* ======== 初期化・終了 ======== */
 /* 選択中 backend の台帳名 (LEDGER_SF_*)。通常文脈で source と照合する。 */
 u32 gfx_sf_backend(void);
+struct gfx_kernel_fb {
+    u32 width, height, pitch, format;
+    u8 *planes[4];
+};
+int gfx_kernel_framebuffer(struct gfx_kernel_fb *out);
+struct surface_query_source;
+int gfx_surface_source(u32 role, struct surface_query_source *out);
 void gfx_init(void);       /* 640x400x16初期化 + バックバッファ確保 */
 void gfx_init_200(void);   /* 640x200x16初期化 (縦はHWが2倍表示) */
 /* KAPI スロット gfx_init / gfx_init_200 の実体 (票 T8 D1 / D1a)。

@@ -20,7 +20,7 @@
 
 /* ======== 外部参照 ======== */
 extern volatile u32 tick_count;
-extern u8 *bb[4];  /* バックバッファプレーン [B,R,G,I] */
+static struct gfx_kernel_fb splash_fb;
 extern void __cdecl gfx_add_dirty_rect(int x, int y, int w, int h);
 
 /* ======== パレット番号 ======== */
@@ -56,7 +56,7 @@ static void bb_clear(u8 color)
     int p;
     for (p = 0; p < 4; p++) {
         u8 val = (color & (1 << p)) ? 0xFF : 0x00;
-        kmemset(bb[p], val, GFX_PLANE_SZ);
+        kmemset(splash_fb.planes[p], val, GFX_PLANE_SZ);
     }
 }
 
@@ -82,7 +82,7 @@ static void bb_fill_rect(int x, int y, int w, int h, u8 color)
     mask_last  = 0xFF << (7 - (x2 & 7));
 
     for (p = 0; p < 4; p++) {
-        u8 *plane = bb[p];
+        u8 *plane = splash_fb.planes[p];
         u8 set = (color & (1 << p)) ? 1 : 0;
 
         for (row = y; row < y + h; row++) {
@@ -292,8 +292,9 @@ void boot_splash(void)
     /* 標準ハードの存在とソフトウェア状態の正常性は別。gfx_init は void
      * なので、描画に必要な状態が無ければ任意デバイスへ逃げず表示を終了。
      * 初期化中の fault や I/O 障害そのものを検出する API ではない。 */
-    if (!g_backend || g_backend->bb_format != GFX_BB_PLANAR4 ||
-        !bb[0] || !bb[1] || !bb[2] || !bb[3]) {
+    if (gfx_kernel_framebuffer(&splash_fb) || splash_fb.format != GFX_BB_PLANAR4 ||
+        !splash_fb.planes[0] || !splash_fb.planes[1] ||
+        !splash_fb.planes[2] || !splash_fb.planes[3]) {
         gfx_shutdown();
         tvram_clear();
         return;

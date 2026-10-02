@@ -105,6 +105,9 @@ def main():
                     target = tree / source.relative_to(ROOT)
                     target.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copyfile(source, target)
+        (tree / 'exec').mkdir(parents=True)
+        for name in ('surface_query.h', 'lease.h'):
+            shutil.copyfile(ROOT / 'exec' / name, tree / 'exec' / name)
         (tree / 'tools/tests').mkdir(parents=True)
         for name in ('display_cleanup_host.c', 'boot_splash_native_host.c'):
             shutil.copyfile(ROOT / 'tools/tests' / name, tree / 'tools/tests' / name)

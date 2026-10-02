@@ -119,7 +119,7 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 
 /* ---- gfx_core.c の周り (切り出しが引く名前) ---- */
 static int g_backend_pref = PREF;
-const GfxBackend gfx_backend_pc98;
+GfxBackend gfx_backend_pc98;
 GfxBackend gfx_backend_pegc;
 GfxBackend gfx_backend_cirrus;
 const GfxBackend *g_backend = &gfx_backend_pc98;
@@ -195,6 +195,9 @@ void host_freeze(void)
     ledger_arena_freeze();
 }
 
+#include "../../exec/surface_query.h"
+static int gfx_started;
+static void gfx_bind_client(void) { } /* binding covered by gfx_kernel_fb_host */
 #include "gfx_boot_slice.inc"
 
 /* ---- 起動 (memory_boot_init の ③ と同じ段) ---- */
@@ -309,6 +312,7 @@ void _start(void)
     if (pc || cc) want[nw++] = 'R';
     if (pc) want[nw++] = 'M';
     if (cc) want[nw++] = 'M';
+    if (map_pegc) want[nw++] = 'S'; /* PEGC DISPLAY precedes BB allocation */
     if (map_pegc) want[nw++] = 'B';
     want[nw++] = 'S';
     if (bb) want[nw++] = 'S';
@@ -384,6 +388,18 @@ void _start(void)
     }
     for (i = 0; i < 4; i++) CHECK(sp->plane_offset[i] == i * 32000U);
     CHECK(sp->planes == 4 && sp->pitch == 80 && sp->height == 400);
+    {
+        const struct ledger_surface *display = ledger_surface_find(LEDGER_SF_PEGC, LEDGER_ROLE_DISPLAY);
+        CHECK(!display == !map_pegc);
+        if (display) CHECK(display->first == PEGC_LINEAR_BASE / PAGE_SIZE &&
+            display->npages == PEGC_FB_SIZE_480 / PAGE_SIZE &&
+            display->width == MEM_GFX_BB8_WIDTH && display->height == MEM_GFX_BB8_HEIGHT &&
+            display->pitch == MEM_GFX_BB8_PITCH && display->planes == 1 &&
+            display->plane_offset[0] == 0 && display->format == GFX_BB_PACKED8 &&
+            display->owner == LEDGER_OWNER_KERNEL && display->backing == LEDGER_SB_VRAM &&
+            display->cache == LEDGER_CACHE_UC && display->perm_max == LEDGER_PERM_RW &&
+            ledger_surface_validate(display));
+    }
     CHECK(!se == !bb);
     CHECK(ledger_owner_pages(LEDGER_OWNER_BOOT) == (bb ? 75U : 0U));
     if (bb) {
