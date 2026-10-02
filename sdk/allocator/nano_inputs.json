@@ -115,8 +115,39 @@
     }
   },
   "sdk_build": {
-    "status": "f1b pending; no public switch in f1a",
-    "sources": [],
-    "patches": []
+    "status": "f1b fixture only; no public link switch",
+    "sources": {
+      "sdk/allocator/nano_adapter.c": "b3e56cf2aa41e0592b926a93b7de003329a42aa2325a3606779762af3b271163",
+      "sdk/allocator/nano_adapter.h": "a78c2beaf0a6b2340359259453fa04d51ef93dc3fdd8746388f14c3c698a854d",
+      "sdk/allocator/build_nano.py": "591f8cfc3a76c8ce21d70855d18d41f0e0dab42c4c81991f4c3a88a0d7d0d5a3",
+      "sdk/allocator/check_link.py": "af2de3ca50e194dd44d1080904fee865caaaa8e8c407d66e327f08a945b18a93"
+    },
+    "patches": [],
+    "mode": "objcopy-private-members",
+    "members": [
+      "libc_a-mallocr.o",
+      "libc_a-freer.o",
+      "libc_a-callocr.o",
+      "libc_a-reallocr.o",
+      "libc_a-msizer.o",
+      "libc_a-mallinfor.o"
+    ],
+    "renames": {
+      "_malloc_r": "os32_private_malloc_r",
+      "_free_r": "os32_private_free_r",
+      "_calloc_r": "os32_private_calloc_r",
+      "_realloc_r": "os32_private_realloc_r",
+      "_malloc_usable_size_r": "os32_private_malloc_usable_size_r",
+      "_mallinfo_r": "os32_private_mallinfo_r",
+      "__malloc_free_list": "os32_private_free_list",
+      "__malloc_sbrk_start": "os32_private_sbrk_start",
+      "__malloc_current_mallinfo": "os32_private_current_mallinfo",
+      "_sbrk_r": "os32_nano_sbrk",
+      "__malloc_lock": "os32_nano_lock",
+      "__malloc_unlock": "os32_nano_unlock"
+    },
+    "upstream": {
+      "newlib/libc/stdlib/nano-mallocr.c": "ddd9154fae788262390a61d6b0e144a4d8f7e52efb097484ac3db6398904e2e5"
+    }
   }
 }

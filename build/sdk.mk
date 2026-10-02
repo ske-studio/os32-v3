@@ -1146,6 +1146,7 @@ CHECK_PAR_TARGETS := check-shlib-high-host check-bootinfo-host check-hdd-stage1-
     check-db-caller-host \
     check-surface-query-host \
     check-nano-inputs-host \
+    check-nano-adapter-host \
     check-surface-lease-host \
     check-h3-park-resume-host \
     check-cirrus-win-host check-pegc-mode-host \
@@ -1239,3 +1240,8 @@ check-h2-fixtures-host:
 # T2h/h3 fixtures and PM script, entirely offline.
 check-h3-park-resume-host:
 	python3 -B tools/tests/test_h3_park_resume.py $(MUT)
+
+# T2f f1b: real nano, private SDK adapter and opt-in link gate.
+check-nano-adapter-host:
+	@set -e; test -n "$(HOST32_RUNNERS)"; for runner in $(HOST32_RUNNERS); do echo "HOST32_RUNNERS=$$runner"; python3 -B tools/tests/test_nano_adapter.py --runner $$runner; done
+	$(if $(MUT),python3 -B tools/tests/test_nano_adapter.py --runner $(firstword $(HOST32_RUNNERS)) $(MUT),@:)

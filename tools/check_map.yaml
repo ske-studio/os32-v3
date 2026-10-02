@@ -3442,6 +3442,7 @@ checks:
   - tools/tests/pgalloc_host_fixture.h
 
   check-nano-inputs-host:
+    - sdk/allocator/**
     - .github/workflows/build.yml
     - tools/check_nano_inputs.py
     - tools/tests/test_nano_inputs.py
@@ -3551,3 +3552,11 @@ checks:
   - userland/tests/h3/state.inc
   - userland/tests/h3a.c
   - userland/tests/h3b.c
+
+  check-nano-adapter-host:
+    - sdk/allocator/**
+    - tools/check_nano_inputs.py
+    - tools/ci/build_cross.sh
+    - tools/tests/test_nano_adapter.py
+    - tools/tests/nano_adapter_host.c
+    - tools/tests/host32.py

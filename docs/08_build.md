@@ -840,7 +840,12 @@ make -j$(nproc) && make install
 SDK用nano/adapterの入力は [`sdk/allocator/nano_inputs.json`](../sdk/allocator/nano_inputs.json)
 に置く。SDK実装入力を `sdk/` に集める既存の構成に合わせ、将来のadapterと隣接して
 由来・版・ソースhash・configure・patch列を追跡する。`toolchain` 節は構築入力 (patch禁止)、`sdk_build` 節はf1bのソース・patch・表示用。
-構築検査/receiptは前者だけを見るため、SDK用patchの追記はtoolchain再構築を要求しない。
+構築検査/receiptは前者だけを見るため、SDK入力の追記はtoolchain再構築を要求しない。
+f1bの単体archive生成では `sdk_build.sources` のSDKファイルhash、`upstream` の
+元ソースhashとtoolchain台帳の一致、member名を別に照合する。
+`local.members` の名前集合を増やした後、既存receiptで `members SHA256 differs` が出る場合は、
+保存した構築入力で `--record-built --source --tarball --config` を再実行するか、
+`tools/ci/build_cross.sh` で再構築する (receipt形式は変更していない)。
 ARM Ltd (2012, 2013) のnanoファイルのBSD 3-clause表示を
 [`nano.LICENSE`](../sdk/allocator/nano.LICENSE) に全文保持し、配布全体の
 `COPYING.NEWLIB` もhashで記録した。f1bで追加のソース/patchを使う際はその入力と表示も追加する。

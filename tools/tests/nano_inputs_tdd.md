@@ -49,3 +49,8 @@ N5はlicenseがtoolchain節にありSDK節に無いことを確認。
 make allの既存image.mkによるNP21/W宛自動コピーは失敗 (警告)、配備成功無し。
 票を検査開始前に固定し、最終make check-changedのrcは完了報告と
 `/home/hight/os32-tmp/t2f1-rereview-check-changed.log` に残す。
+
+f1b追補 (2026-10-03): 既存50ケース・25変異の期待は変更せず、SDK入力の
+正常対照とsource hash/upstream照合/member名/patch拒否4ケースを追加。
+55ケースGREEN、29変異 runtime RED / 0 survived / 0 ERROR、rc=0。
+SDK-onlyの変更がtoolchain cache keyやreceipt構築に影響しない既存の試験も維持した。
