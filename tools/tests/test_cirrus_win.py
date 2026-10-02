@@ -14,6 +14,7 @@ tools/tests/cirrus_win_host.c が実物の gfx/backend_cirrus.c を 1 行も写�
 読む / リニア窓を旧番地へ戻す / probe が ⑥ の SURFACE を確かめない) を写しの木で組み、この試験が RED になることを見る。
 make・エミュレータ・配備には触れない。
 """
+import host32
 import os
 import pathlib
 import subprocess
@@ -107,7 +108,7 @@ def one_mutation(item):
                 [host_cmd(exe)], capture_output=True)
         except subprocess.CalledProcessError:
             return "MUTATE %-20s RED (コンパイルが通らない)" % name, 0
-        out = subprocess.run([str(exe)], cwd=str(tree), timeout=60,
+        out = host32.run([str(exe)], cwd=str(tree), timeout=60,
                              capture_output=True)
     if out.returncode == 0:
         return ("MUTATE %-20s **GREEN のまま = 試験が規則を見ていない**"
@@ -125,7 +126,7 @@ if __name__ == "__main__":
         subprocess.run(host_cmd(exe), cwd=ROOT, check=True)
         print("HOST ILP32 GNU11 COMPILE PASS (real gfx/backend_cirrus.c)",
               flush=True)
-        rc = subprocess.run([str(exe)], cwd=ROOT, timeout=60).returncode
+        rc = host32.run([str(exe)], cwd=ROOT, timeout=60).returncode
         print("EXIT cirrus_win_host=%d" % rc, flush=True)
         failed += rc != 0
         subprocess.run(target_cmd(tmp / "backend_cirrus.o"), cwd=ROOT,

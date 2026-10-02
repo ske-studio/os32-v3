@@ -27,6 +27,7 @@
 復元を抜く) を写しに当て、どれかの試験が RED になることを見る。実物の
 ソースは書き換えない (メモリ上の写しをハーネスへ書き出すだけ)。
 """
+import host32
 import pathlib
 import re
 import subprocess
@@ -178,7 +179,7 @@ def run_c(texts, body):
                                       '-o', str(tmp / 'test')], capture_output=True, text=True)
         if build.returncode:
             return False, 'compile\n' + build.stderr
-        out = subprocess.run([str(tmp / 'test')], capture_output=True, text=True, timeout=120)
+        out = host32.run([str(tmp / 'test')], capture_output=True, text=True, timeout=120)
         return out.returncode == 0, 'rc=%d %s%s' % (out.returncode, out.stdout, out.stderr)
 
 
@@ -550,7 +551,7 @@ def setjmp_run(texts):
                            capture_output=True, text=True)
         if r.returncode:
             return False, 'compile\n' + r.stderr
-        r = subprocess.run([str(tmp / 't')], capture_output=True, text=True, timeout=30)
+        r = host32.run([str(tmp / 't')], capture_output=True, text=True, timeout=30)
         return r.returncode == 0, r.stdout + r.stderr
 
 

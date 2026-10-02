@@ -7,6 +7,7 @@
 
 記録: tools/tests/s6p_tdd.md
 """
+import host32
 import pathlib
 import subprocess
 import sys
@@ -41,7 +42,7 @@ if __name__ == "__main__":
         failed = 0
         cases = sys.argv[1:] or CASES
         for case in cases:
-            rc = subprocess.run([str(exe), case], cwd=ROOT).returncode
+            rc = host32.run([str(exe), case], cwd=ROOT).returncode
             print(f"EXIT {case}={rc}", flush=True)
             failed += rc != 0
         # 実物と同じフラグでクロスコンパイルも通ること ([C1] GNU11)

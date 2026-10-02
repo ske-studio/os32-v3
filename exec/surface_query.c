@@ -38,10 +38,10 @@ int surface_query_authorize(const struct surface_query_source *s,
     case LEDGER_ROLE_DISPLAY:
         if (!gfx || (gui && appslot_gfx_owner() != c.app_id)) return OS32_ERR_INVAL;
         break;
-    case SURFACE_ROLE_TVRAM:
+    case LEDGER_ROLE_TVRAM:
         if (gui) return OS32_ERR_INVAL;
         break;
-    case SURFACE_ROLE_UNICODE:
+    case LEDGER_ROLE_UNICODE:
         break;
     default:
         return OS32_ERR_INVAL;
@@ -77,7 +77,7 @@ static int surface_snapshot(const struct surface_query_source *s,
             !sf->width || !sf->height || !sf->pitch ||
             sf->npages > ~(u32)0 / PAGE_SIZE ||
             (sf->perm_max != LEDGER_PERM_RO && sf->perm_max != LEDGER_PERM_RW) ||
-            (s->role == SURFACE_ROLE_UNICODE && sf->perm_max != LEDGER_PERM_RO))
+            (s->role == LEDGER_ROLE_UNICODE && sf->perm_max != LEDGER_PERM_RO))
             return OS32_ERR_INVAL;
         d->ref = *r;
         d->role = sf->role; d->backend = sf->backend; d->format = sf->format;
@@ -100,23 +100,39 @@ int surface_query_refs(const struct surface_query_source *s,
 {
     struct caller_access c;
     struct surface_query_result snap = {0};
-    u32 i;
+    u32 i, j;
+    int stale = 0;
     unsigned int flags = irq_save();
     int rc = surface_query_authorize(s, &c);
     if (rc) goto done;
-    if (!refs || count != s->count ||
+    if (!refs || count != s->count || count > SURFACE_QUERY_MAX ||
         (access != LEDGER_PERM_RO && access != LEDGER_PERM_RW)) {
         rc = OS32_ERR_INVAL; goto done;
     }
+    /* Validate the whole bundle before reporting any stale generation. */
+    for (i = 0; i < count; i++) {
+        if (refs[i].sid >= LEDGER_MAX_SURFACES || !refs[i].generation) {
+            rc = OS32_ERR_INVAL; goto done;
+        }
+        for (j = 0; j < i; j++)
+            if (refs[j].sid == refs[i].sid) { rc = OS32_ERR_INVAL; goto done; }
+    }
     rc = surface_snapshot(s, &snap);
     if (rc) goto done;
-    /* Structural mistakes take precedence over stale generations. */
-    for (i = 0; i < count; i++)
-        if (refs[i].sid != snap.desc[i].ref.sid) { rc = OS32_ERR_INVAL; goto done; }
     for (i = 0; i < count; i++) {
-        if (refs[i].generation != snap.desc[i].ref.generation) {
-            rc = OS32_ERR_STALE; goto done;
+        const struct ledger_surface *sf;
+        if (refs[i].sid != snap.desc[i].ref.sid) {
+            sf = &ledger_surfaces[refs[i].sid];
+            if (sf->gen == refs[i].generation && !sf->closing && sf->npages) {
+                rc = OS32_ERR_INVAL; goto done;
+            }
+            stale = 1;
+        } else if (refs[i].generation != snap.desc[i].ref.generation) {
+            stale = 1;
         }
+    }
+    if (stale) { rc = OS32_ERR_STALE; goto done; }
+    for (i = 0; i < count; i++) {
         if (access == LEDGER_PERM_RW && snap.desc[i].access_max != LEDGER_PERM_RW) {
             rc = OS32_ERR_INVAL; goto done;
         }

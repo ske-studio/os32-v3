@@ -6,7 +6,6 @@ TARGET_SRC = ['exec/surface_query.c', 'exec/redir_access.c', 'exec/access_walk.c
 import argparse
 import hashlib
 import pathlib
-import shutil
 import subprocess
 import tempfile
 import time
@@ -25,18 +24,29 @@ MUTANTS = [
     ('if (gui) return OS32_ERR_INVAL;', 'if (0) return OS32_ERR_INVAL;', 'GUI TVRAM'),
     ('s->count != want', 's->count > want', 'missing face'),
     ('sf->gen != r->generation', '0', 'snapshot generation'),
-    ('sf->closing', '0', 'closing'),
+    ('|| sf->closing ||', '|| 0 ||', 'snapshot closing'),
     ('!sf->npages)', '0)', 'retired'),
     ('sf->role != s->role || sf->backend != s->backend', 'sf->role != s->role', 'selected backend'),
     ('s->refs[j].sid == r->sid', '0', 'duplicate source'),
-    ('refs[i].sid != snap.desc[i].ref.sid', '0', 'different bundle'),
+    ('sf->gen == refs[i].generation && !sf->closing && sf->npages', 'sf->gen == 0xffffffffU', 'different bundle'),
+    ('            stale = 1;\n        } else if', '            stale = 0;\n        } else if', 'reinit changed sid'),
+    ('refs[i].sid >= LEDGER_MAX_SURFACES', '0', 'ref sid bound'),
+    ('!refs[i].generation', '0', 'ref zero generation'),
+    ('sf->gen == refs[i].generation &&', '1 &&', 'alien ref generation'),
+    ('!sf->closing && sf->npages', '1 && sf->npages', 'alien ref closing'),
+    ('&& sf->npages', '&& 1', 'alien ref pages'),
+    ('refs[j].sid == refs[i].sid', '0', 'duplicate input'),
+    ('s->backend < LEDGER_SF_PC98', '0', 'backend lower bound'),
+    ('s->backend > LEDGER_SF_CIRRUS', '0', 'backend upper bound'),
+    ('else if (s->backend)', 'else if (0)', 'system backend'),
+    ('s->backend == LEDGER_SF_PC98 ? SURFACE_QUERY_MAX : 1', 's->backend != 0 ? SURFACE_QUERY_MAX : 1', 'PEGC DISPLAY count'),
     ('refs[i].generation != snap.desc[i].ref.generation', '0', 'old refs'),
     ('access == LEDGER_PERM_RW && snap.desc[i].access_max != LEDGER_PERM_RW', '0', 'RO escalation'),
-    ('s->role == SURFACE_ROLE_UNICODE && sf->perm_max != LEDGER_PERM_RO', '0', 'Unicode RO'),
+    ('s->role == LEDGER_ROLE_UNICODE && sf->perm_max != LEDGER_PERM_RO', '0', 'Unicode RO'),
     ('refs[i].generation != snap.desc[i].ref.generation', 'refs[0].generation != snap.desc[0].ref.generation', 'last ref generation'),
     ('d->plane_offset[j] = sf->plane_offset[j];', 'd->plane_offset[j] = 0;', 'geometry'),
     ('!copy_to_caller(&c, user_out, &snap, sizeof(snap))', '0', 'copyout'),
-    ('irq_restore(flags);', 'irq_restore(flags | 0x200);', 'IF restore'),
+    ('sizeof(snap)))\n        rc = OS32_ERR_INVAL;\ndone:\n    irq_restore(flags);', 'sizeof(snap)))\n        rc = OS32_ERR_INVAL;\ndone:\n    irq_restore(flags | 0x200);', 'IF restore'),
     ('return OS32_ERR_NOSPC;', 'return OS32_ERR_FULL;', 'error mapping'),
 ]
 
@@ -44,7 +54,7 @@ MUTANTS = [
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--mutate', action='store_true')
-    p.add_argument('--runner', choices=['native', 'qemu'], default='qemu')
+    p.add_argument('--runner', choices=['native', 'qemu'], default='native')
     args = p.parse_args()
     paths = [ROOT / v for v in walk.FILES.values()] + [ROOT / 'exec/surface_query.c']
     paths += [ROOT / x for x in ('exec/surface_query.h', 'tools/tests/surface_query_host.c',
@@ -87,12 +97,7 @@ def main():
                             '-Wl,--gc-sections', str(tmp / 'fixture.o'),
                             str(tmp / 'physmem.o'), str(obj), '-o', str(exe)],
                            check=True, capture_output=True, text=True)
-            cmd = [str(exe)]
-            if args.runner == 'qemu': cmd.insert(0, shutil.which('qemu-i386') or 'qemu-i386')
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-            if result.returncode < 0:
-                raise RuntimeError(f'{args.runner}: signal {-result.returncode}; not a test verdict')
-            return result
+            return walk.run_host32(exe, args.runner)
         body = sources['surface_query']
         r = run(body, 'normal')
         print(r.stdout + r.stderr, end='')
@@ -101,7 +106,7 @@ def main():
         if args.mutate:
             def one(entry):
                 index, (old, new, name) = entry
-                assert old in body, name
+                assert body.count(old) == 1, (name, body.count(old))
                 start = time.monotonic()
                 r = run(body.replace(old, new), f'mut{index}')
                 assert r.returncode != 0 and 'FAIL:' in r.stdout, (name, r.returncode, r.stdout, r.stderr)

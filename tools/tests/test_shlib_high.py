@@ -1,4 +1,5 @@
 """T2c actual shlib and paging/ledger, fragmented supply and rollback (ILP32)."""
+import host32
 import pathlib
 import subprocess
 import sys
@@ -38,7 +39,7 @@ def run(mutation=None):
             if mutation:
                 return 'compile'
             raise subprocess.CalledProcessError(build.returncode, cmd)
-        out = subprocess.run([str(exe)], timeout=60, capture_output=bool(mutation))
+        out = host32.run([str(exe)], timeout=60, capture_output=bool(mutation))
         if mutation:
             return 'ok' if out.returncode == 0 else 'fail'
         if out.returncode != 0:

@@ -34,6 +34,7 @@ irq_restore の度に L1 / L2 の不変条件を全ページ検査する — tes
 RED になることを見る。実物のソースは書き換えない。コンパイルの失敗は RED に
 数えない。
 """
+import host32
 import pathlib
 import subprocess
 import sys
@@ -567,7 +568,7 @@ def run_c(texts, body):
                                       '-o', str(tmp / 'test')], capture_output=True, text=True)
         if build.returncode:
             return False, 'compile\n' + build.stderr
-        out = subprocess.run([str(tmp / 'test')], capture_output=True, text=True, timeout=120)
+        out = host32.run([str(tmp / 'test')], capture_output=True, text=True, timeout=120)
         return out.returncode == 0, 'rc=%d %s%s' % (out.returncode, out.stdout, out.stderr)
 
 
@@ -591,7 +592,7 @@ def stage_run(texts):
                                capture_output=True, text=True)
         if build.returncode:
             return False, 'compile\n' + build.stderr
-        out = subprocess.run([str(tmp / 'test')], capture_output=True, text=True, timeout=60)
+        out = host32.run([str(tmp / 'test')], capture_output=True, text=True, timeout=60)
         return out.returncode == 0, 'rc=%d %s%s' % (out.returncode, out.stdout, out.stderr)
 
 

@@ -56,23 +56,27 @@ MUTANTS = [
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--runner', choices=['native', 'qemu'], default='native')
     args = parser.parse_args()
     paths = [walk.ROOT / p for p in list(walk.FILES.values()) +
              ['exec/exec.c', 'exec/ring3_str.c', 'kapi/kapi_db.c', 'fs/vfs.c',
               'kapi/kapi_generated.c', 'userland/tests/db_v50_test.c', 'tools/tests/db_caller_host.c']]
     hashes = {p: hashlib.sha256(p.read_bytes()).digest() for p in paths}
     src = sources()
-    r = walk.run(src, fixture='db_caller_host.c')
+    r = walk.run(src, fixture='db_caller_host.c', runner=args.runner)
     print(r.stdout + r.stderr, end='')
     assert r.returncode == 0, r.returncode
+    print(f'PASS runner={args.runner}')
     if args.mutate:
         def one(m):
             key, old, new, name = m
             mutated = dict(src)
-            assert old in mutated[key], name
+            # These named mutations intentionally cover all exits of one contract.
+            expected = {'path copied as bytes': 2}.get(name, 1)
+            assert mutated[key].count(old) == expected, (name, mutated[key].count(old))
             mutated[key] = mutated[key].replace(old, new)
             start = time.monotonic()
-            r = walk.run(mutated, fixture='db_caller_host.c')
+            r = walk.run(mutated, fixture='db_caller_host.c', runner=args.runner)
             assert r.returncode != 0 and 'FAIL:' in r.stdout, (name, r.returncode, r.stdout, r.stderr)
             return name, time.monotonic() - start
         for name, seconds in run_ordered(one, MUTANTS):

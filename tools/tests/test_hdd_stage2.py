@@ -26,6 +26,7 @@
   python3 -B tools/tests/test_hdd_stage2.py --target   # + i386-elf -Werror で新しいソース
   python3 -B tools/tests/test_hdd_stage2.py --mutate   # 否定側 (変異が RED になるか)
 """
+import host32
 import importlib.util
 import pathlib
 import re
@@ -79,7 +80,7 @@ MIRROR = ["userland/system/inst_disk.c", "userland/system/inst_disk.h",
 
 
 def run(cmd, **kw):
-    return subprocess.run(cmd, cwd=ROOT, **kw)
+    return host32.run(cmd, cwd=ROOT, **kw)
 
 
 def _harness(src, tmp, root):
@@ -220,7 +221,7 @@ def room_cross_check(pure_exe, tmp):
     for size in ROOM_SIZES:
         img = pathlib.Path(tmp) / f"room_{size}.img"
         with open(img, "wb") as f:
-            r = subprocess.run([str(pexe), "dump", "2016", str(size)], stdout=f)
+            r = host32.run([str(pexe), "dump", "2016", str(size)], stdout=f)
         if r.returncode != 0:
             bad += 1
             continue

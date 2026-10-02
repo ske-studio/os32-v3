@@ -819,6 +819,7 @@ class Extractor:
             except ValueError:
                 toks = line.split()
             for i, t in enumerate(toks):
+                t = t.rstrip(";")
                 if t == "-s" and i + 1 < len(toks) and "-p" in toks:
                     pat = toks[toks.index("-p") + 1]
                     rx = glob_re(norm(os.path.join(toks[i + 1], pat)))

@@ -46,6 +46,7 @@ userland/lib/rt/pkg.c を取り込み、RAM 上の 8MB の ext2 で
           取り出し、-DFDP_RED で組んで回す。**落ちること**を確かめて記録を出す
           (失効の印・inode の口を直接見る検査と注入は RED では組まない)。
 """
+import host32
 import os
 import pathlib
 import shutil
@@ -392,7 +393,7 @@ def run_ime(tmp, quiet=False):
         print(err)
         print("IME BUILD FAIL")
         return False
-    r = subprocess.run([str(exe)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+    r = host32.run([str(exe)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                        timeout=120)
     if not quiet:
         print("case ime (real kernel/ime_dict.c + SQLite + vfs_fd.c)")
@@ -402,7 +403,7 @@ def run_ime(tmp, quiet=False):
 
 def _run_ime_exe(exe):
     try:
-        r = subprocess.run([str(exe)], stdout=subprocess.PIPE,
+        r = host32.run([str(exe)], stdout=subprocess.PIPE,
                            stderr=subprocess.STDOUT, timeout=120)
         return r.returncode == 0
     except subprocess.TimeoutExpired:
@@ -709,7 +710,7 @@ def run_exe(exe, imgdir, pkgdir, case=None, quiet=False, e2fsck=None, first_fail
         argv.append(case)
     elif first_fail:
         argv.append("+first-fail")
-    res = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+    res = host32.run(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                          timeout=120)
     out = res.stdout.decode("utf-8", "replace")
     ok = res.returncode == 0
@@ -770,7 +771,7 @@ def run_errno(tmp, syscalls=SYSCALLS_SRC, quiet=False):
         print(res.stdout.decode("utf-8", "replace"))
         print("ERRNO BUILD FAIL")
         return False
-    r = subprocess.run([str(exe)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+    r = host32.run([str(exe)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                        timeout=60)
     if not quiet:
         print("case errno (real sdk/crt/syscalls.c + newlib headers)")

@@ -19,6 +19,7 @@ IRP_MJ_CREATE が返す NTSTATUS を 1 つずつ指定して
 --target を付けると fs/hostdrvfs.c が実ビルドの素性でも通ることを見る。
 make・エミュレータ・実配備には一切触れない。
 """
+import host32
 import pathlib
 import subprocess
 import sys
@@ -60,7 +61,7 @@ if __name__ == "__main__":
                        cwd=ROOT, check=True)
         print("HOST GNU11 -Werror COMPILE PASS (real fs/hostdrvfs.c)", flush=True)
 
-        rc = subprocess.run([str(exe)], cwd=ROOT, timeout=120).returncode
+        rc = host32.run([str(exe)], cwd=ROOT, timeout=120).returncode
         print("EXIT b8_hostdrv_host=%d" % rc, flush=True)
 
         if "--target" in sys.argv:

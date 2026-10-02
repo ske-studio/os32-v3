@@ -11,6 +11,7 @@ test_con_sink.py と同じ様式 — ホスト ILP32 GNU11 で走らせたあと
 そのまま #include する (模型ではない)。カーネル帯の代わりに要るのは所有者
 (res_owner_get/set)・GUI 判定 (con_sink_is_enabled)・kstrncpy の 3 つだけ。
 """
+import host32
 import pathlib
 import subprocess
 import sys
@@ -32,7 +33,7 @@ if __name__ == "__main__":
                         "-nostdlib", "-static", "-no-pie",
                         str(HOST_SRC), "-o", str(exe)], cwd=ROOT, check=True)
         print("HOST ILP32 GNU11 COMPILE PASS", flush=True)
-        rc = subprocess.run([str(exe)], cwd=ROOT, timeout=30).returncode
+        rc = host32.run([str(exe)], cwd=ROOT, timeout=30).returncode
         subprocess.run(["i386-elf-gcc", *FLAGS, "-D__KERNEL_BUILD__",
                         *INCLUDES, "-O2", "-c", str(KERNEL_SRC),
                         "-o", str(tmp / "launch.o")], cwd=ROOT, check=True)

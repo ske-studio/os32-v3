@@ -15,6 +15,7 @@ Same shape as test_multiapp_model.py / test_pgalloc_range.py: build ILP32
 freestanding, run it, then prove the same source compiles with the cross
 compiler under the kernel's flags ([C1] GNU11).
 """
+import host32
 import pathlib
 import subprocess
 import tempfile
@@ -36,7 +37,7 @@ if __name__ == "__main__":
                         *includes, str(SRC), "-o", str(exe)],
                        cwd=ROOT, check=True)
         print("HOST ILP32 GNU11 COMPILE PASS", flush=True)
-        subprocess.run([str(exe)], cwd=ROOT, check=True, timeout=60)
+        host32.run([str(exe)], cwd=ROOT, check=True, timeout=60)
         subprocess.run(["i386-elf-gcc", *FLAGS, "-O2", *includes, "-c",
                         str(ROOT / "exec/appslot.c"),
                         "-o", str(tmp / "appslot.o")],

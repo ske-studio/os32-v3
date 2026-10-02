@@ -130,8 +130,15 @@ def parse_makefiles():
                         cmd = cmd.rstrip()[:-1] + " " + lines[i].strip()
                     # 変異の有無は $(MUT) / $(MUTS) で切り替える (build/sdk.mk)。
                     # 表には `make check` (MUTATE=1) で回る形を出す。
+                    # These recipes run the true branch under MUTATE=1.
+                    # Strip the outer conditional before displaying its body;
+                    # the nested $(firstword ...) remains a readable variable.
+                    if cmd.startswith("$(if $(MUT),") and cmd.endswith(",@:)"):
+                        cmd = cmd[len("$(if $(MUT),"):-len(",@:)")]
                     cmd = cmd.replace("$(MUTS)", "--mutants").replace(
                         "$(MUT)", "--mutate")
+                    if 'for runner in $(HOST32_RUNNERS);' in cmd:
+                        cmd = 'HOST32_RUNNERS ごと: ' + cmd[cmd.index('python3 '):].removesuffix('; done')
                     recipe.append(cmd)
                 i += 1
             if target in rules and not recipe:

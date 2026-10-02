@@ -16,6 +16,7 @@ ILP32 で回す。送る OUT 列 (ポート・値・順序) を期待列と比�
 --mutate は否定側。順序・値・FIFO 待ち・上限を 1 か所ずつ壊した版を写しの木で
 組み、この試験が RED になることを見る。make・エミュレータ・配備には触れない。
 """
+import host32
 import os
 import pathlib
 import subprocess
@@ -301,7 +302,7 @@ def one_mutation(item):
         except subprocess.CalledProcessError:
             return "MUTATE %-34s RED (コンパイルが通らない)" % name, 0
         try:
-            out = subprocess.run([str(exe)], cwd=str(tree), timeout=60,
+            out = host32.run([str(exe)], cwd=str(tree), timeout=60,
                                  capture_output=True)
         except subprocess.TimeoutExpired:
             return "MUTATE %-34s RED (時間切れ)" % name, 0
@@ -321,7 +322,7 @@ if __name__ == "__main__":
         subprocess.run(host_cmd(exe), cwd=ROOT, check=True)
         print("HOST ILP32 GNU11 COMPILE PASS (real gfx/backend_pegc.c)",
               flush=True)
-        rc = subprocess.run([str(exe)], cwd=ROOT, timeout=60).returncode
+        rc = host32.run([str(exe)], cwd=ROOT, timeout=60).returncode
         print("EXIT pegc_mode_host=%d" % rc, flush=True)
         failed += rc != 0
         subprocess.run(target_cmd(tmp / "backend_pegc.o"), cwd=ROOT,

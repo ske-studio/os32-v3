@@ -21,6 +21,7 @@ CRC は zlib.crc32 と突き合わせる。
   python3 -B tools/tests/test_vk32_crc.py --target   # C を i386-elf-gcc (ローダと同じ) で組む
   python3 -B tools/tests/test_vk32_crc.py --mutate   # 否定側 (写しの上で変異 → RED)
 """
+import host32
 import os
 import pathlib
 import random
@@ -182,7 +183,7 @@ def build(work, srcs, target, geom):
 
 def run(exe, mode, data):
     inp = struct.pack("<2I", mode, len(data)) + data
-    r = subprocess.run([str(exe)], input=inp, capture_output=True, timeout=120)
+    r = host32.run([str(exe)], input=inp, capture_output=True, timeout=120)
     if r.returncode == 3:
         raise Fail("mode {}: 窓の後ろ (番兵) を書き越した".format(mode))
     if r.returncode != 0:

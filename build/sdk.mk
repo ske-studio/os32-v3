@@ -1180,25 +1180,33 @@ check-caller-access-host:
 .PHONY: check-caller-access-host
 
 # T2d d3: managed tables/PFN with real paging and allocator.
+# Run every explicit ILP32 control; mutate only the first runner. No fallback.
+HOST32_RUNNERS ?= native qemu
+export HOST32_RUNNERS
 check-access-walk-host:
-	python3 -B tools/tests/test_access_walk.py $(MUT)
+	python3 -B tools/tests/test_host32.py
+	@set -e; test -n "$(HOST32_RUNNERS)"; for runner in $(HOST32_RUNNERS); do echo "HOST32_RUNNERS=$$runner"; python3 -B tools/tests/test_access_walk.py --runner $$runner; done
+	$(if $(MUT),python3 -B tools/tests/test_access_walk.py --runner $(firstword $(HOST32_RUNNERS)) $(MUT),@:)
 
 .PHONY: check-access-walk-host
 
 # T2d d4: bounded copies through the real managed walk.
 check-caller-copy-host:
-	python3 -B tools/tests/test_caller_copy.py $(MUT)
+	@set -e; test -n "$(HOST32_RUNNERS)"; for runner in $(HOST32_RUNNERS); do echo "HOST32_RUNNERS=$$runner"; python3 -B tools/tests/test_caller_copy.py --runner $$runner; done
+	$(if $(MUT),python3 -B tools/tests/test_caller_copy.py --runner $(firstword $(HOST32_RUNNERS)) $(MUT),@:)
 
 .PHONY: check-caller-copy-host
 
 # T2d d5: actual DB wrappers and output guards through caller copy/walk.
 check-db-caller-host:
-	python3 -B tools/tests/test_db_caller.py $(MUT)
+	@set -e; test -n "$(HOST32_RUNNERS)"; for runner in $(HOST32_RUNNERS); do echo "HOST32_RUNNERS=$$runner"; python3 -B tools/tests/test_db_caller.py --runner $$runner; done
+	$(if $(MUT),python3 -B tools/tests/test_db_caller.py --runner $(firstword $(HOST32_RUNNERS)) $(MUT),@:)
 
 .PHONY: check-db-caller-host
 
 # T2e e1: dormant query/authorization through real B1 and managed paging.
 check-surface-query-host:
-	python3 -B tools/tests/test_surface_query.py $(MUT)
+	@set -e; test -n "$(HOST32_RUNNERS)"; for runner in $(HOST32_RUNNERS); do echo "HOST32_RUNNERS=$$runner"; python3 -B tools/tests/test_surface_query.py --runner $$runner; done
+	$(if $(MUT),python3 -B tools/tests/test_surface_query.py --runner $(firstword $(HOST32_RUNNERS)) $(MUT),@:)
 
 .PHONY: check-surface-query-host

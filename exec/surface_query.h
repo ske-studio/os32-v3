@@ -6,8 +6,6 @@
 /* T2e e1: kernel-only staging of the future value ABI. No KAPI/SDK exposure
  * until e11. No physical address, kernel alias, owner or cache in the values. */
 #define SURFACE_QUERY_MAX 4
-#define SURFACE_ROLE_TVRAM 3
-#define SURFACE_ROLE_UNICODE 4
 struct surface_desc {
     struct surface_ref ref;
     u32 role, backend, format, width, height, pitch, planes;
@@ -30,6 +28,8 @@ struct surface_query_source {
  * authorization and use. Failures leave outputs unchanged, preserve IF/CR3.
  * authorize/refs return a kernel value snapshot. query does B1 copyout.
  * refs are kernel staging (e2 must B1-copy user input before calling). */
+/* Caller must hold an IRQ-saved interval; the returned caller is valid only
+ * within that interval. */
 int surface_query_authorize(const struct surface_query_source *source,
                             struct caller_access *caller);
 int surface_query_refs(const struct surface_query_source *source,

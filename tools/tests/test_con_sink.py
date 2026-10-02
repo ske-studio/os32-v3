@@ -11,6 +11,7 @@ test_multiapp_model.py と同じ様式 — ホスト ILP32 GNU11 で走らせた
 実行できないため。クロス側は付けないので、include/io.h を使う本番の経路も
 同じ試験の中でコンパイルされる。
 """
+import host32
 import pathlib
 import subprocess
 import sys
@@ -40,7 +41,7 @@ if __name__ == "__main__":
                         "-nostdlib", "-static", "-no-pie",
                         str(HOST_SRC), "-o", str(exe)], cwd=ROOT, check=True)
         print("HOST ILP32 GNU11 COMPILE PASS", flush=True)
-        rc = subprocess.run([str(exe)], cwd=ROOT, timeout=30).returncode
+        rc = host32.run([str(exe)], cwd=ROOT, timeout=30).returncode
         # 本番の割込み禁止区間 (include/io.h) を含む形でクロスコンパイル
         subprocess.run(["i386-elf-gcc", *FLAGS, "-D__KERNEL_BUILD__",
                         *INCLUDES, "-O2", "-c", str(KERNEL_SRC),

@@ -31,6 +31,7 @@ make・エミュレータ・実配備・libc には一切触れない。
 import os
 import pathlib
 import shutil
+import host32
 import subprocess
 import sys
 import tempfile
@@ -232,7 +233,7 @@ def one_mutation(item):
             exe, _, _ = build_exe(td, tree / rel, "mut-" + name)
         except subprocess.CalledProcessError:
             return "MUTATE %-22s RED (コンパイルが通らない)" % name, 0
-        rc = subprocess.run([str(exe)], cwd=str(tree), timeout=300,
+        rc = host32.run([str(exe)], cwd=str(tree), timeout=300,
                             capture_output=True).returncode
     if rc == 0:
         return ("MUTATE %-22s **GREEN のまま = 試験が契約を見ていない**"
@@ -256,7 +257,7 @@ if __name__ == "__main__":
         failed += check_symbol_set(asm_o, "asm (nasm)")
         failed += check_symbol_set(c_o, "c (host m32)")
 
-        rc = subprocess.run([str(exe)], cwd=ROOT, timeout=300).returncode
+        rc = host32.run([str(exe)], cwd=ROOT, timeout=300).returncode
         print("EXIT kstring_c_host=%d" % rc, flush=True)
         failed += rc != 0
 

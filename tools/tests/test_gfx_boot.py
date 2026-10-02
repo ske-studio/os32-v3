@@ -30,6 +30,7 @@ gfx_client_to_gshell)。
 --mutate は要の行を写しで壊し、どれかの構成が実行時に RED になることを見る。
 実物のソースは書き換えない。コンパイルの失敗は RED に数えない。
 """
+import host32
 import pathlib
 import re
 import subprocess
@@ -128,7 +129,7 @@ def run_case(texts, name, defs):
                                     '-o', str(tmp / 'test')], capture_output=True, text=True)
         if out.returncode:
             return 'compile', out.stderr
-        run = subprocess.run([str(tmp / 'test')], capture_output=True, text=True, timeout=60)
+        run = host32.run([str(tmp / 'test')], capture_output=True, text=True, timeout=60)
         return ('ok' if run.returncode == 0 else 'fail'), 'rc=%d %s%s' % (
             run.returncode, run.stdout, run.stderr)
 

@@ -24,6 +24,7 @@ e2fsck が無い環境では `E2FSCK SKIP` と明示して自前の検査だけ�
 --mutants fs/ の**写し**に変異を 1 つずつ当てて組み直し、どれも落ちることを見る。
           実物のソースは書き換えないので、並列の check-par に置いてよい。
 """
+import host32
 import os
 import pathlib
 import shutil
@@ -150,7 +151,7 @@ def run(exe, imgdir, pkgs, case=None, quiet=False, e2fsck=None):
     argv = [str(exe), str(imgdir), str(pkgs[0]), str(pkgs[1])]
     if case:
         argv.append(case)
-    res = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+    res = host32.run(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                          timeout=120)
     out = res.stdout.decode("utf-8", "replace")
     ok = res.returncode == 0

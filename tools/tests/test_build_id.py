@@ -80,6 +80,8 @@ def run_all(script):
         repo = work / "repo"
         repo.mkdir()
         git(repo, "init", "-q")
+        git(repo, "config", "maintenance.auto", "false")
+        git(repo, "config", "gc.auto", "0")
         (repo / "a.txt").write_text("a\n")
         git(repo, "add", "a.txt")
         git(repo, "commit", "-q", "-m", "one")
@@ -117,6 +119,8 @@ def run_all(script):
         sub = work / "subsrc"
         sub.mkdir()
         git(sub, "init", "-q")
+        git(sub, "config", "maintenance.auto", "false")
+        git(sub, "config", "gc.auto", "0")
         (sub / "s.txt").write_text("s\n")
         git(sub, "add", "s.txt")
         git(sub, "commit", "-q", "-m", "s1")
@@ -128,6 +132,8 @@ def run_all(script):
         got = gen(script, repo)
         if got != want3:
             raise Fail("サブモジュールの中の変更で dirty になった: {}".format(got))
+        git(repo / "apps", "config", "maintenance.auto", "false")
+        git(repo / "apps", "config", "gc.auto", "0")
         git(repo / "apps", "commit", "-q", "-am", "s2")               # 指す先を動かす
         got = gen(script, repo)
         if got != want3 + "-dirty":

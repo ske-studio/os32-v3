@@ -3,6 +3,7 @@
 Covers TASK_T2_APPBAND: sparse high PTs and the actual kselftest ledger
 procedure on 8/17MB pools; retains the legacy physical byte-budget tests.
 """
+import host32
 import pathlib
 import subprocess
 import tempfile
@@ -62,7 +63,7 @@ def run(mutation=None):
         if build.returncode:
             if mutation: return 'compile'
             raise RuntimeError('host compile failed')
-        result = subprocess.run([str(exe)], capture_output=bool(mutation), timeout=60)
+        result = host32.run([str(exe)], capture_output=bool(mutation), timeout=60)
         if mutation:
             if mutation[0].startswith('kselftest-'):
                 if result.returncode != 1 or b'ledger:AS alloc\n' not in result.stdout:

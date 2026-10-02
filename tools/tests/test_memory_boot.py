@@ -12,6 +12,7 @@ sys_frozen_exec を workspace_first に戻す) と、FIXED / ARENA_TOP の境界
 backing の写像・FIXED の RAM 拒否を壊した版で、試験が RED になることを見る。
 変異は一時ディレクトリの写しに当てる (実物のソースは書き換えない)。
 """
+import host32
 import pathlib
 import re
 import subprocess
@@ -120,7 +121,7 @@ def run_case(case='default', kb=16384, defines=(), mutation=None):
             if mutation:
                 return 'compile'
             raise subprocess.CalledProcessError(build.returncode, cmd)
-        out = subprocess.run([str(d / 'test')], timeout=120, capture_output=bool(mutation))
+        out = host32.run([str(d / 'test')], timeout=120, capture_output=bool(mutation))
         if mutation:
             return 'ok' if out.returncode == 0 else 'fail'
         if out.returncode != 0:

@@ -1,4 +1,5 @@
 """T2b: actual paging/ledger/lease ILP32 runtime and compiled runtime mutants."""
+import host32
 import pathlib
 import subprocess
 import tempfile
@@ -82,7 +83,7 @@ def run(changes=None):
         subprocess.run(['gcc', *FLAGS, '-DPHYSMEM_HOST_TEST=1', '-nostdlib', '-static',
                         '-no-pie', *includes, str(ROOT / 'tools/tests/lease_host.c'),
                         str(ROOT / 'kernel/physmem.c'), '-o', str(exe)], check=True)
-        return subprocess.run([str(exe)], capture_output=True, text=True, timeout=60)
+        return host32.run([str(exe)], capture_output=True, text=True, timeout=60)
 
 p = run()
 print(p.stdout, end='')

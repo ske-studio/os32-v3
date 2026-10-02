@@ -1,4 +1,5 @@
 """Actual paging.c, ILP32; only privileged asm replaced for host execution."""
+import host32
 import pathlib
 import subprocess
 import tempfile
@@ -32,7 +33,7 @@ with tempfile.TemporaryDirectory(prefix='os32-paging-') as tmp:
         defines.append('-DTEST_' + args.rebuild.upper())
     build = ['gcc', *FLAGS, *defines, '-nostdlib', '-static', '-no-pie', *host_includes, str(ROOT / 'tools/tests' / harness), str(ROOT / 'kernel/physmem.c'), '-o', str(exe)]
     subprocess.run(build, check=True)
-    subprocess.run([str(exe)], check=True, timeout=60)
+    host32.run([str(exe)], check=True, timeout=60)
     subprocess.run(['i386-elf-gcc', *FLAGS, '-O2', *includes, '-c', str(ROOT / 'kernel/paging.c'), '-o', str(tmp / 'paging.o')], check=True)
     print('HOST ILP32 + TARGET GNU11 PASS')
 
@@ -46,7 +47,7 @@ with tempfile.TemporaryDirectory(prefix='os32-paging-') as tmp:
             assert source.count(old) == 1
             (tmp / 'paging_host_source.c').write_text(source.replace(old, new))
             subprocess.run(build, check=True)  # Compile errors are not RED.
-            result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=60)
+            result = host32.run([str(exe)], capture_output=True, text=True, timeout=60)
             assert result.returncode != 0, name + ' survived'
             assert 'FAIL:' in result.stdout, result.stdout + result.stderr
             print('RED (runtime): ' + name)

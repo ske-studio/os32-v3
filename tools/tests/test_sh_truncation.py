@@ -24,6 +24,7 @@ Make・エミュレータは使わない。
 libc は使わない (-nostdlib) ので、shell.h が引く <string.h> と
 <stdio.h> / <stdlib.h> だけ一時ディレクトリに薄いシムを置く。
 """
+import host32
 import pathlib
 import re
 import subprocess
@@ -686,7 +687,7 @@ def run_mutations(tmp, shim):
             except subprocess.CalledProcessError:
                 print("MUTATE %-22s RED (コンパイルが通らない)" % name, flush=True)
                 continue
-            rc = subprocess.run([str(exe)], cwd=ROOT, timeout=60,
+            rc = host32.run([str(exe)], cwd=ROOT, timeout=60,
                                 capture_output=True).returncode
             if rc == 0:
                 print("MUTATE %-22s **GREEN のまま = 試験が規則を見ていない**"
@@ -707,7 +708,7 @@ if __name__ == "__main__":
 
         exe = build_host(tmp, shim, "sh_truncation")
         print("HOST ILP32 GNU11 COMPILE PASS", flush=True)
-        rc = subprocess.run([str(exe)], cwd=ROOT, timeout=30).returncode
+        rc = host32.run([str(exe)], cwd=ROOT, timeout=30).returncode
 
         subprocess.run(["i386-elf-gcc", *BASE, "-O2", "-nostdlib",
                         "-mno-red-zone", "-fcommon", *shim, *INCLUDES,

@@ -31,6 +31,7 @@ e2fsck を当てて出力を「許容 (漏れ側)」「不整合」に分類し 
 **自前の媒体検査 (media_ok) と食い違ったら失敗**にする。e2fsck が無い環境では
 `E2FSCK SKIP` と明示して媒体検査だけで通す ([V4])。
 """
+import host32
 import collections
 import os
 import pathlib
@@ -113,7 +114,7 @@ def run_with_e2fsck(exe, imgdir, e2fsck):
     cats_allowed = collections.OrderedDict()
     cats_bad = collections.OrderedDict()
     mismatches = []
-    proc = subprocess.Popen([str(exe), str(imgdir)], cwd=ROOT,
+    proc = subprocess.Popen(host32.command([str(exe), str(imgdir)], cwd=ROOT), cwd=ROOT,
                             stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT)
     q = queue.Queue()
@@ -235,6 +236,8 @@ def run_with_e2fsck(exe, imgdir, e2fsck):
             print("E2FSCK STALL: 出力が閉じたのに子が %.0f 秒で終わらない — 最後の像: %s"
                   % (EXIT_SEC, last_label), flush=True)
 
+    host32.report_signal(rc)
+
     print("E2FSCK samples=%d clean=%d allowed-only=%d inconsistent=%d mismatch=%d"
           % (stats["samples"], stats["clean"], stats["allowed"], stats["bad"],
              stats["mismatch"]), flush=True)
@@ -270,7 +273,7 @@ if __name__ == "__main__":
         else:
             print("E2FSCK SKIP: e2fsck not found (or --no-e2fsck) — "
                   "media_check only, e2fsck cross-check NOT performed", flush=True)
-            rc = subprocess.run([str(exe)], cwd=ROOT, timeout=900).returncode
+            rc = host32.run([str(exe)], cwd=ROOT, timeout=900).returncode
         print("EXIT b8_open_host=%d" % rc, flush=True)
 
         if "--target" in sys.argv:
