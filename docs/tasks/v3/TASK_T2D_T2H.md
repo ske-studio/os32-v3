@@ -1473,6 +1473,14 @@ make check-changed < /dev/null` は上記PATH/PYTHONPATHで **最後に1回だ�
 検査中のソース変更なし。終了後は本結果の記録とwrapper数の表記訂正のみ。
 
 
+## 10-14. d5 の着地とゲスト受入 (PM、2026-10-02、NP21/W 17MB、main `9b1e917` → 試験の追従 `d5fix`)
+
+独立レビュー Opus 5.5 は 1 回目 Request changes (P2-1 kselftest の拒否理由、P2-2 prepare_only の公開契約) → コーダー (sol) が対応 (`555fba9`、P2-2 は PM の決定で公開契約を優先) → 同じレビュアーが差分で Approve。
+
+ゲスト (17MB、今の ini — §12): kselftest 0 fail、`db_test` 9/9、`klibc_test` 49/49、`alloc_demo` 16/16、`ring3_fault` kill、`ls / | wc -l` = 54、`echo abc | wc -c` = 4、`d0a_test` 全行 OK、faulttest 一式・V86・GUI (gui_demo → CUI) 従来どおり。
+
+**受入で `db_v50_test` が kill された** (`[Process crashed]`、$?=139)。PM は当初、カーネルスタックの番地 (0x2ffd84、WR_TABLE) の拒否記録から d5 の退行と見立てたが、コーダー (astra) の調査で**誤り**と分かった: 拒否記録は起動時の kselftest (kselftest.c:1691) の残り値で、kill の本当の原因は **T2c の高位配置への試験の追従漏れ** — 試験が「帯の端」として旧い番地 0x7fffff を `db_bind_text` に渡し、T2c 以降は帯の外なので入口の早期検査 (exec.c:1451) が設計どおり kill した。カーネル・公開 KAPI は変更不要で、試験の番地を `sbrk_heap_limit - 1` に直した (`d5fix`、ホストの回帰試験も追加)。直した後のゲストで **`db_v50_test` PASS 41/41、$?=0**。T2c の受入で `db_test` / `db_v50_test` を流していなかったのが見逃しの原因 — 以後の段の受入に加える。
+
 ## 11. 独立レビュー 2 回目 (Opus 5.5、Approve) の P3 — 実装時の注記
 
 2026-10-01、`3180a51` の差分に対して Approve (P1 2 件・P2 11 件はすべて閉)。以下の 5 件は設計の変更ではなく、実装時に従う注記 (PM 記入)。
