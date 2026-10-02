@@ -86,7 +86,7 @@ walkはT2cの低位恒等backingをP2Vで参照し、**dではmaster往復を除
 
 早期 `ring3_ptr_ok` はNULL・高位image/heap/stack/SHMと**現在ASの有効lease**の分類に拡張。穴の最終判定はwalk。dでは旧consumerのため既存低位VRAM分類を暫定維持し、eで消す。既存出力ガードはRW検査を弱めず新walkへ集約する。`_always` の保存済みapp pointer経路をtrusted扱いへ変えない。
 
-DB接続は `kapi_db.c:512` / `:974` / `:1116` の3呼出箇所 (db_open / db_open_existing / db_prepare_only)とその補助だけ。copy失敗では既存rcを返し、SQLite入口カウンタ差分0、旧stmt/FDに副作用なし。B3/B4やFEP全体を安全化したとは報告しない。
+DB接続は `kapi_db.c:512` / `:974` / `:1116` の3呼出箇所 (db_open / db_open_existing / db_prepare_only)とその補助だけ。copy失敗では既存rcを返し、SQLite入口カウンタ差分0、旧stmt/FDに副作用なし。B3/B4やFEP全体を安全化したとは報告しない。 **例外: `db_prepare_only` の旧 stmt はコピー拒否でも入口で finalize する** (公開仕様 KAPI_SPEC.md:1304-1306 を優先、§10-13)。
 
 **d0a の試験と判定 (2026-10-01、ゲスト未実施)**:
 `userland/tests/d0a_test.c` を既定の CPL=3 でビルドし、`userland/deploy.yaml` に
@@ -1226,7 +1226,7 @@ DB結果は既存固定SHM形式であり、3入口にcaller出力引数はな�
 (定義/本文を無改変で抽出)、実caller/copy/paging/pgalloc/shlib/walkをリンク。
 MMU/IRQ/VFS/SQLite境界のみ足場、SQLiteは入口呼出を数えてstaging内容を照合する。
 高位VAに異なるdecoy、低位PAに本物の入力を置き、3入口のpage末NUL対照/
-次NP拒否→次操作成功、SQLite/VFS進入0、旧stmt不変、RO入力/出力拒否、
+次NP拒否→次操作成功、SQLite/VFS進入0、prepare_only は拒否でも旧 stmt を finalize (他の 2 入口は旧状態不変)、RO入力/出力拒否、
 2本目拒否、PDE RW、WMの通常/always、CPL0直呼び、失効caller、scratch、lease、
 IF/CR3不変を確認。カウンタはホスト境界のもの、製品KAPIを追加していない。
 既存SQLite-engine試験5本は共通caller境界shimへ更新し、実walk試験と区別した。
