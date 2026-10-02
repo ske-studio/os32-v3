@@ -41,6 +41,21 @@ impl Ctx {
     }
 }
 
+/// ABORTED owner exit consumes the same STOP in every WM input representation.
+pub fn discard_stop(st: &mut GuiState) {
+    st.abort_seen = false;
+    let mut kept = 0;
+    for i in 0..st.pending_raw_n {
+        let raw = st.pending_raw[i];
+        if raw & 0x1ff == (SC_STOP as i32 | 0x100) && raw & ((MOD_CTRL as i32) << 9) != 0 {
+            continue;
+        }
+        st.pending_raw[kept] = raw;
+        kept += 1;
+    }
+    st.pending_raw_n = kept;
+}
+
 /* 修飾ビット (drivers/kbd.h の SHIFT_* と一致)。 */
 const MOD_SHIFT: u32 = 0x01;
 const MOD_CAPS: u32 = 0x02;
@@ -281,7 +296,7 @@ pub fn standalone_key(st: &mut GuiState, scan: u8) {
 ///   2. モーダル中は宛先をダイアログに限定する。
 ///   3. 押下は先に FEP へ通し、FEP が消費したら `Key` を配送しない。
 ///      確定文字列は取り込みの最後に `Text` でまとめて流す。
-fn capture_keyboard(st: &mut GuiState, ctx: Ctx) {
+pub(crate) fn capture_keyboard(st: &mut GuiState, ctx: Ctx) {
     /* X4 で見た SHIFT+SPACE をここで実行する (契約 T8: 辞書を開く重い処理は X3)。 */
     if ctx.wm_ui() {
         fep::apply_pending_toggle(st);
@@ -307,7 +322,7 @@ fn capture_keyboard(st: &mut GuiState, ctx: Ctx) {
         if ctx == Ctx::Pump && (modal::is_open() || startmenu::is_open()) {
             break;
         }
-        /* 満杯に近ければ取り込まない (カーネル待ち行列に残す。契約 T3)。
+        /* X4 は満杯に近ければ取り込まない。X3 は STOP を探して読み続ける。
          * FEP の確定文字列が続く可能性があるので 4 件分を見る。 */
         let space_ok = if modal::is_open() || startmenu::is_open() {
             /* 打鍵の宛先はダイアログ (WM 自身) でリングへは積まない。アプリの
@@ -319,7 +334,7 @@ fn capture_keyboard(st: &mut GuiState, ctx: Ctx) {
                 None => true, /* 宛先無し: 取り込んでも捨てるだけなので読む (キューを空ける) */
             }
         };
-        if !space_ok {
+        if !space_ok && ctx == Ctx::Pump {
             break;
         }
         /* X4 (ポンプ) で FEP がオンなら変換をここでは行わない (契約 T8: 辞書検索
@@ -367,6 +382,18 @@ fn capture_keyboard(st: &mut GuiState, ctx: Ctx) {
         let scan = (raw & 0x7F) as u8;
         let down = ((raw >> 8) & 1) != 0;
         let mods = ((raw >> 9) & 0x7F) as u32; /* イベント時点の修飾状態 */
+        /* X3 must reach STOP behind undeliverable input. Count every discarded
+         * raw event, without running FEP/WM actions for it. */
+        if !space_ok {
+            if scan == SC_STOP && down && (mods & MOD_CTRL) != 0 {
+                st.abort_seen = true;
+                // Preserve later raw input until STOP changes the foreground.
+                break;
+            } else if let Some(t) = focus_target(st) {
+                ring::add_dropped(st, t.slot, 1);
+            }
+            continue;
+        }
         /* X4 まで来た make は WM のキーではない (上で退避していない)。古い印を
          * 消して、対になる break を X4 がそのまま配れるようにする。 */
         if ctx == Ctx::Pump && down {

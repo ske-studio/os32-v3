@@ -1157,6 +1157,237 @@ Opus 5.5による差分再レビュー、e〜gを含む最終一式でのゲス�
 
 記録欄: SHA/build ID/hash/画像size/機種RAM/backend、実コマンド/rc、kselftest/地図、owner別used/free、lease数、leftover、bad_free、IRQ/例外深さ、ledger_irq_ops/exc_ops、fault終了種別、KHEAP/stack high-water、画面結果。brokerのboot自己診断+1は基準値、操作差分は0。失敗後の次起動と親データの一致までが1ケース。失敗/skipには担当と次の試験を記す。
 
+### 5-4. GUI KAPI-loop の STOP (ユーザー決定: A + 二重 kill の修正、2026-10-02、GPT-6)
+
+**状態: 実装・独立レビュー指摘の修正済み、ゲスト受入待ち。** 全体ホスト検査の最新結果は下の追補ログを参照。 作業木 `wt/kstop`、開始 HEAD `e1c213b`。ユーザーは
+Opus の第三案 C ではなく **A** を選択し、OWNER_EXIT の内部引数へ終了種別を
+渡す変更も承認した。設計 A = h3 の **KAPI-loop A / wm-kill**。
+公開 KAPI・sdk/kapi.json・KAPI 版・h3 台本は変更しない。
+
+**確定設計**: IRQ の GUI 受付拒否時、RUNNING/gui/CPL3 の current に
+`stop_wm_req` だけを立てる。WM の入力読取り直後〜resume/start の隙間に
+IRQ が来たときは shell slot に未配送要求を保持する。次の正常 syscall、既存park、
+WMのabort_clear、回収で消費し、currentへ誤killせず同じAへ渡す。正常 syscall 完了後 (戻り値書込・callback 復帰後)、
+第5の由来 `parked_from_stop` で WAIT_POLL に退避する。状態の公開値は増やさず、
+WM の既存 pick/should_park で起こせる。resume は EAX を保存し注入リングを読まない。
+既存 park・abort_clear・reclaim で要求を消す。WM は既存宛先解決で exec_kill。
+`resume_one` の前段でも keyboard capture (Standalone) → top_level_abort を行う。
+exec_start が同じ周の X3 より後に戻った場合も、未読 raw / deferred / abort_seen を
+処理してから再開する。マウス・時計はそこで取り込まず、既存の起床順位/tick制御を保つ。
+ABORTED の OWNER_EXIT は raw の未読 CTRL+STOP make、WM の abort_seen と
+pending_raw 内の CTRL+STOP make を消費し、次の前景への二重 kill を防ぐ。
+STOP 以外の打鍵・break は保つ。複数の未処理 STOP は既存 bool と同じく合流する。
+STOP と無関係な ABORTED (request_kill_all、resume 失敗の exec_kill_one) でも、
+その時点の実打鍵 STOP はこの合流に含めて消費する。
+IRQ/例外では ledger を触らず、通常回収の深さ0、owner別回収、R1 pending一回消費を維持。
+
+**レビューの扱い**: P1-1 は既知の制約として受け入れる。張本人=current と
+前景連鎖末尾の宛先が違う場合、宛先を畳んだ後に張本人は保存 EAX で再開し、
+再び KAPI-loop で WM を塞ぎ得る。窓なし・連鎖外の張本人も A では畳めない。
+試験はこの挙動も固定し、受入の中心は「前景自身が KAPI-loop」である。
+P1-2 は今回修正、P2-1 は第5由来の印・EAX保存・S6正常対照で確認する。
+P1-3 (B) は対象外。P3-1 は上の名称対応、P3-2 は **時計の進行確認は STOP 後だけ**。
+協調型なので KAPI-loop 中の時計停止は残る。GUI アプリの exec_run の子 (gui=0) が
+KAPI-loop に入る場合も救えない (修正前からの制約)。
+- 健全だが遅いアプリが前景にあり、別アプリの OP_WAIT の X3 や top-level が走ると、宛先リングの空きが 4 未満のとき先打ちの打鍵が数えられて捨てられる (以前はカーネルの待ち行列に最大 32 件残った)。
+- 読み捨てには WM のショートカット (GRPH+TAB など) と SHIFT+SPACE も含まれ、宛先リングが満杯の間はキーボードでフォーカスを移して逃げられない (以前も読まれず詰まっていたので悪化ではない)。
+
+
+**原因 (実ソースで確認、ゲスト再実行なし)**:
+
+1. `drivers/kbd.c` は CTRL+STOP を raw リングに積む経路と
+   `ring3_abort_request()` の経路を持つ。後者は `exec/exec.c` で
+   `appslot_abort_admit(con_sink_is_enabled(), tick_count)` が偽なら戻る。
+2. `exec/appslot.c` の受付は GUI / RUNNING / `in_op_wait=0` の場合、
+   `now_tick-last_kernel_tick >= APP_RUNAWAY_TICKS` だけを例外として通す。
+   `ring3_syscall_dispatch()` は入口ごとに `last_kernel_tick` を更新する。
+   get_tick loop ではこの受付を通らず、`abort_req` は立たない。
+   **CUI は同じ受付の先頭で無条件に通る**ため、IRQ 中は要求だけを立て、
+   被割込み CPL=3 なら既存 R1 移譲、KAPI 中なら後の syscall 安全点で畳める。
+3. GUI の raw 側は `gshell_gui_pump()` → `input::capture(Ctx::Pump)` に届き、
+   CTRL+STOP make が `abort_seen=true` になる。しかし X4 は capture のあと戻るだけ。
+   消費する OP_WAIT / top-level は get_tick loop から呼ばれない。
+   従って **IRQ 側は受付拒否、WM 側は要求の消費点に到達不能**という二重の穴である。
+   IRQ や raw 入力が全く来ないことを原因とするものではない。
+4. `multiapp::abort_target()` は全画面 owner または前景窓 owner から
+   launch 連鎖の末尾を選ぶ。一方 IRQ が知るのは current だけ。
+   GUI の受付を一律に通す修正は、別アプリが動いている瞬間の STOP で
+   current を巻き添えにするため採らない。暴走の時計変更も USER-loop の
+   既存判定と OP_WAIT 待機の扱いを変えるため、本修正の近道にしない。
+
+**A を選ぶ理由と比較**: 宛先解決と回収を既存 WM top-level に集約し、X4 の
+許可操作と公開 callback ABI を維持できる。既存 OP_WAIT の park を偽装せず、
+完了済み syscall を第5由来として区別する (API_CONTRACTS T8 を更新)。
+前回の B (X4 で宛先を決め、syscall境界へ私有要求を渡す) は採用しない。
+第三案 C (WMへ2秒戻らないことを暴走へ追加) も採用しない。
+R1/R2 と [TASK_MEMMAP_V3 §3-5-1/§3-5-3](TASK_MEMMAP_V3.md) の
+安全点と通常文脈回収の範囲内で接続する。
+
+**A の不変条件・実装の境界**:
+
+- IRQ は要求だけを記録し、AS/owner/ledger を更新しない。KAPI 本体・callback が
+  全て正常復帰した安全点でだけ退避する。CUI、USER-loop の admit/IRQ 移譲、fault、
+  既存 park 中 WM kill の受付と回収経路を変えない。
+- IRQ の返却要求と raw/abort_seen は同じ STOP の二つの表現として処理する。
+  通常 OP_WAIT に到達した場合・対象なし・終了/fault・slot 再利用にも古い要求を残さない。
+  一回の STOP が二回の kill にならず、IRQ USER-loop の残存 raw も相手へ転送しないことを
+  対照試験で確認する。USER-loop の残存 STOP による二重 kill も承認済み範囲で閉じる。
+- KAPI-loop は h3 の **A / wm-kill**: 対象回収1回、fault/abort差分0、
+  launch/resume pending と pending消費は0。R1 の IRQ/fault 経路は pending消費1回を維持。
+  回収点の IRQ/例外深さ0、ledger IRQ/例外操作の差分0、対象 owner の pages/kinds0、
+  SHM owner0/free、pending ID0を要求する。観測時の syscall/WM 深さは §5-2 の静止点規則に従う。
+- 非対象 app の AS 世代・資源・保存レジスタを保ち、注入キーを勝手に消費しない。
+  syscall の戻り値を改変せず、再開時に副作用のある KAPI を二回呼ばない。
+  通常の OP_WAIT park と STOP 由来退避を識別し、h3 の park 証拠を偽装しない。
+
+**実装・ホスト検証**:
+
+- `tools/tests/test_kstop.py`: 実 AppSlot 全体と exec の IRQ受付/dispatch/完了退避/
+  resume値選択、kbd raw除去、gui OWNER_EXIT 配送を ILP32 で実行。
+  STOP が syscall の前/本体中、完了値/全13語保存、副作用1回、相手生存、
+  CUI、USER-loop/tick wrap、既存4由来park、clear、reclaim、shell/CPL0拒否、
+  IRQ/例外/WM深さの拒否、raw循環境界を検査。11変異すべて runtime RED (再開直前のSTOP保持/参照欠落の2本を追加)。
+- `test_exec_r1.py`: 実回収/両着地/setjmp の既存対照を維持し、終了種別と
+  ABORTED の raw消費を追加。正常終了/fault/USER-loop、CUI/GUI、launch/resume、
+  park中WM kill、通常syscall abort、親文脈復元、pending一回消費を検査。
+  AppSlot 200Bをassert。26変異すべて runtime RED (今回追加2)。
+- gshell 実Rust: 追加5試験。旧 arg=0 の OWNER_EXIT で相手への2本目killが
+  起きる正常対照、修正後の捕捉済み/退避STOP消費、S6/STOP退避とも前景のみ1回、
+  張本人≠宛先の再開、起動直後のraw/退避/捕捉済みSTOP、窓なし宛先なしを固定。
+  既存の連鎖末尾/全画面/park中kill対照も維持 (153試験PASS)。追加5変異を含む49変異が runtime RED。
+- 新規は ILP32 1試験プログラム + Rust 5試験、追加変異は **18本**
+  (=11+2+5)。各置換当たり数を固定し、コンパイル失敗はREDに含めない。
+  kselftestが既に呼ぶ `appslot_resume_mark_selftest` に第5由来の検査を追加。
+  ゲストでのselftest実行は未実施。実ハード/ページ返却の観測は以下のPM手順で行う。
+- `tools/check_map.yaml` 登録と `gen_tests_inventory.py --write` を実施。
+  ILP32は host32.py / qemu。個別実行ログは `/home/hight/os32-tmp/kstop-{new,r1,rust}.log`。
+  初期の試験足場の型/サイズ不整合は修正済み。再開前に入力全体を取り込む案では
+  既存8試験が失敗したため keyboardだけへ限定し、起床順位/tick制御の回帰を解消。
+
+**Approve 後の P3 追補 (2026-10-02、GPT-6)**:
+
+- P3-a: raw 満杯時、CTRL 無し STOP make / CTRL+STOP break / CTRL make が末尾を置換せず、dropped に各1件を加えることを全32通りの head で固定。make 条件と CTRL 条件を外す2変異を追加 (各置換1か所、runtime RED)。kstop は34/34変異RED。
+- P3-b: X3 の読み捨て中に CTRL+STOP make を拾ったら、その周の raw 読取りを止める。STOP 後の make/break は kernel raw と X4 退避列の双方で保持し、OWNER_EXIT 後の次の前景へ配送する。既存試験の dropped/退避件数を追従し、Rust 1試験・1変異を追加。修正前は2試験RED、修正後は155試験PASS・53/53変異runtime RED。raw 満杯/カーネル dropped 増加に限る案は採用せず、上の既知の限界に記載。
+- P3-c: WM ショートカットと SHIFT+SPACE も読み捨てる制約を上に記載。
+- 直前未コミット版比: kernel.bin / vmkernel.lz4 は **±0 B**、gshell .text **−48 B**、.data/.bss **±0 B**、gshell.bin **−64 B** (225,128 → 225,064 B)。kernel の ASSERT 余白34,988 Bとe枠の残り15,040 Bは変わらない。
+- 指定環境で make all rc=0。NP21W_DIR=/dev/null によるD88コピー失敗警告のみ。個別試験と変異、生成2本、lint、最終check-changedのコマンド/rcは最終報告と /home/hight/os32-tmp/kstop-p3-*.log に記録する。全体検査中は票・ソースを固定する。ゲスト・実機検証は今回の依頼範囲外で未実施。
+
+**独立レビュー追補 (2026-10-02、GPT-6、P1なし・Request changesへの対応)**:
+
+- P2-1: X3 は配送不能な raw を dropped / OVERFLOW として捨てて STOP まで読む。
+  X4 の保留は維持。カーネルは raw 満杯時の CTRL+STOP make で末尾を上書きする。
+  1枠予約と違い既に満杯の状態でも確実に保持でき、head と先行順序を保つためこの方式を採用。
+- P2-2: gui_call の入口で OWNER_EXIT を OS32_ERR_INVAL。内部 gui_owner_exit は
+  gui_call を経由せず g_gui_handler を呼ぶ。拒否の試験と1変異を追加。
+- P3-1〜4: exec_park_stop の6守り、他4park/clear/reclaim/start/resumeの要求掃除、
+  非GUI拒否を関数単位で変異。CPL0拒否、CTRL無しSTOP保持、OP_WAIT中のabort_reqも固定。
+  R1はSTOP退避を実関数へ置換し、親caller文脈が残る条件でinvalidate欠落をruntime REDにする。
+- P3-5: ring3_stop_park_count は退避成立ごとに+1。今回mapは **0x180B4C**。
+  PMの再ビルド後は必ず引き直す。
+- P3-6〜10: T4/T6/U8/PROTO_LAYOUT/KAPI_SPECを追従。Rustの3定数は
+  Cヘッダ対照のstatic assertで固定し、公開ABIを増やさない。kbd注釈の位置、
+  STOP以外のABORTEDとの合流、gui=0のexec_run子の限界を明記した。
+- 足場のgrep: dispatcher.incのcaller_access、dispatch_host_source.cのdb_callerに
+  回数を数えるstubとassertを追加。test_exec_r1/test_kstopは実dispatch/STOP関数。
+  test_kapi_db_v50/test_net_linkの関数抽出は現行署名を確認。
+  multiapp_impl_host/net_link_hostは入口規則のみ、con_sink_host/owner_reclaim_hostは
+  回収部分だけの模型で、新しいSTOP呼出しの追加漏れなし。
+  検索全文は /home/hight/os32-tmp/kstop-review-scaffolds.log。
+- 個別確認: kstop **32/32**、R1 **27/27**、ring3_guard **15/15**、
+  caller_access **24/24**、db_caller **15/15** の変異がruntime RED。
+  Rust **154試験PASS・52/52変異RED**。この6集合は変異合計165本。
+  初回はkstopのカウンタ追加後の置換不一致、R1のSTOP-invalidate変異SURVIVEDを検出。
+  置換と親callerを含む足場を直して再実行済み。コンパイル失敗はREDに数えない。
+- 今回のレビュー修正増分 (直前未コミット版比): .text **+192 B**、
+  .data/.bssのsectionサイズは不変 (カウンタは整列余白に収まる)、
+  kernel.bin **+192 B**、vmkernel.lz4 **+159 B**、__bss_end **0x18C754**、
+  ASSERT余白 **34,988 B**。最初の修正前比は本体 **+1,344 B**、
+  e枠16,384 Bの残り **15,040 B** (他作業との合算はPM)。
+- 共通環境: CROSS_DIR=/home/hight/opt/cross、TMPDIR=/home/hight/os32-tmp、
+  PYTHONPATH空、HOST32_RUNNERS=qemu、makeはNP21W_DIR=/dev/null、stdin=/dev/null。
+  make all rc=0 (D88コピー失敗警告は指定の/dev/nullによる配備抑止)。
+  個別は python3 -B tools/tests/test_{kstop,exec_r1,ring3_guard,caller_access}.py --mutate、
+  test_db_caller.py --runner qemu --mutate、userland/gshell/host/integration.py --mutate、
+  すべてrc=0。ログは /home/hight/os32-tmp/kstop-review-{kstop,r1,guard,caller,db,rust,all}.log。
+- 本追補と生成地図/試験一覧を固定後、gen_memmap.py --write、
+  gen_tests_inventory.py --write、check_select.py --lintを実施し、
+  最後にmake check-changed (OS32_MUT_JOBS=4、OS32_MUT_NICE=0)を実行する。
+  結果は /home/hight/os32-tmp/kstop-review-check-changed.log / .rc と最終報告へ残す。
+  実行中は票・ソースを書き換えない。過去のrc=130二回とPMのrc=2は下記の履歴として保持。
+  配備・NP21/W・NHD・ini・実機・commit/pushは今回も未実施。
+
+**§6-1 e枠への内数計上** (同じ cross、build ID `e1c213b-dirty`、selftest込み):
+
+| 指標 | 修正前 | 修正後 | 差分 |
+|---|---:|---:|---:|
+| kernel .text | 330,446 B | 331,550 B | +1,104 B |
+| kernel .data / .got.plt | 32,647 / 12 B | 同左 | 0 |
+| kernel .bss | 210,836 B | 210,900 B | +64 B |
+| kernel.bin | 363,124 B | 364,212 B | +1,088 B (整列 -16 B込み) |
+| __bss_end | 0x18C214 | 0x18C694 | **+1,152 B** |
+| ASSERT余白 (0x195000まで) | 36,332 B | 35,180 B | -1,152 B |
+| vmkernel.lz4 | 480,618 B | 481,193 B | +575 B |
+
+AppSlotは192→200B、6slot分+48B (BSS差分に内包、別加算しない)。AS/ledgerの
+構造は不変、16KiB管理ASSERTも通過。今回分1,152Bをe枠16,384Bの内数とし、
+今回分を引いた残りは15,232B (他のe作業との統合残高はPMが合算)。圧縮余白38,999B。
+基準ELF/LZ4は `/home/hight/os32-tmp/kstop-before.{elf,lz4}`。
+
+**固定前コマンドと結果** (PYTHONPATH空、TMPDIR=/home/hight/os32-tmp、
+ILP32はHOST32_RUNNERS=qemu、makeはstdin=/dev/null):
+
+- `CROSS_DIR=/home/hight/opt/cross make all < /dev/null`: rc=0。
+  初回はIPAフォント不在の非対話確認でrc=2。既存mainの取得済みTTFをコピーして解消
+  (新たなライセンス同意やダウンロードなし)。最終ログ `kstop-all-final.log`。
+  make all内のD88コピーは初回既定 `/tmp/np21w` で失敗。以後は
+  `NP21W_DIR=/home/hight/os32-tmp/kstop-image-output` に隔離してビルド出力だけを保存。
+- `python3 tools/gen_memmap.py --write`: rc=0。
+- `python3 tools/gen_tests_inventory.py --write`: rc=0。
+- `python3 tools/check_select.py --lint`: rc=0 (119検査、漏れ0)。初回の依存ヘッダ2件漏れは補完済み。
+- `python3 tools/tests/test_kstop.py --mutate` / `test_exec_r1.py --mutate` /
+  `python3 userland/gshell/host/integration.py --mutate`: 各rc=0。
+
+この欄を書き終えてから最後に
+`CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp HOST32_RUNNERS=qemu
+make check-changed < /dev/null` を実施する (PYTHONPATH空、NP21W_DIRは上記隔離先)。
+1回目は ring3-guard の変異パターンが旧 OWNER_EXIT 引数0を前提として失敗。
+残りC方言変異で12分以上出力が止まり、停止して全体rc=130
+(`kstop-check-changed-first.log` / `.rc`)。元の木の不変性は保ったまま停止した。
+その後パターンを更新し、`test_ring3_guard.py --mutate` はrc=0 / 14本runtime RED。
+再開直前STOPも写しのハーネスでruntime REDを再現後に上記の保持で修正した。
+2回目は `OS32_MUT_NICE=0` も明示して実行した (対象/変異数は同じ、nice +10だけ解除)。
+db-v50回収順検査が旧 `exec_reclaim_owned(int id)` の正規表現で失敗し、
+net-linkにも旧 `exec_notify_owned(int id)` の同じ追従漏れがあることを確認。
+2回目も停止して全体rc=130 (`kstop-check-changed.log` / `.rc`)。
+**全体検査のrc=0という完了条件は未達**。1回目・2回目とも検査中の票/ソース変更はない。
+停止後、この2検査を現行署名へ追従させた。製品の回収順・資源操作は変えていない。
+以下の個別確認・lintをこの欄の固定後に実施し、結果は最終報告と
+`kstop-signature-checks.log`へ残す。依頼の再実行枠は使い切ったので3回目は実施しない。
+PMへの引継ぎは **最終差分のcheck-changedを新たに実行しrc=0を得ること**と、
+Opus 5.5の差分再レビュー、下のゲスト確認。現時点で受入完了とはしない。
+
+旧ソースの写しによる二重kill正常対照も追加実行した。HEAD の修正前 handler.rs を
+一時木へ復元し、登録済み `kstop_old_owner_exit_contract_reproduces_second_kill` を実行。
+捕捉済みSTOP・退避STOPとも app 3終了後に無関係なapp 2がkillされるassertがPASS (rc=0)。
+ログ `kstop-old-source-control.log`。作業木のソースは変更せず、修正後153試験PASSと対照した。
+
+**PM へのゲスト手順 (A 採用・実装・ホスト検査完了後、未実施)**:
+
+1. PM が新一式の反映を [V1] で確認し、新 ELF/map から §5-2 の layout を生成する。
+   GUI で h3a/h3b を起動し、別々の case で init。両 AS の owner/世代を記録する。
+2. §5-2 に従い対象の実 park → arm KAPI-loop → resume/FIRING を採取する。
+   対象が前景である新しい証拠を渡して、修正済み台本から STOP を一度だけ送る。
+   台本の `ok:1` 対応は別担当の成果物を使い、この段では変更しない。
+3. 新 kernel.map の ring3_stop_park_count を前後で読み、KAPI-loop の STOP で +1 を確認する。
+   打鍵・クリックを重ねて宛先リング/raw を満杯にした場合も再実行し、同じ退避・回収を確認する。
+   A の wm-kill 対象ID/回収1回、pending0、abort/fault差分0、対象FREE/owner0、
+   相手の同じ AS 世代での生存、ledger/深さを既存判定で確認する。
+   時計の再進行と相手窓への操作で WM 再開も観測する。次起動の新世代まで確認する。
+4. 両fixtureで対象を交換して再実行し、USER-loop・4 fault・park中WM kill の対照を行う。
+   e〜g を含む最終一式で全証拠を取り直す。native のホスト検査は PM が行う。
+
+NP21/W・NHD・配備・ini・実機・commit/push は未実施。
+
 ## 6. 予算・ホスト試験の重さ
 
 ### 6-1. 予算ゲート (設計上の配分、未測定)

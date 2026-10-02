@@ -790,6 +790,15 @@ checks:
     - tools/tests/test_highram_stage.py
     - tools/tests/test_ledger.py
     - tools/tests/test_exec_r1.py
+    - tools/tests/test_kstop.py
+    - userland/gshell/src/input.rs
+    - userland/gshell/src/handler.rs
+    - drivers/kbd_dlog.h
+    - drivers/serial.h
+    - kernel/gui.c
+    - kernel/gui.h
+    - drivers/kbd.c
+    - drivers/kbd.h
     - tools/tests/test_memory_boot.py
     - tools/tests/test_paging_bounds.py
     - tools/tests/paging_bounds_host.c

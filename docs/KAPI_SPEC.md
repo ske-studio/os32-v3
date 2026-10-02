@@ -502,13 +502,15 @@ V86 ゲストを起動する。MS-DOS 5.00A の起動確認に使う。
 それ以外からは `OS32_ERR_INVAL`。設計の正典は
 [archive/gui_v13/TASK_K5_multiapp.md](archive/gui_v13/TASK_K5_multiapp.md) の D0〜D11。
 
-- `exec_start(cmdline)`: **塞がない起動**。>0 = app_id (2〜5) で最初の `gui_call(OP_WAIT)` まで
-  進んで park した / 0 = park より前に終了した (回収済み・`gui_owner_exit` 配送済み) /
+- `exec_start(cmdline)`: **塞がない起動**。>0 = app_id (2〜5) で OP_WAIT / キー待ち / poll・yield / STOP 完了安全点の
+  いずれかで park した / 0 = park より前に終了した (回収済み・`gui_owner_exit` 配送済み) /
   <0 = 起動しなかった (`OS32_ERR_FULL` = ID の池が尽きた、`EXEC_ERR_NOMEM` = 物理が足りない、
   `EXEC_ERR_NOT_FOUND`、`EXEC_ERR_INVALID`)。従来の `exec_run` は残り、CUI の入れ子はそのまま。
 - `exec_resume(app_id, wait_ret)`: park してあるアプリを 1 本だけ起こす。`wait_ret` は
   `OP_WAIT` の戻り値としてアプリに渡る。戻り値は app_id (また park した) / 0 (終了した) / <0。
-  起こせるのは **`OP_WAIT` で park された印のあるフレームだけ**で、印が無ければ
+  WAIT_KEY では注入キーを使い、WAIT_POLL (poll・yield・STOP 完了退避) では wait_ret を無視する。
+  STOP は保存 EAX をそのまま使い、KAPI を再実行しない。
+  起こせるのは **対応する park 由来の印があるフレームだけ**で、印が無ければ
   `OS32_ERR_STALE` を返し `ring3_resume_bad_frame_count` が増える (受入 G7)。
 - `exec_park()`: 走っているアプリを `OP_WAIT` の中で止め WM へ戻す。成立すれば **戻らない**。
   呼べない文脈 (他の op / 走っているアプリが居ない / CUI の入れ子の子) では `OS32_ERR_INVAL` を
@@ -516,7 +518,8 @@ V86 ゲストを起動する。MS-DOS 5.00A の起動確認に使う。
   ループ先頭 1 点だけ (park 規約)。
 - `exec_kill(app_id)`: 止めてあるアプリを起こさずに畳む。走っている本人は `OS32_ERR_STALE`
   (そちらは CTRL+STOP の経路)。
-- `exec_app_state(app_id)`: 0 = 空き / 1 = 走っている / 2 = park 中。
+- `exec_app_state(app_id)`: 0 = 空き / 1 = 走っている / 2 = park 中 /
+  3 = WAIT_KEY (注入キー待ち) / 4 = WAIT_POLL (poll・yield・STOP 完了退避)。
 - `snd_focus(app_id)`: 音の所有者をフォーカス窓の owner に合わせる。それまでの所有者の BGM を
   退避して止め、移った先に退避があれば復元する。**同時には鳴らさない**。フォーカスの無い
   所有者の `snd_bgm_play` は鳴らさず退避に積むだけ、SE は捨てる。

@@ -34,7 +34,8 @@ i32 gui_register(void *handler, void *pump);
 
 /* 所有者による回収の口 (契約 T4 / U8)。exec_exit() が owner 別回収で呼ぶ。
  * ハンドラが登録済みなら GUI_OP_OWNER_EXIT を渡して WM に回収させる。 */
-void gui_owner_exit(int owner);
+/* Internal arg = EXEC_KIND_*; ABORTED consumes stale STOP in the WM. */
+void gui_owner_exit(int owner, int kind);
 
 /* KAPI ime_set_render の入口 (sdk/kapi.json の target)。shell 帯 (owner 1) の
  * CPL=0 の直呼びだけを通し、アプリ由来 (ring3_call_from_user) は黙って断って

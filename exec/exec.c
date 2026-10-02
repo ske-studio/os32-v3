@@ -617,7 +617,10 @@ void ring3_abort_request(void)
      * 100ms タイマの端末が巻き込まれる (受入 S6 の 2 回目)。
      * 例外は暴走 (APP_RUNAWAY_TICKS 以上 WM へ戻っていない) だけ。
      * CUI 中は 1 バイトも変えない (K2 の唯一の逃げ道)。 */
-    if (!appslot_abort_admit(con_sink_is_enabled(), tick_count)) return;
+    if (!appslot_abort_admit(con_sink_is_enabled(), tick_count)) {
+        appslot_stop_request();
+        return;
+    }
     appslot_abort_request();
 }
 
@@ -1143,12 +1146,13 @@ static void exec_reclaim_resources(int id)
     pcm_reclaim(id);
 }
 
-static void exec_notify_owned(int id)
+static void exec_notify_owned(int id, int kind)
 {
     /* (7) GUI リソース回収 (契約 T4 / U8)。WM がこの owner のウィンドウ・
      * サーフェス・タイマ・スロットを回収する。畳む 3 経路すべてが
      * ここを通るので、WM は 1 か所で回収できる。 */
-    gui_owner_exit(id);
+    if (kind == EXEC_KIND_ABORTED) kbd_discard_stop();
+    gui_owner_exit(id, kind);
     /* (8) 打鍵の注入リング (票 K7 D5)。注ぎ手は con_sink の読み手 1 本なので、
      * 畳んだのがその 1 本なら溜まっている打鍵を捨てる。**con_sink の所有を
      * 返す前**に呼ぶこと — 照合に g_reader を使うため。 */
@@ -1201,10 +1205,10 @@ static void exec_notify_owned(int id)
     appslot_gfx_owner_exit(id);
 }
 
-static void exec_reclaim_owned(int id)
+static void exec_reclaim_owned(int id, int kind)
 {
     exec_reclaim_resources(id);
-    exec_notify_owned(id);
+    exec_notify_owned(id, kind);
 }
 
 /* ======================================================================== */
@@ -1300,7 +1304,7 @@ static void exec_finish(int id, int status, int kind)
         ring3_band_set(1);
         exec_nest_level = 0;
         res_owner_set(0);
-        exec_reclaim_owned(id);
+        exec_reclaim_owned(id, kind);
     } else {
         parent = appslot_return_target(id);
         /* 装置・FD の利用終了を私有ページの返却より先に済ませる (R1)。 */
@@ -1311,7 +1315,7 @@ static void exec_finish(int id, int status, int kind)
          * 切替ではない。appslot_switch_to が transition_count で別勘定する。 */
         appslot_switch_to(parent);
         exec_restore_context(parent);
-        exec_notify_owned(id);
+        exec_notify_owned(id, kind);
     }
 }
 
@@ -1390,6 +1394,27 @@ void __cdecl kapi_sys_exit(int status)
 
 /* 可変長引数 (kprintf) を拾うためのコピー窓 (固定分より広めに取る)。 */
 #define RING3_ARG_WINDOW  64u
+
+/* Fifth park origin: only after the entire KAPI/callback has returned.
+ * No cleanup here; the existing WM top-level selects the owner to kill. */
+static void exec_park_stop(u32 *frame)
+{
+    int id = appslot_cur();
+    AppSlot *a = appslot_get(id);
+    u32 k;
+    if (!a || !appslot_stop_pending() || !a->gui || !a->cpl3 ||
+        a != g_cur_app || a->state != APP_STATE_RUNNING || a->in_op_wait ||
+        ring3_wm_depth || kctx_irq_depth || kctx_exc_depth) return;
+    for (k = 0; k < APP_FRAME_WORDS; k++) a->frame[k] = frame[k];
+    exec_heap_save_state(&a->exec_heap_used);
+    ring3_context_clear();
+    paging_load_cr3(paging_kernel_pd_phys());
+    appslot_park_stop_commit();
+    exec_restore_context(APP_ID_SHELL);
+    g_longjmp_reason = EXEC_LJ_PARK;
+    g_longjmp_id = id;
+    exec_longjmp(a->jmpbuf);
+}
 
 void __cdecl ring3_syscall_dispatch(u32 *frame)
 {
@@ -1474,6 +1499,7 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
 
     /* --- 出口でも CTRL+STOP を見る (契約 T6、v1.2 G2 で実測した隙間) --- */
     ring3_abort_check();
+    exec_park_stop(frame);
 }
 
 /* ======================================================================== */
@@ -2407,7 +2433,9 @@ i32 exec_resume(i32 app_id, i32 wait_ret)
     a = appslot_get((int)app_id);
     if (!a->cpl3 || !a->as->pd_phys) return OS32_ERR_INVAL;
     src = appslot_resume_source((int)app_id);
-    if (src == APP_RESUME_SRC_YIELD) {
+    if (src == APP_RESUME_SRC_KEEP) {
+        /* STOP parked a completed syscall; do not overwrite EAX or read keys. */
+    } else if (src == APP_RESUME_SRC_YIELD) {
         /* 票 T9 D5: 明示的な譲り (sys_yield) は **注入リングを読まない**。
          * 読むと、sh が譲っている間に届いた子宛の 1 バイトを吸って捨てる
          * (票 §6 blocker 1)。アプリからは sys_yield() が 0 を返して見える。 */
@@ -2473,7 +2501,7 @@ static void exec_kill_one(int id)
     exec_reclaim_resources(id);
     exec_teardown_app(a);
     appslot_reclaim(id);
-    exec_notify_owned(id);
+    exec_notify_owned(id, EXEC_KIND_ABORTED);
     /* 生存アプリの集合が変わる瞬間 = transition。G7 の switch ではない。 */
     ring3_transition_count++;
 }

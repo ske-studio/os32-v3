@@ -24,6 +24,8 @@ static u32 tick_count;
 volatile u32 ring3_caller_reject_count;
 static void ring3_abort_check(void) {}
 static void ring3_gui_pump(void) {}
+static int stop_park_calls;
+static void exec_park_stop(u32 *frame) { (void)frame; stop_park_calls++; }
 static u32 kapi_invoke(void *fn, const void *args, u32 n) {
     const u32 *a = args;
     (void)n;
@@ -41,13 +43,15 @@ static int dispatch_probe(u32 slot_id, u32 a, u32 b, u32 c, u32 d, int kill) {
     u32 *args = (u32 *)MEM_EXEC_LOAD_ADDR;
     args[1] = a; args[2] = b; args[3] = c; args[4] = d;
     frame[7] = slot_id; frame[11] = (u32)args;
+    int parks_before = stop_park_calls;
     expect_kill = kill;
     if (__builtin_setjmp(kill_env)) {
+        CHECK(stop_park_calls == parks_before);
         expect_kill = 0;
         return -999;
     }
     ring3_syscall_dispatch(frame);
-    CHECK(!kill);
+    CHECK(!kill && stop_park_calls == parks_before + 1);
     return (int)frame[7];
 }
 

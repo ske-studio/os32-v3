@@ -407,6 +407,12 @@ static void kbd_deliver(u8 scancode)
             kbd_raw_tail = (kbd_raw_tail + 1) % KBD_BUF_SIZE;
             kbd_raw_count++;
         } else {
+            /* Keep emergency make even when ordinary input filled the ring.
+             * Replace the newest entry: earlier input order and head stay intact. */
+            if (keycode == KEY_STOP && !is_break && (kbd_shift_state & SHIFT_CTRL)) {
+                int last = (kbd_raw_tail + KBD_BUF_SIZE - 1) % KBD_BUF_SIZE;
+                kbd_raw_buf[last] = KEY_STOP | 0x100 | (u16)((kbd_shift_state & 0x7F) << 9);
+            }
             kbd_raw_dropped++;   /* GUI が resync できるよう必ず数える (レビュー ①) */
         }
     }
@@ -852,6 +858,28 @@ int kbd_is_pressed(int scancode)
 {
     if (scancode < 0 || scancode > 127) return 0;
     return (kbd_key_pressed[scancode >> 3] >> (scancode & 7)) & 1;
+}
+
+/* Preserve order and all non-STOP input, including modifier/break events. */
+void kbd_discard_stop(void)
+{
+    u32 flags = irq_save();
+    int n = kbd_raw_count;
+    int read = kbd_raw_head;
+    int write = read;
+    int kept = 0;
+    while (n-- > 0) {
+        u16 raw = kbd_raw_buf[read];
+        read = (read + 1) % KBD_BUF_SIZE;
+        if ((raw & 0x1ff) == (KEY_STOP | 0x100) &&
+            (raw & (SHIFT_CTRL << 9))) continue;
+        kbd_raw_buf[write] = raw;
+        write = (write + 1) % KBD_BUF_SIZE;
+        kept++;
+    }
+    kbd_raw_tail = write;
+    kbd_raw_count = kept;
+    irq_restore(flags);
 }
 
 /* 生 make/break イベントを 1 件取り出す (レビュー ⑥)。無ければ -1。

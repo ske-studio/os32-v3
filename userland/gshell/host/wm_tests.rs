@@ -3276,3 +3276,215 @@ fn ctrl_stop_in_op_wait_with_a_child_still_folds_the_tail() {
     );
     wm::g().inited = false;
 }
+
+// §5-4: same source path, with the old arg=0 contract as a positive reproducer.
+fn stop_exit_scenario(kind: u32, deferred: bool) -> Vec<i32> {
+    use crate::{handler, input, mocks, multiapp, wm};
+    use os32api::gui::proto::GUI_OP_OWNER_EXIT;
+    mocks::init();
+    multiapp::reset();
+    let shm = mocks::Shm::new();
+    two_app_global(&shm);
+    let stop = 0x60 | 0x100 | (0x10 << 9);
+    if deferred {
+        wm::g().pending_raw[..3].copy_from_slice(&[stop, 0x70, stop & !0x100]);
+        wm::g().pending_raw_n = 3;
+    } else {
+        wm::g().abort_seen = true;
+    }
+    handler::gshell_gui_handler(GUI_OP_OWNER_EXIT, kind, 3);
+    if kind == 3 {
+        assert!(!wm::g().abort_seen);
+        if deferred {
+            assert_eq!(&wm::g().pending_raw[..wm::g().pending_raw_n], &[0x70, stop & !0x100]);
+        }
+    }
+    input::capture(wm::g(), input::Ctx::Standalone);
+    crate::top_level_abort(wm::g());
+    let calls = mocks::kill_calls();
+    wm::g().inited = false;
+    calls
+}
+
+#[test]
+fn kstop_old_owner_exit_contract_reproduces_second_kill() {
+    assert_eq!(stop_exit_scenario(0, false), vec![2]);
+    assert_eq!(stop_exit_scenario(0, true), vec![2]);
+}
+
+#[test]
+fn kstop_aborted_exit_consumes_captured_and_deferred_stop() {
+    assert!(stop_exit_scenario(3, false).is_empty());
+    assert!(stop_exit_scenario(3, true).is_empty());
+}
+
+#[test]
+fn kstop_completion_and_s6_resolve_foreground_once() {
+    use crate::{input, mocks, multiapp, wm};
+    // STOP completion and ordinary polling both expose WAIT_POLL to the WM.
+    for current in [2, 3] {
+        mocks::init();
+        multiapp::reset();
+        let shm = mocks::Shm::new();
+        two_app_global(&shm);
+        multiapp::mark_resumed(current);
+        multiapp::end_start(current);
+        mocks::set_app_state(2, 4);
+        mocks::set_app_state(3, 4);
+        mocks::set_kill_frees(&[3]);
+        mocks::push_rawkeys(&[0x60 | 0x100 | (0x10 << 9)]);
+        input::capture(wm::g(), input::Ctx::Pump);
+        crate::top_level_abort(wm::g());
+        crate::top_level_abort(wm::g());
+        assert_eq!(mocks::kill_calls(), vec![3]);
+        assert_eq!(mocks::abort_clear_calls(), 1);
+        assert!(multiapp::is_tracked(2));
+        // current!=target: culprit 2 remains eligible, hence can block WM again.
+        assert!(multiapp::resume_one(wm::g()));
+        assert_eq!(mocks::resume_calls().last().unwrap().0, 2);
+        wm::g().inited = false;
+    }
+}
+
+#[test]
+fn kstop_start_return_consumes_stop_before_any_resume() {
+    use crate::{mocks, multiapp, wm};
+    for form in 0..3 {
+        mocks::init();
+        let shm = mocks::Shm::new();
+        two_app_global(&shm);
+        multiapp::end_start(3);
+        mocks::set_app_state(2, 4);
+        mocks::set_app_state(3, 4);
+        mocks::set_kill_frees(&[3]);
+        let stop = 0x60 | 0x100 | (0x10 << 9);
+        match form {
+            0 => mocks::push_rawkeys(&[stop]),
+            1 => { wm::g().pending_raw[0] = stop; wm::g().pending_raw_n = 1; }
+            _ => wm::g().abort_seen = true,
+        }
+        assert!(multiapp::resume_one(wm::g()));
+        assert_eq!(mocks::kill_calls(), vec![3]);
+        assert!(mocks::resume_calls().is_empty());
+        assert!(multiapp::is_tracked(2));
+        wm::g().inited = false;
+    }
+}
+
+#[test]
+fn kstop_without_a_foreground_resumes_the_slotless_culprit() {
+    use crate::{mocks, multiapp, wm};
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let st = wm::g();
+    *st = wm::GuiState::NEW;
+    st.shm_base = shm.base();
+    st.inited = true;
+    multiapp::on_start(2);
+    multiapp::end_start(2);
+    mocks::set_app_state(2, 4);
+    mocks::push_rawkeys(&[0x60 | 0x100 | (0x10 << 9)]);
+    assert!(multiapp::resume_one(st));
+    assert!(mocks::kill_calls().is_empty());
+    assert_eq!(mocks::abort_clear_calls(), 1);
+    assert_eq!(mocks::resume_calls(), vec![(2, 0)]);
+    st.inited = false;
+}
+
+#[test]
+fn kstop_full_event_ring_drains_raw_and_counts_overflow() {
+    use crate::{input, mocks, multiapp, ring, slot, wm};
+    use os32api::gui::proto::{GUI_RING_CAPACITY, GUI_HDR_FLAG_OVERFLOW};
+    for deferred in [false, true] {
+        mocks::init();
+        multiapp::reset();
+        let shm = mocks::Shm::new();
+        two_app_global(&shm);
+        let st = wm::g();
+        // Foreground app 3 uses slot 1. Leave fewer than the four reserved events.
+        let mut h = slot::read_header(st, 1);
+        h.ring_tail = h.ring_head.wrapping_add(GUI_RING_CAPACITY as u16 - 3);
+        h.dropped = 0;
+        h.flags = 0;
+        slot::write_header(st, 1, &h);
+        let stop = 0x60 | 0x100 | (0x10 << 9);
+        if deferred {
+            st.pending_raw[..3].copy_from_slice(&[0x110, stop, 0x10]);
+            st.pending_raw_n = 3;
+        }
+        mocks::push_rawkeys(&[0x111, 0x11, stop]);
+        input::capture_keyboard(st, input::Ctx::Pump);
+        assert!(!st.abort_seen);
+        input::capture_keyboard(st, input::Ctx::Standalone);
+        assert!(st.abort_seen);
+        assert_eq!(st.pending_raw_n, if deferred { 1 } else { 0 });
+        assert_eq!(ring::space(st, 1), 3);
+        let h = slot::read_header(st, 1);
+        assert_eq!(h.dropped, if deferred { 1 } else { 2 });
+        assert_ne!(h.flags & GUI_HDR_FLAG_OVERFLOW, 0);
+        multiapp::end_start(3);
+        mocks::set_app_state(2, 4);
+        mocks::set_app_state(3, 4);
+        mocks::set_kill_frees(&[3]);
+        crate::top_level_abort(st);
+        crate::top_level_abort(st);
+        assert_eq!(mocks::kill_calls(), vec![3]);
+        st.inited = false;
+    }
+}
+
+#[test]
+fn kstop_full_ring_preserves_following_input_for_next_foreground() {
+    use crate::{input, mocks, multiapp, ring, slot, wm};
+    use os32api::gui::proto::{GuiEvent, GUI_EV_KEY, GUI_RING_CAPACITY};
+    for deferred in [false, true] {
+        mocks::init();
+        multiapp::reset();
+        let shm = mocks::Shm::new();
+        two_app_global(&shm);
+        let st = wm::g();
+        let mut h = slot::read_header(st, 1);
+        h.ring_tail = h.ring_head.wrapping_add(GUI_RING_CAPACITY as u16 - 3);
+        h.dropped = 0;
+        slot::write_header(st, 1, &h);
+        let stop = 0x60 | 0x100 | (0x10 << 9);
+        let keys = [0x111, stop, 0x110, 0x10];
+        if deferred {
+            st.pending_raw[..4].copy_from_slice(&keys);
+            st.pending_raw_n = 4;
+        } else {
+            mocks::push_rawkeys(&keys);
+        }
+        input::capture_keyboard(st, input::Ctx::Standalone);
+        assert!(st.abort_seen);
+        assert_eq!(slot::read_header(st, 1).dropped, 1);
+        if deferred {
+            assert_eq!(&st.pending_raw[..st.pending_raw_n], &[0x110, 0x10]);
+        }
+        multiapp::end_start(3);
+        mocks::set_app_state(2, 4);
+        mocks::set_app_state(3, 4);
+        mocks::set_kill_frees(&[3]);
+        crate::top_level_abort(st);
+        assert_eq!(mocks::kill_calls(), vec![3]);
+        // The kill mock only frees AppSlot; deliver the real kernel's WM notice.
+        crate::handler::gshell_gui_handler(os32api::gui::proto::GUI_OP_OWNER_EXIT, 3, 3);
+        let st = wm::g();
+        assert_eq!(input::focus_target(st).unwrap().slot, 0);
+        let before = slot::read_header(st, 0).ring_tail;
+        input::capture_keyboard(st, input::Ctx::Standalone);
+        assert!(!st.abort_seen);
+        assert_eq!(st.pending_raw_n, 0);
+        assert_eq!(slot::read_header(st, 0).dropped, 0);
+        let after = slot::read_header(st, 0).ring_tail;
+        let mut scans = Vec::new();
+        for i in before..after {
+            let ev: GuiEvent = unsafe { core::ptr::read_unaligned(
+                slot::ring_ptr(st, 0).add((i as usize % GUI_RING_CAPACITY) * 16) as *const GuiEvent) };
+            if ev.kind == GUI_EV_KEY { scans.push((ev.sub, ev.payload[0])); }
+        }
+        assert_eq!(scans, vec![(1, 0x10), (0, 0x10)]);
+        assert!(ring::pending(st, 0) > 0);
+        st.inited = false;
+    }
+}

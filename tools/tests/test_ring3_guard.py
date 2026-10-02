@@ -46,6 +46,8 @@ KERNEL_SRCS = [ROOT / "exec/ring3_str.c", ROOT / "kernel/gui.c", ROOT / "fs/fd_r
 
 # 否定側: 実物の 1 行を壊すと RED になることを見る (写しの上で。ソースは触らない)。
 MUTATIONS = [
+    ("kernel/gui.c", "    if (op == GUI_OP_OWNER_EXIT) return OS32_ERR_INVAL;", "",
+     "OWNER_EXIT public forgery allowed"),
     ("exec/ring3_str.c",
      "    if (wm_depth > 0) return 0;\n",
      "    (void)wm_depth;\n",
@@ -59,8 +61,8 @@ MUTATIONS = [
      "    r = g_gui_handler(op, arg, res_owner_get());\n",
      "gui_call が印を下ろさない"),
     ("kernel/gui.c",
-     "        ring3_wm_enter();\n        g_gui_handler(GUI_OP_OWNER_EXIT, 0, owner);\n",
-     "        g_gui_handler(GUI_OP_OWNER_EXIT, 0, owner);\n",
+     "        ring3_wm_enter();\n        g_gui_handler(GUI_OP_OWNER_EXIT, (u32)kind, owner);\n",
+     "        g_gui_handler(GUI_OP_OWNER_EXIT, (u32)kind, owner);\n",
      "owner_exit が印を立てない"),
     # Registered-buffer mutations now live in test_fd_redirect_d0a.py.
     # 代行レビュー P2 (2026-09-26): ime_set_render は常駐側だけ。

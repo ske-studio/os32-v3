@@ -37,6 +37,9 @@ use os32api::gui::proto::{
 /*  入口 (カーネルが呼ぶ C ABI)                                      */
 /* ================================================================ */
 
+// Internal OWNER_EXIT arg; EXEC_KIND_ABORTED in os32_kapi_shared.h.
+const OWNER_EXIT_ABORTED: u32 = 3;
+
 /// `gui_register` に渡すハンドラ。**この 1 本がアプリ → WM の全経路**。
 #[no_mangle]
 pub extern "C" fn gshell_gui_handler(op: u32, arg: u32, owner: i32) -> i32 {
@@ -48,6 +51,9 @@ pub extern "C" fn gshell_gui_handler(op: u32, arg: u32, owner: i32) -> i32 {
 
     /* スロットを要らない (あるいは持てない) op を先に片づける。 */
     if op == GUI_OP_OWNER_EXIT {
+        if arg == OWNER_EXIT_ABORTED {
+            input::discard_stop(st);
+        }
         /* カーネルの exec_exit から。owner のウィンドウ / タイマ / スロットを回収。
          * 描かない (X1) — 空いた領域は screen_dirty に積まれ、次の X3 で埋まる。 */
         modal::reclaim_owner(st, owner);

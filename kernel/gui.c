@@ -64,11 +64,12 @@ static char g_next_shell[OS32_MAX_PATH];
 i32 gui_call(u32 op, u32 arg)
 {
     i32 r;
+    if (op == GUI_OP_OWNER_EXIT) return OS32_ERR_INVAL;
     if (g_gui_handler == 0) {
         return OS32_ERR_NOSYS;
     }
-    /* op の意味は解釈しない。ただし「いまが OP_WAIT かどうか」だけは控える
-     * — 切替点を OP_WAIT に限る唯一の判定材料で、ここが op を見る唯一の場所
+    /* OWNER_EXIT は内部通知専用。それ以外は「いまが OP_WAIT か」を控える
+     * — OP_WAIT 内の明示的な park の判定材料
      * (票 K5 の D0/C4)。WM が OP_WAIT の中で exec_park() を呼んだときは
      * longjmp するのでこの関数へは戻ってこない。 */
     appslot_gui_op_enter(op == GUI_OP_WAIT);
@@ -117,11 +118,11 @@ i32 gui_register(void *handler, void *pump)
 /*  GUI_OP_OWNER_EXIT を渡し、WM がその owner のウィンドウ・サーフェス・       */
 /*  タイマ・スロットを回収する (W1 が実装)。未登録なら何もしない。           */
 /* ======================================================================== */
-void gui_owner_exit(int owner)
+void gui_owner_exit(int owner, int kind)
 {
     if (g_gui_handler != 0) {
         ring3_wm_enter();
-        g_gui_handler(GUI_OP_OWNER_EXIT, 0, owner);
+        g_gui_handler(GUI_OP_OWNER_EXIT, (u32)kind, owner);
         ring3_wm_leave();
     }
     /* WM 自身 (gshell = shell 帯 owner 1) が終了するなら登録を解除する。
