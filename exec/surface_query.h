@@ -28,13 +28,20 @@ struct surface_query_source {
  * authorization and use. Failures leave outputs unchanged, preserve IF/CR3.
  * authorize/refs return a kernel value snapshot. query does B1 copyout.
  * refs are kernel staging (e2 must B1-copy user input before calling). */
-/* Caller must hold an IRQ-saved interval; the returned caller is valid only
- * within that interval. */
+/* authorize/refs require an IRQ-saved interval for the value snapshot.
+ * The caller may be used afterward in normal context with no scheduling or
+ * callbacks: AS reclamation is restricted to safe points, and each B1 copy
+ * helper saves IRQs and rechecks live identity. ABORT_PENDING refuses copyout
+ * (surface_lease then rolls back its unpublished lease). */
 int surface_query_authorize(const struct surface_query_source *source,
                             struct caller_access *caller);
 int surface_query_refs(const struct surface_query_source *source,
                        const struct surface_ref *refs, u32 count, u32 access);
 int surface_query(const struct surface_query_source *source,
                   struct surface_query_result *user_out);
+/* Single-surface B1 entry. No planar DISPLAY single-face acquisition. */
+int surface_lease(const struct surface_query_source *source,
+                  const struct surface_ref *user_ref, u32 access,
+                  struct lease_view *user_out);
 int surface_query_error(int lease_rc);
 #endif

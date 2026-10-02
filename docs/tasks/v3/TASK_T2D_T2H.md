@@ -197,7 +197,7 @@ Unicodeはkernel所有FIXED_RAM/RO SURFACE。ユーザー版utf8だけsetterでl
 | 小段 (各45〜75分) | 成果 / 閉じる試験 |
 |---|---|
 | e1 | 公開予定desc/エラー/授権とqueryの内部準備。偽owner/旧ref/GUI DISPLAY拒否。実装・試験・サイズ・単独着地の扱いは下記「e1 実装結果」 |
-| e2 | 単面公開lease + copyout rollback。`lease.c:158 walk_enter/leave`のmaster往復を除去、保存caller/管理PD/PTをP2VでwalkしIF/CR3不変。FULL/PT不足/out不変 |
+| e2 | 単面公開lease + copyout rollback。`walk_enter/leave`のmaster往復を除去、保存caller/管理PD/PTをP2VでwalkしIF/CR3不変。FULL/PT不足/out不変。実装・ホスト・予算は下記「e2 実装結果」 |
 | e3 | DISPLAY4面束 + native UC。最後の面失敗で全巻戻し、cache全alias一致 |
 | e4 | backend→kernel fb/geometry。実3backendの選択と200/400行 |
 | e5 | 再init/revoke/fallback。旧token拒否、第三AS不変 |
@@ -421,6 +421,155 @@ select-final-fixed,fast,legacy-fixes,b8,gfx}.log`。
 GUI (gui_demo の窓 → ESC → CUI に戻る) OK。終わりのカウンタ: `fault_kill_count`=7 (faulttest 4 + STOP 2 + d0a の RO 子の
 意図した拒否 1)、`ring3_caller_reject_count`=0、`redir_refuse_count`=0、深さ 0、`exec_as_leftover_pages`=0、
 `irq_ctx_violations`=1 (起動時の基準値のまま)。e1 は未結線なので、ゲストでは回帰が無いことだけを見た。
+
+
+### e2 実装結果 (コーダー、2026-10-02)
+
+記名: Codex gpt-6-astra (利用上限で完了報告前に停止)、レビュー対応は gpt-6.1-sol。基点 `6a8aba9`、worktree `wt/t2e2`。commit/pushなし。
+範囲は単面USER入口・B1・copyout rollbackと既存leaseのmaster往復撤去。
+`surface_lease(source, user_ref, access, user_out)` をkernel内部に追加した。
+sourceはe1と同じkernel publisher用の値で、USERからowner/AS/物理は受け取らない。
+CLIENT/Unicode/TVRAMと非planar DISPLAYの単面を扱い、planar DISPLAY単面は拒否する。
+4面束、publisher、公開KAPI/版/生成物/SDKは変更していない。
+
+**入口・IRQ・rollback**: 保存USER caller取得→B1でrefをkernelへコピー→B1で
+全outを事前検査→短いIRQ保存区間で共通授権/ref照合→slot/VA/PT準備→
+既存pagingの短いIRQ保存区間で公開→B1 copyout。
+準備からcopyoutまで通常文脈でAS scheduling/callbackを挟まない契約を維持する。
+refs照合後の世代不一致/closing/失効はacquire側でも新しい内部 `LEASE_STALE` で区別し、
+公開予定 `OS32_ERR_STALE` へ変換する (e1の申し送り1)。
+copyout拒否はB1の全範囲preflightによってoutを一切書かず、今回のtokenだけをreleaseし、
+追加PTを返却、未使用slotの旧内容と未返却tokenの採番を復元する。
+既存lease、SURFACE参照数、master/他AS、固定上限8本/AS・16 SURFACEは維持する。
+FULLはFULL、PT不足はNOSPC、現行の別束はINVAL。
+
+`walk_enter/walk_leave` とmaster専用wrapperを撤去した。現在rootはmasterまたは対象AS
+に限定し、保存ASの所有する整列済み管理PD/PTをP2Vで辿る。
+pagingの書換え前にはlease PDEのPFN/権限/PSを管理表と一致させる。
+読み側も対象PTを検査し、全56 PDEを各PTEごとに再検査する方式は避けた。
+CR3の値は途中も不変。active ASのTLB同期には**同じCR3のreload**を残し、
+PTE/PDE無効化→同期→PT/backing返却の順を保つ。入口IFは両値とも保存する。
+
+**結線・予算**: 既存leaseの修正はboot/内部経路に入るが、新USER入口は未結線。
+kernel全体はfunction-sectionsではないため、新入口を `.text.surface_lease` に分けた。
+mapのdiscarded欄とnmで入口500Bとquery一式1,463Bの未参照除去を確認した。
+分離前の試作ではqueryまで残ることを実測し、最終版では除去済み。
+e1票の未参照1,255Bを無料扱いせず、今回の同一toolchainではquery 1,463Bと入口500B、
+計1,963B以上 (整列別) をe11接続時に再計上する。
+AS/AppSlot/SURFACEの常駐サイズは不変、ASSERT緩和なし。
+
+| 同一cross toolchain実測 | 基点 | e2未コミット |
+|---|---:|---:|
+| kernel.bin | 363,216 B | 363,124 B (-92) |
+| vmkernel.lz4 | 480,677 B | 480,619 B (-58) |
+| __bss_end | 0x18C270 | 0x18C210 |
+| 本体占有 | 574,064 B | 573,968 B (-96) |
+| ASSERT残り | 36,240 B | 36,336 B |
+| e枠の正味増分 / 残り | 0 / 16,384 B | -96 / 16,480 B |
+
+未参照1,963Bを見込んだe残枠は14,517B (接続時の実測はe11)。
+
+**試験**: 新 `test_surface_lease.py` は実lease/queryとT2d caller/copy/walk、
+paging/pgallocを連結したILP32試験。MMU/IRQ、allocator枯渇とcopyout直前の
+末尾PTE RO化だけを足場で注入し、B1自身の拒否と全out不変を確認する。
+USER高位VAと物理backingを分け、低位fixture stackを使用する。
+IF両値、RO入力/RW出力、CLIENT RW/Unicode RW拒否、planar単面拒否、GUI/CUI授権、
+NULL/overflow/次NP、FULL/PT不足、旧世代/別束、既存leaseを持つ他AS、
+管理PTのPS/所有者/USER/整列、追加PT付きrollbackと次tokenの連続性を確認した。
+PT非整列の目的別負例は実 `lease_check` に対して修正前runtime RED (rc=1)、
+整列検査追加後GREEN。kselftest追加はなく、既存lease boot自己診断を維持する。
+
+qemu正常対照PASS。e2は**12/12 runtime RED** (直近の中央値1.64秒、最大3.57秒)、
+e1 queryはrefs出口のIF復元変異を一意に追加して**34/34 runtime RED** (申し送り2)、
+既存leaseは**10/10 runtime RED**。計56本。compile/link error・signal・timeoutは
+これらのREDへ数えず、置換当たり数を固定し、理由を含むFAIL/順序違反出力を要求する。
+新試験は正常objectを再利用し、変異TUだけを再コンパイル/リンクする。
+旧10本のPT/backing早期返却変異は新しい同期順序に合わせて更新した。
+途中の旧イベント数期待は正常対照でREDとなり、master往復を除いた順序へ更新した。
+planar単面ガードだけを外す試作変異はquery側防御で生存したので、本数に含めない。
+新検査をHOST32_RUNNERS全runnerの正常対照・先頭runnerの変異というe1と同じ形で
+build/sdk.mk / check_mapへ登録し、docs/TESTS.mdを生成器で更新した。
+
+**コマンド・ログ**: 全てPYTHONPATH空、TMPDIR=/home/hight/os32-tmp。
+makeはstdin=/dev/null、CROSS_DIR=/home/hight/opt/cross、HOST32_RUNNERS=qemu、
+NP21W_DIR=/home/hight/os32-tmp/e2-unused-destination (存在しないFDコピー先) を使用。
+基点/最終版 `make all` はrc=0、FDコピー警告を確認。最初の基点allはフォント未取得で
+rc=2だったため、既存mainの取得済みTTFをコピーして再実行した (新規同意なし)。
+`python3 tools/gen_memmap.py --write` rc=0、`python3 tools/check_select.py --lint` rc=0
+(116検査・漏れ0件)、`git diff --check` rc=0。
+`make check-memory-host check-access-walk-host check-caller-copy-host MUT=--mutate` rc=0。
+補助 `make check-fast` rc=0 (PT整列の最終修正前)。起動準備の1回はPATHの空白引用漏れで
+rc=127・make未起動、環境指定を直して実行した。Windows opt-inは単独4件/集約5件skip。
+ログは `/home/hight/os32-tmp/e2-{baseline,all,public,query,lease,related,alignment-red,check-fast}.log`。
+
+**独立レビューとP3対応**: Opus 5.5 は Approve (P3だけ)。PMのホスト検査は
+`make all` / `check_select.py --lint` / `make check-changed` (full、native/qemu) が全てrc=0。
+実在ログは `/home/hight/os32-tmp/pm-e2-{all,lint,cc}.log`。
+e2 12/12・surface_query 34/34・lease 10/10、計56変異がruntime RED。
+
+今回の対応はP3-1〜P3-8だけ。rollback release失敗を
+`lease_rollback_fail_count` (カーネル診断用のvolatile u32)で数え、通常は到達せず
+残ったleaseを終了時revokeへ委ねる旨を記した。通常文脈・safe pointのみのAS回収、
+保存caller.asの区間外使用、caller取得/B1 helperもIRQ保存すること、live再検査と
+ABORT_PENDINGによるcopyout拒否→rollbackをコメントで明示した。
+入口はB1読み込み前にIRQ/例外深さを拒否する。二重root述語は相互参照コメントで保守する。
+全runner正常対照の正典一覧をsurface_lease込みの5本へ修正した。
+
+**追加負例と変異**: lease_pt_phys[0]をずらしlease_acquire=INVAL、
+paging_lease_pte=0を確認する。権限bitでずらしてPDE比較は一致させ、読み側は
+ずれた読取先を非zeroにする。map側は使用PTの独立PFN検査でも拒否されるため、
+未使用PDEのPTも同じ形でずらしlease_context全走査の整列検査を分離した。
+初回map整列変異は生存 (runtime rc=0) し、未使用PT負例追加後にruntime RED。
+rollback master hop、診断欠落、入口文脈検査欠落も追加し、新規5本、e2計17/17 runtime RED。
+qemu正常対照PASS、中央値2.73秒/最大7.20秒。IRQ/例外入口のB1未読、
+ABORT_PENDINGの実B1 copyout拒否と正常rollback、PDE破損によるrollback失敗の
+カウンタ+1/lease保持/修復後revokeも確認した。置換は各1か所、compile/link失敗は数えない。
+既存check-surface-lease-hostのcheck_map登録内で負例を拡張し、docs/TESTS.mdを生成器で更新。
+
+**修正後のコマンド・結果**: PYTHONPATH空、TMPDIR=/home/hight/os32-tmp、
+HOST32_RUNNERS=qemu、makeはCROSS_DIR=/home/hight/opt/crossとstdin=/dev/null。
+NP21W_DIRは前回同様存在しないe2-unused-destinationへ向け、FDコピーは警告のみ。
+`python3 tools/tests/test_surface_lease.py --runner qemu --mutate` rc=0 (17/17)、
+`make all` rc=0、`python3 tools/gen_memmap.py --write` rc=0、
+`python3 tools/gen_tests_inventory.py --write` rc=0、`python3 tools/check_select.py --lint` rc=0
+(116検査・漏れ0件)。ログは `/home/hight/os32-tmp/e2-p3-{target,all,memmap,lint}.log`。
+ビルド実測はkernel.bin 363,124 B、vmkernel.lz4 480,618 B、__bss_end=0x18C214、
+本体573,972 B、ASSERT残り36,332 B (今回追加の常駐カウンタ4 B)。
+未参照入口540 B+query 1,463 B=2,003 Bはe11接続時に再計上 (e残枠16,476 B、見込み14,473 B)。
+修正後の全体検査初回はfull、rc=2。e2の読み側整列変異がqemu実行の10秒上限で
+TimeoutExpiredとなった (REDには不算入)。実在ログ:
+`/home/hight/os32-tmp/e2-p3-check-changed.log` (末尾FINAL_RC=2)。
+残りの検査が終了してから、e2の実行物だけhost32.runで60秒上限へ変更した。
+単体再確認はrc=0、正常対照PASS・17/17 runtime RED (中央値0.52秒/最大1.05秒)。
+修正後の `make all` / memmap生成 / TESTS生成 / lint は再度rc=0。
+ログは `/home/hight/os32-tmp/e2-p3-{target,all,memmap,lint}-final.log`。
+最終の全体再検査コマンドは `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4
+TMPDIR=/home/hight/os32-tmp HOST32_RUNNERS=qemu make check-changed < /dev/null`。
+MAKEFLAGS='-j4 --jobserver-style=pipe'で全体並列数を4に抑え、初回のjobserver
+FIFO衝突警告も回避する。再検査の結果正典は
+`/home/hight/os32-tmp/e2-p3-check-changed-final.log` の末尾FINAL_RC
+(この票を先に固定し、検査中・終了後は変更しない)。
+補助check-fastがPT整列の最終修正前だった注記は上記のとおり維持する。
+**最終の値 (PM、2026-10-02)**: コーダーの sandbox (qemu) の全体再検査は FINAL_RC=0、変異は e2 17/17・query 34/34・lease 10/10 が実行時 RED。
+PM のホスト (PYTHONPATH なし、既定 `HOST32_RUNNERS=native qemu`) で `make all`・`check_select --lint`・`check-changed` (full) すべて rc=0、
+全 runner の正常対照 5 試験は native と qemu の両方で PASS (`/home/hight/os32-tmp/pm2-e2-{all,cc}.log`)。
+独立レビュー (Opus 5.5) は 1 回目 Approve (P3 8 件) → P3 対応の差分確認で Approve。
+
+**e3/e5/e10cへの申し送り (P3-7、記録のみ)**:
+(a) lease_acquireは先頭の旧世代refでSTALEとなり後続INVALを見ない。
+surface_query_refsは束全体を検査してからSTALEなので、e3の4面束で順序を揃える。
+(b) rootはmasterか対象ASのみ。第三ASがactiveな間は他ASをrevokeできない。
+e5の「関連全ASのrevoke」はこの制約を前提にする。
+(c) exec.cのlease_revoke_all戻り値無視は未変更。厳しいlease_contextではPDE1本の
+破損で全releaseが拒否されlease_countが残るため、e5かe10cで失敗を数える。
+今回nativeはsandboxのSIGSYS制限で未実施 (PMに委ねる)。commit/push、NP21/W、
+NHD、配備、ini、実機は未操作。公開KAPI・sdk/kapi.json・版は不変。
+
+**未実施・申し送り**: nativeはsandboxのSIGSYS制限により未実施、PMのホストで確認。
+NP21/W・実機・NHD・配備・iniは未操作。独立レビューとゲスト回帰はPMへ。
+e3は4面束/全出力の巻戻しとnative UC、e4以降は実publisher、e5は再init/revoke、
+e8はUnicode/TVRAM登録を担当する。e11はKAPI/SDK/版の一括公開と接続時サイズ測定、
+STALE/INVALが示す情報の違いの公開文書化を引き継ぐ。
 
 
 ## 3. T2f — map/unmapとallocator、暫定heap終了

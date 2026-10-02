@@ -1140,6 +1140,7 @@ CHECK_PAR_TARGETS := check-shlib-high-host check-bootinfo-host check-hdd-stage1-
     check-db-caller-host \
     check-surface-query-host \
     check-nano-inputs-host \
+    check-surface-lease-host \
     check-cirrus-win-host check-pegc-mode-host
 check-par: $(CHECK_PAR_TARGETS)
 
@@ -1215,3 +1216,10 @@ check-surface-query-host:
 # T2f f1a: actual nano archives, providers and build provenance.
 check-nano-inputs-host:
 	python3 -B tools/tests/test_nano_inputs.py $(MUT)
+
+# T2e e2: single-surface USER lease and transactional B1 copyout rollback.
+check-surface-lease-host:
+	@set -e; test -n "$(HOST32_RUNNERS)"; for runner in $(HOST32_RUNNERS); do echo "HOST32_RUNNERS=$$runner"; python3 -B tools/tests/test_surface_lease.py --runner $$runner; done
+	$(if $(MUT),python3 -B tools/tests/test_surface_lease.py --runner $(firstword $(HOST32_RUNNERS)) $(MUT),@:)
+
+.PHONY: check-surface-lease-host

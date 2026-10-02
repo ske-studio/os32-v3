@@ -7,17 +7,17 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-ffreestanding', '-fno-pie',
-         '-fno-stack-protector', '-Wall', '-Wextra', '-Werror']
+         '-fno-stack-protector', '-ffunction-sections', '-fdata-sections', '-Wall', '-Wextra', '-Werror']
 SOURCES = ('kernel/paging.c', 'kernel/pgalloc.c', 'exec/lease.c')
 MUTANTS = [
     ('surface registration master guard removed', 1,
      'paging_current_cr3() != paging_kernel_pd_phys() ||\n        kctx_irq_depth', 'kctx_irq_depth'),
-    ('free before active TLB synchronization', 2,
-     'if (!walk_enter(as, &root)) return LEASE_INVAL;\n    rc = lease_release_master(as, token);',
-     'rc = lease_release_master(as, token);\n    if (!walk_enter(as, &root)) return LEASE_INVAL;'),
+    ('free before active TLB synchronization', 0,
+     'if (paging_current_cr3() == as->pd_phys) paging_load_cr3(as->pd_phys);\n    for (k = 1; k < MEM_LEASE_MAX_PDES; k++)',
+     '/* synchronization omitted */\n    for (k = 1; k < MEM_LEASE_MAX_PDES; k++)'),
     ('backing free before active TLB synchronization', 2,
-     'if (!walk_enter(as, &root)) return LEASE_INVAL;\n    rc = lease_release_master(as, token);',
-     'rc = lease_release_master(as, token);\n    if (!walk_enter(as, &root)) return LEASE_INVAL;'),
+     '        if (paging_lease_unmap(as, l->base, l->npages)) {',
+     '        if (paging_lease_unmap(as, l->base, l->npages)) {'),
     ('shared PT write', 0,
      '((u32 *)P2V(phys))[(va >> PAGE_SHIFT) % PTE_COUNT] =\n            (maps[i].phys',
      'page_tables[0][(va >> PAGE_SHIFT) % PTE_COUNT] =\n            (maps[i].phys'),
@@ -31,6 +31,11 @@ MUTANTS = [
      'if (j == PTE_COUNT) { pgalloc_free_n_owner(as->owner, as->lease_pt_phys[k] / PAGE_SIZE, 1); pd[(MEM_LEASE_BASE >> 22) + k] = 0; }'),
 ]
 
+def replace_once(body, old, new):
+    assert body.count(old) == 1, (old, body.count(old))
+    return body.replace(old, new)
+
+
 def run(changes=None):
     with tempfile.TemporaryDirectory(prefix='os32-lease-') as tmpdir:
         tmp = pathlib.Path(tmpdir)
@@ -39,18 +44,6 @@ def run(changes=None):
             name, index, old, new = changes
             assert texts[index].count(old) == 1, name
             texts[index] = texts[index].replace(old, new)
-            if name in ('free before active TLB synchronization',
-                        'backing free before active TLB synchronization'):
-                texts[0] = texts[0].replace(
-                    'if (paging_current_cr3() == as->pd_phys) paging_load_cr3(as->pd_phys);\n    for (k = 1; k < MEM_LEASE_MAX_PDES; k++)',
-                    '/* synchronization deferred until after release */\n    for (k = 1; k < MEM_LEASE_MAX_PDES; k++)')
-                # Permit the early walk so RED must come from stale translations,
-                # not the transitional master-context rejection.
-                for i in (0, 2):
-                    texts[i] = texts[i].replace(
-                        'paging_current_cr3() == paging_kernel_pd_phys() &&',
-                        '(paging_current_cr3() == paging_kernel_pd_phys() || '
-                        'paging_current_cr3() == as->pd_phys) &&')
             if name == 'backing free before active TLB synchronization':
                 # Reorder last-reference backing return ahead of PTE/PT teardown.
                 old_block = ('        l->token = 0;\n        sf->lease_count--;\n'
@@ -61,11 +54,11 @@ def run(changes=None):
                 assert texts[2].count(marker) == 1
                 texts[2] = texts[2].replace(marker, old_block + marker)
             if name == 'permission ignored':
-                texts[0] = texts[0].replace('((m->flags & PTE_RW) && ledger_surfaces[m->sid].perm_max != LEDGER_PERM_RW)', '0')
+                texts[0] = replace_once(texts[0], '((m->flags & PTE_RW) && ledger_surfaces[m->sid].perm_max != LEDGER_PERM_RW)', '0')
             if name == 'PCD lost':
-                texts[0] = texts[0].replace('(m->flags & (PTE_PCD | PTE_PWT)) !=\n                (ledger_surfaces[m->sid].cache == LEDGER_CACHE_UC ? PTE_PCD : 0)', '0')
+                texts[0] = replace_once(texts[0], '(m->flags & (PTE_PCD | PTE_PWT)) !=\n                (ledger_surfaces[m->sid].cache == LEDGER_CACHE_UC ? PTE_PCD : 0)', '0')
             if name == 'generation ignored':
-                texts[0] = texts[0].replace('ledger_surfaces[m->sid].gen != m->generation', '0')
+                texts[0] = replace_once(texts[0], 'ledger_surfaces[m->sid].gen != m->generation', '0')
         texts = [s.replace('irq_save()', '0').replace('irq_restore(saved)', '(void)saved')
                    .replace('irq_restore(flags)', '(void)flags') for s in texts]
         texts[0] = texts[0].replace('pgalloc_alloc_phys(', 'host_lease_alloc(').replace('pgalloc_free_n_owner(', 'host_lease_free(')
@@ -78,10 +71,10 @@ def run(changes=None):
         for name, source in zip(('paging_host_source.c', 'pgalloc_host_source.c', 'lease_host_source.c'), texts):
             (tmp / name).write_text(source)
         includes = ['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'include',
-                    'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec')] + ['-I' + str(tmp)]
+                    'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec', 'sdk/include/os32')] + ['-I' + str(tmp)]
         exe = tmp / 'lease'
         subprocess.run(['gcc', *FLAGS, '-DPHYSMEM_HOST_TEST=1', '-nostdlib', '-static',
-                        '-no-pie', *includes, str(ROOT / 'tools/tests/lease_host.c'),
+                        '-no-pie', '-Wl,--gc-sections', *includes, str(ROOT / 'tools/tests/lease_host.c'),
                         str(ROOT / 'kernel/physmem.c'), '-o', str(exe)], check=True)
         return host32.run([str(exe)], capture_output=True, text=True, timeout=60)
 
@@ -95,6 +88,8 @@ if '--mutate' in sys.argv:
         p = run(mutant)
         if p.returncode == 0:
             raise SystemExit('SURVIVED: ' + mutant[0])
+        assert p.returncode in (1, 2) and ('FAIL:' in p.stdout or
+            'ORDER: free before TLB synchronization' in p.stdout), (mutant[0], p.returncode, p.stdout)
         if mutant[0] in ('free before active TLB synchronization',
                           'backing free before active TLB synchronization'):
             assert p.returncode == 2 and 'ORDER: free before TLB synchronization' in p.stdout, p.stdout

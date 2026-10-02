@@ -15,6 +15,7 @@ from mutpar import run_ordered
 
 ROOT = walk.ROOT
 MUTANTS = [
+    ('done:\n    irq_restore(flags);\n    return rc;\n}\n\nint surface_query(', 'done:\n    irq_restore(flags | 0x200);\n    return rc;\n}\n\nint surface_query(', 'refs IF restore'),
     ('!s->ready', '0', 'uninitialized'),
     ('c.origin != CALLER_USER', '0', 'trusted'),
     ('slot->state != APP_STATE_RUNNING', '0', 'parked'),
