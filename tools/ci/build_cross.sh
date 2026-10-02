@@ -13,9 +13,11 @@
 #     --work     展開・ビルド用ディレクトリ (既定: mktemp -d、成功したら消す)
 #     --jobs     make -j の値 (既定 nproc)
 #
-# このスクリプトの内容が変わると CI のキャッシュキー (hashFiles) も変わり、
+# このスクリプトの内容が変わると CI のキャッシュキー (--cache-key) も変わり、
 # ツールチェーンが作り直される (約 30 分)。
 set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
 TARGET=i386-elf
 BINUTILS_VER=2.41
@@ -170,6 +172,12 @@ fi
 "$PREFIX/bin/$TARGET-gcc" --version | sed -n 1p
 echo "prefix: $PREFIX ($(du -sh "$PREFIX" | cut -f1))"
 echo "newlib: nano-formatted-io + nano-malloc を確認"
+
+# f1a: after source/config validation, seal this build's archive/member hashes.
+# DWARF paths differ from the pinned local build; never overwrite its ledger.
+python3 "$REPO_ROOT/tools/check_nano_inputs.py" --cross-dir "$PREFIX" --record-built \
+    --source "$WORK/newlib-$NEWLIB_VER" --tarball "$SRC_DIR/$NEWLIB_TAR" \
+    --config "$WORK/build-newlib/$TARGET/newlib/config.log"
 
 if [ "$REMOVE_WORK" = 1 ]; then
     cd /

@@ -6,7 +6,7 @@
 #
 # - i386-elf ツールチェーン (binutils 2.41 / GCC 13.2.0 / newlib 4.4.0 nano) は
 #   tools/ci/build_cross.sh でソースから作り、actions/cache に置く (初回とキーが変わったとき
-#   だけ約 25〜30 分。キーはスクリプトの hash と gcc / newlib の版)。
+#   だけ約 25〜30 分。キーは OS・gcc/newlib の版・構築入力と builder の hash)。
 # - IPAex フォント (ipaexg.ttf / ipaexm.ttf) はリポジトリに無く tools/fetch_fonts.py が
 #   IPA の公式配布から取る。取れた ttf は zip の SHA-256 を key にキャッシュする。
 # - apps/game (private submodule) は v3 の開発では組まない (ユーザー決定 2026-09-30)。
@@ -63,14 +63,15 @@ jobs:
           rustc --version
 
       # ① i386-elf ツールチェーン (~/opt/cross、tools/ci/build_cross.sh の既定と同じ)。
-      #    キー = OS + gcc / newlib の版 + スクリプトの hash。
+      #    キー = OS + gcc/newlib の版 + 構築入力 / builder hash / inventory名 (SDK入力は除外)。
       - name: Toolchain cache key
         id: crosskey
         run: |
           echo "CROSS_DIR=$HOME/opt/cross" >> "$GITHUB_ENV"
           gcc="$(sed -n 's/^GCC_VER=//p' tools/ci/build_cross.sh)"
           newlib="$(sed -n 's/^NEWLIB_VER=//p' tools/ci/build_cross.sh)"
-          echo "key=cross-i386-elf-${{ runner.os }}-gcc${gcc}-newlib${newlib}-${{ hashFiles('tools/ci/build_cross.sh') }}" >> "$GITHUB_OUTPUT"
+          k="$(python3 tools/check_nano_inputs.py --cache-key)"
+          echo "key=cross-i386-elf-${{ runner.os }}-gcc${gcc}-newlib${newlib}-${k}" >> "$GITHUB_OUTPUT"
 
       - name: Cache i386-elf toolchain
         id: cross-cache

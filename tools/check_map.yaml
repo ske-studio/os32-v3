@@ -3406,3 +3406,13 @@ checks:
   - tools/tests/surface_query_host.c
   - tools/tests/access_walk_host.c
   - tools/tests/pgalloc_host_fixture.h
+
+  check-nano-inputs-host:
+    - .github/workflows/build.yml
+    - tools/check_nano_inputs.py
+    - tools/tests/test_nano_inputs.py
+    - sdk/allocator/nano_inputs.json
+    - sdk/allocator/nano.LICENSE
+    - tools/ci/build_cross.sh
+    - build/config.mk
+    - build/programs.mk

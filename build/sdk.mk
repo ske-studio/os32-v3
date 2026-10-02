@@ -1139,6 +1139,7 @@ CHECK_PAR_TARGETS := check-shlib-high-host check-bootinfo-host check-hdd-stage1-
     check-caller-copy-host \
     check-db-caller-host \
     check-surface-query-host \
+    check-nano-inputs-host \
     check-cirrus-win-host check-pegc-mode-host
 check-par: $(CHECK_PAR_TARGETS)
 
@@ -1210,3 +1211,7 @@ check-surface-query-host:
 	$(if $(MUT),python3 -B tools/tests/test_surface_query.py --runner $(firstword $(HOST32_RUNNERS)) $(MUT),@:)
 
 .PHONY: check-surface-query-host
+
+# T2f f1a: actual nano archives, providers and build provenance.
+check-nano-inputs-host:
+	python3 -B tools/tests/test_nano_inputs.py $(MUT)

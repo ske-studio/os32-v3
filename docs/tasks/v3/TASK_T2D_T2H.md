@@ -465,7 +465,7 @@ nanoのtail trimは実free list上で末尾のfree chunkを確認し、header/�
 
 | 小段 (各45〜75分) | 成果 / 閉じる試験 |
 |---|---|
-| f1a | toolchainの実nano入力/hash・リンク対象と由来/ライセンス/パッチのビルド台帳 |
+| f1a | toolchainの実nano入力/hash・リンク対象と由来/ライセンス/パッチのビルド台帳。実装・対象host検証済み (2026-10-02)、全体検査は下記記録 |
 | f1b | adapter最小接続。整列追加/末尾拡張の実ソース対照、resident/Rust接続の分離 |
 | f2 | extent/穴探索/flags。両端/overflow/EXACT/hint衝突、固定32本 |
 | f3 | map準備/公開。data各枚・PT各枚不足の全rollback |
@@ -479,6 +479,79 @@ nanoのtail trimは実free list上で末尾のfree chunkを確認し、header/�
 | f11 | nano trim。失敗rollback、再割当の実ソース試験 |
 | f12 | 起動予算・旧helper撤去・最小初期量/世代の一括切替 |
 | f13 | mem表示・変異結線・size/manifestとPM台本を確定 |
+
+**f1a 実装記録 (2026-10-02、Codex gpt-6.1-sol、wt/t2f1、基点6a8aba9)**:
+範囲は実toolchain台帳と検査・CI結線だけ。選択は§3-4のnewlib nano維持。
+eのlease/gfx/SHM権限/KAPI・公開SDK・`sdk/kapi.json`・機能版/4世代は変更しない。
+入力の正本は [`sdk/allocator/nano_inputs.json`](../../../sdk/allocator/nano_inputs.json)、
+配置理由・実リンク・CIの扱いは [08_build §8-5](../../08_build.md)、
+試験記録は [`nano_inputs_tdd.md`](../../../tools/tests/nano_inputs_tdd.md)。
+
+- 実版newlib 4.4.0.20231231 / GCC13.2.0、`-g -O2`。
+  `build-newlib-nano/i386-elf/newlib/config.log` の4フラグは§8-5と一致。
+  関連ソース25ファイルは公式tarballとhash一致、追加patchは無し。
+  `libc_nano.a` / `libg_nano.a` は無く、nano構成の通常名 `libc.a` / `libg.a` は同一hash
+  `d7a35f3fe99d533d16dca01694a4effd7a149dd7367e610de03e8ae5441e83d8`。
+  実 `-lc` はcrossの `libc.a`、提供object/hashは台帳。計22 memberを記録 (当初9 memberは実build objectとbyte一致)。
+- f1bへ: ソースは `/home/hight/opt/src/newlib-4.4.0.20231231/newlib/libc/stdlib/nano-mallocr.c`。
+  行107–109は `free_list`→`__malloc_free_list`、`sbrk_start`→`__malloc_sbrk_start`、
+  `current_mallinfo`→`__malloc_current_mallinfo`。定義は198/201、統計はDEFINE_MALLINFO区間。
+  行117–119はMALLOC_ALIGN=8、CHUNK_ALIGN=sizeof(void*) (ILP32では4)、padding=4。
+  `sbrk_aligned` 行209–231はsbrk_startを_sbrk_r(0)で保存→要求量取得→
+  CHUNK_ALIGNへ切上げ→不整列時は行226で追加 `_SBRK_R(RCALL align_p - p)`。
+  後半要求の失敗時に先の取得量を自動巻戻ししない点も接続試験に含める。
+  末尾隣接検査は行326の `(char *)p + p->size == (char *)_SBRK_R(RCALL 0)`、
+  行330で不足分だけ要求、行332成功後に334でsizeを増す。
+  別arenaを同一free_listへ連結せず、状態/整列の追加要求もarenaごとに扱う。
+  `#ifdef _LIBC` は行54、入口renameは69–80の全12入口、`#else` は82。
+  各DEFINE_* wrapper→`_mallocr.c`→nanoという入力。
+  ARM Ltdの表示は `sdk/allocator/nano.LICENSE` に保持。adapter実装・patchはf1bで追記する。
+- 再レビュー対応 (N1〜N5、2026-10-02): cache_keyにlocal.members/local.archivesの
+  ソート済み名前だけを追加。hash値・SDK入力・symbolsはキーから除外する。
+  CIはchecker出力を独立した代入で受け、rc=1ならbash -eで停止してkeyを出さない。
+  receipt builder不一致には再記録/再構築の復旧路を付記。builderはreceipt/cache_keyとも
+  ファイル全体SHA256で比較 (正規化なし)、手作りtoolchainでは名目上の記録であることを§8-5に明記。
+  receipt absentの案内はcompareのhash差にだけ付け、inventoryの提供元/dlmalloc/map/GCC失敗には付けない。
+  nanoのlicenseは現行toolchainの責務なので台帳のtoolchain節へ戻した。
+- 対象host試験: 名前追加時のキー変化/hash値変更時の不変性、CIのrc=1停止、
+  builder復旧案内、inventory失敗の診断を追加。50ケースGREEN、25変異は実行時RED、
+  生き残り0 / ERROR0、対象hostコマンドrc=0。
+  `CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp PYTHONPATH= HOST32_RUNNERS=qemu
+  python3 -B tools/tests/test_nano_inputs.py --mutate`。
+  i386リンクprobeはld -rのmap検査のみ、ILP32実行無し。置換当たり各1、実行時REDだけを数える。
+  ログ: `/home/hight/os32-tmp/t2f1-rereview-nano.log`。
+- 今回の全体ビルド: `CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp PYTHONPATH=
+  HOST32_RUNNERS=qemu make all < /dev/null` rc=0。
+  既存image.mkによるNP21/W宛の自動cpが失敗 (警告) した。配備先の変更成功は無し。
+  今後の再ビルドはコピー先を隔離する必要がある。ログ: `/home/hight/os32-tmp/t2f1-rereview-all.log`。
+  `python3 tools/gen_memmap.py --write` rc=0 (追跡差分無し)、
+  `python3 tools/gen_tests_inventory.py --write` rc=0、`python3 tools/check_select.py --lint` rc=0。
+  試験はcheck_mapと生成TESTSへ登録済み。
+- 最終全体検査は本欄を固定後、
+  `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp
+  HOST32_RUNNERS=qemu PYTHONPATH= make check-changed < /dev/null` を実行する。
+  実行中・終了後は票/ソースを変更せず、終了rcは完了報告と
+  `/home/hight/os32-tmp/t2f1-rereview-check-changed.log` に残す。
+- 未実施: GitHub Actions新規toolchain構築/receipt生成、native ILP32 (PM担当)、
+  修正後の独立再レビュー、adapter接続/arena/trim (f1b以降)、NP21/W/NHD/ini/実機操作。
+  意図した配備・commit/pushは無し。実config/sourceによる隔離prefixへのreceipt生成は前回rc=0。
+  receiptは署名/手元とのbyte再現性の証明ではない。初回build.yml runでCIを受入し、f公開切替はe受入後。
+- f1bへ追加申し送り: `sdk_build.sources` にはtoolchainのupstreamと同じ照合を足すこと。
+- f1bへ追加申し送り (f1a の再レビュー P3、2026-10-02): (a) receipt を持つ手元の toolchain は、台帳 `local.members` に名前を足すと `members SHA256 differs` で案内なしに落ちる (CI はキーが変わり作り直される) — 名前の集合が違うときの案内か §8-5 への 1 行を足す。(b) `build_inputs()` が receipt に必須キーを足すとキャッシュ済み receipt が KeyError になりキーも変わらない — receipt の形を変えるときに `RECEIPT_SCHEMA` 定数を receipt と `cache_key` の両方に入れ、check で一致を require する。
+- **f1a の着地 (PM、2026-10-02)**: 独立レビュー (Opus 5.5) は 3 往復で Approve (1 回目 P2 6 件、2 回目 N1 の P2 1 件、3 回目 P3 2 件 → 上の申し送り)。PM がホスト (PYTHONPATH なし、既定 `HOST32_RUNNERS=native qemu`) で `make all`・`check_select --lint`・`check-changed` rc=0。カーネル・userland の実行物は変えていないのでゲスト回帰は不要と判断。受入の条件の初回 build.yml run (toolchain の新規構築と receipt) は push 後に確かめる。
+  `_memalign_r` / memalign / aligned_alloc、`_valloc_r` / `_pvalloc_r` /
+  valloc / pvalloc、`_malloc_usable_size_r`、`_mallopt_r` / mallopt / malloc_stats、`_cfree_r`、
+  `_mallinfo_r` / `_malloc_stats_r` / mallinfo / malloc_usable_size も同じfree_list系の入力として台帳に含める。
+  valloc系reentrantの提供元はvallocr.o / pvallocr.o、wrapperはvalloc.o。
+  未結線入口の選択肢は (A) リンクされたら失敗、(B) adapterへ落とす。
+  **推奨はA**: 一部だけ元のlibc状態へ落ちるとarenaが混在するため、f1bで結線しない入口は
+  リンクされたら失敗にする。整列・統計・usable-sizeを含め全arena状態への動作が定義/試験できた入口から
+  Bに替える。これはf1bの受入方針の申し送りで、f1aでは公開リンク挙動を変更しない。
+  `_SBRK_R` 行52→`_sbrk_r` (libc_a-sbrkr.o)→U sbrk→SDKの
+  `sdk/crt/syscalls.c:162` `_sbrk` / `:181` `sbrk` ALIAS が実経路。
+  MALLOC_LOCK行64=`__malloc_lock`、UNLOCK行65。libc_a-mlock.oの実lock/unlockはretのみ。
+  再入/複数arenaの排他を保証しないので、adapterはbusy/arena選択の保護を明示し、
+  再帰呼出しを含む全入口で整合させる (mlock.cの再帰lock契約)。
 
 f1bの接続が成立しなければ最小初期量切替へ進まない。TLSF採用へ黙って切り替えず、失敗した実ソースケースとサイズを添えて本節の設計差分をレビューする (D23の再決裁ではなくallocator実装選択の再設計)。各小段の不確実性を全fの一回依頼へまとめない。
 
