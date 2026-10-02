@@ -1,15 +1,21 @@
-/* Private SURFACE leases. Public KAPI/caller integration belongs to T2e. */
+/* Private SURFACE leases and the dormant T2e single-surface USER entry. */
 #include "lease.h"
 #include "kstring.h"
 #include "io.h"
+#include "surface_query.h"
+#include "os32_kapi_shared.h"
 static u32 lease_next_token = 1;
 u32 lease_selftest_result;
+volatile u32 lease_rollback_fail_count;
 
+/* Keep this root/normal-context predicate in sync with
+ * kernel/paging.c:lease_root_context(); paging also validates managed PTs. */
 static int context(const struct addrspace *as)
 {
-    return as && as->pd_phys && as->lease_pt_phys[0] &&
+    return as && as->pd_phys && !(as->pd_phys % PAGE_SIZE) && as->lease_pt_phys[0] &&
            pgalloc_page_owned(as->pd_phys / PAGE_SIZE, as->owner) &&
-        paging_current_cr3() == paging_kernel_pd_phys() &&
+        (paging_current_cr3() == paging_kernel_pd_phys() ||
+         paging_current_cr3() == as->pd_phys) &&
         !kctx_irq_depth && !kctx_exc_depth;
 }
 
@@ -27,7 +33,7 @@ static int alias_cache(const struct ledger_surface *sf)
     return 1;
 }
 
-static int lease_acquire_master(struct addrspace *as, const struct lease_authority *auth,
+int lease_acquire(struct addrspace *as, const struct lease_authority *auth,
                   const struct surface_ref *refs, u32 count, u32 access,
                   struct lease_view *out)
 {
@@ -45,8 +51,9 @@ static int lease_acquire_master(struct addrspace *as, const struct lease_authori
         const struct ledger_surface *sf;
         if (refs[i].sid >= LEDGER_MAX_SURFACES) return LEASE_INVAL;
         sf = &ledger_surfaces[refs[i].sid];
-        if (!sf->npages || sf->gen != refs[i].generation || sf->closing ||
-            sf->backend != auth->backend || sf->role != auth->role ||
+        if (!sf->npages || sf->gen != refs[i].generation || sf->closing)
+            return LEASE_STALE;
+        if (sf->backend != auth->backend || sf->role != auth->role ||
             sf->perm_max == LEDGER_PERM_NONE ||
             (access == LEDGER_PERM_RW && sf->perm_max != LEDGER_PERM_RW) ||
             !ledger_surface_validate(sf) || !alias_cache(sf)) return LEASE_INVAL;
@@ -92,7 +99,7 @@ static int lease_acquire_master(struct addrspace *as, const struct lease_authori
     return 0;
 }
 
-static int lease_release_master(struct addrspace *as, u32 token)
+int lease_release(struct addrspace *as, u32 token)
 {
     u32 i;
     unsigned int saved;
@@ -122,7 +129,7 @@ int lease_revoke_all(struct addrspace *as)
     return 0;
 }
 
-static int lease_check_master(const struct addrspace *as)
+int lease_check(const struct addrspace *as)
 {
     u32 va, i, expected, pte, *pd;
     if (!context(as)) return LEASE_INVAL;
@@ -130,7 +137,8 @@ static int lease_check_master(const struct addrspace *as)
     for (i = 0; i < MEM_LEASE_MAX_PDES; i++) {
         u32 d = pd[(MEM_LEASE_BASE >> 22) + i];
         if (as->lease_pt_phys[i]) {
-            if (!pgalloc_page_owned(as->lease_pt_phys[i] / PAGE_SIZE, as->owner)) return LEASE_INVAL;
+            if (as->lease_pt_phys[i] % PAGE_SIZE ||
+                !pgalloc_page_owned(as->lease_pt_phys[i] / PAGE_SIZE, as->owner)) return LEASE_INVAL;
             if ((d & ~(PTE_ACCESSED | PTE_DIRTY)) !=
                 (as->lease_pt_phys[i] | PAGE_RW | PTE_USER)) return LEASE_INVAL;
         } else if (d) return LEASE_INVAL;
@@ -152,54 +160,65 @@ static int lease_check_master(const struct addrspace *as)
     return 0;
 }
 
-/* The transitional low app band may alias table backing. Keep the caller's
- * root, walk under master, then reload the caller (386 TLB synchronization).
- * No callback or AS scheduling occurs while master is installed. */
-static int walk_enter(const struct addrspace *as, u32 *root)
+/* Internal USER entry, dormant until e11. source is a kernel publisher value.
+ * Normal context forbids AS scheduling/callbacks until copyout completes.
+ * AS reclamation occurs only at safe points, so caller.as remains valid outside
+ * IRQ-saved intervals. caller_access_get, authorization, publication and each
+ * B1 helper save IRQs internally or at the call site, preserving entry IF.
+ * Copy helpers recheck live identity each time; ABORT_PENDING rejects copyout
+ * and takes rollback. acquire rechecks generation after refs. */
+/* The kernel does not globally use -ffunction-sections. Keep this dormant
+ * entry independently collectable until the e11 KAPI caller is installed. */
+__attribute__((section(".text.surface_lease")))
+int surface_lease(const struct surface_query_source *source,
+                  const struct surface_ref *user_ref, u32 access,
+                  struct lease_view *user_out)
 {
-    unsigned int saved;
-    if (!as || !as->pd_phys || kctx_irq_depth || kctx_exc_depth) return 0;
-    *root = paging_current_cr3();
-    if (*root != paging_kernel_pd_phys() && *root != as->pd_phys) return 0;
-    saved = irq_save();
-    if (*root != paging_kernel_pd_phys()) paging_load_cr3(paging_kernel_pd_phys());
-    irq_restore(saved);
-    return 1;
-}
-static void walk_leave(u32 root)
-{
-    unsigned int saved = irq_save();
-    if (root != paging_kernel_pd_phys()) paging_load_cr3(root);
-    irq_restore(saved);
-}
-int lease_acquire(struct addrspace *as, const struct lease_authority *auth,
-                  const struct surface_ref *refs, u32 count, u32 access,
-                  struct lease_view *out)
-{
-    u32 root;
+    struct caller_access caller;
+    struct surface_ref ref;
+    struct lease_view view;
+    struct lease_authority auth;
+    struct as_lease old[MEM_LEASE_MAX];
+    u32 next, i;
+    unsigned int flags;
     int rc;
-    if (!walk_enter(as, &root)) return LEASE_INVAL;
-    rc = lease_acquire_master(as, auth, refs, count, access, out);
-    walk_leave(root);
-    return rc;
-}
-int lease_release(struct addrspace *as, u32 token)
-{
-    u32 root;
-    int rc;
-    if (!walk_enter(as, &root)) return LEASE_INVAL;
-    rc = lease_release_master(as, token);
-    walk_leave(root);
-    return rc;
-}
-int lease_check(const struct addrspace *as)
-{
-    u32 root;
-    int rc;
-    if (!walk_enter(as, &root)) return LEASE_INVAL;
-    rc = lease_check_master(as);
-    walk_leave(root);
-    return rc;
+    if (kctx_irq_depth || kctx_exc_depth) return OS32_ERR_INVAL;
+    if (!source || source->count != 1 ||
+        (source->role == LEDGER_ROLE_DISPLAY && source->backend == LEDGER_SF_PC98))
+        return OS32_ERR_INVAL;
+    flags = irq_save();
+    rc = !caller_access_get(&caller) || caller.origin != CALLER_USER;
+    irq_restore(flags);
+    if (rc || !copy_caller_bytes(&caller, user_ref, &ref, sizeof(ref)) ||
+        !check_caller_write_range(&caller, user_out, sizeof(view)))
+        return OS32_ERR_INVAL;
+    flags = irq_save();
+    rc = surface_query_authorize(source, &caller);
+    if (!rc) rc = surface_query_refs(source, &ref, 1, access);
+    irq_restore(flags);
+    if (rc) return rc;
+    auth = (struct lease_authority){caller.owner, source->backend, source->role};
+    kmemcpy(old, caller.as->leases, sizeof(old));
+    next = lease_next_token;
+    rc = lease_acquire(caller.as, &auth, &ref, 1, access, &view);
+    if (rc) return surface_query_error(rc);
+    if (!copy_to_caller(&caller, user_out, &view, sizeof(view))) {
+        /* B1 preflights the whole output before writing any byte. Only this
+         * unpublished token is returned; restore even the unused slot bytes.
+         * No intervening acquisition is possible in this normal-context path. */
+        for (i = 0; i < MEM_LEASE_MAX; i++)
+            if (caller.as->leases[i].token == view.token) break;
+        if (!lease_release(caller.as, view.token)) {
+            caller.as->leases[i] = old[i];
+            lease_next_token = next;
+        } else {
+            /* Normally unreachable: an invariant was broken. Leave the
+             * remaining lease for exit-time revoke and record the failure. */
+            lease_rollback_fail_count++;
+        }
+        return OS32_ERR_INVAL;
+    }
+    return 0;
 }
 
 /* Copy/compare every present table, excluding only CPU-owned A/D bits. */

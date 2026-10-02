@@ -11,6 +11,7 @@ STATIC_ASSERT(sizeof(struct surface_query_result) == 244, surface_query_size);
 int surface_query_error(int rc)
 {
     if (!rc) return 0;
+    if (rc == LEASE_STALE) return OS32_ERR_STALE;
     if (rc == LEASE_FULL) return OS32_ERR_FULL;
     if (rc == LEASE_NOMEM) return OS32_ERR_NOSPC;
     return OS32_ERR_INVAL;

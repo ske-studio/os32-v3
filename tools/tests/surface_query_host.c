@@ -63,6 +63,7 @@ static void caller_copy_tests(void)
                         query_expect(allowed ? 0 : OS32_ERR_INVAL);
                         CHECK(surface_query_refs(&source, refs, 1, LEDGER_PERM_RO) ==
                               (allowed ? 0 : OS32_ERR_INVAL));
+                        CHECK(host_arch_if == (if_on ? 0x202U : 2U));
                     }
                 }
             }

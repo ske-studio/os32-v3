@@ -9,6 +9,7 @@ struct lease_authority { u32 owner, backend, role; };
 #define LEASE_INVAL (-1)
 #define LEASE_NOMEM (-2)
 #define LEASE_FULL  (-3)
+#define LEASE_STALE (-4)
 int lease_acquire(struct addrspace *as, const struct lease_authority *auth,
                   const struct surface_ref *refs, u32 count, u32 access,
                   struct lease_view *out);
@@ -17,4 +18,5 @@ int lease_revoke_all(struct addrspace *as);
 int lease_check(const struct addrspace *as);
 int lease_selftest(void);
 extern u32 lease_selftest_result;
+extern volatile u32 lease_rollback_fail_count;
 #endif

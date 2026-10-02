@@ -180,7 +180,7 @@ void _start(void) {
     for(i=0;i<MEM_LEASE_MAX;i++) refs[i]=(struct surface_ref){sid,ledger_surfaces[sid].gen};
     image_pd(paging_kernel_pd_phys(),0,0); image_pd(b.pd_phys,1,0);
     for(i=0;i<sizeof(out)/(sizeof(u32));i++) ((u32 *)out)[i]=0x11223344;
-    refs[0].generation--; CHECK(lease_acquire(&a,&auth,refs,1,LEDGER_PERM_RW,out)==LEASE_INVAL); refs[0].generation++;
+    refs[0].generation--; CHECK(lease_acquire(&a,&auth,refs,1,LEDGER_PERM_RW,out)==LEASE_STALE); refs[0].generation++;
     auth.role=LEDGER_ROLE_DISPLAY; CHECK(lease_acquire(&a,&auth,refs,1,LEDGER_PERM_RW,out)==LEASE_INVAL); auth.role=sf.role;
     CHECK(((u32 *)out)[0]==0x11223344);
     ledger_surfaces[sid].perm_max=LEDGER_PERM_RO;
@@ -213,7 +213,7 @@ void _start(void) {
     }
     image_pd(a.pd_phys,2,0); count=used_pages;
     refs[3].generation--;
-    CHECK(lease_acquire(&a,&auth,refs,4,LEDGER_PERM_RW,out)==LEASE_INVAL);
+    CHECK(lease_acquire(&a,&auth,refs,4,LEDGER_PERM_RW,out)==LEASE_STALE);
     CHECK(used_pages==count); image_pd(a.pd_phys,2,1); refs[3].generation++;
     CHECK(!lease_acquire(&a,&auth,refs,4,LEDGER_PERM_RW,v));
     for(i=0;i<4;i++) CHECK((paging_lease_pte(&a,v[i].base)&~0xfffUL)==pa+2*i*PAGE_SIZE);
@@ -243,20 +243,19 @@ void _start(void) {
     event_count = 0; watching = stale_translation = 1;
     CHECK(!lease_release(&a,v[0].token)); CHECK(paging_current_cr3()==a.pd_phys);
     watching = 0;
-    CHECK(event_count == PTE_COUNT + 5);
-    CHECK(events[0].kind == EV_SYNC && events[0].value == paging_kernel_pd_phys());
+    CHECK(event_count == PTE_COUNT + 4);
     for (i = 0; i < PTE_COUNT + 1; i++) {
-        CHECK(events[i + 1].kind == EV_CLEAR);
-        CHECK(events[i + 1].value == v[0].base + i * PAGE_SIZE);
+        CHECK(events[i].kind == EV_CLEAR);
+        CHECK(events[i].value == v[0].base + i * PAGE_SIZE);
     }
+    CHECK(events[PTE_COUNT + 1].kind == EV_SYNC && events[PTE_COUNT + 1].value == a.pd_phys);
     CHECK(events[PTE_COUNT + 2].kind == EV_PT_FREE);
     CHECK(events[PTE_COUNT + 2].value == watch_pt);
     CHECK(events[PTE_COUNT + 3].kind == EV_BACKING_FREE);
     CHECK(events[PTE_COUNT + 3].value == watch_backing);
-    CHECK(events[PTE_COUNT + 4].kind == EV_SYNC && events[PTE_COUNT + 4].value == a.pd_phys);
     CHECK(!ledger_surfaces[sid].npages && !ledger_surfaces[sid].lease_count);
     CHECK(!pgalloc_page_owned(watch_backing, owner));
-    SAY("active closing last lease: sync -> PTE clear -> PT free -> backing free -> CR3 restore PASS");
+    SAY("active closing last lease: PTE clear -> active TLB sync -> PT free -> backing free PASS");
     paging_load_cr3(paging_kernel_pd_phys());
     CHECK(!a.lease_pt_phys[1] && a.lease_pt_phys[0]);
     /* UC backing and mismatch with supervisor alias. */

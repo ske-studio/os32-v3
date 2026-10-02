@@ -1316,13 +1316,30 @@ int paging_memmap_selftest(u32 tramp_page)
 }
 
 /* T2b: page-table transactions confined to the private lease window. */
+/* Root predicate mirrors exec/lease.c:context(); lease_context adds PT checks. */
+static int lease_root_context(const struct addrspace *as)
+{
+    return as && as->pd_phys && !(as->pd_phys % PAGE_SIZE) && as->lease_pt_phys[0] &&
+        pgalloc_page_owned(as->pd_phys / PAGE_SIZE, as->owner) &&
+        (paging_current_cr3() == paging_kernel_pd_phys() ||
+         paging_current_cr3() == as->pd_phys) && !kctx_irq_depth && !kctx_exc_depth;
+}
+
 static int lease_context(const struct addrspace *as)
 {
-    /* Until T2c, the old low band aliases page-table backing. Walk only master. */
-    return as && as->pd_phys && as->lease_pt_phys[0] &&
-           pgalloc_page_owned(as->pd_phys / PAGE_SIZE, as->owner) &&
-           paging_current_cr3() == paging_kernel_pd_phys() &&
-           !kctx_irq_depth && !kctx_exc_depth;
+    u32 i, *pd;
+    if (!lease_root_context(as)) return 0;
+    /* T2c supervisor identity aliases: never install the master to walk.
+     * Validate managed frames and exact PDE rights before dereferencing PTs. */
+    pd = P2V(as->pd_phys);
+    for (i = 0; i < MEM_LEASE_MAX_PDES; i++) {
+        u32 phys = as->lease_pt_phys[i], d = pd[(MEM_LEASE_BASE >> 22) + i];
+        if (!phys) { if (d) return 0; continue; }
+        if (phys % PAGE_SIZE || !pgalloc_page_owned(phys / PAGE_SIZE, as->owner) ||
+            (d & ~(PTE_ACCESSED | PTE_DIRTY)) != (phys | PAGE_RW | PTE_USER))
+            return 0;
+    }
+    return 1;
 }
 
 int paging_addrspace_create_lease(struct addrspace *as, u32 owner)
@@ -1344,10 +1361,14 @@ int paging_addrspace_create_lease(struct addrspace *as, u32 owner)
 
 u32 paging_lease_pte(const struct addrspace *as, u32 va)
 {
-    u32 phys;
-    if (!lease_context(as) || va < MEM_LEASE_BASE || va >= MEM_LEASE_END) return 0;
-    phys = as->lease_pt_phys[(va - MEM_LEASE_BASE) >> 22];
-    return phys ? ((u32 *)P2V(phys))[(va >> PAGE_SHIFT) % PTE_COUNT] : 0;
+    u32 phys, d, index;
+    if (!lease_root_context(as) || va < MEM_LEASE_BASE || va >= MEM_LEASE_END) return 0;
+    index = (va - MEM_LEASE_BASE) >> 22;
+    phys = as->lease_pt_phys[index];
+    if (!phys || phys % PAGE_SIZE || !pgalloc_page_owned(phys / PAGE_SIZE, as->owner)) return 0;
+    d = ((u32 *)P2V(as->pd_phys))[(MEM_LEASE_BASE >> 22) + index];
+    if ((d & ~(PTE_ACCESSED | PTE_DIRTY)) != (phys | PAGE_RW | PTE_USER)) return 0;
+    return ((u32 *)P2V(phys))[(va >> PAGE_SHIFT) % PTE_COUNT];
 }
 
 int paging_lease_map(struct addrspace *as, const struct lease_mapping *maps, u32 n)
