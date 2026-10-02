@@ -41,9 +41,9 @@
 - `test_pgalloc_model.py` の容量/疎 PFN 算術試験は非公開 `alloc_n_pfn` core を明示的に使う。
   公開 MODEL allocation は以前と違って BOOTSTRAP 中拒否することを検査する。
   exec A/B claim、shared-library failed load、mark/free の旧意味は変更しない。
-- `paging_rebuild_host.c` の sparse/attrs/final は残した legacy mapped-candidate scanner の
-  単体 fixture として `online=1, model_mode=0` を設定し、元の成功/拒否条件を維持。
-  MODEL の publish 証拠には数えない。新しい結合ハーネスにはこの bypass はない。
+- `paging_rebuild_host.c` の sparse/attrs/final は T1a で scanner とともに撤去済み。
+  残る nonmaster / rollback は `check-memory-host` に登録 (2026-10-02)。
+  判断根拠は [paging_bounds_tdd.md](paging_bounds_tdd.md) の試験整理を参照。
 - `test_pgalloc_range.py` は新しい未使用 stage 関数のリンク依存を gc-sections で除外。
   paging を fake success stub に置換していない。
 
@@ -53,7 +53,7 @@
 - `python3 tools/tests/test_pgalloc_model.py`
 - `python3 tools/tests/test_pgalloc_range.py`
 - `python3 tools/tests/test_paging_bounds.py`
-- `python3 tools/tests/test_paging_bounds.py --rebuild nonmaster`（rollback / sparse / attrs / final も）
+- `python3 tools/tests/test_paging_bounds.py --rebuild nonmaster`（`--rebuild rollback` も。sparse / attrs / final は撤去済み）
 - `python3 tools/tests/test_physmem.py`
 - `make kernel && make check`
 

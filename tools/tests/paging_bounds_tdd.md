@@ -150,3 +150,11 @@ GNU89 (`-march=i386 -Werror -Wdeclaration-after-statement`) を専用一時領�
   exit 0。各 runner の未置換 `i386-elf-gcc` GNU89 `-Werror` target compile も PASS。
   対象限定 `git diff --check` PASS。共有ビルド、pgalloc/sys 編集、実機・emulator・
   配備・network・環境/秘密・docs/hw・commit・agent 操作なし。
+
+## 2026-10-02 試験整理
+
+`--rebuild nonmaster` / `--rebuild rollback` を `check-memory-host` に追加した。
+通常版も非master拒否と複数PTのrollbackを見るが、前者の確保呼出し数不変、
+後者の同じ2 PTへの再試行・フレーム/PCD・隣接PTEゼロの組は残る固有表明。
+したがってハーネスは撤去しない。sparse / attrs / final は T1a で撤去済みで、
+上の記録の旧コマンドは当時の履歴。現行の実行手順は `make check-memory-host`。

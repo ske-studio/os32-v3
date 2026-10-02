@@ -4,7 +4,7 @@
 
 # === ベースプログラム (単体ソースファイル → 自動ビルド) ===
 C_CMDS = $(wildcard userland/cmds/*.c)
-C_TESTS = $(filter-out userland/tests/gfx200_test.c userland/tests/gfx_demo200.c userland/tests/blit_test.c userland/tests/blit_test2.c userland/tests/demo_tile.c userland/tests/tile_bench.c userland/tests/rotate_test.c userland/tests/db_test.c userland/tests/dbq.c userland/tests/e2test.c userland/tests/math_test.c userland/tests/chem_test.c userland/tests/chem_demo.c userland/tests/map_test.c userland/tests/map_demo.c userland/tests/input_test.c userland/tests/asset_test.c userland/tests/asset_demo.c userland/tests/ecs_test.c userland/tests/ecs_demo.c userland/tests/text_test.c userland/tests/text_demo.c userland/tests/econ_test.c userland/tests/ai_test.c userland/tests/btl_test.c userland/tests/board_test.c userland/tests/evt_test.c userland/tests/inv_test.c userland/tests/turn_test.c userland/tests/rpg_test.c userland/tests/save_test.c userland/tests/mgx_test.c userland/tests/kbd_echo.c userland/tests/ring3_hello.c userland/tests/ring3_fault.c userland/tests/ring3_guard.c userland/tests/kstr_bench.c, $(wildcard userland/tests/*.c))
+C_TESTS = $(filter-out userland/tests/gfx200_test.c userland/tests/gfx_demo200.c userland/tests/blit_test.c userland/tests/blit_test2.c userland/tests/demo_tile.c userland/tests/tile_bench.c userland/tests/rotate_test.c userland/tests/db_test.c userland/tests/dbq.c userland/tests/e2test.c userland/tests/math_test.c userland/tests/input_test.c userland/tests/asset_test.c userland/tests/asset_demo.c userland/tests/ecs_test.c userland/tests/save_test.c userland/tests/mgx_test.c userland/tests/kbd_echo.c userland/tests/ring3_hello.c userland/tests/ring3_fault.c userland/tests/ring3_guard.c userland/tests/kstr_bench.c, $(wildcard userland/tests/*.c))
 C_SYSTEM = $(filter-out userland/system/lz4.c userland/system/cdinst.c $(INST_SHARED_SRC), $(wildcard userland/system/*.c))
 # cdinst / install が共有する hd0 の検査と書き込み (票 TASK_HDD_INSTALL 段 2)。
 # main を持たないので単体のプログラムにはしない (下の INST_OBJ でリンクする)
@@ -243,7 +243,7 @@ faultprobe: $(CRT0_OBJ) userland/tests/faultprobe.bin
 # ring3_fault / ring3_guard) は KAPI データ欄の配置の刻印を持たないので、
 # ソースに OS32_KAPI_LAYOUT_STAMP(); を明示して置く (mkos32x は刻印の無い ELF を
 # 断る)。--api 39 は mkos32x が v3 の最低版 63 へ引き上げる (旧カーネルでは
-# 走らない = v3 の照合を持たないカーネルに載せない)。hello_r3 / faultprobe_r3 は
+# 走らない = v3 の照合を持たないカーネルに載せない)。hello_r3 は
 # crt0 をリンクした ELF の流用なので crt0 の刻印をそのまま持つ。
 userland/tests/ring3_hello.o: userland/tests/ring3_hello.c
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
@@ -302,17 +302,6 @@ userland/tests/hello_r3.bin: userland/tests/hello.elf
 
 hello_r3: userland/tests/hello_r3.bin
 .PHONY: hello_r3
-
-# --- faultprobe_r3 (M2e KAPI 版 [ABI4] 検証: faultprobe を CPL=3 で) ---
-# faultprobe.elf (crt0 リンク済み) を --ring3 で .bin 化。case 4 が
-# api->sys_unlink((char*)0xDEADBEEF) = KAPI 経由ワイルドポインタ。
-userland/tests/faultprobe_r3.bin: userland/tests/faultprobe.elf
-	$(OBJCOPY) -O binary $< userland/tests/faultprobe_r3.raw
-	python3 sdk/mkos32x.py userland/tests/faultprobe_r3.raw $@ --elf $< --api 39 --ring3
-	@rm -f userland/tests/faultprobe_r3.raw
-
-faultprobe_r3: userland/tests/faultprobe_r3.bin
-.PHONY: faultprobe_r3
 
 
 # ---------------------------------------------------------------------------
@@ -658,7 +647,7 @@ FORCE:
 # プログラムを追加したらこの一覧にも必ず足すこと。
 programs_base: $(CRT0_OBJ) $(BASE_PROGRAMS_BIN)
 
-programs: libs $(DBG_OBJ) programs_base sh bench cdinst lz4_cmd bench_scale2x faultprobe ring3_hello ring3_fault ring3_guard hello_r3 faultprobe_r3 gfx200_test gfx_demo200 blit_test blit_test2 demo_tile tile_bench rotate_test db_test dbq e2test sqlite_standalone math_test input_test kbd_echo asset_test asset_demo ecs_test save_test mgx_test kstr_bench hello_gfx_rust alloc_demo_rust math_test_rs_rust font_test_rust gui_demo_rust gdi_test_rust lease_test_rust gui_bench_rust v12_api_test_rust filer_rust edit_gui_rust about_rust gshell shlib
+programs: libs $(DBG_OBJ) programs_base sh bench cdinst lz4_cmd bench_scale2x faultprobe ring3_hello ring3_fault ring3_guard hello_r3 gfx200_test gfx_demo200 blit_test blit_test2 demo_tile tile_bench rotate_test db_test dbq e2test sqlite_standalone math_test input_test kbd_echo asset_test asset_demo ecs_test save_test mgx_test kstr_bench hello_gfx_rust alloc_demo_rust math_test_rs_rust font_test_rust gui_demo_rust gdi_test_rust lease_test_rust gui_bench_rust v12_api_test_rust filer_rust edit_gui_rust about_rust gshell shlib
 
 # === KAPI ヘッダ依存 ===
 userland/%.o: $(SDK_KAPI_HDR)

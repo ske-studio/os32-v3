@@ -34,7 +34,6 @@ class Availability(unittest.TestCase):
         self.assertTrue(SCRIPT.is_file(), 'mk_blank_nhd.py must implement the tested contract')
 
 
-@unittest.skipIf(nhd is None, 'implementation not yet written (assertion RED)')
 class Geometry(unittest.TestCase):
     def test_fixed_geometry(self):
         self.assertEqual((nhd.HEADS, nhd.SECTORS, nhd.SECTOR_SIZE, nhd.HEADER_SIZE),
@@ -69,7 +68,6 @@ class Geometry(unittest.TestCase):
                          struct.pack('<IIHHH', 512, 3011, 8, 17, 512) + bytes(0xe2))
 
 
-@unittest.skipIf(nhd is None, 'implementation not yet written (assertion RED)')
 class Image(unittest.TestCase):
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
@@ -129,7 +127,6 @@ class Image(unittest.TestCase):
         self.assertEqual(target.read_bytes(), b'keep')
 
 
-@unittest.skipIf(nhd is None, 'implementation not yet written (assertion RED)')
 class DeployConstants(unittest.TestCase):
     """tools/nhd_deploy.py と同じ値であること。環境変数を読む import は避け、
     定数はソースの字面から読む ([D3]: .env / 資格情報に触れない)。"""

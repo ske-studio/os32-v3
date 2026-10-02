@@ -47,9 +47,9 @@ make check-tests-inventory                      # 表が古くないか検査す
   `#[path]` 取り込みや `integration.py` の実行時走査なので、静的には拾えない。
 - **`check-privileged` は構造上落ちない**。findings があっても `--strict` を付けなければ
   `return 0`。表の ○ は「`check` の列にある」であって「門である」ではない。
-- **`tools/tests/paging_rebuild_host.c` (5 モード) はどの自動ゲートからも到達しない**。
-  [`test_paging_bounds.py`](../tools/tests/test_paging_bounds.py) は `--rebuild` を
-  付けたときだけこのハーネスを選ぶが、`check-memory-host` は引数なしで呼ぶ。
+- **`paging_rebuild_host.c` の残る2モードは自動列に登録済み** (2026-10-02)。
+  `check-memory-host` が `--rebuild nonmaster` / `--rebuild rollback` を呼ぶ。
+  sparse / attrs / final は T1a で撤去済み。
 - **`apps/` と `game/` はサブモジュール**で、切り出した worktree では空のことがある。
   それらの中のホスト試験はこの表に出ない (`make external` 側)。
 <!-- /manual:intro -->
@@ -117,11 +117,11 @@ make check-tests-inventory                      # 表が古くないか検査す
 | 33 | `check-term-model` | `cargo test --manifest-path userland/libos32term/Cargo.toml --target x86_64-unknown-linux-gnu --offline`<br>`cargo check --manifest-path userland/libos32term/Cargo.toml --lib --target x86_64-unknown-linux-gnu --offline` | `userland/libos32term/Cargo.toml` | — | — | × |
 | 34 | `check-term-render` | `cargo test --manifest-path userland/libos32term_render/Cargo.toml --target x86_64-unknown-linux-gnu --offline`<br>`cargo check --manifest-path userland/libos32term_render/Cargo.toml --lib --target x86_64-unknown-linux-gnu --offline` | `userland/libos32term_render/Cargo.toml` | — | — | × |
 | 35 | `check-t5a-host` | `cargo test --manifest-path userland/rust/t5a_display/host_tests/Cargo.toml --target x86_64-unknown-linux-gnu --offline` | `userland/rust/t5a_display/host_tests/Cargo.toml` | — | — | × |
-| 36 | `check-memory-host` | `python3 -B tools/tests/test_physmem.py`<br>`python3 -B tools/tests/test_paging_bounds.py --mutate`<br>`python3 -B tools/tests/test_app_band_pde.py --mutate`<br>`python3 -B tools/tests/test_pgalloc_model.py`<br>`python3 -B tools/tests/test_pgalloc_range.py`<br>`python3 -B tools/tests/test_highram_stage.py`<br>`python3 -B tools/tests/test_memory_boot.py --mutate`<br>`python3 -B tools/tests/test_ledger.py --mutate`<br>`python3 -B tools/tests/test_lease.py --mutate`<br>`python3 -B tools/tests/test_exec_r1.py --mutate`<br>`python3 -B tools/tests/test_device_reservation.py --mutate`<br>`python3 -B tools/tests/test_sbrk_tier.py --mutate`<br>`python3 -B tools/tests/test_app_bb_overlap.py --mutate`<br>`python3 -B tools/tests/test_gfx_boot.py --mutate` | `kernel/pgalloc.c`<br>`kernel/physmem.c`<br>`exec/appslot.c` | [`tools/tests/k5b_kernel_tdd.md`](../tools/tests/k5b_kernel_tdd.md)<br>[`tools/tests/physmem_tdd.md`](../tools/tests/physmem_tdd.md)<br>[`tools/tests/paging_bounds_tdd.md`](../tools/tests/paging_bounds_tdd.md)<br>[`tools/tests/app_band_pde_tdd.md`](../tools/tests/app_band_pde_tdd.md)<br>[`tools/tests/pgalloc_model_tdd.md`](../tools/tests/pgalloc_model_tdd.md)<br>[`tools/tests/pgalloc_range_tdd.md`](../tools/tests/pgalloc_range_tdd.md)<br>[`tools/tests/highram_stage_tdd.md`](../tools/tests/highram_stage_tdd.md)<br>[`tools/tests/memory_boot_tdd.md`](../tools/tests/memory_boot_tdd.md)<br>[`tools/tests/device_reservation_tdd.md`](../tools/tests/device_reservation_tdd.md) | [`docs/archive/gui_v13/TASK_K5B_kernel.md`](archive/gui_v13/TASK_K5B_kernel.md)<br>[`docs/tasks/memory/APP_BAND_PDE.md`](tasks/memory/APP_BAND_PDE.md) | × |
+| 36 | `check-memory-host` | `python3 -B tools/tests/test_physmem.py`<br>`python3 -B tools/tests/test_paging_bounds.py --mutate`<br>`python3 -B tools/tests/test_paging_bounds.py --rebuild nonmaster`<br>`python3 -B tools/tests/test_paging_bounds.py --rebuild rollback`<br>`python3 -B tools/tests/test_app_band_pde.py --mutate`<br>`python3 -B tools/tests/test_pgalloc_model.py`<br>`python3 -B tools/tests/test_pgalloc_range.py`<br>`python3 -B tools/tests/test_highram_stage.py`<br>`python3 -B tools/tests/test_memory_boot.py --mutate`<br>`python3 -B tools/tests/test_ledger.py --mutate`<br>`python3 -B tools/tests/test_lease.py --mutate`<br>`python3 -B tools/tests/test_exec_r1.py --mutate`<br>`python3 -B tools/tests/test_device_reservation.py --mutate`<br>`python3 -B tools/tests/test_sbrk_tier.py --mutate`<br>`python3 -B tools/tests/test_app_bb_overlap.py --mutate`<br>`python3 -B tools/tests/test_gfx_boot.py --mutate` | `kernel/pgalloc.c`<br>`kernel/physmem.c`<br>`exec/appslot.c` | [`tools/tests/k5b_kernel_tdd.md`](../tools/tests/k5b_kernel_tdd.md)<br>[`tools/tests/physmem_tdd.md`](../tools/tests/physmem_tdd.md)<br>[`tools/tests/paging_bounds_tdd.md`](../tools/tests/paging_bounds_tdd.md)<br>[`tools/tests/app_band_pde_tdd.md`](../tools/tests/app_band_pde_tdd.md)<br>[`tools/tests/pgalloc_model_tdd.md`](../tools/tests/pgalloc_model_tdd.md)<br>[`tools/tests/pgalloc_range_tdd.md`](../tools/tests/pgalloc_range_tdd.md)<br>[`tools/tests/highram_stage_tdd.md`](../tools/tests/highram_stage_tdd.md)<br>[`tools/tests/memory_boot_tdd.md`](../tools/tests/memory_boot_tdd.md)<br>[`tools/tests/device_reservation_tdd.md`](../tools/tests/device_reservation_tdd.md) | [`docs/archive/gui_v13/TASK_K5B_kernel.md`](archive/gui_v13/TASK_K5B_kernel.md)<br>[`docs/tasks/memory/APP_BAND_PDE.md`](tasks/memory/APP_BAND_PDE.md) | × |
 | 37 | `check-memmap-host` | `python3 -B tools/tests/test_memmap_gen.py --mutate`<br>`python3 -B tools/tests/test_memmap_boot.py --mutate` | `tools/gen_memmap.py`<br>`kernel/paging.c`<br>`kernel/shm.c`<br>`kernel/pgalloc.c` | [`tools/tests/memmap_tdd.md`](../tools/tests/memmap_tdd.md) | [`docs/archive/kernel_v21/TASK_KSTACK_USER.md`](archive/kernel_v21/TASK_KSTACK_USER.md) | × |
 | 38 | `check-memmap` | `python3 tools/gen_memmap.py --check` | — | [`tools/tests/memmap_tdd.md`](../tools/tests/memmap_tdd.md) | [`docs/archive/kernel_v21/TASK_KSTACK_USER.md`](archive/kernel_v21/TASK_KSTACK_USER.md) | × |
 | 39 | `check-boot-splash-host` | `python3 -B tools/tests/test_boot_splash_native.py` | `gfx/gfx_core.c`<br>`gfx/backend_pc98.c`<br>`kernel/boot_splash.c` | [`tools/tests/boot_splash_native_tdd.md`](../tools/tests/boot_splash_native_tdd.md) | — | ○ |
-| 40 | `check-tools-host` | `python3 -B -m unittest discover -s tools/tests -p 'test_np21w_*.py'`<br>`python3 -B tools/tests/test_nhd_deploy_failure.py`<br>`python3 -B tools/tests/test_filer_normalize.py`<br>`python3 -B tools/tests/test_filer_copy_abort.py`<br>`python3 -B tools/tests/test_about_info.py --mutate`<br>`python3 -B tools/tests/test_gui_button_dispatch.py`<br>`PYTHONPATH=. python3 -B tools/tests/test_emu_playbook.py`<br>`python3 -B tools/tests/test_mk_settings_db.py`<br>`python3 -B tools/tests/test_fetch_fonts.py`<br>`python3 -B tools/tests/test_mk_blank_nhd.py`<br>`python3 -B tools/tests/test_stat_cmd.py`<br>`python3 -B tools/tests/test_tar_cmd.py` | `userland/rust/filer/src/model.rs`<br>`userland/rust/filer/host/model_tests.rs`<br>`userland/rust/libos32gui/src/app.rs`<br>`tools/mk_settings_db.py`<br>`tools/fetch_fonts.py`<br>`userland/cmds/stat.c`<br>`userland/cmds/tar.c`<br>`lib/microtar/microtar.c` | [`tools/tests/about_info_tdd.md`](../tools/tests/about_info_tdd.md)<br>[`tools/tests/stat_cmd_tdd.md`](../tools/tests/stat_cmd_tdd.md)<br>[`tools/tests/s6_tdd.md`](../tools/tests/s6_tdd.md)<br>[`tools/tests/np21w_ini_tdd.md`](../tools/tests/np21w_ini_tdd.md)<br>[`tools/tests/np21w_ini_live_tdd.md`](../tools/tests/np21w_ini_live_tdd.md)<br>[`tools/tests/np21w_transport_tdd.md`](../tools/tests/np21w_transport_tdd.md)<br>[`tools/tests/np21w_trial_tdd.md`](../tools/tests/np21w_trial_tdd.md)<br>[`tools/tests/emu_playbook_tdd.md`](../tools/tests/emu_playbook_tdd.md) | `S6` | × |
+| 40 | `check-tools-host` | `python3 -B -m unittest discover -s tools/tests -p 'test_np21w_ini.py'`<br>`python3 -B -m unittest discover -s tools/tests -p 'test_np21w_transport.py'`<br>`python3 -B -m unittest discover -s tools/tests -p 'test_np21w_trial.py'`<br>`python3 -B tools/tests/test_nhd_deploy_failure.py`<br>`python3 -B tools/tests/test_filer_normalize.py`<br>`python3 -B tools/tests/test_filer_copy_abort.py`<br>`python3 -B tools/tests/test_about_info.py --mutate`<br>`python3 -B tools/tests/test_gui_button_dispatch.py`<br>`PYTHONPATH=. python3 -B tools/tests/test_emu_playbook.py`<br>`python3 -B tools/tests/test_mk_settings_db.py`<br>`python3 -B tools/tests/test_fetch_fonts.py`<br>`python3 -B tools/tests/test_mk_blank_nhd.py`<br>`python3 -B tools/tests/test_stat_cmd.py`<br>`python3 -B tools/tests/test_tar_cmd.py` | `userland/rust/filer/src/model.rs`<br>`userland/rust/filer/host/model_tests.rs`<br>`userland/rust/libos32gui/src/app.rs`<br>`tools/mk_settings_db.py`<br>`tools/fetch_fonts.py`<br>`userland/cmds/stat.c`<br>`userland/cmds/tar.c`<br>`lib/microtar/microtar.c` | [`tools/tests/about_info_tdd.md`](../tools/tests/about_info_tdd.md)<br>[`tools/tests/stat_cmd_tdd.md`](../tools/tests/stat_cmd_tdd.md)<br>[`tools/tests/s6_tdd.md`](../tools/tests/s6_tdd.md)<br>[`tools/tests/np21w_ini_tdd.md`](../tools/tests/np21w_ini_tdd.md)<br>[`tools/tests/np21w_transport_tdd.md`](../tools/tests/np21w_transport_tdd.md)<br>[`tools/tests/np21w_trial_tdd.md`](../tools/tests/np21w_trial_tdd.md)<br>[`tools/tests/emu_playbook_tdd.md`](../tools/tests/emu_playbook_tdd.md) | `S6` | × |
 | 41 | `check-np21w-ctl-host` | `python3 -B tools/tests/test_np21w_ctl.py --mutate` | — | — | — | ○ |
 | 42 | `check-np21w-ini-live-host` | `python3 -B tools/tests/test_np21w_ini_live.py --mutate` | — | [`tools/tests/np21w_ini_live_tdd.md`](../tools/tests/np21w_ini_live_tdd.md) | — | × |
 | 43 | `check-gshell-host` | `python3 userland/gshell/host/integration.py --mutate` | — | — | — | × |
@@ -250,7 +250,7 @@ CI の静的ゲート (`.github/workflows/check.yml`、os32-v3 で 2026-09-30 �
 
 | a | 重複 | 根拠 | 残す案 |
 |---|---|---|---|
-| **a1** | `multiapp_model_host.c` と `multiapp_impl_host.c` | `test_multiapp_impl.py` の docstring:「K5a の `multiapp_model_host.c` は状態機械を**手で書いた**模型。こちらは**出荷するカーネルのソース**をコンパイルして**同じ番号の検査**に掛ける」。ケース関数名を突き合わせると model の 19 件中 **17 件が impl に同名で存在**。impl のみ 10 件、model のみ 2 件 (`case_launch_pending_parks` / `case_wait_key_joins_the_round`) | **impl を残す**。model 固有の 2 件を impl へ移してから model (1,438 行 / 62KB) を撤去する。設計文書としての価値は `multiapp_model_tdd.md` に残る |
+| **a1** | `multiapp_model_host.c` と `multiapp_impl_host.c` | 2026-10-02 再確認: model 19 ケース中16件が impl に同名で存在。model 固有は `case_launch_pending_parks` / `case_poll_yield_is_lowest_priority` / `case_wait_key_joins_the_round`。impl の WM pick 自体も手書き | **今回は模型を残す**。Rust 実物の pick 試験はあるが exec は mock。LAUNCH 保留ありのラウンド上界と WAIT_KEY の kernel 状態遷移を組み合わせた全表明の移管は未完。模型の poll ID 昇順は T9 の実物 (巡回 + tick 制限) と異なるので、単純移植しない |
 | **a2** | `check-term-model` / `check-term-render` の `cargo test` と直後の `cargo check --lib` | `cargo test` が同じクレートを既にビルドする。差は `cfg(test)` の有無だけ | `cargo check --lib` を落とす。「test 無しでも lib が通る」を本当に見たいなら残す判断もある — **PM/ユーザー決裁** |
 | **a3** | ページング系ハーネスの重複 (試験内容ではなく**仕掛け**) | `test_paging_bounds.py` / `test_app_band_pde.py` / `test_highram_stage.py` / `test_memory_boot.py` が `kernel/paging.c` の**同じ 5 行の特権 asm 置換**を各自コピーしている | 試験そのものは別契約なので統合しない。置換だけを 1 つのヘルパへ |
 | **a4** | `kselftest.c` の `test_con_sink` / `test_kbd_inject` / `test_launch` / `test_tramp_user_str` / `test_db_v50` / `test_app_band_pde` と、対応するホスト試験 | グループ名とホスト試験の対象ファイルが一致 | **重複として扱わない**。ホスト試験は網羅、kselftest 側は**煙試験**で、実機で毎起動踏むという別の価値がある。ただし 1 表明のものは (c4) 参照 |
@@ -259,7 +259,7 @@ CI の静的ゲート (`.github/workflows/check.yml`、os32-v3 で 2026-09-30 �
 
 | b | 対象 | 根拠 | 判断 |
 |---|---|---|---|
-| **b1** | `tools/tests/paging_rebuild_host.c` (39 `CHECK()`、5 モード) が `make check` から**到達しない** | `test_paging_bounds.py` は `--rebuild` を `choices=[nonmaster, rollback, sparse, attrs, final]` で受け、付いたときだけ `paging_rebuild_host.c` を選ぶ。`check-memory-host` は引数なしで呼ぶ | 「不要」ではなく**死んだ被覆**。5 モードを足すか、意図的に手動なら票に書く。**PM 決裁** |
+| **b1** | `tools/tests/paging_rebuild_host.c` の到達性 | 2026-10-02 再確認: 現存は nonmaster / rollback の2モード。通常版にも拒否/rollback はあるが、確保呼出し数不変と同じ2 PTへの失敗後再試行・フレーム/PCD・隣接ゼロの組は重複しない | **残して `check-memory-host` に追加済み**。sparse / attrs / final は T1a で撤去済み。根拠は [paging_bounds_tdd.md](../tools/tests/paging_bounds_tdd.md) |
 | **b2** | `check-privileged` が構造上落ちない | findings があっても `--strict` でなければ `return 0`。既定の根拠文は「**現在 userland は CPL=0 で動作**。リング3 導入時に `--strict` でゲートする」。しかし `CLAUDE.md` は「External programs run at CPL=3 with their own page directory」と書いており、リング3 は既に入っている | 根拠文が現状と矛盾。`--strict` へ上げる / `make check` から外す / 現 offender を票に書いて例外表を持つ、のいずれか。**PM 決裁** |
 | **b3** | 撤去済み機能の試験 — **見つからなかった** | T5b (常駐表示パネル) は `1c98613` で撤去済みだが `wm_tests.rs` に `panel` の語は 0 件。hermes の語は `tools/` `userland/` のコードに 0 件。`t5a_display` も生きた依存 | **撤去候補なし** |
 
@@ -282,6 +282,15 @@ CI の静的ゲート (`.github/workflows/check.yml`、os32-v3 で 2026-09-30 �
 | **d4** | `libos32gui` のウィジェット描画と WM 配送 | ホスト試験は `cfgro` wrapper だけ。描画・ジャンプ表・WM は「動かさない」と `Cargo.toml` が明記。Button 配送は構造ガード 1 本 (c1) |
 | **d5** | ネットワーク L0〜L3 / M2〜M4 の回帰 | `make check` にも CI にも無く、`host_agent.py` の起動 + LINKTEST カーネルの配備 + 実機が要る。合否は各スクリプトの `RESULT:` 行 |
 | **d6** | T5b 撤去で消えた 4 本の書き直し | `wm_tests.rs` には既に 4 本が揃っている。**残件記述が古い可能性が高い** — PM が確認して閉じるのが先 |
+
+### 2026-10-02 の整理結果
+
+- `faultprobe_r3` は `faultprobe.elf` の別包装だけで、exec は全非shellを CPL=3 にするため、ビルド/配備登録を削除。過去の M2e 記録は履歴として保持。
+- 未配備で起動参照の無い `test3` / `test4` / `args` / `libc_test` のソース4本を削除。`test_script.bat` の `echo test3` は文字列出力で呼出しではない。`check_manifests.py` の未配備一覧は実在 `.bin` の走査なので、古いローカル成果物も除去し一覧へ追従する。
+- np21w の ctl / ini_live は専用列だけでケースと変異を実行。ini / transport / trial の discover は維持。未実装 skip ガード6個だけを削除し、ケースは保持。
+- `C_TESTS` の不存在 game 系ソース15名を除去。実装/ビルド対象の追加はない。
+- 段の進行に伴う試験の改廃は [T2d〜T2h 票](tasks/v3/TASK_T2D_T2H.md) の e8b/e9/e10a/e11/f12 に申し送った。現時点では削除しない。
+
 <!-- /manual:findings -->
 
 ## 6. 改善提言
@@ -293,7 +302,7 @@ CI の静的ゲート (`.github/workflows/check.yml`、os32-v3 で 2026-09-30 �
 
 | 案 | 対象 | 根拠 | 前提 |
 |---|---|---|---|
-| **R1** | `tools/tests/multiapp_model_host.c` (1,438 行 / 62KB) と `check-multiapp-model-host` からの `test_multiapp_model.py` | (a1)。19 ケース中 17 ケースが `multiapp_impl_host.c` に**同名で**存在し、impl は出荷する `exec/appslot.c` をそのまま走らせる | 先に model 固有の 2 件を impl へ移す。設計の記録は `multiapp_model_tdd.md` に残る |
+| **R1** | `multiapp_model_host.c` / `test_multiapp_model.py` | (a1)。19件中16件が impl と同名、残り3件は WM 選択との組合せ | **2026-10-02 保留**。同等被覆の移管前には削除しない。模型は現行 poll 順序の証拠にしない |
 
 **削除を勧めないもの**: T5b / hermes 由来の残骸は**見つからなかった** (b3)。
 `t5a_display` も `libos32term` / `libos32term_render` も生きた依存。
@@ -323,7 +332,7 @@ CI の静的ゲート (`.github/workflows/check.yml`、os32-v3 で 2026-09-30 �
 
 | 案 | 対象 | 根拠 |
 |---|---|---|
-| **R8** | `paging_rebuild_host.c` の 5 モードを `check-memory-host` に足す (または「手動専用」と票に書く) | (b1)。39 表明が現在どの自動ゲートからも到達しない |
+| **R8** | `paging_rebuild_host.c` の nonmaster / rollback を `check-memory-host` に足す | **2026-10-02 対応済み**。(b1)。旧 sparse / attrs / final は T1a 撤去済み |
 | **R9** | `test_gui_button_dispatch.py` を `libos32gui/host_tests` の贋物試験へ移す | (c1)。足場は既に `host_tests/src/fake.rs` にある |
 | **R10** | `hsync` の inode 比較を `.inc` に切り出してホスト試験へ | (c3) / (d1)。契約 D0 の最後の砦が現在ノーガード |
 

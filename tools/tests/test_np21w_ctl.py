@@ -7,8 +7,8 @@ FakeHttp、時計と sleep は FakeClock に差し替える。実プロセス・
   python3 -B tools/tests/test_np21w_ctl.py            # 全ケース
   python3 -B tools/tests/test_np21w_ctl.py --mutate   # 否定側 (変異 + 恒等の対照)
 
-`make check-tools-host` は unittest discover でケースだけを、
-`make check-np21w-ctl-host` は変異まで回す。
+`make check-np21w-ctl-host` がケースと変異を回す。
+`make check-tools-host` の discover からは除外して二重実行を避ける。
 """
 import base64
 import importlib.util
