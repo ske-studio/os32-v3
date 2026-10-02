@@ -790,6 +790,7 @@ STOP最終増分は予告1152Bではなく1344B。ASSERT/診断は削らず、�
     Ra266ではCUIを撮影して確認し、31kHz機の200/400ライン往復、STOP1/STOP2の差、
     PEGC/planar VRAMの関係はh最終一式へ。GRCG/EGCをV86終了時に無効化しない件は
     未観測のまま記録のみ (今回変更しない)。A6h=1/flip無効の不一致は通常出口のA6h=0で解消。
+  - **着地とゲスト受入 (PM、2026-10-03)**: Opus 5.5 の独立レビューは Approve (P1/P2 なし、P3 9 件は Codex gpt-6.1-sol が対応 — 正常 13・変異 16/16 が期待文言で RED、PM が差分を読んで取り込み)。main へ取り込み (`f7174c4`)。コミット済みの木で `make all` rc=0・`make check` rc=0。NP21/W を停止 → 停止確認 → `nhd-pull` → `deploy-kernel` → `deploy` → 起動 (17MB、今の ini — §12)。`ver` の Commit `d5fca8f`、`/boot/vmkernel.lz4` 481,688 B が手元と一致、**kselftest pass 272 / fail 0**。`/api/gdc`: 起動直後 `grph_on`=0・`access_page`=0 (修正前は 1)、`v86 -t` の後も `grph_on`=0・A4h/A6h=0・`text_on`=1、画面にロゴの残留なし。`v86 -g` と `v86 -g -t` の後も `grph_on`=0・A4h/A6h=0。GUI (gui_demo の窓 → ESC → CUI) OK、戻った CUI にロゴなし。カウンタ: `fault_kill_count`=0、深さ 0、`ledger_*_ops`=0、`exec_as_leftover_pages`=0、`irq_ctx_violations`=1 (起動時の基準値)。**観測 (記録だけ)**: `v86 -g` の後は 68h の状態 (`mode1` 0x89→0x99)、`crtc`、グラフィック GDC の SYNC/CSRFORM が ROM の設定のまま残る (表示は止まっていて CUI に影響なし、GUI の起動で設定し直される)。修正の前からあるかは未確認、GRCG/EGC・6Ah の件と同じく h の最終一式で見る。
 
 
 
