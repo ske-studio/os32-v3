@@ -137,6 +137,13 @@ filesystem:
     - host: userland/tests/d0a_test.bin
       guest: /usr/bin/
       tags: [test]
+    # --- T2h h2 stack preparation, default 256KiB / explicit 512KiB [V2] ---
+    - host: userland/tests/h2_stack.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/h2_stack512.bin
+      guest: /usr/bin/
+      tags: [test]
     # --- heap_test (子プロセス帯レイアウト検証: sbrk / exec_heap の位置と重なり) ---
     - host: userland/tests/heap_test.bin
       guest: /usr/bin/

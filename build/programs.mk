@@ -11,7 +11,7 @@ C_SYSTEM = $(filter-out userland/system/lz4.c userland/system/cdinst.c $(INST_SH
 INST_SHARED_SRC = userland/system/inst_disk.c userland/system/inst_hdd.c
 
 C_BASE_PROGRAMS = $(C_CMDS) $(C_TESTS) $(C_SYSTEM)
-BASE_PROGRAMS_BIN = $(C_BASE_PROGRAMS:.c=.bin) userland/shell.bin
+BASE_PROGRAMS_BIN = $(C_BASE_PROGRAMS:.c=.bin) userland/shell.bin userland/tests/h2_stack512.bin
 
 # === CRT0 ビルドルール ===
 sdk/crt/crt0.o: sdk/crt/crt0.asm
@@ -694,3 +694,17 @@ clean-programs: clean-rust clean-gshell
 
 .PHONY: unicode_bin fep_dic
 .PHONY: clean-programs
+
+# T2h h2: same guest, default 256KiB and explicit 512KiB; no public format change.
+H2_STACK512_BYTES := 524288
+userland/tests/h2_stack.elf: userland/tests/h2_stack_probe.h userland/tests/h2_stack_probe.inc include/memmap.h sdk/include/os32/os32_gui_shared.h
+userland/tests/h2_stack512.elf: userland/tests/h2_stack.c userland/tests/h2_stack_probe.h userland/tests/h2_stack_probe.inc include/memmap.h sdk/include/os32/os32_gui_shared.h sdk/link/app.ld $(CRT0_OBJ)
+	$(CC) $(PROGRAM_FLAGS) -DH2_STACK_BYTES=$(H2_STACK512_BYTES) -c $< -o userland/tests/h2_stack512.o
+	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/tests/h2_stack512.o -lc -lgcc
+userland/tests/h2_stack512.bin: userland/tests/h2_stack512.raw userland/tests/h2_stack512.elf sdk/mkos32x.py
+	python3 sdk/mkos32x.py $< $@ --elf userland/tests/h2_stack512.elf --stack $(H2_STACK512_BYTES)
+
+# Explicit opt-in only. .fixture files never enter deploy manifests/packages.
+.PHONY: h2-fixtures
+h2-fixtures: userland/tests/h2_stack.bin userland/shell.bin userland/libos32gui.shlib userland/tests/gui_demo.bin
+	python3 tools/gen_h2_fixtures.py --out $(BUILD_OUT)/h2-isolated

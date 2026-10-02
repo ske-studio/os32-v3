@@ -111,6 +111,30 @@ notest:
       - docs/manpages/hsync.1
 
 checks:
+  check-h2-fixtures-host:
+  - include/types.h
+  - include/memmap.h
+  - sdk/os32x_hdr.py
+  - sdk/os32_generations.py
+  - exec/os32x_hdr.c
+  - exec/os32x_hdr.h
+  - sdk/include/os32/os32_generations.h
+  - sdk/include/os32/os32_gui_shared.h
+  - sdk/include/os32/os32_kapi_generated.h
+  - sdk/include/os32/os32_kapi_shared.h
+  - sdk/include/os32/os32_unit_stamp.h
+  - sdk/include/os32/os32api.h
+  - sdk/link/app.ld
+  - sdk/link_guard.py
+  - sdk/mkos32x.py
+  - tools/gen_h2_fixtures.py
+  - tools/tests/h2_stack_host.c
+  - tools/tests/host32.py
+  - tools/tests/test_h2_fixtures.py
+  - userland/deploy.yaml
+  - userland/tests/h2_stack.c
+  - userland/tests/h2_stack_probe.h
+  - userland/tests/h2_stack_probe.inc
   check-p2v:
     - tools/clang_ast/**
     - tools/tests/test_clang_ast.py
