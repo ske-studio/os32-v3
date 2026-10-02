@@ -18,7 +18,7 @@ gfx_client_to_gshell を 1 構成 1 プロセスで走らせる (見るものは
   模擬選択で使う装置 (Cirrus / PEGC / 無し = PC98)。
 
 保証範囲: 実物の backend 選択処理・probe は呼ばず、HW と SURFACE の存在から
-g_backend を代入する。予約・写像・確保・移譲と 14 変異の検証には有効だが、
+g_backend を代入する。予約・写像・確保・移譲と 17 変異の検証には有効だが、
 「Cirrus probe 失敗 → PEGC 選択」や fb->planes[0] までの統合は保証しない。
 予約拒否・SURFACE 登録拒否も 17 構成には含めていない。
 
@@ -83,7 +83,7 @@ def load(mutation=None):
     texts = {rel: (ROOT / rel).read_text() for rel in SOURCES}
     if mutation:
         _, rel, old, new = mutation
-        if old not in texts[rel]:
+        if texts[rel].count(old) != 1:
             raise SystemExit('変異 %s の当て先が見つからない: %s' % (mutation[0], rel))
         texts[rel] = texts[rel].replace(old, new, 1)
     return texts
@@ -130,8 +130,9 @@ def run_case(texts, name, defs):
         if out.returncode:
             return 'compile', out.stderr
         run = host32.run([str(tmp / 'test')], capture_output=True, text=True, timeout=60)
-        return ('ok' if run.returncode == 0 else 'fail'), 'rc=%d %s%s' % (
-            run.returncode, run.stdout, run.stderr)
+        verdict = 'ok' if run.returncode == 0 else (
+            'fail' if run.returncode == 1 and 'FAIL ' in run.stdout else 'runtime-error')
+        return verdict, 'rc=%d %s%s' % (run.returncode, run.stdout, run.stderr)
 
 
 def text_problems():
@@ -203,6 +204,15 @@ def _swap_reserve_and_map():
 RESERVE_THEN_MAP, MAP_THEN_RESERVE = _swap_reserve_and_map()
 
 MUTATIONS = [
+    ('planar-plane-stride-rounded', 'gfx/gfx_core.c',
+     '.plane_offset = {0, GFX_BPL * GFX_HEIGHT, 2 * GFX_BPL * GFX_HEIGHT,\n                       3 * GFX_BPL * GFX_HEIGHT}',
+     '.plane_offset = {0, GVRAM_PLANE_SIZE, 2 * GVRAM_PLANE_SIZE, 3 * GVRAM_PLANE_SIZE}'),
+    ('planar-display-UC-lost', 'gfx/gfx_core.c',
+     '.format = GFX_BB_PLANAR4, .planes = 1, .cache = LEDGER_CACHE_UC',
+     '.format = GFX_BB_PLANAR4, .planes = 1, .cache = LEDGER_CACHE_WB'),
+    ('planar-last-plane-missing', 'gfx/gfx_core.c',
+     'for (i = 0; i < 4; i++) {\n        sf = gfx_planar_display;',
+     'for (i = 0; i < 3; i++) {\n        sf = gfx_planar_display;'),
     # BB の探索範囲を池全体にする (高位 RAM へ行く、X14)
     ('bb-whole-pool', 'gfx/gfx_core.c',
      'pgalloc_arena_end(),\n                              LEDGER_TOP_DOWN',
@@ -262,8 +272,8 @@ def mutate():
         verdict = 'GREEN'
         for name, defs in CASES:
             result, _ = run_case(texts, name, defs)
-            if result == 'compile':
-                verdict = 'compile'
+            if result in ('compile', 'runtime-error'):
+                verdict = result
                 break
             if result == 'fail':
                 verdict = 'RED (%s)' % name

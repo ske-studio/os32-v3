@@ -16,7 +16,8 @@
 /*  [コンベンショナルメモリ]                                                */
 /*    0x00000 - 0x00FFF : NP   (NULLポインタ検出, paging_reclaim後)          */
 /*    0x01000 - 0x9FFFF : R/W  (フォント/Unicode/GFX, ブート後に再利用)      */
-/*    0xA0000 - 0xEFFFF : R/W  (テキスト/グラフィックVRAM)                  */
+/*    0xA0000 - 0xEFFFF : R/W。TVRAM / B,R,G / E は PCD (UC)。             */
+/*    CG 窓と ROM は WB (PCD なし)。ROM の書込み保護は下記。                 */
 /*    0xF0000 - 0xFFFFF : R/O  (BIOS ROM)                                   */
 /*                                                                          */
 /*  [拡張メモリ]                                                            */
@@ -46,6 +47,7 @@
 #include "cpu.h"      /* arch_mmu_* (実装は arch/$(ARCH)/arch_cpu.h) */
 #include "memmap.h"
 #include "pgalloc.h"
+#include "pc98.h"
 
 /* カーネルスタック帯のレイアウト不変条件。
  * ガードページはスタック直下に隣接する。ずれると paging_init の R/W 強制や
@@ -283,7 +285,8 @@ void paging_init(u32 mem_kb)
             phys = (u32)(i * PTE_COUNT + j) * PAGE_SIZE;
             if (phys < max_mem_bytes || phys < MEM_1MB) {
                 /* コンベンショナルメモリ(0-1MB)またはプローブ範囲内 */
-                page_tables[i][j] = phys | PAGE_RW;
+                page_tables[i][j] = phys | PAGE_RW |
+                    (PC98_NATIVE_VRAM(phys) ? PTE_PCD : 0);
             } else {
                 /* 未実装領域 */
                 page_tables[i][j] = PAGE_NOT_PRESENT;

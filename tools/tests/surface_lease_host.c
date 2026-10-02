@@ -22,6 +22,8 @@ static void lease_root_check(unsigned long root)
 }
 int con_sink_is_enabled(void) { return gui; }
 int appslot_gfx_owner(void) { return gfx_owner; }
+static u32 selected_backend = LEDGER_SF_PC98;
+u32 gfx_sf_backend(void) { return selected_backend; }
 /* Inject a last-page RO change after publication, then run the real B1
  * preflight/copy. No fake success/failure implementation of B1. */
 int host_lease_copyout(const struct caller_access *c, void *dst, const void *src, u32 n)
@@ -137,6 +139,9 @@ static void caller_copy_tests(void)
         CHECK(!lease_revoke_all(&space));
         CHECK(host_arch_if == (on ? 0x202U : 2U));
     }
+    selected_backend = LEDGER_SF_PEGC; GET(OS32_ERR_INVAL);
+    selected_backend = LEDGER_SF_CIRRUS; GET(OS32_ERR_INVAL);
+    selected_backend = LEDGER_SF_PC98;
     input->generation++; GET(OS32_ERR_STALE); *input = source.refs[0];
     *input = (struct surface_ref){alien, ledger_surfaces[alien].gen};
     GET(OS32_ERR_INVAL); *input = source.refs[0];
@@ -149,6 +154,8 @@ static void caller_copy_tests(void)
     GET(OS32_ERR_INVAL); /* Even a forged count=1 cannot lease planar DISPLAY. */
     source.count = 4; GET(OS32_ERR_INVAL); source.count = 1;
     source.backend = LEDGER_SF_PEGC; ledger_surfaces[sid].backend = LEDGER_SF_PEGC;
+    GET(OS32_ERR_INVAL); /* DISPLAY also requires the selected backend. */
+    selected_backend = LEDGER_SF_PEGC;
     tokens[0] = GET(0); CHECK(!lease_release(&space, tokens[0]));
     gui = 1; gfx_owner = 1; GET(OS32_ERR_INVAL); gfx_owner = 2; gui = 0;
     source.role = LEDGER_ROLE_UNICODE; source.backend = 0;

@@ -75,7 +75,7 @@ make check-tests-inventory                      # 表が古くないか検査す
 `TARGET_SRCS` など) にある `ROOT / "…"`。どちらにも現れないものは空欄になる
 (Rust は `--manifest-path` を代わりに出す)。
 
-## 2. `make check` の列 (120 ターゲット)
+## 2. `make check` の列 (121 ターゲット)
 
 `build/sdk.mk` の `CHECK_PAR_TARGETS` (`check-par` の依存) が
 正典。この表はその列をそのまま展開したもの。コマンド列は `make check` (変異込み) の形。
@@ -198,10 +198,11 @@ make check-tests-inventory                      # 表が古くないか検査す
 | 114 | `check-nano-inputs-host` | `python3 -B tools/tests/test_nano_inputs.py --mutate` | `tools/check_nano_inputs.py` | [`tools/tests/nano_inputs_tdd.md`](../tools/tests/nano_inputs_tdd.md) | [`docs/tasks/v3/TASK_T2D_T2H.md`](tasks/v3/TASK_T2D_T2H.md) | × |
 | 115 | `check-nano-adapter-host` | `HOST32_RUNNERS ごと: python3 -B tools/tests/test_nano_adapter.py --runner $$runner`<br>`python3 -B tools/tests/test_nano_adapter.py --runner $(firstword $(HOST32_RUNNERS)) --mutate` | — | [`tools/tests/nano_adapter_tdd.md`](../tools/tests/nano_adapter_tdd.md) | [`docs/tasks/v3/TASK_T2D_T2H.md`](tasks/v3/TASK_T2D_T2H.md) | × |
 | 116 | `check-surface-lease-host` | `HOST32_RUNNERS ごと: python3 -B tools/tests/test_surface_lease.py --runner $$runner`<br>`python3 -B tools/tests/test_surface_lease.py --runner $(firstword $(HOST32_RUNNERS)) --mutate` | `exec/lease.c`<br>`exec/surface_query.c`<br>`exec/redir_access.c`<br>`exec/access_walk.c`<br>`kernel/paging.c`<br>`kernel/pgalloc.c` | — | — | × |
-| 117 | `check-h3-park-resume-host` | `python3 -B tools/tests/test_h3_park_resume.py --mutate` | `tools/h3_park_resume.py`<br>`tools/h3_layout.c`<br>`userland/tests/h3/state.inc`<br>`userland/tests/h3/fixture.inc`<br>`userland/tests/h3a.c`<br>`userland/tests/h3b.c` | — | — | × |
-| 118 | `check-cirrus-win-host` | `python3 -B tools/tests/test_cirrus_win.py --mutate` | `gfx/backend_cirrus.c`<br>`drivers/wab_glue_xe10.c` | [`tools/tests/cirrus_win_tdd.md`](../tools/tests/cirrus_win_tdd.md) | — | × |
-| 119 | `check-pegc-mode-host` | `python3 -B tools/tests/test_pegc_mode.py --mutate` | `gfx/backend_pegc.c`<br>`kernel/console.c` | [`tools/tests/pegc_mode_tdd.md`](../tools/tests/pegc_mode_tdd.md) | [`docs/tasks/realhw/TASK_PEGC480_REALHW.md`](tasks/realhw/TASK_PEGC480_REALHW.md) | × |
-| 120 | `check-h2-fixtures-host` | `python3 -B tools/tests/test_h2_fixtures.py --mutate` | `userland/tests/h2_stack.c`<br>`userland/tests/h2_stack_probe.inc`<br>`tools/gen_h2_fixtures.py` | — | — | × |
+| 117 | `check-surface-bundle-host` | `HOST32_RUNNERS ごと: python3 -B tools/tests/test_surface_bundle.py --runner $$runner`<br>`python3 -B tools/tests/test_surface_bundle.py --runner $(firstword $(HOST32_RUNNERS)) --mutate` | `exec/lease.c`<br>`exec/surface_query.c`<br>`exec/exec.c`<br>`kernel/v86_mem.c`<br>`kernel/paging.c`<br>`kernel/pgalloc.c` | [`tools/tests/surface_bundle_tdd.md`](../tools/tests/surface_bundle_tdd.md) | [`docs/tasks/v3/TASK_T2D_T2H.md`](tasks/v3/TASK_T2D_T2H.md) | × |
+| 118 | `check-h3-park-resume-host` | `python3 -B tools/tests/test_h3_park_resume.py --mutate` | `tools/h3_park_resume.py`<br>`tools/h3_layout.c`<br>`userland/tests/h3/state.inc`<br>`userland/tests/h3/fixture.inc`<br>`userland/tests/h3a.c`<br>`userland/tests/h3b.c` | — | — | × |
+| 119 | `check-cirrus-win-host` | `python3 -B tools/tests/test_cirrus_win.py --mutate` | `gfx/backend_cirrus.c`<br>`drivers/wab_glue_xe10.c` | [`tools/tests/cirrus_win_tdd.md`](../tools/tests/cirrus_win_tdd.md) | — | × |
+| 120 | `check-pegc-mode-host` | `python3 -B tools/tests/test_pegc_mode.py --mutate` | `gfx/backend_pegc.c`<br>`kernel/console.c` | [`tools/tests/pegc_mode_tdd.md`](../tools/tests/pegc_mode_tdd.md) | [`docs/tasks/realhw/TASK_PEGC480_REALHW.md`](tasks/realhw/TASK_PEGC480_REALHW.md) | × |
+| 121 | `check-h2-fixtures-host` | `python3 -B tools/tests/test_h2_fixtures.py --mutate` | `userland/tests/h2_stack.c`<br>`userland/tests/h2_stack_probe.inc`<br>`tools/gen_h2_fixtures.py` | — | — | × |
 
 ## 3. `check` の列に**入っていない** `check-*` ターゲット (9)
 

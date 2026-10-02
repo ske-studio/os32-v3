@@ -39,7 +39,7 @@ void res_owner_set(int owner) { g_owner = owner; }
 /* ======================================================================== */
 
 #include "tvram.h"
-#undef TVRAM_BPR            /* pc98.h が 160 で再定義する (-Werror 回避) */
+/* tvram.h now includes the canonical pc98.h constants. */
 #include "pc98.h"
 #include "io.h"
 #include "utf8.h"

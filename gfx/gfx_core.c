@@ -221,6 +221,22 @@ static const struct ledger_surface gfx_sf[4] = {
       .planes = 1, .cache = LEDGER_CACHE_UC, .perm_max = LEDGER_PERM_NONE }
 };
 
+/* PC98 is always a candidate: even explicit PEGC/Cirrus falls back to it.
+ * One record per discontiguous plane. PLANAR4 describes the pixel layout;
+ * planes=1 describes this record. Do not clear device padding (32000..32767).
+ * Cirrus DISPLAY remains NONE until its fullscreen publisher is connected. */
+static const u32 gfx_display_planes[4] = {
+    VRAM_PLANE_B, VRAM_PLANE_R, VRAM_PLANE_G, VRAM_PLANE_I
+};
+static const struct ledger_surface gfx_planar_display = {
+    .npages = GFX_PFN(GVRAM_PLANE_SIZE),
+    .width = GFX_WIDTH, .height = GFX_HEIGHT, .pitch = GFX_BPL,
+    .owner = LEDGER_OWNER_KERNEL, .backing = LEDGER_SB_VRAM,
+    .backend = LEDGER_SF_PC98, .role = LEDGER_ROLE_DISPLAY,
+    .format = GFX_BB_PLANAR4, .planes = 1, .cache = LEDGER_CACHE_UC,
+    .perm_max = LEDGER_PERM_RW
+};
+
 /* 資源レコード i (と SURFACE の型板 i + 1) がどの候補のものか。 */
 static u32 gfx_cand_of(u32 i)
 {
@@ -248,7 +264,7 @@ void __attribute__((cold)) gfx_boot_reserve(void)
     struct ledger_span sp[3];
     struct ledger_surface sf;
     const struct ledger_resource *r;
-    u32 i, n, m, rid, pfn, cand;
+    u32 i, n, m, rid, pfn, cand, display_fail = 0;
     rid = 0;
 
     cand = m = gfx_identify_candidates();
@@ -286,15 +302,20 @@ void __attribute__((cold)) gfx_boot_reserve(void)
         if (i == 1) sf.first = pfn;
         if (!ledger_surface_create(&sf, 0) && i) m &= ~gfx_cand_of(i - 1);
     }
+    for (i = 0; i < 4; i++) {
+        sf = gfx_planar_display;
+        sf.first = GFX_PFN(gfx_display_planes[i]);
+        if (!ledger_surface_create(&sf, 0)) display_fail++;
+    }
     /* 6. */
     ledger_arena_freeze();
-    kprintf(0x07, "[gfx] ledger cand=%u ok=%u bb=%x top=%x\n", cand, m,
+    kprintf(0x07, "[gfx] ledger cand=%u ok=%u display_fail=%u bb=%x top=%x\n", cand, m, display_fail,
             pfn * PAGE_SIZE, ledger_arena_top() * PAGE_SIZE);
     (void)ledger_selfcheck("gfx");
 }
 
 /* 選択中の backend の SURFACE 上の名前 (LEDGER_SF_*)。 */
-static u32 gfx_sf_backend(void)
+u32 gfx_sf_backend(void)
 {
     if (g_backend == &gfx_backend_pegc) return LEDGER_SF_PEGC;
     if (g_backend == &gfx_backend_cirrus) return LEDGER_SF_CIRRUS;

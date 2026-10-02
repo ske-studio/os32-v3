@@ -8,6 +8,7 @@
 #ifndef __GFX_H
 #define __GFX_H
 
+#include "pc98.h"
 #include "types.h"  /* u8, u16, u32 */
 
 /* ======== 画面定数 ======== */
@@ -22,10 +23,10 @@
 #define GFX_PLANE_SZ_200 16000  /* 80 * 200 = 16000 bytes/plane */
 
 /* ======== VRAMプレーンアドレス (PC9800Bible §2-7) ======== */
-#define VRAM_PLANE_B  0xA8000UL   /* 青 / Plane 0 */
-#define VRAM_PLANE_R  0xB0000UL   /* 赤 / Plane 1 */
-#define VRAM_PLANE_G  0xB8000UL   /* 緑 / Plane 2 */
-#define VRAM_PLANE_I  0xE0000UL   /* 輝度 / Plane 3 */
+#define VRAM_PLANE_B  GVRAM_PLANE_B   /* 青 / Plane 0 */
+#define VRAM_PLANE_R  GVRAM_PLANE_R   /* 赤 / Plane 1 */
+#define VRAM_PLANE_G  GVRAM_PLANE_G   /* 緑 / Plane 2 */
+#define VRAM_PLANE_I  GVRAM_PLANE_I   /* 輝度 / Plane 3 */
 
 /* ======== パレットI/O (16色モード) ======== */
 #define PAL_IDX_PORT  0xA8
@@ -40,6 +41,8 @@
 /* 上記のヘッダで GFX_Rect, GFX_Color, GFX_Surface, GFX_Sprite は定義される */  
 
 /* ======== 初期化・終了 ======== */
+/* 選択中 backend の台帳名 (LEDGER_SF_*)。通常文脈で source と照合する。 */
+u32 gfx_sf_backend(void);
 void gfx_init(void);       /* 640x400x16初期化 + バックバッファ確保 */
 void gfx_init_200(void);   /* 640x200x16初期化 (縦はHWが2倍表示) */
 /* KAPI スロット gfx_init / gfx_init_200 の実体 (票 T8 D1 / D1a)。

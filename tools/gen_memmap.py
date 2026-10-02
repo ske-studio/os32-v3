@@ -204,8 +204,8 @@ def bands(m, sym):
         (v("MEM_CONV_END") or 0) - 1, "RW",
         "0x90000 は自動プレイ観測メールボックス (memmap.h に定義は無い)")
     add(CONV, "VRAM (テキスト + グラフィック)", v("MEM_CONV_END"),
-        (v("MEM_BIOS_ROM_START") or 0) - 1, "RW", "CPL=3 からは USER")
-    add(CONV, "BIOS ROM", v("MEM_BIOS_ROM_START"), v("MEM_BIOS_ROM_END"), "RO")
+        (v("MEM_BIOS_ROM_START") or 0) - 1, "RW", "CPL=3 からは USER。TVRAM / B,R,G / E は PCD (UC)、CG 窓は WB")
+    add(CONV, "BIOS ROM", v("MEM_BIOS_ROM_START"), v("MEM_BIOS_ROM_END"), "RO", "WB (PCD なし)")
 
     add(KERN, "カーネル .text/.data/.bss", v("KERNEL_LOAD_ADDR"),
         sym["__bss_end"] - 1, "RW", "kernel.map の __bss_end まで")

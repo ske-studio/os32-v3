@@ -281,7 +281,12 @@ void _start(void) {
     ledger_regions[ledger_region_count++]=(struct ledger_region){.first=sf.first,.end=sf.first+1,
         .type=LEDGER_R_FIXED,.owner=LEDGER_OWNER_KERNEL,.cache=LEDGER_CACHE_UC};
     CHECK(ledger_surface_create(&sf,&sid)); refs[0]=(struct surface_ref){sid,ledger_surfaces[sid].gen};
-    CHECK(lease_acquire(&a,&auth,refs,1,LEDGER_PERM_RW,out)==LEASE_INVAL); /* old alias is WB */
+    /* e3: native alias starts UC. Preserve the old mismatch rejection by
+     * explicitly corrupting its cache bits after the positive control. */
+    CHECK(!lease_acquire(&a,&auth,refs,1,LEDGER_PERM_RW,v));
+    CHECK(!lease_revoke_all(&a));
+    CHECK(!paging_map_phys(TVRAM_BASE,TVRAM_BASE,1,PAGE_RW));
+    CHECK(lease_acquire(&a,&auth,refs,1,LEDGER_PERM_RW,out)==LEASE_INVAL);
     CHECK(!paging_map_phys(TVRAM_BASE,TVRAM_BASE,1,PAGE_RW|PTE_PCD));
     CHECK(!lease_acquire(&a,&auth,refs,1,LEDGER_PERM_RW,v));
     CHECK(!lease_revoke_all(&a)); CHECK(ledger_surface_release(sid));

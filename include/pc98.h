@@ -284,11 +284,21 @@
 /* ====================================================================== */
 /*  グラフィックVRAM — PC9800Bible §2-7, §4-2                             */
 /* ====================================================================== */
-/* 各プレーンのベースアドレスは gfx.h にも定義あり (VRAM_PLANE_B等)          */
+/* Native VRAM address canon; gfx.h/tvram.h use aliases. */
 #define GVRAM_PLANE_B        0x000A8000UL  /* プレーン0: 青 */
 #define GVRAM_PLANE_R        0x000B0000UL  /* プレーン1: 赤 */
 #define GVRAM_PLANE_G        0x000B8000UL  /* プレーン2: 緑 */
 #define GVRAM_PLANE_I        0x000E0000UL  /* プレーン3: 輝度 */
+
+/* Native VRAM backing is FIXED/UC in the ledger. Exclude CG and ROM.
+ * This predicate is also usable before memory_boot installs the ledger. */
+#define GVRAM_PLANE_SIZE     0x00008000UL
+#define GVRAM_BRG_END        (GVRAM_PLANE_G + GVRAM_PLANE_SIZE)
+#define GVRAM_I_END          (GVRAM_PLANE_I + GVRAM_PLANE_SIZE)
+#define PC98_NATIVE_VRAM(pa) \
+    (((pa) >= TVRAM_CHAR_BASE && (pa) < TVRAM_CG_WINDOW) || \
+     ((pa) >= GVRAM_PLANE_B && (pa) < GVRAM_BRG_END) || \
+     ((pa) >= GVRAM_PLANE_I && (pa) < GVRAM_I_END))
 
 #define GFX_SCREEN_W         640     /* 画面幅 (ピクセル) */
 #define GFX_SCREEN_H         400     /* 画面高さ (400ラインモード) */

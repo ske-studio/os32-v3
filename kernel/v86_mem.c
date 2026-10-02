@@ -24,8 +24,12 @@ static const struct v86_ident_ent {
     u32 setup_flags;    /* セッション中 (ゲストから見える) */
     u32 teardown_flags; /* 平常時 */
 } v86_ident_map[] = {
-    { V86_VRAM_START,     V86_VRAM_END,         PAGE_RW | PTE_USER, PAGE_RW },
-    { V86_GVRAM_E_START,  V86_GVRAM_E_END,      PAGE_RW | PTE_USER, PAGE_RW },
+    /* PC98_NATIVE_VRAM と同じ区間。surface_bundle_host が照合する。
+     * Same FIXED/UC native backing policy as paging_init; CG stays WB. */
+    { V86_VRAM_START, TVRAM_CG_WINDOW, PAGE_RW | PTE_USER | PTE_PCD, PAGE_RW | PTE_PCD },
+    { TVRAM_CG_WINDOW, GVRAM_PLANE_B, PAGE_RW | PTE_USER, PAGE_RW },
+    { GVRAM_PLANE_B, V86_VRAM_END, PAGE_RW | PTE_USER | PTE_PCD, PAGE_RW | PTE_PCD },
+    { V86_GVRAM_E_START, V86_GVRAM_E_END, PAGE_RW | PTE_USER | PTE_PCD, PAGE_RW | PTE_PCD },
     { V86_EXTROM_START,   V86_EXTROM_END,       PAGE_RO | PTE_USER, PAGE_RO },
     { V86_SOUNDROM_START, V86_SOUNDROM_END,     PAGE_RO | PTE_USER, PAGE_RO },
     { MEM_BIOS_ROM_START, MEM_BIOS_ROM_END + 1, PAGE_RO | PTE_USER, PAGE_RO },

@@ -198,7 +198,7 @@ Unicodeはkernel所有FIXED_RAM/RO SURFACE。ユーザー版utf8だけsetterでl
 |---|---|
 | e1 | 公開予定desc/エラー/授権とqueryの内部準備。偽owner/旧ref/GUI DISPLAY拒否。実装・試験・サイズ・単独着地の扱いは下記「e1 実装結果」 |
 | e2 | 単面公開lease + copyout rollback。`walk_enter/leave`のmaster往復を除去、保存caller/管理PD/PTをP2VでwalkしIF/CR3不変。FULL/PT不足/out不変。実装・ホスト・予算は下記「e2 実装結果」 |
-| e3 | DISPLAY4面束 + native UC。最後の面失敗で全巻戻し、cache全alias一致 |
+| e3 | DISPLAY4面束 + native UC。最後の面失敗で全巻戻し、cache全alias一致。実装・試験・予算は下記「e3 実装結果」。exec/V86のPCD保持を前倒し |
 | e4 | backend→kernel fb/geometry。実3backendの選択と200/400行 |
 | e5 | 再init/revoke/fallback。旧token拒否、第三AS不変 |
 | e6 | C SDK checked attach/互換void橋。反復取得/失敗時描画なし |
@@ -207,7 +207,7 @@ Unicodeはkernel所有FIXED_RAM/RO SURFACE。ユーザー版utf8だけsetterでl
 | e8b | kcg boot専用化とNOSYS。font_load_test/台本/host期待値、表/BB/mailbox不変<br>申し送り (2026-10-02): `font_load_test` と `test_result_conv` の期待を boot 後 NOSYS/表・BB 不変へ更新する。 |
 | e9 | tvdumpとSHMマーカー・観測側。wire不変、fault目的地一致、lock→free/exit→2本目アプリのSHM書込み<br>申し送り (2026-10-02): `nop`・`ring3_hello/fault/guard` のマーカーを SHM へ移し、`db_v50_test` の VRAM 許可期待を未貸与拒否へ変える。 |
 | e10a | shm_init後のboot口・SHM権限口・起動時map撤去・汎用昇格禁止。lock/free/回収のUSER維持<br>申し送り (2026-10-02、e11 で統合): kselftest `test_map_user_keep` と paging.c `paging_map_user_keep_selftest` を共有PT昇格禁止に合わせて改廃し、`paging_bounds_host.c` の `paging_addrspace_map_user_keep(...) == 0` の呼出しは拒否期待へ反転する。`paging_map_user_keep_selftest() == 0` の呼出しは成功期待を維持し、selftest の中身を共有PT昇格禁止に合わせて書き直す。 |
-| e10b | V86 sessionと全出口復元。VRAM/E両行PCD、PDE USER、失敗/STOP出口を確認 |
+| e10b | V86 sessionと全出口復元。VRAM/Eのsetup/teardown PCDはe3へ前倒し済み (PM判断、初回起動/V86でUCを失わないため)。PDE USER、失敗/STOP出口を確認 |
 | e10c | master/AS/post-exec毎bootの3段検査。kselftest (c)とV86帰路でalias_cache一致、DISPLAY/TVRAM再取得 |
 | e11 | 全切替・世代/生成/manifest確認 (前小段を統合、単独で部分配備しない)<br>申し送り (2026-10-02): `test_app_bb_overlap.py` は旧直接BB公開の撤去時に退役するか lease CLIENT 試験へ作り直す。e10a の map_user_keep 試験更新も統合する。 |
 | e12 | 変異/サイズ結果と受入台本を確定、PM受入は構成ごと別依頼 |
@@ -571,6 +571,162 @@ NP21/W・実機・NHD・配備・iniは未操作。独立レビューとゲス�
 e3は4面束/全出力の巻戻しとnative UC、e4以降は実publisher、e5は再init/revoke、
 e8はUnicode/TVRAM登録を担当する。e11はKAPI/SDK/版の一括公開と接続時サイズ測定、
 STALE/INVALが示す情報の違いの公開文書化を引き継ぐ。
+
+
+#### e3 実装結果 (2026-10-03、GPT-6)
+
+**状態: 実装・個別ホスト確認済み、独立レビュー・ゲスト受入待ち。**
+作業木 `wt/t2e3`、基点 `d4d5a2b` (STOP修正着地後)。
+PM判断は作業依頼の `/home/hight/os32-tmp/ref_e3.md` §7。
+全体検査前に本欄・生成文書を固定し、最終ゲートの結果は下記ログ/rcと最終報告へ残す。
+
+**範囲・設計**:
+- §2-2の束契約を `surface_lease_bundle(source, user_refs, count, access, user_out)` として
+  内部実装。PC98 DISPLAY/count=4専用、出力はcount+4 view (116B)。単面口は従来どおり。
+  B1でrefを一括コピー・出力全域を事前検査し、授権→surface_query_refs→acquireを
+  同じIRQ保存区間で実行。束全体INVAL優先→STALEの順序を入口で確定し、
+  低層lease_acquireの重複sid許可/再検査/既存10変異の当て先は維持。
+- 4slot/VA/PTを準備後に一括公開。copyout拒否では今回4tokenだけをrelease。
+  失敗したreleaseの本数だけ診断を加算し、**全release成功時だけ**旧slot全バイトと採番を復元。
+  sourceはkernel snapshot。束入口と単面CLIENT/DISPLAYは `gfx_sf_backend()` と
+  source.backendを同じIRQ保存区間で照合し、不一致はINVAL・out不変。
+  PEGC/Cirrus選択中にPC98 source/4refを渡して拒否、PC98選択時に成功を確認。
+- `gfx_boot_reserve`にB/R/G/Iの4 SURFACEを追加。owner=KERNEL、VRAM/UC/RW、
+  planes=1/offset=0、640×400/pitch80/8page。
+  formatは既存PLANAR4 (画素配置)、planesはその記録に入る面数。
+  PC98は `g_backend_list` の最終候補で明示PEGC/Cirrus失敗時もfallbackするため常時候補。
+  登録があっても選択中backendと一致しなければ貸さない。PEGC DISPLAYはe4。
+  Cirrus DISPLAYのNONEは既存の授権接続段まで維持。VRAM末尾768Bは装置の同じ面であり
+  他用途と同居させず、PM判断どおりゼロにしない。RAM planar CLIENTのstrideは32000Bのまま。
+- nativeの番地正典を `include/pc98.h` に集約しgfx/tvram/V86は参照。
+  paging_initの最初のPTEからTVRAM `[A0000,A4000)`、BRG `[A8000,C0000)`、
+  I `[E0000,E8000)` にPCD。CG/ROM/RAMはWB。
+  FIXED/UC台帳のnative backing方針をboot前の定数で表現する (ROM/CGまで一律UCにはしない)。
+  execの低位USER化は既存 `_keep`、V86の表はCGを分離しsetup/teardownともPCD。
+  これはe10b分の前倒し。共有USER化の撤去はe11、全ASのPD照合はe10cのまま。
+- kselftestに4登録とnative alias全ページの2 check追加。期待pass **270→272**、
+  ゲスト未実施なので272成功とは主張しない。KAPI/SDK生成・版・memory世代は変更なし。
+
+**変更前に洗い出した既存期待・足場**:
+1. `lease_host.c`: TVRAMのboot aliasがWBなのでINVAL → UCなので成功。
+   WB不一致の拒否という旧意図は明示的なPCD破壊で残した。
+2. `gfx_boot_host.c`: S trace+4。実bootにあるFIXED/UC記録を足場へ追加し、
+   identifyが確認する初期region数3→4。4面の全属性とCLIENTの32000B strideも照合。
+3. `test_surface_lease.py`: 新入口追加で同文言が増えるため、既存単面変異を単面側の
+   ソース区間に限定し置換数1を維持。ビルド足場は新束試験と共有。
+4. `con_sink_host.c`: tvram.hがpc98.hを含むようになったため、旧include順専用の
+   `#undef TVRAM_BPR`を除去。console/con_sink実物の期待値は変更しない。
+5. query/leaseの重複sid契約、paging_bounds/memmap/access_walkの既存成功・拒否期待は維持。
+   `rg`でpaging_init/gfx_boot_reserve/v86_ident_map/surface_lease/map_user/gfx_sfの
+   includeと関数切出しを走査。app_band_pde/app_bb_overlap/highram/memory_boot/device_reservation/
+   paging_rebuild/shlib_high等のpaging全文取り込み、gfx_bootのsliceも確認。
+
+**試験**: [surface_bundle_tdd](../../../tools/tests/surface_bundle_tdd.md)。
+新規1ホストsuite (実lease/query/B1/paging/pgalloc、execの実VRAM map文、V86 setup/teardown全文)。
+正常対照はqemu成功、束21/21 runtime RED (初回18+レビュー対応3)。gfxは17構成+1静的検査、
+既存14+新規3=17/17 runtime RED。既存lease10/10、単面18/18 runtime RED (既存17+backend照合1) を確認。
+この4集合は**66変異 (e3新規25+既存41)**。query既存34/34も個別で確認し、
+5集合では**100変異**。con_sinkの既存正常対照とtargetコンパイルもrc=0。
+全変異の置換数固定、コンパイル失敗/signal/timeoutをREDに数えない。
+4面目だけPT不足、最終outページRO、既存lease/master/別AS/slot/台帳/会計/IF/CR3不変、
+RO/RW、FULL、混在INVAL/STALE、通常GUI拒否、PEGC選択拒否、release全4失敗/途中1失敗を確認。
+boot→exec map→V86 setup→teardown→再execで低位1MB全PCD/PWTを照合。
+V86 BIOS/I/Oはstub、CPU仮想RAM書込みだけhost backingへ向ける。実exec全体や実V86 CPUは未検証。
+最初のslot復元変異SURVIVEDは、空slotの残存内容が偶然一致していたため。異なる残存バイトを
+注入して閉じた。初期の関数名/kmemset/boot限定登録の足場修正はコンパイルREDに算入しない。
+
+**サイズ** (同じ `/home/hight/opt/cross`、size/nm/readelf/kernel.map、build ID差を含む):
+
+| 項目 | STOP着地後の基準 | e3 | 増分 |
+|---|---:|---:|---:|
+| ELF text (SQLite込み) | 702,788 B | 703,316 B | +528 B |
+| ELF data | 36,555 B | 36,731 B | +176 B |
+| ELF bss | 606,484 B | 606,484 B | 0 |
+| kernel.bin | 364,404 B | 365,124 B | +720 B |
+| vmkernel.lz4 | 481,352 B | 481,821 B | +469 B |
+| __bss_end | 0x18C754 | 0x18CA34 | +736 B |
+| ASSERT余白 | 34,988 B | 34,252 B | −736 B |
+
+レビュー対応後のmake all実測を採用 (同一toolchain、CONFIG_LGY98_FLAGS=0)。
+今回の開始時の実物はkernel.bin 365,076B / vmkernel.lz4 481,824B、text703,284B /
+data36,715B / bss606,484B / __bss_end0x18C9F4。
+今回の修正だけではbin+48B、圧縮−3B、text+32B、data+16B、bss不変、__bss_end+64B。
+未結線 `.text.surface_lease_bundle` は578B、単面584B、query1463Bでgc。
+未参照見込みは2,625B。d6起点0x18C270からのe残枠は**14,396B**、
+未参照見込み控除後**11,771B**。接続時には再計測する。
+STOP最終増分は予告1152Bではなく1344B。ASSERT/診断は削らず、定数上限も増やしていない。
+
+**実行と残件**:
+- 環境はTMPDIR=/home/hight/os32-tmp、PYTHONPATH空、HOST32_RUNNERS=qemu。
+  makeはCROSS_DIR=/home/hight/opt/cross、NP21W_DIR=/dev/null、stdin=/dev/null。
+- 初回基準make allは未追跡IPAフォント不足でrc=2。既存mainの取得済み2ファイルを
+  worktreeにコピー後、基準再実行rc=0、e3のmake allもrc=0。
+  `/dev/null`へのD88コピー警告は指定による配備抑止。配備先へのコピーはなし。
+- 個別コマンド `python3 -B tools/tests/test_{lease,gfx_boot}.py --mutate`、
+  `test_{surface_lease,surface_bundle}.py --runner qemu --mutate` はrc=0。
+  queryの`--runner qemu --mutate`とcon_sinkもrc=0。
+  ログ: `/home/hight/os32-tmp/e3-{lease,gfx,single,bundle,query,con-sink}.log`。
+- `gen_memmap.py --write` / `gen_tests_inventory.py --write` / `check_select.py --lint`
+  はrc=0 (120検査、対応表漏れ0)。ヘッダ参照増加の6対応表も追従。
+- 最後に指定の `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp HOST32_RUNNERS=qemu make check-changed NP21W_DIR=/dev/null < /dev/null`
+  を実行。ログ `/home/hight/os32-tmp/e3-check-changed.log`、終了値 `.rc`。
+  新規make recipeの型が絞込み対象外なので安全側の全変異となる。実行中は票・ソースを固定。
+  **初回rc=2**: (1) con_sink足場の旧`#undef TVRAM_BPR`でコンパイル失敗、
+  (2) gfxの既存bb-whole-pool変異がSIGSEGVで終わり、厳格なruntime RED判定では不合格。
+  最初のgfx個別17/17はsignalも拾っていた旧判定によるため、その時点の同変異はREDに算入しない。
+  (1)は不要undef除去、(2)は実allocatorの戻り範囲をクリア前にassertして修正。
+  修正後はcon_sink rc=0、gfx全17変異がrc=1/FAILによるRED、正常18試験も成功。
+  headerのundef/代替定義を追加grepし、同型の足場は他に無いことを確認。
+  記録・生成物を更新し、許可された**再実行1回**を
+  `/home/hight/os32-tmp/e3-check-changed-retry.log` / `.rc` に保存した。
+  **再実行rc=0** (初回実装の束18/18・gfx17/17・単面17/17・query34/34)。
+  レビュー対応後の個別結果は上記の束21/21・単面18/18へ更新。
+- nativeはPMのホストへ。初回独立レビューはOpus 5.5のApprove (条件付き)。
+  今回はそのP2/P3対応。差分の再レビュー、NP21/W/実機の受入はPMへ。
+  NHD/配備/ini/実機/commit/pushは未操作。e4はpublisher/geometryとPEGC DISPLAY、
+  e5は再init/revoke、e10bはsession全出口/PDE USER、e10cは全AS alias照合、
+  e11は共有USER化撤去・KAPI/世代公開・未参照2,625Bの接続時再計測を引き継ぐ。
+
+
+**独立レビュー対応 (2026-10-03、P2-1/P3-1〜10)**:
+- 選択中backendの台帳名を返す `gfx_sf_backend()` を内部公開し、束と単面の
+  CLIENT/DISPLAYの照合を追加。実backend probeは模擬、source/refsはPC98のまま
+  選択をPEGC/Cirrusへ変える拒否試験。削除変異は束/単面で各1本。
+- 内部名/sectionは `surface_lease_bundle`。e11公開予定の
+  `gfx_surface_lease(role, refs, count, access, out)` が内部sourceを構築して呼ぶ対応。
+- `test_surface_lease.py:run()` は同一unitの重複とpaging/V86/execを2種類以上
+  同時に差し替える変異をassertで拒否 (同じfixture.oを上書きするため)。
+  query+lease+pagingの世代3防壁変異は保つ。束の出力事前検査とIRQ/例外拒否を各1変異追加。
+- 全runner正常対照は6試験へ。生成器のmemory表とpaging見出しにnative UC/CG・ROM WBを記載。
+  V86表の注記はPC98_NATIVE_VRAMとの同一区間とhost照合を明記。
+  DISPLAY登録失敗数は起動ログ `display_fail` へ。
+- 既存関数取り込みの足場を `rg` で再走査。lease単面/束の共通ビルド、lease_hostの
+  全文取り込み、gfx_bootのsliceとgfx_sf_backendを使う2変異の当て先を確認。
+  走査ログ: `/home/hight/os32-tmp/e3-review-scaffolds.txt`。
+- e4申し送り: publisherはsourceをg_backend (gfx_sf_backend)から作る。
+- e11申し送り: `exec/exec.c:ring3_ptr_ok` のVRAM範囲直書き (現行727行付近) も
+  共有USER化撤去の対象。今回は変更しない。
+- UC化のpresent性能: NP21/Wはキャッシュを模擬しないので差は出ない見込み。
+  実機はMTRRがA0000〜BFFFFをUCにしていれば変化なし、WBだったならpresentは遅くなるが
+  正しくなる方向。h (Ra266) でgfx_countersを計測する。
+  §11-2に従いCG窓はWBのまま。I/Oでコードを切り替えた後に古いグリフが読める危険もhで確認。
+- 今回の `make all` はrc=0。個別ログは `/home/hight/os32-tmp/e3-review-{bundle,single,gfx}.log`。
+  単面の初回正常対照は足場編集時のTVRAM期待の重複でrc=1、当該重複だけ除去してrc=0。
+  レビュー対応後の全体ゲート `e3-review-check-changed.log` / `.rc` はrc=0。
+  束21/21・gfx17/17・単面18/18・query34/34・lease10/10、関連100変異。
+  検査終了後に§2-2の公開予定名の誤置換1箇所をgfx_surface_leaseへ戻した。
+  文書訂正後の `e3-review-check-changed-final.log` / `.rc` はrc=2。
+  今回の関連100変異は通過したが、H3 FakeEmulator試験が共有TMPDIRの
+  `os32-h3-live.lock` 競合により、期待するSTOP拒否より先にロック拒否を受けた。
+  `test_h3_park_resume.py:setUp` のロック先だけ試験ごとの一時ディレクトリへ隔離。
+  実flock/競合CLI拒否と全既存期待は維持し、運用側ロック/H3本体/実機は変更しない。
+  個別H3は正常39試験＋ILP32状態42チェック、61/61 runtime RED、rc=0。
+  ログ `e3-review-h3.log`。失敗後の再実行1回 (`e3-review-check-changed-retry.log`) は rc=0。
+  検査中は票・ソースを固定。コミット/push/配備/NP21W/NHD/ini/実機は未操作。
+
+**e3 の PM 検査 (2026-10-03)**: 独立レビュー (Opus 5.5) は 1 回目 Approve (条件付き、P2 1 件・P3 10 件) → 対応の差分確認で Approve
+(残る P3: 予定形の記述 → 上で結果に訂正、exec/lease.c:6 の gfx.h の相対 include は害が無いので据え置き)。PM のホスト
+(既定 `HOST32_RUNNERS=native qemu`) で `make all`・lint・`check-changed` rc=0 (修正前・修正後の版とも、`/home/hight/os32-tmp/pm{,2}-e3-{all,cc}.log`)。
 
 
 ## 3. T2f — map/unmapとallocator、暫定heap終了

@@ -134,8 +134,8 @@ static u32 count(char c)
     return n;
 }
 
-int pegc_identify(void) { note('P'); CHECK(ledger_region_count == 3); return PEGC_ID; }
-int cirrus_identify(void) { note('C'); CHECK(ledger_region_count == 3); return CIRRUS_ID; }
+int pegc_identify(void) { note('P'); CHECK(ledger_region_count == 4); return PEGC_ID; }
+int cirrus_identify(void) { note('C'); CHECK(ledger_region_count == 4); return CIRRUS_ID; }
 static u8 host_bda(volatile u32 addr)
 {
     CHECK(addr == PEGC_BIOS_ARCH_FLAG);
@@ -175,8 +175,14 @@ int host_map(u32 virt, u32 phys, u32 n, u32 flags)
 }
 int host_alloc(u32 owner, int n, u32 first, u32 end, u32 dir, u32 *pfn)
 {
+    int ok;
     note('B');
-    return pgalloc_alloc_n_owner(owner, n, first, end, dir, pfn);
+    ok = pgalloc_alloc_n_owner(owner, n, first, end, dir, pfn);
+    /* Check the actual allocation before the real reserve code clears it.
+     * A high-RAM mutant must fail an assertion, not fault on unmapped host RAM. */
+    if (ok) CHECK(*pfn >= MEM_PHYS_EXEC_FLOOR / PAGE_SIZE &&
+                  *pfn + (u32)n <= pgalloc_arena_end());
+    return ok;
 }
 int host_surface(const struct ledger_surface *sf, u32 *sid)
 {
@@ -240,6 +246,10 @@ static void boot(void)
     CHECK(sys_memory_bootstrap_model(&m, &l, paging_verify_identity));
     CHECK(sys_memory_stage_online());
     CHECK(paging_boot_context());
+    /* Production memory_boot also registers the native VRAM FIXED/UC band. */
+    CHECK(ledger_register_region(LEDGER_R_FIXED, LEDGER_OWNER_KERNEL,
+          MEM_CONV_END / PAGE_SIZE, KERNEL_LOAD_ADDR / PAGE_SIZE,
+          LEDGER_CACHE_UC, 0));
     /* ③ の区間のうち ⑥ に効くもの: planar BB の固定面と背景 2 本 */
     CHECK(ledger_register_region(LEDGER_R_SURFACE_BACKING, LEDGER_OWNER_BOOT,
                                  MEM_GFX_BB_BASE / PAGE_SIZE,
@@ -303,6 +313,7 @@ void _start(void)
     want[nw++] = 'S';
     if (bb) want[nw++] = 'S';
     if (cirrus_ok) { want[nw++] = 'S'; want[nw++] = 'S'; }
+    for (i = 0; i < 4; i++) want[nw++] = 'S';
     want[nw++] = 'F';
 
     pte_before_pegc = pte(PEGC_LINEAR_BASE);
@@ -355,6 +366,24 @@ void _start(void)
     CHECK(sp && sp->first == MEM_GFX_BB_BASE / PAGE_SIZE &&
           sp->npages == MEM_GFX_BB_SIZE / PAGE_SIZE &&
           sp->backing == LEDGER_SB_FIXED_RAM && sp->owner == LEDGER_OWNER_BOOT);
+    {
+        const u32 planes[4] = {VRAM_PLANE_B, VRAM_PLANE_R, VRAM_PLANE_G, VRAM_PLANE_I};
+        u32 count = 0;
+        for (i = 0; i < LEDGER_MAX_SURFACES; i++) {
+            const struct ledger_surface *s = &ledger_surfaces[i];
+            if (!s->npages || s->backend != LEDGER_SF_PC98 ||
+                s->role != LEDGER_ROLE_DISPLAY) continue;
+            CHECK(count < 4 && s->first * PAGE_SIZE == planes[count++]);
+            CHECK(s->npages == 8 && s->width == 640 && s->height == 400 &&
+                  s->pitch == 80 && s->planes == 1 && !s->plane_offset[0] &&
+                  s->owner == LEDGER_OWNER_KERNEL && s->cache == LEDGER_CACHE_UC &&
+                  s->backing == LEDGER_SB_VRAM && s->perm_max == LEDGER_PERM_RW &&
+                  s->format == GFX_BB_PLANAR4 && ledger_surface_validate(s));
+        }
+        CHECK(count == 4);
+    }
+    for (i = 0; i < 4; i++) CHECK(sp->plane_offset[i] == i * 32000U);
+    CHECK(sp->planes == 4 && sp->pitch == 80 && sp->height == 400);
     CHECK(!se == !bb);
     CHECK(ledger_owner_pages(LEDGER_OWNER_BOOT) == (bb ? 75U : 0U));
     if (bb) {
