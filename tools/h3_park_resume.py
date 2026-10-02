@@ -49,6 +49,17 @@ def require(condition, message):
         raise RuntimeError(message)
 
 
+def debug_reply(reply, path):
+    """Individual BP deletion uses integer status; other endpoints use bool."""
+    if path.split('?')[0] == '/api/break/del':
+        require(type(reply.get('ok')) is int and reply['ok'] == 1 and
+                type(reply.get('removed')) is int and reply['removed'] == 1,
+                'debug operation failed: ' + path)
+    else:
+        require(reply.get('ok') is True, 'debug operation failed: ' + path)
+    return reply
+
+
 def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
@@ -137,11 +148,10 @@ def capture_trace(p, case, seconds=15, start=None, advance=None):
     """Own breakpoints and sample sequentially; callbacks run only between traps."""
     client = p.emu.client
     def get(path):
-        return json.loads(client.get(path))
+        return debug_reply(json.loads(client.get(path)), path)
     def post(path):
         reply = json.loads(client.post(path))
-        require(reply.get('ok') is True, 'debug operation failed: ' + path)
-        return reply
+        return debug_reply(reply, path)
     require(not get('/api/break').get('breakpoints'), 'release existing breakpoints first')
     instance = get('/api/instance')
     require(not instance['trap_pause'] and not instance['user_pause'], 'release existing pause first')
@@ -150,6 +160,8 @@ def capture_trace(p, case, seconds=15, start=None, advance=None):
     result = dict(case_id=case['case_id'], elf_sha256=p.layout['elf_sha256'],
                   sites=sites, samples=[], started_at=time.time())
     installed = []
+    owned_trap = False
+    failure = None
     p.emu.capture_active = True
     try:
         for address in watched.values():
@@ -174,6 +186,7 @@ def capture_trace(p, case, seconds=15, start=None, advance=None):
             eip = int(regs['eip'], 16)
             names = [name for name, address in watched.items() if address == eip]
             require(len(names) == 1, 'unowned debugger trap')
+            owned_trap = True
             site = names[0]
             sample = dict(site=site, eip=eip, eax=int(regs['eax'], 16),
                 pending=p.word(p.s['g_pending_id']), irq=p.word(p.s['kctx_irq_depth']),
@@ -186,14 +199,54 @@ def capture_trace(p, case, seconds=15, start=None, advance=None):
             result['samples'].append(sample)
             # Execute the trapped instruction once, then re-arm exactly our BP.
             post(f'/api/break/del?addr=0x{eip:x}')
+            installed.remove(eip)
             post('/api/step?n=1')
             post(f'/api/break/add?addr=0x{eip:x}')
+            installed.append(eip)
             post('/api/resume')
+            owned_trap = False
+    except Exception as exc:
+        failure = exc
+        raise
     finally:
+        errors = []
         for address in installed:
-            post(f'/api/break/del?addr=0x{address:x}')
-        p.emu.capture_active = False
-        # No blanket resume: an unexpected/user trap belongs to PM.
+            try:
+                post(f'/api/break/del?addr=0x{address:x}')
+            except Exception as exc:
+                errors.append(str(exc))
+        try:
+            # Verify actual debugger state, including deletions that failed.
+            remaining = sorted({int(bp['eip'], 16) for bp in get('/api/break')['breakpoints']}
+                               & set(watched.values()))
+            if remaining:
+                errors.append('remaining watched breakpoints: ' +
+                              ', '.join(f'0x{address:x}' for address in remaining) +
+                              '; PM must delete them manually before resume')
+            instance = get('/api/instance')
+            if instance['trap_pause'] or instance['user_pause']:
+                eip = int(get('/api/regs')['eip'], 16)
+                watched_trap = instance['trap_pause'] and eip in watched.values()
+                # Cleanup never synthesizes samples: a late event invalidates
+                # successful collection, even if we can release its trap safely.
+                if failure is None and watched_trap:
+                    errors.append('incomplete capture: unrecorded watched trap')
+                can_resume = (not remaining and instance['trap_pause'] and
+                              not instance['user_pause'] and (owned_trap or watched_trap))
+                if errors or not can_resume:
+                    errors.append(f"pause state: trap_pause={instance['trap_pause']}, "
+                                  f"user_pause={instance['user_pause']}, eip=0x{eip:x}")
+                if can_resume:
+                    post('/api/resume')
+        except Exception as exc:
+            errors.append(str(exc))
+        finally:
+            p.emu.capture_active = False
+        if errors:
+            message = 'capture cleanup failed: ' + '; '.join(errors)
+            if failure is not None:
+                message = str(failure) + '; ' + message
+            raise RuntimeError(message) from failure
     result['ended_at'] = time.time()
     return result
 
@@ -299,6 +352,7 @@ class Emulator:
     def read(self, address, size):
         reply = json.loads(self.client.get(
             f'/api/mem?addr=0x{address:x}&len={size}&space=phys'))
+        debug_reply(reply, '/api/mem')
         data = bytes.fromhex(reply['hex'])
         require(len(data) == size, 'short physical read')
         return data
@@ -309,10 +363,12 @@ class Emulator:
         require(reply.get('ok') is True, 'memory write rejected')
 
     def click(self, x, y, height):
-        self.client.post('/api/mouse', f'ax={(x * 65535 + 319) // 639}&ay={(y * 65535 + (height - 1) // 2) // (height - 1)}')
-        self.client.post('/api/mouse', 'btn=1')
+        position = (f'ax={(x * 65535 + 319) // 639}&'
+                    f'ay={(y * 65535 + (height - 1) // 2) // (height - 1)}')
+        debug_reply(json.loads(self.client.post('/api/mouse', position)), '/api/mouse')
+        debug_reply(json.loads(self.client.post('/api/mouse', 'btn=1')), '/api/mouse')
         time.sleep(0.4)
-        self.client.post('/api/mouse', 'btn=0')
+        debug_reply(json.loads(self.client.post('/api/mouse', 'btn=0')), '/api/mouse')
 
     def stop(self):
         reply = json.loads(self.client.post('/api/key', 'seq=CTRL%2BSTOP&hold=300'))

@@ -3519,6 +3519,8 @@ checks:
 
   check-h3-park-resume-host:
   # Layout validates current ELF calling convention and abort/landing sites.
+  # Includes ai-debug integer deletion status, late duplicate traps, remaining
+  # watched BP resume blocking, and trap/user pause + EIP cleanup diagnostics.
   - exec/exec.c
   - kernel/isr_stub.asm
   - exec/appslot.h
