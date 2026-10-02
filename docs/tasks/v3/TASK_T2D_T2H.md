@@ -754,6 +754,175 @@ d〜gの対象host/変異・独立レビューとNP21/W受入が揃って統合�
 
 manifestはkernel/loader/SDK/CRT/libs/shell/gshell/shlib/sh.bin/testsのhash/4世代/ビルドIDを固定。**apps/gameはv3でビルド対象外** ([ユーザー決定2026-09-30](../agents/HANDOVER_2026-09-30.md) §1/§3)。hの成果は外部callerの追随一覧 (lease/query/世代、低位直読撤去、heap/整列、再attach/trim、manifest)と、再開時の再構築・監査・guest受入ゲート。状態はPASSやh未完ではなく**決定による持越し**。外部集合の完全移行を実証したとは記さない。旧shellを起動して更新する手順にはしない [D1][D2][V1][V2]。媒体異常のあるNHDを無断修復せず、PMが健全な試験媒体を用意する (別件は§8)。
 
+#### h2 準備記録 (コーダー、2026-10-02)
+
+モデル: Codex gpt-6.1-sol (利用上限で完了報告前に停止)、レビュー対応は gpt-6-astra、`wt/t2h2`。**h2準備のみ完了、guest受入の証拠は未取得**。
+e (lease/gfx/SHM権限/KAPI) の実装・公開SDK/KAPI版は変更しない。
+
+- `userland/tests/h2_stack.c` を既定256KiB (`h2_stack.bin`、header要求0) と
+  明示512KiB (`h2_stack512.bin`、`mkos32x --stack 524288`) でビルド。
+  両方 `userland/deploy.yaml` の `/usr/bin/`、`[test]` に登録 [V2]。
+  512版は288KiBのvolatile自動配列 + 16KiB×8段の生きた再帰フレーム、
+  256版は96KiB + 16KiB×4段。各配列内の全pageと末尾へpatternを書き、
+  戻り時に照合する。任意のstack帯を掃引せずreturn frameを壊さない。
+  深い段でargc/argvの `h2-arg` を検査し、待機後にも再検査する。
+- モードは `run|park|guard h2-arg`。`park` は深いフレームを保持して
+  GUI窓を作り、生成時のringをPOLL/消費して `GUI_OP_WAIT(100 ticks)`、
+  復帰後全フレーム/配列/argvを検査。
+  `h2_stack_probe.h/.inc` のwait callbackをh3が再利用できる。
+  この窓はh3のSHM `{magic,owner,generation,phase,mode}`/arm台本を代用しない。
+  WAITの戻りや `H2 resume` の文字だけではpark成功に数えない。
+  `guard` はpattern/argv照合後、各版の
+  `MEM_APP_STACK_TOP - 実stack量 - MEM_GUARD_SIZE` へUSER byte write、PF error=6を期待。
+  `H2 entry`、pages/span/low/high、guard番地、`H2 exit OK`を出す。
+  exit行は回収前の観測印で、owner0の実測成功を自己申告しない。
+- `make h2-fixtures < /dev/null` → `build/out/h2-isolated/`。
+  現在の正規ビルドを壊す専用生成器 `tools/gen_h2_fixtures.py` を明示targetだけで起動。
+  **通常deploy・package・NHDの入力に登録しない**。成果物は `.fixture` と
+  source/size/SHA-256/期待理由の `manifest.json`。
+  正常controlはapp/shell/shlib/依存GUI appの4本。
+  拒否用は `old-app` / `old-shell` / `old-shlib` (**合成した旧形式ヘッダ**: 現在の
+  フィールドからversion/header_sizeを戻した48B v3 header + 元body。実際の旧版成果物ではない)、
+  `unknown-format` / `bad-abi-generation` / `bad-memory-generation` /
+  `bad-shlib-generation` / `bad-shell-generation` / `old-cpl0-flag` の9本。
+  不正世代を強制したguest用fixtureと、新SDK+旧.oを拒否するhost証拠を分ける。
+  古い有効印を捏造する包装口は追加しない。
+- `check-h2-fixtures-host` を `CHECK_PAR_TARGETS`、`tools/check_map.yaml` と
+  生成 `docs/TESTS.md` に登録。ホストはビルド済header/deploy 2版、
+  一時dirだけに生成したfixtureのhash、試験側の固定13行表 (名前→期待rc) と
+  recordsのキー集合一致、実 `os32x_layout_check` のILP32 admission (4 control/9拒否)、
+  新SDK+刻印なし旧.oのlink_guard拒否・ELF削除とmkos32x拒否 (2判定) を検査。
+  `build/out/h2-isolated` の有無・鮮度には依存しない (PM決定b)。
+  共通 `h2_plan` を256/512KiBで呼ぶ2ケースで配列量/段数/guard番地を検査、
+  共通の起動argc判定3ケース、両サイズのlive-frame各6ケース (正常、argc/token、
+  復帰時frame/argv/外側array破損) を実行。計34ケース。
+  ILP32実行はすべて `tools/tests/host32.py`、`HOST32_RUNNERS=qemu`。
+  13変異は置換数をすべて1箇所に固定し、**13/13 runtime RED**、compile失敗0。
+  大小arrayを独立に壊し、512版の配列選択/大小depth/guard減算/起動argcも検出。
+  両ELFにmemmap/GUI共有ヘッダの依存を追加 (userlandの.dは読まれない)。
+
+**PM台本 (最終d〜g一式の同一hashで再生成・再実行する)**:
+
+1. 正常一式の `make all < /dev/null` → `make h2-fixtures < /dev/null` の直後に、
+   `build/out/h2-isolated/manifest.json` の全項目について生成物のbytes/SHA-256を照合する。
+   例: `python3 -c 'import pathlib,json,hashlib; p=pathlib.Path("build/out/h2-isolated"); m=json.loads((p/"manifest.json").read_text()); assert all(len((p/n).read_bytes())==r["bytes"] and hashlib.sha256((p/n).read_bytes()).hexdigest()==r["sha256"] for n,r in m.items())'`。
+   rc=0を記録してmanifestを保管。入力を再buildしたら生成・照合もやり直す。
+   old-app/old-shell/old-shlibは「合成した旧形式ヘッダ」と記録する。
+   健全な隔離試験媒体のコピーにPMが1ケースずつ載せる [D1][D2][V1]。
+   `.fixture` は運用名へPMがコピーするだけで再包装しない。
+   初回control後に異常を載せ、各ケース後に正常一式へ戻す。
+   hash/build IDと新kernel.map/nm・対応control ELFを使い、入口 `_start`
+   (headerのload+entry、shlib関数は対象jump entry) のbreakpoint/trace hitを数える。
+   カーネルに未実装のentryカウンタがあるとは仮定しない。
+2. Stack: CUIで `h2_stack run h2-arg` / `h2_stack512 run h2-arg`。
+   pattern/argv OK、pages=40/104、512版span>256KiB、終了rc=0。
+   起動中に `g_slot` の当該AS ownerを控え、exit後 `ledger_owners[owner].pages=0`
+   (owner退役後は同番号の空き)、leftover/depth=0、次の起動成功を確認。
+   `H2 exit OK`のみでowner0としない。GUIでは **GUI端末 (t5a_display)** のコマンド欄から
+   `/usr/bin/h2_stack.bin park h2-arg` / `/usr/bin/h2_stack512.bin park h2-arg` を実行する。
+   ソース確認: `t5a_display/src/guest.rs` の `launch_req(cmdline)` → gshell
+   `drain_launch_requests` → `run_program` → `exec_start` → `exec_launch(cmdline,1)`。
+   CUIビルドでもこの経路はAppSlot.gui=1。同期CUIのexec_runではgui=0で
+   `appslot_park_check` が拒否する。Start→Runは引数列が対象外なので使わない。
+   別のreadyな窓/端末を残し、WMのshould_park条件を満たすことを確認する。
+   起動経路はソース上で確認済み、実PARKEDは未実測。
+   当該slotのPARKED状態と `ring3_switch_count` の復帰増分を確認してから
+   resume出力・pattern/argv・回収を確認。
+   `api->shm_base` からGUI slotのrequest/ringを直接読み書きする箇所は、
+   eのSHM権限変更・低位直読撤去後に再確認し、hの最終一式で再検証する。h3の2窓/SHM固定mode台本へhelperを接続する。
+   両版の `guard h2-arg` は表示番地のCR2・PF error=6、fault_kill_count+1、
+   SURVIVED行なし、同owner回収/次起動成功。正常終了とfaultを別に記録。
+3. App: `/test/h2/control-app.bin` と各app用破損fixtureを `/test/h2/*.bin` に置く。
+   controlを `run h2-arg` で1回起動、entry差分+1/正常終了。
+   old-app/unknown-format/bad-abi-generation/bad-memory-generation/old-cpl0-flagは
+   1回ずつ起動、entry差分0・拒否理由とrc、AS/ownerの取り残し0。
+   H2出力が無いだけで入口前拒否としない。拒否理由はformat/flags又はgeneration。
+4. Shell: 起動前からcontrol-shellの入口traceを準備。隔離媒体の `/sys/shell.bin`
+   だけをold-shell / bad-shell-generationへ1ケースずつ置換して初回boot。初回entry=0、各format/generation拒否の停止理由と画面、
+   停止継続を記録。旧shellを起動して更新しない。正常shell controlは初回entry+1。
+5. Shlib: 毎回cold bootの隔離媒体で `/sys/lib/libos32gui.shlib` だけを
+   old-shlib / bad-shlib-generationに置換。既ロード状態からの差替えでは試さない。
+   `g_loaded=0`、`g_reject=SHLIB_REJECT_LAYOUT`、共有text/関数未公開、
+   control-dependent (gui_demo) を明示起動してentry差分0。
+   正常shlib controlはg_loaded=1、依存app entry+1と正常描画。
+   単なる起動失敗/未ロードでのPFをshlib拒否証拠にしない。
+6. 新SDK+旧.oはhostのlink/包装拒否・guest binary未生成を合格証拠とする。
+   `bad-*-generation.fixture` のguest拒否とは別行に記録する。
+   h2のguest証拠は準備時点には無く、f/h受入とh3接続はPMが最終一式で取り直す。
+
+**実行記録**: PATHに `/home/hight/opt/cross/bin`、`CROSS_DIR=/home/hight/opt/cross`、
+`TMPDIR=/home/hight/os32-tmp`、`PYTHONPATH=`、`HOST32_RUNNERS=qemu`。
+`NP21W_DIR=/home/hight/os32-tmp/h2-unused-np21w-destination` は存在しない出力先へ限定し、
+FD copy警告を確認 (実NP21/W・NHD・配備・ini・実機、commit/pushは未操作)。
+初回fixture単独buildと最初のallは既存未生成libos32saveでrc=2。
+`make libs < /dev/null` rc=0。次のallは未取得フォントの非対話同意待ちでrc=2。
+[既存手順](../agents/HANDOVER_2026-09-30.md)に従ってmain worktreeの正規TTFをコピーし、
+取得器の固定hash確認後、`CROSS_DIR=/home/hight/opt/cross make all < /dev/null` **rc=0**
+(`h2-all-ready.log`)。`make h2-fixtures < /dev/null`、
+`python3 -B tools/tests/test_h2_fixtures.py --mutate` は各rc=0 (`h2-fixtures-{build,test}.log`)。
+`python3 tools/gen_memmap.py --write` rc=0 (最初はkernel.map未生成で失敗、all後に再実行)。
+`python3 tools/check_select.py --lint` rc=0。
+ログは `/home/hight/os32-tmp/`。既存GNU-stack/RWX/Rust警告あり。
+前回PM検査: ホストで `make all` / lint / `make check-changed` (native qemu) はrc=0。
+ただし `make h2-fixtures` を先に流した木であり、clean出力の保証にはならなかった。
+
+**レビュー対応の検査記録 (gpt-6-astra)**:
+- 同じ環境変数と未存在NP21W_DIRを使用。`make all < /dev/null` rc=0
+  (`h2-review-all.log`)、FD copyは失敗警告で実環境には触れていない。
+- `python3 -B tools/tests/test_h2_fixtures.py --mutate` rc=0、13/13 runtime RED。
+- clean clone全体buildは、初回のlibs/フォント準備を含む再buildを避けるため省略。
+  許可された代替として `/home/hight/os32-tmp/h2-clean-wwinx0ct/repo` にgit cloneし、
+  今回の変更とallで得た必要な5入力binaryだけをコピー、**build/outにファイルが無い**状態で
+  `CROSS_DIR=/home/hight/opt/cross HOST32_RUNNERS=qemu make check-h2-fixtures-host < /dev/null`
+  rc=0 (変異13本込み、`h2-review-clean.log`)。h2-fixturesは未実行。
+  最初の補助スクリプトはmakeが空のbuild/out/libを作るため「directoryも無い」という
+  事後assertだけ失敗 (対象試験自体は成功)。ファイル不在判定に直して再実行rc=0。
+- `python3 tools/gen_memmap.py --write` rc=0、
+  `python3 tools/gen_tests_inventory.py --write` rc=0。
+  `python3 tools/check_select.py --lint` はinclude/types.h登録漏れで初回rc=1、追加後rc=0。
+- レビュー修正後の `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4
+  TMPDIR=/home/hight/os32-tmp HOST32_RUNNERS=qemu make check-changed < /dev/null` は
+  **rc=0** (`h2-review-check-changed-pre.log`)。build規則変更により全検査・全変異へ拡大。
+  h2は34ケース/13変異、13/13 runtime RED。既存Windows opt-in試験は計9件skip
+  (PowerShell temporary fixtures 4件が単独/まとめ検査で2回、Windows parser 1件)。
+  検査中の票/ソース編集なし。
+  結果記録後の最終検査はskip内訳の誤記に気付きCtrl-Cで中断 (rc=130)。
+  停止完了後に内訳だけを訂正し、票を固定して同じコマンドで最終検査を再実行する。
+  最終 **rc=0 (full、skip 9件)**。内訳はPowerShell temporary fixtures 4件が
+  単独/まとめ検査で各1回 (計8件)、Windows parser 1件。
+  `h2-review-check-changed-final.rc` と同名の `.log` で確認済み
+  (ともに `/home/hight/os32-tmp/`、票は最終検査前に記入完了)。
+- guest/native実行、e後のSHMアクセス、最終d〜g一式での受入とh3接続は未実施。
+  NP21/W・NHD・配備・ini・実機、commit/pushは未操作。
+
+**再レビュー Approve / P3 3件の対応 (Codex gpt-6.1-sol、2026-10-02)**:
+- h2準備の範囲のみ。P3-1は前回最終rc=0とfull/skip内訳を実ログで確定。
+  P3-2は `H2_STACK512_BYTES := 524288` をコンパイルと包装で共有。
+  `test_built` は両版のguard絶対書込み即値を、headerのstack_size
+  (要求0ならMEM_EXEC_STACK_SIZE) とmemmapから求める番地へ照合する。
+  既定版の中間 `.raw` はmakeが削除するため、包装済みheader後の同一bytesを読む。
+  P3-3は生成側と同じhashを再計算する照合を削除し、書き出したmanifestの
+  expected理由3種→rc (0/2/3) が固定13項目の表と一致することを検査。
+- 環境は上記と同じ。`CROSS_DIR=/home/hight/opt/cross make all < /dev/null`
+  rc=0 (`h2-p3-all.log`)。h2単独試験は最初にmakeによる中間raw削除でrc=1、
+  包装済みbytesを読む形へ修正後、`python3 -B tools/tests/test_h2_fixtures.py --mutate`
+  rc=0 (`h2-p3-fixtures.log`)。**36ケース/13変異、13/13 runtime RED、
+  置換各1箇所、compile失敗0**。ILP32実行は全てhost32.py/qemu経由。
+- 既存 `check-h2-fixtures-host` の `tools/check_map.yaml` 登録を使用。
+  `python3 tools/gen_memmap.py --write`、
+  `python3 tools/gen_tests_inventory.py --write`、
+  `python3 tools/check_select.py --lint` は各rc=0 (116本、対応表漏れ0件)。
+- `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp
+  HOST32_RUNNERS=qemu make check-changed < /dev/null` **rc=0 (full、skip 9件)**
+  (`h2-p3-check-changed-pre.log/.rc`)。内訳は上記と同じ8+1。
+  検査中の票/ソース編集なし。この結果記入後も票/ソースを固定し、同条件の最終検査を行う。
+  最終実行 (コーダーの sandbox、qemu) は rc=0 (full、skip 9 件、`h2-p3-check-changed-final.log/.rc`)。
+  独立レビュー (Opus 5.5) は P3 対応の差分確認でも Approve。PM のホストでの native を含む結果は着地の記録に書く。
+**h2準備の PM 検査 (2026-10-02)**: PM のホスト (PYTHONPATH なし、既定 `HOST32_RUNNERS=native qemu`) で `make all`・`check_select --lint`・`check-changed` すべて rc=0 (`/home/hight/os32-tmp/pmf-h2-{all,cc}.log`)。ゲストでの採取・受入は最終一式で行う (準備の段)。
+- 公開KAPI・sdk/kapi.json・KAPI版・eのlease/gfx/SHM権限実装は変更なし。
+  guest/native・e後のSHMアクセス・最終一式の受入とh3接続はPMへ申し送り。
+  NP21/W・NHD・配備・ini・実機、commit/pushは未操作。
+
 ### 5-2. 未実施項目の担当と合格証拠
 
 | 未実施 / 初回に閉じる段 | 具体的な準備・合格条件 |

@@ -1141,7 +1141,8 @@ CHECK_PAR_TARGETS := check-shlib-high-host check-bootinfo-host check-hdd-stage1-
     check-surface-query-host \
     check-nano-inputs-host \
     check-surface-lease-host \
-    check-cirrus-win-host check-pegc-mode-host
+    check-cirrus-win-host check-pegc-mode-host \
+    check-h2-fixtures-host
 check-par: $(CHECK_PAR_TARGETS)
 
 # エディタ GUI 版の本文と libos32gui の桁・折り返し (票 TASK_EDIT_GUI 受入 E8 / E10)。
@@ -1223,3 +1224,7 @@ check-surface-lease-host:
 	$(if $(MUT),python3 -B tools/tests/test_surface_lease.py --runner $(firstword $(HOST32_RUNNERS)) $(MUT),@:)
 
 .PHONY: check-surface-lease-host
+
+.PHONY: check-h2-fixtures-host
+check-h2-fixtures-host:
+	python3 -B tools/tests/test_h2_fixtures.py $(MUT)
