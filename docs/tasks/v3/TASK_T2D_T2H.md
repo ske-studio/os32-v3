@@ -1166,6 +1166,12 @@ caller-copy は 17/17 runtime RED、C 方言は 27/27 RED・正常対照 5/5 GRE
 
 
 
+## 10-12. d4 の着地とゲスト受入 (PM、2026-10-02、NP21/W 17MB、main `f38afad`)
+
+独立レビュー Opus 5.5 は P1・P2 なしで Approve (d5 で接続したときに到達する反例もなし)。P3-1 (RO の write-range 拒否の試験の穴) と P3-2 (NP 拒否の写し先の不変の確認) はコーダー (sol) が対応 (変異 17/17 実行時 RED)、P3-3〜5 は §10-11 の d5 への申し送り (cstr の IRQ 区間の長さの計測、len / cap の上限をラッパーごとに明示、staging を SHM に置かない)。予算: d の枠の残り 2,012B、ASSERT 残り 36,624B。新しい 4 関数は d5 まで呼び出し元が無い。
+
+ゲスト (17MB、今の ini — §12): kselftest 0 fail、`klibc_test` 49/49、`alloc_demo` 16/16、`ring3_fault` kill、`ls / | wc -l` = 54、`echo abc | wc -c` = 4、`d0a_test` 全行 OK、faulttest 一式・V86・GUI (gui_demo → CUI) 従来どおり。`ring3_caller_reject_count` = 0、`redir_refuse_count` = 0、kill 8 件はすべて意図したもの、取り残し 0、深さ 0。
+
 ## 11. 独立レビュー 2 回目 (Opus 5.5、Approve) の P3 — 実装時の注記
 
 2026-10-01、`3180a51` の差分に対して Approve (P1 2 件・P2 11 件はすべて閉)。以下の 5 件は設計の変更ではなく、実装時に従う注記 (PM 記入)。
