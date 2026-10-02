@@ -1480,6 +1480,12 @@ Opus 5.5の差分再レビュー、下のゲスト確認。現時点で受入完
 
 NP21/W・NHD・配備・ini・実機・commit/push は未実施。
 
+**着地とゲスト受入 (PM、2026-10-03、main `9897cf4`、NP21/W 17MB・今の ini)**: 独立レビュー (Opus 5.5) は 1 回目 Request changes (P2 2 件・P3 10 件) → 2 回目 Approve (P3 3 件) → P3 対応の差分確認で Approve。PM のホスト (既定 `HOST32_RUNNERS=native qemu`) で `make all`・lint・`check-changed` rc=0 (1 回目は既存試験 test_caller_access の足場の追従漏れで rc=2 → 直して rc=0)。main へ取り込み (TESTS.md の競合は生成器で解消)、`make all`・`make check` rc=0。停止 → 停止確認 → `nhd-pull` → `deploy-kernel` → `deploy` → 起動。`ver` の Commit `9897cf4`、`/boot/vmkernel.lz4` 481,335 B 一致。`deploy-kernel` の prune で `/usr/bin/faultprobe_r3.bin` が刈られ、ゲストの `ls` で無いことを確認 (`faultprobe.bin` は残る)。kselftest pass 270 / fail 0、db・klibc・alloc・d0a・faulttest 4 種・STOP・V86 は従来どおり。
+- **GUI KAPI-loop の STOP (受入の中心)**: h3a/h3b を起動・init、h3a に台本で `arm --mode KAPI-loop` (台本は 30 秒の窓で STOP を送れず止まった — 既知の時間窓の問題、後始末は正常)。SHM の phase=6 (FIRING) で h3a (app 2) が `g_cur`・RUNNING・`in_op_wait=0`。CTRL+STOP を 1 回 → 2 秒後に h3a の slot は FREE、`appslot_reclaim_count` 14→15 (+1、last=2)、**`ring3_stop_park_count` 0→1** (案 A の退避経路)、`fault_kill_count`・`ring3_abort_count` は不変 (h3 の経路 A / wm-kill と一致)。h3b は生存し前景になり、WM が回る (時計が進む)。修正前 (`4693a62`) は同じ操作で 70 秒たっても畳まれず GUI 全体が固まっていた。
+- **通常の STOP (S6)**: h3a を起動し直して前景のまま (OP_WAIT 中) CTRL+STOP → `appslot_reclaim_count` +1 だけ、h3b は生存。
+- **USER-loop の STOP と二重 kill**: h3a を起動し直し、h3b を前景にして、h3a の SHM block に mode=USER-loop・arm=1 だけを書き (台本の arm は「OP_WAIT park でない」で断ったので、台本と同じ書き方で PM が直接書いた観測 — 受入の PASS 判定ではない)、h3a のタイトルをクリックして FIRING。1 回目の CTRL+STOP は FIRING から約 1 秒で、暴走の判定 (200 tick) の前だったため何も起きない (修正前からの挙動)。2 回目の STOP で `fault_kill_count` 7→8 (R1 経路)、`appslot_reclaim_count` 16→17 (**+1 だけ**)、**h3b は生存**。修正前 (`8bea831`) は同じ形で `appslot_reclaim_count` +2 (h3b も kill) だった — 二重 kill は解消。
+- 残り: 台本の捕捉の時間窓 (fixture の 5 秒の猶予がホストの 30 秒を超える) と arm の park 判定 (2 本とも OP_WAIT のとき PARKED にならない) は h の最終一式までに台本側で直す。打鍵を重ねた後の STOP、前景以外の張本人、park 中 WM kill の対照は h の最終一式で取る。
+
 ## 6. 予算・ホスト試験の重さ
 
 ### 6-1. 予算ゲート (設計上の配分、未測定)
