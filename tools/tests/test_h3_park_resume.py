@@ -34,6 +34,18 @@ def module(path):
 h3 = module(ROOT / 'tools/h3_park_resume.py')
 
 
+def http_success(path):
+    endpoint = path.split('?')[0]
+    reply = {'ok': True}
+    if endpoint == '/api/break/del':
+        reply = dict(ok=1, removed=1)
+    elif endpoint == '/api/break/add':
+        reply.update(slot=0, eip=path.split('=')[1])
+    elif endpoint == '/api/step':
+        reply.update(trap_pause=1, cs='0x0008', eip='0x00000069')
+    return json.dumps(reply)
+
+
 class FakeEmulator:
     def __init__(self):
         self.mem = bytearray(0x40000)
@@ -252,10 +264,10 @@ class Tests(unittest.TestCase):
                 calls.append(('get', path))
                 if path == '/api/instance':
                     return json.dumps(dict(ok=True, trap_pause=False, user_pause=False))
-                return json.dumps(dict(hex='01000000'))
+                return json.dumps(dict(ok=True, addr='0x1234', len=4, space='phys', hex='01000000'))
             def post(self, path, body=None):
                 calls.append(('post', path, body))
-                return '{"ok":true}'
+                return http_success(path)
         emu = h3.Emulator.__new__(h3.Emulator)
         emu.client = Client(); emu.freeze_depth = 0
         with emu.freeze():
@@ -459,18 +471,18 @@ class Tests(unittest.TestCase):
         class Client:
             def get(self, path):
                 calls.append(path)
-                if path == '/api/break': return '{"breakpoints":[]}'
+                if path == '/api/break': return '{"ok":true,"breakpoints":[]}'
                 if path == '/api/instance':
-                    return json.dumps(dict(trap_pause=bool(frames) and len(calls)>2, user_pause=False))
+                    return json.dumps(dict(ok=True, trap_pause=bool(frames) and len(calls)>2, user_pause=False))
                 if path == '/api/regs':
                     site, pending = frames[0]
                     parent.emu.word(parent.s['g_pending_id'], pending)
-                    return json.dumps(dict(eip=hex(parent.p.layout['trace_sites'][site]), eax='0x2'))
+                    return json.dumps(dict(ok=True, eip=hex(parent.p.layout['trace_sites'][site]), eax='0x2'))
                 raise AssertionError(path)
             def post(self, path):
                 calls.append(path)
                 if path == '/api/resume': frames.pop(0)
-                return '{"ok":true}'
+                return http_success(path)
         self.emu.client = Client()
         with patch.object(h3.time, 'monotonic', side_effect=range(100)):
             capture = h3.capture_trace(self.p, case, seconds=8)
@@ -531,16 +543,16 @@ class Tests(unittest.TestCase):
         class Client:
             def get(self, path):
                 calls.append(path)
-                if path == '/api/break': return '{"breakpoints":[]}'
+                if path == '/api/break': return '{"ok":true,"breakpoints":[]}'
                 if path == '/api/instance':
-                    return json.dumps(dict(trap_pause=bool(frames) and len(calls)>2, user_pause=False))
+                    return json.dumps(dict(ok=True, trap_pause=bool(frames) and len(calls)>2, user_pause=False))
                 if path == '/api/regs':
                     parent.emu.word(0x7004, frames[0])
-                    return json.dumps(dict(eip='0x68', eax='0x63', esp='0x7000'))
+                    return json.dumps(dict(ok=True, eip='0x68', eax='0x63', esp='0x7000'))
                 raise AssertionError(path)
             def post(self, path):
                 if path == '/api/resume': frames.pop(0)
-                return '{"ok":true}'
+                return http_success(path)
         self.emu.client = Client()
         with patch.object(h3.time, 'monotonic', side_effect=range(100)):
             capture = h3.capture_trace(self.p, case, seconds=6)
@@ -647,16 +659,196 @@ class Tests(unittest.TestCase):
         class Client:
             def get(self, path):
                 calls.append(path)
-                if path == '/api/break': return '{"breakpoints":[]}'
-                return json.dumps(dict(trap_pause=False, user_pause=calls.count('/api/instance')>1))
+                if path == '/api/break': return '{"ok":true,"breakpoints":[]}'
+                return json.dumps(dict(ok=True, trap_pause=False, user_pause=calls.count('/api/instance')>1))
             def post(self, path):
                 calls.append(path)
-                return '{"ok":true}'
+                return http_success(path)
         self.emu.client = Client()
         with self.assertRaisesRegex(RuntimeError, 'user pause during capture'):
             h3.capture_trace(self.p, case)
         self.assertNotIn('/api/resume', calls)
         self.assertEqual(sum('/api/break/del' in path for path in calls), 5)
+        self.assertFalse(self.emu.capture_active)
+
+    def test_delete_integer_status_contract(self):
+        path = '/api/break/del?addr=0x143364'
+        self.assertEqual(h3.debug_reply(dict(ok=1, removed=1), path)['removed'], 1)
+        for reply in (dict(ok=0, removed=0), dict(ok=1, removed=0),
+                      dict(ok=1), dict(ok=True, removed=1),
+                      dict(ok='1', removed=1), dict(ok=1.0, removed=1),
+                      dict(ok=2, removed=1), dict(ok=1, removed=True)):
+            with self.subTest(reply=reply), self.assertRaises(RuntimeError):
+                h3.debug_reply(reply, path)
+        for path in ('/api/instance', '/api/pause', '/api/resume', '/api/mem',
+                     '/api/break', '/api/break/add?addr=0x68', '/api/step?n=1',
+                     '/api/regs', '/api/key', '/api/mouse'):
+            self.assertEqual(h3.debug_reply(dict(ok=True), path), dict(ok=True))
+            for ok in (False, 0, 1, 'true', None):
+                with self.subTest(path=path, ok=ok), self.assertRaises(RuntimeError):
+                    h3.debug_reply(dict(ok=ok), path)
+
+    def test_capture_cleanup_attempts_all_and_resumes_owned_trap(self):
+        case = self.p.arm(self.ident, 6)
+        calls = []
+        parent = self
+        class Client:
+            trap = False
+            def get(self, path):
+                if path == '/api/break': return http_success(path)[:-1] + ',"breakpoints":[]}'
+                if path == '/api/instance':
+                    return json.dumps(dict(ok=True, trap_pause=self.trap, user_pause=False))
+                if path == '/api/regs':
+                    return json.dumps(dict(ok=True, eip=hex(parent.p.layout['trace_sites']['resume_pending']), eax='0x2'))
+                raise AssertionError(path)
+            def post(self, path):
+                calls.append(path)
+                if '/api/break/del' in path and sum('/api/break/del' in c for c in calls) == 1:
+                    return '{"ok":0,"removed":0}'
+                if path == '/api/resume': self.trap = False
+                return http_success(path)
+        client = self.emu.client = Client()
+        def start():
+            client.trap = True
+            raise RuntimeError('capture body failed')
+        with self.assertRaisesRegex(RuntimeError, 'capture body failed; capture cleanup failed'):
+            h3.capture_trace(self.p, case, start=start)
+        self.assertEqual(sum('/api/break/del' in c for c in calls), 5)
+        self.assertIn('/api/resume', calls)
+        self.assertFalse(client.trap)
+        self.assertFalse(self.emu.capture_active)
+
+    def test_capture_step_failure_resumes_changed_pc(self):
+        case = self.p.arm(self.ident, 6)
+        calls = []
+        parent = self
+        class Client:
+            trap = False
+            pc = parent.p.layout['trace_sites']['resume_pending']
+            def get(self, path):
+                if path == '/api/break': return '{"ok":true,"breakpoints":[]}'
+                if path == '/api/instance': return json.dumps(dict(ok=True, trap_pause=self.trap, user_pause=False))
+                if path == '/api/regs': return json.dumps(dict(ok=True, eip=hex(self.pc), eax='0x2'))
+                raise AssertionError(path)
+            def post(self, path):
+                calls.append(path)
+                if path == '/api/step?n=1':
+                    self.pc = 999
+                    raise RuntimeError('step failed')
+                if path == '/api/resume': self.trap = False
+                return http_success(path)
+        client = self.emu.client = Client()
+        with self.assertRaisesRegex(RuntimeError, 'step failed'):
+            h3.capture_trace(self.p, case, start=lambda: setattr(client, 'trap', True))
+        self.assertEqual(sum('/api/break/del' in c for c in calls), 5)
+        self.assertIn('/api/resume', calls)
+        self.assertFalse(client.trap)
+        self.assertFalse(self.emu.capture_active)
+
+    def test_capture_preserves_unowned_trap(self):
+        case = self.p.arm(self.ident, 6)
+        calls = []
+        class Client:
+            trap = False
+            def get(self, path):
+                if path == '/api/break': return '{"ok":true,"breakpoints":[]}'
+                if path == '/api/instance': return json.dumps(dict(ok=True, trap_pause=self.trap, user_pause=False))
+                if path == '/api/regs': return '{"ok":true,"eip":"0x999"}'
+                raise AssertionError(path)
+            def post(self, path):
+                calls.append(path)
+                return http_success(path)
+        client = self.emu.client = Client()
+        with self.assertRaisesRegex(RuntimeError, 'unowned debugger trap'):
+            h3.capture_trace(self.p, case, start=lambda: setattr(client, 'trap', True))
+        self.assertEqual(sum('/api/break/del' in c for c in calls), 5)
+        self.assertNotIn('/api/resume', calls)
+        self.assertTrue(client.trap)
+        self.assertFalse(self.emu.capture_active)
+
+    def cleanup_client(self, *, site='wm_kill', late=False, failed=(), user=False):
+        parent = self
+        class Client:
+            trap = False
+            user_pause = False
+            bps = set()
+            calls = []
+            deletes = 0
+            def get(self, path):
+                self.calls.append(path)
+                if path == '/api/break':
+                    return json.dumps(dict(ok=True, breakpoints=[dict(eip=hex(a)) for a in sorted(self.bps)]))
+                if path == '/api/instance':
+                    return json.dumps(dict(ok=True, trap_pause=self.trap, user_pause=self.user_pause))
+                if path == '/api/regs':
+                    return json.dumps(dict(ok=True, eip=hex(parent.p.layout['trace_sites'][site]),
+                                           eax='0x2', esp='0x7000'))
+                raise AssertionError(path)
+            def post(self, path):
+                self.calls.append(path)
+                if path.startswith('/api/break/add'):
+                    self.bps.add(int(path.split('=')[1], 16))
+                if path.startswith('/api/break/del'):
+                    self.deletes += 1
+                    # First deletion executes the sampled instruction; later ones are cleanup.
+                    if late and self.deletes == 2:
+                        self.trap = True
+                        self.user_pause = user
+                    addr = int(path.split('=')[1], 16)
+                    if addr in failed:
+                        return '{"ok":0,"removed":0}'
+                    self.bps.remove(addr)
+                if path == '/api/resume': self.trap = False
+                return http_success(path)
+        self.emu.word(0x7004, 2)
+        return Client()
+
+    def test_capture_late_duplicate_is_incomplete(self):
+        for site in ('wm_kill', 'syscall_abort'):
+            for finish in ('deadline', 'advance'):
+                with self.subTest(site=site, finish=finish):
+                    client = self.emu.client = self.cleanup_client(site=site, late=True)
+                    with patch.object(h3.time, 'monotonic', side_effect=range(100)):
+                        with self.assertRaisesRegex(RuntimeError, 'incomplete capture: unrecorded watched trap'):
+                            h3.capture_trace(self.p, dict(case_id='late'),
+                                seconds=2 if finish == 'deadline' else 10,
+                                start=lambda: setattr(client, 'trap', True),
+                                advance=(lambda: True) if finish == 'advance' else None)
+                    self.assertEqual(client.calls.count('/api/step?n=1'), 1)
+                    self.assertEqual(client.calls.count('/api/resume'), 2)
+                    self.assertEqual(client.bps, set())
+                    self.assertFalse(self.emu.capture_active)
+
+    def test_capture_remaining_breakpoints_prevent_resume(self):
+        remaining = (101, 104)
+        client = self.emu.client = self.cleanup_client(failed=remaining)
+        def start():
+            client.trap = True
+            raise RuntimeError('capture body failed')
+        with self.assertRaises(RuntimeError) as caught:
+            h3.capture_trace(self.p, dict(case_id='remaining'), start=start)
+        message = str(caught.exception)
+        for part in ('capture body failed', 'remaining watched breakpoints: 0x65, 0x68',
+                     'PM must delete them manually before resume',
+                     'trap_pause=True', 'user_pause=False', 'eip=0x68'):
+            self.assertIn(part, message)
+        self.assertEqual(client.deletes, 5)
+        self.assertEqual(client.bps, set(remaining))
+        self.assertNotIn('/api/resume', client.calls)
+        self.assertFalse(self.emu.capture_active)
+
+    def test_capture_reports_combined_pause(self):
+        client = self.emu.client = self.cleanup_client()
+        def start():
+            client.trap = client.user_pause = True
+            raise RuntimeError('capture body failed')
+        with self.assertRaises(RuntimeError) as caught:
+            h3.capture_trace(self.p, dict(case_id='pause'), start=start)
+        for part in ('capture body failed', 'trap_pause=True', 'user_pause=True', 'eip=0x68'):
+            self.assertIn(part, str(caught.exception))
+        self.assertNotIn('/api/resume', client.calls)
+        self.assertTrue(client.trap and client.user_pause)
+        self.assertEqual(client.bps, set())
         self.assertFalse(self.emu.capture_active)
 
     def test_capture_freeze_races(self):
@@ -685,17 +877,17 @@ class Tests(unittest.TestCase):
         parent = self
         class Client:
             def get(self, path):
-                if path == '/api/break': return '{"breakpoints":[]}'
+                if path == '/api/break': return '{"ok":true,"breakpoints":[]}'
                 if path == '/api/instance':
-                    return json.dumps(dict(trap_pause=bool(frames), user_pause=False))
+                    return json.dumps(dict(ok=True, trap_pause=bool(frames), user_pause=False))
                 if path == '/api/regs':
-                    return json.dumps(dict(eip='0x68', eax='0x63', esp='0x7000'))
+                    return json.dumps(dict(ok=True, eip='0x68', eax='0x63', esp='0x7000'))
                 raise AssertionError(path)
             def post(self, path):
                 if path.startswith('/api/break/add'): bps.add(path.split('=')[1])
                 if path.startswith('/api/break/del'): bps.discard(path.split('=')[1])
                 if path == '/api/resume': frames.pop(0)
-                return '{"ok":true}'
+                return http_success(path)
         self.emu.client = Client()
         self.emu.word(0x7004, 2)
         def click():
@@ -813,6 +1005,22 @@ PY_MUTANTS += [
     ("fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)", "pass", 1),
     ("if start:\n            start()", "if False:\n            start()", 1),
     ("for delay in (2, 10):", "for delay in (10,):", 1),
+]
+
+
+PY_MUTANTS += [
+    ("type(reply.get('ok')) is int and reply['ok'] == 1", "reply.get('ok') is True", 1),
+    ("type(reply.get('removed')) is int and reply['removed'] == 1", "True", 1),
+    ("errors.append(str(exc))\n        try:", "errors.append(str(exc)); break\n        try:", 1),
+    ("if can_resume:", "if False:", 1),
+]
+
+
+PY_MUTANTS += [
+    ("if failure is None and watched_trap:", "if False:", 1),
+    ("not remaining and instance['trap_pause']", "instance['trap_pause']", 1),
+    ("if remaining:", "if False:", 1),
+    ("if errors or not can_resume:", "if False:", 1),
 ]
 
 

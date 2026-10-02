@@ -980,6 +980,95 @@ mode=1 pf (#PF14)、2 gp (HLT/#GP13)、3 de (DIV0/#DE0)、4 ud (UD2/#UD6)、
 5 USER-loop、6 KAPI-loop。arm は RESUMED 後に0へ戻し consumed を1へ。
 不正 mode / 二度目の arm は発火させない。任意アドレス書込み口を製品に追加していない。
 
+**h3 台本 HTTP 応答・後始末修正 (2026-10-02、Codex gpt-6.1-sol、wt/h3fix、基点 e1c213b)**:
+実装対象は `tools/h3_park_resume.py` と `tools/tests/test_h3_park_resume.py`。
+PM の KAPI-loop 捕捉が個別 breakpoint 削除の `{"ok":1,"removed":1}` を
+`is True` で拒否した不具合を修正。e の lease/gfx/SHM 権限・公開 KAPI/JSON/版は変更なし。
+以下は `/home/hight/np21w-src/src/win9x/aidebug/` の
+`aidebug_api.cpp` と `aidebug_app.cpp` を読み取りだけで照合した成功応答。
+
+| 台本が使う HTTP endpoint | 実フォークの ok 型と応答欄 |
+|---|---|
+| GET `/api/instance` | bool true。`trap_pause` / `user_pause` も bool。他に instance_id、pid、exe、ini、media 等 |
+| POST `/api/pause` / `/api/resume` | bool true のみ。resume は trap pause があれば trap、なければ user pause を解除 |
+| GET `/api/mem` | bool true。`addr` は hex文字列、`len` は整数、`space` / `hex` は文字列 |
+| POST `/api/mem` | bool true。`addr` は hex文字列、`written` は整数 |
+| GET `/api/break` | bool true。`breakpoints` 配列、要素は slot/eip/use_cs/cs/hits (eip/cs は hex文字列、他は整数) |
+| POST `/api/break/add` | bool true。`slot` は整数、`eip` は hex文字列 |
+| POST `/api/break/del?addr=...` | **整数** `ok=1, removed=1`。不在は両欄0。全削除 (`addr=*` / `all=1`、台本では不使用) だけ bool true |
+| POST `/api/step` | bool true。`trap_pause` は整数、`cs` / `eip` は hex文字列 |
+| GET `/api/regs` | bool true。eax/eip/esp 等は hex文字列、その他 segment/control register 欄 |
+| POST `/api/key` | bool true のみ |
+| POST `/api/mouse` | bool true。dx/dy/btn/ax/ay/pending_x/pending_y は整数、left/right/abs_override は bool、hw_btn は hex文字列 |
+
+個別 del は **int 型の ok=1 と removed=1 の両方**を要求し、他 endpoint は bool true を要求。
+欠落・0・文字列・float・bool の個別削除 status を成功扱いしない。
+GET 捕捉/mem と mouse にも成功判定を追加。偽 client は個別削除の整数 status と
+捕捉用 endpoint の実欄を返す。成功した削除は所有リストから外し、再設置時に戻す。
+後始末は削除失敗を集約して残りを試み、所有する breakpoint/step trap を再開する。
+user pause/無関係の trap は保持。元の例外と後始末の失敗を両方報告し、capture_active を必ず解除。
+
+- Python **36 ケース**、ILP32 **42 state checks**。追加4ケースは整数 status の成功/拒否、
+  後始末の削除失敗継続、step 失敗後の PC 変化、無関係の trap の保持。
+  **57/57 変異 runtime RED (追加4本)、compile/import失敗0、置換数は各固定**。
+  元の `is True` 判定へ戻す変異も実行時 RED。ILP32 は host32.py/qemu 経由。
+- `PYTHONPATH=`、`TMPDIR=/home/hight/os32-tmp`、`HOST32_RUNNERS=qemu`、
+  `CROSS_DIR=/home/hight/opt/cross`。`make` は全て `< /dev/null`。
+  `NP21W_DIR=/home/hight/os32-tmp/h3fix-unused-np21w-destination` (存在しない専用先) を指定。
+  初回 `make all` はフォント未取得で **rc=2** (`h3fix-all.log`)。
+  既存main worktreeの正規TTFをコピーして `fetch_fonts.py --check` rc=0、
+  再実行 `make all` **rc=0** (`h3fix-all-ready.log`)。FD copy失敗警告は専用先による。
+- `python3 -u -B tools/tests/test_h3_park_resume.py --mutate` **rc=0**
+  (`h3fix-tests-final.log`)。その開始時はELF/map未生成のlayout 1件skip。
+  all後の `python3 -B tools/tests/test_h3_park_resume.py` **rc=0、36件/skip0**
+  (`h3fix-tests-built.log`) でlayoutも確認。
+- 既存 `check-h3-park-resume-host` 登録に追加ケースを含め、`tools/check_map.yaml` に内容を明記。
+  `python3 tools/gen_tests_inventory.py --write` rc=0 (生成 `docs/TESTS.md` は差分なし)。
+  `python3 tools/gen_memmap.py --write` と `python3 tools/check_select.py --lint` は各 **rc=0**
+  (119本、対応表漏れ0件)、`git diff --check` rc=0。
+- この記録を検査前に完了し、票/ソースを固定して最終
+  `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp
+  HOST32_RUNNERS=qemu make check-changed < /dev/null` を実行する。
+  結果は `/home/hight/os32-tmp/h3fix-check-changed.log` と `.rc` に保存し、完了報告で確定する。
+- guest/native・最終一式でのh受入は未実施。PMが今回の KAPI-loop 捕捉を再実行し、
+  native と独立レビューも担当する。台本修正は別途記録済みのKAPI-loop/STOPカーネル不具合を直すものではない。
+  NP21/W操作・NHD・配備・ini・実機、commit/push は未操作。
+
+**h3 台本 P3 対応 (2026-10-02、Codex gpt-6.1-sol、独立レビュー Opus 5.5 Approve / P3 4件)**:
+対象は上記台本・偽 client 試験・本 h3 欄。試験登録の説明だけ `tools/check_map.yaml` を更新。
+e の lease/gfx/SHM 権限・公開 KAPI/JSON/版は変更なし。前回の未コミット差分を維持。
+
+- P3-1: 期限切れ/advance完了後、削除との間に来た監視点トラップは、
+  `failure is None` なら **incomplete capture** 例外とする。採取処理を後始末に複製せず、
+  未採取の二度目を成功扱いしない単純な方式を選択。安全に解除できる所有trapは再開する。
+  wm_kill/syscall_abort の二度目を、期限切れとadvance完了の両方で偽clientに注入。
+- P3-2: 全削除を試みた後、GET `/api/break` の実一覧と監視番地を突き合わせる。
+  残留番地を列挙し、再開せず **PM must delete them manually before resume** と案内。
+  2番地の削除失敗でも5番地全部を試み、再開しないことを試験。
+- P3-3: 後始末で pause が残る/エラーがあるとき、読んだ `trap_pause` / `user_pause` /
+  `eip` を例外へ加える。trap + user pause の併存を保持し、元の例外と状態を両方報告。
+- P3-4: 上記実装記録のモデル名を **Codex gpt-6.1-sol** に訂正。
+- RED→GREEN: 修正前の追加試験は **39件中6失敗** (遅延trap 4条件 + 残留 + pause)。
+  修正後は **Python 39件 / skip0、ILP32 42 state checks PASS**。
+  **61/61変異 runtime RED** (追加4本)、compile/import失敗0、置換の当たり数は各固定。
+  ILP32は `tools/tests/host32.py` / qemu。ログ `h3p3-red.log` / `h3p3-tests.log`。
+- 共通環境は `PYTHONPATH=`、`TMPDIR=/home/hight/os32-tmp`、`HOST32_RUNNERS=qemu`、
+  `CROSS_DIR=/home/hight/opt/cross`。makeは全て `< /dev/null`。
+  `NP21W_DIR=/home/hight/os32-tmp/h3fix-unused-np21w-destination` は存在しない専用先。
+  `make all` **rc=0** (`h3p3-all.log` / `.rc`、FD copy失敗警告は専用先による)。
+  `python3 -u -B tools/tests/test_h3_park_resume.py --mutate` **rc=0** (`h3p3-tests.log` / `.rc`)。
+- 既存 `check-h3-park-resume-host` に追加試験を登録済み。
+  `python3 tools/gen_tests_inventory.py --write` **rc=0** (生成 `docs/TESTS.md` 差分なし)。
+  `python3 tools/gen_memmap.py --write` **rc=0** (生成地図差分なし)、
+  `python3 tools/check_select.py --lint` **rc=0** (119本、対応表漏れ0件)、`git diff --check` **rc=0**。
+- 本欄の記録をここで完了し、票とソースを固定して最後に
+  `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp
+  HOST32_RUNNERS=qemu make check-changed < /dev/null` を実行する。
+  結果は `/home/hight/os32-tmp/h3p3-check-changed.log` / `.rc` と完了報告で確定する。
+- native/guest・最終一式でのh受入は未実施。PMはnativeと新しい最終一式での捕捉を再実行。
+  残留breakpointの案内時は手で削除し、pause状態を確認してから再開。
+  NP21/W・NHD・配備・ini・実機、commit/pushは未操作。
+
 **PM手順 (コーダーは live 台本を未実行、レビュー指摘対応 2026-10-02)**:
 
 1. 新しい一式の反映を確認 [V1]。`python3 tools/h3_park_resume.py layout --layout
@@ -1129,6 +1218,8 @@ make check-changed < /dev/null` を実行する。最終結果は
 NP21/W・NHD・配備・ini・実機・commit/pushは未実施。nativeはsandbox SIGSYSのため未実施。
 e9識別/前景接続、KAPI-loop穴の観測とe/g判断、実trace/park中WM kill対照、
 Opus 5.5による差分再レビュー、e〜gを含む最終一式でのゲストmatrixを次段/PMへ申し送る。
+
+**h3 台本の修正の着地 (PM、2026-10-02)**: 独立レビュー (Opus 5.5) は 1 回目 Approve (P3 4 件) → P3 対応の差分確認で Approve。PM のホスト (既定 `HOST32_RUNNERS=native qemu`) で `make all`・`check_select --lint`・`check-changed` rc=0 (`/home/hight/os32-tmp/pm-h3fix-{all,cc}.log`)。
 
 **h3準備の独立レビュー (Opus 5.5) — 3往復で Approve (2026-10-02)**: 1回目 P1 2件 (深さ0の読み方、KAPI-loopの期待経路)、
 2回目 P1 2件 (wm_killの採取をcdeclのスタック引数に、捕捉とSTOP/observeの直列化) と PM の決定 (KAPI-loop は経路 A/B のどちらか1本)、
