@@ -199,7 +199,7 @@ Unicodeはkernel所有FIXED_RAM/RO SURFACE。ユーザー版utf8だけsetterでl
 | e1 | 公開予定desc/エラー/授権とqueryの内部準備。偽owner/旧ref/GUI DISPLAY拒否。実装・試験・サイズ・単独着地の扱いは下記「e1 実装結果」 |
 | e2 | 単面公開lease + copyout rollback。`walk_enter/leave`のmaster往復を除去、保存caller/管理PD/PTをP2VでwalkしIF/CR3不変。FULL/PT不足/out不変。実装・ホスト・予算は下記「e2 実装結果」 |
 | e3 | DISPLAY4面束 + native UC。最後の面失敗で全巻戻し、cache全alias一致。実装・試験・予算は下記「e3 実装結果」。exec/V86のPCD保持を前倒し |
-| e4 | backend→kernel fb/geometry。実3backendの選択と200/400行 |
+| e4 | backend→kernel fb/geometry。実3backendの選択と200/400行。下記「e4 実装結果」 |
 | e5 | 再init/revoke/fallback。旧token拒否、第三AS不変 |
 | e6 | C SDK checked attach/互換void橋。反復取得/失敗時描画なし |
 | e7 | shlib/gshell復帰配線。gfx両実体で再描画 |
@@ -793,6 +793,105 @@ STOP最終増分は予告1152Bではなく1344B。ASSERT/診断は削らず、�
   - **着地とゲスト受入 (PM、2026-10-03)**: Opus 5.5 の独立レビューは Approve (P1/P2 なし、P3 9 件は Codex gpt-6.1-sol が対応 — 正常 13・変異 16/16 が期待文言で RED、PM が差分を読んで取り込み)。main へ取り込み (`f7174c4`)。コミット済みの木で `make all` rc=0・`make check` rc=0。NP21/W を停止 → 停止確認 → `nhd-pull` → `deploy-kernel` → `deploy` → 起動 (17MB、今の ini — §12)。`ver` の Commit `d5fca8f`、`/boot/vmkernel.lz4` 481,688 B が手元と一致、**kselftest pass 272 / fail 0**。`/api/gdc`: 起動直後 `grph_on`=0・`access_page`=0 (修正前は 1)、`v86 -t` の後も `grph_on`=0・A4h/A6h=0・`text_on`=1、画面にロゴの残留なし。`v86 -g` と `v86 -g -t` の後も `grph_on`=0・A4h/A6h=0。GUI (gui_demo の窓 → ESC → CUI) OK、戻った CUI にロゴなし。カウンタ: `fault_kill_count`=0、深さ 0、`ledger_*_ops`=0、`exec_as_leftover_pages`=0、`irq_ctx_violations`=1 (起動時の基準値)。**観測 (記録だけ)**: `v86 -g` の後は 68h の状態 (`mode1` 0x89→0x99)、`crtc`、グラフィック GDC の SYNC/CSRFORM が ROM の設定のまま残る (表示は止まっていて CUI に影響なし、GUI の起動で設定し直される)。修正の前からあるかは未確認、GRCG/EGC・6Ah の件と同じく h の最終一式で見る。
 
 
+
+### e4 実装結果 (2026-10-03、Codex gpt-6-astra)
+
+基点 `f7174c4` (dispfix取り込み済み)、worktree `wt/e4`。
+PM判断は作業依頼の `ref_e4.md` §8。独立レビュー (Opus 5.5) P2-1で
+公開queryの起動前PC98固定によるpegcchk/hal_testの誤判定を指摘、PMが到達可能性を確認してQ3を訂正。
+以下は訂正後のQ3に準拠する。
+独立レビュー・ゲスト受入はPMへ。最終全体検査中は本欄/ソースを固定する。
+
+**実装と判断の対応**:
+- Q1: 公開型とは別の `struct gfx_kernel_fb` と `gfx_kernel_framebuffer`。
+  CLIENTのbackingをP2V/P2V_IOで解決し、登録済みplane_offsetを足す。
+  `bb_b/r/g/i` と `bb[]` はNULL開始、`gfx_bind_client` でreserveのPC98登録直後・
+  init/init_200・prepareの選択/fallback時に設定。非constのPC98 bb_baseも同じ口。
+  CLIENT不在時は旧pointerを消し、present/dirty/raster/scrollは何もしない。
+  boot_splashは内部fbを取得。互換KAPIは両CPLともkernel aliasを返す現契約を維持。
+- Q2: PC98登録は640×400/pitch80、stride32000、200行では各面先頭16000Bを使用。
+  台帳の再登録・generation更新はしない。
+- Q3: 起動済み状態をinit成功で設定、shutdown/prepare/init開始で解除。
+  起動済みfbは選択backend queryのwidth/height/format、pitchはqueryに欄が無いので
+  CLIENTから設定したbackend bb_pitchを使う。未起動の**内部fbだけ**PC98 CLIENTの640×400。
+  公開gfx_screen_infoは基点どおり常に選択backend query、互換fbは選択CLIENTのbackingと
+  同backend queryのgeometryを返す。prepare済みPEGCは640×480/pitch640でUSER写像とも一致。
+  GFX_FMT_*とGFX_BB_*の一致はSTATIC_ASSERTで固定。
+  PEGC/Cirrusのinit_200もnative 640×480。prepare後のpacked BB/400行の混在を解消。
+- Q4/Q5: USERへの橋は未接続。`gfx_surface_source` は選択backendからCLIENT/DISPLAYを作り、
+  planar DISPLAYは表のPFNを照合してB/R/G/I順に並べる。起動済みかつ面の存在がready条件。
+  `.text.gfx_surface_source` は未参照でgc。生成からsnapshot/取得完了までcallback/schedulingなし。
+- Q6/Q7: PEGC DISPLAYは窓の予約/写像成功後にVRAM/UC/RW、KERNEL、640×480/pitch640、
+  75pageで登録。CLIENT確保失敗でもDISPLAYは残る。登録失敗はdisplay_failへ。
+  Cirrus DISPLAYはNONEを維持、publisherはnot-ready/INVAL。
+- Q8/Q9: 実3backend連結のILP32試験を追加、全runner正常/先頭runner変異へ登録。
+  gfx_bootのS順/本数とPEGC DISPLAY属性、splashのCLIENTスタブ、display_cleanupの
+  変異用ヘッダ閉包を更新。kselftestにPEGC DISPLAY属性の条件付き検査1項目を追加。
+  **pass見込み272→273** (未配備なので273成功とは主張しない)。
+
+**予算** (同一 `/home/hight/opt/cross`、make all、size/nm/map。build ID差を含む):
+
+| 項目 | 着手時 | レビュー前e4 | P2/P3修正後 | 修正差分 |
+|---|---:|---:|---:|---:|
+| ELF text (SQLite込み) | 703,108 B | 704,276 B | 704,260 B | −16 B |
+| ELF data | 36,723 B | 36,779 B | 36,779 B | 0 B |
+| ELF bss | 606,484 B | 606,516 B | 606,516 B | 0 B |
+| kernel.bin | 364,892 B | 366,132 B | 366,100 B | −32 B |
+| vmkernel.lz4 | 481,688 B | 482,534 B | 482,538 B | +4 B |
+| __bss_end | 0x18C934 | 0x18CE34 | 0x18CE14 | −32 B |
+| ASSERT余白 (上限0x195000) | 34,508 B | 33,228 B | 33,260 B | +32 B |
+| 圧縮余白 (上限520,192 B) | 38,504 B | 37,658 B | 37,654 B | −4 B |
+| e枠残り (d6起点0x18C270) | 14,652 B | 13,372 B | 13,404 B | +32 B |
+| 未結線分控除後のe枠残り | 12,027 B | 10,415 B | 10,447 B | +32 B |
+
+未結線の既存2,625Bにpublisher332Bを追加控除。e4分は接続見込み込み1,580Bで
+約11.8KB以内。ASSERT・上限・診断は緩和なし。
+
+**P3対応**: (1) check_mapにhost fixture自身を登録、(2) 実Cirrus initのI/Oスタブで
+probeを落としfallback直後のbb全4面/内部fb/互換fbを照合、bind除去変異を追加、
+(3) splashはGDC START後にCLIENTのplanesを2へ減らし部分欠落で畳む枝を復元、
+(4) formatのSTATIC_ASSERT、(5) prepareなしPC98→Cirrus切替とpacked bind除去変異、
+(7) TDD冒頭を「設計票」にしてTESTS生成器がTASK_T2D_T2Hリンクを抽出できるよう修正。
+P3-6はP2-1で解消、P3-8は従前の記録を維持。
+
+**試験とコマンド**: [gfx_kernel_fb_tdd](../../../tools/tests/gfx_kernel_fb_tdd.md)。
+共通環境 `TMPDIR=/home/hight/os32-tmp PYTHONPATH= HOST32_RUNNERS=qemu`、
+makeは `CROSS_DIR=/home/hight/opt/cross`、`NP21W_DIR=/dev/null < /dev/null`。
+- 新規fb: `python3 tools/tests/test_gfx_kernel_fb.py --runner qemu --mutate` rc=0、
+  **1 suite/正常496チェック、10/10 runtime RED**。実gfx_core/3backend/pgalloc/paging/B1/query/lease。
+  probe/識別とI/O・IRQ/MMUを足場化。3backend lifecycle、fallback、欠落CLIENT、PEGC DISPLAY lease。
+- 既存gfx_boot: `python3 tools/tests/test_gfx_boot.py --mutate` rc=0、18試験/17変異。
+  display_cleanup: 同名scriptの`--mutate` rc=0、13条件/16変異。
+  splash_native: 同名script rc=0、2 unittest/8構成。
+  上記の独立した変異集合は合計**43本** (新規10+既存33)。
+- 初回の新規試験足場はinclude/宣言/caller保存/IRQ変数の不整合で失敗→修正。
+  display_cleanup初回変異はコピー先のsurface_query.h欠落でコンパイル失敗→閉包を補って再実行rc=0。
+  コンパイル失敗は変異REDに算入しない。lint初回の依存ヘッダ漏れと追記の字下げ不一致も修正。
+- 開始時/実装後の `make all NP21W_DIR=/dev/null` はともにrc=0。
+  `/dev/null`へのD88コピー警告は配備抑止の指定によるもの。実配備なし。
+- `python3 tools/gen_memmap.py --write` / `python3 tools/gen_tests_inventory.py --write` /
+  `python3 tools/check_select.py --lint` はrc=0、123検査/対応表漏れ0。
+- レビュー前の最終ゲートは初回rc=0 (ログ `e4-check-changed.log`)。
+  P2/P3修正の個別fb試験は初回void関数のCHECK誤用でコンパイル失敗、修正後496チェック/10変異rc=0。
+  splashは2 unittest/8構成rc=0。修正後make all rc=0 (`e4-p2-all.log`)。
+- 修正後の最終ゲートは本欄を固定して
+  `OS32_MUT_JOBS=4 HOST32_RUNNERS=qemu make check-changed NP21W_DIR=/dev/null < /dev/null`。
+  ログ `/home/hight/os32-tmp/e4-p2-check-changed.log`。**初回rc=0、再実行なし**。
+  新規fb正常496チェック/10変異RED、C方言27/27変異RED・5/5対照GREEN。
+  make定義差分によりfull選択。実行中は票/ソースを固定し、終了後に結果のみ追記。
+  修正後のgen_memmap/gen_tests_inventory --writeとcheck_select --lintもrc=0 (123検査、漏れ0)。
+
+**e5以降への申し送り・持ち越し**:
+- Q2: 200行でpitch×200へSURFACEを再登録しgeneration更新するかはe5の論点。
+  現在の公開予定queryは登録geometry (400行) を返し、内部描画fbは200行の有効範囲。
+- Q7: Cirrus DISPLAYのNONE→RWは全画面授権の接続段 (e6以降)。
+- Q10: dispfixの `v86_cui_display_restore` はGDC状態のみ。
+  gfx_current_height/flip状態との整合はe5へ持越し、e4ではV86を変更しない。
+- e5はrevoke/TLB/参照0→再init/generation/fallbackとpublisherの接続、
+  e6/e11は互換USER lease橋、e8はTVRAM/Unicode。`exec_map_shared_bb` はe11まで維持。
+  sdk/kapi.json・機能版・memory世代・SDK生成物は無変更、公開はe11。
+- NP21/W・NHD・配備・ini・実機・commit/pushは未操作。
+  native ILP32とゲスト受入は未実施。§12どおり構成依存の一括確認はT2hへ。
 
 ## 3. T2f — map/unmapとallocator、暫定heap終了
 

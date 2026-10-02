@@ -16,6 +16,7 @@ void gfx_scroll_init(void)
 
 void gfx_hardware_scroll(int lines)
 {
+    if (!bb_b) return;
     int sad1, sl1, sad2, sl2;
     int line_mul;
     int sad_base;

@@ -98,10 +98,16 @@ int appslot_gfx_owner(void) { return 1; }   /* APP_ID_SHELL = GFX_OWNER_WM */
 void shell_print(const char *str, u8 color) { (void)str; (void)color; }
 /* 起動時の ⑥ / ⑨ (gfx_boot_reserve / gfx_client_to_gshell、TASK_T1_LEDGER
  * §3-8) が引く台帳と写像。このハーネスは ⑥ を走らせない (試験は
- * tools/tests/test_gfx_boot.py) ので、SURFACE は無い = gfx_bb_phys_range は 0。 */
+ * tools/tests/test_gfx_boot.py)。描画用 CLIENT だけ実型板から返す。 */
 struct ledger_surface ledger_surfaces[LEDGER_MAX_SURFACES];
 struct ledger_surface *ledger_surface_find(u32 b, u32 r)
-{ (void)b; (void)r; return (struct ledger_surface *)0; }
+{
+    static struct ledger_surface client;
+    if (b != LEDGER_SF_PC98 || r != LEDGER_ROLE_CLIENT) return 0;
+    client = gfx_sf[0];
+    if (native_state_fault && starts) client.planes = 2;
+    return &client;
+}
 int ledger_surface_transfer(u32 sid, u32 to) { (void)sid; (void)to; return 0; }
 int ledger_surface_create(const struct ledger_surface *sf, u32 *sid)
 { (void)sf; (void)sid; return 0; }
@@ -122,8 +128,7 @@ void palette_set(int idx, u8 r, u8 g, u8 b)
 { (void)idx; (void)r; (void)g; (void)b; }
 void gfx_scroll_init(void)
 {
-    /* Inject a software state failure after the real native init body. */
-    if (native_state_fault) bb[2] = (u8 *)0;
+    /* After GDC START, ledger fixture omits the last two planes. */
 }
 void tvram_clear(void) { text_clears++; }
 void cpu_delay_us(u32 us)
@@ -172,7 +177,7 @@ int main(int argc, char **argv)
     if (argc == 3) {
         native_state_fault = 1;
         boot_splash();
-        CHECK(!raster_frames, "invalid native buffer skips drawing");
+        CHECK(starts == 1 && !raster_frames, "incomplete planes after GDC start skip drawing");
         CHECK(stops == 1 && !gfx_flip_enabled && text_clears == 1,
               "invalid native state returns to text");
         CHECK(gfx_get_backend_pref() == pref, "failed boot preserves preference");

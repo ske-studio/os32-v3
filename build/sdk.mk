@@ -1149,6 +1149,7 @@ CHECK_PAR_TARGETS := check-shlib-high-host check-bootinfo-host check-hdd-stage1-
     check-nano-adapter-host \
     check-surface-lease-host \
     check-surface-bundle-host \
+    check-gfx-kernel-fb-host \
     check-h3-park-resume-host \
     check-cirrus-win-host check-pegc-mode-host \
     check-display-cleanup-host \
@@ -1258,3 +1259,10 @@ check-surface-bundle-host:
 # Display cleanup regression; record: tools/tests/display_cleanup_tdd.md.
 check-display-cleanup-host:
 	python3 -B tools/tests/test_display_cleanup.py $(MUT)
+
+# T2e e4: real backend lifecycle, internal fb and DISPLAY lease.
+check-gfx-kernel-fb-host:
+	@set -e; test -n "$(HOST32_RUNNERS)"; for runner in $(HOST32_RUNNERS); do echo "HOST32_RUNNERS=$$runner"; python3 -B tools/tests/test_gfx_kernel_fb.py --runner $$runner; done
+	$(if $(MUT),python3 -B tools/tests/test_gfx_kernel_fb.py --runner $(firstword $(HOST32_RUNNERS)) $(MUT),@:)
+
+.PHONY: check-gfx-kernel-fb-host

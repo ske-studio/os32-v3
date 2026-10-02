@@ -16,6 +16,8 @@
 /* ======================================================================== */
 
 #include "kselftest.h"
+#include "pegc.h"
+#include "gfx_hal.h"
 #include "kstring.h"
 #include "kprintf.h"
 #include "kmalloc.h"
@@ -773,6 +775,17 @@ static void __attribute__((cold)) test_gfx_ledger(void)
     check(p && p->first * PAGE_SIZE == MEM_GFX_BB_BASE &&
           p->backing == LEDGER_SB_FIXED_RAM && p->owner == LEDGER_OWNER_BOOT,
           "gfx:planar surface");
+    {
+        const struct ledger_surface *pd = ledger_surface_find(LEDGER_SF_PEGC, LEDGER_ROLE_DISPLAY);
+        check(!pd || (pd->first == PEGC_LINEAR_BASE / PAGE_SIZE &&
+              pd->npages == PEGC_FB_SIZE_480 / PAGE_SIZE &&
+              pd->width == MEM_GFX_BB8_WIDTH && pd->height == MEM_GFX_BB8_HEIGHT &&
+              pd->pitch == MEM_GFX_BB8_PITCH && pd->planes == 1 && !pd->plane_offset[0] &&
+              pd->format == GFX_BB_PACKED8 && pd->owner == LEDGER_OWNER_KERNEL &&
+              pd->backing == LEDGER_SB_VRAM && pd->cache == LEDGER_CACHE_UC &&
+              pd->perm_max == LEDGER_PERM_RW && ledger_surface_validate(pd)),
+              "gfx:pegc display");
+    }
     check(sys_usable_mem_end() <= top, "gfx:usable <= arena top");
     check(!e || (e->owner == LEDGER_OWNER_BOOT && e->backing == LEDGER_SB_RAM &&
                  e->first * PAGE_SIZE >= top &&

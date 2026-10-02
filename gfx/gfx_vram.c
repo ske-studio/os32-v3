@@ -49,6 +49,7 @@ static int _present_dirty_packed(void)
 /* ======================================================================== */
 void __cdecl gfx_add_dirty_rect(int x, int y, int w, int h)
 {
+    if (!bb_b) return;
     int aligned_x, aligned_w;
     int right = x + w;
     int bottom = y + h;
@@ -220,6 +221,7 @@ static void _flip_page(void)
 /* ======================================================================== */
 void __cdecl gfx_present_dirty(void)
 {
+    if (!bb_b) return;
     if (_present_dirty_packed()) return;
     if (gfx_flip_enabled) {
         DirtyRectQueue snapshot;
@@ -248,6 +250,7 @@ void __cdecl gfx_present_dirty(void)
 /* ======================================================================== */
 void __cdecl gfx_present_nosync(void)
 {
+    if (!bb_b) return;
     if (_present_dirty_packed()) return;
     if (gfx_flip_enabled) {
         DirtyRectQueue snapshot;
@@ -270,6 +273,7 @@ void __cdecl gfx_present_nosync(void)
 /* ======================================================================== */
 void __cdecl gfx_present(void)
 {
+    if (!bb_b) return;
     /* HAL バックエンド経由 (契約 G4 の present_rect)。全画面 present。 */
     if (g_backend && g_backend->present_rect)
         g_backend->present_rect(0, 0, GFX_WIDTH, gfx_current_height);
@@ -277,6 +281,7 @@ void __cdecl gfx_present(void)
 
 void __cdecl gfx_present_rect(int rx, int ry, int rw, int rh)
 {
+    if (!bb_b) return;
     if (g_backend && g_backend->present_rect)
         g_backend->present_rect(rx, ry, rw, rh);
 }
@@ -370,6 +375,7 @@ static void _raster_delay_open(unsigned int *flags)
 
 void __cdecl gfx_present_raster(GFX_RasterPalTable *table)
 {
+    if (!bb_b) return;
     int entry_idx, line;
     int has_dirty;
     unsigned int flags;
