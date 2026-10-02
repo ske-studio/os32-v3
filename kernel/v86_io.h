@@ -21,6 +21,9 @@ void v86_io_apply_policy(void);
 /* 全ポートを再び拒否に戻す (セッション終了時)。 */
 void v86_io_reset_policy(void);
 
+/* CUI 表示: グラフィック停止 → 表示可 → テキスト開始。VRAM は保持。 */
+void v86_cui_display_restore(void);
+
 /* 仮想化対象ポートへのアクセス。size は 1 または 2 バイト。
  * ここに来るのは I/O 許可ビットマップで塞いだポートだけ。 */
 u32  v86_io_in(u16 port, int size);

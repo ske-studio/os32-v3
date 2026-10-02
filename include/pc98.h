@@ -241,9 +241,12 @@
 #define GDC_GFX_CMD          0xA2   /* コマンドライト */
 #define GDC_DISP_PAGE        0xA4   /* 表示ページ設定 (DP) */
 #define GDC_ACCESS_PAGE      0xA6   /* 描画ページ設定 (WP) */
+/* A4h/A6h の値 ([U] io_disp.md 00A4h/00A6h) */
+#define GDC_PAGE_0           0x00
+#define GDC_PAGE_1           0x01
 
 /* グラフィックGDC 400ラインモード設定値 */
-#define GDC_GFX_400LINE      0x4B   /* SYNC P3: 400ラインモード */
+#define GDC_GFX_400LINE      0x4B   /* CSRFORM: L/R で 400/200 ラインを選ぶ */
 
 
 /* ====================================================================== */

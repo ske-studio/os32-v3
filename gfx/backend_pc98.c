@@ -67,8 +67,8 @@ static int pc98_query(GFX_ScreenInfo *info)
 static void pc98_shutdown(void)
 {
     if (gfx_flip_enabled) {
-        _out(GDC_DISP_PAGE, 0x00);
-        _out(GDC_ACCESS_PAGE, 0x00);
+        _out(GDC_DISP_PAGE, GDC_PAGE_0);
+        _out(GDC_ACCESS_PAGE, GDC_PAGE_0);
         gfx_flip_enabled = 0;
         gfx_display_page = 0;
     }
