@@ -3,7 +3,7 @@
   python3 -B tools/tests/test_device_reservation.py            # 肯定側 (unittest)
   python3 -B tools/tests/test_device_reservation.py --mutate   # 否定側 + 肯定側
 
-票 docs/tasks/v3/TASK_T1_LEDGER.md §4-4 (T1d、D33・X4)。旧 DEVICE_RESERVATION の
+票 docs/archive/v3/TASK_T1_LEDGER.md §4-4 (T1d、D33・X4)。旧 DEVICE_RESERVATION の
 核 (pgalloc_device_reserve / sys_device_reserve_core) を台帳の ledger_reserve_set
 に載せ直したので、その試験をここで流用・拡張する。kernel/pgalloc.c と
 kernel/ledger_pci.c を丸ごと、drivers/pci.c からは読み口 pci_get だけを

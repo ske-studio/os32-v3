@@ -3,7 +3,7 @@
 > 状態: **受入待ち** — 着地済み・v2.1 に同梱。NP21/W で E0〜E3 合格、実装レビュー往復 2 で Approve。残: E4・E5 (NP21/W) と E6 (実機)。(2026-09-29 の棚卸しで更新)
 >
 > 発行: PM (Claude Code `claude-fable-5-1`、2026-09-23) / それまでの状態: **実装済み・NP21/W で E0〜E3 合格 (2026-09-23、§3-1)。実装レビュー (Codex) 往復 1 = Request changes 5 件 (reclaim と restart の競合、close 入口の非原子性、close 期限の公開順、時計の巻き戻り判定、FAULTED 後の音量書き) → 修正済み (e301a61: 交互試験 7 ケース RED→GREEN、変異 30 本)。合流後に NP21/W で E3 を再確認 (5 秒 × 2 + 短いストリーム、close 0、fault site 0、kselftest 197/197)。**実装レビュー往復 2 = Approve** (P1〜P5 閉、新規 blocker 無し。非 blocker: claim のコメント、wrapper 経由の write 契約試験、交互試験の補強 3 件 — §3-1 の残件に)。E4/E5 は残件、E6 は実機**。
-> 正典の関係: [`PLAN.md`](PLAN.md) §5-5、土台は [`TASK_HAL_WIRING.md`](TASK_HAL_WIRING.md) (1-1 割り込み、1-2 8237、1-3 プール、1-5 時計)、
+> 正典の関係: [`PLAN.md`](../../archive/v3/PLAN.md) §5-5、土台は [`TASK_HAL_WIRING.md`](TASK_HAL_WIRING.md) (1-1 割り込み、1-2 8237、1-3 プール、1-5 時計)、
 > 出力保護は [`../../archive/kernel_v21/TASK_KAPI_OUTPUT_GUARD.md`](../../archive/kernel_v21/TASK_KAPI_OUTPUT_GUARD.md)。
 > 典拠: Crystal **CS4231A データシート DS139PP2** (`docs/hw/crystal/cs4231a.pdf`、gitignore のミラー、`pdftotext` 済み)、
 > `docs/hw/undocumented/io_sound.md`「PC-9821X･N内蔵型」、NP21/W `src/sound/cs4231c.c` / `src/cbus/cs4231io.c`。

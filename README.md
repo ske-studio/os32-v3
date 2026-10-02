@@ -8,7 +8,7 @@
 *「PC-9821 の実機で、1 本のアプリケーションに機械の資源を渡し切れる入れ物を作り直す。入れ物とは、カーネル帯の切り方 (再配置)、
 ドライバの置き場 (動的読み込み)、装置窓の資源割当、実機の装置ドライバ、そしてその上の HAL の口である。時代依存の仕事は Host Service に任せ、
 OS32 側の契約は小さく保つ」* ([docs/tasks/v3/V3_PLAN.md §1](docs/tasks/v3/V3_PLAN.md)、本案)。機能を足す前に入れ物を作り直す版で、
-最初の票は C89 → C11 の移行 ([docs/tasks/v3/TASK_C11_MIGRATION.md](docs/tasks/v3/TASK_C11_MIGRATION.md))、
+最初の票は C89 → C11 の移行 ([docs/archive/v3/TASK_C11_MIGRATION.md](docs/archive/v3/TASK_C11_MIGRATION.md))、
 設計の決定は [docs/tasks/v3/TASK_MEMMAP_V3.md](docs/tasks/v3/TASK_MEMMAP_V3.md) にあります。
 
 **fork 元**: os32 v2.1 (リポジトリ [os32](https://github.com/ske-studio/os32)、タグ `v2.1` = コミット `6ccc4049`) と、fork 時点の `feat/gui` (`dfa97f57`、2026-09-30) の作業ツリーです。

@@ -3,7 +3,7 @@
   python3 -B tools/tests/test_ledger.py            # 肯定側 (unittest)
   python3 -B tools/tests/test_ledger.py --mutate   # 否定側 + 肯定側
 
-票 docs/tasks/v3/TASK_T1_LEDGER.md §4-2 (T1b)。kernel/pgalloc.c を丸ごと取り込み
+票 docs/archive/v3/TASK_T1_LEDGER.md §4-2 (T1b)。kernel/pgalloc.c を丸ごと取り込み
 (test_pgalloc_model.py と同じ流儀: 特権命令の irq_save / irq_restore だけを
 贋物にし、irq_restore の度に L1 / L2 の不変条件を全ページで検査する)、次を見る:
 

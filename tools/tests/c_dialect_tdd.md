@@ -1,6 +1,6 @@
 # c_dialect (言語モードの検査、[C1]) — ホスト TDD の記録
 
-票: [docs/tasks/v3/TASK_C11_MIGRATION.md](../../docs/tasks/v3/TASK_C11_MIGRATION.md) §6 段 4・段 5、受入 A1・A2・A5・A6
+票: [docs/archive/v3/TASK_C11_MIGRATION.md](../../docs/archive/v3/TASK_C11_MIGRATION.md) §6 段 4・段 5、受入 A1・A2・A5・A6
 実装: `tools/check_c_dialect.py` (`make check-c-dialect`)
 試験: `tools/tests/test_c_dialect.py` (`make check-c-dialect-host`、否定側は `--mutate`)
 
@@ -195,4 +195,4 @@ MUTATIONS 27/27 RED; CONTROLS 5/5 GREEN
 行継続 include の報告は clang の物理開始行 (旧GCC行標識は終端行)。
 内部 `__restrict` も型として restrict と判定する。
 不正な C / ヘッダ不足は解析失敗として fail closed、変異の RED には数えない。
-具体的な件数・コマンド・差分は [TASK_CLANG_CHECKS](../../docs/tasks/v3/TASK_CLANG_CHECKS.md) §6。
+具体的な件数・コマンド・差分は [TASK_CLANG_CHECKS](../../docs/archive/v3/TASK_CLANG_CHECKS.md) §6。

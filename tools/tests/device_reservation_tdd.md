@@ -4,7 +4,7 @@
 > (検証済み資源レコード・区間の表、`kernel/pgalloc.c`) に載せ直し、
 > `sys_device_reserve_core` / `pgalloc_device_reserve` は撤去した。今の試験と
 > 変異は `tools/tests/test_device_reservation.py` の docstring、結果は
-> [`docs/tasks/v3/TASK_T1_LEDGER.md`](../../docs/tasks/v3/TASK_T1_LEDGER.md) §4-4-R。
+> [`docs/archive/v3/TASK_T1_LEDGER.md`](../../docs/archive/v3/TASK_T1_LEDGER.md) §4-4-R。
 
 ## Scope
 

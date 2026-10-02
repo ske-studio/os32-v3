@@ -1,6 +1,6 @@
 # V3_PLAN — v3 本案 (目的・範囲・目標・柱と順序)
 
-> 状態: **実装中 (2026-09-30)** — v3 の本案。草案 [V3_PLAN_DRAFT.md](V3_PLAN_DRAFT.md) を、ユーザー判断 U1〜U11 と Codex の突き合わせ X1〜X8 (草案 §7) が揃った 2026-09-30 に昇格した (最後の U3 (OS64) と U4 (目的と範囲) は同日ユーザーが決定)。**T0 (C11) は受入完了 (2026-09-30、main `f5bcb35`)、T1 (物理地図 + 所有権台帳) も受入完了 (2026-10-01)、次は T2 (アプリ帯 + lease 窓)**。
+> 状態: **実装中 (2026-09-30)** — v3 の本案。草案 [V3_PLAN_DRAFT.md](../../archive/v3/V3_PLAN_DRAFT.md) を、ユーザー判断 U1〜U11 と Codex の突き合わせ X1〜X8 (草案 §7) が揃った 2026-09-30 に昇格した (最後の U3 (OS64) と U4 (目的と範囲) は同日ユーザーが決定)。**T0 (C11) は受入完了 (2026-09-30、main `f5bcb35`)、T1 (物理地図 + 所有権台帳) も受入完了 (2026-10-01)、次は T2 (アプリ帯 + lease 窓)**。
 >
 > 発行: コーダー `claude-opus-5-5` (worktree `wt/v3-plan`、基点 main `c9a8973`)、PM の指示による。
 
@@ -8,7 +8,7 @@
 版と fork は [ROADMAP.md §0](../../ROADMAP.md)) にあり、ここには写さない。論点の経緯 (草案の一覧と振り分け、食い違い、v2.x 互換の論点、fork の段取り、
 判断の往復) は草案に残した — §7 の表から辿る。数字 (カーネル予算など) の正典は [02_memory.md §2-1](../../02_memory.md) の生成ブロックと [KAPI_SPEC.md](../../KAPI_SPEC.md)。
 
-策定時 (2026-09-17) の計画 [PLAN.md](PLAN.md) は記録として残す (ドライバの動的読み込みの動機 §3、HAL の棚卸し §3-1、温めているアイデア §5 は各票の出典)。
+策定時 (2026-09-17) の計画 [PLAN.md](../../archive/v3/PLAN.md) は記録として残す (ドライバの動的読み込みの動機 §3、HAL の棚卸し §3-1、温めているアイデア §5 は各票の出典)。
 その §1 の順序は、PCI・82557 が静的に先行した事実 (v2.1) を入れて本書 §4 が引き直した。
 
 ---
@@ -50,8 +50,8 @@ OS32 側の契約は小さく保つ。*
 
 | 柱 | 中身 | 正典 (決定・票) | 状態 |
 |---|---|---|---|
-| **P0 規約と道具** | C11 (gnu11) への移行、型は固定長のまま、fork 先の検査・CI・文書 | [TASK_C11_MIGRATION.md](TASK_C11_MIGRATION.md) (T0) | **受入完了** (2026-09-30、`f5bcb35`) |
-| **P1 メモリマップの再構築** | システムは恒等写像のまま、アプリだけ 0x80000000〜 の私有写像、物理地図 + 所有権台帳、固定帯はカーネル 3MB + シェル 1MB、SQLite・FEP 等をモジュールに、低位 640KB を V86 へ、OpenType | TASK_MEMMAP_V3 (決定 §0、帯 §2-1、票 T1〜T7 §6、受入 §7) | **T1 受入完了** (2026-10-01、[TASK_T1_LEDGER](TASK_T1_LEDGER.md))、次は [T2 アプリ帯 + lease 窓](TASK_T2_APPBAND.md) |
+| **P0 規約と道具** | C11 (gnu11) への移行、型は固定長のまま、fork 先の検査・CI・文書 | [TASK_C11_MIGRATION.md](../../archive/v3/TASK_C11_MIGRATION.md) (T0) | **受入完了** (2026-09-30、`f5bcb35`) |
+| **P1 メモリマップの再構築** | システムは恒等写像のまま、アプリだけ 0x80000000〜 の私有写像、物理地図 + 所有権台帳、固定帯はカーネル 3MB + シェル 1MB、SQLite・FEP 等をモジュールに、低位 640KB を V86 へ、OpenType | TASK_MEMMAP_V3 (決定 §0、帯 §2-1、票 T1〜T7 §6、受入 §7) | **T1 受入完了** (2026-10-01、[TASK_T1_LEDGER](../../archive/v3/TASK_T1_LEDGER.md))、次は [T2 アプリ帯 + lease 窓](TASK_T2_APPBAND.md) |
 | **P2 ドライバの置き場** | 専用のモジュールローダ (ロード時検証、信頼する配布物だけ、IRQ 登録と初期化状態の結び付け、停止を証明できない失敗は隔離) | TASK_MEMMAP_V3 §4-7、票 T4〜T5c・T6b | P1 の中で |
 | **P3 HAL の結線** | HAL_WIRING の残 (W7)、NIC 境界 (L-C)、音源バックエンド、1kHz tick | [TASK_HAL_WIRING.md](TASK_HAL_WIRING.md)、[realhw/TASK_LAN_82557.md](../realhw/TASK_LAN_82557.md) | 一部着地 (v2.1)。1kHz tick は票が無い |
 | **P4 デバイス窓の資源割当** | 予約の核は T1 の台帳の MMIO 登録、P4 には順序契約 (識別 → 予約 → 写像 → probe / enable → 面公開) と検証済み資源レコード (実測 BAR) | TASK_MEMMAP_V3 D33・§4-5、[settings/DEVICE_RESERVATION.md](../settings/DEVICE_RESERVATION.md) (改訂は P4 着手時) | T1 / T2 の後 |
@@ -61,7 +61,7 @@ OS32 側の契約は小さく保つ。*
 | **P7 KAPI / ABI** | 後方互換は基本考えない、fork 時に 1 回整理 (スロット順を変えてよい)、世代の識別と旧新混在の試験が必須 | TASK_MEMMAP_V3 D7・**D35** | P1 と同時 |
 | **P8 GUI 層** | 8bpp のまま、音 (PCM リング) と入力の層、microUI へのマウスキー、F3a〜c 等 | TASK_MEMMAP_V3 D19 | v3 後半 (§5) |
 | **P9 アプリ層・互換層** | Video HAL の共通化、VESA2 的互換層、SDL 1.2 の受け皿、移植アプリ (ZSNES を含む) | TASK_MEMMAP_V3 D19・§2-2 (lease)、[PORT_CANDIDATES.md](PORT_CANDIDATES.md) | v3 後半 (§5) |
-| **P10 データ・設定層** | F2 / FEP_BOUNDARY / F3a・F3c は P1 の T2〜T5a に畳む。独立票は辞書メタ情報と F3b だけ | TASK_MEMMAP_V3 D29〜D31、[U6_PENDING_REVIEW.md](U6_PENDING_REVIEW.md) | v3 後半 (§5) |
+| **P10 データ・設定層** | F2 / FEP_BOUNDARY / F3a・F3c は P1 の T2〜T5a に畳む。独立票は辞書メタ情報と F3b だけ | TASK_MEMMAP_V3 D29〜D31、[U6_PENDING_REVIEW.md](../../archive/v3/U6_PENDING_REVIEW.md) | v3 後半 (§5) |
 
 ## 4. 順序
 
@@ -106,9 +106,9 @@ PLAN §5 の残り (5-1 ホストを仮想メモリに、5-2 V86 の装置要求
 | 知りたいこと | 正典 |
 |---|---|
 | メモリマップ・モジュール・ABI・実行モデルの要件の決定 (D1〜D36) | [TASK_MEMMAP_V3.md](TASK_MEMMAP_V3.md) §0 (経緯 §11、Codex X1〜X8 の補足 §8-4) |
-| ユーザー判断 U1〜U11 と Codex の論点 X1〜X8 の往復 | [V3_PLAN_DRAFT.md](V3_PLAN_DRAFT.md) §7 |
+| ユーザー判断 U1〜U11 と Codex の論点 X1〜X8 の往復 | [V3_PLAN_DRAFT.md](../../archive/v3/V3_PLAN_DRAFT.md) §7 |
 | 草案の一覧と振り分け、食い違い D1〜D21、v2.x 互換の論点 C1〜C8 | 同 §1、§4、§5 (C1 は D35 で決着、C7 は二段移行) |
 | 版数と fork の決定、os32 v2.x の扱い | [ROADMAP.md §0](../../ROADMAP.md)、[FORK_PLAN.md](FORK_PLAN.md) |
-| 保留 5 件の拾い方 | [U6_PENDING_REVIEW.md](U6_PENDING_REVIEW.md)、TASK_MEMMAP_V3 D29〜D34 |
+| 保留 5 件の拾い方 | [U6_PENDING_REVIEW.md](../../archive/v3/U6_PENDING_REVIEW.md)、TASK_MEMMAP_V3 D29〜D34 |
 | Rust と C11 の分担、386 下限 | [RUST_VS_C11.md](RUST_VS_C11.md)、TASK_MEMMAP_V3 D36 |
 | 現在地と残件 (日々の進捗) | 最新の引き継ぎ ([INDEX.md](../../INDEX.md) 冒頭の正典表の「引き継ぎ」の行) と各票の状態行 |

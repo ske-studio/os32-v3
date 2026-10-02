@@ -4,9 +4,9 @@
 >
 > それまでの状態: **受入待ち (2026-09-30)** — 段 2〜6 と文書 (A7・A10) はブランチ `wt/t0-c11` に実装済み、`check-c-dialect` / `check-c-dialect-host` を `make check` の列に追加。残件: A8 の差分確認 (Codex レビュー)、A9 のゲスト回帰 (PM)。apps/game は組まない (ユーザー決定、A5 は `check-c-dialect` の (c) で代える)。
 >
-> それまでの状態: **計画 (2026-09-30)** — §8 の判断 3 点は同日にユーザー承認 (推奨どおり)、[C1] の改訂案 (§9) は文面確定、CONSTRAINTS.md の改訂は fork 後の T0 で。v3 の最初の票 T0 ([TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) §6、[V3_PLAN_DRAFT](V3_PLAN_DRAFT.md) §3 P0)。Codex (gpt-6-astra、読み取りのみ) の調査提案 (`x18/c11.md`、2026-09-30、基点 `d995e078`) を元に起票。**ユーザー判断が要る点 3 つ (§8) と [C1] の改訂文面 (§9) は未決** — 決定後に [CONSTRAINTS.md](../../CONSTRAINTS.md) を直し、設計票へ進む。コードは未着手。
+> それまでの状態: **計画 (2026-09-30)** — §8 の判断 3 点は同日にユーザー承認 (推奨どおり)、[C1] の改訂案 (§9) は文面確定、CONSTRAINTS.md の改訂は fork 後の T0 で。v3 の最初の票 T0 ([TASK_MEMMAP_V3](../../tasks/v3/TASK_MEMMAP_V3.md) §6、[V3_PLAN_DRAFT](V3_PLAN_DRAFT.md) §3 P0)。Codex (gpt-6-astra、読み取りのみ) の調査提案 (`x18/c11.md`、2026-09-30、基点 `d995e078`) を元に起票。**ユーザー判断が要る点 3 つ (§8) と [C1] の改訂文面 (§9) は未決** — 決定後に [CONSTRAINTS.md](../../CONSTRAINTS.md) を直し、設計票へ進む。コードは未着手。
 >
-> 発行: PM (Claude Code) の指示によりコーダー `claude-fable-5-1` (feat/gui `e8931cac`)。読んだもの: Codex 提案 `x18/c11.md`、V3_PLAN_DRAFT §3 P0 (根拠は X1 で改訂済み)・§6-4、[RUST_VS_C11](RUST_VS_C11.md) §1-1、[CONSTRAINTS](../../CONSTRAINTS.md) [C1]、`tools/check_constraints.py`、[POLICY_DEV](../../POLICY_DEV.md) §2、`build/config.mk` / `boot.mk` / `kernel.mk` / `programs.mk` の旗、`include/types.h`、`kernel/tss.c`、`kernel/shm.c`。**事実は `file:line` で示す。Codex の実測は §3・§5 の表の「実測」列に写した (再実行はしていない)。**
+> 発行: PM (Claude Code) の指示によりコーダー `claude-fable-5-1` (feat/gui `e8931cac`)。読んだもの: Codex 提案 `x18/c11.md`、V3_PLAN_DRAFT §3 P0 (根拠は X1 で改訂済み)・§6-4、[RUST_VS_C11](../../tasks/v3/RUST_VS_C11.md) §1-1、[CONSTRAINTS](../../CONSTRAINTS.md) [C1]、`tools/check_constraints.py`、[POLICY_DEV](../../POLICY_DEV.md) §2、`build/config.mk` / `boot.mk` / `kernel.mk` / `programs.mk` の旗、`include/types.h`、`kernel/tss.c`、`kernel/shm.c`。**事実は `file:line` で示す。Codex の実測は §3・§5 の表の「実測」列に写した (再実行はしていない)。**
 
 ---
 
@@ -204,7 +204,7 @@ replacements = {
 | J2 | **内部コードで許す構文の範囲** | §4 の表 | **宣言位置・`//`・真偽型 (`<stdbool.h>`、純粋な真偽値だけ)・指示付き初期化子・寿命が明確な複合リテラル**を許可。**匿名構造体/共用体・`restrict`・`_Atomic`・TLS・`<threads.h>` は T0 では入れない** (別途) | **推奨どおり承認 (2026-09-30)** |
 | J3 | **apps / game (submodule) の旗も T0 で変えるか** | (a) gnu89 のまま、SDK 後方互換の検証対象にする / (b) gnu11 化 (各 submodule の別コミット + 親の参照更新) | **(a) gnu89 のまま**。apps/game の保守は当面 os32 側 (FORK_PLAN)、`sdk/example/hello` も gnu89 互換の検証例として残す | **推奨どおり承認 (2026-09-30)** |
 
-決定は [TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) §0 の決定表に D 番号で記録し、この表の「決定」列を埋める。
+決定は [TASK_MEMMAP_V3](../../tasks/v3/TASK_MEMMAP_V3.md) §0 の決定表に D 番号で記録し、この表の「決定」列を埋める。
 
 ---
 
@@ -223,9 +223,9 @@ replacements = {
 ## 10. 参照
 
 - [V3_PLAN_DRAFT](V3_PLAN_DRAFT.md) §3 P0 (根拠は Codex X1 で改訂済み)、§4 D9、§5 C3、§6-4 の 4
-- [TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) §6 T0、D35 (Rust 生成器の未知型)、D36 (SDK ヘッダは C89 互換)
-- [RUST_VS_C11](RUST_VS_C11.md) §1-1 (訂正は §2)、§5 C3、§7 (386 下限 — T0 の対象外だが `_Atomic` を入れない理由)
-- [FORK_PLAN](FORK_PLAN.md) §3 g (v3 の最初の票 = この票)
+- [TASK_MEMMAP_V3](../../tasks/v3/TASK_MEMMAP_V3.md) §6 T0、D35 (Rust 生成器の未知型)、D36 (SDK ヘッダは C89 互換)
+- [RUST_VS_C11](../../tasks/v3/RUST_VS_C11.md) §1-1 (訂正は §2)、§5 C3、§7 (386 下限 — T0 の対象外だが `_Atomic` を入れない理由)
+- [FORK_PLAN](../../tasks/v3/FORK_PLAN.md) §3 g (v3 の最初の票 = この票)
 - [PLAN](PLAN.md) §1 の 1 (C11 へ、SHM の記述は §2 F3 で訂正)
 - [CONSTRAINTS](../../CONSTRAINTS.md) [C1]、[POLICY_DEV](../../POLICY_DEV.md) §2、`tools/check_constraints.py`
 - Codex 提案: `scratchpad/x18/c11.md` (2026-09-30、gpt-6-astra、読み取りのみ。リポジトリには置かない)

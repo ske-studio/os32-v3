@@ -29,6 +29,7 @@
 | `realhw_v21/` | v2.1 で実機 Ra266 に届いた票 (FDC / SERIAL_VFAST / HDD_INSTALL / SERIAL_HOSTFS / ATAPI_TIMEOUT)、PEGC_RA266_TIMING (完了記録、正典は `tasks/realhw/TASK_PEGC480_REALHW.md`)。実機の回の手順 3 本 (CHECKLIST_2026-09-24〜26、09-26 は v2.1 の判定の記録) は**実機作業の日次記録として os32 側に残した** (fork で持ってこなかった。[FORK_PLAN §1-2](../tasks/v3/FORK_PLAN.md)) |
 | `v21/` | fork 時 (2026-09-30、[FORK_PLAN §4 J4](../tasks/v3/FORK_PLAN.md) = (a)) に `docs/tasks/` から落とした v2.1 までの受入完了の設計記録 48 本。元のディレクトリ名のまま: `sqlite/` (9)、`tilemap/` (8)、`v86v2/` (15 — md 12 + `data/` の json 3)、`boot_reform/` (8)、`wintree_port/` (1)、`libasset/` `libecs/` `libinput/` `libmath/` `libtext/` (各 1)、直下に `cross_compiler_rebuild.md` `ext2_dind_debug.md`。状態行の無かった 39 本には「完了記録 (os32 での最終コミット日)」を足した (D19、移動でいじった本文はこの 1 行だけ) |
 | `portability/` | kstring の速度実測 (TASK_KSTRING_BENCH) |
+| `v3/` | v3 で受入完了・完了記録になった票 (2026-10-02): T0 の TASK_C11_MIGRATION、TASK_CLANG_CHECKS、TASK_EXT2_ERRORS_INVESTIGATION、T1 の TASK_T1_LEDGER、策定時の PLAN・U6_PENDING_REVIEW・V3_PLAN_DRAFT、TASK_T2D_T2H から切り出した T2d の結果 (TASK_T2D_RESULTS)。進行中・受入待ちの v3 票 (V3_PLAN・TASK_MEMMAP_V3・T2・T3 以降・HAL_WIRING・PCM_CS4231 など) は `tasks/v3/` に残る |
 | `agents/` | 引き継ぎ (HANDOVER_v14 / 2026-09-16 / 09-18 / 09-22)・体制の快照 (RETROSPECTIVE_2026-09-09)・Hermes の最上位プロンプト (SOUL.md、撤収済み・効力なし) |
 | 直下 | 領域に属さない単発の記録 (`REFACTORING_PLAN.md` `ROADMAP_v1.0.md` `TEST_INVENTORY_2026-09-14.md` `debug_kcg_load_font.md`) |
 

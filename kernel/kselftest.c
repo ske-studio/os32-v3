@@ -619,7 +619,7 @@ static void test_memmap_pool_user(void)
 }
 
 /* ------------------------------------------------------------------------ */
-/*  物理ページの池 (票 docs/tasks/v3/TASK_T1_LEDGER.md §4-1、T1a)             */
+/*  物理ページの池 (票 docs/archive/v3/TASK_T1_LEDGER.md §4-1、T1a)             */
 /*                                                                          */
 /*  legacy の pgalloc_init への fallback は撤去した。8MB でも 17MB でも池は  */
 /*  モデル経路で ONLINE でなければならない (legacy に戻ったら落ちる)。       */
@@ -636,7 +636,7 @@ static void test_pool_model(void)
 }
 
 /* ------------------------------------------------------------------------ */
-/*  所有権台帳 (票 docs/tasks/v3/TASK_T1_LEDGER.md §4-2、T1b)                 */
+/*  所有権台帳 (票 docs/archive/v3/TASK_T1_LEDGER.md §4-2、T1b)                 */
 /*                                                                          */
 /*  (1) 通常文脈では割り込み / 例外の深さが 0 (§3-5。longjmp の控えの戻し  */
 /*      忘れや IRQ_LEAVE の抜けがあると 0 に戻らない)。                     */
@@ -737,7 +737,7 @@ static void test_ledger(void)
 }
 
 /* ------------------------------------------------------------------------ */
-/*  gfx の予約・BB・SURFACE (票 docs/tasks/v3/TASK_T1_LEDGER.md §4-5、T1e)    */
+/*  gfx の予約・BB・SURFACE (票 docs/archive/v3/TASK_T1_LEDGER.md §4-5、T1e)    */
 /*                                                                          */
 /*  ⑥ (gfx_boot_reserve) の後・⑦ (probe) の前に走るので、選択中の backend  */
 /*  はまだ決まっていない — 候補ごとに見る。                                  */

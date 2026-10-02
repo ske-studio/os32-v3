@@ -64,7 +64,7 @@ KernelAPI・共有ライブラリの読み込みを指す。アプリ 1 本の�
 **公開 SDK ヘッダ** (`sdk/include/os32/*.h`。`sdk/include/os32/os32_kapi_shared.h` を含む) は gnu89 と gnu11 の
 両方から読めること (apps / game / `sdk/example/hello` は gnu89 のまま)。**SQLite 系**
 (`lib/sqlite3/` と userland の SQLite 単体) は `C_STD_SQLITE` (gnu89)。旗の実際の効き方は
-`make check-c-dialect` が確かめる。採用範囲の経緯は [TASK_C11_MIGRATION](tasks/v3/TASK_C11_MIGRATION.md) §4。
+`make check-c-dialect` が確かめる。採用範囲の経緯は [TASK_C11_MIGRATION](archive/v3/TASK_C11_MIGRATION.md) §4。
 
 | 機能 | 内部実装での扱い | 既存コード |
 |--------|-----|-----|

@@ -2,7 +2,7 @@
 
 記録: tools/tests/dma_pool_tdd.md
 票  : docs/tasks/v3/TASK_HAL_WIRING.md §1-3 (DMA プール)、
-      docs/tasks/v3/TASK_T1_LEDGER.md §3-7 / §4-3 (T1c: dma_alloc の limit、
+      docs/archive/v3/TASK_T1_LEDGER.md §3-7 / §4-3 (T1c: dma_alloc の limit、
       {pa, va} の組、失敗時 *out 不変、R4 の最悪の並び)
 
 実物の kernel/dma_pool_math.c と drivers/dma8237_math.c を 1 行も写さずに

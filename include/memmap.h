@@ -290,7 +290,7 @@ extern u32 __sqlite_end;
 #define MEM_DMA_POOL_END       (MEM_DMA_POOL_BASE + MEM_DMA_POOL_SIZE - 1)
 
 /* ---------------------------------------------------------------------- */
-/*  台帳の backing (FIXED 型、票 docs/tasks/v3/TASK_T1_LEDGER.md §3-3)      */
+/*  台帳の backing (FIXED 型、票 docs/archive/v3/TASK_T1_LEDGER.md §3-3)      */
 /*                                                                          */
 /*  低位 RAM の末尾に metadata + workspace を置くと下端がアプリ帯の最大上端 */
 /*  (MEM_APP_BAND_MAX_TOP) を割る構成 (8MB・9MB・12MB。高位 RAM は無い) は、 */

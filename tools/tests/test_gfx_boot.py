@@ -3,7 +3,7 @@
   python3 -B tools/tests/test_gfx_boot.py            # 肯定側
   python3 -B tools/tests/test_gfx_boot.py --mutate   # 否定側 + 肯定側
 
-票 docs/tasks/v3/TASK_T1_LEDGER.md §3-3 ⑥・⑨、§3-6、§3-8、§4-5。
+票 docs/archive/v3/TASK_T1_LEDGER.md §3-3 ⑥・⑨、§3-6、§3-8、§4-5。
 tools/tests/gfx_boot_host.c が実物の kernel/paging.c・pgalloc.c・sys.c・
 physmem.c を ILP32 で組み、段つき起動で台帳を ONLINE にしてから、gfx/gfx_core.c
 から切り出した本物の gfx_boot_reserve / gfx_bb_phys_range /

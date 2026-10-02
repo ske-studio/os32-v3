@@ -2,7 +2,7 @@
 
 > 状態: **計画 (2026-09-30)** — ユーザー決定 (2026-09-30): GUI アプリ群と移植用の層 (P9: Video HAL・VESA2 的互換層・SDL 1.2 の受け皿) は **v3 後半、基盤が整い次第**。**ZSNES は移植する**。**移植は難度の低いものから挑戦する**。この票はその候補の一覧と挑戦順。個々の移植の票はまだ無い (着手時に `TASK_PORT_<名前>.md` を切る)。
 >
-> 発行: コーダー `claude-fable-5-1` (feat/gui、PM の指示による)。上位は [V3_PLAN_DRAFT.md](V3_PLAN_DRAFT.md) §3 P9、思想は [DESIGN_APP_FIRST.md](../../DESIGN_APP_FIRST.md) §8〜§10。
+> 発行: コーダー `claude-fable-5-1` (feat/gui、PM の指示による)。上位は [V3_PLAN_DRAFT.md](../../archive/v3/V3_PLAN_DRAFT.md) §3 P9、思想は [DESIGN_APP_FIRST.md](../../DESIGN_APP_FIRST.md) §8〜§10。
 
 読み方: §1 が移植の前提となる基盤 (いま有るもの・無いもの)、§2 が候補の一覧表、§2-1 が ZSNES の詳細、§3 が推奨の挑戦順、§4 が未確認の事項、§5 が出典。**ライセンスと実機性能の記述は §4 に書いたとおり推測を含む** — 着手時に各票で原典を確かめる。
 

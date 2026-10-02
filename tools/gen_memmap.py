@@ -242,7 +242,7 @@ def bands(m, sym):
         "予約域に開けた穴。present / supervisor / R/W。**USER は立てない** "
         "(kselftest の MM 検査が MM_RW と MM_RWU を分けて見る)")
     # 予約域の上側は「4KB のガード + 8KB の台帳 backing」に割れる
-    # (票 docs/tasks/v3/TASK_T1_LEDGER.md §3-3、T1a)。backing を張るのは
+    # (票 docs/archive/v3/TASK_T1_LEDGER.md §3-3、T1a)。backing を張るのは
     # FIXED 型 (低位 RAM の末尾に置けない 8MB・9MB・12MB) のときだけ。
     add(SQL, "カーネル予約 (上)", (v("MEM_DMA_POOL_END") or 0) + 1,
         (v("MEM_LEDGER_META_BASE") or 0) - 1, "NP", "DMA プールの上側ガード")

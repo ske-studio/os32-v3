@@ -1,7 +1,7 @@
 """tools/check_c_dialect.py (言語モードの検査、[C1]) のホスト試験。
 
 記録: tools/tests/c_dialect_tdd.md
-票:   docs/tasks/v3/TASK_C11_MIGRATION.md §6 段 4・段 5
+票:   docs/archive/v3/TASK_C11_MIGRATION.md §6 段 4・段 5
 
 検査器の部品 (字句の読み分け・コンパイル行の読み取り・実際に効いている言語モード・
 拒否の探り・公開 SDK ヘッダの検査) を小さな入力で固定し、実物の木が通ることも見る。

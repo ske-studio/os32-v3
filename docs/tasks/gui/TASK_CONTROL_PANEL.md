@@ -2,7 +2,7 @@
 
 > 状態: **計画 (2026-09-30)** — ユーザー指示 (2026-09-30「v3 の後半にコントロールパネルのようなものの設計を入れる」) で起票。**着手 (設計票の作成) は v3 後半** — P1 の T2〜T5a (settings.db の経路が乗る SQLite のモジュール化と接続の所有) と P8 GUI 層の後。ここは範囲・材料・設計で決めることの一覧だけで、画面や API はまだ決めていない。
 >
-> 発行: PM (Claude Code `claude-opus-5-5`、2026-09-30)。関係: [V3_PLAN_DRAFT.md](../v3/V3_PLAN_DRAFT.md) §3 P8、[settings/DESIGN.md](../settings/DESIGN.md) (設定の置き場の正典)、[TASK_KBD_NAV.md](TASK_KBD_NAV.md) §1-3 (「MouseKeys の速さは設定画面で決める」を先送りした行)。
+> 発行: PM (Claude Code `claude-opus-5-5`、2026-09-30)。関係: [V3_PLAN_DRAFT.md](../../archive/v3/V3_PLAN_DRAFT.md) §3 P8、[settings/DESIGN.md](../settings/DESIGN.md) (設定の置き場の正典)、[TASK_KBD_NAV.md](TASK_KBD_NAV.md) §1-3 (「MouseKeys の速さは設定画面で決める」を先送りした行)。
 
 ## 1. 目的
 
@@ -18,7 +18,7 @@ Windows 98 のコントロールパネルに当たる **GUI の設定アプリ�
 | **「初期値に戻す」機能は GUI にも CUI にも置かない** (戻すのはリカバリモードだけ) | 同 §0・§2 |
 | 読み書きは `libos32cfg` の `cfg_*`、書き込みは 1 トランザクション、X4 (syscall 境界ポンプ) では触らない | 同 §0・§4 |
 | `system.cfg` は廃止しない | 同 §7 |
-| 前景アプリ 1 本に資源を集中する (設定アプリも常駐させない) | [V3_PLAN_DRAFT](../v3/V3_PLAN_DRAFT.md) §2 |
+| 前景アプリ 1 本に資源を集中する (設定アプリも常駐させない) | [V3_PLAN_DRAFT](../../archive/v3/V3_PLAN_DRAFT.md) §2 |
 
 ## 3. 材料 — いま設定として外に出したい項目 (候補、設計で取捨する)
 

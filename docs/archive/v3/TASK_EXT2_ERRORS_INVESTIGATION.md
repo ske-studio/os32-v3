@@ -1,8 +1,8 @@
 # TASK_EXT2_ERRORS_INVESTIGATION — NHD ext2 errors印の原因調査
 
 > 状態: **受入完了 (2026-10-01)** — 再インストールで印を解消、原因の発生時点は未確定 (§4-6)。それまでの状態: 計画 (2026-10-01) — 調査計画。原因未確定、修復・ゲスト再現は未実施。
-> 起票: GPT-6 / Codex。観測の正典: [T2親票](TASK_T2_APPBAND.md) §5-1 T2c-R末尾。
-> 順序: [T2d〜h詳細](TASK_T2D_T2H.md) §0・§5・§8。PMが調査担当と媒体を指定し、dと並行に着手、T2h受入より前に§3を閉じる。
+> 起票: GPT-6 / Codex。観測の正典: [T2親票](../../tasks/v3/TASK_T2_APPBAND.md) §5-1 T2c-R末尾。
+> 順序: [T2d〜h詳細](../../tasks/v3/TASK_T2D_T2H.md) §0・§5・§8。PMが調査担当と媒体を指定し、dと並行に着手、T2h受入より前に§3を閉じる。
 
 ## 1. 観測と切り分けること
 
@@ -58,7 +58,7 @@ T1 の kselftest / GUI 合格や警告の引用省略を、errors 印なしの�
 | 9/30〜10/1、T1a/b。`d7ac7a0` コミット 00:08:46 | 確定 (文書) | 8/17MB の起動・GUI、test2、V86、#PF。`sleep 20` の STOP は未確認。続く `faulttest gp/de/ud`、loop/kloop+CTRL+STOP ではアプリ kill とシェル復帰を確認 | [T1票](TASK_T1_LEDGER.md) §4-2-N。faulttest は `168a47b`、kernel は `d7ac7a0` のまま。errors の有無、ゲスト hsync の実施・件数、停止方式は不明 |
 | 10/1、T1c。`7d1133d` 03:19:38 / `4233715` 03:23:06 | 確定 (文書) | HDD/FD 226/226。`/host/sbin/hsync.bin` 34560B → FD `/VAR/T1C.BIN` へ cp → `emu_reset` → FDから /host へ cp、cmp一致 | T1票 §4-3-N。これは **hsync バイナリの FD コピー**で、hsync 実行の証拠ではない。NHDへの当該書込みは記録なし |
 | 10/1、T1e/f。`0fedc76` 08:39:14 / `c90eed8` 10:06:21 | 確定 (文書) | PEGC/planar/Cirrus、8/17MB、GUI→CUI→GUI、gfxmode、V86、ゲスト試験14 PASS/2 SKIP、HDD/FD 226/226 | T1票 §4-5-N・§4-6-N。gfxmode の設定書込みはあり得るが、その前後の ext2 印・書込み結果は未記録。警告非掲載は正常の証明にならない |
-| 10/1、T2a。`ce5a2a9` 11:44:19 | 確定 (文書) | deploy-kernel 実施記録、8/17MB boot fail=0。gp/de/ud/pf、loop/kloop+STOP、V86、GUIからCUI時のWM kill (park中アプリ含む) | [T2親票](TASK_T2_APPBAND.md) §5-1 T2a-R。検査中の配備でISO/FD鮮度チェックが失敗した記録はあるが、NP21/W稼働中NHD書込みをした証拠ではない |
+| 10/1、T2a。`ce5a2a9` 11:44:19 | 確定 (文書) | deploy-kernel 実施記録、8/17MB boot fail=0。gp/de/ud/pf、loop/kloop+STOP、V86、GUIからCUI時のWM kill (park中アプリ含む) | [T2親票](../../tasks/v3/TASK_T2_APPBAND.md) §5-1 T2a-R。検査中の配備でISO/FD鮮度チェックが失敗した記録はあるが、NP21/W稼働中NHD書込みをした証拠ではない |
 | 10/1、T2a′。`279272d` 14:07:24 | 確定 (文書) | **停止 → nhd-pull → deploy-kernel → deploy → 起動**。8/17MB fault/STOP/V86/GUI→CUI。配置実測では `cat boot.log`、`hsync -n` 等も実施 | T2親票 §5-1 T2a′-R・§6-1。`hsync -n` はdry-run。正常 unmount/sync・停止時刻・強制 kill の有無・hash は不明 |
 | 10/1、T2a′ kernel、T2bより前の試験記録 | 確定 (文書) | CRC `c02dc716` 472431B。PCM正常close、再生中CTRL+STOP×3→再open/再生×3、アプリ回収・IRQ解除・tick継続。`gfxmode cirrus` → `/api/reset`、planar fallback GUI→CUI | T1票 §4-6-N2、記録コミット `92dbe59` は15:20:25。初回PCM試行のopen直後killは別記。**アプリ kill とエミュレータ強制 kill を混同しない**。errors の前後は不明 |
 | 10/1、T2b。`c06df8d` 15:35:16、build 15:36:32 | **確定 (提供全ログ)** | 停止 → nhd-pull → deploy-kernel → deploy → 起動 (T2親票)。`boot_prev.log`: HDD、CRC `688f8280`、477781B、**errors 警告**、227/227。受入記録は8/17MB fail=0・lease=0、fault/STOP/V86/GUI→CUI | 起動実時刻不明。警告は kselftest / PCM / GUI より前。起動中の新規 metadata I/O error 行はこのログにない |
@@ -75,7 +75,7 @@ T1 の kselftest / GUI 合格や警告の引用省略を、errors 印なしの�
 各配備の元/先hash、ホストmount/unmount結果、ゲスト `sync` / 正常終了の成否、
 エミュレータ `/api/quit` / reset / 強制killの実コマンド・時刻は今回の材料では揃わない。
 [POLICY_DEBUG](../../POLICY_DEBUG.md) §4-60 は9/24〜25の `taskkill`→起動とロック問題の過去事例であり、今回の媒体で同じ操作があった証拠ではない。
-[realhw/PLAN](../realhw/PLAN.md) §0 の SerialFS `hsync -n boot`→`hsync boot`→reboot→`hsync sys`→`hsync` と、
+[realhw/PLAN](../../tasks/realhw/PLAN.md) §0 の SerialFS `hsync -n boot`→`hsync boot`→reboot→`hsync sys`→`hsync` と、
 T1票の Ra266 実機の更新・fault/PCM 記録は **別の物理 HDD**。今回の NP21/W 媒体の hsync 履歴に足してはいけない。
 そこから参照される9/24〜26の日次チェックリストは v3 に持ち込まれていない。
 

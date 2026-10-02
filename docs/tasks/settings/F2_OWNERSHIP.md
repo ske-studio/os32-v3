@@ -1,6 +1,6 @@
 # F2 — SQLite 接続単位の VFS FD 所有・失敗隔離・exec 終了統合
 
-> 状態: **設計中 (2026-09-30)** — **U6 決定 (ユーザー 2026-09-30、[TASK_MEMMAP_V3](../v3/TASK_MEMMAP_V3.md) D30): 残り全部 (F2b の呼び出し側接続・F2c・F2d の隔離経路・default VFS の fail-closed・R0 / R1) は独立票にせず、TASK_MEMMAP_V3 §6 の T4 (SQLite 分離、`kapi_db` / `ime_dict` の接続部) と T5a (FEP モジュール) の受入に畳む。** 前提の変化 (RESIDENT group は 1 → 2 本、FEP の接続は起動時 live AS = 0 で開く、group 表はモジュールの data、R7 で v3 では取り外さない) は [U6_PENDING_REVIEW](../v3/U6_PENDING_REVIEW.md) §1-2。本文 (§1〜§8) は 09-13 のままで書き換えない。
+> 状態: **設計中 (2026-09-30)** — **U6 決定 (ユーザー 2026-09-30、[TASK_MEMMAP_V3](../v3/TASK_MEMMAP_V3.md) D30): 残り全部 (F2b の呼び出し側接続・F2c・F2d の隔離経路・default VFS の fail-closed・R0 / R1) は独立票にせず、TASK_MEMMAP_V3 §6 の T4 (SQLite 分離、`kapi_db` / `ime_dict` の接続部) と T5a (FEP モジュール) の受入に畳む。** 前提の変化 (RESIDENT group は 1 → 2 本、FEP の接続は起動時 live AS = 0 で開く、group 表はモジュールの data、R7 で v3 では取り外さない) は [U6_PENDING_REVIEW](../../archive/v3/U6_PENDING_REVIEW.md) §1-2。本文 (§1〜§8) は 09-13 のままで書き換えない。
 > それまでの状態: 設計中 (2026-09-13 から動きなし) — F2b の内部基盤だけ着地 (be445f4e、`os32_sqlite_group_*` は呼び出し側に未接続 — 2026-09-29 に grep で確認)。§7 の設計レビュー R0・実装レビュー R1 は未実施。「実装中」は実態と違うので直した。v3 の入力として残す。(2026-09-29 の棚卸しで更新)
 >
 > 発行: PM (2026-09-09) / それまでの状態: **実装中 (2026-09-13)**

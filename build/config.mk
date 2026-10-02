@@ -88,7 +88,7 @@ INC_SQLITE = $(INC_COMMON) -Ilib/sqlite3 -Ifs -Idrivers -Ilib -Ikernel
 #   同じ構造体を異なるレイアウトで扱う .o が混在して実行時に壊れる。
 DEPFLAGS = -MMD -MP
 
-# === 言語指定 ([C1]、票 docs/tasks/v3/TASK_C11_MIGRATION.md) ===
+# === 言語指定 ([C1]、票 docs/archive/v3/TASK_C11_MIGRATION.md) ===
 # 言語指定は機械・ABI の旗 (CFLAGS_MACHINE) と分けて持つ。SQLite 系だけ別の
 # 言語指定 (C_STD_SQLITE) を使うので、共通旗に -std を入れて後ろの -std で
 # 打ち消す構成にはしない (どちらが効いたかが旗の並びに依存するため)。

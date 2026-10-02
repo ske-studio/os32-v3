@@ -1,10 +1,10 @@
 # U6_PENDING_REVIEW — 保留 5 件 (F3a〜c / F2c / FEP_BOUNDARY / MEMORY_RAM_INTEGRATION / DEVICE_RESERVATION) の仕分け表
 
-> 状態: **完了記録 (2026-09-30)** — **決裁済み**。[V3_PLAN_DRAFT.md](V3_PLAN_DRAFT.md) §7-1 **U6**「保留 5 件を v3 で拾うか」の仕分け表。§2 の判断 6 点は **2026-09-30 にユーザーがすべて推奨 (★) どおりに決定**: (1) F3b は (b) 同一 DB の排他 open を TASK_DICT_META の後、(2) F2 の残りは (a) T4 + T5a に畳む、(3) FEP_BOUNDARY は (a) T2 / T4 / T5a の要件 + 旧 `db_exec` / `db_prepare` の 1024B 超は失敗に、(4) MEMORY_RAM_INTEGRATION は撤回して archive へ、(5) DEVICE_RESERVATION は (c) 識別 + 予約は起動時・probe + enable は GUI 境界、範囲は検証済みの実測 BAR へ (X4 は Codex へ)、(6) U6 の答えは「一部」。決定の正典は [TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) **D29〜D34**、§2 末尾の「決裁後に PM が行うこと」は同日に反映済み (各票の状態行、T1 / T2 / T4 / T5a の受入、V3_PLAN_DRAFT P4 / P10 / U6、ROADMAP §1、INDEX)。以下の本文は草案時のまま。
+> 状態: **完了記録 (2026-09-30)** — **決裁済み**。[V3_PLAN_DRAFT.md](V3_PLAN_DRAFT.md) §7-1 **U6**「保留 5 件を v3 で拾うか」の仕分け表。§2 の判断 6 点は **2026-09-30 にユーザーがすべて推奨 (★) どおりに決定**: (1) F3b は (b) 同一 DB の排他 open を TASK_DICT_META の後、(2) F2 の残りは (a) T4 + T5a に畳む、(3) FEP_BOUNDARY は (a) T2 / T4 / T5a の要件 + 旧 `db_exec` / `db_prepare` の 1024B 超は失敗に、(4) MEMORY_RAM_INTEGRATION は撤回して archive へ、(5) DEVICE_RESERVATION は (c) 識別 + 予約は起動時・probe + enable は GUI 境界、範囲は検証済みの実測 BAR へ (X4 は Codex へ)、(6) U6 の答えは「一部」。決定の正典は [TASK_MEMMAP_V3](../../tasks/v3/TASK_MEMMAP_V3.md) **D29〜D34**、§2 末尾の「決裁後に PM が行うこと」は同日に反映済み (各票の状態行、T1 / T2 / T4 / T5a の受入、V3_PLAN_DRAFT P4 / P10 / U6、ROADMAP §1、INDEX)。以下の本文は草案時のまま。
 > それまでの状態: 草案 (2026-09-30) — ユーザーが内容を再確認するための仕分け表。決定ではない
 >
 > 発行: コーダー `claude-fable-5-1` (2026-09-30)、PM の指示 (ユーザー指示「U6 の仕分け表を作る」) による。基点 `feat/gui` 2a6cc836 (KernelAPI v68)。
-> 読んだもの: 5 件の票 ([F2_OWNERSHIP](../settings/F2_OWNERSHIP.md) / [FEP_BOUNDARY](../settings/FEP_BOUNDARY.md) / [MEMORY_RAM_INTEGRATION](../../archive/settings/MEMORY_RAM_INTEGRATION.md) / [DEVICE_RESERVATION](../settings/DEVICE_RESERVATION.md)、F3a〜c は [S0_FOUNDATION §3](../../archive/settings/S0_FOUNDATION.md) の表)、保留の出典 ([HANDOVER_v14 §3](../../archive/agents/HANDOVER_v14.md)、[S0_PLAN_2026-09-13 §2 後回し欄](../../archive/settings/S0_PLAN_2026-09-13.md))、[V3_PLAN_DRAFT](V3_PLAN_DRAFT.md) §1-3・§3・§4、**[TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) の決定 D1〜D28・§2-2 lease・§3-5 池の運用規則 R1〜R7・§4-6 SQLite/FEP の取り分・§6 票 T0〜T7**、[TASK_DICT_META](../fep/TASK_DICT_META.md)、[TASK_TRIDENT_DRIVER §4-2](../realhw/TASK_TRIDENT_DRIVER.md)。
+> 読んだもの: 5 件の票 ([F2_OWNERSHIP](../../tasks/settings/F2_OWNERSHIP.md) / [FEP_BOUNDARY](../../tasks/settings/FEP_BOUNDARY.md) / [MEMORY_RAM_INTEGRATION](../settings/MEMORY_RAM_INTEGRATION.md) / [DEVICE_RESERVATION](../../tasks/settings/DEVICE_RESERVATION.md)、F3a〜c は [S0_FOUNDATION §3](../settings/S0_FOUNDATION.md) の表)、保留の出典 ([HANDOVER_v14 §3](../agents/HANDOVER_v14.md)、[S0_PLAN_2026-09-13 §2 後回し欄](../settings/S0_PLAN_2026-09-13.md))、[V3_PLAN_DRAFT](V3_PLAN_DRAFT.md) §1-3・§3・§4、**[TASK_MEMMAP_V3](../../tasks/v3/TASK_MEMMAP_V3.md) の決定 D1〜D28・§2-2 lease・§3-5 池の運用規則 R1〜R7・§4-6 SQLite/FEP の取り分・§6 票 T0〜T7**、[TASK_DICT_META](../../tasks/fep/TASK_DICT_META.md)、[TASK_TRIDENT_DRIVER §4-2](../../tasks/realhw/TASK_TRIDENT_DRIVER.md)。
 > **「今の状態」の列は 2026-09-30 に HEAD 2a6cc836 のソースと `git log` で確かめたもの** (根拠は §3)。票の本文の行番号は 09-13 の作業ツリーのものなので、ここでは関数名で書く。
 
 ---
@@ -33,7 +33,7 @@ U6 の選択肢「拾う (P4・P10) / 一部 / 拾わない」に当てると **
 
 ### 1-1. F3a〜c — SQLite VFS の失敗と排他を正直にする
 
-出典: [S0_FOUNDATION §3 F3](../../archive/settings/S0_FOUNDATION.md) (3 行の表だけ。独立の票は無い)。保留の理由 (S0_PLAN §2): v1.3 で settings.db を使うのに要らない。
+出典: [S0_FOUNDATION §3 F3](../settings/S0_FOUNDATION.md) (3 行の表だけ。独立の票は無い)。保留の理由 (S0_PLAN §2): v1.3 で settings.db を使うのに要らない。
 
 | | 内容 |
 |---|---|
@@ -45,7 +45,7 @@ U6 の選択肢「拾う (P4・P10) / 一部 / 拾わない」に当てると **
 
 ### 1-2. F2c — FEP の RESIDENT group 移行 (実態は F2 の残り全部)
 
-出典: [F2_OWNERSHIP](../settings/F2_OWNERSHIP.md) (設計中、F2b の内部基盤だけ着地)。保留欄には「F2c」とあるが、F2c だけを切り出して拾う形にはならない (F2b の呼び出し側接続と F2d の隔離経路が前提)。
+出典: [F2_OWNERSHIP](../../tasks/settings/F2_OWNERSHIP.md) (設計中、F2b の内部基盤だけ着地)。保留欄には「F2c」とあるが、F2c だけを切り出して拾う形にはならない (F2b の呼び出し側接続と F2d の隔離経路が前提)。
 
 | | 内容 |
 |---|---|
@@ -57,19 +57,19 @@ U6 の選択肢「拾う (P4・P10) / 一部 / 拾わない」に当てると **
 
 ### 1-3. FEP_BOUNDARY — FEP user 境界と SQLite 中断禁止
 
-出典: [FEP_BOUNDARY](../settings/FEP_BOUNDARY.md) (設計中、R0 待ち)。
+出典: [FEP_BOUNDARY](../../tasks/settings/FEP_BOUNDARY.md) (設計中、R0 待ち)。
 
 | | 内容 |
 |---|---|
 | (1) 何を | **SQLite / VFS が caller の未検証ポインタを一度も読まない・書かない境界**。(a) 上限表 §3 (prefix / yomi / kanji / path は 256B、list は 1〜64 件、staging 64 × 68B、SQL は 1024B で**切捨てて実行しない**); (b) checked copy の helper §4 (caller PD の PDE/PTE を walk、`[start, start+len)` の overflow、IF の保存/復元); (c) list は kernel staging → **finalize → copyout** の順 §5; (d) DB の path / SQL も同じ checked copy、**旧 active_stmt の finalize より前に SQL を全コピー** §6.1; (e) **エンジン in-flight の fail-stop** §6.2 — SQLite 進入中 (`enter` / `leave`) の #PF / 一般例外は app-kill にせず kernel 異常として停止、EIP が `.sqlite_text` にあるかだけで判定しない; (f) 全 `sqlite3_*` 呼び出しの台帳 §6.3; 段 B1 uaccess → B2 FEP → B3 DB → B4a/b guard |
-| (2) 今 | **FEP の facade は未着手**: `ime_user_list_facade / delete / export` (`kernel/ime.c`) は caller のポインタをそのまま `ime_user_*` に渡す。**その後に着地して一部を覆うもの**: (i) [TASK_KAPI_OUTPUT_GUARD](../../archive/kernel_v21/TASK_KAPI_OUTPUT_GUARD.md) (09-23) — `wrap_ime_user_list` の先頭で `ring3_user_ranges_writable(out, max × sizeof(IME_UserEntry))` を検査 (書けない出力範囲は kill)。ただし SQLite の step 中に**直接 user メモリへ書く**のは変わらず、§5 の「finalize の後に copyout」ではない; (ii) 入力の文字列 (prefix / yomi / kanji / path) は dispatcher の `ring3_ptr_ok` (先頭番地の帯判定) だけで、長さ・NUL・ページ跨ぎは見ない; (iii) DB 側: KAPI v50 の `db_open_existing` / `db_prepare_only` は **`db_user_str_copy`** (1 バイトずつ `ring3_user_range_ok` で検証、cap 内に NUL が無ければ**失敗、切捨てない**) — §6.1 の新規 3 本分は着地。旧 `db_exec` / `db_prepare` は今も `kstrncpy` の切捨てで、**旧 stmt の finalize が SQL のコピーより先** (§6.1 の指摘のまま); (iv) §6.2 の fail-stop は**無い** — `kernel/isr_handlers.c` は EIP が `__sqlite_start..__sqlite_end` にあれば「[.sqlite_text]」と表示するだけ (票が禁じた判定法そのもの) で、`ring3_in_syscall` の app-kill はそのまま走る; (v) §6.3 の台帳は無い |
+| (2) 今 | **FEP の facade は未着手**: `ime_user_list_facade / delete / export` (`kernel/ime.c`) は caller のポインタをそのまま `ime_user_*` に渡す。**その後に着地して一部を覆うもの**: (i) [TASK_KAPI_OUTPUT_GUARD](../kernel_v21/TASK_KAPI_OUTPUT_GUARD.md) (09-23) — `wrap_ime_user_list` の先頭で `ring3_user_ranges_writable(out, max × sizeof(IME_UserEntry))` を検査 (書けない出力範囲は kill)。ただし SQLite の step 中に**直接 user メモリへ書く**のは変わらず、§5 の「finalize の後に copyout」ではない; (ii) 入力の文字列 (prefix / yomi / kanji / path) は dispatcher の `ring3_ptr_ok` (先頭番地の帯判定) だけで、長さ・NUL・ページ跨ぎは見ない; (iii) DB 側: KAPI v50 の `db_open_existing` / `db_prepare_only` は **`db_user_str_copy`** (1 バイトずつ `ring3_user_range_ok` で検証、cap 内に NUL が無ければ**失敗、切捨てない**) — §6.1 の新規 3 本分は着地。旧 `db_exec` / `db_prepare` は今も `kstrncpy` の切捨てで、**旧 stmt の finalize が SQL のコピーより先** (§6.1 の指摘のまま); (iv) §6.2 の fail-stop は**無い** — `kernel/isr_handlers.c` は EIP が `__sqlite_start..__sqlite_end` にあれば「[.sqlite_text]」と表示するだけ (票が禁じた判定法そのもの) で、`ring3_in_syscall` の app-kill はそのまま走る; (v) §6.3 の台帳は無い |
 | (3) 置き換わった / 残る | **置き換わった**: (i) §4 の「caller PD の帯」— **T2 でアプリ帯が 0x80000000〜 の私有写像に**なり `ring3_ptr_ok` / `RING3_*` は定数分離の対象 (TASK_MEMMAP_V3 §2-3 ⑦ の表に `ring3_ptr_ok` 明記)。今の帯で B1 を作ると T2 で作り直しになる → **B1 は T2 の中で**; (ii) §6.3「全 outer 呼び出しの台帳」— **T4 でカーネル → SQLite の呼び出しはエクスポート表 1 か所を通る** ので、`enter / leave` は表のラッパに置けば台帳は表そのもの。FEP (T5a) の呼び出しも同じ表; (iii) §6.2「CTRL+STOP は syscall 境界まで保留」— **§3-5 R1 で決定済み** (IRQ は要求と制御移譲だけ、回収は通常文脈。T2 で `ring3_abort_kill` を 2 段に)。P6 の番犬 (前景が固まったら取り戻す) も同じ契約の上; (iv) MINIMAL (D21・D26) では SQLite が無いので `db_*` / `ime_user_*` は stub — 境界の検査は「モジュール有り」の経路だけ。**残る**: (a) 入力文字列の bounded copy (FEP の 4 引数 + 旧 `db_exec` / `db_prepare`); (b) list の staging と finalize 後の copyout; (c) delete の「不正 kanji で全候補削除に拡大しない」、export の「不正 path で truncate しない」(§3); (d) エンジン in-flight の fail-stop 自体 (判定法を表のラッパに変えるだけで、要件は残る); (e) 32B 結果幅 vs 入力上限 256B の区別 |
 | (4) どこで | **P10 だが独立票にしない**: **B1 (uaccess の helper) → T2 の受入** (新しい帯で `ring3_ptr_ok` を書き直す差分に「NUL まで 1 バイトずつ検証するコピー」を含める。`db_user_str_copy` を `exec/` へ移して共通化); **B4 (enter / leave と fail-stop) → T4** (エクスポート表のラッパ + `isr_handlers.c` の判定順); **B2 (FEP facade) → T5a**、**B3 (旧 `db_exec` / `db_prepare` の checked copy) → T4**。TASK_DICT_META (v3 後半) は `ime_user_*` の宛先を学習 DB へ変えるので、B2 はその前に済ませる |
 | (5) 判断 | (a) 上の「T2 / T4 / T5a の要件として拾う」 (推奨。独立票が要らず、レビューも T 票の Codex 往復で受ける) / (b) T5a の後に P10 の独立票 (票の §7 の段のまま) / (c) 拾わない (今の帯判定 + 出力ガードで足りるとする — ただし §2 の穴 (未終端の user 文字列で SQLite 進入中に #PF → app-kill が cleanup に再入) は残る)。**追加の判断**: 旧 `db_exec` / `db_prepare` の SQL が 1024B を超えたとき、今の**切捨てて実行**を**失敗**に変えてよいか (D7「後方互換は考えない」の範囲。推奨: 変える) |
 
 ### 1-4. MEMORY_RAM_INTEGRATION — RAM 統合 Phase 2
 
-出典: [MEMORY_RAM_INTEGRATION](../../archive/settings/MEMORY_RAM_INTEGRATION.md) (計画)。V3_PLAN_DRAFT §1-3 は「再棚卸しが先」(§4 D10・D11)。
+出典: [MEMORY_RAM_INTEGRATION](../settings/MEMORY_RAM_INTEGRATION.md) (計画)。V3_PLAN_DRAFT §1-3 は「再棚卸しが先」(§4 D10・D11)。
 
 | | 内容 |
 |---|---|
@@ -81,7 +81,7 @@ U6 の選択肢「拾う (P4・P10) / 一部 / 拾わない」に当てると **
 
 ### 1-5. DEVICE_RESERVATION — 任意デバイス窓の予約 broker
 
-出典: [DEVICE_RESERVATION](../settings/DEVICE_RESERVATION.md) (計画、09-29 に Cirrus の帯を更新)。V3_PLAN_DRAFT §3 は「P4 の芯」、§4 D17 は「Trident の要求を取り込んで改訂」。
+出典: [DEVICE_RESERVATION](../../tasks/settings/DEVICE_RESERVATION.md) (計画、09-29 に Cirrus の帯を更新)。V3_PLAN_DRAFT §3 は「P4 の芯」、§4 D17 は「Trident の要求を取り込んで改訂」。
 
 | | 内容 |
 |---|---|

@@ -5,7 +5,7 @@
 > 発行: PM (Claude Code `claude-fable-5-1`、2026-09-22) / それまでの状態: **L-A (PCI 列挙、KAPI v58) と L-D (Linux の橋) を着地 (2026-09-22)。**R1〜R4 は実機で取得 (2026-09-23、§6)**: 82557 = `0:11.0`、Interrupt Line **3** / PIN A、I/O BAR **0x6000** (BIOS 割当済み)、Command 0x0147 (IO/MEM/BM 有効)、PCMC = 82441FX (メカニズム #1 で可)。次は L-B (EEPROM 読み = R5)**。決裁: §3 の 1 は (b) 推奨案、2 は Ubuntu ノート、3 はスイッチ直結 (ユーザー、2026-09-22)。
 > ユーザー指示 2026-09-22: 「シリアル転送が実用的な速度になったので、次は内蔵 LAN によるホストサービスの稼働を目指す」
 
-正典: [`PLAN.md`](PLAN.md) §5 (82557 を狙う理由)・§6 (PCI の土台)、[`../v3/PLAN.md`](../v3/PLAN.md) §1 (順序) ・§3 (ドライバの動的読み込み)、
+正典: [`PLAN.md`](PLAN.md) §5 (82557 を狙う理由)・§6 (PCI の土台)、[`../../archive/v3/PLAN.md`](../../archive/v3/PLAN.md) §1 (順序) ・§3 (ドライバの動的読み込み)、
 リンク層と Host Services は [`../network/LINK_PLAN.md`](../network/LINK_PLAN.md) / [`../network/HOST_SERVICES_PLAN.md`](../network/HOST_SERVICES_PLAN.md)。
 資料: `docs/hw/undocumented/io_pci.md` (PC-98 の PCI)、**`docs/hw/intel/8255x_open_source_sdm.pdf`** (Intel 8255x Open Source Software Developer Manual、
 341 ページ、2026-09-22 に Intel の公開 URL から取得。`docs/hw/` は著作権物のミラーで gitignore)。テキスト版 `8255x_open_source_sdm.txt` (9,133 行、`pdftotext -layout`) も同じ場所 — grep で引く。要点の所在: SCB = §6.3.2 (34 ページ)、EEPROM = §5/§6.3.4、Configure = 62 ページ、RFD = 100 ページ、PCI Interrupt Line = §4.1.15。

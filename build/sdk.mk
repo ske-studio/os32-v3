@@ -116,7 +116,7 @@ check-p2v:
 	python3 tools/check_p2v.py
 	python3 tools/tests/test_p2v.py $(MUT)
 
-# 言語モードの検査 ([C1]、票 docs/tasks/v3/TASK_C11_MIGRATION.md §6 段 4)。
+# 言語モードの検査 ([C1]、票 docs/archive/v3/TASK_C11_MIGRATION.md §6 段 4)。
 # check-constraints は ID の整合だけなので、こちらが**実際の旗とコンパイル結果**を見る:
 # make -n -B all のコンパイル行ごとに効いている言語モード (本体・ブート・userland は
 # gnu11、SQLite 系は gnu89)、暗黙宣言・暗黙 int・VLA・偽の STATIC_ASSERT の拒否、

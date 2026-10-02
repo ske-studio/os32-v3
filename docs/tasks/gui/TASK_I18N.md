@@ -2,7 +2,7 @@
 
 > 状態: **計画 (2026-09-30)** — ユーザー発案 (2026-09-30「v4 か v3 の後半に多言語対応。テキスト表示の UI メッセージを SQLite で管理し、メッセージ ID ごとに翻訳を持つ」)。§2 の 5 点はユーザーと決めた。**設計票の作成は v3 後半** (P1 の T4 = SQLite のモジュール化と、[TASK_CONTROL_PANEL](TASK_CONTROL_PANEL.md) の後)。日本語・英語以外の文字体系の表示は OpenType 層 (TASK_MEMMAP_V3 の T7b) の後 = v3 の終わりか v4。
 >
-> 発行: PM (Claude Code `claude-opus-5-5`、2026-09-30)。関係: [V3_PLAN_DRAFT.md](../v3/V3_PLAN_DRAFT.md) §3 P8、[settings/DESIGN.md](../settings/DESIGN.md) (TSV → SQLite の生成と「開いて読んで閉じる」作法の手本)、[TASK_MEMMAP_V3.md](../v3/TASK_MEMMAP_V3.md) D21・D27 (SQLite の常時読み込みと MEMSYS5 の予算)。
+> 発行: PM (Claude Code `claude-opus-5-5`、2026-09-30)。関係: [V3_PLAN_DRAFT.md](../../archive/v3/V3_PLAN_DRAFT.md) §3 P8、[settings/DESIGN.md](../settings/DESIGN.md) (TSV → SQLite の生成と「開いて読んで閉じる」作法の手本)、[TASK_MEMMAP_V3.md](../v3/TASK_MEMMAP_V3.md) D21・D27 (SQLite の常時読み込みと MEMSYS5 の予算)。
 
 ## 1. 目的と範囲
 

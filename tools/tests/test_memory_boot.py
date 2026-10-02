@@ -3,7 +3,7 @@
   python3 -B tools/tests/test_memory_boot.py            # 肯定側 (unittest)
   python3 -B tools/tests/test_memory_boot.py --mutate   # 否定側 + 肯定側
 
-T1a (docs/tasks/v3/TASK_T1_LEDGER.md §4-1): legacy の pgalloc_init への
+T1a (docs/archive/v3/TASK_T1_LEDGER.md §4-1): legacy の pgalloc_init への
 fallback は撤去した。8MB から 2GB 超の申告まで、全部の構成がモデル経路で
 ONLINE になり、台帳の置き場は backing の 2 択 (ARENA_TOP / FIXED、§3-3)。
 

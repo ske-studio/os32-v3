@@ -1,7 +1,7 @@
 /* ========================================================================
  *  FAULTTEST.C — CPL=3 の例外 kill と CTRL+STOP を起こす試験バイナリ
  *
- *  票: docs/tasks/v3/TASK_T1_LEDGER.md §4-2-N (T1b の NP21/W 回帰の未確認)
+ *  票: docs/archive/v3/TASK_T1_LEDGER.md §4-2-N (T1b の NP21/W 回帰の未確認)
  *      docs/tasks/v3/TASK_T2_APPBAND.md §5-1 (T2a: park → resume 後の fault/STOP)
  *
  *  使い方:

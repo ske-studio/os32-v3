@@ -678,7 +678,7 @@ PYTHONPATH=tools python3 -c 'from clang_ast.type_occurrences import visitor_bina
 clang の解析失敗・不足入力は非0で終了する。`make all` の後に検査する。
 実ビルドで選ばれたソースとそこから取り込むヘッダが対象で、未使用ヘッダ・
 非選択の `#if` 分岐は対象外。旗の読み替え・判定・比較の詳細は
-[TASK_CLANG_CHECKS](tasks/v3/TASK_CLANG_CHECKS.md) §4・§6。
+[TASK_CLANG_CHECKS](archive/v3/TASK_CLANG_CHECKS.md) §4・§6。
 
 - `make check-p2v`: canonical type とマクロ展開で物理キャスト・物理引数、
   user/lease の V2P、関数内 CONST を検査。[C5] の file:function:reason は

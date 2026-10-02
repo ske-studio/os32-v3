@@ -98,9 +98,9 @@ v3 に先行して着地したもの: 結線の土台 (HAL_WIRING)、PCM CS4231�
 ### v3 (2026-09-17 計画 → 09-30 方針確定 → os32-v3 へ fork)
 
 「機能を足す前に入れ物を作り直す」版。2026-09-17 にカーネル帯 1MB の帯域超過 (必要量 1041KB) が判明し、再配置で凌いだ (修正後の余裕は 34KB、`docs/archive/kernel_v21/TASK_KSTACK_USER.md` §7) が、v2.1 の時点では本体の予算の残りが約 13KB — 穴の根は帯の切り方で、帯の中で削るのは延命、というのが出発点。
-目的の一文と目標の 2 段 (8MB 機で GUI + 私有 2MB のアプリ / 前景 1 本で P100/32MB の Win95 より快適、32〜64MB 機で Win2000 当時の使用感) は `docs/tasks/v3/V3_PLAN_DRAFT.md` §2。
+目的の一文と目標の 2 段 (8MB 機で GUI + 私有 2MB のアプリ / 前景 1 本で P100/32MB の Win95 より快適、32〜64MB 機で Win2000 当時の使用感) は `docs/archive/v3/V3_PLAN_DRAFT.md` §2。
 メモリマップ (システムは恒等のまま、アプリだけ 0x80000000〜、物理台帳、SQLite のモジュール化、低位 640KB を V86 へ、OpenType) は 3 者討論で決めた (`docs/tasks/v3/TASK_MEMMAP_V3.md`、D1〜D36)。
-最初の票は T0 (C89 → C11、`docs/tasks/v3/TASK_C11_MIGRATION.md`)。os32-v3 は新しい履歴 (初期コミット) で始め、経緯はこの文書で持つ (FORK_PLAN)。
+最初の票は T0 (C89 → C11、`docs/archive/v3/TASK_C11_MIGRATION.md`)。os32-v3 は新しい履歴 (初期コミット) で始め、経緯はこの文書で持つ (FORK_PLAN)。
 
 ---
 
