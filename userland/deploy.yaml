@@ -167,10 +167,6 @@ filesystem:
     - host: userland/tests/hello_r3.bin
       guest: /usr/bin/
       tags: [test]
-    # --- faultprobe_r3 (M2e KAPI 版 [ABI4] 検証, faultprobe の CPL=3 版) ---
-    - host: userland/tests/faultprobe_r3.bin
-      guest: /usr/bin/
-      tags: [test]
     - host: userland/tests/math_test.bin
       guest: /usr/bin/
       tags: [test]

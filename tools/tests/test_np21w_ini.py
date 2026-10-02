@@ -29,7 +29,7 @@ class ExMemory(unittest.TestCase):
     """ExMemory は MB 単位の拡張メモリ (win9x/ini.cpp:477, PFTYPE_UINT16、
     SUPPORT_LARGE_MEMORY 有効時)。ブートローダが 1MB から 512KB 刻みで実測するので
     (boot/loader_fat.asm:248)、ゲストの総容量はこの値から決まる。
-    8MB は CUI の最低動作環境で、memory_boot の legacy フォールバック経路を通す。"""
+    8MB は CUI の最低動作環境。memory_boot は低容量でもモデル経路を使う。"""
 
     def test_switch_between_proven_sizes(self):
         small, diff = ini.transform(RAW, {'EXMEMORY': '7'})
@@ -44,8 +44,8 @@ class ExMemory(unittest.TestCase):
                 ini.transform(RAW, {'EXMEMORY': value})
 
     def test_nine_mb_is_the_pegc_gui_floor(self):
-        """ExMemory=8 -> ゲスト 9MB。640x480 PEGC の 300KB 予約が
-        固定アプリ帯 0x500000-0x800000 の外に出る最小構成 (2026-09-09 実測)。"""
+        """ExMemory=8 -> ゲスト 9MB。PEGC GUI の検証済み最小構成
+        (2026-09-09 実測)。現在の BB は pool から予約する。"""
         out, diff = ini.transform(RAW, {'EXMEMORY': '8'})
         self.assertEqual(diff, ['EXMEMORY: 16 -> 8'])
         self.assertEqual(out, RAW.replace(b'ExMemory=16', b'ExMemory=8'))
@@ -100,7 +100,6 @@ class Availability(unittest.TestCase):
         self.assertTrue(SCRIPT.is_file(), 'np21w_ini.py must implement the tested contract')
 
 
-@unittest.skipIf(ini is None, 'implementation not yet written (assertion RED)')
 class Transformation(unittest.TestCase):
     def test_preserves_unrelated_bytes(self):
         result, diff = ini.transform(RAW, CHANGES)
@@ -140,7 +139,6 @@ class Transformation(unittest.TestCase):
                 ini.transform(raw, CHANGES)
 
 
-@unittest.skipIf(ini is None, 'implementation not yet written (assertion RED)')
 class OfflineFiles(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -332,7 +330,6 @@ class WslpathFake:
         return types.SimpleNamespace(returncode=0, stdout=text.encode('cp932') + b'\r\n')
 
 
-@unittest.skipIf(ini is None, 'implementation not yet written (assertion RED)')
 class PathFields(unittest.TestCase):
     """HDD1FILE / FDD1FILE / FDD2FILE。fail closed / CP932 保持 / 重複拒否は
     固定値キーと同じ作法で、存在要求だけを ALLOWED と別々に適用する。

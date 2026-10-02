@@ -68,8 +68,8 @@ db_test                 # 下の「確かめていない 1 件」
 #
 # 約束事に未適合 — 集計行も終了コードも出さない道具・断片。適合させてから
 # ここへ足すこと (前段 §8 の「44 本すべての適合は次の票」)。
-#     args / dbq / e2seek / gui_busy / heap_test / hello / libc_test / nop /
-#     ring3_hello / t_exit / test3 / test4
+#     dbq / e2seek / gui_busy / heap_test / hello / nop /
+#     ring3_hello / t_exit
 #
 # Rust の alloc_demo は書式を testresult.h に揃えてあるが、配備の名前が
 # 別系統 (userland/rust/) なので第 2 陣で足す。

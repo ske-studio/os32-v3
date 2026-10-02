@@ -204,12 +204,12 @@ Unicodeはkernel所有FIXED_RAM/RO SURFACE。ユーザー版utf8だけsetterでl
 | e6 | C SDK checked attach/互換void橋。反復取得/失敗時描画なし |
 | e7 | shlib/gshell復帰配線。gfx両実体で再描画 |
 | e8a | Unicode CRT/shlib/user utf8。日本語、RO出力拒否、取得失敗時ready=0 |
-| e8b | kcg boot専用化とNOSYS。font_load_test/台本/host期待値、表/BB/mailbox不変 |
-| e9 | tvdumpとSHMマーカー・観測側。wire不変、fault目的地一致、lock→free/exit→2本目アプリのSHM書込み |
-| e10a | shm_init後のboot口・SHM権限口・起動時map撤去・汎用昇格禁止。lock/free/回収のUSER維持 |
+| e8b | kcg boot専用化とNOSYS。font_load_test/台本/host期待値、表/BB/mailbox不変<br>申し送り (2026-10-02): `font_load_test` と `test_result_conv` の期待を boot 後 NOSYS/表・BB 不変へ更新する。 |
+| e9 | tvdumpとSHMマーカー・観測側。wire不変、fault目的地一致、lock→free/exit→2本目アプリのSHM書込み<br>申し送り (2026-10-02): `nop`・`ring3_hello/fault/guard` のマーカーを SHM へ移し、`db_v50_test` の VRAM 許可期待を未貸与拒否へ変える。 |
+| e10a | shm_init後のboot口・SHM権限口・起動時map撤去・汎用昇格禁止。lock/free/回収のUSER維持<br>申し送り (2026-10-02、e11 で統合): kselftest `test_map_user_keep` と paging.c `paging_map_user_keep_selftest` を共有PT昇格禁止に合わせて改廃し、`paging_bounds_host.c` の `paging_addrspace_map_user_keep(...) == 0` の呼出しは拒否期待へ反転する。`paging_map_user_keep_selftest() == 0` の呼出しは成功期待を維持し、selftest の中身を共有PT昇格禁止に合わせて書き直す。 |
 | e10b | V86 sessionと全出口復元。VRAM/E両行PCD、PDE USER、失敗/STOP出口を確認 |
 | e10c | master/AS/post-exec毎bootの3段検査。kselftest (c)とV86帰路でalias_cache一致、DISPLAY/TVRAM再取得 |
-| e11 | 全切替・世代/生成/manifest確認 (前小段を統合、単独で部分配備しない) |
+| e11 | 全切替・世代/生成/manifest確認 (前小段を統合、単独で部分配備しない)<br>申し送り (2026-10-02): `test_app_bb_overlap.py` は旧直接BB公開の撤去時に退役するか lease CLIENT 試験へ作り直す。e10a の map_user_keep 試験更新も統合する。 |
 | e12 | 変異/サイズ結果と受入台本を確定、PM受入は構成ごと別依頼 |
 
 実ソース `test_lease.py` / `test_gfx_boot.py` とSDK呼出しを連結し、backendを選ぶだけの模型で終えない。変異は旧bb pointer、plane stride丸め、片実体だけ再attach、GUI DISPLAY許可、UC落ち、共有PT書込み許可、revoke前free、V86後PDE USER復元欠落、teardownのPCD欠落、SHM lock/free/回収後USER欠落、束generation照合削除、fontのboot終了ガード除去。既存10 lease変異の意図も保持。
@@ -627,7 +627,7 @@ nanoのtail trimは実free list上で末尾のfree chunkを確認し、header/�
 | f9 | exec_heap小arenaと親保存/復元。公開EXEC_* unmap拒否と改竄header検出で他owner不変 |
 | f10 | exec_heap大塊と安全なtrim。空末尾/空arena/生存データ保持 |
 | f11 | nano trim。失敗rollback、再割当の実ソース試験 |
-| f12 | 起動予算・旧helper撤去・最小初期量/世代の一括切替 |
+| f12 | 起動予算・旧helper撤去・最小初期量/世代の一括切替<br>申し送り (2026-10-02): `test_sbrk_tier.py` を丸ごと削除し、`app_band_pde_host.c` の legacy byte budget、`memory_boot_host.c` の `MEM_EXEC_SBRK_MIN` 式、kselftest `test_pool_model` の `pool:exec range`、`heap_test` を新予算/heap契約へ更新する。 |
 | f13 | mem表示・変異結線・size/manifestとPM台本を確定 |
 
 **f1a 実装記録 (2026-10-02、Codex gpt-6.1-sol、wt/t2f1、基点6a8aba9)**:

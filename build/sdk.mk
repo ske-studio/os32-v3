@@ -184,6 +184,8 @@ check-multiapp-model-host:
 check-memory-host:
 	python3 -B tools/tests/test_physmem.py
 	python3 -B tools/tests/test_paging_bounds.py $(MUT)
+	python3 -B tools/tests/test_paging_bounds.py --rebuild nonmaster
+	python3 -B tools/tests/test_paging_bounds.py --rebuild rollback
 	python3 -B tools/tests/test_app_band_pde.py $(MUT)
 	python3 -B tools/tests/test_pgalloc_model.py
 	python3 -B tools/tests/test_pgalloc_range.py
@@ -217,18 +219,21 @@ check-memmap:
 check-boot-splash-host:
 	python3 -B tools/tests/test_boot_splash_native.py
 
-# NP21/W の停止・起動 (tools/np21w_ctl.py) の変異まで回す。ケースだけなら
-# check-tools-host の discover でも回る。
+# NP21/W の停止・起動 (tools/np21w_ctl.py)。ケースと変異はこの専用列で回す。
 check-np21w-ctl-host:
 	python3 -B tools/tests/test_np21w_ctl.py $(MUT)
 
-# NP21/W の ini ライブ変更 (tools/np21w_ini_live.py) の変異まで回す。ケースだけなら
-# check-tools-host の discover でも回る (票: tools/tests/np21w_ini_live_tdd.md)。
+# NP21/W の ini ライブ変更。ケースと変異はこの専用列で回す
+# (票: tools/tests/np21w_ini_live_tdd.md)。
 check-np21w-ini-live-host:
 	python3 -B tools/tests/test_np21w_ini_live.py $(MUT)
 
+# ctl / ini_live は専用列で実行する。残る3本だけを discover する。
+# 新しい test_np21w_*.py はここへ足す (専用列で実行するものを除く)。
 check-tools-host:
-	python3 -B -m unittest discover -s tools/tests -p 'test_np21w_*.py'
+	python3 -B -m unittest discover -s tools/tests -p 'test_np21w_ini.py'
+	python3 -B -m unittest discover -s tools/tests -p 'test_np21w_transport.py'
+	python3 -B -m unittest discover -s tools/tests -p 'test_np21w_trial.py'
 	python3 -B tools/tests/test_nhd_deploy_failure.py
 	python3 -B tools/tests/test_filer_normalize.py
 	python3 -B tools/tests/test_filer_copy_abort.py
@@ -1171,7 +1176,7 @@ check-shlib-high-host:
 
 .PHONY: check-shlib-high-host
 
-# T2d d0a: known failure is explicit XFAIL until d0b fixes registered-AS copy.
+# T2d d0b: registered-AS copy is a passing regression, including runtime mutants.
 check-fd-redirect-d0a-host:
 	python3 -B tools/tests/test_fd_redirect_d0a.py $(MUT)
 

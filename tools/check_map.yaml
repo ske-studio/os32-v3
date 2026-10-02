@@ -766,7 +766,7 @@ checks:
     - tools/tests/highram_stage_host.c
     - tools/tests/host_arch/arch_cpu.h
     - tools/tests/memory_boot_host.c
-    - tools/tests/paging_rebuild_host.c
+    - tools/tests/paging_rebuild_host.c # nonmaster / rollback は check-memory-host で実行
     - tools/tests/pgalloc_host_fixture.h
     - tools/tests/pgalloc_range_host.c
     - tools/tests/sbrk_tier_host.c
@@ -1037,8 +1037,8 @@ checks:
     - tools/tests/test_mk_blank_nhd.py
     - tools/tests/test_mk_settings_db.py
     - tools/tests/test_nhd_deploy_failure.py
-    - tools/tests/test_np21w_ctl.py
     - tools/tests/test_np21w_ini.py
+    # transport 試験が Fake / TARGET fixture を import するため入力依存として残す。
     - tools/tests/test_np21w_ini_live.py
     - tools/tests/test_np21w_transport.py
     - tools/tests/test_np21w_trial.py
