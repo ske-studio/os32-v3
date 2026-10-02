@@ -3198,6 +3198,22 @@ checks:
   - sdk/include/os32/os32_kapi_slots.h
   - tools/tests/db_caller_host.c
   - tools/tests/test_db_caller.py
+  - fs/ext2.h
+  - fs/serialfs.h
+  - fs/sfs_client.h
+  - fs/sfs_proto.h
+  - include/bootinfo.h
+  - include/tvram.h
+  - kapi/kapi_generated.c
+  - kapi/kapi_profile.h
+  - kernel/ime.h
+  - kernel/ime_render.h
+  - kernel/memory_boot.h
+  - kernel/v86.h
+  - kernel/v86_gcap.h
+  - sdk/include/os32/os32api.h
+  - fs/vfs.c
+  - userland/tests/db_v50_test.c
   - drivers/kbd.h
   - drivers/kbd_status.h
   - exec/exec_heap.h

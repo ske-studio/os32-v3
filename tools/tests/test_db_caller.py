@@ -14,9 +14,25 @@ def sources():
     result['guards'] = constants + src[src.index('int ring3_ptr_ok(u32 p)'):src.index('#include "ksetjmp.h"')]
     result['db'] = (walk.ROOT / 'kapi/kapi_db.c').read_text()
     result['str'] = (walk.ROOT / 'exec/ring3_str.c').read_text()
+    result['vfs'] = (walk.ROOT / 'fs/vfs.c').read_text()
+    generated = (walk.ROOT / 'kapi/kapi_generated.c').read_text()
+    result['out_wrapper'] = generated[generated.index('#define KAPI_OUT_LEN('):generated.index('static u32 kapi_out_mul')]
+    start = generated.index('int __cdecl wrap_sys_stat(')
+    result['out_wrapper'] += generated[start:generated.index('\n}', start) + 2]
+    start = src.index('void __cdecl ring3_syscall_dispatch(')
+    result['dispatch'] = src[start:src.index('\n}', start) + 2]
+    end = generated.index('};', generated.index('const u16 kapi_argptr')) + 2
+    result['arg_tables'] = generated[generated.index('const u16 kapi_argsize'):end]
+    guest = (walk.ROOT / 'userland/tests/db_v50_test.c').read_text()
+    assert 'api->db_bind_text(h, 1, guard_crossing_text(api), 2)' in guest
+    start = guest.index('static const char *guard_crossing_text(')
+    result['guest_probe'] = guest[start:guest.index('\n}', start) + 2]
     return result
 
 MUTANTS = [
+    ('guest_probe', 'api->sbrk_heap_limit - 1u', '((void)api, 0x800000UL - 1u)', 'guest old low app boundary'),
+    ('db', 'rc = vfs_stat(abs_path_buf, &st);', 'rc = wrap_sys_stat(abs_path_buf, &st);', 'internal stat routed through public guard'),
+    ('out_wrapper', 'KAPI_OUT_LEN(buf, sizeof(OS32_Stat))', '0u', 'public stat output unchecked'),
     ('redir_access', 'dst[i] = *(const char *)P2V(pa);', 'dst[i] = src[i];', 'PA copy replaced by VA'),
     ('guards', 'return ok;\n    }', 'return ok && 0;\n    }', 'valid lease early refusal'),
     ('db', 'PATH_COPY_BUF_SIZE, 1)', 'PATH_COPY_BUF_SIZE, 0)', 'path copied as bytes'),
@@ -40,7 +56,8 @@ def main():
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
     paths = [walk.ROOT / p for p in list(walk.FILES.values()) +
-             ['exec/exec.c', 'exec/ring3_str.c', 'kapi/kapi_db.c', 'tools/tests/db_caller_host.c']]
+             ['exec/exec.c', 'exec/ring3_str.c', 'kapi/kapi_db.c', 'fs/vfs.c',
+              'kapi/kapi_generated.c', 'userland/tests/db_v50_test.c', 'tools/tests/db_caller_host.c']]
     hashes = {p: hashlib.sha256(p.read_bytes()).digest() for p in paths}
     src = sources()
     r = walk.run(src, fixture='db_caller_host.c')

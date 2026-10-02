@@ -20,17 +20,13 @@
 #include "os32api.h"
 #include "rt/testresult.h"
 
-/* CPL=3 アプリの許可帯 (exec/exec.c の ring3_ptr_ok)。番地は
- * userland/tests/ring3_guard.c と同じ **アプリ固有 PDE 1 枚** の既定配置を
- * 前提にする — このプログラムは build/app.conf でヒープを要求しない (0) ので
- * `paging_app_band_pdes` は必ず 1 を返し、帯の上端は MEM_APP_BAND_TOP。 */
-#define BAND_TOP        0x800000UL   /* MEM_APP_BAND_TOP (スタック帯の上端) */
-#define VRAM_END        0x0C0000UL   /* 許可帯 [0xA0000, 0xC0000) の末尾 */
-/* 「許可帯の中だが非 present」= sbrk 上限のすぐ上 (guard_a)。
- * **ここは試験しない** (票 §1a の改定、2026-09-13): 検証は帯と長さだけを見る
- * ので -1 では返らず、カーネルが写した瞬間に #PF → 呼び手が kill される
- * (kprintf の %s など他の KAPI と同じ既定の扱い)。この試験プログラムは
- * 「落ちないこと」を合格条件にしているので、同じプロセスでは踏めない。 */
+/* T2c の可変配置に追従する。先頭は sbrk の最終 byte、2 byte 目は
+ * guard_a。先頭の早期検査を通し、DB の範囲検査が -1 を返すことを見る。 */
+static const char *guard_crossing_text(KernelAPI *api)
+{
+    return (const char *)(api->sbrk_heap_limit - 1u);
+}
+#define VRAM_END        0x0C0000UL   /* 旧 VRAM 入力の拒否対照 */
 
 static int passed;
 static int failed;
@@ -143,10 +139,12 @@ int main(int argc, char **argv, KernelAPI *api)
     }
     /* RO でも開けるか (RW 固有の段 = journal_mode の照会を切り分ける)。 */
     h = api->db_open_existing(work, 0);
+    api->kprintf(0x07, "  existing RO handle=%d\n", h);
     ok(h >= 0, "RO open of an existing db");
     if (h >= 0) api->db_close(h);
 
     h = api->db_open_existing(work, 1);
+    api->kprintf(0x07, "  existing RW handle=%d\n", h);
     ok(h >= 0, "RW open of an existing db");
     if (h < 0) {
         api->kprintf(0x41, "db_v50_test: aborted\n");
@@ -159,10 +157,9 @@ int main(int argc, char **argv, KernelAPI *api)
        "prepare_only of a single statement");
     ok(api->db_bind_text(h, 1, (const char *)(VRAM_END - 1), 2) < 0,
        "text range crossing the end of a permitted band is refused");
-    ok(api->db_bind_text(h, 1, (const char *)(BAND_TOP - 1), 2) < 0,
-       "text range crossing the top of the app band is refused");
-    /* 帯の**外**へ出る範囲だけを見る。帯の中の未マップページ (sbrk 上限〜
-     * guard) は -1 ではなく kill なので、ここでは踏まない (上の注記)。 */
+    ok(api->db_bind_text(h, 1, guard_crossing_text(api), 2) < 0,
+       "text range crossing the sbrk guard is refused");
+    /* d5 の caller copy は未マップページもコピー前に -1 で断る。 */
     ok(api->db_bind_text(h, 1, "x", -1) < 0, "a negative length is refused");
     ok(api->db_bind_text(h, 1, (const char *)0, 0) < 0,
        "a NULL text pointer is refused (db_bind_null is the way)");
