@@ -96,8 +96,8 @@ taskkill は ini を書き戻さないので使わない)。使い捨て NHD は
   確認ダイアログの拒否・放置・ハングは失敗。kill fallback、自動再試行はない。
 - baseline は終了確認後に初めて読み、read-only snapshot と限定変換から
   `CreateNew` で隣接する `np21w-trial-<UUID>.ini` を作る。原本へ直接書かない。
-  Cirrus の既知キー2つと `e_resume` のみ扱い、trial 内で
-  `USEGD5430=true`、`GD5430TYPE=91`、必要なら `e_resume=true→false`。
+  限定変換は `HDD1FILE` の差し替え、`FDD1FILE` / `FDD2FILE` の空化 (`--fdd-eject`)、
+  必要なら `e_resume=true→false` だけで、Cirrus / PEGC / ExMemory は触らない。
   resume 欠落・重複・未知値も追記せず拒否する（この場合は終了後に停止する）。
   無関係な全バイトを保持。通常終了が baseline を保存し直すことは許容する。
 - 起動直前に原本の内容・識別情報と trial 全バイトを再確認する。
@@ -105,7 +105,7 @@ taskkill は ini を書き戻さないので使わない)。使い捨て NHD は
   新プロセスのハンドル・PID・生成時刻・exe・明示コマンド行を照合し、再照会する。
   これは起動検証であり、起動後の UI 設定切替やゲスト backend の検証ではない。
 - 許容するライフサイクル差は、通常終了に伴う設定・状態保存、新しい ini のファイル名、
-  上記3キー、明示 cwd、新しいプロセスと cold start。
+  上記の限定変換、明示 cwd、新しいプロセスと cold start。
   VM RAM の完全保存は約束しない。共有ディスクのゲスト通常動作も隔離されない。
   NHD のコピー・配備は行わない。resume state の名前も ini stem に従う。
   原本の保持とはツールが終了後の baseline を上書きしない意味で、終了前の完全保存ではない。

@@ -25,7 +25,8 @@ PM は着地で `make all` + `make check` を 1 回。**PM の推奨は基本的
 
 OS32 is a 32-bit bare-metal OS for NEC PC-9801/9821 machines, built with an i386-elf GCC
 cross-compiler and NASM. The kernel runs in protected mode at physical 0x100000; external
-programs load at 0x500000 and run at CPL=3 in their own page directory.
+programs load in the per-address-space app band (code at 0x80100000) and run at CPL=3 in their
+own page directory.
 
 ## Build Commands
 
@@ -93,8 +94,8 @@ waits for the image locks to clear before starting; a hand-typed `taskkill` → 
 | `0x00000–0x9FFFF` | Conventional — font cache, Unicode table (0x4A000), GFX backbuffer (0x6A000), V86 test magic (0x8C000), autoplay mailbox (0x90000). Handed whole to the V86 guest |
 | `0xA0000–0xFFFFF` | VRAM (text + graphics planes) and BIOS ROM |
 | `0x100000–0x2FFFFF` | Kernel (binary + heap + KAPI + 224KB SHM), then SQLite from 0x200000; the 16KB kernel stack sits at the **top of the SQLite band** with its guard below it, and the DMA pool is a fixed 64KB hole at 0x2E8000 in the reserve below it. **The detailed map is generated — `docs/02_memory.md` §2-1 is the only copy** (`tools/gen_memmap.py`, checked by `make check`) |
-| `0x300000–0x4FFFFF` | Resident shell (two heaps: newlib sbrk, exec_heap at 0x380000), then the shared-library band — `libos32gui.shlib` `.text` is shared across PDs, `.data`/`.bss` per app |
-| `0x500000–` | External programs: code+bss → sbrk → guard → exec_heap → stack |
+| `0x300000–0x3FFFFF` | Resident shell (two heaps: newlib sbrk, exec_heap at 0x380000), then the fixed PD/PT at 0x3F1000 |
+| `0x80000000–` (virtual, per AS) | App band: the shared-library band first (`libos32gui.shlib` `.text` shared across PDs, `.data`/`.bss` per app), then the program at 0x80100000 (code+bss → sbrk → guard), exec_heap at 0x88000000, stack below 0x90000000 |
 | arena top | The PEGC 8bpp backbuffer (300KB) — allocated at boot from the pool at the top of the CPL=0 arena (owner boot → gshell, a ledger SURFACE); `sys_usable_mem_end()` is frozen just below it (`ledger_arena_top`). Cirrus uses its linear window instead |
 | `0xFE000000–0xFEFFFFFF` | Device-window band (v3 layout, landed in v2.1): the Cirrus linear window lives here; the PT for the first 4MB of the band is static. Decide device windows from the physical map, never the RAM ceiling |
 
@@ -103,7 +104,7 @@ waits for the image locks to clear before starting; a hand-typed `taskkill` → 
 Three facts that matter on almost every change:
 
 - External programs run at CPL=3 with their own page directory, so a bad pointer kills only the
-  app (`fault_kill_count`). The resident shell and `mkos32x --cpl0` binaries are the exceptions.
+  app (`fault_kill_count`). The resident shell is the exception (`mkos32x --cpl0` was removed).
 - SQLite lives in the kernel at 0x200000 with one fixed 384KB MEMSYS5 pool shared by every
   connection (the FEP dictionary included). Close connections at the end of `*_init()`.
 - `exec_exit()` reclaims FDs / redirects / pipe buffers **by owner** (exec nest level).

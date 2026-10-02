@@ -1,6 +1,6 @@
 ---
 name: os32-local-review
-description: Codex・Antigravity・Fable が枯渇したときに、ローカル/リモートの Ollama モデルへ独立レビューを依頼する。対象を行番号つきで埋め込んで 1 回で返させる。opencode は使わない。所見の採否は PM が反例の到達可能性を確かめてから決める。
+description: 主レビュアーとその代行 (docs/tasks/agents/ROLES.md §0) が使えないときに、ローカル/リモートの Ollama モデルへ独立レビューを依頼する。対象を行番号つきで埋め込んで 1 回で返させる。opencode は使わない。所見の採否は PM が反例の到達可能性を確かめてから決める。
 ---
 
 # ローカルモデルによる独立レビュー
@@ -10,8 +10,8 @@ description: Codex・Antigravity・Fable が枯渇したときに、ローカル
 
 ## いつ使うか
 
-`ROLES.md` §5 のレビュアー在庫表で、上位 (Codex → Antigravity `agy` → Fable サブエージェント →
-Opus 5 サブエージェント) が使えないとき。実力の目安は §「測った結果」。
+`ROLES.md` §0 の主レビュアーとその代行がどれも使えないとき。
+実力の目安は §「測った結果」。
 
 ## 手順
 
