@@ -1138,6 +1138,7 @@ CHECK_PAR_TARGETS := check-shlib-high-host check-bootinfo-host check-hdd-stage1-
     check-access-walk-host \
     check-caller-copy-host \
     check-db-caller-host \
+    check-surface-query-host \
     check-cirrus-win-host check-pegc-mode-host
 check-par: $(CHECK_PAR_TARGETS)
 
@@ -1195,3 +1196,9 @@ check-db-caller-host:
 	python3 -B tools/tests/test_db_caller.py $(MUT)
 
 .PHONY: check-db-caller-host
+
+# T2e e1: dormant query/authorization through real B1 and managed paging.
+check-surface-query-host:
+	python3 -B tools/tests/test_surface_query.py $(MUT)
+
+.PHONY: check-surface-query-host

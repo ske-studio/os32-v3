@@ -45,6 +45,7 @@ T2a / T2a′ / T2b / T2c の実装結果、レビュー対応、PM受入は親�
 ### 0-2. 全段で固定する判断
 
 - D35の4世代は上記JSONから全言語へ生成。追記APIの機能版は着地時の正典に対して上げ、番号の未来予約を本票で作らない。スロット整理はP7、構造体返却は使わずint/u32とchecked out。公開構造体はC89 [ABI1]〜[ABI3]。
+- **ユーザー決定 (2026-10-02)**: T2e の query 等の公開 KAPI は **e11 でまとめて公開**する。e1〜e10 は既存経路につながないカーネル内部の準備として単独着地可。上の「追記APIの機能版は着地時」は T2e では **e11 の着地時**と読む。`sdk/kapi.json` の登録・機能版更新は e11 の全切替で1回、memory 世代更新も従来どおり e11。e11 の「単独で部分配備しない」は公開切替を指し、未接続の準備の着地を禁じない。
 - T2d〜T2eのheapは**PM決定2の挙動維持**。旧1/2 PDE、旧物理上端、sbrk二段選択を残す。fの公開切替だけで撤去する。高位VAを旧物理予算へ渡さない。
 - T2e前の共有USERは移行期間、最終隔離の合格ではない。低位の物理配置はeで動かさない。T2f前に初期heapを縮めない。
 - 公開エラーは既存 `OS32_ERR_INVAL` (不正/権限)、`OS32_ERR_STALE` (-11、既存番号。識別可能な旧generation/失効token)、`OS32_ERR_FULL` (固定表)、`OS32_ERR_NOSPC` (物理/PT不足)へ対応させる。**OS32_ERR_NOMEMは現正典に無い**。内部LEASE_NOMEMと公開番号を同一視しない。mapはNULL、SDKはENOMEM。内部には物理不足/VA不足/表不足/不正の理由を残し、gの通知判定に使う。
@@ -195,7 +196,7 @@ Unicodeはkernel所有FIXED_RAM/RO SURFACE。ユーザー版utf8だけsetterでl
 
 | 小段 (各45〜75分) | 成果 / 閉じる試験 |
 |---|---|
-| e1 | 公開desc/エラー/授権とquery。偽owner/旧ref/GUI DISPLAY拒否 |
+| e1 | 公開予定desc/エラー/授権とqueryの内部準備。偽owner/旧ref/GUI DISPLAY拒否。実装・試験・サイズ・単独着地の扱いは下記「e1 実装結果」 |
 | e2 | 単面公開lease + copyout rollback。`lease.c:158 walk_enter/leave`のmaster往復を除去、保存caller/管理PD/PTをP2VでwalkしIF/CR3不変。FULL/PT不足/out不変 |
 | e3 | DISPLAY4面束 + native UC。最後の面失敗で全巻戻し、cache全alias一致 |
 | e4 | backend→kernel fb/geometry。実3backendの選択と200/400行 |
@@ -214,6 +215,96 @@ Unicodeはkernel所有FIXED_RAM/RO SURFACE。ユーザー版utf8だけsetterでl
 実ソース `test_lease.py` / `test_gfx_boot.py` とSDK呼出しを連結し、backendを選ぶだけの模型で終えない。変異は旧bb pointer、plane stride丸め、片実体だけ再attach、GUI DISPLAY許可、UC落ち、共有PT書込み許可、revoke前free、V86後PDE USER復元欠落、teardownのPCD欠落、SHM lock/free/回収後USER欠落、束generation照合削除、fontのboot終了ガード除去。既存10 lease変異の意図も保持。
 
 NP21/Wは8MB planar/PEGC、17MB planar/PEGC/Cirrus。日本語/描画/present、GUI→CUI→GUI、全画面DISPLAY、通常GUIの低位VRAMとdevice直書きkill、S/T/Uと片側revoke、cirrus-off強制指定fallback、V86復元後のalias_cache一致とDISPLAY/TVRAM再lease、SHMの2本目書込み、boot後font_load_testのNOSYS/表・BB不変を確認。ring3_guard旧Eの「低位BB生存」はここから**拒否へ更新**し、正規CLIENT leaseで生存する対照を追加。Bはshlib実ロード後にPTE P/U/ROかつPF error=7、Aは実stack直下NPかつerror=6を確認する。Ra266のPEGC/日本語/全画面とUCはhへ。予算は§6のe枠。
+
+### e1 実装結果 (コーダー、2026-10-02)
+
+モデル: GPT-6 (Codex)。基点 `531baf4`、worktree `wt/t2e1`。
+`exec/surface_query.[ch]` に公開予定の値の記述子 (60B、4面の結果244B)、
+既存エラーへの変換、共通授権、ref照合、B1 queryを追加した。
+公開型はまだSDKに出さず、ポインタ/物理/owner/cacheを含めないu32欄だけ。
+queryは参照数もASのlease表も変えない。
+
+**今の挙動を保つ具体化**: e4/e5/e8のpublisherがまだ無いため、
+内部だけの `surface_query_source` に選択backend・ready・role・順序付きrefを渡す。
+ユーザー入力ではなく、将来のkernel publisherが呼出し直前に作る値である。
+e1はpublisher、初期化/再init経路、KAPI呼出しを追加しない。
+ready=0/未登録/NONE面は拒否。TVRAM/Unicodeはbackend=0、UnicodeはROのみ。
+CLIENT/DISPLAYは選択backendと台帳のrole/backendを一致させる。
+通常CLIENTは1記録 (planarでも4planeを内包)、planar DISPLAYのquery結果は4記録。
+このsnapshot検査はe1の値の準備で、4面のlease取得・登録はe3へ残す。
+CUI前景は保存callerとcurrent slot/resource owner/CR3が一致するRUNNING USERと解釈し、
+WMの `g_gfx_owner` をCUIの授権条件にしない。物理ownerと利用者を分離する。
+GUIではGFX宣言付きCLIENTとDISPLAYにFを要求し、通常GUI CLIENTにはG不要。
+bootで通常AS開始前の要求、TRUSTED、WM代理、park中、失効callerを拒否する。
+旧generation/closing/登録解除はSTALE、未知sid/面欠落/重複/別束/権限違反はINVAL。
+構造の不一致を先に判定し、その後に各refのgenerationを比較する。
+
+**単独着地・配備**: 既存の呼出し経路に接続していないため、既存GUI/CUI/アプリの
+挙動は変更しない。buildに追加した新TUはコンパイルされるが、未参照なので
+`--gc-sections` が本体から除去する (map/nmで確認)。KAPI slot、機能版69、
+形式/ABI/memory/shlib世代、SDKと生成物は無変更。ABI変更によるcleanや外部再ビルドは
+e1では不要。e11で[ABI1]〜[ABI3]の生成・版更新・clean→allを行う。
+これは未配備のコード経路上の判断で、ゲスト動作確認の合格ではない。
+
+**e2以降への穴**: e2はUSER refsをB1でstagingへコピーしてから
+`surface_query_refs` を使い、同じ保存caller/sourceで取得・copyout・失敗時rollbackを
+行う。今のhelperはkernel staging専用で、任意owner/ASの公開引数を作らない。
+既存leaseのmaster往復、枯渇理由の内訳、token失効は未変更。
+e3のDISPLAY登録/束取得、e4以降の実backend/ready publisher、e5のモード切替と世代、
+e8のUnicode/TVRAM登録、e11のKAPI wrapper/SDK公開は未実装。
+sourceの生成からsnapshot/取得完了までcallback/schedulingを挟まない契約を引き継ぐ。
+
+**試験**: `tools/tests/test_surface_query.py` は実query + T2d caller/copy/walk +
+paging/pgallocを実行。MMU/IRQだけを既存host足場に置換し、低位固定64KiBスタックへ
+切替える (高位entry stackの正常対照)。正常な台帳登録から作る4面、GUI/CUI×role×G/F、
+3backend、ready/boot/gshell owner、偽caller owner/旧AS generation/別current/park/WM、
+旧ref・最後の面・重複・RO、B1のNULL/overflow/RO/次NPとout不変、会計/IF/CR3不変を確認。
+qemu-i386正常対照はrc=0、**22/22がコンパイル成功後のruntime RED**。
+通常の実ソース閉包を一組で1回だけコンパイルし、変異は新TUだけを再コンパイル/リンク。
+中央値0.23秒、最大0.28秒、全木コピー・変異ごとのmakeなし。
+最初の足場は台帳createをUSER CR3のまま呼んでrc=1、登録時だけmasterへ戻して修正。
+初回のTRUSTED拒否削除はB1の別防御で生存したのでREDに数えず、
+共通ref授権への直接負例を追加して22本すべてruntime REDを確認した。
+**Linux nativeはSIGSYS (signal 31、sandboxのint 0x80制限)で実行不可**。
+qemuへの自動fallbackでnative合格に見せず、`--runner native` は明示失敗する。
+ユーザー指定のnative/qemu両方PASSは未達、PMは制限のないLinuxで
+`TMPDIR=/home/hight/os32-tmp OS32_MUT_JOBS=4 python3 -B tools/tests/test_surface_query.py --runner native --mutate`
+を **PYTHONPATHのqemu補助を外して**実行する。ゲスト/構成依存は§12の方針を継承。
+
+| 同一cross toolchain実測 | 基点clean | e1未コミット (-dirty) |
+|---|---:|---:|
+| kernel.bin | 363,216 B | 363,220 B |
+| vmkernel.lz4 | 480,677 B | 480,697 B |
+| __bss_end | 0x18C270 | 0x18C270 |
+| 本体占有 | 574,064 B | 574,064 B |
+| ASSERT残り | 36,240 B | 36,240 B |
+| e枠の実消費 / 残り | 0 / 16,384 B | 0 / 16,384 B |
+
+新objectはtext 1,255B・data/BSS 0B。未参照除去による実消費0を将来の無料実装と
+扱わず、e11の接続時に少なくともこのtextと整列を再計上する
+(1,255Bを見込んだe残枠は15,129B、接続時の実測は未実施)。
+AS/AppSlot/SURFACEの常駐サイズは無変更。ASSERT緩和なし。
+
+`CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp
+NP21W_DIR=/home/hight/os32-tmp/e1-unused-destination make all < /dev/null` は
+基点・e1ともrc=0。FDコピー先は存在しない一時パスに限定し、コピー警告を確認。
+通常のGNU-stack/RWX等の既存警告あり。実NP21/W・NHD・配備・ini・commit/pushは未操作。
+検査を `build/sdk.mk` / `tools/check_map.yaml` / 生成 `docs/TESTS.md` に結線し、
+`make check-map` は115検査・漏れ0件、rc=0。`gen_memmap.py --write` はrc=0で差分なし。
+親票、TASK_MEMMAP_V3、状態行は変更していない。
+ログは `/home/hight/os32-tmp/e1-{baseline,all,query,mutations,native}.log`。
+
+**最終検査**: PATHにcross/bin、既存のELF32用qemu補助
+`PYTHONPATH=/home/hight/os32-tmp/d0b-host-runner`、上記NP21W_DIRを設定し、
+`CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp
+make check-changed < /dev/null` を**最後に1回だけ実行しrc=0**。
+`build/kernel.mk`のソース一覧変更で選択器はfullとなり、全検査・全変異を実行した。
+e1は22/22 runtime RED (全体並行時の中央値1.12秒・最大1.30秒)、
+C方言27/27 RED・正常対照5/5 GREEN。既存Windows opt-inは単独4件・集約5件skip。
+ログ: `/home/hight/os32-tmp/e1-check-changed.log`。
+検査中はソース無変更、終了後はこの結果の記録だけを追記した。
+**all/check-changedのrc=0条件は達成したが、native/qemu両方PASSの条件は
+nativeのSIGSYSにより未達**。nativeの再確認をPMへ残し、qemuの結果と混同しない。
 
 ## 3. T2f — map/unmapとallocator、暫定heap終了
 

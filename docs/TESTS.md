@@ -75,7 +75,7 @@ make check-tests-inventory                      # 表が古くないか検査す
 `TARGET_SRCS` など) にある `ROOT / "…"`。どちらにも現れないものは空欄になる
 (Rust は `--manifest-path` を代わりに出す)。
 
-## 2. `make check` の列 (114 ターゲット)
+## 2. `make check` の列 (115 ターゲット)
 
 `build/sdk.mk` の `CHECK_PAR_TARGETS` (`check-par` の依存) が
 正典。この表はその列をそのまま展開したもの。コマンド列は `make check` (変異込み) の形。
@@ -194,8 +194,9 @@ make check-tests-inventory                      # 表が古くないか検査す
 | 110 | `check-access-walk-host` | `python3 -B tools/tests/test_access_walk.py --mutate` | `exec/access_walk.c`<br>`exec/redir_access.c`<br>`kernel/paging.c`<br>`kernel/pgalloc.c`<br>`kernel/shlib.c`<br>`kernel/kselftest.c` | — | — | × |
 | 111 | `check-caller-copy-host` | `python3 -B tools/tests/test_caller_copy.py --mutate` | `exec/redir_access.c`<br>`exec/access_walk.c`<br>`kernel/kselftest.c` | — | — | × |
 | 112 | `check-db-caller-host` | `python3 -B tools/tests/test_db_caller.py --mutate` | `kapi/kapi_db.c`<br>`exec/exec.c`<br>`exec/redir_access.c`<br>`exec/access_walk.c`<br>`fs/vfs.c`<br>`kapi/kapi_generated.c`<br>`kernel/kselftest.c` | — | — | × |
-| 113 | `check-cirrus-win-host` | `python3 -B tools/tests/test_cirrus_win.py --mutate` | `gfx/backend_cirrus.c`<br>`drivers/wab_glue_xe10.c` | [`tools/tests/cirrus_win_tdd.md`](../tools/tests/cirrus_win_tdd.md) | — | × |
-| 114 | `check-pegc-mode-host` | `python3 -B tools/tests/test_pegc_mode.py --mutate` | `gfx/backend_pegc.c`<br>`kernel/console.c` | [`tools/tests/pegc_mode_tdd.md`](../tools/tests/pegc_mode_tdd.md) | [`docs/tasks/realhw/TASK_PEGC480_REALHW.md`](tasks/realhw/TASK_PEGC480_REALHW.md) | × |
+| 113 | `check-surface-query-host` | `python3 -B tools/tests/test_surface_query.py --mutate` | `exec/surface_query.c`<br>`exec/redir_access.c`<br>`exec/access_walk.c`<br>`kernel/paging.c`<br>`kernel/pgalloc.c` | — | — | × |
+| 114 | `check-cirrus-win-host` | `python3 -B tools/tests/test_cirrus_win.py --mutate` | `gfx/backend_cirrus.c`<br>`drivers/wab_glue_xe10.c` | [`tools/tests/cirrus_win_tdd.md`](../tools/tests/cirrus_win_tdd.md) | — | × |
+| 115 | `check-pegc-mode-host` | `python3 -B tools/tests/test_pegc_mode.py --mutate` | `gfx/backend_pegc.c`<br>`kernel/console.c` | [`tools/tests/pegc_mode_tdd.md`](../tools/tests/pegc_mode_tdd.md) | [`docs/tasks/realhw/TASK_PEGC480_REALHW.md`](tasks/realhw/TASK_PEGC480_REALHW.md) | × |
 
 ## 3. `check` の列に**入っていない** `check-*` ターゲット (9)
 
