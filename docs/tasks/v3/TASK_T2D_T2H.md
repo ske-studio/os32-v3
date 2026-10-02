@@ -408,6 +408,19 @@ b8補助再検査rc=0、gfx正常対照18/18 PASS・14/14変異RED・rc=0。
 commit/push・実NP21/W・NHD・配備・iniは未操作。
 ログ: `/home/hight/os32-tmp/e1rr-{all-final,check-changed-final,four-final,
 select-final-fixed,fast,legacy-fixes,b8,gfx}.log`。
+(上の「未達」は2回目 (sol) の版のこと。3回目 (astra) の版はsandboxで明示qemuのcheck-changed rc=0、下のPMのnative/qemu検査で確定。)
+
+**e1 の着地とゲスト受入 (PM、2026-10-02)**: レビュー (Opus 5.5) は 3 往復で Approve
+(3回目の新しい指摘は N-1 の P3 だけ → e2への申し送り)。worktree の最終版 `f6228a2` で PM がホスト
+(PYTHONPATH なし、既定 `HOST32_RUNNERS=native qemu`) で `make all` rc=0、`check_select.py --lint` rc=0、
+`check-changed` (full) rc=0 — 4 試験は native と qemu の両方で正常対照が流れた。main へ取り込み (`e203f31`)、
+コミット済みの木で `make all` rc=0・`make check` rc=0。NP21/W を停止 → 停止確認 → `nhd-pull` → `deploy-kernel`
+→ `deploy` → 起動 (17MB、今の ini — §12)。`ver` の Commit `e203f31`、`/boot/vmkernel.lz4` 480,677 B が手元と一致。
+**kselftest pass 270 / fail 0** (d6 と同数)、`db_test` 9/9、`db_v50_test` 41/41、`klibc_test` 49/49、`alloc_demo` 16/16、
+`d0a_test` 全行 OK、faulttest gp/de/ud/pf は 4 件とも `-> kill app`、loop・kloop + CTRL+STOP、`v86 -t` OK、
+GUI (gui_demo の窓 → ESC → CUI に戻る) OK。終わりのカウンタ: `fault_kill_count`=7 (faulttest 4 + STOP 2 + d0a の RO 子の
+意図した拒否 1)、`ring3_caller_reject_count`=0、`redir_refuse_count`=0、深さ 0、`exec_as_leftover_pages`=0、
+`irq_ctx_violations`=1 (起動時の基準値のまま)。e1 は未結線なので、ゲストでは回帰が無いことだけを見た。
 
 
 ## 3. T2f — map/unmapとallocator、暫定heap終了
