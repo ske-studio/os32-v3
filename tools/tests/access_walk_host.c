@@ -63,9 +63,10 @@ void pgalloc_free_pt(u32 phys)
 #include "redir_access_host_source.c"
 static AppSlot slot;
 static int current = 2;
+static int resource_owner = 2;
 volatile int ring3_wm_depth;
 int appslot_cur(void) { return current; }
-int res_owner_get(void) { return current; }
+int res_owner_get(void) { return resource_owner; }
 int ring3_call_from_user(void) {
 #ifdef HOST_DB_CALLER_TEST
     extern volatile int ring3_in_syscall;
@@ -79,6 +80,15 @@ u32 exec_tramp_page_addr(void) { return 0x170000; }
 void *kmemcpy(void *d, const void *s, u32 n) {
     u8 *out = d; const u8 *in = s; while (n--) *out++ = *in++; return d;
 }
+static void check(int ok, const char *name)
+{
+    if (!ok) {
+        u32 len = 0;
+        while (name[len]) len++;
+        SAY("FAIL: boot caller"); report(name, len); SAY(""); die(1);
+    }
+}
+#include "boot_host_source.c"
 static struct addrspace space;
 static struct caller_access caller;
 static u32 payload;
@@ -94,7 +104,30 @@ static void probe(u32 va, int write, int ok, u32 expected)
 #ifdef HOST_CALLER_COPY_TEST
 static void caller_copy_tests(void);
 #endif
-void _start(void)
+/* Linux's native i386 entry stack may be above MEM_APP_BAND_BASE; qemu's
+ * default stack is below it. Boot's TRUSTED buffers live in the low kernel
+ * band, so run on an ELF-backed low stack in either execution environment. */
+static u8 host_stack[64 * 1024] __attribute__((aligned(16), __used__));
+static void host_start(void) __attribute__((__used__));
+#ifdef HOST_HIGH_ENTRY_STACK
+/* Regression control: emulate Linux's high initial stack even under qemu. */
+static u32 high_stack_args[6] __attribute__((__used__)) = {
+    MEM_APP_BAND_BASE, sizeof(host_stack), 3, 0x32, 0xffffffff, 0
+};
+#endif
+__asm__(".text\n.globl _start\n_start:\n"
+#ifdef HOST_HIGH_ENTRY_STACK
+        "mov $90, %eax\nmov $high_stack_args, %ebx\nint $0x80\n"
+        "cmp high_stack_args, %eax\njne 1f\n"
+        "mov %eax, %esp\nadd $65536, %esp\n"
+#endif
+        "lea host_stack+65536, %esp\n"
+        "call host_start\n"
+#ifdef HOST_HIGH_ENTRY_STACK
+        "1: mov $1, %eax\nmov $98, %ebx\nint $0x80\n"
+#endif
+        );
+static void host_start(void)
 {
     u32 args[6] = {0x100000, 0xF00000, 3, 0x32, 0xFFFFFFFF, 0};
     u32 result, owner, other, *pd, *pt, original, fake, i;
@@ -143,6 +176,17 @@ void _start(void)
     pd[APP_BAND_PDE] |= PTE_PS;
     probe(MEM_EXEC_LOAD_ADDR, 0, 0, 0);
     pd[APP_BAND_PDE] &= ~PTE_PS;
+    /* Misaligned PD still points into owned present RAM. Shift its entries
+     * to make the lower translator succeed; alignment alone must reject. */
+    space.pd_phys++;
+    host_cr3 = caller.pd_phys = space.pd_phys;
+    ((u32 *)P2V(space.pd_phys))[APP_BAND_PDE] = V2P(pt) | PAGE_RW | PTE_USER;
+    CHECK(!as_va_to_pa_read(space.pd_phys, MEM_EXEC_LOAD_ADDR, &result));
+    probe(MEM_EXEC_LOAD_ADDR, 0, 0, 0);
+    space.pd_phys--;
+    host_cr3 = caller.pd_phys = space.pd_phys;
+    pd[APP_BAND_PDE + 1] = 0;
+    pd[APP_BAND_PDE] = V2P(pt) | PAGE_RW | PTE_USER;
     /* Fake table contains a valid PTE and is present RAM. */
     ((u32 *)P2V(fake))[(MEM_EXEC_LOAD_ADDR >> PAGE_SHIFT) % PTE_COUNT] = original;
     pd[APP_BAND_PDE] = fake | PAGE_RW | PTE_USER;
@@ -189,6 +233,12 @@ void _start(void)
     probe(MEM_SHM_BASE, 0, 0, 0);
     page_directory[0] = original; pd[0] = original | PTE_USER;
     probe(MEM_SHM_BASE, 0, 1, MEM_SHM_BASE);
+    /* The AS PDE remains valid: master flags alone must reject. */
+    page_directory[0] &= ~PTE_PRESENT;
+    probe(MEM_SHM_BASE, 0, 0, 0);
+    page_directory[0] |= PTE_PRESENT | PTE_PS;
+    probe(MEM_SHM_BASE, 0, 0, 0);
+    page_directory[0] &= ~PTE_PS;
     {
         u32 *shared = page_tables[0], idx = (MEM_SHM_BASE >> PAGE_SHIFT) % PTE_COUNT;
         u32 old = shared[idx]; shared[idx] = payload | PAGE_RW | PTE_USER;
@@ -207,6 +257,14 @@ void _start(void)
     probe(MEM_SHLIB_BASE, 0, 1, g_pages[0]);
     probe(MEM_SHLIB_BASE, 1, 0, 0);
     pt[0] |= PTE_RW; probe(MEM_SHLIB_BASE, 1, 0, 0);
+    CHECK(ledger_transfer(g_pages[0] / PAGE_SIZE, 1, LEDGER_OWNER_SHLIB, other));
+    probe(MEM_SHLIB_BASE, 0, 0, 0);
+    CHECK(ledger_transfer(g_pages[0] / PAGE_SIZE, 1, other, LEDGER_OWNER_SHLIB));
+    /* A registered data original is not shared read payload. */
+    g_pages[2] = pgalloc_alloc_phys(LEDGER_OWNER_SHLIB, 1);
+    pt[2] = g_pages[2] | PAGE_RO | PTE_USER;
+    probe(MEM_SHLIB_BASE + 2 * PAGE_SIZE, 0, 0, 0);
+    pt[2] = 0;
     pt[0] = g_pages[1] | PAGE_RO | PTE_USER;
     probe(MEM_SHLIB_BASE, 0, 0, 0);
     /* RAM lease: exact surface generation/backing, even when closing. */
@@ -229,6 +287,13 @@ void _start(void)
         probe(MEM_LEASE_BASE, 1, 0, 0);
         lp[0] |= PTE_RW; probe(MEM_LEASE_BASE, 1, 0, 0);
         l->flags |= PTE_RW; probe(MEM_LEASE_BASE, 1, 1, fake);
+        live->lease_count = 0; probe(MEM_LEASE_BASE, 0, 0, 0); live->lease_count = 1;
+        l->npages = 2; probe(MEM_LEASE_BASE, 0, 0, 0); l->npages = 1;
+        live->perm_max = LEDGER_PERM_NONE;
+        CHECK(ledger_surface_validate(live));
+        probe(MEM_LEASE_BASE, 0, 0, 0); live->perm_max = LEDGER_PERM_RW;
+        l->sid = LEDGER_MAX_SURFACES;
+        probe(MEM_LEASE_BASE, 0, 0, 0); l->sid = sid;
         live->closing = 1; probe(MEM_LEASE_BASE, 0, 1, fake);
         live->gen++; probe(MEM_LEASE_BASE, 0, 0, 0); live->gen--;
         l->token = 0; probe(MEM_LEASE_BASE, 0, 0, 0); l->token = 1;
@@ -261,6 +326,30 @@ void _start(void)
         probe(MEM_LEASE_BASE, 0, 1, MEM_GFX_BB_BASE);
         live->first++; lp[0] += PAGE_SIZE; probe(MEM_LEASE_BASE, 0, 0, 0);
     }
+    /* Real boot helper: small trusted copies and separate RO AS walk. */
+    {
+        struct addrspace boot_as;
+        CallerAccessFrame before, after;
+        u32 saved_root = host_cr3;
+        int saved_current = current, saved_owner = resource_owner;
+        host_cr3 = paging_kernel_pd_phys();
+        current = resource_owner = 0;
+        caller_access_save(&before);
+        CHECK(!paging_addrspace_create(&boot_as, owner));
+        for (i = 0; i < 2; i++) {
+            u32 root = host_cr3, f = i ? 0x202U : 2U;
+            host_arch_if = f;
+            test_caller_boot(&boot_as, payload);
+            CHECK(host_cr3 == root && host_arch_if == f);
+            caller_access_save(&after);
+            CHECK(after.valid == before.valid);
+            CHECK(after.access.origin == before.access.origin);
+        }
+        paging_addrspace_destroy(&boot_as);
+        current = saved_current;
+        resource_owner = saved_owner;
+        host_cr3 = saved_root;
+    }
     /* Current caller is stricter than a live registrant under another root. */
     host_cr3 = paging_kernel_pd_phys();
     for (i = 0; i < 2; i++) {
@@ -274,6 +363,7 @@ void _start(void)
     }
     host_cr3 = space.pd_phys;
     current = 3; probe(MEM_EXEC_LOAD_ADDR, 0, 0, 0); current = 2;
+    resource_owner = 3; probe(MEM_EXEC_LOAD_ADDR, 0, 0, 0); resource_owner = 2;
     caller.generation++; probe(MEM_EXEC_LOAD_ADDR, 0, 0, 0);
     SAY("PASS: d3 real managed walk, PFN classes, caller/registrant, IF/CR3/output");
     die(0);

@@ -1,4 +1,6 @@
 """T2d d5: real wrappers/copy/walk, SQLite entry-only, small source closure."""
+TARGET_SRC = ['kapi/kapi_db.c', 'exec/exec.c', 'exec/redir_access.c', 'exec/access_walk.c', 'fs/vfs.c', 'kapi/kapi_generated.c', 'kernel/kselftest.c']
+
 import argparse
 import hashlib
 import subprocess
