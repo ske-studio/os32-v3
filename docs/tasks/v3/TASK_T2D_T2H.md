@@ -371,6 +371,15 @@ pending PT控え256Bは§3-2のkernel stackに置く。ASへ足すと1,456Bで1,
 
 **d の枠の拡大 (ユーザー決定 2026-10-02「全体の余白から回す」)**: d0b・d1・d2 (P3 後) の実測で d の枠 3,072B の残りが **764B** になり (`kernel.bin` 361,272B、ASSERT 残り 38,192B)、d2 のレビュー (Opus) の見積もりでは d3〜d6 に 1.7〜3.2KB 要る。そこで **d の枠を +2,816B して 5,888B にする** (d3〜d6 に約 3.5KB)。h の後の全枠消費時の ASSERT 残りは 6,708B → **約 3,892B** に減る。d3 では d0b の `as_va_to_pa` / `redir_page` を使い回して見積もりの下限側に寄せる。**T3 の着手前に実測で残りを再計算する** (§11 の注記 5) — e〜h の枠と T3 のカーネル増分がこの余白に収まらなければ、その時点で再見積もりのゲートに戻す。
 
+**d6確定値 (2026-10-02、同一cross toolchain、詳細§10-15)**: d0b直前 `a64dd4e` の
+ソースを一時ディレクトリで再ビルドし、比較用build_idを現worktreeと同じ
+`bbabb6a-dirty` に揃えると、基準 `kernel.bin=359,432 B` / `__bss_end=0x18B1CC`。
+d6は `kernel.bin=363,220 B` (+3,788 B)、`__bss_end=0x18C270`、本体574,064 B。
+d0b〜d6の正味増分は **4,260 B**、ASSERT残り **36,240 B**、d枠5,888 Bの残り
+**1,628 B**。e/f/g/h枠16,384/8,192/3,072/3,072 Bは変更せず、全部消費後の余白は
+**5,520 B** (=拡大後3,892 B + d未消費1,628 B) を後続へ持ち越す。T3前の再計算ゲートを維持。
+圧縮像480,683 B、520,192 B上限まで39,509 B。ASSERT・状態行・親票は変更していない。
+
 ### 6-2. 試験実装の規約
 
 各小段に正常対照と1つの目的別負例を先に用意し、実ソースの失敗→修正→成功を記録。MMU/IRQ/I/Oだけをホスト足場にし、kernelの判定やallocatorを模型に複製しない。実CR3/TLB・デバイス・描画の合格はguestで補う。新試験は `tools/check_map.yaml`、該当build検査、生成 [TESTS](../../TESTS.md)へ実装時に登録する。今回は実在しない試験へのリンクや生成一覧を作らない。
@@ -1480,6 +1489,110 @@ make check-changed < /dev/null` は上記PATH/PYTHONPATHで **最後に1回だ�
 ゲスト (17MB、今の ini — §12): kselftest 0 fail、`db_test` 9/9、`klibc_test` 49/49、`alloc_demo` 16/16、`ring3_fault` kill、`ls / | wc -l` = 54、`echo abc | wc -c` = 4、`d0a_test` 全行 OK、faulttest 一式・V86・GUI (gui_demo → CUI) 従来どおり。
 
 **受入で `db_v50_test` が kill された** (`[Process crashed]`、$?=139)。PM は当初、カーネルスタックの番地 (0x2ffd84、WR_TABLE) の拒否記録から d5 の退行と見立てたが、コーダー (astra) の調査で**誤り**と分かった: 拒否記録は起動時の kselftest (kselftest.c:1691) の残り値で、kill の本当の原因は **T2c の高位配置への試験の追従漏れ** — 試験が「帯の端」として旧い番地 0x7fffff を `db_bind_text` に渡し、T2c 以降は帯の外なので入口の早期検査 (exec.c:1451) が設計どおり kill した。カーネル・公開 KAPI は変更不要で、試験の番地を `sbrk_heap_limit - 1` に直した (`d5fix`、ホストの回帰試験も追加)。直した後のゲストで **`db_v50_test` PASS 41/41、$?=0**。T2c の受入で `db_test` / `db_v50_test` を流していなかったのが見逃しの原因 — 以後の段の受入に加える。
+
+## 10-15. d6 実装結果 (コーダー、2026-10-02)
+
+モデル: GPT-6 (Codex)。基点 `bbabb6a`、worktree `wt/t2d6`。
+§10-9 P3-2は以下の11本を個別に仕分けた。製品の防御撤去 (c) は0本。
+(a)は管理情報の不整合を注入した実ソース試験でruntime RED、(b)は多重防御を維持。
+正常な登録APIが不整合を作ると主張するものではなく、walkが受け取る管理状態の
+拒否を検証する。ABI・公開形式・ユーザーから見える挙動は変更していない。
+
+| 対象 | 仕分け | 正常対照・目的別負例 / 維持理由 |
+|---|---|---|
+| trampoline `!write` | (b) 多重防御、維持 | RO入力成功、出力拒否。write walkのPTE_RW要求と末尾のRO PTE要求は両立しないため、単独削除は生存。入力専用契約の明示として残す |
+| lease `!sf->lease_count` | (a) | live参照1で成功→0でread拒否。他の権限/台帳は正常。削除をruntime RED |
+| lease `sf->npages != l->npages` | (a) | 1 page一致で成功→lease側だけ2 page、先頭page readも拒否。削除をruntime RED |
+| lease `l->sid` 上限 | (b) 多重防御、維持 | 正常sidで成功、上限sidを拒否。`paging_lease_map_batch`はsid上限を確認後にl->sidを保存し、USERからAS metadataは変更不可。単独削除は足場の範囲外位置がgen不一致となり生存したが、これは配列外読取りの安全性の証拠ではない。**sfを読む前の境界検査は撤去不可** |
+| lease `perm_max == NONE` | (a) | RW surfaceのread成功→NONEだけに変更。`ledger_surface_validate`自体はNONEを許す正常対照を明示し、read拒否。削除をruntime RED |
+| shlib SHLIB owner | (a) | 登録PFN一致のread成功→原本の台帳ownerだけ別ownerへ移譲、拒否→復元。削除をruntime RED |
+| shlib `page < g_text_pages` | (a) | text原本のread成功、登録済みdata原本をRO/USERにmapしても入力拒否。境界をg_pages容量まで広げる変異をruntime RED (配列外読取りを発生させる無制限削除は使わない) |
+| master PDE P | (a) | AS PDE/登録PT/PTEは正常のままmaster Pだけclearし拒否。削除をruntime RED |
+| master PDE PS | (a) | AS PDE/登録PT/PTEは正常のままmaster PSだけsetし拒否。削除をruntime RED |
+| PD整列 | (a) | owned/present PDを1 byteずらし、ずれた位置に正常PDEを用意。下位translatorの成功対照と上位walk拒否を確認。削除をruntime RED |
+| `caller_access_page` の `appslot_cur()` | (a) | CR3/live AS/resource ownerを保存callerに合わせ、current slotだけ別にする。fixtureのres_owner_getをcurrent slotから独立させ、削除をruntime RED |
+
+(a)9本を既存walk23本へ追加し、**32/32コンパイル成功後の実行時RED**。
+一組内の中央値1.145秒・最重2.17秒 (all/DB試験と並行した最終対象実行)、
+全木コピー・変異ごとのmakeは無し。
+(b)2本の写しへの単独削除はcompile成功後rc=0で生存 (`d6-retained.log`)。
+生存をREDに数えず、複合削除で見かけの本数を増やしていない。
+初回のshlib境界変異は未定義の仮定マクロ名でcompile失敗し、実定数
+`MEM_SHLIB_SIZE / PAGE_SIZE` へ修正した。この失敗もREDに数えない。
+
+**結線**: `build/sdk.mk`は既存recipe/検査列に6系統すべてあり、変更不要。
+caller/walk/copy/DB/redirectは各専用target、`test_exec_r1.py`は
+`check-memory-host`のrecipeで変異込みに結線済み。`check_map.yaml`にboot実ソースと
+静的include closureを追加。実行スクリプトのTARGET_SRCを明示して生成TESTSの
+walk/copy/DB欄の対象ソース空欄を解消した。
+`make check-map`はrc=0、114検査・漏れ0件。
+`check_select.py --select --files exec/access_walk.c exec/redir_access.c exec/exec.c
+kernel/kselftest.c fs/fd_redirect.c tools/tests/test_access_walk.py` で6系統を含む
+21検査が変異込みに選択されることを確認。実未コミット差分で選ぶ場合も
+walk/copy/DB/boot(memory)を選択する。未変更のcaller/redirect変異は対象試験で別途実施。
+
+**小さなboot診断**: `test_ledger`の既存AS/2 data pageを再利用して
+`test_caller_boot`をpost-exec毎bootへ結線。TRUSTED descriptor enter/get/leave、
+2 byte cstr成功・cap1未終端拒否、2 byte copyout・NULL拒否、1枚のRO APP mapの
+read PA一致・write拒否時PA不変、IF/CR3不変を10 checkで見る。
+追加確保は疎APP PT **1 page**だけ、直後のAS destroyで回収し、既存owner0/
+retire/selfcheckで取り残しを確認する。常駐BSS追加なし、USER ASのCR3ロードなし。
+コピーは最大2 byte、walkも1 pageで、VFS/SQLite/callbackなし。
+boot専用の時間/byte上限数値は票にないため、既存試験再利用・d枠内に収める解釈で実装。
+同じ実helperをhost fixtureへ抽出してIF=0/1・frame復元を検証した。
+**ゲストのkselftest 0 fail・実IRQ時間は未実施、PMが新kernel.mapで確認する**。
+構成依存の確認は§12どおりT2hへ持越し。
+
+| 同一cross toolchain実測 | d0b前ソース・ID長を同一化 | d5着地 | d6 (-dirty) |
+|---|---:|---:|---:|
+| kernel.bin | 359,432 B | 362,224 B (clean) | 363,220 B |
+| vmkernel.lz4 | 477,999 B | 480,088 B (旧計測) | 480,683 B |
+| 本体占有 | 569,804 B | 573,072 B | 574,064 B |
+| __bss_end | 0x18B1CC | 0x18BE90 | 0x18C270 |
+| ASSERT残り (596 KiB) | 40,500 B | 37,232 B | 36,240 B |
+| d枠消費 / 残り | 0 / 5,888 B | 3,268 / 2,620 B | **4,260 / 1,628 B** |
+
+d6本体増分は **992 B**。d0b〜d6増分はkernel.bin **3,788 B**、本体 **4,260 B**。
+e〜h枠30,720 B消費後 **5,520 B**持越し (§6-1)。ASSERTの緩和なし。
+サイズ比較の旧ソースは `git archive a64dd4e` を `/home/hight/os32-tmp/d6-before-d0b`
+へ展開してkernelだけ再ビルド。最初のarchive既定ID `unknown` (7文字、clean相当)は
+359,424 B / 0x18B1ACで、票の基準より整列込み32 B少なかった。
+生成器の `--repo` を現worktreeへ指定して比較用IDを `bbabb6a-dirty` に揃え、
+build_id.oを再生成して上表を実測した。**旧ソース像はサイズ比較専用で、基点の実行像ではない**。
+基点実測と同一化実測を混同せず、現在像との差からdirtyの整列影響を除いた。
+
+環境: PATHに `/home/hight/opt/cross/bin`、`CROSS_DIR=/home/hight/opt/cross`、
+`TMPDIR=/home/hight/os32-tmp`、`OS32_MUT_JOBS=4`。
+ILP32だけ既存 `PYTHONPATH=/home/hight/os32-tmp/d0b-host-runner` でqemu-i386を経由。
+`python3 tools/tests/test_{access_walk,caller_copy,db_caller,caller_access,fd_redirect_d0a,exec_r1}.py
+--mutate` は各rc=0 (32/18/15/24/24/24本runtime RED)。
+`CROSS_DIR=/home/hight/opt/cross make all < /dev/null` はrc=0。
+allの `NP21W_DIR=/home/hight/os32-tmp/d6-unused-image-destination` は存在しない
+一時パスへ限定し、FDコピー警告を確認した。既存GNU-stack/RWX/Rust警告あり。
+実NP21/W・NHD・配備・ini・commit/pushは未操作。親票/TASK_MEMMAP_V3/状態行は変更なし。
+ログ: `/home/hight/os32-tmp/d6-{all,baseline,baseline-normalized,walk-final,retained,copy,db,caller,redir,r1}.log`。
+
+**最終全体検査と補修**: 上記PATH/PYTHONPATHで
+`CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp
+make check-changed < /dev/null` を**最後に1回だけ実行しrc=2**。
+boot helperを追加したことに対する既存fixtureの追従を見落とした。
+`check-memory-host` の `test_app_band_pde.py` がkselftestのledgerブロックを
+広く抽出し、caller型/関数を持たない足場へboot helperまで取り込んでcompile失敗。
+この失敗は変異REDに数えていない。残りの実行中ジョブの終了までソースを変更せず、
+C方言27/27 RED・正常対照5/5 GREEN、P2V違反0件を確認した。
+既存Windows opt-inは単独4件・集約5件skip。
+
+終了後にAPP帯fixtureの抽出をledgerの確保/回収部分へ限定し、caller bootの
+実helper/呼出だけを抽出対象から外した (判定の模型や素通しstubは作らない)。
+実boot helperは上記walk試験で実行済み。製品コード/画像/確定sizeは変更なし。
+補修後 `make check-memory-host MUT=--mutate < /dev/null` は上記環境で**rc=0**。
+APP帯の正常対照+5/5 runtime RED (compile failures 0)、後続のledger/lease/R1/
+backbuffer/gfxを含む停止したtargetを全て確認した。
+`make check-map`、`python3 tools/gen_tests_inventory.py --check`、`git diff --check` はrc=0。
+ログ: `/home/hight/os32-tmp/d6-check-changed.log`、`d6-memory-recovery.log`。
+**ユーザーの「最後に1回」に従いcheck-changedは再実行していない。
+対象失敗は修正済みだが、完了条件のcheck-changed rc=0は未達。PMの全体再確認へ残す。**
+ゲストkselftest 0 failもPM確認待ち。状態行は変更していない。
 
 ## 11. 独立レビュー 2 回目 (Opus 5.5、Approve) の P3 — 実装時の注記
 

@@ -3063,6 +3063,34 @@ checks:
   - tools/tests/test_caller_access.py
 
   check-access-walk-host:
+  - drivers/kbd.h
+  - drivers/kbd_status.h
+  - exec/lease.h
+  - include/bootinfo.h
+  - include/bootlog.h
+  - include/con_sink.h
+  - include/console.h
+  - include/kbd.h
+  - include/kbd_inject.h
+  - include/launch.h
+  - include/pc98.h
+  - include/tvram.h
+  - kapi/kapi_db.h
+  - kernel/cpu_calibrate.h
+  - kernel/cpu_calibrate_math.h
+  - kernel/dma_pool.h
+  - kernel/gui.h
+  - kernel/idt.h
+  - kernel/irq.h
+  - kernel/irq_math.h
+  - kernel/kmalloc.h
+  - kernel/kselftest.h
+  - kernel/ktime.h
+  - kernel/pit_math.h
+  - kernel/sysclk.h
+  - kernel/time_math.h
+  - sdk/include/os32/os32_gui_shared.h
+  - kernel/kselftest.c
   - arch/x86/arch_cpu.h
   - arch/x86/arch_io.h
   - exec/access_walk.c
@@ -3104,6 +3132,34 @@ checks:
   - tools/tests/test_access_walk.py
 
   check-caller-copy-host:
+  - drivers/kbd.h
+  - drivers/kbd_status.h
+  - exec/lease.h
+  - include/bootinfo.h
+  - include/bootlog.h
+  - include/con_sink.h
+  - include/console.h
+  - include/kbd.h
+  - include/kbd_inject.h
+  - include/launch.h
+  - include/pc98.h
+  - include/tvram.h
+  - kapi/kapi_db.h
+  - kernel/cpu_calibrate.h
+  - kernel/cpu_calibrate_math.h
+  - kernel/dma_pool.h
+  - kernel/gui.h
+  - kernel/idt.h
+  - kernel/irq.h
+  - kernel/irq_math.h
+  - kernel/kmalloc.h
+  - kernel/kselftest.h
+  - kernel/ktime.h
+  - kernel/pit_math.h
+  - kernel/sysclk.h
+  - kernel/time_math.h
+  - sdk/include/os32/os32_gui_shared.h
+  - kernel/kselftest.c
   - arch/x86/arch_cpu.h
   - arch/x86/arch_io.h
   - exec/access_walk.c
@@ -3147,6 +3203,20 @@ checks:
   - tools/tests/test_caller_copy.py
 
   check-db-caller-host:
+  - include/bootlog.h
+  - include/pc98.h
+  - kernel/cpu_calibrate.h
+  - kernel/cpu_calibrate_math.h
+  - kernel/dma_pool.h
+  - kernel/idt.h
+  - kernel/irq.h
+  - kernel/irq_math.h
+  - kernel/kselftest.h
+  - kernel/ktime.h
+  - kernel/pit_math.h
+  - kernel/sysclk.h
+  - kernel/time_math.h
+  - kernel/kselftest.c
   - arch/x86/arch_cpu.h
   - arch/x86/arch_io.h
   - exec/access_walk.c

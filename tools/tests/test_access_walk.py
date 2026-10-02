@@ -1,6 +1,8 @@
 """T2d d3: real paging/allocator/shlib/access source, ILP32 host MMU/IRQ.
 Only a fixed source closure is copied; compile failures never count as RED.
 """
+TARGET_SRC = ['exec/access_walk.c', 'exec/redir_access.c', 'kernel/paging.c', 'kernel/pgalloc.c', 'kernel/shlib.c', 'kernel/kselftest.c']
+
 import argparse
 import hashlib
 import pathlib
@@ -13,8 +15,18 @@ FILES = {
     'paging': 'kernel/paging.c', 'pgalloc': 'kernel/pgalloc.c',
     'shlib': 'kernel/shlib.c', 'access_walk': 'exec/access_walk.c',
     'redir_access': 'exec/redir_access.c',
+    'boot': 'kernel/kselftest.c',
 }
 MUTANTS = [
+    ('access_walk', '!sf->lease_count', '0', 'lease live reference'),
+    ('access_walk', 'sf->npages != l->npages', '0', 'lease page count'),
+    ('access_walk', 'sf->perm_max == LEDGER_PERM_NONE', '0', 'lease NONE input'),
+    ('shlib', 'pgalloc_page_owned(frame / PAGE_SIZE, LEDGER_OWNER_SHLIB)', '1', 'shlib ledger owner'),
+    ('shlib', 'page < g_text_pages', 'page < MEM_SHLIB_SIZE / PAGE_SIZE', 'shlib text bound'),
+    ('access_walk', '!(expected & PTE_PRESENT)', '0', 'master present'),
+    ('access_walk', '(expected & PTE_PS)', '0', 'master PS'),
+    ('access_walk', '(as->pd_phys & ~mask)', '0', 'PD alignment'),
+    ('redir_access', 'a->app_id != appslot_cur() ||', '', 'current slot independent of resource owner'),
     ('access_walk', 'as_va_to_pa(as->pd_phys, va, &result)', 'as_va_to_pa(paging_current_cr3(), va, &result)', 'registrant PD write'),
     ('access_walk', 'as_va_to_pa_read(as->pd_phys, va, &result)', 'as_va_to_pa_read(paging_current_cr3(), va, &result)', 'registrant PD read'),
     ('access_walk', 'va - (u32)MEM_SHM_BASE < MEM_SHM_SIZE', '1', 'SHM upper bound'),
@@ -46,6 +58,8 @@ def run(sources, mutant=None, fixture="access_walk_host.c"):
     with tempfile.TemporaryDirectory(prefix='os32-d3-') as directory:
         tmp = pathlib.Path(directory)
         for key, body in sources.items():
+            if key == 'boot':
+                body = body[body.index('static void test_caller_boot('):body.index('static void test_ledger(void)')]
             if mutant and mutant[3] == 'PS in both walk layers' and key == 'paging':
                 body = body.replace(' || (pde & PTE_PS)', '')
             if mutant and key == mutant[0]:

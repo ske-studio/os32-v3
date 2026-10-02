@@ -25,6 +25,14 @@ def run(mutation=None):
         kselftest = (ROOT / 'kernel/kselftest.c').read_text()
         ledger = kselftest[kselftest.index('static u32 ledger_persist_total(void)'):kselftest.index('/*  gfx の予約・BB・SURFACE')]
         ledger = ledger[:ledger.rfind('/* ------------------------------------------------------------------------ */')]
+        # This fixture tests ledger allocation/reclaim, not caller copies.
+        # The real bounded boot helper is executed by test_access_walk.py.
+        boot_start = ledger.index('static void test_caller_boot(')
+        boot_end = ledger.index('static void test_ledger(void)')
+        ledger = ledger[:boot_start] + ledger[boot_end:]
+        boot_call = '            if (phys) test_caller_boot(&as, phys);\n'
+        assert ledger.count(boot_call) == 1
+        ledger = ledger.replace(boot_call, '')
         if mutation:
             old, new = mutation[1:]
             if mutation[0].startswith('kselftest-'):

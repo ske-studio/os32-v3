@@ -1,4 +1,6 @@
 """T2d d4: real caller/copy + managed walk, with MMU/IRQ host boundaries."""
+TARGET_SRC = ['exec/redir_access.c', 'exec/access_walk.c', 'kernel/kselftest.c']
+
 import argparse
 import hashlib
 import subprocess
