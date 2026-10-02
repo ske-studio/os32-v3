@@ -1140,6 +1140,11 @@ Opus 5.5による差分再レビュー、e〜gを含む最終一式でのゲス�
 (4) 前景の照合から STOP 送信までの隙間は前回合意の見送りのまま。
 **h3準備の PM 検査 (2026-10-02)**: PM のホスト (PYTHONPATH なし、既定 `HOST32_RUNNERS=native qemu`) で `make all`・`check_select --lint`・`check-changed` すべて rc=0 (`/home/hight/os32-tmp/pmf-h3-{all,cc}.log`)。ゲストでの採取・受入は最終一式で行う (準備の段)。
 
+**h2・h3 準備の着地と PM のゲスト観測 (2026-10-02、main `4693a62`、NP21/W 17MB・今の ini)**: h2・h3 を main へ取り込み (e2・f1a と `build/sdk.mk`・`build/programs.mk`・`tools/check_map.yaml` が競合 → 全部を残して解消、TESTS.md は生成器で再生成)、コミット済みの木で `make all`・`make check` rc=0。配備後の回帰は従来どおり (kselftest 270/0、db・klibc・alloc・d0a、faulttest 4 種、STOP、V86)。
+- h2: `h2_stack run h2-arg` は stack=262144・pages=40・span 163,968、`h2_stack512 run h2-arg` は stack=524288・pages=104・span 426,240 (256KiB 超) で patterns/argv OK・`$?`=0。`guard` モードは 512 版 `#PF addr=0x8FF7F000`、既定版 `#PF addr=0x8FFBF000` で kill (= 上端 − stack − 1 page)。旧形式 fixture のゲスト試験は最終一式 (隔離媒体)。
+- h3: GUI で h3a/h3b を起動し init (h3a app 2・owner 8・世代 26、h3b app 3・owner 9・世代 27)。h3a に `arm --mode KAPI-loop --capture` を流すと、捕捉は `exec_resume` の pending 点で止まったが、台本が **`/api/break/del` の返り値 `"ok":1` (数値) を `ok is True` で失敗と判定**して中止した (偽 client の試験がこの形を再現していなかった — 台本の不具合、直す)。残った breakpoint 3 つを PM が削除し trap を再開。
+- **KAPI-loop の CTRL+STOP が畳まれないことを観測 (カーネル層の不具合、確定)**: 再開後の h3a は app 2 が `g_cur`、slot RUNNING・`in_op_wait=0`・`last_kernel_tick` が現在 tick と一致 (KAPI を回し続けている)、画面で h3a が前景。`/api/key` POST `seq=CTRL%2BSTOP&hold=300` の 2 秒後・10 秒後・約 70 秒後の `observe` で、slot は RUNNING のまま、`abort_req`=0、`appslot_reclaim_count` 18 のまま、`fault_kill_count`・`ring3_abort_count` も不変。画面の時計は 21:41 のまま止まり、WM が一度も回らない (GUI 全体が固まり STOP でも戻れない)。NP21/W の再起動で復旧。観測は `observe` (合否判定なし) と手で送った STOP によるもので、h3 の受入ではない。上の「e/g への申し送り」の疑い (`appslot_abort_admit` が int80 ごとの `last_kernel_tick` 更新で暴走と判定しない、X4 の pump は abort_seen を立てるだけ) と一致する。POLICY_DEV §1 により新しい段より先に直す。ログ: `/home/hight/os32-tmp/h3-obs-{before,2s,10s,70s}.json`。
+
 故障画像・旧shell試験は作業用の媒体と明示した台本をPMが扱う。本設計作業から環境へ触れない。Ra266物理操作/配備の承認手続は既存規則の担当へ渡す。
 
 ### 5-3. 統合matrixと観測
