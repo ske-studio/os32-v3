@@ -247,8 +247,10 @@ SHM (`MEM_SHM_BASE`, 256KB = 16KB × 16 ブロック) のうち、DB 結果は�
   `OP_POLL` を呼ばない間に保持できる待ち行列型は **リング 128 件** + その先のカーネルの
   キー待ち行列 **32 打鍵** (`KBD_BUF_SIZE`。満杯時は新しい打鍵を黙って捨てる。印字可能な
   打鍵は `Key` + `Text` の 2 件になるので、リング側は最悪 64 打鍵分)。空きが無ければ WM は
-  (1) リング内の `Pointer` を落とし、(2) それでも無ければ**カーネルの待ち行列から読まない**
-  (打鍵はそこに残る。「捨てる」のではなく「取り込まない」。2026-09-05 3 回目で確定)。
+  (1) リング内の `Pointer` を落とし、(2) それでも無ければ X4 はカーネル待ち行列から読まない。
+  **X3 は STOP の救済を優先して raw を読み続ける** (2026-10-02 改訂、T6)。
+  CTRL+STOP make は捕捉し、それ以外の配送不能な raw は dropped / OVERFLOW に加算して捨てる。
+  raw 満杯時も CTRL+STOP make は末尾の1件を置換して保持し、置換された1件を数える。
   その先で溢れた打鍵は**カーネルが捨てて数える** (`kbd.c` の満杯分岐に `kbd_dropped` を
   足す。KAPI `kbd_dropped_count()` で読む。K1 の v41 に含める)。WM は取り込みのたびに
   その差分をヘッダの `dropped: u16` に足し、`OVERFLOW` を立てる。したがって**打鍵の欠落は
@@ -265,6 +267,8 @@ SHM (`MEM_SHM_BASE`, 256KB = 16KB × 16 ブロック) のうち、DB 結果は�
   `ERR_STALE` で弾く。0 は無効。
 - 所有者 = exec のネスト段 (`res_owner_get()`、FD と同じ)。アプリ終了 / kill 時に WM が
   そのアプリのウィンドウ・サーフェス・タイマを全部回収する。
+- 内部通知 OWNER_EXIT の arg は EXEC_KIND_*。ABORTED は未処理 STOP を合流して消費する。
+  gui_owner_exit は直接 WM を呼ぶ。公開 gui_call の OWNER_EXIT は OS32_ERR_INVAL。
 - クライアント側 (Rust) は所有型 (`Drop` で destroy)。
 
 ### T5. バージョン
@@ -281,7 +285,11 @@ SHM (`MEM_SHM_BASE`, 256KB = 16KB × 16 ブロック) のうち、DB 結果は�
   `fault_kill` 経路へ落とし、シェルへ復帰する。**注記 (2026-09-06)**: 凍結時点の「現行の
   CTRL+STOP 系」は V86 セッションの脱出しか無く、CPL=3 アプリを畳む経路は K2 が新設した
   (`ring3_abort_request` / `ring3_abort_check`、IRQ1 で CS.RPL=3 のときだけ即時、KAPI 実行中
-  なら次の syscall 入口で畳む)。CUI でも CTRL+STOP で CPL=3 アプリが kill されるようになった。
+  なら安全な syscall 境界で畳む)。GUI KAPI-loop は KAPI 完了後に WAIT_POLL へ退避し、
+  WM top-level の既存宛先解決 → exec_kill へ返す。OP_WAIT 中は既存 abort_req 経路を保つ。
+  X3 は宛先リングに空きがなくても raw を読み、STOP make 以外を dropped / OVERFLOW として捨てる。
+  raw 満杯時の CTRL+STOP make は末尾を置換し、捨てた1件を数える。X4 の空き待ちは維持する。
+  CUI でも CTRL+STOP で CPL=3 アプリが kill される。
 - 長い処理をするアプリは `OP_POLL` を定期的に呼ぶか、仕事をタイマで分割する (U5)。
 
 ### T7. エラー
@@ -307,6 +315,17 @@ WM (gshell) はシェル帯に常駐する CPL=0 のコードで、アプリ実�
   カーソルも止まり、CTRL+STOP (ISR 側の脱出) で kill するしかない (T6)。長い処理は `OP_POLL` を
   挟むかタイマで分割する (U3)。
 - アプリが走っていないとき (gshell 単独) は、gshell 自身のループが X3 と同じ周期を回す。
+
+**park の由来 (5 種)**: OP_WAIT / kbd待ち / polling / sys_yield に加え、
+GUI STOP の WM 返却要求だけが **正常 syscall 完了後**に退避する。
+第5由来は WAIT_POLL の内部印 `parked_from_stop`、resume は保存 EAX を維持し、
+注入リングを読まない。X4 自体は退避も宛先解決もしない。WM は再開直前にもキーボード入力と STOP を
+処理する (exec_start が同じ周の最初の X3 より後に戻る場合にも先に消費)。
+OWNER_EXIT の内部 arg は EXEC_KIND_*。ABORTED (3) は窓の除去前に WM の
+abort_seen と退避 raw の CTRL+STOP make を捨てる。カーネルも未読 raw の同 make を
+除去する。1 個の STOP が前景変更後の相手を二度目に畳まないための内部契約で、
+公開 KAPI の変更はない。詳細と既知の限界は
+[TASK_T2D_T2H §5-4](../v3/TASK_T2D_T2H.md)。
 
 ### T9. CUI シェル ⇄ gshell の切替 — 2026-09-05 追加
 
@@ -482,6 +501,9 @@ loop {
 
 ### U8. 所有者と後始末
 
+OWNER_EXIT はカーネル内部専用で arg = EXEC_KIND_* (T4)。ABORTED は WM の
+捕捉済み・退避済み STOP も消費してから所有者の窓を除去する。
+
 - ウィンドウ / サーフェス / タイマ / ダイアログはアプリの所有。終了・kill で WM が回収 (T4)。
 - WM 自身のウィンドウ (デスクトップ・フォルダ・ターミナル) は gshell 内で同じ API を使う
   (経路が直接呼び出しになるだけ)。
@@ -553,7 +575,8 @@ UTF-8 入力、KCG の 8x16 / 16x16 セル、幅は半角セル数 × 8。プロ
    `OP_POLL` を呼ばない。`/api/key` を 20ms 間隔、アプリ `gui_busy` は 10ms ごとに KAPI を
    呼ぶのでポンプが動く): 印字可能キー 60 打鍵 (= 120 件) → 全部届く。200 打鍵 → 先頭
    64 打鍵 + カーネル待ち行列 32 打鍵の範囲だけ届き、`OVERFLOW` と `dropped = 200 − 64 − 32 =
-   104`、以後の取り込みは `head` が進むと再開する。
+   104`、X4 の取り込みは `head` が進むと再開する。X3 では残存 raw の配送不能分も
+   dropped に数えて捨て、後ろの CTRL+STOP make を捕捉する (T6)。
 3b. **入力元の溢れ (リングが空でも起きる)**: KAPI を一切呼ばないアプリ (ポンプ停止) に
    `/api/key` を 20ms 間隔で 40 打鍵 → カーネルが 8 打鍵を捨てて数え、アプリが次に
    `OP_POLL` したとき 32 打鍵 + `OVERFLOW` + `dropped = 8`。

@@ -92,7 +92,7 @@ C ヘッダ / Rust `proto.rs` の三者を突き合わせる。**数値を動か
 | 32〜33 | サーフェス: `CREATE` 32, `DESTROY` 33 |
 | 48〜49 | タイマ: `SET` 48, `KILL` 49 |
 | 64 | モーダル: `OPEN` 64 |
-| 80 | `OWNER_EXIT` (カーネル内部。exec_exit → WM。アプリは送らない) |
+| 80 | `OWNER_EXIT` (カーネル内部。arg = EXEC_KIND_*、ABORTED は未処理 STOP を消費。gui_call からは OS32_ERR_INVAL) |
 
 ## イベント種別 (GuiEvent.kind)
 

@@ -39,6 +39,8 @@ const u16 kapi_argsize[KAPI_FUNC_COUNT] = {0};
 const u16 kapi_argptr[KAPI_FUNC_COUNT] = {0};
 static void ring3_abort_check(void) {}
 static void ring3_gui_pump(void) {}
+static int stop_park_calls;
+static void exec_park_stop(u32 *frame) { (void)frame; stop_park_calls++; }
 static int ring3_ptr_ok(u32 p) { (void)p; return 1; }
 static void ring3_fault_kill(void) { longjmp(killed, 1); }
 static u32 kapi_invoke(void *fn, const void *args, u32 n);
@@ -157,6 +159,7 @@ int main(void)
         /* The kill fixture does not emulate d2 landing; reset only test state. */
         select_parent(); g_cur_frame = NULL;
     }
+    assert(stop_park_calls == invoked);
     puts("caller d2: actual dispatcher, USER/TRUSTED/WM/nesting/rejection/IF PASS");
     return 0;
 }

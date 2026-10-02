@@ -138,4 +138,7 @@ extern volatile u8 kbd_shift_state;
 #define SHIFT_GRPH   0x08
 #define SHIFT_CTRL   0x10
 
+/* Internal: discard coalesced CTRL+STOP makes after an ABORTED owner exit. */
+void kbd_discard_stop(void);
+
 #endif /* __KBD_H */

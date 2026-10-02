@@ -37,7 +37,9 @@ PRE = r'''
 #include "exec.h"
 #define CHECK(x) do { if (!(x)) die(__LINE__); } while (0)
 static void die(int n) {
-    (void)n;
+    char b[12]; int len = 0;
+    do { b[len++] = '0' + n % 10; n /= 10; } while (n);
+    __asm__ volatile("int $0x80" : : "a"(4), "b"(2), "c"(b), "d"(len) : "memory");
     __asm__ volatile("int $0x80" : : "a"(1), "b"(1) : "memory");
     for (;;) {}
 }
@@ -93,8 +95,12 @@ static void pipe_free_owned(int id) { resource(id, 3); }
 static void shm_free_owned(int id) { resource(id, 4); }
 static void snd_owner_exit(int id) { resource(id, 5); }
 static void pcm_reclaim(int id) { resource(id, 6); }
-static void gui_owner_exit(int id) {
+static int stop_discards;
+static void kbd_discard_stop(void) { stop_discards++; }
+static void gui_owner_exit(int id, int kind) {
+    CHECK(kind == (host_wm_kill ? EXEC_KIND_ABORTED : phase == 3 ? EXEC_KIND_EXITED : scheduled_kind));
     CHECK(id == 2 && cleanup == 7 && teardown == 1);
+    CHECK(stop_discards == (kind == EXEC_KIND_ABORTED));
     CHECK(cur == (host_wm_kill ? 1 : 3) && owner == cur && cr3 == cur);
     CHECK(host_if && !kctx_irq_depth && !kctx_exc_depth); notices++;
 }
@@ -159,6 +165,9 @@ static u32 host_kapi_table[KAPI_FUNC_COUNT + 2];
 const u16 kapi_argsize[KAPI_FUNC_COUNT] = {0};
 const u16 kapi_argptr[KAPI_FUNC_COUNT] = {0};
 static void ring3_abort_check(void) {}
+static int stop_pending;
+int appslot_stop_pending(void) { return stop_pending; }
+static void exec_park_stop(u32 *f);
 static void ring3_gui_pump(void) {}
 int ring3_ptr_ok(u32 p) { (void)p; return 1; }
 static u32 kapi_invoke(void *fn, const void *args, u32 n) {
@@ -178,6 +187,7 @@ void appslot_park_commit(void) { cur = owner = 1; slots[2].state = APP_STATE_PAR
 void appslot_park_kbd_commit(void) { appslot_park_commit(); }
 void appslot_park_poll_commit(void) { appslot_park_commit(); }
 void appslot_park_yield_commit(void) { appslot_park_commit(); }
+void appslot_park_stop_commit(void) { stop_pending = 0; appslot_park_commit(); }
 '''
 
 POST = r'''
@@ -200,6 +210,7 @@ static void simulate(void) {
 }
 static void simulate_action(void) {
     struct caller_access out;
+    if (phase == 8) { stop_pending = 1; return; }
     ring3_wm_enter(); ring3_wm_enter();
     CHECK(caller_access_get(&out) && out.origin == CALLER_TRUSTED);
     CHECK(caller_access_get_user(&out) && out.app_id == 2);
@@ -226,7 +237,7 @@ static void simulate_action(void) {
 }
 static void setup(int gui, int kind) {
     cur = owner = cr3 = 2; host_if = 1; host_gui = gui;
-    cleanup = teardown = notices = transfers = 0;
+    cleanup = teardown = notices = transfers = stop_discards = 0;
     ring3_context_clear(); nested_parent = 0;
     for (int id = 2; id <= 3; id++) {
         slots[id].state = APP_STATE_RUNNING; slots[id].cpl3 = 1;
@@ -254,7 +265,7 @@ static int host_handler(unsigned int irq, void *arg) { (void)irq; (void)arg; ret
 END = r'''
 static int test(void) {
     int gui, kind, resumed;
-    CHECK(sizeof(struct addrspace) == 692 && sizeof(AppSlot) == 192);
+    CHECK(sizeof(struct addrspace) == 692 && sizeof(AppSlot) == 200);
     CHECK(sizeof(RedirAccess) == 24 && sizeof(CallerAccessFrame) == 28);
     CHECK(sizeof(FdRedirect) == 52 && sizeof(FdRedirectState) == 156);
     CHECK(sizeof(Ring3CallContext) == 40);
@@ -285,6 +296,16 @@ static int test(void) {
         if (!gui) CHECK(g_last_kind == kind && g_last_code == EXEC_ERR_FAULT);
         exec_pending_finish(); /* 一度消費した pending を二重回収しない */
         CHECK(cleanup == 7 && teardown == 1 && notices == 1);
+    }
+    for (resumed = 0; resumed < 2; resumed++) {
+        setup(1, EXEC_KIND_ABORTED); phase = 8;
+        nested_parent = 1; cur = owner = cr3 = 3;
+        CallerAccessFrame prev;
+        CHECK(caller_access_enter(&prev, CALLER_USER));
+        ring3_in_syscall = 1; g_cur_frame = parent_frame;
+        CHECK((resumed ? resume_landing() : launch_landing()) == 2);
+        CHECK(!stop_pending && !cleanup && caller_frame.valid);
+        caller_access_leave(&prev);
     }
     setup(0, EXEC_KIND_EXITED); phase = 3;
     CHECK(launch_landing() == 17);
@@ -341,7 +362,7 @@ def run(source=None, irq=None):
     names = ('exec_reclaim_resources', 'exec_notify_owned', 'exec_reclaim_owned',
              'ring3_context_save', 'ring3_context_clear', 'ring3_context_restore',
              'ring3_wm_enter', 'ring3_wm_leave', 'ring3_syscall_dispatch',
-             'exec_park', 'exec_park_kbd', 'exec_park_poll', 'exec_sys_yield',
+             'exec_park', 'exec_park_kbd', 'exec_park_poll', 'exec_sys_yield', 'exec_park_stop',
              'exec_finish', 'exec_exit', 'kapi_sys_exit', 'exec_pending_transfer', 'exec_pending_finish',
              'exec_kill_one', 'exec_fault_recover', 'ring3_kill_kind', 'ring3_fault_kill', 'ring3_abort_kill')
     context = source[source.index('typedef struct {\n    CallerAccessFrame caller;'):source.index('} Ring3CallContext;') + len('} Ring3CallContext;')]
@@ -379,6 +400,8 @@ class ExecR1(unittest.TestCase):
 
 
 MUTATIONS = (
+    ('aborted-raw-retained', '    if (kind == EXEC_KIND_ABORTED) kbd_discard_stop();', ''),
+    ('exit-kind-lost', '    gui_owner_exit(id, kind);', '    gui_owner_exit(id, 0);'),
     ('launch-save-missing', '    ring3_context_save(&caller_context);\n    if (exec_setjmp(ctx->jmpbuf) != 0) {',
      '    if (exec_setjmp(ctx->jmpbuf) != 0) {'),
     ('launch-save-after-setjmp', '    ring3_context_save(&caller_context);\n    if (exec_setjmp(ctx->jmpbuf) != 0) {',
@@ -404,8 +427,8 @@ MUTATIONS = (
     ('snapshot-WM', '    out->wm_depth = ring3_wm_depth;', '    out->wm_depth = 0;'),
     ('snapshot-frame', '    out->frame = g_cur_frame;', '    out->frame = 0;'),
     ('wm-notify-before-as',
-     '    exec_reclaim_resources(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);\n    exec_notify_owned(id);',
-     '    exec_reclaim_owned(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);'),
+     '    exec_reclaim_resources(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);\n    exec_notify_owned(id, EXEC_KIND_ABORTED);',
+     '    exec_reclaim_owned(id, EXEC_KIND_ABORTED);\n    exec_teardown_app(a);\n    appslot_reclaim(id);'),
     ('irq-teardown', '    g_pending_id = id;', '    exec_teardown_app(a);\n    g_pending_id = id;'),
     ('landing-if-missing', '    _enable();\n    exec_finish(id,', '    exec_finish(id,'),
     ('pending-consumed-twice', '    g_pending_id = 0;             /* callback',
@@ -423,23 +446,25 @@ if __name__ == '__main__':
     if '--mutate' in sys.argv:
         source = (ROOT / 'exec/exec.c').read_text()
         for name, old, new in MUTATIONS:
-            if old not in source:
-                raise SystemExit('missing mutation: ' + name)
+            expected = 2 if name == 'landing-restore' else 1
+            assert source.count(old) == expected, (name, source.count(old))
             status, log = run(source.replace(old, new, 1))
             print(name + ': ' + status)
             if status != 'runtime':
                 raise SystemExit(log or 'mutation must fail at runtime')
 
-        for name in ('exec_park', 'exec_park_kbd', 'exec_park_poll', 'exec_sys_yield'):
+        for name in ('exec_park', 'exec_park_kbd', 'exec_park_poll', 'exec_sys_yield', 'exec_park_stop'):
             original = function(source, name)
             changed = original.replace('    ring3_context_clear();', '')
-            assert changed != original
+            assert original.count('    ring3_context_clear();') == 1
             status, log = run(source.replace(original, changed))
             print(name + '-invalidate: ' + status)
             if status != 'runtime':
                 raise SystemExit(log or 'mutation must fail at runtime')
 
         irq = (ROOT / 'kernel/irq.c').read_text()
+        assert irq.count('flags, kctx_irq_depth)') == 1
+        assert irq.count('arg, kctx_irq_depth)') == 1
         status, log = run(irq=irq.replace('flags, kctx_irq_depth)', 'flags, 0)').replace('arg, kctx_irq_depth)', 'arg, 0)'))
         print('broker-old-depth: ' + status)
         if status != 'runtime':

@@ -130,6 +130,8 @@ typedef struct {
      * 非シェルの CPL=0 起動はローダが拒否する。構造体の末尾に足すので、
      * 旧 ExecContext 由来の欄の並びは 1 バイトも動かない (I12/I13)。 */
     u32  hdr_flags;
+    volatile int stop_wm_req;  /* IRQ: return to WM at completed syscall */
+    int  parked_from_stop;     /* preserve every completed register on resume */
 } AppSlot;
 
 /* ---- 受入 G7 のカウンタ (D8 の C1/C2/C3/C6) --------------------------- */
@@ -147,6 +149,7 @@ extern volatile u32 ring3_poll_yield_count;
 /* GUI 中に sys_yield で明示的に譲った回数 (票 T9 D5 の観測点)。tick の
  * 間引きが無い park 点なので、ポーリングの譲りとは別に数える。 */
 extern volatile u32 ring3_yield_count;
+extern volatile u32 ring3_stop_park_count;
 /* 回収の回数と直前の対象 (試験と診断用。G2/G5 の「1 本分だけ」を数える) */
 extern volatile u32 appslot_reclaim_count;
 extern volatile int appslot_last_reclaim_id;
@@ -274,6 +277,11 @@ void appslot_park_yield_commit(void);
 
 /* resume のとき EAX に何を入れるか。印から導くので、対応表は 1 か所
  * (exec_resume が switch するだけ)。id が起こせない状態なら負。 */
+void appslot_stop_request(void);
+int appslot_stop_pending(void);
+void appslot_park_stop_commit(void);
+
+#define APP_RESUME_SRC_KEEP   4   /* completed syscall: preserve EAX */
 #define APP_RESUME_SRC_WAIT   0   /* WM が渡す wait_ret */
 #define APP_RESUME_SRC_KBD    1   /* 注入リングの 1 バイト。空なら起こさない */
 #define APP_RESUME_SRC_POLL   2   /* 注入リングの 1 バイト。空なら -1 で起こす */

@@ -1039,6 +1039,12 @@ fn undo_park(cur: i32) {
 /// **`exec_resume` を呼ぶ唯一の点**。呼べるのは WM top-level だけで
 /// (カーネルの `appslot_resume_check`)、印の無いフレームは `OS32_ERR_STALE`。
 pub fn resume_one(st: &mut GuiState) -> bool {
+    // exec_start can return after this iteration's X3. Consume STOP before
+    // waking a completed-syscall frame, including raw not yet seen by X4.
+    crate::input::capture_keyboard(st, crate::input::Ctx::Standalone);
+    if crate::top_level_abort(st) != 0 {
+        return true;
+    }
     if drain_top_level() {
         /* 票 T8-3 (PM 実測 2026-09-12): 畳んだ相手が全画面の所有者だったかも
          * しれない。`exec_kill` は `exec_start` / `exec_resume` の復帰点を

@@ -60,9 +60,9 @@ def check_reclaim_order():
     db = body.index("db_cleanup_owned(id);")
     fd = body.index("vfs_close_owned(id);")
     assert db < fd, "exec_reclaim_resources: db_cleanup_owned は vfs_close_owned より先"
-    m = re.search(r"static void exec_reclaim_owned\(int id\)\s*\{(.*?)\n\}", src, re.S)
+    m = re.search(r"static void exec_reclaim_owned\(int id, int kind\)\s*\{(.*?)\n\}", src, re.S)
     assert m, "exec_reclaim_owned が見つからない"
-    assert m.group(1).index("exec_reclaim_resources(id);") < m.group(1).index("exec_notify_owned(id);")
+    assert m.group(1).index("exec_reclaim_resources(id);") < m.group(1).index("exec_notify_owned(id, kind);")
     print("ORDER SOURCE: db_cleanup_owned before vfs_close_owned PASS", flush=True)
 
 

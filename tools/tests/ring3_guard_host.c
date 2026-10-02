@@ -234,6 +234,9 @@ static void case_gui_call(void)
 
     /* アプリ (owner 2) の gui_call: ハンドラの中は深さ 1、戻ると 0。 */
     res_owner_set(2);
+    check(gui_call(GUI_OP_OWNER_EXIT, EXEC_KIND_ABORTED) == OS32_ERR_INVAL,
+          "2 owner exit cannot be forged");
+    check(!host_enter_calls && !host_op_enter, "2 refusal never enters WM");
     r = gui_call(GUI_OP_WAIT, 5);
     check(r == 7, "2d handler result passes through");
     check(last_op == GUI_OP_WAIT, "2e op passes through");
@@ -288,20 +291,20 @@ static void case_owner_exit(void)
     before_enter = host_enter_calls;
     before_leave = host_leave_calls;
 
-    gui_owner_exit(3);                      /* アプリ (owner 3) の回収 */
+    gui_owner_exit(3, 1);                      /* アプリ (owner 3) の回収 */
     check(exit_depth == 1 && exit_owner == 3, "3b OWNER_EXIT runs with depth 1");
     check(ring3_wm_depth == 0, "3c depth back to 0");
     check(host_enter_calls == before_enter + 1 &&
           host_leave_calls == before_leave + 1, "3d enter/leave paired");
 
     /* WM 自身 (owner 1) の終了 = 登録解除。以後の gui_call は印を立てない。 */
-    gui_owner_exit(GUI_SHELL_OWNER);
+    gui_owner_exit(GUI_SHELL_OWNER, 1);
     before_enter = host_enter_calls;
     check(gui_call(GUI_OP_POLL, 0) == OS32_ERR_NOSYS, "3e WM gone -> NOSYS");
     check(host_enter_calls == before_enter && ring3_wm_depth == 0,
           "3f WM gone -> no mark");
     /* 未登録の owner_exit は何もしない (印も立てない)。 */
-    gui_owner_exit(2);
+    gui_owner_exit(2, 1);
     check(host_enter_calls == before_enter, "3g owner_exit without WM -> no mark");
 }
 
@@ -404,7 +407,7 @@ static void case_registered_ptr(void)
 
     host_in_syscall = 0;
     res_owner_set(1);
-    gui_owner_exit(GUI_SHELL_OWNER);
+    gui_owner_exit(GUI_SHELL_OWNER, 1);
 }
 
 /* ========================================================================
@@ -467,9 +470,9 @@ static void case_ime_render(void)
      * アプリ (owner 3) の回収では触らない。 */
     gui_ime_set_render(wm_render_table);
     res_owner_set(0);                        /* exec_exit はシェルの回収で owner 0 */
-    gui_owner_exit(3);
+    gui_owner_exit(3, 1);
     check(host_ime_render == (void *)wm_render_table, "5i app exit leaves render");
-    gui_owner_exit(GUI_SHELL_OWNER);
+    gui_owner_exit(GUI_SHELL_OWNER, 1);
     check(host_ime_render == (void *)0, "5j shell exit resets render to NULL");
     res_owner_set(1);
     check(gui_ime_render_rejected == rej0 + 4, "5k four refusals counted");
@@ -530,7 +533,7 @@ static void case_register_gate(void)
     host_in_syscall = 0;
     check(gui_register((void *)0, (void *)0) == OS32_ERR_INVAL, "6g NULL handler -> INVAL");
 
-    gui_owner_exit(GUI_SHELL_OWNER);
+    gui_owner_exit(GUI_SHELL_OWNER, 1);
 }
 
 int main(void)

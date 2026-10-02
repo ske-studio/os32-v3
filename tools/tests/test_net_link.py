@@ -68,7 +68,7 @@ def check_reclaim_has_host_owner_exit():
     con_sink_owner_exit / launch_owner_exit と同じ位置にあることを本文で見る。
     """
     src = (ROOT / "exec/exec.c").read_text(encoding="utf-8")
-    m = re.search(r"static void exec_notify_owned\(int id\)\s*\{(.*?)\n\}", src, re.S)
+    m = re.search(r"static void exec_notify_owned\(int id, int kind\)\s*\{(.*?)\n\}", src, re.S)
     assert m, "exec_notify_owned が見つからない"
     body = m.group(1)
     assert "host_owner_exit(id);" in body, "exec_notify_owned に host_owner_exit が無い"

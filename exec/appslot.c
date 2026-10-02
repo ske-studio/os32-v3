@@ -75,6 +75,7 @@ volatile u32 ring3_resume_bad_frame_count = 0;
 volatile u32 ring3_kbd_park_count = 0;
 volatile u32 ring3_poll_yield_count = 0;
 volatile u32 ring3_yield_count = 0;
+volatile u32 ring3_stop_park_count = 0;
 volatile u32 appslot_reclaim_count = 0;
 volatile int appslot_last_reclaim_id = 0;
 volatile u32 gfx_init_reject_count = 0;
@@ -213,6 +214,8 @@ void appslot_start_commit(int id, int gui, u32 pages)
     a->parked_from_kbd = 0;
     a->parked_from_poll = 0;
     a->parked_from_yield = 0;
+    a->parked_from_stop = 0;
+    a->stop_wm_req = 0;
     a->last_kernel_tick = 0;
     g_cur = id;
     res_owner_set(id);
@@ -235,6 +238,8 @@ void appslot_shell_commit(void)
     a->parked_from_kbd = 0;
     a->parked_from_poll = 0;
     a->parked_from_yield = 0;
+    a->parked_from_stop = 0;
+    a->stop_wm_req = 0;
     a->last_kernel_tick = 0;
     g_cur = APP_ID_SHELL;
     g_cur_op_is_wait = 0;
@@ -302,6 +307,8 @@ void appslot_park_commit(void)
     /* 票 T9 §12 T1: リダイレクト表を ID の文脈として持ち替える。 */
     redir_switch_out(g_cur);
     a->parked_from_wait = 1;      /* 「OP_WAIT 由来」の印 (C5) */
+    a->stop_wm_req = 0;
+    g_slot[APP_ID_SHELL].stop_wm_req = 0;
     a->in_op_wait = 0;
     a->state = APP_STATE_PARKED;
     g_cur_op_is_wait = 0;
@@ -344,6 +351,8 @@ void appslot_park_kbd_commit(void)
     /* 票 T9 §12 T1: リダイレクト表を ID の文脈として持ち替える。 */
     redir_switch_out(g_cur);
     a->parked_from_kbd = 1;       /* 「kbd 待ち由来」の印 (K7 D1) */
+    a->stop_wm_req = 0;
+    g_slot[APP_ID_SHELL].stop_wm_req = 0;
     a->in_op_wait = 0;
     a->state = APP_STATE_WAIT_KEY;
     g_cur_op_is_wait = 0;
@@ -397,6 +406,8 @@ void appslot_park_poll_commit(void)
     /* 票 T9 §12 T1: リダイレクト表を ID の文脈として持ち替える。 */
     redir_switch_out(g_cur);
     a->parked_from_poll = 1;      /* 「ポーリング由来」の印 (T8 D8) */
+    a->stop_wm_req = 0;
+    g_slot[APP_ID_SHELL].stop_wm_req = 0;
     a->in_op_wait = 0;
     a->state = APP_STATE_WAIT_POLL;
     g_cur_op_is_wait = 0;
@@ -446,12 +457,52 @@ void appslot_park_yield_commit(void)
     /* 票 T9 §12 T1: リダイレクト表を ID の文脈として持ち替える。 */
     redir_switch_out(g_cur);
     a->parked_from_yield = 1;     /* 「明示的な譲り由来」の印 (T9 D5) */
+    a->stop_wm_req = 0;
+    g_slot[APP_ID_SHELL].stop_wm_req = 0;
     a->in_op_wait = 0;
     a->state = APP_STATE_WAIT_POLL;
     g_cur_op_is_wait = 0;
     g_cur = APP_ID_SHELL;
     res_owner_set(APP_ID_SHELL);
     ring3_yield_count++;
+}
+
+/* STOP never chooses an owner in IRQ context. The WM resolves the target. */
+void appslot_stop_request(void)
+{
+    AppSlot *a = appslot_get(g_cur);
+    /* IRQ can arrive after WM capture, immediately before resume/start.
+     * Keep that request in the shell slot until WM consumes it or the next
+     * completed syscall returns control. It has no application target yet. */
+    if (g_cur == APP_ID_SHELL) {
+        g_slot[APP_ID_SHELL].stop_wm_req = 1;
+        return;
+    }
+    if (a && g_cur >= APP_ID_MIN && a->gui && a->cpl3 &&
+        a->state == APP_STATE_RUNNING && !a->in_op_wait)
+        a->stop_wm_req = 1;
+}
+
+int appslot_stop_pending(void)
+{
+    AppSlot *a = appslot_get(g_cur);
+    return g_slot[APP_ID_SHELL].stop_wm_req || (a && a->stop_wm_req);
+}
+
+void appslot_park_stop_commit(void)
+{
+    AppSlot *a = appslot_get(g_cur);
+    if (!a) return;
+    redir_switch_out(g_cur);
+    a->stop_wm_req = 0;
+    g_slot[APP_ID_SHELL].stop_wm_req = 0;
+    ring3_stop_park_count++;
+    a->parked_from_stop = 1;
+    a->in_op_wait = 0;
+    a->state = APP_STATE_WAIT_POLL;
+    g_cur_op_is_wait = 0;
+    g_cur = APP_ID_SHELL;
+    res_owner_set(APP_ID_SHELL);
 }
 
 int appslot_resume_check(int id)
@@ -477,10 +528,10 @@ int appslot_resume_check(int id)
      * 「注入リングに文字がある」ではない — WM は次の周に必ず起こし、
      * 空なら exec_resume が EAX に -1 を書く。ここで見るのは印だけ。 */
     if (a->state == APP_STATE_WAIT_POLL) {
-        /* WAIT_POLL には 2 つの由来がある (票 T9 D5)。どちらの印も無ければ
+        /* WAIT_POLL は polling / yield / STOP 完了の 3 由来。印が無ければ
          * 起こさない — 規則は park 点が増えても 1 つ: 「その状態に対応する
          * 印が立っているフレームだけ」。 */
-        if (!a->parked_from_poll && !a->parked_from_yield) {
+        if (!a->parked_from_poll && !a->parked_from_yield && !a->parked_from_stop) {
             ring3_resume_bad_frame_count++;
             return OS32_ERR_STALE;
         }
@@ -505,6 +556,7 @@ int appslot_resume_source(int id)
     if (a->state == APP_STATE_WAIT_POLL) {
         /* 明示的な譲りは注入リングを読まない — 読むと、譲っている sh が
          * 子宛の 1 バイトを吸って捨てる (票 §6 blocker 1)。 */
+        if (a->parked_from_stop) return APP_RESUME_SRC_KEEP;
         if (a->parked_from_yield) return APP_RESUME_SRC_YIELD;
         return APP_RESUME_SRC_POLL;
     }
@@ -521,6 +573,8 @@ void appslot_resume_commit(int id)
     a->parked_from_kbd = 0;
     a->parked_from_poll = 0;
     a->parked_from_yield = 0;
+    a->parked_from_stop = 0;
+    a->stop_wm_req = 0;
     a->last_kernel_tick = 0;
     a->in_op_wait = 0;
     a->state = APP_STATE_RUNNING;
@@ -540,6 +594,7 @@ u32 appslot_reclaim(int id)
     u32 pages;
     if (!a || id == APP_ID_SHELL) return 0;
     pages = a->pages;
+    g_slot[APP_ID_SHELL].stop_wm_req = 0;
     /* 票 T9 §12 T1: 枠は **閉じずに空にするだけ**。枠の中の file_fd は
      * fd_redirect_to_file の vfs_open がこの ID の owner タグを付けて取った
      * ものなので、park したまま畳まれても exec_reclaim_owned の
@@ -686,8 +741,12 @@ int appslot_abort_clear(void)
     /* gui_register と同じ判定: シェル帯 (owner 1) からのみ。 */
     if (res_owner_get() != APP_ID_SHELL) return OS32_ERR_INVAL;
 
+    g_slot[APP_ID_SHELL].stop_wm_req = 0;
     for (i = APP_ID_MIN; i <= APP_ID_MAX; i++) {
-        if (g_slot[i].state != APP_STATE_FREE) g_slot[i].abort_req = 0;
+        if (g_slot[i].state != APP_STATE_FREE) {
+            g_slot[i].abort_req = 0;
+            g_slot[i].stop_wm_req = 0;
+        }
     }
     return 0;
 }
@@ -862,6 +921,15 @@ u32 appslot_resume_mark_selftest(void)
     if (appslot_resume_source(id) != APP_RESUME_SRC_KBD) bad |= 1u << 8;
     g_slot[id].state = APP_STATE_PARKED;
     if (appslot_resume_source(id) != APP_RESUME_SRC_WAIT) bad |= 1u << 8;
+
+    /* (9) STOP completion is the fifth origin; never supply a new EAX. */
+    g_slot[id].state = APP_STATE_WAIT_POLL;
+    g_slot[id].parked_from_poll = 0;
+    g_slot[id].parked_from_yield = 0;
+    g_slot[id].parked_from_stop = 1;
+    if (appslot_resume_check(id) != 0 || appslot_kill_check(id) != 0 ||
+        appslot_resume_source(id) != APP_RESUME_SRC_KEEP) bad |= 1u << 9;
+    g_slot[id].parked_from_stop = 0;
 
     /* (7) tick の間引き (D8): 同じ tick では 2 度譲らない。間引きは表の検査
      * より**先**に効くので、弾き数 ring3_park_reject_count に載らない。
