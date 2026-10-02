@@ -82,7 +82,11 @@ void *kmemcpy(void *d, const void *s, u32 n) {
 }
 static void check(int ok, const char *name)
 {
-    if (!ok) { SAY("FAIL: boot caller"); report(name, 0); die(1); }
+    if (!ok) {
+        u32 len = 0;
+        while (name[len]) len++;
+        SAY("FAIL: boot caller"); report(name, len); SAY(""); die(1);
+    }
 }
 #include "boot_host_source.c"
 static struct addrspace space;
@@ -100,7 +104,30 @@ static void probe(u32 va, int write, int ok, u32 expected)
 #ifdef HOST_CALLER_COPY_TEST
 static void caller_copy_tests(void);
 #endif
-void _start(void)
+/* Linux's native i386 entry stack may be above MEM_APP_BAND_BASE; qemu's
+ * default stack is below it. Boot's TRUSTED buffers live in the low kernel
+ * band, so run on an ELF-backed low stack in either execution environment. */
+static u8 host_stack[64 * 1024] __attribute__((aligned(16), __used__));
+static void host_start(void) __attribute__((__used__));
+#ifdef HOST_HIGH_ENTRY_STACK
+/* Regression control: emulate Linux's high initial stack even under qemu. */
+static u32 high_stack_args[6] __attribute__((__used__)) = {
+    MEM_APP_BAND_BASE, sizeof(host_stack), 3, 0x32, 0xffffffff, 0
+};
+#endif
+__asm__(".text\n.globl _start\n_start:\n"
+#ifdef HOST_HIGH_ENTRY_STACK
+        "mov $90, %eax\nmov $high_stack_args, %ebx\nint $0x80\n"
+        "cmp high_stack_args, %eax\njne 1f\n"
+        "mov %eax, %esp\nadd $65536, %esp\n"
+#endif
+        "lea host_stack+65536, %esp\n"
+        "call host_start\n"
+#ifdef HOST_HIGH_ENTRY_STACK
+        "1: mov $1, %eax\nmov $98, %ebx\nint $0x80\n"
+#endif
+        );
+static void host_start(void)
 {
     u32 args[6] = {0x100000, 0xF00000, 3, 0x32, 0xFFFFFFFF, 0};
     u32 result, owner, other, *pd, *pt, original, fake, i;
@@ -303,6 +330,10 @@ void _start(void)
     {
         struct addrspace boot_as;
         CallerAccessFrame before, after;
+        u32 saved_root = host_cr3;
+        int saved_current = current, saved_owner = resource_owner;
+        host_cr3 = paging_kernel_pd_phys();
+        current = resource_owner = 0;
         caller_access_save(&before);
         CHECK(!paging_addrspace_create(&boot_as, owner));
         for (i = 0; i < 2; i++) {
@@ -315,6 +346,9 @@ void _start(void)
             CHECK(after.access.origin == before.access.origin);
         }
         paging_addrspace_destroy(&boot_as);
+        current = saved_current;
+        resource_owner = saved_owner;
+        host_cr3 = saved_root;
     }
     /* Current caller is stricter than a live registrant under another root. */
     host_cr3 = paging_kernel_pd_phys();

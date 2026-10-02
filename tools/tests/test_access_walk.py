@@ -6,6 +6,8 @@ TARGET_SRC = ['exec/access_walk.c', 'exec/redir_access.c', 'kernel/paging.c', 'k
 import argparse
 import hashlib
 import pathlib
+import shutil
+import signal
 import subprocess
 import tempfile
 import time
@@ -51,10 +53,11 @@ MUTANTS = [
     ('access_walk', 'frame != (sf->first + (va - l->base) / PAGE_SIZE) * PAGE_SIZE', '0', 'lease PFN'),
     ('shlib', 'g_pages[page] == frame', '1', 'shlib exact backing'),
     ('access_walk', '!write && shlib_read_page(va, frame)', 'shlib_read_page(va, frame)', 'shlib output'),
+    ('redir_access', 'if (write) kmemcpy(P2V(pa), bytes, n);', 'if (write) { }', 'boot copyout moves bytes'),
 ]
 
 
-def run(sources, mutant=None, fixture="access_walk_host.c"):
+def run(sources, mutant=None, fixture="access_walk_host.c", high_stack=False):
     with tempfile.TemporaryDirectory(prefix='os32-d3-') as directory:
         tmp = pathlib.Path(directory)
         for key, body in sources.items():
@@ -71,13 +74,22 @@ def run(sources, mutant=None, fixture="access_walk_host.c"):
         cmd = ['gcc', '-std=gnu11', '-m32', '-march=i386', '-ffreestanding',
                '-fno-pie', '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
                '-Wall', '-Wextra', '-Werror', '-DPHYSMEM_HOST_TEST=1', '-nostdlib',
+               *(['-DHOST_HIGH_ENTRY_STACK=1'] if high_stack else []),
                '-static', '-no-pie', '-Wl,--gc-sections',
                *['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'include',
                   'arch/x86', 'platform/pc98', 'kernel', 'exec', 'fs', 'lib', 'kapi', 'lib/sqlite3', 'sdk/include/os32')],
                '-I' + str(tmp), str(ROOT / 'tools/tests' / fixture),
                str(ROOT / 'kernel/physmem.c'), '-o', str(exe)]
         subprocess.run(cmd, check=True, capture_output=True, text=True)
-        return subprocess.run([str(exe)], capture_output=True, text=True, timeout=10)
+        result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=10)
+        # Some sandboxes forbid native int 0x80. Only SIGSYS permits this
+        # compatibility retry; assertion failures/signals must remain RED.
+        if result.returncode == -signal.SIGSYS:
+            qemu = shutil.which('qemu-i386')
+            if not qemu:
+                raise RuntimeError('native i386 syscalls blocked (SIGSYS); qemu-i386 required')
+            result = subprocess.run([qemu, str(exe)], capture_output=True, text=True, timeout=10)
+        return result
 
 
 def main():
@@ -89,11 +101,18 @@ def main():
     result = run(sources)
     print(result.stdout + result.stderr, end='')
     assert result.returncode == 0
+    result = run(sources, high_stack=True)
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    print('PASS: boot buffers on low fixture stack with high initial stack')
     if args.mutate:
         def one(m):
             start = time.monotonic()
-            r = run(sources, m)
+            r = run(sources, m, high_stack=True)
             assert r.returncode != 0 and 'FAIL:' in r.stdout, (m[3], r.stdout, r.stderr)
+            if m[3] == 'boot copyout moves bytes':
+                assert 'caller:boot copyout' in r.stdout, r.stdout
+            if m[3] == 'registrant PD write':
+                assert 'FAIL: redir_access_check(&caller, MEM_EXEC_LOAD_ADDR, 1, 1)' in r.stdout, r.stdout
             return m[3], time.monotonic() - start
         for name, seconds in run_ordered(one, MUTANTS):
             print(f'RED (runtime): {name} ({seconds:.2f}s)')

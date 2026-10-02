@@ -673,6 +673,7 @@ static void test_caller_boot(struct addrspace *as, u32 phys)
               "caller:boot bounded cstr");
         dst[0] = 'x';
         check(!copy_caller_cstr(&c, src, dst, 1), "caller:boot missing NUL");
+        dst[0] = 'x'; dst[1] = 'y';
         check(copy_to_caller(&c, dst, src, sizeof(src)) && dst[0] == 'd' && !dst[1],
               "caller:boot copyout");
         check(!copy_to_caller(&c, 0, src, 1), "caller:boot NULL output");

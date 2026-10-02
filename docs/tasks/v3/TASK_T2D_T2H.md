@@ -1503,7 +1503,7 @@ make check-changed < /dev/null` は上記PATH/PYTHONPATHで **最後に1回だ�
 | trampoline `!write` | (b) 多重防御、維持 | RO入力成功、出力拒否。write walkのPTE_RW要求と末尾のRO PTE要求は両立しないため、単独削除は生存。入力専用契約の明示として残す |
 | lease `!sf->lease_count` | (a) | live参照1で成功→0でread拒否。他の権限/台帳は正常。削除をruntime RED |
 | lease `sf->npages != l->npages` | (a) | 1 page一致で成功→lease側だけ2 page、先頭page readも拒否。削除をruntime RED |
-| lease `l->sid` 上限 | (b) 多重防御、維持 | 正常sidで成功、上限sidを拒否。`paging_lease_map_batch`はsid上限を確認後にl->sidを保存し、USERからAS metadataは変更不可。単独削除は足場の範囲外位置がgen不一致となり生存したが、これは配列外読取りの安全性の証拠ではない。**sfを読む前の境界検査は撤去不可** |
+| lease `l->sid` 上限 | (b) 多重防御、維持 | 正常sidで成功、上限sidを拒否。`paging_lease_map`はsid上限を確認後にl->sidを保存し、USERからAS metadataは変更不可。単独削除は足場の範囲外位置がgen不一致となり生存したが、これは配列外読取りの安全性の証拠ではない。**sfを読む前の境界検査は撤去不可** |
 | lease `perm_max == NONE` | (a) | RW surfaceのread成功→NONEだけに変更。`ledger_surface_validate`自体はNONEを許す正常対照を明示し、read拒否。削除をruntime RED |
 | shlib SHLIB owner | (a) | 登録PFN一致のread成功→原本の台帳ownerだけ別ownerへ移譲、拒否→復元。削除をruntime RED |
 | shlib `page < g_text_pages` | (a) | text原本のread成功、登録済みdata原本をRO/USERにmapしても入力拒否。境界をg_pages容量まで広げる変異をruntime RED (配列外読取りを発生させる無制限削除は使わない) |
@@ -1593,6 +1593,61 @@ backbuffer/gfxを含む停止したtargetを全て確認した。
 **ユーザーの「最後に1回」に従いcheck-changedは再実行していない。
 対象失敗は修正済みだが、完了条件のcheck-changed rc=0は未達。PMの全体再確認へ残す。**
 ゲストkselftest 0 failもPM確認待ち。状態行は変更していない。
+
+
+**レビューの P3 と作業ツリーでの試験の失敗の対応 (2026-10-02、基点 `4d2294b`)**:
+
+- 作業ツリーの `FAIL: boot caller` はホスト足場のスタック番地に依存した。
+  `test_caller_boot` のローカル `src` / `dst` が Linux native i386 の高位スタックに
+  置かれると、TRUSTED の `va >= MEM_APP_BAND_BASE` (`0x80000000`) 拒否に掛かる。
+  以前の試験は `PYTHONPATH=/home/hight/os32-tmp/d0b-host-runner` の qemu 補助を使い、
+  qemu の低位スタックで通っていた。実ソース閉包は毎回一時ディレクトリへコピーして
+  host GCC でリンクするため、OS の `.o` / 生成像 / `kernel.map` は入力でない。
+  同じ閉包を qemu 上で高位スタック (`0xB0000000`) に置くと
+  `caller:boot bounded cstr` で rc=1、通常の qemu スタックでは rc=0。
+  ELF 内の低位 64KiB スタックへ entry で切替える修正を入れ、高位 entry stack の
+  正常対照も常設した。切替命令だけを写しから除くと同診断で rc=1、修正版は rc=0。
+  製品の TRUSTED 境界検査は維持した。失敗名も長さ0でなく全文を出力する。
+  この sandbox では native `int 0x80` が SIGSYS (-31) なので、walk runner は
+  **SIGSYS のときだけ** `qemu-i386` を明示的に再実行する。通常の失敗は再試行しない。
+  補助 PYTHONPATH 無しでも本試験が通り、native の高位スタック位置にも依存しない。
+- **P3-1**: missing NUL の部分コピーが残した `dst` を、copyout の直前に
+  `{'x', 'y'}` へ置き直す。caller copyout の `kmemcpy` 削除変異を追加した。
+  旧 boot helper では同変異が rc=0、新 helper では `caller:boot copyout` で rc=1。
+  既存32本と合わせ **33/33 runtime RED**。compile失敗をREDに含めない。
+- **P3-2**: boot helper の間は kernel PD、current slot/resource owner 0 とし、
+  終了後に保存値へ戻す。IF=0/1 の保存とcaller frame復元を継続検査する。
+  `registrant PD write` 変異は本来の
+  `redir_access_check(&caller, MEM_EXEC_LOAD_ADDR, 1, 1)` で rc=1 となることを明示的に検査。
+  CR3 の修正とスタック問題は別で、kernel PD だけでは高位TRUSTED bufferを救えない。
+- **P3-3**: 上表のsid保存元を実在する `paging_lease_map` へ訂正した
+  (`kernel/paging.c` の関数1353行・sid上限検査1364行・保存1412行)。
+
+根拠ログ: `/home/hight/os32-tmp/d6-fix-evidence.log` (旧copyout変異生存、新copyout RED、
+低位stack切替削除RED、高位entry正常対照、登録者write変異の失敗箇所)。
+修正後 `make all` はrc=0 (`d6-fix-all.log`)。kernel.bin 363,220 B、
+`__bss_end=0x18C270`、本体574,064 B、ASSERT残り36,240 Bは前回と同じ。
+vmkernel.lz4は480,697 B。NP21/WへのFDコピー先は存在しない一時パス
+`NP21W_DIR=/home/hight/os32-tmp/d6-fix-unused-destination` に限定した。
+ゲストkselftest・NP21/W・NHD・配備・ini・commit/pushは未実施。
+
+`make all` の終了後に、補助PYTHONPATH無しで
+`CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp
+python3 -B tools/tests/test_access_walk.py --mutate` はrc=0 (33/33 runtime RED、
+`d6-fix-walk-after-all.log`)。共通足場を使うcaller copyとDBも同じ環境で
+`python3 -B tools/tests/test_caller_copy.py --mutate` / `test_db_caller.py --mutate`
+が各rc=0 (18/18、15/15 runtime RED、`d6-fix-copy.log` / `d6-fix-db.log`)。
+`python3 tools/gen_memmap.py --write`、試験一覧の鮮度確認、`git diff --check` もrc=0。
+
+
+**今回の最終検査**: `PATH=/home/hight/opt/cross/bin:$PATH`、
+`PYTHONPATH=/home/hight/os32-tmp/d0b-host-runner`、上記の存在しないNP21W_DIRで
+`CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp
+make check-changed < /dev/null` を**今回最後に1回だけ実行しrc=0**
+(`d6-fix-check-changed.log`)。全体でもwalk 33/33、copy 18/18、DB 15/15 runtime RED。
+他の既存i386足場にもsandboxのSIGSYS制限があるため、この全体検査だけ既存qemu補助を付けた。
+Windows opt-inの既存skipは単独4件・集約5件。ゲスト/配備は依頼どおり未実施。
+以前のd6で残したcheck-changed rc=0の未達は、今回の実行で解消した。
 
 ## 11. 独立レビュー 2 回目 (Opus 5.5、Approve) の P3 — 実装時の注記
 
