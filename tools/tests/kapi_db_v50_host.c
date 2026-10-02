@@ -917,14 +917,9 @@ static void prepare_replaces(void)
         else CHECK(kapi_db_prepare_only(h, (const char *)0) == -1);
         CHECK(kapi_db_error_code(h) == SQLITE_MISUSE);
 
-        /* B1 copy refusal preserves stmt; semantic empty SQL discards it. */
-        if (mode == 0) {
-            CHECK(kapi_db_step(h) == DB_STATUS_DONE);
-            CHECK(kapi_db_bind_int(h, 1, 1) == -1);
-        } else {
-            CHECK(kapi_db_bind_int(h, 1, 1) == 0);
-            CHECK(kapi_db_finalize(h) == 0);
-        }
+        /* Every refusal discards the previous stmt, including copy refusal. */
+        CHECK(kapi_db_step(h) == DB_STATUS_DONE);
+        CHECK(kapi_db_bind_int(h, 1, 1) == -1);
 
         CHECK(kapi_db_prepare_only(h, "SELECT count(*) FROM t") == 0);
         CHECK(kapi_db_step(h) == DB_STATUS_ROW);

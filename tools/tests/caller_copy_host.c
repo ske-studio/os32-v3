@@ -1,5 +1,7 @@
 #define HOST_CALLER_COPY_TEST
 static unsigned int copy_probes;
+static unsigned int check_irq_epoch, check_irq_seen;
+static int observing_check;
 #include "access_walk_host.c"
 
 static void caller_copy_tests(void)
@@ -62,6 +64,11 @@ static void caller_copy_tests(void)
         RESET(); CHECK(copy_caller_bytes(&caller, (void *)va, out, 8));
         for (u32 j = 0; j < 8; j++) CHECK(out[j] == input[j]);
         SAME();
+        copy_probes = check_irq_epoch = check_irq_seen = 0;
+        observing_check = 1;
+        CHECK(check_caller_write_range(&caller, (void *)va, 8));
+        observing_check = 0;
+        CHECK(check_irq_epoch == 2); SAME();
         RESET(); CHECK(copy_caller_cstr(&caller, (void *)va, out, 8));
         CHECK(copy_probes == 2 && out[7] == 0); SAME();
         pt[index + 1] &= ~PTE_RW;

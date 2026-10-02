@@ -1188,7 +1188,7 @@ bind_text/blobの「検査→直接kmemcpy」も、同じ入力補助の固定�
 既存 `db_v50_selftest` のNULL/overflow 2呼出だけ撤去補助から新補助へ付替えた。
 d6のboot自己診断追加はしていない。
 
-§1-2で指定されたcopy失敗時のSQLite進入0・旧stmt不変を満たすため、
+**初回実装の記録 (下記レビュー対応で撤回)**: §1-2で指定されたcopy失敗時のSQLite進入0・旧stmt不変を満たすため、
 prepare_onlyはcopyを旧stmtのfinalizeより前へ移した。NULL/未終端/NP等の
 **copy拒否では旧stmt/bindableを残す**。空SQL・複数statementなどコピー成功後の
 意味検査は従来どおり旧stmtを捨てる。旧ホスト試験の「NULL/未終端でも破棄」は
@@ -1199,7 +1199,8 @@ SQLite engine、旧db_exec/db_prepare、FEP facadeには入っていない。
 既存 `ring3_user_range_ok` / `ring3_user_ranges_writable[_always]` は保存callerの
 管理walkへ統一。PDE/PTEのPRESENT/USER、出力は両方RW、管理frame/backingを検査。
 `ring3_pd_range_writable` / trivial補助 / master CR3往復を撤去した。
-2出力は1つのIRQ保存区間で全検査し、`_always` はWM内も保存USERを使う。
+初回は2出力を1つのIRQ保存区間で全検査した (下記P3-1でページ単位へ変更)。
+`_always` はWM内も保存USERを使う。
 単独checkは予約ではなく、既存出力wrapperが検査後yieldしない契約を保つ。
 汎用ガードは従来のlenを検査するだけで新たな無制限copyを追加しない。
 DB結果は既存固定SHM形式であり、3入口にcaller出力引数はないため
@@ -1283,8 +1284,8 @@ hash/size、kselftestを確認 [V1]。構成依存は一括確認へ持越し (�
    (open/existingの第1引数、prepare_onlyの第2引数。元の値/4 Bを控える)。
    dispatcherの早期分類前で差替え、帯内判定を通過することも確認する。
    新nmのsqlite3_open/open_v2/prepare_v2/finalize等の入口breakpointで当該wrapper
-   の呼出区間を数え、全て0、rc=-1、kill差分0を確認。prepare_onlyは有効handleに
-   旧stmtを用意し、同stmt/bindable/FD数が変わらないことを観測する。
+   の呼出区間を数え、open/prepare入口は0、rc=-1、kill差分0を確認。prepare_onlyは有効handleに
+   旧stmtを用意し、finalizeのみ1回、stmt=NULL/bindable=0、FD数不変を観測する。
    診断はopen=CANTOPEN、existing/prepare=MISUSE。引数/4 Bを復元し、
    新しい正常prepare/DB操作が成功することまで記録する。page末をNULへ変えた
    対照では次NPを読まずSQLite入口へ進む (SQL/path内容の意味エラーは別)。
@@ -1326,6 +1327,66 @@ C方言27/27 RED・正常対照5/5 GREEN、P2V違反0件。
 `d5-app-bb-before.log`、`d5-app-bb.log`、`d5-gfx.log` (同ディレクトリ)。
 **ユーザーの「最後に1回」に従いcheck-changedは再実行していない。
 対象失敗は修正済みだが、完了条件のcheck-changed rc=0は未達で、PMの再確認に残る。**
+
+### d5 独立レビュー (Opus 5.5、Request changes) 対応 (2026-10-02)
+
+基点 `747a1e1`、`wt/t2d5`。モデル: GPT-6。上記初回記録の契約/IRQ区間を更新する。
+
+- **P2-1**: 許容された小さい修正を採用し、kselftestは拒否理由非0・計数+1・addr一致を要求する。
+  管理backing/leaseを含む全walk層への理由伝播は変更範囲が広く、現段階ではwrite=WR_TABLE /
+  read=BANDの集約を維持する。起動中のcaller無効はwrite=WR_TABLE (8)、read=BAND (4)。
+  kselftest注記とring3_guard_tddの試験案内を修正。ホストでdispatch中/caller無効の拒否、
+  理由、計数、addr、page=0を確認し、理由誤置換/計数削除をruntime REDにする。
+  2本目の出力拒否addrはvbへ修正。P3-3の詳細なPDE/PTE理由と拒否pageは未実装 (page=0)。
+- **P2-2**: **公開仕様 (KAPI_SPEC.md:1304-1306) を優先 — prepare_only の旧 stmt は拒否でも finalize**。
+  §1-2の「旧stmt/FDに副作用なし」のうちprepare_onlyの旧stmtは例外とする。
+  コピー前に旧stmtをfinalizeし、active_stmt=NULL/bindable=0にする。
+  copy拒否でも旧stmtのfinalizeはSQLiteへ入るが、新SQLのprepare/openへは入らない。
+  実SQLiteのprepare_replaces全mode (空/未終端/NULL) は拒否後step=DONE・bind拒否・旧SQL未実行。
+  実callerのNP/NULL拒否でも旧stmt破棄を確認し、finalizeしない変異をREDへ反転した。
+- **P3-1**: 単独checkおよびread/writeガードはページごとにirq_save/restoreする。
+  ガード全体を囲むIRQ区間も撤去。copyの全preflight/書戻し区間は維持する。
+  2ページのcheckでページ間restoreとIF/CR3不変を確認し、restoreを最終ページだけにする変異をREDにした。
+- **P3-4**: db_v50_selftestの512 B要求の写し先を1024 Bのsql_copy_bufへ変更。
+- **P3-5**: WM文脈でreadガードにUSER無効番地を渡す対照を追加し、WM素通し撤去の変異をREDにした。
+
+**申し送り (コード変更なし)**:
+P3-2: ring3_ptr_okはRO lease番地を早期分類で許す。kapi_host_status等の出力ガードを持たない
+KAPIはCR0.WP=0でそこへ書ける。lease取得の公開APIはT2eまで無く、現時点では到達しない。
+**T2eの前に出力ガードを持たないKAPIを棚卸しする**。
+P3-6: 低位USER帯 (VRAM/バックバッファ/font) への出力とVRAMからの入力は拒否へ変わった。
+設計票どおりであり、**ゲストでGUI回帰を必ず見る**。今回はゲスト未実施。
+
+| 同一cross toolchain実測 | 対応前 (clean) | 対応後 (-dirty) | 差分 |
+|---|---:|---:|---:|
+| kernel.bin | 362,128 B | 362,232 B | +104 B |
+| 本体占有 | 572,976 B | 573,072 B | +96 B |
+| __bss_end | 0x18BE30 | 0x18BE90 | +96 B |
+| ASSERT残り (596 KiB枠) | 37,328 B | 37,232 B | -96 B |
+| d枠残り (5,888 B) | 2,716 B | 2,620 B | -96 B |
+
+kernel.bin増分にはdirty化8 Bを含む。ASSERTは変更なし。
+対象試験: `python3 tools/tests/test_db_caller.py --mutate` (12/12 runtime RED)、
+`python3 tools/tests/test_caller_copy.py --mutate` (18/18 runtime RED)、
+`python3 tools/tests/test_kapi_db_v50.py prepare_replaces v50_selftest` (2/2 PASS)、全てrc=0。
+初回のdb fixture追加stepは未提供SQLite足場へのリンク失敗となり、その確認は実SQLite試験へ集約した。
+IRQ観測fixtureの初回は前試験のprobe数を残して正常対照が失敗、probe初期化後に全変異が合格。
+これらの失敗はruntime REDに数えていない。
+
+環境: `PATH=/home/hight/opt/cross/bin:$PATH`、`PYTHONPATH=/home/hight/os32-tmp/d0b-host-runner`、
+`CROSS_DIR=/home/hight/opt/cross`、`TMPDIR=/home/hight/os32-tmp`、`OS32_MUT_JOBS=4`。
+`NP21W_DIR=/home/hight/os32-tmp/d5-review-unused-image-destination make all < /dev/null` はrc=0。
+存在しないFDコピー先に限定し、コピー警告を確認。実NP21/W・NHD・配備・iniは未操作。
+commit/pushなし。
+`python3 tools/tests/test_ring3_guard.py --mutate` は14/14 RED、rc=0。
+`python3 tools/gen_memmap.py --write`、`python3 tools/check_select.py --lint` はrc=0。
+最終 `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp
+make check-changed < /dev/null` は上記PATH/PYTHONPATHで**1回だけ実行しrc=0**。
+基点以降のbuild/sdk.mk変更によりfullへ拡張した。対象12/12・18/18 runtime RED、
+C方言27/27 RED・正常対照5/5 GREEN。既存Windows opt-inは単独4件・集約5件skip。
+ログ: `/home/hight/os32-tmp/d5-review-all-final.log`、
+`/home/hight/os32-tmp/d5-review-check-changed.log`。
+検査開始後はコード変更なし。終了後は本結果の追記のみ。
 
 ## 11. 独立レビュー 2 回目 (Opus 5.5、Approve) の P3 — 実装時の注記
 

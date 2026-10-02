@@ -759,14 +759,14 @@ int ring3_user_ranges_writable(u32 va, u32 la, u32 vb, u32 lb)
 
 int ring3_user_ranges_writable_always(u32 va, u32 la, u32 vb, u32 lb)
 {
-    unsigned int saved = irq_save();
     struct caller_access c;
-    int ok = (!la && !lb) ||
-        (caller_access_get_user(&c) &&
-         check_caller_write_range(&c, (void *)(uptr)va, la) &&
-         check_caller_write_range(&c, (void *)(uptr)vb, lb));
-    irq_restore(saved);
-    if (!ok) return ring3_range_refuse(RING3_RANGE_WR_TABLE, va, 0);
+    if (!la && !lb) return 1;
+    if (!caller_access_get_user(&c))
+        return ring3_range_refuse(RING3_RANGE_WR_TABLE, la ? va : vb, 0);
+    if (!check_caller_write_range(&c, (void *)(uptr)va, la))
+        return ring3_range_refuse(RING3_RANGE_WR_TABLE, va, 0);
+    if (!check_caller_write_range(&c, (void *)(uptr)vb, lb))
+        return ring3_range_refuse(RING3_RANGE_WR_TABLE, vb, 0);
     return 1;
 }
 
@@ -785,16 +785,16 @@ int ring3_user_range_ok(u32 p, u32 len)
     if (!len) return 1;
     if (len - 1 > ~(u32)0 - p)
         return ring3_range_refuse(RING3_RANGE_OVERFLOW, p, 0);
-    saved = irq_save();
     ok = caller_access_get_user(&c);
     for (u32 va = p, left = len; ok && left;) {
         u32 pa, n = PAGE_SIZE - (va & (PAGE_SIZE - 1));
+        saved = irq_save();
         ok = caller_access_page(&c, va, 0, &pa);
+        irq_restore(saved);
         if (n > left) n = left;
         left -= n;
         if (left) va += n;
     }
-    irq_restore(saved);
     if (!ok) return ring3_range_refuse(RING3_RANGE_BAND, p, 0);
     return 1;
 }

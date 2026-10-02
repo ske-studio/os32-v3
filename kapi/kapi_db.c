@@ -1083,19 +1083,18 @@ int __cdecl kapi_db_prepare_only(int handle, const char *sql)
         return -1;
     }
 
-    if (!db_copy_input(sql, sql_copy_buf, SQL_COPY_BUF_SIZE, 1)) {
-        slot_note(slot, SQLITE_MISUSE);
-        shm_write_error_text("sql pointer rejected by the range check");
-        return -1;
-    }
-    /* B1 copy refusal must not enter SQLite or destroy the previous stmt.
-     * Once copied, semantic rejection still replaces it as before. */
+    /* Public prepare_only contract: discard the old stmt even on copy refusal. */
     if (slot->active_stmt) {
         slot_note_teardown(slot, sqlite3_finalize(slot->active_stmt));
         slot->active_stmt = (sqlite3_stmt *)0;
     }
     slot->bindable = 0;
 
+    if (!db_copy_input(sql, sql_copy_buf, SQL_COPY_BUF_SIZE, 1)) {
+        slot_note(slot, SQLITE_MISUSE);
+        shm_write_error_text("sql pointer rejected by the range check");
+        return -1;
+    }
     if (sql_copy_buf[0] == '\0') {
         slot_note(slot, SQLITE_MISUSE);
         shm_write_error_text("sql is empty");
@@ -1269,7 +1268,7 @@ u32 db_v50_selftest(void)
 
     /* (2) ポインタ検証の NULL / overflow (帯と PTE は CPL=3 側でしか踏めない) */
     if (db_copy_input((const void *)0, path_copy_buf, 1u, 0)) bad |= 1u << 2;
-    if (db_copy_input((const void *)0xFFFFFF00UL, path_copy_buf, 0x200u, 0)) bad |= 1u << 2;
+    if (db_copy_input((const void *)0xFFFFFF00UL, sql_copy_buf, 0x200u, 0)) bad |= 1u << 2;
 
     /* (3) journal 名の容量規則 (票 §1a / Codex 往復 2 の B4)。
      * 末尾判定は SQLite 自身にさせるので接続が要る = ブート時には踏めない。

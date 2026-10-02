@@ -193,7 +193,7 @@ void ring3_fault_kill(void);
  * までは書き側は数えておらず、wrap_mouse_poll で kill されても count が 0 の
  * ままだった)。addr = 断ったポインタ、page = 見ていたページ (TRIVIAL は 0)。 */
 #define RING3_RANGE_WR_TRIVIAL 7   /* NULL か p + len の折り返し (長さ > 0) */
-#define RING3_RANGE_WR_TABLE   8   /* PD / PT の物理が読めない */
+#define RING3_RANGE_WR_TABLE   8   /* 保存caller無効 / 管理walk拒否 (d5: write拒否を集約、page=0) */
 #define RING3_RANGE_WR_PDE     9   /* PDE に present / RW / USER が無い (か PS) */
 #define RING3_RANGE_WR_PTE    10   /* PTE に present / RW / USER が無い */
 extern volatile u32 ring3_range_reject_count;

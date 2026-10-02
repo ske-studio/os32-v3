@@ -21,12 +21,17 @@ MUTANTS = [
     ('guards', 'return ok;\n    }', 'return ok && 0;\n    }', 'valid lease early refusal'),
     ('db', 'PATH_COPY_BUF_SIZE, 1)', 'PATH_COPY_BUF_SIZE, 0)', 'path copied as bytes'),
     ('db', 'SQL_COPY_BUF_SIZE, 1)', 'SQL_COPY_BUF_SIZE, 0)', 'SQL copied as bytes'),
-    ('db', 'if (!db_copy_input(sql, sql_copy_buf, SQL_COPY_BUF_SIZE, 1)) {',
-     'if (!db_copy_input(sql, sql_copy_buf, SQL_COPY_BUF_SIZE, 1)) { sqlite3_finalize(slot->active_stmt);', 'finalize before copy refusal'),
-    ('guards', 'caller_access_get_user(&c) &&', 'caller_access_get(&c) &&', 'always becomes WM trusted'),
+    ('db', 'if (slot->active_stmt) {\n        slot_note_teardown(slot, sqlite3_finalize(slot->active_stmt));\n        slot->active_stmt = (sqlite3_stmt *)0;\n    }\n    slot->bindable = 0;', '', 'no finalize before copy refusal'),
+    ('guards', 'if (!caller_access_get_user(&c))', 'if (!caller_access_get(&c))', 'always becomes WM trusted'),
     ('guards', 'check_caller_write_range(&c, (void *)(uptr)vb, lb)', '((void)vb, 1)', 'second output unchecked'),
     ('guards', 'caller_access_page(&c, va, 0, &pa)', 'caller_access_page(&c, va, 1, &pa)', 'RO input refused'),
     ('guards', 'check_caller_write_range(&c, (void *)(uptr)va, la)', '1', 'first output unchecked'),
+    ('guards', 'ring3_range_reject_count++;', '(void)0;', 'invalid caller refusal not counted'),
+    ('guards', 'ring3_range_refuse(RING3_RANGE_WR_TABLE, la ? va : vb, 0)',
+     'ring3_range_refuse(RING3_RANGE_WR_PDE, la ? va : vb, 0)', 'invalid caller wrong reason'),
+    ('guards', 'if (!ring3_guard_active(ring3_in_syscall, ring3_wm_depth)) return 1;\n    if (!p)',
+     'if (!ring3_in_syscall) return 1;\n    if (!p)', 'read guard WM bypass removed'),
+
 ]
 
 

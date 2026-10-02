@@ -95,8 +95,12 @@ static void caller_copy_tests(void)
             CHECK(ring3_ptr_ok(va));
             int rc = entry == 0 ? kapi_db_open((void *)va) : entry == 1 ?
                 kapi_db_open_existing((void *)va, 0) : kapi_db_prepare_only(0, (void *)va);
-            CHECK(rc == -1 && !sqlite_calls && !vfs_calls);
-            CHECK(db_slots[0].active_stmt == (sqlite3_stmt *)3 && db_slots[0].bindable);
+            CHECK(rc == -1 && sqlite_calls == (entry == 2 ? 1u : 0u) && !vfs_calls);
+            if (entry == 2) {
+                CHECK(!db_slots[0].active_stmt && !db_slots[0].bindable);
+            } else {
+                CHECK(db_slots[0].active_stmt == (sqlite3_stmt *)3 && db_slots[0].bindable);
+            }
             CHECK(host_arch_if == expected_if && host_cr3 == root);
             p[PAGE_SIZE - 1] = 0; expected_input = "abc";
             rc = entry == 0 ? kapi_db_open((void *)va) : entry == 1 ?
@@ -115,7 +119,8 @@ static void caller_copy_tests(void)
         CHECK(ring3_user_range_ok(va, 4));
         CHECK(!ring3_user_range_ok(va, 5));
         CHECK(ring3_user_ranges_writable(va, 4, va, 4));
-        CHECK(!ring3_user_ranges_writable(va, 4, va, 5));
+        CHECK(!ring3_user_ranges_writable(va, 4, va + 1, 4));
+        CHECK(ring3_range_reject_addr == va + 1);
         CHECK(!ring3_user_range_ok(~(u32)0 - 1, 4));
         pt[index] &= ~PTE_RW;
         CHECK(ring3_user_range_ok(va, 4));
@@ -126,6 +131,7 @@ static void caller_copy_tests(void)
         ((u32 *)P2V(space.pd_phys))[APP_BAND_PDE] |= PTE_RW;
         ring3_wm_depth = 1;
         CHECK(ring3_user_ranges_writable(1, 4, 1, 4));
+        CHECK(ring3_user_range_ok(1, 4));
         CHECK(!ring3_user_ranges_writable_always(va, 4, va, 5));
         CHECK(ring3_user_ranges_writable_always(va, 4, va, 4));
         ring3_wm_depth = 0;
@@ -147,7 +153,20 @@ static void caller_copy_tests(void)
         ring3_wm_depth = 0;
         caller_access_invalidate(); reset_db();
         CHECK(kapi_db_open((void *)va) == -1 && !sqlite_calls);
+        /* Boot kselftest analogue: dispatch flag set, saved caller invalid. */
+        u32 base = ring3_range_reject_count;
         CHECK(!ring3_user_range_writable(va, 1));
+        CHECK(ring3_range_reject_count == base + 1 &&
+              ring3_range_reject_last == RING3_RANGE_WR_TABLE &&
+              ring3_range_reject_addr == va && ring3_range_reject_page == 0);
+        CHECK(!ring3_user_range_ok(va, 1));
+        CHECK(ring3_range_reject_count == base + 2 &&
+              ring3_range_reject_last == RING3_RANGE_BAND);
+        for (int mode = 0; mode < 2; mode++) {
+            reset_db();
+            CHECK(kapi_db_prepare_only(0, mode ? (void *)va : 0) == -1);
+            CHECK(sqlite_calls == 1 && !db_slots[0].active_stmt && !db_slots[0].bindable);
+        }
         CHECK(caller_access_enter(&prev, CALLER_USER));
         CHECK(host_arch_if == expected_if && host_cr3 == root);
     }
@@ -171,7 +190,7 @@ static void caller_copy_tests(void)
     live->gen++;
     CHECK(!ring3_ptr_ok(MEM_LEASE_BASE));
     CHECK(!ring3_user_range_ok(MEM_LEASE_BASE, 4));
-    SAY("PASS: d5 real DB/copy/walk, NP entry-zero/stmt unchanged, RO/scratch/output/WM/IF/CR3");
+    SAY("PASS: d5 real DB/copy/walk, NP no prepare/old stmt finalized, RO/scratch/output/WM/IF/CR3");
     die(0);
 }
 
