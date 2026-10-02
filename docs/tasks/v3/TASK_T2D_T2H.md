@@ -547,6 +547,207 @@ manifestはkernel/loader/SDK/CRT/libs/shell/gshell/shlib/sh.bin/testsのhash/4�
 
 park→resume台本は**h3のコーダーがe9と同じSHM観測形式で実装**し、PM/テスターが実行する。試験GUI 2本を立上げ→各々が自分のSHM blockに `{magic, owner, generation, phase, mode}` を初期化→OP_WAITでpark確認→新kernel.map/診断から当該blockの物理番地を引く→MCP `emu_write_mem`で固定mode (pf/gp/de/ud/USER-loop/KAPI-loop)とarmだけを書込む→resume印とswitch増分を待つ→当該mode発火を観測→owner回収/次起動を確認、を1ケースとする。armはresume後に1回だけ消費。timerはarmed以後の猶予にだけ使い、park前に発火させない。別owner/古いgenerationなら台本は中止し、キー注入を代用にしない。試験専用のSHM制御であり任意書込口は製品に追加しない。
 
+**h3準備・PM決定(A)と実装記録 (2026-10-02、Codex gpt-6-astra、基点 `6a8aba9`)**:
+PM決定(A)を採用。初期化時だけ、ホストが SHM 所有アプリ ID → appslot の AS →
+台帳 AS owner / AS generation を照合して owner、generation の順に書く。
+GUI slot を owner、tick を generation とする代用はない。以後は mode / arm のみ。
+e9 で本人識別を渡す正式な経路ができたら、h3 の初期化もそちらへ切り替える。
+公開 KAPI / JSON / 版・kernel/exec/gfx/lease/SHM 権限の実装は変更していない。
+
+成果は [h3a.c](../../../userland/tests/h3a.c) / [h3b.c](../../../userland/tests/h3b.c)、
+共通 [fixture.inc](../../../userland/tests/h3/fixture.inc) と
+[state.inc](../../../userland/tests/h3/state.inc)、
+[PM台本](../../../tools/h3_park_resume.py)、
+[診断配置のコンパイル入力](../../../tools/h3_layout.c)。両バイナリを
+`userland/deploy.yaml` に `/usr/bin/h3a.bin` / `h3b.bin` として登録した [V2]。
+各窓は左 (30,60,250,130) / 右 (340,60,250,130)、独立の `sys_shm_alloc(1)`。
+起動引数は使わない。初期化受領待ちは `sys_yield` (WAIT_POLL) で他アプリへ譲る。
+**この初期化 yield は試験対象の OP_WAIT park の証拠に数えない**。
+受領後、イベントを捨て OP_WAIT(0) へ進む。戻るたびに resumes を増やすが、
+それだけでは実 park を主張せず、台本が appslot PARKED / parked_from_wait と
+前後の `ring3_switch_count` を必ず照合する。mode は一度消費したローカル値に固定。
+arm 消費後だけ get_tick の 500 tick 猶予を設け、その後に発火する。
+USER loop は KAPI なし、KAPI loop は get_tick。park 前の timer はない。
+
+**e9 と共有する観測形式**: 正典は試験専用
+[protocol.h](../../../userland/tests/h3/protocol.h)。48 B、全欄 little-endian u32。
+SHM ブロック先頭に置き、公開 SDK ABI にはしない。
+
+| byte offset | 欄 / 意味 |
+|---|---|
+| 0 / 4 / 8 | magic=`0x48335031` / owner=台帳 AS owner / generation=AS 寿命世代 |
+| 12 / 16 / 20 | phase / mode / arm (host は mode を先、arm=1 を後に書く) |
+| 24 / 28 | version=1 / fixture=1(h3a),2(h3b) |
+| 32 / 36 | resumes=WAIT 返却印の回数 / consumed=arm 消費回数 (1 回限定) |
+| 40 / 44 | window=GUI window handle / gui_slot=GUI slot (識別 owner と別物) |
+
+phase=1 INIT → 2 IDENTIFIED → 3 WAIT → 4 RESUMED → 5 ARMED → 6 FIRING。
+異常は7 ERROR。2/4は短いので、台本は後続phaseとresumes/consumedでも受領を確認する。
+owner/generation は最初0、ホストが generation を最後に publish し、fixture が phase を進める。
+mode=1 pf (#PF14)、2 gp (HLT/#GP13)、3 de (DIV0/#DE0)、4 ud (UD2/#UD6)、
+5 USER-loop、6 KAPI-loop。arm は RESUMED 後に0へ戻し consumed を1へ。
+不正 mode / 二度目の arm は発火させない。任意アドレス書込み口を製品に追加していない。
+
+**PM手順 (コーダーは live 台本を未実行、レビュー指摘対応 2026-10-02)**:
+
+1. 新しい一式の反映を確認 [V1]。`python3 tools/h3_park_resume.py layout --layout
+   /home/hight/os32-tmp/h3-layout.json` はオフライン。
+   cross GCC の `sizeof/offsetof`、新 `kernel.elf` の nm、`kernel.map` のアンカー一致を使う。
+   `__bss_end` 切上げとコンパイルした SHM 差分からブロック PA を求める。
+   外部アプリの SHM / 複数 block の span=0 の後続は読み飛ばし、magic/version/fixture
+   が一致する候補が一つだけであることを要求。live コマンドは ELF/map SHA-256 を照合する。
+   **ホスト成果物の一致検査は実行中ゲストへの反映確認の代用ではない**。
+2. GUI で h3a / h3b を引数なしで起動。各々 `init --fixture 1` / `--fixture 2`、
+   共通の `--layout` と別々の `--case /home/hight/os32-tmp/h3-a.json` / `h3-b.json` を渡す。
+   INIT だけに owner/generation を publish、受領を待つ。caseファイルの再使用は拒否。
+3. PM は相手側の窓へフォーカスを移し、両窓の位置を動かさず target の OP_WAIT park を待つ。
+   `arm --mode pf --capture /home/hight/os32-tmp/h3-capture.json
+   --out /home/hight/os32-tmp/h3-observe.json` (gp/de/ud/USER-loop/KAPI-loop も同様)、
+   同じ `--layout` / `--case` を渡す。loop は `--trace /home/hight/os32-tmp/h3-front.json`
+   も渡し、PM/e9 が FIRING 後の新しい前景証拠をそのファイルへ渡す。
+   台本は一時 pause 中に対象と相手の PA/所有者/世代、実 park を照合して mode / arm を書く。
+   **breakpoint を click より先に設置**し、target のタイトルをクリックして起こす
+   (480行なら `--height 480`)。SHM 書込み単独には WM を起こす効果がない。
+   同じプロセスの採取ループで resume 印・switch増分・consumed=1 を case に記録する。
+   fault の5秒猶予内に別コマンドを起動する必要はない。失敗は中止、arm 再送なし。
+4. loop は同じプロセスが捕捉・前景照合・STOP送信・前後のobserveを順に実行する。
+   再開済みloop用には `loop-watch --capture RAW.json --out OBS.json --trace FRONT.json`。
+   USER runaway の200 tick猶予を待ち、case/identity/map/phase と5秒以内の前景app/windowを
+   照合して `/api/key` に `seq=CTRL%2BSTOP&hold=300` をPOSTする。STOP再送は拒否。
+   `trace-watch --trace RAW.json` は受動採取専用。別端末の stop / observe と併用しない。
+   live台本全体を共通の非blockingロックで排他し、競合コマンドはHTTP操作前に拒否する。
+   既存breakpoint / user pauseは先にPMが解除し、台本外のdebugger操作も同時に行わない。
+   fault の vector / FIRING と前景の実観測は引き続き e9/PM の外部証拠を必須とする。
+5. 回収後、次起動**前**に `reclaim`。対象 appslot FREE、SHM owner0/free、
+   台帳ownerのkind/pages=0、reclaim +1/対象ID、ledger IRQ/例外操作0、pending ID0を要求。
+   IRQ 中または下記の静止点でない標本は最大20回、再開を挟んで0.1秒おきに取り直す。
+   int80入口直後の `(1,0)` も取り直す。例外深さは0。
+   syscall/WM は通常 `(0,0)`、**記録した相手 fixture が同じAS世代で生存し、g_cur が
+   その app、appslot RUNNING かつ in_op_wait=1 の静止点では `(1,1)` も許す**。
+   2本構成の残り1本は should_park でparkせず X3 内で WM が回るためであり、任意の深さを
+   許すものではない。この方法は製品の破棄点に breakpoint を増やすより単純で、相手の
+   巻き添え終了も拒否できる。mode別の期待値は次表。
+
+| mode | 設計上の経路 / landing | fault_kill差分 | abort差分 | launch/resume pending | pending消費 |
+|---|---|---:|---:|---|---:|
+| pf/gp/de/ud | FAULT_PENDING → resume着地 | 1 | 0 | 0 / 1 | 1 |
+| USER-loop | runaway IRQ → ABORT_PENDING → resume着地 | 1 | 1 | 0 / 1 | 1 |
+| KAPI-loop A | WMが宛先を解決 → 通常文脈exec_kill (`wm-kill`) | 0 | 0 | 0 / 0 | 0 |
+| KAPI-loop B | syscall境界ring3_abort_check → 直行回収 (`syscall-abort`) | 1 | 1 | 0 / 0 | 0 |
+
+KAPI-loop は共通して pending 0 (着地なし)、回収1回、静止点の深さ、相手の同じAS世代での生存を要求。
+A は対象ID一致の wm_kill 1 / syscall-abort 0、B は wm_kill 0 / syscall-abort 1 とし、
+どちらか一方だけを認める。回収を伴わない入口到達や混在は合格にしない。次に同じfixtureを新規起動し `verify --trace /home/hight/os32-tmp/h3-trace.json`。
+新世代の INIT、mode別の着地/pending、breakpoint採取との一致を確認して初めてPASS。
+各modeを両fixtureで行い、e〜gを含む最終一式でも再実行する。
+
+**e/g への申し送り (未観測、コード読み)**:
+[TASK_T2_APPBAND §4-3 R1 / §4-4 R2](TASK_T2_APPBAND.md) は KAPI 連打の強制停止受入と
+通常文脈回収を要求し、[TASK_MEMMAP_V3 §3-5-1](TASK_MEMMAP_V3.md) は KAPI 内の更新を
+途中で破棄せず安全点へ渡す。PM決定により、通常文脈での WM kill と syscall 境界 abort の
+両方を認める。穴の直し方は e/g が決める。現実装の `appslot_abort_admit` は RUNNING /
+in_op_wait=0 かつ int80 ごとに last_kernel_tick が更新される get_tick loop を拒否する。
+X4 (`pump.rs`) は入力から abort_seen を立てるだけで、消費点 X3 / top-level へこの loop
+から戻らない。**要求と消費点の接続不足が疑われる製品側の穴**であり、h3では修正しない。
+USER-loop は raw CTRL+STOP が後の WM top-level に残り相手まで畳む可能性もある。
+起きたら製品側の所見として扱い、追加reclaimや相手消失を台本の期待値へ吸収しない。
+
+KAPI-loop のSTOP直前・送信後2秒/10秒の観測は統合採取プロセスが `--out` へ保存する。
+単独の `observe --out 別ファイル.json` もPASS判定をしない観測用で、caseを上書きしない。
+統合出力は `observations.before_stop / after_2s / after_10s / final`、faultは `final` のみ。
+各標本に新nm番地のカウンタ、g_cur/tick、対象slotの state / in_op_wait / abort_req /
+last_kernel_tick、`slot.as`、`address_space.address / owner / generation`、観測時刻を記録する。
+STOP後も同一対象が RUNNING、in_op_wait=0、last_kernel_tickが進む、reclaim差分0なら未回収。
+wm_kill / ring3_abort_check の採取点 / 両pending / consumed の実PC・標本も保存し、
+回収経路A/Bのどちらかと一致するか確認する。製品側の未回収はh3の期待値に吸収しない。
+
+**park中WM killの対照 (手作業を選択)**:
+自動STOP/armケースに混ぜず、別の新しい2本とcaseを初期化し mode=arm=consumed=0 のまま、
+新layoutの対象 appslot PARKED / parked_from_wait=1、SHM phase=WAITをfreeze中に読む。
+PMが対象窓の閉じる操作で WM の request_kill → top-level exec_kill を起こす。
+対象IDの wm_kill入口は下記の手動breakで採取する。
+対象FREE / SHM owner0/free / 台帳kind/pages0 / reclaim+1 / last_reclaim_id対象、
+fault_kill/abort/pending消費の差分0、相手生存、IRQ外で上記深さ、次起動の新世代を確認する。
+armを作らない対照では trace-watch の `resume_verified` ガードを解除しない。
+代わりにPMがlayoutの `wm_kill` PCへ手でbreakし、ESPと `/api/mem` の恒等写像 `[ESP+4]` にあるcdeclの対象IDを読み、
+breakを解除する。
+この対照はresume印やresume後faultの証拠には数えない。窓を閉じるUIは手作業にすることで、
+位置変更・他窓・未公開WM状態のオフセットを台本へ固定せずに済む。
+
+**e9 / PM trace の受渡し**:
+正典の共通 protocol.h を e9 も読む。host試験が欄順・MAGIC/version・全phase/mode定数を照合。
+layout の `trace_sites` は nm で関数を同定して objdump から launch/resume の setjmp返却PC、
+それぞれの pending helper 呼出PC、helper入口、g_pending_id=0代入直後PC、exec_kill入口、
+ring3_abort_check内の実際にabortする分岐の採取点を得る (毎syscallで通る入口は数えない)。
+呼出/代入が一意でないビルドは拒否する。trace-watch は launch/resume pending呼出PCで
+対象pending IDを持つ到達だけ数え、consumed PCで pending=0・IRQ/例外深さ0を読む。
+通常のpark帰りは pending=0 なので pending回数に含めない。exec_killはcdeclで、
+入口のESPを読み、恒等写像 `/api/mem` の `[ESP+4]` を対象app IDとして採取する。
+実ELFの先頭命令 `push %ebp; mov %esp,%ebp` をlayout生成で検証し、違えば拒否する。
+採取JSONには実PC・ESP・スタック引数・pending・深さ・時刻を残す。
+最終JSONの `capture` 欄へ、この採取JSON全体を入れる。verifyは生サンプルから回数を再計算し、
+ELF SHA / case_id / 全観測PCも照合する。採取ファイルのSHA-256と started_at / ended_atを
+caseの `capture_record` へ記録し、埋め込みcaptureのハッシュ一致と `armed_at` 後の時刻を要求する。採取器を通さず
+最終JSONへ期待値を書いただけのcaptureや採取後の改変を拒否する。
+
+外部証拠は `case_id`, `identity` (index/address/app/owner/generation/slot), `mode`,
+`map_sha256`、`resume_observed:true`, `fired:mode`, `vector:14/13/0/6` (loopはnull)。
+最終 `landing`, `launch_pending`, `resume_pending`, `pending_consumed` は上表と採取値に一致させる。
+STOP前景用は `phase:6`, `observed_at:Unix秒`, `foreground_app`, `foreground_window`、
+最終STOP証拠にも同じ前景欄を含める。
+**前回 P2-1 の判断を維持: 自動着地/pending採取を実装し、前景自動物理読取は見送る**。
+gshellのGuiState/WinはRust私有配置で、新ELFに対応したoffsetofを保証する診断経路が無い。
+製品を変えず型の配置を推測して読むより、PM/e9の前景観測を必須に残す。
+従ってSTOP送信と同一freezeでの前景確定は未実施であり、5秒以内の外部観測と
+照合の間の前景変更は排除できない。PMはこの間に入力/フォーカス変更を行わず、
+前景の実読取番地と値・ゲスト同一性の証拠を添える。自動採取の追加はe9接続時に再検討する。
+
+**今回の再レビュー対応・ホスト検証 (2026-10-02、Codex gpt-6-astra)**:
+P1-A/B、P2-a/b/c、P3-a/b をh3準備の範囲で修正。製品コード・公開KAPI・版は変更しない。
+[test_h3_park_resume.py](../../../tools/tests/test_h3_park_resume.py) は偽emulator/CLI/
+breakpoint client/実ELF layout/プロトコル照合 **32ケース**、実state.incのILP32 **42検査**。
+変異は C 8 + Python 45 = **53/53 runtime RED**、compile失敗0。置換当たり数を固定し、
+Cはcompile成功後の実行失敗、Pythonは試験assertion failureのみを数える。
+拡張途中にSTOP再送ガードの置換件数増加を固定件数検査が検出して中断した。
+正しい2箇所に更新し、最終の変異一式を再実行して上記結果を得た (全体検査の失敗ではない)。
+前回の22ケースに、cdeclスタック/EAX不一致、captureハッシュ/時刻、KAPI二経路と混在拒否、
+IRQ abort採取点の除外、静止点再採取/上限、observe別出力とAS識別、並行コマンド拒否、
+freeze/trap競合、click前break設置〜STOP〜時間別観測、外部user pause拒否の10ケースを追加。
+`check-h3-park-resume-host` の登録を維持し、ELF採取点の入力も `tools/check_map.yaml` へ追加。
+`docs/TESTS.md` は生成器で更新。ILP32は `tools/tests/host32.py` / `HOST32_RUNNERS=qemu`。
+
+今回実行済み:
+- `CROSS_DIR=/home/hight/opt/cross make all < /dev/null` **rc=0**。
+- `python3 tools/tests/test_h3_park_resume.py --mutate` **rc=0**。
+- `python3 tools/gen_memmap.py --write` / `python3 tools/gen_tests_inventory.py --write` **rc=0**。
+- `python3 tools/check_select.py --lint` **rc=0** (116検査、漏れ0)。
+
+共通環境は `TMPDIR=/home/hight/os32-tmp`, `PYTHONPATH=`, `HOST32_RUNNERS=qemu`。
+make all の外部FDコピー先は存在しない `NP21W_DIR=/home/hight/os32-tmp/h3-no-deploy-destination`
+へ向け、NP21/W側へコピーしない。既存Rust警告とFDコピー失敗警告あり。
+ログは同所 `h3-rereview-all.log` / `h3-rereview-all.rc` / `h3-rereview-host.log`。
+既存の製品ビルド依存を含む差分は選択器の許可型外なので、check-changedは全変異へ
+安全側fallbackする。選択器の許可型は拡張しない。
+
+この票を検査前に固定し、最後に
+`CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp HOST32_RUNNERS=qemu
+make check-changed < /dev/null` を実行する。最終結果は
+`/home/hight/os32-tmp/h3-rereview-check-changed.log` と同所 `.rc`、最終報告に記録する。
+検査前時点では未実施であり、PASSを先取りしない。検査中は票/ソースを変更しない。
+NP21/W・NHD・配備・ini・実機・commit/pushは未実施。nativeはsandbox SIGSYSのため未実施。
+e9識別/前景接続、KAPI-loop穴の観測とe/g判断、実trace/park中WM kill対照、
+Opus 5.5による差分再レビュー、e〜gを含む最終一式でのゲストmatrixを次段/PMへ申し送る。
+
+**h3準備の独立レビュー (Opus 5.5) — 3往復で Approve (2026-10-02)**: 1回目 P1 2件 (深さ0の読み方、KAPI-loopの期待経路)、
+2回目 P1 2件 (wm_killの採取をcdeclのスタック引数に、捕捉とSTOP/observeの直列化) と PM の決定 (KAPI-loop は経路 A/B のどちらか1本)、
+3回目は着地を止める指摘なし。残る P3 は実ゲストの初回採取で確かめる (どれも失敗すれば台本が中止する側に倒れ、偽PASSは出ない):
+(1) freeze が `/api/instance` を読んだ直後・`/api/pause` の前にトラップが入るとユーザー pause が残り `'user pause during capture'` で中止する —
+起きたら PM が手で再開し新しい case でやり直す (直すなら `/api/pause` の後に instance を読み直し、トラップなら CaptureTrap 扱い)。
+(2) `exec_kill` の `[ESP+4]` を物理番地で読む前提 — 初回採取で argument が 2〜5 に入ることを確かめ、範囲外なら CR3 を見て線形番地で読む。
+(3) KAPI-loop 経路 A で製品の修正の形によっては exec_kill の入口に2回届き得る — e/g の修正の形が決まった時点で「回収を伴う到達1回」に数え直すか決める。
+(4) 前景の照合から STOP 送信までの隙間は前回合意の見送りのまま。
+**h3準備の PM 検査 (2026-10-02)**: PM のホスト (PYTHONPATH なし、既定 `HOST32_RUNNERS=native qemu`) で `make all`・`check_select --lint`・`check-changed` すべて rc=0 (`/home/hight/os32-tmp/pmf-h3-{all,cc}.log`)。ゲストでの採取・受入は最終一式で行う (準備の段)。
+
 故障画像・旧shell試験は作業用の媒体と明示した台本をPMが扱う。本設計作業から環境へ触れない。Ra266物理操作/配備の承認手続は既存規則の担当へ渡す。
 
 ### 5-3. 統合matrixと観測

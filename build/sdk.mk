@@ -1139,6 +1139,7 @@ CHECK_PAR_TARGETS := check-shlib-high-host check-bootinfo-host check-hdd-stage1-
     check-caller-copy-host \
     check-db-caller-host \
     check-surface-query-host \
+    check-h3-park-resume-host \
     check-cirrus-win-host check-pegc-mode-host
 check-par: $(CHECK_PAR_TARGETS)
 
@@ -1210,3 +1211,7 @@ check-surface-query-host:
 	$(if $(MUT),python3 -B tools/tests/test_surface_query.py --runner $(firstword $(HOST32_RUNNERS)) $(MUT),@:)
 
 .PHONY: check-surface-query-host
+
+# T2h/h3 fixtures and PM script, entirely offline.
+check-h3-park-resume-host:
+	python3 -B tools/tests/test_h3_park_resume.py $(MUT)
