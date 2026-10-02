@@ -1388,6 +1388,91 @@ C方言27/27 RED・正常対照5/5 GREEN。既存Windows opt-inは単独4件・�
 `/home/hight/os32-tmp/d5-review-check-changed.log`。
 検査開始後はコード変更なし。終了後は本結果の追記のみ。
 
+### d5 受入で見つかった退行と修正 (2026-10-02、基点 `9b1e917`)
+
+モデル: GPT-6、worktree `wt/t2d5-fix`。**原因は d5 の内部出力ガードではなく、
+T2c (`396ed1f`) の高位配置へのゲスト試験の追従漏れ**。
+`userland/tests/db_v50_test.c` は v2 の `BAND_TOP=0x800000` を残し、
+`db_bind_text(h, 1, 0x7fffff, 2)` を渡していた。`exec/exec.c` の
+`ring3_syscall_dispatch` → `ring3_ptr_ok` が先頭を帯外と判定し、
+wrapper へ入る前に `ring3_fault_kill` する。この経路は例外ハンドラを通らず、
+`ring3_range_reject_count` も更新しない。RO/RW open の成功時は従来何も表示せず、
+fixture の行が最後に見えるため、直後の open が落ちたように見えた。
+T2c 前の許可帯は `0x400000` からで、現在は `0x80000000` から。
+d4 基点 `47397cb` にも同じゲスト定数と低位を断る早期検査があり、d5 起因ではない。
+
+**提示された `WR_TABLE / addr=0x2ffd84 / count=4` は起動時自己診断の記録**。
+`kernel/kselftest.c:test_ring3_wm_guard` は `&local` を write/read/write/write の
+4 回拒否させ、最後を負の WM 深さで write=WR_TABLE にする。
+基点を同じ cross toolchain でビルドした逆アセンブルでは、
+`kentry` が ESP=`0x2ffffc` から3語を積んで `kernel_main` へ jump、
+同関数の EBP=`0x2fffec`、固定フレーム 0x158 B、
+`kselftest_run` の call と saved EBP 各4 B から EBP=`0x2ffe8c`。
+インライン化された `local` は `[ebp-0x108]`、すなわち **`0x2ffd84` と完全一致**。
+`db_open_existing` のローカル `st` を拒否した証拠ではない。
+
+修正はゲスト試験の `guard_crossing_text` が公開 `sbrk_heap_limit - 1` を使う形。
+先頭は早期検査を通り、2 byte 目の guard_a を d5 の copy が拒否して -1 で戻る。
+RO/RW open の handle も表示し、次の受入で停止位置を区別できるようにした。
+KAPI・kernel の製品コードと公開契約は変更していない。
+
+**内部経路の棚卸し**: DB3入口と bind、旧 exec/prepare、SQLite VFS の
+read/stat/size/resolve は内部 VFS/SQLite 関数へ直接渡し、生成 `wrap_*` を呼ばない。
+`db_open_existing` の本体/journal の `&st`、resolver の BSS/stack 出力は
+既に内部口を通る。生成出力ガード43 wrapper と手書きの
+`kapi_sys_time_now` / `kapi_pci_bind_info` を調査し、カーネル内部バッファを
+公開出力ラッパーへ渡す新たな到達経路は見つからなかった。
+時計内部は `sys_time_now(&snap_lo, &snap_hi)`、WM の公開表経由は既存
+`ring3_wm_enter/leave`、登録済み redirect は登録者の検証という境界を維持する。
+
+**回帰**: `test_db_caller.py` に実 dispatcher・生成引数表・生成 sys_stat wrapper・
+実 `fs/vfs.c` を追加。MMU/IRQ/KAPI呼出命令・SQLite・FSドライバだけ足場。
+旧値が wrapper 進入0・kill・range counter不変、新値が bind の -1へ到達することを確認。
+実 DB → 実 resolve/stat → FS の kernel local 出力では拒否計数不変、
+公開 sys_stat はRW出力成功/RO出力kill・書込み前の値不変を確認する (IF=0/1)。
+既存12変異に、旧低位定数へ戻す/内部statを公開wrapperへ誤配線/
+公開statの出力検査を外す3変異を追加し、**15/15コンパイル後の実行時RED**。
+`test_kapi_db_v50.py` は実SQLiteで **24/24 PASS**。
+初回の足場コンパイル失敗 (宣言/定数名) と native ILP32 のSIGSYSはREDに算入せず、
+既存qemu-i386 runnerへ切り替えて上記結果を確認した。
+
+| 同一cross toolchain実測 | 基点 clean | 修正後 dirty | 差分 |
+|---|---:|---:|---:|
+| kernel.bin | 362,224 B | 362,232 B | +8 B |
+| vmkernel.lz4 | 480,088 B | 480,091 B | +3 B |
+| 本体占有 | 573,072 B | 573,072 B | 0 B |
+| __bss_end | 0x18BE90 | 0x18BE90 | 0 B |
+| ASSERT残り (596 KiB枠) | 37,232 B | 37,232 B | 0 B |
+| d枠残り (5,888 B) | 2,620 B | 2,620 B | 0 B |
+
+画像差は build_id の dirty 化のみ。環境は
+`PATH=/home/hight/opt/cross/bin:$PATH`、
+`PYTHONPATH=/home/hight/os32-tmp/d0b-host-runner`、`TMPDIR=/home/hight/os32-tmp`。
+`CROSS_DIR=/home/hight/opt/cross make kernel < /dev/null` (修正前)、
+`python3 tools/tests/test_db_caller.py --mutate`、
+`python3 tools/tests/test_kapi_db_v50.py`、
+`CROSS_DIR=/home/hight/opt/cross make all NP21W_DIR=/home/hight/os32-tmp/d5fix-unused-image-destination < /dev/null`
+は全てrc=0。allのFDコピー先は存在しないパスを指定し、コピー警告を確認。
+`python3 tools/gen_memmap.py --write` と `python3 tools/check_select.py --lint` はrc=0。
+ログは `/home/hight/os32-tmp/d5fix-{before,db-caller,v50,all}.log`。
+
+**PM の受入手順 (未実施)**: 現構成17MBのまま、既定の停止→配備→起動手順で
+修正後の `db_v50_test.bin` をNHD側も更新し、実行するバイナリのサイズ/ハッシュを照合。
+起動後・試験前に `fault_kill_count` と range reject 一式を記録し、
+`db_v50_test` の RO/RW handle >=0、最後の `PASS n/n` と `$?=0`、
+fault kill の増分0を確認する。range reject は絶対値4ではなく前後差で見る。
+`db_test`・`d0a_test`・`klibc_test`・`alloc_demo`・パイプを回帰する。
+ホストでは停止原因を除去できているが、ゲストの完走はPM確認待ち。
+NP21/W・NHD・配備・ini・commit/pushは未操作。状態行は変更していない。
+
+最終 `CROSS_DIR=/home/hight/opt/cross OS32_MUT_JOBS=4 TMPDIR=/home/hight/os32-tmp
+make check-changed < /dev/null` は上記PATH/PYTHONPATHで **最後に1回だけ実行しrc=0**。
+追加回帰15/15 runtime RED、C方言27/27 RED・正常対照5/5 GREEN。
+既存Windows opt-inは単独4件・集約5件skip。
+ログ: `/home/hight/os32-tmp/d5fix-check-changed.log`。
+検査中のソース変更なし。終了後は本結果の記録とwrapper数の表記訂正のみ。
+
+
 ## 11. 独立レビュー 2 回目 (Opus 5.5、Approve) の P3 — 実装時の注記
 
 2026-10-01、`3180a51` の差分に対して Approve (P1 2 件・P2 11 件はすべて閉)。以下の 5 件は設計の変更ではなく、実装時に従う注記 (PM 記入)。

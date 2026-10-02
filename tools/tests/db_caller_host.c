@@ -1,5 +1,5 @@
-/* Actual DB wrapper + caller copy + managed paging. SQLite/VFS only record
- * entry; this test never executes an engine or touches a host database. */
+/* Actual dispatcher, DB/output wrappers, VFS and caller copy/walk.
+ * Only SQLite and the filesystem driver are entry-recording boundaries. */
 #define HOST_DB_CALLER_TEST
 #define HOST_CALLER_COPY_TEST
 #include "access_walk_host.c"
@@ -7,7 +7,49 @@
 volatile int ring3_in_syscall = 1;
 static AppSlot *g_cur_app;
 #include "guards_host_source.c"
+static void *kill_env[5];
+static int expect_kill, invoke_calls;
+void ring3_fault_kill(void) {
+    CHECK(expect_kill);
+    __builtin_longjmp(kill_env, 1);
+}
+#define KAPI_HIT(n) ((void)(n))
+#include "out_wrapper_host_source.c"
 #include "db_host_source.c"
+#include "vfs_host_source.c"
+#include "guest_probe_host_source.c"
+#include "arg_tables_host_source.c"
+static u32 *g_cur_frame;
+static u32 tick_count;
+volatile u32 ring3_caller_reject_count;
+static void ring3_abort_check(void) {}
+static void ring3_gui_pump(void) {}
+static u32 kapi_invoke(void *fn, const void *args, u32 n) {
+    const u32 *a = args;
+    (void)n;
+    invoke_calls++;
+    return ((u32 (*)(u32, u32, u32, u32, u32, u32))fn)(a[0], a[1], a[2], a[3], a[4], a[5]);
+}
+static u32 host_kapi_table[KAPI_FUNC_COUNT + 2];
+#define KAPI_ADDR host_kapi_table
+#define RING3_ARG_WINDOW 64u
+#include "dispatch_host_source.c"
+
+/* Exercise the real early gate and wrappers with a mapped USER argument window. */
+static int dispatch_probe(u32 slot_id, u32 a, u32 b, u32 c, u32 d, int kill) {
+    u32 frame[13] = {0};
+    u32 *args = (u32 *)MEM_EXEC_LOAD_ADDR;
+    args[1] = a; args[2] = b; args[3] = c; args[4] = d;
+    frame[7] = slot_id; frame[11] = (u32)args;
+    expect_kill = kill;
+    if (__builtin_setjmp(kill_env)) {
+        expect_kill = 0;
+        return -999;
+    }
+    ring3_syscall_dispatch(frame);
+    CHECK(!kill);
+    return (int)frame[7];
+}
 
 static u32 sqlite_calls, vfs_calls;
 static const char *expected_input;
@@ -26,7 +68,10 @@ int sqlite3_open(const char *s, sqlite3 **out) {
     sql_entry(); copied(s); *out = (sqlite3 *)1; return SQLITE_OK;
 }
 int sqlite3_open_v2(const char *s, sqlite3 **out, int f, const char *v) {
-    (void)f; (void)v; return sqlite3_open(s, out);
+    (void)f; (void)v; sql_entry();
+    CHECK(s == abs_path_buf && s[0] == '/');
+    copied(expected_input[0] == '/' ? s : s + 1);
+    *out = (sqlite3 *)1; return SQLITE_OK;
 }
 int sqlite3_prepare_v2(sqlite3 *db, const char *s, int n, sqlite3_stmt **out, const char **tail) {
     (void)db; (void)n; sql_entry(); copied(s); *out = (sqlite3_stmt *)2;
@@ -54,16 +99,13 @@ int sqlite3_bind_text(sqlite3_stmt *s, int i, const char *t, int n, void (*d)(vo
 int sqlite3_bind_blob(sqlite3_stmt *s, int i, const void *t, int n, void (*d)(void *)) {
     return sqlite3_bind_text(s, i, t, n, d);
 }
-const char *vfs_cwd(void) { vfs_calls++; return "/"; }
-int vfs_resolve_path(const char *s, char *out, int cap) {
-    vfs_calls++; CHECK(host_arch_if == expected_if);
-    kstrncpy(out, s, cap); return VFS_OK;
-}
-int vfs_stat(const char *s, OS32_Stat *st) {
+static int host_stat(void *ctx, const char *s, OS32_Stat *st) {
+    (void)ctx;
     vfs_calls++; CHECK(host_arch_if == expected_if);
     if (kstrlen(s) > 8) return OS32_ERR_NOTFOUND;
     st->st_size = PAGE_SIZE; return 0;
 }
+static VfsOps host_ops = {.stat = host_stat};
 /* Real ring3_str.c is independently tested; guard predicate is its real body. */
 #include "str_host_source.c"
 
@@ -84,12 +126,46 @@ static void caller_copy_tests(void)
     u32 args[6] = {MEM_EXEC_LOAD_ADDR, PAGE_SIZE, 3, 0x32, 0xffffffff, 0}, mapped;
     __asm__ volatile("int $0x80" : "=a"(mapped) : "a"(90), "b"(args) : "memory");
     CHECK(mapped == MEM_EXEC_LOAD_ADDR);
+    mounts[0].in_use = 1;
+    kstrncpy(mounts[0].prefix, "/", VFS_MAX_PATH);
+    mounts[0].ops = &host_ops;
+    ((u32 *)KAPI_ADDR)[2 + KAPI_SLOT_DB_BIND_TEXT] = (u32)kapi_db_bind_text;
+    ((u32 *)KAPI_ADDR)[2 + KAPI_SLOT_SYS_STAT] = (u32)wrap_sys_stat;
+    g_cur_app = &slot;
+    slot.stack_base = MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE;
+    slot.stack_top = MEM_APP_STACK_TOP;
     kmemcpy((void *)va, "bad", 4); /* VA is accessible but different from PA. */
     expected_input = "abc";
     CHECK(caller_access_enter(&prev, CALLER_USER));
     for (u32 f = 0; f < 2; f++) {
         expected_if = host_arch_if = f ? 0x202 : 2;
         u32 root = host_cr3;
+        /* The guest probe must reach DB range rejection, never the early kill.
+         * The historical 0x7fffff reproduces a kill WITHOUT a range-counter bump. */
+        KernelAPI api = {0};
+        api.sbrk_heap_limit = MEM_EXEC_LOAD_ADDR + PAGE_SIZE;
+        reset_db();
+        u32 before = ring3_range_reject_count;
+        int invoked = invoke_calls;
+        CHECK(dispatch_probe(KAPI_SLOT_DB_BIND_TEXT, 0, 1, 0x7fffff, 2, 1) == -999);
+        CHECK(invoke_calls == invoked && ring3_range_reject_count == before);
+        CHECK(dispatch_probe(KAPI_SLOT_DB_BIND_TEXT, 0, 1,
+              (u32)guard_crossing_text(&api), 2, 0) == -1);
+        CHECK(invoke_calls == invoked + 1 && ring3_range_reject_count == before);
+        /* Public sys_stat still checks the app output before driver writes. */
+        kmemcpy((void *)(MEM_EXEC_LOAD_ADDR + 128), "/abc", 5);
+        u32 out = MEM_EXEC_LOAD_ADDR + 256;
+        CHECK(dispatch_probe(KAPI_SLOT_SYS_STAT, MEM_EXEC_LOAD_ADDR + 128,
+              out, 0, 0, 0) == 0);
+        CHECK(((OS32_Stat *)out)->st_size == PAGE_SIZE);
+        pt[index] &= ~PTE_RW;
+        u32 stat_before = vfs_calls;
+        ((OS32_Stat *)out)->st_size = 123;
+        CHECK(dispatch_probe(KAPI_SLOT_SYS_STAT, MEM_EXEC_LOAD_ADDR + 128,
+              out, 0, 0, 1) == -999);
+        CHECK(vfs_calls == stat_before && ((OS32_Stat *)out)->st_size == 123);
+        CHECK(ring3_range_reject_addr == out);
+        pt[index] |= PTE_RW;
         for (int entry = 0; entry < 3; entry++) {
             reset_db(); kmemcpy(p + PAGE_SIZE - 4, "abcd", 4);
             CHECK(ring3_ptr_ok(va));
@@ -103,9 +179,12 @@ static void caller_copy_tests(void)
             }
             CHECK(host_arch_if == expected_if && host_cr3 == root);
             p[PAGE_SIZE - 1] = 0; expected_input = "abc";
+            u32 rejects = ring3_range_reject_count;
             rc = entry == 0 ? kapi_db_open((void *)va) : entry == 1 ?
                 kapi_db_open_existing((void *)va, 0) : kapi_db_prepare_only(0, (void *)va);
             CHECK(rc >= 0 && sqlite_calls);
+            CHECK(ring3_range_reject_count == rejects);
+            if (entry == 1) CHECK(vfs_calls == 2); /* real VFS -> kernel local st */
             CHECK(host_arch_if == expected_if && host_cr3 == root);
         }
         reset_db(); kmemcpy(p + PAGE_SIZE - 4, "abcd", 4);
@@ -190,7 +269,7 @@ static void caller_copy_tests(void)
     live->gen++;
     CHECK(!ring3_ptr_ok(MEM_LEASE_BASE));
     CHECK(!ring3_user_range_ok(MEM_LEASE_BASE, 4));
-    SAY("PASS: d5 real DB/copy/walk, NP no prepare/old stmt finalized, RO/scratch/output/WM/IF/CR3");
+    SAY("PASS: d5 real DB/copy/walk, guest dispatch boundary, internal VFS/public stat, RO/scratch/output/WM/IF/CR3");
     die(0);
 }
 
