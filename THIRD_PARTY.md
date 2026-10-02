@@ -32,3 +32,10 @@ PC-98 のハードウェア資料 (PC-9800 Bible、UNDOCUMENTED 9801/9821) は**
 
 生成される辞書 DB にライセンスと出所を運ばせる件は
 [docs/tasks/fep/TASK_DICT_META.md](docs/tasks/fep/TASK_DICT_META.md) (M5)。
+
+T2f f1b の単体接続は、上記 newlib nano の検証済み member 6 個をコピーし、
+`objcopy --redefine-sym` で私有名に変換する。nano のソース・命令本体は無改変、
+インストール済み libc.a は変更しない。変換入力と全 rename は
+[`nano_inputs.json`](sdk/allocator/nano_inputs.json) の `sdk_build`、ライセンス原文は
+[`nano.LICENSE`](sdk/allocator/nano.LICENSE) (変更なし)。
+SDK adapter 自体は OS32 の MIT。公開アプリへの結線は後段。

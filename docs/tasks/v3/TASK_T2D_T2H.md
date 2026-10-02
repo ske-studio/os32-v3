@@ -595,6 +595,10 @@ fの公開切替でのみ、未指定exec_heap=64KiB、明示値は丸めて最�
 
 CRTをUSER/residentでビルド時に分ける。USER _sbrkはu32番地でsigned incr/INT_MIN/上端を加算前に検査し、breakとmapped_endを別に保持。増加は必要なpageだけ末尾へEXACT map、全成功時だけbreakを更新し旧breakを返す。減少は初期break未満拒否、breakだけ下げる。mapped_endはtrim成功時だけ下げる。非連続値を成功として返さない。resident版は既存固定上限方式 (境界/overflow検査は同じ)で、mem_mapへ落ちない。`sbrk_heap_limit`はUSERでは初期mapped_endの引渡し値であり、実行中の予約天井と解釈しない。SDKが自分のmapped_endを持つ。親CR3復元後に親heapの状態を復元し、初期化し直さない。
 
+注記 (f1bレビュー対応、2026-10-03): 上の「CRTがbreak/mapped_endを保持」は
+接続口の説明。実際の状態の所有者はprimary arenaのadapterとし、f6のCRT `_sbrk` は
+そのmorecoreへ委ねる。公開時にCRT自身の独立したbreakを残さない (§3-5 f1b記録)。
+
 ### 3-4. allocatorの選択と安全な返却
 
 **選択案はnewlib nano維持 + SDKの複数arena接続**。TLSFを同時導入しない。調査した実ソースはnewlib 4.4.0.20231231のnano-mallocr.c (`/home/hight/opt/src/`、リポジトリ外)。free_list、sbrk_start、sbrk_alignedの追加整列要求、末尾free chunkとの隣接検査を持つ。f1aで実toolchainのリンク対象/hashを確認し、違う版ならその差を記録して接続試験を直す。システムのlibc.aを手編集せず、SDK用のnanoビルド/adapterを用意し、由来・ライセンス・パッチをビルド入力として追跡する。
@@ -702,6 +706,126 @@ eのlease/gfx/SHM権限/KAPI・公開SDK・`sdk/kapi.json`・機能版/4世代�
   MALLOC_LOCK行64=`__malloc_lock`、UNLOCK行65。libc_a-mlock.oの実lock/unlockはretのみ。
   再入/複数arenaの排他を保証しないので、adapterはbusy/arena選択の保護を明示し、
   再帰呼出しを含む全入口で整合させる (mlock.cの再帰lock契約)。
+
+**f1b 実装記録 (2026-10-03、Codex gpt-6-astra、wt/t2f1b、基点 d4d5a2b = 着手時 main)**:
+
+範囲はSDKの単体接続だけ。実アプリ/shell/gshellのリンク、CRT、kernel、KAPI/4世代、
+Rustを変更しない。`sdk/allocator/build_nano.py` は検証済みlibc.aから6 member
+(mallocr/freer/callocr/reallocr/msizer/mallinfor) を抽出し、台帳のrename表で私有化する。
+実nanoの命令本体・ソースを再コンパイル/patchせず、system libc.aも変更しない。
+理由は既存toolchainで検証済みの実コードをそのまま対照にし、同じ再帰呼出しを保ちながら
+外部のmalloc/free/calloc/reallocと4つのreentrant入口をadapterへ集約できるため。
+
+`nano_adapter.c` は入口全体でbusyを保持し、arenaごとのfree_list/sbrk_start/mallinfoを
+実memberの私有globalへload/saveする。別arenaのchunkを一つのlistへ繋がない。
+nano内部のcalloc/reallocからの私有malloc/freeは同じbusy/arenaを使い、map callbackから
+公開入口への再入はENOMEM、freeは状態不変、arena選択は拒否する。
+f1bのarena選択・初期化はfixtureの責務。free/reallocはenter後に
+pointerが選択arenaの `[sbrk_start (未設定ならinitial), brk)` に属するか検査し、
+外れならEINVALを立て、freeは状態不変、reallocはNULLで旧内容を保持する。f7で自動routingと
+先頭管理page/副arena生成・回収へ接続するまで、これを公開allocatorとして使わない。
+
+`os32_nano_morecore` はu32の加算前overflow/INT_MIN/下限/上限/page丸めを検査し、
+旧breakだけを返す。USER接続点は「指定末尾の全pageを原子的にEXACT mapする」callback、
+失敗時はbreak/mapped_end不変。resident接続点はcallback無しの固定mapped_end。
+負増分はbreakだけを下げる。f6の実CRT二分とmem_mapへの接続は未実施。
+primary arenaのbreak/mapped_endはadapterが持ち、f6のCRT `_sbrk` はそのmorecoreに
+委ねる。公開の段ではCRTが独自のbreakを持たない。f6への申し送りとして、CRTの
+`_sbrk`/`sbrk` とlibc_a-sbrkr.oを残して所有者を二重化せず、adapter側の定義へ集約する。
+初期initialはCHUNK_ALIGN (4) に切り上げてCRTから渡す契約とする (f6)。
+fixtureの不整列break試験はupstream追加要求の対照として残す。
+実 `sbrk_aligned` の不整列時追加要求 (:226相当) と `nano_malloc` の末尾不足分要求
+(:332相当) を実行した。追加要求の後半失敗時は先の取得分が残るupstream挙動を記録し、
+巻戻しや別arenaへの非連続成功へ改変しない。nanoのpatchは不要だった。
+
+未結線入口は `sdk/allocator/check_link.py` のopt-in検査で拒否 (失敗出力を削除)。
+ldが選んだobject/archive memberの全定義を調べるため、gshell同様の
+`--allow-multiple-definition` で後勝ち/先勝ちが隠れても検出する。
+`sbrk`/`_sbrk`/`_sbrk_r` の定義がnano_adapter以外から選ばれた場合も、
+同じopt-in検査で拒否する (未定義は許可)。公開 `sdk/link_guard.py` への適用は公開切替時。Rustの `Os32Alloc::alloc/dealloc`
+(`sdk/rust/os32api/src/lib.rs`) はmem_alloc/mem_free直結でnanoを呼ばない。
+実libos32guiのinputsにもnano member無し。gshellのC CRTは別にnanoを使うため、
+「gshell全体がnewlibをリンクしない」とは扱わない。Rustの整列adapterはf8。
+
+台帳の `sdk_build.sources` にSDK実装hash、`upstream` にnanoの原本hash、member/全rename、
+空patch列を記録。SDK入力は原本台帳と照合し、toolchainのreceipt/cache_keyとは分離。
+SDK upstream照合は台帳内の2つのhashの比較のみで、f1aの「toolchainと同じ照合」
+より弱い。再コンパイルは行わず、実member/archiveのhashはinputs.checkで固定する。
+THIRD_PARTYに変換を追記、nano.LICENSEは原文のまま (追加vendor source無し)。
+receipt P3(a)のmember名追加時の復旧案内は08_build §8-5へ追記。
+receipt形式を変えないためRECEIPT_SCHEMA追加/CI cache更新は行わない。
+
+**既存試験の事前一覧と追従**: 期待を変えた既存試験は **0件**。
+`rg` で実関数を抽出/コピーする足場も検索し、sbrk_tier、memory_boot、memmap_boot
+(実exec_heap)、app_band_pde、exec_r1、app_bb_overlap、db_caller、shlib_high、
+guest heap_test/alloc_demo/klibc_test/dbgserialは対象ソース不変と確認。
+`test_nano_inputs.py` は既存50ケースの期待を維持してSDK照合5ケースと4変異を追加
+(55 GREEN / 29 runtime RED)。SDK patch/cache分離の既存負例も残した。
+
+**試験**: [nano_adapter_tdd.md](../../../tools/tests/nano_adapter_tdd.md)。
+実nano ILP32の88 CHECK GREEN、未結線/重複/独立break所有者の46リンク拒否、C21+リンク検査3 =
+24 runtime RED / 0 survived / 0 ERROR。新検査はcheck_mapと生成TESTSへ登録。
+変異置換当たり数は固定、期待CHECKラベルが一致した実行失敗だけRED。
+compile/link失敗・timeout・別CHECKの失敗はREDに数えない。
+途中のfixture compile警告と丸め後上限変異の生存は同ログへ記録し、修正後に再実行。
+
+**サイズ (基点build→変更後build)**:
+
+| 対象 | 前→後 (byte) | 増分 |
+|---|---|---|
+| kernel.bin | 364404→364404 | 0 |
+| vmkernel.lz4 | 481352→481352 | 0 |
+| shell.bin | 99968→99968 | 0、SHA256も不変 |
+| gshell.bin | 225064→225064 | 0、SHA256も不変 |
+| libos32gui.shlib | 129568→129568 | 0、SHA256も不変 |
+
+108成果物を比較し、全size不変、kernel/vmkernel以外の106本はSHA256も不変。
+kernelは毎回のkapi_sys日時埋込みでhashが変わるためSHA不変とはしない。
+`__bss_end=0x18C754`、ASSERT残34988 B、f枠8192 Bの消費0。
+レビュー対応前の未配布fixture archiveはtext2649/data0/bss56 B、その内adapterはtext1425/bss8 B。
+レビュー対応後 (owns_pointer 追加後) の adapter は同じフラグ (`i386-elf-gcc -std=gnu11 -O2 -ffreestanding -fno-builtin`) で text 1682 / data 0 / bss 8 B (+257 B、PM 実測 2026-10-03)。公開成果物への影響は 0。
+**公開の段への申し送り (f1b 再レビュー P3)**: sdk/allocator/check_link.py:45,52 は提供元を `endswith('(nano_adapter.o)')` (ファイル名) だけで見分ける — adapter を .o のままリンクすると正しい構成でも拒否され、同じ名前の別物は通る。公開切替 (link_guard.py への適用、f6 で CRT の `_sbrk` を adapter に集める段) のときに、台帳の sdk_build.sources の hash などで提供元を照合する形に改める。
+**f1b の着地 (PM、2026-10-03)**: 独立レビュー (Opus 5.5) は 1 回目 Request changes (P2 3 件・P3 8 件) → P2/P3 対応の差分確認で Approve (P3 2 件 → 上の 2 行)。PM のホスト (既定 `HOST32_RUNNERS=native qemu`) で `make all`・lint・`check-changed` rc=0 (修正前の版・修正後の版とも、`/home/hight/os32-tmp/pm{,2}-f1b-{all,cc}.log`) — 実 nano の ILP32 試験は native でも通過。公開リンク・CRT・kernel・Rust は不変なのでゲスト回帰は不要と判断。
+arena記録は72 B/本 (fixture側、f7の管理page実装ではない)。画像へのadapter増分0。
+
+**独立レビュー対応 (2026-10-03、Codex gpt-6.1-sol)**:
+P2-1: pointer所属検査、境界で隣接するchunkの非併合/別arena free・realloc拒否、検査迂回変異。
+P2-2: primary break所有者をadapterと明記、§3-3注記とf6申し送り、独立sbrk定義のopt-in拒否/変異。
+P2-3: link負例を実数集計、malloc_trim/_malloc_trim_rも未結線として拒否 (46件)。
+P3-1: initialの4整列契約と不整列fixture維持。P3-2: 変異ごとの期待CHECKラベル照合。
+P3-3: page丸めoverflow/resident分岐/busy外morecoreの3変異追加。
+P3-4: 実libc_a-reallocf.oをfixtureにリンクしてarena free_list変化を確認。
+P3-5: upstream照合の限界を記録。P3-6: baselineのinputs.checkは1回、変異は私有memberを再利用。
+P3-7: HOST32 runnerの列挙をMake recipeへ合わせ、前実装者表記をCodex gpt-6-astraへ訂正。
+公開リンク、6 memberの私有化、arena状態load/save、receipt/cache_key、Rust経路、e受入ゲートを維持。
+
+**前実装者の検査の実行記録**:
+環境はCROSS_DIR=/home/hight/opt/cross、TMPDIR=/home/hight/os32-tmp、PYTHONPATH空、
+HOST32_RUNNERS=qemu。`make all NP21W_DIR=/dev/null < /dev/null` は初回rc=2
+(worktreeにIPAフォント無し)。既存mainの取得済みTTFをコピーしhash検査後、再実行rc=0。
+変更後の同コマンドもrc=0。配備コピーは/dev/null指定のため警告のみで実行されない。
+`test_nano_adapter.py --runner qemu --mutate`、`test_nano_inputs.py --mutate` は各rc=0。
+`gen_memmap.py --write`、`gen_tests_inventory.py --write`、`check_select.py --lint` は各rc=0。
+この欄を凍結後、指定の `OS32_MUT_JOBS=4 make check-changed NP21W_DIR=/dev/null < /dev/null`
+を実行し、そのrcは最終報告と `/home/hight/os32-tmp/f1b-check-changed.log` に残す。
+全体検査中は票/ソースを書き換えない。
+
+**レビュー対応後の検査記録 (全体検査開始前に凍結)**:
+環境は上記と同じ。`make all NP21W_DIR=/dev/null < /dev/null` はrc=0。
+`python3 -B tools/tests/test_nano_adapter.py --runner qemu --mutate` はrc=0
+(88 CHECK / 46 link拒否 / C21+gate3=24 runtime RED)。
+`python3 -B tools/tests/test_nano_inputs.py --mutate` はrc=0 (55 GREEN / 29 runtime RED)。
+`python3 -B tools/gen_memmap.py --write`、`python3 -B tools/gen_tests_inventory.py --write`、
+`python3 -B tools/check_select.py --lint` は各rc=0 (対応表120検査、漏れ0)。
+以下の全体検査中は票/ソースを変更せず、結果は最終報告と
+`/home/hight/os32-tmp/f1b-review-check-changed.log` に残す:
+`OS32_MUT_JOBS=4 HOST32_RUNNERS=qemu make check-changed NP21W_DIR=/dev/null < /dev/null`。
+
+**未実施と申し送り**: nativeはPMホスト、NP21/W/NHD/配備/ini/実機は依頼により未実施。
+外部apps/gameの再結線も無し (公開SDK不変)。独立レビューはPMへ引渡し。
+f5/f9で保存caller由来のkernel接続、f6で実CRT、f7で副arena/全入口routing、f8で大塊とRust、
+f11で実free listのtrim/rollbackを続ける。f1bはtrimや最小初期量切替の成立を主張しない。
+f2以降および公開切替のe受入ゲートは維持する。commit/push無し。
 
 f1bの接続が成立しなければ最小初期量切替へ進まない。TLSF採用へ黙って切り替えず、失敗した実ソースケースとサイズを添えて本節の設計差分をレビューする (D23の再決裁ではなくallocator実装選択の再設計)。各小段の不確実性を全fの一回依頼へまとめない。
 

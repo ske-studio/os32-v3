@@ -221,10 +221,29 @@ def cases(script):
         config.write_text(invocation)
         tiny["toolchain"]["patches"] = ["unrecorded.patch"]
         rejected(mod, lambda: mod.build_inputs(tiny, source, tarball, config), "patched build")
-    return 50
+    mod.sdk_inputs(ledger)
+    for field, name, message in (
+            ("sources", "sdk/allocator/nano_adapter.c", "SDK source differs"),
+            ("upstream", "newlib/libc/stdlib/nano-mallocr.c", "SDK upstream differs")):
+        bad = copy.deepcopy(ledger)
+        bad["sdk_build"][field][name] = "0" * 64
+        rejected(mod, lambda: mod.sdk_inputs(bad), message)
+    bad = copy.deepcopy(ledger)
+    bad["sdk_build"]["members"].append("untracked.o")
+    rejected(mod, lambda: mod.sdk_inputs(bad), "SDK member absent")
+    bad = copy.deepcopy(ledger)
+    bad["sdk_build"]["patches"] = ["unrecorded.patch"]
+    rejected(mod, lambda: mod.sdk_inputs(bad), "SDK source patch")
+    return 55
 
 
 MUTATIONS = [
+    ('require(digest((ROOT / name).read_bytes()) == sha,', 'require(True,', 1, 'SDK source bypass'),
+    ('require(ledger["toolchain"]["upstream"]["files"].get(name) == sha,',
+     'require(True,', 1, 'SDK upstream bypass'),
+    ('require(all(name in ledger["toolchain"]["local"]["members"] for name in sdk["members"]),',
+     'require(True,', 1, 'SDK member bypass'),
+    ('require(sdk["patches"] == [],', 'require(True,', 1, 'SDK patch bypass'),
     ('require((source / name).read_bytes() == data,', 'require(True,', 1, 'source bypass'),
     ('require(flag in invocation.split(),', 'require(True,', 1, 'build flag bypass'),
     ('require("CFLAGS = " + ledger["cflags"] in makefile.splitlines(),',

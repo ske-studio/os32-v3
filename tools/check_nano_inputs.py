@@ -135,6 +135,19 @@ def check(prefix, ledger):
     return "build receipt" if receipt.exists() else "pinned local ledger"
 
 
+def sdk_inputs(ledger):
+    """SDK-only integrity never changes the toolchain receipt/cache schema."""
+    sdk = ledger["sdk_build"]
+    for name, sha in sdk["sources"].items():
+        require(digest((ROOT / name).read_bytes()) == sha, "SDK source differs: " + name)
+    for name, sha in sdk["upstream"].items():
+        require(ledger["toolchain"]["upstream"]["files"].get(name) == sha,
+                "SDK upstream differs: " + name)
+    require(all(name in ledger["toolchain"]["local"]["members"] for name in sdk["members"]),
+            "SDK member absent from toolchain ledger")
+    require(sdk["patches"] == [], "SDK source patch requires a new build mode")
+
+
 def cache_key(ledger):
     """Key construction inputs and inventory names, excluding local hash values."""
     tc = ledger["toolchain"]
