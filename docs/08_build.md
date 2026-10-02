@@ -153,7 +153,7 @@ os32/
 ├── apps/           git submodule (ske-studio/os32-apps) — 標準アプリ。make external / make apps
 ├── game/           git submodule (ske-studio/os32-game) — 対戦スゴロク RPG。make external / make game
 ├── docs/hw/        PC-98 資料のローカルミラー (git 管理外、tools/sync_hwdocs.sh)
-├── sdk/            配布 SDK (include/, crt/, link/ (app.ld / app_sys.ld / shlib.ld), rust/, example/)、kapi.json と生成器
+├── sdk/            配布 SDK (allocator/ (nano入力台帳・表示), include/, crt/, link/ (app.ld / app_sys.ld / shlib.ld), rust/, example/)、kapi.json と生成器
 ├── build/          モジュール化 Makefile 群 (config.mk, kernel.mk, programs.mk, libs.mk, deploy.mk, image.mk, sdk.mk 等) + リンカスクリプト
 │   └── out/        ビルド成果物 (kernel.bin, sqlite.bin, vmkernel.lz4, unicode.bin, kernel.elf/.map)
 ├── assets/         データアセット (DB, 辞書, profile 等)
@@ -835,6 +835,67 @@ make -j$(nproc) && make install
 > 系がフル実装になり、各コマンド .bin が約3倍 (14KB→40KB) に肥大化して
 > 1.2MB ブートFDが容量不足でビルド失敗する (2026-08 環境再構築時に実証済み)。
 
+#### nano allocator の入力台帳 (T2f f1a)
+
+SDK用nano/adapterの入力は [`sdk/allocator/nano_inputs.json`](../sdk/allocator/nano_inputs.json)
+に置く。SDK実装入力を `sdk/` に集める既存の構成に合わせ、将来のadapterと隣接して
+由来・版・ソースhash・configure・patch列を追跡する。`toolchain` 節は構築入力 (patch禁止)、`sdk_build` 節はf1bのソース・patch・表示用。
+構築検査/receiptは前者だけを見るため、SDK用patchの追記はtoolchain再構築を要求しない。
+ARM Ltd (2012, 2013) のnanoファイルのBSD 3-clause表示を
+[`nano.LICENSE`](../sdk/allocator/nano.LICENSE) に全文保持し、配布全体の
+`COPYING.NEWLIB` もhashで記録した。f1bで追加のソース/patchを使う際はその入力と表示も追加する。
+
+手元の実toolchainはnewlib 4.4.0.20231231 / GCC 13.2.0、`CFLAGS=-g -O2`。
+上の4つのnewlib設定と一致し、`libc_nano.a` / `libg_nano.a` は存在しない。
+nanoは通常名の `libc.a` / `libg.a` に入り、両者のSHA256は
+`d7a35f3fe99d533d16dca01694a4effd7a149dd7367e610de03e8ae5441e83d8`。
+`build/config.mk` の検索順で `-lc` が `$(CROSS_DIR)/i386-elf/lib/libc.a` を選ぶ。
+malloc/freeは `libc_a-malloc.o`、calloc/reallocは各非reentrant wrapper、
+`_malloc_r` / `_free_r` / `_calloc_r` / `_realloc_r` は
+`libc_a-mallocr.o` / `libc_a-freer.o` / `libc_a-callocr.o` / `libc_a-reallocr.o`。
+台帳は全12 reentrant入口、整列/統計wrapper、sbrkr/lockの計22メンバーを記録する。
+当初9メンバーは手元の `build-newlib-nano` の実objectともbyte一致した。
+`_mallocr.c` が `<newlib.h>` の `_NANO_MALLOC` を見て `nano-mallocr.c` を取り込む。
+
+`CROSS_DIR=... make check-nano-inputs-host` は実アーカイブ/memberのhash、提供symbol、
+実 `-lc` リンクmapを検査する。i386出力はrelocatableとして検査し、実行はしない。
+receiptの無いtoolchainは **f1a参照ホスト (PMの開発ホストで採取した構築)** の固定台帳と照合する。
+他ホストや手作り/旧build_cross.sh構築では、同じ入力でもDWARFのbuild path差により
+`archives SHA256 differs` になり得る。失敗時の診断も参照ホストと以下の復旧路を示す。
+元のsource/tarball/config.logと同階層のMakefileが残っていれば、実入力を検証して
+その構築固有のreceiptを作る (台帳/hashを手修正して通さない):
+
+```bash
+python3 tools/check_nano_inputs.py --cross-dir "$CROSS_DIR" --record-built \
+  --source "$NEWLIB_SOURCE" --tarball "$NEWLIB_TARBALL" \
+  --config "$NEWLIB_BUILD/i386-elf/newlib/config.log"
+```
+
+各変数はそのtoolchainを作った未改変の実入力へ設定する。元の入力が残っていない場合は
+`tools/ci/build_cross.sh --prefix "$CROSS_DIR" --work "$CROSS_WORK" < /dev/null`
+で作り直す (§8-5冒頭の手順)。構築スクリプトが同じ検証とreceipt生成を行う。
+CIの `build.yml` は `make check-fast` の同じ検査を使う。
+CI再構築ではDWARF内のbuild path等が異なり得るため、手元のアーカイブhashとのbyte一致は要求しない。
+`tools/ci/build_cross.sh` はtarball/関連ソースの固定hash・実configure・CFLAGS・nano提供元を
+検査した後、構築固有のhashをprefix直下の `os32-nano-build.json` に記録する。
+同じ検査器がreceiptの由来・設定・builder hashと実アーカイブ/memberを照合する。
+手作りtoolchainのreceiptにあるbuilderは、記録時の `build_cross.sh` を示す名目上の値で、
+そのスクリプトで構築した証明ではない。`build_cross.sh` を変えると記録し直しが要る。
+`receipt builder differs` の場合も、保存した実入力を使って上記コマンドでreceiptを再記録し、
+入力が無ければスクリプトで再構築する。builderの比較はcache_keyと同じファイル全体の
+SHA256 (正規化なし) なので、コメントだけの変更も両方を無効化する。
+これは署名や再現可能ビルドの証明ではなく、信頼するCI構築における入力と出力の記録。
+構築後の改変は失敗する。台帳をCIの出力で上書きしない。
+CIキャッシュキーは `check_nano_inputs.py --cache-key` が、toolchainの
+upstream/configure/GCC/target/CFLAGS/patchesとbuilder内容を正規化JSONからSHA256化する。
+さらに `sorted(local.members)` / `sorted(local.archives)` の名前だけを含める。
+名前を追加すると古いreceiptを持つキャッシュを作り直し、hash値だけの変更ではキーは変わらない。
+SDK節・local hash値・symbolsは除外する。OS/GCC/newlib版をキーのprefixにも付ける。
+旧キーのキャッシュは再構築する。検査器だけの変更は再構築せず、現在の検査器でreceiptを再検査する。
+クロスtoolchain無しの `check.yml` の静的集合には追加しない。
+GitHub Actionsでの新規構築はf1a作業中は未実施、PMがCI runで確認する。
+システムの `libc.a` の手編集・allocator公開切替は行わない。
+
 #### Rust ツールチェーン
 
 `userland/rust/` の Rust プログラム (hello_gfx, alloc_demo, math_test_rs) のビルドには
@@ -885,7 +946,7 @@ Windows 表記へ変換して使う。変換が合わない環境では環境変
 | submodule | **`apps/` と `game/` (private submodule) は v3 の CI では組まない** (ユーザー決定 2026-09-30: 今回の開発に要らないので `SUBMODULE_TOKEN` は登録しない)。必要になったら secret `SUBMODULE_TOKEN` (os32-apps / os32-game の Contents: read を持つ fine-grained PAT) で submodule 取得 + `make external` の step を足す ([FORK_PLAN §3 d ③](tasks/v3/FORK_PLAN.md)) |
 | フォント | IPAex の TTF はリポジトリに無く `tools/fetch_fonts.py` が IPA の公式配布から取る (§8-2)。CI は `OS32_ACCEPT_IPA_LICENSE=1` で非対話に同意し (リポジトリ所有者が同意済みの前提)、取れた ttf を key `ipaex-<zip の SHA-256>` (`fetch_fonts.py --print-zip-sha256`) で `actions/cache` に置く |
 | 文書だけの push | `docs/**`・`*.md`・`.claude/**` だけの push では回さない (`paths-ignore`。文書の検査は `check.yml`)。同じ ref の run は 1 つ (`cancel-in-progress`) なので、**run の途中でその ref へ push すると打ち切られる** |
-| ツールチェーン | `tools/ci/build_cross.sh` (§8-5) で `~/opt/cross` に作り、`actions/cache` で保存。キーは `cross-i386-elf-<OS>-gcc<版>-newlib<版>-<build_cross.sh のハッシュ>` なので、**スクリプトか版を変えたときだけ作り直す**。os32 での実測 (2026-09-23): 初回はツールチェーン約 25 分、キャッシュが効けば run 全体で約 2 分 (ubuntu-latest 4 vCPU、キャッシュ 335MB)。os32-v3 での実走はまだ (最初の push で見る) |
+| ツールチェーン | `tools/ci/build_cross.sh` (§8-5) で `~/opt/cross` に作り、`actions/cache` で保存。キーは `cross-i386-elf-<OS>-gcc<版>-newlib<版>-<構築入力/builder/inventory名のSHA256>` (`check_nano_inputs.py --cache-key`)。**構築入力・builder・inventory名を変えたときに作り直す**。SDK用ソース/patch・local hash値の変更はキーを変えない。os32 での実測 (2026-09-23): 初回はツールチェーン約 25 分、キャッシュが効けば run 全体で約 2 分 (ubuntu-latest 4 vCPU、キャッシュ 335MB)。os32-v3 での実走はまだ (最初の push で見る) |
 | Rust | `rust-toolchain.toml` (nightly + rust-src) を `rustup toolchain install` (引数なし) で解決。`target/` のキャッシュは無し (最小構成。遅ければ `Swatinem/rust-cache` を足す) |
 | apt | `build-essential nasm genisoimage e2fsprogs` + ツールチェーン構築の `libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex`。Python は `requirements.txt`。FD イメージは `tools/mkfat12.py` (純 Python) なので mtools は要らない |
 | 上限 | `timeout-minutes: 150` |

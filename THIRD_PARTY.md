@@ -14,7 +14,7 @@ OS32 本体は MIT ([LICENSE](LICENSE))。ここに挙げるのはリポジト�
 | microui (rxi) | 2.x 系 (Copyright 2024 rxi) | MIT | `userland/lib/ui/microui.{c,h}` | OS32 移植版 (C89 化、整数演算のみ、メモリ縮小、`OS32:` コメントの箇所) | `userland/lib/ui/microui.c` 冒頭 |
 | FatFs (ChaN) | R0.15 | FatFs License (BSD 風、1 条項) | `fs/fatfs/ff.{c,h}` `diskio.h` | `ff.c` `ff.h` `diskio.h` は**無改変** (改行コードを LF に揃えたのみ。2026-09-30 に上流 ff15.zip と照合)。`ffconf.h` は OS32 向け設定、`diskio.c` `diskio_os32.h` `string.h` は OS32 の自作 | `fs/fatfs/ff.h` 冒頭 |
 | LZ4 ブロック展開 | — (仕様 lz4_Block_format.md 準拠) | MIT (本リポジトリ) | `lib/lz4.c`、`boot/lz4_mini.c`、`lib/os32_lz4/` (Rust) | **自作**。公式 LZ4 のコードは使っていない (ホスト側の圧縮は Python `lz4` パッケージ) | — |
-| newlib (nano) | 4.4.0 | 各ファイルの BSD 系ライセンス (newlib の `COPYING.NEWLIB`) | リポジトリには無い。クロスツールチェーン側 (`tools/ci/build_cross.sh` が sourceware から取得) — 外部プログラム・常駐シェルに**静的リンク**される | 無改変 | https://sourceware.org/git/?p=newlib-cygwin.git;a=blob;f=COPYING.NEWLIB (配布物を作るときは同梱) |
+| newlib (nano) | 4.4.0 | 各ファイルの BSD 系ライセンス (newlib の `COPYING.NEWLIB`)、[入力台帳](sdk/allocator/nano_inputs.json) / [nano 著作権表示](sdk/allocator/nano.LICENSE) | リポジトリには無い。クロスツールチェーン側 (`tools/ci/build_cross.sh` が sourceware から取得) — 外部プログラム・常駐シェルに**静的リンク**される | 無改変 | https://sourceware.org/git/?p=newlib-cygwin.git;a=blob;f=COPYING.NEWLIB (配布物を作るときは同梱) |
 | Rust クレート `ttf-parser` | 0.21.1 | MIT OR Apache-2.0 | vendor していない (`userland/rust/Cargo.lock`、ビルド時に crates.io から取得)。`font_test` に含まれる | 無改変 | crates.io (https://crates.io/crates/ttf-parser) |
 | Rust クレート `ab_glyph_rasterizer` | 0.1.10 | Apache-2.0 | 同上 | 無改変 | https://crates.io/crates/ab_glyph_rasterizer |
 | Rust クレート `libm` | 0.2.16 | MIT (crates.io の表記、2026-09-30) | 同上 | 無改変 | https://crates.io/crates/libm |
