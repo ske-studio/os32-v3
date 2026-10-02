@@ -217,6 +217,7 @@ checks:
     - kernel/kmalloc.h
     - lib/kstring.h
   check-hdd-stage2-host:
+    - include/pc98.h
     - tools/tests/host32.py
     - include/redir_access.h
     - sdk/include/os32/os32_generations.h
@@ -889,6 +890,7 @@ checks:
     - sdk/include/os32/os32_kapi_generated.h
     - sdk/include/os32/os32_kapi_shared.h
   check-memmap-host:
+    - include/pc98.h
     - tools/tests/host32.py
     - tools/tests/redir_access_stub.h
     - include/redir_access.h
@@ -1548,6 +1550,7 @@ checks:
     - sdk/include/os32/os32_kapi_generated.h
     - sdk/include/os32/os32_kapi_shared.h
   check-ring3-guard-host:
+    - include/pc98.h
     - tools/tests/host32.py
     - tools/tests/redir_access_stub.h
     - include/redir_access.h
@@ -2291,6 +2294,7 @@ checks:
     - tools/host_agent.py
     - tools/tests/test_host_agent.py
   check-net-link-host:
+    - include/pc98.h
     - include/redir_access.h
     - sdk/include/os32/os32_generations.h
     - exec/lease.h
@@ -2555,6 +2559,7 @@ checks:
     - CLAUDE.md
     - README.md
   check-kapi-layout-host:
+    - include/pc98.h
     - include/redir_access.h
     - sdk/rustc_stamp.py
     - sdk/link_guard.py
@@ -3018,6 +3023,7 @@ checks:
     - tools/tests/test_pegc_mode.py
 
   check-shlib-high-host:
+    - include/pc98.h
     - tools/tests/host32.py
     - platform/pc98/platform_io.h
     - lib/kstring.h
@@ -3452,6 +3458,7 @@ checks:
     - build/programs.mk
 
   check-surface-lease-host:
+  - gfx/gfx.h
   - arch/x86/arch_cpu.h
   - arch/x86/arch_io.h
   - drivers/kbd.h
@@ -3551,3 +3558,94 @@ checks:
   - userland/tests/h3/state.inc
   - userland/tests/h3a.c
   - userland/tests/h3b.c
+
+  check-surface-bundle-host:
+  - gfx/gfx.h
+  - arch/x86/arch_cpu.h
+  - arch/x86/arch_io.h
+  - drivers/kbd.h
+  - drivers/kbd_status.h
+  - exec/access_walk.c
+  - exec/appslot.h
+  - exec/exec.c
+  - exec/exec.h
+  - exec/exec_heap.h
+  - exec/exec_kapi_init.inc
+  - exec/lease.c
+  - exec/lease.h
+  - exec/os32x_hdr.h
+  - exec/redir_access.c
+  - exec/ring3_str.h
+  - exec/surface_query.c
+  - exec/surface_query.h
+  - fs/fd_redirect.h
+  - fs/pipe_buffer.h
+  - fs/vfs.h
+  - include/bootinfo.h
+  - include/bootlog.h
+  - include/con_sink.h
+  - include/config.h
+  - include/console.h
+  - include/cpu.h
+  - include/gfx_hal.h
+  - include/io.h
+  - include/kbd.h
+  - include/kbd_inject.h
+  - include/kprintf.h
+  - include/ksetjmp.h
+  - include/launch.h
+  - include/memmap.h
+  - include/pc98.h
+  - include/redir_access.h
+  - include/sys.h
+  - include/tvram.h
+  - include/types.h
+  - kapi/kapi_db.h
+  - kapi/kapi_host.h
+  - kernel/cpu_calibrate.h
+  - kernel/cpu_calibrate_math.h
+  - kernel/dma_pool.h
+  - kernel/gdt.h
+  - kernel/gui.h
+  - kernel/idt.h
+  - kernel/irq.h
+  - kernel/irq_math.h
+  - kernel/kmalloc.h
+  - kernel/kselftest.c
+  - kernel/kselftest.h
+  - kernel/ktime.h
+  - kernel/paging.c
+  - kernel/paging.h
+  - kernel/pgalloc.c
+  - kernel/pgalloc.h
+  - kernel/physmem.c
+  - kernel/physmem.h
+  - kernel/pit_math.h
+  - kernel/shlib.c
+  - kernel/shlib.h
+  - kernel/shm.h
+  - kernel/snd_engine.h
+  - kernel/sysclk.h
+  - kernel/time_math.h
+  - kernel/tss.h
+  - kernel/v86_bios.h
+  - kernel/v86_io.h
+  - kernel/v86_mem.c
+  - kernel/v86_mem.h
+  - lib/kstring.h
+  - lib/path.h
+  - platform/pc98/platform_io.h
+  - sdk/include/os32/os32_generations.h
+  - sdk/include/os32/os32_gui_shared.h
+  - sdk/include/os32/os32_kapi_generated.h
+  - sdk/include/os32/os32_kapi_shared.h
+  - tools/tests/access_walk_host.c
+  - tools/tests/host32.py
+  - tools/tests/host_arch/arch_cpu.h
+  - tools/tests/host_arch/arch_io.h
+  - tools/tests/mutpar.py
+  - tools/tests/pgalloc_host_fixture.h
+  - tools/tests/surface_bundle_host.c
+  - tools/tests/test_access_walk.py
+  - tools/tests/test_surface_bundle.py
+  - tools/tests/test_surface_lease.py

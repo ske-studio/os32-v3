@@ -3,6 +3,7 @@
 #include "kstring.h"
 #include "io.h"
 #include "surface_query.h"
+#include "../gfx/gfx.h"
 #include "os32_kapi_shared.h"
 static u32 lease_next_token = 1;
 u32 lease_selftest_result;
@@ -193,7 +194,9 @@ int surface_lease(const struct surface_query_source *source,
         !check_caller_write_range(&caller, user_out, sizeof(view)))
         return OS32_ERR_INVAL;
     flags = irq_save();
-    rc = surface_query_authorize(source, &caller);
+    rc = ((source->role == LEDGER_ROLE_CLIENT || source->role == LEDGER_ROLE_DISPLAY) &&
+          source->backend != gfx_sf_backend()) ? OS32_ERR_INVAL :
+         surface_query_authorize(source, &caller);
     if (!rc) rc = surface_query_refs(source, &ref, 1, access);
     irq_restore(flags);
     if (rc) return rc;
@@ -215,6 +218,63 @@ int surface_lease(const struct surface_query_source *source,
             /* Normally unreachable: an invariant was broken. Leave the
              * remaining lease for exit-time revoke and record the failure. */
             lease_rollback_fail_count++;
+        }
+        return OS32_ERR_INVAL;
+    }
+    return 0;
+}
+
+/* PC98 DISPLAY bundle; dormant until e11. No callback or AS switch between
+ * input copy and copyout. Validate all refs before acquire's rechecks, in one
+ * IRQ-saved interval, so a later INVAL takes precedence over an earlier STALE. */
+__attribute__((section(".text.surface_lease_bundle")))
+int surface_lease_bundle(const struct surface_query_source *source,
+                      const struct surface_ref *user_refs, u32 count, u32 access,
+                      struct surface_lease_result *user_out)
+{
+    struct caller_access caller;
+    struct surface_ref refs[SURFACE_QUERY_MAX];
+    struct surface_lease_result result = {0};
+    struct lease_authority auth;
+    struct as_lease previous[MEM_LEASE_MAX];
+    u32 next_token, i, failed = 0;
+    unsigned int saved;
+    int rc;
+    if (kctx_irq_depth || kctx_exc_depth || !source ||
+        source->role != LEDGER_ROLE_DISPLAY || source->backend != LEDGER_SF_PC98 ||
+        source->count != SURFACE_QUERY_MAX || count != SURFACE_QUERY_MAX)
+        return OS32_ERR_INVAL;
+    saved = irq_save();
+    rc = !caller_access_get(&caller) || caller.origin != CALLER_USER;
+    irq_restore(saved);
+    if (rc || !copy_caller_bytes(&caller, user_refs, refs, sizeof(refs)) ||
+        !check_caller_write_range(&caller, user_out, sizeof(result)))
+        return OS32_ERR_INVAL;
+    saved = irq_save();
+    rc = ((source->role == LEDGER_ROLE_CLIENT || source->role == LEDGER_ROLE_DISPLAY) &&
+          source->backend != gfx_sf_backend()) ? OS32_ERR_INVAL :
+         surface_query_authorize(source, &caller);
+    if (!rc) rc = surface_query_refs(source, refs, count, access);
+    if (!rc) {
+        auth = (struct lease_authority){caller.owner, source->backend, source->role};
+        kmemcpy(previous, caller.as->leases, sizeof(previous));
+        next_token = lease_next_token;
+        rc = surface_query_error(lease_acquire(caller.as, &auth, refs, count,
+                                               access, result.views));
+    }
+    irq_restore(saved);
+    if (rc) return rc;
+    result.count = count;
+    if (!copy_to_caller(&caller, user_out, &result, sizeof(result))) {
+        for (i = 0; i < count; i++) {
+            if (lease_release(caller.as, result.views[i].token)) {
+                lease_rollback_fail_count++;
+                failed++;
+            }
+        }
+        if (!failed) {
+            kmemcpy(caller.as->leases, previous, sizeof(previous));
+            lease_next_token = next_token;
         }
         return OS32_ERR_INVAL;
     }

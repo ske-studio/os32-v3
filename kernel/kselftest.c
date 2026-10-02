@@ -783,6 +783,27 @@ static void __attribute__((cold)) test_gfx_ledger(void)
                               d->owner == LEDGER_OWNER_KERNEL &&
                               gfx_dev_covers(c->first) && gfx_dev_covers(d->first))),
           "gfx:cirrus client+display");
+    {
+        const u32 planes[4] = {GVRAM_PLANE_B, GVRAM_PLANE_R, GVRAM_PLANE_G, GVRAM_PLANE_I};
+        u32 i, n = 0, valid = 1, cache_ok = 1;
+        u32 *pd = P2V(paging_kernel_pd_phys());
+        u32 *pt = P2V(pd[0] & ~0xfffUL);
+        for (i = 0; i < LEDGER_MAX_SURFACES; i++) {
+            const struct ledger_surface *sf = &ledger_surfaces[i];
+            if (!sf->npages || sf->backend != LEDGER_SF_PC98 ||
+                sf->role != LEDGER_ROLE_DISPLAY) continue;
+            if (n >= 4 || sf->first * PAGE_SIZE != planes[n] ||
+                sf->npages != GVRAM_PLANE_SIZE / PAGE_SIZE ||
+                sf->cache != LEDGER_CACHE_UC || sf->planes != 1 ||
+                sf->plane_offset[0] || !ledger_surface_validate(sf)) valid = 0;
+            n++;
+        }
+        for (i = 0; i < MEM_1MB / PAGE_SIZE; i++)
+            if ((pt[i] & (PTE_PCD | PTE_PWT)) !=
+                (PC98_NATIVE_VRAM(i * PAGE_SIZE) ? PTE_PCD : 0)) cache_ok = 0;
+        check(valid && n == 4, "gfx:planar display bundle");
+        check(cache_ok, "gfx:native aliases UC, CG/ROM WB");
+    }
 }
 
 /* ------------------------------------------------------------------------ */

@@ -14,6 +14,7 @@ from mutpar import run_ordered
 
 ROOT = walk.ROOT
 MUTANTS = [
+    ('lease', 'source->backend != gfx_sf_backend()', '0', 'selected backend mismatch'),
     ('paging', 'if (phys % PAGE_SIZE || !pgalloc_page_owned(phys / PAGE_SIZE, as->owner) ||',
      'if (0 || !pgalloc_page_owned(phys / PAGE_SIZE, as->owner) ||', 'map PT alignment'),
     ('paging', 'if (!phys || phys % PAGE_SIZE || !pgalloc_page_owned(phys / PAGE_SIZE, as->owner))',
@@ -45,15 +46,16 @@ MUTANTS = [
 ]
 
 
-def main():
+def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=None, lease_hook=""):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--runner', choices=['native', 'qemu'], default='native')
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
     files = dict(walk.FILES, lease='exec/lease.c', surface_query='exec/surface_query.c')
+    files.update(extra_sources or {})
     paths = [ROOT / p for p in files.values()]
     paths += [ROOT / p for p in ('exec/lease.h', 'exec/surface_query.h',
-        'tools/tests/surface_lease_host.c', 'tools/tests/test_surface_lease.py',
+        'tools/tests/' + fixture_name, 'tools/tests/test_surface_lease.py',
         'tools/tests/access_walk_host.c')]
     hashes = {p: hashlib.sha256(p.read_bytes()).digest() for p in paths}
     sources = {k: (ROOT / p).read_text() for k, p in files.items()}
@@ -61,13 +63,18 @@ def main():
         tmp = pathlib.Path(directory)
         for key, body in sources.items():
             if key in ('lease', 'surface_query'): continue
+            if key == 'v86':
+                body = body.replace('(volatile u32 *)(V86_REMAP_START + PAGE_SIZE)',
+                                    '(volatile u32 *)P2V(backing_phys)')
+            if key == 'exec':
+                body = body[body.index('        /* VRAM (テキスト 0xA0000'):body.index('        /* SHM (アプリ間データ受け渡し)')]
             if key == 'boot':
                 body = body[body.index('static void test_caller_boot('):body.index('static void test_ledger(void)')]
             (tmp / (key + '_host_source.c')).write_text(body)
         io = (ROOT / 'tools/tests/host_arch/arch_io.h').read_text().replace(
             'static unsigned int host_arch_if = 0x202U;', 'extern unsigned int host_arch_if;')
         (tmp / 'arch_io.h').write_text(io)
-        fixture = 'unsigned int host_arch_if = 0x202U;\n#include "surface_lease_host.c"\n'
+        fixture = 'unsigned int host_arch_if = 0x202U;\n#include "' + fixture_name + '"\n'
         (tmp / 'fixture.c').write_text(fixture)
         cc = ['gcc', '-std=gnu11', '-m32', '-march=i386', '-ffreestanding', '-fno-pie',
               '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
@@ -85,27 +92,35 @@ def main():
             objects[key] = tmp / (key + '.o'); compile_source(src, objects[key])
         for key in ('lease', 'surface_query'):
             src = tmp / (key + '.c')
-            prefix = '#define copy_to_caller host_lease_copyout\n#define copy_caller_bytes host_lease_copyin\n' if key == 'lease' else ''
+            prefix = lease_hook + '#define copy_to_caller host_lease_copyout\n#define copy_caller_bytes host_lease_copyin\n' if key == 'lease' else ''
             src.write_text(prefix + sources[key])
             objects[key] = tmp / (key + '.o'); compile_source(src, objects[key])
         def run(key, changed=None):
+            units = [unit for unit, _ in changed or []]
+            assert len(units) == len(set(units)), (key, units)
+            # v86/exec/paging each rebuild the fixture TU: never combine them.
+            assert sum(unit in ("paging", "v86", "exec") for unit in units) <= 1, (key, units)
             objs = dict(objects)
-            if changed:
-                unit, body = changed
-                src, obj = tmp / (key + '.c'), tmp / (key + '.o')
-                if unit == 'paging':
+            for unit, body in changed or []:
+                src, obj = tmp / (key + '_' + unit + '.c'), tmp / (key + '_' + unit + '.o')
+                if unit in ('paging', 'v86', 'exec'):
                     # Only the TU containing real paging is rebuilt. A private
                     # include name keeps parallel mutants independent.
-                    paging = tmp / (key + '_paging.c'); paging.write_text(body)
+                    if unit == 'v86':
+                        body = body.replace('(volatile u32 *)(V86_REMAP_START + PAGE_SIZE)', '(volatile u32 *)P2V(backing_phys)')
+                    if unit == 'exec':
+                        body = body[body.index('        /* VRAM (テキスト 0xA0000'):body.index('        /* SHM (アプリ間データ受け渡し)')]
+                    paging = tmp / (key + '_source.c'); paging.write_text(body)
                     access = (ROOT / 'tools/tests/access_walk_host.c').read_text().replace(
-                        '#include "paging_host_source.c"', '#include "' + paging.name + '"')
+                        '#include "' + unit + '_host_source.c"', '#include "' + paging.name + '"')
                     af = tmp / (key + '_access.c'); af.write_text(access)
-                    host = (ROOT / 'tools/tests/surface_lease_host.c').read_text().replace(
+                    host = (ROOT / ('tools/tests/' + fixture_name)).read_text().replace(
                         '#include "access_walk_host.c"', '#include "' + af.name + '"')
+                    host = host.replace('#include "' + unit + '_host_source.c"', '#include "' + paging.name + '"')
                     src.write_text('unsigned int host_arch_if = 0x202U;\n' + host)
                     objs['fixture'] = obj
                 else:
-                    src.write_text('#define copy_to_caller host_lease_copyout\n#define copy_caller_bytes host_lease_copyin\n' + body)
+                    src.write_text((lease_hook if unit == 'lease' else '') + '#define copy_to_caller host_lease_copyout\n#define copy_caller_bytes host_lease_copyin\n' + body)
                     objs[unit] = obj
                 compile_source(src, obj)
             exe = tmp / (key + '.elf')
@@ -121,17 +136,33 @@ def main():
         print(f'PASS runner={args.runner}')
         if args.mutate:
             def one(entry):
-                index, (unit, old, new, name) = entry
-                body = sources[unit]; assert body.count(old) == 1, (name, body.count(old))
+                index, mutation = entry
+                unit, old, new, name = mutation[:4]
+                body = sources[unit]
+                tail = ''
+                if fixture_name == 'surface_lease_host.c' and unit == 'lease':
+                    body, tail = body.split('/* PC98 DISPLAY bundle;', 1)
+                    tail = '/* PC98 DISPLAY bundle;' + tail
+                if fixture_name == 'surface_bundle_host.c' and unit == 'lease' and old == 'source->backend != gfx_sf_backend()':
+                    head, body = body.split('/* PC98 DISPLAY bundle;', 1)
+                    body = '/* PC98 DISPLAY bundle;' + body
+                else:
+                    head = ''
+                assert body.count(old) == 1, (name, body.count(old))
                 start = time.monotonic()
-                result = run(f'mut{index}', (unit, body.replace(old, new)))
+                changes = [(unit, head + body.replace(old, new) + tail)]
+                for extra_unit, extra_old, extra_new in (mutation[4] if len(mutation) > 4 else []):
+                    extra_body = sources[extra_unit]
+                    assert extra_body.count(extra_old) == 1, (name, extra_old)
+                    changes.append((extra_unit, extra_body.replace(extra_old, extra_new)))
+                result = run(f'mut{index}', changes)
                 assert result.returncode == 1 and 'FAIL:' in result.stdout, (
                     name, result.returncode, result.stdout, result.stderr)
                 return name, time.monotonic() - start
             times = []
-            for name, seconds in run_ordered(one, list(enumerate(MUTANTS))):
+            for name, seconds in run_ordered(one, list(enumerate(mutants))):
                 print(f'RED (runtime): {name} ({seconds:.2f}s)'); times.append(seconds)
-            print(f'MUTATIONS {len(times)}/{len(MUTANTS)} runtime RED; '
+            print(f'MUTATIONS {len(times)}/{len(mutants)} runtime RED; '
                   f'median={statistics.median(times):.2f}s max={max(times):.2f}s')
     assert all(hashlib.sha256(p.read_bytes()).digest() == h for p, h in hashes.items())
 

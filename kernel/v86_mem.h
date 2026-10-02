@@ -19,6 +19,7 @@
 #ifndef __V86_MEM_H
 #define __V86_MEM_H
 
+#include "pc98.h"
 #include "types.h"
 #include "memmap.h"
 
@@ -44,12 +45,12 @@
 #define V86_BACKING_PAGES   ((V86_REMAP_END / PAGE_SIZE) - 1)   /* 159 ページ */
 
 /* VRAM / ROM 帯 (リマップせず実物理を見せる) */
-#define V86_VRAM_START      0xA0000UL
-#define V86_VRAM_END        0xC0000UL   /* TVRAM/CG/GVRAM (含まず) */
+#define V86_VRAM_START      TVRAM_CHAR_BASE
+#define V86_VRAM_END        GVRAM_BRG_END   /* TVRAM/CG/GVRAM (含まず) */
 #define V86_EXTROM_START    0xC0000UL
 #define V86_EXTROM_END      0xE0000UL   /* 拡張 ROM (含まず) */
-#define V86_GVRAM_E_START   0xE0000UL
-#define V86_GVRAM_E_END     0xE8000UL   /* GVRAM プレーン E (含まず) */
+#define V86_GVRAM_E_START   GVRAM_PLANE_I
+#define V86_GVRAM_E_END     GVRAM_I_END   /* GVRAM プレーン E (含まず) */
 #define V86_SOUNDROM_START  0xE8000UL
 #define V86_SOUNDROM_END    0xF0000UL   /* サウンド BIOS ROM (含まず) */
 

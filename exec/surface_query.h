@@ -43,5 +43,13 @@ int surface_query(const struct surface_query_source *source,
 int surface_lease(const struct surface_query_source *source,
                   const struct surface_ref *user_ref, u32 access,
                   struct lease_view *user_out);
+/* PC98 DISPLAY bundle only. Trusted source is the selected backend snapshot. */
+struct surface_lease_result {
+    u32 count;
+    struct lease_view views[SURFACE_QUERY_MAX];
+};
+int surface_lease_bundle(const struct surface_query_source *source,
+                      const struct surface_ref *user_refs, u32 count, u32 access,
+                      struct surface_lease_result *user_out);
 int surface_query_error(int lease_rc);
 #endif

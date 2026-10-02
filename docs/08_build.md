@@ -222,7 +222,7 @@ KernelAPI の構造体を変えたときは `make clean` → `make all` が必�
 <a id="検査の3段"></a>
 #### 検査の 3 段 (`check-fast` / `check-changed` / `check`、2026-09-26)
 
-`HOST32_RUNNERS` は既定 `native qemu`。T2d/T2e の5試験 (access_walk / caller_copy / db_caller / surface_query / surface_lease) の正常対照だけを指定した全runner、変異を先頭のrunnerで実行する。既存試験は正常対照・変異とも環境へ export した HOST32_RUNNERS の先頭で1回だけ実行する。sandboxでは `HOST32_RUNNERS=qemu` を明示する (nativeへの自動fallbackなし)。
+`HOST32_RUNNERS` は既定 `native qemu`。T2d/T2e の6試験 (access_walk / caller_copy / db_caller / surface_query / surface_lease / surface_bundle) の正常対照だけを指定した全runner、変異を先頭のrunnerで実行する。既存試験は正常対照・変異とも環境へ export した HOST32_RUNNERS の先頭で1回だけ実行する。sandboxでは `HOST32_RUNNERS=qemu` を明示する (nativeへの自動fallbackなし)。
 
 どれも `make all` の後に回す (成果物を読む検査がある)。列 (`build/sdk.mk` の
 `CHECK_PAR_TARGETS`、2026-09-26 から 1 本) と recipe は共通で、違うのは**変異

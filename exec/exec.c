@@ -1884,8 +1884,8 @@ static int exec_launch(const char *cmdline, int gui_arg)
         }
 
         /* VRAM (テキスト 0xA0000 + グラフィック 0xA8000) — C2: 全PD共有+USER */
-        paging_addrspace_map_user_range(ctx->as,
-            0xA0000UL, 0xC0000UL, PAGE_RW | PTE_USER);
+        paging_addrspace_map_user_keep(ctx->as,
+            TVRAM_CHAR_BASE, GVRAM_BRG_END, PAGE_RW | PTE_USER);
         /* SHM (アプリ間データ受け渡し) — C2: 全PD共有+USER */
         paging_addrspace_map_user_range(ctx->as,
             (u32)MEM_SHM_BASE, (u32)MEM_SHM_BASE + (u32)MEM_SHM_SIZE,

@@ -82,6 +82,14 @@ class Tests(unittest.TestCase):
             self.fail(str(exc))
 
     def setUp(self):
+        # Every fake-emulator case owns a private lock namespace. Preserve the
+        # real flock/competing-CLI test without touching a live instance's lock
+        # or another worktree's host test. Mutant subprocesses isolate likewise.
+        lock_dir = tempfile.TemporaryDirectory(prefix='h3-fake-lock-')
+        self.addCleanup(lock_dir.cleanup)
+        lock_env = patch.dict('os.environ', {'TMPDIR': lock_dir.name})
+        lock_env.start()
+        self.addCleanup(lock_env.stop)
         self.emu = e = FakeEmulator()
         self.o = o = dict(slot_size=192, slot_state=0, slot_as=180, slot_wait=28,
                          slot_in_wait=20, slot_abort=24, slot_tick=44, running=1, as_owner=272, as_generation=0, ledger_size=24,
