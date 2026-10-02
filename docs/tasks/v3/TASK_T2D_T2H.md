@@ -1649,6 +1649,14 @@ make check-changed < /dev/null` を**今回最後に1回だけ実行しrc=0**
 Windows opt-inの既存skipは単独4件・集約5件。ゲスト/配備は依頼どおり未実施。
 以前のd6で残したcheck-changed rc=0の未達は、今回の実行で解消した。
 
+## 10-16. d6 の着地と T2d の完了 (PM、2026-10-02、NP21/W 17MB、main `3fafa7c`)
+
+独立レビュー Opus 5.5 は P1・P2 なしで Approve (網羅性の要求つき — 仕分けた 11 本と boot 診断 10 項目を 1 本ずつ確認)。P3 3 件 (copyout の移動の確認、helper 中は kernel PD、票の関数名) と、**PM の取り込み前の検査で見つかった `test_access_walk` の失敗** — 足場が boot helper を Linux の高位スタック (0xFFxxxxxx) で走らせ、TRUSTED の境界 (< 0x80000000) で落ちていた。コーダーの sandbox とレビュアーは qemu-i386 (低位スタック) で動かしていたので通っていた。製品のコードは正しく、実機の起動時はカーネルスタック (0x2FC000〜) なので通る — はコーダー (sol) が足場を低位の固定スタックにして直し (`d1d5fa8`)、高位スタックで始まる場合も試験に入れた。PM のネイティブ実行でも PASS。
+
+ゲスト (17MB、今の ini — §12): **kselftest pass 270 / fail 0** (d6 の boot 診断を含む)、`db_test` 9/9、`db_v50_test` 41/41、`klibc_test` 49/49、`alloc_demo` 16/16、`d0a_test` 全行 OK、faulttest 一式・V86・GUI (gui_demo → CUI) 従来どおり、取り残し 0、深さ 0。
+
+**T2d (d0a〜d6) はこれで完了**。T2d 全体の増分 +4,260B、ASSERT 残り 36,240B、d の枠の残り 1,628B (e〜h を使い切った後の余白 5,520B の見込み)。構成依存の確認 (8MB・GFX 切替・音源) と Ra266 は §12 のとおり T2h で一括。次は T2e (gfx / 低位 USER の切替)。
+
 ## 11. 独立レビュー 2 回目 (Opus 5.5、Approve) の P3 — 実装時の注記
 
 2026-10-01、`3180a51` の差分に対して Approve (P1 2 件・P2 11 件はすべて閉)。以下の 5 件は設計の変更ではなく、実装時に従う注記 (PM 記入)。
