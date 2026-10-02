@@ -554,6 +554,7 @@ FIFO衝突警告も回避する。再検査の結果正典は
 PM のホスト (PYTHONPATH なし、既定 `HOST32_RUNNERS=native qemu`) で `make all`・`check_select --lint`・`check-changed` (full) すべて rc=0、
 全 runner の正常対照 5 試験は native と qemu の両方で PASS (`/home/hight/os32-tmp/pm2-e2-{all,cc}.log`)。
 独立レビュー (Opus 5.5) は 1 回目 Approve (P3 8 件) → P3 対応の差分確認で Approve。
+**e2 の着地とゲスト受入 (PM、2026-10-02)**: main へ取り込み (`b0d4d7e`、f1a と `build/sdk.mk`・`tools/check_map.yaml` が競合 → 両方を残して解消、TESTS.md は生成器で再生成)。コミット済みの木で `make all` rc=0・`make check` rc=0。NP21/W を停止 → 停止確認 → `nhd-pull` → `deploy-kernel` → `deploy` → 起動 (17MB、今の ini — §12)。`ver` の Commit `b0d4d7e`、`/boot/vmkernel.lz4` 480,603 B が手元と一致。**kselftest pass 270 / fail 0**、`db_test` 9/9、`db_v50_test` 41/41、`klibc_test` 49/49、`alloc_demo` 16/16、`d0a_test` 全行 OK、faulttest gp/de/ud/pf は 4 件とも `-> kill app`、loop・kloop + CTRL+STOP、`v86 -t` OK、GUI (gui_demo の窓 → ESC → CUI) OK。終わりのカウンタ: `fault_kill_count`=7 (e1 と同じ内訳)、`ring3_caller_reject_count`=0、`redir_refuse_count`=0、深さ 0、`ledger_*_ops`=0、`exec_as_leftover_pages`=0、`irq_ctx_violations`=1 (起動時の基準値)。`surface_lease` は未結線 (gc で除去) なので、ゲストでは `kernel/paging.c` の変更を含む回帰が無いことだけを見た。
 
 **e3/e5/e10cへの申し送り (P3-7、記録のみ)**:
 (a) lease_acquireは先頭の旧世代refでSTALEとなり後続INVALを見ない。
