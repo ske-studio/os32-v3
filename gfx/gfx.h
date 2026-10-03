@@ -141,4 +141,8 @@ void gfx_set_default_palette(void);
 /* ======== テストパターン ======== */
 /* gfx_test_pattern: 外部プログラム化のため削除 */
 
+/* T2e e6: dormant compatibility entry; e11 replaces the KAPI binding. */
+void gfx_framebuffer_bridge(void *out);
+extern volatile u32 gfx_bridge_fail_count;
+
 #endif /* __GFX_H */

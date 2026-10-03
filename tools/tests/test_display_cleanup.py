@@ -46,7 +46,8 @@ def build_run(tree, kind, cases):
             src = tree / 'tools/tests/boot_splash_native_host.c'
         binary = tmp / 'test'
         command = ['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
-                   '-Wno-unused-function', '-D__KERNEL_BUILD__', '-I' + str(tmp)]
+                   '-Wno-unused-function', '-D__KERNEL_BUILD__', '-Wl,--gc-sections',
+                   '-I' + str(tmp)]
         command += ['-I' + str(tree / p) for p in
                     ('include', 'sdk/include', 'sdk/include/os32', 'gfx', 'lib', 'kernel')]
         subprocess.run(command + [str(src), '-o', str(binary)], check=True)
@@ -106,7 +107,7 @@ def main():
                     target.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copyfile(source, target)
         (tree / 'exec').mkdir(parents=True)
-        for name in ('surface_query.h', 'lease.h'):
+        for name in ('surface_query.h', 'lease.h', 'appslot.h'):
             shutil.copyfile(ROOT / 'exec' / name, tree / 'exec' / name)
         (tree / 'tools/tests').mkdir(parents=True)
         for name in ('display_cleanup_host.c', 'boot_splash_native_host.c'):

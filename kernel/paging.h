@@ -180,6 +180,9 @@ u32 paging_pte_flags(u32 virt_addr);
  * 整合は kernel/paging.c の STATIC_ASSERT が検査する。 */
 #define APP_BAND_PDE   (MEM_APP_BAND_BASE >> 22)
 
+/* Metadata only: never written into a PTE. */
+#define AS_LEASE_GFX_COMPAT 0x80000000U
+
 struct as_lease {
     u32 token, sid, generation, base, npages, flags;
 };

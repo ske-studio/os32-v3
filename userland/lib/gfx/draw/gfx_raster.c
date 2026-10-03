@@ -41,6 +41,7 @@ int gfx_raster_add(GFX_RasterPalTable *table,
  * VSYNC同期 + HBLANK同期パレット書き換えのみ行う。 */
 void gfx_present_raster_only(GFX_RasterPalTable *table)
 {
+    if (libos32gfx_check() || !gfx_ready) return;
     gfx_api->gfx_present_raster(table);
 }
 
@@ -49,6 +50,7 @@ void gfx_present_raster_only(GFX_RasterPalTable *table)
  * dirty rect全画面登録 → KAPI gfx_present_raster で転送+パレット書き換え */
 void gfx_present_with_raster(GFX_RasterPalTable *table)
 {
+    if (libos32gfx_check() || !gfx_ready) return;
     gfx_api->gfx_add_dirty_rect(0, 0, 640, 400);
     gfx_api->gfx_present_raster(table);
 }

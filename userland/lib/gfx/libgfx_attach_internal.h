@@ -1,0 +1,25 @@
+#ifndef OS32_LIBGFX_ATTACH_H
+#define OS32_LIBGFX_ATTACH_H
+#include "libos32gfx.h"
+
+/* Private staging port, not the public KAPI ABI. e11 binds the generated
+ * query/lease/unlease slots; NULL keeps the pre-e11 guest path unchanged.
+ * One CLIENT per library instance. No callbacks/scheduling within an attach.
+ * query describes registered storage (400 planar lines even in 200 mode).
+ * lease publishes a view only on success; unlease(INVAL) also covers revoke.
+ * Set the port only before attaching, or after libos32gfx_detach(). */
+struct gfx_attach_ref { u32 sid, generation; };
+struct gfx_attach_desc {
+    struct gfx_attach_ref ref;
+    u32 format, width, height, pitch, planes, plane_offset[4], bytes;
+};
+struct gfx_attach_view { u32 token, base, bytes, planes[4]; };
+struct gfx_attach_port {
+    int (*query)(struct gfx_attach_desc *out);
+    int (*lease)(const struct gfx_attach_ref *ref, struct gfx_attach_view *out);
+    int (*unlease)(u32 token);
+};
+extern const struct gfx_attach_port *gfx_attach_port;
+/* e7 uses detach on both instances when either side fails. */
+void libos32gfx_detach(void);
+#endif

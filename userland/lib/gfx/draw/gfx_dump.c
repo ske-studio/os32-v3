@@ -152,6 +152,7 @@ static int read_packbits(int fd, u8 *dst, int size) {
  *  バックバッファをVDP形式としてファイルへダンプ (RLE圧縮)
  * ------------------------------------------------------------------------ */
 int gfx_screenshot(const char *path) {
+    if (!gfx_ready) return -1;
     int fd;
     VdpHeader hdr;
     int i;
@@ -203,6 +204,7 @@ int gfx_screenshot(const char *path) {
  *  指定されたVDPファイルを読み込んでバックバッファへ展開＆パレット設定
  * ------------------------------------------------------------------------ */
 int gfx_load_vdp(const char *path) {
+    if (!gfx_ready) return -1;
     int fd;
     VdpHeader hdr;
     int i;

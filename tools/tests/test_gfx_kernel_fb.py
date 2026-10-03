@@ -54,7 +54,7 @@ def replace_function(body, signature, replacement):
         end += 1
     return body[:brace] + '{\n' + replacement + '\n}' + body[end:]
 
-def run_case(mutation, runner, extra_changes=(), fixture_body=None, source_texts=None, object_cache=None):
+def run_case(mutation, runner, extra_changes=(), fixture_body=None, source_texts=None, object_cache=None, stage=None):
     with tempfile.TemporaryDirectory(prefix='os32-e4-') as name:
         tmp = pathlib.Path(name)
         arch = (ROOT/'tools/tests/host_arch/arch_io.h').read_text().replace(
@@ -120,6 +120,7 @@ static inline void io_wait_n(int n) {(void)n;}
         fixture = 'unsigned int host_arch_if = 0x202U;\n#include "gfx_kernel_fb_host.c"\n'
         (tmp/'fixture.c').write_text(fixture_body or fixture)
         sources.append(tmp/'fixture.c')
+        if stage is not None: stage(tmp, sources)
         flags=['gcc','-std=gnu11','-m32','-march=i386','-ffreestanding','-fno-pie',
                '-fno-stack-protector','-ffunction-sections','-fdata-sections',
                '-Wall','-Wextra','-Werror','-Wno-unused-function','-Wno-unused-variable',

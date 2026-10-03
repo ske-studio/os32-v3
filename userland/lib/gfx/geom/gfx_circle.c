@@ -17,6 +17,7 @@
 
 void gfx_circle(int cx, int cy, int r, u8 color)
 {
+    if (!gfx_ready) return;
     int x = 0;
     int y = r;
     int d = 1 - r;
@@ -57,6 +58,7 @@ void gfx_circle(int cx, int cy, int r, u8 color)
 
 void gfx_fill_circle(int cx, int cy, int r, u8 color)
 {
+    if (!gfx_ready) return;
     int x = 0;
     int y = r;
     int d = 1 - r;
@@ -138,6 +140,7 @@ void gfx_fill_circle(int cx, int cy, int r, u8 color)
 
 void gfx_ellipse(int cx, int cy, int rx, int ry, u8 color)
 {
+    if (!gfx_ready) return;
     long rx2, ry2;
     long tworx2, twory2;
     long x, y;
@@ -207,6 +210,7 @@ void gfx_ellipse(int cx, int cy, int rx, int ry, u8 color)
 
 void gfx_fill_ellipse(int cx, int cy, int rx, int ry, u8 color)
 {
+    if (!gfx_ready) return;
     long rx2, ry2;
     long tworx2, twory2;
     long x, y;
@@ -328,6 +332,7 @@ static int in_arc_range(int angle, int start, int end)
 
 void gfx_arc(int cx, int cy, int r, int start_deg, int end_deg, u8 color)
 {
+    if (!gfx_ready) return;
     int x = 0;
     int y = r;
     int d = 1 - r;
@@ -387,6 +392,7 @@ void gfx_arc(int cx, int cy, int r, int start_deg, int end_deg, u8 color)
 
 void gfx_circle_thick(int cx, int cy, int r, int thickness, u8 color)
 {
+    if (!gfx_ready) return;
     int outer_r = r;
     int inner_r = r - thickness + 1;
     int x, y, d;

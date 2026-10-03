@@ -33,6 +33,7 @@ static void gfx_line_packed(int x0, int y0, int x1, int y1, u8 color)
 
 void gfx_clear(u8 color)
 {
+    if (!gfx_ready) return;
     if (gfx_packed) {
         /* バックバッファ全面 (pitch × height) を 1 バイト/画素で塗る */
         int rows = gfx_fb.height;
@@ -55,6 +56,7 @@ void gfx_clear(u8 color)
 
 void gfx_clear_rect(int rx, int ry, int rw, int rh, u8 color)
 {
+    if (!gfx_ready) return;
     int p;
     int byte_x, byte_w;
     int start_off;
@@ -104,6 +106,7 @@ void gfx_clear_rect(int rx, int ry, int rw, int rh, u8 color)
 
 void gfx_pixel(int x, int y, u8 color)
 {
+    if (!gfx_ready) return;
     int offset;
     u8 bit;
     int p;
@@ -132,6 +135,7 @@ void gfx_pixel(int x, int y, u8 color)
  * 呼出し元がバウンディングボックスで一括登録する前提。 */
 void gfx_pixel_nodirty(int x, int y, u8 color)
 {
+    if (!gfx_ready) return;
     int offset;
     u8 bit;
     int p;
@@ -156,6 +160,7 @@ void gfx_pixel_nodirty(int x, int y, u8 color)
 
 u8 gfx_get_pixel(int x, int y)
 {
+    if (!gfx_ready) return 0;
     int offset;
     u8 bit, color;
     int p;
@@ -177,6 +182,7 @@ u8 gfx_get_pixel(int x, int y)
 
 void gfx_hline(int x, int y, int w, u8 color)
 {
+    if (!gfx_ready) return;
     int x2;
 
     if (y < 0 || y >= gfx_fb.height || w <= 0) return;
@@ -196,6 +202,7 @@ void gfx_hline(int x, int y, int w, u8 color)
 
 void gfx_vline(int x, int y, int h, u8 color)
 {
+    if (!gfx_ready) return;
     int p, off;
     u8 bit;
 
@@ -236,6 +243,7 @@ void gfx_vline(int x, int y, int h, u8 color)
 
 void gfx_line(int x0, int y0, int x1, int y1, u8 color)
 {
+    if (!gfx_ready) return;
     /* dirty_rect をバウンディングボックスで1回だけ登録 */
     int minx, miny, maxx, maxy;
     minx = (x0 < x1) ? x0 : x1;
@@ -265,6 +273,7 @@ void gfx_line(int x0, int y0, int x1, int y1, u8 color)
 
 void gfx_rect(int x, int y, int w, int h, u8 color)
 {
+    if (!gfx_ready) return;
     /* dirty rect を全体で1つだけ登録してから描画する (4辺個別登録を回避) */
     int x2 = x + w - 1;
     int y2 = y + h - 1;
@@ -292,6 +301,7 @@ void gfx_rect(int x, int y, int w, int h, u8 color)
 
 void gfx_fill_rect(int x, int y, int w, int h, u8 color)
 {
+    if (!gfx_ready) return;
     int x2, r, base;
 
     if (w <= 0 || h <= 0) return;
@@ -325,6 +335,7 @@ void gfx_fill_rect(int x, int y, int w, int h, u8 color)
 
 void gfx_fill_tri(int x0, int y0, int x1, int y1, int x2, int y2, u8 color)
 {
+    if (!gfx_ready) return;
     int tmp, y, sa, sb, sx, ex;
     int ax, ay, bx, by, cx, cy;
     int min_x, max_x, min_y, max_y;
@@ -390,6 +401,7 @@ extern void __cdecl asm_kcg_draw_font(int x, int y, const u8 *pat, int w_bytes, 
 
 void gfx_draw_font(int x, int y, const u8 *pat, int w_bytes, int h_lines, u8 fg)
 {
+    if (!gfx_ready) return;
     /* パックド 8bpp: 1 バイト 1 画素で直接置く。アライメント制約は無い。
      * dirty rect はグリフ全体で 1 回だけ登録する (gfx_pixel を画素ごとに
      * 呼ぶと登録回数が h*w になり present が細切れになる)。 */

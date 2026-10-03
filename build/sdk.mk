@@ -1151,6 +1151,7 @@ CHECK_PAR_TARGETS := check-shlib-high-host check-bootinfo-host check-hdd-stage1-
     check-surface-bundle-host \
     check-gfx-kernel-fb-host \
     check-gfx-reinit-host \
+    check-gfx-attach-host \
     check-h3-park-resume-host \
     check-cirrus-win-host check-pegc-mode-host \
     check-display-cleanup-host \
@@ -1274,3 +1275,10 @@ check-gfx-reinit-host:
 	$(if $(MUT),python3 -B tools/tests/test_gfx_reinit.py --runner $(firstword $(HOST32_RUNNERS)) $(MUT),@:)
 
 .PHONY: check-gfx-reinit-host
+
+# T2e e6: checked C SDK attach and dormant compatibility USER bridge.
+check-gfx-attach-host:
+	@set -e; test -n "$(HOST32_RUNNERS)"; for runner in $(HOST32_RUNNERS); do echo "HOST32_RUNNERS=$$runner"; python3 -B tools/tests/test_gfx_attach.py --runner $$runner; done
+	$(if $(MUT),python3 -B tools/tests/test_gfx_attach.py --runner $(firstword $(HOST32_RUNNERS)) $(MUT),@:)
+
+.PHONY: check-gfx-attach-host

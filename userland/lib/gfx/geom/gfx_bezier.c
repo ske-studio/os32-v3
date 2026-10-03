@@ -105,6 +105,7 @@ static void bezier2_recursive(int x0, int y0, int x1, int y1,
 void gfx_bezier2(int x0, int y0, int x1, int y1,
                  int x2, int y2, u8 color)
 {
+    if (!gfx_ready) return;
     bezier2_recursive(x0, y0, x1, y1, x2, y2, color, 0);
 }
 
@@ -149,6 +150,7 @@ static void bezier3_recursive(int x0, int y0, int x1, int y1,
 void gfx_bezier3(int x0, int y0, int x1, int y1,
                  int x2, int y2, int x3, int y3, u8 color)
 {
+    if (!gfx_ready) return;
     bezier3_recursive(x0, y0, x1, y1, x2, y2, x3, y3, color, 0);
 }
 
@@ -219,6 +221,7 @@ void gfx_bezier3_thick(int x0, int y0, int x1, int y1,
                        int x2, int y2, int x3, int y3,
                        int thickness, u8 color)
 {
+    if (!gfx_ready) return;
     if (thickness <= 1) {
         gfx_bezier3(x0, y0, x1, y1, x2, y2, x3, y3, color);
         return;

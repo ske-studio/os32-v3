@@ -234,6 +234,7 @@ static void gfx_draw_sprite_packed(int x, int y, int h, int pitch,
 
 void gfx_draw_sprite(int x, int y, const GFX_Sprite *spr)
 {
+    if (!gfx_ready) return;
     if (!spr) return;
     if (spr->_pool_idx >= 0 && spr->_pool_idx < SPR_POOL_MAX) {
         SprSlot *slot = &spr_slots[spr->_pool_idx];
@@ -270,12 +271,14 @@ void gfx_draw_sprite(int x, int y, const GFX_Sprite *spr)
 
 void gfx_sprite_save_bg(int x, int y, GFX_Sprite *spr)
 {
+    if (!gfx_ready) return;
     if (!spr || !spr->bg_buf) return;
     gfx_save_rect(x, y, spr->w, spr->h, spr->bg_buf);
 }
 
 void gfx_sprite_restore_bg(int x, int y, GFX_Sprite *spr)
 {
+    if (!gfx_ready) return;
     if (!spr || !spr->bg_buf) return;
     gfx_restore_rect(x, y, spr->w, spr->h, spr->bg_buf);
     gfx_api->gfx_add_dirty_rect(x, y, spr->w, spr->h);

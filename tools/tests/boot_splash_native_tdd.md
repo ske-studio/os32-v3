@@ -98,3 +98,10 @@ No shared object/build output, full build, deployment or emulator run was used.
   only catches missing post-init software state before splash drawing.
 - kernel.c's existing comment saying the splash selects the configured backend
   is now stale; kernel.c edits were outside this task's allowed scope.
+
+## T2e e6 の未結線橋 (2026-10-03)
+
+全体検査で未使用の `.text.gfx_fb_bridge` が native fixture のリンクに残り、
+caller/query/lease の未解決参照で rc=1 となった。kernel と同様に
+`--gc-sections` を付けて未結線部分だけを除去する。既存の boot/splash の
+判定・呼出経路・期待値は変えない。2試験 (各4 preference) を再検査する。

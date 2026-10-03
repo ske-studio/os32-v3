@@ -5,16 +5,20 @@
 
 extern KernelAPI *gfx_api;
 extern GFX_Framebuffer gfx_fb;
+extern int gfx_ready; /* zero: framebuffer unavailable, drawing is a no-op */
 extern int gfx_dirty_suppress;  /* 非0のとき gfx_blit 等の dirty rect 登録を抑制 */
 
 /* 画素形式 (票 H2b)。0 = 4 プレーン 16 色 (PC-9801 標準)、
  * 非0 = パックド 8bpp (PEGC 256 色: planes[0] + y*pitch + x に 1 バイト/画素)。
- * libos32gfx_attach が gfx_get_framebuffer / gfx_screen_info を見て決める。
+ * checked attach が取得した CLIENT の形式から決める。e11 までは旧 KAPI。
  * 色は 0〜15 をそのまま使う (システム色に同じ番号が割ってある)。 */
 extern int gfx_packed;
 
 void libos32gfx_init(KernelAPI *api);    /* gfx_init + attach (単独アプリ) */
 void libos32gfx_attach(KernelAPI *api);  /* init 抜き: gshell 配下のアプリ / shlib */
+/* Set gfx_api first (or use the existing api-taking wrappers). 0 = success. */
+int libos32gfx_attach_checked(void);
+int libos32gfx_check(void);
 void libos32gfx_shutdown(void);
 void gfx_present(void);
 
