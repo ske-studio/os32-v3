@@ -3,11 +3,13 @@
 #include "kstring.h"
 #include "io.h"
 #include "surface_query.h"
+#include "appslot.h"
 #include "../gfx/gfx.h"
 #include "os32_kapi_shared.h"
 static u32 lease_next_token = 1;
 u32 lease_selftest_result;
 volatile u32 lease_rollback_fail_count;
+volatile u32 lease_revoke_fail_count;
 
 /* Keep this root/normal-context predicate in sync with
  * kernel/paging.c:lease_root_context(); paging also validates managed PTs. */
@@ -121,13 +123,39 @@ int lease_release(struct addrspace *as, u32 token)
     return LEASE_INVAL;
 }
 
-int lease_revoke_all(struct addrspace *as)
+/* A failed slot must not prevent independent slots from being revoked. */
+int lease_revoke_sid(struct addrspace *as, u32 sid)
 {
     u32 i;
-    if (!as || !as->pd_phys) return LEASE_INVAL;
+    int failed = 0;
+    if (!as || !as->pd_phys) {
+        lease_revoke_fail_count++;
+        return 1;
+    }
     for (i = 0; i < MEM_LEASE_MAX; i++)
-        if (as->leases[i].token && lease_release(as, as->leases[i].token)) return LEASE_INVAL;
-    return 0;
+        if (as->leases[i].token &&
+            (sid == LEDGER_MAX_SURFACES || as->leases[i].sid == sid) &&
+            lease_release(as, as->leases[i].token)) {
+            failed++;
+            lease_revoke_fail_count++;
+        }
+    return failed;
+}
+
+/* The gfx caller owns the short master/IRQ interval, including ref checks. */
+int lease_revoke_surface(u32 sid)
+{
+    int failed = 0;
+    for (int id = APP_ID_SHELL; id <= APP_ID_MAX; id++) {
+        AppSlot *a = appslot_at(id);
+        if (a && a->as && a->as->pd_phys) failed += lease_revoke_sid(a->as, sid);
+    }
+    return failed;
+}
+
+int lease_revoke_all(struct addrspace *as)
+{
+    return lease_revoke_sid(as, LEDGER_MAX_SURFACES);
 }
 
 int lease_check(const struct addrspace *as)

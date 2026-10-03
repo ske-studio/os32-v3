@@ -108,6 +108,12 @@ struct ledger_surface *ledger_surface_find(u32 b, u32 r)
     if (native_state_fault && starts) client.planes = 2;
     return &client;
 }
+u32 paging_current_cr3(void) { return 0; }
+u32 paging_kernel_pd_phys(void) { return 0; }
+void paging_load_cr3(u32 cr3) { (void)cr3; }
+int lease_revoke_surface(u32 sid) { (void)sid; return 0; }
+int ledger_surface_regen(u32 sid, const struct ledger_surface *geom)
+{ (void)sid; (void)geom; return 1; }
 int ledger_surface_transfer(u32 sid, u32 to) { (void)sid; (void)to; return 0; }
 int ledger_surface_create(const struct ledger_surface *sf, u32 *sid)
 { (void)sf; (void)sid; return 0; }

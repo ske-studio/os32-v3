@@ -786,6 +786,13 @@ static void __attribute__((cold)) test_gfx_ledger(void)
               pd->perm_max == LEDGER_PERM_RW && ledger_surface_validate(pd)),
               "gfx:pegc display");
     }
+    {
+        u32 gen = p ? p->gen : 0, first = p ? p->first : 0;
+        check(p && ledger_surface_regen((u32)(p - ledger_surfaces), 0) &&
+              p->gen == gen + 1 && p->first == first &&
+              p->npages == MEM_GFX_BB_SIZE / PAGE_SIZE,
+              "gfx:regen keeps backing");
+    }
     check(sys_usable_mem_end() <= top, "gfx:usable <= arena top");
     check(!e || (e->owner == LEDGER_OWNER_BOOT && e->backing == LEDGER_SB_RAM &&
                  e->first * PAGE_SIZE >= top &&

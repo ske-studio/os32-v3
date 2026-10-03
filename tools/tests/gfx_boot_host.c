@@ -197,6 +197,9 @@ void host_freeze(void)
 
 #include "../../exec/surface_query.h"
 static int gfx_started;
+static u32 gfx_reinit_pending, gfx_surface_unready;
+static volatile u32 gfx_reinit_fail_count;
+int lease_revoke_surface(u32 sid) { (void)sid; return 0; } /* no live AS at boot */
 static void gfx_bind_client(void) { } /* binding covered by gfx_kernel_fb_host */
 #include "gfx_boot_slice.inc"
 

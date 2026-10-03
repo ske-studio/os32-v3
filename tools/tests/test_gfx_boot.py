@@ -244,8 +244,8 @@ MUTATIONS = [
      '        ledger_surface_find(LEDGER_SF_PC98, LEDGER_ROLE_CLIENT);\n    if (base)'),
     # ⑨ が選択中でない CLIENT を移す
     ('gshell-wrong-client', 'gfx/gfx_core.c',
-     '        ledger_surface_find(gfx_sf_backend(), LEDGER_ROLE_CLIENT);\n    if (sf)',
-     '        ledger_surface_find(LEDGER_SF_PEGC, LEDGER_ROLE_CLIENT);\n    if (sf)'),
+     '        ledger_surface_find(gfx_sf_backend(), LEDGER_ROLE_CLIENT);\n    if (sf && sf->owner != LEDGER_OWNER_GSHELL)',
+     '        ledger_surface_find(LEDGER_SF_PEGC, LEDGER_ROLE_CLIENT);\n    if (sf && sf->owner != LEDGER_OWNER_GSHELL)'),
     # RAM の面の移譲で L2 のページを移さない
     ('transfer-surface-only', 'kernel/pgalloc.c',
      '    ok = from == to || sf->backing != LEDGER_SB_RAM ||\n'

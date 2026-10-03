@@ -11,7 +11,7 @@ FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-ffreestanding', '-fno-pie',
 SOURCES = ('kernel/paging.c', 'kernel/pgalloc.c', 'exec/lease.c')
 MUTANTS = [
     ('surface registration master guard removed', 1,
-     'paging_current_cr3() != paging_kernel_pd_phys() ||\n        kctx_irq_depth', 'kctx_irq_depth'),
+     '/* Padding uses the master identity alias until T2c. Reject before writes. */\n    if (paging_current_cr3() != paging_kernel_pd_phys() ||', '/* Padding uses the master identity alias until T2c. Reject before writes. */\n    if ('),
     ('free before active TLB synchronization', 0,
      'if (paging_current_cr3() == as->pd_phys) paging_load_cr3(as->pd_phys);\n    for (k = 1; k < MEM_LEASE_MAX_PDES; k++)',
      '/* synchronization omitted */\n    for (k = 1; k < MEM_LEASE_MAX_PDES; k++)'),

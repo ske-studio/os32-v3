@@ -111,13 +111,15 @@ static void map_host(u32 base, u32 size)
 int host_pegc_available = 1, host_cirrus_available = 1;
 static int fail_after_init;
 int host_select_and_init(void);
-static AppSlot slot;
+static AppSlot host_slots[APP_SLOT_COUNT];
+#define slot host_slots[2]
 static struct addrspace space;
 static u32 payload;
 volatile int ring3_wm_depth;
 int appslot_cur(void) { return 2; }
 int res_owner_get(void) { return 2; }
 int ring3_call_from_user(void) { return 1; }
+AppSlot *appslot_at(int id) { return id >= 0 && id < APP_SLOT_COUNT ? &host_slots[id] : 0; }
 AppSlot *appslot_get(int id) { return id == 2 ? &slot : 0; }
 int appslot_gfx_owner(void) { return 2; }
 int appslot_gfx_claim(int gui) { (void)gui;return 0; }
@@ -252,6 +254,8 @@ static void run(void)
         /* Poison aliases: init_200 must rebind, even on the same backend. */
         bb[0]=bb_b=0;
         gfx_init_200();
+        CHECK(ledger_surface_find(LEDGER_SF_PC98,LEDGER_ROLE_CLIENT)->height == GFX_HEIGHT);
+        CHECK(ledger_surface_find(LEDGER_SF_PC98,LEDGER_ROLE_CLIENT)->plane_offset[1] == GFX_PLANE_SZ);
         view_check(selected,selected == LEDGER_SF_PC98 ? GFX_HEIGHT_200 : MEM_GFX_BB8_HEIGHT,1);
         display_check(selected);
         gfx_shutdown();

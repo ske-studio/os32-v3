@@ -888,7 +888,7 @@ ledger_surface_create(const struct ledger_surface *sf, u32 *sid)
             other->first < sf->first + sf->npages) goto done;
     }
     for (i = 0; i < LEDGER_MAX_SURFACES; i++)
-        if (!ledger_surfaces[i].npages && ledger_surfaces[i].gen != 0xffffffffUL) break;
+        if (!ledger_surfaces[i].npages && ledger_surfaces[i].gen != LEDGER_SURFACE_GEN_MAX) break;
     if (i == LEDGER_MAX_SURFACES) goto done;
     p = ledger_surfaces[i].gen + 1;
     ledger_surfaces[i] = *sf;
@@ -904,6 +904,35 @@ ledger_surface_create(const struct ledger_surface *sf, u32 *sid)
         }
     }
     if (sid) *sid = i;
+    ok = 1;
+done:
+    irq_restore(flags);
+    return ok;
+}
+
+/* Preserve identity/backing and pixels; only validated geometry is replaceable. */
+int ledger_surface_regen(u32 sid, const struct ledger_surface *geom)
+{
+    unsigned int flags = irq_save();
+    struct ledger_surface next, *sf;
+    int ok = 0;
+    if (paging_current_cr3() != paging_kernel_pd_phys() ||
+        kctx_irq_depth || kctx_exc_depth || sid >= LEDGER_MAX_SURFACES) goto done;
+    sf = &ledger_surfaces[sid];
+    if (!sf->npages || sf->lease_count || sf->closing || sf->gen == LEDGER_SURFACE_GEN_MAX)
+        goto done;
+    next = *sf;
+    if (geom) {
+        next.width = geom->width;
+        next.height = geom->height;
+        next.pitch = geom->pitch;
+        next.format = geom->format;
+        next.planes = geom->planes;
+        for (u32 i = 0; i < 4; i++) next.plane_offset[i] = geom->plane_offset[i];
+        if (!ledger_surface_validate(&next)) goto done;
+    }
+    next.gen++;
+    *sf = next;
     ok = 1;
 done:
     irq_restore(flags);
