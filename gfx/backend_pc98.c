@@ -86,6 +86,7 @@ static void pc98_shutdown(void)
 /* ------------------------------------------------------------------------ */
 static void pc98_count_present(int x, int y, int w, int h)
 {
+    if (!gfx_clip_screen(&x, &y, &w, &h, GFX_WIDTH, gfx_current_height)) return;
     int right = x + w;
     int ax = x & ~31;
     int aw = ((right + 31) & ~31) - ax;

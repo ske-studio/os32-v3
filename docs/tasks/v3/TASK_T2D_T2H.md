@@ -1429,6 +1429,121 @@ C方言27/27 RED・5/5 GREEN、公開ヘッダgnu89も通過。
 **e7 の着地 (PM、2026-10-03)**: 独立レビュー Opus 5.5 は Approve (P1/P2 なし。レビュアーは test_gui_reattach 7/7・test_gfx_reattach 167 を再実行し、本番 (port が NULL) では帰路の check が失敗する経路が無く、Painter の門を迂回する blit・漢字も C の入口の門で守られることを確認)。PM のホスト検査は native の単体と `check_slot.sh` 経由の `HOST32_RUNNERS="native qemu"` check-changed で rc=0。**e8a で直す** (ref_e8a §9): P3-4 init していないアプリの `os32api::gfx::shutdown` が NULL を辿る、P3-5 gdi_test と試験の注記の「次の check で回収」は誤り (同じ世代なら再利用、回収は世代が変わったときか終了時)、P3-6 Rust の `static gfx_ready` / `gfx_fb` を不変で宣言している (C が書き換える、形式上 UB)。**e11 へ**: P3-1 wait の帰路の check が失敗すると run_vt を抜けて窓アプリが終わる (Q1 の「描画不可のまま続けて回復」は初回の attach だけに効く)、P3-2 Painter の門はオフスクリーンの描画も止める、P3-8 OP_WAIT 以外の park (WAIT_KEY・WAIT_POLL) で戻った shlib の利用者は帰路の check を通らない、P3-9 帰路の check の負値が OP_WAIT の値を上書きする。記録: P3-3 stub の check_gfx と os32api の present/shutdown は Rust 試験では贋物を通している、P3-7 libos32gfx_detach は公開ヘッダに無い (C は shlib を使えないので実害なし)。
 
 **e7 のゲスト受入 (PM、2026-10-03)**: main へ取り込み (`19f9346`、e8b と sdk.mk・08_build・check_map・TESTS・票が競合 → 両方を残し、全 runner の列挙を実物の 14 本に、check_map は両方の版から 2 つの検査の入力一覧を組み直し、TESTS.md は生成器で再生成)。コミット済みの木で `make all` rc=0・`make check` rc=0、push。NP21/W を停止 → 停止確認 → `nhd-pull` → `deploy-kernel` (直後の 483,472 B を控えた) → `deploy` → 起動 (17MB、今の ini)。`ver` の Commit `19f9346`・Image 483,472 B が控えと一致、**kselftest pass 274 / fail 0**。回帰の一式 (db_test 9/9、db_v50_test 41/41、klibc_test 49/49、alloc_demo 16/16、d0a_test、faulttest 4 件、loop・kloop + CTRL+STOP、`v86 -t`) OK。GUI (gui_demo の窓 → ESC → CUI) OK (新しい shlib — 帰路の check・Painter の門 — で描画)。**gdi_test (2 実体: static の libos32gfx と shlib の G API) を GUI から起動し、16 色の見本・装飾・クリップ・日本語の混在表示を確認**。終わりはキー待ち (全画面アプリへの注入キーが届かない既知の件、e11) なので CTRL+STOP で畳んだ。カウンタ: 深さ 0、`ledger_*_ops`=0、`exec_as_leftover_pages`=0、`irq_ctx_violations`=1。
+### KAPI の範囲検査の欠落の修正 (2026-10-03)
+
+GPT-6、基点 `b5c0351`、`wt/tvramfix`。PM 確認済みの TVRAM の座標から
+CPL=0 の任意番地アクセスへ至る穴を、POLICY_DEV §1 に従い優先修正。
+KAPI v69・240 entry (slot 0〜239) の宣言、生成 wrap の body/out、手書き
+`kapi_sys.c` / `kapi_db.c` / `kapi_host.c` と下記 target を監査した。
+`kapi_profile.h` は固定 slot の計数、各 `.h` は宣言のみ。予約60 slot は NOSYS。
+KAPI の形・版・生成物は変更していない。
+
+**TVRAM の契約**: x=0〜COLS-1、y=0〜ROWS-1、漢字だけ x=0〜COLS-2。
+`TVRAM_ROWS=25` を採用する。console_get_size/clear/scroll/cursor は全て25行固定で、
+現在行数の可変状態はない。30行定数の利用は `v86_gcap.c` の採取領域であり、通常
+コンソールのモード切替ではない。文字面 A0000〜A1FFF、属性面 A2000〜A3FFF の
+各8KiBに25行×160Bが収まることを既存定数による STATIC_ASSERT でも固定した。
+read の範囲外は code/attr を変更しない。既存の呼び手は IME の画面保存と
+kselftest で、有効セルを読む。palette_get と同様の no-op を採り、0への上書きを
+追加しない。NULL 出力も従来どおり。番地計算より先に全座標を拒否する。
+
+**全 entry の監査一覧** (連続範囲の和が0〜239。整数の安全性と入力pointerの
+安全性は別判定。「既存」はこの監査で新たな固定領域の範囲欠落を認めなかった意):
+
+| slot | target / 確認対象 | 判定 |
+|---|---|---|
+| 0〜17 | gfx lifecycle、kbd、exec_heap/kmalloc、kprintf、VFS path/ls、paging_enabled、RTC | 固定統計・初期化は caller index なし。heap size 上限あり。heap metadata、printf、ls callback は下記持越し。RTC outあり |
+| 18〜32 | TVRAM 3出力操作・scroll、kbd、VFS mount/cwd/devname/sync/rmdir | TVRAM put 2本修正。scroll reserve は既存 clamp。VFS mount 表は内部探索/容量制限、返却文字列は trampoline copy |
+| 33〜48 | serial、exec_run、dev_get_info、FM MML、NP2文字列 | dev_get が idx 検査、NP2 は size<=0 拒否/size内コピー。入力文字列B1は持越し |
+| 49〜67 | IDE、path、ext2 format、KCG init/scale、buzzer/reboot/halt | IDE表は drive&3 または IDE_MAX_DRIVES、LBA/count は ide_addr。KCG scale clamp・boot後font閉鎖。path出力は固定ParsedPath。I/O権限は別問題 |
+| 68〜87 | console、VFS fd/read/write/seek/stat、gfx scroll/rect、sys exit/time/mem | console cursor clamp、fd_get 範囲検査、read出力guard。GFX scroll加算・rect下位clipを修正 |
+| 88〜99 | palette、framebuffer/dirty/raster、KCG read、SHM alloc/lock/free | palette idx既存。dirty/raster修正。KCG ANK u8の256個、JIS検査後94×94、非NULL出力16/32B guard (NULLは下記)。SHM個数・番地・整列・span検査あり |
+| 100〜117 | IME、fd redirect、pipe、paging_is_present | fd=0..2、pipe ID範囲あり、redirectはB1登録AS固定、size/len検査。pagingはPDE/PTEビット分解で表内。SHM/pipe所有権は持越し |
+| 118〜131 | snd BGM/SE/master、kbd pressed、FM/SSG | SE ID・owner表・MML出力数上限あり。FM tone負値とnote負値を修正 (snd_se_play_rawも同じtargetへ)。kbdは0..127。SSGは固定port、chからRAM表を引かない |
+| 132〜139 | mouse、TVRAM read/reverse | mouse値はi16/clamp、reverseは既存検査と漢字右端制限。read修正 |
+| 140〜152 | DB、KCG font、IDE info、build info | DB slot検査、SQLite column_intはengineで検査。column_textの改竄SHM count/offset修正。fontはboot閉鎖。build infoはsize<=0拒否 |
+| 153〜163 | loop、dev block、IME辞書 | loop slot/CHS/track範囲、Deviceは名前探索、count負/範囲加算検査。FDCのtrack/sector/driveおよびDMA境界も確認。IME variant=0..2、user_listはmaxまで |
+| 164〜179 | V86、gfx info/fill/blit/stats/palette、GUI登録、IME feed/render | Cirrus fill clip修正、blitは座標検査後に残幅で縮小。palette count修正。GUI/render登録はtrusted shellのみ。V86・入力pointerは下記 |
+| 180〜188 | exec start/resume/park/kill/state、snd focus、abort、con sink | appslot_get範囲/state検査、snd owner ID制限、con sink内部ring制限とcap/out guard |
+| 189〜200 | RAM、kbd inject、gfx owner、launch、yield | inject ring容量制限、launch id_ok/固定表token探索/長さ上限、take/poll out guard |
+| 201〜207 | DB open_existing/prepare_only/bind/error_code | 既存B1 copy、bind index/length上限、owner配列検査。旧DB所有権は下記 |
+| 208〜215 | Host Services、mtime、kbd peek、exec result | LINK_HANDLES/owner検査、固定1400B staging上限、mtime固定path、複数out guard。旧入力walkは下記 |
+| 216〜223 | serial vfast/status、kbd local、PCI cfg/get/bind、time_now | PCI idx検査、cfgフィールドmask、bind idx検査、timeの出力重なり拒否。time/bind手書きtargetが全out先行検査 |
+| 224〜239 | PCM、kbd diag/log、ext2 format_at、dev mount count、geom/boot info、serialfs、V86 capture | PCM frame/ring容量とvolume上限、kbd log maxとring、format長さと媒体境界、geom drv、gcap modeと固定採取領域、全出力guard |
+
+**追加修正**:
+
+- `drivers/fm.c`: `tone_table[tone_num]` と `fnumber_table[note % 12]` の負添字拒否。
+  正の大きな音階の既存 octave clamp は維持する。
+- `gfx/gfx_internal.h` の共通clipで、非正幅/高さ・画面右/下の外を加算前に拒否し、
+  負原点を削ってから `幅 > 画面幅 - x` で縮小。`gfx_vram.c` のdirty、
+  `backend_pegc.c` / `backend_cirrus.c` の転送/塗り、`backend_pc98.c` の計数に接続。
+  `gfx_scroll.c` は lines を先に剰余化。`gfx_core.c` のlease paletteは減算型の上限検査。
+  `gfx_present_raster` は固定200 entryを超える件数と負件数を拒否。
+- `kapi/kapi_db.c`: callerが書けるSHM内のcolumn_countを容量として信用せず、
+  `DB_SHM_RESULT_LIMIT` から実列上限を求めて乗算前に検査。data_offsetも同じ領域内に制限。
+- **競合申し送り**: e8aと重なり得るGFX上記7ファイルを最小修正。
+  utf8/shlib、e10aのshm/paging/exec/v86本体は無変更。試験登録/sdk.mk/check_mapと票も共有。
+
+**ポインタ監査と持越し** (全体を安全化済みとは扱わない):
+
+99 entryが明示pointer引数を持つ。42 entryの宣言outは非NULL出力の全範囲RW/USER検査へ生成済み。
+`out: target` 3本は dev_blk_read (sect_size積のoverflowを検査)、time_now、pci_bind_info。
+`out: none` 7本は mem_free、sys_ls、raster、shm lock/free、gui_register、ime_set_render。
+前4系統は下記別契約、登録2本はtrusted限定。KCGの非NULL出力先は生成outガードで16/32Bを保護。
+B1実copyはDB open/open_existing/prepare_only/bindと登録redir等に接続済みだが、
+早期kapi_argptrは先頭の帯分類であり、残りの読み取り全域を保証しない。
+
+| 持越し | 理由・次の段 |
+|---|---|
+| 旧入力のB1化: kprintf/serial/shell/MML、VFS/path/IDE/dev write、IME facade、exec/launch/V86、kbd_inject、raster表/rgb、Host/PCM/mtimeの旧range+直接copy | 長さ・NULL・失敗時副作用・nested pointerの契約を合わせる必要がある。今回の固定表の整数検査で解決したとしない。T2のB1追補とT4/T5aの旧DB/FEP移行へ。特にrasterはcount検査だけで表pointer全域は未保護 |
+| NULL出力と非零長の契約: KCG read、RTC、path_parse、IDE identify/read_sector、dev_blk_read、sys_read | `KAPI_OUT_LEN(NULL,n)=0`、`ring3_ptr_ok(0)=1` によりout guardはNULLを拒否しない。targetにもNULL拒否がない経路では低位ページへの書込みが残る。整数の範囲検査とは別に各targetのNULL時の戻り値・副作用を定義して修正する必要がある。page 0の非present化だけを代用せず、B1追補の優先別票へ。未修正であり、全KAPI安全化済みとはしない |
+| sys_ls の caller callback | `vfs_ls → ops->list_dir → cb` はCPL0で呼ぶ。out:noneは安全の根拠にならず、CPL3由来コードの実行が残る重大課題。単なる添字検査では塞げず、USER callbackの実行方式/列挙APIの設計が必要。PMへ優先別票として引渡し (本修正で解消とはしない) |
+| SHM lock/free、pipe、旧DB slotの他owner操作 | IDの範囲検査はあるが所有権の授権とは別。e10aのSHM権限移行とT4/T5aに引渡し。並行中の権限経路を独自に置き換えない |
+| mem_alloc/free の caller-writable heap metadata | size/ptrの帯上限だけでは偽BlkHdrの権限を証明できない。§3-4のT2fに既存のextent/PTE/owner検証契約があり、allocator全体と一緒に扱う |
+| IDE drive&3、FM/SSG channel、raw I/O/format/reboot等の授権、GUI opのWM内処理 | maskingで固定表は範囲内でも意味/所有者の安全性とは異なる。デバイス授権とWMはこのカーネル固定表監査の範囲外。MMLの数値parse overflowも別の入力契約課題として残す |
+
+**試験**: [kapi_bounds_tdd.md](../../../tools/tests/kapi_bounds_tdd.md)。実target 84条件、
+実3 backend統合640条件 (既存対照を含む)、新規変異14本 (11+3) 全検出。
+TVRAMの3入口を個別に外す必須変異を含む。PEGCの1変異は実OOBのSIGSEGV、他13本は
+固有assertでRED。kselftest追加はせずホスト番兵で確認。NP21/W/native/実機は未実施。
+
+**予算** (同一toolchain、build ID差込み):
+
+| 項目 | 前 | 後 | 増分 |
+|---|---:|---:|---:|
+| kernel.bin | 367,628 | 368,340 | +712 B |
+| kernel本体BSS末尾 | 0x18D418 | 0x18D6D8 | +704 B |
+| ELF text / data / bss (SQLite含む) | 705,716 / 36,835 / 606,520 | 706,436 / 36,843 / 606,520 | +720 / +8 / 0 B |
+| ASSERT残り | 31,720 | 31,016 | −704 B |
+| e枠残り | 11,864 | 11,160 | −704 B |
+
+前値は編集前のmake all成果物をos32-tmp/tvramfix-before.{elf,bin}へ保存したもの。
+追加の常駐バッファ・動的確保はない。memmapは最終mapから再生成済み。
+
+**検証**: 共通環境 `CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp PYTHONPATH=`。
+makeは `NP21W_DIR=/dev/null < /dev/null`。
+
+| 実行コマンド (上記共通環境) | rc |
+|---|---:|
+| `make all NP21W_DIR=/dev/null < /dev/null` (編集前・編集後) | 0 / 0 |
+| `python3 -B tools/tests/test_kapi_bounds.py --runner qemu --mutate` | 0 |
+| `python3 -B tools/tests/test_gfx_bounds.py --runner qemu --mutate` | 0 |
+| `python3 -B tools/gen_memmap.py --write` | 0 |
+| `python3 -B tools/gen_tests_inventory.py --write` | 0 |
+| `python3 -B tools/check_select.py --lint` | 0 |
+| `/home/hight/os32-tmp/bin/check_slot.sh tvramfix-coder env HOST32_RUNNERS=qemu make check-changed NP21W_DIR=/dev/null < /dev/null` | 0 |
+
+全体検査はslot 0で1回完走 (変異付き32 target、通常98 target)。最初の予約待ちは
+文書リンクの修正のため取得前に中断 (rc=130、検査未実行)。文書リンク検査の初回rc=2は
+見出しanchorを修正してrc=0を確認済み。その他の試験作成中のRED/修正はTDD記録を参照。
+完走後の変更は本節の検証結果・NULL契約の監査記録だけで、実装と試験は変更していない。
+ログはos32-tmp/tvramfix-{baseline,all,bounds,gfx,lint,check-changed}.log。
+`make all` の /dev/null へのFDコピー警告は指定環境によるもの。配備・NHD・ini・
+NP21/W・実機・commit/pushは行っていない。独立レビューとゲスト受入はPMへ。
+
+
+**範囲検査の修正の着地とユーザー決定 (PM、2026-10-03)**: 独立レビュー Opus 5.5 は Approve (P1/P2 なし。3 関数は番地の計算より前に符号付きで拒否、u32 で折り返す値も入口で落ちる。カーネル内の呼び手と木の中のアプリは 25 行を超えない。レビュアーは test_kapi_bounds 84 条件・変異 11/11、test_gfx_bounds 640 条件・変異 3/3 を native で、e8a 取り込み後の main にも当てて再実行)。PM のホスト検査は `check_slot.sh` 経由の `HOST32_RUNNERS="native qemu"` check-changed で rc=0。**別段へ回した課題の評価 (レビュアー、4 件ともコードで到達可能を確認)**: (1) NULL 出力 — `KAPI_OUT_LEN(NULL,n)=0` と `ring3_ptr_ok(0)=1` で検査をすり抜け、ページ 0 は R/O present (paging.c:398 の [DEBUG] の変更) で CR0.WP=0 なので、CPL3 の `sys_read(fd, NULL, 0x120000)` が物理 0 からカーネルの .text までをファイルの中身で上書きする (任意のカーネル書き込み、P1 相当)。(2) `sys_ls` の callback を CPL0 で呼ぶ (fs/vfs.c:484、SMEP なし) — どのアプリも ring0 を取れる (設計の穴、普通のアプリの経路)。(3) 入力の B1 不足 — 入力ポインタは先頭 1 バイトしか見ず、`sys_write(fd, 0xA0000, 0x11F000)` や `ide_write_sectors`・`dev_blk_write` でカーネルの中身をファイルやディスクへ出せる。生のディスク書き込みと ext2_format に授権が無い。(4) `shm_free` は所有者を見ない (SHM 帯は全アプリに USER で見えるので重さは中)。**ユーザー決定 (2026-10-03)**: (1) の NULL 出力と (3) の入力の範囲検査は、KAPI の形を変えずに wrap 側で拒否できるのでカーネル層の不具合として今すぐ直す (T2 より優先、wt/kapinull)。(2) sys_ls の callback の廃止、(3) の生ディスクの授権、(4) SHM の所有権は KAPI の意味が変わるので e11 の公開 KAPI 一括で直す。**P3 (記録)**: console_set_cursor は clamp していない (票の「cursor clamp」の記述は誤り、tvram の 3 関数の検査で安全だが cursor_x=INT_MAX の後の ++ は符号付きのあふれ)、PEGC 480 ラインの 26〜30 行目は KAPI から書けなくなった (木の中に使い手なし、契約は 25 行)、変異の抜け (pc98_count_present の clip、raster の上限の単独、gfx_clip_screen の早期拒否、PEGC の照合が SIGSEGV 頼み)、FM/SSG の ch は無検査 (ハードの誤設定)、fm_play_mml と serial_getchar の DoS (カーネル内で CTRL+STOP が効かない)、TESTS.md の check-kapi-bounds-host の対象ソースが「—」。監査の未確認: pipe、redirect、host_*、exec_*/launch_*/appslot、ime_*、gui_call/register、con_sink はレビュアーが見ていない。
 ## 3. T2f — map/unmapとallocator、暫定heap終了
 
 ### 3-1. 着手条件・範囲

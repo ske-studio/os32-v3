@@ -1105,7 +1105,7 @@ check-key-inject-host:
 check-gui-gate-host:
 	python3 -B tools/tests/test_gui_gate.py $(MUT)
 
-CHECK_PAR_TARGETS := check-shlib-high-host check-bootinfo-host check-hdd-stage1-host \
+CHECK_PAR_TARGETS := check-kapi-bounds-host check-shlib-high-host check-bootinfo-host check-hdd-stage1-host \
     check-hdd-stage2-host check-vmkernel-lz4-host check-vk32-crc-host \
     check-build-id-host check-kbd-status-host check-kbd-dlog-host \
     check-pcm-cs4231-host check-kprintf-attr-host check-key-inject-host check-gui-gate-host \
@@ -1319,3 +1319,8 @@ check-unicode-surface-host:
 	@set -e; test -n "$(HOST32_RUNNERS)"; for runner in $(HOST32_RUNNERS); do echo "HOST32_RUNNERS=$$runner"; python3 -B tools/tests/test_unicode_surface.py --runner $$runner; done
 	$(if $(MUT),python3 -B tools/tests/test_unicode_surface.py --runner $(firstword $(HOST32_RUNNERS)) $(MUT),@:)
 .PHONY: check-unicode-surface-host
+
+# KAPI coordinates, indices and counts: real targets, private-copy mutants.
+check-kapi-bounds-host:
+	python3 -B tools/tests/test_kapi_bounds.py $(MUT)
+	python3 -B tools/tests/test_gfx_bounds.py $(MUT)

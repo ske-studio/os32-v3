@@ -201,7 +201,7 @@ void fm_set_tone(int ch, const uchar *tone_data)
 /* FM音色設定 (番号指定) */
 void fm_set_tone_num(int ch, int tone_num)
 {
-    if (tone_num < NUM_TONES) {
+    if (tone_num >= 0 && tone_num < NUM_TONES) {
         fm_set_tone(ch, tone_table[tone_num]);
     }
 }
@@ -212,6 +212,7 @@ void fm_note_on(int ch, int note)
     int block, key;
     u16 fnum;
 
+    if (note < 0) return;
     block = note / 12;
     key = note % 12;
     if (block > 7) block = 7;
