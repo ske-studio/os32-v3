@@ -183,10 +183,7 @@ def capture_trace(p, case, seconds=15, start=None, advance=None, guest_time=Fals
             require(not instance['user_pause'], 'user pause during capture')
             if not instance['trap_pause']:
                 if guest_time:
-                    try:
-                        tick = p.guest_tick()
-                    except CaptureTrap:
-                        continue
+                    tick = p.guest_tick()
                     now = time.monotonic()
                     if first_tick is None:
                         first_tick = tick
@@ -661,6 +658,22 @@ class Playbook:
         # in the frozen snapshot immediately before STOP.
         return self.word(case['identity']['address'] + FIELDS.index('phase') * 4)
 
+    def resume_wait_alive(self, case):
+        # Live reads can only reject a dead/reused fixture, never authorize STOP.
+        # Avoid debugger pauses while the fixture is still waiting for focus.
+        ident = case['identity']
+        require(self.emu.read(self.s['shm_state'] + ident['index'], 1) == b'\x01' and
+                self.word(self.s['shm_block_owner'] + ident['index'] * 4) == ident['app'] and
+                self.word(ident['slot'] + self.o['slot_state']) != self.o['free'],
+                'fixture died before resume')
+        space = self.word(ident['slot'] + self.o['slot_as'])
+        require(0 < space < self.s['__bss_end'] + self.o['shm_delta'], 'invalid AS pointer')
+        require(self.word(space + self.o['as_owner']) == ident['owner'] and
+                self.word(space + self.o['as_generation']) == ident['generation'] and
+                self.word(ident['address'] + 4) == ident['owner'] and
+                self.word(ident['address'] + 8) == ident['generation'],
+                'owner/generation/address changed before resume')
+
     def loop_evidence(self, case, foreground, firing_at, status):
         elapsed = (self.guest_tick() - firing_at) & 0xffffffff
         status['reason'] = f'210 ticks not reached: FIRING elapsed={elapsed}'
@@ -677,8 +690,7 @@ class Playbook:
         status = dict(reason='FIRING not observed')
         def advance():
             nonlocal firing_at
-            if self.loop_phase(case) != PHASES['FIRING']:
-                return
+            require(self.loop_phase(case) == PHASES['FIRING'], 'loop not firing')
             if firing_at is None:
                 firing_at = self.guest_tick()
             evidence = self.loop_evidence(case, foreground, firing_at, status)
@@ -715,6 +727,7 @@ class Playbook:
                 return 'after_10s' in observations
             if not case.get('resume_verified'):
                 if self.loop_phase(case) not in (PHASES['ARMED'], PHASES['FIRING'], PHASES['ERROR']):
+                    self.resume_wait_alive(case)
                     return
                 resumed = self.resumed(case)
                 if not resumed:
@@ -724,7 +737,9 @@ class Playbook:
                 persist()
             if case['mode'] < 5:
                 return
-            if self.loop_phase(case) != PHASES['FIRING']:
+            phase = self.loop_phase(case)
+            if phase != PHASES['FIRING']:
+                require(firing_at is None, 'loop not firing: phase changed after FIRING')
                 return
             if firing_at is None:
                 firing_at = self.guest_tick()
@@ -747,8 +762,8 @@ class Playbook:
         capture = capture_trace(self, case, seconds=30, start=click, advance=advance, guest_time=True)
         save_capture(case, capture, capture_path)
         persist()
-        require(case['mode'] < 5 or case.get('stop_sent') is True, 'STOP not sent during capture: ' + status['reason'])
         require(case.get('resume_verified') is True, 'resume not captured')
+        require(case['mode'] < 5 or case.get('stop_sent') is True, 'STOP not sent during capture: ' + status['reason'])
         require(case['mode'] < 5 or 'after_10s' in observations, 'timed observations incomplete')
         observations['final'] = self.observe(case)
         with Path(out).open('xb') as output:

@@ -927,7 +927,7 @@ class Tests(unittest.TestCase):
         self.assertEqual(emu.freeze_depth, 0)
 
     def clock_capture(self, *, initial=0, step=25, firing=True, wall_step=3,
-                      front_at=0, refresh_at=None, tick_race=False, switches=1,
+                      front_at=0, refresh_at=None, switches=1,
                       firing_tick=500, snapshot_delay=0, resume=True):
         case = self.p.arm(self.ident, 5)
         case['map_sha256'] = 'map'
@@ -990,15 +990,6 @@ class Tests(unittest.TestCase):
                  patch.object(h3.time, 'time', side_effect=lambda: case['armed_at'] +
                      (clock['wall'] if refresh_at is not None else 1)), \
                  patch.object(self.p, 'foreground', side_effect=foreground):
-                original_tick = self.p.guest_tick
-                def guest_tick():
-                    if tick_race and not client.trap and not clock.get('raced'):
-                        clock['raced'] = True
-                        client.trap = True
-                        raise h3.CaptureTrap('tick sampling race')
-                    return original_tick()
-                if tick_race:
-                    self.p.guest_tick = guest_tick
                 try:
                     self.p.run_capture(case, d/'raw.json', d/'out.json', front, click=click)
                 finally:
@@ -1195,8 +1186,8 @@ class Tests(unittest.TestCase):
         wall, tick = self.clock_capture(firing_tick=2775, wall_step=0.25)
         self.assertEqual(tick, 3000)
 
-    def test_capture_no_resume_reports_firing_unobserved(self):
-        with self.assertRaisesRegex(RuntimeError, 'STOP not sent during capture: FIRING not observed'):
+    def test_capture_no_resume_reports_resume_missing(self):
+        with self.assertRaisesRegex(RuntimeError, 'resume not captured'):
             self.clock_capture(firing=False, resume=False)
 
     def test_capture_snapshot_cost_requires_fresh_evidence_again(self):
@@ -1211,8 +1202,111 @@ class Tests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'foreground evidence missing/invalid'):
                 self.p.foreground(case, path)
 
-    def test_capture_tick_sampling_trap_is_drained(self):
-        self.clock_capture(tick_race=True, wall_step=0.25)
+    def negative_loop(self, *, standalone=False, race=None, after_firing=False,
+                      before_resume=None, stale=False):
+        case = self.p.arm(self.ident, 5)
+        case.update(map_sha256='map', resume_verified=before_resume is None)
+        self.change('phase', 3 if before_resume else 6)
+        stops = []
+        self.emu.stop = lambda: stops.append(1)
+        tick = [0]
+        self.p.guest_tick = lambda: tick[0]
+        freezes = []
+        original_freeze = self.emu.freeze
+        @contextmanager
+        def freeze():
+            if self.emu.depth == 0:
+                freezes.append(1)
+                if race == 'phase':
+                    self.change('phase', 7)
+                elif race == 'generation':
+                    self.emu.word(0x5000, 92)
+                if stale:
+                    clock[0] += 6
+            with original_freeze():
+                yield
+        self.emu.freeze = freeze
+        clock = [case['armed_at'] + 1]
+        with tempfile.TemporaryDirectory(prefix='h3-negative-') as directory:
+            d = pathlib.Path(directory)
+            front = d/'front.json'
+            front.write_text(json.dumps(dict(case_id=case['case_id'],
+                identity=self.ident, observed_at=case['armed_at'], phase=6,
+                map_sha256='map', foreground_window=42, foreground_app=2)))
+            def pump(p, value, **kwargs):
+                # Real callbacks, live polling followed by the final frozen
+                # snapshot. Stop after three polls so missing checks surface.
+                for i in range(3):
+                    tick[0] = i * 210
+                    if i == 1:
+                        if after_firing or before_resume == 'ERROR':
+                            self.change('phase', 7)
+                        elif before_resume == 'generation':
+                            self.emu.word(0x5000, 92)
+                        elif before_resume == 'dead':
+                            self.emu.word(self.slot, 0)
+                    if kwargs['advance']():
+                        break
+                return dict(started_at=clock[0], ended_at=clock[0], samples=[])
+            with patch.object(h3, 'capture_trace', side_effect=pump), \
+                 patch.object(h3.time, 'time', side_effect=lambda: clock[0]):
+                try:
+                    if standalone:
+                        self.p.stop_loop(case, front)
+                    else:
+                        self.p.run_capture(case, d/'raw.json', d/'out.json', front)
+                finally:
+                    self.assertEqual(stops, [], 'invalid fixture/evidence must never send STOP')
+                    if before_resume in ('generation', 'dead'):
+                        self.assertEqual(freezes, [], 'resume wait must not freeze')
+
+    def test_stop_snapshot_rejects_phase_race(self):
+        for standalone in (False, True):
+            with self.subTest(standalone=standalone):
+                self.setUp()
+                with self.assertRaisesRegex(RuntimeError, 'loop not firing'):
+                    self.negative_loop(standalone=standalone, race='phase')
+
+    def test_stop_snapshot_rejects_generation_race(self):
+        for standalone in (False, True):
+            with self.subTest(standalone=standalone):
+                self.setUp()
+                with self.assertRaisesRegex(RuntimeError, 'owner/generation/address changed'):
+                    self.negative_loop(standalone=standalone, race='generation')
+
+    def test_standalone_stop_snapshot_cost_requires_fresh_evidence(self):
+        with self.assertRaisesRegex(RuntimeError, 'foreground evidence stale'):
+            self.negative_loop(standalone=True, stale=True)
+
+    def test_capture_phase_changed_after_firing(self):
+        with self.assertRaisesRegex(RuntimeError, 'loop not firing: phase changed after FIRING'):
+            self.negative_loop(after_firing=True)
+
+    def test_standalone_stop_requires_firing_immediately(self):
+        case = self.p.arm(self.ident, 5)
+        for phase in (3, 5, 7):
+            with self.subTest(phase=phase):
+                self.change('phase', phase)
+                client = self.emu.client = self.cleanup_client()
+                self.emu.stop = lambda: self.fail('unexpected STOP')
+                self.p.sleep = lambda _: self.fail('non-FIRING stop waited')
+                with self.assertRaisesRegex(RuntimeError, 'loop not firing'):
+                    self.p.stop_loop(case, '/missing-front.json')
+                self.assertEqual(client.bps, set())
+                self.assertFalse(self.emu.capture_active)
+                self.change('phase', 3); self.change('arm', 0)
+
+    def test_capture_fixture_error_before_resume(self):
+        with self.assertRaisesRegex(RuntimeError, 'fixture ERROR'):
+            self.negative_loop(before_resume='ERROR')
+
+    def test_capture_fixture_generation_changed_before_resume(self):
+        with self.assertRaisesRegex(RuntimeError, 'changed before resume'):
+            self.negative_loop(before_resume='generation')
+
+    def test_capture_fixture_died_before_resume(self):
+        with self.assertRaisesRegex(RuntimeError, 'fixture died before resume'):
+            self.negative_loop(before_resume='dead')
 
     def test_capture_parked_requires_switch_increment(self):
         with self.assertRaisesRegex(RuntimeError, 'missing switch increment'):
@@ -1393,7 +1487,6 @@ PY_MUTANTS += [
 
 
 PY_MUTANTS += [
-    ("tick = p.guest_tick()\n                    except CaptureTrap:\n                        continue", "tick = p.guest_tick()\n                    except CaptureTrap:\n                        raise", 1),
     ("TICK_STALL_SECONDS = 120", "TICK_STALL_SECONDS = 1000", 1),
     ("first_tick = tick", "first_tick = (tick - 1000) & 0xffffffff", 1),
     ("firing_at = None\n        stop_at = None", "case['armed_in_running_wait'] = True\n        firing_at = None\n        stop_at = None", 1),
@@ -1412,6 +1505,20 @@ PY_MUTANTS += [
     ("'STOP not sent during capture: ' + status['reason']", "'STOP not sent during capture'", 2),
 ]
 
+
+
+PY_MUTANTS += [
+    ("require(self.checked(case['identity'])['phase'] == PHASES['FIRING'], 'loop not firing')",
+     "pass  # omit frozen phase check", 2),
+    ("self.checked(case['identity'])['phase'] == PHASES['FIRING']",
+     "self.block(case['identity']['address'])['phase'] == PHASES['FIRING']", 2),
+    ("# Identity reads also cost host time; refresh evidence after them.\n            evidence = self.loop_evidence(case, foreground, firing_at, status)\n            if evidence is None:\n                return",
+     "# Omit standalone STOP freshness recheck.", 1),
+    ("(PHASES['ARMED'], PHASES['FIRING'], PHASES['ERROR'])",
+     "(PHASES['ARMED'], PHASES['FIRING'])", 1),
+    ("self.resume_wait_alive(case)", "pass", 1),
+    ("require(firing_at is None, 'loop not firing: phase changed after FIRING')", "pass", 1),
+]
 
 
 def main():

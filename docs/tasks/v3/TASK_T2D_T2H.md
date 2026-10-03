@@ -2416,6 +2416,20 @@ ILP32 42検査、84/84変異 runtime RED、compile/import失敗0**
 
 **h3fix3 のゲストでの実地確認と着地 (PM、2026-10-03、kernel `5159cd5`、17MB)**: 新しい case で layout → GUI で h3a/h3b → init → h3a に `arm --mode USER-loop --capture ... --trace FRONT.json --height 480`、前景証拠は PM の書き手が 1.5〜3 秒ごとに捕捉終了まで `replace` で書いた。**arm rc=0・ホスト 73 秒** (h3fix2 では 384 秒で rc=1)、PARKED から arm → resume の捕捉 → FIRING → **STOP 1 回**、`appslot_reclaim_count` 0→1・`fault_kill_count` 0→1、h3b は phase=WAIT で生存、`reclaim` rc=0。verify (新しい起動) と KAPI-loop・PARKED 以外の arm は h の最終一式で採る。独立レビュー Opus 5.5 は Approve (P1/P2 なし。`/api/mem` は core_lock の中で読むので単独読取りは裂けない、firing_at は安全側、STOP 直前に freeze の中で身元と phase を照合、二重送信なし)。**P3 は sol へ (wt/h3fix4)**: P3-1 STOP 前の freeze 照合を守る試験が無い (freeze 内の phase==FIRING の require を外す・checked() を block() に替える・stop_loop の 2 回目の鮮度照合を外す・resume の門から ERROR を外す、の 4 変異が生き残る)、P3-2 FIRING を観測した後に phase が変わったときなどの診断文の取り違え、P3-3 resume 前に fixture が死んだときの検出が 3,000 tick の上限まで遅れる、P3-4 `guest_tick()` が CaptureTrap を出さなくなったので `except CaptureTrap: continue` とその試験・変異は死んだ経路。
 
+**h3fix4 の P3 対応 (2026-10-03、Codex GPT-6、wt/h3fix4、基点 `a958439`)**:
+
+- P3-1: run_capture/stop_loop の live 読取り後、freeze 入口で phase が ERROR または AS 世代が変わる負例を追加。両経路とも STOP 0 回で例外になることを検査。単独 stop の身元照合中に前景証拠が 6 秒古くなる負例と、resume 前の ERROR の負例も追加。レビューの m1 (両方の frozen phase require 削除)、m6 (checked→block)、m2 (単独 stop の最後の鮮度照合削除)、m3 (resume の門から ERROR 削除) を変異定義に登録。
+- P3-2: FIRING 観測後の phase 変化は `loop not firing: phase changed after FIRING` で中止。単独 stop は最初の poll から FIRING を要求し `loop not firing`。run_capture の完了判定は resume を先に要求し、未捕捉時は `resume not captured`。
+- P3-3: resume 前の待機 poll に、SHM の割当て/app owner、slot の生存、AS と SHM の owner/generation の安価な live 読取りを追加。死んだ fixture/世代変更は 3,000 tick を待たずに拒否し、待機中の freeze は追加しない。ERROR は既存の resumed() の照合で即時拒否。待機中の死/世代変更と freeze 0 回を負例で検査。
+- P3-4: 死んだ guest_tick() の CaptureTrap catch と `test_capture_tick_sampling_trap_is_drained`、対応する変異・注入オプションを削除した。freeze 入口での trap 競合の既存試験は維持。
+- 試験は 8 件追加・1 件削除で **68 件**、ILP32 状態チェック **42 件**。変異は指定 4 件＋待機生存確認/phase 診断の 2 件を追加、死んだ 1 件を削除し **89 件 (C 8 + Python 81)**。修正前の台本へ新試験を適用した RED は rc=1 (7 failure)。最初の変異実行は新試験の subTest 内 RuntimeError が error 扱いとなり rc=1、試験側を修正した。
+- 初回の通常試験は 68 件中 layout 1 件 skip (実 ELF/map 未生成)、ILP32 42 件 PASS。ゲスト検証・NP21/W・NHD・配備・ini・実機・commit/push は未実施。独立確認レビューは回さず PM が差分を読む。
+- 共通環境は `CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp PYTHONPATH= HOST32_RUNNERS=qemu`。`python3 -u -B tools/tests/test_h3_park_resume.py --mutate` は **rc=0、89/89 runtime RED、compile failure 0** (`/home/hight/os32-tmp/h3fix4-tests.log`)。全体検査の成果物を準備する `make all NP21W_DIR=/dev/null < /dev/null` は **rc=0** (`h3fix4-all.log`)、/dev/null への FD コピー失敗警告は想定どおりで実配備なし。生成後の通常 h3 試験は **68 件/skip0 + ILP32 42 件、rc=0** (`h3fix4-tests-built.log`)、実 ELF/map の layout を確認済み。
+- `python3 tools/check_select.py --lint`、`python3 tools/gen_tests_inventory.py --write` は各 **rc=0** (127 本、対応表漏れ0件、生成 inventory の追跡差分なし)。`git diff --check` は rc=0。追跡変更は台本・ホスト試験・本票の3ファイルだけ。
+- 本記録を固定後、最後に `/home/hight/os32-tmp/bin/check_slot.sh h3fix4-coder env HOST32_RUNNERS=qemu make check-changed NP21W_DIR=/dev/null < /dev/null` を1回実行する。検査中・終了後に票/ソースを変更せず、実際の終了rcは完了報告と `/home/hight/os32-tmp/h3fix4-check-changed-final.rc`、ログは `.log` に残す。
+
+
+
 共通環境は`CROSS_DIR=/home/hight/opt/cross`、`TMPDIR=/home/hight/os32-tmp`、`PYTHONPATH=`、
 `HOST32_RUNNERS=qemu`。inventory生成`python3 tools/gen_tests_inventory.py --write`はrc=0、
 生成`docs/TESTS.md`の差分なし。個別試験は`python3 -u -B tools/tests/test_h3_park_resume.py --mutate`、
