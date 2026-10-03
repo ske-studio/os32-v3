@@ -1,8 +1,20 @@
 # TASK_T7_AND_FOLLOWUPS — 低位解放・OpenType と v3 後半への接続
 
-> 状態: **設計中 (2026-10-01)** — 実装用の設計案。Opus 5.5 第3回の独立レビューでApprove。実装・実測・受入は未実施。
-> 設計: Codex gpt-6-astra。調査基点 `59c4285bbacf36e829e7480d741bbabac95be191`。
+> 状態: **設計中 (2026-10-03)** — 実装用の設計案。Opus 5.5 第3回の独立レビューでApprove。実装・実測・受入は未実施。
+> 設計: Codex gpt-6-astra。調査基点 `3c4171a784cc47720392ab55b3c4a24aee17e6f3` (2026-10-03、main)。元の設計レビュー基点は `59c4285`。今回の更新は実装事実・参照の照合で、D番号・契約・順序とレビュー履歴は変更しない。
 > 決定本文は [TASK_MEMMAP_V3](TASK_MEMMAP_V3.md)、柱/範囲/順序は [V3_PLAN](V3_PLAN.md)。前提は [T3](TASK_T3_LAYOUT.md) と [T4〜T6b](TASK_T4_T6_MODULES.md)。後半の既存票を置換せず、接続契約と未起票項目の着手ゲートを定める。
+
+## 0. 基点で照合した実装と残件
+
+| 実物 (file:line / シンボル) | 確認した境界 |
+|---|---|
+| `gfx/gfx_core.c:158` / `:178` (`gfx_kernel_framebuffer` / `gfx_bind_client`)、`:398` (`gfx_surface_source`) | e4 で kernel の CLIENT 参照は着地、USER 側は未結線。T7a は T2 完了後の lease caller を引き継ぐ |
+| `kernel/v86_io.c:239` (`v86_cui_display_restore`)、`kernel/v86_gcap.c:571` (同呼出し)、`gfx/gfx_core.c:675` (`gfx_clear_planar_pages`) | CUI 定常への表示復帰と両ページ消去の修正は着地。§1-1 の KCG CODE 復帰/cache失効・低位専有化とは別 |
+| `kernel/v86_mem.c:40` (`v86_mem_setup`)、`kernel/v86_bios.c:19` (`REAL_SNAPSHOT_SIZE`)、`:253` (`v86_bios_save_real`) | 636KiB backing と 0x600 snapshot は存続。page0 全体保存は未実装 |
+| `gfx/backend_pegc.c:543` (`pegc_identify`)、`:450` (`pegc_boot_sync_record`)、`gfx/gfx_core.c:312` (`gfx_identify_candidates`) | §1-1 の BIOS 直読撤去の照合先 |
+| `fs/vfs_fd.c:292` (`vfs_validate_sqlite`)、`exec/exec.c:299` / `:316` (`ring3_wm_enter/leave`) | 世代検査と WM 境界の既存入口。font read lease・内容 epoch は未実装 |
+
+**T2 完了後に確定**: e5〜e12 の再init/revoke/再attach・200行の面配置・Unicode橋、f2〜f13/g の map・allocator・trim、h の V86 復元/STOP/構成別受入。現状と記録は [T2d〜h §2・§5・§7・§12](TASK_T2D_T2H.md)、未解決の文言差は [再整備草案 §4](DOCS_REORG_T3.md)。T2h の残件を T7 の未来の受入で消さない。
 
 ## 1. T7a 低位の所有権切替
 
