@@ -872,6 +872,8 @@ int ledger_surface_validate(const struct ledger_surface *sf)
     return 1;
 }
 
+u32 gfx_surface_unready;
+
 int __attribute__((cold))
 ledger_surface_create(const struct ledger_surface *sf, u32 *sid)
 {
@@ -893,6 +895,7 @@ ledger_surface_create(const struct ledger_surface *sf, u32 *sid)
     p = ledger_surfaces[i].gen + 1;
     ledger_surfaces[i] = *sf;
     ledger_surfaces[i].gen = p;
+    gfx_surface_unready &= ~(1U << i);
     /* RAM padding belongs to this surface, and is never disclosed dirty. */
     if (sf->backing <= LEDGER_SB_FIXED_RAM) {
         used_bytes = (u32)sf->pitch * sf->height;

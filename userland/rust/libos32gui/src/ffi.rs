@@ -44,8 +44,9 @@ pub struct GfxSurface {
 
 extern "C" {
     /// 全画面バックバッファ記述子 (libos32gfx の可変グローバル)。読むだけ。
-    pub static gfx_fb: GfxFramebuffer;
-    pub static gfx_ready: i32;
+    pub static mut gfx_fb: GfxFramebuffer;
+    pub static mut gfx_ready: i32;
+    pub fn libos32gfx_unicode_init();
     pub static mut gfx_api: *mut os32api::KernelAPI;
     pub fn libos32gfx_attach_checked() -> i32;
     pub fn libos32gfx_check() -> i32;

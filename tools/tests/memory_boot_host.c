@@ -271,7 +271,7 @@ void _start(void)
     /* 区間の表 (T1b、§3-3 ③): 固定用途 12 本 + ARENA_TOP 型の backing +
      * 背景 2 本。不変条件が成り立ち、背景は 15〜16MB と [2GB, 4GiB)。 */
     {
-        u32 k, n, bg;
+        u32 k, n, bg, backing = 0, fixed = 0;
         CHECK(ledger_selfcheck("boot"));
         n = sizeof(memory_boot_fixed) / sizeof(memory_boot_fixed[0]);
         CHECK(n == 14);
@@ -289,9 +289,16 @@ void _start(void)
                        r->end == PHYSMEM_MAX_PFN &&
                        (r->flags & LEDGER_RF_OUTSIDE)));
             }
-            if (r->type == LEDGER_R_SURFACE_BACKING)
-                CHECK(r->owner == LEDGER_OWNER_BOOT &&
-                      r->first == MEM_GFX_BB_BASE / PAGE_SIZE);
+            if (r->type == LEDGER_R_SURFACE_BACKING) {
+                backing++;
+                CHECK((r->owner == LEDGER_OWNER_BOOT &&
+                       r->first == MEM_GFX_BB_BASE / PAGE_SIZE) ||
+                      (r->owner == LEDGER_OWNER_KERNEL &&
+                       r->first == MEM_UNICODE_TABLE_BASE / PAGE_SIZE &&
+                       r->end == (MEM_UNICODE_TABLE_BASE + MEM_UNICODE_TABLE_SIZE) / PAGE_SIZE &&
+                       r->cache == LEDGER_CACHE_WB));
+            }
+            if (r->type == LEDGER_R_FIXED) fixed++;
             if (r->type == LEDGER_R_DMA)
                 CHECK(r->first == MEM_DMA_POOL_BASE / PAGE_SIZE &&
                       r->end == (MEM_DMA_POOL_END + 1) / PAGE_SIZE);
@@ -300,6 +307,7 @@ void _start(void)
                 CHECK(!ledger_backing_mapped && r->first == workspace_first);
         }
         CHECK(bg == 2);
+        CHECK(backing == 2 && fixed == 11 + (ledger_backing_mapped ? 0U : 1U));
         /* 同梱の申告は無い (bootinfo に欄が無い): 同梱域も集積域も池のまま */
         CHECK(!ledger_owner_pages(LEDGER_OWNER_BUNDLE));
     }

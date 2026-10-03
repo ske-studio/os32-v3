@@ -100,6 +100,7 @@ void shell_print(const char *str, u8 color) { (void)str; (void)color; }
  * §3-8) が引く台帳と写像。このハーネスは ⑥ を走らせない (試験は
  * tools/tests/test_gfx_boot.py)。描画用 CLIENT だけ実型板から返す。 */
 struct ledger_surface ledger_surfaces[LEDGER_MAX_SURFACES];
+u32 gfx_surface_unready; /* production definition lives in pgalloc */
 struct ledger_surface *ledger_surface_find(u32 b, u32 r)
 {
     static struct ledger_surface client;

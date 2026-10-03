@@ -284,7 +284,7 @@ pub mod gfx {
         fn libos32gfx_check() -> i32;
         fn libos32gfx_detach();
         fn gfx_present();
-        static gfx_ready: i32;
+        static mut gfx_ready: i32;
         pub fn gfx_clear(color: u8);
         pub fn gfx_pixel(x: i32, y: i32, color: u8);
         pub fn gfx_hline(x: i32, y: i32, w: i32, color: u8);
@@ -320,7 +320,7 @@ pub mod gfx {
     pub fn present() {
         unsafe {
             gfx_present();
-            if gfx_ready != 0 {
+            if core::ptr::read_volatile(core::ptr::addr_of!(gfx_ready)) != 0 {
                 (super::api().gfx_present_dirty)();
             }
         }

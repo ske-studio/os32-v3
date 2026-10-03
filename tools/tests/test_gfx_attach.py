@@ -40,9 +40,12 @@ TARGET_SRCS = [
     'userland/lib/gfx/libgfx_internal.h',
     'userland/lib/gfx/libgfx_attach_internal.h',
     'userland/lib/math/libos32math.h',
+    'lib/utf8.c',
+    'lib/utf8.h',
+    'lib/utf8_internal.h',
 ]
 assert set(KERNEL_SRCS) <= set(TARGET_SRCS)
-SDK_SRCS = [p for p in TARGET_SRCS if p.startswith("userland/") and p.endswith(".c")]
+SDK_SRCS = [p for p in TARGET_SRCS if (p.startswith("userland/") or p == "lib/utf8.c") and p.endswith(".c")]
 HEADERS = [p for p in TARGET_SRCS if p.endswith(".h")]
 CORE='userland/lib/gfx/libos32gfx_core.c'
 MUTANTS = [

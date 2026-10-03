@@ -195,7 +195,7 @@ def bands(m, sym):
         parent="フォントキャッシュ")
     add(CONV, "Unicode-JIS 変換表", v("MEM_UNICODE_TABLE_BASE"),
         plus("MEM_UNICODE_TABLE_BASE", "MEM_UNICODE_TABLE_SIZE", -1), "RW",
-        "utf8.c")
+        "SURFACE_BACKING/KERNEL/WB、RO lease。旧 USER RW は e11 で撤去、T3 V86_LOW 統合時に再検討")
     add(CONV, "GFX バックバッファ (4 プレーン)", v("MEM_GFX_BB_BASE"),
         plus("MEM_GFX_BB_BASE", "MEM_GFX_BB_SIZE", -1), "RW",
         "CPL=3 からは常に USER (レビュー #6)")

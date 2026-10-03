@@ -17,5 +17,6 @@ int kselftest_run(void);
  * 読むのはその 2 つなので、後から増えても「全部通ったか」の意味は変わらない)。
  * 戻り値: 失敗した項目数 (0 = 全て通過)。 */
 int kselftest_run_post_exec(void);
+int kselftest_run_post_unicode(void);
 
 #endif /* __KSELFTEST_H */

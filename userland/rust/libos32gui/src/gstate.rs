@@ -145,7 +145,7 @@ pub fn refresh_screen_info() -> ScreenInfo {
     }
     /* バックエンドが何も埋めない (旧カーネル) 場合の保険: 全画面バックバッファから補う。 */
     if info.width == 0 || info.height == 0 {
-        let fb = unsafe { ffi::gfx_fb };
+        let fb = unsafe { core::ptr::read_volatile(core::ptr::addr_of!(ffi::gfx_fb)) };
         info.width = fb.width as u16;
         info.height = fb.height as u16;
         if info.bpp == 0 {

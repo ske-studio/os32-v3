@@ -197,7 +197,7 @@ void host_freeze(void)
 
 #include "../../exec/surface_query.h"
 static int gfx_started;
-static u32 gfx_reinit_pending, gfx_surface_unready;
+static u32 gfx_reinit_pending;
 static volatile u32 gfx_reinit_fail_count;
 int lease_revoke_surface(u32 sid) { (void)sid; return 0; } /* no live AS at boot */
 static void gfx_bind_client(void) { } /* binding covered by gfx_kernel_fb_host */
@@ -321,6 +321,7 @@ void _start(void)
     if (bb) want[nw++] = 'S';
     if (cirrus_ok) { want[nw++] = 'S'; want[nw++] = 'S'; }
     for (i = 0; i < 4; i++) want[nw++] = 'S';
+    want[nw++] = 'S'; /* TVRAM */
     want[nw++] = 'F';
 
     pte_before_pegc = pte(PEGC_LINEAR_BASE);
