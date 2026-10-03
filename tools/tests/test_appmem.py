@@ -19,6 +19,9 @@ TARGET_SRCS = ['exec/appmem.c', 'exec/appmem.h', 'include/types.h',
                'tools/tests/appmem_host.c', 'tools/tests/test_appmem.py',
                'tools/tests/host32.py', 'tools/tests/mutpar.py']
 MUTANTS = [
+    ('unknown-flag', '(map_flags & ~(APPMEM_MAP_EXACT | APPMEM_MAP_TOPDOWN))', '0', 'unknown flag'),
+    ('unaligned-hint', '!aligned(hint) || hint < MEM_EXEC_LOAD_ADDR', 'hint < MEM_EXEC_LOAD_ADDR', 'unaligned'),
+    ('hint-floor', 'hint < MEM_EXEC_LOAD_ADDR', 'hint < MEM_SHLIB_BASE', 'outside'),
     ('exact-fallback', 'if (!base && (map_flags & APPMEM_MAP_EXACT)) return APPMEM_ENOVA;',
      'if (0) return APPMEM_ENOVA;', 'exact collision'),
     ('hint-overwrite', 'range_free(table, count, hint, end)) base = hint;',

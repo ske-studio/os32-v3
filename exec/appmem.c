@@ -128,6 +128,14 @@ int appmem_prepare(const struct appmem_table *table,
 
 void appmem_publish(struct appmem_table *table, const struct appmem_plan *plan)
 {
+    /* P3-3: refuse a stale/invalid proposal before touching the table.
+     * A successful serialized prepare is the only supported source of plans. */
+    if (!table || !plan || table_count(table) != (int)plan->count ||
+        plan->count > APPMEM_EXTENT_MAX || plan->first > plan->count ||
+        plan->remove_count > plan->count - plan->first ||
+        plan->count + 1 - plan->remove_count > APPMEM_EXTENT_MAX ||
+        plan->base >= plan->end || !aligned(plan->base) || !aligned(plan->end) ||
+        !range_free(table, (int)plan->count, plan->base, plan->end)) return;
     u32 after = plan->count + 1 - plan->remove_count;
     if (!plan->remove_count) {
         for (u32 i = plan->count; i > plan->first; i--) table->e[i] = table->e[i - 1];

@@ -1,0 +1,146 @@
+"""T2f f3: real host-only appmem/paging_app/paging/pgalloc/physmem ILP32.
+記録: tools/tests/appmem_map_tdd.md
+Only intended runtime FAIL labels count as RED; errors/timeouts are separate.
+"""
+import argparse
+import hashlib
+import pathlib
+import statistics
+import subprocess
+import tempfile
+import time
+
+import host32
+from mutpar import run_ordered
+
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+SOURCES = ['exec/appmem.c', 'kernel/paging_app.c', 'exec/appmem_map.c']
+TARGET_SRCS = SOURCES + [
+    'exec/appmem.h', 'kernel/paging_app.h', 'kernel/paging.c', 'kernel/paging.h',
+    'kernel/pgalloc.c', 'kernel/pgalloc.h', 'kernel/physmem.c', 'kernel/physmem.h',
+    'include/types.h', 'include/memmap.h', 'include/io.h',
+    'include/cpu.h', 'include/pc98.h', 'include/sys.h', 'include/tvram.h',
+    'kernel/gdt.h', 'kernel/tss.h', 'arch/x86/arch_cpu.h', 'arch/x86/arch_io.h', 'lib/kstring.h', 'tools/tests/appmem_map_host.c',
+    'tools/tests/test_appmem_map.py', 'tools/tests/pgalloc_host_fixture.h',
+    'tools/tests/host_arch/arch_cpu.h', 'tools/tests/host_arch/arch_io.h',
+    'tools/tests/host32.py', 'tools/tests/mutpar.py', 'platform/pc98/platform_io.h']
+DATA_ABORT = '''    for (u32 va = tx->base; va < tx->end; va += PAGE_SIZE) {
+        u32 *entry = app_entry(tx, va);
+        if (entry && *entry) {
+            app_return(tx->as->owner, *entry & ~(PAGE_SIZE - 1U));
+            *entry = 0;
+        }
+    }
+'''
+PT_ABORT = '''    for (u32 k = 0; k < MEM_APP_BAND_MAX_PDES; k++) if (tx->pending[k]) {
+        app_return(tx->as->owner, tx->pending[k]);
+        tx->pending[k] = 0;
+    }
+'''
+MUTANTS = [
+    ('data-zero', 1, 'kmemset(P2V(phys), 0, PAGE_SIZE);', '(void)phys;', 'data zero'),
+    ('free-before-publish', 2, 'paging_app_commit(&tx);', 'paging_app_abort(&tx); paging_app_commit(&tx);', 'no free before publication'),
+    ('PT-zero', 1, 'kmemset(P2V(tx->pending[k]), 0, PAGE_SIZE);', '(void)k;', 'PT zero'),
+    ('early-PRESENT', 1, 'phys | PTE_RW | PTE_USER;', 'phys | PAGE_RW | PTE_USER;', 'staged PRESENT clear'),
+    ('rollback-PFN-leak', 1, 'app_return(tx->as->owner, *entry & ~(PAGE_SIZE - 1U));', '(void)entry;', 'data before PT free'),
+    ('rollback-PT-leak', 1, 'app_return(tx->as->owner, tx->pending[k]);', '(void)k;', 'PFN rollback'),
+    ('PT-before-data', 1, DATA_ABORT + PT_ABORT, PT_ABORT + DATA_ABORT, 'data before PT free'),
+    ('failure-publish', 2, 'if (rc) return rc;\n    unsigned int saved', 'if (rc) { appmem_publish(table, &plan); return rc; }\n    unsigned int saved', 'failure table unchanged'),
+    ('active-no-reload', 2, 'if (paging_current_cr3() == as->pd_phys) paging_load_cr3(as->pd_phys);', '(void)as;', 'publish reload count'),
+    ('alloc-IRQ-disabled', 1, 'tx->as = as; tx->base = base; tx->end = end;', 'tx->as = as; tx->base = base; tx->end = end; _disable();', 'alloc IF enabled'),
+    ('nonzero-overwrite', 1, 'if (entry && *entry) return APPMEM_EINVAL;', '(void)entry;', 'nonzero PTE rejected'),
+]
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--runner', choices=['native', 'qemu'], default='native')
+    parser.add_argument('--mutate', action='store_true')
+    args = parser.parse_args()
+    before = {p: hashlib.sha256((ROOT / p).read_bytes()).digest() for p in TARGET_SRCS}
+    bodies = [(ROOT / p).read_text() for p in SOURCES]
+    cc = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-ffreestanding', '-fno-builtin',
+          '-fno-pie', '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
+          '-Wall', '-Wextra', '-Werror', '-Werror=implicit-function-declaration',
+          '-Werror=implicit-int', '-Werror=vla', '-DPHYSMEM_HOST_TEST=1']
+    try:
+        with tempfile.TemporaryDirectory(prefix='os32-f3-') as d:
+            tmp = pathlib.Path(d)
+            includes = ['-I' + str(tmp), *['-I' + str(ROOT / p) for p in
+                ('tools/tests/host_arch', 'include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec')]]
+            cc += includes
+            # Share host IF across TUs so the real allocator's short IRQ save
+            # is distinguished from an incorrectly disabled transaction.
+            io = (ROOT / 'tools/tests/host_arch/arch_io.h').read_text()
+            (tmp / 'arch_io.h').write_text(io.replace('static unsigned int host_arch_if = 0x202U;', 'extern unsigned int host_arch_if;'))
+            (tmp / 'hooks.h').write_text('#include "types.h"\n#include "io.h"\nu32 map_alloc(u32,int);\nint map_free(u32,u32,int);\nunsigned int publish_save(void);\n')
+            for src in ('paging', 'pgalloc'):
+                (tmp / (src + '_source.c')).write_text((ROOT / ('kernel/' + src + '.c')).read_text())
+
+            def compile_source(source, key, index):
+                src, obj = tmp / (key + '.c'), tmp / (key + '.o')
+                if index == 2: source = source.replace('irq_save()', 'publish_save()')
+                src.write_text(source)
+                extra = ['-include', str(tmp / 'hooks.h')]
+                if index == 1:
+                    extra += ['-Dpgalloc_alloc_phys=map_alloc', '-Dpgalloc_free_n_owner=map_free']
+                subprocess.run(cc + extra + ['-c', str(src), '-o', str(obj)], check=True,
+                               capture_output=True, text=True, timeout=30)
+                return obj
+
+            objects = []
+            for key, path in [('fixture', 'tools/tests/appmem_map_host.c'), ('physmem', 'kernel/physmem.c')]:
+                obj = tmp / (key + '.o')
+                subprocess.run(cc + ['-c', str(ROOT / path), '-o', str(obj)], check=True,
+                               capture_output=True, text=True, timeout=30)
+                objects.append(obj)
+            normal = [compile_source(body, 'normal' + str(i), i) for i, body in enumerate(bodies)]
+
+            def run(objs, key):
+                exe = tmp / (key + '.elf')
+                subprocess.run(['gcc', '-m32', '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
+                                *map(str, objects + objs), '-o', str(exe)], check=True,
+                               capture_output=True, text=True, timeout=30)
+                return host32.run([str(exe)], runner=args.runner, capture_output=True, text=True, timeout=10)
+
+            r = run(normal, 'normal')
+            print(r.stdout + r.stderr, end='')
+            assert r.returncode == 0, (r.returncode, r.stdout, r.stderr)
+            print('PASS runner=' + args.runner)
+            if args.mutate:
+                def one(entry):
+                    index, (name, target, old, new, expected) = entry
+                    start = time.monotonic()
+                    try:
+                        assert bodies[target].count(old) == 1, (name, bodies[target].count(old))
+                        obj = compile_source(bodies[target].replace(old, new), f'mut{index}', target)
+                        objs = normal.copy(); objs[target] = obj
+                        r = run(objs, f'mut{index}')
+                    except subprocess.CalledProcessError as e:
+                        return 'COMPILE_LINK_ERROR', name, time.monotonic() - start, (e.stdout or '') + (e.stderr or '')
+                    except subprocess.TimeoutExpired as e:
+                        return 'TIMEOUT', name, time.monotonic() - start, str(e)
+                    except AssertionError as e:
+                        return 'ERROR', name, time.monotonic() - start, str(e)
+                    status = ('RED' if r.returncode == 1 and f'FAIL: {expected}\n' in r.stdout else
+                              'SURVIVED' if r.returncode == 0 else 'SIGNAL' if r.returncode < 0 else 'ERROR')
+                    return status, name, time.monotonic() - start, r.stdout + r.stderr
+                results = list(run_ordered(one, list(enumerate(MUTANTS))))
+                for status, name, seconds, output in results:
+                    print(f'{status} (runtime): {name} ({seconds:.2f}s)')
+                    if status != 'RED': print(output)
+                times = [r[2] for r in results]
+                counts = {s: sum(r[0] == s for r in results) for s in
+                          ('RED', 'SURVIVED', 'COMPILE_LINK_ERROR', 'TIMEOUT', 'SIGNAL', 'ERROR')}
+                print(f'MUTATIONS {counts}; median={statistics.median(times):.2f}s max={max(times):.2f}s')
+                assert counts['RED'] == len(MUTANTS) and max(times) < 30, counts
+    finally:
+        assert all(hashlib.sha256((ROOT / p).read_bytes()).digest() == digest for p, digest in before.items()), 'input changed during test'
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except subprocess.CalledProcessError as e:
+        print(e.stdout or '', e.stderr or '')
+        raise

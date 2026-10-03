@@ -9,6 +9,7 @@
 #define APPMEM_EINVAL (-1)
 #define APPMEM_ENOVA  (-2)
 #define APPMEM_EFULL  (-3)
+#define APPMEM_ENOSPC (-4)
 
 #define APPMEM_MAP_EXACT   1U
 #define APPMEM_MAP_TOPDOWN 2U
@@ -51,5 +52,12 @@ int appmem_prepare(const struct appmem_table *table,
                    u32 bytes, u32 hint, u32 map_flags,
                    u32 kind, u32 extent_flags, struct appmem_plan *out);
 void appmem_publish(struct appmem_table *table, const struct appmem_plan *plan);
+
+/* Private host-only f3 entry. Outputs must not alias AS/table/layout.
+ * The caller serializes this transaction: no callbacks/reentry/AS switches. */
+struct addrspace;
+int appmem_map(struct addrspace *as, struct appmem_table *table,
+               const struct appmem_layout *layout, u32 bytes, u32 hint,
+               u32 map_flags, u32 kind, u32 extent_flags, u32 *base_out);
 
 #endif

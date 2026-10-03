@@ -1148,6 +1148,7 @@ CHECK_PAR_TARGETS := check-shlib-high-host check-bootinfo-host check-hdd-stage1-
     check-nano-inputs-host \
     check-nano-adapter-host \
     check-appmem-host \
+check-appmem-map-host \
     check-surface-lease-host \
     check-surface-bundle-host \
     check-gfx-kernel-fb-host \
@@ -1281,3 +1282,9 @@ check-gfx-reinit-host:
 check-appmem-host:
 	@set -e; test -n "$(HOST32_RUNNERS)"; for runner in $(HOST32_RUNNERS); do echo "HOST32_RUNNERS=$$runner"; python3 -B tools/tests/test_appmem.py --runner $$runner; done
 	$(if $(MUT),python3 -B tools/tests/test_appmem.py --runner $(firstword $(HOST32_RUNNERS)) $(MUT),@:)
+
+# T2f f3: unlinked map transaction, real paging/allocator/physmem (no kernel object).
+.PHONY: check-appmem-map-host
+check-appmem-map-host:
+	@set -e; test -n "$(HOST32_RUNNERS)"; for runner in $(HOST32_RUNNERS); do echo "[host32] appmem_map: $$runner"; python3 -B tools/tests/test_appmem_map.py --runner $$runner; done
+	$(if $(MUT),python3 -B tools/tests/test_appmem_map.py --runner $(firstword $(HOST32_RUNNERS)) --mutate,)

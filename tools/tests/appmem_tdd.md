@@ -69,3 +69,10 @@ extent.flags は map flags とは独立した内部属性/EXEC_LARGE 識別子�
 固定領域は layout で除外し、extent に数えない。
 f5 の AS 埋込みで型移動とtarget sizeof予算検査を行う。
 kernel.mk 未変更、カーネル増分0 B。native/ゲスト/独立レビューは PM へ引渡す。
+
+## f3でのP3持ち越し対応 (2026-10-03)
+
+publish入口のcount/range_free検査と古いproposalの2拒否対照を追加し、139 CHECK。
+未知flag検査省略 (`unknown flag`)、非整列hint検査省略 (`unaligned`)、
+hint下限をshlibへ緩和 (`outside`) の3変異を追加。合計16/16 runtime RED。
+詳細/最終rcは [appmem_map_tdd.md](appmem_map_tdd.md) と票§3-5 f3記録。
