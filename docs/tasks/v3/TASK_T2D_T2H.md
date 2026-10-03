@@ -1780,20 +1780,26 @@ e の lease/gfx/SHM 権限・公開 KAPI/JSON/版は変更なし。前回の未�
 2. GUI で h3a / h3b を引数なしで起動。各々 `init --fixture 1` / `--fixture 2`、
    共通の `--layout` と別々の `--case /home/hight/os32-tmp/h3-a.json` / `h3-b.json` を渡す。
    INIT だけに owner/generation を publish、受領を待つ。caseファイルの再使用は拒否。
-3. PM は相手側の窓へフォーカスを移し、両窓の位置を動かさず target の OP_WAIT park を待つ。
+3. PM は相手側の窓へフォーカスを移し、両窓の位置を動かさず target の OP_WAIT を待つ (PARKED/待ち由来印1、または g_cur=target・RUNNING/in_op_wait=1)。
    `arm --mode pf --capture /home/hight/os32-tmp/h3-capture.json
    --out /home/hight/os32-tmp/h3-observe.json` (gp/de/ud/USER-loop/KAPI-loop も同様)、
    同じ `--layout` / `--case` を渡す。loop は `--trace /home/hight/os32-tmp/h3-front.json`
    も渡し、PM/e9 が FIRING 後の新しい前景証拠をそのファイルへ渡す。
-   台本は一時 pause 中に対象と相手の PA/所有者/世代、実 park を照合して mode / arm を書く。
+   台本は一時 pause 中に対象と相手の PA/所有者/世代、上記 OP_WAIT 状態を照合して mode / arm を書く。
    **breakpoint を click より先に設置**し、target のタイトルをクリックして起こす
    (480行なら `--height 480`)。SHM 書込み単独には WM を起こす効果がない。
-   同じプロセスの採取ループで resume 印・switch増分・consumed=1 を case に記録する。
+   同じプロセスの採取ループで resume 印・switch値・consumed=1 を case に記録する。
+   PARKEDからはswitch増分必須、arm時に実行中OP_WAITだった場合だけ同値も認める。
+   実行中OP_WAITでarmしたcaseはcase内でpark→resumeを通らないため、
+   **最終matrixにはPARKEDでarmするcaseを少なくとも1本含める**。
    fault の5秒猶予内に別コマンドを起動する必要はない。失敗は中止、arm 再送なし。
 4. loop は同じプロセスが捕捉・前景照合・STOP送信・前後のobserveを順に実行する。
    再開済みloop用には `loop-watch --capture RAW.json --out OBS.json --trace FRONT.json`。
-   USER runaway の200 tick猶予を待ち、case/identity/map/phase と5秒以内の前景app/windowを
-   照合して `/api/key` に `seq=CTRL%2BSTOP&hold=300` をPOSTする。STOP再送は拒否。
+   FIRING観測後にゲスト210 tickを待ち (USER runawayの200 tick猶予を越える)、case/identity/map/phase と5秒以内の前景app/windowを
+   照合する。210 tickの間に前景証拠がホスト5秒より古くなった場合は中止せず、
+   STOP前の3,000 tick上限内でファイルを読み直し、新しい証拠を待つ。
+   単独`stop`も210ゲストtickと同じ鮮度再試行を使う。STOP後はtick上限で打ち切らず、
+   ホスト2秒/10秒の観測を完了する。送信は `/api/key` に `seq=CTRL%2BSTOP&hold=300` をPOSTする。STOP再送は拒否。
    `trace-watch --trace RAW.json` は受動採取専用。別端末の stop / observe と併用しない。
    live台本全体を共通の非blockingロックで排他し、競合コマンドはHTTP操作前に拒否する。
    既存breakpoint / user pauseは先にPMが解除し、台本外のdebugger操作も同時に行わない。
@@ -1937,6 +1943,126 @@ Opus 5.5による差分再レビュー、e〜gを含む最終一式でのゲス�
 - **一度の CTRL+STOP が二回 kill になる (二重 kill) をゲストで再現 (2026-10-02、main `8bea831`、17MB)**: h3a/h3b を GUI で起動・init (app 2 / app 3)、h3a に直した台本で `arm --mode USER-loop --capture` を流した。台本は「捕捉の 30 秒の間に STOP が送られなかった」で止まった — fixture の 5 秒 (500 tick) の猶予の待ちが台本の頻繁な一時停止でゲスト時間として遅れ、FIRING がホストの 30 秒の窓を超えたため (台本の時間の取り方の問題、h の最終一式までに直す)。breakpoint と trap は直した後始末が正しく片付けた。続けて SHM で phase=6 (FIRING、USER-loop) と h3a が前景であることを確かめ、`/api/key` POST `seq=CTRL%2BSTOP&hold=300` を **1 回**送った。5 秒後: h3a の slot は FREE、`fault_kill_count` 0→1・`ring3_abort_count` 0→1 (カーネルの R1 経路で畳んだ) に加え、**`appslot_reclaim_count` 0→2、`appslot_last_reclaim_id`=3 (h3b)**、画面から両方の窓が消えた。WM に残った raw STOP が次の前景 (無関係な h3b) を kill した。Opus の設計レビューの P1-2 (drivers/kbd.c が raw を先に積む → WM の top_level_abort) の見立てと一致。ユーザー決定により STOP の修正 (wt/kstop、案 A) で同時に閉じる。ログ: `/home/hight/os32-tmp/dk-{a,b,after-a}.json`、画面 `dk_before.png` / `dk_after.png` (scratchpad)。
 
 故障画像・旧shell試験は作業用の媒体と明示した台本をPMが扱う。本設計作業から環境へ触れない。Ra266物理操作/配備の承認手続は既存規則の担当へ渡す。
+
+**h3fix2 — 捕捉の時間窓・arm の OP_WAIT 判定 (2026-10-03、Codex gpt-6.1-sol、コーダー)**:
+基点 `37d1aef`、ブランチ `wt/h3fix2`。変更は台本・h3ホスト試験・本記録だけ。
+§5-4末尾の既知2件を修正し、T2h最終一式のゲスト受入はPMへ残す。
+
+- 時間窓: `arm --capture` / `loop-watch` は新layoutの `tick_count` をfreeze中に読む。
+  捕捉開始後の最初の標本から**STOP前は3,000ゲストtick (PIT_HZ=100、30秒)**を上限にし、
+  停止によるホスト経過をfixtureの500 tick猶予から引かない。差分はu32周回を処理。
+  FIRING観測後のSTOP待ちも**210ゲストtick**にする (ホスト2.1秒では暴走判定前になり得る)。
+  通常pollを0.01秒から**0.25秒**へ広げ、pause/メモリ読取の頻度も下げる。
+  tickが進まない場合は最後の進行から**ホスト120秒**で異常終了し、既存のbreakpoint後始末を通す。
+  ゲスト進行中にはホスト30秒の打切りを適用しない。受動`trace-watch`は従来のホスト15秒。
+  STOP後2秒/10秒観測と前景証拠の5秒鮮度は従来のホスト時間。
+  STOP送信後はtick上限を適用せず、after_10sまで採取する。古い有効な前景証拠は
+  例外にせずSTOP前の上限内で更新を待つ (case/identity/map等の不一致は引き続き拒否)。
+  単独`stop`も同じ捕捉pumpで210 tickを待ち、鮮度再試行・上限・後始末を揃える。
+- arm: SHM WAIT/unarmed/consumed0に加え、**PARKED + parked_from_wait=1**、または
+  **RUNNING + g_cur=対象 + in_op_wait=1**を同じfreeze内で要求。
+  `appslot_park_commit` / `appslot_resume_commit`、`exec_park` / `exec_resume`、
+  `multiapp::should_park` / `op_wait`を照合。相手がreadyでなければWMが現在のOP_WAITを
+  実行し続けるため、PARKEDだけでは正しいWAITを拒否する。
+  caseへ`armed_in_running_wait`を保存。この経路のOP_WAITはクリックでAS切替なしに戻るので、
+  resume判定のswitch同値をこの印がある場合だけ認める (減少は拒否、PARKEDは増分必須)。
+  resume印増分・mode一致・arm0/consumed1、実PCの着地/pending/WM kill検証は維持。
+  別appがcurrent・待ち印欠落/不正・WAIT_KEY・古いpark印だけのRUNNINGは書込み前に拒否する。
+- ホスト対照: 通常速度/ホスト30秒超の遅いゲスト、FIRING後210 tick、u32周回、
+  FIRINGしないまま3,000 tick (周回あり/なし)、tick停止、後始末をAPI模擬clientで確認。
+  PARKEDの従来正常対照に実行中OP_WAITのarm/継続を追加し、上記不正状態・switch減少を拒否。
+  修正前台本の追加試験は**rc=1、45件中4失敗/skip1** (`h3fix2-red.log`)。
+  ホスト壁時計への差戻しとPARKED限定への差戻しも写しの台本の変異として検証する。
+  最終個別試験は**Python 47件 (layout 1件skip)、ILP32 42検査 PASS、
+  C 8 + Python 65 = 73/73変異 runtime RED、compile/import失敗0、rc=0**。
+  追加8ケース/12変異に両不具合の正常対照と負例を含む。
+  全体検査の最終結果は下記ログと完了報告で確定する。
+- 試験開発中: 変異実行を長時間化として中断 **rc=130**、再調査で既存start抑止変異の
+  壁時計待ちと確認。再実行はtick差分の符号なし処理を外す変異1本が生き残り **rc=1**。
+  周回を含む予算超過の負例を追加。2対照を同一caseで行った試行はarm再使用拒否で **rc=1**、
+  独立caseへ分けた。実行中OP_WAITの継続条件も確認して試験を固定するため、途中の変異実行を
+  もう一度中断 **rc=130**。最終ソース/試験の再実行結果を記録する。compile/import失敗をREDに数えない。
+
+**Approve後のP3対応 (同日、確認レビューは回さずPMが差分を読む)**:
+STOP後の3,000 tick打切り、古い前景証拠での例外、単独stopのホスト2.1秒待ちを修正。
+上限直前2,900 tickでのSTOPと10秒観測完了、証拠未到着/更新なしで上限終了、
+遅いゲストでの鮮度更新待ち、単独stopのtick周回と更新待ちを追加した。
+採取tick読取とtrapの競合、捕捉全体でPARKEDのswitch同値拒否、stallの上限側も確認。
+修正前は追加試験で**Python 53件中4失敗、rc=1** (`h3fix2-p3-red.log`)。
+指定4変異 (tick読取のCaptureTrapをraise、stall上限1000秒、基点を1000 tick早める、
+run_captureで実行中OP_WAIT印を常に真にする) とP3修正差戻し3変異を追加。
+Pythonは**54件 (追加7件、layout skip0)**、ILP32は**42検査**、
+C 8 + Python 72 = **80/80変異 runtime RED、compile/import失敗0、rc=0**
+(`h3fix2-p3-mutate-final.log`)。変異定義の置換対象数のずれで途中の実行はrc=1
+(`h3fix2-p3-mutate.log`)となり、定義を合わせて再実行した。
+単独stopは送信直後にcaseを保存し、後始末失敗時も送信済み印を残す。
+既存start抑止変異の受動捕捉でホスト時間を長く待ったため、模擬clientのmonotonicを
+仮想化して再試験する (個別の遅いゲスト・stall試験は専用時計を使う)。
+最終ソースの個別試験は`HOST32_RUNNERS=qemu python3 -u -B
+ tools/tests/test_h3_park_resume.py --mutate`、ログは
+`/home/hight/os32-tmp/h3fix2-p3-tests-final.log` / `.rc`。
+全体検査は前掲と同じ`check_slot.sh h3fix2-coder`経由の`make check-changed
+ NP21W_DIR=/dev/null`、ログは`/home/hight/os32-tmp/h3fix2-p3-check-changed.log` / `.rc`。
+最終個別試験は**rc=0、Python 54件/skip0、ILP32 42検査、80/80変異 runtime RED**。
+全体検査も**rc=0** (基点側の`build/sdk.mk`による全変異fallbackを含め完走)。
+検査前後の差分は`cmp`で一致 **rc=0**。検査終了後に本結果だけ追記した。
+試験準備中の初回RED実行は2失敗/2エラー、rc=1 (空の前景JSONを試験側で修正)。
+続くRED実行は前述の4失敗、rc=1。これらと置換対象数エラーはruntime RED本数に数えない。
+ゲスト・native・配備・commitは未実施。
+
+**PMのゲスト確認 (未実施)**:
+1. PMが最終一式の反映を[V1]で確認し、新ELF/mapからlayoutを生成。
+   新規h3a/h3bをinitし、別caseのowner/世代を保存。既存break/user pauseは先に解除する。
+2. 両fixtureがWAITのとき、対象のPARKED/待ち由来印1、または
+   g_cur=対象/RUNNING/in_op_wait1を新layoutで確認。
+   §5-2の`arm --mode USER-loop --capture RAW.json --out OBS.json --trace FRONT.json`
+   (共通`--layout`/`--case`)を実行。手作業のSHM arm書込みで迂回しない。
+   AS切替なしで待ちが戻った場合はcaseの印とswitch同値を確認し、resume印増分/consumed1を確認する。
+3. ホスト30秒を越えてもゲスト500 tickの猶予からFIRINGへ進むことを確認し、
+   PM/e9がFIRING後の新しい前景証拠を渡す。台本外の入力/フォーカス/debug操作を重ねない。
+   FIRING観測後210 tick以上でSTOPが**一度だけ**送られることと、RAW/OBSの採取を確認。
+   捕捉終了後、監視breakpointが残らずtrap/user pauseもないことを確認する。
+4. `reclaim`、同fixtureの新規起動、外部証拠を添えた`verify`まで§5-2どおりに実行。
+   reclaim+1/対象ID、相手の同世代での生存、pending/深さ、mode別の経路を確認。
+   対象をh3bへ交換して再実行し、KAPI-loop・pf/gp/de/ud・park中WM kill対照を最終matrixで採る。
+   最終matrixでPARKEDのarmを少なくとも1本採る (実行中OP_WAITのarmだけではpark→resumeの証拠にならない)。
+   不正OP_WAIT状態はarm拒否/書込みなしを確認する。tick停止のホスト120秒上限と
+   後始末は**ホスト試験で確認済み**。実ゲストのuser pauseは先に
+   `user pause during capture`で中止するため、120秒上限の再現手順には使わない。
+
+共通環境は`CROSS_DIR=/home/hight/opt/cross`、`TMPDIR=/home/hight/os32-tmp`、`PYTHONPATH=`、
+`HOST32_RUNNERS=qemu`。inventory生成`python3 tools/gen_tests_inventory.py --write`はrc=0、
+生成`docs/TESTS.md`の差分なし。個別試験は`python3 -u -B tools/tests/test_h3_park_resume.py --mutate`、
+ログ`/home/hight/os32-tmp/h3fix2-tests-final.log` / `.rc`。実ELF/map未生成のlayout試験1件はskip、
+native/guestは未実施。lintは`python3 tools/check_select.py --lint` **rc=0**
+(125本、対応表漏れ0件)。`git diff --check` rc=0。
+全体検査の1回目は**rc=2** (`h3fix2-check-changed.log` / `.rc`)。
+基点側の`build/sdk.mk`が選択器の許可型外なので全変異へfallbackし、
+`check-vmkernel-lz4-host` / `check-vk32-crc-host`が未生成のkernel.bin/sqlite.bin/vmkernel.lz4で停止した。
+検査前後の差分は同一。ホスト成果物の前準備不足を解消するため、
+`make kernel NP21W_DIR=/dev/null < /dev/null` **rc=0** (`h3fix2-kernel.log` / `.rc`)。
+製品ソース差分なし。生成後のh3ホスト試験は**47件/skip0 + ILP32 42検査、rc=0**
+(`h3fix2-tests-built.log`)、実ELF/mapのlayoutも確認済み。
+2回目も**rc=2** (`h3fix2-check-changed-second.log` / `.rc`)。
+`check-manifests`がuserland成果物なし、`check-vk32-crc-host`がos32_boot.imgなしで停止。
+`make kernel`だけでは前準備が不足していたため、
+`make all NP21W_DIR=/dev/null < /dev/null` **rc=0** (`h3fix2-all.log` / `.rc`)で生成。
+NP21W_DIR=/dev/nullへのFDコピー失敗警告は想定どおりで、実配備なし。
+生成後の`check_manifests.py`と`test_vk32_crc.py --real --target`は各rc=0。
+追跡ファイルは指定3ファイルのみ。この追加記録後に票/ソースを固定し、
+最後に以下を再実行して**rc=0を1回**得る。
+検査実行中は票/ソースを変更しない。
+
+```sh
+CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp PYTHONPATH= \
+/home/hight/os32-tmp/bin/check_slot.sh h3fix2-coder env HOST32_RUNNERS=qemu \
+make check-changed NP21W_DIR=/dev/null < /dev/null
+```
+
+最終検査 (3回目) は**rc=0** (`/home/hight/os32-tmp/h3fix2-check-changed-final.log` / `.rc`)。
+全変異へのfallbackを含め完走し、h3は47件/skip0 + ILP32 42検査、73/73変異runtime RED。
+検査前後の差分は`cmp`で同一 (rc=0)。検査終了後に本結果だけ追記した。
+NP21/W・NHD・配備・ini・実機・commit/pushは未操作。製品コード・kernel.mkは変更なし。
 
 ### 5-3. 統合matrixと観測
 

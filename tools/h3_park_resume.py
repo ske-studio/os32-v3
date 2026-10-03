@@ -3,7 +3,7 @@
 
 layout: derive offsets from current headers with cross GCC, symbols with nm.
 init: discover both fresh fixtures; publish diagnosed owner/generation once.
-arm --capture: require real OP_WAIT park; arm, install breakpoints BEFORE the
+arm --capture: require a real OP_WAIT state; arm, install breakpoints BEFORE the
      focus click, then capture resume/fire. Loops check foreground, send STOP,
      and record observations in this same process.
 verify: require e9/PM evidence JSON, reclamation, then a newly launched fixture.
@@ -37,6 +37,12 @@ PHASES = dict(INIT=1, IDENTIFIED=2, WAIT=3, RESUMED=4, ARMED=5, FIRING=6, ERROR=
 # R1: KAPI accepts WM kill OR syscall-boundary abort, both without pending.
 ROUTES = {1: (1, 0, 1), 2: (1, 0, 1), 3: (1, 0, 1), 4: (1, 0, 1),
           5: (1, 1, 1), 6: (0, 0, 0)}  # fault_kill, abort, pending
+# OS32 PIT is 100 Hz; fixture grace is 500 ticks, runaway grace 200.
+GUEST_HZ = 100
+RUNAWAY_WAIT_TICKS = 210
+CAPTURE_POLL = 0.25
+TICK_STALL_SECONDS = 120
+
 VECTORS = {1: 14, 2: 13, 3: 0, 4: 6, 5: None, 6: None}
 COUNTERS = ('ring3_switch_count', 'fault_kill_count', 'ring3_abort_count',
             'appslot_reclaim_count', 'appslot_last_reclaim_id',
@@ -144,8 +150,8 @@ def capture_counts(case, capture, layout):
     return counts
 
 
-def capture_trace(p, case, seconds=15, start=None, advance=None):
-    """Own breakpoints and sample sequentially; callbacks run only between traps."""
+def capture_trace(p, case, seconds=15, start=None, advance=None, guest_time=False):
+    """Serialize traps/callbacks; active runs use PIT time, passive traces wall time."""
     client = p.emu.client
     def get(path):
         return debug_reply(json.loads(client.get(path)), path)
@@ -170,17 +176,35 @@ def capture_trace(p, case, seconds=15, start=None, advance=None):
         if start:
             start()
         deadline = time.monotonic() + seconds
-        while time.monotonic() < deadline:
+        first_tick = last_tick = None
+        progressed_at = time.monotonic() if guest_time else None
+        while guest_time or time.monotonic() < deadline:
             instance = get('/api/instance')
             require(not instance['user_pause'], 'user pause during capture')
             if not instance['trap_pause']:
+                if guest_time:
+                    try:
+                        tick = p.guest_tick()
+                    except CaptureTrap:
+                        continue
+                    now = time.monotonic()
+                    if first_tick is None:
+                        first_tick = tick
+                    if tick != last_tick:
+                        last_tick, progressed_at = tick, now
+                    require(now - progressed_at < TICK_STALL_SECONDS,
+                            'guest tick stalled during capture')
+                    # Unsigned subtraction handles the 32-bit PIT wrap.
+                    if (not case.get('stop_sent') and
+                            ((tick - first_tick) & 0xffffffff) >= seconds * GUEST_HZ):
+                        break
                 if advance:
                     try:
                         if advance():
                             break
                     except CaptureTrap:
                         continue  # owned trap won the pause race; drain it first
-                p.sleep(0.01)
+                p.sleep(CAPTURE_POLL if guest_time else 0.01)
                 continue
             regs = get('/api/regs')
             eip = int(regs['eip'], 16)
@@ -460,12 +484,23 @@ class Playbook:
         raise RuntimeError('timeout: ' + label)
 
     @frozen
+    def guest_tick(self):
+        return self.word(self.s['tick_count'])
+
+    @frozen
     def arm(self, ident, mode):
         require(mode in MODES.values(), 'invalid mode')
         b = self.checked(ident)
         require(b['phase'] == PHASES['WAIT'] and b['arm'] == 0 and b['consumed'] == 0, 'not unarmed WAIT')
-        require(self.word(ident['slot'] + self.o['slot_state']) == self.o['parked'] and
-                self.word(ident['slot'] + self.o['slot_wait']) == 1, 'not actual OP_WAIT park')
+        state = self.word(ident['slot'] + self.o['slot_state'])
+        # Idle fixtures need not yield: WM may keep one inside OP_WAIT.
+        # Only the current RUNNING app with the live wait mark is admissible.
+        parked_wait = (state == self.o['parked'] and
+                       self.word(ident['slot'] + self.o['slot_wait']) == 1)
+        running_wait = (state == self.o['running'] and
+                        self.word(self.s['g_cur']) == ident['app'] and
+                        self.word(ident['slot'] + self.o['slot_in_wait']) == 1)
+        require(parked_wait or running_wait, 'not actual OP_WAIT state')
         survivor = self.discover(3 - b['fixture'])
         self.checked(survivor)
         before = self.counters()
@@ -476,7 +511,7 @@ class Playbook:
         self.put(ident['address'] + 20, 1)
         return {'survivor': survivor, 'identity': ident, 'mode': mode, 'before': before, 'resumes': b['resumes'],
                 'fixture': b['fixture'], 'window': b['window'], 'case_id': uuid.uuid4().hex,
-                'armed_at': time.time()}
+                'armed_in_running_wait': running_wait, 'armed_at': time.time()}
 
     @frozen
     def resumed(self, case):
@@ -487,7 +522,11 @@ class Playbook:
         require(b['mode'] == case['mode'] and b['arm'] == 0 and b['consumed'] == 1,
                 'arm not consumed exactly once')
         require(b['resumes'] > case['resumes'], 'missing resume mark')
-        require(self.word(self.s['ring3_switch_count']) > case['before']['ring3_switch_count'],
+        switches = self.word(self.s['ring3_switch_count'])
+        before_switches = case['before']['ring3_switch_count']
+        # A live OP_WAIT may return on the focus event without switching AS.
+        require(switches > before_switches or
+                (case.get('armed_in_running_wait') is True and switches == before_switches),
                 'missing switch increment')
         return {'block': b, 'switch_count': self.word(self.s['ring3_switch_count'])}
 
@@ -596,13 +635,37 @@ class Playbook:
     def foreground(self, case, path):
         trace = json.loads(Path(path).read_text())
         require(trace['case_id'] == case['case_id'] and
-                0 <= time.time() - trace['observed_at'] <= 5 and
+                0 <= time.time() - trace['observed_at'] and
                 trace['observed_at'] >= case['armed_at'] and
                 trace['phase'] == PHASES['FIRING'] and trace['identity'] == case['identity'] and
                 trace['map_sha256'] == case['map_sha256'] and
                 trace['foreground_window'] == case['window'] and
                 trace['foreground_app'] == case['identity']['app'], 'STOP foreground not confirmed')
+        if time.time() - trace['observed_at'] > 5:
+            return None  # Valid but stale: wait for the PM to refresh it.
         return trace
+
+    def stop_loop(self, case, foreground, persist=lambda: None):
+        firing_at = None
+        def advance():
+            nonlocal firing_at
+            require(self.checked(case['identity'])['phase'] == PHASES['FIRING'], 'loop not firing')
+            if firing_at is None:
+                firing_at = self.guest_tick()
+            if ((self.guest_tick() - firing_at) & 0xffffffff) < RUNAWAY_WAIT_TICKS or not Path(foreground).exists():
+                return
+            with self.emu.freeze():
+                evidence = self.foreground(case, foreground)
+                if evidence is None:
+                    return
+                self.checked(case['identity'])
+            self.emu.stop()
+            case['stop_sent'] = True
+            case['foreground_observation'] = evidence
+            persist()
+            return True
+        capture_trace(self, case, seconds=30, advance=advance, guest_time=True)
+        require(case.get('stop_sent') is True, 'STOP not sent during capture')
 
     def run_capture(self, case, capture_path, out, foreground=None, click=None, persist=lambda: None):
         require(case['mode'] < 5 or foreground is not None, 'loop requires --trace foreground evidence')
@@ -630,13 +693,15 @@ class Playbook:
             if self.checked(case['identity'])['phase'] != PHASES['FIRING']:
                 return
             if firing_at is None:
-                firing_at = time.monotonic()
-            if time.monotonic() - firing_at < 2.1 or not Path(foreground).exists():
+                firing_at = self.guest_tick()
+            if ((self.guest_tick() - firing_at) & 0xffffffff) < RUNAWAY_WAIT_TICKS or not Path(foreground).exists():
                 return
             # Snapshot only between owned traps, then thaw before injecting
             # the key sequence. The live lock excludes other h3 processes.
             with self.emu.freeze():
                 evidence = self.foreground(case, foreground)
+                if evidence is None:
+                    return
                 require(self.checked(case['identity'])['phase'] == PHASES['FIRING'], 'loop not firing')
                 observations['before_stop'] = self.observe(case)
             stop_at = time.monotonic()
@@ -644,7 +709,7 @@ class Playbook:
             case['stop_sent'] = True
             case['foreground_observation'] = evidence
             persist()
-        capture = capture_trace(self, case, seconds=30, start=click, advance=advance)
+        capture = capture_trace(self, case, seconds=30, start=click, advance=advance, guest_time=True)
         save_capture(case, capture, capture_path)
         persist()
         require(case.get('resume_verified') is True, 'resume not captured')
@@ -738,12 +803,8 @@ def live_main(args):
                 'STOP requires a resumed loop case')
         require(args.trace is not None, 'STOP requires fresh foreground evidence --trace')
         require(p.checked(case['identity'])['phase'] == PHASES['FIRING'], 'loop not firing')
-        # USER runaway eligibility requires > APP_RUNAWAY_TICKS (200).
-        time.sleep(2.1)
-        p.foreground(case, args.trace)
-        p.checked(case['identity'])
-        p.emu.stop()
-        case['stop_sent'] = True
+        # Use the same guest grace, freshness retry and bounded pump as arm.
+        p.stop_loop(case, args.trace, persist=lambda: args.case.write_bytes(json_bytes(case)))
         args.case.write_text(json.dumps(case, indent=2) + '\n')
         return
     if args.action == 'reclaim':
