@@ -893,6 +893,8 @@ makeは `CROSS_DIR=/home/hight/opt/cross`、`NP21W_DIR=/dev/null < /dev/null`。
 - NP21/W・NHD・配備・ini・実機・commit/pushは未操作。
   native ILP32とゲスト受入は未実施。§12どおり構成依存の一括確認はT2hへ。
 
+
+**e4 の着地とゲスト受入 (PM、2026-10-03)**: 独立レビュー Opus 5.5 は 1 往復目 Request changes (P2-1: 起動前の公開 `gfx_screen_info` が PC98 固定になり pegcchk / hal_test が誤判定 → PM が Q3 を訂正し、Codex gpt-6-astra が直した、P3 6 件も同時) → 2 往復目 Approve。PM のホスト検査 `HOST32_RUNNERS="native qemu"` の check-changed rc=0 (新試験の正常対照は native と qemu で PASS 496)。main へ取り込み (`ac0a728`、`docs/02_memory.md` の競合は生成物なので再生成)。コミット済みの木で `make all` rc=0・`make check` rc=0。NP21/W を停止 → 停止確認 → `nhd-pull` → `deploy-kernel` → `deploy` → 起動 (17MB、今の ini — §12)。`ver` の Commit `ac0a728`、`/boot/vmkernel.lz4` 482,526 B が手元と一致、**kselftest pass 273 / fail 0** (PEGC DISPLAY の 1 項目)。`db_test` 9/9、`db_v50_test` 41/41、`klibc_test` 49/49、`alloc_demo` 16/16、`d0a_test` 全行 OK、faulttest gp/de/ud/pf は 4 件とも `-> kill app`、loop・kloop + CTRL+STOP、`v86 -t` OK。**gfx**: 今の ini は PEGC が選ばれる構成で、`hal_test` は `backend pegc (packed 8bpp)`、`pegcchk` は SKIP せず 640x480 に入り CUI に戻った (起動前の公開 query が選択 backend を返す — P2-1 の直しをゲストで確認)。GUI (gui_demo の窓 → ESC → CUI) OK。終わりのカウンタ: `fault_kill_count`=7 (faulttest の内訳)、深さ 0、`ledger_*_ops`=0、`exec_as_leftover_pages`=0、`irq_ctx_violations`=1 (起動時の基準値)。**未実施**: `gfx200_test` (キー待ちの画面デモで rshell から操作できない。PEGC 構成では init_200 が 480 行で起動し PC98 の 200 行経路は通らない) — PC98 の 200 行と planar 構成は e5 の 200 行再登録と合わせて T2h の構成変更の確認へ。
 ## 3. T2f — map/unmapとallocator、暫定heap終了
 
 ### 3-1. 着手条件・範囲
