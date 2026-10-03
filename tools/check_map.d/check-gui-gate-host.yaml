@@ -1,0 +1,5 @@
+check-gui-gate-host:
+- tools/gui_gate.py
+- tools/tests/test_gui_gate.py
+- tools/check_map.d/check-gui-gate-host.yaml
+- build/checks.d/check-gui-gate-host.mk

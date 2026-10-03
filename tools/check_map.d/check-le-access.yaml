@@ -1,0 +1,12 @@
+check-le-access:
+- tools/clang_ast/**
+- tools/tests/test_clang_ast.py
+- drivers/**/*.[ch]
+- fs/**/*.[ch]
+- lib/**/*.[ch]
+- kernel/**/*.[ch]
+- include/**
+- tools/check_arm_compile.py
+- tools/check_le_access.py
+- tools/check_map.d/check-le-access.yaml
+- build/checks.d/check-le-access.mk

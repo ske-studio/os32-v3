@@ -1,0 +1,7 @@
+check-time-math-host:
+- kernel/ktime.c
+- kernel/time_math.c
+- tools/tests/test_time_math.py
+- tools/tests/time_math_host.c
+- tools/check_map.d/check-time-math-host.yaml
+- build/checks.d/check-time-math-host.mk

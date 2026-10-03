@@ -1,0 +1,7 @@
+check-ring3-str-host:
+- tools/tests/host32.py
+- exec/ring3_str.c
+- tools/tests/ring3_str_host.c
+- tools/tests/test_ring3_str.py
+- tools/check_map.d/check-ring3-str-host.yaml
+- build/checks.d/check-ring3-str-host.mk

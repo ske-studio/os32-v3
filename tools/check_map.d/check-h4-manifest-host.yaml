@@ -1,0 +1,17 @@
+check-h4-manifest-host:
+- build/core.yaml
+- docs/manpages/hsync.1
+- tools/deploy_manifests.py
+- tools/deploy_protect.py
+- tools/hostdrv_deploy.py
+- tools/tests/h4_manifest_host.c
+- tools/tests/test_h4_manifest.py
+- tools/tests/test_hostdrv_manifest.py
+- userland/deploy.yaml
+- userland/system/hsync.c
+- lib/crc32_core.inc
+- userland/system/hsync_bootold.inc
+- userland/system/hsync_protect.inc
+- tools/tests/mutpar.py
+- tools/check_map.d/check-h4-manifest-host.yaml
+- build/checks.d/check-h4-manifest-host.mk

@@ -1,0 +1,8 @@
+check-dma-pool-host:
+- drivers/dma8237_math.c
+- kernel/dma_pool.c
+- kernel/dma_pool_math.c
+- tools/tests/dma_pool_host.c
+- tools/tests/test_dma_pool.py
+- tools/check_map.d/check-dma-pool-host.yaml
+- build/checks.d/check-dma-pool-host.mk

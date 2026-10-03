@@ -1,0 +1,20 @@
+check-ext2-empty-name-host:
+- tools/tests/host32.py
+- build/core.yaml
+- drivers/pc98pt.c
+- fs/ext2_dir.c
+- fs/ext2_file.c
+- fs/ext2_vfs.c
+- fs/vfs.c
+- tools/deploy_manifests.py
+- tools/mkpkg.py
+- tools/tests/ext2_empty_name_host.c
+- tools/tests/test_ext2_empty_name.py
+- userland/deploy.yaml
+- fs/ext2_fmt.c
+- fs/ext2_inode.c
+- fs/ext2_layout.c
+- fs/ext2_super.c
+- fs/vfs_fd.c
+- tools/check_map.d/check-ext2-empty-name-host.yaml
+- build/checks.d/check-ext2-empty-name-host.mk

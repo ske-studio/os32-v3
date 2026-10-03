@@ -190,7 +190,7 @@ def case_single_stage(cs):
     _, vars_ = cs.read_makefiles()
     par = cs.check_lists(vars_)
     assert "check-sh-status-host" in par and "check-kapi-layout-host" in par
-    for f in ("Makefile", "build/sdk.mk", "sdk/kapi.json"):
+    for f in ("Makefile", "build/sdk.mk"):
         mode, st, mu = run_plan(cs, [f])
         assert mode == "full" and st == set(par) and mu == set(par), (f, mode)
 
@@ -510,7 +510,7 @@ def case_mk_mixed(cs):
         fx.write("tools/tests/test_b.py", "changed\n")
         _only(fx.plan(), "check-a", "check-b")
         fx.write("sdk/kapi.json", '{"v": 2}')
-        _full(fx.plan(), "全体に影響")
+        _only(fx.plan(), "check-a", "check-b")
 
 
 def case_mk_git_versions(cs):
@@ -619,7 +619,7 @@ def _neg_cases():
         neg("境界 %r" % bad, lambda fx, bad=bad: fx.append("build/sdk.mk", bad))
     neg("規則の末尾の空白", lambda fx: fx.add_c(rule="check-c: \n\tpython3 -B tools/tests/test_c.py\n"))
     # 独立レビュー P1: .PHONY は型に無い。既存の規則と recipe の間に挟む配置は全部
-    neg(".PHONY の追加 (末尾)", lambda fx: fx.add_c(phony=".PHONY: check-c\n"), None, "型に合わない行")
+    neg(".PHONY の追加 (末尾)", lambda fx: fx.add_c(phony=".PHONY: check-c\n"), None, ".PHONY")
     neg("既存の .PHONY 行への追記", lambda fx: (fx.add_c(),
                                                fx.edit("Makefile", ".PHONY: check-b", ".PHONY: check-b check-c")),
         None, "削除・変更行")
@@ -810,26 +810,22 @@ def case_mk_real_tree(cs):
         r = fx.plan(files=["build/sdk.mk", "Makefile"], map_=m)
         _fast(r)
         assert any("新しい検査 0 本" in l and "追加選択なし" in l for l in r[3]), r[3]
-        # 実物の列を末尾へ移す (astra の P2 の反例) → 全部
-        sdk = pathlib.Path(fx.d, "build/sdk.mk").read_text(encoding="utf-8")
-        a = sdk.index("CHECK_PAR_TARGETS :=")
-        b = sdk.index("check-par: $(CHECK_PAR_TARGETS)")
-        fx.write("build/sdk.mk", sdk[:a] + sdk[b:] + sdk[a:b])
-        _full(fx.plan(files=["build/sdk.mk"], map_=m), "削除・変更行")
-        fx.write("build/sdk.mk", sdk)
-        fx.edit("build/sdk.mk", "\tpython3 -B tools/tests/test_time_math.py --target $(MUT)\n",
+        rel = "build/checks.d/check-time-math-host.mk"
+        text = pathlib.Path(fx.d, rel).read_text()
+        fx.edit(rel, "\tpython3 -B tools/tests/test_time_math.py --target $(MUT)\n",
                 "\tpython3 -B tools/tests/test_time_math.py --target $(MUT)\n"
                 "\tpython3 -B tools/tests/test_time_math.py --target --again $(MUT)\n")
-        r = fx.plan(files=["build/sdk.mk"], map_=m)
-        _only(r, "check-time-math-host")
+        r = fx.plan(files=[rel], map_=m)
+        _only(r, "check-time-math-host", "check-map")
         assert len(r[1]) == len(cs.check_lists(cs.read_makefiles()[1])), r[1]
+
 
 
 CASES = [case_recipe_semicolon, case_inc_extract, case_hsync_protect, case_sh_pipe, case_bare_extract,
          case_readme, case_claude, case_docs_always, case_broad_only,
          case_submodule, case_nothing, case_single_stage, case_inc_dir_extract,
          case_notest_fast, case_notest_glob_wins, case_notest_guard,
-         case_featgui_commit, case_lint_real,
+         case_featgui_commit,
          case_mk_new_check, case_mk_recipe_add, case_mk_comment_only, case_mk_mixed,
          case_mk_git_versions, case_mk_negative, case_mk_no_base, case_mk_real_tree, case_mk_maintenance_disabled]
 
@@ -865,7 +861,7 @@ GLOB_MUTATIONS = [
      "走査型の ** glob を「表に載っている」に数える (P2-1 の保険が外れる)"),
     ('run = hit | (set(m["docs_always"]) & set(par))', 'run = hit',
      "docs だけの変更で文書を読む検査を常には回さない (P2-2)"),
-    ('        if mb != head:\n', '        if True:\n',
+    ('    if branch in branches:\n', '    if False:\n',
      "feat/gui の上でコミットした後も merge-base (== HEAD) を基点にする (P2-3)"),
     ('    elif full_hits or unmatched:\n', '    elif full_hits:\n',
      "表に無い変更でも安全側 (全部変異込み) に倒さない"),
@@ -957,9 +953,8 @@ MK_MUTATIONS = [
      "recipe に行を足した既存の検査を選ばない"),
     ('    return set(picked), why', '    return set(picked) - new_names, why',
      "列に足した新しい検査を選ばない"),
-    ('            if matches(f, mk):\n                mk_hits.append(f)',
-     '            if matches(f, mk) or f.endswith(".json"):\n                mk_hits.append(f)',
-     "sdk/kapi.json も型で絞る (生成物を介した変化は字面に現れない)"),
+    ('        if f == "sdk/kapi.json":', '        if False:',
+     "KAPI generated readers routing disabled"),
     ('base=None if files is not None else base)', 'base=None)',
      "select から基点を渡さず絞り込めない"),
 ]

@@ -1,0 +1,7 @@
+check-dma8237-host:
+- drivers/dma8237.c
+- drivers/dma8237_math.c
+- tools/tests/dma8237_host.c
+- tools/tests/test_dma8237.py
+- tools/check_map.d/check-dma8237-host.yaml
+- build/checks.d/check-dma8237-host.mk

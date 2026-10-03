@@ -1,0 +1,6 @@
+check-docs-status:
+- docs/tasks/**/*.md
+- docs/POLICY_DEV.md
+- tools/check_docs_status.py
+- tools/check_map.d/check-docs-status.yaml
+- build/checks.d/check-docs-status.mk

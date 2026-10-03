@@ -1,0 +1,7 @@
+check-pci-bind-host:
+- drivers/pci_bind.c
+- drivers/pci_bind_match.c
+- tools/tests/pci_bind_host.c
+- tools/tests/test_pci_bind.py
+- tools/check_map.d/check-pci-bind-host.yaml
+- build/checks.d/check-pci-bind-host.mk

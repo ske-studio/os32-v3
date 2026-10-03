@@ -1,0 +1,9 @@
+check-c-dialect:
+- tools/clang_ast/**
+- tools/tests/test_clang_ast.py
+- '**/*.[ch]'
+- '**/*.inc'
+- sdk/example/hello/**
+- tools/check_c_dialect.py
+- tools/check_map.d/check-c-dialect.yaml
+- build/checks.d/check-c-dialect.mk

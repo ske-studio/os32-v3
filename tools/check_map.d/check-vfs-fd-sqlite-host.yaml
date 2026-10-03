@@ -1,0 +1,6 @@
+check-vfs-fd-sqlite-host:
+- fs/vfs_fd.c
+- tools/tests/test_vfs_fd_sqlite.py
+- tools/tests/vfs_fd_sqlite_host.c
+- tools/check_map.d/check-vfs-fd-sqlite-host.yaml
+- build/checks.d/check-vfs-fd-sqlite-host.mk

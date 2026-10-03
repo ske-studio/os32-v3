@@ -1,0 +1,13 @@
+check-fdc-track-host:
+- drivers/fdc.c
+- drivers/fdc_decide.c
+- drivers/fdc_track.c
+- fs/fatfs/diskio.c
+- fs/fatfs/ff.c
+- fs/fatfs_vfs.c
+- tools/tests/fdc_track_host.c
+- tools/tests/test_fdc_track.py
+- drivers/dma8237_math.c
+- fs/vfs_name_rules.inc
+- tools/check_map.d/check-fdc-track-host.yaml
+- build/checks.d/check-fdc-track-host.mk

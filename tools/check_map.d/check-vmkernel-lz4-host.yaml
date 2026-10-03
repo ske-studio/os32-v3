@@ -1,0 +1,10 @@
+check-vmkernel-lz4-host:
+- tools/tests/host32.py
+- boot/loader_fat_new.asm
+- boot/lz4_mini.c
+- lib/lz4.c
+- tools/mkvmkernel.py
+- tools/tests/test_vmkernel_lz4.py
+- tools/tests/vmkernel_lz4_host.c
+- tools/check_map.d/check-vmkernel-lz4-host.yaml
+- build/checks.d/check-vmkernel-lz4-host.mk

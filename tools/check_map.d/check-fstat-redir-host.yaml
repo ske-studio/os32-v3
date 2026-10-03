@@ -1,0 +1,9 @@
+check-fstat-redir-host:
+- fs/fd_redirect.c
+- fs/vfs.c
+- fs/vfs_fd.c
+- tools/tests/fstat_redir_host.c
+- tools/tests/test_fstat_redir.py
+- tools/tests/mutpar.py
+- tools/check_map.d/check-fstat-redir-host.yaml
+- build/checks.d/check-fstat-redir-host.mk

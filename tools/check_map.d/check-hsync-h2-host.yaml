@@ -1,0 +1,12 @@
+check-hsync-h2-host:
+- build/app.conf
+- docs/manpages/hsync.1
+- tools/tests/hsync_h2_host.c
+- tools/tests/test_hsync_h2.py
+- userland/system/hsync.c
+- lib/crc32_core.inc
+- userland/system/hsync_bootold.inc
+- userland/system/hsync_protect.inc
+- tools/tests/mutpar.py
+- tools/check_map.d/check-hsync-h2-host.yaml
+- build/checks.d/check-hsync-h2-host.mk

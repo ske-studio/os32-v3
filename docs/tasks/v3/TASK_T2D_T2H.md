@@ -3247,3 +3247,210 @@ P3は依頼文の列挙順に番号を付す。反映済みは文書の修正を
     shutdown/ゲスト入口のA4h/A6hもGDC_PAGE_0へ統一し、定数に資料注記、余分な空行を削除。
     最終検査は記録/ソースを固定して実行し、rcは最終報告と
     `/home/hight/os32-tmp/disp-p3-check-changed.log` に残す。
+
+<a id="検査の仕組みの整理-ci-select"></a>
+## 検査の仕組みの整理 (ci-select)
+
+2026-10-03、ユーザー決定の第1・第2段。基点 `1a8a2d2`、`wt/ci-select`。
+カーネル・userland・SDK実装、配備・NP21/W・NHD・iniは変更していない。
+並行のci-stabが担当する壁時計・正常対照の二重・通信・後片付け・鮮度の試験ファイルも変更しない。
+
+- merge-baseがHEADの作業枝ではHEADを使う。feat/gui自身の直前コミットは従来どおりHEAD~1。
+- HOST32の16本は1行マクロ。新規則のrecipe後のPHONYだけ許し、横取り配置は拒否。
+  ring3-guardの直書きmutateとdb-errstrの変異スイッチを修正。
+- 132本の対応表を `tools/check_map.d/`、SDK側の規則と登録を `build/checks.d/` へ分割。
+  全体設定だけ `tools/check_map.yaml`。登録番号で旧列の順を保つ。`.gitignore` の `*.d` から2ディレクトリを除外。
+- ヘッダの明示列挙を除去。gcc -MMと静的includeの和を選択・lintに使う。
+  手書きのソース漏れは引き続きlintで落とす。`--suggest` はヘッダを除く。
+- runner一覧と `docs/TESTS.md` は共通生成器の `--write` で生成、`--check` で照合。
+- kernel/libs/programs.mkはbroadと成果物を読む検査へ、kapi.jsonは生成物を読む検査へ選択。
+  userland/lib/md・tilemapはnotest (broadの走査は維持)。
+- c-dialect-hostの実物のlintを本体検査に集約。make変種9回は変異ありかbuild/検査器変更時のみ。
+  docs-status-host・check-select-hostの実物のlintも各本体へ集約。変異はfixtureで見る。
+
+**取りこぼしの恐れ**: build設定によって正常試験で見えない変異の到達性が変わる場合、
+成果物を間接的に読む新しい試験をartifact_readersへ登録し忘れた場合、生成物への依存を動的に組み立てる場合は、
+狭めた選択から漏れる可能性がある。gccはホスト前処理のためターゲットの全条件を再現せず、失敗したTUと
+非活性分岐は既存の静的include走査で保守的に補う。AST共有・TUキャッシュ・変異キャッシュは今回の範囲外。
+**保証は取り込み後の `make check`。型の変更はPMによる独立レビュー待ち。**
+
+### 試験・所要時間
+
+ログは `/home/hight/os32-tmp/ci-select/`。CROSS_DIR=/home/hight/opt/cross、TMPDIR=/home/hight/os32-tmp、
+PYTHONPATH空、makeはNP21W_DIR=/dev/nullかつstdin=/dev/null。
+
+- 変更前: lint 1.45秒。既定基点がmainのHEADからHEAD~1へ落ちることを実測。
+  全体検査は参照資料の当日50ログで12〜48分 (44/50がfull)。過去の129秒とは条件・試験数が異なる。
+- 新規回帰の旧版実行: 9件中5失敗・1エラー (RED)。修正後9/9 GREEN。
+  追加後12/12 GREEN、選択・型・依存・build/KAPI振り分け・言語検査gateの10変異が10/10 RED。
+- `make all NP21W_DIR=/dev/null`: rc=0、48.48秒。NP21W_DIR=/dev/nullへのコピー警告のみ。
+- 最初のcheck-fast: rc=2、6.09秒。この節へのリンクを先に追加し、節がまだ無くdocs-linksで停止。節追加で修正。
+- 最終結果と代表ログの試算は以下の追記に記録。
+
+### 当日ログの選択試算
+
+当時の未コミット木はログだけでは復元できないため、対応する実装コミットのパス一覧を代理入力とした。
+**build/sdk.mkの検査追加は新しい分割規則とHOST32マクロへ移す**前提で、そのファイルを除いた一覧を
+現行132本の表で `plan()` に渡した。新規分割規則の型は別のfixtureで検証した。
+旧レイアウトの変更をそのまま渡せば引き続きfullになる。これは過去の全50回を完全再現した数値ではない。
+再実行用の入力と出力は `ci-select/simulation.json` / `simulate.py`。
+
+| 代表ログ | 代理コミット | 旧判定 | 新判定 | 変異を回す検査数 |
+|---|---|---|---|---|
+| e3-check-changed.log | 7b49be5 | full (HOST32行) | sel | 57 |
+| e6-check-changed.log | d7ccd6f | full (HOST32行) | sel | 55 |
+| f2-check-changed.log | b2867b7 | full (HOST32行) | sel | 13 |
+| f3-check-changed.log | 7e0a1d9 | full (PHONY行) | sel | 14 |
+| docarch-check-changed.log | 1941a68 | docs | docs | 11 |
+
+新形式でもbuild/sdk.mkのマクロ本体変更やconfig.mkの変更はfullを維持する。
+新規則を前置PHONYで書く形は許さず、recipe後へ移す必要がある。
+
+### 検証の追加記録
+
+- 規則の機械比較: 132本の登録順が変更前と一致。recipe差分はHOST32の16本、変異スイッチ2本、回帰runner追加1本のみ。
+- 選択器既存26/26ケース、44/44変異REDとmaintenance順序1変異RED: rc=0、56.44秒 (`select-mut2.log`)。
+- 新規14/14ケース: rc=0 (`infra-green3.log`)。生成物を故意に古くした写しで `--check` rc=1 → `--write` → rc=0。
+- docs-status: 実物のlintを除いた12ケース、14/14変異RED、rc=0 (`docs-status.log`)。
+- 最終lint: rc=0、132本・漏れ0、12.74秒 (`lint-final.log`)。gcc依存を加えたため旧1.45秒より増えた。
+  通常のソース変更の選択は手書き表だけを引き、ヘッダ変更とKAPI入力変更の時だけgcc依存を展開する。
+- 2回目check-fastと最初の選択器変異試験は、分割側の成功理由に旧試験が求める「型に一致」が無い点を発見して中断 (rc=130)。理由文を合わせ、既存26ケースと45変異で再確認。
+- `gen_tests_inventory.py --write` / `--check`、`git diff --check`: rc=0。
+
+- ヘッダ依存の追加監査: Python内のC断片、裸のC fixture名、手書きのC本体からも辿るよう補正。
+  旧表のヘッダで残らない2件はboot_splash.h (試験が取り込まない宣言) とdb-errstrのexec.h
+  (試験では独自shimへ差し替え)。その他は自動依存または既存の走査globで被覆する。
+  3回目check-fastはこの不足を補うため中断 (rc=130)。
+- 最終回帰16/16 GREEN、追加12/12変異RED (`infra-mut4.log`)。
+  旧HEADの選択器に同じ16ケースを当てると8失敗・3エラー (`red2.log`, rc=1)。
+  既存26/26と44変異＋maintenance順序1変異も再通過 (`select-mut3.log`, rc=0, 65.61秒)。
+  docs-statusの14変異と合わせ、担当箇所の変異は71本 (45+12+14) がRED。
+- ヘッダ補正後lint: rc=0、132本・漏れ0、15.24秒 (`lint7.log`)。
+  永続キャッシュは導入せず、同じ選択プロセスのgcc呼出しだけ重複を避ける。
+- 4回目check-fast: check-memmapがmake all後のkernel.mapとの生成文書のずれを検出 (rc=1、親makeは中断rc=130)。
+  正規の `gen_memmap.py --write` で `docs/02_memory.md` を再生成。カーネルコードの変更ではない。
+- KAPI生成器の実パス `sdk/gen_kapi.py` だけを読む検査の回帰を追加 (17/17 GREEN)。
+  5回目check-fastはこの補正前に中断 (rc=130)。
+- userland/libの未対応C本体を追加監査し、md・tilemapに加えて31ファイルを正確なパスでnotestへ登録。
+  broadの走査は引き続き選び、将来ホスト試験が入力に取り込めばnotestの番人で落とす。
+  補正後lintも132本・漏れ0 (rc=0, lint9.log)。
+
+- KAPI生成器の誤パスを戻す変異も含め、追加17/17ケース・13/13変異が通過 (`infra-mut5.log`)。
+  担当箇所の確認済み変異は72本 (選択器45+追加13+docs-status14)。
+- `make check-fast NP21W_DIR=/dev/null < /dev/null`: **rc=0、339.13秒** (`check-fast6.log`)。
+  MAKEFLAGS=-j4、OS32_MUT_JOBS=4、HOST32_RUNNERS=qemu。nativeはこのsandboxでは実行していない。
+  build規則が変更されているためc-dialectのmake変種9回を含む。木の不変チェックもrc=0。
+
+### 全体検査で見つかったdb-errstrの旧方式 (2026-10-04)
+
+初回の指定スロット経由 `make check`: **rc=2、723.97秒** (`check-full.log`)。
+今回 `$(MUT)` を有効にしたdb-errstrで、変異6の旧 `data_offset == 0` の目印が現行の範囲検査に一致せずSKIP。
+さらに同runnerの変異は実物のkapi_db.cを書き換えて戻す旧方式だった。初回fullでは一時的に実物を変異したが、
+終了後のkapi/kernel/userland/sdkのgit差分は0。以後この方式では実行しない。
+
+このrunnerはci-stabの壁時計・通信・後片付け・鮮度の担当には含まれず、今回変異を有効にするための必須修正として
+`tools/tests/test_db_errstr.py` を修正した。変異ごとにmutparの写しを作り、静的番人も写しを見る。
+写しの正常対照を先に確認し、変異6は同じエラー経路の現在の2行に合わせた。C本体は変更しない。
+
+- `test_db_errstr.py --target --mutate`: 正常5/5、写しの正常5/5、8/8変異RED、**rc=0、8.64秒** (`db-errstr-green.log`)。
+- コンパイラを差し替えた隔離回帰は、変異ごとのbuild入口で元の木が不変であることを確認。旧runnerでは一時のfixture原本を変えるためRED、現行はGREEN。
+- 追加回帰は18/18 GREEN (`infra18.log`)。旧HEADの選択器/DB runnerでは同18件中10失敗・3エラー (`red18.log`, rc=1)。
+- C方言は27/27変異RED、5/5正常対照GREEN (初回full内)。makeの9変種も通過。
+- 番人の入力に増えたDB runner・ハーネス・C本体は対応表へ追加。ユーザーが指定した並行担当ファイルは変更していない。
+
+- 修正版 `make check-fast NP21W_DIR=/dev/null < /dev/null`: **rc=0、304.24秒** (`check-fast7.log`)。
+  qemu / -j4 / OS32_MUT_JOBS=4。コード不変の番人も通過。
+- 旧DB試験の一時書込みでmtimeが変わった成果物を揃えるため、`make all NP21W_DIR=/dev/null < /dev/null` を再実行:
+  **rc=0、3.27秒** (`all-final.log`)。生成メモリ地図も再生成。
+- 修正後lint: **rc=0、132本・漏れ0、10.58秒** (`lint-final2.log`)。
+
+
+### 最終受入結果 (2026-10-04)
+
+`CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp PYTHONPATH= HOST32_RUNNERS=qemu`
+で `/home/hight/os32-tmp/bin/check_slot.sh ci-select-coder make check NP21W_DIR=/dev/null < /dev/null` を実行:
+**rc=0、872.83秒 (14分33秒)** (`check-full-final.log`)。修正版での成功した全体実行は1回。
+check_slotの既定はMAKEFLAGS=-j4 / OS32_MUT_JOBS=4。全132本と前後のソース不変チェックを通過した。
+
+- 選択器: 既存26＋追加18 = **44ケース**、既存44＋maintenance順序1＋追加13 = **58変異RED**。
+- docs-status: 12ケース、14変異RED。C方言: 正常80チェック、27変異RED・5正常対照GREEN。
+- db-errstr: 正常5ケース、写しの正常対照、8変異RED。
+  担当箇所の変異は計107本 (58+14+27+8)。これは全132検査の全変異の合計ではない。
+- 時間: 旧ログの全体12〜48分に対して今回14分33秒。並列度・runner・負荷が異なるため、同条件の速度比とはしない。
+  check-fastは修正後304.24秒 (5分4秒)。build変更のためmake変種9回を含む。通常のC変更では9回を省く回帰を確認。
+- native runner・NP21/W・実機は未実施。NHD・ini・配備は操作していない。
+  最終のkapi/kernel/userland/sdkコード差分は0。初回DB試験の一時変異と修正は上記のとおり。
+- コミット・pushはしていない。型 (HOST32 / PHONY / 分割登録) の独立レビューはPMへ引き渡す。
+
+### 独立レビュー P2/P3 の修正 (ci-select、2026-10-04)
+
+モデル: Codex gpt-6-astra。基点は `1a8a2d2`、コミットはPMへ渡す。
+
+- P2-1: ne2000-ring / shlib の規則を各 checks.d shard に移動。
+  kernel/libs/programs.mk の追加・削除行の両方に check- / MUT / HOST32 / .ONESHELL /
+  export / override / CHECK_PAR が出れば full。比較元が無い場合も full。
+  3ファイル×8形×追加/削除の48反例と、規則の置き場を隔離試験で固定する。
+- P2-2: kapi.json は artifact_readers と build/out・build/sdk を読む検査も選ぶ。
+  gen_kapi.py / kapi_rust_gen.py の実出力15ファイルを列挙し、空の一時ディレクトリで
+  両生成器を走らせた出力集合と一致を検証。各出力の単独readerも選択する。
+  edit-doc / tools-host の表に sdk/rust/os32api/src/** を追加 (lib.rs も被覆)。
+- P2-3: base_refs を全体設定へ追加 (main / origin/main / feat/gui / origin/feat/gui)。
+  現在の枝が基準枝自身なら HEAD~1。main と設定した release/test 上のコミットを試験する。
+- P3: 振り分け対象3ファイルは lint の full 免除から外し、kstr-bench の
+  KSTR_BENCH_FUNCS、memory-host、選択器を読む検査等の表を補正。
+  C方言のmake変種の門に sdk/example/hello/Makefile と tools/tests/mutpar.py を追加。
+  旗の検査で gnu11/gnu89 が各1 TU以上あることを検証し、AST再走査なしの小さな回帰を追加。
+  emu_agent・local-aiスキル・POLICY_DEBUG・gen_memmap・試験一覧生成器の現行参照を更新。
+  過去のTDD記録の build/sdk.mk は当時の記録として維持する。
+- check-fast の339.13秒はdb-errstr修正前、304.24秒は修正後の成功記録。
+  §8-4 と本票の代表値は **304.24秒** に統一してある。
+
+検証ログは `/home/hight/os32-tmp/ci-select-review/`。
+修正前の写しに新27ケースを当てると74 assertion失敗、エラー0、rc=1
+(`copy-red-final.log`)。生成先ごとの漏れ、Rust reader、48形のMake制御、基準枝、lintを含む。
+C方言の旧検査器に軽い回帰を当ててもgnu89欠落で1失敗、rc=1 (`dialect-red.log`)。
+追加試験の最初の置き場assertは実機用check-net-m2まで禁止してしまい1失敗。
+移動対象2規則に限定して修正し、新27ケースはGREEN (`infra-mut-final.log` の正常側)。
+既存変異の最初の実行では基点判定の移動により1本が無効化されGREEN (rc=1)。
+同じ「基準枝でHEAD~1を使わない」不具合を戻す位置へ変異を更新した。
+
+分割前 `1a8a2d2` のMake入力を写しに復元し、現行と GNU make で比較
+(`compare_make.py`, `compare.log`, `database-diff.json`, 各 `.diff`)。
+make -np の検査目標名144個、CHECK_PAR_TARGETS の132本と順序は一致。
+make -n は単独目標141個を MUTATE=0/1 で各1回比較 (282組)。
+MUTATE=0 は138個がバイト一致、差3個は回帰試験追加・db-errstr末尾空白・ring3-guardの変異抑制。
+MUTATE=1 は139個が一致、差2個は回帰試験追加とdb-errstrの --mutate 有効化。
+HOST32の16規則はmake -pでは共通マクロ呼出しに変わるが、両MUTATEの展開は一致。
+ne2000-ring / shlib の規則と展開も両方一致。check-fast / check-changed の集約recipeは
+make -pで一致を確認し、再帰実行を伴うため単独展開比較には含めない (check-parも集約)。
+.PHONYの比較で分割時に余分に付いた7目標を検出し、属性を分割前どおりへ戻した。
+全ての差は上記の意図したMUT修正・回帰追加・HOST32表現変更だけと確認する。
+
+
+レビュー修正後の最終結果:
+
+- `python3 -B tools/tests/test_check_select.py --mutate`: 26/26ケース、45/45変異RED、rc=0。
+- `python3 -B tools/tests/test_checkinfra.py --mutate`: 27/27ケース、18/18変異RED、rc=0。
+  同じ53ケース・63変異は全体検査でも通過。`--select --base HEAD` はfullを選択 (rc=0)。
+- `python3 -B tools/check_select.py --lint`: 132本、漏れ0件、rc=0 (全体検査内も同じ)。
+- make -np の最終再照合で .PHONY は分割前と同じ250目標 (`phony-final.log`, rc=0)。
+- `CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp PYTHONPATH= HOST32_RUNNERS=qemu`
+  で `/home/hight/os32-tmp/bin/check_slot.sh ci-select-coder make check NP21W_DIR=/dev/null < /dev/null`:
+  **rc=0、967.50秒 (16分7.5秒)** (`check-full.log`)。MAKEFLAGS=-j4 / OS32_MUT_JOBS=4。
+  全132検査と前後のソース不変チェックを通過。C方言は84チェック・失敗0、27変異RED・5対照GREEN。
+  実ビルドの翻訳単位はGNU11 345 / GNU89 6 / その他0。
+
+担当箇所の変異内訳 (全132検査の変異合計ではない):
+
+| 試験 | 前回の107本 | レビュー修正後 |
+|---|---:|---:|
+| test_check_select.py (選択44＋maintenance順序1) | 45 | 45 |
+| test_checkinfra.py | 13 | 18 |
+| test_docs_status.py | 14 | 14 |
+| test_c_dialect.py (正常対照5本を除く) | 27 | 27 |
+| test_db_errstr.py | 8 | 8 |
+| **合計 (全てRED)** | **107** | **112** |
+
+native runner・NP21/W・実機は未実施。配備・NHD・ini操作、コミット・pushはしていない。
+
+**ci-select の着地 (PM、2026-10-04)**: 独立レビュー Opus 5.5 は 1 往復目 Request changes (P2-1 kernel.mk / libs.mk / programs.mk の振り分けが型の門を迂回、P2-2 kapi.json の振り分けが成果物を読む検査と edit-doc を取りこぼす、P2-3 main の上のコミットが fast に退化 — 3 件ともレビュアーが写しで実測) → Codex gpt-6-astra が直した → 2 往復目 Approve (前回の反例を写しで再実行し、全部 full か期待どおりの選択)。残る P3 の `CHECK_CONTROL` の大文字小文字 (小文字の `mut_on` / `host32_check`、`BASE := HEAD` で基点が化ける) は PM が正規表現に `\bBASE\b|mut_on|host32_check` と re.IGNORECASE を足して閉じた (振り分け先の mk の `check-` を含むコメントで full に倒れるのは安全側の過剰として残す)。

@@ -1,0 +1,8 @@
+check-fd-redirect-d0a-host:
+- tools/tests/mutpar.py
+- exec/redir_access.c
+- tools/tests/test_fd_redirect_d0a.py
+- tools/tests/fd_redirect_d0a_host.c
+- fs/fd_redirect.c
+- tools/check_map.d/check-fd-redirect-d0a-host.yaml
+- build/checks.d/check-fd-redirect-d0a-host.mk

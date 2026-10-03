@@ -1,0 +1,12 @@
+check-install-recover-host:
+- fs/vfs_fd.c
+- kapi/kapi_db.c
+- lib/sqlite3/os32_sqlite_vfs.c
+- lib/sqlite3/sqlite3.c
+- tools/tests/install_recover_host.c
+- tools/tests/test_install_recover.py
+- tools/tests/vfs_fd_sqlite_host.c
+- userland/system/install.c
+- userland/system/install_recover.inc
+- tools/check_map.d/check-install-recover-host.yaml
+- build/checks.d/check-install-recover-host.mk

@@ -1,0 +1,6 @@
+check-db-owned-host:
+- kapi/kapi_db.c
+- tools/tests/kapi_db_owned_host.c
+- tools/tests/test_kapi_db_owned.py
+- tools/check_map.d/check-db-owned-host.yaml
+- build/checks.d/check-db-owned-host.mk

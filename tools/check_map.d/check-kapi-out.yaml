@@ -1,0 +1,7 @@
+check-kapi-out:
+- kapi/kapi_generated.c
+- sdk/gen_kapi.py
+- tools/tests/test_kapi_out.py
+- tools/check_map.d/check-kapi-out.yaml
+- build/checks.d/check-kapi-out.mk
+- sdk/kapi.json

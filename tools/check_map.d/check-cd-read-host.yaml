@@ -1,0 +1,10 @@
+check-cd-read-host:
+- tools/tests/mutpar.py
+- drivers/atapi.c
+- fs/iso9660.c
+- tools/tests/cd_pkg_host.c
+- tools/tests/cd_read_host.c
+- tools/tests/test_cd_read.py
+- userland/lib/rt/pkg.c
+- tools/check_map.d/check-cd-read-host.yaml
+- build/checks.d/check-cd-read-host.mk

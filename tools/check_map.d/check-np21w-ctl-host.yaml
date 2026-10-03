@@ -1,0 +1,5 @@
+check-np21w-ctl-host:
+- tools/np21w_ctl.py
+- tools/tests/test_np21w_ctl.py
+- tools/check_map.d/check-np21w-ctl-host.yaml
+- build/checks.d/check-np21w-ctl-host.mk

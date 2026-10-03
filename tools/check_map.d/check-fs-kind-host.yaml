@@ -1,0 +1,7 @@
+check-fs-kind-host:
+- tools/tests/fs_kind_host.c
+- tools/tests/test_fs_kind.py
+- userland/shell/cmd_file.c
+- userland/shell/cmd_fs_shared.c
+- tools/check_map.d/check-fs-kind-host.yaml
+- build/checks.d/check-fs-kind-host.mk

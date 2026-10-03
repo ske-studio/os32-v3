@@ -1,0 +1,13 @@
+check-vk32-crc-host:
+- tools/tests/host32.py
+- tools/tests/mutpar.py
+- boot/loader_fat_new.asm
+- boot/lz4_mini.c
+- boot/vk32_boot.c
+- tools/mkvmkernel.py
+- tools/tests/test_vk32_crc.py
+- tools/tests/vk32_old_lz4_3e22825.asm
+- tools/tests/vk32_host.c
+- lib/crc32_core.inc
+- tools/check_map.d/check-vk32-crc-host.yaml
+- build/checks.d/check-vk32-crc-host.mk

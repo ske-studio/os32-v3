@@ -1,0 +1,8 @@
+check-con-sink-host:
+- tools/tests/host32.py
+- kernel/con_sink.c
+- kernel/console.c
+- tools/tests/con_sink_host.c
+- tools/tests/test_con_sink.py
+- tools/check_map.d/check-con-sink-host.yaml
+- build/checks.d/check-con-sink-host.mk

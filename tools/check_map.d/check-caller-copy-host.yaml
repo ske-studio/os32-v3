@@ -1,0 +1,16 @@
+check-caller-copy-host:
+- tools/tests/host32.py
+- kernel/kselftest.c
+- exec/access_walk.c
+- exec/redir_access.c
+- kernel/paging.c
+- kernel/pgalloc.c
+- kernel/physmem.c
+- kernel/shlib.c
+- tools/tests/access_walk_host.c
+- tools/tests/mutpar.py
+- tools/tests/test_access_walk.py
+- tools/tests/caller_copy_host.c
+- tools/tests/test_caller_copy.py
+- tools/check_map.d/check-caller-copy-host.yaml
+- build/checks.d/check-caller-copy-host.mk

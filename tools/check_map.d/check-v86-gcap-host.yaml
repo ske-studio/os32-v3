@@ -1,0 +1,8 @@
+check-v86-gcap-host:
+- kernel/v86_gcap.c
+- kernel/v86_gcap_math.c
+- kernel/v86_test16_gcap.asm
+- tools/tests/test_v86_gcap.py
+- tools/tests/v86_gcap_host.c
+- tools/check_map.d/check-v86-gcap-host.yaml
+- build/checks.d/check-v86-gcap-host.mk

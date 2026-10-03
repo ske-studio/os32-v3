@@ -1,0 +1,5 @@
+check-build-id-host:
+- tools/gen_build_id.py
+- tools/tests/test_build_id.py
+- tools/check_map.d/check-build-id-host.yaml
+- build/checks.d/check-build-id-host.mk

@@ -1,0 +1,14 @@
+check-kstr-bench-host:
+- tools/tests/host32.py
+- build/app.conf
+- lib/kstring_asm.asm
+- lib/kstring_c.c
+- tools/tests/kstr_bench_host.c
+- tools/tests/test_kstr_bench.py
+- userland/deploy.yaml
+- userland/tests/kstr_bench.c
+- tools/tests/mutpar.py
+- tools/check_map.d/check-kstr-bench-host.yaml
+- build/checks.d/check-kstr-bench-host.mk
+- build/libs.mk
+- build/programs.mk

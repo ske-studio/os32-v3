@@ -1,0 +1,14 @@
+check-appmem-map-host:
+- exec/appmem.c
+- exec/appmem_map.c
+- exec/appmem_unmap.c
+- kernel/paging_app.c
+- kernel/paging.c
+- kernel/pgalloc.c
+- kernel/physmem.c
+- tools/tests/appmem_map_host.c
+- tools/tests/test_appmem_map.py
+- tools/tests/host32.py
+- tools/tests/mutpar.py
+- tools/check_map.d/check-appmem-map-host.yaml
+- build/checks.d/check-appmem-map-host.mk

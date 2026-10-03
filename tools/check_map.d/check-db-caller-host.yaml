@@ -1,0 +1,23 @@
+check-db-caller-host:
+- tools/tests/host32.py
+- kernel/kselftest.c
+- exec/access_walk.c
+- exec/redir_access.c
+- kernel/paging.c
+- kernel/pgalloc.c
+- kernel/physmem.c
+- kernel/shlib.c
+- tools/tests/access_walk_host.c
+- tools/tests/mutpar.py
+- tools/tests/test_access_walk.py
+- exec/exec.c
+- exec/ring3_str.c
+- kapi/kapi_db.c
+- tools/tests/db_caller_host.c
+- tools/tests/test_db_caller.py
+- kapi/kapi_generated.c
+- fs/vfs.c
+- userland/tests/db_v50_test.c
+- exec/exec_kapi_init.inc
+- tools/check_map.d/check-db-caller-host.yaml
+- build/checks.d/check-db-caller-host.mk

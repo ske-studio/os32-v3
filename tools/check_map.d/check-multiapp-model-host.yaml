@@ -1,0 +1,16 @@
+check-multiapp-model-host:
+- tools/tests/host32.py
+- exec/appslot.c
+- fs/fd_redirect.c
+- fs/pipe_buffer.c
+- kernel/shm.c
+- tools/tests/multiapp_impl_host.c
+- tools/tests/multiapp_model_host.c
+- tools/tests/owner_reclaim_host.c
+- tools/tests/test_multiapp_impl.py
+- tools/tests/test_multiapp_model.py
+- tools/tests/test_owner_reclaim.py
+- exec/launch.c
+- kernel/kbd_inject.c
+- tools/check_map.d/check-multiapp-model-host.yaml
+- build/checks.d/check-multiapp-model-host.mk

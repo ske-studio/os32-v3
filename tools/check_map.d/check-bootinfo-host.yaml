@@ -1,0 +1,9 @@
+check-bootinfo-host:
+- boot/bootinfo.inc
+- drivers/ide.c
+- kernel/bootinfo.c
+- kernel/bootinfo_check.c
+- tools/tests/bootinfo_host.c
+- tools/tests/test_bootinfo.py
+- tools/check_map.d/check-bootinfo-host.yaml
+- build/checks.d/check-bootinfo-host.mk

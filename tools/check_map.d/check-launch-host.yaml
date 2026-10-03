@@ -1,0 +1,8 @@
+check-launch-host:
+- tools/tests/host32.py
+- exec/launch.c
+- tools/tests/launch_host.c
+- tools/tests/test_launch.py
+- exec/appslot.c
+- tools/check_map.d/check-launch-host.yaml
+- build/checks.d/check-launch-host.mk

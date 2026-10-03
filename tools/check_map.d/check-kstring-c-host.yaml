@@ -1,0 +1,9 @@
+check-kstring-c-host:
+- tools/tests/host32.py
+- lib/kstring_asm.asm
+- lib/kstring_c.c
+- tools/tests/kstring_c_host.c
+- tools/tests/test_kstring_c.py
+- tools/tests/mutpar.py
+- tools/check_map.d/check-kstring-c-host.yaml
+- build/checks.d/check-kstring-c-host.mk

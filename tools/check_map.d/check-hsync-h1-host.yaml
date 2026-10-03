@@ -1,0 +1,14 @@
+check-hsync-h1-host:
+- fs/hostdrv_stat_rules.inc
+- fs/hostdrvfs.c
+- lib/crc32.c
+- tools/tests/hsync_h1_host.c
+- tools/tests/test_hsync_h1.py
+- userland/system/hsync.c
+- userland/system/hsync_protect.inc
+- fs/hostdrv_list_rules.inc
+- fs/vfs_name_rules.inc
+- lib/crc32_core.inc
+- userland/system/hsync_bootold.inc
+- tools/check_map.d/check-hsync-h1-host.yaml
+- build/checks.d/check-hsync-h1-host.mk

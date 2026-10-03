@@ -48,10 +48,11 @@ import os
 import re
 import sys
 import tempfile
+import check_select
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_REL = "docs/TESTS.md"
-MK_FILES = ["build/sdk.mk", "build/kernel.mk", "build/programs.mk"]
+MK_FILES = check_select.makefile_paths()
 CI_WORKFLOW = ".github/workflows/check.yml"
 
 # 実行スクリプトの module 直下の代入のうち、対象ソース / ハーネスを指しているもの。
@@ -135,6 +136,9 @@ def parse_makefiles():
                     # the nested $(firstword ...) remains a readable variable.
                     if cmd.startswith("$(if $(MUT),") and cmd.endswith(",@:)"):
                         cmd = cmd[len("$(if $(MUT),"):-len(",@:)")]
+                    macro = check_select.TPL_HOST32_RE.match("\t" + cmd.strip())
+                    if macro:
+                        cmd = "HOST32_RUNNERS ごと: python3 -B tools/tests/%s --runner <runner>; 先頭で $(MUT)" % macro.group(1)
                     cmd = cmd.replace("$(MUTS)", "--mutants").replace(
                         "$(MUT)", "--mutate")
                     if 'for runner in $(HOST32_RUNNERS);' in cmd:
@@ -155,15 +159,7 @@ def parse_makefiles():
 
 def parse_variables():
     """build/*.mk の `NAME := …` (行継続込み) を {NAME: [語…]} で返す。"""
-    out = {}
-    for mk in MK_FILES:
-        text = read(mk)
-        if text is None:
-            continue
-        text = re.sub(r"\\\n", " ", text)
-        for m in re.finditer(r"^([A-Z_][A-Z0-9_]*)\s*:?=\s*(.*)$", text, re.M):
-            out[m.group(1)] = m.group(2).split()
-    return out
+    return check_select.read_makefiles()[1]
 
 
 # ---------------------------------------------------------------------------
@@ -499,8 +495,7 @@ HEADER = """<!-- 生成物: tools/gen_tests_inventory.py が build/*.mk と試�
 
 OS32 の自動試験の**正典**。日付を持たない (快照ではないので古くならない)。表は
 [`tools/gen_tests_inventory.py`](../tools/gen_tests_inventory.py) が
-[`build/sdk.mk`](../build/sdk.mk) / [`build/kernel.mk`](../build/kernel.mk) /
-[`build/programs.mk`](../build/programs.mk) と各試験スクリプトから生成する。
+[`build/checks.d/`](../build/checks.d/) / [`build/sdk.mk`](../build/sdk.mk) と各試験スクリプトから生成する。
 
 ```
 python3 tools/gen_tests_inventory.py --write    # 表を更新する
@@ -537,7 +532,7 @@ RULE_TEXT = """## 1. 名前の対応規則
 
 ## 2. `make check` の列 ({n} ターゲット)
 
-`build/sdk.mk` の `CHECK_PAR_TARGETS` (`check-par` の依存) が
+`build/checks.d/*.mk` の登録から集めた `CHECK_PAR_TARGETS` (`check-par` の依存) が
 正典。この表はその列をそのまま展開したもの。コマンド列は `make check` (変異込み) の形。
 """
 
@@ -591,7 +586,26 @@ def main():
     current = read(OUT_REL)
     fresh = render(read_manual(current))
 
+    build_current = read("docs/08_build.md")
+    names = []
+    for t, info in parse_makefiles().items():
+        for cmd in info["recipe"]:
+            if "HOST32_RUNNERS ごと:" in cmd:
+                names += [os.path.basename(p)[5:-3] for p in PY_IN_CMD.findall(cmd)]
+    block = ("<!-- generated:host32 -->\n"
+             "`HOST32_RUNNERS` は既定 `native qemu`。%d 試験 (%s) の正常対照を指定した全 runner、"
+             "変異を先頭の runner で実行する。native への自動 fallback はしない。\n"
+             "<!-- /generated:host32 -->") % (len(names), " / ".join(names))
+    if build_current.count("<!-- generated:host32 -->") != 1 or build_current.count("<!-- /generated:host32 -->") != 1:
+        raise SystemExit("docs/08_build.md: runner generation markers missing/duplicated")
+    build_fresh = re.sub(r"<!-- generated:host32 -->.*?<!-- /generated:host32 -->",
+                         lambda _: block, build_current, flags=re.S)
+    if args.check and build_current != build_fresh:
+        print("docs/08_build.md runner list is stale; run --write")
+        return 1
     if args.write:
+        with open(os.path.join(ROOT, "docs/08_build.md"), "w", encoding="utf-8") as f:
+            f.write(build_fresh)
         with open(path, "w", encoding="utf-8") as f:
             f.write(fresh)
         print("%s を書き出した (%d 行)" % (OUT_REL, fresh.count("\n")))

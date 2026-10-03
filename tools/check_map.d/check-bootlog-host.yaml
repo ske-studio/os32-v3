@@ -1,0 +1,13 @@
+check-bootlog-host:
+- fs/ext2_dir.c
+- fs/ext2_vfs.c
+- fs/fatfs_vfs.c
+- kernel/bootlog.c
+- kernel/bootlog_save.c
+- kernel/console.c
+- kernel/kernel.c
+- tools/tests/bootlog_host.c
+- tools/tests/test_bootlog.py
+- fs/vfs_name_rules.inc
+- tools/check_map.d/check-bootlog-host.yaml
+- build/checks.d/check-bootlog-host.mk

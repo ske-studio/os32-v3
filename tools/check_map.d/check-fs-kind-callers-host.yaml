@@ -1,0 +1,8 @@
+check-fs-kind-callers-host:
+- tools/tests/fs_kind_callers_host.c
+- tools/tests/test_fs_kind_callers.py
+- userland/shell/cmd_file.c
+- userland/shell/cmd_fs_shared.c
+- tools/tests/mutpar.py
+- tools/check_map.d/check-fs-kind-callers-host.yaml
+- build/checks.d/check-fs-kind-callers-host.mk

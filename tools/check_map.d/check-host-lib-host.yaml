@@ -1,0 +1,11 @@
+check-host-lib-host:
+- tools/tests/host_cmd_host.c
+- tools/tests/host_lib_host.c
+- tools/tests/test_host_lib.py
+- userland/cmds/hclip.c
+- userland/cmds/hdate.c
+- userland/cmds/lpr.c
+- userland/cmds/wget.c
+- userland/lib/host/libos32host.c
+- tools/check_map.d/check-host-lib-host.yaml
+- build/checks.d/check-host-lib-host.mk

@@ -1,0 +1,9 @@
+check-cirrus-win-host:
+- tools/tests/host32.py
+- drivers/wab_glue_xe10.c
+- gfx/backend_cirrus.c
+- tools/tests/cirrus_win_host.c
+- tools/tests/mutpar.py
+- tools/tests/test_cirrus_win.py
+- tools/check_map.d/check-cirrus-win-host.yaml
+- build/checks.d/check-cirrus-win-host.mk

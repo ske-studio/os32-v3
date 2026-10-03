@@ -1,0 +1,5 @@
+check-term-render:
+- userland/libos32term_render/**
+- userland/libos32term/**
+- tools/check_map.d/check-term-render.yaml
+- build/checks.d/check-term-render.mk

@@ -1,0 +1,8 @@
+check-pit-clock-host:
+- kernel/idt.c
+- kernel/pit_math.c
+- kernel/sysclk.c
+- tools/tests/pit_clock_host.c
+- tools/tests/test_pit_clock.py
+- tools/check_map.d/check-pit-clock-host.yaml
+- build/checks.d/check-pit-clock-host.mk

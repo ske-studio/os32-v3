@@ -1,0 +1,8 @@
+check-cat-linenum-host:
+- tools/tests/cat_linenum_host.c
+- tools/tests/test_cat_linenum.py
+- userland/shell/cmd_file.c
+- userland/shell/cmd_fs_shared.c
+- tools/tests/mutpar.py
+- tools/check_map.d/check-cat-linenum-host.yaml
+- build/checks.d/check-cat-linenum-host.mk

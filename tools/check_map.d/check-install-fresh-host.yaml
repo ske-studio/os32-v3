@@ -1,0 +1,12 @@
+check-install-fresh-host:
+- drivers/pc98pt.c
+- fs/ext2_layout.c
+- tools/tests/install_fresh_host.c
+- tools/tests/test_install_fresh.py
+- userland/shell/hdprep_plan.c
+- userland/system/inst_disk.c
+- userland/system/inst_hdd.c
+- userland/system/install.c
+- userland/system/install_recover.inc
+- tools/check_map.d/check-install-fresh-host.yaml
+- build/checks.d/check-install-fresh-host.mk

@@ -1,0 +1,7 @@
+check-kprintf-attr-host:
+- lib/kprintf.c
+- lib/kprintf_attr.c
+- tools/tests/kprintf_attr_host.c
+- tools/tests/test_kprintf_attr.py
+- tools/check_map.d/check-kprintf-attr-host.yaml
+- build/checks.d/check-kprintf-attr-host.mk

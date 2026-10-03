@@ -1,0 +1,23 @@
+check-serialfs-host:
+- tools/tests/mutpar.py
+- drivers/serial.c
+- drivers/serial_plan.c
+- fs/serialfs.c
+- fs/serialfs_session.c
+- fs/sfs_client.c
+- fs/sfs_proto.c
+- kernel/sys.c
+- lib/crc32.c
+- tools/rshell_serial.py
+- tools/serialfs_host.py
+- tools/tests/serial_gate_host.c
+- tools/tests/serial_portc_host.c
+- tools/tests/serialfs_host.c
+- tools/tests/serialfs_session_host.c
+- tools/tests/test_serial_portc.py
+- tools/tests/test_serialfs.py
+- userland/shell/serial_watchdog.c
+- userland/system/hsync_bootold.inc
+- lib/crc32_core.inc
+- tools/check_map.d/check-serialfs-host.yaml
+- build/checks.d/check-serialfs-host.mk

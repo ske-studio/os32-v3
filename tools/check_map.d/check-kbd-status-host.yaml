@@ -1,0 +1,8 @@
+check-kbd-status-host:
+- drivers/kbd.c
+- drivers/kbd_status.c
+- kernel/v86_kbd.c
+- tools/tests/kbd_status_host.c
+- tools/tests/test_kbd_status.py
+- tools/check_map.d/check-kbd-status-host.yaml
+- build/checks.d/check-kbd-status-host.mk

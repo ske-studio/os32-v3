@@ -1,0 +1,8 @@
+check-serial-vfast-host:
+- drivers/serial.c
+- drivers/serial_plan.c
+- tools/tests/serial_vfast_host.c
+- tools/tests/test_serial_vfast.py
+- userland/shell/serial_watchdog.c
+- tools/check_map.d/check-serial-vfast-host.yaml
+- build/checks.d/check-serial-vfast-host.mk

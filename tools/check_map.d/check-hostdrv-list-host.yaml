@@ -1,0 +1,9 @@
+check-hostdrv-list-host:
+- fs/hostdrv_list_rules.inc
+- fs/hostdrvfs.c
+- tools/tests/hostdrv_list_host.c
+- tools/tests/test_hostdrv_list.py
+- fs/hostdrv_stat_rules.inc
+- fs/vfs_name_rules.inc
+- tools/check_map.d/check-hostdrv-list-host.yaml
+- build/checks.d/check-hostdrv-list-host.mk

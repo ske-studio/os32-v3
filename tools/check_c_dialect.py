@@ -389,6 +389,9 @@ def check_build_flags(root):
     for (exp, eff), srcs in sorted(bad.items()):
         probs.append("%d 単位が %s でなく %s: %s%s" % (
             len(srcs), exp, eff, " ".join(srcs[:6]), " …" if len(srcs) > 6 else ""))
+    for std in (STD_MAIN, STD_SQLITE):
+        if not counts.get(std, 0):
+            probs.append("%s の翻訳単位が 0 本 (検査が空振りしている)" % std)
     probed = 0
     for (cc, sig) in sorted({(u["cc"], u["sig"]) for u in units
                              if expected_std(u["src"]) == STD_MAIN}):

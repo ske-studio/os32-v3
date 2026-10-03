@@ -1,0 +1,8 @@
+check-serial-portc-host:
+- drivers/serial.c
+- drivers/serial_plan.c
+- kernel/sys.c
+- tools/tests/serial_portc_host.c
+- tools/tests/test_serial_portc.py
+- tools/check_map.d/check-serial-portc-host.yaml
+- build/checks.d/check-serial-portc-host.mk

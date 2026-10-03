@@ -1,0 +1,5 @@
+check-gui-proto:
+- sdk/rust/os32api/src/gui/proto.rs
+- tools/check_gui_proto.py
+- tools/check_map.d/check-gui-proto.yaml
+- build/checks.d/check-gui-proto.mk

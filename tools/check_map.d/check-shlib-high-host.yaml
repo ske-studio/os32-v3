@@ -1,0 +1,11 @@
+check-shlib-high-host:
+- tools/tests/host32.py
+- tools/tests/test_shlib_high.py
+- tools/tests/shlib_high_host.c
+- kernel/shlib.c
+- exec/os32x_hdr.c
+- kernel/paging.c
+- kernel/pgalloc.c
+- kernel/physmem.c
+- tools/check_map.d/check-shlib-high-host.yaml
+- build/checks.d/check-shlib-high-host.mk

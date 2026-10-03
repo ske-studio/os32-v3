@@ -1,0 +1,4 @@
+check-term-model:
+- userland/libos32term/**
+- tools/check_map.d/check-term-model.yaml
+- build/checks.d/check-term-model.mk

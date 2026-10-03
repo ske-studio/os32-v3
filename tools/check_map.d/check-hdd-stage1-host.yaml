@@ -1,0 +1,24 @@
+check-hdd-stage1-host:
+- tools/tests/host32.py
+- tools/tests/mutpar.py
+- boot/boot_main.c
+- build/core.yaml
+- drivers/ide_addr.c
+- drivers/pc98pt.c
+- fs/ext2_dir.c
+- fs/ext2_file.c
+- fs/ext2_fmt.c
+- fs/ext2_inode.c
+- fs/ext2_layout.c
+- fs/ext2_super.c
+- tools/deploy_manifests.py
+- tools/deploy_protect.py
+- tools/nhd_deploy.py
+- tools/pc98pt.py
+- tools/tests/ext2_part_host.c
+- tools/tests/hdd_stage1_host.c
+- tools/tests/test_hdd_stage1.py
+- userland/deploy.yaml
+- userland/shell/hdprep_plan.c
+- tools/check_map.d/check-hdd-stage1-host.yaml
+- build/checks.d/check-hdd-stage1-host.mk
