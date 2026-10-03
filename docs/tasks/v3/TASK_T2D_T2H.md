@@ -1324,6 +1324,83 @@ C方言27/27 RED・5/5 GREEN、公開ヘッダgnu89も通過。
 **e7 の着地 (PM、2026-10-03)**: 独立レビュー Opus 5.5 は Approve (P1/P2 なし。レビュアーは test_gui_reattach 7/7・test_gfx_reattach 167 を再実行し、本番 (port が NULL) では帰路の check が失敗する経路が無く、Painter の門を迂回する blit・漢字も C の入口の門で守られることを確認)。PM のホスト検査は native の単体と `check_slot.sh` 経由の `HOST32_RUNNERS="native qemu"` check-changed で rc=0。**e8a で直す** (ref_e8a §9): P3-4 init していないアプリの `os32api::gfx::shutdown` が NULL を辿る、P3-5 gdi_test と試験の注記の「次の check で回収」は誤り (同じ世代なら再利用、回収は世代が変わったときか終了時)、P3-6 Rust の `static gfx_ready` / `gfx_fb` を不変で宣言している (C が書き換える、形式上 UB)。**e11 へ**: P3-1 wait の帰路の check が失敗すると run_vt を抜けて窓アプリが終わる (Q1 の「描画不可のまま続けて回復」は初回の attach だけに効く)、P3-2 Painter の門はオフスクリーンの描画も止める、P3-8 OP_WAIT 以外の park (WAIT_KEY・WAIT_POLL) で戻った shlib の利用者は帰路の check を通らない、P3-9 帰路の check の負値が OP_WAIT の値を上書きする。記録: P3-3 stub の check_gfx と os32api の present/shutdown は Rust 試験では贋物を通している、P3-7 libos32gfx_detach は公開ヘッダに無い (C は shlib を使えないので実害なし)。
 
 **e7 のゲスト受入 (PM、2026-10-03)**: main へ取り込み (`19f9346`、e8b と sdk.mk・08_build・check_map・TESTS・票が競合 → 両方を残し、全 runner の列挙を実物の 14 本に、check_map は両方の版から 2 つの検査の入力一覧を組み直し、TESTS.md は生成器で再生成)。コミット済みの木で `make all` rc=0・`make check` rc=0、push。NP21/W を停止 → 停止確認 → `nhd-pull` → `deploy-kernel` (直後の 483,472 B を控えた) → `deploy` → 起動 (17MB、今の ini)。`ver` の Commit `19f9346`・Image 483,472 B が控えと一致、**kselftest pass 274 / fail 0**。回帰の一式 (db_test 9/9、db_v50_test 41/41、klibc_test 49/49、alloc_demo 16/16、d0a_test、faulttest 4 件、loop・kloop + CTRL+STOP、`v86 -t`) OK。GUI (gui_demo の窓 → ESC → CUI) OK (新しい shlib — 帰路の check・Painter の門 — で描画)。**gdi_test (2 実体: static の libos32gfx と shlib の G API) を GUI から起動し、16 色の見本・装飾・クリップ・日本語の混在表示を確認**。終わりはキー待ち (全画面アプリへの注入キーが届かない既知の件、e11) なので CTRL+STOP で畳んだ。カウンタ: 深さ 0、`ledger_*_ops`=0、`exec_as_leftover_pages`=0、`irq_ctx_violations`=1。
+
+### e10a 実装結果 (2026-10-03、Codex GPT-6)
+
+基点 `b5c0351`、ブランチ `wt/e10a`。PM 判断 Q1〜Q9 に沿った実装。
+**ホスト検証段階。ゲスト受入・e11 の全切替は未実施**。
+
+- Q1/Q2: master汎用3口はlive AS > 0のPTE_USER要求を無変更拒否。
+  V86は低位1MB専用`paging_v86_map_range`へ移し、teardownの
+  `paging_pde_clear_user`直後にPDE0 USERを戻してactive CR3を再ロード。
+- Q3: shm_init直後・kselftestの最初のAS前に`paging_boot_user_shared`を一回。
+  SHM=USER|RW/WB、静的BSSのtrampoline=USER|RO/WB。
+  exec_initで従来どおりWP=0の内容構築。二回目とlive AS中は拒否。
+  毎起動のSHM/trampoline mapを撤去し、create_nのmaster PDE継承を試験。
+- Q4: `paging_shm_set_rw`は範囲/整列/恒等PFN/登録共有PT/present/USERを
+  全範囲で先に検査。USER欠落は無変更-1と`paging_shm_user_missing_count`加算。
+  lock=USER|RO、free/free_owned/cleanup_all=USER|RW、WB、active TLB同期。
+  権限変更失敗時はSHM状態を解放済みにしない。cleanup_allは残す。
+- Q5/Q6/Q9: 地図期待はSHM=MM_RWU。memmap再生とboot順序/stubを更新。
+  kselftestは汎用拒否とSHM USER/RW/WBの2項目を足し、**276/0見込み** (従来274/0)。
+  paging.h/cとgen_memmapの注記を更新し、02_memoryを再生成。
+  新ILP32正常47条件+結線4条件、必須を含む11/11変異 (runtime9、結線2)。
+  [shm_user_tdd.md](../../../tools/tests/shm_user_tdd.md)に境界・RED/GREENを記録。
+  全runner対象は基点の実物14本→15本。資料の15→16は並行e8a着地後の数。
+- Q8: e9担当のrshell/アプリ/tvdumpには変更なし。
+
+**変えない試験 (Q1、e11で統合)**: `paging_bounds_host.c` のkeep成功期待、
+`access_walk_host.c` の共有PT map成功期待、kselftest `test_map_user_keep` と
+`paging_map_user_keep_selftest` の中身はそのまま。addrspaceの共有PT経路、
+execのVRAM/font/Unicode/BB直接USERとring3_ptr_okの例外もe11へ残す。
+
+**Q7予算 (同一CROSS_DIR、byte、build ID差込み)**:
+
+| 項目 | 前 | 後 | 増分 |
+|---|---:|---:|---:|
+| kernel.bin | 367,628 | 368,356 | +728 |
+| vmkernel.lz4 | 483,472 | 483,911 | +439 |
+| __bss_end | 0x18D418 | 0x18D6F8 | +736 |
+| 本体 (BSS/整列込み) | 578,584 | 579,320 | +736 |
+| ASSERT残り | 31,720 | 30,984 | −736 |
+| e枠残り | 11,864 | 11,128 | −736 |
+
+2,000B枠に対し736B、残り1,264B。並行e8aの増分は含まない。
+KHEAP/SHMのページ境界は維持。公開KAPI/版/生成物は未変更。
+
+**試験と申し送り**: make all rc=0、既存memory_boot 19件、owner_reclaim、
+memmap正常/13変異を確認。全体検査の前に票/ソースを固定し、
+`check_slot.sh e10a-coder env HOST32_RUNNERS=qemu make check-changed NP21W_DIR=/dev/null < /dev/null`
+を実行、結果は終了後に追記する。初回試験のsignal11と結線範囲選択の誤りは
+ホスト足場を修正。単体コマンドのPATH引用不足は実行前rc=127、引用して再実行。
+make allの/dev/nullへのFDコピー警告は指定環境による。配備はしていない。
+
+PM判断からの逸脱なし。e10bへsessionの入退場・失敗/STOP全出口、e10cへ3段検査。
+e11へ共有PT拒否/旧USER撤去/公開世代一括変更、および**shm_free/lockのowner照合が
+無い点** (sys_shm_*の意味が変わるため記録のみ)。受入はPMが17MB・現行iniで
+**`v86 -t`後のアプリでもSHMとtrampolineが使えること**、lock→free/exit→
+二本目アプリのSHM書込みを確認する。NP21/W/NHD/ini/実機には触れていない。
+
+初回全体検査はslot1、full選択、**rc=2**。既存surface bundle試験が撤去した
+SHMコメントをexec VRAMコードの抽出終端にしていたため失敗。
+終了を待って`test_surface_lease.py`の終端を次のフォントコメントへ変更し、
+抽出するVRAMコードと既存UC変異の意図は維持する。GUI予約帯もSHMと同じ
+RW+USER表記へ同期。surface bundle正常対照と21/21変異はrc=0、
+追随修正後のmake allもrc=0、予算数値は不変。再検査も同じcheck_slot経由で実施する。
+
+**最終結果 (全体検査終了後の追記)**:
+`/home/hight/os32-tmp/bin/check_slot.sh e10a-coder env HOST32_RUNNERS=qemu make check-changed NP21W_DIR=/dev/null < /dev/null`
+は **rc=0、成功1回、slot0、full選択** (初回は上記抽出終端の不整合でrc=2)。
+待ち行列を経由し、検査中の票/ソース変更なし。登録130検査、新規SHM正常47条件と
+結線4条件、11/11変異、surface bundle 21/21変異を含めて通過。
+最終make all、gen_memmap --write、gen_tests_inventory --write、check_select --lintもrc=0。
+ログ: `/home/hight/os32-tmp/e10a-check-changed-final.log`、`e10a-all-verified.log`、
+`e10a-shm-final.log`、`e10a-bundle.log`。kselftest 276/0は未配備の見込み値。
+commit/pushなし。ゲスト受入・独立レビューはPMへ引き渡す。
+
+
+
+**e10a の着地 (PM、2026-10-03)**: 独立レビュー Opus 5.5 は Approve (P1/P2 なし。レビュアーは test_shm_user 47 CHECK・変異 11/11 を native で、main 454d9de (e8a・tvramfix 後) に差分を当てた写しで関係 9 本を native で再実行し全 PASS。コードの衝突なし)。PM のホスト検査 (`check_slot.sh` 経由の `HOST32_RUNNERS="native qemu"` check-changed) は rc=2 — test_appmem_map の変異 3 本と test_surface_lease の変異 1 本が時間切れ (30〜60 秒超)。ロードアベレージ 24 (2 枠 × 並列度 6 に qemu とコーダーのビルドが重なった) のためで、この 2 本を単独で回し直すと rc=0・変異はすべて 2 秒前後で RED。→ `check_slot.sh` の枠あたりの並列度を 6 から 4 に下げた。**e10b へ**: P3-2 `paging_v86_map_range` は session を見ない (低位 1MB にどの文脈からでも USER を立てられる。今の呼び手は v86_mem.c だけ) — session 口に吸収する。**e10c へ**: P3-1 汎用口の禁止は live AS が今ある間だけ (live==0 の合間に汎用口で USER を立てると共有 PT0 経由で次のアプリへ引き継がれる。今は呼び手なし) — 一度立てたら戻らない旗にするか (a) 検査で拾う、P3-3 `paging_shm_set_rw` は master の PDE の USER を検査しない (set_page_noflush の OR が黙って立て直す)。記録: P3-4 USER 欠落時の shm_free_owned / cleanup_all は死んだ owner の ID のブロックを残す (不変条件違反が前提)、P3-5 試験の変異 boot-order・launch-shm の形と kselftest の SHM 項目が先頭 1 ページだけ、P3-7 test_ring3_pd の新しい項目は selftest_as_begin の失敗で素通り。数: kselftest は main で 277/0 の見込み、全 runner の列は 16 本。
 ## 3. T2f — map/unmapとallocator、暫定heap終了
 
 ### 3-1. 着手条件・範囲

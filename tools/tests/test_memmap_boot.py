@@ -115,6 +115,8 @@ def check_shm_replay():
         raise SystemExit("shm_init() の写しがずれている: 本物 %s / 写し %s\n"
                          "  tools/tests/memmap_boot_host.c の shm_init_replay() を直すこと"
                          % (calls, replay))
+    boot = HARNESS.read_text(encoding="utf-8")
+    assert boot.index('    shm_init_replay();') < boot.index('paging_boot_user_shared(tramp)') < boot.index('paging_addrspace_create(&as'), 'shared boot before AS replay'
 
 
 def build_and_run(tmp, case, mutation=None, kb=8192, initial_if=0x202):

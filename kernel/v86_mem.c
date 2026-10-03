@@ -75,13 +75,14 @@ int v86_mem_setup(u32 owner)
      * フォントキャッシュ以降 (0x1000-) はバッキングのままなので、
      * ゲストが OS32 のデータを壊す心配はない。
      *
-     * ゲストは CPL=3 なので USER を付ける。paging_set_page() が PDE 側にも
+     * ゲストは CPL=3 なので USER を付ける。V86 専用口が PDE 側にも
      * USER を伝播させる (実効権限は PDE と PTE の論理積のため)。 */
-    paging_set_page(0, 0, PAGE_RW | PTE_USER);
+    if (paging_v86_map_range(0, PAGE_SIZE, 0, PAGE_RW | PTE_USER) != 0)
+        goto fail;
 
     /* ページ 1 以降をバッキング RAM へ。backing_phys の先頭がゲストの
      * 0x1000 に対応する (ページ 0 はバッキングを持たない)。 */
-    if (paging_map_range(V86_REMAP_START + PAGE_SIZE, V86_REMAP_END,
+    if (paging_v86_map_range(V86_REMAP_START + PAGE_SIZE, V86_REMAP_END,
                          backing_phys, PAGE_RW | PTE_USER) != 0) {
         goto fail;
     }
@@ -107,7 +108,7 @@ int v86_mem_setup(u32 owner)
         int mi;
         for (mi = 0; mi < V86_IDENT_MAP_N; mi++) {
             const struct v86_ident_ent *e = &v86_ident_map[mi];
-            if (paging_map_range(e->start, e->end, e->start,
+            if (paging_v86_map_range(e->start, e->end, e->start,
                                  e->setup_flags) != 0) {
                 goto fail;
             }
@@ -149,8 +150,8 @@ void v86_mem_teardown(void)
      *  経緯が残っている)。ここを勝手に Not-Present にすると、次に
      * v86_bios_save_real() が IVT を読んだ瞬間に #PF する。
      * teardown は「元に戻す」のであって「あるべき姿にする」のではない。 */
-    paging_set_page(0, 0, PAGE_RO);
-    paging_map_range(V86_REMAP_START + PAGE_SIZE, V86_REMAP_END,
+    paging_v86_map_range(0, PAGE_SIZE, 0, PAGE_RO);
+    paging_v86_map_range(V86_REMAP_START + PAGE_SIZE, V86_REMAP_END,
                      V86_REMAP_START + PAGE_SIZE, PAGE_RW);
 
     /* VRAM / ROM から USER を剥がす (setup と同じ表の teardown 側属性) */
@@ -158,13 +159,14 @@ void v86_mem_teardown(void)
         int mi;
         for (mi = 0; mi < V86_IDENT_MAP_N; mi++) {
             const struct v86_ident_ent *e = &v86_ident_map[mi];
-            paging_map_range(e->start, e->end, e->start, e->teardown_flags);
+            paging_v86_map_range(e->start, e->end, e->start, e->teardown_flags);
         }
     }
 
     /* PDE 側の USER も落とす。paging_set_page() は USER を立てる方向にしか
      * 伝播させないので、ここで明示的に戻す。 */
     paging_pde_clear_user(V86_REMAP_START, MEM_BIOS_ROM_END);
+    paging_v86_restore_shared_user();
 
     /* ゲストに開けたポートを全部塞ぐ */
     v86_io_reset_policy();

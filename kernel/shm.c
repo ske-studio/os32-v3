@@ -173,7 +173,8 @@ int shm_lock(void *ptr)
 
     /* 全ブロックの全ページを Read-Only に (連続範囲なので一括) */
     addr = block_to_addr(idx);
-    paging_map_range(addr, addr + (u32)span * SHM_BLOCK_SIZE, addr, PAGE_RO);
+    if (paging_shm_set_rw(addr, addr + (u32)span * SHM_BLOCK_SIZE, 0) != 0)
+        return -1;
     for (i = 0; i < span; i++) {
         shm_state[idx + i] = SHM_LOCKED;
     }
@@ -199,7 +200,8 @@ int shm_free(void *ptr)
 
     /* 全ブロックの全ページを R/W に戻して解放 (連続範囲なので一括) */
     addr = block_to_addr(idx);
-    paging_map_range(addr, addr + (u32)span * SHM_BLOCK_SIZE, addr, PAGE_RW);
+    if (paging_shm_set_rw(addr, addr + (u32)span * SHM_BLOCK_SIZE, 1) != 0)
+        return -1;
     for (i = 0; i < span; i++) {
         shm_state[idx + i] = SHM_FREE;
         shm_block_owner[idx + i] = 0;
@@ -228,8 +230,8 @@ void shm_free_owned(int owner)
         if (shm_block_owner[i] != owner) continue;
         /* ページ属性を R/W に戻す (lock されていたぶんを含む) */
         blk_start = block_to_addr(i);
-        paging_map_range(blk_start, blk_start + SHM_BLOCK_SIZE,
-                         blk_start, PAGE_RW);
+        if (paging_shm_set_rw(blk_start, blk_start + SHM_BLOCK_SIZE, 1) != 0)
+            continue;
         shm_state[i] = SHM_FREE;
         shm_block_owner[i] = 0;
         shm_block_span[i] = 0;
@@ -253,8 +255,8 @@ void shm_cleanup_all(void)
         if (shm_state[i] != SHM_FREE) {
             /* ページ属性をR/Wに戻す */
             blk_start = block_to_addr(i);
-            paging_map_range(blk_start, blk_start + SHM_BLOCK_SIZE,
-                             blk_start, PAGE_RW);
+            if (paging_shm_set_rw(blk_start, blk_start + SHM_BLOCK_SIZE, 1) != 0)
+                continue;
             shm_state[i] = SHM_FREE;
         }
         shm_block_owner[i] = 0;

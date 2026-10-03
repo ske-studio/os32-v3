@@ -103,16 +103,25 @@ int paging_map_range(u32 virt_start, u32 virt_end, u32 phys_start, u32 flags);
  * (同じ PDE 配下の他ページは PTE が supervisor のままなので保護は保たれる)。
  * npages=0 は no-op。最終ページ 0xFFFFF000 も 1 ページとして指定可能。
  * 新 PDE の追加は master CR3、pgalloc 初期化後、live AS が 0 の時だけ。
- * 既存 PT の更新は従来どおり。追加 PT は master の寿命まで保持する。
+ * 汎用 3 口は live AS > 0 で PTE_USER の要求を未変更拒否。追加 PT は master の寿命まで保持する。
  * 失敗時には追加 PT を全解放し、既存 PTE/PDE も変更しない。
  *
  * **表示面を含むデバイス窓に PTE_USER を渡してはならない** (レビュー #5 ②)。
  * master に USER で張ると、PDE をまるごと写す paging_addrspace_create() の
  * 先で CPL=3 アプリが表示 VRAM に直接書けてしまい、契約 G4 (commit 前の描画は
  * 表示面に出ない) が崩れる。窓は supervisor + PTE_PCD で張り、アプリに見せる
- * クライアント面だけを exec が paging_addrspace_map_user_keep() で昇格させる。
+ * クライアント面は私有 lease 窓へ貸す (旧 keep 経路の撤去は e11)。
  * 戻り値: 0=成功, -1=逆順/桁あふれ/必要 PT の確保不可 (全範囲を未変更)。 */
 int paging_map_phys(u32 virt_addr, u32 phys_addr, u32 npages, u32 flags);
+
+/* boot は shm_init 後・最初の AS 前の一度だけ。共有 USER は WB。 */
+int paging_boot_user_shared(u32 tramp_page);
+/* 既存 SHM の恒等 present/USER と登録共有 PT を検査し、RW だけを変更。 */
+int paging_shm_set_rw(u32 base, u32 end, int writable);
+extern u32 paging_shm_user_missing_count;
+/* V86 低位専用。session と全出口の制御は e10b。 */
+int paging_v86_map_range(u32 base, u32 end, u32 phys, u32 flags);
+void paging_v86_restore_shared_user(void);
 
 /* 指定範囲を覆う PDE から USER を落とす (V86 セッション終了時の後始末)
  * end は inclusive。戻り値: 0=成功, -1=逆順 (未変更) */
@@ -333,7 +342,8 @@ int paging_addrspace_map_user_keep(struct addrspace *as, u32 vstart,
  *   1. アプリ AS を作る
  *   2. CR3 を新 PD に載せてもカーネル (コード/スタック/データ) が生存する
  *   3. カーネル帯域の 1 語が master PD と新 PD で同一物理を指す (共有の証明)
- *   4. CR3 を master に戻し、AS を破棄する
+ *   4. live AS 中の汎用 USER 要求を拒否する (失敗 bit4)
+ *   5. CR3 を master に戻し、AS を破棄する
  * 戻り値: 0=全通過。非0 はビットフラグで失敗内容を示す。
  * ブート時に kselftest_run() から呼ぶ想定 (memory_boot_init 後)。 */
 int paging_pd_clone_selftest(void);
@@ -362,7 +372,7 @@ int paging_app_band_selftest(void);
 #define MM_BAD_MAX 8
 
 /* 食い違った区間を 3 ワードずつ: [start, end(inclusive), (期待<<4)|実物]。
- * 期待 / 実物のコードは paging.c の MM_NP / MM_RW / MM_RO / MM_ROU。
+ * 期待 / 実物のコードは paging.c の MM_NP / MM_RW / MM_RO / MM_ROU / MM_RWU。
  * 件数は paging_memmap_bad_count (MM_BAD_MAX を超えても数え続ける)。
  * static にしないのは kselftest_pass と同じ理由 — 画面が流れても
  * kernel.map の番地から emu_read_mem で読めるようにするため。 */
@@ -370,10 +380,10 @@ extern u32 paging_memmap_bad[MM_BAD_MAX * 3];
 extern u32 paging_memmap_bad_count;
 
 /* tramp_page には exec の KAPI 踏み台ページ (RO+USER) の番地を渡す。
- * exec_init の前で不明なら 0。戻り値: 食い違い区間の本数 (0 = 一致)、
+ * boot 口の後は exec_init 前でも静的 BSS の番地を渡す。戻り値: 食い違い区間の本数 (0 = 一致)、
  * -1 = ページング無効で検証対象外。
  * **ブート直後に 1 回だけ呼ぶこと** — CPL=3 アプリを起動すると exec が
- * SHM / VRAM / フォント表を USER へ昇格させ、期待値と合わなくなる。 */
+ * VRAM / フォント表を USER へ昇格させ、期待値と合わなくなる。 */
 int paging_memmap_selftest(u32 tramp_page);
 
 /* **自己診断のための変異だけ**に使う。master の PTE 1 本の USER ビットを

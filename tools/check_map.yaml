@@ -4150,3 +4150,53 @@ checks:
   - tools/tests/test_gfx_reattach.py
   - tools/tests/gfx_reattach_host.c
 
+
+  check-shm-user-host:
+  - kernel/paging.*
+  - kernel/shm.*
+  - kernel/v86*.h
+  - kernel/v86_mem.c
+  - kernel/kernel.c
+  - kernel/pgalloc.*
+  - kernel/physmem.*
+  - kernel/kmalloc.h
+  - exec/exec.c
+  - include/**
+  - arch/x86/**
+  - platform/pc98/**
+  - lib/kstring.h
+  - tools/tests/shm_user_host.c
+  - tools/tests/test_shm_user.py
+  - tools/tests/pgalloc_host_fixture.h
+  - tools/tests/host_arch/**
+  - tools/tests/host32.py
+  - drivers/kbd.h
+  - drivers/kbd_status.h
+  - exec/appslot.h
+  - exec/exec.h
+  - exec/exec_heap.h
+  - exec/exec_kapi_init.inc
+  - exec/lease.h
+  - exec/os32x_hdr.h
+  - exec/ring3_str.h
+  - kernel/boot_font.h
+  - kernel/boot_splash.h
+  - kernel/cpu_calibrate.h
+  - kernel/dma_pool.h
+  - kernel/gdt.h
+  - kernel/gui.h
+  - kernel/idt.h
+  - kernel/ime.h
+  - kernel/ime_render.h
+  - kernel/irq.h
+  - kernel/irq_math.h
+  - kernel/kselftest.h
+  - kernel/memory_boot.h
+  - kernel/pit_math.h
+  - kernel/shlib.h
+  - kernel/snd_engine.h
+  - kernel/sysclk.h
+  - kernel/sysconfig.h
+  - kernel/tss.h
+  - lib/path.h
+  - lib/utf8.h

@@ -75,7 +75,7 @@ make check-tests-inventory                      # 表が古くないか検査す
 `TARGET_SRCS` など) にある `ROOT / "…"`。どちらにも現れないものは空欄になる
 (Rust は `--manifest-path` を代わりに出す)。
 
-## 2. `make check` の列 (129 ターゲット)
+## 2. `make check` の列 (130 ターゲット)
 
 `build/sdk.mk` の `CHECK_PAR_TARGETS` (`check-par` の依存) が
 正典。この表はその列をそのまま展開したもの。コマンド列は `make check` (変異込み) の形。
@@ -211,6 +211,7 @@ make check-tests-inventory                      # 表が古くないか検査す
 | 127 | `check-display-cleanup-host` | `python3 -B tools/tests/test_display_cleanup.py --mutate` | `kernel/v86_io.c`<br>`kernel/v86_gcap.c`<br>`kernel/boot_splash.c`<br>`gfx/gfx_core.c` | [`tools/tests/display_cleanup_tdd.md`](../tools/tests/display_cleanup_tdd.md) | [`docs/tasks/v3/TASK_T2D_T2H.md`](tasks/v3/TASK_T2D_T2H.md) | × |
 | 128 | `check-h2-fixtures-host` | `python3 -B tools/tests/test_h2_fixtures.py --mutate` | `userland/tests/h2_stack.c`<br>`userland/tests/h2_stack_probe.inc`<br>`tools/gen_h2_fixtures.py` | — | — | × |
 | 129 | `check-kcg-boot-host` | `HOST32_RUNNERS ごと: python3 -B tools/tests/test_kcg_boot.py --runner $$runner`<br>`python3 -B tools/tests/test_kcg_boot.py --runner $(firstword $(HOST32_RUNNERS)) --mutate` | — | [`tools/tests/kcg_boot_tdd.md`](../tools/tests/kcg_boot_tdd.md) | [`docs/tasks/v3/TASK_T2D_T2H.md`](tasks/v3/TASK_T2D_T2H.md) | × |
+| 130 | `check-shm-user-host` | `HOST32_RUNNERS ごと: python3 -B tools/tests/test_shm_user.py --runner $$runner`<br>`python3 -B tools/tests/test_shm_user.py --runner $(firstword $(HOST32_RUNNERS)) --mutate` | — | [`tools/tests/shm_user_tdd.md`](../tools/tests/shm_user_tdd.md) | — | × |
 
 ## 3. `check` の列に**入っていない** `check-*` ターゲット (9)
 

@@ -1160,7 +1160,7 @@ CHECK_PAR_TARGETS := check-shlib-high-host check-bootinfo-host check-hdd-stage1-
     check-cirrus-win-host check-pegc-mode-host \
     check-display-cleanup-host \
     check-h2-fixtures-host \
-    check-kcg-boot-host
+    check-kcg-boot-host check-shm-user-host
 check-par: $(CHECK_PAR_TARGETS)
 
 # エディタ GUI 版の本文と libos32gui の桁・折り返し (票 TASK_EDIT_GUI 受入 E8 / E10)。
@@ -1312,3 +1312,9 @@ check-gfx-reattach-host:
 	@set -e; test -n "$(HOST32_RUNNERS)"; for runner in $(HOST32_RUNNERS); do echo "HOST32_RUNNERS=$$runner"; python3 -B tools/tests/test_gfx_reattach.py --runner $$runner; done
 	$(if $(MUT),python3 -B tools/tests/test_gfx_reattach.py --runner $(firstword $(HOST32_RUNNERS)) $(MUT),@:)
 .PHONY: check-gfx-reattach-host
+
+# T2e e10a: boot/shared USER and real SHM/V86 teardown.
+check-shm-user-host:
+	@set -e; test -n "$(HOST32_RUNNERS)"; for runner in $(HOST32_RUNNERS); do echo "HOST32_RUNNERS=$$runner"; python3 -B tools/tests/test_shm_user.py --runner $$runner; done
+	$(if $(MUT),python3 -B tools/tests/test_shm_user.py --runner $(firstword $(HOST32_RUNNERS)) $(MUT),@:)
+.PHONY: check-shm-user-host

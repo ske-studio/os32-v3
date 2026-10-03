@@ -340,10 +340,11 @@ static void test_kprintf_attr(void)
 static void test_ring3_pd(void)
 {
     int rc = paging_pd_clone_selftest();
-    check(rc == 0, "ring3 PD clone (kernel band shared across PDs)");
+    check((rc & 15) == 0, "ring3 PD clone (kernel band shared across PDs)");
     if (rc != 0) {
         kprintf(0xC1, "[selftest]   paging_pd_clone_selftest rc=%d\n", rc);
     }
+    check((rc & 16) == 0, "paging: live AS rejects generic USER");
 }
 
 /* ------------------------------------------------------------------------ */
@@ -557,6 +558,11 @@ static void test_memmap(void)
 {
     int bad = paging_memmap_selftest(exec_tramp_page_addr());
     u32 i, n;
+
+    u32 *pt = (u32 *)P2V(paging_registered_pt(MEM_SHM_BASE));
+    check(pt && (pt[(MEM_SHM_BASE >> PAGE_SHIFT) % PTE_COUNT] &
+          (PAGE_RW | PTE_USER | PTE_PCD | PTE_PWT)) == (PAGE_RW | PTE_USER),
+          "paging: SHM boot USER RW WB");
 
     check(paging_range_reject_count == 0,
           "paging: no reversed (start > end) range was rejected");
