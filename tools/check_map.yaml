@@ -4386,3 +4386,4 @@ checks:
   - kernel/tss.h
   - lib/path.h
   - lib/utf8.h
+  - lib/utf8_internal.h
