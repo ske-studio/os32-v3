@@ -1163,6 +1163,8 @@ ELF text/data/bss は 705540/36843/606520。kernel data は build ID を含む�
 - (2 往復目、→ e11) P3-1 の直しで、`caller_access_get` が失敗した (`!valid`) USER では abort しなくなった。e11 の KAPI 経路では dispatch が常に frame を張るので届かない — 結線のときの確認項目。
 
 **e6 の着地 (PM、2026-10-03)**: 独立レビュー Opus 5.5 は 1 往復目 Request changes (P2-1: attach に失敗した後 check で回復すると surface/sprite のプールが未初期化のまま ready=1 → gfx_create_surface が NULL を読む。e6 の本番 (port が NULL) には届かない、e7・e11 の結線で届く) → Codex gpt-6-astra が直した (P3-1・P3-5・P3-7 も同時) → 2 往復目 Approve (レビュアーの再現が通り、再 attach を越えて既存の surface が残ることも確認)。PM のホスト検査は native の単体と `check_slot.sh` 経由の `HOST32_RUNNERS="native qemu"` check-changed で rc=0。
+
+**e6 のゲスト受入 (PM、2026-10-03)**: main へ取り込み (`328c379`、f2/f3 と sdk.mk・08_build・TESTS・票が競合 → 両方を残し、全 runner の列挙を実物の 12 本に、TESTS.md は生成器で再生成)。コミット済みの木で `make all` rc=0・`make check` rc=0 (h3fix2 の取り込みとまとめて 1 回)、push。NP21/W を停止 → 停止確認 → `nhd-pull` → `deploy-kernel` (直後の `vmkernel.lz4` 483,339 B を控えた) → `deploy` → 起動 (17MB、今の ini — §12)。`ver` の Commit `328c379`・Image 483,339 B が控えと一致、**kselftest pass 274 / fail 0**。回帰の一式 (db_test 9/9、db_v50_test 41/41、klibc_test 49/49、alloc_demo 16/16、d0a_test、faulttest gp/de/ud/pf は 4 件とも `-> kill app`、loop・kloop + CTRL+STOP、`v86 -t`) OK。gfx: `hal_test` は `backend pegc (packed 8bpp)`、`pegcchk` は 640x480 に入って CUI に戻った、GUI (gui_demo の窓 → ESC → CUI) OK (新しい SDK を同梱した shlib で描画)、`hello_gfx` (Rust static、新しい SDK) を GUI から起動して全画面の描画を確認。カウンタ: 深さ 0、`ledger_*_ops`=0、`exec_as_leftover_pages`=0、`irq_ctx_violations`=1 (起動時の基準値)。**既存の観測 (e6 とは無関係、記録)**: GUI から起動した全画面アプリ (hello_gfx) が KAPI `kbd_getchar` で待つと、`/api/key` で注入したキー (`SPACE`、`a`) で終わらない — e6 より前の SDK で組んだ hello_gfx (wt/f4 のビルドを `/host/test/hello_old.bin` に置いて同じ手順) でも同じだったので前からの挙動。CTRL+STOP で畳める。キーの経路 (gshell の全画面所有者への配送、または注入の経路) の調査は別件で、h の最終一式までに見る。
   revoke 経路を増やす際の前提として再検討する。
 
 ## 3. T2f — map/unmapとallocator、暫定heap終了
@@ -2099,6 +2101,8 @@ Opus 5.5による差分再レビュー、e〜gを含む最終一式でのゲス�
 **h3fix2 — 捕捉の時間窓・arm の OP_WAIT 判定 (2026-10-03、Codex gpt-6.1-sol、コーダー)**:
 基点 `37d1aef`、ブランチ `wt/h3fix2`。変更は台本・h3ホスト試験・本記録だけ。
 §5-4末尾の既知2件を修正し、T2h最終一式のゲスト受入はPMへ残す。
+
+**h3fix2 のゲストでの実地確認 (PM、2026-10-03、kernel `328c379`、17MB)**: layout → GUI で h3a/h3b を起動 → init (fixture 1/2) は成功。h3a に `arm --mode USER-loop --capture ... --trace FRONT.json --height 480` を流すと、arm は PARKED 経由で通り resume の捕捉 (resume の印・switch 値・consumed=1) も成功したが、**rc=1・ホスト 384 秒・`STOP not sent during capture`** で終わった。終了後に SHM を直接読むと h3a は phase=6 (FIRING) でユーザー空間のループ中 — FIRING に入っていたのに台本が STOP を送らずに上限で終わった。捕捉の間ゲストはホスト 365 秒で数千 tick しか進まず (実時間の 1 割前後、一時停止の頻度が高い)。前景の証拠は PM のスクリプトが 1.5〜3 秒ごとに 34 回書いた。**PM が手で CTRL+STOP を 1 回送ると h3a だけが畳まれた** (appslot_reclaim_count +1、fault_kill_count +1、h3b は生存、二重 kill なし — カーネル側の STOP 修正は正常)。台本の不具合として sol に原因の調査と修正を出した (wt/h3fix3)。資料: /home/hight/os32-tmp/h3x-*.json・h3x-arm.log・h3x-front.log。
 
 - 時間窓: `arm --capture` / `loop-watch` は新layoutの `tick_count` をfreeze中に読む。
   捕捉開始後の最初の標本から**STOP前は3,000ゲストtick (PIT_HZ=100、30秒)**を上限にし、
