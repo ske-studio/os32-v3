@@ -927,7 +927,8 @@ class Tests(unittest.TestCase):
         self.assertEqual(emu.freeze_depth, 0)
 
     def clock_capture(self, *, initial=0, step=25, firing=True, wall_step=3,
-                      front_at=0, refresh_at=None, tick_race=False, switches=1):
+                      front_at=0, refresh_at=None, tick_race=False, switches=1,
+                      firing_tick=500, snapshot_delay=0, resume=True):
         case = self.p.arm(self.ident, 5)
         case['map_sha256'] = 'map'
         client = self.emu.client = self.cleanup_client()
@@ -947,11 +948,20 @@ class Tests(unittest.TestCase):
                 front.write_text(json.dumps(dict(evidence, observed_at=case['armed_at'] + clock['wall'])))
             self.emu.word(self.s['tick_count'],
                           (initial + clock['elapsed']) & 0xffffffff)
-            if firing and clock['elapsed'] >= 500:
+            if firing and clock['elapsed'] >= firing_tick:
                 self.change('phase', h3.PHASES['FIRING'])
         self.p.sleep = sleep
+        original_observe = self.p.observe
+        def observe(value):
+            if snapshot_delay and not clock.get('delayed'):
+                clock['delayed'] = True
+                clock['wall'] += snapshot_delay
+            return original_observe(value)
+        self.p.observe = observe
         def click():
             self.assertEqual(len(client.bps), 5)
+            if not resume:
+                return
             self.change('phase', h3.PHASES['ARMED'])
             self.change('arm', 0); self.change('consumed', 1)
             self.change('resumes', 9)
@@ -1001,6 +1011,96 @@ class Tests(unittest.TestCase):
             self.assertEqual(set(obs), {'before_stop', 'after_2s', 'after_10s', 'final'})
         self.assertEqual(len(stops), 1)
         return stops[0]
+
+    def timed_http_capture(self, mode):
+        # Real Emulator HTTP calls cost 0.1 host seconds. 22 ticks/s while
+        # thawed produces ~8 ticks/s overall with the old repeated freezes
+        # (~1/10 of the 100Hz PIT, 3000 ticks in ~365s). PM started the 90s
+        # writer ~18s before capture: its last refresh is near arm + 71s.
+        case = self.p.arm(self.ident, mode)
+        case['map_sha256'] = 'map'
+        memory = self.emu
+        debugger = self.cleanup_client()
+        clock = dict(wall=0., ticks=0., next_front=1.5, writes=0)
+        stops = []
+        parent = self
+        with tempfile.TemporaryDirectory(prefix='h3-http-clock-') as directory:
+            d = pathlib.Path(directory)
+            front = d / 'front.json'
+            def progress(delay):
+                clock['wall'] += delay
+                if not client.paused and not debugger.trap:
+                    clock['ticks'] += delay * 22
+                parent.assertLess(clock['wall'], 1500, 'unbounded capture')
+                memory.word(parent.s['tick_count'], int(clock['ticks']))
+                if clock['ticks'] >= 500:
+                    parent.change('phase', 6)
+                if clock['wall'] >= clock['next_front'] and clock['wall'] + 18 < 90:
+                    front.write_text(json.dumps(dict(case_id=case['case_id'],
+                        identity=parent.ident, map_sha256='map', phase=6,
+                        foreground_window=42, foreground_app=2,
+                        observed_at=case['armed_at'] + clock['wall'])))
+                    clock['writes'] += 1
+                    clock['next_front'] = clock['wall'] + (1.5 if clock['writes'] % 2 else 3)
+            class Client:
+                paused = False
+                pauses = 0
+                def get(self, path):
+                    progress(0.1)
+                    if path.startswith('/api/mem?'):
+                        from urllib.parse import parse_qs, urlsplit
+                        q = parse_qs(urlsplit(path).query)
+                        raw = memory.read(int(q['addr'][0], 16), int(q['len'][0]))
+                        return json.dumps(dict(ok=True, hex=raw.hex()))
+                    if path == '/api/instance':
+                        return json.dumps(dict(ok=True, user_pause=self.paused,
+                                               trap_pause=debugger.trap))
+                    return debugger.get(path)
+                def post(self, path):
+                    progress(0.1)
+                    if path == '/api/pause':
+                        self.paused = True
+                        self.pauses += 1
+                        return http_success(path)
+                    if path == '/api/resume' and self.paused:
+                        self.paused = False
+                        return http_success(path)
+                    return debugger.post(path)
+            client = Client()
+            emu = h3.Emulator.__new__(h3.Emulator)
+            emu.client = client
+            emu.freeze_depth = 0
+            self.p.emu = emu
+            self.p.sleep = progress
+            def click():
+                self.change('phase', 5)
+                self.change('arm', 0); self.change('consumed', 1)
+                self.change('resumes', 9)
+                memory.word(self.s['ring3_switch_count'], 1)
+            def stop():
+                self.assertFalse(client.paused)
+                stops.append((clock['wall'], clock['ticks']))
+                debugger.trap = True
+            emu.stop = stop
+            with patch.object(h3.time, 'monotonic', side_effect=lambda: clock['wall']), \
+                 patch.object(h3.time, 'time', side_effect=lambda: case['armed_at'] + clock['wall']):
+                try:
+                    self.p.run_capture(case, d/'raw.json', d/'out.json', front, click=click)
+                finally:
+                    self.assertEqual(debugger.bps, set())
+                    self.assertFalse(debugger.trap or client.paused)
+            self.assertEqual(len(stops), 1)
+            self.assertGreaterEqual(stops[0][1], 710)
+            self.assertLess(stops[0][0], 72, 'PM writer expired before STOP')
+            self.assertLessEqual(client.pauses, 6, 'waiting polls must not freeze')
+            self.assertLessEqual(case['foreground_observation']['observed_at'],
+                                 case['armed_at'] + stops[0][0])
+
+    def test_http_cost_slow_user_loop_periodic_foreground(self):
+        self.timed_http_capture(5)
+
+    def test_http_cost_slow_kapi_loop_periodic_foreground(self):
+        self.timed_http_capture(6)
 
     def test_standalone_stop_guest_grace_and_freshness_retry(self):
         case = self.p.arm(self.ident, 5)
@@ -1062,11 +1162,11 @@ class Tests(unittest.TestCase):
             self.clock_capture(step=0)
 
     def test_capture_guest_budget_without_firing(self):
-        with self.assertRaisesRegex(RuntimeError, 'STOP not sent during capture'):
+        with self.assertRaisesRegex(RuntimeError, 'STOP not sent during capture: FIRING not observed'):
             self.clock_capture(firing=False)
 
     def test_capture_guest_budget_across_wrap(self):
-        with self.assertRaisesRegex(RuntimeError, 'STOP not sent during capture'):
+        with self.assertRaisesRegex(RuntimeError, 'STOP not sent during capture: FIRING not observed'):
             self.clock_capture(firing=False, initial=0xfffffd80)
 
     def test_capture_late_stop_completes_after_guest_limit(self):
@@ -1075,7 +1175,7 @@ class Tests(unittest.TestCase):
         self.assertGreater(wall, 12)
 
     def test_capture_late_foreground_without_stop_is_bounded(self):
-        with self.assertRaisesRegex(RuntimeError, 'STOP not sent during capture'):
+        with self.assertRaisesRegex(RuntimeError, 'foreground evidence missing'):
             self.clock_capture(front_at=3100, wall_step=0.25)
 
     def test_capture_stale_foreground_waits_for_refresh(self):
@@ -1084,8 +1184,32 @@ class Tests(unittest.TestCase):
         self.assertGreater(wall, 5)
 
     def test_capture_stale_foreground_without_refresh_is_bounded(self):
-        with self.assertRaisesRegex(RuntimeError, 'STOP not sent during capture'):
+        with self.assertRaisesRegex(RuntimeError, 'foreground evidence stale'):
             self.clock_capture(refresh_at=3100)
+
+    def test_capture_late_firing_reports_remaining_grace(self):
+        with self.assertRaisesRegex(RuntimeError, '210 ticks not reached: FIRING elapsed=100'):
+            self.clock_capture(firing_tick=2900, wall_step=0.25)
+
+    def test_capture_guest_boundary_gets_last_stop_attempt(self):
+        wall, tick = self.clock_capture(firing_tick=2775, wall_step=0.25)
+        self.assertEqual(tick, 3000)
+
+    def test_capture_no_resume_reports_firing_unobserved(self):
+        with self.assertRaisesRegex(RuntimeError, 'STOP not sent during capture: FIRING not observed'):
+            self.clock_capture(firing=False, resume=False)
+
+    def test_capture_snapshot_cost_requires_fresh_evidence_again(self):
+        wall, tick = self.clock_capture(refresh_at=700, snapshot_delay=6)
+        self.assertGreater(tick, 725, 'stale final snapshot must wait for refresh')
+
+    def test_foreground_missing_fields_reports_invalid_evidence(self):
+        case = self.p.arm(self.ident, 5)
+        with tempfile.TemporaryDirectory(prefix='h3-invalid-front-') as directory:
+            path = pathlib.Path(directory) / 'front.json'
+            path.write_text('{}')
+            with self.assertRaisesRegex(RuntimeError, 'foreground evidence missing/invalid'):
+                self.p.foreground(case, path)
 
     def test_capture_tick_sampling_trap_is_drained(self):
         self.clock_capture(tick_race=True, wall_step=0.25)
@@ -1263,8 +1387,8 @@ PY_MUTANTS += [
     ("seconds * GUEST_HZ", "500 * GUEST_HZ", 1),
     ("now - progressed_at < TICK_STALL_SECONDS", "now - progressed_at < 30", 1),
     ("(tick - first_tick) & 0xffffffff", "tick - first_tick", 1),
-    ("(self.guest_tick() - firing_at) & 0xffffffff", "self.guest_tick() - firing_at", 2),
-    ("< RUNAWAY_WAIT_TICKS or not Path(foreground).exists()", "< 0 or not Path(foreground).exists()", 2),
+    ("(self.guest_tick() - firing_at) & 0xffffffff", "self.guest_tick() - firing_at", 1),
+    ("< RUNAWAY_WAIT_TICKS or not Path(foreground).exists()", "< 0 or not Path(foreground).exists()", 1),
 ]
 
 
@@ -1274,9 +1398,20 @@ PY_MUTANTS += [
     ("first_tick = tick", "first_tick = (tick - 1000) & 0xffffffff", 1),
     ("firing_at = None\n        stop_at = None", "case['armed_in_running_wait'] = True\n        firing_at = None\n        stop_at = None", 1),
     ("not case.get('stop_sent') and", "True and", 1),
-    ("if evidence is None:", "if False:", 2),
+    ("if evidence is None:", "if False:", 4),
     ("p.stop_loop(case, args.trace, persist=lambda: args.case.write_bytes(json_bytes(case)))", "p.foreground(case, args.trace); p.emu.stop(); case['stop_sent'] = True", 1),
 ]
+
+
+PY_MUTANTS += [
+    ("    def guest_tick(self):", "    @frozen\n    def guest_tick(self):", 1),
+    ("return self.word(case['identity']['address'] + FIELDS.index('phase') * 4)",
+     "return self.checked(case['identity'])['phase']", 1),
+    ("evidence = self.loop_evidence(case, foreground, firing_at, status)\n            if evidence is None:\n                return\n            stop_at",
+     "# Omit the final freshness check.\n            stop_at", 1),
+    ("'STOP not sent during capture: ' + status['reason']", "'STOP not sent during capture'", 2),
+]
+
 
 
 def main():

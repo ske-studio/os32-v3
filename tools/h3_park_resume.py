@@ -194,16 +194,18 @@ def capture_trace(p, case, seconds=15, start=None, advance=None, guest_time=Fals
                         last_tick, progressed_at = tick, now
                     require(now - progressed_at < TICK_STALL_SECONDS,
                             'guest tick stalled during capture')
-                    # Unsigned subtraction handles the 32-bit PIT wrap.
-                    if (not case.get('stop_sent') and
-                            ((tick - first_tick) & 0xffffffff) >= seconds * GUEST_HZ):
-                        break
                 if advance:
                     try:
                         if advance():
                             break
                     except CaptureTrap:
                         continue  # owned trap won the pause race; drain it first
+                # Give advance the boundary tick too: FIRING + 210 may become
+                # eligible exactly at the budget. STOP then gets its full tail.
+                # Unsigned subtraction handles the 32-bit PIT wrap.
+                if guest_time and (not case.get('stop_sent') and
+                        ((tick - first_tick) & 0xffffffff) >= seconds * GUEST_HZ):
+                    break
                 p.sleep(CAPTURE_POLL if guest_time else 0.01)
                 continue
             regs = get('/api/regs')
@@ -483,8 +485,8 @@ class Playbook:
             self.sleep(0.1)
         raise RuntimeError('timeout: ' + label)
 
-    @frozen
     def guest_tick(self):
+        # One aligned u32 read needs no multi-field frozen snapshot.
         return self.word(self.s['tick_count'])
 
     @frozen
@@ -633,42 +635,72 @@ class Playbook:
             observed_at=time.time())
 
     def foreground(self, case, path):
-        trace = json.loads(Path(path).read_text())
+        try:
+            trace = json.loads(Path(path).read_text())
+            required = ('case_id', 'observed_at', 'phase', 'identity', 'map_sha256',
+                        'foreground_window', 'foreground_app')
+            require(isinstance(trace, dict) and all(key in trace for key in required) and
+                    type(trace['observed_at']) in (int, float), 'invalid foreground fields')
+        except (OSError, ValueError, RuntimeError) as exc:
+            raise RuntimeError('STOP not sent during capture: foreground evidence missing/invalid; '
+                               'STOP foreground not confirmed: ' + str(exc)) from exc
         require(trace['case_id'] == case['case_id'] and
                 0 <= time.time() - trace['observed_at'] and
                 trace['observed_at'] >= case['armed_at'] and
                 trace['phase'] == PHASES['FIRING'] and trace['identity'] == case['identity'] and
                 trace['map_sha256'] == case['map_sha256'] and
                 trace['foreground_window'] == case['window'] and
-                trace['foreground_app'] == case['identity']['app'], 'STOP foreground not confirmed')
+                trace['foreground_app'] == case['identity']['app'],
+                'STOP not sent during capture: foreground evidence mismatch; STOP foreground not confirmed')
         if time.time() - trace['observed_at'] > 5:
             return None  # Valid but stale: wait for the PM to refresh it.
         return trace
 
+    def loop_phase(self, case):
+        # This live hint authorizes only waiting. Revalidate identity and phase
+        # in the frozen snapshot immediately before STOP.
+        return self.word(case['identity']['address'] + FIELDS.index('phase') * 4)
+
+    def loop_evidence(self, case, foreground, firing_at, status):
+        elapsed = (self.guest_tick() - firing_at) & 0xffffffff
+        status['reason'] = f'210 ticks not reached: FIRING elapsed={elapsed}'
+        if elapsed < RUNAWAY_WAIT_TICKS or not Path(foreground).exists():
+            if elapsed >= RUNAWAY_WAIT_TICKS:
+                status['reason'] = 'foreground evidence missing'
+            return None
+        evidence = self.foreground(case, foreground)
+        status['reason'] = 'foreground evidence stale (host age > 5s)'
+        return evidence
+
     def stop_loop(self, case, foreground, persist=lambda: None):
         firing_at = None
+        status = dict(reason='FIRING not observed')
         def advance():
             nonlocal firing_at
-            require(self.checked(case['identity'])['phase'] == PHASES['FIRING'], 'loop not firing')
+            if self.loop_phase(case) != PHASES['FIRING']:
+                return
             if firing_at is None:
                 firing_at = self.guest_tick()
-            if ((self.guest_tick() - firing_at) & 0xffffffff) < RUNAWAY_WAIT_TICKS or not Path(foreground).exists():
+            evidence = self.loop_evidence(case, foreground, firing_at, status)
+            if evidence is None:
                 return
             with self.emu.freeze():
-                evidence = self.foreground(case, foreground)
-                if evidence is None:
-                    return
-                self.checked(case['identity'])
+                require(self.checked(case['identity'])['phase'] == PHASES['FIRING'], 'loop not firing')
+            # Identity reads also cost host time; refresh evidence after them.
+            evidence = self.loop_evidence(case, foreground, firing_at, status)
+            if evidence is None:
+                return
             self.emu.stop()
             case['stop_sent'] = True
             case['foreground_observation'] = evidence
             persist()
             return True
         capture_trace(self, case, seconds=30, advance=advance, guest_time=True)
-        require(case.get('stop_sent') is True, 'STOP not sent during capture')
+        require(case.get('stop_sent') is True, 'STOP not sent during capture: ' + status['reason'])
 
     def run_capture(self, case, capture_path, out, foreground=None, click=None, persist=lambda: None):
         require(case['mode'] < 5 or foreground is not None, 'loop requires --trace foreground evidence')
+        status = dict(reason='FIRING not observed')
         firing_at = None
         stop_at = None
         observations = {}
@@ -682,6 +714,8 @@ class Playbook:
                         observations[key] = self.observe(case)
                 return 'after_10s' in observations
             if not case.get('resume_verified'):
+                if self.loop_phase(case) not in (PHASES['ARMED'], PHASES['FIRING'], PHASES['ERROR']):
+                    return
                 resumed = self.resumed(case)
                 if not resumed:
                     return
@@ -690,20 +724,21 @@ class Playbook:
                 persist()
             if case['mode'] < 5:
                 return
-            if self.checked(case['identity'])['phase'] != PHASES['FIRING']:
+            if self.loop_phase(case) != PHASES['FIRING']:
                 return
             if firing_at is None:
                 firing_at = self.guest_tick()
-            if ((self.guest_tick() - firing_at) & 0xffffffff) < RUNAWAY_WAIT_TICKS or not Path(foreground).exists():
+            evidence = self.loop_evidence(case, foreground, firing_at, status)
+            if evidence is None:
                 return
-            # Snapshot only between owned traps, then thaw before injecting
-            # the key sequence. The live lock excludes other h3 processes.
+            # Freeze only the final identity/observation snapshot, never each
+            # waiting poll. Drain any owned trap before retrying this snapshot.
             with self.emu.freeze():
-                evidence = self.foreground(case, foreground)
-                if evidence is None:
-                    return
                 require(self.checked(case['identity'])['phase'] == PHASES['FIRING'], 'loop not firing')
                 observations['before_stop'] = self.observe(case)
+            evidence = self.loop_evidence(case, foreground, firing_at, status)
+            if evidence is None:
+                return
             stop_at = time.monotonic()
             self.emu.stop()
             case['stop_sent'] = True
@@ -712,8 +747,8 @@ class Playbook:
         capture = capture_trace(self, case, seconds=30, start=click, advance=advance, guest_time=True)
         save_capture(case, capture, capture_path)
         persist()
+        require(case['mode'] < 5 or case.get('stop_sent') is True, 'STOP not sent during capture: ' + status['reason'])
         require(case.get('resume_verified') is True, 'resume not captured')
-        require(case['mode'] < 5 or case.get('stop_sent') is True, 'STOP not sent during capture')
         require(case['mode'] < 5 or 'after_10s' in observations, 'timed observations incomplete')
         observations['final'] = self.observe(case)
         with Path(out).open('xb') as output:

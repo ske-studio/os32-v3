@@ -1937,6 +1937,15 @@ e の lease/gfx/SHM 権限・公開 KAPI/JSON/版は変更なし。前回の未�
    --out /home/hight/os32-tmp/h3-observe.json` (gp/de/ud/USER-loop/KAPI-loop も同様)、
    同じ `--layout` / `--case` を渡す。loop は `--trace /home/hight/os32-tmp/h3-front.json`
    も渡し、PM/e9 が FIRING 後の新しい前景証拠をそのファイルへ渡す。
+   前景の実観測ごとに `case_id`、`identity`、`map_sha256`、`phase=6`、
+   `foreground_window`、`foreground_app`、`observed_at=time.time()` (ホストUNIX秒) を書く。
+   phase=6 は resume_verified だけから推定せず、SHM phase欄をpauseなしの単独読取りで
+   確認し、撮影した対象の前景と合わせる (配置は上のbyte offset表)。
+   **1.5〜3ホスト秒ごと**に新しい実観測で更新し、**stop_sent または捕捉終了まで**続ける。
+   固定90秒でwriterを止めない。撮影/読取り時間も含めた更新間隔を3秒以内にする。
+   同じディレクトリの一時JSONを `replace` して公開し、書込み途中のJSONを読ませない。
+   STOP時の鮮度は **0〜5ホスト秒**、arm以後の観測だけが有効。古い画像の時刻だけ更新しない。
+   PM/e9のwriterは撮影とファイル更新を行い、pause/breakpoint/キー操作は台本に任せる。
    台本は一時 pause 中に対象と相手の PA/所有者/世代、上記 OP_WAIT 状態を照合して mode / arm を書く。
    **breakpoint を click より先に設置**し、target のタイトルをクリックして起こす
    (480行なら `--height 480`)。SHM 書込み単独には WM を起こす効果がない。
@@ -2162,6 +2171,74 @@ C 8 + Python 72 = **80/80変異 runtime RED、compile/import失敗0、rc=0**
 続くRED実行は前述の4失敗、rc=1。これらと置換対象数エラーはruntime RED本数に数えない。
 ゲスト・native・配備・commitは未実施。
 
+**h3fix3 — 低速ゲストでのSTOP未送信 (2026-10-03、GPT-6 / Codex、コーダー)**:
+基点 `328c379`、ブランチ `wt/h3fix3`。変更は台本・そのホスト試験・本票だけ。
+PMの `h3x-arm.log` はrc=1、ホスト384.25秒。caseはPARKED経由でresume検証済み、
+captureは365.30秒でresume_pendingの1標本だけ。`h3x-front-writer.py` は起動から90秒で終了し、
+34回書いた最後の `observed_at=1791007330.9045947` はarmの71.45秒後、捕捉終了の294.05秒前。
+終了後のPMのSHM観測はFIRING/mode5/consumed1、手動STOPで対象だけ回収された。
+**原因**は待機中もtick最大3回とphase/所有者全照合を別々にfreezeするためゲストを長く止め、
+500 tick猶予＋FIRING観測後210 tick待ちがwriterの寿命を越え得ること。
+最後の証拠が失効しても台本は残りの3,000 tick予算を待ち、旧例外には理由がなかった。
+ゲストログにはFIRING観測時刻がないため、実行中の失効開始点そのものは断定しない。
+HTTPごとホスト0.1秒、thaw中22 tick/秒 (旧台本のfreeze込みで平均約8.5 tick/秒、
+通常100Hzの約1割)、前景更新1.5/3秒交互の模擬clientで再現した。writerは
+捕捉の18秒前に起動して90秒で終了する設定で、最後の証拠がarm約71秒後という
+PMの流れに合わせた。旧台本のUSER/KAPI-loopとも仮想353.75秒の捕捉後に同じSTOP未送信、
+上限tickのSTOPとresume未観測の診断もRED、計4件/4失敗、rc=1
+(`h3fix3-red-regressions-final.log` / `.rc`)。先行のthaw中10 tick/秒・writer90秒の
+対照も2件/2失敗、rc=1 (`h3fix3-red-http.log`)。先行のREDは模擬時計上限が短すぎて2失敗、
+全59件の旧台本対照は8失敗/1エラー/skip1 (欠落欄のKeyErrorを含む)、rc=1。
+これらを変異runtime RED本数には数えない。
+
+修正は待機のtick/phaseを単独のu32読取りにし、resume照合とSTOP前の多欄観測だけfreeze。
+phaseのlive読取りは待機判断のヒントで、STOP前には所有者/世代/phaseをfreeze中に再照合する。
+前景JSONはfreeze前と観測/thaw後に読み、重い観測で鮮度が落ちれば更新を待つ。
+firing_atは最初のFIRING観測のゲストtickを維持、u32周回・210 tick・5秒鮮度も維持する。
+3,000 tickは捕捉開始が基点で500 tick猶予も含むため、FIRINGが遅すぎる場合は
+残り210 tickを満たせないまま終わり得る。この場合も上限を延長せず不足tickを報告する。
+上限のtickでもadvanceを1回実行し、そのtickで条件を満たすSTOPは許可して後続観測を完了する。
+STOP未送信の例外はFIRING未観測／210 tick未満 (経過tick付き)／前景なし・不正／
+前景失効／照合不一致を区別する。更新方法・鮮度は§5-2手順3を正典とし、
+h3fix2のゲスト手順3でもそのwriterを捕捉終了まで動かす。
+
+ホスト追加7件: HTTP時間込みのUSER/KAPI-loop、予算末尾のFIRINGによる210 tick不足、
+上限tickでのSTOP、resume未観測の診断、観測コストで失効した証拠の再取得、前景JSON必須欄の欠落。
+既存のFIRING未観測・前景なし・失効試験も例外の原因文字列を照合する。
+待機tickへのfreeze差戻し、phase全照合の差戻し、最後の鮮度照合削除、診断文削除の4変異を追加。
+検証環境は `CROSS_DIR=/home/hight/opt/cross`、`TMPDIR=/home/hight/os32-tmp`、`PYTHONPATH=`、
+`HOST32_RUNNERS=qemu`。`HOST32_RUNNERS=qemu python3 -u -B tools/tests/test_h3_park_resume.py --mutate`
+は **rc=0、Python61件 (layout skip1)、ILP32 42検査、C8＋Python76＝84/84変異 runtime RED、
+compile/import失敗0** (`h3fix3-tests-final.log` / `.rc`)。
+検査用成果物の初回生成は `build/out/unicode.bin` を直接目標にして **rc=2** (生成規則なし、
+`h3fix3-build.log` / `.rc`)。`unicode_bin` へ訂正し、
+`make -j4 boot kernel programs sdk assets-deployed unicode_bin build/out/settings.db build/out/settings.v2.fixture
+ NP21W_DIR=/dev/null < /dev/null` は **rc=0** (`h3fix3-build-ready.log` / `.rc`)。
+既存mainの正規TTFをコピーし `fetch_fonts.py --check` rc=0。NHD/配備は行っていない。
+生成後の同試験 (`--mutate` なし) は **rc=0、61件/skip0、ILP32 42検査**
+(`h3fix3-tests-built.log` / `.rc`)。実ELF/mapのlayoutも確認済み。
+`gen_memmap.py --check` / `check_manifests.py` は各rc=0。
+最終の時間モデル調整後に指定の `HOST32_RUNNERS=qemu python3 -u -B
+ tools/tests/test_h3_park_resume.py --mutate` を再実行し、**rc=0、Python61件/skip0、
+ILP32 42検査、84/84変異 runtime RED、compile/import失敗0**
+(`h3fix3-tests-ready.log` / `.rc`)。最終ソースの個別合否はこの結果。
+全体検査1回目は **rc=2** (`h3fix3-check-changed.log` / `.rc`)。
+既定selectorが`HEAD~1`を選び、基点側の`build/sdk.mk`を含む33ファイルも対象にして全変異fallback。
+起動FD未生成により `check-packages-host` / `check-vk32-crc-host` が失敗。他の実行済み検査は通過。
+検査前後の差分は`cmp`で一致、rc=0。生成レシピのNP21/W向けcopyを使わず、
+`mkpkg.py --fd-args` → `mkfat12.py` でホスト作業ツリー内の2HD/1.44MB FDを生成、
+`mkpkg.py --output packages/` → `genisoimage` でISO、`gen_generation_manifest.py`で証明書を生成。
+このホスト生成は **rc=0** (`h3fix3-media.log` / `.rc`)。既存NHD/配備先は未操作。
+最終 `python3 -B tools/check_select.py --lint` / `python3 -B tools/gen_tests_inventory.py --write`
+は各 **rc=0** (`h3fix3-lint-final.log` / `.rc`、`h3fix3-inventory-final.log` / `.rc`)。
+生成 `docs/TESTS.md` に差分なし。指定コマンド
+`/home/hight/os32-tmp/bin/check_slot.sh h3fix3-coder env HOST32_RUNNERS=qemu make check-changed
+ NP21W_DIR=/dev/null < /dev/null` は最終 **rc=0** を1回達成
+(`h3fix3-check-changed-final.log` / `.rc`)。基点側の変更による全変異fallbackも完走。
+全体検査内でもh3の61件・84/84変異が通過。検査前後の差分は`cmp`で一致、rc=0。
+この結果だけ検査終了後に追記した。ログはすべて `/home/hight/os32-tmp/`。
+ゲスト再確認はPM担当、NP21/W/NHD/配備/ini/実機・commit/pushは未実施。
+
 **PMのゲスト確認 (未実施)**:
 1. PMが最終一式の反映を[V1]で確認し、新ELF/mapからlayoutを生成。
    新規h3a/h3bをinitし、別caseのowner/世代を保存。既存break/user pauseは先に解除する。
@@ -2171,7 +2248,8 @@ C 8 + Python 72 = **80/80変異 runtime RED、compile/import失敗0、rc=0**
    (共通`--layout`/`--case`)を実行。手作業のSHM arm書込みで迂回しない。
    AS切替なしで待ちが戻った場合はcaseの印とswitch同値を確認し、resume印増分/consumed1を確認する。
 3. ホスト30秒を越えてもゲスト500 tickの猶予からFIRINGへ進むことを確認し、
-   PM/e9がFIRING後の新しい前景証拠を渡す。台本外の入力/フォーカス/debug操作を重ねない。
+   PM/e9がFIRING後の新しい前景証拠を§5-2手順3どおり1.5〜3ホスト秒ごとに更新し、
+   stop_sentまたは捕捉終了まで続ける。鮮度は0〜5ホスト秒。台本外の入力/フォーカス/debug操作を重ねない。
    FIRING観測後210 tick以上でSTOPが**一度だけ**送られることと、RAW/OBSの採取を確認。
    捕捉終了後、監視breakpointが残らずtrap/user pauseもないことを確認する。
 4. `reclaim`、同fixtureの新規起動、外部証拠を添えた`verify`まで§5-2どおりに実行。
@@ -2181,6 +2259,8 @@ C 8 + Python 72 = **80/80変異 runtime RED、compile/import失敗0、rc=0**
    不正OP_WAIT状態はarm拒否/書込みなしを確認する。tick停止のホスト120秒上限と
    後始末は**ホスト試験で確認済み**。実ゲストのuser pauseは先に
    `user pause during capture`で中止するため、120秒上限の再現手順には使わない。
+
+**h3fix3 のゲストでの実地確認と着地 (PM、2026-10-03、kernel `5159cd5`、17MB)**: 新しい case で layout → GUI で h3a/h3b → init → h3a に `arm --mode USER-loop --capture ... --trace FRONT.json --height 480`、前景証拠は PM の書き手が 1.5〜3 秒ごとに捕捉終了まで `replace` で書いた。**arm rc=0・ホスト 73 秒** (h3fix2 では 384 秒で rc=1)、PARKED から arm → resume の捕捉 → FIRING → **STOP 1 回**、`appslot_reclaim_count` 0→1・`fault_kill_count` 0→1、h3b は phase=WAIT で生存、`reclaim` rc=0。verify (新しい起動) と KAPI-loop・PARKED 以外の arm は h の最終一式で採る。独立レビュー Opus 5.5 は Approve (P1/P2 なし。`/api/mem` は core_lock の中で読むので単独読取りは裂けない、firing_at は安全側、STOP 直前に freeze の中で身元と phase を照合、二重送信なし)。**P3 は sol へ (wt/h3fix4)**: P3-1 STOP 前の freeze 照合を守る試験が無い (freeze 内の phase==FIRING の require を外す・checked() を block() に替える・stop_loop の 2 回目の鮮度照合を外す・resume の門から ERROR を外す、の 4 変異が生き残る)、P3-2 FIRING を観測した後に phase が変わったときなどの診断文の取り違え、P3-3 resume 前に fixture が死んだときの検出が 3,000 tick の上限まで遅れる、P3-4 `guest_tick()` が CaptureTrap を出さなくなったので `except CaptureTrap: continue` とその試験・変異は死んだ経路。
 
 共通環境は`CROSS_DIR=/home/hight/opt/cross`、`TMPDIR=/home/hight/os32-tmp`、`PYTHONPATH=`、
 `HOST32_RUNNERS=qemu`。inventory生成`python3 tools/gen_tests_inventory.py --write`はrc=0、
