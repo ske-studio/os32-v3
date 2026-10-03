@@ -242,3 +242,11 @@ Rust の `alloc_demo` は C のヘッダを使えないので、書式・`PASS`/
   なので実害はない — と**机上で判断しただけで、ゲストで確かめていない**。
 - Rust の `alloc_demo` は**まだ `kprintf` で出している**。第 2 陣で足すときに
   同じ穴を踏むので、そのときに `sys_write(1, …)` へ揃えること。
+
+## T2e e8b 更新 (2026-10-03)
+
+`font_load_test` の正常対照は boot 後の `OS32_ERR_NOSYS` で PASS 1/1。
+0 (boot 後の読込成功) と -3 は FAIL 0/1、stat 失敗は従来どおり SKIP。
+変異5は新しい SKIP 理由に当て直し、予約終了値127を返す誤りの検出を維持。
+既存11変異は全て RED。表・BB・mailbox は
+[kcg_boot_tdd.md](kcg_boot_tdd.md) の実ドライバ試験で照合する。

@@ -28,6 +28,7 @@
 #include "utf8.h"
 #include "pc98.h"
 #include "kstring.h"
+#include "os32_kapi_shared.h"
 #include "endian_le.h"   /* フォント書庫ヘッダは LE の外部形式 */
 
 /* スケール係数 (デフォルト=1, 最大4) */
@@ -208,7 +209,7 @@ void kcg_read_kanji(u16 jis_code, u8 *buf)
  * (0x4A000) を流用する。0x4A000〜0x9FFFF = 344KB が利用可能。
  * 圧縮フォントデータは ~180KB なので十分。
  *
- * フォントロード後に unicode_init() で上書きされるため安全。
+ * boot 内部読込だけに限定し、閉鎖後は表・BB・mailbox を上書きしない。
  * 上限は VRAM の直前 (MEM_CONV_END)。カーネルスタックを 0x1FC000 へ
  * 退避する前は 0x8F000 (スタックガード) で頭打ちだった。
  */
@@ -237,12 +238,26 @@ static int kcg_read_chunked(int fd, u8 *dst, int total)
     return done;
 }
 
+/* boot 内部読込だけが scratch を使える。kcg_init でも再開しない。 */
+static int kcg_boot_phase_open = 1;
+
+void kcg_boot_phase_close(void)
+{
+    if (!kcg_boot_phase_open) return;
+    kcg_boot_phase_open = 0;  /* 先に scratch を失効、TRUSTED も NOSYS */
+    if (!utf8_validate_jis_table()) utf8_set_jis_table_ready(0);
+    kmemset(P2V(MEM_GFX_BB_BASE), 0, MEM_GFX_BB_SIZE);
+    kmemset(P2V(MEM_AUTOPLAY_MAILBOX_BASE), 0, MEM_AUTOPLAY_MAILBOX_SIZE);
+}
+
 int kcg_load_font(const char *path)
 {
     int fd;
     u8 hdr[16];
     u32 magic, payload_size, flags;
     int n, compressed_size, ret;
+
+    if (!kcg_boot_phase_open) return OS32_ERR_NOSYS;
 
     kprintf(0x07, "[KCG] loading: %s\n", path);
 

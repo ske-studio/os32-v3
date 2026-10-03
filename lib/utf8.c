@@ -74,6 +74,14 @@ static int jis_table_probe(void)
     return 1;
 }
 
+#ifdef __KERNEL_BUILD__
+/* boot の読込と scratch 失効時もユーザー版と同じ4点を照合する。 */
+int utf8_validate_jis_table(void)
+{
+    return jis_table_probe();
+}
+#endif
+
 static int jis_table_usable(void)
 {
     if (jis_table_ready < 0) {

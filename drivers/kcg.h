@@ -61,7 +61,11 @@ int kcg_draw_sjis(int x, int y, const char *sjis_str, u8 fg, u8 bg);
 /* 戻り値: 描画した文字列のピクセル幅 */
 int kcg_draw_utf8(int x, int y, const char *utf8_str, u8 fg, u8 bg);
 
-/* 外部フォントファイル(.kcgfont)をロードしてキャッシュを上書き */
+/* 通常 AS 開始前の1回だけ。scratch失効→表検証→BB/mailbox初期化。
+ * SURFACE publisher (gfx_started 後) / USER lease より先に完了する。 */
+void kcg_boot_phase_close(void);
+
+/* boot内部でフォントをロード。閉鎖後は全呼び手へNOSYS、副作用なし。 */
 /* path: ゲスト側のフォントファイルパス (例: "/sys/font/default.kcgfont") */
 /* 戻り値: 0=成功, 負数=エラー */
 int kcg_load_font(const char *path);
