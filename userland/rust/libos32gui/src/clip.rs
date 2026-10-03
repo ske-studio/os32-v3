@@ -14,6 +14,7 @@ use os32api::gui::types::{Rect, SurfaceId};
 /// クリップスタックを深さ 0 に戻し、`rect ∩ サーフェス境界` を基底に置く。
 /// 戻り値: 0 成功、負値 (`OS32_ERR_STALE`) は無効な surface。
 pub fn set_base_clip(surface: SurfaceId, rect: Rect) -> i32 {
+    crate::gstate::screen_info_cached();
     let s = st();
     let idx = match s.resolve(surface) {
         Some(i) => i,
@@ -88,6 +89,7 @@ pub(crate) struct Target {
 /// 描画先を解決する。基底未設定の窓面は拒否 (None)。空クリップも None ではなく
 /// `clip.is_empty()` で表す (呼び出し側が早期 return する)。
 pub(crate) fn resolve_target(surface: SurfaceId) -> Option<Target> {
+    crate::gstate::screen_info_cached();
     let s = st();
     let idx = s.resolve(surface)?;
     let ent = s.surfaces[idx];

@@ -841,6 +841,7 @@ pub fn init() {
     KBD_MODS.store(0, Ordering::SeqCst);
     a.mouse_poll = mouse;
     a.gfx_init = gfx_init;
+    a.gfx_screen_info = screen_info;
     a.gfx_shutdown = nothing;
     a.tvram_clear = nothing;
     a.gfx_set_palette = palette;
@@ -918,4 +919,25 @@ pub fn init() {
     crate::multiapp::reset();
     os32api::os32_init(Box::into_raw(Box::new(a)));
     clear(9);
+}
+
+// e7: C SDK is mocked here; real attach is exercised by gfx_reattach_host.c.
+pub static FB_ATTACHES: AtomicUsize = AtomicUsize::new(0);
+pub static SCREEN_READS: AtomicUsize = AtomicUsize::new(0);
+#[no_mangle]
+pub static gfx_ready: i32 = 1;
+#[no_mangle]
+pub unsafe extern "C" fn libos32gfx_init(api: *mut os32api::KernelAPI) {
+    ((*api).gfx_init)();
+    FB_ATTACHES.fetch_add(1, Ordering::SeqCst);
+}
+#[no_mangle]
+pub unsafe extern "C" fn libos32gfx_shutdown() { (os32api::api().gfx_shutdown)(); }
+#[no_mangle]
+pub unsafe extern "C" fn gfx_present() { (os32api::api().gfx_add_dirty_rect)(0, 0, W as i32, H as i32); }
+unsafe extern "C" fn screen_info(out: *mut u8) {
+    SCREEN_READS.fetch_add(1, Ordering::SeqCst);
+    let mut info = os32api::gui::types::ScreenInfo::ZERO;
+    info.width = 640; info.height = 400; info.bpp = 4;
+    *(out as *mut os32api::gui::types::ScreenInfo) = info;
 }

@@ -40,6 +40,13 @@ pub(crate) struct Painter {
 
 impl Painter {
     pub(crate) fn from_target(t: &Target) -> Painter {
+        if unsafe { ffi::gfx_ready } == 0 {
+            return Painter {
+                ox: 0, oy: 0, offscreen: core::ptr::null_mut(), packed8: true,
+                fb_base: core::ptr::null_mut(), fb_pitch: 0, fb_w: 0, fb_h: 0,
+                clip: Rect::EMPTY,
+            };
+        }
         let info = screen_info_cached();
         let packed8 = !t.offscreen && info.format == GFX_FMT_PACKED8;
         let (fb_base, fb_pitch) = if packed8 {
@@ -651,7 +658,9 @@ pub fn measure_text(utf8: &[u8]) -> (i32, i32) {
 
 /// 画面能力 (KAPI v40 `gfx_screen_info`)。GUI とアプリはこれを信じ、決め打ちしない。
 pub fn screen_info() -> ScreenInfo {
-    crate::gstate::refresh_screen_info()
+    // Existing entry reports no drawable screen after a failed attach.
+    if unsafe { ffi::gfx_ready } == 0 { return ScreenInfo::ZERO; }
+    crate::gstate::screen_info_cached()
 }
 
 /// GUI カウンタ (KAPI v41 `gfx_stats`)。累積。NP21/W では転送量で性能を見積もる。

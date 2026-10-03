@@ -14,6 +14,14 @@ extern int gfx_dirty_suppress;  /* 非0のとき gfx_blit 等の dirty rect 登�
  * 色は 0〜15 をそのまま使う (システム色に同じ番号が割ってある)。 */
 extern int gfx_packed;
 
+/* Fullscreen ownership prevents another app from changing our generation.
+ * Generation changes only at gfx_init/gfx_init_200/gfx_shutdown while we own
+ * fullscreen. SDK init/attach/shutdown and check/present cover that lifecycle.
+ * After an explicit mode change, reattach before drawing (including 200-line).
+ * Direct KAPI mode changes and saved raw pointers are outside this contract.
+ * Reinitialization never resets live surface/sprite pools: free them explicitly.
+ * Mixed static/shlib consumers must check both before resuming either renderer.
+ */
 void libos32gfx_init(KernelAPI *api);    /* gfx_init + attach (単独アプリ) */
 void libos32gfx_attach(KernelAPI *api);  /* init 抜き: gshell 配下のアプリ / shlib */
 /* Set gfx_api first (or use the existing api-taking wrappers). 0 = success. */

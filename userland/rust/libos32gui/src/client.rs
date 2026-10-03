@@ -176,17 +176,28 @@ pub fn slot_base() -> *mut u8 {
 /*  置くのは、ここで個別にやると PACKED8 判定を忘れて漢字が描けなく    */
 /*  なるため (2026-09-06 に実測)。                                     */
 /* ================================================================ */
-extern "C" {
-    fn libos32gfx_attach(api: *mut os32api::KernelAPI);
+/// Attach this shlib's C instance without changing the display mode.
+/// Failure leaves drawing disabled; binding / OP_INIT still succeed.
+pub(crate) fn attach_gfx() -> i32 {
+    let rc = unsafe {
+        crate::ffi::gfx_api = os32api::api_ptr();
+        crate::ffi::libos32gfx_attach_checked()
+    };
+    crate::gstate::st().screen_valid = false;
+    rc
 }
 
-/// framebuffer 記述子・画素形式・サーフェス/スプライトのプールを取り直す。
-/// `init()` と共有ライブラリの `shlib_init` (票 C3) の両方から呼ぶ。冪等。
-pub(crate) fn attach_gfx() {
-    unsafe {
-        libos32gfx_attach(os32api::api_ptr());
+/// No callbacks or mode changes between this return gate and painting.
+fn check_gfx() -> GuiResult<()> {
+    let rc = unsafe { crate::ffi::libos32gfx_check() };
+    // Also invalidate on failure: recovery must not reuse old geometry.
+    crate::gstate::st().screen_valid = false;
+    if rc < 0 {
+        unsafe { crate::ffi::libos32gfx_detach() };
+        Err(GuiErr(rc))
+    } else {
+        Ok(())
     }
-    crate::gstate::refresh_screen_info();
 }
 
 /* ================================================================ */
@@ -345,7 +356,9 @@ pub fn poll(out: &mut [GuiEvent]) -> GuiResult<Poll> {
 /// **ハンドラの中から呼んではいけない** (契約 U3。`debug_assert` で守る)。
 pub fn wait(timeout_ticks: u32) -> GuiResult<i32> {
     debug_assert!(!c().in_handler, "gui wait() called from inside an event handler (U3)");
-    call(GUI_OP_WAIT, timeout_ticks)
+    let result = call(GUI_OP_WAIT, timeout_ticks);
+    check_gfx()?;
+    result
 }
 
 /// ハンドラ実行中の印 (再入検出用)。`app::run` が包む。

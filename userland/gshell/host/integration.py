@@ -42,6 +42,18 @@ def build(gshell: Path, name: str, quiet: bool = False) -> Path:
 # 票 KBD_NAV (docs/tasks/gui/TASK_KBD_NAV.md) の受け入れ K1 の変異。
 # (名前, ファイル, 置き換え前 (ちょうど 1 か所), 置き換え後, RED になるべき試験の絞り込み)
 MUTATIONS = [
+    ('e7 CUI rollback screen info', 'src/lib.rs',
+     '        wm::read_screen_info(st);\n        fep::install();',
+     '        fep::install();',
+     'e7_failed_cui_refreshes_framebuffer_and_geometry'),
+    ('e7 restore screen info', 'src/lib.rs',
+     '    wm::read_screen_info(st);\n    damage::invalidate_all_clients(st);',
+     '    damage::invalidate_all_clients(st);',
+     'e7_restore_refreshes_framebuffer_and_geometry'),
+    ('e7 restore framebuffer', 'src/lib.rs',
+     '    gfx::init();\n    wm::read_screen_info(st);\n    damage::invalidate_all_clients(st);',
+     '    unsafe { (os32api::api().gfx_init)() };\n    wm::read_screen_info(st);\n    damage::invalidate_all_clients(st);',
+     'e7_restore_refreshes_framebuffer_and_geometry'),
     ('full ring drains input after STOP', 'src/input.rs',
      '                // Preserve later raw input until STOP changes the foreground.\n                break;',
      '                // Preserve later raw input until STOP changes the foreground.',
@@ -255,7 +267,10 @@ def one_mutation(k: int) -> tuple:
                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         exe.unlink(missing_ok=True)
         ran = re.search(r'test result: \w+\. (\d+) passed; (\d+) failed', r.stdout)
-        if r.returncode != 0 and ran and int(ran[2]) > 0:
+        expected = {'e7 CUI rollback screen info': 'e7 CUI rollback geometry stale',
+                    'e7 restore screen info': 'e7 restore geometry stale',
+                    'e7 restore framebuffer': 'e7 restore framebuffer stale'}.get(name)
+        if r.returncode != 0 and ran and int(ran[2]) > 0 and (expected is None or expected in r.stdout):
             return True, f'RED  {name}  ({ran[2]} failed)'
         return False, f'SURVIVED  {name}  (filter {filt!r})'
 
