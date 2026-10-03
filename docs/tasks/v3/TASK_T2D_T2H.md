@@ -1421,7 +1421,7 @@ f5/f9で保存caller由来のkernel接続、f6で実CRT、f7で副arena/全入�
 f11で実free listのtrim/rollbackを続ける。f1bはtrimや最小初期量切替の成立を主張しない。
 f2以降および公開切替のe受入ゲートは維持する。commit/push無し。
 
-**f2 実装記録 (2026-10-03、GPT-6 Codex、wt/f2、基点 main e28f7de)**:
+**f2 実装記録 (2026-10-03、Codex gpt-6.1-sol、wt/f2、基点 main e28f7de)**:
 
 PM の先行方針: f2〜f4 は e と並行する未結線の先行準備とし、公開切替・AS 埋込み・呼び手への接続は e 受入後の f5 以降に行う。
 
@@ -1485,7 +1485,7 @@ NP21/W・NHD・配備・ini・実機操作、commit/push無し。
 **f2 の着地 (PM、2026-10-03)**: 独立レビュー Opus 5.5 は Approve (P1/P2 なし、native で 136 CHECK・変異 13/13 を自ら再実行)。PM のホスト検査は native の単体と `check_slot.sh` 経由の `HOST32_RUNNERS="native qemu"` check-changed で rc=0。P3 の扱い: P3-5 (tdd に票の行) は PM が直した。P3-3 (publish の入口で plan と表の照合) と P3-6 (未知 flag・非整列 hint・hint 下限の変異 3 本) は f3 で直す。**持ち越し**: P3-1 exec_heap が空の配置 (`exec_heap_cur_end == MEM_EXEC_HEAP_BASE`) で 0x88000000 をまたぐ併合が起きる — f5/f9 で「cur_end > BASE を不変条件にする」か「境界をまたぐ併合を禁じる」かを決める。P3-2 shlib 帯・lease 窓の hint は flags=0 でも INVAL (私有利用帯の外は拒否、ref_f2_pm Q4 の文言との差) — 公開での挙動を f5 で票に確定させる。P3-4 初期 heap を extent に数えないので、LIBC_INITIAL を unmap で返した後の穴が flags=0 の窓に入らず再利用されない — f4/f5 で LIBC_INITIAL を extent に持つか `primary_mapped_end` を下げるかを決める。
 
 
-**f3 実装記録 (2026-10-03、GPT-6 Codex、wt/f3、基点 main 37d1aef — f2取込み済み)**:
+**f3 実装記録 (2026-10-03、Codex gpt-6.1-sol、wt/f3、基点 main 37d1aef — f2取込み済み)**:
 
 PM判断 `/home/hight/os32-tmp/ref_f3.md` §8を最優先、Q1〜Q10からの逸脱なし。
 f2〜f4はeと並行する未結線の先行準備、公開切替・AS埋込み・caller接続はf5以降。
@@ -1555,6 +1555,92 @@ f2は139 CHECK/16 RED (中央値0.87秒、最大1.17秒)、C方言27 RED/対照5
 未実施: native/独立レビュー (PM)、f4 unmap、f5 caller/KAPI/heap端/AS埋込み、guest受入。
 NP21/W・NHD・配備・ini・実機・git commit/push操作なし。
 **f3 の着地 (PM、2026-10-03)**: 独立レビュー Opus 5.5 は Approve (P1/P2 なし。レビュアーは native/qemu で 2,254,940 CHECK と変異 11/11・f2 の 16/16 を再実行し、追加の変異 12 本と既存 PT だけ・新 PT 1 枚・隣接 PRESENT の形の探りでも実装の欠陥なし)。PM のホスト検査は native の単体 2 本と `check_slot.sh` 経由の `HOST32_RUNNERS="native qemu"` check-changed で rc=0。P3 は f4 で直す (ref_f4.md §9): P3-1/P3-2 publish の照合が件数の同じ古い plan を通す → `appmem_plan_valid()` を commit の前に、P3-4 試験の穴 (既存の非 0 PTE の検査を先頭だけにする変異・abort で既存 PT を全ゼロにする変異が生き残る、need_pt=0 と新 PT 1 枚の形)、P3-5 commit の後の abort を無害に、P3-7 登録の体裁。**PM 判断 (P3-3)**: pending の新しい PT の中の PTE は PDE を入れるまで見えないので、PRESENT は irq_save の前に立ててよい (ref_f3 Q7 の補足、IRQ 禁止の区間を O(PDE 数 + 既存 PT のページ数) に)。P3-6 (CHECK 数が確保数の 2 乗で増える、大きな形を足すときは照合を間引く) は記録。
+
+**f4 実装記録 (2026-10-03、Codex gpt-6.1-sol、wt/f4、基点 main f281b7a — f2/f3取込み済み)**:
+
+PM判断 `/home/hight/os32-tmp/ref_f4.md` §8 Q1〜Q9 / §9を最優先、逸脱なし。
+f2〜f4はeと並行する未結線の先行準備。kernel.mk/caller/KAPI/AS埋込みはf5以降。
+
+- [appmem.c](../../../exec/appmem.c) にunmap prepare/plan_valid/publish、
+  [appmem_unmap.c](../../../exec/appmem_unmap.c) に公開方針の1回完結入口を追加。
+  公開対象はANON/LIBC_INITIALのみ。隣接するallowed-kindを跨げるが穴/EXEC_*は全拒否。
+  最大2残片は元kind/flagsを保持し、32本で中抜きFULLなら表/PTE/PDE/owner/池/output全不変。
+  31本での成功対照も確認。私有EINVAL/EFULL、公開値への対応はf5。
+- **Q1訂正 (f2 Q3 / P3-4)**: 初期heapだけ固定領域のextent除外から外す。
+  LIBC_INITIALを `[page_align(img_end), primary_mapped_end)` のextentに持つ。
+  BSS共有端pageはimage。f5で登録してlayout.primary_mapped_endにpage_align(img_end)を渡す。
+  f4はhost内で登録し、返した穴へのflags0再mapを確認。ANONとは併合しない。
+  f2 P3-1 (空exec_heap境界の併合) とP3-2 (公開hintの範囲) はf5/f9へ引継ぐ。
+- [paging_app.c](../../../kernel/paging_app.c) に全PTEの形式/owner/live SURFACE検査、
+  空PT判定/withdraw/freeを追加。A/D許可、PS/PCD/PWT/権限不足/NP/0/別ownerは事前拒否・診断。
+  空PT判定は範囲外entry全0、触れたPTだけ、k=0保持。8 Bの空PT membershipだけ控え、
+  data PFNはNP PTE、返すPTはapp_pt_phys/PDEに保持 (pending配列追加なし)。
+  IRQ保存中は残るPTの対象PTEをNP、返すPTはPDE=0、active CR3を1回同期 (master=0回)。
+  空PTの中身は同期前不変、IF=1復元後に全対象NP→data owner free→entry0→PT free→
+  app_pt_phys0→extent残片確定。完了後PDE/app_pt_phys整合とcontext成功を確認。
+  不変条件違反のfree失敗はbad_free++/負値/失敗NP frame保持、成功へ偽装しない。
+- **§9 P3-1/P3-2**: map_mergeをprepare/plan_validで共有し、first/remove_count/mergedを再計算。
+  同数古いproposalの挿入位置/隣接消失/併合向きの反例を拒否。
+  mapはstage前とIRQ保存前にvalid、後者失敗はabort。unmapも件数/位置/残片を再計算。
+- **P3-3**: 全確保成功後にpending新PTのPRESENTをIF=1で立て、IRQ区間は
+  O(PDE数+既存PTの対象ページ数)。unmapも空PTをPDE撤去し、残るPTだけNP化。
+  hookでIRQ内PTE操作数の上限と、空PTの同期前不変を検査。
+- **P3-4**: 2ページ目/2枚目PTの非0、範囲外PRESENTのabort後保持、既存PTだけ/
+  新PT1枚の形を追加。検査を先頭だけにする変異・abortで既存PT全消去の変異もruntime RED。
+- **P3-5**: commitの最後にtx.end=tx.base、続くabortで公開済PTE/owner不変。
+  省略変異をruntime REDにした。
+- **P3-6**: data byte/他AS PTの全内容照合をpage単位CHECKに集約。
+  大きい形のO(確保数²×4096)増幅は避け、runner timeout10秒を維持。
+- **P3-7**: sdk.mkのrecipe字下げ/echo/MUT/末尾を周辺と統一。
+  TARGET_SRCSをliteral一覧へ直し、生成TESTSの対象ソース欄を埋めた。
+  既存test_appmem_mapの拡張なので全runner列は11本のまま。
+- 禁止対象 (paging.c/paging.h/kernel.mk/gfx/lease/userland/lib/SDK/KAPI生成物) は変更なし。
+  kernelリンク増分0 B・f枠8192 B消費0、AS/AppSlot増分0。
+  kernel.mapにappmem/paging_app object無し、__bss_end=0x18D358、ASSERT残31912 B。
+
+**試験**: [appmem_map_tdd.md](../../../tools/tests/appmem_map_tdd.md) / [appmem_tdd.md](../../../tools/tests/appmem_tdd.md)。
+実appmem/paging_app/paging/pgalloc/physmemをILP32/qemuで連結。
+map6成功/21確保失敗、unmap16基本成功と31本split成功、16穴再map、目的別負例、
+検査後free失敗注入 (負値/NP frame/診断) を確認。
+統合111,088 CHECK GREEN/32 runtime RED、表194 CHECK GREEN/19 runtime RED。
+必須unmap14種類を全て含む。生存/compile-link ERROR/signal/timeout/その他ERROR各0。
+対象実行の中央値/最大は統合0.66/0.96秒、表0.56/1.12秒。
+原本はhash不変、変異TUだけ差替え、期待FAIL完全行を照合。
+拡張途中の置換重複/ラベル相違はERRORで記録して修正、REDへ算入しない。
+
+**frame実測**: cross GCC13.2.0、`-std=gnu11 -march=i386 -O2 -fstack-usage
+-ffreestanding -fno-builtin -Wall -Wextra -Werror -Werror=implicit-function-declaration
+-Werror=implicit-int -Werror=vla -Iinclude -Ikernel -Iexec -Ilib -Iarch/x86 -Iplatform/pc98`。
+`i386-elf-gcc ... -c` でappmem.c/map.c/unmap.c/paging_app.c、各rc=0。
+appmem_map384 B、appmem_unmap160 B、表unmap prepare/valid/publish=52/96/40 B、
+paging unmap prepare/withdraw/free=80/64/64 B。map context/stage/abort/commit=64/64/48/52 B、
+map plan_valid72 B。控え `/home/hight/os32-tmp/f4-stack/*.su`。
+**16 KiB kernel stack全体のhigh-waterは未測定**、hで測る。
+
+**実行記録 (全体検査開始前に凍結)**:
+環境CROSS_DIR=/home/hight/opt/cross、TMPDIR=/home/hight/os32-tmp、PYTHONPATH空。
+makeはNP21W_DIR=/dev/null・stdin=/dev/null。
+`make all NP21W_DIR=/dev/null < /dev/null` rc=0 (`f4-all.log` / `.rc`)。
+既存imageの/dev/null宛コピー失敗警告はあり、NP21/Wへの配備成功なし。
+`python3 -B tools/tests/test_appmem_map.py --runner qemu --mutate` rc=0 (`f4-appmem-map.log` / `.rc`)、
+`python3 -B tools/tests/test_appmem.py --runner qemu --mutate` rc=0 (`f4-appmem.log`)。
+`gen_memmap.py --write` rc=0 (`f4-gen-memmap.log` / `.rc`; 初回はbuild中でkernel.map未生成のためrc=1)、
+`gen_tests_inventory.py --write` rc=0 (`f4-gen-tests.log` / `.rc`)、
+`check_select.py --lint` rc=0 (126検査/漏れ0、`f4-lint.log` / `.rc`)。
+`check_p2v.py` rc=0 (違反0/例外63、`f4-p2v.log` / `.rc`)。
+全ログは `/home/hight/os32-tmp/`。
+票/ソースを固定して次を1回実行し、終了rcは最終報告と `f4-check-changed.log` / `.rc` に残す:
+`/home/hight/os32-tmp/bin/check_slot.sh f4-coder env HOST32_RUNNERS=qemu make check-changed NP21W_DIR=/dev/null < /dev/null`。
+全体検査中は票/ソースを書き換えず、OS32_MUT_JOBSは枠に任せる。
+未実施: native/独立レビューはPMへ、kernel結線・初期heap実登録・caller/KAPI/AS埋込みはf5、
+EXEC_*内部返却口はf9/f10、実TLBを含むguest受入は結線後。
+NP21/W・NHD・配備・ini・実機・git commit/push操作なし。PM判断から外れた点なし。
+**全体ゲート結果**: slot0取得後、指定のf4-coderコマンドを**1回実行しrc=0**。
+Make登録差分を含みfull選択。統合111,088 CHECK/32 RED (中央値1.17秒、最大1.70秒)、
+表194 CHECK/19 RED (中央値0.80秒、最大1.15秒)、C方言27 RED/対照5 GREEN。
+既存検査は計5件skip。検査開始前の16ファイルhashが全て不変と終了後に照合し、
+**終了後にこの結果だけを追記**した。ログ `f4-check-changed.log` / `.rc` は上記tmp配下。
+**f4 の着地 (PM、2026-10-03)**: 独立レビュー Opus 5.5 は Approve (P1/P2 なし。レビュアーは native/qemu で 111,088 CHECK・変異 32/32、表の 194 CHECK・19/19 を再実行し、unmap の表操作をページ単位のモデルと約 600 万件の fuzz で突き合わせて不一致 0、f3 の反例 2 件が新しい plan 照合で拒否されることも確認)。PM のホスト検査は native の単体 2 本と `check_slot.sh` 経由の `HOST32_RUNNERS="native qemu"` check-changed で rc=0。P3 の扱い: P3-5 (コーダー表記) は PM が直した (f2〜f4 の記録を Codex gpt-6.1-sol に)。**f5 で直す**: P3-1 map の plan 照合の `remove_count` 比較を外す変異が生き残る (同じ件数・first・merged で remove だけ違う古い plan の負例を足す)、P3-2 空 PT の `app_releasable` 検査を外す変異が生き残る (PT の frame に SURFACE を置く負例か記録)、P3-4 生きた SURFACE と closing+lease の拒否でカウンタの増分を確かめていない・hook の「unmap PDE before PT free」を単独で落とす変異が無い。**記録 (f5 で決める)**: P3-3 free の段の失敗 (不変条件の違反、範囲内の 2 つの PTE が同じ PFN を指す場合を含む) で PDE=0 なのに app_pt_phys≠0 が残り、その AS は以後 `paging_app_context` が偽になり NP の frame も destroy で返らない — kstop にするか AS を毒として扱うか。
 
 f1bの接続が成立しなければ最小初期量切替へ進まない。TLSF採用へ黙って切り替えず、失敗した実ソースケースとサイズを添えて本節の設計差分をレビューする (D23の再決裁ではなくallocator実装選択の再設計)。各小段の不確実性を全fの一回依頼へまとめない。
 

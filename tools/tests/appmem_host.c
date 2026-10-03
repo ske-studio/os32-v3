@@ -61,6 +61,97 @@ static void number(u32 n)
     }
     say(buf, len);
 }
+static void unmap_table(void)
+{
+    u32 lo = MEM_EXEC_LOAD_ADDR + PAGE_SIZE;
+    struct appmem_table t = {0}, before;
+    struct appmem_unmap_plan p = {0}, old;
+    /* Whole, head, tail, middle; metadata survives both residual edges. */
+    for (u32 shape = 0; shape < 4; shape++) {
+        t = (struct appmem_table){0};
+        t.e[0] = (struct appmem_extent){lo, lo + 4*PAGE_SIZE, APPMEM_LIBC_INITIAL, TEST_ATTR};
+        u32 base = lo + ((shape == 2 || shape == 3) ? PAGE_SIZE : 0);
+        u32 end = lo + ((shape == 1 || shape == 3) ? 3*PAGE_SIZE : 4*PAGE_SIZE);
+        CHECK("unmap table prepare", !appmem_unmap_prepare(&t, base, end, APPMEM_PUBLIC_UNMAP_MASK, &p));
+        CHECK("unmap metadata preserved", (!p.left.base || (p.left.kind == APPMEM_LIBC_INITIAL && p.left.flags == TEST_ATTR)) &&
+              (!p.right.base || (p.right.kind == APPMEM_LIBC_INITIAL && p.right.flags == TEST_ATTR)));
+        CHECK("unmap table valid", appmem_unmap_plan_valid(&t, &p));
+        appmem_unmap_publish(&t, &p);
+        CHECK("unmap table remnants", (!p.left.base || equal(&t.e[0], &p.left, sizeof(p.left))) &&
+              (!p.right.base || equal(&t.e[!!p.left.base], &p.right, sizeof(p.right))));
+        CHECK("unmap table empty tail", !t.e[p.remain_count].base && !t.e[p.remain_count].kind);
+    }
+    t = (struct appmem_table){0};
+    t.e[0] = (struct appmem_extent){lo, lo+PAGE_SIZE, APPMEM_LIBC_INITIAL, TEST_ATTR};
+    t.e[1] = (struct appmem_extent){lo+PAGE_SIZE, lo+2*PAGE_SIZE, APPMEM_ANON, 0};
+    CHECK("unmap adjacent kinds", !appmem_unmap_prepare(&t, lo, lo+2*PAGE_SIZE, APPMEM_PUBLIC_UNMAP_MASK, &p));
+    appmem_unmap_publish(&t, &p);
+    CHECK("unmap adjacent removed", !t.e[0].base);
+    for (u32 count = APPMEM_EXTENT_MAX-1; count <= APPMEM_EXTENT_MAX; count++) {
+        t = (struct appmem_table){0};
+        for (u32 i = 0; i < count; i++)
+            t.e[i] = (struct appmem_extent){lo+4*i*PAGE_SIZE, lo+(4*i+3)*PAGE_SIZE, APPMEM_ANON, TEST_ATTR};
+        before = t; old = p;
+        int rc = appmem_unmap_prepare(&t, lo+PAGE_SIZE, lo+2*PAGE_SIZE, APPMEM_PUBLIC_UNMAP_MASK, &p);
+        CHECK("unmap table slot reason", rc == (count == APPMEM_EXTENT_MAX ? APPMEM_EFULL : 0));
+        CHECK("unmap prepare table unchanged", equal(&t, &before, sizeof(t)));
+        if (rc) CHECK("unmap full plan unchanged", equal(&p, &old, sizeof(p)));
+        else {
+            appmem_unmap_publish(&t, &p);
+            CHECK("unmap split shifts tail", t.e[2].base == lo+4*PAGE_SIZE && t.e[APPMEM_EXTENT_MAX-1].base == lo+4*(count-1)*PAGE_SIZE);
+        }
+    }
+    t = (struct appmem_table){0};
+    t.e[0] = (struct appmem_extent){lo, lo+3*PAGE_SIZE, APPMEM_EXEC_LARGE, TEST_ATTR};
+    CHECK("unmap private identity prepare", !appmem_unmap_prepare(&t, lo+PAGE_SIZE, lo+2*PAGE_SIZE,
+          APPMEM_KIND_MASK(APPMEM_EXEC_LARGE), &p));
+    CHECK("unmap private identity", p.left.kind == APPMEM_EXEC_LARGE && p.right.kind == APPMEM_EXEC_LARGE &&
+          p.left.flags == TEST_ATTR && p.right.flags == TEST_ATTR);
+    t.e[0].flags++;
+    before = t;
+    CHECK("unmap stale metadata invalid", !appmem_unmap_plan_valid(&t, &p));
+    appmem_unmap_publish(&t, &p);
+    CHECK("unmap stale publish unchanged", equal(&t, &before, sizeof(t)));
+    t.e[0].flags = TEST_ATTR;
+    t.e[0].base += PAGE_SIZE;
+    CHECK("unmap stale edge invalid", !appmem_unmap_plan_valid(&t, &p));
+    const u32 invalid[][2] = {{lo+1,lo+PAGE_SIZE},{lo,lo},{lo,lo+1},
+        {MEM_SHLIB_BASE,lo},{lo,MEM_LEASE_BASE},{0,~(u32)0}};
+    for (u32 i = 0; i < sizeof(invalid)/sizeof(invalid[0]); i++) {
+        before = t; old = p;
+        CHECK("unmap invalid range", appmem_unmap_prepare(&t, invalid[i][0], invalid[i][1], APPMEM_PUBLIC_UNMAP_MASK, &p) == APPMEM_EINVAL);
+        CHECK("unmap reject unchanged", equal(&t, &before, sizeof(t)) && equal(&p, &old, sizeof(p)));
+    }
+    struct appmem_layout reusable = layout();
+    reusable.primary_mapped_end = PAGE_ALIGN_UP(reusable.img_end);
+    struct appmem_plan remap;
+    t = (struct appmem_table){0};
+    t.e[0] = (struct appmem_extent){MEM_EXEC_HEAP_BASE-PAGE_SIZE, MEM_EXEC_HEAP_BASE, APPMEM_LIBC_INITIAL, 0};
+    CHECK("libc hole prepare", !appmem_unmap_prepare(&t, t.e[0].base, t.e[0].end, APPMEM_PUBLIC_UNMAP_MASK, &p));
+    appmem_unmap_publish(&t, &p);
+    CHECK("libc hole flags0 reuse", !prepare(&t, &reusable, PAGE_SIZE, 0, 0, &remap) && remap.base == MEM_EXEC_HEAP_BASE-PAGE_SIZE);
+    t.e[0] = (struct appmem_extent){lo+PAGE_SIZE,lo+2*PAGE_SIZE,APPMEM_LIBC_INITIAL,0};
+    CHECK("libc anon distinct prepare", !prepare(&t, &reusable, PAGE_SIZE, lo+2*PAGE_SIZE, APPMEM_MAP_EXACT, &remap));
+    appmem_publish(&t, &remap);
+    CHECK("libc anon do not merge", t.e[0].kind == APPMEM_LIBC_INITIAL && t.e[1].kind == APPMEM_ANON);
+    /* Same-count stale map proposals must recalculate insertion/merge edges. */
+    struct appmem_layout l = layout();
+    struct appmem_plan m;
+    t = (struct appmem_table){0};
+    t.e[0] = (struct appmem_extent){lo+3*PAGE_SIZE,lo+4*PAGE_SIZE,APPMEM_ANON,0};
+    CHECK("same count prepare", !prepare(&t, &l, PAGE_SIZE, lo+2*PAGE_SIZE, APPMEM_MAP_EXACT, &m));
+    t.e[0] = (struct appmem_extent){lo+PAGE_SIZE,lo+2*PAGE_SIZE,APPMEM_ANON,0};
+    before = t;
+    CHECK("same count merge invalid", !appmem_plan_valid(&t, &m));
+    appmem_publish(&t, &m);
+    CHECK("same count publish unchanged", equal(&t, &before, sizeof(t)));
+    t.e[0] = (struct appmem_extent){lo+5*PAGE_SIZE,lo+6*PAGE_SIZE,APPMEM_ANON,0};
+    CHECK("same count lost neighbor invalid", !appmem_plan_valid(&t, &m));
+    CHECK("same count insertion prepare", !prepare(&t, &l, PAGE_SIZE, lo+2*PAGE_SIZE, APPMEM_MAP_EXACT, &m));
+    t.e[0] = (struct appmem_extent){lo,lo+PAGE_SIZE,APPMEM_ANON,0};
+    CHECK("same count insertion invalid", !appmem_plan_valid(&t, &m));
+}
+
 static void run(void)
 {
     struct appmem_layout l = layout();
@@ -207,9 +298,10 @@ static void run(void)
     CHECK("null table", appmem_prepare(0, &l, PAGE_SIZE, 0, 0, APPMEM_ANON, 0, &p) == APPMEM_EINVAL);
     CHECK("null layout", prepare(&t, 0, PAGE_SIZE, 0, 0, &p) == APPMEM_EINVAL);
     CHECK("null output", prepare(&t, &l, PAGE_SIZE, 0, 0, 0) == APPMEM_EINVAL);
-    say("PASS appmem CHECKS=", sizeof("PASS appmem CHECKS=") - 1); number(checks); say("\n", 1);
 }
 void _start(void)
 {
-    run(); die(0);
+    run(); unmap_table();
+    say("PASS appmem CHECKS=", sizeof("PASS appmem CHECKS=") - 1); number(checks); say("\n", 1);
+    die(0);
 }

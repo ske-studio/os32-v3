@@ -59,6 +59,25 @@ static int mergeable(const struct appmem_extent *a,
            a->kind != APPMEM_EXEC_LARGE;
 }
 
+static void map_merge(const struct appmem_table *table, int count,
+                      struct appmem_plan *plan)
+{
+    plan->first = 0;
+    while (plan->first < (u32)count && table->e[plan->first].base < plan->base) plan->first++;
+    u32 end = plan->first;
+    while (plan->first && table->e[plan->first - 1].end == plan->merged.base &&
+           mergeable(&table->e[plan->first - 1], &plan->merged)) {
+        plan->first--;
+        plan->merged.base = table->e[plan->first].base;
+    }
+    while (end < (u32)count && table->e[end].base == plan->merged.end &&
+           mergeable(&table->e[end], &plan->merged)) {
+        plan->merged.end = table->e[end].end;
+        end++;
+    }
+    plan->remove_count = end - plan->first;
+}
+
 int appmem_prepare(const struct appmem_table *table,
                    const struct appmem_layout *layout,
                    u32 bytes, u32 hint, u32 map_flags,
@@ -106,36 +125,34 @@ int appmem_prepare(const struct appmem_table *table,
     plan.base = base;
     plan.end = base + size;
     plan.merged = (struct appmem_extent){base, plan.end, kind, extent_flags};
-    plan.first = 0;
-    while (plan.first < (u32)count && table->e[plan.first].base < base) plan.first++;
-    end = plan.first;
-    while (plan.first && table->e[plan.first - 1].end == plan.merged.base &&
-           mergeable(&table->e[plan.first - 1], &plan.merged)) {
-        plan.first--;
-        plan.merged.base = table->e[plan.first].base;
-    }
-    while (end < (u32)count && table->e[end].base == plan.merged.end &&
-           mergeable(&table->e[end], &plan.merged)) {
-        plan.merged.end = table->e[end].end;
-        end++;
-    }
-    plan.remove_count = end - plan.first;
+    map_merge(table, count, &plan);
     plan.count = (u32)count;
     if (plan.count + 1 - plan.remove_count > APPMEM_EXTENT_MAX) return APPMEM_EFULL;
     *out = plan;
     return 0;
 }
 
+int appmem_plan_valid(const struct appmem_table *table, const struct appmem_plan *plan)
+{
+    struct appmem_plan expected;
+    if (!table || !plan || table_count(table) != (int)plan->count ||
+        plan->count > APPMEM_EXTENT_MAX || plan->base < MEM_EXEC_LOAD_ADDR ||
+        plan->end > MEM_APP_BAND_MAX_TOP || plan->base >= plan->end ||
+        !aligned(plan->base) || !aligned(plan->end) ||
+        plan->merged.kind < APPMEM_LIBC_INITIAL || plan->merged.kind > APPMEM_EXEC_LARGE ||
+        !range_free(table, (int)plan->count, plan->base, plan->end)) return 0;
+    expected = *plan;
+    expected.merged.base = plan->base;
+    expected.merged.end = plan->end;
+    map_merge(table, (int)plan->count, &expected);
+    return expected.first == plan->first && expected.remove_count == plan->remove_count &&
+           expected.merged.base == plan->merged.base && expected.merged.end == plan->merged.end &&
+           plan->count + 1 - expected.remove_count <= APPMEM_EXTENT_MAX;
+}
+
 void appmem_publish(struct appmem_table *table, const struct appmem_plan *plan)
 {
-    /* P3-3: refuse a stale/invalid proposal before touching the table.
-     * A successful serialized prepare is the only supported source of plans. */
-    if (!table || !plan || table_count(table) != (int)plan->count ||
-        plan->count > APPMEM_EXTENT_MAX || plan->first > plan->count ||
-        plan->remove_count > plan->count - plan->first ||
-        plan->count + 1 - plan->remove_count > APPMEM_EXTENT_MAX ||
-        plan->base >= plan->end || !aligned(plan->base) || !aligned(plan->end) ||
-        !range_free(table, (int)plan->count, plan->base, plan->end)) return;
+    if (!appmem_plan_valid(table, plan)) return;
     u32 after = plan->count + 1 - plan->remove_count;
     if (!plan->remove_count) {
         for (u32 i = plan->count; i > plan->first; i--) table->e[i] = table->e[i - 1];
@@ -145,5 +162,72 @@ void appmem_publish(struct appmem_table *table, const struct appmem_plan *plan)
     }
     table->e[plan->first] = plan->merged;
     for (u32 i = after; i < APPMEM_EXTENT_MAX; i++)
+        table->e[i] = (struct appmem_extent){0, 0, 0, 0};
+}
+
+/* At most the first and last touched extents survive. No table-sized proposal. */
+int appmem_unmap_prepare(const struct appmem_table *table, u32 base, u32 end,
+                         u32 allowed_kind_mask, struct appmem_unmap_plan *out)
+{
+    struct appmem_unmap_plan plan = {0};
+    if (!table || !out || base < MEM_EXEC_LOAD_ADDR || end > MEM_APP_BAND_MAX_TOP ||
+        base >= end || !aligned(base) || !aligned(end)) return APPMEM_EINVAL;
+    int count = table_count(table);
+    if (count < 0) return count;
+    plan.base = base; plan.end = end; plan.allowed_kind_mask = allowed_kind_mask;
+    plan.count = (u32)count;
+    while (plan.first < plan.count && table->e[plan.first].end <= base) plan.first++;
+    u32 cursor = base, i = plan.first;
+    while (cursor < end) {
+        if (i == plan.count || table->e[i].base > cursor ||
+            !(allowed_kind_mask & APPMEM_KIND_MASK(table->e[i].kind))) return APPMEM_EINVAL;
+        const struct appmem_extent *e = &table->e[i];
+        if (i == plan.first && e->base < base)
+            plan.left = (struct appmem_extent){e->base, base, e->kind, e->flags};
+        if (e->end > end)
+            plan.right = (struct appmem_extent){end, e->end, e->kind, e->flags};
+        cursor = e->end;
+        i++;
+    }
+    plan.remove_count = i - plan.first;
+    plan.remain_count = !!plan.left.base + !!plan.right.base;
+    if (plan.count - plan.remove_count + plan.remain_count > APPMEM_EXTENT_MAX)
+        return APPMEM_EFULL;
+    *out = plan;
+    return 0;
+}
+
+static int extent_equal(const struct appmem_extent *a, const struct appmem_extent *b)
+{
+    return a->base == b->base && a->kind == b->kind && a->end == b->end && a->flags == b->flags;
+}
+
+int appmem_unmap_plan_valid(const struct appmem_table *table,
+                            const struct appmem_unmap_plan *plan)
+{
+    struct appmem_unmap_plan expected;
+    if (!plan || appmem_unmap_prepare(table, plan->base, plan->end,
+                                      plan->allowed_kind_mask, &expected)) return 0;
+    return expected.count == plan->count && expected.first == plan->first &&
+           expected.remove_count == plan->remove_count && expected.remain_count == plan->remain_count &&
+           extent_equal(&expected.left, &plan->left) && extent_equal(&expected.right, &plan->right);
+}
+
+void appmem_unmap_publish(struct appmem_table *table, const struct appmem_unmap_plan *plan)
+{
+    if (!appmem_unmap_plan_valid(table, plan)) return;
+    u32 after = plan->count - plan->remove_count + plan->remain_count;
+    /* Middle split grows by one; all other cases compact towards the front. */
+    if (plan->remain_count > plan->remove_count) {
+        for (u32 i = after; i > plan->first + plan->remain_count; i--)
+            table->e[i - 1] = table->e[i - 1 - plan->remain_count + plan->remove_count];
+    } else {
+        for (u32 i = plan->first + plan->remain_count; i < after; i++)
+            table->e[i] = table->e[i + plan->remove_count - plan->remain_count];
+    }
+    u32 i = plan->first;
+    if (plan->left.base) table->e[i++] = plan->left;
+    if (plan->right.base) table->e[i++] = plan->right;
+    for (i = after; i < APPMEM_EXTENT_MAX; i++)
         table->e[i] = (struct appmem_extent){0, 0, 0, 0};
 }

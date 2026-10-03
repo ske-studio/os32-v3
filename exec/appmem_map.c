@@ -12,8 +12,13 @@ int appmem_map(struct addrspace *as, struct appmem_table *table,
     if (!base_out || !paging_app_context(as)) return APPMEM_EINVAL;
     int rc = appmem_prepare(table, layout, bytes, hint, map_flags, kind, extent_flags, &plan);
     if (rc) return rc;
+    if (!appmem_plan_valid(table, &plan)) return APPMEM_EINVAL;
     rc = paging_app_stage(&tx, as, plan.base, plan.end);
     if (rc) return rc;
+    if (!appmem_plan_valid(table, &plan)) {
+        paging_app_abort(&tx);
+        return APPMEM_EINVAL;
+    }
     unsigned int saved = irq_save();
     paging_app_commit(&tx);
     appmem_publish(table, &plan);
