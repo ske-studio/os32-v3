@@ -38,18 +38,20 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | プログラムの一覧 | 各層の `deploy.yaml` (機械可読の正典)、コマンドは [07_shell.md §7-1](07_shell.md) | 09_exec / INDEX に表を持たない |
 | LAN の設計・進捗 | ドライバ = [tasks/network/PLAN.md](tasks/network/PLAN.md)、リンク層と Host Services = [tasks/network/LINK_PLAN.md](tasks/network/LINK_PLAN.md) | 05_drivers / DEVELOPMENT は要約 + リンク |
 | 設定の置き場 (system.cfg の残すキー、settings.db のスキーマ / API / リカバリ) | [tasks/settings/DESIGN.md](tasks/settings/DESIGN.md) (計画、v1.3) | ROADMAP は 1 行 |
-| アプリ帯の広さ (1 アプリに渡せる量) | [tasks/memory/APP_BAND_PDE.md](tasks/memory/APP_BAND_PDE.md) (実装済み `b8dab24`、v2.1 に同梱、kselftest で毎起動検証。**§5 のゲスト受入は未記録** = 受入待ち、2026-09-29 に確認) | 02_memory.md は方針と帯の表 |
+| アプリ帯の広さ・私有量 (v3) | [TASK_MEMMAP_V3](tasks/v3/TASK_MEMMAP_V3.md) D9・D11・§3-5 (決定)、[TASK_T2_APPBAND](tasks/v3/TASK_T2_APPBAND.md) と [T2d〜h](tasks/v3/TASK_T2D_T2H.md) (実装・受入) | 02_memory.md は生成地図。旧 v2.1 の帯と未記録ゲスト受入は [APP_BAND_PDE](tasks/memory/APP_BAND_PDE.md) の履歴として区別 |
 | 試験の一覧 (`make check` のターゲット、`_tdd.md` と票の対応) | [TESTS.md](TESTS.md) (`tools/gen_tests_inventory.py` で生成、`make check-tests-inventory` が鮮度を照合) | 各票は自分の `_tdd.md` を指すだけ |
 | 移植性 (CPU / 機種の 2 軸、ARM 計測、順序 1〜4 の経過) | [tasks/portability/ARM_GAUGE.md](tasks/portability/ARM_GAUGE.md) (計測と経過)、[../arch/README.md](../arch/README.md) (足し方) | [archive/portability/SURVEY_N1.md](archive/portability/SURVEY_N1.md) (調査)、`archive/arch_port/` は**別リポジトリ `pw-sh4-research` の調査の快照** (正典はそちら。本リポジトリでは更新しない)、[archive/portability/TASK_KSTRING_BENCH.md](archive/portability/TASK_KSTRING_BENCH.md) (kstring の速度実測 **完了 2026-09-17** — x86 は asm 維持、C 版は他 32 ビットアーキ向け。数字は ARM_GAUGE §9、語長の前提は §10) |
 | 版数 (カーネル 2.1 / GUI 1.4 で閉じた / 現行の開発 v3 / v4 草案) と v3 の fork の段取り | [ROADMAP.md §0](ROADMAP.md) | 各版の要約は [CHANGELOG.md](../CHANGELOG.md) (3〜5 行 + リリースノートへのリンク)、詳細は `RELEASE_vX.md` ([RELEASE_v2.1.md](RELEASE_v2.1.md))。`ver` の文字列、タグ |
 | v3 の目的・範囲・目標の 2 段・柱 (P0〜P10) と順序・v3 後半の票 | [tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md) (本案、2026-09-30 昇格) | ROADMAP.md の v3 の行、README.md (目的の一文)。メモリマップの決定の本文は TASK_MEMMAP_V3 (D 番号) |
-| v3 T2d〜T2h の詳細な実装契約・分割・受入 | [T2d〜T2h詳細](tasks/v3/TASK_T2D_T2H.md) (設計中。決定はTASK_MEMMAP_V3とTASK_T2_APPBAND、先行段の実績は後者§5-1) | TASK_T2_APPBAND §5-1は段の要約とリンク |
+| v3 T2d〜T2h の詳細な実装契約・分割・受入 | [T2d〜T2h詳細](tasks/v3/TASK_T2D_T2H.md) (現在地は各実装結果と§5・§12。冒頭の状態行は設計時の記録が残るため、実装前とは読まない。決定はTASK_MEMMAP_V3とTASK_T2_APPBAND、a〜cの実績は後者§5-1) | TASK_T2_APPBAND §5-1は段の要約とリンク |
 | NHD ext2のerrors印の原因調査 | [ext2調査票](archive/v3/TASK_EXT2_ERRORS_INVESTIGATION.md) (受入完了 2026-10-01、再インストールで印を解消・原因の発生時点は未確定。T2h受入前ゲートの照合先) | T2d〜h詳細 §0・§5・§8は順序とリンク |
 | v3 T3以降の実装契約・分割・受入と後半接続 | [T3配置](tasks/v3/TASK_T3_LAYOUT.md)、[T4〜T6bモジュール/起動](tasks/v3/TASK_T4_T6_MODULES.md)、[T7/後半接続](tasks/v3/TASK_T7_AND_FOLLOWUPS.md) (設計中。D決定の本文はTASK_MEMMAP_V3) | V3_PLAN / TASK_MEMMAP_V3 はリンクのみ |
 | 実機 Ra266 の画面ドライバ (内蔵 Trident 1023:9660) の設計・資料・段取り | [tasks/realhw/TASK_TRIDENT_DRIVER.md](tasks/realhw/TASK_TRIDENT_DRIVER.md) (設計中 — 設計票 v5 が Codex 5 回目で Approve、実装は未着手) | [tasks/realhw/PLAN.md](tasks/realhw/PLAN.md) §7、[ROADMAP.md](ROADMAP.md) (1 行) |
 | 実機 Ra266 の PEGC 640x480 (実機 ROM の OUT 列に合わせたモード設定と受け入れ) | [tasks/realhw/TASK_PEGC480_REALHW.md](tasks/realhw/TASK_PEGC480_REALHW.md) | [RELEASE_v2.1.md](RELEASE_v2.1.md) §2-1、[POLICY_DEBUG.md §4-62](POLICY_DEBUG.md)、`archive/realhw_v21/TASK_PEGC_RA266_TIMING.md` (起票の完了記録) |
 | 現行 / 未実装 / 過去 の区別 | 各文書の冒頭に「現行仕様」「計画」「YYYY-MM-DD 時点のスナップショット」を明記 | — |
 | 票の状態行の語彙 | [POLICY_DEV.md §8](POLICY_DEV.md) の表 (`tools/check_docs_status.py` がそこから読む) | 下の「タスク」節の冒頭 (語の列挙のみ) |
+
+T3 前の文書再整備の候補・未解決点は [DOCS_REORG_T3](tasks/v3/DOCS_REORG_T3.md) (草案)。正典の差替えやアーカイブ移動の承認を意味しない。
 
 ## カーネル技術仕様書 (§1-§10)
 

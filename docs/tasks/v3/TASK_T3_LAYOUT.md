@@ -1,12 +1,12 @@
 # TASK_T3_LAYOUT — T3 カーネル帯・常駐シェルの詳細設計
 
-> 状態: **設計中 (2026-10-01)** — 実装用の設計。独立レビュー Opus 5.5 (`claude-opus-5-5`) 往復3でApprove。実装・受入は未実施。
-> 設計: Codex gpt-6-astra。調査基点 `59c4285bbacf36e829e7480d741bbabac95be191`。
+> 状態: **設計中 (2026-10-03)** — 実装用の設計。独立レビュー Opus 5.5 (`claude-opus-5-5`) 往復3でApprove。実装・受入は未実施。
+> 設計: Codex gpt-6-astra。調査基点 `3c4171a784cc47720392ab55b3c4a24aee17e6f3` (2026-10-03、main)。元の設計レビュー基点は `59c4285`。今回の更新は実装事実・参照の照合で、D番号・契約・順序とレビュー履歴は変更しない。
 > 決定の正典は [TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) D1〜D36、配置の定義は `include/memmap.h`、実装済み地図は [02_memory](../../02_memory.md)。本票は実装順・追加契約・試験だけを持つ。
 
 ## 1. 着手条件と成果物
 
-T3 は [T2](TASK_T2_APPBAND.md) の **T2c〜h が統合・受入済み**になってから実装する。調査基点で着地しているのは T2a・T2a′・T2b までであり、高位アプリ、lease、世代検査、可変 map はまだ前提を満たさない。T2 のゲスト未確認項目を T3 の成功で消さない。
+T3 は [T2](TASK_T2_APPBAND.md) の **T2c〜h が統合・受入済み**になってから実装する。調査基点では T2a・T2a′・T2b・T2c と T2d の checked copy、T2e1〜e4、T2f1a/f1b、T2h2/h3 の準備が着地している。T2 全体の受入完了ではない。現在地と残件の正典は [T2d〜h](TASK_T2D_T2H.md) の各実装結果・§5・§12。e5 は別 worktree で実装・レビュー Approve 済みだが本基点には未取り込み (作業依頼時の申し送り)、e6〜e12・f2〜f13・g・h 最終一式は未着手。T2 のゲスト未確認項目を T3 の成功で消さない。
 
 T2a′ の固定 PD/PT 10 ページは既に画像外・最終位置にある。再移設せず、周囲の旧 shell heap を解放し DMA・ガード・kstack に替える。旧 T3 行の「PT を画像の外へ」は残作業ではない。後続は [T4〜T6b](TASK_T4_T6_MODULES.md)、[T7 と後半](TASK_T7_AND_FOLLOWUPS.md)。
 
@@ -15,6 +15,23 @@ T2a′ の固定 PD/PT 10 ページは既に画像外・最終位置にある。
 | 一組の新配置成果物 | kernel、resident shell/gshell、SDK、shlib、同梱ユーザーランドを同じ配置世代で再ビルド。旧 shell は入口前に拒否 |
 | 配置 manifest | ELF シンボルから code/data/bss・暫定 SQLite・浮動鎖・SLACK・shell の半開区間を生成。手書きの実測値を増やさない |
 | 起動診断 | 固定占有、SLACK、一般池、メタデータ、BB のページ数を別々に記録。推測予算を合格根拠にしない |
+
+### 1-1. 基点の実物と引渡し待ち
+
+参照は上記基点の行番号とシンボルで照合したもの。将来の配置値ではない。
+
+| 実物 (file:line / シンボル) | 確認した境界 |
+|---|---|
+| `build/os32.ld:75` (`__bss_end`)、`:81` / `:84` (`__sqlite_start`)、`:107` (`__sqlite_end`) | SQLite は固定帯のまま。T3 の連結配置は未実装 |
+| `build/kernel.mk:199` (`mkvmkernel.py`)、`:201` (`--sqlite-addr`) | SQLite 別圧縮の宛先はまだ固定値 |
+| `kernel/memory_boot.c:24` (`MEMORY_BOOT_FIXED_FIRST`)、`include/memmap.h:304` (`MEM_LEDGER_META_BASE`) | FIXED backing は旧 DMA/stack 隣接式。§2-2 の core BSS 移動は未実装 |
+| `exec/redir_access.c:257` (`copy_caller_cstr`)、`exec/lease.c:174` / `:231` (`surface_lease` / `surface_lease_bundle`) | B1・単面/4面束の内部入口はある。公開 KAPI 接続とは別 |
+| `kernel/v86_mem.c:26` (`v86_ident_map`) | e3 の native VRAM UC は setup/teardown 両方に着地。旧 WB 問題を未修正扱いにしない |
+| `gfx/gfx_core.c:158` / `:178` (`gfx_kernel_framebuffer` / `gfx_bind_client`)、`:398` (`gfx_surface_source`) | kernel は CLIENT backing を使用。互換 KAPI は起動前も選択 backend の geometry を返す。USER publisher は未結線 |
+
+**T2 完了後に確定**: 公開 query/lease と版 (e11 で一括)、再init/revoke/fallback・200行 geometry と SDK の実接続 (e5〜e12)、可変 map/allocator と resident CRT の分離 (f2〜f13)、trim 安全点 (g)、構成別受入 (h)。以下の契約はその引渡し後の設計で、現在の実装済み機能とはしない。
+
+T3 前の予算再計算と文書計画提示は [T2d〜h §6-1・§11](TASK_T2D_T2H.md) の関門。e4 の計測値を最終予算へ流用せず、T2h 受入後の一式で再計算する。文書計画の先行草案は [DOCS_REORG_T3](DOCS_REORG_T3.md)。
 
 ## 2. 配置の計算と起動契約
 
@@ -58,11 +75,11 @@ T2fのCPL=3用 `_sbrk` (EXACT mem_map) と **常駐shell/gshell用CRTの `_sbrk`
 
 T3 で Unicode 組表を kernel `.rodata` と二分探索へ移す。既存 `lib/unicode_jis_table.h` の並び/重複/端点をホスト検査し、Unicode→JIS の失敗値は現行 `utf8` 契約を維持する。ユーザー側の変換は **KAPI `unicode_to_jis` を選ぶ設計案**とし、`lib/utf8.c` の kernel/user ビルドを分ける。アプリが kernel の表ポインタを取得する API は設けない。
 
-T2 の暫定 Unicode RO lease は全同梱 caller が KAPI へ移行してから撤去する。apps/game は現行ビルド対象外のため変更要件を引き渡し、再ビルド再開時の受入ゲートとする。`unicode.bin` 読込・ready/4点照合・暫定RO leaseは同一差分で撤去し、leaseだけ残して未初期化領域を読ませない。
+T2 の暫定 Unicode RO lease は全同梱 caller が KAPI へ移行してから撤去する。**T2 完了後に確定**: e8 の CRT/shlib 取得・解除と e11 の公開接続を照合して撤去対象を確定する (本基点で移行済みとはしない)。apps/game は現行ビルド対象外のため変更要件を引き渡し、再ビルド再開時の受入ゲートとする。`unicode.bin` 読込・ready/4点照合・暫定RO leaseは同一差分で撤去し、leaseだけ残して未初期化領域を読ませない。
 
 boot後の旧 `kcg_load_font` NOSYS化・bootフェーズ制限・font_load_test/台本/host期待値/公開説明の変更は [T2e8b](TASK_T2D_T2H.md) §2-3へ前倒しする (実装は未着手)。公開Unicode/BBの実行中上書きをT2eの受入前に防ぐためで、D7は変更しない。T3はこの契約の継承確認と次のscratch定数整理を行う。
 
-`kcg.c` のLZ4 scratchはT7aまで旧低位FIXED領域に保持し、専用定数 `MEM_KCG_LZ4_TEMP_BASE/END` (従来の0x4A000〜MEM_CONV_END、344KiB) でUnicodeから名前を分離する。poolの追加確保・常駐予算追加はしない。ただしこの範囲はplanar BBとmailboxを重ねるため、**旧kcg_load_fontの実行はboot時のBB公開/host操作/V86開始より前に限定**する。bootフェーズを閉じた後の旧KAPI呼出しはNOSYSで副作用なし (D7の意味変更)。実行中の再ロードを温存してGUIやmailboxを上書きしない。scratchが有効なboot期間は通常AS/USER leaseがゼロ。boot期間終了でscratchを失効させ、重なるplanar BBは全消去・初期化してからT2のSURFACE/leaseとして公開する。公開後の低位BB leaseはscratchの漏出とは数えず、kcgからの上書きを禁止する。mailboxもhost操作開始前に初期化する。T7aまではV86の現行636KiB backingによる扱いを維持し、低位を直接渡さない。T7aで旧scratch/BB用途を撤去してV86へ専有を移す。低位の占有を解いて V86 へ専有を引き渡すのは T7a (一般池へは返さない)。T2e8bの意味変更と同じ差分で `userland/tests/font_load_test.c` を **期待NOSYSのPASS試験 (BB/mailbox不変はhost読取またはkselftestで別に照合し、未貸与mailboxをCPL=3試験が直読しない)** へ変更し、`tools/tests/guest_tests.txt` と `tools/tests/test_result_conv_host.c` の成功経路期待も更新する。SKIPで回帰を隠さない。`sdk/kapi.json` の説明はboot専用内部読込/公開口NOSYSを明記し、説明/NOSYS化のKAPI版更新はT2eの一式で行い、T3ではUnicode追加分を更新する (同じ意味変更を二重計上しない)。生成・clean再ビルドは [KAPI_SPEC §3-1](../../KAPI_SPEC.md) と [ABI1]〜[ABI3]。
+`kcg.c` のLZ4 scratchはT7aまで旧低位FIXED領域に保持し、専用定数 `MEM_KCG_LZ4_TEMP_BASE/END` (従来の0x4A000〜MEM_CONV_END、344KiB) でUnicodeから名前を分離する。poolの追加確保・常駐予算追加はしない。ただしこの範囲はplanar BBとmailboxを重ねるため、**旧kcg_load_fontの実行はboot時のBB公開/host操作/V86開始より前に限定**する。bootフェーズを閉じた後の旧KAPI呼出しはNOSYSで副作用なし (D7の意味変更)。実行中の再ロードを温存してGUIやmailboxを上書きしない。scratchが有効なboot期間は通常AS/USER leaseがゼロ。boot期間終了でscratchを失効させ、重なるplanar BBは全消去・初期化してからT2のSURFACE/leaseとして公開する。公開後の低位BB leaseはscratchの漏出とは数えず、kcgからの上書きを禁止する。mailboxもhost操作開始前に初期化する。T7aまではV86の現行636KiB backingによる扱いを維持し、低位を直接渡さない。T7aで旧scratch/BB用途を撤去してV86へ専有を移す。低位の占有を解いて V86 へ専有を引き渡すのは T7a (一般池へは返さない)。T2e8bの意味変更と同じ差分で `userland/tests/font_load_test.c` を **期待NOSYSのPASS試験 (BB/mailbox不変はhost読取またはkselftestで別に照合し、未貸与mailboxをCPL=3試験が直読しない)** へ変更し、`tools/tests/guest_tests.txt` と `tools/tests/test_result_conv_host.c` の成功経路期待も更新する。SKIPで回帰を隠さない。`sdk/kapi.json` の説明はboot専用内部読込/公開口NOSYSを明記し、説明/NOSYS化のKAPI版更新はT2e11の一括公開で行い、T3ではUnicode追加分を更新する (同じ意味変更を二重計上しない)。生成・clean再ビルドは [KAPI_SPEC §3-1](../../KAPI_SPEC.md) と [ABI1]〜[ABI3]。
 
 KAPI 追加は [ABI1]〜[ABI3]、番号予約は [KAPI_SPEC §3-2](../../KAPI_SPEC.md) に従い、D35 の世代を勝手に別定義しない。
 

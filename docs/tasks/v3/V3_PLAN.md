@@ -1,6 +1,6 @@
 # V3_PLAN — v3 本案 (目的・範囲・目標・柱と順序)
 
-> 状態: **実装中 (2026-09-30)** — v3 の本案。草案 [V3_PLAN_DRAFT.md](../../archive/v3/V3_PLAN_DRAFT.md) を、ユーザー判断 U1〜U11 と Codex の突き合わせ X1〜X8 (草案 §7) が揃った 2026-09-30 に昇格した (最後の U3 (OS64) と U4 (目的と範囲) は同日ユーザーが決定)。**T0 (C11) は受入完了 (2026-09-30、main `f5bcb35`)、T1 (物理地図 + 所有権台帳) も受入完了 (2026-10-01)、次は T2 (アプリ帯 + lease 窓)**。
+> 状態: **実装中 (2026-10-03)** — v3 の本案。草案 [V3_PLAN_DRAFT.md](../../archive/v3/V3_PLAN_DRAFT.md) を、ユーザー判断 U1〜U11 と Codex の突き合わせ X1〜X8 (草案 §7) が揃った 2026-09-30 に昇格した (最後の U3 (OS64) と U4 (目的と範囲) は同日ユーザーが決定)。**T0 (C11) は受入完了 (2026-09-30、main `f5bcb35`)、T1 (物理地図 + 所有権台帳) も受入完了 (2026-10-01)、T2 (アプリ帯 + lease 窓) は実装中 (main `3c4171a` 時点)。詳細な現在地は [T2d〜h の実装結果と残件](TASK_T2D_T2H.md) を参照**。
 >
 > 発行: コーダー `claude-opus-5-5` (worktree `wt/v3-plan`、基点 main `c9a8973`)、PM の指示による。
 
@@ -51,7 +51,7 @@ OS32 側の契約は小さく保つ。*
 | 柱 | 中身 | 正典 (決定・票) | 状態 |
 |---|---|---|---|
 | **P0 規約と道具** | C11 (gnu11) への移行、型は固定長のまま、fork 先の検査・CI・文書 | [TASK_C11_MIGRATION.md](../../archive/v3/TASK_C11_MIGRATION.md) (T0) | **受入完了** (2026-09-30、`f5bcb35`) |
-| **P1 メモリマップの再構築** | システムは恒等写像のまま、アプリだけ 0x80000000〜 の私有写像、物理地図 + 所有権台帳、固定帯はカーネル 3MB + シェル 1MB、SQLite・FEP 等をモジュールに、低位 640KB を V86 へ、OpenType | TASK_MEMMAP_V3 (決定 §0、帯 §2-1、票 T1〜T7 §6、受入 §7) | **T1 受入完了** (2026-10-01、[TASK_T1_LEDGER](../../archive/v3/TASK_T1_LEDGER.md))、次は [T2 アプリ帯 + lease 窓](TASK_T2_APPBAND.md) |
+| **P1 メモリマップの再構築** | システムは恒等写像のまま、アプリだけ 0x80000000〜 の私有写像、物理地図 + 所有権台帳、固定帯はカーネル 3MB + シェル 1MB、SQLite・FEP 等をモジュールに、低位 640KB を V86 へ、OpenType | TASK_MEMMAP_V3 (決定 §0、帯 §2-1、票 T1〜T7 §6、受入 §7) | **T1 受入完了** (2026-10-01、[TASK_T1_LEDGER](../../archive/v3/TASK_T1_LEDGER.md))、[T2 アプリ帯 + lease 窓](TASK_T2_APPBAND.md) は実装中。d・e1〜e4・f1a/f1b と h の準備が着地、統合受入は未完了 ([詳細](TASK_T2D_T2H.md)) |
 | **P2 ドライバの置き場** | 専用のモジュールローダ (ロード時検証、信頼する配布物だけ、IRQ 登録と初期化状態の結び付け、停止を証明できない失敗は隔離) | TASK_MEMMAP_V3 §4-7、票 T4〜T5c・T6b | P1 の中で |
 | **P3 HAL の結線** | HAL_WIRING の残 (W7)、NIC 境界 (L-C)、音源バックエンド、1kHz tick | [TASK_HAL_WIRING.md](TASK_HAL_WIRING.md)、[realhw/TASK_LAN_82557.md](../realhw/TASK_LAN_82557.md) | 一部着地 (v2.1)。1kHz tick は票が無い |
 | **P4 デバイス窓の資源割当** | 予約の核は T1 の台帳の MMIO 登録、P4 には順序契約 (識別 → 予約 → 写像 → probe / enable → 面公開) と検証済み資源レコード (実測 BAR) | TASK_MEMMAP_V3 D33・§4-5、[settings/DEVICE_RESERVATION.md](../settings/DEVICE_RESERVATION.md) (改訂は P4 着手時) | T1 / T2 の後 |
@@ -74,6 +74,8 @@ OS32 側の契約は小さく保つ。*
 | 5 | **v3 後半** (§5): P8 → P9、P10 の残り、GUI アプリ群 | — |
 
 T3以降の実装用詳細設計: [T3 配置](TASK_T3_LAYOUT.md)、[T4〜T6b モジュール・起動](TASK_T4_T6_MODULES.md)、[T7 低位・OpenType / P3〜P10 接続ゲート](TASK_T7_AND_FOLLOWUPS.md)。いずれも設計中で、既決方針の承認と新しい実装案のレビューを区別する。
+
+T3 着手前には T2h の受入に加え、[T2d〜h §6-1](TASK_T2D_T2H.md) の実測予算再計算・文書再整備計画の提示が必要。先行調査は [再整備草案](DOCS_REORG_T3.md) に置く (移動・削除は未実施)。
 
 票の中の順序と受入は TASK_MEMMAP_V3 §6・§7 が正典。策定時の「1 と 2 を同時に動かさない」「アイデアを順序に割り込ませない」(PLAN §1・§6) は維持する。
 

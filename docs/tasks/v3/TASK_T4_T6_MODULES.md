@@ -1,12 +1,25 @@
 # TASK_T4_T6_MODULES — SQLite・FEP・起動モジュールの詳細設計
 
-> 状態: **設計中 (2026-10-01)** — 実装用の設計。独立レビュー Opus 5.5 (`claude-opus-5-5`) 往復3でApprove。実装・受入は未実施。
-> 設計: Codex gpt-6-astra。調査基点 `59c4285bbacf36e829e7480d741bbabac95be191`。
+> 状態: **設計中 (2026-10-03)** — 実装用の設計。独立レビュー Opus 5.5 (`claude-opus-5-5`) 往復3でApprove。実装・受入は未実施。
+> 設計: Codex gpt-6-astra。調査基点 `3c4171a784cc47720392ab55b3c4a24aee17e6f3` (2026-10-03、main)。元の設計レビュー基点は `59c4285`。今回の更新は実装事実・参照の照合で、D番号・契約・順序とレビュー履歴は変更しない。
 > 上位契約: [TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) §3-5・§4・§6・§7。前提: [T2](TASK_T2_APPBAND.md) 完了 → [T3](TASK_T3_LAYOUT.md)。この票は形式、状態、移行と失敗処理の実装契約を補う。D番号の決定を変更しない。
 
 ## 1. 現在との差と共通境界
 
 基点では `build/os32.ld` と `build/kernel.mk` が SQLite を別セクション・固定宛先へ出力し、`kernel/kernel.c` が直接初期化する。`kernel/shlib.c` はモジュール再配置器ではない。`boot/vk32_boot.c` は複数エントリを検査するが、占有は raw_size、集積との非重複は低位集積を前提にする。`kernel_main` のルートマウントは `paging_init` / `memory_boot_init` より先。これらを変更済みとみなさない。
+
+### 1-1. 基点で照合した接続先
+
+| 実物 (file:line / シンボル) | 現在と後続の区別 |
+|---|---|
+| `build/os32.ld:84` (`__sqlite_start`)、`build/kernel.mk:201` (`--sqlite-addr`) | 固定 SQLite の出力を継続。module 形式には未移行 |
+| `kernel/kernel.c:435` (`vfs_mount`)、`:506` (`paging_init`)、`:558` (`memory_boot_init`)、`:689` (`os32_sqlite_init`) | root → PG/台帳 → SQLite の現行順。§5 の並べ替えは後続設計 |
+| `boot/vk32_boot.c:43` (`vk32_boot`) | 既存 raw_size の検証。load_span/BSS 込み形式は本票で実装する |
+| `exec/redir_access.c:257` (`copy_caller_cstr`)、`kapi/kapi_db.c:194` (`db_copy_input`) | T2d の B1 は着地。全 DB facade の結線完了ではない |
+| `kapi/kapi_db.c:587` (`kapi_db_exec`) | 旧 stmt の finalize 後に SQL をコピーする経路が残る。§3-1 B3 の修正対象 |
+| `kernel/ime_dict.c:63` (`ime_dict_open`)、`fs/vfs_fd.c:292` (`vfs_validate_sqlite`) | 現行 FEP open と世代検査の入口。RO FEP・group/identity の追加契約と区別する |
+
+T2d の完了範囲と T4/T5a へ残した DB/FEP 境界は [T2d〜h §7](TASK_T2D_T2H.md) が引渡し元。**T2 完了後に確定**: f2〜f13 の map/allocator、g の trim、h の owner/STOP 回収と予算の実績。GUI KAPI-loop の STOP・二重 kill 修正は同 §5-4 に着地記録があるが、B4 engine active/代替 stack の契約を実装済みにはしない。e11 の公開版と4世代の値も最終一式で照合し、ここで先取りしない。
 
 新規ファイル名は実装案: `kernel/module.c/.h` (状態と公開)、`kernel/module_image.c/.h` (副作用のない検証)、`tools/mkmod.py`、`build/module.ld`、`kernel/module_imports.def` (import の生成元)。モジュールの ABI は **内部 ABI** で、公開 KAPI と同じ表へ混ぜない。世代識別の値は T2/P7 の正典から取得する。
 
