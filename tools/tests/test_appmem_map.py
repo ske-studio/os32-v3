@@ -1,4 +1,4 @@
-"""T2f f3: real host-only appmem/paging_app/paging/pgalloc/physmem ILP32.
+"""T2f f3/f4: real host-only appmem/paging_app/paging/pgalloc/physmem ILP32.
 記録: tools/tests/appmem_map_tdd.md
 Only intended runtime FAIL labels count as RED; errors/timeouts are separate.
 """
@@ -14,8 +14,8 @@ import host32
 from mutpar import run_ordered
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SOURCES = ['exec/appmem.c', 'kernel/paging_app.c', 'exec/appmem_map.c']
-TARGET_SRCS = SOURCES + [
+SOURCES = ['exec/appmem.c', 'kernel/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c']
+TARGET_SRCS = ['exec/appmem.c', 'kernel/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c',
     'exec/appmem.h', 'kernel/paging_app.h', 'kernel/paging.c', 'kernel/paging.h',
     'kernel/pgalloc.c', 'kernel/pgalloc.h', 'kernel/physmem.c', 'kernel/physmem.h',
     'include/types.h', 'include/memmap.h', 'include/io.h',
@@ -45,10 +45,51 @@ MUTANTS = [
     ('rollback-PFN-leak', 1, 'app_return(tx->as->owner, *entry & ~(PAGE_SIZE - 1U));', '(void)entry;', 'data before PT free'),
     ('rollback-PT-leak', 1, 'app_return(tx->as->owner, tx->pending[k]);', '(void)k;', 'PFN rollback'),
     ('PT-before-data', 1, DATA_ABORT + PT_ABORT, PT_ABORT + DATA_ABORT, 'data before PT free'),
-    ('failure-publish', 2, 'if (rc) return rc;\n    unsigned int saved', 'if (rc) { appmem_publish(table, &plan); return rc; }\n    unsigned int saved', 'failure table unchanged'),
+    ('failure-publish', 2, 'if (rc) return rc;\n    if (!appmem_plan_valid(table, &plan)) {', 'if (rc) { appmem_publish(table, &plan); return rc; }\n    if (!appmem_plan_valid(table, &plan)) {', 'failure table unchanged'),
     ('active-no-reload', 2, 'if (paging_current_cr3() == as->pd_phys) paging_load_cr3(as->pd_phys);', '(void)as;', 'publish reload count'),
     ('alloc-IRQ-disabled', 1, 'tx->as = as; tx->base = base; tx->end = end;', 'tx->as = as; tx->base = base; tx->end = end; _disable();', 'alloc IF enabled'),
     ('nonzero-overwrite', 1, 'if (entry && *entry) return APPMEM_EINVAL;', '(void)entry;', 'nonzero PTE rejected'),
+    ('late-nonzero-only-first', 1, 'if (entry && *entry) return APPMEM_EINVAL;',
+     'if (va == base && entry && *entry) return APPMEM_EINVAL;', 'late nonzero PTE rejected'),
+    ('abort-whole-existing-PT', 1, PT_ABORT,
+     '    for (u32 k = 0; k < MEM_APP_BAND_MAX_PDES; k++) if (tx->end > tx->base && tx->as->app_pt_phys[k]) kmemset(P2V(tx->as->app_pt_phys[k]), 0, PAGE_SIZE);\n' + PT_ABORT,
+     'existing PT rollback unchanged'),
+    ('postcommit-abort', 1, 'tx->end = tx->base;', '(void)tx;', 'no free before publication'),
+    ('IRQ-pending-pages', 1, 'for (u32 k = first; k <= last; k++) if (!tx->pending[k]) {', 'for (u32 k = first; k <= last; k++) if (1) {', 'IRQ page work bounded'),
+    ('unmap-FULL-partial', 3, '    if (rc) return rc;\n    if (!appmem_unmap_plan_valid(table, &plan)) return APPMEM_EINVAL;\n    rc = paging_app_unmap_prepare',
+     '    if (rc) { if (rc == APPMEM_EFULL) { paging_app_unmap_prepare(&tx, as, base, base + bytes); unsigned int f = irq_save(); paging_app_unmap_withdraw(&tx); irq_restore(f); paging_app_unmap_free(&tx); } return rc; }\n    if (!appmem_unmap_plan_valid(table, &plan)) return APPMEM_EINVAL;\n    rc = paging_app_unmap_prepare',
+     'unmap FULL no withdrawal'),
+    ('unmap-other-owner', 1, 'if (!pgalloc_page_owned(pfn, owner)) return 0;',
+     'if (0 && !pgalloc_page_owned(pfn, owner)) return 0;', 'unmap reject before writes'),
+    ('unmap-EXEC-public', 3, 'APPMEM_PUBLIC_UNMAP_MASK', '~0U', 'unmap reject before writes'),
+    ('unmap-free-before-TLB', 3, '    paging_app_unmap_withdraw(&tx);',
+     '    if (paging_current_cr3() == as->pd_phys) { irq_restore(saved); paging_app_unmap_free(&tx); saved = irq_save(); } paging_app_unmap_withdraw(&tx);', 'unmap TLB before free'),
+    ('unmap-no-reload', 1, 'if (paging_current_cr3() == tx->as->pd_phys) paging_load_cr3(tx->as->pd_phys);',
+     '(void)tx;', 'unmap TLB before free'),
+    ('unmap-early-zero', 1, '        if (!pgalloc_free_n_owner(tx->as->owner, *entry / PAGE_SIZE, 1)) {',
+     '        *entry = 0; if (!pgalloc_free_n_owner(tx->as->owner, *entry / PAGE_SIZE, 1)) {', 'unmap owner argument'),
+    ('unmap-zero-omitted', 1, '        *entry = 0;\n    }\n    u32 first',
+     '        (void)entry;\n    }\n    u32 first', 'unmap returned entry zero'),
+    ('unmap-PT-before-PDE', 1, 'if (unmap_empty(tx, k)) { pd[APP_BAND_PDE + k] = 0; continue; }',
+     'if (unmap_empty(tx, k)) { pgalloc_free_n_owner(tx->as->owner, tx->as->app_pt_phys[k] / PAGE_SIZE, 1); pd[APP_BAND_PDE + k] = 0; continue; }', 'unmap free IF enabled'),
+    ('unmap-live-PT-free', 1, 'if (empty) {', 'if (1) { (void)empty;', 'unmap only empty PT'),
+    ('unmap-PT-metadata', 1, '        tx->as->app_pt_phys[k] = 0;',
+     '        (void)k;', 'unmap context restored'),
+    ('unmap-hole', 0, 'table->e[i].base > cursor ||', '0 ||', 'unmap reject before writes'),
+    ('unmap-fragment-kind', 0, 'plan.left = (struct appmem_extent){e->base, base, e->kind, e->flags};',
+     'plan.left = (struct appmem_extent){e->base, base, APPMEM_ANON, 0};', 'unmap fragment identity'),
+    ('unmap-publish-first', 3, '    rc = paging_app_unmap_free(&tx);',
+     '    appmem_unmap_publish(table, &plan); rc = paging_app_unmap_free(&tx);', 'unmap extent last'),
+    ('unmap-k0-free', 1, 'if (!k) continue;', 'if (0) continue;', 'unmap k0 retained'),
+
+    ('map-plan-before-stage', 2, '    if (!appmem_plan_valid(table, &plan)) return APPMEM_EINVAL;',
+     '    /* omitted */', 'map plan validation twice'),
+    ('map-plan-before-IRQ', 2, '    if (!appmem_plan_valid(table, &plan)) {',
+     '    if (0) {', 'map plan validation twice'),
+    ('unmap-early-empty-NP', 1, 'if (unmap_empty(tx, k)) { pd[APP_BAND_PDE + k] = 0; continue; }',
+     'if (unmap_empty(tx, k)) { u32 *pt = P2V(tx->as->app_pt_phys[k]); for (u32 j = 0; j < PTE_COUNT; j++) pt[j] &= ~PTE_PRESENT; pd[APP_BAND_PDE + k] = 0; continue; }',
+     'unmap empty PT untouched before TLB'),
+
 ]
 
 
@@ -64,7 +105,7 @@ def main():
           '-Wall', '-Wextra', '-Werror', '-Werror=implicit-function-declaration',
           '-Werror=implicit-int', '-Werror=vla', '-DPHYSMEM_HOST_TEST=1']
     try:
-        with tempfile.TemporaryDirectory(prefix='os32-f3-') as d:
+        with tempfile.TemporaryDirectory(prefix='os32-f4-') as d:
             tmp = pathlib.Path(d)
             includes = ['-I' + str(tmp), *['-I' + str(ROOT / p) for p in
                 ('tools/tests/host_arch', 'include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec')]]
@@ -73,16 +114,19 @@ def main():
             # is distinguished from an incorrectly disabled transaction.
             io = (ROOT / 'tools/tests/host_arch/arch_io.h').read_text()
             (tmp / 'arch_io.h').write_text(io.replace('static unsigned int host_arch_if = 0x202U;', 'extern unsigned int host_arch_if;'))
-            (tmp / 'hooks.h').write_text('#include "types.h"\n#include "io.h"\nu32 map_alloc(u32,int);\nint map_free(u32,u32,int);\nunsigned int publish_save(void);\n')
+            (tmp / 'hooks.h').write_text('#include "types.h"\n#include "io.h"\nu32 map_alloc(u32,int);\nint map_free(u32,u32,int);\nunsigned int publish_save(void);\nstruct appmem_table; struct appmem_plan;\nint host_plan_valid(const struct appmem_table *, const struct appmem_plan *);\nvoid host_pte_touch(void);\n')
             for src in ('paging', 'pgalloc'):
                 (tmp / (src + '_source.c')).write_text((ROOT / ('kernel/' + src + '.c')).read_text())
 
             def compile_source(source, key, index):
                 src, obj = tmp / (key + '.c'), tmp / (key + '.o')
-                if index == 2: source = source.replace('irq_save()', 'publish_save()')
+                if index in (2, 3): source = source.replace('irq_save()', 'publish_save()')
+                if index == 2: source = source.replace('appmem_plan_valid(table, &plan)', 'host_plan_valid(table, &plan)')
                 src.write_text(source)
                 extra = ['-include', str(tmp / 'hooks.h')]
                 if index == 1:
+                    source = source.replace('*app_entry(tx, va) |= PTE_PRESENT;', '{ host_pte_touch(); *app_entry(tx, va) |= PTE_PRESENT; }').replace('*unmap_entry(tx, va) &= ~PTE_PRESENT;', '{ host_pte_touch(); *unmap_entry(tx, va) &= ~PTE_PRESENT; }')
+                    src.write_text(source)
                     extra += ['-Dpgalloc_alloc_phys=map_alloc', '-Dpgalloc_free_n_owner=map_free']
                 subprocess.run(cc + extra + ['-c', str(src), '-o', str(obj)], check=True,
                                capture_output=True, text=True, timeout=30)

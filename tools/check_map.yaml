@@ -3643,6 +3643,7 @@ checks:
     - exec/appmem.c
     - exec/appmem.h
     - exec/appmem_map.c
+    - exec/appmem_unmap.c
     - kernel/paging_app.c
     - kernel/paging_app.h
     - kernel/paging.c

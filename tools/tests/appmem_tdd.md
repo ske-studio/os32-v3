@@ -76,3 +76,16 @@ publish入口のcount/range_free検査と古いproposalの2拒否対照を追加
 未知flag検査省略 (`unknown flag`)、非整列hint検査省略 (`unaligned`)、
 hint下限をshlibへ緩和 (`outside`) の3変異を追加。合計16/16 runtime RED。
 詳細/最終rcは [appmem_map_tdd.md](appmem_map_tdd.md) と票§3-5 f3記録。
+
+## f4 の純粋な表操作 (2026-10-03)
+
+票 [TASK_T2D_T2H.md](../../docs/tasks/v3/TASK_T2D_T2H.md) §3-5 f4。
+全体/先頭/末尾/中抜き/隣接異kind、32本FULL/31本成功、残片kind/flagsと
+EXEC_LARGE識別、古いunmap proposal (属性/端) と同数古いmap proposal (挿入/左右併合) を検査。
+LIBC_INITIALの返却後はimageのpage境界をlayoutに渡し、flags0で穴を再利用する。
+ANONとLIBC_INITIALは併合しない。失敗は表/output不変、末尾の空slotは全欄0。
+既存16変異に同数plan照合省略・unmap残片照合省略・残片flags取り違えの3本を追加。
+期待FAIL完全行照合で19/19 runtime RED、194 CHECK GREEN。
+初回はmerge条件とextent_equalの置換文字列が重複して2 ERROR。
+共有走査を維持して置換を一意にし、テスト追加による先行FAILラベルは既存対照を先に実行して
+解消した。ERRORはREDへ数えない。最終rc/時間は票に記録する。

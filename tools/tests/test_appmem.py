@@ -47,6 +47,14 @@ MUTANTS = [
      'MEM_EXEC_HEAP_BASE, layout->guard_b, size);', 'upper short'),
     ('publish-shift', 'table->e[i] = table->e[i + plan->remove_count - 1];',
      'table->e[i] = table->e[i];', 'full bridge sorted tail'),
+    ('same-count-plan', 'expected.first == plan->first && expected.remove_count == plan->remove_count &&',
+     '1 &&', 'same count insertion invalid'),
+    ('unmap-stale', 'extent_equal(&expected.left, &plan->left) && extent_equal(&expected.right, &plan->right);',
+     '(extent_equal(&expected.left, &plan->left) || 1) && (extent_equal(&expected.right, &plan->right) || 1);', 'unmap stale metadata invalid'),
+
+    ('unmap-fragment-flags', 'plan.left = (struct appmem_extent){e->base, base, e->kind, e->flags};',
+     'plan.left = (struct appmem_extent){e->base, base, e->kind, 0};', 'unmap metadata preserved'),
+
 ]
 
 
