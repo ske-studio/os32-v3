@@ -3488,3 +3488,37 @@ fn kstop_full_ring_preserves_following_input_for_next_foreground() {
         st.inited = false;
     }
 }
+
+#[test]
+fn e7_restore_refreshes_framebuffer_and_geometry() {
+    use crate::{mocks, wm};
+    use std::sync::atomic::Ordering::SeqCst;
+    mocks::init();
+    let st = wm::g();
+    *st = wm::GuiState::NEW;
+    st.screen_w = 320; st.screen_h = 200;
+    let reads = mocks::SCREEN_READS.load(SeqCst);
+    let attaches = mocks::FB_ATTACHES.load(SeqCst);
+    crate::restore_screen(st, &[0;48]);
+    assert_eq!((st.screen_w, st.screen_h), (640,400), "e7 restore geometry stale");
+    assert_eq!(mocks::SCREEN_READS.load(SeqCst), reads+1, "e7 restore screen info missing");
+    assert_eq!(mocks::FB_ATTACHES.load(SeqCst), attaches+1, "e7 restore framebuffer stale");
+}
+
+#[test]
+fn e7_failed_cui_refreshes_framebuffer_and_geometry() {
+    use crate::{mocks, wm};
+    use std::sync::atomic::Ordering::SeqCst;
+    mocks::init();
+    let st = wm::g();
+    *st = wm::GuiState::NEW;
+    st.inited = true;
+    st.screen_w = 320; st.screen_h = 200;
+    let reads = mocks::SCREEN_READS.load(SeqCst);
+    let attaches = mocks::FB_ATTACHES.load(SeqCst);
+    assert!(crate::switch_cui(st)); // empty FILE_BYTES makes config write fail
+    assert_eq!((st.screen_w, st.screen_h), (640,400), "e7 CUI rollback geometry stale");
+    assert_eq!(mocks::SCREEN_READS.load(SeqCst), reads+1);
+    assert_eq!(mocks::FB_ATTACHES.load(SeqCst), attaches+1);
+    st.inited = false;
+}

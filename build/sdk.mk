@@ -892,6 +892,7 @@ check-net-link-host:
 	python3 -B tools/tests/test_net_link.py --target
 # libos32gui の os32gui_cfg_* wrapper の分岐 (票 S2-W)。C の実体は贋物。
 check-gui-host:
+	python3 -B tools/tests/test_gui_reattach.py $(MUT)
 	cargo test --manifest-path userland/rust/libos32gui/host_tests/Cargo.toml --target x86_64-unknown-linux-gnu --offline
 # libos32host + wget/lpr/hclip/hdate のホスト TDD (票 N3)。実物のソースを #include し、
 # KAPI / libos32host の関数だけを贋物に。記録は tools/tests/n3_tdd.md。
@@ -1154,6 +1155,7 @@ CHECK_PAR_TARGETS := check-shlib-high-host check-bootinfo-host check-hdd-stage1-
     check-gfx-kernel-fb-host \
     check-gfx-reinit-host \
     check-gfx-attach-host \
+    check-gfx-reattach-host \
     check-h3-park-resume-host \
     check-cirrus-win-host check-pegc-mode-host \
     check-display-cleanup-host \
@@ -1304,3 +1306,9 @@ check-kcg-boot-host:
 	$(if $(MUT),python3 -B tools/tests/test_kcg_boot.py --runner $(firstword $(HOST32_RUNNERS)) $(MUT),@:)
 
 .PHONY: check-kcg-boot-host
+
+# T2e e7: both SDK instances over real CLIENT query/lease and three backends.
+check-gfx-reattach-host:
+	@set -e; test -n "$(HOST32_RUNNERS)"; for runner in $(HOST32_RUNNERS); do echo "HOST32_RUNNERS=$$runner"; python3 -B tools/tests/test_gfx_reattach.py --runner $$runner; done
+	$(if $(MUT),python3 -B tools/tests/test_gfx_reattach.py --runner $(firstword $(HOST32_RUNNERS)) $(MUT),@:)
+.PHONY: check-gfx-reattach-host

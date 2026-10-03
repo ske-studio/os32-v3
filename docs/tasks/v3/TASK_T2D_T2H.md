@@ -1233,6 +1233,95 @@ e11へ: 公開説明/版/生成と通常ASの一括切替。e8a/T3のUnicode移�
 **e8b の着地 (PM、2026-10-03)**: 独立レビュー Opus 5.5 は Approve (P1/P2 なし。レビュアーは qemu で 12 シナリオと変異 5/5 を再実行、kcg_load_font の実際の呼び手は boot_font.c と font_load_test だけ、閉じた後に BB・mailbox を読む者は無い、mailbox は game の view_export.c の sizeof==868 と driver.py の MAILBOX_SIZE=868 と一致)。PM のホスト検査は native の単体と `check_slot.sh` 経由の `HOST32_RUNNERS="native qemu"` check-changed で rc=0。P3 の扱い: P3-2 (kernel.c の古い [DEBUG] 注記) と P3-6 (コーダー表記) は PM が直した。**e11 へ**: P3-1 公開 KAPI の `kcg_init` は `kanji_fetched`/`ank_fetched` をゼロにするので、呼んだプログラム (apps/edit、blit_test2、rotate_test、gfx_demo200、bench) の後は再起動まで漢字が ROM の字形になる — e8b より前からあり、e8b は読み直しの道 (kcg_load_font) を NOSYS で塞いだだけ。e11 で閉じた後の `kcg_init` はフラグを消さない (または NOSYS) を決める。**e8a へ**: P3-3 `lib/utf8.h` は SDK に写される公開ヘッダで、カーネル専用の `utf8_validate_jis_table` が `#ifdef __KERNEL_BUILD__` で載っている — Unicode の面の整理で外へ出す。記録: P3-4 (slot の path ガードが無効なポインタを先に弾いたときの戻り値は未確認、副作用なし)、P3-5 (kernel.c の結線は試験では文字列の順序照合だけ、実行時はゲストの font_load_test で見る)、P3-7 (font_load_test の SKIP 文言の変更は不要だったが、変異 5 の当て先も合わせてあり期待は弱まっていない)。
 
 **e8b のゲスト受入 (PM、2026-10-03)**: main へ取り込み (`c66fe20`、h3fix4 も同時に `8d3966e`)。コミット済みの木で `make all` rc=0・`make check` rc=0。NP21/W を停止 → 停止確認 → `nhd-pull` → `deploy-kernel` (直後の `vmkernel.lz4` 483,472 B を控えた) → `deploy` → 起動 (17MB、今の ini — §12)。`ver` の Commit `8d3966e`・Image 483,472 B が控えと一致、**kselftest pass 274 / fail 0**。**`font_load_test` は `result: -10` (NOSYS) で PASS 1/1** (boot の後は字形の読み直しが止まる)。CUI の `echo 日本語の表示 漢字テスト` が漢字で表示された (boot の字形と Unicode 表の 4 点照合が通っている)。回帰の一式 (db_test 9/9、db_v50_test 41/41、klibc_test 49/49、alloc_demo 16/16、d0a_test、faulttest 4 件、loop・kloop + CTRL+STOP、`v86 -t`) と GUI (gui_demo の窓 → ESC → CUI) OK。カウンタ: 深さ 0、`ledger_*_ops`=0、`exec_as_leftover_pages`=0、`irq_ctx_violations`=1 (起動時の基準値)。
+
+### e7 実装結果 (コーダー、2026-10-03)
+
+モデル: GPT-6 (Codex)。基点 `328c379`、worktree `wt/e7`。
+PM の ref_e7 §8 Q1〜Q10 と §9 の補足に従う。PM判断からの逸脱なし。
+全体検査の確定結果は本節末尾。
+
+**実装**:
+- Q1/Q2: shlibのattachはchecked版。bind/OP_INITはattach失敗で拒否せず、
+  wait帰路でcheckして失敗なら自己detachし、既存waitの負値で返す。
+  check後はscreen_validを落とし、次の利用時にscreen_infoと既存screen_surfaceの寸法を更新。
+  同じVAへの再取得も考慮し、pointer比較でキャッシュ失効を省略しない。
+  surface_size/基底clipが最初に呼ばれる場合も先にrefreshする (再現REDから追加修正)。
+- Q3: Rust staticにcheck/detachを追加。presentはSDK gfx_presentで照合・dirty登録し、
+  readyなら既存KAPIで転送 (Cのgfx_presentはdirty登録だけなので転送呼出しを維持)。
+  shutdownはSDKでdetachしてからモード終了。公開Cヘッダに全画面所有・明示再init・
+  raw pointer・プール非リセットの契約を注記。gfx200_test等の直接KAPI利用は契約外のまま。
+- Q4/Q5/Q6/§9: 新entry/protocol変更なし。Painterはready=0なら空の描画先。
+  screen_infoの既存entryは描画不可ならZEROを返す。gdi_testはOP_INITしない全画面アプリで、
+  kbd_getcharからの帰路と初回描画前に、stubが既存SHLIB_INIT/SCREEN_INFOでshlibを再取得・
+  確認し、staticのcheckと合わせて判定する。片側失敗ではstaticをdetachし、G APIも呼ばない。
+  成功したshlib tokenが残る場合があることは§9どおりの既知の差。
+  帰路と描画の間にはcallbackや再initを置かない。
+- Q7: gshellのrestoreとCUI失敗戻しはgfx::init経由で自身のfbも取り直し、
+  read_screen_info後に既存invalidate/compositeへ進む。アプリ側はwait帰路に任せる。
+- Q8/Q10: revoke経路、KAPI slot/bridge、Cirrus DISPLAY、exec_map_shared_bb、
+  機能版69、memory/shlib世代、KAPI生成物は無変更。本番portはNULLのまま。
+  query/leaseのint 0x80が帰路checkに加わるのはe11の結線後。
+
+**試験**: [gfx_reattach_tdd.md](../../../tools/tests/gfx_reattach_tdd.md)。
+C実2組と実カーネル3 backendのqemu ILP32は167条件/4変異、Rust帰路・Painter・gdiは
+2試験/7変異、gshellは157試験 (追加2)/56変異 (追加3)。
+新規変異14本は必須7種を含み、コンパイル失敗ではなく固有assertのruntime REDで照合。
+HOST32_RUNNERS全runner列へ追加、08_buildの列挙を13本へ更新。
+
+**予算 (同一toolchain、byte)**:
+
+| 項目 | 前 | 後 | 増分 |
+|---|---:|---:|---:|
+| kernel.bin | 367,436 | 367,444 | +8 |
+| kernel本体BSS末尾 | 0x18D358 | 0x18D358 | 0 |
+| ASSERT残り / e枠残り | 31,912 / 12,056 | 31,912 / 12,056 | 0 |
+| SDK libos32gfx.a | 69,698 | 69,698 | 0 |
+| libos32gui.shlib | 129,568 | 133,672 | +4,104 |
+| shlib text / data page | 26 / 10 | 27 / 10 | +1 / 0 |
+| shlib BSS | 17,052 | 17,052 | 0 |
+| gshell.bin | 226,376 | 227,144 | +768 |
+| gdi_test.bin | 26,428 | 26,972 | +544 |
+| hello_gfx.bin | 22,316 | 22,316 | 0 |
+
+前は基点ソースに一時復元してmake allを再実行した値。kernelソースの変更はなく、
++8 Bはdirty build IDを含む差。kernel正味増分0 B、shlib dataは10 pageを維持。
+最初の比較用ビルドはソース編集と重なったため比較値には採用しなかった。
+
+**持越し**:
+- e11: §2-3 (:178) の「今回得たtokenを全部返す」を厳密に満たすため、
+  shlib表末尾にos32gui_gfx_detach相当を追加し、protocolとstub nfuncを同時更新する (§9)。
+- e6のsid/genのみの再利用、e5 P3-6のrevoke失敗は記録のみ。tilemap/mdの利用者も
+  SDK check/init/attachの回復契約に従う (描画の途中で回復処理を呼ばない)。
+- native、NP21/W、NHD、配備、ini、実機、apps/gameは未実施。独立レビューとゲスト受入はPMへ。
+  exec/appmem*・kernel/paging_app.*、commit/pushは未操作。
+
+**検証確定 (全ジョブ終了後の結果追記)**:
+共通環境は `CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp PYTHONPATH=`。
+makeは全て `NP21W_DIR=/dev/null < /dev/null`。配備は行わない。
+
+| コマンド (共通環境を先頭に付ける) | rc / 結果 |
+|---|---|
+| `make all NP21W_DIR=/dev/null < /dev/null` | 0。最終ログ `e7-final-build.log` |
+| `python3 -B tools/gen_memmap.py --write` | 0。生成ブロックは差分なし |
+| `python3 -B tools/gen_tests_inventory.py --write` | 0。TESTS.md再生成 |
+| `python3 -B tools/check_select.py --lint` | 0、128検査・対応表漏れ0 |
+| `make check-gui-host NP21W_DIR=/dev/null < /dev/null` | 0、当段2試験と既存60試験。追加寸法2変異は下記単独/全体で確認 |
+| `python3 -B tools/tests/test_gui_reattach.py --mutate` | 0、2試験/7変異 |
+| `python3 -B tools/tests/test_gfx_reattach.py --runner qemu --mutate` | 0、167条件/4変異 |
+| `make check-gshell-host NP21W_DIR=/dev/null < /dev/null` | 0、157試験/56変異 |
+| `/home/hight/os32-tmp/bin/check_slot.sh e7-coder env HOST32_RUNNERS=qemu make check-changed NP21W_DIR=/dev/null < /dev/null` | **0**、slot0。安全側のfull選択、全変異込みで1回完走 |
+
+ログは `/home/hight/os32-tmp/` の `e7-check-changed.log`、`e7-rust-test.log`、
+`e7-c-test.log`、`e7-gshell-mutants.log`、`e7-gui-host.log`。
+C方言27/27 RED・5/5 GREEN、公開ヘッダgnu89も通過。
+最初の全体検査キューはslot取得前に中断 (rc=130)、その後でのみ寸法更新の穴を修正した。
+再投入後は全体検査中に票/ソースを変更せず、終了後にこの結果を追記した。
+足場作成時のコンパイル/mock不足等の失敗はTDD記録どおり修正済み。
+`make all` の `/dev/null` へのFDコピー警告は指定環境によるもので、NP21/Wへの配備はしていない。
+
+
+
+**e7 の着地 (PM、2026-10-03)**: 独立レビュー Opus 5.5 は Approve (P1/P2 なし。レビュアーは test_gui_reattach 7/7・test_gfx_reattach 167 を再実行し、本番 (port が NULL) では帰路の check が失敗する経路が無く、Painter の門を迂回する blit・漢字も C の入口の門で守られることを確認)。PM のホスト検査は native の単体と `check_slot.sh` 経由の `HOST32_RUNNERS="native qemu"` check-changed で rc=0。**e8a で直す** (ref_e8a §9): P3-4 init していないアプリの `os32api::gfx::shutdown` が NULL を辿る、P3-5 gdi_test と試験の注記の「次の check で回収」は誤り (同じ世代なら再利用、回収は世代が変わったときか終了時)、P3-6 Rust の `static gfx_ready` / `gfx_fb` を不変で宣言している (C が書き換える、形式上 UB)。**e11 へ**: P3-1 wait の帰路の check が失敗すると run_vt を抜けて窓アプリが終わる (Q1 の「描画不可のまま続けて回復」は初回の attach だけに効く)、P3-2 Painter の門はオフスクリーンの描画も止める、P3-8 OP_WAIT 以外の park (WAIT_KEY・WAIT_POLL) で戻った shlib の利用者は帰路の check を通らない、P3-9 帰路の check の負値が OP_WAIT の値を上書きする。記録: P3-3 stub の check_gfx と os32api の present/shutdown は Rust 試験では贋物を通している、P3-7 libos32gfx_detach は公開ヘッダに無い (C は shlib を使えないので実害なし)。
 ## 3. T2f — map/unmapとallocator、暫定heap終了
 
 ### 3-1. 着手条件・範囲

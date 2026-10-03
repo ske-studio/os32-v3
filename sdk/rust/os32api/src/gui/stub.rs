@@ -677,3 +677,17 @@ pub unsafe fn fp<F: Copy>(idx: usize) -> F {
 pub fn is_bound() -> bool {
     unsafe { !(*TABLE.0.get()).is_null() }
 }
+
+/// Fullscreen consumers have no OP_INIT slot / OP_WAIT loop. Reuse the
+/// existing shlib initializer after their input wait or explicit mode change.
+/// This does not reset pools or add an entry / protocol generation (e7).
+pub fn check_gfx() -> i32 {
+    unsafe {
+        let init = fp::<extern "C" fn(*mut KernelAPI) -> i32>(E_SHLIB_INIT);
+        let rc = init(crate::api_ptr());
+        if rc < 0 { return rc; }
+        let mut info = super::types::ScreenInfo::ZERO;
+        fp::<extern "C" fn(*mut super::types::ScreenInfo)>(E_SCREEN_INFO)(&mut info);
+        if info.width == 0 || info.height == 0 { super::proto::OS32_ERR_INVAL } else { 0 }
+    }
+}

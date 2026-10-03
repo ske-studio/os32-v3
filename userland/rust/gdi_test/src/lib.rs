@@ -84,6 +84,20 @@ fn is_dark(idx: usize) -> bool {
     matches!(idx, 0 | 1 | 2 | 3 | 8 | 9 | 12 | 13)
 }
 
+// Both C instances are independent. e7 cannot detach the shlib from the
+// static side: on either failure do not enter either renderer; e11 adds that
+// protocol entry. Its remaining token is reclaimed at the next check / exit.
+fn check_both_gfx() -> bool {
+    let shlib_rc = os32api::gui::stub::check_gfx();
+    let static_rc = os32api::gfx::check();
+    if shlib_rc < 0 || static_rc < 0 {
+        os32api::gfx::detach();
+        false
+    } else {
+        true
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI) -> i32 {
     os32api::os32_init(api);
@@ -101,6 +115,11 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
             (a.gfx_set_palette)(i as i32, c.r, c.g, c.b);
             i += 1;
         }
+    }
+
+    if !check_both_gfx() {
+        os32api::gfx::shutdown();
+        return 1;
     }
 
     /* 画面能力を信じる (640×400 を決め打ちしない、G5)。 */
@@ -174,10 +193,10 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
     unsafe {
         let a = os32api::api();
         (a.kbd_getchar)();
-        (a.gfx_shutdown)();
-        (a.tvram_clear)();
     }
-    0
+    let ready = check_both_gfx();
+    os32api::gfx::shutdown();
+    if ready { 0 } else { 1 }
 }
 
 /* ---- 16 色見本帯 ---- */

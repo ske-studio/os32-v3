@@ -6,7 +6,7 @@
 //!
 //! ポインタは surface テーブル内だけで持ち、G API には `SurfaceId` しか出さない (票 C1)。
 use crate::ffi;
-use crate::gstate::{refresh_screen_info, st, SurfaceEnt, SurfaceKind};
+use crate::gstate::{st, SurfaceEnt, SurfaceKind};
 use os32api::gui::types::{Rect, SurfaceId};
 
 /// オフスクリーンサーフェスを作る (主記憶)。上限超過/確保失敗で `SurfaceId::NULL`。
@@ -78,13 +78,13 @@ pub fn create_window_surface(rect: Rect) -> SurfaceId {
 /// 全画面バックバッファ全体を指す非窓サーフェス (gdi_test / デスクトップ)。
 /// 一度作ってキャッシュする。`screen_info()` を信じ、640×400 を決め打ちしない (G5)。
 pub fn screen_surface() -> SurfaceId {
+    let info = crate::gstate::screen_info_cached();
     {
         let s = st();
         if !s.screen_surf.is_null() && s.resolve(s.screen_surf).is_some() {
             return s.screen_surf;
         }
     }
-    let info = refresh_screen_info();
     let ent = SurfaceEnt {
         used: true,
         generation: 0,
@@ -100,6 +100,7 @@ pub fn screen_surface() -> SurfaceId {
 
 /// サーフェスのサイズ (w,h)。無効な ID は (0,0)。
 pub fn surface_size(id: SurfaceId) -> (i32, i32) {
+    crate::gstate::screen_info_cached();
     let s = st();
     match s.resolve(id) {
         Some(i) => (s.surfaces[i].w as i32, s.surfaces[i].h as i32),

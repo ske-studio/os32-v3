@@ -281,6 +281,10 @@ pub mod gfx {
     extern "C" {
         pub fn libos32gfx_init(api: *mut KernelAPI);
         pub fn libos32gfx_shutdown();
+        fn libos32gfx_check() -> i32;
+        fn libos32gfx_detach();
+        fn gfx_present();
+        static gfx_ready: i32;
         pub fn gfx_clear(color: u8);
         pub fn gfx_pixel(x: i32, y: i32, color: u8);
         pub fn gfx_hline(x: i32, y: i32, w: i32, color: u8);
@@ -307,7 +311,7 @@ pub mod gfx {
     pub fn shutdown() {
         unsafe {
             let a = super::api();
-            (a.gfx_shutdown)();
+            libos32gfx_shutdown();
             (a.tvram_clear)();
         }
     }
@@ -315,10 +319,23 @@ pub mod gfx {
     /// バックバッファをVRAMに転送する (全画面)
     pub fn present() {
         unsafe {
-            let a = super::api();
-            (a.gfx_add_dirty_rect)(0, 0, 640, 400);
-            (a.gfx_present_dirty)();
+            gfx_present();
+            if gfx_ready != 0 {
+                (super::api().gfx_present_dirty)();
+            }
         }
+    }
+
+    /// Check this static instance after a wait / explicit reinitialization.
+    pub fn check() -> i32 {
+        let rc = unsafe { libos32gfx_check() };
+        if rc < 0 { detach(); }
+        rc
+    }
+
+    /// Release only this static instance's CLIENT view.
+    pub fn detach() {
+        unsafe { libos32gfx_detach() };
     }
 
     /// 画面をクリアしてVRAMに転送する

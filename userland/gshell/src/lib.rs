@@ -443,7 +443,8 @@ fn run_program(st: &mut wm::GuiState, path: &[u8; 256], via: LaunchVia) -> i32 {
 /// - 全画面 GFX プログラムが抜けて所有者が WM (1) に戻った (`exec_start` /
 ///   `exec_resume` のどちらから戻った直後でも)
 fn restore_screen(st: &mut wm::GuiState, saved: &[u8; 48]) {
-    unsafe { (os32api::api().gfx_init)() };
+    gfx::init();
+    wm::read_screen_info(st);
     damage::invalidate_all_clients(st);
     repaint_full(st, saved);
 }
@@ -641,7 +642,8 @@ fn switch_cui(st: &mut wm::GuiState) -> bool {
     }
     if !cfg_set_gui(b"0") {
         /* 失敗: GFX を戻してデスクトップへ復帰し、action は捨てる。 */
-        unsafe { (os32api::api().gfx_init)() };
+        gfx::init();
+        wm::read_screen_info(st);
         fep::install();
         st.inited = true;
         wm::install_system_palette();

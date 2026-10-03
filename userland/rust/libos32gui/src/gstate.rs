@@ -153,6 +153,10 @@ pub fn refresh_screen_info() -> ScreenInfo {
             info.format = os32api::gui::types::GFX_FMT_PLANAR4;
         }
     }
+    if let Some(i) = s.resolve(s.screen_surf) {
+        s.surfaces[i].w = info.width as i16;
+        s.surfaces[i].h = info.height as i16;
+    }
     s.screen = info;
     s.screen_valid = true;
     info
