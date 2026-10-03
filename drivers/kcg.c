@@ -26,6 +26,7 @@
 /* #include "gfx.h" removed */
 #include "io.h"
 #include "utf8.h"
+#include "utf8_internal.h"
 #include "pc98.h"
 #include "kstring.h"
 #include "os32_kapi_shared.h"

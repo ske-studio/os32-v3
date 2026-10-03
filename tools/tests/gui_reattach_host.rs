@@ -1,5 +1,7 @@
 use os32api::gui::types::{Rect, ScreenInfo, Style, GFX_FMT_PACKED8};
 use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering::SeqCst};
+static UNICODE_INITS: AtomicUsize = AtomicUsize::new(0);
+#[no_mangle] extern "C" fn libos32gfx_unicode_init() { UNICODE_INITS.fetch_add(1,SeqCst); }
 static CHECKS: AtomicUsize = AtomicUsize::new(0);
 static DETACHES: AtomicUsize = AtomicUsize::new(0);
 static RC: AtomicI32 = AtomicI32::new(0);
@@ -69,7 +71,9 @@ fn return_gate_and_painter() {
     assert_eq!(pixels,[0;16],"Painter gate missing");
     assert!(painter.row(0).is_none());
     RC.store(-22,SeqCst);
+    let unicode_before=UNICODE_INITS.load(SeqCst);
     assert_eq!(os32gui_shlib_init(&mut api),0,"attach failure must not reject bind");
+    assert_eq!(UNICODE_INITS.load(SeqCst),unicode_before+1,"shlib Unicode acquisition missing");
     assert!(unsafe { SHLIB_INIT_OK });
     let detached=DETACHES.load(SeqCst);
     assert!(client::wait(1).is_err());

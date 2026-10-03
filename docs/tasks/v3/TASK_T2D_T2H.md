@@ -1169,6 +1169,109 @@ ELF text/data/bss は 705540/36843/606520。kernel data は build ID を含む�
 **全画面アプリへの注入キーが届かない件 — 原因とユーザー決定 (2026-10-03)**: 原因は T8 (2026-09-12) の設計の穴。GUI 中の `kbd_getchar` は注入リング (`kbd_inject`) だけを見るが、注入できるのは con_sink の読み手 (端末) だけ (kernel/kbd_inject.c:106-118)。gshell は raw キーをフォーカス窓のリングへ配るだけで、全画面の所有者へ注ぐ経路を持たず、宛先が無ければ捨てる (userland/gshell/src/input.rs:479-481・:504-520)。起床条件 `key_ready` は注入リングの未読だけ (multiapp.rs:582-590)。Run から直接起動した全画面アプリには担い手の端末が居ないので WAIT_KEY のまま。CTRL+STOP だけは全画面の所有者宛ての別経路 (T8 D4d) で効く。**ゲストで確認**: hello_gfx の起動で `ring3_kbd_park_count` 2→3・`g_gfx_owner` 1→2、`a` の注入で raw リングの head 16→18 (make/break)・未読 0 (gshell が読み捨て)、`g_inj_count` 0 のまま、`ring3_switch_count` 不変。付随: 端末はプロンプト中は注入しない (票 E2) ので「端末を開いて Run」でも届かない見込み (未確認)。**ユーザー決定 (2026-10-03)**: e11 の公開 KAPI 一括に入れる — gshell が全画面の所有者 (端末の子でないもの) へ raw キーを変換して注入する経路と、カーネルの注入の権限 (全画面中の owner 1、または専用の KAPI) を e11 で足し、版の更新を 1 回にまとめる。それまでは既知の制限 (Run から直接起動した全画面アプリはキーで抜けられない、CTRL+STOP で畳む)。e11 の受入に「Run から全画面アプリ → キーで終わる」「端末の子は二重に注がない」「窓へ漏れない」「WAIT_POLL 型 (gfx200_test) も届く」を足す。
   revoke 経路を増やす際の前提として再検討する。
 
+### e8a 実装結果 (2026-10-03、Codex gpt-6-astra)
+
+**状態: 実装・全体ホスト確認済み。独立レビュー・ゲスト受入待ち。**
+基点 `19f9346`、worktree `wt/e8a`。PM `ref_e8a.md` §8 Q1〜Q11・§9・§10
+に沿い、設計判断からの逸脱なし。全runner対象は実物の14本へ当段1本を足す
+**15本** (§10の補足)。`memory_boot_fixed` の要素数14は変わらず、用途の内訳を
+FIXED 12→11、SURFACE_BACKING 1→2へ変更した (DMA 1、動的backingは別)。
+
+**登録・publisher (Q2〜Q6・Q9)**:
+- TVRAMをgfx_boot_reserveでbackend 0 / KERNEL / VRAM / UC / ROとして登録。
+  範囲は `[0xA0000,0xA4000)`、80×25、pitch160、2 plane、offset {0,0x2000}。
+  共有ハード資料 `os32/docs/hw/undocumented/io_disp.md` のNVMW PERMIT項で
+  A000:3FE2〜3FFEのメモリスイッチを確認した (著作権本文の転載なし)。
+  RW化・貸与範囲の絞り込みはe9かe11へ、モード切替の再取得はe10cへ。
+- Unicodeの台帳区間をSURFACE_BACKING/KERNEL/WBへ変更。
+  読込と4点照合の後、成否に関わらずFIXED_RAM/ROの面を登録する。
+  geometryは4096×32、pitch4096、1 plane。formatはkernel私有の
+  LEDGER_FMT_TABLE/TEXT。最大11 SURFACE、上限16は不変。
+- `exec/system_surface.[ch]` はgfx_startedと独立。Unicodeのreadyはkernel版utf8、
+  TVRAMはCUI状態。query/lease共通授権は現在のRUNNING USERを確認する。
+  Unicode読込後のkselftestを1項目追加 (登録・owner・RO・backend 0・backing)。
+- e5 P3-4のunready bitmapをslot寿命の管理側へ移し、create成功時に該当bitを消す。
+  CLIENT/DISPLAY再initは引き続きsystem面を触らない。
+
+**利用側 (Q1・Q7・Q8)**:
+- ユーザー版utf8の私有setterでpointerを切替え、既知4対をLE helperで照合。
+  `lib/utf8_internal.h` はSDKにコピーしない。e8b P3-3のkernel専用validate宣言も
+  公開utf8.hからここへ移した。kernel版の恒等pointerは不変。
+- CRT0は変更せず、static側はlibos32gfxのinit/attach、shlib側は既存init内から
+  FFIでCの取得helper→setterを呼ぶ。新entry/protocolは追加しない。
+  各実体はUnicode tokenを1本保持、同じrefでは再利用、失敗時は返してpointer NULL / ready=0。
+  解除はexec teardownの既存revoke_all。通常2実体でCLIENT2+Unicode2=4/8 lease。
+- **「低位へ戻さない」はportがある経路の契約**。本番はe6と同様NULL portなので
+  旧低位pointerと自動4点照合を維持する。CPL=0はportを呼ばない。
+  t5a_displayも従来の自動照合。取得失敗でも描画初期化/bindを続け、代替表示を使う。
+- e11へ: KAPI結線、旧低位USER/RW撤去、明示解除口、公開format/世代の統合。
+  T3でUnicode区間をV86_LOWへ統合する際に台帳注記を見直す。
+
+**e7 §9のP3**:
+- P3-4: C shutdownはgfx_apiがNULLならdetachだけ。未init shutdownを実Cで実行。
+- P3-5: gdi_testと2実体fixtureの注記を「同世代はtoken再利用、世代変更または終了で回収」へ訂正。
+- P3-6: Rustのgfx_readyとgfx_fbをstatic mut宣言とし、全読み取りをaddr_of! + read_volatileへ統一。
+
+**試験**:
+新 `test_unicode_surface.py` は実SDKのC/utf8を2組、実kernelのpublisher/query/lease/
+pgalloc/B1に接続。103条件で、2実体の漢字変換、未ready表、4点の各破損、RO出力拒否
+(書込成功対照・読取成功対照付き)、NULL/ready=0、低位mprotect(PROT_NONE)、
+FULL/8本上限、TVRAMのGUI/park拒否、再init保持、終了revoke、slot再利用を確認。
+MMUのhost VAのみ別bufferへコピーする足場であり、物理backingとlease VAは異なる。
+必須6変異は全て指定FAILのruntime RED。
+既存e7 Cは167条件/4変異、Rustは2試験/8変異 (shlib初期化の取得欠落を1本追加)。
+既存memory_bootは19試験、gfx_bootは18試験、既存変異の意図を維持した。
+実装中のfixtureのコンパイル不備、B1のbool戻り値の期待逆転、host run末尾のexit漏れ、
+check_mapの依存不足/字下げ不備は修正して再実行した。コンパイル失敗は変異REDに算入しない。
+
+**予算 (同一toolchain、byte)**:
+
+| 項目 | 前 | 後 | 増分 |
+|---|---:|---:|---:|
+| kernel.bin | 367,628 | 367,956 | +328 (上限2,500) |
+| kernel本体BSS末尾 | 0x18D418 | 0x18D558 | +320 |
+| ASSERT残り / e枠残り | 31,720 / 11,864 | 31,400 / 11,544 | −320 |
+| SDK libos32gfx.a | 69,698 | 70,794 | +1,096 |
+| libos32gui.shlib | 133,672 | 133,676 | +4 |
+| shlib text / data page | 27 / 10 | 27 / 10 | 0 / 0 |
+| shlib BSS | 17,052 | 17,088 | +36 |
+
+前値は編集前make all成功後に採取、kernelの+8 Bはdirty build IDを含む。
+未結線publisher `system_surface_source` のtext 203 Bもe11接続時に再計上する。
+
+**検証コマンド・持越し**:
+共通環境 `CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp PYTHONPATH=`、
+makeは `NP21W_DIR=/dev/null < /dev/null`。全体検査中は票/ソースを固定する。
+`make all`、gen_memmap/gen_tests_inventory --write、check_select --lint、
+`check_slot.sh e8a-coder env HOST32_RUNNERS=qemu make check-changed NP21W_DIR=/dev/null`
+の最終rcは終了後に追記する。ログは `/home/hight/os32-tmp/e8a-*.log`。
+native ILP32・NP21/W・NHD・配備・ini・実機・apps/gameは未実施。commit/pushなし。
+公開KAPI/kapi.json/版/生成ABI/shlib entry/protocolは無変更。
+独立レビューとゲスト日本語/RO拒否受入はPMへ。
+初回check-changedはrc=2。boot_splash_native_hostがpgallocをリンクしない足場で、
+unready bitmapの定義移動に追随せずリンク失敗した。全ジョブ終了後、
+既存の台帳スタブ群へbitmapの定義を1行追加。C方言27変異/5対照、
+P2V12変異等の既存検査は成功していたが、初回全体を合格とは扱わない。
+再実行ログは `e8a-check-changed-final.log`。
+
+**検証確定 (全ジョブ終了後の結果追記)**:
+
+| コマンド (上記共通環境) | rc / 結果 |
+|---|---|
+| `make all NP21W_DIR=/dev/null < /dev/null` | 0 (`e8a-final-build.log`) |
+| `python3 -B tools/gen_memmap.py --write` | 0、地図の注記・予算を更新 |
+| `python3 -B tools/gen_tests_inventory.py --write` | 0、試験一覧を再生成 |
+| `python3 -B tools/check_select.py --lint` | 0、130検査・対応表の漏れ0 |
+| `/home/hight/os32-tmp/bin/check_slot.sh e8a-coder env HOST32_RUNNERS=qemu make check-changed NP21W_DIR=/dev/null < /dev/null` | 再実行0、成功1回。ビルド規則変更でfull (全変異) を選択 |
+| `python3 -B tools/tests/test_unicode_surface.py --runner qemu --mutate` | 0、103条件 / 6変異runtime RED |
+| `python3 -B tools/tests/test_gui_reattach.py --mutate` | 0、2試験 / 8変異runtime RED |
+| `python3 -B tools/tests/test_gfx_reattach.py --runner qemu --mutate` | 0、167条件 / 4変異runtime RED |
+
+全体内でも上記新規・関連試験が成功。LE違反0、P2V違反0 / 12変異RED、
+C方言27変異RED / 正常対照5 GREEN。初回rc=2のログは削除せず保持した。
+
+
+**e8a の着地 (PM、2026-10-03)**: 独立レビュー Opus 5.5 は Approve (P1/P2 なし。port が NULL の本番では libos32gfx_unicode_init が最初に return し、ほかの差分も結果を変えない。Unicode の台帳区間の種別を読むのは ledger_surface_validate だけで、V86・paging・exec は見ない)。PM のホスト検査は native の単体と `check_slot.sh` 経由の `HOST32_RUNNERS="native qemu"` check-changed で rc=0。P3 の扱い: P3-5 (gfx_core.c:60 の古い注記) と P3-6 (programs.mk の utf8_prog.o の依存に utf8_internal.h) は PM が直した。**e11 へ**: P3-1 ユーザー版 utf8 の pointer の初期値は低位 (0x4A000)・ready=-1 のままなので、port がある経路でも libos32gfx_init より前の unicode_to_jis (例 game の enable_kanji_table) は低位を読む — e11 で低位の USER 写像を外すと fault するので、port がある実体の初期値を NULL にするか init 前の参照を禁ずるかを決める。P3-2 shlib では os32gui_shlib_init の明示の呼び出しと attach_checked 経由で取得が 2 回走る (同じ世代で再利用、port 結線後は query が 1 回余計) — どちらかに寄せる。**e10c へ**: P3-10 CUI のアプリが TVRAM を RO で lease したまま gshell を起動すると、GUI 中も park した親に RO の view が残る。記録: P3-3 Unicode の登録 (kernel.c:665) は kcg_boot_phase_close より前だが、登録は公開ではなく USER への公開は exec 以降なので §2-3 :182 の順序と矛盾しない、P3-4 init 前の os32api::gfx::shutdown は detach だけで gfx_shutdown の KAPI を呼ばない (in-tree に該当者なし)、P3-7 unicode_init の desc 検査は format・width・pitch を見ない、P3-8 ledger_surface_create の padding の走査を Unicode でも IRQ 保存区間で 131072 回まわす (遅い機種で起動時の tick の取りこぼし、planar BB も同じ)、P3-9 kselftest の期待は 275/0。
 ### e8b 実装結果 (2026-10-03、Codex gpt-6.1-sol)
 
 基点 `5159cd5` (main)、worktree `wt/e8b`。PM `ref_e8b.md` §8 Q1〜Q5 / §9 に沿い、逸脱なし。

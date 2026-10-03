@@ -10,10 +10,11 @@ GUI='userland/rust/libos32gui/src/'
 GDI='userland/rust/gdi_test/src/lib.rs'
 TARGET_SRCS=[GUI+x+'.rs' for x in ('client','clip','draw','ffi','gstate','surface','utf8core')]+[GDI,GUI+'shlib.rs','sdk/rust/os32api/src/lib.rs','sdk/rust/os32api/src/gui/stub.rs']
 MUTANTS=[
+ ('shlib-no-unicode',GUI+'shlib.rs','    unsafe { crate::ffi::libos32gfx_unicode_init(); }','', 'shlib Unicode acquisition missing'),
  ('surface-size-stale',GUI+'surface.rs','pub fn surface_size(id: SurfaceId) -> (i32, i32) {\n    crate::gstate::screen_info_cached();','pub fn surface_size(id: SurfaceId) -> (i32, i32) {','first surface_size is stale'),
  ('base-clip-stale',GUI+'clip.rs','pub fn set_base_clip(surface: SurfaceId, rect: Rect) -> i32 {\n    crate::gstate::screen_info_cached();','pub fn set_base_clip(surface: SurfaceId, rect: Rect) -> i32 {','base clip keeps old geometry'),
  ('wait-no-check',GUI+'client.rs','    check_gfx()?;','', 'return check missing'),
- ('painter-no-gate',GUI+'draw.rs','if unsafe { ffi::gfx_ready } == 0 {\n            return Painter','if false {\n            return Painter','Painter gate missing'),
+ ('painter-no-gate',GUI+'draw.rs','if unsafe { core::ptr::read_volatile(core::ptr::addr_of!(ffi::gfx_ready)) } == 0 {\n            return Painter','if false {\n            return Painter','Painter gate missing'),
  ('cache-not-invalidated',GUI+'client.rs','    // Also invalidate on failure: recovery must not reuse old geometry.\n    crate::gstate::st().screen_valid = false;','','stale screen cache'),
  ('gdi-one-instance',GDI,'let shlib_rc = os32api::gui::stub::check_gfx();','let shlib_rc = 0;','gdi must stop both renderers'),
  ('gdi-no-rollback',GDI,'        os32api::gfx::detach();','', 'gdi static rollback missing'),

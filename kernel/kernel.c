@@ -33,6 +33,8 @@
 #include "shlib.h"
 #include "shm.h"
 #include "utf8.h"
+#include "utf8_internal.h"
+#include "system_surface.h"
 #include "kselftest.h"
 #include "exec.h"
 #include "pci.h"
@@ -659,6 +661,9 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
             tvram_print(67, 2, "ER", TATTR_RED);
         }
     }
+
+    (void)system_unicode_register();
+    kselftest_run_post_unicode();
 
     /* IME (FEP) 初期化 — 辞書は初回使用時に遅延ロード */
     tvram_print(0, 4, "IME..", TATTR_GREEN);

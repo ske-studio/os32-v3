@@ -434,6 +434,7 @@ pub extern "C" fn os32gui_shlib_init(api: *mut KernelAPI) -> i32 {
      * (libos32gfx の `attach` と同じ理屈)。これより前に表 101..=104 を呼ばれても
      * NULL を辿らないよう、wrapper 側にも門がある。 */
     crate::cfgro::set_kapi(api as *mut core::ffi::c_void);
+    unsafe { crate::ffi::libos32gfx_unicode_init(); }
     client::attach_gfx();
     unsafe { core::ptr::write_volatile(core::ptr::addr_of_mut!(SHLIB_INIT_OK), true) };
     0

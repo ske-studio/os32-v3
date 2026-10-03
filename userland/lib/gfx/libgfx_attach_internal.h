@@ -20,6 +20,11 @@ struct gfx_attach_port {
     int (*unlease)(u32 token);
 };
 extern const struct gfx_attach_port *gfx_attach_port;
-/* e7 uses detach on both instances when either side fails. */
+/* Independent RO Unicode port, NULL until e11. No public ABI/CRT dependency.
+ * Both C instances own one token; teardown's revoke_all releases it.
+ * Set only before the first acquisition. query/lease have no callbacks. */
+extern const struct gfx_attach_port *gfx_unicode_port;
+void libos32gfx_unicode_init(void);
+/* Detach affects this instance's CLIENT only. */
 void libos32gfx_detach(void);
 #endif

@@ -170,6 +170,11 @@ struct ledger_resource {       /* 32B。u32 → u16 → u8 の順で詰め物な
 /* 予約の要求 1 本。first / end は PFN 半開 (end = 1048576 で 4GiB 端)、
  * kind は LEDGER_SPAN_*、res はこの span の根拠の資源レコードの番号。 */
 struct ledger_span { u32 first, end, kind, res; };
+/* Internal formats; the public format namespace is assigned in e11. */
+#define LEDGER_FMT_TABLE 2
+#define LEDGER_FMT_TEXT  3
+/* Publisher availability follows a slot's lifetime, reset on create. */
+extern u32 gfx_surface_unready;
 #define LEDGER_SURFACE_GEN_MAX 0xffffffffUL
 struct ledger_surface {        /* T2b: whole-page occupancy and stable references */
     u32 first, npages;         /* npages == 0 = 表の空き */

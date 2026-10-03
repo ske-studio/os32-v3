@@ -851,6 +851,18 @@ static void test_kapi_layout(void)
     check((bad & (1u << 3)) == 0, "kapi:hdr v3");
 }
 
+int kselftest_run_post_unicode(void)
+{
+    int before = ksel_fail;
+    const struct ledger_surface *sf = ledger_surface_find(0, LEDGER_ROLE_UNICODE);
+    check(sf && sf->owner == LEDGER_OWNER_KERNEL && !sf->backend &&
+          sf->perm_max == LEDGER_PERM_RO && sf->backing == LEDGER_SB_FIXED_RAM &&
+          sf->first == MEM_UNICODE_TABLE_BASE / PAGE_SIZE &&
+          sf->npages == MEM_UNICODE_TABLE_SIZE / PAGE_SIZE &&
+          ledger_surface_validate(sf), "unicode:registered RO backend0");
+    return ksel_fail - before;
+}
+
 int kselftest_run_post_exec(void)
 {
     int before = ksel_fail;

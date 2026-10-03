@@ -57,8 +57,8 @@ static const GfxBackend *const g_backend_list[] = {
 static int g_backend_pref = GFX_PREF_AUTO;
 static int gfx_started;
 STATIC_ASSERT(LEDGER_MAX_SURFACES <= 32, gfx_surface_bitmap_width);
-/* Slot reuse must clear stale not-ready bits (e8). */
-static u32 gfx_reinit_pending, gfx_surface_unready;
+/* The not-ready bitmap lives with the ledger (pgalloc.c); ledger_surface_create clears it on slot reuse (e8a). */
+static u32 gfx_reinit_pending;
 volatile u32 gfx_reinit_fail_count;
 static void gfx_reinit_surfaces(int finish);
 static void gfx_bind_client(void);
@@ -308,6 +308,17 @@ static const struct ledger_surface gfx_pegc_display = {
     .perm_max = LEDGER_PERM_RW
 };
 
+/* RO until e9/e11: the last attr page also contains memory switches. */
+static const struct ledger_surface system_tvram = {
+    .first = GFX_PFN(TVRAM_CHAR_BASE),
+    .npages = GFX_PFN(TVRAM_CG_WINDOW - TVRAM_CHAR_BASE),
+    .width = TVRAM_COLS, .height = TVRAM_ROWS, .pitch = TVRAM_BPR,
+    .owner = LEDGER_OWNER_KERNEL, .backing = LEDGER_SB_VRAM,
+    .role = LEDGER_ROLE_TVRAM, .format = LEDGER_FMT_TEXT,
+    .planes = 2, .cache = LEDGER_CACHE_UC, .perm_max = LEDGER_PERM_RO,
+    .plane_offset = {0, TVRAM_ATTR_BASE - TVRAM_CHAR_BASE}
+};
+
 /* 資源レコード i (と SURFACE の型板 i + 1) がどの候補のものか。 */
 static u32 gfx_cand_of(u32 i)
 {
@@ -382,6 +393,7 @@ void __attribute__((cold)) gfx_boot_reserve(void)
         sf.first = GFX_PFN(gfx_display_planes[i]);
         if (!ledger_surface_create(&sf, 0)) display_fail++;
     }
+    (void)ledger_surface_create(&system_tvram, 0);
     /* 6. */
     ledger_arena_freeze();
     kprintf(0x07, "[gfx] ledger cand=%u ok=%u display_fail=%u bb=%x top=%x\n", cand, m, display_fail,

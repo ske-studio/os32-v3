@@ -144,7 +144,7 @@ clean-gshell:
 # そのオブジェクトを外部プログラムにリンクすると 1 つの .o が 2 つの
 # リンクドメインに跨ることになる。ユーザー空間用は _prog.o として
 # PROGRAM_FLAGS で別途ビルドする。
-lib/utf8_prog.o: lib/utf8.c lib/utf8.h include/memmap.h include/endian_le.h
+lib/utf8_prog.o: lib/utf8.c lib/utf8.h lib/utf8_internal.h include/memmap.h include/endian_le.h
 	$(CC) $(PROGRAM_FLAGS) -Ilib -c $< -o $@
 
 # === LZ4 Command ===

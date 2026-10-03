@@ -1,5 +1,6 @@
 /* e7 PM §9: the app stops both renderers, but cannot detach a successful
- * shlib via the current protocol. That one token can remain until exit. */
+ * shlib via the current protocol. Same-generation checks reuse that token;
+ * a generation change or exit reclaims it. */
 extern KernelAPI *shl_gfx_api;
 extern GFX_Framebuffer shl_gfx_fb;
 extern int shl_gfx_ready;

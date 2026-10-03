@@ -86,7 +86,8 @@ fn is_dark(idx: usize) -> bool {
 
 // Both C instances are independent. e7 cannot detach the shlib from the
 // static side: on either failure do not enter either renderer; e11 adds that
-// protocol entry. Its remaining token is reclaimed at the next check / exit.
+// protocol entry. The remaining token is reused at the same generation;
+// a generation change or exit reclaims it.
 fn check_both_gfx() -> bool {
     let shlib_rc = os32api::gui::stub::check_gfx();
     let static_rc = os32api::gfx::check();

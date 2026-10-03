@@ -21,6 +21,7 @@
 /* ======================================================================== */
 
 #include "utf8.h"
+#include "utf8_internal.h"
 #include "memmap.h"
 #include "endian_le.h"
 
@@ -56,7 +57,7 @@ static int jis_table_ready = -1;
 
 void utf8_set_jis_table_ready(int ready)
 {
-    jis_table_ready = ready ? 1 : 0;
+    jis_table_ready = ready && unicode_jis_table ? 1 : 0;
 }
 
 /* 既知の (Unicode, JIS X 0208) 対応を数点照合して、0x4A000 に載っている
@@ -68,6 +69,7 @@ static int jis_table_probe(void)
     static const u16 probe_jis[4] = { 0x3021, 0x306C, 0x4250, 0x412A };
     int i;
 
+    if (!unicode_jis_table) return 0;
     for (i = 0; i < 4; i++) {
         if (jis_table_lookup(probe_cp[i]) != probe_jis[i]) return 0;
     }
@@ -79,6 +81,17 @@ static int jis_table_probe(void)
 int utf8_validate_jis_table(void)
 {
     return jis_table_probe();
+}
+int utf8_jis_table_ready(void)
+{
+    return jis_table_ready == 1;
+}
+#else
+void utf8_set_jis_table(const u8 *table)
+{
+    jis_table_ready = 0;
+    unicode_jis_table = table;
+    if (table) jis_table_ready = jis_table_probe();
 }
 #endif
 

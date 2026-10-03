@@ -1156,6 +1156,7 @@ CHECK_PAR_TARGETS := check-shlib-high-host check-bootinfo-host check-hdd-stage1-
     check-gfx-reinit-host \
     check-gfx-attach-host \
     check-gfx-reattach-host \
+    check-unicode-surface-host \
     check-h3-park-resume-host \
     check-cirrus-win-host check-pegc-mode-host \
     check-display-cleanup-host \
@@ -1312,3 +1313,9 @@ check-gfx-reattach-host:
 	@set -e; test -n "$(HOST32_RUNNERS)"; for runner in $(HOST32_RUNNERS); do echo "HOST32_RUNNERS=$$runner"; python3 -B tools/tests/test_gfx_reattach.py --runner $$runner; done
 	$(if $(MUT),python3 -B tools/tests/test_gfx_reattach.py --runner $(firstword $(HOST32_RUNNERS)) $(MUT),@:)
 .PHONY: check-gfx-reattach-host
+
+# T2e e8a: two utf8 instances, RO system surfaces and real query/lease.
+check-unicode-surface-host:
+	@set -e; test -n "$(HOST32_RUNNERS)"; for runner in $(HOST32_RUNNERS); do echo "HOST32_RUNNERS=$$runner"; python3 -B tools/tests/test_unicode_surface.py --runner $$runner; done
+	$(if $(MUT),python3 -B tools/tests/test_unicode_surface.py --runner $(firstword $(HOST32_RUNNERS)) $(MUT),@:)
+.PHONY: check-unicode-surface-host

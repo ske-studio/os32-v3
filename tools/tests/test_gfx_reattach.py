@@ -27,8 +27,8 @@ def main():
     pattern = re.compile(r'(?<!->)(?<!\.)\b('+'|'.join(sorted(names))+r')\b')
     # First namespace is the e6 fixture's sdk_ drawing exports; its globals
     # keep their names. The second copy prefixes every exported SDK symbol.
-    globals_ = ['gfx_api', 'gfx_fb', 'gfx_ready', 'gfx_packed', 'gfx_dirty_suppress', 'gfx_attach_port']
-    second = re.compile(r'(?<!->)(?<!\.)(?<!struct )\b('+'|'.join(sorted(names | set(globals_)))+r'|libos32gfx_\w+)\b')
+    globals_ = ['gfx_api', 'gfx_fb', 'gfx_ready', 'gfx_packed', 'gfx_dirty_suppress', 'gfx_attach_port', 'gfx_unicode_port']
+    second = re.compile(r'(?<!->)(?<!\.)(?<!struct )\b('+'|'.join(sorted(names | set(globals_)))+r'|libos32gfx_\w+|utf8_\w+(?=\s*\()|unicode_to_\w+(?=\s*\())\b')
     with tempfile.TemporaryDirectory(prefix='os32-e7-objects-') as cache:
         def run(m=None):
             def stage(tmp, sources):
