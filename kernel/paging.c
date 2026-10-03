@@ -185,6 +185,8 @@ static u32 *page_tables[PAGING_PT_COUNT];
 
 static int pg_enabled = 0;
 static u32 live_addrspaces;
+static int boot_user_shared_done;
+u32 paging_shm_user_missing_count;
 /* 逆転した範囲 (start > end) を渡されて撥ねた回数。
  *
  * 範囲 API は前から -1 を返していたが、**呼び側が戻り値を見ていない**ので
@@ -537,7 +539,9 @@ static int set_page_noflush(u32 virt_addr, u32 phys_addr, u32 flags)
 
 int paging_set_page(u32 virt_addr, u32 phys_addr, u32 flags)
 {
-    int rc = prepare_tables(virt_addr >> PAGE_SHIFT, 1);
+    int rc;
+    if (live_addrspaces && (flags & PTE_USER)) return -1;
+    rc = prepare_tables(virt_addr >> PAGE_SHIFT, 1);
     if (rc == 0) rc = set_page_noflush(virt_addr, phys_addr, flags);
     if (rc == 0 && pg_enabled) arch_mmu_flush_tlb();
     return rc;
@@ -554,6 +558,7 @@ int paging_set_page(u32 virt_addr, u32 phys_addr, u32 flags)
 int paging_map_range(u32 virt_start, u32 virt_end, u32 phys_start, u32 flags)
 {
     u32 count;
+    if (live_addrspaces && (flags & PTE_USER)) return -1;
     if (virt_start > virt_end) { paging_range_reject_count++; return -1; }
     if (virt_start == virt_end) return 0;
     count = ((virt_end - 1) >> PAGE_SHIFT) - (virt_start >> PAGE_SHIFT) + 1;
@@ -572,6 +577,7 @@ int paging_map_phys(u32 virt_addr, u32 phys_addr, u32 npages, u32 flags)
     u32 v = virt_addr >> PAGE_SHIFT;
     u32 p = phys_addr >> PAGE_SHIFT;
     u32 i;
+    if (live_addrspaces && (flags & PTE_USER)) return -1;
     if (npages > PAGING_PFN_COUNT - v || npages > PAGING_PFN_COUNT - p)
         return -1;
     if (prepare_tables(v, npages) != 0) return -1;
@@ -579,6 +585,64 @@ int paging_map_phys(u32 virt_addr, u32 phys_addr, u32 npages, u32 flags)
         set_page_noflush((v + i) << PAGE_SHIFT, (p + i) << PAGE_SHIFT, flags);
     if (npages && pg_enabled) arch_mmu_flush_tlb();
     return 0;
+}
+
+/* 最初の AS より前、shm_init の後だけ。tramp は exec の静的 BSS。 */
+int paging_boot_user_shared(u32 tramp)
+{
+    if (boot_user_shared_done || live_addrspaces || !pg_enabled ||
+        (tramp & (PAGE_SIZE - 1)) || tramp < KERNEL_LOAD_ADDR ||
+        tramp >= KHEAP_BASE) return -1;
+    if (paging_map_range(MEM_SHM_BASE, MEM_SHM_BASE + MEM_SHM_SIZE,
+                         MEM_SHM_BASE, PAGE_RW | PTE_USER) != 0 ||
+        paging_set_page(tramp, tramp, PAGE_RO | PTE_USER) != 0) return -1;
+    boot_user_shared_done = 1;
+    return 0;
+}
+
+/* SHM は既存共有 USER の RW だけを切り替える。全範囲を検査してから書く。 */
+int paging_shm_set_rw(u32 base, u32 end, int writable)
+{
+    u32 a, pdi, entry;
+    u32 mask = ~(u32)(PAGE_SIZE - 1);
+    if (base < MEM_SHM_BASE || end > MEM_SHM_BASE + MEM_SHM_SIZE ||
+        base >= end || ((base | end) & (PAGE_SIZE - 1))) return -1;
+    for (a = base; a < end; a += PAGE_SIZE) {
+        pdi = a >> 22;
+        if (!page_tables[pdi] ||
+            (page_directory[pdi] & (mask | PTE_PRESENT | PTE_PS)) !=
+            (V2P(page_tables[pdi]) | PTE_PRESENT)) return -1;
+        entry = page_tables[pdi][(a >> PAGE_SHIFT) % PTE_COUNT];
+        if ((entry & (mask | PTE_PRESENT)) != (a | PTE_PRESENT)) return -1;
+        if (!(entry & PTE_USER)) {
+            paging_shm_user_missing_count++;
+            return -1;
+        }
+    }
+    for (a = base; a < end; a += PAGE_SIZE)
+        set_page_noflush(a, a, (writable ? PAGE_RW : PAGE_RO) | PTE_USER);
+    if (pg_enabled) arch_mmu_flush_tlb();
+    return 0;
+}
+
+/* e10b の session 化までの専用口。低位 1MB 以外を昇格させない。 */
+int paging_v86_map_range(u32 base, u32 end, u32 phys, u32 flags)
+{
+    u32 a;
+    if (base >= end || end > MEM_BIOS_ROM_END + 1 ||
+        ((base | end | phys) & (PAGE_SIZE - 1)) ||
+        phys > ~(u32)0 - (end - base - 1) || !page_tables[0]) return -1;
+    for (a = base; a < end; a += PAGE_SIZE, phys += PAGE_SIZE)
+        set_page_noflush(a, phys, flags);
+    if (pg_enabled) arch_mmu_flush_tlb();
+    return 0;
+}
+
+void paging_v86_restore_shared_user(void)
+{
+    /* SHM と trampoline はどちらも PDE0。PTE は teardown が触らない。 */
+    if (boot_user_shared_done) page_directory[0] |= PTE_USER;
+    if (pg_enabled) arch_mmu_flush_tlb();
 }
 
 /* 指定範囲を覆う PDE から USER を落とす。
@@ -1049,6 +1113,12 @@ int paging_pd_clone_selftest(void)
 
     if (selftest_as_begin(&as, 1) != 0) return 1;
 
+    /* live AS 中の汎用 USER 要求は、既存共有 USER 宛てでも拒否する。 */
+    if (paging_set_page(MEM_SHM_BASE, MEM_SHM_BASE, PAGE_RW | PTE_USER) != -1 ||
+        paging_map_range(MEM_SHM_BASE, MEM_SHM_BASE + PAGE_SIZE,
+                         MEM_SHM_BASE, PAGE_RW | PTE_USER) != -1 ||
+        paging_map_phys(MEM_SHM_BASE, MEM_SHM_BASE, 1, PAGE_RW | PTE_USER) != -1)
+        rc |= 16;
     saved_cr3 = paging_current_cr3();
 
     /* master 経由で既知値を書く。 */
@@ -1191,7 +1261,7 @@ int paging_app_band_selftest(void)
 /*  期待値は全て memmap.h から引く ([C4])。番地は 1 つも直書きしない。        */
 /*                                                                          */
 /*  **呼ぶのはブート直後 (kselftest_run_post_exec) だけ。** CPL=3 アプリを    */
-/*  起動すると exec が SHM / VRAM / フォント表 / GFX BB を USER へ昇格させ   */
+/*  起動すると exec が VRAM / フォント表 / GFX BB を USER へ昇格させ   */
 /*  (PDE 0 は全 PD 共有なので master にも残る)、期待値と合わなくなる。       */
 /* ======================================================================== */
 
@@ -1226,7 +1296,7 @@ static u8 memmap_want_at(u32 a, u32 tramp)
      * 作られているせいで一致してしまう (= 自己診断が穴を隠す)。 */
     if (a >= KERNEL_LOAD_ADDR && a <= MEM_KERNEL_BAND_END) {
         if (a >= MEM_SHM_GUARD_LO && a < MEM_SHM_BASE) return MM_NP;
-        if (a >= MEM_SHM_BASE && a <= MEM_SHM_END) return MM_RW;
+        if (a >= MEM_SHM_BASE && a <= MEM_SHM_END) return MM_RWU;
         if (a >= MEM_SHM_GUARD_HI && a < MEM_SHM_GUARD_HI + PAGE_SIZE)
             return MM_NP;
         if (a < MEM_SHM_GUARD_LO) return MM_RW; /* 本体 + ヒープ + KAPI */

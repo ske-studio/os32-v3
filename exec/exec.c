@@ -123,8 +123,8 @@ STATIC_ASSERT(sizeof(KernelAPI) <= (u32)MEM_KAPI_SIZE, kapi_table_fits_reserve);
 /* ======================================================================== */
 static void ring3_trampoline_init(void)
 {
-    u32 page = ((u32)ring3_tramp_raw + PAGE_SIZE - 1) & ~(u32)(PAGE_SIZE - 1);
-    u32 *tbl = (u32 *)page;
+    u32 page = exec_tramp_page_addr();
+    u32 *tbl = (u32 *)P2V(page);
     u32 stub_base = page + RING3_USTR_STUB_OFF;   /* 全 struct の後ろ */
     u32 i;
 
@@ -139,7 +139,7 @@ static void ring3_trampoline_init(void)
      * とき 0 番地へ飛ぶ。スタブならディスパッチャが slot >= KAPI_FUNC_COUNT
      * でアプリだけ kill する。 */
     for (i = 0; i < KAPI_FUNC_CAPACITY; i++) {
-        u8 *st = (u8 *)(stub_base + i * 8u);
+        u8 *st = (u8 *)P2V(stub_base + i * 8u);
         /* ユーザ可視表: entry[i] = スタブ i の番地 (KernelAPI fn[i] と同一 offset) */
         tbl[2 + i] = stub_base + i * 8u;
         /* スタブ: B8 <slot:imm32> CD 80 C3  (mov eax,slot; int 0x80; ret) */
@@ -159,10 +159,9 @@ static void ring3_trampoline_init(void)
     tbl[KAPI_DATA_IDX_SBRK_HEAP_LIMIT] = 0;
     tbl[KAPI_DATA_IDX_SHM_BASE] = (u32)MEM_SHM_BASE;
 
-    /* 全 PD 共有で RO+USER マップ (kernel band PDE0)。i386 は NX なしなので
+    /* boot 口が確定した全 PD 共有 RO+USER (kernel band PDE0)。i386 は NX なしなので
      * RO でも実行可能 (スタブ実行 OK)。ユーザは書けない = スタブ改竄不可。
-     * CR0.WP=0 によりカーネルは RO でも書ける (per-launch のデータ更新)。 */
-    paging_set_page(page, page, PAGE_RO | PTE_USER);
+     * CR0.WP=0 により、この初期化と per-launch のデータ更新も RO に書ける。 */
 }
 
 /* スタックを4バイト境界に揃えるためのマスク */
@@ -428,12 +427,12 @@ const char *path_get_cwd_user(void)   { return tramp_copy(path_get_cwd()); }
 /*  exec_tramp_user_selftest — 写し場の番地とページ属性 (票 T9 §12 R1)       */
 /*                                                                          */
 /*  kselftest_run() は exec_init() より **前** に走るのでトランポリンページが */
-/*  まだ無い。この項だけ kselftest_run_post_exec() から呼ぶ。                */
+/*  内容はまだ無い。この項だけ kselftest_run_post_exec() から呼ぶ。                */
 /*  ビット 0..n が落ちた項目 (0 = 全部通った)。                              */
 /* ======================================================================== */
 u32 exec_tramp_page_addr(void)
 {
-    return ring3_tramp_page;
+    return (V2P(ring3_tramp_raw) + PAGE_SIZE - 1) & ~(u32)(PAGE_SIZE - 1);
 }
 
 /* ======================================================================== */
@@ -1887,10 +1886,6 @@ static int exec_launch(const char *cmdline, int gui_arg)
         /* VRAM (テキスト 0xA0000 + グラフィック 0xA8000) — C2: 全PD共有+USER */
         paging_addrspace_map_user_keep(ctx->as,
             TVRAM_CHAR_BASE, GVRAM_BRG_END, PAGE_RW | PTE_USER);
-        /* SHM (アプリ間データ受け渡し) — C2: 全PD共有+USER */
-        paging_addrspace_map_user_range(ctx->as,
-            (u32)MEM_SHM_BASE, (u32)MEM_SHM_BASE + (u32)MEM_SHM_SIZE,
-            PAGE_RW | PTE_USER);
         /* フォントキャッシュ (0x01000-0x49FFF): kcg フォントビットマップ直読 */
         paging_addrspace_map_user_range(ctx->as,
             (u32)MEM_FONT_CACHE_BASE, (u32)MEM_UNICODE_TABLE_BASE,
@@ -1914,10 +1909,6 @@ static int exec_launch(const char *cmdline, int gui_arg)
             shell_print("Error: backbuffer overlaps app area\n", ATTR_RED);
             return exec_launch_abort(launcher_id, id, EXEC_ERR_NOMEM);
         }
-        /* KAPI トランポリンページ (RO+USER, 全PD共有) */
-        paging_addrspace_map_user(ctx->as, ring3_tramp_page,
-            V2P((const void *)ring3_tramp_page), PAGE_RO | PTE_USER);
-
         /* --- K3: 共有ライブラリ帯域 (0x400000-0x4FFFFF) ---
          * .text/.rodata は RO+USER、.data/.bss は同じ仮想番地にこのアプリ
          * 専用の物理ページ (原本から複製)。**master CR3 のまま**行う —

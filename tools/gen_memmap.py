@@ -216,11 +216,11 @@ def bands(m, sym):
         (v("MEM_SHM_GUARD_LO") or 0) - 1, "RW", "KAPI_ADDR")
     add(KERN, "SHM 前方ガード", v("MEM_SHM_GUARD_LO"),
         (v("MEM_SHM_BASE") or 0) - 1, "NP")
-    add(KERN, "共有メモリ本体", v("MEM_SHM_BASE"), v("MEM_SHM_END"), "RW",
-        "16KB x SHM_BLOCK_COUNT。CPL=3 アプリの起動時に USER へ昇格 "
-        "(exec.c、PDE 0 は全 PD 共有)")
+    add(KERN, "共有メモリ本体", v("MEM_SHM_BASE"), v("MEM_SHM_END"), "RW+USER",
+        "16KB x SHM_BLOCK_COUNT。shm_init 後・最初の AS 前に boot 口で USER/WB。"
+        "lock/free/回収は USER を保ち RW のみ切替 (PDE 0 は全 PD 共有)")
     add(KERN, "GUI 予約 (末尾 4 ブロック)", v("MEM_SHM_GUI_BASE"),
-        plus("MEM_SHM_GUI_BASE", "MEM_SHM_GUI_SIZE", -1), "RW",
+        plus("MEM_SHM_GUI_BASE", "MEM_SHM_GUI_SIZE", -1), "RW+USER",
         "契約 T2。SDK の GUI_SHM_OFFSET = MEM_SHM_GUI_OFFSET",
         parent="共有メモリ本体")
     guard_hi = v("MEM_SHM_GUARD_HI")

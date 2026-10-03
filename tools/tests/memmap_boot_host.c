@@ -187,6 +187,15 @@ void _start(void)
     shell_heap_test();
     host_pool_boot(16384);
     paging_reclaim_conventional();
+    shm_init_replay();
+
+    /* shm_init 後の boot 口が張る KAPI 踏み台ページ (RO+USER)。番地は .bss 由来なので
+     * カーネルでは実行時にしか分からない。ここではカーネル帯の中の 1 ページ
+     * を選んで同じ属性で張る。 */
+    tramp = KERNEL_LOAD_ADDR + 0x60000UL;
+    CHECK(paging_boot_user_shared(tramp) == 0);
+
+
     {
         struct addrspace as;
         u32 a, pa, hash = fixed_hash();
@@ -203,13 +212,6 @@ void _start(void)
      * ことが肝心 — 空は予約を使い切っただけで、逆転は設計が壊れている。 */
     CHECK(paging_range_reject_count == HOST_EXPECT_REJECT);
 
-    shm_init_replay();
-
-    /* exec_init が張る KAPI 踏み台ページ (RO+USER)。番地は .bss 由来なので
-     * カーネルでは実行時にしか分からない。ここではカーネル帯の中の 1 ページ
-     * を選んで同じ属性で張る。 */
-    tramp = KERNEL_LOAD_ADDR + 0x60000UL;
-    CHECK(paging_set_page(tramp, tramp, PAGE_RO | PTE_USER) == 0);
 
     bad = paging_memmap_selftest(tramp);
     SAY("--- memmap mismatch runs (want/seen: 0=NP 1=RW 2=RO 3=RO+USER) ---");

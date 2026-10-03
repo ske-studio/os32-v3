@@ -38,6 +38,10 @@ int paging_map_range(u32 vs, u32 ve, u32 ps, u32 flags)
     g_last_map_start = vs;
     return 0;
 }
+int paging_shm_set_rw(u32 base, u32 end, int writable)
+{
+    return paging_map_range(base, end, base, writable ? PAGE_RW : PAGE_RO);
+}
 int paging_set_not_present(u32 s, u32 e)
 {
     (void)s; (void)e;

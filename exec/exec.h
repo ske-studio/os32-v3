@@ -123,7 +123,7 @@ u32 exec_tramp_user_selftest(void);
  * 予約スタブ、3 = ヘッダ v3 の照合。0 = 全部通った。exec_init の後に呼ぶ。 */
 u32 exec_kapi_layout_selftest(void);
 
-/* KAPI 踏み台ページ (RO+USER、全 PD 共有) の番地。exec_init の前は 0。
+/* KAPI 踏み台ページ (RO+USER、全 PD 共有) の番地。exec_init 前も静的 BSS の番地を返す。
  * ページ表と memmap.h の照合 (paging_memmap_selftest) が期待値に使う —
  * ここは .bss の中なのでビルドごとに動き、定数では書けない。 */
 u32 exec_tramp_page_addr(void);
