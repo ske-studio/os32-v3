@@ -1148,7 +1148,7 @@ CHECK_PAR_TARGETS := check-shlib-high-host check-bootinfo-host check-hdd-stage1-
     check-nano-inputs-host \
     check-nano-adapter-host \
     check-appmem-host \
-check-appmem-map-host \
+    check-appmem-map-host \
     check-surface-lease-host \
     check-surface-bundle-host \
     check-gfx-kernel-fb-host \
