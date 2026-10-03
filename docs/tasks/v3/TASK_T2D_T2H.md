@@ -1011,6 +1011,8 @@ e5予算残り1,652 B。e残枠は13,404→12,056 B。
   commit/push・NP21/W・NHD・配備・ini・実機は未操作。
 - `ledger_surface_regen` の geometry を変える口は本番の経路で使わない (試験の validate 拒否だけ)。e6/e7 で 200 行の pitch×height 再登録に使うときは、padding のゼロ化 (APPBAND:140) を一緒に決める (独立レビュー 2 往復目 P3-4、記録)。
 
+
+**e5 の着地とゲスト受入 (PM、2026-10-03)**: 独立レビュー Opus 5.5 は 1 往復目 Request changes (P2-1: 200⇄400 で旧 offset のまま BB を消す、P2-2: 200 行で 16000 刻みにすると SDK の 32000/400 前提で隣の面を壊す → PM が Q5 を (a) に戻した、ref_e5 §10) → Codex gpt-6-astra が修正 → 2 往復目 Approve (残る P3 は PM が 3 件直し 1 件記録)。PM のホスト検査 `HOST32_RUNNERS="native qemu"` の check-changed rc=0 (新試験の正常対照は両 runner で PASS)。main へ取り込み (`e28f7de`、票は e4 の受入記録と e5 の節の両方を残して競合を解消)。コミット済みの木で `make all` rc=0・`make check` rc=0、push。NP21/W を停止 → 停止確認 → `nhd-pull` → `deploy-kernel` → `deploy` → 起動 (17MB、今の ini — §12)。`ver` の Commit `953656d` (文書の取り込み後の HEAD、カーネルのソースは e5 と同じ)、**kselftest pass 274 / fail 0** (regen の 1 項目)。`db_test` 9/9、`db_v50_test` 41/41、`klibc_test` 49/49、`alloc_demo` 16/16、`d0a_test` 全行 OK、faulttest gp/de/ud/pf は 4 件とも `-> kill app`、loop・kloop + CTRL+STOP、`v86 -t` OK。カウンタ: 深さ 0、`ledger_*_ops`=0、`exec_as_leftover_pages`=0、`irq_ctx_violations`=1 (起動時の基準値)。USER の lease は 0 本なので、ゲストでは gen が進むだけ (再 init の経路は gfx_init/shutdown の通常の回帰で通る)。**照合の注記**: `/boot/vmkernel.lz4` は 483,335 B、手元は 483,339 B。ゲストの Build は 11:02:16 (`deploy-kernel` が組んだもの)、手元の `build/out` はその後の `make deploy` が 11:02:41 に組み直したもの (build_id の時刻だけが違い、圧縮後の大きさが 4 B 変わる)。サイズの照合は「NHD に書いたビルド」と比べる必要がある — 手順側の穴として記録 (e4 までは偶然一致)。
 ## 3. T2f — map/unmapとallocator、暫定heap終了
 
 ### 3-1. 着手条件・範囲
