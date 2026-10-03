@@ -6,6 +6,19 @@
 #include "memmap.h"
 #include "palette.h"
 
+/* Clip before adding coordinates: callers may supply any signed KAPI value.
+ * Positive extents plus negative origins cannot overflow; then use subtraction. */
+static inline int gfx_clip_screen(int *x, int *y, int *w, int *h,
+                                  int width, int height)
+{
+    if (*w <= 0 || *h <= 0 || *x >= width || *y >= height) return 0;
+    if (*x < 0) { *w += *x; *x = 0; }
+    if (*y < 0) { *h += *y; *y = 0; }
+    if (*w > width - *x) *w = width - *x;
+    if (*h > height - *y) *h = height - *y;
+    return *w > 0 && *h > 0;
+}
+
 /* ======================================================================== */
 /*  内部変数アクセス                                                        */
 /* ======================================================================== */

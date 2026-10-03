@@ -753,10 +753,14 @@ const char * __cdecl kapi_db_column_text(int handle, int col)
     if (!slot || !slot->active_stmt) return db_shm_empty();
 
     /* 共有メモリ上のカラム情報からデータ位置を参照 */
-    if (col < 0 || col >= hdr->column_count) return db_shm_empty();
+    /* SHM is caller-writable: its column_count is not a capacity check. */
+    if (col < 0 || (u32)col >=
+        (DB_SHM_RESULT_LIMIT - sizeof(DB_ResultHeader)) / sizeof(DB_ColumnInfo) ||
+        col >= hdr->column_count) return db_shm_empty();
     info = (DB_ColumnInfo *)(DB_SHM_PTR + sizeof(DB_ResultHeader)
                              + (u32)col * sizeof(DB_ColumnInfo));
-    if (info->data_offset == 0) return db_shm_empty();
+    if (info->data_offset <= 0 || (u32)info->data_offset >= DB_SHM_RESULT_LIMIT)
+        return db_shm_empty();
     return (const char *)(DB_SHM_PTR + info->data_offset);
 }
 

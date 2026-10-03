@@ -23,8 +23,8 @@ void gfx_hardware_scroll(int lines)
     u8 params[8];
     int i;
 
-    vram_scroll_y += lines;
-    while (vram_scroll_y < 0) vram_scroll_y += gfx_current_height;
+    vram_scroll_y += lines % gfx_current_height;
+    if (vram_scroll_y < 0) vram_scroll_y += gfx_current_height;
     vram_scroll_y %= gfx_current_height;
 
     /*

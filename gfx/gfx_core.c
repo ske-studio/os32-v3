@@ -595,11 +595,12 @@ int __cdecl gfx_lease_palette(int first, int count, const u8 *rgb)
     if (si.lease_count > 0) {
         /* 256 色機: 連続範囲 [lease_first, lease_first + lease_count) */
         if (first < (int)si.lease_first ||
-            first + count > (int)si.lease_first + (int)si.lease_count)
+            first > (int)si.lease_first + (int)si.lease_count ||
+            count > (int)si.lease_first + (int)si.lease_count - first)
             return OS32_ERR_INVAL;
     } else {
         /* 16 色機: lease_mask のビットが立つ index だけ貸せる */
-        if (first + count > 16) return OS32_ERR_INVAL;
+        if (first >= PALETTE_COUNT || count > PALETTE_COUNT - first) return OS32_ERR_INVAL;
         for (i = first; i < first + count; i++) {
             if (!(si.lease_mask & (u16)(1u << i))) return OS32_ERR_INVAL;
         }

@@ -28,6 +28,10 @@ extern int v86_is_active(void);
 
 /* テキストVRAM定義 (tvram.hとpc98.hの定義を使用) */
 #define TVRAM_TEXT  TVRAM_BASE
+STATIC_ASSERT(TVRAM_ROWS * TVRAM_BPR <= TVRAM_ATTR_BASE - TVRAM_CHAR_BASE,
+              console_text_within_plane);
+STATIC_ASSERT(TVRAM_ROWS * TVRAM_BPR <= TVRAM_CG_WINDOW - TVRAM_ATTR_BASE,
+              console_attr_within_plane);
 
 /* デフォルト属性 (os32_kapi_shared.h で定義済みの場合はスキップ) */
 #ifndef ATTR_WHITE
@@ -111,8 +115,11 @@ void tvram_clear(void)
     console_hw_cursor_sync();
 }
 
+/* The console uses the standard TVRAM_ROWS grid (also clear/scroll/cursor).
+ * Reject before unsigned address arithmetic; a kanji must fit both cells. */
 void tvram_putchar_at(int x, int y, char ch, u8 color)
 {
+    if (x < 0 || x >= TVRAM_COLS || y < 0 || y >= TVRAM_ROWS) return;
     u32 offset = (u32)y * TVRAM_BPR + (u32)x * 2;
     *(volatile u16 *)P2V_IO(TVRAM_TEXT + offset) = (u16)(u8)ch;
     *(volatile u8 *)P2V_IO(TVRAM_ATTR + offset) = color;
@@ -121,6 +128,7 @@ void tvram_putchar_at(int x, int y, char ch, u8 color)
 /* TVRAM 1セル読み取り (文字コード + 属性) */
 void tvram_readchar_at(int x, int y, u16 *code, u8 *attr)
 {
+    if (x < 0 || x >= TVRAM_COLS || y < 0 || y >= TVRAM_ROWS) return;
     u32 offset = (u32)y * TVRAM_BPR + (u32)x * 2;
     if (code) *code = *(volatile u16 *)P2V_IO((TVRAM_TEXT + offset));
     if (attr) *attr = *(volatile u8 *)P2V_IO((TVRAM_ATTR + offset));
@@ -187,6 +195,7 @@ void tvram_scroll(void)
  * PC9800Bible §2-6-2 */
 void tvram_putkanji_at(int x, int y, u16 jis, u8 color)
 {
+    if (x < 0 || x >= TVRAM_COLS - 1 || y < 0 || y >= TVRAM_ROWS) return;
     u32 offset = (u32)y * TVRAM_BPR + (u32)x * 2;
     u8 jh = (u8)((jis >> 8) & 0xFF);
     u8 jl = (u8)(jis & 0xFF);

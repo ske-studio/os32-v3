@@ -898,12 +898,7 @@ static void pegc_present_rect(int x, int y, int w, int h)
 
     if (!s_active || s_bb_phys == 0) return;
 
-    /* 画面クリップ */
-    if (x < 0) { w += x; x = 0; }
-    if (y < 0) { h += y; y = 0; }
-    if (x + w > PEGC_WIDTH)      w = PEGC_WIDTH - x;
-    if (y + h > PEGC_HEIGHT_480) h = PEGC_HEIGHT_480 - y;
-    if (w <= 0 || h <= 0) return;
+    if (!gfx_clip_screen(&x, &y, &w, &h, PEGC_WIDTH, PEGC_HEIGHT_480)) return;
 
     src = (u8 *)P2V(s_bb_phys) + (u32)y * PEGC_PITCH + (u32)x;
     dst = (u8 *)P2V(PEGC_LINEAR_BASE) + (u32)y * PEGC_PITCH + (u32)x;

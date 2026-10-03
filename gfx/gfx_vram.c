@@ -51,8 +51,7 @@ void __cdecl gfx_add_dirty_rect(int x, int y, int w, int h)
 {
     if (!bb_b) return;
     int aligned_x, aligned_w;
-    int right = x + w;
-    int bottom = y + h;
+    int right;
     int i;
     GFX_Rect *r;
 
@@ -62,7 +61,8 @@ void __cdecl gfx_add_dirty_rect(int x, int y, int w, int h)
 
     int new_x, new_y, new_r, new_b;
 
-    if (w <= 0 || h <= 0) return;
+    if (!gfx_clip_screen(&x, &y, &w, &h, GFX_WIDTH, gfx_current_height)) return;
+    right = x + w;
 
     /* 32ピクセル境界 (4バイト) にアライメント:
      * xは切り捨て、幅は切り上げ
@@ -380,7 +380,7 @@ void __cdecl gfx_present_raster(GFX_RasterPalTable *table)
     int has_dirty;
     unsigned int flags;
 
-    if (!table || table->count == 0) return;
+    if (!table || table->count <= 0 || table->count > GFX_RASTER_MAX_ENTRIES) return;
 
     /* ラスタパレットは 16 色プレーン機の HBLANK 同期パレット書き換え。
      * パックド系 (PEGC 256 色) には対応物が無いので、v1 では普通の present に

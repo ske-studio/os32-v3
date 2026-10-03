@@ -429,11 +429,7 @@ static int cirrus_query(GFX_ScreenInfo *info)
 /* 画面矩形へのクリップ。戻り値 0 = 空になった。 */
 static int cirrus_clip(int *x, int *y, int *w, int *h)
 {
-    if (*x < 0) { *w += *x; *x = 0; }
-    if (*y < 0) { *h += *y; *y = 0; }
-    if (*x + *w > CIRRUS_WIDTH)  *w = CIRRUS_WIDTH - *x;
-    if (*y + *h > CIRRUS_HEIGHT) *h = CIRRUS_HEIGHT - *y;
-    return (*w > 0 && *h > 0);
+    return gfx_clip_screen(x, y, w, h, CIRRUS_WIDTH, CIRRUS_HEIGHT);
 }
 
 /* ------------------------------------------------------------------------ */
