@@ -12,8 +12,10 @@ class NativeBootTest(unittest.TestCase):
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory(prefix="os32-boot-native-")
         cls.binary = Path(cls.tmp.name) / "boot-native"
+        # As in the kernel link, leave dormant e6 compatibility code unbound.
         command = ["gcc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
-                   "-Wno-unused-function", "-D__KERNEL_BUILD__"]
+                   "-Wno-unused-function", "-D__KERNEL_BUILD__",
+                   "-Wl,--gc-sections"]
         command += ["-I" + str(ROOT / p) for p in
                     ("include", "sdk/include", "sdk/include/os32", "gfx", "lib", "kernel")]
         command += [str(ROOT / "tools/tests/boot_splash_native_host.c"),

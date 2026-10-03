@@ -184,6 +184,7 @@ static void sort_intersections(int *arr, int n)
 
 void gfx_scanline_fill(GFX_EdgeTable *et, u8 color, int min_y, int max_y)
 {
+    if (!gfx_ready) return;
     int y, i;
     int edge_idx;       /* 次にAETに投入するエッジのインデックス */
     int aet_count;      /* AET内の有効エントリ数 */

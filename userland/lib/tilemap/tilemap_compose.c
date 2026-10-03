@@ -372,6 +372,7 @@ static int check_can_fast(int axis, int fixed_idx, int count)
 
 void tilemap_compose_btf(void)
 {
+    if (!gfx_ready) return;
     int row, col;
 
     if (!_tilemap.kapi || !_tilemap.bg_planes) return;
@@ -400,6 +401,7 @@ void tilemap_compose_btf(void)
 
 void tilemap_compose_ftb(void)
 {
+    if (!gfx_ready) return;
     int row, col, bg;
 
     if (!_tilemap.kapi || !_tilemap.bg_planes) return;
@@ -476,6 +478,7 @@ void tilemap_compose_ftb(void)
 
 void tilemap_compose_btf_fast(void)
 {
+    if (!gfx_ready) return;
     int row, col, bg;
 
     if (!_tilemap.kapi || !_tilemap.bg_planes) return;
@@ -831,6 +834,7 @@ static void scroll_update_prev(void)
 
 void tilemap_compose_scroll(void)
 {
+    if (!gfx_ready) return;
     int dx_total, dy_total, has_upper;
 
     if (!_tilemap.kapi || !_tilemap.bg_planes) return;
@@ -866,6 +870,7 @@ void tilemap_compose_scroll(void)
 
 void tilemap_present(void)
 {
+    if (!gfx_ready) return;
     if (_tilemap.kapi) {
         /* compose で登録済みの dirty rect のみを VRAM 転送する。
          * gfx_present_rect は全面 dirty rect を再登録してしまうため使わない。 */

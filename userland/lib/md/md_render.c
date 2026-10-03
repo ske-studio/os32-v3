@@ -625,6 +625,7 @@ static void render_strip_nodes(MdDocument *doc, int scroll_y,
 
 void md_render_page(MdDocument *doc, int scroll_y)
 {
+    if (!gfx_ready) return;
     int delta = scroll_y - prev_scroll_y;
     int abs_delta = (delta > 0) ? delta : -delta;
 
@@ -661,6 +662,7 @@ void md_render_page(MdDocument *doc, int scroll_y)
 
 void md_render_statusbar(const char *filename, int scroll_y, int total_h)
 {
+    if (!gfx_ready) return;
     int pct;
     char buf[80];
     int len;

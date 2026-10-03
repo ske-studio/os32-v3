@@ -42,6 +42,7 @@ void gfx_blit_affine(int dx, int dy,
                       int scale,
                       u8 colorkey)
 {
+    if (!gfx_ready) return;
     i32 cos_v, sin_v;
     int cx, cy;
     i32 du_x, dv_x, du_y, dv_y;
@@ -161,5 +162,6 @@ void gfx_blit_rotated(int dx, int dy,
                        const GFX_Surface *src,
                        int angle)
 {
+    if (!gfx_ready) return;
     gfx_blit_affine(dx, dy, src, angle, 256, 0);
 }

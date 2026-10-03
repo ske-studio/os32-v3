@@ -1013,6 +1013,158 @@ e5予算残り1,652 B。e残枠は13,404→12,056 B。
 
 
 **e5 の着地とゲスト受入 (PM、2026-10-03)**: 独立レビュー Opus 5.5 は 1 往復目 Request changes (P2-1: 200⇄400 で旧 offset のまま BB を消す、P2-2: 200 行で 16000 刻みにすると SDK の 32000/400 前提で隣の面を壊す → PM が Q5 を (a) に戻した、ref_e5 §10) → Codex gpt-6-astra が修正 → 2 往復目 Approve (残る P3 は PM が 3 件直し 1 件記録)。PM のホスト検査 `HOST32_RUNNERS="native qemu"` の check-changed rc=0 (新試験の正常対照は両 runner で PASS)。main へ取り込み (`e28f7de`、票は e4 の受入記録と e5 の節の両方を残して競合を解消)。コミット済みの木で `make all` rc=0・`make check` rc=0、push。NP21/W を停止 → 停止確認 → `nhd-pull` → `deploy-kernel` → `deploy` → 起動 (17MB、今の ini — §12)。`ver` の Commit `953656d` (文書の取り込み後の HEAD、カーネルのソースは e5 と同じ)、**kselftest pass 274 / fail 0** (regen の 1 項目)。`db_test` 9/9、`db_v50_test` 41/41、`klibc_test` 49/49、`alloc_demo` 16/16、`d0a_test` 全行 OK、faulttest gp/de/ud/pf は 4 件とも `-> kill app`、loop・kloop + CTRL+STOP、`v86 -t` OK。カウンタ: 深さ 0、`ledger_*_ops`=0、`exec_as_leftover_pages`=0、`irq_ctx_violations`=1 (起動時の基準値)。USER の lease は 0 本なので、ゲストでは gen が進むだけ (再 init の経路は gfx_init/shutdown の通常の回帰で通る)。**照合の注記**: `/boot/vmkernel.lz4` は 483,335 B、手元は 483,339 B。ゲストの Build は 11:02:16 (`deploy-kernel` が組んだもの)、手元の `build/out` はその後の `make deploy` が 11:02:41 に組み直したもの (build_id の時刻だけが違い、圧縮後の大きさが 4 B 変わる)。サイズの照合は「NHD に書いたビルド」と比べる必要がある — 手順側の穴として記録 (e4 までは偶然一致)。
+
+### e6 実装結果 (2026-10-03、Codex GPT-6)
+
+基点 `953656d`、worktree `wt/e6`。PM 判断は作業依頼 `ref_e6.md` §8 の
+Q1〜Q11 を優先し、逸脱なし。独立レビュー・ゲスト受入は PM へ。
+
+**実装と PM 判断の対応**:
+- Q1/Q5/Q6/Q7: `libgfx_attach_internal.h` に CLIENT query/lease/unlease の内部 port。
+  SDK 配布から除外する `_internal.h` 命名。公開 KAPI 型を先取りしない独立の値型で、
+  `libos32gfx_attach_checked(void)` と `libos32gfx_check(void)` は 0/負の rc を返す。
+  `gfx_api` は既存の api 引数付き void attach/init で設定する (checked を直接呼ぶときは
+  呼出側が先に設定)。port は e6 本番では NULL、CPL=0 も旧経路の内部 backing。
+  port のある USER は旧 gfx_get_framebuffer に fallback しない。
+  同じ sid/gen は query だけで token/view を再利用。変更時は旧 state を消し、release 後に取得。
+  失敗では取得済み token を返し、gfx_fb 全体をゼロ・gfx_ready=0 にする。
+  C の framebuffer 描画入口・asm 呼出しの包みに ready の門を付ける。
+  present/raster 入口は check を呼び、同世代なら query 1 回だけ。
+  check は surface/sprite pool を初期化し直さない。
+- Q2/Q3/Q4: `gfx_framebuffer_bridge` を `.text.gfx_fb_bridge` に未結線で実装。
+  保存 caller を使い USER にだけ CLIENT lease VA、TRUSTED には内部 framebuffer。
+  AS の既存 flags に `AS_LEASE_GFX_COMPAT` を付け、互換 token を 1 本だけ再利用する。
+  flags の印は lease_check の PTE 照合から除外し、AS のサイズは増やさない。
+  失敗は checked copy で framebuffer をゼロにしてから abort_req を立て、
+  `gfx_bridge_fail_count` に数える。copy 自体が拒否された不正出力先には書かない。
+  取得から copyout まで callback/scheduling なし。既存 KAPI の binding は無変更。
+- Q8/Q9: 200 行でも登録 height=400、stride=32000 を維持。query は登録 geometry、
+  再取得時だけ既存 screen_info で有効 height (200/400、packed は480) を照合する。
+  同世代の check には screen_info を追加しない。Cirrus DISPLAY は NONE のまま。
+- Q10: 実 SDK core/描画入口と実 query/lease/gfx_core/3 backend を連結する
+  `test_gfx_attach.py` を追加。正常 **230 条件**、必須8種を含む **12/12 runtime RED**。
+  e4 **502 条件・10/10**、e5 **11/11** 変異も成功。
+  build/sdk.mk・check_map に登録、08_build の全 runner 列は nano_adapter も含む10本へ。
+  f2 側の追加は未混入。詳細は [gfx_attach_tdd.md](../../../tools/tests/gfx_attach_tdd.md)。
+
+**Q11 予算 (同じ /home/hight/opt/cross toolchain、byte)**:
+
+| 項目 | 前 | 後 | 増分 |
+|---|---:|---:|---:|
+| kernel.bin | 367,436 | 367,440 | +4 |
+| vmkernel.lz4 | 483,339 | 483,335 | −4 |
+| __bss_end | 0x18D358 | 0x18D358 | 0 |
+| kernel 本体 (BSS/整列込み) | 578,392 | 578,392 | 0 |
+| ASSERT 残り | 31,912 | 31,912 | 0 |
+| e 枠残り | 12,056 | 12,056 | 0 |
+| libos32gfx.a | 66,708 | 69,514 | +2,806 |
+| libos32gui.shlib | 129,568 | 129,568 | 0 |
+| shlib BSS | 17,012 | 17,052 | +40 |
+| gshell.bin | 225,064 | 226,312 | +1,248 |
+| hello_gfx.bin | 21,004 | 22,252 | +1,248 |
+
+ELF 全体 (SQLite なども含む) の size は text/data/bss が
+705524/36835/606520 → 705540/36839/606520。before は clean 基点、after は dirty
+build ID を含むのでバイナリ/圧縮の差をコード増分だけとは扱わない。
+bridge の text 915 B と counter 4 B は map の discarded、nm に未出現。
+本体正味増分 0 B は e6 上限2,000 B以内。shlib はページ整列内に収まり
+text_pages=26/data_pages=10 を維持。SDK/shlib の勘定は kernel 枠の外。
+
+**Q8 の 32000/400 前提の監査一覧 (定数/asm の変更なし)**:
+
+| 場所 | 前提 |
+|---|---|
+| userland/lib/gfx/geom/gfx_fill.c | y を400、x を640で切る (max_y、gmin/gmax、x_end) |
+| userland/lib/gfx/draw/gfx_dump.c | VDP1 の保存/読込が各面32000 B固定 |
+| userland/lib/gfx/asm/gfx_const.inc | width640/height400/BPL80/PLANE_SZ32000 |
+| userland/lib/gfx/asm/asm_draw.asm | clear の4面32000 B、pixel/line の400行クリップ (142–176、844–848付近) |
+| userland/lib/gfx/asm/asm_sprite.asm | 101–133付近の画面端クリップが固定 geometry |
+| userland/lib/gfx/draw/gfx_raster.c | present_with_raster の dirty rect が640×400 |
+| userland/lib/mgx/libos32mgx.h | MGX_MAX_PLANE=32000 はファイル形式上限、BB strideとは別 |
+| sdk/rust/os32api/src/lib.rs | present() の dirty rect が640×400 |
+| userland/tests/blit_test.c | snapshot_bb が80×400 B/面をコピー |
+
+**検証と申し送り**:
+- `make all NP21W_DIR=/dev/null < /dev/null` rc=0。memmap/test inventory は生成器で更新。
+  check_select --lint は125検査・漏れ0。本番で bridge/query/lease が未結線であることを map/nm で確認。
+  全体検査は票/ソース固定後に check_slot.sh e6-coder 経由で check-changed を実行し、
+  3回目で rc=0。HOST32_RUNNERS=qemu、保守的な full 選択で全変異を実行。
+  slot 0 を取得でき、直接実行への fallback は不要だった。
+  ログは `/home/hight/os32-tmp/e6-check-changed.log`。この結果記録は検査終了後に追記。
+  初回は rc=2: boot_splash の非gcリンクが未結線bridgeの依存を要求し、P2V検査も
+  lease VA の cast を検出。終了後、試験リンクへ --gc-sections を付け、[C5] の
+  例外表に関数と「lease VA、物理変換不要」の理由を記録して再実行する。
+  初回ログは `/home/hight/os32-tmp/e6-check-changed-first.log`。
+  2回目も rc=2: 同じ足場を独立にリンクする display_cleanup 実行器にも
+  --gc-sections と変異用コピーの appslot.h が必要だった。実行器だけを修正し、
+  既存16変異の定義/期待理由は維持。正常13条件・16/16 runtime REDを単独再検査してrc=0。
+  ログは `e6-check-changed-second.log`。
+- e7: shlib/gshell の復帰、待ち/yield後の check、2実体の一括 attach/失敗巻戻しを結線。
+  `libos32gfx_detach()` は内部 port に対応する実体自身の token を返すので、片側失敗時は
+  両側で呼んでからエラーにする。port の変更は attach 前または detach 後だけ。
+- e11: 内部 port を生成 query/lease/unlease に束ね、compat bridge の KAPI を結線。
+  screen_info を再取得時に使う geometry 契約、保存 caller/B1 と失敗出口を維持する。
+  sdk/kapi.json・機能版69・memory世代・KAPI生成物・exec_map_shared_bb は無変更。
+  Cirrus DISPLAY NONE→RW、旧USER写像撤去、生成/世代一式は同段。
+- 16000 B stride 化は SDK/asm 全面監査が必要。Q8 に従い PM のユーザー報告と
+  DOCS_REORG_T3 §4 の論点へ渡す。e5 の再登録申し送りを e6 で実行しない。
+- e5 P3-3 (shutdown の門)、P3-6 (revoke 失敗で参照が残る) は既存の持越し。
+  native runner、NP21/W、NHD、配備、ini、実機は未実施。構成依存は §12 の一括確認へ。
+  exec/appmem.*、apps/game、commit/push は未操作。
+
+
+**独立レビュー修正 (2026-10-03、Codex gpt-6-astra、Opus 5.5 Request changes 対応)**:
+- P2-1: checked attach は refresh の失敗時も gfx_api があれば surface/sprite を初期化。
+  両 init は既存スロットをリセットするため、SDK 実体ごとの初回だけ呼ぶ。
+  初回 FULL → slot 返却 → present 回復 → surface/sprite 作成・描画と、
+  再 attach 後も既存オブジェクトを保持する正常対照を追加。
+- P3-1: bridge 失敗の abort は保存 caller が USER、current >= APP_ID_MIN、
+  current slot が RUNNING の場合だけ。TRUSTED 失敗でもカウンタは増やすが abort しない。
+- P3-5: tilemap の compose 4入口と present、md の page/statusbar の C 入口で
+  gfx_ready=0 なら何もしない。Rust Painter は e7。
+- P3-7: gfx_attach_tdd の票リンクを追加し、TESTS.md は生成器で再生成。
+- 追加変異3本 (失敗時 init を飛ばす、再 attach でプールをリセット、TRUSTED abort)。
+  qemu ILP32 は **268 条件 / 15/15 runtime RED**、単独実行 rc=0。
+  P3-5 は make all でビルド確認 (専用 runtime 試験・ゲスト検証は未実施)。
+
+今回の修正前 → 修正後 (B、基点との差分表は上記):
+
+| 項目 | 修正前 | 修正後 | 増分 |
+|---|---:|---:|---:|
+| kernel.bin | 367,440 | 367,444 | +4 |
+| vmkernel.lz4 | 483,335 | 483,347 | +12 |
+| __bss_end | 0x18D358 | 0x18D358 | 0 |
+| libos32gfx.a | 69,514 | 69,698 | +184 |
+| libos32gui.shlib | 129,568 | 129,568 | 0 |
+| shlib BSS | 17,052 | 17,052 | 0 |
+| gshell.bin | 226,312 | 226,376 | +64 |
+| hello_gfx.bin | 22,252 | 22,316 | +64 |
+
+kernel 本体正味増分は引き続き0 B (基点比、上限2,000 B)、bridge は gc で未結線。
+ELF text/data/bss は 705540/36843/606520。kernel data は build ID を含む。
+`CROSS_DIR=/home/hight/opt/cross make all NP21W_DIR=/dev/null` rc=0。
+初回の CROSS_DIR 未指定は libc/libgcc の探索失敗で rc=2、設定して再実行した。
+ログ: `/home/hight/os32-tmp/e6-review-build-retry.log`、`e6-review-attach.log`。
+全体検査はソース・票固定後、
+`CROSS_DIR=/home/hight/opt/cross /home/hight/os32-tmp/bin/check_slot.sh e6-coder env HOST32_RUNNERS=qemu make check-changed NP21W_DIR=/dev/null < /dev/null`
+で **rc=0** (slot1、full 選択、直接実行への fallback なし)。
+ログ: `/home/hight/os32-tmp/e6-review-check-changed.log`。この結果だけ検査終了後に追記。
+`gen_memmap.py --write`、`gen_tests_inventory.py --write`、`check_select.py --lint` も rc=0
+(125検査、対応表漏れ0)。NP21/W・配備・native runner は未実施、コミットはPMへ。
+
+レビュー指摘の申し送り (この段では記録のみ):
+- P3-2 → e11 互換表: pre-init USER は bridge で abort するが現 KAPI は boot PC98
+  CLIENT を返す。TRUSTED 経路の選択も bridge は gfx_started、現 KAPI は selected=1。
+- P3-3 → e11: bridge 本体は __cdecl でない。公開時の kapi wrapper で呼出規約を合わせる。
+- P3-4 → e11: port 経路の gfx_screen_info に版の門はない。結線時は版70以上を前提にする。
+- P3-6 → e7: SDK の再利用判定は sid/gen だけで token の生存を見ない。
+- (2 往復目のレビュー、記録) 再 init でプールを空きに戻さなくなった — 旧コードは attach / init のたびに surface・sprite の枠を全部空きに戻していた。今は実体ごとの初回だけ (生きている surface を壊さないため、こちらが正しい)。init → 作る → shutdown → init を free せずに繰り返すアプリは 16 枠を使い切る。in-tree で 2 回 init する呼び手 (bench_scale2x、bench、game、libos32gui) はその間に作らないので実害なし。公開ヘッダの注記に「再 init はプールを戻さない」を e7 で足す。
+- (2 往復目、→ e7・e11) tilemap と md は `libos32gfx_check()` を呼ばないので、e11 で port を結線した後に `gfx_ready=0` になると回復の経路が無い。e7 で帰路の check を配線するときに扱う。
+- (2 往復目、→ e11) P3-1 の直しで、`caller_access_get` が失敗した (`!valid`) USER では abort しなくなった。e11 の KAPI 経路では dispatch が常に frame を張るので届かない — 結線のときの確認項目。
+
+**e6 の着地 (PM、2026-10-03)**: 独立レビュー Opus 5.5 は 1 往復目 Request changes (P2-1: attach に失敗した後 check で回復すると surface/sprite のプールが未初期化のまま ready=1 → gfx_create_surface が NULL を読む。e6 の本番 (port が NULL) には届かない、e7・e11 の結線で届く) → Codex gpt-6-astra が直した (P3-1・P3-5・P3-7 も同時) → 2 往復目 Approve (レビュアーの再現が通り、再 attach を越えて既存の surface が残ることも確認)。PM のホスト検査は native の単体と `check_slot.sh` 経由の `HOST32_RUNNERS="native qemu"` check-changed で rc=0。
+  revoke 経路を増やす際の前提として再検討する。
+
 ## 3. T2f — map/unmapとallocator、暫定heap終了
 
 ### 3-1. 着手条件・範囲

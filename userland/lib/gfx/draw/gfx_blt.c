@@ -66,6 +66,7 @@ static void gfx_packed_restore_planar(int sx, int y, int wb, int h,
 
 void __cdecl gfx_save_rect(int x, int y, int w, int h, void *buf)
 {
+    if (!gfx_ready) return;
     int i;
     int sx, ex, wb;
     u8 *dst_base = (u8 *)buf;
@@ -100,6 +101,7 @@ void __cdecl gfx_save_rect(int x, int y, int w, int h, void *buf)
 
 void __cdecl gfx_restore_rect(int x, int y, int w, int h, const void *buf)
 {
+    if (!gfx_ready) return;
     int i;
     int sx, ex, wb;
     const u8 *src_base = (const u8 *)buf;

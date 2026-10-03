@@ -97,6 +97,7 @@ void gfx_surface_pixel(GFX_Surface *surf, int x, int y, u8 color)
 void gfx_blit(int dx, int dy,
               const GFX_Surface *src, const GFX_Rect *src_rect)
 {
+    if (!gfx_ready) return;
     int sx, sy, sw, sh;
     int p;
 
@@ -160,6 +161,7 @@ void gfx_blit_colorkey(int dx, int dy,
                        const GFX_Surface *src, const GFX_Rect *src_rect,
                        u8 colorkey)
 {
+    if (!gfx_ready) return;
     int sx, sy, sw, sh;
     int ix, iy;
 
@@ -193,6 +195,7 @@ void gfx_blit_colorkey(int dx, int dy,
 void gfx_blit_transparent(int dx, int dy,
                           const GFX_Surface *src, const GFX_Rect *src_rect)
 {
+    if (!gfx_ready) return;
     int sx, sy, sw, sh;
     int p;
 

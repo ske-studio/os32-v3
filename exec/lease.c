@@ -180,7 +180,7 @@ int lease_check(const struct addrspace *as)
                 const struct ledger_surface *sf = &ledger_surfaces[l->sid];
                 if (!sf->npages || l->generation != sf->gen || !sf->lease_count) return LEASE_INVAL;
                 expected = sf->first * PAGE_SIZE + va - l->base;
-                expected |= l->flags;
+                expected |= l->flags & ~AS_LEASE_GFX_COMPAT;
             }
         }
         pte = paging_lease_pte(as, va);
