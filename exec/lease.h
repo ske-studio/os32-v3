@@ -14,6 +14,11 @@ int lease_acquire(struct addrspace *as, const struct lease_authority *auth,
                   const struct surface_ref *refs, u32 count, u32 access,
                   struct lease_view *out);
 int lease_release(struct addrspace *as, u32 token);
+/* Revoke returns the failed-slot count; all slots/ASes are attempted.
+ * surface() requires the caller to hold master CR3 with IRQs saved. */
+int lease_revoke_surface(u32 sid);
+int lease_revoke_sid(struct addrspace *as, u32 sid);
+extern volatile u32 lease_revoke_fail_count;
 int lease_revoke_all(struct addrspace *as);
 int lease_check(const struct addrspace *as);
 int lease_selftest(void);

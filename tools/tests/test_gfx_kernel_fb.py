@@ -3,6 +3,7 @@ Normal controls run on every requested runner; mutants on the first runner.
 Hardware discovery and port I/O are stubbed, lifecycle and ledger are real.
 """
 import argparse
+import hashlib
 import pathlib
 import re
 import subprocess
@@ -29,7 +30,7 @@ MUTANTS = [
   'FAIL ledger_surface_find(LEDGER_SF_PEGC,LEDGER_ROLE_DISPLAY) != 0'),
  ('preinit-backend', 'selected ? gfx_sf_backend() : LEDGER_SF_PC98', 'gfx_sf_backend()',
   'FAIL fb.width == sf->width && fb.height == height'),
- ('init200-rebind', '    gfx_bind_client(); /* rebind for init_200, keeping registered plane offsets */', '',
+ ('init200-rebind', '    gfx_bind_client(); /* bind before init_200; retain 400-line plane stride */', '',
   'FAIL fb.width == sf->width && fb.height == height'),
  ('preinit-screen-pc98', '    if (g_backend && g_backend->query)\n        g_backend->query((GFX_ScreenInfo *)out);',
   '    (gfx_started ? g_backend : &gfx_backend_pc98)->query((GFX_ScreenInfo *)out);',
@@ -53,7 +54,7 @@ def replace_function(body, signature, replacement):
         end += 1
     return body[:brace] + '{\n' + replacement + '\n}' + body[end:]
 
-def run_case(mutation, runner):
+def run_case(mutation, runner, extra_changes=(), fixture_body=None, source_texts=None, object_cache=None):
     with tempfile.TemporaryDirectory(prefix='os32-e4-') as name:
         tmp = pathlib.Path(name)
         arch = (ROOT/'tools/tests/host_arch/arch_io.h').read_text().replace(
@@ -74,12 +75,20 @@ static inline void io_wait_n(int n) {(void)n;}
 ''')
         sources = []
         for path in TARGET_SRCS:
-            body = (ROOT/path).read_text()
+            body = source_texts[path] if source_texts is not None else (ROOT/path).read_text()
+            for unit, old, new in extra_changes:
+                if unit == path:
+                    assert body.count(old) == 1, (unit, old, body.count(old))
+                    body = body.replace(old, new)
             if path == 'gfx/gfx_core.c':
                 if mutation:
                     _, old, new, _ = mutation
                     assert body.count(old) == 1, (mutation[0], body.count(old))
                     body = body.replace(old,new)
+                    if mutation[0] == 'packed-bind':
+                        old = '        gfx_reinit_pending = 0;\n        gfx_bind_client();'
+                        assert body.count(old) == 1
+                        body = body.replace(old, '        gfx_reinit_pending = 0;\n        if (gfx_sf_backend() == LEDGER_SF_PC98) gfx_bind_client();')
                 body = body.replace('*(volatile u8 *)P2V_IO(arch)', '(arch, PEGC_BIOS_ARCH_EXTGFX)')
                 body += '\nint host_select_and_init(void) { return gfx_select_and_init_backend(); }\n'
             if path == 'gfx/backend_pegc.c':
@@ -109,7 +118,7 @@ static inline void io_wait_n(int n) {(void)n;}
             else:
                 dest = tmp/(pathlib.Path(path).stem+'.c');dest.write_text(body);sources.append(dest)
         fixture = 'unsigned int host_arch_if = 0x202U;\n#include "gfx_kernel_fb_host.c"\n'
-        (tmp/'fixture.c').write_text(fixture)
+        (tmp/'fixture.c').write_text(fixture_body or fixture)
         sources.append(tmp/'fixture.c')
         flags=['gcc','-std=gnu11','-m32','-march=i386','-ffreestanding','-fno-pie',
                '-fno-stack-protector','-ffunction-sections','-fdata-sections',
@@ -119,8 +128,22 @@ static inline void io_wait_n(int n) {(void)n;}
                   'arch/x86','platform/pc98','kernel','exec','gfx','drivers','lib','fs',
                   'kapi','lib/sqlite3','sdk/include/os32')]
         exe=tmp/'test'
+        inputs = sources
+        if object_cache is not None:
+            inputs = []
+            for src in sources:
+                content = src.read_bytes()
+                if src.name == 'fixture.c':
+                    content += b''.join((tmp/(unit+'_host_source.c')).read_bytes()
+                                        for unit in ('paging','pgalloc','sys'))
+                obj = object_cache/(hashlib.sha256(content).hexdigest()+'.o')
+                if not obj.exists():
+                    result = subprocess.run(flags+['-c',str(src),'-o',str(obj)],
+                                            capture_output=True,text=True)
+                    assert result.returncode == 0, result.stderr
+                inputs.append(obj)
         compiled=subprocess.run(flags+['-nostdlib','-static','-no-pie','-Wl,--gc-sections',
-            *map(str,sources),'-o',str(exe)],capture_output=True,text=True)
+            *map(str,inputs),'-o',str(exe)],capture_output=True,text=True)
         assert compiled.returncode == 0, compiled.stderr
         return host32.run([str(exe)],runner=runner,capture_output=True,text=True,timeout=60)
 

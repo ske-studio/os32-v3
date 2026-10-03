@@ -55,6 +55,11 @@ static const GfxBackend *const g_backend_list[] = {
  * kernel.c が gfx_init より前に gfx_set_backend_pref() で設定する。 */
 static int g_backend_pref = GFX_PREF_AUTO;
 static int gfx_started;
+STATIC_ASSERT(LEDGER_MAX_SURFACES <= 32, gfx_surface_bitmap_width);
+/* Slot reuse must clear stale not-ready bits (e8). */
+static u32 gfx_reinit_pending, gfx_surface_unready;
+volatile u32 gfx_reinit_fail_count;
+static void gfx_reinit_surfaces(int finish);
 static void gfx_bind_client(void);
 
 void gfx_set_backend_pref(int pref)
@@ -409,7 +414,8 @@ int gfx_surface_source(u32 role, struct surface_query_source *out)
     for (plane = 0; plane < count; plane++) {
         for (i = 0; i < LEDGER_MAX_SURFACES; i++) {
             const struct ledger_surface *sf = &ledger_surfaces[i];
-            if (!sf->npages || sf->closing || sf->backend != source.backend ||
+            if ((gfx_surface_unready & (1U << i)) || !sf->npages || sf->closing ||
+                sf->backend != source.backend ||
                 sf->role != role || sf->perm_max == LEDGER_PERM_NONE) continue;
             if (count == 4 && sf->first != GFX_PFN(gfx_display_planes[plane])) continue;
             source.refs[plane] = (struct surface_ref){i, sf->gen};
@@ -421,6 +427,42 @@ int gfx_surface_source(u32 role, struct surface_query_source *out)
     source.ready = 1;
     *out = source;
     return 0;
+}
+
+/* Separate revoke and regen master phases (PM e5 section 9). The revoke
+ * phase visits old/selected/fallback backends as selection resolves. Between
+ * phases the publisher
+ * is not-ready, and no scheduling/callback or public caller exists until e11.
+ * regen rechecks zero references even if this normal-context contract breaks. */
+static void gfx_reinit_surfaces(int finish)
+{
+    unsigned int flags = irq_save();
+    u32 cr3 = paging_current_cr3(), i;
+    paging_load_cr3(paging_kernel_pd_phys());
+    for (i = 0; i < LEDGER_MAX_SURFACES; i++) {
+        struct ledger_surface *sf = &ledger_surfaces[i];
+        u32 bit = 1U << i;
+        if (!finish) {
+            if (!sf->npages || sf->backend != gfx_sf_backend() ||
+                (sf->role != LEDGER_ROLE_CLIENT && sf->role != LEDGER_ROLE_DISPLAY) ||
+                (gfx_reinit_pending & bit)) continue;
+            gfx_reinit_pending |= bit;
+            gfx_surface_unready |= bit;
+            (void)lease_revoke_surface(i);
+        } else if (gfx_reinit_pending & bit) {
+            /* 200 lines use each 400-line plane's first half. SDK checked
+             * attach/geometry migration is deferred to e6/e7 (PM Q5 correction). */
+            if (ledger_surface_regen(i, 0)) gfx_surface_unready &= ~bit;
+            else gfx_reinit_fail_count++;
+        }
+    }
+    /* Reload the caller even when it owns leases revoked under master. */
+    paging_load_cr3(cr3);
+    irq_restore(flags);
+    if (finish) {
+        gfx_reinit_pending = 0;
+        gfx_bind_client();
+    }
 }
 
 /* ======================================================================== */
@@ -444,13 +486,25 @@ void gfx_bb_phys_range(u32 *base, u32 *size)
 /* ⑨ GUI の開始 (exec_run(gshell) の直前): 選択中 backend の CLIENT を
  * boot → gshell へ移す (RAM の面は L2 のページごと、MMIO の面は SURFACE の
  * owner だけ)。2 回目以降 (GUI → CUI → GUI) は同じ owner なので何もしない —
- * BB は返さず保持する (R5 (b))。 */
+ * BB は返さず保持する (R5 (b))。revoke failure / exhausted gen prevents
+ * ownership transfer; the surface stays not-ready and kernel backing survives. */
 void __attribute__((cold)) gfx_client_to_gshell(void)
 {
     struct ledger_surface *sf =
         ledger_surface_find(gfx_sf_backend(), LEDGER_ROLE_CLIENT);
-    if (sf) (void)ledger_surface_transfer((u32)(sf - ledger_surfaces),
-                                          LEDGER_OWNER_GSHELL);
+    if (sf && sf->owner != LEDGER_OWNER_GSHELL) {
+        unsigned int flags = irq_save();
+        u32 cr3 = paging_current_cr3(), sid = (u32)(sf - ledger_surfaces);
+        paging_load_cr3(paging_kernel_pd_phys());
+        gfx_surface_unready |= 1U << sid;
+        (void)lease_revoke_surface(sid);
+        if (!sf->lease_count && sf->gen != LEDGER_SURFACE_GEN_MAX &&
+            ledger_surface_transfer(sid, LEDGER_OWNER_GSHELL) &&
+            ledger_surface_regen(sid, 0)) gfx_surface_unready &= ~(1U << sid);
+        else gfx_reinit_fail_count++;
+        paging_load_cr3(cr3);
+        irq_restore(flags);
+    }
     (void)ledger_selfcheck("gui");
 }
 
@@ -604,13 +658,16 @@ static void _gfx_common_init(int plane_sz)
 static int gfx_select_and_init_backend(void)
 {
     gfx_started = 0;
+    gfx_reinit_surfaces(0);
     gfx_select_backend();
+    gfx_reinit_surfaces(0);
     if (g_backend && g_backend->init) {
         g_backend->init();
         /* init が失敗して probe が取り下げられた場合は 9801 へ落とす
          * (バックバッファが取れない等)。 */
         if (g_backend->probe && !g_backend->probe()) {
             g_backend = &gfx_backend_pc98;
+            gfx_reinit_surfaces(0);
             gfx_bind_client(); /* bind init failure fallback */
             return 0;
         }
@@ -644,9 +701,11 @@ static int gfx_select_and_init_backend(void)
 void gfx_prepare_backend(void)
 {
     gfx_started = 0;
+    gfx_reinit_surfaces(0);
     gfx_select_backend();
+    gfx_reinit_surfaces(0);
     gfx_bind_client();
-    if (!g_backend) return;
+    if (!g_backend) goto done;
     /* 下ごしらえを別に持つバックエンド (PEGC) は表示に触らずに済ませる。
      * init → shutdown で済ませると CUI しか使わない起動でも同期を送り直す
      * (実機 Ra266 + 液晶の桁ズレの原因という仮説、TASK_FDC_REALHW §9-1)。 */
@@ -654,19 +713,23 @@ void gfx_prepare_backend(void)
         g_backend->prepare();
         if (g_backend->probe && !g_backend->probe()) {
             g_backend = &gfx_backend_pc98;
+            gfx_reinit_surfaces(0);
             gfx_bind_client();
         }
-        return;
+        goto done;
     }
-    if (!g_backend->init) return;
+    if (!g_backend->init) goto done;
     g_backend->init();
     /* init が失敗して probe が取り下げられたら 9801 へ落とす (gfx_init と同じ)。 */
     if (g_backend->probe && !g_backend->probe()) {
         g_backend = &gfx_backend_pc98;
+        gfx_reinit_surfaces(0);
         gfx_bind_client();
-        return;
+        goto done;
     }
     if (g_backend->shutdown) g_backend->shutdown();
+done:
+    gfx_reinit_surfaces(1);
 }
 
 /* 標準 planar モード専用。CPU 直書きで両ページの表示領域を消す [HW1]。
@@ -692,6 +755,7 @@ void gfx_init(void)
     /* ⑤: GDC 初期化より前にバックエンドを決める */
     if (gfx_select_and_init_backend()) {
         gfx_bind_client(); /* bind packed init */
+        gfx_reinit_surfaces(1);
         gfx_started = bb[0] != 0;
         if (g_backend->enter) g_backend->enter();
         return;   /* 9821 等: モード設定もバックバッファも init() が済ませた */
@@ -702,7 +766,7 @@ void gfx_init(void)
     prev_dirty.count = 0;
 
     gfx_bind_client();
-    if (!bb[0]) return;
+    if (!bb[0]) { gfx_reinit_surfaces(1); return; }
     _gfx_common_init(GFX_PLANE_SZ);
 
     /* GDC CSRFORM: L/R=0 (400ライン) */
@@ -721,6 +785,7 @@ void gfx_init(void)
 
     palette_init();
     gfx_scroll_init();
+    gfx_reinit_surfaces(1);
     gfx_started = 1;
 
     /* 表示出力を有効化 (9801 の enter は空)。バックエンドの選択は先頭で済み。 */
@@ -735,6 +800,7 @@ void gfx_init_200(void)
      * 縦 2 倍表示は 16 色プレーンの機能で、PEGC には対応物が無い)。 */
     if (gfx_select_and_init_backend()) {
         gfx_bind_client();
+        gfx_reinit_surfaces(1);
         gfx_started = bb[0] != 0;
         if (g_backend->enter) g_backend->enter();
         return;
@@ -742,8 +808,8 @@ void gfx_init_200(void)
 
     gfx_current_height = GFX_HEIGHT_200;  /* 200ラインモード */
 
-    gfx_bind_client(); /* rebind for init_200, keeping registered plane offsets */
-    if (!bb[0]) return;
+    gfx_bind_client(); /* bind before init_200; retain 400-line plane stride */
+    if (!bb[0]) { gfx_reinit_surfaces(1); return; }
     _gfx_common_init(GFX_PLANE_SZ_200);
 
     /* GDC CSRFORM: L/R=1 (各ライン2倍表示 → 200ライン) */
@@ -764,6 +830,7 @@ void gfx_init_200(void)
 
     palette_init();
     gfx_scroll_init();
+    gfx_reinit_surfaces(1);
     gfx_started = 1;
 
     /* 表示出力を有効化 (9801 の enter は空)。バックエンドの選択は先頭で済み。 */
@@ -816,9 +883,11 @@ i32 gfx_screen_owner(void)
 void gfx_shutdown(void)
 {
     gfx_started = 0;
+    gfx_reinit_surfaces(0);
     /* 表示出力を戻し (leave)、バックエンドのハードウェア終了処理へ。
      * 9801 では leave は空、shutdown がフリップ解除 + GDC 表示停止を行う
      * (旧 gfx_shutdown の本体は backend_pc98.c の pc98_shutdown に移設)。 */
     if (g_backend && g_backend->leave) g_backend->leave();
     if (g_backend && g_backend->shutdown) g_backend->shutdown();
+    gfx_reinit_surfaces(1);
 }

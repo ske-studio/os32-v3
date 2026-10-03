@@ -893,6 +893,121 @@ makeは `CROSS_DIR=/home/hight/opt/cross`、`NP21W_DIR=/dev/null < /dev/null`。
 - NP21/W・NHD・配備・ini・実機・commit/pushは未操作。
   native ILP32とゲスト受入は未実施。§12どおり構成依存の一括確認はT2hへ。
 
+### e5 実装結果 (2026-10-03、コーダー GPT-6-astra)
+
+**対象**: 再 init / revoke / fallback、旧 token 拒否と第三 AS の不変。
+PM 参照資料 ref_e5 §8 Q1〜Q12・§9・§10 の訂正を適用。公開 KAPI、機能版、memory 世代、
+SDK 生成物、AS の大きさ、8 lease/AS・16 SURFACE、ASSERT は変更しない。
+
+**実装と PM 判断の対応**:
+- Q1/Q2/§9: `gfx_reinit_surfaces` に revoke と regen の master 区間を集約。
+  旧 backend、選択 backend、probe 失敗で加わる PC98 を対象にし、
+  同一呼出し中に一度処理した sid は重複 revoke/regen しない。
+  backend の選択に応じた revoke 区間と最後の regen 区間の各出口で
+  caller CR3 を再ロードし、保存 IF を戻す。長い init/shutdown/bind は caller 文脈。
+  walk/acquire の root 述語は不変。publisher の呼び手は未結線 (e11)。
+- Q3/Q4/Q5: `ledger_surface_regen` は master・通常文脈・参照0・非closing・
+  gen未枯渇を要求し、geometry を validate して gen+1。
+  sid/backing/owner と RAM 内容・padding は保存。PC98 CLIENT は200行でも
+  640×400・offset 32000刻み、DISPLAY 4面もheight=400のまま、最後にkernel bbを再bind。
+  prepare/init/init_200/shutdown、切替時の旧面、fallback の面を更新。
+  **「e4 Q2の200行持越しは閉じる」を取消**。レビューP2-2を受けPMがQ5を(a)へ戻した。
+  SDKの固定stride/heightと整合させ、各面先頭16000 Bだけを200行で使用する。
+  P2-1は400→200→400の全表示範囲消去と200行後半の保持、消去範囲変異で固定。
+- Q6/Q7: 区間の間は gfx_started=0。regen でも参照0を再確認。
+  sid の not-ready bitmap により、revoke未完了/世代枯渇の role は INVAL、
+  kernel backing は維持。gfx_reinit_fail_count はregen失敗時に一度だけ数える。
+  bitmap幅はSTATIC_ASSERT、gen番兵はpgallocと共有するLEDGER_SURFACE_GEN_MAX。
+  旧 token を保存/復活する経路は作らない。CLIENT欠落は従来どおりnot-ready。
+- Q8/Q9: `lease_revoke_sid` と appslot 列挙の `lease_revoke_surface` を追加。
+  `lease_revoke_all` は最後まで処理し、失敗slot数を返す。
+  lease_revoke_fail_count で数え、exec teardown は戻り値を診断出力へ使う。
+  解除済みtokenのreleaseはINVAL、旧refのacquire/queryはSTALE。
+- Q11: boot→gshell CLIENT は先にrevoke、参照0・gen余裕を確認して移譲/gen+1。
+  同一ownerへの繰返しは無変更。所有者交代時の再initも同じrevoke経路。
+  revoke失敗・gen枯渇では移譲せずnot-ready。IF/CR3復元とともに試験で確認。
+- Q12: 新規ILP32試験 `check-gfx-reinit-host` を全runner正常対照の8本目に登録。
+  実3backend・lease/query/paging/pgallocを連結し、3 ASのappslot足場で確認。
+  詳細は [gfx_reinit_tdd.md](../../../tools/tests/gfx_reinit_tdd.md)。
+  kselftest は regen/backing保持を1項目追加し、**pass 274 / fail 0 の見込み**
+  (e4の273から+1、ゲスト未測定)。
+
+**予算実測** (同一CROSS_DIR、kernel.map/stat。3,000 B上限):
+
+| 項目 | 着手時 | 実装後 | 増分 |
+|---|---:|---:|---:|
+| __bss_end | 0x18CE14 | 0x18D358 | +1,348 B |
+| kernel.bin | 366,092 B | 367,444 B | +1,352 B |
+| vmkernel.lz4 | 482,526 B | 483,344 B | +818 B |
+| ASSERT残り | 33,260 B | 31,912 B | −1,348 B |
+
+e5予算残り1,652 B。e残枠は13,404→12,056 B。
+レビュー修正前比: __bss_end −160 B、kernel.bin −160 B、vmkernel.lz4 −134 B。
+未結線入口の接続時の再計測はe11へ (publisherのnot-ready判定も含む)。
+圧縮520,192 B上限まで36,848 B。backingの追加確保は無し。
+
+**試験・実行記録 (レビュー修正前 — 最終値は下の「レビュー修正の実行記録」)**:
+- 環境: CROSS_DIR=/home/hight/opt/cross、TMPDIR=/home/hight/os32-tmp、
+  PYTHONPATH空、HOST32_RUNNERS=qemu。makeはNP21W_DIR=/dev/null・stdin=/dev/null。
+- 新規正常対照はAのCR3/master・IF=1/0、BのCLIENT/DISPLAY、
+  master/Cの全PD/PT・lease表/参照数不変、旧ref/token、200⇄400、fallback、
+  not-ready区間の取得拒否、revoke部分失敗/継続、gen上限、移譲を確認。
+  レビュー修正後は**11/11変異runtime RED**。compile/timeoutは不算入。
+  直接acquireの区間間負例とregenの再確認、packed両系のcaller ASも通す。
+- 既存個別: fb496チェック/10変異、lease10変異、gfx boot17変異、
+  display_cleanup16変異を維持。exec_r1とapp_bb_overlap(15変異)もrc=0。
+  置換が変わった既存変異は当て先/期待FAILを更新し、検出目的を維持。
+- 部分make kernel初回はkmemcpy宣言不足でrc=2、配列コピーへ修正後rc=0。
+  新規試験初回はcaller frame未設置でquery期待に失敗、足場修正後rc=0。
+  個別検査起動1回は存在しないcheck-gfx-boot-host指定でrc=2、実際のPython入口で再実行。
+  既存boot変異1回は置換先不一致、fb変異1回はFAIL文言不一致、修正後すべてruntime RED。
+  補助check-fastは試験一覧生成前でrc=2 (check-tests-inventory)。
+- `make all NP21W_DIR=/dev/null` は初回/最終ともrc=0。
+  gen_memmap --write、gen_tests_inventory --write、check_select --lint はrc=0
+  (124検査・漏れ0件)。/dev/nullへのD88コピー警告は指定による配備抑止。
+- 最終ゲートは票/ソースを固定して
+  `OS32_MUT_JOBS=4 HOST32_RUNNERS=qemu make check-changed NP21W_DIR=/dev/null < /dev/null`。
+  ログ `/home/hight/os32-tmp/e5-check-changed.log`、終了コードは同名 `.rc`。
+  **初回rc=0、再実行なし (make定義差分でfull選択)**。
+  新規e5は10/10、fbは496チェック/10変異、単面18/18、束21/21、
+  query34/34がruntime RED。C方言27/27 RED・正常対照5/5 GREEN。
+  既存Windows opt-inは計5件skip。検査中は票/ソースを変更せず、
+  終了後にこの結果だけを追記した。
+
+**レビュー修正の実行記録**:
+- 個別検査でSTATIC_ASSERT引数不足、packedのホストBIOS未写像、変異期待文言、
+  既存fb試験の実表示高/登録高の混同を検出し修正 (各rc=1)。正常対照と変異は修正後rc=0。
+- make all rc=0。gen_memmap/gen_tests_inventory --write、check_select --lintと
+  最終check-changedの結果は修正後ログ e5-revision-* と完了報告で記録する。
+  初回check-changedはrc=2: gfx_boot足場の未使用gfx_current_heightが-Werror。
+  全ジョブ終了後にその変数を削除。gfx_bootは18試験 (17構成+静的検査)・17変異でrc=0。
+  再実行check-changedは**rc=0** (full選択、2回目で完了)。
+  ログ `/home/hight/os32-tmp/e5-revision-check-changed-2.log`、同名 `.rc` に0。
+  新規e5の11/11変異、fb502チェック/10変異、boot17変異、C方言27/27 RED・5/5 GREEN。
+  gen_memmap/gen_tests_inventory --write、check_select --lintもrc=0 (124検査・漏れ0)。
+  この結果だけを全ジョブ終了後に追記。
+  最終検査中は票/ソースを固定する。
+
+**e6以降への申し送り**:
+- Q5訂正: planarのpitch×height再計算はe6/e7のchecked attachへ持越し。
+  SDK監査はgfx_fill.cのy切り、gfx_dump.cの32000固定、asm_draw.asmのGFX_PLANE_SZ、
+  libos32mgxのMGX_MAX_PLANEの4箇所を併せて行う。e5でSDKは変更しない。
+- P3-2: Cirrus prepareでinit後probe偽ならPC98面が一度not-readyになる。
+- P3-3: gfx_shutdownのKAPIには門が無い。e11のlease結線時にDoSを検討する。
+- P3-4: slot再利用時にnot-ready bitが残る件はe8で扱う。
+- P3-6: teardownのrevoke失敗でlease_countが残り、以後regenできない。
+- P3-8: 区間2のirq_restoreからbindまで窓がある。IRQ文脈でsfを読む描画が無い前提。
+- e6/e7はgen変更後のC静的/shlib両方の再attach、旧pointer/tokenの破棄。
+  e11でpublisherを結線するときも、source生成から取得完了までcallback/scheduling禁止、
+  not-readyを無視して古いsource値から取得しない契約を保つ。
+- Cirrus DISPLAYのNONE→RWは授権接続段へ。TVRAM/Unicodeはe8。
+- **Q10**: V86出口のgfx_current_height/flip整合はe10bへ持越す。
+  V86本体とdisplay_cleanupの変異定義は変更しない。
+- native、NP21/W、gfx200_test/gfx_demo200、実機の受入は未実施。
+  構成依存は§12どおりT2hへ。独立レビューとゲスト受入はPMへ。
+  commit/push・NP21/W・NHD・配備・ini・実機は未操作。
+- `ledger_surface_regen` の geometry を変える口は本番の経路で使わない (試験の validate 拒否だけ)。e6/e7 で 200 行の pitch×height 再登録に使うときは、padding のゼロ化 (APPBAND:140) を一緒に決める (独立レビュー 2 往復目 P3-4、記録)。
+
 ## 3. T2f — map/unmapとallocator、暫定heap終了
 
 ### 3-1. 着手条件・範囲

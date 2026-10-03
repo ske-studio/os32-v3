@@ -170,6 +170,7 @@ struct ledger_resource {       /* 32B。u32 → u16 → u8 の順で詰め物な
 /* 予約の要求 1 本。first / end は PFN 半開 (end = 1048576 で 4GiB 端)、
  * kind は LEDGER_SPAN_*、res はこの span の根拠の資源レコードの番号。 */
 struct ledger_span { u32 first, end, kind, res; };
+#define LEDGER_SURFACE_GEN_MAX 0xffffffffUL
 struct ledger_surface {        /* T2b: whole-page occupancy and stable references */
     u32 first, npages;         /* npages == 0 = 表の空き */
     u32 gen, plane_offset[4];
@@ -276,6 +277,9 @@ int ledger_reserve_set(u32 owner, const struct ledger_span *spans, u32 n);
 int pgalloc_page_owned(u32 pfn, u32 owner);
 /* Validate geometry, whole-page ownership/resource coverage and cache. */
 int ledger_surface_validate(const struct ledger_surface *sf);
+/* Master/normal context only: lease_count==0 and !closing, then generation+1.
+ * Keeps sid and backing (no padding clear); geom==NULL keeps the geometry. */
+int ledger_surface_regen(u32 sid, const struct ledger_surface *geom);
 /* Stop lending; RAM is returned after the last lease, DEVICE stays reserved. */
 int ledger_surface_release(u32 sid);
 /* Normal-context registration. Reject overlap; zero RAM padding; increment

@@ -1035,7 +1035,8 @@ static void exec_teardown_app(AppSlot *a)
     u32 left;
     if (!a || !a->cpl3 || !a->as || !a->as->pd_phys) return;
     /* 共有ライブラリの .data 複製ページを返す (PD 破棄の前, K3) */
-    lease_revoke_all(a->as);
+    if (lease_revoke_all(a->as))
+        kprintf(ATTR_RED, "lease revoke failed during teardown\n");
     shlib_addrspace_detach(a->as);
     if (a->sbrk_heap_limit > a->load_addr)
         paging_addrspace_free_user_range(a->as, a->load_addr,
