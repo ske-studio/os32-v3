@@ -1169,6 +1169,68 @@ ELF text/data/bss は 705540/36843/606520。kernel data は build ID を含む�
 **全画面アプリへの注入キーが届かない件 — 原因とユーザー決定 (2026-10-03)**: 原因は T8 (2026-09-12) の設計の穴。GUI 中の `kbd_getchar` は注入リング (`kbd_inject`) だけを見るが、注入できるのは con_sink の読み手 (端末) だけ (kernel/kbd_inject.c:106-118)。gshell は raw キーをフォーカス窓のリングへ配るだけで、全画面の所有者へ注ぐ経路を持たず、宛先が無ければ捨てる (userland/gshell/src/input.rs:479-481・:504-520)。起床条件 `key_ready` は注入リングの未読だけ (multiapp.rs:582-590)。Run から直接起動した全画面アプリには担い手の端末が居ないので WAIT_KEY のまま。CTRL+STOP だけは全画面の所有者宛ての別経路 (T8 D4d) で効く。**ゲストで確認**: hello_gfx の起動で `ring3_kbd_park_count` 2→3・`g_gfx_owner` 1→2、`a` の注入で raw リングの head 16→18 (make/break)・未読 0 (gshell が読み捨て)、`g_inj_count` 0 のまま、`ring3_switch_count` 不変。付随: 端末はプロンプト中は注入しない (票 E2) ので「端末を開いて Run」でも届かない見込み (未確認)。**ユーザー決定 (2026-10-03)**: e11 の公開 KAPI 一括に入れる — gshell が全画面の所有者 (端末の子でないもの) へ raw キーを変換して注入する経路と、カーネルの注入の権限 (全画面中の owner 1、または専用の KAPI) を e11 で足し、版の更新を 1 回にまとめる。それまでは既知の制限 (Run から直接起動した全画面アプリはキーで抜けられない、CTRL+STOP で畳む)。e11 の受入に「Run から全画面アプリ → キーで終わる」「端末の子は二重に注がない」「窓へ漏れない」「WAIT_POLL 型 (gfx200_test) も届く」を足す。
   revoke 経路を増やす際の前提として再検討する。
 
+### e8b 実装結果 (2026-10-03、Codex gpt-6.1-sol)
+
+基点 `5159cd5` (main)、worktree `wt/e8b`。PM `ref_e8b.md` §8 Q1〜Q5 / §9 に沿い、逸脱なし。
+公開slot/target・sdk/kapi.json・版・KAPI生成物・D7・scratch定数名は無変更。
+userland/lib・userland/rust・userland/gshell・sdk/rust と apps/game は無編集。
+
+- Q1: `kcg_boot_phase_close()` を shlib_init / bootlog_save 後、シェルループの
+  最初のexec前に1回結線。kcg.cのboot状態を永久に閉じ、入口で全callerへNOSYS。
+  logging / VFS / cacheへのアクセスより前に返す。kcg_initも再開せず、二重閉鎖は無変更。
+- Q2: 閉鎖時はscratch失効→Unicode4点再検証 (不一致ready=0)→planar BB全128KiB消去
+  →mailbox868B消去。Unicode完全読込直後にもlib/utf8.cの既存4点probeを使う。
+  失敗したreadのready=0を閉鎖時に復活させない。通常AS/USER lease開始前に完了。
+  予約済みSURFACEとgfx_started後のpublisherを区別し、既存boot順序は維持。
+- §9: MEM_AUTOPLAY_MAILBOX_BASE/SIZEをmemmap.hに追加 (0x90000/868)。
+  game commit `6d5be1e` のapp/view_export.c/hとdriver.pyを読取りで照合。
+  対と同じコミットでの変更規則を注記。docs/02_memory.mdの旧「定義は無い」は
+  生成ブロック内のためgen_memmapの説明を直して再生成。
+- Q3: font_load_testはNOSYS=PASS、0と他のrc=FAIL。stat段のSKIPを維持。
+  guest台本・host P/F/S・変異5の新文言を同時更新 (予約値127の意図は維持)。
+- Q4: 実kcg.c/utf8.c全文とC LZ4を使うILP32ホスト試験を追加。
+  正常12シナリオとboot結線順序、必須5/5変異を期待FAIL文言/rc=1で検出。
+  cache/Unicode/BB/mailboxを含む全640KiBとVFSカウンタ不変、初期化範囲外不変を照合。
+  全HOST32_RUNNERS列へ追加し08_buildも13試験へ。既存結果集計は227条件/0失敗、
+  11/11変異RED。詳細: [kcg_boot_tdd.md](../../../tools/tests/kcg_boot_tdd.md)。
+  kselftestは閉鎖前の位置であり、起動ログ確定後の新しい自己試験位置を増やさず
+  hostとゲストfont_load_testで代替。ゲスト実行はPM受入へ (未実施)。
+
+**Q5予算 (同一 /home/hight/opt/cross、byte、build ID差を含む)**:
+
+| 項目 | 前 | 後 | 増分 |
+|---|---:|---:|---:|
+| kernel.bin | 367,436 | 367,636 | +200 |
+| vmkernel.lz4 | 483,339 | 483,473 | +134 |
+| __bss_end | 0x18D358 | 0x18D418 | +192 |
+| kernel本体 (BSS/整列込み) | 578,392 | 578,584 | +192 |
+| ASSERT残り | 31,912 | 31,720 | −192 |
+| e枠残り | 12,056 | 11,864 | −192 |
+
+上限1,500Bに対して192B、残り1,308B。ELF text/data/bssは
+705540/36835/606520→705716/36843/606520。KHEAPページ境界は維持。
+
+**検証・申し送り**:
+make all NP21W_DIR=/dev/nullは前後ともrc=0。初回足場のcompile失敗と
+I/O stub不足signal11を修正し、正常12シナリオ/5変異はrc=0。
+途中gen_memmap --checkは古いbuild値でrc=1、最終build後に--writeで同期する。
+全体検査は票/ソース固定後、check_slot.sh e8b-coder経由で実行し、結果のみ終了後追記。
+環境はCROSS_DIR=/home/hight/opt/cross、TMPDIR=/home/hight/os32-tmp、PYTHONPATH空、
+HOST32_RUNNERS=qemu、makeのstdinは/dev/null。ログはos32-tmp/e8b-*.log。
+NP21/W・NHD・配備・ini・実機・native runnerは未実施。commit/pushなし。
+e11へ: 公開説明/版/生成と通常ASの一括切替。e8a/T3のUnicode移行は別段。
+
+最終結果 (全体検査終了後の追記):
+`/home/hight/os32-tmp/bin/check_slot.sh e8b-coder env HOST32_RUNNERS=qemu make check-changed NP21W_DIR=/dev/null < /dev/null`
+は **rc=0、1回、slot0、full選択**。途中の票/ソース変更なし、直接実行へのfallbackなし。
+128検査の対応表漏れ0、新規正常12シナリオ/必須5/5変異、既存result_convの
+227条件/0失敗・11/11変異を全体検査内でも確認。C方言は27/27変異・5/5対照。
+ログ: `/home/hight/os32-tmp/e8b-check-changed.log`。
+最終make allはrc=0 (`e8b-final-build.log`)。
+最終gen_memmap/gen_tests_inventoryの--writeと--check、check_select --lintはrc=0。
+
+
+**e8b の着地 (PM、2026-10-03)**: 独立レビュー Opus 5.5 は Approve (P1/P2 なし。レビュアーは qemu で 12 シナリオと変異 5/5 を再実行、kcg_load_font の実際の呼び手は boot_font.c と font_load_test だけ、閉じた後に BB・mailbox を読む者は無い、mailbox は game の view_export.c の sizeof==868 と driver.py の MAILBOX_SIZE=868 と一致)。PM のホスト検査は native の単体と `check_slot.sh` 経由の `HOST32_RUNNERS="native qemu"` check-changed で rc=0。P3 の扱い: P3-2 (kernel.c の古い [DEBUG] 注記) と P3-6 (コーダー表記) は PM が直した。**e11 へ**: P3-1 公開 KAPI の `kcg_init` は `kanji_fetched`/`ank_fetched` をゼロにするので、呼んだプログラム (apps/edit、blit_test2、rotate_test、gfx_demo200、bench) の後は再起動まで漢字が ROM の字形になる — e8b より前からあり、e8b は読み直しの道 (kcg_load_font) を NOSYS で塞いだだけ。e11 で閉じた後の `kcg_init` はフラグを消さない (または NOSYS) を決める。**e8a へ**: P3-3 `lib/utf8.h` は SDK に写される公開ヘッダで、カーネル専用の `utf8_validate_jis_table` が `#ifdef __KERNEL_BUILD__` で載っている — Unicode の面の整理で外へ出す。記録: P3-4 (slot の path ガードが無効なポインタを先に弾いたときの戻り値は未確認、副作用なし)、P3-5 (kernel.c の結線は試験では文字列の順序照合だけ、実行時はゲストの font_load_test で見る)、P3-7 (font_load_test の SKIP 文言の変更は不要だったが、変異 5 の当て先も合わせてあり期待は弱まっていない)。
 ## 3. T2f — map/unmapとallocator、暫定heap終了
 
 ### 3-1. 着手条件・範囲

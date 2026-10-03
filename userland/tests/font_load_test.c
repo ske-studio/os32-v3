@@ -1,8 +1,7 @@
 /* ======================================================================== */
 /*  FONT_LOAD_TEST.C — kcg_load_font KAPI テスト                            */
 /*                                                                          */
-/*  .kcgfont ファイルをロードして KCG キャッシュを上書きし、                  */
-/*  日本語テキスト描画で動作確認する。                                        */
+/*  boot後の読込がNOSYSで拒否されることを確認する。                          */
 /*                                                                          */
 /*  合否の出し方は票 docs/archive/test/TASK_TEST_RESULT.md §2 に従う。         */
 /*  **kcg_load_font の戻り値をそのまま終了コードにしない** — 失敗は負値で、   */
@@ -31,11 +30,11 @@ int main(int argc, char **argv, KernelAPI *api)
 
     if (api->sys_stat(path, &st) != 0) {
         return os32_test_summary_skip(api, "font_load_test",
-                                      "font file not found");
+                                      "font file not found (NOSYS test prerequisite)");
     }
 
     ret = api->kcg_load_font(path);
     printf("result: %d\n", ret);
 
-    return os32_test_summary(api, "font_load_test", (ret == 0) ? 1 : 0, 1);
+    return os32_test_summary(api, "font_load_test", (ret == OS32_ERR_NOSYS) ? 1 : 0, 1);
 }

@@ -515,11 +515,10 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * これがないとBIOSデータの残骸がキャッシュ済みと誤認される。 */
     kcg_init();
 
-    /* [DEBUG] カーネル初期化中にフォントロードをテスト。
-     * 外部プログラム経由のクラッシュが、スタック/コンテキストの問題か
-     * lz4_decode 自体の問題かを切り分けるための一時的なテスト。
-     * 注意: Unicode テーブル (0x4A000) はまだロードされていないので
-     *        LZ4 一時バッファとして安全に使用可能。 */
+    /* boot 内の正規のフォント読込 (e8b: kcg_load_font は boot フェーズの
+     * 間だけ通り、boot_phase_close() の後は NOSYS)。
+     * Unicode テーブル (0x4A000) はまだロードされていないので、
+     * LZ4 一時バッファとして安全に使える。 */
     tvram_print(0, 3, "FONT..", TATTR_GREEN);
     {
         int fret;
@@ -541,7 +540,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
         }
     }
 
-    /* TTF由来フォント: 外部プログラムから kcg_load_font() (KAPI) で呼ぶ */
+    /* TTF由来フォントもboot内部で読む。boot後の公開口はNOSYS。 */
 
     /* FPU 初期化 (paging_init の後で CR0 に対して設定)
      * CR0.EM=0 (ネイティブFPU使用), CR0.TS=0 (タスクスイッチ不要)
@@ -649,7 +648,8 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     {
         int bytes = vfs_read(SYS_UNICODE_BIN, (void *)P2V(MEM_UNICODE_TABLE_BASE), MEM_UNICODE_TABLE_SIZE);
         kprintf(0x07, "[BOOT] UNI load: bytes=%d\n", bytes);
-        if (bytes == (int)MEM_UNICODE_TABLE_SIZE) {
+        if (bytes == (int)MEM_UNICODE_TABLE_SIZE &&
+            utf8_validate_jis_table()) {
             utf8_set_jis_table_ready(1);
             tvram_print(67, 2, "OK", TATTR_WHITE);
         } else {
@@ -734,6 +734,11 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * exec する直前。溜めるのはここまで (以後の出力は入らない)。ルートが
      * ext2 / FAT でなければ書かない。どこで失敗しても起動は続ける。 */
     bootlog_save();
+
+    /* scratch失効→Unicode再検証→planar BB全域/mailbox初期化。
+     * 台帳の予約と公開は別。gfx_started後のSURFACE publisher/USER lease、
+     * 最初の通常AS開始より前に完了する。 */
+    kcg_boot_phase_close();
 
     /* 外部シェル起動 — CUI(shell.bin) と GUI(gshell.bin) を同じシェル帯
      * (0x300000, Level 1) で入れ替えながら回す (契約 T9)。両者は同時に

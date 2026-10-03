@@ -202,7 +202,7 @@ def bands(m, sym):
     add(CONV, "空き / V86 ゲスト窓の一部",
         plus("MEM_GFX_BB_BASE", "MEM_GFX_BB_SIZE"),
         (v("MEM_CONV_END") or 0) - 1, "RW",
-        "0x90000 は自動プレイ観測メールボックス (memmap.h に定義は無い)")
+        "MEM_AUTOPLAY_MAILBOX_BASE/SIZE は自動プレイ観測メールボックス (game/app と driver.py の対)")
     add(CONV, "VRAM (テキスト + グラフィック)", v("MEM_CONV_END"),
         (v("MEM_BIOS_ROM_START") or 0) - 1, "RW", "CPL=3 からは USER。TVRAM / B,R,G / E は PCD (UC)、CG 窓は WB")
     add(CONV, "BIOS ROM", v("MEM_BIOS_ROM_START"), v("MEM_BIOS_ROM_END"), "RO", "WB (PCD なし)")

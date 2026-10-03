@@ -148,6 +148,11 @@ extern u32 __bss_end;
 #define MEM_GFX_BB_BASE         0x6A000UL
 #define MEM_GFX_BB_SIZE         0x20000UL  /* 128KB (32000B×4プレーン, 0x6A000-0x89FFF) */
 
+/* 自動プレイ mailbox: game/app の実装と game/tools/autoplay/driver.py の対。
+ * 配置や大きさを変えるときは game 側も同じコミットで直す (CLAUDE.md)。 */
+#define MEM_AUTOPLAY_MAILBOX_BASE 0x90000UL
+#define MEM_AUTOPLAY_MAILBOX_SIZE 868UL
+
 /* ====================================================================== */
 /*  8bpp パックドバックバッファ (PEGC 256 色, GUI v1.1 H2)                  */
 /*                                                                          */

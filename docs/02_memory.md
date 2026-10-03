@@ -92,7 +92,7 @@
 読み手に暗算させ、2026-09-17 の「SHM がカーネルスタックに食い込んでいた」穴を隠していた。
 
 ```
-__bss_end      = 0x18D358   (カーネル本体 564.8KB)
+__bss_end      = 0x18D418   (カーネル本体 565.0KB)
 __sqlite_start = 0x200000
 __sqlite_end   = 0x2BC200   (SQLite 本体 752.5KB)
 
@@ -102,13 +102,13 @@ __sqlite_end   = 0x2BC200   (SQLite 本体 752.5KB)
 0x007E00 - 0x007EFF 256B     ブート情報域 (ローダ → kernel_main)  (INT 1Bh AH=84h の結果 (include/bootinfo.h)。kernel_main の最初で写した後はフォントキャッシュが上書きしてよい) RW
 0x04A000 - 0x069FFF 128KB    Unicode-JIS 変換表  (utf8.c)                                  RW
 0x06A000 - 0x089FFF 128KB    GFX バックバッファ (4 プレーン)  (CPL=3 からは常に USER (レビュー #6)) RW
-0x08A000 - 0x09FFFF 88KB     空き / V86 ゲスト窓の一部  (0x90000 は自動プレイ観測メールボックス (memmap.h に定義は無い)) RW
+0x08A000 - 0x09FFFF 88KB     空き / V86 ゲスト窓の一部  (MEM_AUTOPLAY_MAILBOX_BASE/SIZE は自動プレイ観測メールボックス (game/app と driver.py の対)) RW
 0x0A0000 - 0x0EFFFF 320KB    VRAM (テキスト + グラフィック)  (CPL=3 からは USER。TVRAM / B,R,G / E は PCD (UC)、CG 窓は WB) RW
 0x0F0000 - 0x0FFFFF 64KB     BIOS ROM  (WB (PCD なし))                                     RO
 
 [ カーネル帯域 (0x100000-0x1FFFFF) ]
-0x100000 - 0x18D357 564.8KB  カーネル .text/.data/.bss  (kernel.map の __bss_end まで)     RW
-0x18D358 - 0x18DFFF 3.2KB    空き
+0x100000 - 0x18D417 565.0KB  カーネル .text/.data/.bss  (kernel.map の __bss_end まで)     RW
+0x18D418 - 0x18DFFF 3.0KB    空き
 0x18E000 - 0x1BDFFF 192KB    カーネルヒープ (kmalloc)  (__bss_end を 4KB に切り上げた位置から) RW
 0x1BE000 - 0x1BEFFF 4KB      KernelAPI テーブル  (KAPI_ADDR)                               RW
 0x1BF000 - 0x1BFFFF 4KB      SHM 前方ガード                                                NP
@@ -157,12 +157,12 @@ __sqlite_end   = 0x2BC200   (SQLite 本体 752.5KB)
 
 **地図の矛盾: 0 件** (重なりも逆転も無い。`--check` が毎回確かめる)
 
-**カーネル本体の予算**: 596KB 中 564.8KB を使用 (残り 31.2KB)。
+**カーネル本体の予算**: 596KB 中 565.0KB を使用 (残り 31.0KB)。
 
 **カーネルがあと何 KB 育つと何が壊れるか** (`__bss_end` が伸びると `KHEAP_BASE` 以降が芋づるで動く)
 
-- `__bss_end` +3.2KB で KHEAP_BASE が 1 ページ上がる。0x18E000 → 0x18F000。以降の KAPI / SHM / ガードが全部 4KB 動く
-- `__bss_end` +31.2KB で **build/os32.ld の ASSERT がリンクを止める** (予算 MEM_KERNEL_IMAGE_MAX 超過)。止めるのが目的。超えたぶんだけ SHM 帯が カーネル帯域 0x1FFFFF を突き抜ける
+- `__bss_end` +3.0KB で KHEAP_BASE が 1 ページ上がる。0x18E000 → 0x18F000。以降の KAPI / SHM / ガードが全部 4KB 動く
+- `__bss_end` +31.0KB で **build/os32.ld の ASSERT がリンクを止める** (予算 MEM_KERNEL_IMAGE_MAX 超過)。止めるのが目的。超えたぶんだけ SHM 帯が カーネル帯域 0x1FFFFF を突き抜ける
 
 <!-- /生成: tools/gen_memmap.py -->
 

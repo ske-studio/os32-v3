@@ -24,7 +24,7 @@ gui_call_test           # PASS 2/2
 input_test              # PASS 29/29
 db_v50_test             # PASS 41/41
 save_test               # PASS 15/15  /host を使う (このランナーの前提と同じ)
-font_load_test          # PASS 1/1
+font_load_test          # PASS 1/1 (boot後NOSYS、表/BB/mailbox不変はhostで照合)
 test2                   # PASS 5/5
 stat_t                  # PASS 5/5
 restest all             # PASS 3/3  引数が要る (argc < 2 で使い方を出して終わる)
