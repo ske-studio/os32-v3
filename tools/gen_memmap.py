@@ -28,7 +28,7 @@ gen_memmap.py — メモリ地図の生成と、重なり・逆転の検出
 
 **`make check` にはまだ登録していない。** 登録すると今すぐ赤になる — 検出される
 重なりが実在するため (票 §4 の 4 で番地を直すのはユーザー判断)。番地を直したら
-`build/sdk.mk` の `check:` の列に `check-memmap` を足すこと。
+`build/checks.d/check-memmap.mk` の登録に `check-memmap` を足すこと。
 
 kernel.map が無いときは**推測しない**。__bss_end を決め打ちにすると、地図が
 「それらしく」出てしまい、今回とまったく同じ嘘をもう一度書くことになる。

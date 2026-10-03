@@ -1,0 +1,7 @@
+check-pcm-cs4231-host:
+- drivers/pcm_cs4231.c
+- drivers/pcm_cs4231_math.c
+- tools/tests/pcm_cs4231_host.c
+- tools/tests/test_pcm_cs4231.py
+- tools/check_map.d/check-pcm-cs4231-host.yaml
+- build/checks.d/check-pcm-cs4231-host.mk

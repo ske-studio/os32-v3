@@ -1,0 +1,13 @@
+check-ring3-guard-host:
+- tools/tests/host32.py
+- exec/exec.c
+- exec/exec_kapi_init.inc
+- exec/ring3_str.c
+- fs/fd_redirect.c
+- kernel/gui.c
+- kernel/isr_handlers.c
+- sdk/kapi.json
+- tools/tests/ring3_guard_host.c
+- tools/tests/test_ring3_guard.py
+- tools/check_map.d/check-ring3-guard-host.yaml
+- build/checks.d/check-ring3-guard-host.mk

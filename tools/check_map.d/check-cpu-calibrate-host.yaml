@@ -1,0 +1,7 @@
+check-cpu-calibrate-host:
+- kernel/cpu_calibrate.c
+- kernel/cpu_calibrate_math.c
+- tools/tests/cpu_calibrate_host.c
+- tools/tests/test_cpu_calibrate.py
+- tools/check_map.d/check-cpu-calibrate-host.yaml
+- build/checks.d/check-cpu-calibrate-host.mk

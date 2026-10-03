@@ -1,0 +1,22 @@
+check-shm-user-host:
+- kernel/paging.*
+- kernel/shm.*
+- kernel/v86_mem.c
+- kernel/kernel.c
+- kernel/pgalloc.*
+- kernel/physmem.*
+- exec/exec.c
+- include/**
+- arch/x86/**
+- platform/pc98/**
+- tools/tests/shm_user_host.c
+- tools/tests/test_shm_user.py
+- tools/tests/host_arch/**
+- tools/tests/host32.py
+- exec/exec_kapi_init.inc
+- kernel/paging.c
+- kernel/pgalloc.c
+- kernel/physmem.c
+- kernel/shm.c
+- tools/check_map.d/check-shm-user-host.yaml
+- build/checks.d/check-shm-user-host.mk

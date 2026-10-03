@@ -1,0 +1,22 @@
+check-result-conv-host:
+- userland/tests/*.c
+- tools/tests/result_conv/run_font_load_test.c
+- tools/tests/result_conv/run_klibc_test.c
+- tools/tests/result_conv/run_restest.c
+- tools/tests/result_conv/run_stat_t.c
+- tools/tests/result_conv/run_test2.c
+- tools/tests/test_result_conv.py
+- tools/tests/test_result_conv_host.c
+- userland/rust/alloc_demo/src/lib.rs
+- userland/tests/asset_test.c
+- userland/tests/font_load_test.c
+- userland/tests/klibc_test.c
+- userland/tests/restest.c
+- userland/tests/ring3_fault.c
+- userland/tests/ring3_guard.c
+- userland/tests/ring3_hello.c
+- userland/tests/stat_t.c
+- userland/tests/test2.c
+- tools/tests/mutpar.py
+- tools/check_map.d/check-result-conv-host.yaml
+- build/checks.d/check-result-conv-host.mk

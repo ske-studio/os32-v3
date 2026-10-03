@@ -1,0 +1,5 @@
+check-host-agent:
+- tools/host_agent.py
+- tools/tests/test_host_agent.py
+- tools/check_map.d/check-host-agent.yaml
+- build/checks.d/check-host-agent.mk

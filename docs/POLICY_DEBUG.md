@@ -962,7 +962,7 @@ curl -X POST http://127.0.0.1:8025/api/cmd --data-binary "ver"   # Build タイ�
   重さの中心は並列段の中の**変異試験** (上位 6 本で 909 秒)。変異は「その試験が見ている
   ソースを変えたとき」にしか意味が無いので、変異の有無を `MUTATE` で切り替え
   (recipe は `$(MUT)` / `$(MUTS)`)、`check-fast` (変異なし、**約 40 秒**) と
-  `check-changed` (変えたファイルに関係する検査だけ変異、対応表 `tools/check_map.yaml`、
+  `check-changed` (変えたファイルに関係する検査だけ変異、対応表 `tools/check_map.d/*.yaml`、全体設定 `tools/check_map.yaml`、
   漏れは `check-map` が静的に照合) を足した。`check` は全部変異込みのまま (**約 9 分 (529 秒)**)。
   使い分けは [`08_build.md`](08_build.md#検査の3段) §8-4。
 - **追記 (2026-09-26 夕) — 全並列になった**: 2 段目 `check-mut` (14 本、`-j1`) を写しの木へ移して消した。

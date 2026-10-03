@@ -3,6 +3,8 @@
 # ビルド生成物
 *.o
 *.d
+!/build/checks.d/
+!/tools/check_map.d/
 *.bin
 *.elf
 *.raw

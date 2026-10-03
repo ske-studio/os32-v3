@@ -1,0 +1,17 @@
+check-p2v:
+- tools/clang_ast/**
+- tools/tests/test_clang_ast.py
+- tools/check_p2v.py
+- tools/check_p2v_allow.txt
+- tools/tests/test_p2v.py
+- tools/tests/mutpar.py
+- kernel/**
+- drivers/**
+- gfx/**
+- fs/**
+- exec/**
+- kapi/**
+- lib/**
+- tools/check_map.d/check-p2v.yaml
+- build/checks.d/check-p2v.mk
+- include/**

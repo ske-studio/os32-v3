@@ -1,0 +1,7 @@
+check-irq-math-host:
+- kernel/irq.c
+- kernel/irq_math.c
+- tools/tests/irq_math_host.c
+- tools/tests/test_irq_math.py
+- tools/check_map.d/check-irq-math-host.yaml
+- build/checks.d/check-irq-math-host.mk

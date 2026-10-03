@@ -1,0 +1,16 @@
+check-gui-host:
+- tools/tests/mutpar.py
+- tools/tests/test_gui_reattach.py
+- tools/tests/gui_reattach_host.rs
+- tools/tests/os32api_host.py
+- sdk/rust/os32api/src/**
+- userland/rust/gdi_test/src/lib.rs
+- userland/rust/libos32gui/src/**
+- userland/rust/libos32gui/host_tests/**
+- sdk/rust/os32api/src/cfg.rs
+- sdk/rust/os32api/src/host.rs
+- userland/rust/libos32gui/src/cfgro.rs
+- userland/rust/libos32gui/src/hostsvc.rs
+- userland/rust/libos32gui/src/utf8core.rs
+- tools/check_map.d/check-gui-host.yaml
+- build/checks.d/check-gui-host.mk

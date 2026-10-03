@@ -1,0 +1,5 @@
+check-privileged:
+- userland/**
+- tools/check_privileged.py
+- tools/check_map.d/check-privileged.yaml
+- build/checks.d/check-privileged.mk

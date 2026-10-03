@@ -1,0 +1,22 @@
+check-kapi-layout-host:
+- sdk/rustc_stamp.py
+- sdk/link_guard.py
+- exec/exec.c
+- exec/exec_kapi_init.inc
+- exec/os32x_hdr.c
+- kapi/kapi_generated.c
+- sdk/crt/crt0_c.c
+- sdk/gen_kapi.py
+- sdk/link/app.ld
+- sdk/mkos32x.py
+- sdk/os32x_hdr.py
+- sdk/rust/os32api/src/gui/proto.rs
+- sdk/rust/os32api/src/gui/stub.rs
+- tools/mkshlib.py
+- tools/tests/os32x_layout_host.c
+- tools/tests/test_kapi_layout.py
+- userland/rust/libos32gui/src/shlib.rs
+- tools/tests/mutpar.py
+- tools/check_map.d/check-kapi-layout-host.yaml
+- build/checks.d/check-kapi-layout-host.mk
+- sdk/kapi.json

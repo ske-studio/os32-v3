@@ -1,0 +1,6 @@
+check-rshell-serial-host:
+- tools/rshell_serial.py
+- tools/serialfs_host.py
+- tools/tests/test_rshell_serial.py
+- tools/check_map.d/check-rshell-serial-host.yaml
+- build/checks.d/check-rshell-serial-host.mk

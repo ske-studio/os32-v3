@@ -1,0 +1,9 @@
+check-boot-splash-host:
+- gfx/gfx_vram.c
+- gfx/backend_pc98.c
+- gfx/gfx_core.c
+- kernel/boot_splash.c
+- tools/tests/boot_splash_native_host.c
+- tools/tests/test_boot_splash_native.py
+- tools/check_map.d/check-boot-splash-host.yaml
+- build/checks.d/check-boot-splash-host.mk

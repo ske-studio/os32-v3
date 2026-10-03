@@ -1,0 +1,18 @@
+check-sh-shell-host:
+- tools/tests/host32.py
+- tools/tests/sh_shell_host.c
+- tools/tests/test_sh_shell.py
+- userland/shell/cmd_env.c
+- userland/shell/cmd_file.c
+- userland/shell/cmd_fs_shared.c
+- userland/shell/cmd_mnt.c
+- userland/shell/cmd_script.c
+- userland/shell/cmd_sys.c
+- userland/shell/kbd_watch.c
+- userland/shell/sh_args.inc
+- userland/shell/sh_launch.inc
+- userland/shell/sh_ls.inc
+- userland/shell/sh_pipe.inc
+- userland/shell/sh_redraw.inc
+- tools/check_map.d/check-sh-shell-host.yaml
+- build/checks.d/check-sh-shell-host.mk

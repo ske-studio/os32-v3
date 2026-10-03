@@ -1,0 +1,10 @@
+check-docs-links:
+- docs/**/*.md
+- CLAUDE.md
+- README.md
+- tools/tests/*_tdd.md
+- arch/README.md
+- platform/README.md
+- tools/check_docs_links.py
+- tools/check_map.d/check-docs-links.yaml
+- build/checks.d/check-docs-links.mk

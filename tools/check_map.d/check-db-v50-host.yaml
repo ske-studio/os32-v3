@@ -1,0 +1,14 @@
+check-db-v50-host:
+- exec/exec.c
+- fs/vfs_fd.c
+- kapi/kapi_db.c
+- kernel/kselftest.c
+- kernel/paging.c
+- lib/sqlite3/os32_sqlite_vfs.c
+- lib/sqlite3/sqlite3.c
+- tools/tests/kapi_db_v50_host.c
+- tools/tests/test_kapi_db_v50.py
+- tools/tests/vfs_fd_sqlite_host.c
+- exec/exec_kapi_init.inc
+- tools/check_map.d/check-db-v50-host.yaml
+- build/checks.d/check-db-v50-host.mk

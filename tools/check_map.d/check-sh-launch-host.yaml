@@ -1,0 +1,7 @@
+check-sh-launch-host:
+- tools/tests/host32.py
+- tools/tests/sh_launch_host.c
+- tools/tests/test_sh_launch.py
+- userland/shell/sh_launch.inc
+- tools/check_map.d/check-sh-launch-host.yaml
+- build/checks.d/check-sh-launch-host.mk

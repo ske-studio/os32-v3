@@ -1,0 +1,8 @@
+check-appmem-host:
+- exec/appmem.c
+- tools/tests/appmem_host.c
+- tools/tests/host32.py
+- tools/tests/mutpar.py
+- tools/tests/test_appmem.py
+- tools/check_map.d/check-appmem-host.yaml
+- build/checks.d/check-appmem-host.mk

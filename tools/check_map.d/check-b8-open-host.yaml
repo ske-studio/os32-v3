@@ -1,0 +1,24 @@
+check-b8-open-host:
+- tools/tests/host32.py
+- drivers/pc98pt.c
+- fs/ext2_dir.c
+- fs/ext2_file.c
+- fs/ext2_fmt.c
+- fs/ext2_inode.c
+- fs/ext2_super.c
+- fs/ext2_vfs.c
+- fs/hostdrv_stat_rules.inc
+- fs/hostdrvfs.c
+- fs/vfs.c
+- fs/vfs_fd.c
+- lib/kutf16.c
+- tools/tests/b8_e2fsck.py
+- tools/tests/b8_hostdrv_host.c
+- tools/tests/b8_open_host.c
+- tools/tests/test_b8_hostdrv.py
+- tools/tests/test_b8_open.py
+- fs/hostdrv_list_rules.inc
+- fs/vfs_name_rules.inc
+- fs/ext2_layout.c
+- tools/check_map.d/check-b8-open-host.yaml
+- build/checks.d/check-b8-open-host.mk

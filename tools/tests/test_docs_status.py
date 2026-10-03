@@ -5,7 +5,7 @@
 
 一時ディレクトリに小さな木 (docs/POLICY_DEV.md の語彙の表と docs/tasks/ の票) を
 作り、実物の tools/check_docs_status.py (または変異させた写し) を import して
-check(root) の結果を見る。実物のリポジトリの木が通ることも 1 ケースとして見る。
+check(root) の結果を見る。実物のリポジトリの木は check-docs-status が見る。
 
   python3 -B tools/tests/test_docs_status.py            # 全ケース
   python3 -B tools/tests/test_docs_status.py --mutate   # 否定側
@@ -81,11 +81,6 @@ def run_check(mod, root):
         return mod.check(root), None
     except Exception as e:           # 語彙の読み失敗など
         return None, e
-
-
-def case_real_tree(mod, tmp):
-    probs, err = run_check(mod, str(ROOT))
-    check(err is None and probs == [], "実物の木が通らない: %r %r" % (err, probs))
 
 
 def case_vocab_ok(mod, tmp):
@@ -209,7 +204,6 @@ def case_main_rc(mod, tmp):
 
 
 CASES = {
-    "real_tree": case_real_tree,
     "vocab_ok": case_vocab_ok,
     "longest_word": case_longest_word,
     "outside_vocab": case_outside_vocab,

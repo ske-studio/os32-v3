@@ -1,76 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""check_select.py — 変更したファイルから「変異込みで回す検査」を選ぶ (make check-changed)。
+"""Select check mutations from changed inputs; see docs/08_build.md §8-4.
 
-**check-changed の絞り込みは作業中の近道 (目安) で、取りこぼしの保証はしない。** 保証は
-取り込み (PM) の `make check` (全部を変異込み) が担う。そのため絞り込みの型 (Makefile の
-許可リストも対応表も) は保守的な許可リストにとどめ、わざと作った入力への耐性は目標に
-しない。全体の検査はマシンが空いているときに流す (並行負荷で落ちる時間依存の試験が
-ある)。(ユーザー承認 2026-10-01)
-
-`make check` は全部の検査を変異込みで回すので約 10 分かかる (2026-09-26 実測)。
-変異試験 (否定側) が意味を持つのは**その試験が見ているソースを変えたとき**だけ
-なので、変更したファイルに関係する検査だけ変異込みで回し、残りは変異なしで回す。
-対応表 (検査 → 入力のパスの glob) は tools/check_map.yaml の 1 か所に置く。
-
-使い方:
-    python3 tools/check_select.py --select [--base <ref>]   make check-changed の中
-    python3 tools/check_select.py --select --files <パス>...  選び方の試し (git を見ない)
-    python3 tools/check_select.py --lint                     make check-map の中
-    python3 tools/check_select.py --inputs <検査名>          静的に拾えた入力の一覧
-    python3 tools/check_select.py --suggest <検査名>...      対応表の下書き (yaml)
-
---select の規則 (安全側に倒す):
-  * 変更 = `git diff --name-only <base>...HEAD` + 未コミット (staged / unstaged)
-    + 追跡外 (gitignore を除く)。`ignore:` に当たるものは数えない。
-  * 基点の既定は feat/gui との merge-base。それが HEAD (= feat/gui の上でコミット
-    した後) なら HEAD~1
-  * 変更が無い                     → 全部を変異なし (= check-fast)
-  * `full:` に当たる変更がある     → 全部を変異込み (= check)
-    ただし Makefile / build/*.mk (MAKE_INPUT_GLOBS) は **「新しい試験を足す形」だけ**を
-    決まった型との完全一致で絞る (make_narrow の docstring、ユーザー決定 2026-10-01 —
-    Makefile の変更の安全性を一般に証明するのはやめた。make は呼ばない)。基点
-    (merge-base) との差分が「追加だけ」(削除・変更行が 0) で、足した行が全部
-    次の型に完全一致するときだけ: (a) CHECK_PAR_TARGETS の列への検査名の追加
-    (語の集合で比べる)、(b) 新しい検査の規則 `check-<name>:` + 型どおりの recipe 行、
-    (c) 列にある既存の検査の recipe への型どおりの行の追加、(d) コメント行と空行。
-    選ぶのは (b) の新しい検査と (c) の行を足した検査。
-    置き場所も限る: 新しい規則はファイル末尾の塊だけ、既存の検査への行はその recipe が
-    規則行の直後から連続する tab 行だけのときにその連続の中か直後だけ、コメント・空行は
-    末尾の塊か基点の tab 行に接しない場所だけ (持ち主が変わる配置を締め出す)。
-    それ以外の差分 (削除・変更行、型に合わない行 (`.PHONY:` も)、define / 条件の中、
-    継続行の途中、列の移動、追加・削除・改名されたファイル、`--files` (基点なし)) は
-    全部 (理由を出す)。
-    sdk/kapi.json は生成物を介して試験の中身が変わるので全部のまま。
-  * どの検査の glob にも `docs_only:` にも `notest:` にも当たらない変更がある
-                                   → 全部を変異込み (= check)。表の漏れで
-                                     否定側を落とさないため。`broad:` の検査の
-                                     `**` glob はこの判定に数えない
-  * 変更が全部 `docs_only:` に当たる → 当たった検査 + `docs_always:` だけを回す
-  * 変更が全部 `notest:` (と docs) で、どの検査の glob にも当たらない
-                                   → 全部を変異なし (= check-fast)。
-                                     どのホスト試験の入力でもない場所の変更
-  * それ以外                       → 当たった検査は変異込み、残りは変異なし
-                                     (`notest:` の変更は何も足さない)
-  検査の glob に当たった変更は `notest:` にも当たっていても「当たった検査」に
-  数える (glob が勝つ)。
-  出力は sh の代入 (CC_MODE / CC_STAGE1 / CC_MUT1 / CC_SUMMARY)。説明は stderr。
-  試験は tools/tests/test_check_select.py (make check-check-select-host)。
-
---lint が見るもの (make check-map、check-fast / check の列に入っている):
-  (a) build/sdk.mk の CHECK_PAR_TARGETS と対応表の検査名が過不足なく一致すること
-  (b) 対応表の各 glob (`notest:` も) が追跡されているファイルに 1 つ以上当たること
-      (古い glob)
-  (c) **漏れ**: 各検査の recipe から辿れる試験スクリプトが開く / #include する
-      (取り込む側の場所・ROOT・-I の探索先) / `#[path]` で取り込むソースが、
-      その検査の glob に入っていること。
-      辿り方は静的 (文字列リテラルと #include "..." だけ) なので、
-      os.walk で舐める検査器などは拾えない — そういう検査は glob を手で広く書く。
-  (d) **notest の番人**: 各検査の拾えた入力が `notest:` に当たらないこと。
-      試験が notest の場所を読むようになったら「notest なのに入力になっている」
-      と言って落ちる — notest を狭める (`except:` に足す) か外す。
+--select [--base REF | --files PATH...] emits shell assignments.
+--lint checks per-check tools/check_map.d/*.yaml plus automatic C headers.
+--inputs TARGET includes gcc -MM/static dependencies; --suggest TARGET emits
+manual source/script/data entries without headers. Global policy stays in
+check_map.yaml. Selection is a work-in-progress shortcut; full make check is
+required after integration.
 """
 import os
+import glob
+from functools import lru_cache
 import re
 import shlex
 import subprocess
@@ -143,6 +84,15 @@ def matches(path, cglobs):
 def load_map():
     with open(MAP_PATH, encoding="utf-8") as f:
         m = yaml.safe_load(f)
+    for path in sorted(glob.glob(os.path.join(os.path.dirname(MAP_PATH), "check_map.d", "*.yaml"))):
+        with open(path, encoding="utf-8") as f:
+            shard = yaml.safe_load(f)
+        name = os.path.basename(path)[:-5]
+        if not isinstance(shard, dict) or set(shard) != {name}:
+            raise SystemExit("check-map: shard name mismatch: " + path)
+        if name in m.get("checks", {}):
+            raise SystemExit("check-map: duplicate: " + name)
+        m.setdefault("checks", {}).update(shard)
     m.setdefault("ignore", [])
     m.setdefault("full", [])
     m.setdefault("docs_only", [])
@@ -174,7 +124,42 @@ def is_notest(path, cnotest):
 
 # ---------------------------------------------------------------- Makefile
 # make の入力のうち、基点版との差分を型で絞るもの (`full:` の中の Makefile)。
-MAKE_INPUT_GLOBS = ("Makefile", "build/*.mk")
+ROUTED_BUILD = {"build/kernel.mk", "build/libs.mk", "build/programs.mk"}
+CHECK_CONTROL = re.compile(r"check-|MUT|HOST32|\.ONESHELL|export|override|CHECK_PAR|\bBASE\b|mut_on|host32_check", re.IGNORECASE)
+
+# Outputs of sdk/gen_kapi.py and sdk/kapi_rust_gen.py, including rewritten link scripts.
+KAPI_GENERATED = (
+    "sdk/include/os32/os32_kapi_generated.h", "sdk/include/os32/os32_kapi_slots.h",
+    "kapi/kapi_generated.c", "exec/exec_kapi_init.inc",
+    "sdk/include/os32/os32_generations.h", "sdk/os32_generations.py",
+    "sdk/rust/os32api/src/generations.rs", "sdk/include/os32/os32_unit_stamp.h",
+    "sdk/crt/generations.inc", "sdk/link/generations.ld",
+    "sdk/link/app.ld", "sdk/link/app_sys.ld", "sdk/link/shlib.ld", "build/os32.ld",
+    "sdk/rust/os32api/src/kapi_generated.rs",
+)
+
+
+def routed_build_safe(base, path):
+    """Only route build changes whose added AND removed lines contain no check controls."""
+    if base is None:
+        return False
+    try:
+        ancestor = git("merge-base", base, "HEAD")[0]
+        before = subprocess.run(["git", "-C", ROOT, "show", ancestor + ":" + path],
+                                capture_output=True, text=True)
+        if before.returncode:
+            return False
+        with open(os.path.join(ROOT, path), encoding="utf-8") as f:
+            after = f.read()
+    except (OSError, IndexError):
+        return False
+    import difflib
+    delta = difflib.ndiff(before.stdout.splitlines(), after.splitlines())
+    return not any(CHECK_CONTROL.search(line[2:]) for line in delta
+                   if line.startswith(("+ ", "- ")))
+
+
+MAKE_INPUT_GLOBS = ("Makefile", "build/*.mk", "build/checks.d/*.mk")
 
 
 def makefile_paths():
@@ -185,6 +170,8 @@ def makefile_paths():
     bdir = os.path.join(ROOT, "build")
     if os.path.isdir(bdir):
         out += sorted("build/" + f for f in os.listdir(bdir) if f.endswith(".mk"))
+    out += sorted(os.path.relpath(p, ROOT) for p in
+                  glob.glob(os.path.join(ROOT, "build/checks.d/*.mk")))
     return out
 
 
@@ -194,7 +181,7 @@ def read_makefiles():
     --lint / --inputs / --suggest が recipe から試験スクリプトを辿るための
     字面の読みで、make の意味論は持たない (検査列の名前と、タブ行の字面だけ)。
     変異の選び方で build/*.mk の差を判定するのはここではなく make_narrow (型の一致)。"""
-    rules, vars_ = {}, {}
+    rules, vars_, order = {}, {}, []
     for mf in makefile_paths():
         with open(os.path.join(ROOT, mf), encoding="utf-8") as f:
             lines = f.read().split("\n")
@@ -204,6 +191,8 @@ def read_makefiles():
             while line.endswith("\\") and i + 1 < len(lines):
                 i += 1
                 line = line[:-1] + " " + lines[i].strip()
+            if line.startswith("CHECK_PAR_ORDER += "):
+                order.extend(line.split("+=", 1)[1].split())
             m = re.match(r"^([A-Z_][A-Z0-9_]*)\s*:?=\s*(.*)$", line)
             if m:
                 vars_[m.group(1)] = m.group(2).split()
@@ -216,6 +205,8 @@ def read_makefiles():
             elif line.strip() and not line.startswith("#"):
                 cur = None
             i += 1
+    if order:
+        vars_["CHECK_PAR_TARGETS"] = [x.split(":", 1)[1] for x in sorted(order)]
     return rules, vars_
 
 
@@ -267,9 +258,7 @@ def check_lists(vars_):
 #       (d)  空行 (完全に空) と `#` 始まりのコメント行 (末尾 `\` なし) — 末尾の塊の中か、
 #            前後どちらにも基点の tab 行が接していない基点の 2 行のあいだだけ (recipe の途中・
 #            規則と recipe のあいだには入れない)
-#     `.PHONY:` の行は型に入れない (独立レビュー 1 回目 P1: 既存の規則の行と recipe の間に
-#     `.PHONY: check-new` を挟むと既存の recipe が .PHONY の所属になる。新しい検査を
-#     .PHONY に載せたいなら全部に倒れるのを受け入れる — 載っていない前例はある)。
+#     `.PHONY: 新名` は末尾に足した新規則のrecipe後だけ。以後のtab行は拒否。
 #     (b)(c)(d) の置き場所の制限は「持ち主が変わる配置を型から締め出す」(ユーザー決定
 #     2026-10-01、独立レビュー 2〜3 回目: 基点のコメント・空行・ifeq 越しの横取り)
 #   * 列に足した名前の集合 = (b) の規則の名前の集合
@@ -284,6 +273,8 @@ NAME_RE = re.compile(r"^%s$" % NAME)
 # 型 (1 か所。docs/08_build.md §8-4 に同じものを書いてある)
 TPL_RECIPE_RE = re.compile(
     r"^\tpython3 -B tools/tests/([a-z0-9_]+\.py)((?: --[a-z][a-z-]*)*)( \$\((?:MUT|MUTS)\))?$")
+TPL_HOST32_RE = re.compile(r"^\t\$\(call host32_check,([a-z0-9_]+\.py)\)$")
+TPL_PHONY_RE = re.compile(r"^\.PHONY: (%s)$" % NAME)
 TPL_HEADER_RE = re.compile(r"^(%s):$" % NAME)
 TPL_COMMENT_RE = re.compile(r"^#(?:.*[^\\])?$")
 # 列の論理行 (継続を結合した後) と、列への代入に見える行 (これが 2 つ以上なら読まない)
@@ -496,7 +487,13 @@ def classify_file(rel, work, inserted, base_words, new_names, m_checks):
                     raise Reject("%s: 基点の recipe 行に接してコメント / 空行を足している" % where)
             continue
         mh = TPL_HEADER_RE.match(line)
-        mr = TPL_RECIPE_RE.match(line)
+        mr = TPL_RECIPE_RE.match(line) or TPL_HOST32_RE.match(line)
+        mp = TPL_PHONY_RE.match(line)
+        if mp:
+            if not in_tail or mp.group(1) != cur_new or not picked.get(cur_new):
+                raise Reject("%s: .PHONY must follow its new rule and recipe" % where)
+            cur_new = None
+            continue
         if mh:
             name = mh.group(1)
             if not in_tail:
@@ -585,6 +582,58 @@ def _work_texts():
     return out
 
 
+SHARD_REG = re.compile(r"^CHECK_PAR_ORDER \+= ([0-9]{3,}):(check-[a-z0-9-]+)$")
+
+
+def shard_layout(texts):
+    registrations = {}
+    for rel, lines in texts.items():
+        for i, line in enumerate(lines):
+            if line.startswith("CHECK_PAR_ORDER +="):
+                match = SHARD_REG.fullmatch(line)
+                if not match or rel != "build/checks.d/" + match[2] + ".mk":
+                    raise Reject("invalid check registration: " + rel)
+                if match[2] in registrations:
+                    raise Reject("duplicate check registration: " + match[2])
+                registrations[match[2]] = (rel, i, match[1])
+    return registrations
+
+
+def narrow_shards(bt, wt, mk_hits, m_checks):
+    before, after = shard_layout(bt), shard_layout(wt)
+    if not set(before) <= set(after):
+        raise Reject("check registration removed")
+    new = set(after) - set(before)
+    for name in before:
+        if before[name] != after[name]:
+            raise Reject("check registration moved or reordered: " + name)
+    for name in new:
+        if any(re.search(r"(?<![\w-])" + re.escape(name) + r"(?![\w-])", line)
+               for lines in bt.values() for line in lines):
+            raise Reject("new check name already occurs: " + name)
+    picked, headers = {}, {}
+    for rel in mk_hits:
+        if rel not in wt:
+            raise Reject("make file removed: " + rel)
+        if rel not in bt and rel not in {after[n][0] for n in new}:
+            raise Reject("unregistered make file added: " + rel)
+        b, w = bt.get(rel, []), wt[rel]
+        # Existing registration lines stay byte-for-byte in place. New ones are
+        # validated above, then omitted from the recipe ownership analysis.
+        w = [line for line in w if not (SHARD_REG.fullmatch(line) and
+                                       SHARD_REG.fullmatch(line)[2] in new)]
+        ins = inserted_lines(b, w, set(), set())
+        if ins is None:
+            raise Reject("%s に削除・変更行がある" % rel)
+        pk, hd = classify_file(rel, w, ins, set(before), new, m_checks)
+        picked.update(pk)
+        for name, count in hd.items():
+            headers[name] = headers.get(name, 0) + count
+    if set(headers) != new or any(n != 1 for n in headers.values()):
+        raise Reject("new registrations and rules differ")
+    return set(picked), "型に一致: 新しい検査 %d 本、行を足した検査 %d 本" % (len(new), len(set(picked) - new))
+
+
 def make_narrow(base, mk_hits, m_checks):
     """Makefile / build/*.mk の変更 (mk_hits) を型の完全一致で絞る。
 
@@ -599,6 +648,10 @@ def make_narrow(base, mk_hits, m_checks):
         return None, "基点 %s と HEAD の merge-base を決められない" % base
     try:
         bt, wt = _base_texts(ancestor), _work_texts()
+        if any(rel.startswith("build/checks.d/") for rel in bt):
+            if any(".ONESHELL" in line for lines in wt.values() for line in lines):
+                raise Reject(".ONESHELL がある")
+            return narrow_shards(bt, wt, mk_hits, m_checks)
         for rel in mk_hits:
             if rel not in bt or rel not in wt:
                 raise Reject("%s は追加・削除・改名されたファイル" % rel)
@@ -658,7 +711,7 @@ SCAN_ROOTS = ("tools/", "userland/gshell/host/")   # ここの下は中身まで
 C_EXTS = (".c", ".h", ".inc")
 # "/" を含まない裸のファイル名でも、この拡張子なら ROOT 相対の候補にする
 # (check_kapi_version.py の README.md、check_manifests.py の CLAUDE.md — P2-2)。
-BARE_EXTS = (".md", ".yaml", ".yml", ".json", ".tsv")
+BARE_EXTS = (".md", ".yaml", ".yml", ".json", ".tsv", ".c", ".h", ".inc")
 
 
 def norm(p):
@@ -799,6 +852,13 @@ class Extractor:
                 self.add(r[1])
             elif r[1].startswith("tools/tests/") and r[1] != "tools/tests":
                 self.add_dir(r[1])          # hostshim などの差し替えディレクトリ
+        # Inline C snippets used by compiler probes have the same include search
+        # roots as the script's compiler invocation.
+        for inc in C_INC.findall(text):
+            for base in sorted(self.inc_dirs | {"", d}):
+                rel = norm(os.path.join(base, inc))
+                if is_tracked_file(rel):
+                    self.add(rel)
         for a, b in PY_IMPORT.findall(text):
             for name in ([a] if a else [x.strip() for x in b.split(",")]):
                 name = name.split(" as ")[0].strip()
@@ -813,6 +873,10 @@ class Extractor:
 
     def from_recipe(self, lines):
         for line in lines:
+            macro = TPL_HOST32_RE.match("\t" + line.strip())
+            if macro:
+                self.add("tools/tests/" + macro.group(1))
+                continue
             line = re.sub(r"\$\([A-Z_]+\)", "", line).lstrip("@-")
             try:
                 toks = shlex.split(line)
@@ -846,11 +910,43 @@ def header_dirs():
     return _HDR_DIRS
 
 
-def extract(rules, target):
+@lru_cache(maxsize=512)
+def compiler_headers(root, sources, inc_dirs):
+    """Compiler dependency scan, supplemented by static includes for inactive branches.
+
+    -MG keeps generated/missing includes visible; only repository files count.
+    The conservative static closure is retained when a host compiler cannot
+    preprocess a target-only translation unit (asm/ABI/vendor configuration).
+    """
+    found = set()
+    for source in sources:
+        cmd = ["gcc", "-MM", "-MG", "-I."] + ["-I" + d for d in inc_dirs] + [source]
+        proc = subprocess.run(cmd, cwd=root, capture_output=True, text=True)
+        if proc.returncode:
+            continue
+        deps = proc.stdout.replace("\\\n", " ").split(":", 1)[-1]
+        for dep in shlex.split(deps):
+            rel = norm(os.path.relpath(dep, root) if os.path.isabs(dep) else dep)
+            if rel.endswith(".h") and os.path.isfile(os.path.join(root, rel)):
+                found.add(rel)
+    return frozenset(found)
+
+
+def extract(rules, target, seeds=()):
     ex = Extractor()
     ex.from_recipe(rules.get(target, []))
+    for source in seeds:
+        if source.endswith((".c", ".py")) and not any(c in source for c in "*?["):
+            ex.add(source)
     ex.drain()
+    ex.found.update(compiler_headers(ROOT, tuple(sorted(f for f in ex.found if f.endswith(".c"))),
+                                    tuple(sorted(ex.inc_dirs))))
     return ex.found
+
+
+def effective_checks(m, rules):
+    return {t: list(g or []) + sorted(f for f in extract(rules, t, g or []) if f.endswith(".h"))
+            for t, g in m["checks"].items()}
 
 
 # ---------------------------------------------------------------- --lint
@@ -862,11 +958,11 @@ def lint():
     mapped = set(m["checks"])
     errs = []
     for t in sorted(listed - mapped):
-        errs.append("対応表に無い検査: %s (tools/check_map.yaml の checks: に足す)" % t)
+        errs.append("対応表に無い検査: %s (tools/check_map.d/ に足す)" % t)
     for t in sorted(mapped - listed):
         errs.append("列に無い検査が対応表にある: %s" % t)
-    for key in ("broad", "docs_always"):
-        for t in m[key]:
+    for key in ("broad", "docs_always", "artifact_readers"):
+        for t in m.get(key, []):
             if t not in listed:
                 errs.append("%s: に列に無い検査がある: %s" % (key, t))
     trk = tracked()
@@ -882,13 +978,14 @@ def lint():
     for f in sorted(trk):
         if is_notest(f, notest) and matches(f, full):
             errs.append("notest: と full: の両方に当たる: %s" % f)
+    effective = effective_checks(m, rules)
     leaks = 0
     for t in sorted(mapped & listed):
         globs = m["checks"][t] or []
         if not globs:
             errs.append("%s: glob が空" % t)
             continue
-        cg = compile_globs(globs)
+        cg = compile_globs(effective[t])
         for g, r in cg:
             if not any(r.match(f) for f in trk):
                 errs.append("%s: glob %r が追跡されているどのファイルにも当たらない"
@@ -897,7 +994,7 @@ def lint():
             if is_notest(f, notest):
                 errs.append("%s: 入力 %s が notest なのに入力になっている "
                             "(notest: を狭めるか外す)" % (t, f))
-            if not (matches(f, cg) or matches(f, full) or matches(f, ign)):
+            if not (matches(f, cg) or (f not in ROUTED_BUILD and matches(f, full)) or matches(f, ign)):
                 errs.append("%s: 入力 %s が glob に入っていない (漏れ)" % (t, f))
                 leaks += 1
     if errs:
@@ -919,14 +1016,18 @@ def changed_files(base):
 
 
 def default_base():
-    """(基点, 説明)。既定は feat/gui との merge-base。
-
-    feat/gui の上でコミットした後は merge-base == HEAD になり、コミット済みの
-    変更が 1 件も見えず「変更なし = check-fast」に退化する。そのときは HEAD~1
-    (直前のコミット) を基点にする (代行レビュー P2-3)。
-    """
+    """基準枝自身では直前のコミット、作業枝では merge-base を検査する。"""
     head = git("rev-parse", "HEAD")[0]
-    for ref in ("feat/gui", "origin/feat/gui", "main"):
+    branch = git("rev-parse", "--abbrev-ref", "HEAD")[0]
+    refs = load_map().get("base_refs", ["main", "origin/main", "feat/gui", "origin/feat/gui"])
+    branches = {ref.removeprefix("origin/") for ref in refs}
+    if branch in branches:
+        p = subprocess.run(["git", "-C", ROOT, "rev-parse", "--verify", "-q", "HEAD~1"],
+                           capture_output=True, text=True)
+        if p.returncode == 0 and p.stdout.strip():
+            return p.stdout.strip(), "HEAD~1 (%s の上でコミット済み)" % branch
+        return head, "HEAD (%s の上、親コミットが無い)" % branch
+    for ref in refs:
         p = subprocess.run(["git", "-C", ROOT, "merge-base", ref, "HEAD"],
                            capture_output=True, text=True)
         mb = p.stdout.strip()
@@ -934,14 +1035,8 @@ def default_base():
             continue
         if mb != head:
             return mb, "%s との merge-base" % ref
-        p = subprocess.run(["git", "-C", ROOT, "rev-parse", "--verify", "-q",
-                            "HEAD~1"], capture_output=True, text=True)
-        if p.returncode == 0 and p.stdout.strip():
-            return (p.stdout.strip(),
-                    "HEAD~1 (%s との merge-base が HEAD — %s の上でコミット済み)"
-                    % (ref, ref))
-        return head, "HEAD (%s の上、親コミットが無い)" % ref
-    return head, "HEAD (feat/gui / main が見つからない)"
+        return head, "HEAD (%s と同じ基点、worktree の変更だけ)" % ref
+    return head, "HEAD (基準枝が見つからない)"
 
 
 def plan(files, base=None):
@@ -952,7 +1047,7 @@ def plan(files, base=None):
 
     stage は回す検査 (make の目標)、mut はそのうち変異込みで回す検査。"""
     m = load_map()
-    _, vars_ = read_makefiles()
+    rules, vars_ = read_makefiles()
     par = check_lists(vars_)
     ign = compile_globs(m["ignore"])
     full = compile_globs(m["full"])
@@ -960,18 +1055,41 @@ def plan(files, base=None):
     notest = compile_notest(m["notest"])
     mk = compile_globs(MAKE_INPUT_GLOBS)
     broad = set(m["broad"])
-    checks = {t: compile_globs(g) for t, g in m["checks"].items()}
+    # Only header changes (or KAPI regeneration) need compiler dependencies.
+    # Source/script changes use the explicit map; lint always checks both.
+    inputs = effective_checks(m, rules) if any(
+        f.endswith(".h") or f == "sdk/kapi.json" for f in files) else m["checks"]
+    checks = {t: compile_globs(g) for t, g in inputs.items()}
     # 走査型の検査 (broad:) の `**` を含む glob は「表に載っている」の判定に数えない
     # — ツリーを丸ごと舐める検査に当たっただけで安全側が発火しなくなるのを防ぐ
     # (代行レビュー P2-1 の保険)。変異込みで回す検査を選ぶ方には数える。
     cover = {t: [(g, r) for g, r in cg if not (t in broad and "**" in g)]
              for t, cg in checks.items()}
     changed = [f for f in files if not matches(f, ign)]
+    # Build flags affect scanners and checks consuming built artifacts. KAPI input
+    # reaches readers through generated files even before regeneration.
+    artifact_targets = set(m.get("artifact_readers", [])) | {t for t, globs in m["checks"].items()
+                        if any(g.startswith(("build/out/", "build/sdk/")) for g in globs)}
+    generated = KAPI_GENERATED + ("sdk/gen_kapi.py", "sdk/kapi_rust_gen.py")
 
     lines = []
     hit, unmatched, full_hits, notest_hits, mk_hits = set(), [], [], [], []
     for f in changed:
         hit |= {t for t, cg in checks.items() if matches(f, cg)}
+        if f in ROUTED_BUILD:
+            if not routed_build_safe(base, f):
+                full_hits.append(f)
+                lines.append("%s: 全部 — 検査制御の変更または基点版なし" % f)
+                continue
+            hit |= broad | artifact_targets
+            lines.append("%s: build scanners + artifact readers" % f)
+            continue
+        if f == "sdk/kapi.json":
+            hit |= artifact_targets
+            hit |= {t for t, cg in checks.items() if "kapi" in t or
+                    any(matches(dep, cg) for dep in generated)}
+            lines.append("sdk/kapi.json: generated KAPI readers")
+            continue
         if matches(f, full):
             if matches(f, mk):
                 mk_hits.append(f)
@@ -1056,11 +1174,24 @@ def suggest(targets):
     rules, _ = read_makefiles()
     out = {}
     for t in targets:
-        fs = sorted(extract(rules, t))
+        fs = sorted(f for f in extract(rules, t, load_map()["checks"].get(t, [])) if not f.endswith(".h"))
         out[t] = fs
-    sys.stdout.write(yaml.safe_dump({"checks": out}, allow_unicode=True,
+    sys.stdout.write(yaml.safe_dump(out, allow_unicode=True,
                                     sort_keys=False, default_flow_style=False))
     return 0
+
+
+def dialect_variants_needed(files=None):
+    """The nine make environment/override cases only depend on build/checker code."""
+    if files is None:
+        base, _ = default_base()
+        committed, work = changed_files(base)
+        files = committed + work
+    patterns = compile_globs(["Makefile", "build/**/*.mk", "tools/check_c_dialect.py",
+                              "tools/clang_ast/**", "tools/tests/test_c_dialect.py",
+                              "tools/check_select.py", "sdk/example/hello/Makefile",
+                              "tools/tests/mutpar.py"])
+    return any(matches(f, patterns) for f in files)
 
 
 def main(argv):
@@ -1077,7 +1208,8 @@ def main(argv):
         return select(b, None, note)
     if "--inputs" in argv:
         rules, _ = read_makefiles()
-        for f in sorted(extract(rules, argv[argv.index("--inputs") + 1])):
+        target = argv[argv.index("--inputs") + 1]
+        for f in sorted(extract(rules, target, load_map()["checks"].get(target, []))):
             print(f)
         return 0
     if "--suggest" in argv:

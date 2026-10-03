@@ -1,0 +1,8 @@
+check-kbd-inject-host:
+- tools/tests/host32.py
+- kernel/kbd_inject.c
+- tools/tests/kbd_inject_host.c
+- tools/tests/test_kbd_inject.py
+- kernel/con_sink.c
+- tools/check_map.d/check-kbd-inject-host.yaml
+- build/checks.d/check-kbd-inject-host.mk

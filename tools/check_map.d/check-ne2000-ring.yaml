@@ -1,0 +1,5 @@
+check-ne2000-ring:
+- drivers/ne2000_ring.c
+- tools/tests/ne2000_ring_test.c
+- tools/check_map.d/check-ne2000-ring.yaml
+- build/checks.d/check-ne2000-ring.mk

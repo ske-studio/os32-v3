@@ -1,0 +1,12 @@
+check-guest-host:
+- tools/tests/guest_tests.txt
+- build/core.yaml
+- tools/deploy_manifests.py
+- tools/deploy_protect.py
+- tools/guest_tests.py
+- tools/hostdrv_deploy.py
+- tools/tests/test_guest_tests.py
+- userland/deploy.yaml
+- tools/tests/mutpar.py
+- tools/check_map.d/check-guest-host.yaml
+- build/checks.d/check-guest-host.mk

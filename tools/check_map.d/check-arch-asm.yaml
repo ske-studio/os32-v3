@@ -1,0 +1,21 @@
+check-arch-asm:
+- tools/check_le_access.py
+- tools/check_p2v.py
+- tools/check_p2v_allow.txt
+- tools/tests/mutpar.py
+- tools/clang_ast/**
+- tools/tests/test_clang_ast.py
+- kernel/**
+- drivers/**
+- exec/**
+- fs/**
+- kapi/**
+- lib/**
+- net/**
+- gfx/**
+- include/**
+- arch/**
+- platform/**
+- tools/check_arch_asm.py
+- tools/check_map.d/check-arch-asm.yaml
+- build/checks.d/check-arch-asm.mk

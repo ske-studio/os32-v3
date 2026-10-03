@@ -629,10 +629,7 @@ userland/libos32gui.shlib: userland/libos32gui.raw userland/libos32gui.elf tools
 
 shlib: userland/libos32gui.shlib
 
-check-shlib:
-	python3 tools/mkshlib.py --check
-
-.PHONY: shlib check-shlib
+.PHONY: shlib
 
 # Rustクリーン
 clean-rust:

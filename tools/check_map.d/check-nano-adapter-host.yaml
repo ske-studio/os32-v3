@@ -1,0 +1,9 @@
+check-nano-adapter-host:
+- sdk/allocator/**
+- tools/check_nano_inputs.py
+- tools/ci/build_cross.sh
+- tools/tests/test_nano_adapter.py
+- tools/tests/nano_adapter_host.c
+- tools/tests/host32.py
+- tools/check_map.d/check-nano-adapter-host.yaml
+- build/checks.d/check-nano-adapter-host.mk

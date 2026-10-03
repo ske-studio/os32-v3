@@ -1,0 +1,10 @@
+check-kcg-boot-host:
+- drivers/kcg.c
+- kernel/kernel.c
+- lib/lz4.c
+- lib/utf8.c
+- tools/tests/host32.py
+- tools/tests/kcg_boot_host.c
+- tools/tests/test_kcg_boot.py
+- tools/check_map.d/check-kcg-boot-host.yaml
+- build/checks.d/check-kcg-boot-host.mk

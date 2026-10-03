@@ -1,0 +1,22 @@
+check-hsync-h3-host:
+- build/app.conf
+- fs/ext2_vfs.c
+- fs/fatfs_vfs.c
+- fs/hostdrv_stat_rules.inc
+- fs/hostdrvfs.c
+- fs/iso9660.c
+- fs/vfs.c
+- kapi/kapi_sys.c
+- tools/tests/hsync_h3_host.c
+- tools/tests/test_hsync_h3.py
+- tools/tests/vfs_set_mtime_host.c
+- userland/system/hsync.c
+- fs/hostdrv_list_rules.inc
+- fs/vfs_name_rules.inc
+- lib/crc32_core.inc
+- userland/system/hsync_bootold.inc
+- userland/system/hsync_protect.inc
+- tools/tests/mutpar.py
+- tools/check_map.d/check-hsync-h3-host.yaml
+- build/checks.d/check-hsync-h3-host.mk
+- sdk/kapi.json

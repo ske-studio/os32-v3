@@ -1,0 +1,9 @@
+check-pegc-mode-host:
+- tools/tests/host32.py
+- gfx/backend_pegc.c
+- kernel/console.c
+- tools/tests/mutpar.py
+- tools/tests/pegc_mode_host.c
+- tools/tests/test_pegc_mode.py
+- tools/check_map.d/check-pegc-mode-host.yaml
+- build/checks.d/check-pegc-mode-host.mk

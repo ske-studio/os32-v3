@@ -33,7 +33,7 @@ python3 tools/emu_agent/agent.py tail                                      # 直
 | ホスト | `make <許可 target>` `deploy` (= `os32-cycle deploy`) |
 
 `make` の許可リストは `MAKE_TARGETS` (agent.py)。`check-*` の個別ターゲットも入れてある
-(落ちた 1 本だけ回し直すため)。**`build/sdk.mk` に `check-*` を足したら `MAKE_TARGETS`
+(落ちた 1 本だけ回し直すため)。**`build/checks.d/*.mk` に `check-*` を足したら `MAKE_TARGETS`
 にも足す** — 2026-09-09 にここが古く、回し直せなかった。
 
 **ini はローカル AI に触らせない。** `ACTIONS` に ini 操作は無く、追加もしない。

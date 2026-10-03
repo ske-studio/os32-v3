@@ -1,0 +1,12 @@
+check-net-link-host:
+- drivers/lgy98.c
+- exec/exec.c
+- kapi/kapi_generated.c
+- kapi/kapi_host.c
+- kernel/isr_handlers.c
+- net/link.c
+- tools/tests/net_link_host.c
+- tools/tests/test_net_link.py
+- exec/exec_kapi_init.inc
+- tools/check_map.d/check-net-link-host.yaml
+- build/checks.d/check-net-link-host.mk

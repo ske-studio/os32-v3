@@ -1,0 +1,16 @@
+check-h2-fixtures-host:
+- sdk/os32x_hdr.py
+- sdk/os32_generations.py
+- exec/os32x_hdr.c
+- sdk/link/app.ld
+- sdk/link_guard.py
+- sdk/mkos32x.py
+- tools/gen_h2_fixtures.py
+- tools/tests/h2_stack_host.c
+- tools/tests/host32.py
+- tools/tests/test_h2_fixtures.py
+- userland/deploy.yaml
+- userland/tests/h2_stack.c
+- userland/tests/h2_stack_probe.inc
+- tools/check_map.d/check-h2-fixtures-host.yaml
+- build/checks.d/check-h2-fixtures-host.mk

@@ -1,0 +1,9 @@
+check-caller-access-host:
+- exec/exec.c
+- exec/exec_kapi_init.inc
+- exec/redir_access.c
+- tools/tests/caller_access_host.c
+- tools/tests/mutpar.py
+- tools/tests/test_caller_access.py
+- tools/check_map.d/check-caller-access-host.yaml
+- build/checks.d/check-caller-access-host.mk

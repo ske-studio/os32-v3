@@ -1,0 +1,10 @@
+check-pci-decode-host:
+- drivers/pci.c
+- drivers/pci_decode.c
+- tools/tests/lspci_cmd_host.c
+- tools/tests/pci_decode_host.c
+- tools/tests/test_pci_decode.py
+- userland/shell/cmd_pci.c
+- userland/shell/pci_verbose.c
+- tools/check_map.d/check-pci-decode-host.yaml
+- build/checks.d/check-pci-decode-host.mk

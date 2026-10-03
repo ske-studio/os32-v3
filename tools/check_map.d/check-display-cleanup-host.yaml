@@ -1,0 +1,13 @@
+check-display-cleanup-host:
+- gfx/backend_pc98.c
+- gfx/gfx_core.c
+- gfx/gfx_vram.c
+- kernel/boot_splash.c
+- kernel/v86_gcap.c
+- kernel/v86_io.c
+- tools/tests/boot_splash_native_host.c
+- tools/tests/display_cleanup_host.c
+- tools/tests/host32.py
+- tools/tests/test_display_cleanup.py
+- tools/check_map.d/check-display-cleanup-host.yaml
+- build/checks.d/check-display-cleanup-host.mk

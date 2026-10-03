@@ -4,7 +4,7 @@
 票:   docs/archive/v3/TASK_C11_MIGRATION.md §6 段 4・段 5
 
 検査器の部品 (字句の読み分け・コンパイル行の読み取り・実際に効いている言語モード・
-拒否の探り・公開 SDK ヘッダの検査) を小さな入力で固定し、実物の木が通ることも見る。
+拒否の探り・公開 SDK ヘッダの検査) を小さな入力で固定する。実物の木は check-c-dialect が見る。
 
 --mutate は否定側: 実物の木の写し (tools/tests/mutpar.py の写しの木) に変異を当て、
 写しに対して検査器を回して **落ちる** (RED) ことを見る。C11 で許す書き方 (`//`、
@@ -291,7 +291,7 @@ def case_internal(cd):
 
 
 # --------------------------------------------------------------------------
-#  7. 実物の木
+#  7. make の環境変数・override の変種
 # --------------------------------------------------------------------------
 
 def run_checker(root):
@@ -299,14 +299,21 @@ def run_checker(root):
                            "--root", str(root)], capture_output=True, text=True)
 
 
-def case_real():
-    print("== 7: 実物の木 ==", flush=True)
-    r = run_checker(ROOT)
-    sys.stdout.write(r.stdout)
-    if r.returncode != 0:
-        sys.stdout.write(r.stderr)
-    check(r.returncode == 0, "実物の木で check_c_dialect.py が rc=0")
-    check("gnu89" in r.stdout and "gnu11" in r.stdout, "要約に gnu11 と gnu89 の翻訳単位の数を出す")
+def case_build_coverage(cd):
+    # Exercise the same flag pass used by the full checker, with a tiny dry run.
+    from unittest import mock
+    lines = "i386-elf-gcc -std=gnu11 -c kernel/kernel.c -o kernel/kernel.o\n"
+    for sqlite, want_ok in [(False, False), (True, True)]:
+        out = lines + ("i386-elf-gcc -std=gnu89 -c lib/sqlite3/sqlite3.c -o sqlite.o\n" if sqlite else "")
+        with mock.patch.object(cd, 'dry_run', return_value=(0, out, '')), \
+             mock.patch.object(cd, 'REQUIRED_SRCS', []), \
+             mock.patch.object(cd, 'probe_rejects', return_value=[]):
+            problems, summary = cd.check_build_flags(ROOT)
+        check((not problems) == want_ok, 'gnu89 TU coverage: sqlite=%s' % sqlite)
+        check(summary['counts'].get('gnu11', 0) > 0, 'gnu11 TU count retained')
+
+
+def case_make_variants():
     # 親の make の旗と変数指定は MAKEFLAGS のまま子の make -n に渡す (Codex P2-1、2 回目 1・2)
     base = dict(os.environ)
     for k in ("MAKEFLAGS", "MFLAGS", "MAKELEVEL", "MAKEOVERRIDES"):
@@ -497,7 +504,13 @@ def main(argv):
     case_probe(cd)
     case_sdk(cd)
     case_internal(cd)
-    case_real()
+    case_build_coverage(cd)
+    sys.path.insert(0, str(ROOT / "tools"))
+    import check_select
+    if "--mutate" in argv or check_select.dialect_variants_needed():
+        case_make_variants()
+    else:
+        print("make variants: unchanged build/checker; skipped", flush=True)
     ok = not FAILED
     print("%d checks, %d failed" % (N[0], len(FAILED)), flush=True)
     if "--mutate" in argv:

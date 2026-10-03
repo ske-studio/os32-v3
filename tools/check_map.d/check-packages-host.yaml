@@ -1,0 +1,27 @@
+check-packages-host:
+- apps
+- game
+- userland/deploy.yaml
+- docs/manpages/**
+- assets/**
+- build/core.yaml
+- build/packages.yaml
+- drivers/pc98pt.c
+- fs/ext2_layout.c
+- fs/fatfs_vfs.c
+- kernel/boot_font.c
+- kernel/kernel.c
+- tools/deploy_manifests.py
+- tools/mkpkg.py
+- tools/tests/install_fresh_host.c
+- tools/tests/test_packages.py
+- userland/shell/cmd_filer.c
+- userland/shell/hdprep_plan.c
+- userland/system/cdinst.c
+- userland/system/inst_disk.c
+- userland/system/inst_hdd.c
+- userland/system/install.c
+- userland/system/install_recover.inc
+- fs/vfs_name_rules.inc
+- tools/check_map.d/check-packages-host.yaml
+- build/checks.d/check-packages-host.mk

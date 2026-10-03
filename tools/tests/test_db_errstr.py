@@ -31,6 +31,8 @@ import subprocess
 import sys
 import tempfile
 
+import mutpar
+
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CASES = ["errstr_range", "coltext_range", "errstr_truncate", "result_bound",
          "diag_layout"]
@@ -51,7 +53,7 @@ HOST_FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
               "-Wno-missing-field-initializers", "-D__cdecl="]
 
 
-def check_no_block_size():
+def check_no_block_size(root=ROOT):
     """kapi/kapi_db.c が `DB_SHM_BLOCK_SIZE` を名指ししていないこと (票 §4 の 1)。
 
     結果データの上限は 5 か所で見ている。1 か所でも 16KB から直接引くと
@@ -59,7 +61,7 @@ def check_no_block_size():
     だから「その名前を使わない」を規則そのものとして固定する。上限は
     `DB_SHM_RESULT_LIMIT` (= 診断領域を除いた分) からだけ導く。
     """
-    src = (ROOT / "kapi/kapi_db.c").read_text(encoding="utf-8")
+    src = (root / "kapi/kapi_db.c").read_text(encoding="utf-8")
     hits = [n for n, line in enumerate(src.splitlines(), 1)
             if "DB_SHM_BLOCK_SIZE" in line]
     if hits:
@@ -77,18 +79,18 @@ def check_no_block_size():
     return 0
 
 
-def build(tmp, tag, sqlite_obj, san):
+def build(tmp, tag, sqlite_obj, san, root=ROOT):
     exe = str(tmp / ("dberrstr-" + tag))
     rc = subprocess.run(["gcc", *HOST_FLAGS, *san, "-I" + str(tmp), *INC,
-                         str(ROOT / "tools/tests/db_errstr_host.c"), sqlite_obj,
+                         str(root / "tools/tests/db_errstr_host.c"), sqlite_obj,
                          "-o", exe])
     return exe if rc.returncode == 0 else None
 
 
-def run_cases(exe, cases):
+def run_cases(exe, cases, root=ROOT):
     failed = 0
     for case in cases:
-        rc = subprocess.run([exe, case], cwd=ROOT).returncode
+        rc = subprocess.run([exe, case], cwd=root).returncode
         print("EXIT %s=%d" % (case, rc), flush=True)
         failed += rc != 0
     return failed
@@ -134,8 +136,10 @@ MUTATIONS = [
      "run"),
     # 6. db_column_text のエラー経路を `return "";` に戻す。
     ("kapi/kapi_db.c",
-     "    if (info->data_offset == 0) return db_shm_empty();",
-     "    if (info->data_offset == 0) return \"\";",
+     "    if (info->data_offset <= 0 || (u32)info->data_offset >= DB_SHM_RESULT_LIMIT)\n"
+     "        return db_shm_empty();",
+     "    if (info->data_offset <= 0 || (u32)info->data_offset >= DB_SHM_RESULT_LIMIT)\n"
+     '        return "";',
      "run"),
     # 7. 切り詰めで NUL を置き忘れる (切った側)。
     ("kapi/kapi_db.c",
@@ -151,43 +155,48 @@ MUTATIONS = [
 
 
 def run_mutations(tmp, sqlite_obj, san):
+    """Each mutation lives in an isolated tree, including the static guard input."""
+    real = {"tools/tests/db_errstr_host.c", "kapi/kapi_db.c"}
+    control = mutpar.mutant_tree(ROOT, tmp / "control-tree", {}, real=real)
+    exe = build(tmp, "control", sqlite_obj, san, root=control)
+    if exe is None or run_cases(exe, CASES, root=control) or check_no_block_size_quiet(control):
+        print("MUTATE CONTROL FAILED", flush=True)
+        return 1
+    print("MUTATE CONTROL GREEN (isolated tree)", flush=True)
     bad = 0
     for i, (relpath, old, new, kind) in enumerate(MUTATIONS, 1):
-        target = ROOT / relpath
-        original = target.read_text(encoding="utf-8")
+        original = (ROOT / relpath).read_text(encoding="utf-8")
         label = "%d %s" % (i, kind)
-        if old not in original:
-            print("MUTATE %-12s SKIP (目印が見つからない)" % label, flush=True)
+        if original.count(old) != 1:
+            print("MUTATE %-12s SKIP (目印が一意でない)" % label, flush=True)
             bad += 1
             continue
-        try:
-            target.write_text(original.replace(old, new, 1), encoding="utf-8")
-            exe = build(tmp, "mut%d" % i, sqlite_obj, san)
-            if exe is None:
-                print("MUTATE %-12s **コンパイルが通らない = 目が働いていない**"
-                      % label, flush=True)
-                bad += 1
-                continue
-            fails = run_cases(exe, CASES) if kind == "run" else 0
-            fails += check_no_block_size_quiet()
-            if fails == 0:
-                print("MUTATE %-12s **GREEN のまま = 試験が規則を見ていない**"
-                      % label, flush=True)
-                bad += 1
-            else:
-                print("MUTATE %-12s RED (期待どおり落ちた: %d 件)"
-                      % (label, fails), flush=True)
-        finally:
-            target.write_text(original, encoding="utf-8")
+        tree = mutpar.mutant_tree(ROOT, tmp / ("mutant-tree-%d" % i),
+                                 {relpath: original.replace(old, new, 1)}, real=real)
+        exe = build(tmp, "mut%d" % i, sqlite_obj, san, root=tree)
+        if exe is None:
+            print("MUTATE %-12s **コンパイルが通らない = 目が働いていない**"
+                  % label, flush=True)
+            bad += 1
+            continue
+        fails = run_cases(exe, CASES, root=tree) if kind == "run" else 0
+        fails += check_no_block_size_quiet(tree)
+        if fails == 0:
+            print("MUTATE %-12s **GREEN のまま = 試験が規則を見ていない**"
+                  % label, flush=True)
+            bad += 1
+        else:
+            print("MUTATE %-12s RED (期待どおり落ちた: %d 件)"
+                  % (label, fails), flush=True)
     return bad
 
 
-def check_no_block_size_quiet():
+def check_no_block_size_quiet(root=ROOT):
     import io
     import contextlib
     buf = io.StringIO()
     with contextlib.redirect_stdout(buf):
-        rc = check_no_block_size()
+        rc = check_no_block_size(root)
     return rc
 
 

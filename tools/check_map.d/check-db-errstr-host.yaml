@@ -1,0 +1,11 @@
+check-db-errstr-host:
+- fs/vfs_fd.c
+- kapi/kapi_db.c
+- lib/sqlite3/os32_sqlite_vfs.c
+- lib/sqlite3/sqlite3.c
+- tools/tests/db_errstr_host.c
+- tools/tests/test_db_errstr.py
+- tools/tests/vfs_fd_sqlite_host.c
+- tools/check_map.d/check-db-errstr-host.yaml
+- build/checks.d/check-db-errstr-host.mk
+- tools/tests/mutpar.py

@@ -1,0 +1,12 @@
+check-nano-inputs-host:
+- sdk/allocator/**
+- .github/workflows/build.yml
+- tools/check_nano_inputs.py
+- tools/tests/test_nano_inputs.py
+- sdk/allocator/nano_inputs.json
+- sdk/allocator/nano.LICENSE
+- tools/ci/build_cross.sh
+- build/config.mk
+- build/programs.mk
+- tools/check_map.d/check-nano-inputs-host.yaml
+- build/checks.d/check-nano-inputs-host.mk

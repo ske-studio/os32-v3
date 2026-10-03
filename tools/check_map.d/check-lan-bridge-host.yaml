@@ -1,0 +1,6 @@
+check-lan-bridge-host:
+- tools/host_agent.py
+- tools/lan_bridge.py
+- tools/tests/test_lan_bridge.py
+- tools/check_map.d/check-lan-bridge-host.yaml
+- build/checks.d/check-lan-bridge-host.mk

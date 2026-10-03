@@ -1,0 +1,7 @@
+check-docs-orphans:
+- docs/**/*.md
+- tools/**/*.md
+- docs/.orphans-allow
+- tools/check_docs_orphans.py
+- tools/check_map.d/check-docs-orphans.yaml
+- build/checks.d/check-docs-orphans.mk

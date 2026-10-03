@@ -1,0 +1,27 @@
+check-c-dialect-host:
+- tools/clang_ast/**
+- tools/tests/test_clang_ast.py
+- '**/*.[ch]'
+- '**/*.inc'
+- sdk/example/hello/**
+- tools/check_c_dialect.py
+- tools/tests/test_c_dialect.py
+- tools/tests/mutpar.py
+- tools/check_map.d/check-c-dialect-host.yaml
+- build/checks.d/check-c-dialect-host.mk
+- sdk/kapi.json
+- sdk/rust/os32api/src/kapi_generated.rs
+- tools/check_map.yaml
+- tools/check_select.py
+- sdk/gen_kapi.py
+- build/kernel.mk
+- build/libs.mk
+- build/os32.ld
+- build/programs.mk
+- sdk/kapi_rust_gen.py
+- sdk/link/app.ld
+- sdk/link/app_sys.ld
+- sdk/link/generations.ld
+- sdk/link/shlib.ld
+- sdk/os32_generations.py
+- sdk/rust/os32api/src/generations.rs

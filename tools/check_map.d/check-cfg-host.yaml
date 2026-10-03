@@ -1,0 +1,21 @@
+check-cfg-host:
+- assets/settings/defaults.tsv
+- fs/vfs_fd.c
+- kapi/kapi_db.c
+- lib/sqlite3/os32_sqlite_vfs.c
+- lib/sqlite3/sqlite3.c
+- tools/mk_settings_db.py
+- tools/tests/cfg_host.c
+- tools/tests/test_cfg.py
+- tools/tests/vfs_fd_sqlite_host.c
+- userland/cmds/cfg.c
+- userland/lib/cfg/cfg_backend.c
+- userland/lib/cfg/cfg_enum.c
+- userland/lib/cfg/cfg_import.c
+- userland/lib/cfg/cfg_init.c
+- userland/lib/cfg/cfg_json.c
+- userland/lib/cfg/cfg_tsv.c
+- userland/lib/cfg/libos32cfg.c
+- userland/tests/cfg_bench.c
+- tools/check_map.d/check-cfg-host.yaml
+- build/checks.d/check-cfg-host.mk

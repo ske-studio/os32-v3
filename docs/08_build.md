@@ -222,110 +222,72 @@ KernelAPI の構造体を変えたときは `make clean` → `make all` が必�
 <a id="検査の3段"></a>
 #### 検査の 3 段 (`check-fast` / `check-changed` / `check`、2026-09-26)
 
-`HOST32_RUNNERS` は既定 `native qemu`。T2d/T2e/T2f の16試験 (access_walk / caller_copy / db_caller / surface_query / surface_lease / surface_bundle / gfx_kernel_fb / gfx_reinit / gfx_attach / gfx_reattach / unicode_surface / nano_adapter / appmem / appmem_map / kcg_boot / shm_user) の正常対照だけを指定した全runner、変異を先頭のrunnerで実行する。既存試験は正常対照・変異とも環境へ export した HOST32_RUNNERS の先頭で1回だけ実行する。sandboxでは `HOST32_RUNNERS=qemu` を明示する (nativeへの自動fallbackなし)。
+<!-- generated:host32 -->
+`HOST32_RUNNERS` は既定 `native qemu`。16 試験 (access_walk / appmem / appmem_map / caller_copy / db_caller / gfx_attach / gfx_kernel_fb / gfx_reattach / gfx_reinit / kcg_boot / nano_adapter / shm_user / surface_bundle / surface_lease / surface_query / unicode_surface) の正常対照を指定した全 runner、変異を先頭の runner で実行する。native への自動 fallback はしない。
+<!-- /generated:host32 -->
 
-どれも `make all` の後に回す (成果物を読む検査がある)。列 (`build/sdk.mk` の
-`CHECK_PAR_TARGETS`、2026-09-26 から 1 本) と recipe は共通で、違うのは**変異
-(否定側 — 実装を壊して試験が RED になるか) を回すかどうか**だけ。
+どれも `make all` の後に回す (成果物を読む検査がある)。規則と登録は
+`build/checks.d/<検査名>.mk` に置き、`build/sdk.mk` が include する。
+`CHECK_PAR_ORDER` の番号で従来の順序を保ち、`CHECK_PAR_TARGETS` を集める。
 
-| ターゲット | 回すもの | いつ | 実測 (16 コア) |
+| ターゲット | 回すもの | いつ | 所要時間 |
 |---|---|---|---|
-| `make check-fast` | 全部の検査を**変異なし**で 1 段の並列 | 作業中に何度でも | **約 33 秒** |
-| `make check-changed` | 変更したファイルに関係する検査だけ変異込み、残りは変異なし | コミットの前 | docs だけ **0.7 秒**、`drivers/serial.c` **137 秒**、変更なし **48 秒** |
-| `make check` | 全部を**変異込み** (1 段の並列。変異は写しの木に当てる) | 取り込み (merge) の前に 1 回 | **約 2 分 (129 秒)** |
+| `make check-fast` | 全検査を変異なし | 作業中 | 304.24秒 (2026-10-04、-j4/qemu、build変更によるmake変種9回込み) |
+| `make check-changed` | 当たった検査だけ変異込み、残りは変異なし。docs だけなら文書系のみ | 作業中の差分検査 | 選択集合に依存 |
+| `make check` | 全検査を変異込み | 取り込み前に1回 | 967.50秒 (16分7.5秒、2026-10-04、-j4/qemu、レビュー修正後)。改修前の当日ログは12〜48分で条件差あり |
 
-- **変異の切り替え**: recipe は `--mutate` / `--mutants` の代わりに `$(MUT)` / `$(MUTS)` と書く。
-  `MUTATE=1` (既定) で付く、`MUTATE=0` で付かない、`MUTATE=sel` なら `MUTATE_TARGETS` に
-  名前のある検査だけ付く。新しい変異試験を足すときもこの書き方にする。
-- **`check-changed` は作業中の近道 (目安) で、取りこぼしの保証はしない** (ユーザー承認 2026-10-01)。
-  保証は取り込み (PM) の `make check` (全部を変異込み) が担う。そのため絞り込みの型 (対応表の glob も
-  Makefile の許可リストも) は保守的な許可リストにとどめ、わざと作った入力への耐性は目標にしない。
-  全体の検査はマシンが空いているときに流す (並行負荷で落ちる時間依存の試験がある)。
-- **`check-changed` の選び方** (`tools/check_select.py`、対応表は `tools/check_map.yaml`):
-  変更 = `git diff --name-only --no-renames $(BASE)...HEAD` + 未コミット + 追跡外。`BASE` の既定は
-  `feat/gui` との merge-base。**`feat/gui` の上でコミットした後は merge-base == HEAD になるので
-  `HEAD~1` を基点にする** (直前のコミットを見る)。使った基点と「コミット済み N 件 + 未コミット M 件」は
-  最後の行 (`*** check-changed: … ***`) に出る。`FILES="a b"` を渡すと git を見ずにその一覧で選ぶ (試し用)。
-  - 変更なし → 全部を変異なし (= `check-fast`)
-  - `full:` (`Makefile` `build/*.mk` `sdk/kapi.json`) に当たる変更、または**対応表のどの
-    glob にも当たらない変更** → 全部を変異込み (= `check`)。表の漏れで否定側を落とさないための安全側。
-    ただし `Makefile` / `build/*.mk` は **「新しい試験を足す形」だけを決まった型との完全一致で絞る**
-    (ユーザー決定 2026-10-01 — Makefile の変更の安全性を一般に証明するのはやめた。自前で make の構文を
-    解釈する作りは独立レビューで 2 回 P1、make 自身に `make -n` で展開させて比べる作りも 3 回目で P1
-    (展開が同じでも export 変数・`.ONESHELL`・recipe の `-` で実行の意味が変わる、順・逆順の一致では
-    `-j` の独立性を保証できない、`$(MAKE)` / `$(shell)` の副作用が実物の木に及ぶ) で撤去。**make は
-    呼ばない**ので副作用の問題が消える):
-    - **差分の条件**: 基点 (merge-base) との差分が**追加だけ** (削除・変更行が 0 = `git diff` の `-` 行 0)。
-      行は **LF だけ**で分ける (`splitlines()` は VT / FF / CR / NEL なども境界にして変更を消す)。末尾の LF の
-      有無は差に数えない。足した行に制御文字 (CR・VT など) があれば全部。
-      検査の列 `CHECK_PAR_TARGETS :=` の物理行だけは継続 `\` の付け替えで字面が変わるので、
-      両版とも 1 つの固定マーカー行に畳んでから部分列を見て (既存行に対する**位置**は保つ — 同じ
-      ファイル内で列を動かすのも全部)、中身は**語の集合**で比べる (基点の語 ⊆ 今の語、重複なし。
-      増えた語 = 新しい検査の名前)。変更した make ファイルは基点にも作業中にもある (追加・削除・改名は全部)。
-    - **型** (`tools/check_select.py` の `TPL_*_RE` の 1 か所に定義。足した行の 1 本 1 本がどれかに完全一致):
-      - (a) 列への検査名の追加 (上の語集合の比較)
-      - (b) 新しい検査の規則 `check-<name>:` (`^(check-[a-z0-9-]+):$` — 前提なし)。name は列に足した新しい
-        名前で、**基点のどの make ファイルの字面にも現れない**。規則は 1 つ、recipe は 1 行以上。
-        **置けるのはファイル末尾の塊だけ** (基点の最後の行より後ろに続く足した行。規則とその recipe・
-        コメント・空行がそこに入る)。基点の行のあいだに入った新規則は全部
-      - (c) 列にある既存の検査の recipe への行の追加。recipe 行の型は
-        `^\tpython3 -B tools/tests/([a-z0-9_]+\.py)((?: --[a-z][a-z-]*)*)( \$\((?:MUT|MUTS)\))?$`
-        — `python3 -B tools/tests/<file>.py` + 任意の `--<小文字と->` 旗 + 任意で末尾 ` $(MUT)` / ` $(MUTS)`。
-        `$` はこの 2 つ以外を許さず、`;` `|` `&` `>` `<` バッククォート・`$(shell` など shell / make の特殊な
-        ものは全部拒否。持ち主は、上へ **tab 行だけ**を辿って着く基点の列にある検査の**基点の**規則の行
-        (`check-<name>:…`、`=` を含まない)。**その検査の recipe は規則行の直後から連続する tab 行だけ**
-        (途中に基点のコメント・空行・条件ディレクティブなど非 tab 行を含まず、連続の後ろにそれらを挟んで
-        tab 行が続かない — make はそれらで recipe を切らない)。規則の行は基点の独立した論理行 (直前の物理行が
-        奇数個の `\` で終わっていない — `\t@echo \` の次の `check-a:` は echo の続き — で、それ自身も継続で
-        終わらない)。足す位置はその連続の中 (行のあいだ) か直後。
-        末尾の塊の新しい規則の後ろの recipe 行はその規則のもの。script は木にあり、
-        対応表 (`tools/check_map.yaml`) の当該検査の glob に当たる (当たらなければ全部)
-      - (d) 空行 (完全に空) と `#` 始まりのコメント行 (末尾 `\` なし) — 末尾の塊の中か、**前後どちらにも基点の
-        tab 行が接していない**基点の 2 行のあいだだけ (recipe の途中・規則と recipe のあいだには入れない)
-      - (b)(c)(d) の置き場所の制限は**持ち主が変わる配置を型から締め出す**ため (ユーザー決定 2026-10-01 —
-        独立レビューが基点のコメント・空行・`ifeq` 越しに既存の recipe を新規則へ移す反例を 3 回出した)
-      - `.PHONY:` の行は型に**入れない** (独立レビュー P1: 既存の規則の行と recipe の間に `.PHONY: check-new`
-        を挟むと既存の recipe が `.PHONY` の所属になる)。新しい検査は `.PHONY` に載せなくてよい
-        (`check-cirrus-win-host` などの前例)。載せるなら全部に倒れる
-      - 足した行はそれぞれ 1 行で 1 論理行 (継続行の途中ではない)、define / 条件の**外** (make の読み方と
-        字下げを無視する読み方の両方で深さ 0)。列に足した名前の集合 = (b) の規則の名前の集合。
-        作業中の make ファイルに `.ONESHELL` が無い
-    - **判定**: 条件を全部満たせば、(b) の新しい検査と (c) で行を足した検査を変異込み。他の変更ファイルの
-      glob の選択と合算。満たさなければ全部 (理由は stderr の `型に合わない: …`)。
-    - **型に入れないもの** (全部に倒す): cargo / `unittest discover` / `tools/*.py` の検査器の行、`$(MUT)` の
-      後ろの旗 (`check-fdc-track-host` の形)、前提つきの規則、`-B` 無しの `python3`、既存の行への `$(MUT)` の
-      追加 (変更行)。実測: main の e241312 / f4989ee (check-memory-host に試験の行を 1 行) は
-      `check-memory-host` 1 本に絞れる、480a967 (既存の行に `$(MUT)` を足した) は変更行なので全部。
-    - `sdk/kapi.json` は**全部のまま**: 生成物 (ヘッダ・ラッパ) を介して試験の中身が変わる経路は字面に現れない。
-    - 残る限界: 型に合う追加は「試験を 1 本足す」だけで、その試験が書き換える・読むものは試験の側の問題
-      (段の前後の `check_tree_unchanged.py` が見る)。基点の make ファイルの構造 (define / 条件 / 継続) は
-      足した行の周りだけ見る — 足した行が深さ 0 で 1 論理行であることを 2 通りの読みで確かめるだけで、
-      基点の意味は解釈しない。
-    走査型の検査 (`broad:` — `check-arch-asm` など) の `**` glob はこの判定に**数えない**
-    (ツリー全体の glob に当たっただけで安全側が消えるのを防ぐ)
-  - 変更が全部 `docs_only:` (`**/*.md` など) → 当たった検査 + **文書を読む検査 (`docs_always:` —
-    constraints / kapi-version / manifests / packages / tests-inventory / docs-links / docs-orphans / memmap) を常に**
-  - `notest:` (どのホスト試験の入力でもない場所 — `userland/cmds/**`・`gfx/*.c`・`docs/manpages/*.1`、
-    試験が読むものは `except:`) の変更は変異の選び方に何も足さない。それだけで、どの検査の glob にも
-    当たらなければ全部を変異なし (= `check-fast`)。走査型の `**` glob など検査の glob に当たれば
-    その検査は変異込み (glob が勝つ)
-  - それ以外 → 当たった検査は変異込み、残りは変異なし
-- **対応表の漏れは `make check-map` が見る** (両方の列に入っている): 列と表の検査名の過不足、
-  どのファイルにも当たらない古い glob、各検査の recipe から辿れる試験スクリプトが開く /
-  `#include` する / `#[path]` で取り込むソースがその検査の glob に入っていること。C は場所を問わず
-  `#include "..."` を多段に辿る (実装の `.c` が取り込む `.inc` も入力)。見つける先は取り込む側の場所・
-  ROOT・**その検査の `-I` の探索先** (recipe の `-I…` と、試験スクリプトの `"-I…"` / `.h` を持つ
-  ディレクトリ名の文字列 — `include/types.h` などのヘッダもこれで表に載る)。拾えた入力が `notest:` に
-  当たると「notest なのに入力になっている」で落ちる (notest の番人)。`"/"` の無い裸の名前も
-  `.md` `.yaml` `.json` `.tsv` なら候補にする (`README.md` / `CLAUDE.md` を読む検査器)。
-  辿り方は静的なので、ツリーを舐める検査器 (`check-arch-asm` など) は glob を手で広く書いてある。
-  表が欠けても `sel` の場合は**試験そのものは変異なしで必ず回る** — 落とすのは否定側だけ。
-  docs だけの変更では当たらない検査は回らないので、文書を読む検査は `docs_always:` に入れておく。
-  選び方そのものの試験は `make check-check-select-host` (`tools/tests/test_check_select.py`、変異 44 本 —
-  Makefile の反例は一時の git リポジトリ + 小さい Makefile で再現する。変異は `mutpar` (`OS32_MUT_JOBS`) で
-  並列、fixture のリポジトリは基点の内容ごとに 1 回作って写す。`OS32_MUT_JOBS=4` で約 1 分)。
-- 新しい検査を列に足したら `python3 tools/check_select.py --suggest <検査名>` の出力を
-  下書きにして対応表へ足す (`make check-map` が足りないと言う)。
+今回の条件・実測・RED/GREEN は [検査整理の記録](tasks/v3/TASK_T2D_T2H.md#検査の仕組みの整理-ci-select) を参照。
+`MUTATE=1` / `0` / `sel` と `MUTATE_TARGETS` で変異を切り替える。
+recipe には `$(MUT)` / `$(MUTS)` を使う。HOST32 は `$(call host32_check,test_x.py)` の1行。
+`check-c-dialect-host` のmake変種9回は、変異ありの場合、または Makefile・build の規則・
+言語検査器が変わった場合だけ回す。実物の lint は各本体検査に集約し、ホスト試験はfixtureを使う。
+
+**`check-changed` は作業中の近道で、取りこぼしの保証はしない。保証は取り込み後の `make check` が担う。**
+変更は基点からHEADまでと、未コミット (staged/unstaged)・未追跡の和。
+基点は `tools/check_map.yaml` の `base_refs` (main、origin/main、feat/gui、origin/feat/gui の順) に見つかる merge-base。
+merge-base が HEAD と同じ作業枝では **HEAD** を使い、直前の取り込みを変更に数えない。
+基準枝自身 (main を含む。origin/ 接頭辞を除いた枝名) の上では HEAD~1 を使い、直前のコミットを検査する。
+`BASE=<ref>` で明示、`FILES="a b"` で選択を試せる (makeの型照合は基点が要る)。
+
+- 変更なし → 全部を変異なし (`fast`)。
+- `full:` または表に無い入力 → 全部を変異込み (`full`)。
+- `build/kernel.mk` / `libs.mk` / `programs.mk` → 対応表の入力検査、broad の走査器と `artifact_readers`。
+  ただし追加・削除行に `check-` / `MUT` / `HOST32` / `.ONESHELL` / `export` / `override` / `CHECK_PAR` があれば full。基点版なしも full。
+- `sdk/kapi.json` → KAPI検査、両生成器の出力15ファイル (generation・link scriptを含む) と生成器を読む検査、および `artifact_readers`。
+- 文書だけ → 当たった検査と `docs_always` (`docs`)。
+- その他 → 当たった検査は変異込み、残りは変異なし (`sel`)。
+  `notest` の md・tilemap 等も broad に当たれば、その走査器は変異込みで回す。
+  broad の `**` だけの一致は「表に載っている」の判定から除く。
+
+Makefile・その他のbuild規則を絞る型は `tools/check_select.py` の `TPL_*_RE` が正典。
+makeを実行して判定せず、基点から**追加だけ**であることをLF単位で調べる。
+新しい規則は末尾の塊だけ、既存recipeへの追加は規則直後の連続tab行だけ。
+空行・コメント・条件・継続行をまたいでrecipeの持ち主を変える配置は拒否する。
+許すrecipeは `python3 -B tools/tests/<file>.py` + 小文字の旗 + 末尾の `$(MUT)` / `$(MUTS)`、
+またはHOST32マクロの1行。scriptは木と当該検査の表に必要。
+`.PHONY: check-<新名>` は、その新規則のrecipeの**後ろ**だけ許す。
+既存規則とrecipeの間への挿入、`.PHONY` の後のtab行は拒否する。
+分割ファイルの追加は名前と `CHECK_PAR_ORDER += <番号>:<検査名>` の一致を確認する。
+既存の登録番号・位置の変更、規則の削除・変更、未知のmake構文はfull。
+旧形式の単一リストも、固定マーカーによる位置と名前集合の比較を保つ。
+
+**新しい試験の足し方**:
+
+1. `build/checks.d/check-<name>.mk` を追加する。登録と規則はこの1ファイルに置く。
+   `CHECK_PAR_ORDER += 133:check-<name>`、規則、recipe、最後に `.PHONY` の順。
+2. `python3 tools/check_select.py --suggest check-<name>` を下書きに
+   `tools/check_map.d/check-<name>.yaml` を追加する。手で列挙するのはソース・試験・データ。
+   **ヘッダは手で列挙しない**。検査時の gcc -MM と静的includeの保守的な和から補う。
+   gccで処理できないターゲット専用TUや非活性の条件分岐も、既存の静的include走査を残して拾う。
+3. `python3 tools/gen_tests_inventory.py --write` でこの節のrunner一覧と `docs/TESTS.md` を生成する。
+4. `make check-map` と関連ホスト試験で確認する。`make check` は生成物の鮮度も照合する。
+
+全体設定 (`base_refs/ignore/full/docs_only/broad/docs_always/notest/artifact_readers`) は `tools/check_map.yaml`。
+lint は「手書きの一覧 + 自動ヘッダ依存」とrecipeからの入力を照合し、ソースの漏れ、古いglob、
+列との不一致、試験が読む入力へのnotest指定を拒否する。`--inputs` はヘッダ込み、`--suggest` はヘッダを除く。
+入力の組み立て方やコンパイル条件を完全には解釈しないため、動的な走査には広いglobを残す。
+選択で省くのは主に変異で、selでは正常試験を全て実行する。
+
 - `tools/check_tree_unchanged.py` の番人 ([POLICY_DEBUG §4-40](POLICY_DEBUG.md)) は 3 通りとも段の前後で回る。
 - **変異試験は実物のソースを書き換えない** (2026-09-26〜)。変異は `tools/tests/mutpar.py` の
   `mutant_tree` / `build_in_tree` / `run_script_in_tree` で一時ディレクトリの写しの木 (変異を当てるファイルと

@@ -1,0 +1,6 @@
+check-constraints:
+- CLAUDE.md
+- docs/CONSTRAINTS.md
+- tools/check_constraints.py
+- tools/check_map.d/check-constraints.yaml
+- build/checks.d/check-constraints.mk
