@@ -1267,6 +1267,69 @@ f5/f9で保存caller由来のkernel接続、f6で実CRT、f7で副arena/全入�
 f11で実free listのtrim/rollbackを続ける。f1bはtrimや最小初期量切替の成立を主張しない。
 f2以降および公開切替のe受入ゲートは維持する。commit/push無し。
 
+**f2 実装記録 (2026-10-03、GPT-6 Codex、wt/f2、基点 main e28f7de)**:
+
+PM の先行方針: f2〜f4 は e と並行する未結線の先行準備とし、公開切替・AS 埋込み・呼び手への接続は e 受入後の f5 以降に行う。
+
+PM 判断 `/home/hight/os32-tmp/ref_f2_pm.md` を最優先に実装、判断からの逸脱なし。
+新 [appmem.h](../../../exec/appmem.h) / [appmem.c](../../../exec/appmem.c) は
+ホスト試験だけにリンクする。`build/kernel.mk`・paging・gfx・lease・KAPI・SDK生成物は不変。
+
+- Q1/Q2/Q6: 独立の `appmem_table` は `APPMEM_EXTENT_MAX=32`、
+  extent16 B/table512 BをSTATIC_ASSERT。base昇順、空slot全欄ゼロで末尾。
+  `appmem_prepare` は表を変更せず、穴と併合後slot数を先に検査する。
+  `appmem_plan` は36 B、失敗時はproposalも不変。成功proposal専用の
+  `appmem_publish` はf3のPTE確保/ゼロ化成功後の確定に使う。
+  prepare〜publish は同一表を直列化し、callback/AS切替を入れない契約。
+- Q3/Q4: 配置記述子は img_end / primary_mapped_end / exec_heap_cur_end / guard_b。
+  image/BSS端page、初期heap、stack/guard/shlib/leaseはextentに数えない。
+  primary_mapped_endまでを除外し、flags0は下側窓の上端から、TOPDOWNはguard直下から探索。
+  非NULL hintは整列/私有帯/加算overflowを検査し、両窓の空き希望を先に採用する。
+  固定領域やextentへの衝突はflags0/TOPDOWNで別穴、EXACTはENOVAで全不変。
+  EXACT|TOPDOWNはEXACT優先。exec_heap自体の内部伸長専用口はf9。
+- Q5: map_flagsとextent.flagsを分離。kind/内部flagsが一致した隣接だけ併合し、
+  EXEC_LARGEは同識別子でも併合しない (識別子の供給は接続側)。
+- Q7/Q8: kernelへの増分0 B、f枠8192 Bの消費0。
+  kernel.mapにappmem object/symbol無し、`__bss_end=0x18D358`、ASSERT残31912 B。
+  INVAL=-1 / ENOVA=-2 / EFULL=-3は私有値で、公開エラー対応はf5。
+  ASへの512 B追加はf5に延期し、§6-1の1376 B上限と全管理16 KiB検査をその段で更新する。
+- Q10: `check-appmem-host` をsdk.mk末尾/検査列/check_map/生成TESTSへ登録。
+  08_buildの全runner列挙を実recipeの10本 (nano_adapterとappmemを含む) に合わせた。
+  既存試験の期待変更0件。事前にrgでsbrk_tier/app_band_pde/memory_boot/
+  exec_r1/app_bb_overlapの足場を一覧し、対象ソースを変更していない。
+
+**試験**: [appmem_tdd.md](../../../tools/tests/appmem_tdd.md)。
+実appmem ILP32/qemuで136 CHECK GREEN、13/13 runtime RED、生存0 / compile-link ERROR0 /
+signal0 / timeout0 / その他ERROR0。必須3変異に併合kind/flags/LARGE、FULL不変、
+丸め/加算overflow、TOPDOWN優先違反、併合前FULL、探索下限、公開時移動の変異を追加。
+全変異は写しで置換当たり数1、期待FAIL文言を照合し、原本入力hash不変を確認。
+最終対象実行は中央値0.14秒/最大0.18秒 (compile+run、OS32_MUT_JOBS=4)。
+
+**検査の実行記録 (全体検査開始前に凍結)**:
+共通環境はCROSS_DIR=/home/hight/opt/cross、TMPDIR=/home/hight/os32-tmp、PYTHONPATH空、
+HOST32_RUNNERS=qemu、makeはstdin=/dev/nullかつNP21W_DIR=/dev/null。
+`make all NP21W_DIR=/dev/null < /dev/null` rc=0 (`/home/hight/os32-tmp/f2-all.log`)。
+既存imageレシピの自動コピーは/dev/null宛のため失敗警告、配備成功なし。
+`python3 -B tools/tests/test_appmem.py --runner qemu --mutate` rc=0
+(`/home/hight/os32-tmp/f2-appmem.log`)。
+`python3 tools/gen_memmap.py --write`、`python3 tools/gen_tests_inventory.py --write`、
+`python3 tools/check_select.py --lint` は各rc=0 (対応表125検査、漏れ0)。
+この欄を固定後、協調枠の
+`/home/hight/os32-tmp/bin/check_slot.sh f2-coder env HOST32_RUNNERS=qemu make check-changed NP21W_DIR=/dev/null < /dev/null`
+を実行する。OS32_MUT_JOBSは枠に任せる。sandboxで枠が使えない場合だけ指定の
+OS32_MUT_JOBS=4直接実行へ移る。実行中に票/ソースは変更せず、枠の可否/終了rcは
+最終報告と `/home/hight/os32-tmp/f2-check-changed.log` に残す。
+
+**f3〜f5への申し送り**: f3はprepare後のPT/data全確保/ゼロ/rollbackと成功時publishを接続し、
+ENOSPCを私有理由に追加する。slot/物理をprepareで先取りしない。
+f4は同じ昇順/空slot/併合規約でunmap被覆・最大2残片・FULL不変・owner検査を実装する。
+f5は型をpaging.hかincludeへ移しASへ固定埋込み、保存code_end/配置記述子、
+caller由来、公開エラー翻訳、KAPI/kselftestとkernelリンクをe受入後に行う。
+公開mapはANON、kind/extent.flags/配置記述子をcallerから受けない。
+未実施: native (PM担当)、独立レビュー (PMへ引渡し)、f3以降の接続/guest受入。
+NP21/W・NHD・配備・ini・実機操作、commit/push無し。
+**f2 の着地 (PM、2026-10-03)**: 独立レビュー Opus 5.5 は Approve (P1/P2 なし、native で 136 CHECK・変異 13/13 を自ら再実行)。PM のホスト検査は native の単体と `check_slot.sh` 経由の `HOST32_RUNNERS="native qemu"` check-changed で rc=0。P3 の扱い: P3-5 (tdd に票の行) は PM が直した。P3-3 (publish の入口で plan と表の照合) と P3-6 (未知 flag・非整列 hint・hint 下限の変異 3 本) は f3 で直す。**持ち越し**: P3-1 exec_heap が空の配置 (`exec_heap_cur_end == MEM_EXEC_HEAP_BASE`) で 0x88000000 をまたぐ併合が起きる — f5/f9 で「cur_end > BASE を不変条件にする」か「境界をまたぐ併合を禁じる」かを決める。P3-2 shlib 帯・lease 窓の hint は flags=0 でも INVAL (私有利用帯の外は拒否、ref_f2_pm Q4 の文言との差) — 公開での挙動を f5 で票に確定させる。P3-4 初期 heap を extent に数えないので、LIBC_INITIAL を unmap で返した後の穴が flags=0 の窓に入らず再利用されない — f4/f5 で LIBC_INITIAL を extent に持つか `primary_mapped_end` を下げるかを決める。
+
 f1bの接続が成立しなければ最小初期量切替へ進まない。TLSF採用へ黙って切り替えず、失敗した実ソースケースとサイズを添えて本節の設計差分をレビューする (D23の再決裁ではなくallocator実装選択の再設計)。各小段の不確実性を全fの一回依頼へまとめない。
 
 ホストは実appmem/paging/pgalloc/execと実nano/KHeap/SDKを使用。変異: zero化省略、公開前free、EXACTを別VA成功にする、slot不足後部分unmap、hint重複上書き、flags0の下端探索によるbreak妨害、EXEC_*公開unmap許可、失敗時break更新、65536判定をheader込みに変更、calloc積overflow、realloc先に旧free、別owner PFN返却、固定stack計数、起動予約追加。assertの目的を分け、コンパイルエラーをREDにしない。

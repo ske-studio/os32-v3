@@ -1147,6 +1147,7 @@ CHECK_PAR_TARGETS := check-shlib-high-host check-bootinfo-host check-hdd-stage1-
     check-surface-query-host \
     check-nano-inputs-host \
     check-nano-adapter-host \
+    check-appmem-host \
     check-surface-lease-host \
     check-surface-bundle-host \
     check-gfx-kernel-fb-host \
@@ -1274,3 +1275,9 @@ check-gfx-reinit-host:
 	$(if $(MUT),python3 -B tools/tests/test_gfx_reinit.py --runner $(firstword $(HOST32_RUNNERS)) $(MUT),@:)
 
 .PHONY: check-gfx-reinit-host
+
+# T2f f2: unlinked extent preparation, real appmem.c (no kernel object).
+.PHONY: check-appmem-host
+check-appmem-host:
+	@set -e; test -n "$(HOST32_RUNNERS)"; for runner in $(HOST32_RUNNERS); do echo "HOST32_RUNNERS=$$runner"; python3 -B tools/tests/test_appmem.py --runner $$runner; done
+	$(if $(MUT),python3 -B tools/tests/test_appmem.py --runner $(firstword $(HOST32_RUNNERS)) $(MUT),@:)
