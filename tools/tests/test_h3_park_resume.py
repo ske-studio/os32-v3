@@ -90,6 +90,12 @@ class Tests(unittest.TestCase):
         lock_env = patch.dict('os.environ', {'TMPDIR': lock_dir.name})
         lock_env.start()
         self.addCleanup(lock_env.stop)
+        # Fake clients must not wait on real wall time, including mutants that
+        # suppress start or substitute passive deadlines for guest time.
+        wall_clock = iter(i / 100 for i in range(1000000))
+        wall_patch = patch.object(h3.time, 'monotonic', side_effect=lambda: next(wall_clock))
+        wall_patch.start()
+        self.addCleanup(wall_patch.stop)
         self.emu = e = FakeEmulator()
         self.o = o = dict(slot_size=192, slot_state=0, slot_as=180, slot_wait=28,
                          slot_in_wait=20, slot_abort=24, slot_tick=44, running=1, as_owner=272, as_generation=0, ledger_size=24,
@@ -187,6 +193,42 @@ class Tests(unittest.TestCase):
             with self.assertRaises(RuntimeError): self.p.arm(self.ident, 1)
             self.assertEqual(self.emu.writes, [])
             self.emu.word(addr, old)
+
+    def test_arm_running_op_wait(self):
+        self.emu.word(self.slot, self.o['running'])
+        self.emu.word(self.slot + self.o['slot_wait'], 0)
+        self.emu.word(self.slot + self.o['slot_in_wait'], 1)
+        self.emu.word(self.s['g_cur'], self.ident['app'])
+        case = self.p.arm(self.ident, 5)
+        self.assertEqual(case['identity'], self.ident)
+        self.assertTrue(case['armed_in_running_wait'])
+        self.change('phase', 5); self.change('arm', 0)
+        self.change('consumed', 1); self.change('resumes', 9)
+        self.assertTrue(self.p.resumed(case))
+        self.emu.word(self.s['ring3_switch_count'], 2)
+        case['before']['ring3_switch_count'] = 3
+        with self.assertRaises(RuntimeError):
+            self.p.resumed(case)
+        self.assertEqual([a for a, _ in self.emu.writes],
+                         [self.address + 16, self.address + 20])
+
+    def test_arm_running_wait_rejects_wrong_current_or_mark(self):
+        self.emu.word(self.slot, self.o['running'])
+        self.emu.word(self.slot + self.o['slot_wait'], 1)  # stale park mark
+        for current, in_wait in ((3, 1), (2, 0), (2, 2)):
+            with self.subTest(current=current, in_wait=in_wait):
+                self.emu.word(self.s['g_cur'], current)
+                self.emu.word(self.slot + self.o['slot_in_wait'], in_wait)
+                with self.assertRaises(RuntimeError):
+                    self.p.arm(self.ident, 5)
+                self.assertEqual(self.emu.writes, [])
+        self.emu.word(self.slot, 3)  # WAIT_KEY is not OP_WAIT
+        self.emu.word(self.slot + self.o['slot_wait'], 0)
+        self.emu.word(self.slot + self.o['slot_in_wait'], 1)
+        self.emu.word(self.s['g_cur'], 2)
+        with self.assertRaises(RuntimeError):
+            self.p.arm(self.ident, 5)
+        self.assertEqual(self.emu.writes, [])
 
     def test_corrupt_diagnostics(self):
         for addr, value in [(0x2200, 2), (self.slot + 180, 0), (0x5000 + 272, 0),
@@ -413,12 +455,14 @@ class Tests(unittest.TestCase):
             argv = ['h3', action, '--elf', str(elf), '--map', str(kmap), '--layout', str(layout),
                     '--case', str(casepath), '--trace', str(tracepath), *extra]
             with patch.object(sys, 'argv', argv), patch.object(h3, 'Emulator', return_value=self.emu), \
-                 patch.object(h3.time, 'sleep'), patch.object(h3.time, 'time', return_value=100), \
+                 patch.object(h3.time, 'sleep') as host_sleep, patch.object(h3.time, 'time', return_value=100), \
                  patch.object(h3, 'Playbook', return_value=self.p):
                 if expected:
                     with self.assertRaisesRegex(RuntimeError, expected): h3.main()
                 else:
                     h3.main()
+                    if action == 'stop':
+                        host_sleep.assert_not_called()
                     return json.loads(casepath.read_text())
 
     def test_cli_guards(self):
@@ -432,14 +476,20 @@ class Tests(unittest.TestCase):
         trace = dict(case_id=case['case_id'], observed_at=100, phase=6,
                      identity=self.ident, foreground_window=42, foreground_app=2)
         self.emu.stop = lambda: None
+        self.emu.client = self.cleanup_client()
+        self.p.sleep = lambda _: self.emu.word(self.s['tick_count'],
+            (self.p.word(self.s['tick_count']) + 25) & 0xffffffff)
         with patch.object(self.p, 'checked', return_value={'phase':6}):
             # The Playbook mock's map hash must match the temporary layout.
-            for key, value in [('observed_at',94), ('observed_at',101), ('foreground_app',3),
+            for key, value in [('observed_at',101), ('foreground_app',3),
                                ('foreground_window',43), ('case_id','old'), ('phase',3),
                                ('identity',{})]:
                 bad = dict(trace); bad[key] = value
                 self.cli('stop', case, bad, expected='STOP foreground not confirmed')
+            self.cli('stop', case, dict(trace, observed_at=94), expected='STOP not sent')
+            before = self.p.guest_tick()
             sent = self.cli('stop', case, trace)
+            self.assertGreaterEqual((self.p.guest_tick() - before) & 0xffffffff, 210)
             self.assertTrue(sent['stop_sent'])
             self.cli('stop', sent, trace, expected='STOP requires a resumed loop case')
         for value in (False, None):
@@ -876,6 +926,174 @@ class Tests(unittest.TestCase):
             with emu.freeze(): pass
         self.assertEqual(emu.freeze_depth, 0)
 
+    def clock_capture(self, *, initial=0, step=25, firing=True, wall_step=3,
+                      front_at=0, refresh_at=None, tick_race=False, switches=1):
+        case = self.p.arm(self.ident, 5)
+        case['map_sha256'] = 'map'
+        client = self.emu.client = self.cleanup_client()
+        clock = dict(wall=0, elapsed=0)
+        self.emu.word(self.s['tick_count'], initial)
+        stops = []
+        def sleep(delay):
+            clock['wall'] += wall_step
+            clock['elapsed'] += step
+            if step == 0:
+                self.assertLessEqual(clock['wall'], 150, 'capture exceeded stall budget')
+            self.assertLessEqual(clock['elapsed'], 3000 if not firing or front_at > 3000 else 5000,
+                                 'capture exceeded guest budget')
+            if clock['elapsed'] >= front_at and not front.exists():
+                front.write_text(json.dumps(evidence))
+            if refresh_at is not None and clock['elapsed'] >= refresh_at:
+                front.write_text(json.dumps(dict(evidence, observed_at=case['armed_at'] + clock['wall'])))
+            self.emu.word(self.s['tick_count'],
+                          (initial + clock['elapsed']) & 0xffffffff)
+            if firing and clock['elapsed'] >= 500:
+                self.change('phase', h3.PHASES['FIRING'])
+        self.p.sleep = sleep
+        def click():
+            self.assertEqual(len(client.bps), 5)
+            self.change('phase', h3.PHASES['ARMED'])
+            self.change('arm', 0); self.change('consumed', 1)
+            self.change('resumes', 9)
+            self.emu.word(self.s['ring3_switch_count'], switches)
+        def stop():
+            self.assertEqual(self.emu.depth, 0)
+            stops.append((clock['wall'], clock['elapsed']))
+            client.trap = True
+        self.emu.stop = stop
+        with tempfile.TemporaryDirectory(prefix='h3-clock-') as directory:
+            d = pathlib.Path(directory)
+            front = d / 'front.json'
+            # Model a fresh PM foreground observation when asked, without
+            # changing the actual identity/freshness validation.
+            evidence = dict(case_id=case['case_id'], identity=self.ident,
+                observed_at=case['armed_at'], phase=6, map_sha256='map',
+                foreground_window=42, foreground_app=2)
+            if front_at == 0:
+                front.write_text(json.dumps(evidence))
+            original = self.p.foreground
+            def foreground(*args):
+                if refresh_at is None:
+                    front.write_text(json.dumps(evidence))
+                return original(*args)
+            with patch.object(h3.time, 'monotonic', side_effect=lambda: clock['wall']), \
+                 patch.object(h3.time, 'time', side_effect=lambda: case['armed_at'] +
+                     (clock['wall'] if refresh_at is not None else 1)), \
+                 patch.object(self.p, 'foreground', side_effect=foreground):
+                original_tick = self.p.guest_tick
+                def guest_tick():
+                    if tick_race and not client.trap and not clock.get('raced'):
+                        clock['raced'] = True
+                        client.trap = True
+                        raise h3.CaptureTrap('tick sampling race')
+                    return original_tick()
+                if tick_race:
+                    self.p.guest_tick = guest_tick
+                try:
+                    self.p.run_capture(case, d/'raw.json', d/'out.json', front, click=click)
+                finally:
+                    self.assertEqual(client.bps, set())
+                    self.assertFalse(client.trap)
+                    self.assertFalse(self.emu.capture_active)
+                    if step == 0:
+                        self.assertGreaterEqual(clock['wall'], 120)
+            obs = json.loads((d/'out.json').read_text())['observations']
+            self.assertEqual(set(obs), {'before_stop', 'after_2s', 'after_10s', 'final'})
+        self.assertEqual(len(stops), 1)
+        return stops[0]
+
+    def test_standalone_stop_guest_grace_and_freshness_retry(self):
+        case = self.p.arm(self.ident, 5)
+        case.update(map_sha256='map', resume_verified=True)
+        self.change('phase', 6)
+        client = self.emu.client = self.cleanup_client()
+        initial = 0xffffff80
+        self.emu.word(self.s['tick_count'], initial)
+        clock = dict(wall=0, ticks=0)
+        stops = []
+        self.emu.stop = lambda: stops.append(clock['ticks'])
+        with tempfile.TemporaryDirectory(prefix='h3-stop-') as directory:
+            front = pathlib.Path(directory) / 'front.json'
+            evidence = dict(case_id=case['case_id'], identity=self.ident,
+                observed_at=case['armed_at'], phase=6, map_sha256='map',
+                foreground_window=42, foreground_app=2)
+            front.write_text(json.dumps(evidence))
+            def sleep(_):
+                self.assertEqual(self.emu.depth, 0)
+                clock['ticks'] += 25
+                clock['wall'] += 3  # 210 guest ticks take more than 5 host seconds.
+                self.assertLessEqual(clock['ticks'], 300)
+                self.emu.word(self.s['tick_count'], (initial + clock['ticks']) & 0xffffffff)
+                if clock['ticks'] == 300:
+                    front.write_text(json.dumps(dict(evidence,
+                        observed_at=case['armed_at'] + clock['wall'])))
+            self.p.sleep = sleep
+            with patch.object(h3.time, 'time', side_effect=lambda: case['armed_at'] + clock['wall']), \
+                 patch.object(h3.time, 'monotonic', side_effect=lambda: clock['wall']):
+                persisted = []
+                def persist():
+                    self.assertTrue(case['stop_sent'])
+                    self.assertEqual(len(client.bps), 5)  # Persist before cleanup can fail.
+                    persisted.append(1)
+                self.p.stop_loop(case, front, persist=persist)
+                self.assertEqual(persisted, [1])
+        self.assertEqual(stops, [300])
+        self.assertTrue(case['stop_sent'])
+        self.assertEqual(client.bps, set())
+        self.assertFalse(self.emu.capture_active)
+
+    def test_capture_normal_guest(self):
+        wall, tick = self.clock_capture(wall_step=0.25)
+        self.assertLess(wall, 30)
+        self.assertGreaterEqual(tick, 710)
+
+    def test_capture_slow_guest_and_runaway_grace(self):
+        wall, tick = self.clock_capture()
+        self.assertGreater(wall, 30)
+        self.assertGreaterEqual(tick, 710)  # FIRING + 210 guest ticks
+
+    def test_capture_tick_wrap(self):
+        wall, tick = self.clock_capture(initial=0xfffffd80)
+        self.assertGreater(wall, 30)
+        self.assertGreaterEqual(tick, 710)
+
+    def test_capture_stalled_guest_fails_and_cleans_up(self):
+        with self.assertRaisesRegex(RuntimeError, 'guest tick stalled'):
+            self.clock_capture(step=0)
+
+    def test_capture_guest_budget_without_firing(self):
+        with self.assertRaisesRegex(RuntimeError, 'STOP not sent during capture'):
+            self.clock_capture(firing=False)
+
+    def test_capture_guest_budget_across_wrap(self):
+        with self.assertRaisesRegex(RuntimeError, 'STOP not sent during capture'):
+            self.clock_capture(firing=False, initial=0xfffffd80)
+
+    def test_capture_late_stop_completes_after_guest_limit(self):
+        wall, tick = self.clock_capture(front_at=2900, wall_step=0.25)
+        self.assertEqual(tick, 2900)
+        self.assertGreater(wall, 12)
+
+    def test_capture_late_foreground_without_stop_is_bounded(self):
+        with self.assertRaisesRegex(RuntimeError, 'STOP not sent during capture'):
+            self.clock_capture(front_at=3100, wall_step=0.25)
+
+    def test_capture_stale_foreground_waits_for_refresh(self):
+        wall, tick = self.clock_capture(refresh_at=900)
+        self.assertEqual(tick, 900)
+        self.assertGreater(wall, 5)
+
+    def test_capture_stale_foreground_without_refresh_is_bounded(self):
+        with self.assertRaisesRegex(RuntimeError, 'STOP not sent during capture'):
+            self.clock_capture(refresh_at=3100)
+
+    def test_capture_tick_sampling_trap_is_drained(self):
+        self.clock_capture(tick_race=True, wall_step=0.25)
+
+    def test_capture_parked_requires_switch_increment(self):
+        with self.assertRaisesRegex(RuntimeError, 'missing switch increment'):
+            self.clock_capture(switches=0, wall_step=0.25)
+
     def test_serialized_capture_click_stop_observations(self):
         case = self.p.arm(self.ident, 6)
         case['map_sha256'] = 'map'
@@ -912,6 +1130,8 @@ class Tests(unittest.TestCase):
             self.assertFalse(frames, 'observe must wait until trap is drained')
             events.append('observe')
             return original_observe(value)
+        self.p.sleep = lambda _: self.emu.word(self.s['tick_count'],
+            (self.p.word(self.s['tick_count']) + 25) & 0xffffffff)
         ticks = iter(x / 4 for x in range(1000))
         with tempfile.TemporaryDirectory(prefix='h3-serial-') as directory:
             d = pathlib.Path(directory)
@@ -964,10 +1184,10 @@ PY_MUTANTS = [
     ("base + index * o['block_size']", "base", 1),
     ("self.identity(ident['index']) == ident", 'True', 2),
     ("(b['owner'], b['generation']) == (ident['owner'], ident['generation'])", 'True', 1),
-    ("self.word(ident['slot'] + self.o['slot_state']) == self.o['parked']", 'True', 1),
+    ("state == self.o['parked']", 'True', 1),
     ("self.word(ident['slot'] + self.o['slot_wait']) == 1", 'True', 1),
     ("b['resumes'] > case['resumes']", 'True', 1),
-    ("self.word(self.s['ring3_switch_count']) > case['before']['ring3_switch_count']", 'True', 1),
+    ("switches > before_switches", 'True', 1),
     ("b['consumed'] == 1", 'True', 1),
     ("c[name] == 0", 'True', 1),
     ("trace['pending_consumed'] == pending", 'True', 1),
@@ -982,8 +1202,8 @@ PY_MUTANTS += [
     ("'mode' not in case", "True", 1),
     ("digest(args.elf) == layout['elf_sha256']", "True", 1),
     ("digest(args.map) == layout['map_sha256']", "True", 1),
-    ("0 <= time.time() - trace['observed_at'] <= 5", "True", 1),
-    ("not case.get('stop_sent')", "True", 2),
+    ("time.time() - trace['observed_at'] > 5", "False", 1),
+    ("not case.get('stop_sent')", "True", 3),
     ("case['mode'] < 5 or case.get('stop_sent') is True", "True", 2),
     ("trace['foreground_window'] == case['window']", "True", 2),
     ("c['fault_kill_count'] - case['before']['fault_kill_count'] == kills", "True", 1),
@@ -1029,6 +1249,33 @@ PY_MUTANTS += [
     ("not remaining and instance['trap_pause']", "instance['trap_pause']", 1),
     ("if remaining:", "if False:", 1),
     ("if errors or not can_resume:", "if False:", 1),
+]
+
+
+PY_MUTANTS += [
+    ("case.get('armed_in_running_wait') is True", "False", 1),
+    ("switches == before_switches", "True", 1),
+    ("advance=advance, guest_time=True", "advance=advance, guest_time=False", 2),
+    ("parked_wait or running_wait", "parked_wait", 1),
+    ("state == self.o['running']", "True", 1),
+    ("self.word(self.s['g_cur']) == ident['app']", "True", 1),
+    ("self.word(ident['slot'] + self.o['slot_in_wait']) == 1", "True", 1),
+    ("seconds * GUEST_HZ", "500 * GUEST_HZ", 1),
+    ("now - progressed_at < TICK_STALL_SECONDS", "now - progressed_at < 30", 1),
+    ("(tick - first_tick) & 0xffffffff", "tick - first_tick", 1),
+    ("(self.guest_tick() - firing_at) & 0xffffffff", "self.guest_tick() - firing_at", 2),
+    ("< RUNAWAY_WAIT_TICKS or not Path(foreground).exists()", "< 0 or not Path(foreground).exists()", 2),
+]
+
+
+PY_MUTANTS += [
+    ("tick = p.guest_tick()\n                    except CaptureTrap:\n                        continue", "tick = p.guest_tick()\n                    except CaptureTrap:\n                        raise", 1),
+    ("TICK_STALL_SECONDS = 120", "TICK_STALL_SECONDS = 1000", 1),
+    ("first_tick = tick", "first_tick = (tick - 1000) & 0xffffffff", 1),
+    ("firing_at = None\n        stop_at = None", "case['armed_in_running_wait'] = True\n        firing_at = None\n        stop_at = None", 1),
+    ("not case.get('stop_sent') and", "True and", 1),
+    ("if evidence is None:", "if False:", 2),
+    ("p.stop_loop(case, args.trace, persist=lambda: args.case.write_bytes(json_bytes(case)))", "p.foreground(case, args.trace); p.emu.stop(); case['stop_sent'] = True", 1),
 ]
 
 
