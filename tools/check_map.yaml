@@ -3632,6 +3632,39 @@ checks:
     - tools/tests/nano_adapter_host.c
     - tools/tests/host32.py
 
+  check-appmem-map-host:
+    - arch/x86/arch_cpu.h
+    - arch/x86/arch_io.h
+    - include/pc98.h
+    - include/sys.h
+    - include/tvram.h
+    - kernel/gdt.h
+    - kernel/tss.h
+    - exec/appmem.c
+    - exec/appmem.h
+    - exec/appmem_map.c
+    - kernel/paging_app.c
+    - kernel/paging_app.h
+    - kernel/paging.c
+    - kernel/paging.h
+    - kernel/pgalloc.c
+    - kernel/pgalloc.h
+    - kernel/physmem.c
+    - kernel/physmem.h
+    - include/types.h
+    - include/memmap.h
+    - include/io.h
+    - include/cpu.h
+    - lib/kstring.h
+    - tools/tests/appmem_map_host.c
+    - tools/tests/test_appmem_map.py
+    - tools/tests/pgalloc_host_fixture.h
+    - tools/tests/host_arch/arch_cpu.h
+    - tools/tests/host_arch/arch_io.h
+    - tools/tests/host32.py
+    - tools/tests/mutpar.py
+    - platform/pc98/platform_io.h
+
   check-appmem-host:
     - exec/appmem.c
     - exec/appmem.h

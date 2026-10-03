@@ -126,6 +126,17 @@ static void run(void)
     appmem_publish(&t, &p);
     CHECK("sorted prepend", t.e[0].base == low && t.e[0].end == low + 3 * PAGE_SIZE);
 
+    /* P3-3: both a changed count and a newly occupied same-count range. */
+    before = t;
+    appmem_publish(&t, &p);
+    CHECK("stale publish range", equal(&t, &before, sizeof(t)));
+    CHECK("stale proposal prepare", !prepare(&t, &l, PAGE_SIZE, high - 4 * PAGE_SIZE, APPMEM_MAP_EXACT, &old));
+    /* Use a separate valid table with a different count. */
+    t = (struct appmem_table){0};
+    before = t;
+    appmem_publish(&t, &old);
+    CHECK("stale publish count", equal(&t, &before, sizeof(t)));
+
     /* Hole clipped by extents at both edges; exactly one free page remains. */
     t = (struct appmem_table){0};
     t.e[0] = (struct appmem_extent){low, high - 2 * PAGE_SIZE, APPMEM_ANON, 0};
