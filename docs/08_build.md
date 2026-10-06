@@ -223,7 +223,7 @@ KernelAPI の構造体を変えたときは `make clean` → `make all` が必�
 #### 検査の 3 段 (`check-fast` / `check-changed` / `check`、2026-09-26)
 
 <!-- generated:host32 -->
-`HOST32_RUNNERS` は既定 `native qemu`。19 試験 (access_walk / appmem / appmem_map / caller_copy / db_caller / disk_auth / gfx_attach / gfx_kernel_fb / gfx_reattach / gfx_reinit / kapi_ranges / kcallback / kcg_boot / nano_adapter / shm_user / surface_bundle / surface_lease / surface_query / unicode_surface) の正常対照を指定した全 runner、変異を先頭の runner で実行する。native への自動 fallback はしない。
+`HOST32_RUNNERS` は既定 `native qemu`。21 試験 (access_walk / appmem / appmem_map / caller_copy / db_caller / disk_auth / gfx_attach / gfx_kernel_fb / gfx_reattach / gfx_reinit / kapi_ranges / kcallback / kcg_boot / memmap_audit / e10c_lifecycle / nano_adapter / shm_user / surface_bundle / surface_lease / surface_query / unicode_surface) の正常対照を指定した全 runner、変異を先頭の runner で実行する。native への自動 fallback はしない。
 <!-- /generated:host32 -->
 
 どれも `make all` の後に回す (成果物を読む検査がある)。規則と登録は
