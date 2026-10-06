@@ -44,6 +44,7 @@
 #include "paging.h"
 
 #include "io.h"
+#include "v86_mem.h"
 #include "cpu.h"      /* arch_mmu_* (実装は arch/$(ARCH)/arch_cpu.h) */
 #include "memmap.h"
 #include "pgalloc.h"
@@ -625,24 +626,57 @@ int paging_shm_set_rw(u32 base, u32 end, int writable)
     return 0;
 }
 
-/* e10b の session 化までの専用口。低位 1MB 以外を昇格させない。 */
+static struct v86_session_state *v86_map_session;
+int paging_v86_session_open(void) { return v86_map_session != 0; }
+
+int paging_v86_snapshot(struct v86_session_state *s)
+{
+    if (v86_map_session || !pg_enabled || !page_tables[0]) return -1;
+    s->active_cr3 = paging_current_cr3();
+    s->master_pde = page_directory[0];
+    s->active_pde = ((u32 *)P2V(s->active_cr3))[0];
+    for (u32 i = 0; i < V86_GUEST_MAP_END / PAGE_SIZE; i++)
+        s->low_pte[i] = page_tables[0][i];
+    v86_map_session = s;
+    return 0;
+}
+
+/* Restore is allocation-free and cannot leave a live backing alias behind.
+ * Count a missing session, then restore the shared PT directly. No PDE USER
+ * propagation to the current CR3 (which may differ from the captured CR3),
+ * and only one TLB flush after all saved PTEs/PDEs have been written. */
+int paging_v86_restore(struct v86_session_state *s)
+{
+    u32 bad = 0;
+    for (u32 i = 0; i < V86_GUEST_MAP_END / PAGE_SIZE; i++) {
+        u32 saved = s->low_pte[i];
+        if (v86_map_session != s) bad++;
+        page_tables[0][i] = saved;
+    }
+    page_directory[0] = s->master_pde;
+    ((u32 *)P2V(s->active_cr3))[0] = s->active_pde;
+    arch_mmu_flush_tlb();
+    for (u32 i = 0; i < V86_GUEST_MAP_END / PAGE_SIZE; i++)
+        if (page_tables[0][i] != s->low_pte[i]) bad++;
+    if (page_directory[0] != s->master_pde ||
+        ((u32 *)P2V(s->active_cr3))[0] != s->active_pde) bad++;
+    v86_map_session = 0;
+    return (int)bad;
+}
+
+/* Open session only: never promote outside the low 1MB. */
 int paging_v86_map_range(u32 base, u32 end, u32 phys, u32 flags)
 {
     u32 a;
-    if (base >= end || end > MEM_BIOS_ROM_END + 1 ||
+    if (!v86_map_session || base >= end || end > MEM_BIOS_ROM_END + 1 ||
         ((base | end | phys) & (PAGE_SIZE - 1)) ||
         phys > ~(u32)0 - (end - base - 1) || !page_tables[0]) return -1;
     for (a = base; a < end; a += PAGE_SIZE, phys += PAGE_SIZE)
         set_page_noflush(a, phys, flags);
+    if (flags & PTE_USER)
+        ((u32 *)P2V(paging_current_cr3()))[0] |= PTE_USER;
     if (pg_enabled) arch_mmu_flush_tlb();
     return 0;
-}
-
-void paging_v86_restore_shared_user(void)
-{
-    /* SHM と trampoline はどちらも PDE0。PTE は teardown が触らない。 */
-    if (boot_user_shared_done) page_directory[0] |= PTE_USER;
-    if (pg_enabled) arch_mmu_flush_tlb();
 }
 
 /* 指定範囲を覆う PDE から USER を落とす。
@@ -830,6 +864,7 @@ int paging_addrspace_create_n(struct addrspace *as, u32 owner, u32 pde_count)
 {
     u32 pd_phys, i;
     u32 *pd;
+    if (paging_v86_session_open()) return -1;
     if (!as || !owner || !pde_count || pde_count > MEM_APP_BAND_MAX_PDES ||
         as_generation == ~(u32)0) return -1;
     for (i = 0; i < sizeof(*as) / sizeof(u32); i++) ((u32 *)as)[i] = 0;
@@ -1360,6 +1395,7 @@ int paging_memmap_selftest(u32 tramp_page)
     u8 want, seen;
     int runs = 0;
 
+    if (paging_v86_session_open()) return -1;
     paging_memmap_bad_count = 0;
     if (!pg_enabled || !page_tables[0] || !fixed_paging_valid() ||
         paging_current_cr3() != MEM_FIXED_PD_BASE) return -1;

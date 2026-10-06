@@ -32,7 +32,9 @@ MUTANTS = [
     ('exec', 'paging_addrspace_map_user_keep(ctx->as,\n            TVRAM_CHAR_BASE',
      'paging_addrspace_map_user_range(ctx->as,\n            TVRAM_CHAR_BASE', 'exec loses UC'),
     ('v86', 'e->setup_flags) != 0', '(e->setup_flags & ~PTE_PCD)) != 0', 'V86 setup loses UC'),
-    ('v86', 'e->teardown_flags);', '(e->teardown_flags & ~PTE_PCD));', 'V86 teardown loses UC'),
+    ('v86', 'e->teardown_flags & PTE_PCD', '(e->teardown_flags & ~PTE_PCD) & PTE_PCD', 'V86 teardown table loses UC'),
+    ('v86', '(e->setup_flags & PTE_PCD) != want || pcd != want', '((void)want, 0)', 'V86 ledger cache mismatch'),
+    ('v86', 'v86_restore_mismatch += paging_v86_restore(&v86_session);', 'v86_session.low_pte[V86_GVRAM_E_START / PAGE_SIZE] &= ~PTE_PCD; v86_restore_mismatch += paging_v86_restore(&v86_session);', 'V86 teardown loses UC'),
     ('surface_query', 'if (!gfx || (gui && appslot_gfx_owner() != c.app_id))',
      'if (!gfx)', 'ordinary GUI DISPLAY'),
 ]

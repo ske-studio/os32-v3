@@ -119,9 +119,8 @@ int paging_boot_user_shared(u32 tramp_page);
 /* 既存 SHM の恒等 present/USER と登録共有 PT を検査し、RW だけを変更。 */
 int paging_shm_set_rw(u32 base, u32 end, int writable);
 extern u32 paging_shm_user_missing_count;
-/* V86 低位専用。session と全出口の制御は e10b。 */
+/* V86 低位専用。open session 外は無変更で拒否する。 */
 int paging_v86_map_range(u32 base, u32 end, u32 phys, u32 flags);
-void paging_v86_restore_shared_user(void);
 
 /* 指定範囲を覆う PDE から USER を落とす (V86 セッション終了時の後始末)
  * end は inclusive。戻り値: 0=成功, -1=逆順 (未変更) */

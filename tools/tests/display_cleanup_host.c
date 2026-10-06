@@ -3,6 +3,10 @@
 #include <stdlib.h>
 #include "types.h"
 #include "pc98.h"
+#undef __cdecl
+#define __cdecl
+#include "gfx.h"
+int gfx_current_height = 200, gfx_flip_enabled = 1;
 #define CHECK(c, msg) do { if (!(c)) { fprintf(stderr, "FAIL: %s\n", msg); exit(1); } } while (0)
 static unsigned int ports[64], values[64], n, waits;
 static int palette, cursor, deny, sound, active, restored;
@@ -64,6 +68,7 @@ int main(int argc, char **argv)
         for (unsigned int i = 0; i < n; i++)
             CHECK(ports[i] == want_ports[16+i] && values[i] == want_values[16+i], "shared CUI order");
     }
+    if (mode != 1) CHECK(gfx_current_height == GFX_HEIGHT && !gfx_flip_enabled, "CUI height flip");
     CHECK(waits == n, "I/O wait for every OUT");
     puts("PASS: V86 CUI exit");
     return 0;

@@ -24,7 +24,8 @@
  *
  * IOPL=3 にしているのが要点。386 には VME が無いため IOPL<3 では
  * INT n / CLI / STI / PUSHF / POPF / IRET が全て #GP に落ちる。
- * IOPL=3 ならこれらは素通りし、I/O だけが TSS の I/O 許可ビットマップで
+ * IOPL=3 でも INT は IDT の DPL 検査を受ける。他の命令は素通りし、I/O は
+ * TSS の I/O 許可ビットマップで
  * 個別に制御される。実測ではこれで #GP レートが 5〜6 倍下がる
  * (docs/archive/v21/v86v2/00_approach_study.md §3.1)。
  *
@@ -169,6 +170,9 @@ void v86_reflect_irq(u32 *frame, u32 irq);
  * ゲスト自身の IVT (多くは BIOS ROM) へ流すために使う。
  * 戻り値 1 = 成功 / 0 = ゲストスタック不正 (呼び出し元でセッションを畳む)。 */
 int v86_inject_int(u32 *frame, u32 vector);
+
+/* DPL3 INT 80h: error-code-free VM frame, already at the following IP. */
+void v86_int80(u32 *frame);
 
 /* 反射した割り込みの回数 (検証用) */
 u32 v86_irq_reflect_count(void);

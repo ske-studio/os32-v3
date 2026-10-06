@@ -11,14 +11,14 @@
 #include "paging.h"
 #include "vfs.h"
 
-/* 実機の IVT (1KB) と BDA (0x400-0x5FF) の退避先。
+/* 実機の page0 全体 (IVT/BDA とゲストが触れる残部) の退避先。
  *
  * バッキング RAM を張るとゲストから見た低位メモリは真っさらになるので、
  * 実機の値をそのまま渡してやらないとゲストは何も判断できない。
  * ROM を指す割り込みベクタもここから引き継ぐ。 */
-#define REAL_SNAPSHOT_SIZE  0x600
-static u8 real_lowmem[REAL_SNAPSHOT_SIZE];
-static int real_saved = 0;
+#define REAL_SNAPSHOT_SIZE PAGE_SIZE
+#define real_lowmem v86_session.real_lowmem
+#define real_saved v86_session.real_saved
 
 static u32 bios_calls = 0;
 static u32 bios_last_vec = 0;
@@ -252,16 +252,8 @@ static const u8 hle_vectors[] = {
 
 void v86_bios_save_real(void)
 {
-    /* ページ 0 の状態に依存しないこと。
-     *
-     * paging.c は NULL ガードを R/O にしている (Not-Present だと LZ4 展開中の
-     * BDA 参照で落ちるため、と経緯が残っている) が、外部プログラムを一度でも
-     * 実行すると Not-Present に戻ってしまう実測がある。原因は exec 経路の
-     * どこかで未特定。IVT の退避をその状態に賭けるわけにはいかないので、
-     * 読む直前に自分で読める状態を作る。
-     *
-     * この後 v86_mem_setup() がページ 0 をバッキング RAM に張り替え、
-     * teardown が R/O に戻すので、ここで R/O にしておくのが一貫している。 */
+    /* begin already captured the old PTE, including NP/RO/USER. Temporarily
+     * expose physical page zero for the full snapshot; end restores the PTE. */
     paging_set_page(0, 0, PAGE_RO);
     kmemcpy(real_lowmem, P2V(0), REAL_SNAPSHOT_SIZE);
     real_saved = 1;
@@ -277,6 +269,7 @@ void v86_bios_restore_real(void)
     }
     paging_set_page(0, 0, PAGE_RW);
     kmemcpy(P2V(0), real_lowmem, REAL_SNAPSHOT_SIZE);
+    real_saved = 0;
 }
 
 void v86_bios_setup(void)

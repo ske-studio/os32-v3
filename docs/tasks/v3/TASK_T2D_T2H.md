@@ -218,6 +218,14 @@ Unicodeはkernel所有FIXED_RAM/RO SURFACE。ユーザー版utf8だけsetterでl
 
 NP21/Wは8MB planar/PEGC、17MB planar/PEGC/Cirrus。日本語/描画/present、GUI→CUI→GUI、全画面DISPLAY、通常GUIの低位VRAMとdevice直書きkill、S/T/Uと片側revoke、cirrus-off強制指定fallback、V86復元後のalias_cache一致とDISPLAY/TVRAM再lease、SHMの2本目書込み、boot後font_load_testのNOSYS/表・BB不変を確認。ring3_guard旧Eの「低位BB生存」はここから**拒否へ更新**し、正規CLIENT leaseで生存する対照を追加。Bはshlib実ロード後にPTE P/U/ROかつPF error=7、Aは実stack直下NPかつerror=6を確認する。Ra266のPEGC/日本語/全画面とUCはhへ。予算は§6のe枠。
 
+**e10b 実装 (2026-10-06)**: session に低位 PTE・master/active PDE0・page0 全 4KB・runtime 復帰状態を集約。
+kill は深さ 0 でも回収前に end。例外では longjmp 前に地図/I/O/IRQ を戻し、解放は master CR3・IF=1 の trusted 着地へ送る。
+VM INT80h は KAPI 入口で分離しゲスト IVT へ反射。end は再入防止、途中の再例外は回収へ進まず停止する。
+通常 AS は exec launch/resume・AS 生成・通常地図 selftest の入口で拒否。復元は保存 PDE/PTE の直接書戻し・1 回 flush、PCD は表と台帳に照合。
+CUI 出口は高さ 400/flip 無効。公開 KAPI・低位 USER 撤去・page0 NP 化は変更しない。
+ゲスト/native と K1 実例外受入は [持越し台帳](../DEFERRED_TESTS.md) E10-1。H-6 と e10c の範囲は維持、gcap kill の漏れは E10-4。
+証拠は `/home/hight/os32-tmp/run/e10b/` の検査ログと `fix1-report.md` (F1〜F7・検査 rc・PM ゲスト手順)。
+
 **e9 実装 (2026-10-06)**: tvdump は既存 `tvram_readchar_at`、TVDM wire 不変。公開 KAPI・旧 USER/VRAM 例外は維持。
 マーカーは owned SHM (配置 `userland/tests/ring3_marker.h`)、fault は target/ARMD と serial addr/kill 差分で照合する。
 `shm_reuse_test` は free/exit の各経路で別 AS の同一ブロック・全ページ書込みを判定。E の旧 BB 生存期待は維持。

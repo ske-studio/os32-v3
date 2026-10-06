@@ -11,6 +11,7 @@ from mutpar import run_ordered
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 MUTATIONS = [
+    ("dispatch", "frame[V86I_EFLAGS] & EFLAGS_VM", "0", "VM int80 bypasses KAPI"),
     ("access", "if (ring3_wm_depth > 0)", "if (0)", "WM trusted scope"),
     ("access", "if (user_only && a->origin != CALLER_USER)", "if (0 && user_only)", "saved USER only"),
     ("access", "caller_frame.valid = 0;", ";", "invalidation"),

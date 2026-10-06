@@ -57,8 +57,8 @@ int v86_gui_refuse(void)
     return 1;
 }
 
-static u32 v86_jmpbuf[KSETJMP_BUF_LEN];
-static volatile int v86_active = 0;
+#define v86_jmpbuf v86_session.jmpbuf
+#define v86_active v86_session.active
 static volatile enum v86_exit_reason v86_exit_reason = V86_EXIT_NONE;
 static volatile int v86_exit_request = 0;
 static volatile u32 v86_gp_since_tick = 0;   /* タイマ tick ごとに 0 に戻る #GP 数 */
@@ -111,7 +111,7 @@ static u8 *v86_ptr(u32 seg, u32 off)
 /*  INT n が来る理由: V86 の INT n は IOPL に関係なくプロテクトモードの      */
 /*  IDT を引く仕様で、OS32 のゲートは DPL=0 / ゲストは CPL=3 なので          */
 /*  「softint && gate.DPL < CPL」で #GP になる。おかげでトランポリンを       */
-/*  仕込まなくても BIOS コールを横取りできる。                              */
+/*  仕込まなくても BIOS コールを横取りできる。DPL3 の 80h は v86_int80 へ。 */
 /* ======================================================================== */
 /* ゲストの IP を n バイト進める。V86 の IP は 16bit なのでラップさせる。 */
 static void v86_advance_ip(u32 *frame, u32 n)
@@ -307,7 +307,7 @@ int v86_gp_handler(u32 *frame)
 
     case 0xCD:  /* INT imm8 */
         /* V86 の INT n は IOPL に関係なくプロテクトモードの IDT を引く。
-         * OS32 のゲートは DPL=0、ゲストは CPL=3 なので必ずここに落ちる。
+         * DPL0 のゲートはここへ落ちる。DPL3 の 80h は v86_int80 へ行く。
          * (IOPL=3 が消してくれるのは CLI/STI/PUSHF/POPF/IRET のほう) */
         {
             u32 vec = pc[len + 1];
@@ -454,6 +454,20 @@ int v86_inject_int(u32 *frame, u32 vector)
                       v86_gcap_keep_if());
 }
 
+/* INT 80h reaches the DPL3 gate without #GP at IOPL3. Reuse the
+ * software-INT injection policy with the error-code-free frame offsets.
+ * EIP already points past INT; leave pushad and ES/DS/FS/GS untouched. */
+void v86_int80(u32 *frame)
+{
+    if (!v86_do_int(frame, RING3_SYSCALL_VECTOR,
+                    V86I_EIP, V86I_CS, V86I_EFLAGS, V86I_ESP, V86I_SS,
+                    v86_gcap_keep_if())) {
+        extern void v86_exit_to_kernel(void);
+        v86_exit_reason = V86_EXIT_FAULT;
+        v86_exit_to_kernel();
+    }
+}
+
 /* キーボード ISR から。脱出ホットキーを受けたことを記録する。
  * ここで longjmp しないのは、割り込みスタックの畳み方を 1 か所
  * (asm スタブ) に寄せるため。タイマのタイムアウトと同じ作法。 */
@@ -515,12 +529,22 @@ int v86_run(const struct v86_context *ctx)
     return v86_run_limit(ctx, V86_TICK_LIMIT);
 }
 
+/* Also called before the app fault longjmp. Keep exception IF disabled;
+ * normal v86_run restores its caller EFLAGS after this common unwind. */
+void v86_runtime_end(void)
+{
+    v86_active = 0;
+    if (!v86_session.running) return;
+    irq_disable(V86_IRQ_SOUND);
+    irq_disable(V86_IRQ_VSYNC);
+    tss_set_esp0(v86_session.saved_esp0);
+    v86_session.running = 0;
+    irq_restore(v86_session.saved_eflags & ~EFLAGS_IF);
+}
+
 int v86_run_limit(const struct v86_context *ctx, u32 tick_limit)
 {
-    u32 saved_esp0;
-    u32 saved_eflags;
-
-    if (v86_active) {
+    if (!v86_session.open || v86_active) {
         return -1;      /* 再入禁止 */
     }
 
@@ -535,7 +559,8 @@ int v86_run_limit(const struct v86_context *ctx, u32 tick_limit)
      * シェルがタイマ待ちループから二度と抜けなくなった。
      * (irq_save は CLI も行うが、直後の v86_enter がゲスト EFLAGS を
      *  iretd でロードするので問題ない) */
-    saved_eflags = irq_save();
+    v86_session.saved_eflags = irq_save();
+    v86_session.running = 1;
 
     v86_exit_reason = V86_EXIT_NONE;
     v86_exit_request = 0;
@@ -544,7 +569,7 @@ int v86_run_limit(const struct v86_context *ctx, u32 tick_limit)
     v86_irq_n = 0;
     v86_ticks = 0;
     v86_tick_limit = tick_limit;
-    saved_esp0 = tss_get_esp0();
+    v86_session.saved_esp0 = tss_get_esp0();
 
     /* サウンドボードの IRQ をセッション中だけ開ける。
      * ゲストの FM ドライバは OPN のタイマ割り込みで演奏を進めるので、
@@ -564,13 +589,8 @@ int v86_run_limit(const struct v86_context *ctx, u32 tick_limit)
     }
 
     /* longjmp で戻ってきた */
-    v86_active = 0;
-    irq_disable(V86_IRQ_SOUND);
-    irq_disable(V86_IRQ_VSYNC);
-    tss_set_esp0(saved_esp0);
-
-    /* IF と IOPL を呼び出し前の状態に戻す */
-    irq_restore(saved_eflags);
+    v86_runtime_end();
+    irq_restore(v86_session.saved_eflags);
 
     return (int)v86_exit_reason;
 }

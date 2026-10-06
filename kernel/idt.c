@@ -86,7 +86,6 @@ extern void isr_stub_default(void);
 /* リング3 システムコール入口 (kernel/ring3_entry.asm, v2 M1/M2)。
  * ベクタ 0x80, ゲート DPL=3 で CPL=3 から呼べる。M1 では sys_exit のみ。 */
 extern void int80_stub(void);
-#define RING3_SYSCALL_VECTOR 0x80
 
 /* ======================================================================== */
 /*  idt_set_gate — IDTエントリを設定                                        */

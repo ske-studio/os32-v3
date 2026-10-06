@@ -15,6 +15,8 @@ PRE = r'''
 #include "fd_redirect.h"
 #include "kbd.h"
 #include "gui.h"
+#include "v86.h"
+void v86_int80(u32 *frame) { (void)frame; __builtin_trap(); }
 #define CHECK(x) do { if (!(x)) die(__LINE__); } while (0)
 static void die(int line) {
     char b[12]; int n=0; unsigned v=line;
@@ -43,6 +45,7 @@ static void ring3_abort_kill(void) { aborted++; }
 static void ring3_context_clear(void) { caller=ring3_in_syscall=ring3_wm_depth=0; g_cur_frame=0; clears++; }
 static void exec_restore_context(int id) { CHECK(id==1); g_cur_app=0; }
 void exec_heap_save_state(u32 *p) { *p=17; }
+int paging_v86_session_open(void) { return 0; }
 u32 paging_kernel_pd_phys(void) { return 1; }
 void paging_load_cr3(u32 p) { cr3=p; }
 void exec_longjmp(u32 *p) {

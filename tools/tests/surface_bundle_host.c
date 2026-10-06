@@ -37,6 +37,9 @@ void v86_bios_restore_real(void) {}
 void v86_bios_setup(void) {}
 void v86_io_apply_policy(void) {}
 void v86_io_reset_policy(void) {}
+void v86_runtime_end(void) { v86_session.active = 0; v86_session.running = 0; }
+void v86_bios_detach_disk(void) {}
+V86Gcap *v86_gcap_rec;
 /* Only the CPU write to V86 virtual RAM is redirected to its backing by the
  * harness. setup/teardown, map table and all PTE updates are real. */
 #include "v86_host_source.c"
@@ -142,6 +145,7 @@ static void caller_copy_tests(void)
     exec_native_map(&space); native_cache();
     CHECK(!v86_mem_setup(space.owner)); native_cache();
     v86_mem_teardown(); native_cache();
+    CHECK(!v86_restore_mismatch);
     exec_native_map(&space); native_cache();
     /* access_walk has already made an AS; supply memory_boot's fixed record
      * directly, as lease_host does (registration is boot-context-only). */
@@ -163,6 +167,15 @@ static void caller_copy_tests(void)
         CHECK(ledger_surface_create(&sf, &sid));
         source.refs[i] = (struct surface_ref){sid, ledger_surfaces[sid].gen};
     }
+    CHECK(!v86_mem_setup(space.owner));
+    v86_mem_teardown();
+    CHECK(!v86_restore_mismatch);
+    /* A ledger cache mismatch must be observed independently of the table. */
+    ledger_surfaces[source.refs[3].sid].cache = LEDGER_CACHE_WB;
+    CHECK(!v86_mem_setup(space.owner));
+    v86_mem_teardown();
+    CHECK(v86_restore_mismatch != 0);
+    ledger_surfaces[source.refs[3].sid].cache = LEDGER_CACHE_UC;
     /* Filler ends immediately before the fourth plane crosses a PDE. */
     u32 backing = pgalloc_alloc_phys(space.owner, PTE_COUNT - 24);
     sf = (struct ledger_surface){.first = backing / PAGE_SIZE, .npages = PTE_COUNT - 24,

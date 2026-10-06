@@ -231,7 +231,7 @@ def main():
         for src in ('kernel/paging.c', 'kernel/shm.c'):
             subprocess.run(['i386-elf-gcc', *target,
                             *['-I' + str(ROOT / p) for p in
-                              ('include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec')],
+                              ('include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec', 'sdk/include/os32')],
                             '-c', str(ROOT / src),
                             '-o', str(pathlib.Path(tmp) / (src.replace('/', '_') + '.o'))],
                            check=True)

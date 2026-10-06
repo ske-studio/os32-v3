@@ -1,3 +1,5 @@
+#include "v86_mem.h"
+#include "v86.h"
 #include "memmap.h"
 #include "exec.h"
 #include "os32x_hdr.h"
@@ -1322,6 +1324,10 @@ static void exec_finish(int id, int status, int kind)
 
 void exec_exit(int status, int kind)
 {
+    /* A fault during teardown must not jump over an unfinished unmap. */
+    if (v86_session.closing) { for (;;) { _stop(); } }
+    v86_session.aborting = 1;
+    v86_session_end();
     ring3_context_clear();
     exec_finish(appslot_cur(), status, kind);
     g_longjmp_reason = EXEC_LJ_EXIT;
@@ -1335,6 +1341,10 @@ static void exec_pending_transfer(int kind)
     int id = appslot_cur();
     AppSlot *a = appslot_get(id);
     if (!a || g_pending_id) { for (;;) { _stop(); } }
+    /* A fault during teardown must not jump over an unfinished unmap. */
+    if (v86_session.closing) { for (;;) { _stop(); } }
+    v86_session.aborting = 1;
+    v86_session_end();
     ring3_context_clear();
     g_pending_id = id;
     g_pending_kind = kind;
@@ -1357,6 +1367,7 @@ static void exec_pending_finish(void)
     g_longjmp_id = 0;
     paging_load_cr3(paging_kernel_pd_phys());
     _enable();
+    v86_session_end();
     exec_finish(id, EXEC_ERR_FAULT, kind);
 }
 
@@ -1419,6 +1430,12 @@ static void exec_park_stop(u32 *frame)
 
 void __cdecl ring3_syscall_dispatch(u32 *frame)
 {
+    /* VM frames also carry ES/DS/FS/GS after SS. This is a guest INT,
+     * never an OS caller, even when EAX happens to name a valid KAPI slot. */
+    if (frame[V86I_EFLAGS] & EFLAGS_VM) {
+        v86_int80(frame);
+        return;
+    }
     u32 slot     = frame[7];         /* スタブが積んだ slot (eax) */
     u32 user_esp = frame[11];        /* CPL=3 の ESP (int が積んだ) */
     const void *args_src;
@@ -1557,6 +1574,7 @@ extern void ring3_resume(const u32 *frame, u32 pd_phys, void *tss);
 /* ======================================================================== */
 static int exec_launch(const char *cmdline, int gui_arg)
 {
+    if (paging_v86_session_open()) return EXEC_ERR_INVALID;
     /* longjmp 復帰側で読む gui。caller_context は setjmp 前の値から不変。
      * volatile でフレーム上に固定する
      * — レジスタに置かれると longjmp で失われる (他は全部グローバルで判断)。 */
@@ -2415,6 +2433,7 @@ i32 exec_sys_yield(void)
 /* ======================================================================== */
 i32 exec_resume(i32 app_id, i32 wait_ret)
 {
+    if (paging_v86_session_open()) return OS32_ERR_BUSY;
     AppSlot *a;
     int rc;
     int src;
