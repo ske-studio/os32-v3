@@ -1,0 +1,302 @@
+# Acceptance index; batch entry names resolve through guest_tests.txt.
+- id: e9-nop
+  gate: e9
+  contract: userland/tests/ring3_marker.h
+  mode: manual
+  prereq: 17MB, current ini
+  entry: nop
+  observe:
+  - 'kernel.map: __bss_end, fault_kill_count'
+  - 'SHM discovery and target: ring3_marker.h PM acceptance table'
+  - 'serial #PF addr, shell/ver'
+  expect:
+    marker_row: nop
+    tag: NOP!
+    completion: DONE
+    armed: 0
+    kill_delta: 0
+    serial_addr: null
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e9-ring3_hello
+  gate: e9
+  contract: userland/tests/ring3_marker.h
+  mode: manual
+  prereq: 17MB, current ini
+  entry: ring3_hello
+  observe:
+  - 'kernel.map: __bss_end, fault_kill_count'
+  - 'SHM discovery and target: ring3_marker.h PM acceptance table'
+  - 'serial #PF addr, shell/ver'
+  expect:
+    marker_row: ring3_hello
+    tag: RNG3
+    completion: DONE
+    armed: 0
+    kill_delta: 0
+    serial_addr: null
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e9-ring3_fault
+  gate: e9
+  contract: userland/tests/ring3_marker.h
+  mode: manual
+  prereq: 17MB, current ini
+  entry: ring3_fault
+  observe:
+  - 'kernel.map: __bss_end, fault_kill_count'
+  - 'SHM discovery and target: ring3_marker.h PM acceptance table'
+  - 'serial #PF addr, shell/ver'
+  expect:
+    marker_row: ring3_fault
+    tag: FLT?
+    completion: 0
+    armed: ARMD
+    kill_delta: 1
+    serial_addr: marker.target
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e9-A
+  gate: e9
+  contract: userland/tests/ring3_marker.h
+  mode: manual
+  prereq: 17MB, current ini
+  entry: ring3_guard
+  observe:
+  - 'kernel.map: __bss_end, fault_kill_count'
+  - 'SHM discovery and target: ring3_marker.h PM acceptance table'
+  - 'serial #PF addr, shell/ver'
+  expect:
+    marker_row: A
+    tag: GRD?
+    completion: 0
+    armed: ARMD
+    kill_delta: 1
+    serial_addr: marker.target
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e9-B
+  gate: e9
+  contract: userland/tests/ring3_marker.h
+  mode: manual
+  prereq: '17MB, current ini; B: mapped shlib for RO proof (2026-10-06 B had no shlib;
+    H-9) '
+  entry: ring3_guard shlib
+  observe:
+  - 'kernel.map: __bss_end, fault_kill_count'
+  - 'SHM discovery and target: ring3_marker.h PM acceptance table'
+  - 'serial #PF addr, shell/ver'
+  expect:
+    marker_row: B
+    tag: SLB?
+    completion: 0
+    armed: ARMD
+    kill_delta: 1
+    serial_addr: marker.target
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e9-C
+  gate: e9
+  contract: userland/tests/ring3_marker.h
+  mode: manual
+  prereq: 17MB, current ini
+  entry: ring3_guard cirrus
+  observe:
+  - 'kernel.map: __bss_end, fault_kill_count'
+  - 'SHM discovery and target: ring3_marker.h PM acceptance table'
+  - 'serial #PF addr, shell/ver'
+  expect:
+    marker_row: C
+    tag: VIS?
+    completion: 0
+    armed: ARMD
+    kill_delta: 1
+    serial_addr: marker.target
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e9-D
+  gate: e9
+  contract: userland/tests/ring3_marker.h
+  mode: manual
+  prereq: 17MB, current ini
+  entry: ring3_guard pegc
+  observe:
+  - 'kernel.map: __bss_end, fault_kill_count'
+  - 'SHM discovery and target: ring3_marker.h PM acceptance table'
+  - 'serial #PF addr, shell/ver'
+  expect:
+    marker_row: D
+    tag: PEG?
+    completion: 0
+    armed: ARMD
+    kill_delta: 1
+    serial_addr: marker.target
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e9-E
+  gate: e9
+  contract: userland/tests/ring3_marker.h
+  mode: manual
+  prereq: 17MB, current ini
+  entry: ring3_guard bb
+  observe:
+  - 'kernel.map: __bss_end, fault_kill_count'
+  - 'SHM discovery and target: ring3_marker.h PM acceptance table'
+  - 'serial #PF addr, shell/ver'
+  expect:
+    marker_row: E
+    tag: BB??
+    completion: SURV
+    armed: 0
+    kill_delta: 0
+    serial_addr: null
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e9-shm_reuse_test
+  gate: e9
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#2-5-分割試験受入
+  mode: batch
+  prereq: 17MB, current ini
+  entry:
+    guest_tests: shm_reuse_test
+  observe:
+  - 'guest_tests output: RC and PASS summary'
+  expect:
+    rc: 0
+    passed: 4
+    total: 4
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e9-db_test
+  gate: e9
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#2-5-分割試験受入
+  mode: batch
+  prereq: 17MB, current ini
+  entry:
+    guest_tests: db_test
+  observe:
+  - 'guest_tests output: RC and PASS summary'
+  expect:
+    rc: 0
+    passed: 9
+    total: 9
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e9-db_v50_test
+  gate: e9
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#2-5-分割試験受入
+  mode: batch
+  prereq: 17MB, current ini
+  entry:
+    guest_tests: db_v50_test
+  observe:
+  - 'guest_tests output: RC and PASS summary'
+  expect:
+    rc: 0
+    passed: 41
+    total: 41
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e10b-shm_reuse_test
+  gate: e10b
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#2-5-分割試験受入
+  mode: batch
+  prereq: 17MB, current ini
+  entry:
+    guest_tests: shm_reuse_test
+  observe:
+  - 'guest_tests output: RC and PASS summary'
+  expect:
+    rc: 0
+    passed: 4
+    total: 4
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e10b-db_test
+  gate: e10b
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#2-5-分割試験受入
+  mode: batch
+  prereq: 17MB, current ini
+  entry:
+    guest_tests: db_test
+  observe:
+  - 'guest_tests output: RC and PASS summary'
+  expect:
+    rc: 0
+    passed: 9
+    total: 9
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e10b-db_v50_test
+  gate: e10b
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#2-5-分割試験受入
+  mode: batch
+  prereq: 17MB, current ini
+  entry:
+    guest_tests: db_v50_test
+  observe:
+  - 'guest_tests output: RC and PASS summary'
+  expect:
+    rc: 0
+    passed: 41
+    total: 41
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e9-tvdump
+  gate: e9
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#2-5-分割試験受入
+  mode: tool
+  prereq: 17MB, current ini
+  entry: python3 tools/tvdump_recv.py --raw <evidence>/tvdump.bin
+  observe:
+  - /api/cmd raw TVDM
+  - /api/tvram lines
+  expect:
+    cols: 80
+    rows: 25
+    cell_bytes: 4000
+    frame_bytes: 4006
+    line_match: true
+    scroll_rows_excluded: 1
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e10b-pt0
+  gate: e10b
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#2-5-分割試験受入
+  mode: tool
+  prereq: 17MB, current ini
+  entry:
+    snapshot: python3 tools/accept/pt0_snapshot.py <out.json>
+    compare: python3 tools/accept/pt0_snapshot.py --compare base.json other.json --ignore-ad
+    sequence:
+    - application execution
+    - baseline
+    - v86 -t
+    - snapshot
+    - v86 -t
+    - snapshot
+    - v86 -g -t
+    - snapshot
+  observe:
+  - kernel.map observation globals
+  - /api/mem physical PDE0 and 256 PT0 PTEs
+  expect:
+    pte_count: 256
+    ignore_pte_bits: 96
+    pde0_unchanged: true
+    ptes_match: true
+    v86_restore_mismatch: 0
+    gfx_current_height: 400
+    gfx_flip_enabled: 0
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e10b-regression-E
+  gate: e10b
+  contract: userland/tests/ring3_marker.h
+  mode: manual
+  prereq: 17MB, current ini
+  entry: ring3_guard bb
+  observe:
+  - SHM marker row E
+  - fault_kill_count, shell/ver
+  expect:
+    marker_row: E
+    completion: SURV
+    kill_delta: 0
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: E10-1-d
+  mode: manual
+  status: deferred
+  contract: docs/tasks/DEFERRED_TESTS.md#E10-1
+- id: E10-1-b
+  mode: manual
+  status: deferred
+  contract: docs/tasks/DEFERRED_TESTS.md#E10-1
+- id: E10-1-K1
+  mode: manual
+  status: deferred
+  contract: docs/tasks/DEFERRED_TESTS.md#E10-1
