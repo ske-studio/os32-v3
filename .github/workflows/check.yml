@@ -11,7 +11,7 @@
 #     check-edit-doc-host, check-tools-host) → 同じく build.yml
 #   - np21w-src が無いと SKIP になるもの (check-key-inject-host) → 緑でも意味が無いので載せない
 # 各行を `make <target>` の形で書く: tools/gen_tests_inventory.py がこのファイルを読んで
-# docs/TESTS.md の CI 列を埋める。
+# build/out/TESTS.md の CI 列を埋める。
 name: check
 
 on:

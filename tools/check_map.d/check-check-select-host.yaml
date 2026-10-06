@@ -50,3 +50,8 @@ check-check-select-host:
 - sdk/os32_generations.py
 - sdk/rust/os32api/src/generations.rs
 - sdk/rust/os32api/src/lib.rs
+- docs/.orphans-allow
+- docs/INDEX.md
+- docs/POLICY_DEV.md
+- tools/check_docs_orphans.py
+- tools/check_map.d/check-tests-inventory.yaml

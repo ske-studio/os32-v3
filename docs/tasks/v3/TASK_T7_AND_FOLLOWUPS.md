@@ -43,7 +43,7 @@ masterの検査は共有低位PTの復元検査でもあり、caller復帰時の
 
 ページ0をNPにする前に、`pegc_identify`、`pegc_boot_sync_record` のBIOSフラグ、`gfx_identify_candidates` (`gfx_core.c`)、`v86_bios_save_real` の4経路を起動時の保存済みcore写しへ変更する。PEGCの実port probeは存続しBIOS値との比較だけ写しを使う。V86用原本はページ0全体 `[0, PAGE_SIZE)` (4096B) の上書きされないboot snapshot、セッション用編集は別stagingとする。現行 `REAL_SNAPSHOT_SIZE=0x600` をページ全体へ拡大し、0x600〜0xFFFも起動時の値を保持する。退避は低位consumerの書換え/NP化より前、復元も全ページが対象。追加の2560Bをcore BSS予算へ算入する。開始はmailboxを退避 → 実物低位640KiBをゼロ化 → 保存済みIVT/BDAを種にguest BIOS情報を構築 → guest image配置 → 実行の順。これにより前回guest/旧font/boot stackを再公開しない。終了時にmailbox原内容を復元する。ゼロ化の前に全boot stack/bootinfo consumerの退去を確認する。
 
-`memory_boot_fixed` の旧FONT/UNICODE/BB/残余の低位行は、`[0, MEM_CONV_END)` の単一予約 **LEDGER_R_FIXED / LEDGER_OWNER_KERNEL / WB** (用途名V86_LOW、一般poolへ供給しない) に統合する。新しい台帳型やセッションownerへの移譲は不要で、V86状態が排他使用権を表す。BBのpool移動は別のSURFACE_BACKING記録にする。memmap定数・`tools/gen_memmap.py`・生成される `02_memory.md` とCLAUDEの帯要約を同じ差分で更新し、開始/終了でこの予約の型/owner/PFN数不変を検査する。
+`memory_boot_fixed` の旧FONT/UNICODE/BB/残余の低位行は、`[0, MEM_CONV_END)` の単一予約 **LEDGER_R_FIXED / LEDGER_OWNER_KERNEL / WB** (用途名V86_LOW、一般poolへ供給しない) に統合する。新しい台帳型やセッションownerへの移譲は不要で、V86状態が排他使用権を表す。BBのpool移動は別のSURFACE_BACKING記録にする。memmap定数・`tools/gen_memmap.py`・`02_memory.md` の説明を同じ差分で更新し、`make docs-gen` で `build/out/MEMMAP.md` を確認し、開始/終了でこの予約の型/owner/PFN数不変を検査する。
 
 mailboxはDOSへ申告する640KiBの内側なのでV86中はguestが上書きしてよい。保存・実行・復元の**全セッション中**にhostが読書きしないことをツール側のセッション所有で保証する。`game/tools/autoplay/driver.py` の変更が必要なら外部引継ぎ事項として記録し、外部リポジトリの実装を完了したと扱わない。
 

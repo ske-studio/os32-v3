@@ -153,7 +153,7 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
 - VFS: エラーは `OS32_ERR_*` (FS の境界で翻訳)、`mount(dev_id)` は `(dev_type << 8) | unit`、`sys_ls` のコールバックから専用バッファ無しで FS を触らない。→ [`docs/06_filesystem.md`](06_filesystem.md) §6-1、§4-30、§4-26
 - デバイス窓は物理地図 (`pgalloc_range_has_ram`) で判定する (RAM の上端 `sys_get_mem_kb` ではない)。→ §4-34
 - CPL=3 の KAPI は IF=1 で走る (`int80_stub` の出口は IF=0)。KAPI の検査は `ring3_guard_active(ring3_in_syscall, ring3_wm_depth)` で (WM はアプリの syscall の中で走る)。→ §4-19、§4-61
-- シェルは 2 ヒープ (`kernel/paging.c` は shell heap 0x380000–0x3F0FFF を present に保つ。0x3F1000–0x3FAFFF は固定 PD/PT 10 枚、0x3FB000–0x3FFFFF は NP — 正典は [`docs/02_memory.md`](02_memory.md) §2-1)。exit の資源回収は所有者タグ (exec のネスト段) — カーネル常駐の FD は `vfs_fd_set_protect(fd, 1)`、親へ戻るときは `exec_heap_restore_state()` (`exec_heap_init_at()` ではない)。→ §4-15、§4-16、[`09_exec.md`](09_exec.md)
+- シェルは 2 ヒープ (`kernel/paging.c` は shell heap 0x380000–0x3F0FFF を present に保つ。0x3F1000–0x3FAFFF は固定 PD/PT 10 枚、0x3FB000–0x3FFFFF は NP — 番地の正典は `include/memmap.h`、生成した地図は `build/out/MEMMAP.md` (`make docs-gen`))。exit の資源回収は所有者タグ (exec のネスト段) — カーネル常駐の FD は `vfs_fd_set_protect(fd, 1)`、親へ戻るときは `exec_heap_restore_state()` (`exec_heap_init_at()` ではない)。→ §4-15、§4-16、[`09_exec.md`](09_exec.md)
 - SQLite はカーネル内 (0x200000) の固定 384KB MEMSYS5 プールを全接続 (FEP 辞書を含む) で共有する — `*_init()` の末尾で接続を閉じる。枯渇は `db_query` の `-2`、`db_last_error()` を必ず出す。→ §4-13
 - 日本語は 1 文字 3 バイト・2 桁、切り詰めは UTF-8 の境界で。外部プログラムの漢字は既知の対で JIS 表を確かめてから `utf8_set_jis_table_ready(1)`。フォントは `tools/gen_font16.py`。→ §4-27、§4-11、§4-10
 - 物理 0x90000 は自動プレイのメールボックス — 配置を変えたら `game/tools/autoplay/driver.py` も同じコミットで。→ [`docs/02_memory.md`](02_memory.md) §2-1

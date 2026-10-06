@@ -114,7 +114,7 @@ GUI アプリ      → libos32gui_stub (ジャンプ表への薄いスタブ) �
 `mkshlib --check`、GUI プロトコルの C ⇄ Rust 照合 (`check_gui_proto.py`)、`check-arch-asm` / `check-le-access`、
 対応表 (`check-map` / `check-check-select-host`)、文書 (lychee のリンク・孤児・状態行・試験一覧)、
 ne2000 リングと gcc + python3 だけで回るホスト試験 17 本。どの検査が CI に載っているかは
-[TESTS.md](TESTS.md) の CI 列 (yml の `make <target>` 行から生成)。
+`build/out/TESTS.md` ([生成手順](INDEX.md#生成文書の見方)) の CI 列 (yml の `make <target>` 行から生成)。
 残り (末尾で `i386-elf-gcc` を使うホスト試験、rustc が要るもの、`check-manifests` / `check-packages-host` /
 `check-memmap` のように `make all` の成果物を読むもの) は `build.yml` の `make check-fast` が回す (§8-6)。
 
@@ -222,9 +222,9 @@ KernelAPI の構造体を変えたときは `make clean` → `make all` が必�
 <a id="検査の3段"></a>
 #### 検査の 3 段 (`check-fast` / `check-changed` / `check`、2026-09-26)
 
-<!-- generated:host32 -->
-`HOST32_RUNNERS` は既定 `native qemu`。21 試験 (access_walk / appmem / appmem_map / caller_copy / db_caller / disk_auth / gfx_attach / gfx_kernel_fb / gfx_reattach / gfx_reinit / kapi_ranges / kcallback / kcg_boot / memmap_audit / e10c_lifecycle / nano_adapter / shm_user / surface_bundle / surface_lease / surface_query / unicode_surface) の正常対照を指定した全 runner、変異を先頭の runner で実行する。native への自動 fallback はしない。
-<!-- /generated:host32 -->
+`HOST32_RUNNERS` は既定 `native qemu`。対象試験の一覧は `make tests-inventory` で
+`build/out/HOST32.md` に生成する ([生成文書の見方](INDEX.md#生成文書の見方))。
+正常対照は指定した全 runner、変異は先頭の runner で実行する。native への自動 fallback はしない。
 
 どれも `make all` の後に回す (成果物を読む検査がある)。規則と登録は
 `build/checks.d/<検査名>.mk` に置き、`build/sdk.mk` が include する。
@@ -245,6 +245,7 @@ recipe には `$(MUT)` / `$(MUTS)` を使う。HOST32 は `$(call host32_check,t
 **誰がいつ回すか** ([ROLES §0](tasks/agents/ROLES.md)): 実装者は依頼パックに列挙された `make check-<名前>` と新しい試験だけ。
 `check-changed` / `check_select.py` は PM が列挙を作る・変更が広がったときに候補を出し直すための道具。
 全体 (`make check`) は PM が取り込みのまとまりごとに統合状態で 1 回 — 修正のやり直しの中では回さない。
+取り込みは `make all` → `make check` → `make check-fast` → 両方 rc=0 なら push。
 
 **`check-changed` は作業中の近道で、取りこぼしの保証はしない。保証は取り込み後の `make check` が担う。**
 変更は基点からHEADまでと、未コミット (staged/unstaged)・未追跡の和。
@@ -283,8 +284,8 @@ makeを実行して判定せず、基点から**追加だけ**であることを
    `tools/check_map.d/check-<name>.yaml` を追加する。手で列挙するのはソース・試験・データ。
    **ヘッダは手で列挙しない**。検査時の gcc -MM と静的includeの保守的な和から補う。
    gccで処理できないターゲット専用TUや非活性の条件分岐も、既存の静的include走査を残して拾う。
-3. `python3 tools/gen_tests_inventory.py --write` でこの節のrunner一覧と `docs/TESTS.md` を生成する。
-4. `make check-map` と関連ホスト試験で確認する。`make check` は生成物の鮮度も照合する。
+3. `make tests-inventory` で `build/out/` の試験表と runner 一覧を確認する (コミット不要)。
+4. `make check-map` と関連ホスト試験で確認する。`check-tests-inventory` は登録・入力対応を照合し、生成本文の鮮度は照合しない。
 
 全体設定 (`base_refs/ignore/full/docs_only/broad/docs_always/notest/artifact_readers`) は `tools/check_map.yaml`。
 lint は「手書きの一覧 + 自動ヘッダ依存」とrecipeからの入力を照合し、ソースの漏れ、古いglob、
@@ -721,7 +722,7 @@ python3 tools/move_docs.py SRC DST [SRC DST ...]
 動いた文書自身の中のリンクは深さが変わるので全部引き直す。`--dry-run` で一覧だけ出せる。
 運用 (何を落として何を残すか、落としたあとに守ること) は
 [archive/README.md](archive/README.md)。実行後は `check-docs-links` / `check-docs-orphans` /
-`gen_tests_inventory.py --write` の 3 つを回す。
+`make check-tests-inventory` (登録の照合) の 3 つを回す。
 
 **`--ext` / `--rewrite-only`** — 追従させるのは `.md` だけではない。票の番号や設計の正典は
 ヘッダやモジュールの先頭コメントに「仕様: `docs/tasks/…`」と書く慣例があり、文書だけ動かすと

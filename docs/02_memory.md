@@ -82,93 +82,18 @@
 > カーネル本体の上限は `MEM_KERNEL_IMAGE_MAX` で、**`build/os32.ld` の
 > `ASSERT` がリンク時に守る**。超えるとリンクが失敗し、何をすればよいかを
 > メッセージが言う。`make check` の `check-memmap` は、その予算・帯どうしの
-> 重なり・範囲の逆転・写しのずれ・この表の鮮度をまとめて見る。
+> 重なり・範囲の逆転・写しのずれ・定数の整合をまとめて見る。生成文書との一致は検査しない。
 
-<!-- 生成: tools/gen_memmap.py --write (この印の中は手で書かない) -->
-
-番地の定義の正典は [`include/memmap.h`](../include/memmap.h)。この表はそこと
-`build/out/kernel.map` の `__bss_end` から [`tools/gen_memmap.py`](../tools/gen_memmap.py) が起こす。
-手で直しても次の `--write` で消える。**表記は全て絶対番地** — 相対表記 (`+4KB`) は
-読み手に暗算させ、2026-09-17 の「SHM がカーネルスタックに食い込んでいた」穴を隠していた。
-
-```
-__bss_end      = 0x191CA0   (カーネル本体 583.2KB)
-__sqlite_start = 0x200000
-__sqlite_end   = 0x2BC200   (SQLite 本体 752.5KB)
-
-[ コンベンショナルメモリ (0x00000-0xFFFFF) ]
-0x000000 - 0x000FFF 4KB      NULL ポインタ検出ガード  (ブート後は R/O (BDA 参照のため。paging.c の [DEBUG] 注記)) NP
-0x001000 - 0x049FFF 292KB    フォントキャッシュ  (kcg.c がブート後に配置)                  RW
-0x007E00 - 0x007EFF 256B     ブート情報域 (ローダ → kernel_main)  (INT 1Bh AH=84h の結果 (include/bootinfo.h)。kernel_main の最初で写した後はフォントキャッシュが上書きしてよい) RW
-0x04A000 - 0x069FFF 128KB    Unicode-JIS 変換表  (SURFACE_BACKING/KERNEL/WB、RO lease。旧 USER RW は e11 で撤去、T3 V86_LOW 統合時に再検討) RW
-0x06A000 - 0x089FFF 128KB    GFX バックバッファ (4 プレーン)  (CPL=3 からは常に USER (レビュー #6)) RW
-0x08A000 - 0x09FFFF 88KB     空き / V86 ゲスト窓の一部  (MEM_AUTOPLAY_MAILBOX_BASE/SIZE は自動プレイ観測メールボックス (game/app と driver.py の対)) RW
-0x0A0000 - 0x0EFFFF 320KB    VRAM (テキスト + グラフィック)  (CPL=3 からは USER。TVRAM / B,R,G / E は PCD (UC)、CG 窓は WB) RW
-0x0F0000 - 0x0FFFFF 64KB     BIOS ROM  (WB (PCD なし))                                     RO
-
-[ カーネル帯域 (0x100000-0x1FFFFF) ]
-0x100000 - 0x191C9F 583.2KB  カーネル .text/.data/.bss  (kernel.map の __bss_end まで)     RW
-0x191CA0 - 0x191FFF 864B     空き
-0x192000 - 0x1C1FFF 192KB    カーネルヒープ (kmalloc)  (__bss_end を 4KB に切り上げた位置から) RW
-0x1C2000 - 0x1C2FFF 4KB      KernelAPI テーブル  (KAPI_ADDR)                               RW
-0x1C3000 - 0x1C3FFF 4KB      SHM 前方ガード                                                NP
-0x1C4000 - 0x1FBFFF 224KB    共有メモリ本体  (16KB x SHM_BLOCK_COUNT。shm_init 後・最初の AS 前に boot 口で USER/WB。lock/free/回収は USER を保ち RW のみ切替 (PDE 0 は全 PD 共有)) RW+USER
-0x1EC000 - 0x1FBFFF 64KB     GUI 予約 (末尾 4 ブロック)  (契約 T2。SDK の GUI_SHM_OFFSET = MEM_SHM_GUI_OFFSET) RW+USER
-0x1FC000 - 0x1FCFFF 4KB      SHM 後方ガード                                                NP
-0x1FD000 - 0x1FFFFF 12KB     SHM 後方予約  (カーネルが予算いっぱいなら空になる (それは正しい)) NP
-
-[ SQLite 帯域 (0x200000-0x2FFFFF) ]
-0x200000 - 0x2BC1FF 752.5KB  SQLite code+BSS  (kernel.map の __sqlite_start / __sqlite_end) RW
-0x2BC200 - 0x2BCFFF 3.5KB    空き
-0x2BD000 - 0x2DCFFF 128KB    SQLite 代替スタック                                           RW
-0x2DD000 - 0x2E7FFF 44KB     カーネル予約 (下)  (DMA プールの下側ガード)                   NP
-0x2E8000 - 0x2F7FFF 64KB     DMA プール  (予約域に開けた穴。present / supervisor / R/W。**USER は立てない** (kselftest の MM 検査が MM_RW と MM_RWU を分けて見る)) RW
-0x2F8000 - 0x2F8FFF 4KB      カーネル予約 (上)  (DMA プールの上側ガード)                   NP
-0x2F9000 - 0x2FAFFF 8KB      台帳 backing (FIXED 型)  (metadata 1 ページ + PT workspace 1 ページ。FIXED 型のときだけ present / supervisor / R/W (USER なし)、ほかの構成では予約域 (NP) のまま) NP / RW
-0x2FB000 - 0x2FBFFF 4KB      カーネルスタックガード  (2026-09-17 に 0x1FB000 から移設 (決裁 D1)) NP
-0x2FC000 - 0x2FFFFF 16KB     カーネルスタック  (ESP 初期値 = MEM_KSTACK_TOP (kentry.asm / TSS.ESP0)) RW
-
-[ シェル常駐帯域 (0x300000-0x3FFFFF) ]
-0x300000 - 0x374FFF 468KB    シェル .text/.data/.bss + newlib sbrk  (MEM_SHELL_MAX_SIZE が上限 = sbrk の天井) RW
-0x375000 - 0x375FFF 4KB      シェルスタックガード                                          NP
-0x376000 - 0x37FFFF 40KB     シェルスタック  (下向き成長)                                  RW
-0x380000 - 0x3F0FFF 452KB    シェル exec_heap (KAPI mem_alloc)  (newlib の sbrk とは別領域 (2026-09-03)) RW
-0x3F1000 - 0x3F1FFF 4KB      固定 master PD  (恒久FIXED / supervisor / WB)                 RW
-0x3F2000 - 0x3F9FFF 32KB     固定 bootstrap PT (8枚)  (恒久FIXED / supervisor / WB)        RW
-0x3FA000 - 0x3FAFFF 4KB      固定 device aperture PT  (backing は WB、MMIO PTE は PCD/PWT) RW
-0x3FB000 - 0x3FFFFF 20KB     上端残余予約  (恒久FIXED、T3 の guard+kstack 用)              NP
-
-[ 仮想アプリ帯 (0x80000000-) ]
-0x80000000 - 0x800FFFFF 1MB      共有ライブラリ帯 (libos32gui.shlib)  (.text は全 PD 共有、.data/.bss はアプリごとの物理) RO+USER / RW+USER
-0x80100000 -       動的     外部プログラム空間  (image/sbrk、exec_heap は 0x88000000、可変 stack は 0x90000000 直下。物理ページの池の下端は MEM_POOL_BASE) RW+USER
-
-[ 物理 RAM とデバイス窓 ]
-0x500000 - 0x5FFFFF 1MB      集積域 (ブート時)  (圧縮画像の読み込み先 (T6b 以後)。展開が終われば池へ。T1 ではローダは未使用) 池
-0x600000 - 0x6FFFFF 1MB      同梱域 (ブート時)  (ブート必須モジュールの展開先 (T5b 以後、台帳が owner=bundle で予約)。T1 ではローダは未使用) 池
-0x700000 - 0xEFFFFF 8MB      空き
-0xF00000 - 0xFFFFFF 1MB      PC-98 システム空間 (PEGC リニア窓)  (RAM として配らない)      NP / supervisor+PCD
-0x1000000 - 0x7FFFFFFF 2032MB   16MB 以上の実 RAM (の置き場)  (検出量ぶんだけ pgalloc の池に入る (K6-RAM)。上端は MEM_PHYS_RAM_CEILING (D11)) RW
-0x80000000 - 0xFFFFFFFF 2048MB   RAM の登録上限 (2GB) 以上  (RAM として登録しない (D11)。PCI の BAR・デバイス窓の帯 (0xFE000000〜)・最上位の ROM / MMIO) NP / supervisor+PCD
-
-  属性: RW=読み書き / RO=読み取り専用 / NP=Not-Present (ガード)
-  USER=CPL=3 から見える。`<<<` の行は下の「地図の矛盾」に出る帯。
-  アプリ固有 PDE (0x80000000 から 4MB 単位) は最大 0x90000000 まで伸びる。
-```
-
-**地図の矛盾: 0 件** (重なりも逆転も無い。`--check` が毎回確かめる)
-
-**カーネル本体の予算**: 596KB 中 583.2KB を使用 (残り 12.8KB)。
-
-**カーネルがあと何 KB 育つと何が壊れるか** (`__bss_end` が伸びると `KHEAP_BASE` 以降が芋づるで動く)
-
-- `__bss_end` +864B で KHEAP_BASE が 1 ページ上がる。0x192000 → 0x193000。以降の KAPI / SHM / ガードが全部 4KB 動く
-- `__bss_end` +12.8KB で **build/os32.ld の ASSERT がリンクを止める** (予算 MEM_KERNEL_IMAGE_MAX 超過)。止めるのが目的。超えたぶんだけ SHM 帯が カーネル帯域 0x1FFFFF を突き抜ける
-
-<!-- /生成: tools/gen_memmap.py -->
+実ビルドの地図は `build/out/MEMMAP.md` に生成する
+([生成文書の見方](INDEX.md#生成文書の見方))。定義は `include/memmap.h`、
+実ビルドの数値は `build/out/kernel.map` の `__bss_end` / SQLite の境界から求める。
+表は全て絶対番地とし、カーネル本体の使用量・残り予算・成長時に動く帯も表示する。
+`__bss_end` が伸びると `KHEAP_BASE` 以降の KAPI / SHM / ガードも動くため、
+数値の地図はコミットせず、説明をこの節に残す。
 
 #### 動的レイアウト (番地が実行時に決まるので生成できない部分)
 
-上の表に出るのは `include/memmap.h` と `kernel.map` で決まる固定の番地だけ。
+生成される地図に出るのは `include/memmap.h` と `kernel.map` で決まる固定の番地だけ。
 以下は搭載メモリ量・バイナリの大きさ・起動の仕方で変わるので手で持つ。
 
 ```
@@ -198,7 +123,7 @@ guard_a+4KB - heap_top             exec_heap (KAPI mem_alloc)                 R/
     (`ledger_arena_top`、TASK_T1_LEDGER §3-6。旧 `sys_reserve_top` は T1e で撤去)。
     Cirrus の面はリニア窓の中 (MMIO) なので引かない
   ※ カーネル帯域内の KAPI / SHM の番地は `__bss_end` を基点に動的算出される。
-    **だから上の表は `kernel.map` を読まないと書けない** (票 TASK_KSTACK_USER §4-bis)
+    **だから生成した地図は `kernel.map` を読まないと書けない** (票 TASK_KSTACK_USER §4-bis)
   ※ 入れ子起動は子として走り終了で親へ戻る (最大 4 段)。CPL=3 のプログラムは
     PD ごとに独立したアプリ帯を持つ (09_exec.md)。帯は 0x400000 から 4MB (PDE)
     単位で 1〜2 枚 (tasks/memory/APP_BAND_PDE.md)。0x400000 帯の shlib .text は共有、.data はアプリごと

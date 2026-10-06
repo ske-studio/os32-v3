@@ -48,7 +48,7 @@ RESYNC との競合を `gen` の検査では消せない (既に鳴ったデー�
 
 **メモリ**: **リング 16KB (DMA、4096 frame = 半バッファ 2048 × 2)** は 1-3 の `dma_pool_alloc` から (プール 64KB のうち。82557 の 16KB と共存できる)、
 **ステージング 16KB (4096 frame、DMA しない)** は `kmalloc` (KHEAP) から (PM 指示 2026-09-23、`drivers/pcm_cs4231.c`。初稿は「カーネル予算が
-6KB しか無いので暫定でプールを使う」だったが解消 — §2-1 末尾「票からの逸脱」1。カーネル予算の現在値は [`02_memory.md`](../../02_memory.md) §2-1 の生成ブロック)。open 時に両方を 0 で埋める。
+6KB しか無いので暫定でプールを使う」だったが解消 — §2-1 末尾「票からの逸脱」1。カーネル予算の現在値は [`02_memory.md`](../../02_memory.md) §2-1 から案内する `build/out/MEMMAP.md`)。open 時に両方を 0 で埋める。
 
 **レジスタアクセス**: `cs_read(idx)` / `cs_write(idx, val)` / `cs_write_mce(idx, val)` (R0 に `0x40 | idx` を書いて MCE を保つ) は
 **Index と Data の組を 1 つの `irq_save` の中**で行う (往復 1 B9)。MCE の列の途中 (`s_mce_busy = 1`) は IRQ / tick は装置に触らない。

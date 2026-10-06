@@ -101,7 +101,7 @@ move_docs.py — 文書を動かし、リポジトリ中の参照を追従させ
 
     python3 tools/check_docs_links.py        # リンクと見出しアンカー
     python3 tools/check_docs_orphans.py      # 索引から辿れなくなっていないか
-    python3 tools/gen_tests_inventory.py --write   # 票の列を引き直す
+    make tests-inventory   # build/out/ の票の列を引き直す (コミット不要)
 
 `docs/INDEX.md` の索引行と、アーカイブ先の README は人が書く。運用は
 `docs/archive/README.md`。
@@ -463,7 +463,7 @@ def main():
     print("完了。次に回すもの:")
     print("  python3 tools/check_docs_links.py")
     print("  python3 tools/check_docs_orphans.py")
-    print("  python3 tools/gen_tests_inventory.py --write")
+    print("  make tests-inventory  # build/out/ の生成表、コミット不要")
     return 0
 
 

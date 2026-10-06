@@ -18,7 +18,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | 引き継ぎ (次の PM への申し送り)・現在地と残件 | [tasks/agents/HANDOVER_2026-10-06.md](tasks/agents/HANDOVER_2026-10-06.md) (入口の 1 枚、50 行以内・上書き。進捗の本文は持たない) | 前回は [archive/agents/HANDOVER_2026-09-30.md](archive/agents/HANDOVER_2026-09-30.md) (fork 初日) |
 | エージェント運用体制 (役割・起動・規約) | [tasks/agents/ROLES.md](tasks/agents/ROLES.md) (§0 が現行の 1 表。経緯は持たない) | CLAUDE.md (体制 1 段落 + リンク)。経緯は [archive/agents/ROLES_HISTORY_2026-10-06.md](archive/agents/ROLES_HISTORY_2026-10-06.md)、見直しの根拠は [tasks/agents/REVIEW_2026-10-06.md](tasks/agents/REVIEW_2026-10-06.md) |
 | 延ばした試験・SKIP・ホストだけの合格・未結線 (持越し) | [tasks/DEFERRED_TESTS.md](tasks/DEFERRED_TESTS.md) (未完了だけを持つ。終わった行は消す) | 各票・引き継ぎは参照のみ。同じ延期を票や memory に写さない |
-| 番地・帯域 | `include/memmap.h` (定義) → [02_memory.md §2-1](02_memory.md) の**生成ブロック** (`tools/gen_memmap.py --write`、地図はここ 1 か所だけ) | CLAUDE.md は参照のみ (帯の表は 2026-10-06 に外した)。`memmap.h` の先頭は生成先への案内。重なり・逆転・写しのずれは `make check` の `gen_memmap.py --check` が見る |
+| 番地・帯域 | `include/memmap.h` (定義)、[02_memory.md §2-1](02_memory.md) (説明)、`build/out/MEMMAP.md` (実ビルドの生成地図、`make docs-gen`) | CLAUDE.md は入口のみ |
 | KAPI の一覧・オフセット・版 | `sdk/kapi.json` → [KAPI_SPEC.md §4](KAPI_SPEC.md) | README.md / このファイル / KAPI_SPEC.md の版番号 (`tools/check_kapi_version.py` が照合。CLAUDE.md は版数を持たない) |
 | KAPI 追加手順 | [KAPI_SPEC.md §3-1](KAPI_SPEC.md) | スキル `.claude/skills/os32-kapi-add` と CLAUDE.md (どちらもポインタのみ) |
 | KAPI 版番号・エラー番号の予約 (未実装の先取り調停) | [KAPI_SPEC.md §3-2](KAPI_SPEC.md) | 各計画 (GUI TASK_K1、network LINK_PLAN) は参照 |
@@ -39,8 +39,8 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | プログラムの一覧 | 各層の `deploy.yaml` (機械可読の正典)、コマンドは [07_shell.md §7-1](07_shell.md) | 09_exec / INDEX に表を持たない |
 | LAN の設計・進捗 | ドライバ = [tasks/network/PLAN.md](tasks/network/PLAN.md)、リンク層と Host Services = [tasks/network/LINK_PLAN.md](tasks/network/LINK_PLAN.md) | 05_drivers / DEVELOPMENT は要約 + リンク |
 | 設定の置き場 (system.cfg の残すキー、settings.db のスキーマ / API / リカバリ) | [tasks/settings/DESIGN.md](tasks/settings/DESIGN.md) (計画、v1.3) | ROADMAP は 1 行 |
-| アプリ帯の広さ・私有量 (v3) | [TASK_MEMMAP_V3](tasks/v3/TASK_MEMMAP_V3.md) D9・D11・§3-5 (決定)、[TASK_T2_APPBAND](tasks/v3/TASK_T2_APPBAND.md) と [T2d〜h](tasks/v3/TASK_T2D_T2H.md) (実装・受入) | 02_memory.md は生成地図。旧 v2.1 の帯と未記録ゲスト受入は [APP_BAND_PDE](tasks/memory/APP_BAND_PDE.md) の履歴として区別 |
-| 試験の一覧 (`make check` のターゲット、`_tdd.md` と票の対応) | [TESTS.md](TESTS.md) (`tools/gen_tests_inventory.py` で生成、`make check-tests-inventory` が鮮度を照合) | 各票は自分の `_tdd.md` を指すだけ |
+| アプリ帯の広さ・私有量 (v3) | [TASK_MEMMAP_V3](tasks/v3/TASK_MEMMAP_V3.md) D9・D11・§3-5 (決定)、[TASK_T2_APPBAND](tasks/v3/TASK_T2_APPBAND.md) と [T2d〜h](tasks/v3/TASK_T2D_T2H.md) (実装・受入) | 02_memory.md は地図の説明。旧 v2.1 の帯と未記録ゲスト受入は [APP_BAND_PDE](tasks/memory/APP_BAND_PDE.md) の履歴として区別 |
+| 試験の一覧 (`make check` のターゲット、`_tdd.md` と票の対応) | `build/out/TESTS.md` / `build/out/HOST32.md` (生成表、`make docs-gen`)、[TESTS.md](TESTS.md) (手書きの読み方・判断) | [08_build.md](08_build.md) は手順と参照のみ |
 | 移植性 (CPU / 機種の 2 軸、ARM 計測、順序 1〜4 の経過) | [tasks/portability/ARM_GAUGE.md](tasks/portability/ARM_GAUGE.md) (計測と経過)、[../arch/README.md](../arch/README.md) (足し方) | [archive/portability/SURVEY_N1.md](archive/portability/SURVEY_N1.md) (調査)、`archive/arch_port/` は**別リポジトリ `pw-sh4-research` の調査の快照** (正典はそちら。本リポジトリでは更新しない)、[archive/portability/TASK_KSTRING_BENCH.md](archive/portability/TASK_KSTRING_BENCH.md) (kstring の速度実測 **完了 2026-09-17** — x86 は asm 維持、C 版は他 32 ビットアーキ向け。数字は ARM_GAUGE §9、語長の前提は §10) |
 | 版数 (カーネル 2.1 / GUI 1.4 で閉じた / 現行の開発 v3 / v4 草案) と v3 の fork の段取り | [ROADMAP.md §0](ROADMAP.md) | 各版の要約は [CHANGELOG.md](../CHANGELOG.md) (3〜5 行 + リリースノートへのリンク)、詳細は `RELEASE_vX.md` ([RELEASE_v2.1.md](RELEASE_v2.1.md))。`ver` の文字列、タグ |
 | v3 の目的・範囲・目標の 2 段・柱 (P0〜P10) と順序・v3 後半の票 | [tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md) (本案、2026-09-30 昇格) | ROADMAP.md の v3 の行、README.md (目的の一文)。メモリマップの決定の本文は TASK_MEMMAP_V3 (D 番号) |
@@ -53,6 +53,27 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | 票の状態行の語彙 | [POLICY_DEV.md §8](POLICY_DEV.md) の表 (`tools/check_docs_status.py` がそこから読む) | 下の「タスク」節の冒頭 (語の列挙のみ) |
 
 T3 前の文書再整備の候補・未解決点は [DOCS_REORG_T3](tasks/v3/DOCS_REORG_T3.md) (草案)。正典の差替えやアーカイブ移動の承認を意味しない。
+
+## 生成文書の見方
+
+リポジトリのルートで `make all` → `make docs-gen` を実行する。
+現在のビルド成果物を読み、次の 3 つを `build/out/` に書き出す。
+`docs-gen` 自体はビルドしない。地図の入力が無い・古い場合は再ビルドを求めて停止する。
+ツールチェーンの準備は [INSTALL.md](../INSTALL.md)。
+試験表だけなら `make tests-inventory` (カーネルのビルド不要)。
+
+| 出力 | 内容・説明の正典 |
+|---|---|
+| `build/out/TESTS.md` | Make の検査ターゲット・コマンド・対象ソース・記録・票・CI。読み方と判断は [TESTS.md](TESTS.md) |
+| `build/out/HOST32.md` | runner ごとに実行する試験の一覧。運用は [08_build.md §8-4](08_build.md) |
+| `build/out/MEMMAP.md` | 現在の `kernel.map` と `memmap.h` から求めた絶対番地・予算・余裕。説明は [02_memory.md §2-1](02_memory.md) |
+
+生成物は既存の gitignore 対象ディレクトリに置き、コミットしない。
+ブランチ間の競合と生成本文の鮮度による取り込み失敗を避け、必要な時点で再生成して読む。
+生成前にも索引を読めるよう、出力パスはコード表記とする。
+`check-tests-inventory` は登録・入力対応、`check-memmap` は配置・予算・写し・定数を検査する。
+生成文書との一致はゲートに含めない。`kernel.map` 自体のビルド鮮度の確認は残す。
+`make docs-win` は生成後、文書と 3 つの生成物を同じ相対配置で Windows 側へ写す。
 
 ## カーネル技術仕様書 (§1-§10)
 
@@ -197,7 +218,7 @@ T3 前の文書再整備の候補・未解決点は [DOCS_REORG_T3](tasks/v3/DOC
 |-------------|------|
 | [archive/v3/V3_PLAN_DRAFT.md](archive/v3/V3_PLAN_DRAFT.md) | **v3 本案の草案 — 草案群のまとめ (2026-09-30、完了記録: 本案 V3_PLAN.md に昇格)** — 草案の一覧と振り分け (§1)、目的と範囲・**目標の 2 段** (§2、§2-1)、柱と順序の案 (§3)、**メモリマップの柱は決定済み** (§3-1 は要点と決着先、正典は TASK_MEMMAP_V3)、食い違いの一覧 (§4)、v2.x との互換 (§5)、fork の段取り (§6)、ユーザー判断と Codex の論点 (§7)。**§7-2 X1〜X8 は 2026-09-30 に Codex が回答しユーザーが承認 (結論と反映先は表)**。本案への昇格はユーザー判断と Codex の突き合わせの後 |
 | [tasks/v3/FORK_PLAN.md](tasks/v3/FORK_PLAN.md) | **os32-v3 への fork の段取り — 計画 (2026-09-30、ユーザー承認「準備を承認」)** — 持っていくものの一覧 (`git ls-files` 1,551 ファイルをディレクトリ単位で 持つ / 持たない / 要判断、§1)、経緯の要約とケーススタディの候補 (HISTORY / CASE_STUDIES / THIRD_PARTY、§1-4)、**公開前の監査 (秘密・著作権物・第三者ライセンス・実パス・ホスト名、コマンドと合格条件、2026-09-30 の結果、§2)**、手順 a〜g と [D2] の地点 (§3)、判断が要る点 J1〜J8 (§4)。リポジトリの作成・push は未実施 |
-| [archive/v3/PLAN.md](archive/v3/PLAN.md) | **v3 の計画 (2026-09-17)** — 機能を足す前に入れ物を作り直す (C11 → メモリマップ再配置 → ドライバの動的読み込み → PCI → 82557)。カーネル本体の大きさと残りは [02_memory.md §2-1](02_memory.md) (生成)。アプリへの払い出し §4、アイデア §5。**完了記録 (2026-09-30): 策定時の計画。本案は V3_PLAN.md** |
+| [archive/v3/PLAN.md](archive/v3/PLAN.md) | **v3 の計画 (2026-09-17)** — 機能を足す前に入れ物を作り直す (C11 → メモリマップ再配置 → ドライバの動的読み込み → PCI → 82557)。カーネル本体の大きさと残りは `build/out/MEMMAP.md` ([生成手順](#生成文書の見方))。アプリへの払い出し §4、アイデア §5。**完了記録 (2026-09-30): 策定時の計画。本案は V3_PLAN.md** |
 | [tasks/v3/TASK_MEMMAP_V3.md](tasks/v3/TASK_MEMMAP_V3.md) | **v3 のメモリマップ — 設計中 (方針確定 2026-09-30、3 者討論で決定、Codex Approve)**。決定 D1〜D35 (D29〜D34 = 保留 5 件 U6 の拾い方、**D35 = D7 の改訂: fork 時の KAPI 整理でスロット順を変えてよい、世代の識別と旧新混在試験が条件**、2026-09-30; システムは恒等のまま、アプリだけ 0x80000000〜、物理台帳、SQLite のモジュール化、低位 640KB を V86 へ、OpenType)、帯の表、票 T0〜T7、受入条件、**Codex X1〜X8 の補足の対応表 (§8-4)**、経緯。実装は未着手 |
 | [archive/v3/U6_PENDING_REVIEW.md](archive/v3/U6_PENDING_REVIEW.md) | **U6 の仕分け表 — 決裁済み (2026-09-30、ユーザーが 6 点すべて推奨どおりに決定 → TASK_MEMMAP_V3 D29〜D34)**: 保留 5 件 (F3a〜c / F2c / FEP_BOUNDARY / MEMORY_RAM_INTEGRATION / DEVICE_RESERVATION) の現状 (コードで確認)、TASK_MEMMAP_V3 の決定で置き換わった部分と残る部分、拾う先 (T2 / T4 / T5a の要件、P4、撤回)、判断点 6 つとその決定 |
 | [archive/v3/TASK_T1_LEDGER.md](archive/v3/TASK_T1_LEDGER.md) | **T1: 物理地図と所有権台帳 — 受入完了 (2026-10-01、T1a〜T1f 着地、残件は状態行)** — TASK_MEMMAP_V3 §6 T1 の範囲と T2 以降との境界 (§1)、物理メモリの確保・予約・写像の現状一覧と P2V / V2P の監査見積り 161 件 (§2)、台帳の 4 層 (地図・割当可否・owner・区間の表)、owner の種別 (AS / 永続 / モジュール / device)、検証済み資源レコード (X4、span ごとの資源と `res_mask`)、SURFACE の型 (Cirrus の CLIENT / DISPLAY を含む)、API、起動順 (8MB 型の backing と exec 上端、PCI 採取値の取り込み)、P2V / V2P / `P2V_CONST` と `check_p2v.py`、R1 の計数 (観測用の深さと broker の判定を分ける、jmpbuf の 3 保存先)、`dma_alloc`、gfx の識別 → 予約 → 写像 (候補群 1 owner) (§3)、段 T1a (モデル経路) 〜 T1f と受入・8MB / 17MB / 64MB の確かめ方・段の境目の owner 表 (§4)、リスクと未確認 (§5)、Codex の論点 X9〜X16 と 1 回目 B1〜B7 / 2 回目 B8〜B11 の対応表 (§6) |
@@ -331,7 +352,7 @@ V86・SQLite・タイルマップ・ライブラリ設計書 (と上の boot_ref
 
 | ドキュメント | 内容 |
 |-------------|------|
-| [TESTS.md](TESTS.md) | **試験の一覧** (正典、生成) — `make check` の全ターゲット、`_tdd.md` と票の対応、改善提言 |
+| [TESTS.md](TESTS.md) | **試験の一覧の入口** (読み方・判断の正典) — `make check` の全ターゲット、`_tdd.md` と票の対応、改善提言 |
 | [archive/TEST_INVENTORY_2026-09-14.md](archive/TEST_INVENTORY_2026-09-14.md) | 試験の棚卸し (2026-09-14 の快照)。正典は `TESTS.md` へ移行 |
 | [archive/debug_kcg_load_font.md](archive/debug_kcg_load_font.md) | `kcg_load_font` クラッシュの仮説計画 (単発の障害記録) |
 | [archive/v21/cross_compiler_rebuild.md](archive/v21/cross_compiler_rebuild.md) / [archive/v21/ext2_dind_debug.md](archive/v21/ext2_dind_debug.md) | クロスコンパイラ再構築 / ext2 二重間接の障害記録 |
