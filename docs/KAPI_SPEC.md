@@ -103,12 +103,12 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v57 | **実装済み (2026-09-22、実機シリアル往復 4)** | ローカル打鍵だけの読み口 `kbd_trygetchar_local` 1 本 (slot 218 = 0x370、data_fields は 0x374 / 0x378 へ)。cooked リングだけを見て**シリアルも注入リングも見ない**。rshell の速度切替の番犬が「この 1 バイトはシリアル由来か」を**1 回の読みで**確定できるようにする (2 度読みの窓を消す)。⚠ 番号は PM が着地時に振り直す (同日に L-A も v57 を取得) | [archive/realhw_v21/TASK_SERIAL_VFAST.md](archive/realhw_v21/TASK_SERIAL_VFAST.md) |
 | v58 | **実装済み (2026-09-22、手元ビルドのみ)** | 実機の PCI 列挙 `pci_count` / `pci_get` / `pci_cfg_read32` の 3 本 (slot 219 = 0x374、220 = 0x378、221 = 0x37C、data_fields は 0x380 / 0x384 へ)。起動時に `pci_init()` が コンフィギュレーションメカニズム #1 (`0CF8h` DWORD / `0CFCh`) で bus 0 を走査し、vendor/device/class/BAR/Interrupt Line を静的表 (上限 32) に記録する。**読むだけ** — BAR のサイズ判定 (全 1 を書いて読み戻す) はしないので BIOS の割り当てを壊さない。シェルの `lspci` / `pcidump` がこの 3 本を使う。**NP21/W は PCI を実装していない**ので、エミュレータでは `[pci] mech#1 absent` と `lspci: no PCI` が正しい姿。実体は `drivers/pci.c` / `drivers/pci_decode.c` | [tasks/realhw/TASK_LAN_82557.md](tasks/realhw/TASK_LAN_82557.md) |
 | v59 | **実装済み (2026-09-23、手元ビルドのみ)** | µs 時計 `sys_time_now` 1 本 (slot 222 = 0x380、data_fields は 0x384 / 0x388 へ)。起動からの経過を µs で返す。**64 ビットは KAPI で返せない** (往復 1 の B14) ので、出力引数 2 本に**同じスナップショットの上下**を書く。時間源は `tick_count` (§1-0 の後はどちらのシステムクロックでもちょうど 10ms) と PIT ch0 のラッチ読みで、周期の境界はPIC1 の IRR bit0 をラッチの前後で挟んで判定する (最大 3 回やり直す)。戻り 0 = 成功 / `OS32_ERR_AGAIN` = 3 回とも判定できなかった / `OS32_ERR_NOSYS` = PIT 未初期化か mode 2 でない / `OS32_ERR_INVAL` = `lo` か `hi` が NULL・4 バイトが帯境界を跨ぐ・**2 本の範囲が交差する (差 0〜3)**。**負のときは 2 本とも書かない**。出力が読み取り専用の USER ページ (共有ライブラリの `.text`) なら `ring3_fault_kill` — OS32 は CR0.WP = 0 なのでハードウェアは止めない。実体は `kernel/ktime.c` / `kernel/time_math.c`、検証は `kapi/kapi_sys.c` の `kapi_sys_time_now` | [tasks/v3/TASK_HAL_WIRING.md](tasks/v3/TASK_HAL_WIRING.md) §1-5 |
-| v60 | **実装済み (2026-09-23、手元ビルドのみ)** | PCI 結線の診断の取得口 `pci_bind_info` 1 本 (slot 223 = 0x384、data_fields は 0x388 / 0x38C へ)。`idx` 番目 (**`pci_get` と同じ列挙順**) の結線結果を呼び手のバッファへ**8 バイトちょうど**写す。並びは `drivers/pci_bind.h` の `struct pci_bind_info`。`result` = NONE / BOUND / DECLINED / QUARANTINED、`reason` は上書き規則 1 つだけが正、`line_state` は**読む時点で合成**する (結線のときは正常だった線が後から隔離されても `result` は BOUND のまま `line_state` だけが QUARANTINED になる)。**既存 `pci_get` の 40 バイトは広げない** — 旧呼び手のバッファを踏むので別の口にした。戻り 0 = 成功 / `OS32_ERR_INVAL` = `out` が NULL・8 バイトが帯境界を跨ぐ・`idx` が範囲外 (**負のときは 1 バイトも書かない**)。出力が読み取り専用の USER ページなら `ring3_fault_kill` (v59 と同じ規則)。シェルの `lspci` が注記を出す。実体は `drivers/pci_bind.c`、検証は `kapi/kapi_sys.c` の `kapi_pci_bind_info` | [tasks/v3/TASK_HAL_WIRING.md](tasks/v3/TASK_HAL_WIRING.md) §1-4 |
+| v60 | **実装済み (2026-09-23、手元ビルドのみ)** | PCI 結線の診断の取得口 `pci_bind_info` 1 本 (slot 223 = 0x384、data_fields は 0x388 / 0x38C へ)。`idx` 番目 (**`pci_get` と同じ列挙順**) の結線結果を呼び手のバッファへ**8 バイトちょうど**写す。並びは `drivers/pci_bind.h` の `struct pci_bind_info`。`result` = NONE / BOUND / DECLINED / QUARANTINED、`reason` は上書き規則 1 つだけが正、`line_state` は**読む時点で合成**する (結線のときは正常だった線が後から隔離されても `result` は BOUND のまま `line_state` だけが QUARANTINED になる)。**既存 `pci_get` の 40 バイトは広げない** — 旧呼び手のバッファを踏むので別の口にした。戻り 0 = 成功 / `OS32_ERR_INVAL` = CPL=0 / WM で `out` が NULL (CPL=3 は wrap で kill)・8 バイトが帯境界を跨ぐ・`idx` が範囲外 (**負のときは 1 バイトも書かない**)。出力が読み取り専用の USER ページなら `ring3_fault_kill` (v59 と同じ規則)。シェルの `lspci` が注記を出す。実体は `drivers/pci_bind.c`、検証は `kapi/kapi_sys.c` の `kapi_pci_bind_info` | [tasks/v3/TASK_HAL_WIRING.md](tasks/v3/TASK_HAL_WIRING.md) §1-4 |
 | v61 | **実装済み (2026-09-23、手元ビルドのみ)** | CS4231 (MATE-X PCM) の再生 `pcm_open` / `pcm_write` / `pcm_status` / `pcm_close` / `pcm_set_volume` の 5 本 (slot 224〜228 = 0x388〜0x398、data_fields は 0x39C / 0x3A0 へ)。16 ビット・ステレオ・44.1k / 22.05kHz の**再生だけ**で、単位は frame (左右 1 組 = 4 バイト)。カーネルが DMA リング 16KB (`dma_pool`) とステージング 16KB (`kmalloc`) を持ち、**アプリのバッファを IRQ から読むことはしない** — `pcm_write` はステージングへ写すだけで、リングを書くのは `pcm_advance` (IRQ / tick、IF=0) と停止中の `pcm_start` / RS_RESTART に限る。所有者は既存の資源 owner と同じアプリ ID で、異常終了は `exec_reclaim_owned` の `pcm_reclaim` が**待たずに**止めて返す。実体は `drivers/pcm_cs4231.c` / `drivers/pcm_cs4231_math.c` | [tasks/v3/TASK_PCM_CS4231.md](tasks/v3/TASK_PCM_CS4231.md) |
 | v63 | **実装済み (2026-09-24、手元ビルドのみ)** | **データ欄の固定配置** (票 TASK_KAPI_DATA_FIELDS)。関数は増えていない。関数表の容量を **R = 300** 予約し (予約スロット 230〜299)、`sbrk_heap_limit` / `shm_base` を **0x4B8 / 0x4BC に固定** — 以後の関数追加でデータ欄は動かない。OS32X ヘッダを **v3** (末尾に `kapi_data_off`) にし、exec / shlib ローダ / 常駐シェルの起動は値がカーネルと違えば断る。crt の `kapi` の実名を `os32_kapi_v63` に変えた。**旧バイナリは一度だけ全部断られる** — 移行は [08_build.md](08_build.md) §8-4 | [archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md](archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md) |
 | v64 | **実装済み (2026-09-24、手元ビルドのみ)** | HDD の一時置き場 (票 TASK_HDD_INSTALL 段 1): `ext2_format_at` / `dev_mount_count` / `sys_umount_checked` / `hdd_geom_info` の 4 本 (slot 230〜233 = 0x3A0〜0x3AC。データ欄は v63 で固定済みなので動かない、crt の `kapi` の実名も `os32_kapi_v63` のまま)。`ext2_format_at` は区画表を読まずに範囲だけに作る (ディスク総数超過・LBA 0〜17・桁あふれは 1 バイトも書かずに断る)、`sys_umount_checked` は sync を先に呼んで失敗なら外さない、`hdd_geom_info` は BIOS 幾何 (INT 1Bh AH=84h) と IDENTIFY と I/O の方式を `HddGeom` (32 バイト) に写す。同じ版で ATA I/O を LBA28 (word 49 bit9) に、区画表を PC-98 標準配置に、ext2 の区画探索を「見つからなければ失敗」に変えた — **旧配置の NHD は `make nhd-migrate-pt` で移す** ([08_build.md](08_build.md) §8-4)。配備は**カーネルを先** | [archive/realhw_v21/TASK_HDD_INSTALL.md](archive/realhw_v21/TASK_HDD_INSTALL.md) 段 1 |
-| v62 | **実装済み (2026-09-23、手元ビルドのみ)** | キーボード 8251 の診断 `kbd_diag` 1 本 (slot 229 = 0x39C、data_fields は 0x3A0 / 0x3A4 へ)。`KbdDiag` (24 バイト、`os32_kapi_shared.h`) を呼び手のバッファへ写す — IRQ1 回数・空 IRQ (RxRDY = 0)・エラー (PE/FE)・オーバーラン (OE だけ、バイトは使う)・起動時に読み捨てたバイト数・`kbd_init` の前後の 0043h・直近の 0043h とスキャンコード・書いたコマンド語・呼んだ時点の 0043h。戻り 0 / `OS32_ERR_INVAL` (`out` が NULL)。出力は生成ラッパの `out` 検査 (読み取り専用の USER ページなら `ring3_fault_kill`)。シェルの `kbdstat` が 1 行で出す。同じ変更でカーネルが 0043h に書くコマンド語を **0x14 → 0x16** (DTR = 1 = RTY# HIGH、BIOS の定常値) に直した — 実機 PC-9821Ra266 で打鍵が一切届かなかった件。実体は `drivers/kbd.c` / `drivers/kbd_status.c` | [POLICY_DEBUG.md](POLICY_DEBUG.md) §4-57 |
-| v65 | **実装済み (2026-09-24、手元ビルドのみ)** | 起動したイメージの識別 (票 TASK_SERIAL_HOSTFS 部品 A-4): `boot_image_info` 1 本 (slot 234 = 0x3B0)。`BootImageInfo` (40 バイト) に**ローダが検査して起動した** `vmkernel.lz4` のファイル全体の CRC32・長さ・記録の有無・どのローダか (FD / HDD) と、カーネルを組んだ git のコミット ID を写す。0 / `OS32_ERR_INVAL` (`out` が NULL)。同じ版で **VK32 を v2** (エントリごとの展開後 CRC32 + 完全長 + ファイル全体の CRC32、`boot/boot_defs.h`) に、**ブート情報域を v2** (0x30〜0x3F のイメージ欄、`include/bootinfo.h`) にした — v1 のイメージはどちらのローダも `VK32: unknown version` で止まる。**ローダ (FD イメージ / HDD の LBA 2〜17) と `vmkernel.lz4` を同時に入れ替える** (旧ローダと新イメージ・新ローダと旧イメージはどちらも起動しない)。`ver` と起動画面に `Commit:` / `Image CRC:` | [archive/realhw_v21/TASK_SERIAL_HOSTFS.md](archive/realhw_v21/TASK_SERIAL_HOSTFS.md) 部品 A-4 |
+| v62 | **実装済み (2026-09-23、手元ビルドのみ)** | キーボード 8251 の診断 `kbd_diag` 1 本 (slot 229 = 0x39C、data_fields は 0x3A0 / 0x3A4 へ)。`KbdDiag` (24 バイト、`os32_kapi_shared.h`) を呼び手のバッファへ写す — IRQ1 回数・空 IRQ (RxRDY = 0)・エラー (PE/FE)・オーバーラン (OE だけ、バイトは使う)・起動時に読み捨てたバイト数・`kbd_init` の前後の 0043h・直近の 0043h とスキャンコード・書いたコマンド語・呼んだ時点の 0043h。戻り 0 / `OS32_ERR_INVAL` (CPL=0 / WM で `out` が NULL。CPL=3 は wrap で kill)。出力は生成ラッパの `out` 検査 (読み取り専用の USER ページなら `ring3_fault_kill`)。シェルの `kbdstat` が 1 行で出す。同じ変更でカーネルが 0043h に書くコマンド語を **0x14 → 0x16** (DTR = 1 = RTY# HIGH、BIOS の定常値) に直した — 実機 PC-9821Ra266 で打鍵が一切届かなかった件。実体は `drivers/kbd.c` / `drivers/kbd_status.c` | [POLICY_DEBUG.md](POLICY_DEBUG.md) §4-57 |
+| v65 | **実装済み (2026-09-24、手元ビルドのみ)** | 起動したイメージの識別 (票 TASK_SERIAL_HOSTFS 部品 A-4): `boot_image_info` 1 本 (slot 234 = 0x3B0)。`BootImageInfo` (40 バイト) に**ローダが検査して起動した** `vmkernel.lz4` のファイル全体の CRC32・長さ・記録の有無・どのローダか (FD / HDD) と、カーネルを組んだ git のコミット ID を写す。0 / `OS32_ERR_INVAL` (CPL=0 / WM で `out` が NULL。CPL=3 は wrap で kill)。同じ版で **VK32 を v2** (エントリごとの展開後 CRC32 + 完全長 + ファイル全体の CRC32、`boot/boot_defs.h`) に、**ブート情報域を v2** (0x30〜0x3F のイメージ欄、`include/bootinfo.h`) にした — v1 のイメージはどちらのローダも `VK32: unknown version` で止まる。**ローダ (FD イメージ / HDD の LBA 2〜17) と `vmkernel.lz4` を同時に入れ替える** (旧ローダと新イメージ・新ローダと旧イメージはどちらも起動しない)。`ver` と起動画面に `Commit:` / `Image CRC:` | [archive/realhw_v21/TASK_SERIAL_HOSTFS.md](archive/realhw_v21/TASK_SERIAL_HOSTFS.md) 部品 A-4 |
 | v66 | **実装済み (2026-09-25、手元ビルドとホスト試験のみ)** | シリアル越しの /host (票 TASK_SERIAL_HOSTFS 部品 B): `sfs_begin` / `sfs_end` / `serial_diag` の 3 本 (slot 235〜237 = 0x3B4〜0x3BC)。常駐シェルの `sfs run <コマンド行>` だけがセッションを開き (送受信のゲート → HELLO → `/host` に SerialFS)、子がどう終わっても BYE → アンマウント → 隔離 → 溜めた出力と終了コードを長さ付きのフレームで送る → ゲートを下ろす。`serial_diag` は受信の OE / FE / PE と受信リング溢れの数。同じ版で `vfs_mount` が同じ prefix の二重登録を断る | [archive/realhw_v21/TASK_SERIAL_HOSTFS.md](archive/realhw_v21/TASK_SERIAL_HOSTFS.md) 部品 B |
 | v67 | **実装済み (2026-09-26、手元ビルドとホスト試験のみ)** | キーボードの受信記録 `kbd_diag_log` 1 本 (slot 238 = 0x3C0)。IRQ1 が 0041h から**使うバイトを読むたびに** `KbdDiagLogEnt` (8 バイト: seq / 生の code / 処理後の修飾 / 印) を 32 件の循環リングへ積み、`after_seq` より新しい分を古い順に写す。EMPTY / ERROR で捨てたバイトは積まない。上書きで失われた分は写した先頭の seq の飛びで分かる。シェルの `kbdstat -w` が使う — 実機のカナ / CAPS が「ロックで make、解除で break」か「押すたびに make だけ」かを見る準備。実体は `drivers/kbd_dlog.c` / `drivers/kbd.c` | [tasks/gui/TASK_KBD_NAV.md](tasks/gui/TASK_KBD_NAV.md) §3 |
 | v68 | **実装済み (2026-09-26、手元ビルドとホスト試験のみ)** | 実機の ROM の INT 18h の I/O 記録 `v86_gdc_capture` 1 本 (slot 239 = 0x3C4)。`mode = V86G_MODE_ROM` は V86 で実機の ROM の AH=31h を呼んで今のモードを読み、その bit の並び (NP21/W の bit2 / Bible 3-2 の bit3) から 640x480 の AH=30h を決めて呼び、同じ AH=30h で元のモードへ戻して (戻れなければ OS32 の表 `pegc_restore_text_sync`) CUI を作り直す。その間に捕まえた OUT を**畳まずに**最大 512 件、IN をポートごとの回数で `V86Gcap` (8460 バイト) へ写す。`V86G_MODE_SELFTEST` は決まった I/O 列の試験ゲストで記録器を確かめる (実機へ通さない)。`v86 -g [-t]` が使う。実体は `kernel/v86_gcap.c` / `kernel/v86_gcap_math.c` | [tasks/realhw/TASK_PEGC480_REALHW.md](tasks/realhw/TASK_PEGC480_REALHW.md) §3 段 1 |
@@ -148,23 +148,40 @@ CPL=3 が出力引数に渡した**読み取り専用の USER ページ** — �
 | `"out": [{"arg": "buf", "len": "size"}]` | `size` バイトの出力バッファ |
 | `"out": [{"arg": "buf", "len": "count", "unit": 512}]` | `count` × `unit` バイト (`unit` は整数か C の式) |
 | `"out": [{"arg": "info", "size": "sizeof(IdeInfo)"}]` | 固定長 (整数か C の式。式は kapi.json の `includes` で見える型のみ) |
-| `"out": "none"` | 非 const のポインタが**入力**か関数ポインタ (`mem_free` / `sys_shm_lock` / `sys_shm_free` / `sys_ls` / `gui_register` / `gfx_present_raster` / `ime_set_render`) |
-| `"out": "target"` | target / body 自身が `ring3_user_ranges_writable` で検査している (`sys_time_now` / `pci_bind_info`)。ここで二重に見ると CR3 の往復が 2 倍になる |
+| `"out": "none"` | 非 const のポインタが**入力**か関数ポインタ (`mem_free` / `sys_shm_lock` / `sys_shm_free` / `sys_ls` / `gui_register` / `ime_set_render`) |
+| `"out": "target"` | target / body 自身が `ring3_user_ranges_writable` で検査している (`dev_blk_read` / `sys_time_now` / `pci_bind_info`)。生成wrapでの二重検査は不要 |
 
 1 本の KAPI に出力が複数あるときは**全部を並べる**。生成されるコードは
 **全範囲を検査してから target を呼ぶ**ので、2 つ目が不可のときに 1 つ目だけ書かれることはない。
 
-検査の中身 (`exec/exec.c` の `ring3_user_ranges_writable`): IF=0 → master CR3 へ切り替え →
-アプリ PD の PDE/PTE が範囲の全ページで present + RW + USER か → CR3 復元 → IF 復元。
-**CPL=0 の直呼び (常駐シェル / gshell) は素通し** (`ring3_in_syscall` で判定)。
-不合格は `ring3_fault_kill()` = アプリの死 (戻らない)。長さの扱いは
+検査の中身 (`exec/exec.c` の `ring3_user_ranges_writable`) は保存 caller の B1
+managed walk。CR3 を切り替えず、ページごとに IRQ を保存して USER/RW と所有権を確認する。
+**CPL=0 の直呼びと WM は素通し** (`ring3_guard_active` で判定)。
+不合格は `ring3_fault_kill()`。長さの扱いは:
 
-- **NULL はその範囲を見ない** — KAPI ごとの既存の NULL の扱い (無視 / 負を返す / 死ぬ) を変えない
-- **長さ 0 / 負 も見ない** (`int` の長さ引数は 0 に丸める)
-- 個数 × 単位があふれたら `0xFFFFFFFF` = 必ず拒否
+- **非零長では NULL を拒否**。NULL で長さを 0 に置き換えてはいけない。
+- **長さ 0 / 負はアクセスしない** (`int` の負値は既存 target の処理へ渡す)。NULL・長さ0も範囲検査を通るが、target 自身の引数エラーは従来どおり。
+- target は長さ 0 の範囲を読み書きしない (NULL でも触らない)。
+- 個数 × 単位があふれたら `0xFFFFFFFF` = 必ず拒否。
 
-既知の穴: `dev_blk_read` の `unit` は**最小のセクタ長 512** で見る。1024 (FD) / 2048 (CD) の
-デバイスでは後ろ半分以上が未検査のまま (帯検査は効く)。`dev->sect_size` はラッパからは引けない。
+`in` は wrap の検査だけに使う注記で、ABI・slot・型・版を変更しない。
+`out` と同じ `arg` / `len` / `unit` / `size` の配列を指定し、全域を
+`ring3_user_range_ok` (B1 USER/read) で確認する。長さ0は読まない。
+非 const の入力 (raster表、redirectバッファ) にも使える。
+`target: true` は既存target/bodyがB1で全域検査する場合に使い、既存の失敗戻り値を保つ。
+DB bind・Host入力・PCMは`len`も併記する。動的な長さは`{"arg":"buf","target":true}`とする。`dev_blk_read/write` は検索した `Device.sect_size` と count の
+積を overflow 検査してから全域を確認する (512/1024/2048対応)。
+範囲を申告した引数は `kapi_argptr` の早期1番地検査から外し、NULL・長さ0を wrap に届ける。
+その他の文字列・opaque・関数ポインタは `ring3_ptr_ok` が NULL を通し、
+NULL の意味は wrap/target が決める (`sys_ls` の ctx、`v86_boot2` の second、
+`gui_register` の pump の NULL は早期検査を通る)。文字列のNULまでの走査、
+callbackやopaque値の意味・権限は、この長さ付き範囲注記とは別契約。
+
+CPL=3 の `gfx_present_raster(NULL)` は固定長入力の拒否で kill、
+`sys_redirect_fd_buf` は size の書込範囲に加えて len の読取範囲も検査し、
+不正な len による範囲越境・桁あふれは target の切り詰めより前に kill する。
+`mem_free(NULL)` を早期検査で kill していた修正途中の回帰は撤回し、
+従来どおり target の no-op に届く。CPL=0 / WM の直呼びは既存 target の扱いを維持する。
 
 | v69 | **実装済み (2026-10-01、手元ビルド・ホスト試験)** | T2c: OS32X v4 / 4 世代の正典・高位配置・可変 stack。KAPI slot の追加・並べ替えなし | [tasks/v3/TASK_T2_APPBAND.md](tasks/v3/TASK_T2_APPBAND.md) §4-6・T2c-R |
 
@@ -806,7 +823,8 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
   `serial_putchar` / `serial_trygetchar` が従来どおり使える。
 - 戻しは `serial_init(9600)`。`013Ah` bit7 = 0 と `0138h` = 0 を**8251 を触る前に**書く。
 - `serial_get_status` は `mode` = `0` 互換 / `1` V･FAST、`baud` = **実効値** (要求値では
-  ない)、`fifo` = `0136h` の判定を返す。`NULL` は飛ばす。戻り値 `0` = 初期化済み /
+  ない)、`fifo` = `0136h` の判定を返す。CPL=0 / WM の `NULL` は飛ばすが、
+  CPL=3 は生成 wrap で kill。戻り値 `0` = 初期化済み /
   `-1` = まだ `serial_init` を呼んでいない。**カーネルのポインタは返さない**
   (POLICY_DEBUG §4-13 の `db_last_error` と同じ事故を繰り返さないため)。
 - 資料は `docs/hw/undocumented/io_rs.md` (`0130h`〜`013Ah`)。**NP21/W は通信速度を
@@ -990,7 +1008,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
 - **`pcm_status(free_bytes, counters)`** — `free_bytes` はステージングの空き
   (バイト)。`counters` = `(underruns << 24) | (repeats << 16) | resyncs`
   (8 / 8 / 16 ビット、255 / 255 / 65535 で飽和)。**出力 2 本**で、
-  検証は v59 と同じ規則 (NULL は見ない / 書く前に present + RW + USER)。
+  CPL=3 は生成 wrap が NULL を拒否し、書く前に present + RW + USER を確認する。CPL=0 / WM は既存 target の NULL 省略を維持する。
   drain の失敗はここには出ない — `pcm_close` の戻り値で受ける。
 - **`pcm_close()`** — **drain、期限つき**。残りを鳴らし切り、最後のデータの
   半分と無音の半分を通してから止める。期限は
@@ -1032,7 +1050,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
 | 21 | `u8` | `now_st` | `kbd_diag` を呼んだ時点の 0043h |
 | 22 | `u16` | `overrun_count` | OE だけが立っていた IRQ (0041h のバイトは正しいので使い、ER で解除)。0xFFFF で飽和。bda95fa では `reserved[2]` (= 0) だった場所で、大きさ・並びは変えていない |
 
-- 戻り 0 = 成功 / `OS32_ERR_INVAL` = `out` が NULL。
+- 戻り 0 = 成功 / `OS32_ERR_INVAL` = CPL=0 / WM で `out` が NULL (CPL=3 は wrap で kill)。
 - IRQ1 ハンドラが書く値 (u32 3 本・`last_st`・`last_code`) は割り込み禁止の
   間に一括で写すので、同じ瞬間の組になる。
 - u32 のカウンタは飽和しない (折り返す)。`overrun_count` だけ u16 で飽和する。
@@ -1068,7 +1086,8 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
   `OS32_ERR_INVAL`。既存の `sys_umount` (void、sync の失敗を捨てる) は変えない。
 - **`hdd_geom_info`** — `HddGeom` (32 バイト、`os32_kapi_shared.h`、
   `kernel/bootinfo.c` の `STATIC_ASSERT` が見張る) を写す。0 / `OS32_ERR_INVAL`
-  (`out` が NULL・`drv` が 0〜3 の外)。出力は生成ラッパの `out` 検査。
+  (`drv` が 0〜3 の外、または CPL=0 / WM で `out` が NULL)。
+  CPL=3 の NULL は生成ラッパの `out` 検査で kill。
 
 | Offset | 型 | フィールド | 意味 |
 |---|---|---|---|
@@ -1105,7 +1124,7 @@ LBA28、無ければ word 53 bit0 の現在の CHS、それも無ければ既定
 
 - **`boot_image_info`** — `BootImageInfo` (40 バイト、`os32_kapi_shared.h`、
   `kernel/bootinfo.c` の `STATIC_ASSERT` が見張る) を写す。0 / `OS32_ERR_INVAL`
-  (`out` が NULL)。出力は生成ラッパの `out` 検査。
+  (CPL=0 / WM で `out` が NULL)。CPL=3 の NULL は生成ラッパの `out` 検査で kill。
 - 値の出どころ: ローダ (FD: `boot/loader_fat_new.asm`、HDD: `boot/boot_main.c`) が
   `vmkernel.lz4` を**全部検査し終えてから** (長さ・範囲・展開後の CRC32・ファイル全体の CRC32)
   ブート情報域 0x7E00 のイメージ欄 (0x30〜0x3B、自分のチェック語 `img_check` を最後に書く)
@@ -1178,7 +1197,7 @@ LBA28、無ければ word 53 bit0 の現在の CHS、それも無ければ既定
 - **seq** は起動 (`kbd_init`) からの通し番号 (1 から)。`after_seq` より新しい分を**古い順**に
   最大 `max` 件 (32 で頭打ち) 写し、件数を返す。上書きで失われた分は飛ばすので、
   写した先頭の seq が `after_seq + 1` でなければその間は**取りこぼし**。初回は 0 を渡す。
-- 戻り: 件数 (0 = 新しい分なし) / `OS32_ERR_INVAL` (`out` が NULL・`max <= 0`)。
+- 戻り: 件数 (0 = 新しい分なし) / `OS32_ERR_INVAL` (`max <= 0`、または CPL=0 / WM で `out` が NULL。CPL=3 の NULL + `max > 0` は wrap で kill)。
   出力は生成ラッパの `out` 検査 (`max × 8` バイト。読み取り専用の USER ページなら `ring3_fault_kill`)。
 - シェルの `kbdstat -w` が毎 tick 読んで 1 行ずつ出す ([POLICY_DEBUG.md](POLICY_DEBUG.md) §4-57)。
 
@@ -1266,7 +1285,8 @@ LBA28、無ければ word 53 bit0 の現在の CHS、それも無ければ既定
   積む。HELLO 未確立 / 再同期中 → `STALE`、空き無し → `FULL`、直前のハンドルの
   RELEASE が未 ACK → `AGAIN`、NIC 無し / 未初期化 → `NOSYS`。戻り値は h (0 / 1)。
 - `host_status`: 業務 RESPONSE 未着 → `AGAIN`。Agent が墓標を返したハンドル → `STALE`。
-  出力ポインタは NULL 可で、**全部を先に検証してから書く** (失敗時は書かない)。
+  CPL=3 の固定長出力ポインタは NULL 不可 (wrap で kill)。CPL=0 / WM の
+  直呼びは NULL 可 (その出力を省略)。**全部を先に検証してから書く** (失敗時は書かない)。
 - `host_read`: 1 回に写す量は min(cap, リングの連続可用, 1400)。最後のバイトを写した
   呼び出しは正の長さを返し、**その次**の呼び出しが 0。リングの所有者は最初に読んだ
   ハンドルで、他方は `AGAIN`。
@@ -1343,14 +1363,15 @@ owner 1 (WM) が top-level で取りに来て `exec_start` / `exec_kill` を実�
 照合は要求者 ID ではなく **`token`** (32bit の全体単調増加、0 と負は使わない) で行う
 — ID は再利用されるので、古い要求の poll / cancel が新しい住人の表に当たってしまう。
 
-共通の規則: 出力ポインタは NULL 可 (書かない)。失敗時は出力を 1 つも書かない。
-CPL=3 のポインタは既存のディスパッチャが範囲検証する。
+共通の規則: CPL=3 の非零長出力ポインタは NULL 不可 (生成 wrap で kill)。
+CPL=0 / WM の直呼びは NULL 可 (その出力を省略)。失敗時は出力を 1 つも書かない。
+CPL=3 は生成 wrap が全出力範囲を検査してから target を呼ぶ。
 
 | 名前 | 権限 | 規則 |
 |---|---|---|
 | `launch_req` | 宣言 `OS32X_FLAG_LAUNCHER` を持つ CPL=3 | 要求者は `res_owner_get()` で記録。cmdline は NUL 終端 1〜255B (空 / 超過 → `OS32_ERR_INVAL`)。GUI 外 (`con_sink` 無効) / 入れ子 `exec_run` の子 (`gui == 0` の非シェル) → `OS32_ERR_INVAL`。自分の表が IDLE でない (孤児回収中を含む) → `OS32_ERR_FULL`。戻り値 = token (> 0) |
 | `launch_pending` | 誰でも | `PENDING` の要求数。WM は `should_park` の材料にする (0 なら何もしない) |
-| `launch_take` | owner 1 | `buf` も出力なので **NULL 可** (cmdline のコピーだけ飛ばす)。`cap` を見るのは `buf` が非 NULL のときだけで、そのとき `cap < 256` → `OS32_ERR_INVAL`。要求者 ID 昇順に `PENDING` を 1 本 `TAKEN` にして token を返す (無ければ 0)。`kind` = 1 LAUNCH (buf に cmdline) / 2 KILL (`arg` = 畳む ID)。`requester` は孤児回収の表なら -1 |
+| `launch_take` | owner 1 | CPL=0 / WM の直呼びでは `buf` も **NULL 可** (cmdline のコピーだけ飛ばす)。`cap` を見るのは `buf` が非 NULL のときだけで、そのとき `cap < 256` → `OS32_ERR_INVAL`。要求者 ID 昇順に `PENDING` を 1 本 `TAKEN` にして token を返す (無ければ 0)。`kind` = 1 LAUNCH (buf に cmdline) / 2 KILL (`arg` = 畳む ID)。`requester` は孤児回収の表なら -1 |
 | `launch_report` | owner 1 | `TAKEN` 以外 → `OS32_ERR_STALE`。LAUNCH: `rc > 0` は生きている非シェル ID でなければ `OS32_ERR_INVAL` → `child = rc`, `RUNNING`; `rc == 0` → `DONE`; `rc < 0` → `FAILED(rc)`。KILL: `rc` は無視。**取得済みの印を消して `RUNNING` に戻すだけ**で `child` は落とさない (落とすと生きている子の所有が表から消え、以後の退場でも回収されない)。`DONE` を付けるのは常に `child` の回収通知なので、正常な順序では先に付いていて `STALE` が返る — WM は再試行せず正常として扱う |
 | `launch_poll` | 要求者 | `status`: `0` PENDING / `1` TAKEN / `0x100 + child` RUNNING / `0x200` DONE / `0x300 + (-rc)` FAILED。`DONE` / `FAILED` を渡した時点で表は IDLE に戻る (再 poll は `OS32_ERR_STALE`) |
 | `launch_cancel` | 要求者 | `RUNNING` → `kind = KILL(child)`, `PENDING` (child は保持); `PENDING` / `TAKEN` → `OS32_ERR_AGAIN` (**これだけが「次のタイマで再試行」の合図**); `DONE` / `FAILED` / 要求者の不一致 (別 ID からの cancel、孤児回収中の表を再利用 ID が指した旧 token) → `OS32_ERR_STALE` |

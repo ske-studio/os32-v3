@@ -1,0 +1,23 @@
+check-kapi-ranges-host:
+- exec/access_walk.c
+- exec/exec.c
+- exec/exec_kapi_init.inc
+- exec/redir_access.c
+- exec/ring3_str.c
+- kapi/kapi_generated.c
+- kernel/kselftest.c
+- kernel/paging.c
+- kernel/pgalloc.c
+- kernel/physmem.c
+- kernel/shlib.c
+- sdk/gen_kapi.py
+- sdk/kapi.json
+- tools/tests/access_walk_host.c
+- tools/tests/host32.py
+- tools/tests/kapi_ranges_host.c
+- tools/tests/mutpar.py
+- tools/tests/test_access_walk.py
+- tools/tests/test_kapi_out.py
+- tools/tests/test_kapi_ranges.py
+- tools/check_map.d/check-kapi-ranges-host.yaml
+- build/checks.d/check-kapi-ranges-host.mk

@@ -74,7 +74,7 @@ make check-tests-inventory                      # 表が古くないか検査す
 `TARGET_SRCS` など) にある `ROOT / "…"`。どちらにも現れないものは空欄になる
 (Rust は `--manifest-path` を代わりに出す)。
 
-## 2. `make check` の列 (132 ターゲット)
+## 2. `make check` の列 (133 ターゲット)
 
 `build/checks.d/*.mk` の登録から集めた `CHECK_PAR_TARGETS` (`check-par` の依存) が
 正典。この表はその列をそのまま展開したもの。コマンド列は `make check` (変異込み) の形。
@@ -213,6 +213,7 @@ make check-tests-inventory                      # 表が古くないか検査す
 | 130 | `check-h2-fixtures-host` | `python3 -B tools/tests/test_h2_fixtures.py --mutate` | `userland/tests/h2_stack.c`<br>`userland/tests/h2_stack_probe.inc`<br>`tools/gen_h2_fixtures.py` | — | — | × |
 | 131 | `check-kcg-boot-host` | `HOST32_RUNNERS ごと: python3 -B tools/tests/test_kcg_boot.py --runner <runner>; 先頭で --mutate` | — | [`tools/tests/kcg_boot_tdd.md`](../tools/tests/kcg_boot_tdd.md) | [`docs/tasks/v3/TASK_T2D_T2H.md`](tasks/v3/TASK_T2D_T2H.md) | × |
 | 132 | `check-shm-user-host` | `HOST32_RUNNERS ごと: python3 -B tools/tests/test_shm_user.py --runner <runner>; 先頭で --mutate` | — | [`tools/tests/shm_user_tdd.md`](../tools/tests/shm_user_tdd.md) | — | × |
+| 133 | `check-kapi-ranges-host` | `HOST32_RUNNERS ごと: python3 -B tools/tests/test_kapi_ranges.py --runner <runner>; 先頭で --mutate` | `sdk/gen_kapi.py`<br>`exec/exec.c`<br>`exec/ring3_str.c`<br>`exec/access_walk.c`<br>`exec/redir_access.c` | — | — | × |
 
 ## 3. `check` の列に**入っていない** `check-*` ターゲット (9)
 

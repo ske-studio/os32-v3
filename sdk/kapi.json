@@ -521,6 +521,7 @@
     },
     {
       "name": "ide_write_sector",
+      "in": [{"arg": "buf", "size": 512}],
       "ret": "int",
       "args": [
         "int drv",
@@ -530,6 +531,7 @@
     },
     {
       "name": "ide_write_sectors",
+      "in": [{"arg": "buf", "len": "cnt", "unit": 512}],
       "ret": "int",
       "args": [
         "int drv",
@@ -612,6 +614,7 @@
     },
     {
       "name": "sys_write",
+      "in": [{"arg": "buf", "len": "size"}],
       "ret": "int",
       "args": [
         "int fd",
@@ -761,6 +764,7 @@
     },
     {
       "name": "gfx_present_raster",
+      "in": [{"arg": "table", "size": "sizeof(GFX_RasterPalTable)"}],
       "out": "none",
       "ret": "void",
       "args": [
@@ -915,6 +919,7 @@
     },
     {
       "name": "sys_redirect_fd_buf",
+      "in": [{"arg": "buf", "len": "len"}],
       "out": [{"arg": "buf", "len": "size"}],
       "ret": "int",
       "args": [
@@ -1202,13 +1207,14 @@
       "out": "target",
       "ret": "int",
       "args": ["const char *dev_name", "u32 lba", "int count", "void *buf"],
-      "body": "{ Device *d = dev_find(dev_name); if (!d) return -1; if (count < 0) return -1; if (count > 0 && buf && d->sect_size > 0) { if ((u32)count > 0xFFFFFFFFu / (u32)d->sect_size) return -1; if (!ring3_user_ranges_writable((u32)buf, (u32)count * (u32)d->sect_size, 0, 0)) ring3_fault_kill(); } return dev_blk_read_lba(d, lba, count, buf); }"
+      "body": "{ Device *d = dev_find(dev_name); if (!d) return -1; if (count < 0) return -1; if (count > 0) { if (d->sect_size <= 0) return -1; if ((u32)count > 0xFFFFFFFFu / (u32)d->sect_size) return -1; if (!ring3_user_ranges_writable((u32)buf, (u32)count * (u32)d->sect_size, 0, 0)) ring3_fault_kill(); } return dev_blk_read_lba(d, lba, count, buf); }"
     },
     {
       "name": "dev_blk_write",
+      "in": [{"arg": "buf", "target": true}],
       "ret": "int",
       "args": ["const char *dev_name", "u32 lba", "int count", "const void *buf"],
-      "body": "{ Device *d = dev_find(dev_name); if (!d) return -1; return dev_blk_write_lba(d, lba, count, buf); }"
+      "body": "{ Device *d = dev_find(dev_name); if (!d) return -1; if (count < 0) return -1; if (count > 0) { if (d->sect_size <= 0) return -1; if ((u32)count > 0xFFFFFFFFu / (u32)d->sect_size) return -1; if (!ring3_user_range_ok((u32)buf, (u32)count * (u32)d->sect_size)) ring3_fault_kill(); } return dev_blk_write_lba(d, lba, count, buf); }"
     },
     {
       "name": "ime_switch_dict",
@@ -1309,6 +1315,7 @@
     },
     {
       "name": "gfx_lease_palette",
+      "in": [{"arg": "rgb", "len": "count", "unit": 3}],
       "ret": "int",
       "args": ["int first", "int count", "const u8 *rgb"]
     },
@@ -1400,6 +1407,7 @@
     },
     {
       "name": "kbd_inject",
+      "in": [{"arg": "utf8", "len": "len"}],
       "ret": "i32",
       "args": [
         "const u8 *utf8",
@@ -1479,12 +1487,14 @@
     },
     {
       "name": "db_bind_text",
+      "in": [{"arg": "text", "len": "length", "target": true}],
       "ret": "int",
       "args": ["int handle", "int index", "const char *text", "int length"],
       "target": "kapi_db_bind_text"
     },
     {
       "name": "db_bind_blob",
+      "in": [{"arg": "data", "len": "length", "target": true}],
       "ret": "int",
       "args": ["int handle", "int index", "const void *data", "int length"],
       "target": "kapi_db_bind_blob"
@@ -1503,6 +1513,7 @@
     },
     {
       "name": "host_open",
+      "in": [{"arg": "req", "len": "len", "target": true}],
       "ret": "i32",
       "args": ["const char *req", "u32 len"],
       "target": "kapi_host_open"
@@ -1523,6 +1534,7 @@
     },
     {
       "name": "host_write",
+      "in": [{"arg": "buf", "len": "len", "target": true}],
       "ret": "i32",
       "args": ["i32 h", "const void *buf", "u32 len"],
       "target": "kapi_host_write"
@@ -1603,6 +1615,7 @@
     },
     {
       "name": "pcm_write",
+      "in": [{"arg": "buf", "len": "bytes", "target": true}],
       "ret": "int",
       "args": ["const void *buf", "u32 bytes"],
       "body": "{ u32 a = (u32)buf;\n  int rc = pcm_write_check();\n  if (rc != 0) return rc;\n  if (buf == 0) return OS32_ERR_INVAL;\n  if (a + bytes < a) return OS32_ERR_INVAL;\n  if (!ring3_user_range_ok(a, bytes)) return OS32_ERR_INVAL;\n  if (bytes < PCM_FRAME_BYTES) return 0;\n  return pcm_write(buf, bytes); }"

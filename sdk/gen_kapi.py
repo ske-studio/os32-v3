@@ -160,21 +160,72 @@ def out_errors(api):
     return errs
 
 
+def input_errors(api):
+    """`in` is wrapper-only range metadata; it never changes ABI declarations."""
+    spec = api.get("in")
+    if spec is None:
+        return []
+    if not isinstance(spec, list) or not spec:
+        return [api["name"] + ': "in" must be a nonempty range list']
+    decls = _arg_decl_map(api.get("args", []))
+    errors = []
+    seen = set()
+    for r in spec:
+        if not isinstance(r, dict) or r.get("arg") not in decls:
+            errors.append(api["name"] + ': invalid "in" argument')
+            continue
+        if set(r) - {"arg", "len", "size", "unit", "target"} or ("target" in r and r["target"] is not True):
+            errors.append(api["name"] + ": invalid input range keys")
+        arg = r["arg"]
+        if "*" not in decls[arg] or arg in seen:
+            errors.append(api["name"] + ': invalid/duplicate "in" pointer ' + arg)
+        seen.add(arg)
+        if r.get("target") is True:
+            if not (api.get("body") or api.get("target")):
+                errors.append(api["name"] + ': target range needs a body or target')
+            if set(r) == {"arg", "target"}:
+                continue
+        # Reuse the same size/len/unit validation without requiring other inputs.
+        check = dict(api, args=[d.replace("const ", "") if n == arg else
+                               d.replace("*", "*const ") if "*" in d else d
+                               for n, d in decls.items()], out=[r])
+        errors.extend(out_errors(check))
+    if api.get("direct"):
+        errors.append(api["name"] + ': "in" requires a wrapper')
+    return errors
+
+
+def guarded_args(api):
+    """Length-aware guards must see NULL themselves (including zero length)."""
+    names = set()
+    for field in ("out", "in"):
+        spec = api.get(field)
+        if isinstance(spec, list):
+            names.update(r["arg"] for r in spec)
+    if api.get("out") == "target":
+        names.update(n for n, d in _arg_decl_map(api.get("args", [])).items()
+                     if _is_out_ptr(d))
+    return names
+
+
 def check_all_out(data):
     errs = []
     for api in data.get("api", []):
         errs.extend(out_errors(api))
+        errs.extend(input_errors(api))
     return errs
 
 
-def out_ranges_c(api):
+def out_ranges_c(api, field="out"):
     """wrapper の先頭に出す (addr, len) の C 式の配列。無ければ空。"""
-    spec = api.get("out", None)
+    spec = api.get(field, None)
     if not isinstance(spec, list):
         return []
     decls = _arg_decl_map(api.get("args", []) or [])
     ranges = []
     for r in spec:
+        if r.get("target") is True:
+            continue
         a = r["arg"]
         if "size" in r:
             s = r["size"]
@@ -404,8 +455,8 @@ for _slot, _api in enumerate(data["api"]):
 c_content += "};\n\n"
 
 # --- M2e: kapi_argptr[] (CONTRACTS C5 追記) ---
-c_content += "/* 各スロットの固定引数のうちポインタ型のビットマスク (bit k = 引数 k)。\n"
-c_content += " * ディスパッチャが wrap 前に範囲検証する引数を示す (可変長はガード担保)。 */\n"
+c_content += "/* 各スロットの固定引数のうち早期検査するポインタのビットマスク (bit k = 引数 k)。\n"
+c_content += " * 長さ付き引数は wrap の全域検査へ委ねる (NULL・長さ0を許可)。 */\n"
 c_content += "const u16 kapi_argptr[KAPI_FUNC_COUNT] = {\n"
 for _slot, _api in enumerate(data["api"]):
     _mask = 0
@@ -413,7 +464,7 @@ for _slot, _api in enumerate(data["api"]):
     for _a in _api.get("args", []):
         if _a == "...":
             continue
-        if "*" in _a:
+        if "*" in _a and get_arg_names([_a])[0] not in guarded_args(_api):
             _mask |= (1 << _k)
         _k += 1
     _pnames = [get_arg_names([a])[0] for a in _api.get("args", []) if a != "..." and "*" in a]
@@ -422,7 +473,7 @@ for _slot, _api in enumerate(data["api"]):
 c_content += "};\n\n"
 
 # --- 出力ポインタの書き込み可検査 (票 TASK_KAPI_OUTPUT_GUARD) -------------
-_all_ranges = [out_ranges_c(a) for a in data["api"]]
+_all_ranges = [out_ranges_c(a, field) for a in data["api"] for field in ("out", "in")]
 _needs_mul = any("kapi_out_mul(" in ln for rs in _all_ranges for (_p, ln) in rs)
 
 c_content += "/* ---- 出力ポインタの書き込み可検査 (票 TASK_KAPI_OUTPUT_GUARD) --------\n"
@@ -434,13 +485,13 @@ c_content += " * ring3_user_ranges_writable で present + RW + USER を確かめ
 c_content += " * 断ったら ring3_fault_kill() (戻らない)。CPL=0 の直呼びは素通し。\n"
 c_content += " *\n"
 c_content += " * 長さの決め方 (kapi.json の \"out\" から生成):\n"
-c_content += " *   NULL          → その範囲は見ない (KAPI ごとの NULL の扱いを変えない)\n"
+c_content += " *   NULL + 非零長 → B1 で拒否。NULL + 長さ0 はアクセスしない\n"
 c_content += " *   長さ 0 / 負   → 見ない (target 側も書かないか、既存どおりの扱い)\n"
 c_content += " *   個数 × 単位   → あふれたら 0xFFFFFFFF (= 必ず拒否) にする\n"
 c_content += " * 1 回の呼び出しで 2 範囲まで見られるので、3 範囲以上は 2 本ずつに割る\n"
 c_content += " * (**どれか 1 つでも不可なら 1 バイトも書かない**)。 */\n"
-c_content += "#define KAPI_OUT_LEN(p, n)    ((p) ? (u32)(n) : 0u)\n"
-c_content += "#define KAPI_OUT_LEN_S(p, n)  (((p) && (int)(n) > 0) ? (u32)(n) : 0u)\n"
+c_content += "#define KAPI_OUT_LEN(p, n)    ((u32)(n))\n"
+c_content += "#define KAPI_OUT_LEN_S(p, n)  (((int)(n) > 0) ? (u32)(n) : 0u)\n"
 if _needs_mul:
     c_content += "\nstatic u32 kapi_out_mul(u32 n, u32 unit)\n{\n"
     c_content += "    if (unit == 0) return 0u;\n"
@@ -478,6 +529,20 @@ def out_guard_c(api):
     return text
 
 
+def input_guard_c(api):
+    ranges = out_ranges_c(api, "in")
+    if not ranges:
+        return ""
+    # ring3_user_range_ok rejects NULL even for len=0; skip the empty range.
+    calls = ["!kapi_in_range(%s, %s)" % (p, n) for p, n in ranges]
+    return ("    /* 入力の全範囲を B1 で検査 (USER/read)。 */\n"
+            "    if (" + " ||\n        ".join(calls) + ") {\n"
+            "        ring3_fault_kill();\n    }\n")
+
+c_content += "static int kapi_in_range(u32 p, u32 len)\n{\n"
+c_content += "    return !len || ring3_user_range_ok(p, len);\n}\n\n"
+
+
 # 予約スロットの「未実装」(CPL=0 の呼び手向け。CPL=3 はトランポリンの
 # スタブ → ディスパッチャが slot >= KAPI_FUNC_COUNT で kill)。
 c_content += "/* 予約スロット (KAPI_FUNC_COUNT..KAPI_FUNC_CAPACITY-1) の中身。\n"
@@ -496,6 +561,7 @@ for slot, api in enumerate(data["api"]):
     c_content += f"{ret} __cdecl wrap_{name}({args_str})\n{{\n"
     c_content += f"    KAPI_HIT({slot});\n"
     c_content += out_guard_c(api)
+    c_content += input_guard_c(api)
 
     if "body" in api:
         lines = api["body"].split("\n")

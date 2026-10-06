@@ -14,6 +14,7 @@ void ring3_fault_kill(void) {
     __builtin_longjmp(kill_env, 1);
 }
 #define KAPI_HIT(n) ((void)(n))
+#include "kapi_db.h"
 #include "out_wrapper_host_source.c"
 #include "db_host_source.c"
 #include "vfs_host_source.c"
@@ -133,7 +134,7 @@ static void caller_copy_tests(void)
     mounts[0].in_use = 1;
     kstrncpy(mounts[0].prefix, "/", VFS_MAX_PATH);
     mounts[0].ops = &host_ops;
-    ((u32 *)KAPI_ADDR)[2 + KAPI_SLOT_DB_BIND_TEXT] = (u32)kapi_db_bind_text;
+    ((u32 *)KAPI_ADDR)[2 + KAPI_SLOT_DB_BIND_TEXT] = (u32)wrap_db_bind_text;
     ((u32 *)KAPI_ADDR)[2 + KAPI_SLOT_SYS_STAT] = (u32)wrap_sys_stat;
     g_cur_app = &slot;
     slot.stack_base = MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE;
@@ -144,18 +145,19 @@ static void caller_copy_tests(void)
     for (u32 f = 0; f < 2; f++) {
         expected_if = host_arch_if = f ? 0x202 : 2;
         u32 root = host_cr3;
-        /* The guest probe must reach DB range rejection, never the early kill.
-         * The historical 0x7fffff reproduces a kill WITHOUT a range-counter bump. */
+        /* Both bad inputs reach the existing DB copy guard and keep its -1.
+         * The guest probe must use the current high application boundary. */
         KernelAPI api = {0};
         api.sbrk_heap_limit = MEM_EXEC_LOAD_ADDR + PAGE_SIZE;
         reset_db();
         u32 before = ring3_range_reject_count;
         int invoked = invoke_calls;
-        CHECK(dispatch_probe(KAPI_SLOT_DB_BIND_TEXT, 0, 1, 0x7fffff, 2, 1) == -999);
-        CHECK(invoke_calls == invoked && ring3_range_reject_count == before);
+        CHECK(dispatch_probe(KAPI_SLOT_DB_BIND_TEXT, 0, 1, 0x7fffff, 2, 0) == -1);
+        CHECK(invoke_calls == invoked + 1 && ring3_range_reject_count == before);
+        CHECK(ring3_ptr_ok((u32)guard_crossing_text(&api)));
         CHECK(dispatch_probe(KAPI_SLOT_DB_BIND_TEXT, 0, 1,
               (u32)guard_crossing_text(&api), 2, 0) == -1);
-        CHECK(invoke_calls == invoked + 1 && ring3_range_reject_count == before);
+        CHECK(invoke_calls == invoked + 2 && ring3_range_reject_count == before);
         /* Public sys_stat still checks the app output before driver writes. */
         kmemcpy((void *)(MEM_EXEC_LOAD_ADDR + 128), "/abc", 5);
         u32 out = MEM_EXEC_LOAD_ADDR + 256;

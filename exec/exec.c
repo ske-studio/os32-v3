@@ -693,12 +693,13 @@ static void ring3_gui_pump(void)
 
 /* ユーザポインタ引数の早期範囲検証 (v2 M2e 補助)。exec が CPL=3 アプリに
  * USER マップした領域 (共有ライブラリ帯/プログラム帯/ユーザスタック/SHM/VRAM)
- * と NULL のみ許可。範囲外 (例: 0xDEADBEEF) は wrap に入る前に弾き、
- * カーネル状態不整合を避ける。
+ * を許可。NULL は通す。長さ付き引数は生成 wrap が NULL と全域を検査する。
+ * 早期検査に残る文字列・opaque・関数ポインタの NULL の意味は wrap/target が決める。
+ * 範囲外 (例: 0xDEADBEEF) は wrap に入る前に弾き、カーネル状態不整合を避ける。
  * 可変長引数はここでは見えないのでフォールトガードが担保する。 */
 int ring3_ptr_ok(u32 p)
 {
-    if (p == 0) return 1;                         /* NULL は wrap 側が処理 */
+    if (p == 0) return 1;                         /* NULL の意味は wrap/target */
     if (exec_tramp_page_addr() && p >= exec_tramp_page_addr() + RING3_USTR_OFF &&
         p - (exec_tramp_page_addr() + RING3_USTR_OFF) < RING3_USTR_CAP) return 1;
     if (p >= MEM_SHLIB_BASE && p < RING3_HEAP_TOP) return 1;

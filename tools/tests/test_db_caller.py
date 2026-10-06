@@ -19,8 +19,9 @@ def sources():
     result['vfs'] = (walk.ROOT / 'fs/vfs.c').read_text()
     generated = (walk.ROOT / 'kapi/kapi_generated.c').read_text()
     result['out_wrapper'] = generated[generated.index('#define KAPI_OUT_LEN('):generated.index('static u32 kapi_out_mul')]
-    start = generated.index('int __cdecl wrap_sys_stat(')
-    result['out_wrapper'] += generated[start:generated.index('\n}', start) + 2]
+    for name in ('wrap_sys_stat', 'wrap_db_bind_text'):
+        start = generated.index('int __cdecl ' + name + '(')
+        result['out_wrapper'] += generated[start:generated.index('\n}', start) + 2] + '\n'
     start = src.index('void __cdecl ring3_syscall_dispatch(')
     result['dispatch'] = src[start:src.index('\n}', start) + 2]
     end = generated.index('};', generated.index('const u16 kapi_argptr')) + 2

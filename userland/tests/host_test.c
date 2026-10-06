@@ -153,7 +153,8 @@ int main(int argc, char **argv, KernelAPI *api)
         ok(api->host_close(h) == 0, "close a fresh handle");
         ok(api->host_close(h) == OS32_ERR_INVAL, "double close is INVAL");
     }
-    ok(api->host_read(0, (void *)0, 16) == OS32_ERR_INVAL, "NULL buf is INVAL");
+    /* Nonzero NULL output faults in the public wrap (host range test). */
+    ok(api->host_read(0, (void *)0, 0) == OS32_ERR_INVAL, "zero-length NULL reaches target validation");
 
     /* ---- (6) Agent 再起動 → STALE → close → open ----------------------- */
     if (stale_mode) {
