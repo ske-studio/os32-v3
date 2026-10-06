@@ -194,6 +194,32 @@ Unicodeはkernel所有FIXED_RAM/RO SURFACE。ユーザー版utf8だけsetterでl
 5. tvdumpはCUI授権済みchecked copy KAPIへ移しTVDM wire形式を維持。nop/ring3_hello/fault/guardの観測マーカーは割当済みSHMへ (CRT非依存入口も同じ取得/初期化)。保護違反そのもののVRAM書込みは残す。db_v50_testのVRAM許可期待をRAM境界成功と未貸与VRAM拒否へ変更。
 6. memory世代更新と現行ビルド対象の全再ビルド。apps/gameはユーザー決定により対象外。caller追随要件と再開時ゲートをhへ渡し、決定による持越しと記録する (§5/§8)。
 
+**e11 結線表** ([持越し台帳 §2](../DEFERRED_TESTS.md#2-関門-e11-公開-kapi-の一括版の更新は-1-回) の ID。§2-4 項の「—」は内部準備・契約補足)
+
+| ID | §2-4 項 | 担当パック (a/b/c、複数可) | 何を | 接続先 (port・KAPI) | 撤去する旧経路 | 期待が変わる試験 | 受入 |
+|---|---|---|---|---|---|---|---|
+| E11-1 | 2 | a/c | 面・束・Unicode・両 gfx 実体・帰路の結線 | 面query/lease/bundle、attach/Unicode port、publisher・互換橋 | 本番 NULL port、USER への kernel alias、Unicode 低位直読 | lease/gfx_boot・SDK連結、帰路失敗 | 世代不一致で再attach、部分失敗で全返却・描画不可、RO日本語 |
+| E11-2 | — | a/b/c | 結線後の予算実測 (§6) | kernel・SDK・shlib の最終リンク | 撤去前の見積り流用 | サイズ計測 | 同一toolchain前後差、e枠・圧縮・8MB私有量 |
+| E11-3 | 2 | a/b | 低位 USER・共有PT操作の閉鎖、Cirrus DISPLAY公開 | lease CLIENT/DISPLAY、通常map/unmap | VRAM/font/Unicode/BB直map、`ring3_ptr_ok` 例外、`exec_map_shared_bb` | app_bb_overlapを退役/lease化、paging_bounds拒否へ | 共有PT無変更拒否、DISPLAY NONE→RWは授権leaseだけ |
+| E11-4 | 3 | b/c | 台帳KAPI-CALLBACK/OWNER/DISK-AUTH受入後の公開変更 | 値返し列挙KAPI・caller、OS32X授権flag | 旧callback列挙caller・旧授権方式 | man列挙、SHM他owner拒否、ディスク拒否/正規利用 | 修正の証拠＋caller追随、未解消のまま公開しない |
+| E11-5 | — | a/b/c | Run全画面の入力配送 | 全画面owner 1または専用KAPI・WAIT_POLL | 端末だけへの注入 | Run全画面4点 | キー終了、端末子二重注入なし、窓漏れなし、WAIT_POLL到達 |
+| E11-6 | 1/3/6 | a/b/c | boot順・P3残件と公開一式 | SHM master・cdecl/終了門、CRT/shlib・公開一式 | 起動毎共有map、古いtoken/utf8初期値・二重取得 | map_user_keep内部改修、font NOSYS、wait帰路4件 | SHM初期化後RW→初AS、漢字維持、全現行対象再ビルド・世代整合 |
+| E11-7 | — | c | 公開契約の注記 | KAPI文書・SDK契約 | STALE/INVALを秘匿保証とする解釈 | 契約と生成の照合 | 推測可能性明記、callback/scheduling禁止 |
+| E11-8 | — | c | 台帳KAPI-AUDIT-FIX/OWNERの受入・分類を接続 | `pipe_get_buf` kernel番地返却の意味変更・未監査区分 | 未監査を安全扱いする区分 | 区分別正常/拒否対照、範囲検査P3変異 | 到達可能な穴は先行修正、意味変更だけ一括公開 |
+| E11-9 | 5 | b/c | tvdumpのCUI授権 | `tvram_readchar_at` checked copy | 無授権TVRAM読出し | tvdump正常/非所有者拒否 | CUI前景のみ、TVDM wire不変 |
+| E11-10 | 2 | a/b | 旧Eの拒否と成功対照 | 正規CLIENT lease | BB低位直書き生存 | `ring3_guard bb` E→拒否 | E kill、正規CLIENTは生存 |
+| E11-11 | 2/5 | b | 未貸与VRAM拒否 | DB出力のB1 walk | VRAM出力許可 | `db_v50_test` 拒否追加 | RAM最終byte成功・guard越境拒否も維持 |
+| E11-12 | 5 | a/c | h3本人識別・writer初期化 | 値返し本人識別、owned SHM marker | 旧PM(A)識別、TVRAM観測 | h3・nop/hello/fault/guard | CRT非依存も初期化、fault目的地一致、違反用VRAM書込みは保持 |
+| E11-13 | 3 | b | SHM全ページROの実効性 | `paging_shm_set_rw`、lock/free/owner回収 | 呼出し成功だけの判定 | SHM lock書込み拒否、shm_reuse | CPL3拒否、free/exit後の次AS全ページ書込み成功 |
+| E11-14 | — | c | SHM・ページ長の公開定数 | SDK共有ヘッダ・caller | 私有PAGE_BYTES等の重複 | SDK/markerビルド | 公開値とkernel一致、生成・版は一括 |
+| 補4 | 4 | a/b | V86全出口と通常地図の結線 | session end → CR3 reload → 3段検査 | 旧出口の復元漏れ | V86正常/失敗/STOP/kill/K1・VM INT80h | 内容/属性・PCD・PDE USER復元、通常AS禁止、DISPLAY/TVRAM再lease |
+
+- a=内部結線 (旧USER下は準備確認)、b=低位USER/旧例外撤去・SHM/V86契約・拒否/正規lease対照、c=公開KAPI/caller/SDK/生成/版/manifest。**a → b → c → 統合の順、bの撤去はaのconsumer準備の後**。a/b/cは独立公開・配備せず、**版の更新・生成は統合でだけ行う**。統合で§2-4全6項を同時成立、現行対象再ビルド・配備を一括。受入は§2-5末尾のNP21/W一式とe12の変異一覧による。apps/gameは§5/§8へ。E11-5は2026-10-03決定の「全画面中のowner 1または専用のKAPI」、追加ならcで版一括へ含める。
+- **KAPI-CALLBACK**: 未完了は[台帳の優先段](../DEFERRED_TESTS.md#関門-新機能より先-優先段)。公開KAPIの形と版を変えずCPL0実行を塞ぎ、**e11より先に配備・受入する**。hsync・install・filerを壊す単純拒否は不可。候補はkernel生成trampolineのslot 12 stubをCPL3 shimへ替え、kernel内部の列挙口で項目を写しcallbackをCPL3で呼ぶ。CPL0不実行・既存callerの列挙正常・`man -l` crash解消を受入。値返し列挙KAPI追加とcaller移行はe11c。
+- **KAPI-OWNER**: 台帳の優先段でSHM lock/free・pipe free/clear/get_buf・DB slotをwrapで所有者照合し、既存の-1で他owner操作を無変更拒否。本人成功・trusted回収も先行受入。`pipe_get_buf`がkernel番地を返す件の意味変更はE11-8のe11c。
+- **KAPI-DISK-AUTH**: 台帳の優先段でkernelが知るexec経路・`/sys`由来・CUI前景の識別を授権に使い、拒否＋許可リストを先行配備。無授権I/Oゼロと隔離媒体での正規caller `inst_hdd` (CPL3)・常駐シェル`cmd_hdprep`を受入。OS32Xヘッダへflagを足す方式はE11-4のe11c。
+- **KAPI-AUDIT-FIX**: 台帳の優先段で`console_set_cursor`の後の`cursor_x++`の符号付きあふれをclampで防ぎ、FM/SSGのch無検査、`fm_play_mml`/`serial_getchar`のCTRL+STOP不能DoS、`wrap_rshell_set_active`の無授権を先行修正・配備・受入。残りの未監査区分 (pipe/redirect/host_*、exec_*/launch_*/appslot、ime_*、gui_call/register、con_sink) はe11a着手前に分類し、到達可能な穴は新機能より先に修正。公開意味変更・範囲検査P3変異はE11-8へ。
+
 ### 2-5. 分割・試験・受入
 
 | 小段 (各45〜75分) | 成果 / 閉じる試験 |
