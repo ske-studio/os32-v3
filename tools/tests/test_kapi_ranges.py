@@ -21,7 +21,7 @@ MUTANTS = (
     ('input multiplication wrap', 'generated', 'if (n > (0xFFFFFFFFUL / unit))', 'if (0)', 'input multiplication'),
 )
 
-def run(runner, mutant=None):
+def run(runner, mutant=None, fixture_name="kapi_ranges_host.c"):
     with tempfile.TemporaryDirectory(prefix='kapinull-') as directory:
         rc, output, generated = generator.gen(directory, json.loads(generator.KAPI_JSON.read_text()))
         assert rc == 0, output
@@ -34,6 +34,14 @@ def run(runner, mutant=None):
         start = source.index('    /* --- (補助) 明示ポインタ引数の早期範囲検証')
         end = source.index('    /* 引数コピー窓:', start)
         sources['early'] = source[start:end]
+        start = source.index('static int exec_disk_write_path_allowed(')
+        end = source.index('/* ======================================================================== */', start)
+        sources['disk'] = '#include "' + str(ROOT / 'fs/vfs.h') + '"\n' + source[start:end]
+        vfs = (ROOT / 'fs/vfs.c').read_text()
+        start = vfs.index('#define VFS_NAME_MAX')
+        end = vfs.index('/* 末尾の', start)
+        sources['resolve'] = ('#include "' + str(ROOT / 'fs/vfs.h') + '"\n' +
+                              'static char cwd[VFS_MAX_PATH] = "/";\n' + vfs[start:end])
         if mutant:
             name, key, old, new, expected = mutant
             assert old in sources[key], name
@@ -53,7 +61,7 @@ def run(runner, mutant=None):
                 if path.exists(): return '#include "' + str(path) + '"'
             return m.group(0)
         sources['generated'] = re.sub(r'#include "([^"]+)"', resolve, sources['generated'])
-        result = walk.run(sources, fixture='kapi_ranges_host.c', runner=runner)
+        result = walk.run(sources, fixture=fixture_name, runner=runner)
         if mutant:
             assert result.returncode == 1 and ('FAIL: ' + expected) in result.stdout, (name, result.returncode, result.stdout, result.stderr)
             print('RED:', name)

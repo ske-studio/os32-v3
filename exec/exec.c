@@ -2,6 +2,7 @@
 #include "v86.h"
 #include "memmap.h"
 #include "exec.h"
+#include "config.h"
 #include "os32x_hdr.h"
 #include "appslot.h"
 #include "exec_heap.h"
@@ -368,6 +369,35 @@ volatile u32 ring3_caller_reject_count = 0;
 int ring3_call_from_user(void)
 {
     return ring3_guard_active(ring3_in_syscall, ring3_wm_depth);
+}
+
+/* Match the loaded image after the same cwd/path normalization as VFS. */
+static int exec_disk_write_path_allowed(const char *resolved)
+{
+    static const char *const paths[] = SYS_DISK_WRITE_PATHS;
+    char absolute[VFS_MAX_PATH];
+    u32 i;
+    if (vfs_resolve_path(resolved, absolute, sizeof(absolute)) != VFS_OK) return 0;
+    for (i = 0; i < sizeof(paths) / sizeof(paths[0]); i++)
+        if (kstrcmp(absolute, paths[i]) == 0) return 1;
+    return 0;
+}
+
+int exec_disk_write_allowed(void)
+{
+    struct caller_access caller;
+    AppSlot *slot;
+    /* No WM elevation: this capability belongs to a CUI foreground caller. */
+    if (ring3_wm_depth || con_sink_is_enabled()) return 0;
+    slot = appslot_get(appslot_cur());
+    if (!slot || slot->state != APP_STATE_RUNNING || slot->gui) return 0;
+    /* The resident CPL0 shell calls wrappers directly, outside int80. */
+    if (!ring3_in_syscall)
+        return appslot_cur() == APP_ID_SHELL && !slot->cpl3 &&
+               res_owner_get() == APP_ID_SHELL;
+    /* Invalid/stale USER frames must never fall back to trusted access. */
+    if (!caller_access_get_user(&caller)) return 0;
+    return slot->cpl3 && slot->disk_write_authorized;
 }
 
 /* ======================================================================== */
@@ -1853,6 +1883,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
     ctx->exec_heap_used = 0;
     ctx->sbrk_heap_limit = is_shell ? guard_b : sbrk_end;
     ctx->cpl3 = 0;
+    ctx->disk_write_authorized = exec_disk_write_path_allowed(resolved);
     /* 票 T8 D1a: 全画面 GFX の宣言 (OS32X_FLAG_GFX) を見るのは gfx_init を
      * 呼ばれた瞬間なので、起動時にヘッダの flags を控えておく。 */
     ctx->hdr_flags = hdr->flags;

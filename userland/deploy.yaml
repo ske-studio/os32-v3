@@ -189,6 +189,10 @@ filesystem:
     - host: userland/tests/cfg_bench.bin
       guest: /usr/bin/
       tags: [test]
+    # Raw disk authorization: explicit harmless LBA, PM acceptance only.
+    - host: userland/tests/disk_auth_test.bin
+      guest: /usr/bin/
+      tags: [test]
     # --- time_test (票 TASK_HAL_WIRING §1-5 / 受入 W4: µs 時計 sys_time_now の
     #     CPL=3 受入。カーネル側 kselftest は CPL=0 なのでポインタ契約を踏めない。
     #     `time_test ro` は**わざとアプリを殺す**ので既定では走らない) ---

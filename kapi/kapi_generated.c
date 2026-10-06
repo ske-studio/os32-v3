@@ -977,6 +977,7 @@ void __cdecl wrap_path_parse(const char *input, void *result)
 int __cdecl wrap_ext2_format(int drv, u32 sectors)
 {
     KAPI_HIT(58);
+    if (!exec_disk_write_allowed()) return -1;
     return ext2_format(drv, sectors);
 }
 
@@ -1013,20 +1014,17 @@ void __cdecl wrap_rshell_set_active(int active)
 int __cdecl wrap_ide_write_sector(int drv, u32 lba, const void *buf)
 {
     KAPI_HIT(64);
-    /* 入力の全範囲を B1 で検査 (USER/read)。 */
-    if (!kapi_in_range((u32)buf, KAPI_OUT_LEN(buf, 512u))) {
-        ring3_fault_kill();
-    }
+    if (!exec_disk_write_allowed()) return -1;
+    if (!kapi_in_range((u32)buf, 512u)) ring3_fault_kill();
     return ide_write_sector(drv, lba, buf);
 }
 
 int __cdecl wrap_ide_write_sectors(int drv, u32 lba, u32 cnt, const void *buf)
 {
     KAPI_HIT(65);
-    /* 入力の全範囲を B1 で検査 (USER/read)。 */
-    if (!kapi_in_range((u32)buf, kapi_out_mul(KAPI_OUT_LEN(buf, cnt), 512u))) {
-        ring3_fault_kill();
-    }
+    if (!exec_disk_write_allowed()) return -1;
+    if (cnt == 0) return 0;
+    if (!kapi_in_range((u32)buf, kapi_out_mul((u32)cnt, 512u))) ring3_fault_kill();
     return ide_write_sectors(drv, lba, cnt, buf);
 }
 
@@ -1663,6 +1661,7 @@ int __cdecl wrap_dev_blk_read(const char *dev_name, u32 lba, int count, void *bu
 int __cdecl wrap_dev_blk_write(const char *dev_name, u32 lba, int count, const void *buf)
 {
     KAPI_HIT(157);
+    if (!exec_disk_write_allowed()) return -1;
     { Device *d = dev_find(dev_name); if (!d) return -1; if (count < 0) return -1; if (count > 0) { if (d->sect_size <= 0) return -1; if ((u32)count > 0xFFFFFFFFu / (u32)d->sect_size) return -1; if (!ring3_user_range_ok((u32)buf, (u32)count * (u32)d->sect_size)) ring3_fault_kill(); } return dev_blk_write_lba(d, lba, count, buf); }
 }
 
@@ -2191,6 +2190,7 @@ int __cdecl wrap_kbd_diag(KbdDiag *out)
 int __cdecl wrap_ext2_format_at(int drv, u32 start_lba, u32 length)
 {
     KAPI_HIT(230);
+    if (!exec_disk_write_allowed()) return -1;
     return ext2_format_at(drv, start_lba, length);
 }
 
