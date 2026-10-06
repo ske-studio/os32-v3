@@ -26,6 +26,98 @@ static u8 buf_32[32 * 4 * 4];   /* 32x32: pitch=4, 4planes */
 static u8 snap_a[4][80 * 400];
 static u8 snap_b[4][80 * 400];
 
+static void setup_surface(GFX_Surface *surf, u8 *buf, int size, int pattern);
+static void snapshot_bb(u8 dst[4][80 * 400]);
+static int compare_snapshots(int dx, int dy, int w, int h);
+static int run_test(const char *label, int size, int pattern, int dx, int dy);
+static void run_benchmark(int size, int pattern);
+
+/* ---- メイン ---- */
+int main(int argc, char **argv, KernelAPI *api)
+{
+    int total_fail = 0;
+
+    (void)argc; (void)argv;
+
+    kapi = api;
+    api->kprintf(ATTR_WHITE, "=== gfx_blit_transparent Test ===\r\n\r\n");
+
+    libos32gfx_init(api);
+
+    /* ---- 正確性テスト ---- */
+    api->kprintf(ATTR_CYAN, "[Correctness Tests]\r\n");
+
+    /* 16x16 テスト */
+    total_fail += run_test("16x16 transparent",  16, 0, 100, 100);
+    total_fail += run_test("16x16 opaque",       16, 1, 100, 100);
+    total_fail += run_test("16x16 checker",      16, 2, 100, 100);
+
+    /* 32x32 テスト (32bit パスを通る) */
+    total_fail += run_test("32x32 transparent",  32, 0, 100, 100);
+    total_fail += run_test("32x32 opaque",       32, 1, 100, 100);
+    total_fail += run_test("32x32 checker",      32, 2, 100, 100);
+
+    /* 境界テスト: バイト境界位置 */
+    total_fail += run_test("16x16 at (0,0)",     16, 2,   0,   0);
+    total_fail += run_test("16x16 at (624,384)", 16, 2, 624, 384);
+    total_fail += run_test("32x32 at (0,0)",     32, 2,   0,   0);
+    total_fail += run_test("32x32 at (608,368)", 32, 2, 608, 368);
+
+    /* src_rect テスト (部分矩形) */
+    {
+        GFX_Surface surf;
+        GFX_Rect rect;
+        int mismatch;
+
+        setup_surface(&surf, buf_32, 32, 2);
+        rect.x = 0; rect.y = 0; rect.w = 16; rect.h = 16;
+
+        api->kprintf(ATTR_WHITE, "  src_rect 16x16 from 32x32 ... ");
+
+        gfx_clear(1);
+        gfx_blit_colorkey(200, 200, &surf, &rect, 0);
+        gfx_present();
+        snapshot_bb(snap_a);
+
+        gfx_clear(1);
+        gfx_blit_transparent(200, 200, &surf, &rect);
+        gfx_present();
+        snapshot_bb(snap_b);
+
+        mismatch = compare_snapshots(200, 200, 16, 16);
+        if (mismatch == 0) {
+            api->kprintf(ATTR_GREEN, "OK\r\n");
+        } else {
+            api->kprintf(ATTR_RED, "FAIL (%d)\r\n", mismatch);
+            total_fail += mismatch;
+        }
+    }
+
+    /* ---- 結果サマリー ---- */
+    api->kprintf(ATTR_WHITE, "\r\n");
+    if (total_fail == 0) {
+        api->kprintf(ATTR_GREEN, "All correctness tests PASSED.\r\n\r\n");
+    } else {
+        api->kprintf(ATTR_RED, "FAILED: %d mismatches total.\r\n\r\n", total_fail);
+    }
+
+    /* ---- ベンチマーク ---- */
+    api->kprintf(ATTR_CYAN, "[Benchmark (ticks, lower=better)]\r\n");
+    run_benchmark(16, 1);  /* 全不透明 */
+    run_benchmark(16, 2);  /* 市松模様 */
+    run_benchmark(32, 1);
+    run_benchmark(32, 2);
+
+    /* クリーンアップ */
+    gfx_clear(0);
+    gfx_present();
+    libos32gfx_shutdown();
+
+    api->kprintf(ATTR_WHITE, "\r\nDone. Press any key.\r\n");
+    api->kbd_getchar();
+    return total_fail ? 1 : 0;
+}
+
 /* ---- サーフェス構築 ---- */
 static void setup_surface(GFX_Surface *surf, u8 *buf, int size, int pattern)
 {
@@ -190,87 +282,4 @@ static void run_benchmark(int size, int pattern)
     } else {
         kapi->kprintf(ATTR_YELLOW, " (no speedup)\r\n");
     }
-}
-
-/* ---- メイン ---- */
-void main(int argc, char **argv, KernelAPI *api)
-{
-    int total_fail = 0;
-
-    kapi = api;
-    api->kprintf(ATTR_WHITE, "=== gfx_blit_transparent Test ===\r\n\r\n");
-
-    libos32gfx_init(api);
-
-    /* ---- 正確性テスト ---- */
-    api->kprintf(ATTR_CYAN, "[Correctness Tests]\r\n");
-
-    /* 16x16 テスト */
-    total_fail += run_test("16x16 transparent",  16, 0, 100, 100);
-    total_fail += run_test("16x16 opaque",       16, 1, 100, 100);
-    total_fail += run_test("16x16 checker",      16, 2, 100, 100);
-
-    /* 32x32 テスト (32bit パスを通る) */
-    total_fail += run_test("32x32 transparent",  32, 0, 100, 100);
-    total_fail += run_test("32x32 opaque",       32, 1, 100, 100);
-    total_fail += run_test("32x32 checker",      32, 2, 100, 100);
-
-    /* 境界テスト: バイト境界位置 */
-    total_fail += run_test("16x16 at (0,0)",     16, 2,   0,   0);
-    total_fail += run_test("16x16 at (624,384)", 16, 2, 624, 384);
-    total_fail += run_test("32x32 at (0,0)",     32, 2,   0,   0);
-    total_fail += run_test("32x32 at (608,368)", 32, 2, 608, 368);
-
-    /* src_rect テスト (部分矩形) */
-    {
-        GFX_Surface surf;
-        GFX_Rect rect;
-        int mismatch;
-
-        setup_surface(&surf, buf_32, 32, 2);
-        rect.x = 0; rect.y = 0; rect.w = 16; rect.h = 16;
-
-        api->kprintf(ATTR_WHITE, "  src_rect 16x16 from 32x32 ... ");
-
-        gfx_clear(1);
-        gfx_blit_colorkey(200, 200, &surf, &rect, 0);
-        gfx_present();
-        snapshot_bb(snap_a);
-
-        gfx_clear(1);
-        gfx_blit_transparent(200, 200, &surf, &rect);
-        gfx_present();
-        snapshot_bb(snap_b);
-
-        mismatch = compare_snapshots(200, 200, 16, 16);
-        if (mismatch == 0) {
-            api->kprintf(ATTR_GREEN, "OK\r\n");
-        } else {
-            api->kprintf(ATTR_RED, "FAIL (%d)\r\n", mismatch);
-            total_fail += mismatch;
-        }
-    }
-
-    /* ---- 結果サマリー ---- */
-    api->kprintf(ATTR_WHITE, "\r\n");
-    if (total_fail == 0) {
-        api->kprintf(ATTR_GREEN, "All correctness tests PASSED.\r\n\r\n");
-    } else {
-        api->kprintf(ATTR_RED, "FAILED: %d mismatches total.\r\n\r\n", total_fail);
-    }
-
-    /* ---- ベンチマーク ---- */
-    api->kprintf(ATTR_CYAN, "[Benchmark (ticks, lower=better)]\r\n");
-    run_benchmark(16, 1);  /* 全不透明 */
-    run_benchmark(16, 2);  /* 市松模様 */
-    run_benchmark(32, 1);
-    run_benchmark(32, 2);
-
-    /* クリーンアップ */
-    gfx_clear(0);
-    gfx_present();
-    libos32gfx_shutdown();
-
-    api->kprintf(ATTR_WHITE, "\r\nDone. Press any key.\r\n");
-    api->kbd_getchar();
 }

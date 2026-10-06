@@ -19,7 +19,7 @@
  * 定数を書かずにリンク結果を表示するので、帯域が動いてもここは腐らない。 */
 extern char _start[];
 
-void main(int argc, char **argv, KernelAPI *api)
+int main(int argc, char **argv, KernelAPI *api)
 {
     static void *mb[MAXN];
     static void *kb[MAXN];
@@ -63,4 +63,5 @@ void main(int argc, char **argv, KernelAPI *api)
     for (i = 0; i < nm; i++) free(mb[i]);
     free(probe);
     api->kprintf(0xC1, "%s", "heap_test done\n");
+    return bad ? 1 : 0;
 }

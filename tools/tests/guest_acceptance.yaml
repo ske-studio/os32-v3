@@ -300,3 +300,81 @@
   mode: manual
   status: deferred
   contract: docs/tasks/DEFERRED_TESTS.md#E10-1
+- id: prio3-audit-cursor
+  gate: PRIO-3
+  contract: userland/tests/audit_test.c
+  mode: manual
+  prereq: current CPL3 audit_test binary, CUI console, KAPI-AUDIT-FIX kernel
+  entry: audit_test cursor
+  observe:
+  - audit_test cursor output, shell/ver after probe
+  expect:
+    result: cursor PASS, status 0; every clamped position and post-character position
+      inside console size
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: prio3-audit-fmch
+  gate: PRIO-3
+  contract: userland/tests/audit_test.c
+  mode: manual
+  prereq: current CPL3 audit_test binary, CUI console, KAPI-AUDIT-FIX kernel
+  entry: audit_test fmch
+  observe:
+  - audit_test fmch output, shell/ver after probe
+  expect:
+    result: fmch PASS, status 0; void calls all return, no fault or hang
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: prio3-audit-mml
+  gate: PRIO-3
+  contract: userland/tests/audit_test.c
+  mode: manual
+  prereq: current CPL3 audit_test binary, CUI console, KAPI-AUDIT-FIX kernel
+  entry: audit_test mml
+  observe:
+  - 'audit_test: waiting mml; PM sends CTRL+STOP externally only after this line'
+  - shell return, exit status 130, no exception; ver and subsequent command respond
+  - sound stops after CTRL+STOP (Key-OFF)
+  expect:
+    termination: CTRL+STOP abort, status 130; no normal wait return
+    responsive: shell/ver and rshell respond after abort
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: prio3-audit-serial
+  gate: PRIO-3
+  contract: userland/tests/audit_test.c
+  mode: manual
+  prereq: current CPL3 audit_test binary, CUI console, KAPI-AUDIT-FIX kernel; launch
+    locally with serial RX empty, no serial command traffic during wait
+  entry: audit_test serial
+  observe:
+  - 'audit_test: waiting serial; PM sends CTRL+STOP externally only after this line'
+  - shell return, exit status 130, no exception; ver and subsequent command respond
+  expect:
+    termination: CTRL+STOP abort, status 130; no normal wait return
+    responsive: shell/ver and rshell respond after abort
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: prio3-audit-ime
+  gate: PRIO-3
+  contract: userland/tests/audit_test.c
+  mode: manual
+  prereq: current CPL3 audit_test binary, CUI console, KAPI-AUDIT-FIX kernel; keyboard
+    queue empty, no input until CTRL+STOP
+  entry: audit_test ime
+  observe:
+  - 'audit_test: waiting ime; PM sends CTRL+STOP externally only after this line'
+  - shell return, exit status 130, no exception; ver and subsequent command respond
+  expect:
+    termination: CTRL+STOP abort, status 130; no normal wait return
+    responsive: shell/ver and rshell respond after abort
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: prio3-audit-rshell
+  gate: PRIO-3
+  contract: userland/tests/audit_test.c
+  mode: manual
+  prereq: current CPL3 audit_test binary, CUI console, KAPI-AUDIT-FIX kernel
+  entry: audit_test rshell
+  observe:
+  - audit_test rshell output, shell/ver after probe
+  - before/after lines around both set_active calls; remote command response continues
+  expect:
+    result: status 0, both lines appear; rshell remains active and responds to subsequent
+      ver
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/

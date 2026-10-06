@@ -12,7 +12,7 @@
 /*    pcm_test short    1 frame だけ書いて close (drain の最短経路)           */
 /*    pcm_test nodev    装置が無い機械で OS32_ERR_NOSYS が返ることの確認      */
 /*                                                                          */
-/*  [C1] C89 (GNU89)。main() は**このファイルの最初の関数**。                */
+/*  [C1] C11 (GNU11)。main() は**このファイルの最初の関数**。                */
 /* ======================================================================== */
 
 #include "os32api.h"
@@ -41,15 +41,15 @@ static void fill_chunk(u32 first_frame, u32 n);
 static void show_status(KernelAPI *api, u32 sec);
 static int  run_stream(KernelAPI *api, u32 total_frames, int report);
 
-void main(int argc, char **argv, KernelAPI *api)
+int main(int argc, char **argv, KernelAPI *api)
 {
-    int rc;
+    int rc, failed = 0;
     u32 total;
 
     if (api->version < PCM_MIN_API) {
         api->kprintf(0x41, "KAPI v%d < %d: pcm_* absent\n",
                      api->version, PCM_MIN_API);
-        return;
+        return 1;
     }
 
     /* --- nodev: 装置の無い機械で「無い」と言えること --- */
@@ -62,13 +62,13 @@ void main(int argc, char **argv, KernelAPI *api)
                          rc, OS32_ERR_NOSYS);
             if (rc == 0) api->pcm_close();
         }
-        return;
+        return rc == OS32_ERR_NOSYS ? 0 : 1;
     }
 
     rc = api->pcm_open(PCM_RATE);
     if (rc != 0) {
         api->kprintf(0x41, "pcm_open(%d) -> %d\n", PCM_RATE, rc);
-        return;
+        return 1;
     }
     api->kprintf(0xE1, "pcm_open(%d) OK\n", PCM_RATE);
 
@@ -80,18 +80,21 @@ void main(int argc, char **argv, KernelAPI *api)
         rc = api->pcm_write(chunk, PCM_FRAME_BYTES);
         api->kprintf(rc == PCM_FRAME_BYTES ? 0xE1 : 0x41,
                      "short: pcm_write(4) -> %d\n", rc);
+        failed = (rc != PCM_FRAME_BYTES);
         rc = api->pcm_close();
         api->kprintf(rc == 0 ? 0xC1 : 0x41, "short: pcm_close -> %d\n", rc);
-        return;
+        return failed || rc != 0 ? 1 : 0;
     }
 
     total = (u32)PCM_RATE * PCM_SECONDS;
     rc = run_stream(api, total, 1);
+    failed = (rc != 0);
 
     /* close は drain (期限つき)。**「PI が来ない」は証拠にしない** ので、
      * 戻り値が 0 でなければ drain が失敗したということ。 */
     rc = api->pcm_close();
     api->kprintf(rc == 0 ? 0xC1 : 0x41, "pcm_close -> %d\n", rc);
+    return failed || rc != 0 ? 1 : 0;
 }
 
 /* ------------------------------------------------------------------------ */

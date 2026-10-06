@@ -110,7 +110,7 @@ TARGET_FLAGS = ["-std=gnu11", "-Wno-shift-negative-value", "-m32", "-march=i386"
                 "-Isdk/include/os32", "-Iuserland/lib", "-Iuserland/lib/math",
                 "-Iuserland/lib/ecs", "-Iuserland/lib/input",
                 "-Iuserland/lib/save", "-Iuserland/lib/db",
-                "-Iuserland/lib/asset", "-Iuserland/lib/mgx", "-Ilib/zlib",
+                "-Iuserland/lib/asset", "-Iuserland/lib/mgx", "-Iuserland/lib/gfx", "-Ilib/zlib",
                 "-I" + str(CROSS_DIR / "i386-elf/include")]
 
 
@@ -591,7 +591,10 @@ def run_target(tmp):
           % len(conforming_sources()), flush=True)
     for src in ("userland/tests/ring3_hello.c", "userland/tests/ring3_fault.c",
                 "userland/tests/ring3_guard.c", "userland/tests/nop.c",
-                "userland/tests/shm_reuse_child.c"):
+                "userland/tests/shm_reuse_child.c", "userland/tests/audit_test.c",
+                "userland/tests/blit_test.c", "userland/tests/heap_test.c",
+                "userland/tests/kout_test.c", "userland/tests/pcm_test.c",
+                "userland/tests/time_test.c"):
         subprocess.run(["i386-elf-gcc", *TARGET_FLAGS, "-c", src,
                         "-o", str(tmp / (pathlib.Path(src).stem + ".o"))],
                        cwd=ROOT, check=True)
