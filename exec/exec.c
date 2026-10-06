@@ -1529,6 +1529,8 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
 /*  資源を触らず longjmp。両着地点の exec_pending_finish が通常文脈で回収。 */
 /*  この関数は longjmp するので戻らない。                                    */
 /* ======================================================================== */
+/* h3 の syscall_abort 観測点として ring3_abort_check 内の呼出しを残す。 */
+static void ring3_kill_kind(int kind) __attribute__((noinline));
 static void ring3_kill_kind(int kind)
 {
     fault_kill_count++;
