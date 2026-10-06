@@ -10,6 +10,8 @@
 #include "fd_redirect.h"   /* res_owner_get */
 #include "kmalloc.h"
 
+extern int ring3_call_from_user(void);
+
 /* パイプバッファ管理構造 (ポインタ + メタデータのみ。BSS = 数十バイト) */
 static u8 *pipe_ptr[PIPE_BUF_COUNT];
 static u32 pipe_len[PIPE_BUF_COUNT];
@@ -59,6 +61,7 @@ void pipe_free_owned(int owner)
 void pipe_free(int id)
 {
     if (id >= 0 && id < PIPE_BUF_COUNT) {
+        if (ring3_call_from_user() && pipe_owner[id] != res_owner_get()) return;
         if (pipe_ptr[id]) {
             kfree(pipe_ptr[id]);
             pipe_ptr[id] = (u8 *)0;
@@ -71,6 +74,9 @@ void pipe_free(int id)
 
 u8 *pipe_get_buf(int id)
 {
+    if (id >= 0 && id < PIPE_BUF_COUNT &&
+        ring3_call_from_user() && pipe_owner[id] != res_owner_get())
+        return (u8 *)0;
     if (id >= 0 && id < PIPE_BUF_COUNT && pipe_ptr[id]) {
         return pipe_ptr[id];
     }
@@ -102,6 +108,8 @@ void pipe_set_len(int id, u32 len)
 
 void pipe_clear(int id)
 {
+    if (id >= 0 && id < PIPE_BUF_COUNT &&
+        ring3_call_from_user() && pipe_owner[id] != res_owner_get()) return;
     if (id >= 0 && id < PIPE_BUF_COUNT) {
         pipe_len[id] = 0;
     }

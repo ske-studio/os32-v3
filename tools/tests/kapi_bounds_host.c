@@ -28,6 +28,9 @@ static unsigned host_in(unsigned p) { static unsigned n; (void)p; return (++n & 
 static u8 db_memory[DB_SHM_RESULT_LIMIT + 4096] __attribute__((aligned(4)));
 #undef MEM_SHM_BASE
 #define MEM_SHM_BASE db_memory
+/* This bounds fixture uses the direct TRUSTED caller convention. */
+int ring3_call_from_user(void) { return 0; }
+int res_owner_get(void) { return 1; }
 #include "db_source.inc"
 #include "gfx_core_source.inc"
 #include "gfx_vram_source.inc"

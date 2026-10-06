@@ -33,6 +33,7 @@ static int checked_restore(struct v86_session_state *s);
 static u8 host_page0[PAGE_SIZE];
 static int owner = 2;
 int res_owner_get(void) { return owner; }
+int ring3_call_from_user(void) { return 1; }
 void *kmemset(void *p, int c, u32 n)
 {
     u8 *d = p;
