@@ -3,7 +3,9 @@
 票:   docs/archive/shell/TASK_SH_TRUNCATION.md §5 の段 2 (T1 と §2-1)
 記録: tools/tests/sh_truncation_tdd.md
 
-  python3 -B tools/tests/test_sh_truncation.py [--mutate]
+  python3 -B tools/tests/test_sh_truncation.py [--mutate | --mutate-rshell]
+
+--mutate-rshell は今回の授権拒否だけを写しで変異する (Make の MUTATE 接続)。
 
 --mutate は**否定側**。この段の中心規則は
 
@@ -100,11 +102,11 @@ def write_shims(tmp):
     return ["-I" + str(tmp)]
 
 
-def build_host(tmp, shim, name):
+def build_host(tmp, shim, name, source=HOST_SRC):
     exe = tmp / name
     subprocess.run(["gcc", *BASE, "-O0", *shim, *INCLUDES,
                     "-nostdlib", "-static", "-no-pie",
-                    str(HOST_SRC), "-o", str(exe)], cwd=ROOT, check=True)
+                    str(source), "-o", str(exe)], cwd=ROOT, check=True)
     return exe
 
 
@@ -112,6 +114,9 @@ def build_host(tmp, shim, name):
 #  変異 (否定側)。(ファイル, 置換前, 置換後) — 置換前は 1 か所だけに出ること。
 # ---------------------------------------------------------------------------
 MUTATIONS = [
+    ("rshell_app_rejection", "userland/shell/rshell.c",
+     '    return SH_STATUS_ERROR;\n#else\n    return cmd_rshell_resident(argc, argv);',
+     '    return cmd_rshell_resident(argc, argv);\n#else\n    return cmd_rshell_resident(argc, argv);'),
     # 変異 1: 段 2 の前の姿。strip_quotes が黙って max-1 文字に切る。
     #         → 先頭 255 文字が同じ 2 つの値が「等しい」になる (T1 / U1 / U2)。
     ("compare_truncated", "userland/shell/cmd_script.c",
@@ -670,6 +675,35 @@ def cui_has_no_yield(tmp, shim):
     return 0 if ok else 1
 
 
+def run_rshell_mutation(tmp, shim):
+    """KAPI authority regression only, on copies; never mutate the worktree.
+
+    The legacy --mutate suite is not wired into Make and retains its separate
+    CLI. This new gate must reject compile failures rather than count them RED.
+    """
+    name, rel, old, new = next(m for m in MUTATIONS if m[0] == 'rshell_app_rejection')
+    original = (ROOT / rel).read_text(encoding='utf-8')
+    assert original.count(old) == 1
+    mutated = tmp / 'rshell_mutant.c'
+    mutated.write_text(original.replace(old, new, 1), encoding='utf-8')
+    host = HOST_SRC.read_text(encoding='utf-8')
+    def include(match):
+        target = (HOST_SRC.parent / match[1]).resolve()
+        if target == ROOT / rel:
+            target = mutated
+        return '#include "' + str(target) + '"'
+    host = re.sub(r'#include "(\.\./[^"\n]+)"', include, host)
+    fixture = tmp / 'rshell_mutant_host.c'
+    fixture.write_text(host, encoding='utf-8')
+    exe = build_host(tmp, shim, 'rshell_mutant', fixture)
+    result = host32.run([str(exe)], cwd=ROOT, timeout=60, capture_output=True, text=True)
+    if result.returncode != 1 or 'FAIL sh.bin rshell rejected' not in result.stdout:
+        print('rshell mutation did not produce the expected runtime failure', result.stdout)
+        return 1
+    print('MUTATE ' + name + ' runtime RED (isolated copy)', flush=True)
+    return 0
+
+
 def run_mutations(tmp, shim):
     bad = 0
     for name, rel, old, new in MUTATIONS:
@@ -719,6 +753,9 @@ if __name__ == "__main__":
         failed += rc != 0
 
         failed += cui_has_no_yield(tmp, shim)
+
+        if "--mutate-rshell" in sys.argv:
+            failed += run_rshell_mutation(tmp, shim)
 
         if "--mutate" in sys.argv:
             failed += run_mutations(tmp, shim)

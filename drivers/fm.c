@@ -10,6 +10,10 @@
 #include "fm.h"
 #include "io.h"
 
+/* drivers/ does not include exec headers (same boundary as kbd.c). */
+extern void ring3_abort_check(void);
+extern int ring3_wait_pending(void);
+
 /* ======================================================================== */
 /*  OPN低レベルI/O — snddrv/src/opn.c 移植                                 */
 /* ======================================================================== */
@@ -183,6 +187,8 @@ static const u16 fnumber_table[12] = {
 /* FM音色設定 — snddrv fm_set_tone() 移植 */
 void fm_set_tone(int ch, const uchar *tone_data)
 {
+    if (ch < 0 || ch >= OPN_CHANNEL_COUNT) return;
+
     int s;
     static const int slot_offset[] = {0, 8, 4, 12};
 
@@ -209,6 +215,8 @@ void fm_set_tone_num(int ch, int tone_num)
 /* FM Key-ON — snddrv fm_note_on() 移植 */
 void fm_note_on(int ch, int note)
 {
+    if (ch < 0 || ch >= OPN_CHANNEL_COUNT) return;
+
     int block, key;
     u16 fnum;
 
@@ -230,6 +238,8 @@ void fm_note_on(int ch, int note)
 /* FM Key-OFF */
 void fm_note_off(int ch)
 {
+    if (ch < 0 || ch >= OPN_CHANNEL_COUNT) return;
+
     opn_write(OPN_REG_KEY_ONOFF, (uchar)(0x00 | ch));
 }
 
@@ -247,6 +257,8 @@ void fm_all_off(void)
 
 void ssg_tone(int ch, u16 period)
 {
+    if (ch < 0 || ch >= OPN_CHANNEL_COUNT) return;
+
     uchar lo_reg = (uchar)(ch * 2);
     uchar hi_reg = (uchar)(ch * 2 + 1);
     opn_write(lo_reg, (uchar)(period & 0xFF));
@@ -255,6 +267,8 @@ void ssg_tone(int ch, u16 period)
 
 void ssg_volume(int ch, uchar vol)
 {
+    if (ch < 0 || ch >= OPN_CHANNEL_COUNT) return;
+
     opn_write(SSG_REG_VOL_A + (uchar)ch, vol & 0x1F);
 }
 
@@ -280,16 +294,19 @@ void ssg_all_off(void)
 /*  高レベルAPI                                                            */
 /* ======================================================================== */
 
-/* ウェイト (tickカウンタ使用) */
+/* ウェイト (tickカウンタ使用)。GUI STOP は完了した syscall の出口で
+ * WM へ譲るので、途中で park せず 0 を返して MML の Key-OFF へ進む。 */
 extern volatile u32 tick_count;
-static void wait_ms(u32 ms)
+static int wait_ms(u32 ms, int interruptible)
 {
     u32 ticks = ms / 10;   /* 100Hz → 10ms/tick */
     u32 start = tick_count;
     if (ticks == 0) ticks = 1;
     while ((tick_count - start) < ticks) {
+        if (interruptible && ring3_wait_pending()) return 0;
         io_wait(); /* PC-98エミュレータ固有のhltハング対策 */
     }
+    return 1;
 }
 
 /* 起動ジングル — ベル音色でC-E-G-C(上) アルペジオ */
@@ -302,31 +319,31 @@ void fm_startup_sound(void)
 
     /* C5 */
     fm_note_on(0, NOTE(5, N_C));
-    wait_ms(120);
+    wait_ms(120, 0);
     fm_note_off(0);
-    wait_ms(30);
+    wait_ms(30, 0);
 
     /* E5 */
     fm_note_on(0, NOTE(5, N_E));
-    wait_ms(120);
+    wait_ms(120, 0);
     fm_note_off(0);
-    wait_ms(30);
+    wait_ms(30, 0);
 
     /* G5 */
     fm_note_on(0, NOTE(5, N_G));
-    wait_ms(120);
+    wait_ms(120, 0);
     fm_note_off(0);
-    wait_ms(30);
+    wait_ms(30, 0);
 
     /* C6 (長め) */
     fm_note_on(0, NOTE(6, N_C));
-    wait_ms(400);
+    wait_ms(400, 0);
     fm_note_off(0);
 }
 
 /* 簡易MML再生 — "CDEFGAB" + 数字(オクターブ) + "+#"(シャープ)
  * Ch1/ピアノ音色で単音再生 */
-void fm_play_mml(const char *mml)
+static void fm_play_mml_wait(const char *mml, int interruptible)
 {
     int octave = 4;
     int note_map[7] = { N_A, N_B, N_C, N_D, N_E, N_F, N_G };
@@ -337,6 +354,7 @@ void fm_play_mml(const char *mml)
     fm_set_tone_num(0, 0);  /* ピアノ */
 
     while (*p) {
+        if (interruptible && ring3_wait_pending()) break;
         char ch = *p++;
         int note_idx = -1;
         int sharp = 0;
@@ -357,7 +375,7 @@ void fm_play_mml(const char *mml)
             note_idx = ch - 'a';
         } else if (ch == 'R' || ch == 'r') {
             /* 休符 */
-            wait_ms(200);
+            if (!wait_ms(200, interruptible)) break;
             continue;
         } else if (ch == ' ' || ch == ',') {
             continue;  /* 区切り文字 */
@@ -373,10 +391,17 @@ void fm_play_mml(const char *mml)
 
         /* Key-OFF → Key-ON */
         fm_note_off(0);
-        wait_ms(20);
+        if (!wait_ms(20, interruptible)) break;
         fm_note_on(0, NOTE(octave, note_map[note_idx] + sharp));
-        wait_ms(200);
+        if (!wait_ms(200, interruptible)) break;
     }
 
     fm_note_off(0);
+}
+
+void fm_play_mml(const char *mml) { fm_play_mml_wait(mml, 0); }
+void fm_play_mml_kapi(const char *mml)
+{
+    fm_play_mml_wait(mml, 1); /* includes Key-OFF before a nonlocal exit */
+    if (ring3_wait_pending()) ring3_abort_check();
 }

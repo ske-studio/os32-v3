@@ -151,4 +151,8 @@ int  ime_user_delete(IME_Dict *dict, const char *yomi, const char *kanji);
 int  ime_user_export(IME_Dict *dict, const char *path);
 int  ime_user_clear(IME_Dict *dict);
 
+void ime_owner_exit(int owner);
+int ime_getchar_kapi(void);
+int ime_getkey_kapi(void);
+
 #endif /* __IME_H */

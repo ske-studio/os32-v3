@@ -7,6 +7,6 @@ CHECK_PAR_ORDER += 067:check-sh-truncation-host
 # 入っている。否定側は `--mutate` (印を立てない / 消し忘れる / 対話でも
 # 打ち切る 版などが RED になる)。記録は tools/tests/sh_truncation_tdd.md。
 check-sh-truncation-host:
-	python3 -B tools/tests/test_sh_truncation.py
+	python3 -B tools/tests/test_sh_truncation.py $(if $(mut_on),--mutate-rshell)
 
 .PHONY: check-sh-truncation-host

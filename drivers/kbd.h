@@ -141,4 +141,9 @@ extern volatile u8 kbd_shift_state;
 /* Internal: discard coalesced CTRL+STOP makes after an ABORTED owner exit. */
 void kbd_discard_stop(void);
 
+int kbd_getchar_kapi(void);
+int kbd_getkey_kapi(void);
+/* Only explicit input waits may request interruption; returns -1, no unwind. */
+int kbd_getkey_wait(int interruptible);
+
 #endif /* __KBD_H */

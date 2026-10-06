@@ -12,6 +12,9 @@
 /* ======== 型定義 ======== */
 typedef unsigned char uchar;
 
+/* FM and SSG each have channels 0 through 2 on YM2203. */
+#define OPN_CHANNEL_COUNT 3
+
 /* ======== OPN I/O ポート (PC9800Bible §2-13) ======== */
 #define OPN_ADDR      0x0188   /* レジスタアドレス (Write) */
 #define OPN_DATA      0x018A   /* レジスタデータ (Write) */
@@ -109,5 +112,7 @@ void ssg_all_off(void);
 /* 高レベル */
 void fm_startup_sound(void);       /* 起動ジングル */
 void fm_play_mml(const char *mml); /* 簡易MML再生 */
+
+void fm_play_mml_kapi(const char *mml);
 
 #endif /* __FM_H */

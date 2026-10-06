@@ -29,6 +29,10 @@
 extern unsigned long sysclk_hz(void);
 extern int sysclk_is_8mhz(void);
 
+/* STOP safe points for USER input/output waits (never in an IF=0 log). */
+extern void ring3_abort_check(void);
+extern int ring3_wait_pending(void);
+
 /* 外部: irq_enable / irq_disable (idt.c で定義)。drivers/ は -Ikernel を
  * 持たないので、kbd.c / ide.c と同じ扱いでここに宣言する。 */
 extern void irq_enable(unsigned int irq);
@@ -567,12 +571,16 @@ int serial_peekchar(void)
 }
 
 /* ブロッキング受信 */
-int serial_getchar(void)
+static int serial_getchar_wait(int interruptible)
 {
     int ch;
     /* セッション中は待たずに「無い」(待つと SerialFS の応答を盗む) */
     if (s_gate) return -1;
     while (ser_count == 0) {
+        if (interruptible && ring3_wait_pending()) {
+            ring3_abort_check();
+            return -1;
+        }
         if (s_gate) return -1;
         _halt();
     }
@@ -854,4 +862,32 @@ void serial_put_hex32_polled(u32 val)
     }
     buf[10] = '\0';
     serial_puts_polled(buf);
+}
+
+/* Public KAPI waits only. Internal logs and SerialFS never unwind here.
+ * ser_tx_byte has a bounded retry budget; abort only between whole bytes. */
+int serial_getchar(void) { return serial_getchar_wait(0); }
+int serial_getchar_kapi(void) { return serial_getchar_wait(1); }
+int serial_putchar_kapi(char c)
+{
+    if (ring3_wait_pending()) {
+        ring3_abort_check();
+        return SER_TX_DROPPED;
+    }
+    return serial_putchar(c);
+}
+void serial_puts_kapi(const char *str)
+{
+    int count = 0;
+    while (*str) {
+        if (ring3_wait_pending()) {
+            ring3_abort_check();
+            return;
+        }
+        serial_putchar(*str++);
+        if ((++count & (SER_PUTS_WAIT_EVERY - 1)) == 0) {
+            io_wait();
+            io_wait();
+        }
+    }
 }

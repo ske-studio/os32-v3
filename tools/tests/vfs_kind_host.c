@@ -65,7 +65,7 @@ int fd_redirect_read(int fd, void *buf, u32 size)
 { (void)fd; (void)buf; (void)size; return VFS_ERR_INVAL; }
 int fd_redirect_write(int fd, const void *buf, u32 size)
 { (void)fd; (void)buf; (void)size; return VFS_ERR_INVAL; }
-int kbd_getchar(void) { return '\n'; }
+int kbd_getchar_kapi(void) { return '\n'; }
 void console_write(const char *buf, u32 size, u8 color)
 { (void)buf; (void)size; (void)color; }
 int res_owner_get(void) { return 0; }

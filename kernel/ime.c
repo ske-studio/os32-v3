@@ -15,12 +15,18 @@
 #include "kstring.h"
 #include "os32_kapi_shared.h"
 #include "kmalloc.h"
+#include "exec.h"
+#include "con_sink.h"
+#include "fd_redirect.h"
+extern int ring3_call_from_user(void);
+extern void ring3_abort_check(void);
 
 /* ======================================================================== */
 /*  グローバル IME 状態                                                      */
 /* ======================================================================== */
 
 static IME_State g_ime;
+static int g_ime_reader_owner;
 
 /* 辞書ファイルのパス */
 #define IME_DICT_PATH  "/db/fep.db"
@@ -663,7 +669,7 @@ int ime_get_mode(void)
     return g_ime.mode;
 }
 
-int ime_getchar(void)
+static int ime_getchar_wait(int interruptible)
 {
     int keydata;
     int result;
@@ -674,7 +680,8 @@ int ime_getchar(void)
     }
 
     for (;;) {
-        keydata = kbd_getkey();
+        keydata = kbd_getkey_wait(interruptible);
+        if (keydata < 0) return -1;
 
         /* Shift+Space: ON/OFF問わず常に検出 */
         if (((keydata >> 8) & 0x7F) == KEY_SPACE &&
@@ -799,7 +806,7 @@ void ime_set_render(void *table)
     g_ime.render = table ? (const IME_Render *)table : &g_ime_render_tvram;
 }
 
-int ime_getkey(void)
+static int ime_getkey_wait(int interruptible)
 {
     int keydata;
     int result;
@@ -810,7 +817,8 @@ int ime_getkey(void)
     }
 
     for (;;) {
-        keydata = kbd_getkey();
+        keydata = kbd_getkey_wait(interruptible);
+        if (keydata < 0) return -1; /* key wait interrupted */
 
         /* Shift+Space: ON/OFF問わず常に検出 */
         if (((keydata >> 8) & 0x7F) == KEY_SPACE &&
@@ -914,4 +922,55 @@ int ime_user_export_facade(const char *path)
 int ime_user_clear_facade(void)
 {
     return ime_user_clear(&g_ime.dict);
+}
+
+/* Cancel the dying CUI reader's composition, without committing candidates.
+ * Dictionary/mode stay available for the next reader. */
+static void ime_cancel_input(void)
+{
+    candlist_clear();
+    g_ime.state = IME_ST_INPUT;
+    g_ime.kana_len = 0;
+    g_ime.kana_buf[0] = '\0';
+    g_ime.converting = 0;
+    g_ime.result_count = g_ime.candidate_idx = g_ime.page = 0;
+    g_ime.commit_len = g_ime.commit_pos = 0;
+    ime_rk_init(&g_ime.rk);
+    /* OFF leaves the last console row to the app; ON keeps the mode visible. */
+    if (g_ime.mode != IME_MODE_OFF) preedit_draw();
+}
+int ime_getchar(void) { return ime_getchar_wait(0); }
+int ime_getkey(void) { return ime_getkey_wait(0); }
+int ime_getchar_kapi(void)
+{
+    int c;
+    if (!con_sink_is_enabled() && ring3_call_from_user())
+        g_ime_reader_owner = res_owner_get();
+    c = ime_getchar_wait(1);
+    if (c < 0) {
+        if (!con_sink_is_enabled()) ime_cancel_input();
+        ring3_abort_check();
+    }
+    return c;
+}
+int ime_getkey_kapi(void)
+{
+    int c;
+    if (!con_sink_is_enabled() && ring3_call_from_user())
+        g_ime_reader_owner = res_owner_get();
+    c = ime_getkey_wait(1);
+    if (c < 0) {
+        if (!con_sink_is_enabled()) ime_cancel_input();
+        ring3_abort_check();
+    }
+    return c;
+}
+
+/* Also covers abort/fault at a syscall boundary after input became ready.
+ * A child that never read IME input must not cancel its parent's preedit. */
+void ime_owner_exit(int owner)
+{
+    if (owner <= 0 || owner != g_ime_reader_owner) return;
+    g_ime_reader_owner = 0;
+    if (!con_sink_is_enabled()) ime_cancel_input();
 }

@@ -46,6 +46,12 @@ int sysclk_is_8mhz(void) { return 0; }
 void irq_enable(unsigned int irq) { (void)irq; }
 void irq_disable(unsigned int irq) { (void)irq; }
 
+/* A child VFS syscall runs in USER context with STOP pending. No frame or
+ * internal log may unwind in the shared serial transport. */
+int ring3_call_from_user(void) { return 1; }
+int ring3_wait_pending(void) { return 1; }
+void ring3_abort_check(void) { fprintf(stderr, "internal serial abort\n"); abort(); }
+
 #include "serial.c"
 #include "../../drivers/serial_plan.c"
 #include "crc32.c"

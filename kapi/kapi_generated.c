@@ -720,13 +720,13 @@ void __cdecl wrap_tvram_scroll(void)
 int __cdecl wrap_kbd_getchar(void)
 {
     KAPI_HIT(22);
-    return kbd_getchar();
+    return kbd_getchar_kapi();
 }
 
 int __cdecl wrap_kbd_getkey(void)
 {
     KAPI_HIT(23);
-    return kbd_getkey();
+    return kbd_getkey_kapi();
 }
 
 int __cdecl wrap_kbd_trygetkey(void)
@@ -792,19 +792,19 @@ void __cdecl wrap_serial_init(u32 baud)
 void __cdecl wrap_serial_puts(const char *s)
 {
     KAPI_HIT(34);
-    serial_puts(s);
+    serial_puts_kapi(s);
 }
 
 int __cdecl wrap_serial_getchar(void)
 {
     KAPI_HIT(35);
-    return serial_getchar();
+    return serial_getchar_kapi();
 }
 
 int __cdecl wrap_serial_putchar(u8 ch)
 {
     KAPI_HIT(36);
-    return serial_putchar(ch);
+    return serial_putchar_kapi(ch);
 }
 
 int __cdecl wrap_serial_trygetchar(void)
@@ -853,7 +853,7 @@ void __cdecl wrap_fm_startup_sound(void)
 void __cdecl wrap_fm_play_mml(const char *mml)
 {
     KAPI_HIT(43);
-    fm_play_mml(mml);
+    fm_play_mml_kapi(mml);
 }
 
 int __cdecl wrap_np2_detect(void)
@@ -1009,6 +1009,7 @@ void __cdecl wrap_buz_off(void)
 void __cdecl wrap_rshell_set_active(int active)
 {
     KAPI_HIT(63);
+    if (ring3_call_from_user()) return;
     rshell_active = active;
 }
 
@@ -1286,7 +1287,7 @@ int __cdecl wrap_sys_shm_free(void *ptr)
 int __cdecl wrap_ime_getchar(void)
 {
     KAPI_HIT(100);
-    return ime_getchar();
+    return ime_getchar_kapi();
 }
 
 int __cdecl wrap_ime_trygetchar(void)
@@ -1322,7 +1323,7 @@ int __cdecl wrap_ime_get_mode(void)
 int __cdecl wrap_ime_getkey(void)
 {
     KAPI_HIT(106);
-    return ime_getkey();
+    return ime_getkey_kapi();
 }
 
 int __cdecl wrap_sys_redirect_fd(int fd, const char *path, int mode)

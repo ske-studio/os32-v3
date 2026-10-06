@@ -226,12 +226,14 @@
     {
       "name": "kbd_getchar",
       "ret": "int",
-      "args": []
+      "args": [],
+      "target": "kbd_getchar_kapi"
     },
     {
       "name": "kbd_getkey",
       "ret": "int",
-      "args": []
+      "args": [],
+      "target": "kbd_getkey_kapi"
     },
     {
       "name": "kbd_trygetkey",
@@ -311,19 +313,22 @@
       "ret": "void",
       "args": [
         "const char *s"
-      ]
+      ],
+      "target": "serial_puts_kapi"
     },
     {
       "name": "serial_getchar",
       "ret": "int",
-      "args": []
+      "args": [],
+      "target": "serial_getchar_kapi"
     },
     {
       "name": "serial_putchar",
       "ret": "int",
       "args": [
         "u8 ch"
-      ]
+      ],
+      "target": "serial_putchar_kapi"
     },
     {
       "name": "serial_trygetchar",
@@ -370,7 +375,8 @@
       "ret": "void",
       "args": [
         "const char *mml"
-      ]
+      ],
+      "target": "fm_play_mml_kapi"
     },
     {
       "name": "np2_detect",
@@ -518,7 +524,7 @@
       "args": [
         "int active"
       ],
-      "body": "rshell_active = active;"
+      "body": "if (ring3_call_from_user()) return;\nrshell_active = active;"
     },
     {
       "name": "ide_write_sector",
@@ -822,7 +828,8 @@
     {
       "name": "ime_getchar",
       "ret": "int",
-      "args": []
+      "args": [],
+      "target": "ime_getchar_kapi"
     },
     {
       "name": "ime_trygetchar",
@@ -854,7 +861,8 @@
     {
       "name": "ime_getkey",
       "ret": "int",
-      "args": []
+      "args": [],
+      "target": "ime_getkey_kapi"
     },
     {
       "name": "sys_redirect_fd",
