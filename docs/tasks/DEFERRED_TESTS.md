@@ -29,6 +29,8 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 | E10-4 | gcap killの通常着地でg/tv解放・ops解除・30行/cursor復元を実装。PMが途中STOPと次回採取を確認 | ゲスト・native待ち | e10c-gcap-kill |
 | E10-5 | closing再例外等の停止前にpolledシリアル1行とexec_stop_countを追加。PMが別の故障注入起動で確認 | ゲスト・native待ち | e10c-stop-vm |
 | E10-6 | INT80は保存VMを見てstiを迂回。実ASMの分岐をホスト確認、PMがIF=0・IVT反射・通常KAPI IF=1を受入 | ゲスト・native待ち | e10c-stop-vm |
+| E10-8 | gfx が台帳のレコード (`ledger_resources[rid].map_*`) を直接書き換えている — pgalloc に範囲を検査して設定する口を作る | 改善 | e11a |
+| E10-9 | 監査 (launch・GUI 移譲・V86 帰路) の失敗が計数だけで表示されない — 最初の 1 回だけシリアル 1 行か tag を残す | 改善 | e11a |
 
 ## 2. 関門: e11 (公開 KAPI の一括、版の更新は 1 回)
 
