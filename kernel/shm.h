@@ -22,7 +22,7 @@
 #define SHM_FREE     0   /* 未使用 */
 #define SHM_USED     1   /* 確保済み (R/W) */
 #define SHM_LOCKED   2   /* ロック済み (R/O) */
-#define SHM_RESERVED 3   /* カーネルが固定予約 (GUI ブロック 12〜15 等)。
+#define SHM_RESERVED 3   /* カーネルが固定予約 (DB 先頭 1 / GUI 末尾 4 ブロック)。
                           * shm_alloc は配らず、shm_free / shm_cleanup_all は
                           * 触らない (契約 T2)。 */
 
@@ -51,7 +51,7 @@ void shm_cleanup_all(void);
 
 /* 指定所有者 (確保時の res_owner_get() の値でタグ付け) のブロックだけ解放。
  * exec_exit / exec_kill が ID 単位で呼ぶ (票 K5 の D3、P3)。
- * GUI 予約ブロック (SHM_RESERVED) は触らない (契約 T2)。 */
+ * DB / GUI 予約ブロック (SHM_RESERVED) は触らない (契約 T2)。 */
 void shm_free_owned(int owner);
 
 #endif /* __SHM_H */

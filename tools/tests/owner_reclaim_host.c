@@ -128,6 +128,7 @@ int main(void)
     int p2, p3;
 
     shm_init();
+    check(shm_state[0] == SHM_RESERVED, "DB block 0 is reserved at init");
     pipe_buffer_init();
     fd_redirect_init();
 
@@ -140,7 +141,7 @@ int main(void)
     g_zero_calls = 0;
     a2 = shm_alloc(2);
     check(a2 != 0, "1c ID 2 が SHM を 2 ブロック取れる");
-    check(g_zero_calls == 1 && g_last_zero_start == (unsigned int)MEM_SHM_BASE,
+    check(g_zero_calls == 1 && g_last_zero_start == (unsigned int)MEM_SHM_BASE + SHM_BLOCK_SIZE,
           "1d 確保時に先頭からゼロクリアされる (前の所有者のデータを見せない)");
 
     /* ---- ID 3 が資源を確保 ---- */
@@ -149,20 +150,21 @@ int main(void)
     check(p3 >= 0 && p3 != p2, "2a ID 3 が別のパイプバッファを取れる");
     a3 = shm_alloc(1);
     check(a3 != 0 && a3 != a2, "2b ID 3 が別の SHM ブロックを取れる");
-    check(shm_state[0] == SHM_USED && shm_state[1] == SHM_USED &&
-          shm_state[2] == SHM_USED,
+    check(shm_state[1] == SHM_USED && shm_state[2] == SHM_USED &&
+          shm_state[3] == SHM_USED,
           "2c 3 ブロックが使用中 (2 の 2 枚 + 3 の 1 枚)");
-    check(shm_block_owner[0] == 2 && shm_block_owner[1] == 2 &&
-          shm_block_owner[2] == 3,
+    check(shm_block_owner[1] == 2 && shm_block_owner[2] == 2 &&
+          shm_block_owner[3] == 3,
           "2d SHM ブロックに確保した ID のタグが付く");
 
     /* ---- ID 2 だけを畳む ---- */
     g_map_calls = 0;
     reclaim_owned(2);
+    check(shm_state[0] == SHM_RESERVED, "DB block 0 survives owned reclaim");
 
-    check(shm_state[0] == SHM_FREE && shm_state[1] == SHM_FREE,
+    check(shm_state[1] == SHM_FREE && shm_state[2] == SHM_FREE,
           "3a ID 2 の SHM ブロックだけが空く");
-    check(shm_state[2] == SHM_USED && shm_block_owner[2] == 3,
+    check(shm_state[3] == SHM_USED && shm_block_owner[3] == 3,
           "3b ID 3 の SHM ブロックは使用中のまま");
     check(g_map_calls == 2, "3c 属性を戻したのは ID 2 の 2 ブロックだけ");
     check(pipe_used[p2] == 0, "3d ID 2 のパイプバッファが返る");
@@ -179,16 +181,16 @@ int main(void)
     reclaim_owned(1);
     check(shm_state[SHM_GUI_BLOCK_FIRST] == SHM_RESERVED,
           "4b シェル帯の回収でも GUI 予約は無傷");
-    check(shm_state[2] == SHM_USED,
+    check(shm_state[3] == SHM_USED,
           "4c 無関係な ID の SHM はシェルの回収でも残る");
 
     /* ---- 所有者 0 (タグなし) では何も回収しない ---- */
     reclaim_owned(0);
-    check(shm_state[2] == SHM_USED, "5a owner 0 の回収は何も解放しない");
+    check(shm_state[3] == SHM_USED, "5a owner 0 の回収は何も解放しない");
 
     /* ---- ID 3 を畳めば残りが返る ---- */
     reclaim_owned(3);
-    check(shm_state[2] == SHM_FREE, "5b ID 3 の回収で残りの SHM が返る");
+    check(shm_state[3] == SHM_FREE, "5b ID 3 の回収で残りの SHM が返る");
     check(pipe_used[p3] == 0 && g_live_allocs == 0,
           "5c ID 3 のパイプバッファも返る");
     check(shm_state[SHM_GUI_BLOCK_FIRST] == SHM_RESERVED,
@@ -198,10 +200,10 @@ int main(void)
     res_owner_set(4);
     a2 = shm_alloc(1);
     check(a2 != 0 && shm_lock(a2) == 0, "6a ID 4 が SHM を lock できる");
-    check(shm_state[0] == SHM_LOCKED, "6b lock 後の状態は SHM_LOCKED");
+    check(shm_state[1] == SHM_LOCKED, "6b lock 後の状態は SHM_LOCKED");
     reclaim_owned(4);
-    check(shm_state[0] == SHM_FREE, "6c lock 済みでも所有者の回収で返る");
-    check(shm_block_owner[0] == 0, "6d 返ったブロックのタグは消える");
+    check(shm_state[1] == SHM_FREE, "6c lock 済みでも所有者の回収で返る");
+    check(shm_block_owner[1] == 0, "6d 返ったブロックのタグは消える");
 
     if (failures) {
         printf("FAILURES (%d/%d)\n", failures, checks);

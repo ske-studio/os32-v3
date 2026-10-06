@@ -195,6 +195,13 @@ extern u32 __bss_end;
 #define MEM_SHM_END           (MEM_SHM_BASE + MEM_SHM_SIZE - 1)
 #define MEM_SHM_GUARD_HI      (MEM_SHM_BASE + MEM_SHM_SIZE)
 
+/* DB 結果・エラー文用 SHM: 先頭 1 ブロックを固定予約する。
+ * shm_alloc には配らず、末尾の GUI 予約を除いた 9 ブロックを IPC に使う。
+ * SDK の DB_SHM_BLOCK_SIZE との一致は kernel/shm.c で表明する。 */
+#define MEM_SHM_DB_OFFSET     0UL
+#define MEM_SHM_DB_SIZE       0x4000UL                     /* 16KB = 1 ブロック */
+#define MEM_SHM_DB_BASE       (MEM_SHM_BASE + MEM_SHM_DB_OFFSET)
+
 /* GUI 予約 SHM (契約 T2 / docs/tasks/gui/API_CONTRACTS.md)。
  * SHM 帯の **末尾 4 ブロック** を GUI 用に固定予約する。kernel/shm.c の
  * 初期化でこの 4 ブロックを SHM_RESERVED にし、shm_alloc が配らないようにする。
