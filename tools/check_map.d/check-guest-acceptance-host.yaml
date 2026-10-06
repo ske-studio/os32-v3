@@ -1,0 +1,22 @@
+check-guest-acceptance-host:
+- tools/tests/guest_acceptance.yaml
+- tools/tests/guest_tests.txt
+- tools/gen_guest_acceptance.py
+- tools/accept/pt0_snapshot.py
+- tools/tvdump_recv.py
+- tools/tests/test_guest_acceptance.py
+- tools/tests/mutpar.py
+- tools/guest_tests.py
+- tools/np21w_mcp/np21w_client.py
+- tools/np21w_mcp/symbols.py
+- include/memmap.h
+- userland/tests/ring3_marker.h
+- docs/tasks/v3/TASK_T2D_T2H.md
+- docs/tasks/DEFERRED_TESTS.md
+- build/checks.d/check-guest-acceptance-host.mk
+- tools/check_map.d/check-guest-acceptance-host.yaml
+- build/core.yaml
+- tools/deploy_manifests.py
+- tools/deploy_protect.py
+- tools/hostdrv_deploy.py
+- userland/deploy.yaml
