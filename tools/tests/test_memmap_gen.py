@@ -279,6 +279,9 @@ def main():
     ap.add_argument("--mutate", action="store_true")
     args = ap.parse_args()
 
+    for line in cases(SCRIPT):
+        print("  " + line)
+    print("gen_memmap PASS")
     if args.mutate:
         source = SCRIPT.read_text(encoding="utf-8")
         red = 0
@@ -301,9 +304,6 @@ def main():
         print("%d/%d の変異が RED" % (red, len(MUTATIONS)))
         return 0 if red == len(MUTATIONS) else 1
 
-    for line in cases(SCRIPT):
-        print("  " + line)
-    print("gen_memmap PASS")
     return 0
 
 

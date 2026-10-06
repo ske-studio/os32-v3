@@ -87,3 +87,16 @@ check-ci-stab-host:
 - userland/system/inst_hdd.c
 - userland/system/install.c
 - userland/system/install_recover.inc
+- exec/exec_heap.c
+- kernel/kmalloc.c
+- tools/tests/memmap_boot_host.c
+- tools/tests/test_memmap_boot.py
+- tools/tests/test_memmap_gen.py
+- tools/tests/test_hostdrv_manifest.py
+- tools/tests/test_ring3_guard.py
+- tools/tests/test_memory_boot.py
+- tools/tests/test_ledger.py
+- tools/tests/test_gfx_boot.py
+- tools/tests/test_device_reservation.py
+- tools/tests/test_app_bb_overlap.py
+- tools/tests/test_shlib_high.py

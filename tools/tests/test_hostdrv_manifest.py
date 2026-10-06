@@ -478,9 +478,6 @@ def run_mutations():
 
 
 if __name__ == "__main__":
-    if "--mutate" in sys.argv:
-        sys.exit(1 if run_mutations() else 0)
-
     with tempfile.TemporaryDirectory(prefix="os32-h4-host-") as td:
         td = pathlib.Path(td)
         case_m1(td)
@@ -492,4 +489,8 @@ if __name__ == "__main__":
         case_kapi(td)
 
     print("\n%d checks, %d failures" % (checks, failures))
-    sys.exit(1 if failures else 0)
+    if failures:
+        sys.exit(1)
+    if "--mutate" in sys.argv:
+        sys.exit(1 if run_mutations() else 0)
+    sys.exit(0)

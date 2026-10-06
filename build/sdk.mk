@@ -151,8 +151,7 @@ export OS32_CONTROL_SESSION := $(shell python3 -c "import uuid; print(uuid.uuid4
 endif
 
 define host32_check
-@set -e; test -n "$(HOST32_RUNNERS)"; for runner in $(HOST32_RUNNERS); do echo "HOST32_RUNNERS=$$runner"; python3 -B tools/tests/$(1) --runner $$runner; done
-$(if $(MUT),python3 -B tools/tests/$(1) --runner $(firstword $(HOST32_RUNNERS)) $(MUT),@:)
+@set -e; test -n "$(HOST32_RUNNERS)"; mutations="$(MUT)"; for runner in $(HOST32_RUNNERS); do echo "HOST32_RUNNERS=$$runner"; python3 -B tools/tests/$(1) --runner $$runner $$mutations; mutations=""; done
 endef
 CHECK_PAR_ORDER :=
 include $(sort $(wildcard build/checks.d/*.mk))

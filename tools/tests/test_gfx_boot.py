@@ -287,9 +287,10 @@ def mutate():
 
 
 if __name__ == '__main__':
-    if '--mutate' in sys.argv:
+    do_mutate = '--mutate' in sys.argv
+    if do_mutate:
         sys.argv.remove('--mutate')
-        rc = mutate()
-        if rc:
-            sys.exit(rc)
-    unittest.main(verbosity=1)
+    result = unittest.main(verbosity=1, exit=False).result
+    if not result.wasSuccessful():
+        sys.exit(1)
+    sys.exit(mutate() if do_mutate else 0)

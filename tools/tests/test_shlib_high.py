@@ -60,12 +60,12 @@ def mutate():
 
 
 def main():
+    run()
+    print('HOST ILP32 PASS shlib fragmented backing and complete rollback')
     if '--mutate' in sys.argv:
         rc = mutate()
         if rc:
             return rc
-    run()
-    print('HOST ILP32 PASS shlib fragmented backing and complete rollback')
     return 0
 
 
