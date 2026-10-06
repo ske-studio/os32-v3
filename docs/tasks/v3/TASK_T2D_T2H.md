@@ -207,7 +207,7 @@ Unicodeはkernel所有FIXED_RAM/RO SURFACE。ユーザー版utf8だけsetterでl
 | e7 | shlib/gshell復帰配線。gfx両実体で再描画 |
 | e8a | Unicode CRT/shlib/user utf8。日本語、RO出力拒否、取得失敗時ready=0 |
 | e8b | kcg boot専用化とNOSYS。font_load_test/台本/host期待値、表/BB/mailbox不変<br>申し送り (2026-10-02): `font_load_test` と `test_result_conv` の期待を boot 後 NOSYS/表・BB 不変へ更新する。 |
-| e9 | tvdumpとSHMマーカー・観測側。wire不変、fault目的地一致、lock→free/exit→2本目アプリのSHM書込み<br>申し送り (2026-10-02): `nop`・`ring3_hello/fault/guard` のマーカーを SHM へ移し、`db_v50_test` の VRAM 許可期待を未貸与拒否へ変える。 |
+| e9 | tvdumpとSHMマーカー・観測側。wire不変、fault目的地一致、lock→free/exit→2本目アプリのSHM書込み<br>申し送り (2026-10-02): `nop`・`ring3_hello/fault/guard` のマーカーを SHM へ移し、`db_v50_test` は実 RAM 境界の成功へ移す。未貸与 VRAM 拒否は e11 の USER 撤去後 (PM 決定)。 |
 | e10a | shm_init後のboot口・SHM権限口・起動時map撤去・汎用昇格禁止。lock/free/回収のUSER維持<br>申し送り (2026-10-02、e11 で統合): kselftest `test_map_user_keep` と paging.c `paging_map_user_keep_selftest` を共有PT昇格禁止に合わせて改廃し、`paging_bounds_host.c` の `paging_addrspace_map_user_keep(...) == 0` の呼出しは拒否期待へ反転する。`paging_map_user_keep_selftest() == 0` の呼出しは成功期待を維持し、selftest の中身を共有PT昇格禁止に合わせて書き直す。 |
 | e10b | V86 sessionと全出口復元。VRAM/Eのsetup/teardown PCDはe3へ前倒し済み (PM判断、初回起動/V86でUCを失わないため)。PDE USER、失敗/STOP出口を確認 |
 | e10c | master/AS/post-exec毎bootの3段検査。kselftest (c)とV86帰路でalias_cache一致、DISPLAY/TVRAM再取得 |
@@ -217,6 +217,12 @@ Unicodeはkernel所有FIXED_RAM/RO SURFACE。ユーザー版utf8だけsetterでl
 実ソース `test_lease.py` / `test_gfx_boot.py` とSDK呼出しを連結し、backendを選ぶだけの模型で終えない。変異は旧bb pointer、plane stride丸め、片実体だけ再attach、GUI DISPLAY許可、UC落ち、共有PT書込み許可、revoke前free、V86後PDE USER復元欠落、teardownのPCD欠落、SHM lock/free/回収後USER欠落、束generation照合削除、fontのboot終了ガード除去。既存10 lease変異の意図も保持。
 
 NP21/Wは8MB planar/PEGC、17MB planar/PEGC/Cirrus。日本語/描画/present、GUI→CUI→GUI、全画面DISPLAY、通常GUIの低位VRAMとdevice直書きkill、S/T/Uと片側revoke、cirrus-off強制指定fallback、V86復元後のalias_cache一致とDISPLAY/TVRAM再lease、SHMの2本目書込み、boot後font_load_testのNOSYS/表・BB不変を確認。ring3_guard旧Eの「低位BB生存」はここから**拒否へ更新**し、正規CLIENT leaseで生存する対照を追加。Bはshlib実ロード後にPTE P/U/ROかつPF error=7、Aは実stack直下NPかつerror=6を確認する。Ra266のPEGC/日本語/全画面とUCはhへ。予算は§6のe枠。
+
+**e9 実装 (2026-10-06)**: tvdump は既存 `tvram_readchar_at`、TVDM wire 不変。公開 KAPI・旧 USER/VRAM 例外は維持。
+マーカーは owned SHM (配置 `userland/tests/ring3_marker.h`)、fault は target/ARMD と serial addr/kill 差分で照合する。
+`shm_reuse_test` は free/exit の各経路で別 AS の同一ブロック・全ページ書込みを判定。E の旧 BB 生存期待は維持。
+ゲスト/native 未確認と e11 の4件は [持越し台帳](../DEFERRED_TESTS.md) E9-1〜4 / E10-3 / E11-9〜12 / S-5。
+証拠は `/home/hight/os32-tmp/run/e9/` のビルド・検査ログと e9 最終報告 (PM ゲスト手順)。
 
 > **記録は archive へ移した (2026-10-06)**: T2e — e1〜e10a、KAPI の範囲検査・NULL 検査 (kapinull) の実装結果と受入 — [TASK_T2D_T2H_RECORDS.md の「元の行 219–1889」](../../archive/v3/TASK_T2D_T2H_RECORDS.md#r219)。
 

@@ -876,8 +876,6 @@ static int cmd_push(int argc, char **argv)
 
 static int cmd_tvdump(int argc, char **argv)
 {
-    volatile u16 *text = (volatile u16 *)0xA0000UL;
-    volatile u8  *attr_base = (volatile u8 *)0xA2000UL;
     int row, col;
     (void)argc; (void)argv;
 
@@ -892,9 +890,9 @@ static int cmd_tvdump(int argc, char **argv)
 
     for (row = 0; row < 25; row++) {
         for (col = 0; col < 80; col++) {
-            int idx = row * 80 + col;
-            u16 ch_val = text[idx];
-            u8  at = attr_base[idx * 2];
+            u16 ch_val = 0;
+            u8 at = 0;
+            g_api->tvram_readchar_at(col, row, &ch_val, &at);
             g_api->serial_putchar((u8)(ch_val & 0xFF));
             g_api->serial_putchar(at);
         }

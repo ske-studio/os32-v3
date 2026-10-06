@@ -99,7 +99,8 @@ const unsigned char *sqlite3_column_text(sqlite3_stmt *s, int c) {
 int sqlite3_bind_parameter_count(sqlite3_stmt *s) { (void)s; sql_entry(); return 1; }
 int sqlite3_bind_text(sqlite3_stmt *s, int i, const char *t, int n, void (*d)(void *)) {
     (void)s; (void)i; (void)d; sql_entry();
-    CHECK(n == 4 && t[0] == 'a' && t[3] == 'd'); return SQLITE_OK;
+    CHECK((n == 1 && t[0] == 'R') || (n == 4 && t[0] == 'a' && t[3] == 'd'));
+    return SQLITE_OK;
 }
 int sqlite3_bind_blob(sqlite3_stmt *s, int i, const void *t, int n, void (*d)(void *)) {
     return sqlite3_bind_text(s, i, t, n, d);
@@ -150,6 +151,11 @@ static void caller_copy_tests(void)
         KernelAPI api = {0};
         api.sbrk_heap_limit = MEM_EXEC_LOAD_ADDR + PAGE_SIZE;
         reset_db();
+        /* Same last-byte success as db_v50_test, through real caller copy.
+         * VA and physical backing differ, so a raw dereference is caught. */
+        p[PAGE_SIZE - 1] = 'R';
+        CHECK(dispatch_probe(KAPI_SLOT_DB_BIND_TEXT, 0, 1,
+              (u32)guard_crossing_text(&api), 1, 0) == 0);
         u32 before = ring3_range_reject_count;
         int invoked = invoke_calls;
         CHECK(dispatch_probe(KAPI_SLOT_DB_BIND_TEXT, 0, 1, 0x7fffff, 2, 0) == -1);

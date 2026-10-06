@@ -26,7 +26,6 @@ static const char *guard_crossing_text(KernelAPI *api)
 {
     return (const char *)(api->sbrk_heap_limit - 1u);
 }
-#define VRAM_END        0x0C0000UL   /* 旧 VRAM 入力の拒否対照 */
 
 static int passed;
 static int failed;
@@ -155,8 +154,16 @@ int main(int argc, char **argv, KernelAPI *api)
     /* ---- (5) 不正範囲: 先頭は許可帯の中、範囲が外へ出る ---------------- */
     ok(api->db_prepare_only(h, "INSERT INTO v50(k,n,b) VALUES(?,?,?)") == 0,
        "prepare_only of a single statement");
-    ok(api->db_bind_text(h, 1, (const char *)(VRAM_END - 1), 2) < 0,
-       "text range crossing the end of a permitted band is refused");
+    /* The last mapped RAM byte is valid; the next byte is guard_a.
+     * Explicit length 1 requires no NUL. Restore the scratch byte afterwards. */
+    {
+        volatile char *last = (volatile char *)guard_crossing_text(api);
+        char saved = *last;
+        *last = 'R';
+        ok(api->db_bind_text(h, 1, (const char *)last, 1) == 0,
+           "text at the last mapped RAM byte is accepted");
+        *last = saved;
+    }
     ok(api->db_bind_text(h, 1, guard_crossing_text(api), 2) < 0,
        "text range crossing the sbrk guard is refused");
     /* d5 の caller copy は未マップページもコピー前に -1 で断る。 */
