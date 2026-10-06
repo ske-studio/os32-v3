@@ -126,7 +126,7 @@ V86 ゲスト線形・リンカ由来の仮想などの例外は `tools/check_p2
 > かつて「KAPI にポインタ検証はない/呼ぶ側が防衛的に」という制約だったが、
 > アーキテクチャで解決したため規則から外した。例外は shell (常駐・信頼) と
 > `OS32X_FLAG_FORCE_CPL0` の CPL=0 プログラムのみ。詳細は
-> `docs/archive/kernel_v2/PLAN.md` と `CLAUDE.md` Known Gotchas。
+> `docs/archive/kernel_v2/PLAN.md` と [POLICY_DEBUG.md §4 の早見](POLICY_DEBUG.md)。
 
 ---
 
@@ -139,7 +139,7 @@ V86 ゲスト線形・リンカ由来の仮想などの例外は `tools/check_p2
 **理由**: PATH 解決は NHD の `/usr/bin` を優先する。HostDrv だけ更新しても
 名前で起動すると**古いバイナリが黙って動き、合格に見える**。
 
-**詳細**: `CLAUDE.md` Known Gotchas
+**詳細**: [POLICY_DEBUG.md §4 冒頭の「領域別の早見」](POLICY_DEBUG.md) (検証・配備)
 
 ### [V2] 起動対象のバイナリは自層の `deploy.yaml` に登録する
 

@@ -126,6 +126,45 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
 過去に OS32 開発で実際に遭遇し、大きな時間を費やした問題のカタログ。
 新しい問題に直面した際は、まずこのリストに該当するものがないか確認すること。
 
+### 領域別の早見 (触る前にここを見る)
+
+1 行ずつ。症状・経緯・検証は § 番号の先 (この文書の §2・§4・§5、または併記したリンク)。
+2026-10-06 に `CLAUDE.md` の「Known Gotchas」から移した — 入口の文書には置かず、ここが 1 か所の早見。
+
+**検証・配備**
+- 配備の成否は文言で判断しない — ゲストの `ls -l /boot/vmkernel.lz4` と手元のサイズ、kselftest (`kselftest_pass` / `_fail`) は**新しい** `kernel.map` の番地で読む。NHD の作業イメージは `build/nhd/os32.nhd`。→ §2、§4-17、§4-29
+- `deploy.yaml` に無いバイナリは NHD で古いまま残り rshell を止める ([V2])。`hsync` は HostDrv の内容で上書きするので NHD 配備の後は先に `make deploy`、`/sys` は `hsync sys` + リセット (GUI の窓が例外 0 件で出ない = shlib が古い)。→ §4-12、§4-33、§4-36、§4-42
+- 保存の試験はバイト列で突き合わせ、冪等も繰り返して見る。通知のある API は入力経由と API 経由の両方を見る。→ §4-46、§4-44
+- 変異試験は実物のソースを書き換えない (写しの木、`tools/tests/mutpar.py`)。検査の 3 段と所要時間は [`docs/08_build.md`](08_build.md) §8-4。→ §4-40、§4-41
+
+**実機と NP21/W の差** (ここは「エミュレータで確認済み」が通用しない)
+- 実機の画面モード設定は NP21/W の BIOS 値ではなく**実機 ROM の OUT 列 (`v86 -g`) に合わせる** (Ra266 の PEGC 640x480)。→ §4-62
+- シリアルは 8253 の整数分周 (既定 9600、38400 は 1.9968MHz で 41600 に化ける)、PIT は判定したクロックで割る。NP21/W は通信速度も 2.4576MHz 系も模擬しない。→ §4-49、§4-50、§4-54
+- FDC: 時間上限は機構の最悪値から、0x94 は FRY を立てる、1MB 超への DMA は 0439h bit2。FD は 2HD 1232KB と 1.44MB の生イメージ (IPL は 512 バイトしか読まれない)。→ §4-47、§4-48、§4-51、§4-53
+- キーボード 8251 のコマンド語は 0x16 (0x14 は再送要求)。0035h は全体で書かない (BUZ は 07h = 停止)。→ §4-57、§4-59
+- `io_wait()` を万単位で連打しない (待ちは `nop`)。ISR が書く状態は `volatile` で読む。→ §4-55、§4-56
+- 「画面に出ている」は `/api/screenshot` の見た目で確かめる (`kprintf` の属性は入口で変換)。→ §4-52
+- NP21/W の停止・起動は `tools/np21w_ctl.py` だけで (手打ちの taskkill → 起動は媒体のロックで止まる)。→ §4-60
+
+**カーネル・FS**
+- 外部プログラムは CPL=3・自前のページディレクトリで走り、不正ポインタはそのアプリだけを kill する (`fault_kill_count`)。常駐シェルだけが例外。→ [`09_exec.md`](09_exec.md)
+- kstring / kmalloc / kprintf の基本部品を触ったら kselftest のケースを足す。→ §2
+- ext2: `ext2_g_aux` を free/alloc をまたいで持たない、`ext2_read_file` は端数ブロックを `to_copy` だけ写す、メタデータの I/O エラー後は書き込みを全部断る (-15 → ホストの e2fsck)、OS32 で読めることは正しい ext2 の証拠でない。→ §4-24、§4-32、§4-35、§4-58
+- VFS: エラーは `OS32_ERR_*` (FS の境界で翻訳)、`mount(dev_id)` は `(dev_type << 8) | unit`、`sys_ls` のコールバックから専用バッファ無しで FS を触らない。→ [`docs/06_filesystem.md`](06_filesystem.md) §6-1、§4-30、§4-26
+- デバイス窓は物理地図 (`pgalloc_range_has_ram`) で判定する (RAM の上端 `sys_get_mem_kb` ではない)。→ §4-34
+- CPL=3 の KAPI は IF=1 で走る (`int80_stub` の出口は IF=0)。KAPI の検査は `ring3_guard_active(ring3_in_syscall, ring3_wm_depth)` で (WM はアプリの syscall の中で走る)。→ §4-19、§4-61
+- シェルは 2 ヒープ (`kernel/paging.c` は shell heap 0x380000–0x3F0FFF を present に保つ。0x3F1000–0x3FAFFF は固定 PD/PT 10 枚、0x3FB000–0x3FFFFF は NP — 正典は [`docs/02_memory.md`](02_memory.md) §2-1)。exit の資源回収は所有者タグ (exec のネスト段) — カーネル常駐の FD は `vfs_fd_set_protect(fd, 1)`、親へ戻るときは `exec_heap_restore_state()` (`exec_heap_init_at()` ではない)。→ §4-15、§4-16、[`09_exec.md`](09_exec.md)
+- SQLite はカーネル内 (0x200000) の固定 384KB MEMSYS5 プールを全接続 (FEP 辞書を含む) で共有する — `*_init()` の末尾で接続を閉じる。枯渇は `db_query` の `-2`、`db_last_error()` を必ず出す。→ §4-13
+- 日本語は 1 文字 3 バイト・2 桁、切り詰めは UTF-8 の境界で。外部プログラムの漢字は既知の対で JIS 表を確かめてから `utf8_set_jis_table_ready(1)`。フォントは `tools/gen_font16.py`。→ §4-27、§4-11、§4-10
+- 物理 0x90000 は自動プレイのメールボックス — 配置を変えたら `game/tools/autoplay/driver.py` も同じコミットで。→ [`docs/02_memory.md`](02_memory.md) §2-1
+- ブートローダ: PM 遷移は `loader_fat.asm` に内蔵、`boot_fat.asm` は `.8086`、HDD IPL の INT 1Bh は 16 回 (上限の理由は未確認)。→ [`docs/10_notes.md`](10_notes.md) §10-2、§10-3
+
+**GUI・入力・道具**
+- GUI の内部: `libos32gfx_attach()` (`gfx_init` ではない)、Cirrus の窓は 1 回だけ写像、テキストカーソルは CSRFORM の DC ビットだけ。→ §4-18、§4-20〜§4-22
+- `mui_pump_input()` はキーキューを食う (自前でキーを読むアプリは `mui_pump_input_ch()`)。→ §4-14
+- GUI を NP21/W で叩く: rshell を ESC で抜けてから、`SHIFT+SPACE` は `--data-urlencode`、`/api/mouse` は `ax/ay`、Start メニューの行は `start_row()`、配備は `system.cfg` を書き換える。「遅い」はまず `gfx_counters` と `/api/status` の `eip`。→ §4-23、§4-25、§4-31
+- Host Services は常駐の `tools/host_agent.py` が要る (`-100` = `HOST_ELINK`)。設定は ini ではなく `/api/net` に聞く。→ §4-45
+
 ### 4-1. ABI 不整合 (KernelAPI 構造体変更後の clean 忘れ)
 
 - **現象**: `malloc` が常に ENOMEM で失敗する、KAPI 関数が間違った引数を受け取る
@@ -714,7 +753,7 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
   NULLで非零長を0に消さず、入力・出力とも長さの全域をB1で検査する (NULL・長さ0だけはアクセス不要)。
 - **試験**: 実ソースをホストで組み、正常な末端セルと領域外の番兵を確認する。
   u32 の乗算が周回して有効番地に戻る値も拒否を確認し、各入口の検査を個別に外す。
-  詳細と残課題は [T2e の修正記録](tasks/v3/TASK_T2D_T2H.md#kapi-の範囲検査の欠落の修正-2026-10-03)、
+  詳細と残課題は [T2e の修正記録](archive/v3/TASK_T2D_T2H_RECORDS.md#kapi-の範囲検査の欠落の修正-2026-10-03)、
   [ホスト試験記録](../tools/tests/kapi_bounds_tdd.md) を参照。
 
 ## §5. デバッグ道具箱

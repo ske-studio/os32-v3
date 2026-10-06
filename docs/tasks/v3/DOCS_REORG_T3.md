@@ -5,7 +5,7 @@
 
 ## 1. 調査範囲と読み方
 
-対象は `docs/tasks/v3/` の12本、[09-30引き継ぎ](../agents/HANDOVER_2026-09-30.md)、入口の [INDEX](../../INDEX.md) と [V3_PLAN](V3_PLAN.md)。行数と本草案の既存文書 `file:line` は **編集前の `3c4171a`** に固定する。設計3票に新設した実物参照表のソース行番号も同基点。行番号だけで追わず節名・関数名で照合する。
+対象は `docs/tasks/v3/` の12本、[09-30引き継ぎ](../../archive/agents/HANDOVER_2026-09-30.md)、入口の [INDEX](../../INDEX.md) と [V3_PLAN](V3_PLAN.md)。行数と本草案の既存文書 `file:line` は **編集前の `3c4171a`** に固定する。設計3票に新設した実物参照表のソース行番号も同基点。行番号だけで追わず節名・関数名で照合する。
 
 T2d〜h の最新実績は同票の各実装結果が正典。e5 は依頼時の申し送りでは実装・レビュー Approve 済みだが基点に未取り込み。別 worktree の成果を現在の実装へ数えない。e6〜e12・f2〜f13・g・h 最終一式は未着手。予算と構成別結果は同票 §6-1・§11・§12 を参照し、本草案に数値の写しを持たない。
 
@@ -29,7 +29,7 @@ T2d〜h の最新実績は同票の各実装結果が正典。e5 は依頼時の
 | [FORK_PLAN](FORK_PLAN.md) | 202 | 実装中 | fork の判断と実施記録。現在の版/fork 運用の正典は ROADMAP。完了記録化・移動の候補 |
 | [PORT_CANDIDATES](PORT_CANDIDATES.md) | 191 | 計画 | P9 移植候補と挑戦順の正典。個別票未起票、保持 |
 | [RUST_VS_C11](RUST_VS_C11.md) | 283 | 設計中・方針確定 | D36 の根拠調査・実装条件。§3-3/§7-2 が未着手、T5c/T7b が参照。保持 |
-| [HANDOVER_2026-09-30](../agents/HANDOVER_2026-09-30.md) | 55 | 現行 | 09-30 の快照だが INDEX は現在地の正典として案内。扱いは §3 の PM 向け提案だけ |
+| [HANDOVER_2026-09-30](../../archive/agents/HANDOVER_2026-09-30.md) | 55 | 現行 | 09-30 の快照だが INDEX は現在地の正典として案内。扱いは §3 の PM 向け提案だけ |
 
 HAL/PCM の完了実績は既に [HAL_RESULTS](../../archive/v3/TASK_HAL_WIRING_RESULTS.md) / [PCM_RESULTS](../../archive/v3/TASK_PCM_CS4231_RESULTS.md) へ分離されている。未実施の受入を消す目的で元票を丸ごと移さない。「参照されない」と判定できる対象はない。
 
@@ -53,9 +53,9 @@ HAL/PCM の完了実績は既に [HAL_RESULTS](../../archive/v3/TASK_HAL_WIRING_
 |---|---|---|
 | `docs/tasks/v3/TASK_T3_LAYOUT.md:9` / `V3_PLAN.md:3`・`:54` | T2b まで / 次はT2、という古い入口 | 今回実績への参照に更新。T2 全体の受入済みとはしない |
 | `docs/tasks/v3/TASK_MEMMAP_V3.md:3` / `TASK_T2_APPBAND.md:3` / `TASK_T2D_T2H.md:3` | 全段未着手 / d〜h 設計待ち / 実装前、という状態説明 | 後日 PM が各担当と同期して状態行を更新。D の承認と実装進捗を分離 |
-| `docs/INDEX.md:18`・`:37` / `docs/tasks/agents/HANDOVER_2026-09-30.md:13`・`:14`・`:16` | 最新の現在地という案内先が T0 途中、体制・コミット手順も ROLES とずれる | §3 の引き継ぎ案。旧体制は転載せず ROLES §0 を参照 |
+| `docs/INDEX.md:18`・`:37` / `docs/archive/agents/HANDOVER_2026-09-30.md:13`・`:14`・`:16` | 最新の現在地という案内先が T0 途中、体制・コミット手順も ROLES とずれる | §3 の引き継ぎ案。旧体制は転載せず ROLES §0 を参照 |
 | `docs/DEVELOPMENT.md:70` | app/shlib の旧物理番地の写し | 今回の対象外。次回、具体値を生成地図へのリンクに置換する候補 |
-| `docs/tasks/v3/FORK_PLAN.md:3` / `docs/tasks/agents/HANDOVER_2026-09-30.md:10` | fork票の d/f/g 残と引き継ぎの a〜g 完了が不一致 | PM が FORK_PLAN §3 f の数字照合の閉鎖根拠を確認してから完了記録化 |
+| `docs/tasks/v3/FORK_PLAN.md:3` / `docs/archive/agents/HANDOVER_2026-09-30.md:10` | fork票の d/f/g 残と引き継ぎの a〜g 完了が不一致 | PM が FORK_PLAN §3 f の数字照合の閉鎖根拠を確認してから完了記録化 |
 | `docs/tasks/v3/TASK_T2D_T2H.md:170` / `gfx/gfx_core.c:178`・`:745` | 設計は planar pitch×height の面 offset、e4 は400行登録の strideを200行でも維持 | **契約との過渡的な差**。e5 未取り込み、200行再登録とSDK4箇所監査はe6/e7へ持越し (依頼の申し送り)。T3/T7 の参照は T2 完了後に確定。設計を固定strideへ変更しない |
 | `docs/tasks/v3/TASK_T2_APPBAND.md` §3-4 / `TASK_T3_LAYOUT.md:61` / `TASK_T2D_T2H.md:1992` | Unicode橋をT7までとする親票と、T3でKAPI化・同時撤去する後続具体化 | 既存論点を継承。PMが撤去担当=T3の表記を親票へ揃える案。今回順序は変えない |
 | `docs/tasks/v3/TASK_T2_APPBAND.md` §3-1 / `TASK_T2D_T2H.md:1998` / `exec/surface_query.c:11` | 親票の旧世代INVALと実装のSTALE対応 | e2で内部STALE、公開版はe11。既存レビュー判断をPMが確認し親票を整合。新エラー番号は予約しない |

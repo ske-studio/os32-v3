@@ -15,9 +15,10 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | 情報単位 | 正典 (ここだけ更新) | 参照側 (要約 + リンクのみ) |
 |---|---|---|
 | 制約規則 [C/HW/ABI/V/D] | [CONSTRAINTS.md](CONSTRAINTS.md) | CLAUDE.md (ID 参照、`make check` が照合)。Hermes 用の SOUL.md は 2026-09-29 に `SOUL.md` (非公開・リポジトリ外、`.gitignore`) へ (効力なし) |
-| 引き継ぎ (次の PM への申し送り)・現在地と残件 | [tasks/agents/HANDOVER_2026-09-30.md](tasks/agents/HANDOVER_2026-09-30.md) (os32-v3 の初日、T0 の途中。表だけ) | 前回は [archive/agents/HANDOVER_2026-09-22.md](archive/agents/HANDOVER_2026-09-22.md) (09-22〜25 の日ごとの追記) |
-| エージェント運用体制 (役割・起動・規約) | [tasks/agents/ROLES.md](tasks/agents/ROLES.md) (§0「現行の体制」が 1 節で現行、下は経緯) | CLAUDE.md (体制 1 段落 + リンク)。過去の快照は [archive/agents/RETROSPECTIVE_2026-09-09.md](archive/agents/RETROSPECTIVE_2026-09-09.md) |
-| 番地・帯域 | `include/memmap.h` (定義) → [02_memory.md §2-1](02_memory.md) の**生成ブロック** (`tools/gen_memmap.py --write`、地図はここ 1 か所だけ) | CLAUDE.md は帯の粒度のみ。`memmap.h` の先頭は生成先への案内。重なり・逆転・写しのずれは `make check` の `gen_memmap.py --check` が見る |
+| 引き継ぎ (次の PM への申し送り)・現在地と残件 | [tasks/agents/HANDOVER_2026-10-06.md](tasks/agents/HANDOVER_2026-10-06.md) (入口の 1 枚、50 行以内・上書き。進捗の本文は持たない) | 前回は [archive/agents/HANDOVER_2026-09-30.md](archive/agents/HANDOVER_2026-09-30.md) (fork 初日) |
+| エージェント運用体制 (役割・起動・規約) | [tasks/agents/ROLES.md](tasks/agents/ROLES.md) (§0 が現行の 1 表。経緯は持たない) | CLAUDE.md (体制 1 段落 + リンク)。経緯は [archive/agents/ROLES_HISTORY_2026-10-06.md](archive/agents/ROLES_HISTORY_2026-10-06.md)、見直しの根拠は [tasks/agents/REVIEW_2026-10-06.md](tasks/agents/REVIEW_2026-10-06.md) |
+| 延ばした試験・SKIP・ホストだけの合格・未結線 (持越し) | [tasks/DEFERRED_TESTS.md](tasks/DEFERRED_TESTS.md) (未完了だけを持つ。終わった行は消す) | 各票・引き継ぎは参照のみ。同じ延期を票や memory に写さない |
+| 番地・帯域 | `include/memmap.h` (定義) → [02_memory.md §2-1](02_memory.md) の**生成ブロック** (`tools/gen_memmap.py --write`、地図はここ 1 か所だけ) | CLAUDE.md は参照のみ (帯の表は 2026-10-06 に外した)。`memmap.h` の先頭は生成先への案内。重なり・逆転・写しのずれは `make check` の `gen_memmap.py --check` が見る |
 | KAPI の一覧・オフセット・版 | `sdk/kapi.json` → [KAPI_SPEC.md §4](KAPI_SPEC.md) | README.md / このファイル / KAPI_SPEC.md の版番号 (`tools/check_kapi_version.py` が照合。CLAUDE.md は版数を持たない) |
 | KAPI 追加手順 | [KAPI_SPEC.md §3-1](KAPI_SPEC.md) | スキル `.claude/skills/os32-kapi-add` と CLAUDE.md (どちらもポインタのみ) |
 | KAPI 版番号・エラー番号の予約 (未実装の先取り調停) | [KAPI_SPEC.md §3-2](KAPI_SPEC.md) | 各計画 (GUI TASK_K1、network LINK_PLAN) は参照 |
@@ -31,8 +32,8 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | 第三者の部品とライセンス (版・改変の有無・原文の所在) | [../THIRD_PARTY.md](../THIRD_PARTY.md) (原文は各 vendor ディレクトリと `assets/*/README.OS32`) | README.md「ライセンス」(リンクのみ)、[../requirements.txt](../requirements.txt) (ホストの Python 依存) |
 | 作業別の参照先 | [DEVELOPMENT.md §1](DEVELOPMENT.md) | — |
 | 実行モデル (ローダ、ネスト、リング3、資源回収、exec_run の分割壁) | [09_exec.md](09_exec.md) | [10 §10-9](10_notes.md)、`archive/kernel_v2/` (設計経緯) |
-| 描画方式 (ページフリップ、200 ライン) | [05_drivers.md §5-5](05_drivers.md) | CLAUDE.md「Graphics」(1 行) |
-| 落とし穴の経緯・検証記録 | [POLICY_DEBUG.md §4](POLICY_DEBUG.md) | CLAUDE.md「Known Gotchas」(2〜3 行の注意 + §番号) |
+| 描画方式 (ページフリップ、200 ライン) | [05_drivers.md §5-5](05_drivers.md) | CLAUDE.md は参照のみ |
+| 落とし穴の経緯・検証記録 | [POLICY_DEBUG.md §4](POLICY_DEBUG.md) | 1 行の注意は同じ §4 の冒頭「領域別の早見」(2026-10-06 に CLAUDE.md から移した)。CLAUDE.md は入口の 1 行だけ |
 | コーディング規約 (C11 (gnu11)、kstring、三層定数、asm) | [POLICY_DEV.md §2](POLICY_DEV.md) | CONSTRAINTS [C1]〜[C4] (規則行) |
 | 進捗 | 各票の冒頭の状態行 (語彙は [POLICY_DEV.md §8](POLICY_DEV.md)、`make check-docs-status`) と、最新の引き継ぎの残件表 (上の「引き継ぎ」の行)。領域の中の進捗は領域別索引 ([tasks/fep/00_INDEX.md](tasks/fep/00_INDEX.md)、[archive/v21/v86v2/04](archive/v21/v86v2/04_implementation_status.md)) | [ROADMAP.md](ROADMAP.md) (計画)、[CHANGELOG.md](../CHANGELOG.md) (履歴)。[tasks/gui/TASKS.md](tasks/gui/TASKS.md) のゲートは v1.1 の記録 |
 | プログラムの一覧 | 各層の `deploy.yaml` (機械可読の正典)、コマンドは [07_shell.md §7-1](07_shell.md) | 09_exec / INDEX に表を持たない |
@@ -43,7 +44,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | 移植性 (CPU / 機種の 2 軸、ARM 計測、順序 1〜4 の経過) | [tasks/portability/ARM_GAUGE.md](tasks/portability/ARM_GAUGE.md) (計測と経過)、[../arch/README.md](../arch/README.md) (足し方) | [archive/portability/SURVEY_N1.md](archive/portability/SURVEY_N1.md) (調査)、`archive/arch_port/` は**別リポジトリ `pw-sh4-research` の調査の快照** (正典はそちら。本リポジトリでは更新しない)、[archive/portability/TASK_KSTRING_BENCH.md](archive/portability/TASK_KSTRING_BENCH.md) (kstring の速度実測 **完了 2026-09-17** — x86 は asm 維持、C 版は他 32 ビットアーキ向け。数字は ARM_GAUGE §9、語長の前提は §10) |
 | 版数 (カーネル 2.1 / GUI 1.4 で閉じた / 現行の開発 v3 / v4 草案) と v3 の fork の段取り | [ROADMAP.md §0](ROADMAP.md) | 各版の要約は [CHANGELOG.md](../CHANGELOG.md) (3〜5 行 + リリースノートへのリンク)、詳細は `RELEASE_vX.md` ([RELEASE_v2.1.md](RELEASE_v2.1.md))。`ver` の文字列、タグ |
 | v3 の目的・範囲・目標の 2 段・柱 (P0〜P10) と順序・v3 後半の票 | [tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md) (本案、2026-09-30 昇格) | ROADMAP.md の v3 の行、README.md (目的の一文)。メモリマップの決定の本文は TASK_MEMMAP_V3 (D 番号) |
-| v3 T2d〜T2h の詳細な実装契約・分割・受入 | [T2d〜T2h詳細](tasks/v3/TASK_T2D_T2H.md) (現在地は各実装結果と§5・§12。冒頭の状態行は設計時の記録が残るため、実装前とは読まない。決定はTASK_MEMMAP_V3とTASK_T2_APPBAND、a〜cの実績は後者§5-1) | TASK_T2_APPBAND §5-1は段の要約とリンク |
+| v3 T2d〜T2h の詳細な実装契約・分割・受入 | [T2d〜T2h詳細](tasks/v3/TASK_T2D_T2H.md) (契約・分割・受入条件・未実施の手順だけ。実行記録は [archive/v3/TASK_T2D_T2H_RECORDS.md](archive/v3/TASK_T2D_T2H_RECORDS.md)、延期は [DEFERRED_TESTS](tasks/DEFERRED_TESTS.md)。決定はTASK_MEMMAP_V3とTASK_T2_APPBAND、a〜cの実績は後者§5-1) | TASK_T2_APPBAND §5-1は段の要約とリンク |
 | NHD ext2のerrors印の原因調査 | [ext2調査票](archive/v3/TASK_EXT2_ERRORS_INVESTIGATION.md) (受入完了 2026-10-01、再インストールで印を解消・原因の発生時点は未確定。T2h受入前ゲートの照合先) | T2d〜h詳細 §0・§5・§8は順序とリンク |
 | v3 T3以降の実装契約・分割・受入と後半接続 | [T3配置](tasks/v3/TASK_T3_LAYOUT.md)、[T4〜T6bモジュール/起動](tasks/v3/TASK_T4_T6_MODULES.md)、[T7/後半接続](tasks/v3/TASK_T7_AND_FOLLOWUPS.md) (設計中。D決定の本文はTASK_MEMMAP_V3) | V3_PLAN / TASK_MEMMAP_V3 はリンクのみ |
 | 実機 Ra266 の画面ドライバ (内蔵 Trident 1023:9660) の設計・資料・段取り | [tasks/realhw/TASK_TRIDENT_DRIVER.md](tasks/realhw/TASK_TRIDENT_DRIVER.md) (設計中 — 設計票 v5 が Codex 5 回目で Approve、実装は未着手) | [tasks/realhw/PLAN.md](tasks/realhw/PLAN.md) §7、[ROADMAP.md](ROADMAP.md) (1 行) |
@@ -150,9 +151,13 @@ T3 前の文書再整備の候補・未解決点は [DOCS_REORG_T3](tasks/v3/DOC
 
 | ドキュメント | 内容 |
 |-------------|------|
-| [tasks/agents/HANDOVER_2026-09-30.md](tasks/agents/HANDOVER_2026-09-30.md) | **引き継ぎ 2026-09-30 (現行)** — os32-v3 の初日: fork 手順 a〜f 完了、CI success、T0 (C11) は worktree `wt/t0-c11` で段 3 まで、次の PM の手順、09-30 の決定 (manga・フォント・apps/game)、v3 側の道具と罠 |
+| [tasks/agents/HANDOVER_2026-10-06.md](tasks/agents/HANDOVER_2026-10-06.md) | **引き継ぎ 2026-10-06 (現行)** — T2e の途中の現在地、次の一手、段をまたぐ道具と罠。入口だけ (50 行以内) |
+| [tasks/agents/REVIEW_2026-10-06.md](tasks/agents/REVIEW_2026-10-06.md) | **開発体制の見直し 2026-10-06 — 完了記録** — 遅さの原因 (根拠つき)、決めたこと、残りの作業 a〜e |
+| [tasks/DEFERRED_TESTS.md](tasks/DEFERRED_TESTS.md) | **持越し台帳** — 延ばした試験・SKIP・ホストだけの合格・未結線を 1 か所に |
+| [archive/agents/HANDOVER_2026-09-30.md](archive/agents/HANDOVER_2026-09-30.md) | 引き継ぎ 2026-09-30 (os32-v3 の初日、履歴) |
+| [archive/agents/ROLES_HISTORY_2026-10-06.md](archive/agents/ROLES_HISTORY_2026-10-06.md) | 体制の経緯 (2026-09-09〜10-06 の日付つき指示と、3 役へ畳む前の ROLES 本文) |
 | [archive/agents/HANDOVER_2026-09-29.md](archive/agents/HANDOVER_2026-09-29.md) | **fork 時点の申し送り (2026-09-29、完了記録)** — v2.1 のタグの時点の現在地、v3 の fork の段取り (決定済み、2026-09-30 に実施)、残件表、道具、罠。表だけ。次の引き継ぎは os32-v3 で新しく起こす |
-| [tasks/agents/ROLES.md](tasks/agents/ROLES.md) | **体制の正典** (現行) — §0 の 1 表が現行の体制、§1〜§5 が細則、末尾が経緯 |
+| [tasks/agents/ROLES.md](tasks/agents/ROLES.md) | **体制の正典** (現行) — §0 の 1 表が現行の体制 (3 役)、§1〜§5 が細則・起動・規約・合否・レビュー依頼 |
 | [archive/agents/HANDOVER_2026-09-22.md](archive/agents/HANDOVER_2026-09-22.md) | 引き継ぎ 2026-09-22〜25 (完了記録) — 実機初日 (FD 起動・シリアル 115200・PCI 列挙・LAN の橋) から HDD 起動まで、日ごとの追記 |
 | [archive/agents/HANDOVER_2026-09-18.md](archive/agents/HANDOVER_2026-09-18.md) / [HANDOVER_2026-09-16.md](archive/agents/HANDOVER_2026-09-16.md) | それ以前の引き継ぎ (完了記録) — 09-16 は残件 (H2 / H4 / arch 移設 / kstring 判断 / ゲスト試験ランナー / ARM / LAN 実機 / 小物) の推奨順・決裁点 |
 | [archive/agents/HANDOVER_v14.md](archive/agents/HANDOVER_v14.md) | v1.4 の引き継ぎ — **撤回 (2026-09-14)**。アプリ層を別エージェントへ渡す案は取りやめ |
@@ -197,6 +202,7 @@ T3 前の文書再整備の候補・未解決点は [DOCS_REORG_T3](tasks/v3/DOC
 | [archive/v3/U6_PENDING_REVIEW.md](archive/v3/U6_PENDING_REVIEW.md) | **U6 の仕分け表 — 決裁済み (2026-09-30、ユーザーが 6 点すべて推奨どおりに決定 → TASK_MEMMAP_V3 D29〜D34)**: 保留 5 件 (F3a〜c / F2c / FEP_BOUNDARY / MEMORY_RAM_INTEGRATION / DEVICE_RESERVATION) の現状 (コードで確認)、TASK_MEMMAP_V3 の決定で置き換わった部分と残る部分、拾う先 (T2 / T4 / T5a の要件、P4、撤回)、判断点 6 つとその決定 |
 | [archive/v3/TASK_T1_LEDGER.md](archive/v3/TASK_T1_LEDGER.md) | **T1: 物理地図と所有権台帳 — 受入完了 (2026-10-01、T1a〜T1f 着地、残件は状態行)** — TASK_MEMMAP_V3 §6 T1 の範囲と T2 以降との境界 (§1)、物理メモリの確保・予約・写像の現状一覧と P2V / V2P の監査見積り 161 件 (§2)、台帳の 4 層 (地図・割当可否・owner・区間の表)、owner の種別 (AS / 永続 / モジュール / device)、検証済み資源レコード (X4、span ごとの資源と `res_mask`)、SURFACE の型 (Cirrus の CLIENT / DISPLAY を含む)、API、起動順 (8MB 型の backing と exec 上端、PCI 採取値の取り込み)、P2V / V2P / `P2V_CONST` と `check_p2v.py`、R1 の計数 (観測用の深さと broker の判定を分ける、jmpbuf の 3 保存先)、`dma_alloc`、gfx の識別 → 予約 → 写像 (候補群 1 owner) (§3)、段 T1a (モデル経路) 〜 T1f と受入・8MB / 17MB / 64MB の確かめ方・段の境目の owner 表 (§4)、リスクと未確認 (§5)、Codex の論点 X9〜X16 と 1 回目 B1〜B7 / 2 回目 B8〜B11 の対応表 (§6) |
 | [archive/v3/TASK_T2D_RESULTS.md](archive/v3/TASK_T2D_RESULTS.md) | **T2d (B1 checked copy) d0a〜d6 の実装結果と受入 — 完了記録 (2026-10-02)** — [TASK_T2D_T2H](tasks/v3/TASK_T2D_T2H.md) の §10-2〜§10-16 をそのまま移したもの (節番号は元のまま)。各段のコーダーの実装結果・レビュー対応・PM のゲスト受入、d6 の変異の仕分けと size 確定 |
+| [archive/v3/TASK_T2D_T2H_RECORDS.md](archive/v3/TASK_T2D_T2H_RECORDS.md) | **T2e〜T2h の実行記録 — 完了記録 (2026-10-06)** — [TASK_T2D_T2H](tasks/v3/TASK_T2D_T2H.md) から切り離した e1〜e10a・kapinull・f1a〜f4・h2・h3・STOP 修正・検査の整理 (ci-stab / ci-select) の実装結果と受入。見出しは元の行番号。未実施は [DEFERRED_TESTS](tasks/DEFERRED_TESTS.md) が正 |
 | [archive/v3/TASK_T2ABC_RESULTS.md](archive/v3/TASK_T2ABC_RESULTS.md) | 完了記録 — T2 親票 §5-1 の T2a〜T2c 実装・受入結果 (未実施・残件を含む)。設計・受入条件は TASK_T2_APPBAND に残す |
 | [tasks/v3/TASK_T2_APPBAND.md](tasks/v3/TASK_T2_APPBAND.md) | **T2: アプリ帯 + lease 窓 — 設計中 (2026-10-01)**。SURFACE lease 契約、現状調査、高位 AS・可変スタック・R1/R2/R3-e・B1・D35、T2a〜T2h の受入、サイズ予算と独立レビュー論点 |
 | [archive/v3/TASK_CLANG_CHECKS.md](archive/v3/TASK_CLANG_CHECKS.md) | C ソースの静的検査 5 本 (check-p2v・check-c-dialect・check-le-access・check-arch-asm・audit_cast_align) を clang の構文木で作り直した。旧版 (`tools/legacy_checks/`) は撤去 (ユーザー決定 2026-10-01、リポジトリ外にバックアップ) **着地 (2026-10-01、`8612b06`)** |
@@ -337,7 +343,7 @@ V86・SQLite・タイルマップ・ライブラリ設計書 (と上の boot_ref
 
 ## ソースツリー概要
 
-[08_build.md §8-3](08_build.md) を参照 (複製しない。CLAUDE.md「Source Tree」も同じ表)。
+[08_build.md §8-3](08_build.md) を参照 (複製しない)。
 
 - [TASK_MEMMAP_V3_RESULTS](archive/v3/TASK_MEMMAP_V3_RESULTS.md) — TASK_MEMMAP_V3 から切り出した完了段の記録 (未確認事項は元票に保持)。
 

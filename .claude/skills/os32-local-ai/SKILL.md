@@ -1,12 +1,13 @@
 ---
 name: os32-local-ai
-description: OS32 のビルド・ホスト試験・配備・実機検証をローカル AI (tools/emu_agent) に実行させる。PM は指示と合否判定だけを行う。手を動かす前にこれを読む。設計判断やコード編集には使わない。
+description: OS32 のビルド・ホスト試験・配備・実機検証をローカル AI (tools/emu_agent) に実行させたいときに使う (任意 — 配備と回帰は PM が決定的な道具で回してよい)。合否は PM が観測を読んで決める。設計判断やコード編集には使わない。
 ---
 
 # ローカル AI に実行させる (テスト・配備・ビルド)
 
-体制上、**実行はテスター役 (ローカル AI) が行い、PM は判断だけ**する
-([`docs/tasks/agents/ROLES.md`](../../../docs/tasks/agents/ROLES.md))。
+**ローカル AI は任意の実行手段** (2026-10-06〜、[`docs/tasks/agents/ROLES.md`](../../../docs/tasks/agents/ROLES.md) §0 の「実行の道具」)。
+配備と回帰は PM が `run-os32` の `driver.py`・`tools/guest_tests.py` で直接回してよい。どちらで回しても、ここに書いた手順の中身
+(停止 → `nhd-pull` → 配備 → 起動、新しい `kernel.map` の番地での到達確認、`regress.txt` の項目、観測を読んで判定) は守る。
 何をどのビルド・どの配備経路で確かめるかの選択は **`os32-build-verify`** が正典。
 本スキルは「選んだものをローカル AI にどう実行させ、結果をどう判定するか」だけを扱う。
 

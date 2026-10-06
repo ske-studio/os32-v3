@@ -19,11 +19,15 @@ ABI 変更は `docs/KAPI_SPEC.md` を正典とする。同一セッションの�
 
 | 変更 | 選ぶビルド・チェック | 実行検証 |
 |---|---|---|
-| カーネル・ドライバ | `make kernel` と `make check` | 新カーネルの起動、kselftest、対象機能と関連デバイス |
-| ユーザーランド | 既存の個別ターゲット、必要なら `make programs`、`make check` | 対象ゲストプログラム。ライブラリ変更なら再リンクした利用側も確認 |
+| カーネル・ドライバ | `make kernel` と列挙された検査 | 新カーネルの起動、kselftest、対象機能と関連デバイス |
+| ユーザーランド | 既存の個別ターゲット、必要なら `make programs`、列挙された検査 | 対象ゲストプログラム。ライブラリ変更なら再リンクした利用側も確認 |
 | KAPI / ABI | `docs/KAPI_SPEC.md` の生成・版更新手順と clean/full build | 旧成果物混在を排除し、呼出し側・SDK・該当 submodule を検証 |
 | ブート | `build/boot.mk` の該当ターゲットと必要なカーネル | 対象媒体から起動する試験。ブート領域の配備は別途範囲確認 |
-| 文書・スキルのみ | 参照・形式・`git diff --check`、必要な専用 validator、`make check` | ゲスト実行は通常不要。スキル検証のためにNHD配備しない |
+| 文書・スキルのみ | 参照・形式・`git diff --check`、`make check-changed` (文書だけなら文書系の検査だけが回る) | ゲスト実行は通常不要。スキル検証のためにNHD配備しない |
+
+**「列挙された検査」** = 依頼文に PM が書いた `make check-<名前>` と、新しく足した試験。修正のやり直しの中で全体検査を回さない。
+`make check` (全部・変異込み) は PM が取り込みのまとまりごとに統合状態で 1 回だけ流す (`docs/tasks/agents/ROLES.md` §0)。
+変更が依頼の範囲から広がったら `python3 tools/check_select.py` で候補を出し直し、列挙との差を報告する。
 
 正確なターゲット名は `build/*.mk` / `Makefile` で確認し、ファイル名から推測しない。
 ツールチェーンがない場合は `INSTALL.md` / `build/config.mk` と照合する。
@@ -31,7 +35,7 @@ ABI 変更は `docs/KAPI_SPEC.md` を正典とする。同一セッションの�
 ビルドログは終了コードと最初の有意な失敗を保存し、`tail` の成功をビルド成功にしない。
 ABI が変わっていない通常の変更で、習慣的に `make clean` を実行しない。
 
-プリミティブを変更した場合の kselftest 追加要件は `CLAUDE.md` を確認する。
+`kstring` / `kmalloc` / `kprintf` のプリミティブを変更したら kselftest に項目を足す (`docs/POLICY_DEBUG.md` §2)。
 ユーザーランドの newlib を使うテストはカーネルの kstring/kmalloc 検証を代替しない。
 
 ## 配備は成果物を確定してから
