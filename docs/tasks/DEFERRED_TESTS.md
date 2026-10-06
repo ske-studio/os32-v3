@@ -14,7 +14,7 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 
 | ID | 何を | 種類 | 関門 |
 |---|---|---|---|
-| KAPI-AUDIT-FIX | cursor clamp・FM/SSG ch検査・fm_play_mml/serial_getcharのSTOP不能DoS・rshell授権を修正。残りの未監査区分はe11a着手前に分類 | 既知の不具合・未監査 | 優先段 |
+| PRIO-3 | KAPI-AUDIT-FIX のゲスト確認 — CTRL+STOP で MML・シリアル・IME の待ちから抜ける、範囲外のカーソル・ch、USER の rshell_set_active。直接呼ぶ CPL3 の試験プログラムを作って | ホストのみ | 次の保守枠 |
 | PRIO-1 | install / cdinst の通しの実行 (授権が通り、区画・format・書込みまで) を別のディスクイメージで — 取り込み済みの DISK-AUTH の受入の残り | 未実施の確認 | 次の構成試験 (h の前) |
 
 ## 1. 関門: e9 / e10b / e10c
