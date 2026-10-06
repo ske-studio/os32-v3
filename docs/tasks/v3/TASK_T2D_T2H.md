@@ -1,6 +1,6 @@
 # TASK_T2D_T2H — T2d〜T2h 詳細設計
 
-> 状態: **実装中 (2026-10-06)** — T2d は受入済み。T2e は e1〜e9・e10a、T2f は f1a〜f4 (f2〜f4 は未結線)、T2h は h2・h3 の準備まで着地。残りは e10b/c・e11、f5 以降、g、h の統合受入 (現在地は [HANDOVER_2026-10-06](../agents/HANDOVER_2026-10-06.md))。
+> 状態: **実装中 (2026-10-06)** — T2d は受入済み。T2e は e1〜e10b、T2f は f1a〜f4 (f2〜f4 は未結線)、T2h は h2・h3 の準備まで着地。残りは e10c・e11、f5 以降、g、h の統合受入 (現在地は [HANDOVER_2026-10-06](../agents/HANDOVER_2026-10-06.md))。
 > それまでの状態: 設計中 (2026-10-01) — 独立レビュー Opus 5.5 は 1 回目 Request changes (P1 2件 / P2 11件 / P3 8件) → 反映 → 2 回目 Approve (P3 5件は §11 の実装時の注記)。
 > 作成: GPT-6 / Codex。調査基点: main / docs/t2d-h-design 共通 **9ae6073406c2027fd50938e3870a3fb3888cd7f6**。
 > **実行記録は 2026-10-06 に [archive/v3/TASK_T2D_T2H_RECORDS.md](../../archive/v3/TASK_T2D_T2H_RECORDS.md) へ移した** (この票は契約・分割・受入条件・未実施の手順だけ)。延ばした試験と未実施は [DEFERRED_TESTS.md](../DEFERRED_TESTS.md) が正。段の記録は 1 段 10 行以内で書く ([ROLES §0](../agents/ROLES.md))。
@@ -225,6 +225,9 @@ VM INT80h は KAPI 入口で分離しゲスト IVT へ反射。end は再入防�
 CUI 出口は高さ 400/flip 無効。公開 KAPI・低位 USER 撤去・page0 NP 化は変更しない。
 ゲスト/native と K1 実例外受入は [持越し台帳](../DEFERRED_TESTS.md) E10-1。H-6 と e10c の範囲は維持、gcap kill の漏れは E10-4。
 証拠は `/home/hight/os32-tmp/run/e10b/` の検査ログと `fix1-report.md` (F1〜F7・検査 rc・PM ゲスト手順)。
+**e10b 着地・ゲスト受入 (PM、2026-10-06、main `d34fccc`、17MB・今の ini)**: 取り込み `make check`・`check-fast` rc=0。配備の Commit・サイズ一致、kselftest 277/0。
+アプリ実行後の状態を基準に `v86 -t` ×2 と `-g -t` の後も低位 PT0 の 256 PTE は A/D 以外すべて一致、PDE0 不変、`v86_restore_mismatch`=0、高さ 400・flip 0。
+続く `shm_reuse_test` 4/4・`ring3_guard bb` 生存・`db_test` 9/9・`db_v50_test` 41/41。未実施: `-d`/`-b` の出口、K1 のゲスト注入 (台帳 E10-1)。証拠 `~/os32-tmp/evidence/2026-10-06/accept_e10b/`。
 
 **e9 実装 (2026-10-06)**: tvdump は既存 `tvram_readchar_at`、TVDM wire 不変。公開 KAPI・旧 USER/VRAM 例外は維持。
 マーカーは owned SHM (配置 `userland/tests/ring3_marker.h`)、fault は target/ARMD と serial addr/kill 差分で照合する。
