@@ -17,10 +17,23 @@
 #include "shm.h"
 #include "paging.h"
 #include "kstring.h"
+#include "os32_kapi_shared.h"
 
 /* shm.h のブロック定義と memmap.h の帯域サイズは別々に書かれている。
  * 食い違うとガードページの位置やゼロクリア範囲が実帯域からずれる。 */
 STATIC_ASSERT(SHM_TOTAL_SIZE == MEM_SHM_SIZE, shm_size_matches_memmap);
+
+/* DB 予約は SDK の結果領域と同じ、先頭の 1 ブロック。浮動番地を
+ * 表明に含めず offset/size だけで配置の契約を検査する。 */
+#define SHM_DB_BLOCK_FIRST  ((int)(MEM_SHM_DB_OFFSET / SHM_BLOCK_SIZE))
+#define SHM_DB_BLOCK_COUNT  ((int)(MEM_SHM_DB_SIZE / SHM_BLOCK_SIZE))
+STATIC_ASSERT(SHM_BLOCK_SIZE == DB_SHM_BLOCK_SIZE, shm_db_sdk_block_size);
+STATIC_ASSERT(MEM_SHM_DB_SIZE == DB_SHM_BLOCK_SIZE, shm_db_reservation_size);
+STATIC_ASSERT(MEM_SHM_DB_OFFSET == 0, shm_db_is_first_block);
+STATIC_ASSERT(MEM_SHM_DB_OFFSET % SHM_BLOCK_SIZE == 0, shm_db_base_aligned);
+STATIC_ASSERT(MEM_SHM_DB_SIZE % SHM_BLOCK_SIZE == 0, shm_db_size_aligned);
+STATIC_ASSERT(MEM_SHM_DB_OFFSET + MEM_SHM_DB_SIZE <= MEM_SHM_GUI_OFFSET,
+              shm_db_gui_disjoint);
 
 /* GUI 予約 (契約 T2): SHM 帯の **末尾 4 ブロック**。
  * 先頭とサイズがブロック境界に乗っていること、SHM 帯に収まることを固定する。
@@ -92,7 +105,13 @@ void shm_init(void)
         shm_block_owner[i] = 0;
     }
 
-    /* GUI 予約 (契約 T2): ブロック 12〜15 を固定予約。shm_alloc は SHM_FREE
+    /* DB 結果領域は固定予約。span/owner は 0 のまま回収対象外。 */
+    for (i = SHM_DB_BLOCK_FIRST;
+         i < SHM_DB_BLOCK_FIRST + SHM_DB_BLOCK_COUNT; i++) {
+        shm_state[i] = SHM_RESERVED;
+    }
+
+    /* GUI 予約 (契約 T2): 末尾 4 ブロックを固定予約。shm_alloc は SHM_FREE
      * だけを配るので予約済みは配られず、shm_cleanup_all / shm_free も
      * SHM_RESERVED を触らない。span は 0 のまま (単独管理ではない)。 */
     for (i = SHM_GUI_BLOCK_FIRST;
@@ -216,7 +235,7 @@ int shm_free(void *ptr)
 /*                                                                          */
 /*  exec_exit / exec_kill がアプリ ID で呼ぶ。**その ID が確保したものだけ** */
 /*  を返すので、同時に生きている他のアプリのブロックは 1 つも動かない。      */
-/*  GUI 予約 (SHM_RESERVED) は所有者 0 のまま触らない (契約 T2)。            */
+/*  DB / GUI 予約 (SHM_RESERVED) は所有者 0 のまま触らない (契約 T2)。            */
 /* ======================================================================== */
 void shm_free_owned(int owner)
 {
@@ -248,7 +267,7 @@ void shm_cleanup_all(void)
     u32 blk_start;
 
     for (i = 0; i < SHM_BLOCK_COUNT; i++) {
-        /* GUI 予約ブロックはプログラム終了で回収しない (契約 T2)。 */
+        /* DB / GUI 予約ブロックはプログラム終了で回収しない (契約 T2)。 */
         if (shm_state[i] == SHM_RESERVED) {
             continue;
         }

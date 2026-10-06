@@ -12,7 +12,7 @@ class DbOwnedTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="os32-db-f1-") as tmp:
             tmp = pathlib.Path(tmp)
             (tmp / "memmap.h").write_text(
-                "extern unsigned char test_shm[];\n#define MEM_SHM_BASE test_shm\n")
+                "extern unsigned char test_shm[];\n#define MEM_SHM_BASE test_shm\n#define MEM_SHM_DB_OFFSET 0UL\n#define MEM_SHM_DB_BASE (MEM_SHM_BASE + MEM_SHM_DB_OFFSET)\n")
             (tmp / "kstring.h").write_text(
                 "#include <string.h>\n#define kstrncpy(d,s,n) strncpy(d,s,n)\n"
                 "char *host_strlcat(char *d, const char *s, unsigned long n);\n"

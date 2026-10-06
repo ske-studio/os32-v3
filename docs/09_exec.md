@@ -48,6 +48,9 @@ KernelAPIポインタを引数として実行する。
 | KAPI トランポリン 1 ページ | RO+USER | `int 0x80` スタブ列 |
 | 0x400000〜 shlib .text | RO+USER (共有) / .data は per-app | 共有ライブラリ |
 
+SHM の先頭 1 ブロック (16KB) は DB 結果・エラー文用、末尾 4 ブロックは GUI 用に固定予約する。
+`shm_alloc` が配るのは残り 9 ブロックで、解放・所有者回収・全回収でも固定予約を維持する。
+
 写像は `gfx_init` より**前** (exec 時) に行われるので、バックエンドの `bb_base` と窓の PTE は
 最初の init 以後 shutdown を挟んでも保持される (Cirrus は窓を畳まない。[POLICY_DEBUG §4-21](POLICY_DEBUG.md))。
 

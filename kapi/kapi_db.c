@@ -5,7 +5,7 @@
 /*  カーネル側ブリッジ。DB 接続スロットで最大 DB_MAX_CONNECTIONS 個の           */
 /*  同時接続を管理する。                                                      */
 /*                                                                          */
-/*  結果データは共有メモリ (MEM_SHM_BASE) に DB_ResultHeader +               */
+/*  結果データは共有メモリ (MEM_SHM_DB_BASE) に DB_ResultHeader +               */
 /*  DB_ColumnInfo[] + データ の形式で書き込まれる。                            */
 /* ======================================================================== */
 
@@ -80,7 +80,10 @@ static DbSlot db_slots[DB_MAX_CONNECTIONS];
 static int db_open_fail[DB_OWNER_SLOTS];
 
 /* 共有メモリベースアドレス (IPC用) */
-#define DB_SHM_PTR   ((u8 *)MEM_SHM_BASE)
+/* MEM_SHM_DB_BASE と同じ先頭を使う。offset=0 は既存 ABI の結果番地契約。
+ * リンカ由来の浮動番地を STATIC_ASSERT の条件に入れない。 */
+STATIC_ASSERT(MEM_SHM_DB_OFFSET == 0, db_shm_at_band_start);
+#define DB_SHM_PTR   ((u8 *)MEM_SHM_DB_BASE)
 
 /* ======================================================================== */
 /*  ヘルパー: CPL=3 から読める文字列 (票 TASK_DB_ERRSTR §4)                  */

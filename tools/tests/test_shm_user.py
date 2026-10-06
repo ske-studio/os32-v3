@@ -10,6 +10,12 @@ import host32
 ROOT = Path(__file__).resolve().parents[2]
 
 MUTATIONS = (
+    ('db-unreserved', 'kernel/shm.c',
+     '        shm_state[i] = SHM_RESERVED;',
+     '', 'FAIL first allocation excludes DB'),
+    ('db-shifted', 'kernel/shm.c',
+     '        shm_state[i] = SHM_RESERVED;',
+     '        shm_state[i + 1] = SHM_RESERVED;', 'FAIL first allocation excludes DB'),
     ('lock-user', 'kernel/shm.c',
      'paging_shm_set_rw(addr, addr + (u32)span * SHM_BLOCK_SIZE, 0)',
      'paging_map_range(addr, addr + (u32)span * SHM_BLOCK_SIZE, addr, PAGE_RO)', 'FAIL lock USER'),
@@ -57,7 +63,7 @@ def run(runner, mutation=None):
         assert old in sources[path], name + ': mutation target'
         if name == 'boot-order':
             sources[path] = sources[path].replace('    shm_init();', '    shm_init();\n    kselftest_run();', 1)
-        elif name == 'owned-user':
+        elif name in ('owned-user', 'db-unreserved', 'db-shifted'):
             sources[path] = sources[path].replace(old, new, 1)
         else:
             sources[path] = sources[path].replace(old, new)
@@ -87,7 +93,7 @@ def run(runner, mutation=None):
                '-ffunction-sections', '-fdata-sections', '-nostdlib', '-static', '-no-pie',
                '-Wl,--gc-sections', '-DPHYSMEM_HOST_TEST=1']
         cmd += ['-I'+str(work)] + ['-I'+str(ROOT/p) for p in
-                  ('tools/tests/host_arch', 'tools/tests', 'include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec')]
+                  ('tools/tests/host_arch', 'tools/tests', 'include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec', 'sdk/include/os32')]
         exe = work/'fixture'
         result = host32.build(cmd + [str(ROOT/'tools/tests/shm_user_host.c'), str(ROOT/'kernel/physmem.c'), '-o', str(exe)], capture_output=True, text=True)
         if result.returncode:
@@ -114,7 +120,7 @@ def main():
     if args.mutate:
         for _ in run_ordered(lambda mutation: run(args.runner, mutation), MUTATIONS):
             pass
-        print(f'PASS {len(MUTATIONS)}/{len(MUTATIONS)} mutations (runtime 9, wiring 2)')
+        print(f'PASS {len(MUTATIONS)}/{len(MUTATIONS)} mutations (runtime 11, wiring 2)')
 
 if __name__ == '__main__':
     main()
