@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "appslot.h"
+#include "v86.h"
 #define __KSTRING_H
 void *kmemcpy(void *d, const void *s, u32 n) { return memcpy(d, s, n); }
 #define IO_H
@@ -44,6 +45,11 @@ static void exec_park_stop(u32 *frame) { (void)frame; stop_park_calls++; }
 static int ring3_ptr_ok(u32 p) { (void)p; return 1; }
 static void ring3_fault_kill(void) { longjmp(killed, 1); }
 static u32 kapi_invoke(void *fn, const void *args, u32 n);
+static int guest_ints;
+void v86_int80(u32 *frame) {
+    assert(frame[V86I_EFLAGS] & EFLAGS_VM);
+    guest_ints++;
+}
 /* The runner inserts the unmodified ring3_syscall_dispatch definition here. */
 #include "dispatcher.inc"
 #include "wm.inc"
@@ -86,6 +92,20 @@ int main(void)
         spaces[id].pd_phys = id * PAGE_SIZE;
     }
     select_parent();
+    /* VM=1 reaches int80 with 17 words, including real-mode segments.
+     * Valid and invalid slots must both bypass caller setup, abort and KAPI. */
+    for (int valid = 0; valid < 2; valid++) {
+        u32 vm[17] = {0};
+        vm[7] = valid ? 0 : ~0U;
+        vm[V86I_EFLAGS] = EFLAGS_VM | EFLAGS_IOPL3;
+        vm[V86I_ES] = 0xa000; vm[V86I_DS] = 0x8000;
+        vm[V86I_FS] = 0x1234; vm[V86I_GS] = 0x5678;
+        u32 saved[17]; memcpy(saved, vm, sizeof(vm));
+        if (!setjmp(killed)) ring3_syscall_dispatch(vm); else assert(0);
+        assert(guest_ints == valid + 1 && !invoked && !stop_park_calls);
+        assert(!caller_access_get(&out) && !g_cur_frame && !ring3_in_syscall);
+        assert(!memcmp(saved, vm, sizeof(vm)));
+    }
     assert(!caller_access_get(&out));
     for (unsigned int f = 0; f <= 1; f++) {
         host_if = f;

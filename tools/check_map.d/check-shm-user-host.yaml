@@ -1,7 +1,11 @@
 check-shm-user-host:
 - kernel/paging.*
 - kernel/shm.*
-- kernel/v86_mem.c
+- kernel/v86_mem.*
+- kernel/v86.h
+- kernel/idt.h
+- kernel/v86.c
+- kernel/v86_bios.c
 - kernel/kernel.c
 - kernel/pgalloc.*
 - kernel/physmem.*

@@ -7,6 +7,8 @@
 #ifndef __IDT_H
 #define __IDT_H
 
+#define RING3_SYSCALL_VECTOR 0x80
+
 /* ======== 基本型 ======== */
 #include "types.h"
 #include "pit_math.h"   /* struct pit_setup / pit_compute */

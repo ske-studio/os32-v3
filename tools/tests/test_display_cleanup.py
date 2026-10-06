@@ -57,6 +57,8 @@ def build_run(tree, kind, cases):
 
 # Each anchor's exact hit count is fixed; compile failures never count as RED.
 MUTATIONS = [
+    ('v86-height', TARGET_SRCS[0], '    gfx_current_height = GFX_HEIGHT;', '', 1, 'v86', 'FAIL: CUI height flip'),
+    ('v86-flip', TARGET_SRCS[0], '    gfx_flip_enabled = 0;', '', 1, 'v86', 'FAIL: CUI height flip'),
     ('v86-start', TARGET_SRCS[0], '    v86_cui_display_restore();',
      '    io_out(GDC_GFX_CMD, GDC_CMD_START);', 1, 'v86', 'FAIL: graphics must stay stopped'),
     ('v86-access-one', TARGET_SRCS[0], 'io_out(GDC_ACCESS_PAGE, GDC_PAGE_0);\n\n    /* 16 色',

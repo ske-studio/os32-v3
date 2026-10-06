@@ -35,6 +35,8 @@ def landing(s, start, buf, name):
 PRE = r'''
 #include "appslot.h"
 #include "exec.h"
+#include "v86.h"
+void v86_int80(u32 *frame) { (void)frame; __builtin_trap(); }
 #define CHECK(x) do { if (!(x)) die(__LINE__); } while (0)
 static void die(int n) {
     char b[12]; int len = 0;
@@ -44,6 +46,9 @@ static void die(int n) {
     for (;;) {}
 }
 volatile u32 kctx_irq_depth, kctx_exc_depth;
+/* These cases have no V86 session; its live unwind is shm_user_host.c. */
+static struct host_v86_session { int aborting, closing; } v86_session;
+static void v86_session_end(void) {}
 static AppSlot slots[APP_SLOT_COUNT];
 static AppSlot *g_cur_app;
 static int cur = 2, owner = 2, cr3 = 2, host_if = 1, host_gui;
@@ -430,7 +435,7 @@ MUTATIONS = (
      '    exec_reclaim_resources(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);\n    exec_notify_owned(id, EXEC_KIND_ABORTED);',
      '    exec_reclaim_owned(id, EXEC_KIND_ABORTED);\n    exec_teardown_app(a);\n    appslot_reclaim(id);'),
     ('irq-teardown', '    g_pending_id = id;', '    exec_teardown_app(a);\n    g_pending_id = id;'),
-    ('landing-if-missing', '    _enable();\n    exec_finish(id,', '    exec_finish(id,'),
+    ('landing-if-missing', '    _enable();\n    v86_session_end();', '    v86_session_end();'),
     ('pending-consumed-twice', '    g_pending_id = 0;             /* callback',
      '    g_pending_id = id;            /* callback'),
     ('resume-landing-missing', '        exec_pending_finish();\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason',

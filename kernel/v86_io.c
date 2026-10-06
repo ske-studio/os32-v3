@@ -8,6 +8,7 @@
 #include "tss.h"
 #include "pc98.h"
 #include "io.h"
+#include "gfx_internal.h"
 #include "gfx.h"        /* PAL_IDX_PORT / PAL_G_PORT / PAL_R_PORT / PAL_B_PORT */
 #include "palette.h"    /* palette_init() — セッション終了時の復帰 */
 #include "console.h"    /* console_hw_cursor_enable() — DOS が変えた CSRFORM を戻す */
@@ -238,6 +239,8 @@ static void gfx_state_for_guest(void)
  * CUI の表示順序を通常の V86 と ROM 採取の出口で共有する。 */
 void v86_cui_display_restore(void)
 {
+    gfx_current_height = GFX_HEIGHT;
+    gfx_flip_enabled = 0;
     io_out(GDC_GFX_CMD, GDC_CMD_STOP);
     io_out(MODE_FF1_PORT, MFF1_DISP_ON);
     io_out(GDC_TEXT_CMD, GDC_CMD_START);

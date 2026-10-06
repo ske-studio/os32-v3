@@ -3,14 +3,19 @@
 /* ======================================================================== */
 
 #include "v86_mem.h"
+#include "v86.h"
 #include "paging.h"
 #include "pgalloc.h"
+#include "io.h"
 #include "v86_io.h"
 #include "v86_bios.h"
+#include "v86_gcap.h"
+extern V86Gcap *v86_gcap_rec;
 
-static u32 backing_phys = 0;
-/* バッキングの台帳の owner (setup の引数。teardown が同じ owner で返す)。 */
-static u32 backing_owner = 0;
+struct v86_session_state v86_session;
+u32 v86_restore_mismatch;
+#define backing_phys v86_session.backing_phys
+#define backing_owner v86_session.backing_owner
 
 u32 v86_mem_backing_phys(void) { return backing_phys; }
 
@@ -37,19 +42,23 @@ static const struct v86_ident_ent {
 #define V86_IDENT_MAP_N \
     ((int)(sizeof(v86_ident_map) / sizeof(v86_ident_map[0])))
 
-int v86_mem_setup(u32 owner)
+int v86_session_begin(u32 owner)
 {
-    if (backing_phys) {
+    if (v86_session.open || v86_session.closing || v86_session.release_pending) {
         return -1;              /* 二重セットアップ */
     }
 
     /* リマップすると実機の IVT/BDA が見えなくなるので先に退避する。
      * ゲストはこれを引き継いで初めてまともに動ける。 */
+    if (paging_v86_snapshot(&v86_session) != 0) return -1;
+    v86_session.open = 1;
+    v86_session.aborting = 0;
     v86_bios_save_real();
 
     backing_phys = pgalloc_alloc_phys(owner, V86_BACKING_PAGES);
     backing_owner = owner;
     if (!backing_phys) {
+        v86_session_end();
         return -2;              /* 連続領域が取れない */
     }
 
@@ -132,47 +141,60 @@ fail:
     return -3;
 }
 
-void v86_mem_teardown(void)
+void v86_session_end(void)
 {
-    if (!backing_phys) {
-        return;
-    }
-
-    /* ゲストが書き換えた実機の IVT/BDA を元に戻す。
-     * ページ 0 は実物理のまま渡してあるので、ここを戻さないと
-     * OS32 が持っている実機の割り込みベクタが壊れたままになる。 */
+    u32 flags = irq_save();
+    if (v86_session.closing) { irq_restore(flags); return; }
+    v86_session.closing = 1;
+    if (!v86_session.open) goto release;
+    /* Preserve this context's IF, but leave guest IOPL/other flags behind. */
+    if (v86_session.running)
+        flags = (v86_session.saved_eflags & ~EFLAGS_IF) | (flags & EFLAGS_IF);
+    v86_runtime_end();
     v86_bios_restore_real();
 
-    /* 低位 RAM をアイデンティティマッピングに戻す。
-     *
-     * ページ 0 は paging_reclaim_conventional() が R/O にしている
-     * (Not-Present だと LZ4 展開中の BDA 参照で落ちるため、と paging.c に
-     *  経緯が残っている)。ここを勝手に Not-Present にすると、次に
-     * v86_bios_save_real() が IVT を読んだ瞬間に #PF する。
-     * teardown は「元に戻す」のであって「あるべき姿にする」のではない。 */
-    paging_v86_map_range(0, PAGE_SIZE, 0, PAGE_RO);
-    paging_v86_map_range(V86_REMAP_START + PAGE_SIZE, V86_REMAP_END,
-                     V86_REMAP_START + PAGE_SIZE, PAGE_RW);
-
-    /* VRAM / ROM から USER を剥がす (setup と同じ表の teardown 側属性) */
-    {
-        int mi;
-        for (mi = 0; mi < V86_IDENT_MAP_N; mi++) {
-            const struct v86_ident_ent *e = &v86_ident_map[mi];
-            paging_v86_map_range(e->start, e->end, e->start, e->teardown_flags);
+    /* Restore exact saved PTEs, including NP, USER and cache attributes.
+     * The table remains the setup/teardown cache-policy contract. */
+    for (int mi = 0; mi < V86_IDENT_MAP_N; mi++) {
+        const struct v86_ident_ent *e = &v86_ident_map[mi];
+        for (u32 a = e->start; a < e->end; a += PAGE_SIZE) {
+            u32 pcd = e->teardown_flags & PTE_PCD;
+            if ((v86_session.low_pte[a / PAGE_SIZE] & PTE_PCD) != pcd)
+                v86_restore_mismatch++;
+            for (u32 sid = 0; sid < LEDGER_MAX_SURFACES; sid++) {
+                const struct ledger_surface *sf = &ledger_surfaces[sid];
+                u32 pfn = a / PAGE_SIZE;
+                if (sf->npages && pfn >= sf->first && pfn - sf->first < sf->npages) {
+                    u32 want = sf->cache == LEDGER_CACHE_UC ? PTE_PCD : 0;
+                    if ((e->setup_flags & PTE_PCD) != want || pcd != want)
+                        v86_restore_mismatch++;
+                }
+            }
         }
     }
-
-    /* PDE 側の USER も落とす。paging_set_page() は USER を立てる方向にしか
-     * 伝播させないので、ここで明示的に戻す。 */
-    paging_pde_clear_user(V86_REMAP_START, MEM_BIOS_ROM_END);
-    paging_v86_restore_shared_user();
-
-    /* ゲストに開けたポートを全部塞ぐ */
+    v86_restore_mismatch += paging_v86_restore(&v86_session);
+    /* All backing aliases are gone before owner reclamation can run. */
+    if (v86_session.aborting) v86_gcap_rec = 0;
     v86_io_reset_policy();
-
-    pgalloc_free_n_owner(backing_owner, backing_phys / PAGE_SIZE,
-                         V86_BACKING_PAGES);
+    v86_gcap_rec = 0;
+    v86_session.open = 0;
+    v86_session.release_pending = 1;
+release:
+    irq_restore(flags);
+    /* R1 forbids allocator/VFS reclamation on an exception stack. The kill
+     * landing calls end again before exec_finish can reclaim the owner. */
+    if (!v86_session.release_pending || kctx_irq_depth || kctx_exc_depth) goto done;
+    v86_bios_detach_disk();
+    if (backing_phys)
+        pgalloc_free_n_owner(backing_owner, backing_phys / PAGE_SIZE,
+                            V86_BACKING_PAGES);
     backing_phys = 0;
     backing_owner = 0;
+    v86_session.release_pending = 0;
+done:
+    v86_session.closing = 0;
 }
+
+/* Internal compatibility names; all four callers use the session boundary. */
+int v86_mem_setup(u32 owner) { return v86_session_begin(owner); }
+void v86_mem_teardown(void) { v86_session_end(); }

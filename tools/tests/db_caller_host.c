@@ -4,6 +4,8 @@
 #define HOST_CALLER_COPY_TEST
 #include "access_walk_host.c"
 #include "ring3_str.h"
+#include "v86.h"
+void v86_int80(u32 *frame) { (void)frame; __builtin_trap(); }
 volatile int ring3_in_syscall = 1;
 static AppSlot *g_cur_app;
 #include "guards_host_source.c"

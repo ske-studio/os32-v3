@@ -59,3 +59,4 @@ check-memory-host:
 - build/checks.d/check-memory-host.mk
 - build/kernel.mk
 - build/programs.mk
+- kernel/v86_mem.h

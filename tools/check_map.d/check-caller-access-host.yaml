@@ -1,4 +1,5 @@
 check-caller-access-host:
+- kernel/v86.h
 - exec/exec.c
 - exec/exec_kapi_init.inc
 - exec/redir_access.c

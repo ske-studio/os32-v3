@@ -7,7 +7,7 @@
 /*                                                                          */
 /*  そこで pgalloc から連続物理メモリを別途確保し、セッション中だけ         */
 /*  低位アドレスをそこへリマップする。OS32 のデータは物理的には無傷のまま   */
-/*  で、teardown でアイデンティティマッピングに戻せば元通りになる。         */
+/*  で、teardown で保存した PTE に戻せば元通りになる。         */
 /*                                                                          */
 /*  VRAM (0xA0000-0xEFFFF) はリマップせず実物理をそのまま見せる。           */
 /*  実測で Ys は GVRAM へ CPU で直接書き込んで描画しており、GDC/GRCG/EGC の  */
@@ -21,6 +21,8 @@
 
 #include "pc98.h"
 #include "types.h"
+#include "ksetjmp.h"
+#include "paging.h"
 #include "memmap.h"
 
 /* リマップ範囲は 0x00000 から VRAM の直前 (0xA0000) まで = 640KB。
@@ -102,6 +104,31 @@ static inline int v86_guest_read_ok(u32 linear, u32 len)
     return 1;
 }
 
+/* One owner for mapping, real page zero and runtime unwind state. */
+struct v86_session_state {
+    int open;
+    int closing;
+    volatile int active;
+    int running;
+    int aborting;
+    int release_pending;
+    int real_saved;
+    u32 backing_phys, backing_owner;
+    u32 jmpbuf[KSETJMP_BUF_LEN];
+    u32 saved_esp0, saved_eflags;
+    u32 low_pte[V86_GUEST_MAP_END / PAGE_SIZE];
+    u32 master_pde, active_pde, active_cr3;
+    u8 real_lowmem[PAGE_SIZE];
+};
+extern struct v86_session_state v86_session;
+extern u32 v86_restore_mismatch;
+int v86_session_begin(u32 owner);
+void v86_session_end(void);
+void v86_runtime_end(void);
+int paging_v86_session_open(void);
+int paging_v86_snapshot(struct v86_session_state *s);
+int paging_v86_restore(struct v86_session_state *s);
+
 /* ======== API ======== */
 
 /* バッキング RAM を owner で確保して低位アドレスをリマップする
@@ -109,7 +136,7 @@ static inline int v86_guest_read_ok(u32 linear, u32 len)
  * exec_ledger_owner()、TASK_T1_LEDGER §4-8)。0 で成功、負でエラー。 */
 int  v86_mem_setup(u32 owner);
 
-/* アイデンティティマッピングに戻し、バッキング RAM を解放する。 */
+/* 保存地図へ復元。例外中の解放は trusted 着地の再呼出しへ送る。 */
 void v86_mem_teardown(void);
 
 /* 確保済みバッキング RAM の物理先頭 (0 = 未確保)。デバッグ用。 */
