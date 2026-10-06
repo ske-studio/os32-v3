@@ -57,7 +57,7 @@ $(BUILD_ID_SRC): .FORCE
 	@python3 tools/gen_build_id.py -o $@
 
 $(BUILD_ID_OBJ): $(BUILD_ID_SRC)
-	$(CC) $(CFLAGS_BASE) -c $< -o $@
+	$(CC) $(CFLAGS_BASE) -Iinclude -c $< -o $@
 
 # === SQLite関連 (カーネル拡張域 0x200000 に配置) ===
 C_SQLITE = lib/sqlite3/sqlite3.c lib/sqlite3/os32_sqlite_vfs.c lib/sqlite3/os32_sqlite_test.c

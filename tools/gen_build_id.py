@@ -57,7 +57,8 @@ def commit_id(cwd=ROOT):
 
 def render(cid):
     return ('/* 生成物 (tools/gen_build_id.py)。手で編集しない。宣言は include/build_id.h */\n'
-            'const char os32_build_commit[] = "{}";\n'.format(cid))
+            '#include "build_id.h"\n'
+            'const char os32_build_commit[BUILD_COMMIT_MAX] = "{}";\n'.format(cid))
 
 
 def main():

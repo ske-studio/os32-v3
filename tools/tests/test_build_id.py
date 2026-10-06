@@ -9,6 +9,7 @@
   - リポジトリでない / git が PATH に無い → "unknown"
   - 中身が同じなら書き直さない (mtime が動かない = build_id.o を組み直さない)
   - 生成した C を gcc で組んで文字列を読むと同じ ID
+  - clean / -dirty のシンボルサイズはどちらも BUILD_COMMIT_MAX (24)
   - 長さが BUILD_COMMIT_MAX (include/build_id.h) 未満
 
   python3 -B tools/tests/test_build_id.py            # 全ケース
@@ -67,10 +68,27 @@ def compiled_string(c_file, work):
                     encoding="utf-8")
     exe = pathlib.Path(work) / "m"
     r = subprocess.run(["gcc", "-std=gnu11", "-Wall", "-Werror", str(main), str(c_file),
-                        "-o", str(exe)], capture_output=True, text=True)
+                        "-I", str(HDR.parent), "-o", str(exe)], capture_output=True, text=True)
     if r.returncode != 0:
         raise Fail("生成した C が組めない: {}".format(r.stderr))
     return subprocess.run([str(exe)], capture_output=True, text=True).stdout
+
+
+def compiled_size(c_file, work):
+    """文字列長ではなく、生成したオブジェクトのシンボルサイズを確かめる。"""
+    obj = pathlib.Path(work) / "build_id.o"
+    r = subprocess.run(["gcc", "-std=gnu11", "-Wall", "-Werror", "-I", str(HDR.parent),
+                        "-c", str(c_file), "-o", str(obj)], capture_output=True, text=True)
+    if r.returncode != 0:
+        raise Fail("生成した C が組めない: {}".format(r.stderr))
+    r = subprocess.run(["nm", "-S", str(obj)], capture_output=True, text=True)
+    if r.returncode != 0:
+        raise Fail("nm が失敗: {}".format(r.stderr))
+    m = re.search(r"^[0-9a-fA-F]+\s+([0-9a-fA-F]+)\s+R\s+os32_build_commit$",
+                  r.stdout, re.MULTILINE)
+    if not m:
+        raise Fail("os32_build_commit のシンボルサイズが無い: {}".format(r.stdout))
+    return int(m.group(1), 16)
 
 
 def run_all(script):
@@ -161,6 +179,7 @@ def run_all(script):
         text = out.read_text()
         if compiled_string(out, work) != want2:
             raise Fail("生成した C の文字列が {} でない:\n{}".format(want2, text))
+        clean_size = compiled_size(out, work)
         m1 = out.stat().st_mtime_ns
         time.sleep(0.05)
         gen(script, repo, out)
@@ -173,6 +192,11 @@ def run_all(script):
         lines.append("output: 同じなら書かない / 変われば書く、組んだ文字列が一致")
 
         cm = commit_max()
+        dirty_size = compiled_size(out, work)
+        if clean_size != cm or dirty_size != cm:
+            raise Fail("シンボルサイズ: clean {} / dirty {} (want {})".format(
+                clean_size, dirty_size, cm))
+        lines.append("symbol size: clean / dirty ともに {} バイト".format(cm))
         longest = "f" * 40
         r = subprocess.run([sys.executable, "-B", "-c",
                             "import importlib.util,sys;"
@@ -200,6 +224,7 @@ MUTATIONS = [
     ("h = git(['rev-parse', '--short=7', 'HEAD'], cwd).strip()",
      "h = git(['rev-parse', 'HEAD'], cwd).strip()", "短縮しない"),
     ("COMMIT_MAX = 24", "COMMIT_MAX = 32", "ヘッダの上限とずれる"),
+    ("os32_build_commit[BUILD_COMMIT_MAX]", "os32_build_commit[]", "固定長を外す"),
     ("                     '--ignore-submodules=dirty'], cwd)", "                     ], cwd)",
      "サブモジュールの中の変更でも dirty にする"),
 ]
