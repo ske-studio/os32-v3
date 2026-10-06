@@ -229,15 +229,14 @@ userland/tests/faultprobe.elf: sdk/link/app.ld $(CRT0_OBJ) $(FAULTPROBE_OBJ)
 faultprobe: $(CRT0_OBJ) userland/tests/faultprobe.bin
 
 # --- ring3_hello / ring3_fault / ring3_guard (CPL=3 検証用) ---
-# 3 本ともグラフィック VRAM 0xA8000 に機械可読マーカーを直接書くが、
-# --cui-only (票 T8-2) は**立てない** (PM 判断 2026-09-12): ring3_fault は
-# GUI 中の fault 隔離 (K5b 受入 G5) の観測手段で、GUI から起動できる必要がある。
-# マーカーは数バイトで WM の画面を実用上壊さない。
+# マーカーは自分で確保した SHM。GUI fault 隔離の観測にも使うので
+# --cui-only は立てない。公開 KAPI の追加・意味変更なし。
+userland/tests/nop.o userland/tests/ring3_hello.o userland/tests/ring3_fault.o userland/tests/ring3_guard.o: userland/tests/ring3_marker.h
 # --- ring3_hello (CPL=3 検証用最小プログラム, v2 M1) ---
 # crt0 を link しない自己完結バイナリ (独自 _start)。標準 crt0 は
 # kapi->sys_exit() 等カーネル関数ポインタを呼ぶが、M2 トランポリン前は CPL=3
 # から呼べないため。mkos32x に --ring3 を付け OS32X_FLAG_RING3 を立てる。
-# KAPI 不使用なので --api は最小でよい。explicit ルールなので generic の
+# KAPI テーブルは使わず sys_shm_alloc/sys_exit を int 0x80 で呼ぶ。explicit ルールは
 # %.elf / %.bin / %.raw パターンより優先される (crt0 リンクを回避)。
 # ヘッダ v3 (票 TASK_KAPI_DATA_FIELDS): crt0 を付けない 3 本 (ring3_hello /
 # ring3_fault / ring3_guard) は KAPI データ欄の配置の刻印を持たないので、

@@ -1,18 +1,11 @@
-/* NOP.C — 何もしないで戻るだけのテストプログラム */
-typedef unsigned long u32;
-typedef unsigned char u8;
-typedef struct {
-    u32 magic;
-    u32 version;
-} KernelAPI;
-
-void main(int argc, char **argv, KernelAPI *api)
+/* PM observation / per-case expectations: ring3_marker.h acceptance table. */
+#include "os32api.h"
+#include "ring3_marker.h"
+int main(int argc, char **argv, KernelAPI *api)
 {
-    /* 最小テスト: VRAMに直接1文字書いて戻る */
-    volatile unsigned short *tvram = (volatile unsigned short *)0xA0000;
-    volatile unsigned short *avram = (volatile unsigned short *)0xA2000;
-    /* 画面右上にOKマーク */
-    tvram[78] = 'O'; avram[78] = 0x00E1;
-    tvram[79] = 'K'; avram[79] = 0x00E1;
-    (void)api;
+    volatile unsigned long *mark = r3_marker(0x4B4FUL); /* OK */
+    (void)argc; (void)argv; (void)api;
+    mark[0] = 0x21504F4EUL; /* NOP! */
+    mark[1] = R3_DONE;
+    return 0;
 }

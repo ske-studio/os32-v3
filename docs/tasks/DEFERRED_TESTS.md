@@ -17,7 +17,8 @@
 | E9-3 | TVRAM 範囲外の呼び出しの拒否をゲストで (`6e4df78` はホスト試験だけ) | ホストのみ | 1432–1548 |
 | E10-1 | e10b: V86 session の全出口と PDE USER、出口の高さ / flip の整合、`paging_v86_map_range` が session を見ない | 未実施の確認 | 605、686、888、1007、1599、1624 |
 | E10-2 | e10c: 全 AS の alias 照合、3 段検査、live==0 の合間の USER、`shm_set_rw` の検査、TVRAM の再取得と RO view の残り | 未実施の確認 | 606、686、1185、1274、1599、1624 |
-| E10-3 | e10a: 「lock → free / exit → 二本目の SHM 書込み」のゲスト確認 (実施の記録が無い) | 未実施の確認 | 1601 |
+| E10-3 | e9/e10a: `shm_reuse_test` の lock → free / exit → 二本目の同一 SHM 全ページ書込みをゲスト確認 (e9 で試験実装、PM 受入待ち) | 未実施の確認 | 1601 |
+| E9-4 | e9 の SHM マーカー (`nop` / `ring3_hello/fault/guard`)、tvdump 前後 wire 比較、`db_v50_test` の RAM 境界成功と越境拒否をゲストで確認。SHM + serial addr + kill 差分の手順は `userland/tests/ring3_marker.h` | ホストのみ | e9 (2026-10-06) |
 
 ## 2. 関門: e11 (公開 KAPI の一括、版の更新は 1 回)
 
@@ -31,6 +32,12 @@
 | E11-6 | e5〜e8b・e10a のレビュー P3 の残り (pre-init USER の食い違い、bridge が `__cdecl` でない、版の門、`gfx_shutdown` の門、utf8 pointer の初期値、Unicode の 2 回取得、`kcg_init` が漢字フラグを消す、shlib token の残り、wait 帰路 check 4 件) | 申し送り | 998–1002、1111、1156–1163、1274、1338、1361、1396、1429、1624 |
 | E11-7 | KAPI 文書への注記: STALE / INVAL の推測可能性、callback / scheduling 禁止の契約 | 申し送り | 258、375–377、573、1004 |
 | E11-8 | 監査していない KAPI の区分を洗い直す (pipe、redirect、host_*、exec_* / launch_* / appslot、ime_*、gui_call / register、con_sink)。pipe・旧 DB slot の他 owner 操作、範囲検査レビューの P3 群 | 未実施の確認 | 1502、1504、1546 |
+| E11-9 | tvdump に使う `tvram_readchar_at` を CUI 全画面の所有者だけに授権 (公開 KAPI の意味変更は e11 の 1 回に集約) | 申し送り | e9 (2026-10-02 PM 決定) |
+| E11-10 | `ring3_guard bb` (E) を拒否期待へ反転し、正規 CLIENT lease で生き残る対照を追加。e9 は旧 E 生存を保持 | 申し送り | e9 / T2d〜h §2-5 |
+| E11-11 | `db_v50_test` に未貸与 VRAM 拒否の期待を追加 (低位 USER 撤去後)。e9 は実 RAM 最終 byte 成功と guard 越境拒否 | 申し送り | e9 (2026-10-02 PM 決定) |
+| E11-12 | h3 の本人識別を値で返す経路と writer 初期化を結線 (E9-2)。e9 では PM 決定 (A) を維持 | 申し送り | E9-2 / e9 |
+| E11-13 | SHM lock の実効性 (全ページが RO となり CPL3 書込みを拒否するか) をゲストで確認。e9 のホスト試験は lock 呼出しと結果判定のみ | 未実施の確認 | e9 R4 |
+| E11-14 | SHM ブロック長・ページ長の公開定数を整理。e9 は既存の DB_SHM_BLOCK_SIZE と私有 PAGE_BYTES を使用し、公開 SDK は変更しない | 申し送り | e9 R5 |
 
 ## 3. 関門: f5 以降 (T2f の結線と受入)
 
@@ -54,6 +61,7 @@
 | H-5 | 実機 Ra266: UC 化で present が遅くならないかの計測と CG 窓の WB、表示の後始末 (GRCG / EGC・68h の残り)、kernel stack の high-water | 構成持越し (実機) | 709–712、790–793、2253、2338 |
 | H-6 | V86 の出口で 6Ah の標準 / 拡張を戻していない (9821 で E0000h が MMIO のまま残り得る)。`v86 -d` / `-b` の後の表示確認、9801 構成での `gui_gate` | 未対処・未観測 | 788–789、3503 |
 | H-7 | apps / game の再ビルドと追随 (v3 の開発中は組まない決定 — 統合受入で必ず行う) | 未実施の確認 | 1113、1248、1810–1826、1868、3463 |
+| H-8 | `ring3_guard` A の固定 target (`MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE - MEM_GUARD_SIZE`) は T2c 可変スタックで実 stack 直下と一致しないことがある。h 受入で A が実 stack 直下 NP を指すことを確認 | 未実施の確認 | e9 R6 |
 
 ## 5. 関門の記載が無いもの (PM が関門を決めて上の表へ移す)
 
@@ -73,6 +81,7 @@
 | S-2 | `kout_test` の 1 件 | ゲストに `/etc/profile` が無い | **環境不足** (合格ではない) | 次のゲスト受入で `/etc/profile` を置いて回す |
 | S-3 | `kout_test` の 2d / 3c | 設計上の適用外 | 適用外 | — (延期ではない。試験側で SKIP ではなく N/A と出すようにする) |
 | S-4 | 外部 apps / game の再結線 | v3 の開発中は組まない決定 | 適用外 → H-7 | T2h 統合受入 |
+| S-5 | e9 列挙10ホスト検査 + `test_e9_observation.py` の native runner | Codex sandbox の ILP32 native は SIGSYS、qemu で検証 | 環境 | PM が e9 取り込み時に native 分だけ補う |
 
 ## 7. 一括ゲスト一覧に入っていない受入
 

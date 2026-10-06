@@ -20,3 +20,7 @@ check-result-conv-host:
 - tools/tests/mutpar.py
 - tools/check_map.d/check-result-conv-host.yaml
 - build/checks.d/check-result-conv-host.mk
+- userland/tests/ring3_marker.h
+- userland/tests/nop.c
+- userland/tests/shm_reuse_test.c
+- userland/tests/shm_reuse_child.c

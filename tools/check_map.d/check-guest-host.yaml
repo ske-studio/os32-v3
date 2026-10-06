@@ -10,3 +10,16 @@ check-guest-host:
 - tools/tests/mutpar.py
 - tools/check_map.d/check-guest-host.yaml
 - build/checks.d/check-guest-host.mk
+- tools/tests/test_e9_observation.py
+- tools/tests/host32.py
+- userland/shell/rshell.c
+- userland/tests/ring3_marker.h
+- userland/tests/nop.c
+- userland/tests/ring3_hello.c
+- userland/tests/ring3_fault.c
+- userland/tests/ring3_guard.c
+- userland/tests/shm_reuse_test.c
+- userland/tests/shm_reuse_child.c
+- build/programs.mk
+- include/memmap.h
+- sdk/include/os32/os32_kapi_slots.h

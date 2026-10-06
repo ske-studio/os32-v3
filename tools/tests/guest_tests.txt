@@ -22,7 +22,7 @@ ecs_test                # PASS 45/45
 asset_test              # PASS 23/23
 gui_call_test           # PASS 2/2
 input_test              # PASS 29/29
-db_v50_test             # PASS 41/41
+db_v50_test             # PASS 41/41 (旧 VRAM 境界1件を RAM 最終byte成功へ置換)
 save_test               # PASS 15/15  /host を使う (このランナーの前提と同じ)
 font_load_test          # PASS 1/1 (boot後NOSYS、表/BB/mailbox不変はhostで照合)
 test2                   # PASS 5/5
@@ -44,6 +44,8 @@ db_test                 # 下の「確かめていない 1 件」
 # ([V4])。まだ 139 のままなら、それはカーネル層の残件として先に直す
 # (POLICY_DEV §1)。
 
+shm_reuse_test          # PASS 4/4: lock→free/exit→別 AS の同一 SHM 全ページ書込み
+
 # --- 入れなかったもの (前段 §8 の分類。理由を必ず書く) ---
 #
 # (c) 画面デモ — 描くのが目的で合否を言わない。終わりも人が見て決める。
@@ -58,7 +60,8 @@ db_test                 # 下の「確かめていない 1 件」
 # (b) 計測・ベンチ — 合否ではなく**数字を出すのが目的**なので約束事の対象外。
 #     cfg_bench / kstr_bench
 #
-# (d) 落ちるのが正解 — マーカー番地と fault_kill_count で判定する別方式。
+# (d) 落ちるのが正解 — owned SHM の ARMD/target、serial #PF addr、
+#     fault_kill_count の差分を照合 (ring3_marker.h)。guard bb は生存が正解。
 #     終了コード方式に載らない (TASK_TEST_RESULT.md §5-2)。
 #     ring3_fault / ring3_guard / crash
 #
@@ -68,8 +71,9 @@ db_test                 # 下の「確かめていない 1 件」
 #
 # 約束事に未適合 — 集計行も終了コードも出さない道具・断片。適合させてから
 # ここへ足すこと (前段 §8 の「44 本すべての適合は次の票」)。
-#     dbq / e2seek / gui_busy / heap_test / hello / nop /
-#     ring3_hello / t_exit
+#     dbq / e2seek / gui_busy / heap_test / hello / t_exit
+#     nop / ring3_hello は SHM の NOP!/RNG3 + DONE、kill 差分0で別途判定。
+#     shm_reuse_child は shm_reuse_test が起動・終了種別/同一ブロックを判定。
 #
 # Rust の alloc_demo は書式を testresult.h に揃えてあるが、配備の名前が
 # 別系統 (userland/rust/) なので第 2 陣で足す。

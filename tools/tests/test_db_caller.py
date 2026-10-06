@@ -28,6 +28,9 @@ def sources():
     end = generated.index('};', generated.index('const u16 kapi_argptr')) + 2
     result['arg_tables'] = generated[generated.index('const u16 kapi_argsize'):end]
     guest = (walk.ROOT / 'userland/tests/db_v50_test.c').read_text()
+    assert 'VRAM_END' not in guest
+    assert 'api->db_bind_text(h, 1, (const char *)last, 1) == 0' in guest
+    assert 'last = (volatile char *)guard_crossing_text(api)' in guest
     assert 'api->db_bind_text(h, 1, guard_crossing_text(api), 2)' in guest
     start = guest.index('static const char *guard_crossing_text(')
     result['guest_probe'] = guest[start:guest.index('\n}', start) + 2]

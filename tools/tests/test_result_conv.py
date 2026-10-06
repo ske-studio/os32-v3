@@ -590,7 +590,8 @@ def run_target(tmp):
     print("TARGET i386-elf -Werror COMPILE PASS (%d sources)"
           % len(conforming_sources()), flush=True)
     for src in ("userland/tests/ring3_hello.c", "userland/tests/ring3_fault.c",
-                "userland/tests/ring3_guard.c"):
+                "userland/tests/ring3_guard.c", "userland/tests/nop.c",
+                "userland/tests/shm_reuse_child.c"):
         subprocess.run(["i386-elf-gcc", *TARGET_FLAGS, "-c", src,
                         "-o", str(tmp / (pathlib.Path(src).stem + ".o"))],
                        cwd=ROOT, check=True)

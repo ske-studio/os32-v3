@@ -124,6 +124,15 @@ filesystem:
     - host: userland/tests/faultprobe.bin
       guest: /usr/bin/
       tags: [test]
+    - host: userland/tests/nop.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/shm_reuse_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/shm_reuse_child.bin
+      guest: /usr/bin/
+      tags: [test]
     # --- ring3_hello (CPL=3 検証, v2 M1) ---
     - host: userland/tests/ring3_hello.bin
       guest: /usr/bin/

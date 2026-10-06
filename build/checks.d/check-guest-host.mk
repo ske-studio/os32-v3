@@ -21,5 +21,6 @@ CHECK_PAR_ORDER += 108:check-guest-host
 #                     走らせる一覧は tools/tests/guest_tests.txt。
 check-guest-host:
 	python3 -B tools/tests/test_guest_tests.py $(MUT)
+	python3 -B tools/tests/test_e9_observation.py $(MUT)
 
 .PHONY: check-guest-host
