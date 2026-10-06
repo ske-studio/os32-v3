@@ -92,7 +92,7 @@
 読み手に暗算させ、2026-09-17 の「SHM がカーネルスタックに食い込んでいた」穴を隠していた。
 
 ```
-__bss_end      = 0x18DB58   (カーネル本体 566.8KB)
+__bss_end      = 0x18DB38   (カーネル本体 566.8KB)
 __sqlite_start = 0x200000
 __sqlite_end   = 0x2BC200   (SQLite 本体 752.5KB)
 
@@ -107,8 +107,8 @@ __sqlite_end   = 0x2BC200   (SQLite 本体 752.5KB)
 0x0F0000 - 0x0FFFFF 64KB     BIOS ROM  (WB (PCD なし))                                     RO
 
 [ カーネル帯域 (0x100000-0x1FFFFF) ]
-0x100000 - 0x18DB57 566.8KB  カーネル .text/.data/.bss  (kernel.map の __bss_end まで)     RW
-0x18DB58 - 0x18DFFF 1.2KB    空き
+0x100000 - 0x18DB37 566.8KB  カーネル .text/.data/.bss  (kernel.map の __bss_end まで)     RW
+0x18DB38 - 0x18DFFF 1.2KB    空き
 0x18E000 - 0x1BDFFF 192KB    カーネルヒープ (kmalloc)  (__bss_end を 4KB に切り上げた位置から) RW
 0x1BE000 - 0x1BEFFF 4KB      KernelAPI テーブル  (KAPI_ADDR)                               RW
 0x1BF000 - 0x1BFFFF 4KB      SHM 前方ガード                                                NP
