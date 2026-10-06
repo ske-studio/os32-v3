@@ -14,3 +14,4 @@ check-manifests:
 - build/checks.d/check-manifests.mk
 - build/programs.mk
 - tools/check_artifacts.py
+- include/config.h

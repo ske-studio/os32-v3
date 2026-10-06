@@ -424,6 +424,39 @@ def check_undeployed(bins):
     return sorted(bins - deployed)
 
 
+def check_disk_write_paths(config=None, manifest=None):
+    """Disk writer allowlist must match the installers' deployed guest paths."""
+    import re
+    from pathlib import Path
+    if config is None:
+        config = Path("include/config.h").read_text()
+    if manifest is None:
+        manifest = yaml.safe_load(Path("userland/deploy.yaml").read_text())
+    match = re.search(r'^#define\s+SYS_DISK_WRITE_PATHS\s+([^\n]+)', config, re.M)
+    if not match:
+        return ["SYS_DISK_WRITE_PATHS is missing"]
+    allowed = re.findall(r'"([^"\n]+)"', match.group(1))
+    entries = (manifest.get("filesystem") or {}).get("files") or []
+    bad = []
+    deployed = set()
+    for name in ("install", "cdinst"):
+        host = "userland/system/" + name + ".bin"
+        paths = []
+        for entry in entries:
+            if entry.get("host") == host:
+                guest = entry["guest"]
+                if guest.endswith("/"):
+                    guest += name + ".bin"
+                paths.append(guest)
+        if len(paths) != 1:
+            bad.append(host + ": expected one deployment")
+        deployed.update(paths)
+    if set(allowed) != deployed or len(allowed) != len(deployed):
+        bad.append("SYS_DISK_WRITE_PATHS differs from installer guest paths: " +
+                   repr(allowed) + " != " + repr(sorted(deployed)))
+    return bad
+
+
 def main():
     from check_artifacts import require_fresh
     bins = built_binaries()
@@ -435,6 +468,15 @@ def main():
                         *sorted(bins)])
 
     rc = 0
+
+    print("== Disk writer authorization / deployed guest paths ==")
+    disk_paths = check_disk_write_paths()
+    for error in disk_paths:
+        print("  [NG] " + error)
+    if disk_paths:
+        rc = 1
+    else:
+        print("  PASS")
 
     missing, warn = check_missing_hosts()
     print("== 1. マニフェストが挙げているのに存在しないファイル ==")

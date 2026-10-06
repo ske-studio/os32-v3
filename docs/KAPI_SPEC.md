@@ -132,6 +132,48 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 同じ票で既存の **-11 `STALE`** を VFS の FD にも使う (unlink・置き換え rename・umount で失効した FD の
 read / write / fstat / seek)。版数は据え置き。
 
+### 生ディスク書込みの授権 (KAPI-DISK-AUTH)
+
+`ide_write_sector` (slot 64) / `ide_write_sectors` (65) / `dev_blk_write` (157) /
+`ext2_format` (58) / `ext2_format_at` (230) は、授権のない
+呼出しを既存の失敗値 `-1` で拒否し、デバイスを呼ばない。公開の型・slot・版・
+OS32X flag は変えない。読み取りの契約は変わらない。
+wrap 内では授権をバッファ範囲検査より先に判定するため、無授権なら不正バッファでも kill せず `-1` を返す。
+`ide_write_sectors(drv, lba, 0, NULL)` は授権なしで `-1`、ありで `0` を返す
+問い合わせでもある。0 セクタ時は drv/lba によらずデバイスを呼ばない。
+両インストーラは共通の `inst_hdd_check` でこれを問い合わせ、拒否なら umount/sync・
+消去・mkfs・ファイル書込みの前に CUI 前景で `/sbin/install` として起動する案内を出して終了する。
+
+- 常駐 CPL0 シェルの直接呼出しは、CUI・実行中・資源 owner 一致で許可する。
+- CPL3 は、ローダが実際に読むパスを `vfs_resolve_path` (cwd + 正規化) で絶対パスにした結果が `config.h` の
+  `SYS_DISK_WRITE_PATHS` (`/sbin/install.bin`・`/sbin/cdinst.bin`、`deploy.yaml` と一致) に完全一致した
+  起動だけを内部 AppSlot に記録する。各起動で上書きし、子へ継承しない。
+- 呼出時は保存済み USER 識別 (AS・世代・CR3・slot・owner) が有効で、
+  実行中の CUI 前景 (`gui == 0`、console sink 無効、WM scope 外) に限る。
+  別の配置・同名・GUI・park・無効な識別は許可しない。相対表記・`./`・重複 `/` は
+  同じ絶対パスへ正規化できれば許可する。起動後の cwd 変更は授権に影響しない。
+
+名前だけの許可は別パスの同名を通し、ディレクトリ単位の許可は対象が広すぎる。
+固定配置の完全一致なら公開 ABI を増やさず既存インストーラを識別できる。
+これは配置に基づく授権であり、イメージ署名や VFS の書込み権限を新設するものではない。
+`/sbin/install.bin` 等の差し替えや `sys_mount` による `/sbin` の覆いは可能だが、
+同じアプリは `/boot/vmkernel.lz4` も差し替えられるため新しい昇格ではない。`sys_mount` の授権は e11 の行で扱う。
+公開口の全件走査では対象は上記 5 口。通常のファイル操作・sync/umount、読み取り、
+loop および loop 媒体へ書く V86 の口は今回の生ディスク授権の対象外。
+`check-manifests` は許可リストと両インストーラの配置を照合する。
+ホスト検証は `check-disk-auth-host` (実物の判定・生成 wrap・保存 caller、変異込み)。
+
+ゲスト受入は PM が実施する。通常 NHD の区画表は書き換えず、拒否確認には
+PM が選んだ別イメージ上の未使用・無害な LBA (18 以上、512-byte raw device) を使う。
+
+| 操作 | 期待 |
+|---|---|
+| `/usr/bin/disk_auth_test.bin <IDE drive> <無害なLBA>` | 3 口すべて `-1`、各回の読み戻しが一致、終了 0。書く引数は読んだ内容そのもの |
+| `/sbin/install.bin` を CUI の `install` と同じ経路で起動し、書込み直前まで進めて中止 | 通常の検査・確認画面が従来どおり。実際の導入を確かめる場合は PM が別イメージを選ぶ |
+| 常駐シェルの `hdprep` を書込み前の検査まで進める | 従来どおり。書込み許可そのものはホストでデバイス代役への到達を確認 |
+
+上記ゲスト手順はホスト合格に含めない。配備したバイナリを確認してから実施する ([V1])。
+
 ### §3-3 出力ポインタの宣言 `out` (票 TASK_KAPI_OUTPUT_GUARD)
 
 OS32 は **CR0.WP = 0** で走る (`kernel/shlib.c` がカーネルからの書き込みで共有ライブラリを

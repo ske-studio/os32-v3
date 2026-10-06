@@ -487,7 +487,8 @@
       "args": [
         "int drv",
         "u32 sectors"
-      ]
+      ],
+      "body": "if (!exec_disk_write_allowed()) return -1;\nreturn ext2_format(drv, sectors);"
     },
     {
       "name": "kcg_init",
@@ -521,7 +522,8 @@
     },
     {
       "name": "ide_write_sector",
-      "in": [{"arg": "buf", "size": 512}],
+      "in": [{"arg": "buf", "size": 512, "target": true}],
+      "body": "if (!exec_disk_write_allowed()) return -1;\nif (!kapi_in_range((u32)buf, 512u)) ring3_fault_kill();\nreturn ide_write_sector(drv, lba, buf);",
       "ret": "int",
       "args": [
         "int drv",
@@ -531,7 +533,8 @@
     },
     {
       "name": "ide_write_sectors",
-      "in": [{"arg": "buf", "len": "cnt", "unit": 512}],
+      "in": [{"arg": "buf", "len": "cnt", "unit": 512, "target": true}],
+      "body": "if (!exec_disk_write_allowed()) return -1;\nif (cnt == 0) return 0;\nif (!kapi_in_range((u32)buf, kapi_out_mul((u32)cnt, 512u))) ring3_fault_kill();\nreturn ide_write_sectors(drv, lba, cnt, buf);",
       "ret": "int",
       "args": [
         "int drv",
@@ -1214,7 +1217,7 @@
       "in": [{"arg": "buf", "target": true}],
       "ret": "int",
       "args": ["const char *dev_name", "u32 lba", "int count", "const void *buf"],
-      "body": "{ Device *d = dev_find(dev_name); if (!d) return -1; if (count < 0) return -1; if (count > 0) { if (d->sect_size <= 0) return -1; if ((u32)count > 0xFFFFFFFFu / (u32)d->sect_size) return -1; if (!ring3_user_range_ok((u32)buf, (u32)count * (u32)d->sect_size)) ring3_fault_kill(); } return dev_blk_write_lba(d, lba, count, buf); }"
+      "body": "if (!exec_disk_write_allowed()) return -1;\n{ Device *d = dev_find(dev_name); if (!d) return -1; if (count < 0) return -1; if (count > 0) { if (d->sect_size <= 0) return -1; if ((u32)count > 0xFFFFFFFFu / (u32)d->sect_size) return -1; if (!ring3_user_range_ok((u32)buf, (u32)count * (u32)d->sect_size)) ring3_fault_kill(); } return dev_blk_write_lba(d, lba, count, buf); }"
     },
     {
       "name": "ime_switch_dict",
@@ -1645,7 +1648,8 @@
     {
       "name": "ext2_format_at",
       "ret": "int",
-      "args": ["int drv", "u32 start_lba", "u32 length"]
+      "args": ["int drv", "u32 start_lba", "u32 length"],
+      "body": "if (!exec_disk_write_allowed()) return -1;\nreturn ext2_format_at(drv, start_lba, length);"
     },
     {
       "name": "dev_mount_count",

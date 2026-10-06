@@ -367,6 +367,9 @@ def build_target(tmp):
 
 # ---- 否定側: (ファイル, 前, 後, 説明) -------------------------------------------
 MUTATIONS = [
+    ("userland/system/inst_hdd.c",
+     "if (api->ide_write_sectors(INST_DRIVE, 0, 0, NULL) != 0)",
+     "if (0)", "installer ignores disk authorization denial"),
     ("userland/system/inst_disk.c",
      "        if (lba0[510] == 0x55 && lba0[511] == 0xAA) return HDPREP_E_MBR_SIG;",
      "        (void)0;", "空の表で LBA 0 の 55AA を見ない"),

@@ -173,6 +173,9 @@ int ring3_user_ranges_writable_always(u32 va, u32 la, u32 vb, u32 lb);
  * 由来を記録するのに使う (redir_access_capture の RedirAccess)。 */
 int ring3_call_from_user(void);
 
+/* Internal raw-disk KAPI authorization; no public ABI field. */
+int exec_disk_write_allowed(void);
+
 /* CPL=3 アプリを fault として畳む (fault_kill_count++ → master CR3 復帰 →
  * AS 破棄 → longjmp)。**戻らない。** 実体は exec/exec.c。
  * 帯違反と同じ扱いにしたい KAPI ラッパだけが呼ぶ。 */

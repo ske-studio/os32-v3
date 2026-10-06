@@ -55,6 +55,8 @@
 /* ====================================================================== */
 /*  デフォルトコマンド検索パス                                                */
 /* ====================================================================== */
+/* Raw-disk writers: exact loader paths, matched before entering user code. */
+#define SYS_DISK_WRITE_PATHS  { "/sbin/install.bin", "/sbin/cdinst.bin" }
 #define SYS_DEFAULT_PATH      "/bin:/sbin:/usr/bin"
 #define SYS_DEFAULT_HOME      "/home/user"
 #define SYS_DEFAULT_SHELL     "/shell"

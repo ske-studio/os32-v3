@@ -9,6 +9,22 @@ volatile int ring3_in_syscall = 1;
 #define RING3_STACK_BOTTOM (MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE)
 #define RING3_HEAP_TOP (RING3_STACK_BOTTOM - PAGE_SIZE)
 #include "exec_host_source.c"
+#include "config.h"
+int con_sink_is_enabled(void) { return 0; }
+int kstrcmp(const char *a, const char *b)
+{
+    while (*a && *a == *b) { a++; b++; }
+    return (u8)*a - (u8)*b;
+}
+u32 kstrlen(const char *s) { u32 n = 0; while (s[n]) n++; return n; }
+char *kstrncpy(char *d, const char *s, u32 n)
+{
+    u32 i = 0;
+    if (n) { while (i + 1 < n && s[i]) { d[i] = s[i]; i++; } d[i] = 0; }
+    return d;
+}
+#include "resolve_host_source.c"
+#include "disk_host_source.c"
 #include "generated_host_source.c"
 
 static void *escape[5];
@@ -101,10 +117,17 @@ static void caller_copy_tests(void)
     EXPECT("output RO tail", 1, wrap_sys_read(1, (void *)tail, 2));
     pt[index + 1] = 0;
     EXPECT("input length overflow", 1, wrap_sys_write(1, (void *)va, 0xffffffffU));
+    slot.disk_write_authorized = 1;
     EXPECT("input multiplication", 1, wrap_ide_write_sectors(0, 0, 0x800001U, (void *)va));
+    slot.disk_write_authorized = 0;
+    reached = 0;
+    named(wrap_ide_write_sector(0, 0, (void *)va) == -1 && reached == 0,
+          "unauthorized disk write");
+    slot.disk_write_authorized = exec_disk_write_path_allowed("/sbin/install.bin");
     EXPECT("IDE one", 0, wrap_ide_write_sector(0, 0, (void *)va));
     EXPECT("IDE tail", 1, wrap_ide_write_sector(0, 0, (void *)tail));
-    EXPECT("IDE zero", 0, wrap_ide_write_sectors(0, 0, 0, 0));
+    reached = 0;
+    named(wrap_ide_write_sectors(0, 0, 0, 0) == 0 && reached == 0, "IDE zero probe");
     for (disk.sect_size = 512; disk.sect_size <= 2048; disk.sect_size *= 2) {
         EXPECT("device NULL", 1, wrap_dev_blk_read("d", 0, 1, 0));
         EXPECT("device read zero", 0, wrap_dev_blk_read("d", 0, 0, 0));

@@ -404,12 +404,12 @@ static int fake_ide_write_sector(int drv, u32 lba, const void *buf)
     return 0;
 }
 
-/* 旧経路 (複数セクタ) は段 2 では使わない。呼ばれたら落とす */
+/* Only the zero-sector authorization probe is permitted. */
+static int deny_disk_auth;
 static int fake_ide_write_sectors(int drv, u32 lba, u32 cnt, const void *buf)
 {
-    (void)drv; (void)lba; (void)cnt; (void)buf;
-    CHECK(!"ide_write_sectors must not be used");
-    return -1;
+    CHECK(drv == 0 && lba == 0 && cnt == 0 && buf == NULL);
+    return deny_disk_auth ? -1 : 0;
 }
 
 static int fake_ide_read_sector(int drv, u32 lba, void *buf)
@@ -711,6 +711,7 @@ static void media_fixture(void)
 
 static void setup(void)
 {
+    deny_disk_auth = 0;
     api_init();
     rec_reset();
     inj_geom_fail = 0;
@@ -1294,6 +1295,13 @@ static void case_modes(void)
 /* 事前検査の各失敗: 1 セクタも書かない (段 2-11、N6、N8) */
 static void case_preflight(void)
 {
+    setup();
+    deny_disk_auth = 1;
+    CHECK(run() == 1);
+    CHECK_NOTHING_WRITTEN();
+    CHECK_STR("CUI");
+    CHECK_STR("/sbin の install または cdinst");
+
     /* 大きさの境界: ローダ 8192 と vmkernel 508KiB ちょうどは通る */
     setup();
     fx_put("/VMKRNL.LZ4", 508 * 1024);

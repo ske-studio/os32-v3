@@ -272,7 +272,7 @@ static int host_handler(unsigned int irq, void *arg) { (void)irq; (void)arg; ret
 END = r'''
 static int test(void) {
     int gui, kind, resumed;
-    CHECK(sizeof(struct addrspace) == 692 && sizeof(AppSlot) == 200);
+    CHECK(sizeof(struct addrspace) == 692 && sizeof(AppSlot) == 204);
     CHECK(sizeof(RedirAccess) == 24 && sizeof(CallerAccessFrame) == 28);
     CHECK(sizeof(FdRedirect) == 52 && sizeof(FdRedirectState) == 156);
     CHECK(sizeof(Ring3CallContext) == 40);

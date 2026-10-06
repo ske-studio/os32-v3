@@ -132,6 +132,7 @@ typedef struct {
     u32  hdr_flags;
     volatile int stop_wm_req;  /* IRQ: return to WM at completed syscall */
     int  parked_from_stop;     /* preserve every completed register on resume */
+    int disk_write_authorized; /* loader-owned; never inherited by children */
 } AppSlot;
 
 /* ---- 受入 G7 のカウンタ (D8 の C1/C2/C3/C6) --------------------------- */

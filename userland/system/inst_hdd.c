@@ -361,6 +361,15 @@ int inst_hdd_check(KernelAPI *api, InstTarget *t)
     t->erase_code = 0;
     t->umount_hd0 = 0;
 
+    /* Zero sectors queries authorization without touching the device. Refuse
+     * before umount/sync, ERASE, formatting or any installer file writes. */
+    if (api->ide_write_sectors(INST_DRIVE, 0, 0, NULL) != 0) {
+        api->kprintf(ATTR_RED, "%s",
+                     "Disk write not authorized. Nothing was written.\n"
+                     "CUI の前景で /sbin の install または cdinst として起動してください。\n");
+        return -1;
+    }
+
     rc = api->hdd_geom_info(INST_DRIVE, &t->hg);
     if (rc != 0) {
         api->kprintf(ATTR_RED, "  hdd_geom_info(hd0) = %d\n", rc);

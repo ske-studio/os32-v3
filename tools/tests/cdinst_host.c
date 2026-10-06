@@ -589,6 +589,13 @@ static void geom_1663(void)
     geom.ata_total = 16514063;
 }
 
+static int deny_disk_auth;
+static int f_ide_write_sectors(int drv, u32 lba, u32 cnt, const void *buf)
+{
+    CHECK(drv == 0 && lba == 0 && cnt == 0 && buf == NULL);
+    return deny_disk_auth ? -1 : 0;
+}
+
 static void setup(void)
 {
     int i;
@@ -641,6 +648,8 @@ static void setup(void)
     g_api.vfs_devname = f_vfs_devname;
     g_api.vfs_sync = f_vfs_sync;
     g_api.ide_read_sector = f_ide_read_sector;
+    deny_disk_auth = 0;
+    g_api.ide_write_sectors = f_ide_write_sectors;
     g_api.ide_write_sector = f_ide_write_sector;
     g_api.hdd_geom_info = f_hdd_geom_info;
     g_api.ext2_format_at = f_ext2_format_at;
@@ -777,6 +786,13 @@ static void case_modes(void)
 /* ---- 事前検査の各失敗: 1 セクタも書かない ---- */
 static void case_preflight(void)
 {
+    setup();
+    deny_disk_auth = 1;
+    run();
+    CHECK_NOTHING_WRITTEN();
+    CHECK_STR("CUI");
+    CHECK_STR("/sbin の install または cdinst");
+
     setup();                                        /* ローダ 8193 */
     boot_pkg(IPL_LEN, 8193u, 1, 0);
     run();
