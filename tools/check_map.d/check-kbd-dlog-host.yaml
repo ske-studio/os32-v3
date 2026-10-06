@@ -7,3 +7,4 @@ check-kbd-dlog-host:
 - userland/shell/kbd_watch.c
 - tools/check_map.d/check-kbd-dlog-host.yaml
 - build/checks.d/check-kbd-dlog-host.mk
+- tools/tests/mutpar.py

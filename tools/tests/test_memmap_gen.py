@@ -179,15 +179,15 @@ def cases(script):
         check("写しのずれ" in out.stdout and "MEM_KSTACK_TOP" in out.stdout,
               "ずれた場所と基準を名指ししない: %r" % out.stdout)
         # ASM が数値直書きに戻ったら気づく
-        root2 = make_tree(tempfile.mkdtemp(prefix="os32-genmm-asm-"), CLEAN)
-        asm = root2 / "kernel/kentry.asm"
-        asm.write_text(asm.read_text(encoding="utf-8")
-                       .replace("mov     esp, MEM_KSTACK_TOP",
-                                "mov     esp, 002FFFFCh"), encoding="utf-8")
-        out = run(script, root2, "--check")
-        check(out.returncode != 0, "kentry.asm の数値直書きに気づかない")
-        check("kentry.asm" in out.stdout, "どのファイルか言わない")
-        shutil.rmtree(root2, ignore_errors=True)
+        with tempfile.TemporaryDirectory(prefix="os32-genmm-asm-") as directory:
+            root2 = make_tree(directory, CLEAN)
+            asm = root2 / "kernel/kentry.asm"
+            asm.write_text(asm.read_text(encoding="utf-8")
+                           .replace("mov     esp, MEM_KSTACK_TOP",
+                                    "mov     esp, 002FFFFCh"), encoding="utf-8")
+            out = run(script, root2, "--check")
+            check(out.returncode != 0, "kentry.asm の数値直書きに気づかない")
+            check("kentry.asm" in out.stdout, "どのファイルか言わない")
         log.append("MIRROR  --check = 1 (os32.ld のずれと ASM の直書きを検出)")
 
     # --- 5. kernel.map が無いときは推測しない ---

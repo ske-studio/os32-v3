@@ -1,3 +1,4 @@
+#include <sys/prctl.h>
 /* =========================================================================
  *  NET_LINK_HOST.C — リンク層 v2 と KAPI v51 を **実物のソースで** 確かめる
  *
@@ -463,16 +464,31 @@ static void agent_pump(void)
     }
 }
 
+static void agent_stop(void);
+
 static int agent_start(void)
 {
     struct sockaddr_un sa;
     int i, fd;
-    snprintf(agent_sock, sizeof(agent_sock), "/tmp/os32-n1-%d.sock", (int)getpid());
-    snprintf(agent_state, sizeof(agent_state), "/tmp/os32-n1-%d.state", (int)getpid());
+    const char *tmpdir = getenv("TMPDIR");
+    int child_status;
+    pid_t parent_pid = getpid();
+    if (!tmpdir || !*tmpdir) tmpdir = "/tmp";
+    /* sun_path is shorter than our buffer: fail rather than silently truncate. */
+    if (snprintf(agent_sock, sizeof(agent_sock), "%s/os32-n1-%d.sock", tmpdir,
+                 (int)getpid()) >= (int)sizeof(sa.sun_path) ||
+        snprintf(agent_state, sizeof(agent_state), "%s/os32-n1-%d.state", tmpdir,
+                 (int)getpid()) >= (int)sizeof(agent_state)) {
+        fprintf(stderr, "agent_start: TMPDIR path is too long for UNIX sun_path (%zu bytes)\n",
+                sizeof(sa.sun_path));
+        agent_sock[0] = agent_state[0] = '\0';
+        return -1;
+    }
     unlink(agent_sock);
     if (mkdir(agent_state, 0700) != 0 && errno != EEXIST) return -1;
     agent_pid = fork();
     if (agent_pid == 0) {
+        if (prctl(PR_SET_PDEATHSIG, SIGTERM) != 0 || getppid() != parent_pid) _exit(127);
         int devnull = open("/dev/null", O_WRONLY);
         if (devnull >= 0) { dup2(devnull, 1); dup2(devnull, 2); }
         execlp("python3", "python3", "-B", "tools/host_agent.py",
@@ -480,11 +496,18 @@ static int agent_start(void)
                "--agent-gen", "4660", "--quiet", "--offline", (char *)NULL);
         _exit(127);
     }
-    if (agent_pid < 0) return -1;
+    if (agent_pid < 0) { agent_stop(); return -1; }
     memset(&sa, 0, sizeof(sa));
     sa.sun_family = AF_UNIX;
     strncpy(sa.sun_path, agent_sock, sizeof(sa.sun_path) - 1);
-    for (i = 0; i < 200; i++) {
+    /* 60s (3000 * 20ms): Python startup competes with four make jobs and
+       mutation compilers. A dead child still fails immediately. */
+    for (i = 0; i < 3000; i++) {
+        if (waitpid(agent_pid, &child_status, WNOHANG) == agent_pid) {
+            agent_pid = -1;
+            agent_stop();
+            return -1;
+        }
         fd = socket(AF_UNIX, SOCK_STREAM, 0);
         if (fd >= 0 && connect(fd, (struct sockaddr *)&sa, sizeof(sa)) == 0) {
             agent_fd = fd;
@@ -496,13 +519,14 @@ static int agent_start(void)
         if (fd >= 0) close(fd);
         usleep(20000);
     }
+    agent_stop();
     return -1;
 }
 
 static void agent_stop(void)
 {
     if (agent_fd >= 0) { close(agent_fd); agent_fd = -1; }
-    if (agent_pid > 0) { kill(agent_pid, SIGTERM); waitpid(agent_pid, 0, 0); agent_pid = -1; }
+    if (agent_pid > 0) { kill(agent_pid, SIGTERM); while (waitpid(agent_pid, 0, 0) < 0 && errno == EINTR) {} agent_pid = -1; }
     unlink(agent_sock);
     if (agent_state[0]) {
         char f[160];

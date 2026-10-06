@@ -7,6 +7,7 @@ import argparse
 from pathlib import Path
 import subprocess
 import tempfile
+from mutpar import run_ordered
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -52,7 +53,7 @@ def run(runner, mutation=None):
         cmd += ['-I'+str(ROOT/p) for p in ('tools/tests/host_arch', 'include',
                 'arch/x86', 'platform/pc98', 'drivers', 'lib', 'fs', 'sdk/include/os32')]
         exe = work / 'fixture'
-        result = subprocess.run(cmd + [str(ROOT/'tools/tests/kcg_boot_host.c'),
+        result = host32.build(cmd + [str(ROOT/'tools/tests/kcg_boot_host.c'),
                 str(ROOT/'lib/lz4.c'), '-o', str(exe)], capture_output=True, text=True)
         if result.returncode:
             raise RuntimeError('build failure is not runtime RED\n'+result.stdout+result.stderr)
@@ -78,16 +79,20 @@ def boot_order():
     print('PASS boot order and complete Unicode read gate')
 
 
+@host32.control_session
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--runner', choices=('native', 'qemu'))
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
+    host32.begin_control(args.mutate, args.runner, ROOT)
     boot_order()
-    run(args.runner)
+    with host32.control(args.mutate, args.runner, ROOT) as normal:
+        if normal:
+            run(args.runner)
     if args.mutate:
-        for mutation in MUTATIONS:
-            run(args.runner, mutation)
+        for _ in run_ordered(lambda mutation: run(args.runner, mutation), MUTATIONS):
+            pass
         print('PASS 5/5 runtime mutations')
 
 

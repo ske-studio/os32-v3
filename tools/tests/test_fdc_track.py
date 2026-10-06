@@ -537,6 +537,10 @@ def mutate(tmp):
 
 if __name__ == "__main__":
     args = sys.argv[1:]
+    if '--require-image' in args:
+        sys.path.insert(0, str(ROOT / 'tools'))
+        from check_artifacts import require_fresh
+        require_fresh(ROOT, ['images/os32_boot.d88'])
     tmp_root = os.environ.get("TMPDIR") or None
     with tempfile.TemporaryDirectory(prefix="os32-fdc-track-", dir=tmp_root) as tmp:
         exe = host_build(tmp)

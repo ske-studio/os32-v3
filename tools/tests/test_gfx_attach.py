@@ -1,4 +1,5 @@
 """T2e e6: real SDK and kernel CLIENT leases, checked drawing and void bridge."""
+import host32
 import argparse
 import hashlib
 import pathlib
@@ -89,11 +90,13 @@ MUTANTS = [
 ]
 
 
+@host32.control_session
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--runner',choices=['native','qemu'],default='native')
     p.add_argument('--mutate',action='store_true')
     a=p.parse_args()
+    host32.begin_control(a.mutate, a.runner, ROOT)
     texts={path:(ROOT/path).read_text() for path in TARGET_SRCS}
     digest={path:hashlib.sha256(text.encode()).digest() for path,text in texts.items()}
     # SDK and kernel deliberately export the same drawing names. Rename only
@@ -122,9 +125,11 @@ def main():
                     if path in SDK_SRCS: sources.append(dest)
             return run_case(None,a.runner,[c for c in changes if c[0] in KERNEL_SRCS],
                             '#include "gfx_attach_host.c"\n',texts,pathlib.Path(directory),stage)
-        result=run([])
-        print(result.stdout+result.stderr,end='')
-        assert result.returncode==0,result.returncode
+        with host32.control(a.mutate, a.runner, ROOT) as normal:
+            if normal:
+                result=run([])
+                print(result.stdout+result.stderr,end='')
+                assert result.returncode==0,result.returncode
         if a.mutate:
             def one(m):
                 start=time.monotonic();result=run(m[1])

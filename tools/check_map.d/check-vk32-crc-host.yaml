@@ -11,3 +11,4 @@ check-vk32-crc-host:
 - lib/crc32_core.inc
 - tools/check_map.d/check-vk32-crc-host.yaml
 - build/checks.d/check-vk32-crc-host.mk
+- tools/check_artifacts.py

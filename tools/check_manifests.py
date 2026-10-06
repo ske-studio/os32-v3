@@ -425,11 +425,14 @@ def check_undeployed(bins):
 
 
 def main():
+    from check_artifacts import require_fresh
     bins = built_binaries()
     if not bins:
         print("ビルド成果物が見つからない。先に make all を実行すること。",
               file=sys.stderr)
         return 2
+    require_fresh('.', ['build/out/kernel.bin', 'build/out/sqlite.bin',
+                        *sorted(bins)])
 
     rc = 0
 

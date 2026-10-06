@@ -160,34 +160,50 @@ class Rig:
     """贋 OS32 ↔ 橋 (子プロセス) ↔ 実 host_agent (子プロセス) を組む。"""
 
     def __init__(self, tmp, bridge_args=(), agent_mac=AGENT_MAC, nic_mac=NIC_MAC):
-        self.tmp = pathlib.Path(tmp)
-        self.nic_path = str(self.tmp / "nic.sock")
-        self.agent_path = str(self.tmp / "agent.sock")
-        self.srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self.srv.bind(self.nic_path)
-        self.srv.listen(1)
-        self.srv.settimeout(10)
-        self.agent = subprocess.Popen(
-            [sys.executable, "-B", str(HOST_AGENT), "--unix", self.agent_path,
-             "--offline", "--quiet", "--once", "--mac", mac_str(agent_mac),
-             "--state-dir", str(self.tmp / "state"), "--agent-gen", "1"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        self._wait_for(self.agent_path)
-        self.bridge = subprocess.Popen(
-            [sys.executable, "-B", str(BRIDGE), "--fake-nic", self.nic_path,
-             "--connect", "unix:" + self.agent_path,
-             "--nic-mac", mac_str(nic_mac), *bridge_args],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        conn, _ = self.srv.accept()
-        conn.settimeout(10)
-        self.os32 = FakeOS32(conn)
+        self.agent = self.bridge = self.os32 = self.srv = None
+        # Interpreter startup shares CPU with make and mutation workers.
+        # 60s is a startup/deadlock bound; early process death fails immediately.
+        try:
+            self.tmp = pathlib.Path(tmp)
+            self.nic_path = str(self.tmp / "nic.sock")
+            self.agent_path = str(self.tmp / "agent.sock")
+            self.srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            self.srv.bind(self.nic_path)
+            self.srv.listen(1)
+            self.srv.settimeout(0.1)
+            self.agent = subprocess.Popen(
+                [sys.executable, "-B", str(HOST_AGENT), "--unix", self.agent_path,
+                 "--offline", "--quiet", "--once", "--mac", mac_str(agent_mac),
+                 "--state-dir", str(self.tmp / "state"), "--agent-gen", "1"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self._wait_for(self.agent_path)
+            self.bridge = subprocess.Popen(
+                [sys.executable, "-B", str(BRIDGE), "--fake-nic", self.nic_path,
+                 "--connect", "unix:" + self.agent_path,
+                 "--nic-mac", mac_str(nic_mac), *bridge_args],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            deadline = time.monotonic() + 60
+            while True:
+                assert self.bridge.poll() is None, "bridge が接続前に死んだ"
+                assert self.agent.poll() is None, "host_agent が接続前に死んだ"
+                try:
+                    conn, _ = self.srv.accept()
+                    break
+                except socket.timeout:
+                    if time.monotonic() >= deadline:
+                        raise AssertionError("bridge が 60 秒以内に接続しない")
+            conn.settimeout(10)
+            self.os32 = FakeOS32(conn)
+        except BaseException:
+            self.close()
+            raise
 
-    def _wait_for(self, path, timeout=10.0):
+    def _wait_for(self, path, timeout=60.0):
         end = time.monotonic() + timeout
         while time.monotonic() < end:
+            assert self.agent.poll() is None, "host_agent が起動直後に死んだ"
             if os.path.exists(path):
                 return
-            assert self.agent.poll() is None, "host_agent が起動直後に死んだ"
             time.sleep(0.02)
         raise AssertionError("host_agent が %s を作らない" % path)
 
@@ -199,31 +215,31 @@ class Rig:
         """
         out = ""
         try:
-            if sigusr1 and self.bridge.poll() is None:
-                self.bridge.send_signal(signal.SIGUSR1)
-                # 橋はハンドラでは旗を立てるだけ (再入する print で落ちないため)。
-                # 主ループが select の期限 (1 秒) で起きてから統計を出す。
-                time.sleep(1.8)
-            try:
-                self.os32.conn.close()
-            except OSError:
-                pass
-            out = self.bridge.communicate(timeout=10)[0] or ""
-        except subprocess.TimeoutExpired:
-            self.bridge.kill()
-            out = self.bridge.communicate()[0] or ""
+            if self.bridge is not None:
+                if sigusr1 and self.bridge.poll() is None:
+                    self.bridge.send_signal(signal.SIGUSR1)
+                    time.sleep(1.8)
+                if self.os32 is not None:
+                    self.os32.conn.close()
+                elif self.bridge.poll() is None:
+                    self.bridge.terminate()
+                try:
+                    out = self.bridge.communicate(timeout=60)[0] or ""
+                except subprocess.TimeoutExpired:
+                    self.bridge.kill()
+                    out = self.bridge.communicate()[0] or ""
         finally:
-            for p in (self.agent,):
-                if p.poll() is None:
-                    p.terminate()
+            for process in (self.bridge, self.agent):
+                if process is not None:
+                    if process.poll() is None:
+                        process.terminate()
                     try:
-                        p.wait(timeout=5)
+                        process.wait(timeout=5)
                     except subprocess.TimeoutExpired:
-                        p.kill()
-            try:
+                        process.kill()
+                        process.wait()
+            if self.srv is not None:
                 self.srv.close()
-            except OSError:
-                pass
         return out
 
 

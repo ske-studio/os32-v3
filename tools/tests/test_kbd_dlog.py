@@ -17,6 +17,7 @@ tools/tests/kbd_hostshim/io.h で模型へ回す。
 """
 import pathlib
 import re
+import mutpar
 import subprocess
 import sys
 import tempfile
@@ -140,7 +141,7 @@ def host_build(tmp, mutated=None):
 def run_cases(exe, cases):
     failed = 0
     for case in cases:
-        rc = subprocess.run([str(exe), case], cwd=ROOT).returncode
+        rc = mutpar.run_timeout([str(exe), case], cwd=ROOT).returncode
         print(f"EXIT {case}={rc}", flush=True)
         failed += rc != 0
     print(f"SUMMARY {len(cases) - failed}/{len(cases)} PASS", flush=True)
@@ -185,7 +186,7 @@ def mutate(tmp):
         hits = 0
         for c in CASES:
             try:
-                rc = subprocess.run([str(exe), c], cwd=ROOT, timeout=20,
+                rc = mutpar.run_timeout([str(exe), c], cwd=ROOT, timeout=20,
                                     stderr=subprocess.DEVNULL).returncode
             except subprocess.TimeoutExpired:
                 rc = -1

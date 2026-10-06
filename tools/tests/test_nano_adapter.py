@@ -9,6 +9,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+from mutpar import run_ordered
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -27,7 +28,7 @@ gate = load('nano_link_gate', ROOT / 'sdk/allocator/check_link.py')
 
 
 def command(prefix, tool, *args):
-    result = subprocess.run([str(prefix / ('bin/i386-elf-' + tool)), *map(str, args)],
+    result = host32.build([str(prefix / ('bin/i386-elf-' + tool)), *map(str, args)],
                             capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError(result.stdout + result.stderr)
@@ -39,7 +40,7 @@ def link(prefix, work, archive, extra=(), after=False):
     mapfile = work / 'fixture.map'
     # host gcc is only the static Linux link driver; nano and the fixture use
     # the cross compiler's exact newlib ABI (struct _reent included).
-    subprocess.run(['gcc', '-m32', '-nostdlib', '-static', '-no-pie',
+    host32.build(['gcc', '-m32', '-nostdlib', '-static', '-no-pie',
                     '-Wl,--build-id=none,--allow-multiple-definition,-Map=' + str(mapfile),
                     str(work / 'host.o'), str(work / 'libc_a-reallocf.o'), *([] if after else map(str, extra)), str(archive),
                     *(map(str, extra) if after else []), '-o', str(exe)],
@@ -124,6 +125,7 @@ EXPECTED_CHECKS = [
 assert len(EXPECTED_CHECKS) == len(MUTATIONS)
 
 
+@host32.control_session
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--runner', choices=['native', 'qemu'])
@@ -135,10 +137,13 @@ def main():
             raise ValueError('HOST32_RUNNERS is empty')
         for index, runner in enumerate(runners):
             command_line = [sys.executable, '-B', str(Path(__file__).resolve()), '--runner', runner]
-            if args.mutate and index == 0:
+            if args.mutate:
+                # Standalone --mutate establishes its own normal control first.
+                subprocess.run(command_line, check=True)
                 command_line.append('--mutate')
             subprocess.run(command_line, check=True)
         return 0
+    host32.begin_control(args.mutate, args.runner, ROOT)
     prefix = Path(os.environ.get('CROSS_DIR', '/usr/local/cross'))
     with tempfile.TemporaryDirectory(prefix='nano_adapter_') as tmp:
         work = Path(tmp)
@@ -146,47 +151,53 @@ def main():
         build_host(prefix, work)
         exe, mapfile = link(prefix, work, archive)
         gate.validate_output(prefix, mapfile, exe)
-        result = host32.run([str(exe)], runner=args.runner, capture_output=True, text=True, timeout=60)
-        assert result.returncode == 0, result.stdout + result.stderr
-        print(result.stdout.strip())
-        negative_links = 0
-        for name in sorted(gate.FORBIDDEN):
-            rejection(prefix, work, archive, 'void ' + name + '(void) {}\n')
-            negative_links += 1
-        for name in sorted(gate.CONNECTED):
-            rejection(prefix, work, archive, 'void ' + name + '(void) {}\n')
-            negative_links += 1
-            rejection(prefix, work, archive, 'void ' + name + '(void) {}\n', after=True)
-            negative_links += 1
-        for name in sorted(gate.MORECORE):
-            for after in (False, True):
-                rejection(prefix, work, archive, 'void ' + name + '(void) {}\n', after=after)
-                negative_links += 1
-        for member in ('libc_a-malignr.o', 'libc_a-msizer.o'):
-            obj = work / member
-            obj.write_bytes(builder.inputs.command(prefix, 'ar', 'p', prefix / 'i386-elf/lib/libc.a', member))
-            exe, mapfile = link(prefix, work, archive, [obj], after=True)
-            try:
-                gate.validate_output(prefix, mapfile, exe)
-            except ValueError as exc:
-                assert 'unconnected' in str(exc) and not exe.exists()
-                negative_links += 1
-            else:
-                raise AssertionError('original newlib unconnected entry accepted')
-        print(f'nano link gate: {negative_links} negative links rejected (allow-multiple-definition)')
+        with host32.control(args.mutate, args.runner, ROOT) as normal:
+            if normal:
+                result = host32.run([str(exe)], runner=args.runner, capture_output=True, text=True, timeout=host32.RUN_TIMEOUT)
+                assert result.returncode == 0, result.stdout + result.stderr
+                print(result.stdout.strip())
+                negative_links = 0
+                for name in sorted(gate.FORBIDDEN):
+                    rejection(prefix, work, archive, 'void ' + name + '(void) {}\n')
+                    negative_links += 1
+                for name in sorted(gate.CONNECTED):
+                    rejection(prefix, work, archive, 'void ' + name + '(void) {}\n')
+                    negative_links += 1
+                    rejection(prefix, work, archive, 'void ' + name + '(void) {}\n', after=True)
+                    negative_links += 1
+                for name in sorted(gate.MORECORE):
+                    for after in (False, True):
+                        rejection(prefix, work, archive, 'void ' + name + '(void) {}\n', after=after)
+                        negative_links += 1
+                for member in ('libc_a-malignr.o', 'libc_a-msizer.o'):
+                    obj = work / member
+                    obj.write_bytes(builder.inputs.command(prefix, 'ar', 'p', prefix / 'i386-elf/lib/libc.a', member))
+                    exe, mapfile = link(prefix, work, archive, [obj], after=True)
+                    try:
+                        gate.validate_output(prefix, mapfile, exe)
+                    except ValueError as exc:
+                        assert 'unconnected' in str(exc) and not exe.exists()
+                        negative_links += 1
+                    else:
+                        raise AssertionError('original newlib unconnected entry accepted')
+                print(f'nano link gate: {negative_links} negative links rejected (allow-multiple-definition)')
         if args.mutate:
             source = SOURCE.read_text()
-            red = 0
-            for (old, new, hits, label), expected in zip(MUTATIONS, EXPECTED_CHECKS):
+            def one(entry):
+                (old, new, hits, label), expected = entry
                 assert source.count(old) == hits, label
                 mutant = work / 'mutant.c'
                 mutant.write_text(source.replace(old, new))
                 mutant_archive = builder.build(prefix, work / "mut-build", adapter=mutant, reuse=archive)
                 exe, mapfile = link(prefix, work, mutant_archive)
                 gate.validate_output(prefix, mapfile, exe)
-                result = host32.run([str(exe)], runner=args.runner, capture_output=True, text=True, timeout=60)
+                result = host32.run([str(exe)], runner=args.runner, capture_output=True, text=True, timeout=host32.RUN_TIMEOUT)
                 assert result.returncode == 1 and result.stdout.endswith(' check: ' + expected + '\n'), (label, result)
-                print('MUTATION runtime RED: ' + label)
+                return 'MUTATION runtime RED: ' + label
+            red = 0
+            # These mutations share the link workspace and must remain serial.
+            for message in run_ordered(one, zip(MUTATIONS, EXPECTED_CHECKS), serial=True):
+                print(message)
                 red += 1
             print(f'nano adapter: {red} runtime RED / 0 survived / 0 ERROR')
             # A gate mutation counts only an executed assertion on a valid link.

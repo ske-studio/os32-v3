@@ -857,6 +857,12 @@ def run_mutations(target):
 def main(args):
     target = "--target" in args
     real = "--real" in args
+    if real:
+        sys.path.insert(0, str(ROOT / 'tools'))
+        from check_artifacts import require_fresh
+        require_fresh(ROOT, ['build/out/vmkernel.lz4', 'images/os32_boot.img',
+                            'images/os32_boot144.img'],
+                      targets={'images/os32_boot.img': 'images/os32_boot.d88'})
     srcs = {"vk32": VK32_SRC, "mini": MINI_SRC, "asm": ASM_SRC}
     try:
         for ln in run_all(srcs, SCRIPT, target, real):

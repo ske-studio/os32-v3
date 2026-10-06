@@ -3,6 +3,7 @@ Fixed low fixture stack; explicit native/qemu execution, no silent fallback.
 Compile failures and signals are never mutation kills.
 """
 TARGET_SRC = ['exec/surface_query.c', 'exec/redir_access.c', 'exec/access_walk.c', 'kernel/paging.c', 'kernel/pgalloc.c']
+import host32
 import argparse
 import hashlib
 import pathlib
@@ -52,11 +53,13 @@ MUTANTS = [
 ]
 
 
+@host32.control_session
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--mutate', action='store_true')
     p.add_argument('--runner', choices=['native', 'qemu'], default='native')
     args = p.parse_args()
+    host32.begin_control(args.mutate, args.runner, ROOT)
     paths = [ROOT / v for v in walk.FILES.values()] + [ROOT / 'exec/surface_query.c']
     paths += [ROOT / x for x in ('exec/surface_query.h', 'tools/tests/surface_query_host.c',
                                  'tools/tests/test_surface_query.py', 'tools/tests/access_walk_host.c')]
@@ -87,23 +90,25 @@ def main():
                 'lib', 'kapi', 'lib/sqlite3', 'sdk/include/os32')]]
         for src, obj in [(tmp / 'fixture.c', tmp / 'fixture.o'),
                          (ROOT / 'kernel/physmem.c', tmp / 'physmem.o')]:
-            subprocess.run(cc + ['-c', str(src), '-o', str(obj)], check=True,
+            host32.build(cc + ['-c', str(src), '-o', str(obj)], check=True,
                            capture_output=True, text=True)
         def run(body, key):
             src, obj, exe = [tmp / (key + ext) for ext in ('.c', '.o', '.elf')]
             src.write_text(body)
-            subprocess.run(cc + ['-c', str(src), '-o', str(obj)], check=True,
+            host32.build(cc + ['-c', str(src), '-o', str(obj)], check=True,
                            capture_output=True, text=True)
-            subprocess.run(['gcc', '-m32', '-nostdlib', '-static', '-no-pie',
+            host32.build(['gcc', '-m32', '-nostdlib', '-static', '-no-pie',
                             '-Wl,--gc-sections', str(tmp / 'fixture.o'),
                             str(tmp / 'physmem.o'), str(obj), '-o', str(exe)],
                            check=True, capture_output=True, text=True)
             return walk.run_host32(exe, args.runner)
         body = sources['surface_query']
-        r = run(body, 'normal')
-        print(r.stdout + r.stderr, end='')
-        assert r.returncode == 0, r.returncode
-        print(f'PASS runner={args.runner}')
+        with host32.control(args.mutate, args.runner, ROOT) as normal:
+            if normal:
+                r = run(body, 'normal')
+                print(r.stdout + r.stderr, end='')
+                assert r.returncode == 0, r.returncode
+                print(f'PASS runner={args.runner}')
         if args.mutate:
             def one(entry):
                 index, (old, new, name) = entry

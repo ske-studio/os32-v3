@@ -19,3 +19,4 @@ check-memmap:
 - tools/tests/test_owner_reclaim.py
 - tools/check_map.d/check-memmap.yaml
 - build/checks.d/check-memmap.mk
+- tools/check_artifacts.py

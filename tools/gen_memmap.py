@@ -739,6 +739,10 @@ def main():
     args = ap.parse_args()
 
     root = args.root or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if args.root is None and args.map is None:
+        from check_artifacts import require_fresh
+        require_fresh(root, [MAP_REL], ['build/os32.ld', 'include/memmap.h'],
+                      targets={MAP_REL: 'build/out/kernel.elf'})
     map_path = args.map or os.path.join(root, MAP_REL)
 
     try:

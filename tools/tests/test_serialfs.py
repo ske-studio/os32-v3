@@ -44,6 +44,7 @@ import re
 import select
 import shutil
 import struct
+import mutpar
 import subprocess
 import sys
 import tempfile
@@ -190,12 +191,12 @@ def run_exe_cases(exe, cases, quiet=False, tag="", first_fail=False, timeout=60)
     failed = 0
     for case in cases:
         try:
-            rc = subprocess.run([str(exe), case], cwd=ROOT, timeout=timeout,
+            rc = mutpar.run_timeout([str(exe), case], cwd=ROOT, timeout=timeout,
                                 stdout=subprocess.DEVNULL if quiet else None,
                                 stderr=subprocess.DEVNULL if quiet else None
                                 ).returncode
         except subprocess.TimeoutExpired:
-            rc = 124
+            rc = mutpar.timeout_red(124)
         if not quiet:
             print(f"EXIT {tag}{case}={rc}", flush=True)
         failed += rc != 0
@@ -1199,7 +1200,7 @@ def run_py(h, r, names, quiet=False, first_fail=False):
 # ============================================================================
 def cross_check(exe, h):
     bad = 0
-    out = subprocess.run([str(exe), "vectors"], capture_output=True, text=True,
+    out = mutpar.run_timeout([str(exe), "vectors"], capture_output=True, text=True,
                          check=True).stdout.split()
     pl = bytes((i * 31 + 7) & 0xFF for i in range(512))
     want = [h.encode(h.T_HELLO, 0, 0, pl[:8]),
@@ -1214,7 +1215,7 @@ def cross_check(exe, h):
     bad_frame = bytearray(want[1])
     bad_frame[-2] ^= 1
     stream = b"\x41\x05" + want[2] + bytes(bad_frame) + want[3]
-    res = subprocess.run([str(exe), "decode"], input=stream.hex() + "\n",
+    res = mutpar.run_timeout([str(exe), "decode"], input=stream.hex() + "\n",
                          capture_output=True, text=True, check=True).stdout
     lines = res.strip().split("\n")
     if lines[-1] != "bad_crc=1 bad_len=0 frames=2":

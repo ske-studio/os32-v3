@@ -1,4 +1,5 @@
 """Explicit host runner selection and rejection of replaced native execution."""
+import os
 import pathlib
 import subprocess
 import tempfile
@@ -8,6 +9,31 @@ import host32
 
 
 class Host32(unittest.TestCase):
+    def test_prune_old_pending(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cache = pathlib.Path(directory)
+            pending = cache / 'abandoned.pending'
+            pending.touch()
+            os.utime(pending, (3600, 3600))
+            with patch.object(host32.time, 'time', return_value=7201):
+                host32.prune_fixtures(cache)
+            self.assertFalse(pending.exists())
+
+    def test_prune_keeps_recent_pending(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cache = pathlib.Path(directory)
+            for age in (0, 3599, 3600):
+                pending = cache / f'active-{age}.pending'
+                pending.touch()
+                os.utime(pending, (7200 - age, 7200 - age))
+            with patch.object(host32.time, 'time', return_value=7200), \
+                 patch.object(host32, 'CACHE_BYTES', 0), \
+                 patch.object(host32, 'CACHE_ENTRIES', 0):
+                host32.prune_fixtures(cache)
+            self.assertEqual({p.name for p in cache.iterdir()},
+                             {'active-0.pending', 'active-3599.pending',
+                              'active-3600.pending'})
+
     def test_native_standard_library(self):
         host32.verify_native()
 

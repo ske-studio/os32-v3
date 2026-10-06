@@ -46,11 +46,13 @@ MUTANTS = [
 ]
 
 
+@host32.control_session
 def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=None, lease_hook=""):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--runner', choices=['native', 'qemu'], default='native')
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
+    host32.begin_control(args.mutate, args.runner, ROOT)
     files = dict(walk.FILES, lease='exec/lease.c', surface_query='exec/surface_query.c')
     files.update(extra_sources or {})
     paths = [ROOT / p for p in files.values()]
@@ -84,7 +86,7 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
                 'include', 'arch/x86', 'platform/pc98', 'kernel', 'exec', 'fs', 'lib',
                 'kapi', 'lib/sqlite3', 'sdk/include/os32')]]
         def compile_source(src, obj):
-            subprocess.run(cc + ['-c', str(src), '-o', str(obj)], check=True,
+            host32.build(cc + ['-c', str(src), '-o', str(obj)], check=True,
                            capture_output=True, text=True)
         objects = {}
         for key, src in [('fixture', tmp / 'fixture.c'),
@@ -124,16 +126,18 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
                     objs[unit] = obj
                 compile_source(src, obj)
             exe = tmp / (key + '.elf')
-            subprocess.run(['gcc', '-m32', '-nostdlib', '-static', '-no-pie',
+            host32.build(['gcc', '-m32', '-nostdlib', '-static', '-no-pie',
                 '-Wl,--gc-sections', *map(str, objs.values()), '-o', str(exe)],
                 check=True, capture_output=True, text=True)
             # Full checks run alongside other compiler/MMU fixtures. Keep
             # a bounded execution budget without treating timeouts as RED.
             return host32.run([str(exe)], runner=args.runner,
-                              capture_output=True, text=True, timeout=60)
-        result = run('normal'); print(result.stdout + result.stderr, end='')
-        assert result.returncode == 0, result.returncode
-        print(f'PASS runner={args.runner}')
+                              capture_output=True, text=True, timeout=host32.RUN_TIMEOUT)
+        with host32.control(args.mutate, args.runner, ROOT) as normal:
+            if normal:
+                result = run('normal'); print(result.stdout + result.stderr, end='')
+                assert result.returncode == 0, result.returncode
+                print(f'PASS runner={args.runner}')
         if args.mutate:
             def one(entry):
                 index, mutation = entry

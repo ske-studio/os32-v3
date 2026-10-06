@@ -20,3 +20,6 @@ check-kapi-layout-host:
 - tools/check_map.d/check-kapi-layout-host.yaml
 - build/checks.d/check-kapi-layout-host.mk
 - sdk/kapi.json
+- build/os32.ld
+- sdk/link/app_sys.ld
+- sdk/link/shlib.ld
