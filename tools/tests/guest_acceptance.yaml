@@ -377,6 +377,7 @@
   expect:
     result: status 0, both lines appear; rshell remains active and responds to subsequent
       ver
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
 
 - id: e10c-boot-audit
   gate: e10c
