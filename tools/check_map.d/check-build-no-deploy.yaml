@@ -1,7 +1,6 @@
 check-build-no-deploy:
-- Makefile
-- build/image.mk
-- build/deploy.mk
+# Makefile / build/*.mk は full と make の型照合に任せる。
+# build/kernel.mk / libs.mk / programs.mk の変更は broad の走査器として選ぶ。
 - build/checks.d/check-build-no-deploy.mk
 - tools/tests/test_build_no_deploy.py
 - tools/check_map.d/check-build-no-deploy.yaml
