@@ -245,7 +245,7 @@ recipe には `$(MUT)` / `$(MUTS)` を使う。HOST32 は `$(call host32_check,t
 **誰がいつ回すか** ([ROLES §0](tasks/agents/ROLES.md)): 実装者は依頼パックに列挙された `make check-<名前>` と新しい試験だけ。
 `check-changed` / `check_select.py` は PM が列挙を作る・変更が広がったときに候補を出し直すための道具。
 全体 (`make check`) は PM が取り込みのまとまりごとに統合状態で 1 回 — 修正のやり直しの中では回さない。
-取り込みは `make all` → `make check` → `make check-fast` → 両方 rc=0 なら push。
+取り込みは `make all` → `make check` → rc=0 なら push (`make check` は各試験の正常の対照も回すので `check-fast` を兼ねる)。
 
 **`check-changed` は作業中の近道で、取りこぼしの保証はしない。保証は取り込み後の `make check` が担う。**
 変更は基点からHEADまでと、未コミット (staged/unstaged)・未追跡の和。
