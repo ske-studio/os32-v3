@@ -15,7 +15,7 @@
 | **検査** | 実装者の完了条件は **依頼パックに列挙された検査 (`make check-<名前>`) + 新しく足した試験** の rc=0。変更が依頼の範囲から広がったら `tools/check_select.py` で候補を出し直し、列挙との差を報告する。PM は同じ検査を回し直さない (実装者の sandbox で動かない runner の分だけ補う)。**全体 (`make all` + `make check`) は取り込みのまとまりごとに、統合した状態で PM が 1 回** — rc を読んでから push。**修正のやり直しの中で全体検査を回さない** |
 | **並行** | 同時に進める段は **2 本まで**。全体検査は `~/os32-tmp/bin/check_slot.sh` の枠を通す。エミュレータの操作者は同時に 1 人 |
 | **段の大きさ** | 1 段 = **独立して受入できる契約・挙動** (実装 + レビューの直し + 対象の受入で半日〜1 日が目安)。同じ受入条件への直しは**同じ worktree・同じレビュアー**で続ける (fix の段を新しく切らない)。未結線の先行部品は、結線先が決まっているときだけ分ける。ゲストの台本は実ゲストで目的を達するまで閉じない |
-| **生成文書** | `docs/02_memory.md` の地図と `docs/TESTS.md` は、取り込みのたびに PM が全体検査の**前**に `python3 tools/gen_memmap.py --write` と `python3 tools/gen_tests_inventory.py --write` で作り直してコミットする (段で試験を足すと TESTS.md が古くなり `check-tests-inventory` で落ちる)。生成本文をコミットしない形への移行は [REVIEW_2026-10-06 §5 の d](REVIEW_2026-10-06.md) |
+| **取り込みの順** | `make all` → `python3 tools/gen_memmap.py --write` と `python3 tools/gen_tests_inventory.py --write` → 変わっていればコミットして `make all` をもう一度 → `make check` → `make check-fast` → 両方 rc=0 なら push。生成本文をコミットしない形への移行は [REVIEW_2026-10-06 §5 の d](REVIEW_2026-10-06.md) |
 | **記録** | 票に人が書くのは **1 段 10 行以内** — 決定・未確認・持越し・証拠の所在。コマンド・runner・rc・時刻・RED/GREEN は道具のログに残し、票に貼らない。契約の変更は仕様の正典へ書く |
 | **持越し** | 延ばした試験・SKIP・ホストだけの合格・未結線は [DEFERRED_TESTS.md](../DEFERRED_TESTS.md) の 1 か所に書く (何を・なぜ・どの関門で必ずやるか)。そこに無い SKIP は合格に数えない |
 | **レビューの重さ** | P3 だけの直しは PM が差分を読んで着地する。P1・P2 の直しの確認は**前回と同じレビュアーに差分だけ**。**3 往復で決着しない争点はユーザーへ** |
@@ -53,7 +53,7 @@ timeout 1500 codex exec -m gpt-6-astra -s read-only -C <repo> "<依頼文>" < /d
 
 **依頼パック** (PM が 1 本のファイルにまとめ、依頼文の冒頭で「最初に読む」と指定する。票の節番号を指すだけで済ませない):
 期待する基点の SHA / 契約の正典 (節) / 触る関数と呼出し元 (file:line) / 決定済みの事項 / **期待が変わる既存試験** /
-**回す検査の名前と runner** (`python3 tools/check_select.py --select --files <触る予定のファイル>` の候補から PM が選ぶ — 手で一から並べない。2026-10-06 に手で並べた列挙が `check-cfg-host` を漏らし、取り込みの全体検査で落ちた) / 受入条件 / 既知の未確認 / 外部の実物の形 (NP21/W の API の返り値など) / 環境 (上の 3 点)。
+**回す検査の名前と runner** (`python3 tools/check_select.py --select --files <触る予定のファイル>` の候補から PM が選ぶ。**全体に効く静的検査 `check-p2v` `check-c-dialect` `check-constraints` `check-arch-asm` `check-privileged` は毎回含める**。変異あり (`MUTATE=1`) と変異なし (`MUTATE=0`) の両方で回す) / 受入条件 / 既知の未確認 / 外部の実物の形 (NP21/W の API の返り値など) / 環境 (上の 3 点)。
 実装者は最初に `git log --oneline -1` を実行して報告の先頭に書く。期待と違えば合わせる (`--hard` は使わない)。
 PM は着地の前に worktree の `git log -1` を確かめる。参照先が「無い」と報告されたら、まず基点を疑う。
 
