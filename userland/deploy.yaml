@@ -145,6 +145,10 @@ filesystem:
     - host: userland/tests/faulttest.bin
       guest: /usr/bin/
       tags: [test]
+    # --- KAPI-CALLBACK: callback CPL=3 / ctx / mid-enumeration kill ---
+    - host: userland/tests/kcallback_test.bin
+      guest: /usr/bin/
+      tags: [test]
     # --- ring3_guard (M3 heap/stack ガード検証) ---
     - host: userland/tests/ring3_guard.bin
       guest: /usr/bin/
@@ -412,4 +416,3 @@ filesystem:
     - host: userland/tests/font_load_test.bin
       guest: /usr/bin/
       tags: [test]
-

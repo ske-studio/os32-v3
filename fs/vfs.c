@@ -472,6 +472,34 @@ const char *vfs_devname(const char *prefix)
     return "";
 }
 
+struct vfs_ls_window_ctx {
+    u32 skip, metadata_count;
+    vfs_dir_cb cb;
+    void *ctx;
+};
+
+static void vfs_ls_window_cb(const VfsDirEntry *entry, void *ctx)
+{
+    struct vfs_ls_window_ctx *w = ctx;
+    if (w->skip) { w->skip--; return; }
+    if (w->metadata_count) w->metadata_count--;
+    w->cb(entry, w->ctx);
+}
+
+int vfs_dir_needs_metadata(vfs_dir_cb cb, void *ctx)
+{
+    if (cb != vfs_ls_window_cb) return 1;
+    struct vfs_ls_window_ctx *w = ctx;
+    return !w->skip && w->metadata_count;
+}
+
+int vfs_ls_window(const char *path, u32 skip, u32 metadata_count,
+                  vfs_dir_cb cb, void *ctx)
+{
+    struct vfs_ls_window_ctx w = { skip, metadata_count, cb, ctx };
+    return vfs_ls(path, vfs_ls_window_cb, &w);
+}
+
 int vfs_ls(const char *path, vfs_dir_cb cb, void *ctx)
 {
     char resolved[VFS_MAX_PATH], rel_path[VFS_MAX_PATH];

@@ -35,6 +35,8 @@
 #include "path.h"        /* path_get_drive / path_get_cwd (CPL=3 向けの写し) */
 #include "gdt.h"
 #include "tss.h"
+#include "ring3_ls.h"
+#include "os32_kapi_slots.h"
 
 extern void shell_print(const char *s, u8 attr);
 extern void shell_print_dec(u32 val, u8 color);
@@ -101,6 +103,9 @@ STATIC_ASSERT(((MEM_APP_STACK_TOP - 1) >> 22) >= (MEM_APP_BAND_BASE >> 22) &&
               ((MEM_APP_STACK_TOP - 1) >> 22) < (MEM_APP_BAND_MAX_TOP >> 22), stack_pde_in_app_band);
 STATIC_ASSERT(RING3_USTR_OFF + RING3_USTR_CAP <= (u32)PAGE_SIZE,
               ring3_ustr_fits_in_trampoline_page);
+#define RING3_LS_SHIM_OFF (RING3_USTR_OFF + RING3_USTR_CAP)
+STATIC_ASSERT(RING3_LS_SHIM_OFF + RING3_LS_SHIM_CAP <= PAGE_SIZE,
+              ring3_ls_fits_in_trampoline_page);
 
 /* データ欄の固定配置 (票 TASK_KAPI_DATA_FIELDS、KAPI v63)。生成器
  * (sdk/gen_kapi.py) の KAPI_DATA_FIELDS_OFF と構造体の実際の並びが一致し、
@@ -154,6 +159,10 @@ static void ring3_trampoline_init(void)
         st[6] = 0x80;   /* 0x80 */
         st[7] = 0xC3;   /* ret */
     }
+
+    kmemcpy(P2V(page + RING3_LS_SHIM_OFF), ring3_ls_start,
+            (u32)(ring3_ls_end - ring3_ls_start));
+    tbl[2 + KAPI_SLOT_SYS_LS] = page + RING3_LS_SHIM_OFF;
 
     /* データフィールド (値): KernelAPI 表と同一オフセット。v63 から
      * KAPI_DATA_FIELDS_OFF に固定 (関数の数ではなく容量の後ろ)。
@@ -477,6 +486,14 @@ u32 exec_kapi_layout_selftest(void)
             st[2] != (u8)((i >> 8) & 0xFF) || st[5] != 0xCD || st[6] != 0x80) {
             bad |= 1u << 2;
         }
+    }
+    /* Slot 12 must enter the relocated CPL3 shim, never the ordinary stub. */
+    if (tbl[2 + KAPI_SLOT_SYS_LS] != ring3_tramp_page + RING3_LS_SHIM_OFF) {
+        bad |= 1u << 2;
+    }
+    for (i = 0; i < (u32)(ring3_ls_end - ring3_ls_start); i++) {
+        const u8 *shim = (const u8 *)(ring3_tramp_page + RING3_LS_SHIM_OFF);
+        if (shim[i] != ring3_ls_start[i]) bad |= 1u << 2;
     }
     /* (3) ヘッダ v3 の照合: v2 → 断る / v3 値違い → 断る / 一致 → 通す */
     kmemset(&h, 0, sizeof(h));
@@ -1470,6 +1487,14 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
      * フォールトガード (ring3_in_syscall) を立てる **前** に回す。 */
     ring3_gui_pump();
 
+    /* Private value-copy entry used by the CPL3 sys_ls shim. No USER callback
+     * address crosses this boundary; raw public slot 12 is guarded as well. */
+    if (slot == RING3_LS_CALL) {
+        ring3_in_syscall = 1;
+        frame[7] = (u32)ring3_ls_dispatch(user_esp);
+        goto syscall_complete;
+    }
+
     /* 範囲外 slot はワイルド呼び出し → アプリだけ kill (カーネルを飛ばさない)。 */
     if (slot >= (u32)KAPI_FUNC_COUNT) {
         ring3_fault_kill();
@@ -1510,6 +1535,7 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
      * gui_call(OP_WAIT) → exec_park() はここから longjmp して戻らない。 */
     frame[7] = kapi_invoke((void *)wrapptr, args_src, window);
 
+syscall_complete:
     /* 正常復帰: ガードを下ろす */
     caller_access_leave(&prev_caller);
     ring3_in_syscall = prev_in_syscall;
