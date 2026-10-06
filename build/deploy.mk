@@ -89,3 +89,11 @@ nhd-init:
 	$(NHD_DEPLOY) init
 
 .PHONY: deploy deploy-kernel deploy-boot deploy-nhd nhd-migrate-pt hotdeploy nhd-mount nhd-umount nhd-pull nhd-init prune-stale prune-stale-delete
+
+# deploy-fd: ビルド済みの起動 FD 2 種を明示的に NP21/W へ配備する。
+deploy-fd: images/os32_boot.d88 images/os32_boot144.img
+	@echo "=== Boot FD Deploy ==="
+	cp images/os32_boot.d88 '$(NP21W_DIR)/os32_boot.d88'
+	cp images/os32_boot144.img '$(NP21W_DIR)/os32_boot144.img'
+
+.PHONY: deploy-fd

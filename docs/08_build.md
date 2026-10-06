@@ -395,6 +395,8 @@ NP21/W の停止が要る ([D1])。停止できるならこちらで一式を入
 | **NHD** | `make deploy-kernel` | HostDrv 同期 + カーネル・プログラム・データを NHD の ext2 へ丸ごと書く | **必要** |
 | **ブートセクタ** | `make deploy-boot` | `boot/loader_hdd.bin` を NHD のブート領域 (LBA 2〜17) へ。ローダを変えたときだけ | **必要** |
 
+起動 FD 2 種は `make all` で生成だけ行い、`NP21W_DIR` へのコピーは `make deploy-fd` で明示する。
+
 - **NHD への書き込みは NP21/W を止めてから** ([D1])。停止 → 配備 → 起動の順。
   `emu_pause`、breakpoint 停止、HTTP 無応答はプロセス終了の証拠にならない。
 - **HostDrv だけでは検証にならない** ([V1])。ゲストの PATH は NHD の `/usr/bin` を先に見るので、

@@ -16,3 +16,5 @@ check-kcallback-host:
 - tools/tests/host32.py
 - build/checks.d/check-kcallback-host.mk
 - tools/check_map.d/check-kcallback-host.yaml
+- userland/tests/kcallback_test.c
+- tools/tests/kcallback_result_host.c

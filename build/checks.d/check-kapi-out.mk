@@ -9,5 +9,6 @@ CHECK_PAR_ORDER += 016:check-kapi-out
 # 戻すので check では回さない)。記録は tools/tests/kapi_out_tdd.md。
 check-kapi-out:
 	@python3 -B tools/tests/test_kapi_out.py
+	@python3 -B tools/tests/test_gen_kapi_cli.py
 
 .PHONY: check-kapi-out
