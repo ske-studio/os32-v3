@@ -84,7 +84,7 @@ INC = ["-I" + str(ROOT / p) for p in
 CONFIG = str(ROOT / "lib/sqlite3/os32_sqlite_config.h")
 
 SHIMS = {
-    "memmap.h": "extern unsigned char test_shm[];\n#define MEM_SHM_BASE test_shm\n",
+    "memmap.h": "extern unsigned char test_shm[];\n#define MEM_SHM_BASE test_shm\n#define MEM_SHM_DB_OFFSET 0UL\n#define MEM_SHM_DB_BASE (MEM_SHM_BASE + MEM_SHM_DB_OFFSET)\n",
     "exec.h": "int ring3_user_range_ok(u32 p, u32 len);\n",
 }
 
