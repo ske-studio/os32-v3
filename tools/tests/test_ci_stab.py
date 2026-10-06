@@ -37,6 +37,162 @@ class InfrastructureTests(unittest.TestCase):
             self.assertFalse(cache.exists())
             self.assertTrue((tmp / 'keep').exists())
 
+
+    def test_control_always_runs_without_prior_receipt(self):
+        # A prior success, runner/input change, or missing receipt must never
+        # suppress the current normal compile/run in mutation mode.
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(host32.subprocess, 'check_output', return_value=b''):
+            for mutate in (True, False, True, True):
+                for runner in ('qemu', 'native'):
+                    with host32.control(mutate, runner, directory) as normal:
+                        self.assertTrue(normal)
+                    self.assertTrue(host32._receipt(directory, runner).exists())
+
+    def test_control_failure_never_records_success(self):
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(host32.subprocess, 'check_output', return_value=b''):
+            for mutate in (False, True):
+                with host32.control(False, 'qemu', directory):
+                    pass
+                with self.assertRaisesRegex(AssertionError, 'control failed'):
+                    with host32.control(mutate, 'qemu', directory):
+                        raise AssertionError('control failed')
+                self.assertFalse(host32._receipt(directory, 'qemu').exists())
+
+    def test_later_failure_invalidates_control_in_both_modes(self):
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(host32.subprocess, 'check_output', return_value=b''):
+            for mutate in (False, True):
+                @host32.control_session
+                def run():
+                    host32.begin_control(mutate, 'qemu', directory)
+                    with host32.control(mutate, 'qemu', directory):
+                        pass
+                    raise AssertionError('later source-hash check')
+                with self.assertRaises(AssertionError):
+                    run()
+                self.assertFalse(host32._receipt(directory, 'qemu').exists())
+
+    def test_make_runs_each_runner_once_and_mutates_first(self):
+        import re
+        import json
+        root = pathlib.Path(__file__).resolve().parents[2]
+        macro = re.search(r'^define host32_check\n.*?^endef',
+                          (root / 'build/sdk.mk').read_text(), re.M | re.S)[0]
+        with tempfile.TemporaryDirectory() as directory:
+            tmp = pathlib.Path(directory)
+            calls = tmp / 'calls'
+            python = tmp / 'python3'
+            python.write_text('#!/usr/bin/python3\nimport json, sys\n'
+                              + 'with open(' + repr(str(calls)) + ', "a") as f: '
+                              + 'f.write(json.dumps(sys.argv[1:]) + "\\n")\n')
+            python.chmod(0o755)
+            (tmp / 'Makefile').write_text(macro + '\ncheck:\n\t$(call host32_check,probe.py)\n')
+            env = {k: v for k, v in os.environ.items() if k not in ('MAKEFLAGS', 'MFLAGS')}
+            env['PATH'] = str(tmp) + os.pathsep + env['PATH']
+            for mutate in (False, True):
+                calls.unlink(missing_ok=True)
+                subprocess.run(['make', 'check', 'HOST32_RUNNERS=qemu native',
+                                'MUT=' + ('--mutate' if mutate else '')],
+                               cwd=tmp, env=env, capture_output=True, check=True)
+                got = [json.loads(line) for line in calls.read_text().splitlines()]
+                self.assertEqual(got, [
+                    ['-B', 'tools/tests/probe.py', '--runner', 'qemu'] + (['--mutate'] if mutate else []),
+                    ['-B', 'tools/tests/probe.py', '--runner', 'native']])
+            result = subprocess.run(['make', 'check', 'HOST32_RUNNERS='],
+                                    cwd=tmp, env=env, capture_output=True)
+            self.assertNotEqual(result.returncode, 0)
+
+    def test_entry_controls_are_a_prefix_of_mutation_stages(self):
+        """Execute the real entry blocks with expensive stage bodies replaced.
+
+        This checks dispatch/order, including unittest's exit behaviour. The
+        actual compile/run bodies are covered by their individual make checks.
+        """
+        import ast
+        import contextlib
+        import io
+        import sys
+        from types import SimpleNamespace
+        root = pathlib.Path(__file__).parent
+        suites = {
+            'hostdrv_manifest': ['case_m1', 'case_m2', 'case_m3', 'case_m4',
+                                 'case_tag', 'case_build_id', 'case_kapi'],
+            'ring3_guard': ['kapi_target_ok', 'static_checks', 'run_host'],
+            'memory_boot': ['unittest'], 'ledger': ['unittest'],
+            'gfx_boot': ['unittest'], 'device_reservation': ['unittest'],
+            'app_bb_overlap': ['run'], 'shlib_high': ['run'],
+        }
+        for name, expected in suites.items():
+            tree = ast.parse((root / ('test_' + name + '.py')).read_text())
+            entry = tree.body[-1]
+            main = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == 'main']
+            code = compile(ast.Module(body=main + [entry], type_ignores=[]), name, 'exec')
+            traces = []
+            for mutate in (False, True):
+                stages = []
+                def stage(label, result=0):
+                    def call(*args, **kwargs):
+                        stages.append(label)
+                        return result
+                    return call
+                def normal_suite(**kwargs):
+                    stages.append('unittest')
+                    self.assertFalse(kwargs.get('exit', True))
+                    return SimpleNamespace(result=SimpleNamespace(wasSuccessful=lambda: True))
+                ns = dict(__name__='__main__', sys=sys, os=os,
+                          tempfile=tempfile, pathlib=pathlib, ROOT=root,
+                          checks=0, failures=0, unittest=SimpleNamespace(main=normal_suite),
+                          mutate=stage('mutation'), run_mutations=stage('mutation'))
+                for label in expected:
+                    if label != 'unittest':
+                        ns[label] = stage(label, True if label == 'kapi_target_ok' else 0)
+                argv = [name] + (['--mutate'] if mutate else [])
+                with patch.object(sys, 'argv', argv), contextlib.redirect_stdout(io.StringIO()):
+                    with self.assertRaises(SystemExit) as done:
+                        exec(code, ns)
+                    self.assertEqual(done.exception.code, 0)
+                traces.append(stages)
+            with self.subTest(suite=name):
+                self.assertEqual(traces[0], expected)
+                self.assertEqual(traces[1], traces[0] + ['mutation'])
+
+    def test_memmap_controls_are_a_prefix_of_mutation_stages(self):
+        import contextlib
+        import io
+        import sys
+        import test_memmap_boot as boot
+        import test_memmap_gen as gen
+        for module in (boot, gen):
+            traces = []
+            for mutate in (False, True):
+                stages = []
+                def build(tmp, case, **kwargs):
+                    if kwargs.get('mutation'):
+                        stages.append('mutation')
+                        return subprocess.CompletedProcess([], 1, b'', b'')
+                    stages.append(('host', case, tuple(sorted(kwargs.items()))))
+                    return subprocess.CompletedProcess([], 0, b'', b'')
+                def cases(script):
+                    if script != gen.SCRIPT:
+                        stages.append('mutation')
+                        raise AssertionError('fixture rejected mutant')
+                    stages.append('generator cases')
+                    return ['PASS']
+                with patch.object(sys, 'argv', ['test'] + (['--mutate'] if mutate else [])), \
+                     patch.object(boot, 'check_shm_replay', side_effect=lambda: stages.append('SHM replay')), \
+                     patch.object(boot, 'build_and_run', side_effect=build), \
+                     patch.object(gen, 'cases', side_effect=cases), \
+                     patch.object(boot.subprocess, 'run', side_effect=lambda cmd, **kw: stages.append(('target', cmd[-3]))), \
+                     contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(module.main(), 0)
+                traces.append(stages)
+            with self.subTest(suite=module.__name__):
+                first_mutation = traces[1].index('mutation')
+                self.assertEqual(traces[1][:first_mutation], traces[0])
+                self.assertTrue(all(s == 'mutation' for s in traces[1][first_mutation:]))
+
     def test_control_prunes_old_sessions_on_every_runner(self):
         import time
         with tempfile.TemporaryDirectory() as directory, \
@@ -55,7 +211,8 @@ class InfrastructureTests(unittest.TestCase):
                         if mutate:
                             with host32.control(True, 'native', directory):
                                 pass
-                    self.assertEqual(len(list(cache.glob('*.json'))), 1 if mutate else 2)
+                    self.assertEqual(len(list(cache.glob('*.json'))), 2)
+
 
     def test_control_preserves_old_current_and_unrelated_receipts(self):
         with tempfile.TemporaryDirectory() as directory, \
@@ -68,8 +225,22 @@ class InfrastructureTests(unittest.TestCase):
             for path in (receipt, other):
                 os.utime(path, (1, 1))
             with host32.control(True, 'native', directory) as normal:
-                self.assertFalse(normal)
+                self.assertTrue(normal)
             self.assertTrue(other.exists())
+
+
+    def test_control_sessions_record_independently(self):
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(host32.subprocess, 'check_output', return_value=b''):
+            for session in ('make-one', 'make-two'):
+                with patch.dict(os.environ, OS32_CONTROL_SESSION=session):
+                    with host32.control(False, 'qemu', directory):
+                        pass
+            for session in ('make-one', 'make-two'):
+                with patch.dict(os.environ, OS32_CONTROL_SESSION=session):
+                    with host32.control(True, 'qemu', directory) as normal:
+                        self.assertTrue(normal)
+
 
     def test_build_compiles_outside_lock_and_keeps_pending(self):
         import fcntl
@@ -196,41 +367,6 @@ class InfrastructureTests(unittest.TestCase):
             host32.build(['gcc', str(src), '-o', str(out)], check=True)
             self.assertEqual(subprocess.run([str(out)]).returncode, 0)
 
-    def test_control_sessions_do_not_consume_each_other(self):
-        with tempfile.TemporaryDirectory() as directory, \
-             patch.object(host32.subprocess, 'check_output', return_value=b''):
-            for session in ('make-one', 'make-two'):
-                with patch.dict(os.environ, OS32_CONTROL_SESSION=session):
-                    with host32.control(False, 'qemu', directory):
-                        pass
-            for session in ('make-one', 'make-two'):
-                with patch.dict(os.environ, OS32_CONTROL_SESSION=session):
-                    with host32.control(True, 'qemu', directory) as normal:
-                        self.assertFalse(normal)
-
-    def test_control_untracked_header_and_path_compiler(self):
-        import shutil
-        with tempfile.TemporaryDirectory() as directory:
-            root = pathlib.Path(directory)
-            subprocess.run(['git', 'init', '-q', str(root)], check=True)
-            (root / 'include').mkdir()
-            header = root / 'include/new.h'
-            header.write_text('before')
-            with host32.control(False, 'qemu', root):
-                pass
-            header.write_text('after')
-            with self.assertRaises(RuntimeError):
-                with host32.control(True, 'qemu', root):
-                    pass
-            with host32.control(False, 'qemu', root):
-                pass
-            compiler = root / 'gcc'
-            compiler.write_text('#!/bin/sh\necho test-compiler\n')
-            compiler.chmod(0o755)
-            with patch.object(shutil, 'which', return_value=str(compiler)), \
-                 self.assertRaises(RuntimeError):
-                with host32.control(True, 'qemu', root):
-                    pass
 
     def test_guest_cleanup(self):
         import test_guest_tests as guest
@@ -264,7 +400,7 @@ class InfrastructureTests(unittest.TestCase):
                 with patch.object(module.argparse.ArgumentParser, 'parse_args',
                                   return_value=SimpleNamespace(runner='qemu', mutate=True)), \
                      patch.object(module.host32, 'control',
-                                  return_value=contextlib.nullcontext(False), create=True), \
+                                  return_value=contextlib.nullcontext(True), create=True), \
                      patch.object(module.host32, 'begin_control', create=True), \
                      patch.object(module.host32, 'build', create=True), \
                      patch.object(module.subprocess, 'run'), \
@@ -340,48 +476,7 @@ class InfrastructureTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, '先に make all'):
                     artifacts.require_fresh(root, ['map'], targets={'map': 'elf'})
 
-    def test_control_runner_inputs_and_consumption(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = pathlib.Path(tmp)
-            (root / 'source').write_text('before')
-            with patch.object(host32.subprocess, 'check_output', return_value=b'source\0'):
-                with self.assertRaises(RuntimeError):
-                    with host32.control(True, 'qemu', root):
-                        pass
 
-                with host32.control(False, 'qemu', root) as normal:
-                    self.assertTrue(normal)
-                with self.assertRaises(RuntimeError):
-                    with host32.control(True, 'native', root):
-                        pass
-                with host32.control(True, 'qemu', root) as normal:
-                    self.assertFalse(normal)
-                with self.assertRaises(RuntimeError):
-                    with host32.control(True, 'qemu', root):
-                        pass
-                with host32.control(False, 'qemu', root):
-                    pass
-                (root / 'source').write_text('after')
-                with self.assertRaises(RuntimeError):
-                    with host32.control(True, 'qemu', root):
-                        pass
-
-
-    def test_later_failure_invalidates_control(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = pathlib.Path(tmp)
-            with patch.object(host32.subprocess, 'check_output', return_value=b''):
-                @host32.control_session
-                def normal():
-                    host32.begin_control(False, 'qemu', root)
-                    with host32.control(False, 'qemu', root):
-                        pass
-                    raise AssertionError('later source-hash check')
-                with self.assertRaises(AssertionError):
-                    normal()
-                with self.assertRaises(RuntimeError):
-                    with host32.control(True, 'qemu', root):
-                        pass
     def test_fixture_compile_once_and_header_invalidation(self):
         with tempfile.TemporaryDirectory() as directory:
             tmp = pathlib.Path(directory)

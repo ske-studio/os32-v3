@@ -236,16 +236,15 @@ def prune_fixtures(cache):
 
 
 def _receipt(root, runner):
-    # make exports one unique session to all recipe shells. Direct invocations
-    # share their invoking shell, so normal -> --mutate remains usable.
+    # Keep diagnostic receipts separate for concurrent make sessions. Direct
+    # invocations share their invoking shell; receipts never skip a control.
     session = os.environ.get('OS32_CONTROL_SESSION', str(os.getppid()))
     return pathlib.Path(root) / 'build/out/host32-controls' / (
         pathlib.Path(sys.argv[0]).stem + '-' + selected_runner(runner) + '-' + session + '.json')
 
 
-# Retain recent sessions for concurrent checks in the same worktree. This is
-# an age bound, not a fixed count; a check lasting over six hours may fail
-# closed if another session prunes its receipt. Never prune our own receipt.
+# Bound diagnostic receipt age while preserving concurrent recent sessions.
+# Receipts do not authorize skipping work. Never prune our own receipt.
 CONTROL_MAX_AGE = 6 * 3600
 
 
@@ -258,11 +257,11 @@ def prune_controls(cache, receipt, runner):
                 if path.stat().st_mtime < cutoff:
                     path.unlink(missing_ok=True)
             except FileNotFoundError:
-                pass  # Another session consumed/pruned it concurrently.
+                pass  # Another session pruned it concurrently.
 
 
 def control(mutate, runner, root):
-    """Context manager: consume a successful same-runner, same-input control."""
+    """Run the normal control in every mode; receipts never replace execution."""
     import contextlib
     import hashlib
     import json
@@ -289,23 +288,16 @@ def control(mutate, runner, root):
         digest.update(subprocess.check_output([str(compiler), '--version']))
         expected = {'inputs': digest.hexdigest(), 'runner': selected_runner(runner),
                     'cross': os.environ.get('CROSS_DIR', '')}
-        previous = json.loads(receipt.read_text()) if receipt.exists() else None
         receipt.unlink(missing_ok=True)
-        if mutate:
-            if previous != expected:
-                raise RuntimeError('先に同じ runner で正常対照を実行してください: ' + script.name)
-            yield False
-        else:
-            yield True
-            receipt.write_text(json.dumps(expected))
+        yield True
+        receipt.write_text(json.dumps(expected))
     return checked()
 
 
 def begin_control(mutate, runner, root):
     global _control_receipt
     _control_receipt = _receipt(root, runner)
-    if not mutate:
-        _control_receipt.unlink(missing_ok=True)
+    _control_receipt.unlink(missing_ok=True)
 
 
 _control_receipt = None

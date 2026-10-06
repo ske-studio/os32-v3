@@ -138,8 +138,6 @@ def main():
         for index, runner in enumerate(runners):
             command_line = [sys.executable, '-B', str(Path(__file__).resolve()), '--runner', runner]
             if args.mutate:
-                # Standalone --mutate establishes its own normal control first.
-                subprocess.run(command_line, check=True)
                 command_line.append('--mutate')
             subprocess.run(command_line, check=True)
         return 0

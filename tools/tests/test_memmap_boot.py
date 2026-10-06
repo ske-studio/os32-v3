@@ -171,31 +171,6 @@ def main():
 
     check_shm_replay()
 
-    if args.mutate:
-        red = 0
-        for name in MUTATIONS:
-            # **全部の場面で回す。** 1 場面だけだと、その場面では無害な変異を
-            # 「試験が見逃した」ではなく「変異が効かなかった」として取り違える
-            # (resv-blind は「予算ちょうど」でしか差が出ない)。
-            ok = True
-            where = ''
-            for case in CASES + [("IF=0", *CASES[0][1:]), ("PG-failure", *CASES[0][1:])]:
-                with tempfile.TemporaryDirectory(prefix='os32-memmap-') as tmp:
-                    try:
-                        out = build_and_run(tmp, case, mutation=name, initial_if=2 if case[0] == "IF=0" else 0x202)
-                        if out.returncode != 0:
-                            ok, where = False, case[0]
-                            break
-                    except subprocess.CalledProcessError:
-                        print('NOT COUNTED: compile failure', name)
-                        return 1
-            print('  変異 %-14s %s' % (name, 'RED (%s で落ちた)' % where if not ok
-                                       else '**GREEN — 試験が穴を見逃した**'))
-            if not ok:
-                red += 1
-        print('%d/%d の変異が RED' % (red, len(MUTATIONS)))
-        return 0 if red == len(MUTATIONS) else 1
-
     for kb in (8192, 17408, 65536):
         for initial_if in (2, 0x202):
             with tempfile.TemporaryDirectory(prefix='os32-fixed-paging-') as tmp:
@@ -238,6 +213,31 @@ def main():
                             '-o', str(pathlib.Path(tmp) / (src.replace('/', '_') + '.o'))],
                            check=True)
     print('HOST ILP32 + TARGET GNU11 PASS')
+    if args.mutate:
+        red = 0
+        for name in MUTATIONS:
+            # **全部の場面で回す。** 1 場面だけだと、その場面では無害な変異を
+            # 「試験が見逃した」ではなく「変異が効かなかった」として取り違える
+            # (resv-blind は「予算ちょうど」でしか差が出ない)。
+            ok = True
+            where = ''
+            for case in CASES + [("IF=0", *CASES[0][1:]), ("PG-failure", *CASES[0][1:])]:
+                with tempfile.TemporaryDirectory(prefix='os32-memmap-') as tmp:
+                    try:
+                        out = build_and_run(tmp, case, mutation=name, initial_if=2 if case[0] == "IF=0" else 0x202)
+                        if out.returncode != 0:
+                            ok, where = False, case[0]
+                            break
+                    except subprocess.CalledProcessError:
+                        print('NOT COUNTED: compile failure', name)
+                        return 1
+            print('  変異 %-14s %s' % (name, 'RED (%s で落ちた)' % where if not ok
+                                       else '**GREEN — 試験が穴を見逃した**'))
+            if not ok:
+                red += 1
+        print('%d/%d の変異が RED' % (red, len(MUTATIONS)))
+        return 0 if red == len(MUTATIONS) else 1
+
     return 0
 
 

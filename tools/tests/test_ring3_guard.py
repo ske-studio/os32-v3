@@ -223,8 +223,6 @@ def kapi_target_ok(root):
 
 
 if __name__ == "__main__":
-    if "--mutate" in sys.argv:
-        sys.exit(mutate())
     if not kapi_target_ok(ROOT):
         print("FAIL: sdk/kapi.json の ime_set_render の target が gui_ime_set_render でない")
         sys.exit(1)
@@ -242,4 +240,6 @@ if __name__ == "__main__":
                                 "-o", str(tmp / (src.stem + ".o"))],
                                cwd=ROOT, check=True)
             print("TARGET i386-elf GNU11 -Werror COMPILE PASS", flush=True)
-        sys.exit(rc)
+        if rc:
+            sys.exit(rc)
+    sys.exit(mutate() if "--mutate" in sys.argv else 0)
