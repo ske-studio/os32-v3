@@ -214,6 +214,10 @@ Unicodeはkernel所有FIXED_RAM/RO SURFACE。ユーザー版utf8だけsetterでl
 | E11-14 | — | c | SHM・ページ長の公開定数 | SDK共有ヘッダ・caller | 私有PAGE_BYTES等の重複 | SDK/markerビルド | 公開値とkernel一致、生成・版は一括 |
 | 補4 | 4 | a/b | V86全出口と通常地図の結線 | session end → CR3 reload → 3段検査 | 旧出口の復元漏れ | V86正常/失敗/STOP/kill/K1・VM INT80h | 内容/属性・PCD・PDE USER復元、通常AS禁止、DISPLAY/TVRAM再lease |
 
+**優先段の着地とゲスト受入 (PM、2026-10-07、main `678e0dc`、17MB・今の ini)**: KAPI-CALLBACK・OWNER・DISK-AUTH を取り込み、`make check`・`check-fast` rc=0。kselftest 277/0。
+CALLBACK: `man -l` は落ちない、`kcallback_test` は callback が CPL=3・ctx 素通し・67 件 PASS、途中 kill の後も正常。DISK-AUTH: `disk_auth_test 0 20` で 3 口とも -1・セクタ不変。
+OWNER と回帰: `shm_reuse_test` 4/4・`db_test` 9/9・`db_v50_test` 41/41・パイプ 2 本。未実施: install / cdinst の通しの実行 (別イメージで)、`kcallback_test` の終了コード (台帳)。証拠 `~/os32-tmp/evidence/2026-10-07/accept_prio/`。
+
 - a=内部結線 (旧USER下は準備確認)、b=低位USER/旧例外撤去・SHM/V86契約・拒否/正規lease対照、c=公開KAPI/caller/SDK/生成/版/manifest。**a → b → c → 統合の順、bの撤去はaのconsumer準備の後**。a/b/cは独立公開・配備せず、**版の更新・生成は統合でだけ行う**。統合で§2-4全6項を同時成立、現行対象再ビルド・配備を一括。受入は§2-5末尾のNP21/W一式とe12の変異一覧による。apps/gameは§5/§8へ。E11-5は2026-10-03決定の「全画面中のowner 1または専用のKAPI」、追加ならcで版一括へ含める。
 - **KAPI-CALLBACK**: 未完了は[台帳の優先段](../DEFERRED_TESTS.md#関門-新機能より先-優先段)。公開KAPIの形と版を変えずCPL0実行を塞ぎ、**e11より先に配備・受入する**。hsync・install・filerを壊す単純拒否は不可。候補はkernel生成trampolineのslot 12 stubをCPL3 shimへ替え、kernel内部の列挙口で項目を写しcallbackをCPL3で呼ぶ。CPL0不実行・既存callerの列挙正常・`man -l` crash解消を受入。値返し列挙KAPI追加とcaller移行はe11c。
 - **KAPI-OWNER**: 台帳の優先段でSHM lock/free・pipe free/clear/get_buf・DB slotをwrapで所有者照合し、既存の-1で他owner操作を無変更拒否。本人成功・trusted回収も先行受入。`pipe_get_buf`がkernel番地を返す件の意味変更はE11-8のe11c。

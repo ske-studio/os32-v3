@@ -14,10 +14,9 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 
 | ID | 何を | 種類 | 関門 |
 |---|---|---|---|
-| KAPI-CALLBACK | 公開形・版を保ちUSER callbackのCPL0実行を塞ぐ。単純拒否不可、hsync/install/filerの列挙正常・man -l crash解消を確認 | 既知の不具合 | 優先段 |
-| KAPI-OWNER | SHM lock/free・pipe free/clear/get_buf・DB slotをwrapで所有者照合、既存の-1で無変更拒否。本人成功・trusted回収も確認 | 既知の不具合 | 優先段 |
-| KAPI-DISK-AUTH | exec経路・/sys由来・CUI前景を基に拒否＋許可リスト。無授権I/Oゼロ、inst_hdd(CPL3)・常駐cmd_hdprepの正規利用を確認 | 既知の不具合 | 優先段 |
 | KAPI-AUDIT-FIX | cursor clamp・FM/SSG ch検査・fm_play_mml/serial_getcharのSTOP不能DoS・rshell授権を修正。残りの未監査区分はe11a着手前に分類 | 既知の不具合・未監査 | 優先段 |
+| PRIO-1 | install / cdinst の通しの実行 (授権が通り、区画・format・書込みまで) を別のディスクイメージで — 取り込み済みの DISK-AUTH の受入の残り | 未実施の確認 | 次の構成試験 (h の前) |
+| PRIO-2 | `kcallback_test` の `main` が void で終了コードが不定 (PASS でも 7) — `int main` で 0/1 を返す。一括試験に入れる前に | 試験の不具合 | KAPI-AUDIT-FIX の取り込み |
 
 ## 1. 関門: e9 / e10b / e10c
 
