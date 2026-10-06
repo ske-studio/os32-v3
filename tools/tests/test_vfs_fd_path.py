@@ -335,7 +335,7 @@ def build_ime(tmp, ime_c=None, exe_name="ime", overrides=None):
     overrides = {"lib/sqlite3/os32_sqlite_vfs.c" / "fs/vfs_fd.c": 写しのパス}"""
     shim = tmp / "ime_shim"
     shim.mkdir(exist_ok=True)
-    memmap = "extern unsigned char test_shm[];\n#define MEM_SHM_BASE test_shm\n"
+    memmap = "extern unsigned char test_shm[];\n#define MEM_SHM_BASE test_shm\n#define MEM_SHM_DB_OFFSET 0UL\n#define MEM_SHM_DB_BASE (MEM_SHM_BASE + MEM_SHM_DB_OFFSET)\n"
     # 変異は並列に組む (mutpar) — 同じ中身なら書き直さない (読んでいる gcc と競らない)
     if not (shim / "memmap.h").exists() or (shim / "memmap.h").read_text() != memmap:
         (shim / "memmap.h").write_text(memmap)
