@@ -187,6 +187,9 @@ static u32 *page_tables[PAGING_PT_COUNT];
 static int pg_enabled = 0;
 static u32 live_addrspaces;
 static int boot_user_shared_done;
+/* Intended SHM permissions, recorded by the only post-boot RW-changing API.
+ * Auditing must not infer the expected RW bit from the PTE being checked. */
+static u32 shm_audit_ro[(MEM_SHM_SIZE / PAGE_SIZE + 31) / 32];
 u32 paging_shm_user_missing_count;
 /* 逆転した範囲 (start > end) を渡されて撥ねた回数。
  *
@@ -215,8 +218,11 @@ static int fixed_paging_valid(void)
             (a | PAGE_RW)) return 0;
     }
     entry = page_directory[PAGING_APERTURE_PDI];
+    /* e11b removes this legacy shared CLIENT exception. */
+    if ((entry & PTE_USER) &&
+        !ledger_surface_find(LEDGER_SF_CIRRUS, LEDGER_ROLE_CLIENT)) return 0;
     if (V2P(page_tables[PAGING_APERTURE_PDI]) != MEM_FIXED_APERTURE_PT_BASE ||
-        (entry & (mask | PAGE_RW | PTE_USER | PTE_PS | PTE_PCD | PTE_PWT)) !=
+        (entry & (mask | PAGE_RW | PTE_PS | PTE_PCD | PTE_PWT)) !=
         (MEM_FIXED_APERTURE_PT_BASE | PAGE_RW)) return 0;
     for (a = MEM_FIXED_PAGING_BASE; a < MEM_FIXED_PAGING_END; a += PAGE_SIZE) {
         entry = page_tables[0][a / PAGE_SIZE];
@@ -286,7 +292,8 @@ void paging_init(u32 mem_kb)
     for (i = 0; i < PAGING_BOOT_PT_COUNT; i++) {
         for (j = 0; j < PTE_COUNT; j++) {
             phys = (u32)(i * PTE_COUNT + j) * PAGE_SIZE;
-            if (phys < max_mem_bytes || phys < MEM_1MB) {
+            if ((phys < max_mem_bytes || phys < MEM_1MB) &&
+                !(phys >= MEM_SYSTEM_SPACE_BASE && phys < MEM_SYSTEM_SPACE_END)) {
                 /* コンベンショナルメモリ(0-1MB)またはプローブ範囲内 */
                 page_tables[i][j] = phys | PAGE_RW |
                     (PC98_NATIVE_VRAM(phys) ? PTE_PCD : 0);
@@ -620,8 +627,13 @@ int paging_shm_set_rw(u32 base, u32 end, int writable)
             return -1;
         }
     }
-    for (a = base; a < end; a += PAGE_SIZE)
+    for (a = base; a < end; a += PAGE_SIZE) {
+        u32 page = (a - MEM_SHM_BASE) / PAGE_SIZE;
         set_page_noflush(a, a, (writable ? PAGE_RW : PAGE_RO) | PTE_USER);
+        if (page >= MEM_SHM_SIZE / PAGE_SIZE) continue;
+        if (writable) shm_audit_ro[page / 32] &= ~(1UL << (page % 32));
+        else shm_audit_ro[page / 32] |= 1UL << (page % 32);
+    }
     if (pg_enabled) arch_mmu_flush_tlb();
     return 0;
 }
@@ -1331,7 +1343,10 @@ static u8 memmap_want_at(u32 a, u32 tramp)
      * 作られているせいで一致してしまう (= 自己診断が穴を隠す)。 */
     if (a >= KERNEL_LOAD_ADDR && a <= MEM_KERNEL_BAND_END) {
         if (a >= MEM_SHM_GUARD_LO && a < MEM_SHM_BASE) return MM_NP;
-        if (a >= MEM_SHM_BASE && a <= MEM_SHM_END) return MM_RWU;
+        if (a >= MEM_SHM_BASE && a <= MEM_SHM_END) {
+            u32 page = (a - MEM_SHM_BASE) / PAGE_SIZE;
+            return shm_audit_ro[page / 32] & (1UL << (page % 32)) ? MM_ROU : MM_RWU;
+        }
         if (a >= MEM_SHM_GUARD_HI && a < MEM_SHM_GUARD_HI + PAGE_SIZE)
             return MM_NP;
         if (a < MEM_SHM_GUARD_LO) return MM_RW; /* 本体 + ヒープ + KAPI */
@@ -1359,6 +1374,34 @@ static u8 memmap_want_at(u32 a, u32 tramp)
     if (a < MEM_SHELL_GUARD + PAGE_SIZE) return MM_NP;
     if (a >= MEM_FIXED_PAGING_END) return MM_NP;
     return MM_RW;                               /* スタック + heap + 固定PD/PT */
+}
+
+static int memmap_legacy_user(u32 a)
+{
+    if ((a >= MEM_FONT_CACHE_BASE && a < MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE) ||
+        (a >= TVRAM_CHAR_BASE && a < GVRAM_BRG_END)) return 1;
+    for (u32 i = 0; i < LEDGER_MAX_SURFACES; i++) {
+        const struct ledger_surface *sf = &ledger_surfaces[i];
+        if (sf->npages && sf->role == LEDGER_ROLE_CLIENT &&
+            a / PAGE_SIZE >= sf->first && a / PAGE_SIZE - sf->first < sf->npages)
+            return 1;
+    }
+    return 0;
+}
+
+/* Make shared PDE permissions stable before the first real AS. Only PDEs
+ * covering the legacy CLIENT gain USER; individual supervisor PTEs stay sup.
+ * e11b removes this along with the old shared USER consumers. */
+void paging_prepare_legacy_clients(void)
+{
+    if (!paging_boot_context()) return;
+    for (u32 i = 0; i < LEDGER_MAX_SURFACES; i++) {
+        const struct ledger_surface *sf = &ledger_surfaces[i];
+        if (!sf->npages || sf->role != LEDGER_ROLE_CLIENT) continue;
+        for (u32 p = sf->first; p < sf->first + sf->npages; p++)
+            page_directory[p / PTE_COUNT] |= PTE_USER;
+    }
+    arch_mmu_flush_tlb();
 }
 
 static u8 memmap_seen_at(u32 pte)
@@ -1398,13 +1441,14 @@ int paging_memmap_selftest(u32 tramp_page)
     if (paging_v86_session_open()) return -1;
     paging_memmap_bad_count = 0;
     if (!pg_enabled || !page_tables[0] || !fixed_paging_valid() ||
-        paging_current_cr3() != MEM_FIXED_PD_BASE) return -1;
+        V2P(page_directory) != MEM_FIXED_PD_BASE) return -1;
 
     i = 0;
     while (i < PTE_COUNT) {
         a = i * PAGE_SIZE;
         want = memmap_want_at(a, tramp_page);
         seen = memmap_seen_at(page_tables[0][i]);
+        if (want == MM_RW && seen == MM_RWU && memmap_legacy_user(a)) want = seen;
         if (want == seen) { i++; continue; }
         /* 同じ (期待, 実物) の組が続くあいだを 1 本の区間にまとめる */
         for (j = i + 1; j < PTE_COUNT; j++) {
@@ -1591,5 +1635,94 @@ int paging_lease_unmap(struct addrspace *as, u32 base, u32 npages)
             as->lease_pt_phys[k] = 0;
         }
     irq_restore(saved);
+    return 0;
+}
+
+/* T2e e10c (a). Return -1 only for the explicit V86 skip. Counters are
+ * accumulated by the lifecycle caller, so deliberate test corruptions do not
+ * pollute guest observation. A/D bits are hardware-owned, never compared. */
+int paging_master_audit(u32 tramp)
+{
+    int bad = 0;
+    if (paging_v86_session_open()) return -1;
+    if (!pg_enabled || !fixed_paging_valid()) return 1;
+    for (u32 di = 0; di < PDE_COUNT; di++) {
+        u32 d = page_directory[di];
+        if (di >= APP_BAND_PDE && di < (MEM_LEASE_END >> 22)) {
+            if (d) bad++;
+            continue;
+        }
+        /* Registered pointers guard the dereference even for a corrupt PDE. */
+        if (d & PTE_PRESENT) {
+            if (!page_tables[di] || (d & ~(u32)(PAGE_SIZE - 1)) != V2P(page_tables[di]) ||
+                (d & (PAGE_RW | PTE_PS | PTE_PCD | PTE_PWT)) != PAGE_RW) {
+                bad++; continue;
+            }
+        } else if (!page_tables[di] && di * PTE_COUNT >= pgalloc_limit_pfn()) continue;
+        for (u32 ti = 0; ti < PTE_COUNT; ti++) {
+            u32 p = di * PTE_COUNT + ti, a = p * PAGE_SIZE;
+            u32 e = (d & PTE_PRESENT) ? page_tables[di][ti] : 0;
+            u32 want = 0;
+            if (di == 0) {
+                u8 kind = memmap_want_at(a, tramp);
+                if (kind != MM_NP) want = PTE_PRESENT;
+                if (kind == MM_RW || kind == MM_RWU) want |= PTE_RW;
+                if (kind == MM_RWU || kind == MM_ROU) want |= PTE_USER;
+                if (PC98_NATIVE_VRAM(a)) want |= PTE_PCD;
+            } else if ((p < boot_identity_end || pgalloc_audit_ram(p)) &&
+                       !(a >= MEM_SYSTEM_SPACE_BASE && a < MEM_SYSTEM_SPACE_END)) want = PAGE_RW;
+            for (u32 ri = 0; ri < ledger_region_count; ri++) {
+                const struct ledger_region *r = &ledger_regions[ri];
+                if (r->type != LEDGER_R_DEVICE || p < r->first || p >= r->end) continue;
+                /* A decode reservation can exceed the actual mapped window. */
+                want = 0;
+                for (u32 k = 0; k < LEDGER_MAX_RESOURCES; k++) {
+                    const struct ledger_resource *res = &ledger_resources[k];
+                    if ((r->res_mask & (1U << k)) && p >= res->map_first && p < res->map_end)
+                        want = PAGE_RW | PTE_PCD;
+                }
+            }
+            if ((want & PTE_PRESENT) && memmap_legacy_user(a)) want |= e & PTE_USER;
+            if (!(want & PTE_PRESENT)) { if (e & PTE_PRESENT) bad++; continue; }
+            if ((e & (~(u32)(PAGE_SIZE - 1) | PAGE_RW | PTE_USER | PTE_PCD | PTE_PWT)) !=
+                (a | want)) bad++;
+            if ((want & PTE_USER) && !(d & PTE_USER)) bad++;
+        }
+    }
+    return bad;
+}
+
+/* (b), private application and shared PDEs; lease pages are checked by lease.c. */
+int paging_as_audit(const struct addrspace *as, int (*shared_ro)(u32, u32))
+{
+    u32 *pd;
+    if (!as || !as->pd_phys || as->pd_phys % PAGE_SIZE ||
+        !pgalloc_page_owned(as->pd_phys / PAGE_SIZE, as->owner)) return 1;
+    pd = P2V(as->pd_phys);
+    for (u32 di = 0; di < PDE_COUNT; di++) {
+        u32 d = pd[di];
+        if (di < APP_BAND_PDE || di >= (MEM_LEASE_END >> 22)) {
+            if ((d & ~(PTE_ACCESSED | PTE_DIRTY)) !=
+                (page_directory[di] & ~(PTE_ACCESSED | PTE_DIRTY))) return 1;
+        } else if (di < (MEM_LEASE_BASE >> 22)) {
+            if (di >= APP_BAND_PDE + MEM_APP_BAND_MAX_PDES) {
+                if (d) return 1;
+                continue;
+            }
+            u32 pt_phys = as->app_pt_phys[di - APP_BAND_PDE];
+            if (!pt_phys) { if (d) return 1; continue; }
+            if (pt_phys % PAGE_SIZE || !pgalloc_page_owned(pt_phys / PAGE_SIZE, as->owner) ||
+                (d & ~(PTE_ACCESSED | PTE_DIRTY)) != (pt_phys | PAGE_RW | PTE_USER)) return 1;
+            u32 *pt = P2V(pt_phys);
+            for (u32 ti = 0; ti < PTE_COUNT; ti++) {
+                u32 e = pt[ti], va = (di * PTE_COUNT + ti) * PAGE_SIZE;
+                if (!(e & PTE_PRESENT)) continue;
+                if (!(e & PTE_USER) || (e & (PTE_PCD | PTE_PWT))) return 1;
+                if (!pgalloc_page_owned(e >> PAGE_SHIFT, as->owner) &&
+                    !(va >= MEM_SHLIB_BASE && va < MEM_SHLIB_END && !(e & PTE_RW) &&
+                      shared_ro && shared_ro(va, e & ~(u32)(PAGE_SIZE - 1)))) return 1;
+            }
+        }
+    }
     return 0;
 }

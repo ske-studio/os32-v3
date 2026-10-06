@@ -31,6 +31,7 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 #define used used_pages
 
 
+int shlib_read_page(u32 va, u32 frame) { (void)va; (void)frame; return 0; }
 #include "lease_host_source.c"
 void *kmemcpy(void *dst, const void *src, u32 n) {
     u8 *d = dst; const u8 *s = src; while (n--) *d++ = *s++; return dst;

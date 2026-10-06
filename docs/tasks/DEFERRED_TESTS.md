@@ -25,10 +25,10 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 | E9-2 | h3 の本人識別・前景の証拠 writer を正式な経路へ切り替える (h3 の初期化も) | 申し送り | 2605、2747–2893 |
 | E9-3 | TVRAM 範囲外の呼び出しの拒否をゲストで (`6e4df78` はホスト試験だけ) | ホストのみ | 1432–1548 |
 | E10-1 | V86 の `-d` / `-b` の正常・失敗・STOP 出口と K1 (session 中の CPL0 例外) のゲスト確認 — 画像と注入手段が要る (`-t`・`-g -t` は 2026-10-06 受入済み) | 未実施の確認 | e10c |
-| E10-2 | e10c: 全 AS の alias 照合、3 段検査、live==0 の合間の USER、`shm_set_rw` の検査、TVRAM の再取得と RO view の残り | 未実施の確認 | 606、686、1185、1274、1599、1624 |
-| E10-4 | `v86 -g` 途中の kill で g/tv の kmalloc が漏れ、gcap_ops と TVRAM 30 行が戻らない (既存不具合、e10b では未修正) | 既知の不具合 | e10c で所有と出口を整理し受入 |
-| E10-5 | V86 session の end 中の再例外は `cli; hlt` で無言停止 — 停止前にシリアル 1 行と計数を残す | 改善 | e10c |
-| E10-6 | V86 の INT 80h 反射中は IF=1 (int80_stub の sti が VM 判定より前) — IRQ がゲストへ反射されず tick も数えない | 改善 | e10c |
+| E10-2 | e10c の3段/全AS/alias照合・DISPLAY/TVRAM再取得をホスト確認。PMが e10c 台本でboot/往復/GUIを受入 | ゲスト・native待ち | e10c、E11-1の公開leaseは別受入 |
+| E10-4 | gcap killの通常着地でg/tv解放・ops解除・30行/cursor復元を実装。PMが途中STOPと次回採取を確認 | ゲスト・native待ち | e10c-gcap-kill |
+| E10-5 | closing再例外等の停止前にpolledシリアル1行とexec_stop_countを追加。PMが別の故障注入起動で確認 | ゲスト・native待ち | e10c-stop-vm |
+| E10-6 | INT80は保存VMを見てstiを迂回。実ASMの分岐をホスト確認、PMがIF=0・IVT反射・通常KAPI IF=1を受入 | ゲスト・native待ち | e10c-stop-vm |
 
 ## 2. 関門: e11 (公開 KAPI の一括、版の更新は 1 回)
 
@@ -36,7 +36,7 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 |---|---|---|---|---|
 | E11-1 | surface query/lease/bundle・gfx source/再init publisher・NULL port/互換橋・Unicode・帰路失敗を結線。準備だけで隔離合格としない | 未結線 | 223–257、430–455、571、584–585、654–656、821–823、847、911、949、1023–1040、1069、1089、1105–1108、1143、1204–1207、1367–1368 | e11a/c準備 → 統合 |
 | E11-2 | 結線後のkernel/SDK/shlibサイズを再実測し、§6のe枠・圧縮・8MB私有量を確認。撤去の減少を先取りしない | 申し送り | 289–291、457–470、538、688、1240 | e11a/b/c → 統合 |
-| E11-3 | 低位/共有USER化・VRAM例外・exec_map_shared_bbを撤去、共有PT操作を拒否。Cirrus DISPLAYは授権leaseでNONE→RW | 未実施の確認 | 599、605–606、707、826、887–892、1006、1043、1573–1576、1762–1763 | e11a/b → 統合 |
+| E11-3 | 低位/共有USER化・VRAM例外・exec_map_shared_bbを撤去、共有PT操作を拒否。Cirrus DISPLAYは授権leaseでNONE→RW、e11bで窓PDEもUSER禁止へ | 未実施の確認 | 599、605–606、707、826、887–892、1006、1043、1573–1576、1762–1763 | e11a/b → 統合 |
 | E11-4 | 上記KAPI-CALLBACK/OWNER/DISK-AUTHの受入を前提に、値返し列挙KAPIとcaller移行・必要ならOS32X授権flag、子が親のredirect先fdを閉じられるFD所有を一括接続 | 契約接続待ち | 1501–1504、1546、1600、1694、1887 | e11b/c → 統合 |
 | E11-5 | Run全画面のowner 1または専用KAPIでキー配送。終了・二重注入なし・窓漏れなし・WAIT_POLLを確認、KAPI追加はcで版一括 | 既知の不具合 | 1167–1169、1431 | e11a/b/c → 統合 |
 | E11-6 | P3残: pre-init USER・cdecl橋・版/終了門・utf8初期値/Unicode二重取得・kcg漢字旗・shlib token・wait帰路4件 | 申し送り | 998–1002、1111、1156–1163、1274、1338、1361、1396、1429、1624 | e11a/b/c → 統合 |

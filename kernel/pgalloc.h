@@ -61,6 +61,7 @@ u32 pgalloc_metadata_bytes(const struct physmem *model);
 int pgalloc_init_model(struct physmem *model, void *backing, u32 backing_bytes,
                       u32 backing_pfn, int (*verify)(u32, u32, void *));
 u32 pgalloc_limit_pfn(void);
+int pgalloc_audit_ram(u32 pfn);
 
 /* End PFN (exclusive) of the legacy arena — the contiguous low RAM from
  * MEM_PHYS_EXEC_FLOOR — after the model reserved its backing, frozen at init.

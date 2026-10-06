@@ -33,7 +33,8 @@ int system_surface_source(u32 role, struct surface_query_source *out)
     source.count = 1;
     source.refs[0] = (struct surface_ref){(u32)(sf - ledger_surfaces), sf->gen};
     source.ready = role == LEDGER_ROLE_UNICODE ? utf8_jis_table_ready() :
-                                               !con_sink_is_enabled();
+                                               !con_sink_is_enabled() &&
+                                               !(gfx_surface_unready & (1U << (sf - ledger_surfaces)));
     *out = source;
     return 0;
 }

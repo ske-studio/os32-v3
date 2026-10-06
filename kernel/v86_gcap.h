@@ -43,4 +43,6 @@ int  v86_gcap_pass_out(u16 port, int size, u32 value);
 void v86_gcap_note_emul_in(u16 port, int size, u32 value);
 void v86_gcap_note_emul_out(u16 port, int size, u32 value);
 
+void v86_gcap_release(void);
+
 #endif /* __V86_GCAP_H */

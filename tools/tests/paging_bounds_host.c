@@ -54,9 +54,9 @@ void pgalloc_free_pt(u32 phys)
     actual_free_pt(phys);
 }
 #define used (used_pages + ws_used)
-/* 試験用の池の workspace: 16MiB の末尾 16 ページ (恒等写像済み、下で mmap)。 */
-#define HOST_WS_FIRST (0x1000000UL / PAGE_SIZE - 16)
-#define HOST_WS_END   (0x1000000UL / PAGE_SIZE)
+/* 試験用の池の workspace: 15MiB の末尾 16 ページ (恒等写像済み、下で mmap)。 */
+#define HOST_WS_FIRST (MEM_SYSTEM_SPACE_BASE / PAGE_SIZE - 16)
+#define HOST_WS_END   (MEM_SYSTEM_SPACE_BASE / PAGE_SIZE)
 void _start(void)
 {
     u32 args[6] = {0x400000, 0xC00000, 3, 0x32, 0xFFFFFFFF, 0};
@@ -68,7 +68,8 @@ void _start(void)
     /* K6-RAM: paging_init が張るのは「ブート窓の内側 x 検出量」だけで、
      * RAM の上限ではない。16MiB 報告ならそこまで (従来と同じ)。 */
     CHECK(paging_boot_identity_end() == 16384UL * 1024 / PAGE_SIZE);
-    CHECK(paging_is_present(PAGING_BOOT_MAP_SIZE / 2 - PAGE_SIZE));
+    CHECK(paging_is_present(MEM_SYSTEM_SPACE_BASE - PAGE_SIZE));
+    CHECK(!paging_is_present(MEM_SYSTEM_SPACE_END - PAGE_SIZE));
     CHECK(!paging_is_present(PAGING_BOOT_MAP_SIZE / 2));
     CHECK(!paging_is_present(0xFFFFFFFFUL));
     CHECK(paging_set_page(0xFFFFF000UL, 0, PAGE_RW) == -1);

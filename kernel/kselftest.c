@@ -1,3 +1,4 @@
+#include "v86_mem.h"
 /* ======================================================================== */
 /*  KSELFTEST.C — カーネル内プリミティブの自己診断                          */
 /*                                                                          */
@@ -18,6 +19,7 @@
 #include "kselftest.h"
 #include "pegc.h"
 #include "gfx_hal.h"
+#include "../gfx/gfx.h"
 #include "kstring.h"
 #include "kprintf.h"
 #include "kmalloc.h"
@@ -558,6 +560,7 @@ static void test_memmap(void)
 {
     int bad = paging_memmap_selftest(exec_tramp_page_addr());
     u32 i, n;
+    if (paging_v86_session_open()) return;
 
     u32 *pt = (u32 *)P2V(paging_registered_pt(MEM_SHM_BASE));
     check(pt && (pt[(MEM_SHM_BASE >> PAGE_SHIFT) % PTE_COUNT] &
@@ -872,7 +875,10 @@ int kselftest_run_post_unicode(void)
 int kselftest_run_post_exec(void)
 {
     int before = ksel_fail;
+    if (paging_v86_session_open()) return kselftest_run_audit("post-exec");
 
+    check(kselftest_run_audit("post-exec") == 0, "post-exec: lifecycle audit");
+    check(lease_selftest() == 0, "post-exec: synthetic AS S/T/U");
     test_tramp_user_str();
     test_kapi_layout();
     test_memmap();
@@ -1982,4 +1988,38 @@ int kselftest_run(void)
                 ksel_fail, ksel_pass);
     }
     return ksel_fail;
+}
+
+/* Lifecycle diagnostics, intentionally externally visible in kernel.map. */
+u32 memmap_audit_fail, as_audit_fail, memmap_audit_runs, as_audit_runs;
+u32 memmap_audit_skip, v86_return_audit_fail, v86_return_audit_runs;
+u32 audit_runs, audit_fail;
+int kselftest_run_audit(const char *tag)
+{
+    int a, b, bad;
+    if (paging_v86_session_open()) { memmap_audit_skip++; return 0; }
+    a = paging_master_audit(exec_tramp_page_addr());
+    b = lease_audit_all();
+    memmap_audit_runs++;
+    as_audit_runs++;
+    memmap_audit_fail += a != 0;
+    as_audit_fail += b != 0;
+    bad = (a != 0) + (b != 0) + !ledger_selfcheck(tag);
+    audit_runs++;
+    audit_fail += bad;
+    return bad;
+}
+
+int kselftest_run_post_probe(void)
+{
+    int before = ksel_fail;
+    check(kselftest_run_audit("post-probe") == 0, "post-probe: lifecycle audit");
+    check(gfx_selected_selfcheck(), "post-probe: selected sources/bind/BB");
+    return ksel_fail - before;
+}
+
+void kselftest_audit_v86_return(void)
+{
+    v86_return_audit_runs++;
+    v86_return_audit_fail += kselftest_run_audit("v86-return") != 0;
 }

@@ -43,11 +43,11 @@ void _start(void)
     CHECK(result == 0x800000);
     host_map_fixed_paging();
     paging_init(16384);
-    physmem_bootstrap_legacy(&m,16384);
+    physmem_bootstrap_legacy(&m,MEM_SYSTEM_SPACE_BASE / 1024);
     CHECK(physmem_add_trusted(&m,4096,8192,PHYSMEM_SOURCE_SYNTHETIC));
     l.kind = 0;   /* PGALLOC_BACKING_ARENA_TOP */
     l.capacity = pgalloc_metadata_bytes(&m);
-    l.metadata_first = 4096 - l.capacity / PAGE_SIZE;
+    l.metadata_first = MEM_SYSTEM_SPACE_BASE / PAGE_SIZE - l.capacity / PAGE_SIZE;
     l.metadata = (void *)(l.metadata_first * PAGE_SIZE);
     l.workspace_end = l.metadata_first;
     l.workspace_first = l.workspace_end - 16;

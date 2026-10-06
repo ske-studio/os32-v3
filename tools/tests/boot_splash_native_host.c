@@ -100,6 +100,8 @@ void shell_print(const char *str, u8 color) { (void)str; (void)color; }
  * §3-8) が引く台帳と写像。このハーネスは ⑥ を走らせない (試験は
  * tools/tests/test_gfx_boot.py)。描画用 CLIENT だけ実型板から返す。 */
 struct ledger_surface ledger_surfaces[LEDGER_MAX_SURFACES];
+struct ledger_resource ledger_resources[LEDGER_MAX_RESOURCES];
+int ledger_surface_validate(const struct ledger_surface *sf) { return sf != 0; }
 u32 gfx_surface_unready; /* production definition lives in pgalloc */
 struct ledger_surface *ledger_surface_find(u32 b, u32 r)
 {
@@ -122,6 +124,7 @@ int ledger_resource_add(const struct ledger_resource *rec, u32 *rid)
 { (void)rec; (void)rid; return 0; }
 int ledger_reserve_set(u32 o, const struct ledger_span *s, u32 n)
 { (void)o; (void)s; (void)n; return 0; }
+int kselftest_run_audit(const char *tag) { (void)tag; return 0; }
 int ledger_selfcheck(const char *tag) { (void)tag; return 1; }
 void ledger_arena_freeze(void) { }
 u32 ledger_arena_top(void) { return 0; }

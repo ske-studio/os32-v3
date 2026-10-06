@@ -50,6 +50,7 @@ struct gfx_kernel_fb {
 int gfx_kernel_framebuffer(struct gfx_kernel_fb *out);
 struct surface_query_source;
 int gfx_surface_source(u32 role, struct surface_query_source *out);
+int gfx_selected_selfcheck(void);
 void gfx_init(void);       /* 640x400x16初期化 + バックバッファ確保 */
 void gfx_init_200(void);   /* 640x200x16初期化 (縦はHWが2倍表示) */
 /* KAPI スロット gfx_init / gfx_init_200 の実体 (票 T8 D1 / D1a)。
@@ -144,5 +145,8 @@ void gfx_set_default_palette(void);
 /* T2e e6: dormant compatibility entry; e11 replaces the KAPI binding. */
 void gfx_framebuffer_bridge(void *out);
 extern volatile u32 gfx_bridge_fail_count;
+
+void gfx_reinit_tvram(void);
+void gfx_v86_return(void);
 
 #endif /* __GFX_H */

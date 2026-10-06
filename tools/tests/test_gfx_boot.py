@@ -219,7 +219,7 @@ MUTATIONS = [
      'pgalloc_limit_pfn(),\n                              LEDGER_TOP_DOWN'),
     # 1 つの窓の写像失敗で候補を全部捨てる (B3: Xe10 の失敗が PEGC を妨げる)
     ('map-failure-drops-all', 'gfx/gfx_core.c',
-     '            m &= ~gfx_cand_of(i);\n    }', '            m = 0;\n    }'),
+     '            m &= ~gfx_cand_of(i);', '            m = 0;'),
     # 写像を予約より先に行う (識別 → 予約 → 写像の順、D33)
     ('map-before-reserve', 'gfx/gfx_core.c', RESERVE_THEN_MAP, MAP_THEN_RESERVE),
     # アリーナの上端を凍結しない (CPL=0 の子が BB まで伸びる)

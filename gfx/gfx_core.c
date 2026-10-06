@@ -10,6 +10,7 @@
 #include "pegc.h"         /* PEGC の窓と BIOS ワークの番地 (⑥ の資源レコード) */
 #include "wab_xe10.h"     /* Xe10 の窓の定数 (同上) */
 #include "kprintf.h"
+#include "kselftest.h"
 #include "../exec/surface_query.h"
 #include "../exec/appslot.h"
 
@@ -347,6 +348,7 @@ void __attribute__((cold)) gfx_boot_reserve(void)
     struct ledger_surface sf;
     const struct ledger_resource *r;
     u32 i, n, m, rid, pfn, cand, display_fail = 0;
+    u32 resource_ids[3] = {LEDGER_MAX_RESOURCES, LEDGER_MAX_RESOURCES, LEDGER_MAX_RESOURCES};
     rid = 0;
 
     cand = m = gfx_identify_candidates();
@@ -355,6 +357,10 @@ void __attribute__((cold)) gfx_boot_reserve(void)
     for (i = n = 0; m && i < 3; i++) {
         if (!(m & gfx_cand_of(i))) continue;
         if (!ledger_resource_add(&gfx_res[i], &rid)) m = 0;
+        else {
+            resource_ids[i] = rid;
+            ledger_resources[rid].map_first = ledger_resources[rid].map_end = 0;
+        }
         sp[n].first = gfx_res[i].decode_first;
         sp[n].end = gfx_res[i].decode_end;
         sp[n].kind = LEDGER_SPAN_MMIO;
@@ -368,6 +374,10 @@ void __attribute__((cold)) gfx_boot_reserve(void)
             paging_map_phys(r->map_first * PAGE_SIZE, r->map_first * PAGE_SIZE,
                             r->map_end - r->map_first, PAGE_RW | PTE_PCD) != 0)
             m &= ~gfx_cand_of(i);
+        else if ((m & gfx_cand_of(i)) && resource_ids[i] < LEDGER_MAX_RESOURCES) {
+            ledger_resources[resource_ids[i]].map_first = r->map_first;
+            ledger_resources[resource_ids[i]].map_end = r->map_end;
+        }
     }
     /* DISPLAY depends on reservation + mapping, not CLIENT allocation. */
     if ((m & GFX_CAND_PEGC) && !ledger_surface_create(&gfx_pegc_display, 0))
@@ -413,7 +423,7 @@ u32 gfx_sf_backend(void)
  * must not cross a callback or scheduling point (T2e e1/e3 contract).
  * Dormant until e5/e11; TVRAM/Unicode are supplied in e8. */
 __attribute__((section(".text.gfx_surface_source")))
-int gfx_surface_source(u32 role, struct surface_query_source *out)
+static int gfx_selected_source(u32 role, struct surface_query_source *out)
 {
     struct surface_query_source source = {0};
     u32 i, plane, count;
@@ -421,7 +431,7 @@ int gfx_surface_source(u32 role, struct surface_query_source *out)
     source.role = role;
     source.backend = gfx_sf_backend();
     *out = source;
-    if (!gfx_started || (role != LEDGER_ROLE_CLIENT && role != LEDGER_ROLE_DISPLAY))
+    if (role != LEDGER_ROLE_CLIENT && role != LEDGER_ROLE_DISPLAY)
         return OS32_ERR_INVAL;
     count = role == LEDGER_ROLE_DISPLAY && source.backend == LEDGER_SF_PC98 ? 4 : 1;
     for (plane = 0; plane < count; plane++) {
@@ -429,7 +439,7 @@ int gfx_surface_source(u32 role, struct surface_query_source *out)
             const struct ledger_surface *sf = &ledger_surfaces[i];
             if ((gfx_surface_unready & (1U << i)) || !sf->npages || sf->closing ||
                 sf->backend != source.backend ||
-                sf->role != role || sf->perm_max == LEDGER_PERM_NONE) continue;
+                sf->role != role) continue;
             if (count == 4 && sf->first != GFX_PFN(gfx_display_planes[plane])) continue;
             source.refs[plane] = (struct surface_ref){i, sf->gen};
             break;
@@ -442,12 +452,48 @@ int gfx_surface_source(u32 role, struct surface_query_source *out)
     return 0;
 }
 
+int gfx_surface_source(u32 role, struct surface_query_source *out)
+{
+    int rc = gfx_selected_source(role, out);
+    if (rc) return rc;
+    if (gfx_started) {
+        for (u32 i = 0; i < out->count; i++)
+            if (ledger_surfaces[out->refs[i].sid].perm_max == LEDGER_PERM_NONE)
+                goto unready;
+        return 0;
+    }
+unready:
+    *out = (struct surface_query_source){.role = role, .backend = gfx_sf_backend()};
+    return OS32_ERR_INVAL;
+}
+
+/* Probe selects backing before drawing starts. Cirrus DISPLAY is deliberately
+ * NONE until e11: validate its internal source without granting a public view. */
+int gfx_selected_selfcheck(void)
+{
+    struct surface_query_source client, display;
+    if (gfx_selected_source(LEDGER_ROLE_CLIENT, &client) ||
+        gfx_selected_source(LEDGER_ROLE_DISPLAY, &display) ||
+        !client.ready || !display.ready || client.count != 1) return 0;
+    for (u32 i = 0; i < display.count; i++)
+        if (!ledger_surface_validate(&ledger_surfaces[display.refs[i].sid])) return 0;
+    const struct ledger_surface *sf = &ledger_surfaces[client.refs[0].sid];
+    if (!ledger_surface_validate(sf) || !g_backend ||
+        g_backend->bb_base != bb[0] || g_backend->bb_size != sf->npages * PAGE_SIZE ||
+        g_backend->bb_pitch != sf->pitch || g_backend->bb_format != sf->format) return 0;
+    u8 *base = sf->backing >= LEDGER_SB_VRAM ?
+               (u8 *)P2V_IO(sf->first * PAGE_SIZE) : (u8 *)P2V(sf->first * PAGE_SIZE);
+    for (u32 i = 0; i < 4; i++)
+        if (bb[i] != (i < sf->planes ? base + sf->plane_offset[i] : 0)) return 0;
+    return bb_b == bb[0] && bb_r == bb[1] && bb_g == bb[2] && bb_i == bb[3];
+}
+
 /* Separate revoke and regen master phases (PM e5 section 9). The revoke
  * phase visits old/selected/fallback backends as selection resolves. Between
  * phases the publisher
  * is not-ready, and no scheduling/callback or public caller exists until e11.
  * regen rechecks zero references even if this normal-context contract breaks. */
-static void gfx_reinit_surfaces(int finish)
+static void gfx_reinit_surface_roles(int finish, int display_only)
 {
     unsigned int flags = irq_save();
     u32 cr3 = paging_current_cr3(), i;
@@ -458,6 +504,7 @@ static void gfx_reinit_surfaces(int finish)
         if (!finish) {
             if (!sf->npages || sf->backend != gfx_sf_backend() ||
                 (sf->role != LEDGER_ROLE_CLIENT && sf->role != LEDGER_ROLE_DISPLAY) ||
+                (display_only && sf->role != LEDGER_ROLE_DISPLAY) ||
                 (gfx_reinit_pending & bit)) continue;
             gfx_reinit_pending |= bit;
             gfx_surface_unready |= bit;
@@ -476,6 +523,37 @@ static void gfx_reinit_surfaces(int finish)
         gfx_reinit_pending = 0;
         gfx_bind_client();
     }
+}
+
+static void gfx_reinit_surfaces(int finish)
+{
+    gfx_reinit_surface_roles(finish, 0);
+}
+
+/* TVRAM is independent of the selected graphics backend. Revoke even on
+ * repeat GUI entry: a parked CUI parent may have acquired a new RO view. */
+void gfx_reinit_tvram(void)
+{
+    unsigned int flags = irq_save();
+    u32 cr3 = paging_current_cr3();
+    paging_load_cr3(paging_kernel_pd_phys());
+    for (u32 sid = 0; sid < LEDGER_MAX_SURFACES; sid++) {
+        struct ledger_surface *sf = &ledger_surfaces[sid];
+        if (!sf->npages || sf->role != LEDGER_ROLE_TVRAM) continue;
+        gfx_surface_unready |= 1U << sid;
+        (void)lease_revoke_surface(sid);
+        if (ledger_surface_regen(sid, 0)) gfx_surface_unready &= ~(1U << sid);
+        else gfx_reinit_fail_count++;
+    }
+    paging_load_cr3(cr3);
+    irq_restore(flags);
+}
+
+void gfx_v86_return(void)
+{
+    gfx_reinit_surface_roles(0, 1);
+    gfx_reinit_surface_roles(1, 1);
+    gfx_reinit_tvram();
 }
 
 /* ======================================================================== */
@@ -518,7 +596,8 @@ void __attribute__((cold)) gfx_client_to_gshell(void)
         paging_load_cr3(cr3);
         irq_restore(flags);
     }
-    (void)ledger_selfcheck("gui");
+    gfx_reinit_tvram();
+    kselftest_run_audit("gui");
 }
 
 /* ======================================================================== */

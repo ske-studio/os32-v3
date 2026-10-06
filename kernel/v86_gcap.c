@@ -38,6 +38,7 @@
 #include "v86.h"
 #include "v86_io.h"
 #include "v86_mem.h"
+#include "pgalloc.h"
 #include "exec.h"       /* exec_ledger_owner: バッキングの台帳の owner */
 #include "v86_pic.h"
 #include "kmalloc.h"
@@ -137,6 +138,9 @@ static const u8 v86_gcap_code[] = {
 V86Gcap *v86_gcap_rec = 0;
 u32 v86_gcap_phase = 0;
 static const V86gIoOps *gcap_ops = 0;
+static V86Gcap *gcap_owned;
+static u16 *gcap_tv;
+u32 v86_gcap_alloc_count, v86_gcap_free_count;
 static int gcap_keep_if = 0;    /* 1 = ゲストの INT n で IF を落とさない */
 
 int v86_gcap_active(void)
@@ -573,6 +577,28 @@ static void gcap_cui_rebuild(const u16 *tv)
     console_hw_cursor_enable();
 }
 
+/* Called only on the normal-stack release path, or after copying the result.
+ * Exception teardown only disconnects the recorder; it must not free here. */
+void v86_gcap_release(void)
+{
+    V86Gcap *g = gcap_owned;
+    u16 *tv = gcap_tv;
+    if (!g || !tv || kctx_irq_depth || kctx_exc_depth) return;
+    v86_gcap_rec = 0;
+    gcap_ops = 0;
+    gcap_keep_if = 0;
+    if (g->mode == V86G_MODE_ROM &&
+        g->restore == V86G_RST_FALLBACK && pegc_restore_text_sync)
+        pegc_restore_text_sync(v86g_mode_is_31k((int)g->layout, g->r31_ax & 0xFFU));
+    if (g->mode == V86G_MODE_ROM || v86_session.aborting)
+        gcap_cui_rebuild(tv);
+    gcap_owned = 0;
+    gcap_tv = 0;
+    kfree(tv);
+    kfree(g);
+    v86_gcap_free_count += 2;
+}
+
 /* ------------------------------------------------------------------------ */
 /*  KAPI v68 v86_gdc_capture                                                */
 /* ------------------------------------------------------------------------ */
@@ -598,6 +624,9 @@ int v86_gdc_capture(int mode, V86Gcap *out)
         if (tv) kfree(tv);
         return OS32_ERR_NOSPC;
     }
+    gcap_owned = g;
+    gcap_tv = tv;
+    v86_gcap_alloc_count += 2;
     v86g_reset(g);
     g->mode = (u32)mode;
     tv_save(tv);
@@ -629,11 +658,6 @@ int v86_gdc_capture(int mode, V86Gcap *out)
     gcap_ops = 0;
 
     if (mode == V86G_MODE_ROM) {
-        if (g->restore == V86G_RST_FALLBACK && pegc_restore_text_sync) {
-            pegc_restore_text_sync(
-                v86g_mode_is_31k((int)g->layout, g->r31_ax & 0xFFU));
-        }
-        gcap_cui_rebuild(tv);
         /* 失敗した採取は列を出さない (溢れ・05h 以外・打ち切り・暴走)。
          * 回数と理由は残す。 */
         if (g->status != V86G_ST_OK) {
@@ -644,7 +668,6 @@ int v86_gdc_capture(int mode, V86Gcap *out)
 
     kmemcpy(out, g, (u32)sizeof(*g));
     rc = (int)g->status;
-    kfree(tv);
-    kfree(g);
+    v86_gcap_release();
     return rc;
 }

@@ -20,7 +20,12 @@ WORD_BYTES = 4
 AD_BITS = 0x60
 PAGE_OFFSET_MASK = 0xfff
 SYMBOLS = ("v86_restore_mismatch", "kselftest_pass", "kselftest_fail",
-           "fault_kill_count", "gfx_current_height", "gfx_flip_enabled")
+           "fault_kill_count", "gfx_current_height", "gfx_flip_enabled",
+           "memmap_audit_fail", "as_audit_fail", "audit_runs", "audit_fail", "memmap_audit_runs", "as_audit_runs",
+           "memmap_audit_skip", "v86_return_audit_fail", "v86_return_audit_runs",
+           "lease_revoke_all_fail_count", "lease_revoke_fail_count",
+           "gfx_reinit_fail_count", "exec_stop_count",
+           "v86_gcap_alloc_count", "v86_gcap_free_count")
 
 
 def compare(base, other, ignore_ad=False):
