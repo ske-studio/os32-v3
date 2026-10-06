@@ -14,33 +14,30 @@ gen_memmap.py — メモリ地図の生成と、重なり・逆転の検出
 
   情報源   include/memmap.h の #define (番地の正典) と
            build/out/kernel.map の __bss_end / __sqlite_start / __sqlite_end
-  出力先   docs/02_memory.md の生成ブロック **1 か所だけ**。表は全て **絶対番地**。
+  出力先   build/out/MEMMAP.md (コミットしない)。表は全て **絶対番地**。
   検査     帯どうしの重なりと、start > end の逆転。今回の穴は両方ともこれで捕まる。
 
 使い方:
     python3 tools/gen_memmap.py              # 表を標準出力に出す
-    python3 tools/gen_memmap.py --write      # docs/02_memory.md の生成ブロックを差し替える
-    python3 tools/gen_memmap.py --check      # 重なり・逆転・鮮度ずれがあれば 1 で終わる
+    python3 tools/gen_memmap.py --write      # build/out/MEMMAP.md を書き出す
+    python3 tools/gen_memmap.py --check      # 重なり・逆転・予算超過・定数のずれがあれば 1 で終わる
     python3 tools/gen_memmap.py --headroom   # カーネルがあと何 KB 育つと何が壊れるか
 
     --root <dir>  別のツリーを見る (試験用)
     --map <path>  kernel.map の場所 (既定 <root>/build/out/kernel.map)
 
-**`make check` にはまだ登録していない。** 登録すると今すぐ赤になる — 検出される
-重なりが実在するため (票 §4 の 4 で番地を直すのはユーザー判断)。番地を直したら
-`build/checks.d/check-memmap.mk` の登録に `check-memmap` を足すこと。
+`make check-memmap` は生成文書によらず配置を検査する。
 
 kernel.map が無いときは**推測しない**。__bss_end を決め打ちにすると、地図が
 「それらしく」出てしまい、今回とまったく同じ嘘をもう一度書くことになる。
 """
 
 import argparse
-import difflib
 import os
 import re
 import sys
 
-OUT_REL = "docs/02_memory.md"
+OUT_REL = "build/out/MEMMAP.md"
 MAP_REL = "build/out/kernel.map"
 HDR_REL = "include/memmap.h"
 
@@ -643,10 +640,10 @@ def render(m, sym, rows, map_path, root):
     parts = []
     parts.append(BEGIN)
     parts.append("")
-    parts.append("番地の定義の正典は [`include/memmap.h`](../include/memmap.h)。"
+    parts.append("番地の定義の正典は [`include/memmap.h`](../../include/memmap.h)。"
                  "この表はそこと")
     parts.append("`%s` の `__bss_end` から "
-                 "[`tools/gen_memmap.py`](../tools/gen_memmap.py) が起こす。"
+                 "[`tools/gen_memmap.py`](../../tools/gen_memmap.py) が起こす。"
                  % MAP_REL)
     parts.append("手で直しても次の `--write` で消える。**表記は全て絶対番地** — "
                  "相対表記 (`+4KB`) は")
@@ -680,7 +677,7 @@ def render(m, sym, rows, map_path, root):
             parts.append("- " + x)
         parts.append("")
         parts.append("直し方は票 "
-                     "[`archive/kernel_v21/TASK_KSTACK_USER.md`](archive/kernel_v21/TASK_KSTACK_USER.md) §4 の 4。")
+                     "[`archive/kernel_v21/TASK_KSTACK_USER.md`](../../docs/archive/kernel_v21/TASK_KSTACK_USER.md) §4 の 4。")
         parts.append("")
     else:
         parts.append("**地図の矛盾: 0 件** "
@@ -709,16 +706,8 @@ def render(m, sym, rows, map_path, root):
 
 
 # ---------------------------------------------------------------------------
-#  6. docs/02_memory.md への差し込み
+#  6. 読み込みと CLI
 # ---------------------------------------------------------------------------
-
-def splice(doc, block):
-    i = doc.find(BEGIN)
-    j = doc.find(END)
-    if i < 0 or j < 0:
-        return None
-    return doc[:i] + block + doc[j + len(END) + 1:]
-
 
 def load(root, map_path):
     sym = read_symbols(map_path)
@@ -729,9 +718,9 @@ def load(root, map_path):
 def main():
     ap = argparse.ArgumentParser(description="メモリ地図の生成と重なり・逆転の検出")
     ap.add_argument("--write", action="store_true",
-                    help="docs/02_memory.md の生成ブロックを差し替える")
+                    help="build/out/MEMMAP.md を書き出す")
     ap.add_argument("--check", action="store_true",
-                    help="重なり・逆転・鮮度ずれがあれば 1 で終わる")
+                    help="重なり・逆転・予算超過・定数のずれがあれば 1 で終わる")
     ap.add_argument("--headroom", action="store_true",
                     help="カーネルがあと何 KB 育つと何が壊れるかだけ出す")
     ap.add_argument("--root", default=None, help="別のツリーを見る (試験用)")
@@ -762,59 +751,23 @@ def main():
         return 0
 
     out_path = os.path.join(root, OUT_REL)
-    doc = None
-    if os.path.isfile(out_path):
-        with open(out_path, encoding="utf-8") as f:
-            doc = f.read()
-
     if args.write:
-        if doc is None:
-            sys.stderr.write("gen_memmap: %s が無い\n" % OUT_REL)
-            return 2
-        fresh = splice(doc, block)
-        if fresh is None:
-            sys.stderr.write("gen_memmap: %s に生成ブロックの印が無い。\n"
-                             "  %s\n  %s\n をこの順で置くこと。\n"
-                             % (OUT_REL, BEGIN, END))
-            return 2
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
         with open(out_path, "w", encoding="utf-8") as f:
-            f.write(fresh)
-        print("%s の生成ブロックを書き出した (%d 行)" % (OUT_REL, block.count("\n")))
+            f.write(block)
+        print("%s を書き出した (%d 行)" % (OUT_REL, block.count("\n")))
         for x in lines:
             sys.stderr.write("gen_memmap: 警告: %s\n" % x)
         return 0
 
     if args.check:
-        rc = 0
         for x in lines:
             print("gen_memmap: %s" % x)
         if lines:
-            print("")
             print("地図に矛盾がある (%d 件)。番地の正典は include/memmap.h。" % len(lines))
-            rc = 1
-        if doc is None:
-            print("gen_memmap: %s が無い" % OUT_REL)
             return 1
-        current = splice(doc, block)
-        if current is None:
-            print("gen_memmap: %s に生成ブロックの印が無い "
-                  "(--write が差し込めない)" % OUT_REL)
-            return 1
-        if current != doc:
-            print("")
-            print("gen_memmap: %s の生成ブロックが古い。"
-                  "`python3 tools/gen_memmap.py --write` を実行せよ。" % OUT_REL)
-            diff = list(difflib.unified_diff(
-                doc.split("\n"), current.split("\n"),
-                fromfile=OUT_REL, tofile="生成器の出力", lineterm="", n=1))
-            for line in diff[:40]:
-                print("  " + line)
-            if len(diff) > 40:
-                print("  ... (差分 %d 行のうち先頭 40 行)" % len(diff))
-            rc = 1
-        if rc == 0:
-            print("地図に矛盾なし / %s は最新" % OUT_REL)
-        return rc
+        print("地図に矛盾なし (配置・予算・写し・定数を照合)")
+        return 0
 
     sys.stdout.write(block)
     return 0

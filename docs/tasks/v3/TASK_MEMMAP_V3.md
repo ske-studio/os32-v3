@@ -4,7 +4,7 @@
 > それまでの状態: 設計 v2 (Codex 往復 1 の 9 件を反映。2-2 は保留、2-3 (KHEAP 192KB) は着地) — 経緯は §11。
 >
 > 発行: PM (Claude Code `claude-fable-5-1`、2026-09-23)。出所: ユーザー指示 2026-09-23「カーネル予算はシュリンクではなく考え直す。順に実行」→ 2026-09-29「3 者で討論して決める」。
-> 正典の関係: 番地の正典は `include/memmap.h`、地図は [`../../02_memory.md`](../../02_memory.md) §2-1 (生成)、v3 全体の柱と順序は [`V3_PLAN.md`](V3_PLAN.md) §3・§4 (本案)、目標の 2 段は同 §2-2 (論点の経緯は草案 [`V3_PLAN_DRAFT.md`](../../archive/v3/V3_PLAN_DRAFT.md))。
+> 正典の関係: 番地の正典は `include/memmap.h`、地図は `build/out/MEMMAP.md` ([02_memory.md §2-1](../../02_memory.md) に説明と生成手順への入口)、v3 全体の柱と順序は [`V3_PLAN.md`](V3_PLAN.md) §3・§4 (本案)、目標の 2 段は同 §2-2 (論点の経緯は草案 [`V3_PLAN_DRAFT.md`](../../archive/v3/V3_PLAN_DRAFT.md))。
 > 討論前の経緯は [`../../archive/kernel_v21/TASK_KSTACK_USER.md`](../../archive/kernel_v21/TASK_KSTACK_USER.md)。
 > 討論の基点は `feat/gui` 39a09b89 (KernelAPI v68)。本文の `file:line` はその基点の行で、数字は `docs/02_memory.md` §2-1 の生成ブロックと `size` / `ls -l` / `readelf` の実測 (容量は KiB)。**「推測」と書いたものは未確認**で §10 に集める。
 

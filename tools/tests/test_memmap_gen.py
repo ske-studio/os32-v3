@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""tools/gen_memmap.py — 重なり・逆転の検出と、生成物の鮮度照合。
+"""tools/gen_memmap.py — 重なり・逆転の検出と、生成物から独立した配置検査。
 
 票 docs/archive/kernel_v21/TASK_KSTACK_USER.md §4-bis / 記録: tools/tests/memmap_tdd.md
 
@@ -17,6 +17,8 @@
 
 --mutate は**否定側**。この道具の存在理由を 1 つずつ外した版で、試験が RED に
 なることを見る。
+  no-budget    カーネル本体の予算を見ない → 予算超過の診断を失う
+  no-escape    親領域からのはみ出しを見ない → 子領域の逸脱を見逃す
   no-overlap   重なりを見ない        → 壊れた地図を「矛盾なし」と言う
   no-reversed  逆転を見ない          → 空振りする範囲指定を見逃す
   guess-map    kernel.map が無いとき __bss_end を決め打ちにする
@@ -46,6 +48,10 @@ MAP_TEMPLATE = (
     "                0x002bc060                        __sqlite_end = .\n")
 
 MUTATIONS = {
+    "no-budget": ("    return limit, sym[\"__bss_end\"] - load",
+                  "    return None"),
+    "no-escape": ("def escaped_children(rows):",
+                  "def escaped_children(rows):\n    return []\ndef _unused_escaped_children(rows):"),
     "no-fixed-bounds": ("    if m is not None:\n        names = (",
                         "    if False:\n        names = ("),
     "no-overlap": ("""    good = [r for r in concrete(rows) if r["start"] <= r["end"]]""",
@@ -118,8 +124,7 @@ def cases(script):
     # --- 1. 壊れた地図: 重なりも逆転も名指しで出し、非ゼロで終わる ---
     with tempfile.TemporaryDirectory(prefix="os32-genmm-") as tmp:
         root = make_tree(tmp, BROKEN)
-        # 先に --write して鮮度ずれを消す。こうしておけば、このあとの
-        # --check が非ゼロで終わる理由は **矛盾の検出だけ** になる。
+        # 壊れた地図も診断用に出力でき、配置の検査は非ゼロで終わる。
         check(run(script, root, "--write").returncode == 0, "--write が失敗した")
         out = run(script, root, "--check")
         check(out.returncode != 0, "壊れた地図なのに 0 で終わった")
@@ -136,12 +141,28 @@ def cases(script):
         log.append("BROKEN  --check = %d (予算超過 1 / 逆転 %d / 重なり %d)"
                    % (out.returncode, len(rev), len(ovl)))
 
+    # GUI 子領域の末尾を親の SHM 領域から 1 ページはみ出させる。
+    with tempfile.TemporaryDirectory(prefix="os32-genmm-escape-") as tmp:
+        root = make_tree(tmp, CLEAN)
+        header = root / "include/memmap.h"
+        original = header.read_text()
+        header.write_text(re.sub(r'(^#define\s+MEM_SHM_GUI_BASE\s+).*$',
+                                 r'\1(MEM_SHM_BASE + MEM_SHM_GUI_OFFSET + MEM_GUARD_SIZE)',
+                                 original, flags=re.M))
+        out = run(script, root, "--check")
+        check(out.returncode != 0, "子領域が親をはみ出しても 0 で終わった")
+        esc = [x for x in out.stdout.splitlines() if x.startswith("gen_memmap: はみ出し:")]
+        check(any("GUI 予約" in x and "共有メモリ本体" in x for x in esc),
+              "GUI 子領域の親 SHM 領域からのはみ出しを報告しない: %r" % esc)
+        log.append("ESCAPE  --check = %d (GUI 子領域のはみ出しを検出)" % out.returncode)
+
     # --- 2. 直した地図: --write して --check が 0 で終わる ---
     with tempfile.TemporaryDirectory(prefix="os32-genmm-") as tmp:
         root = make_tree(tmp, CLEAN)
         w = run(script, root, "--write")
         check(w.returncode == 0, "--write が失敗した: " + w.stderr)
-        doc = (root / "docs/02_memory.md").read_text(encoding="utf-8")
+        original = (root / "docs/02_memory.md").read_text(encoding="utf-8")
+        doc = (root / "build/out/MEMMAP.md").read_text(encoding="utf-8")
         check("0x140000" in doc, "生成ブロックに __bss_end が入っていない")
         # 表の行は必ず絶対番地で始まる (「+4KB - +260KB」のような相対表記を禁じる)
         block = doc.split("<!-- 生成")[1].split("<!-- /生成")[0]
@@ -156,13 +177,19 @@ def cases(script):
               "矛盾の無い地図なのに落ちた: " + out.stdout + out.stderr)
         log.append("CLEAN   --write → --check = 0")
 
-        # --- 3. 生成ブロックを手で触ったら鮮度検査が落ちる ---
-        (root / "docs/02_memory.md").write_text(
-            doc.replace("0x140000", "0x999999", 1), encoding="utf-8")
-        out = run(script, root, "--check")
-        check(out.returncode != 0, "生成ブロックを書き換えても気づかない")
-        check("古い" in out.stdout, "鮮度ずれだと言わない")
-        log.append("STALE   --check = %d (鮮度ずれを検出)" % out.returncode)
+        # --- 3. 生成物の改変・欠落は配置検査に影響せず、説明は変更しない ---
+        artifact = root / "build/out/MEMMAP.md"
+        artifact.write_text(doc.replace("0x140000", "0x999999", 1), encoding="utf-8")
+        check(run(script, root, "--check").returncode == 0, "生成物の鮮度で落ちた")
+        check(run(script, root, "--write").returncode == 0, "再生成できない")
+        check(artifact.read_text() == doc, "再生成で地図が復元されない")
+        artifact.unlink()
+        check(run(script, root, "--check").returncode == 0, "生成物無しで落ちた")
+        check((root / "docs/02_memory.md").read_text() == original, "説明を変更した")
+        (root / "docs/02_memory.md").unlink()
+        check(run(script, root, "--check").returncode == 0, "説明文書無しで落ちた")
+        check(run(script, root, "--write").returncode == 0, "説明文書無しで生成できない")
+        log.append("ARTIFACT  改変・欠落でも配置検査 = 0 / 説明文書は不変")
 
     # --- 4. 写しがずれたら気づく (リンカスクリプト / NASM / SDK) ---
     with tempfile.TemporaryDirectory(prefix="os32-genmm-") as tmp:
@@ -280,6 +307,7 @@ def main():
     args = ap.parse_args()
 
     if args.mutate:
+        cases(SCRIPT)  # 正常な検査器の合格を確認してから変異を評価する。
         source = SCRIPT.read_text(encoding="utf-8")
         red = 0
         for name, (old, new) in MUTATIONS.items():

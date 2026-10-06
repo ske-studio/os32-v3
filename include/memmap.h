@@ -9,8 +9,8 @@
 /*  ~220KB」と書いていた (実測 432KB)。相対表記が共有メモリとカーネルスタックの */
 /*  重なりを隠していた (票 docs/archive/kernel_v21/TASK_KSTACK_USER.md)。             */
 /*                                                                          */
-/*  実値の地図 (絶対番地) の正典は **docs/02_memory.md §2-1** で、             */
-/*  tools/gen_memmap.py がこのファイルの #define と build/out/kernel.map の    */
+/*  実値の地図 (絶対番地) は build/out/MEMMAP.md (コミットしない)。             */
+/*  説明は docs/02_memory.md §2-1。tools/gen_memmap.py が定義と kernel.map の    */
 /*  __bss_end から生成する。番地を動かしたら:                                 */
 /*                                                                          */
 /*      make kernel                          (kernel.map を作り直す)         */

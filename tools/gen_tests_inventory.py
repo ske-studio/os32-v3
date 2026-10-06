@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-gen_tests_inventory.py — 試験一覧 docs/TESTS.md の生成と鮮度検査
+gen_tests_inventory.py — 試験一覧の生成と登録検査
 
 試験の一覧を人が手で書くと、ターゲットを足した日から腐りはじめる。実際
 docs/archive/TEST_INVENTORY_2026-09-14.md は「`make check` は 31 ターゲット」と
@@ -18,8 +18,8 @@ docs/archive/TEST_INVENTORY_2026-09-14.md は「`make check` は 31 ターゲッ
 
 使い方:
     python3 tools/gen_tests_inventory.py            # 標準出力に出す
-    python3 tools/gen_tests_inventory.py --write    # docs/TESTS.md を書き換える
-    python3 tools/gen_tests_inventory.py --check    # ずれていたら 1 で終わる
+    python3 tools/gen_tests_inventory.py --write    # build/out/TESTS.md と HOST32.md を書く
+    python3 tools/gen_tests_inventory.py --check    # 登録不備があれば 1 で終わる
                                                     #   (make check-tests-inventory)
 
 名前の対応規則 (ターゲット → `*_tdd.md`) は 3 段。3 つとも当てて、当たったものを
@@ -42,16 +42,15 @@ docs/archive/TEST_INVENTORY_2026-09-14.md は「`make check` は 31 ターゲッ
 
 import argparse
 import ast
-import difflib
 import glob
 import os
 import re
 import sys
-import tempfile
 import check_select
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT_REL = "docs/TESTS.md"
+OUT_REL = "build/out/TESTS.md"
+HOST32_REL = "build/out/HOST32.md"
 MK_FILES = check_select.makefile_paths()
 CI_WORKFLOW = ".github/workflows/check.yml"
 
@@ -452,61 +451,12 @@ def build_rows(rules, names, ci):
 
 
 # ---------------------------------------------------------------------------
-#  manual 区間
+#  生成本文
 # ---------------------------------------------------------------------------
+HEADER = """# 試験一覧 (生成物)
 
-MANUAL_SECTIONS = ["intro", "outside", "findings", "recommend", "unread"]
-MANUAL_SEED = {
-    "intro": "(この区間は手で書く。生成器は中身を触らない。)",
-    "outside": "(この区間は手で書く。生成器は中身を触らない。)",
-    "findings": "(この区間は手で書く。生成器は中身を触らない。)",
-    "recommend": "(この区間は手で書く。生成器は中身を触らない。)",
-    "unread": "(この区間は手で書く。生成器は中身を触らない。)",
-}
-
-
-def read_manual(text):
-    """既存の docs/TESTS.md から `<!-- manual:x -->` 〜 `<!-- /manual:x -->` を取る"""
-    got = {}
-    if not text:
-        return got
-    for name in MANUAL_SECTIONS:
-        m = re.search(r"<!-- manual:%s -->\n(.*?)\n<!-- /manual:%s -->"
-                      % (re.escape(name), re.escape(name)), text, re.S)
-        if m:
-            got[name] = m.group(1)
-    return got
-
-
-def manual_block(name, manual):
-    body = manual.get(name, MANUAL_SEED[name])
-    return "<!-- manual:%s -->\n%s\n<!-- /manual:%s -->" % (name, body, name)
-
-
-# ---------------------------------------------------------------------------
-#  本文
-# ---------------------------------------------------------------------------
-
-HEADER = """<!-- 生成物: tools/gen_tests_inventory.py が build/*.mk と試験スクリプトから書き出す。
-     表を手で直さない。手書きは manual 区間 (下の HTML コメントの対) の中だけで、
-     生成器はそこを読み戻して保つ。ずれは `make check-tests-inventory` が検出する。 -->
-
-# 試験一覧
-
-OS32 の自動試験の**正典**。日付を持たない (快照ではないので古くならない)。表は
-[`tools/gen_tests_inventory.py`](../tools/gen_tests_inventory.py) が
-[`build/checks.d/`](../build/checks.d/) / [`build/sdk.mk`](../build/sdk.mk) と各試験スクリプトから生成する。
-
-```
-python3 tools/gen_tests_inventory.py --write    # 表を更新する
-make check-tests-inventory                      # 表が古くないか検査する (make check の中)
-```
-
-判断 (重複・弱さ・穴・改善案) は生成できないので `<!-- manual:… -->` の区間に手で書く。
-2026-09-14 の快照 [`docs/archive/TEST_INVENTORY_2026-09-14.md`](archive/TEST_INVENTORY_2026-09-14.md)
-の調査結果のうち、生成できない部分はこの文書の manual 区間へ移してある。
-
-## 0. 読み方
+`make tests-inventory` で build/*.mk と試験スクリプトから生成する。コミットしない。
+読み方・判断・手書きの節は [docs/TESTS.md](../../docs/TESTS.md)。
 """
 
 RULE_TEXT = """## 1. 名前の対応規則
@@ -537,7 +487,7 @@ RULE_TEXT = """## 1. 名前の対応規則
 """
 
 
-def render(manual):
+def render():
     rules = parse_makefiles()
     # `make check` が回すのは check-par の依存 (列は変数 CHECK_PAR_TARGETS)。
     # 2026-09-17〜26 は逐次の 2 段目 check-mut があった — 残っていれば数える。
@@ -558,85 +508,74 @@ def render(manual):
     rows = build_rows(rules, names, ci)
     out_rows = build_rows(rules, outside, ci)
 
-    parts = [HEADER, manual_block("intro", manual), "",
-             RULE_TEXT.replace("{n}", str(len(names))),
+    parts = [HEADER, RULE_TEXT.replace("{n}", str(len(names))),
              table(rows), "",
-             "## 3. `check` の列に**入っていない** `check-*` ターゲット (%d)"
+             "## 3. `check` の列に入っていない `check-*` ターゲット (%d)"
              % len(outside), "",
              "門ではなく計測器・実機試験。`make check` からは呼ばれない。", "",
-             table(out_rows), "",
-             "## 4. `make check` の外にある試験", "",
-             manual_block("outside", manual), "",
-             "## 5. 分類 (重複 / 不要 / 弱い / 穴)", "",
-             manual_block("findings", manual), "",
-             "## 6. 改善提言", "",
-             manual_block("recommend", manual), "",
-             "## 7. 未読 / 調べていないこと", "",
-             manual_block("unread", manual), ""]
+             table(out_rows), ""]
     return "\n".join(parts).rstrip() + "\n"
 
 
-def main():
-    ap = argparse.ArgumentParser(description="docs/TESTS.md の生成と鮮度検査")
-    ap.add_argument("--write", action="store_true", help="docs/TESTS.md を書き換える")
-    ap.add_argument("--check", action="store_true", help="ずれていたら 1 で終わる")
-    args = ap.parse_args()
+def check_registration():
+    """本文の鮮度によらず、登録列・recipe・対応表の漏れを検出する。"""
+    rules = parse_makefiles()
+    names = check_select.check_lists(parse_variables())
+    errors = []
+    mapping = check_select.load_map()["checks"]
+    for name in sorted(set(names) ^ set(mapping)):
+        errors.append("登録列と入力対応表が一致しない: " + name)
+    for name in names:
+        if name not in rules or not rules[name]["recipe"]:
+            errors.append("登録された検査に recipe が無い: " + name)
+    for name, info in rules.items():
+        if not name.startswith("check-"):
+            continue
+        for cmd in info["recipe"]:
+            for script in PY_IN_CMD.findall(cmd):
+                if not os.path.isfile(os.path.join(ROOT, script)):
+                    errors.append("%s: 試験スクリプトが無い: %s" % (name, script))
+                if name in mapping and not check_select.matches(
+                        script, check_select.compile_globs(mapping[name])):
+                    errors.append("%s: 試験スクリプトが入力対応表に無い: %s" % (name, script))
+    for error in errors:
+        print(error, file=sys.stderr)
+    if not errors:
+        print("試験の登録照合: %d ターゲット、漏れ 0 件" % len(names))
+    return int(bool(errors))
 
-    path = os.path.join(ROOT, OUT_REL)
-    current = read(OUT_REL)
-    fresh = render(read_manual(current))
 
-    build_current = read("docs/08_build.md")
+def render_host32():
     names = []
-    for t, info in parse_makefiles().items():
+    for info in parse_makefiles().values():
         for cmd in info["recipe"]:
             if "HOST32_RUNNERS ごと:" in cmd:
                 names += [os.path.basename(p)[5:-3] for p in PY_IN_CMD.findall(cmd)]
-    block = ("<!-- generated:host32 -->\n"
-             "`HOST32_RUNNERS` は既定 `native qemu`。%d 試験 (%s) の正常対照を指定した全 runner、"
-             "変異を先頭の runner で実行する。native への自動 fallback はしない。\n"
-             "<!-- /generated:host32 -->") % (len(names), " / ".join(names))
-    if build_current.count("<!-- generated:host32 -->") != 1 or build_current.count("<!-- /generated:host32 -->") != 1:
-        raise SystemExit("docs/08_build.md: runner generation markers missing/duplicated")
-    build_fresh = re.sub(r"<!-- generated:host32 -->.*?<!-- /generated:host32 -->",
-                         lambda _: block, build_current, flags=re.S)
-    if args.check and build_current != build_fresh:
-        print("docs/08_build.md runner list is stale; run --write")
-        return 1
-    if args.write:
-        with open(os.path.join(ROOT, "docs/08_build.md"), "w", encoding="utf-8") as f:
-            f.write(build_fresh)
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(fresh)
-        print("%s を書き出した (%d 行)" % (OUT_REL, fresh.count("\n")))
-        return 0
+    return ("# HOST32 試験一覧 (生成物)\n\n"
+            "`make tests-inventory` で生成する。コミットしない。\n\n"
+            "`HOST32_RUNNERS` は既定 `native qemu`。%d 試験 (%s) の正常対照を指定した全 runner、"
+            "変異を先頭の runner で実行する。native への自動 fallback はしない。\n"
+            % (len(names), " / ".join(names)))
 
+
+def main():
+    ap = argparse.ArgumentParser(description="試験一覧の生成と登録検査")
+    mode = ap.add_mutually_exclusive_group()
+    mode.add_argument("--write", action="store_true", help="build/out/ に試験一覧を書く")
+    mode.add_argument("--check", action="store_true", help="登録漏れを検査する (生成物は不要)")
+    args = ap.parse_args()
     if args.check:
-        if current is None:
-            print("%s が無い。`python3 tools/gen_tests_inventory.py --write` を実行せよ。"
-                  % OUT_REL)
-            return 1
-        if current == fresh:
-            print("試験一覧は最新: %s" % OUT_REL)
-            return 0
-        fd, tmp = tempfile.mkstemp(prefix="TESTS-", suffix=".md")
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(fresh)
-        diff = list(difflib.unified_diff(
-            current.split("\n"), fresh.split("\n"),
-            fromfile=OUT_REL, tofile="生成器の出力 (%s)" % tmp, lineterm="", n=1))
-        print("試験一覧が古い: %s が build/*.mk / 試験スクリプトとずれている" % OUT_REL)
-        print("")
-        for line in diff[:60]:
-            print("  " + line)
-        if len(diff) > 60:
-            print("  ... (差分 %d 行のうち先頭 60 行)" % len(diff))
-        print("")
-        print("`python3 tools/gen_tests_inventory.py --write` を実行せよ。")
-        print("手書きの節は `<!-- manual:… -->` の中だけで、生成器はそこを保つ。")
-        return 1
-
-    sys.stdout.write(fresh)
+        return check_registration()
+    fresh = render()
+    if args.write:
+        for relpath, text in ((OUT_REL, fresh), (HOST32_REL, render_host32())):
+            path = os.path.join(ROOT, relpath)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(text)
+            print("%s を書き出した" % relpath)
+    else:
+        sys.stdout.write(fresh)
     return 0
 
 

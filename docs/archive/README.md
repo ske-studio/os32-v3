@@ -63,7 +63,7 @@ python3 tools/move_docs.py --into docs/archive/<領域> docs/tasks/<領域>/TASK
 ```bash
 python3 tools/check_docs_links.py              # リンクと見出しアンカー
 python3 tools/check_docs_orphans.py            # 索引から辿れなくなっていないか
-python3 tools/gen_tests_inventory.py --write   # TESTS.md の「票」列を引き直す
+make check-tests-inventory                    # 試験の登録を照合する
 ```
 
 `docs/INDEX.md` の索引行と、上の籠の表は人が書く。

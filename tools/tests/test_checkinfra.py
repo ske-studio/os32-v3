@@ -10,6 +10,7 @@ import test_check_select as legacy
 import os
 BEFORE = '--before' in sys.argv
 CS = legacy.load()
+INVENTORY_SOURCE = None
 if os.environ.get('CHECK_SELECT_BEFORE'):
     CS = legacy.load(pathlib.Path(os.environ['CHECK_SELECT_BEFORE']).read_text())
 if '--before' in sys.argv:
@@ -315,24 +316,85 @@ class CheckInfra(unittest.TestCase):
             self.assertEqual(proc.returncode, 0, proc.stderr)
             self.assertEqual(proc.stdout.count('--mutate'), expected)
 
-    def test_generated_inventory_freshness(self):
+    def test_generated_inventory_registration(self):
         import tempfile
         with tempfile.TemporaryDirectory(prefix='checkinfra-gen-') as tmp:
-            edits = {'docs/TESTS.md': (legacy.ROOT / 'docs/TESTS.md').read_text() + 'stale\n',
-                     'docs/08_build.md': (legacy.ROOT / 'docs/08_build.md').read_text().replace(
-                         '<!-- generated:host32 -->', '<!-- generated:host32 -->\nstale')}
+            edits = {'docs/TESTS.md': (legacy.ROOT / 'docs/TESTS.md').read_text() + 'manual note\n',
+                     'docs/08_build.md': (legacy.ROOT / 'docs/08_build.md').read_text() + 'manual note\n'}
+            if INVENTORY_SOURCE is not None:
+                edits['tools/gen_tests_inventory.py'] = INVENTORY_SOURCE
+            # build/out を実ツリーと共有しない (生成先は必ず fixture 内)。
             root = legacy.mutpar.mutant_tree(legacy.ROOT, pathlib.Path(tmp)/'tree', edits,
-                       real={'tools/gen_tests_inventory.py', 'tools/check_select.py'})
+                       real={'tools/gen_tests_inventory.py', 'tools/check_select.py',
+                             'build/checks.d/check-tests-inventory.mk',
+                             'tools/check_map.d/check-tests-inventory.yaml'})
+            out = root / 'build/out'
+            if out.is_symlink():
+                out.unlink()
+            out.mkdir(exist_ok=True)
             def run(flag):
                 return subprocess.run([sys.executable, '-B', str(root/'tools/gen_tests_inventory.py'), flag],
                                       capture_output=True, text=True)
-            self.assertEqual(run('--check').returncode, 1)
-            self.assertEqual(run('--write').returncode, 0)
             result = run('--check')
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(run('--write').returncode, 0)
+            for path, text in edits.items():
+                self.assertEqual((root/path).read_text(), text)
+            inventory = out / 'TESTS.md'
+            host32 = out / 'HOST32.md'
+            self.assertIn('check-tests-inventory', inventory.read_text())
+            self.assertIn('HOST32_RUNNERS', host32.read_text())
+            inventory.write_text('stale\n')
+            host32.unlink()
+            result = run('--check')
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(run('--write').returncode, 0)
+            self.assertIn('check-tests-inventory', inventory.read_text())
+            # Make 登録に存在しない試験を指定した場合は生成済みでも拒否する。
+            shard = root / 'build/checks.d/check-tests-inventory.mk'
+            text = shard.read_text()
+            shard.unlink()  # mutant_tree の symlink を介して実ツリーを書き換えない
+            shard.write_text(text.replace('tools/gen_tests_inventory.py --check',
+                                          'tools/tests/test_missing_inventory.py'))
+            result = run('--check')
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('test_missing_inventory.py', result.stderr)
+            shard.write_text(text + '\nCHECK_PAR_ORDER += 999:check-missing-inventory\n')
+            result = run('--check')
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('check-missing-inventory', result.stderr)
+            shard.write_text(text)
+            mapping = root / 'tools/check_map.d/check-tests-inventory.yaml'
+            before = mapping.read_text()
+            mapping.unlink()
+            mapping.write_text(before.replace('- tools/gen_tests_inventory.py\n', ''))
+            result = run('--check')
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('tools/gen_tests_inventory.py', result.stderr)
+
+
+    def test_inventory_orphan_edges(self):
+        import importlib.util
+        from unittest.mock import patch
+        path = legacy.ROOT / 'tools/check_docs_orphans.py'
+        spec = importlib.util.spec_from_file_location('docs_orphans', path)
+        orphan = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(orphan)
+        sys.path.insert(0, str(legacy.ROOT / "tools"))
+        import gen_tests_inventory as inventory
+        with patch.object(orphan, 'read', return_value='[manual](POLICY_DEV.md)'), \
+             patch.object(inventory, 'render', return_value=
+                          '[record](../../tools/tests/example_tdd.md)\n'
+                          '[ticket](../../docs/tasks/example.md)'):
+            self.assertEqual(set(orphan.link_targets('docs/TESTS.md')),
+                             {'docs/POLICY_DEV.md', 'tools/tests/example_tdd.md',
+                              'docs/tasks/example.md'})
+            # 通常の文書は生成表への仮想参照を持たない。
+            self.assertEqual(orphan.link_targets('docs/OTHER.md'), ['docs/POLICY_DEV.md'])
 
 
 MUTATIONS = [
+    ('tools/gen_tests_inventory.py', 'return int(bool(errors))', 'return 0'),
     ('if not routed_build_safe(base, f):', 'if False:'),
     ('("+ ", "- ")', '("+ ",)'),
     ('            hit |= artifact_targets\n', '            pass\n'),
@@ -355,7 +417,7 @@ MUTATIONS = [
 
 
 def main():
-    global CS
+    global CS, INVENTORY_SOURCE
     mutate = '--mutate' in sys.argv
     if mutate:
         sys.argv.remove('--mutate')
@@ -366,9 +428,18 @@ def main():
     if mutate:
         import contextlib, io
         source = legacy.SRC.read_text()
-        for i, (old, new) in enumerate(MUTATIONS, 1):
-            assert source.count(old) == 1, (i, old)
-            CS = legacy.load(source.replace(old, new))
+        for i, mutation in enumerate(MUTATIONS, 1):
+            INVENTORY_SOURCE = None
+            if len(mutation) == 3:
+                path, old, new = mutation
+                original = (legacy.ROOT / path).read_text()
+                assert original.count(old) == 1, (i, path, old)
+                INVENTORY_SOURCE = original.replace(old, new)
+                CS = legacy.load(source)
+            else:
+                old, new = mutation
+                assert source.count(old) == 1, (i, old)
+                CS = legacy.load(source.replace(old, new))
             suite = unittest.defaultTestLoader.loadTestsFromTestCase(CheckInfra)
             with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
                 result = unittest.TextTestRunner(stream=io.StringIO()).run(suite)

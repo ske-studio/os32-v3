@@ -31,6 +31,8 @@ check_docs_orphans.py — どこからも辿れない文書 (孤児) の検出
 加えて、票は TDD 記録を Markdown リンクではなく
 「記録は tools/tests/s0_tdd.md」のように**素のパスで**書くのが慣例なので、
 本文中にパスがそのまま現れていれば参照とみなす。
+`docs/TESTS.md` からは登録済み試験の生成表のリンクも辿る。保存済み生成物は読まず、
+生成器がメモリ上で作る表を使うので、生成物の有無・鮮度で結果は変わらない。
 
 `docs/hw/` は対象外。gitignore された著作権物のミラーで、環境によって
 有ったり無かったりする。
@@ -83,8 +85,16 @@ def read(rel):
 
 def link_targets(rel):
     """1 ファイルから出ている相対リンクのうち、.md を指すものを正規化して返す。"""
-    text = read(rel)
-    base = os.path.dirname(rel)
+    out = []
+    if rel == "docs/TESTS.md":
+        # 表は保存しない。登録済み試験から生成されるリンクも索引の辺として辿る。
+        import gen_tests_inventory as inventory
+        out.extend(markdown_targets(inventory.render(), os.path.dirname(inventory.OUT_REL)))
+    return out + markdown_targets(read(rel), os.path.dirname(rel))
+
+
+def markdown_targets(text, base):
+    """出力先のディレクトリを基準に、生成表と手書き文書のリンクを解く。"""
     out = []
     for m in LINK_RE.finditer(text):
         raw = m.group(1).split("#", 1)[0].strip()

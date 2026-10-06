@@ -108,7 +108,13 @@ clean-deps:
 .PHONY: all clean clean-deps
 
 # ドキュメントを Windows 側 (C:\WATCOM\docs\os32) へミラー / 逆方向は tools/sync_hwdocs.sh
-.PHONY: docs-win
+.PHONY: docs-gen tests-inventory docs-win
+tests-inventory:
+	python3 tools/gen_tests_inventory.py --write
+
+docs-gen: tests-inventory
+	python3 tools/gen_memmap.py --write
+
 docs-win:
 	sh tools/sync_docs_to_win.sh
 

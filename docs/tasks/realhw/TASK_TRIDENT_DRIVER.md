@@ -494,7 +494,7 @@ gfx/backend_trident.c      GfxBackend (probe / prepare / init / query / present_
 
 ### 4-4. カーネルの大きさ
 
-- 予算の制限対象は **`__bss_end`** (`docs/02_memory.md` §2-1 の生成ブロック「カーネルがあと何 KB 育つと何が壊れるか」: 残りぶんを超えると `build/os32.ld` の ASSERT がリンクを止める。2026-09-30 の `kernel.map` では残り 13.0KB)。
+- 予算の制限対象は **`__bss_end`** (`docs/02_memory.md` §2-1 から案内する `build/out/MEMMAP.md` の「カーネルがあと何 KB 育つと何が壊れるか」: 残りぶんを超えると `build/os32.ld` の ASSERT がリンクを止める。2026-09-30 の `kernel.map` では残り 13.0KB)。
   バックエンドの `.text` だけでは判断できない — モード表 (.rodata)・状態領域 (.bss)・**共通の写像 / 復帰処理 (§3-5 R3/R4、§4-2 の記述子と paging の変種)**・
   **Trident の枠の追加 PT** (4KB × PDE 数。静的に持つなら `.bss`、T8 の境界で pgalloc から取るならカーネル像の外 — どちらかを見積もりに書く、Codex D7) も入る。
 - 参考値: Cirrus 系の `.text` は `wab_glue_xe10.o` 0x19C + `wab_cirrus.o` 0xDAD + `backend_cirrus.o` 0xB4B ≈ **6.6KB** (手元の `build/out/kernel.map`)。

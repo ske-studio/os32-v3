@@ -9,8 +9,11 @@ set -eu
 SRC="$(cd "$(dirname "$0")/.." && pwd)"
 DST="${OS32_DOCS_WIN:-/mnt/c/WATCOM/docs/os32}"
 [ -d "$(dirname "$DST")" ] || { echo "ERROR: $(dirname "$DST") が無い (Windows 側の資料ディレクトリ)"; exit 1; }
-mkdir -p "$DST"
+# 直接実行でも、生成に失敗したら同期前に止める。
+make -C "$SRC" docs-gen
+mkdir -p "$DST/build/out"
 rsync -a --delete --exclude='hw/' --exclude='__pycache__/' "$SRC/docs/" "$DST/docs/"
+cp "$SRC/build/out/TESTS.md" "$SRC/build/out/HOST32.md" "$SRC/build/out/MEMMAP.md" "$DST/build/out/"
 cp "$SRC/README.md" "$SRC/CLAUDE.md" "$DST/"
 cat > "$DST/README_MIRROR.md" <<EOT
 # os32 — OS32 リポジトリのドキュメントミラー (読み取り専用)
@@ -20,6 +23,7 @@ cat > "$DST/README_MIRROR.md" <<EOT
 
 - \`docs/\` — リポジトリの docs/ そのまま (\`docs/INDEX.md\` が目次)。docs/hw は含まない
 - \`README.md\` \`CLAUDE.md\` — リポジトリ最上位の 2 つ
+- \`build/out/\` — 今回生成した TESTS.md / HOST32.md / MEMMAP.md (git 管理外)
 - 最終同期: $(date '+%Y-%m-%d %H:%M')
 EOT
 echo "synced -> $DST: $(find "$DST" -type f | wc -l) files, $(du -sh "$DST" | cut -f1)"

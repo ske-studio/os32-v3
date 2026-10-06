@@ -27,7 +27,7 @@
 | リンク層は NIC の上に載る。`drivers/lgy98.c` が `link_init(mac)` を呼び、IRQ スタブは `irq_stub_nic_3/5/6` | `drivers/lgy98.c` 122〜137 行 |
 | ホスト側 `tools/host_agent.py` は **TCP の FrameStream** (NP21/W の NP2NETSOCK が繋ぐ) しか話さない。実機では LAN の生フレームを FrameStream に橋渡しする道具が要る | `host_agent.py` `open_stream()` |
 | WSL2 (ミラーモード) は `eth3` (物理、f0:68:e3:fa:99:06) を見るが AF_PACKET は root 要 (sudoers に python は無い)。Windows 側には **Npcap 導入済み** (`System32\Npcap`)、scapy は未導入 (uv で入る) | 2026-09-22 実測 |
-| カーネル本体の大きさと残り予算は [`docs/02_memory.md`](../../02_memory.md) §2-1 の生成ブロックが正典 (策定時 2026-09-22 の写しは 442.6KB / 468KB、残り 25.4KB。2026-09-30 は 583.0KB / 596KB、残り 13.0KB — KHEAP の切り直しで予算が 596KB になった)。予算は `MEM_KERNEL_IMAGE_MAX` = 帯 − KHEAP − KAPI − ガード − SHM。増やすなら SHM を 16KB 単位で削るか KHEAP を減らす | `docs/02_memory.md` §2-1、`include/memmap.h` (`MEM_KERNEL_IMAGE_MAX`) |
+| カーネル本体の大きさと残り予算は [`docs/02_memory.md`](../../02_memory.md) §2-1 から案内する `build/out/MEMMAP.md` が実測の地図 (策定時 2026-09-22 の写しは 442.6KB / 468KB、残り 25.4KB。2026-09-30 は 583.0KB / 596KB、残り 13.0KB — KHEAP の切り直しで予算が 596KB になった)。予算は `MEM_KERNEL_IMAGE_MAX` = 帯 − KHEAP − KAPI − ガード − SHM。増やすなら SHM を 16KB 単位で削るか KHEAP を減らす | `docs/02_memory.md` §2-1、`include/memmap.h` (`MEM_KERNEL_IMAGE_MAX`) |
 | v3 の順序は C11 → メモリマップ再配置 → **ドライバ動的読み込み → PCI → 82557** (「動かさない」)。理由は予算 (PCI 数 KB + 82557 十数 KB、USB は 100KB 超) | `../v3/PLAN.md` §1/§3 |
 
 ## 2. 段取り (案)
