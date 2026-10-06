@@ -1,0 +1,18 @@
+check-kcallback-host:
+- fs/vfs.c
+- fs/vfs.h
+- fs/ext2_vfs.c
+- exec/exec.c
+- exec/exec_kapi_init.inc
+- exec/ring3_ls.c
+- exec/ring3_ls.h
+- exec/ring3_ls.S
+- exec/ring3_str.h
+- sdk/kapi.json
+- kapi/kapi_generated.c
+- build/kernel.mk
+- tools/tests/kcallback_host.c
+- tools/tests/test_kcallback.py
+- tools/tests/host32.py
+- build/checks.d/check-kcallback-host.mk
+- tools/check_map.d/check-kcallback-host.yaml

@@ -45,6 +45,16 @@ static void exec_park_stop(u32 *frame) { (void)frame; stop_park_calls++; }
 static int ring3_ptr_ok(u32 p) { (void)p; return 1; }
 static void ring3_fault_kill(void) { longjmp(killed, 1); }
 static u32 kapi_invoke(void *fn, const void *args, u32 n);
+#include "ring3_ls.h"
+static int ls_calls;
+int ring3_ls_dispatch(u32 user_esp)
+{
+    struct caller_access a;
+    assert(user_esp == MEM_APP_BAND_BASE && ring3_in_syscall);
+    assert(caller_access_get_user(&a) && a.app_id == cur);
+    ls_calls++;
+    return 91;
+}
 static int guest_ints;
 void v86_int80(u32 *frame) {
     assert(frame[V86I_EFLAGS] & EFLAGS_VM);
@@ -179,7 +189,14 @@ int main(void)
         /* The kill fixture does not emulate d2 landing; reset only test state. */
         select_parent(); g_cur_frame = NULL;
     }
-    assert(stop_park_calls == invoked);
+    u32 ls_frame[13] = {0};
+    ls_frame[7] = RING3_LS_CALL;
+    ls_frame[11] = MEM_APP_BAND_BASE;
+    ring3_in_syscall = 0;
+    ring3_syscall_dispatch(ls_frame);
+    assert(ls_frame[7] == 91 && ls_calls == 1);
+    assert(!caller_access_get(&out) && !ring3_in_syscall && !g_cur_frame);
+    assert(stop_park_calls == invoked + ls_calls);
     puts("caller d2: actual dispatcher, USER/TRUSTED/WM/nesting/rejection/IF PASS");
     return 0;
 }

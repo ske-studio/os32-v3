@@ -200,6 +200,12 @@ const char *vfs_devname(const char *prefix);
 
 /* ディレクトリ操作 */
 int  vfs_ls(const char *path, vfs_dir_cb cb, void *ctx);
+/* Private enumeration window. Backends still emit every visible name so
+ * errors and end-of-directory remain observable; metadata outside the window
+ * may be omitted. Ordinary vfs_ls callbacks always require metadata. */
+int vfs_ls_window(const char *path, u32 skip, u32 metadata_count,
+                  vfs_dir_cb cb, void *ctx);
+int vfs_dir_needs_metadata(vfs_dir_cb cb, void *ctx);
 int  vfs_mkdir(const char *path);
 int  vfs_rmdir(const char *path);
 

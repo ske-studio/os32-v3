@@ -81,7 +81,8 @@ static void ext2_to_vfs_cb(const Ext2DirEntry *e, void *ctx)
 
     /* ext2ディレクトリエントリにはサイズ情報がないためinodeから取得 */
     ve.size = 0;
-    if (e->file_type != EXT2_FT_DIR) {
+    if (e->file_type != EXT2_FT_DIR &&
+        vfs_dir_needs_metadata(lc->user_cb, lc->user_ctx)) {
         ext2_get_size_ino(lc->ec, e->inode, &ve.size);
     }
 

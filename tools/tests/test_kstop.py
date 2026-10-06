@@ -12,6 +12,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 PRE = r'''
 #include "appslot.h"
 #include "exec.h"
+#include "ring3_ls.h"
+int ring3_ls_dispatch(u32 user_esp) { (void)user_esp; __builtin_trap(); }
 #include "fd_redirect.h"
 #include "kbd.h"
 #include "gui.h"

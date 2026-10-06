@@ -162,7 +162,7 @@
         "void *cb",
         "void *ctx"
       ],
-      "body": "return vfs_ls(path, (vfs_dir_cb)cb, ctx);"
+      "body": "if (ring3_call_from_user()) { ring3_fault_kill(); return OS32_ERR_INVAL; }\nreturn vfs_ls(path, (vfs_dir_cb)cb, ctx);"
     },
     {
       "name": "kmalloc_total",

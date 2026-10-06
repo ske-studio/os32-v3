@@ -1,4 +1,5 @@
 check-caller-access-host:
+- exec/ring3_ls.h
 - kernel/v86.h
 - exec/exec.c
 - exec/exec_kapi_init.inc

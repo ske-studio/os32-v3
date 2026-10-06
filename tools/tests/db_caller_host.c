@@ -4,6 +4,8 @@
 #define HOST_CALLER_COPY_TEST
 #include "access_walk_host.c"
 #include "ring3_str.h"
+#include "ring3_ls.h"
+int ring3_ls_dispatch(u32 user_esp) { (void)user_esp; __builtin_trap(); }
 #include "v86.h"
 void v86_int80(u32 *frame) { (void)frame; __builtin_trap(); }
 volatile int ring3_in_syscall = 1;

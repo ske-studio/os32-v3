@@ -35,6 +35,8 @@ exec/exec.c:exec_kapi_layout_selftest:KAPI / トランポリン / アプリの�
 exec/exec.c:exec_tramp_user_selftest:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
 exec/exec.c:exec_restore_context:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
 exec/exec.c:ring3_syscall_dispatch:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
+exec/ring3_ls.c:ring3_ls_dispatch:USER ESP と引数は呼び手の仮想番地。caller access が所属・PTE を検証して物理へ変換する
+exec/ring3_ls.c:ls_copy_path:USER パスの仮想番地の加算。copy_caller_bytes が所属・PTE を検証して物理へ変換する
 exec/exec.c:exec_launch:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
 exec/exec.c:tramp_copy:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
 exec/exec_heap.c:exec_heap_init_at:アプリ/シェルの仮想ヒープ先頭 (物理変換しない)

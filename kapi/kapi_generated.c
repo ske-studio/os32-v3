@@ -654,6 +654,7 @@ int __cdecl wrap_sys_mkdir(const char *path)
 int __cdecl wrap_sys_ls(const char *path, void *cb, void *ctx)
 {
     KAPI_HIT(12);
+    if (ring3_call_from_user()) { ring3_fault_kill(); return OS32_ERR_INVAL; }
     return vfs_ls(path, (vfs_dir_cb)cb, ctx);
 }
 
