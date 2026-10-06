@@ -8,6 +8,17 @@
 [archive/v3/TASK_T2D_T2H_RECORDS.md](../archive/v3/TASK_T2D_T2H_RECORDS.md) の同じ範囲の見出しから読む。
 拾い出しの作業表 (全件、約 290 行。Opus サブエージェントが全行を読んで作成、PM は未照合) は `~/os32-tmp/evidence/2026-10-06/t2dh_open_items/`。
 
+## 関門: 新機能より先 (優先段)
+
+PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に配備・受入する。手段と受入条件は [T2票 §2-4 結線表の注記](v3/TASK_T2D_T2H.md#2-4-user切替の一括境界)。
+
+| ID | 何を | 種類 | 関門 |
+|---|---|---|---|
+| KAPI-CALLBACK | 公開形・版を保ちUSER callbackのCPL0実行を塞ぐ。単純拒否不可、hsync/install/filerの列挙正常・man -l crash解消を確認 | 既知の不具合 | 優先段 |
+| KAPI-OWNER | SHM lock/free・pipe free/clear/get_buf・DB slotをwrapで所有者照合、既存の-1で無変更拒否。本人成功・trusted回収も確認 | 既知の不具合 | 優先段 |
+| KAPI-DISK-AUTH | exec経路・/sys由来・CUI前景を基に拒否＋許可リスト。無授権I/Oゼロ、inst_hdd(CPL3)・常駐cmd_hdprepの正規利用を確認 | 既知の不具合 | 優先段 |
+| KAPI-AUDIT-FIX | cursor clamp・FM/SSG ch検査・fm_play_mml/serial_getcharのSTOP不能DoS・rshell授権を修正。残りの未監査区分はe11a着手前に分類 | 既知の不具合・未監査 | 優先段 |
+
 ## 1. 関門: e9 / e10b / e10c
 
 | ID | 何を | 種類 | 元の行 |
@@ -23,22 +34,23 @@
 
 ## 2. 関門: e11 (公開 KAPI の一括、版の更新は 1 回)
 
-| ID | 何を | 種類 | 元の行 |
-|---|---|---|---|
-| E11-1 | 未結線のまま入っているコードの結線と受入: `surface_query` / `query_source`、`surface_lease`、`lease_bundle`、`gfx_surface_source`、`gfx_reinit_surfaces` の publisher、内部 port (本番 NULL) と compat bridge、Unicode 面の port、帰路 check の失敗経路 | 未結線 | 223–257、430–455、571、584–585、654–656、821–823、847、911、949、1023–1040、1069、1089、1105–1108、1143、1204–1207、1367–1368 |
-| E11-2 | 結線時にサイズを再計測する (予算の実測ゲート) | 申し送り | 289–291、457–470、538、688、1240 |
-| E11-3 | 旧低位 USER / 共有 USER 化の撤去、`ring3_ptr_ok` の VRAM 直書き、`exec_map_shared_bb`、Cirrus DISPLAY NONE→RW | 未実施の確認 | 599、605–606、707、826、887–892、1006、1043、1573–1576、1762–1763 |
-| E11-4 | **`sys_ls` の callback を CPL0 で呼ぶ** (ring0 を取れる。`man -l` の crash もこれ)、`shm_lock` / `shm_free` の所有者照合、生ディスクの授権 | 既知の不具合 | 1501–1504、1546、1600、1694、1887 |
-| E11-5 | Run から起動した全画面アプリにキーが届かない — 受入 4 点 (キーで終わる / 端末の子に二重に注入しない / 窓へ漏れない / WAIT_POLL 型にも届く) | 既知の不具合 | 1167–1169、1431 |
-| E11-6 | e5〜e8b・e10a のレビュー P3 の残り (pre-init USER の食い違い、bridge が `__cdecl` でない、版の門、`gfx_shutdown` の門、utf8 pointer の初期値、Unicode の 2 回取得、`kcg_init` が漢字フラグを消す、shlib token の残り、wait 帰路 check 4 件) | 申し送り | 998–1002、1111、1156–1163、1274、1338、1361、1396、1429、1624 |
-| E11-7 | KAPI 文書への注記: STALE / INVAL の推測可能性、callback / scheduling 禁止の契約 | 申し送り | 258、375–377、573、1004 |
-| E11-8 | 監査していない KAPI の区分を洗い直す (pipe、redirect、host_*、exec_* / launch_* / appslot、ime_*、gui_call / register、con_sink)。pipe・旧 DB slot の他 owner 操作、範囲検査レビューの P3 群 | 未実施の確認 | 1502、1504、1546 |
-| E11-9 | tvdump に使う `tvram_readchar_at` を CUI 全画面の所有者だけに授権 (公開 KAPI の意味変更は e11 の 1 回に集約) | 申し送り | e9 (2026-10-02 PM 決定) |
-| E11-10 | `ring3_guard bb` (E) を拒否期待へ反転し、正規 CLIENT lease で生き残る対照を追加。e9 は旧 E 生存を保持 | 申し送り | e9 / T2d〜h §2-5 |
-| E11-11 | `db_v50_test` に未貸与 VRAM 拒否の期待を追加 (低位 USER 撤去後)。e9 は実 RAM 最終 byte 成功と guard 越境拒否 | 申し送り | e9 (2026-10-02 PM 決定) |
-| E11-12 | h3 の本人識別を値で返す経路と writer 初期化を結線 (E9-2)。e9 では PM 決定 (A) を維持 | 申し送り | E9-2 / e9 |
-| E11-13 | SHM lock の実効性 (全ページが RO となり CPL3 書込みを拒否するか) をゲストで確認。e9 のホスト試験は lock 呼出しと結果判定のみ | 未実施の確認 | e9 R4 |
-| E11-14 | SHM ブロック長・ページ長の公開定数を整理。e9 は既存の DB_SHM_BLOCK_SIZE と私有 PAGE_BYTES を使用し、公開 SDK は変更しない | 申し送り | e9 R5 |
+| ID | 何を | 種類 | 元の行 | 関門 |
+|---|---|---|---|---|
+| E11-1 | surface query/lease/bundle・gfx source/再init publisher・NULL port/互換橋・Unicode・帰路失敗を結線。準備だけで隔離合格としない | 未結線 | 223–257、430–455、571、584–585、654–656、821–823、847、911、949、1023–1040、1069、1089、1105–1108、1143、1204–1207、1367–1368 | e11a/c準備 → 統合 |
+| E11-2 | 結線後のkernel/SDK/shlibサイズを再実測し、§6のe枠・圧縮・8MB私有量を確認。撤去の減少を先取りしない | 申し送り | 289–291、457–470、538、688、1240 | e11a/b/c → 統合 |
+| E11-3 | 低位/共有USER化・VRAM例外・exec_map_shared_bbを撤去、共有PT操作を拒否。Cirrus DISPLAYは授権leaseでNONE→RW | 未実施の確認 | 599、605–606、707、826、887–892、1006、1043、1573–1576、1762–1763 | e11a/b → 統合 |
+| E11-4 | 上記KAPI-CALLBACK/OWNER/DISK-AUTHの受入を前提に、値返し列挙KAPIとcaller移行・必要ならOS32X授権flagを一括接続 | 契約接続待ち | 1501–1504、1546、1600、1694、1887 | e11b/c → 統合 |
+| E11-5 | Run全画面のowner 1または専用KAPIでキー配送。終了・二重注入なし・窓漏れなし・WAIT_POLLを確認、KAPI追加はcで版一括 | 既知の不具合 | 1167–1169、1431 | e11a/b/c → 統合 |
+| E11-6 | P3残: pre-init USER・cdecl橋・版/終了門・utf8初期値/Unicode二重取得・kcg漢字旗・shlib token・wait帰路4件 | 申し送り | 998–1002、1111、1156–1163、1274、1338、1361、1396、1429、1624 | e11a/b/c → 統合 |
+| E11-7 | KAPI文書にSTALE/INVALの推測可能性とcallback/scheduling禁止を明記し、公開契約・生成物と照合 | 申し送り | 258、375–377、573、1004 | e11c → 統合 |
+| E11-8 | 上記KAPI-AUDIT-FIX/OWNERの受入・分類を反映。pipe_get_bufのkernel番地返却の意味変更と範囲検査P3変異を接続 | 契約接続待ち | 1502、1504、1546 | e11c → 統合 |
+| E11-9 | tvdumpのtvram_readchar_atをCUI前景所有者だけに授権。checked copyとTVDM wireを維持し非所有者拒否を確認 | 申し送り | e9 (2026-10-02 PM 決定) | e11b/c → 統合 |
+| E11-10 | ring3_guard bb (E)を旧生存から拒否期待へ反転し、正規CLIENT leaseの生存対照を追加。e9の旧期待は準備時のみ | 申し送り | e9 / T2d〜h §2-5 | e11a/b → 統合 |
+| E11-11 | db_v50_testに未貸与VRAM拒否を追加。e9の実RAM最終byte成功・guard越境拒否も維持して低位USER撤去後に確認 | 申し送り | e9 (2026-10-02 PM 決定) | e11b → 統合 |
+| E11-12 | h3の本人識別を値返しにしwriter初期化を結線 (E9-2)。e9のPM(A)から切替え、CRT非依存markerも確認 | 申し送り | E9-2 / e9 | e11a/c → 統合 |
+| E11-13 | SHM lockで全ページRO・CPL3書込み拒否をゲスト確認。ホストの呼出し/結果判定だけで閉じずfree/exit後の次AS成功も対照 | 未実施の確認 | e9 R4 | e11b → 統合 |
+| E11-14 | SHMブロック長・ページ長の公開定数を整理しcaller追随。e9のDB_SHM_BLOCK_SIZE/私有PAGE_BYTESから一括移行 | 申し送り | e9 R5 | e11c → 統合 |
+
 
 ## 3. 関門: f5 以降 (T2f の結線と受入)
 
