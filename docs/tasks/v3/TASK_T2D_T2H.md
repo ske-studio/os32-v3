@@ -1,6 +1,6 @@
 # TASK_T2D_T2H — T2d〜T2h 詳細設計
 
-> 状態: **実装中 (2026-10-06)** — T2d は受入済み。T2e は e1〜e8b・e10a、T2f は f1a〜f4 (f2〜f4 は未結線)、T2h は h2・h3 の準備まで着地。残りは e9・e10b/c・e11、f5 以降、g、h の統合受入 (現在地は [HANDOVER_2026-10-06](../agents/HANDOVER_2026-10-06.md))。
+> 状態: **実装中 (2026-10-06)** — T2d は受入済み。T2e は e1〜e9・e10a、T2f は f1a〜f4 (f2〜f4 は未結線)、T2h は h2・h3 の準備まで着地。残りは e10b/c・e11、f5 以降、g、h の統合受入 (現在地は [HANDOVER_2026-10-06](../agents/HANDOVER_2026-10-06.md))。
 > それまでの状態: 設計中 (2026-10-01) — 独立レビュー Opus 5.5 は 1 回目 Request changes (P1 2件 / P2 11件 / P3 8件) → 反映 → 2 回目 Approve (P3 5件は §11 の実装時の注記)。
 > 作成: GPT-6 / Codex。調査基点: main / docs/t2d-h-design 共通 **9ae6073406c2027fd50938e3870a3fb3888cd7f6**。
 > **実行記録は 2026-10-06 に [archive/v3/TASK_T2D_T2H_RECORDS.md](../../archive/v3/TASK_T2D_T2H_RECORDS.md) へ移した** (この票は契約・分割・受入条件・未実施の手順だけ)。延ばした試験と未実施は [DEFERRED_TESTS.md](../DEFERRED_TESTS.md) が正。段の記録は 1 段 10 行以内で書く ([ROLES §0](../agents/ROLES.md))。
@@ -223,6 +223,13 @@ NP21/Wは8MB planar/PEGC、17MB planar/PEGC/Cirrus。日本語/描画/present、
 `shm_reuse_test` は free/exit の各経路で別 AS の同一ブロック・全ページ書込みを判定。E の旧 BB 生存期待は維持。
 ゲスト/native 未確認と e11 の4件は [持越し台帳](../DEFERRED_TESTS.md) E9-1〜4 / E10-3 / E11-9〜12 / S-5。
 証拠は `/home/hight/os32-tmp/run/e9/` のビルド・検査ログと e9 最終報告 (PM ゲスト手順)。
+
+**e9 + SHM の DB 予約の着地とゲスト受入 (PM、2026-10-06、main `ee15d21`、NP21/W 17MB・今の ini)**: 取り込みの `make check` rc=0 (3 回目 — 1 回目は TESTS.md の再生成漏れ、2 回目は試験の差し替え memmap の追従漏れ `323c044` で直した)。
+NHD 配備 (stop → nhd-pull → deploy-kernel → start)、`ver` の Commit `ee15d21`・`/boot/vmkernel.lz4` 484,623 B が手元と一致、kselftest 277/0 (試験の前後とも)。
+マーカー 8 行は `ring3_marker.h` の表どおり — 全行がブロック 1 (`0x1C4000`、ブロック 0 は DB 予約で配られない)、fault 5 行は ARMD・kill +1 ずつ (0→5)・シリアルの addr が target と一致、E は SURV・kill +0。
+`shm_reuse_test` PASS 4/4 (free / exit とも 2 本目が同じブロック `0x1C8000` に全ページ書込み)、`db_test` 9/9、`db_v50_test` 41/41。
+tvdump: `/api/cmd` で取った生バイトが TVDM 80×25・4,000 B、内容は `/api/tvram` と全行一致 (完了表示の 1 行のスクロール分を除く)。`tools/tvdump_recv.py` は名前付きパイプ `np21w_com1` が今の NP21/W に無く使えない (台帳 X-6)。
+未確認: B は shlib を読み込まずに走らせた (RO の error 7 は未証明、台帳 H-9)、sh.bin 経由の tvdump (台帳 E9-1)。証拠は `~/os32-tmp/evidence/2026-10-06/accept_e9/`。
 
 > **記録は archive へ移した (2026-10-06)**: T2e — e1〜e10a、KAPI の範囲検査・NULL 検査 (kapinull) の実装結果と受入 — [TASK_T2D_T2H_RECORDS.md の「元の行 219–1889」](../../archive/v3/TASK_T2D_T2H_RECORDS.md#r219)。
 

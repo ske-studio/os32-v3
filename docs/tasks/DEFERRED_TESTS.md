@@ -12,13 +12,11 @@
 
 | ID | 何を | 種類 | 元の行 |
 |---|---|---|---|
-| E9-1 | TVRAM の RW 化、rshell / アプリ / tvdump の経路をゲストで確かめる | 未実施の確認 | 1185、1571 |
+| E9-1 | TVRAM の RW 化、アプリと sh.bin (CPL3) 経由の tvdump をゲストで確かめる (常駐シェルの tvdump は 2026-10-06 に受入済み) | 未実施の確認 | 1185、1571 |
 | E9-2 | h3 の本人識別・前景の証拠 writer を正式な経路へ切り替える (h3 の初期化も) | 申し送り | 2605、2747–2893 |
 | E9-3 | TVRAM 範囲外の呼び出しの拒否をゲストで (`6e4df78` はホスト試験だけ) | ホストのみ | 1432–1548 |
 | E10-1 | e10b: V86 session の全出口と PDE USER、出口の高さ / flip の整合、`paging_v86_map_range` が session を見ない | 未実施の確認 | 605、686、888、1007、1599、1624 |
 | E10-2 | e10c: 全 AS の alias 照合、3 段検査、live==0 の合間の USER、`shm_set_rw` の検査、TVRAM の再取得と RO view の残り | 未実施の確認 | 606、686、1185、1274、1599、1624 |
-| E10-3 | e9/e10a: `shm_reuse_test` の lock → free / exit → 二本目の同一 SHM 全ページ書込みをゲスト確認 (e9 で試験実装、PM 受入待ち) | 未実施の確認 | 1601 |
-| E9-4 | e9 の SHM マーカー (`nop` / `ring3_hello/fault/guard`)、tvdump 前後 wire 比較、`db_v50_test` の RAM 境界成功と越境拒否をゲストで確認。SHM + serial addr + kill 差分の手順は `userland/tests/ring3_marker.h` | ホストのみ | e9 (2026-10-06) |
 
 ## 2. 関門: e11 (公開 KAPI の一括、版の更新は 1 回)
 
@@ -62,6 +60,7 @@
 | H-6 | V86 の出口で 6Ah の標準 / 拡張を戻していない (9821 で E0000h が MMIO のまま残り得る)。`v86 -d` / `-b` の後の表示確認、9801 構成での `gui_gate` | 未対処・未観測 | 788–789、3503 |
 | H-7 | apps / game の再ビルドと追随 (v3 の開発中は組まない決定 — 統合受入で必ず行う) | 未実施の確認 | 1113、1248、1810–1826、1868、3463 |
 | H-8 | `ring3_guard` A の固定 target (`MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE - MEM_GUARD_SIZE`) は T2c 可変スタックで実 stack 直下と一致しないことがある。h 受入で A が実 stack 直下 NP を指すことを確認 | 未実施の確認 | e9 R6 |
+| H-9 | `ring3_guard` B (shlib 帯) を shlib を読み込んだ AS で走らせ、RO の error=7 を確かめる (2026-10-06 の受入は未ロードで、帯の fault だけを確認。今のシリアル行は error_code を出さない) | 未実施の確認 | — |
 
 ## 5. 関門の記載が無いもの (PM が関門を決めて上の表へ移す)
 
@@ -72,6 +71,7 @@
 | X-3 | GitHub Actions の結果が票に無い: e1 の CI 修正後、f1a の初回 run | 未実施の確認 | 335–345、2003–2009 |
 | X-4 | 検査の整理の残り: ci-stab2 の P2-B の後の全体 check-changed と native の記録、6 時間超の対照の刈り取り、pending の 1 時間回収、生き残る弱い変異、`net_link` の TMPDIR 長、選択の取りこぼし 3 種 | 既知の制限 | 3551、3627、3705、3740、3754–3768、3776、3800–3807、3828–3832 |
 | X-5 | 16000B stride / 200 行の再登録についてのユーザーへの報告 | 未実施 | 1109–1110 |
+| X-6 | `tools/tvdump_recv.py` は COM1 の名前付きパイプ `np21w_com1` 前提で、今の NP21/W (デバッグ HTTP サーバ内蔵) では接続できない。`/api/cmd` で生バイトを取る形に直すか退役させる | 道具の不具合 | — |
 
 ## 6. SKIP の登録 (ここにあるものだけを「延期」と数える)
 
@@ -81,7 +81,6 @@
 | S-2 | `kout_test` の 1 件 | ゲストに `/etc/profile` が無い | **環境不足** (合格ではない) | 次のゲスト受入で `/etc/profile` を置いて回す |
 | S-3 | `kout_test` の 2d / 3c | 設計上の適用外 | 適用外 | — (延期ではない。試験側で SKIP ではなく N/A と出すようにする) |
 | S-4 | 外部 apps / game の再結線 | v3 の開発中は組まない決定 | 適用外 → H-7 | T2h 統合受入 |
-| S-5 | e9 列挙10ホスト検査 + `test_e9_observation.py` の native runner | Codex sandbox の ILP32 native は SIGSYS、qemu で検証 | 環境 | PM が e9 取り込み時に native 分だけ補う |
 
 ## 7. 一括ゲスト一覧に入っていない受入
 
