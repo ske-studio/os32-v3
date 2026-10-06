@@ -46,6 +46,7 @@ timeout 1500 codex exec -m gpt-6-astra -s read-only -C <repo> "<依頼文>" < /d
 ```
 
 **worktree の環境** (ここを外すと検査が環境のせいで落ちる):
+- 依頼の最初に `tools/preflight.sh --base <SHA> --fix-fonts` を実行し、NG を直してから始める。
 - worktree には `.env` が無い — `CROSS_DIR=/home/hight/opt/cross` を明示する。`TMPDIR` はディスク上 (`~/os32-tmp/…`、`/tmp` は RAM)。
 - Codex の sandbox では native の runner が SIGSYS で動かない — qemu で回させ、native は PM が列挙分だけ補う。
 - 検査が読む成果物 (`make all` の出力) が worktree にあることを、依頼の前に確かめる。
