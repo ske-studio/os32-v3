@@ -39,7 +39,7 @@
 #define KOUT_PCI_LEN  40     /* struct pci_dev の写し (drivers/pci.h) */
 #define KOUT_VER_LEN  32
 
-void main(int argc, char **argv, KernelAPI *api)
+int main(int argc, char **argv, KernelAPI *api)
 {
     u8 sbuf[KOUT_SECTOR];              /* アプリのスタック (非恒等写像) */
     char vbuf[KOUT_VER_LEN];
@@ -54,13 +54,13 @@ void main(int argc, char **argv, KernelAPI *api)
 
     if (api->version < 60) {
         api->kprintf(0x41, "KAPI v%d < 60\n", api->version);
-        return;
+        return 1;
     }
 
     heap = (u8 *)malloc(KOUT_SECTOR);
     if (!heap) {
         api->kprintf(0x41, "malloc failed\n");
-        return;
+        return 1;
     }
 
     /* --- 1. sys_read (A 型: 長さ引数つき) -------------------------------- */
@@ -187,4 +187,5 @@ void main(int argc, char **argv, KernelAPI *api)
     free(heap);
     api->kprintf(fails ? 0x41 : 0xC1, "KOUT %s (%d failure(s), %d skip(s))\n",
                  fails ? "FAIL" : "PASS", fails, skips);
+    return fails ? 1 : 0;
 }

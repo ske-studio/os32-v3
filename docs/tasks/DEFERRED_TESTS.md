@@ -14,7 +14,7 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 
 | ID | 何を | 種類 | 関門 |
 |---|---|---|---|
-| PRIO-3 | KAPI-AUDIT-FIX のゲスト確認 — CTRL+STOP で MML・シリアル・IME の待ちから抜ける、範囲外のカーソル・ch、USER の rshell_set_active。直接呼ぶ CPL3 の試験プログラムを作って | ホストのみ | 次の保守枠 |
+| PRIO-3 | KAPI-AUDIT-FIX のゲスト確認 — CTRL+STOP で MML・シリアル・IME の待ちから抜ける、範囲外のカーソル・ch、USER の rshell_set_active。`audit_test cursor/fmch/mml/serial/ime/rshell` を実装済み、入口・観測は `tools/tests/guest_acceptance.yaml` | ホストのみ | 次の保守枠 |
 | PRIO-1 | install / cdinst の通しの実行 (授権が通り、区画・format・書込みまで) を別のディスクイメージで — 取り込み済みの DISK-AUTH の受入の残り | 未実施の確認 | 次の構成試験 (h の前) |
 
 ## 1. 関門: e9 / e10b / e10c
@@ -85,7 +85,7 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 | X-3 | GitHub Actions の結果が票に無い (e1 の CI 修正後、f1a の初回 run) → 次の統合判定 (e11) の前に過去の run を照合。今の成功で過去を合格にしない | 未実施の確認 | 335–345、2003–2009 |
 | X-4 | 検査の整理の残り: ci-stab2 の P2-B の後の全体 check-changed と native の記録、6 時間超の対照の刈り取り、pending の 1 時間回収、生き残る弱い変異、`net_link` の TMPDIR 長、選択の取りこぼし 3 種 | 既知の制限 | 3551、3627、3705、3740、3754–3768、3776、3800–3807、3828–3832 |
 | X-6 | `tools/tvdump_recv.py` は名前付きパイプ前提で今の NP21/W に接続できない → `/api/cmd` で生バイトを取り TVDM の長さ・寸法・内容を照合する形に (計画 3 番、受入索引と同枠) | 道具の不具合 | — |
-| X-9 | `void main` で合否を表示だけする試験 (`blit_test`・`heap_test`・`kout_test`・`pcm_test`・`time_test`) — 終了コードが不定で一括試験の判定に使えない。`int main` で 0/1 を返す | 試験の不具合 | 次の保守枠 |
+| X-9 | `void main` で合否を表示だけする試験 (`blit_test`・`heap_test`・`kout_test`・`pcm_test`・`time_test`) — 終了コードが不定で一括試験の判定に使えない。`int main` の 0/1 へ修正済み、PCM の write/close 失敗も反映。ゲスト終了値の実測待ち | ゲスト未確認 | 次の保守枠 |
 
 ## 6. SKIP の登録 (ここにあるものだけを「延期」と数える)
 

@@ -31,7 +31,7 @@
 
 #define TIME_READS 2000
 
-void main(int argc, char **argv, KernelAPI *api)
+int main(int argc, char **argv, KernelAPI *api)
 {
     u32 lo = 0, hi = 0;          /* アプリのスタック (非恒等写像) */
     u32 plo, phi;
@@ -40,7 +40,7 @@ void main(int argc, char **argv, KernelAPI *api)
 
     if (api->version < 59) {
         api->kprintf(0x41, "KAPI v%d < 59: sys_time_now absent\n", api->version);
-        return;
+        return 1;
     }
 
     /* --- 1. 正常系 --- */
@@ -122,5 +122,7 @@ void main(int argc, char **argv, KernelAPI *api)
                      (void *)code);
         rc = api->sys_time_now(code, &lo);
         api->kprintf(0x41, "6 **NOT KILLED**: rc=%d (page was writable)\n", rc);
+        fails++;
     }
+    return fails ? 1 : 0;
 }

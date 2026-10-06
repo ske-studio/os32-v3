@@ -89,6 +89,10 @@ filesystem:
     - host: userland/tests/gui_busy.bin
       guest: /usr/bin/
       tags: [test]
+    # CPL3 probes for PRIO-3 / KAPI-AUDIT-FIX.
+    - host: userland/tests/audit_test.bin
+      guest: /usr/bin/
+      tags: [test]
     - host: userland/tests/blit_test.bin
       guest: /usr/bin/
       tags: [test]
