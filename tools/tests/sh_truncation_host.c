@@ -793,7 +793,8 @@ static int  __cdecl h_pcm_set_volume(u32 percent)
 static int  __cdecl h_serial_init_vfast(u32 baud) { (void)baud; return -1; }
 static int  __cdecl h_serial_get_status(u32 *mode, u32 *baud, u32 *fifo)
 { if (mode) *mode = 0; if (baud) *baud = 9600; if (fifo) *fifo = 0; return 0; }
-static void __cdecl h_rshell_set_active(int on) { (void)on; }
+static int rshell_active_calls;
+static void __cdecl h_rshell_set_active(int on) { (void)on; rshell_active_calls++; }
 static void __cdecl h_buz_off(void) {}
 static void __cdecl h_sys_halt(void) {}
 static int  __cdecl h_sys_mount(const char *mp, const char *dev, const char *fs)
@@ -2648,13 +2649,25 @@ static void case_rshell_line(void)
 {
     char *av[4];
 
+    fresh();
+    av[0] = "rshell";
+    rshell_active_calls=0;
+    check(cmd_rshell(1, av) == SH_STATUS_ERROR, "sh.bin rshell rejected");
+    check(out_has("resident shell only") && ser_count(0x04) == 0,
+          "sh.bin rshell rejection visible without EOT");
+    check(!rshell_active_calls, "sh.bin rshell does not try to claim serial output");
+    fresh(); rshell_active_calls=0;
+    key_push('T'); key_push(0x1B);
+    check(cmd_terminal(1, av)==0 && ser_count('T')==1 && !rshell_active_calls,
+          "sh.bin terminal sends directly without rshell activation");
+    /* Remaining cases exercise the resident implementation directly. */
     report("23 U11: rshell の 1 行上限 126 と EOT (T10)\n");
 
     /* --- 127 文字 → 実行しない。EOT は返す。 -------------------------- */
     fresh();
     rs_line("mk10 ", 'a', 122);          /* 5 + 122 = 127 文字 */
     av[0] = "rshell";
-    cmd_rshell(1, av);
+    cmd_rshell_resident(1, av);
     check(!ran("mk10"), "23a 127 文字の行は接頭辞も実行しない");
     check(refused_msg("rshell: command line"), "23b 上限を報告する");
     check(ser_count(0x04) == 2,
@@ -2663,7 +2676,7 @@ static void case_rshell_line(void)
     /* 126 文字ちょうどは通る (誤発火の裏) */
     fresh();
     rs_line("mk11 ", 'a', 121);          /* 5 + 121 = 126 文字 */
-    cmd_rshell(1, av);
+    cmd_rshell_resident(1, av);
     check(ran("mk11"), "23d 126 文字ちょうどは今までどおり実行する");
     check(!out_has("too long"), "23e 同上: 断らない");
     check(ser_count(0x04) == 2, "23f 同上: EOT も今までどおり 1 つ");
@@ -2674,7 +2687,7 @@ static void case_rshell_line(void)
     fresh();
     rs_line("mk12 ", 'b', 122);          /* 127 文字 — 断られる */
     rs_line("mk13", 'c', 0);             /* 次の行 — 通る */
-    cmd_rshell(1, av);
+    cmd_rshell_resident(1, av);
     check(!ran("mk12"), "23g 断った行は実行しない");
     check(ran("mk13"), "23h 次の行は正常に動く");
     check(ser_count(0x04) == 3, "23i EOT は 起動 + 断り + 次の行 の 3 つ");
@@ -2744,20 +2757,20 @@ static void case_rshell_line(void)
     rs_line("exit", ' ', 0);
     rs_line("mk14", ' ', 0);             /* exit の後ろ — 読まれてはいけない */
     av[0] = "rshell";
-    cmd_rshell(1, av);
+    cmd_rshell_resident(1, av);
     check(ser_count(0x04) == 2,
           "23r exit にも EOT を返す (起動の 1 つ + exit の 1 つ)");
     check(!ran("mk14"), "23s exit の後ろの行は実行しない");
 
     /* 待ち中の ESC: 直前の行の EOT は返し終えている → 足さない */
     fresh();
-    cmd_rshell(1, av);                   /* 台本なし = いきなり ESC */
+    cmd_rshell_resident(1, av);                   /* 台本なし = いきなり ESC */
     check(ser_count(0x04) == 1,
           "23t 待ち中の ESC では EOT を足さない (起動の 1 つだけ)");
 
     fresh();
     rs_line("mk15", ' ', 0);             /* 1 行実行してから台本切れ = ESC */
-    cmd_rshell(1, av);
+    cmd_rshell_resident(1, av);
     check(ran("mk15"), "23u 普通の行は今までどおり実行する");
     check(ser_count(0x04) == 2,
           "23v 同上: EOT は 起動 + その行 の 2 つ (ESC で 3 つにしない)");
@@ -2765,7 +2778,7 @@ static void case_rshell_line(void)
     /* 行の途中の ESC: 改行を積まない = 受けかけのまま ESC が来る */
     fresh();
     key_push_str("mk16");
-    cmd_rshell(1, av);
+    cmd_rshell_resident(1, av);
     check(!ran("mk16"), "23w 受けかけの行は実行しない");
     check(ser_count(0x04) == 2,
           "23x 受けかけで ESC なら EOT を返す (ホストを待たせない)");
@@ -2792,7 +2805,7 @@ static void rshell_nested(void)
     av[0] = "rshell";
     av[1] = (char *)0;
     g_exec_depth++;
-    cmd_rshell(1, av);
+    cmd_rshell_resident(1, av);
     g_exec_depth--;
 }
 

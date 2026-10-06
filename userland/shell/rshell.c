@@ -361,7 +361,7 @@ static const struct rsh_io rsh_io_real = {
     rsh_io_getch, rsh_io_tick, rsh_io_idle, (void *)0
 };
 
-static int cmd_rshell(int argc, char **argv)
+static int __attribute__((unused)) cmd_rshell_resident(int argc, char **argv)
 {
     char rbuf[RSHELL_LINE_MAX];
     struct rsh_line ln;
@@ -521,6 +521,17 @@ rshell_exit:
     g_api->rshell_set_active(0);
     g_api->kprintf(ATTR_CYAN, "%s", "\n[Remote shell closed]\n");
     return 0;
+}
+
+static int cmd_rshell(int argc, char **argv)
+{
+#ifdef SHELL_AS_APP
+    (void)argc; (void)argv;
+    g_api->kprintf(ATTR_RED, "%s", "rshell: resident shell only\n");
+    return SH_STATUS_ERROR;
+#else
+    return cmd_rshell_resident(argc, argv);
+#endif
 }
 
 #ifndef SHELL_AS_APP

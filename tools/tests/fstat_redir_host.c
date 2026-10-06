@@ -59,7 +59,13 @@ char *kstrncat(char *dst, const char *src, u32 n)
  * リダイレクトは**贋物を置かない** — この票の主題そのものなので、
  * fs/fd_redirect.c を実物のまま下で取り込む。 */
 static u32 con_written;
-int kbd_getchar(void) { return '\n'; }
+static int stdin_prefix;
+static int stdin_interrupt;
+int kbd_getchar_kapi(void)
+{
+    if (stdin_prefix) { stdin_prefix--; return 'A'; }
+    return stdin_interrupt ? -1 : '\n';
+}
 void console_write(const char *buf, u32 size, u8 color)
 { (void)buf; (void)color; con_written += size; }
 
@@ -395,6 +401,16 @@ int main(void)
 {
     printf("=== 票 TASK_FSTAT_REDIR: fstat がリダイレクトに従い isatty と"
            "一致する ===\n");
+    {
+        unsigned char buf[4] = {0, 0, 0, 0};
+        stdin_interrupt=1;
+        check(vfs_read_fd(0, buf, sizeof(buf)) == -1 && !buf[0],
+              "stdin interrupt before data leaves buffer untouched");
+        stdin_prefix=1;
+        check(vfs_read_fd(0, buf, sizeof(buf)) == 1 && buf[0]=='A' && !buf[1],
+              "stdin interrupt returns partial data without FF");
+        stdin_interrupt=0;
+    }
     case_f4();
     case_f5();
     case_pipe();

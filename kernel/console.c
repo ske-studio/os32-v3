@@ -461,6 +461,11 @@ int console_get_cursor_x(void) { return cursor_x; }
 int console_get_cursor_y(void) { return cursor_y; }
 void console_set_cursor(int x, int y)
 {
+    /* Keep both the sink record and the next text/GDC operation in range. */
+    if (x < 0) x = 0;
+    if (x >= TVRAM_COLS) x = TVRAM_COLS - 1;
+    if (y < 0) y = 0;
+    if (y >= TVRAM_ROWS) y = TVRAM_ROWS - 1;
     con_sink_push_cursor(x, y);     /* 票 K6C: CURSOR レコード */
     /* 票 K6C-2: GUI 中は論理位置も GDC も動かさない。ここで
      * console_hw_cursor_enable() を通すと、console_text_gdc_stop() で消した

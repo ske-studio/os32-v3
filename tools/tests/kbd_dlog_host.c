@@ -70,6 +70,9 @@ int  v86_is_active(void) { return stub_v86; }
 void v86_request_exit(void) { }
 int  v86_kbd_push(u8 scancode) { (void)scancode; stub_v86_pushed++; return 0; }
 void ring3_abort_request(void) { }
+void ring3_abort_check(void) { }
+int ring3_call_from_user(void) { return 0; }
+int ring3_wait_pending(void) { return 0; }
 int  exec_park_kbd(void) { return 0; }
 int  exec_park_poll(u32 now_tick) { (void)now_tick; return 0; }
 void appslot_poll_yield_reset(void) { }

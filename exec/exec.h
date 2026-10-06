@@ -101,6 +101,7 @@ i32 exec_app_state(i32 app_id);
 /* CTRL+STOP (IRQ1 が走っているアプリに立てた要求) を降ろす (KAPI v45、A1)。
  * 0 = 降ろした / 要求が無かった、OS32_ERR_INVAL = owner 1 以外。 */
 i32 exec_abort_clear(void);
+int ring3_wait_pending(void);
 
 /* KAPI sys_getcwd の実体 (票 T9 §12 R1)。CPL=3 の呼び手には
  * トランポリンページ内の写しを、CPL=0 の呼び手には fs/vfs.c の static cwd を

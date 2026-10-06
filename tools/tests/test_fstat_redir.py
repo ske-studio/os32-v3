@@ -140,6 +140,8 @@ def build_host(tmp, name):
 
 
 MUTATIONS = [
+    ("stdin_interrupt", "fs/vfs_fd.c",
+     "                if (c < 0) return i ? (int)i : c;", ""),
     # 変異 1: **2026-09-17 の不具合そのもの**。fstat だけリダイレクトを見ず、
     # fd 0/1/2 を無条件で S_IFCHR と答える。F4 も F5 も落ちなければならない。
     ("fstat_always_chr", "fs/vfs_fd.c",

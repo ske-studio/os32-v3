@@ -117,7 +117,7 @@ u16 fd_redirect_ifmt(int fd, int *out_file_fd)
 { (void)fd; if (out_file_fd) *out_file_fd = -1; return OS_S_IFCHR; }
 int fd_redirect_read(int fd, void *buf, u32 size) { return VFS_ERR_INVAL; }
 int fd_redirect_write(int fd, const void *buf, u32 size) { return VFS_ERR_INVAL; }
-int kbd_getchar(void) { return '\n'; }
+int kbd_getchar_kapi(void) { return '\n'; }
 void console_write(const char *buf, u32 size, u8 color) { }
 
 static void explicit_owner(void)

@@ -312,4 +312,8 @@ void serial_diag_get(u32 *oe, u32 *fe, u32 *pe, u32 *overflow);
 /* IRQ4ハンドラ (ASMスタブから呼ばれる) */
 void serial_irq_handler(void);
 
+int serial_getchar_kapi(void);
+int serial_putchar_kapi(char c);
+void serial_puts_kapi(const char *str);
+
 #endif /* __SERIAL_H */

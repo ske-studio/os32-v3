@@ -45,6 +45,8 @@ extern int rshell_active;
  * (割り込まれた文脈が CPL=3 のとき) か次の syscall 入口。drivers/ は
  * -Iexec を持たないので irq_enable と同じ流儀で extern 宣言する。 */
 extern void ring3_abort_request(void);
+extern void ring3_abort_check(void);
+extern int ring3_wait_pending(void);
 
 /* 外部: 第 2 の park 点 (exec/exec.c、票 K7 D1)。GUI モードで注入リングが
  * 空のとき、走っている CPL=3 アプリを WAIT_KEY で止めて WM へ戻す。
@@ -707,25 +709,26 @@ int kbd_trygetchar_local(void)
  *
  *  `hlt` ループを GUI 中の CPL=3 アプリに残すと、syscall の中で止まったまま
  *  協調型の全体 (gshell と他の 3 本) が動かなくなる (票 §0)。 */
-static int kbd_gui_getbyte(void)
+static int kbd_gui_getbyte(int interruptible)
 {
     for (;;) {
         int ch = kbd_gui_trygetbyte();
         if (ch >= 0) return ch;
         /* 成立すれば戻らない。戻ってきたのは止められなかったときだけ。 */
         (void)exec_park_kbd();
+        if (interruptible && ring3_wait_pending()) return -1; /* GUI fallback */
         _halt();
     }
 }
 
-int kbd_getchar(void)
+static int kbd_getchar_wait(int interruptible)
 {
     u16 entry;
     u32 timeout_ticks;
 
     /* GUI 中は注入リングだけを見る。CUI モード (kbd_gui_mode == 0) の経路は
-     * rshell のタイムアウトを含めて 1 行も変えない (票 D6)。 */
-    if (kbd_gui_mode) return kbd_gui_getbyte();
+     * rshell のタイムアウトは維持する (票 D6)。 */
+    if (kbd_gui_mode) return kbd_gui_getbyte(interruptible);
 
     /* rshellモード: KBD_TIMEOUT_TICKS タイムアウト (デフォルト300 ticks @ 100Hz) */
     timeout_ticks = rshell_active ? KBD_TIMEOUT_TICKS : 0;
@@ -748,6 +751,7 @@ int kbd_getchar(void)
                 if (sch >= 0) return sch;
             }
 
+            if (interruptible && ring3_wait_pending()) return -1;
             _halt();
 
             /* rshellタイムアウト: スペースキーを自動返却 */
@@ -762,13 +766,14 @@ int kbd_getchar(void)
 /* u16キーコードを返す (上位=スキャンコード, 下位=ASCII)。
  * GUI 中は下位 8bit だけが意味を持ち、スキャンコードは 0 (票 D7) —
  * 端末経由で届く打鍵にはスキャンコードが無い。 */
-int kbd_getkey(void)
+int kbd_getkey_wait(int interruptible)
 {
     u16 entry;
 
-    if (kbd_gui_mode) return kbd_gui_getbyte();
+    if (kbd_gui_mode) return kbd_gui_getbyte(interruptible);
 
     while (kbd_count == 0) {
+        if (interruptible && ring3_wait_pending()) return -1;
         _halt();
     }
 
@@ -945,4 +950,19 @@ void kbd_set_gui_mode(int on)
 u32 kbd_dropped_count(void)
 {
     return kbd_dropped + kbd_raw_dropped;
+}
+
+int kbd_getchar(void) { return kbd_getchar_wait(0); }
+int kbd_getkey(void) { return kbd_getkey_wait(0); }
+int kbd_getchar_kapi(void)
+{
+    int c = kbd_getchar_wait(1);
+    if (c < 0) ring3_abort_check();
+    return c;
+}
+int kbd_getkey_kapi(void)
+{
+    int c = kbd_getkey_wait(1);
+    if (c < 0) ring3_abort_check();
+    return c;
 }

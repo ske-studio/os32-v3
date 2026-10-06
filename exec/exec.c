@@ -13,6 +13,7 @@
 #include "gfx.h"
 #include "gfx_hal.h"   /* gfx_bb_phys_range: CPL=3 へ USER マップする範囲 */
 #include "kbd.h"
+#include "ime.h"
 #include "kmalloc.h"
 #include "kprintf.h"
 #include "paging.h"
@@ -625,13 +626,23 @@ void ring3_abort_request(void)
     appslot_abort_request();
 }
 
+/* Only explicit KAPI waits use this probe. It never unwinds kernel state.
+ * A gui=0 nested child cannot hand STOP to the WM at syscall exit. */
+int ring3_wait_pending(void)
+{
+    AppSlot *a = appslot_get(appslot_cur());
+    if (!ring3_call_from_user() || !a) return 0;
+    return a->abort_req || (a->gui && a->cpl3 && appslot_stop_pending());
+}
+
 /* ======================================================================== */
 /*  ring3_abort_check — 要求があればアプリを畳む (戻らない)                  */
 /*                                                                          */
-/*  呼び出し元は 2 か所:                                                     */
+/*  呼び出し元:                                                             */
 /*    - kernel/isr_stub.asm の IRQ1 スタブ (EOI と V86 反射の後、割り込まれた */
 /*      文脈が CPL=3 のときだけ)。KAPI を呼ばない計算ループはここで死ぬ。     */
 /*    - ring3_syscall_dispatch の入口 (wrap に入る前)。                      */
+/*    - 公開 KAPI の待ち (内部経路を除き、資源の後始末が済んだ安全点)。     */
 /*  IRQ 上では資源を触らず移譲し、launch/resume の着地点で IF=1 にして回収。*/
 /*  syscall 入口の通常の安全点では共通回収へ直行する (T2a R1)。            */
 /* ======================================================================== */
@@ -1155,6 +1166,7 @@ static void exec_notify_owned(int id, int kind)
      * サーフェス・タイマ・スロットを回収する。畳む 3 経路すべてが
      * ここを通るので、WM は 1 か所で回収できる。 */
     if (kind == EXEC_KIND_ABORTED) kbd_discard_stop();
+    ime_owner_exit(id);
     gui_owner_exit(id, kind);
     /* (8) 打鍵の注入リング (票 K7 D5)。注ぎ手は con_sink の読み手 1 本なので、
      * 畳んだのがその 1 本なら溜まっている打鍵を捨てる。**con_sink の所有を

@@ -379,7 +379,8 @@ int vfs_read_fd(int fd, void *buf, u32 size)
             u8 *p = (u8 *)buf;
             u32 i = 0;
             while (i < size) {
-                int c = kbd_getchar();
+                int c = kbd_getchar_kapi();
+                if (c < 0) return i ? (int)i : c;
                 if (c == '\r') c = '\n';
                 p[i++] = (u8)c;
                 if (c == '\n') break;

@@ -101,6 +101,11 @@ static int g_irq4_enabled;
 void irq_enable(unsigned int irq) { if (irq == 4) g_irq4_enabled = 1; }
 void irq_disable(unsigned int irq) { if (irq == 4) g_irq4_enabled = 0; }
 
+/* These fixtures exercise trusted driver callers; USER STOP has its own fixture. */
+int ring3_call_from_user(void) { return 0; }
+void ring3_abort_check(void) {}
+int ring3_wait_pending(void) { return 0; }
+
 #include "serial.c"          /* 変異の写しを引けるよう -I で探させる */
 #include "../../drivers/serial_plan.c"
 #include "sys_buz.inc"       /* kernel/sys.c の buz_on / buz_off (実物の写し) */

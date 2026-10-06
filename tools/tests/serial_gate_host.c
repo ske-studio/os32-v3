@@ -78,6 +78,11 @@ int sysclk_is_8mhz(void) { return 0; }
 void irq_enable(unsigned int irq) { (void)irq; }
 void irq_disable(unsigned int irq) { (void)irq; }
 
+/* These fixtures exercise trusted driver callers; USER STOP has its own fixture. */
+int ring3_call_from_user(void) { return 0; }
+void ring3_abort_check(void) {}
+int ring3_wait_pending(void) { return 0; }
+
 #include "serial.c"
 #include "../../drivers/serial_plan.c"
 
