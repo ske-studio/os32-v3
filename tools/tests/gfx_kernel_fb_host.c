@@ -124,6 +124,9 @@ AppSlot *appslot_get(int id) { return id == 2 ? &slot : 0; }
 int appslot_gfx_owner(void) { return 2; }
 int appslot_gfx_claim(int gui) { (void)gui;return 0; }
 int con_sink_is_enabled(void) { return 0; }
+#ifndef E10C_REAL_AUDIT
+int kselftest_run_audit(const char *tag) { return !ledger_selfcheck(tag); }
+#endif
 u32 exec_tramp_page_addr(void) { return 0x170000; }
 void shell_print(const char *s,u8 c) {(void)s;(void)c;}
 void console_hw_cursor_enable(void) { }

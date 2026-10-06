@@ -250,6 +250,17 @@ OWNER と回帰: `shm_reuse_test` 4/4・`db_test` 9/9・`db_v50_test` 41/41・�
 
 NP21/Wは8MB planar/PEGC、17MB planar/PEGC/Cirrus。日本語/描画/present、GUI→CUI→GUI、全画面DISPLAY、通常GUIの低位VRAMとdevice直書きkill、S/T/Uと片側revoke、cirrus-off強制指定fallback、V86復元後のalias_cache一致とDISPLAY/TVRAM再lease、SHMの2本目書込み、boot後font_load_testのNOSYS/表・BB不変を確認。ring3_guard旧Eの「低位BB生存」はここから**拒否へ更新**し、正規CLIENT leaseで生存する対照を追加。Bはshlib実ロード後にPTE P/U/ROかつPF error=7、Aは実stack直下NPかつerror=6を確認する。Ra266のPEGC/日本語/全画面とUCはhへ。予算は§6のe枠。
 
+**e10c 実装 (2026-10-07)**: master/全 AS・alias/refcount 検査を post-exec・probe 後・GUI 移譲・AS launch・V86 通常帰路に接続。合成 S/T/U は post-exec でも実行。
+監査は生涯専用計数、AS単位のIRQ区切りと割当PTだけの照合。probe後は選択面/source・bind/BBも確認。
+DISPLAY/TVRAM は帰路で revoke→regen (CLIENTは保持)、GUI 再入でも TVRAM を失効。gcap kill の通常着地で回収・30 行/cursor 復元、停止前の polled 印と VM INT80 の IF 保持を追加。
+
+| 段 | present USER の期待 | 対応する台帳 |
+|---|---|---|
+| e10c (e11 前) | SHM/trampoline 必須、font/Unicode/BB・TVRAM〜BRG・CLIENT の旧共有 USER は遷移前後とも許可。共有 CLIENT の PDE 権限は実 AS 前に固定 | E10-2 / E11-2 |
+| e11b 後 | SHM/trampoline だけ。旧共有 PTE USER・CLIENT 用 PDE 準備・旧 VRAM 例外を撤去し検査を反転 | E11-2 |
+証拠: `/home/hight/os32-tmp/run/e10c/` のログと最終報告。PM 台本は `tools/tests/guest_acceptance.yaml` の e10c 群、観測記号は `tools/accept/pt0_snapshot.py`。
+ゲスト/native は PM 待ち (E10-2/4/5/6 は未閉鎖)。`check-memmap` の生成ブロック鮮度差分は、編集禁止に従い PM 統合時の再生成へ。
+
 **e10b 実装 (2026-10-06)**: session に低位 PTE・master/active PDE0・page0 全 4KB・runtime 復帰状態を集約。
 kill は深さ 0 でも回収前に end。例外では longjmp 前に地図/I/O/IRQ を戻し、解放は master CR3・IF=1 の trusted 着地へ送る。
 VM INT80h は KAPI 入口で分離しゲスト IVT へ反射。end は再入防止、途中の再例外は回収へ進まず停止する。

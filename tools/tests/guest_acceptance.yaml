@@ -300,3 +300,95 @@
   mode: manual
   status: deferred
   contract: docs/tasks/DEFERRED_TESTS.md#E10-1
+
+- id: e10c-boot-audit
+  gate: e10c
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#5-3-統合matrixと観測
+  mode: manual
+  prereq: PM deploys this build and matching kernel.map; 8MB planar/PEGC and 17MB planar/PEGC/Cirrus
+  entry: boot, capture bootlog and tools/accept/pt0_snapshot.py output, then run a CUI app
+  observe:
+  - kselftest_pass/fail; memmap_audit_runs/fail; as_audit_runs/fail; ledger_check_fail
+  - post-exec synthetic S/T/U result and post-probe counted audit
+  expect:
+    kselftest_fail: 0
+    memmap_audit_fail: 0
+    as_audit_fail: 0
+    minimum_boot_audit_runs: 2
+    minimum_added_boot_checks: 4
+    lifecycle_keeps_boot_pass_fail_unchanged: true
+    resume_keeps_audit_runs_unchanged: true
+    audit_fail: 0
+    lease_selftest_result: 0
+    subsequent_AS_increases_audit_runs: true
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e10c-v86-return
+  gate: e10c
+  contract: docs/tasks/DEFERRED_TESTS.md#E10-2
+  mode: manual
+  prereq: e10c-boot-audit; snapshot after one normal app, matching deployed map
+  entry: snapshot; v86 -t; snapshot; v86 -g -t; snapshot; repeat and compare PT0 ignoring A/D
+  observe:
+  - v86_return_audit_runs/fail; memmap_audit_fail; as_audit_fail; v86_restore_mismatch
+  - ledger_surfaces DISPLAY/TVRAM gen and lease_count; lease_revoke_all_fail_count
+  - v86_gcap_alloc_count/free_count; TVRAM 30 rows and cursor
+  expect:
+    each_return_increases_runs: true
+    failure_counter_delta: 0
+    pde0_and_pte_restore: true
+    display_and_tvram_generation_increases: true
+    lease_count: 0
+    gcap_allocation_minus_free: 0
+    tvram_30_rows_and_cursor_restored: true
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e10c-gcap-kill
+  gate: e10c
+  contract: docs/tasks/DEFERRED_TESTS.md#E10-4
+  mode: manual
+  prereq: capture baseline and saved TVRAM 30 rows; stop while capture session is open
+  entry: start v86 -g; CTRL+STOP during capture; snapshot; repeat v86 -g -t; run ver
+  observe:
+  - v86_session open/closing/release_pending; v86_gcap_rec
+  - v86_gcap_alloc_count/free_count; exec_stop_count; return audit counters
+  - TVRAM all 30 rows and cursor; normal prompt and ver response
+  expect:
+    session_closed: true
+    recorder: 0
+    gcap_allocation_minus_free: 0
+    audit_fail_delta: 0
+    exec_stop_count_delta: 0
+    tvram_and_cursor_restored: true
+    next_capture_and_ver_succeed: true
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e10c-gui-tvram
+  gate: e10c
+  contract: docs/tasks/DEFERRED_TESTS.md#E10-2
+  mode: manual
+  prereq: e10c build; public lease acquisition remains deferred to E11-1
+  entry: record TVRAM surface; GUI start; GUI exit to CUI; repeat GUI start; snapshot
+  observe:
+  - ledger_surfaces TVRAM gen and lease_count, gfx_surface_unready, gfx_reinit_fail_count
+  - kselftest_pass/fail and master/AS audit counters
+  expect:
+    generation_increases_each_GUI_entry: true
+    lease_count: 0
+    audit_fail_delta: 0
+    reinit_fail_delta: 0
+    public_RO_lease_reacquire: deferred-to-E11-1
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e10c-stop-vm
+  gate: e10c
+  contract: docs/tasks/DEFERRED_TESTS.md#E10-5
+  mode: manual
+  prereq: separate PM fault-injection run for closing reexception; regular boot remains separate
+  entry: trigger closing reexception, record serial line and exec_stop_count; separate normal V86 INT80 reflection run
+  observe:
+  - serial OS32 exec teardown stopped line, exec_stop_count
+  - VM INT80 entry saved EFLAGS, IF before dispatcher, guest IVT target and resume
+  expect:
+    injected_stop_counter_delta: 1
+    injected_stop_serial_line: true
+    VM_dispatch_IF: 0
+    ordinary_KAPI_IF: 1
+    guest_IVT_reflection_preserved: true
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/

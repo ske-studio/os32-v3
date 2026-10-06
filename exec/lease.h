@@ -21,6 +21,7 @@ int lease_revoke_sid(struct addrspace *as, u32 sid);
 extern volatile u32 lease_revoke_fail_count;
 int lease_revoke_all(struct addrspace *as);
 int lease_check(const struct addrspace *as);
+int lease_audit_all(void);
 int lease_selftest(void);
 extern u32 lease_selftest_result;
 extern volatile u32 lease_rollback_fail_count;

@@ -54,6 +54,11 @@ void v86_io_reset_policy(void) {}
 
 void v86_bios_detach_disk(void);
 V86Gcap *v86_gcap_rec;
+static u32 release_calls, return_calls, audit_calls;
+void v86_gcap_release(void);
+void gfx_v86_return(void);
+void kselftest_audit_v86_return(void);
+static void exec_stop_mark(void) {}
 void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 static void die(int rc)
 {
@@ -68,6 +73,19 @@ static void say(const char *s, u32 n)
 #define SAY(s) say(s "\n", sizeof(s "\n") - 1)
 static u32 checks;
 #define CHECK(x, s) do { checks++; if (!(x)) { SAY("FAIL " s); die(1); } } while (0)
+void v86_gcap_release(void) {
+    CHECK(!kctx_irq_depth && !kctx_exc_depth, "gcap release normal context");
+    release_calls++;
+}
+void gfx_v86_return(void) {
+    CHECK(!kctx_irq_depth && !kctx_exc_depth && !backing_phys, "gfx return after release");
+    return_calls++;
+}
+void kselftest_audit_v86_return(void) {
+    CHECK(!kctx_irq_depth && !kctx_exc_depth && return_calls == audit_calls + 1,
+          "audit after gfx return");
+    audit_calls++;
+}
 #define V86_TEST_BB MEM_GFX_BB_BASE
 static int checked_restore(struct v86_session_state *s) {
     u32 flushes = host_flushes;
@@ -313,6 +331,7 @@ void _start(void)
     for (u32 i = 0; i < PAGE_SIZE; i++)
         CHECK(host_page0[i] == (u8)(i ^ (i >> 8)), "V86 page0 all bytes");
     CHECK(host_flushes == flushes + 2 && host_flushed_cr3 == a.pd_phys, "V86 active TLB");
+    CHECK(return_calls == 1 && audit_calls == 1, "V86 return audited");
     CHECK(page_directory[0] & PTE_USER, "V86 restores PDE0 USER");
     CHECK(!(entry(V86_REMAP_START + PAGE_SIZE) & PTE_USER), "V86 removes low USER");
     CHECK(perm(p, 1) && perm(TRAMP, 0), "V86 preserves shared PTE");
@@ -332,6 +351,7 @@ void _start(void)
     _disable();
     exec_pending_transfer(0);
     exec_pending_finish();
+    CHECK(release_calls == 1 && return_calls == 2 && audit_calls == 2, "kill gcap release audited");
     host_cr3 = a.pd_phys;
     CHECK(!(((u32 *)P2V(a.pd_phys))[0] & PTE_USER), "V86 active PDE exact");
     CHECK(irq_disabled == ((1U << 12) | (1U << 2)) && restored_esp0 == 1234,

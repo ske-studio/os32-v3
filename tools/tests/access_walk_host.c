@@ -54,9 +54,9 @@ void pgalloc_free_pt(u32 phys)
     actual_free_pt(phys);
 }
 #define used (used_pages + ws_used)
-/* 試験用の池の workspace: 16MiB の末尾 16 ページ (恒等写像済み、下で mmap)。 */
-#define HOST_WS_FIRST (0x1000000UL / PAGE_SIZE - 16)
-#define HOST_WS_END   (0x1000000UL / PAGE_SIZE)
+/* 試験用の池の workspace: 15MiB の末尾 16 ページ (恒等写像済み、下で mmap)。 */
+#define HOST_WS_FIRST (MEM_SYSTEM_SPACE_BASE / PAGE_SIZE - 16)
+#define HOST_WS_END   (MEM_SYSTEM_SPACE_BASE / PAGE_SIZE)
 
 #include "shlib_host_source.c"
 #include "access_walk_host_source.c"

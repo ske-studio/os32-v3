@@ -1,3 +1,5 @@
+#include "v86_mem.h"
+#include "shlib.h"
 /* Private SURFACE leases and the dormant T2e single-surface USER entry. */
 #include "lease.h"
 #include "kstring.h"
@@ -10,6 +12,7 @@ static u32 lease_next_token = 1;
 u32 lease_selftest_result;
 volatile u32 lease_rollback_fail_count;
 volatile u32 lease_revoke_fail_count;
+volatile u32 lease_revoke_all_fail_count;
 
 /* Keep this root/normal-context predicate in sync with
  * kernel/paging.c:lease_root_context(); paging also validates managed PTs. */
@@ -155,7 +158,9 @@ int lease_revoke_surface(u32 sid)
 
 int lease_revoke_all(struct addrspace *as)
 {
-    return lease_revoke_sid(as, LEDGER_MAX_SURFACES);
+    int failed = lease_revoke_sid(as, LEDGER_MAX_SURFACES);
+    lease_revoke_all_fail_count += (u32)failed;
+    return failed;
 }
 
 int lease_check(const struct addrspace *as)
@@ -163,6 +168,26 @@ int lease_check(const struct addrspace *as)
     u32 va, i, expected, pte, *pd;
     if (!context(as)) return LEASE_INVAL;
     pd = P2V(as->pd_phys);
+    for (i = 0; i < MEM_LEASE_MAX; i++) {
+        const struct as_lease *l = &as->leases[i];
+        if (!l->token) continue;
+        if (l->sid >= LEDGER_MAX_SURFACES || !l->npages || l->base % PAGE_SIZE ||
+            l->base < MEM_LEASE_BASE || l->base >= MEM_LEASE_END ||
+            l->npages > (MEM_LEASE_END - l->base) / PAGE_SIZE) return LEASE_INVAL;
+        const struct ledger_surface *sf = &ledger_surfaces[l->sid];
+        u32 flags = l->flags & ~AS_LEASE_GFX_COMPAT;
+        u32 cache = sf->cache == LEDGER_CACHE_UC ? PTE_PCD : 0;
+        if (l->npages != sf->npages || !ledger_surface_validate(sf) ||
+            (flags & ~PTE_RW) != (PTE_PRESENT | PTE_USER | cache) ||
+            sf->perm_max == LEDGER_PERM_NONE ||
+            ((flags & PTE_RW) && sf->perm_max != LEDGER_PERM_RW)) return LEASE_INVAL;
+        for (u32 j = 0; j < i; j++) {
+            const struct as_lease *o = &as->leases[j];
+            if (o->token && (o->token == l->token ||
+                (o->base < l->base + l->npages * PAGE_SIZE &&
+                 l->base < o->base + o->npages * PAGE_SIZE))) return LEASE_INVAL;
+        }
+    }
     for (i = 0; i < MEM_LEASE_MAX_PDES; i++) {
         u32 d = pd[(MEM_LEASE_BASE >> 22) + i];
         if (as->lease_pt_phys[i]) {
@@ -172,19 +197,36 @@ int lease_check(const struct addrspace *as)
                 (as->lease_pt_phys[i] | PAGE_RW | PTE_USER)) return LEASE_INVAL;
         } else if (d) return LEASE_INVAL;
     }
-    for (va = MEM_LEASE_BASE; va < MEM_LEASE_END; va += PAGE_SIZE) {
-        expected = 0;
-        for (i = 0; i < MEM_LEASE_MAX; i++) {
-            const struct as_lease *l = &as->leases[i];
-            if (l->token && va >= l->base && (va - l->base) / PAGE_SIZE < l->npages) {
-                const struct ledger_surface *sf = &ledger_surfaces[l->sid];
-                if (!sf->npages || l->generation != sf->gen || !sf->lease_count) return LEASE_INVAL;
-                expected = sf->first * PAGE_SIZE + va - l->base;
-                expected |= l->flags & ~AS_LEASE_GFX_COMPAT;
+    /* Only allocated tables can contain PTEs. Validate covered PDEs even
+     * when a corrupt lease names an absent PT (which the scan would skip). */
+    for (i = 0; i < MEM_LEASE_MAX; i++) {
+        const struct as_lease *l = &as->leases[i];
+        if (!l->token) continue;
+        if (l->generation != ledger_surfaces[l->sid].gen ||
+            !ledger_surfaces[l->sid].lease_count) return LEASE_INVAL;
+        u32 first = (l->base - MEM_LEASE_BASE) >> 22;
+        u32 last = (l->base + (l->npages - 1) * PAGE_SIZE - MEM_LEASE_BASE) >> 22;
+        for (u32 di = first; di <= last; di++)
+            if (!as->lease_pt_phys[di]) return LEASE_INVAL;
+    }
+    for (u32 di = 0; di < MEM_LEASE_MAX_PDES; di++) {
+        if (!as->lease_pt_phys[di]) continue;
+        const u32 *pt = P2V(as->lease_pt_phys[di]);
+        for (u32 ti = 0; ti < PTE_COUNT; ti++) {
+            va = MEM_LEASE_BASE + (di * PTE_COUNT + ti) * PAGE_SIZE;
+            expected = 0;
+            for (i = 0; i < MEM_LEASE_MAX; i++) {
+                const struct as_lease *l = &as->leases[i];
+                if (l->token && va >= l->base && (va - l->base) / PAGE_SIZE < l->npages) {
+                    const struct ledger_surface *sf = &ledger_surfaces[l->sid];
+                    if (!sf->npages || l->generation != sf->gen || !sf->lease_count) return LEASE_INVAL;
+                    expected = sf->first * PAGE_SIZE + va - l->base;
+                    expected |= l->flags & ~AS_LEASE_GFX_COMPAT;
+                }
             }
+            pte = pt[ti];
+            if ((pte & ~(PTE_ACCESSED | PTE_DIRTY)) != expected) return LEASE_INVAL;
         }
-        pte = paging_lease_pte(as, va);
-        if ((pte & ~(PTE_ACCESSED | PTE_DIRTY)) != expected) return LEASE_INVAL;
     }
     return 0;
 }
@@ -377,7 +419,8 @@ int lease_selftest(void)
         r[0] = refs[1]; auth.owner = ob;
         if (lease_acquire(&b, &auth, r, 2, LEDGER_PERM_RO, bv)) goto done;
     }
-    if (lease_check(&a) || lease_check(&b) ||
+    if (paging_as_audit(&a, shlib_read_page) || paging_as_audit(&b, shlib_read_page) ||
+        lease_check(&a) || lease_check(&b) ||
         (paging_lease_pte(&a, av[0].base) & ~0xfffUL) != frames[0] ||
         (paging_lease_pte(&b, bv[0].base) & ~0xfffUL) != frames[1] ||
         (paging_lease_pte(&a, av[1].base) & ~0xfffUL) != frames[2] ||
@@ -420,4 +463,43 @@ done:
     if (owner && !ledger_owner_retire(owner)) rc |= 8;
     lease_selftest_result = (u32)rc;
     return rc;
+}
+
+/* Audit all real ASes under a temporary master root, preserving caller IF/CR3.
+ * appslot_at includes in-construction and pending-kill slots. */
+int lease_audit_all(void)
+{
+    u32 refs[LEDGER_MAX_SURFACES] = {0};
+    unsigned int flags;
+    u32 cr3;
+    int bad = 0;
+    if (paging_v86_session_open()) return -1;
+    if (kctx_irq_depth || kctx_exc_depth) return 1;
+    /* Normal context has no scheduling/reclamation point here. IRQ handlers
+     * cannot change AS/lease ownership. Restore IF and CR3 between ASes. */
+    for (int id = APP_ID_SHELL; id <= APP_ID_MAX; id++) {
+        AppSlot *a = appslot_at(id);
+        if (!a || !a->as || !a->as->pd_phys) continue;
+        flags = irq_save();
+        cr3 = paging_current_cr3();
+        paging_load_cr3(paging_kernel_pd_phys());
+        bad += paging_as_audit(a->as, shlib_read_page) != 0;
+        bad += lease_check(a->as) != 0;
+        for (u32 i = 0; i < MEM_LEASE_MAX; i++) {
+            const struct as_lease *l = &a->as->leases[i];
+            if (l->token && l->sid < LEDGER_MAX_SURFACES) refs[l->sid]++;
+        }
+        paging_load_cr3(cr3);
+        irq_restore(flags);
+    }
+    /* Alias/descriptor reads need no root switch or long IRQ exclusion. */
+    for (u32 i = 0; i < LEDGER_MAX_SURFACES; i++) {
+        const struct ledger_surface *sf = &ledger_surfaces[i];
+        if (sf->npages && (!ledger_surface_validate(sf) || !alias_cache(sf))) bad++;
+    }
+    flags = irq_save();
+    for (u32 i = 0; i < LEDGER_MAX_SURFACES; i++)
+        if (ledger_surfaces[i].lease_count != refs[i]) bad++;
+    irq_restore(flags);
+    return bad;
 }

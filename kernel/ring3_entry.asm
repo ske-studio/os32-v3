@@ -47,7 +47,10 @@ int80_stub:
         ;; 待つため、IF=0 のままだと CPL=3 からの呼び出しで永久停止する
         ;; (2026-09-06、gdi_test の kbd_getchar と less の sys_halt で実測)。
         ;; iretd が EFLAGS をフレームから復元するので戻りの cli は不要。
+        test    dword [esp + 40], 0x00020000   ;; saved EFLAGS.VM
+        jnz     .dispatch
         sti
+.dispatch:
 
         mov     eax, esp                ;; frame ptr (pushad 先頭)
         push    eax

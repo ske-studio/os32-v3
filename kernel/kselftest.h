@@ -18,5 +18,8 @@ int kselftest_run(void);
  * 戻り値: 失敗した項目数 (0 = 全て通過)。 */
 int kselftest_run_post_exec(void);
 int kselftest_run_post_unicode(void);
+int kselftest_run_audit(const char *tag);
+int kselftest_run_post_probe(void);
+void kselftest_audit_v86_return(void);
 
 #endif /* __KSELFTEST_H */

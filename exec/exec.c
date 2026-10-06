@@ -1,7 +1,9 @@
 #include "v86_mem.h"
+#include "../drivers/serial.h"
 #include "v86.h"
 #include "memmap.h"
 #include "exec.h"
+#include "kselftest.h"
 #include "config.h"
 #include "os32x_hdr.h"
 #include "appslot.h"
@@ -82,6 +84,7 @@ void exec_init(void) {
     kapi = (KernelAPI *)KAPI_ADDR;
     /* アプリ ID の表を空にし、シェル帯 (ID 1) を走っている状態にする。
      * res_owner_set(1) もここで行われる (票 K5 の D3)。 */
+    paging_prepare_legacy_clients();
     appslot_init();
     /* 起動要求表 (票 T9 D3) も空から始める。 */
     launch_init();
@@ -1310,6 +1313,13 @@ static void exec_restore_band(int id)
 
 /* longjmp する側がスロットを空にするので、jmpbuf は先に控える。 */
 static u32 g_exit_jmpbuf[KSETJMP_BUF_LEN];
+volatile u32 exec_stop_count;
+/* Polled output works with IF=0, including a recursive teardown fault. */
+static void exec_stop_mark(void)
+{
+    exec_stop_count++;
+    serial_puts_polled("OS32: exec teardown stopped\r\n");
+}
 
 /* ======================================================================== */
 /*  exec_exit — 現在のプログラムを畳み、その ID の呼び出し元へ戻る            */
@@ -1384,7 +1394,7 @@ static void exec_finish(int id, int status, int kind)
 void exec_exit(int status, int kind)
 {
     /* A fault during teardown must not jump over an unfinished unmap. */
-    if (v86_session.closing) { for (;;) { _stop(); } }
+    if (v86_session.closing) { exec_stop_mark(); for (;;) { _stop(); } }
     v86_session.aborting = 1;
     v86_session_end();
     ring3_context_clear();
@@ -1399,9 +1409,9 @@ static void exec_pending_transfer(int kind)
 {
     int id = appslot_cur();
     AppSlot *a = appslot_get(id);
-    if (!a || g_pending_id) { for (;;) { _stop(); } }
+    if (!a || g_pending_id) { exec_stop_mark(); for (;;) { _stop(); } }
     /* A fault during teardown must not jump over an unfinished unmap. */
-    if (v86_session.closing) { for (;;) { _stop(); } }
+    if (v86_session.closing) { exec_stop_mark(); for (;;) { _stop(); } }
     v86_session.aborting = 1;
     v86_session_end();
     ring3_context_clear();
@@ -1418,7 +1428,7 @@ static void exec_pending_finish(void)
 {
     int id, kind;
     if (g_longjmp_reason != EXEC_LJ_PENDING) return;
-    if (kctx_irq_depth || kctx_exc_depth) { for (;;) { _stop(); } }
+    if (kctx_irq_depth || kctx_exc_depth) { exec_stop_mark(); for (;;) { _stop(); } }
     id = g_pending_id;
     kind = g_pending_kind;
     g_pending_id = 0;             /* callback / 再 longjmp より先に一度だけ消費 */
@@ -2170,6 +2180,8 @@ static int exec_launch(const char *cmdline, int gui_arg)
         /* The heap header needs its user VA; switch only after image and argv. */
         if (want_ring3) paging_load_cr3(ctx->as->pd_phys);
         if (exec_heap_size) exec_heap_init_at(exec_heap_base, exec_heap_size);
+
+        if (want_ring3) kselftest_run_audit("AS-launch");
 
         /* ======== ここで初めて「走っているのはこの ID」になる ======== */
         if (is_shell) {

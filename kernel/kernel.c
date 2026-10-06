@@ -732,6 +732,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * 使うだけ (⑦、TASK_T1_LEDGER §3-3)。init まで済ませたら表示はテキストへ
      * 戻る。 */
     gfx_prepare_backend();
+    kselftest_run_post_probe();
 
     /* 共有ライブラリ (0x400000 帯) を常駐させる — シェルを載せる **前** に
      * 1 回だけ (票 K3)。ここより後だと pgalloc が帯域のページを配ってしまう。

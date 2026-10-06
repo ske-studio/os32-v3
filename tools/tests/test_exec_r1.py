@@ -51,6 +51,7 @@ volatile u32 kctx_irq_depth, kctx_exc_depth;
 /* These cases have no V86 session; its live unwind is shm_user_host.c. */
 static struct host_v86_session { int aborting, closing; } v86_session;
 static void v86_session_end(void) {}
+static void exec_stop_mark(void) {}
 static AppSlot slots[APP_SLOT_COUNT];
 static AppSlot *g_cur_app;
 static int cur = 2, owner = 2, cr3 = 2, host_if = 1, host_gui;

@@ -56,6 +56,16 @@ static int bit(const u32 *map, u32 pfn)
 {
     return (map[pfn / 32] & (1UL << (pfn % 32))) != 0;
 }
+int pgalloc_audit_ram(u32 pfn)
+{
+    if (!initialized) return 0;
+    for (u32 i = 0; i < device_boot_map.count; i++) {
+        const struct physmem_range *r = &device_boot_map.ranges[i];
+        if (r->first <= pfn && pfn < r->end) return r->kind == PHYSMEM_RAM;
+    }
+    return 0;
+}
+
 static int bmp_test(u32 pfn) { return !bit(eligible, pfn) || bit(bitmap, pfn); }
 static void bmp_set(u32 pfn) { bitmap[pfn / 32] |= 1UL << (pfn % 32); }
 static void bmp_clear(u32 pfn) { bitmap[pfn / 32] &= ~(1UL << (pfn % 32)); }
@@ -645,6 +655,9 @@ done:
     return ok;
 }
 
+/* Counts and owner totals must describe one instant: IRQ allocations/frees
+ * prevent a safe chunked snapshot. Lifecycle callers are limited to boot,
+ * launch, GUI handoff and V86 return; never poll/yield/resume. */
 int ledger_selfcheck(const char *tag)
 {
     u32 counts[LEDGER_MAX_OWNERS];

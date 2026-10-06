@@ -20,6 +20,9 @@ def function(text, name):
 ROOT = Path(__file__).resolve().parents[2]
 
 MUTATIONS = (
+    ('return-audit', 'kernel/v86_mem.c', '    kselftest_audit_v86_return();', '', 'FAIL V86 return audited'),
+    ('return-gfx', 'kernel/v86_mem.c', '    gfx_v86_return();', '', 'FAIL audit after gfx return'),
+    ('kill-gcap-release', 'kernel/v86_mem.c', '    if (v86_session.aborting) v86_gcap_release();', '', 'FAIL kill gcap release audited'),
     ('end-guest-iopl', 'kernel/v86_mem.c', 'flags = (v86_session.saved_eflags & ~EFLAGS_IF) | (flags & EFLAGS_IF);', 'flags = flags;', 'FAIL kill restores caller IOPL'),
     ('direct-kill-no-end', 'exec/exec.c', '    v86_session_end();\n    ring3_context_clear();\n    exec_finish', '    ring3_context_clear();\n    exec_finish', 'FAIL kill release before owner reclaim'),
     ('end-reentry', 'kernel/v86_mem.c', 'if (v86_session.closing) { irq_restore(flags); return; }', 'if (0) { irq_restore(flags); return; }', 'FAIL end recursion'),

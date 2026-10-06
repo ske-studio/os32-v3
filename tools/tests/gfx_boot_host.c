@@ -200,7 +200,9 @@ static int gfx_started;
 static u32 gfx_reinit_pending;
 static volatile u32 gfx_reinit_fail_count;
 int lease_revoke_surface(u32 sid) { (void)sid; return 0; } /* no live AS at boot */
+static u8 *bb[4], *bb_b, *bb_r, *bb_g, *bb_i;
 static void gfx_bind_client(void) { } /* binding covered by gfx_kernel_fb_host */
+int kselftest_run_audit(const char *tag) { return !ledger_selfcheck(tag); }
 #include "gfx_boot_slice.inc"
 
 /* ---- 起動 (memory_boot_init の ③ と同じ段) ---- */

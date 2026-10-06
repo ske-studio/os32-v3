@@ -10,6 +10,8 @@
 #include "v86_io.h"
 #include "v86_bios.h"
 #include "v86_gcap.h"
+#include "kselftest.h"
+#include "../gfx/gfx.h"
 extern V86Gcap *v86_gcap_rec;
 
 struct v86_session_state v86_session;
@@ -191,6 +193,9 @@ release:
     backing_phys = 0;
     backing_owner = 0;
     v86_session.release_pending = 0;
+    if (v86_session.aborting) v86_gcap_release();
+    gfx_v86_return();
+    kselftest_audit_v86_return();
 done:
     v86_session.closing = 0;
 }

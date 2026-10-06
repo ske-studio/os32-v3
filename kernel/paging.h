@@ -384,6 +384,10 @@ extern u32 paging_memmap_bad_count;
  * **ブート直後に 1 回だけ呼ぶこと** — CPL=3 アプリを起動すると exec が
  * VRAM / フォント表を USER へ昇格させ、期待値と合わなくなる。 */
 int paging_memmap_selftest(u32 tramp_page);
+void paging_prepare_legacy_clients(void);
+int paging_master_audit(u32 tramp_page);
+/* shared_ro must validate exact registered shlib text VA/frame pairs. */
+int paging_as_audit(const struct addrspace *as, int (*shared_ro)(u32, u32));
 
 /* **自己診断のための変異だけ**に使う。master の PTE 1 本の USER ビットを
  * 立てる / 落として TLB を無効化する。`paging_set_page` を使わないのは、
