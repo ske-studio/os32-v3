@@ -74,7 +74,7 @@ make check-tests-inventory                      # 表が古くないか検査す
 `TARGET_SRCS` など) にある `ROOT / "…"`。どちらにも現れないものは空欄になる
 (Rust は `--manifest-path` を代わりに出す)。
 
-## 2. `make check` の列 (137 ターゲット)
+## 2. `make check` の列 (138 ターゲット)
 
 `build/checks.d/*.mk` の登録から集めた `CHECK_PAR_TARGETS` (`check-par` の依存) が
 正典。この表はその列をそのまま展開したもの。コマンド列は `make check` (変異込み) の形。
@@ -96,7 +96,7 @@ make check-tests-inventory                      # 表が古くないか検査す
 | 13 | `check-key-inject-host` | `python3 -B tools/tests/test_key_inject.py` | — | — | — | × |
 | 14 | `check-gui-gate-host` | `python3 -B tools/tests/test_gui_gate.py --mutate` | `tools/gui_gate.py` | [`tools/tests/gui_gate_tdd.md`](../tools/tests/gui_gate_tdd.md) | — | ○ |
 | 15 | `check-kapi-version` | `python3 tools/check_kapi_version.py` | — | — | — | ○ |
-| 16 | `check-kapi-out` | `python3 -B tools/tests/test_kapi_out.py` | `sdk/gen_kapi.py` | [`tools/tests/kapi_out_tdd.md`](../tools/tests/kapi_out_tdd.md) | [`docs/archive/kernel_v21/TASK_KAPI_OUTPUT_GUARD.md`](archive/kernel_v21/TASK_KAPI_OUTPUT_GUARD.md) | ○ |
+| 16 | `check-kapi-out` | `python3 -B tools/tests/test_kapi_out.py`<br>`python3 -B tools/tests/test_gen_kapi_cli.py` | `sdk/gen_kapi.py` | [`tools/tests/kapi_out_tdd.md`](../tools/tests/kapi_out_tdd.md) | [`docs/archive/kernel_v21/TASK_KAPI_OUTPUT_GUARD.md`](archive/kernel_v21/TASK_KAPI_OUTPUT_GUARD.md) | ○ |
 | 17 | `check-docs-links` | `python3 tools/check_docs_links.py` | — | — | — | ○ |
 | 18 | `check-docs-orphans` | `python3 tools/check_docs_orphans.py` | — | [`tools/tests/s0_tdd.md`](../tools/tests/s0_tdd.md) | [`docs/archive/settings/TASK_S0.md`](archive/settings/TASK_S0.md) | ○ |
 | 19 | `check-docs-status` | `python3 tools/check_docs_status.py` | — | [`tools/tests/docs_status_tdd.md`](../tools/tests/docs_status_tdd.md) | — | ○ |
@@ -218,6 +218,7 @@ make check-tests-inventory                      # 表が古くないか検査す
 | 135 | `check-disk-auth-host` | `HOST32_RUNNERS ごと: python3 -B tools/tests/test_disk_auth.py --runner <runner>; 先頭で --mutate` | — | — | — | × |
 | 136 | `check-guest-acceptance-host` | `python3 -B tools/gen_guest_acceptance.py --check`<br>`python3 -B tools/tests/test_guest_acceptance.py --mutate` | — | — | — | × |
 | 137 | `check-kcallback-host` | `HOST32_RUNNERS ごと: python3 -B tools/tests/test_kcallback.py --runner <runner>; 先頭で --mutate` | — | — | — | × |
+| 138 | `check-build-no-deploy` | `python3 -B tools/tests/test_build_no_deploy.py` | — | — | — | × |
 
 ## 3. `check` の列に**入っていない** `check-*` ターゲット (9)
 

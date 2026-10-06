@@ -21,8 +21,6 @@ images/os32_boot.d88: $(FDD_IMAGE_DEPS)
 	@echo "=== Building OS32 minimal FDD image (images/os32_boot.d88) ==="
 	@$(call FDD_IMAGE_ARGS,boot/loader_fat_new.bin); \
 	python3 tools/mkfat12.py -o images/os32_boot.img -b boot/boot_fat.bin -d images/os32_boot.d88 --tree $$args
-	@echo "Copying os32_boot.d88 to NP21/W directory..."
-	@cp images/os32_boot.d88 '$(NP21W_DIR)/os32_boot.d88' 2>/dev/null || echo "Warning: Failed to copy os32_boot.d88 to np21w directory."
 
 # --- 1.44MB 版 (生イメージ) ---
 # **D88 にしない。** 1.44MB の D88 は fd_type=0x21 かつ全セクタの rpm_flg=1 が
@@ -38,7 +36,6 @@ images/os32_boot144.img: $(FDD_IMAGE_DEPS)
 		echo "ERROR: $$SIZE バイト。NP21/W は 1474560 ちょうどでないと 1.44MB と見ない"; \
 		exit 1; \
 	fi
-	@cp images/os32_boot144.img '$(NP21W_DIR)/os32_boot144.img' 2>/dev/null || echo "Warning: Failed to copy os32_boot144.img to np21w directory."
 
 fd144: images/os32_boot144.img
 .PHONY: fd144

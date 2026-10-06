@@ -5,16 +5,18 @@ static KernelAPI *test_api;
 static int count, bad, kill_mode;
 static void *expected_ctx;
 
-void main(int argc, char **argv, KernelAPI *api)
+int main(int argc, char **argv, KernelAPI *api)
 {
     test_api = api;
     count = bad = 0;
     kill_mode = argc > 1 && argv[1][0] == 'k';
     expected_ctx = &count;
     int rc = api->sys_ls("/usr/bin", (void *)ls_callback, expected_ctx);
-    api->kprintf(bad || rc < 0 || !count ? 0x41 : 0xE1,
+    int failed = bad || rc < 0 || !count;
+    api->kprintf(failed ? 0x41 : 0xE1,
                  "kcallback: rc=%d count=%d bad=%d CPL=3 %s\n", rc, count, bad,
-                 bad || rc < 0 || !count ? "FAIL" : "PASS");
+                 failed ? "FAIL" : "PASS");
+    return failed ? 1 : 0;
 }
 
 static void ls_callback(const void *entry, void *ctx)

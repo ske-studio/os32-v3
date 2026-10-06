@@ -68,6 +68,34 @@ def run(args, mutant=None):
             assert result.returncode == 0, (result.returncode, result.stderr)
 
 
+def run_guest_result(args, mutant=None):
+    """Guest PASS=0, sys_ls error/empty/bad callback=1 (PRIO-2)."""
+    with tempfile.TemporaryDirectory(prefix='kcallback-result-') as folder:
+        tmp = pathlib.Path(folder)
+        source = (ROOT / 'userland/tests/kcallback_test.c').read_text()
+        if mutant is not None:
+            old = 'return failed ? 1 : 0;'
+            assert source.count(old) == 1
+            source = source.replace(old, 'return %d;' % mutant)
+        (tmp / 'guest.inc').write_text(source)
+        (tmp / 'os32api.h').write_text(
+            'typedef struct { int (*sys_ls)(const char *, void *, void *); '
+            'void (*kprintf)(int, const char *, ...); } KernelAPI;\n')
+        exe = tmp / 'test'
+        subprocess.run(['gcc', '-m32', '-static', '-fno-pie', '-no-pie', '-nostdlib',
+                        '-std=gnu11', '-Wall', '-Wextra', '-Werror',
+                        '-fno-stack-protector', '-ffreestanding', '-I' + str(tmp),
+                        str(ROOT / 'tools/tests/kcallback_result_host.c'),
+                        '-o', str(exe)], check=True, capture_output=True)
+        result = host32.run([str(exe)], runner=args.runner, timeout=30,
+                            capture_output=True, text=True)
+        assert result.returncode == (0 if mutant is None else 1), (result.returncode, result.stderr)
+        if mutant is None:
+            print('PASS: guest main returns 0/1 for PASS/error/empty/bad ctx/bad entry')
+        else:
+            print('RED (compiled, runtime rc=1): guest main always returns', mutant)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
@@ -75,7 +103,10 @@ def main():
     args = parser.parse_args()
     try:
         run(args)
+        run_guest_result(args)
         if args.mutate:
+            for rc in (0, 1):
+                run_guest_result(args, rc)
             for mutant in MUTANTS:
                 run(args, mutant)
     except subprocess.CalledProcessError as exc:

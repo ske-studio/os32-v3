@@ -1,14 +1,17 @@
+import argparse
 import json
 import re
 import sys
 
-# 使い方:
-#   python3 sdk/gen_kapi.py                     生成する (既定)
-#   python3 sdk/gen_kapi.py --check-only [json] 検査だけして何も書かない
-#                                               (make check の check-kapi-out)
-CHECK_ONLY = "--check-only" in sys.argv
-_rest = [a for a in sys.argv[1:] if not a.startswith("-")]
-JSON_PATH = _rest[0] if _rest else "sdk/kapi.json"
+parser = argparse.ArgumentParser(
+    description="Generate KAPI files from sdk/kapi.json.", allow_abbrev=False)
+parser.add_argument("--check", "--check-only", dest="check_only", action="store_true",
+                    help="validate KAPI declarations without writing generated files")
+parser.add_argument("json", nargs="?", default="sdk/kapi.json",
+                    help="KAPI JSON input (default: sdk/kapi.json)")
+args = parser.parse_args()
+CHECK_ONLY = args.check_only
+JSON_PATH = args.json
 
 with open(JSON_PATH, "r", encoding="utf-8") as f:
     data = json.load(f)
