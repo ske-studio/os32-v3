@@ -18,6 +18,8 @@
 | E10-1 | V86 全出口の PTE/PDE・高さ/flip・連続実行と SHM/BB 回帰、K1 実例外・VM INT80h、native runner | ホストのみ・ゲスト未実施 | PM の e10b ゲスト受入で照合後に閉じる (K1 は注入手順も確定) |
 | E10-2 | e10c: 全 AS の alias 照合、3 段検査、live==0 の合間の USER、`shm_set_rw` の検査、TVRAM の再取得と RO view の残り | 未実施の確認 | 606、686、1185、1274、1599、1624 |
 | E10-4 | `v86 -g` 途中の kill で g/tv の kmalloc が漏れ、gcap_ops と TVRAM 30 行が戻らない (既存不具合、e10b では未修正) | 既知の不具合 | e10c で所有と出口を整理し受入 |
+| E10-5 | V86 session の end 中の再例外は `cli; hlt` で無言停止 — 停止前にシリアル 1 行と計数を残す | 改善 | e10c |
+| E10-6 | V86 の INT 80h 反射中は IF=1 (int80_stub の sti が VM 判定より前) — IRQ がゲストへ反射されず tick も数えない | 改善 | e10c |
 
 ## 2. 関門: e11 (公開 KAPI の一括、版の更新は 1 回)
 
