@@ -174,6 +174,14 @@ PM が選んだ別イメージ上の未使用・無害な LBA (18 以上、512-b
 
 上記ゲスト手順はホスト合格に含めない。配備したバイナリを確認してから実施する ([V1])。
 
+### 他のアプリの資源 (KAPI-OWNER、2026-10-07)
+
+SHM ブロック (`sys_shm_lock` / `sys_shm_free`)、パイプ (`sys_pipe_free` / `sys_pipe_clear` / `sys_pipe_get_buf`)、DB の接続 (`db_*` のハンドル) は、
+呼び手のアプリ (`res_owner_get()`) が確保したものだけを操作できる。**他のアプリの資源を渡すと、不正な引数と同じ値**
+(int の口は -1、`get_buf` は NULL、`column_int` は 0、`column_text` は `""`、void の口は何もしない) を返し、状態は変わらない。
+常駐シェル・WM・終了時の回収 (信頼側の文脈) は今どおり操作できる。版は変えていない。`pipe_get_buf` がカーネル番地を返す件と
+`pipe_get_len` の他アプリの照会は e11c (台帳 E11-8)。
+
 ### §3-3 出力ポインタの宣言 `out` (票 TASK_KAPI_OUTPUT_GUARD)
 
 OS32 は **CR0.WP = 0** で走る (`kernel/shlib.c` がカーネルからの書き込みで共有ライブラリを
