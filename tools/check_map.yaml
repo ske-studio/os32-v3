@@ -17,6 +17,7 @@ docs_only:
 - docs/images/**
 - docs/logs/**
 broad:
+- check-build-no-deploy
 - check-p2v
 - check-c-dialect
 - check-c-dialect-host
