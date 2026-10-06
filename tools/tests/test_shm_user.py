@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 import subprocess
 import tempfile
+from mutpar import run_ordered
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -88,7 +89,7 @@ def run(runner, mutation=None):
         cmd += ['-I'+str(work)] + ['-I'+str(ROOT/p) for p in
                   ('tools/tests/host_arch', 'tools/tests', 'include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec')]
         exe = work/'fixture'
-        result = subprocess.run(cmd + [str(ROOT/'tools/tests/shm_user_host.c'), str(ROOT/'kernel/physmem.c'), '-o', str(exe)], capture_output=True, text=True)
+        result = host32.build(cmd + [str(ROOT/'tools/tests/shm_user_host.c'), str(ROOT/'kernel/physmem.c'), '-o', str(exe)], capture_output=True, text=True)
         if result.returncode:
             raise RuntimeError('build failure is not RED\n'+result.stderr)
         result = host32.run([str(exe)], runner=runner, capture_output=True, text=True)
@@ -100,15 +101,19 @@ def run(runner, mutation=None):
             print(result.stdout.strip())
 
 
+@host32.control_session
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--runner', choices=('native', 'qemu'))
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    run(args.runner)
+    host32.begin_control(args.mutate, args.runner, ROOT)
+    with host32.control(args.mutate, args.runner, ROOT) as normal:
+        if normal:
+            run(args.runner)
     if args.mutate:
-        for mutation in MUTATIONS:
-            run(args.runner, mutation)
+        for _ in run_ordered(lambda mutation: run(args.runner, mutation), MUTATIONS):
+            pass
         print(f'PASS {len(MUTATIONS)}/{len(MUTATIONS)} mutations (runtime 9, wiring 2)')
 
 if __name__ == '__main__':

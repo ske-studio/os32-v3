@@ -3,6 +3,7 @@
 The host maps separate lease VAs; no hardware or emulator is accessed.
 Mutants must fail at the named runtime assertion (compile failures are errors).
 """
+import host32
 import argparse
 import pathlib
 import re
@@ -65,11 +66,13 @@ MUTANTS = [
 ]
 
 
+@host32.control_session
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--runner', choices=['native', 'qemu'], default='native')
     p.add_argument('--mutate', action='store_true')
     a = p.parse_args()
+    host32.begin_control(a.mutate, a.runner, ROOT)
     originals = {x: (ROOT/x).read_text() for x in TARGET_SRCS}
     names = set(re.findall(r'\b(gfx_\w+)\s*\(', '\n'.join(originals[x] for x in SDK_SRCS+HEADERS)))
     names.discard('gfx_cpl')
@@ -117,7 +120,9 @@ def main():
                 (tmp/'fixture.c').write_text(prefix+'\n'+fixture)
             return run_case(None,a.runner,fixture_body='/* staged */',source_texts=texts,
                             object_cache=pathlib.Path(cache),stage=stage)
-        r=run();print(r.stdout+r.stderr,end='');assert r.returncode==0,r.returncode
+        with host32.control(a.mutate, a.runner, ROOT) as normal:
+            if normal:
+                r=run();print(r.stdout+r.stderr,end='');assert r.returncode==0,r.returncode
         if a.mutate:
             def one(m):
                 r=run(m)

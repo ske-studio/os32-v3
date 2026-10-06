@@ -58,7 +58,7 @@ MUTANTS = [
 
 def run_host32(exe, runner):
     result = host32.run([str(exe)], runner=runner, capture_output=True,
-                        text=True, timeout=10)
+                        text=True, timeout=host32.RUN_TIMEOUT)
     return result
 
 
@@ -86,24 +86,28 @@ def run(sources, mutant=None, fixture="access_walk_host.c", high_stack=False, ru
                   'arch/x86', 'platform/pc98', 'kernel', 'exec', 'fs', 'lib', 'kapi', 'lib/sqlite3', 'sdk/include/os32')],
                '-I' + str(tmp), str(ROOT / 'tools/tests' / fixture),
                str(ROOT / 'kernel/physmem.c'), '-o', str(exe)]
-        subprocess.run(cmd, check=True, capture_output=True, text=True)
+        host32.build(cmd, check=True, capture_output=True, text=True)
         return run_host32(exe, runner)
 
 
+@host32.control_session
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
     parser.add_argument('--runner', choices=['native', 'qemu'], default='native')
     args = parser.parse_args()
+    host32.begin_control(args.mutate, args.runner, ROOT)
     sources = {k: (ROOT / v).read_text() for k, v in FILES.items()}
     hashes = {p: hashlib.sha256((ROOT / p).read_bytes()).digest() for p in FILES.values()}
-    result = run(sources, runner=args.runner)
-    print(result.stdout + result.stderr, end='')
-    assert result.returncode == 0
-    result = run(sources, high_stack=True, runner=args.runner)
-    assert result.returncode == 0, (result.stdout, result.stderr)
-    print(f'PASS runner={args.runner}')
-    print('PASS: boot buffers on low fixture stack with high initial stack')
+    with host32.control(args.mutate, args.runner, ROOT) as normal:
+        if normal:
+            result = run(sources, runner=args.runner)
+            print(result.stdout + result.stderr, end='')
+            assert result.returncode == 0
+            result = run(sources, high_stack=True, runner=args.runner)
+            assert result.returncode == 0, (result.stdout, result.stderr)
+            print(f'PASS runner={args.runner}')
+            print('PASS: boot buffers on low fixture stack with high initial stack')
     if args.mutate:
         def one(m):
             start = time.monotonic()

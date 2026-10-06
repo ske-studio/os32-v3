@@ -1,4 +1,5 @@
 """T2e e5: real gfx/three backends/ledger/lease/query with three ASes (ILP32)."""
+import host32
 import argparse
 import hashlib
 import pathlib
@@ -47,20 +48,24 @@ MUTANTS = [
   'FAIL gfx_surface_source(LEDGER_ROLE_CLIENT,&source) == OS32_ERR_INVAL && !source.ready'),
 ]
 
+@host32.control_session
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--runner',choices=['native','qemu'],default='native')
     p.add_argument('--mutate',action='store_true')
     a=p.parse_args()
+    host32.begin_control(a.mutate, a.runner, ROOT)
     texts={path:(ROOT/path).read_text() for path in TARGET_SRCS}
     before={path:hashlib.sha256(text.encode()).digest() for path,text in texts.items()}
     with tempfile.TemporaryDirectory(prefix='os32-e5-objects-') as directory:
         def run(changes):
             return run_case(None,a.runner,HOOKS+changes,'#include "gfx_reinit_host.c"\n',
                             texts,pathlib.Path(directory))
-        r=run([])
-        print(r.stdout+r.stderr,end='')
-        assert r.returncode == 0,r.returncode
+        with host32.control(a.mutate, a.runner, ROOT) as normal:
+            if normal:
+                r=run([])
+                print(r.stdout+r.stderr,end='')
+                assert r.returncode == 0,r.returncode
         if a.mutate:
             def one(m):
                 start=time.monotonic()

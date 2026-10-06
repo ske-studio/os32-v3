@@ -1884,6 +1884,8 @@ DB callerは実行時変異15/15 RED、C方言は27/27 REDと正例対照5/5 GRE
 残件は実行可能な環境でのnative検査、独立レビュー、PMのゲスト受入。
 callback/生ディスク授権/SHM所有権と長さなし文字列のcopy化は既存の別段の課題のまま。
 
+**kapinull の着地と受入 (PM、2026-10-06)**: 独立レビュー Opus 5.5 は往復 2 で Approve (往復 1 は B1 = `ring3_ptr_ok(0)` を 0 にしたため sys_ls の ctx NULL などが早期検査で kill される P1 回帰、B2 = kout_test の未更新)。PM のホスト検査 (native + qemu の check-changed) rc=0、main に取り込み (2f0957b、検査の規則と対応表は ci-select の後の配置 `build/checks.d/` `tools/check_map.d/` へ移した)、`make check` rc=0。**ゲスト受入 (e10a + 範囲検査の修正 + kapinull をまとめて、NP21/W、Commit 2f0957b、vmkernel.lz4 484632 B 一致)**: kselftest 277/0、klibc_test 49/49、alloc_demo 16/16、ring3_fault は kill されシェル生存、`ls / | wc -l` = 54、`echo abc | wc -c` = 4、db_test 9/9、db_v50_test 41/41、host_test 26/26 (常駐 host_agent を起こして)、kout_test PASS (0 failure、skip 3 = 2d/3c は設計どおり、1 は /etc/profile が無い環境)、gui_call_test 2/2、font_load_test 1/1、`v86 -t` の後の alloc_demo・db_test、`hsync -n` (B1 の経路 sys_ls ctx NULL) は落ちない、GUI ゲート v12g1 OK (スクリーンショットで確認)、日本語の表示。tvram の範囲外呼び出しはホスト試験だけ (ゲストでは試していない)。**既存の障害 (kapinull 由来ではない)**: `man -l` が `[Process crashed]` ($?=139、fault_kill_count +1)。man の list_cb は sys_ls の callback (CPL=0、カーネルスタック上) の中で `char buf[4096]` に sys_read するので、wrap_sys_read の出力範囲検査 (kapinull 以前から同じ、buf は非 NULL) で断られる。ring3_range_reject_addr = 0x002ffd84 (カーネルスタック)。sys_ls の callback の廃止 (e11) で直す。旧カーネルでの実測はしていない (コードの比較で判断)。
+
 
 ## 3. T2f — map/unmapとallocator、暫定heap終了
 
@@ -3512,6 +3514,298 @@ P3は依頼文の列挙順に番号を付す。反映済みは文書の修正を
     `/home/hight/os32-tmp/disp-p3-check-changed.log` に残す。
 
 <a id="検査の仕組みの整理-ci-select"></a>
+## 13. 検査の仕組みの整理 (ci-stab、2026-10-03〜04)
+
+**13-1〜13-3 は旧 worktree の履歴。載せ直し・レビュー修正の現状は 13-4。**
+
+GPT-6、`wt/ci-stab`、基点 `main 1a8a2d2`。ユーザー決定の第1・第2段のうち、
+並行時の安定化、試験側の重複、後片付けを実装。ホスト単体検証は終了したが、
+**対応表の担当側反映と最終 `check-changed` は未完了**。禁止された
+`build/sdk.mk`・`tools/check_select.py`・`tools/check_map.yaml`・`docs/08_build.md`
+と、カーネル・userland・SDKのコードは変更していない。commit・push・配備・
+NP21/W・NHD・ini・実機の操作なし。
+
+### 13-1. 変更と回帰の証拠
+
+1. appmem / appmem_map の30秒による合否判定を除去し、中央値・最大値の記録は維持。
+   共通 `mutpar.run_ordered` は初回の全workerが終了したあと、TIMEOUTだけを1回逐次で
+   再実行する。2回目もTIMEOUTならそのままTIMEOUT（例外も保持）。
+   スレッド・プロセス・逐次の経路を試験。HOST32の実行上限は120秒へ統一
+   （呼出し元がそれより長く指定した場合は維持）。
+   make 4本と変異workerのCPU競合を見込む停止検出用の上限であり、速さの合格条件ではない。
+   nanoは共用リンク作業場を持つため `serial=True` で共通処理に載せた。
+2. 16本の `--mutate` は正常対照を再実行しない。
+   同じrunner・同じ入力で通った記録を1回だけ消費する。正常試験の開始時に古い記録を無効化し、
+   後続の入力ハッシュ検査などが失敗した場合も記録を無効化する。
+   fixtureは展開したヘッダ、ソース、フラグ、コンパイラの場所・更新情報・版、
+   入力objectを照合したコンパイルキャッシュを `build/out/host32-fixtures` に持ち、
+   runnerを替えても再コンパイルしない。flockと完成後のrenameで並行書込みを防ぐ。
+   GFXの一時objectはworker別にして、既存のソースだけによる共有出力の競合も除去。
+   nanoの正常側の46件の負のリンク対照も成功記録の内側で回し、変異側で繰り返さない。
+   各変異の終了コード・FAILラベルの条件は維持。
+3. lan_bridgeのRigは部分初期化でもtry/exceptとfinallyで両子プロセスを終了・回収し、
+   ソケットを閉じる。アドレスとNIC接続は60秒まで、生存を見ながら待つ。
+   旧10秒を越える11秒の出現、既存アドレスを残して死んだagent、起動途中の例外を試験。
+4. net_linkのagent開始待ちを4秒から60秒（3000×20ms）へ拡大。
+   同じCPU競合下のPython起動を見込む。子の早期終了は即座に検出する。
+   ソケットと状態ディレクトリはTMPDIRを使い、UNIXソケット長を超える場合は切り詰めず拒否。
+   201回目の接続成功（旧上限越え）とTMPDIRの使用を、時計待ちなしのC足場で確認。
+5. guest_testsの4箇所をTemporaryDirectoryへ変更。
+   `mkdtemp / NamedTemporaryFile(delete=False)` をtools/tests全体で調査し、
+   memmap_genのASM用の別の木とcheck_selectのfixture構築失敗時も保護した。
+   packagesの5箇所は既存のfinally、check_selectの雛形はatexit、
+   gui_gate/kapi_outは親TemporaryDirectoryが所有。delete=Falseの使用なし。
+6. 共通の [check_artifacts.py](../../../tools/check_artifacts.py) を
+   --real、--require-image、packages、manifests、実物memmapの入口から呼ぶ。
+   欠損はコンパイル前に拒否し、makeの展開済み依存（.dも含む）を読み、
+   入力より古い成果物は「先に make all」を明記する。phonyの時刻は比較せず実入力へ辿る。
+   kernel.mapやPKG/ISOなどの副生成物は生成するtargetへ対応づける。
+   合成した--root/--mapのmemmap試験は従来どおり。make all後の地図の生成ブロックも再生成した。
+
+追加の [test_ci_stab.py](../../../tools/tests/test_ci_stab.py) は15試験。
+旧ソースの隔離コピーではrc=1、修正後はrc=0。31秒を記録するappmem両試験が
+GREENになること、TIMEOUTの再試行回数と実行順、ヘッダ変更によるキャッシュ無効化、
+正常対照のrunner・入力・消費・後続失敗、部分初期化の後片付け、
+欠損・古い成果物の事前拒否を確認する。
+既存runner試験6件と合わせて `test_host32.py` は21件成功。
+check_selectのfixtureコピー失敗の追加ケースも旧形でRED、修正後GREEN。
+
+16本の変異は実数276件（nanoのリンク検査3件とSHMのwiring2件を含む）すべてRED。
+このほかguest_tests 10、lan_bridge 5、vmkernel_lz4 13、vk32_crc 38、
+fdc_track 41、memmap_gen 5の変異を確認し、無変異の対照はGREENを維持。
+net_linkは35/35正常条件、lan_bridgeは9/9正常条件が成功。
+
+### 13-2. 所要時間（秒、記録だけ）
+
+HOST32はrecipeと同じ正常対照→変異の2プロセスの合計。
+修正前はHEADの試験スクリプトを隔離コピーに置き、実物のソースは変更せず測った。
+並行負荷とキャッシュ状態を含む観測値であり、速度の合否判定や一定の短縮保証には使わない。
+計測中のload averageは6.82/6.50/5.79だった。
+
+| 試験 | 修正前 | 修正後 | 変異RED |
+|---|---:|---:|---:|
+| access_walk | 7.17 | 4.15 | 33/33 |
+| caller_copy | 4.28 | 2.44 | 18/18 |
+| db_caller | 4.71 | 2.62 | 15/15 |
+| surface_query | 3.80 | 2.57 | 34/34 |
+| surface_lease | 6.11 | 5.41 | 18/18 |
+| surface_bundle | 3.01 | 3.64 | 21/21 |
+| gfx_kernel_fb | 2.98 | 3.41 | 10/10 |
+| gfx_reinit | 2.07 | 3.73 | 11/11 |
+| gfx_attach | 2.96 | 6.52 | 15/15 |
+| gfx_reattach | 3.38 | 4.69 | 4/4 |
+| unicode_surface | 3.44 | 5.57 | 6/6 |
+| nano_adapter | 23.27 | 14.05 | 24/24 |
+| appmem | 1.16 | 0.89 | 19/19 |
+| appmem_map | 2.87 | 2.32 | 32/32 |
+| kcg_boot | 2.15 | 0.72 | 5/5 |
+| shm_user | 15.31 | 3.51 | 11/11 |
+| 16本の合計 | 88.65 | 66.23 | 276/276 |
+
+| ほかの変更対象 | 修正前 | 修正後 |
+|---|---:|---:|
+| guest_tests | 1.835 | 1.915 |
+| net_link | 6.720 | 7.098 |
+| lan_bridge | 31.419 | 33.284 |
+| vmkernel_lz4 | 3.137 | 3.828 |
+| vk32_crc | 12.216 | 13.754 |
+| fdc_track | 16.911 | 29.773 |
+| packages | 1.893 | 2.109 |
+| memmap_gen | 1.823 | 2.045 |
+| tools/check_manifests.py | 0.568 | 0.644 |
+| tools/gen_memmap.py | 0.056 | 0.124 |
+| test_host32 | 0.158 | 1.069 |
+| test_ci_stab | 0.991 | 1.097 |
+| fixture_cleanup | 0.260 | 0.071 |
+
+test_ci_stabとfixture_cleanupの修正前はRED（rc=1）。それ以外のこの表の修正前・修正後はrc=0。
+各試験・変異のstdout、時刻、rcは `/home/hight/os32-tmp/ci-stab-records/` の
+`*-recipe-before.log` / `*-recipe-after.log` と各JSONに保存した。
+
+作業途中にはGFXの共有object出力、appmem_mapの制御変数名の衝突で失敗し、修正して再検証した。
+測定中のhelper変更をnanoの対照照合が拒否した回もある。入力を固定して16本を再実行し全件rc=0。
+vmkernel_lz4/vk32_crcをrunner未指定で回した回はnativeのSIGSYSで失敗した
+（試験の合否とせず、qemu指定で再実行してrc=0）。これらの途中の失敗ログも保存している。
+
+### 13-3. コマンドと残るゲート
+
+環境は `CROSS_DIR=/home/hight/opt/cross`、`TMPDIR=/home/hight/os32-tmp`、
+`PYTHONPATH=`。makeは常に `NP21W_DIR=/dev/null`、標準入力は `/dev/null`。
+
+- `make all NP21W_DIR=/dev/null < /dev/null`：rc=0。
+- `python3 -B tools/gen_tests_inventory.py --write`：rc=0（384行を生成、内容の差分なし）。
+- `python3 -B tools/tests/test_host32.py`：rc=0、21件。
+- 各16本 `python3 -B tools/tests/test_<name>.py --runner qemu`、
+  続けて同じコマンドに `--mutate`：すべてrc=0。
+- guest_tests / lan_bridge / memmap_genは `--mutate`、
+  vmkernel_lz4 / vk32_crcは `HOST32_RUNNERS=qemu` で `--real --mutate`、
+  fdc_trackは `--require-image --mutate`、net_link / packages / check_manifests /
+  gen_memmap `--check`：すべてrc=0。
+- `python3 -B tools/check_select.py --lint`：**rc=1、対応表の依存漏れ**。
+  禁止範囲の対応表は変更せず、担当側用の追記案を
+  `/home/hight/os32-tmp/ci-stab-records/map-additions.yaml` に置いた。
+  追記案を用いたlintはrc=0。本体のrc=0としては数えない。
+- 指定の
+  `/home/hight/os32-tmp/bin/check_slot.sh ci-stab-coder env HOST32_RUNNERS=qemu make check-changed NP21W_DIR=/dev/null < /dev/null`
+  は対応表反映待ちで**未実行**。既知のlint失敗を残して全体検査を浪費せず、
+  担当側反映後に1回実行しrc=0を確認する必要がある。完了条件はまだ満たしていない。
+
+### 13-4. ci-select 上への載せ直しと P2/P3 修正 (2026-10-04)
+
+コーダー GPT-6.1-sol、`wt/ci-stab2`、基点 `05f87ee`。旧 `wt/ci-stab` の
+未コミット差分と未追跡2ファイルを移植。ci-select のチェック分割とヘッダ自動依存を維持し、
+票・check_select試験を統合、メモリ地図と試験一覧を生成器で更新した。
+
+- P2-1: net_link の開始時間切れ・fork失敗・子の早期終了を agent_stop に集約。
+  kill/waitpid（EINTR再開）とソケット・state削除を行う。子には
+  PR_SET_PDEATHSIG=SIGTERM と設定直後の親PID確認を追加。Python側は
+  start_new_session と finally の killpg/wait、専用TemporaryDirectoryで異常終了にも対応。
+- P2-2: fixtureは単一 `.lock` 下で読み書き・刈込み。mtime順で古いものを捨て、
+  **32 MiBかつ1,024完成物**を上限とする。小さなホスト足場の作業集合を残しつつ、
+  世代をまたぐ容量とinodeの両方を制限するため。旧個別lockとpendingも回収。
+  コンパイルのみの `-c` とリンクを鍵で分離した。
+- P2-3: mutpar.timeout_red が初回の時間切れ判定を保留し、全worker終了後に逐次再試行。
+  hdd_stage2 / pegc_mode / vfs_fd_path（IME経路も）/ cd_read / serialfsを接続。
+  もともと逐次のkbd_dlog / pcm_cs4231は共通run_timeoutで同じコマンドを1回再試行。
+  生のsubprocessは既定60秒、PCM変異は負荷を見込み3→20秒。
+  host32.runは明示された上限を尊重し、未指定だけ120秒。
+- P2-4: test_host32からInfrastructureTestsをimportせず、専用check-ci-stab-hostを
+  checks.d/check_map.dに登録。packages・lan_bridge・net_link・install等への依存は
+  この専用表に置く。check-map / inventory / C方言 / check_selectの漏れは
+  ci-selectの分割表と上記import除去で解消。新check_artifacts・mutpar入力は所有する表に追加。
+- P3: 正常対照の鍵にgitの未追跡（ignore除外）入力とPATHで解決したgccの場所・版・更新情報を追加。
+  makeごとにUUIDをexportし対照記録を分離。nanoのrunnerなし--mutateは子に正常対照を先行させる。
+  processes=Trueは逐次時も再試行も別プロセスで実行し、sys.modulesを親に持ち込まない。
+  check_artifactsはorder-onlyを時刻判定から除き、make -qもincludeを再生成しうることを明記。
+
+回帰23件成功。新しい8試験を旧helperに当てるとrc=1（4失敗・5エラー、subtest含む）、
+修正後はrc=0。net_linkは35/35。正常→変異のmakeを同じworktreeで2本並行に実行し両方rc=0。
+nanoのrunnerなし--mutate（HOST32_RUNNERS=qemu）はrc=0、30.96秒。
+キャッシュは旧内容を複写して刈込みを実測：9,790ファイル・86,409,216割当bytes →
+1,025ファイル（完成物1,024＋lock1）・12,767,232割当bytes、刈込み0.348秒。
+旧実装の比較元は9,747ファイル・86,208,512割当bytes。新worktreeの初期キャッシュは存在しなかった。
+
+`make all NP21W_DIR=/dev/null < /dev/null` はrc=0、88.78秒。
+`gen_memmap.py --write` / `gen_tests_inventory.py --write` はrc=0。
+`check_select.py --lint` は133検査・漏れ0、rc=0。
+16本の正常→変異は276/276 RED、全コマンドrc=0、合計435.158秒。
+旧票の66.23秒に対して今回は全体検査と並行し、load average 22.47/18.35/11.99
+（旧6.82/6.50/5.79）だったため速度改善とは評価しない。
+最初の全体検査はrc=0、1283.45秒。ただしログ監査でcheck_selectの2変異が
+無関係なfixture後片付けの失敗をREDにしていたため、最終ゲートには数えない。
+原因はforkserverで関数globalsとモジュール名経由のmock先が別になること。
+関数globalsへ直接patchし、fresh workerで後片付けの正常対照を追加。
+隔離コピーで変異14/37の検出が本来のgit_versions/negativeケースに戻ることを確認した。
+修正後の全体検査はcheck-memmapで失敗。前回のtest_kapi_layoutの生成器変異が
+symlinkのbuild/os32.ldを通して実物のmtimeを更新していたことを、新しい鮮度検査が検出した。
+MUT_REALへbuild/os32.ldを追加し、合成した元の木の内容・mtimeが生成後も不変である
+2チェックを追加（旧形1失敗→修正後0失敗）。SDK生成器自体は変更せず、成果物をmake allで更新。
+この修正後の全体検査は最終結果欄に記録する。ログは
+`/home/hight/os32-tmp/ci-stab2-records/`。環境は13-3に同じ、ホスト実行はqemu指定。
+commit・push・NP21/W・NHD・配備・ini・実機操作は行っていない。
+
+### 13-5. 最終結果 (2026-10-04)
+
+修正後の指定コマンドは **rc=0、1015.39秒（16分55秒）**。
+133検査と前後のソース不変検査が通過。最終ログは
+`/home/hight/os32-tmp/ci-stab2-records/check-accepted.log`、時刻・rcは同名の `.time`。
+受入用実行の前半は、鮮度で失敗した実行の残りworkerと並行。後者は927.69秒、rc=2で終了した。
+最初の1283.45秒・rc=0は偽REDが含まれたため受入には使っていない。
+
+```bash
+CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp PYTHONPATH= HOST32_RUNNERS=qemu \
+  /home/hight/os32-tmp/bin/check_slot.sh ci-stab2-coder make check NP21W_DIR=/dev/null < /dev/null
+```
+
+| 確認対象 | 最終結果 |
+|---|---|
+| 専用ci-stab回帰 | 23/23、全体内12.352秒 |
+| net_link | 35/35。開始待ち終了・早期終了・外側の時間切れ・異常終了の後片付けも回帰で確認 |
+| 時間切れ対応7本 | hdd_stage2 128、pegc_mode 76、vfs_fd_path 83、cd_read 79、kbd_dlog 22、pcm_cs4231 31、serialfs 83：計502変異検出（恒等対照を除く） |
+| HOST32の16本 | 276/276 RED（SHM wiring 2件を含む） |
+| check_select | 27/27ケース、45/45変異RED、fresh workerの後片付け対照GREEN |
+| checkinfra | 27/27ケース、18/18変異RED |
+| KAPI配置 | 60チェック失敗0、15変異RED、恒等対照GREEN。新規2チェックで元の木の内容・mtimeを保護 |
+| make all | 初回88.78秒、鮮度更新の再実行3.24秒、両方rc=0 |
+| 生成器・表 | gen_memmap.py --write、gen_tests_inventory.py --write、check_select.py --lintすべてrc=0。lintは133検査・漏れ0 |
+| 全体後の鮮度 | gen_memmap.py --check：rc=0、地図に矛盾なし・文書最新 |
+
+fixtureキャッシュの最終値は **1,025ファイル（完成物1,024＋lock1）、pending 0**、
+内容12,543,124 bytes、ファイル割当14,626,816 bytes、ディレクトリ込み `du -sk` 15,748 KiB。
+開始時に読んだ旧worktreeの `du -sk` 85,260 KiB（83.26 MiB）→最終15,748 KiB（15.38 MiB）。
+新worktree自体はキャッシュ無しから開始し、13-4の刈込み試験で旧キャッシュを複写した。
+サイズ上限32 MiBは完成物の内容合計、個数上限1,024は完成物数。単一lockの下で両方を検査する。
+
+Windows opt-in試験5件（trial parser 1、PowerShell fixture 4）は既定どおりskip。
+native実行・NP21/W・実機は未実施。配備・NHD・ini操作、commit・pushなし。
+カーネル・userland・SDKコードの差分なし。所要時間の比較条件は13-2・13-4を参照。
+
+
+### 13-6. ci-stab2 確認レビュー修正 (2026-10-06)
+
+基点 `05f87ee`、worktree `wt/ci-stab2`。PM の `ref_cistab2_fix.md` に従い、
+既存の未コミット作業の上で P2-A と P3-1〜4 を修正した。
+PM 修正済みの `test_mutate_switches` は維持。P3-5 (pcm_cs4231 の時間)、
+P3-7 (CROSS_DIR)、P3-8 (sdk.mk の ifndef) は今回変更していない。
+
+- P2-A: `control()` の正常系・変異系どちらでも、同じ stem・runner の
+  **6時間より古い別 session** の記録だけを刈る。現 session と最近の別 session は
+  保護し、対照の session・runner・入力一致と消費の判定は維持。
+  固定個数の上限ではなく保持期間の制限であり、6時間以内の記録数は実行回数に依存する。
+  同一 worktree で6時間を超えて走る検査は別 session に刈られて「対照なし」で
+  不合格になる可能性を許容する (偽の合格にはしない)。別 worktree は別 build/out。
+  `make clean` は `build/out/host32-controls` 自体を削除する。
+- P3-1・2: net_link の SIGTERM を SystemExit に変換し、finally で独立した
+  ハーネスのプロセス群を停止・回収する。終了後は元の signal handler を復元。
+  `agent_start()` の sun_path 超過は TMPDIR のパスが長いことを stderr に明示する。
+- P3-3・4: 固有の `.pending` へのコンパイルは flock 外、ヒット時のコピーと
+  完成物の公開・刈り込みは flock 内。新しい pending は刈らず、所有する build が
+  finally で回収する。入力 `.o` / `.a` と出力の相対パスは kwargs の cwd を基準にする。
+- P2-B (確認レビュー往復2、`ref_cistab2_fix2.md`): **異常終了時の pending は1時間で刈る**。
+  正確には mtime が1時間を超えた `.pending` を次の flock 内の prune で削除する。
+  新しいものとちょうど1時間のものは保持する。gcc の実行時間に上限がないため
+  猶予を1時間とし、稼働判定ではなく mtime による回収とする。
+  flock 外の finally による同時削除は許容する。
+
+往復2の検証: `python3 -B tools/tests/test_host32.py` は **8/8 PASS** (追加2件)。
+修正前は古い pending の保持で1件 RED、修正後は削除・新しいものと境界の保持を確認。
+写しのモジュールで削除を無効化した変異は **1/1 RED** (assertion、rc=1)。
+`HOST32_RUNNERS=qemu make check-ci-stab-host` は **28/28 PASS、rc=0**、
+同設定の `make check-access-walk-host` は正常対照 PASS・既存変異 **33/33 runtime RED、rc=0**。
+native は前回の sandbox SIGSYS 記録に従い今回再実行せず PM に委ねる。
+全体の `check-changed` は今回の PM 指示により未実施。以下の表は往復1の記録。
+
+| 確認 | 結果 |
+|---|---|
+| 専用 ci-stab 回帰 | **28/28 PASS** (従来23件に5件追加、既存の通信2件も拡張)。全体検査内でも28/28、5.582秒 |
+| 記録の保持 | 正常 native→正常 qemu→変異 native を3 session、正常系のみも3 session。旧記録のmtimeを7時間前にして各巡回後1件/2件を確認。古い現 session、最近の並行 session、別stemも保護。runner名を使う記録単体試験であり native実行の代替ではない |
+| clean | 実物の clean レシピを一時の木で実行し、記録ディレクトリの削除と無関係ファイルの保持を確認 |
+| キャッシュ・並行 | 相対 `.o` / `.a` の内容変更で再コンパイル。コンパイル中に別fdでflockを取得できる。追加の同一鍵2本同時ビルドでも固有pending・正しい出力・pending回収を確認 |
+| 追加変異 | **5/5 RED**: 記録刈り込みなし、cwd解決なし、稼働pending削除、SIGTERM変換なし、TMPDIR診断なし。写しのモジュール/Cソースと隔離キャッシュで実行 |
+| net_link | 全体検査内で **35/35 PASS**。SIGTERM・異常終了・外側timeoutの子回収とTMPDIR診断は専用回帰でも確認 |
+| 指定の native + qemu | **rc=2**。native が signal 31 (SIGSYS、not a test verdict)。PM指示どおり qemu のみに切り替え |
+| qemu の check-changed | **rc=0**。Makefile等の変更からfullを選択、登録133検査と最後のソース不変検査が通過 |
+
+```bash
+TMPDIR=/home/hight/os32-tmp /home/hight/os32-tmp/bin/check_slot.sh cistab2-fix \
+  env HOST32_RUNNERS=qemu CROSS_DIR=/home/hight/opt/cross make check-changed
+```
+
+ログ・再現用補助スクリプトは `/home/hight/os32-tmp/ci-stab2-fix-records/`。
+`check-native-qemu.log`、`check-qemu.log`、`regression.log`、`mutations.log`、
+各 `*-mutant.log`、`concurrent.log`、`results.json` を保存。
+修正前は記録蓄積・lock占有・相対入力の更新見落としを再現。
+補助driver初版のmock条件誤り、SIGTERM変異の継承pipe待ちtimeout、
+並行probeの標準モジュールと衝突するファイル名は直し、これらは検出件数に含めない。
+pendingを単に集計対象に戻す弱い変異は生存したため、旧動作の「pending削除」を
+再現する変異で検出を確認した。
+
+検査後は完成fixture **1,024件、pending 0**。正常対照は18件残るが、すべて
+約1.3〜2.2時間前の別sessionであり、並行実行保護の6時間内なので意図して保持した。
+Windows opt-in の5件は既定どおりskip。nativeはPM側での検証待ち。
+NP21/W・実機・配備・NHD・ini操作、commit・pushは行っていない。
+P2修正の同じレビュアーによる確認と対象外3点の扱いはPMへ引き継ぐ。
+
 ## 検査の仕組みの整理 (ci-select)
 
 2026-10-03、ユーザー決定の第1・第2段。基点 `1a8a2d2`、`wt/ci-select`。

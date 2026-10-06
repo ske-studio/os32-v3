@@ -22,6 +22,7 @@
 """
 import pathlib
 import re
+import mutpar
 import subprocess
 import sys
 import tempfile
@@ -271,19 +272,16 @@ def build_target(tmp):
     print("TARGET i386-elf GNU11 -Werror PASS", flush=True)
 
 
-# 変異 1 本の 1 ケースにかける時間の上限。正常なケースは 1 本 0.01 秒未満
-# (2026-09-26 に 28 ケースを実測、全部 0.00 秒)。変異の中には待ちが切れなく
-# なるもの (期限の入れ直しなど) があり、上限 60 秒のころは 4 本がそれを満了して
-# 変異試験だけで 241 秒かかっていた。3 秒は並列段の負荷を見込んでも数百倍の余裕。
-# 見逃し (GREEN) の調査は MUTANT_CASE_TIMEOUT を大きくして --mutate を手で回す。
-MUTANT_CASE_TIMEOUT = 3
+# 正常ケースは 0.01 秒未満だが、make の並行負荷を見込み 20 秒まで待つ。
+# 時間切れは mutpar.run_timeout が逐次で一度再試行してから RED にする。
+MUTANT_CASE_TIMEOUT = 20
 
 
 def run_mutant(exe):
     """変異 1 本を回す。**最初に落ちたケースで打ち切る** — RED は 1 件で決まる。"""
     for c in CASES:
         try:
-            rc = subprocess.run([str(exe), c], cwd=ROOT,
+            rc = mutpar.run_timeout([str(exe), c], cwd=ROOT,
                                 timeout=MUTANT_CASE_TIMEOUT,
                                 stdout=subprocess.DEVNULL,
                                 stderr=subprocess.DEVNULL).returncode

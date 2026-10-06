@@ -26,6 +26,7 @@ ATAPI_READ_MAX_SECTORS を 32 にした版 (1 回の転送が 64KB = byte count 
 import os
 import pathlib
 import re
+import mutpar
 import subprocess
 import sys
 import tempfile
@@ -115,10 +116,10 @@ def run1(exe, case, env=None, quiet=False):
     if env:
         e.update(env)
     try:
-        r = subprocess.run([str(exe), case], cwd=ROOT, timeout=60, env=e,
+        r = mutpar.run_timeout([str(exe), case], cwd=ROOT, timeout=60, env=e,
                            capture_output=True, text=True)
     except subprocess.TimeoutExpired:
-        return 124, ""
+        return mutpar.timeout_red((124, ""))
     if not quiet:
         sys.stdout.write(r.stdout)
         sys.stderr.write(r.stderr)

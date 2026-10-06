@@ -51,6 +51,7 @@ import os
 import pathlib
 import shutil
 import struct
+import mutpar
 import subprocess
 import sys
 import tempfile
@@ -407,7 +408,7 @@ def _run_ime_exe(exe):
                            stderr=subprocess.STDOUT, timeout=120)
         return r.returncode == 0
     except subprocess.TimeoutExpired:
-        return False
+        return mutpar.timeout_red(False)
 
 
 def _ime_mutant_one(item):
@@ -838,7 +839,7 @@ def _mutant_one(item):
             ok, _ = run_exe(exe, imgdir, pkgdir, quiet=True, e2fsck=e2fsck,
                             first_fail=True)
         except subprocess.TimeoutExpired:
-            ok = False
+            ok = mutpar.timeout_red(False)
         return (name if ok else None), \
             f"MUTANT {i} ({name}): {'SURVIVED' if ok else 'killed'}"
     finally:

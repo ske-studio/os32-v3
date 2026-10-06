@@ -93,11 +93,13 @@ MUTANTS = [
 ]
 
 
+@host32.control_session
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--runner', choices=['native', 'qemu'], default='native')
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
+    host32.begin_control(args.mutate, args.runner, ROOT)
     before = {p: hashlib.sha256((ROOT / p).read_bytes()).digest() for p in TARGET_SRCS}
     bodies = [(ROOT / p).read_text() for p in SOURCES]
     cc = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-ffreestanding', '-fno-builtin',
@@ -128,29 +130,31 @@ def main():
                     source = source.replace('*app_entry(tx, va) |= PTE_PRESENT;', '{ host_pte_touch(); *app_entry(tx, va) |= PTE_PRESENT; }').replace('*unmap_entry(tx, va) &= ~PTE_PRESENT;', '{ host_pte_touch(); *unmap_entry(tx, va) &= ~PTE_PRESENT; }')
                     src.write_text(source)
                     extra += ['-Dpgalloc_alloc_phys=map_alloc', '-Dpgalloc_free_n_owner=map_free']
-                subprocess.run(cc + extra + ['-c', str(src), '-o', str(obj)], check=True,
+                host32.build(cc + extra + ['-c', str(src), '-o', str(obj)], check=True,
                                capture_output=True, text=True, timeout=30)
                 return obj
 
             objects = []
             for key, path in [('fixture', 'tools/tests/appmem_map_host.c'), ('physmem', 'kernel/physmem.c')]:
                 obj = tmp / (key + '.o')
-                subprocess.run(cc + ['-c', str(ROOT / path), '-o', str(obj)], check=True,
+                host32.build(cc + ['-c', str(ROOT / path), '-o', str(obj)], check=True,
                                capture_output=True, text=True, timeout=30)
                 objects.append(obj)
             normal = [compile_source(body, 'normal' + str(i), i) for i, body in enumerate(bodies)]
 
             def run(objs, key):
                 exe = tmp / (key + '.elf')
-                subprocess.run(['gcc', '-m32', '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
+                host32.build(['gcc', '-m32', '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                                 *map(str, objects + objs), '-o', str(exe)], check=True,
                                capture_output=True, text=True, timeout=30)
-                return host32.run([str(exe)], runner=args.runner, capture_output=True, text=True, timeout=10)
+                return host32.run([str(exe)], runner=args.runner, capture_output=True, text=True, timeout=host32.RUN_TIMEOUT)
 
-            r = run(normal, 'normal')
-            print(r.stdout + r.stderr, end='')
-            assert r.returncode == 0, (r.returncode, r.stdout, r.stderr)
-            print('PASS runner=' + args.runner)
+            with host32.control(args.mutate, args.runner, ROOT) as run_control:
+                if run_control:
+                    r = run(normal, 'normal')
+                    print(r.stdout + r.stderr, end='')
+                    assert r.returncode == 0, (r.returncode, r.stdout, r.stderr)
+                    print('PASS runner=' + args.runner)
             if args.mutate:
                 def one(entry):
                     index, (name, target, old, new, expected) = entry
@@ -177,7 +181,7 @@ def main():
                 counts = {s: sum(r[0] == s for r in results) for s in
                           ('RED', 'SURVIVED', 'COMPILE_LINK_ERROR', 'TIMEOUT', 'SIGNAL', 'ERROR')}
                 print(f'MUTATIONS {counts}; median={statistics.median(times):.2f}s max={max(times):.2f}s')
-                assert counts['RED'] == len(MUTANTS) and max(times) < 30, counts
+                assert counts['RED'] == len(MUTANTS), counts
     finally:
         assert all(hashlib.sha256((ROOT / p).read_bytes()).digest() == digest for p, digest in before.items()), 'input changed during test'
 

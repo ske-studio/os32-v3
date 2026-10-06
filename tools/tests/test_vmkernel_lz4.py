@@ -422,6 +422,10 @@ def run_mutations(target):
 def main(args):
     target = "--target" in args
     real = "--real" in args
+    if real:
+        sys.path.insert(0, str(ROOT / 'tools'))
+        from check_artifacts import require_fresh
+        require_fresh(ROOT, ['build/out/kernel.bin', 'build/out/sqlite.bin'])
     srcs = {"mini": MINI_SRC, "lz4c": LZ4C_SRC, "asm": ASM_SRC}
     try:
         for ln in run_all(srcs, SCRIPT, target, real):

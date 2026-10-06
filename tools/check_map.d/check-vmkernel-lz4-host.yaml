@@ -8,3 +8,4 @@ check-vmkernel-lz4-host:
 - tools/tests/vmkernel_lz4_host.c
 - tools/check_map.d/check-vmkernel-lz4-host.yaml
 - build/checks.d/check-vmkernel-lz4-host.mk
+- tools/check_artifacts.py

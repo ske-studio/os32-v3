@@ -31,6 +31,7 @@ import importlib.util
 import pathlib
 import re
 import shutil
+import mutpar
 import subprocess
 import sys
 import tempfile
@@ -762,7 +763,7 @@ def _mutate_one(item):
                 if run_cases(exes, img, quiet=True, keys=(k,), first_fail=True):
                     return "RED", why, control
             except subprocess.TimeoutExpired:
-                return "RED", why, control
+                return mutpar.timeout_red(("RED", why, control))
         return "SURVIVED", why, control
 
 

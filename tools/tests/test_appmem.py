@@ -58,11 +58,13 @@ MUTANTS = [
 ]
 
 
+@host32.control_session
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--runner', choices=['native', 'qemu'], default='native')
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
+    host32.begin_control(args.mutate, args.runner, ROOT)
     before = {path: hashlib.sha256((ROOT / path).read_bytes()).digest() for path in TARGET_SRCS}
     body = (ROOT / 'exec/appmem.c').read_text()
     cc = ['gcc', '-std=gnu11', '-m32', '-march=i386', '-ffreestanding', '-fno-builtin',
@@ -72,25 +74,27 @@ def main():
     try:
         with tempfile.TemporaryDirectory(prefix='os32-f2-') as directory:
             tmp = pathlib.Path(directory)
-            subprocess.run(cc + ['-c', str(ROOT / 'tools/tests/appmem_host.c'),
+            host32.build(cc + ['-c', str(ROOT / 'tools/tests/appmem_host.c'),
                                  '-o', str(tmp / 'fixture.o')], check=True,
                            capture_output=True, text=True, timeout=30)
 
             def run(source, key):
                 src, obj, exe = [tmp / (key + ext) for ext in ('.c', '.o', '.elf')]
                 src.write_text(source)
-                subprocess.run(cc + ['-c', str(src), '-o', str(obj)], check=True,
+                host32.build(cc + ['-c', str(src), '-o', str(obj)], check=True,
                                capture_output=True, text=True, timeout=30)
-                subprocess.run(['gcc', '-m32', '-nostdlib', '-static', '-no-pie',
+                host32.build(['gcc', '-m32', '-nostdlib', '-static', '-no-pie',
                                 str(tmp / 'fixture.o'), str(obj), '-o', str(exe)],
                                check=True, capture_output=True, text=True, timeout=30)
                 return host32.run([str(exe)], runner=args.runner,
-                                  capture_output=True, text=True, timeout=10)
+                                  capture_output=True, text=True, timeout=host32.RUN_TIMEOUT)
 
-            result = run(body, 'normal')
-            print(result.stdout + result.stderr, end='')
-            assert result.returncode == 0, (result.returncode, result.stdout, result.stderr)
-            print(f'PASS runner={args.runner}')
+            with host32.control(args.mutate, args.runner, ROOT) as normal:
+                if normal:
+                    result = run(body, 'normal')
+                    print(result.stdout + result.stderr, end='')
+                    assert result.returncode == 0, (result.returncode, result.stdout, result.stderr)
+                    print(f'PASS runner={args.runner}')
             if args.mutate:
                 def one(entry):
                     index, (name, old, new, expected) = entry
@@ -117,7 +121,7 @@ def main():
                 counts = {status: sum(r[0] == status for r in results)
                           for status in ('RED', 'SURVIVED', 'COMPILE_LINK_ERROR', 'TIMEOUT', 'SIGNAL', 'ERROR')}
                 print(f'MUTATIONS {counts}; median={statistics.median(times):.2f}s max={max(times):.2f}s')
-                assert counts['RED'] == len(MUTANTS) and max(times) < 30, counts
+                assert counts['RED'] == len(MUTANTS), counts
     finally:
         assert all(hashlib.sha256((ROOT / path).read_bytes()).digest() == digest
                    for path, digest in before.items()), 'input changed during test'

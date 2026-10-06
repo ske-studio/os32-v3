@@ -304,9 +304,12 @@ class CheckInfra(unittest.TestCase):
     def test_mutate_switches(self):
         import os
         env = dict(os.environ, NP21W_DIR='/dev/null', PYTHONPATH='')
+        # 外側の make (check-changed の MUTATE=sel / MUTATE_TARGETS) から継ぐ値を落とす。
+        for k in ('MAKEFLAGS', 'MFLAGS', 'MAKELEVEL', 'MAKEOVERRIDES', 'MUT', 'MUTATE', 'MUTATE_TARGETS'):
+            env.pop(k, None)
         for mutate, expected in [('0', 0), ('1', 2)]:
             proc = subprocess.run(['make', '-n', 'check-ring3-guard-host', 'check-db-errstr-host',
-                                   'MUTATE='+mutate, 'NP21W_DIR=/dev/null'],
+                                   'MUTATE='+mutate, 'MUTATE_TARGETS=', 'NP21W_DIR=/dev/null'],
                                   cwd=legacy.ROOT, env=env, stdin=subprocess.DEVNULL,
                                   text=True, capture_output=True)
             self.assertEqual(proc.returncode, 0, proc.stderr)

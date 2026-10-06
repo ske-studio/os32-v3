@@ -39,6 +39,7 @@ CD インストール (userland/system/cdinst.c) の .PKG は、配備の正典
 """
 
 import os
+import pathlib
 import re
 import shutil
 import subprocess
@@ -930,6 +931,14 @@ def case_install(plan, resolved):
 
 
 def main():
+    from check_artifacts import require_fresh
+    artifacts = ['images/os32_boot.d88', 'images/os32_boot144.img',
+                 'images/os32_install.iso'] + [os.path.relpath(p, ROOT)
+                                               for p in pathlib.Path(ROOT, 'packages').glob('*.PKG')]
+    require_fresh(ROOT, artifacts, ['build/packages.yaml', 'build/core.yaml',
+        'userland/deploy.yaml', 'tools/mkpkg.py'],
+        targets={p: 'packages' for p in artifacts if p.startswith('packages/')} |
+                {'images/os32_install.iso': 'iso'})
     plan, resolved = case_real_plan()
     case_negative()
     case_split()

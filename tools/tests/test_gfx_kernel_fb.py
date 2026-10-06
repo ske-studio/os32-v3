@@ -132,30 +132,32 @@ static inline void io_wait_n(int n) {(void)n;}
         inputs = sources
         if object_cache is not None:
             inputs = []
-            for src in sources:
-                content = src.read_bytes()
-                if src.name == 'fixture.c':
-                    content += b''.join((tmp/(unit+'_host_source.c')).read_bytes()
-                                        for unit in ('paging','pgalloc','sys'))
-                obj = object_cache/(hashlib.sha256(content).hexdigest()+'.o')
-                if not obj.exists():
-                    result = subprocess.run(flags+['-c',str(src),'-o',str(obj)],
-                                            capture_output=True,text=True)
-                    assert result.returncode == 0, result.stderr
+            for index, src in enumerate(sources):
+                # The shared cache hashes expanded headers too. Each worker
+                # writes its own object; local source-only keys raced on output
+                # and omitted staged header changes.
+                obj = tmp / ('unit' + str(index) + '.o')
+                result = host32.build(flags+['-c',str(src),'-o',str(obj)],
+                                      capture_output=True,text=True)
+                assert result.returncode == 0, result.stderr
                 inputs.append(obj)
-        compiled=subprocess.run(flags+['-nostdlib','-static','-no-pie','-Wl,--gc-sections',
+        compiled=host32.build(flags+['-nostdlib','-static','-no-pie','-Wl,--gc-sections',
             *map(str,inputs),'-o',str(exe)],capture_output=True,text=True)
         assert compiled.returncode == 0, compiled.stderr
-        return host32.run([str(exe)],runner=runner,capture_output=True,text=True,timeout=60)
+        return host32.run([str(exe)],runner=runner,capture_output=True,text=True,timeout=host32.RUN_TIMEOUT)
 
+@host32.control_session
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--runner',choices=['native','qemu'],default='native')
     parser.add_argument('--mutate',action='store_true')
     args=parser.parse_args()
-    result=run_case(None,args.runner)
-    print(result.stdout+result.stderr,end='')
-    assert result.returncode == 0,result.returncode
+    host32.begin_control(args.mutate, args.runner, ROOT)
+    with host32.control(args.mutate, args.runner, ROOT) as normal:
+        if normal:
+            result=run_case(None,args.runner)
+            print(result.stdout+result.stderr,end='')
+            assert result.returncode == 0,result.returncode
     if args.mutate:
         def one(m):
             result=run_case(m,args.runner)

@@ -516,8 +516,28 @@ SELF = "tools/tests/test_kapi_layout.py"
 # 写しの木で実体にする場所。変異を当てるファイル (exec/ sdk/) と、生成器が
 # cwd 相対で書き出す先 (sdk/include/os32 kapi/ exec/)、子の試験が "..." で
 # 引く先 (include/) は丸ごと実体にする — symlink を通して書くと実物を壊す。
-MUT_REAL = ("exec", "sdk", "include", "kapi",
+MUT_REAL = ("exec", "sdk", "include", "kapi", "build/os32.ld",
             "tools/tests/os32x_layout_host.c")
+
+
+def case_generation_isolation(tmp):
+    """Generators in an overlay must preserve the owning tree, including mtimes."""
+    seed = tmp / 'generation-seed'
+    for directory in ('sdk/include/os32', 'sdk/rust/os32api/src', 'sdk/crt',
+                      'sdk/link', 'kapi', 'exec', 'include', 'build', 'tools/tests'):
+        (seed / directory).mkdir(parents=True, exist_ok=True)
+    links = ('sdk/link/app.ld', 'sdk/link/app_sys.ld', 'sdk/link/shlib.ld', 'build/os32.ld')
+    for rel in ('sdk/gen_kapi.py', 'sdk/kapi.json', 'tools/tests/os32x_layout_host.c', *links):
+        shutil.copy2(ROOT / rel, seed / rel)
+    def snapshot():
+        return {rel: ((seed / rel).read_bytes(), (seed / rel).stat().st_mtime_ns)
+                for rel in links}
+    before = snapshot()
+    tree = mutpar.overlay(seed, tmp / 'generation-overlay', real=MUT_REAL)
+    result = subprocess.run([sys.executable, '-B', 'sdk/gen_kapi.py'], cwd=tree,
+                            capture_output=True, timeout=60)
+    check(result.returncode == 0, 'overlay generator completes')
+    check(snapshot() == before, 'overlay preserves source link script bytes and mtimes')
 
 
 def one_mutation(item):
@@ -560,6 +580,7 @@ if __name__ == "__main__":
         case_mkos32x(td)
         case_mkshlib(td)
         case_rename(td)
+        case_generation_isolation(td)
     print("\n%d checks, %d failures" % (checks, failures))
     if failures:
         sys.exit(1)

@@ -1,6 +1,7 @@
 """T2d d4: real caller/copy + managed walk, with MMU/IRQ host boundaries."""
 TARGET_SRC = ['exec/redir_access.c', 'exec/access_walk.c', 'kernel/kselftest.c']
 
+import host32
 import argparse
 import hashlib
 import subprocess
@@ -30,11 +31,13 @@ MUTANTS = [
 ]
 
 
+@host32.control_session
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
     parser.add_argument('--runner', choices=['native', 'qemu'], default='native')
     args = parser.parse_args()
+    host32.begin_control(args.mutate, args.runner, walk.ROOT)
     sources = {k: (walk.ROOT / p).read_text() for k, p in walk.FILES.items()}
     paths = [walk.ROOT / p for p in walk.FILES.values()] + [
         walk.ROOT / 'tools/tests/caller_copy_host.c', walk.ROOT / 'tools/tests/access_walk_host.c']
@@ -57,10 +60,12 @@ int caller_access_page(const struct caller_access *a, u32 va, int write, u32 *pa
 }
 '''
     sources['redir_access'] = body
-    result = walk.run(sources, fixture='caller_copy_host.c', runner=args.runner)
-    print(result.stdout + result.stderr, end='')
-    assert result.returncode == 0, result.returncode
-    print(f'PASS runner={args.runner}')
+    with host32.control(args.mutate, args.runner, walk.ROOT) as normal:
+        if normal:
+            result = walk.run(sources, fixture='caller_copy_host.c', runner=args.runner)
+            print(result.stdout + result.stderr, end='')
+            assert result.returncode == 0, result.returncode
+            print(f'PASS runner={args.runner}')
     if args.mutate:
         def one(m):
             old, new, name = m

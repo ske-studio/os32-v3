@@ -8,3 +8,4 @@ check-kcg-boot-host:
 - tools/tests/test_kcg_boot.py
 - tools/check_map.d/check-kcg-boot-host.yaml
 - build/checks.d/check-kcg-boot-host.mk
+- tools/tests/mutpar.py

@@ -388,9 +388,13 @@ class Fixture:
                 "sdk/kapi.json": "{}", "gen.txt": "x\n"}
         base.update({s: "" for s in FX_SCRIPTS})
         base.update(files or {})
-        self.d = tempfile.mkdtemp(prefix="os32-ckmk-")
-        os.rmdir(self.d)
-        shutil.copytree(_template_for(base), self.d, symlinks=True)
+        self._directory = tempfile.TemporaryDirectory(prefix="os32-ckmk-")
+        self.d = self._directory.name
+        try:
+            shutil.copytree(_template_for(base), self.d, symlinks=True, dirs_exist_ok=True)
+        except BaseException:
+            self._directory.cleanup()
+            raise
 
     def write(self, rel, text):
         p = pathlib.Path(self.d, rel)
@@ -425,7 +429,7 @@ class Fixture:
             cs.ROOT, cs._TRACKED, cs.load_map = saved
 
     def close(self):
-        shutil.rmtree(self.d, ignore_errors=True)
+        self._directory.cleanup()
 
 
 @contextlib.contextmanager
@@ -796,6 +800,29 @@ def case_mk_maintenance_disabled(cs):
                                for argv in children), children
 
 
+def case_mk_fixture_cleanup(cs):
+    from unittest.mock import patch
+    with tempfile.TemporaryDirectory(prefix="os32-ckcleanup-") as directory:
+        def broken_copy(source, destination, **kw):
+            pathlib.Path(destination).mkdir(exist_ok=True)
+            pathlib.Path(destination, "partial").write_text("partial copy")
+            raise OSError("copy failure")
+        saved = tempfile.tempdir
+        tempfile.tempdir = directory
+        try:
+            with patch.dict(Fixture.__init__.__globals__, {"_template_for": lambda base: "unused"}), \
+                 patch.object(shutil, "copytree", side_effect=broken_copy):
+                try:
+                    Fixture(cs)
+                except OSError as error:
+                    assert str(error) == "copy failure"
+                else:
+                    raise AssertionError("copy failure was swallowed")
+            assert not list(pathlib.Path(directory).iterdir()), "partial fixture leaked"
+        finally:
+            tempfile.tempdir = saved
+
+
 def case_mk_real_tree(cs):
     # 実物の make ファイル (作業中の版) を基点に置いた一時リポジトリ: 列が読めて差が無い
     # (追加選択なし)。check-time-math-host に型どおりの行を足す (main の e241312 / f4989ee の形)
@@ -821,7 +848,7 @@ def case_mk_real_tree(cs):
 
 
 
-CASES = [case_recipe_semicolon, case_inc_extract, case_hsync_protect, case_sh_pipe, case_bare_extract,
+CASES = [case_mk_fixture_cleanup, case_recipe_semicolon, case_inc_extract, case_hsync_protect, case_sh_pipe, case_bare_extract,
          case_readme, case_claude, case_docs_always, case_broad_only,
          case_submodule, case_nothing, case_single_stage, case_inc_dir_extract,
          case_notest_fast, case_notest_glob_wins, case_notest_guard,
@@ -1004,8 +1031,16 @@ def mutation_maintenance_order():
     return 1
 
 
+def _fixture_cleanup_worker(_):
+    # spawn/forkserver can copy __main__'s module dictionary while functions
+    # still reference the original globals. Exercise mocks in a fresh worker.
+    case_mk_fixture_cleanup(None)
+
+
 def mutate():
     """変異を並列に回す (mutpar、OS32_MUT_JOBS)。結果は変異の番号順に出す。"""
+    list(mutpar.run_ordered(_fixture_cleanup_worker, [None], processes=True))
+    print('CONTROL fixture cleanup in worker GREEN', flush=True)
     bad = mutation_maintenance_order()
     for i, status, info in mutpar.run_ordered(_run_mutation, range(1, len(MUTATIONS) + 1),
                                               processes=True):

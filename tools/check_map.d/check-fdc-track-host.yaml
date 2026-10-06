@@ -11,3 +11,4 @@ check-fdc-track-host:
 - fs/vfs_name_rules.inc
 - tools/check_map.d/check-fdc-track-host.yaml
 - build/checks.d/check-fdc-track-host.mk
+- tools/check_artifacts.py

@@ -19,6 +19,7 @@ ILP32 で回す。送る OUT 列 (ポート・値・順序) を期待列と比�
 import host32
 import os
 import pathlib
+import mutpar
 import subprocess
 import sys
 import tempfile
@@ -305,7 +306,7 @@ def one_mutation(item):
             out = host32.run([str(exe)], cwd=str(tree), timeout=60,
                                  capture_output=True)
         except subprocess.TimeoutExpired:
-            return "MUTATE %-34s RED (時間切れ)" % name, 0
+            return mutpar.timeout_red(("MUTATE %-34s RED (時間切れ)" % name, 0))
     if out.returncode == 0:
         return ("MUTATE %-34s **GREEN のまま = 試験が規則を見ていない**"
                 % name, 1)

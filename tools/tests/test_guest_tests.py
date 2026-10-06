@@ -160,7 +160,10 @@ class FakeGuest(object):
 def drive(steps, probe_ok=True, reopen_ok=True, stall=gt.STALL_SECS_MIN,
           total=gt.STALL_SECS_MIN * 8, token="tk1", host_dir=None, tmp=None):
     """run_suite を贋のゲストと贋の時計で回す。返り値: (rep, rc, guest, log)"""
-    tmp = tmp or tempfile.mkdtemp(prefix="os32-guest-tests-")
+    if tmp is None:
+        with tempfile.TemporaryDirectory(prefix="os32-guest-tests-") as directory:
+            return drive(steps, probe_ok, reopen_ok, stall, total, token,
+                         host_dir, directory)
     host_dir = host_dir if host_dir is not None else tmp
     test_dir = pathlib.Path(host_dir) / gt.HOST_SUBDIR
     if os.path.isdir(host_dir):
@@ -609,18 +612,18 @@ def t_run_timeout():
 
 def t_run_no_host():
     print("== 13. 通し (/host が無い) ==", flush=True)
-    tmp = tempfile.mkdtemp(prefix="os32-guest-tests-")
-    missing = os.path.join(tmp, "no-such-dir")
-    rep, rc, guest, log = drive([], host_dir=missing)
-    eq(rc, gt.RC_NO_PREREQ, "/host が無ければ前提不足で非ゼロ")
-    check(rep is None, "報告を作らない (合格にしない)")
-    eq(guest.reopened, 0, "前提が無い時点で止まる (走らせない)")
-    check("/host" in log, "断る理由を言う [V4]")
+    with tempfile.TemporaryDirectory(prefix="os32-guest-tests-") as tmp:
+        missing = os.path.join(tmp, "no-such-dir")
+        rep, rc, guest, log = drive([], host_dir=missing)
+        eq(rc, gt.RC_NO_PREREQ, "/host が無ければ前提不足で非ゼロ")
+        check(rep is None, "報告を作らない (合格にしない)")
+        eq(guest.reopened, 0, "前提が無い時点で止まる (走らせない)")
+        check("/host" in log, "断る理由を言う [V4]")
 
-    # 置き場はあるが、ゲストに /host がマウントされていない (実機)
-    rep, rc, _, log = drive([], probe_ok=False)
-    eq(rc, gt.RC_NO_PREREQ, "ゲストの印が現れなければ非ゼロ")
-    check(rep is None, "黙って合格にしない")
+        # 置き場はあるが、ゲストに /host がマウントされていない (実機)
+        rep, rc, _, log = drive([], probe_ok=False)
+        eq(rc, gt.RC_NO_PREREQ, "ゲストの印が現れなければ非ゼロ")
+        check(rep is None, "黙って合格にしない")
 
 
 def t_run_unreachable():
@@ -630,16 +633,16 @@ def t_run_unreachable():
         def cmd(self, line, timeout=None):
             raise gt.GuestUnreachable("繋がらない")
 
-    tmp = tempfile.mkdtemp(prefix="os32-guest-tests-")
-    (pathlib.Path(tmp) / gt.HOST_SUBDIR).mkdir(parents=True)
-    log = []
-    clock = Clock()
-    rep, rc = gt.run_suite(Dead(pathlib.Path(tmp) / gt.HOST_SUBDIR, []), tmp,
-                           ENTS, stall_secs=60, total_secs=600, token="tk1",
-                           now=clock.now, sleep=clock.sleep, log=log.append)
-    eq(rc, gt.RC_NO_PREREQ, "ゲストに届かなければ前提不足 (不合格と混ぜない)")
-    check(rep is None, "報告を作らない")
-    check("手が届かない" in "\n".join(log), "届かないと言う [V4]")
+    with tempfile.TemporaryDirectory(prefix="os32-guest-tests-") as tmp:
+        (pathlib.Path(tmp) / gt.HOST_SUBDIR).mkdir(parents=True)
+        log = []
+        clock = Clock()
+        rep, rc = gt.run_suite(Dead(pathlib.Path(tmp) / gt.HOST_SUBDIR, []), tmp,
+                               ENTS, stall_secs=60, total_secs=600, token="tk1",
+                               now=clock.now, sleep=clock.sleep, log=log.append)
+        eq(rc, gt.RC_NO_PREREQ, "ゲストに届かなければ前提不足 (不合格と混ぜない)")
+        check(rep is None, "報告を作らない")
+        check("手が届かない" in "\n".join(log), "届かないと言う [V4]")
 
 
 def t_run_reopen_fails():
@@ -651,21 +654,21 @@ def t_run_reopen_fails():
 
 def t_run_twice():
     print("== 16. 通し (2 回続けて回す — R8) ==", flush=True)
-    tmp = tempfile.mkdtemp(prefix="os32-guest-tests-")
-    mk = lambda tok: [(0.0, tape(tok, blk("aa", 0, ["aa: PASS 1/1"]),
-                                 blk("bb", 0, ["bb: PASS 2/2"]),
-                                 blk("cc", 0, ["cc: PASS 3/3"])) + done(tok))]
-    rep1, rc1, _, _ = drive(mk("tk1"), token="tk1", tmp=tmp, host_dir=tmp)
-    eq(rc1, gt.RC_OK, "1 回目は 0")
-    rep2, rc2, _, _ = drive(mk("tk2"), token="tk2", tmp=tmp, host_dir=tmp)
-    eq(rc2, gt.RC_OK, "2 回目も同じ結果 (前回の出力が混ざらない)")
-    eq([r.kind for r in rep2.rows], [r.kind for r in rep1.rows],
-       "2 回目の判定は 1 回目と同じ")
+    with tempfile.TemporaryDirectory(prefix="os32-guest-tests-") as tmp:
+        mk = lambda tok: [(0.0, tape(tok, blk("aa", 0, ["aa: PASS 1/1"]),
+                                     blk("bb", 0, ["bb: PASS 2/2"]),
+                                     blk("cc", 0, ["cc: PASS 3/3"])) + done(tok))]
+        rep1, rc1, _, _ = drive(mk("tk1"), token="tk1", tmp=tmp, host_dir=tmp)
+        eq(rc1, gt.RC_OK, "1 回目は 0")
+        rep2, rc2, _, _ = drive(mk("tk2"), token="tk2", tmp=tmp, host_dir=tmp)
+        eq(rc2, gt.RC_OK, "2 回目も同じ結果 (前回の出力が混ざらない)")
+        eq([r.kind for r in rep2.rows], [r.kind for r in rep1.rows],
+           "2 回目の判定は 1 回目と同じ")
 
-    # 2 回目が**走らなかった**場合、1 回目の出力をそのまま読んで合格にしない
-    rep3, rc3, _, log = drive([], token="tk3", tmp=tmp, host_dir=tmp)
-    check(rc3 != gt.RC_OK,
-          "走らなかった 2 回目が前回の出力で合格にならない (R8)")
+        # 2 回目が**走らなかった**場合、1 回目の出力をそのまま読んで合格にしない
+        rep3, rc3, _, log = drive([], token="tk3", tmp=tmp, host_dir=tmp)
+        check(rc3 != gt.RC_OK,
+              "走らなかった 2 回目が前回の出力で合格にならない (R8)")
 
 
 def t_report_shape():

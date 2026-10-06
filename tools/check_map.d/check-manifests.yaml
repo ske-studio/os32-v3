@@ -13,3 +13,4 @@ check-manifests:
 - tools/check_map.d/check-manifests.yaml
 - build/checks.d/check-manifests.mk
 - build/programs.mk
+- tools/check_artifacts.py

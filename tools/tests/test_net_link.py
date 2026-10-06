@@ -14,6 +14,8 @@ Make・エミュレータ・ネットワークには触らない (Agent は --of
 --target は同じソースがカーネルと同じフラグの i386-elf-gcc -Werror でも通ることを
 別に見る ([C1] GNU11)。
 """
+import os
+import signal
 import pathlib
 import re
 import subprocess
@@ -107,6 +109,31 @@ def check_timer_calls_link_tick():
     print("DRIVE SOURCE: link_tick only from timer_handler PASS", flush=True)
 
 
+def run_fixture(args, timeout=600):
+    def terminate(signum, frame):
+        raise SystemExit(128 + signum)
+
+    # A private TMPDIR also owns state left by an abnormally killed harness.
+    previous = signal.signal(signal.SIGTERM, terminate)
+    try:
+        with tempfile.TemporaryDirectory(prefix="os32-n1-state-") as state:
+            proc = None
+            try:
+                proc = subprocess.Popen(args, cwd=ROOT, start_new_session=True,
+                                        env={**os.environ, 'TMPDIR': state})
+                rc = proc.wait(timeout=timeout)
+            finally:
+                if proc is not None:
+                    try:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    proc.wait()
+    finally:
+        signal.signal(signal.SIGTERM, previous)
+    return rc
+
+
 if __name__ == "__main__":
     check_reclaim_has_host_owner_exit()
     check_timer_calls_link_tick()
@@ -127,6 +154,6 @@ if __name__ == "__main__":
                                check=True, cwd=ROOT)
             print("TARGET i386-elf GNU11 -Werror compile PASS", flush=True)
         cases = [x for x in sys.argv[1:] if not x.startswith("--")]
-        rc = subprocess.run([exe, *cases], cwd=ROOT, timeout=600).returncode
+        rc = run_fixture([exe, *cases])
         print("EXIT net_link_host=%d" % rc, flush=True)
         sys.exit(rc)

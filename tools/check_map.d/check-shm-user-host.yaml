@@ -20,3 +20,4 @@ check-shm-user-host:
 - kernel/shm.c
 - tools/check_map.d/check-shm-user-host.yaml
 - build/checks.d/check-shm-user-host.mk
+- tools/tests/mutpar.py

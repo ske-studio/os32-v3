@@ -28,3 +28,4 @@ check-memmap-host:
 - tools/tests/test_owner_reclaim.py
 - tools/check_map.d/check-memmap-host.yaml
 - build/checks.d/check-memmap-host.mk
+- tools/check_artifacts.py

@@ -14,6 +14,7 @@ os.cpu_count() // 2。make -j の下で 6 本の重い試験が同時に走っ�
 組み直さない (= 見逃す) ので、変異の前に表を依存と突き合わせ、狭ければ試験を落とす。
 表に無いファイルはハーネスを全部組む (安全側)。
 """
+import contextvars
 import concurrent.futures
 import os
 import pathlib
@@ -61,7 +62,7 @@ def _lower_priority():
             pass
 
 
-def run_ordered(fn, items, processes=False):
+def run_ordered(fn, items, processes=False, serial=False):
     """fn(item) を並列に回し、結果を items の順に yield する。
 
     既定はスレッド (中身が gcc と実行ファイルの subprocess のとき。GIL を離して
@@ -71,17 +72,75 @@ def run_ordered(fn, items, processes=False):
     fn は試験スクリプトの最上位の関数、items と結果は pickle できるものにする。
     fn は作業ツリーの実物にも、ほかの変異の写しにも書かないこと。"""
     items = list(items)
-    n = min(jobs(), max(1, len(items)))
+    n = 1 if serial else min(jobs(), max(1, len(items)))
     _lower_priority()
-    if n == 1:
-        for it in items:
-            yield fn(it)
-        return
-    pool = (concurrent.futures.ProcessPoolExecutor if processes
-            else concurrent.futures.ThreadPoolExecutor)
-    with pool(max_workers=n) as ex:
-        for r in ex.map(fn, items):
-            yield r
+    # Keep every first attempt until the pool is completely idle. Retrying
+    # inside a worker would repeat the same contention that caused TIMEOUT.
+    if n == 1 and not processes:
+        results = [_attempt(fn, it) for it in items]
+    else:
+        pool = (concurrent.futures.ProcessPoolExecutor if processes
+                else concurrent.futures.ThreadPoolExecutor)
+        with pool(max_workers=n) as ex:
+            futures = [ex.submit(_attempt, fn, it) for it in items]
+            results = [future.result() for future in futures]
+    for it, result in zip(items, results):
+        if isinstance(result, (subprocess.TimeoutExpired, TimeoutVerdict)) or (
+                isinstance(result, tuple) and result and result[0] == 'TIMEOUT'):
+            if processes:
+                # A fresh worker prevents sys.modules mutations reaching the
+                # parent or a subsequent retry (also when jobs=1).
+                with concurrent.futures.ProcessPoolExecutor(max_workers=1) as ex:
+                    result = ex.submit(_retry, fn, it).result()
+            else:
+                result = _retry(fn, it)
+        yield result
+
+
+_phase = contextvars.ContextVar('mutation_attempt', default=None)
+
+
+class TimeoutVerdict(Exception):
+    """Defer a suite's timeout-as-RED verdict until its serial retry."""
+
+
+def timeout_red(verdict):
+    if _phase.get() == 'first':
+        raise TimeoutVerdict()
+    return verdict
+
+
+def run_timeout(args, **kwargs):
+    """Raw subprocess with one retry for callers outside run_ordered.
+
+    Inside a worker, leave retry scheduling to run_ordered. Explicit deadlines
+    remain effective (host32.run must not silently raise a 3s bound to 120s).
+    """
+    kwargs.setdefault('timeout', 60)
+    try:
+        return subprocess.run(args, **kwargs)
+    except subprocess.TimeoutExpired:
+        if _phase.get() is not None:
+            raise
+        return subprocess.run(args, **kwargs)
+
+
+def _retry(fn, item):
+    token = _phase.set('retry')
+    try:
+        return fn(item)
+    finally:
+        _phase.reset(token)
+
+
+def _attempt(fn, item):
+    token = _phase.set('first')
+    try:
+        return fn(item)
+    except (subprocess.TimeoutExpired, TimeoutVerdict) as error:
+        return error
+    finally:
+        _phase.reset(token)
 
 
 def gcc_deps(cmd, root, cwd=None):

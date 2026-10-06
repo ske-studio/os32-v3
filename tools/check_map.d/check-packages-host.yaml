@@ -25,3 +25,4 @@ check-packages-host:
 - fs/vfs_name_rules.inc
 - tools/check_map.d/check-packages-host.yaml
 - build/checks.d/check-packages-host.mk
+- tools/check_artifacts.py
