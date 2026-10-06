@@ -14,7 +14,7 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 
 | ID | 何を | 種類 | 関門 |
 |---|---|---|---|
-| PRIO-3 | KAPI-AUDIT-FIX のゲスト確認 — CTRL+STOP で MML・シリアル・IME の待ちから抜ける、範囲外のカーソル・ch、USER の rshell_set_active。`audit_test cursor/fmch/mml/serial/ime/rshell` を実装済み、入口・観測は `tools/tests/guest_acceptance.yaml` | ホストのみ | 次の保守枠 |
+| PRIO-3 | シリアルの待ちの CTRL+STOP (`audit_test serial` — rshell の通信路とぶつかるのでキーボードから起動)、GUI→CUI→GUI の TVRAM generation | 未実施の確認 | e11 統合受入 |
 | PRIO-1 | install / cdinst の通しの実行 (授権が通り、区画・format・書込みまで) を別のディスクイメージで — 取り込み済みの DISK-AUTH の受入の残り | 未実施の確認 | 次の構成試験 (h の前) |
 
 ## 1. 関門: e9 / e10b / e10c
@@ -25,10 +25,9 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 | E9-2 | h3 の本人識別・前景の証拠 writer を正式な経路へ切り替える (h3 の初期化も) | 申し送り | 2605、2747–2893 |
 | E9-3 | TVRAM 範囲外の呼び出しの拒否をゲストで (`6e4df78` はホスト試験だけ) | ホストのみ | 1432–1548 |
 | E10-1 | V86 の `-d` / `-b` の正常・失敗・STOP 出口と K1 (session 中の CPL0 例外) のゲスト確認 — 画像と注入手段が要る (`-t`・`-g -t` は 2026-10-06 受入済み) | 未実施の確認 | e10c |
-| E10-2 | e10c の3段/全AS/alias照合・DISPLAY/TVRAM再取得をホスト確認。PMが e10c 台本でboot/往復/GUIを受入 | ゲスト・native待ち | e10c、E11-1の公開leaseは別受入 |
-| E10-4 | gcap killの通常着地でg/tv解放・ops解除・30行/cursor復元を実装。PMが途中STOPと次回採取を確認 | ゲスト・native待ち | e10c-gcap-kill |
-| E10-5 | closing再例外等の停止前にpolledシリアル1行とexec_stop_countを追加。PMが別の故障注入起動で確認 | ゲスト・native待ち | e10c-stop-vm |
-| E10-6 | INT80は保存VMを見てstiを迂回。実ASMの分岐をホスト確認、PMがIF=0・IVT反射・通常KAPI IF=1を受入 | ゲスト・native待ち | e10c-stop-vm |
+| E10-4 | `v86 -g` の採取の途中の kill で g/tv の解放・gcap_ops・TVRAM 30 行が戻ることのゲスト確認 (ホストのみ。採取が 1 秒未満で途中を狙えない — 長い採取か注入が要る) | ホストのみ | e11 統合受入 |
+| E10-5 | V86 session の end 中の再例外での停止の印 (シリアル 1 行と `exec_stop_count`) のゲスト確認 (ホストのみ、注入の手段が要る) | ホストのみ | e11 統合受入 |
+| E10-6 | V86 の INT 80h を反射する間 IF=0 のゲスト確認 (ホストのみ、INT 80h を出す V86 の画像が要る) | ホストのみ | e11 統合受入 |
 | E10-8 | gfx が台帳のレコード (`ledger_resources[rid].map_*`) を直接書き換えている — pgalloc に範囲を検査して設定する口を作る | 改善 | e11a |
 | E10-9 | 監査 (launch・GUI 移譲・V86 帰路) の失敗が計数だけで表示されない — 最初の 1 回だけシリアル 1 行か tag を残す | 改善 | e11a |
 
@@ -87,7 +86,7 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 | X-3 | GitHub Actions の結果が票に無い (e1 の CI 修正後、f1a の初回 run) → 次の統合判定 (e11) の前に過去の run を照合。今の成功で過去を合格にしない | 未実施の確認 | 335–345、2003–2009 |
 | X-4 | 検査の整理の残り: ci-stab2 の P2-B の後の全体 check-changed と native の記録、6 時間超の対照の刈り取り、pending の 1 時間回収、生き残る弱い変異、`net_link` の TMPDIR 長、選択の取りこぼし 3 種 | 既知の制限 | 3551、3627、3705、3740、3754–3768、3776、3800–3807、3828–3832 |
 | X-6 | `tools/tvdump_recv.py` は名前付きパイプ前提で今の NP21/W に接続できない → `/api/cmd` で生バイトを取り TVDM の長さ・寸法・内容を照合する形に (計画 3 番、受入索引と同枠) | 道具の不具合 | — |
-| X-9 | `void main` で合否を表示だけする試験 (`blit_test`・`heap_test`・`kout_test`・`pcm_test`・`time_test`) — 終了コードが不定で一括試験の判定に使えない。`int main` の 0/1 へ修正済み、PCM の write/close 失敗も反映。ゲスト終了値の実測待ち | ゲスト未確認 | 次の保守枠 |
+| X-10 | 変異なしのときだけ走る段を持つ試験を洗い出し、`--mutate` でも全段を走らせる → 取り込みから `make check-fast` を外す (今は二重に回して 5〜7 分余分) | 検査の重複 | 次の保守枠 |
 
 ## 6. SKIP の登録 (ここにあるものだけを「延期」と数える)
 

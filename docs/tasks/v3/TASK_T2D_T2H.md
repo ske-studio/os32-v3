@@ -1,6 +1,6 @@
 # TASK_T2D_T2H — T2d〜T2h 詳細設計
 
-> 状態: **実装中 (2026-10-06)** — T2d は受入済み。T2e は e1〜e10b、T2f は f1a〜f4 (f2〜f4 は未結線)、T2h は h2・h3 の準備まで着地。残りは e10c・e11、f5 以降、g、h の統合受入 (現在地は [HANDOVER_2026-10-06](../agents/HANDOVER_2026-10-06.md))。
+> 状態: **実装中 (2026-10-06)** — T2d は受入済み。T2e は e1〜e10c、T2f は f1a〜f4 (f2〜f4 は未結線)、T2h は h2・h3 の準備まで着地。残りは e11、f5 以降、g、h の統合受入 (現在地は [HANDOVER_2026-10-06](../agents/HANDOVER_2026-10-06.md))。
 > それまでの状態: 設計中 (2026-10-01) — 独立レビュー Opus 5.5 は 1 回目 Request changes (P1 2件 / P2 11件 / P3 8件) → 反映 → 2 回目 Approve (P3 5件は §11 の実装時の注記)。
 > 作成: GPT-6 / Codex。調査基点: main / docs/t2d-h-design 共通 **9ae6073406c2027fd50938e3870a3fb3888cd7f6**。
 > **実行記録は 2026-10-06 に [archive/v3/TASK_T2D_T2H_RECORDS.md](../../archive/v3/TASK_T2D_T2H_RECORDS.md) へ移した** (この票は契約・分割・受入条件・未実施の手順だけ)。延ばした試験と未実施は [DEFERRED_TESTS.md](../DEFERRED_TESTS.md) が正。段の記録は 1 段 10 行以内で書く ([ROLES §0](../agents/ROLES.md))。
@@ -253,6 +253,9 @@ NP21/Wは8MB planar/PEGC、17MB planar/PEGC/Cirrus。日本語/描画/present、
 **e10c 実装 (2026-10-07)**: master/全 AS・alias/refcount 検査を post-exec・probe 後・GUI 移譲・AS launch・V86 通常帰路に接続。合成 S/T/U は post-exec でも実行。
 監査は生涯専用計数、AS単位のIRQ区切りと割当PTだけの照合。probe後は選択面/source・bind/BBも確認。
 DISPLAY/TVRAM は帰路で revoke→regen (CLIENTは保持)、GUI 再入でも TVRAM を失効。gcap kill の通常着地で回収・30 行/cursor 復元、停止前の polled 印と VM INT80 の IF 保持を追加。
+**e10c 着地・ゲスト受入 (PM、2026-10-07、main `e730cd3`、17MB・今の ini)**: 取り込み `make check`・`check-fast` rc=0。kselftest 281/0、3 段検査は受入中に 23 回走り失敗 0、`v86_restore_mismatch`=0。
+`v86 -t`・`-g -t` の後も帰路の照合は失敗 0、gcap の確保と解放が釣り合い、低位 PT0 は一致。PRIO-3: cursor・fmch PASS、MML と IME の待ちは CTRL+STOP で 130、USER の rshell_set_active の後も rshell は応答。
+未実施: `-g` 途中の kill (E10-4)、end 中の再例外と VM INT80 の IF (E10-5/6)、シリアルの待ちの中断 (ローカル起動が要る)、GUI→CUI→GUI の TVRAM generation。証拠 `~/os32-tmp/evidence/2026-10-07/accept_e10c/`。
 
 | 段 | present USER の期待 | 対応する台帳 |
 |---|---|---|
