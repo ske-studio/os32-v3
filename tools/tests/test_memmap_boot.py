@@ -28,6 +28,11 @@ import sys
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
+# build/config.mk の INC_KERNEL と同じ並び。ホスト側は模型のヘッダだけ先頭に足す。
+KERNEL_INCLUDES = ['-I' + str(ROOT / p) for p in
+                   ('.', 'include', 'arch/x86', 'platform/pc98',
+                    'sdk/include', 'sdk/include/os32', 'kernel', 'drivers',
+                    'net', 'fs', 'exec', 'gfx', 'lib', 'kapi', 'lib/sqlite3')]
 HARNESS = ROOT / "tools/tests/memmap_boot_host.c"
 TARGET_SRCS = [ROOT / "kernel/paging.c"]
 SHM_SRC = ROOT / "kernel/shm.c"
@@ -145,9 +150,7 @@ def build_and_run(tmp, case, mutation=None, kb=8192, initial_if=0x202):
     alloc = alloc.replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags')
     (tmp / "pgalloc_host_source.c").write_text(alloc, encoding="utf-8")
 
-    includes = ['-I' + str(ROOT / p) for p in
-                ('include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec')]
-    includes = ['-I' + str(ROOT / 'tools/tests/host_arch'), '-I' + str(tmp)] + includes
+    includes = ['-I' + str(ROOT / 'tools/tests/host_arch'), '-I' + str(tmp)] + KERNEL_INCLUDES
     exe = tmp / ("memmap_" + re.sub(r"\W", "", str(bss)))
     defines = ['-DPHYSMEM_HOST_TEST=1',
                '-DHOST_BSS_END=0x%X' % bss,
@@ -230,8 +233,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='os32-memmap-') as tmp:
         for src in ('kernel/paging.c', 'kernel/shm.c'):
             subprocess.run(['i386-elf-gcc', *target,
-                            *['-I' + str(ROOT / p) for p in
-                              ('include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec')],
+                            *KERNEL_INCLUDES,
                             '-c', str(ROOT / src),
                             '-o', str(pathlib.Path(tmp) / (src.replace('/', '_') + '.o'))],
                            check=True)
