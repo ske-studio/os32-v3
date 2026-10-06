@@ -236,11 +236,15 @@ KernelAPI の構造体を変えたときは `make clean` → `make all` が必�
 | `make check-changed` | 当たった検査だけ変異込み、残りは変異なし。docs だけなら文書系のみ | 作業中の差分検査 | 選択集合に依存 |
 | `make check` | 全検査を変異込み | 取り込み前に1回 | 967.50秒 (16分7.5秒、2026-10-04、-j4/qemu、レビュー修正後)。改修前の当日ログは12〜48分で条件差あり |
 
-今回の条件・実測・RED/GREEN は [検査整理の記録](tasks/v3/TASK_T2D_T2H.md#検査の仕組みの整理-ci-select) を参照。
+今回の条件・実測・RED/GREEN は [検査整理の記録](archive/v3/TASK_T2D_T2H_RECORDS.md#検査の仕組みの整理-ci-select) を参照。
 `MUTATE=1` / `0` / `sel` と `MUTATE_TARGETS` で変異を切り替える。
 recipe には `$(MUT)` / `$(MUTS)` を使う。HOST32 は `$(call host32_check,test_x.py)` の1行。
 `check-c-dialect-host` のmake変種9回は、変異ありの場合、または Makefile・build の規則・
 言語検査器が変わった場合だけ回す。実物の lint は各本体検査に集約し、ホスト試験はfixtureを使う。
+
+**誰がいつ回すか** ([ROLES §0](tasks/agents/ROLES.md)): 実装者は依頼パックに列挙された `make check-<名前>` と新しい試験だけ。
+`check-changed` / `check_select.py` は PM が列挙を作る・変更が広がったときに候補を出し直すための道具。
+全体 (`make check`) は PM が取り込みのまとまりごとに統合状態で 1 回 — 修正のやり直しの中では回さない。
 
 **`check-changed` は作業中の近道で、取りこぼしの保証はしない。保証は取り込み後の `make check` が担う。**
 変更は基点からHEADまでと、未コミット (staged/unstaged)・未追跡の和。

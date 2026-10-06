@@ -5,7 +5,7 @@ description: 主レビュアーとその代行 (docs/tasks/agents/ROLES.md §0) 
 
 # ローカルモデルによる独立レビュー
 
-レビューは PM が代行できない (`docs/tasks/agents/ROLES.md` §3 の規約 4 番目)。
+レビューは PM が代行できない (`docs/tasks/agents/ROLES.md` §1)。
 主レビュアーが尽きたときの**補助**としてローカルモデルを使う。主レビュアーの代わりではない。
 
 ## いつ使うか

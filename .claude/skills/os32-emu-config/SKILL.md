@@ -10,9 +10,9 @@ description: NP21/W ini の限定変更。変更権限は PM (Claude Code) だ�
 
 | 役 | ini |
 |---|---|
-| **PM** (Claude Code) | **変更してよい唯一の役**。ただし操作ごとに [D2] の承認を取る |
+| **PM** (Claude Code) | **変更してよい唯一の役**。ユーザーが権限を付与済み (2026-10-01、`ROLES.md` §0 の「決裁」) — 個別の承認は要らないが、原本を残す経路を既定にし、終わったら戻す。NHD・イメージ原本の上書きは [D2] のまま |
 | コーダー (サブエージェント) | 不可。ini はスコープ外。必要になったら PM に戻す |
-| テスター (ローカル AI) | 不可。`tools/emu_agent/` の `ACTIONS` に ini 操作は存在しない |
+| ローカル AI (`tools/emu_agent/`) | 不可。`tools/emu_agent/` の `ACTIONS` に ini 操作は存在しない |
 | レビュアー | 不可 (読み取りのみの役) |
 
 機械的な裏付けは `.claude/settings.json` の `ask`:
