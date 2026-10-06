@@ -74,7 +74,7 @@ make check-tests-inventory                      # 表が古くないか検査す
 `TARGET_SRCS` など) にある `ROOT / "…"`。どちらにも現れないものは空欄になる
 (Rust は `--manifest-path` を代わりに出す)。
 
-## 2. `make check` の列 (135 ターゲット)
+## 2. `make check` の列 (137 ターゲット)
 
 `build/checks.d/*.mk` の登録から集めた `CHECK_PAR_TARGETS` (`check-par` の依存) が
 正典。この表はその列をそのまま展開したもの。コマンド列は `make check` (変異込み) の形。
@@ -125,7 +125,7 @@ make check-tests-inventory                      # 表が古くないか検査す
 | 42 | `check-np21w-ctl-host` | `python3 -B tools/tests/test_np21w_ctl.py --mutate` | — | — | — | ○ |
 | 43 | `check-np21w-ini-live-host` | `python3 -B tools/tests/test_np21w_ini_live.py --mutate` | — | [`tools/tests/np21w_ini_live_tdd.md`](../tools/tests/np21w_ini_live_tdd.md) | — | × |
 | 44 | `check-gshell-host` | `python3 userland/gshell/host/integration.py --mutate` | — | — | — | × |
-| 45 | `check-db-owned-host` | `python3 -B -m unittest discover -s tools/tests -p 'test_kapi_db_owned.py'` | `kapi/kapi_db.c` | [`tools/tests/kapi_db_owned_tdd.md`](../tools/tests/kapi_db_owned_tdd.md) | — | ○ |
+| 45 | `check-db-owned-host` | `MUTATE=$(MUTATE) python3 -B -m unittest discover -s tools/tests -p 'test_kapi_db_owned.py'` | `kapi/kapi_db.c` | [`tools/tests/kapi_db_owned_tdd.md`](../tools/tests/kapi_db_owned_tdd.md) | — | ○ |
 | 46 | `check-vfs-fd-sqlite-host` | `python3 tools/tests/test_vfs_fd_sqlite.py` | `fs/vfs_fd.c` | [`tools/tests/vfs_fd_sqlite_tdd.md`](../tools/tests/vfs_fd_sqlite_tdd.md) | — | ○ |
 | 47 | `check-fdc-seek-host` | `python3 -B tools/tests/test_fdc_seek.py --target --mutate` | `drivers/fdc_decide.c`<br>`drivers/fdc.c` | [`tools/tests/fdc_seek_tdd.md`](../tools/tests/fdc_seek_tdd.md) | — | × |
 | 48 | `check-serial-vfast-host` | `python3 -B tools/tests/test_serial_vfast.py --target --mutate` | `drivers/serial_plan.c`<br>`userland/shell/serial_watchdog.c`<br>`drivers/serial.c` | [`tools/tests/serial_vfast_tdd.md`](../tools/tests/serial_vfast_tdd.md) | [`docs/archive/realhw_v21/TASK_SERIAL_VFAST.md`](archive/realhw_v21/TASK_SERIAL_VFAST.md) | × |
@@ -148,7 +148,7 @@ make check-tests-inventory                      # 表が古くないか検査す
 | 65 | `check-sh-launch-host` | `python3 -B tools/tests/test_sh_launch.py` | `userland/shell/sh_launch.inc` | [`tools/tests/t9_tdd.md`](../tools/tests/t9_tdd.md) | [`docs/archive/gui_v13/TASK_T9_sh.md`](archive/gui_v13/TASK_T9_sh.md) | × |
 | 66 | `check-sh-shell-host` | `python3 -B tools/tests/test_sh_shell.py` | `userland/shell/sh_redraw.inc`<br>`userland/shell/sh_pipe.inc`<br>`userland/shell/sh_ls.inc`<br>`userland/shell/sh_launch.inc`<br>`userland/shell/sh_args.inc`<br>`userland/shell/cmd_script.c`<br>`userland/shell/cmd_fs_shared.c`<br>`userland/shell/cmd_file.c`<br>`userland/shell/cmd_mnt.c`<br>`userland/shell/cmd_env.c`<br>`userland/shell/cmd_sys.c`<br>`userland/shell/kbd_watch.c` | [`tools/tests/t9_tdd.md`](../tools/tests/t9_tdd.md) | [`docs/archive/gui_v13/TASK_T9_sh.md`](archive/gui_v13/TASK_T9_sh.md) | × |
 | 67 | `check-sh-truncation-host` | `python3 -B tools/tests/test_sh_truncation.py` | `userland/shell/main.c`<br>`userland/shell/cmd_base.c`<br>`userland/shell/cmd_dir.c`<br>`userland/shell/cmd_env.c`<br>`userland/shell/cmd_fs_shared.c`<br>`userland/shell/cmd_file.c`<br>`userland/shell/cmd_mnt.c`<br>`userland/shell/cmd_script.c`<br>`userland/shell/cmd_sys.c`<br>`userland/shell/kbd_watch.c`<br>`userland/shell/cmd_pci.c`<br>`drivers/pci_decode.c`<br>`userland/shell/pci_verbose.c`<br>`userland/shell/cmd_hdprep.c`<br>`userland/shell/hdprep_plan.c`<br>`drivers/pc98pt.c`<br>`userland/shell/cmd_filer.c`<br>`userland/shell/rshell.c`<br>`userland/shell/serial_watchdog.c`<br>`userland/shell/ui.c`<br>`kernel/kernel.c` | [`tools/tests/sh_truncation_tdd.md`](../tools/tests/sh_truncation_tdd.md) | [`docs/archive/shell/TASK_SH_TRUNCATION.md`](archive/shell/TASK_SH_TRUNCATION.md) | × |
-| 68 | `check-multiapp-model-host` | `python3 -B tools/tests/test_multiapp_model.py`<br>`python3 -B tools/tests/test_multiapp_impl.py`<br>`python3 -B tools/tests/test_owner_reclaim.py` | `exec/appslot.c`<br>`fs/fd_redirect.c`<br>`fs/pipe_buffer.c`<br>`kernel/shm.c` | [`tools/tests/multiapp_model_tdd.md`](../tools/tests/multiapp_model_tdd.md)<br>[`tools/tests/k5b_kernel_tdd.md`](../tools/tests/k5b_kernel_tdd.md) | [`docs/archive/gui_v13/TASK_K5_multiapp.md`](archive/gui_v13/TASK_K5_multiapp.md)<br>[`docs/archive/gui_v13/TASK_K5B_kernel.md`](archive/gui_v13/TASK_K5B_kernel.md) | × |
+| 68 | `check-multiapp-model-host` | `python3 -B tools/tests/test_multiapp_model.py`<br>`python3 -B tools/tests/test_multiapp_impl.py`<br>`MUTATE=$(MUTATE) python3 -B tools/tests/test_owner_reclaim.py` | `exec/appslot.c`<br>`fs/fd_redirect.c`<br>`fs/pipe_buffer.c`<br>`kernel/shm.c` | [`tools/tests/multiapp_model_tdd.md`](../tools/tests/multiapp_model_tdd.md)<br>[`tools/tests/k5b_kernel_tdd.md`](../tools/tests/k5b_kernel_tdd.md) | [`docs/archive/gui_v13/TASK_K5_multiapp.md`](archive/gui_v13/TASK_K5_multiapp.md)<br>[`docs/archive/gui_v13/TASK_K5B_kernel.md`](archive/gui_v13/TASK_K5B_kernel.md) | × |
 | 69 | `check-settings-protect-host` | `python3 -B tools/tests/test_deploy_protect.py`<br>`python3 -B tools/tests/test_hsync_protect.py` | `userland/system/hsync.c` | [`tools/tests/s0_tdd.md`](../tools/tests/s0_tdd.md) | [`docs/archive/settings/TASK_S0.md`](archive/settings/TASK_S0.md) | × |
 | 70 | `check-hsync-h1-host` | `python3 -B tools/tests/test_hsync_h1.py --target` | `fs/hostdrv_stat_rules.inc`<br>`userland/system/hsync.c`<br>`lib/crc32.c` | [`tools/tests/h1_tdd.md`](../tools/tests/h1_tdd.md) | [`docs/tasks/shell/HSYNC_IMPROVEMENT_PLAN.md`](tasks/shell/HSYNC_IMPROVEMENT_PLAN.md) | × |
 | 71 | `check-hostdrv-list-host` | `python3 -B tools/tests/test_hostdrv_list.py --target` | `fs/hostdrvfs.c`<br>`fs/hostdrv_list_rules.inc` | [`tools/tests/h1_tdd.md`](../tools/tests/h1_tdd.md)<br>[`tools/tests/hostdrv_list_tdd.md`](../tools/tests/hostdrv_list_tdd.md) | [`docs/tasks/shell/HSYNC_IMPROVEMENT_PLAN.md`](tasks/shell/HSYNC_IMPROVEMENT_PLAN.md) | × |
@@ -215,7 +215,9 @@ make check-tests-inventory                      # 表が古くないか検査す
 | 132 | `check-shm-user-host` | `HOST32_RUNNERS ごと: python3 -B tools/tests/test_shm_user.py --runner <runner>; 先頭で --mutate` | — | [`tools/tests/shm_user_tdd.md`](../tools/tests/shm_user_tdd.md) | — | × |
 | 133 | `check-ci-stab-host` | `python3 -B tools/tests/test_ci_stab.py` | — | — | — | × |
 | 134 | `check-kapi-ranges-host` | `HOST32_RUNNERS ごと: python3 -B tools/tests/test_kapi_ranges.py --runner <runner>; 先頭で --mutate` | `sdk/gen_kapi.py`<br>`exec/exec.c`<br>`exec/ring3_str.c`<br>`exec/access_walk.c`<br>`exec/redir_access.c` | — | — | × |
-| 135 | `check-guest-acceptance-host` | `python3 -B tools/gen_guest_acceptance.py --check`<br>`python3 -B tools/tests/test_guest_acceptance.py --mutate` | — | — | — | × |
+| 135 | `check-disk-auth-host` | `HOST32_RUNNERS ごと: python3 -B tools/tests/test_disk_auth.py --runner <runner>; 先頭で --mutate` | — | — | — | × |
+| 136 | `check-guest-acceptance-host` | `python3 -B tools/gen_guest_acceptance.py --check`<br>`python3 -B tools/tests/test_guest_acceptance.py --mutate` | — | — | — | × |
+| 137 | `check-kcallback-host` | `HOST32_RUNNERS ごと: python3 -B tools/tests/test_kcallback.py --runner <runner>; 先頭で --mutate` | — | — | — | × |
 
 ## 3. `check` の列に**入っていない** `check-*` ターゲット (9)
 
