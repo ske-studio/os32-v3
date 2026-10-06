@@ -1,5 +1,5 @@
 /* ======================================================================== */
-/*  KOUT_TEST.C — 出力ポインタの書き込み可検査の CPL=3 受入 (KAPI v60)       */
+/*  KOUT_TEST.C — 出力ポインタの書き込み可検査の CPL=3 受入 (NULL 非零長は kill)       */
 /*                                                                          */
 /*  票: docs/archive/kernel_v21/TASK_KAPI_OUTPUT_GUARD.md 受入 G2 / G4            */
 /*                                                                          */
@@ -17,8 +17,8 @@
 /*    (a) **正常系** — アプリのスタックとヒープ (どちらも非恒等写像) へ      */
 /*        これまでどおり書けること。**回帰の本体はここ** — 検査が            */
 /*        厳しすぎると普通のアプリが黙って死ぬ。                            */
-/*    (b) **NULL** — その KAPI の従来どおりの答え。検査は NULL の範囲を      */
-/*        見ないので、意味は 1 つも変わっていないはず。                      */
+/*    (b) **エラー系** — 有効な出力バッファで、不正 fd / index / 不在装置。 */
+/*        NULL + 非零長は target より前に kill。ホストの実 wrap 試験で確認。 */
 /*                                                                          */
 /*  ⚠ ここで作れないもの (PM が NP21/W で手で見る。票 §3 の G2):             */
 /*    **読み取り専用の USER ページ (共有ライブラリの `.text`) を出力に渡す**  */
@@ -26,8 +26,8 @@
 /*    渡しても検査は通って**自分のコードが壊れる**だけ。shlib の `.text` の   */
 /*    番地はそれを attach した GUI アプリでないと持てない。安全に作れない    */
 /*    ので、ここでは 1 度も試さない ([V4]: 見ていないものは見ていないと書く)。*/
-/*    NULL が従来から「カーネルが NULL へ書いて死ぬ」ものも、ここでは呼ばない */
-/*    (np2_get_version / rtc_read。下の SKIP 行がその旨を出す)。             */
+/*    NULL + 非零長の kill はこの単一プロセスの試験では実行しない。         */
+/*    tools/tests/test_kapi_ranges.py が実 wrap + B1 で拒否を確認する。        */
 /* ======================================================================== */
 
 #include "os32api.h"
@@ -80,11 +80,10 @@ void main(int argc, char **argv, KernelAPI *api)
         api->kprintf(rc >= 0 ? 0xE1 : 0x41, "1b heap buf: rc=%d\n", rc);
         api->sys_close(fd);
     }
-    /* NULL: 閉じた fd なら VFS が buf を触らずに負を返す (従来どおり)。
-     * 開いている fd に NULL を渡すと FS が NULL へ書くので**呼ばない**。 */
-    rc = api->sys_read(99, (void *)0, KOUT_READ_LEN);
+    /* fd が不正でも出力範囲を先に検査する。有効なバッファで VFS に届ける。 */
+    rc = api->sys_read(99, sbuf, KOUT_READ_LEN);
     if (rc >= 0) fails++;
-    api->kprintf(rc < 0 ? 0xE1 : 0x41, "1c NULL buf (bad fd): rc=%d\n", rc);
+    api->kprintf(rc < 0 ? 0xE1 : 0x41, "1c stack buf (bad fd): rc=%d\n", rc);
 
     /* --- 2. np2_get_version (A 型) --------------------------------------- */
     for (i = 0; i < KOUT_VER_LEN; i++) vbuf[i] = (char)0xAA;
@@ -102,11 +101,10 @@ void main(int argc, char **argv, KernelAPI *api)
     if (!rc) fails++;
     api->kprintf(rc ? 0xE1 : 0x41, "2b heap buf: NUL found=%d\n", rc);
 
-    /* 長さ 0 は検査も書き込みも無い (np2_recv_str は maxlen<=0 で 1 バイト
-     * だけ書くので、**バッファは渡したまま** 0 を渡して生き残るのを見る)。 */
-    api->np2_get_version(vbuf, 0);
+    /* 長さ 0 は検査も書き込みも無い。np2_recv_str も maxlen<=0 で戻る。 */
+    api->np2_get_version((char *)0, 0);
     api->kprintf(0xE1, "2c len=0: survived\n");
-    api->kprintf(0x46, "2d NULL: SKIP (従来からカーネルが NULL へ書いて死ぬ)\n");
+    api->kprintf(0x46, "2d NULL: SKIP (NULL + 非零長は wrap で kill、ホスト試験で確認)\n");
     skips++;
 
     /* --- 3. rtc_read (B 型: 固定長 7 バイト) ----------------------------- */
@@ -121,7 +119,7 @@ void main(int argc, char **argv, KernelAPI *api)
     rc = (heap[1] >= 1 && heap[1] <= 12);
     if (!rc) fails++;
     api->kprintf(rc ? 0xE1 : 0x41, "3b heap: month=%d\n", heap[1]);
-    api->kprintf(0x46, "3c NULL: SKIP (従来からカーネルが NULL へ書いて死ぬ)\n");
+    api->kprintf(0x46, "3c NULL: SKIP (NULL + 非零長は wrap で kill、ホスト試験で確認)\n");
     skips++;
 
     /* --- 4. console_get_size (B 型: 出力 2 本) --------------------------- */
@@ -131,13 +129,17 @@ void main(int argc, char **argv, KernelAPI *api)
     if (!rc) fails++;
     api->kprintf(rc ? 0xE1 : 0x41, "4a both: %dx%d\n", w, h);
 
-    /* **片方だけ NULL** — NULL の範囲は見ない。もう 1 本は今までどおり書ける */
-    w = 0;
-    api->console_get_size(&w, (int *)0);
-    if (w <= 0) fails++;
-    api->kprintf(w > 0 ? 0xE1 : 0x41, "4b h=NULL: w=%d\n", w);
-    api->console_get_size((int *)0, (int *)0);
-    api->kprintf(0xE1, "4c both NULL: survived\n");
+    /* 2 本とも必須。stack/heap の混在と heap 2 本を確認する。 */
+    w = 0; ((int *)heap)[0] = 0;
+    api->console_get_size(&w, (int *)heap);
+    rc = (w > 0 && ((int *)heap)[0] == h);
+    if (!rc) fails++;
+    api->kprintf(rc ? 0xE1 : 0x41, "4b stack/heap: %dx%d\n", w, ((int *)heap)[0]);
+    ((int *)heap)[0] = 0; ((int *)heap)[1] = 0;
+    api->console_get_size((int *)heap, (int *)heap + 1);
+    rc = (((int *)heap)[0] == w && ((int *)heap)[1] == h);
+    if (!rc) fails++;
+    api->kprintf(rc ? 0xE1 : 0x41, "4c heap: %dx%d\n", ((int *)heap)[0], ((int *)heap)[1]);
 
     /* --- 5. pci_get (B 型: 40 バイト) ------------------------------------ */
     for (i = 0; i < KOUT_PCI_LEN; i++) pci_buf[i] = 0xAA;
@@ -146,9 +148,9 @@ void main(int argc, char **argv, KernelAPI *api)
     api->kprintf(0xE1, "5a stack (count=%d): rc=%d\n", api->pci_count(), rc);
     if (api->pci_count() > 0 && rc != 0) fails++;
 
-    rc = api->pci_get(0, (void *)0);
+    rc = api->pci_get(api->pci_count(), pci_buf);
     if (rc >= 0) fails++;
-    api->kprintf(rc < 0 ? 0xE1 : 0x41, "5b NULL out: rc=%d\n", rc);
+    api->kprintf(rc < 0 ? 0xE1 : 0x41, "5b invalid index: rc=%d\n", rc);
 
     /* --- 6. ide_read_sector (B 型: 512 バイト) --------------------------- */
     present = -1; absent = -1;
@@ -172,15 +174,14 @@ void main(int argc, char **argv, KernelAPI *api)
         api->kprintf(rc == 0 ? 0xE1 : 0x41, "6b stack 512B: rc=%d\n", rc);
     }
     if (absent < 0) {
-        api->kprintf(0x46, "6c NULL buf: SKIP (不在ドライブが無い)\n");
+        api->kprintf(0x46, "6c stack buf: SKIP (不在ドライブが無い)\n");
         skips++;
     } else {
-        /* 不在ドライブは buf を 1 バイトも触らずに負を返す (従来どおり)。
-         * 在るドライブに NULL を渡すと 512 バイトを NULL へ書くので呼ばない。 */
-        rc = api->ide_read_sector(absent, 0, (void *)0);
+        /* 不在ドライブのエラーも、有効な出力範囲を渡して確認する。 */
+        rc = api->ide_read_sector(absent, 0, sbuf);
         if (rc >= 0) fails++;
         api->kprintf(rc < 0 ? 0xE1 : 0x41,
-                     "6c NULL buf (drv %d absent): rc=%d\n", absent, rc);
+                     "6c stack buf (drv %d absent): rc=%d\n", absent, rc);
     }
 
     free(heap);

@@ -61,6 +61,15 @@ def argptr_defines():
     return out
 
 
+def generated_open_guard(tmp):
+    """Compile the actual generated input guard, not a hand-written replica."""
+    text = GENERATED.read_text(encoding="utf-8")
+    match = re.search(r"i32 __cdecl wrap_host_open\([^)]*\)\n\{.*?\n\}", text, re.S)
+    assert match, "wrap_host_open"
+    (tmp / "generated_host_open.inc").write_text(match.group(0) + "\n")
+
+
+
 def check_reclaim_has_host_owner_exit():
     """exec_notify_owned が host_owner_exit を呼んでいるか (票 N1 段 3)。
 
@@ -106,7 +115,8 @@ if __name__ == "__main__":
         exe = str(tmp / "net_link")
         san = (["-fsanitize=address", "-fno-omit-frame-pointer"]
                if "--sanitize" in sys.argv else [])
-        subprocess.run(["gcc", *FLAGS, *san, *argptr_defines(), *INC,
+        generated_open_guard(tmp)
+        subprocess.run(["gcc", *FLAGS, *san, *argptr_defines(), *INC, "-I" + str(tmp),
                         str(HOST_SRC), "-o", exe], check=True, cwd=ROOT)
         print("HOST GNU11 -Werror compile PASS (real net/link.c + kapi/kapi_host.c)",
               flush=True)

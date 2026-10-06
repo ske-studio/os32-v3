@@ -248,7 +248,7 @@ static const u8 *user_resolve(u32 p)
 
 int ring3_ptr_ok(u32 p)
 {
-    if (p == 0) return 1;
+    if (p == 0) return 0;
     if (!host_cpl3) return 1;
     return user_resolve(p) != (const u8 *)0;
 }
@@ -266,9 +266,11 @@ int ring3_user_range_ok(u32 p, u32 len)
 }
 
 #include "../../kapi/kapi_host.c"
+#include "kapi_profile.h"
+#include "generated_host_open.inc"
 
 /* ディスパッチャの早期検査 (exec/exec.c の ring3_syscall_dispatch と同じ規則)。
- * 先頭番地が帯外なら **ラッパーに入る前に** kill する ([往復 3 の B8])。 */
+ * 表に残る引数だけを早期検査する。長さ付きは生成wrapが全域検査する。 */
 static int dispatch_early(u16 ptrmask, const u32 *args, int nfixed)
 {
     int k;
@@ -858,8 +860,7 @@ static void r3_no_slot_resends_release_then_request(void)
     check(rel < 0 || req < 0 || rel < req, "REQUEST が RELEASE より先に出た");
 }
 
-/* B8: 先頭帯外ポインタはディスパッチャが kill、先頭帯内 + 長さ超過は
- *     ラッパーが INVAL (どちらもラッパー経由で踏む) */
+/* B8: 長さ付き入力は生成wrapから既存targetの全域検査へ渡し、INVALを保つ。 */
 static void r3_B8_dispatcher_kill_and_wrapper_inval(void)
 {
     static u8 band[4096];
@@ -872,10 +873,14 @@ static void r3_B8_dispatcher_kill_and_wrapper_inval(void)
     host_cpl3 = 1;
     memcpy(band, "PING", 4);
 
-    /* (1) 先頭が帯外 → ディスパッチャが kill (ラッパーへ入らない) */
+    /* (1) 早期検査を通り、実物の生成wrap→targetが範囲外を拒否する。 */
     args[0] = 0xDEADBEEFu; args[1] = 4;
-    check(!dispatch_early((u16)ARGPTR_HOST_OPEN, args, 2), "帯外ポインタが通った");
-    check(fault_kills == 1, "kill が数えられていない");
+    check(dispatch_early((u16)ARGPTR_HOST_OPEN, args, 2), "長さ付き入力がwrapへ届かない");
+    check(wrap_host_open((const char *)(unsigned long)args[0], args[1]) == OS32_ERR_INVAL,
+          "帯外入力がINVALにならない");
+    check(wrap_host_open((const char *)(band + sizeof(band) - 1), 16) == OS32_ERR_INVAL,
+          "末尾の越境がINVALにならない");
+    check(fault_kills == 0, "既存のINVALがkillに変わった");
 
     /* (2) 先頭は帯内、長さが帯を越える → ラッパーが INVAL */
     args[0] = (u32)(unsigned long)band; args[1] = (u32)sizeof(band) + 16;

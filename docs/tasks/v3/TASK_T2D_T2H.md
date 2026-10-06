@@ -1544,6 +1544,270 @@ NP21/W・実機・commit/pushは行っていない。独立レビューとゲス
 
 
 **範囲検査の修正の着地とユーザー決定 (PM、2026-10-03)**: 独立レビュー Opus 5.5 は Approve (P1/P2 なし。3 関数は番地の計算より前に符号付きで拒否、u32 で折り返す値も入口で落ちる。カーネル内の呼び手と木の中のアプリは 25 行を超えない。レビュアーは test_kapi_bounds 84 条件・変異 11/11、test_gfx_bounds 640 条件・変異 3/3 を native で、e8a 取り込み後の main にも当てて再実行)。PM のホスト検査は `check_slot.sh` 経由の `HOST32_RUNNERS="native qemu"` check-changed で rc=0。**別段へ回した課題の評価 (レビュアー、4 件ともコードで到達可能を確認)**: (1) NULL 出力 — `KAPI_OUT_LEN(NULL,n)=0` と `ring3_ptr_ok(0)=1` で検査をすり抜け、ページ 0 は R/O present (paging.c:398 の [DEBUG] の変更) で CR0.WP=0 なので、CPL3 の `sys_read(fd, NULL, 0x120000)` が物理 0 からカーネルの .text までをファイルの中身で上書きする (任意のカーネル書き込み、P1 相当)。(2) `sys_ls` の callback を CPL0 で呼ぶ (fs/vfs.c:484、SMEP なし) — どのアプリも ring0 を取れる (設計の穴、普通のアプリの経路)。(3) 入力の B1 不足 — 入力ポインタは先頭 1 バイトしか見ず、`sys_write(fd, 0xA0000, 0x11F000)` や `ide_write_sectors`・`dev_blk_write` でカーネルの中身をファイルやディスクへ出せる。生のディスク書き込みと ext2_format に授権が無い。(4) `shm_free` は所有者を見ない (SHM 帯は全アプリに USER で見えるので重さは中)。**ユーザー決定 (2026-10-03)**: (1) の NULL 出力と (3) の入力の範囲検査は、KAPI の形を変えずに wrap 側で拒否できるのでカーネル層の不具合として今すぐ直す (T2 より優先、wt/kapinull)。(2) sys_ls の callback の廃止、(3) の生ディスクの授権、(4) SHM の所有権は KAPI の意味が変わるので e11 の公開 KAPI 一括で直す。**P3 (記録)**: console_set_cursor は clamp していない (票の「cursor clamp」の記述は誤り、tvram の 3 関数の検査で安全だが cursor_x=INT_MAX の後の ++ は符号付きのあふれ)、PEGC 480 ラインの 26〜30 行目は KAPI から書けなくなった (木の中に使い手なし、契約は 25 行)、変異の抜け (pc98_count_present の clip、raster の上限の単独、gfx_clip_screen の早期拒否、PEGC の照合が SIGSEGV 頼み)、FM/SSG の ch は無検査 (ハードの誤設定)、fm_play_mml と serial_getchar の DoS (カーネル内で CTRL+STOP が効かない)、TESTS.md の check-kapi-bounds-host の対象ソースが「—」。監査の未確認: pipe、redirect、host_*、exec_*/launch_*/appslot、ime_*、gui_call/register、con_sink はレビュアーが見ていない。
+
+### KAPI の NULL・長さ付き全域検査の修正 (2026-10-03)
+
+GPT-6 ベースの Codex、基点 `454d9de`、`wt/kapinull`。上記の独立レビューで
+到達可能とされた NULL 出力(P1)・入力漏洩(P2)を、ユーザー決定に従ってT2より優先した。
+ABI v69、240 slot、引数・戻り値・4世代・構造体配置は不変。
+`in` は wrap の範囲検査用注記のみ。[ABI1]に従い生成器から再生成。
+[ABI3]のレイアウト変更はないためclean不要 (外部の旧未刻印成果物だけclean)。
+
+**修正**: `KAPI_OUT_LEN`/`_S` はNULLでも非零長を保存し、B1 USER/RWの全域検査へ渡す。
+生成した`in`はUSER/readを全ページ検査する。積のoverflowは拒否長に飽和。
+`ring3_ptr_ok(0)`は許可を維持 (修正1のPM判断a)。長さ付き・target検査の
+引数は生成`kapi_argptr`から除き、NULL・長さ0をwrapへ渡す。
+文字列・opaque・関数ポインタのNULLの意味はwrap/targetに残し、
+`sys_ls` のctx、`v86_boot2` のsecond、`gui_register` のpumpがNULLでも早期killしない。
+`dev_blk_read/write`は実`sect_size`で積を検査し、readのNULLバイパスを除去。
+既存のtarget検査(time/pci/DB等)とCPL0/WMの呼出し規則は維持。
+CPL3の `gfx_present_raster(NULL)` は固定長入力検査でkill、`sys_redirect_fd_buf` は
+lenの読取範囲が不正ならtargetの切り詰めより前にkill。修正途中の `mem_free(NULL)` の
+早期killは判断aで撤回し、従来どおりtargetのno-opへ届く。
+
+**監査一覧**: 全240 entryを照合。明示ポインタ99 entryを以下に全列挙。
+W=非零長は非NULLかつB1 USER/RW全域、R=B1 USER/read全域、長さ0はアクセスなし。
+S=NUL終端文字列で宣言長なし。早期の先頭番地検査だけでは文字列全域を保証しない。
+Sとprintfの可変引数/nested pointerのcopy化は今回の「長さが分かる入力」の範囲外であり、
+全KAPIの安全化完了とはしない。Oのcallback/所有権はユーザー指定どおりe11へ。
+TはCPL3登録をtargetが拒否する。整数に符号化されたGUI要求はSHMプロトコルの別契約。
+
+| slot | entry | 引数ごとの検査 |
+|---|---|---|
+| 6 | mem_free | `ptr`: O (opaque/callback、別契約) |
+| 8 | kprintf | `fmt`: S (NUL終端、長さ引数なし) |
+| 9 | sys_unlink | `path`: S (NUL終端、長さ引数なし) |
+| 10 | sys_rename | `oldpath`: S (NUL終端、長さ引数なし); `newpath`: S (NUL終端、長さ引数なし) |
+| 11 | sys_mkdir | `path`: S (NUL終端、長さ引数なし) |
+| 12 | sys_ls | `path`: S (NUL終端、長さ引数なし); `cb`: O (opaque/callback、別契約); `ctx`: O (opaque/callback、別契約) |
+| 17 | rtc_read | `rtc_time`: W(sizeof(RTC_Time)) |
+| 25 | sys_mount | `prefix`: S (NUL終端、長さ引数なし); `dev`: S (NUL終端、長さ引数なし); `fs`: S (NUL終端、長さ引数なし) |
+| 26 | sys_umount | `prefix`: S (NUL終端、長さ引数なし) |
+| 27 | sys_is_mounted | `prefix`: S (NUL終端、長さ引数なし) |
+| 28 | sys_chdir | `path`: S (NUL終端、長さ引数なし) |
+| 30 | vfs_devname | `prefix`: S (NUL終端、長さ引数なし) |
+| 32 | sys_rmdir | `path`: S (NUL終端、長さ引数なし) |
+| 34 | serial_puts | `s`: S (NUL終端、長さ引数なし) |
+| 39 | exec_run | `path`: S (NUL終端、長さ引数なし) |
+| 41 | dev_get_info | `name`: W(nm); `type`: W(sizeof(int)); `sects`: W(sizeof(u32)) |
+| 43 | fm_play_mml | `mml`: S (NUL終端、長さ引数なし) |
+| 45 | np2_get_version | `buf`: W(size) |
+| 46 | np2_get_cpu | `buf`: W(size) |
+| 47 | np2_get_clock | `buf`: W(size) |
+| 48 | np2_check_hostdrv | `buf`: W(size) |
+| 51 | ide_identify | `info`: W(sizeof(IdeInfo)) |
+| 52 | ide_read_sector | `buf`: W(512) |
+| 55 | path_set_drive | `d`: S (NUL終端、長さ引数なし) |
+| 56 | path_set_cwd | `p`: S (NUL終端、長さ引数なし) |
+| 57 | path_parse | `input`: S (NUL終端、長さ引数なし); `result`: W(sizeof(ParsedPath)) |
+| 64 | ide_write_sector | `buf`: R(512) |
+| 65 | ide_write_sectors | `buf`: R(cnt × 512) |
+| 69 | shell_print_utf8 | `utf8_str`: S (NUL終端、長さ引数なし) |
+| 73 | sys_open | `path`: S (NUL終端、長さ引数なし) |
+| 75 | sys_read | `buf`: W(size) |
+| 76 | sys_write | `buf`: R(size) |
+| 78 | console_get_size | `w`: W(sizeof(int)); `h`: W(sizeof(int)) |
+| 86 | sys_stat | `path`: S (NUL終端、長さ引数なし); `buf`: W(sizeof(OS32_Stat)) |
+| 87 | sys_fstat | `buf`: W(sizeof(OS32_Stat)) |
+| 89 | gfx_get_palette | `r`: W(sizeof(u8)); `g`: W(sizeof(u8)); `b`: W(sizeof(u8)) |
+| 90 | gfx_get_framebuffer | `fb`: W(sizeof(GFX_Framebuffer)) |
+| 94 | gfx_present_raster | `table`: R(sizeof(GFX_RasterPalTable)) |
+| 95 | kcg_read_ank | `buf`: W(KCG_ANK_H) |
+| 96 | kcg_read_kanji | `buf`: W((KCG_KANJI_H * 2)) |
+| 98 | sys_shm_lock | `ptr`: O (opaque/callback、別契約) |
+| 99 | sys_shm_free | `ptr`: O (opaque/callback、別契約) |
+| 107 | sys_redirect_fd | `path`: S (NUL終端、長さ引数なし) |
+| 115 | sys_redirect_fd_buf | `buf`: W(size), R(len) |
+| 118 | snd_bgm_play | `mml`: S (NUL終端、長さ引数なし) |
+| 132 | mouse_poll | `info`: W(sizeof(MouseState)) |
+| 135 | tvram_readchar_at | `code`: W(sizeof(u16)); `attr`: W(sizeof(u8)) |
+| 140 | db_open | `path`: R(targetのbounded copy/range) |
+| 142 | db_exec | `sql`: S (NUL終端、長さ引数なし) |
+| 143 | db_prepare | `sql`: S (NUL終端、長さ引数なし) |
+| 150 | kcg_load_font | `path`: S (NUL終端、長さ引数なし) |
+| 151 | ide_get_info | `info`: W(sizeof(IdeInfo)) |
+| 152 | sys_get_build_info | `buf`: W(size) |
+| 153 | loop_attach | `path`: S (NUL終端、長さ引数なし) |
+| 155 | loop_status | `total`: W(sizeof(u32)); `bps`: W(sizeof(int)) |
+| 156 | dev_blk_read | `dev_name`: S (NUL終端、長さ引数なし); `buf`: W(target、NULL拒否) |
+| 157 | dev_blk_write | `dev_name`: S (NUL終端、長さ引数なし); `buf`: R(Device.sect_size × count) |
+| 159 | ime_user_list | `yomi_prefix`: S (NUL終端、長さ引数なし); `out`: W(max × sizeof(IME_UserEntry)) |
+| 160 | ime_user_delete | `yomi`: S (NUL終端、長さ引数なし); `kanji`: S (NUL終端、長さ引数なし) |
+| 161 | ime_user_export | `path`: S (NUL終端、長さ引数なし) |
+| 165 | v86_disktest | `path`: S (NUL終端、長さ引数なし) |
+| 166 | v86_boot | `path`: S (NUL終端、長さ引数なし) |
+| 167 | v86_boot2 | `path`: S (NUL終端、長さ引数なし); `second`: S (NUL終端、長さ引数なし) |
+| 168 | gfx_screen_info | `out`: W(sizeof(GFX_ScreenInfo)) |
+| 172 | gui_register | `handler`: T (trusted登録のみ); `pump`: T (trusted登録のみ) |
+| 173 | gfx_stats | `out`: W(sizeof(GFX_Stats)) |
+| 174 | gfx_lease_palette | `rgb`: R(count × 3) |
+| 175 | sys_switch_shell | `path`: S (NUL終端、長さ引数なし) |
+| 179 | ime_set_render | `table`: T (trusted登録のみ) |
+| 180 | exec_start | `cmdline`: S (NUL終端、長さ引数なし) |
+| 187 | con_sink_read | `buf`: W(cap) |
+| 188 | con_sink_stat | `pending`: W(sizeof(u32)); `dropped`: W(sizeof(u32)) |
+| 190 | kbd_inject | `utf8`: R(len) |
+| 193 | launch_req | `cmdline`: S (NUL終端、長さ引数なし) |
+| 195 | launch_take | `buf`: W(cap); `requester`: W(sizeof(i32)); `kind`: W(sizeof(i32)); `arg`: W(sizeof(i32)) |
+| 197 | launch_poll | `status`: W(sizeof(i32)) |
+| 201 | db_open_existing | `path`: R(targetのbounded copy/range) |
+| 202 | db_prepare_only | `sql`: R(targetのbounded copy/range) |
+| 204 | db_bind_text | `text`: R(length) (既存target/bodyのB1検査・失敗戻り値を維持) |
+| 205 | db_bind_blob | `data`: R(length) (既存target/bodyのB1検査・失敗戻り値を維持) |
+| 208 | host_open | `req`: R(len) (既存target/bodyのB1検査・失敗戻り値を維持) |
+| 209 | host_status | `status`: W(sizeof(u32)); `length`: W(sizeof(u32)) |
+| 210 | host_read | `buf`: W(cap) |
+| 211 | host_write | `buf`: R(len) (既存target/bodyのB1検査・失敗戻り値を維持) |
+| 213 | sys_set_mtime | `path`: R(targetのbounded copy/range) |
+| 215 | exec_last_result | `kind`: W(sizeof(int)); `code`: W(sizeof(int)) |
+| 217 | serial_get_status | `mode`: W(sizeof(u32)); `baud`: W(sizeof(u32)); `fifo`: W(sizeof(u32)) |
+| 220 | pci_get | `out`: W(PCI_DEV_STRUCT_SIZE) |
+| 222 | sys_time_now | `lo`: W(target、NULL拒否); `hi`: W(target、NULL拒否) |
+| 223 | pci_bind_info | `out`: W(target、NULL拒否) |
+| 225 | pcm_write | `buf`: R(bytes) (既存target/bodyのB1検査・失敗戻り値を維持) |
+| 226 | pcm_status | `free_bytes`: W(sizeof(u32)); `counters`: W(sizeof(u32)) |
+| 229 | kbd_diag | `out`: W(sizeof(KbdDiag)) |
+| 232 | sys_umount_checked | `prefix`: S (NUL終端、長さ引数なし) |
+| 233 | hdd_geom_info | `out`: W(sizeof(HddGeom)) |
+| 234 | boot_image_info | `out`: W(sizeof(BootImageInfo)) |
+| 237 | serial_diag | `out`: W(sizeof(SerialDiag)) |
+| 238 | kbd_diag_log | `out`: W(max × sizeof(KbdDiagLogEnt)) |
+| 239 | v86_gdc_capture | `out`: W(sizeof(V86Gcap)) |
+
+明示ポインタなし (141 entry): 0〜5, 7, 13〜16, 18〜24, 29, 31, 33, 35〜38, 40, 42, 44, 49〜50, 53〜54, 58〜63, 66〜68, 70〜72, 74, 77, 79〜85, 88, 91〜93, 97, 100〜106, 108〜114, 116〜117, 119〜131, 133〜134, 136〜139, 141, 144〜149, 154, 158, 162〜164, 169〜171, 176〜178, 181〜186, 189, 191〜192, 194, 196, 198〜200, 203, 206〜207, 212, 214, 216, 218〜219, 221, 224, 227〜228, 230〜231, 235〜236.
+戻り値のポインタ、可変引数、整数に符号化されたポインタを「全域検査済み」とは扱わない。
+
+**ページ0**: NP化しない。`paging_reclaim_conventional`のR/O presentはBDA参照/LZ4調査の
+既知の依存を残しており、§2-1とT2eの前倒し禁止を守る。`v86_bios_save_real/restore_real`も
+IVTの退避/復元前にpage0をR/O・RWへ写像し、`v86_mem_teardown`はR/Oへ戻すため、
+reclaimの1行だけをNPにしても一貫したNULL guardにはならない。CR0.WP=0ではNULL書込みを
+防げないため、wrapとB1で拒否する。paging.cは無変更。
+旧VRAMの早期例外も直書きアプリとの互換のため残すが、長さ付きKAPIのB1 walkは
+VRAMそのもの、VRAMからカーネルへ跨ぐ範囲、カーネル帯を拒否する。写像撤去はe11。
+
+**試験**: [ホスト試験](../../../tools/tests/test_kapi_ranges.py) は一時ディレクトリで
+実jsonから生成したCの全wrapをコンパイルし、実execのrange関数・caller_access・access_walk・
+ページ表/allocatorと結合。実ディスパッチャの早期検査ブロックも抽出して生成maskと
+組み合わせ、NULL ctx/second/pumpの通過とNULL非零長のwrap拒否を確認する。
+FS/装置targetだけを副作用計数stubにする。DB・Hostは下記の実target試験で確認する。
+83条件、実行時変異6/6 (出力NULL、符号付き出力NULL、入力1バイト化、早期NULL拒否、
+動的セクタreadのNULL回避、個数積のoverflow)を固有assertで検出。
+NULL非零/零、VRAM/カーネル/折返し、RO入力対出力、正当なページ跨ぎ、複数出力の先行検査、
+CPL0/WM、512/1024/2048 sectorを含む。試験作成時のinclude探索漏れ・stub型/マクロの
+衝突はコンパイルエラーとして修正し、変異検出に数えない。kselftest追加なし。
+既存net-link試験は早期maskだけを読み、生成wrapを飛ばしていたため初回34/35で失敗。
+生成済み`wrap_host_open`を実コンパイルし、帯外/末尾越境を既存targetのINVALで拒否する
+経路へ直した。再実行35/35 PASS。DBも実生成wrap→実copy/walkを通し、既存の-1を維持、
+回帰と実行時変異15/15 PASS。DB/Host/PCMは既存のB1全域検査を`target: true`で明示し、
+重複killガードを生成しない。host_testのNULL出力は長さ0へ修正し、非零NULLのfaultは
+ホスト試験で検証する (ゲスト実行は指示どおり未実施)。
+
+**予算** (同一toolchain/リンク入力で、変更2TUだけHEAD版へ戻した一時コピーと比較):
+
+| 項目 | 前 | 後 | 増分 |
+|---|---:|---:|---:|
+| kernel.bin | 368,660 | 368,788 | +128 B |
+| kernel本体BSS末尾 | 0x18D818 | 0x18D898 | +128 B |
+| ELF text / data / bss (SQLite含む) | 706,660 / 36,939 / 606,520 | 706,772 / 36,939 / 606,520 | +112 / 0 / 0 B |
+| ASSERT残り | 30,696 | 30,568 | −128 B |
+
+一時再リンクの実行定義と前成果物は `/home/hight/os32-tmp/kapinull-budget/`。
+検査は既存caller/walkを再利用し、常駐バッファ・動的確保を追加していない。
+並行e10aへの競合はexec.cの上記2行だけ。paging/shm/v86は変更なし。
+
+**検証**: 共通環境 `CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp PYTHONPATH=`。
+makeは全て `NP21W_DIR=/dev/null < /dev/null`。
+最終全体検査は外側環境に`MAKEFLAGS=-j4 OS32_MUT_JOBS=4`を指定し、共有負荷を制限。
+最終ログは`/home/hight/os32-tmp/kapinull-check-changed-final.log`。検査中のソース不変確認も成功。
+既存の明示有効化式Windows/PowerShell試験5件 (`test_np21w_trial` 1件、
+`test_np21w_ini_live` 4件) はSKIP。それ以外の検査を任意に省略していない。
+
+| コマンド | rc |
+|---|---:|
+| `python3 -B sdk/gen_kapi.py` / `python3 -B sdk/kapi_rust_gen.py` | 0 / 0 |
+| `python3 -B tools/tests/test_kapi_out.py` | 0 |
+| `python3 -B tools/tests/test_kapi_ranges.py --runner qemu --mutate` | 0 (76条件、変異6/6) |
+| `python3 -B tools/tests/test_db_caller.py --runner qemu --mutate` | 0 (実行時変異15/15) |
+| `python3 -B tools/tests/test_net_link.py --target` (試験経路修正後) | 0 (35/35) |
+| `make all NP21W_DIR=/dev/null` / 最終 `make -j4 all NP21W_DIR=/dev/null` | 0 / 0 |
+| `make -j4 external NP21W_DIR=/dev/null` (旧外部Makefileそのまま) | 2 (v3 link入力証明なし) |
+| `make -j4 clean-external NP21W_DIR=/dev/null` | 0 |
+| 下記のv3互換指定付き `make -j4 external` | 0 |
+| `python3 -B tools/gen_memmap.py --write` | 0 |
+| `python3 -B tools/gen_tests_inventory.py --write` | 0 |
+| `python3 -B tools/check_select.py --lint` | 0 |
+| `/home/hight/os32-tmp/bin/check_slot.sh kapinull-coder env HOST32_RUNNERS=qemu make check-changed NP21W_DIR=/dev/null < /dev/null` | 初回2 (net-link旧前提)、修正後0 (全132検査・変異込み、1回成功) |
+
+apps/gameは指定gitlinkへcheckoutし、追跡ソース・gitlinkは不変。`make all`の
+現行規則はexternalを含まないため、ユーザー指定により別途12 appsとgame本体+15 testsを組んだ。
+外部Makefileはv3刻印/link_guardに未追随のため、
+`CC=/home/hight/os32-tmp/kapinull-cc`、
+`LD='python3 /home/hight/os32-v3-wt-kapinull/sdk/link_guard.py i386-elf-ld'` を渡した。
+CCはgnu11/暗黙宣言・暗黙int・VLAエラーと`os32_unit_stamp.h`を加える。
+旧gameの`rpg_level.c`だけ宣言不足があったので正規`libos32math.h`を強制include。
+互換指定の途中でも2回rc=2 (同宣言不足、SDK側との刻印二重include)となり、
+後者は既存の`-include`を検出して重複を避けることで解決。検査を無効化していない。
+再現用CCスクリプト・全ログは `/home/hight/os32-tmp/kapinull-*` に保存。
+外部ディレクトリの未追跡`*.inputs.json`はlink_guardのビルド成果物。
+
+`make all`の/dev/nullへのFDコピー警告は指定環境によるもの。NP21/W・NHD・配備・ini・
+実機には触っていない。ゲスト試験・独立レビューは未実施、PMへ引渡す。commit/pushなし。
+
+
+#### kapinull 修正1 (2026-10-06、レビュー B1 / B2 / P3)
+
+基点 `454d9de`、既存の未コミット差分を保持。PM判断(a)に従い早期検査のNULL許可を
+戻した。NULL非零長の入力・出力は生成wrapのB1検査で引き続き拒否する。
+`kout_test` の1c/4b/4c/5b/6cは有効な出力先を渡す正例・targetエラー例へ変更。
+長さ0のNP2出力はNULLでも書かない正例とし、非零NULLのkillはホスト試験へ分離した。
+`gui_call_test` の `OS32_ERR_INVAL` 期待は維持。実 `gui_register` の既存ホスト試験
+(6c/6e/6f、NULL pump)も成功した。`exec.h`、KAPI仕様、SDK版注釈のNULL規則を揃えた。
+`mem_free(NULL)` のkillは今回撤回した回帰であり、残る振る舞いの変更とは区別する。
+版69・240 slot・配置・世代は不変。生成物の手編集・外部submoduleソースの変更なし。
+
+**TDD**: 修正前はqemuで `FAIL: sys_ls NULL ctx` (rc=1)。修正後は
+実ディスパッチャの早期検査ブロックと生成maskによるNULL ctx/second/pump通過、
+NULL非零長のwrap拒否を含む **83条件PASS、6/6実行時変異RED、生存0**。
+新規assertの追加直後は変異の固有markerが先行assertに変わって判定が失敗したが、
+assert順を整えて従来の固有markerで6/6を確認した (コンパイル失敗をREDに数えていない)。
+
+**実行結果**: 共通環境は `CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp PYTHONPATH=`。
+全コマンドで配備先は `NP21W_DIR=/dev/null`。全体検査の既存変更選択はfull、**132 target**。
+
+| コマンド (共通環境の下) | rc / 結果 |
+|---|---|
+| `make -j4 all NP21W_DIR=/dev/null` | 0 |
+| `make -j4 external NP21W_DIR=/dev/null CC=/home/hight/os32-tmp/kapinull-cc LD='python3 /home/hight/os32-v3-wt-kapinull/sdk/link_guard.py /home/hight/opt/cross/bin/i386-elf-ld'` | 0 (12 apps、game本体+15 tests) |
+| `MAKEFLAGS=-j4 /home/hight/os32-tmp/bin/check_slot.sh kapinull-fix1 env HOST32_RUNNERS="native qemu" make check-changed NP21W_DIR=/dev/null` | **2** (nativeのsignal 31、試験判定ではない) |
+| `MAKEFLAGS=-j4 /home/hight/os32-tmp/bin/check_slot.sh kapinull-fix1-qemu env HOST32_RUNNERS=qemu make check-changed NP21W_DIR=/dev/null` | **0** (132 target、変異付き) |
+
+check_slotはslot0を取得できたため、flock回避はしていない。指定のnative+qemu検査は
+`check-shlib-high-host` / `check-kapi-bounds-host` / `check-hdd-stage1-host` で
+`signal 31 (runner=native); not a test verdict` となった。単独native試験も同じ制限。
+**qemu-onlyの成功は指定のnative+qemu完了条件を満たしたとは扱わない**。
+`host32.py` の無断fallback禁止を守り、別名の明示qemu検査として実行した。
+qemuはILP32ホストfixtureの実行器であり、NP21/Wゲスト受入ではない。
+
+外部ビルドは前回の互換CCを再利用 (GNU11/暗黙宣言・暗黙int・VLAエラー、unit stamp、
+旧gameの `rpg_level.c` への正規mathヘッダ)。旧submodule Makefileのv3刻印/link入力証明
+不足を補うためlink_guardも指定した。今回、互換指定なしのexternalは実行していない。
+外部gitlink・追跡ソースは不変、未追跡 `.inputs.json` は従来どおりビルド成果物。
+allのコンパイラ警告233件、externalは63件 (変更したexec.c/生成KAPI/kout_test.cへの警告なし)。
+/dev/nullへのFDコピー警告は配備抑止の指定による。
+
+既存の明示有効化式Windows試験は `test_np21w_trial` 1件、`test_np21w_ini_live` 4件がSKIP。
+変異の恒等対照GREENや意図的な構文エラー対照は生存mutantには数えない。
+DB callerは実行時変異15/15 RED、C方言は27/27 REDと正例対照5/5 GREEN。
+最新の生成メモリ地図は `__bss_end = 0x18D878`。最終検査後の編集は本記録のみ。
+
+ログは `/home/hight/os32-tmp/kapinull-fix1-` に
+`all.log` / `external.log` / `red.log` (native不可) / `red-qemu.log` (修正前RED) /
+`ranges.log` / `check-changed-native.log` / `check-changed-qemu.log`。
+配備・NHD・ini・NP21/W操作・ゲスト実行・commit/pushはしていない。
+残件は実行可能な環境でのnative検査、独立レビュー、PMのゲスト受入。
+callback/生ディスク授権/SHM所有権と長さなし文字列のcopy化は既存の別段の課題のまま。
+
+
 ## 3. T2f — map/unmapとallocator、暫定heap終了
 
 ### 3-1. 着手条件・範囲

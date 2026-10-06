@@ -304,8 +304,8 @@ const u16 kapi_argsize[KAPI_FUNC_COUNT] = {
     8,  /* v86_gdc_capture */
 };
 
-/* 各スロットの固定引数のうちポインタ型のビットマスク (bit k = 引数 k)。
- * ディスパッチャが wrap 前に範囲検証する引数を示す (可変長はガード担保)。 */
+/* 各スロットの固定引数のうち早期検査するポインタのビットマスク (bit k = 引数 k)。
+ * 長さ付き引数は wrap の全域検査へ委ねる (NULL・長さ0を許可)。 */
 const u16 kapi_argptr[KAPI_FUNC_COUNT] = {
     0x0000,  /* gfx_init */
     0x0000,  /* gfx_init_200 */
@@ -324,7 +324,7 @@ const u16 kapi_argptr[KAPI_FUNC_COUNT] = {
     0x0000,  /* kmalloc_used */
     0x0000,  /* kmalloc_free */
     0x0000,  /* paging_enabled */
-    0x0001,  /* rtc_read: rtc_time */
+    0x0000,  /* rtc_read */
     0x0000,  /* tvram_clear */
     0x0000,  /* tvram_putchar_at */
     0x0000,  /* tvram_putkanji_at */
@@ -348,31 +348,31 @@ const u16 kapi_argptr[KAPI_FUNC_COUNT] = {
     0x0000,  /* serial_is_initialized */
     0x0001,  /* exec_run: path */
     0x0000,  /* dev_count */
-    0x001A,  /* dev_get_info: name,type,sects */
+    0x0000,  /* dev_get_info */
     0x0000,  /* fm_startup_sound */
     0x0001,  /* fm_play_mml: mml */
     0x0000,  /* np2_detect */
-    0x0001,  /* np2_get_version: buf */
-    0x0001,  /* np2_get_cpu: buf */
-    0x0001,  /* np2_get_clock: buf */
-    0x0001,  /* np2_check_hostdrv: buf */
+    0x0000,  /* np2_get_version */
+    0x0000,  /* np2_get_cpu */
+    0x0000,  /* np2_get_clock */
+    0x0000,  /* np2_check_hostdrv */
     0x0000,  /* ide_init */
     0x0000,  /* ide_drive_present */
-    0x0002,  /* ide_identify: info */
-    0x0004,  /* ide_read_sector: buf */
+    0x0000,  /* ide_identify */
+    0x0000,  /* ide_read_sector */
     0x0000,  /* path_get_drive */
     0x0000,  /* path_get_cwd */
     0x0001,  /* path_set_drive: d */
     0x0001,  /* path_set_cwd: p */
-    0x0003,  /* path_parse: input,result */
+    0x0001,  /* path_parse: input,result */
     0x0000,  /* ext2_format */
     0x0000,  /* kcg_init */
     0x0000,  /* kcg_set_scale */
     0x0000,  /* buz_on */
     0x0000,  /* buz_off */
     0x0000,  /* rshell_set_active */
-    0x0004,  /* ide_write_sector: buf */
-    0x0008,  /* ide_write_sectors: buf */
+    0x0000,  /* ide_write_sector */
+    0x0000,  /* ide_write_sectors */
     0x0000,  /* sys_reboot */
     0x0000,  /* sys_halt */
     0x0000,  /* shell_putchar */
@@ -382,10 +382,10 @@ const u16 kapi_argptr[KAPI_FUNC_COUNT] = {
     0x0000,  /* console_set_cursor */
     0x0001,  /* sys_open: path */
     0x0000,  /* sys_close */
-    0x0002,  /* sys_read: buf */
-    0x0002,  /* sys_write: buf */
+    0x0000,  /* sys_read */
+    0x0000,  /* sys_write */
     0x0000,  /* sys_lseek */
-    0x0003,  /* console_get_size: w,h */
+    0x0000,  /* console_get_size */
     0x0000,  /* kbd_get_modifiers */
     0x0000,  /* sys_get_mem_kb */
     0x0000,  /* sys_time */
@@ -393,17 +393,17 @@ const u16 kapi_argptr[KAPI_FUNC_COUNT] = {
     0x0000,  /* gfx_present_rect */
     0x0000,  /* sys_exit */
     0x0000,  /* sys_isatty */
-    0x0003,  /* sys_stat: path,buf */
-    0x0002,  /* sys_fstat: buf */
+    0x0001,  /* sys_stat: path,buf */
+    0x0000,  /* sys_fstat */
     0x0000,  /* gfx_set_palette */
-    0x000E,  /* gfx_get_palette: r,g,b */
-    0x0001,  /* gfx_get_framebuffer: fb */
+    0x0000,  /* gfx_get_palette */
+    0x0000,  /* gfx_get_framebuffer */
     0x0000,  /* gfx_add_dirty_rect */
     0x0000,  /* gfx_present_dirty */
     0x0000,  /* gfx_present_nosync */
-    0x0001,  /* gfx_present_raster: table */
-    0x0002,  /* kcg_read_ank: buf */
-    0x0002,  /* kcg_read_kanji: buf */
+    0x0000,  /* gfx_present_raster */
+    0x0000,  /* kcg_read_ank */
+    0x0000,  /* kcg_read_kanji */
     0x0000,  /* sys_shm_alloc */
     0x0001,  /* sys_shm_lock: ptr */
     0x0001,  /* sys_shm_free: ptr */
@@ -422,7 +422,7 @@ const u16 kapi_argptr[KAPI_FUNC_COUNT] = {
     0x0000,  /* sys_pipe_get_buf */
     0x0000,  /* sys_pipe_get_len */
     0x0000,  /* sys_pipe_clear */
-    0x0002,  /* sys_redirect_fd_buf: buf */
+    0x0000,  /* sys_redirect_fd_buf */
     0x0000,  /* sys_redirect_get_buf_len */
     0x0000,  /* paging_is_present */
     0x0001,  /* snd_bgm_play: mml */
@@ -439,10 +439,10 @@ const u16 kapi_argptr[KAPI_FUNC_COUNT] = {
     0x0000,  /* ssg_tone */
     0x0000,  /* ssg_volume */
     0x0000,  /* ssg_all_off */
-    0x0001,  /* mouse_poll: info */
+    0x0000,  /* mouse_poll */
     0x0000,  /* mouse_available */
     0x0000,  /* mouse_set_bounds */
-    0x000C,  /* tvram_readchar_at: code,attr */
+    0x0000,  /* tvram_readchar_at */
     0x0000,  /* tvram_reverse_cell */
     0x0000,  /* mouse_cursor_set_mode */
     0x0000,  /* mouse_cursor_show */
@@ -458,15 +458,15 @@ const u16 kapi_argptr[KAPI_FUNC_COUNT] = {
     0x0000,  /* db_last_error */
     0x0000,  /* db_mem_used */
     0x0001,  /* kcg_load_font: path */
-    0x0002,  /* ide_get_info: info */
-    0x0001,  /* sys_get_build_info: buf */
+    0x0000,  /* ide_get_info */
+    0x0000,  /* sys_get_build_info */
     0x0001,  /* loop_attach: path */
     0x0000,  /* loop_detach */
-    0x0006,  /* loop_status: total,bps */
-    0x0009,  /* dev_blk_read: dev_name,buf */
-    0x0009,  /* dev_blk_write: dev_name,buf */
+    0x0000,  /* loop_status */
+    0x0001,  /* dev_blk_read: dev_name,buf */
+    0x0001,  /* dev_blk_write: dev_name,buf */
     0x0000,  /* ime_switch_dict */
-    0x0003,  /* ime_user_list: yomi_prefix,out */
+    0x0001,  /* ime_user_list: yomi_prefix,out */
     0x0003,  /* ime_user_delete: yomi,kanji */
     0x0001,  /* ime_user_export: path */
     0x0000,  /* ime_user_clear */
@@ -475,13 +475,13 @@ const u16 kapi_argptr[KAPI_FUNC_COUNT] = {
     0x0001,  /* v86_disktest: path */
     0x0001,  /* v86_boot: path */
     0x0003,  /* v86_boot2: path,second */
-    0x0001,  /* gfx_screen_info: out */
+    0x0000,  /* gfx_screen_info */
     0x0000,  /* gfx_hw_fill_rect */
     0x0000,  /* gfx_hw_blit */
     0x0000,  /* gui_call */
     0x0003,  /* gui_register: handler,pump */
-    0x0001,  /* gfx_stats: out */
-    0x0004,  /* gfx_lease_palette: rgb */
+    0x0000,  /* gfx_stats */
+    0x0000,  /* gfx_lease_palette */
     0x0001,  /* sys_switch_shell: path */
     0x0000,  /* kbd_dropped_count */
     0x0000,  /* kbd_trygetrawkey */
@@ -494,59 +494,59 @@ const u16 kapi_argptr[KAPI_FUNC_COUNT] = {
     0x0000,  /* exec_app_state */
     0x0000,  /* snd_focus */
     0x0000,  /* exec_abort_clear */
-    0x0001,  /* con_sink_read: buf */
-    0x0003,  /* con_sink_stat: pending,dropped */
+    0x0000,  /* con_sink_read */
+    0x0000,  /* con_sink_stat */
     0x0000,  /* sys_ram_kb */
-    0x0001,  /* kbd_inject: utf8 */
+    0x0000,  /* kbd_inject */
     0x0000,  /* kbd_inject_pending */
     0x0000,  /* gfx_screen_owner */
     0x0001,  /* launch_req: cmdline */
     0x0000,  /* launch_pending */
-    0x001D,  /* launch_take: buf,requester,kind,arg */
+    0x0000,  /* launch_take */
     0x0000,  /* launch_report */
-    0x0002,  /* launch_poll: status */
+    0x0000,  /* launch_poll */
     0x0000,  /* launch_cancel */
     0x0000,  /* launch_child */
     0x0000,  /* sys_yield */
     0x0001,  /* db_open_existing: path */
     0x0002,  /* db_prepare_only: sql */
     0x0000,  /* db_bind_int */
-    0x0004,  /* db_bind_text: text */
-    0x0004,  /* db_bind_blob: data */
+    0x0000,  /* db_bind_text */
+    0x0000,  /* db_bind_blob */
     0x0000,  /* db_bind_null */
     0x0000,  /* db_error_code */
-    0x0001,  /* host_open: req */
-    0x0006,  /* host_status: status,length */
-    0x0002,  /* host_read: buf */
-    0x0002,  /* host_write: buf */
+    0x0000,  /* host_open */
+    0x0000,  /* host_status */
+    0x0000,  /* host_read */
+    0x0000,  /* host_write */
     0x0000,  /* host_close */
     0x0001,  /* sys_set_mtime: path */
     0x0000,  /* kbd_peekkey */
-    0x0003,  /* exec_last_result: kind,code */
+    0x0000,  /* exec_last_result */
     0x0000,  /* serial_init_vfast */
-    0x0007,  /* serial_get_status: mode,baud,fifo */
+    0x0000,  /* serial_get_status */
     0x0000,  /* kbd_trygetchar_local */
     0x0000,  /* pci_count */
-    0x0002,  /* pci_get: out */
+    0x0000,  /* pci_get */
     0x0000,  /* pci_cfg_read32 */
-    0x0003,  /* sys_time_now: lo,hi */
-    0x0002,  /* pci_bind_info: out */
+    0x0000,  /* sys_time_now */
+    0x0000,  /* pci_bind_info */
     0x0000,  /* pcm_open */
-    0x0001,  /* pcm_write: buf */
-    0x0003,  /* pcm_status: free_bytes,counters */
+    0x0000,  /* pcm_write */
+    0x0000,  /* pcm_status */
     0x0000,  /* pcm_close */
     0x0000,  /* pcm_set_volume */
-    0x0001,  /* kbd_diag: out */
+    0x0000,  /* kbd_diag */
     0x0000,  /* ext2_format_at */
     0x0000,  /* dev_mount_count */
     0x0001,  /* sys_umount_checked: prefix */
-    0x0002,  /* hdd_geom_info: out */
-    0x0001,  /* boot_image_info: out */
+    0x0000,  /* hdd_geom_info */
+    0x0000,  /* boot_image_info */
     0x0000,  /* sfs_begin */
     0x0000,  /* sfs_end */
-    0x0001,  /* serial_diag: out */
-    0x0002,  /* kbd_diag_log: out */
-    0x0002,  /* v86_gdc_capture: out */
+    0x0000,  /* serial_diag */
+    0x0000,  /* kbd_diag_log */
+    0x0000,  /* v86_gdc_capture */
 };
 
 /* ---- 出力ポインタの書き込み可検査 (票 TASK_KAPI_OUTPUT_GUARD) --------
@@ -558,19 +558,24 @@ const u16 kapi_argptr[KAPI_FUNC_COUNT] = {
  * 断ったら ring3_fault_kill() (戻らない)。CPL=0 の直呼びは素通し。
  *
  * 長さの決め方 (kapi.json の "out" から生成):
- *   NULL          → その範囲は見ない (KAPI ごとの NULL の扱いを変えない)
+ *   NULL + 非零長 → B1 で拒否。NULL + 長さ0 はアクセスしない
  *   長さ 0 / 負   → 見ない (target 側も書かないか、既存どおりの扱い)
  *   個数 × 単位   → あふれたら 0xFFFFFFFF (= 必ず拒否) にする
  * 1 回の呼び出しで 2 範囲まで見られるので、3 範囲以上は 2 本ずつに割る
  * (**どれか 1 つでも不可なら 1 バイトも書かない**)。 */
-#define KAPI_OUT_LEN(p, n)    ((p) ? (u32)(n) : 0u)
-#define KAPI_OUT_LEN_S(p, n)  (((p) && (int)(n) > 0) ? (u32)(n) : 0u)
+#define KAPI_OUT_LEN(p, n)    ((u32)(n))
+#define KAPI_OUT_LEN_S(p, n)  (((int)(n) > 0) ? (u32)(n) : 0u)
 
 static u32 kapi_out_mul(u32 n, u32 unit)
 {
     if (unit == 0) return 0u;
     if (n > (0xFFFFFFFFUL / unit)) return 0xFFFFFFFFUL;  /* あふれ → 拒否 */
     return n * unit;
+}
+
+static int kapi_in_range(u32 p, u32 len)
+{
+    return !len || ring3_user_range_ok(p, len);
 }
 
 /* 予約スロット (KAPI_FUNC_COUNT..KAPI_FUNC_CAPACITY-1) の中身。
@@ -1008,12 +1013,20 @@ void __cdecl wrap_rshell_set_active(int active)
 int __cdecl wrap_ide_write_sector(int drv, u32 lba, const void *buf)
 {
     KAPI_HIT(64);
+    /* 入力の全範囲を B1 で検査 (USER/read)。 */
+    if (!kapi_in_range((u32)buf, KAPI_OUT_LEN(buf, 512u))) {
+        ring3_fault_kill();
+    }
     return ide_write_sector(drv, lba, buf);
 }
 
 int __cdecl wrap_ide_write_sectors(int drv, u32 lba, u32 cnt, const void *buf)
 {
     KAPI_HIT(65);
+    /* 入力の全範囲を B1 で検査 (USER/read)。 */
+    if (!kapi_in_range((u32)buf, kapi_out_mul(KAPI_OUT_LEN(buf, cnt), 512u))) {
+        ring3_fault_kill();
+    }
     return ide_write_sectors(drv, lba, cnt, buf);
 }
 
@@ -1085,6 +1098,10 @@ int __cdecl wrap_sys_read(int fd, void *buf, u32 size)
 int __cdecl wrap_sys_write(int fd, const void *buf, u32 size)
 {
     KAPI_HIT(76);
+    /* 入力の全範囲を B1 で検査 (USER/read)。 */
+    if (!kapi_in_range((u32)buf, KAPI_OUT_LEN(buf, size))) {
+        ring3_fault_kill();
+    }
     return vfs_write_fd(fd, buf, size);
 }
 
@@ -1220,6 +1237,10 @@ void __cdecl wrap_gfx_present_nosync(void)
 void __cdecl wrap_gfx_present_raster(void *table)
 {
     KAPI_HIT(94);
+    /* 入力の全範囲を B1 で検査 (USER/read)。 */
+    if (!kapi_in_range((u32)table, KAPI_OUT_LEN(table, sizeof(GFX_RasterPalTable)))) {
+        ring3_fault_kill();
+    }
     gfx_present_raster((GFX_RasterPalTable *)table);
 }
 
@@ -1360,6 +1381,10 @@ int __cdecl wrap_sys_redirect_fd_buf(int fd, u8 *buf, u32 size, u32 len)
     if (!ring3_user_ranges_writable((u32)buf, KAPI_OUT_LEN(buf, size),
                                     (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
+    }
+    /* 入力の全範囲を B1 で検査 (USER/read)。 */
+    if (!kapi_in_range((u32)buf, KAPI_OUT_LEN(buf, len))) {
+        ring3_fault_kill();
     }
     { if (len > size) return -1; return fd_redirect_to_buffer(fd, buf, size, len); }
 }
@@ -1632,13 +1657,13 @@ int __cdecl wrap_loop_status(int slot, u32 *total, int *bps)
 int __cdecl wrap_dev_blk_read(const char *dev_name, u32 lba, int count, void *buf)
 {
     KAPI_HIT(156);
-    { Device *d = dev_find(dev_name); if (!d) return -1; if (count < 0) return -1; if (count > 0 && buf && d->sect_size > 0) { if ((u32)count > 0xFFFFFFFFu / (u32)d->sect_size) return -1; if (!ring3_user_ranges_writable((u32)buf, (u32)count * (u32)d->sect_size, 0, 0)) ring3_fault_kill(); } return dev_blk_read_lba(d, lba, count, buf); }
+    { Device *d = dev_find(dev_name); if (!d) return -1; if (count < 0) return -1; if (count > 0) { if (d->sect_size <= 0) return -1; if ((u32)count > 0xFFFFFFFFu / (u32)d->sect_size) return -1; if (!ring3_user_ranges_writable((u32)buf, (u32)count * (u32)d->sect_size, 0, 0)) ring3_fault_kill(); } return dev_blk_read_lba(d, lba, count, buf); }
 }
 
 int __cdecl wrap_dev_blk_write(const char *dev_name, u32 lba, int count, const void *buf)
 {
     KAPI_HIT(157);
-    { Device *d = dev_find(dev_name); if (!d) return -1; return dev_blk_write_lba(d, lba, count, buf); }
+    { Device *d = dev_find(dev_name); if (!d) return -1; if (count < 0) return -1; if (count > 0) { if (d->sect_size <= 0) return -1; if ((u32)count > 0xFFFFFFFFu / (u32)d->sect_size) return -1; if (!ring3_user_range_ok((u32)buf, (u32)count * (u32)d->sect_size)) ring3_fault_kill(); } return dev_blk_write_lba(d, lba, count, buf); }
 }
 
 int __cdecl wrap_ime_switch_dict(int variant)
@@ -1756,6 +1781,10 @@ int __cdecl wrap_gfx_stats(void *out)
 int __cdecl wrap_gfx_lease_palette(int first, int count, const u8 *rgb)
 {
     KAPI_HIT(174);
+    /* 入力の全範囲を B1 で検査 (USER/read)。 */
+    if (!kapi_in_range((u32)rgb, kapi_out_mul(KAPI_OUT_LEN_S(rgb, count), 3u))) {
+        ring3_fault_kill();
+    }
     return gfx_lease_palette(first, count, rgb);
 }
 
@@ -1862,6 +1891,10 @@ u32 __cdecl wrap_sys_ram_kb(void)
 i32 __cdecl wrap_kbd_inject(const u8 *utf8, u32 len)
 {
     KAPI_HIT(190);
+    /* 入力の全範囲を B1 で検査 (USER/read)。 */
+    if (!kapi_in_range((u32)utf8, KAPI_OUT_LEN(utf8, len))) {
+        ring3_fault_kill();
+    }
     return kbd_inject(utf8, len);
 }
 
