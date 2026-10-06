@@ -39,6 +39,16 @@ TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-I" + str(CROSS_DIR / "i386-elf/include")]
 
 CMDS = ["WGET", "LPR", "HCLIP", "HDATE"]
+RUN_TIMEOUT = 60
+
+
+def run_host(exe):
+    try:
+        return subprocess.run([exe], cwd=ROOT, stdin=subprocess.DEVNULL,
+                              timeout=RUN_TIMEOUT).returncode
+    except subprocess.TimeoutExpired:
+        print(f"TIMEOUT {exe} after {RUN_TIMEOUT}s", flush=True)
+        return 124
 
 
 def build_lib(tmp):
@@ -77,13 +87,13 @@ if __name__ == "__main__":
         failed = 0
 
         lib = build_lib(tmp)
-        rc = subprocess.run([lib], cwd=ROOT).returncode
+        rc = run_host(lib)
         print(f"EXIT host_lib_host={rc}", flush=True)
         failed += rc != 0
 
         for cmd in CMDS:
             exe = build_cmd(tmp, cmd)
-            rc = subprocess.run([exe], cwd=ROOT).returncode
+            rc = run_host(exe)
             print(f"EXIT host_cmd_{cmd.lower()}={rc}", flush=True)
             failed += rc != 0
 
