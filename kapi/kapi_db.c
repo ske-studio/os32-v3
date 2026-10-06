@@ -21,6 +21,8 @@
 #include "vfs.h"          /* v50: open 前の vfs_stat (本体 size / journal) */
 #include "redir_access.h"
 
+extern int ring3_call_from_user(void);
+
 /* kapi_db.c はリンカスクリプトで EXCLUDE_FILE に含まれていないため、
  * 通常の .text に配置される。sqlite3_exec 等は .sqlite_text にあるが、
  * カーネルの .text から .sqlite_text を呼ぶのは問題ない。
@@ -142,6 +144,9 @@ static const char *db_shm_diag(const char *msg)
 static DbSlot *slot_get(int handle)
 {
     if (handle < 0 || handle >= DB_MAX_CONNECTIONS) return (DbSlot *)0;
+    /* USER handles belong to the opening app; kernel/WM remain trusted. */
+    if (ring3_call_from_user() && db_slots[handle].owner != res_owner_get())
+        return (DbSlot *)0;
     if (!db_slots[handle].in_use || db_slots[handle].isolated)
         return (DbSlot *)0;
     return &db_slots[handle];
@@ -157,6 +162,9 @@ static DbSlot *slot_get(int handle)
 static DbSlot *slot_diag(int handle)
 {
     if (handle < 0 || handle >= DB_MAX_CONNECTIONS) return (DbSlot *)0;
+    /* USER handles belong to the opening app; kernel/WM remain trusted. */
+    if (ring3_call_from_user() && db_slots[handle].owner != res_owner_get())
+        return (DbSlot *)0;
     return &db_slots[handle];
 }
 
@@ -793,7 +801,8 @@ const char * __cdecl kapi_db_last_error(int handle)
     DbSlot *slot;
     if (handle < 0 || handle >= DB_MAX_CONNECTIONS)
         return db_shm_diag("invalid handle");
-    slot = &db_slots[handle];
+    slot = slot_diag(handle);
+    if (!slot) return db_shm_diag("invalid handle");
     if (slot->cleanup_error != SQLITE_OK)
         return db_shm_diag(slot->cleanup_message);
     if (!slot->in_use || !slot->db)

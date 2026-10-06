@@ -67,6 +67,7 @@ static int shm_block_owner[SHM_BLOCK_COUNT];
 /* res_owner_get() は fs/fd_redirect.c。kernel/ は -Ifs を持たないので
  * kernel/gui.c と同じ流儀で extern 宣言する。 */
 extern int res_owner_get(void);
+extern int ring3_call_from_user(void);
 
 /* ブロックインデックス → 物理/仮想アドレス変換 */
 static u32 block_to_addr(int idx)
@@ -181,6 +182,9 @@ int shm_lock(void *ptr)
 
     idx = addr_to_block(ptr);
     if (idx < 0) return -1;
+    /* USER may only change its own allocation; kernel/WM remain trusted. */
+    if (ring3_call_from_user() && shm_block_owner[idx] != res_owner_get())
+        return -1;
 
     span = shm_block_span[idx];
     /* span が壊れていると idx+i が管理テーブル外に出る */
@@ -212,6 +216,9 @@ int shm_free(void *ptr)
 
     idx = addr_to_block(ptr);
     if (idx < 0) return -1;
+    /* USER may only change its own allocation; kernel/WM remain trusted. */
+    if (ring3_call_from_user() && shm_block_owner[idx] != res_owner_get())
+        return -1;
 
     span = shm_block_span[idx];
     /* span が壊れていると idx+i が管理テーブル外に出る */

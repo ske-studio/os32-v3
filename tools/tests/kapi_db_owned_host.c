@@ -272,8 +272,55 @@ static void test_open_failure(void)
     open_rc = SQLITE_OK; open_null = 0;
     assert(kapi_db_open("reuse-null-failure") == 0);
 }
+static void test_public_owner(void)
+{
+    reset();
+    owner = 2;
+    int h = kapi_db_open("owner");
+    assert(h >= 0);
+    db_test_user_call = 1;
+    assert(kapi_db_prepare_only(h, "SELECT") == 0);
+    assert(kapi_db_bind_int(h, 1, 42) == 0);
+    DbSlot saved = db_slots[h];
+    sqlite3 db_saved = connections[0];
+    owner = 3;
+    assert(kapi_db_close(h) == -1);
+    assert(kapi_db_exec(h, "UPDATE") == -1);
+    assert(kapi_db_prepare(h, "SELECT") == -1);
+    assert(kapi_db_prepare_only(h, "SELECT") == -1);
+    assert(kapi_db_step(h) == -1);
+    assert(kapi_db_finalize(h) == -1);
+    assert(kapi_db_bind_int(h, 1, 7) == -1);
+    assert(kapi_db_bind_text(h, 1, "x", 1) == -1);
+    assert(kapi_db_bind_blob(h, 1, "x", 1) == -1);
+    assert(kapi_db_bind_null(h, 1) == -1);
+    assert(kapi_db_column_int(h, 0) == 0);
+    assert(!strcmp(kapi_db_column_text(h, 0), ""));
+    assert(!strcmp(kapi_db_last_error(h), "invalid handle"));
+    assert(kapi_db_error_code(h) == SQLITE_MISUSE);
+    assert(!memcmp(&saved, &db_slots[h], sizeof(saved)));
+    assert(!memcmp(&db_saved, &connections[0], sizeof(db_saved)));
+    owner = 2;
+    assert(kapi_db_finalize(h) == 0);
+    assert(kapi_db_close(h) == 0);
+    /* Closed-slot diagnostics keep their owner check until slot reuse. */
+    owner = 3;
+    db_slots[h].last_error = SQLITE_IOERR;
+    assert(kapi_db_error_code(h) == SQLITE_MISUSE);
+    owner = 2;
+    assert(kapi_db_error_code(h) == SQLITE_IOERR);
+    h = kapi_db_open("trusted");
+    db_test_user_call = 0;
+    owner = 1;
+    assert(kapi_db_prepare_only(h, "SELECT") == 0);
+    assert(kapi_db_bind_int(h, 1, 42) == 0);
+    assert(kapi_db_finalize(h) == 0);
+    assert(kapi_db_close(h) == 0);
+    assert(kapi_db_error_code(h) == SQLITE_OK);
+}
 int main(void)
 {
+    test_public_owner();
     test_open_failure();
     test_busy_isolation();
     test_rollback_failure();

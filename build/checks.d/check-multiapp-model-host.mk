@@ -4,6 +4,6 @@ CHECK_PAR_ORDER += 068:check-multiapp-model-host
 check-multiapp-model-host:
 	python3 -B tools/tests/test_multiapp_model.py
 	python3 -B tools/tests/test_multiapp_impl.py
-	python3 -B tools/tests/test_owner_reclaim.py
+	MUTATE=$(MUTATE) python3 -B tools/tests/test_owner_reclaim.py
 
 .PHONY: check-multiapp-model-host

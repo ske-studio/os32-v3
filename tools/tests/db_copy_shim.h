@@ -1,6 +1,8 @@
 /* Legacy SQLite-engine tests model the caller boundary only. The real B1
  * wrapper -> copy -> walk path is exercised by db_caller_host.c. */
 #include "redir_access.h"
+static int db_test_user_call;
+int ring3_call_from_user(void) { return db_test_user_call; }
 int ring3_user_range_ok(u32 p, u32 len);
 int redir_access_capture(RedirAccess *out) { (void)out; return 1; }
 int copy_caller_cstr(const struct caller_access *c, const char *src, char *dst, u32 cap)

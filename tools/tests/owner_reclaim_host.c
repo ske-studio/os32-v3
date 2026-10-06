@@ -52,10 +52,10 @@ int paging_set_not_present(u32 s, u32 e)
 static int g_live_allocs;
 void *kmalloc(u32 size)
 {
-    static char pool[4][1024];
+    static char pool[8][1024];
     static int next;
     (void)size;
-    if (next >= 4) return 0;
+    if (next >= 8) return 0;
     g_live_allocs++;
     return pool[next++];
 }
@@ -70,7 +70,8 @@ int ring3_user_ranges_writable(u32 pa, u32 la, u32 pb, u32 lb)
  * アプリ由来の筋書きは tools/tests/ring3_guard_host.c が見る。 */
 int ring3_user_ranges_writable_always(u32 pa, u32 la, u32 pb, u32 lb)
 { (void)pa; (void)la; (void)pb; (void)lb; return 1; }
-int ring3_call_from_user(void) { return 0; }
+static int user_call;
+int ring3_call_from_user(void) { return user_call; }
 void ring3_fault_kill(void) { for (;;) { } }
 
 /* fd_redirect.c が呼ぶ VFS。ここでは「開いた FD の台帳」だけ持つ。 */
@@ -156,6 +157,52 @@ int main(void)
     check(shm_block_owner[1] == 2 && shm_block_owner[2] == 2 &&
           shm_block_owner[3] == 3,
           "2d SHM ブロックに確保した ID のタグが付く");
+
+    /* Public USER calls cannot change another app's live resources. */
+    user_call = 1;
+    pipe_set_len(p2, 17);
+    g_map_calls = 0;
+    check(shm_lock(a2) == -1, "foreign SHM lock refused");
+    check(shm_free(a2) == -1, "foreign SHM free refused");
+    check(g_map_calls == 0 && shm_state[1] == SHM_USED &&
+          shm_state[2] == SHM_USED && shm_block_span[1] == 2 &&
+          shm_block_owner[1] == 2 && shm_block_owner[2] == 2,
+          "foreign SHM rejection leaves span and permissions unchanged");
+    u8 *saved_pipe = pipe_ptr[p2];
+    pipe_clear(p2);
+    check(pipe_len[p2] == 17, "foreign pipe clear refused");
+    check(pipe_get_buf(p2) == 0, "foreign pipe buffer refused");
+    pipe_free(p2);
+    check(pipe_ptr[p2] == saved_pipe && pipe_used[p2] &&
+          pipe_owner[p2] == 2 && pipe_len[p2] == 17 && g_live_allocs == 2,
+          "foreign pipe free refused");
+    check(shm_lock(a3) == 0 && shm_free(a3) == 0,
+          "own SHM lock and free allowed");
+    a3 = shm_alloc(1);
+    check(pipe_get_buf(p3) == pipe_ptr[p3], "own pipe buffer allowed");
+    pipe_set_len(p3, 9);
+    pipe_clear(p3);
+    check(pipe_len[p3] == 0, "own pipe clear allowed");
+    pipe_free(p3);
+    check(!pipe_used[p3] && g_live_allocs == 1, "own pipe free allowed");
+    p3 = pipe_alloc();
+    check(p3 >= 0, "own pipe reallocation");
+
+    /* TRUSTED can operate on a different owner, including shell owner 1. */
+    user_call = 0;
+    res_owner_set(1);
+    check(shm_lock(a2) == 0 && shm_free(a2) == 0,
+          "trusted foreign SHM allowed");
+    check(pipe_get_buf(p2) == saved_pipe, "trusted foreign pipe buffer allowed");
+    pipe_clear(p2);
+    check(pipe_len[p2] == 0, "trusted foreign pipe clear allowed");
+    pipe_free(p2);
+    check(!pipe_used[p2] && g_live_allocs == 1, "trusted foreign pipe free allowed");
+    res_owner_set(2);
+    a2 = shm_alloc(2);
+    p2 = pipe_alloc();
+    check(a2 != 0 && p2 >= 0, "reallocate for trusted owner reclaim");
+    res_owner_set(3);
 
     /* ---- ID 2 だけを畳む ---- */
     g_map_calls = 0;
