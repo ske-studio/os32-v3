@@ -14,7 +14,7 @@ kernel/v86_gcap.c:gd_get:V86 ゲスト線形の IVT / コード / magic (リマ�
 kernel/v86_gcap.c:gd_set:V86 ゲスト線形の IVT / コード / magic (リマップ済み)
 kernel/v86_gcap.c:gcap_rom:V86 ゲスト線形の IVT / コード / magic (リマップ済み)
 kernel/v86_gcap.c:v86_gdc_capture:V86 ゲスト線形の IVT / コード / magic (リマップ済み)
-kernel/v86_mem.c:v86_mem_setup:ゲスト VA のリマップ検証。backing 物理は別に保持
+kernel/v86_mem.c:v86_session_begin:ゲスト VA のリマップ検証。backing 物理は別に保持
 kapi/kapi_db.c:<file>:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
 kapi/kapi_db.c:db_v50_selftest:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
 kapi/kapi_db.c:db_shm_empty:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
