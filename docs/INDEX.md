@@ -371,3 +371,5 @@ V86・SQLite・タイルマップ・ライブラリ設計書 (と上の boot_ref
 - [TASK_HAL_WIRING_RESULTS](archive/v3/TASK_HAL_WIRING_RESULTS.md) — TASK_HAL_WIRING から切り出した完了段の記録 (未確認事項は元票に保持)。
 
 - [TASK_PCM_CS4231_RESULTS](archive/v3/TASK_PCM_CS4231_RESULTS.md) — TASK_PCM_CS4231 から切り出した完了段の記録 (未確認事項は元票に保持)。
+
+- [DEFERRED_CLOSED](archive/v3/DEFERRED_CLOSED.md) — e11 統合受入で閉じた持越し台帳の行と証拠。
