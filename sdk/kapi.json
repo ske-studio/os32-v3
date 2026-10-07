@@ -1,6 +1,6 @@
 {
   "generations": {"os32x_format": 4, "kapi_abi": 1, "memory_layout": 1, "shlib_protocol": 1},
-  "version": 69,
+  "version": 70,
   "func_capacity": 300,
   "crt_kapi_symbol": "os32_kapi_v63",
   "data_fields": [
@@ -53,7 +53,7 @@
     "memory_boot.h",
     "launch.h",
     "kapi_host.h",
-    "pci.h", "pcm_cs4231.h", "bootinfo.h", "serialfs.h", "v86_gcap.h"
+    "pci.h", "pcm_cs4231.h", "bootinfo.h", "serialfs.h", "v86_gcap.h", "surface_query.h", "ring3_ls.h", "redir_access.h"
   ],
   "externs": [
     "extern volatile u32 tick_count;",
@@ -1716,6 +1716,122 @@
       "out": [{"arg": "out", "size": "sizeof(V86Gcap)"}],
       "ret": "int",
       "args": ["int mode", "V86Gcap *out"]
+    },
+    {
+      "name": "surface_query",
+      "ret": "int",
+      "args": [
+        "u32 role",
+        "OS32_SurfaceQueryResult *out"
+      ],
+      "body": "return surface_api_query(role, (struct surface_query_result *)out);",
+      "out": [
+        {
+          "arg": "out",
+          "size": "sizeof(OS32_SurfaceQueryResult)"
+        }
+      ]
+    },
+    {
+      "name": "surface_lease",
+      "ret": "int",
+      "args": [
+        "u32 role",
+        "const OS32_SurfaceRef *ref",
+        "u32 access",
+        "OS32_LeaseView *out"
+      ],
+      "body": "return surface_api_lease(role, (const struct surface_ref *)ref, access, (struct lease_view *)out);",
+      "out": [
+        {
+          "arg": "out",
+          "size": "sizeof(OS32_LeaseView)"
+        }
+      ],
+      "in": [
+        {
+          "arg": "ref",
+          "target": true
+        }
+      ]
+    },
+    {
+      "name": "gfx_surface_lease",
+      "ret": "int",
+      "args": [
+        "u32 role",
+        "const OS32_SurfaceRef *refs",
+        "u32 count",
+        "u32 access",
+        "OS32_LeaseResult *out"
+      ],
+      "body": "return surface_api_bundle(role, (const struct surface_ref *)refs, count, access, (struct surface_lease_result *)out);",
+      "out": [
+        {
+          "arg": "out",
+          "size": "sizeof(OS32_LeaseResult)"
+        }
+      ],
+      "in": [
+        {
+          "arg": "refs",
+          "target": true
+        }
+      ]
+    },
+    {
+      "name": "surface_unlease",
+      "ret": "int",
+      "args": [
+        "u32 token"
+      ],
+      "body": "return surface_api_unlease(token);"
+    },
+    {
+      "name": "sys_ls_window",
+      "ret": "int",
+      "args": [
+        "const char *path",
+        "u32 skip",
+        "OS32_LsPacket *out"
+      ],
+      "body": "return ring3_ls_window(path, skip, out);",
+      "out": [
+        {
+          "arg": "out",
+          "size": "sizeof(OS32_LsPacket)"
+        }
+      ],
+      "in": [
+        {
+          "arg": "path",
+          "target": true
+        }
+      ]
+    },
+    {
+      "name": "caller_identity",
+      "ret": "int",
+      "args": [
+        "u32 *app",
+        "u32 *owner",
+        "u32 *generation"
+      ],
+      "body": "struct caller_access caller;\nif (!caller_access_get(&caller) || caller.origin != CALLER_USER) return OS32_ERR_INVAL;\nif (!app || !owner || !generation) return OS32_ERR_INVAL;\nstruct caller_identity identity = caller_identity_get();\n*app = (u32)identity.app_id;\n*owner = identity.owner;\n*generation = identity.generation;\nreturn 0;",
+      "out": [
+        {
+          "arg": "app",
+          "size": "sizeof(u32)"
+        },
+        {
+          "arg": "owner",
+          "size": "sizeof(u32)"
+        },
+        {
+          "arg": "generation",
+          "size": "sizeof(u32)"
+        }
+      ]
     }
   ]
 }

@@ -1,4 +1,4 @@
-# KernelAPI v69 仕様書
+# KernelAPI v70 仕様書
 
 外部プログラム (OS32X) がカーネル機能を利用するためのAPIテーブル仕様。
 
@@ -16,8 +16,8 @@
 | 最大プログラムサイズ | image と暫定 heap 予算を起動時に検査 ([TASK_T2_APPBAND](tasks/v3/TASK_T2_APPBAND.md) §4) |
 | プログラム専用ヒープ | 動的配置 (sbrk_heap_limit, exec_heap 管理下) |
 | プログラム専用スタック | 動的配置 (メモリ終端付近、下向き展開) |
-| 現在のバージョン | **69** |
-| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 240・予約 60) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
+| 現在のバージョン | **70** |
+| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 246・予約 54) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
 
 ---
 
@@ -112,6 +112,8 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v66 | **実装済み (2026-09-25、手元ビルドとホスト試験のみ)** | シリアル越しの /host (票 TASK_SERIAL_HOSTFS 部品 B): `sfs_begin` / `sfs_end` / `serial_diag` の 3 本 (slot 235〜237 = 0x3B4〜0x3BC)。常駐シェルの `sfs run <コマンド行>` だけがセッションを開き (送受信のゲート → HELLO → `/host` に SerialFS)、子がどう終わっても BYE → アンマウント → 隔離 → 溜めた出力と終了コードを長さ付きのフレームで送る → ゲートを下ろす。`serial_diag` は受信の OE / FE / PE と受信リング溢れの数。同じ版で `vfs_mount` が同じ prefix の二重登録を断る | [archive/realhw_v21/TASK_SERIAL_HOSTFS.md](archive/realhw_v21/TASK_SERIAL_HOSTFS.md) 部品 B |
 | v67 | **実装済み (2026-09-26、手元ビルドとホスト試験のみ)** | キーボードの受信記録 `kbd_diag_log` 1 本 (slot 238 = 0x3C0)。IRQ1 が 0041h から**使うバイトを読むたびに** `KbdDiagLogEnt` (8 バイト: seq / 生の code / 処理後の修飾 / 印) を 32 件の循環リングへ積み、`after_seq` より新しい分を古い順に写す。EMPTY / ERROR で捨てたバイトは積まない。上書きで失われた分は写した先頭の seq の飛びで分かる。シェルの `kbdstat -w` が使う — 実機のカナ / CAPS が「ロックで make、解除で break」か「押すたびに make だけ」かを見る準備。実体は `drivers/kbd_dlog.c` / `drivers/kbd.c` | [tasks/gui/TASK_KBD_NAV.md](tasks/gui/TASK_KBD_NAV.md) §3 |
 | v68 | **実装済み (2026-09-26、手元ビルドとホスト試験のみ)** | 実機の ROM の INT 18h の I/O 記録 `v86_gdc_capture` 1 本 (slot 239 = 0x3C4)。`mode = V86G_MODE_ROM` は V86 で実機の ROM の AH=31h を呼んで今のモードを読み、その bit の並び (NP21/W の bit2 / Bible 3-2 の bit3) から 640x480 の AH=30h を決めて呼び、同じ AH=30h で元のモードへ戻して (戻れなければ OS32 の表 `pegc_restore_text_sync`) CUI を作り直す。その間に捕まえた OUT を**畳まずに**最大 512 件、IN をポートごとの回数で `V86Gcap` (8460 バイト) へ写す。`V86G_MODE_SELFTEST` は決まった I/O 列の試験ゲストで記録器を確かめる (実機へ通さない)。`v86 -g [-t]` が使う。実体は `kernel/v86_gcap.c` / `kernel/v86_gcap_math.c` | [tasks/realhw/TASK_PEGC480_REALHW.md](tasks/realhw/TASK_PEGC480_REALHW.md) §3 段 1 |
+| v69 | **実装済み (2026-10-01、手元ビルド・ホスト試験)** | T2c: OS32X v4 / 4 世代の正典・高位配置・可変 stack。KAPI slot の追加・並べ替えなし | [tasks/v3/TASK_T2_APPBAND.md](tasks/v3/TASK_T2_APPBAND.md) §4-6・T2c-R |
+| v70 | **実装 (2026-10-07、e11c1・統合ゲスト受入前)** | surface query/lease/bundle/unlease・値返し ls・本人識別の 6 本 (slot 240〜245)。公開値型・ページ/SHM 定数、pipe の CPL3 制限。memory_layout 世代は 1 のまま | §4-10、[TASK_T2D_T2H](tasks/v3/TASK_T2D_T2H.md) e11 |
 
 調停 (2026-09-06、同日改訂): GUI (K1〜W2) を先に実装するので **v42 = GUI、v43 = ネットワーク Host Services**
 に確定。実装順が入れ替わるときは、着手前にこの表を更新してから版番号を取ること。
@@ -179,8 +181,7 @@ PM が選んだ別イメージ上の未使用・無害な LBA (18 以上、512-b
 SHM ブロック (`sys_shm_lock` / `sys_shm_free`)、パイプ (`sys_pipe_free` / `sys_pipe_clear` / `sys_pipe_get_buf`)、DB の接続 (`db_*` のハンドル) は、
 呼び手のアプリ (`res_owner_get()`) が確保したものだけを操作できる。**他のアプリの資源を渡すと、不正な引数と同じ値**
 (int の口は -1、`get_buf` は NULL、`column_int` は 0、`column_text` は `""`、void の口は何もしない) を返し、状態は変わらない。
-常駐シェル・WM・終了時の回収 (信頼側の文脈) は今どおり操作できる。版は変えていない。`pipe_get_buf` がカーネル番地を返す件と
-`pipe_get_len` の他アプリの照会は e11c (台帳 E11-8)。
+常駐シェル・WM・終了時の回収 (信頼側の文脈) は今どおり操作できる。v70 では `pipe_get_buf` は CPL3 なら自分の資源でも NULL。`pipe_get_len` は CPL3 の別 owner なら 0、自分なら長さを返す。TRUSTED は従来どおり。台帳 E11-8 の意味変更。
 
 ### §3-3 出力ポインタの宣言 `out` (票 TASK_KAPI_OUTPUT_GUARD)
 
@@ -233,7 +234,6 @@ CPL=3 の `gfx_present_raster(NULL)` は固定長入力の拒否で kill、
 `mem_free(NULL)` を早期検査で kill していた修正途中の回帰は撤回し、
 従来どおり target の no-op に届く。CPL=0 / WM の直呼びは既存 target の扱いを維持する。
 
-| v69 | **実装済み (2026-10-01、手元ビルド・ホスト試験)** | T2c: OS32X v4 / 4 世代の正典・高位配置・可変 stack。KAPI slot の追加・並べ替えなし | [tasks/v3/TASK_T2_APPBAND.md](tasks/v3/TASK_T2_APPBAND.md) §4-6・T2c-R |
 
 ---
 
@@ -249,7 +249,7 @@ v62 まではデータ欄 (`sbrk_heap_limit` / `shm_base`) を関数表の**直�
 |---|---|---|
 | 関数表の容量 R | **300** スロット (`KAPI_FUNC_CAPACITY`) | `sdk/kapi.json` の `func_capacity` |
 | データ欄の先頭 | **0x4B8** = 8 + 4 × R (`KAPI_DATA_FIELDS_OFF`) | `sdk/gen_kapi.py` が生成 |
-| 予約スロット | 240〜299 (`kapi_reserved[60]`、v68 時点。v67 は 239〜299、v66 は 238〜299、v65 は 235〜299、v64 は 234〜299、v63 は 230〜299)。カーネルの表は `kapi_reserved_nosys` (= `OS32_ERR_NOSYS`)、CPL=3 のトランポリンは int 0x80 のスタブ (ディスパッチャが `slot >= KAPI_FUNC_COUNT` で kill)。**NULL にしない** | `exec/exec.c` |
+| 予約スロット | 246〜299 (`kapi_reserved[54]`、v70 時点。v68 は 240〜299、v67 は 239〜299、v66 は 238〜299、v65 は 235〜299、v64 は 234〜299、v63 は 230〜299)。カーネルの表は `kapi_reserved_nosys` (= `OS32_ERR_NOSYS`)、CPL=3 のトランポリンは int 0x80 のスタブ (ディスパッチャが `slot >= KAPI_FUNC_COUNT` で kill)。**NULL にしない** | `exec/exec.c` |
 | R の上限 | トランポリン 1 ページ: `sizeof(KernelAPI)` + スタブ 8B × R + 写し場 256B ≤ 4096 → **R ≤ 318** (`STATIC_ASSERT`) | `exec/exec.c` |
 
 関数を足すときは `kapi_reserved[]` が 1 本減るだけで、データ欄は動かない。**関数数が R を
@@ -1449,9 +1449,57 @@ CPL=3 は生成 wrap が全出力範囲を検査してから target を呼ぶ。
 `launch_cancel` の `DONE` も壊れる。CTRL+STOP のように 1 本だけ止めたいときは、WM が
 `launch_child()` で末尾を解決してその ID を渡す (末尾は子孫を持たないので 1 本だけ畳まれる)。
 
+### §4-10 v70: surface 値 ABI・列挙 window・本人識別 (e11c1)
+
+| Offset | フィールド | プロトタイプ |
+|--------|-----------|------|
+| 0x3C8 | surface_query | `int(u32 role, OS32_SurfaceQueryResult *out)` |
+| 0x3CC | surface_lease | `int(u32 role, const OS32_SurfaceRef *ref, u32 access, OS32_LeaseView *out)` |
+| 0x3D0 | gfx_surface_lease | `int(u32 role, const OS32_SurfaceRef *refs, u32 count, u32 access, OS32_LeaseResult *out)` |
+| 0x3D4 | surface_unlease | `int(u32 token)` |
+| 0x3D8 | sys_ls_window | `int(const char *path, u32 skip, OS32_LsPacket *out)` |
+| 0x3DC | caller_identity | `int(u32 *app, u32 *owner, u32 *generation)` |
+
+公開型は `os32_surface.h` / `os32_ls.h` (`os32_kapi_shared.h` からも include)。
+`OS32_SurfaceRef` は sid/generation の 8B、`OS32_SurfaceDesc` は 60B、`OS32_SurfaceQueryResult` は 244B、
+`OS32_LeaseView` は token/base/bytes/planes[4] の **28B**、`OS32_LeaseResult` は count + 4 view の **116B**。
+物理番地・kernel ポインタ・cache 指定は公開しない。base/planes は呼び手の lease VA。
+公開 role/backend/access/format の `OS32_SURFACE_*` 定数は kernel と静的照合する。
+`OS32_PAGE_SIZE=4096`、`OS32_SHM_BLOCK_SIZE=16384` も kernel と静的照合する。
+
+- `surface_query`: 初期化済みの選択 backend の値 snapshot を返す。lease は増やさない。
+- `surface_lease`: query の単一 ref を B1 で取り込み、授権・世代・最大 access を再検証して貸す。PC98 planar DISPLAY の単面取得は不可。
+- `gfx_surface_lease`: PC98 DISPLAY の 4 ref を query と同順で渡す。4 面すべて成功か巻戻し。count/欠落/重複/別束は INVAL、古い世代は STALE。
+- `surface_unlease`: 保存 USER caller の AS が持つ token のみ返却する。他人・無効・互換 token は INVAL。再 init/終了による revoke は内部処理。
+
+query/lease は保存 USER の AS/owner/generation と現在実行中の slot の一致を要求する。
+CUI では CLIENT は GFX flag 不要、DISPLAY は GFX flag が必要、TVRAM は前景 USER、Unicode は ready な表の RO のみ。
+GUI では通常 CLIENT は GFX flag 不要、全画面 CLIENT と DISPLAY は GFX flag と gfx owner 一致が必要。TVRAM は拒否。
+TRUSTED/WM/IRQ/例外からの surface 貸与は不可。授権の詳細は [T2e §2-2](tasks/v3/TASK_T2D_T2H.md#2-2-公開apiと授権)。
+戻り値は 0 / `OS32_ERR_INVAL` (-9) / `OS32_ERR_STALE` (-11) / `OS32_ERR_FULL` (-13、lease slot 不足) /
+`OS32_ERR_NOSPC` (-4、ページ不足)。失敗時の out は不変。
+
+**E11-7 の寿命契約**: STALE/INVAL の区別から世代や状態は推測可能であり、秘密の識別子ではない。
+query→lease の間に callback/scheduling を挟まない。VA は first-fit で再利用され得るため、
+生 pointer を保存して再 init をまたぐのは契約違反。**CLIENT regen では互換 token も失効する (案 A)**。
+query/lease と互換 framebuffer を取り直す。再利用された同じ数値の VA を旧 view の有効性の証拠にしない。
+
+`sys_ls_window(path, skip, out)` は保存 USER caller 専用で、callback を kernel から呼ばず最大 14 件を値で返す。
+`OS32_LsPacket` は 3708B (count/result/done + 264B の OS32_LsEntry ×14)。名前は 256B の NUL 終端、size は u32、type は u8、残り3Bはゼロ。
+WM/TRUSTED または保存 USER の識別が無効なら INVAL (kill しない)。path=NULL は cwd。skip は列挙の先頭から飛ばす件数。戻り 0 は packet のコピー成功であり、FS の結果は `out->result` に返す。
+`done==0` なら次は skip+count、`done==1` は末尾。FS エラーは result の負値で伝える。バッチ間の snapshot は保証しない。
+従来の slot 12 `sys_ls` は CPL3 shim と私的 int80 `0x8000000c` 経由で同じ列挙本体を使い、callback は USER 側で実行する。
+
+`caller_identity(app, owner, generation)` は `caller_identity_get()` と同じ保存 USER の値を 3 本の u32 に写して 0。
+WM/TRUSTED または保存 USER が無効なら INVAL (kill せず出力は不変)。出力は別々の u32 を渡す。
+全新規出力は `kapi.json` の sizeof 宣言で生成 wrap が全域を先に検査する。CPL3 の NULL/範囲外/RO は kill し、本体を呼ばない。
+surface の ref 入力は本体の B1 で検査する。ls の不正入力・出力も従来どおり kill。
+
+c1 は公開口まで。framebuffer の既存 alias、SDK port の NULL、utf8 初期値は c2、consumer は c3、低位 USER 撤去と memory_layout 世代変更は b2。
+
 ### 予約スロット (v63〜)
 
-0x3C8〜0x4B4 (slot 240〜299、60 本、v68 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
+0x3E0〜0x4B4 (slot 246〜299、54 本、v70 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
 (§4-0)。カーネルの表は `kapi_reserved_nosys` (`OS32_ERR_NOSYS`)、トランポリンは
 int 0x80 のスタブで、CPL=3 からの呼び出しはアプリを kill する。
 
@@ -1511,8 +1559,8 @@ v25で追加。外部プログラム（シェル）がFD単位の入出力リダ
 **パイプバッファ**:
 - `sys_pipe_alloc()` — パイプバッファを1個確保 (IDを返す)
 - `sys_pipe_free(id)` — パイプバッファを解放
-- `sys_pipe_get_buf(id)` — パイプバッファのデータポインタ取得
-- `sys_pipe_get_len(id)` — パイプバッファの書き込み済みバイト数取得
+- `sys_pipe_get_buf(id)` — TRUSTED のパイプバッファのデータポインタ取得 (v70: CPL3 は常に NULL)
+- `sys_pipe_get_len(id)` — パイプバッファの書き込み済みバイト数取得 (v70: CPL3 の別 owner は 0)
 - `sys_pipe_clear(id)` — パイプバッファをクリア
 
 **典型的なパイプ実行フロー** (`cmd1 | cmd2`):
@@ -1586,4 +1634,4 @@ v28で追加。カーネル管理のマウスカーソル表示を制御する�
 
 ---
 
-*Last Updated: 2026-04-29*
+*Last Updated: 2026-10-07*

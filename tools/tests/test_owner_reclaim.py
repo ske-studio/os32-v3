@@ -83,14 +83,14 @@ class OwnerReclaimTests(unittest.TestCase):
                     guards = []
                     offset = 0
                     for line in source.splitlines(keepends=True):
-                        if "ring3_call_from_user() &&" in line:
+                        if "ring3_call_from_user() &&" in line or "if (ring3_call_from_user()) return (u8 *)0;" in line:
                             guards.append((offset, line.rstrip("\n")))
                         offset += len(line)
                     for index, (begin, guard) in enumerate(guards):
                         for label, new in (
-                            ("removed", guard.replace("ring3_call_from_user() &&", "0 &&")),
-                            ("inverted", guard.replace("!= res_owner_get()", "== res_owner_get()")),
-                            ("trusted-denied", guard.replace("ring3_call_from_user() &&", "")),
+                            ("removed", guard.replace("ring3_call_from_user() &&", "0 &&").replace("if (ring3_call_from_user())", "if (0)")),
+                            ("inverted", guard.replace("!= res_owner_get()", "== res_owner_get()").replace("if (ring3_call_from_user())", "if (!ring3_call_from_user())")),
+                            ("trusted-denied", guard.replace("ring3_call_from_user() &&", "").replace("if (ring3_call_from_user())", "if (1)")),
                         ):
                             mutated = tmp / pathlib.Path(path).name
                             # Replace only this occurrence (SHM/DB guards repeat).

@@ -1,6 +1,6 @@
 #include "v86_mem.h"
 #include "shlib.h"
-/* Private SURFACE leases and the dormant T2e single-surface USER entry. */
+/* Private SURFACE leases and the v70 single-surface USER entry. */
 #include "lease.h"
 #include "kstring.h"
 #include "io.h"
@@ -231,15 +231,15 @@ int lease_check(const struct addrspace *as)
     return 0;
 }
 
-/* Internal USER entry, dormant until e11. source is a kernel publisher value.
+/* v70 USER lease entry. source is a kernel publisher value.
  * Normal context forbids AS scheduling/callbacks until copyout completes.
  * AS reclamation occurs only at safe points, so caller.as remains valid outside
  * IRQ-saved intervals. caller_access_get, authorization, publication and each
  * B1 helper save IRQs internally or at the call site, preserving entry IF.
  * Copy helpers recheck live identity each time; ABORT_PENDING rejects copyout
  * and takes rollback. acquire rechecks generation after refs. */
-/* The kernel does not globally use -ffunction-sections. Keep this dormant
- * entry independently collectable until the e11 KAPI caller is installed. */
+/* The kernel does not globally use -ffunction-sections. Keep this
+ * entry in its own section; v70 KAPI wrappers now retain it. */
 __attribute__((section(".text.surface_lease")))
 int surface_lease(const struct surface_query_source *source,
                   const struct surface_ref *user_ref, u32 access,
@@ -294,7 +294,7 @@ int surface_lease(const struct surface_query_source *source,
     return 0;
 }
 
-/* PC98 DISPLAY bundle; dormant until e11. No callback or AS switch between
+/* PC98 DISPLAY bundle; exposed by the v70 KAPI. No callback or AS switch between
  * input copy and copyout. Validate all refs before acquire's rechecks, in one
  * IRQ-saved interval, so a later INVAL takes precedence over an earlier STALE. */
 __attribute__((section(".text.surface_lease_bundle")))

@@ -99,11 +99,11 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
             units = [unit for unit, _ in changed or []]
             assert len(units) == len(set(units)), (key, units)
             # v86/exec/paging each rebuild the fixture TU: never combine them.
-            assert sum(unit in ("paging", "v86", "exec") for unit in units) <= 1, (key, units)
+            assert sum(unit in ("paging", "v86", "exec", "public_wrap") for unit in units) <= 1, (key, units)
             objs = dict(objects)
             for unit, body in changed or []:
                 src, obj = tmp / (key + '_' + unit + '.c'), tmp / (key + '_' + unit + '.o')
-                if unit in ('paging', 'v86', 'exec'):
+                if unit in ('paging', 'v86', 'exec', 'public_wrap'):
                     # Only the TU containing real paging is rebuilt. A private
                     # include name keeps parallel mutants independent.
                     if unit == 'v86':
@@ -169,6 +169,9 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
 if __name__ == '__main__':
     try:
         main()
+        import sys
+        subprocess.run([sys.executable, str(ROOT / "tools/tests/test_public_surface.py"),
+                        *sys.argv[1:]], check=True)
     except subprocess.CalledProcessError as error:
         print(error.stdout or '', error.stderr or '')
         raise

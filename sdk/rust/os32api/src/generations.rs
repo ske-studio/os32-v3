@@ -3,4 +3,4 @@ pub const OS32X_HDR_VERSION: u32 = 4;
 pub const OS32_KAPI_ABI_GENERATION: u32 = 1;
 pub const OS32_MEMORY_LAYOUT_GENERATION: u32 = 1;
 pub const OS32_SHLIB_PROTOCOL: u32 = 1;
-pub const OS32X_MIN_API: u32 = 69;
+pub const OS32X_MIN_API: u32 = 70;

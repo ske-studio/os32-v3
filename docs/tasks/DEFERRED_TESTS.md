@@ -51,6 +51,7 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 | E11-12 | h3の本人識別を値返しにしwriter初期化を結線 (E9-2)。e9のPM(A)から切替え、CRT非依存markerも確認 | 申し送り | E9-2 / e9 | e11a/c → 統合 |
 | E11-13 | SHM lockで全ページRO・CPL3書込み拒否をゲスト確認。ホストの呼出し/結果判定だけで閉じずfree/exit後の次AS成功も対照 | 未実施の確認 | e9 R4 | e11b → 統合 |
 | E11-14 | SHMブロック長・ページ長の公開定数を整理しcaller追随。e9のDB_SHM_BLOCK_SIZE/私有PAGE_BYTESから一括移行 | 申し送り | e9 R5 | e11c → 統合 |
+| E11-BUD | c1: KHEAP_SIZE=176KB、像予算 +16KB の一時増枠 (17MB/NHD main peak 21,328B、281/0) | b2 撤去後と T2h 前に再計測し戻すか決定 | `c1_sizes.json` | b2 後 → T2h 前。統合ゲストで e11 の kernel の `kmalloc_peak_bytes` を測る (P3-8) |
 | E11-A2 | 全画面入力4点・日本語保持・wait失敗回復・非所有shutdownのゲスト受入とnative補完 (a2はqemu/ホストのみ)。本人識別のh3 identity()との照合はe11cとゲストへ持越し (a2はcaller_access模型との照合のみ)、cのslot接続後にh3自己公開とhost読値を照合、raw KAPI待機利用者は明示check契約を統合確認 | 未配備・自己公開未結線 | e11a2 / guest_acceptance e11a2-* | e11c → e11統合受入 (PM) |
 | E11-B1 | TVRAM/font低位USER撤去後の描画・日本語・CUI/GUI/WM TVDM、DB42件、SHM lockwrite先頭/末尾CPL3 PFと再利用、PT0・V86全出口3段監査・kselftest、native補完 | 未配備、qemuホストのみ (lockwriteは境界stubで制御フロー確認、CPL3保護の実効性未確認) | guest_acceptance e11b1-*、b1_results.json | b1準備確認 → c → b2 → e11統合受入 (PM) |
 | E11-A3 | 全画面 owner の同期の子 (slot.parent) は kernel が読ませるが WM の起床の手がかりに入らない。端末由来のバイト (宛先 0) は全員が読める。**PM 決定 (2026-10-07): 専用 KAPI `kbd_inject_to` は e11c に入れない** — 全画面への矢印・機能キーの配送とともに持ち越し | 改善 | T2h 前に要否を再判断 |

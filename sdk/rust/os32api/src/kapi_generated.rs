@@ -249,17 +249,23 @@ pub struct KernelAPI {
     /* idx 239 */ pub serial_diag: unsafe extern "C" fn(out: *mut u8) -> i32,
     /* idx 240 */ pub kbd_diag_log: unsafe extern "C" fn(after_seq: u32, out: *mut u8, max: i32) -> i32,
     /* idx 241 */ pub v86_gdc_capture: unsafe extern "C" fn(mode: i32, out: *mut u8) -> i32,
-    /* idx 242..301 予約 (C の kapi_reserved[]) */ pub kapi_reserved: [u32; 60],
+    /* idx 242 */ pub surface_query: unsafe extern "C" fn(role: u32, out: *mut u8) -> i32,
+    /* idx 243 */ pub surface_lease: unsafe extern "C" fn(role: u32, r#ref: *mut u8, access: u32, out: *mut u8) -> i32,
+    /* idx 244 */ pub gfx_surface_lease: unsafe extern "C" fn(role: u32, refs: *mut u8, count: u32, access: u32, out: *mut u8) -> i32,
+    /* idx 245 */ pub surface_unlease: unsafe extern "C" fn(token: u32) -> i32,
+    /* idx 246 */ pub sys_ls_window: unsafe extern "C" fn(path: *const u8, skip: u32, out: *mut u8) -> i32,
+    /* idx 247 */ pub caller_identity: unsafe extern "C" fn(app: *mut u32, owner: *mut u32, generation: *mut u32) -> i32,
+    /* idx 248..301 予約 (C の kapi_reserved[]) */ pub kapi_reserved: [u32; 54],
     pub sbrk_heap_limit: u32,  /* newlib _sbrk用ヒープ上限アドレス (exec_runでセットされる) */
     pub shm_base: u32,  /* 共有メモリ (MEM_SHM_BASE) の先頭アドレス。DB結果受け渡しに使用 (exec_initでセット) */
 }
 
 /* KernelAPI マジックナンバー */
 pub const KAPI_MAGIC: u32 = 0x4B415049;  /* "KAPI" */
-pub const KAPI_VERSION: u32 = 69;
+pub const KAPI_VERSION: u32 = 70;
 
 /* 関数表の容量とデータ欄の固定配置 (票 TASK_KAPI_DATA_FIELDS、v63) */
-pub const KAPI_FUNC_COUNT: u32 = 240;
+pub const KAPI_FUNC_COUNT: u32 = 246;
 pub const KAPI_FUNC_CAPACITY: u32 = 300;
 pub const KAPI_DATA_FIELDS_OFF: u32 = 0x4B8;
 /// データ欄が固定になった KAPI 版 (= C の OS32X_HDR_V3_MIN_API)。これ未満の

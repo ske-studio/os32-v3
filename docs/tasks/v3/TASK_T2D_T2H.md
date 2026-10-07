@@ -220,6 +220,8 @@ OWNER と回帰: `shm_reuse_test` 4/4・`db_test` 9/9・`db_v50_test` 41/41・�
 **KAPI-AUDIT-FIX の着地とゲスト受入 (PM、2026-10-07、main `9dcb51b`)**: 取り込み `make check`・`check-fast` rc=0 (1 回目は小さな保守の対応表の誤りで落ち、直した)。kselftest 277/0、`sndtest`・DB・SHM・パイプの回帰 OK、常駐 rshell は受入の経路そのもの。
 未実施 (ホストのみ): CTRL+STOP で MML・シリアル・IME の待ちから抜けること、範囲外のカーソル・ch、USER の `rshell_set_active` — 直接呼ぶ CPL3 の試験プログラムが要る (台帳 PRIO-3)。
 
+c1 注記 (2026-10-07): v70 slot 240〜245・公開値型・E11-8/14、像予算一時 +16KB。c2/c3/b2 と統合ゲストは未実施。証拠 `/home/hight/os32-tmp/run/e11/c1_report.md`、`c1_sizes.json`、`c1_*.log`。
+
 - a=内部結線 (旧USER下は準備確認)、b=低位USER/旧例外撤去・SHM/V86契約・拒否、c=正規lease対照・公開KAPI/caller/SDK/生成/版/manifest。**順序は b1 → c → b2** (aの後。b1は直接consumerの無いTVRAM/font/VRAM例外、b2はUnicode/BB/共有PT)。a/b/cは独立公開・配備せず、**版の更新は統合でだけ行う** (b1のTVRAM wrap本体は宣言・slot・版不変で再生成可)。統合で§2-4全6項を同時成立、現行対象再ビルド・配備を一括。受入は§2-5末尾のNP21/W一式とe12の変異一覧による。apps/gameは§5/§8へ。E11-5は2026-10-03決定の「全画面中のowner 1または専用のKAPI」、追加ならcで版一括へ含める。
 **e11a2 内部準備 (基点 `5ca3f01`、2026-10-07、未配備)**:
 - E11-5: WM/端末子孫の注入門と全画面フォーカス配送。WM注入に宛先を保持しtake/peek/pendingを連鎖内へ限定。exec_resumeの2箇所だけ宛先ID付きtakeに変更し、両帰路を抽出検査。WMは成功注入だけ起床候補にしAGAIN/退場で消す。

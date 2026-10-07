@@ -38,7 +38,7 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "tools/gen_memmap.py"
 
-# 予算 MEM_KERNEL_IMAGE_MAX = 0x95000 (KHEAP 192KB、2026-09-23) → 上限は __bss_end = 0x195000。
+# 予算 MEM_KERNEL_IMAGE_MAX = 0x99000 (KHEAP 176KB、E11-BUD) → 上限は __bss_end = 0x199000。
 BROKEN = 0x1A0000        # 予算超過。SHM がカーネル帯域を突き抜ける
 CLEAN = 0x140000         # 予算内。重なりも逆転も無い
 
