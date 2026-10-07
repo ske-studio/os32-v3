@@ -1,6 +1,4 @@
-/* e7 PM §9: the app stops both renderers, but cannot detach a successful
- * shlib via the current protocol. Same-generation checks reuse that token;
- * a generation change or exit reclaims it. */
+/* c2: both independent C instances roll back if either check fails. */
 extern KernelAPI *shl_gfx_api;
 extern GFX_Framebuffer shl_gfx_fb;
 extern int shl_gfx_ready;
@@ -27,6 +25,7 @@ static int return_both(void)
     int a = libos32gfx_check();
     if (a || b) {
         libos32gfx_detach(); /* application rollback */
+        shl_libos32gfx_detach(); /* shlib entry 119 */
         return 0;
     }
     return 1;
@@ -94,7 +93,7 @@ static void run(void)
         struct gfx_attach_view held[MEM_LEASE_MAX-1];
         CHECK(!port_query(&desc));
         for(u32 i=0;i<MEM_LEASE_MAX-1;i++) CHECK(!port_lease(&desc.ref,&held[i]));
-        CHECK(!return_both() && !gfx_ready && shl_gfx_ready && live()==MEM_LEASE_MAX);
+        CHECK(!return_both() && !gfx_ready && !shl_gfx_ready && live()==MEM_LEASE_MAX-1);
         for(u32 i=0;i<MEM_LEASE_MAX-1;i++) CHECK(!port_unlease(held[i].token));
         shl_libos32gfx_detach();
         CHECK(!live());
@@ -108,12 +107,11 @@ static void run(void)
         CHECK(asm_calls==before);
         deny_shlib=0;
         CHECK(return_both() && live()==2);
-        /* Fail only static query after the shlib check; retained shlib token
-         * is intentional under §9. Neither renderer may be entered. */
+        /* Fail only static query after shlib succeeds: both return tokens. */
         deny_query=1;
         before=asm_calls;
         if(return_both()) {sdk_gfx_pixel(0,0,7);shl_gfx_pixel(0,0,7);}
-        CHECK(!gfx_ready && shl_gfx_ready && live()==1 && asm_calls==before);
+        CHECK(!gfx_ready && !shl_gfx_ready && !live() && asm_calls==before);
         deny_query=0;
         libos32gfx_detach();shl_libos32gfx_detach();
         CHECK(!live() && !lease_check(&space));

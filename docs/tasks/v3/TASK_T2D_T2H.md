@@ -670,3 +670,10 @@ T2で2MBが成立しても最終P1/P6合格ではない。SQLite/FEP/モジュ�
 - UC変異を旧exec切出しからleaseへ移し、縮小容認下のV86帰路3段監査をホスト確認。
 - 証拠: `/home/hight/os32-tmp/run/e11/b1_*.log` と `b1_results.json`。PM手順は guest_acceptance の e11b1-*、持越しは台帳 E11-B1。
 - Opus レビュー Approve (P3 のみ)。R1-R3 は PM が文書・注釈を直し、R4 (授権の変異 4 項)・R5 (旧 probe の復元) は fix1。決定 (R7): gshell の Run から直接起動した全画面 CUI (`gui=0`、con_sink 無効) は画面を持つ前景なので tvdump を許す。R6 (試験の私有定数) は e11c で SDK 定数へ、R8 (`dbg_memdump` の低位) は到達なしで見送り。
+
+### e11c2 — CPL3 consumer の lease 結線 (2026-10-07)
+- v70 の CLIENT/Unicode port、USER framebuffer 橋、present/明示待ち帰路の世代照合を接続。描画ごとの syscall は追加しない。
+- 互換 token は CLIENT regen で失効し、次回取り直す (同 VA の保証なし)。CPL0 の直呼びは alias を維持。
+- shlib 119 番に detach、120 本。gdi_test の両実体 rollback、Unicode の二重取得を除去。protocol/ABI 世代は不変。
+- ユーザー utf8 は NULL 開始、t5a_display の静的実体も port 初期化。ring3_guard F の有効書込と revoke 後 kill を追加。
+- ホスト証拠・予算・指定検査は `~/os32-tmp/run/e11/c2_report.md`。ゲストは台帳 E11-1/6/A1 と guest_acceptance の e11c2-* で PM 受入。

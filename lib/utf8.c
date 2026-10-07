@@ -30,7 +30,11 @@
  * (kernel/kernel.c の vfs_read)。表の番地は 2 バイト整列なのでアラインの
  * 心配は無いが、`u16 *` で引くと BE の CPU で値が入れ替わる。だから
  * バイト列として持ち、引くときに le16_rd() でバイト順を当てる。 */
+#ifdef __KERNEL_BUILD__
 static const u8 *unicode_jis_table = (const u8 *)P2V_CONST(MEM_UNICODE_TABLE_BASE);
+#else
+static const u8 *unicode_jis_table = 0;
+#endif
 
 static u16 jis_table_lookup(u32 cp)
 {
@@ -48,11 +52,9 @@ static u16 jis_table_lookup(u32 cp)
  * 気づけない。だから「読めるかどうか」ではなく「正しい表かどうか」を
  * 確かめる必要がある。
  *
- * このフラグは static なので、カーネルと各外部プログラムがそれぞれ別の
- * 実体を持つ。カーネルはロード直後に utf8_set_jis_table_ready(1) を呼ぶが、
- * 外部プログラムには対応する契機が無く、以前は全プログラムで漢字が出ない
- * ままだった (ゲームだけが自前で有効化していた)。表は物理アドレス固定で
- * 共有されているので、こちら側で内容を検証して自動的に判定する。 */
+ * カーネルと外部プログラムは別の実体を持つ。kernel はロード後に ready を
+ * 設定し、ユーザー版は NULL で始めて SDK Unicode port が渡す RO lease の
+ * 内容を検証する。初回の NULL probe が失敗しても setter で回復できる。 */
 static int jis_table_ready = -1;
 
 void utf8_set_jis_table_ready(int ready)

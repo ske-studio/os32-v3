@@ -101,7 +101,7 @@ void main(int argc, char **argv, KernelAPI *api)
     /* 200ラインモードで初期化 */
     libos32gfx_init(api);
     api->gfx_init_200();
-    api->gfx_get_framebuffer(&gfx_fb);
+    (void)libos32gfx_attach_checked();
 
     api->kcg_init();
     kcg_set_scale(1);
@@ -119,7 +119,7 @@ void main(int argc, char **argv, KernelAPI *api)
         int ch;
 
         /* ESCキーで終了 */
-        while ((ch = api->kbd_trygetchar()) >= 0) {
+        while ((ch = libos32gfx_trygetchar()) >= 0) {
             if (ch == 0x1B) goto done;
         }
 
@@ -164,7 +164,7 @@ void main(int argc, char **argv, KernelAPI *api)
 
         /* フレーム待機 */
         while (api->get_tick() == last_tick) {
-            api->sys_halt();
+            libos32gfx_halt();
         }
         last_tick = api->get_tick();
     }

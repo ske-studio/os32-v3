@@ -13,8 +13,60 @@ const struct gfx_attach_port *gfx_unicode_port;
 static struct gfx_attach_ref unicode_ref;
 static struct gfx_attach_view unicode_view;
 static int gfx_pools_initialized;
+static int gfx_stopped;
 static struct gfx_attach_ref gfx_ref;
 static struct gfx_attach_view gfx_view;
+
+/* Generated v70 value ABI; these ports own no kernel aliases. */
+static int kapi_query(u32 role, struct gfx_attach_desc *out)
+{
+    OS32_SurfaceQueryResult q;
+    const OS32_SurfaceDesc *d;
+    u32 i;
+    int rc = gfx_api->surface_query(role, &q);
+    if (rc) return rc;
+    if (q.count != 1 || q.desc[0].role != role) return OS32_ERR_INVAL;
+    d = &q.desc[0];
+    out->ref = (struct gfx_attach_ref){d->ref.sid, d->ref.generation};
+    out->format = d->format; out->width = d->width; out->height = d->height;
+    out->pitch = d->pitch; out->planes = d->planes; out->bytes = d->bytes;
+    for (i = 0; i < 4; i++) out->plane_offset[i] = d->plane_offset[i];
+    return 0;
+}
+
+static int kapi_lease(u32 role, u32 access, const struct gfx_attach_ref *ref,
+                      struct gfx_attach_view *out)
+{
+    OS32_SurfaceRef r = {ref->sid, ref->generation};
+    OS32_LeaseView v;
+    u32 i;
+    int rc = gfx_api->surface_lease(role, &r, access, &v);
+    if (rc) return rc;
+    out->token = v.token; out->base = v.base; out->bytes = v.bytes;
+    for (i = 0; i < 4; i++) out->planes[i] = v.planes[i];
+    return 0;
+}
+
+static int client_query(struct gfx_attach_desc *out)
+{ return kapi_query(OS32_SURFACE_CLIENT, out); }
+static int unicode_query(struct gfx_attach_desc *out)
+{ return kapi_query(OS32_SURFACE_UNICODE, out); }
+static int client_lease(const struct gfx_attach_ref *ref, struct gfx_attach_view *out)
+{ return kapi_lease(OS32_SURFACE_CLIENT, OS32_SURFACE_RW, ref, out); }
+static int unicode_lease(const struct gfx_attach_ref *ref, struct gfx_attach_view *out)
+{ return kapi_lease(OS32_SURFACE_UNICODE, OS32_SURFACE_RO, ref, out); }
+static int kapi_unlease(u32 token)
+{ return gfx_api->surface_unlease(token); }
+static const struct gfx_attach_port gfx_kapi_port = {client_query, client_lease, kapi_unlease};
+static const struct gfx_attach_port unicode_kapi_port = {unicode_query, unicode_lease, kapi_unlease};
+
+static void bind_ports(void)
+{
+    if (gfx_api && gfx_api->version >= 70) {
+        gfx_attach_port = &gfx_kapi_port;
+        gfx_unicode_port = &unicode_kapi_port;
+    }
+}
 
 static unsigned int gfx_cpl(void)
 {
@@ -27,9 +79,13 @@ void libos32gfx_unicode_init(void)
 {
     struct gfx_attach_desc desc = {0};
     struct gfx_attach_view view = {0};
-    /* Q1/Q7: NULL port and CPL=0 retain legacy automatic probing.
-     * Once a port is installed, failure must never read the low alias. */
-    if (gfx_cpl() == 0 || !gfx_unicode_port) return;
+    bind_ports();
+    /* CPL0 keeps its internal path; user failure never probes the low alias. */
+    if (gfx_cpl() == 0) {
+        utf8_set_jis_table((const u8 *)P2V_CONST(MEM_UNICODE_TABLE_BASE));
+        return;
+    }
+    if (!gfx_unicode_port) return;
     utf8_set_jis_table(0);
     if (gfx_unicode_port->query(&desc)) goto fail;
     if (unicode_view.token && unicode_ref.sid == desc.ref.sid &&
@@ -76,8 +132,8 @@ static int gfx_refresh(void)
     int rc;
     u32 i;
     if (!gfx_api) goto invalid;
-    /* CPL=0 (including gshell) must never enter USER query authorization.
-     * NULL is the e6 production binding, not an error fallback from a port. */
+    /* CPL0 (including gshell) bypasses USER query authorization.
+     * A NULL port is only the pre-v70 compatibility path. */
     if (gfx_cpl() == 0 || !gfx_attach_port) {
         gfx_api->gfx_get_framebuffer(&fb);
         if (!fb.planes[0] || fb.width <= 0 || fb.height <= 0 || fb.pitch <= 0)
@@ -138,6 +194,7 @@ fail:
 int libos32gfx_attach_checked(void)
 {
     int rc;
+    gfx_stopped = 0;
     libos32gfx_unicode_init();
     rc = gfx_refresh();
     /* Pools do not depend on a framebuffer. Initialize even after FULL so
@@ -152,7 +209,10 @@ int libos32gfx_attach_checked(void)
 
 int libos32gfx_check(void)
 {
-    /* No extra legacy KAPI traffic before e11, or for TRUSTED callers. */
+    /* CLIENT regen occurs in our fullscreen init/shutdown only. V86 return
+     * regenerates DISPLAY only. Check at present and explicit wait returns,
+     * never in each drawing primitive. */
+    if (gfx_stopped) return OS32_ERR_INVAL;
     if (gfx_ready && (gfx_cpl() == 0 || !gfx_attach_port)) return 0;
     return gfx_refresh();
 }
@@ -172,6 +232,7 @@ void libos32gfx_init(KernelAPI *api)
 
 void libos32gfx_shutdown(void)
 {
+    gfx_stopped = 1;
     libos32gfx_detach();
     if (gfx_api) gfx_api->gfx_shutdown();
 }
@@ -180,4 +241,31 @@ void gfx_present(void)
 {
     if (libos32gfx_check() || !gfx_ready) return;
     gfx_api->gfx_add_dirty_rect(0, 0, gfx_fb.width, gfx_fb.height);
+}
+
+int libos32gfx_getchar(void)
+{
+    int key = gfx_api->kbd_getchar();
+    (void)libos32gfx_check();
+    return key;
+}
+
+int libos32gfx_trygetchar(void)
+{
+    int key = gfx_api->kbd_trygetchar();
+    /* Empty polling does not park. Match Rust's input return gate. */
+    if (key >= 0) (void)libos32gfx_check();
+    return key;
+}
+
+void libos32gfx_yield(void)
+{
+    gfx_api->sys_yield();
+    (void)libos32gfx_check();
+}
+
+void libos32gfx_halt(void)
+{
+    gfx_api->sys_halt();
+    (void)libos32gfx_check();
 }

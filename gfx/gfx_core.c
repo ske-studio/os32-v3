@@ -168,11 +168,12 @@ int gfx_kernel_framebuffer(struct gfx_kernel_fb *out)
     return gfx_client_framebuffer(out, gfx_started);
 }
 
-/* Keep the legacy alias for all callers until SDK generation recovery in e11c. */
+/* USER gets a revocable lease VA; frame-less TRUSTED calls keep the alias. */
 void __cdecl gfx_get_framebuffer(GFX_Framebuffer *fb)
 {
     struct gfx_kernel_fb kernel;
     int i;
+    if (ring3_call_from_user()) { gfx_framebuffer_bridge(fb); return; }
     if (!fb) return;
     (void)gfx_client_framebuffer(&kernel, 1);
     fb->width = kernel.width;
@@ -491,8 +492,8 @@ int gfx_selected_selfcheck(void)
 
 /* Separate revoke and regen master phases (PM e5 section 9). The revoke
  * phase visits old/selected/fallback backends as selection resolves. Between
- * phases the publisher
- * is not-ready, and no scheduling/callback or public caller exists until e11.
+ * phases the publisher is not-ready, so public query/lease cannot acquire it.
+ * The normal-context transition performs no scheduling or callbacks.
  * regen rechecks zero references even if this normal-context contract breaks. */
 static void gfx_reinit_surface_roles(int finish, int display_only)
 {
@@ -994,7 +995,7 @@ void gfx_shutdown(void)
     gfx_reinit_surfaces(1);
 }
 
-/* Internal compatibility bridge; KAPI connection follows in e11c.
+/* Public USER compatibility bridge; regen invalidates the held token.
  * One compatibility CLIENT token per AS, inside the existing eight slots.
  * The saved caller origin, never current CPL/CR3, selects TRUSTED vs USER.
  * No callbacks/scheduling from publisher construction through copyout. */

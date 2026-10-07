@@ -60,6 +60,8 @@ pub fn run(api: *mut KernelAPI) -> i32 {
         Some(c) => c,
         None => return GuiErr::INVAL.code(),
     };
+    // After the once-only claim, initialize this static Unicode consumer.
+    unsafe { os32api::gfx::libos32gfx_attach(api); }
     if let Err(e) = libos32gui::init(api) {
         return e.code();
     }
@@ -973,8 +975,8 @@ impl App for DisplayApp<'_> {
 
 extern "C" {
     // lib/utf8.h: u16 unicode_to_jis(u32 codepoint).
-    // Final link MUST use lib/utf8_prog.o. It probes four known table entries
-    // on first table use; do not call utf8_set_jis_table_ready(1).
+    // The static gfx instance supplies its Unicode lease after the storage claim.
+    // The port validates four known entries; never mark an absent table ready.
     fn unicode_to_jis(codepoint: u32) -> u16;
 }
 struct GuestGlyphs;

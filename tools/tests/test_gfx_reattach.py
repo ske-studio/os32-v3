@@ -10,6 +10,7 @@ from mutpar import run_ordered
 
 FIXTURE = 'tools/tests/gfx_reattach_host.c'
 MUTANTS = [
+    ('failure-no-shlib-detach', FIXTURE, '        shl_libos32gfx_detach(); /* shlib entry 119 */', '', 'FAIL !return_both() && !gfx_ready && !shl_gfx_ready && live()==MEM_LEASE_MAX-1'),
     ('shutdown-no-gate', 'gfx/gfx_core.c', 'caller.app_id != appslot_gfx_owner()', '0', 'FAIL shutdown_nonowner_preserved'),
     ('one-return-check', FIXTURE, 'int b = shl_libos32gfx_check();', 'int b = 0;', 'FAIL both_new_generation'),
     ('static-return-check', FIXTURE, 'int a = libos32gfx_check();', 'int a = 0;', 'FAIL both_new_generation'),

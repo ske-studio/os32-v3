@@ -36,13 +36,13 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 
 | ID | 何を | 種類 | 元の行 | 関門 |
 |---|---|---|---|---|
-| E11-A1 | e11c で CPL3 を lease VA に切替: SDK の port/世代照合で再取得、CLIENT regen 時の互換 token を同一 VA に再結線か失効か決定、窓アプリ→全画面→復帰→再描画で生存、正規 CLIENT ケース F (marker/yaml、gfx_shutdown) を追加。描画4本/V86/kselftest/DB・E10-8/9 のゲストと native 補完、予算帰属/再配分は PM (`~/os32-tmp/run/e11/a1_fix1_report.md`)。c で公開口を足すとき DISPLAY の授権の変異をゲスト受入でも見る、gfx_core.c:1019 のコメントを直す | 未結線・ホストのみ・予算超過 | e11a1 レビュー修正1 (2026-10-07) | e11c 切替と PM 統合受入、予算は公開前 |
-| E11-1 | surface query/lease/bundle・gfx source/再init publisher・NULL port/互換橋・Unicode・帰路失敗を結線。準備だけで隔離合格としない | 未結線 | 223–257、430–455、571、584–585、654–656、821–823、847、911、949、1023–1040、1069、1089、1105–1108、1143、1204–1207、1367–1368 | e11a/c準備 → 統合 |
+| E11-A1 | c2 で USER lease 橋・互換 token 失効/再取得・ring3_guard F を結線。窓→全画面→復帰、日本語、F生存/revoke kill・旧E生存・native補完・予算の統合受入は PM (c2_report.md / guest_acceptance e11c2-*) | ホスト検証・ゲスト未配備 | e11a1 レビュー修正1 (2026-10-07) | e11c 切替と PM 統合受入、予算は公開前 |
+| E11-1 | c1 公開口と c2 SDK CLIENT/Unicode port・present/待ち帰路・USER橋を結線。RO日本語・両gfx実体・世代回復・旧USER撤去との統合ゲスト確認を PM に残す (c2_report.md)。c2 レビュー: present ごとの query (R5) は統合ゲストで bench の前後を記録、t5a_display の gfx 全体 attach (R4) は見送り | ホスト検証・ゲスト未配備 | 223–257、430–455、571、584–585、654–656、821–823、847、911、949、1023–1040、1069、1089、1105–1108、1143、1204–1207、1367–1368 | e11a/c準備 → 統合 |
 | E11-2 | 結線後のkernel/SDK/shlibサイズを再実測し、§6のe枠・圧縮・8MB私有量を確認。撤去の減少を先取りしない | 申し送り | 289–291、457–470、538、688、1240 | e11a/b/c → 統合 |
 | E11-3 | 低位/共有USER化・VRAM例外・exec_map_shared_bbを撤去、共有PT操作を拒否。Cirrus DISPLAYは授権leaseでNONE→RW、e11bで窓PDEもUSER禁止へ | 未実施の確認 | 599、605–606、707、826、887–892、1006、1043、1573–1576、1762–1763 | e11a/b → 統合 |
 | E11-4 | 上記KAPI-CALLBACK/OWNER/DISK-AUTHの受入を前提に、値返し列挙KAPIとcaller移行・必要ならOS32X授権flag、子が親のredirect先fdを閉じられるFD所有を一括接続 | 契約接続待ち | 1501–1504、1546、1600、1694、1887 | e11b/c → 統合 |
 | E11-5 | Run全画面のowner 1または専用KAPIでキー配送。終了・二重注入なし・窓漏れなし・WAIT_POLLを確認。WM直接注入はtranslate()のASCIIのみ (矢印・機能キーは捨て、rawはe11cの専用KAPI)、KAPI追加はcで版一括 | 既知の不具合 | 1167–1169、1431 | e11a/b/c → 統合 |
-| E11-6 | P3残: pre-init USER・cdecl橋・版/終了門・utf8初期値/Unicode二重取得・kcg漢字旗・shlib token・wait帰路4件 | 申し送り | 998–1002、1111、1156–1163、1274、1338、1361、1396、1429、1624 | e11a/b/c → 統合 |
+| E11-6 | c2 で utf8 NULL初期値・Unicode取得1か所・shlib120本/detach・C待ちwrapperを反映。boot/font/全現行対象・t5a_display日本語・c3/b2との統合ゲスト確認を PM に残す (c2_report.md) | ホスト検証・ゲスト未配備 | 998–1002、1111、1156–1163、1274、1338、1361、1396、1429、1624 | e11a/b/c → 統合 |
 | E11-7 | KAPI文書にSTALE/INVALの推測可能性とcallback/scheduling禁止を明記し、公開契約・生成物と照合 | 申し送り | 258、375–377、573、1004 | e11c → 統合 |
 | E11-8 | 上記KAPI-AUDIT-FIX/OWNERの受入・分類を反映。pipe_get_bufのkernel番地返却・pipe_get_lenの他owner照会の意味変更と範囲検査P3変異を接続 | 契約接続待ち | 1502、1504、1546 | e11c → 統合 |
 | E11-9 | tvdumpのtvram_readchar_atをCUI前景所有者だけに授権。checked copyとTVDM wireを維持し非所有者拒否を確認 | 申し送り | e9 (2026-10-02 PM 決定) | e11b/c → 統合 |
@@ -78,7 +78,7 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 | H-4 | **構成を変える試験の一括** (全段が 17MB・今の ini だけで受入した): 8MB、planar / PEGC / Cirrus の切替、音源 (PC-9801-118 の PCM)、Ra266 64MB。`gfx200_test` / `gfx_demo200` | 構成持越し | 278、418、557、894、897、1009、1112、1276、1340、1431、1601、1887、2908、3364 |
 | H-5 | 実機 Ra266: UC 化で present が遅くならないかの計測と CG 窓の WB、表示の後始末 (GRCG / EGC・68h の残り)、kernel stack の high-water | 構成持越し (実機) | 709–712、790–793、2253、2338 |
 | H-6 | V86 の出口で 6Ah の標準 / 拡張を戻していない (9821 で E0000h が MMIO のまま残り得る)。`v86 -d` / `-b` の後の表示確認、9801 構成での `gui_gate` | 未対処・未観測 | 788–789、3503 |
-| H-7 | apps / game: v3 では組まない (ユーザー決定 2026-09-30)。T2h では再開時ゲート (caller 追随・再ビルド・受入の一覧) の引渡しを確かめる。v3 の完了条件ではない | 再開時ゲート | 1113、1248、1810–1826、1868、3463 |
+| H-7 | apps / game: v3 では組まない (ユーザー決定 2026-09-30)。T2h では再開時ゲート (caller 追随・再ビルド・受入の一覧) の引渡しを確かめる。v3 の完了条件ではない。再開時は **c2 以後の SDK で再ビルド必須** — 旧 libos32gfx.a の外部バイナリは v70 で互換 token の VA を得て取り直さず、200 ライン化後に kill され得る (e11c2 レビュー R6) | 再開時ゲート | 1113、1248、1810–1826、1868、3463 |
 | H-8 | `ring3_guard` A の固定 target (`MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE - MEM_GUARD_SIZE`) は T2c 可変スタックで実 stack 直下と一致しないことがある。h 受入で A が実 stack 直下 NP を指すことを確認 | 未実施の確認 | e9 R6 |
 | H-9 | `ring3_guard` B (shlib 帯) を shlib を読み込んだ AS で走らせ、RO の error=7 を確かめる (2026-10-06 の受入は未ロードで、帯の fault だけを確認。今のシリアル行は error_code を出さない) | 未実施の確認 | — |
 | H-10 | 音源ボード (SNDboard) の ini キーを `np21w_ini_live.py` 系が扱えない (emu-config §1 の対応キー外) → 道具の拡張 (sol) を h の音源構成の準備前に | 道具の不足 | — |

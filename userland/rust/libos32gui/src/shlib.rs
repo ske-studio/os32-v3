@@ -210,7 +210,7 @@ core::arch::global_asm!(
 __os32_shlib_header:
     .long   0x42494C53                  /* 0x00 magic  'SLIB'            */
     .long   1                           /* 0x04 version = GUI_PROTO_VERSION */
-    .long   119                         /* 0x08 nfunc                    */
+    .long   120                         /* 0x08 nfunc                    */
     .long   __shlib_data_start          /* 0x0C data_vaddr               */
     .long   __shlib_data_pages          /* 0x10 data_pages               */
     .long   __shlib_text_pages          /* 0x14 text_pages               */
@@ -336,6 +336,7 @@ __os32_shlib_header:
     .long   os32gui_w_textarea_columns          /* 116 */
     .long   os32gui_w_textarea_take_input       /* 117 */
     .long   os32gui_w_focused_in                /* 118 */
+    .long   os32gui_gfx_detach                  /* 119 */
     .text
 "#
 );
@@ -434,7 +435,6 @@ pub extern "C" fn os32gui_shlib_init(api: *mut KernelAPI) -> i32 {
      * (libos32gfx の `attach` と同じ理屈)。これより前に表 101..=104 を呼ばれても
      * NULL を辿らないよう、wrapper 側にも門がある。 */
     crate::cfgro::set_kapi(api as *mut core::ffi::c_void);
-    unsafe { crate::ffi::libos32gfx_unicode_init(); }
     client::attach_gfx();
     unsafe { core::ptr::write_volatile(core::ptr::addr_of_mut!(SHLIB_INIT_OK), true) };
     0
@@ -1423,4 +1423,12 @@ pub extern "C" fn os32gui_draw_icon16(surface: u32, x: i32, y: i32, icon: *const
      * (align_of == 1 なので unaligned でも安全)。 */
     let ic = unsafe { ptr::read_unaligned(icon) };
     crate::icon::draw_icon16(SurfaceId(surface), x, y, &ic)
+}
+
+/// Roll back this library instance's CLIENT after either renderer fails.
+#[no_mangle]
+pub extern "C" fn os32gui_gfx_detach() {
+    gate!();
+    unsafe { crate::ffi::libos32gfx_detach() };
+    crate::gstate::st().screen_valid = false;
 }

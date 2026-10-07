@@ -45,11 +45,54 @@ static int port_lease(const struct gfx_attach_ref *ref, struct gfx_attach_view *
 }
 static int port_unlease(u32 token) { releases++;return lease_release(&space,token); }
 static const struct gfx_attach_port port={port_query,port_lease,port_unlease};
+/* Generated-slot-shaped host boundary: private port performs real B1 calls. */
+static const struct gfx_attach_port *public_unicode;
+static u32 public_queries, public_leases, public_count=1;
+static int __cdecl public_query(u32 role, OS32_SurfaceQueryResult *out)
+{
+    struct gfx_attach_desc d;
+    const struct gfx_attach_port *p=role==OS32_SURFACE_CLIENT ? &port : public_unicode;
+    public_queries++;
+    if (!p) return OS32_ERR_INVAL;
+    int rc=p->query(&d);
+    if(rc) return rc;
+    *out=(OS32_SurfaceQueryResult){0};out->count=public_count;
+    OS32_SurfaceDesc *v=&out->desc[0];
+    v->role=role;v->ref=(OS32_SurfaceRef){d.ref.sid,d.ref.generation};
+    v->format=d.format;v->width=d.width;v->height=d.height;
+    v->pitch=d.pitch;v->planes=d.planes;v->bytes=d.bytes;
+    for(u32 i=0;i<4;i++) v->plane_offset[i]=d.plane_offset[i];
+    return 0;
+}
+static int __cdecl public_lease(u32 role, const OS32_SurfaceRef *ref, u32 access, OS32_LeaseView *out)
+{
+    struct gfx_attach_ref r={ref->sid,ref->generation};
+    struct gfx_attach_view v;
+    const struct gfx_attach_port *p=role==OS32_SURFACE_CLIENT ? &port : public_unicode;
+    CHECK(access==(role==OS32_SURFACE_CLIENT ? OS32_SURFACE_RW : OS32_SURFACE_RO));
+    if(!p) return OS32_ERR_INVAL;
+    int rc=p->lease(&r,&v);
+    if(rc) return rc;
+    public_leases++;
+    out->token=v.token;out->base=v.base;out->bytes=v.bytes;
+    for(u32 i=0;i<4;i++) out->planes[i]=v.planes[i];
+    return 0;
+}
+static int __cdecl public_unlease(u32 token) {return port_unlease(token);}
+static int __cdecl waited_key(void) {gfx_init_200();return 65;}
+static int __cdecl empty_key(void) {return -1;}
+static i32 __cdecl waited_yield(void) {gfx_init();return 0;}
+static void __cdecl waited_halt(void) {gfx_init();}
+static u32 sdk_shutdowns;
+static void __cdecl shutdown_keeps_client(void) {sdk_shutdowns++;}
 static void __cdecl legacy_fb(void *out)
 {
     legacy_calls++;
     host_user=host_sdk_cpl != 0;
-    gfx_get_framebuffer(out);
+    if (host_user) {
+        gfx_get_framebuffer((void *)(MEM_EXEC_LOAD_ADDR+512));
+        *(GFX_Framebuffer *)out=*(GFX_Framebuffer *)P2V(payload+512);
+    } else gfx_get_framebuffer(out);
     host_user=1;
 }
 static void __cdecl screen(void *out) {
@@ -186,8 +229,9 @@ static void run(void)
     u32 q=queries;host_sdk_cpl=0;
     CHECK(!libos32gfx_attach_checked() && queries==q && legacy_calls==1 && !live());
     libos32gfx_detach();host_sdk_cpl=3;gfx_attach_port=0;
-    CHECK(!libos32gfx_attach_checked() && queries==q && legacy_calls==2 && !live());
-    CHECK(gfx_fb.planes[0]==bb_b);
+    CHECK(!libos32gfx_attach_checked() && queries==q && legacy_calls==2 && live()==1);
+    CHECK((u32)gfx_fb.planes[0]>=MEM_LEASE_BASE);
+    CHECK(!lease_release(&space,space.leases[0].token));
     libos32gfx_detach();gfx_attach_port=&port;
     /* Dormant USER bridge: flag metadata must not leak into PTE expectations. */
     GFX_Framebuffer *fb=P2V(payload+512);
@@ -215,6 +259,63 @@ static void run(void)
     failed=gfx_bridge_fail_count;
     gfx_framebuffer_bridge(0);
     CHECK(gfx_bridge_fail_count==failed+1 && !slot.abort_req);
+    caller_access_leave(&prev);
+    /* v69 never reads appended slots; v70 binds without host port injection. */
+    CHECK(caller_access_enter(&prev,CALLER_USER));
+    gfx_attach_port=0;gfx_unicode_port=0;api.version=69;
+    libos32gfx_attach(&api);
+    CHECK(!gfx_attach_port && !gfx_unicode_port && public_queries==0);
+    CHECK(!lease_revoke_all(&space));libos32gfx_detach();
+    api.version=70;api.surface_query=public_query;api.surface_lease=public_lease;
+    api.surface_unlease=public_unlease;api.kbd_getchar=waited_key;
+    api.kbd_trygetchar=waited_key;api.sys_yield=waited_yield;api.sys_halt=waited_halt;
+    libos32gfx_attach(&api);
+    CHECK(gfx_attach_port && gfx_unicode_port && public_queries==2 && public_leases==1);
+    CHECK(gfx_ready && live()==1);
+    u32 fresh=space.leases[0].token;
+    gfx_init_200();sdk_gfx_present();
+    CHECK(gfx_ready && live()==1 && space.leases[0].token!=fresh);
+    fresh=space.leases[0].token;
+    CHECK(libos32gfx_getchar()==65);
+    CHECK(gfx_ready && live()==1 && space.leases[0].token!=fresh);
+    fresh=space.leases[0].token;
+    CHECK(libos32gfx_trygetchar()==65);
+    CHECK(gfx_ready && live()==1 && space.leases[0].token!=fresh);
+    fresh=space.leases[0].token;libos32gfx_yield();
+    CHECK(gfx_ready && live()==1 && space.leases[0].token!=fresh);
+    fresh=space.leases[0].token;libos32gfx_halt();
+    CHECK(gfx_ready && live()==1 && space.leases[0].token!=fresh);
+    api.kbd_trygetchar=empty_key;u32 pq=public_queries;
+    CHECK(libos32gfx_trygetchar()==-1 && public_queries==pq);
+    deny_query=1;CHECK(libos32gfx_getchar()==65 && !gfx_ready && !live());
+    deny_query=0;public_count=4;
+    CHECK(libos32gfx_check()==OS32_ERR_INVAL && !live());
+    public_count=1;CHECK(!libos32gfx_check());libos32gfx_detach();
+    /* A nonowner shutdown can leave CLIENT published. Wait returns must not
+     * reopen drawing, even if their KAPI calls regenerate that storage. */
+    api.gfx_shutdown=shutdown_keeps_client;api.gfx_init=waited_halt;
+    api.kbd_trygetchar=waited_key;
+    for (int resume=0;resume<3;resume++) {
+        if (resume==0) libos32gfx_attach(&api);
+        else if (resume==1) CHECK(!libos32gfx_attach_checked());
+        else libos32gfx_init(&api);
+        CHECK(gfx_ready && live()==1);
+        libos32gfx_shutdown();
+        CHECK(sdk_shutdowns==(u32)resume+1 && !gfx_ready && !live());
+        u32 queries_after_shutdown=public_queries, leases_after_shutdown=public_leases;
+        u32 draws_after_shutdown=draws, asm_after_shutdown=asm_calls;
+        CHECK(libos32gfx_getchar()==65);
+        CHECK(libos32gfx_trygetchar()==65);
+        libos32gfx_yield();libos32gfx_halt();
+        int shutdown_waits_stay_detached = !gfx_ready && !live() &&
+            public_queries==queries_after_shutdown && public_leases==leases_after_shutdown;
+        CHECK(shutdown_waits_stay_detached);
+        CHECK(libos32gfx_check()==OS32_ERR_INVAL);
+        sdk_gfx_present();sdk_gfx_pixel(0,0,7);
+        CHECK(!gfx_fb.planes[0] && !gfx_fb.width && !gfx_packed &&
+              public_queries==queries_after_shutdown && draws==draws_after_shutdown &&
+              asm_calls==asm_after_shutdown);
+    }
     caller_access_leave(&prev);
     char digits[12];u32 n=checks,pos=sizeof(digits);
     do {digits[--pos]='0'+n%10;n/=10;} while(n);

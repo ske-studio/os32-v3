@@ -603,3 +603,53 @@
     rows: 25
     frame_bytes: 4006
   evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+
+- id: e11c2-F-live
+  gate: e11
+  contract: userland/tests/ring3_marker.h
+  mode: manual
+  prereq: 17MB, CUI, newly deployed c2 kernel and programs
+  entry: ring3_guard lease
+  observe:
+  - SHM marker F+, fault_kill_count, lease PTE, shell/ver
+  expect:
+    tag: LES?
+    completion: SURV
+    kill_delta: 0
+    target: CLIENT lease VA from gfx_get_framebuffer planes[0]
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e11c2-F-revoke
+  gate: e11
+  contract: userland/tests/ring3_marker.h
+  mode: manual
+  prereq: 17MB, CUI, newly deployed c2 kernel and programs
+  entry: ring3_guard free
+  observe:
+  - SHM marker F-, fault_kill_count, serial PF target, shell/ver
+  expect:
+    tag: REV?
+    completion: 0
+    armed: ARMD
+    kill_delta: 1
+    serial_addr: marker.target
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e11c2-consumers
+  gate: e11
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#2-3-面alias再attach
+  mode: manual
+  prereq: 17MB, new c2 kernel/static SDK/shlib and rebuilt programs, PC98 then PEGC/Cirrus
+  entry: hello, gfx200_test, gfx_demo200, pegcchk, blit_test, bench, hello_gfx, font_test, gdi_test, about, filer, gui_demo, t5a_display
+  observe:
+  - pt0_snapshot and write observation at BB alias, CLIENT lease VA and Unicode RO PTEs
+  - Japanese text, window to fullscreen to return and repaint, V86 return
+  - kselftest_fail and three-stage check failures, db_test and db_v50_test
+  - ring3_guard bb remains SURV until b2
+  expect:
+    bb_alias_writes: 0
+    japanese_text: correct
+    repaint: survives
+    kselftest_fail: 0
+    three_stage_failures: 0
+    db_test: 9/9
+    db_v50_test: 42/42
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
