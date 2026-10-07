@@ -16,6 +16,7 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 |---|---|---|---|
 | PRIO-3 | シリアルの待ちの CTRL+STOP (`audit_test serial` — rshell の通信路とぶつかるのでキーボードから起動)、GUI→CUI→GUI の TVRAM generation | 未実施の確認 | e11 統合受入 |
 | PRIO-1 | install / cdinst の通しの実行 (授権が通り、区画・format・書込みまで) を別のディスクイメージで — 取り込み済みの DISK-AUTH の受入の残り | 未実施の確認 | 次の構成試験 (h の前) |
+| LZSS-1 | 修正した圧縮器の PKG (種250の2ファイル) を cdinst で入れて照合。実物 pkg.c の32ビット qemu ホスト試験は合格、依頼範囲に配備・NP21/W操作は含まない | ホストのみ | PRIO-1 のインストール受入 |
 
 ## 1. 関門: e9 / e10b / e10c
 

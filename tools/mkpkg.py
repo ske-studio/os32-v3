@@ -84,7 +84,13 @@ def lzss_encode(in_data):
 
                 # マッチ長を計測
                 l = 0
-                while l < F and src_p + l < in_len and text_buf[(chain_pos + l) % N] == in_data[src_p + l]:
+                while l < F and src_p + l < in_len:
+                    # 展開は逐次コピー。参照が書込位置に追いついた後は、
+                    # 古い窓ではなく、この一致で既に出力したバイトを読む。
+                    c = (text_buf[(chain_pos + l) % N] if l < dist
+                         else in_data[src_p + l - dist])
+                    if c != in_data[src_p + l]:
+                        break
                     l += 1
                 if l > match_len:
                     match_len = l
