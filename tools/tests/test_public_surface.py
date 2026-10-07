@@ -1,4 +1,4 @@
-"""KAPI v70 public wraps: real ILP32 caller/B1/lease, runtime mutants."""
+"""KAPI v71 public wraps: real ILP32 caller/B1/lease, runtime mutants."""
 import pathlib
 import re
 import subprocess
@@ -13,9 +13,10 @@ NAMES = ['surface_query', 'surface_lease', 'gfx_surface_lease', 'surface_unlease
          'sys_ls_window', 'caller_identity']
 
 def contract(data, shared, source, ls, shm):
-    assert data['version'] >= 70
+    assert data['version'] >= 71
     assert int(re.search(r'#define KAPI_VERSION\s+(\d+)', shared)[1]) == data['version']
     assert [a['name'] for a in data['api'][240:246]] == NAMES
+    assert [a['name'] for a in data['api'][246:248]] == ['mem_map', 'mem_unmap']
     for typ, fields in {
         'surface_ref':'sid generation',
         'surface_desc':'ref role backend format width height pitch planes plane_offset bytes access_max',
@@ -39,8 +40,8 @@ if __name__ == '__main__':
     contract(*values)
     if '--mutate' in sys.argv:
         for idx, changed, label in [
-            (0, dict(values[0], version=69), 'version rollback'),
-            (1, values[1].replace('KAPI_VERSION      70','KAPI_VERSION      69'), 'shared version rollback'),
+            (0, dict(values[0], version=70), 'version rollback'),
+            (1, values[1].replace('KAPI_VERSION      71','KAPI_VERSION      70'), 'shared version rollback'),
             (2, re.sub(r'STATIC_ASSERT\([^;]+\babi_lease_view_size\);','',values[2]), 'STATIC_ASSERT removed'),
             (3, re.sub(r'STATIC_ASSERT[^;]+abi_LsEntry_size_offset\);', '', values[3]), 'ls size offset assertion removed'),
             (4, values[4].replace('STATIC_ASSERT(PAGE_SIZE == OS32_PAGE_SIZE, shm_sdk_page_size);',''), 'page assertion removed'),
@@ -59,7 +60,7 @@ if __name__ == '__main__':
     if '--mutate' in sys.argv:
         original_open = open
         doc = (ROOT/'docs/KAPI_SPEC.md').read_text()
-        stale = doc.replace('現在のバージョン | **70**', '現在のバージョン | **69**')
+        stale = doc.replace('現在のバージョン | **71**', '現在のバージョン | **70**')
         assert stale != doc
         def stale_open(path, *args, **kwargs):
             if pathlib.Path(path).resolve() == ROOT/'docs/KAPI_SPEC.md': return io.StringIO(stale)

@@ -293,7 +293,7 @@ nanoのtail trimは実free list上で末尾のfree chunkを確認し、header/�
 | f3 | map準備/公開。data各枚・PT各枚不足の全rollback |
 | f4 | unmap/部分分割/併合。FULL不変、NP→TLB→free、別owner拒否 |
 | f5a | 内部結線 (KAPI 70 不変): AS extent/layout、初期 heap 登録、ANON teardown、毒 AS 隔離、owner 往復 +5。AS 1,224B (表 512 + layout 16 + poison 4)、1,376B/16KiB ASSERT 内。F-2/F-3 の負例はホスト試験へ。fix1: 毒化時に対象の中断要求、resume 前に検査、live 数から隔離。4 TU は -Os。証拠 `/home/hight/os32-tmp/run/f5/fix1_report.md` と `f5a_fix1_sizes.json` (初回は `report.md` / `f5a_sizes.json`)。実 kill・high-water は台帳 F-6。 |
-| f5b | public mem_map/mem_unmap と caller 接続、KAPI 71。f5a の内部エラー翻訳を公開境界から使う。 |
+| f5b | USER 専用 mem_map/mem_unmap (slot 246/247)、KAPI 71・memory 2。内部の検査とエラー翻訳に接続、公開 flags を静的照合。F-1 閉鎖。map/write/unmap の対照と同じ VA の PF 試験を登録、ゲスト受入は F-6。P3 の poison 経路検査と master 文脈注記を追加。証拠 `/home/hight/os32-tmp/run/f5/f5b_report.md`・`f5b_sizes.json`。 |
 | f6 | USER/resident CRT、_sbrk EXACT/負増分とmapped_end |
 | f7 | nano副arena/通常malloc・reentrant入口。非連続成功と連続性保持 |
 | f8 | 大塊/calloc/realloc/整列とRust結線。65535/65536/65537の3値 |

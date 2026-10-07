@@ -244,10 +244,12 @@ extern int __cdecl wrap_gfx_surface_lease(u32 role, const OS32_SurfaceRef *refs,
 extern int __cdecl wrap_surface_unlease(u32 token);
 extern int __cdecl wrap_sys_ls_window(const char *path, u32 skip, OS32_LsPacket *out);
 extern int __cdecl wrap_caller_identity(u32 *app, u32 *owner, u32 *generation);
+extern void * __cdecl wrap_mem_map(u32 bytes, void *hint, u32 flags);
+extern int __cdecl wrap_mem_unmap(void *base, u32 bytes);
 extern i32 __cdecl kapi_reserved_nosys(void);
 
 kapi->magic = 0x4B415049UL;
-kapi->version = 70;
+kapi->version = 71;
 
     kapi->gfx_init = wrap_gfx_init;
     kapi->gfx_init_200 = wrap_gfx_init_200;
@@ -495,6 +497,8 @@ kapi->version = 70;
     kapi->surface_unlease = wrap_surface_unlease;
     kapi->sys_ls_window = wrap_sys_ls_window;
     kapi->caller_identity = wrap_caller_identity;
+    kapi->mem_map = wrap_mem_map;
+    kapi->mem_unmap = wrap_mem_unmap;
     {
         u32 _kr;
         for (_kr = 0; _kr < (u32)KAPI_FUNC_RESERVED; _kr++)

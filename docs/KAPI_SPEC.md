@@ -1,4 +1,4 @@
-# KernelAPI v70 仕様書
+# KernelAPI v71 仕様書
 
 外部プログラム (OS32X) がカーネル機能を利用するためのAPIテーブル仕様。
 
@@ -16,8 +16,8 @@
 | 最大プログラムサイズ | image と暫定 heap 予算を起動時に検査 ([TASK_T2_APPBAND](tasks/v3/TASK_T2_APPBAND.md) §4) |
 | プログラム専用ヒープ | 動的配置 (sbrk_heap_limit, exec_heap 管理下) |
 | プログラム専用スタック | 動的配置 (メモリ終端付近、下向き展開) |
-| 現在のバージョン | **70** |
-| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 246・予約 54) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
+| 現在のバージョン | **71** |
+| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 248・予約 52) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
 
 ---
 
@@ -114,6 +114,7 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v68 | **実装済み (2026-09-26、手元ビルドとホスト試験のみ)** | 実機の ROM の INT 18h の I/O 記録 `v86_gdc_capture` 1 本 (slot 239 = 0x3C4)。`mode = V86G_MODE_ROM` は V86 で実機の ROM の AH=31h を呼んで今のモードを読み、その bit の並び (NP21/W の bit2 / Bible 3-2 の bit3) から 640x480 の AH=30h を決めて呼び、同じ AH=30h で元のモードへ戻して (戻れなければ OS32 の表 `pegc_restore_text_sync`) CUI を作り直す。その間に捕まえた OUT を**畳まずに**最大 512 件、IN をポートごとの回数で `V86Gcap` (8460 バイト) へ写す。`V86G_MODE_SELFTEST` は決まった I/O 列の試験ゲストで記録器を確かめる (実機へ通さない)。`v86 -g [-t]` が使う。実体は `kernel/v86_gcap.c` / `kernel/v86_gcap_math.c` | [tasks/realhw/TASK_PEGC480_REALHW.md](tasks/realhw/TASK_PEGC480_REALHW.md) §3 段 1 |
 | v69 | **実装済み (2026-10-01、手元ビルド・ホスト試験)** | T2c: OS32X v4 / 4 世代の正典・高位配置・可変 stack。KAPI slot の追加・並べ替えなし | [tasks/v3/TASK_T2_APPBAND.md](tasks/v3/TASK_T2_APPBAND.md) §4-6・T2c-R |
 | v70 | **実装 (2026-10-07、e11c1・統合ゲスト受入前)** | surface query/lease/bundle/unlease・値返し ls・本人識別の 6 本 (slot 240〜245)。公開値型・ページ/SHM 定数、pipe の CPL3 制限。e11b2 で memory_layout 世代 2 (版70は不変、旧世代1は拒否) | §4-10、[TASK_T2D_T2H](tasks/v3/TASK_T2D_T2H.md) e11 |
+| v71 | **実装 (2026-10-08、ホスト試験・ゲスト受入前)** | USER 専用 `mem_map` / `mem_unmap` (slot 246・247)。memory 世代は 2 のまま、CRT/allocator の切替は後続。 |
 
 調停 (2026-09-06、同日改訂): GUI (K1〜W2) を先に実装するので **v42 = GUI、v43 = ネットワーク Host Services**
 に確定。実装順が入れ替わるときは、着手前にこの表を更新してから版番号を取ること。
@@ -249,7 +250,7 @@ v62 まではデータ欄 (`sbrk_heap_limit` / `shm_base`) を関数表の**直�
 |---|---|---|
 | 関数表の容量 R | **300** スロット (`KAPI_FUNC_CAPACITY`) | `sdk/kapi.json` の `func_capacity` |
 | データ欄の先頭 | **0x4B8** = 8 + 4 × R (`KAPI_DATA_FIELDS_OFF`) | `sdk/gen_kapi.py` が生成 |
-| 予約スロット | 246〜299 (`kapi_reserved[54]`、v70 時点。v68 は 240〜299、v67 は 239〜299、v66 は 238〜299、v65 は 235〜299、v64 は 234〜299、v63 は 230〜299)。カーネルの表は `kapi_reserved_nosys` (= `OS32_ERR_NOSYS`)、CPL=3 のトランポリンは int 0x80 のスタブ (ディスパッチャが `slot >= KAPI_FUNC_COUNT` で kill)。**NULL にしない** | `exec/exec.c` |
+| 予約スロット | 248〜299 (`kapi_reserved[52]`、v71 時点。v68 は 240〜299、v67 は 239〜299、v66 は 238〜299、v65 は 235〜299、v64 は 234〜299、v63 は 230〜299)。カーネルの表は `kapi_reserved_nosys` (= `OS32_ERR_NOSYS`)、CPL=3 のトランポリンは int 0x80 のスタブ (ディスパッチャが `slot >= KAPI_FUNC_COUNT` で kill)。**NULL にしない** | `exec/exec.c` |
 | R の上限 | トランポリン 1 ページ: `sizeof(KernelAPI)` + スタブ 8B × R + 写し場 256B ≤ 4096 → **R ≤ 318** (`STATIC_ASSERT`) | `exec/exec.c` |
 
 関数を足すときは `kapi_reserved[]` が 1 本減るだけで、データ欄は動かない。**関数数が R を
@@ -1518,7 +1519,7 @@ shlib の末尾119番 `os32gui_gfx_detach` を追加 (120本、protocol世代は
 
 ### 予約スロット (v63〜)
 
-0x3E0〜0x4B4 (slot 246〜299、54 本、v70 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
+0x3E8〜0x4B4 (slot 248〜299、52 本、v71 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
 (§4-0)。カーネルの表は `kapi_reserved_nosys` (`OS32_ERR_NOSYS`)、トランポリンは
 int 0x80 のスタブで、CPL=3 からの呼び出しはアプリを kill する。
 
@@ -1654,3 +1655,42 @@ v28で追加。カーネル管理のマウスカーソル表示を制御する�
 ---
 
 *Last Updated: 2026-10-07*
+
+
+### §4-10 mem_map (v71)
+
+| オフセット | 名前 | 型 |
+|---|---|---|
+| 0x3E0 | mem_map | `void *(u32 bytes, void *hint, u32 flags)` |
+
+保存された呼出元が USER の場合だけ、その AS に ANON の private USER/RW ページを確保する。
+追加授権 flag は不要。WM・TRUSTED・本人照合失敗は kill せず NULL を返す。
+成功は先頭 VA、失敗は NULL。bytes は非ゼロでページ単位へ切り上げ、加算 overflow は拒否する。
+hint は NULL (希望なし) またはページ整列した利用可能なアプリ帯の VA。
+image/BSS・shlib・lease・stack/guard・現在の exec_heap に重なる hint は拒否する。
+`OS32_MEM_MAP_EXACT` は hint のみを使い衝突を拒否し、EXACT+NULL も拒否する。
+`OS32_MEM_MAP_TOPDOWN` は guard 直下から exec_heap 現在端へ向かって穴を探す。
+flags=0 は image 端から exec_heap 予約起点までの穴を上端から下向きに探す。
+両 flag の組合せは EXACT 優先、未知 flag は拒否。有効で空いた hint を先に採用する。
+引数・呼出元、穴、併合後の表容量、PT、ゼロ化した data page の順に検査・確保し、最後に公開する。
+VA・固定表・物理/PT不足は全て NULL で、内部の原因分類は保持する。
+
+### §4-11 mem_unmap (v71)
+
+| オフセット | 名前 | 型 |
+|---|---|---|
+| 0x3E4 | mem_unmap | `int(void *base, u32 bytes)` |
+
+保存された USER 呼出元自身の AS にのみ作用し、追加授権 flag は不要。
+WM・TRUSTED・本人照合失敗は kill せず `OS32_ERR_INVAL`。
+base はページ整列、bytes は非ゼロのページ倍数、加算 overflow は拒否。
+全範囲を ANON または LIBC_INITIAL が連続被覆することが必要。
+EXEC_INITIAL / EXEC_ARENA / EXEC_LARGE、image/BSS端ページ、stack/guard、shlib、lease、穴を含めば
+全拒否し、metadata を変えない。中抜きは残片の表容量と全 PTE/PFN owner を先に検査する。
+成功は 0。不正・帯外・被覆/owner 不一致は `OS32_ERR_INVAL`、残片の表不足は `OS32_ERR_FULL`。
+内部 EINVAL/ENOVA は INVAL、EFULL は FULL に翻訳し、ENOSPC は公開返却経路では使わない。
+全対象 NP、active TLB 同期、owner 付き PFN 返却、空 PT 返却、extent 確定の順。
+検査後の返却失敗は AS を毒化し USER 復帰前に kill する。
+hint/base はアドレス値の入力 (`out: none` と `in: [{arg: hint/base, target: true}]`) で、
+ラッパーから直接参照しない。`kapi_argptr` の早期検査から外し、body の帯・extent 検査で
+帯外や stack/guard・lease を NULL / `OS32_ERR_INVAL` として拒否する (kill しない)。

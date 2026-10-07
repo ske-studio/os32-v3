@@ -30,6 +30,7 @@ check-ci-stab-host:
 - fs/fd_redirect.c
 - fs/pipe_buffer.c
 - fs/vfs_name_rules.inc
+- sdk/kapi.json
 - kapi/kapi_generated.c
 - kapi/kapi_host.c
 - kernel/boot_font.c

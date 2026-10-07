@@ -925,3 +925,23 @@
     font_exit: 2
     benchmark_other_tests_continue: true
   evidence: ~/os32-tmp/evidence/<日付>/e12-17mb-pegc-skip-peak/
+
+- id: f5b-mem-map
+  gate: F-6
+  contract: userland/tests/mem_map_test.c
+  mode: manual
+  prereq: KAPI 71, 17MB, current ini; PM deploy and fresh kernel.map
+  entry: mem_map_test
+  observe:
+  - 'Run mem_map_test: require PASS mem_map invalid addresses survived and PASS mem_map control, exit 0, kill delta 0'
+  - 'Outside hint 0x00400000 and stack guard EXACT return NULL; unmap 0x1000/4096 returns OS32_ERR_INVAL; all three survive'
+  - 'Record fault_kill_count before; run mem_map_test pf and record after'
+  - 'Require MEMMAP PF armed VA=x and serial #PF addr=x at the same VA'
+  - 'Require kill delta 1, no survived message; shell/ver remains responsive'
+  - 'Run db_test and db_v50_test regression; record owner leftovers and image sizes'
+  expect:
+    control_exit: 0
+    control_kill_delta: 0
+    fault_kill_delta: 1
+    fault_result: kill
+  evidence: ~/os32-tmp/evidence/<日付>/f5b-mem-map/
