@@ -1,6 +1,10 @@
 #include "appmem.h"
 #include "memmap.h"
 #include "paging.h"
+#include "os32_kapi_shared.h"
+
+STATIC_ASSERT(sizeof(struct appmem_extent) == 16, appmem_extent_size);
+STATIC_ASSERT(sizeof(struct appmem_table) == 512, appmem_table_size);
 
 #define APPMEM_U32_MAX (~(u32)0)
 
@@ -56,7 +60,9 @@ static int mergeable(const struct appmem_extent *a,
                      const struct appmem_extent *b)
 {
     return a->kind == b->kind && a->flags == b->flags &&
-           a->kind != APPMEM_EXEC_LARGE;
+           a->kind != APPMEM_EXEC_LARGE &&
+           !(a->end == MEM_EXEC_HEAP_BASE && b->base == MEM_EXEC_HEAP_BASE) &&
+           !(b->end == MEM_EXEC_HEAP_BASE && a->base == MEM_EXEC_HEAP_BASE);
 }
 
 static void map_merge(const struct appmem_table *table, int count,
@@ -103,16 +109,17 @@ int appmem_prepare(const struct appmem_table *table,
         layout->guard_b > MEM_APP_STACK_TOP - MEM_GUARD_SIZE)
         return APPMEM_EINVAL;
     size = PAGE_ALIGN_UP(bytes);
-    if (hint && (!aligned(hint) || hint < MEM_EXEC_LOAD_ADDR ||
+    if (hint && (!aligned(hint) ||
                  hint >= MEM_APP_BAND_MAX_TOP ||
                  size > APPMEM_U32_MAX - hint)) return APPMEM_EINVAL;
     count = table_count(table);
     if (count < 0) return count;
     if (hint) {
         end = hint + size;
-        if (((hint >= layout->primary_mapped_end && end <= MEM_EXEC_HEAP_BASE) ||
-             (hint >= layout->exec_heap_cur_end && end <= layout->guard_b)) &&
-            range_free(table, count, hint, end)) base = hint;
+        if (!((hint >= layout->primary_mapped_end && end <= MEM_EXEC_HEAP_BASE) ||
+              (hint >= layout->exec_heap_cur_end && end <= layout->guard_b)))
+            return APPMEM_EINVAL;
+        if (range_free(table, count, hint, end)) base = hint;
     }
     if (!base && (map_flags & APPMEM_MAP_EXACT)) return APPMEM_ENOVA;
     if (!base) {
@@ -230,4 +237,23 @@ void appmem_unmap_publish(struct appmem_table *table, const struct appmem_unmap_
     if (plan->right.base) table->e[i++] = plan->right;
     for (i = after; i < APPMEM_EXTENT_MAX; i++)
         table->e[i] = (struct appmem_extent){0, 0, 0, 0};
+}
+
+/* Initial extents describe existing PTEs; image's partial end page stays image. */
+void appmem_init(struct addrspace *as, u32 img_end, u32 primary_end,
+                 u32 exec_end, u32 guard_b)
+{
+    u32 image = PAGE_ALIGN_UP(img_end), n = 0;
+    as->appmem_layout = (struct appmem_layout){img_end, image, exec_end, guard_b};
+    if (primary_end > image)
+        as->appmem.e[n++] = (struct appmem_extent){image, primary_end, APPMEM_LIBC_INITIAL, 0};
+    if (exec_end > MEM_EXEC_HEAP_BASE)
+        as->appmem.e[n] = (struct appmem_extent){MEM_EXEC_HEAP_BASE, exec_end, APPMEM_EXEC_INITIAL, 0};
+}
+
+int appmem_error_public(int error)
+{
+    if (error == APPMEM_EINVAL || error == APPMEM_ENOVA) return OS32_ERR_INVAL;
+    if (error == APPMEM_EFULL) return OS32_ERR_FULL;
+    return error; /* ENOSPC is private until the pressure path in g. */
 }

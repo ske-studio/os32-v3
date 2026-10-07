@@ -189,3 +189,6 @@ void _start(void)
     SAY("PASS: legacy byte budget; sparse high AS, three disjoint PDEs, master isolation and owner0");
     die(0);
 }
+
+/* Paging-only fixture has no exec slots; abort delivery is appmem_map_host. */
+void exec_addrspace_abort(struct addrspace *as) { (void)as; }

@@ -1,4 +1,4 @@
-/* T2f f4: public-policy unmap, host-linked only until f5. */
+/* T2f f4: private public-policy unmap. */
 #include "appmem.h"
 #include "paging_app.h"
 #include "io.h"

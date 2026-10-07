@@ -690,7 +690,7 @@
   prereq: PM integrated generation-2 build deployed; new kernel.map; 17MB current ini
   entry: ring3_guard bb; ring3_guard lease; ring3_guard free; v86 -d; v86 -b
   observe:
-  - Confirm boot kselftest_pass=281 and kselftest_fail=0; map_user_keep still counts one check
+  - Confirm boot kselftest_pass=288 and kselftest_fail=0; map_user_keep still counts one check
   - Use tools/accept/pt0_snapshot.py with the deployed kernel.map before and after applications and V86
   - Inspect every PTE for font 0x1000-0x49fff, Unicode 0x4a000-0x69fff, BB 0x6a000-0x89fff and TVRAM/BRG 0xa0000-0xbffff; USER must be clear
   - E marker BB?? has ARMD, completion zero, target 0x6a000; serial PF error 7 and fault_kill_count delta one
@@ -698,7 +698,7 @@
   - Observe audit_runs rising and audit_fail=0 at master, AS and post-exec stages, including both V86 returns; shell/ver respond
   - Run db_test and db_v50_test and require their existing PASS totals
   expect:
-    kselftest_pass: 281
+    kselftest_pass: 288
     kselftest_fail: 0
     old_alias_user_pages: 0
     E_completion: 0

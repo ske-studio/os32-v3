@@ -19,6 +19,7 @@ check-ci-stab-host:
 - docs/07_shell.md
 - drivers/lgy98.c
 - drivers/pc98pt.c
+- exec/lease.c
 - exec/appmem.c
 - exec/appmem_map.c
 - exec/appmem_unmap.c
@@ -102,3 +103,4 @@ check-ci-stab-host:
 - tools/tests/test_shlib_high.py
 - tools/tests/test_*.py
 - build/checks.d/*.mk
+- exec/appslot.c

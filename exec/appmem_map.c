@@ -1,4 +1,4 @@
-/* T2f f3: one serialized transaction; unlinked from kernel until f5. */
+/* T2f f3: one serialized transaction; private kernel entry. */
 #include "appmem.h"
 #include "paging_app.h"
 #include "io.h"

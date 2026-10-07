@@ -48,12 +48,10 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 
 | ID | 何を | 種類 | 元の行 |
 |---|---|---|---|
-| F-1 | f2〜f4 (`appmem` / `paging_app` / `appmem_unmap`) はカーネル未結線 — **ホスト合格だけで、完成扱いにしない**。私有エラー値の翻訳、AS への extent 埋込み、LIBC_INITIAL の実登録 | 未結線 | 2146–2202、2211–2235、2282–2319 |
-| F-2 | f2 P3: exec_heap が空のとき 0x88000000 をまたぐ併合、shlib / lease 窓の hint | 申し送り | 2205、2231、2293 |
-| F-3 | f4 P3: 生き残る変異 3 種、free の失敗で AS が壊れたまま残る | 既知の不具合 | 2363 |
+| F-1 | f5a で内部結線・初期 heap 登録・私有エラー翻訳は実装。公開 mem_map/mem_unmap と caller 接続は f5b、実 TLB/終了受入は F-6。 | 未結線 / ホスト確認のみ | f5a |
 | F-4 | f6 (CRT の `_sbrk` 集約、link_guard、`check_link` が提供元をファイル名だけで判定)、f7 (arena routing)、f8 (Rust `Os32Alloc`)、f9 / f10 (内部の伸長口、EXEC_* の返却)、`mem_alloc` が偽の BlkHdr を信用する | 未結線 / 申し送り | 1503、2037、2045–2059、2101、2103、2163、2355 |
 | F-5 | malloc 系の入口の結線と最小初期量の切替 | 未結線 | 2010–2017、2055、2141、2365 |
-| F-6 | f の受入一式: 8MB / 17MB での伸長と unmap、512KiB stack、leftover==0 | 未実施の確認 | 2369 |
+| F-6 | f の受入一式: 8MB / 17MB での伸長と unmap、512KiB stack、kernel stack high-water (f5a の AS +532B / map pending 256B、lease_selftest 1,676→2,732B (AS 2 個)・test_ledger 812→1,340B・test_appmem 1,232B を含む)、leftover==0、毒 AS の kill (syscall 帰路と resume)。f5a レビュー: 入れ子で親 A が毒の後に子の終了で A の PD が一時的に CR3 に載る (USER へは戻らず syscall 出口で kill — P3-c)、resume の中断も h3 の `syscall_abort` 地点に当たる (P3-d) — ゲストの h3 の数え方で確かめる | 未実施の確認 | 2369 |
 
 ## 4. 関門: h の最終一式 / T2h 統合受入
 
@@ -77,7 +75,7 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 | X-1 | NUL 終端の文字列入力と `kprintf` 可変引数の B1 化 → T4・T5a の担当境界で確定。ページ 0 の NP 化 → T7 | 既知の制限 | 1499、1647、1757、1885 |
 | X-2 | `font_load_test` の stat 段の SKIP 理由 → 次にその試験を回す前に確定 | 未実施の確認 / SKIP | 1250、1294 |
 | X-3 | GitHub Actions の結果が票に無い (e1 の CI 修正後、f1a の初回 run) → 次の統合判定 (e11) の前に過去の run を照合。今の成功で過去を合格にしない | 未実施の確認 | 335–345、2003–2009 |
-| X-4 | 検査の整理の残り: ci-stab2 の P2-B の後の全体 check-changed と native の記録、6 時間超の対照の刈り取り、pending の 1 時間回収、生き残る弱い変異、`net_link` の TMPDIR 長、選択の取りこぼし 3 種 | 既知の制限 | 3551、3627、3705、3740、3754–3768、3776、3800–3807、3828–3832 |
+| X-4 | 検査の整理の残り: ci-stab2 の P2-B の後の全体 check-changed と native の記録、6 時間超の対照の刈り取り、pending の 1 時間回収、生き残る弱い変異、f5a の full 候補検査に残る 5 SKIP と `test_vfs_fd_path.py` errno 4 変異の include 欠落による偽 RED (実行時 RED と数えない。PM の統合検査前に修正)、`net_link` の TMPDIR 長、選択の取りこぼし 3 種 | 既知の制限 | 3551、3627、3705、3740、3754–3768、3776、3800–3807、3828–3832 |
 | X-6 | `tools/tvdump_recv.py` は名前付きパイプ前提で今の NP21/W に接続できない → `/api/cmd` で生バイトを取り TVDM の長さ・寸法・内容を照合する形に (計画 3 番、受入索引と同枠) | 道具の不具合 | — |
 | X-11 | 監査分類 (`~/os32-tmp/evidence/2026-10-07/audit-classification.md`) の「意味変更 (e11c)」のうち pipe (E11-8) を除く 12 件 — IME 9 本 (trygetchar/toggle/set_mode/switch_dict/user_delete/user_export/user_clear/trygetkey/feed_key)・exec_last_result・gui_call・con_sink_read の授権/本人別の契約 → **T4 の設計票で扱う (ユーザー決定 2026-10-07)** | 契約の整理 | 分類表 :33/:43-55/:57/:60 |
 

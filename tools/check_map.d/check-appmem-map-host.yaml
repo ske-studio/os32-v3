@@ -1,4 +1,7 @@
 check-appmem-map-host:
+- exec/exec.c
+- exec/exec_kapi_init.inc
+- exec/lease.c
 - exec/appmem.c
 - exec/appmem_map.c
 - exec/appmem_unmap.c
@@ -12,3 +15,4 @@ check-appmem-map-host:
 - tools/tests/mutpar.py
 - tools/check_map.d/check-appmem-map-host.yaml
 - build/checks.d/check-appmem-map-host.mk
+- exec/appslot.c

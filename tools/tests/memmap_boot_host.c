@@ -304,3 +304,6 @@ void _start(void)
     SAY("PASS");
     die(0);
 }
+
+/* Paging-only fixture has no exec slots; abort delivery is appmem_map_host. */
+void exec_addrspace_abort(struct addrspace *as) { (void)as; }

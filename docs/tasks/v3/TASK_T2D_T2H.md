@@ -243,17 +243,17 @@ eの隔離・両gfx実体・B1が合格。新 `exec/appmem.[ch]`、paging、exec
 
 ### 3-2. extentとmap transaction
 
-ASに32本の `{u32 base,end,kind,flags}` (16B)を固定追加。空slotはbase=end=0、管理はkernelのみ。kindはLIBC_INITIAL / EXEC_INITIAL / ANON / EXEC_ARENA / EXEC_LARGE等の内部識別、公開引数にしない。公開mapはANON。隣接同kind/flagsは併合するが、EXEC_LARGEの割当識別は保持する。PFNの正典はPTE。公開unmap対象kindは**ANONとLIBC_INITIALだけ**。EXEC_INITIAL / EXEC_ARENA / EXEC_LARGEは全て拒否し、返却はkernelのowner検証付き内部口だけ。image/stack/shlibも公開unmap対象に含めない。
+ASに32本の `{u32 base,end,kind,flags}` (16B)を固定追加。空slotはbase=end=0、管理はkernelのみ。kindはLIBC_INITIAL / EXEC_INITIAL / ANON / EXEC_ARENA / EXEC_LARGE等の内部識別、公開引数にしない。公開mapはANON。隣接同kind/flagsは併合するが、EXEC_LARGEの割当識別は保持する。exec_heap が空でも予約起点 MEM_EXEC_HEAP_BASE をまたいで併合しない (F-2)。PFNの正典はPTE。公開unmap対象kindは**ANONとLIBC_INITIALだけ**。EXEC_INITIAL / EXEC_ARENA / EXEC_LARGEは全て拒否し、返却はkernelのowner検証付き内部口だけ。image/stack/shlibも公開unmap対象に含めない。
 libc初期量のうちBSSと同居する端pageはimage所属のまま、独立したheap pageだけをLIBC_INITIALとして返却可能にする。
 
-map(bytes,hint,flags)は0、EXACT、TOPDOWN、EXACT|TOPDOWNを許可 (最後はEXACT優先)。NULL hintは希望なし、EXACT+NULLは拒否。非NULL hintはpage整列かつアプリ私有利用帯内、bytesは加算前overflow検査して切上げ。未知flag/size0/帯外は拒否。flags=0は `[page_align(image+BSS end), 0x88000000)` (exec_heap予約起点未満)の**上端側から下向き**に穴を探し、primary _sbrk直上を先に塞がない。TOPDOWNはstack guard直下からexec_heapの現在端より上の穴を下へ探す。hintが有効で空なら先に採用、EXACTの衝突は別穴へ逃がさない。image/BSS端page、
+map(bytes,hint,flags)は0、EXACT、TOPDOWN、EXACT|TOPDOWNを許可 (最後はEXACT優先)。NULL hintは希望なし、EXACT+NULLは拒否。非NULL hintはpage整列かつアプリ私有利用帯内、bytesは加算前overflow検査して切上げ。未知flag/size0/帯外は拒否。flags=0は `[page_align(image+BSS end), 0x88000000)` (exec_heap予約起点未満)の**上端側から下向き**に穴を探し、primary _sbrk直上を先に塞がない。TOPDOWNはstack guard直下からexec_heapの現在端より上の穴を下へ探す。hintが有効で空なら先に採用、EXACTの衝突は別穴へ逃がさない。hint が image・shlib・lease・stack/guard・現在の exec_heap にかかる場合は INVAL で拒否し、別穴へ逃がさない (F-2)。image/BSS端page、
 初期heap、stack/guard、shlib、leaseを除外し、低位/未使用256MB超へ広げない。exec_heap伸長も現在端のEXACTが第一候補、衝突時は別arena。予約はVAの排他境界で物理先取りを意味しない。
 
 順序は引数/呼出元→穴→併合後slot数→必要PT→全data page確保/ゼロ→公開。pendingのPTは最大64本の控え (256B)を**非再入map transactionのkernel stack上**に置く。ASにもAppSlotにも常駐させず、呼出stack high-waterの予算/実測へ含める。dataは予約した空PTEにPFNを**PRESENTなし**で記録し、失敗時の返却リストとする。live PTへ置く場合もPRESENTなし・AS更新中で、callback/AS切替なし。既存PTE/未使用slotの初期値を前提にして撤去範囲を確定、既存の有効entryを上書きしない。巨大PFN配列・追加rollbackページを確保しない。失敗はpending PFN全返却→今回PT全返却→予約slot解放で元通り。
 公開時だけPRESENT/USER/RWとextent/heap端を一括確定、active CR3再ロード。IRQ禁止は公開の短い区間、確保/ゼロ化では解除する。IRQ/例外からallocatorを呼ばないR1を維持。
 
 unmapはbytes page倍数、base整列、overflow/全範囲のextent種別 (公開口はANON/LIBC_INITIALのみ)/連続被覆/PTE ownerを先に検査。内部exec_heap返却口は別でEXEC_*と所有者を検証する。一つの穴・image・stack・shlib・leaseを含めば全拒否。中抜きは最大2残片を計算してslotを事前確保、足りなければFULLで全不変。複数extent跨ぎは全て同じ検査を通す。全対象NP→active CR3 reload (非activeは次回load保証)→PFN owner free→空APP PTをPDE NP/TLB同期後返却→extent残片確定。先頭lease PTは触らない。freeに必要なPFNはNP PTEのframeに保持し返却後ゼロにする。
-owner不整合は検査段で拒否/診断し、途中まで返して成功しない。
+owner不整合は検査段で拒否/診断し、途中まで返して成功しない。検査後の PFN/PT free が失敗した AS は毒状態とし、USER 復帰前に kill。teardown はその owner を再返却/reclaim/retire せず、残りページ数を exec_as_leftover_pages に数えシリアルへ 1 行出す。kstop にはしない (f4 P3-3)。
 
 ### 3-3. 最小起動と_sbrk
 
@@ -292,7 +292,8 @@ nanoのtail trimは実free list上で末尾のfree chunkを確認し、header/�
 | f2 | extent/穴探索/flags。両端/overflow/EXACT/hint衝突、固定32本 |
 | f3 | map準備/公開。data各枚・PT各枚不足の全rollback |
 | f4 | unmap/部分分割/併合。FULL不変、NP→TLB→free、別owner拒否 |
-| f5 | public KAPIとcaller接続、kselftest owner往復。機能は準備のみ |
+| f5a | 内部結線 (KAPI 70 不変): AS extent/layout、初期 heap 登録、ANON teardown、毒 AS 隔離、owner 往復 +5。AS 1,224B (表 512 + layout 16 + poison 4)、1,376B/16KiB ASSERT 内。F-2/F-3 の負例はホスト試験へ。fix1: 毒化時に対象の中断要求、resume 前に検査、live 数から隔離。4 TU は -Os。証拠 `/home/hight/os32-tmp/run/f5/fix1_report.md` と `f5a_fix1_sizes.json` (初回は `report.md` / `f5a_sizes.json`)。実 kill・high-water は台帳 F-6。 |
+| f5b | public mem_map/mem_unmap と caller 接続、KAPI 71。f5a の内部エラー翻訳を公開境界から使う。 |
 | f6 | USER/resident CRT、_sbrk EXACT/負増分とmapped_end |
 | f7 | nano副arena/通常malloc・reentrant入口。非連続成功と連続性保持 |
 | f8 | 大塊/calloc/realloc/整列とRust結線。65535/65536/65537の3値 |
@@ -525,15 +526,16 @@ d6 の `__bss_end=0x18C270` が e の増分の基準。KHEAP は E11-BUD の一�
 | d6 確定 | `__bss_end=0x18C270`、d 正味 4,260B | 旧上限で 36,240B |
 | e11 / e12 修正前 (`83f2db7`) | `__bss_end=0x1936E0`、e 正味 **29,808B** | **22,816B** |
 | e12 ピーク修正後 | `__bss_end=0x193740`、e 正味 **29,904B** (+96B) | **22,720B** |
-| f | 8,192B | 14,528B |
-| g | 3,072B | 11,456B |
-| h (selftest/診断追加) | 3,072B | **8,384B** |
+| f (**ユーザー決定 2026-10-08: 予備から +4KB → 12,288B**) | 12,288B (f5a 実測 6,400B、-Os 込み、残り 5,888B) | 10,432B |
+| g | 3,072B | 7,360B |
+| h (selftest/診断追加) | 3,072B | **4,288B** (予備) |
 
 e の 16,384B 枠は修正前で **13,424B 超過**、修正後で **13,520B 超過**。
 一時 +16KiB で吸収しているため、枠内の合格とはしない。修正前の f/g/h 14,336B
 控除後は **8,480B**、修正後は **8,384B**。KHEAP を 192KiB に戻すと、
 修正前 **6,432B** / 修正後 **6,336B** しか残らず f/g/h の枠に足りない。
 E11-BUD の kernel 専用ピークを統合ゲストで測り直してから復元と再配分を決める。
+**f5a の後 (2026-10-08)**: f5a だけで f 枠 8,192B のうち 6,400B (appmem 4 TU は -Os) を使ったので、ユーザー決定で予備から f に +4KB (12,288B)。予備は約 4.3KB、KHEAP の一時増枠は維持。f の各段で実測し、枠を超えたら止める。
 ASSERT・診断削除・T3前倒しで超過を隠さず、T3 着手前の再見積もりゲートを維持する。
 
 圧縮 `vmkernel.lz4` は修正前 **494,395B** / 修正後 **494,417B**、

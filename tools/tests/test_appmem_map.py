@@ -14,11 +14,11 @@ import host32
 from mutpar import run_ordered
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SOURCES = ['exec/appmem.c', 'kernel/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c']
-TARGET_SRCS = ['exec/appmem.c', 'kernel/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c',
+SOURCES = ['exec/appmem.c', 'kernel/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'kernel/paging.c', 'exec/exec.c', 'exec/appslot.c']
+TARGET_SRCS = ['exec/exec.c', 'exec/appslot.c', 'exec/lease.c', 'exec/appslot.h', 'exec/appmem.c', 'kernel/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c',
     'exec/appmem.h', 'kernel/paging_app.h', 'kernel/paging.c', 'kernel/paging.h',
     'kernel/pgalloc.c', 'kernel/pgalloc.h', 'kernel/physmem.c', 'kernel/physmem.h',
-    'include/types.h', 'include/memmap.h', 'include/io.h',
+    'include/appmem_types.h', 'sdk/include/os32/os32_kapi_shared.h', 'include/types.h', 'include/memmap.h', 'include/io.h',
     'include/cpu.h', 'include/pc98.h', 'include/sys.h', 'include/tvram.h',
     'kernel/gdt.h', 'kernel/tss.h', 'arch/x86/arch_cpu.h', 'arch/x86/arch_io.h', 'lib/kstring.h', 'tools/tests/appmem_map_host.c',
     'tools/tests/test_appmem_map.py', 'tools/tests/pgalloc_host_fixture.h',
@@ -27,13 +27,13 @@ TARGET_SRCS = ['exec/appmem.c', 'kernel/paging_app.c', 'exec/appmem_map.c', 'exe
 DATA_ABORT = '''    for (u32 va = tx->base; va < tx->end; va += PAGE_SIZE) {
         u32 *entry = app_entry(tx, va);
         if (entry && *entry) {
-            app_return(tx->as->owner, *entry & ~(PAGE_SIZE - 1U));
+            app_return(tx->as, *entry & ~(PAGE_SIZE - 1U));
             *entry = 0;
         }
     }
 '''
 PT_ABORT = '''    for (u32 k = 0; k < MEM_APP_BAND_MAX_PDES; k++) if (tx->pending[k]) {
-        app_return(tx->as->owner, tx->pending[k]);
+        app_return(tx->as, tx->pending[k]);
         tx->pending[k] = 0;
     }
 '''
@@ -42,8 +42,8 @@ MUTANTS = [
     ('free-before-publish', 2, 'paging_app_commit(&tx);', 'paging_app_abort(&tx); paging_app_commit(&tx);', 'no free before publication'),
     ('PT-zero', 1, 'kmemset(P2V(tx->pending[k]), 0, PAGE_SIZE);', '(void)k;', 'PT zero'),
     ('early-PRESENT', 1, 'phys | PTE_RW | PTE_USER;', 'phys | PAGE_RW | PTE_USER;', 'staged PRESENT clear'),
-    ('rollback-PFN-leak', 1, 'app_return(tx->as->owner, *entry & ~(PAGE_SIZE - 1U));', '(void)entry;', 'data before PT free'),
-    ('rollback-PT-leak', 1, 'app_return(tx->as->owner, tx->pending[k]);', '(void)k;', 'PFN rollback'),
+    ('rollback-PFN-leak', 1, 'app_return(tx->as, *entry & ~(PAGE_SIZE - 1U));', '(void)entry;', 'data before PT free'),
+    ('rollback-PT-leak', 1, 'app_return(tx->as, tx->pending[k]);', '(void)k;', 'PFN rollback'),
     ('PT-before-data', 1, DATA_ABORT + PT_ABORT, PT_ABORT + DATA_ABORT, 'data before PT free'),
     ('failure-publish', 2, 'if (rc) return rc;\n    if (!appmem_plan_valid(table, &plan)) {', 'if (rc) { appmem_publish(table, &plan); return rc; }\n    if (!appmem_plan_valid(table, &plan)) {', 'failure table unchanged'),
     ('active-no-reload', 2, 'if (paging_current_cr3() == as->pd_phys) paging_load_cr3(as->pd_phys);', '(void)as;', 'publish reload count'),
@@ -80,6 +80,10 @@ MUTANTS = [
      'plan.left = (struct appmem_extent){e->base, base, APPMEM_ANON, 0};', 'unmap fragment identity'),
     ('unmap-publish-first', 3, '    rc = paging_app_unmap_free(&tx);',
      '    appmem_unmap_publish(table, &plan); rc = paging_app_unmap_free(&tx);', 'unmap extent last'),
+    ('unmap-SURFACE-counter', 1, 'paging_app_unmap_reject_count++;', 'if (!ledger_surfaces[0].npages) paging_app_unmap_reject_count++;', 'unmap SURFACE diagnosed'),
+    ('unmap-empty-PT-surface', 1, 'if (!app_releasable(as->owner, as->app_pt_phys[k])) goto reject;', '(void)k;', 'unmap reject before writes'),
+    ('unmap-PDE-retained', 1, '        if (!pgalloc_free_n_owner(tx->as->owner, tx->as->app_pt_phys[k] / PAGE_SIZE, 1)) {',
+     '        ((u32 *)P2V(tx->as->pd_phys))[APP_BAND_PDE + k] = tx->as->app_pt_phys[k] | PAGE_RW;\n        if (!pgalloc_free_n_owner(tx->as->owner, tx->as->app_pt_phys[k] / PAGE_SIZE, 1)) {', 'unmap PDE before PT free'),
     ('unmap-k0-free', 1, 'if (!k) continue;', 'if (0) continue;', 'unmap k0 retained'),
 
     ('map-plan-before-stage', 2, '    if (!appmem_plan_valid(table, &plan)) return APPMEM_EINVAL;',
@@ -89,6 +93,21 @@ MUTANTS = [
     ('unmap-early-empty-NP', 1, 'if (unmap_empty(tx, k)) { pd[APP_BAND_PDE + k] = 0; continue; }',
      'if (unmap_empty(tx, k)) { u32 *pt = P2V(tx->as->app_pt_phys[k]); for (u32 j = 0; j < PTE_COUNT; j++) pt[j] &= ~PTE_PRESENT; pd[APP_BAND_PDE + k] = 0; continue; }',
      'unmap empty PT untouched before TLB'),
+
+    ('teardown-ANON-loop', 5, 'if (e->kind == APPMEM_ANON) {', 'if (0 && e->kind == APPMEM_ANON) {', 'teardown R5 no leftover'),
+    ('teardown-entry-poison', 5, '    if (a->as->appmem_poisoned) goto poisoned;\n    shlib_addrspace_detach',
+     '    shlib_addrspace_detach', 'poison quarantined'),
+    ('free-range-no-break', 4, '                paging_addrspace_poison(as);\n                break;',
+     '                paging_addrspace_poison(as);\n                continue;', 'free range poison stops'),
+    ('poison-no-abort', 4, '    exec_addrspace_abort(as);', '    (void)as;', 'poison owner abort requested'),
+    ('poison-live-count', 4, '    live_addrspaces--;\n    exec_addrspace_abort(as);',
+     '    exec_addrspace_abort(as);', 'poison counted once'),
+    ('resume-no-abort', 5, '    g_cur_app = a;\n    ring3_abort_check();',
+     '    g_cur_app = a;', 'poison resume killed before CR3'),
+    ('syscall-exit-no-abort', 5, '    ring3_abort_check();\n    exec_park_stop(frame);',
+     '    exec_park_stop(frame);', 'poison syscall exit killed'),
+    ('WM-clears-poison-abort', 6, 'if (!g_slot[i].as || !g_slot[i].as->appmem_poisoned)',
+     'if (1)', 'poison WM clear preserves abort'),
 
 ]
 
@@ -110,18 +129,65 @@ def main():
         with tempfile.TemporaryDirectory(prefix='os32-f4-') as d:
             tmp = pathlib.Path(d)
             includes = ['-I' + str(tmp), *['-I' + str(ROOT / p) for p in
-                ('tools/tests/host_arch', 'include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec')]]
+                ('tools/tests/host_arch', 'include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec', 'sdk/include/os32')]]
             cc += includes
             # Share host IF across TUs so the real allocator's short IRQ save
             # is distinguished from an incorrectly disabled transaction.
             io = (ROOT / 'tools/tests/host_arch/arch_io.h').read_text()
             (tmp / 'arch_io.h').write_text(io.replace('static unsigned int host_arch_if = 0x202U;', 'extern unsigned int host_arch_if;'))
             (tmp / 'hooks.h').write_text('#include "types.h"\n#include "io.h"\nu32 map_alloc(u32,int);\nint map_free(u32,u32,int);\nunsigned int publish_save(void);\nstruct appmem_table; struct appmem_plan;\nint host_plan_valid(const struct appmem_table *, const struct appmem_plan *);\nvoid host_pte_touch(void);\n')
+            def function(source, signature):
+                begin = source.index(signature)
+                brace = source.index('{', begin)
+                depth, end = 1, brace + 1
+                while depth:
+                    depth += (source[end] == '{') - (source[end] == '}')
+                    end += 1
+                return source[begin:end]
+
+            def exec_parts(source):
+                parts = [function(source, sig) for sig in
+                         ('void exec_addrspace_abort(', 'void ring3_abort_check(', 'static void exec_teardown_app(')]
+                # Execute actual safe-point tails; Linux boundary supplies the
+                # non-returning kill and MMU entry. R1 separately tests real kill.
+                resume = function(source, 'i32 exec_resume(')
+                tail = resume[resume.index('    appslot_resume_commit('):resume.index('    return 0;   /* 到達しない */')]
+                parts.append('static void host_resume_tail(int app_id) { AppSlot *a = appslot_get(app_id);\n' + tail + '\n}')
+                dispatch = function(source, 'void __cdecl ring3_syscall_dispatch(')
+                tail = dispatch[dispatch.index('syscall_complete:') + len('syscall_complete:'):dispatch.rfind('}')]
+                parts.append('static void host_syscall_tail(u32 *frame) { int prev_caller = 0, prev_in_syscall = 0; u32 *prev_frame = 0;\n' + tail + '\n}')
+                return '\n'.join(parts)
+
+            (tmp / 'exec_source.c').write_text(exec_parts(bodies[5]))
+            (tmp / 'abort_clear_source.c').write_text(function(bodies[6], 'int appslot_abort_clear('))
+            lease_source = (ROOT / 'exec/lease.c').read_text()
+            parts = ['volatile u32 lease_revoke_fail_count, lease_revoke_all_fail_count;']
+            for signature in ('static int context(', 'int lease_release(', 'int lease_revoke_sid(', 'int lease_revoke_all('):
+                begin = lease_source.index(signature)
+                brace = lease_source.index('{', begin)
+                depth, end = 1, brace + 1
+                while depth:
+                    depth += (lease_source[end] == '{') - (lease_source[end] == '}')
+                    end += 1
+                parts.append(lease_source[begin:end])
+            (tmp / 'lease_revoke_source.c').write_text('\n'.join(parts))
+
             for src in ('paging', 'pgalloc'):
                 (tmp / (src + '_source.c')).write_text((ROOT / ('kernel/' + src + '.c')).read_text())
 
             def compile_source(source, key, index):
                 src, obj = tmp / (key + '.c'), tmp / (key + '.o')
+                if index >= 4:
+                    if index == 4: (tmp / 'paging_source.c').write_text(source)
+                    if index == 5: (tmp / 'exec_source.c').write_text(exec_parts(source))
+                    if index == 6: (tmp / 'abort_clear_source.c').write_text(function(source, 'int appslot_abort_clear('))
+                    host32.build(cc + ['-c', str(ROOT / 'tools/tests/appmem_map_host.c'), '-o', str(obj)],
+                                 check=True, capture_output=True, text=True, timeout=30)
+                    # Restore inputs before the next (sequential) mutation.
+                    (tmp / 'paging_source.c').write_text(bodies[4])
+                    (tmp / 'exec_source.c').write_text(exec_parts(bodies[5]))
+                    (tmp / 'abort_clear_source.c').write_text(function(bodies[6], 'int appslot_abort_clear('))
+                    return obj
                 if index in (2, 3): source = source.replace('irq_save()', 'publish_save()')
                 if index == 2: source = source.replace('appmem_plan_valid(table, &plan)', 'host_plan_valid(table, &plan)')
                 src.write_text(source)
@@ -140,12 +206,12 @@ def main():
                 host32.build(cc + ['-c', str(ROOT / path), '-o', str(obj)], check=True,
                                capture_output=True, text=True, timeout=30)
                 objects.append(obj)
-            normal = [compile_source(body, 'normal' + str(i), i) for i, body in enumerate(bodies)]
+            normal = [compile_source(body, 'normal' + str(i), i) for i, body in enumerate(bodies[:4])]
 
             def run(objs, key):
                 exe = tmp / (key + '.elf')
                 host32.build(['gcc', '-m32', '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
-                                *map(str, objects + objs), '-o', str(exe)], check=True,
+                                *map(str, (objects if len(objs) == 4 else objects[1:]) + objs), '-o', str(exe)], check=True,
                                capture_output=True, text=True, timeout=30)
                 return host32.run([str(exe)], runner=args.runner, capture_output=True, text=True, timeout=host32.RUN_TIMEOUT)
 
@@ -162,7 +228,9 @@ def main():
                     try:
                         assert bodies[target].count(old) == 1, (name, bodies[target].count(old))
                         obj = compile_source(bodies[target].replace(old, new), f'mut{index}', target)
-                        objs = normal.copy(); objs[target] = obj
+                        objs = normal.copy()
+                        if target < 4: objs[target] = obj
+                        else: objs = [obj] + objs
                         r = run(objs, f'mut{index}')
                     except subprocess.CalledProcessError as e:
                         return 'COMPILE_LINK_ERROR', name, time.monotonic() - start, (e.stdout or '') + (e.stderr or '')
@@ -173,7 +241,9 @@ def main():
                     status = ('RED' if r.returncode == 1 and f'FAIL: {expected}\n' in r.stdout else
                               'SURVIVED' if r.returncode == 0 else 'SIGNAL' if r.returncode < 0 else 'ERROR')
                     return status, name, time.monotonic() - start, r.stdout + r.stderr
-                results = list(run_ordered(one, list(enumerate(MUTANTS))))
+                # Fixture-copy mutants share include paths, so run those sequentially.
+                results = list(run_ordered(one, [(i, m) for i, m in enumerate(MUTANTS) if m[1] < 4]))
+                results += [one((i, m)) for i, m in enumerate(MUTANTS) if m[1] >= 4]
                 for status, name, seconds, output in results:
                     print(f'{status} (runtime): {name} ({seconds:.2f}s)')
                     if status != 'RED': print(output)

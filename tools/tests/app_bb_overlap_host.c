@@ -57,6 +57,7 @@ int host_free_hook(u32 owner, u32 pfn, int n)
 
 /* exec_teardown_app が引く。この試験は shlib を載せない。 */
 #include "appslot.h"
+void serial_puts_polled(const char *s) { (void)s; }
 void shlib_addrspace_detach(struct addrspace *as);
 void shlib_addrspace_detach(struct addrspace *as) { (void)as; }
 
@@ -261,3 +262,6 @@ void _start(void) {
     exec_teardown_app(&a); CHECK(!kmalloc_used() && used_pages == before);
     SAY("app_bb_overlap: PASS high private image/heap/variable stack, supervisor BB aliases, KHEAP and owner0"); die(0);
 }
+
+/* Paging-only fixture has no exec slots; abort delivery is appmem_map_host. */
+void exec_addrspace_abort(struct addrspace *as) { (void)as; }

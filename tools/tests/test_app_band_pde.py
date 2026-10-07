@@ -15,7 +15,7 @@ import sys
 MUTATIONS = [
  ('single-PDE', '    as->app_pde_count = MEM_APP_BAND_MAX_PDES;', '    as->app_pde_count = 1;'),
  ('master-USER', '        pd[pdi] |= PTE_USER;', '        page_directory[pdi] |= PTE_USER;'),
- ('PT-destroy-leak', '        if (as->app_pt_phys[k])\n            pgalloc_free_n_owner', '        if (0)\n            pgalloc_free_n_owner'),
+ ('PT-destroy-leak', '        if (as->app_pt_phys[k] &&', '        if (0 && as->app_pt_phys[k] &&'),
  ('partial-PT-leak', '        while (n) {', '        while (0) {'),
  ('kselftest-old-AS-count', 'PDE_COUNT * sizeof(u32) / PAGE_SIZE + data_pages', '(PDE_COUNT + PTE_COUNT) * sizeof(u32) / PAGE_SIZE + data_pages'),
 ]

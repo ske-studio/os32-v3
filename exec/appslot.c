@@ -744,7 +744,9 @@ int appslot_abort_clear(void)
     g_slot[APP_ID_SHELL].stop_wm_req = 0;
     for (i = APP_ID_MIN; i <= APP_ID_MAX; i++) {
         if (g_slot[i].state != APP_STATE_FREE) {
-            g_slot[i].abort_req = 0;
+            /* WM clears keyboard STOP requests, never a quarantine abort. */
+            if (!g_slot[i].as || !g_slot[i].as->appmem_poisoned)
+                g_slot[i].abort_req = 0;
             g_slot[i].stop_wm_req = 0;
         }
     }

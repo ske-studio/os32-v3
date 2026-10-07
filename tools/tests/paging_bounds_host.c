@@ -316,3 +316,6 @@ void _start(void)
     SAY("PASS: real allocator rollback, live-AS lifecycle, master-only backing");
     die(0);
 }
+
+/* Paging-only fixture has no exec slots; abort delivery is appmem_map_host. */
+void exec_addrspace_abort(struct addrspace *as) { (void)as; }

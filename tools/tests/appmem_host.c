@@ -2,6 +2,7 @@
 #include "appmem.h"
 #include "memmap.h"
 #include "paging.h"
+#include "os32_kapi_shared.h"
 
 #define WRAP_BYTES 0xfffff001UL
 #define ONE_SHORT_BYTES 0xfffff000UL
@@ -150,6 +151,29 @@ static void unmap_table(void)
     CHECK("same count insertion prepare", !prepare(&t, &l, PAGE_SIZE, lo+2*PAGE_SIZE, APPMEM_MAP_EXACT, &m));
     t.e[0] = (struct appmem_extent){lo,lo+PAGE_SIZE,APPMEM_ANON,0};
     CHECK("same count insertion invalid", !appmem_plan_valid(&t, &m));
+    /* Same count/first/merged range: split a neighbour and drop a distant tail. */
+    t = (struct appmem_table){0};
+    t.e[0] = (struct appmem_extent){lo, lo+2*PAGE_SIZE, APPMEM_ANON, 0};
+    t.e[1] = (struct appmem_extent){lo+3*PAGE_SIZE, lo+4*PAGE_SIZE, APPMEM_ANON, 0};
+    t.e[2] = (struct appmem_extent){lo+6*PAGE_SIZE, lo+7*PAGE_SIZE, APPMEM_ANON, 0};
+    CHECK("remove stale prepare", !prepare(&t, &l, PAGE_SIZE, lo+2*PAGE_SIZE, APPMEM_MAP_EXACT, &m));
+    t.e[0].end = lo+PAGE_SIZE;
+    t.e[1] = (struct appmem_extent){lo+PAGE_SIZE, lo+2*PAGE_SIZE, APPMEM_ANON, 0};
+    t.e[2] = (struct appmem_extent){lo+3*PAGE_SIZE, lo+4*PAGE_SIZE, APPMEM_ANON, 0};
+    before = t;
+    CHECK("remove only invalid", !appmem_plan_valid(&t, &m));
+    appmem_publish(&t, &m);
+    CHECK("remove stale unchanged", equal(&t, &before, sizeof(t)));
+    t = (struct appmem_table){0};
+    t.e[0] = (struct appmem_extent){lo, lo+PAGE_SIZE, APPMEM_ANON, 0};
+    /* A corrupt remove count alone must not consume an unrelated tail. */
+    CHECK("remove only prepare", !prepare(&t, &l, PAGE_SIZE, lo+2*PAGE_SIZE, APPMEM_MAP_EXACT, &m));
+    m.remove_count++;
+    before = t;
+    CHECK("remove only invalid", !appmem_plan_valid(&t, &m));
+    appmem_publish(&t, &m);
+    CHECK("remove only unchanged", equal(&t, &before, sizeof(t)));
+
 }
 
 static void run(void)
@@ -158,6 +182,25 @@ static void run(void)
     struct appmem_table t = {0}, before;
     struct appmem_plan p = {0}, old;
     u32 low = l.primary_mapped_end, high = MEM_EXEC_HEAP_BASE;
+    CHECK("public error translation", appmem_error_public(APPMEM_EINVAL) == OS32_ERR_INVAL &&
+          appmem_error_public(APPMEM_ENOVA) == OS32_ERR_INVAL &&
+          appmem_error_public(APPMEM_EFULL) == OS32_ERR_FULL &&
+          appmem_error_public(APPMEM_ENOSPC) == APPMEM_ENOSPC && !appmem_error_public(0));
+    struct addrspace as = {0};
+    appmem_init(&as, MEM_EXEC_LOAD_ADDR + 1, MEM_EXEC_LOAD_ADDR + 3*PAGE_SIZE,
+                MEM_EXEC_HEAP_BASE + PAGE_SIZE, l.guard_b);
+    CHECK("initial layout saved", as.appmem_layout.img_end == MEM_EXEC_LOAD_ADDR + 1 &&
+          as.appmem_layout.primary_mapped_end == MEM_EXEC_LOAD_ADDR + PAGE_SIZE);
+    CHECK("initial kinds registered", as.appmem.e[0].base == MEM_EXEC_LOAD_ADDR + PAGE_SIZE &&
+          as.appmem.e[0].end == MEM_EXEC_LOAD_ADDR + 3*PAGE_SIZE && as.appmem.e[0].kind == APPMEM_LIBC_INITIAL &&
+          as.appmem.e[1].kind == APPMEM_EXEC_INITIAL && as.appmem.e[1].end == MEM_EXEC_HEAP_BASE + PAGE_SIZE);
+    struct appmem_layout empty = l;
+    empty.exec_heap_cur_end = MEM_EXEC_HEAP_BASE;
+    t.e[0] = (struct appmem_extent){MEM_EXEC_HEAP_BASE-PAGE_SIZE, MEM_EXEC_HEAP_BASE, APPMEM_ANON, 0};
+    CHECK("reservation boundary prepare", !prepare(&t, &empty, PAGE_SIZE, MEM_EXEC_HEAP_BASE, APPMEM_MAP_EXACT, &p));
+    appmem_publish(&t, &p);
+    CHECK("reservation boundary no merge", t.e[0].end == MEM_EXEC_HEAP_BASE && t.e[1].base == MEM_EXEC_HEAP_BASE);
+    t = (struct appmem_table){0};
     CHECK("extent bytes", sizeof(t.e[0]) == 16 && sizeof(t) == 16 * APPMEM_EXTENT_MAX);
     CHECK("round page", !prepare(&t, &l, 1, 0, 0, &p) && p.end - p.base == PAGE_SIZE);
     CHECK("flags0 preserves break", p.base == high - PAGE_SIZE && p.base > low);
@@ -193,10 +236,10 @@ static void run(void)
     const u32 fixed[] = {MEM_EXEC_LOAD_ADDR, low - PAGE_SIZE, MEM_EXEC_HEAP_BASE,
                         l.guard_b, MEM_APP_STACK_TOP - PAGE_SIZE};
     for (u32 i = 0; i < sizeof(fixed) / sizeof(fixed[0]); i++) {
-        rejected(&t, &l, PAGE_SIZE, fixed[i], APPMEM_MAP_EXACT, APPMEM_ENOVA, "fixed");
-        CHECK("fixed hint fallback", !prepare(&t, &l, PAGE_SIZE, fixed[i], 0, &p) && p.base == high - PAGE_SIZE);
+        rejected(&t, &l, PAGE_SIZE, fixed[i], APPMEM_MAP_EXACT, APPMEM_EINVAL, "fixed");
+        rejected(&t, &l, PAGE_SIZE, fixed[i], 0, APPMEM_EINVAL, "fixed hint rejected");
     }
-    rejected(&t, &l, 2 * PAGE_SIZE, high - PAGE_SIZE, APPMEM_MAP_EXACT, APPMEM_ENOVA, "cross boundary");
+    rejected(&t, &l, 2 * PAGE_SIZE, high - PAGE_SIZE, APPMEM_MAP_EXACT, APPMEM_EINVAL, "cross boundary");
     CHECK("round max no overflow", prepare(&t, &l, ONE_SHORT_BYTES, 0, 0, &p) == APPMEM_ENOVA);
     CHECK("hint success", !prepare(&t, &l, PAGE_SIZE, low + PAGE_SIZE, 0, &p) && p.base == low + PAGE_SIZE);
     appmem_publish(&t, &p);

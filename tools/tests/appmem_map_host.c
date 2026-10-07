@@ -2,6 +2,9 @@
 #include "types.h"
 #include "tvram.h"
 #include "appmem.h"
+#include "appslot.h"
+#include "lease.h"
+#include "os32_kapi_shared.h"
 static u32 host_cr3;
 static void map_sync(u32 root);
 static int unmap_free_check(u32 owner, u32 pfn, int n);
@@ -9,7 +12,10 @@ static unsigned int unmap_save(void);
 static void unmap_sync(void);
 static void unmap_cases(u32 owner);
 #define HOST_MMU_LOAD_CHECK(root) map_sync(root)
+int paging_free(u32 owner, u32 pfn, int n);
+#define pgalloc_free_n_owner paging_free
 #include "paging_source.c"
+#undef pgalloc_free_n_owner
 #include "pgalloc_source.c"
 #include "pgalloc_host_fixture.h"
 #include "paging_app.h"
@@ -52,6 +58,11 @@ static struct appmem_table table, saved_table;
 static struct appmem_layout layout;
 static u32 base, end, allocs[DATA_MAX + MEM_APP_BAND_MAX_PDES];
 static u32 alloc_count, need_pt, calls, reloads, publish_count;
+static int integration;
+static u32 integration_free_fail;
+int paging_free(u32 owner, u32 pfn, int n) {
+    return integration && pfn == integration_free_fail ? 0 : pgalloc_free_n_owner(owner, pfn, n);
+}
 static int fail_at, failed, watching, ready, unmapping, reject_unmap;
 static u32 irq_touches, irq_bound, validation_calls;
 int host_plan_valid(const struct appmem_table *t, const struct appmem_plan *p) {
@@ -59,6 +70,7 @@ int host_plan_valid(const struct appmem_table *t, const struct appmem_plan *p) {
     return appmem_plan_valid(t, p);
 }
 void host_pte_touch(void) {
+    if (integration) return;
     if (!_irq_enabled()) { irq_touches++; CHECK("IRQ page work bounded", irq_touches <= irq_bound); }
 }
 static u32 pd_images[3][PDE_COUNT], pt_images[MEM_APP_BAND_MAX_PDES][PTE_COUNT];
@@ -138,6 +150,7 @@ static void prepublication(void) {
     }
 }
 u32 map_alloc(u32 owner, int n) {
+    if (integration) return pgalloc_alloc_phys(owner, n);
     CHECK("alloc IF enabled", _irq_enabled());
     CHECK("one page allocations", n == 1);
     prepublication();
@@ -151,6 +164,7 @@ u32 map_alloc(u32 owner, int n) {
     return p;
 }
 int map_free(u32 owner, u32 pfn, int n) {
+    if (integration) return pfn == integration_free_fail ? 0 : pgalloc_free_n_owner(owner, pfn, n);
     if (unmapping) return unmap_free_check(owner, pfn, n);
     CHECK("no free before publication", failed);
     CHECK("rollback IF enabled", _irq_enabled());
@@ -166,6 +180,7 @@ int map_free(u32 owner, u32 pfn, int n) {
     return pgalloc_free_n_owner(owner, pfn, n);
 }
 unsigned int publish_save(void) {
+    if (integration) return irq_save();
     CHECK("unmap reject before writes", !reject_unmap);
     if (unmapping) return unmap_save();
     ready = 1;
@@ -566,7 +581,20 @@ static void unmap_cases(u32 owner) {
     for (u32 closing = 0; closing < 2; closing++) {
         ledger_surfaces[0].first = original / PAGE_SIZE; ledger_surfaces[0].npages = 1;
         ledger_surfaces[0].closing = closing; ledger_surfaces[0].lease_count = closing;
+        rejects = paging_app_unmap_reject_count;
         unmap_reject(lo, 3*PAGE_SIZE, APPMEM_EINVAL, 1);
+        CHECK("unmap SURFACE diagnosed", paging_app_unmap_reject_count == rejects + 1);
+        ledger_surfaces[0] = (struct ledger_surface){0};
+    }
+    /* Protect the empty PT frame itself, with both live SURFACE states. */
+    u32 pk = (lo + 2*PAGE_SIZE - MEM_APP_BAND_BASE) / MEM_APP_BAND_PDE_SIZE;
+    for (u32 closing = 0; closing < 2; closing++) {
+        ledger_surfaces[0].first = a.app_pt_phys[pk] / PAGE_SIZE;
+        ledger_surfaces[0].npages = 1;
+        ledger_surfaces[0].closing = closing; ledger_surfaces[0].lease_count = closing;
+        rejects = paging_app_unmap_reject_count;
+        unmap_reject(lo, 3*PAGE_SIZE, APPMEM_EINVAL, 1);
+        CHECK("unmap PT surface diagnosed", paging_app_unmap_reject_count == rejects + 1);
         ledger_surfaces[0] = (struct ledger_surface){0};
     }
     for (u32 v = 0; v < 5; v++) {
@@ -590,6 +618,8 @@ static void unmap_cases(u32 owner) {
     CHECK("unmap failed frame kept", *original_entry(base) / PAGE_SIZE == unmap_images[0] / PAGE_SIZE &&
           !(*original_entry(base) & PTE_PRESENT) && equal(&table, &saved_table, sizeof(table)));
     CHECK("unmap bad free diagnosed", paging_app_bad_free_count == bad + 1);
+    CHECK("unmap AS poisoned", a.appmem_poisoned && !paging_app_context(&a));
+    a.appmem_poisoned = 0; live_addrspaces++; /* Fixture alone repairs the impossible injected failure. */
     fail_free = unmapping = watching = 0;
     *original_entry(base) |= PTE_PRESENT;
     u32 k = (base - MEM_APP_BAND_BASE) / MEM_APP_BAND_PDE_SIZE;
@@ -602,6 +632,202 @@ static void number(u32 n) {
     for (u32 i = 0; i < len / 2; i++) { char c = buf[i]; buf[i] = buf[len - i - 1]; buf[len - i - 1] = c; }
     say(buf, len);
 }
+static u32 serial_lines, exec_as_leftover_pages, detached;
+void serial_puts_polled(const char *s) { (void)s; serial_lines++; }
+#include "lease_revoke_source.c"
+void shlib_addrspace_detach(struct addrspace *as) { (void)as; detached++; }
+void kfree(void *p) { CHECK("teardown AS control", p == &a); }
+static AppSlot g_slot[APP_SLOT_COUNT], *g_cur_app;
+static int current_slot = APP_ID_SHELL;
+static u32 ring3_abort_count, tick_count;
+static int ring3_in_syscall;
+static u32 *g_cur_frame;
+static int killed, entered_user;
+static void *kernel_tss;
+static long kill_jump[5];
+AppSlot *appslot_get(int id) {
+    return id >= APP_ID_SHELL && id <= APP_ID_MAX && g_slot[id].state != APP_STATE_FREE ? &g_slot[id] : 0;
+}
+int appslot_cur(void) { return current_slot; }
+int res_owner_get(void) { return current_slot; }
+void ring3_abort_kill(void) { killed++; __builtin_longjmp(kill_jump, 1); }
+void appslot_resume_commit(int id) { current_slot = id; g_slot[id].state = APP_STATE_RUNNING; }
+void appslot_mark_scheduled(int id, u32 ticks) { (void)id; (void)ticks; }
+static void exec_restore_context(int id) { (void)id; entered_user++; }
+void ring3_resume(const u32 *frame, u32 pd, void *tss) { (void)frame; (void)pd; (void)tss; entered_user++; }
+static void caller_access_leave(int *prev) { (void)prev; }
+static void exec_park_stop(u32 *frame) { (void)frame; entered_user++; }
+#include "exec_source.c"
+#include "abort_clear_source.c"
+static void poison_abort_cases(void) {
+    integration = 1;
+    for (int path = 0; path < 4; path++) for (int resume = 0; resume < 2; resume++) {
+        u32 owner;
+        CHECK("abort fixture owner", ledger_owner_new(LEDGER_KIND_AS, 0, "abort", &owner));
+        make_as(owner); host_cr3 = roots[0];
+        g_slot[2] = (AppSlot){0}; g_slot[3] = (AppSlot){0};
+        g_slot[2].state = resume ? APP_STATE_PARKED : APP_STATE_RUNNING;
+        g_slot[2].as = &a; g_slot[2].cpl3 = 1;
+        g_slot[3].state = APP_STATE_PARKED; g_slot[3].as = &b;
+        current_slot = resume ? APP_ID_SHELL : 2;
+        g_cur_app = resume ? 0 : &g_slot[2];
+        u32 live = live_addrspaces;
+        unsigned int saved = irq_save();
+        if (path == 0) paging_app_poison(&a);
+        else if (path == 1) {
+            u32 phys = pgalloc_alloc_phys(owner, 1);
+            CHECK("abort range map", phys && !paging_addrspace_map_user(&a, MEM_EXEC_LOAD_ADDR, phys, PAGE_RW | PTE_USER));
+            integration_free_fail = phys / PAGE_SIZE;
+            CHECK("abort range free", !paging_addrspace_free_user_range(&a, MEM_EXEC_LOAD_ADDR, MEM_EXEC_LOAD_ADDR + PAGE_SIZE));
+        } else if (path == 2) {
+            integration_free_fail = a.lease_pt_phys[0] / PAGE_SIZE;
+            paging_addrspace_destroy(&a);
+        } else {
+            u32 phys = pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, 1);
+            struct lease_mapping lm = {MEM_LEASE_BASE + MEM_APP_BAND_PDE_SIZE, phys, 1, PAGE_RO | PTE_USER, 0, 1, 0, 1};
+            ledger_surfaces[0] = (struct ledger_surface){0};
+            ledger_surfaces[0].first = phys / PAGE_SIZE; ledger_surfaces[0].npages = 1;
+            ledger_surfaces[0].gen = 1; ledger_surfaces[0].perm_max = LEDGER_PERM_RO;
+            /* Mapping allocates before the IRQ-disabled unmap under test. */
+            irq_restore(saved);
+            CHECK("abort lease map", phys && !paging_lease_map(&a, &lm, 1));
+            integration_free_fail = a.lease_pt_phys[1] / PAGE_SIZE;
+            CHECK("abort lease revoke", !lease_revoke_all(&a));
+            ledger_surfaces[0] = (struct ledger_surface){0};
+            CHECK("abort lease foreign return", pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, phys / PAGE_SIZE, 1));
+            saved = irq_save();
+        }
+        paging_addrspace_poison(&a);
+        CHECK("poison owner abort requested", g_slot[2].abort_req && !g_slot[3].abort_req && !_irq_enabled());
+        irq_restore(saved);
+        CHECK("poison counted once", live_addrspaces + 1 == live);
+        if (resume) {
+            CHECK("poison WM clear", !appslot_abort_clear());
+            CHECK("poison WM clear preserves abort", g_slot[2].abort_req);
+        }
+        killed = entered_user = 0;
+        if (!__builtin_setjmp(kill_jump)) {
+            if (resume) host_resume_tail(2);
+            else host_syscall_tail(g_slot[2].frame);
+        }
+        if (resume) CHECK("poison resume killed before CR3", killed == 1 && !entered_user && host_cr3 == roots[0]);
+        else CHECK("poison syscall exit killed", killed == 1 && !entered_user);
+        CHECK("poison boot context restored", paging_boot_context());
+        /* Host-only repair restores the count as well as the poison flag. */
+        integration_free_fail = 0;
+        a.appmem_poisoned = 0; live_addrspaces++;
+        /* A failed data return leaves an NP frame; host-only repair returns it. */
+        if (path == 1) {
+            u32 *pt = P2V(a.app_pt_phys[0]);
+            CHECK("abort data cleanup", pgalloc_free_n_owner(owner, pt[(MEM_EXEC_LOAD_ADDR >> PAGE_SHIFT) % PTE_COUNT] / PAGE_SIZE, 1));
+            pt[(MEM_EXEC_LOAD_ADDR >> PAGE_SHIFT) % PTE_COUNT] = 0;
+        }
+        paging_addrspace_destroy(&a);
+        CHECK("abort fixture retire", ledger_owner_retire(owner));
+    }
+    g_slot[2].state = g_slot[3].state = APP_STATE_FREE;
+    g_cur_app = 0; current_slot = APP_ID_SHELL;
+}
+
+static void teardown_cases(void) {
+    integration = 1;
+    u32 owner, out;
+    CHECK("teardown owner", ledger_owner_new(LEDGER_KIND_AS, 0, "exit", &owner));
+    make_as(owner); host_cr3 = roots[0]; watching = unmapping = 0;
+    AppSlot slot = {0}; slot.as = &a; slot.cpl3 = 1;
+    slot.load_addr = MEM_EXEC_LOAD_ADDR;
+    slot.sbrk_heap_limit = MEM_EXEC_LOAD_ADDR + 3*PAGE_SIZE;
+    slot.exec_heap_base = MEM_EXEC_HEAP_BASE; slot.exec_heap_size = PAGE_SIZE;
+    slot.stack_top = MEM_APP_STACK_TOP; slot.stack_base = MEM_APP_STACK_TOP - PAGE_SIZE;
+    appmem_init(&a, MEM_EXEC_LOAD_ADDR + 1, slot.sbrk_heap_limit,
+                MEM_EXEC_HEAP_BASE + PAGE_SIZE, slot.stack_base - MEM_GUARD_SIZE);
+    const u32 ranges[][2] = {{slot.load_addr, slot.sbrk_heap_limit},
+        {slot.exec_heap_base, slot.exec_heap_base + PAGE_SIZE}, {slot.stack_base, slot.stack_top}};
+    for (u32 i = 0; i < 3; i++) for (u32 va = ranges[i][0]; va < ranges[i][1]; va += PAGE_SIZE) {
+        u32 phys = pgalloc_alloc_phys(owner, 1);
+        CHECK("teardown initial pages", phys && !paging_addrspace_map_user(&a, va, phys, PAGE_RW | PTE_USER));
+    }
+    CHECK("teardown libc hole", !appmem_unmap(&a, &a.appmem, MEM_EXEC_LOAD_ADDR + PAGE_SIZE, PAGE_SIZE));
+    CHECK("teardown libc hole remap", !appmem_map(&a, &a.appmem, &a.appmem_layout,
+          PAGE_SIZE, MEM_EXEC_LOAD_ADDR + PAGE_SIZE, APPMEM_MAP_EXACT, APPMEM_ANON, 0, &out));
+    CHECK("teardown ANON map", !appmem_map(&a, &a.appmem, &a.appmem_layout,
+          2*PAGE_SIZE, 0, 0, APPMEM_ANON, 0, &out));
+    u32 before = exec_as_leftover_pages;
+    exec_teardown_app(&slot);
+    CHECK("teardown R5 no leftover", !slot.as && !slot.cpl3 && !ledger_owner_pages(owner) &&
+          exec_as_leftover_pages == before && detached == 1 && !serial_lines);
+    CHECK("poison owner", ledger_owner_new(LEDGER_KIND_AS, 0, "poison", &owner));
+    make_as(owner); host_cr3 = roots[0];
+    slot.as = &a; slot.cpl3 = 1;
+    u32 foreign = pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, 1);
+    CHECK("poison foreign page", foreign);
+    ledger_surfaces[0] = (struct ledger_surface){0};
+    ledger_surfaces[0].first = foreign / PAGE_SIZE; ledger_surfaces[0].npages = 1;
+    ledger_surfaces[0].gen = 1; ledger_surfaces[0].perm_max = LEDGER_PERM_RO;
+    struct lease_mapping lm = {MEM_LEASE_BASE + MEM_APP_BAND_PDE_SIZE,
+        foreign, 1, PAGE_RO | PTE_USER, 0, 1, 0, 1};
+    CHECK("poison foreign lease", !paging_lease_map(&a, &lm, 1) && ledger_surfaces[0].lease_count == 1);
+    u32 pages = ledger_owner_pages(owner), pd = a.pd_phys;
+    paging_app_poison(&a);
+    exec_teardown_app(&slot);
+    CHECK("poison lease refs released", !a.leases[0].token && !ledger_surfaces[0].lease_count);
+    CHECK("poison quarantined", !slot.as && !slot.cpl3 && a.pd_phys == pd &&
+          ledger_owner_pages(owner) == pages && exec_as_leftover_pages == before + pages &&
+          serial_lines == 1 && detached == 1);
+    /* Host-only repair to return fixture resources; product never retries. */
+    a.appmem_poisoned = 0; live_addrspaces++; paging_addrspace_destroy(&a);
+    CHECK("poison fixture retired", ledger_owner_retire(owner));
+    ledger_surfaces[0] = (struct ledger_surface){0};
+    CHECK("poison foreign page returned", pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, foreign / PAGE_SIZE, 1));
+    /* PT return failure and duplicate PFNs after one successful data return. */
+    for (u32 duplicate = 0; duplicate < 2; duplicate++) {
+        CHECK("partial owner", ledger_owner_new(LEDGER_KIND_AS, 0, "partial", &owner));
+        make_as(owner); host_cr3 = roots[0];
+        slot.as = &a; slot.cpl3 = 1;
+        appmem_init(&a, MEM_EXEC_LOAD_ADDR + 1, MEM_EXEC_LOAD_ADDR + PAGE_SIZE,
+                    MEM_EXEC_HEAP_BASE, MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE - MEM_GUARD_SIZE);
+        CHECK("partial map", !appmem_map(&a, &a.appmem, &a.appmem_layout,
+              2*PAGE_SIZE, 0, 0, APPMEM_ANON, 0, &out));
+        u32 pk = (out - MEM_APP_BAND_BASE) / MEM_APP_BAND_PDE_SIZE;
+        u32 *pt = P2V(a.app_pt_phys[pk]);
+        u32 j = (out >> PAGE_SHIFT) % PTE_COUNT;
+        if (duplicate) {
+            CHECK("duplicate fixture release", pgalloc_free_n_owner(owner, pt[j+1] / PAGE_SIZE, 1));
+            pt[j+1] = pt[j];
+        } else integration_free_fail = a.app_pt_phys[pk] / PAGE_SIZE;
+        CHECK("partial free poisoned", appmem_unmap(&a, &a.appmem, out, 2*PAGE_SIZE) == APPMEM_EINVAL &&
+              a.appmem_poisoned && !paging_app_context(&a));
+        CHECK("partial retained metadata", a.appmem.e[0].base == out && a.app_pt_phys[pk] &&
+              !((u32 *)P2V(a.pd_phys))[APP_BAND_PDE + pk]);
+        pages = ledger_owner_pages(owner); before = exec_as_leftover_pages;
+        exec_teardown_app(&slot);
+        CHECK("partial no retry", ledger_owner_pages(owner) == pages &&
+              exec_as_leftover_pages == before + pages && serial_lines == duplicate + 2);
+        /* Reconstruct an empty PT solely to retire the host fixture. */
+        integration_free_fail = 0;
+        for (u32 i = 0; i < PTE_COUNT; i++) pt[i] = 0;
+        a.appmem_poisoned = 0; live_addrspaces++; paging_addrspace_destroy(&a);
+        CHECK("partial fixture retire", ledger_owner_retire(owner));
+    }
+
+    CHECK("range poison owner", ledger_owner_new(LEDGER_KIND_AS, 0, "range", &owner));
+    make_as(owner); host_cr3 = roots[0];
+    u32 foreign_page = pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, 1);
+    u32 own_page = pgalloc_alloc_phys(owner, 1);
+    CHECK("range poison map", foreign_page && own_page &&
+          !paging_addrspace_map_user(&a, MEM_EXEC_LOAD_ADDR, foreign_page, PAGE_RW | PTE_USER) &&
+          !paging_addrspace_map_user(&a, MEM_EXEC_LOAD_ADDR + PAGE_SIZE, own_page, PAGE_RW | PTE_USER));
+    CHECK("free range poison stops", !paging_addrspace_free_user_range(&a, MEM_EXEC_LOAD_ADDR, MEM_EXEC_LOAD_ADDR + 2*PAGE_SIZE) &&
+          a.appmem_poisoned && pgalloc_page_owned(own_page / PAGE_SIZE, owner));
+    a.appmem_poisoned = 0; live_addrspaces++;
+    ((u32 *)P2V(a.app_pt_phys[0]))[(MEM_EXEC_LOAD_ADDR >> PAGE_SHIFT) % PTE_COUNT] = 0;
+    CHECK("range poison cleanup", paging_addrspace_free_user_range(&a, MEM_EXEC_LOAD_ADDR + PAGE_SIZE, MEM_EXEC_LOAD_ADDR + 2*PAGE_SIZE) == 1);
+    paging_addrspace_destroy(&a);
+    CHECK("range poison retire", ledger_owner_retire(owner));
+    CHECK("range foreign return", pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, foreign_page / PAGE_SIZE, 1));
+
+}
+
 void _start(void) {
     u32 args[6] = {MEM_POOL_BASE, 0x4000000, 3, 0x32, 0xffffffffUL, 0}, result;
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
@@ -624,6 +850,8 @@ void _start(void) {
     CHECK("bad frees zero", !paging_app_bad_free_count && !ledger_bad_free);
     paging_addrspace_destroy(&b);
     CHECK("owner B returned", !ledger_owner_pages(ob));
+    poison_abort_cases();
+    teardown_cases();
     say("PASS appmem_map CHECK=", sizeof("PASS appmem_map CHECK=") - 1); number(checks); say("\n", 1);
     die(0);
 }
