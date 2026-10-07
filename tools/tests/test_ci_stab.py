@@ -422,7 +422,11 @@ class InfrastructureTests(unittest.TestCase):
 
 
     def test_build_compiles_outside_lock_and_keeps_pending(self):
+        self._check_build_compiles_outside_lock_and_keeps_pending(host32.build)
+
+    def _check_build_compiles_outside_lock_and_keeps_pending(self, build):
         import fcntl
+        import time
         with tempfile.TemporaryDirectory() as directory:
             tmp = pathlib.Path(directory)
             src, out = tmp / 'main.c', tmp / 'out'
@@ -433,14 +437,49 @@ class InfrastructureTests(unittest.TestCase):
                 if '-o' in args and '-E' not in args:
                     pending = pathlib.Path(args[args.index('-o') + 1])
                     with (pending.parent / '.lock').open('a') as lock:
-                        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        # 他試験の短いキャッシュ操作との競合は待つ。コンパイル中に
+                        # build 自身が保持するロックは解放されず、上限で失敗する。
+                        deadline = time.monotonic() + 10
+                        while True:
+                            try:
+                                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                                break
+                            except BlockingIOError:
+                                remaining = deadline - time.monotonic()
+                                if remaining <= 0:
+                                    self.fail('compile cache lock unavailable for 10 seconds')
+                                time.sleep(min(.01, remaining))
                         pending.touch()
                         host32.prune_fixtures(pending.parent)
                         self.assertTrue(pending.exists())
                 return real_run(args, **kwargs)
             with patch.object(host32.subprocess, 'run', side_effect=run):
-                host32.build(['gcc', str(src), '-o', str(out)], check=True)
+                build(['gcc', str(src), '-o', str(out)], check=True)
             self.assertEqual(subprocess.run([str(out)]).returncode, 0)
+
+    def test_build_compile_lock_mutant_is_red_at_deadline(self):
+        import inspect
+        import time
+        self._check_build_compiles_outside_lock_and_keeps_pending(host32.build)
+        source = inspect.getsource(host32.build)
+        original = '        result = subprocess.run(compile_args, **kwargs)\n'
+        self.assertEqual(source.count(original), 1)
+        source = source.replace(original,
+            "        with (cache / '.lock').open('a') as lock:\n"
+            '            fcntl.flock(lock, fcntl.LOCK_EX)\n'
+            '            result = subprocess.run(compile_args, **kwargs)\n')
+        namespace = dict(vars(host32))
+        exec(compile(source, host32.__file__, 'exec'), namespace)
+        # 長時間ロックを保持する変異だけ専用キャッシュに隔離する。
+        with tempfile.TemporaryDirectory() as directory:
+            namespace['__file__'] = str(pathlib.Path(directory) / 'tools/tests/host32.py')
+            started = time.monotonic()
+            with self.assertRaisesRegex(AssertionError,
+                                       'compile cache lock unavailable for 10 seconds'):
+                self._check_build_compiles_outside_lock_and_keeps_pending(namespace['build'])
+            elapsed = time.monotonic() - started
+        self.assertGreaterEqual(elapsed, 10)
+        print(f'compile-lock mutant RED at deadline ({elapsed:.2f}s)')
 
     def test_build_relative_link_inputs_use_cwd(self):
         with tempfile.TemporaryDirectory() as directory:
