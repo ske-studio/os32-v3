@@ -116,3 +116,10 @@
 | --- | --- | --- | --- |
 | E10-9 | 監査 (launch・GUI 移譲・V86 帰路) の失敗が計数だけで表示されない — 最初の 1 回だけシリアル 1 行か tag を残す | 改善 | e11a |
 
+
+### f5a (2026-10-07、ホスト確認。ゲストは F-6)
+
+| ID | 閉じた項目 | 証拠 |
+|---|---|---|
+| F-2 | 空 exec_heap の予約境界をまたぐ併合を禁止、shlib/lease/image/stack/guard の hint を INVAL。 | `tools/tests/appmem_host.c`、`/home/hight/os32-tmp/run/f5/report.md` |
+| F-3 | remove_count 単独・空 PT SURFACE・PDE before PT free の負例と変異。部分 free 失敗の隔離・計数・中断要求はホスト確認、実 kill はゲスト F-6。 | `tools/tests/appmem_map_host.c`、同 report。ゲストは F-6 |

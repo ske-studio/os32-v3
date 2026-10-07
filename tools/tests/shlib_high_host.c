@@ -149,3 +149,6 @@ void _start(void) {
     CHECK(used_pages == before + shpages && !ledger_bad_free);
     SAY("shlib_high: PASS fragmented originals, private copy, every allocation/read failure and owner0"); die(0);
 }
+
+/* Paging-only fixture has no exec slots; abort delivery is appmem_map_host. */
+void exec_addrspace_abort(struct addrspace *as) { (void)as; }

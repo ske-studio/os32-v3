@@ -1,5 +1,6 @@
 #include "v86_mem.h"
 #include "../drivers/serial.h"
+#include "appmem.h"
 #include "v86.h"
 #include "memmap.h"
 #include "exec.h"
@@ -690,6 +691,17 @@ void ring3_abort_request(void)
     appslot_abort_request();
 }
 
+/* Quarantine notification also targets parked apps. Like IRQ1's request this
+ * only stores abort_req; it never reclaims or longjmps with IRQs disabled.
+ * Four slots bound the scan even inside paging_lease_unmap's IRQ section. */
+void exec_addrspace_abort(struct addrspace *as)
+{
+    for (int id = APP_ID_MIN; id <= APP_ID_MAX; id++) {
+        AppSlot *a = appslot_get(id);
+        if (a && a->as == as) a->abort_req = 1;
+    }
+}
+
 /* Only explicit KAPI waits use this probe. It never unwinds kernel state.
  * A gui=0 nested child cannot hand STOP to the WM at syscall exit. */
 int ring3_wait_pending(void)
@@ -1076,7 +1088,19 @@ static void exec_teardown_app(AppSlot *a)
     /* 共有ライブラリの .data 複製ページを返す (PD 破棄の前, K3) */
     if (lease_revoke_all(a->as))
         kprintf(ATTR_RED, "lease revoke failed during teardown\n");
+    /* Revoke foreign leases even when private pages are quarantined. */
+    if (a->as->appmem_poisoned) goto poisoned;
     shlib_addrspace_detach(a->as);
+    for (u32 i = 0; i < APPMEM_EXTENT_MAX; i++) {
+        const struct appmem_extent *e = &a->as->appmem.e[i];
+        if (e->kind == APPMEM_ANON) {
+            u32 pages = (e->end - e->base) / PAGE_SIZE;
+            if (paging_addrspace_free_user_range(a->as, e->base, e->end) != pages) {
+                paging_addrspace_poison(a->as);
+                goto poisoned;
+            }
+        }
+    }
     if (a->sbrk_heap_limit > a->load_addr)
         paging_addrspace_free_user_range(a->as, a->load_addr,
                                          a->sbrk_heap_limit);
@@ -1085,12 +1109,18 @@ static void exec_teardown_app(AppSlot *a)
                                          a->exec_heap_base + a->exec_heap_size);
     paging_addrspace_free_user_range(a->as, a->stack_base, a->stack_top);
     paging_addrspace_destroy(a->as);
+    if (a->as->appmem_poisoned) goto poisoned;
     /* 最後に AS owner の取り残しを台帳から掃除し (件数は診断へ)、番号を返す
      * (TASK_T1_LEDGER §3-2、R5 (a))。 */
     left = 0;
     if (ledger_reclaim_owner(a->as->owner, &left))
         exec_as_leftover_pages += left;
     (void)ledger_owner_retire(a->as->owner);
+    goto done;
+poisoned:
+    serial_puts_polled("OS32: appmem AS poisoned; owner pages retained\r\n");
+    exec_as_leftover_pages += ledger_owner_pages(a->as->owner);
+done:
     kfree(a->as);
     a->as = 0;
     a->cpl3 = 0;
@@ -1936,6 +1966,8 @@ static int exec_launch(const char *cmdline, int gui_arg)
             return EXEC_ERR_NOMEM;
         }
         ctx->cpl3 = 1;
+        appmem_init(ctx->as, load_base + text_sz + bss_sz, sbrk_end,
+                    exec_heap_base + exec_heap_size, ctx->guard_b);
 
         /* **I6**: アプリ PT は master の identity PTE で初期化されている。
          * 落とし忘れると物理 0x5xxxxx が素通しで見え、他アプリのページや
@@ -2519,6 +2551,10 @@ i32 exec_resume(i32 app_id, i32 wait_ret)
 
     appslot_resume_commit((int)app_id);
     appslot_mark_scheduled((int)app_id, tick_count);   /* 票 T9 §12 S6 */
+    /* A parked AS may have been poisoned by a foreign lease revoke. Consume
+     * its abort before loading its PD or returning the saved frame to USER. */
+    g_cur_app = a;
+    ring3_abort_check();
     exec_restore_context((int)app_id);
     /* cli → TSS.ESP0 → CR3 → popad; iretd を割り込み禁止で一続きに。
      * iretd が保存済み EFLAGS (IF=1) を復元するのでアプリ側の IF は変わらない。 */

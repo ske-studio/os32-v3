@@ -1,3 +1,4 @@
+#include "appmem.h"
 #include "v86_mem.h"
 /* ======================================================================== */
 /*  KSELFTEST.C — カーネル内プリミティブの自己診断                          */
@@ -657,6 +658,30 @@ static void test_pool_model(void)
 /*  (4) R5 (b): 永続 owner の総量はその間に変わらない。                     */
 /*  件数 (R1) は 1 行に出す。値そのものは kernel.map の番地で読む。          */
 /* ------------------------------------------------------------------------ */
+/* Internal f5a transaction smoke test: real owner/lease AS and enabled IF. */
+static void test_appmem(void)
+{
+    struct addrspace as;
+    u32 owner = 0, base = 0;
+    int created = 0, mapped = 0;
+    int ok = ledger_owner_new(LEDGER_KIND_AS, 0, "appmem", &owner);
+    if (ok) created = paging_addrspace_create_lease(&as, owner) == 0;
+    check(ok && created && _irq_enabled() && !kctx_irq_depth && !kctx_exc_depth,
+          "appmem:owner lease AS context");
+    if (created) {
+        appmem_init(&as, MEM_EXEC_LOAD_ADDR + 1, MEM_EXEC_LOAD_ADDR + PAGE_SIZE,
+                    MEM_EXEC_HEAP_BASE, MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE - MEM_GUARD_SIZE);
+        mapped = appmem_map(&as, &as.appmem, &as.appmem_layout, PAGE_SIZE, 0,
+                            0, APPMEM_ANON, 0, &base) == 0;
+    }
+    check(mapped && base && as.appmem.e[0].base == base, "appmem:map extent");
+    ok = mapped && appmem_unmap(&as, &as.appmem, base, PAGE_SIZE) == 0;
+    check(ok && !as.appmem.e[0].base, "appmem:unmap extent");
+    if (created) paging_addrspace_destroy(&as);
+    check(owner && ledger_owner_pages(owner) == 0, "appmem:owner pages 0");
+    check(owner && ledger_owner_retire(owner), "appmem:owner retire");
+}
+
 static u32 ledger_persist_total(void)
 {
     u32 i, n = 0;
@@ -893,6 +918,7 @@ int kselftest_run_post_exec(void)
     test_memmap_pool_user();
     test_pool_model();
     test_ledger();
+    test_appmem();
     test_gfx_ledger();
     test_pcm();
 

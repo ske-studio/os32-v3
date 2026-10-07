@@ -1,4 +1,4 @@
-/* T2f f3/f4 private transactions; host-only until f5. */
+/* T2f f3/f4 private transactions; kernel-internal. */
 #ifndef PAGING_APP_H
 #define PAGING_APP_H
 #include "paging.h"
@@ -12,6 +12,7 @@ struct paging_app_stage {
 STATIC_ASSERT(sizeof(((struct paging_app_stage *)0)->pending) == 256, app_pending_size);
 extern u32 paging_app_bad_free_count;
 extern u32 paging_app_pt_nospc_count, paging_app_data_nospc_count;
+void paging_app_poison(struct addrspace *as);
 int paging_app_context(const struct addrspace *as);
 /* Caller serializes context/prepare/stage/commit or abort without callbacks,
  * reentry or AS switches. stage requires IF=1, depth=0 and an empty range.

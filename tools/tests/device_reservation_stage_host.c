@@ -90,3 +90,6 @@ void _start(void)
            sizeof("PASS real ONLINE ledger_reserve_set atomic RAM+aperture; no device mapping\n") - 1);
     die(0);
 }
+
+/* Paging-only fixture has no exec slots; abort delivery is appmem_map_host. */
+void exec_addrspace_abort(struct addrspace *as) { (void)as; }

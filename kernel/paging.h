@@ -9,6 +9,7 @@
 #define __PAGING_H
 
 #include "types.h"
+#include "appmem_types.h"
 #include "memmap.h"   /* MEM_APP_BAND_* (struct addrspace の PT 配列長) */
 
 /* ページサイズ */
@@ -207,6 +208,9 @@ struct addrspace {
     u32 owner;
     u32 lease_pt_phys[MEM_LEASE_MAX_PDES];
     struct as_lease leases[MEM_LEASE_MAX];
+    struct appmem_table appmem;
+    struct appmem_layout appmem_layout;
+    u32 appmem_poisoned; /* Never run or reclaim this owner after a failed free. */
 };
 /* T2c launch path: sparse app PTs and the first lease PT. */
 int paging_addrspace_create_lease(struct addrspace *as, u32 owner);
@@ -257,6 +261,10 @@ int paging_addrspace_create(struct addrspace *as, u32 owner);
  * 破棄する PD がアクティブ (CR3) であってはならない — 先に
  * paging_load_cr3(paging_kernel_pd_phys()) で master へ戻すこと。 */
 void paging_addrspace_destroy(struct addrspace *as);
+/* Failed frees quarantine once and request an abort at an existing safe point. */
+void paging_addrspace_poison(struct addrspace *as);
+/* Exec-side notification; bounded slot lookup, safe with IRQs disabled. */
+void exec_addrspace_abort(struct addrspace *as);
 
 /* アプリ帯に必要な PDE 枚数を求める (票 §4-1 の規則、純関数)。
  *   code_end : 本体 (code+data+bss) 末尾のページ境界切り上げ済み仮想番地

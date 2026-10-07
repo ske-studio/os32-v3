@@ -142,3 +142,19 @@ ERRORとして記録した (`f4-table-initial.log`, `f4-map-base-mut.log`, `f4-m
 `f4-map-mut2.log` まで)。元の判定は緩めず、置換範囲を限定し、目的に合う負例/ラベルを
 固定して修正後32/32 runtime RED・その他分類0。最終件数/時間/rcは票§3-5 f4へ集約。
 kernel結線/AS埋込み/caller/KAPI/初期heap登録/実TLBのguest受入はf5以降。
+
+### f5a 内部結線 (2026-10-07)
+
+AS の extent/layout と初期 heap 登録、予約境界・固定帯 hint 拒否を実ソースで検証。
+remove_count 単独・空 PT の SURFACE・PDE before PT free の変異を独立に観測する。
+実 exec_teardown_app を抽出し、LIBC_INITIAL の穴と ANON の R5 回収、
+PT free 失敗・重複 PFN の途中失敗から毒 AS の隔離/残ページ計数を検証。
+ログと予算は `/home/hight/os32-tmp/run/f5/report.md`。実 TLB/kill は台帳 F-6。
+
+### f5a fix1
+毒 AS の appmem / free_user_range / destroy / lease_unmap 各入口から、対象 slot
+だけに IRQ-safe な abort_req を立てる。実 exec の resume と syscall 帰路の末尾・
+ring3_abort_check を実行し、非復帰 kill 境界への移譲を確認する (実 kill は F-6)。
+WM の abort_clear でも保持、live の計数は一度だけ減り boot context に戻る。
+追加変異は ANON 返却欠落、teardown 入口毒判定欠落、毒後 break 欠落、中断要求欠落、
+live 補正欠落、resume/syscall 中断点欠落、WM による中断要求消去の 8 本。

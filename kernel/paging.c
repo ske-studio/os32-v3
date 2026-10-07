@@ -898,11 +898,21 @@ int paging_addrspace_create(struct addrspace *as, u32 owner)
     return paging_addrspace_create_n(as, owner, 1);
 }
 
+void paging_addrspace_poison(struct addrspace *as)
+{
+    if (!as || as->appmem_poisoned || !as->pd_phys) return;
+    as->appmem_poisoned = 1;
+    /* Retain PD/PT pages, but remove the quarantined AS from the live count.
+     * The abort safe points prevent this PD from being scheduled again. */
+    live_addrspaces--;
+    exec_addrspace_abort(as);
+}
+
 void paging_addrspace_destroy(struct addrspace *as)
 {
     u32 k;
 
-    if (!as || !as->pd_phys) return;
+    if (!as || as->appmem_poisoned || !as->pd_phys) return;
     /* アクティブな PD を破棄してはならない (呼び出し側が master へ戻す責任)。
      * ここでは確認だけして、万一アクティブでも解放は続行しない。 */
     if (paging_current_cr3() == as->pd_phys) {
@@ -911,16 +921,25 @@ void paging_addrspace_destroy(struct addrspace *as)
     for (k = 0; k < MEM_LEASE_MAX; k++)
         if (as->leases[k].token) return; /* revoke before PD/PT teardown */
     for (k = 0; k < MEM_LEASE_MAX_PDES; k++) {
-        if (as->lease_pt_phys[k])
-            pgalloc_free_n_owner(as->owner, as->lease_pt_phys[k] / PAGE_SIZE, 1);
+        if (as->lease_pt_phys[k] &&
+            !pgalloc_free_n_owner(as->owner, as->lease_pt_phys[k] / PAGE_SIZE, 1)) {
+            paging_addrspace_poison(as);
+            return;
+        }
         as->lease_pt_phys[k] = 0;
     }
     for (k = 0; k < MEM_APP_BAND_MAX_PDES; k++) {
-        if (as->app_pt_phys[k])
-            pgalloc_free_n_owner(as->owner, as->app_pt_phys[k] / PAGE_SIZE, 1);
+        if (as->app_pt_phys[k] &&
+            !pgalloc_free_n_owner(as->owner, as->app_pt_phys[k] / PAGE_SIZE, 1)) {
+            paging_addrspace_poison(as);
+            return;
+        }
         as->app_pt_phys[k] = 0;
     }
-    pgalloc_free_n_owner(as->owner, as->pd_phys / PAGE_SIZE, 1);
+    if (!pgalloc_free_n_owner(as->owner, as->pd_phys / PAGE_SIZE, 1)) {
+        paging_addrspace_poison(as);
+        return;
+    }
     live_addrspaces--;
     as->pd_phys = 0;
     as->app_pde = 0;
@@ -1089,7 +1108,7 @@ u32 paging_addrspace_free_user_range(struct addrspace *as, u32 vstart,
 {
     u32 pfn, first, count, freed = 0, saved;
 
-    if (!as || !as->pd_phys || !as->app_pde_count || vstart >= vend) return 0;
+    if (!as || as->appmem_poisoned || !as->pd_phys || !as->app_pde_count || vstart >= vend) return 0;
     /* Reject the entire request before freeing any private page. */
     if ((vstart >> 22) < as->app_pde ||
         ((vend - 1) >> 22) >= as->app_pde + as->app_pde_count) return 0;
@@ -1105,12 +1124,18 @@ u32 paging_addrspace_free_user_range(struct addrspace *as, u32 vstart,
             continue;                       /* 共有帯は触らない */
         if (!as->app_pt_phys[pdi - as->app_pde]) continue;
         pt = (u32 *)P2V(as->app_pt_phys[pdi - as->app_pde]);
-        if ((pt[pti] & PTE_PRESENT) &&
-            pgalloc_free_n_owner(as->owner, pt[pti] >> PAGE_SHIFT, 1))
+        if (pt[pti] & PTE_PRESENT) {
+            if (!pgalloc_free_n_owner(as->owner, pt[pti] >> PAGE_SHIFT, 1)) {
+                /* Retain the failed frame; never retry a poisoned owner. */
+                pt[pti] &= ~PTE_PRESENT;
+                paging_addrspace_poison(as);
+                break;
+            }
             freed++;
+        }
         pt[pti] = 0;
     }
-    if (saved == as->pd_phys) paging_load_cr3(saved);
+    if (saved == as->pd_phys && !as->appmem_poisoned) paging_load_cr3(saved);
     return freed;
 }
 
@@ -1564,8 +1589,12 @@ int paging_lease_unmap(struct addrspace *as, u32 base, u32 npages)
     }
     if (paging_current_cr3() == as->pd_phys) paging_load_cr3(as->pd_phys);
     for (k = 1; k < MEM_LEASE_MAX_PDES; k++)
-        if (as->lease_pt_phys[k] && !pd[(MEM_LEASE_BASE >> 22) + k]) {
-            pgalloc_free_n_owner(as->owner, as->lease_pt_phys[k] / PAGE_SIZE, 1);
+        if (!as->appmem_poisoned && as->lease_pt_phys[k] &&
+            !pd[(MEM_LEASE_BASE >> 22) + k]) {
+            if (!pgalloc_free_n_owner(as->owner, as->lease_pt_phys[k] / PAGE_SIZE, 1)) {
+                paging_addrspace_poison(as);
+                continue;
+            }
             as->lease_pt_phys[k] = 0;
         }
     irq_restore(saved);

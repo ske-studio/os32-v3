@@ -381,3 +381,6 @@ static void host_start(void)
     SAY("PASS: d3 real managed walk, PFN classes, caller/registrant, IF/CR3/output");
     die(0);
 }
+
+/* Paging-only fixture has no exec slots; abort delivery is appmem_map_host. */
+void exec_addrspace_abort(struct addrspace *as) { (void)as; }

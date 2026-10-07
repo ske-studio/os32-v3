@@ -89,3 +89,11 @@ ANONとLIBC_INITIALは併合しない。失敗は表/output不変、末尾の空
 初回はmerge条件とextent_equalの置換文字列が重複して2 ERROR。
 共有走査を維持して置換を一意にし、テスト追加による先行FAILラベルは既存対照を先に実行して
 解消した。ERRORはREDへ数えない。最終rc/時間は票に記録する。
+
+### f5a 内部結線 (2026-10-07)
+
+AS の extent/layout と初期 heap 登録、予約境界・固定帯 hint 拒否を実ソースで検証。
+remove_count 単独・空 PT の SURFACE・PDE before PT free の変異を独立に観測する。
+実 exec_teardown_app を抽出し、LIBC_INITIAL の穴と ANON の R5 回収、
+PT free 失敗・重複 PFN の途中失敗から毒 AS の隔離/残ページ計数を検証。
+ログと予算は `/home/hight/os32-tmp/run/f5/report.md`。実 TLB/kill は台帳 F-6。

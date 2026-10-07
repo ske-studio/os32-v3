@@ -14,14 +14,14 @@ import host32
 from mutpar import run_ordered
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-TARGET_SRCS = ['exec/appmem.c', 'exec/appmem.h', 'include/types.h',
+TARGET_SRCS = ['exec/appmem.c', 'exec/appmem.h', 'include/appmem_types.h', 'sdk/include/os32/os32_kapi_shared.h', 'include/types.h',
                'include/memmap.h', 'kernel/paging.h',
                'tools/tests/appmem_host.c', 'tools/tests/test_appmem.py',
                'tools/tests/host32.py', 'tools/tests/mutpar.py']
 MUTANTS = [
     ('unknown-flag', '(map_flags & ~(APPMEM_MAP_EXACT | APPMEM_MAP_TOPDOWN))', '0', 'unknown flag'),
-    ('unaligned-hint', '!aligned(hint) || hint < MEM_EXEC_LOAD_ADDR', 'hint < MEM_EXEC_LOAD_ADDR', 'unaligned'),
-    ('hint-floor', 'hint < MEM_EXEC_LOAD_ADDR', 'hint < MEM_SHLIB_BASE', 'outside'),
+    ('unaligned-hint', '!aligned(hint) ||', '0 ||', 'unaligned'),
+    ('hint-floor', 'hint >= layout->primary_mapped_end', 'hint >= MEM_SHLIB_BASE', 'outside'),
     ('exact-fallback', 'if (!base && (map_flags & APPMEM_MAP_EXACT)) return APPMEM_ENOVA;',
      'if (0) return APPMEM_ENOVA;', 'exact collision'),
     ('hint-overwrite', 'range_free(table, count, hint, end)) base = hint;',
@@ -32,7 +32,7 @@ MUTANTS = [
      'a->flags == b->flags', 'distinct extents'),
     ('merge-flags', 'a->kind == b->kind && a->flags == b->flags',
      'a->kind == b->kind', 'distinct extents'),
-    ('merge-large', 'a->kind != APPMEM_EXEC_LARGE;', '1;', 'distinct extents'),
+    ('merge-large', 'a->kind != APPMEM_EXEC_LARGE &&', '1 &&', 'distinct extents'),
     ('full-changes-table', 'if (plan.count + 1 - plan.remove_count > APPMEM_EXTENT_MAX) return APPMEM_EFULL;',
      'if (plan.count + 1 - plan.remove_count > APPMEM_EXTENT_MAX) { ((struct appmem_table *)table)->e[0].end = 0; return APPMEM_EFULL; }',
      'full table unchanged'),
@@ -49,6 +49,8 @@ MUTANTS = [
      'table->e[i] = table->e[i];', 'full bridge sorted tail'),
     ('same-count-plan', 'expected.first == plan->first && expected.remove_count == plan->remove_count &&',
      '1 &&', 'same count insertion invalid'),
+    ('reservation-merge', '!(a->end == MEM_EXEC_HEAP_BASE && b->base == MEM_EXEC_HEAP_BASE)', '1', 'reservation boundary no merge'),
+    ('map-remove-only', 'return expected.first == plan->first && expected.remove_count == plan->remove_count &&', 'return expected.first == plan->first && 1 &&', 'remove only invalid'),
     ('unmap-stale', 'extent_equal(&expected.left, &plan->left) && extent_equal(&expected.right, &plan->right);',
      '(extent_equal(&expected.left, &plan->left) || 1) && (extent_equal(&expected.right, &plan->right) || 1);', 'unmap stale metadata invalid'),
 
@@ -70,7 +72,7 @@ def main():
     cc = ['gcc', '-std=gnu11', '-m32', '-march=i386', '-ffreestanding', '-fno-builtin',
           '-fno-pie', '-fno-stack-protector', '-Wall', '-Wextra', '-Werror',
           '-Werror=implicit-function-declaration', '-Werror=implicit-int', '-Werror=vla',
-          *['-I' + str(ROOT / path) for path in ('include', 'kernel', 'exec')]]
+          *['-I' + str(ROOT / path) for path in ('include', 'kernel', 'exec', 'sdk/include/os32')]]
     try:
         with tempfile.TemporaryDirectory(prefix='os32-f2-') as directory:
             tmp = pathlib.Path(directory)

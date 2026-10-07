@@ -9,7 +9,7 @@ u32 paging_app_pt_nospc_count, paging_app_data_nospc_count;
 
 int paging_app_context(const struct addrspace *as)
 {
-    if (!as || !as->pd_phys || as->pd_phys % PAGE_SIZE || !as->lease_pt_phys[0] ||
+    if (!as || as->appmem_poisoned || !as->pd_phys || as->pd_phys % PAGE_SIZE || !as->lease_pt_phys[0] ||
         as->app_pde != APP_BAND_PDE || as->app_pde_count != MEM_APP_BAND_MAX_PDES ||
         !pgalloc_page_owned(as->pd_phys / PAGE_SIZE, as->owner) ||
         (paging_current_cr3() != paging_kernel_pd_phys() &&
@@ -33,9 +33,13 @@ static u32 *app_entry(const struct paging_app_stage *tx, u32 va)
     return phys ? &((u32 *)P2V(phys))[(va >> PAGE_SHIFT) % PTE_COUNT] : 0;
 }
 
-static void app_return(u32 owner, u32 phys)
+static void app_return(struct addrspace *as, u32 phys)
 {
-    if (!pgalloc_free_n_owner(owner, phys / PAGE_SIZE, 1)) paging_app_bad_free_count++;
+    if (as->appmem_poisoned) return;
+    if (!pgalloc_free_n_owner(as->owner, phys / PAGE_SIZE, 1)) {
+        paging_app_bad_free_count++;
+        paging_app_poison(as);
+    }
 }
 
 void paging_app_abort(struct paging_app_stage *tx)
@@ -44,12 +48,12 @@ void paging_app_abort(struct paging_app_stage *tx)
     for (u32 va = tx->base; va < tx->end; va += PAGE_SIZE) {
         u32 *entry = app_entry(tx, va);
         if (entry && *entry) {
-            app_return(tx->as->owner, *entry & ~(PAGE_SIZE - 1U));
+            app_return(tx->as, *entry & ~(PAGE_SIZE - 1U));
             *entry = 0;
         }
     }
     for (u32 k = 0; k < MEM_APP_BAND_MAX_PDES; k++) if (tx->pending[k]) {
-        app_return(tx->as->owner, tx->pending[k]);
+        app_return(tx->as, tx->pending[k]);
         tx->pending[k] = 0;
     }
 }
@@ -213,6 +217,7 @@ int paging_app_unmap_free(struct paging_app_unmap *tx)
         u32 *entry = unmap_entry(tx, va);
         if (!pgalloc_free_n_owner(tx->as->owner, *entry / PAGE_SIZE, 1)) {
             paging_app_bad_free_count++;
+            paging_app_poison(tx->as);
             return APPMEM_EINVAL; /* Retain the failed frame for diagnosis. */
         }
         *entry = 0;
@@ -222,9 +227,15 @@ int paging_app_unmap_free(struct paging_app_unmap *tx)
     for (u32 k = first; k <= last; k++) if (unmap_empty(tx, k)) {
         if (!pgalloc_free_n_owner(tx->as->owner, tx->as->app_pt_phys[k] / PAGE_SIZE, 1)) {
             paging_app_bad_free_count++;
+            paging_app_poison(tx->as);
             return APPMEM_EINVAL;
         }
         tx->as->app_pt_phys[k] = 0;
     }
     return 0;
+}
+
+void paging_app_poison(struct addrspace *as)
+{
+    paging_addrspace_poison(as);
 }
