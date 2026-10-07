@@ -113,6 +113,22 @@ void _start(void) {
     host_map_fixed_paging(); paging_init(8192); host_pool_boot(8192);
     kmalloc_init(heap, sizeof(heap)); before = used_pages;
     {
+        KHeap exec_test_heap;
+        static u8 exec_buffer[4096];
+        void *p;
+        u32 peak = kmalloc_peak_bytes;
+        kheap_init(&exec_test_heap, exec_buffer, sizeof(exec_buffer), "exec_heap");
+        p = kheap_alloc(&exec_test_heap, 2048);
+        CHECK(p && kmalloc_peak_bytes == peak);
+        kheap_free(&exec_test_heap, p);
+        p = kmalloc(64);
+        CHECK(p && kmalloc_peak_bytes == kmalloc_used() && kmalloc_peak_bytes > peak);
+        peak = kmalloc_peak_bytes;
+        kfree(p);
+        CHECK(kmalloc_peak_bytes == peak);
+        CHECK(!kmalloc(sizeof(heap)) && kmalloc_peak_bytes == peak);
+    }
+    {
         u32 bytes;
         CHECK(!exec_stack_bytes(0, 0, &bytes) && bytes == MEM_EXEC_STACK_SIZE);
         CHECK(!exec_stack_bytes(1, 0, &bytes) && bytes == MEM_APP_STACK_MIN);

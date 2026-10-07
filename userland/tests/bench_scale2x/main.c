@@ -187,6 +187,10 @@ static void test_scale2x_to_bb(void)
     log_header("Test 3: Scale2x Full (LUT + BB write)");
 
     kapi->gfx_get_framebuffer(&fb);
+    if (fb.planes[1] == NULL) {
+        log_header("Test 3: SKIP packed framebuffer (planar test)");
+        return;
+    }
 
     /* ソース領域 (BB内 0,0 から 256x192) にパターンを描画 */
     {

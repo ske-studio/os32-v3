@@ -17,6 +17,8 @@ DEFINES = ('#define RING3_USTACK_TOP ', '#define RING3_STACK_BOTTOM ', '#define 
 WANTED = ('int ring3_ptr_ok(', 'static const char *exec_image_reject_reason(', 'static int exec_stack_bytes(', 'static u8 launch_read_byte(', 'static int app_store(', 'static int app_map_region(', 'u32 exec_as_leftover_pages;',
           'static void exec_teardown_app(')
 MUTATIONS = [
+ ('peak-common-update', '        h->used += blk->size + BLK_HDR_SIZE;',
+  '        h->used += blk->size + BLK_HDR_SIZE;\n        if (h->used > kmalloc_peak_bytes) kmalloc_peak_bytes = h->used;'),
  ('unicode-user-restored', '        /* --- K3:', '        paging_addrspace_map_user_range(ctx->as, MEM_UNICODE_TABLE_BASE, MEM_UNICODE_TABLE_BASE + MEM_UNICODE_TABLE_SIZE, PAGE_RW | PTE_USER);\n        /* --- K3:'),
  ('bb-user-restored', '        /* --- K3:', '        paging_addrspace_map_user_range(ctx->as, MEM_GFX_BB_BASE, MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE, PAGE_RW | PTE_USER);\n        /* --- K3:'),
  ('guard-fixed-stack', '#define RING3_HEAP_TOP (RING3_STACK_BOTTOM - PAGE_SIZE)', '#define RING3_HEAP_TOP (MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE - PAGE_SIZE)'),
@@ -72,7 +74,7 @@ def extract(source):
 
 def run(mutation=None):
     source = (ROOT / 'exec/exec.c').read_text()
-    if mutation:
+    if mutation and mutation[0] != "peak-common-update":
         _, old, new = mutation
         if old not in source:
             raise SystemExit('変異 %s の当て先が見つからない' % mutation[0])
@@ -84,19 +86,27 @@ def run(mutation=None):
         allocator = (ROOT / 'kernel/pgalloc.c').read_text()
         allocator = allocator.replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags')
         (tmp / 'pgalloc_host_source.c').write_text(allocator)
-        includes = ['-I' + str(ROOT / p)
+        heap_source = (ROOT / 'kernel/kmalloc.c').read_text()
+        if mutation and mutation[0] == 'peak-common-update':
+            _, old, new = mutation
+            assert heap_source.count(old) == 1
+            heap_source = heap_source.replace(old, new)
+        (tmp / 'kmalloc_host_source.c').write_text(heap_source)
+        includes = ['-I'  + str(ROOT / p)
                     for p in ('include', 'arch/x86', 'platform/pc98', 'kernel',
                               'lib', 'exec', 'sdk/include/os32')] + ['-I' + str(tmp)]
         host_includes = ['-I' + str(ROOT / 'tools/tests/host_arch')] + includes
         exe = tmp / 'app_bb_overlap'
         cmd = ['gcc', *FLAGS, '-DPHYSMEM_HOST_TEST=1', '-nostdlib', '-static', '-no-pie',
-               *host_includes, str(SRC), str(ROOT / 'kernel/physmem.c'), str(ROOT / 'kernel/kmalloc.c'), '-o', str(exe)]
+               *host_includes, str(SRC), str(ROOT / 'kernel/physmem.c'), str(tmp / 'kmalloc_host_source.c'), '-o', str(exe)]
         build = subprocess.run(cmd, capture_output=bool(mutation))
         if build.returncode != 0:
             if mutation:
                 return 'compile'
             raise subprocess.CalledProcessError(build.returncode, cmd)
         out = host32.run([str(exe)], timeout=60, capture_output=bool(mutation))
+        if mutation and mutation[0] == 'peak-common-update':
+            assert out.returncode == 1 and b'FAIL: p && kmalloc_peak_bytes == peak' in out.stdout, out
         if mutation:
             return 'ok' if out.returncode == 0 else 'fail'
         if out.returncode != 0:

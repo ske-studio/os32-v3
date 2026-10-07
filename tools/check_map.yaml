@@ -43,6 +43,9 @@ docs_always:
 - check-docs-status-host
 - check-memmap
 notest:
+# Planar-only benchmark / optional font consumer: targeted build and guest SKIP checks.
+- userland/tests/bench_scale2x/main.c
+- userland/rust/font_test/src/lib.rs
 - glob: userland/cmds/**
   except:
   - userland/cmds/cfg.c
