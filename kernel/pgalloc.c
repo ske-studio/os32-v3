@@ -740,6 +740,23 @@ done:
     return ok;
 }
 
+int ledger_resource_set_map(u32 rid, u32 first, u32 end)
+{
+    unsigned int flags = irq_save();
+    int ok = 0;
+    if (rid < LEDGER_MAX_RESOURCES && ledger_resources[rid].bus) {
+        struct ledger_resource *r = &ledger_resources[rid];
+        if ((!first && !end) || (first < end && first >= r->decode_first &&
+                               end <= r->decode_end)) {
+            r->map_first = first;
+            r->map_end = end;
+            ok = 1;
+        }
+    }
+    irq_restore(flags);
+    return ok;
+}
+
 int ledger_reserve_set(u32 owner, const struct ledger_span *spans, u32 n)
 {
     struct ledger_span s[LEDGER_MAX_SPANS], t;

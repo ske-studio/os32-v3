@@ -6,6 +6,14 @@ unsigned int host_arch_if = 0x202U;
 #undef run
 static int ksel_fail, ksel_pass;
 static void check(int ok, const char *why) { (void)why; if (ok) ksel_pass++; else ksel_fail++; }
+static char serial_line[128];
+static u32 serial_len;
+static int serial_session;
+int serial_gate_active(void) { return serial_session; }
+void serial_puts_polled(const char *s)
+{ while (*s && serial_len+1 < sizeof(serial_line)) serial_line[serial_len++]=*s++; }
+char *kstrncpy(char *d, const char *s, u32 n)
+{ char *ret=d; if (n) { while (--n && *s) *d++=*s++; *d=0; } return ret; }
 #include "audit_slice.inc"
 #include "system_surface.h"
 int utf8_jis_table_ready(void) { return 1; }
@@ -180,6 +188,7 @@ static void run(void)
     CHECK(!lease_acquire(&space, &auth, &ref, 1, LEDGER_PERM_RO, &view));
     gfx_client_to_gshell();
     CHECK(tv->gen == ref.generation + 1 && !tv->lease_count);
+    gfx_init();
     struct ledger_surface *display = ledger_surface_find(LEDGER_SF_PC98, LEDGER_ROLE_DISPLAY);
     u32 gen = display->gen;
     struct surface_ref dref = {(u32)(display-ledger_surfaces), gen};
@@ -190,12 +199,55 @@ static void run(void)
     CHECK(!lease_acquire(&space, &auth, &ref, 1, LEDGER_PERM_RO, &view));
     struct ledger_surface *client = ledger_surface_find(gfx_sf_backend(), LEDGER_ROLE_CLIENT);
     struct surface_ref cref = {(u32)(client-ledger_surfaces), client->gen};
-    struct lease_authority cauth = {owner, client->backend, client->role};
-    struct lease_view cview;
-    CHECK(!lease_acquire(&space, &cauth, &cref, 1, LEDGER_PERM_RW, &cview));
+    CallerAccessFrame previous;
+    slot.state=APP_STATE_RUNNING; slot.cpl3=1; slot.hdr_flags=OS32X_FLAG_GFX;
+    payload=frame; host_cr3=space.pd_phys;
+    CHECK(caller_access_enter(&previous,CALLER_USER));
+    cref.generation=client->gen;
+    gfx_framebuffer_bridge((void *)MEM_EXEC_LOAD_ADDR);
+    u32 compat=space.leases[2].token;
+    CHECK(compat && (space.leases[2].flags & AS_LEASE_GFX_COMPAT));
     gfx_v86_return();
     CHECK(client->gen == cref.generation && client->lease_count == 1);
-    CHECK(!lease_release(&space, cview.token));
+    CHECK(space.leases[2].token == compat);
+    CHECK(surface_api_unlease(compat) == OS32_ERR_INVAL);
+    CHECK(space.leases[2].token == compat);
+    CHECK(!lease_release(&space, compat));
+    CHECK(surface_api_unlease(compat) == OS32_ERR_INVAL);
+    CHECK(!surface_api_query(LEDGER_ROLE_CLIENT,(void *)MEM_EXEC_LOAD_ADDR));
+    struct surface_query_result *q=P2V(payload);
+    CHECK(q->count == 1 && q->desc[0].role == LEDGER_ROLE_CLIENT);
+    *(struct surface_ref *)P2V(payload+512)=q->desc[0].ref;
+    CHECK(!surface_api_lease(LEDGER_ROLE_CLIENT,(void *)(MEM_EXEC_LOAD_ADDR+512),LEDGER_PERM_RW,(void *)(MEM_EXEC_LOAD_ADDR+256)));
+    u32 token=((struct lease_view *)P2V(payload+256))->token;
+    host_cr3=paging_kernel_pd_phys();
+    CHECK(surface_api_unlease(token) == OS32_ERR_INVAL);
+    host_cr3=space.pd_phys;
+    u32 generation=space.generation, saved_owner=space.owner;
+    space.generation++;
+    CHECK(surface_api_unlease(token) == OS32_ERR_INVAL);
+    space.generation=generation; space.owner++;
+    CHECK(surface_api_unlease(token) == OS32_ERR_INVAL);
+    space.owner=saved_owner;
+    ring3_wm_depth=1;
+    CHECK(surface_api_unlease(token) == OS32_ERR_INVAL);
+    ring3_wm_depth=0;
+    kctx_irq_depth=1;
+    CHECK(surface_api_unlease(token) == OS32_ERR_INVAL);
+    kctx_irq_depth=0;
+    CHECK(!surface_api_unlease(token));
+    CHECK(!surface_api_query(LEDGER_ROLE_TVRAM,(void *)MEM_EXEC_LOAD_ADDR));
+    CHECK(q->count == 1 && q->desc[0].role == LEDGER_ROLE_TVRAM);
+    CHECK(surface_api_query(0,(void *)MEM_EXEC_LOAD_ADDR) == OS32_ERR_INVAL);
+    CHECK(!surface_api_query(LEDGER_ROLE_DISPLAY,(void *)MEM_EXEC_LOAD_ADDR));
+    CHECK(q->count == 4);
+    for (u32 i=0;i<4;i++) ((struct surface_ref *)P2V(payload+512))[i]=q->desc[i].ref;
+    CHECK(!surface_api_bundle(LEDGER_ROLE_DISPLAY,(void *)(MEM_EXEC_LOAD_ADDR+512),4,LEDGER_PERM_RW,(void *)(MEM_EXEC_LOAD_ADDR+256)));
+    for (u32 i=0;i<4;i++)
+        CHECK(!surface_api_unlease(((struct surface_lease_result *)P2V(payload+256))->views[i].token));
+    caller_access_leave(&previous);
+    CHECK(surface_api_unlease(token) == OS32_ERR_INVAL);
+    host_cr3=paging_kernel_pd_phys();
     kselftest_audit_v86_return();
     CHECK(tv->gen == ref.generation + 1 && !tv->lease_count && display->gen == gen + 1);
     CHECK(lease_release(&space, dview.token) == LEASE_INVAL);
@@ -215,6 +267,25 @@ static void run(void)
     CHECK(!kselftest_run_audit("skip"));
     CHECK(memmap_audit_runs == runs && memmap_audit_skip == 1);
     v86_map_session = 0;
+    pt[idx] &= ~PTE_PCD;
+    CHECK(kselftest_run_audit("host-first") > 0);
+    CHECK(audit_first_fail_tag[0] == 'h' && audit_first_fail_tag[5] == 'f');
+    CHECK(serial_len >= 2 && serial_line[serial_len-2] == '\r' && serial_line[serial_len-1] == '\n');
+    u32 first_len=serial_len;
+    CHECK(kselftest_run_audit("host-second") > 0);
+    CHECK(serial_len == first_len && audit_first_fail_tag[5] == 'f');
+    pt[idx] |= PTE_PCD;
+    CHECK(!kselftest_run_audit("recovered"));
+    CHECK(serial_len == first_len);
+    /* A fresh first failure during SerialFS records only the tag. */
+    audit_fail=0; serial_len=0; serial_session=1;
+    pt[idx] &= ~PTE_PCD;
+    CHECK(kselftest_run_audit("serial-session") > 0);
+    CHECK(audit_first_fail_tag[0] == 's' && !serial_len);
+    serial_session=0;
+    CHECK(kselftest_run_audit("after-session") > 0);
+    CHECK(audit_first_fail_tag[0] == 's' && !serial_len);
+    pt[idx] |= PTE_PCD;
     CHECK(!lease_selftest());
     CHECK(!lease_audit_all());
     SAY("PASS e10c master/AS/lifecycle/TVRAM/DISPLAY/IRQ-bounds");

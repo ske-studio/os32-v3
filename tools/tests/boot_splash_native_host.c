@@ -231,3 +231,5 @@ int main(int argc, char **argv)
     puts("PASS: native boot, preference, shutdown, repeat, optional failures");
     return 0;
 }
+
+int ledger_resource_set_map(u32 id, u32 f, u32 e) { (void)id; (void)f; (void)e; return 0; }
