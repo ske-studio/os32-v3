@@ -39,6 +39,7 @@ CD インストール (userland/system/cdinst.c) の .PKG は、配備の正典
 """
 
 import os
+import random
 import pathlib
 import re
 import shutil
@@ -258,7 +259,8 @@ def case_split():
         a = os.path.join(tmp, 'a')
         b = os.path.join(tmp, 'b')
         open(a, 'wb').write(bytes((i * 7) & 0xFF for i in range(9000)) + b'abc' * 3000)
-        open(b, 'wb').write(os.urandom(5000))
+        rng = random.Random(250)  # 旧圧縮器が /b[0] を壊す固定入力
+        open(b, 'wb').write(bytes(rng.getrandbits(8) for _ in range(5000)))
         blob = mkpkg.build_pkg('rt', 1, [('/x/a', a), ('/b', b)], True, 0)
         out = os.path.join(tmp, 'RT.PKG')
         open(out, 'wb').write(blob)

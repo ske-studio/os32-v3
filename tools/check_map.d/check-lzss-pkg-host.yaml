@@ -1,0 +1,11 @@
+check-lzss-pkg-host:
+- tools/mkpkg.py
+- tools/deploy_manifests.py
+- build/core.yaml
+- userland/deploy.yaml
+- userland/lib/rt/pkg.c
+- tools/tests/lzss_pkg_host.c
+- tools/tests/test_lzss_pkg.py
+- tools/tests/host32.py
+- tools/check_map.d/check-lzss-pkg-host.yaml
+- build/checks.d/check-lzss-pkg-host.mk
