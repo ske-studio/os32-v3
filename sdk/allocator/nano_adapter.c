@@ -1,21 +1,55 @@
-/* f1b nano connection. f6 embeds only morecore in each CRT syscalls.o;
- * the allocation hooks remain opt-in until f7. */
+/* One break owner per executable. USER adds isolated nano arenas; resident
+ * builds only the fixed primary backend and retains libc's nano entries. */
 #include "nano_adapter.h"
 #include <errno.h>
 #include <stdlib.h>
+#include <string.h>
 
-#ifndef OS32_NANO_MORECORE_ONLY
+#ifndef OS32_NANO_FIXTURE
+#include "os32api.h"
+extern KernelAPI *kapi;
+extern char _end[];
+#define CRT_CHUNK_ALIGN 4u
+static struct os32_nano_arena primary_arena;
+/* -1 permanently rejects a malformed initial handoff, including sbrk(0). */
+static int primary_initialized;
+#ifndef OS32_CRT_RESIDENT
+static int crt_grow_exact(void *opaque, uintptr_t base, size_t bytes)
+{
+    (void)opaque;
+    if (!kapi->mem_map) return -1;
+    return kapi->mem_map(bytes, (void *)base, OS32_MEM_MAP_EXACT) == (void *)base ? 0 : -1;
+}
+static void *crt_map(void *opaque, size_t bytes)
+{
+    (void)opaque;
+    return kapi->mem_map ? kapi->mem_map(bytes, NULL, 0) : NULL;
+}
+static int crt_unmap(void *opaque, uintptr_t base, size_t bytes)
+{
+    (void)opaque;
+    return kapi->mem_unmap ? kapi->mem_unmap((void *)base, bytes) : -1;
+}
+#endif
+#endif
+
+#ifndef OS32_CRT_RESIDENT
 extern void *os32_private_malloc_r(struct _reent *, size_t);
 extern void os32_private_free_r(struct _reent *, void *);
 extern void *os32_private_calloc_r(struct _reent *, size_t, size_t);
 extern void *os32_private_realloc_r(struct _reent *, void *, size_t);
+extern size_t os32_private_malloc_usable_size_r(struct _reent *, void *);
 extern struct mallinfo os32_private_mallinfo_r(struct _reent *);
 extern void *os32_private_free_list;
 extern char *os32_private_sbrk_start;
 extern struct mallinfo os32_private_current_mallinfo;
-static struct os32_nano_arena *selected;
+static struct os32_nano_arena *selected, *arenas;
+static void *(*map_arena)(void *, size_t);
+static int (*unmap_arena)(void *, uintptr_t, size_t);
+static void *map_opaque;
 static int busy;
 
+#ifdef OS32_NANO_FIXTURE
 int os32_nano_select(struct os32_nano_arena *arena)
 {
     if (busy) return 0;
@@ -23,27 +57,64 @@ int os32_nano_select(struct os32_nano_arena *arena)
     return 1;
 }
 
-static int enter(struct _reent *r)
+#endif
+
+int os32_nano_configure(struct os32_nano_arena *primary,
+                        void *(*map)(void *, size_t),
+                        int (*unmap)(void *, uintptr_t, size_t), void *opaque)
 {
-    if (busy || selected == NULL) {
-        r->_errno = ENOMEM;
-        return 0;
-    }
-    busy = 1;
-    os32_private_free_list = selected->free_list;
-    os32_private_sbrk_start = selected->sbrk_start;
-    os32_private_current_mallinfo = selected->info;
+    if (busy || arenas) return 0;
+    arenas = selected = primary;
+    map_arena = map;
+    unmap_arena = unmap;
+    map_opaque = opaque;
     return 1;
 }
+#endif
 
-static void leave(void)
+#ifndef OS32_NANO_FIXTURE
+static int initialize(struct _reent *r)
 {
-    selected->free_list = os32_private_free_list;
-    selected->sbrk_start = os32_private_sbrk_start;
-    selected->info = os32_private_current_mallinfo;
-    busy = 0;
+    if (!primary_initialized) {
+        uintptr_t initial = (uintptr_t)&_end;
+        primary_initialized = -1;
+        if (initial > UINTPTR_MAX - (CRT_CHUNK_ALIGN - 1u)) goto fail;
+        initial = (initial + CRT_CHUNK_ALIGN - 1u) & ~(CRT_CHUNK_ALIGN - 1u);
+        if (kapi->sbrk_heap_limit < initial) goto fail;
+        primary_arena.initial = primary_arena.brk = initial;
+        primary_arena.mapped_end = kapi->sbrk_heap_limit;
+#ifdef OS32_CRT_RESIDENT
+        primary_arena.limit = kapi->sbrk_heap_limit;
+        primary_arena.grow_exact = NULL;
+#else
+        primary_arena.limit = UINTPTR_MAX;
+        primary_arena.grow_exact = crt_grow_exact;
+        if (!os32_nano_configure(&primary_arena, crt_map, crt_unmap, NULL)) goto fail;
+#endif
+        primary_initialized = 1;
+    }
+    if (primary_initialized == 1) return 1;
+fail:
+    r->_errno = ENOMEM;
+    return 0;
 }
 
+void *os32_nano_crt_sbrk(struct _reent *r, ptrdiff_t incr)
+{
+#ifndef OS32_CRT_RESIDENT
+    if (busy) { r->_errno = ENOMEM; return (void *)-1; }
+#endif
+    if (!initialize(r)) return (void *)-1;
+#ifndef OS32_CRT_RESIDENT
+    /* The callback cannot reenter malloc or change the selected arena. */
+    busy = 1;
+    void *p = os32_nano_morecore(&primary_arena, r, incr);
+    busy = 0;
+    return p;
+#else
+    return os32_nano_morecore(&primary_arena, r, incr);
+#endif
+}
 #endif
 
 void *os32_nano_morecore(struct os32_nano_arena *a, struct _reent *r, ptrdiff_t incr)
@@ -75,58 +146,199 @@ fail:
     return (void *)-1;
 }
 
-#ifndef OS32_NANO_MORECORE_ONLY
+#ifndef OS32_CRT_RESIDENT
+static void load_state(void)
+{
+    os32_private_free_list = selected->free_list;
+    os32_private_sbrk_start = selected->sbrk_start;
+    os32_private_current_mallinfo = selected->info;
+}
+static void save_state(void)
+{
+    selected->free_list = os32_private_free_list;
+    selected->sbrk_start = os32_private_sbrk_start;
+    selected->info = os32_private_current_mallinfo;
+}
+static int enter(struct _reent *r)
+{
+#ifndef OS32_NANO_FIXTURE
+    if (!busy && !initialize(r)) return 0;
+#endif
+    if (busy || selected == NULL) {
+        r->_errno = ENOMEM;
+        return 0;
+    }
+    busy = 1;
+    load_state();
+    return 1;
+}
+static void switch_arena(struct os32_nano_arena *a)
+{
+    save_state();
+    selected = a;
+    load_state();
+}
+static void leave(void)
+{
+    save_state();
+    busy = 0;
+}
+
 void *os32_nano_sbrk(struct _reent *r, ptrdiff_t incr)
 {
     return os32_nano_morecore(busy ? selected : NULL, r, incr);
 }
 
-/* These hooks are private to the transformed objects. The public entry owns
- * busy across nested nano calloc/realloc -> malloc/free, not each nano lock.
- * Callback reentry through any public entry is rejected before state loads. */
+/* Private nested calloc/realloc -> malloc/free stay in the same arena and
+ * keep busy. Only the outer adapter switches, after nano has returned. */
 void os32_nano_lock(struct _reent *r) { (void)r; }
 void os32_nano_unlock(struct _reent *r) { (void)r; }
+
+static struct os32_nano_arena *new_arena(size_t size)
+{
+    uintptr_t base;
+    size_t bytes;
+    struct os32_nano_arena *a;
+    /* Management page + nano chunk header/padding + page rounding. */
+    const size_t overhead = 2u * OS32_NANO_PAGE - 1u + 16u;
+    if (!arenas || !map_arena || !unmap_arena || size > PTRDIFF_MAX - overhead) return NULL;
+    bytes = (size + overhead) & ~(OS32_NANO_PAGE - 1u);
+    base = (uintptr_t)map_arena(map_opaque, bytes);
+    if (!base) return NULL;
+    a = (struct os32_nano_arena *)base;
+    memset(a, 0, sizeof(*a));
+    a->map_base = base;
+    a->initial = a->brk = base + OS32_NANO_PAGE;
+    a->mapped_end = base + bytes;
+    a->limit = UINTPTR_MAX;
+    a->grow_exact = arenas->grow_exact;
+    a->opaque = arenas->opaque;
+    a->next = arenas->next;
+    arenas->next = a;
+    return a;
+}
+
+static void release_empty(struct os32_nano_arena *a)
+{
+    struct os32_nano_arena **link, *next;
+    uintptr_t base;
+    size_t bytes;
+    if (!arenas || a == arenas || a->live || !a->map_base) return;
+    /* All fields needed after unmap are held outside the mapping. On failure
+     * the list and saved nano state remain available for reuse/retry. */
+    if (selected == a) switch_arena(arenas);
+    for (link = &arenas->next; *link && *link != a; link = &(*link)->next) {}
+    if (!*link) return;
+    next = a->next;
+    base = a->map_base;
+    bytes = a->mapped_end - base;
+    *link = next;
+    if (unmap_arena(map_opaque, base, bytes) != 0) *link = a;
+}
+
+static void *try_allocate(struct _reent *r, size_t n, size_t size, int clear)
+{
+    void *p;
+    if (clear) p = os32_private_calloc_r(r, n, size);
+    else p = os32_private_malloc_r(r, size);
+    if (p) selected->live++;
+    return p;
+}
+static __attribute__((noinline)) void *allocate(struct _reent *r, size_t n, size_t size, int clear,
+                      struct os32_nano_arena *exclude)
+{
+    struct os32_nano_arena *a;
+    void *p = NULL;
+    size_t bytes;
+    if (n && size > SIZE_MAX / n) { r->_errno = ENOMEM; return NULL; }
+    bytes = n * size;
+    /* Explicit standalone fixtures may select just one backing arena. */
+    if (!arenas) return try_allocate(r, n, size, clear);
+    for (a = arenas; a; a = a->next) {
+        if (a == exclude) continue;
+        switch_arena(a);
+        p = try_allocate(r, n, size, clear);
+        if (p) return p;
+    }
+    a = new_arena(bytes);
+    if (a) {
+        switch_arena(a);
+        p = try_allocate(r, n, size, clear);
+        if (!p) release_empty(a);
+    }
+    if (!p) r->_errno = ENOMEM;
+    return p;
+}
 
 void *_malloc_r(struct _reent *r, size_t size)
 {
     void *p;
     if (!enter(r)) return NULL;
-    p = os32_private_malloc_r(r, size);
+    p = allocate(r, 1, size, 0, NULL);
     leave();
     return p;
 }
-static int owns_pointer(struct _reent *r, const void *p)
+static struct os32_nano_arena *owner(struct _reent *r, const void *p)
 {
-    uintptr_t start = selected->sbrk_start ? (uintptr_t)selected->sbrk_start : selected->initial;
-    if (p != NULL && ((uintptr_t)p < start || (uintptr_t)p >= selected->brk)) {
-        r->_errno = EINVAL;
-        return 0;
+    struct os32_nano_arena *a;
+    for (a = arenas ? arenas : selected; a; a = a->next) {
+        uintptr_t start = a->sbrk_start ? (uintptr_t)a->sbrk_start : a->initial;
+        if ((uintptr_t)p >= start && (uintptr_t)p < a->brk) return a;
     }
-    return 1;
+    r->_errno = EINVAL;
+    return NULL;
 }
 
 void _free_r(struct _reent *r, void *p)
 {
+    struct os32_nano_arena *a;
     if (!enter(r)) return;
-    if (owns_pointer(r, p)) os32_private_free_r(r, p);
+    if (p && (a = owner(r, p)) != NULL) {
+        switch_arena(a);
+        os32_private_free_r(r, p);
+        a->live--;
+        release_empty(a);
+    }
     leave();
 }
 void *_calloc_r(struct _reent *r, size_t n, size_t size)
 {
     void *p;
     if (!enter(r)) return NULL;
-    p = os32_private_calloc_r(r, n, size);
+    p = allocate(r, n, size, 1, NULL);
     leave();
     return p;
 }
 void *_realloc_r(struct _reent *r, void *old, size_t size)
 {
-    void *p;
+    struct os32_nano_arena *a;
+    void *p = NULL;
+    size_t old_size;
     if (!enter(r)) return NULL;
-    p = owns_pointer(r, old) ? os32_private_realloc_r(r, old, size) : NULL;
+    if (!old) {
+        p = allocate(r, 1, size, 0, NULL);
+    } else if ((a = owner(r, old)) != NULL) {
+        switch_arena(a);
+        old_size = os32_private_malloc_usable_size_r(r, old);
+        p = os32_private_realloc_r(r, old, size);
+        if (!size) {
+            a->live--;
+            release_empty(a);
+        } else if (!p && arenas) {
+            p = allocate(r, 1, size, 0, a);
+            if (p) {
+                memcpy(p, old, old_size < size ? old_size : size);
+                switch_arena(a);
+                os32_private_free_r(r, old);
+                a->live--;
+                release_empty(a);
+            }
+        }
+    }
     leave();
     return p;
 }
+#ifdef OS32_NANO_FIXTURE
 struct mallinfo os32_nano_info(struct _reent *r)
 {
     struct mallinfo info = {0};
@@ -135,9 +347,9 @@ struct mallinfo os32_nano_info(struct _reent *r)
     leave();
     return info;
 }
+#endif
 void *malloc(size_t size) { return _malloc_r(_impure_ptr, size); }
 void free(void *p) { _free_r(_impure_ptr, p); }
 void *calloc(size_t n, size_t size) { return _calloc_r(_impure_ptr, n, size); }
 void *realloc(void *p, size_t size) { return _realloc_r(_impure_ptr, p, size); }
-
-#endif /* OS32_NANO_MORECORE_ONLY */
+#endif

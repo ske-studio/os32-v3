@@ -962,3 +962,20 @@
     kill_delta: 0
     leftover: 0
   evidence: ~/os32-tmp/evidence/<日付>/f6-sbrk-grow/
+
+- id: f7-malloc-arena
+  gate: F-8
+  contract: userland/tests/malloc_arena_test.c
+  mode: manual
+  prereq: KAPI 71, memory layout 2, 17MB, current ini; PM deploy USER adapter binaries and fresh kernel.map
+  entry: malloc_arena_test
+  observe:
+  - 'Record fault_kill_count and exec_as_leftover_pages before and after malloc_arena_test'
+  - 'Require malloc_arena_test PASS and exit 0; primary EXACT blocker forces secondary nano allocation'
+  - 'Require cross-arena realloc preserves all old bytes, free permits EXACT remap of the management page and whole secondary arena, printf output is visible'
+  - 'Require kill delta 0 and leftover 0; run heap_test (64KiB requests still use nano), sbrk_grow_test, db_test and db_v50_test regressions'
+  expect:
+    exit: 0
+    kill_delta: 0
+    leftover: 0
+  evidence: ~/os32-tmp/evidence/<日付>/f7-malloc-arena/

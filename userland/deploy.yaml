@@ -171,6 +171,10 @@ filesystem:
     - host: userland/tests/mem_map_test.bin
       guest: /usr/bin/
       tags: [test]
+    # --- f7 USER nano secondary arena ---
+    - host: userland/tests/malloc_arena_test.bin
+      guest: /usr/bin/
+      tags: [test]
     # --- f6 USER sbrk EXACT growth ---
     - host: userland/tests/sbrk_grow_test.bin
       guest: /usr/bin/

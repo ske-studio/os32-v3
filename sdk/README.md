@@ -111,3 +111,10 @@ asm には `-p $(OS32_SDK)/crt/generations.inc` を付ける。
 生成器が記録した `.inputs.json` / `.generations.json` もビルド成果物として保つ。
 `example/hello/Makefile` が C の最小例。4世代の正典と形式は
 OS ソースツリーの `docs/KAPI_SPEC.md` §4-0。
+
+USER の newlib 利用プログラムは `lib/libos32nano.a` を `-lc` より前にリンクする
+(付属 example を参照)。`libos32nano.json` は CRT と adapter の hash 照合用で、
+ライブラリと一緒に配る。`bin/link_guard.py` が選択された全入力を調べ、未結線の
+memalign・mallinfo・usable-size 等と重複 morecore を拒否する。
+archive の由来とライセンスは `lib/nano.LICENSE`、提供元の hash は
+`lib/libos32nano.json` に収録する。

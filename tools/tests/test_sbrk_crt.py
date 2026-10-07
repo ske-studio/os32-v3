@@ -8,18 +8,21 @@ from pathlib import Path
 import subprocess
 import tempfile
 import host32
+import importlib.util
 
 ROOT = Path(__file__).resolve().parents[2]
 CRT = 'sdk/crt/syscalls.c'
 ADAPTER = 'sdk/allocator/nano_adapter.c'
 MUTANTS = [
+    (ADAPTER, 'if (kapi->sbrk_heap_limit < initial) goto fail;', 'if (0) goto fail;',
+     'invalid handoff rejected', True),
     (ADAPTER, 'if (decrease > old - a->initial)', 'if (0)', 'negative lower bound', False),
     (ADAPTER, 'if ((uintptr_t)incr > UINTPTR_MAX - old)', 'if (0)', 'addition overflow', False),
-    (CRT, '== (void *)base ? 0 : -1', '!= NULL ? 0 : -1', 'noncontiguous map refused', False),
+    (ADAPTER, '== (void *)base ? 0 : -1', '!= NULL ? 0 : -1', 'noncontiguous map refused', False),
     (ADAPTER, 'if (a->grow_exact(a->opaque, a->mapped_end, end - a->mapped_end) != 0) goto fail;',
      'if (a->grow_exact(a->opaque, a->mapped_end, end - a->mapped_end) != 0) { a->brk = next; goto fail; }',
      'failed map unchanged', False),
-    (CRT, 'primary_arena.grow_exact = NULL;', 'primary_arena.grow_exact = crt_grow_exact;',
+    (ADAPTER, 'primary_arena.grow_exact = NULL;', 'primary_arena.grow_exact = crt_grow_exact;',
      'resident no map beyond backing', True),
 ]
 
@@ -32,27 +35,34 @@ def run(runner, resident=False, mutant=None):
             if mutant and name == mutant[0]:
                 assert source.count(mutant[1]) == 1, mutant
                 source = source.replace(mutant[1], mutant[2])
-                if resident:
-                    source = source.replace('#ifndef OS32_CRT_RESIDENT', '#if 1')
+                if resident and 'crt_grow_exact' in mutant[2]:
+                    source = source.replace('#ifndef OS32_CRT_RESIDENT\nstatic int crt_grow_exact', '#if 1\nstatic int crt_grow_exact')
+                    source = source.replace('static void *crt_map', '__attribute__((unused)) static void *crt_map').replace('static int crt_unmap', '__attribute__((unused)) static int crt_unmap')
             path = tree / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(source)
         cross = Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross'))
         gccinc = subprocess.check_output(['gcc', '-m32', '-print-file-name=include'], text=True).strip()
         flags = ['-std=gnu11', '-m32', '-march=i386', '-ffreestanding', '-fno-builtin',
-                 '-fno-pie', '-fno-stack-protector', '-nostdinc', '-isystem', gccinc,
+                 '-fno-pie', '-fno-stack-protector', '-U_FORTIFY_SOURCE', '-D_FORTIFY_SOURCE=0', '-nostdinc', '-isystem', gccinc,
                  '-isystem', str(cross / 'i386-elf/include'), '-I' + str(tree),
                  '-I' + str(ROOT / 'sdk/include/os32'), '-O1', '-Wall', '-Wextra',
                  '-Werror', '-Werror=vla', '-Wno-unused-parameter', '-D_end=crt_fixture_end',
                  '-ffunction-sections', '-fdata-sections']
         if resident:
             flags.append('-DOS32_CRT_RESIDENT')
+        spec = importlib.util.spec_from_file_location('nano_builder', ROOT / 'sdk/allocator/build_nano.py')
+        builder = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(builder)
+        archive = builder.build(cross, tree / 'nano')
+        # Only the six nano members are needed; the actual adapter is included
+        # with syscalls in this fixture, so the archive adapter stays unselected.
         exe = tree / 'fixture'
         # Unused syscall functions are discarded; _sbrk and its exact dependency
         # closure still compile from the actual source with newlib headers.
         subprocess.run(['gcc', *flags, '-nostdlib', '-static', '-no-pie',
                         '-Wl,--gc-sections', str(ROOT / 'tools/tests/sbrk_crt_host.c'),
-                        '-o', str(exe)], check=True, capture_output=True, text=True)
+                        str(archive), '-o', str(exe)], check=True, text=True)
         result = host32.run([str(exe)], runner=runner, capture_output=True, text=True, timeout=60)
         if mutant:
             assert result.returncode == 1 and result.stdout == 'FAIL: ' + mutant[3] + '\n', result

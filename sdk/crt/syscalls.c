@@ -156,49 +156,11 @@ clock_t _times(struct tms *buf) {
 }
 clock_t times(struct tms *buf) ALIAS(_times);
 
-/* Embed the adapter's morecore only: standalone SDK clients already link
- * syscalls.o, while nano malloc/free routing belongs to f7. */
-#define OS32_NANO_MORECORE_ONLY
-#include "../allocator/nano_adapter.c"
-
-#define CRT_CHUNK_ALIGN 4u
-extern char _end[];
-static struct os32_nano_arena primary_arena;
-static int primary_initialized;
-
-#ifndef OS32_CRT_RESIDENT
-static int crt_grow_exact(void *opaque, uintptr_t base, size_t bytes)
-{
-    (void)opaque;
-    if (!kapi->mem_map) return -1;
-    return kapi->mem_map(bytes, (void *)base, OS32_MEM_MAP_EXACT) == (void *)base ? 0 : -1;
-}
-#endif
-
+/* The adapter owns both primary state and morecore (also for resident CRT). */
+#include "../allocator/nano_adapter.h"
 void *_sbrk(int incr)
 {
-    if (!primary_initialized) {
-        uintptr_t initial = (uintptr_t)&_end;
-        if (initial > UINTPTR_MAX - (CRT_CHUNK_ALIGN - 1u)) {
-            errno = ENOMEM;
-            return (void *)-1;
-        }
-        initial = (initial + CRT_CHUNK_ALIGN - 1u) & ~(CRT_CHUNK_ALIGN - 1u);
-        primary_arena.initial = initial;
-        primary_arena.brk = initial;
-        primary_arena.mapped_end = kapi->sbrk_heap_limit;
-#ifdef OS32_CRT_RESIDENT
-        primary_arena.limit = kapi->sbrk_heap_limit;
-        primary_arena.grow_exact = NULL;
-#else
-        /* The kernel enforces the available VA ranges. This KAPI field is
-         * only the initial mapped end, never the growing USER heap ceiling. */
-        primary_arena.limit = UINTPTR_MAX;
-        primary_arena.grow_exact = crt_grow_exact;
-#endif
-        primary_initialized = 1;
-    }
-    return os32_nano_morecore(&primary_arena, _impure_ptr, incr);
+    return os32_nano_crt_sbrk(_impure_ptr, incr);
 }
 void *sbrk(int incr) ALIAS(_sbrk);
 

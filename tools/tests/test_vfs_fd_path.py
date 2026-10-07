@@ -767,7 +767,8 @@ def run_errno(tmp, syscalls=SYSCALLS_SRC, quiet=False):
              "-Wno-unused-but-set-variable"]
     exe = tmp / "errno"
     res = subprocess.run(["gcc", *flags, "-nostdlib", "-static", "-no-pie",
-                          str(ERRNO_SRC), str(syscalls), "-o", str(exe)],
+                          str(ERRNO_SRC), str(syscalls), str(ROOT / "sdk/allocator/nano_adapter.c"),
+                          "-DOS32_CRT_RESIDENT", "-o", str(exe)],
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     if res.returncode != 0:
         print(res.stdout.decode("utf-8", "replace"))

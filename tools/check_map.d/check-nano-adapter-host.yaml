@@ -8,3 +8,8 @@ check-nano-adapter-host:
 - tools/check_map.d/check-nano-adapter-host.yaml
 - build/checks.d/check-nano-adapter-host.mk
 - tools/tests/mutpar.py
+- sdk/link_guard.py
+- sdk/crt/syscalls.c
+- userland/tests/malloc_arena_test.c
+- sdk/link/app.ld
+- userland/lib/rt/ls.c

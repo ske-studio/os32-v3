@@ -1,7 +1,10 @@
 /* Real CRT included to inspect its arena without a production reset API. */
 #include <limits.h>
 #include "sdk/crt/syscalls.c"
+#include "sdk/allocator/nano_adapter.c"
 
+void *memset(void *p, int c, size_t n) { unsigned char *q=p; while(n--) *q++=c; return p; }
+void *memcpy(void *p, const void *s, size_t n) { unsigned char *q=p; const unsigned char *r=s; while(n--) *q++=*r++; return p; }
 static struct _reent host_reent;
 struct _reent *_impure_ptr = &host_reent;
 int *__errno(void) { return &host_reent._errno; }
@@ -101,6 +104,14 @@ static int run(void)
     CHECK(sbrk((int)(mapped - initial + 1)) == (void *)-1 && errno == ENOMEM && calls == 0 && primary_arena.brk == initial,
           "missing map refused");
 #endif
+    /* USER already has arenas: configure rejects reinit, masking a missing handoff check. */
+    primary_initialized = 0;
+    api.sbrk_heap_limit = initial - 1u;
+    CHECK(sbrk(0) == (void *)-1 && errno == ENOMEM && primary_initialized == -1,
+          "invalid handoff rejected");
+    api.sbrk_heap_limit = mapped;
+    CHECK(sbrk(0) == (void *)-1 && sbrk(1) == (void *)-1 && sbrk(-1) == (void *)-1,
+          "invalid handoff stays ENOMEM");
     report("PASS CRT morecore\n");
     return 0;
 }

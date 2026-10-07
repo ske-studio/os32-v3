@@ -115,12 +115,12 @@
     }
   },
   "sdk_build": {
-    "status": "f6 CRT morecore only; nano allocation hooks remain f1b fixture until f7",
+    "status": "f7 USER multi-arena adapter; resident fixed morecore with libc nano",
     "sources": {
-      "sdk/allocator/nano_adapter.c": "b48fec1348aa49b722b27371bee597c31d8d558638c0d7bfba85d3b231fd0694",
-      "sdk/allocator/nano_adapter.h": "a78c2beaf0a6b2340359259453fa04d51ef93dc3fdd8746388f14c3c698a854d",
-      "sdk/allocator/build_nano.py": "591f8cfc3a76c8ce21d70855d18d41f0e0dab42c4c81991f4c3a88a0d7d0d5a3",
-      "sdk/allocator/check_link.py": "af2de3ca50e194dd44d1080904fee865caaaa8e8c407d66e327f08a945b18a93"
+      "sdk/allocator/nano_adapter.c": "6d4f53f821f14af8c8a4623209b609caa90767b40257f259ed659d182b42014c",
+      "sdk/allocator/nano_adapter.h": "9bddfbabdb54f0af86bc4d992553fa126a78dbcacc5acefbb1367085536ee38d",
+      "sdk/allocator/build_nano.py": "5ee17bf0d3d550c01f5abb083f3202ab580c158ceb41f7c85266ec0b980d3dde",
+      "sdk/allocator/check_link.py": "12a6826d36eb95912e1d2739b3ee36d17d3bf5de2edd8457289761e5ef541302"
     },
     "patches": [],
     "mode": "objcopy-private-members",

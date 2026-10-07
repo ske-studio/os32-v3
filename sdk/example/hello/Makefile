@@ -50,7 +50,7 @@ $(APP).o: main.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(APP).elf: $(APP).o
-	$(LD) $(LDFLAGS) -o $@ $(CRT) $< --start-group $(LIBS) --end-group -lc -lgcc
+	$(LD) $(LDFLAGS) -o $@ $(CRT) $< --start-group $(LIBS) --end-group -los32nano -lc -lgcc
 
 $(APP).raw: $(APP).elf
 	$(OBJCOPY) -O binary $< $@
