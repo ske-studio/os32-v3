@@ -10,7 +10,7 @@ ENTRY(kentry)
 /*  MEM_KSTACK_TOP  kernel/kentry.asm が `extern` で参照する ESP の初期値。  */
 /*                  ASM からは C のマクロを引けないので絶対シンボルで渡す。  */
 /*  MEM_KERNEL_IMAGE_MAX  カーネル本体 (.text+.data+.bss) に使える最大。     */
-/*                  カーネル帯域 1MB から、ヒープ 320KB・KAPI 4KB・          */
+/*                  カーネル帯域 1MB から、ヒープ 176KB・KAPI 4KB・          */
 /*                  ガード 2 枚・SHM 224KB を引いた残り。                    */
 /*  MEM_SQLITE_STACK_SIZE / MEM_DMA_POOL_BASE                                */
 /*                  SQLite の伸び代を止めるための 2 つ (票 TASK_HAL_WIRING   */
@@ -20,7 +20,7 @@ ENTRY(kentry)
 /* ======================================================================== */
 KERNEL_LOAD_ADDR     = 0x100000;
 MEM_KSTACK_TOP       = 0x2FFFFC;
-MEM_KERNEL_IMAGE_MAX = 0x95000;
+MEM_KERNEL_IMAGE_MAX = 0x99000;
 
 /*  名前が長いので列は揃えない。**上の 3 行の綴りは変えないこと** —
  *  tools/tests/test_memmap_gen.py が「写しがずれたら気づくか」を

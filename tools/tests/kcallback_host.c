@@ -13,18 +13,24 @@ static void say(const char *s) { u32 n = 0; while (s[n]) n++; __asm__ volatile("
 #define assert(x) do { if (!(x)) { say("FAIL: " #x "\n"); die(1); } } while (0)
 
 static int user_call, calls, fs_active, fs_calls, total = 19, result = 57;
-static int kill_at, reject_input, reject_output, reject_copy;
+static int output_checks;
+static int kill_at, reject_input, reject_output, reject_copy, reject_identity;
 static const u8 *read_end;
 static void *expected_ctx;
 static void *killed[5];
-int ring3_call_from_user(void) { return user_call; }
+volatile int ring3_wm_depth;
+volatile u32 ring3_wm_depth_underflow;
+#include "wm.inc"
+int ring3_call_from_user(void) { return user_call && !ring3_wm_depth; }
 void ring3_fault_kill(void) { assert(!fs_active); __builtin_longjmp(killed, 1); }
 void *kmemcpy(void *d, const void *s, u32 n) { u8 *a = d; const u8 *b = s; while (n--) *a++ = *b++; return d; }
 void *kmemset(void *d, int v, u32 n) { u8 *a = d; while (n--) *a++ = v; return d; }
 char *kstrncpy(char *d, const char *s, u32 n) { u32 i = 0; if (n) { while (i + 1 < n && s[i]) { d[i] = s[i]; i++; } d[i] = 0; } return d; }
-int caller_access_get_user(struct caller_access *c) { assert(user_call); kmemset(c, 0, sizeof(*c)); return 1; }
+int caller_access_get_user(struct caller_access *c) { assert(user_call); kmemset(c, 0, sizeof(*c)); c->origin = CALLER_USER; return !reject_identity; }
+/* The enumeration side models caller_access_get (same meaning as exec/redir_access.c); the real WM semantics are checked on the identity side (public_surface_host). */
+int caller_access_get(struct caller_access *c) { if (ring3_wm_depth || !user_call) { kmemset(c, 0, sizeof(*c)); c->origin = CALLER_TRUSTED; return 1; } return caller_access_get_user(c); }
 int copy_caller_bytes(const struct caller_access *c, const void *s, void *d, u32 n) { (void)c; assert(!fs_active); if (reject_input) return 0; if (read_end) assert((const u8 *)s + n <= read_end); kmemcpy(d, s, n); return 1; }
-int check_caller_write_range(const struct caller_access *c, void *d, u32 n) { (void)c; (void)d; assert(!fs_active && n == sizeof(struct ring3_ls_packet)); return !reject_output; }
+int check_caller_write_range(const struct caller_access *c, void *d, u32 n) { (void)c; output_checks++; if (!d || (u32)d > ~(u32)0 - n) return 0; assert(!fs_active && n == sizeof(struct ring3_ls_packet)); return !reject_output; }
 int copy_to_caller(const struct caller_access *c, void *d, const void *s, u32 n) { (void)c; assert(!fs_active); if (reject_copy) return 0; kmemcpy(d, s, n); return 1; }
 
 static void nested_listing(void);
@@ -59,6 +65,9 @@ int vfs_ls(const char *path, vfs_dir_cb cb, void *ctx)
     return result;
 }
 #define KAPI_HIT(slot) ((void)(slot))
+#define KAPI_OUT_LEN(p,n) ((u32)(n))
+int ring3_user_ranges_writable(u32 a, u32 n, u32 b, u32 m)
+{ (void)b; (void)m; return !ring3_call_from_user() || !n || (a && a <= ~(u32)0 - n && !reject_output); }
 #include "wrapper.inc"
 
 #define PAGE_SIZE 4096u
@@ -181,6 +190,35 @@ int main(void)
         for (u32 j = 2; j < VFS_MAX_PATH; j++) assert(p[j] == 0);
         for (u32 j = VFS_MAX_PATH + 5; j < sizeof(VfsDirEntry); j++) assert(p[j] == 0);
     }
+    OS32_LsPacket value;
+    int before_wm = fs_calls;
+    kmemset(&value, 0x5a, sizeof(value));
+    ring3_wm_enter();
+    reject_input = 1; /* shell path cannot be read as A's USER pointer */
+    assert(!__builtin_setjmp(killed));
+    assert(wrap_sys_ls_window("/", 0, &value) == OS32_ERR_INVAL);
+    assert(wrap_sys_ls_window("/", 0, 0) == OS32_ERR_INVAL);
+    ring3_wm_leave();
+    user_call = 0;
+    assert(wrap_sys_ls_window("/", 0, &value) == OS32_ERR_INVAL);
+    user_call = 1; reject_input = 0;
+    assert(fs_calls == before_wm);
+    for (u32 i = 0; i < sizeof(value); i++) assert(((u8 *)&value)[i] == 0x5a);
+    reject_identity = 1;
+    assert(wrap_sys_ls_window("/", 0, &value) == OS32_ERR_INVAL);
+    reject_identity = 0;
+    assert(wrap_sys_ls_window("/", 0, &value) == 0);
+    assert(value.count == out.count && value.result == out.result && value.done == out.done);
+    for (u32 i = 0; i < sizeof(value); i++) assert(((u8 *)&value)[i] == ((u8 *)&out)[i]);
+    assert(wrap_sys_ls_window("/", 14, &value) == 0 && value.count == 5 && value.done);
+    int checks_before_bad = output_checks;
+    for (u32 bad = 0; bad < 2; bad++) {
+        if (!__builtin_setjmp(killed)) {
+            wrap_sys_ls_window("/", 0, bad ? (void *)0xffffffffUL : 0);
+            assert(0);
+        }
+    }
+    assert(output_checks == checks_before_bad); /* wrap rejected before collector */
     request[1] = 0;
     assert(ring3_ls_dispatch((u32)request) == 0 && out.count == RING3_LS_BATCH);
     char long_path[VFS_MAX_PATH];

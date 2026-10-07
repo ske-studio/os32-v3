@@ -10,6 +10,12 @@ import host32
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 MUTANTS = (
+    # Both guards reject bad output. The mutant must kill in the collector,
+    # then fail the assertion that the wrap rejected before collector entry.
+    ('WM origin guard', 'ls',
+     '!caller_access_get(&caller) || caller.origin != CALLER_USER',
+     '!caller_access_get_user(&caller)', 'FAIL:'),
+    ('ls out guard', 'public_wrapper', 'KAPI_OUT_LEN(out, sizeof(OS32_LsPacket))', 'KAPI_OUT_LEN(out, 0)', 'FAIL:'),
     ('direct USER callback', 'wrapper',
      'if (ring3_call_from_user())', 'if (0)', 'FAIL: !user_call'),
     ('drop one entry', 'shim', 'call *12(%ebp)',
@@ -31,6 +37,8 @@ def run(args, mutant=None):
     sources = {
         'wrapper': function((ROOT / 'kapi/kapi_generated.c').read_text(),
                             'int __cdecl wrap_sys_ls(const char *path, void *cb, void *ctx)'),
+        'public_wrapper': function((ROOT / 'kapi/kapi_generated.c').read_text(),
+                            'int __cdecl wrap_sys_ls_window(const char *path, u32 skip, OS32_LsPacket *out)'),
         'window': (ROOT / 'fs/vfs.c').read_text().split('struct vfs_ls_window_ctx {', 1)[1].split('int vfs_ls(const char *path', 1)[0],
         'ext2_cb': function((ROOT / 'fs/ext2_vfs.c').read_text(),
                             'static void ext2_to_vfs_cb(const Ext2DirEntry *e, void *ctx)'),
@@ -45,7 +53,8 @@ def run(args, mutant=None):
     sources['shim'] = sources['shim'].replace('int $0x80', 'movl $host_gate, %eax\n    call *%eax')
     with tempfile.TemporaryDirectory(prefix='kcallback-') as folder:
         tmp = pathlib.Path(folder)
-        (tmp / 'wrapper.inc').write_text(sources['wrapper'])
+        (tmp / 'wm.inc').write_text('\n'.join(function(source, 'void ' + n + '(void)') for n in ('ring3_wm_enter', 'ring3_wm_leave')))
+        (tmp / 'wrapper.inc').write_text(sources['wrapper'] + '\n' + sources['public_wrapper'])
         (tmp / 'window.inc').write_text('struct vfs_ls_window_ctx {' + sources['window'])
         (tmp / 'ext2_cb.inc').write_text(sources['ext2_cb'])
         (tmp / 'ls_source.inc').write_text(sources['ls'])

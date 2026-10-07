@@ -12,7 +12,8 @@ class NativeBootTest(unittest.TestCase):
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory(prefix="os32-boot-native-")
         cls.binary = Path(cls.tmp.name) / "boot-native"
-        # As in the kernel link, leave dormant e6 compatibility code unbound.
+        # This narrow gfx fixture leaves the compatibility bridge unbound.
+        # v70 kernel links surface_api_*; the framebuffer bridge waits for c2.
         command = ["gcc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
                    "-Wno-unused-function", "-D__KERNEL_BUILD__",
                    "-Wl,--gc-sections"]

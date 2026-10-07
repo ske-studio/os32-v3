@@ -27,6 +27,8 @@ STATIC_ASSERT(SHM_TOTAL_SIZE == MEM_SHM_SIZE, shm_size_matches_memmap);
  * 表明に含めず offset/size だけで配置の契約を検査する。 */
 #define SHM_DB_BLOCK_FIRST  ((int)(MEM_SHM_DB_OFFSET / SHM_BLOCK_SIZE))
 #define SHM_DB_BLOCK_COUNT  ((int)(MEM_SHM_DB_SIZE / SHM_BLOCK_SIZE))
+STATIC_ASSERT(PAGE_SIZE == OS32_PAGE_SIZE, shm_sdk_page_size);
+STATIC_ASSERT(SHM_BLOCK_SIZE == OS32_SHM_BLOCK_SIZE, shm_sdk_block_size);
 STATIC_ASSERT(SHM_BLOCK_SIZE == DB_SHM_BLOCK_SIZE, shm_db_sdk_block_size);
 STATIC_ASSERT(MEM_SHM_DB_SIZE == DB_SHM_BLOCK_SIZE, shm_db_reservation_size);
 STATIC_ASSERT(MEM_SHM_DB_OFFSET == 0, shm_db_is_first_block);

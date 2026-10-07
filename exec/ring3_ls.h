@@ -1,4 +1,4 @@
-/* Private int80 protocol; not a public KAPI slot or SDK ABI. */
+/* Legacy int80 shim and KAPI v70 value enumeration share one collector. */
 #ifndef RING3_LS_H
 #define RING3_LS_H
 
@@ -15,6 +15,8 @@
 
 #ifndef __ASSEMBLER__
 #include "types.h"
+#include "os32_ls.h"
+int ring3_ls_window(const char *path, u32 skip, OS32_LsPacket *out);
 int ring3_ls_dispatch(u32 user_esp);
 extern const u8 ring3_ls_start[], ring3_ls_end[];
 #endif
