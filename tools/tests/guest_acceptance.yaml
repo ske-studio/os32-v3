@@ -945,3 +945,20 @@
     fault_kill_delta: 1
     fault_result: kill
   evidence: ~/os32-tmp/evidence/<日付>/f5b-mem-map/
+
+- id: f6-sbrk-grow
+  gate: F-7
+  contract: userland/tests/sbrk_grow_test.c
+  mode: manual
+  prereq: KAPI 71, 17MB, current ini; PM deploy USER CRT binaries and fresh kernel.map
+  entry: sbrk_grow_test
+  observe:
+  - 'Record fault_kill_count and exec_as_leftover_pages before and after sbrk_grow_test'
+  - 'Require sbrk_grow_test PASS, exit 0; growth past initial mapped_end is contiguous and writable'
+  - 'Require below-initial and INT_MIN refusal, shrink preserves mapped pages, EXACT collision leaves break unchanged, retry succeeds'
+  - 'Require kill delta 0 and leftover 0; run db_test and db_v50_test regressions'
+  expect:
+    exit: 0
+    kill_delta: 0
+    leftover: 0
+  evidence: ~/os32-tmp/evidence/<日付>/f6-sbrk-grow/

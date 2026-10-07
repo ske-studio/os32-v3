@@ -283,8 +283,11 @@ static int _dbg_is_blacklisted(u32 addr)
     if (addr >= 0x370000UL && addr <= 0x370FFFUL) return 1;
     /* シェル帯域後の予約 */
     if (addr >= 0x380000UL && addr <= 0x3FFFFFUL) return 1;
-    /* GUARD A (sbrk上限ガード) */
-    if (dbg_api && addr >= dbg_api->sbrk_heap_limit &&
+    /* Resident keeps its fixed guard. USER initial mapped_end can grow.
+     * NOTE: the PRESENT check below reads the master page tables, not the
+     * caller's AS, so it does not prove a USER address is mapped (no
+     * in-tree USER caller of dbg_memdump today). */
+    if (dbg_api && !dbg_api->mem_map && addr >= dbg_api->sbrk_heap_limit &&
         addr - dbg_api->sbrk_heap_limit < 4096UL) return 1;
     return 0;
 }

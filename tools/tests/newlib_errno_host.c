@@ -12,6 +12,7 @@
  * ======================================================================== */
 
 #include <errno.h>
+#include <reent.h>
 #include <sys/stat.h>
 /* syscalls.c と同じ: newlib の st_atime マクロが OS32_Stat の欄名とぶつかる */
 #undef st_atime
@@ -40,7 +41,9 @@ static void report_i(int v)
     report(&buf[i]);
 }
 
-static int g_errno;
+static struct _reent host_reent;
+struct _reent *_impure_ptr = &host_reent;
+#define g_errno (host_reent._errno)
 int *__errno(void) { return &g_errno; }
 void *memset(void *d, int c, unsigned n)
 { unsigned char *p = d; while (n--) *p++ = (unsigned char)c; return d; }

@@ -171,6 +171,11 @@ filesystem:
     - host: userland/tests/mem_map_test.bin
       guest: /usr/bin/
       tags: [test]
+    # --- f6 USER sbrk EXACT growth ---
+    - host: userland/tests/sbrk_grow_test.bin
+      guest: /usr/bin/
+      tags: [test]
+
     # --- heap_test (子プロセス帯レイアウト検証: sbrk / exec_heap の位置と重なり) ---
     - host: userland/tests/heap_test.bin
       guest: /usr/bin/
