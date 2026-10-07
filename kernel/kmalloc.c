@@ -27,21 +27,12 @@
 #include "kprintf.h"
 
 /* ======== ブロックヘッダ ======== */
-#define BLK_MAGIC_USED  0xA110CA7EUL  /* "ALLOCATE" */
-#define BLK_MAGIC_FREE  0xFEEEFEEEUL
-#define BLK_HDR_SIZE    8             /* sizeof(BlkHdr) */
 
 /* 8バイトアライメント。
  * SQLite は double を含む構造体をこのヒープ上に置く (malloc ラッパー経由)。
  * 4 バイト境界だと i386 では動くが未定義動作寄りで、SSE 命令を使う
  * コードが混ざった途端に落ちる。ヘッダも 8 バイトなので、ベースさえ
  * 8 バイト境界なら全データポインタが 8 バイト境界になる。 */
-#define BLK_ALIGN       8
-
-typedef struct BlkHdr {
-    u32 size;      /* データ部サイズ */
-    u32 magic;     /* マジックナンバー */
-} BlkHdr;
 
 /* ======================================================================== */
 /*  共通実装 (kheap_*)                                                      */

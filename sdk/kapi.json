@@ -100,16 +100,19 @@
       "args": [
         "u32 size"
       ],
-      "target": "exec_heap_alloc"
+      "target": "exec_heap_alloc",
+      "body": "struct caller_access caller;\nif (caller_access_get(&caller) && caller.origin == CALLER_USER)\n    return exec_heap_user_alloc(caller.as, size);\nreturn exec_heap_alloc(size);"
     },
     {
       "name": "mem_free",
       "out": "none",
+      "in": [{"arg": "ptr", "target": true}],
       "ret": "void",
       "args": [
         "void *ptr"
       ],
-      "target": "exec_heap_free"
+      "target": "exec_heap_free",
+      "body": "struct caller_access caller;\nif (caller_access_get(&caller) && caller.origin == CALLER_USER)\n    exec_heap_user_free(caller.as, ptr);\nelse exec_heap_free(ptr);"
     },
     {
       "name": "get_tick",

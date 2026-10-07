@@ -47,6 +47,10 @@ int main(int argc, char **argv, KernelAPI *api)
         ((unsigned *)kb[nk])[0] = 0x4B000000u | (unsigned)nk;   /* 'K' + index */
         nk++;
     }
+    if (!nk) {
+        api->kprintf(0x41, "FAIL: mem_alloc could not allocate one 64KB block\n");
+        bad++;
+    }
     for (i = 0; i < nm; i++) {
         if (((unsigned *)mb[i])[0] != (0x4D000000u | (unsigned)i)) bad++;
     }

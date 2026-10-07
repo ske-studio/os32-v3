@@ -8,6 +8,7 @@
 #include "os32_kapi_shared.h"
 static u32 host_cr3;
 static void map_sync(u32 root);
+static void heap_alias(u32 root);
 static int unmap_free_check(u32 owner, u32 pfn, int n);
 static unsigned int unmap_save(void);
 static void unmap_sync(void);
@@ -200,6 +201,7 @@ unsigned int publish_save(void) {
     return irq_save();
 }
 static void map_sync(u32 root) {
+    heap_alias(root);
     if (!watching) return;
     CHECK("reload target", root == a.pd_phys);
     CHECK("reload IF disabled", !_irq_enabled());
@@ -737,6 +739,7 @@ static void poison_abort_cases(void) {
  * own host suite. Execute generated wrappers with the real paging allocator. */
 static struct caller_access public_caller;
 static int public_caller_valid;
+#define caller_access_get public_caller_get
 int caller_access_get(struct caller_access *out) {
     if (!public_caller_valid) return 0;
     *out = public_caller;
@@ -746,6 +749,7 @@ int caller_access_get(struct caller_access *out) {
 #define KAPI_HIT(slot) ((void)(slot))
 #include "public_wrap_source.c"
 #undef KAPI_HIT
+#undef caller_access_get
 
 static void public_cases(void) {
     integration = 1; watching = unmapping = 0;
@@ -829,6 +833,8 @@ static void teardown_cases(void) {
           PAGE_SIZE, MEM_EXEC_LOAD_ADDR + PAGE_SIZE, APPMEM_MAP_EXACT, APPMEM_ANON, 0, &out));
     CHECK("teardown ANON map", !appmem_map(&a, &a.appmem, &a.appmem_layout,
           2*PAGE_SIZE, 0, 0, APPMEM_ANON, 0, &out));
+    CHECK("teardown ARENA map", !appmem_map(&a, &a.appmem, &a.appmem_layout,
+          2*PAGE_SIZE, 0, APPMEM_MAP_TOPDOWN, APPMEM_EXEC_ARENA, 0, &out));
     u32 before = exec_as_leftover_pages;
     exec_teardown_app(&slot);
     CHECK("teardown R5 no leftover", !slot.as && !slot.cpl3 && !ledger_owner_pages(owner) &&
@@ -905,10 +911,14 @@ static void teardown_cases(void) {
 
 }
 
+
+#include "exec_heap_host.h"
+
 void _start(void) {
     u32 args[6] = {MEM_POOL_BASE, 0x4000000, 3, 0x32, 0xffffffffUL, 0}, result;
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
     CHECK("host RAM", result == MEM_POOL_BASE);
+    heap_ram();
     host_map_fixed_paging(); paging_init(17408); host_pool_boot(17408);
     u32 oa, ob;
     CHECK("owner A", ledger_owner_new(LEDGER_KIND_AS, 0, "A", &oa));
@@ -930,6 +940,7 @@ void _start(void) {
     poison_abort_cases();
     teardown_cases();
     public_cases();
+    heap_cases();
     say("PASS appmem_map CHECK=", sizeof("PASS appmem_map CHECK=") - 1); number(checks); say("\n", 1);
     die(0);
 }
