@@ -310,7 +310,6 @@ def main():
         print("  " + line)
     print("gen_memmap PASS")
     if args.mutate:
-        cases(SCRIPT)  # 正常な検査器の合格を確認してから変異を評価する。
         source = SCRIPT.read_text(encoding="utf-8")
         red = 0
         for name, (old, new) in MUTATIONS.items():
