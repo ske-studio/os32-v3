@@ -148,7 +148,6 @@ void *kheap_alloc(KHeap *h, u32 size)
 
         blk->magic = BLK_MAGIC_USED;
         h->used += blk->size + BLK_HDR_SIZE;
-        if (h->used > kmalloc_peak_bytes) kmalloc_peak_bytes = h->used;
         return (void *)(p + BLK_HDR_SIZE);
     }
 
@@ -271,7 +270,10 @@ void kmalloc_init(void *heap_start, u32 heap_size)
 
 void *kmalloc(u32 size)
 {
-    return kheap_alloc(&kernel_heap, size);
+    void *p = kheap_alloc(&kernel_heap, size);
+    if (p && kernel_heap.used > kmalloc_peak_bytes)
+        kmalloc_peak_bytes = kernel_heap.used;
+    return p;
 }
 
 /* ======================================================================== */

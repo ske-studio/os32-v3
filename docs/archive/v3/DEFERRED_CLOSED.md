@@ -116,3 +116,19 @@
 | --- | --- | --- | --- |
 | E10-9 | 監査 (launch・GUI 移譲・V86 帰路) の失敗が計数だけで表示されない — 最初の 1 回だけシリアル 1 行か tag を残す | 改善 | e11a |
 
+
+## e12 の閉鎖
+
+2026-10-07: X-12 は packed で blit_test 全体 / bench_scale2x Test 3 を SKIP、
+X-13 は非配備の方針を維持して font_test の未配備を SKIP (終了 2) に修正。
+実装・ホスト / ビルドの証拠は `run/e12/report.md`。ゲスト再確認は T2h の H-4 で行う。
+X-10 は main 取り込み検査 `land_check2.log` (2026-10-07、rc=0) で受入済み。
+X-2 の前半 (e8a の RO 日本語) は `accept_e11/RESULT.md` の GUI 日本語受入で閉鎖。
+後半の font_load_test stat SKIP 理由は現行台帳に残す。
+
+| ID | 閉鎖時の元の行 |
+| --- | --- |
+| X-12 | blit_test と bench_scale2x (Test 3) が 9801 の 4 プレーン前提で gfx_fb.planes[1..3] を読み、PEGC (1 プレーン) で NULL への書き込みで kill。e11 以前から同じで退行でない。非プレーン形式なら SKIP を出す。関門: T2h の構成試験の前 |
+| X-13 | font_test の `/data/ipaexg.ttf` が NHD に無い。配備の対象に入れるか、試験が SKIP を出すか決める。関門: T2h の構成試験の前 |
+| X-10 | 正常対照 21 本の省略と 6 本の実行順を修正し、段の包含を回帰試験化。取り込みから `make check-fast` を除去 → PM の統合 `make check` で受入 |
+| X-2 (前半) | e8a の RO 拒否のゲスト確認 → e11 統合受入。 |

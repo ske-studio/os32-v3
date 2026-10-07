@@ -36,9 +36,9 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 |---|---|---|---|---|
 | E11-5 | Run からの全画面の 1 キー終了は受入済み。端末の子・WAIT_POLL・隠れた sh・先行入力の 4 点だけゲスト確認 | 既知の不具合 | 1167–1169、1431 | T2h 統合受入 |
 | E11-8 | pipe_get_buf の kernel 番地返却・pipe_get_len の他 owner 照会の意味変更と範囲検査はホスト確認のみ。ゲストで本人成功・他 owner 拒否の対照を確認 | 契約接続待ち | 1502、1504、1546 | T2h 統合受入 |
-| E11-9 | CUI の tvdump は受入済み。GUI 端末と WM の 0 埋めのゲスト確認だけ (ホストのみ) | 申し送り | e9 (2026-10-02 PM 決定) | T2h 統合受入 |
+| E11-9 | CUI の tvdump は受入済み。GUI 端末と WM の 0 埋めのゲスト確認 (ホストのみ)、V86 後の DISPLAY/TVRAM 再 lease と全 alias UC の明示観測 (e12-17mb-pegc-v86-release) | 申し送り | e9 (2026-10-02 PM 決定) | T2h 統合受入 |
 | E11-12 | c3: h3 caller_identity自己公開とhost identity()照合を接続、qemuホスト確認。PM: h3a/b実ゲスト・CRT非依存marker受入 | ホスト確認・統合ゲスト未確認 | E9-2 / e9 | T2h の h3 (本人識別のゲスト照合は h3 の手順一式で) |
-| E11-BUD | kmalloc_peak_bytes は exec ヒープの確保も数える (kheap_alloc が全 KHeap 共通で更新) — GUI 後 1,286,752B。カーネルヒープの使用は `mem` で 2,544/180,224B。カーネルヒープ専用のピークにしてから測り直し、KHEAP を戻すか決める。b2 実測は b2_sizes.json | ホスト検証・統合ゲスト未実施 | `c1_sizes.json` | T2h 前 |
+| E11-BUD | kmalloc_peak_bytes は exec ヒープの確保も数える (kheap_alloc が全 KHeap 共通で更新) — GUI 後 1,286,752B。カーネルヒープの使用は `mem` で 2,544/180,224B。ピークはカーネルヒープだけに直した (e12)、測り直しは統合ゲストで、KHEAP を戻すか決める。b2 実測は b2_sizes.json | ホスト検証・統合ゲスト未実施 | `c1_sizes.json` | T2h 前 |
 | E11-A2 | h3 本人識別のゲスト照合は h3 の手順一式で。attach 失敗の注入・非 owner shutdown・raw KAPI 待機利用者の明示 check はホストのみ。全画面入力 4 点は E11-5 に集約、日本語は受入済み | ホスト確認・統合ゲスト未確認 | e11a2 / guest_acceptance e11a2-* | T2h の h3 |
 | E11-A3 | 全画面 owner の同期の子 (slot.parent) は kernel が読ませるが WM の起床の手がかりに入らない。端末由来のバイト (宛先 0) は全員が読める。**PM 決定 (2026-10-07): 専用 KAPI `kbd_inject_to` は e11c に入れない** — 全画面への矢印・機能キーの配送とともに持ち越し | 改善 | T2h 前に要否を再判断 |
 
@@ -62,7 +62,7 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 | H-1 | h2: fixture の再生成と hash 照合、隔離媒体で旧 app / shell / shlib を拒否、owner 回収、park、guard の error=6 とカウンタ、故障画像・旧 shell の試験 | 未実施の確認 | 2463–2509、2909、2914 |
 | H-2 | h3: 台本経由の KAPI-loop、pf / gp / de / ud、verify、h3b への交換、PARKED の arm、実行中 OP_WAIT の arm、park 中の WM kill、打鍵を重ねた STOP、前景以外の張本人。h3fix4 の後のゲスト再実行。loop-watch / 単独 stop / trace-watch の live 実行 | 未実施の確認 | 2692–2830、2894–2905、3059–3069、3082、3365–3368 |
 | H-3 | GUI KAPI-loop の STOP: ホストだけで見た分岐群、ページ返却の観測、FIRING の後 約 1 秒は STOP が効かない、制限 3 件 | ホストのみ / 既知の制限 | 3218–3262、3278、3305、3367 |
-| H-4 | **構成を変える試験の一括** (全段が 17MB・今の ini だけで受入した): 8MB、planar / PEGC / Cirrus の切替、音源 (PC-9801-118 の PCM)、Ra266 64MB。`gfx200_test` / `gfx_demo200` | 構成持越し | 278、418、557、894、897、1009、1112、1276、1340、1431、1601、1887、2908、3364 |
+| H-4 | **構成を変える試験の一括** (全段が 17MB・今の ini だけで受入した): 8MB、planar / PEGC / Cirrus の切替、音源 (PC-9801-118 の PCM)、Ra266 64MB。`gfx200_test` / `gfx_demo200`、e12 の構成別台本 (guest_acceptance.yaml の e12-8mb-* / e12-17mb-planar / e12-17mb-cirrus / e12-cirrus-off) | 構成持越し | 278、418、557、894、897、1009、1112、1276、1340、1431、1601、1887、2908、3364 |
 | H-5 | 実機 Ra266: UC 化で present が遅くならないかの計測と CG 窓の WB、表示の後始末 (GRCG / EGC・68h の残り)、kernel stack の high-water | 構成持越し (実機) | 709–712、790–793、2253、2338 |
 | H-6 | V86 の出口で 6Ah の標準 / 拡張を戻していない (9821 で E0000h が MMIO のまま残り得る)。`v86 -d` / `-b` の後の表示確認、9801 構成での `gui_gate` | 未対処・未観測 | 788–789、3503 |
 | H-7 | apps / game: v3 では組まない (ユーザー決定 2026-09-30)。T2h では再開時ゲート (caller 追随・再ビルド・受入の一覧) の引渡しを確かめる。v3 の完了条件ではない。再開時は **c2 以後の SDK で再ビルド必須** — 旧 libos32gfx.a の外部バイナリは v70 で互換 token の VA を得て取り直さず、200 ライン化後に kill され得る (e11c2 レビュー R6)。**memory_layout=2 (e11b2) により、再ビルド前の apps/game の成果物はロード時に世代不一致で必ず拒否される** | 再開時ゲート | 1113、1248、1810–1826、1868、3463 |
@@ -75,15 +75,12 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 | ID | 何を | 種類 | 元の行 |
 |---|---|---|---|
 | X-1 | NUL 終端の文字列入力と `kprintf` 可変引数の B1 化 → T4・T5a の担当境界で確定。ページ 0 の NP 化 → T7 | 既知の制限 | 1499、1647、1757、1885 |
-| X-2 | e8a の RO 拒否のゲスト確認 → e11 統合受入。`font_load_test` の stat 段の SKIP 理由 → 次にその試験を回す前に確定 | 未実施の確認 / SKIP | 1250、1294 |
+| X-2 | `font_load_test` の stat 段の SKIP 理由 → 次にその試験を回す前に確定 | 未実施の確認 / SKIP | 1250、1294 |
 | X-3 | GitHub Actions の結果が票に無い (e1 の CI 修正後、f1a の初回 run) → 次の統合判定 (e11) の前に過去の run を照合。今の成功で過去を合格にしない | 未実施の確認 | 335–345、2003–2009 |
 | X-4 | 検査の整理の残り: ci-stab2 の P2-B の後の全体 check-changed と native の記録、6 時間超の対照の刈り取り、pending の 1 時間回収、生き残る弱い変異、`net_link` の TMPDIR 長、選択の取りこぼし 3 種 | 既知の制限 | 3551、3627、3705、3740、3754–3768、3776、3800–3807、3828–3832 |
 | X-6 | `tools/tvdump_recv.py` は名前付きパイプ前提で今の NP21/W に接続できない → `/api/cmd` で生バイトを取り TVDM の長さ・寸法・内容を照合する形に (計画 3 番、受入索引と同枠) | 道具の不具合 | — |
 | X-11 | 監査分類 (`~/os32-tmp/evidence/2026-10-07/audit-classification.md`) の「意味変更 (e11c)」のうち pipe (E11-8) を除く 12 件 — IME 9 本 (trygetchar/toggle/set_mode/switch_dict/user_delete/user_export/user_clear/trygetkey/feed_key)・exec_last_result・gui_call・con_sink_read の授権/本人別の契約 → **T4 の設計票で扱う (ユーザー決定 2026-10-07)** | 契約の整理 | 分類表 :33/:43-55/:57/:60 |
-| X-10 | 正常対照 21 本の省略と 6 本の実行順を修正し、段の包含を回帰試験化。取り込みから `make check-fast` を除去 → PM の統合 `make check` で受入 | 実装済み・統合受入待ち | 次の取り込み |
 
-| X-12 | blit_test と bench_scale2x (Test 3) が 9801 の 4 プレーン前提で gfx_fb.planes[1..3] を読み、PEGC (1 プレーン) で NULL への書き込みで kill。e11 以前から同じで退行でない。非プレーン形式なら SKIP を出す。関門: T2h の構成試験の前 | 既存の不具合 | accept_e11/RESULT.md |
-| X-13 | font_test の `/data/ipaexg.ttf` が NHD に無い。配備の対象に入れるか、試験が SKIP を出すか決める。関門: T2h の構成試験の前 | 環境不足 | accept_e11/RESULT.md |
 
 ## 6. SKIP の登録 (ここにあるものだけを「延期」と数える)
 
@@ -92,6 +89,8 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 | S-1 | Windows opt-in のホスト試験 (全段で 5 件、集約では 9 件) | WSL から Windows 側の道具を既定で起動しない | 環境 | T2h 統合受入の前に 1 回、opt-in で |
 | S-2 | `kout_test` の 1 件 | ゲストに `/etc/profile` が無い | **環境不足** (合格ではない) | 次のゲスト受入で `/etc/profile` を置いて回す |
 | S-3 | `kout_test` の 2d / 3c | 設計上の適用外 | 適用外 | — (延期ではない。試験側で SKIP ではなく N/A と出すようにする) |
+| S-7 | blit_test 全体 / bench_scale2x Test 3 | packed は planar 4 面試験の適用外 | 適用外 (PASS に数えない) | H-4 planar 構成で実行、PEGC は SKIP と他の計測の継続を確認 |
+| S-8 | font_test | /data/ipaexg.ttf は意図的に非配備 | 環境不足 | H-4 前に TTF を置いて実行、未配備は終了 2 と SKIP 行を確認。SKIP 行の `os32api::print` (kprintf) はリダイレクトを素通りする既知の制限 (Rust の fd1 helper ができるまで) |
 | S-4 | 外部 apps / game の再結線 | v3 では組まない決定 | 適用外 → H-7 (再開時ゲート) | T2h で引渡しの確認 |
 
 ## 7. 一括ゲスト一覧に入っていない受入

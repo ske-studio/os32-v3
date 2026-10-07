@@ -328,14 +328,10 @@ pub extern "C" fn main(
 
     /* フォントは同梱していない。無ければここで終わる (GFX モードに入らない) */
     if !font_available(FONT_PATH) {
-        kprint!(
-            b"font_test: cannot open %s\r\n\0",
-            FONT_PATH.as_ptr()
-        );
         os32api::print(
-            b"  put assets/fonts/ipaexg.ttf at /data/ipaexg.ttf (e.g. hsync)\r\n\0",
+            b"font_test: SKIP font not deployed (/data/ipaexg.ttf)\r\n\0",
         );
-        return 1;
+        return 2;
     }
 
     os32api::print(b"Press any key to start...\r\n\0");

@@ -12,6 +12,7 @@
 
 #include "os32api.h"
 #include "libos32gfx.h"
+#include "rt/testresult.h"
 #include <string.h>
 
 extern int sprintf(char *str, const char *format, ...);
@@ -43,6 +44,10 @@ int main(int argc, char **argv, KernelAPI *api)
     api->kprintf(ATTR_WHITE, "=== gfx_blit_transparent Test ===\r\n\r\n");
 
     libos32gfx_init(api);
+    if (gfx_packed) {
+        libos32gfx_shutdown();
+        return os32_test_summary_skip(api, "blit_test", "packed framebuffer (planar test)");
+    }
 
     /* ---- 正確性テスト ---- */
     api->kprintf(ATTR_CYAN, "[Correctness Tests]\r\n");
@@ -115,7 +120,7 @@ int main(int argc, char **argv, KernelAPI *api)
 
     api->kprintf(ATTR_WHITE, "\r\nDone. Press any key.\r\n");
     libos32gfx_getchar();
-    return total_fail ? 1 : 0;
+    return os32_test_summary(api, "blit_test", total_fail ? 0 : 1, 1);
 }
 
 /* ---- サーフェス構築 ---- */

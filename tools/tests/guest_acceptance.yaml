@@ -738,3 +738,190 @@
     generation_2_runs: true
     kapi_version: 70
   evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+
+# e12 configuration matrix; accepted scope is restricted to RESULT observations.
+- id: e12-8mb-planar
+  gate: T2h
+  mode: manual
+  status: deferred
+  contract: docs/tasks/DEFERRED_TESTS.md#H-4
+  prereq: 8MB planar; H-4 configuration batch, TASK_T2D_T2H.md §12
+  entry: Full T2e acceptance suite
+  observe: &id001
+  - Use rebuilt generation-2 binaries and matching kernel.map; record hashes, __bss_end, backend and RAM.
+  - Run gfx200_test/gfx_demo200, Japanese gdi_test/t5a_display and present; GUI -> CUI -> GUI; window
+    -> fullscreen DISPLAY -> window.
+  - Ordinary GUI low VRAM/device direct writes must kill; E low BB must kill while F+ legitimate CLIENT
+    survives and F- revoked lease kills.
+  - 'Boot kselftest S/T/U: two ASes, private leases and one-sided revoke preserve the other AS; all resources
+    returned and fail=0.'
+  - After V86 test/disk/STOP return compare alias_cache UC across master/AS/device/lease, restore PDE
+    USER and reacquire DISPLAY/TVRAM.
+  - SHM lock first/last page faults; free/owner cleanup then second application writes successfully.
+  - After boot font_load_test returns NOSYS, Unicode table/BB/mailbox unchanged; distinguish stat SKIP
+    from executing the NOSYS case.
+  - A target must equal actual stack bottom minus one page; PTE NP and PF error=6. B after shlib load
+    must be PTE P/U/RO and PF error=7.
+  - Run db_test and db_v50_test and require their existing PASS totals.
+  expect:
+    kselftest_fail: 0
+    audit_fail: 0
+    A_pf_error: 6
+    B_pf_error: 7
+  evidence: ~/os32-tmp/evidence/<日付>/e12-8mb-planar/
+- id: e12-8mb-pegc
+  gate: T2h
+  mode: manual
+  status: deferred
+  contract: docs/tasks/DEFERRED_TESTS.md#H-4
+  prereq: 8MB PEGC; H-4 configuration batch, TASK_T2D_T2H.md §12
+  entry: Full T2e acceptance suite
+  observe: *id001
+  expect:
+    kselftest_fail: 0
+    audit_fail: 0
+    A_pf_error: 6
+    B_pf_error: 7
+  evidence: ~/os32-tmp/evidence/<日付>/e12-8mb-pegc/
+- id: e12-17mb-planar
+  gate: T2h
+  mode: manual
+  status: deferred
+  contract: docs/tasks/DEFERRED_TESTS.md#H-4
+  prereq: 17MB planar; H-4 configuration batch, TASK_T2D_T2H.md §12
+  entry: Full T2e acceptance suite
+  observe: *id001
+  expect:
+    kselftest_fail: 0
+    audit_fail: 0
+    A_pf_error: 6
+    B_pf_error: 7
+  evidence: ~/os32-tmp/evidence/<日付>/e12-17mb-planar/
+- id: e12-17mb-cirrus
+  gate: T2h
+  mode: manual
+  status: deferred
+  contract: docs/tasks/DEFERRED_TESTS.md#H-4
+  prereq: 17MB Cirrus; H-4 configuration batch, TASK_T2D_T2H.md §12
+  entry: Full T2e acceptance suite
+  observe: *id001
+  expect:
+    kselftest_fail: 0
+    audit_fail: 0
+    A_pf_error: 6
+    B_pf_error: 7
+  evidence: ~/os32-tmp/evidence/<日付>/e12-17mb-cirrus/
+- id: e12-cirrus-off
+  gate: T2h
+  mode: manual
+  status: deferred
+  contract: docs/tasks/DEFERRED_TESTS.md#H-4
+  prereq: 'H-4: Cirrus unavailable, force cirrus preference; §12 configuration batch'
+  entry: Force cirrus then run drawing and lease suite
+  observe:
+  - Record actual fallback backend and valid CLIENT/DISPLAY geometry; draw/present Japanese with fallback.
+  - Old tokens revoked, both SDK instances reattach, UC aliases agree; no stale BB or leaked leases.
+  expect:
+    drawing_failures: 0
+    stale_lease_faults: 0
+    audit_fail: 0
+  evidence: ~/os32-tmp/evidence/<日付>/e12-cirrus-off/
+- id: e12-17mb-pegc-accepted
+  gate: e12
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  status: accepted
+  prereq: 17MB PEGC; e11 integrated build v70, commit 1d222ac
+  entry: e11b2-isolation; e11b2-consumers; e11b2-generation; e11c2-consumers; e11a2-fullscreen-input
+  observe:
+  - Reference e11 entries for Japanese/drawing/present, fullscreen return and generation checks.
+  - 'RESULT: kselftest 283/0 including S/T/U, PT0 USER=0 before/after V86; audit_runs 79/fail 0, v86_restore_mismatch
+    0.'
+  - 'RESULT: E kill, F+ SURV, F- kill; SHM lock first/last kill then shm_reuse_test 4/4.'
+  - 'RESULT: GUI Japanese gdi_test/t5a_display, fullscreen -> desktop -> CUI; db_test 9/9, db_v50_test
+    42/42.'
+  - Acceptance excludes blit_test and bench Test 3 crash (fixed in e12), font_test missing font, PF error
+    codes, and other unobserved details.
+  expect:
+    kselftest_pass: 283
+    kselftest_fail: 0
+    audit_fail: 0
+    v86_restore_mismatch: 0
+    shm_reuse_pass: 4
+  evidence: ~/os32-tmp/evidence/2026-10-07/accept_e11/RESULT.md
+- id: e12-17mb-pegc-A
+  gate: T2h
+  mode: manual
+  status: deferred
+  contract: docs/tasks/DEFERRED_TESTS.md#H-8
+  prereq: 17MB PEGC; pending H-8
+  entry: Explicit e12 supplemental checks
+  observe:
+  - Record actual stack bottom and marker target; PTE NP, fault at that page; obtain PF error_code=6 (e11
+    serial lacks error code).
+  expect:
+    PTE_present: 0
+    pf_error: 6
+  evidence: ~/os32-tmp/evidence/<日付>/e12-17mb-pegc-A/
+- id: e12-17mb-pegc-B
+  gate: T2h
+  mode: manual
+  status: deferred
+  contract: docs/tasks/DEFERRED_TESTS.md#H-9
+  prereq: 17MB PEGC; pending H-9
+  entry: Explicit e12 supplemental checks
+  observe:
+  - Load shlib in the same AS before B; snapshot PTE P=1/U=1/RW=0 and record PF error_code=7. e11 fault
+    at shlib base alone does not prove RO.
+  expect:
+    PTE_present: 1
+    PTE_user: 1
+    PTE_rw: 0
+    pf_error: 7
+  evidence: ~/os32-tmp/evidence/<日付>/e12-17mb-pegc-B/
+- id: e12-17mb-pegc-font
+  gate: T2h
+  mode: manual
+  status: deferred
+  contract: docs/tasks/DEFERRED_TESTS.md#X-2
+  prereq: 17MB PEGC; pending X-2
+  entry: Explicit e12 supplemental checks
+  observe:
+  - Run font_load_test; record exact reason if stat SKIP; run postboot NOSYS check with table/BB/mailbox
+    snapshots. e11 font_test missing TTF is a different test.
+  expect:
+    postboot_result: NOSYS
+    table_bb_mailbox_changes: 0
+  evidence: ~/os32-tmp/evidence/<日付>/e12-17mb-pegc-font/
+- id: e12-17mb-pegc-v86-release
+  gate: T2h
+  mode: manual
+  status: deferred
+  contract: docs/tasks/DEFERRED_TESTS.md#E11-9
+  prereq: 17MB PEGC; pending E11-9
+  entry: Explicit e12 supplemental checks
+  observe:
+  - Reference e11b2-isolation for PT0/V86 audit accepted evidence; explicitly reacquire DISPLAY/TVRAM
+    after V86 and verify UC on every alias; GUI/WM TVRAM reads are zero-filled.
+  expect:
+    alias_cache_mismatches: 0
+    reacquire_failures: 0
+  evidence: ~/os32-tmp/evidence/<日付>/e12-17mb-pegc-v86-release/
+- id: e12-17mb-pegc-skip-peak
+  gate: T2h
+  mode: manual
+  status: deferred
+  contract: docs/tasks/DEFERRED_TESTS.md#E11-BUD
+  prereq: 17MB PEGC; pending E11-BUD
+  entry: Explicit e12 supplemental checks
+  observe:
+  - 'blit_test: SKIP packed framebuffer (planar test), exit=2 (S-7).'
+  - bench_scale2x Test 3 alone prints SKIP; other timings continue (S-7).
+  - 'font_test: SKIP font not deployed (/data/ipaexg.ttf), exit=2 (S-8); supply TTF and run at H-4.'
+  - Measure kernel-only kmalloc_peak_bytes across CUI/GUI/fullscreen and return; decide KHEAP restoration
+    at E11-BUD.
+  expect:
+    blit_exit: 2
+    font_exit: 2
+    benchmark_other_tests_continue: true
+  evidence: ~/os32-tmp/evidence/<日付>/e12-17mb-pegc-skip-peak/
