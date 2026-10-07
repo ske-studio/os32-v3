@@ -3494,3 +3494,138 @@ native runner・NP21/W・実機は未実施。配備・NHD・ini操作、コミ�
 
 **ci-select の着地 (PM、2026-10-04)**: 独立レビュー Opus 5.5 は 1 往復目 Request changes (P2-1 kernel.mk / libs.mk / programs.mk の振り分けが型の門を迂回、P2-2 kapi.json の振り分けが成果物を読む検査と edit-doc を取りこぼす、P2-3 main の上のコミットが fast に退化 — 3 件ともレビュアーが写しで実測) → Codex gpt-6-astra が直した → 2 往復目 Approve (前回の反例を写しで再実行し、全部 full か期待どおりの選択)。残る P3 の `CHECK_CONTROL` の大文字小文字 (小文字の `mut_on` / `host32_check`、`BASE := HEAD` で基点が化ける) は PM が正規表現に `\bBASE\b|mut_on|host32_check` と re.IGNORECASE を足して閉じた (振り分け先の mk の `check-` を含むコメントで full に倒れるのは安全側の過剰として残す)。
 
+
+<a id="land-r94"></a>
+## 2026-10-07 移管: 基点 c09e5d8 の元の行 94–127 — d0a の試験と判定
+
+**d0a の試験と判定 (2026-10-01、ゲスト未実施)**:
+`userland/tests/d0a_test.c` を既定の CPL=3 でビルドし、`userland/deploy.yaml` に
+`/usr/bin/d0a_test.bin` として登録した [V2]。同一バイナリを親/子に使い、親の
+volatile BSS 64B を 0xA5 で埋めて stdout に登録 → `exec_run` で自分を `--child`
+付きで起動 → 子は引数の親VAと自身のBSS VAの一致と CPL=3 を確認し、同VAを
+0x5Aで埋める → `sys_write(1, "d0a child stdout\n", 17)` → 子自身の64Bを
+自己点検して終了 → 親は長さ17・payload全byte・未使用47Bの0xA5を確認する。
+子の終了codeは0=値不変、10=値変更、11=write不完全、12=VA不一致、13=CPL不一致。
+親はリダイレクト解除後に結果を出し、全正常なら0、それ以外は1で終了する。
+
+PMは健全な試験媒体に今回のバイナリを反映したことを確認 [V1] し、8MB/17MBで
+`/usr/bin/d0a_test.bin` を実行する (外側にパイプ/リダイレクトを付けない)。
+正しい実装なら `d0a: parent_buffer=OK`、`d0a: child_value=OK`、
+`d0a: child_status kind=1 code=0 rc=0 result_rc=0 bytes=17` が各1行。
+**`parent_buffer=MISSING` と `child_value=CHANGED`、かつ
+`child_status kind=1 code=10 rc=10 result_rc=0 bytes=17` の組なら、同VAの子を
+書換えたという指摘が当たり、d0bの修正対象と判断する。** `MISSING`単独は
+登録/継承/起動失敗などでも起きるので確定根拠にしない。子の異常終了/起動失敗/
+自己点検未完は `child_value=UNVERIFIED` と終了状態を出し、CHANGEDと偽らない。
+この場合は条件差として記録し候補を消さない。追加で CPL=3 の `sh` 内から
+`ls | cat` を実行し、単独 `ls` と比較する。画面・buffer VA・新kernel.mapから
+引いた親/子CR3・同VAの別PFN・kill差分もPMが記録する (本fixtureはCR3/PAを読む
+公開口を追加しない)。ゲストの別PFN/CR3と画面結果は未確認であり、ホスト結果を
+ゲスト再現として扱わない。
+
+ホストは `tools/tests/test_fd_redirect_d0a.py` と `fd_redirect_d0a_host.c`。
+実物 `fs/fd_redirect.c` をincludeし、Linuxの別memfd backingを同VAに順にmapして
+上の登録→切替→write→自己点検→子owner回収→親復帰を模擬する。MMU/権限検査/VFS
+境界は足場で、実exec/KAPI/CR3は検証しない。同AS正常対照はOK、親子ケースは
+`MISSING/CHANGED` (親64B不変・子payload一致・残り不変) を観測した。
+既定実行は契約に対してRED (rc=1)。全体checkには
+`check-fd-redirect-d0a-host` の `--expect-known-bug` でこの厳密な失敗のみをXFAIL
+(rc=0)として登録し、compile error/kill/別失敗/XPASSは失敗にする。
+d0bでrecipeの同flagを外し、登録者ASのwalk/copy境界の足場を追加してGREENにする。
+
+<a id="land-r217"></a>
+## 2026-10-07 移管: 基点 c09e5d8 の元の行 217–228 — 優先段・KAPI-AUDIT-FIX・e11c1/c3
+
+**優先段の着地とゲスト受入 (PM、2026-10-07、main `678e0dc`、17MB・今の ini)**: KAPI-CALLBACK・OWNER・DISK-AUTH を取り込み、`make check`・`check-fast` rc=0。kselftest 277/0。
+CALLBACK: `man -l` は落ちない、`kcallback_test` は callback が CPL=3・ctx 素通し・67 件 PASS、途中 kill の後も正常。DISK-AUTH: `disk_auth_test 0 20` で 3 口とも -1・セクタ不変。
+OWNER と回帰: `shm_reuse_test` 4/4・`db_test` 9/9・`db_v50_test` 41/41・パイプ 2 本。未実施: install / cdinst の通しの実行 (別イメージで)、`kcallback_test` の終了コード (台帳)。証拠 `~/os32-tmp/evidence/2026-10-07/accept_prio/`。
+**KAPI-AUDIT-FIX の着地とゲスト受入 (PM、2026-10-07、main `9dcb51b`)**: 取り込み `make check`・`check-fast` rc=0 (1 回目は小さな保守の対応表の誤りで落ち、直した)。kselftest 277/0、`sndtest`・DB・SHM・パイプの回帰 OK、常駐 rshell は受入の経路そのもの。
+未実施 (ホストのみ): CTRL+STOP で MML・シリアル・IME の待ちから抜けること、範囲外のカーソル・ch、USER の `rshell_set_active` — 直接呼ぶ CPL3 の試験プログラムが要る (台帳 PRIO-3)。
+
+c3 注記 (2026-10-07、基点 `4dcb7ec`): C/Rust os32_ls の値返し列挙へcaller移行、CPL0は初窓INVALで旧slotへ戻す。
+h3a/bはcaller_identityで自己公開、host initialize/次launchはhost identity()と照合し書込まない。
+shm_reuse_child/h2のページ・SHM長を公開定数へ。301件=22窓、再走査O(n²)・非snapshot。
+ホスト検査・証拠 `/home/hight/os32-tmp/run/e11/c3_report.md` と `c3_*.log`。ゲスト受入/nativeは台帳とe11c3-*でPMへ。
+
+c1 注記 (2026-10-07): v70 slot 240〜245・公開値型・E11-8/14、像予算一時 +16KB。c2/c3/b2 と統合ゲストは未実施。証拠 `/home/hight/os32-tmp/run/e11/c1_report.md`、`c1_sizes.json`、`c1_*.log`。
+
+<a id="land-r231"></a>
+## 2026-10-07 移管: 基点 c09e5d8 の元の行 231–243 — e11b2・e11a2
+
+**e11b2 実装 (2026-10-07、基点 `6d62e0f`、未配備)**:
+- Unicode/BB・旧 CLIENT の共有 USER と PDE 準備を撤去、通常 AS map/unmap は共有 PT 要求を無変更拒否。
+- selftest の呼出し/件数を維持して拒否を検証。E は error7/0x6A000 の kill、F は c2 のまま。
+- memory_layout=2、KAPI70不変、旧世代1を拒否。全現行ビルド対象を clean 再ビルド。
+- 証拠 `~/os32-tmp/run/e11/b2_report.md`・`b2_*.log`、予算 `b2_sizes.json`。KHEAP の戻しは PM 判断。
+- ゲスト/native補完は台帳 E11-3/6/10/BUD、台本 `e11b2-*` で PM 統合受入。§4-1 の差分確認を報告に残す。
+
+**e11a2 内部準備 (基点 `5ca3f01`、2026-10-07、未配備)**:
+- E11-5: WM/端末子孫の注入門と全画面フォーカス配送。WM注入に宛先を保持しtake/peek/pendingを連鎖内へ限定。exec_resumeの2箇所だけ宛先ID付きtakeに変更し、両帰路を抽出検査。WMは成功注入だけ起床候補にしAGAIN/退場で消す。
+- E11-6a: kcg_init は boot 閉鎖後も倍率1へ戻す (取得済み旗保持)。GUI の非所有 USER shutdown を無変更拒否、CUI/内部終了は維持。
+- wait は描画再取得失敗でも元の結果を返し、次の wait で回復。offscreen は描画継続。Rust wait_key/try_key は束縛済み shlib の帰路を照合し、try_key の k<=0 は省く (raw KAPI 利用者は明示 check が必要)。
+- E11-12a: saved USER の値だけ返す内部 caller_identity_get、h3 自己公開は opt-in・既定無効。slot/protocol/版/utf8 初期値は不変。h3 identity() との照合は e11c とゲストへ持越し (現試験は caller_access 模型との照合)。
+- 証拠: `/home/hight/os32-tmp/run/e11/a2_*.log`、初回検査別 rc は `a2_final_results.json`、レビュー修正は `a2_fix1_results.json` / `a2_fix1_extra_results.json`。ゲスト手順は guest_acceptance の e11a2 3 件、持越しは台帳 E11-A2。
+
+<a id="land-r274"></a>
+## 2026-10-07 移管: 基点 c09e5d8 の元の行 274–315 — e11a1・e10c・e10b・e9
+
+**e11a1 内部結線 (2026-10-07、基点 `5ca3f01`、レビュー修正1)**: `gfx_get_framebuffer` は CPL3/CPL0 とも従来の selected alias を維持。公開 KAPI・版・旧 USER は維持。
+内部の互換橋は pre-init/授権失敗をゼロ出力だけで返し、不正な書出し範囲だけ USER abort。role→publisher と caller 照合 unlease は専用 section で未使用時に GC、互換 token は unlease 不可。
+Cirrus DISPLAY は G∧F の授権 lease 用 RW。E10-8 は pgalloc の decode 範囲検査口へ、E10-9 は初回 tag と SerialFS セッション外だけ CRLF の polled 行。
+V86 帰路の互換 CLIENT token 維持をホスト確認。旧 E は a で SURV、`ring3_guard l…` は従来の B。切替条件と延期は台帳 E11-A1。
+証拠・E11-2 前後サイズ・検査 rc: `/home/hight/os32-tmp/run/e11/a1_fix1_report.md`。旧 USER 下のホスト合格は準備確認のみ。
+
+**e10c 実装 (2026-10-07)**: master/全 AS・alias/refcount 検査を post-exec・probe 後・GUI 移譲・AS launch・V86 通常帰路に接続。合成 S/T/U は post-exec でも実行。
+監査は生涯専用計数、AS単位のIRQ区切りと割当PTだけの照合。probe後は選択面/source・bind/BBも確認。
+DISPLAY/TVRAM は帰路で revoke→regen (CLIENTは保持)、GUI 再入でも TVRAM を失効。gcap kill の通常着地で回収・30 行/cursor 復元、停止前の polled 印と VM INT80 の IF 保持を追加。
+**e10c 着地・ゲスト受入 (PM、2026-10-07、main `e730cd3`、17MB・今の ini)**: 取り込み `make check`・`check-fast` rc=0。kselftest 281/0、3 段検査は受入中に 23 回走り失敗 0、`v86_restore_mismatch`=0。
+`v86 -t`・`-g -t` の後も帰路の照合は失敗 0、gcap の確保と解放が釣り合い、低位 PT0 は一致。PRIO-3: cursor・fmch PASS、MML と IME の待ちは CTRL+STOP で 130、USER の rshell_set_active の後も rshell は応答。
+未実施: `-g` 途中の kill (E10-4)、end 中の再例外と VM INT80 の IF (E10-5/6)、シリアルの待ちの中断 (ローカル起動が要る)、GUI→CUI→GUI の TVRAM generation。証拠 `~/os32-tmp/evidence/2026-10-07/accept_e10c/`。
+
+| 段 | present USER の期待 | 対応する台帳 |
+|---|---|---|
+| e10c (e11 前) | SHM/trampoline 必須、font/Unicode/BB・TVRAM〜BRG・CLIENT の旧共有 USER は遷移前後とも許可。共有 CLIENT の PDE 権限は実 AS 前に固定 | E10-2 / E11-2 |
+| e11b 後 | SHM/trampoline だけ。旧共有 PTE USER・CLIENT 用 PDE 準備・旧 VRAM 例外を撤去し検査を反転 | E11-2 |
+証拠: `/home/hight/os32-tmp/run/e10c/` のログと最終報告。PM 台本は `tools/tests/guest_acceptance.yaml` の e10c 群、観測記号は `tools/accept/pt0_snapshot.py`。
+ゲスト/native は PM 待ち (E10-2/4/5/6 は未閉鎖)。`check-memmap` の生成ブロック鮮度差分は、編集禁止に従い PM 統合時の再生成へ。
+
+**e10b 実装 (2026-10-06)**: session に低位 PTE・master/active PDE0・page0 全 4KB・runtime 復帰状態を集約。
+kill は深さ 0 でも回収前に end。例外では longjmp 前に地図/I/O/IRQ を戻し、解放は master CR3・IF=1 の trusted 着地へ送る。
+VM INT80h は KAPI 入口で分離しゲスト IVT へ反射。end は再入防止、途中の再例外は回収へ進まず停止する。
+通常 AS は exec launch/resume・AS 生成・通常地図 selftest の入口で拒否。復元は保存 PDE/PTE の直接書戻し・1 回 flush、PCD は表と台帳に照合。
+CUI 出口は高さ 400/flip 無効。公開 KAPI・低位 USER 撤去・page0 NP 化は変更しない。
+ゲスト/native と K1 実例外受入は [持越し台帳](../../tasks/DEFERRED_TESTS.md) E10-1。H-6 と e10c の範囲は維持、gcap kill の漏れは E10-4。
+証拠は `/home/hight/os32-tmp/run/e10b/` の検査ログと `fix1-report.md` (F1〜F7・検査 rc・PM ゲスト手順)。
+**e10b 着地・ゲスト受入 (PM、2026-10-06、main `d34fccc`、17MB・今の ini)**: 取り込み `make check`・`check-fast` rc=0。配備の Commit・サイズ一致、kselftest 277/0。
+アプリ実行後の状態を基準に `v86 -t` ×2 と `-g -t` の後も低位 PT0 の 256 PTE は A/D 以外すべて一致、PDE0 不変、`v86_restore_mismatch`=0、高さ 400・flip 0。
+続く `shm_reuse_test` 4/4・`ring3_guard bb` 生存・`db_test` 9/9・`db_v50_test` 41/41。未実施: `-d`/`-b` の出口、K1 のゲスト注入 (台帳 E10-1)。証拠 `~/os32-tmp/evidence/2026-10-06/accept_e10b/`。
+
+**e9 実装 (2026-10-06)**: tvdump は既存 `tvram_readchar_at`、TVDM wire 不変。公開 KAPI・旧 USER/VRAM 例外は維持。
+マーカーは owned SHM (配置 `userland/tests/ring3_marker.h`)、fault は target/ARMD と serial addr/kill 差分で照合する。
+`shm_reuse_test` は free/exit の各経路で別 AS の同一ブロック・全ページ書込みを判定。E の旧 BB 生存期待は維持。
+ゲスト/native 未確認と e11 の4件は [持越し台帳](../../tasks/DEFERRED_TESTS.md) E9-1〜4 / E10-3 / E11-9〜12 / S-5。
+証拠は `/home/hight/os32-tmp/run/e9/` のビルド・検査ログと e9 最終報告 (PM ゲスト手順)。
+
+**e9 + SHM の DB 予約の着地とゲスト受入 (PM、2026-10-06、main `ee15d21`、NP21/W 17MB・今の ini)**: 取り込みの `make check` rc=0 (3 回目 — 1 回目は TESTS.md の再生成漏れ、2 回目は試験の差し替え memmap の追従漏れ `323c044` で直した)。
+NHD 配備 (stop → nhd-pull → deploy-kernel → start)、`ver` の Commit `ee15d21`・`/boot/vmkernel.lz4` 484,623 B が手元と一致、kselftest 277/0 (試験の前後とも)。
+マーカー 8 行は `ring3_marker.h` の表どおり — 全行がブロック 1 (`0x1C4000`、ブロック 0 は DB 予約で配られない)、fault 5 行は ARMD・kill +1 ずつ (0→5)・シリアルの addr が target と一致、E は SURV・kill +0。
+`shm_reuse_test` PASS 4/4 (free / exit とも 2 本目が同じブロック `0x1C8000` に全ページ書込み)、`db_test` 9/9、`db_v50_test` 41/41。
+tvdump: `/api/cmd` で取った生バイトが TVDM 80×25・4,000 B、内容は `/api/tvram` と全行一致 (完了表示の 1 行のスクロール分を除く)。`tools/tvdump_recv.py` は名前付きパイプ `np21w_com1` が今の NP21/W に無く使えない (台帳 X-6)。
+
+<a id="land-r678"></a>
+## 2026-10-07 移管: 基点 c09e5d8 の元の行 678–691 — e11b1・e11c2
+
+**e11b1 (基点 `78929ab`、2026-10-07、未配備)**:
+- TVRAM〜BRG/fontの起動時USERとVRAM早期例外を撤去。監査容認はUnicode/BBとCLIENTだけ、残りはc後のb2。
+- E11-9は公開wrapだけCUI授権・拒否時ゼロ埋め。内部console/IME/selftestとTVDM 4006Bは維持、宣言・slot・版不変。
+- E11-11は未貸与VRAM拒否を追加してDB 42件。E11-13はlockwrite first/lastの別起動とSL markerを追加、ゲスト実効性は未確認。
+- UC変異を旧exec切出しからleaseへ移し、縮小容認下のV86帰路3段監査をホスト確認。
+- 証拠: `/home/hight/os32-tmp/run/e11/b1_*.log` と `b1_results.json`。PM手順は guest_acceptance の e11b1-*、持越しは台帳 E11-B1。
+- Opus レビュー Approve (P3 のみ)。R1-R3 は PM が文書・注釈を直し、R4 (授権の変異 4 項)・R5 (旧 probe の復元) は fix1。決定 (R7): gshell の Run から直接起動した全画面 CUI (`gui=0`、con_sink 無効) は画面を持つ前景なので tvdump を許す。R6 (試験の私有定数) は e11c で SDK 定数へ、R8 (`dbg_memdump` の低位) は到達なしで見送り。
+
+### e11c2 — CPL3 consumer の lease 結線 (2026-10-07)
+- v70 の CLIENT/Unicode port、USER framebuffer 橋、present/明示待ち帰路の世代照合を接続。描画ごとの syscall は追加しない。
+- 互換 token は CLIENT regen で失効し、次回取り直す (同 VA の保証なし)。CPL0 の直呼びは alias を維持。
+- shlib 119 番に detach、120 本。gdi_test の両実体 rollback、Unicode の二重取得を除去。protocol/ABI 世代は不変。
+- ユーザー utf8 は NULL 開始、t5a_display の静的実体も port 初期化。ring3_guard F の有効書込と revoke 後 kill を追加。
+- ホスト証拠・予算・指定検査は `~/os32-tmp/run/e11/c2_report.md`。ゲストは台帳 E11-1/6/A1 と guest_acceptance の e11c2-* で PM 受入。

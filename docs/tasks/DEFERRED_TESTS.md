@@ -1,7 +1,7 @@
 # 持越し台帳 — 延ばした試験・SKIP・ホストだけの合格・未結線
 
 > 状態: **実装中 (2026-10-06)** — 初版。[TASK_T2D_T2H](v3/TASK_T2D_T2H.md) の実行記録 (4,013 行) に埋もれていた未完了を関門ごとに集めた。
-> 規則: **未完了だけを持つ**。終わった行は、証拠の所在を票に 1 行書いてからここから消す。実行ログを貼らない。同じ延期を票・引き継ぎ・memory に写さない。
+> 規則: **未完了だけを持つ**。終わった行は、証拠の所在を票に書いてから [閉鎖台帳](../archive/v3/DEFERRED_CLOSED.md) へ移す。実行ログを貼らない。同じ延期を票・引き継ぎ・memory に写さない。
 > ここに行が無い SKIP・未実行は合格に数えない ([ROLES §4](agents/ROLES.md))。FAIL・crash・timeout を延期に書き換えない。関門に着いたら、その関門の行を全部消すまで次へ進まない。
 
 「元の行」は切り離す前 (`b486494`) の TASK_T2D_T2H.md の行番号 — `git show b486494:docs/tasks/v3/TASK_T2D_T2H.md | sed -n 'N,Mp'` か、
@@ -14,48 +14,35 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 
 | ID | 何を | 種類 | 関門 |
 |---|---|---|---|
-| PRIO-3 | シリアルの待ちの CTRL+STOP (`audit_test serial` — rshell の通信路とぶつかるのでキーボードから起動)、GUI→CUI→GUI の TVRAM generation | 未実施の確認 | e11 統合受入 |
-| PRIO-1 | install / cdinst の通しの実行 (授権が通り、区画・format・書込みまで) を別のディスクイメージで — 取り込み済みの DISK-AUTH の受入の残り | 未実施の確認 | 次の構成試験 (h の前) |
+| PRIO-3 | シリアルの待ちの CTRL+STOP (`audit_test serial` — rshell の通信路とぶつかるのでキーボードから起動)、GUI→CUI→GUI の TVRAM generation。e11 受入ではローカル起動が必要で未実施 | 未実施の確認 | T2h 統合受入 |
+| PRIO-1 | install / cdinst の通しの実行 (授権が通り、区画・format・書込みまで) を別のディスクイメージで — 取り込み済みの DISK-AUTH の受入の残り。e11 受入では別イメージが必要で未実施 | 未実施の確認 | T2h の構成試験の前 |
 | LZSS-1 | 修正した圧縮器の PKG (種250の2ファイル) を cdinst で入れて照合。実物 pkg.c の32ビット qemu ホスト試験は合格、依頼範囲に配備・NP21/W操作は含まない | ホストのみ | PRIO-1 のインストール受入 |
 
 ## 1. 関門: e9 / e10b / e10c
 
 | ID | 何を | 種類 | 元の行 |
 |---|---|---|---|
-| E9-1 | TVRAM の RW 化、アプリと sh.bin (CPL3) 経由の tvdump をゲストで確かめる (常駐シェルの tvdump は 2026-10-06 に受入済み) | 未実施の確認 | 1185、1571 |
+| E9-1 | CPL3 sh 経由の tvdump をゲストで確かめる。常駐 CUI は受入済み。sh に -c が無く対話入力はキーボードのため、入力の道具が要る | 未実施の確認 | 1185、1571 |
 | E9-2 | h3 の本人識別・前景の証拠 writer を正式な経路へ切り替える (h3 の初期化も) | 申し送り | 2605、2747–2893 |
 | E9-3 | TVRAM 範囲外の呼び出しの拒否をゲストで (`6e4df78` はホスト試験だけ) | ホストのみ | 1432–1548 |
-| E10-1 | V86 の `-d` / `-b` の正常・失敗・STOP 出口と K1 (session 中の CPL0 例外) のゲスト確認 — 画像と注入手段が要る (`-t`・`-g -t` は 2026-10-06 受入済み) | 未実施の確認 | e10c |
-| E10-4 | `v86 -g` の採取の途中の kill で g/tv の解放・gcap_ops・TVRAM 30 行が戻ることのゲスト確認 (ホストのみ。採取が 1 秒未満で途中を狙えない — 長い採取か注入が要る) | ホストのみ | e11 統合受入 |
-| E10-5 | V86 session の end 中の再例外での停止の印 (シリアル 1 行と `exec_stop_count`) のゲスト確認 (ホストのみ、注入の手段が要る) | ホストのみ | e11 統合受入 |
-| E10-6 | V86 の INT 80h を反射する間 IF=0 のゲスト確認 (ホストのみ、INT 80h を出す V86 の画像が要る) | ホストのみ | e11 統合受入 |
-| E10-8 | gfx が台帳のレコード (`ledger_resources[rid].map_*`) を直接書き換えている — pgalloc に範囲を検査して設定する口を作る | 改善 | e11a |
-| E10-9 | 監査 (launch・GUI 移譲・V86 帰路) の失敗が計数だけで表示されない — 最初の 1 回だけシリアル 1 行か tag を残す | 改善 | e11a |
+| E10-1 | V86 の `-d` / `-b` の失敗出口と K1 (session 中の CPL0 例外) のゲスト確認。正常・STOP 出口は e11 統合受入済み、故障画像と注入手段が要る | 未実施の確認 | e10c |
+| E10-4 | `v86 -g` の採取の途中の kill で g/tv の解放・gcap_ops・TVRAM 30 行が戻ることのゲスト確認 (ホストのみ。採取が 1 秒未満で途中を狙えない — 長い採取か注入が要る)。e11 受入の持越し理由: 採取が 1 秒未満で途中を狙えない | ホストのみ | T2h 統合受入 |
+| E10-5 | V86 session の end 中の再例外での停止の印 (シリアル 1 行と `exec_stop_count`) のゲスト確認 (ホストのみ、注入の手段が要る)。e11 受入の持越し理由: 故障画像と再例外の注入手段が要る | ホストのみ | T2h 統合受入 |
+| E10-6 | V86 の INT 80h を反射する間 IF=0 のゲスト確認 (ホストのみ、INT 80h を出す V86 の画像が要る)。e11 受入の持越し理由: INT 80h を出す V86 の画像が要る | ホストのみ | T2h 統合受入 |
 
 ## 2. 関門: e11 (公開 KAPI の一括、版の更新は 1 回)
 
 | ID | 何を | 種類 | 元の行 | 関門 |
 |---|---|---|---|---|
-| E11-A1 | c2 で USER lease 橋・互換 token 失効/再取得・ring3_guard F を結線。窓→全画面→復帰、日本語、F生存/revoke kill・旧E生存・native補完・予算の統合受入は PM (c2_report.md / guest_acceptance e11c2-*) | ホスト検証・ゲスト未配備 | e11a1 レビュー修正1 (2026-10-07) | e11c 切替と PM 統合受入、予算は公開前 |
-| E11-1 | c1 公開口と c2 SDK CLIENT/Unicode port・present/待ち帰路・USER橋を結線。RO日本語・両gfx実体・世代回復・旧USER撤去との統合ゲスト確認を PM に残す (c2_report.md)。c2 レビュー: present ごとの query (R5) は統合ゲストで bench の前後を記録、t5a_display の gfx 全体 attach (R4) は見送り | ホスト検証・ゲスト未配備 | 223–257、430–455、571、584–585、654–656、821–823、847、911、949、1023–1040、1069、1089、1105–1108、1143、1204–1207、1367–1368 | e11a/c準備 → 統合 |
-| E11-2 | 結線後のkernel/SDK/shlibサイズを再実測し、§6のe枠・圧縮・8MB私有量を確認。撤去の減少を先取りしない。c3 で CRT (syscalls.o) が全バイナリ +348B (os32_ls、-ffunction-sections 無し) — 統合で計測 | 申し送り | 289–291、457–470、538、688、1240 | e11a/b/c → 統合 |
-| E11-3 | 低位 Unicode/BB・共有 CLIENT USER、旧 PDE 準備・exec 共有 map を b2 で撤去。通常 map/unmap は共有 PT 無変更拒否、CLIENT/DISPLAY は lease 経由。実 PTE/PF・V86 は e11b2-isolation で PM 受入 | ホスト検証・統合ゲスト未実施 | 599、605–606、707、826、887–892、1006、1043、1573–1576、1762–1763 | e11a/b → 統合 |
-| E11-4 | c3: C/Rust os32_ls 移行・CPL0 INVAL fallback実装、qemuホスト確認。PM: sh/CPL0 dir・補完・man/find/du/hsync・Rust filer を統合ゲストで受入、FD所有/授権flagを含む従来の統合関門も維持 | ホスト確認・統合ゲスト未確認 | 1501–1504、1546、1600、1694、1887 | e11b/c → 統合 |
-| E11-5 | Run全画面のowner 1または専用KAPIでキー配送。終了・二重注入なし・窓漏れなし・WAIT_POLLを確認。WM直接注入はtranslate()のASCIIのみ (矢印・機能キーは捨て、rawはe11cの専用KAPI)、KAPI追加はcで版一括 | 既知の不具合 | 1167–1169、1431 | e11a/b/c → 統合 |
-| E11-6 | c2 の Unicode/両 gfx/待ち帰路に続き b2 は memory_layout=2 (KAPI70不変)・旧世代拒否・selftest 件数維持。全現行対象再ビルド、native 補完と日本語/boot/描画ゲストは e11b2-consumers/generation で PM 受入 | ホスト検証・統合ゲスト未実施 | 998–1002、1111、1156–1163、1274、1338、1361、1396、1429、1624 | e11a/b/c → 統合 |
-| E11-7 | KAPI文書にSTALE/INVALの推測可能性とcallback/scheduling禁止を明記し、公開契約・生成物と照合 | 申し送り | 258、375–377、573、1004 | e11c → 統合 |
-| E11-8 | 上記KAPI-AUDIT-FIX/OWNERの受入・分類を反映。pipe_get_bufのkernel番地返却・pipe_get_lenの他owner照会の意味変更と範囲検査P3変異を接続 | 契約接続待ち | 1502、1504、1546 | e11c → 統合 |
-| E11-9 | tvdumpのtvram_readchar_atをCUI前景所有者だけに授権。checked copyとTVDM wireを維持し非所有者拒否を確認 | 申し送り | e9 (2026-10-02 PM 決定) | e11b/c → 統合 |
-| E11-10 | b2 で E を kill (error7、0x6A000) へ反転。F の lease SURV/revoke kill は維持。ホスト確認後の実 PF/kill は e11b2-isolation で PM 受入 | ホスト検証・統合ゲスト未実施 | e9 / T2d〜h §2-5 | e11a/b → 統合 |
-| E11-11 | db_v50_testに未貸与VRAM拒否を追加。e9の実RAM最終byte成功・guard越境拒否も維持して低位USER撤去後に確認 | 申し送り | e9 (2026-10-02 PM 決定) | e11b → 統合 |
-| E11-12 | c3: h3 caller_identity自己公開とhost identity()照合を接続、qemuホスト確認。PM: h3a/b実ゲスト・CRT非依存marker受入 | ホスト確認・統合ゲスト未確認 | E9-2 / e9 | e11a/c → 統合 |
-| E11-13 | SHM lockで全ページRO・CPL3書込み拒否をゲスト確認。ホストの呼出し/結果判定だけで閉じずfree/exit後の次AS成功も対照 | 未実施の確認 | e9 R4 | e11b → 統合 |
-| E11-14 | c3: shm_reuse_child/h2のページ・SHM長を公開定数へ移行。PM: shm_reuse_testとh2を統合ゲストで受入 | ホスト確認・統合ゲスト未確認 | e9 R5 | e11c → 統合 |
-| E11-BUD | KHEAP176KB・像+16KBは維持。b2 の同一toolchain基点6d62e0f/撤去後実測は b2_sizes.json。戻す判断は PM、統合ゲストの kmalloc_peak_bytes と T2h 前再計測を待つ | ホスト検証・統合ゲスト未実施 | `c1_sizes.json` | b2 後 → T2h 前。統合ゲストで e11 の kernel の `kmalloc_peak_bytes` を測る (P3-8) |
-| E11-A2 | c3: h3自己公開照合を接続・ホスト確認。全画面入力4点・日本語・wait失敗・非所有shutdown・native補完とraw KAPI待機利用者の明示check契約はPM統合受入に残す | ホスト確認・統合ゲスト未確認 | e11a2 / guest_acceptance e11a2-* | e11c → e11統合受入 (PM) |
-| E11-B1 | TVRAM/font低位USER撤去後の描画・日本語・CUI/GUI/WM TVDM、DB42件、SHM lockwrite先頭/末尾CPL3 PFと再利用、PT0・V86全出口3段監査・kselftest、native補完 | 未配備、qemuホストのみ (lockwriteは境界stubで制御フロー確認、CPL3保護の実効性未確認) | guest_acceptance e11b1-*、b1_results.json | b1準備確認 → c → b2 → e11統合受入 (PM) |
+| E11-5 | Run からの全画面の 1 キー終了は受入済み。端末の子・WAIT_POLL・隠れた sh・先行入力の 4 点だけゲスト確認 | 既知の不具合 | 1167–1169、1431 | T2h 統合受入 |
+| E11-8 | pipe_get_buf の kernel 番地返却・pipe_get_len の他 owner 照会の意味変更と範囲検査はホスト確認のみ。ゲストで本人成功・他 owner 拒否の対照を確認 | 契約接続待ち | 1502、1504、1546 | T2h 統合受入 |
+| E11-9 | CUI の tvdump は受入済み。GUI 端末と WM の 0 埋めのゲスト確認だけ (ホストのみ) | 申し送り | e9 (2026-10-02 PM 決定) | T2h 統合受入 |
+| E11-12 | c3: h3 caller_identity自己公開とhost identity()照合を接続、qemuホスト確認。PM: h3a/b実ゲスト・CRT非依存marker受入 | ホスト確認・統合ゲスト未確認 | E9-2 / e9 | T2h の h3 (本人識別のゲスト照合は h3 の手順一式で) |
+| E11-BUD | kmalloc_peak_bytes は exec ヒープの確保も数える (kheap_alloc が全 KHeap 共通で更新) — GUI 後 1,286,752B。カーネルヒープの使用は `mem` で 2,544/180,224B。カーネルヒープ専用のピークにしてから測り直し、KHEAP を戻すか決める。b2 実測は b2_sizes.json | ホスト検証・統合ゲスト未実施 | `c1_sizes.json` | T2h 前 |
+| E11-A2 | h3 本人識別のゲスト照合は h3 の手順一式で。attach 失敗の注入・非 owner shutdown・raw KAPI 待機利用者の明示 check はホストのみ。全画面入力 4 点は E11-5 に集約、日本語は受入済み | ホスト確認・統合ゲスト未確認 | e11a2 / guest_acceptance e11a2-* | T2h の h3 |
 | E11-A3 | 全画面 owner の同期の子 (slot.parent) は kernel が読ませるが WM の起床の手がかりに入らない。端末由来のバイト (宛先 0) は全員が読める。**PM 決定 (2026-10-07): 専用 KAPI `kbd_inject_to` は e11c に入れない** — 全画面への矢印・機能キーの配送とともに持ち越し | 改善 | T2h 前に要否を再判断 |
 
+| E11-PERF | present ごとの query の前後比較は基準値が無く未実施。bench_scale2x Test 1 の基準は 320x200 40ms/100、640x400 10ms/100 (accept_e11/RESULT.md)。比較値を採取する | 未実施の確認 | E11-1 の比較残件 | T2h 統合受入 |
 
 ## 3. 関門: f5 以降 (T2f の結線と受入)
 
@@ -95,6 +82,9 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 | X-11 | 監査分類 (`~/os32-tmp/evidence/2026-10-07/audit-classification.md`) の「意味変更 (e11c)」のうち pipe (E11-8) を除く 12 件 — IME 9 本 (trygetchar/toggle/set_mode/switch_dict/user_delete/user_export/user_clear/trygetkey/feed_key)・exec_last_result・gui_call・con_sink_read の授権/本人別の契約 → **T4 の設計票で扱う (ユーザー決定 2026-10-07)** | 契約の整理 | 分類表 :33/:43-55/:57/:60 |
 | X-10 | 正常対照 21 本の省略と 6 本の実行順を修正し、段の包含を回帰試験化。取り込みから `make check-fast` を除去 → PM の統合 `make check` で受入 | 実装済み・統合受入待ち | 次の取り込み |
 
+| X-12 | blit_test と bench_scale2x (Test 3) が 9801 の 4 プレーン前提で gfx_fb.planes[1..3] を読み、PEGC (1 プレーン) で NULL への書き込みで kill。e11 以前から同じで退行でない。非プレーン形式なら SKIP を出す。関門: T2h の構成試験の前 | 既存の不具合 | accept_e11/RESULT.md |
+| X-13 | font_test の `/data/ipaexg.ttf` が NHD に無い。配備の対象に入れるか、試験が SKIP を出すか決める。関門: T2h の構成試験の前 | 環境不足 | accept_e11/RESULT.md |
+
 ## 6. SKIP の登録 (ここにあるものだけを「延期」と数える)
 
 | ID | 試験 | SKIP の理由 | 区別 | いつ必ず回すか |
@@ -109,3 +99,5 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 `tools/tests/guest_tests.txt` (一括) と `tools/emu_agent/tasks/regress.txt` (6 項目) には `d0a_test`・`kout_test`・fault 系・STOP / park-resume・GUI 受入が無い。
 一覧を回しただけでは受入一式の代わりにならない — これらは段の受入で個別に回し、結果を票に 1 行書く。
 一覧への追加と「台帳に無い SKIP・未起動の必須試験を失敗にする」照合は [REVIEW_2026-10-06 §5 の b](agents/REVIEW_2026-10-06.md)。
+| S-5 | e2test | 372KB × 2 のバッファが取れない | 環境の前提不足 | exec ヒープの上限を見直す f の段 |
+| S-6 | host_test | host_agent 不在 | 環境の前提不足 | T2h の Host Services の受入 |

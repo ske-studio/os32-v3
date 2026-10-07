@@ -68,8 +68,9 @@ void _start(int argc, char **argv)
         *guard = 0xDEADBEEFUL;
     }
 
-    /* ここに来た = 書けた。ケース E ではこれが正解、それ以外は保護が効いて
-     * いない (退行)。0x56525553 = LE "SURV" */
+    /* ここに来た = 書けた。b2 後のケース E は kill が正解で、ここに来たら退行。
+     * F の有効 lease は生存が正解、それ以外は保護が効いていない (退行)。
+     * 0x56525553 = LE "SURV" */
     mark[1] = R3_SURV;
 
     r3_exit(0);
