@@ -5,6 +5,7 @@
 import argparse
 import importlib.util
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -63,11 +64,86 @@ def rejection(prefix, work, archive, text, checker=gate, after=False):
     command(prefix, 'gcc', '-ffreestanding', '-fno-builtin', '-c', probe, '-o', work / 'probe.o')
     exe, mapfile = link(prefix, work, archive, [work / 'probe.o'], after=after)
     try:
-        checker.validate_output(prefix, mapfile, exe)
+        checker.validate_output(prefix, mapfile, exe, archive.with_suffix('.json'))
     except ValueError:
         assert not exe.exists(), "rejected executable remains"
         return
     raise AssertionError('link gate accepted forbidden/duplicate provider')
+
+
+def public_link(prefix, work):
+    """Real USER CRT + libc callers pass through the actual link_guard."""
+    public = work / 'public'
+    public.mkdir()
+    flags = ['-std=gnu11', '-O2', '-ffreestanding', '-fno-builtin', '-fno-pie',
+             '-I' + str(ROOT / 'sdk/include/os32'),
+             '-include', str(ROOT / 'sdk/include/os32/os32_unit_stamp.h')]
+    crt = public / 'syscalls.o'
+    command(prefix, 'gcc', *flags, '-c', ROOT / 'sdk/crt/syscalls.c', '-o', crt)
+    archive = builder.build(prefix, public, crt=crt)
+    source = public / 'caller.c'
+    source.write_text("""
+#include "os32api.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+KernelAPI *kapi;
+void _start(void) {
+    char *p = strdup("nano");
+    setenv("NANO", p, 1);
+    printf("%s %d", p, 7);
+    free(p);
+}
+""")
+    command(prefix, 'gcc', *flags, '-c', source, '-o', public / 'caller.o')
+    exe, mapfile = public / 'caller.elf', public / 'caller.map'
+    args = [sys.executable, str(ROOT / 'sdk/link_guard.py'), str(prefix / 'bin/i386-elf-ld'),
+            '-m', 'elf_i386', '-T', str(ROOT / 'sdk/link/app.ld'), '-nostdlib', '--nmagic',
+            '--gc-sections', '--allow-multiple-definition', '-Map=' + str(mapfile),
+            '-L' + str(prefix / 'i386-elf/lib'), '-L' + str(prefix / 'lib/gcc/i386-elf/13.2.0'),
+            '-o', str(exe), str(crt), str(public / 'caller.o'), str(archive), '-u', '_dtoa_r', '-lc', '-lgcc']
+    result = subprocess.run(args, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    mapping = mapfile.read_text()
+    for member in ('libc_a-makebuf.o', 'libc_a-nano-vfprintf.o', 'libc_a-strdup_r.o',
+                   'libc_a-setenv_r.o', 'libc_a-dtoa.o', 'libc_a-mprec.o'):
+        assert member in mapping, member
+    gate.check(prefix, mapfile, archive.with_suffix('.json'))
+    print('PASS USER link_guard: stdio/printf/strdup/setenv/dtoa/mprec -> adapter')
+    # The actual wrapper must reject even a losing duplicate and remove output.
+    rogue = public / 'rogue.c'; rogue.write_text('void os32_nano_morecore(void) {}')
+    command(prefix, 'gcc', *flags, '-c', rogue, '-o', public / 'rogue.o')
+    result = subprocess.run([*args, str(public / 'rogue.o')], capture_output=True, text=True)
+    assert result.returncode != 0 and 'independent break provider' in result.stderr and not exe.exists(), result
+    # Missing library/receipt cannot fall back to libc malloc.
+    result = subprocess.run([a for a in args if a != str(archive)], capture_output=True, text=True)
+    assert result.returncode != 0 and not exe.exists(), result
+    print('PASS public USER duplicate morecore / missing adapter rejected')
+
+
+def hash_providers(prefix, work, archive):
+    """Renaming valid bytes is allowed; an adapter basename grants no trust."""
+    private = [
+        work / name for name in __import__('json').loads(builder.inputs.LEDGER.read_text())['sdk_build']['members']]
+    renamed = work / 'renamed.o'
+    shutil.copyfile(work / 'nano_adapter.o', renamed)
+    alt = work / 'renamed.a'
+    command(prefix, 'ar', 'rcs', alt, *private, renamed)
+    exe, mapfile = link(prefix, work, alt)
+    gate.validate_output(prefix, mapfile, exe, archive.with_suffix('.json'))
+    command(prefix, 'objcopy', '--add-symbol=foreign_provider=.text:0,global', renamed)
+    spoof = work / 'spoof'; spoof.mkdir()
+    shutil.copyfile(renamed, spoof / 'nano_adapter.o')
+    bad = spoof / 'spoof.a'
+    command(prefix, 'ar', 'rcs', bad, *private, spoof / 'nano_adapter.o')
+    exe, mapfile = link(prefix, work, bad)
+    try:
+        gate.validate_output(prefix, mapfile, exe, archive.with_suffix('.json'))
+    except ValueError as exc:
+        assert 'adapter provider' in str(exc) and not exe.exists()
+    else:
+        raise AssertionError('same-name untrusted adapter accepted')
+    print('PASS providers validated by bytes, independent of member name')
 
 
 MUTATIONS = [
@@ -89,11 +165,18 @@ MUTATIONS = [
     ('a->brk = next;', 'a->brk = next + 4;', 1, 'noncontiguous break'),
     ('return (void *)old;', 'return (void *)(old + 4);', 2, 'noncontiguous success'),
     ('p = os32_private_calloc_r(r, n, size);', 'p = os32_private_malloc_r(r, n * size);', 1, 'calloc bypass'),
-    ('p != NULL && ((uintptr_t)p < start || (uintptr_t)p >= selected->brk)',
-     'p != NULL && (uintptr_t)p < start && (uintptr_t)p >= selected->brk', 1, 'pointer arena bounds'),
+    ('(uintptr_t)p >= start && (uintptr_t)p < a->brk',
+     '(uintptr_t)p >= start || (uintptr_t)p < a->brk', 1, 'pointer arena bounds'),
     ('next > UINTPTR_MAX - (OS32_NANO_PAGE - 1u)', '0', 1, 'page rounding overflow'),
     ('!a->grow_exact', '1', 1, 'resident branch forced for USER'),
     ('busy ? selected : NULL', 'selected', 1, 'morecore outside busy'),
+    ('a = new_arena(bytes);', 'a = bytes ? NULL : new_arena(bytes);', 1, 'secondary allocation disabled'),
+    ('switch_arena(a);\n        os32_private_free_r(r, p);',
+     'os32_private_free_r(r, p);', 1, 'free uses selected instead of owner'),
+    ('if (unmap_arena(map_opaque, base, bytes) != 0) *link = a;',
+     '(void)unmap_arena(map_opaque, base, bytes);', 1, 'failed unmap loses arena'),
+    ('if (!arenas || a == arenas || a->live || !a->map_base) return;',
+     'if (arenas && a == arenas && !a->live) { unmap_arena(map_opaque, a->initial, a->mapped_end-a->initial); return; }\n    if (!arenas || a == arenas || a->live || !a->map_base) return;', 1, 'primary returned'),
 ]
 
 
@@ -121,6 +204,10 @@ EXPECTED_CHECKS = [
     'os32_nano_morecore(&a,&reent,1)==(void*)-1 && calls==0',
     'p && calls==1',
     'os32_nano_sbrk(&reent,16)==(void*)-1 && a.brk==old',
+    'p && maps==1 && a.next && (uintptr_t)p >= a.next->initial',
+    'unmaps==1 && a.next==NULL && a.free_list==NULL && ((unsigned char*)keep)[31]==0x74',
+    'a.next==other && other->live==0 && unmaps==saved',
+    'base != a.initial',
 ]
 assert len(EXPECTED_CHECKS) == len(MUTATIONS)
 
@@ -148,16 +235,20 @@ def main():
         archive = builder.build(prefix, work)
         build_host(prefix, work)
         exe, mapfile = link(prefix, work, archive)
-        gate.validate_output(prefix, mapfile, exe)
+        gate.validate_output(prefix, mapfile, exe, archive.with_suffix('.json'))
         with host32.control(args.mutate, args.runner, ROOT) as normal:
             if normal:
                 result = host32.run([str(exe)], runner=args.runner, capture_output=True, text=True, timeout=host32.RUN_TIMEOUT)
                 assert result.returncode == 0, result.stdout + result.stderr
                 print(result.stdout.strip())
+                public_link(prefix, work)
+                hash_providers(prefix, work, archive)
                 negative_links = 0
                 for name in sorted(gate.FORBIDDEN):
                     rejection(prefix, work, archive, 'void ' + name + '(void) {}\n')
                     negative_links += 1
+                rejection(prefix, work, archive, '__asm__(".globl memalign\\n.set memalign, 0");')
+                negative_links += 1
                 for name in sorted(gate.CONNECTED):
                     rejection(prefix, work, archive, 'void ' + name + '(void) {}\n')
                     negative_links += 1
@@ -172,7 +263,7 @@ def main():
                     obj.write_bytes(builder.inputs.command(prefix, 'ar', 'p', prefix / 'i386-elf/lib/libc.a', member))
                     exe, mapfile = link(prefix, work, archive, [obj], after=True)
                     try:
-                        gate.validate_output(prefix, mapfile, exe)
+                        gate.validate_output(prefix, mapfile, exe, archive.with_suffix('.json'))
                     except ValueError as exc:
                         assert 'unconnected' in str(exc) and not exe.exists()
                         negative_links += 1
@@ -188,7 +279,7 @@ def main():
                 mutant.write_text(source.replace(old, new))
                 mutant_archive = builder.build(prefix, work / "mut-build", adapter=mutant, reuse=archive)
                 exe, mapfile = link(prefix, work, mutant_archive)
-                gate.validate_output(prefix, mapfile, exe)
+                gate.validate_output(prefix, mapfile, exe, mutant_archive.with_suffix('.json'))
                 result = host32.run([str(exe)], runner=args.runner, capture_output=True, text=True, timeout=host32.RUN_TIMEOUT)
                 assert result.returncode == 1 and result.stdout.endswith(' check: ' + expected + '\n'), (label, result)
                 return 'MUTATION runtime RED: ' + label
@@ -203,9 +294,9 @@ def main():
             gate_red = 0
             for old, new, symbol in (
                     ('if definitions.get(symbol):', 'if False:', '_memalign_r'),
-                    ('if len(providers) != 1 or not providers[0].endswith',
-                     'if False and not providers[0].endswith', 'malloc'),
-                    ("if any(not provider.endswith('(nano_adapter.o)') for provider in providers):",
+                    ("if len(providers) != 1 or hashes[providers[0]] != trusted['adapter']:",
+                     'if False:', 'malloc'),
+                    ("if len(providers) > 1 or (required and not providers) or any(hashes[p] != expected for p in providers):",
                      'if False:', '_sbrk')):
                 assert gate_source.count(old) == 1
                 script = work / 'gate_mutant.py'

@@ -34,7 +34,7 @@ def run(args, mutant=None):
         assert (result.returncode != 0) if mutant else (result.returncode == 0), result
         print('RED runtime: ' + mutant[0] if mutant else 'PASS: counts/order/14/15/301/error/TRUSTED; 301 entries = 22 calls')
 def sdk_link():
-    """Compile a GNU89 consumer and link only the documented four CRT objects."""
+    """Compile a GNU89 consumer with the four CRT objects and USER allocator."""
     cross = pathlib.Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross'))
     sdk = ROOT / 'build/sdk'
     libgcc = pathlib.Path(subprocess.check_output(
@@ -49,13 +49,13 @@ def sdk_link():
             '-c', str(tmp / 'main.c'), '-o', str(tmp / 'main.o')], check=True, capture_output=True)
         subprocess.run(['python3', str(sdk / 'bin/link_guard.py'), str(cross / 'bin/i386-elf-ld'),
             '-m', 'elf_i386', '-T', str(sdk / 'link/app.ld'), '-nostdlib', '--nmagic', '--gc-sections',
-            '-L'+str(cross / 'i386-elf/lib'), '-L'+str(libgcc),
+            '-L'+str(sdk / 'lib'), '-L'+str(cross / 'i386-elf/lib'), '-L'+str(libgcc),
             '-o', str(tmp / 'app.elf'),
             *[str(sdk / 'crt' / name) for name in ('crt0.o','crt0_c.o','syscalls.o','help.o')],
-            str(tmp / 'main.o'), '-lc', '-lgcc'], check=True, capture_output=True)
+            str(tmp / 'main.o'), '-los32nano', '-lc', '-lgcc'], check=True, capture_output=True)
         symbols = subprocess.check_output([str(cross / 'bin/i386-elf-nm'), str(tmp / 'app.elf')], text=True)
         assert ' T os32_ls' in symbols
-        print('PASS: standalone SDK GNU89 consumer links os32_ls with the original four CRT objects')
+        print('PASS: standalone SDK GNU89 consumer links os32_ls with four CRT objects and libos32nano')
 
 RUST_MUTANTS = [
     ('Rust path snapshot', 'sys_ls_window)(snapshot.as_ptr(),', 'sys_ls_window)(path,'),

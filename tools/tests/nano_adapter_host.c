@@ -173,7 +173,116 @@ static void tests(void)
     CHECK(realloc(p,0)==NULL && a.free_list);
     CHECK(os32_nano_select(NULL)); CHECK(malloc(16)==NULL);
 }
+/* Automatic routing uses management pages and the real private nano objects. */
+#define MAP_SLOTS 4
+#define MAP_CAPACITY (64u * OS32_NANO_PAGE)
+static unsigned char secondary[MAP_SLOTS][MAP_CAPACITY] __attribute__((aligned(OS32_NANO_PAGE)));
+static size_t mapped[MAP_SLOTS];
+static unsigned maps, unmaps;
+static int reject_map, reject_unmap;
+static void callback_checks(void)
+{
+    struct _reent nested = {0};
+    CHECK(!os32_nano_select(&b));
+    CHECK(!os32_nano_configure(&b, NULL, NULL, NULL));
+    CHECK(_malloc_r(&nested, 8) == NULL && nested._errno == ENOMEM);
+    CHECK(_realloc_r(&nested, NULL, 8) == NULL && nested._errno == ENOMEM);
+}
+static void *map_secondary(void *opaque, size_t bytes)
+{
+    CHECK(opaque == &maps);
+    callback_checks();
+    if (reject_map || bytes > MAP_CAPACITY) return NULL;
+    for (unsigned i=0; i<MAP_SLOTS; i++) if (!mapped[i]) {
+        mapped[i]=bytes; maps++;
+        return secondary[i];
+    }
+    return NULL;
+}
+static int unmap_secondary(void *opaque, uintptr_t base, size_t bytes)
+{
+    CHECK(opaque == &maps);
+    callback_checks();
+    CHECK(base != a.initial); /* Never return primary/BSS backing. */
+    for (unsigned i=0; i<MAP_SLOTS; i++) if (base == (uintptr_t)secondary[i]) {
+        CHECK(mapped[i] == bytes);
+        if (reject_unmap) return -1;
+        mapped[i]=0; unmaps++;
+        memset((void *)base, 0xcc, bytes); /* No access to metadata after unmap. */
+        return 0;
+    }
+    CHECK(0);
+    return -1;
+}
+static int blocked_grow(void *opaque, uintptr_t base, size_t bytes)
+{
+    (void)opaque; (void)base; (void)bytes;
+    callback_checks();
+    return -1;
+}
+static void automatic_tests(void)
+{
+    void *p, *q, *r, *keep;
+    struct os32_nano_arena *other;
+    unsigned saved;
+    reset();
+    a.grow_exact=blocked_grow;
+    a.limit=UINTPTR_MAX;
+    CHECK(os32_nano_configure(&a,map_secondary,unmap_secondary,&maps));
+    keep=malloc(32); CHECK(keep); memset(keep,0x74,32);
+    p=malloc(2*OS32_NANO_PAGE);
+    CHECK(p && maps==1 && a.next && (uintptr_t)p >= a.next->initial);
+    CHECK(a.next->map_base==(uintptr_t)secondary[0] && a.next->live==1);
+    other=a.next;
+    memset(p,0x6d,2*OS32_NANO_PAGE);
+    CHECK(os32_nano_select(&a));
+    free(p);
+    CHECK(unmaps==1 && a.next==NULL && a.free_list==NULL && ((unsigned char*)keep)[31]==0x74);
+    /* realloc first fails in primary, then succeeds in a separate arena. */
+    p=realloc(keep,2*OS32_NANO_PAGE);
+    CHECK(p && ((unsigned char*)p)[0]==0x74 && ((unsigned char*)p)[31]==0x74);
+    CHECK(a.live==0 && a.next && a.next->live==1);
+    other=a.next;
+    memset(p,0x39,2*OS32_NANO_PAGE);
+    reject_map=1;
+    CHECK(realloc(p,8*OS32_NANO_PAGE)==NULL && ((unsigned char*)p)[8191]==0x39 && other->live==1);
+    reject_map=0;
+    q=realloc(p,8*OS32_NANO_PAGE);
+    CHECK(q && ((unsigned char*)q)[8191]==0x39 && unmaps==2 && a.next!=other);
+    other=a.next;
+    /* Foreign pointers leave all arenas and live contents intact. */
+    saved=unmaps;
+    CHECK(os32_nano_select(&a));
+    reent._errno=0;
+    free(storage+sizeof(storage));
+    CHECK(reent._errno==EINVAL && unmaps==saved && other->live==1);
+    CHECK(realloc(storage+sizeof(storage),32)==NULL && reent._errno==EINVAL && other->live==1);
+    /* Failed unmap restores reachability, allowing reuse and a later retry. */
+    reject_unmap=1;
+    free(q);
+    CHECK(a.next==other && other->live==0 && unmaps==saved);
+    reject_map=1;
+    r=malloc(4*OS32_NANO_PAGE);
+    CHECK(r && a.next==other && other->live==1 && maps==3);
+    reject_map=reject_unmap=0;
+    free(r);
+    CHECK(a.next==NULL && unmaps==3);
+    /* Two live arenas: freeing one must not touch its neighbor's state. */
+    p=calloc(1,2*OS32_NANO_PAGE); q=malloc(8*OS32_NANO_PAGE);
+    CHECK(p && q && ((unsigned char*)p)[8191]==0);
+    memset(q,0x58,8*OS32_NANO_PAGE);
+    CHECK(os32_nano_select(&a));
+    free(p);
+    CHECK(a.next && a.next->next==NULL && ((unsigned char*)q)[32767]==0x58);
+    free(q);
+    CHECK(!a.next && a.live==0);
+    /* >=64KiB remains on nano, including its private chunk/free-list path. */
+    p=malloc(65536); CHECK(p && a.next && a.next->sbrk_start && a.next->live==1);
+    free(p); CHECK(!a.next);
+    p=malloc(16); saved=unmaps; free(p);
+    CHECK(unmaps==saved && a.free_list && a.live==0);
+}
 void _start(void)
 {
-    tests(); write_text("nano adapter: ",14); number(checks); write_text(" checks GREEN\n",14); stop(0);
+    tests(); automatic_tests(); write_text("nano adapter: ",14); number(checks); write_text(" checks GREEN\n",14); stop(0);
 }

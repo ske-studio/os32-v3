@@ -48,10 +48,12 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 
 | ID | 何を | 種類 | 元の行 |
 |---|---|---|---|
-| F-4 | f7 (arena routing、link_guard、`check_link` が提供元をファイル名だけで判定、`os32_nano_morecore` の提供元を syscalls.o と nano_adapter.o の 1 か所に)、f8 (Rust `Os32Alloc`)、f9 / f10 (内部の伸長口、EXEC_* の返却)、`mem_alloc` が偽の BlkHdr を信用する | 未結線 / 申し送り | 1503、2037、2045–2059、2101、2103、2163、2355 |
-| F-5 | malloc 系の入口の結線と最小初期量の切替 | 未結線 | 2010–2017、2055、2141、2365 |
+| F-4 | f7 の実装分は閉鎖 (host 検証済み: arena routing / hash 検査 / morecore 単一化、実ゲストは F-8)。残り: f8 (Rust `Os32Alloc`)、f9 / f10 (内部の伸長口、EXEC_* の返却)、`mem_alloc` が偽の BlkHdr を信用する | 未結線 / 申し送り | 1503、2037、2045–2059、2101、2103、2163、2355 |
+| F-5 | USER malloc 入口は f7 で結線。残りは f12 の最小初期量切替 (resident は libc nano / 固定 sbrk を維持) | 一部未結線 | 2010–2017、2055、2141、2365 |
 | F-6 | f5b の `mem_map_test` 対照 (exit 0) と `mem_map_test pf` (unmap 後の同じ VA で PF/kill)、KAPI 71 のゲスト未受入。手順 `tools/tests/guest_acceptance.yaml` の f5b-mem-map。f の受入一式: 8MB / 17MB での伸長と unmap、512KiB stack、kernel stack high-water (f5a の AS +532B / map pending 256B、lease_selftest 1,676→2,732B (AS 2 個)・test_ledger 812→1,340B・test_appmem 1,232B を含む)、leftover==0、毒 AS の kill (syscall 帰路と resume)。f5a レビュー: 入れ子で親 A が毒の後に子の終了で A の PD が一時的に CR3 に載る (USER へは戻らず syscall 出口で kill — P3-c)、resume の中断も h3 の `syscall_abort` 地点に当たる (P3-d) — ゲストの h3 の数え方で確かめる | 未実施の確認 | 2369 |
 | F-7 | f6 の USER/resident CRT の実ゲスト受入 (`f6-sbrk-grow`: 初期 mapped_end を越える連続伸長と書込み、INT_MIN・負増分の下限、EXACT 衝突時に break 不変、終了後の kill 差 0・leftover 0、db_test/db_v50_test、親子入れ子で親の break 保持) | 未実施の確認 | f6 受入
+| F-8 | f7 の実ゲスト受入 (`f7-malloc-arena`: 強制副 arena、跨ぎ realloc、空副 arena の EXACT 再map、printf、kill 差0・leftover 0) と heap_test / sbrk_grow_test / db_test / db_v50_test。配備・ゲスト操作は依頼範囲外のため PM が取り込み時に実施。SDK 利用 apps/game の再ビルドも PM 統合時。 | 未実施の確認 | f7 受入 |
+| F-9 | 副 arena が要求量に応じた大きさで作られるため、小さい割当ての継続で arena が N 個に増え、伸長失敗の syscall が N+1 回・free が O(N) になる。f11/f12 で最小 arena サイズまたは EXACT 失敗の印を検討・検証する (f7 は性能改善を延期)。 | 性能課題 / 申し送り | f11 / f12 |
 
 ## 4. 関門: h の最終一式 / T2h 統合受入
 
@@ -63,7 +65,7 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 | H-4 | **構成を変える試験の一括** (全段が 17MB・今の ini だけで受入した): 8MB、planar / PEGC / Cirrus の切替、音源 (PC-9801-118 の PCM)、Ra266 64MB。`gfx200_test` / `gfx_demo200`、e12 の構成別台本 (guest_acceptance.yaml の e12-8mb-* / e12-17mb-planar / e12-17mb-cirrus / e12-cirrus-off) | 構成持越し | 278、418、557、894、897、1009、1112、1276、1340、1431、1601、1887、2908、3364 |
 | H-5 | 実機 Ra266: UC 化で present が遅くならないかの計測と CG 窓の WB、表示の後始末 (GRCG / EGC・68h の残り)、kernel stack の high-water | 構成持越し (実機) | 709–712、790–793、2253、2338 |
 | H-6 | V86 の出口で 6Ah の標準 / 拡張を戻していない (9821 で E0000h が MMIO のまま残り得る)。`v86 -d` / `-b` の後の表示確認、9801 構成での `gui_gate` | 未対処・未観測 | 788–789、3503 |
-| H-7 | apps / game: v3 では組まない (ユーザー決定 2026-09-30)。T2h では再開時ゲート (caller 追随・再ビルド・受入の一覧) の引渡しを確かめる。v3 の完了条件ではない。再開時は **c2 以後の SDK で再ビルド必須** — 旧 libos32gfx.a の外部バイナリは v70 で互換 token の VA を得て取り直さず、200 ライン化後に kill され得る (e11c2 レビュー R6)。**memory_layout=2 (e11b2) により、再ビルド前の apps/game の成果物はロード時に世代不一致で必ず拒否される**。外部の Makefile は T2c 以後の `link_guard.py` 経由のリンクにも未追随 (2026-10-08 の `make external` で mkos32x が拒否) | 再開時ゲート | 1113、1248、1810–1826、1868、3463 |
+| H-7 | apps / game: v3 では組まない (ユーザー決定 2026-09-30)。T2h では再開時ゲート (caller 追随・再ビルド・受入の一覧) の引渡しを確かめる。v3 の完了条件ではない。再開時は **c2 以後の SDK で再ビルド必須** — 旧 libos32gfx.a の外部バイナリは v70 で互換 token の VA を得て取り直さず、200 ライン化後に kill され得る (e11c2 レビュー R6)。**memory_layout=2 (e11b2) により、再ビルド前の apps/game の成果物はロード時に世代不一致で必ず拒否される**。外部の Makefile は T2c 以後の `link_guard.py` 経由のリンクにも未追随 (2026-10-08 の `make external` で mkos32x が拒否)。f7 以後は SDK の CRT が `libos32nano.a` を要るので、外部 Makefile のリンクに `-los32nano` を `-lc` より前に足す (f7 レビュー P2-1) | 再開時ゲート | 1113、1248、1810–1826、1868、3463 |
 | H-8 | `ring3_guard` A の固定 target (`MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE - MEM_GUARD_SIZE`) は T2c 可変スタックで実 stack 直下と一致しないことがある。h 受入で A が実 stack 直下 NP を指すことを確認 | 未実施の確認 | e9 R6 |
 | H-9 | `ring3_guard` B (shlib 帯) を shlib を読み込んだ AS で走らせ、RO の error=7 を確かめる (2026-10-06 の受入は未ロードで、帯の fault だけを確認。今のシリアル行は error_code を出さない) | 未実施の確認 | — |
 | H-10 | 音源ボード (SNDboard) の ini キーを `np21w_ini_live.py` 系が扱えない (emu-config §1 の対応キー外) → 道具の拡張 (sol) を h の音源構成の準備前に | 道具の不足 | — |

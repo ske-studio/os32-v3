@@ -1,7 +1,6 @@
 check-sbrk-crt-host:
 - sdk/crt/syscalls.c
-- sdk/allocator/nano_adapter.c
-- sdk/allocator/nano_adapter.h
+- sdk/allocator/**
 - tools/tests/test_sbrk_crt.py
 - tools/tests/sbrk_crt_host.c
 - tools/tests/host32.py

@@ -295,7 +295,7 @@ nanoのtail trimは実free list上で末尾のfree chunkを確認し、header/�
 | f5a | 内部結線 (KAPI 70 不変): AS extent/layout、初期 heap 登録、ANON teardown、毒 AS 隔離、owner 往復 +5。AS 1,224B (表 512 + layout 16 + poison 4)、1,376B/16KiB ASSERT 内。F-2/F-3 の負例はホスト試験へ。fix1: 毒化時に対象の中断要求、resume 前に検査、live 数から隔離。4 TU は -Os。証拠 `/home/hight/os32-tmp/run/f5/fix1_report.md` と `f5a_fix1_sizes.json` (初回は `report.md` / `f5a_sizes.json`)。実 kill・high-water は台帳 F-6。 |
 | f5b | USER 専用 mem_map/mem_unmap (slot 246/247)、KAPI 71・memory 2。内部の検査とエラー翻訳に接続、公開 flags を静的照合。F-1 閉鎖。map/write/unmap の対照と同じ VA の PF 試験を登録、ゲスト受入は F-6。P3 の poison 経路検査と master 文脈注記を追加。証拠 `/home/hight/os32-tmp/run/f5/f5b_report.md`・`f5b_sizes.json`。 |
 | f6 | USER/resident CRT を分離。primary adapter morecore に委譲し、USER は初期 mapped_end から EXACT 伸長、resident は固定上限。負増分/INT_MIN/overflow・失敗時不変を検査。KAPI 71・memory 2 据置、malloc 結線は f7。host 対照/指定5変異とゲスト `sbrk_grow_test` を登録、実ゲストは台帳 F-7。証拠 `/home/hight/os32-tmp/run/f6/f6_report.md`。 |
-| f7 | nano副arena/通常malloc・reentrant入口。非連続成功と連続性保持 |
+| f7 | USER の malloc 8入口を私有 nano archive + adapter へ結線。arena 別状態・pointer routing・跨ぎ realloc・空副 arena の unmap rollback、CRT と primary 所有を単一化。resident は libc nano / 固定 sbrk。hash による link_guard 検査、SDK 配布と `malloc_arena_test` を追加。KAPI 71・memory 2・kernel 不変。64KiB 以上の直接map は f8、最小初期量は f12。host/変異・サイズの証拠 `/home/hight/os32-tmp/run/f7/f7_report.md`、実ゲスト受入は台帳 F-8。 |
 | f8 | 大塊/calloc/realloc/整列とRust結線。65535/65536/65537の3値 |
 | f9 | exec_heap小arenaと親保存/復元。公開EXEC_* unmap拒否と改竄header検出で他owner不変 |
 | f10 | exec_heap大塊と安全なtrim。空末尾/空arena/生存データ保持 |

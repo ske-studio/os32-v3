@@ -853,6 +853,20 @@ malloc/freeは `libc_a-malloc.o`、calloc/reallocは各非reentrant wrapper、
 当初9メンバーは手元の `build-newlib-nano` の実objectともbyte一致した。
 `_mallocr.c` が `<newlib.h>` の `_NANO_MALLOC` を見て `nano-mallocr.c` を取り込む。
 
+f7 から USER ELF は `build/out/lib/libos32nano.a` (検証済み libc の6 memberを
+私有化したもの + adapter) を `-lc` より前にリンクする。`make sdk` は archive、
+`libos32nano.json` (adapter/CRT/私有member の hash)、リンク検査器とライセンスを配る。
+`link_guard.py` は選択された全入力 (多重定義の負け側を含む) を hash で検査する。
+未結線の memalign/valloc/mallinfo/usable-size/mallopt/cfree 等はリンクエラー。
+allocator を一切含まない freestanding ELF は archive 不要だが、同じ入力検査を通る。
+resident の shell/gshell は libc の nano を維持し、別ビルドの adapter が固定 primary
+morecore だけを持つ。USER の `_sbrk` と malloc は adapter の primary を共有する。
+不正な初期引渡し (`sbrk_heap_limit < aligned _end`) は以後の全 sbrk を ENOMEM に固定する。
+副 arena の先頭1 pageに管理情報を置き、nano の呼出しが失敗して戻った後に状態を切り替える。
+各 arena の free list は独立し、pointer 所属で free/realloc を振り分ける。空副 arena は
+unmap 成功時だけ list から確定除去し、失敗時は復元する。primary/BSS は返さない。
+65536 bytes 以上も f7 では nano 経路で、大塊の直接 map は f8 で切り替える。
+
 `CROSS_DIR=... make check-nano-inputs-host` は実アーカイブ/memberのhash、提供symbol、
 実 `-lc` リンクmapを検査する。i386出力はrelocatableとして検査し、実行はしない。
 receiptの無いtoolchainは **f1a参照ホスト (PMの開発ホストで採取した構築)** の固定台帳と照合する。

@@ -34,12 +34,15 @@ sdk: $(ALL_LIB_ARCHIVES) $(CRT0_USER_OBJ) $(DBG_OBJ) $(SDK_KAPI_HDR)
 	@# 共有 C の公開ヘッダ。実装は libos32gfx.a に入っている (utf8_prog.o)。
 	cp lib/utf8.h                         $(SDK_OUT)/include/
 	cp $(LIBDIR)/*.a                     $(SDK_OUT)/lib/
-	cp $(CRT0_USER_OBJ) $(DBG_OBJ)            $(SDK_OUT)/crt/
+	cp $(filter %.o,$(CRT0_USER_OBJ)) $(DBG_OBJ)            $(SDK_OUT)/crt/
 	cp sdk/crt/generations.inc            $(SDK_OUT)/crt/
 	cp sdk/link/*.ld                     $(SDK_OUT)/link/
 	cp sdk/mkos32x.py                    $(SDK_OUT)/bin/
 	@# mkos32x.py が import するヘッダ v3 の共通モジュール (票 TASK_KAPI_DATA_FIELDS)
 	cp sdk/link_guard.py sdk/rustc_stamp.py $(SDK_OUT)/bin/
+	cp sdk/allocator/check_link.py $(SDK_OUT)/bin/nano_check_link.py
+	cp $(LIBDIR)/libos32nano.json $(SDK_OUT)/lib/
+	cp sdk/allocator/nano.LICENSE $(SDK_OUT)/lib/
 	cp sdk/os32_generations.py          $(SDK_OUT)/bin/
 	cp sdk/os32x_hdr.py                  $(SDK_OUT)/bin/
 	cp sdk/rust/i686-os32-none.json      $(SDK_OUT)/rust/

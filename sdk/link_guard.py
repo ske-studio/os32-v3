@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """D35: validate the objects actually selected by ld, including archive members."""
 import pathlib
+import os
+import shutil
+import importlib.util
 import re
 import subprocess
 import sys
@@ -67,6 +70,22 @@ def main():
         if r.returncode:
             return r.returncode
         try:
+            nano_vendor = set()
+            if any(pathlib.Path(a).name == 'app.ld' for a in args):
+                module = pathlib.Path(__file__).parent / 'allocator/check_link.py'
+                if not module.exists():
+                    module = pathlib.Path(__file__).parent / 'nano_check_link.py'
+                spec = importlib.util.spec_from_file_location('nano_check_link', module)
+                gate = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(gate)
+                # Resolve the receipt from the actual selected archive, never a
+                # guessed object basename. SDK staging keeps it beside the lib.
+                archives = [pathlib.Path(n[5:]) for n in mapfile.read_text().splitlines()
+                            if n.startswith('LOAD ') and pathlib.Path(n[5:]).name == 'libos32nano.a']
+                if len(archives) > 1:
+                    raise H.HeaderError('USER link has duplicate libos32nano.a inputs')
+                cross = pathlib.Path(os.environ.get('CROSS_DIR') or pathlib.Path(shutil.which(linker)).resolve().parent.parent)
+                nano_vendor = gate.validate_output(cross, mapfile, out, archives[0].with_suffix('.json') if archives else None)
             source = mapfile.read_text()
             selected = set(re.findall(r'(?m)^LOAD (.+)$', source))
             selected.update(re.findall(r'(?m)^([^\s]+\.a\([^\n)]+\))\s*(?:\n|\s)', source))
@@ -76,7 +95,7 @@ def main():
                 if not path.exists() or (path.suffix == '.a' and not match) or (not match and path.suffix != '.o'):
                     continue
                 # Compiler/newlib components are generation independent, not OS32 SDK code.
-                if path.resolve() in vendor:
+                if path.resolve() in vendor or name in nano_vendor:
                     exempt.add(str(path.resolve()))
                     continue
                 if match:
@@ -91,7 +110,7 @@ def main():
                 {'selected': sorted(selected), 'vendor': sorted(exempt),
                  'elf_sha256': __import__('hashlib').sha256(out.read_bytes()).hexdigest(),
                  'generations': [H.OS32X_HDR_VERSION, H.OS32_KAPI_ABI_GENERATION, H.OS32_MEMORY_LAYOUT_GENERATION, H.OS32_SHLIB_PROTOCOL]}, indent=2) + '\n')
-        except (H.HeaderError, subprocess.CalledProcessError) as e:
+        except (H.HeaderError, ValueError, KeyError, OSError, subprocess.CalledProcessError) as e:
             out.unlink(missing_ok=True)
             print(f'link_guard: {e}', file=sys.stderr)
             return 1

@@ -1,4 +1,6 @@
-/* f6 USER morecore acceptance; PM observes teardown counters after exit. */
+/* f6 USER morecore acceptance; PM observes teardown counters after exit.
+ * f7 shares primary with nano. No libc allocation/stdio is called before or
+ * during these direct sbrk probes; CRT's normal main entry does not allocate. */
 #include "os32api.h"
 #include "rt/testresult.h"
 #include <errno.h>

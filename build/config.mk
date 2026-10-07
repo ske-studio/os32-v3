@@ -203,8 +203,8 @@ LGRP_BEG = --start-group
 LGRP_END = --end-group
 
 # === CRT0 / デバッグオブジェクト ===
-CRT0_USER_OBJ = sdk/crt/crt0.o sdk/crt/crt0_c.o sdk/crt/syscalls.o sdk/crt/help.o
-CRT0_RESIDENT_OBJ = sdk/crt/crt0.o sdk/crt/crt0_c.o sdk/crt/resident/syscalls.o sdk/crt/help.o
+CRT0_USER_OBJ = sdk/crt/crt0.o sdk/crt/crt0_c.o sdk/crt/syscalls.o sdk/crt/help.o $(NANO_LIB)
+CRT0_RESIDENT_OBJ = sdk/crt/crt0.o sdk/crt/crt0_c.o sdk/crt/resident/syscalls.o sdk/crt/help.o sdk/crt/resident/nano_adapter.o
 CRT0_OBJ = $(CRT0_USER_OBJ)
 DBG_OBJ  = userland/lib/rt/dbgserial.o
 

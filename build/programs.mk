@@ -25,6 +25,17 @@ sdk/crt/crt0_c.o: sdk/crt/crt0_c.c sdk/include/os32/help.h $(SDK_KAPI_HDR)
 
 CRT_SYSCALLS_DEPS = sdk/allocator/nano_adapter.c sdk/allocator/nano_adapter.h
 
+# Validated private nano + USER adapter. syscalls.o is hashed into the receipt
+# consumed by link_guard, so stale CRTs cannot silently own a second break.
+NANO_LIB = $(LIBDIR)/libos32nano.a
+$(NANO_LIB) $(NANO_LIB:.a=.json) &: $(CRT_SYSCALLS_DEPS) sdk/allocator/build_nano.py sdk/allocator/check_link.py sdk/allocator/nano_inputs.json tools/check_nano_inputs.py $(CROSS_DIR)/i386-elf/lib/libc.a sdk/crt/syscalls.o $(SDK_KAPI_HDR)
+	python3 sdk/allocator/build_nano.py $(LIBDIR)/nano --crt sdk/crt/syscalls.o
+	cp $(LIBDIR)/nano/libos32nano.a $(LIBDIR)/nano/libos32nano.json $(LIBDIR)/
+
+sdk/crt/resident/nano_adapter.o: $(CRT_SYSCALLS_DEPS) $(SDK_KAPI_HDR)
+	@mkdir -p $(@D)
+	$(CC) $(PROGRAM_FLAGS) -DOS32_CRT_RESIDENT -c sdk/allocator/nano_adapter.c -o $@
+
 sdk/crt/syscalls.o: sdk/crt/syscalls.c $(CRT_SYSCALLS_DEPS) userland/lib/rt/ls.c sdk/include/os32/ls.h $(SDK_KAPI_HDR)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 

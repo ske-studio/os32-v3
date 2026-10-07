@@ -1,7 +1,6 @@
 #ifndef OS32_NANO_ADAPTER_H
 #define OS32_NANO_ADAPTER_H
-/* Private f1b connection, not an installed SDK API. f6 supplies the CRT
- * backend; f7 owns arena discovery, allocation routing and lifetime. */
+/* Private SDK implementation interface; not a public application API. */
 #include <stdint.h>
 #include <stddef.h>
 #include <malloc.h>
@@ -17,12 +16,19 @@ struct os32_nano_arena {
      * This callback must never return a noncontiguous substitute mapping. */
     int (*grow_exact)(void *opaque, uintptr_t base, size_t bytes);
     void *opaque;
+    struct os32_nano_arena *next;
+    uintptr_t map_base;
+    size_t live;
 };
-/* Caller owns zero initialization, disjoint arena backing and initial rounded
- * up to CHUNK_ALIGN (4) by f6 CRT; fixtures may violate alignment to exercise
- * upstream sbrk_aligned. Selection is
- * explicit here: caller-origin dispatch belongs to kernel f5/f9, not CR3. */
+/* Explicit selection is a private fixture/inspection seam; production malloc
+ * starts at the configured primary and free/realloc find the pointer owner.
+ * Callers zero initialize fixture state; CRT initializes the real primary.
+ * Configuration is one-time and cannot replace live arenas or run while busy. */
 int os32_nano_select(struct os32_nano_arena *arena);
+int os32_nano_configure(struct os32_nano_arena *primary,
+                        void *(*map)(void *, size_t),
+                        int (*unmap)(void *, uintptr_t, size_t), void *opaque);
+void *os32_nano_crt_sbrk(struct _reent *r, ptrdiff_t incr);
 void *os32_nano_morecore(struct os32_nano_arena *arena, struct _reent *r, ptrdiff_t incr);
 void *os32_nano_sbrk(struct _reent *r, ptrdiff_t incr);
 struct mallinfo os32_nano_info(struct _reent *r);
