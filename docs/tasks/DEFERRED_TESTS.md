@@ -53,7 +53,7 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 | E11-14 | SHMブロック長・ページ長の公開定数を整理しcaller追随。e9のDB_SHM_BLOCK_SIZE/私有PAGE_BYTESから一括移行 | 申し送り | e9 R5 | e11c → 統合 |
 | E11-A2 | 全画面入力4点・日本語保持・wait失敗回復・非所有shutdownのゲスト受入とnative補完 (a2はqemu/ホストのみ)。本人識別のh3 identity()との照合はe11cとゲストへ持越し (a2はcaller_access模型との照合のみ)、cのslot接続後にh3自己公開とhost読値を照合、raw KAPI待機利用者は明示check契約を統合確認 | 未配備・自己公開未結線 | e11a2 / guest_acceptance e11a2-* | e11c → e11統合受入 (PM) |
 | E11-B1 | TVRAM/font低位USER撤去後の描画・日本語・CUI/GUI/WM TVDM、DB42件、SHM lockwrite先頭/末尾CPL3 PFと再利用、PT0・V86全出口3段監査・kselftest、native補完 | 未配備、qemuホストのみ (lockwriteは境界stubで制御フロー確認、CPL3保護の実効性未確認) | guest_acceptance e11b1-*、b1_results.json | b1準備確認 → c → b2 → e11統合受入 (PM) |
-| E11-A3 | 全画面 owner の同期の子 (slot.parent) は kernel が読ませるが WM の起床の手がかりに入らない。端末由来のバイト (宛先 0) は全員が読める — e11c の専用 KAPI で宛先をそろえる | 改善 | e11c |
+| E11-A3 | 全画面 owner の同期の子 (slot.parent) は kernel が読ませるが WM の起床の手がかりに入らない。端末由来のバイト (宛先 0) は全員が読める。**PM 決定 (2026-10-07): 専用 KAPI `kbd_inject_to` は e11c に入れない** — 全画面への矢印・機能キーの配送とともに持ち越し | 改善 | T2h 前に要否を再判断 |
 
 
 ## 3. 関門: f5 以降 (T2f の結線と受入)
@@ -91,6 +91,7 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 | X-3 | GitHub Actions の結果が票に無い (e1 の CI 修正後、f1a の初回 run) → 次の統合判定 (e11) の前に過去の run を照合。今の成功で過去を合格にしない | 未実施の確認 | 335–345、2003–2009 |
 | X-4 | 検査の整理の残り: ci-stab2 の P2-B の後の全体 check-changed と native の記録、6 時間超の対照の刈り取り、pending の 1 時間回収、生き残る弱い変異、`net_link` の TMPDIR 長、選択の取りこぼし 3 種 | 既知の制限 | 3551、3627、3705、3740、3754–3768、3776、3800–3807、3828–3832 |
 | X-6 | `tools/tvdump_recv.py` は名前付きパイプ前提で今の NP21/W に接続できない → `/api/cmd` で生バイトを取り TVDM の長さ・寸法・内容を照合する形に (計画 3 番、受入索引と同枠) | 道具の不具合 | — |
+| X-11 | 監査分類 (`~/os32-tmp/evidence/2026-10-07/audit-classification.md`) の「意味変更 (e11c)」のうち pipe (E11-8) を除く 12 件 — IME 9 本 (trygetchar/toggle/set_mode/switch_dict/user_delete/user_export/user_clear/trygetkey/feed_key)・exec_last_result・gui_call・con_sink_read の授権/本人別の契約 → **T4 の設計票で扱う (ユーザー決定 2026-10-07)** | 契約の整理 | 分類表 :33/:43-55/:57/:60 |
 | X-10 | 正常対照 21 本の省略と 6 本の実行順を修正し、段の包含を回帰試験化。取り込みから `make check-fast` を除去 → PM の統合 `make check` で受入 | 実装済み・統合受入待ち | 次の取り込み |
 
 ## 6. SKIP の登録 (ここにあるものだけを「延期」と数える)
