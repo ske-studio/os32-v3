@@ -470,3 +470,60 @@
     ordinary_KAPI_IF: 1
     guest_IVT_reflection_preserved: true
   evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+
+- id: e11a2-fullscreen-input
+  gate: e11
+  contract: docs/KAPI_SPEC.md
+  mode: manual
+  prereq: PM integrates e11; deploy matching kernel, gshell and programs; verify ver image and kernel.map; 17MB current ini
+  entry: GUI Run hello_gfx with and without another window open; press a key; repeat from terminal; run a WAIT_POLL graphics program (gfx200_test)
+  observe:
+  - Run child exits on one key; previous window receives neither Key nor Text
+  - Terminal child receives one character per make; break sends nothing; no leftover character at shell prompt
+  - WAIT_POLL frame EAX contains injected character; empty poll remains -1
+  - Keep terminal sh in WAIT_KEY, start fullscreen Y from Run, inject q; only Y receives it and hidden sh remains parked
+  - Repeat with fullscreen WAIT_KEY; after its input drains, no repeated empty resume loop
+  - Exiting a terminal fullscreen descendant preserves sh typeahead; exiting a WM destination discards only its tagged bytes
+  - Record kselftest and run db_test and db_v50_test after return
+  expect:
+    run_key_exit: true
+    terminal_single_injection: true
+    background_window_input: 0
+    wait_poll_receives_key: true
+    hidden_shell_input: 0
+    terminal_typeahead_preserved: true
+    regression_failures: 0
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e11a2-font-and-return
+  gate: e11
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: PM integrated e11 build and matching map; failure-injection build only for attach failure and USER shutdown probes
+  entry: boot Japanese font display; call kcg_init after boot closure; GUI gdi_test; inject one attach failure across wait then allow next attach; probe nonowner gfx_shutdown
+  observe:
+  - Japanese glyph pixels and fetched flags unchanged after late init; set scale 2 first and confirm init restores scale 1
+  - Failed attach leaves screen drawing disabled, offscreen writable and window event loop alive; next successful wait restores drawing
+  - OP_WAIT result and WAIT_KEY or WAIT_POLL result unchanged by attach failure
+  - Nonowner GUI shutdown leaves backend and surface generation unchanged; owner and CUI shutdown still work
+  expect:
+    japanese_preserved: true
+    wait_result_preserved: true
+    next_wait_recovers: true
+    offscreen_drawable: true
+    nonowner_display_unchanged: true
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e11a2-self-identity
+  gate: e11
+  contract: userland/tests/h3/protocol.h
+  mode: manual
+  prereq: e11c connects the public value slot and H3_SELF_IDENTITY adapter; a2 default remains host publication; protocol unchanged
+  entry: launch h3a and h3b with opt-in adapter; freeze before host publication; compare each self-published owner and generation to tools/h3_park_resume.py identity(index); repeat after slot reuse
+  observe:
+  - Internal caller_identity_get app_id, owner and generation match live AS and host observer
+  - SHM owner is written before generation commit; no identity from the other AS or previous generation
+  - Run h3 park-resume fault and STOP cases with the normal PM playbook after comparison
+  expect:
+    two_AS_identity_match: true
+    reused_slot_generation_match: true
+    protocol_unchanged: true
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/

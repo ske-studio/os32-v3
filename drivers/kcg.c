@@ -56,13 +56,16 @@ static u8 *kanji_fetched = (u8 *)P2V_CONST((MEM_FONT_CACHE_BASE + KANJI_CACHE_SI
 static u8 *ank_cache     = (u8 *)P2V_CONST((MEM_FONT_CACHE_BASE + KANJI_CACHE_SIZE + KANJI_FETCHED_SIZE));
 static u8 *ank_fetched   = (u8 *)P2V_CONST((MEM_FONT_CACHE_BASE + KANJI_CACHE_SIZE + KANJI_FETCHED_SIZE + ANK_CACHE_SIZE));
 
+static int kcg_boot_phase_open = 1;
+
 void kcg_init(void)
 {
-    int i;
+    kcg_scale = 1;
+    /* Loaded glyphs are immutable after boot; void ABI cannot return NOSYS. */
+    if (!kcg_boot_phase_open) return;
     /* コードアクセスモードに設定 (モードFF1 = KCGコードアクセス) */
     outp(MODE_FF1_PORT, MFF1_KCG_CODE);
     kcg_wait();
-    kcg_scale = 1;
 
     /* キャッシュフラグの初期化 — kmemset (rep stosd) で高速化 */
     kmemset(kanji_fetched, 0, KANJI_FETCHED_SIZE);
@@ -240,7 +243,6 @@ static int kcg_read_chunked(int fd, u8 *dst, int total)
 }
 
 /* boot 内部読込だけが scratch を使える。kcg_init でも再開しない。 */
-static int kcg_boot_phase_open = 1;
 
 void kcg_boot_phase_close(void)
 {

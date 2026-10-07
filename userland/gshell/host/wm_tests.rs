@@ -3522,3 +3522,83 @@ fn e7_failed_cui_refreshes_framebuffer_and_geometry() {
     assert_eq!(mocks::FB_ATTACHES.load(SeqCst), attaches+1);
     st.inited = false;
 }
+
+#[test]
+fn e11_fullscreen_input_exclusive_and_poll_ready() {
+    use crate::{fullscreen, input, mocks, multiapp, ring, wm};
+    use std::sync::atomic::Ordering;
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = four_app_state(&shm);
+    multiapp::on_start(3);
+    // Run owner 3 must not send text to the old foreground window (owner 5).
+    fullscreen::arm(&[0;48]); mocks::set_screen_owner(3); fullscreen::observe();
+    assert!(input::focus_target(&st).is_none());
+    mocks::push_rawkeys(&[0x1d | (1 << 8), 0x1d]); // 'a', make then break
+    input::capture_keyboard(&mut st, input::Ctx::Standalone);
+    assert_eq!(*mocks::INJECTED.lock().unwrap(), b"a", "fullscreen injection");
+    for slot in 0..4 { assert_eq!(ring::pending(&st, slot), 0, "fullscreen window leak"); }
+    assert_eq!(mocks::INJECT_CALLS.load(Ordering::SeqCst), 1);
+    mocks::fep_script(&[]);
+    mocks::set_app_state(4, multiapp::APP_STATE_WAIT_KEY);
+    mocks::set_app_state(3, multiapp::APP_STATE_WAIT_POLL);
+    assert!(!multiapp::key_ready(4), "WM bytes cannot wake hidden shell");
+    assert!(!multiapp::key_ready(3));
+    assert!(multiapp::poll_ready(3));
+    mocks::set_app_state(3, multiapp::APP_STATE_WAIT_KEY);
+    assert!(multiapp::key_ready(3), "successful injection wakes fullscreen WAIT_KEY");
+    mocks::set_launch_child(3, 2);
+    mocks::set_app_state(2, multiapp::APP_STATE_WAIT_KEY);
+    assert!(multiapp::key_ready(2), "fullscreen launch descendant is a candidate");
+    mocks::set_launch_child(3, 0);
+    // Drain hint on the kernel's empty response; avoid a permanent AGAIN loop.
+    mocks::RESUME_SCRIPT.lock().unwrap().push(os32api::gui::proto::OS32_ERR_AGAIN);
+    multiapp::resume_one(&mut st);
+    assert!(!multiapp::key_ready(3), "empty response clears injection hint");
+    assert!(!multiapp::key_ready(4));
+    // Foreground terminal 5 -> shell 4 -> fullscreen 3 keeps its normal route.
+    mocks::set_launch_child(5, 4); mocks::set_launch_child(4, 3);
+    assert!(input::focus_target(&st).is_some());
+    mocks::push_rawkeys(&[0x1d | (1 << 8)]);
+    input::capture_keyboard(&mut st, input::Ctx::Standalone);
+    assert_eq!(mocks::INJECT_CALLS.load(Ordering::SeqCst), 1, "terminal no duplicate");
+    assert!(ring::pending(&st, st.slot_of_owner(5).unwrap()) > 0);
+    // WAIT_POLL is runnable via the poll scheduler, not key_ready.
+    mocks::set_app_state(3, multiapp::APP_STATE_WAIT_POLL);
+    assert!(!multiapp::key_ready(3));
+    assert!(multiapp::poll_ready(3), "WAIT_POLL must wake");
+    fullscreen::reset();
+    // Run with no windows also injects (Standalone used to discard it).
+    st = wm::GuiState::NEW;
+    fullscreen::arm(&[0;48]); mocks::set_screen_owner(3); fullscreen::observe();
+    mocks::push_rawkeys(&[0x1d | (1 << 8)]);
+    input::capture_keyboard(&mut st, input::Ctx::Standalone);
+    assert_eq!(mocks::INJECT_CALLS.load(Ordering::SeqCst), 2, "empty desktop injection");
+    fullscreen::reset();
+}
+
+#[test]
+fn e11_injection_hint_requires_bytes_and_does_not_survive_owner_exit() {
+    use crate::{fullscreen, input, mocks, multiapp, wm};
+    use std::sync::atomic::Ordering::SeqCst;
+    mocks::init();
+    multiapp::reset();
+    fullscreen::reset();
+    let mut st = wm::GuiState::NEW;
+    multiapp::on_start(3);
+    mocks::set_app_state(3, multiapp::APP_STATE_WAIT_KEY);
+    fullscreen::arm(&[0;48]);
+    mocks::set_screen_owner(3); // WM has not observed the new owner yet.
+    mocks::INJECT_LIMIT.store(0, SeqCst);
+    mocks::push_rawkeys(&[0x1d | (1 << 8)]);
+    input::capture_keyboard(&mut st, input::Ctx::Standalone);
+    assert!(!multiapp::key_ready(3), "full ring must not create a wake hint");
+    mocks::INJECT_LIMIT.store(1, SeqCst);
+    mocks::push_rawkeys(&[0x1d | (1 << 8)]);
+    input::capture_keyboard(&mut st, input::Ctx::Standalone);
+    assert!(multiapp::key_ready(3), "use kernel owner before first observe");
+    multiapp::on_owner_exit(3);
+    multiapp::on_start(3);
+    assert!(!multiapp::key_ready(3), "reused ID has no stale injection hint");
+    fullscreen::reset();
+}

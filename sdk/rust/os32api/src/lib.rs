@@ -120,15 +120,26 @@ macro_rules! kprint_attr {
 /*  キーボード入力ヘルパー                                           */
 /* ================================================================ */
 
+// Bound shlib users may park in WAIT_KEY/WAIT_POLL, outside OP_WAIT.
+// Reattach before returning to their drawing code, preserving the key result.
+fn input_return() {
+    if gui::stub::is_bound() { let _ = gui::stub::check_gfx(); }
+}
+
 /// キー入力を待つ (ブロッキング)
 pub fn wait_key() -> i32 {
-    unsafe { (api().kbd_getchar)() }
+    let result = unsafe { (api().kbd_getchar)() };
+    input_return();
+    result
 }
 
 /// キー入力を試みる (ノンブロッキング、入力なし時は -1)
 pub fn try_key() -> Option<i32> {
     let k = unsafe { (api().kbd_trygetchar)() };
-    if k > 0 { Some(k) } else { None }
+    if k > 0 {
+        input_return();
+        Some(k)
+    } else { None }
 }
 
 /* ================================================================ */

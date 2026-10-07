@@ -121,9 +121,11 @@ int res_owner_get(void) { return 2; }
 int ring3_call_from_user(void) { return 1; }
 AppSlot *appslot_at(int id) { return id >= 0 && id < APP_SLOT_COUNT ? &host_slots[id] : 0; }
 AppSlot *appslot_get(int id) { return id == 2 ? &slot : 0; }
-int appslot_gfx_owner(void) { return 2; }
+static int host_gfx_owner = 2;
+int appslot_gfx_owner(void) { return host_gfx_owner; }
 int appslot_gfx_claim(int gui) { (void)gui;return 0; }
-int con_sink_is_enabled(void) { return 0; }
+static int host_gui;
+int con_sink_is_enabled(void) { return host_gui; }
 #ifndef E10C_REAL_AUDIT
 int kselftest_run_audit(const char *tag) { return !ledger_selfcheck(tag); }
 #endif

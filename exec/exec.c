@@ -2541,7 +2541,7 @@ i32 exec_resume(i32 app_id, i32 wait_ret)
          * 空なら EAX = -1 = 「キーなし」で、アプリの kbd_trygetchar() は
          * 普通に -1 を返したように見える。WM が渡した wait_ret は使わない。 */
         ch = 0;
-        if (kbd_inject_take(&ch)) a->frame[APP_FRAME_EAX] = (u32)ch;
+        if (kbd_inject_take_for((int)app_id, &ch)) a->frame[APP_FRAME_EAX] = (u32)ch;
         else                      a->frame[APP_FRAME_EAX] = (u32)(i32)-1;
     } else if (src == APP_RESUME_SRC_KBD) {
         /* 票 §5 の指摘 B: 文字の取り出しはここで完結する (WM 側に取り出し用
@@ -2549,7 +2549,7 @@ i32 exec_resume(i32 app_id, i32 wait_ret)
          * 空なら起こさず OS32_ERR_AGAIN — 印も状態も残るので、WM は次の周で
          * もう一度試せばよい (その周は譲る = streak に数えない)。 */
         ch = 0;
-        if (!kbd_inject_take(&ch)) return OS32_ERR_AGAIN;
+        if (!kbd_inject_take_for((int)app_id, &ch)) return OS32_ERR_AGAIN;
         a->frame[APP_FRAME_EAX] = (u32)ch;
     } else {
         a->frame[APP_FRAME_EAX] = (u32)wait_ret;

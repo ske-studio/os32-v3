@@ -46,6 +46,21 @@ static void run(void)
     CHECK(payload && !paging_addrspace_map_user(&space,MEM_EXEC_LOAD_ADDR,payload,PAGE_RW|PTE_USER));
     slot.state=APP_STATE_RUNNING;slot.cpl3=1;slot.as=&space;slot.hdr_flags=OS32X_FLAG_GFX;
     host_cr3=space.pd_phys;CHECK(caller_access_enter(&prev,CALLER_USER));
+    gfx_init();
+    struct surface_query_source shutdown_source;
+    host_gui = 1;
+    host_gfx_owner = APP_ID_SHELL;
+    gfx_shutdown();
+    int shutdown_nonowner_preserved =
+        gfx_surface_source(LEDGER_ROLE_CLIENT, &shutdown_source) == 0 && shutdown_source.ready;
+    CHECK(shutdown_nonowner_preserved);
+    host_gfx_owner = 2;
+    gfx_shutdown();
+    CHECK(gfx_surface_source(LEDGER_ROLE_CLIENT, &shutdown_source) == OS32_ERR_INVAL);
+    host_gui = 0; host_gfx_owner = APP_ID_SHELL;
+    gfx_init(); gfx_shutdown(); /* CUI foreground keeps its legacy ownership. */
+    CHECK(gfx_surface_source(LEDGER_ROLE_CLIENT, &shutdown_source) == OS32_ERR_INVAL);
+    host_gfx_owner = 2;
     api.mem_alloc=sdk_alloc;api.version=69;api.gfx_get_framebuffer=legacy_fb;api.gfx_screen_info=screen;
     api.gfx_add_dirty_rect=dirty;
     gfx_api=&api;gfx_attach_port=&port;

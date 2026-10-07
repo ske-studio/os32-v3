@@ -40,7 +40,7 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 | E11-2 | 結線後のkernel/SDK/shlibサイズを再実測し、§6のe枠・圧縮・8MB私有量を確認。撤去の減少を先取りしない | 申し送り | 289–291、457–470、538、688、1240 | e11a/b/c → 統合 |
 | E11-3 | 低位/共有USER化・VRAM例外・exec_map_shared_bbを撤去、共有PT操作を拒否。Cirrus DISPLAYは授権leaseでNONE→RW、e11bで窓PDEもUSER禁止へ | 未実施の確認 | 599、605–606、707、826、887–892、1006、1043、1573–1576、1762–1763 | e11a/b → 統合 |
 | E11-4 | 上記KAPI-CALLBACK/OWNER/DISK-AUTHの受入を前提に、値返し列挙KAPIとcaller移行・必要ならOS32X授権flag、子が親のredirect先fdを閉じられるFD所有を一括接続 | 契約接続待ち | 1501–1504、1546、1600、1694、1887 | e11b/c → 統合 |
-| E11-5 | Run全画面のowner 1または専用KAPIでキー配送。終了・二重注入なし・窓漏れなし・WAIT_POLLを確認、KAPI追加はcで版一括 | 既知の不具合 | 1167–1169、1431 | e11a/b/c → 統合 |
+| E11-5 | Run全画面のowner 1または専用KAPIでキー配送。終了・二重注入なし・窓漏れなし・WAIT_POLLを確認。WM直接注入はtranslate()のASCIIのみ (矢印・機能キーは捨て、rawはe11cの専用KAPI)、KAPI追加はcで版一括 | 既知の不具合 | 1167–1169、1431 | e11a/b/c → 統合 |
 | E11-6 | P3残: pre-init USER・cdecl橋・版/終了門・utf8初期値/Unicode二重取得・kcg漢字旗・shlib token・wait帰路4件 | 申し送り | 998–1002、1111、1156–1163、1274、1338、1361、1396、1429、1624 | e11a/b/c → 統合 |
 | E11-7 | KAPI文書にSTALE/INVALの推測可能性とcallback/scheduling禁止を明記し、公開契約・生成物と照合 | 申し送り | 258、375–377、573、1004 | e11c → 統合 |
 | E11-8 | 上記KAPI-AUDIT-FIX/OWNERの受入・分類を反映。pipe_get_bufのkernel番地返却・pipe_get_lenの他owner照会の意味変更と範囲検査P3変異を接続 | 契約接続待ち | 1502、1504、1546 | e11c → 統合 |
@@ -50,6 +50,8 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 | E11-12 | h3の本人識別を値返しにしwriter初期化を結線 (E9-2)。e9のPM(A)から切替え、CRT非依存markerも確認 | 申し送り | E9-2 / e9 | e11a/c → 統合 |
 | E11-13 | SHM lockで全ページRO・CPL3書込み拒否をゲスト確認。ホストの呼出し/結果判定だけで閉じずfree/exit後の次AS成功も対照 | 未実施の確認 | e9 R4 | e11b → 統合 |
 | E11-14 | SHMブロック長・ページ長の公開定数を整理しcaller追随。e9のDB_SHM_BLOCK_SIZE/私有PAGE_BYTESから一括移行 | 申し送り | e9 R5 | e11c → 統合 |
+| E11-A2 | 全画面入力4点・日本語保持・wait失敗回復・非所有shutdownのゲスト受入とnative補完 (a2はqemu/ホストのみ)。本人識別のh3 identity()との照合はe11cとゲストへ持越し (a2はcaller_access模型との照合のみ)、cのslot接続後にh3自己公開とhost読値を照合、raw KAPI待機利用者は明示check契約を統合確認 | 未配備・自己公開未結線 | e11a2 / guest_acceptance e11a2-* | e11c → e11統合受入 (PM) |
+| E11-A3 | 全画面 owner の同期の子 (slot.parent) は kernel が読ませるが WM の起床の手がかりに入らない。端末由来のバイト (宛先 0) は全員が読める — e11c の専用 KAPI で宛先をそろえる | 改善 | e11c |
 
 
 ## 3. 関門: f5 以降 (T2f の結線と受入)

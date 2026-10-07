@@ -1,4 +1,14 @@
 #include "userland/tests/h3/protocol.h"
+#ifdef H3_SELF_TEST
+static int self_ready;
+static int self_identity(unsigned int *app, unsigned int *owner, unsigned int *generation)
+{
+    if (!self_ready) return 0;
+    *app = 2; *owner = 17; *generation = 91;
+    return 1;
+}
+#define H3_SELF_IDENTITY self_identity
+#endif
 #include "userland/tests/h3/state.inc"
 static void finish(int code)
 {
@@ -37,5 +47,11 @@ void _start(void)
     CHECK(h3_consume(&b) == 0 && b.phase == H3_ERROR);
     b.phase = H3_RESUMED; b.mode = 7;
     CHECK(h3_consume(&b) == 0 && b.phase == H3_ERROR);
+#ifdef H3_SELF_TEST
+    b.owner = b.generation = 0;
+    self_ready = 1;
+    CHECK(h3_identity(&b));
+    CHECK(b.owner == 17 && b.generation == 91 && b.phase == H3_IDENTIFIED);
+#endif
     finish(0);
 }

@@ -648,14 +648,23 @@ syscall の中なので `exec_park` も起きず、協調型の全体が止ま�
 票 [archive/gui_v13/TASK_K7_input.md](archive/gui_v13/TASK_K7_input.md) §1 / §5。
 
 - `kbd_inject(utf8, len)`: UTF-8 のバイト列をカーネルの**注入リング (256B、静的)** へ積み、
-  積んだバイト数を返す。呼べるのは **con_sink の読み手** (= 端末アプリ) だけで、読み手が
-  未確立か別の所有者なら `OS32_ERR_EXIST`、`utf8 == NULL` は `OS32_ERR_INVAL`。
+  積んだバイト数を返す。通常は **con_sink の読み手** (= 端末アプリ) だけが呼べる。
+  e11a の内部例外: 全画面 owner がアプリで、呼び手が WM 本人 (slot 1 または明示的な WM pump)、
+  全画面 owner が読み手本人・その子孫でない場合は、読み手未確立でも注入できる。
+  WM例外の各バイトには注入時のownerを保持し、そのownerとslot/launch連鎖の子孫だけが
+  take/peekできる。別宛先のバイトは飛ばし、宛先ごとのFIFOを維持する (従来の端末由来は不変)。
+  この例外にも通常権限にも該当しなければ `OS32_ERR_EXIST`、`utf8 == NULL` は `OS32_ERR_INVAL`。
+  gshell は全画面 owner につながる起動元の窓だけに配送し、該当窓が無いときだけ直接注入する。
+  端末の子への直接注入はカーネルでも拒否する。`WAIT_POLL` は従来の poll 起床後に 1 byte を取る。
   端末アプリはイベントループに入る前に `con_sink_read` を 1 回呼んで読み手権限を確立する
   規約 (票 §5 R2)。あふれは con_sink と逆で **新しい方を捨てる** — 打鍵は順序が意味を持ち、
   古い方を捨てると打った文字列の頭が欠ける。捨てた分は戻り値 (< `len`) で分かり、累計は
   カーネルシンボル `kbd_inject_drop_count` にも積む (KAPI にはしない)。
-- `kbd_inject_pending()`: 未読バイト数。所有権は要らない — WM (gshell) が
-  「`exec_app_state` が 3 (`WAIT_KEY`) かつ `kbd_inject_pending() > 0`」で起こす相手を選ぶ。
+- `kbd_inject_pending()`: 現在のアプリが取得可能な未読バイト数。WM自身には端末由来だけが
+  見え、全画面宛てを隠れた端末のWAIT_KEYの起床理由にしない。公開シグネチャは不変。
+  WMは直接注入の成功時にownerの起床候補を控え、owner/launch連鎖末尾のWAIT_KEYを
+  再開候補にする。取得可否はカーネルが決め、AGAINで候補を消す (空振りを繰り返さない)。
+  WAIT_POLLは従来のpoll起床を使い、owner退場時は候補も消す。
 - GUI 中の `kbd_getchar` / `kbd_getkey` / `kbd_trygetchar` は**この注入リングだけ**を見る。
   `kbd_getchar` / `kbd_getkey` は空のとき **第 2 の park 点**として止まり
   (`APP_STATE_WAIT_KEY` + 印 `parked_from_kbd`)、`exec_resume` が注入リングの 1 バイトを
@@ -664,8 +673,9 @@ syscall の中なので `exec_park` も起きず、協調型の全体が止ま�
   `kbd_getkey` の GUI 中の戻り値は下位 8bit だけが意味を持つ (スキャンコードは 0)。
 - **CUI モード (`kbd_gui_mode == 0`) は 1 行も変わらない** — rshell のタイムアウト経路を
   含めて従来どおり cooked リング + `hlt`。
-- 注入リングは CUI 復帰 (`console_text_gdc_start`) と読み手の退場
-  (`exec_reclaim_owned` → `kbd_inject_owner_exit`) で捨てる。
+- CUI復帰 (`console_text_gdc_start`) は注入リング全体を捨てる。退場時
+  (`exec_reclaim_owned` → `kbd_inject_owner_exit`) は退場ID宛てのWM注入だけを捨て、
+  con_sink読み手の退場なら端末由来も捨てる。端末の全画面子孫の終了で先行入力を消さない。
 
 GUI モード中 (gshell が全画面 GFX を握っている間) は、カーネルと CUI コマンドが
 `kernel/console.c` の入口へ書いた出力はテキスト VRAM に描かれて見えないまま消える。

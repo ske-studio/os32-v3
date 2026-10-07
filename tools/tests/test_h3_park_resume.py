@@ -1384,10 +1384,18 @@ def c_run(directory, mutation=None):
     subprocess.run(['gcc', '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie', '-no-pie',
                     '-fno-stack-protector', '-nostdlib', '-Wl,-e,_start', '-I' + str(directory),
                     str(ROOT / 'tools/tests/h3_state_host.c'), '-o', str(exe)], check=True)
+    result = run([str(exe)], capture_output=True).returncode
+    if result: return result
+    subprocess.run(['gcc', '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie', '-no-pie',
+                    '-fno-stack-protector', '-nostdlib', '-Wl,-e,_start', '-DH3_SELF_TEST',
+                    '-I'+str(directory), str(ROOT/'tools/tests/h3_state_host.c'),
+                    '-o', str(exe)], check=True)
     return run([str(exe)], capture_output=True).returncode
 
 
 C_MUTANTS = [
+    ('b->owner = owner;', 'b->owner = owner + 1;'),
+    ('b->generation = generation;', 'b->generation = generation + 1;'),
     ('!b->owner || !b->generation', '!b->owner && !b->generation'),
     ('b->phase != H3_RESUMED || ', ''),
     ('b->arm != 1 || ', ''),
