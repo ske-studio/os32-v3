@@ -500,6 +500,8 @@ MUTATIONS = [
      "        if True:"),
     ("exec/os32x_hdr.c", "abi_generation_unchecked",
      "hdr->kapi_abi_generation != OS32_KAPI_ABI_GENERATION", "0"),
+    ("sdk/kapi.json", "memory_generation_rolled_back",
+     '"memory_layout": 2', '"memory_layout": 1'),
     ("exec/os32x_hdr.c", "memory_generation_unchecked",
      "hdr->memory_layout_generation != OS32_MEMORY_LAYOUT_GENERATION", "0"),
     ("exec/os32x_hdr.c", "shlib_protocol_unchecked",
@@ -547,7 +549,7 @@ def one_mutation(item):
     original = (ROOT / rel).read_text(encoding="utf-8")
     if old not in original:
         return "MUTATE %-26s SKIP (目印が見つからない)" % name, 1
-    regen = rel == "sdk/gen_kapi.py" and "CRT_KAPI_SYMBOL" in old
+    regen = rel == "sdk/kapi.json" or (rel == "sdk/gen_kapi.py" and "CRT_KAPI_SYMBOL" in old)
     with tempfile.TemporaryDirectory(prefix="os32-kapi-layout-mut-") as td:
         tree = mutpar.mutant_tree(ROOT, pathlib.Path(td) / "tree",
                                   {rel: original.replace(old, new, 1)},

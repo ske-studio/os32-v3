@@ -137,12 +137,13 @@
   - 'SHM discovery and target: ring3_marker.h PM acceptance table'
   - 'serial #PF addr, shell/ver'
   expect:
+    pf_error: 7
     marker_row: E
     tag: BB??
-    completion: SURV
-    armed: 0
-    kill_delta: 0
-    serial_addr: null
+    completion: 0
+    armed: ARMD
+    kill_delta: 1
+    serial_addr: 0x6A000
   evidence: ~/os32-tmp/evidence/<日付>/<case id>/
 - id: e9-shm_reuse_test
   gate: e9
@@ -284,9 +285,10 @@
   - SHM marker row E
   - fault_kill_count, shell/ver
   expect:
+    pf_error: 7
     marker_row: E
-    completion: SURV
-    kill_delta: 0
+    completion: 0
+    kill_delta: 1
   evidence: ~/os32-tmp/evidence/<日付>/<case id>/
 - id: E10-1-d
   mode: manual
@@ -643,7 +645,7 @@
   - pt0_snapshot and write observation at BB alias, CLIENT lease VA and Unicode RO PTEs
   - Japanese text, window to fullscreen to return and repaint, V86 return
   - kselftest_fail and three-stage check failures, db_test and db_v50_test
-  - ring3_guard bb remains SURV until b2
+  - ring3_guard bb must be killed after b2 (PF error 7, addr 0x6A000)
   expect:
     bb_alias_writes: 0
     japanese_text: correct
@@ -681,3 +683,58 @@
   - 'owner/generation照合が成功、initのhost書込み0、再起動は新generation'
   - 'shm_reuse_test PASS 4/4、db_test/db_v50_test回帰PASS、h3の各fault/STOPが従来の契約どおり'
   evidence: ~/os32-tmp/run/e11/e11c3-identity/
+- id: e11b2-isolation
+  gate: e11
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#2-4-user切替の一括境界
+  mode: manual
+  prereq: PM integrated generation-2 build deployed; new kernel.map; 17MB current ini
+  entry: ring3_guard bb; ring3_guard lease; ring3_guard free; v86 -d; v86 -b
+  observe:
+  - Confirm boot kselftest_pass=281 and kselftest_fail=0; map_user_keep still counts one check
+  - Use tools/accept/pt0_snapshot.py with the deployed kernel.map before and after applications and V86
+  - Inspect every PTE for font 0x1000-0x49fff, Unicode 0x4a000-0x69fff, BB 0x6a000-0x89fff and TVRAM/BRG 0xa0000-0xbffff; USER must be clear
+  - E marker BB?? has ARMD, completion zero, target 0x6a000; serial PF error 7 and fault_kill_count delta one
+  - F lease survives with SURV and no kill; F free faults at recorded lease VA after shutdown
+  - Observe audit_runs rising and audit_fail=0 at master, AS and post-exec stages, including both V86 returns; shell/ver respond
+  - Run db_test and db_v50_test and require their existing PASS totals
+  expect:
+    kselftest_pass: 281
+    kselftest_fail: 0
+    old_alias_user_pages: 0
+    E_completion: 0
+    E_pf_error: 7
+    E_serial_addr: 0x6A000
+    E_kill_delta: 1
+    audit_fail: 0
+    v86_restore_mismatch: 0
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e11b2-consumers
+  gate: e11
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#2-4-user切替の一括境界
+  mode: manual
+  prereq: PM integrated generation-2 build deployed; same binary hashes as build outputs
+  entry: hello; gfx200_test; gfx_demo200; pegcchk; blit_test; bench; hello_gfx; font_test; gdi_test; about; filer; gui_demo; t5a_display
+  observe:
+  - Run the e11c2 consumer list with old USER aliases removed; verify drawing and Japanese glyphs
+  - Window to fullscreen to window restores drawing and input; no stale lease faults; shell/ver respond
+  - Verify both gfx instances in gdi_test and t5a_display Japanese output
+  expect:
+    drawing_failures: 0
+    japanese_failures: 0
+    transition_failures: 0
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e11b2-generation
+  gate: e11
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#2-4-user切替の一括境界
+  mode: manual
+  prereq: PM integrated generation-2 build and saved generation-1 binary; KAPI v70 in both
+  entry: Launch saved generation-1 program, then rebuilt generation-2 program
+  observe:
+  - Confirm header memory_layout_generation differs while KAPI version and all other generations agree
+  - Old binary is rejected with memory layout generation mismatch before entry/AS allocation
+  - New binary starts normally; verify generation manifests and shell/ver response
+  expect:
+    generation_1_rejected: true
+    generation_2_runs: true
+    kapi_version: 70
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/

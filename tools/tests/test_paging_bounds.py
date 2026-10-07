@@ -40,6 +40,10 @@ with tempfile.TemporaryDirectory(prefix='os32-paging-') as tmp:
     if args.mutate:
         assert not args.rebuild
         mutants = [
+            ('mixed free below allowed', '(vstart >> 22) < as->app_pde ||', '0 ||'),
+            ('mixed free allowed', '((vend - 1) >> 22) >= as->app_pde + as->app_pde_count) return 0;', '0) return 0;'),
+            ('shared single page allowed', 'return -1; /* Shared PTs are immutable through ordinary AS mapping. */', 'if (!page_tables[pdi] || !(pd[pdi] & PTE_PRESENT)) return -1;\n        pt = page_tables[pdi];'),
+            ('shared range allowed', '} else goto rollback;', '} else if (!page_tables[pdi] || !(pd[pdi] & PTE_PRESENT)) goto rollback;'),
             ('generation reused', 'as->generation = ++as_generation;', 'as->generation = 1;'),
             ('generation wrap', 'as_generation == ~(u32)0', '0'),
         ]
@@ -51,4 +55,4 @@ with tempfile.TemporaryDirectory(prefix='os32-paging-') as tmp:
             assert result.returncode != 0, name + ' survived'
             assert 'FAIL:' in result.stdout, result.stdout + result.stderr
             print('RED (runtime): ' + name)
-        print('MUTATIONS 2/2 runtime RED')
+        print(f'MUTATIONS {len(mutants)}/{len(mutants)} runtime RED')

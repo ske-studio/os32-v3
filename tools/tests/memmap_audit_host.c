@@ -49,12 +49,14 @@ static void run(void)
     paging_set_not_present(MEM_SHM_GUARD_LO, MEM_SHM_GUARD_LO + PAGE_SIZE - 1);
     paging_set_not_present(MEM_SHM_GUARD_HI, MEM_SHM_GUARD_HI + PAGE_SIZE - 1);
     CHECK(!paging_boot_user_shared(exec_tramp_page_addr()));
-    paging_prepare_legacy_clients();
     CHECK(!ledger_surface_find(LEDGER_SF_PEGC, LEDGER_ROLE_DISPLAY));
     CHECK(!paging_master_audit(exec_tramp_page_addr()));
     gfx_prepare_backend();
     CHECK(gfx_sf_backend() == LEDGER_SF_CIRRUS && gfx_selected_selfcheck());
-    CHECK(fixed_paging_valid()); /* Cirrus CLIENT permits the transitional USER PDE. */
+    CHECK(fixed_paging_valid()); /* Device alias PDE stays supervisor even with a CLIENT. */
+    page_directory[PAGING_APERTURE_PDI] |= PTE_USER;
+    CHECK(!fixed_paging_valid());
+    page_directory[PAGING_APERTURE_PDI] &= ~PTE_USER;
     SAY("PASS failed-map/selected-Cirrus");
     die(0);
 #endif
@@ -63,18 +65,19 @@ static void run(void)
     paging_set_not_present(MEM_SHM_GUARD_LO, MEM_SHM_GUARD_LO + PAGE_SIZE - 1);
     paging_set_not_present(MEM_SHM_GUARD_HI, MEM_SHM_GUARD_HI + PAGE_SIZE - 1);
     CHECK(!paging_boot_user_shared(exec_tramp_page_addr()));
-    paging_prepare_legacy_clients();
     CHECK(!paging_master_audit(exec_tramp_page_addr()));
     u32 *pt = page_tables[TVRAM_CHAR_BASE >> 22];
     u32 idx = TVRAM_CHAR_BASE / PAGE_SIZE, saved = pt[idx];
-    /* b1: low font and native VRAM must never regain USER. */
-    for (u32 a = MEM_FONT_CACHE_BASE; a < MEM_UNICODE_TABLE_BASE; a += PAGE_SIZE) {
+    /* Every font/Unicode/BB/native VRAM page must reject legacy USER. */
+    for (u32 a = MEM_FONT_CACHE_BASE; a < MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE; a += PAGE_SIZE) {
         pt[a / PAGE_SIZE] |= PTE_USER;
+        CHECK(paging_memmap_selftest(exec_tramp_page_addr()) > 0);
         CHECK(paging_master_audit(exec_tramp_page_addr()) > 0);
         pt[a / PAGE_SIZE] &= ~PTE_USER;
     }
     for (u32 a = TVRAM_CHAR_BASE; a < GVRAM_BRG_END; a += PAGE_SIZE) {
         pt[a / PAGE_SIZE] |= PTE_USER;
+        CHECK(paging_memmap_selftest(exec_tramp_page_addr()) > 0);
         CHECK(paging_master_audit(exec_tramp_page_addr()) > 0);
         pt[a / PAGE_SIZE] &= ~PTE_USER;
     }
@@ -133,8 +136,8 @@ static void run(void)
     reset_scans();
     CHECK(ledger_selfcheck("bounded"));
     CHECK(scan_max[1] == pgalloc_limit_pfn() && scan_max[1] <= PHYSMEM_MAX_PFN);
-    CHECK(!paging_addrspace_map_user_range(&space, MEM_UNICODE_TABLE_BASE,
-          MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE, PAGE_RW | PTE_USER));
+    CHECK(paging_addrspace_map_user_range(&space, MEM_UNICODE_TABLE_BASE,
+          MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE, PAGE_RW | PTE_USER) == -1);
     CHECK(!paging_master_audit(exec_tramp_page_addr()));
     CHECK(!paging_shm_set_rw(MEM_SHM_BASE, MEM_SHM_BASE + PAGE_SIZE, 0));
     CHECK(!paging_master_audit(exec_tramp_page_addr()));
@@ -219,6 +222,15 @@ static void run(void)
     CHECK(compat && (space.leases[2].flags & AS_LEASE_GFX_COMPAT));
     gfx_v86_return();
     CHECK(client->gen == cref.generation && client->lease_count == 1);
+    /* CLIENT is accessible only through the lease, never its master alias. */
+    for (u32 p = client->first; p < client->first + client->npages; p++) {
+        u32 *entry = &page_tables[p / PTE_COUNT][p % PTE_COUNT];
+        u32 old = *entry;
+        *entry |= PTE_USER;
+        CHECK(paging_master_audit(exec_tramp_page_addr()) > 0);
+        *entry = old;
+    }
+    CHECK(!paging_master_audit(exec_tramp_page_addr()));
     CHECK(space.leases[2].token == compat);
     CHECK(surface_api_unlease(compat) == OS32_ERR_INVAL);
     CHECK(space.leases[2].token == compat);

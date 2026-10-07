@@ -163,24 +163,14 @@ pgalloc_stage_online() が paging_map_phys() で張り、PT はブート workspa
 > 避けた。**Cirrus は NP21/W 互換のためだけ**で、auto の probe は NP21/W の上でだけボードの ID を読む
 > (実機 Ra266 のアクセラレータは PCI の Trident)。経緯は `docs/POLICY_DEBUG.md` §4-34。
 
-> **デバイス窓の貸し出し規則 (レビュー #5 ②③、2026-09-06)**
-> バックエンドが master PD に張る窓は **supervisor + PCD** で、PTE_USER を付けない。
-> `paging_addrspace_create()` は master の PDE を 1024 本すべて写すので、master で
-> USER にすると CPL=3 アプリが**表示面**に直接書けてしまい、契約 G4 (commit 前の
-> 描画は表示面に出ない) が崩れる。CPL=3 に見せるのは **クライアント面だけ** で、
-> `gfx_bb_phys_range()` が返す範囲 (Cirrus: リニア窓 +04B000h の 300KB、PEGC/9801:
-> 主記憶のバックバッファ) を exec が `paging_addrspace_map_user_keep()` で
-> **アプリ PD ごとに** USER へ昇格させる。この 300KB の PTE は共有 PT にあるので
-> master からも USER に見えるが、master 側の PDE には USER を伝播させないため
-> 実効権限は supervisor のまま (C2 の「共有 + USER」と同じ模型)。
-> `_keep` は既存 PTE の **PCD/PWT を引き継ぐ** — 落とすと CPU が書いた画素が
-> キャッシュに残り、Cirrus の BLT エンジンが古い VRAM を読む。
-> 不変条件はブート時の kselftest (`paging_map_user_keep_selftest`) が毎回検査する。
-> 9801 の主記憶バックバッファ (0x6A000、128KB) は選ばれているバックエンドに関わらず
-> **常に** USER にする (レビュー #6、2026-09-06): アプリの gfx_init でアクセラレータの
-> setup が失敗すると HAL は 9801 へ落ち、以後 `gfx_get_framebuffer()` が 0x6A000 を返す
-> ため。写していないとフォールバック直後の最初の描画で #PF になる (`ring3_guard bb` が
-> 「書けて生き残る」ことを確認する)。
+> **デバイス窓の貸し出し規則 (e11b2)**
+> master のデバイス窓は **supervisor + PCD**、Unicode/主記憶 BB は supervisor + WB を維持する。
+> CPL=3 の描画は CLIENT lease の私有 VA、Unicode は RO lease だけを使う。
+> Cirrus DISPLAY の RW は授権された lease に限定し、旧 alias の PTE/PDE に USER を立てない。
+> 通常の AS map/unmap は共有 PT に掛かる要求を全範囲無変更で拒否する。
+> kselftest (`paging_map_user_keep_selftest`) は拒否と PFN/属性/PDE の不変を検査する。
+> `ring3_guard bb` は低位 0x6A000 への書込みで PF error=7、kill を期待し、
+> 正規 CLIENT lease の生存対照は `ring3_guard lease` が担う。
 
 > **CR0.WP = 0 で走る** (`arch/x86/arch_cpu.h` の MMU 有効化)。`kernel/shlib.c` が
 > 「カーネルからは RO の USER ページにも書ける」前提で共有ライブラリを張るため。

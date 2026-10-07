@@ -351,16 +351,14 @@ static void test_ring3_pd(void)
 }
 
 /* ------------------------------------------------------------------------ */
-/*  デバイス窓の貸し出し (レビュー #5 ②③): 表示面を CPL=3 に見せないまま     */
-/*  クライアント面だけを USER にでき、そのときキャッシュ属性 (PCD) が        */
-/*  消えないこと。ここが壊れると Cirrus で「commit 前の描画が表示面に出る」   */
-/*  (契約 G4 違反) か「BLT が古い VRAM を読んでちらつく」になるが、どちらも   */
-/*  画面を見るまで分からないので毎回ブート時に見る。                          */
-/* ------------------------------------------------------------------------ */
+/* Shared PT promotion is rejected without changing PFN/cache/PDE bits.
+ * rc bits: 1=missing PT, 2=AS creation, 4=keep, 64=single page,
+ * 128=identity range, 256=physical range, 8=free, 16=entry changed,
+ * 32=AS cleanup (paging_map_user_keep_selftest). */
 static void test_map_user_keep(void)
 {
     int rc = paging_map_user_keep_selftest();
-    check(rc == 0, "device window lease (USER only on client page, PCD kept)");
+    check(rc == 0, "shared PT map rejected (PTE/PDE unchanged)");
     if (rc != 0) {
         kprintf(0xC1, "[selftest]   paging_map_user_keep_selftest rc=%d\n", rc);
     }

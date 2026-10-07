@@ -42,7 +42,7 @@ void _start(int argc, char **argv)
             *client = 0;
         }
     } else if (sel == 'b') {
-        /* ---- ケース E: 9801 主記憶バックバッファ (USER であるべき) ---- */
+        /* ---- ケース E: 9801 主記憶バックバッファ (supervisor、error 7 で kill) ---- */
         /* 0x3F3F4242 = LE 42 42 3F 3F = "BB??" */
         r3_arm(mark, 0x3F3F4242UL, (unsigned long)pc98_bb);
         *pc98_bb = 0x00000000UL;   /* 生き残れば下の "SURV" まで進む */

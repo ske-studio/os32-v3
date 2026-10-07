@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline acceptance-index, PT0 and TVDM tests; --mutate checks three guards."""
+"""Offline acceptance-index, PT0 and TVDM tests; --mutate checks four guards."""
 import copy
 import json
 from pathlib import Path
@@ -27,6 +27,18 @@ class AcceptanceTests(unittest.TestCase):
     def test_valid(self):
         self.assertEqual(ga.validate(self.cases), self.cases)
         self.assertIn('| id |', ga.render(self.cases))
+
+    def test_e_rejects_legacy_bb(self):
+        for name in ('e9-E', 'e10b-regression-E'):
+            case = next(c for c in self.cases if c['id'] == name)
+            self.assertEqual(case['expect']['completion'], 0)
+            self.assertEqual(case['expect']['kill_delta'], 1)
+            self.assertEqual(case['expect']['pf_error'], 7)
+        marker = (ROOT / 'userland/tests/ring3_marker.h').read_text()
+        row = next(l for l in marker.splitlines() if 'ring3_guard bb (E)' in l)
+        self.assertIn('| 7', row)
+        self.assertIn('kill +1', row)
+        self.assertNotIn('SURV', row)
 
     def test_missing(self):
         del self.cases[0]['expect']
@@ -116,6 +128,8 @@ class AcceptanceTests(unittest.TestCase):
 
 
 MUTATIONS = [
+    ('tools/tests/guest_acceptance.yaml', '    tag: BB??\n    completion: 0', '    tag: BB??\n    completion: SURV'),
+
     ('tools/gen_guest_acceptance.py', 'or case["id"] in ids', 'or False'),
     ('tools/accept/pt0_snapshot.py', 'mask = ~AD_BITS if ignore_ad else ~0', 'mask = ~(AD_BITS | 4) if ignore_ad else ~0'),
     ('tools/tvdump_recv.py', 'if (cols, rows) != (TVDM_COLS, TVDM_ROWS):', 'if False:'),
@@ -126,6 +140,7 @@ def mutations():
     with tempfile.TemporaryDirectory() as td:
         control = mutpar.run_script_in_tree(ROOT, td, {},
                                            'tools/tests/test_guest_acceptance.py', ['--self'],
+                                           real=('tools/gen_guest_acceptance.py',),
                                            capture_output=True, timeout=60)
     if control.returncode != 0:
         print('CONTROL failed')
@@ -141,6 +156,7 @@ def mutations():
         with tempfile.TemporaryDirectory() as td:
             result = mutpar.run_script_in_tree(ROOT, td, {target: source.replace(old, new, 1)},
                                               'tools/tests/test_guest_acceptance.py', ['--self'],
+                                              real=('tools/gen_guest_acceptance.py',),
                                               capture_output=True, timeout=60)
         # Assertion failures prove semantic detection, rather than syntax/import errors.
         detected = result.returncode != 0 and b'FAIL:' in result.stderr and b'FAILED (failures=' in result.stderr
