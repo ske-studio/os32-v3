@@ -16,7 +16,7 @@ SDK_LIB_HEADER_DIRS = math gfx db ui input asset snd tilemap md filer mgx save e
 # ヘッダ・Rust バインディング・ドキュメントはすべてここから導出する。
 KAPI_VERSION := $(shell python3 -c "import json;print(json.load(open('sdk/kapi.json'))['version'])")
 
-sdk: $(ALL_LIB_ARCHIVES) $(CRT0_OBJ) $(DBG_OBJ) $(SDK_KAPI_HDR)
+sdk: $(ALL_LIB_ARCHIVES) $(CRT0_USER_OBJ) $(DBG_OBJ) $(SDK_KAPI_HDR)
 	@rm -rf $(SDK_OUT)
 	@mkdir -p $(SDK_OUT)/include/os32 $(SDK_OUT)/lib $(SDK_OUT)/crt \
 	          $(SDK_OUT)/link $(SDK_OUT)/bin $(SDK_OUT)/rust
@@ -34,7 +34,7 @@ sdk: $(ALL_LIB_ARCHIVES) $(CRT0_OBJ) $(DBG_OBJ) $(SDK_KAPI_HDR)
 	@# 共有 C の公開ヘッダ。実装は libos32gfx.a に入っている (utf8_prog.o)。
 	cp lib/utf8.h                         $(SDK_OUT)/include/
 	cp $(LIBDIR)/*.a                     $(SDK_OUT)/lib/
-	cp $(CRT0_OBJ) $(DBG_OBJ)            $(SDK_OUT)/crt/
+	cp $(CRT0_USER_OBJ) $(DBG_OBJ)            $(SDK_OUT)/crt/
 	cp sdk/crt/generations.inc            $(SDK_OUT)/crt/
 	cp sdk/link/*.ld                     $(SDK_OUT)/link/
 	cp sdk/mkos32x.py                    $(SDK_OUT)/bin/

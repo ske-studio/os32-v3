@@ -23,8 +23,15 @@ sdk/crt/help.o: sdk/crt/help.c sdk/include/os32/help.h $(SDK_KAPI_HDR)
 sdk/crt/crt0_c.o: sdk/crt/crt0_c.c sdk/include/os32/help.h $(SDK_KAPI_HDR)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
-sdk/crt/syscalls.o: sdk/crt/syscalls.c userland/lib/rt/ls.c sdk/include/os32/ls.h $(SDK_KAPI_HDR)
+CRT_SYSCALLS_DEPS = sdk/allocator/nano_adapter.c sdk/allocator/nano_adapter.h
+
+sdk/crt/syscalls.o: sdk/crt/syscalls.c $(CRT_SYSCALLS_DEPS) userland/lib/rt/ls.c sdk/include/os32/ls.h $(SDK_KAPI_HDR)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
+
+# Resident shell has a separate object and a fixed morecore backend.
+sdk/crt/resident/syscalls.o: sdk/crt/syscalls.c $(CRT_SYSCALLS_DEPS) userland/lib/rt/ls.c sdk/include/os32/ls.h $(SDK_KAPI_HDR)
+	@mkdir -p $(@D)
+	$(CC) $(PROGRAM_FLAGS) -DOS32_CRT_RESIDENT -c $< -o $@
 
 userland/lib/rt/dbgserial.o: userland/lib/rt/dbgserial.c userland/lib/rt/dbgserial.h $(SDK_KAPI_HDR)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
@@ -58,8 +65,8 @@ PC98PT_USER_OBJ = userland/shell/pc98pt_user.o
 $(PC98PT_USER_OBJ): drivers/pc98pt.c drivers/pc98pt.h
 	$(CC) $(PROGRAM_FLAGS) -Idrivers -c drivers/pc98pt.c -o $@
 
-userland/shell.elf: sdk/link/app_sys.ld $(CRT0_OBJ) $(SHELL_OBJ) $(PCI_DECODE_USER_OBJ) $(PC98PT_USER_OBJ) $(FILER_DRAW_OBJ)
-	$(LD) -m elf_i386 -T sdk/link/app_sys.ld -nostdlib --nmagic --gc-sections -L$(LIBDIR) -L$(CROSS_DIR)/i386-elf/lib -L$(CROSS_DIR)/lib/gcc/i386-elf/13.2.0 -o $@ $(CRT0_OBJ) $(SHELL_OBJ) $(PCI_DECODE_USER_OBJ) $(PC98PT_USER_OBJ) $(LGRP_BEG) $(FILER_DRAW_OBJ) -los32save $(LGRP_END) -lc -lgcc
+userland/shell.elf: sdk/link/app_sys.ld $(CRT0_RESIDENT_OBJ) $(SHELL_OBJ) $(PCI_DECODE_USER_OBJ) $(PC98PT_USER_OBJ) $(FILER_DRAW_OBJ)
+	$(LD) -m elf_i386 -T sdk/link/app_sys.ld -nostdlib --nmagic --gc-sections -L$(LIBDIR) -L$(CROSS_DIR)/i386-elf/lib -L$(CROSS_DIR)/lib/gcc/i386-elf/13.2.0 -o $@ $(CRT0_RESIDENT_OBJ) $(SHELL_OBJ) $(PCI_DECODE_USER_OBJ) $(PC98PT_USER_OBJ) $(LGRP_BEG) $(FILER_DRAW_OBJ) -los32save $(LGRP_END) -lc -lgcc
 
 # === sh — 同じシェルのソースを CPL=3 の外部アプリとして (票 T9 D1) ===
 # 常駐 shell.bin (app_sys.ld = 0x300000) の規則は上のまま一切変えない。同じ
@@ -119,12 +126,12 @@ GSHELL_LIB = $(GSHELL_DIR)/target/i686-os32-none/release/libgshell.a
 $(GSHELL_LIB): FORCE $(RUST_KAPI_RS)
 	cd $(GSHELL_DIR) && RUSTC_WRAPPER=$(CURDIR)/sdk/rustc_stamp.py cargo build --release
 
-userland/gshell.elf: sdk/link/app_sys.ld $(CRT0_OBJ) $(GSHELL_LIB) $(GFX_OBJ) $(LIBCFG_OBJ)
+userland/gshell.elf: sdk/link/app_sys.ld $(CRT0_RESIDENT_OBJ) $(GSHELL_LIB) $(GFX_OBJ) $(LIBCFG_OBJ)
 	$(LD) -m elf_i386 -T sdk/link/app_sys.ld -nostdlib --nmagic --gc-sections --allow-multiple-definition \
 		-L$(LIBDIR) -L$(CROSS_DIR)/i386-elf/lib -L$(CROSS_DIR)/lib/gcc/i386-elf/13.2.0 \
-		-o $@ $(CRT0_OBJ) $(LGRP_BEG) $(GFX_OBJ) $(LIBCFG_OBJ) $(GSHELL_LIB) $(LGRP_END) -lc -lgcc
+		-o $@ $(CRT0_RESIDENT_OBJ) $(LGRP_BEG) $(GFX_OBJ) $(LIBCFG_OBJ) $(GSHELL_LIB) $(LGRP_END) -lc -lgcc
 
-gshell: $(CRT0_OBJ) userland/gshell.bin
+gshell: $(CRT0_RESIDENT_OBJ) userland/gshell.bin
 
 clean-gshell:
 	cd $(GSHELL_DIR) && cargo clean 2>/dev/null || true
@@ -658,7 +665,7 @@ clean-programs: clean-rust clean-gshell
 	rm -f userland/tests/bench/*.o userland/tests/bench/*.elf userland/tests/bench/*.raw userland/tests/bench/*.bin
 	rm -f userland/tests/bench_scale2x/*.o userland/tests/bench_scale2x/*.elf userland/tests/bench_scale2x/*.raw userland/tests/bench_scale2x/*.bin
 	rm -f userland/system/*.o userland/system/*.elf userland/system/*.raw userland/system/*.bin
-	rm -f sdk/crt/*.o
+	rm -f sdk/crt/*.o sdk/crt/resident/*.o
 	rm -f userland/shell/*.o
 	rm -rf userland/shell/sh_obj
 	rm -f userland/sh.elf userland/sh.raw userland/sh.bin

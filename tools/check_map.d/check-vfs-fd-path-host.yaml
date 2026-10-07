@@ -40,3 +40,4 @@ check-vfs-fd-path-host:
 - build/checks.d/check-vfs-fd-path-host.mk
 - userland/lib/rt/ls.c
 - sdk/include/os32/ls.h
+- sdk/allocator/nano_adapter.c

@@ -48,9 +48,10 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 
 | ID | 何を | 種類 | 元の行 |
 |---|---|---|---|
-| F-4 | f6 (CRT の `_sbrk` 集約、link_guard、`check_link` が提供元をファイル名だけで判定)、f7 (arena routing)、f8 (Rust `Os32Alloc`)、f9 / f10 (内部の伸長口、EXEC_* の返却)、`mem_alloc` が偽の BlkHdr を信用する | 未結線 / 申し送り | 1503、2037、2045–2059、2101、2103、2163、2355 |
+| F-4 | f7 (arena routing、link_guard、`check_link` が提供元をファイル名だけで判定、`os32_nano_morecore` の提供元を syscalls.o と nano_adapter.o の 1 か所に)、f8 (Rust `Os32Alloc`)、f9 / f10 (内部の伸長口、EXEC_* の返却)、`mem_alloc` が偽の BlkHdr を信用する | 未結線 / 申し送り | 1503、2037、2045–2059、2101、2103、2163、2355 |
 | F-5 | malloc 系の入口の結線と最小初期量の切替 | 未結線 | 2010–2017、2055、2141、2365 |
 | F-6 | f5b の `mem_map_test` 対照 (exit 0) と `mem_map_test pf` (unmap 後の同じ VA で PF/kill)、KAPI 71 のゲスト未受入。手順 `tools/tests/guest_acceptance.yaml` の f5b-mem-map。f の受入一式: 8MB / 17MB での伸長と unmap、512KiB stack、kernel stack high-water (f5a の AS +532B / map pending 256B、lease_selftest 1,676→2,732B (AS 2 個)・test_ledger 812→1,340B・test_appmem 1,232B を含む)、leftover==0、毒 AS の kill (syscall 帰路と resume)。f5a レビュー: 入れ子で親 A が毒の後に子の終了で A の PD が一時的に CR3 に載る (USER へは戻らず syscall 出口で kill — P3-c)、resume の中断も h3 の `syscall_abort` 地点に当たる (P3-d) — ゲストの h3 の数え方で確かめる | 未実施の確認 | 2369 |
+| F-7 | f6 の USER/resident CRT の実ゲスト受入 (`f6-sbrk-grow`: 初期 mapped_end を越える連続伸長と書込み、INT_MIN・負増分の下限、EXACT 衝突時に break 不変、終了後の kill 差 0・leftover 0、db_test/db_v50_test、親子入れ子で親の break 保持) | 未実施の確認 | f6 受入
 
 ## 4. 関門: h の最終一式 / T2h 統合受入
 

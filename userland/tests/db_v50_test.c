@@ -22,8 +22,9 @@
 #include "os32api.h"
 #include "rt/testresult.h"
 
-/* T2c の可変配置に追従する。先頭は sbrk の最終 byte、2 byte 目は
- * guard_a。先頭の早期検査を通し、DB の範囲検査が -1 を返すことを見る。 */
+/* Initial mapped_end probe: this test does not call malloc/sbrk or map
+ * that boundary page before the DB checks. It is not the live heap ceiling.
+ * Keep the limit-1 marker for test_db_caller.py. */
 static const char *guard_crossing_text(KernelAPI *api)
 {
     return (const char *)(api->sbrk_heap_limit - 1u);
@@ -156,7 +157,7 @@ int main(int argc, char **argv, KernelAPI *api)
     /* ---- (5) 不正範囲: 先頭は許可帯の中、範囲が外へ出る ---------------- */
     ok(api->db_prepare_only(h, "INSERT INTO v50(k,n,b) VALUES(?,?,?)") == 0,
        "prepare_only of a single statement");
-    /* The last mapped RAM byte is valid; the next byte is guard_a.
+    /* The last initially mapped RAM byte is valid; the next is unmapped.
      * Explicit length 1 requires no NUL. Restore the scratch byte afterwards. */
     {
         volatile char *last = (volatile char *)guard_crossing_text(api);
@@ -167,7 +168,7 @@ int main(int argc, char **argv, KernelAPI *api)
         *last = saved;
     }
     ok(api->db_bind_text(h, 1, guard_crossing_text(api), 2) < 0,
-       "text range crossing the sbrk guard is refused");
+       "text range crossing the initial mapped end is refused");
     ok(api->db_bind_text(h, 1, (const char *)UNLEASED_VRAM, 1) < 0,
        "unleased VRAM text is refused");
     /* d5 の caller copy は未マップページもコピー前に -1 で断る。 */

@@ -2,7 +2,7 @@
 /*  HEAP_TEST.C — 子プロセス帯レイアウトの検証 (2026-09-04)                  */
 /*                                                                          */
 /*  本体の固定 1MB 上限撤廃後のレイアウトを実機で確かめる:                   */
-/*    - sbrk_heap_limit (= guard_a) と exec_heap の位置を表示               */
+/*    - sbrk_heap_limit (初期 mapped_end) と exec_heap の位置を表示               */
 /*    - newlib malloc と KAPI mem_alloc をそれぞれ 64KB ずつ限界まで取り、    */
 /*      合計を表示。両ヒープが重ならないことは、確保したブロックへ書いた     */
 /*      印を最後に読み返して確かめる。                                       */
@@ -29,7 +29,7 @@ int main(int argc, char **argv, KernelAPI *api)
     (void)argc; (void)argv;
 
     api->kprintf(0xE1, "load                      = 0x%x\n", (unsigned)_start);
-    api->kprintf(0xE1, "sbrk_heap_limit (guard_a) = 0x%x\n", api->sbrk_heap_limit);
+    api->kprintf(0xE1, "sbrk_heap_limit (initial) = 0x%x\n", api->sbrk_heap_limit);
     probe = (char *)malloc(16);
     api->kprintf(0xE1, "first malloc block         = 0x%x\n", (unsigned)probe);
 

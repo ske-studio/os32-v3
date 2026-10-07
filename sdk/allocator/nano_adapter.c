@@ -1,9 +1,10 @@
-/* f1b: isolated connection to pinned newlib nano objects. No public build
- * consumes this file yet. See TASK_T2D_T2H.md section 3-5. */
+/* f1b nano connection. f6 embeds only morecore in each CRT syscalls.o;
+ * the allocation hooks remain opt-in until f7. */
 #include "nano_adapter.h"
 #include <errno.h>
 #include <stdlib.h>
 
+#ifndef OS32_NANO_MORECORE_ONLY
 extern void *os32_private_malloc_r(struct _reent *, size_t);
 extern void os32_private_free_r(struct _reent *, void *);
 extern void *os32_private_calloc_r(struct _reent *, size_t, size_t);
@@ -43,6 +44,8 @@ static void leave(void)
     busy = 0;
 }
 
+#endif
+
 void *os32_nano_morecore(struct os32_nano_arena *a, struct _reent *r, ptrdiff_t incr)
 {
     uintptr_t old, next, end;
@@ -72,6 +75,7 @@ fail:
     return (void *)-1;
 }
 
+#ifndef OS32_NANO_MORECORE_ONLY
 void *os32_nano_sbrk(struct _reent *r, ptrdiff_t incr)
 {
     return os32_nano_morecore(busy ? selected : NULL, r, incr);
@@ -135,3 +139,5 @@ void *malloc(size_t size) { return _malloc_r(_impure_ptr, size); }
 void free(void *p) { _free_r(_impure_ptr, p); }
 void *calloc(size_t n, size_t size) { return _calloc_r(_impure_ptr, n, size); }
 void *realloc(void *p, size_t size) { return _realloc_r(_impure_ptr, p, size); }
+
+#endif /* OS32_NANO_MORECORE_ONLY */

@@ -115,9 +115,9 @@
     }
   },
   "sdk_build": {
-    "status": "f1b fixture only; no public link switch",
+    "status": "f6 CRT morecore only; nano allocation hooks remain f1b fixture until f7",
     "sources": {
-      "sdk/allocator/nano_adapter.c": "b3e56cf2aa41e0592b926a93b7de003329a42aa2325a3606779762af3b271163",
+      "sdk/allocator/nano_adapter.c": "b48fec1348aa49b722b27371bee597c31d8d558638c0d7bfba85d3b231fd0694",
       "sdk/allocator/nano_adapter.h": "a78c2beaf0a6b2340359259453fa04d51ef93dc3fdd8746388f14c3c698a854d",
       "sdk/allocator/build_nano.py": "591f8cfc3a76c8ce21d70855d18d41f0e0dab42c4c81991f4c3a88a0d7d0d5a3",
       "sdk/allocator/check_link.py": "af2de3ca50e194dd44d1080904fee865caaaa8e8c407d66e327f08a945b18a93"
