@@ -973,9 +973,26 @@
   - 'Record fault_kill_count and exec_as_leftover_pages before and after malloc_arena_test'
   - 'Require malloc_arena_test PASS and exit 0; primary EXACT blocker forces secondary nano allocation'
   - 'Require cross-arena realloc preserves all old bytes, free permits EXACT remap of the management page and whole secondary arena, printf output is visible'
-  - 'Require kill delta 0 and leftover 0; run heap_test (64KiB requests still use nano), sbrk_grow_test, db_test and db_v50_test regressions'
+  - 'Require kill delta 0 and leftover 0; run heap_test (64KiB malloc now uses TOPDOWN direct maps; mem_alloc classification belongs to f10), sbrk_grow_test, db_test and db_v50_test regressions'
   expect:
     exit: 0
     kill_delta: 0
     leftover: 0
   evidence: ~/os32-tmp/evidence/<日付>/f7-malloc-arena/
+
+- id: f8-large-aligned
+  gate: F-8
+  contract: sdk/allocator/nano_adapter.c
+  mode: manual
+  prereq: KAPI 71, memory layout 2; PM deploy rebuilt malloc_arena_test and alloc_demo
+  entry: malloc_arena_test
+  observe:
+  - 'Require malloc_arena_test PASS and exit 0 for 65535/65536/65537, all calloc bytes zero, 65536/65537 free permits EXACT remap of the whole direct map'
+  - 'Run alloc_demo: require PASS and exit 0, align 4096 pointer, explicit zeroing and writable tail; kernel classification of raw bytes remains f10 acceptance'
+  - 'Record fault_kill_count and exec_as_leftover_pages before and after; require kill delta 0 and leftover 0'
+  - 'Run heap_test, sbrk_grow_test, db_test and db_v50_test regressions; 64KiB malloc uses direct map'
+  expect:
+    exit: 0
+    kill_delta: 0
+    leftover: 0
+  evidence: ~/os32-tmp/evidence/<日付>/f8-large-aligned/

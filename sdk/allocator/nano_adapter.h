@@ -6,6 +6,8 @@
 #include <malloc.h>
 #include <reent.h>
 #define OS32_NANO_PAGE 4096u
+#define OS32_NANO_LARGE 65536u
+#define OS32_NANO_TOPDOWN 2u
 struct os32_nano_arena {
     void *free_list;
     char *sbrk_start;
@@ -26,7 +28,7 @@ struct os32_nano_arena {
  * Configuration is one-time and cannot replace live arenas or run while busy. */
 int os32_nano_select(struct os32_nano_arena *arena);
 int os32_nano_configure(struct os32_nano_arena *primary,
-                        void *(*map)(void *, size_t),
+                        void *(*map)(void *, size_t, unsigned),
                         int (*unmap)(void *, uintptr_t, size_t), void *opaque);
 void *os32_nano_crt_sbrk(struct _reent *r, ptrdiff_t incr);
 void *os32_nano_morecore(struct os32_nano_arena *arena, struct _reent *r, ptrdiff_t incr);

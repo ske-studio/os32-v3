@@ -1,3 +1,5 @@
+/* f8: malloc(CHUNK=64KiB) uses USER TOPDOWN direct maps; mem_alloc uses
+ * kernel exec_heap (its TOPDOWN classification is accepted in f10). */
 /* ======================================================================== */
 /*  HEAP_TEST.C — 子プロセス帯レイアウトの検証 (2026-09-04)                  */
 /*                                                                          */

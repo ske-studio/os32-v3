@@ -178,7 +178,7 @@ static void tests(void)
 #define MAP_CAPACITY (64u * OS32_NANO_PAGE)
 static unsigned char secondary[MAP_SLOTS][MAP_CAPACITY] __attribute__((aligned(OS32_NANO_PAGE)));
 static size_t mapped[MAP_SLOTS];
-static unsigned maps, unmaps;
+static unsigned maps, unmaps, last_flags, attempts;
 static int reject_map, reject_unmap;
 static void callback_checks(void)
 {
@@ -188,16 +188,28 @@ static void callback_checks(void)
     CHECK(_malloc_r(&nested, 8) == NULL && nested._errno == ENOMEM);
     CHECK(_realloc_r(&nested, NULL, 8) == NULL && nested._errno == ENOMEM);
 }
-static void *map_secondary(void *opaque, size_t bytes)
+static void *map_secondary(void *opaque, size_t bytes, unsigned flags)
 {
     CHECK(opaque == &maps);
     callback_checks();
+    attempts++; last_flags=flags;
+    CHECK(flags == 0 || flags == OS32_NANO_TOPDOWN);
     if (reject_map || bytes > MAP_CAPACITY) return NULL;
     for (unsigned i=0; i<MAP_SLOTS; i++) if (!mapped[i]) {
         mapped[i]=bytes; maps++;
+        memset(secondary[i],0,bytes);
         return secondary[i];
     }
     return NULL;
+}
+/* Executed before prefix loads: an early read of a foreign pointer must
+ * fail a named assertion rather than count a host crash as mutation RED. */
+void os32_nano_prefix_check(const void *prefix)
+{
+    CHECK(((uintptr_t)prefix & (OS32_NANO_PAGE-1u)) == 0);
+    unsigned i;
+    for (i=0;i<MAP_SLOTS;i++) if (prefix == secondary[i] && mapped[i]) break;
+    CHECK(i < MAP_SLOTS);
 }
 static int unmap_secondary(void *opaque, uintptr_t base, size_t bytes)
 {
@@ -276,9 +288,45 @@ static void automatic_tests(void)
     CHECK(a.next && a.next->next==NULL && ((unsigned char*)q)[32767]==0x58);
     free(q);
     CHECK(!a.next && a.live==0);
-    /* >=64KiB remains on nano, including its private chunk/free-list path. */
-    p=malloc(65536); CHECK(p && a.next && a.next->sbrk_start && a.next->live==1);
+    /* C classifies the requested size, independently of map overhead. */
+    p=malloc(65535); CHECK(p && a.next && last_flags==0);
     free(p); CHECK(!a.next);
+    p=malloc(65536); CHECK(p && !a.next && last_flags==OS32_NANO_TOPDOWN && !((uintptr_t)p&7));
+    free(p); CHECK(!a.next);
+    p=malloc(65537); CHECK(p && !a.next && last_flags==OS32_NANO_TOPDOWN);
+    saved=unmaps; memset(p,0x71,65537);
+    reject_map=1;
+    CHECK(realloc(p,65535)==NULL && ((unsigned char*)p)[65536]==0x71 && unmaps==saved);
+    CHECK(realloc(p,131072)==NULL && ((unsigned char*)p)[65536]==0x71 && unmaps==saved);
+    reject_map=0;
+    q=realloc(p,131072); CHECK(q && ((unsigned char*)q)[65536]==0x71 && unmaps==saved+1);
+    p=realloc(q,64); CHECK(p && ((unsigned char*)p)[63]==0x71 && unmaps==saved+2);
+    memset(p,0x72,64);
+    reject_map=1; saved=unmaps;
+    CHECK(realloc(p,65536)==NULL && ((unsigned char*)p)[63]==0x72 && unmaps==saved);
+    reject_map=0;
+    q=realloc(p,65536); CHECK(q && ((unsigned char*)q)[63]==0x72 && last_flags==OS32_NANO_TOPDOWN);
+    saved=unmaps; reject_unmap=1;
+    free(q); CHECK(unmaps==saved && ((unsigned char*)q)[63]==0x72);
+    reject_unmap=0;
+    free(q); CHECK(unmaps==saved+1);
+    p=calloc(256,256); CHECK(p && last_flags==OS32_NANO_TOPDOWN);
+    for (unsigned i=0;i<65536;i++) CHECK(((unsigned char*)p)[i]==0);
+    saved=unmaps;
+    /* A mapped foreign prefix is poisoned: no speculative prefix reads. */
+    free((unsigned char*)p+8);
+    CHECK(reent._errno==EINVAL && unmaps==saved && ((unsigned char*)p)[0]==0);
+    free((void*)1);
+    CHECK(reent._errno==EINVAL && unmaps==saved);
+    free(p);
+    saved=attempts;
+    CHECK(_calloc_r(&reent,0x80000000u,2)==NULL && attempts==saved);
+    CHECK(_calloc_r(&reent,0x80008000u,2)==NULL && attempts==saved);
+    CHECK(_malloc_r(&reent,SIZE_MAX)==NULL && attempts==saved);
+    CHECK(_malloc_r(&reent,SIZE_MAX-64u)==NULL && attempts==saved);
+    p=malloc(65536); saved=unmaps;
+    CHECK(realloc(p,0)==NULL && unmaps==saved+1);
+    p=realloc(NULL,65536); CHECK(p && last_flags==OS32_NANO_TOPDOWN); free(p);
     p=malloc(16); saved=unmaps; free(p);
     CHECK(unmaps==saved && a.free_list && a.live==0);
 }
