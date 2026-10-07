@@ -142,7 +142,7 @@ void gfx_set_default_palette(void);
 /* ======== テストパターン ======== */
 /* gfx_test_pattern: 外部プログラム化のため削除 */
 
-/* Internal compatibility bridge; gfx_get_framebuffer keeps aliases until e11c. */
+/* Compatibility bridge: gfx_get_framebuffer returns USER lease VA; CPL0 keeps aliases. */
 void gfx_framebuffer_bridge(void *out);
 extern volatile u32 gfx_bridge_fail_count, gfx_bridge_user_count, gfx_bridge_last_va;
 

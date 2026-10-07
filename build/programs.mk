@@ -584,8 +584,8 @@ $(eval $(call DEFINE_RUST_PROGRAM,font_test,userland/tests,$$(GFX_OBJ)))
 $(eval $(call DEFINE_RUST_PROGRAM,gui_demo,userland/tests,))
 # v1.2 の client API 試験 (C4): MessageBox/File/Input の modal_result、session_launch、icon16。stub のみ
 $(eval $(call DEFINE_RUST_PROGRAM,v12_api_test,userland/tests,))
-# T5a: 固定テキスト表示試験。Unicode変換だけをユーザー空間Cからリンク。
-$(eval $(call DEFINE_RUST_PROGRAM,t5a_display,userland/tests,lib/utf8_prog.o))
+# T5a: 静的 Unicode consumer も gfx の v70 port から RO lease を初期化。
+$(eval $(call DEFINE_RUST_PROGRAM,t5a_display,userland/tests,$$(GFX_OBJ)))
 programs: t5a_display_rust
 # v1.2 File Manager (C5): Win3.1 風 2 ペイン、SESSION_REQUEST で起動依頼。stub のみ
 $(eval $(call DEFINE_RUST_PROGRAM,filer,userland/system,))

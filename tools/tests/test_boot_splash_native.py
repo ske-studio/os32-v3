@@ -12,8 +12,7 @@ class NativeBootTest(unittest.TestCase):
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory(prefix="os32-boot-native-")
         cls.binary = Path(cls.tmp.name) / "boot-native"
-        # This narrow gfx fixture leaves the compatibility bridge unbound.
-        # v70 kernel links surface_api_*; the framebuffer bridge waits for c2.
+        # CPL0 fixture aborts on any unexpected USER bridge/B1 access.
         command = ["gcc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
                    "-Wno-unused-function", "-D__KERNEL_BUILD__",
                    "-Wl,--gc-sections"]

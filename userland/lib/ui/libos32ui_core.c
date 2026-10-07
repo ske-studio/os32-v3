@@ -222,7 +222,10 @@ void mui_pump_input(mu_Context *ctx)
     /* キーはここで読み切ってしまうので、アプリ側でも自前でキーを処理したい
        場合は mui_pump_input_ch() に読んだ文字を渡すこと。
        (この関数を使うと kbd_trygetchar() の戻りが常に空になる) */
-    mui_pump_input_ch(ctx, ui_api->kbd_trygetchar());
+    int ch = ui_api->kbd_trygetchar();
+    /* UI input may precede gfx attachment; keep its independent API binding. */
+    if (ch >= 0) (void)libos32gfx_check();
+    mui_pump_input_ch(ctx, ch);
 }
 
 /* ======================================================================== */

@@ -114,7 +114,7 @@ int main(int argc, char **argv, KernelAPI *api)
     libos32gfx_shutdown();
 
     api->kprintf(ATTR_WHITE, "\r\nDone. Press any key.\r\n");
-    api->kbd_getchar();
+    libos32gfx_getchar();
     return total_fail ? 1 : 0;
 }
 

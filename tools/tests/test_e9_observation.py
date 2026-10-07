@@ -107,6 +107,9 @@ def marker(src, header, name, sel='', alloc_fail=False):
                     r'target_write((u32)\1, \2);', source)
     declarations = f'''
 #include "os32_kapi_slots.h"
+#define KernelAPI SDKKernelAPI
+#include "os32_kapi_shared.h"
+#undef KernelAPI
 typedef struct {{ int unused; }} KernelAPI;
 static volatile u32 storage[4096];
 static int allocations, writes;
@@ -139,6 +142,52 @@ static __attribute__((unused)) u32 host_call(u32 slot, u32 arg) {{
     else:
         call = 'guest_entry();'
     return PRE + declarations + header + '\n' + source + '\nvoid _start(void) { ' + call + ' }\n'
+
+
+def client_marker(src, header, revoke=False, bad_fb=False):
+    """Real F control flow; only int80 and intentional lease stores are mocked."""
+    header = header.replace(body(header, 'static __inline__ __attribute__((always_inline)) unsigned long\nr3_call('),
+                            '#define r3_call host_call')
+    source = src.replace('#include "ring3_marker.h"', '').replace('#include "os32api.h"', '')
+    source = source.replace('void _start(', 'void guest_entry(')
+    source = source.replace('*client = 0;', 'client_write((u32)client);')
+    declarations = r'''
+#include "os32_kapi_shared.h"
+#include "os32_kapi_slots.h"
+#include "memmap.h"
+static volatile u32 storage[4096];
+static int initialized, queried, stopped, writes;
+static void client_write(u32 addr) {
+    CHECK(!BAD_FB && initialized && queried && addr==MEM_LEASE_BASE);
+    CHECK(storage[2]==addr && storage[3]==0x444d5241UL);
+    CHECK(storage[4]==0x4752UL && storage[5]==(u32)storage);
+    CHECK(storage[1]==0);
+    if (writes++) {
+        CHECK(REVOKE && stopped && writes==2 && storage[0]==0x3f564552UL);
+        finish(0); /* mocked PF at the revoked lease */
+    }
+    CHECK(!stopped && storage[0]==0x3f53454cUL);
+}
+static u32 host_call(u32 slot, u32 arg) {
+    if (slot==KAPI_SLOT_SYS_SHM_ALLOC) { CHECK(arg==1);return (u32)storage; }
+    if (slot==KAPI_SLOT_GFX_INIT) { CHECK(!initialized++);return 0; }
+    if (slot==KAPI_SLOT_GFX_GET_FRAMEBUFFER) {
+        CHECK(initialized && !queried++);
+        ((GFX_Framebuffer *)arg)->planes[0]=BAD_FB ? 0 : (u8 *)MEM_LEASE_BASE;
+        return 0;
+    }
+    if (slot==KAPI_SLOT_GFX_SHUTDOWN) {
+        CHECK(writes==1 && storage[1]==0x56525553UL && !stopped++);
+        return 0;
+    }
+    CHECK(slot==KAPI_SLOT_SYS_EXIT);
+    if (BAD_FB) { CHECK(arg==1 && !writes);finish(0); }
+    CHECK(!REVOKE && arg==0 && writes==1 && stopped==1 && storage[1]==0x56525553UL);
+    finish(0);
+}
+'''
+    tail = '\nvoid _start(void) { char *args[]={"ring3_guard", "'+('free' if revoke else 'lease')+'"};guest_entry(2,args); }\n'
+    return PRE + f'#define REVOKE {int(revoke)}\n#define BAD_FB {int(bad_fb)}\n' + declarations + header + source + tail
 
 
 def reuse(src):
@@ -328,6 +377,8 @@ def main():
         if not args.baseline:
             cases.append((name + ' alloc failure', marker(src, header, name, alloc_fail=True)))
     if not args.baseline:
+        for revoke, bad in ((False, False), (True, False), (False, True)):
+            cases.append((f'CLIENT F revoke={revoke} bad_fb={bad}', client_marker(sources['ring3_guard'], header, revoke, bad)))
         child = (ROOT / 'userland/tests/shm_reuse_child.c').read_text()
         cases.append(('SHM reuse child phases/errors', reuse(child)))
         for sel in ('first', 'last'):
@@ -342,6 +393,11 @@ def main():
         print(('RED baseline: ' if args.baseline else 'GREEN: ') + name, flush=True)
     if args.mutate:
         mutations = [
+            ('CLIENT lease cleanup omitted', client_marker(sources['ring3_guard'].replace('(void)r3_call(KAPI_SLOT_GFX_SHUTDOWN, 0);', ''), header)),
+            ('CLIENT cleanup before SURV', client_marker(sources['ring3_guard'].replace('        mark[1] = R3_SURV;\n        (void)r3_call(KAPI_SLOT_GFX_SHUTDOWN, 0);', '        (void)r3_call(KAPI_SLOT_GFX_SHUTDOWN, 0);\n        mark[1] = R3_SURV;'), header)),
+            ('CLIENT revoke omitted', client_marker(sources['ring3_guard'].replace('(void)r3_call(KAPI_SLOT_GFX_SHUTDOWN, 0);', ''), header, True)),
+            ('CLIENT first write omitted', client_marker(sources['ring3_guard'].replace('*client = 0;', '(void)client;', 1), header, True)),
+            ('CLIENT completion stale', client_marker(sources['ring3_guard'].replace('            mark[1] = 0;', '            mark[1] = R3_SURV;'), header, True)),
             ('wire attr', tvdump(shell.replace('serial_putchar(at)', 'serial_putchar(0)'))),
             ('wire high byte', tvdump(shell.replace('ch_val & 0xFF', 'ch_val >> 8'))),
             ('missing armed', marker(sources['ring3_fault'], header.replace('mark[3] = R3_ARMED;', 'mark[3] = 0;'), 'ring3_fault')),

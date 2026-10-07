@@ -57,6 +57,7 @@ TARGET_SRCS = [
 ]
 assert set(ATTACH_SRCS) <= set(TARGET_SRCS)
 MUTANTS = [
+    ('user-initial-alias', UTF8, 'static const u8 *unicode_jis_table = 0;', 'static const u8 *unicode_jis_table = (const u8 *)P2V_CONST(MEM_UNICODE_TABLE_BASE);', 'FAIL !utf8_host_pointer() && !shl_utf8_host_pointer()'),
     ('unicode-rw', SYSTEM, '.perm_max = LEDGER_PERM_RO', '.perm_max = LEDGER_PERM_RW', 'FAIL unicode_ro'),
     ('fallback-low', CORE, '    utf8_set_jis_table(0);', '    utf8_set_jis_table((const u8 *)P2V_CONST(MEM_UNICODE_TABLE_BASE));', 'FAIL uninitialized_null'),
     ('ready-retained', UTF8, '    jis_table_ready = 0;\n    unicode_jis_table = table;', '    if (jis_table_ready != 1) jis_table_ready = 0;\n    unicode_jis_table = table;', 'FAIL failure_unready'),

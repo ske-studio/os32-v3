@@ -160,10 +160,19 @@ static void view_check(u32 backend, u32 height, int started)
     host_user = 0;
     gfx_get_framebuffer(&public_fb);
     host_user = 1;
-    GFX_Framebuffer user_fb;
-    gfx_get_framebuffer(&user_fb);
-    CHECK(user_fb.width == public_fb.width && user_fb.height == public_fb.height && user_fb.pitch == public_fb.pitch);
-    for (u32 i=0;i<4;i++) CHECK(user_fb.planes[i] == public_fb.planes[i]);
+    if (payload) {
+        GFX_Framebuffer *user_fb=P2V(payload+512);
+        gfx_get_framebuffer((void *)(MEM_EXEC_LOAD_ADDR+512));
+        if (started) {
+            CHECK(user_fb->width == public_fb.width && user_fb->height == public_fb.height);
+            CHECK((u32)user_fb->planes[0] >= MEM_LEASE_BASE);
+            for (u32 i=0;i<4;i++) {
+                CHECK((user_fb->planes[i]!=0) == (public_fb.planes[i]!=0));
+                if (user_fb->planes[i]) CHECK(user_fb->planes[i]-user_fb->planes[0] == public_fb.planes[i]-public_fb.planes[0]);
+            }
+            CHECK(!lease_release(&space,space.leases[0].token));
+        } else CHECK(!user_fb->width && !user_fb->planes[0]);
+    }
     gfx_screen_info(&si);
     const struct ledger_surface *client=ledger_surface_find(gfx_sf_backend(),LEDGER_ROLE_CLIENT);
     GFX_ScreenInfo selected_info;

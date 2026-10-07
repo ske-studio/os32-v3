@@ -1,5 +1,6 @@
 """e7: real Rust wait, Painter, geometry, static wrappers and gdi control flow."""
 import argparse
+import re
 from pathlib import Path
 import subprocess
 import tempfile
@@ -10,11 +11,14 @@ GUI='userland/rust/libos32gui/src/'
 GDI='userland/rust/gdi_test/src/lib.rs'
 TARGET_SRCS=[GUI+x+'.rs' for x in ('client','clip','draw','ffi','gstate','surface','utf8core')]+[GDI,GUI+'shlib.rs','sdk/rust/os32api/src/lib.rs','sdk/rust/os32api/src/gui/stub.rs']
 MUTANTS=[
+ ('shlib-no-detach-entry',GUI+'shlib.rs','    .long   os32gui_gfx_detach                  /* 119 */','', 'shlib detach entry missing'),
+ ('shlib-no-detach-body',GUI+'shlib.rs','    unsafe { crate::ffi::libos32gfx_detach() };','', 'shlib detach body missing'),
  ('empty-poll-check','sdk/rust/os32api/src/lib.rs','    } else { None }','    } else { input_return(); None }', 'empty poll skips gfx check'),
  ('input-no-check','sdk/rust/os32api/src/lib.rs','    input_return();','    // no return check', 'input return check missing'),
  ('wait-result-overwrite',GUI+'client.rs','    let _ = check_gfx(); // Drawing failure must not replace the OP_WAIT result.','    check_gfx()?;', 'wait result survives attach failure'),
  ('offscreen-gated',GUI+'draw.rs','if !t.offscreen && unsafe','if unsafe','offscreen remains drawable'),
- ('shlib-no-unicode',GUI+'shlib.rs','    unsafe { crate::ffi::libos32gfx_unicode_init(); }','', 'shlib Unicode acquisition missing'),
+ ('shlib-double-unicode',GUI+'shlib.rs','    client::attach_gfx();','    unsafe { crate::ffi::libos32gfx_unicode_init(); }\n    client::attach_gfx();', 'shlib Unicode acquisition missing'),
+ ('gdi-shlib-no-rollback',GDI,'        os32api::gui::stub::detach_gfx();','', 'gdi shlib rollback missing'),
  ('surface-size-stale',GUI+'surface.rs','pub fn surface_size(id: SurfaceId) -> (i32, i32) {\n    crate::gstate::screen_info_cached();','pub fn surface_size(id: SurfaceId) -> (i32, i32) {','first surface_size is stale'),
  ('base-clip-stale',GUI+'clip.rs','pub fn set_base_clip(surface: SurfaceId, rect: Rect) -> i32 {\n    crate::gstate::screen_info_cached();','pub fn set_base_clip(surface: SurfaceId, rect: Rect) -> i32 {','base clip keeps old geometry'),
  ('wait-no-check',GUI+'client.rs','    let _ = check_gfx(); // Drawing failure must not replace the OP_WAIT result.','', 'return check missing'),
@@ -46,6 +50,11 @@ def main():
             root+='\nuse os32api::KernelAPI;\nstatic mut SHLIB_INIT_OK: bool=false;\n'
             root+='mod cfgro { pub fn set_kapi(_: *mut core::ffi::c_void) {} }\n'
             root+='pub extern "C" fn os32gui_shlib_init('+init
+            entries=re.findall(r'^\s*\.long\s+(os32gui_\w+)\s*/\*',texts[GUI+'shlib.rs'],re.M)
+            root+='\nfn table_detach() { let entries = '+repr(entries).replace("'",'"')+'; assert_eq!(entries.get(119),Some(&"os32gui_gfx_detach"),"shlib detach entry missing"); os32gui_gfx_detach(); }\n'
+            detach=texts[GUI+'shlib.rs'].split('pub extern "C" fn os32gui_gfx_detach() {')[1].split('\n}',1)[0]
+            root+='pub extern "C" fn os32gui_gfx_detach() {'+detach.replace('gate!();','if !unsafe { SHLIB_INIT_OK } { return; }')+'\n}\n'
+
 
             helper=texts[GDI].split('fn check_both_gfx() -> bool {')[1].split('\n#[no_mangle]')[0]
             root+='\nfn check_both_gfx() -> bool {'+helper.replace('os32api::','app_api::')

@@ -337,7 +337,7 @@ void main(int argc, char **argv, KernelAPI *api)
 
     /* ---- メインループ ---- */
     while (1) {
-        if (api->kbd_trygetchar() != -1) break;
+        if (libos32gfx_trygetchar() != -1) break;
 
         /* Phase 1: 旧位置の背景を書き戻す (逆順) */
         for (i = NUM_TILES - 1; i >= 0; i--) {
@@ -408,7 +408,7 @@ void main(int argc, char **argv, KernelAPI *api)
 
         /* 100Hz同期 */
         while (api->get_tick() == last_tick) {
-            api->sys_halt();
+            libos32gfx_halt();
         }
         last_tick = api->get_tick();
     }

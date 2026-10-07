@@ -50,6 +50,19 @@ SDK_SRCS = [p for p in TARGET_SRCS if (p.startswith("userland/") or p == "lib/ut
 HEADERS = [p for p in TARGET_SRCS if p.endswith(".h")]
 CORE='userland/lib/gfx/libos32gfx_core.c'
 MUTANTS = [
+ ('shutdown-flag-ignored', [(CORE,'    if (gfx_stopped) return OS32_ERR_INVAL;','')],
+   'FAIL shutdown_waits_stay_detached'),
+ ('halt-no-check', [(CORE,'    gfx_api->sys_halt();\n    (void)libos32gfx_check();','    gfx_api->sys_halt();')],
+   'FAIL gfx_ready && live()==1 && space.leases[0].token!=fresh'),
+ ('production-port-absent', [(CORE,'gfx_api->version >= 70','gfx_api->version > 70')],
+   'FAIL gfx_attach_port && gfx_unicode_port && public_queries==2 && public_leases==1'),
+ ('getchar-no-check', [(CORE,'    int key = gfx_api->kbd_getchar();\n    (void)libos32gfx_check();','    int key = gfx_api->kbd_getchar();')],
+   'FAIL gfx_ready && live()==1 && space.leases[0].token!=fresh'),
+ ('trygetchar-no-check', [(CORE,'    if (key >= 0) (void)libos32gfx_check();','    (void)key;')],
+   'FAIL gfx_ready && live()==1 && space.leases[0].token!=fresh'),
+ ('yield-no-check', [(CORE,'    gfx_api->sys_yield();\n    (void)libos32gfx_check();','    gfx_api->sys_yield();')],
+   'FAIL gfx_ready && live()==1 && space.leases[0].token!=fresh'),
+
  ('skip-failed-pool-init', [(CORE,'    if (gfx_api && !gfx_pools_initialized) {',
    '    if (!rc && gfx_api && !gfx_pools_initialized) {')], 'FAIL sdk_allocations==1'),
  ('reset-live-pools', [(CORE,'gfx_api && !gfx_pools_initialized','gfx_api')],

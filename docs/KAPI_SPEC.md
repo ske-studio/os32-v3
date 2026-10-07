@@ -1495,7 +1495,14 @@ WM/TRUSTED または保存 USER が無効なら INVAL (kill せず出力は不�
 全新規出力は `kapi.json` の sizeof 宣言で生成 wrap が全域を先に検査する。CPL3 の NULL/範囲外/RO は kill し、本体を呼ばない。
 surface の ref 入力は本体の B1 で検査する。ls の不正入力・出力も従来どおり kill。
 
-c1 は公開口まで。framebuffer の既存 alias、SDK port の NULL、utf8 初期値は c2、consumer は c3、低位 USER 撤去と memory_layout 世代変更は b2。
+c2 は v70 の SDK CLIENT/Unicode port と USER framebuffer 橋を結線する。CPL0 直呼びは kernel alias を維持。
+描画プリミティブは ready フラグだけを読む。present と明示の待ち帰路で query 世代を照合し、不一致なら再取得する。
+C の `libos32gfx_getchar` / `libos32gfx_trygetchar` / `libos32gfx_yield` / `libos32gfx_halt` は入力結果を保ったまま帰路で check する
+(空 poll は除く)。**生 KAPI で待った場合は描画前に `libos32gfx_check()` を呼ぶ**。Rust の入力帰路も同契約。
+全画面所有中の CLIENT regen は自分の init/shutdown の中だけであり、V86 帰路の regen は DISPLAY だけ。
+明示 mode 変更後も再 attach し、失敗時は描画しない。static/shlib 混用時は両実体を check し、片方の失敗で両方 detach。
+shlib の末尾119番 `os32gui_gfx_detach` を追加 (120本、protocol世代は不変)。Unicode は checked attach の1か所で取得し、
+ユーザー版 utf8 は NULL から開始して port が渡す RO 表を検証する。残る consumer は c3、旧 USER 撤去は b2。
 
 ### 予約スロット (v63〜)
 

@@ -20,7 +20,7 @@ static PRESENTS: AtomicUsize = AtomicUsize::new(0);
     unsafe { gfx_ready = if rc < 0 { 0 } else { 1 }; }
     rc
 }
-#[no_mangle] extern "C" fn libos32gfx_attach_checked() -> i32 { libos32gfx_check() }
+#[no_mangle] extern "C" fn libos32gfx_attach_checked() -> i32 { libos32gfx_unicode_init(); libos32gfx_check() }
 #[no_mangle] extern "C" fn libos32gfx_detach() {
     DETACHES.fetch_add(1,SeqCst);
     unsafe { gfx_ready=0; }
@@ -89,6 +89,10 @@ fn return_gate_and_painter() {
     let unicode_before=UNICODE_INITS.load(SeqCst);
     assert_eq!(os32gui_shlib_init(&mut api),0,"attach failure must not reject bind");
     assert_eq!(UNICODE_INITS.load(SeqCst),unicode_before+1,"shlib Unicode acquisition missing");
+    let detach_before=DETACHES.load(SeqCst);
+    table_detach();
+    assert_eq!(DETACHES.load(SeqCst),detach_before+1,"shlib detach body missing");
+
     assert!(unsafe { SHLIB_INIT_OK });
     let checks=CHECKS.load(SeqCst);
     assert_eq!(input_api::wait_key(),65);
@@ -136,6 +140,7 @@ mod app_api {
     pub static SHLIB_RC: AtomicI32=AtomicI32::new(0);
     pub static STATIC_CHECKS: AtomicUsize=AtomicUsize::new(0);
     pub static SHLIB_CHECKS: AtomicUsize=AtomicUsize::new(0);
+    pub static SHLIB_DETACHED: AtomicUsize=AtomicUsize::new(0);
     pub static DETACHED: AtomicUsize=AtomicUsize::new(0);
     pub mod gfx {
         use super::*;
@@ -144,6 +149,7 @@ mod app_api {
     }
     pub mod gui { pub mod stub {
         use super::super::*;
+        pub fn detach_gfx() {SHLIB_DETACHED.fetch_add(1,SeqCst);}
         pub fn check_gfx()->i32 {SHLIB_CHECKS.fetch_add(1,SeqCst);SHLIB_RC.load(SeqCst)}
     }}
 }
@@ -160,4 +166,5 @@ fn gdi_stops_both_renderers() {
     assert_eq!(STATIC_CHECKS.load(SeqCst),4,"gdi static check missing");
     assert_eq!(SHLIB_CHECKS.load(SeqCst),4,"gdi shlib check missing");
     assert_eq!(DETACHED.load(SeqCst),3,"gdi static rollback missing");
+    assert_eq!(SHLIB_DETACHED.load(SeqCst),3,"gdi shlib rollback missing");
 }

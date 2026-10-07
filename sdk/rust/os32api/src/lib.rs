@@ -291,6 +291,7 @@ pub mod gfx {
 
     extern "C" {
         pub fn libos32gfx_init(api: *mut KernelAPI);
+        pub fn libos32gfx_attach(api: *mut KernelAPI);
         pub fn libos32gfx_shutdown();
         fn libos32gfx_check() -> i32;
         fn libos32gfx_detach();
