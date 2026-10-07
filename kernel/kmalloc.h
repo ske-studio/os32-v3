@@ -20,6 +20,16 @@ typedef struct {
     const char *name;   /* 診断表示用の名前 */
 } KHeap;
 
+/* Shared wire format; USER validation lives only in exec_heap. */
+#define BLK_MAGIC_USED 0xA110CA7EUL
+#define BLK_MAGIC_FREE 0xFEEEFEEEUL
+#define BLK_HDR_SIZE 8
+#define BLK_ALIGN 8
+typedef struct BlkHdr {
+    u32 size;
+    u32 magic;
+} BlkHdr;
+
 void  kheap_init(KHeap *h, void *base, u32 size, const char *name);
 void *kheap_alloc(KHeap *h, u32 size);
 void  kheap_free(KHeap *h, void *ptr);

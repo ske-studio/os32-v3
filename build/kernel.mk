@@ -105,7 +105,7 @@ drivers/pcm_cs4231.o: drivers/pcm_cs4231.c
 	$(CC) $(CFLAGS_BASE) -O2 $(INC_KERNEL) -c $< -o $@
 
 # f5a: keep internal appmem wiring within the f image budget.
-exec/appmem.o exec/appmem_map.o exec/appmem_unmap.o: exec/%.o: exec/%.c
+exec/exec_heap.o exec/appmem.o exec/appmem_map.o exec/appmem_unmap.o: exec/%.o: exec/%.c
 	$(CC) $(CFLAGS_BASE) -Os $(INC_EXEC) -c $< -o $@
 
 kernel/paging_app.o: kernel/paging_app.c

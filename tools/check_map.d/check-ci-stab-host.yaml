@@ -105,3 +105,5 @@ check-ci-stab-host:
 - tools/tests/test_*.py
 - build/checks.d/*.mk
 - exec/appslot.c
+- exec/access_walk.c
+- exec/redir_access.c

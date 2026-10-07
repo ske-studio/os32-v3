@@ -325,7 +325,7 @@ const u16 kapi_argptr[KAPI_FUNC_COUNT] = {
     0x0000,  /* gfx_present */
     0x0000,  /* kbd_trygetchar */
     0x0000,  /* mem_alloc */
-    0x0001,  /* mem_free: ptr */
+    0x0000,  /* mem_free */
     0x0000,  /* get_tick */
     0x0002,  /* kprintf: fmt */
     0x0001,  /* sys_unlink: path */
@@ -638,13 +638,19 @@ int __cdecl wrap_kbd_trygetchar(void)
 void * __cdecl wrap_mem_alloc(u32 size)
 {
     KAPI_HIT(5);
+    struct caller_access caller;
+    if (caller_access_get(&caller) && caller.origin == CALLER_USER)
+        return exec_heap_user_alloc(caller.as, size);
     return exec_heap_alloc(size);
 }
 
 void __cdecl wrap_mem_free(void *ptr)
 {
     KAPI_HIT(6);
-    exec_heap_free(ptr);
+    struct caller_access caller;
+    if (caller_access_get(&caller) && caller.origin == CALLER_USER)
+        exec_heap_user_free(caller.as, ptr);
+    else exec_heap_free(ptr);
 }
 
 u32 __cdecl wrap_get_tick(void)

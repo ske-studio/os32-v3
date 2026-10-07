@@ -14,8 +14,8 @@ import host32
 from mutpar import run_ordered
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SOURCES = ['exec/appmem.c', 'kernel/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'kernel/paging.c', 'exec/exec.c', 'exec/appslot.c', 'kapi/kapi_generated.c']
-TARGET_SRCS = ['sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/exec.c', 'exec/appslot.c', 'exec/lease.c', 'exec/appslot.h', 'exec/appmem.c', 'kernel/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c',
+SOURCES = ['exec/appmem.c', 'kernel/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'kernel/paging.c', 'exec/exec.c', 'exec/appslot.c', 'kapi/kapi_generated.c', 'exec/exec_heap.c']
+TARGET_SRCS = ['exec/exec_heap.c', 'exec/exec_heap.h', 'kernel/kmalloc.c', 'kernel/kmalloc.h', 'exec/redir_access.c', 'exec/access_walk.c', 'tools/tests/exec_heap_host.h', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/exec.c', 'exec/appslot.c', 'exec/lease.c', 'exec/appslot.h', 'exec/appmem.c', 'kernel/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c',
     'exec/appmem.h', 'kernel/paging_app.h', 'kernel/paging.c', 'kernel/paging.h',
     'kernel/pgalloc.c', 'kernel/pgalloc.h', 'kernel/physmem.c', 'kernel/physmem.h',
     'include/appmem_types.h', 'sdk/include/os32/os32_kapi_shared.h', 'include/types.h', 'include/memmap.h', 'include/io.h',
@@ -38,6 +38,31 @@ PT_ABORT = '''    for (u32 k = 0; k < MEM_APP_BAND_MAX_PDES; k++) if (tx->pendin
     }
 '''
 MUTANTS = [
+    ('heap-rounded-growth-limit', 8, 'if (request >= MEM_EXEC_HEAP_MIN) return 0;',
+     '(void)request; if (size >= MEM_EXEC_HEAP_MIN) return 0;', 'unaligned small growth'),
+    ('heap-large-early-reject', 8, 'size > ~(u32)0 - (BLK_ALIGN - 1) - BLK_HDR_SIZE',
+     'size >= MEM_EXEC_HEAP_MIN', 'large INITIAL allocation'),
+    ('heap-CPL3-init', 5, 'if (want_ring3) exec_heap_user_init(ctx->as);\n        else if (exec_heap_size) exec_heap_init_at(exec_heap_base, exec_heap_size);',
+     'if (exec_heap_size) exec_heap_init_at(exec_heap_base, exec_heap_size);', 'CPL3 init keeps resident'),
+    ('heap-free-validation', 8, 'if (!user_view(as, 0, va, &view)) return;',
+     'view = (KHeap){(u8 *)MEM_EXEC_HEAP_BASE, MEM_EXEC_HEAP_MIN, as->exec_heap_used, "exec_heap"};', 'corrupt free immutable'),
+    ('heap-extent-kind', 8, 'if (!user_arena(e)) continue;',
+     'if (!e->base) continue;', 'TOPDOWN separate arena'),
+    ('heap-tail-exact', 8, '            va = next;',
+     '            if (match) { va = e->end; break; } va = next;', 'corrupt free immutable'),
+    ('heap-PTE-owner', 8, 'if (!ok) goto bad;', '(void)ok;', 'corrupt free immutable'),
+    ('heap-cross-free', 8, 'if (!member) return;',
+     'if (!member) { exec_heap_free(ptr); return; }', 'resident unchanged'),
+    ('heap-R1', 8, 'if (kctx_irq_depth || kctx_exc_depth || !as || as->appmem_poisoned ||\n        as->exec_heap_used == ~(u32)0 || !size',
+     'if (!as || as->appmem_poisoned ||\n        as->exec_heap_used == ~(u32)0 || !size', 'R1 USER alloc'),
+    ('heap-CR3-routing', 7, 'if (caller_access_get(&caller) && caller.origin == CALLER_USER)\n        return exec_heap_user_alloc',
+     'if (caller_access_get(&caller) && paging_current_cr3() != paging_kernel_pd_phys())\n        return exec_heap_user_alloc', 'WM resident'),
+    ('heap-CPL3-restore', 5, 'if (!a->cpl3 && a->exec_heap_base != 0) {',
+     'if (a->exec_heap_base != 0) {', 'CPL3 restore keeps resident'),
+    ('teardown-ARENA', 5, 'if (e->kind == APPMEM_ANON || e->kind == APPMEM_EXEC_ARENA) {',
+     'if (e->kind == APPMEM_ANON) {', 'teardown R5 no leftover'),
+    ('unmap-public-ARENA', 3, 'return unmap_mask(as, table, base, bytes, APPMEM_PUBLIC_UNMAP_MASK);',
+     'return unmap_mask(as, table, base, bytes, APPMEM_PUBLIC_UNMAP_MASK | APPMEM_KIND_MASK(APPMEM_EXEC_ARENA));', 'unmap reject before writes'),
     ('data-zero', 1, 'kmemset(P2V(phys), 0, PAGE_SIZE);', '(void)phys;', 'data zero'),
     ('free-before-publish', 2, 'paging_app_commit(&tx);', 'paging_app_abort(&tx); paging_app_commit(&tx);', 'no free before publication'),
     ('PT-zero', 1, 'kmemset(P2V(tx->pending[k]), 0, PAGE_SIZE);', '(void)k;', 'PT zero'),
@@ -94,7 +119,7 @@ MUTANTS = [
      'if (unmap_empty(tx, k)) { u32 *pt = P2V(tx->as->app_pt_phys[k]); for (u32 j = 0; j < PTE_COUNT; j++) pt[j] &= ~PTE_PRESENT; pd[APP_BAND_PDE + k] = 0; continue; }',
      'unmap empty PT untouched before TLB'),
 
-    ('teardown-ANON-loop', 5, 'if (e->kind == APPMEM_ANON) {', 'if (0 && e->kind == APPMEM_ANON) {', 'teardown R5 no leftover'),
+    ('teardown-ANON-loop', 5, 'if (e->kind == APPMEM_ANON || e->kind == APPMEM_EXEC_ARENA) {', 'if (0) {', 'teardown R5 no leftover'),
     ('teardown-entry-poison', 5, '    if (a->as->appmem_poisoned) goto poisoned;\n    shlib_addrspace_detach',
      '    shlib_addrspace_detach', 'poison quarantined'),
     ('free-range-no-break', 4, '                paging_addrspace_poison(as);\n                break;',
@@ -142,7 +167,7 @@ def main():
         with tempfile.TemporaryDirectory(prefix='os32-f4-') as d:
             tmp = pathlib.Path(d)
             includes = ['-I' + str(tmp), *['-I' + str(ROOT / p) for p in
-                ('tools/tests/host_arch', 'include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec', 'sdk/include/os32')]]
+                ('tools/tests/host_arch', '.', 'include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec', 'fs', 'sdk/include/os32')]]
             cc += includes
             # Share host IF across TUs so the real allocator's short IRQ save
             # is distinguished from an incorrectly disabled transaction.
@@ -171,6 +196,12 @@ def main():
                 parts.append('static void host_syscall_tail(u32 *frame) { int prev_caller = 0, prev_in_syscall = 0; u32 *prev_frame = 0;\n' + tail + '\n}')
                 return '\n'.join(parts)
 
+            def heap_context_parts(source):
+                body = function(source, 'static void exec_restore_context(').replace('exec_restore_context', 'heap_restore_context')
+                start = source.index('        if (want_ring3) paging_load_cr3(ctx->as->pd_phys);')
+                end = source.index('        if (want_ring3) kselftest_run_audit', start)
+                return body + '\nstatic void heap_init_context(AppSlot *ctx, int want_ring3, u32 exec_heap_base, u32 exec_heap_size) {\n' + source[start:end] + '}\n'
+
             def public_parts(source):
                 return '\n'.join(function(source, sig) + ';' for sig in
                                  ('const u16 kapi_argptr[KAPI_FUNC_COUNT] = ',
@@ -178,6 +209,7 @@ def main():
 
             (tmp / 'public_wrap_source.c').write_text(public_parts(bodies[7]))
             (tmp / 'exec_source.c').write_text(exec_parts(bodies[5]))
+            (tmp / 'heap_context_source.c').write_text(heap_context_parts(bodies[5]))
             (tmp / 'abort_clear_source.c').write_text(function(bodies[6], 'int appslot_abort_clear('))
             lease_source = (ROOT / 'exec/lease.c').read_text()
             parts = ['volatile u32 lease_revoke_fail_count, lease_revoke_all_fail_count;']
@@ -191,6 +223,8 @@ def main():
                 parts.append(lease_source[begin:end])
             (tmp / 'lease_revoke_source.c').write_text('\n'.join(parts))
 
+            (tmp / 'heap_source.c').write_text(bodies[8])
+            (tmp / 'heap_wrap_source.c').write_text('\n'.join(function(bodies[7], sig) for sig in ('void * __cdecl wrap_mem_alloc(', 'void __cdecl wrap_mem_free(')))
             for src in ('paging', 'pgalloc'):
                 (tmp / (src + '_source.c')).write_text((ROOT / ('kernel/' + src + '.c')).read_text())
 
@@ -198,13 +232,21 @@ def main():
                 src, obj = tmp / (key + '.c'), tmp / (key + '.o')
                 if index >= 4:
                     if index == 4: (tmp / 'paging_source.c').write_text(source)
-                    if index == 5: (tmp / 'exec_source.c').write_text(exec_parts(source))
-                    if index == 7: (tmp / 'public_wrap_source.c').write_text(public_parts(source))
+                    if index == 5:
+                        (tmp / 'exec_source.c').write_text(exec_parts(source))
+                        (tmp / 'heap_context_source.c').write_text(heap_context_parts(source))
+                    if index == 7:
+                        (tmp / 'public_wrap_source.c').write_text(public_parts(source))
+                        (tmp / 'heap_wrap_source.c').write_text('\n'.join(function(source, sig) for sig in ('void * __cdecl wrap_mem_alloc(', 'void __cdecl wrap_mem_free(')))
+                    if index == 8: (tmp / 'heap_source.c').write_text(source)
                     if index == 6: (tmp / 'abort_clear_source.c').write_text(function(source, 'int appslot_abort_clear('))
                     host32.build(cc + ['-c', str(ROOT / 'tools/tests/appmem_map_host.c'), '-o', str(obj)],
                                  check=True, capture_output=True, text=True, timeout=30)
                     (tmp / 'public_wrap_source.c').write_text(public_parts(bodies[7]))
+                    (tmp / 'heap_wrap_source.c').write_text('\n'.join(function(bodies[7], sig) for sig in ('void * __cdecl wrap_mem_alloc(', 'void __cdecl wrap_mem_free(')))
                     # Restore inputs before the next (sequential) mutation.
+                    (tmp / 'heap_source.c').write_text(bodies[8])
+                    (tmp / 'heap_context_source.c').write_text(heap_context_parts(bodies[5]))
                     (tmp / 'paging_source.c').write_text(bodies[4])
                     (tmp / 'exec_source.c').write_text(exec_parts(bodies[5]))
                     (tmp / 'abort_clear_source.c').write_text(function(bodies[6], 'int appslot_abort_clear('))

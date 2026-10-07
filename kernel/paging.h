@@ -211,6 +211,7 @@ struct addrspace {
     struct appmem_table appmem;
     struct appmem_layout appmem_layout;
     u32 appmem_poisoned; /* Never run or reclaim this owner after a failed free. */
+    u32 exec_heap_used; /* Validated aggregate; ~0U disables a corrupt heap. */
 };
 /* T2c launch path: sparse app PTs and the first lease PT. */
 int paging_addrspace_create_lease(struct addrspace *as, u32 owner);

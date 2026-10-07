@@ -1093,7 +1093,7 @@ static void exec_teardown_app(AppSlot *a)
     shlib_addrspace_detach(a->as);
     for (u32 i = 0; i < APPMEM_EXTENT_MAX; i++) {
         const struct appmem_extent *e = &a->as->appmem.e[i];
-        if (e->kind == APPMEM_ANON) {
+        if (e->kind == APPMEM_ANON || e->kind == APPMEM_EXEC_ARENA) {
             u32 pages = (e->end - e->base) / PAGE_SIZE;
             if (paging_addrspace_free_user_range(a->as, e->base, e->end) != pages) {
                 paging_addrspace_poison(a->as);
@@ -1160,7 +1160,7 @@ static void exec_restore_context(int id)
         paging_load_cr3(paging_kernel_pd_phys());
     }
 
-    if (a->exec_heap_base != 0) {
+    if (!a->cpl3 && a->exec_heap_base != 0) {
         /* exec_heap_init_at ではなく restore_state。init_at はヒープ先頭に
          * 空きブロックヘッダを書き直してしまい、親が子の起動前に確保して
          * いたブロックのヘッダを壊す ("bad magic feeefeee" の正体)。 */
@@ -2161,7 +2161,8 @@ static int exec_launch(const char *cmdline, int gui_arg)
             return exec_launch_abort(launcher_id, id, EXEC_ERR_INVALID);
         /* The heap header needs its user VA; switch only after image and argv. */
         if (want_ring3) paging_load_cr3(ctx->as->pd_phys);
-        if (exec_heap_size) exec_heap_init_at(exec_heap_base, exec_heap_size);
+        if (want_ring3) exec_heap_user_init(ctx->as);
+        else if (exec_heap_size) exec_heap_init_at(exec_heap_base, exec_heap_size);
 
         if (want_ring3) kselftest_run_audit("AS-launch");
 

@@ -996,3 +996,22 @@
     kill_delta: 0
     leftover: 0
   evidence: ~/os32-tmp/evidence/<日付>/f8-large-aligned/
+
+- id: f9-exec-heap
+  gate: F-10
+  contract: userland/tests/exec_heap_test.c
+  mode: manual
+  prereq: KAPI 71, memory layout 2; PM deploy current kernel and exec_heap_test with 65536-byte heap
+  entry: exec_heap_test
+  observe:
+  - 'Parent and child both run /usr/bin/exec_heap_test.bin registered in userland/deploy.yaml; child argument is --child'
+  - 'Require pointers outside [0x88000000,0x88010000), parent full-byte patterns after nested exec, and successful allocation after freeing the parent blocks'
+  - 'Require both child and parent exec_heap_test PASS, exit 0; forged BlkHdr free preserves header and subsequent mem_alloc returns NULL without killing the process'
+  - 'Read kernel.map symbols before/after: resident exec_heap.used (offset 8) must be equal; fault_kill_count delta 0 and exec_as_leftover_pages 0'
+  - 'Run heap_test with default heap: require at least one 64KiB mem_alloc block and exit 0; requests fitting existing arenas remain supported until f10 TOPDOWN classification'
+  - 'Run db_test and db_v50_test regressions; park/yield resident invariance is also covered by host context restoration'
+  expect:
+    exit: 0
+    kill_delta: 0
+    leftover: 0
+  evidence: ~/os32-tmp/evidence/<日付>/f9-exec-heap/

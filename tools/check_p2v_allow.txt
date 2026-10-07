@@ -66,3 +66,6 @@ kapi/kapi_db.c:kapi_db_step:MEM_SHM_BASE はリンカ由来の仮想 (DB_SHM_PTR
 drivers/pci.c:pci_get:呼び手の仮想出力ポインタの型変換
 gfx/gfx_core.c:gfx_framebuffer_bridge:公開 USER 橋。lease 表の base + plane_offset はアプリの仮想番地。物理変換せず B1 出力値にする
 kapi/kapi_generated.c:wrap_mem_map:appmem_map が返すアプリ私有 VA (物理番地ではなく、kernel から参照しない)
+exec/exec_heap.c:user_view:所属 EXEC extent と PTE/owner を検証した USER 仮想ブロックの走査
+exec/exec_heap.c:exec_heap_user_init:起動時に map 済みの USER 初期 extent の仮想先頭
+exec/exec_heap.c:exec_heap_user_alloc:appmem_map が返した USER 仮想 arena の初期化

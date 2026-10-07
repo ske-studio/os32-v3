@@ -43,8 +43,10 @@ int appmem_unmap_prepare(const struct appmem_table *table, u32 base, u32 end,
 int appmem_unmap_plan_valid(const struct appmem_table *table,
                             const struct appmem_unmap_plan *plan);
 void appmem_unmap_publish(struct appmem_table *table, const struct appmem_unmap_plan *plan);
-/* Private internal public-policy wrapper. Internal EXEC_* entry is f9/f10. */
+/* Public-policy entry; EXEC kinds are never accepted here. */
 int appmem_unmap(struct addrspace *as, struct appmem_table *table, u32 base, u32 bytes);
+/* Whole owned EXEC extent only; no partial or mixed-kind returns. */
+int appmem_exec_unmap(struct addrspace *as, u32 base, u32 bytes);
 
 /* Saved launch metadata and public-boundary translation. */
 void appmem_init(struct addrspace *as, u32 img_end, u32 primary_end,

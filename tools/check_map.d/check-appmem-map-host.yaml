@@ -18,3 +18,10 @@ check-appmem-map-host:
 - tools/check_map.d/check-appmem-map-host.yaml
 - build/checks.d/check-appmem-map-host.mk
 - exec/appslot.c
+- exec/exec_heap.c
+- exec/exec_heap.h
+- kernel/kmalloc.c
+- kernel/kmalloc.h
+- exec/redir_access.c
+- exec/access_walk.c
+- tools/tests/exec_heap_host.h

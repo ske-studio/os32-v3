@@ -158,3 +158,20 @@ ring3_abort_check を実行し、非復帰 kill 境界への移譲を確認す�
 WM の abort_clear でも保持、live の計数は一度だけ減り boot context に戻る。
 追加変異は ANON 返却欠落、teardown 入口毒判定欠落、毒後 break 欠落、中断要求欠落、
 live 補正欠落、resume/syscall 中断点欠落、WM による中断要求消去の 8 本。
+
+### f9 USER exec heap (2026-10-08)
+
+[exec_heap_host.h](exec_heap_host.h) は同じ ILP32 fixture に実 exec_heap/kmalloc、
+caller_access、access_walk と生成 KAPI wrapper を追加する。Linux memfd の共有
+alias で同一 VA / 別 PFN の親子を再現し、owner 台帳と PTE は実物を使う。
+USER/WM/TRUSTED/frame 無効/終了通知の窓、R1、親子と共通 restore helper、
+EXACT/TOPDOWN/extent 詰め直し・併合、公開拒否・内部全返却・ARENA teardown を検査。
+size 巨大/wrap/縮小/非整列、magic、payload/ANON の偽 header、別 arena へ届く size、
+double free、PTE/owner 不整合では alloc NULL・free byte 不変を要求する。resident の全 arena と
+KHeap、別 AS の extent/全 arena/PTE、各 owner のページ数を前後照合する。
+新規11変異は検証迂回・kind・終端走査・PTE/owner・跨ぎ free・R1・CR3 振分け・
+CPL3 init/restore・ARENA teardown・公開 ARENA 許可を個別に崩す。
+fix1: INITIAL 256KiB の 65536/131072 全バイト保持、伸長拒否/overflow の状態不変、
+所属/候補 arena の PTE walk 数と集計差分、早期64KiB拒否の独立変異を追加。
+65535 byte は整列後64KiBでも小要求として伸長し、丸め後で伸長を拒否する変異も検出する。
+証拠は `/home/hight/os32-tmp/run/f9/f9_fix1_report.md`。実ゲスト受入は台帳 F-10。

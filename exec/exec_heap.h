@@ -1,7 +1,7 @@
 /* ======================================================================== */
 /*  EXEC_HEAP.H — プログラム専用ヒープ (カーネルヒープと完全分離)           */
 /*                                                                          */
-/*  MEM_EXEC_HEAP_BASE〜 にFirst-Fit動的アロケータを配置。                            */
+/*  resident KHeap と AS 別 EXEC extent の best-fit allocator。              */
 /*  exec_run 開始時に初期化。                                               */
 /*  alloc/freeによる動的な確保・解放・再利用が可能。                         */
 /*  終了/クラッシュ時にresetで全域破棄。                                     */
@@ -21,9 +21,13 @@
  * size: 確保するヒープサイズ (バイト)
  * 全体を1つの空きブロックとして初期化する */
 void exec_heap_init_at(u32 base, u32 size);
+struct addrspace;
+void exec_heap_user_init(struct addrspace *as);
+void *exec_heap_user_alloc(struct addrspace *as, u32 size);
+void exec_heap_user_free(struct addrspace *as, void *ptr);
 
-/* ヒープからメモリ確保 (4バイトアラインメント)
- * ファーストフィット方式で空きブロックを検索・分割
+/* resident ヒープからメモリ確保 (8バイトアラインメント)
+ * best-fit 方式で空きブロックを検索・分割
  * 戻り値: ポインタ, NULL=空き不足 */
 void *exec_heap_alloc(u32 size);
 

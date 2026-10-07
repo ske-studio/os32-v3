@@ -81,6 +81,12 @@ static void shell_heap_test(void)
     CHECK(!exec_heap_alloc(1));
     CHECK(exec_heap_total() == MEM_SHELL_HEAP_SIZE);
     exec_heap_save_state(&used);
+    /* USER child callbacks share this resident heap: a stale snapshot must
+     * not roll back live accounting when restoring the same resident range. */
+    exec_heap_free(parent);
+    exec_heap_restore_state(MEM_SHELL_HEAP_BASE, MEM_SHELL_HEAP_SIZE, used);
+    CHECK(!exec_heap_used());
+    CHECK(exec_heap_alloc(MEM_SHELL_HEAP_SIZE - 8) == parent);
     exec_heap_init_at(0x500000, PAGE_SIZE);
     child = exec_heap_alloc(64);
     CHECK(child);

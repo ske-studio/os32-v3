@@ -171,6 +171,10 @@ filesystem:
     - host: userland/tests/mem_map_test.bin
       guest: /usr/bin/
       tags: [test]
+    # --- f9 exec heap parent and --child use the same registered binary ---
+    - host: userland/tests/exec_heap_test.bin
+      guest: /usr/bin/
+      tags: [test]
     # --- f7 USER nano secondary arena ---
     - host: userland/tests/malloc_arena_test.bin
       guest: /usr/bin/
