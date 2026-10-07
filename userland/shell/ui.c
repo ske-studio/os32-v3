@@ -1,3 +1,4 @@
+#include "ls.h"
 #include "shell.h"
 #include "config.h"
 
@@ -289,7 +290,7 @@ static int tab_complete(char *buf, int pos, int show_candidates) {
                 if (lost) break;
                 if (*pp == ':') pp++;
                 if (di > 0) {
-                    g_api->sys_ls(dir, (void *)path_comp_cb, &pctx);
+                    os32_ls(dir, path_comp_cb, &pctx);
                 }
             }
 
@@ -332,7 +333,7 @@ static int tab_complete(char *buf, int pos, int show_candidates) {
         fctx.count = 0;
         fctx.prefix = file_prefix;
 
-        g_api->sys_ls(dir_path, (void *)file_comp_cb, &fctx);
+        os32_ls(dir_path, file_comp_cb, &fctx);
 
         for (i = 0; i < fctx.count && match_count < TAB_MAX_MATCHES; i++) {
             matches[match_count++] = fctx.matches[i];

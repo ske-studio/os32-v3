@@ -1,0 +1,14 @@
+check-ls-client-host:
+- sdk/crt/syscalls.c
+- userland/lib/rt/ls.c
+- sdk/include/os32/ls.h
+- sdk/include/os32/os32_ls.h
+- sdk/rust/os32api/src/ls.rs
+- sdk/rust/os32api/src/lib.rs
+- tools/tests/ls_client_host.rs
+- sdk/rust/i686-os32-none.json
+- tools/tests/ls_client_host.c
+- tools/tests/test_ls_client.py
+- tools/tests/host32.py
+- build/checks.d/check-ls-client-host.mk
+- tools/check_map.d/check-ls-client-host.yaml

@@ -1,9 +1,11 @@
-/* e11c supplies H3_SELF_IDENTITY(app, owner, generation) via the new slot.
- * No slot is guessed here; the default build still uses host publication. */
+/* Host state tests supply a deterministic replacement. */
+#if defined(H3_FIXTURE) && !defined(H3_SELF_IDENTITY)
+#define H3_SELF_IDENTITY(a, o, g) (h3_api->caller_identity((a), (o), (g)) == 0)
+#endif
 #ifdef H3_SELF_IDENTITY
 static int h3_publish_identity(volatile H3Block *b)
 {
-    unsigned int app = 0, owner = 0, generation = 0;
+    unsigned long app = 0, owner = 0, generation = 0;
     if (!H3_SELF_IDENTITY(&app, &owner, &generation) ||
         !app || !owner || !generation) return 0;
     b->owner = owner;

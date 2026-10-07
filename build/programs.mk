@@ -23,7 +23,7 @@ sdk/crt/help.o: sdk/crt/help.c sdk/include/os32/help.h $(SDK_KAPI_HDR)
 sdk/crt/crt0_c.o: sdk/crt/crt0_c.c sdk/include/os32/help.h $(SDK_KAPI_HDR)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
-sdk/crt/syscalls.o: sdk/crt/syscalls.c $(SDK_KAPI_HDR)
+sdk/crt/syscalls.o: sdk/crt/syscalls.c userland/lib/rt/ls.c sdk/include/os32/ls.h $(SDK_KAPI_HDR)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
 userland/lib/rt/dbgserial.o: userland/lib/rt/dbgserial.c userland/lib/rt/dbgserial.h $(SDK_KAPI_HDR)
@@ -37,7 +37,7 @@ SHELL_OBJ = $(SHELL_SRC:.c=.o)
 # 走査しないので userland の .d は読まれない。sh_launch.inc / sh_pipe.inc /
 # sh_redraw.inc を直しても .o が作り直されないと、直したつもりの sh.bin が
 # 出来上がる。常駐側にも同じ依存を足す (レシピは変えないので .o は不変)。
-SHELL_DEPS = userland/shell/shell.h userland/shell/hdprep_plan.h drivers/pc98pt.h $(wildcard userland/shell/*.inc)
+SHELL_DEPS = sdk/include/os32/ls.h userland/shell/shell.h userland/shell/hdprep_plan.h drivers/pc98pt.h $(wildcard userland/shell/*.inc)
 
 userland/shell/%.o: userland/shell/%.c $(SHELL_DEPS)
 	$(CC) $(PROGRAM_FLAGS) -Iuserland/shell $(INC_libos32filer) -c $< -o $@

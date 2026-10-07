@@ -1366,3 +1366,9 @@ void _start(void)
     report(failures ? "SOME FAIL\n" : "ALL PASS\n");
     die(failures ? 1 : 0);
 }
+
+/* Caller tests mock enumeration; real packet iteration is check-ls-client-host. */
+int os32_ls(const char *path, DirCallback cb, void *ctx)
+{
+    return (g_api)->sys_ls(path, (void *)cb, ctx);
+}

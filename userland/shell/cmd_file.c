@@ -1,3 +1,4 @@
+#include "ls.h"
 #include "cmd_fs_shared.h"
 #include <stdio.h>
 
@@ -156,7 +157,7 @@ static int do_copy_recursive_impl(const char *src, const char *dst, int depth)
      * mkdir の後ろにあったので、宛先に**空のディレクトリだけ**が残っていた。 */
     g_copy_count = 0;
     g_copy_over = 0;
-    rc = g_api->sys_ls(src, collect_entries_cb, (void *)0);
+    rc = os32_ls(src, collect_entries_cb, (void *)0);
     if (rc < 0) {
         g_api->kprintf(ATTR_RED, "cp -r: cannot read directory '%s': %s\n",
                        src, fs_strerror(rc));

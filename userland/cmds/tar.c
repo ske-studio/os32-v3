@@ -31,6 +31,7 @@
 #define TAR_PATH_MAX       256
 #else
 #include "os32api.h"
+#include "ls.h"
 #include <stdio.h>
 #include <string.h>
 #define TAR_FILE_TYPE_FILE OS32_FILE_TYPE_FILE
@@ -516,7 +517,7 @@ static int add_path(const char *path, int depth)
 #ifdef HOST_TEST
     host_list(path);
 #else
-    g_api->sys_ls(path, (void *)collect_cb, 0);
+    os32_ls(path, collect_cb, 0);
 #endif
     if (g_collect_overflow) {
         err_path(path, "too many entries");

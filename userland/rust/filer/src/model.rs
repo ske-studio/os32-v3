@@ -1,6 +1,6 @@
 //! model.rs — filer の非表示側 (パス規則 / VFS / ツリー / コピー) — 票 C5 §2・§5・§6。
 //!
-//! 大きい固定長バッファは**すべてここの `static`** に置く。`sys_ls` の
+//! 大きい固定長バッファは**すべてここの `static`** に置く。`os32_ls` の
 //! コールバックは C ABI の生関数なので閉包を渡せず、収集先はグローバルに
 //! 取るしかない (gshell の `startmenu.rs` と同じ作法)。`static mut` の参照は
 //! 2024 版で禁止されるので `UnsafeCell` + アクセサ 1 本に閉じる。
@@ -8,8 +8,8 @@
 //! # 鉄則 (票 C5)
 //! - パスは**絶対パスだけ**。最大 255B。超えるものは [`ERR_PATH_LONG`] で拒否し、
 //!   黙って切り詰めない (§2)。
-//! - `sys_ls` のコールバックの中では **FS を触らない** (CLAUDE.md の
-//!   `ext2_g_aux` 注意)。名前を自前のバッファへ写すだけ。
+//! - c3 の `os32_ls` はユーザー空間でコールバックを呼び、KAPI/FS を呼べる。
+//!   filer は収集と処理を分けるため、名前を自前のバッファへ写すだけ。
 //! - コピーは 4096B バッファで、1 周につき最大 4 チャンク (16KB)。short write を
 //!   進め、失敗時は両 fd を閉じ、自分が作った出力は消す (§6)。
 
@@ -97,12 +97,7 @@ const S_IFDIR: u16 = 0x4000;
 /*  KAPI の生の型 (os32_kapi_shared.h と同一レイアウト)               */
 /* ================================================================ */
 
-#[repr(C)]
-struct DirEntryExt {
-    name: [u8; 256],
-    size: u32,
-    ftype: u8,
-}
+type DirEntryExt = os32api::ls::LsEntry;
 
 /// `sys_stat` が書く `OS32_Stat` (32B)。
 #[repr(C)]
@@ -181,7 +176,7 @@ impl TreeNode {
     }
 }
 
-/// `sys_ls` の収集先の切り替え。
+/// `os32_ls` の収集先の切り替え。
 const LS_ENTRIES: u8 = 0;
 const LS_DIRS: u8 = 1;
 
@@ -558,9 +553,9 @@ extern "C" fn ls_cb(entry: *const DirEntryExt, _ctx: *mut u8) {
 
 fn ls(path: &[u8]) -> i32 {
     unsafe {
-        (os32api::api().sys_ls)(
+        os32api::os32_ls(
             path.as_ptr(),
-            ls_cb as *const () as *mut u8,
+            ls_cb,
             core::ptr::null_mut(),
         )
     }
@@ -570,7 +565,7 @@ fn ls(path: &[u8]) -> i32 {
 /*  右ペインの読み直し (§3: パスが変わったときだけ)                   */
 /* ================================================================ */
 
-/// `fs().cwd` の中身を読み直して並べ替える。戻り値は `sys_ls` の結果。
+/// `fs().cwd` の中身を読み直して並べ替える。戻り値は `os32_ls` の結果。
 pub fn reload_entries() -> i32 {
     let st = fs();
     st.nent = 0;
@@ -745,7 +740,7 @@ pub fn tree_collapse(idx: usize) {
     st.tree[idx].expanded = false;
 }
 
-/// `idx` の枝を開く (その 1 階層だけ `sys_ls`)。戻り値は `sys_ls` の結果。
+/// `idx` の枝を開く (その 1 階層だけ `sys_ls`)。戻り値は `os32_ls` の結果。
 pub fn tree_expand(idx: usize) -> i32 {
     let mut path = [0u8; PATH_CAP];
     if let Err(e) = tree_path(idx, &mut path) {

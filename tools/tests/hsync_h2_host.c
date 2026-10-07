@@ -2183,3 +2183,9 @@ int main(void)
     printf("\n%d checks, %d failures\n", checks, failures);
     return failures ? 1 : 0;
 }
+
+/* Caller tests mock enumeration; real packet iteration is check-ls-client-host. */
+int os32_ls(const char *path, DirCallback cb, void *ctx)
+{
+    return (&g_fake)->sys_ls(path, (void *)cb, ctx);
+}

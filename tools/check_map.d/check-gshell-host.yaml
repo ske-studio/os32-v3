@@ -1,6 +1,7 @@
 check-gshell-host:
 - userland/gshell/**
 - sdk/rust/os32api/**
+- sdk/rust/os32api/src/ls.rs
 - tools/tests/os32api_host.py
 - tools/check_map.d/check-gshell-host.yaml
 - build/checks.d/check-gshell-host.mk

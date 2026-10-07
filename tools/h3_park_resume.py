@@ -465,13 +465,11 @@ class Playbook:
     def initialize(self, fixture):
         with self.emu.freeze():
             ident = self.discover(fixture)
-            b = self.block(ident['address'])
-            require(b['phase'] == PHASES['INIT'] and b['owner'] == 0 and b['generation'] == 0,
-                    'identity already published or not INIT')
-            require(self.identity(ident['index']) == ident, 'initial identity changed')
-            self.put(ident['address'] + 4, ident['owner'])
-            self.put(ident['address'] + 8, ident['generation']) # publish last
-        self.wait(lambda: self.checked(ident)['phase'] in (PHASES['IDENTIFIED'], PHASES['WAIT'], PHASES['RESUMED']), 'identity receipt')
+        self.wait(lambda: self.block(ident['address'])['phase'] in
+                  (PHASES['IDENTIFIED'], PHASES['WAIT'], PHASES['RESUMED']),
+                  'self identity publication')
+        with self.emu.freeze():
+            self.checked(ident)  # fixture values must equal host identity()
         return ident
 
     def wait(self, predicate, label, attempts=300):
@@ -770,12 +768,11 @@ class Playbook:
             output.write(json_bytes(dict(case_id=case['case_id'], observations=observations)))
         return capture
 
-    @frozen
     def next_launch(self, case):
-        fresh = self.discover(case['fixture'])
+        # Publication can still be in INIT. Wait with the emulator running,
+        # then verify the self-published identity in a frozen snapshot.
+        fresh = self.initialize(case['fixture'])
         require(fresh['generation'] != case['identity']['generation'], 'old next launch generation')
-        b = self.block(fresh['address'])
-        require(b['phase'] == PHASES['INIT'] and b['owner'] == 0 and b['generation'] == 0, 'next launch not fresh INIT')
         return fresh
 
 

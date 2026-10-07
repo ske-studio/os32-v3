@@ -70,7 +70,7 @@ MKDIR_BLOCK = r"""    rc = g_api->sys_mkdir(dst);
     }
 """
 
-LS_BLOCK = r"""    rc = g_api->sys_ls(src, collect_entries_cb, (void *)0);
+LS_BLOCK = r"""    rc = os32_ls(src, collect_entries_cb, (void *)0);
     if (rc < 0) {
         g_api->kprintf(ATTR_RED, "cp -r: cannot read directory '%s': %s\n",
                        src, fs_strerror(rc));
@@ -94,7 +94,7 @@ MUTATIONS = [
          "if (rc != 0 && rc != OS32_ERR_EXIST) {")),
     # 変異 4 = 列挙の失敗を無視する版 (空の宛先を作って終わる)。
     ("ls_err_ignored", LS_BLOCK,
-     "    rc = g_api->sys_ls(src, collect_entries_cb, (void *)0);\n"
+     "    rc = os32_ls(src, collect_entries_cb, (void *)0);\n"
      "    (void)rc;\n"),
 ]
 

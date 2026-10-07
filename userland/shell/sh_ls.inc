@@ -1,18 +1,15 @@
 /* ========================================================================
- *  sh_ls.inc — SHELL_AS_APP の sys_ls 写し取り (Codex 往復 6 の B2)
+ *  sh_ls.inc — SHELL_AS_APP の os32_ls 写し取り (Codex 往復 6 の B2)
  *
  *  main.c が #ifdef SHELL_AS_APP の中で #include する。拡張子が .c でないの
  *  は build/programs.mk の SHELL_SRC が userland/shell 下の .c を wildcard で
  *  拾うためで、sh_launch.inc / sh_pipe.inc / sh_redraw.inc と同じ理由。
  *
- *  なぜ要るか: CPL=3 のアプリが `sys_ls` の**コールバックの中から KAPI を
- *  呼ぶと落ちる** (int 0x80 の再入。実機で `find /etc -name filetypes` が
- *  [Process crashed]、コールバックで KAPI を呼ばない `du /etc` は正常)。
- *  カーネル側の対処は別票。ここでは S 側で避ける — コールバックは名前と
- *  種別を写すだけにし、`sys_ls` が戻ってから表示や mem_alloc を行う。
- *  `docs/POLICY_DEBUG.md` §4-26 (コールバックから FS を触らない) の延長。
+ *  c3 以後は os32_ls が値返しの窓を受け取り、ユーザー空間で callback を
+ *  呼ぶため、CPL=3 の callback から KAPI を呼べる。ここでは表示と収集を
+ *  分け、一覧・glob の上限と溢れ報告を揃えるため写し取りを維持する。
  *
- *  写し取りは 1 本きり。`sys_ls` を呼ぶ直前に sh_ls_reset() し、戻ってから
+ *  写し取りは 1 本きり。`os32_ls` を呼ぶ直前に sh_ls_reset() し、戻ってから
  *  sh_ls_count_get() / sh_ls_fill() で読む — 入れ子で使わないこと。
  * ======================================================================== */
 

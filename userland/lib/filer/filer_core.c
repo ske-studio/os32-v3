@@ -1,3 +1,4 @@
+#include "ls.h"
 /* ======================================================================== */
 /*  FILER_CORE.C - GFXファイラー コアロジック + GFX描画                      */
 /*                                                                          */
@@ -124,7 +125,7 @@ static void scan_directory(const char *dir)
         filer.entry_count = 1;
     }
 
-    f_api->sys_ls(dir, (DirCallback)dir_callback, NULL);
+    os32_ls(dir, (DirCallback)dir_callback, NULL);
 }
 
 /* パスを結合。戻り値: 長さ / out に収まらなければ -1 (票 T23)。

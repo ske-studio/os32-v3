@@ -27,7 +27,9 @@
  * PC-9801; denial belongs to e11b2. F is the e11c2 legitimate lease control.
  *
  * Use the newly deployed kernel.map's __bss_end to derive the SHM base:
- * S = align_up(__bss_end,0x1000)+0x32000; B = S + i*0x4000 (i=0..13).
+ * S = align_up(__bss_end,OS32_PAGE_SIZE)+KHEAP_SIZE+MEM_KAPI_SIZE+MEM_GUARD_SIZE
+ *   (include/memmap.h; 0x2E000 while KHEAP is 176KB — E11-BUD);
+ * B = S + i*OS32_SHM_BLOCK_SIZE (i=0..13).
  * No absolute SHM address is fixed here. Immediately after the program exits,
  * before another SHM allocation, find B with the expected label at B+16 and
  * self-address B at B+20. Compare B+0/tag and B+8/target with the table.
