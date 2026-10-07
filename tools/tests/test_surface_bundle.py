@@ -29,8 +29,7 @@ MUTANTS = [
      '                (void)0;', 'bundle rollback failure count'),
     ('lease', 'if (!failed) {', 'if (1) {', 'failed release must retain slots'),
     ('paging', '(PC98_NATIVE_VRAM(phys) ? PTE_PCD : 0)', '0', 'initial native UC'),
-    ('exec', 'paging_addrspace_map_user_keep(ctx->as,\n            TVRAM_CHAR_BASE',
-     'paging_addrspace_map_user_range(ctx->as,\n            TVRAM_CHAR_BASE', 'exec loses UC'),
+    ('lease', '(sf->cache == LEDGER_CACHE_UC ? PTE_PCD : 0);', '0;', 'lease loses UC'),
     ('v86', 'e->setup_flags) != 0', '(e->setup_flags & ~PTE_PCD)) != 0', 'V86 setup loses UC'),
     ('v86', 'e->teardown_flags & PTE_PCD', '(e->teardown_flags & ~PTE_PCD) & PTE_PCD', 'V86 teardown table loses UC'),
     ('v86', '(e->setup_flags & PTE_PCD) != want || pcd != want', '((void)want, 0)', 'V86 ledger cache mismatch'),
@@ -41,7 +40,7 @@ MUTANTS = [
 if __name__ == '__main__':
     try:
         main(fixture_name='surface_bundle_host.c', mutants=MUTANTS,
-             extra_sources={'v86': 'kernel/v86_mem.c', 'exec': 'exec/exec.c'},
+             extra_sources={'v86': 'kernel/v86_mem.c'},
              lease_hook='#define paging_lease_unmap host_bundle_unmap\n')
     except subprocess.CalledProcessError as error:
         print(error.stdout or '', error.stderr or '')

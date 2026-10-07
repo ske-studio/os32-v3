@@ -1,0 +1,6 @@
+check-shm-lockwrite-host:
+- userland/tests/shm_reuse_child.c
+- userland/tests/ring3_marker.h
+- tools/tests/test_shm_lockwrite.py
+- tools/tests/guest_acceptance.yaml
+- tools/check_map.d/check-shm-lockwrite-host.yaml

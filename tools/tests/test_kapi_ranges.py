@@ -13,6 +13,7 @@ import test_kapi_out as generator
 
 ROOT = walk.ROOT
 MUTANTS = (
+    ('legacy VRAM exception restored', 'exec', '    return 0;\n}', '    if (p >= 0xA0000UL && p < 0xC0000UL) return 1;\n    return 0;\n}', 'unleased VRAM refused'),
     ('output NULL bypass', 'generated', '((u32)(n))', '((p) ? (u32)(n) : 0u)', 'output NULL'),
     ('signed output NULL bypass', 'generated', '(((int)(n) > 0) ? (u32)(n) : 0u)', '(((p) && (int)(n) > 0) ? (u32)(n) : 0u)', 'signed output NULL'),
     ('input first byte', 'generated', 'ring3_user_range_ok(p, len)', 'ring3_user_range_ok(p, 1)', 'input tail'),

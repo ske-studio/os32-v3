@@ -183,8 +183,8 @@
   - 'guest_tests output: RC and PASS summary'
   expect:
     rc: 0
-    passed: 41
-    total: 41
+    passed: 42
+    total: 42
   evidence: ~/os32-tmp/evidence/<日付>/<case id>/
 - id: e10b-shm_reuse_test
   gate: e10b
@@ -225,8 +225,8 @@
   - 'guest_tests output: RC and PASS summary'
   expect:
     rc: 0
-    passed: 41
-    total: 41
+    passed: 42
+    total: 42
   evidence: ~/os32-tmp/evidence/<日付>/<case id>/
 - id: e9-tvdump
   gate: e9
@@ -526,4 +526,80 @@
     two_AS_identity_match: true
     reused_slot_generation_match: true
     protocol_unchanged: true
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e11b1-lockwrite-first
+  gate: e11
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: PM deploys matching b1 kernel and shm_reuse_child; verify ver image and new kernel.map; 17MB current ini
+  entry: record fault_kill_count then run shm_reuse_child lockwrite first; capture marker and fault before any next SHM allocation; run ver
+  observe:
+  - Find SL marker (label 0x4c53 at B+16, self B at B+20), separate from locked target block
+  - B+0 is SLK? (0x3f4b4c53); B+8 is allocated locked block start; B+12 is ARMD; B+4 remains zero
+  - Serial CPL3 PF address equals B+8; read saved PF error 7; fault_kill_count delta from pre-launch is one
+  - Allocation failure, absent marker, wrong fault address or SURV is failure; shell and ver respond
+  expect:
+    target_page: first
+    completion: 0
+    armed: ARMD
+    kill_delta: 1
+    pf_error: 7
+    shell_alive: true
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e11b1-lockwrite-last
+  gate: e11
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: same matching b1 build as e11b1-lockwrite-first; a separate launch is required because the first store kills
+  entry: record fault_kill_count then run shm_reuse_child lockwrite last; capture marker and fault before next SHM allocation; run ver and shm_reuse_test
+  observe:
+  - Same SL/SLK? marker protocol as first; B+8 equals locked block start plus 0x3000 (last 4KB page of 16KB block)
+  - B+12 ARMD and B+4 zero; CPL3 PF address equals B+8, error 7, kill delta one; no SURV
+  - shm_reuse_test subsequently passes 4/4, proving free and owner-exit restore all pages writable for next AS
+  expect:
+    target_page: last
+    completion: 0
+    armed: ARMD
+    kill_delta: 1
+    pf_error: 7
+    shm_reuse_passed: 4
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e11b1-low-user-and-v86
+  gate: e11
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: PM matching b1 kernel/programs and kernel.map; 17MB current ini; run before b2 as well as final integrated acceptance
+  entry: run hello_gfx, gdi_test, gfx200_test and Japanese display; db_test and db_v50_test; take tools/accept/pt0_snapshot.py snapshots after boot and launches, then each V86 exit below
+  observe:
+  - Low PT0 font [0x1000,0x4a000) and TVRAM through BRG [0xa0000,0xc0000) have USER clear; native VRAM PCD remains set
+  - Unicode and BB stay usable in b1; graphics and Japanese glyphs match pre-b1 display
+  - db_v50_test 42/42 includes unleased 0xa0000 refusal, RAM last-byte success and guard-crossing refusal; db_test 9/9
+  - Exercise existing V86 normal, failure, STOP, kill, K1 and VM INT80 cases; compare PT0 snapshots ignoring only A/D
+  - After each exit observe memmap_audit_fail, as_audit_fail, audit_fail and v86_return_audit_fail all zero; audit_runs and v86_return_audit_runs increased; kselftest_fail zero
+  expect:
+    removed_ranges_USER: 0
+    native_cache_UC: true
+    graphics_and_japanese_preserved: true
+    db_v50_passed: 42
+    db_passed: 9
+    kselftest_fail: 0
+    three_stage_failures: 0
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e11b1-tvdump-auth
+  gate: e11
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: PM matching b1 shell.bin, sh.bin and kernel; CUI and GUI sessions; verify image and map
+  entry: run python3 tools/tvdump_recv.py --raw <evidence>/cui.bin in resident CUI; repeat foreground CPL3 sh; then GUI terminal sh and WM rshell into separate raw files
+  observe:
+  - CUI resident shell and foreground CPL3 return the expected text cells; compare /api/tvram lines
+  - GUI terminal and WM return TVDM header 80x25 and all 4000 payload bytes zero
+  - Every frame remains 4006 bytes; denied output does not expose a character or attribute
+  expect:
+    cui_line_match: true
+    gui_payload_nonzero: 0
+    wm_payload_nonzero: 0
+    cols: 80
+    rows: 25
+    frame_bytes: 4006
   evidence: ~/os32-tmp/evidence/<日付>/<case id>/

@@ -68,8 +68,6 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
             if key == 'v86':
                 body = body.replace('(volatile u32 *)(V86_REMAP_START + PAGE_SIZE)',
                                     '(volatile u32 *)P2V(backing_phys)')
-            if key == 'exec':
-                body = body[body.index('        /* VRAM (テキスト 0xA0000'):body.index('        /* フォントキャッシュ')]
             if key == 'boot':
                 body = body[body.index('static void test_caller_boot('):body.index('static void test_ledger(void)')]
             (tmp / (key + '_host_source.c')).write_text(body)
@@ -110,8 +108,6 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
                     # include name keeps parallel mutants independent.
                     if unit == 'v86':
                         body = body.replace('(volatile u32 *)(V86_REMAP_START + PAGE_SIZE)', '(volatile u32 *)P2V(backing_phys)')
-                    if unit == 'exec':
-                        body = body[body.index('        /* VRAM (テキスト 0xA0000'):body.index('        /* フォントキャッシュ')]
                     paging = tmp / (key + '_source.c'); paging.write_text(body)
                     access = (ROOT / 'tools/tests/access_walk_host.c').read_text().replace(
                         '#include "' + unit + '_host_source.c"', '#include "' + paging.name + '"')

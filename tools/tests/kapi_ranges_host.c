@@ -82,7 +82,7 @@ static void caller_copy_tests(void)
     EXPECT("gui_register NULL pump", 0, (dispatch_early(KAPI_SLOT_GUI_REGISTER, gui_args), touch()));
     ls_args[2] = 0x100000;
     EXPECT("sys_ls bad ctx", 1, (dispatch_early(KAPI_SLOT_SYS_LS, ls_args), touch()));
-    named(ring3_ptr_ok(0xA0000), "legacy VRAM retained");
+    named(!ring3_ptr_ok(0xA0000), "unleased VRAM refused");
     named(!(kapi_argptr[KAPI_SLOT_SYS_READ] & 2), "read delegated");
     named(!(kapi_argptr[KAPI_SLOT_SYS_WRITE] & 2), "write delegated");
     named(kapi_argptr[KAPI_SLOT_SYS_OPEN] & 1, "string early guard");

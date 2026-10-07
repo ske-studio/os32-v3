@@ -1516,6 +1516,7 @@ void __cdecl wrap_tvram_readchar_at(int x, int y, u16 *code, u8 *attr)
                                     (u32)attr, KAPI_OUT_LEN(attr, sizeof(u8)))) {
         ring3_fault_kill();   /* 戻らない */
     }
+    if (!exec_tvram_read_allowed()) { if (code) *code = 0; if (attr) *attr = 0; return; }
     tvram_readchar_at(x, y, code, attr);
 }
 

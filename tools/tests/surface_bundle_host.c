@@ -1,4 +1,4 @@
-/* T2e e3: real B1, query, leases, paging, native exec map and V86 paths. */
+/* T2e e3: real B1, query, leases, paging, native cache and V86 paths. */
 #define HOST_CALLER_COPY_TEST
 static void bundle_root_check(unsigned long root);
 #define HOST_MMU_LOAD_CHECK(root) bundle_root_check(root)
@@ -46,11 +46,6 @@ void kselftest_audit_v86_return(void) {}
 /* Only the CPU write to V86 virtual RAM is redirected to its backing by the
  * harness. setup/teardown, map table and all PTE updates are real. */
 #include "v86_host_source.c"
-static void exec_native_map(struct addrspace *as)
-{
-    struct exec_map_context { struct addrspace *as; } context = {as}, *ctx = &context;
-#include "exec_host_source.c"
-}
 int host_lease_copyin(const struct caller_access *c, const void *s, void *d, u32 n)
 {
     copyins++;
@@ -145,11 +140,9 @@ static void caller_copy_tests(void)
     host_cr3 = paging_kernel_pd_phys();
     limit = 4096;
     native_cache();
-    exec_native_map(&space); native_cache();
     CHECK(!v86_mem_setup(space.owner)); native_cache();
     v86_mem_teardown(); native_cache();
     CHECK(!v86_restore_mismatch);
-    exec_native_map(&space); native_cache();
     /* access_walk has already made an AS; supply memory_boot's fixed record
      * directly, as lease_host does (registration is boot-context-only). */
     ledger_regions[ledger_region_count++] = (struct ledger_region){
