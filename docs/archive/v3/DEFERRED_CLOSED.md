@@ -139,3 +139,9 @@ X-2 の前半 (e8a の RO 日本語) は `accept_e11/RESULT.md` の GUI 日本�
 |---|---|---|
 | F-2 | 空 exec_heap の予約境界をまたぐ併合を禁止、shlib/lease/image/stack/guard の hint を INVAL。 | `tools/tests/appmem_host.c`、`/home/hight/os32-tmp/run/f5/report.md` |
 | F-3 | remove_count 単独・空 PT SURFACE・PDE before PT free の負例と変異。部分 free 失敗の隔離・計数・中断要求はホスト確認、実 kill はゲスト F-6。 | `tools/tests/appmem_map_host.c`、同 report。ゲストは F-6 |
+
+## f5b (2026-10-08)
+
+| ID | 閉鎖した内容 | 証拠 |
+|---|---|---|
+| F-1 | 公開 USER 専用 mem_map/mem_unmap、KAPI 71・caller 接続・私有エラー翻訳を実装。ゲスト対照は F-6 に継承。 | `/home/hight/os32-tmp/run/f5/f5b_report.md` |

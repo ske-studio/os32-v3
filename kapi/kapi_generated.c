@@ -45,6 +45,7 @@
 #include "surface_query.h"
 #include "ring3_ls.h"
 #include "redir_access.h"
+#include "appmem.h"
 
 extern volatile u32 tick_count;
 extern void kapi_sys_exit(int status);
@@ -59,7 +60,7 @@ extern int kapi_serial_diag(SerialDiag *out);
 #include "kapi_profile.h"
 
 #ifdef KAPI_PROFILE
-volatile u32 kapi_hits[246];
+volatile u32 kapi_hits[248];
 #endif
 
 /* 各スロットの cdecl 引数バイト数 (固定分)。int 0x80 ディスパッチャが
@@ -311,6 +312,8 @@ const u16 kapi_argsize[KAPI_FUNC_COUNT] = {
     4,  /* surface_unlease */
     12,  /* sys_ls_window */
     12,  /* caller_identity */
+    12,  /* mem_map */
+    8,  /* mem_unmap */
 };
 
 /* 各スロットの固定引数のうち早期検査するポインタのビットマスク (bit k = 引数 k)。
@@ -562,6 +565,8 @@ const u16 kapi_argptr[KAPI_FUNC_COUNT] = {
     0x0000,  /* surface_unlease */
     0x0000,  /* sys_ls_window */
     0x0000,  /* caller_identity */
+    0x0000,  /* mem_map */
+    0x0000,  /* mem_unmap */
 };
 
 /* ---- 出力ポインタの書き込み可検査 (票 TASK_KAPI_OUTPUT_GUARD) --------
@@ -2361,5 +2366,23 @@ int __cdecl wrap_caller_identity(u32 *app, u32 *owner, u32 *generation)
     *owner = identity.owner;
     *generation = identity.generation;
     return 0;
+}
+
+void * __cdecl wrap_mem_map(u32 bytes, void *hint, u32 flags)
+{
+    KAPI_HIT(246);
+    struct caller_access caller;
+    if (!caller_access_get(&caller) || caller.origin != CALLER_USER) return NULL;
+    u32 base;
+    int rc = appmem_map(caller.as, &caller.as->appmem, &caller.as->appmem_layout, bytes, (u32)hint, flags, APPMEM_ANON, 0, &base);
+    return rc ? NULL : (void *)base;
+}
+
+int __cdecl wrap_mem_unmap(void *base, u32 bytes)
+{
+    KAPI_HIT(247);
+    struct caller_access caller;
+    if (!caller_access_get(&caller) || caller.origin != CALLER_USER) return OS32_ERR_INVAL;
+    return appmem_error_public(appmem_unmap(caller.as, &caller.as->appmem, (u32)base, bytes));
 }
 

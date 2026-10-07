@@ -3,6 +3,9 @@
 #include "paging.h"
 #include "os32_kapi_shared.h"
 
+STATIC_ASSERT(APPMEM_MAP_EXACT == OS32_MEM_MAP_EXACT, appmem_sdk_exact);
+STATIC_ASSERT(APPMEM_MAP_TOPDOWN == OS32_MEM_MAP_TOPDOWN, appmem_sdk_topdown);
+
 STATIC_ASSERT(sizeof(struct appmem_extent) == 16, appmem_extent_size);
 STATIC_ASSERT(sizeof(struct appmem_table) == 512, appmem_table_size);
 

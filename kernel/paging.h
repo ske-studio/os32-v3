@@ -317,6 +317,7 @@ int paging_addrspace_clear_app_band(struct addrspace *as);
  * per-app 物理は連続とは限らない (断片化時はページ単位で張る) ので、
  * 解放も PTE を 1 枚ずつ辿って行う。
  * 戻り値: 返したページ数。AS 無効・逆順なら 0。 */
+/* Master context only; do not restore an app CR3 after poisoning. */
 u32 paging_addrspace_free_user_range(struct addrspace *as, u32 vstart,
                                      u32 vend);
 

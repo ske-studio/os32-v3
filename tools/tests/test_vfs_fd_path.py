@@ -762,6 +762,7 @@ def run_errno(tmp, syscalls=SYSCALLS_SRC, quiet=False):
     flags = ["-std=gnu11", "-m32", "-ffreestanding", "-fno-pie",
              "-fno-stack-protector", "-nostdinc", "-isystem", gccinc,
              "-isystem", str(inc), "-I" + str(ROOT / "sdk/include/os32"),
+             "-I" + str(ROOT / "sdk/crt"),
              "-O1", "-Wall", "-Werror", "-Wno-unused-parameter",
              "-Wno-unused-but-set-variable"]
     exe = tmp / "errno"
@@ -771,6 +772,8 @@ def run_errno(tmp, syscalls=SYSCALLS_SRC, quiet=False):
     if res.returncode != 0:
         print(res.stdout.decode("utf-8", "replace"))
         print("ERRNO BUILD FAIL")
+        if quiet:
+            raise RuntimeError("ERRNO mutant build failed; not a runtime RED")
         return False
     r = host32.run([str(exe)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                        timeout=60)

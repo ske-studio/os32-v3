@@ -10,7 +10,7 @@
  * prepare leaves table and output unchanged on failure. No slot is reserved.
  * f3 must serialize prepare -> PTE staging -> publish, with no callbacks or
  * AS switch; publish accepts only a successful, unchanged-table proposal.
- * Output must not alias table/layout. There is no public map API yet. */
+ * Output must not alias table/layout. Public wrappers use saved USER caller metadata. */
 struct appmem_plan {
     u32 base, end;
     struct appmem_extent merged;
@@ -46,7 +46,7 @@ void appmem_unmap_publish(struct appmem_table *table, const struct appmem_unmap_
 /* Private internal public-policy wrapper. Internal EXEC_* entry is f9/f10. */
 int appmem_unmap(struct addrspace *as, struct appmem_table *table, u32 base, u32 bytes);
 
-/* Saved launch metadata and public-boundary translation (no KAPI yet). */
+/* Saved launch metadata and public-boundary translation. */
 void appmem_init(struct addrspace *as, u32 img_end, u32 primary_end,
                  u32 exec_end, u32 guard_b);
 int appmem_error_public(int error);

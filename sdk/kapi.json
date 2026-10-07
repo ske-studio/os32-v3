@@ -1,6 +1,6 @@
 {
   "generations": {"os32x_format": 4, "kapi_abi": 1, "memory_layout": 2, "shlib_protocol": 1},
-  "version": 70,
+  "version": 71,
   "func_capacity": 300,
   "crt_kapi_symbol": "os32_kapi_v63",
   "data_fields": [
@@ -53,7 +53,7 @@
     "memory_boot.h",
     "launch.h",
     "kapi_host.h",
-    "pci.h", "pcm_cs4231.h", "bootinfo.h", "serialfs.h", "v86_gcap.h", "surface_query.h", "ring3_ls.h", "redir_access.h"
+    "pci.h", "pcm_cs4231.h", "bootinfo.h", "serialfs.h", "v86_gcap.h", "surface_query.h", "ring3_ls.h", "redir_access.h", "appmem.h"
   ],
   "externs": [
     "extern volatile u32 tick_count;",
@@ -1832,6 +1832,39 @@
           "size": "sizeof(u32)"
         }
       ]
+    },
+    {
+      "name": "mem_map",
+      "ret": "void *",
+      "args": [
+        "u32 bytes",
+        "void *hint",
+        "u32 flags"
+      ],
+      "out": "none",
+      "in": [
+        {
+          "arg": "hint",
+          "target": true
+        }
+      ],
+      "body": "struct caller_access caller;\nif (!caller_access_get(&caller) || caller.origin != CALLER_USER) return NULL;\nu32 base;\nint rc = appmem_map(caller.as, &caller.as->appmem, &caller.as->appmem_layout, bytes, (u32)hint, flags, APPMEM_ANON, 0, &base);\nreturn rc ? NULL : (void *)base;"
+    },
+    {
+      "name": "mem_unmap",
+      "ret": "int",
+      "args": [
+        "void *base",
+        "u32 bytes"
+      ],
+      "out": "none",
+      "in": [
+        {
+          "arg": "base",
+          "target": true
+        }
+      ],
+      "body": "struct caller_access caller;\nif (!caller_access_get(&caller) || caller.origin != CALLER_USER) return OS32_ERR_INVAL;\nreturn appmem_error_public(appmem_unmap(caller.as, &caller.as->appmem, (u32)base, bytes));"
     }
   ]
 }

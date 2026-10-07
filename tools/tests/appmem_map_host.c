@@ -4,6 +4,7 @@
 #include "appmem.h"
 #include "appslot.h"
 #include "lease.h"
+#include "redir_access.h"
 #include "os32_kapi_shared.h"
 static u32 host_cr3;
 static void map_sync(u32 root);
@@ -655,9 +656,11 @@ void appslot_resume_commit(int id) { current_slot = id; g_slot[id].state = APP_S
 void appslot_mark_scheduled(int id, u32 ticks) { (void)id; (void)ticks; }
 static void exec_restore_context(int id) { (void)id; entered_user++; }
 void ring3_resume(const u32 *frame, u32 pd, void *tss) { (void)frame; (void)pd; (void)tss; entered_user++; }
-static void caller_access_leave(int *prev) { (void)prev; }
+static void host_caller_access_leave(int *prev) { (void)prev; }
 static void exec_park_stop(u32 *frame) { (void)frame; entered_user++; }
+#define caller_access_leave host_caller_access_leave
 #include "exec_source.c"
+#undef caller_access_leave
 #include "abort_clear_source.c"
 static void poison_abort_cases(void) {
     integration = 1;
@@ -697,6 +700,7 @@ static void poison_abort_cases(void) {
             CHECK("abort lease foreign return", pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, phys / PAGE_SIZE, 1));
             saved = irq_save();
         }
+        CHECK("abort path already poisoned", a.appmem_poisoned);
         paging_addrspace_poison(&a);
         CHECK("poison owner abort requested", g_slot[2].abort_req && !g_slot[3].abort_req && !_irq_enabled());
         irq_restore(saved);
@@ -727,6 +731,79 @@ static void poison_abort_cases(void) {
     }
     g_slot[2].state = g_slot[3].state = APP_STATE_FREE;
     g_cur_app = 0; current_slot = APP_ID_SHELL;
+}
+
+/* The saved identity boundary is mocked; actual caller validation has its
+ * own host suite. Execute generated wrappers with the real paging allocator. */
+static struct caller_access public_caller;
+static int public_caller_valid;
+int caller_access_get(struct caller_access *out) {
+    if (!public_caller_valid) return 0;
+    *out = public_caller;
+    return 1;
+}
+#include "os32_kapi_slots.h"
+#define KAPI_HIT(slot) ((void)(slot))
+#include "public_wrap_source.c"
+#undef KAPI_HIT
+
+static void public_cases(void) {
+    integration = 1; watching = unmapping = 0;
+    CHECK("public map address bypasses early guard", !kapi_argptr[KAPI_SLOT_MEM_MAP]);
+    CHECK("public unmap address bypasses early guard", !kapi_argptr[KAPI_SLOT_MEM_UNMAP]);
+    u32 owner;
+    CHECK("public owner", ledger_owner_new(LEDGER_KIND_AS, 0, "public", &owner));
+    make_as(owner); host_cr3 = roots[0];
+    appmem_init(&a, MEM_EXEC_LOAD_ADDR + 1, MEM_EXEC_LOAD_ADDR + PAGE_SIZE,
+                MEM_EXEC_HEAP_BASE, MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE - MEM_GUARD_SIZE);
+    public_caller = (struct caller_access){CALLER_USER, 2, &a, a.pd_phys, owner, 1};
+    public_caller_valid = 1;
+    void *mapped = wrap_mem_map(PAGE_SIZE, 0, OS32_MEM_MAP_TOPDOWN);
+    CHECK("public map ANON", mapped && a.appmem.e[0].kind == APPMEM_ANON);
+    CHECK("public saved AS map", a.appmem.e[0].base == (u32)mapped && host_cr3 == roots[0]);
+    struct appmem_table before = a.appmem;
+    u32 pages = ledger_owner_pages(owner);
+    for (int path = 0; path < 3; path++) {
+        /* invalid identity, TRUSTED, WM with saved USER AS but trusted origin */
+        public_caller_valid = path != 0;
+        public_caller.origin = CALLER_TRUSTED;
+        /* path 2 models caller_access_get during a WM interval. */
+        CHECK("public non-USER map rejected", !wrap_mem_map(PAGE_SIZE, 0, 0));
+        CHECK("public non-USER unmap rejected", wrap_mem_unmap(mapped, PAGE_SIZE) == OS32_ERR_INVAL);
+        CHECK("public rejection immutable", equal(&before, &a.appmem, sizeof(before)) && ledger_owner_pages(owner) == pages);
+    }
+    public_caller_valid = 1; public_caller.origin = CALLER_USER;
+    CHECK("public size zero", !wrap_mem_map(0, 0, 0));
+    CHECK("public exact NULL", !wrap_mem_map(PAGE_SIZE, 0, OS32_MEM_MAP_EXACT));
+    CHECK("public unknown flags", !wrap_mem_map(PAGE_SIZE, 0, 4));
+    CHECK("public outside hint", !wrap_mem_map(PAGE_SIZE, (void *)MEM_LEASE_BASE, 0));
+    CHECK("public exact collision", !wrap_mem_map(PAGE_SIZE, mapped, OS32_MEM_MAP_EXACT));
+    CHECK("public unmap INVAL translated", wrap_mem_unmap(mapped, 1) == OS32_ERR_INVAL);
+    a.appmem_poisoned = 1; snapshot(0);
+    CHECK("public poisoned map immutable", !wrap_mem_map(PAGE_SIZE, 0, 0) &&
+          equal(&before, &a.appmem, sizeof(before)) && ledger_owner_pages(owner) == pages &&
+          equal(owner_image, owner_map, limit_pfn) &&
+          equal(pool_image, host_pool_storage, sizeof(host_pool_storage)) &&
+          equal(owners_image, ledger_owners, sizeof(ledger_owners)) && used_pages == saved_used);
+    CHECK("public poisoned unmap immutable", wrap_mem_unmap(mapped, PAGE_SIZE) == OS32_ERR_INVAL &&
+          equal(&before, &a.appmem, sizeof(before)) && ledger_owner_pages(owner) == pages &&
+          equal(owner_image, owner_map, limit_pfn) &&
+          equal(pool_image, host_pool_storage, sizeof(host_pool_storage)) &&
+          equal(owners_image, ledger_owners, sizeof(ledger_owners)) && used_pages == saved_used);
+    a.appmem_poisoned = 0;
+    for (u32 kind = APPMEM_EXEC_INITIAL; kind <= APPMEM_EXEC_LARGE; kind++) if (kind != APPMEM_ANON) {
+        a.appmem.e[0].kind = kind; before = a.appmem;
+        CHECK("public EXEC rejected", wrap_mem_unmap(mapped, PAGE_SIZE) == OS32_ERR_INVAL);
+        CHECK("public EXEC unchanged", equal(&before, &a.appmem, sizeof(before)) && ledger_owner_pages(owner) == pages);
+    }
+    a.appmem.e[0].kind = APPMEM_ANON;
+    CHECK("public unmap success", !wrap_mem_unmap(mapped, PAGE_SIZE) && !a.appmem.e[0].base);
+    CHECK("public remap exact", wrap_mem_map(PAGE_SIZE, mapped, OS32_MEM_MAP_EXACT | OS32_MEM_MAP_TOPDOWN) == mapped);
+    a.appmem.e[0].kind = APPMEM_LIBC_INITIAL;
+    CHECK("public libc unmap", !wrap_mem_unmap(mapped, PAGE_SIZE));
+    CHECK("public FULL translated", appmem_error_public(APPMEM_EFULL) == OS32_ERR_FULL);
+    paging_addrspace_destroy(&a);
+    CHECK("public owner returned", !ledger_owner_pages(owner) && ledger_owner_retire(owner));
 }
 
 static void teardown_cases(void) {
@@ -852,6 +929,7 @@ void _start(void) {
     CHECK("owner B returned", !ledger_owner_pages(ob));
     poison_abort_cases();
     teardown_cases();
+    public_cases();
     say("PASS appmem_map CHECK=", sizeof("PASS appmem_map CHECK=") - 1); number(checks); say("\n", 1);
     die(0);
 }

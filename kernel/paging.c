@@ -1103,6 +1103,7 @@ int paging_addrspace_clear_app_band(struct addrspace *as)
 /*  アプリ固有 PDE の中だけを辿る。共有 PT (VRAM/SHM/フォント/GFX) に        */
 /*  掛かる範囲は 1 ビットも触らない — 触ると他の PD ごと巻き添えになる。      */
 /* ======================================================================== */
+/* Master context only: never restore the app CR3 after poisoning its AS. */
 u32 paging_addrspace_free_user_range(struct addrspace *as, u32 vstart,
                                      u32 vend)
 {

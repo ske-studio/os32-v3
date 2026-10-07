@@ -14,8 +14,8 @@ import host32
 from mutpar import run_ordered
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SOURCES = ['exec/appmem.c', 'kernel/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'kernel/paging.c', 'exec/exec.c', 'exec/appslot.c']
-TARGET_SRCS = ['exec/exec.c', 'exec/appslot.c', 'exec/lease.c', 'exec/appslot.h', 'exec/appmem.c', 'kernel/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c',
+SOURCES = ['exec/appmem.c', 'kernel/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'kernel/paging.c', 'exec/exec.c', 'exec/appslot.c', 'kapi/kapi_generated.c']
+TARGET_SRCS = ['sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/exec.c', 'exec/appslot.c', 'exec/lease.c', 'exec/appslot.h', 'exec/appmem.c', 'kernel/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c',
     'exec/appmem.h', 'kernel/paging_app.h', 'kernel/paging.c', 'kernel/paging.h',
     'kernel/pgalloc.c', 'kernel/pgalloc.h', 'kernel/physmem.c', 'kernel/physmem.h',
     'include/appmem_types.h', 'sdk/include/os32/os32_kapi_shared.h', 'include/types.h', 'include/memmap.h', 'include/io.h',
@@ -109,6 +109,19 @@ MUTANTS = [
     ('WM-clears-poison-abort', 6, 'if (!g_slot[i].as || !g_slot[i].as->appmem_poisoned)',
      'if (1)', 'poison WM clear preserves abort'),
 
+    ('public-map-early-pointer', 7, '    0x0000,  /* mem_map */',
+     '    0x0002,  /* mem_map */', 'public map address bypasses early guard'),
+    ('public-unmap-early-pointer', 7, '    0x0000,  /* mem_unmap */',
+     '    0x0001,  /* mem_unmap */', 'public unmap address bypasses early guard'),
+    ('public-map-origin', 7, 'caller.origin != CALLER_USER) return NULL;',
+     '0) return NULL;', 'public non-USER map rejected'),
+    ('public-unmap-origin', 7, 'KAPI_HIT(247);\n    struct caller_access caller;\n    if (!caller_access_get(&caller) || caller.origin != CALLER_USER) return OS32_ERR_INVAL;',
+     'KAPI_HIT(247);\n    struct caller_access caller;\n    if (!caller_access_get(&caller) || 0) return OS32_ERR_INVAL;', 'public non-USER unmap rejected'),
+    ('public-map-kind', 7, 'flags, APPMEM_ANON, 0, &base)',
+     'flags, APPMEM_EXEC_ARENA, 0, &base)', 'public map ANON'),
+    ('public-unmap-translation', 7, 'return appmem_error_public(appmem_unmap(caller.as, &caller.as->appmem, (u32)base, bytes));',
+     'return appmem_unmap(caller.as, &caller.as->appmem, (u32)base, bytes);', 'public unmap INVAL translated'),
+
 ]
 
 
@@ -158,6 +171,12 @@ def main():
                 parts.append('static void host_syscall_tail(u32 *frame) { int prev_caller = 0, prev_in_syscall = 0; u32 *prev_frame = 0;\n' + tail + '\n}')
                 return '\n'.join(parts)
 
+            def public_parts(source):
+                return '\n'.join(function(source, sig) + ';' for sig in
+                                 ('const u16 kapi_argptr[KAPI_FUNC_COUNT] = ',
+                                  'void * __cdecl wrap_mem_map(', 'int __cdecl wrap_mem_unmap('))
+
+            (tmp / 'public_wrap_source.c').write_text(public_parts(bodies[7]))
             (tmp / 'exec_source.c').write_text(exec_parts(bodies[5]))
             (tmp / 'abort_clear_source.c').write_text(function(bodies[6], 'int appslot_abort_clear('))
             lease_source = (ROOT / 'exec/lease.c').read_text()
@@ -180,9 +199,11 @@ def main():
                 if index >= 4:
                     if index == 4: (tmp / 'paging_source.c').write_text(source)
                     if index == 5: (tmp / 'exec_source.c').write_text(exec_parts(source))
+                    if index == 7: (tmp / 'public_wrap_source.c').write_text(public_parts(source))
                     if index == 6: (tmp / 'abort_clear_source.c').write_text(function(source, 'int appslot_abort_clear('))
                     host32.build(cc + ['-c', str(ROOT / 'tools/tests/appmem_map_host.c'), '-o', str(obj)],
                                  check=True, capture_output=True, text=True, timeout=30)
+                    (tmp / 'public_wrap_source.c').write_text(public_parts(bodies[7]))
                     # Restore inputs before the next (sequential) mutation.
                     (tmp / 'paging_source.c').write_text(bodies[4])
                     (tmp / 'exec_source.c').write_text(exec_parts(bodies[5]))

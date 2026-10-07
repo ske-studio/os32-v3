@@ -65,3 +65,4 @@ kapi/kapi_db.c:kapi_db_prepare:MEM_SHM_BASE はリンカ由来の仮想 (DB_SHM_
 kapi/kapi_db.c:kapi_db_step:MEM_SHM_BASE はリンカ由来の仮想 (DB_SHM_PTR の型変換)
 drivers/pci.c:pci_get:呼び手の仮想出力ポインタの型変換
 gfx/gfx_core.c:gfx_framebuffer_bridge:公開 USER 橋。lease 表の base + plane_offset はアプリの仮想番地。物理変換せず B1 出力値にする
+kapi/kapi_generated.c:wrap_mem_map:appmem_map が返すアプリ私有 VA (物理番地ではなく、kernel から参照しない)
