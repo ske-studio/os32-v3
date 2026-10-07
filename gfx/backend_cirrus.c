@@ -30,10 +30,9 @@
 /*    FE000000h + 04B000h  クライアント面 = bb_base、300KB                   */
 /*  **Cirrus は NP21/W 互換のためだけ** (ユーザー決定 2026-09-29): auto では   */
 /*  NP21/W 上でしかボードの ID を読みにいかない (cirrus_probe の段 2)。      */
-/*  窓は master には **supervisor + PCD** で張り、exec が                     */
-/*  gfx_bb_phys_range() を見てこの 300KB だけをアプリ PD で USER へ昇格させる */
-/*  (paging_addrspace_map_user_keep、PCD は保つ)。表示面の PTE は決して USER  */
-/*  にならない = 契約 G4 (レビュー #5 ②③、2026-09-06)。                      */
+/*  窓は master と共有 PT では **supervisor + PCD** のまま。CPL=3 には      */
+/*  CLIENT 面だけを私有 lease VA に写し、PCD/PWT を保持する。表示面と       */
+/*  デバイス窓の恒等 alias は USER にしない (契約 G4、e11b2)。              */
 /* ======================================================================== */
 
 #include "memmap.h"
@@ -329,17 +328,11 @@ static void cirrus_init(void)
     /* リニア窓は起動時の ⑥ (gfx_core.c gfx_boot_reserve) が予約 → master PD
      * への写像 (**supervisor + PCD**、写像範囲 = lin_size の 2MB だけ、decode
      * 4MB は予約だけ) を probe より前に 1 回だけ済ませている (TASK_T1_LEDGER
-     * §3-8、T1-R5)。ここでは張らない — 二度目以降の init で張り直すと共有 PT
-     * の PTE を supervisor で上書きし、起動中の CPL=3 アプリのために exec が
-     * 立てたクライアント面の USER が消える (2026-09-06 実測 #PF
-     * addr=0104B000h)。
-     *   USER 無し: この窓のオフセット 0 は **表示面**。アプリに見せるのは
-     *         クライアント面だけで、その 300KB は exec が gfx_bb_phys_range()
-     *         を見て paging_addrspace_map_user_keep() でアプリ PD ごとに昇格
-     *         させる (契約 G4、レビュー #5 ②)。
-     *   PCD : CPU が書いた画素を BLT エンジンが読むので、USER へ昇格させた
-     *         あとも PCD は残らなければならない (…map_user_keep が既存 PTE の
-     *         PCD/PWT を引き継ぐのはそのため)。 */
+     * §3-8、T1-R5)。ここでは張らない。共有 PT の恒等 alias は起動後も
+     * supervisor のまま維持し、CPL=3 には CLIENT 面だけを私有 lease VA で
+     * 貸す (契約 G4、e11b2)。表示面は貸さない。
+     * PCD: CPU が書いた画素を BLT エンジンが読むので、CLIENT の lease
+     * 写像でも backing の PCD/PWT を保持する。 */
     s_lin = (u8 *)P2V(s_glue->lin_base);
 
     if (wab_cirrus_setup_8bpp(s_glue, CIRRUS_WIDTH, CIRRUS_HEIGHT,

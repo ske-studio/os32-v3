@@ -228,6 +228,13 @@ shm_reuse_child/h2のページ・SHM長を公開定数へ。301件=22窓、再�
 c1 注記 (2026-10-07): v70 slot 240〜245・公開値型・E11-8/14、像予算一時 +16KB。c2/c3/b2 と統合ゲストは未実施。証拠 `/home/hight/os32-tmp/run/e11/c1_report.md`、`c1_sizes.json`、`c1_*.log`。
 
 - a=内部結線 (旧USER下は準備確認)、b=低位USER/旧例外撤去・SHM/V86契約・拒否、c=正規lease対照・公開KAPI/caller/SDK/生成/版/manifest。**順序は b1 → c → b2** (aの後。b1は直接consumerの無いTVRAM/font/VRAM例外、b2はUnicode/BB/共有PT)。a/b/cは独立公開・配備せず、**版の更新は統合でだけ行う** (b1のTVRAM wrap本体は宣言・slot・版不変で再生成可)。統合で§2-4全6項を同時成立、現行対象再ビルド・配備を一括。受入は§2-5末尾のNP21/W一式とe12の変異一覧による。apps/gameは§5/§8へ。E11-5は2026-10-03決定の「全画面中のowner 1または専用のKAPI」、追加ならcで版一括へ含める。
+**e11b2 実装 (2026-10-07、基点 `6d62e0f`、未配備)**:
+- Unicode/BB・旧 CLIENT の共有 USER と PDE 準備を撤去、通常 AS map/unmap は共有 PT 要求を無変更拒否。
+- selftest の呼出し/件数を維持して拒否を検証。E は error7/0x6A000 の kill、F は c2 のまま。
+- memory_layout=2、KAPI70不変、旧世代1を拒否。全現行ビルド対象を clean 再ビルド。
+- 証拠 `~/os32-tmp/run/e11/b2_report.md`・`b2_*.log`、予算 `b2_sizes.json`。KHEAP の戻しは PM 判断。
+- ゲスト/native補完は台帳 E11-3/6/10/BUD、台本 `e11b2-*` で PM 統合受入。§4-1 の差分確認を報告に残す。
+
 **e11a2 内部準備 (基点 `5ca3f01`、2026-10-07、未配備)**:
 - E11-5: WM/端末子孫の注入門と全画面フォーカス配送。WM注入に宛先を保持しtake/peek/pendingを連鎖内へ限定。exec_resumeの2箇所だけ宛先ID付きtakeに変更し、両帰路を抽出検査。WMは成功注入だけ起床候補にしAGAIN/退場で消す。
 - E11-6a: kcg_init は boot 閉鎖後も倍率1へ戻す (取得済み旗保持)。GUI の非所有 USER shutdown を無変更拒否、CUI/内部終了は維持。

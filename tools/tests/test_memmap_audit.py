@@ -19,8 +19,27 @@ def function(text, name):
 from mutpar import run_ordered
 
 MUTANTS = [
- ('legacy-font-user', 'kernel/paging.c', 'a >= MEM_UNICODE_TABLE_BASE && a < MEM_GFX_BB_BASE', 'a >= MEM_FONT_CACHE_BASE && a < MEM_GFX_BB_BASE', 'FAIL paging_master_audit(exec_tramp_page_addr()) > 0'),
- ('legacy-tvram-user', 'kernel/paging.c', 'static int memmap_legacy_user(u32 a)\n{', 'static int memmap_legacy_user(u32 a)\n{\n    if (a >= TVRAM_CHAR_BASE && a < GVRAM_BRG_END) return 1;', 'FAIL paging_master_audit(exec_tramp_page_addr()) > 0'),
+ ('low-audit-USER', 'kernel/paging.c', '        if (want == seen) { i++; continue; }',
+  '        if (want == MM_RW && seen == MM_RWU) want = seen;\n        if (want == seen) { i++; continue; }',
+  'FAIL paging_memmap_selftest(exec_tramp_page_addr()) > 0'),
+ ('client-alias-USER', 'kernel/paging.c',
+  '            if (!(want & PTE_PRESENT)) { if (e & PTE_PRESENT) bad++; continue; }',
+  '            for (u32 si = 0; si < LEDGER_MAX_SURFACES; si++) {\n'
+  '                const struct ledger_surface *sf = &ledger_surfaces[si];\n'
+  '                if (sf->role == LEDGER_ROLE_CLIENT && p >= sf->first && p - sf->first < sf->npages) want |= e & PTE_USER;\n'
+  '            }\n'
+  '            if (!(want & PTE_PRESENT)) { if (e & PTE_PRESENT) bad++; continue; }',
+  'FAIL paging_master_audit(exec_tramp_page_addr()) > 0'),
+ *[(f'legacy-{name}-user', 'kernel/paging.c',
+    '            if (!(want & PTE_PRESENT)) { if (e & PTE_PRESENT) bad++; continue; }',
+    f'            if ({condition}) want |= e & PTE_USER;\n'
+    '            if (!(want & PTE_PRESENT)) { if (e & PTE_PRESENT) bad++; continue; }',
+    'FAIL paging_master_audit(exec_tramp_page_addr()) > 0')
+   for name, condition in (
+       ('font', 'a >= MEM_FONT_CACHE_BASE && a < MEM_UNICODE_TABLE_BASE'),
+       ('unicode', 'a >= MEM_UNICODE_TABLE_BASE && a < MEM_GFX_BB_BASE'),
+       ('bb', 'a >= MEM_GFX_BB_BASE && a < MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE'),
+       ('tvram', 'a >= TVRAM_CHAR_BASE && a < GVRAM_BRG_END'))],
 
  ('audit-line-ending', 'kernel/kselftest.c', 'serial_puts_polled("\\r\\n");', 'serial_puts_polled("\\n");', 'FAIL serial_len >= 2'),
 
@@ -38,7 +57,7 @@ MUTANTS = [
  ('AS-IRQ-unbounded', 'exec/lease.c', '        irq_restore(flags);\n    }\n    /* Alias/descriptor', '        (void)flags;\n    }\n    /* Alias/descriptor', 'FAIL scan_max[0] == PTE_COUNT'),
  ('v86-client-revoke', 'gfx/gfx_core.c', '    gfx_reinit_surface_roles(0, 1);', '    gfx_reinit_surface_roles(0, 0);', 'FAIL client->gen == cref.generation && client->lease_count == 1'),
  ('tvram-unready', 'exec/system_surface.c', '!(gfx_surface_unready & (1U << (sf - ledger_surfaces)))', '1', 'FAIL !system_surface_source(LEDGER_ROLE_TVRAM, &tvsrc) && !tvsrc.ready'),
- ('aperture-user', 'kernel/paging.c', '    if ((entry & PTE_USER) &&\n        !ledger_surface_find(LEDGER_SF_CIRRUS, LEDGER_ROLE_CLIENT)) return 0;', '', 'FAIL paging_master_audit(exec_tramp_page_addr()) > 0'),
+ ('aperture-user', 'kernel/paging.c', '    if (entry & PTE_USER) return 0;', '', 'FAIL paging_master_audit(exec_tramp_page_addr()) > 0'),
  ('failed-map-published', 'gfx/gfx_core.c', '            (void)ledger_resource_set_map(rid, 0, 0);', '', 'FAIL !paging_master_audit(exec_tramp_page_addr())'),
  ('lifetime-boot-count', 'kernel/kselftest.c', '    audit_runs++;', '    audit_runs++;\n    ksel_pass++;', 'FAIL ksel_pass == boot_pass && ksel_fail == boot_fail'),
  ('selected-check', 'gfx/gfx_core.c', 'int gfx_selected_selfcheck(void)\n{\n    struct surface_query_source client, display;\n    if (gfx_selected_source(LEDGER_ROLE_CLIENT, &client) ||\n        gfx_selected_source(LEDGER_ROLE_DISPLAY, &display) ||\n        !client.ready || !display.ready || client.count != 1) return 0;\n    for (u32 i = 0; i < display.count; i++)\n        if (!ledger_surface_validate(&ledger_surfaces[display.refs[i].sid])) return 0;\n    const struct ledger_surface *sf = &ledger_surfaces[client.refs[0].sid];\n    if (!ledger_surface_validate(sf) || !g_backend ||\n        g_backend->bb_base != bb[0] || g_backend->bb_size != sf->npages * PAGE_SIZE ||\n        g_backend->bb_pitch != sf->pitch || g_backend->bb_format != sf->format) return 0;\n    u8 *base = sf->backing >= LEDGER_SB_VRAM ?\n               (u8 *)P2V_IO(sf->first * PAGE_SIZE) : (u8 *)P2V(sf->first * PAGE_SIZE);\n    for (u32 i = 0; i < 4; i++)\n        if (bb[i] != (i < sf->planes ? base + sf->plane_offset[i] : 0)) return 0;\n    return bb_b == bb[0] && bb_r == bb[1] && bb_g == bb[2] && bb_i == bb[3];\n}', 'int gfx_selected_selfcheck(void)\n{\n    return 1;\n}', 'FAIL !gfx_selected_selfcheck()'),

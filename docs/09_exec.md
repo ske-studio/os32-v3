@@ -43,17 +43,17 @@ KernelAPIポインタを引数として実行する。
 | 0x7C0000〜0x7FFFFF | RW+USER | ユーザスタック 256KB (帯 1 枚のとき。2 枚なら 0xBC0000〜0xBFFFFF) |
 | 0xA0000〜0xBFFFF | supervisor (e11b1〜) | テキスト / グラフィック VRAM。CPL=3 は KAPI (`tvram_*`) か lease 経由だけ |
 | フォントキャッシュ 0x01000〜 | supervisor (e11b1〜) | `kcg_read_*` の KAPI 越し |
-| SHM、Unicode 表 0x4A000〜 | RW+USER (共有 PT) | SHM は KAPI の割当て分。Unicode 表は **e11b2 まで暫定で USER** (e11c の port 切替の後に撤去) |
-| **0x6A000〜0x89FFF (9801 バックバッファ)** | RW+USER、**常に** | アプリの `gfx_init` でアクセラレータが失敗して 9801 へ落ちたときの描画先 (レビュー #6)。**e11b2 で撤去予定** (e11c で lease VA に切り替えた後) |
-| **バックエンド固有のバックバッファ** (`gfx_bb_phys_range()`: PEGC = 物理末尾 300KB、Cirrus = リニア窓のクライアント面) | RW+USER、`paging_addrspace_map_user_keep` (既存 PTE の PCD/PWT を保つ) | `libos32gfx` が画素を書く先。**表示面 (PEGC F00000h / Cirrus 01000000h) は supervisor のまま** = CPL=3 から書けない (契約 G4、`ring3_guard pegc\|cirrus` が kill を確認) |
+| SHM | RW+USER (共有 PT、lock 中は RO) | boot 専用口で初期化し、SHM 専用口で RW だけ切替 |
+| Unicode 表 0x4A000〜 | supervisor (e11b2〜) | CPL=3 は RO の Unicode lease 経由 |
+| 0x6A000〜0x89FFF (9801 BB)、バックエンド固有 BB | supervisor (e11b2〜) | CLIENT lease の私有 VA で描画。Cirrus DISPLAY は授権された lease だけ RW |
 | KAPI トランポリン 1 ページ | RO+USER | `int 0x80` スタブ列 |
 | 0x400000〜 shlib .text | RO+USER (共有) / .data は per-app | 共有ライブラリ |
 
 SHM の先頭 1 ブロック (16KB) は DB 結果・エラー文用、末尾 4 ブロックは GUI 用に固定予約する。
 `shm_alloc` が配るのは残り 9 ブロックで、解放・所有者回収・全回収でも固定予約を維持する。
 
-写像は `gfx_init` より**前** (exec 時) に行われるので、バックエンドの `bb_base` と窓の PTE は
-最初の init 以後 shutdown を挟んでも保持される (Cirrus は窓を畳まない。[POLICY_DEBUG §4-21](POLICY_DEBUG.md))。
+通常の AS map/unmap は私有 PT だけを操作し、共有 PT に掛かる要求は無変更で拒否する。
+旧低位 USER を前提とした成果物は memory_layout 世代 2 の完全一致検査で拒否する (KAPI v70 は不変)。
 
 ### 起動失敗の巻き戻しと強制脱出
 

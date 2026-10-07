@@ -651,6 +651,7 @@ $(shell find userland -name '*.o' 2>/dev/null): $(SDK_KAPI_HDR)
 
 # === プログラムクリーン ===
 clean-programs: clean-rust clean-gshell
+	rm -f $(FAULTPROBE_OBJ)
 	rm -f userland/cmds/*.o userland/cmds/*.elf userland/cmds/*.raw userland/cmds/*.bin
 	rm -f userland/tests/*.o userland/tests/*.elf userland/tests/*.raw userland/tests/*.bin
 	rm -f userland/tests/kstr_ren_a.txt userland/tests/kstr_ren_c.txt userland/tests/kstr_c_raw.d

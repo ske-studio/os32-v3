@@ -218,9 +218,7 @@ static int fixed_paging_valid(void)
             (a | PAGE_RW)) return 0;
     }
     entry = page_directory[PAGING_APERTURE_PDI];
-    /* e11b removes this legacy shared CLIENT exception. */
-    if ((entry & PTE_USER) &&
-        !ledger_surface_find(LEDGER_SF_CIRRUS, LEDGER_ROLE_CLIENT)) return 0;
+    if (entry & PTE_USER) return 0;
     if (V2P(page_tables[PAGING_APERTURE_PDI]) != MEM_FIXED_APERTURE_PT_BASE ||
         (entry & (mask | PAGE_RW | PTE_PS | PTE_PCD | PTE_PWT)) !=
         (MEM_FIXED_APERTURE_PT_BASE | PAGE_RW)) return 0;
@@ -929,11 +927,7 @@ void paging_addrspace_destroy(struct addrspace *as)
     as->app_pde_count = 0;
 }
 
-/* 1 ページ分の実体。keep_cache=1 なら既存 PTE のキャッシュ属性 (PCD/PWT) を
- * 引き継ぐ。デバイス窓の中を USER へ昇格させるとき、flags に PCD を書き忘れる
- * と「CPU が書いた画素がキャッシュに残り、BLT エンジンが古い VRAM を読む」に
- * なる (Cirrus のクライアント面)。呼び出し側に属性を復唱させるのではなく、
- * 張ってあるものを保つ方が壊れにくい (レビュー #5 ③)。 */
+/* Private application PT only; keep_cache preserves its existing PCD/PWT. */
 static int addrspace_map_user_page(struct addrspace *as, u32 virt, u32 phys,
                                    u32 flags, int keep_cache)
 {
@@ -960,9 +954,7 @@ static int addrspace_map_user_page(struct addrspace *as, u32 virt, u32 phys,
         }
         pt = (u32 *)P2V(as->app_pt_phys[k]);
     } else {
-        /* 共有 PT (master と同一)。VRAM/SHM 等 C2 で共有 + USER の領域用。 */
-        if (!page_tables[pdi] || !(pd[pdi] & PTE_PRESENT)) return -1;
-        pt = page_tables[pdi];
+        return -1; /* Shared PTs are immutable through ordinary AS mapping. */
     }
 
     if (keep_cache) flags |= (pt[pti] & (u32)(PTE_PCD | PTE_PWT));
@@ -1011,7 +1003,7 @@ static int addrspace_map_user_range(struct addrspace *as, u32 vstart,
                 }
                 added[n++] = k;
                 pd[pdi] = as->app_pt_phys[k] | PAGE_RW;
-            } else if (!page_tables[pdi] || !(pd[pdi] & PTE_PRESENT)) goto rollback;
+            } else goto rollback;
         }
         goto ready;
 rollback:
@@ -1044,6 +1036,8 @@ int paging_addrspace_map_user_range(struct addrspace *as, u32 vstart,
     return addrspace_map_user_range(as, vstart, vend, flags, 0, 0);
 }
 
+/* 私有 PT の中だけで既存 PTE の PCD/PWT を保つ。現在 in-tree の呼び手なし
+ * (拒否を検査する selftest を除く) — 将来の私有デバイス lease 用。 */
 int paging_addrspace_map_user_keep(struct addrspace *as, u32 vstart,
                                    u32 vend, u32 flags)
 {
@@ -1096,6 +1090,9 @@ u32 paging_addrspace_free_user_range(struct addrspace *as, u32 vstart,
     u32 pfn, first, count, freed = 0, saved;
 
     if (!as || !as->pd_phys || !as->app_pde_count || vstart >= vend) return 0;
+    /* Reject the entire request before freeing any private page. */
+    if ((vstart >> 22) < as->app_pde ||
+        ((vend - 1) >> 22) >= as->app_pde + as->app_pde_count) return 0;
     saved = paging_current_cr3();
     if (saved == as->pd_phys) paging_load_cr3(paging_kernel_pd_phys());
     first = vstart >> PAGE_SHIFT;
@@ -1192,74 +1189,40 @@ int paging_pd_clone_selftest(void)
     return rc;
 }
 
-/* ======================================================================== */
-/*  paging_map_user_keep_selftest — デバイス窓を CPL=3 へ貸すときの不変条件   */
-/*                                                                          */
-/*  レビュー #5 ②③ の回帰止め。Cirrus のクライアント面のように「共有 PT の   */
-/*  中の 1 枚だけを USER にする」操作で、次の 4 つが同時に成り立つこと:      */
-/*    1. 貸したページに USER が立つ                                          */
-/*    2. そのページの PCD (キャッシュ無効) が消えない                        */
-/*       — 消えると CPU が書いた画素がキャッシュに残り、BLT エンジンが       */
-/*         古い VRAM を読む                                                  */
-/*    3. 同じ PT の隣のページ (= 表示面に相当) は supervisor のまま無傷       */
-/*    4. master の PDE には USER が伝播しない (アプリ PD 側にだけ立つ)        */
-/*                                                                          */
-/*  ハードウェアには一切依存しない: bootstrap (32MB) の末尾 2 ページを使う。 */
-/*  で、実 RAM も無く既定 Not-Present、どのドライバの窓とも重ならない         */
-/*  (Cirrus の窓は 01000000h〜011FFFFFh)。PTE は試験前の値へ戻す。            */
-/* ======================================================================== */
+/* Shared device aliases cannot be promoted, rewritten or freed by an AS.
+ * Exercise ordinary/keep/physical range APIs as well as the single-page API.
+ * Preserve complete entries, including PFN and cache bits, on rejection.
+ * rc bits: 1=missing PT, 2=AS creation, 4=keep, 64=single page,
+ * 128=identity range, 256=physical range, 8=free, 16=entry changed,
+ * 32=AS cleanup. */
 int paging_map_user_keep_selftest(void)
 {
     struct addrspace as;
-    u32 vclient = PAGING_BOOT_MAP_SIZE - PAGE_SIZE;        /* 貸す側 (クライアント面役) */
-    u32 vvisible = PAGING_BOOT_MAP_SIZE - 2 * PAGE_SIZE;   /* 貸さない側 (表示面役) */
-    u32 pdi = vclient >> 22;
-    u32 pti_c = (vclient >> 12) & 0x3FF;
-    u32 pti_v = (vvisible >> 12) & 0x3FF;
-    u32 saved_c, saved_v, saved_pde;
-    u32 pte_c, pte_v;
-    u32 *app_pd;
+    u32 va = PAGING_BOOT_MAP_SIZE - PAGE_SIZE;
+    u32 pdi = va >> 22, pti = (va >> PAGE_SHIFT) % PTE_COUNT;
+    u32 saved, master, app, expected;
     int rc = 0;
-
-    if (!pg_enabled) return 0;              /* ページング無効なら検証対象外 */
-    if (pdi >= PAGING_PT_COUNT) return 1;   /* 定数がずれた (起こらないはず) */
-
-    saved_c = page_tables[pdi][pti_c];
-    saved_v = page_tables[pdi][pti_v];
-    saved_pde = page_directory[pdi];
-
-    /* バックエンド init を模す: どちらも supervisor + PCD のデバイス窓。 */
-    page_tables[pdi][pti_c] = (vclient & 0xFFFFF000UL) | PAGE_RW | PTE_PCD;
-    page_tables[pdi][pti_v] = (vvisible & 0xFFFFF000UL) | PAGE_RW | PTE_PCD;
-
-    if (selftest_as_begin(&as, 1) != 0) {
-        page_tables[pdi][pti_c] = saved_c;
-        page_tables[pdi][pti_v] = saved_v;
-        page_directory[pdi] = saved_pde;
-        arch_mmu_flush_tlb();
+    if (!pg_enabled) return 0;
+    if (pdi >= PAGING_PT_COUNT || !page_tables[pdi]) return 1;
+    saved = page_tables[pdi][pti];
+    master = page_directory[pdi];
+    expected = va | PAGE_RW | PTE_PCD;
+    page_tables[pdi][pti] = expected;
+    if (selftest_as_begin(&as, 1)) {
+        page_tables[pdi][pti] = saved;
         return 2;
     }
-    app_pd = (u32 *)P2V(as.pd_phys);
-
-    /* exec が bb 範囲に対して行う操作そのもの。 */
-    if (paging_addrspace_map_user_keep(&as, vclient, vclient + PAGE_SIZE,
-                                       PAGE_RW | PTE_USER) != 0) rc |= 4;
-
-    pte_c = page_tables[pdi][pti_c];
-    pte_v = page_tables[pdi][pti_v];
-
-    if (!(pte_c & PTE_USER)) rc |= 8;                       /* 1 */
-    if (!(pte_c & PTE_PCD))  rc |= 16;                      /* 2 */
-    if (pte_v & PTE_USER)    rc |= 32;                      /* 3 */
-    if (!(pte_v & PTE_PCD))  rc |= 64;                      /* 3 */
-    if (page_directory[pdi] & PTE_USER) rc |= 128;          /* 4 (master) */
-    if (!(app_pd[pdi] & PTE_USER))      rc |= 256;          /* 4 (アプリ PD) */
-
-    if (selftest_as_end(&as)) rc |= 512;    /* 試験用 owner のページが残った */
-
-    page_tables[pdi][pti_c] = saved_c;
-    page_tables[pdi][pti_v] = saved_v;
-    page_directory[pdi] = saved_pde;
+    app = ((u32 *)P2V(as.pd_phys))[pdi];
+    if (paging_addrspace_map_user_keep(&as, va, va + PAGE_SIZE, PAGE_RW | PTE_USER) != -1) rc |= 4;
+    if (paging_addrspace_map_user(&as, va, va, PAGE_RW | PTE_USER) != -1) rc |= 64;
+    if (paging_addrspace_map_user_range(&as, va, va + PAGE_SIZE, PAGE_RW) != -1) rc |= 128;
+    if (paging_addrspace_map_user_range_phys(&as, va, va + PAGE_SIZE, PAGE_SIZE, PAGE_RW) != -1) rc |= 256;
+    if (paging_addrspace_free_user_range(&as, va, va + PAGE_SIZE)) rc |= 8;
+    if (page_tables[pdi][pti] != expected || page_directory[pdi] != master ||
+        ((u32 *)P2V(as.pd_phys))[pdi] != app) rc |= 16;
+    if (selftest_as_end(&as)) rc |= 32;
+    page_tables[pdi][pti] = saved;
+    page_directory[pdi] = master;
     arch_mmu_flush_tlb();
     return rc;
 }
@@ -1307,9 +1270,9 @@ int paging_app_band_selftest(void)
 /*                                                                          */
 /*  期待値は全て memmap.h から引く ([C4])。番地は 1 つも直書きしない。        */
 /*                                                                          */
-/*  **呼ぶのはブート直後 (kselftest_run_post_exec) だけ。** CPL=3 アプリを    */
-/*  起動すると exec が VRAM / フォント表 / GFX BB を USER へ昇格させ   */
-/*  (PDE 0 は全 PD 共有なので master にも残る)、期待値と合わなくなる。       */
+/*  ブート直後 (kselftest_run_post_exec) に呼ぶ。旧 VRAM / フォント /        */
+/*  Unicode / GFX BB の恒等 alias は CPL=3 起動後も supervisor のまま。      */
+/*  CLIENT と Unicode は私有 lease VA に写し、共有 PT は昇格させない。      */
 /* ======================================================================== */
 
 #define MM_NP   0   /* not-present */
@@ -1376,34 +1339,6 @@ static u8 memmap_want_at(u32 a, u32 tramp)
     return MM_RW;                               /* スタック + heap + 固定PD/PT */
 }
 
-static int memmap_legacy_user(u32 a)
-{
-    /* b1 -> c -> b2: only Unicode/BB and legacy CLIENT consumers remain. */
-    if (a >= MEM_UNICODE_TABLE_BASE && a < MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE) return 1;
-    for (u32 i = 0; i < LEDGER_MAX_SURFACES; i++) {
-        const struct ledger_surface *sf = &ledger_surfaces[i];
-        if (sf->npages && sf->role == LEDGER_ROLE_CLIENT &&
-            a / PAGE_SIZE >= sf->first && a / PAGE_SIZE - sf->first < sf->npages)
-            return 1;
-    }
-    return 0;
-}
-
-/* Make shared PDE permissions stable before the first real AS. Only PDEs
- * covering the legacy CLIENT gain USER; individual supervisor PTEs stay sup.
- * e11b removes this along with the old shared USER consumers. */
-void paging_prepare_legacy_clients(void)
-{
-    if (!paging_boot_context()) return;
-    for (u32 i = 0; i < LEDGER_MAX_SURFACES; i++) {
-        const struct ledger_surface *sf = &ledger_surfaces[i];
-        if (!sf->npages || sf->role != LEDGER_ROLE_CLIENT) continue;
-        for (u32 p = sf->first; p < sf->first + sf->npages; p++)
-            page_directory[p / PTE_COUNT] |= PTE_USER;
-    }
-    arch_mmu_flush_tlb();
-}
-
 static u8 memmap_seen_at(u32 pte)
 {
     if (!(pte & PTE_PRESENT)) return MM_NP;
@@ -1448,7 +1383,6 @@ int paging_memmap_selftest(u32 tramp_page)
         a = i * PAGE_SIZE;
         want = memmap_want_at(a, tramp_page);
         seen = memmap_seen_at(page_tables[0][i]);
-        if (want == MM_RW && seen == MM_RWU && memmap_legacy_user(a)) want = seen;
         if (want == seen) { i++; continue; }
         /* 同じ (期待, 実物) の組が続くあいだを 1 本の区間にまとめる */
         for (j = i + 1; j < PTE_COUNT; j++) {
@@ -1682,7 +1616,6 @@ int paging_master_audit(u32 tramp)
                         want = PAGE_RW | PTE_PCD;
                 }
             }
-            if ((want & PTE_PRESENT) && memmap_legacy_user(a)) want |= e & PTE_USER;
             if (!(want & PTE_PRESENT)) { if (e & PTE_PRESENT) bad++; continue; }
             if ((e & (~(u32)(PAGE_SIZE - 1) | PAGE_RW | PTE_USER | PTE_PCD | PTE_PWT)) !=
                 (a | want)) bad++;

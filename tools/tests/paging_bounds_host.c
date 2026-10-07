@@ -157,8 +157,9 @@ void _start(void)
         CHECK(paging_addrspace_map_user_range(&as, 0x23FF000, 0x2401000, PAGE_RW | PTE_USER) == -1);
         CHECK(page_tables[8][1023] == saved);
         CHECK(paging_addrspace_map_user(&as, 0x2400000, 0, PAGE_RW | PTE_USER) == -1);
-        CHECK(paging_addrspace_map_user_keep(&as, 0xFFFFF000UL, 0xFFFFFFFFUL, PAGE_RW | PTE_USER) == 0);
-        CHECK((page_tables[1023][1023] & (PTE_USER | PTE_PCD)) == (PTE_USER | PTE_PCD));
+        saved = page_tables[1023][1023];
+        CHECK(paging_addrspace_map_user_keep(&as, 0xFFFFF000UL, 0xFFFFFFFFUL, PAGE_RW | PTE_USER) == -1);
+        CHECK(page_tables[1023][1023] == saved);
         CHECK(!(page_directory[1023] & PTE_USER));
         paging_addrspace_destroy(&as);
         CHECK(paging_map_user_keep_selftest() == 0);
@@ -274,6 +275,17 @@ void _start(void)
         code = MEM_EXEC_LOAD_ADDR; sbrk_end = code + 2 * PAGE_SIZE;
         CHECK(paging_addrspace_map_user_range_phys(&as, code, sbrk_end,
                                                    0x900000, PAGE_RW | PTE_USER) == 0);
+        /* Mixed private/shared ranges must not free or rewrite the private prefix. */
+        u32 *private_pt = P2V(as.app_pt_phys[0]);
+        u32 private_saved = private_pt[(code >> PAGE_SHIFT) % PTE_COUNT];
+        u32 outside = (as.app_pde + as.app_pde_count) << 22;
+        CHECK(paging_addrspace_free_user_range(&as, (as.app_pde << 22) - PAGE_SIZE,
+                                                code + PAGE_SIZE) == 0);
+        CHECK(private_pt[(code >> PAGE_SHIFT) % PTE_COUNT] == private_saved);
+        CHECK(paging_addrspace_free_user_range(&as, code, outside + PAGE_SIZE) == 0);
+        CHECK(private_pt[(code >> PAGE_SHIFT) % PTE_COUNT] == private_saved);
+        CHECK(paging_addrspace_map_user_range(&as, code, outside + PAGE_SIZE, PAGE_RW) == -1);
+        CHECK(private_pt[(code >> PAGE_SHIFT) % PTE_COUNT] == private_saved);
         pt_phys = as.app_pt_phys[0];
         pdi = pt_phys >> 22; pti = (pt_phys >> 12) & 0x3ff;
         app_pt = page_tables[pdi];

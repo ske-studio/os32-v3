@@ -271,17 +271,13 @@ u32 paging_app_band_pdes(u32 code_end, u32 heap_req, u32 ram_top);
 /* アプリ AS の 1 ページを USER でマップする (M1c)。
  *   - virt が高位アプリ帯 (app_pde..app_pde_count) なら、疎確保した私有 PT に書く
  *     (このアプリの PD からしか見えない)。
- *   - それ以外の共有帯 (VRAM 0xA8000 / SHM 等、C2 で全 PD 共有 + USER と
- *     定めた領域) なら共有 PT の PTE に USER を立てる。共有 PT は master と
- *     同一だが、master 側の PDE には USER を伝播させないので (このアプリ PD
- *     の PDE コピーにだけ立てる)、カーネル/シェルから見た実効権限は
- *     supervisor のまま保たれる (PDE と PTE の論理積)。
- * flags に PTE_USER を含めること。戻り値 0=成功, -1=範囲外。 */
+ *   - 共有 PT は無変更で拒否する。
+ * 戻り値 0=成功, -1=AS 無効・私有帯の範囲外。 */
 int paging_addrspace_map_user(struct addrspace *as, u32 virt, u32 phys,
                               u32 flags);
 
 /* [vstart, vend) を identity (phys=virt) で USER マップする (M1c)。
- * end は exclusive。プログラム帯・ユーザスタック・VRAM・SHM に使う。
+ * end は exclusive。私有プログラム帯・ユーザスタックに使う。
  * 戻り値 0=成功, -1=AS 無効・逆順・必要 PT/PDE 不在 (全範囲を未変更)。 */
 int paging_addrspace_map_user_range(struct addrspace *as, u32 vstart,
                                     u32 vend, u32 flags);
@@ -291,8 +287,7 @@ int paging_addrspace_map_user_range(struct addrspace *as, u32 vstart,
  * アプリごとに別々の物理ページを同じ仮想番地へ載せるための口。
  * アプリ 4 本同時 (票 TASK_K5_multiapp.md D1/I5) の土台で、共有ライブラリの
  * .data が既にこの形 (1 ページ版 paging_addrspace_map_user) で動いている。
- * pstart はページ境界。範囲がアプリ固有 PDE の外にも掛かってよいが、その
- * ぶんは共有 PT を書き替える (= 全 PD に効く) ので呼び出し側の責任。
+ * pstart はページ境界。共有 PT に掛かる要求は全範囲を無変更で拒否する。
  * 戻り値 0=成功, -1=AS 無効・逆順・非整列・必要 PT/PDE 不在 (全範囲を未変更)。 */
 int paging_addrspace_map_user_range_phys(struct addrspace *as, u32 vstart,
                                          u32 vend, u32 pstart, u32 flags);
@@ -309,21 +304,15 @@ int paging_addrspace_clear_app_band(struct addrspace *as);
 
 /* [vstart, vend) に張ってある **アプリ固有 PT の物理ページを as->owner で
  * pgalloc へ返し** (他 owner のページは返さず ledger_bad_free に数える)、
- * PTE を 0 にする (K5b P6)。範囲はアプリ固有 PDE の中だけを見る — 共有 PT に
- * 掛かる部分は 1 ビットも触らない (VRAM/SHM/フォントを解放しないため)。
+ * PTE を 0 にする (K5b P6)。共有 PT に掛かる要求は
+ * 全範囲を無変更で拒否する (VRAM/SHM/フォントを解放しないため)。
  * per-app 物理は連続とは限らない (断片化時はページ単位で張る) ので、
  * 解放も PTE を 1 枚ずつ辿って行う。
  * 戻り値: 返したページ数。AS 無効・逆順なら 0。 */
 u32 paging_addrspace_free_user_range(struct addrspace *as, u32 vstart,
                                      u32 vend);
 
-/* map_user_range と同じだが、**既存 PTE のキャッシュ属性 (PCD/PWT) を引き継ぐ**。
- * デバイス窓の一部を CPL=3 へ貸すとき用 (GFX バックバッファ)。Cirrus では
- * クライアント面がカード VRAM (master で PCD 付き) なので、flags をそのまま
- * 書き込むと PCD が消え、CPU が書いた画素がキャッシュに残ったまま BLT エンジン
- * が古い VRAM を読む。共有 PT の PTE は master からも見えるため、属性を落とすと
- * カーネル側の描画まで巻き添えになる (レビュー #5 ③)。
- * 戻り値 0=成功, -1=AS 無効・逆順・必要 PT/PDE 不在 (全範囲を未変更)。 */
+/* Private PT range map preserving PCD/PWT. Shared PT: -1, unchanged. */
 int paging_addrspace_map_user_keep(struct addrspace *as, u32 vstart,
                                    u32 vend, u32 flags);
 
@@ -347,13 +336,7 @@ int paging_addrspace_map_user_keep(struct addrspace *as, u32 vstart,
  * ブート時に kselftest_run() から呼ぶ想定 (memory_boot_init 後)。 */
 int paging_pd_clone_selftest(void);
 
-/* デバイス窓の貸し出しの自己診断 (レビュー #5 ②③)。守備範囲末尾の 2 ページを
- * 「supervisor + PCD のデバイス窓」に見立て、片方だけを
- * paging_addrspace_map_user_keep() で昇格させて次を確かめる:
- *   USER が立つ / PCD が消えない / 隣のページ (表示面役) が supervisor のまま /
- *   master の PDE に USER が伝播せずアプリ PD の PDE にだけ立つ。
- * ハードウェアには依存しない (実 RAM の無い番地を使い、PTE は必ず戻す)。
- * 戻り値: 0=全通過。非0 はビットフラグで失敗内容を示す。 */
+/* Shared PT mapping rejection and unchanged PTE/PDE selftest; 0 = pass. */
 int paging_map_user_keep_selftest(void);
 
 /* T2c の高位アプリ帯の自己診断 (票 docs/tasks/v3/TASK_T2_APPBAND.md §5-1)。
@@ -381,10 +364,8 @@ extern u32 paging_memmap_bad_count;
 /* tramp_page には exec の KAPI 踏み台ページ (RO+USER) の番地を渡す。
  * boot 口の後は exec_init 前でも静的 BSS の番地を渡す。戻り値: 食い違い区間の本数 (0 = 一致)、
  * -1 = ページング無効で検証対象外。
- * **ブート直後に 1 回だけ呼ぶこと** — CPL=3 アプリを起動すると exec が
- * VRAM / フォント表を USER へ昇格させ、期待値と合わなくなる。 */
+ * 旧 VRAM/font/Unicode/BB の共有 USER は常に拒否する。 */
 int paging_memmap_selftest(u32 tramp_page);
-void paging_prepare_legacy_clients(void);
 int paging_master_audit(u32 tramp_page);
 /* shared_ro must validate exact registered shlib text VA/frame pairs. */
 int paging_as_audit(const struct addrspace *as, int (*shared_ro)(u32, u32));

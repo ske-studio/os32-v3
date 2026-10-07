@@ -136,6 +136,7 @@ static void host_start(void)
     host_map_fixed_paging();
     paging_init(16384);
     host_pool_boot_ws(16384, HOST_WS_FIRST, HOST_WS_END);
+    CHECK(!paging_boot_user_shared(exec_tramp_page_addr()));
     CHECK(ledger_register_region(LEDGER_R_SURFACE_BACKING, LEDGER_OWNER_KERNEL,
           MEM_GFX_BB_BASE / PAGE_SIZE, MEM_GFX_BB_BASE / PAGE_SIZE + 1, LEDGER_CACHE_WB, 0));
     CHECK(ledger_owner_new(LEDGER_KIND_AS, 2, "d3", &owner));
@@ -207,19 +208,31 @@ static void host_start(void)
     pt[(MEM_EXEC_LOAD_ADDR >> PAGE_SHIFT) % PTE_COUNT] = original;
     /* Shared SHM/trampoline are identity only; arbitrary kernel/VRAM denied. */
     host_cr3 = paging_kernel_pd_phys();
-    CHECK(!paging_addrspace_map_user(&space, MEM_SHM_BASE, MEM_SHM_BASE, PAGE_RW | PTE_USER));
-    CHECK(!paging_addrspace_map_user(&space, exec_tramp_page_addr(), exec_tramp_page_addr(), PAGE_RO | PTE_USER));
-    CHECK(!paging_addrspace_map_user(&space, 0xA0000, 0xA0000, PAGE_RW | PTE_USER));
-    /* Cirrus identity USER window is above SHM_END, but is not copy payload.
-     * Keep a valid shared master/registered PT so only the band rejects it. */
+    CHECK(paging_addrspace_map_user(&space, MEM_SHM_BASE, MEM_SHM_BASE, PAGE_RW | PTE_USER) == -1);
+    CHECK(paging_addrspace_map_user(&space, exec_tramp_page_addr(), exec_tramp_page_addr(), PAGE_RO | PTE_USER) == -1);
+    CHECK(paging_addrspace_map_user(&space, 0xA0000, 0xA0000, PAGE_RW | PTE_USER) == -1);
+    /* Shared device aliases remain supervisor and are not copy payload. */
     CHECK(MEM_DEVICE_APERTURE_BASE > MEM_SHM_END);
-    CHECK(!paging_addrspace_map_user(&space, MEM_DEVICE_APERTURE_BASE,
-          MEM_DEVICE_APERTURE_BASE, PAGE_RW | PTE_USER));
+    CHECK(paging_addrspace_map_user(&space, MEM_DEVICE_APERTURE_BASE,
+          MEM_DEVICE_APERTURE_BASE, PAGE_RW | PTE_USER) == -1);
     host_cr3 = space.pd_phys;
-    CHECK(!as_va_to_pa(space.pd_phys, MEM_DEVICE_APERTURE_BASE, &result));
-    CHECK(result == MEM_DEVICE_APERTURE_BASE);
+    CHECK(as_va_to_pa(space.pd_phys, MEM_DEVICE_APERTURE_BASE, &result) == AS_VA_PDE);
     probe(MEM_DEVICE_APERTURE_BASE, 0, 0, 0);
     probe(MEM_DEVICE_APERTURE_BASE, 1, 0, 0);
+    /* Fault injection: even forged USER permissions cannot turn device aliases
+     * into copy payload. Keep the range gate independent of the PTE gate. */
+    const u32 forbidden[] = {MEM_DEVICE_APERTURE_BASE, TVRAM_CHAR_BASE};
+    for (u32 k = 0; k < sizeof(forbidden) / sizeof(forbidden[0]); k++) {
+        u32 va = forbidden[k], di = va >> 22, ti = (va >> PAGE_SHIFT) % PTE_COUNT;
+        u32 old_pde = pd[di], old_pte = page_tables[di][ti];
+        pd[di] |= PTE_USER;
+        page_tables[di][ti] = va | PAGE_RW | PTE_USER | (old_pte & (PTE_PCD | PTE_PWT));
+        CHECK(!as_va_to_pa(space.pd_phys, va, &result) && result == va);
+        probe(va, 0, 0, 0);
+        probe(va, 1, 0, 0);
+        page_tables[di][ti] = old_pte;
+        pd[di] = old_pde;
+    }
     probe(MEM_SHM_BASE + 7, 1, 1, MEM_SHM_BASE + 7);
     probe(exec_tramp_page_addr() + 17, 0, 1, exec_tramp_page_addr() + 17);
     probe(exec_tramp_page_addr(), 1, 0, 0);

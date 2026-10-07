@@ -159,7 +159,17 @@ void _start(void) {
      * backing, alias, output, all ledger tables and allocator metadata intact. */
     u32 alias = pgalloc_alloc_phys(owner, 1); CHECK(alias);
     for (i = 0; i < PAGE_SIZE; i++) ((u8 *)P2V(alias))[i] = 0xcd;
-    CHECK(!paging_addrspace_map_user(&a, pa, alias, PAGE_RW | PTE_USER));
+    u32 *pd = P2V(a.pd_phys), saved_pde = pd[pa >> 22];
+    u32 *shared = P2V(saved_pde & ~(u32)(PAGE_SIZE - 1));
+    u32 pti = (pa >> PAGE_SHIFT) % PTE_COUNT, saved_pte = shared[pti];
+    CHECK(paging_addrspace_map_user(&a, pa, alias, PAGE_RW | PTE_USER) == -1);
+    CHECK(pd[pa >> 22] == saved_pde && shared[pti] == saved_pte);
+    /* Deliberately forge a private copy of this low PT to retain the hostile
+     * nonidentity-CR3 padding test. Ordinary AS APIs can no longer build it. */
+    u32 alias_pt = pgalloc_alloc_phys(oa, 1); CHECK(alias_pt);
+    kmemcpy(P2V(alias_pt), shared, PAGE_SIZE);
+    ((u32 *)P2V(alias_pt))[pti] = alias | PAGE_RW | PTE_USER;
+    pd[pa >> 22] = alias_pt | PAGE_RW | PTE_USER;
     snapshot_ledger(0); count = used_pages; sid = 0x11223344;
     paging_load_cr3(a.pd_phys);
     CHECK(!ledger_surface_create(&sf, &sid));
@@ -170,7 +180,10 @@ void _start(void) {
         CHECK(((u8 *)P2V(alias))[i] == 0xcd);
     }
     paging_load_cr3(paging_kernel_pd_phys());
-    CHECK(!paging_addrspace_map_user(&a, pa, pa, PAGE_RW));
+    CHECK(paging_addrspace_map_user(&a, pa, pa, PAGE_RW) == -1);
+    CHECK(shared[pti] == saved_pte);
+    pd[pa >> 22] = saved_pde;
+    CHECK(pgalloc_free_n_owner(oa, alias_pt / PAGE_SIZE, 1));
     CHECK(pgalloc_free_n_owner(owner, alias / PAGE_SIZE, 1));
     CHECK(ledger_surface_create(&sf,&sid));
     CHECK(((u8 *)P2V(pa))[0]==0xab && ((u8 *)P2V(pa))[PAGE_SIZE-1]==0);
