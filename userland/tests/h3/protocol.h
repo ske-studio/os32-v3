@@ -1,7 +1,8 @@
 /* T2h/h3 test-only SHM protocol v1. e9 shares this layout, not public KAPI.
  * All fields are little-endian u32. owner is the ledger AS owner, NOT GUI
- * slot or app ID. Host publishes owner then generation (commit word) once.
- * Thereafter the host writes only mode and arm, in that order.
+ * slot or app ID. The fixture publishes owner then generation (commit word)
+ * through caller_identity. Host verifies these values and writes only mode
+ * and arm, in that order.
  */
 #ifndef H3_PROTOCOL_H
 #define H3_PROTOCOL_H

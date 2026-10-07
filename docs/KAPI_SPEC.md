@@ -1490,6 +1490,18 @@ WM/TRUSTED または保存 USER の識別が無効なら INVAL (kill しない)�
 `done==0` なら次は skip+count、`done==1` は末尾。FS エラーは result の負値で伝える。バッチ間の snapshot は保証しない。
 従来の slot 12 `sys_ls` は CPL3 shim と私的 int80 `0x8000000c` 経由で同じ列挙本体を使い、callback は USER 側で実行する。
 
+C の `ls.h` / `userland/lib/rt/ls.c` の `os32_ls(path, cb, ctx)` は CRT の
+`kapi` を使い、窓の件数だけ skip を進めて USER 空間で `DirCallback` を呼ぶ。
+Rust は `os32api::os32_ls`。callback は従来同様 void で早期中断の戻り値はなく、
+各窓のエントリを渡し、done で result を返す (負の FS result でも done==0 なら
+残りの窓を渡す、旧 CPL3 slot と同じ)。syscall 自体の負 rc は直ちに返す。
+最初の窓が INVAL の場合は TRUSTED 呼び手向けに旧 slot へ戻す。
+packet は呼出しごとのスタック上に持ち、callback 内の再帰列挙でも共有しない。
+保存 cursor は無いのでバックエンド走査は窓ごとにやり直す (総走査は O(n²))。
+301 件で 22 syscall (C/Rust helper のホスト試験)。callback 間のディレクトリ変更で skip がずれ重複・欠落し得る;
+旧 CPL3 shim と同じ窓分割で snapshot は保証しない。CPL0 は旧 slot の単一走査を維持する。
+
+
 `caller_identity(app, owner, generation)` は `caller_identity_get()` と同じ保存 USER の値を 3 本の u32 に写して 0。
 WM/TRUSTED または保存 USER が無効なら INVAL (kill せず出力は不変)。出力は別々の u32 を渡す。
 全新規出力は `kapi.json` の sizeof 宣言で生成 wrap が全域を先に検査する。CPL3 の NULL/範囲外/RO は kill し、本体を呼ばない。

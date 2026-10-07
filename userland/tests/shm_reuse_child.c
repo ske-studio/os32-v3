@@ -3,10 +3,8 @@
 #include "ring3_marker.h"
 #include <stdlib.h>
 #include <string.h>
-/* Existing DB SHM size also describes the allocator block; no new SDK ABI. */
-#define BLOCK_BYTES DB_SHM_BLOCK_SIZE
-/* Private page size until public SHM/page constants are settled in e11. */
-#define PAGE_BYTES 4096UL
+#define BLOCK_BYTES OS32_SHM_BLOCK_SIZE
+#define PAGE_BYTES OS32_PAGE_SIZE
 #define WRITE_PATTERN 0x39574853UL /* SHW9 */
 int main(int argc, char **argv, KernelAPI *api)
 {

@@ -3,10 +3,13 @@ check-h3-park-resume-host:
 - kernel/isr_stub.asm
 - tools/h3_layout.c
 - tools/h3_park_resume.py
+- sdk/include/os32/os32api.h
+- sdk/include/os32/os32_kapi_shared.h
 - tools/tests/h3_state_host.c
 - tools/tests/host32.py
 - tools/tests/test_h3_park_resume.py
 - userland/tests/h3/fixture.inc
+- userland/tests/h3/protocol.h
 - userland/tests/h3/state.inc
 - userland/tests/h3a.c
 - userland/tests/h3b.c

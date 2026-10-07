@@ -1,3 +1,4 @@
+#include "ls.h"
 /* ======================================================================== */
 /*  FIND.C -- ファイル名検索 (再帰ディレクトリ走査)                            */
 /*                                                                          */
@@ -65,7 +66,7 @@ static void find_cb(const DirEntry_Ext *entry, void *ctx)
         for (i = 0; fullpath[i] && i < 255; i++) sub.basepath[i] = fullpath[i];
         sub.basepath[i] = '\0';
         sub.depth = fc->depth + 1;
-        api->sys_ls(fullpath, (void *)find_cb, &sub);
+        os32_ls(fullpath, find_cb, &sub);
     }
 }
 
@@ -94,7 +95,7 @@ int main(int argc, char **argv, KernelAPI *kapi)
     }
     ctx.depth = 0;
 
-    api->sys_ls(search_path, (void *)find_cb, &ctx);
+    os32_ls(search_path, find_cb, &ctx);
 
     return 0;
 }

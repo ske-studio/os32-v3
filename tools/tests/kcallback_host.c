@@ -76,6 +76,31 @@ static u8 tramp[PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
 u32 __bss_end;
 static KernelAPI real_kapi;
 static KernelAPI *kapi = &real_kapi;
+#define os32_ls client_ls
+#include "client_source.inc"
+#undef os32_ls
+static int client_window(const char *path, u32 skip, OS32_LsPacket *out)
+{
+    assert(!user_call && !fs_active);
+    user_call = 1;
+    int rc = wrap_sys_ls_window(path, skip, out);
+    user_call = 0;
+    return rc;
+}
+static void client_callback(const DirEntry_Ext *entry, void *ctx)
+{
+    VfsDirEntry e;
+    kmemcpy(e.name, entry->name, sizeof(e.name));
+    e.size = entry->size; e.type = entry->type;
+    callback(&e, ctx);
+}
+static int run_client(void *ctx)
+{
+    real_kapi.sys_ls_window = client_window;
+    expected_ctx = ctx; calls = 0;
+    shim_path[0] = '/'; shim_path[1] = 0;
+    return client_ls(shim_path, client_callback, ctx);
+}
 static u32 ring3_tramp_page;
 u32 exec_tramp_page_addr(void) { return (u32)tramp; }
 #include "trampoline.inc"
@@ -167,6 +192,9 @@ int main(void)
         assert(run_shim((void *)0xdeadbeef) == result && calls == total);
         assert(fs_calls - before == (total ? (total + RING3_LS_BATCH - 1) / RING3_LS_BATCH : 1));
         assert(!fs_active);
+        before = fs_calls;
+        assert(run_client((void *)0xdeadbeef) == result && calls == total);
+        assert(fs_calls - before == (total ? (total + RING3_LS_BATCH - 1) / RING3_LS_BATCH : 1));
     }
     total = 100;
     int before_100 = fs_calls;
@@ -176,8 +204,11 @@ int main(void)
     assert(run_shim(&calls) == result && calls == total);
     nest = 0; result = OS32_ERR_IO;
     assert(run_shim(0) == result && calls == total);
+    assert(run_client(0) == result && calls == total);
     result = 0; kill_at = 3;
     if (!__builtin_setjmp(killed)) { run_shim(&calls); assert(0); }
+    assert(calls == 3 && !fs_active && !user_call);
+    if (!__builtin_setjmp(killed)) { run_client(&calls); assert(0); }
     assert(calls == 3 && !fs_active && !user_call);
     kill_at = 0;
     assert(run_shim(&calls) == 0 && calls == total); /* no leftover cursor */
@@ -246,7 +277,7 @@ int main(void)
         }
         assert(!fs_active && fs_calls == before + (mode == 2));
     }
-    say("PASS: trusted/raw USER, relocated shim order/ctx, 0..100 entries, 100 entries/8 gates, path snapshot, ext2 metadata window, errors, kill/restart, bounds, padding\n");
+    say("PASS: trusted/raw USER, C helper equals relocated shim order/ctx/results, 0..100 entries, 100 entries/8 gates, path snapshot, ext2 metadata window, errors, kill/restart, bounds, padding\n");
     return 0;
 }
 void _start(void) { die(main()); }

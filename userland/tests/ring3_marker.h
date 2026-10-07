@@ -25,7 +25,8 @@
  * PC-9801; denial and a legitimate CLIENT lease control belong to e11.
  *
  * Use the newly deployed kernel.map's __bss_end to derive the SHM base:
- * S = align_up(__bss_end,0x1000)+0x32000; B = S + i*0x4000 (i=0..13).
+ * S = align_up(__bss_end,OS32_PAGE_SIZE)+0x32000;
+ * B = S + i*OS32_SHM_BLOCK_SIZE (i=0..13).
  * No absolute SHM address is fixed here. Immediately after the program exits,
  * before another SHM allocation, find B with the expected label at B+16 and
  * self-address B at B+20. Compare B+0/tag and B+8/target with the table.

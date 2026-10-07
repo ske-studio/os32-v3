@@ -1,4 +1,6 @@
 check-surface-bundle-host:
+- userland/lib/rt/ls.c
+- sdk/include/os32/ls.h
 - exec/access_walk.c
 - exec/exec.c
 - exec/exec_kapi_init.inc

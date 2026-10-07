@@ -162,13 +162,24 @@ class Tests(unittest.TestCase):
         self.assertEqual(self.p.block(self.address)['arm'], 0)
 
     def test_init_publication(self):
-        self.change('owner', 0); self.change('generation', 0); self.change('phase', 1)
-        def receipt():
-            self.change('phase', 3)
-        self.p.sleep = lambda _: receipt()
         self.assertEqual(self.p.initialize(1), self.ident)
-        self.assertEqual([addr - self.address for addr, _ in self.emu.writes], [4, 8])
-        with self.assertRaises(RuntimeError): self.p.initialize(1)
+        self.assertEqual(self.emu.writes, [])
+        for field in ('owner', 'generation'):
+            saved = self.p.block(self.address)[field]
+            self.change(field, saved + 1)
+            with self.assertRaises(RuntimeError): self.p.initialize(1)
+            self.change(field, saved)
+
+    def test_init_waits_for_fixture_publication(self):
+        self.change('owner', 0); self.change('generation', 0); self.change('phase', 1)
+        def publish(_):
+            self.assertEqual(self.emu.depth, 0, 'publication wait must thaw')
+            self.change('owner', self.ident['owner'])
+            self.change('generation', self.ident['generation'])
+            self.change('phase', 3)
+        self.p.sleep = publish
+        self.assertEqual(self.p.initialize(1), self.ident)
+        self.assertEqual(self.emu.writes, [])
 
     def test_modes_and_write_whitelist(self):
         for mode in h3.MODES.values():
@@ -294,9 +305,9 @@ class Tests(unittest.TestCase):
 
     def test_next_launch_generation(self):
         case = self.p.arm(self.ident, 1)
-        self.change('owner', 0); self.change('generation', 0); self.change('phase', 1)
         with self.assertRaises(RuntimeError): self.p.next_launch(case)
         self.emu.word(0x5000, 92)
+        self.change('generation', 92)
         self.p.next_launch(case)
 
     def test_timeout_and_nm(self):
@@ -1390,10 +1401,17 @@ def c_run(directory, mutation=None):
                     '-fno-stack-protector', '-nostdlib', '-Wl,-e,_start', '-DH3_SELF_TEST',
                     '-I'+str(directory), str(ROOT/'tools/tests/h3_state_host.c'),
                     '-o', str(exe)], check=True)
+    result = run([str(exe)], capture_output=True).returncode
+    if result: return result
+    subprocess.run(['gcc', '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie', '-no-pie',
+                    '-fno-stack-protector', '-nostdlib', '-Wl,-e,_start', '-DH3_SLOT_TEST',
+                    '-I'+str(directory), '-I'+str(ROOT/'sdk/include/os32'),
+                    str(ROOT/'tools/tests/h3_state_host.c'), '-o', str(exe)], check=True)
     return run([str(exe)], capture_output=True).returncode
 
 
 C_MUTANTS = [
+    ('(h3_api->caller_identity((a), (o), (g)) == 0)', '(h3_api->caller_identity((a), (o), (g)) != 0)'),
     ('b->owner = owner;', 'b->owner = owner + 1;'),
     ('b->generation = generation;', 'b->generation = generation + 1;'),
     ('!b->owner || !b->generation', '!b->owner && !b->generation'),
@@ -1406,9 +1424,10 @@ C_MUTANTS = [
     ('b->phase = H3_ARMED;', 'b->phase = H3_WAIT;'),
 ]
 PY_MUTANTS = [
+    ("self.checked(ident)  # fixture values must equal host identity()", "pass", 1),
     ("((s['__bss_end'] + 4095) & ~4095)", "(s['__bss_end'] & ~4095)", 1),
     ("base + index * o['block_size']", "base", 1),
-    ("self.identity(ident['index']) == ident", 'True', 2),
+    ("self.identity(ident['index']) == ident", 'True', 1),
     ("(b['owner'], b['generation']) == (ident['owner'], ident['generation'])", 'True', 1),
     ("state == self.o['parked']", 'True', 1),
     ("self.word(ident['slot'] + self.o['slot_wait']) == 1", 'True', 1),
@@ -1542,7 +1561,7 @@ def main():
     if args.module: return 0
     with tempfile.TemporaryDirectory(prefix='h3-test-') as directory:
         assert c_run(directory) == 0, 'ILP32 baseline'
-        print('ILP32: 42 state checks PASS')
+        print('ILP32: state/default/self/SDK caller_identity slot PASS')
         if args.mutate:
             for mutant in C_MUTANTS:
                 rc = c_run(directory, mutant)

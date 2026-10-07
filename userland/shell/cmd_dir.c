@@ -1,3 +1,4 @@
+#include "ls.h"
 #include "cmd_fs_shared.h"
 #include <stdio.h>
 
@@ -40,17 +41,15 @@ static void vfs_ls_cb(const DirEntry_Ext *entry, void *ctx)
 }
 
 #ifdef SHELL_AS_APP
-/* B2: CPL=3 では sys_ls のコールバックから KAPI を呼べない (int 0x80 の
- * 再入で落ちる)。vfs_ls_cb は sys_isatty / kprintf / printf を呼ぶので、
- * 写し取り (sh_ls_collect_cb) を挟んで sys_ls が戻ってから流す。
- * 上限を超えた分は数だけ知らせる。 */
+/* Keep the shell's bounded display collection. os32_ls callbacks already
+ * run in USER space; excess entries are reported after enumeration. */
 static void ls_run(const char *path, struct ls_opts *opts)
 {
     int i, n;
     DirEntry_Ext e;
 
     sh_ls_reset();
-    g_api->sys_ls(path, sh_ls_collect_cb, (void *)0);
+    os32_ls(path, sh_ls_collect_cb, (void *)0);
     n = sh_ls_count_get();
     for (i = 0; i < n; i++) {
         sh_ls_fill(i, &e);
@@ -60,8 +59,8 @@ static void ls_run(const char *path, struct ls_opts *opts)
         g_api->kprintf(ATTR_CYAN, "\n  (... %d more)\n", sh_ls_dropped());
 }
 #else
-/* 常駐 (CPL=0) は従来どおりコールバックで直接出す (展開後のトークンは同一) */
-#define ls_run(path, opts)  (g_api->sys_ls((path), vfs_ls_cb, (opts)))
+/* 常駐 (CPL=0) は helper の INVAL fallback で旧 callback 経路へ。 */
+#define ls_run(path, opts)  (os32_ls((path), vfs_ls_cb, (opts)))
 #endif
 
 static int cmd_ls(int argc, char **argv)

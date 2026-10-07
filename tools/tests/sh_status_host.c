@@ -2121,3 +2121,9 @@ void _start(void)
     report("ALL PASS\n");
     die(0);
 }
+
+/* Caller tests mock enumeration; real packet iteration is check-ls-client-host. */
+int os32_ls(const char *path, DirCallback cb, void *ctx)
+{
+    return (g_api)->sys_ls(path, (void *)cb, ctx);
+}

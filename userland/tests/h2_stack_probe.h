@@ -1,10 +1,11 @@
 #ifndef H2_STACK_PROBE_H
 #define H2_STACK_PROBE_H
 #include "memmap.h"
+#include "os32_kapi_shared.h"
 static void h2_plan(unsigned int stack, unsigned int *bytes, unsigned int *depth, unsigned long *guard);
 static int h2_entry_ok(int argc);
 /* Test-only contract shared with h3: invoke wait at the deepest live frame. */
-#define H2_PAGE_BYTES 4096U
+#define H2_PAGE_BYTES OS32_PAGE_SIZE
 #define H2_DEEP_BYTES (4U * H2_PAGE_BYTES)
 #define H2_LARGE_BYTES (72U * H2_PAGE_BYTES)
 #define H2_SMALL_BYTES (24U * H2_PAGE_BYTES)

@@ -1,3 +1,4 @@
+#include "ls.h"
 /* ======================================================================== */
 /*  CMD_FILER.C — シェル内蔵TVRAMファイラ                                    */
 /*                                                                          */
@@ -241,10 +242,9 @@ static int fl_is_bin_file(const char *name)
     return 0;
 }
 
-static void fl_ls_callback(const void *entry_raw, void *ctx)
+static void fl_ls_callback(const DirEntry_Ext *entry, void *ctx)
 {
-    const char *name = (const char *)entry_raw;
-    const u8 *base = (const u8 *)entry_raw;
+    const char *name = entry->name;
     u32 size;
     u8 type;
     FL_Entry *e;
@@ -252,8 +252,8 @@ static void fl_ls_callback(const void *entry_raw, void *ctx)
 
     (void)ctx;
 
-    size = *(const u32 *)(base + 256);
-    type = base[260];
+    size = entry->size;
+    type = entry->type;
 
     if (name[0] == '.') {
         if (name[1] == '\0') return;
@@ -330,7 +330,7 @@ static void fl_scan_dir(void)
         fl_state.count = 1;
     }
 
-    g_api->sys_ls(fl_state.cwd, (void *)fl_ls_callback, NULL);
+    os32_ls(fl_state.cwd, fl_ls_callback, NULL);
     fl_sort_entries();
 }
 

@@ -1,4 +1,6 @@
 check-surface-lease-host:
+- userland/lib/rt/ls.c
+- sdk/include/os32/ls.h
 - exec/access_walk.c
 - exec/lease.c
 - exec/redir_access.c
