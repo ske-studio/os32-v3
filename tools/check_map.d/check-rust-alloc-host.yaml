@@ -1,0 +1,7 @@
+check-rust-alloc-host:
+- sdk/rust/os32api/src/lib.rs
+- tools/tests/test_rust_alloc.py
+- tools/tests/rust_alloc_host.rs
+- tools/tests/os32api_host.py
+- tools/check_map.d/check-rust-alloc-host.yaml
+- build/checks.d/check-rust-alloc-host.mk

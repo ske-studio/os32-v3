@@ -20,10 +20,10 @@ static int crt_grow_exact(void *opaque, uintptr_t base, size_t bytes)
     if (!kapi->mem_map) return -1;
     return kapi->mem_map(bytes, (void *)base, OS32_MEM_MAP_EXACT) == (void *)base ? 0 : -1;
 }
-static void *crt_map(void *opaque, size_t bytes)
+static void *crt_map(void *opaque, size_t bytes, unsigned flags)
 {
     (void)opaque;
-    return kapi->mem_map ? kapi->mem_map(bytes, NULL, 0) : NULL;
+    return kapi->mem_map ? kapi->mem_map(bytes, NULL, flags) : NULL;
 }
 static int crt_unmap(void *opaque, uintptr_t base, size_t bytes)
 {
@@ -44,7 +44,7 @@ extern void *os32_private_free_list;
 extern char *os32_private_sbrk_start;
 extern struct mallinfo os32_private_current_mallinfo;
 static struct os32_nano_arena *selected, *arenas;
-static void *(*map_arena)(void *, size_t);
+static void *(*map_arena)(void *, size_t, unsigned);
 static int (*unmap_arena)(void *, uintptr_t, size_t);
 static void *map_opaque;
 static int busy;
@@ -60,7 +60,7 @@ int os32_nano_select(struct os32_nano_arena *arena)
 #endif
 
 int os32_nano_configure(struct os32_nano_arena *primary,
-                        void *(*map)(void *, size_t),
+                        void *(*map)(void *, size_t, unsigned),
                         int (*unmap)(void *, uintptr_t, size_t), void *opaque)
 {
     if (busy || arenas) return 0;
@@ -203,7 +203,7 @@ static struct os32_nano_arena *new_arena(size_t size)
     const size_t overhead = 2u * OS32_NANO_PAGE - 1u + 16u;
     if (!arenas || !map_arena || !unmap_arena || size > PTRDIFF_MAX - overhead) return NULL;
     bytes = (size + overhead) & ~(OS32_NANO_PAGE - 1u);
-    base = (uintptr_t)map_arena(map_opaque, bytes);
+    base = (uintptr_t)map_arena(map_opaque, bytes, 0);
     if (!base) return NULL;
     a = (struct os32_nano_arena *)base;
     memset(a, 0, sizeof(*a));
@@ -236,6 +236,85 @@ static void release_empty(struct os32_nano_arena *a)
     if (unmap_arena(map_opaque, base, bytes) != 0) *link = a;
 }
 
+/* The list lives in USER mappings. Only an exact payload match permits
+ * reading its prefix; arbitrary caller pointers are never dereferenced. */
+#define LARGE_MAGIC 0x4c415247u
+#define LARGE_KIND 1u
+struct large_block {
+    struct large_block *next;
+    uintptr_t base;
+    size_t map_bytes, requested;
+    unsigned magic, kind, alignment, reserved;
+} __attribute__((aligned(8)));
+static struct large_block *large_blocks;
+
+static struct large_block **large_link(const void *p)
+{
+    struct large_block **link;
+    for (link = &large_blocks; *link; link = &(*link)->next) {
+        if ((const void *)(*link + 1) == p) return link;
+    }
+    return NULL;
+}
+static int large_valid(struct _reent *r, struct large_block *b)
+{
+#ifdef OS32_NANO_FIXTURE
+    extern void os32_nano_prefix_check(const void *);
+    os32_nano_prefix_check(b);
+#endif
+    if (b->magic == LARGE_MAGIC && b->kind == LARGE_KIND &&
+        b->alignment == 8u && b->base == (uintptr_t)b &&
+        b->requested >= OS32_NANO_LARGE &&
+        b->map_bytes >= sizeof(*b) && b->requested <= b->map_bytes - sizeof(*b) &&
+        !(b->map_bytes & (OS32_NANO_PAGE - 1u))) return 1;
+    r->_errno = EINVAL;
+    return 0;
+}
+static void *large_allocate(struct _reent *r, size_t bytes)
+{
+    size_t total;
+    struct large_block *b;
+    if (bytes > SIZE_MAX - sizeof(*b)) goto fail;
+    total = bytes + sizeof(*b);
+    if (total > SIZE_MAX - (OS32_NANO_PAGE - 1u)) goto fail;
+    total = (total + OS32_NANO_PAGE - 1u) & ~(OS32_NANO_PAGE - 1u);
+    if (!map_arena || !unmap_arena) goto fail;
+    b = map_arena(map_opaque, total, OS32_NANO_TOPDOWN);
+    if (!b) goto fail;
+    b->next = large_blocks;
+    b->base = (uintptr_t)b;
+    b->map_bytes = total;
+    b->requested = bytes;
+    b->magic = LARGE_MAGIC;
+    b->kind = LARGE_KIND;
+    b->alignment = 8u;
+    b->reserved = 0;
+    large_blocks = b;
+    /* calloc relies on fresh app pages being zeroed by paging_app.c.
+     * Only the prefix is written here; recycled VA must also get fresh zeros. */
+    return b + 1;
+fail:
+    r->_errno = ENOMEM;
+    return NULL;
+}
+static int large_release(struct _reent *r, struct large_block **link)
+{
+    struct large_block *b = *link, *next;
+    uintptr_t base;
+    size_t bytes;
+    if (!large_valid(r, b)) return 0;
+    next = b->next;
+    base = b->base;
+    bytes = b->map_bytes;
+    *link = next;
+    if (unmap_arena(map_opaque, base, bytes) != 0) {
+        *link = b;
+        r->_errno = ENOMEM;
+        return 0;
+    }
+    return 1;
+}
+
 static void *try_allocate(struct _reent *r, size_t n, size_t size, int clear)
 {
     void *p;
@@ -252,6 +331,7 @@ static __attribute__((noinline)) void *allocate(struct _reent *r, size_t n, size
     size_t bytes;
     if (n && size > SIZE_MAX / n) { r->_errno = ENOMEM; return NULL; }
     bytes = n * size;
+    if (bytes >= OS32_NANO_LARGE) return large_allocate(r, bytes);
     /* Explicit standalone fixtures may select just one backing arena. */
     if (!arenas) return try_allocate(r, n, size, clear);
     for (a = arenas; a; a = a->next) {
@@ -293,7 +373,9 @@ void _free_r(struct _reent *r, void *p)
 {
     struct os32_nano_arena *a;
     if (!enter(r)) return;
-    if (p && (a = owner(r, p)) != NULL) {
+    struct large_block **link = p ? large_link(p) : NULL;
+    if (link) large_release(r, link);
+    else if (p && (a = owner(r, p)) != NULL) {
         switch_arena(a);
         os32_private_free_r(r, p);
         a->live--;
@@ -317,9 +399,35 @@ void *_realloc_r(struct _reent *r, void *old, size_t size)
     if (!enter(r)) return NULL;
     if (!old) {
         p = allocate(r, 1, size, 0, NULL);
+    } else if (large_link(old)) {
+        struct large_block **link = large_link(old);
+        struct large_block *b = *link;
+        if (large_valid(r, b)) {
+            if (!size) large_release(r, link);
+            else {
+                old_size = b->requested;
+                p = allocate(r, 1, size, 0, NULL);
+                if (p) {
+                    memcpy(p, old, old_size < size ? old_size : size);
+                    /* Allocation may prepend another large block. */
+                    large_release(r, large_link(old));
+                }
+            }
+        }
     } else if ((a = owner(r, old)) != NULL) {
         switch_arena(a);
         old_size = os32_private_malloc_usable_size_r(r, old);
+        if (size >= OS32_NANO_LARGE) {
+            p = allocate(r, 1, size, 0, NULL);
+            if (p) {
+                memcpy(p, old, old_size < size ? old_size : size);
+                os32_private_free_r(r, old);
+                a->live--;
+                release_empty(a);
+            }
+            leave();
+            return p;
+        }
         p = os32_private_realloc_r(r, old, size);
         if (!size) {
             a->live--;

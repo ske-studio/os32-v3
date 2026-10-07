@@ -158,24 +158,60 @@ pub fn get_tick() -> u32 {
 /* ================================================================ */
 struct Os32Alloc;
 
+#[repr(C, align(8))]
+struct AllocPrefix {
+    base: *mut u8,
+    payload: *mut u8,
+}
+
 unsafe impl GlobalAlloc for Os32Alloc {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        let api = &**API.0.get();
-        let ptr = (api.mem_alloc)(layout.size() as u32);
-        if ptr.is_null() {
-            (api.kprintf)(
-                ATTR_RED,
-                b"[OOM] alloc failed: size=%d, align=%d\r\n\0".as_ptr(),
-                layout.size() as i32,
-                layout.align() as i32,
-            );
-        }
+        // Preserve OS32's size-zero NULL contract, without calling mem_alloc(0).
+        if layout.size() == 0 { return core::ptr::null_mut(); }
+        let size = match u32::try_from(layout.size()) {
+            Ok(n) => n, Err(_) => return core::ptr::null_mut(),
+        };
+        if !layout.align().is_power_of_two() { return core::ptr::null_mut(); }
+        let align = layout.align().max(core::mem::align_of::<AllocPrefix>());
+        let align32 = match u32::try_from(align) {
+            Ok(n) => n, Err(_) => return core::ptr::null_mut(),
+        };
+        let prefix = core::mem::size_of::<AllocPrefix>();
+        let bytes = match size.checked_add(align32 - 1)
+            .and_then(|n| n.checked_add(prefix as u32)) {
+            Some(n) => n, None => return core::ptr::null_mut(),
+        };
+        let base = (api().mem_alloc)(bytes);
+        if base.is_null() { return base; }
+        // Offset arithmetic keeps both prefix and payload in the raw block.
+        let offset = prefix + (align - ((base as usize + prefix) & (align - 1))) % align;
+        let ptr = base.add(offset);
+        ptr.sub(prefix).cast::<AllocPrefix>().write(AllocPrefix { base, payload: ptr });
         ptr
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, _layout: Layout) {
-        let api = &**API.0.get();
-        (api.mem_free)(ptr);
+        if ptr.is_null() { return; }
+        let prefix = ptr.sub(core::mem::size_of::<AllocPrefix>()).cast::<AllocPrefix>();
+        (api().mem_free)((*prefix).base);
+    }
+
+    unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
+        let ptr = self.alloc(layout);
+        if !ptr.is_null() { ptr.write_bytes(0, layout.size()); }
+        ptr
+    }
+
+    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+        let next_layout = match Layout::from_size_align(new_size, layout.align()) {
+            Ok(l) => l, Err(_) => return core::ptr::null_mut(),
+        };
+        let next = self.alloc(next_layout);
+        if !next.is_null() {
+            core::ptr::copy_nonoverlapping(ptr, next, layout.size().min(new_size));
+            self.dealloc(ptr, layout);
+        }
+        next
     }
 }
 

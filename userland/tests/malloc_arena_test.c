@@ -10,6 +10,7 @@
 #define TEST_PAGE 4096u
 #define TEST_REQUEST (2u * TEST_PAGE)
 #define TEST_PATTERN 0x6d
+#define TEST_LARGE 65536u
 extern void *sbrk(int incr);
 
 int main(int argc, char **argv, KernelAPI *api)
@@ -44,6 +45,22 @@ int main(int argc, char **argv, KernelAPI *api)
     CHECK(reused == (void *)secondary);
     CHECK(api->mem_unmap(reused, secondary_bytes) == 0);
     reused = NULL;
+    /* f8: requested size selects nano vs TOPDOWN; free returns all pages. */
+    for (unsigned request=TEST_LARGE-1u;request<=TEST_LARGE+1u;request++) {
+        p=calloc(1,request);
+        CHECK(p != NULL && !((uintptr_t)p & 7u));
+        for (unsigned i=0;i<request;i++) CHECK(p[i] == 0);
+        if (request >= TEST_LARGE) {
+            /* Direct-map prefix fits in the first page; infer its page base. */
+            uintptr_t base=(uintptr_t)p & ~(TEST_PAGE-1u);
+            size_t bytes=((uintptr_t)p-base+request+TEST_PAGE-1u) & ~(TEST_PAGE-1u);
+            p[request-1u]=TEST_PATTERN;
+            free(p); p=NULL;
+            void *exact=api->mem_map(bytes,(void*)base,OS32_MEM_MAP_EXACT);
+            CHECK(exact == (void*)base);
+            CHECK(api->mem_unmap(exact,bytes) == 0);
+        } else { free(p); p=NULL; }
+    }
     CHECK(printf("malloc_arena_test: printf %d\n", TEST_PATTERN) > 0);
     CHECK(fflush(stdout) == 0);
 done:

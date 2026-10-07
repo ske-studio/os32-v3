@@ -209,6 +209,30 @@ EXPECTED_CHECKS = [
     'a.next==other && other->live==0 && unmaps==saved',
     'base != a.initial',
 ]
+# f8 mutations retain the runtime assertion/expected-check pairing.
+MUTATIONS += [
+    ('bytes >= OS32_NANO_LARGE', 'bytes > OS32_NANO_LARGE', 1, 'large boundary moved to 65537'),
+    ('struct large_block **link = p ? large_link(p) : NULL;',
+     'if (p) large_valid(r, (struct large_block *)p - 1);\n    struct large_block **link = p ? large_link(p) : NULL;',
+     1, 'prefix read before list match'),
+    ('if (bytes > SIZE_MAX - sizeof(*b)) goto fail;', 'if (0) goto fail;', 1, 'large prefix overflow'),
+    ('if (total > SIZE_MAX - (OS32_NANO_PAGE - 1u)) goto fail;', 'if (0) goto fail;', 1, 'large rounding overflow'),
+    ('if (n && size > SIZE_MAX / n)', 'if (0)', 1, 'calloc product overflow'),
+    ('p = allocate(r, 1, size, 0, NULL);\n                if (p) {',
+     'p = allocate(r, 1, size, 0, NULL);\n                if (!p) large_release(r, large_link(old));\n                if (p) {',
+     1, 'large realloc failure frees old'),
+    ('*link = b;\n        r->_errno = ENOMEM;', 'r->_errno = ENOMEM;', 1, 'large failed unmap loses list'),
+]
+EXPECTED_CHECKS += [
+    'p && !a.next && last_flags==OS32_NANO_TOPDOWN && !((uintptr_t)p&7)',
+    'i < MAP_SLOTS',
+    '_malloc_r(&reent,SIZE_MAX)==NULL && attempts==saved',
+    '_malloc_r(&reent,SIZE_MAX-64u)==NULL && attempts==saved',
+    '_calloc_r(&reent,0x80000000u,2)==NULL && attempts==saved',
+    'realloc(p,65535)==NULL && ((unsigned char*)p)[65536]==0x71 && unmaps==saved',
+    'unmaps==saved+1',
+]
+
 assert len(EXPECTED_CHECKS) == len(MUTATIONS)
 
 

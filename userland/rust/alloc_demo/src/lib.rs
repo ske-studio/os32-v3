@@ -173,6 +173,17 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
             reuse_ok,
         );
 
+        /* f8: strong alignment through the shared mem_alloc adapter. */
+        let layout = core::alloc::Layout::from_size_align(62000, 4096).unwrap();
+        let aligned = alloc::alloc::alloc_zeroed(layout);
+        check(b"align 4096 allocation\0", !aligned.is_null() && aligned as usize % 4096 == 0);
+        if !aligned.is_null() {
+            check(b"aligned block is zeroed\0", (0..layout.size()).all(|i| *aligned.add(i) == 0));
+            *aligned.add(layout.size()-1) = 0x71;
+            check(b"aligned block tail is writable\0", *aligned.add(layout.size()-1) == 0x71);
+            alloc::alloc::dealloc(aligned, layout);
+        }
+
         /* --- 集計行 (最終行に 1 行) --- */
         let pass = PASS;
         let total = TOTAL;
