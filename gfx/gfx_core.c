@@ -976,6 +976,14 @@ i32 gfx_screen_owner(void)
 
 void gfx_shutdown(void)
 {
+    /* Internal cleanup/WM remains trusted. In GUI, USER may stop only its own
+     * fullscreen display, never acquire it merely by calling shutdown. */
+    extern int ring3_call_from_user(void);
+    if (ring3_call_from_user() && con_sink_is_enabled()) {
+        struct caller_access caller;
+        if (!caller_access_get_user(&caller) ||
+            caller.app_id != appslot_gfx_owner()) return;
+    }
     gfx_started = 0;
     gfx_reinit_surfaces(0);
     /* 表示出力を戻し (leave)、バックエンドのハードウェア終了処理へ。

@@ -14,3 +14,6 @@ check-multiapp-model-host:
 - kernel/kbd_inject.c
 - tools/check_map.d/check-multiapp-model-host.yaml
 - build/checks.d/check-multiapp-model-host.mk
+- exec/exec.c
+- exec/appslot.h
+- exec/exec_kapi_init.inc

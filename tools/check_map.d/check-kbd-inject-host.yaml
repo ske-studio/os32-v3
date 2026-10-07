@@ -6,3 +6,7 @@ check-kbd-inject-host:
 - kernel/con_sink.c
 - tools/check_map.d/check-kbd-inject-host.yaml
 - build/checks.d/check-kbd-inject-host.mk
+- exec/appslot.h
+- include/kbd_inject.h
+- include/con_sink.h
+- include/launch.h

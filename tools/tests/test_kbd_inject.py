@@ -28,25 +28,59 @@ FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
 # 同じものをここでも渡す。
 INCLUDES = ["-I" + str(ROOT / p)
             for p in ("include", "arch/x86", "platform/pc98",
-                      "kernel", "lib", "sdk/include/os32")]
+                      "kernel", "exec", "lib", "sdk/include/os32")]
 HOST_SRC = ROOT / "tools/tests/kbd_inject_host.c"
 KERNEL_SRC = ROOT / "kernel/kbd_inject.c"
 
+def run(tmp, source):
+    (tmp / "kbd_inject.c").write_text(source)
+    exe = tmp / "kbd-inject"
+    subprocess.run(["gcc", *FLAGS, "-O0", "-DCON_SINK_NO_IRQ_LOCK",
+                    "-DKBD_INJECT_NO_IRQ_LOCK", "-D__KERNEL_BUILD__",
+                    "-I"+str(tmp), *INCLUDES, "-nostdlib", "-static", "-no-pie",
+                    str(HOST_SRC), "-o", str(exe)], cwd=ROOT, check=True)
+    return host32.run([str(exe)], cwd=ROOT, timeout=30, capture_output=True, text=True)
+
 if __name__ == "__main__":
-    with tempfile.TemporaryDirectory(prefix="os32-kbd-inject-") as tmp:
-        tmp = pathlib.Path(tmp)
-        exe = tmp / "kbd-inject"
-        subprocess.run(["gcc", *FLAGS, "-O0",
-                        "-DCON_SINK_NO_IRQ_LOCK", "-DKBD_INJECT_NO_IRQ_LOCK",
-                        "-D__KERNEL_BUILD__", *INCLUDES,
-                        "-nostdlib", "-static", "-no-pie",
-                        str(HOST_SRC), "-o", str(exe)], cwd=ROOT, check=True)
-        print("HOST ILP32 GNU11 COMPILE PASS", flush=True)
-        rc = host32.run([str(exe)], cwd=ROOT, timeout=30).returncode
-        # 本番の割込み禁止区間 (include/io.h) を含む形でクロスコンパイル
-        subprocess.run(["i386-elf-gcc", *FLAGS, "-D__KERNEL_BUILD__",
-                        *INCLUDES, "-O2", "-c", str(KERNEL_SRC),
-                        "-o", str(tmp / "kbd_inject.o")], cwd=ROOT, check=True)
-        print("TARGET i386-elf GNU11 -Werror COMPILE PASS", flush=True)
-        print("EXIT kbd_inject_host=%d" % rc, flush=True)
-        sys.exit(rc)
+    import argparse
+    p = argparse.ArgumentParser(); p.add_argument('--mutate', action='store_true')
+    args = p.parse_args()
+    source = KERNEL_SRC.read_text()
+    with tempfile.TemporaryDirectory(prefix="os32-kbd-inject-") as directory:
+        tmp = pathlib.Path(directory)
+        result = run(tmp, source)
+        print(result.stdout, end=''); assert result.returncode == 0
+        subprocess.run(["i386-elf-gcc", *FLAGS, "-D__KERNEL_BUILD__", *INCLUDES,
+                        "-O2", "-c", str(KERNEL_SRC), "-o", str(tmp / "kbd_inject.o")],
+                       cwd=ROOT, check=True)
+        if args.mutate:
+            for old, new, expected in [
+                ('return ring3_wm_depth > 0 ? APP_ID_SHELL : appslot_cur();', 'return appslot_cur();',
+                 'FAIL WM pump cannot borrow fullscreen reader identity'),
+                ('if (appslot_gfx_owner() >= APP_ID_MIN) bad |= 1u << 0;', '',
+                 'FAIL boot rejects fullscreen precondition'),
+                ('if (allowed[g_inj_dest[pos]]) {', 'if (1) {',
+                 'FAIL hidden sh cannot take'),
+                ('if (allowed[g_inj_dest[pos]]) n++;', 'n++;',
+                 'FAIL hidden sh pending is empty'),
+                ('dest != id && !(dest == 0 && reader_exit)',
+                 'dest != id && !(dest == 0 && (reader_exit || appslot_gfx_owner() == id))',
+                 'FAIL fullscreen descendant exit preserves terminal typeahead'),
+                ('if (ring3_wm_depth > 0) return (i32)OS32_ERR_EXIST;', '',
+                 'FAIL WM pump cannot borrow terminal authority'),
+                ('dest != id && !(dest == 0 && reader_exit)', '!(dest == 0 && reader_exit)',
+                 'FAIL fullscreen exit discards tail'),
+                ('if (child == id) return 0;', '',
+                 'FAIL async terminal descendant no duplicate'),
+                ('if (ring3_wm_depth <= 0 && appslot_cur() != APP_ID_SHELL) return 0;', '',
+                 'FAIL fullscreen rejects non WM'),
+                ('if (id == reader) return 0;', '(void)reader;',
+                 'FAIL terminal descendant no duplicate'),
+                ('if (id == APP_ID_SHELL) return 1;', 'if (id == APP_ID_SHELL) return 0;',
+                 'FAIL fullscreen WM without reader'),
+            ]:
+                assert source.count(old) == 1
+                result = run(tmp, source.replace(old, new))
+                assert result.returncode != 0 and expected in result.stdout, result.stdout
+                print('RED runtime:', expected)
+        print('PASS kbd inject and target compile')

@@ -91,6 +91,8 @@ void *kmemset(void *dst, int val, u32 n) { return memset(dst, val, n); }
  * tools/tests/multiapp_impl_host.c ケース 20 が実物の exec/appslot.c で見る)。
  * なので「CUI 中 / 誰も所有していない」= 門が素通しになる値を返す。 */
 int con_sink_is_enabled(void) { return 0; }
+int ring3_call_from_user(void) { return 0; }
+int caller_access_get_user(struct caller_access *out) { (void)out; return 0; }
 int appslot_gfx_claim(int gui_mode) { (void)gui_mode; return 0; }
 int appslot_gfx_owner(void) { return 1; }   /* APP_ID_SHELL = GFX_OWNER_WM */
 /* 票 T8-2 で門が拒否の理由を端末へ出すようになった (claim が常に通る上の

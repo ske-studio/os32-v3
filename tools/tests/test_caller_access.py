@@ -11,6 +11,8 @@ from mutpar import run_ordered
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 MUTATIONS = [
+    ("access", "result.owner = caller.owner;", "result.owner = caller.owner + 1;", "identity wrong AS"),
+    ("access", "result.generation = caller.generation;", "result.generation = caller.generation + 1;", "identity wrong generation"),
     ("dispatch", "frame[V86I_EFLAGS] & EFLAGS_VM", "0", "VM int80 bypasses KAPI"),
     ("access", "if (ring3_wm_depth > 0)", "if (0)", "WM trusted scope"),
     ("access", "if (user_only && a->origin != CALLER_USER)", "if (0 && user_only)", "saved USER only"),
@@ -75,7 +77,47 @@ def run(src, quiet=False):
         result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=10)
         if not quiet:
             print(result.stdout + result.stderr, end="")
+        if result.returncode == 0:
+            compare_host_identity(result.stdout)
         return result.returncode
+
+
+def compare_host_identity(output):
+    # Feed the actual host observer an independent memory image of the two C
+    # fixture ASes (app 2/3, owner 12/13, generation 22/23). Never build expected
+    # memory from the kernel-returned tuple.
+    import importlib.util
+    import struct
+    spec = importlib.util.spec_from_file_location('h3_identity', ROOT/'tools/h3_park_resume.py')
+    h3 = importlib.util.module_from_spec(spec); spec.loader.exec_module(h3)
+    class Memory:
+        def __init__(self): self.mem = bytearray(0x10000)
+        def read(self, address, size): return bytes(self.mem[address:address+size])
+        def word(self, address, value): self.mem[address:address+4] = struct.pack('<I', value)
+    memory = Memory()
+    o = dict(block_count=2, app_min=2, app_max=5, slot_size=16, slot_state=0,
+             slot_as=4, free=0, as_owner=0, as_generation=4, ledger_count=64,
+             ledger_size=16, ledger_kind=0, ledger_id=1, ledger_pages=4,
+             ledger_as=2, shm_delta=4096, block_size=16384)
+    symbols = dict(shm_state=0x100, shm_block_span=0x200, shm_block_owner=0x300,
+                   g_slot=0x400, ledger_owners=0x1000, __bss_end=0x5000)
+    observer = object.__new__(h3.Playbook)
+    observer.o, observer.s, observer.emu = o, symbols, memory
+    for index, app in enumerate((2, 3)):
+        memory.mem[0x100+index] = 1
+        memory.word(0x200+index*4, 1); memory.word(0x300+index*4, app)
+        memory.word(0x400+app*16, 1); memory.word(0x404+app*16, 0x800+app*16)
+        memory.word(0x800+app*16, app+10); memory.word(0x804+app*16, app+20)
+        ledger = 0x1000+(app+10)*16
+        memory.mem[ledger:ledger+2] = bytes((2, app)); memory.word(ledger+4, 1)
+    seen = set()
+    for line in output.splitlines():
+        if not line.startswith('IDENTITY '): continue
+        app, owner, generation = map(int, line.split()[1:])
+        expected = observer.identity(app-2)
+        assert (app, owner, generation) == tuple(expected[k] for k in ('app','owner','generation'))
+        seen.add(app)
+    assert seen == {2,3}, 'both current AS identities observed'
 
 
 def main():

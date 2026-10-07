@@ -357,7 +357,7 @@ pub fn poll(out: &mut [GuiEvent]) -> GuiResult<Poll> {
 pub fn wait(timeout_ticks: u32) -> GuiResult<i32> {
     debug_assert!(!c().in_handler, "gui wait() called from inside an event handler (U3)");
     let result = call(GUI_OP_WAIT, timeout_ticks);
-    check_gfx()?;
+    let _ = check_gfx(); // Drawing failure must not replace the OP_WAIT result.
     result
 }
 

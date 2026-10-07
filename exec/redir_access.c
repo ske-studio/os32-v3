@@ -109,6 +109,18 @@ int caller_access_get_user(struct caller_access *out)
     return caller_access_saved_get(out, 1);
 }
 
+struct caller_identity caller_identity_get(void)
+{
+    struct caller_access caller;
+    struct caller_identity result = {0};
+    if (caller_access_get_user(&caller)) {
+        result.app_id = caller.app_id;
+        result.owner = caller.owner;
+        result.generation = caller.generation;
+    }
+    return result;
+}
+
 int caller_access_get(struct caller_access *out)
 {
     /* Only explicit WM enter/leave grants this scope. Preserve the USER value

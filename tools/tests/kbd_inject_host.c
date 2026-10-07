@@ -24,6 +24,18 @@ static int g_owner;
 int  res_owner_get(void)      { return g_owner; }
 void res_owner_set(int owner) { g_owner = owner; }
 
+#include "appslot.h"
+static int host_cur = APP_ID_SHELL, host_gfx = GFX_OWNER_WM;
+static AppSlot host_slots[APP_SLOT_COUNT];
+static int host_children[APP_SLOT_COUNT];
+i32 launch_child(i32 id) { return id >= APP_ID_MIN && id <= APP_ID_MAX ? host_children[id] : 0; }
+volatile int ring3_wm_depth;
+int appslot_cur(void) { return host_cur; }
+int appslot_gfx_owner(void) { return host_gfx; }
+AppSlot *appslot_get(int id) {
+    return id >= APP_ID_MIN && id <= APP_ID_MAX ? &host_slots[id] : 0;
+}
+
 /* 実物。*_NO_IRQ_LOCK は test_kbd_inject.py が -D で渡す。 */
 #include "con_sink.c"
 #include "kbd_inject.c"
@@ -72,6 +84,11 @@ static void reset_all(void)
     kbd_inject_discard();
     kbd_inject_drop_count = 0;
     res_owner_set(0);
+    host_cur = APP_ID_SHELL; host_gfx = GFX_OWNER_WM; ring3_wm_depth = 0;
+    for (int i = 0; i < APP_SLOT_COUNT; i++) {
+        host_slots[i].parent = APP_ID_SHELL;
+        host_children[i] = 0;
+    }
 }
 
 /* owner を con_sink の読み手にする (端末アプリの規約 R2 と同じ手順)。 */
@@ -96,6 +113,41 @@ static void case_permission(void)
 {
     reset_all();
     report("1 permission (only the con_sink reader may inject)\n");
+
+    host_gfx = 3; host_slots[3].parent = APP_ID_SHELL;
+    check(kbd_inject((const u8 *)"F", 1) == 1, "fullscreen WM without reader");
+    host_cur = 3;
+    check(take_one() == 'F', "fullscreen delivery");
+    host_cur = APP_ID_SHELL;
+    check(kbd_inject((const u8 *)"tail", 4) == 4, "fullscreen queued tail");
+    host_cur = 3;
+    kbd_inject_owner_exit(4);
+    check(kbd_inject_pending() == 4, "unrelated exit preserves fullscreen input");
+    kbd_inject_owner_exit(3);
+    check(kbd_inject_pending() == 0, "fullscreen exit discards tail");
+    kbd_inject_discard();
+    host_cur = 4;
+    check(kbd_inject((const u8 *)"X", 1) == OS32_ERR_EXIST, "fullscreen rejects non WM");
+    ring3_wm_depth = 1;
+    check(kbd_inject((const u8 *)"P", 1) == 1, "fullscreen WM pump");
+    ring3_wm_depth = 0; host_cur = 3;
+    check(take_one() == 'P', "pump delivery");
+    ring3_wm_depth = 0; host_cur = APP_ID_SHELL;
+    con_sink_enable(); check(become_reader(2), "terminal reader");
+    host_slots[3].parent = 4; host_slots[4].parent = 2; host_slots[2].parent = APP_ID_SHELL;
+    res_owner_set(0);
+    check(kbd_inject((const u8 *)"X", 1) == OS32_ERR_EXIST, "terminal descendant no duplicate");
+    check(kbd_inject_pending() == 0, "rejection leaves empty ring");
+    /* Async launches all have slot parent=WM; launch table owns this chain. */
+    host_slots[3].parent = host_slots[4].parent = APP_ID_SHELL;
+    host_children[2] = 4; host_children[4] = 3;
+    check(kbd_inject((const u8 *)"X", 1) == OS32_ERR_EXIST, "async terminal descendant no duplicate");
+    ring3_wm_depth = 1; host_cur = 2; res_owner_set(2);
+    check(kbd_inject((const u8 *)"X", 1) == OS32_ERR_EXIST, "WM pump cannot borrow terminal authority");
+    ring3_wm_depth = 0; host_cur = APP_ID_SHELL; res_owner_set(0);
+    host_children[2] = host_children[4] = 0;
+    kbd_inject_discard();
+    reset_all();
 
     res_owner_set(2);
     check(kbd_inject((const u8 *)"A", 1) == (i32)OS32_ERR_EXIST,
@@ -304,12 +356,89 @@ static void case_selftest_agrees(void)
     check(kbd_inject_selftest() == 0, "6a 自己診断のビットマスクは 0");
     check(kbd_inject_pending() == 0, "6b 終わった後は空");
     check(kbd_inject_drop_count == 0, "6c 捨てた累計を元に戻す");
+    host_gfx = 3; host_slots[3].parent = APP_ID_SHELL; host_cur = 4;
+    check((kbd_inject_selftest() & 1u) != 0, "boot rejects fullscreen precondition");
+    reset_all();
+}
+
+/* WM injection belongs to the fullscreen chain, even with a hidden shell. */
+static void case_fullscreen_destination(void)
+{
+    u8 b = 0x5a;
+    reset_all();
+    con_sink_enable(); become_reader(2);
+    host_slots[2].parent = host_slots[3].parent = APP_ID_SHELL;
+    host_slots[4].parent = 2; /* hidden sh: WAIT_KEY */
+    host_slots[4].state = APP_STATE_WAIT_KEY;
+    host_slots[3].state = APP_STATE_WAIT_POLL;
+    host_gfx = 3; host_cur = APP_ID_SHELL; res_owner_set(APP_ID_SHELL);
+    check(kbd_inject((const u8 *)"q", 1) == 1, "WM queues fullscreen q");
+    host_cur = 4; res_owner_set(4);
+    check(kbd_inject_pending() == 0, "hidden sh pending is empty");
+    check(!kbd_inject_peek(&b) && b == 0x5a, "hidden sh cannot peek");
+    check(!kbd_inject_take(&b) && b == 0x5a, "hidden sh cannot take");
+    host_cur = 3; res_owner_set(3); ring3_wm_depth = 1;
+    check(kbd_inject_pending() == 0 && !kbd_inject_peek(&b) && !kbd_inject_take(&b),
+          "WM pump cannot borrow fullscreen reader identity");
+    ring3_wm_depth = 0;
+    check(kbd_inject_pending() == 1 && take_one() == 'q', "only fullscreen Y takes q");
+
+    /* A synchronous descendant and an async launch descendant may consume. */
+    host_cur = APP_ID_SHELL; res_owner_set(APP_ID_SHELL);
+    check(kbd_inject((const u8 *)"ab", 2) == 2, "WM queues descendants");
+    host_slots[5].parent = 3; host_cur = 5; res_owner_set(5);
+    check(take_one() == 'a', "synchronous fullscreen descendant");
+    host_slots[5].parent = APP_ID_SHELL; host_children[3] = 5;
+    check(take_one() == 'b', "async fullscreen descendant");
+    host_children[3] = 0;
+
+    /* Different WM destinations coexist across owner changes. Exercise a
+     * full/wrapped ring, removing non-head entries and filtering on exit. */
+    for (int round = 0; round < 3; round++) {
+        for (int n = 0; n < KBD_INJECT_RING_SIZE; n++) {
+            u8 byte = (u8)n;
+            host_cur = APP_ID_SHELL; res_owner_set(APP_ID_SHELL);
+            host_gfx = (n & 1) ? 5 : 3;
+            check(kbd_inject(&byte, 1) == 1, "mixed destination enqueue");
+        }
+        host_cur = 5; res_owner_set(5);
+        check(kbd_inject_pending() == KBD_INJECT_RING_SIZE / 2, "mixed pending count");
+        for (int n = 1; n < KBD_INJECT_RING_SIZE; n += 2)
+            check(take_one() == n, "non-head destination FIFO");
+        host_cur = 3; res_owner_set(3);
+        for (int n = 0; n < KBD_INJECT_RING_SIZE; n += 2)
+            check(take_one() == n, "preserved destination FIFO");
+    }
+    host_gfx = 3;
+    host_cur = APP_ID_SHELL; res_owner_set(APP_ID_SHELL);
+    kbd_inject((const u8 *)"Y", 1);
+    host_cur = 2; res_owner_set(2);
+    kbd_inject((const u8 *)"T", 1);
+    kbd_inject_owner_exit(2);
+    host_cur = 3; res_owner_set(3);
+    check(kbd_inject_pending() == 1 && take_one() == 'Y', "reader exit preserves WM bytes");
+    host_cur = APP_ID_SHELL; res_owner_set(APP_ID_SHELL);
+    kbd_inject((const u8 *)"Y", 1);
+    host_cur = 2; res_owner_set(2);
+    kbd_inject((const u8 *)"T", 1);
+    kbd_inject_owner_exit(3);
+    check(kbd_inject_pending() == 1 && take_one() == 'T', "WM exit preserves terminal bytes");
+
+    /* Exiting a terminal's fullscreen descendant must preserve typeahead. */
+    host_cur = 2; res_owner_set(2);
+    check(kbd_inject((const u8 *)"sh", 2) == 2, "terminal queues typeahead");
+    host_slots[3].parent = 4;
+    kbd_inject_owner_exit(3);
+    check(kbd_inject_pending() == 2 && take_one() == 's' && take_one() == 'h',
+          "fullscreen descendant exit preserves terminal typeahead");
+    reset_all();
 }
 
 int main(void)
 {
     failures = 0;
     report("kbd inject ring (K7-K)\n");
+    case_fullscreen_destination();
     case_permission();
     case_byte_order();
     case_pending();

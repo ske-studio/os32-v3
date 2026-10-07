@@ -221,6 +221,13 @@ OWNER と回帰: `shm_reuse_test` 4/4・`db_test` 9/9・`db_v50_test` 41/41・�
 未実施 (ホストのみ): CTRL+STOP で MML・シリアル・IME の待ちから抜けること、範囲外のカーソル・ch、USER の `rshell_set_active` — 直接呼ぶ CPL3 の試験プログラムが要る (台帳 PRIO-3)。
 
 - a=内部結線 (旧USER下は準備確認)、b=低位USER/旧例外撤去・SHM/V86契約・拒否、c=正規lease対照・公開KAPI/caller/SDK/生成/版/manifest。**a → b → c → 統合の順、bの撤去はaのconsumer準備の後**。a/b/cは独立公開・配備せず、**版の更新・生成は統合でだけ行う**。統合で§2-4全6項を同時成立、現行対象再ビルド・配備を一括。受入は§2-5末尾のNP21/W一式とe12の変異一覧による。apps/gameは§5/§8へ。E11-5は2026-10-03決定の「全画面中のowner 1または専用のKAPI」、追加ならcで版一括へ含める。
+**e11a2 内部準備 (基点 `5ca3f01`、2026-10-07、未配備)**:
+- E11-5: WM/端末子孫の注入門と全画面フォーカス配送。WM注入に宛先を保持しtake/peek/pendingを連鎖内へ限定。exec_resumeの2箇所だけ宛先ID付きtakeに変更し、両帰路を抽出検査。WMは成功注入だけ起床候補にしAGAIN/退場で消す。
+- E11-6a: kcg_init は boot 閉鎖後も倍率1へ戻す (取得済み旗保持)。GUI の非所有 USER shutdown を無変更拒否、CUI/内部終了は維持。
+- wait は描画再取得失敗でも元の結果を返し、次の wait で回復。offscreen は描画継続。Rust wait_key/try_key は束縛済み shlib の帰路を照合し、try_key の k<=0 は省く (raw KAPI 利用者は明示 check が必要)。
+- E11-12a: saved USER の値だけ返す内部 caller_identity_get、h3 自己公開は opt-in・既定無効。slot/protocol/版/utf8 初期値は不変。h3 identity() との照合は e11c とゲストへ持越し (現試験は caller_access 模型との照合)。
+- 証拠: `/home/hight/os32-tmp/run/e11/a2_*.log`、初回検査別 rc は `a2_final_results.json`、レビュー修正は `a2_fix1_results.json` / `a2_fix1_extra_results.json`。ゲスト手順は guest_acceptance の e11a2 3 件、持越しは台帳 E11-A2。
+
 - **KAPI-CALLBACK**: 未完了は[台帳の優先段](../DEFERRED_TESTS.md#関門-新機能より先-優先段)。公開KAPIの形と版を変えずCPL0実行を塞ぎ、**e11より先に配備・受入する**。hsync・install・filerを壊す単純拒否は不可。候補はkernel生成trampolineのslot 12 stubをCPL3 shimへ替え、kernel内部の列挙口で項目を写しcallbackをCPL3で呼ぶ。CPL0不実行・既存callerの列挙正常・`man -l` crash解消を受入。値返し列挙KAPI追加とcaller移行はe11c。
 - **KAPI-OWNER**: 台帳の優先段でSHM lock/free・pipe free/clear/get_buf・DB slotをwrapで所有者照合し、既存の-1で他owner操作を無変更拒否。本人成功・trusted回収も先行受入。`pipe_get_buf`がkernel番地を返す件の意味変更はE11-8のe11c。
 - **KAPI-DISK-AUTH**: 台帳の優先段でkernelが知るexec経路・`/sys`由来・CUI前景の識別を授権に使い、拒否＋許可リストを先行配備。無授権I/Oゼロと隔離媒体での正規caller `inst_hdd` (CPL3)・常駐シェル`cmd_hdprep`を受入。OS32Xヘッダへflagを足す方式はE11-4のe11c。

@@ -27,6 +27,9 @@ void caller_access_leave(const volatile CallerAccessFrame *previous);
 int caller_access_get(struct caller_access *out);
 /* WM uses this explicitly for the suspended USER's pointers, never TRUSTED. */
 int caller_access_get_user(struct caller_access *out);
+/* Internal value ABI only; zero tuple means no live saved USER identity. */
+struct caller_identity { int app_id; u32 owner, generation; };
+struct caller_identity caller_identity_get(void);
 void caller_access_save(volatile CallerAccessFrame *out);
 void caller_access_invalidate(void);
 

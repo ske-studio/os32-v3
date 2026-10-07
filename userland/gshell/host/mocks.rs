@@ -289,6 +289,9 @@ pub static SND_FOCUS: Mutex<Vec<i32>> = Mutex::new(Vec::new());
 /// `exec_abort_clear()` が呼ばれた回数 (KAPI v45、決裁 A1)。
 pub static ABORT_CLEARS: AtomicUsize = AtomicUsize::new(0);
 /// `kbd_inject_pending()` が返す未読バイト数 (KAPI v47、票 K7 指摘 C)。
+pub static INJECTED: Mutex<Vec<u8>> = Mutex::new(Vec::new());
+pub static INJECT_CALLS: AtomicUsize = AtomicUsize::new(0);
+pub static INJECT_LIMIT: AtomicUsize = AtomicUsize::new(usize::MAX);
 pub static KBD_PENDING: AtomicUsize = AtomicUsize::new(0);
 /// `exec_app_state(app_id)` が返す状態。添字 = app_id、既定は 2 (`PARKED`)。
 pub static APP_STATE: Mutex<Vec<i32>> = Mutex::new(Vec::new());
@@ -812,6 +815,13 @@ unsafe extern "C" fn exec_abort_clear() -> i32 {
 /* KAPI v47 (K7)。注入リングはカーネルの持ち物なので、ここは試験が置いた
  * 「未読バイト数」と「その ID の状態」をそのまま返すだけ — 注入と取り出しの
  * 実体は `tools/tests/kbd_inject_host.c` が実物で検査済み。 */
+unsafe extern "C" fn kbd_inject(bytes: *const u8, len: u32) -> i32 {
+    INJECT_CALLS.fetch_add(1, Ordering::SeqCst);
+    let len = len.min(INJECT_LIMIT.load(Ordering::SeqCst) as u32);
+    lk(&INJECTED).extend_from_slice(std::slice::from_raw_parts(bytes, len as usize));
+    // WM bytes are not visible through the WM's legacy pending query.
+    len as i32
+}
 unsafe extern "C" fn kbd_inject_pending() -> u32 {
     KBD_PENDING.load(Ordering::SeqCst) as u32
 }
@@ -867,6 +877,8 @@ pub fn init() {
     a.exec_kill = exec_kill;
     a.exec_abort_clear = exec_abort_clear;
     a.snd_focus = snd_focus;
+    a.kbd_inject = kbd_inject;
+    lk(&INJECTED).clear(); INJECT_CALLS.store(0, Ordering::SeqCst);
     a.kbd_inject_pending = kbd_inject_pending;
     a.exec_app_state = exec_app_state;
     /* 票 T9 (KAPI v49): 起動要求表。表そのものの遷移は実物で検査済み
@@ -897,6 +909,7 @@ pub fn init() {
     lk(&SND_FOCUS).clear();
     ABORT_CLEARS.store(0, Ordering::SeqCst);
     KBD_PENDING.store(0, Ordering::SeqCst);
+    INJECT_LIMIT.store(usize::MAX, Ordering::SeqCst);
     lk(&APP_STATE).clear();
     LAUNCH_PENDING.store(0, Ordering::SeqCst);
     TAKES.store(0, Ordering::SeqCst);
