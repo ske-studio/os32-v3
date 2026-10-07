@@ -45,7 +45,13 @@ static int port_lease(const struct gfx_attach_ref *ref, struct gfx_attach_view *
 }
 static int port_unlease(u32 token) { releases++;return lease_release(&space,token); }
 static const struct gfx_attach_port port={port_query,port_lease,port_unlease};
-static void __cdecl legacy_fb(void *out) {legacy_calls++;gfx_get_framebuffer(out);}
+static void __cdecl legacy_fb(void *out)
+{
+    legacy_calls++;
+    host_user=host_sdk_cpl != 0;
+    gfx_get_framebuffer(out);
+    host_user=1;
+}
 static void __cdecl screen(void *out) {
     gfx_screen_info(out);
     if(bad_screen) ((GFX_ScreenInfo *)out)->height=0;
@@ -180,7 +186,8 @@ static void run(void)
     u32 q=queries;host_sdk_cpl=0;
     CHECK(!libos32gfx_attach_checked() && queries==q && legacy_calls==1 && !live());
     libos32gfx_detach();host_sdk_cpl=3;gfx_attach_port=0;
-    CHECK(!libos32gfx_attach_checked() && queries==q && legacy_calls==2);
+    CHECK(!libos32gfx_attach_checked() && queries==q && legacy_calls==2 && !live());
+    CHECK(gfx_fb.planes[0]==bb_b);
     libos32gfx_detach();gfx_attach_port=&port;
     /* Dormant USER bridge: flag metadata must not leak into PTE expectations. */
     GFX_Framebuffer *fb=P2V(payload+512);
@@ -195,8 +202,10 @@ static void run(void)
     CHECK(live()==1 && space.leases[0].token!=token && fb->height==GFX_HEIGHT_200);
     gfx_shutdown();u32 fails=gfx_bridge_fail_count;
     gfx_framebuffer_bridge((void *)(MEM_EXEC_LOAD_ADDR+512));
-    CHECK(slot.abort_req && gfx_bridge_fail_count==fails+1);
+    CHECK(!slot.abort_req && gfx_bridge_fail_count==fails+1);
     CHECK(!fb->width && !fb->height && !fb->planes[0] && !fb->planes[1] && !fb->planes[2] && !fb->planes[3]);
+    gfx_framebuffer_bridge((void *)(MEM_EXEC_LOAD_ADDR+PAGE_SIZE-4));
+    CHECK(slot.abort_req);
     slot.abort_req=0;caller_access_leave(&prev);
     CHECK(caller_access_enter(&prev,CALLER_TRUSTED));
     gfx_init();u32 failed=gfx_bridge_fail_count;

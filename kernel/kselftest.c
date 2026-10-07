@@ -17,6 +17,7 @@
 /* ======================================================================== */
 
 #include "kselftest.h"
+#include "serial.h"
 #include "pegc.h"
 #include "gfx_hal.h"
 #include "../gfx/gfx.h"
@@ -717,6 +718,15 @@ static void test_ledger(void)
 
     check(kctx_irq_depth == 0 && kctx_exc_depth == 0, "ledger:ctx depth 0");
     check(ledger_selfcheck("boot"), "ledger:selfcheck boot");
+    check(!ledger_resource_set_map(LEDGER_MAX_RESOURCES, 0, 0), "ledger:map bad id");
+    for (u32 rid = 0; rid < LEDGER_MAX_RESOURCES; rid++) {
+        const struct ledger_resource *r = &ledger_resources[rid];
+        if (!r->bus) continue;
+        u32 first = r->map_first, end = r->map_end;
+        check(!ledger_resource_set_map(rid, r->decode_first, r->decode_end + 1) &&
+              r->map_first == first && r->map_end == end, "ledger:map outside decode");
+        break;
+    }
     persist = ledger_persist_total();
     ok = ledger_owner_new(LEDGER_KIND_AS, 0, "kstest", &owner);
     check(ok, "ledger:AS owner new");
@@ -1994,6 +2004,7 @@ int kselftest_run(void)
 u32 memmap_audit_fail, as_audit_fail, memmap_audit_runs, as_audit_runs;
 u32 memmap_audit_skip, v86_return_audit_fail, v86_return_audit_runs;
 u32 audit_runs, audit_fail;
+char audit_first_fail_tag[32];
 int kselftest_run_audit(const char *tag)
 {
     int a, b, bad;
@@ -2006,6 +2017,15 @@ int kselftest_run_audit(const char *tag)
     as_audit_fail += b != 0;
     bad = (a != 0) + (b != 0) + !ledger_selfcheck(tag);
     audit_runs++;
+    if (bad && !audit_fail) {
+        kstrncpy(audit_first_fail_tag, tag ? tag : "unknown", sizeof(audit_first_fail_tag));
+        audit_first_fail_tag[sizeof(audit_first_fail_tag) - 1] = 0;
+        if (!serial_gate_active()) {
+            serial_puts_polled("[audit] first failure: ");
+            serial_puts_polled(audit_first_fail_tag);
+            serial_puts_polled("\r\n");
+        }
+    }
     audit_fail += bad;
     return bad;
 }

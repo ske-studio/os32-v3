@@ -16,13 +16,10 @@ static int deny_unicode, corrupt_unicode_view;
 static u32 unicode_queries;
 static int unicode_query(struct gfx_attach_desc *out)
 {
-    struct surface_query_source src;
     struct surface_query_result *q = P2V(payload);
     unicode_queries++;
     if (deny_unicode) return OS32_ERR_INVAL;
-    int rc = system_surface_source(LEDGER_ROLE_UNICODE, &src);
-    if (rc) return rc;
-    rc = surface_query(&src, (void *)MEM_EXEC_LOAD_ADDR);
+    int rc = surface_api_query(LEDGER_ROLE_UNICODE, (void *)MEM_EXEC_LOAD_ADDR);
     if (rc) return rc;
     struct surface_desc *d = &q->desc[0];
     *out = (struct gfx_attach_desc){0};
@@ -33,12 +30,10 @@ static int unicode_query(struct gfx_attach_desc *out)
 }
 static int unicode_lease(const struct gfx_attach_ref *ref, struct gfx_attach_view *out)
 {
-    struct surface_query_source src;
     struct lease_view *v=P2V(payload+256);
-    int rc=system_surface_source(LEDGER_ROLE_UNICODE,&src);
-    if (rc) return rc;
+    int rc;
     *(struct surface_ref *)P2V(payload)=(struct surface_ref){ref->sid,ref->generation};
-    rc=surface_lease(&src,(void *)MEM_EXEC_LOAD_ADDR,LEDGER_PERM_RO,
+    rc=surface_api_lease(LEDGER_ROLE_UNICODE,(void *)MEM_EXEC_LOAD_ADDR,LEDGER_PERM_RO,
                      (void *)(MEM_EXEC_LOAD_ADDR+256));
     if (rc) return rc;
     out->token=v->token;out->base=v->base;out->bytes=v->bytes;

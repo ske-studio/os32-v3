@@ -207,7 +207,7 @@ Unicodeはkernel所有FIXED_RAM/RO SURFACE。ユーザー版utf8だけsetterでl
 | E11-7 | — | c | 公開契約の注記 | KAPI文書・SDK契約 | STALE/INVALを秘匿保証とする解釈 | 契約と生成の照合 | 推測可能性明記、callback/scheduling禁止 |
 | E11-8 | — | c | 台帳KAPI-AUDIT-FIX/OWNERの受入・分類を接続 | `pipe_get_buf` kernel番地返却の意味変更・未監査区分 | 未監査を安全扱いする区分 | 区分別正常/拒否対照、範囲検査P3変異 | 到達可能な穴は先行修正、意味変更だけ一括公開 |
 | E11-9 | 5 | b/c | tvdumpのCUI授権 | `tvram_readchar_at` checked copy | 無授権TVRAM読出し | tvdump正常/非所有者拒否 | CUI前景のみ、TVDM wire不変 |
-| E11-10 | 2 | a/b | 旧Eの拒否と成功対照 | 正規CLIENT lease | BB低位直書き生存 | `ring3_guard bb` E→拒否 | E kill、正規CLIENTは生存 |
+| E11-10 | 2 | b/c | 旧Eの拒否と成功対照 | 正規CLIENT lease | BB低位直書き生存 | `ring3_guard bb` E→拒否 | E kill、正規CLIENTは生存 |
 | E11-11 | 2/5 | b | 未貸与VRAM拒否 | DB出力のB1 walk | VRAM出力許可 | `db_v50_test` 拒否追加 | RAM最終byte成功・guard越境拒否も維持 |
 | E11-12 | 5 | a/c | h3本人識別・writer初期化 | 値返し本人識別、owned SHM marker | 旧PM(A)識別、TVRAM観測 | h3・nop/hello/fault/guard | CRT非依存も初期化、fault目的地一致、違反用VRAM書込みは保持 |
 | E11-13 | 3 | b | SHM全ページROの実効性 | `paging_shm_set_rw`、lock/free/owner回収 | 呼出し成功だけの判定 | SHM lock書込み拒否、shm_reuse | CPL3拒否、free/exit後の次AS全ページ書込み成功 |
@@ -220,7 +220,7 @@ OWNER と回帰: `shm_reuse_test` 4/4・`db_test` 9/9・`db_v50_test` 41/41・�
 **KAPI-AUDIT-FIX の着地とゲスト受入 (PM、2026-10-07、main `9dcb51b`)**: 取り込み `make check`・`check-fast` rc=0 (1 回目は小さな保守の対応表の誤りで落ち、直した)。kselftest 277/0、`sndtest`・DB・SHM・パイプの回帰 OK、常駐 rshell は受入の経路そのもの。
 未実施 (ホストのみ): CTRL+STOP で MML・シリアル・IME の待ちから抜けること、範囲外のカーソル・ch、USER の `rshell_set_active` — 直接呼ぶ CPL3 の試験プログラムが要る (台帳 PRIO-3)。
 
-- a=内部結線 (旧USER下は準備確認)、b=低位USER/旧例外撤去・SHM/V86契約・拒否/正規lease対照、c=公開KAPI/caller/SDK/生成/版/manifest。**a → b → c → 統合の順、bの撤去はaのconsumer準備の後**。a/b/cは独立公開・配備せず、**版の更新・生成は統合でだけ行う**。統合で§2-4全6項を同時成立、現行対象再ビルド・配備を一括。受入は§2-5末尾のNP21/W一式とe12の変異一覧による。apps/gameは§5/§8へ。E11-5は2026-10-03決定の「全画面中のowner 1または専用のKAPI」、追加ならcで版一括へ含める。
+- a=内部結線 (旧USER下は準備確認)、b=低位USER/旧例外撤去・SHM/V86契約・拒否、c=正規lease対照・公開KAPI/caller/SDK/生成/版/manifest。**a → b → c → 統合の順、bの撤去はaのconsumer準備の後**。a/b/cは独立公開・配備せず、**版の更新・生成は統合でだけ行う**。統合で§2-4全6項を同時成立、現行対象再ビルド・配備を一括。受入は§2-5末尾のNP21/W一式とe12の変異一覧による。apps/gameは§5/§8へ。E11-5は2026-10-03決定の「全画面中のowner 1または専用のKAPI」、追加ならcで版一括へ含める。
 - **KAPI-CALLBACK**: 未完了は[台帳の優先段](../DEFERRED_TESTS.md#関門-新機能より先-優先段)。公開KAPIの形と版を変えずCPL0実行を塞ぎ、**e11より先に配備・受入する**。hsync・install・filerを壊す単純拒否は不可。候補はkernel生成trampolineのslot 12 stubをCPL3 shimへ替え、kernel内部の列挙口で項目を写しcallbackをCPL3で呼ぶ。CPL0不実行・既存callerの列挙正常・`man -l` crash解消を受入。値返し列挙KAPI追加とcaller移行はe11c。
 - **KAPI-OWNER**: 台帳の優先段でSHM lock/free・pipe free/clear/get_buf・DB slotをwrapで所有者照合し、既存の-1で他owner操作を無変更拒否。本人成功・trusted回収も先行受入。`pipe_get_buf`がkernel番地を返す件の意味変更はE11-8のe11c。
 - **KAPI-DISK-AUTH**: 台帳の優先段でkernelが知るexec経路・`/sys`由来・CUI前景の識別を授権に使い、拒否＋許可リストを先行配備。無授権I/Oゼロと隔離媒体での正規caller `inst_hdd` (CPL3)・常駐シェル`cmd_hdprep`を受入。OS32Xヘッダへflagを足す方式はE11-4のe11c。
@@ -249,6 +249,12 @@ OWNER と回帰: `shm_reuse_test` 4/4・`db_test` 9/9・`db_v50_test` 41/41・�
 実ソース `test_lease.py` / `test_gfx_boot.py` とSDK呼出しを連結し、backendを選ぶだけの模型で終えない。変異は旧bb pointer、plane stride丸め、片実体だけ再attach、GUI DISPLAY許可、UC落ち、共有PT書込み許可、revoke前free、V86後PDE USER復元欠落、teardownのPCD欠落、SHM lock/free/回収後USER欠落、束generation照合削除、fontのboot終了ガード除去。既存10 lease変異の意図も保持。
 
 NP21/Wは8MB planar/PEGC、17MB planar/PEGC/Cirrus。日本語/描画/present、GUI→CUI→GUI、全画面DISPLAY、通常GUIの低位VRAMとdevice直書きkill、S/T/Uと片側revoke、cirrus-off強制指定fallback、V86復元後のalias_cache一致とDISPLAY/TVRAM再lease、SHMの2本目書込み、boot後font_load_testのNOSYS/表・BB不変を確認。ring3_guard旧Eの「低位BB生存」はここから**拒否へ更新**し、正規CLIENT leaseで生存する対照を追加。Bはshlib実ロード後にPTE P/U/ROかつPF error=7、Aは実stack直下NPかつerror=6を確認する。Ra266のPEGC/日本語/全画面とUCはhへ。予算は§6のe枠。
+
+**e11a1 内部結線 (2026-10-07、基点 `5ca3f01`、レビュー修正1)**: `gfx_get_framebuffer` は CPL3/CPL0 とも従来の selected alias を維持。公開 KAPI・版・旧 USER は維持。
+内部の互換橋は pre-init/授権失敗をゼロ出力だけで返し、不正な書出し範囲だけ USER abort。role→publisher と caller 照合 unlease は専用 section で未使用時に GC、互換 token は unlease 不可。
+Cirrus DISPLAY は G∧F の授権 lease 用 RW。E10-8 は pgalloc の decode 範囲検査口へ、E10-9 は初回 tag と SerialFS セッション外だけ CRLF の polled 行。
+V86 帰路の互換 CLIENT token 維持をホスト確認。旧 E は a で SURV、`ring3_guard l…` は従来の B。切替条件と延期は台帳 E11-A1。
+証拠・E11-2 前後サイズ・検査 rc: `/home/hight/os32-tmp/run/e11/a1_fix1_report.md`。旧 USER 下のホスト合格は準備確認のみ。
 
 **e10c 実装 (2026-10-07)**: master/全 AS・alias/refcount 検査を post-exec・probe 後・GUI 移譲・AS launch・V86 通常帰路に接続。合成 S/T/U は post-exec でも実行。
 監査は生涯専用計数、AS単位のIRQ区切りと割当PTだけの照合。probe後は選択面/source・bind/BBも確認。

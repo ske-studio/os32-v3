@@ -219,7 +219,7 @@ MUTATIONS = [
      'pgalloc_limit_pfn(),\n                              LEDGER_TOP_DOWN'),
     # 1 つの窓の写像失敗で候補を全部捨てる (B3: Xe10 の失敗が PEGC を妨げる)
     ('map-failure-drops-all', 'gfx/gfx_core.c',
-     '            m &= ~gfx_cand_of(i);', '            m = 0;'),
+     '            m &= ~gfx_cand_of(i);\n        else if', '            m = 0;\n        else if'),
     # 写像を予約より先に行う (識別 → 予約 → 写像の順、D33)
     ('map-before-reserve', 'gfx/gfx_core.c', RESERVE_THEN_MAP, MAP_THEN_RESERVE),
     # アリーナの上端を凍結しない (CPL=0 の子が BB まで伸びる)
@@ -235,9 +235,10 @@ MUTATIONS = [
     # GFX=pc98 でも識別して予約する
     ('pc98-pref-ignored', 'gfx/gfx_core.c',
      '    if (g_backend_pref == GFX_PREF_PC98 ||\n', '    if (0 ||\n'),
-    # 表示面を貸せる権限にする (契約 G4)
-    ('display-lendable', 'gfx/gfx_core.c',
-     '.perm_max = LEDGER_PERM_NONE', '.perm_max = LEDGER_PERM_RW'),
+    # e11a: authorized DISPLAY lease must now be possible
+    ('display-unlendable', 'gfx/gfx_core.c',
+     '.planes = 1, .cache = LEDGER_CACHE_UC, .perm_max = LEDGER_PERM_RW }',
+     '.planes = 1, .cache = LEDGER_CACHE_UC, .perm_max = LEDGER_PERM_NONE }'),
     # gfx_bb_phys_range が選択中の backend を見ない
     ('phys-range-not-selected', 'gfx/gfx_core.c',
      '        ledger_surface_find(gfx_sf_backend(), LEDGER_ROLE_CLIENT);\n    if (base)',

@@ -19,12 +19,24 @@ def function(text, name):
 from mutpar import run_ordered
 
 MUTANTS = [
+ ('audit-line-ending', 'kernel/kselftest.c', 'serial_puts_polled("\\r\\n");', 'serial_puts_polled("\\n");', 'FAIL serial_len >= 2'),
+
+ ('compat-unlease', 'exec/surface_query.c', 'lease->token == token && (lease->flags & AS_LEASE_GFX_COMPAT)', '0', 'FAIL surface_api_unlease(compat) == OS32_ERR_INVAL'),
+ ('audit-session', 'kernel/kselftest.c', 'if (!serial_gate_active())', 'if (1)', "FAIL audit_first_fail_tag[0] == 's' && !serial_len"),
+
+ ('unlease-WM-caller', 'exec/surface_query.c',
+  'int valid = !kctx_irq_depth && !kctx_exc_depth && caller_access_get(&caller) &&',
+  'int valid = !kctx_irq_depth && !kctx_exc_depth && caller_access_get_user(&caller) &&',
+  'FAIL surface_api_unlease(token) == OS32_ERR_INVAL'),
+ ('audit-no-mark', 'kernel/kselftest.c', '    if (bad && !audit_fail) {', '    if (0) {', 'FAIL audit_first_fail_tag[0]'),
+ ('audit-every-failure', 'kernel/kselftest.c', '    if (bad && !audit_fail) {', '    if (bad) {', 'FAIL serial_len == first_len'),
+
  ('lease-scan-duplicate', 'exec/lease.c', '    for (u32 di = 0; di < MEM_LEASE_MAX_PDES; di++) {', '    for (u32 repeat = 0; repeat < 2; repeat++)\n    for (u32 di = 0; di < MEM_LEASE_MAX_PDES; di++) {', 'FAIL scan_max[0] == PTE_COUNT'),
  ('AS-IRQ-unbounded', 'exec/lease.c', '        irq_restore(flags);\n    }\n    /* Alias/descriptor', '        (void)flags;\n    }\n    /* Alias/descriptor', 'FAIL scan_max[0] == PTE_COUNT'),
  ('v86-client-revoke', 'gfx/gfx_core.c', '    gfx_reinit_surface_roles(0, 1);', '    gfx_reinit_surface_roles(0, 0);', 'FAIL client->gen == cref.generation && client->lease_count == 1'),
  ('tvram-unready', 'exec/system_surface.c', '!(gfx_surface_unready & (1U << (sf - ledger_surfaces)))', '1', 'FAIL !system_surface_source(LEDGER_ROLE_TVRAM, &tvsrc) && !tvsrc.ready'),
  ('aperture-user', 'kernel/paging.c', '    if ((entry & PTE_USER) &&\n        !ledger_surface_find(LEDGER_SF_CIRRUS, LEDGER_ROLE_CLIENT)) return 0;', '', 'FAIL paging_master_audit(exec_tramp_page_addr()) > 0'),
- ('failed-map-published', 'gfx/gfx_core.c', '            ledger_resources[rid].map_first = ledger_resources[rid].map_end = 0;', '', 'FAIL !paging_master_audit(exec_tramp_page_addr())'),
+ ('failed-map-published', 'gfx/gfx_core.c', '            (void)ledger_resource_set_map(rid, 0, 0);', '', 'FAIL !paging_master_audit(exec_tramp_page_addr())'),
  ('lifetime-boot-count', 'kernel/kselftest.c', '    audit_runs++;', '    audit_runs++;\n    ksel_pass++;', 'FAIL ksel_pass == boot_pass && ksel_fail == boot_fail'),
  ('selected-check', 'gfx/gfx_core.c', 'int gfx_selected_selfcheck(void)\n{\n    struct surface_query_source client, display;\n    if (gfx_selected_source(LEDGER_ROLE_CLIENT, &client) ||\n        gfx_selected_source(LEDGER_ROLE_DISPLAY, &display) ||\n        !client.ready || !display.ready || client.count != 1) return 0;\n    for (u32 i = 0; i < display.count; i++)\n        if (!ledger_surface_validate(&ledger_surfaces[display.refs[i].sid])) return 0;\n    const struct ledger_surface *sf = &ledger_surfaces[client.refs[0].sid];\n    if (!ledger_surface_validate(sf) || !g_backend ||\n        g_backend->bb_base != bb[0] || g_backend->bb_size != sf->npages * PAGE_SIZE ||\n        g_backend->bb_pitch != sf->pitch || g_backend->bb_format != sf->format) return 0;\n    u8 *base = sf->backing >= LEDGER_SB_VRAM ?\n               (u8 *)P2V_IO(sf->first * PAGE_SIZE) : (u8 *)P2V(sf->first * PAGE_SIZE);\n    for (u32 i = 0; i < 4; i++)\n        if (bb[i] != (i < sf->planes ? base + sf->plane_offset[i] : 0)) return 0;\n    return bb_b == bb[0] && bb_r == bb[1] && bb_g == bb[2] && bb_i == bb[3];\n}', 'int gfx_selected_selfcheck(void)\n{\n    return 1;\n}', 'FAIL !gfx_selected_selfcheck()'),
 

@@ -161,3 +161,66 @@ done:
     irq_restore(flags);
     return rc;
 }
+
+/* e11a internal entry bodies; no public slot/version change. */
+#include "../gfx/gfx.h"
+#include "system_surface.h"
+__attribute__((section(".text.surface_api")))
+static int surface_api_source(u32 role, struct surface_query_source *source)
+{
+    switch (role) {
+    case LEDGER_ROLE_CLIENT:
+    case LEDGER_ROLE_DISPLAY:
+        return gfx_surface_source(role, source);
+    case LEDGER_ROLE_TVRAM:
+    case LEDGER_ROLE_UNICODE:
+        return system_surface_source(role, source);
+    default:
+        return OS32_ERR_INVAL;
+    }
+}
+__attribute__((section(".text.surface_api")))
+int surface_api_query(u32 role, struct surface_query_result *out)
+{
+    struct surface_query_source source;
+    int rc = surface_api_source(role, &source);
+    return rc ? rc : surface_query(&source, out);
+}
+__attribute__((section(".text.surface_api")))
+int surface_api_lease(u32 role, const struct surface_ref *ref, u32 access,
+                      struct lease_view *out)
+{
+    struct surface_query_source source;
+    int rc = surface_api_source(role, &source);
+    return rc ? rc : surface_lease(&source, ref, access, out);
+}
+__attribute__((section(".text.surface_api")))
+int surface_api_bundle(u32 role, const struct surface_ref *refs, u32 count,
+                       u32 access, struct surface_lease_result *out)
+{
+    struct surface_query_source source;
+    int rc = surface_api_source(role, &source);
+    return rc ? rc : surface_lease_bundle(&source, refs, count, access, out);
+}
+__attribute__((section(".text.surface_api")))
+int surface_api_unlease(u32 token)
+{
+    struct caller_access caller;
+    unsigned int flags = irq_save();
+    int valid = !kctx_irq_depth && !kctx_exc_depth && caller_access_get(&caller) &&
+                caller.origin == CALLER_USER;
+    AppSlot *slot = valid ? appslot_get(caller.app_id) : 0;
+    valid = valid && slot && slot->state == APP_STATE_RUNNING;
+    if (valid) {
+        for (u32 i = 0; i < MEM_LEASE_MAX; i++) {
+            const struct as_lease *lease = &caller.as->leases[i];
+            if (lease->token == token && (lease->flags & AS_LEASE_GFX_COMPAT)) {
+                valid = 0;
+                break;
+            }
+        }
+    }
+    irq_restore(flags);
+    /* No callbacks/scheduling before release; get revalidates AS identity. */
+    return valid ? surface_query_error(lease_release(caller.as, token)) : OS32_ERR_INVAL;
+}

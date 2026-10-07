@@ -17,6 +17,7 @@
 /* 画面の所有者の表は exec/appslot.c にある (判定材料が AppSlot にあり、
  * ホストで試験できるため)。gfx/ は -Iexec を持たないので、kernel/con_sink.c
  * が res_owner_get を引くのと同じ流儀で extern 宣言する。 */
+extern int ring3_call_from_user(void);
 extern int appslot_gfx_claim(int gui_mode);
 extern int appslot_gfx_owner(void);
 
@@ -167,7 +168,7 @@ int gfx_kernel_framebuffer(struct gfx_kernel_fb *out)
     return gfx_client_framebuffer(out, gfx_started);
 }
 
-/* e11 installs the USER lease bridge. Keep both current callers on aliases. */
+/* Keep the legacy alias for all callers until SDK generation recovery in e11c. */
 void __cdecl gfx_get_framebuffer(GFX_Framebuffer *fb)
 {
     struct gfx_kernel_fb kernel;
@@ -281,13 +282,13 @@ static const struct ledger_surface gfx_sf[4] = {
       .pitch = MEM_GFX_BB8_PITCH, .owner = LEDGER_OWNER_KERNEL,
       .backing = LEDGER_SB_MMIO, .backend = LEDGER_SF_CIRRUS,
       .role = LEDGER_ROLE_DISPLAY, .format = GFX_BB_PACKED8,
-      .planes = 1, .cache = LEDGER_CACHE_UC, .perm_max = LEDGER_PERM_NONE }
+      .planes = 1, .cache = LEDGER_CACHE_UC, .perm_max = LEDGER_PERM_RW }
 };
 
 /* PC98 is always a candidate: even explicit PEGC/Cirrus falls back to it.
  * One record per discontiguous plane. PLANAR4 describes the pixel layout;
  * planes=1 describes this record. Do not clear device padding (32000..32767).
- * Cirrus DISPLAY remains NONE until its fullscreen publisher is connected. */
+ * DISPLAY permissions are granted only by the authorized lease entry. */
 static const u32 gfx_display_planes[4] = {
     VRAM_PLANE_B, VRAM_PLANE_R, VRAM_PLANE_G, VRAM_PLANE_I
 };
@@ -359,7 +360,7 @@ void __attribute__((cold)) gfx_boot_reserve(void)
         if (!ledger_resource_add(&gfx_res[i], &rid)) m = 0;
         else {
             resource_ids[i] = rid;
-            ledger_resources[rid].map_first = ledger_resources[rid].map_end = 0;
+            (void)ledger_resource_set_map(rid, 0, 0);
         }
         sp[n].first = gfx_res[i].decode_first;
         sp[n].end = gfx_res[i].decode_end;
@@ -375,8 +376,8 @@ void __attribute__((cold)) gfx_boot_reserve(void)
                             r->map_end - r->map_first, PAGE_RW | PTE_PCD) != 0)
             m &= ~gfx_cand_of(i);
         else if ((m & gfx_cand_of(i)) && resource_ids[i] < LEDGER_MAX_RESOURCES) {
-            ledger_resources[resource_ids[i]].map_first = r->map_first;
-            ledger_resources[resource_ids[i]].map_end = r->map_end;
+            if (!ledger_resource_set_map(resource_ids[i], r->map_first, r->map_end))
+                m &= ~gfx_cand_of(i);
         }
     }
     /* DISPLAY depends on reservation + mapping, not CLIENT allocation. */
@@ -467,8 +468,8 @@ unready:
     return OS32_ERR_INVAL;
 }
 
-/* Probe selects backing before drawing starts. Cirrus DISPLAY is deliberately
- * NONE until e11: validate its internal source without granting a public view. */
+/* Probe validates selected backing before drawing starts; USER publication
+ * additionally requires initialization and the query/lease authorization. */
 int gfx_selected_selfcheck(void)
 {
     struct surface_query_source client, display;
@@ -985,10 +986,11 @@ void gfx_shutdown(void)
     gfx_reinit_surfaces(1);
 }
 
-/* e11 connects this entry after the SDK/shlib consumers have migrated.
+/* Internal compatibility bridge; KAPI connection follows in e11c.
  * One compatibility CLIENT token per AS, inside the existing eight slots.
  * The saved caller origin, never current CPL/CR3, selects TRUSTED vs USER.
  * No callbacks/scheduling from publisher construction through copyout. */
+volatile u32 gfx_bridge_user_count, gfx_bridge_last_va;
 volatile u32 gfx_bridge_fail_count __attribute__((section(".bss.gfx_fb_bridge")));
 __attribute__((section(".text.gfx_fb_bridge")))
 void gfx_framebuffer_bridge(void *out)
@@ -1001,17 +1003,21 @@ void gfx_framebuffer_bridge(void *out)
     struct lease_authority auth;
     struct as_lease *held = 0;
     unsigned int flags = irq_save();
+    int user = ring3_call_from_user();
     int valid = caller_access_get(&caller), rc = OS32_ERR_INVAL;
     u32 i, acquired = 0;
+    int bad_output = !valid || !check_caller_write_range(&caller, out, sizeof(fb));
     irq_restore(flags);
-    if (!valid || !check_caller_write_range(&caller, out, sizeof(fb))) goto fail;
+    if (bad_output) goto fail;
     if (caller.origin == CALLER_TRUSTED) {
         if (gfx_kernel_framebuffer(&kernel)) goto fail;
         for (i = 0; i < 4; i++) fb.planes[i] = kernel.planes[i];
         fb.width = kernel.width; fb.height = kernel.height; fb.pitch = kernel.pitch;
         if (copy_to_caller(&caller, out, &fb, sizeof(fb))) return;
+        bad_output = 1;
         goto fail;
     }
+    /* USER pre-init is not drawable. CPL0 discovery still uses selected alias. */
     if (gfx_surface_source(LEDGER_ROLE_CLIENT, &source)) goto fail;
     flags = irq_save();
     rc = surface_query_authorize(&source, &caller);
@@ -1039,16 +1045,21 @@ void gfx_framebuffer_bridge(void *out)
     for (i = 0; i < sf->planes; i++)
         fb.planes[i] = (u8 *)(held->base + sf->plane_offset[i]);
     fb.width = kernel.width; fb.height = kernel.height; fb.pitch = kernel.pitch;
-    if (copy_to_caller(&caller, out, &fb, sizeof(fb))) return;
+    if (copy_to_caller(&caller, out, &fb, sizeof(fb))) {
+        gfx_bridge_user_count++;
+        gfx_bridge_last_va = held->base;
+        return;
+    }
+    bad_output = 1;
 fail:
     if (acquired) (void)lease_release(caller.as, acquired);
     fb = (GFX_Framebuffer){0};
-    if (valid) (void)copy_to_caller(&caller, out, &fb, sizeof(fb));
+    if (!bad_output && !copy_to_caller(&caller, out, &fb, sizeof(fb))) bad_output = 1;
     gfx_bridge_fail_count++;
     /* Clear the checked output before ABORT_PENDING makes B1 refuse writes.
      * As in gfx_kapi_claim, the syscall exit performs the actual termination. */
     int current = appslot_cur();
     AppSlot *slot = appslot_get(current);
-    if (valid && caller.origin == CALLER_USER && current >= APP_ID_MIN &&
+    if (bad_output && (valid ? caller.origin == CALLER_USER : user) && current >= APP_ID_MIN &&
         slot && slot->state == APP_STATE_RUNNING) slot->abort_req = 1;
 }

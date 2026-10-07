@@ -243,6 +243,8 @@ int ledger_register_region(u32 type, u32 owner, u32 first, u32 end, u32 cache,
  * [0, 4GiB] の中 (RAW は幅未確定なので decode_first == decode_end でよい)、
  * 写像範囲は空か decode の内側。表が満杯なら ledger_res_overflow を数えて
  * 断る。*rid に番号。1 = 成功。 */
+/* Publish a mapped PFN interval inside an existing decode; (0,0) clears it. */
+int ledger_resource_set_map(u32 rid, u32 first, u32 end);
 int ledger_resource_add(const struct ledger_resource *rec, u32 *rid);
 /* ⑥-0 (pci_bind_all の直前): g_pci のメモリ BAR を width_basis = RAW で
  * 取り込む (採取値。予約権限にならない、B4)。載せた本数を返す。
