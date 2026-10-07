@@ -1378,8 +1378,8 @@ static u8 memmap_want_at(u32 a, u32 tramp)
 
 static int memmap_legacy_user(u32 a)
 {
-    if ((a >= MEM_FONT_CACHE_BASE && a < MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE) ||
-        (a >= TVRAM_CHAR_BASE && a < GVRAM_BRG_END)) return 1;
+    /* b1 -> c -> b2: only Unicode/BB and legacy CLIENT consumers remain. */
+    if (a >= MEM_UNICODE_TABLE_BASE && a < MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE) return 1;
     for (u32 i = 0; i < LEDGER_MAX_SURFACES; i++) {
         const struct ledger_surface *sf = &ledger_surfaces[i];
         if (sf->npages && sf->role == LEDGER_ROLE_CLIENT &&

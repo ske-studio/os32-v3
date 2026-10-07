@@ -413,6 +413,21 @@ int exec_disk_write_allowed(void)
     return slot->cpl3 && slot->disk_write_authorized;
 }
 
+/* Public TVRAM reads belong only to the CUI foreground caller. Internal
+ * console/IME/selftest readers deliberately bypass this wrapper policy. */
+int exec_tvram_read_allowed(void)
+{
+    struct caller_access caller;
+    AppSlot *slot;
+    if (ring3_wm_depth || con_sink_is_enabled()) return 0;
+    slot = appslot_get(appslot_cur());
+    if (!slot || slot->state != APP_STATE_RUNNING || slot->gui) return 0;
+    if (!ring3_in_syscall)
+        return appslot_cur() == APP_ID_SHELL && !slot->cpl3 &&
+               res_owner_get() == APP_ID_SHELL;
+    return slot->cpl3 && caller_access_get_user(&caller);
+}
+
 /* ======================================================================== */
 /*  vfs_cwd_user — sys_getcwd の実体 (票 T9 §12 R1、KAPI の追加はしない)     */
 /*                                                                          */
@@ -755,8 +770,8 @@ static void ring3_gui_pump(void)
 }
 
 /* ユーザポインタ引数の早期範囲検証 (v2 M2e 補助)。exec が CPL=3 アプリに
- * USER マップした領域 (共有ライブラリ帯/プログラム帯/ユーザスタック/SHM/VRAM)
- * を許可。NULL は通す。長さ付き引数は生成 wrap が NULL と全域を検査する。
+ * USER マップした領域 (共有ライブラリ帯/プログラム帯/ユーザスタック/SHM) を許可。
+ * 低位 (TVRAM〜BRG・フォント) は e11b1 で例外を外した — 画面は lease 経由だけ。NULL は通す。長さ付き引数は生成 wrap が NULL と全域を検査する。
  * 早期検査に残る文字列・opaque・関数ポインタの NULL の意味は wrap/target が決める。
  * 範囲外 (例: 0xDEADBEEF) は wrap に入る前に弾き、カーネル状態不整合を避ける。
  * 可変長引数はここでは見えないのでフォールトガードが担保する。 */
@@ -787,7 +802,6 @@ int ring3_ptr_ok(u32 p)
         irq_restore(saved);
         return ok;
     }
-    if (p >= 0xA0000UL && p < 0xC0000UL) return 1;/* VRAM (テキスト/グラフィック) */
     return 0;
 }
 
@@ -1983,13 +1997,6 @@ static int exec_launch(const char *cmdline, int gui_arg)
             exec_sbrk_tier_count[sbrk_tier - 1]++;
         }
 
-        /* VRAM (テキスト 0xA0000 + グラフィック 0xA8000) — C2: 全PD共有+USER */
-        paging_addrspace_map_user_keep(ctx->as,
-            TVRAM_CHAR_BASE, GVRAM_BRG_END, PAGE_RW | PTE_USER);
-        /* フォントキャッシュ (0x01000-0x49FFF): kcg フォントビットマップ直読 */
-        paging_addrspace_map_user_range(ctx->as,
-            (u32)MEM_FONT_CACHE_BASE, (u32)MEM_UNICODE_TABLE_BASE,
-            PAGE_RW | PTE_USER);
         /* Unicode-JIS 変換表 (0x4A000, 128KB): unicode_to_jis() 直読 */
         paging_addrspace_map_user_range(ctx->as,
             (u32)MEM_UNICODE_TABLE_BASE,

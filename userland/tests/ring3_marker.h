@@ -14,6 +14,8 @@
  * ring3_guard cirrus (C) | VIS? | RG | Cirrus linear window, offset 0         | 7 or 6   | kill +1
  * ring3_guard pegc (D) | PEG? | RG  | PEGC_LINEAR_BASE, display surface       | 7 or 6   | kill +1
  * ring3_guard bb (E) | BB?? | RG    | MEM_GFX_BB_BASE                          | none     | SURV, kill +0
+ * shm_reuse_child lockwrite first/last | SLK? | SL | locked block + 0/0x3000 | 7 | kill +1
+ * These two lockwrite launches keep the marker in a separate writable block.
  * (*) Load a shared library before B to verify RO with error=7. Without a
  * mapped library it still faults, but cannot prove RO (NP gives error=6).
  * C/D: mapped supervisor display gives error=7; absent hardware/NP gives 6.

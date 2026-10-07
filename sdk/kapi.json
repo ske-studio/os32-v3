@@ -1081,6 +1081,7 @@
     },
     {
       "name": "tvram_readchar_at",
+      "body": "if (!exec_tvram_read_allowed()) { if (code) *code = 0; if (attr) *attr = 0; return; }\ntvram_readchar_at(x, y, code, attr);",
       "out": [{"arg": "code", "size": "sizeof(u16)"}, {"arg": "attr", "size": "sizeof(u8)"}],
       "ret": "void",
       "args": [

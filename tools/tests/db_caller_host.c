@@ -164,10 +164,15 @@ static void caller_copy_tests(void)
         int invoked = invoke_calls;
         CHECK(dispatch_probe(KAPI_SLOT_DB_BIND_TEXT, 0, 1, 0x7fffff, 2, 0) == -1);
         CHECK(invoke_calls == invoked + 1 && ring3_range_reject_count == before);
+        /* The host does not go through exec_launch, so rejection at 0xA0000
+         * is unchanged before/after removal. The effective proof is the guest
+         * db_v50 result: 42/42. */
+        CHECK(dispatch_probe(KAPI_SLOT_DB_BIND_TEXT, 0, 1, 0xA0000, 1, 0) == -1);
+        CHECK(invoke_calls == invoked + 2 && ring3_range_reject_count == before);
         CHECK(ring3_ptr_ok((u32)guard_crossing_text(&api)));
         CHECK(dispatch_probe(KAPI_SLOT_DB_BIND_TEXT, 0, 1,
               (u32)guard_crossing_text(&api), 2, 0) == -1);
-        CHECK(invoke_calls == invoked + 2 && ring3_range_reject_count == before);
+        CHECK(invoke_calls == invoked + 3 && ring3_range_reject_count == before);
         /* Public sys_stat still checks the app output before driver writes. */
         kmemcpy((void *)(MEM_EXEC_LOAD_ADDR + 128), "/abc", 5);
         u32 out = MEM_EXEC_LOAD_ADDR + 256;

@@ -69,6 +69,12 @@ MUTATIONS = (
     ('v86-restore', 'kernel/paging.c', '    page_directory[0] = s->master_pde;', '    page_directory[0] &= ~PTE_USER;', 'FAIL V86 restores PDE0 USER'),
     ('boot-order', 'kernel/kernel.c', '    kselftest_run();',
      '    kselftest_run();', 'FAIL boot before AS'),
+    ('launch-TVRAM', 'exec/exec.c', '        /* --- K3:',
+     '        paging_addrspace_map_user_range(ctx->as, TVRAM_CHAR_BASE, GVRAM_BRG_END, PAGE_RW | PTE_USER);\n        /* --- K3:',
+     'FAIL launch TVRAM removed'),
+    ('launch-font', 'exec/exec.c', '        /* --- K3:',
+     '        paging_addrspace_map_user_range(ctx->as, MEM_FONT_CACHE_BASE, MEM_UNICODE_TABLE_BASE, PAGE_RW | PTE_USER);\n        /* --- K3:',
+     'FAIL launch font removed'),
     ('launch-shm', 'exec/exec.c', '        /* --- K3:',
      '        paging_addrspace_map_user_range(ctx->as, MEM_SHM_BASE, MEM_SHM_BASE + MEM_SHM_SIZE, PAGE_RW | PTE_USER);\n        /* --- K3:',
      'FAIL launch SHM removed'),
@@ -86,7 +92,9 @@ def wiring(sources):
     assert boot in k and k.index('shm_init();') < k.index(boot) < k.index('kselftest_run();'), 'FAIL boot before AS'
     assert k.count(boot) == 1, 'FAIL boot once'
     e = sources['exec/exec.c']
-    launch = e[e.index('/* VRAM (テキスト 0xA0000'):e.index('/* --- K3:')]
+    launch = e[e.index('        /* 3 領域を張り終えて'):e.index('/* --- K3:')]
+    assert 'TVRAM_CHAR_BASE' not in launch, 'FAIL launch TVRAM removed'
+    assert 'MEM_FONT_CACHE_BASE' not in launch, 'FAIL launch font removed'
     assert 'MEM_SHM_BASE' not in launch, 'FAIL launch SHM removed'
     assert 'ring3_tramp_page' not in launch, 'FAIL launch trampoline removed'
 

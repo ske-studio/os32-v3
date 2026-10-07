@@ -19,6 +19,9 @@ def function(text, name):
 from mutpar import run_ordered
 
 MUTANTS = [
+ ('legacy-font-user', 'kernel/paging.c', 'a >= MEM_UNICODE_TABLE_BASE && a < MEM_GFX_BB_BASE', 'a >= MEM_FONT_CACHE_BASE && a < MEM_GFX_BB_BASE', 'FAIL paging_master_audit(exec_tramp_page_addr()) > 0'),
+ ('legacy-tvram-user', 'kernel/paging.c', 'static int memmap_legacy_user(u32 a)\n{', 'static int memmap_legacy_user(u32 a)\n{\n    if (a >= TVRAM_CHAR_BASE && a < GVRAM_BRG_END) return 1;', 'FAIL paging_master_audit(exec_tramp_page_addr()) > 0'),
+
  ('audit-line-ending', 'kernel/kselftest.c', 'serial_puts_polled("\\r\\n");', 'serial_puts_polled("\\n");', 'FAIL serial_len >= 2'),
 
  ('compat-unlease', 'exec/surface_query.c', 'lease->token == token && (lease->flags & AS_LEASE_GFX_COMPAT)', '0', 'FAIL surface_api_unlease(compat) == OS32_ERR_INVAL'),

@@ -67,6 +67,17 @@ static void run(void)
     CHECK(!paging_master_audit(exec_tramp_page_addr()));
     u32 *pt = page_tables[TVRAM_CHAR_BASE >> 22];
     u32 idx = TVRAM_CHAR_BASE / PAGE_SIZE, saved = pt[idx];
+    /* b1: low font and native VRAM must never regain USER. */
+    for (u32 a = MEM_FONT_CACHE_BASE; a < MEM_UNICODE_TABLE_BASE; a += PAGE_SIZE) {
+        pt[a / PAGE_SIZE] |= PTE_USER;
+        CHECK(paging_master_audit(exec_tramp_page_addr()) > 0);
+        pt[a / PAGE_SIZE] &= ~PTE_USER;
+    }
+    for (u32 a = TVRAM_CHAR_BASE; a < GVRAM_BRG_END; a += PAGE_SIZE) {
+        pt[a / PAGE_SIZE] |= PTE_USER;
+        CHECK(paging_master_audit(exec_tramp_page_addr()) > 0);
+        pt[a / PAGE_SIZE] &= ~PTE_USER;
+    }
     pt[idx] &= ~PTE_PCD;
     CHECK(paging_master_audit(exec_tramp_page_addr()) > 0);
     pt[idx] = saved;
@@ -122,8 +133,7 @@ static void run(void)
     reset_scans();
     CHECK(ledger_selfcheck("bounded"));
     CHECK(scan_max[1] == pgalloc_limit_pfn() && scan_max[1] <= PHYSMEM_MAX_PFN);
-    CHECK(!paging_addrspace_map_user_keep(&space, TVRAM_CHAR_BASE, GVRAM_BRG_END, PAGE_RW | PTE_USER));
-    CHECK(!paging_addrspace_map_user_range(&space, MEM_FONT_CACHE_BASE,
+    CHECK(!paging_addrspace_map_user_range(&space, MEM_UNICODE_TABLE_BASE,
           MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE, PAGE_RW | PTE_USER));
     CHECK(!paging_master_audit(exec_tramp_page_addr()));
     CHECK(!paging_shm_set_rw(MEM_SHM_BASE, MEM_SHM_BASE + PAGE_SIZE, 0));

@@ -220,7 +220,7 @@ OWNER と回帰: `shm_reuse_test` 4/4・`db_test` 9/9・`db_v50_test` 41/41・�
 **KAPI-AUDIT-FIX の着地とゲスト受入 (PM、2026-10-07、main `9dcb51b`)**: 取り込み `make check`・`check-fast` rc=0 (1 回目は小さな保守の対応表の誤りで落ち、直した)。kselftest 277/0、`sndtest`・DB・SHM・パイプの回帰 OK、常駐 rshell は受入の経路そのもの。
 未実施 (ホストのみ): CTRL+STOP で MML・シリアル・IME の待ちから抜けること、範囲外のカーソル・ch、USER の `rshell_set_active` — 直接呼ぶ CPL3 の試験プログラムが要る (台帳 PRIO-3)。
 
-- a=内部結線 (旧USER下は準備確認)、b=低位USER/旧例外撤去・SHM/V86契約・拒否、c=正規lease対照・公開KAPI/caller/SDK/生成/版/manifest。**a → b → c → 統合の順、bの撤去はaのconsumer準備の後**。a/b/cは独立公開・配備せず、**版の更新・生成は統合でだけ行う**。統合で§2-4全6項を同時成立、現行対象再ビルド・配備を一括。受入は§2-5末尾のNP21/W一式とe12の変異一覧による。apps/gameは§5/§8へ。E11-5は2026-10-03決定の「全画面中のowner 1または専用のKAPI」、追加ならcで版一括へ含める。
+- a=内部結線 (旧USER下は準備確認)、b=低位USER/旧例外撤去・SHM/V86契約・拒否、c=正規lease対照・公開KAPI/caller/SDK/生成/版/manifest。**順序は b1 → c → b2** (aの後。b1は直接consumerの無いTVRAM/font/VRAM例外、b2はUnicode/BB/共有PT)。a/b/cは独立公開・配備せず、**版の更新は統合でだけ行う** (b1のTVRAM wrap本体は宣言・slot・版不変で再生成可)。統合で§2-4全6項を同時成立、現行対象再ビルド・配備を一括。受入は§2-5末尾のNP21/W一式とe12の変異一覧による。apps/gameは§5/§8へ。E11-5は2026-10-03決定の「全画面中のowner 1または専用のKAPI」、追加ならcで版一括へ含める。
 **e11a2 内部準備 (基点 `5ca3f01`、2026-10-07、未配備)**:
 - E11-5: WM/端末子孫の注入門と全画面フォーカス配送。WM注入に宛先を保持しtake/peek/pendingを連鎖内へ限定。exec_resumeの2箇所だけ宛先ID付きtakeに変更し、両帰路を抽出検査。WMは成功注入だけ起床候補にしAGAIN/退場で消す。
 - E11-6a: kcg_init は boot 閉鎖後も倍率1へ戻す (取得済み旗保持)。GUI の非所有 USER shutdown を無変更拒否、CUI/内部終了は維持。
@@ -660,3 +660,11 @@ T2で2MBが成立しても最終P1/P6合格ではない。SQLite/FEP/モジュ�
 - ゲスト側の設定 (`gfxmode` など) で済む確認は、構成の変更に当たらない — 段の受入で行ってよい。
   - V86 の出口は 6Ah の標準/拡張 (20h/21h) も戻さない — 9821 でゲストが拡張モードのまま戻ると A6h が効かず E0000h が MMIO のまま ([U] 00A6h)。未対処・未観測。
 > **記録は archive へ移した (2026-10-06)**: §12 の P3 対応の記録、§13 検査の仕組みの整理 (ci-stab / ci-select / ci-stab2) — [TASK_T2D_T2H_RECORDS.md の「元の行 3504–4013」](../../archive/v3/TASK_T2D_T2H_RECORDS.md#r3504)。
+
+**e11b1 (基点 `78929ab`、2026-10-07、未配備)**:
+- TVRAM〜BRG/fontの起動時USERとVRAM早期例外を撤去。監査容認はUnicode/BBとCLIENTだけ、残りはc後のb2。
+- E11-9は公開wrapだけCUI授権・拒否時ゼロ埋め。内部console/IME/selftestとTVDM 4006Bは維持、宣言・slot・版不変。
+- E11-11は未貸与VRAM拒否を追加してDB 42件。E11-13はlockwrite first/lastの別起動とSL markerを追加、ゲスト実効性は未確認。
+- UC変異を旧exec切出しからleaseへ移し、縮小容認下のV86帰路3段監査をホスト確認。
+- 証拠: `/home/hight/os32-tmp/run/e11/b1_*.log` と `b1_results.json`。PM手順は guest_acceptance の e11b1-*、持越しは台帳 E11-B1。
+- Opus レビュー Approve (P3 のみ)。R1-R3 は PM が文書・注釈を直し、R4 (授権の変異 4 項)・R5 (旧 probe の復元) は fix1。決定 (R7): gshell の Run から直接起動した全画面 CUI (`gui=0`、con_sink 無効) は画面を持つ前景なので tvdump を許す。R6 (試験の私有定数) は e11c で SDK 定数へ、R8 (`dbg_memdump` の低位) は到達なしで見送り。

@@ -37,7 +37,7 @@ def run(code, runner):
         p = d / 'probe.c'
         p.write_text(code)
         subprocess.run(['gcc', *FLAGS, '-I' + str(ROOT / 'include'),
-                        '-I' + str(ROOT / 'sdk/include/os32'), str(p), '-o', str(d / 'probe')],
+                        '-I' + str(ROOT / 'sdk/include/os32'), '-I' + str(ROOT / 'userland/tests'), str(p), '-o', str(d / 'probe')],
                        check=True, capture_output=True, text=True)
         return host32.run([str(d / 'probe')], runner=runner, timeout=30,
                           capture_output=True).returncode
@@ -179,6 +179,57 @@ void _start(void) {
 
 
 
+def lockwrite(src, header, sel, survive=False, failed=False):
+    # Only the OS32 int80 boundary and the intentional CPL3 store are replaced.
+    # The real marker, mode parsing, lock/arm/store order and failure return run.
+    header = header.replace(body(header, 'static __inline__ __attribute__((always_inline)) unsigned long\nr3_call('),
+                            '#define r3_call host_call')
+    source = src.replace('#include "os32api.h"', '').replace('#include "ring3_marker.h"', '')
+    source = source.replace('#include <stdlib.h>', '').replace('#include <string.h>', '')
+    source = source.replace('int main(', 'static int child_main(')
+    source = source.replace('*target = WRITE_PATTERN;', 'target_write((u32)target, WRITE_PATTERN);')
+    declarations = r'''
+#include "os32_kapi_slots.h"
+#define KernelAPI SDKKernelAPI
+#include "os32_kapi_shared.h"
+#undef KernelAPI
+static volatile u32 storage[4096], block[4096];
+static int locks, writes;
+static u32 host_call(u32 slot, u32 arg) {
+    CHECK(slot == KAPI_SLOT_SYS_SHM_ALLOC && arg == 1);
+    return (u32)storage;
+}
+static void *allocate(int n) { CHECK(n == 1); return (void *)block; }
+static int lock(void *p) { CHECK(p == (void *)block); locks++; return FAIL_LOCK ? -1 : 0; }
+static int release(void *p) { (void)p; finish(1); }
+static unsigned long strtoul(const char *s, char **e, int b) { (void)s; (void)e; (void)b; finish(1); }
+static int strcmp(const char *a, const char *b) { while (*a && *a==*b) {a++;b++;} return *a-*b; }
+typedef struct { void *(*sys_shm_alloc)(int); int (*sys_shm_lock)(void *); int (*sys_shm_free)(void *); } KernelAPI;
+static __attribute__((unused)) void target_write(u32 addr, u32 value) {
+    CHECK(!FAIL_LOCK && locks == 1 && value == 0x39574853UL);
+    CHECK(addr == (u32)block + OFFSET);
+    CHECK(storage[0] == 0x3f4b4c53UL && storage[1] == 0);
+    CHECK(storage[2] == addr && storage[3] == 0x444d5241UL);
+    CHECK(storage[4] == 0x4c53UL && storage[5] == (u32)storage);
+    writes++;
+    if (!SURVIVE) finish(0);
+}
+'''
+    tail = f'''
+void _start(void) {{
+    KernelAPI api = {{allocate, lock, release}};
+    char *args[] = {{"child", "lockwrite", "{sel}"}};
+    CHECK(child_main(3, args, &api) == 1);
+    CHECK(locks == 1 && writes == {0 if failed else 1});
+    CHECK(storage[1] == {0 if failed else '0x56525553UL'});
+    CHECK({int(failed or survive)});
+    finish(0);
+}}
+'''
+    flags = f'#define FAIL_LOCK {int(failed)}\n#define SURVIVE {int(survive)}\n#define OFFSET {0 if sel == "first" else 0x3000}UL\n'
+    return PRE + flags + declarations + header + source + tail
+
+
 def reuse_parent(src):
     source = src.replace('#include "os32api.h"', '').replace('#include "rt/testresult.h"', '').replace('#include <stdio.h>', '').replace('int main(', 'static int parent_main(')
     return PRE + r'''
@@ -279,6 +330,10 @@ def main():
     if not args.baseline:
         child = (ROOT / 'userland/tests/shm_reuse_child.c').read_text()
         cases.append(('SHM reuse child phases/errors', reuse(child)))
+        for sel in ('first', 'last'):
+            for survive, failed in ((False, False), (True, False), (False, True)):
+                cases.append((f'SHM lockwrite {sel} survive={survive} lock_fail={failed}',
+                              lockwrite(child, header, sel, survive, failed)))
         parent = (ROOT / 'userland/tests/shm_reuse_test.c').read_text()
         cases.append(('SHM reuse parent verdicts/errors/reset', reuse_parent(parent)))
     for name, code in cases:
@@ -295,6 +350,9 @@ def main():
             ('parent passed condition', reuse_parent(parent.replace('report[0] == report[2]', 'report[0] != report[2]'))),
             ('parent child exit code', reuse_parent(parent.replace('code == 0', 'code >= 0'))),
             ('parent mode reset', reuse_parent(parent.replace('report[0] = report[1] = report[2] = report[3] = 0;', 'if (!mode) report[0] = report[1] = report[2] = report[3] = 0;'))),
+            ('lockwrite not observed', lockwrite(child.replace('*target = WRITE_PATTERN;', '(void)target;'), header, 'first')),
+            ('lockwrite last is first', lockwrite(child.replace('BLOCK_BYTES - PAGE_BYTES', '0'), header, 'last')),
+            ('lockwrite unlocked', lockwrite(child.replace('api->sys_shm_lock((void *)block)', '0'), header, 'first')),
             ('no lock', reuse(child.replace('api->sys_shm_lock((void *)block)', '0'))),
             ('no free', reuse(child.replace('api->sys_shm_free((void *)block)', '0'))),
             ('wrong block allowed', reuse(child.replace('if ((u32)block != report[0]) return 1;', ''))),

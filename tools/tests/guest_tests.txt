@@ -22,7 +22,7 @@ ecs_test                # PASS 45/45
 asset_test              # PASS 23/23
 gui_call_test           # PASS 2/2
 input_test              # PASS 29/29
-db_v50_test             # PASS 41/41 (旧 VRAM 境界1件を RAM 最終byte成功へ置換)
+db_v50_test             # PASS 42/42 (未貸与 VRAM 拒否、RAM 最終byte成功・guard越境拒否)
 save_test               # PASS 15/15  /host を使う (このランナーの前提と同じ)
 font_load_test          # PASS 1/1 (boot後NOSYS、表/BB/mailbox不変はhostで照合)
 test2                   # PASS 5/5
