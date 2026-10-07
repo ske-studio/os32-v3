@@ -55,3 +55,10 @@ check-check-select-host:
 - docs/POLICY_DEV.md
 - tools/check_docs_orphans.py
 - tools/check_map.d/check-tests-inventory.yaml
+- tools/test_changes.py
+- tools/tests/test_harness_tools.py
+- tools/check_docs_status.py
+- docs/tasks/DEFERRED_TESTS.md
+- tools/check_p2v_allow.txt
+- tools/pack_name_tables.txt
+- tools/pack_notes.txt

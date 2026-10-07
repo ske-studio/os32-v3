@@ -20,6 +20,101 @@ def _process_timeout_fixture(item):
     return item
 
 
+def mutation_control_skips(source):
+    """Find syntactic branches which can bypass normal controls.
+
+    Negative guards, else dispatch, early exits before sibling statements and
+    conditional call dispatch are checked, including entry-point helpers.
+    subprocess で補助スクリプトへ委ねる形は対象外 (ROLES §4-1 の 6 で人が見る)。
+    """
+    import ast
+    import re
+    tree = ast.parse(source)
+    # A trailing return/result exit is bookkeeping, not another normal stage.
+    # Any other following statement can be bypassed by an early mutation exit.
+    def result_exit(stmt):
+        if isinstance(stmt, (ast.Return, ast.Raise)):
+            value = stmt.value if isinstance(stmt, ast.Return) else stmt.exc
+            return not any(isinstance(n, ast.Call) for n in ast.walk(value)) if value else True
+        if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call):
+            call = stmt.value
+            return (ast.unparse(call.func) in ('sys.exit', 'os._exit')
+                    and not any(isinstance(n, ast.Call) for arg in call.args for n in ast.walk(arg)))
+        return False
+
+    followed = set()
+    for parent in ast.walk(tree):
+        for _, value in ast.iter_fields(parent):
+            if isinstance(value, list):
+                for index, item in enumerate(value):
+                    if isinstance(item, ast.If) and any(not result_exit(sibling)
+                                                       for sibling in value[index + 1:]):
+                        followed.add(id(item))
+    hits = []
+    name = r"(?:mutate|do_mutate|mutate_mode|mutants?)"
+    flag = r"--(?:mutate|mutants)"
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.If, ast.IfExp)):
+            continue
+        condition = ast.unparse(node.test)
+        if not re.search(flag + r"\b|\b" + name + r"\b", condition):
+            continue
+        if isinstance(node, ast.IfExp):
+            calls = lambda branch: any(isinstance(n, ast.Call) for n in ast.walk(branch))
+            if calls(node.body) and calls(node.orelse):
+                hits.append((node.lineno, condition))
+            continue
+        negative = (re.search(r"\bnot\s+(?:[\w.]*" + name + r"\b|[\"\']" + flag + r"\b)", condition)
+                    or re.search(r"[\"\']" + flag + r"[\"\']\s+not\s+in\b", condition)
+                    or re.search(r"\b" + name + r"\s*(?:==\s*(?:False|0)|is\s+False)", condition))
+        last = node.body[-1]
+        exits = (isinstance(last, (ast.Return, ast.Raise))
+                 or (isinstance(last, ast.Expr) and isinstance(last.value, ast.Call)
+                     and ast.unparse(last.value.func) in ('sys.exit', 'os._exit')))
+        if negative or node.orelse or (exits and id(node) in followed):
+            hits.append((node.lineno, condition))
+    return hits
+
+
+def mutation_test_sources(root):
+    """All host suites plus Python scripts referenced by checks.d recipes."""
+    import re
+    paths = set(root.glob('tools/tests/test_*.py'))
+    for recipe in root.glob('**/checks.d/*.mk'):
+        text = recipe.read_text()
+        for rel in re.findall(r'(?:(?:[\w.-]+/)+[\w.-]+\.py|test_[\w]+\.py)', text):
+            path = root / (rel if '/' in rel else 'tools/tests/' + rel)
+            if path.is_file():
+                paths.add(path)
+    return sorted(paths)
+
+
+# display_cleanup returns after normal controls and before mutations.
+# c_dialect has an else explaining skipped optional variants after normal controls.
+# Each exception permits exactly one occurrence of its path/condition key.
+# Build label paths from components so dependency lint does not treat exception
+# labels as sources read by this suite (in particular test_c_dialect).
+# The following helpers accept mutant data, not the suite's mutation-mode flag;
+# their callers run a normal fixture before calling the helper with each mutant.
+CONTROL_SKIP_ALLOW = {
+    ('tools/tests/' + 'test_e10c_lifecycle.py', "mutant[0] == 'gcap-ops'", 1):
+        'Selects how to edit one mutant source; main runs run(runner) first.',
+    ('tools/tests/' + 'test_kapi_ranges.py', 'mutant', 1):
+        'Checks one fixture result; entry invokes run(args.runner) before mutant runs.',
+    ('tools/tests/' + 'test_kcallback.py', 'mutant', 1):
+        'Checks fixture result; main runs run(args) before mutant runs.',
+    ('tools/tests/' + 'test_kcallback.py', 'mutant is None', 1):
+        'Reports guest fixture result; main runs run_guest_result(args) first.',
+    ('tools/tests/' + 'test_sbrk_tier.py', 'mutant', 1):
+        'Returns after the mutant runtime assertion; main runs run(source) first.',
+
+    ('tools/tests/' + 'test_display_cleanup.py', "'--mutate' not in sys.argv", 1):
+        'Returns after all normal runtime controls; only mutations follow.',
+    ('tools/tests/' + 'test_c_dialect.py', "'--mutate' in argv or check_select.dialect_variants_needed()", 1):
+        'Optional make variants; normal dialect controls always precede this branch.',
+}
+
+
 class InfrastructureTests(unittest.TestCase):
     def test_make_clean_removes_control_receipts(self):
         import re
@@ -103,6 +198,90 @@ class InfrastructureTests(unittest.TestCase):
             result = subprocess.run(['make', 'check', 'HOST32_RUNNERS='],
                                     cwd=tmp, env=env, capture_output=True)
             self.assertNotEqual(result.returncode, 0)
+
+    def test_all_mutation_entries_keep_normal_controls(self):
+        from collections import Counter
+        root = pathlib.Path(__file__).resolve().parents[2]
+        counts = Counter()
+        findings = []
+        for path in mutation_test_sources(root):
+            for no, condition in mutation_control_skips(path.read_text()):
+                base = (path.relative_to(root).as_posix(), condition)
+                counts[base] += 1
+                key = (*base, counts[base])
+                if key not in CONTROL_SKIP_ALLOW:
+                    findings.append('%s:%d: %s' % (key[0], no, condition))
+                else:
+                    self.assertTrue(CONTROL_SKIP_ALLOW[key])
+        self.assertEqual(findings, [], '\n'.join(findings))
+        self.assertEqual({key: counts[key[:2]] for key in CONTROL_SKIP_ALLOW},
+                         dict.fromkeys(CONTROL_SKIP_ALLOW, 1))
+
+    def test_normal_control_skip_fixture_is_red(self):
+        self.assertEqual(mutation_control_skips('normal()\nif mutate:\n    mutants()\n'), [])
+        for guard in ('not mutate', 'not args.mutate', '"--mutate" not in sys.argv[1:]',
+                      'mutate == False'):
+            with self.subTest(guard=guard):
+                fixture = 'if %s:\n    normal()\n' % guard
+                self.assertTrue(mutation_control_skips(fixture), 'mutant escaped: ' + fixture)
+        self.assertTrue(mutation_control_skips('if mutate:\n    mutants()\nelse:\n    normal()\n'))
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            (root / 'tools/tests').mkdir(parents=True)
+            (root / 'build/checks.d').mkdir(parents=True)
+            (root / 'tools/tests/test_new.py').write_text('normal()\n')
+            (root / 'tools/custom.py').write_text('if not mutate:\n    normal()\n')
+            (root / 'build/checks.d/custom.mk').write_text('check:\n\tpython3 tools/custom.py $(MUT)\n')
+            sources = mutation_test_sources(root)
+            self.assertEqual(len(sources), 2)
+            self.assertEqual(sum(bool(mutation_control_skips(p.read_text())) for p in sources), 1)
+
+    def test_allowance_is_single_occurrence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / 'allowed.py'
+            key = ('allowed.py', 'not mutate', 1)
+            source = 'if not mutate:\n    normal()\n'
+            with patch('pathlib.Path.resolve', return_value=pathlib.Path(directory) / 'tools/tests/test.py'), \
+                 patch(__name__ + '.mutation_test_sources', return_value=[path]), \
+                 patch.dict(CONTROL_SKIP_ALLOW, {key: 'Fixture exception'}, clear=True):
+                path.write_text(source)
+                self.test_all_mutation_entries_keep_normal_controls()
+                path.write_text(source * 2)
+                with self.assertRaises(AssertionError):
+                    self.test_all_mutation_entries_keep_normal_controls()
+
+    def test_early_exit_and_conditional_dispatch(self):
+        good = ('normal()\nif mutate:\n    mutants()\n',
+                'normal()\nsys.exit(mutate() if do_mutate else 0)\n',
+                'normal()\nif args.mutants:\n    run_mutants()\n',
+                'normal()\nif mutate:\n    sys.exit(mutants())\nsys.exit(0)\n')
+        for source in good:
+            self.assertEqual(mutation_control_skips(source), [], source)
+        bad = ('if "--mutate" in sys.argv:\n    sys.exit(mutate())\nmain()\n',
+               'def main():\n    if args.mutate:\n        run_mutants()\n        return 0\n    normal()\n',
+               'sys.exit(mutate() if do_mutate else main())\n',
+               'if mutant:\n    os._exit(0)\nnormal()\n',
+               'if mutants:\n    raise SystemExit\nnormal()\n',
+               'if "--mutants" not in sys.argv:\n    normal()\n',
+               'if not args.mutants:\n    normal()\n',
+               'if mutants == False:\n    normal()\n',
+               'if "--mutants" in sys.argv:\n    mutants()\nelse:\n    normal()\n')
+        for source in bad:
+            self.assertEqual(len(mutation_control_skips(source)), 1, source)
+        import inspect
+        original = inspect.getsource(mutation_control_skips)
+        for old, new, source in (
+                ('exits and id(node) in followed', 'False', bad[0]),
+                ('exits and id(node) in followed', 'False', bad[1]),
+                ('calls(node.body) and calls(node.orelse)', 'False', bad[2]),
+                ('mutants?)', 'unused_name)', bad[6]),
+                ('mutate|mutants)', 'mutate|unused_flag)', bad[5])):
+            self.assertIn(old, original)
+            ns = {}
+            exec(original.replace(old, new), ns)
+            with self.assertRaises(AssertionError):
+                self.assertEqual(len(ns['mutation_control_skips'](source)), 1)
+            print('RED control-skip detection removed:', source.splitlines()[0])
 
     def test_entry_controls_are_a_prefix_of_mutation_stages(self):
         """Execute the real entry blocks with expensive stage bodies replaced.
@@ -626,7 +805,8 @@ int main(int argc, char **argv)
         for module, work in ((test_packages, 'case_real_plan'),
                              (check_manifests, 'check_missing_hosts'),
                              (gen_memmap, 'load')):
-            with patch.object(check_artifacts, 'require_fresh',
+            with patch.object(check_manifests, 'built_binaries', return_value={'build/out/fixture.bin'}), \
+                 patch.object(check_artifacts, 'require_fresh',
                               side_effect=RuntimeError('先に make all')), \
                  patch.object(module, work,
                               side_effect=AssertionError('work before preflight')), \

@@ -1,0 +1,5 @@
+# glob path<TAB>required advisory text
+exec/exec.c	- 必須: `check-h3-park-resume-host`; 逆アセンブル4条件: exec_kill の push %ebp / mov %esp,%ebp、ring3_abort_check → ring3_kill_kind が一意、exec_launch/resume の exec_setjmp / exec_pending_finish 呼出しが各一意で後続命令あり、exec_pending_finish の g_pending_id=0 store が一意で後続命令あり。
+sdk/kapi.json	- 必須: [ABI1] 生成物を手編集しない; [ABI2] 末尾追加のみ; [ABI3] 版更新と `make clean` → `make all`。
+Makefile	- 必須: check_map に Makefile/build/*.mk を直接登録しない; `broad` へ。
+build/*.mk	- 必須: check_map に Makefile/build/*.mk を直接登録しない; `broad` へ。

@@ -26,6 +26,11 @@ check_docs_status.py — docs/tasks/ の票の状態行が語彙を守ってい�
 * `TASK_*.md`・`HANDOVER_*.md`・`CHECKLIST_*.md`・名前に `PLAN` を含むものは
   状態行が**必須**。それ以外は、状態行があれば語彙を守る。
 
+段の記録 (`**e11b1 ...**:` など数字を含む英字 ID の太字見出し) は、次の
+段の見出しまたは Markdown 見出しまでの非空行を数える (見出し本文のない行を除き、
+連続した表は 1 行)。10 行超と、未実施/延期/未確認を含む行に
+DEFERRED_TESTS.md の表の ID がない場合は警告のみ。`--strict` で失敗にする。
+
 ## 使い方
 
     python3 tools/check_docs_status.py            # make check-docs-status と同じ
@@ -127,22 +132,100 @@ def check(root):
     return problems
 
 
+# Ticket stages start with a lowercase letter (v is a version label);
+# uppercase version stages use T followed by digits and a lowercase letter.
+STAGE_HEADING = re.compile(r"^\s*(?:[-*]\s+)?\*\*((?:(?!v[0-9])[a-z][0-9]+[a-z]?[0-9]*|T[0-9]+[a-z]))(?:\s+[^*]*)?\*\*[:：]")
+NEXT_HEADING = re.compile(r"^\s*#{1,6}\s")
+DEFER_WORD = re.compile(r"未実施|延期|未確認")
+
+
+def ledger_ids(root):
+    path = os.path.join(root, TASKS, "DEFERRED_TESTS.md")
+    ids = set()
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            match = re.match(r"^\s*\|\s*`?([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d+)`?\s*\|", line)
+            if match:
+                ids.add(match.group(1))
+    if not ids:
+        raise ValueError("%s に台帳IDがありません" % path)
+    return ids
+
+
+def has_id(line, ids):
+    return any(re.search(r"(?<![A-Za-z0-9_-])" + re.escape(ident) +
+                         r"(?![A-Za-z0-9_-])", line) for ident in ids)
+
+
+def record_warnings(root):
+    """Nonblank physical lines (one contiguous Markdown table = one line), stage heading excluded."""
+    warnings = []
+    try:
+        ids = ledger_ids(root)
+    except (OSError, ValueError) as exc:
+        ids = set()
+        warnings.append("台帳を読めません: " + str(exc))
+    for path in task_docs(root):
+        if not os.path.basename(path).startswith("TASK_"):
+            continue
+        with open(path, encoding="utf-8") as f:
+            lines = f.read().splitlines()
+        rel = os.path.relpath(path, root)
+        stage, start, count = None, 0, 0
+        in_table = False
+
+        def finish():
+            if stage is not None and count > 10:
+                warnings.append("%s:%d: 段 %s の記録 %d 行 (>10)" % (rel, start, stage, count))
+
+        for no, line in enumerate(lines, 1):
+            heading = STAGE_HEADING.match(line)
+            if heading or NEXT_HEADING.match(line):
+                finish()
+                stage, start, count = (heading.group(1), no, 0) if heading else (None, 0, 0)
+                in_table = False
+                if heading and DEFER_WORD.search(line) and not has_id(line, ids):
+                    warnings.append("%s:%d: 段 %s: 台帳IDなし: %s" %
+                                    (rel, no, stage, line.strip()[:160]))
+                # A record can start on its heading's own line.
+                line = line[heading.end():] if heading else ""
+            if stage is not None and line.strip():
+                table = line.lstrip().startswith("|")
+                if not (table and in_table):
+                    count += 1
+                in_table = table
+                if not heading and DEFER_WORD.search(line):
+                    if not has_id(line, ids):
+                        warnings.append("%s:%d: 段 %s: 台帳IDなし: %s" %
+                                        (rel, no, stage, line.strip()[:160]))
+            elif not line.strip():
+                in_table = False
+        finish()
+    return warnings
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default=PROJ_DIR)
+    ap.add_argument("--strict", action="store_true", help="段の記録の警告も失敗にする")
     args = ap.parse_args()
     try:
         problems = check(args.root)
+        warnings = record_warnings(args.root)
     except (OSError, ValueError) as e:
         print("Error: %s" % e, file=sys.stderr)
         return 1
+    for warning in warnings:
+        print("WARN — " + warning)
+    if warnings:
+        print("WARN — 段の記録 %d 件" % len(warnings))
     if problems:
         for s in problems:
             print(s)
         print("NG — 状態行 %d 件。語彙は docs/POLICY_DEV.md §8" % len(problems))
         return 1
     print("OK — docs/tasks/ の状態行はすべて語彙どおり (docs/POLICY_DEV.md §8)")
-    return 0
+    return int(args.strict and bool(warnings))
 
 
 if __name__ == "__main__":

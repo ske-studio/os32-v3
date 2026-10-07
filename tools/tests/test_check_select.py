@@ -826,7 +826,7 @@ def case_mk_fixture_cleanup(cs):
 def case_mk_real_tree(cs):
     # 実物の make ファイル (作業中の版) を基点に置いた一時リポジトリ: 列が読めて差が無い
     # (追加選択なし)。check-time-math-host に型どおりの行を足す (main の e241312 / f4989ee の形)
-    # → その 1 本。tools/ は実物を指す (script の存在)。実物の木を HEAD と比べないのは、
+    # → 対象と登録/分岐走査の検査。tools/ は実物を指す (script の存在)。実物の木を HEAD と比べないのは、
     # 作業中に make ファイルを直しているあいだ (= check-changed の出番) にこの試験が落ちないため
     m = cs.load_map()
     files = {rel: pathlib.Path(cs.ROOT, rel).read_text(encoding="utf-8")
@@ -843,7 +843,7 @@ def case_mk_real_tree(cs):
                 "\tpython3 -B tools/tests/test_time_math.py --target $(MUT)\n"
                 "\tpython3 -B tools/tests/test_time_math.py --target --again $(MUT)\n")
         r = fx.plan(files=[rel], map_=m)
-        _only(r, "check-time-math-host", "check-map")
+        _only(r, "check-time-math-host", "check-map", "check-ci-stab-host")
         assert len(r[1]) == len(cs.check_lists(cs.read_makefiles()[1])), r[1]
 
 
@@ -1060,7 +1060,8 @@ if __name__ == "__main__":
     os.chdir(ROOT)
     failed = run_cases(load())
     print("SUMMARY %d/%d PASS" % (len(CASES) - len(failed), len(CASES)), flush=True)
-    rc = len(failed)
+    import test_harness_tools
+    rc = len(failed) + test_harness_tools.main("--mutate" in sys.argv[1:])
     if "--mutate" in sys.argv[1:]:
         rc += mutate()
     sys.exit(bool(rc))

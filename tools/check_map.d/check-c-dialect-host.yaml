@@ -25,3 +25,5 @@ check-c-dialect-host:
 - sdk/link/shlib.ld
 - sdk/os32_generations.py
 - sdk/rust/os32api/src/generations.rs
+- tools/pack_name_tables.txt
+- tools/pack_notes.txt

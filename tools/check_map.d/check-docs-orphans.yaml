@@ -40,3 +40,5 @@ check-docs-orphans:
 - tools/tests/test_c_dialect.py
 - userland/tests/sqlite_standalone/sqlite_standalone.c
 - userland/tests/sqlite_standalone/sqlite_user_vfs.c
+- tools/pack_name_tables.txt
+- tools/pack_notes.txt
