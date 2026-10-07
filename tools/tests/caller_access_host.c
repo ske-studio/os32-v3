@@ -73,6 +73,10 @@ static u32 kapi_invoke(void *fn, const void *args, u32 n)
     assert(a.origin == CALLER_USER && a.app_id == cur && a.pd_phys == cr3);
     assert(a.as == &spaces[cur] && a.owner == spaces[cur].owner);
     assert(a.generation == spaces[cur].generation);
+    struct caller_identity ident = caller_identity_get();
+    assert(ident.app_id == cur && ident.owner == spaces[cur].owner &&
+           ident.generation == spaces[cur].generation);
+    printf("IDENTITY %d %u %u\n", ident.app_id, (unsigned)ident.owner, (unsigned)ident.generation);
     if (!nesting) {
         u32 child[13] = {0};
         nesting = 1;
@@ -84,6 +88,8 @@ static u32 kapi_invoke(void *fn, const void *args, u32 n)
         assert(caller_access_get(&b) && !memcmp(&a, &b, sizeof(a)));
         assert(caller_access_enter(&previous, CALLER_TRUSTED));
         assert(caller_access_get(&b) && b.origin == CALLER_TRUSTED);
+        struct caller_identity trusted = caller_identity_get();
+        assert(!trusted.app_id && !trusted.owner && !trusted.generation);
         caller_access_leave(&previous);
         assert(caller_access_get(&b) && !memcmp(&a, &b, sizeof(a)));
         nesting = 0;
@@ -102,6 +108,8 @@ int main(void)
         spaces[id].pd_phys = id * PAGE_SIZE;
     }
     select_parent();
+    struct caller_identity absent = caller_identity_get();
+    assert(!absent.app_id && !absent.owner && !absent.generation);
     /* VM=1 reaches int80 with 17 words, including real-mode segments.
      * Valid and invalid slots must both bypass caller setup, abort and KAPI. */
     for (int valid = 0; valid < 2; valid++) {
@@ -133,7 +141,10 @@ int main(void)
         cur = 3; assert(!caller_access_get(&out)); cur = 2;
         owner = 3; assert(!caller_access_get(&out));
         assert(!caller_access_enter(&nested, CALLER_USER)); owner = 2;
-        spaces[2].generation++; assert(!caller_access_get(&out)); spaces[2].generation--;
+        spaces[2].generation++; assert(!caller_access_get(&out));
+        struct caller_identity stale = caller_identity_get();
+        assert(!stale.app_id && !stale.owner && !stale.generation);
+        spaces[2].generation--;
         spaces[2].owner++; assert(!caller_access_get(&out)); spaces[2].owner--;
         spaces[2].pd_phys++; assert(!caller_access_get(&out)); spaces[2].pd_phys--;
         struct addrspace same_fields = spaces[2];

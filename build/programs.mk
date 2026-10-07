@@ -23,7 +23,7 @@ sdk/crt/help.o: sdk/crt/help.c sdk/include/os32/help.h $(SDK_KAPI_HDR)
 sdk/crt/crt0_c.o: sdk/crt/crt0_c.c sdk/include/os32/help.h $(SDK_KAPI_HDR)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
-sdk/crt/syscalls.o: sdk/crt/syscalls.c $(SDK_KAPI_HDR)
+sdk/crt/syscalls.o: sdk/crt/syscalls.c userland/lib/rt/ls.c sdk/include/os32/ls.h $(SDK_KAPI_HDR)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
 userland/lib/rt/dbgserial.o: userland/lib/rt/dbgserial.c userland/lib/rt/dbgserial.h $(SDK_KAPI_HDR)
@@ -37,7 +37,7 @@ SHELL_OBJ = $(SHELL_SRC:.c=.o)
 # 走査しないので userland の .d は読まれない。sh_launch.inc / sh_pipe.inc /
 # sh_redraw.inc を直しても .o が作り直されないと、直したつもりの sh.bin が
 # 出来上がる。常駐側にも同じ依存を足す (レシピは変えないので .o は不変)。
-SHELL_DEPS = userland/shell/shell.h userland/shell/hdprep_plan.h drivers/pc98pt.h $(wildcard userland/shell/*.inc)
+SHELL_DEPS = sdk/include/os32/ls.h userland/shell/shell.h userland/shell/hdprep_plan.h drivers/pc98pt.h $(wildcard userland/shell/*.inc)
 
 userland/shell/%.o: userland/shell/%.c $(SHELL_DEPS)
 	$(CC) $(PROGRAM_FLAGS) -Iuserland/shell $(INC_libos32filer) -c $< -o $@
@@ -584,8 +584,8 @@ $(eval $(call DEFINE_RUST_PROGRAM,font_test,userland/tests,$$(GFX_OBJ)))
 $(eval $(call DEFINE_RUST_PROGRAM,gui_demo,userland/tests,))
 # v1.2 の client API 試験 (C4): MessageBox/File/Input の modal_result、session_launch、icon16。stub のみ
 $(eval $(call DEFINE_RUST_PROGRAM,v12_api_test,userland/tests,))
-# T5a: 固定テキスト表示試験。Unicode変換だけをユーザー空間Cからリンク。
-$(eval $(call DEFINE_RUST_PROGRAM,t5a_display,userland/tests,lib/utf8_prog.o))
+# T5a: 静的 Unicode consumer も gfx の v70 port から RO lease を初期化。
+$(eval $(call DEFINE_RUST_PROGRAM,t5a_display,userland/tests,$$(GFX_OBJ)))
 programs: t5a_display_rust
 # v1.2 File Manager (C5): Win3.1 風 2 ペイン、SESSION_REQUEST で起動依頼。stub のみ
 $(eval $(call DEFINE_RUST_PROGRAM,filer,userland/system,))
@@ -651,6 +651,7 @@ $(shell find userland -name '*.o' 2>/dev/null): $(SDK_KAPI_HDR)
 
 # === プログラムクリーン ===
 clean-programs: clean-rust clean-gshell
+	rm -f $(FAULTPROBE_OBJ)
 	rm -f userland/cmds/*.o userland/cmds/*.elf userland/cmds/*.raw userland/cmds/*.bin
 	rm -f userland/tests/*.o userland/tests/*.elf userland/tests/*.raw userland/tests/*.bin
 	rm -f userland/tests/kstr_ren_a.txt userland/tests/kstr_ren_c.txt userland/tests/kstr_c_raw.d

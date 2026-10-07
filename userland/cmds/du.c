@@ -1,3 +1,4 @@
+#include "ls.h"
 /* ======================================================================== */
 /*  DU.C -- ディスク使用量表示                                                */
 /*                                                                          */
@@ -49,7 +50,7 @@ static void du_cb(const DirEntry_Ext *entry, void *ctx)
             sub.basepath[i] = '\0';
             sub.total = 0;
             sub.depth = dc->depth + 1;
-            api->sys_ls(fullpath, (void *)du_cb, &sub);
+            os32_ls(fullpath, du_cb, &sub);
             dc->total += sub.total;
             if (!opt_summary) {
                 printf("%8lu  %s\n", sub.total, fullpath);
@@ -84,7 +85,7 @@ int main(int argc, char **argv, KernelAPI *kapi)
     ctx.total = 0;
     ctx.depth = 0;
 
-    api->sys_ls(target, (void *)du_cb, &ctx);
+    os32_ls(target, du_cb, &ctx);
     printf("%8lu  %s\n", ctx.total, target);
 
     return 0;

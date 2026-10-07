@@ -138,7 +138,7 @@ void main(int argc, char **argv, KernelAPI *api)
 
     /* メインループ */
     while (1) {
-        int c = api->kbd_trygetchar();
+        int c = libos32gfx_trygetchar();
         if (c == 0x1B) break; /* ESC */
 
         if (c == 'w' || c == 'a' || c == 's' || c == 'd') {
@@ -158,7 +158,7 @@ void main(int argc, char **argv, KernelAPI *api)
             tilemap_present();
             end_tick = api->get_tick();
         }
-        api->sys_halt();
+        libos32gfx_halt();
     }
 
     tilemap_shutdown();

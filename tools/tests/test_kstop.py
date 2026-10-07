@@ -75,7 +75,7 @@ static u32 kapi_invoke(void *fn, const void *args, u32 n) {
     if (request_inside) ring3_abort_request();
     return 0x89abcdef;
 }
-int kbd_inject_take(u8 *ch) { *ch='X'; injected++; return 1; }
+int kbd_inject_take_for(int id, u8 *ch) { (void)id; *ch='X'; injected++; return 1; }
 static int host_if=1;
 static u32 irq_save(void) { int old=host_if; host_if=0; return old; }
 static void irq_restore(u32 f) { host_if=f; }

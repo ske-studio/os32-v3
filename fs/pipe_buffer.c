@@ -74,9 +74,7 @@ void pipe_free(int id)
 
 u8 *pipe_get_buf(int id)
 {
-    if (id >= 0 && id < PIPE_BUF_COUNT &&
-        ring3_call_from_user() && pipe_owner[id] != res_owner_get())
-        return (u8 *)0;
+    if (ring3_call_from_user()) return (u8 *)0;
     if (id >= 0 && id < PIPE_BUF_COUNT && pipe_ptr[id]) {
         return pipe_ptr[id];
     }
@@ -93,6 +91,8 @@ u32 pipe_get_capacity(int id)
 
 u32 pipe_get_len(int id)
 {
+    if (id >= 0 && id < PIPE_BUF_COUNT &&
+        ring3_call_from_user() && pipe_owner[id] != res_owner_get()) return 0;
     if (id >= 0 && id < PIPE_BUF_COUNT) {
         return pipe_len[id];
     }

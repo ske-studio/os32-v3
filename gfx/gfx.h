@@ -142,9 +142,9 @@ void gfx_set_default_palette(void);
 /* ======== テストパターン ======== */
 /* gfx_test_pattern: 外部プログラム化のため削除 */
 
-/* T2e e6: dormant compatibility entry; e11 replaces the KAPI binding. */
+/* Compatibility bridge: gfx_get_framebuffer returns USER lease VA; CPL0 keeps aliases. */
 void gfx_framebuffer_bridge(void *out);
-extern volatile u32 gfx_bridge_fail_count;
+extern volatile u32 gfx_bridge_fail_count, gfx_bridge_user_count, gfx_bridge_last_va;
 
 void gfx_reinit_tvram(void);
 void gfx_v86_return(void);

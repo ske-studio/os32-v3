@@ -91,6 +91,8 @@ void *kmemset(void *dst, int val, u32 n) { return memset(dst, val, n); }
  * tools/tests/multiapp_impl_host.c ケース 20 が実物の exec/appslot.c で見る)。
  * なので「CUI 中 / 誰も所有していない」= 門が素通しになる値を返す。 */
 int con_sink_is_enabled(void) { return 0; }
+int ring3_call_from_user(void) { return 0; }
+int caller_access_get_user(struct caller_access *out) { (void)out; return 0; }
 int appslot_gfx_claim(int gui_mode) { (void)gui_mode; return 0; }
 int appslot_gfx_owner(void) { return 1; }   /* APP_ID_SHELL = GFX_OWNER_WM */
 /* 票 T8-2 で門が拒否の理由を端末へ出すようになった (claim が常に通る上の
@@ -231,3 +233,22 @@ int main(int argc, char **argv)
     puts("PASS: native boot, preference, shutdown, repeat, optional failures");
     return 0;
 }
+
+int ledger_resource_set_map(u32 id, u32 f, u32 e) { (void)id; (void)f; (void)e; return 0; }
+
+/* USER bridge is linked now; this CPL0-only fixture must never enter B1. */
+int caller_access_get(struct caller_access *out) { (void)out; abort(); }
+int check_caller_write_range(const struct caller_access *c, void *p, u32 n)
+{ (void)c; (void)p; (void)n; abort(); }
+int copy_to_caller(const struct caller_access *c, void *p, const void *s, u32 n)
+{ (void)c; (void)p; (void)s; (void)n; abort(); }
+int surface_query_authorize(const struct surface_query_source *s, struct caller_access *c)
+{ (void)s; (void)c; abort(); }
+int surface_query_refs(const struct surface_query_source *s, const struct surface_ref *r, u32 n, u32 a)
+{ (void)s; (void)r; (void)n; (void)a; abort(); }
+int lease_release(struct addrspace *as, u32 t) { (void)as; (void)t; abort(); }
+int lease_acquire(struct addrspace *as, const struct lease_authority *a,
+                  const struct surface_ref *r, u32 n, u32 p, struct lease_view *v)
+{ (void)as; (void)a; (void)r; (void)n; (void)p; (void)v; abort(); }
+int appslot_cur(void) { abort(); }
+AppSlot *appslot_get(int id) { (void)id; abort(); }

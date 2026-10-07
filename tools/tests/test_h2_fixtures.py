@@ -54,7 +54,7 @@ def compile_probe(tmp, body):
     exe = tmp / 'probe'
     r = run(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
              '-fno-pie', '-no-pie', '-fno-stack-protector', '-nostdlib',
-             '-Wl,-e,_start', '-Iinclude', tmp / 'probe.c', '-o', exe])
+             '-Wl,-e,_start', '-Iinclude', '-Isdk/include/os32', tmp / 'probe.c', '-o', exe])
     require(r.returncode == 0, 'probe compile failed (not RED): ' + r.stderr)
     return exe
 

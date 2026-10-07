@@ -1,3 +1,4 @@
+#include "ls.h"
 #ifndef __cdecl
 #define __cdecl __attribute__((cdecl))
 #endif
@@ -335,7 +336,7 @@ static int copy_directory(const char *src_dir, const char *dst_dir, int depth,
 
     fl.count = 0;
     fl.overflow = 0;
-    ls_rc = g_api->sys_ls(src_dir, ls_cb, &fl);
+    ls_rc = os32_ls(src_dir, ls_cb, &fl);
     if (ls_rc < 0) {
         g_api->kprintf(ATTR_RED, "  [FAIL] list %s (code: %d)\n", src_dir, ls_rc);
         return 1;

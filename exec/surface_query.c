@@ -1,4 +1,4 @@
-/* Dormant until T2e e11: value query and common query/lease authorization. */
+/* KAPI v70: value query and common query/lease authorization. */
 #include "surface_query.h"
 #include "appslot.h"
 #include "con_sink.h"
@@ -7,6 +7,66 @@
 
 STATIC_ASSERT(sizeof(struct surface_desc) == 60, surface_desc_size);
 STATIC_ASSERT(sizeof(struct surface_query_result) == 244, surface_query_size);
+
+STATIC_ASSERT(sizeof(OS32_SurfaceRef) == sizeof(struct surface_ref), abi_surface_ref_size);
+STATIC_ASSERT(__builtin_offsetof(OS32_SurfaceRef, sid) ==
+              __builtin_offsetof(struct surface_ref, sid), abi_surface_ref_sid);
+STATIC_ASSERT(__builtin_offsetof(OS32_SurfaceRef, generation) ==
+              __builtin_offsetof(struct surface_ref, generation), abi_surface_ref_generation);
+STATIC_ASSERT(sizeof(OS32_SurfaceDesc) == sizeof(struct surface_desc), abi_surface_desc_size);
+STATIC_ASSERT(__builtin_offsetof(OS32_SurfaceDesc, ref) ==
+              __builtin_offsetof(struct surface_desc, ref), abi_surface_desc_ref);
+STATIC_ASSERT(__builtin_offsetof(OS32_SurfaceDesc, role) ==
+              __builtin_offsetof(struct surface_desc, role), abi_surface_desc_role);
+STATIC_ASSERT(__builtin_offsetof(OS32_SurfaceDesc, backend) ==
+              __builtin_offsetof(struct surface_desc, backend), abi_surface_desc_backend);
+STATIC_ASSERT(__builtin_offsetof(OS32_SurfaceDesc, format) ==
+              __builtin_offsetof(struct surface_desc, format), abi_surface_desc_format);
+STATIC_ASSERT(__builtin_offsetof(OS32_SurfaceDesc, width) ==
+              __builtin_offsetof(struct surface_desc, width), abi_surface_desc_width);
+STATIC_ASSERT(__builtin_offsetof(OS32_SurfaceDesc, height) ==
+              __builtin_offsetof(struct surface_desc, height), abi_surface_desc_height);
+STATIC_ASSERT(__builtin_offsetof(OS32_SurfaceDesc, pitch) ==
+              __builtin_offsetof(struct surface_desc, pitch), abi_surface_desc_pitch);
+STATIC_ASSERT(__builtin_offsetof(OS32_SurfaceDesc, planes) ==
+              __builtin_offsetof(struct surface_desc, planes), abi_surface_desc_planes);
+STATIC_ASSERT(__builtin_offsetof(OS32_SurfaceDesc, plane_offset) ==
+              __builtin_offsetof(struct surface_desc, plane_offset), abi_surface_desc_plane_offset);
+STATIC_ASSERT(__builtin_offsetof(OS32_SurfaceDesc, bytes) ==
+              __builtin_offsetof(struct surface_desc, bytes), abi_surface_desc_bytes);
+STATIC_ASSERT(__builtin_offsetof(OS32_SurfaceDesc, access_max) ==
+              __builtin_offsetof(struct surface_desc, access_max), abi_surface_desc_access_max);
+STATIC_ASSERT(sizeof(OS32_SurfaceQueryResult) == sizeof(struct surface_query_result), abi_surface_query_result_size);
+STATIC_ASSERT(__builtin_offsetof(OS32_SurfaceQueryResult, count) ==
+              __builtin_offsetof(struct surface_query_result, count), abi_surface_query_result_count);
+STATIC_ASSERT(__builtin_offsetof(OS32_SurfaceQueryResult, desc) ==
+              __builtin_offsetof(struct surface_query_result, desc), abi_surface_query_result_desc);
+STATIC_ASSERT(sizeof(OS32_LeaseView) == sizeof(struct lease_view), abi_lease_view_size);
+STATIC_ASSERT(__builtin_offsetof(OS32_LeaseView, token) ==
+              __builtin_offsetof(struct lease_view, token), abi_lease_view_token);
+STATIC_ASSERT(__builtin_offsetof(OS32_LeaseView, base) ==
+              __builtin_offsetof(struct lease_view, base), abi_lease_view_base);
+STATIC_ASSERT(__builtin_offsetof(OS32_LeaseView, bytes) ==
+              __builtin_offsetof(struct lease_view, bytes), abi_lease_view_bytes);
+STATIC_ASSERT(__builtin_offsetof(OS32_LeaseView, planes) ==
+              __builtin_offsetof(struct lease_view, planes), abi_lease_view_planes);
+STATIC_ASSERT(sizeof(OS32_LeaseResult) == sizeof(struct surface_lease_result), abi_surface_lease_result_size);
+STATIC_ASSERT(__builtin_offsetof(OS32_LeaseResult, count) ==
+              __builtin_offsetof(struct surface_lease_result, count), abi_surface_lease_result_count);
+STATIC_ASSERT(__builtin_offsetof(OS32_LeaseResult, views) ==
+              __builtin_offsetof(struct surface_lease_result, views), abi_surface_lease_result_views);
+STATIC_ASSERT(OS32_SURFACE_MAX == SURFACE_QUERY_MAX, abi_surface_max);
+STATIC_ASSERT(OS32_SURFACE_CLIENT == LEDGER_ROLE_CLIENT, abi_surface_client);
+STATIC_ASSERT(OS32_SURFACE_DISPLAY == LEDGER_ROLE_DISPLAY, abi_surface_display);
+STATIC_ASSERT(OS32_SURFACE_TVRAM == LEDGER_ROLE_TVRAM, abi_surface_tvram);
+STATIC_ASSERT(OS32_SURFACE_UNICODE == LEDGER_ROLE_UNICODE, abi_surface_unicode);
+STATIC_ASSERT(OS32_SURFACE_RO == LEDGER_PERM_RO, abi_surface_ro);
+STATIC_ASSERT(OS32_SURFACE_RW == LEDGER_PERM_RW, abi_surface_rw);
+STATIC_ASSERT(OS32_SURFACE_PC98 == LEDGER_SF_PC98, abi_surface_pc98);
+STATIC_ASSERT(OS32_SURFACE_PEGC == LEDGER_SF_PEGC, abi_surface_pegc);
+STATIC_ASSERT(OS32_SURFACE_CIRRUS == LEDGER_SF_CIRRUS, abi_surface_cirrus);
+STATIC_ASSERT(OS32_SURFACE_TABLE == LEDGER_FMT_TABLE, abi_surface_table);
+STATIC_ASSERT(OS32_SURFACE_TEXT == LEDGER_FMT_TEXT, abi_surface_text);
 
 int surface_query_error(int rc)
 {
@@ -160,4 +220,69 @@ int surface_query(const struct surface_query_source *s,
 done:
     irq_restore(flags);
     return rc;
+}
+
+/* Public KAPI bodies; publishers and caller identity stay kernel-owned. */
+#include "../gfx/gfx.h"
+STATIC_ASSERT(OS32_SURFACE_PLANAR4 == GFX_FMT_PLANAR4, abi_surface_planar4);
+STATIC_ASSERT(OS32_SURFACE_PACKED8 == GFX_FMT_PACKED8, abi_surface_packed8);
+#include "system_surface.h"
+__attribute__((section(".text.surface_api")))
+static int surface_api_source(u32 role, struct surface_query_source *source)
+{
+    switch (role) {
+    case LEDGER_ROLE_CLIENT:
+    case LEDGER_ROLE_DISPLAY:
+        return gfx_surface_source(role, source);
+    case LEDGER_ROLE_TVRAM:
+    case LEDGER_ROLE_UNICODE:
+        return system_surface_source(role, source);
+    default:
+        return OS32_ERR_INVAL;
+    }
+}
+__attribute__((section(".text.surface_api")))
+int surface_api_query(u32 role, struct surface_query_result *out)
+{
+    struct surface_query_source source;
+    int rc = surface_api_source(role, &source);
+    return rc ? rc : surface_query(&source, out);
+}
+__attribute__((section(".text.surface_api")))
+int surface_api_lease(u32 role, const struct surface_ref *ref, u32 access,
+                      struct lease_view *out)
+{
+    struct surface_query_source source;
+    int rc = surface_api_source(role, &source);
+    return rc ? rc : surface_lease(&source, ref, access, out);
+}
+__attribute__((section(".text.surface_api")))
+int surface_api_bundle(u32 role, const struct surface_ref *refs, u32 count,
+                       u32 access, struct surface_lease_result *out)
+{
+    struct surface_query_source source;
+    int rc = surface_api_source(role, &source);
+    return rc ? rc : surface_lease_bundle(&source, refs, count, access, out);
+}
+__attribute__((section(".text.surface_api")))
+int surface_api_unlease(u32 token)
+{
+    struct caller_access caller;
+    unsigned int flags = irq_save();
+    int valid = !kctx_irq_depth && !kctx_exc_depth && caller_access_get(&caller) &&
+                caller.origin == CALLER_USER;
+    AppSlot *slot = valid ? appslot_get(caller.app_id) : 0;
+    valid = valid && slot && slot->state == APP_STATE_RUNNING;
+    if (valid) {
+        for (u32 i = 0; i < MEM_LEASE_MAX; i++) {
+            const struct as_lease *lease = &caller.as->leases[i];
+            if (lease->token == token && (lease->flags & AS_LEASE_GFX_COMPAT)) {
+                valid = 0;
+                break;
+            }
+        }
+    }
+    irq_restore(flags);
+    /* No callbacks/scheduling before release; get revalidates AS identity. */
+    return valid ? surface_query_error(lease_release(caller.as, token)) : OS32_ERR_INVAL;
 }

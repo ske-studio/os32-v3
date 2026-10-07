@@ -1,4 +1,4 @@
-"""T2c high private image/heap/variable stack and low shared BB; actual paging,
+"""T2c high private image/heap/variable stack and supervisor BB aliases; actual paging,
 ledger and fixed KHEAP. Mutants must compile and fail during execution.
 """
 import host32
@@ -14,10 +14,11 @@ SRC = ROOT / 'tools/tests/app_bb_overlap_host.c'
 
 # 1 行の #define (順に並べる。RING3_USTACK_TOP が g_ring3_band_top を指す)
 DEFINES = ('#define RING3_USTACK_TOP ', '#define RING3_STACK_BOTTOM ', '#define RING3_HEAP_TOP ')
-WANTED = ('int ring3_ptr_ok(', 'static const char *exec_image_reject_reason(', 'static int exec_stack_bytes(', 'static u8 launch_read_byte(', 'static int app_store(', 'static int app_map_region(', 'static int exec_bb_overlaps_user(',
-          'static int exec_map_shared_bb(', 'u32 exec_as_leftover_pages;',
+WANTED = ('int ring3_ptr_ok(', 'static const char *exec_image_reject_reason(', 'static int exec_stack_bytes(', 'static u8 launch_read_byte(', 'static int app_store(', 'static int app_map_region(', 'u32 exec_as_leftover_pages;',
           'static void exec_teardown_app(')
 MUTATIONS = [
+ ('unicode-user-restored', '        /* --- K3:', '        paging_addrspace_map_user_range(ctx->as, MEM_UNICODE_TABLE_BASE, MEM_UNICODE_TABLE_BASE + MEM_UNICODE_TABLE_SIZE, PAGE_RW | PTE_USER);\n        /* --- K3:'),
+ ('bb-user-restored', '        /* --- K3:', '        paging_addrspace_map_user_range(ctx->as, MEM_GFX_BB_BASE, MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE, PAGE_RW | PTE_USER);\n        /* --- K3:'),
  ('guard-fixed-stack', '#define RING3_HEAP_TOP (RING3_STACK_BOTTOM - PAGE_SIZE)', '#define RING3_HEAP_TOP (MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE - PAGE_SIZE)'),
  ('shell-shlib-accepted', 'else if (is_shell && hdr->shlib_protocol)', 'else if (((void)is_shell, 0) && hdr->shlib_protocol)'),
  ('argv-RO-rejected', 'as_va_to_pa_read(pd, (u32)p, &pa)', 'as_va_to_pa(pd, (u32)p, &pa)'),
@@ -27,11 +28,6 @@ MUTATIONS = [
  ('stack-min-unchecked', '        if (size < MEM_APP_STACK_MIN) size = MEM_APP_STACK_MIN;', '        (void)size;'),
  ('image-not-returned', '                                         a->sbrk_heap_limit);', '                                         a->load_addr);'),
  ('argv-to-wrong-AS', 'as_va_to_pa(a->as->pd_phys, va, &pa)', 'as_va_to_pa(paging_kernel_pd_phys(), va, &pa)'),
- ('overlap-unchecked', '    if (exec_bb_overlaps_user(bb_base, bb_size, user_top)) return -1;',
-  '    (void)exec_bb_overlaps_user(bb_base, bb_size, user_top);'),
- ('bb-unmapped', '    if (bb_size)\n', '    if (0)\n'),
- ('bb-no-keep', 'paging_addrspace_map_user_keep(as, bb_base, bb_base + bb_size,',
-  'paging_addrspace_map_user_range(as, bb_base, bb_base + bb_size,'),
  ('stack-not-returned', 'paging_addrspace_free_user_range(a->as, a->stack_base, a->stack_top);',
   'paging_addrspace_free_user_range(a->as, a->stack_top, a->stack_top);'),
  ('as-kheap-leak', '    kfree(a->as);', '    (void)a->as;'),
@@ -68,6 +64,8 @@ def extract(source):
             parts += ['#define pgalloc_alloc_phys app_fail_alloc', slice_out(source, sig), '#undef pgalloc_alloc_phys']
         else:
             parts.append(slice_out(source, sig))
+    launch = source[source.index('\n        }', source.index('        /* 3 領域を張り終えて')) + len('\n        }'):source.index('        /* --- K3:')]
+    parts += ['#define paging_addrspace_map_user_range launch_map_attempt', 'static void launch_shared_maps(AppSlot *ctx) {', '(void)ctx;', launch, '}', '#undef paging_addrspace_map_user_range']
     return '\n'.join(parts) + '\n'
 
 
@@ -120,7 +118,7 @@ def mutate():
 
 def main():
     run()
-    print('HOST ILP32 PASS high private bands, low shared BB, KHEAP and owner0')
+    print('HOST ILP32 PASS high private bands, supervisor BB aliases, KHEAP and owner0')
     if '--mutate' in sys.argv:
         rc = mutate()
         if rc:

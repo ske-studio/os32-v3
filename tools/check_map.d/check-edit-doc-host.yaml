@@ -1,4 +1,5 @@
 check-edit-doc-host:
+- sdk/rust/os32api/src/ls.rs
 - tools/tests/os32api_host.py
 - tools/tests/test_edit_doc.py
 - userland/rust/edit_gui/host/doc_tests.rs

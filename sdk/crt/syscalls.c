@@ -182,3 +182,7 @@ void * sbrk(int incr) ALIAS(_sbrk);
 
 /* memcpy/memset は newlib (libc.a) の実装をそのまま使用する。
  * 全外部プログラムは -lc でリンクされるため、カーネルへの迂回は不要。 */
+
+/* Common USER helpers travel in the existing CRT object, including in the
+ * standalone SDK (whose applications already link syscalls.o). */
+#include "../../userland/lib/rt/ls.c"

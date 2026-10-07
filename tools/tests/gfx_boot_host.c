@@ -435,7 +435,7 @@ void _start(void)
               sc->perm_max == LEDGER_PERM_RW);
         CHECK(sd->first * PAGE_SIZE == WAB_XE10_LINEARWIN_BASE && sd->npages == 75 &&
               sd->backing == LEDGER_SB_MMIO && sd->cache == LEDGER_CACHE_UC &&
-              sd->owner == LEDGER_OWNER_KERNEL && sd->perm_max == LEDGER_PERM_NONE);
+              sd->owner == LEDGER_OWNER_KERNEL && sd->perm_max == LEDGER_PERM_RW);
     }
     CHECK(ledger_check_fail == 0);
 

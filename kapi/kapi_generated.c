@@ -42,6 +42,9 @@
 #include "bootinfo.h"
 #include "serialfs.h"
 #include "v86_gcap.h"
+#include "surface_query.h"
+#include "ring3_ls.h"
+#include "redir_access.h"
 
 extern volatile u32 tick_count;
 extern void kapi_sys_exit(int status);
@@ -56,7 +59,7 @@ extern int kapi_serial_diag(SerialDiag *out);
 #include "kapi_profile.h"
 
 #ifdef KAPI_PROFILE
-volatile u32 kapi_hits[240];
+volatile u32 kapi_hits[246];
 #endif
 
 /* 各スロットの cdecl 引数バイト数 (固定分)。int 0x80 ディスパッチャが
@@ -302,6 +305,12 @@ const u16 kapi_argsize[KAPI_FUNC_COUNT] = {
     4,  /* serial_diag */
     12,  /* kbd_diag_log */
     8,  /* v86_gdc_capture */
+    8,  /* surface_query */
+    16,  /* surface_lease */
+    20,  /* gfx_surface_lease */
+    4,  /* surface_unlease */
+    12,  /* sys_ls_window */
+    12,  /* caller_identity */
 };
 
 /* 各スロットの固定引数のうち早期検査するポインタのビットマスク (bit k = 引数 k)。
@@ -547,6 +556,12 @@ const u16 kapi_argptr[KAPI_FUNC_COUNT] = {
     0x0000,  /* serial_diag */
     0x0000,  /* kbd_diag_log */
     0x0000,  /* v86_gdc_capture */
+    0x0000,  /* surface_query */
+    0x0000,  /* surface_lease */
+    0x0000,  /* gfx_surface_lease */
+    0x0000,  /* surface_unlease */
+    0x0000,  /* sys_ls_window */
+    0x0000,  /* caller_identity */
 };
 
 /* ---- 出力ポインタの書き込み可検査 (票 TASK_KAPI_OUTPUT_GUARD) --------
@@ -1516,6 +1531,7 @@ void __cdecl wrap_tvram_readchar_at(int x, int y, u16 *code, u8 *attr)
                                     (u32)attr, KAPI_OUT_LEN(attr, sizeof(u8)))) {
         ring3_fault_kill();   /* 戻らない */
     }
+    if (!exec_tvram_read_allowed()) { if (code) *code = 0; if (attr) *attr = 0; return; }
     tvram_readchar_at(x, y, code, attr);
 }
 
@@ -2274,5 +2290,76 @@ int __cdecl wrap_v86_gdc_capture(int mode, V86Gcap *out)
         ring3_fault_kill();   /* 戻らない */
     }
     return v86_gdc_capture(mode, out);
+}
+
+int __cdecl wrap_surface_query(u32 role, OS32_SurfaceQueryResult *out)
+{
+    KAPI_HIT(240);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable(
+            (u32)out, KAPI_OUT_LEN(out, sizeof(OS32_SurfaceQueryResult)),
+            (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return surface_api_query(role, (struct surface_query_result *)out);
+}
+
+int __cdecl wrap_surface_lease(u32 role, const OS32_SurfaceRef *ref, u32 access, OS32_LeaseView *out)
+{
+    KAPI_HIT(241);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)out, KAPI_OUT_LEN(out, sizeof(OS32_LeaseView)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return surface_api_lease(role, (const struct surface_ref *)ref, access, (struct lease_view *)out);
+}
+
+int __cdecl wrap_gfx_surface_lease(u32 role, const OS32_SurfaceRef *refs, u32 count, u32 access, OS32_LeaseResult *out)
+{
+    KAPI_HIT(242);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)out, KAPI_OUT_LEN(out, sizeof(OS32_LeaseResult)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return surface_api_bundle(role, (const struct surface_ref *)refs, count, access, (struct surface_lease_result *)out);
+}
+
+int __cdecl wrap_surface_unlease(u32 token)
+{
+    KAPI_HIT(243);
+    return surface_api_unlease(token);
+}
+
+int __cdecl wrap_sys_ls_window(const char *path, u32 skip, OS32_LsPacket *out)
+{
+    KAPI_HIT(244);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)out, KAPI_OUT_LEN(out, sizeof(OS32_LsPacket)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return ring3_ls_window(path, skip, out);
+}
+
+int __cdecl wrap_caller_identity(u32 *app, u32 *owner, u32 *generation)
+{
+    KAPI_HIT(245);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)app, KAPI_OUT_LEN(app, sizeof(u32)),
+                                    (u32)owner, KAPI_OUT_LEN(owner, sizeof(u32))) ||
+        !ring3_user_ranges_writable((u32)generation, KAPI_OUT_LEN(generation, sizeof(u32)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    struct caller_access caller;
+    if (!caller_access_get(&caller) || caller.origin != CALLER_USER) return OS32_ERR_INVAL;
+    if (!app || !owner || !generation) return OS32_ERR_INVAL;
+    struct caller_identity identity = caller_identity_get();
+    *app = (u32)identity.app_id;
+    *owner = identity.owner;
+    *generation = identity.generation;
+    return 0;
 }
 

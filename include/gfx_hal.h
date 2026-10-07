@@ -58,8 +58,8 @@ typedef struct GfxBackend {
     u32  bb_pitch;
     u8   bb_format;   /* GFX_BB_* */
     u32  bb_size;     /* バックバッファ全体のバイト数。PEGC / Cirrus は台帳の
-                       * SURFACE から埋める (exec が gfx_bb_phys_range() で取る
-                       * USER マップの範囲と同じ情報源、TASK_T1_LEDGER §3-8)。
+                       * SURFACE から埋める (CLIENT lease の backing 範囲と
+                       * 同じ情報源、TASK_T1_LEDGER §3-8、e11b2)。
                        * pitch×height から計算できない (9801 は 4 プレーン +
                        * 端数パディングで 128KB) ので明示的に持つ。
                        * **表示面を含めてはならない** — CPL=3 に見せてよいのは

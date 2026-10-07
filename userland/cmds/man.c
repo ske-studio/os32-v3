@@ -1,3 +1,4 @@
+#include "ls.h"
 /* ======================================================================== */
 /*  MAN.C — マニュアル表示コマンド                                           */
 /*                                                                          */
@@ -202,7 +203,7 @@ int main(int argc, char **argv, KernelAPI *kapi)
         } else {
             printf("\nAvailable manual pages:\n\n");
         }
-        api->sys_ls(OS32_MAN_DIR, list_cb, (void *)0);
+        os32_ls(OS32_MAN_DIR, list_cb, (void *)0);
         printf("\n");
         return 0;
     }
@@ -221,7 +222,7 @@ int main(int argc, char **argv, KernelAPI *kapi)
         } else {
             printf("\nSearching for '%s':\n\n", argv[2]);
         }
-        api->sys_ls(OS32_MAN_DIR, search_cb, &ctx);
+        os32_ls(OS32_MAN_DIR, search_cb, &ctx);
         if (ctx.found == 0) {
             printf("  No matches found.\n");
         }

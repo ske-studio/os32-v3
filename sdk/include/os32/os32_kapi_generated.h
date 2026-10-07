@@ -245,15 +245,21 @@ typedef struct {
     int (__cdecl *serial_diag)(SerialDiag *out);
     int (__cdecl *kbd_diag_log)(u32 after_seq, KbdDiagLogEnt *out, int max);
     int (__cdecl *v86_gdc_capture)(int mode, V86Gcap *out);
-    /* 予約 (KAPI_FUNC_COUNT..KAPI_FUNC_CAPACITY-1、60 本)。末尾追記はここを削って使う */
-    i32 (__cdecl *kapi_reserved[60])(void);
+    int (__cdecl *surface_query)(u32 role, OS32_SurfaceQueryResult *out);
+    int (__cdecl *surface_lease)(u32 role, const OS32_SurfaceRef *ref, u32 access, OS32_LeaseView *out);
+    int (__cdecl *gfx_surface_lease)(u32 role, const OS32_SurfaceRef *refs, u32 count, u32 access, OS32_LeaseResult *out);
+    int (__cdecl *surface_unlease)(u32 token);
+    int (__cdecl *sys_ls_window)(const char *path, u32 skip, OS32_LsPacket *out);
+    int (__cdecl *caller_identity)(u32 *app, u32 *owner, u32 *generation);
+    /* 予約 (KAPI_FUNC_COUNT..KAPI_FUNC_CAPACITY-1、54 本)。末尾追記はここを削って使う */
+    i32 (__cdecl *kapi_reserved[54])(void);
     u32 sbrk_heap_limit;  /* newlib _sbrk用ヒープ上限アドレス (exec_runでセットされる) */
     u32 shm_base;  /* 共有メモリ (MEM_SHM_BASE) の先頭アドレス。DB結果受け渡しに使用 (exec_initでセット) */
 } KernelAPI;
 
-#define KAPI_FUNC_COUNT 240
+#define KAPI_FUNC_COUNT 246
 #define KAPI_FUNC_CAPACITY 300
-#define KAPI_FUNC_RESERVED 60
+#define KAPI_FUNC_RESERVED 54
 #define KAPI_DATA_FIELDS_OFF 0x4B8
 #define KAPI_DATA_IDX_SBRK_HEAP_LIMIT 302
 #define KAPI_DATA_IDX_SHM_BASE 303

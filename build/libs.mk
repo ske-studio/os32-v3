@@ -244,7 +244,7 @@ $(LIBDIR)/libos32md.a: $(MDLIB_ARCHIVE_OBJ)
 	$(AR) rcs $@ $^
 
 # libos32filer — GFXファイラーライブラリ + TVRAM描画
-userland/lib/filer/filer_core.o: userland/lib/filer/filer_core.c userland/lib/filer/libos32filer.h
+userland/lib/filer/filer_core.o: userland/lib/filer/filer_core.c userland/lib/filer/libos32filer.h sdk/include/os32/ls.h
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32filer) -c $< -o $@
 
 userland/lib/filer/filer_draw.o: userland/lib/filer/filer_draw.c userland/lib/filer/filer_draw.h

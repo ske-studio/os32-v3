@@ -68,8 +68,6 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
             if key == 'v86':
                 body = body.replace('(volatile u32 *)(V86_REMAP_START + PAGE_SIZE)',
                                     '(volatile u32 *)P2V(backing_phys)')
-            if key == 'exec':
-                body = body[body.index('        /* VRAM (テキスト 0xA0000'):body.index('        /* フォントキャッシュ')]
             if key == 'boot':
                 body = body[body.index('static void test_caller_boot('):body.index('static void test_ledger(void)')]
             (tmp / (key + '_host_source.c')).write_text(body)
@@ -101,17 +99,15 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
             units = [unit for unit, _ in changed or []]
             assert len(units) == len(set(units)), (key, units)
             # v86/exec/paging each rebuild the fixture TU: never combine them.
-            assert sum(unit in ("paging", "v86", "exec") for unit in units) <= 1, (key, units)
+            assert sum(unit in ("paging", "v86", "exec", "public_wrap") for unit in units) <= 1, (key, units)
             objs = dict(objects)
             for unit, body in changed or []:
                 src, obj = tmp / (key + '_' + unit + '.c'), tmp / (key + '_' + unit + '.o')
-                if unit in ('paging', 'v86', 'exec'):
+                if unit in ('paging', 'v86', 'exec', 'public_wrap'):
                     # Only the TU containing real paging is rebuilt. A private
                     # include name keeps parallel mutants independent.
                     if unit == 'v86':
                         body = body.replace('(volatile u32 *)(V86_REMAP_START + PAGE_SIZE)', '(volatile u32 *)P2V(backing_phys)')
-                    if unit == 'exec':
-                        body = body[body.index('        /* VRAM (テキスト 0xA0000'):body.index('        /* フォントキャッシュ')]
                     paging = tmp / (key + '_source.c'); paging.write_text(body)
                     access = (ROOT / 'tools/tests/access_walk_host.c').read_text().replace(
                         '#include "' + unit + '_host_source.c"', '#include "' + paging.name + '"')
@@ -173,6 +169,9 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
 if __name__ == '__main__':
     try:
         main()
+        import sys
+        subprocess.run([sys.executable, str(ROOT / "tools/tests/test_public_surface.py"),
+                        *sys.argv[1:]], check=True)
     except subprocess.CalledProcessError as error:
         print(error.stdout or '', error.stderr or '')
         raise

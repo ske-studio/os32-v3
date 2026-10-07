@@ -2217,3 +2217,9 @@ int main(int argc, char **argv)
     printf("PASS %s\n", argv[1]);
     return 0;
 }
+
+/* Caller tests mock enumeration; real packet iteration is check-ls-client-host. */
+int os32_ls(const char *path, DirCallback cb, void *ctx)
+{
+    return (&api)->sys_ls(path, (void *)cb, ctx);
+}

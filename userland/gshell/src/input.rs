@@ -241,6 +241,10 @@ pub fn target_of(st: &GuiState, win_id: u32) -> Option<Target> {
 pub fn focus_target(st: &GuiState) -> Option<Target> {
     let index = st.front_index()?;
     let owner = st.windows[index].owner;
+    if crate::fullscreen::active()
+        && crate::multiapp::chain_tail(owner) != crate::fullscreen::owner() {
+        return None;
+    }
     let slot = st.slot_of_owner(owner)?;
     let (cox, coy) = st.windows[index].client_origin();
     Some(Target {
@@ -422,6 +426,20 @@ pub(crate) fn capture_keyboard(st: &mut GuiState, ctx: Ctx) {
             continue;
         }
 
+        /* Fullscreen without its launcher's window: cooked input goes only to
+         * the injection ring. The kernel refuses terminal descendants, even
+         * when their window is hidden; no background window receives this key. */
+        if crate::fullscreen::active() && focus_target(st).is_none() {
+            let ch = translate(scan, mods);
+            if down && ch != 0 {
+                let owner = unsafe { (os32api::api().gfx_screen_owner)() };
+                if unsafe { (os32api::api().kbd_inject)(&ch, 1) } > 0 {
+                    crate::multiapp::note_injected_key(owner);
+                }
+            }
+            continue;
+        }
+
         /* SHIFT+SPACE = FEP の on/off。**常に WM が消費**し、押下も離しも
          * アプリへ配送しない (契約 U2a)。 */
         if scan == SC_SPACE && (mods & MOD_SHIFT) != 0 {
@@ -476,7 +494,7 @@ pub(crate) fn capture_keyboard(st: &mut GuiState, ctx: Ctx) {
          * (`DEBUG_SHORTCUTS == false`) では `standalone_key` が即戻るため何も
          * 起きない。アプリの OP_WAIT (Ctx::Wait) では元から横取りしない
          * — ESC はアプリのもの。メニュー / モーダルの ESC はここより上で処理済み。 */
-        if ctx == Ctx::Standalone && st.front_index().is_none() {
+        if ctx == Ctx::Standalone && st.front_index().is_none() && !crate::fullscreen::active() {
             if down {
                 standalone_key(st, scan);
             }

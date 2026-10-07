@@ -46,10 +46,9 @@ int wildcard_match(const char *pattern, const char *str) {
     return (*pattern == '\0');
 }
 
-/* B2: CPL=3 では sys_ls のコールバックから KAPI を呼べない。glob_cb は
- * mem_alloc を呼ぶので、SHELL_AS_APP では写し取り (sh_ls_collect_cb) を
- * 挟んで sys_ls が戻ってから glob_cb へ流す。常駐はマクロがそのまま
- * g_api->sys_ls(dir_path, glob_cb, ctx) に展開される (.o は不変)。 */
+/* Preserve the shell's bounded glob collection and overflow reporting.
+ * os32_ls runs USER callbacks after each value window; resident callers
+ * use its initial INVAL fallback to the legacy callback slot. */
 struct GlobCtx {
     char **argv;
     int *argc;
@@ -128,7 +127,7 @@ static int sh_glob_run(const char *dir_path, struct GlobCtx *ctx)
     sh_glob_pattern = ctx->pattern;
     sh_ls_reset();
     sh_ls_set_filter(sh_glob_filter);
-    g_api->sys_ls(dir_path, sh_ls_collect_cb, (void *)0);
+    os32_ls(dir_path, sh_ls_collect_cb, (void *)0);
     sh_ls_set_filter((int (*)(const char *))0);
 
     if (sh_ls_dropped() > 0) {
@@ -278,7 +277,7 @@ int parse_args_and_glob(char *cmd_line, char **argv, int *argc_out, int max_args
                 return -1;
             }
 #else
-            g_api->sys_ls(dir_path, glob_cb, &ctx);
+            os32_ls(dir_path, glob_cb, &ctx);
 #endif
 
             /* T6: 一致の **一部だけ** を渡さない。行ごと断って、確保済みの

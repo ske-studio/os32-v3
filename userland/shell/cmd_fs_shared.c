@@ -1,3 +1,4 @@
+#include "ls.h"
 /* ======================================================================== */
 /*  CMD_FS_SHARED.C — ファイル/ディレクトリ操作コマンド 共通ユーティリティ    */
 /*                                                                          */
@@ -42,7 +43,7 @@ void fs_dummy_ls_cb(const DirEntry_Ext *entry, void *ctx)
 static int fs_ls_says_dir(const char *path)
 {
     int found = 0;
-    int rc = g_api->sys_ls(path, (void *)fs_dummy_ls_cb, &found);
+    int rc = os32_ls(path, fs_dummy_ls_cb, &found);
 
     if (rc == 0) return 1;
     if (rc == OS32_ERR_NOTDIR) return 0;

@@ -148,7 +148,12 @@ static void tests(void)
     snapshot(); kcg_boot_phase_close();
     for (unsigned i=0; i<sizeof(ram); ++i)
         CHECK(ram[i] == before[i], "repeated close unchanged");
-    kcg_init(); closed_call("font");
+    kcg_set_scale(2);
+    snapshot(); kcg_init();
+    CHECK(kcg_scale == 1, "closed init resets scale");
+    for (unsigned i=0; i<sizeof(ram); ++i)
+        CHECK(ram[i] == before[i], "closed init preserves font");
+    closed_call("font");
     /* Private state reset is fixture-only: four independent boot failures. */
     for (int bad=0; bad<4; ++bad) {
         table(); ram[MEM_UNICODE_TABLE_BASE + cp[bad]*2] ^= 1;

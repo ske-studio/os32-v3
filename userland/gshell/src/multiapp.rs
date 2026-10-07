@@ -189,6 +189,9 @@ pub struct Multi {
     /// [`mark_resumed`] が「この起床を tick の数えに載せるか」を決める材料で、
     /// [`pick`] の入口で必ず 0 に戻すので前の周の残骸は効かない。
     poll_choice: i32,
+    /// Successful WM injections, indexed by their original fullscreen owner.
+    /// Scheduling hints only; the kernel alone decides who can consume bytes.
+    injected_keys: [bool; MAX_APPS],
 }
 
 impl Multi {
@@ -202,6 +205,7 @@ impl Multi {
         abort_clear_req: false,
         poll_last: 0,
         poll_choice: 0,
+        injected_keys: [false; MAX_APPS],
     };
 }
 
@@ -326,6 +330,7 @@ pub fn on_owner_exit(id: i32) {
         None => return,
     };
     let mm = m();
+    mm.injected_keys[i] = false;
     mm.apps[i] = App::NEW;
     if mm.running == id {
         mm.running = 0;
@@ -570,6 +575,30 @@ fn tick_now() -> u32 {
     unsafe { (os32api::api().get_tick)() }
 }
 
+/// Remember only successful injection. No new KAPI or per-target pending query.
+pub(crate) fn note_injected_key(owner: i32) {
+    if let Some(i) = idx(owner) { m().injected_keys[i] = true; }
+}
+
+fn injected_key_hint(id: i32) -> bool {
+    for i in 0..MAX_APPS {
+        let owner = APP_ID_MIN + i as i32;
+        if m().injected_keys[i] && (id == owner || id == chain_tail(owner)) {
+            return true;
+        }
+    }
+    false
+}
+
+fn injected_key_empty(id: i32) {
+    for i in 0..MAX_APPS {
+        let owner = APP_ID_MIN + i as i32;
+        if m().injected_keys[i] && (id == owner || id == chain_tail(owner)) {
+            m().injected_keys[i] = false;
+        }
+    }
+}
+
 /// 鍵待ち群: `kbd_getchar` で止まっていて (`WAIT_KEY`)、注入リングに
 /// 未読がある (票 K7 §5 指摘 C の `ready_to_run`)。
 ///
@@ -577,13 +606,14 @@ fn tick_now() -> u32 {
 /// 通らないのでスロットも窓も持たない — [`input_ready`] / [`derived_ready`]
 /// の材料が 1 つも無く、注入リングの未読だけが唯一の起床の理由になる。
 ///
-/// **`kbd_inject_pending` を先に見る**。空 (= ふだん) なら KAPI 1 本で
-/// 終わり、`exec_app_state` は文字があるときしか呼ばない。
+/// **`kbd_inject_pending` を先に見る**。端末由来が空で、成功したWM注入の
+/// 候補も無ければKAPI 1本で終わる。候補は未読の保証ではなく、実際の宛先
+/// 照合はexec_resume先のカーネルが行う。AGAINで候補を降ろす。
 pub fn key_ready(id: i32) -> bool {
     if idx(id).is_none() {
         return false;
     }
-    if kbd_pending() == 0 {
+    if kbd_pending() == 0 && !injected_key_hint(id) {
         return false;
     }
     app_state(id) == APP_STATE_WAIT_KEY
@@ -1094,6 +1124,7 @@ pub fn resume_one(st: &mut GuiState) -> bool {
      * 済ませる。全画面中は WM が描かないだけで、譲り合いの判断は変わらない。 */
     crate::after_exec(st);
     if rc == OS32_ERR_AGAIN {
+        injected_key_empty(k);
         /* 注入リングが空だった (指摘 B: カーネルは印を残したまま拒む)。
          * 畳まずに**その周は譲る** — turn も巡回の起点も据え置きの数えも
          * 動かさないので、D11 のラウンドと上界 (30) は変わらない。
@@ -1253,7 +1284,7 @@ pub fn abort_target(st: &GuiState) -> i32 {
 
 /// `launch_child` を末尾まで辿る (票 T9 D8)。**同じ ID が 2 度出たら止める** —
 /// 壊れた表が環を作っても戻ってくる (カーネルの `launch_chain` と同じ線)。
-fn chain_tail(head: i32) -> i32 {
+pub(crate) fn chain_tail(head: i32) -> i32 {
     let mut seen = [0i32; MAX_APPS];
     let mut n = 0;
     let mut cur = head;

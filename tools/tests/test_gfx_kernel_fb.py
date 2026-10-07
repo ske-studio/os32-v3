@@ -17,6 +17,18 @@ TARGET_SRCS = ['gfx/gfx_core.c', 'gfx/backend_pc98.c', 'gfx/backend_pegc.c',
                'exec/redir_access.c', 'kernel/shlib.c', 'kernel/paging.c',
                'kernel/pgalloc.c', 'kernel/sys.c', 'kernel/physmem.c']
 MUTANTS = [
+ ('bridge-init-abort', 'if (bad_output && (valid ? caller.origin == CALLER_USER : user)',
+  'if ((valid ? caller.origin == CALLER_USER : user)',
+  'FAIL !slot.abort_req && gfx_bridge_fail_count == failures+1'),
+
+ ('public-bridge', '    if (ring3_call_from_user()) { gfx_framebuffer_bridge(fb); return; }',
+  '', 'FAIL user_fb->width == public_fb.width && user_fb->height == public_fb.height'),
+ ('bridge-preinit', 'if (gfx_surface_source(LEDGER_ROLE_CLIENT, &source)) goto fail;',
+  'if (gfx_selected_source(LEDGER_ROLE_CLIENT, &source)) goto fail;',
+  'FAIL !user_fb->width && !user_fb->planes[0]'),
+ ('invalid-user-no-abort', '(valid ? caller.origin == CALLER_USER : user)',
+  '(valid && caller.origin == CALLER_USER && (user || !user))', 'FAIL slot.abort_req'),
+
  ('fixed-bb', 'u8 *bb_b, *bb_r, *bb_g, *bb_i;',
   'u8 *bb_b = P2V_CONST(MEM_GFX_BB_BASE), *bb_r, *bb_g, *bb_i;',
   'FAIL !bb_b && !bb_r && !bb_g && !bb_i && !gfx_backend_pc98.bb_base'),
@@ -31,7 +43,7 @@ MUTANTS = [
  ('preinit-backend', 'selected ? gfx_sf_backend() : LEDGER_SF_PC98', 'gfx_sf_backend()',
   'FAIL fb.width == sf->width && fb.height == height'),
  ('init200-rebind', '    gfx_bind_client(); /* bind before init_200; retain 400-line plane stride */', '',
-  'FAIL fb.width == sf->width && fb.height == height'),
+  'FAIL user_fb->width == public_fb.width && user_fb->height == public_fb.height'),
  ('preinit-screen-pc98', '    if (g_backend && g_backend->query)\n        g_backend->query((GFX_ScreenInfo *)out);',
   '    (gfx_started ? g_backend : &gfx_backend_pc98)->query((GFX_ScreenInfo *)out);',
   'FAIL si.format == selected_info.format && si.format == client->format'),
@@ -164,5 +176,15 @@ def main():
             assert result.returncode == 1 and m[3] in result.stdout, (m[0],result.returncode,result.stdout,result.stderr)
             return 'RED '+m[0]
         for message in run_ordered(one,MUTANTS): print(message)
-        print(f'PASS {len(MUTANTS)}/{len(MUTANTS)} runtime mutants')
+        for name,unit,old,new,expected in [
+            ('display-authorization','exec/surface_query.c',
+             'if (!gfx || (gui && appslot_gfx_owner() != c.app_id))', 'if (0)',
+             'FAIL surface_lease(&source,'),
+            ('map-range','kernel/pgalloc.c',
+             'first < end && first >= r->decode_first &&\n                               end <= r->decode_end',
+             'first < end', 'FAIL !ledger_resource_set_map(0,rr->decode_first-1,rr->decode_end)')]:
+            result=run_case(None,args.runner,[(unit,old,new)])
+            assert result.returncode == 1 and expected in result.stdout,(name,result.stdout,result.stderr)
+            print('RED '+name)
+        print(f'PASS {len(MUTANTS)+2}/{len(MUTANTS)+2} runtime mutants')
 if __name__ == '__main__': main()

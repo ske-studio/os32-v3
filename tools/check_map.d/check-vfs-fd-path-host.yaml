@@ -38,3 +38,5 @@ check-vfs-fd-path-host:
 - userland/system/inst_hdd.c
 - tools/check_map.d/check-vfs-fd-path-host.yaml
 - build/checks.d/check-vfs-fd-path-host.mk
+- userland/lib/rt/ls.c
+- sdk/include/os32/ls.h

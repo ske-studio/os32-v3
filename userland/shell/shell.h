@@ -5,6 +5,7 @@
 #define SHELL_H
 
 #include "os32api.h"
+#include "ls.h"
 #include <string.h>
 
 #define str_eq(a, b) (strcmp((a), (b)) == 0)
@@ -240,11 +241,9 @@ void sh_redirect_clear(void);
 #endif
 
 /* ------------------------------------------------------------------------ */
-/*  B2: sys_ls のコールバックからは KAPI を呼ばない (SHELL_AS_APP)           */
-/*                                                                          */
-/*  CPL=3 で `sys_ls` のコールバックから KAPI (int 0x80) を呼ぶと落ちる      */
-/*  (カーネル側の欠陥、別票)。名前と種別を写すだけのコールバックを使い、     */
-/*  `sys_ls` が戻ってから表示 / mem_alloc を行う。実体は sh_ls.inc。         */
+/*  B2: SHELL_AS_APP の一覧・glob 用の写し取り                              */
+/*  c3 の os32_ls は USER callback からの KAPI 呼出しを許す。収集と表示を     */
+/*  分け、上限と溢れ報告を維持するため写し取りを使う。実体は sh_ls.inc。     */
 /* ------------------------------------------------------------------------ */
 #ifdef SHELL_AS_APP
 void sh_ls_reset(void);

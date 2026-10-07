@@ -17,6 +17,7 @@
 /* ======================================================================== */
 
 #include "kselftest.h"
+#include "serial.h"
 #include "pegc.h"
 #include "gfx_hal.h"
 #include "../gfx/gfx.h"
@@ -350,16 +351,14 @@ static void test_ring3_pd(void)
 }
 
 /* ------------------------------------------------------------------------ */
-/*  デバイス窓の貸し出し (レビュー #5 ②③): 表示面を CPL=3 に見せないまま     */
-/*  クライアント面だけを USER にでき、そのときキャッシュ属性 (PCD) が        */
-/*  消えないこと。ここが壊れると Cirrus で「commit 前の描画が表示面に出る」   */
-/*  (契約 G4 違反) か「BLT が古い VRAM を読んでちらつく」になるが、どちらも   */
-/*  画面を見るまで分からないので毎回ブート時に見る。                          */
-/* ------------------------------------------------------------------------ */
+/* Shared PT promotion is rejected without changing PFN/cache/PDE bits.
+ * rc bits: 1=missing PT, 2=AS creation, 4=keep, 64=single page,
+ * 128=identity range, 256=physical range, 8=free, 16=entry changed,
+ * 32=AS cleanup (paging_map_user_keep_selftest). */
 static void test_map_user_keep(void)
 {
     int rc = paging_map_user_keep_selftest();
-    check(rc == 0, "device window lease (USER only on client page, PCD kept)");
+    check(rc == 0, "shared PT map rejected (PTE/PDE unchanged)");
     if (rc != 0) {
         kprintf(0xC1, "[selftest]   paging_map_user_keep_selftest rc=%d\n", rc);
     }
@@ -447,7 +446,7 @@ static void test_con_sink_render_gate(void)
 static void test_kbd_inject(void)
 {
     u32 bad = kbd_inject_selftest();
-    check((bad & (1u << 0)) == 0, "kbd_inject refuses with no con_sink reader");
+    check((bad & (1u << 0)) == 0, "kbd_inject boot has no fullscreen owner and refuses without reader");
     check((bad & (1u << 1)) == 0, "kbd_inject keeps UTF-8 byte order (FIFO)");
     check((bad & (1u << 2)) == 0, "kbd_inject take on empty ring returns 0");
     check((bad & (1u << 3)) == 0, "kbd_inject overflow drops the newest byte");
@@ -717,6 +716,15 @@ static void test_ledger(void)
 
     check(kctx_irq_depth == 0 && kctx_exc_depth == 0, "ledger:ctx depth 0");
     check(ledger_selfcheck("boot"), "ledger:selfcheck boot");
+    check(!ledger_resource_set_map(LEDGER_MAX_RESOURCES, 0, 0), "ledger:map bad id");
+    for (u32 rid = 0; rid < LEDGER_MAX_RESOURCES; rid++) {
+        const struct ledger_resource *r = &ledger_resources[rid];
+        if (!r->bus) continue;
+        u32 first = r->map_first, end = r->map_end;
+        check(!ledger_resource_set_map(rid, r->decode_first, r->decode_end + 1) &&
+              r->map_first == first && r->map_end == end, "ledger:map outside decode");
+        break;
+    }
     persist = ledger_persist_total();
     ok = ledger_owner_new(LEDGER_KIND_AS, 0, "kstest", &owner);
     check(ok, "ledger:AS owner new");
@@ -1994,6 +2002,7 @@ int kselftest_run(void)
 u32 memmap_audit_fail, as_audit_fail, memmap_audit_runs, as_audit_runs;
 u32 memmap_audit_skip, v86_return_audit_fail, v86_return_audit_runs;
 u32 audit_runs, audit_fail;
+char audit_first_fail_tag[32];
 int kselftest_run_audit(const char *tag)
 {
     int a, b, bad;
@@ -2006,6 +2015,15 @@ int kselftest_run_audit(const char *tag)
     as_audit_fail += b != 0;
     bad = (a != 0) + (b != 0) + !ledger_selfcheck(tag);
     audit_runs++;
+    if (bad && !audit_fail) {
+        kstrncpy(audit_first_fail_tag, tag ? tag : "unknown", sizeof(audit_first_fail_tag));
+        audit_first_fail_tag[sizeof(audit_first_fail_tag) - 1] = 0;
+        if (!serial_gate_active()) {
+            serial_puts_polled("[audit] first failure: ");
+            serial_puts_polled(audit_first_fail_tag);
+            serial_puts_polled("\r\n");
+        }
+    }
     audit_fail += bad;
     return bad;
 }

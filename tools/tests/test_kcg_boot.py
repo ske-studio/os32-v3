@@ -12,6 +12,11 @@ import host32
 
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
+    ('init-keeps-scale', 'drivers/kcg.c',
+     '    kcg_scale = 1;\n    /* Loaded glyphs', '    /* Loaded glyphs',
+     'FAIL closed init resets scale'),
+    ('init-clears-font', 'drivers/kcg.c',
+     '    if (!kcg_boot_phase_open) return;\n    /* コードアクセス', '    /* コードアクセス', 'FAIL closed init preserves font'),
     ('guard', 'drivers/kcg.c',
      'if (!kcg_boot_phase_open) return OS32_ERR_NOSYS;', '',
      'FAIL closed VFS untouched'),
@@ -93,7 +98,7 @@ def main():
     if args.mutate:
         for _ in run_ordered(lambda mutation: run(args.runner, mutation), MUTATIONS):
             pass
-        print('PASS 5/5 runtime mutations')
+        print(f'PASS {len(MUTATIONS)}/{len(MUTATIONS)} runtime mutations')
 
 
 if __name__ == '__main__':

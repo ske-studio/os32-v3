@@ -137,12 +137,13 @@
   - 'SHM discovery and target: ring3_marker.h PM acceptance table'
   - 'serial #PF addr, shell/ver'
   expect:
+    pf_error: 7
     marker_row: E
     tag: BB??
-    completion: SURV
-    armed: 0
-    kill_delta: 0
-    serial_addr: null
+    completion: 0
+    armed: ARMD
+    kill_delta: 1
+    serial_addr: 0x6A000
   evidence: ~/os32-tmp/evidence/<日付>/<case id>/
 - id: e9-shm_reuse_test
   gate: e9
@@ -183,8 +184,8 @@
   - 'guest_tests output: RC and PASS summary'
   expect:
     rc: 0
-    passed: 41
-    total: 41
+    passed: 42
+    total: 42
   evidence: ~/os32-tmp/evidence/<日付>/<case id>/
 - id: e10b-shm_reuse_test
   gate: e10b
@@ -225,8 +226,8 @@
   - 'guest_tests output: RC and PASS summary'
   expect:
     rc: 0
-    passed: 41
-    total: 41
+    passed: 42
+    total: 42
   evidence: ~/os32-tmp/evidence/<日付>/<case id>/
 - id: e9-tvdump
   gate: e9
@@ -284,9 +285,10 @@
   - SHM marker row E
   - fault_kill_count, shell/ver
   expect:
+    pf_error: 7
     marker_row: E
-    completion: SURV
-    kill_delta: 0
+    completion: 0
+    kill_delta: 1
   evidence: ~/os32-tmp/evidence/<日付>/<case id>/
 - id: E10-1-d
   mode: manual
@@ -469,4 +471,270 @@
     VM_dispatch_IF: 0
     ordinary_KAPI_IF: 1
     guest_IVT_reflection_preserved: true
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+
+- id: e11a2-fullscreen-input
+  gate: e11
+  contract: docs/KAPI_SPEC.md
+  mode: manual
+  prereq: PM integrates e11; deploy matching kernel, gshell and programs; verify ver image and kernel.map; 17MB current ini
+  entry: GUI Run hello_gfx with and without another window open; press a key; repeat from terminal; run a WAIT_POLL graphics program (gfx200_test)
+  observe:
+  - Run child exits on one key; previous window receives neither Key nor Text
+  - Terminal child receives one character per make; break sends nothing; no leftover character at shell prompt
+  - WAIT_POLL frame EAX contains injected character; empty poll remains -1
+  - Keep terminal sh in WAIT_KEY, start fullscreen Y from Run, inject q; only Y receives it and hidden sh remains parked
+  - Repeat with fullscreen WAIT_KEY; after its input drains, no repeated empty resume loop
+  - Exiting a terminal fullscreen descendant preserves sh typeahead; exiting a WM destination discards only its tagged bytes
+  - Record kselftest and run db_test and db_v50_test after return
+  expect:
+    run_key_exit: true
+    terminal_single_injection: true
+    background_window_input: 0
+    wait_poll_receives_key: true
+    hidden_shell_input: 0
+    terminal_typeahead_preserved: true
+    regression_failures: 0
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e11a2-font-and-return
+  gate: e11
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: PM integrated e11 build and matching map; failure-injection build only for attach failure and USER shutdown probes
+  entry: boot Japanese font display; call kcg_init after boot closure; GUI gdi_test; inject one attach failure across wait then allow next attach; probe nonowner gfx_shutdown
+  observe:
+  - Japanese glyph pixels and fetched flags unchanged after late init; set scale 2 first and confirm init restores scale 1
+  - Failed attach leaves screen drawing disabled, offscreen writable and window event loop alive; next successful wait restores drawing
+  - OP_WAIT result and WAIT_KEY or WAIT_POLL result unchanged by attach failure
+  - Nonowner GUI shutdown leaves backend and surface generation unchanged; owner and CUI shutdown still work
+  expect:
+    japanese_preserved: true
+    wait_result_preserved: true
+    next_wait_recovers: true
+    offscreen_drawable: true
+    nonowner_display_unchanged: true
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e11a2-self-identity
+  gate: e11
+  contract: userland/tests/h3/protocol.h
+  mode: manual
+  prereq: e11c connects the public value slot and H3_SELF_IDENTITY adapter; a2 default remains host publication; protocol unchanged
+  entry: launch h3a and h3b with opt-in adapter; freeze before host publication; compare each self-published owner and generation to tools/h3_park_resume.py identity(index); repeat after slot reuse
+  observe:
+  - Internal caller_identity_get app_id, owner and generation match live AS and host observer
+  - SHM owner is written before generation commit; no identity from the other AS or previous generation
+  - Run h3 park-resume fault and STOP cases with the normal PM playbook after comparison
+  expect:
+    two_AS_identity_match: true
+    reused_slot_generation_match: true
+    protocol_unchanged: true
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e11b1-lockwrite-first
+  gate: e11
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: PM deploys matching b1 kernel and shm_reuse_child; verify ver image and new kernel.map; 17MB current ini
+  entry: record fault_kill_count then run shm_reuse_child lockwrite first; capture marker and fault before any next SHM allocation; run ver
+  observe:
+  - Find SL marker (label 0x4c53 at B+16, self B at B+20), separate from locked target block
+  - B+0 is SLK? (0x3f4b4c53); B+8 is allocated locked block start; B+12 is ARMD; B+4 remains zero
+  - Serial CPL3 PF address equals B+8; read saved PF error 7; fault_kill_count delta from pre-launch is one
+  - Allocation failure, absent marker, wrong fault address or SURV is failure; shell and ver respond
+  expect:
+    target_page: first
+    completion: 0
+    armed: ARMD
+    kill_delta: 1
+    pf_error: 7
+    shell_alive: true
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e11b1-lockwrite-last
+  gate: e11
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: same matching b1 build as e11b1-lockwrite-first; a separate launch is required because the first store kills
+  entry: record fault_kill_count then run shm_reuse_child lockwrite last; capture marker and fault before next SHM allocation; run ver and shm_reuse_test
+  observe:
+  - Same SL/SLK? marker protocol as first; B+8 equals locked block start plus 0x3000 (last 4KB page of 16KB block)
+  - B+12 ARMD and B+4 zero; CPL3 PF address equals B+8, error 7, kill delta one; no SURV
+  - shm_reuse_test subsequently passes 4/4, proving free and owner-exit restore all pages writable for next AS
+  expect:
+    target_page: last
+    completion: 0
+    armed: ARMD
+    kill_delta: 1
+    pf_error: 7
+    shm_reuse_passed: 4
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e11b1-low-user-and-v86
+  gate: e11
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: PM matching b1 kernel/programs and kernel.map; 17MB current ini; run before b2 as well as final integrated acceptance
+  entry: run hello_gfx, gdi_test, gfx200_test and Japanese display; db_test and db_v50_test; take tools/accept/pt0_snapshot.py snapshots after boot and launches, then each V86 exit below
+  observe:
+  - Low PT0 font [0x1000,0x4a000) and TVRAM through BRG [0xa0000,0xc0000) have USER clear; native VRAM PCD remains set
+  - Unicode and BB stay usable in b1; graphics and Japanese glyphs match pre-b1 display
+  - db_v50_test 42/42 includes unleased 0xa0000 refusal, RAM last-byte success and guard-crossing refusal; db_test 9/9
+  - Exercise existing V86 normal, failure, STOP, kill, K1 and VM INT80 cases; compare PT0 snapshots ignoring only A/D
+  - After each exit observe memmap_audit_fail, as_audit_fail, audit_fail and v86_return_audit_fail all zero; audit_runs and v86_return_audit_runs increased; kselftest_fail zero
+  expect:
+    removed_ranges_USER: 0
+    native_cache_UC: true
+    graphics_and_japanese_preserved: true
+    db_v50_passed: 42
+    db_passed: 9
+    kselftest_fail: 0
+    three_stage_failures: 0
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e11b1-tvdump-auth
+  gate: e11
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: PM matching b1 shell.bin, sh.bin and kernel; CUI and GUI sessions; verify image and map
+  entry: run python3 tools/tvdump_recv.py --raw <evidence>/cui.bin in resident CUI; repeat foreground CPL3 sh; then GUI terminal sh and WM rshell into separate raw files
+  observe:
+  - CUI resident shell and foreground CPL3 return the expected text cells; compare /api/tvram lines
+  - GUI terminal and WM return TVDM header 80x25 and all 4000 payload bytes zero
+  - Every frame remains 4006 bytes; denied output does not expose a character or attribute
+  expect:
+    cui_line_match: true
+    gui_payload_nonzero: 0
+    wm_payload_nonzero: 0
+    cols: 80
+    rows: 25
+    frame_bytes: 4006
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+
+- id: e11c2-F-live
+  gate: e11
+  contract: userland/tests/ring3_marker.h
+  mode: manual
+  prereq: 17MB, CUI, newly deployed c2 kernel and programs
+  entry: ring3_guard lease
+  observe:
+  - SHM marker F+, fault_kill_count, lease PTE, shell/ver
+  expect:
+    tag: LES?
+    completion: SURV
+    kill_delta: 0
+    target: CLIENT lease VA from gfx_get_framebuffer planes[0]
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e11c2-F-revoke
+  gate: e11
+  contract: userland/tests/ring3_marker.h
+  mode: manual
+  prereq: 17MB, CUI, newly deployed c2 kernel and programs
+  entry: ring3_guard free
+  observe:
+  - SHM marker F-, fault_kill_count, serial PF target, shell/ver
+  expect:
+    tag: REV?
+    completion: 0
+    armed: ARMD
+    kill_delta: 1
+    serial_addr: marker.target
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e11c2-consumers
+  gate: e11
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#2-3-面alias再attach
+  mode: manual
+  prereq: 17MB, new c2 kernel/static SDK/shlib and rebuilt programs, PC98 then PEGC/Cirrus
+  entry: hello, gfx200_test, gfx_demo200, pegcchk, blit_test, bench, hello_gfx, font_test, gdi_test, about, filer, gui_demo, t5a_display
+  observe:
+  - pt0_snapshot and write observation at BB alias, CLIENT lease VA and Unicode RO PTEs
+  - Japanese text, window to fullscreen to return and repaint, V86 return
+  - kselftest_fail and three-stage check failures, db_test and db_v50_test
+  - ring3_guard bb must be killed after b2 (PF error 7, addr 0x6A000)
+  expect:
+    bb_alias_writes: 0
+    japanese_text: correct
+    repaint: survives
+    kselftest_fail: 0
+    three_stage_failures: 0
+    db_test: 9/9
+    db_v50_test: 42/42
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+
+- id: e11c3-ls
+  gate: e11
+  contract: userland/lib/rt/ls.c
+  mode: manual
+  prereq: PMが統合ビルドをNHDに配備して反映照合
+  entry: sh.bin / shell.bin / filer
+  observe:
+  - 'CPL3 sh: dir / 補完 / man -l / find / du / hsync dryで件数・順序・エラーを確認'
+  - '数百件のdir: 14件窓で切れず全件列挙、CPL0 shellのdirと補完も確認'
+  - 'Rust filer: 一覧・枝展開・更新が成功'
+  expect:
+  - 'CPL3とCPL0で既存の一覧・補完が成功し、窓境界で欠落しない。正常一覧のfault増分0'
+  - 'filer一覧と枝展開が成功、dry同期は書込みなし'
+  evidence: ~/os32-tmp/run/e11/e11c3-ls/
+- id: e11c3-identity
+  gate: e11
+  contract: tools/h3_park_resume.py
+  mode: manual
+  prereq: PMが統合ビルドをNHDに配備して反映照合
+  entry: h3a / h3b / shm_reuse_test
+  observe:
+  - 'h3a/b自己公開owner/generation == host identity()、initがSHMを書かない'
+  - 'park/resume・再起動generation更新・shm_reuse_test PASS、db_test/db_v50_test回帰'
+  expect:
+  - 'owner/generation照合が成功、initのhost書込み0、再起動は新generation'
+  - 'shm_reuse_test PASS 4/4、db_test/db_v50_test回帰PASS、h3の各fault/STOPが従来の契約どおり'
+  evidence: ~/os32-tmp/run/e11/e11c3-identity/
+- id: e11b2-isolation
+  gate: e11
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#2-4-user切替の一括境界
+  mode: manual
+  prereq: PM integrated generation-2 build deployed; new kernel.map; 17MB current ini
+  entry: ring3_guard bb; ring3_guard lease; ring3_guard free; v86 -d; v86 -b
+  observe:
+  - Confirm boot kselftest_pass=281 and kselftest_fail=0; map_user_keep still counts one check
+  - Use tools/accept/pt0_snapshot.py with the deployed kernel.map before and after applications and V86
+  - Inspect every PTE for font 0x1000-0x49fff, Unicode 0x4a000-0x69fff, BB 0x6a000-0x89fff and TVRAM/BRG 0xa0000-0xbffff; USER must be clear
+  - E marker BB?? has ARMD, completion zero, target 0x6a000; serial PF error 7 and fault_kill_count delta one
+  - F lease survives with SURV and no kill; F free faults at recorded lease VA after shutdown
+  - Observe audit_runs rising and audit_fail=0 at master, AS and post-exec stages, including both V86 returns; shell/ver respond
+  - Run db_test and db_v50_test and require their existing PASS totals
+  expect:
+    kselftest_pass: 281
+    kselftest_fail: 0
+    old_alias_user_pages: 0
+    E_completion: 0
+    E_pf_error: 7
+    E_serial_addr: 0x6A000
+    E_kill_delta: 1
+    audit_fail: 0
+    v86_restore_mismatch: 0
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e11b2-consumers
+  gate: e11
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#2-4-user切替の一括境界
+  mode: manual
+  prereq: PM integrated generation-2 build deployed; same binary hashes as build outputs
+  entry: hello; gfx200_test; gfx_demo200; pegcchk; blit_test; bench; hello_gfx; font_test; gdi_test; about; filer; gui_demo; t5a_display
+  observe:
+  - Run the e11c2 consumer list with old USER aliases removed; verify drawing and Japanese glyphs
+  - Window to fullscreen to window restores drawing and input; no stale lease faults; shell/ver respond
+  - Verify both gfx instances in gdi_test and t5a_display Japanese output
+  expect:
+    drawing_failures: 0
+    japanese_failures: 0
+    transition_failures: 0
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: e11b2-generation
+  gate: e11
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#2-4-user切替の一括境界
+  mode: manual
+  prereq: PM integrated generation-2 build and saved generation-1 binary; KAPI v70 in both
+  entry: Launch saved generation-1 program, then rebuilt generation-2 program
+  observe:
+  - Confirm header memory_layout_generation differs while KAPI version and all other generations agree
+  - Old binary is rejected with memory layout generation mismatch before entry/AS allocation
+  - New binary starts normally; verify generation manifests and shell/ver response
+  expect:
+    generation_1_rejected: true
+    generation_2_runs: true
+    kapi_version: 70
   evidence: ~/os32-tmp/evidence/<日付>/<case id>/

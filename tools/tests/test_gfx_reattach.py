@@ -10,6 +10,8 @@ from mutpar import run_ordered
 
 FIXTURE = 'tools/tests/gfx_reattach_host.c'
 MUTANTS = [
+    ('failure-no-shlib-detach', FIXTURE, '        shl_libos32gfx_detach(); /* shlib entry 119 */', '', 'FAIL !return_both() && !gfx_ready && !shl_gfx_ready && live()==MEM_LEASE_MAX-1'),
+    ('shutdown-no-gate', 'gfx/gfx_core.c', 'caller.app_id != appslot_gfx_owner()', '0', 'FAIL shutdown_nonowner_preserved'),
     ('one-return-check', FIXTURE, 'int b = shl_libos32gfx_check();', 'int b = 0;', 'FAIL both_new_generation'),
     ('static-return-check', FIXTURE, 'int a = libos32gfx_check();', 'int a = 0;', 'FAIL both_new_generation'),
     ('failure-no-static-detach', FIXTURE, '        libos32gfx_detach(); /* application rollback */', '', 'FAIL static_token_returned'),
@@ -59,7 +61,11 @@ def main():
                 # Reuse only hardware/MMU/API adapters from e6, not its run().
                 prefix = (ROOT/'tools/tests/gfx_attach_host.c').read_text().split('static void run(void) __attribute__((used));')[0]
                 (tmp/'fixture.c').write_text(prefix+'\n'+fixture)
-            return run_case(None, a.runner, fixture_body='/* staged below */', source_texts=texts,
+            kernel_texts = texts.copy()
+            if m and m[1] == 'gfx/gfx_core.c':
+                assert kernel_texts[m[1]].count(m[2]) == 1
+                kernel_texts[m[1]] = kernel_texts[m[1]].replace(m[2], m[3])
+            return run_case(None, a.runner, fixture_body='/* staged below */', source_texts=kernel_texts,
                             object_cache=pathlib.Path(cache), stage=stage)
         with host32.control(a.mutate, a.runner, ROOT) as normal:
             if normal:

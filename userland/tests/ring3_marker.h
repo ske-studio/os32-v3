@@ -13,17 +13,23 @@
  * ring3_guard shlib (B) | SLB? | RG | MEM_SHLIB_BASE                          | 7 (*)    | kill +1
  * ring3_guard cirrus (C) | VIS? | RG | Cirrus linear window, offset 0         | 7 or 6   | kill +1
  * ring3_guard pegc (D) | PEG? | RG  | PEGC_LINEAR_BASE, display surface       | 7 or 6   | kill +1
- * ring3_guard bb (E) | BB?? | RG    | MEM_GFX_BB_BASE                          | none     | SURV, kill +0
+ * ring3_guard bb (E) | BB?? | RG    | MEM_GFX_BB_BASE (0x6A000)                | 7        | kill +1
+ * ring3_guard lease (F+) | LES? | RG | gfx_get_framebuffer planes[0] lease VA | none | SURV, kill +0
+ * ring3_guard free (F-) | REV? | RG | same VA after gfx_shutdown | 6 | kill +1
+ * shm_reuse_child lockwrite first/last | SLK? | SL | locked block + 0/0x3000 | 7 | kill +1
+ * These two lockwrite launches keep the marker in a separate writable block.
  * (*) Load a shared library before B to verify RO with error=7. Without a
  * mapped library it still faults, but cannot prove RO (NP gives error=6).
  * C/D: mapped supervisor display gives error=7; absent hardware/NP gives 6.
  * A's fixed target must be checked against the actual stack guard at h
  * acceptance (T2c variable stacks may place the guard elsewhere).
- * E remains USER/writable for every backend in e9, including fallback to
- * PC-9801; denial and a legitimate CLIENT lease control belong to e11.
+ * E is supervisor for every backend after e11b2 (PF error=7, addr=0x6A000).
+ * F is the e11c2 legitimate lease control.
  *
  * Use the newly deployed kernel.map's __bss_end to derive the SHM base:
- * S = align_up(__bss_end,0x1000)+0x32000; B = S + i*0x4000 (i=0..13).
+ * S = align_up(__bss_end,OS32_PAGE_SIZE)+KHEAP_SIZE+MEM_KAPI_SIZE+MEM_GUARD_SIZE
+ *   (include/memmap.h; 0x2E000 while KHEAP is 176KB — E11-BUD);
+ * B = S + i*OS32_SHM_BLOCK_SIZE (i=0..13).
  * No absolute SHM address is fixed here. Immediately after the program exits,
  * before another SHM allocation, find B with the expected label at B+16 and
  * self-address B at B+20. Compare B+0/tag and B+8/target with the table.

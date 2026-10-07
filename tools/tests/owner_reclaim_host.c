@@ -179,8 +179,10 @@ int main(void)
     check(shm_lock(a3) == 0 && shm_free(a3) == 0,
           "own SHM lock and free allowed");
     a3 = shm_alloc(1);
-    check(pipe_get_buf(p3) == pipe_ptr[p3], "own pipe buffer allowed");
+    check(pipe_get_buf(p3) == 0, "USER own pipe buffer is opaque");
     pipe_set_len(p3, 9);
+    check(pipe_get_len(p3) == 9, "USER own pipe length");
+    check(pipe_get_len(p2) == 0, "USER foreign pipe length hidden");
     pipe_clear(p3);
     check(pipe_len[p3] == 0, "own pipe clear allowed");
     pipe_free(p3);
@@ -194,6 +196,7 @@ int main(void)
     check(shm_lock(a2) == 0 && shm_free(a2) == 0,
           "trusted foreign SHM allowed");
     check(pipe_get_buf(p2) == saved_pipe, "trusted foreign pipe buffer allowed");
+    check(pipe_get_len(p2) == 17, "trusted foreign pipe length");
     pipe_clear(p2);
     check(pipe_len[p2] == 0, "trusted foreign pipe clear allowed");
     pipe_free(p2);

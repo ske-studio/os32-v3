@@ -137,7 +137,7 @@ static void test_fps_benchmark(void)
         }
 
         /* キー入力チェック */
-        key = api->kbd_trygetchar();
+        key = libos32gfx_trygetchar();
         if (key > 0) running = 0;
     }
 }
@@ -161,7 +161,7 @@ void __cdecl main(int argc, char **argv, KernelAPI *kapi)
 
     /* 200ラインモードに切り替え */
     api->gfx_init_200();
-    api->gfx_get_framebuffer(&gfx_fb);  /* FB更新 */
+    (void)libos32gfx_attach_checked();  /* 新世代の取得失敗時は描画を停止 */
 
     api->kprintf(ATTR_GREEN,
         "Mode: %dx%d, pitch=%d\r\n",
@@ -183,7 +183,7 @@ void __cdecl main(int argc, char **argv, KernelAPI *kapi)
     api->gfx_present_dirty();
 
     /* キー待ち */
-    api->kbd_getchar();
+    libos32gfx_getchar();
 
     /* === フェーズ2: FPSベンチマーク === */
     test_fps_benchmark();

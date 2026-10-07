@@ -125,6 +125,7 @@ void ring3_fault_kill(void) { host_fault_kills++; for (;;) { } }
  * kernel/con_sink.c と組んで見ている)。 */
 static int host_reader = 2;
 int con_sink_reader_get(void) { return host_reader; }
+volatile int ring3_wm_depth;
 #include "kbd_inject.c"
 
 /* T9: 起動要求表も **実物** (exec/launch.c) をそのまま取り込む。要るのは
@@ -321,9 +322,9 @@ static int ma_resume_kbd(int id)
     if (rc < 0) return rc;
     a = appslot_get(id);
     if (a->parked_from_kbd) {
-        ch = 0;
-        if (!kbd_inject_take(&ch)) return OS32_ERR_AGAIN;   /* 印は残す */
-        a->frame[APP_FRAME_EAX] = (u32)ch;
+        i32 app_id = id;
+    (void)app_id;
+#include "exec_resume_kbd.inc"
     } else {
         a->frame[APP_FRAME_EAX] = 0;
     }
@@ -349,6 +350,8 @@ static int ma_park_poll(u32 now_tick)
 
 static int ma_resume_poll(int id)
 {
+    i32 app_id = id;
+    (void)app_id;
     AppSlot *a;
     u8 ch;
     int rc = appslot_resume_check(id);
@@ -361,9 +364,7 @@ static int ma_resume_poll(int id)
         a->frame[APP_FRAME_EAX] = 0;
         break;
     case APP_RESUME_SRC_POLL:
-        ch = 0;
-        if (kbd_inject_take(&ch)) a->frame[APP_FRAME_EAX] = (u32)ch;
-        else                      a->frame[APP_FRAME_EAX] = (u32)(i32)-1;
+#include "exec_resume_poll.inc"
         break;
     default:
         a->frame[APP_FRAME_EAX] = 0;
@@ -2037,6 +2038,34 @@ static void case_abort_admit(void)
           "25R 本人は畳まれない (WM が別の宛先を exec_kill する)");
 }
 
+static void case_fullscreen_resume_destination(void)
+{
+    int sh, y;
+    ma_init(4096);
+    kbd_inject_discard();
+    appslot_poll_yield_reset();
+    host_reader = APP_ID_MIN;
+    sh = ma_start_gfx(100, 1, 0);
+    check(ma_park_kbd() == 0, "F1 hidden shell WAIT_KEY");
+    y = ma_start_gfx(100, 1, OS32X_FLAG_GFX);
+    check(appslot_gfx_claim(1) == 0, "F1 Y owns fullscreen");
+    check(ma_park_poll(1) == 0, "F1 Y WAIT_POLL");
+    check(kbd_inject((const u8 *)"q", 1) == 1, "F1 WM injects q");
+    check(kbd_inject_pending() == 0, "F1 WM legacy pending excludes Y");
+    check(ma_resume_kbd(sh) == OS32_ERR_AGAIN, "F1 hidden shell resume cannot take q");
+    check(appslot_get(sh)->parked_from_kbd == 1 && appslot_cur() == APP_ID_SHELL,
+          "F1 refused shell keeps park mark and WM context");
+    check(ma_resume_poll(y) == 0 && appslot_get(y)->frame[APP_FRAME_EAX] == 'q',
+          "F1 real WAIT_POLL branch delivers only to Y");
+    check(ma_park_kbd() == 0, "F1 Y WAIT_KEY");
+    check(kbd_inject((const u8 *)"r", 1) == 1, "F1 WM injects r");
+    check(ma_resume_kbd(sh) == OS32_ERR_AGAIN, "F1 shell still cannot take r");
+    check(ma_resume_kbd(y) == 0 && appslot_get(y)->frame[APP_FRAME_EAX] == 'r',
+          "F1 real WAIT_KEY branch delivers only to Y");
+    ma_init(4096);
+    kbd_inject_discard();
+}
+
 int main(void)
 {
     failures = 0;
@@ -2069,6 +2098,7 @@ int main(void)
     case_yield_and_kill_chain();
     case_redirect_context();
     case_abort_admit();
+    case_fullscreen_resume_destination();
     if (checks < 84) {
         report("TOO FEW CHECKS (K5a の 84 検査を下回った)\n");
         die(1);

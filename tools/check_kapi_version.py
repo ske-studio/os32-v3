@@ -23,6 +23,9 @@ SSOT = "sdk/kapi.json"
 
 # (パス, 版数を取り出す正規表現, 説明)
 TARGETS = [
+    ("docs/KAPI_SPEC.md",
+     r"現在のバージョン\s*\|\s*\*\*(\d+)\*\*",
+     "KAPI 仕様書概要"),
     ("sdk/include/os32/os32_kapi_shared.h",
      r"#define\s+KAPI_VERSION\s+(\d+)",
      "SDK 契約ヘッダ"),

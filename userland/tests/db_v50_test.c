@@ -17,6 +17,8 @@
 /*  合格は最後の "db_v50_test: PASS n/n" と、fault_kill_count が不変なこと。  */
 /* ======================================================================== */
 
+/* Unleased native TVRAM probe (private acceptance constant). */
+#define UNLEASED_VRAM 0xA0000UL
 #include "os32api.h"
 #include "rt/testresult.h"
 
@@ -166,6 +168,8 @@ int main(int argc, char **argv, KernelAPI *api)
     }
     ok(api->db_bind_text(h, 1, guard_crossing_text(api), 2) < 0,
        "text range crossing the sbrk guard is refused");
+    ok(api->db_bind_text(h, 1, (const char *)UNLEASED_VRAM, 1) < 0,
+       "unleased VRAM text is refused");
     /* d5 の caller copy は未マップページもコピー前に -1 で断る。 */
     ok(api->db_bind_text(h, 1, "x", -1) < 0, "a negative length is refused");
     ok(api->db_bind_text(h, 1, (const char *)0, 0) < 0,

@@ -1,6 +1,7 @@
 /* PM observation / per-case expectations: ring3_marker.h acceptance table. */
 #include "ring3_marker.h"
 #include "memmap.h"
+#include "os32api.h"
 
 /* crt0 を使わないので KAPI データ欄の配置の刻印を自分で置く (ヘッダ v3、票
  * TASK_KAPI_DATA_FIELDS)。mkos32x.py は刻印の無い ELF を断る。この試験は
@@ -24,8 +25,24 @@ void _start(int argc, char **argv)
     volatile unsigned int   *pc98_bb    = (volatile unsigned int *)MEM_GFX_BB_BASE;
     char sel = (argc > 1 && argv[1]) ? argv[1][0] : 0;
 
-    if (sel == 'b') {
-        /* ---- ケース E: 9801 主記憶バックバッファ (USER であるべき) ---- */
+    if (sel == 'l' || sel == 'f') {
+        /* F: legitimate CLIENT survives, the same VA faults after shutdown. */
+        GFX_Framebuffer fb = {0};
+        (void)r3_call(KAPI_SLOT_GFX_INIT, 0);
+        (void)r3_call(KAPI_SLOT_GFX_GET_FRAMEBUFFER, (unsigned long)&fb);
+        if (!fb.planes[0]) r3_exit(1);
+        volatile unsigned char *client = fb.planes[0];
+        r3_arm(mark, 0x3F53454CUL, (unsigned long)client); /* LES? */
+        *client = 0;
+        mark[1] = R3_SURV;
+        (void)r3_call(KAPI_SLOT_GFX_SHUTDOWN, 0);
+        if (sel == 'f') {
+            mark[1] = 0;
+            r3_arm(mark, 0x3F564552UL, (unsigned long)client); /* REV? */
+            *client = 0;
+        }
+    } else if (sel == 'b') {
+        /* ---- ケース E: 9801 主記憶バックバッファ (supervisor、error 7 で kill) ---- */
         /* 0x3F3F4242 = LE 42 42 3F 3F = "BB??" */
         r3_arm(mark, 0x3F3F4242UL, (unsigned long)pc98_bb);
         *pc98_bb = 0x00000000UL;   /* 生き残れば下の "SURV" まで進む */

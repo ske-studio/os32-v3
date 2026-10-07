@@ -36,7 +36,7 @@
 | `sysconfig.c` | `/etc/system.cfg` の解析 (`GUI=0/1`、`GFX=pc98\|pegc\|cirrus\|auto`) | [01 §1-2](01_system.md)、[archive/gui_v11/TASK_K4](archive/gui_v11/TASK_K4_gui_boot.md) |
 | `gui.c` | GUI の背骨: `gui_call` (アプリ → WM の唯一の入口)、`gui_register`、所有者回収 `gui_owner_exit`、次シェル要求 | [tasks/gui/API_CONTRACTS.md T1〜T9](tasks/gui/API_CONTRACTS.md) |
 | `shlib.c` | 共有ライブラリ帯 0x400000〜 のロード (`OS32ShlibHeader`) と、アプリ PD ごとの .data/.bss 複製 (`shlib_addrspace_attach`) | [02 §2-1](02_memory.md)、[09](09_exec.md)、[archive/gui_v11/TASK_K3](archive/gui_v11/TASK_K3_shared_lib_band.md) |
-| `paging.c` `pgalloc.c` | ページテーブル (現行実装: 守備範囲 32MB、実 RAM 管理は 16MB。設計上限ではない)、ガードページ、物理ページ確保。PD はプログラムごと (v2 M1)。デバイス窓は `paging_map_phys` (supervisor+PCD)、クライアント面の USER 昇格は `paging_addrspace_map_user_keep` | [02](02_memory.md)、[archive/kernel_v2/M1_RING3.md](archive/kernel_v2/M1_RING3.md) |
+| `paging.c` `pgalloc.c` | ページテーブル (現行実装: 守備範囲 32MB、実 RAM 管理は 16MB。設計上限ではない)、ガードページ、物理ページ確保。PD はプログラムごと (v2 M1)。デバイス窓は `paging_map_phys` (supervisor+PCD)、CLIENT は lease の私有 VA、共有 PT の通常 map/unmap は拒否 | [02](02_memory.md)、[archive/kernel_v2/M1_RING3.md](archive/kernel_v2/M1_RING3.md) |
 | `kmalloc.c` | カーネルヒープ (320KB) | [02 §2-1](02_memory.md) |
 | `shm.c` | 共有メモリ 16 ブロック × 16KB。ブロック 0 = DB 結果、12〜15 = GUI (K1 票) | [02](02_memory.md)、[tasks/gui/API_CONTRACTS.md T2](tasks/gui/API_CONTRACTS.md) |
 | `idt.c` `isr_*.c` | 割り込み、`int 0x80` KAPI トランポリン着地点 | [04](04_interrupts.md)、[archive/kernel_v2/M2](archive/kernel_v2/M2_KAPI_TRAMPOLINE.md) |

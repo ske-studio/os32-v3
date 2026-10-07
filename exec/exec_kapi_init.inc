@@ -238,10 +238,16 @@ extern int __cdecl wrap_sfs_end(int exit_code);
 extern int __cdecl wrap_serial_diag(SerialDiag *out);
 extern int __cdecl wrap_kbd_diag_log(u32 after_seq, KbdDiagLogEnt *out, int max);
 extern int __cdecl wrap_v86_gdc_capture(int mode, V86Gcap *out);
+extern int __cdecl wrap_surface_query(u32 role, OS32_SurfaceQueryResult *out);
+extern int __cdecl wrap_surface_lease(u32 role, const OS32_SurfaceRef *ref, u32 access, OS32_LeaseView *out);
+extern int __cdecl wrap_gfx_surface_lease(u32 role, const OS32_SurfaceRef *refs, u32 count, u32 access, OS32_LeaseResult *out);
+extern int __cdecl wrap_surface_unlease(u32 token);
+extern int __cdecl wrap_sys_ls_window(const char *path, u32 skip, OS32_LsPacket *out);
+extern int __cdecl wrap_caller_identity(u32 *app, u32 *owner, u32 *generation);
 extern i32 __cdecl kapi_reserved_nosys(void);
 
 kapi->magic = 0x4B415049UL;
-kapi->version = 69;
+kapi->version = 70;
 
     kapi->gfx_init = wrap_gfx_init;
     kapi->gfx_init_200 = wrap_gfx_init_200;
@@ -483,6 +489,12 @@ kapi->version = 69;
     kapi->serial_diag = wrap_serial_diag;
     kapi->kbd_diag_log = wrap_kbd_diag_log;
     kapi->v86_gdc_capture = wrap_v86_gdc_capture;
+    kapi->surface_query = wrap_surface_query;
+    kapi->surface_lease = wrap_surface_lease;
+    kapi->gfx_surface_lease = wrap_gfx_surface_lease;
+    kapi->surface_unlease = wrap_surface_unlease;
+    kapi->sys_ls_window = wrap_sys_ls_window;
+    kapi->caller_identity = wrap_caller_identity;
     {
         u32 _kr;
         for (_kr = 0; _kr < (u32)KAPI_FUNC_RESERVED; _kr++)

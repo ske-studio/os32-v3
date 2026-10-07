@@ -16,13 +16,10 @@ static int deny_unicode, corrupt_unicode_view;
 static u32 unicode_queries;
 static int unicode_query(struct gfx_attach_desc *out)
 {
-    struct surface_query_source src;
     struct surface_query_result *q = P2V(payload);
     unicode_queries++;
     if (deny_unicode) return OS32_ERR_INVAL;
-    int rc = system_surface_source(LEDGER_ROLE_UNICODE, &src);
-    if (rc) return rc;
-    rc = surface_query(&src, (void *)MEM_EXEC_LOAD_ADDR);
+    int rc = surface_api_query(LEDGER_ROLE_UNICODE, (void *)MEM_EXEC_LOAD_ADDR);
     if (rc) return rc;
     struct surface_desc *d = &q->desc[0];
     *out = (struct gfx_attach_desc){0};
@@ -33,12 +30,10 @@ static int unicode_query(struct gfx_attach_desc *out)
 }
 static int unicode_lease(const struct gfx_attach_ref *ref, struct gfx_attach_view *out)
 {
-    struct surface_query_source src;
     struct lease_view *v=P2V(payload+256);
-    int rc=system_surface_source(LEDGER_ROLE_UNICODE,&src);
-    if (rc) return rc;
+    int rc;
     *(struct surface_ref *)P2V(payload)=(struct surface_ref){ref->sid,ref->generation};
-    rc=surface_lease(&src,(void *)MEM_EXEC_LOAD_ADDR,LEDGER_PERM_RO,
+    rc=surface_api_lease(LEDGER_ROLE_UNICODE,(void *)MEM_EXEC_LOAD_ADDR,LEDGER_PERM_RO,
                      (void *)(MEM_EXEC_LOAD_ADDR+256));
     if (rc) return rc;
     out->token=v->token;out->base=v->base;out->bytes=v->bytes;
@@ -111,6 +106,7 @@ static void run(void)
     gfx_unicode_port=&unicode_port;shl_gfx_unicode_port=&unicode_port;
     /* gfx is not initialized: system publisher still works, unready Unicode
      * initialization must not probe stale low bytes. */
+    CHECK(!utf8_host_pointer() && !shl_utf8_host_pointer());
     known_table();
     libos32gfx_unicode_init();shl_libos32gfx_unicode_init();
     int uninitialized_null=!utf8_host_pointer() && !shl_utf8_host_pointer();CHECK(uninitialized_null);
@@ -122,7 +118,6 @@ static void run(void)
     gfx_set_backend_pref(GFX_PREF_PC98);gfx_prepare_backend();gfx_init();
     /* Static init path and shlib's explicit FFI entry own separate leases. */
     CHECK(!libos32gfx_attach_checked());
-    shl_libos32gfx_unicode_init();
     CHECK(!shl_libos32gfx_attach_checked());
     int two_instances=live()==4 && utf8_host_pointer()!=shl_utf8_host_pointer() &&
         (u32)utf8_host_pointer()>=MEM_LEASE_BASE && (u32)shl_utf8_host_pointer()>=MEM_LEASE_BASE;
@@ -196,11 +191,22 @@ static void run(void)
     utf8_set_jis_table(P2V(MEM_UNICODE_TABLE_BASE));
     u32 q=unicode_queries;gfx_unicode_port=0;libos32gfx_unicode_init();
     CHECK(unicode_queries==q && unicode_to_jis(0x4E9C)==0x3021);
+    utf8_set_jis_table(0);
     gfx_unicode_port=&unicode_port;host_sdk_cpl=0;libos32gfx_unicode_init();
+    CHECK(unicode_to_jis(0x4E9C)==0x3021);
     CHECK(unicode_queries==q);host_sdk_cpl=3;
     utf8_set_jis_table(0);utf8_set_jis_table_ready(1);
     CHECK(!utf8_host_ready() && !unicode_to_jis(0x4E9C));
-    gfx_api=0;libos32gfx_shutdown();CHECK(!gfx_ready);
+    deny_unicode=1;libos32gfx_unicode_init();shl_libos32gfx_unicode_init();deny_unicode=0;
+    /* Both real C instances install the production Unicode port on v70. */
+    public_unicode=&unicode_port;api.version=70;api.surface_query=public_query;
+    api.surface_lease=public_lease;api.surface_unlease=public_unlease;
+    CHECK(!libos32gfx_attach_checked() && !shl_libos32gfx_attach_checked());
+    CHECK(public_queries==4 && public_leases==4 && live()==4);
+    protect_low(0);
+    CHECK(unicode_to_jis(0x4E9C)==0x3021 && shl_unicode_to_jis(0x9078)==0x412A);
+    protect_low(3);
+    libos32gfx_detach();gfx_api=0;libos32gfx_shutdown();CHECK(!gfx_ready);
     caller_access_leave(&prev);
     char number[12]; u32 n=checks, len=0;
     do {number[len++]=(char)('0'+n%10);n/=10;} while(n);

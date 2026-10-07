@@ -1,3 +1,4 @@
+#include "ls.h"
 #ifndef __cdecl
 #define __cdecl __attribute__((cdecl))
 #endif
@@ -1231,7 +1232,7 @@ static int scan_protected_entities(void)
         api->kprintf(ATTR_RED, "Error: path too long (%s/etc)。中止する\n", g_root);
         return -1;
     }
-    rc = api->sys_ls(etc, prot_scan_cb, 0);
+    rc = os32_ls(etc, prot_scan_cb, 0);
     if (rc != 0 && rc != OS32_ERR_NOTFOUND) {
         api->kprintf(ATTR_RED, "Error: %s を読めない (%d)。中止する\n", etc, rc);
         return -1;
@@ -2063,7 +2064,7 @@ static void clean_temps(const char *dst_dir)
     tl.count = 0;
     tl.dropped = 0;
     tl.too_long = 0;
-    rc = api->sys_ls(dir, temp_cb, &tl);
+    rc = os32_ls(dir, temp_cb, &tl);
     if (rc != 0) {
         /* 宛先ディレクトリがまだ無いのは普通 (新規階層)。それ以外は
          * 「掃除できなかった」ことだけ見せる — 同期は続ける。 */
@@ -2207,7 +2208,7 @@ static void sync_directory(const char *src_dir, const char *dst_dir, int depth)
     fl.dropped = 0;
     fl.truncated = 0;
     fl.bad_name = 0;
-    rc = api->sys_ls(src_dir, ls_cb, &fl);
+    rc = os32_ls(src_dir, ls_cb, &fl);
     if (rc != 0) {
         api->kprintf(ATTR_RED, "  FAIL: ls %s (err=%d%s)\n", src_dir, rc,
                      err_tag(rc));

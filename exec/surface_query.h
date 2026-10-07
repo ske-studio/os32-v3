@@ -3,8 +3,8 @@
 #include "lease.h"
 #include "redir_access.h"
 
-/* T2e e1: kernel-only staging of the future value ABI. No KAPI/SDK exposure
- * until e11. No physical address, kernel alias, owner or cache in the values. */
+/* Kernel representation of the v70 public value ABI; layouts asserted in C.
+ * No physical address, kernel alias, owner or cache in the values. */
 #define SURFACE_QUERY_MAX 4
 struct surface_desc {
     struct surface_ref ref;
@@ -51,5 +51,12 @@ struct surface_lease_result {
 int surface_lease_bundle(const struct surface_query_source *source,
                       const struct surface_ref *user_refs, u32 count, u32 access,
                       struct surface_lease_result *user_out);
+/* Public entry bodies. Publisher and caller identity are never user input. */
+int surface_api_query(u32 role, struct surface_query_result *out);
+int surface_api_lease(u32 role, const struct surface_ref *ref, u32 access,
+                      struct lease_view *out);
+int surface_api_bundle(u32 role, const struct surface_ref *refs, u32 count,
+                       u32 access, struct surface_lease_result *out);
+int surface_api_unlease(u32 token);
 int surface_query_error(int lease_rc);
 #endif

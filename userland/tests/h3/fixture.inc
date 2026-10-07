@@ -10,12 +10,14 @@ int main(int argc, char **argv, KernelAPI *api)
 {
     (void)argc;
     (void)argv;
-    return h3_run(api);
+    return h3_run(api) ? 1 : 0;
 }
+static KernelAPI *h3_api;
 #include "state.inc"
 
 static int h3_run(KernelAPI *api)
 {
+    h3_api = api;
     i32 slot = api->gui_call(GUI_OP_INIT, GUI_PROTO_VERSION);
     volatile H3Block *b;
     volatile GuiSlotHeader *hdr;

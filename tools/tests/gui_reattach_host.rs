@@ -5,7 +5,9 @@ static UNICODE_INITS: AtomicUsize = AtomicUsize::new(0);
 static CHECKS: AtomicUsize = AtomicUsize::new(0);
 static DETACHES: AtomicUsize = AtomicUsize::new(0);
 static RC: AtomicI32 = AtomicI32::new(0);
+static WAIT_RESULT: AtomicI32 = AtomicI32::new(7);
 static HEIGHT: AtomicI32 = AtomicI32::new(4);
+static OFFSCREEN_WRITES: AtomicUsize = AtomicUsize::new(0);
 static PRESENTS: AtomicUsize = AtomicUsize::new(0);
 #[no_mangle] static mut gfx_api: *mut os32api::KernelAPI = core::ptr::null_mut();
 #[no_mangle] static mut gfx_ready: i32 = 1;
@@ -18,7 +20,7 @@ static PRESENTS: AtomicUsize = AtomicUsize::new(0);
     unsafe { gfx_ready = if rc < 0 { 0 } else { 1 }; }
     rc
 }
-#[no_mangle] extern "C" fn libos32gfx_attach_checked() -> i32 { libos32gfx_check() }
+#[no_mangle] extern "C" fn libos32gfx_attach_checked() -> i32 { libos32gfx_unicode_init(); libos32gfx_check() }
 #[no_mangle] extern "C" fn libos32gfx_detach() {
     DETACHES.fetch_add(1,SeqCst);
     unsafe { gfx_ready=0; }
@@ -28,7 +30,7 @@ static PRESENTS: AtomicUsize = AtomicUsize::new(0);
 #[no_mangle] extern "C" fn gfx_pixel(_:i32,_:i32,_:u8) { panic!("unexpected planar write"); }
 #[no_mangle] extern "C" fn gfx_get_pixel(_:i32,_:i32) -> u8 { panic!("unexpected planar read"); }
 #[no_mangle] extern "C" fn gfx_fill_rect(_:i32,_:i32,_:i32,_:i32,_:u8) { panic!("unexpected planar fill"); }
-#[no_mangle] extern "C" fn gfx_surface_pixel(_: *mut ffi::GfxSurface,_:i32,_:i32,_:u8) { panic!("unexpected surface write"); }
+#[no_mangle] extern "C" fn gfx_surface_pixel(_: *mut ffi::GfxSurface,_:i32,_:i32,_:u8) { OFFSCREEN_WRITES.fetch_add(1,SeqCst); }
 #[no_mangle] extern "C" fn gfx_surface_fill_rect(_: *mut ffi::GfxSurface,_:i32,_:i32,_:i32,_:i32,_:u8) { panic!("unexpected surface fill"); }
 unsafe extern "C" fn screen(out: *mut u8) {
     let mut info=ScreenInfo::ZERO;
@@ -38,14 +40,18 @@ unsafe extern "C" fn screen(out: *mut u8) {
 unsafe extern "C" fn wait(op:u32,_:u32) -> i32 {
     assert_eq!(op,os32api::gui::proto::GUI_OP_WAIT);
     HEIGHT.store(2,SeqCst); // mode changed while parked
-    7
+    WAIT_RESULT.load(SeqCst)
 }
+unsafe extern "C" fn key_wait() -> i32 { 65 }
+static POLL_RESULT: AtomicI32 = AtomicI32::new(-1);
+unsafe extern "C" fn key_poll() -> i32 { POLL_RESULT.load(SeqCst) }
 unsafe extern "C" fn present() { PRESENTS.fetch_add(1,SeqCst); }
 unsafe extern "C" fn clear() {}
 
 #[test]
 fn return_gate_and_painter() {
     let mut api=os32api::mock_api();api.gfx_screen_info=screen;api.gui_call=wait;
+    api.kbd_getchar=key_wait;api.kbd_trygetchar=key_poll;
     api.gfx_present_dirty=present;api.tvram_clear=clear;
     api.version=os32api::OS32X_HDR_V3_MIN_API;
     os32api::os32_init(&mut api);
@@ -70,14 +76,41 @@ fn return_gate_and_painter() {
     painter.put(0,0,3);
     assert_eq!(pixels,[0;16],"Painter gate missing");
     assert!(painter.row(0).is_none());
+    // Offscreen storage remains valid even when display attachment fails.
+    gstate::st().surfaces[15].kind = gstate::SurfaceKind::Offscreen {
+        surf: core::ptr::NonNull::<ffi::GfxSurface>::dangling().as_ptr()
+    };
+    let off=clip::Target {idx:15,ox:0,oy:0,offscreen:true,clip:Rect::new(0,0,2,2)};
+    let writes=OFFSCREEN_WRITES.load(SeqCst);
+    draw::Painter::from_target(&off).put(0,0,3);
+    assert_eq!(OFFSCREEN_WRITES.load(SeqCst),writes+1,"offscreen remains drawable");
+
     RC.store(-22,SeqCst);
     let unicode_before=UNICODE_INITS.load(SeqCst);
     assert_eq!(os32gui_shlib_init(&mut api),0,"attach failure must not reject bind");
     assert_eq!(UNICODE_INITS.load(SeqCst),unicode_before+1,"shlib Unicode acquisition missing");
+    let detach_before=DETACHES.load(SeqCst);
+    table_detach();
+    assert_eq!(DETACHES.load(SeqCst),detach_before+1,"shlib detach body missing");
+
     assert!(unsafe { SHLIB_INIT_OK });
+    let checks=CHECKS.load(SeqCst);
+    assert_eq!(input_api::wait_key(),65);
+    assert_eq!(CHECKS.load(SeqCst),checks+1,"input return check missing");
+    for k in [-1, 0] {
+        POLL_RESULT.store(k,SeqCst);
+        assert_eq!(input_api::try_key(),None);
+        assert_eq!(CHECKS.load(SeqCst),checks+1,"empty poll skips gfx check");
+    }
+    POLL_RESULT.store(66,SeqCst);
+    assert_eq!(input_api::try_key(),Some(66));
+    assert_eq!(CHECKS.load(SeqCst),checks+2,"input return check missing");
     let detached=DETACHES.load(SeqCst);
-    assert!(client::wait(1).is_err());
+    assert_eq!(client::wait(1).unwrap_or(-999),7,"wait result survives attach failure");
     assert_eq!(DETACHES.load(SeqCst),detached+1,"failed shlib not detached");
+    WAIT_RESULT.store(-11,SeqCst);
+    assert_eq!(client::wait(1).unwrap_err().0,-11,"original wait error preserved");
+    WAIT_RESULT.store(7,SeqCst);
     assert_eq!(draw::screen_info().width,0);
     RC.store(0,SeqCst);
     assert_eq!(client::wait(1).unwrap_or(-999),7);
@@ -107,6 +140,7 @@ mod app_api {
     pub static SHLIB_RC: AtomicI32=AtomicI32::new(0);
     pub static STATIC_CHECKS: AtomicUsize=AtomicUsize::new(0);
     pub static SHLIB_CHECKS: AtomicUsize=AtomicUsize::new(0);
+    pub static SHLIB_DETACHED: AtomicUsize=AtomicUsize::new(0);
     pub static DETACHED: AtomicUsize=AtomicUsize::new(0);
     pub mod gfx {
         use super::*;
@@ -115,6 +149,7 @@ mod app_api {
     }
     pub mod gui { pub mod stub {
         use super::super::*;
+        pub fn detach_gfx() {SHLIB_DETACHED.fetch_add(1,SeqCst);}
         pub fn check_gfx()->i32 {SHLIB_CHECKS.fetch_add(1,SeqCst);SHLIB_RC.load(SeqCst)}
     }}
 }
@@ -131,4 +166,5 @@ fn gdi_stops_both_renderers() {
     assert_eq!(STATIC_CHECKS.load(SeqCst),4,"gdi static check missing");
     assert_eq!(SHLIB_CHECKS.load(SeqCst),4,"gdi shlib check missing");
     assert_eq!(DETACHED.load(SeqCst),3,"gdi static rollback missing");
+    assert_eq!(SHLIB_DETACHED.load(SeqCst),3,"gdi shlib rollback missing");
 }

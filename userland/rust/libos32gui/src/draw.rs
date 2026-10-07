@@ -40,7 +40,7 @@ pub(crate) struct Painter {
 
 impl Painter {
     pub(crate) fn from_target(t: &Target) -> Painter {
-        if unsafe { core::ptr::read_volatile(core::ptr::addr_of!(ffi::gfx_ready)) } == 0 {
+        if !t.offscreen && unsafe { core::ptr::read_volatile(core::ptr::addr_of!(ffi::gfx_ready)) } == 0 {
             return Painter {
                 ox: 0, oy: 0, offscreen: core::ptr::null_mut(), packed8: true,
                 fb_base: core::ptr::null_mut(), fb_pitch: 0, fb_w: 0, fb_h: 0,

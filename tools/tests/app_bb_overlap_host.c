@@ -1,48 +1,7 @@
-/* ========================================================================
- *  app_bb_overlap_host.c — 共有 BB と CPL=3 アプリの私有領域が重ならないこと
- *
- *  実行: python3 -B tools/tests/test_app_bb_overlap.py [--mutate]
- *
- *  2026-09-30 の後退 (8MB + PEGC、PM が NP21/W で観測): CPL=3 アプリを 1 本
- *  起動して終了するたびに pgalloc の used_pages が 74 ずつ増え、4 本目で
- *  NOMEM・v86 -t は 159 ページの連続が取れずに失敗した。原因は exec が私有
- *  領域 (スタック / exec_heap) を帯の上端 0x800000 まで張ってから、PEGC の
- *  BB [0x7B5000, 0x800000) を恒等で重ねて写していたこと — 私有ページ 74 枚
- *  の PTE が BB の物理で上書きされ、teardown で戻らない。
- *
- *  修正 (exec/exec.c ring3_band_set): 私有領域の上端を帯の上端と
- *  sys_usable_mem_end() の低い方にする。BB は従来どおり恒等のまま丸ごと写す
- *  (gfx_get_framebuffer / pegc_init が同じ番地を使う) ので、カーネル・アプリ
- *  の BB ポインタは変わらない。
- *
- *  実物の kernel/paging.c + kernel/pgalloc.c + kernel/physmem.c を ILP32 で
- *  そのまま組み、exec/exec.c から切り出した本物の ring3_band_set /
- *  app_map_region / exec_bb_overlaps_user / exec_map_shared_bb /
- *  exec_teardown_app (test_app_bb_overlap.py が生成する exec_bb_overlap.inc)
- *  で「起動 → 終了」をまわす。
- *
- *  見るもの:
- *    (a) 8MB + PEGC: 起動・終了 10 回で used_pages が毎回戻り、V86 の backing
- *        (V86_BACKING_PAGES = 159 の連続) が取れる
- *    (b) 私有 PTE (スタック / exec_heap) が BB の物理を指さない・恒等でない
- *    (c) BB の仮想番地の PTE が BB の物理を恒等 + USER で指す (カーネル・
- *        アプリの BB ポインタが BB に届く)
- *    (d) 私有領域の上端 (band_top = RING3_USTACK_TOP) が BB の下にあり、
- *        PDE の所有範囲 (帯 1 枚) は変わらない
- *    (e) teardown が BB の物理を pgalloc へ返そうとしない (paging.c の
- *        pgalloc_free_n_owner 呼び出しを数える)。T1b 以後は teardown の最後の
- *        ledger_reclaim_owner(AS) が取り残しを回収するので、used_pages が戻る
- *        だけでは漏れが無い証拠にならない — exec_as_leftover_pages (回収で
- *        返った取り残し) と ledger_bad_free (他 owner のページ = BB を返そうと
- *        して断られた回数) が増えないことも見る
- *    (f) BB が私有領域と重なる形 (上端が下がっていない) は起動を断り、
- *        私有 PTE を触らない
- *    (g) 17MB (BB が帯の上) / 12MB (帯の上、PDE 2) / 9801 planar (0x6A000、
- *        帯の下) / Cirrus (デバイス窓、PCD 付き) では私有領域の上端が従来の
- *        0x800000 のままで、BB は共有 PT に USER で写り、PCD を保つ
- *
- *  C89 ([C1])。libc は使わない (-nostdlib で直接走る)。
- * ======================================================================== */
+/* Real private image/heap/stack allocation and teardown, with supervisor BB
+ * aliases (PC98, PEGC and Cirrus). Repeated exits must return every AS page;
+ * exec's actual launch mapping block must never expose low Unicode or BB.
+ * Run through test_app_bb_overlap.py, GNU11 ILP32. */
 #include "types.h"
 #include "ring3_str.h"
 #include "redir_access.h"
@@ -133,6 +92,12 @@ int caller_access_page(const struct caller_access *c, u32 va, int write, u32 *pa
     CHECK(0);
     return 0;
 }
+static u32 launch_map_attempts;
+static int __attribute__((unused)) launch_map_attempt(struct addrspace *as, u32 start, u32 end, u32 flags)
+{
+    launch_map_attempts++;
+    return paging_addrspace_map_user_range(as, start, end, flags);
+}
 #include "exec_bb_overlap.inc"
 static u8 heap[192 * 1024];
 static u32 pte(struct addrspace *as, u32 va) {
@@ -178,9 +143,11 @@ void _start(void) {
         CHECK(!app_map_region(a.as, a.load_addr, a.sbrk_heap_limit));
         CHECK(!app_map_region(a.as, a.exec_heap_base, a.exec_heap_base + a.exec_heap_size));
         CHECK(!app_map_region(a.as, a.stack_base, a.stack_top));
-        CHECK(!exec_map_shared_bb(a.as, MEM_APP_STACK_TOP));
+        launch_shared_maps(&a); CHECK(!launch_map_attempts);
+        for (i = MEM_UNICODE_TABLE_BASE; i < MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE; i += PAGE_SIZE)
+            CHECK(!(page_tables[0][i / PAGE_SIZE] & PTE_USER));
         for (i = 0; i < t_bb_size; i += PAGE_SIZE)
-            CHECK(page_tables[(t_bb_base + i) >> 22][((t_bb_base + i) >> 12) & 1023] == ((t_bb_base + i) | PAGE_RW | PTE_USER));
+            CHECK(page_tables[(t_bb_base + i) >> 22][((t_bb_base + i) >> 12) & 1023] == ((t_bb_base + i) | PAGE_RW));
         CHECK(!(pte(a.as, a.stack_base - PAGE_SIZE) & PTE_PRESENT));
         CHECK(!(pte(a.as, a.exec_heap_base - PAGE_SIZE) & PTE_PRESENT));
         CHECK(!page_directory[MEM_EXEC_LOAD_ADDR >> 22]);
@@ -267,16 +234,14 @@ void _start(void) {
         CHECK(used_pages == before && !kmalloc_used() && !exec_as_leftover_pages);
         CHECK(!ledger_bad_free && !ledger_owners[owner].kind);
     }
-    CHECK(exec_bb_overlaps_user(MEM_EXEC_LOAD_ADDR, PAGE_SIZE, MEM_APP_STACK_TOP));
-    t_bb_base = MEM_EXEC_LOAD_ADDR; t_bb_size = PAGE_SIZE;
-    CHECK(exec_map_shared_bb(0, MEM_APP_STACK_TOP) == -1);
     t_bb_base = MEM_DEVICE_APERTURE_BASE + 0x100000; t_bb_size = PAGE_SIZE;
     page_tables[t_bb_base >> 22][(t_bb_base >> 12) & 1023] = t_bb_base | PAGE_RW | PTE_PCD;
     CHECK(ledger_owner_new(LEDGER_KIND_AS, 2, "PCD", &owner));
     a.as = kmalloc(sizeof(*a.as)); CHECK(a.as); CHECK(!paging_addrspace_create_lease(a.as, owner));
     a.cpl3 = 1; a.load_addr = a.sbrk_heap_limit = 0; a.exec_heap_size = 0; a.stack_base = a.stack_top = 0;
-    CHECK(!exec_map_shared_bb(a.as, MEM_APP_STACK_TOP));
+    launch_shared_maps(&a); CHECK(!launch_map_attempts);
+    CHECK(!(page_tables[t_bb_base >> 22][(t_bb_base >> 12) & 1023] & PTE_USER));
     CHECK(page_tables[t_bb_base >> 22][(t_bb_base >> 12) & 1023] & PTE_PCD);
     exec_teardown_app(&a); CHECK(!kmalloc_used() && used_pages == before);
-    SAY("app_bb_overlap: PASS high private image/heap/variable stack, shared low BB, KHEAP and owner0"); die(0);
+    SAY("app_bb_overlap: PASS high private image/heap/variable stack, supervisor BB aliases, KHEAP and owner0"); die(0);
 }

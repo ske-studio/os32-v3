@@ -182,11 +182,11 @@ void main(int argc, char **argv, KernelAPI *api)
     fps_frames = 0;
 
     /* リモート実行時の残留キー入力(改行など)をクリア */
-    while (api->kbd_trygetchar() != -1) { /* flush */ }
+    while (libos32gfx_trygetchar() != -1) { /* flush */ }
 
     /* メインループ */
     while (1) {
-        if (api->kbd_trygetchar() != -1) break;
+        if (libos32gfx_trygetchar() != -1) break;
 
         /* 背景復元 */
         gfx_restore_rect(spr_x - SPR_SZ / 2, spr_y - SPR_SZ / 2,
@@ -220,7 +220,7 @@ void main(int argc, char **argv, KernelAPI *api)
 
         /* 100Hz 同期 */
         while (api->get_tick() == last_tick) {
-            api->sys_halt();
+            libos32gfx_halt();
         }
         last_tick = api->get_tick();
     }

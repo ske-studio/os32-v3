@@ -1,47 +1,11 @@
 /* ========================================================================
- *  app_bb_overlap_host.c — 共有 BB と CPL=3 アプリの私有領域が重ならないこと
- *
- *  実行: python3 -B tools/tests/test_app_bb_overlap.py [--mutate]
- *
- *  2026-09-30 の後退 (8MB + PEGC、PM が NP21/W で観測): CPL=3 アプリを 1 本
- *  起動して終了するたびに pgalloc の used_pages が 74 ずつ増え、4 本目で
- *  NOMEM・v86 -t は 159 ページの連続が取れずに失敗した。原因は exec が私有
- *  領域 (スタック / exec_heap) を帯の上端 0x800000 まで張ってから、PEGC の
- *  BB [0x7B5000, 0x800000) を恒等で重ねて写していたこと — 私有ページ 74 枚
- *  の PTE が BB の物理で上書きされ、teardown で戻らない。
- *
- *  修正 (exec/exec.c ring3_band_set): 私有領域の上端を帯の上端と
- *  sys_usable_mem_end() の低い方にする。BB は従来どおり恒等のまま丸ごと写す
- *  (gfx_get_framebuffer / pegc_init が同じ番地を使う) ので、カーネル・アプリ
- *  の BB ポインタは変わらない。
- *
- *  実物の kernel/paging.c + kernel/pgalloc.c + kernel/physmem.c を ILP32 で
- *  そのまま組み、exec/exec.c から切り出した本物の ring3_band_set /
- *  app_map_region / exec_bb_overlaps_user / exec_map_shared_bb /
- *  exec_teardown_app (test_app_bb_overlap.py が生成する exec_bb_overlap.inc)
- *  で「起動 → 終了」をまわす。
- *
- *  見るもの:
- *    (a) 8MB + PEGC: 起動・終了 10 回で used_pages が毎回戻り、V86 の backing
- *        (V86_BACKING_PAGES = 159 の連続) が取れる
- *    (b) 私有 PTE (スタック / exec_heap) が BB の物理を指さない・恒等でない
- *    (c) BB の仮想番地の PTE が BB の物理を恒等 + USER で指す (カーネル・
- *        アプリの BB ポインタが BB に届く)
- *    (d) 私有領域の上端 (band_top = RING3_USTACK_TOP) が BB の下にあり、
- *        PDE の所有範囲 (帯 1 枚) は変わらない
- *    (e) teardown が BB の物理を pgalloc へ返そうとしない (paging.c の
- *        pgalloc_free_n_owner 呼び出しを数える)。T1b 以後は teardown の最後の
- *        ledger_reclaim_owner(AS) が取り残しを回収するので、used_pages が戻る
- *        だけでは漏れが無い証拠にならない — exec_as_leftover_pages (回収で
- *        返った取り残し) と ledger_bad_free (他 owner のページ = BB を返そうと
- *        して断られた回数) が増えないことも見る
- *    (f) BB が私有領域と重なる形 (上端が下がっていない) は起動を断り、
- *        私有 PTE を触らない
- *    (g) 17MB (BB が帯の上) / 12MB (帯の上、PDE 2) / 9801 planar (0x6A000、
- *        帯の下) / Cirrus (デバイス窓、PCD 付き) では私有領域の上端が従来の
- *        0x800000 のままで、BB は共有 PT に USER で写り、PCD を保つ
- *
- *  C89 ([C1])。libc は使わない (-nostdlib で直接走る)。
+ * shlib_high_host.c — 高位 shlib の非連続 backing と AS ごとの attach。
+ * 実行: python3 -B tools/tests/test_shlib_high.py [--mutate]
+ * 実物の paging / pgalloc / physmem / shlib を ILP32 で組む。
+ * 読み込み・確保・attach の途中失敗で私有 PTE と owner のページが戻ること、
+ * text が RO+USER、data が AS ごとの RW+USER であることを検査する。
+ * 共有 PT の通常 map は拒否し、旧 BB の恒等 USER 昇格は使わない (e11b2)。
+ * GNU11 ([C1])、libc は使わない (-nostdlib)。
  * ======================================================================== */
 #include "types.h"
 static u32 host_cr3;

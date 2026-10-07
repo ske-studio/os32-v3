@@ -9,3 +9,6 @@ check-caller-access-host:
 - tools/tests/test_caller_access.py
 - tools/check_map.d/check-caller-access-host.yaml
 - build/checks.d/check-caller-access-host.mk
+- include/redir_access.h
+- tools/h3_park_resume.py
+- tools/h3_layout.c

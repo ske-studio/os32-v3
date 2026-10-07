@@ -1,4 +1,6 @@
 check-kcallback-host:
+- userland/lib/rt/ls.c
+- sdk/include/os32/ls.h
 - fs/vfs.c
 - fs/vfs.h
 - fs/ext2_vfs.c

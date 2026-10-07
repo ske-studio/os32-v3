@@ -84,7 +84,6 @@ void exec_init(void) {
     kapi = (KernelAPI *)KAPI_ADDR;
     /* アプリ ID の表を空にし、シェル帯 (ID 1) を走っている状態にする。
      * res_owner_set(1) もここで行われる (票 K5 の D3)。 */
-    paging_prepare_legacy_clients();
     appslot_init();
     /* 起動要求表 (票 T9 D3) も空から始める。 */
     launch_init();
@@ -411,6 +410,21 @@ int exec_disk_write_allowed(void)
     /* Invalid/stale USER frames must never fall back to trusted access. */
     if (!caller_access_get_user(&caller)) return 0;
     return slot->cpl3 && slot->disk_write_authorized;
+}
+
+/* Public TVRAM reads belong only to the CUI foreground caller. Internal
+ * console/IME/selftest readers deliberately bypass this wrapper policy. */
+int exec_tvram_read_allowed(void)
+{
+    struct caller_access caller;
+    AppSlot *slot;
+    if (ring3_wm_depth || con_sink_is_enabled()) return 0;
+    slot = appslot_get(appslot_cur());
+    if (!slot || slot->state != APP_STATE_RUNNING || slot->gui) return 0;
+    if (!ring3_in_syscall)
+        return appslot_cur() == APP_ID_SHELL && !slot->cpl3 &&
+               res_owner_get() == APP_ID_SHELL;
+    return slot->cpl3 && caller_access_get_user(&caller);
 }
 
 /* ======================================================================== */
@@ -755,8 +769,8 @@ static void ring3_gui_pump(void)
 }
 
 /* ユーザポインタ引数の早期範囲検証 (v2 M2e 補助)。exec が CPL=3 アプリに
- * USER マップした領域 (共有ライブラリ帯/プログラム帯/ユーザスタック/SHM/VRAM)
- * を許可。NULL は通す。長さ付き引数は生成 wrap が NULL と全域を検査する。
+ * USER マップした領域 (共有ライブラリ帯/プログラム帯/ユーザスタック/SHM) を許可。
+ * 低位 (TVRAM〜BRG・フォント) は e11b1 で例外を外した — 画面は lease 経由だけ。NULL は通す。長さ付き引数は生成 wrap が NULL と全域を検査する。
  * 早期検査に残る文字列・opaque・関数ポインタの NULL の意味は wrap/target が決める。
  * 範囲外 (例: 0xDEADBEEF) は wrap に入る前に弾き、カーネル状態不整合を避ける。
  * 可変長引数はここでは見えないのでフォールトガードが担保する。 */
@@ -787,7 +801,6 @@ int ring3_ptr_ok(u32 p)
         irq_restore(saved);
         return ok;
     }
-    if (p >= 0xA0000UL && p < 0xC0000UL) return 1;/* VRAM (テキスト/グラフィック) */
     return 0;
 }
 
@@ -979,23 +992,6 @@ static int app_map_region(struct addrspace *as, u32 vstart, u32 vend)
     return 0;
 }
 
-/* ======================================================================== */
-/*  exec_map_shared_bb — 共有のバックバッファをアプリ PD へ USER で写す      */
-/*                                                                          */
-/*  BB は**恒等 (仮想 = 物理) のまま丸ごと**写す — gfx_get_framebuffer() が   */
-/*  返す番地・pegc_init のクリア・libos32gfx / shlib の Painter が全部この    */
-/*  番地で BB を触るので、番地を変えたり一部を写さなかったりはできない。     */
-/*  map_user_range ではなく **_keep** — Cirrus のクライアント面は PCD 付きの  */
-/*  デバイス窓で、flags をそのまま書くと PCD が落ちる (レビュー #5 ②③)。     */
-/*                                                                          */
-/*  BB が私有領域 [MEM_APP_BAND_BASE, user_top) と重なるなら写さずに -1。     */
-/*  ring3_band_set が私有領域の上端を sys_usable_mem_end() で止めているので   */
-/*  通常は起きない (8MB + PEGC の BB [0x7B5000, 0x800000) は user_top の上)。 */
-/*  重なったまま写すと私有ページの PTE を BB の物理で上書きし、teardown で   */
-/*  戻らなくなる (2026-09-30 の 74 ページ漏れ) ので、黙って写すより断る。    */
-/*  帯の中でも私有領域の上 (8MB + PEGC) はアプリ固有 PT に、帯の外はその PD  */
-/*  が master と共有する PT に書く — どちらも teardown が返す 3 領域の外。   */
-/* ======================================================================== */
 /* Copy launch data through physical backing while the master PD is active. */
 /* Read the launcher's bytes after switching to master; no high-VA dereference. */
 static const char *exec_image_reject_reason(const OS32Header *hdr, int is_shell,
@@ -1052,26 +1048,6 @@ static int app_store(AppSlot *a, u32 va, const void *src, u32 len)
     return 0;
 }
 
-static int exec_bb_overlaps_user(u32 bb_base, u32 bb_size, u32 user_top)
-{
-    u32 bb_end;
-    if (!bb_size || bb_base > ~0UL - bb_size) return 0;
-    bb_end = bb_base + bb_size;
-    return (bb_base < user_top && bb_end > MEM_APP_BAND_BASE) ? 1 : 0;
-}
-
-static int exec_map_shared_bb(struct addrspace *as, u32 user_top)
-{
-    u32 bb_base = 0, bb_size = 0;
-
-    gfx_bb_phys_range(&bb_base, &bb_size);
-    if (exec_bb_overlaps_user(bb_base, bb_size, user_top)) return -1;
-    if (bb_size)
-        paging_addrspace_map_user_keep(as, bb_base, bb_base + bb_size,
-                                       PAGE_RW | PTE_USER);
-    return 0;
-}
-
 /* ======================================================================== */
 /*  exec_teardown_app — CPL=3 アプリの物理とアドレス空間を返す (D1/D4)       */
 /*                                                                          */
@@ -1082,11 +1058,11 @@ static int exec_map_shared_bb(struct addrspace *as, u32 user_top)
 /*    [exec_heap_base, +exec_heap_size)   exec_heap                          */
 /*    [band_top - stack, band_top)        ユーザスタック                     */
 /*  ガードページ (guard_a / guard_b) は「張っていない = 非 present」なので     */
-/*  返すものが無い。共有帯 (VRAM / SHM / フォント / GFX / トランポリン) は     */
-/*  paging_addrspace_free_user_range がアプリ固有 PDE の外を触らないので       */
-/*  巻き添えにならない。band_top は**私有領域の上端** (ring3_band_set) で、    */
-/*  帯の中でもその上にある共有 BB (8MB + PEGC の [0x7B5000, 0x800000)) は     */
-/*  3 領域のどれにも入らない — PTE を辿って BB の物理を返そうとはしない。    */
+/*  返すものが無い。共有帯 (SHM / トランポリン) に掛かる解放要求は          */
+/*  paging_addrspace_free_user_range が全範囲無変更で拒否する。              */
+/*  band_top は私有領域の上端 (ring3_band_set)。BB の旧恒等 alias は         */
+/*  supervisor のままで私有 PT に重ねない。CLIENT / Unicode の lease は     */
+/*  専用の解放口で回収し、ここで backing の物理ページを返さない (e11b2)。    */
 /* ======================================================================== */
 /* 取り残し (3 領域の外に張られたまま返らなかったページ) の累計。R5 (a) の
  * 診断で、0 のままが正常 (カーネルシンボル。KAPI にはしない)。 */
@@ -1983,32 +1959,6 @@ static int exec_launch(const char *cmdline, int gui_arg)
             exec_sbrk_tier_count[sbrk_tier - 1]++;
         }
 
-        /* VRAM (テキスト 0xA0000 + グラフィック 0xA8000) — C2: 全PD共有+USER */
-        paging_addrspace_map_user_keep(ctx->as,
-            TVRAM_CHAR_BASE, GVRAM_BRG_END, PAGE_RW | PTE_USER);
-        /* フォントキャッシュ (0x01000-0x49FFF): kcg フォントビットマップ直読 */
-        paging_addrspace_map_user_range(ctx->as,
-            (u32)MEM_FONT_CACHE_BASE, (u32)MEM_UNICODE_TABLE_BASE,
-            PAGE_RW | PTE_USER);
-        /* Unicode-JIS 変換表 (0x4A000, 128KB): unicode_to_jis() 直読 */
-        paging_addrspace_map_user_range(ctx->as,
-            (u32)MEM_UNICODE_TABLE_BASE,
-            (u32)MEM_UNICODE_TABLE_BASE + (u32)MEM_UNICODE_TABLE_SIZE,
-            PAGE_RW | PTE_USER);
-        /* 9801 の主記憶バックバッファ (0x6A000, 128KB) は **常に** USER に
-         * する (レビュー #6)。Cirrus の setup 失敗で 9801 へ落ちたとき、
-         * 最初の CPU 描画が #PF になるのを防ぐ。 */
-        paging_addrspace_map_user_range(ctx->as,
-            (u32)MEM_GFX_BB_BASE,
-            (u32)MEM_GFX_BB_BASE + (u32)MEM_GFX_BB_SIZE,
-            PAGE_RW | PTE_USER);
-        /* いま選ばれているバックエンド固有の面 (gfx_bb_phys_range) を恒等の
-         * まま丸ごと足す (exec_map_shared_bb の注釈)。私有領域と重なるなら
-         * 起動を断る — 重ねて写すと私有ページの PTE が消える。 */
-        if (exec_map_shared_bb(ctx->as, ctx->band_top) != 0) {
-            shell_print("Error: backbuffer overlaps app area\n", ATTR_RED);
-            return exec_launch_abort(launcher_id, id, EXEC_ERR_NOMEM);
-        }
         /* --- K3: 共有ライブラリ帯域 (0x400000-0x4FFFFF) ---
          * .text/.rodata は RO+USER、.data/.bss は同じ仮想番地にこのアプリ
          * 専用の物理ページ (原本から複製)。**master CR3 のまま**行う —
@@ -2541,7 +2491,7 @@ i32 exec_resume(i32 app_id, i32 wait_ret)
          * 空なら EAX = -1 = 「キーなし」で、アプリの kbd_trygetchar() は
          * 普通に -1 を返したように見える。WM が渡した wait_ret は使わない。 */
         ch = 0;
-        if (kbd_inject_take(&ch)) a->frame[APP_FRAME_EAX] = (u32)ch;
+        if (kbd_inject_take_for((int)app_id, &ch)) a->frame[APP_FRAME_EAX] = (u32)ch;
         else                      a->frame[APP_FRAME_EAX] = (u32)(i32)-1;
     } else if (src == APP_RESUME_SRC_KBD) {
         /* 票 §5 の指摘 B: 文字の取り出しはここで完結する (WM 側に取り出し用
@@ -2549,7 +2499,7 @@ i32 exec_resume(i32 app_id, i32 wait_ret)
          * 空なら起こさず OS32_ERR_AGAIN — 印も状態も残るので、WM は次の周で
          * もう一度試せばよい (その周は譲る = streak に数えない)。 */
         ch = 0;
-        if (!kbd_inject_take(&ch)) return OS32_ERR_AGAIN;
+        if (!kbd_inject_take_for((int)app_id, &ch)) return OS32_ERR_AGAIN;
         a->frame[APP_FRAME_EAX] = (u32)ch;
     } else {
         a->frame[APP_FRAME_EAX] = (u32)wait_ret;

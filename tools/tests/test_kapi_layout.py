@@ -10,7 +10,7 @@
   3. sdk/mkos32x.py がヘッダ v4 を焼き、kapi_data_off が ELF の
      .os32_kapi_layout と一致する。刻印が無い / 食い違う / .raw と .elf の
      世代が違う (大きさ、または同じ大きさで PT_LOAD の中身) / --elf が無い、
-     は失敗する。min_api_ver は 69 に引き上がる。
+     は失敗する。min_api_ver は 70 に引き上がる。
      刻印は平らなバイナリに入らない (非ロード)。
   4. tools/mkshlib.py (ビルド済みの libos32gui.elf があれば) も v3 を焼き、
      刻印を剥がした ELF は断る。無ければ SKIP と表示する。
@@ -238,7 +238,7 @@ def case_mkos32x(tmp):
           "kapi_data_off (0x%X) = ELF の .os32_kapi_layout (0x%X) = 0x4B8"
           % (h.get("kapi_data_off", 0), val))
     check(not (sec["flags"] & H.SHF_ALLOC), "刻印のセクションは非ロード (alloc でない)")
-    check(h["min_api_ver"] == H.OS32X_MIN_API, "--api 39 は 69 に引き上がる (旧カーネルが受け入れない)")
+    check(h["min_api_ver"] == H.OS32X_MIN_API, "--api 39 は 70 に引き上がる (旧カーネルが受け入れない)")
     check(h["text_size"] == len(raw.read_bytes()) == len(blob) - H.OS32X_HDR_SIZE,
           "本文は .raw そのまま (刻印は平らなバイナリに入らない)")
     check(h.get("load_addr") == 0x80100000, "load_addr は ELF の .text")
@@ -382,7 +382,7 @@ def case_mkshlib(tmp):
     check(h.get("kapi_data_off") == H.read_kapi_layout(H.Elf32(str(elf))) == 0x4B8,
           "shlib の kapi_data_off = os32api の刻印 = 0x4B8")
     check(h["flags"] & H.OS32X_FLAG_SHLIB, "OS32X_FLAG_SHLIB が立つ")
-    check(h["min_api_ver"] == H.OS32X_MIN_API, "shlib の --api 51 も 69 に引き上がる")
+    check(h["min_api_ver"] == H.OS32X_MIN_API, "shlib の --api 51 も 70 に引き上がる")
     stripped = tmp / "lib_nostamp.elf"
     run([TOBJCOPY, "--remove-section", ".os32_kapi_layout", elf, stripped])
     r = run([sys.executable, "-B", "tools/mkshlib.py", rawtmp, tmp / "x.shlib",
@@ -500,6 +500,8 @@ MUTATIONS = [
      "        if True:"),
     ("exec/os32x_hdr.c", "abi_generation_unchecked",
      "hdr->kapi_abi_generation != OS32_KAPI_ABI_GENERATION", "0"),
+    ("sdk/kapi.json", "memory_generation_rolled_back",
+     '"memory_layout": 2', '"memory_layout": 1'),
     ("exec/os32x_hdr.c", "memory_generation_unchecked",
      "hdr->memory_layout_generation != OS32_MEMORY_LAYOUT_GENERATION", "0"),
     ("exec/os32x_hdr.c", "shlib_protocol_unchecked",
@@ -547,7 +549,7 @@ def one_mutation(item):
     original = (ROOT / rel).read_text(encoding="utf-8")
     if old not in original:
         return "MUTATE %-26s SKIP (目印が見つからない)" % name, 1
-    regen = rel == "sdk/gen_kapi.py" and "CRT_KAPI_SYMBOL" in old
+    regen = rel == "sdk/kapi.json" or (rel == "sdk/gen_kapi.py" and "CRT_KAPI_SYMBOL" in old)
     with tempfile.TemporaryDirectory(prefix="os32-kapi-layout-mut-") as td:
         tree = mutpar.mutant_tree(ROOT, pathlib.Path(td) / "tree",
                                   {rel: original.replace(old, new, 1)},

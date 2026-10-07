@@ -2,6 +2,7 @@ check-gui-host:
 - tools/tests/mutpar.py
 - tools/tests/test_gui_reattach.py
 - tools/tests/gui_reattach_host.rs
+- sdk/rust/os32api/src/ls.rs
 - tools/tests/os32api_host.py
 - sdk/rust/os32api/src/**
 - userland/rust/gdi_test/src/lib.rs
