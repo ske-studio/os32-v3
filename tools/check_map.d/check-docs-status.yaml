@@ -4,3 +4,4 @@ check-docs-status:
 - tools/check_docs_status.py
 - tools/check_map.d/check-docs-status.yaml
 - build/checks.d/check-docs-status.mk
+- docs/tasks/DEFERRED_TESTS.md

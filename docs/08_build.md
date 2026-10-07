@@ -222,6 +222,9 @@ KernelAPI の構造体を変えたときは `make clean` → `make all` が必�
 <a id="検査の3段"></a>
 #### 検査の 3 段 (`check-fast` / `check-changed` / `check`、2026-09-26)
 
+依頼パックの事実は `python3 tools/check_select.py --pack --files <触るファイル…>` の出力を貼る。着地前に `python3 tools/test_changes.py --base <SHA> --pack <依頼パック.md>` で試験変更を確認する。
+票の段の記録は `check-docs-status` が 10 行超・台帳 ID のない未実施/延期/未確認を警告する (`--strict` で失敗)。
+
 `HOST32_RUNNERS` は既定 `native qemu`。対象試験の一覧は `make tests-inventory` で
 `build/out/HOST32.md` に生成する ([生成文書の見方](INDEX.md#生成文書の見方))。
 正常対照は指定した全 runner、変異は先頭の runner で実行する。native への自動 fallback はしない。

@@ -17,6 +17,15 @@ Use the WSL toolchain described in [INSTALL.md](INSTALL.md): i386-elf GCC, NASM,
 
 Run images in NP21/W. Stop the emulator before `make deploy-kernel`, then restart it. See [docs/08_build.md](docs/08_build.md) for deployment details.
 
+## Worktree Environment (Codex implementers)
+
+Worktrees have no `.env`. Before anything else, export
+`CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp/run/<stage> HOST32_RUNNERS=qemu`
+(TMPDIR must be on disk; `/tmp` is RAM; native runners hit SIGSYS in the Codex sandbox), then run
+`tools/preflight.sh --base <SHA from the request> --fix-fonts` and fix every NG. Run checks in the foreground and wait for
+them to finish instead of re-reading partial logs. Only logs produced after your last source change count as passing.
+Never commit (the sandbox keeps `.git` read-only; the PM commits).
+
 ## Coding Style & Naming Conventions
 
 Match surrounding formatting; C typically uses four-space indentation, while Make recipes require tabs. Internal C is GNU11 ([C1]): `//`, mid-block declarations, `_Static_assert` (via `STATIC_ASSERT`), `<stdbool.h>` for pure booleans and designated initializers are allowed, but do not mass-rewrite existing code; implicit declarations, implicit int and VLAs are errors. Public SDK headers (`sdk/include/os32/*.h`, including `sdk/include/os32/os32_kapi_shared.h`) must stay C89/GNU89-compatible, and SQLite keeps GNU89. Use `snake_case` functions, uppercase constants, and `libos32*` library names. Use kernel `kstring` helpers instead of libc equivalents.

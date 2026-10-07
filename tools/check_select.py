@@ -3,6 +3,8 @@
 """Select check mutations from changed inputs; see docs/08_build.md §8-4.
 
 --select [--base REF | --files PATH...] emits shell assignments.
+--pack --files PATH... emits bounded Markdown source references, name-table
+consumers, mandatory cautions and the same selection candidates.
 --lint checks per-check tools/check_map.d/*.yaml plus automatic C headers.
 --inputs TARGET includes gcc -MM/static dependencies; --suggest TARGET emits
 manual source/script/data entries without headers. Global policy stays in
@@ -11,6 +13,7 @@ required after integration.
 """
 import os
 import glob
+import fnmatch
 from functools import lru_cache
 import re
 import shlex
@@ -1169,6 +1172,83 @@ def select(base, files=None, base_note=""):
     return 0
 
 
+# ---------------------------------------------------------------- --pack
+# Add name-driven consumers here; this is advisory static text search, not a C parser.
+NAME_TABLES = "tools/pack_name_tables.txt"
+PACK_NOTES = "tools/pack_notes.txt"
+C_KEYWORDS = set("auto break case char const continue default do double else enum extern float "
+                 "for goto if inline int long register restrict return short signed sizeof "
+                 "static struct switch typedef union unsigned void volatile while _Alignas "
+                 "_Alignof _Atomic _Bool _Complex _Generic _Imaginary _Noreturn _Static_assert "
+                 "_Thread_local".split())
+C_ATTRIBUTE = r"__attribute__\s*\(\([^\n]*?\)\)"
+C_DEFINITION = re.compile(
+    r"^[ \t]*(?:" + C_ATTRIBUTE + r"[ \t\n]*)*"
+    r"(?:[A-Za-z_]\w*[ \t*\n]+|" + C_ATTRIBUTE + r"[ \t\n]+)+"
+    r"([A-Za-z_]\w*)[ \t]*\([^;{}]*\)[ \t\n]*\{", re.MULTILINE)
+
+
+def references_source(line, rel):
+    # Full paths cover includes/extraction; split quoted components cover Path fixtures.
+    if rel in line:
+        return True
+    quoted = re.findall(r"[\"']([^\"']+)[\"']", line)
+    return rel in "/".join(quoted)
+
+
+def pack_text(files, limit=4):
+    """Bounded Markdown facts; selection itself is unchanged."""
+    from pathlib import Path
+    root = Path(ROOT)
+    tests = sorted(p for p in (root / "tools/tests").rglob("*")
+                   if p.is_file() and not p.is_symlink()
+                   and p.suffix in (".c", ".h", ".inc", ".py", ".yaml", ".yml", ".json",
+                                    ".rs", ".cpp", ".cc", ".asm", ".txt", ".sh"))
+    out = ["### 依頼パックの事実 (静的検索・要確認)"]
+
+    def emit(label, hits):
+        shown = hits[:limit]
+        out.append("- %s (%d 件): %s%s" % (
+            label, len(hits), "; ".join(shown) or "なし",
+            "; 省略 %d 件" % (len(hits) - len(shown)) if len(hits) > len(shown) else ""))
+
+    # Scan consumers once, then reuse for each requested source.
+    test_lines = [(p.relative_to(root).as_posix(), no, line)
+                  for p in tests for no, line in enumerate(
+                      p.read_text(encoding="utf-8", errors="replace").splitlines(), 1)]
+    name_tables = (root / NAME_TABLES).read_text(encoding="utf-8").splitlines()
+    tables = [(rel, no, line) for rel in name_tables
+              if rel and not rel.startswith("#") and (root / rel).is_file()
+              for no, line in enumerate((root / rel).read_text(
+                  encoding="utf-8", errors="replace").splitlines(), 1)]
+    notes = [line.split("\t", 1) for line in (root / PACK_NOTES).read_text(
+        encoding="utf-8").splitlines() if line and not line.startswith("#")]
+    for rel in sorted(set(files)):
+        out.append("**`%s`**" % rel)
+        if not (root / rel).is_file():
+            out.append("- 入力ファイルなし (静的参照検索のみ)。")
+        hits = ["`%s:%d`" % (path, no) for path, no, line in test_lines
+                if references_source(line, rel)]
+        emit("ソース参照 (include/切り出し/fixture の候補)", hits)
+        source = root / rel
+        names = (set(C_DEFINITION.findall(source.read_text(encoding="utf-8", errors="replace"))) - C_KEYWORDS) \
+            if source.is_file() and source.suffix in (".c", ".h") else set()
+        hits = ["`%s:%d` (%s)" % (path, no, ", ".join(sorted(
+                    names & set(re.findall(r"[A-Za-z_]\w*", line)))))
+                for path, no, line in tables
+                if names & set(re.findall(r"[A-Za-z_]\w*", line))]
+        emit("定義関数の名前表参照", hits)
+        for pattern, note in notes:
+            if len(rel.split("/")) == len(pattern.split("/")) and fnmatch.fnmatchcase(rel, pattern):
+                out.append(note)
+    mode, stage, mutations, lines = plan(sorted(set(files)))
+    out.extend(["### --select 候補", "```sh", "CC_MODE=" + mode,
+                "CC_STAGE1=" + shlex.quote(" ".join(stage)),
+                "CC_MUT1=" + shlex.quote(" ".join(mutations)), "```"])
+    out.extend("- " + line for line in lines)
+    return "\n".join(out) + "\n"
+
+
 # ---------------------------------------------------------------- 下書き
 def suggest(targets):
     rules, _ = read_makefiles()
@@ -1195,6 +1275,12 @@ def dialect_variants_needed(files=None):
 
 
 def main(argv):
+    if "--pack" in argv:
+        if "--files" not in argv:
+            sys.stderr.write("--pack requires --files PATH...\n")
+            return 2
+        print(pack_text(argv[argv.index("--files") + 1:]), end="")
+        return 0
     if "--lint" in argv:
         return lint()
     if "--select" in argv:

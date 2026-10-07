@@ -100,3 +100,5 @@ check-ci-stab-host:
 - tools/tests/test_device_reservation.py
 - tools/tests/test_app_bb_overlap.py
 - tools/tests/test_shlib_high.py
+- tools/tests/test_*.py
+- build/checks.d/*.mk

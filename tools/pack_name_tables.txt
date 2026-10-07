@@ -1,0 +1,7 @@
+# Name-driven consumers for check_select.py --pack; one repo-relative path per line.
+tools/check_p2v_allow.txt
+tools/accept/pt0_snapshot.py
+tools/h3_park_resume.py
+tools/gen_memmap.py
+tools/memmap_audit_live.py
+tools/tests/guest_acceptance.yaml

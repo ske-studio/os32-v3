@@ -64,6 +64,8 @@ def tree(tmp, files, policy=POLICY):
     if policy is not None:
         with open(os.path.join(root, "docs", "POLICY_DEV.md"), "w", encoding="utf-8") as f:
             f.write(policy)
+    with open(os.path.join(root, "docs", "tasks", "DEFERRED_TESTS.md"), "w", encoding="utf-8") as f:
+        f.write("| ID | 内容 |\n| E11-3 | fixture |\n")
     for rel, body in files.items():
         p = os.path.join(root, "docs", "tasks", rel)
         os.makedirs(os.path.dirname(p), exist_ok=True)
@@ -203,7 +205,26 @@ def case_main_rc(mod, tmp):
     check(rc_bad == 1 and rc_ok == 0, "main の終了コード: bad=%r ok=%r" % (rc_bad, rc_ok))
 
 
+def case_stage_heading_forms(mod, tmp):
+    for stage in ('e11b1', 'd0a', 'f5', 'h3', 'T2c'):
+        root = tree(tmp, {'TASK_A.md': '状態: 計画\n**%s 記録**:\n未確認\n' % stage})
+        warnings = mod.record_warnings(root)
+        check(len(warnings) == 1 and '段 ' + stage + ':' in warnings[0],
+              '段の取りこぼし: %s %r' % (stage, warnings))
+    for label in ('v3 で…', 'H5 の裏付け', 'D3 映像の戻し'):
+        prefix = '- ' if label.startswith('D3') else ''
+        root = tree(tmp, {'TASK_A.md': '状態: 計画\n%s**%s**:\n未確認\n' % (prefix, label)})
+        check(mod.record_warnings(root) == [], '説明ラベルを段にした: ' + label)
+        # Within a real stage the label must not reset the line counter.
+        root = tree(tmp, {'TASK_A.md': '状態: 計画\n**f5 記録**:\n' + '記録\n' * 10
+                          + '%s**%s**:\n' % (prefix, label)})
+        warnings = mod.record_warnings(root)
+        check(len(warnings) == 1 and '11 行' in warnings[0],
+              '説明ラベルで段が終了した: %s %r' % (label, warnings))
+
+
 CASES = {
+    "stage_heading_forms": case_stage_heading_forms,
     "vocab_ok": case_vocab_ok,
     "longest_word": case_longest_word,
     "outside_vocab": case_outside_vocab,
@@ -220,6 +241,9 @@ CASES = {
 
 # (正規表現, 置換, 何を壊すか) — 実物の写しに 1 か所ずつ当てる
 MUTATIONS = [
+    (r'\(\?!v\[0-9\]\)', '', "v3 の版名を段にする"),
+    (r'\[a-z\]\[0-9\]\+\[a-z\]\?\[0-9\]\*', '[A-Za-z][0-9]+[a-z]?[0-9]*', "大文字の説明ラベルを段にする"),
+    (r'\|T\[0-9\]\+\[a-z\]', '', "T 版の段を拾わない"),
     (r'r"\(\?:\^\|> \|/ \)状態:', 'r"状態:', "状態行の前置の制限を外す (それまでの状態: も数える)"),
     (r"if no > HEAD_LINES:\n                break", "pass", "先頭 12 行の制限を外す"),
     (r"HEAD_LINES = 12", "HEAD_LINES = 20", "先頭の行数を広げる"),
