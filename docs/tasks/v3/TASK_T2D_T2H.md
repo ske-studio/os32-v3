@@ -1,6 +1,6 @@
 # TASK_T2D_T2H — T2d〜T2h 詳細設計
 
-> 状態: **実装中 (2026-10-07)** — T2d・T2e (e1〜e11) は受入済み。T2e は e12 の整理、T2f は f1a〜f4 (f2〜f4 は未結線)、T2h は h2・h3 の準備まで着地。残りは e12、f5 以降、g、h の統合受入 (現在地は [HANDOVER_2026-10-06](../agents/HANDOVER_2026-10-06.md))。
+> 状態: **実装中 (2026-10-07)** — T2d・T2e (e1〜e11) は受入済み。T2e は e12 の整理、T2f は f1a〜f4 (f2〜f4 は未結線)、T2h は h2・h3 の準備まで着地。残りは e12、f5 以降、g、h の統合受入 (現在地は [HANDOVER_2026-10-08](../agents/HANDOVER_2026-10-08.md))。
 > それまでの状態: 設計中 (2026-10-01) — 独立レビュー Opus 5.5 は 1 回目 Request changes (P1 2件 / P2 11件 / P3 8件) → 反映 → 2 回目 Approve (P3 5件は §11 の実装時の注記)。
 > 作成: GPT-6 / Codex。調査基点: main / docs/t2d-h-design 共通 **9ae6073406c2027fd50938e3870a3fb3888cd7f6**。
 > **実行記録は 2026-10-06 に [archive/v3/TASK_T2D_T2H_RECORDS.md](../../archive/v3/TASK_T2D_T2H_RECORDS.md) へ移した** (この票は契約・分割・受入条件・未実施の手順だけ)。延ばした試験と未実施は [DEFERRED_TESTS.md](../DEFERRED_TESTS.md) が正。段の記録は 1 段 10 行以内で書く ([ROLES §0](../agents/ROLES.md))。
