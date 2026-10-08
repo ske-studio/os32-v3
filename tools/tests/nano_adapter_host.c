@@ -16,7 +16,8 @@ void *memset(void *p, int c, size_t n) { unsigned char *q=p; while(n--) *q++=c; 
 void *memcpy(void *p, const void *s, size_t n) { unsigned char *q=p; const unsigned char *r=s; while(n--) *q++=*r++; return p; }
 static void write_text(const char *s, size_t n)
 {
-    __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(s), "d"(n) : "memory");
+    int result=4;
+    __asm__ volatile("int $0x80" : "+a"(result) : "b"(1), "c"(s), "d"(n) : "memory");
 }
 static void stop(int code) __attribute__((noreturn));
 static void stop(int code)
@@ -180,6 +181,17 @@ static unsigned char secondary[MAP_SLOTS][MAP_CAPACITY] __attribute__((aligned(O
 static size_t mapped[MAP_SLOTS];
 static unsigned maps, unmaps, last_flags, attempts;
 static int reject_map, reject_unmap;
+static int trim_fixture;
+static uintptr_t primary_end, trim_fail_base, trim_unmap_base;
+static size_t trim_unmap_bytes, grow_ceiling;
+static unsigned trim_unmaps, exact_calls, exact_failures;
+static int trim_callback_depth;
+static uintptr_t exact_base;
+static size_t exact_bytes;
+static uintptr_t page_up(uintptr_t p)
+{
+    return (p+OS32_NANO_PAGE-1u) & ~(OS32_NANO_PAGE-1u);
+}
 static void callback_checks(void)
 {
     struct _reent nested = {0};
@@ -216,6 +228,36 @@ static int unmap_secondary(void *opaque, uintptr_t base, size_t bytes)
     CHECK(opaque == &maps);
     callback_checks();
     CHECK(base != a.initial); /* Never return primary/BSS backing. */
+    if (trim_fixture) {
+        if (trim_callback_depth) return -1;
+        trim_callback_depth=1;
+        CHECK(os32_nano_trim() == 0);
+        reent._errno=0;
+        CHECK(malloc(8) == NULL && reent._errno == ENOMEM);
+        trim_callback_depth=0;
+        trim_unmaps++; trim_unmap_base=base; trim_unmap_bytes=bytes;
+        CHECK(!(base & (OS32_NANO_PAGE-1u)) && bytes && !(bytes & (OS32_NANO_PAGE-1u)));
+        if (base >= (uintptr_t)storage && base < (uintptr_t)storage+sizeof(storage)) {
+            CHECK(base >= page_up(a.initial));
+            CHECK(base+bytes == primary_end);
+            if (reject_unmap && (!trim_fail_base || trim_fail_base==base)) return reject_unmap;
+            primary_end=base;
+            memset((void *)base,0xcc,bytes);
+            return 0;
+        }
+        for (unsigned i=0;i<MAP_SLOTS;i++) {
+            uintptr_t start=(uintptr_t)secondary[i];
+            if (mapped[i] && base>=start && base<start+mapped[i]) {
+                CHECK(base+bytes == start+mapped[i]);
+                if (reject_unmap && (!trim_fail_base || trim_fail_base==base)) return reject_unmap;
+                mapped[i]=base-start;
+                unmaps++;
+                memset((void *)base,0xcc,bytes);
+                return 0;
+            }
+        }
+        CHECK(0);
+    }
     for (unsigned i=0; i<MAP_SLOTS; i++) if (base == (uintptr_t)secondary[i]) {
         CHECK(mapped[i] == bytes);
         if (reject_unmap) return -1;
@@ -330,7 +372,224 @@ static void automatic_tests(void)
     p=malloc(16); saved=unmaps; free(p);
     CHECK(unmaps==saved && a.free_list && a.live==0);
 }
+/* f11: the range model rejects stale mapped_end and wrong EXACT restart. */
+struct test_chunk { long size; struct test_chunk *next; };
+static int trim_grow(void *opaque, uintptr_t base, size_t bytes)
+{
+    (void)opaque;
+    callback_checks();
+    exact_calls++; exact_base=base; exact_bytes=bytes;
+    if (bytes>grow_ceiling) { exact_failures++; return -1; }
+    if (base >= (uintptr_t)storage && base <= (uintptr_t)storage+sizeof(storage)) {
+        CHECK(base == primary_end);
+        if (base+bytes > (uintptr_t)storage+sizeof(storage)) { exact_failures++; return -1; }
+        memset((void *)base,0,bytes); primary_end=base+bytes;
+        return 0;
+    }
+    for (unsigned i=0;i<MAP_SLOTS;i++) if (mapped[i]) {
+        uintptr_t start=(uintptr_t)secondary[i];
+        if (base==start+mapped[i] && bytes<=MAP_CAPACITY-mapped[i]) {
+            memset((void *)base,0,bytes); mapped[i]+=bytes;
+            return 0;
+        }
+    }
+    exact_failures++;
+    return -1;
+}
+static void trim_reset(unsigned offset)
+{
+    CHECK(!a.next);
+    for (unsigned i=0;i<MAP_SLOTS;i++) CHECK(!mapped[i]);
+    reset();
+    a.initial=a.brk=(uintptr_t)storage+offset;
+    a.mapped_end=primary_end=(uintptr_t)storage+sizeof(storage);
+    a.limit=UINTPTR_MAX; a.grow_exact=trim_grow;
+    grow_ceiling=SIZE_MAX;
+    trim_fixture=1; reject_map=reject_unmap=0;
+    trim_unmaps=exact_calls=exact_failures=0;
+    trim_fail_base=0;
+}
+static void same_bytes(const void *p, unsigned byte, size_t n)
+{
+    for (size_t i=0;i<n;i++) CHECK(((const unsigned char *)p)[i] == byte);
+}
+static void same_state(const struct os32_nano_arena *arena,
+                       const struct os32_nano_arena *saved)
+{
+    CHECK(arena->free_list == saved->free_list && arena->brk == saved->brk &&
+          arena->mapped_end == saved->mapped_end && arena->sbrk_start == saved->sbrk_start &&
+          arena->initial == saved->initial && arena->next == saved->next && arena->live == saved->live);
+    for (size_t i=0;i<sizeof(arena->info);i++)
+        CHECK(((const unsigned char *)&arena->info)[i] == ((const unsigned char *)&saved->info)[i]);
+}
+static void trim_tests(void)
+{
+    void *p, *q, *hole, *again;
+    struct test_chunk *tail;
+    struct os32_nano_arena saved, *other;
+    struct mallinfo before, after;
+    uintptr_t keep, end;
+    long old_size;
+    unsigned calls_before;
+
+    /* Standalone tests leave arenas unconfigured; automatic tests configure. */
+    CHECK(os32_nano_trim() == 0);
+    automatic_tests();
+    trim_reset(0);
+    p=malloc(128); CHECK(p); memset(p,0x61,128);
+    q=malloc(2*OS32_NANO_PAGE); CHECK(q);
+    saved=a;
+    CHECK(os32_nano_trim() == 0 && trim_unmaps == 0); /* USED tail. */
+    same_state(&a,&saved); same_bytes(p,0x61,128);
+    free(p); saved=a; /* Free hole is not a tail: do not return live q. */
+    memset(q,0x62,2*OS32_NANO_PAGE);
+    CHECK(os32_nano_trim() == 0 && trim_unmaps == 0);
+    same_state(&a,&saved); same_bytes(q,0x62,2*OS32_NANO_PAGE);
+    free(q);
+
+    trim_reset(0);
+    hole=malloc(32); p=malloc(128); q=malloc(2*OS32_NANO_PAGE);
+    CHECK(hole && p && q); memset(p,0x63,128);
+    free(hole); free(q);
+    tail=((struct test_chunk *)a.free_list)->next;
+    CHECK(tail && tail->next==NULL);
+    keep=page_up((uintptr_t)tail+12u); end=a.mapped_end;
+    before=os32_nano_info(&reent); saved=a; old_size=tail->size;
+    /* EFULL: 中抜きで slot 不足. The callback returns the public error code;
+     * extent splitting itself is covered by appmem's integration fixture. */
+    const int failures[]={-13, -9}; /* OS32_ERR_FULL, OS32_ERR_INVAL */
+    for (unsigned i=0;i<2;i++) {
+        reject_unmap=failures[i];
+        CHECK(os32_nano_trim() == 0);
+        CHECK(tail->size == old_size && a.brk == saved.brk && a.mapped_end == saved.mapped_end);
+        CHECK(tail->next == NULL && ((struct test_chunk *)a.free_list)->next == tail);
+        same_state(&a,&saved);
+        after=os32_nano_info(&reent);
+        CHECK(after.arena == before.arena && after.fordblks == before.fordblks);
+        same_bytes(p,0x63,128);
+    }
+    reject_unmap=0;
+    CHECK(os32_nano_trim() == (end-keep)/OS32_NANO_PAGE);
+    CHECK(a.free_list == saved.free_list && ((struct test_chunk *)a.free_list)->next == tail);
+    CHECK(tail->size == (long)(keep-(uintptr_t)tail) && a.brk == keep && a.mapped_end == keep);
+    after=os32_nano_info(&reent);
+    CHECK(after.arena == keep-(uintptr_t)a.sbrk_start &&
+          after.fordblks == before.fordblks-old_size+(size_t)tail->size);
+    same_bytes(p,0x63,128);
+    saved=a; calls_before=trim_unmaps;
+    CHECK(os32_nano_trim() == 0 && trim_unmaps == calls_before);
+    same_state(&a,&saved);
+    /* Full nano request needs two pages; only the one-page difference fits.
+     * This must reach nano-mallocr.c:326-352 and unlink the retained tail. */
+    grow_ceiling=OS32_NANO_PAGE;
+    again=malloc(OS32_NANO_PAGE+512);
+    CHECK(again == q && exact_failures == 1 && exact_calls == 2);
+    CHECK(exact_base == keep && exact_bytes == OS32_NANO_PAGE && a.mapped_end == keep+OS32_NANO_PAGE);
+    CHECK(((struct test_chunk *)a.free_list)->next == NULL &&
+          a.brk == (uintptr_t)tail+(uintptr_t)tail->size);
+    same_bytes(p,0x63,128);
+    free(again); free(p);
+
+    /* Page-start, middle (above), and near-end headers; initial image page. */
+    const unsigned offsets[]={0, OS32_NANO_PAGE-8, 123};
+    for (unsigned i=0;i<3;i++) {
+        trim_reset(offsets[i]);
+        p=malloc(OS32_NANO_PAGE); CHECK(p); free(p);
+        tail=a.free_list; keep=page_up((uintptr_t)tail+12u); end=a.mapped_end;
+        CHECK(keep >= page_up(a.initial));
+        CHECK(os32_nano_trim() == (end-keep)/OS32_NANO_PAGE);
+        CHECK(a.brk == keep && a.mapped_end == keep && tail->size == (long)(keep-(uintptr_t)tail));
+        CHECK(tail->size >= 12 && tail->next == NULL);
+    }
+    trim_reset(0);
+    p=malloc(OS32_NANO_PAGE); CHECK(p); free(p);
+    end=a.brk;
+    CHECK(os32_nano_morecore(&a,&reent,64) == (void *)end);
+    saved=a; old_size=((struct test_chunk *)a.free_list)->size;
+    CHECK(os32_nano_trim() == 0 && trim_unmaps == 0); /* Direct sbrk gap. */
+    same_state(&a,&saved);
+    CHECK(((struct test_chunk *)a.free_list)->size == old_size);
+
+    trim_reset(0);
+    a.grow_exact=blocked_grow;
+    p=malloc(2*OS32_NANO_PAGE); CHECK(p); /* live primary */
+    q=malloc(2*OS32_NANO_PAGE); CHECK(q && a.next);
+    other=a.next; other->grow_exact=trim_grow;
+    memset(q,0x64,2*OS32_NANO_PAGE);
+    hole=malloc(8*OS32_NANO_PAGE); CHECK(hole && a.next==other && other->live==2);
+    free(hole); tail=other->free_list;
+    keep=page_up((uintptr_t)tail+12u); end=other->mapped_end;
+    CHECK(os32_nano_select(&a)); /* Nonselected arena uses its saved free list. */
+    struct test_chunk *poisoned=(struct test_chunk *)other->initial;
+    long live_size=poisoned->size; poisoned->size=0;
+    CHECK(os32_nano_trim() == (end-keep)/OS32_NANO_PAGE);
+    CHECK(other->brk == keep && other->mapped_end == keep &&
+          other->map_base+OS32_NANO_PAGE == other->initial);
+    CHECK(poisoned->size == 0);
+    poisoned->size=live_size;
+    same_bytes(q,0x64,2*OS32_NANO_PAGE);
+    free(q);
+    CHECK(!a.next && trim_unmap_base == (uintptr_t)secondary[0] &&
+          trim_unmap_bytes == keep-(uintptr_t)secondary[0]);
+    free(p);
+
+    /* Empty secondary retained after free/unmap failure, retried by trim. */
+    trim_reset(0); a.grow_exact=blocked_grow;
+    p=malloc(8*OS32_NANO_PAGE); CHECK(p && a.next); other=a.next;
+    end=other->mapped_end-other->map_base;
+    reject_unmap=-9; free(p);
+    CHECK(a.next == other && other->live == 0);
+    reject_unmap=0;
+    CHECK(os32_nano_trim() == end/OS32_NANO_PAGE && !a.next);
+
+    /* Independent transactions and sum, with/without primary failure. */
+    for (unsigned fail=0;fail<2;fail++) {
+        trim_reset(0); a.grow_exact=blocked_grow;
+        p=malloc(2*OS32_NANO_PAGE); q=malloc(2*OS32_NANO_PAGE);
+        CHECK(p && q && a.next); other=a.next; other->grow_exact=trim_grow;
+        hole=malloc(8*OS32_NANO_PAGE); CHECK(hole); free(hole); free(p);
+        tail=a.free_list; old_size=tail->size; saved=a;
+        keep=page_up((uintptr_t)other->free_list+12u); end=other->mapped_end;
+        trim_fail_base=page_up((uintptr_t)tail+12u); reject_unmap=fail ? -9 : 0;
+        size_t primary_pages=fail ? 0 : (a.mapped_end-trim_fail_base)/OS32_NANO_PAGE;
+        CHECK(os32_nano_trim() == primary_pages+(end-keep)/OS32_NANO_PAGE && trim_unmaps == 2);
+        if (fail) { same_state(&a,&saved); CHECK(tail->size == old_size); }
+        else CHECK(a.brk == trim_fail_base && a.mapped_end == trim_fail_base);
+        CHECK(other->mapped_end == keep && trim_unmap_base == keep);
+        reject_unmap=0; free(q);
+    }
+
+    /* No live header reads, even for a nonselected arena. Poison size so a
+     * physical-chunk scan would mistake its live first chunk for a free tail. */
+    trim_reset(0); a.grow_exact=blocked_grow;
+    p=malloc(2*OS32_NANO_PAGE); q=malloc(2*OS32_NANO_PAGE);
+    CHECK(p && q && a.next); other=a.next;
+    memset(q,0x65,2*OS32_NANO_PAGE);
+    CHECK(os32_nano_select(&a));
+    saved=*other;
+    struct test_chunk *live=(struct test_chunk *)other->initial;
+    old_size=live->size; live->size=12;
+    CHECK(os32_nano_trim() == 0 && trim_unmaps == 0);
+    same_state(other,&saved);
+    CHECK(live->size == 12);
+    same_bytes(q,0x65,2*OS32_NANO_PAGE);
+    live->size=old_size; free(q); free(p);
+
+    /* One connected sequence: hole + alignment, blocked EXACT, routing,
+     * cross-arena realloc, trim and reuse of the retained primary tail. */
+    trim_reset(1); a.mapped_end=primary_end=(uintptr_t)storage+OS32_NANO_PAGE;
+    a.grow_exact=blocked_grow;
+    hole=malloc(32); p=malloc(64); CHECK(hole && p && !((uintptr_t)p&7u));
+    memset(p,0x66,64); free(hole); CHECK(malloc(32)==hole);
+    q=realloc(p,2*OS32_NANO_PAGE); CHECK(q && a.next); same_bytes(q,0x66,64);
+    other=a.next; other->grow_exact=trim_grow;
+    p=malloc(8*OS32_NANO_PAGE); CHECK(p); free(p);
+    CHECK(os32_nano_trim() >= 1);
+    p=malloc(8*OS32_NANO_PAGE); CHECK(p && a.next==other);
+    same_bytes(q,0x66,64); free(p); free(q); free(hole);
+}
+
 void _start(void)
 {
-    tests(); automatic_tests(); write_text("nano adapter: ",14); number(checks); write_text(" checks GREEN\n",14); stop(0);
+    tests(); trim_tests(); write_text("nano adapter: ",14); number(checks); write_text(" checks GREEN\n",14); stop(0);
 }

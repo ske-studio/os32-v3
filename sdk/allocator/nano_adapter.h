@@ -34,4 +34,8 @@ void *os32_nano_crt_sbrk(struct _reent *r, ptrdiff_t incr);
 void *os32_nano_morecore(struct os32_nano_arena *arena, struct _reent *r, ptrdiff_t incr);
 void *os32_nano_sbrk(struct _reent *r, ptrdiff_t incr);
 struct mallinfo os32_nano_info(struct _reent *r);
+#ifndef OS32_CRT_RESIDENT
+/* Internal USER tail reclamation; successful pages, or zero while busy. */
+size_t os32_nano_trim(void);
+#endif
 #endif

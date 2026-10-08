@@ -236,6 +236,64 @@ static void release_empty(struct os32_nano_arena *a)
     if (unmap_arena(map_opaque, base, bytes) != 0) *link = a;
 }
 
+/* Layout/minimum of the pinned ILP32 nano-mallocr.c free chunk. Only nodes
+ * reachable from the saved free list may be inspected (never live chunks). */
+struct nano_free_chunk {
+    long size;
+    struct nano_free_chunk *next;
+};
+#define NANO_MINCHUNK 12u
+
+size_t os32_nano_trim(void)
+{
+    struct os32_nano_arena **link;
+    size_t pages = 0;
+    if (busy || !arenas || !selected) return 0;
+#ifndef OS32_NANO_FIXTURE
+    if (primary_initialized != 1) return 0;
+#endif
+    busy = 1;
+    load_state();
+    save_state();
+    for (link = &arenas; *link;) {
+        struct os32_nano_arena *a = *link;
+        size_t bytes;
+        if (a != arenas && a->map_base && !a->live) {
+            bytes = a->mapped_end - a->map_base;
+            release_empty(a);
+            if (*link != a) {
+                pages += bytes / OS32_NANO_PAGE;
+                continue; /* a is unmapped; do not read its next pointer. */
+            }
+        } else {
+            struct nano_free_chunk *tail = a->free_list;
+            uintptr_t keep, floor;
+            if (tail) {
+                while (tail->next) tail = tail->next;
+                if ((uintptr_t)tail + tail->size == a->brk) {
+                    keep = ((uintptr_t)tail + NANO_MINCHUNK + OS32_NANO_PAGE - 1u)
+                           & ~(OS32_NANO_PAGE - 1u);
+                    floor = (a->initial + OS32_NANO_PAGE - 1u) & ~(OS32_NANO_PAGE - 1u);
+                    if (!a->map_base && keep < floor) keep = floor;
+                    if (keep < a->mapped_end) {
+                        bytes = a->mapped_end - keep;
+                        /* Keep the node and all saved state until unmap succeeds. */
+                        if (unmap_arena(map_opaque, keep, bytes) == 0) {
+                            tail->size = keep - (uintptr_t)tail;
+                            a->brk = a->mapped_end = keep;
+                            pages += bytes / OS32_NANO_PAGE;
+                        }
+                    }
+                }
+            }
+        }
+        link = &a->next;
+    }
+    load_state();
+    leave();
+    return pages;
+}
+
 /* The list lives in USER mappings. Only an exact payload match permits
  * reading its prefix; arbitrary caller pointers are never dereferenced. */
 #define LARGE_MAGIC 0x4c415247u

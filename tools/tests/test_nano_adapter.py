@@ -233,6 +233,32 @@ EXPECTED_CHECKS += [
     'unmaps==saved+1',
 ]
 
+# f11 mutations leave all older replacement counts and first failures intact.
+MUTATIONS += [
+    ('if ((uintptr_t)tail + tail->size == a->brk)', 'if (1)', 1, 'trim returns USED tail'),
+    ('(uintptr_t)tail + NANO_MINCHUNK + OS32_NANO_PAGE - 1u',
+     '(uintptr_t)tail + NANO_MINCHUNK', 1, 'trim returns header page'),
+    ('if (unmap_arena(map_opaque, keep, bytes) == 0)',
+     'if ((unmap_arena(map_opaque, keep, bytes), 1))', 1, 'trim commits failed unmap'),
+    ('a->brk = a->mapped_end = keep;', 'a->brk = keep;', 1, 'trim keeps stale mapped_end'),
+    ('if (busy || !arenas || !selected) return 0;',
+     'if (!arenas || !selected) return 0;', 1, 'trim ignores busy'),
+    ('struct nano_free_chunk *tail = a->free_list;',
+     'struct nano_free_chunk *tail = a->free_list;\n'
+     '            if (a != selected && a->live && ((struct nano_free_chunk *)a->initial)->size <= 0) tail = NULL;',
+     1, 'trim validates nonselected live chunk'),
+]
+EXPECTED_CHECKS += [
+    'os32_nano_trim() == 0 && trim_unmaps == 0',
+    'base != a.initial',
+    'os32_nano_trim() == 0',
+    'tail->size == (long)(keep-(uintptr_t)tail) && a.brk == keep && a.mapped_end == keep',
+    'malloc(8) == NULL && reent._errno == ENOMEM',
+    'os32_nano_trim() == (end-keep)/OS32_NANO_PAGE',
+]
+# image-page-floor removal is equivalent: every valid tail is >= initial and
+# page_up(tail + MINCHUNK) already covers page_up(initial); no fake RED.
+
 assert len(EXPECTED_CHECKS) == len(MUTATIONS)
 
 
