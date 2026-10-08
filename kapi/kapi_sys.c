@@ -35,6 +35,9 @@ i32 kapi_mem_stat(i32 app_id, void *out, u32 size)
 
     if (!out || size < MEMSTAT_MIN || app_id < -1 || app_id > APP_ID_MAX ||
         app_id == APP_ID_SHELL) return OS32_ERR_INVAL;
+    snap.kheap_total = kmalloc_total();
+    snap.kheap_used = kmalloc_used();
+    snap.kheap_free = kmalloc_free();
     irq = irq_save();
     if (ring3_wm_depth > 0) {
         if (app_id == -1) app_id = 0;
@@ -79,9 +82,6 @@ i32 kapi_mem_stat(i32 app_id, void *out, u32 size)
     }
     snap.size = size < sizeof(snap) ? size : sizeof(snap);
     snap.app_id = app_id;
-    snap.kheap_total = kmalloc_total();
-    snap.kheap_used = kmalloc_used();
-    snap.kheap_free = kmalloc_free();
     snap.phys_total_pages = pgalloc_total_pages();
     snap.phys_free_pages = pgalloc_free_pages();
     snap.resident_heap_total = exec_heap_total();

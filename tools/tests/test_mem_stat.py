@@ -9,6 +9,7 @@ import pathlib
 import re
 import subprocess
 import tempfile
+import unicodedata
 
 import host32
 import test_appmem_map as base
@@ -88,6 +89,10 @@ def build_fixture(tmp):
 
 
 MUTANTS = [
+    ('CPL0 non-shell accepted', 'appslot_cur() != APP_ID_SHELL || ', '', 'caller matrix'),
+    ('CPL0 cpl3 shell accepted', ' || slot->cpl3', '', 'caller matrix'),
+    ('snapshot IRQ enabled', 'irq = irq_save();', 'irq = 0x202U;', 'snapshot IRQ disabled'),
+
     ('size ignored', 'snap.size = size < sizeof(snap) ? size : sizeof(snap);', 'snap.size = sizeof(snap);', 'size prefix'),
     ('invalid USER trusted', 'if (!caller_access_get_user(&caller)) goto done;',
      'if (!caller_access_get_user(&caller)) { caller.app_id = app_id; if (app_id == -1) app_id = 0; }', 'caller matrix'),
@@ -242,10 +247,10 @@ def shell_output(output, app):
                     r'定数: Shell exec_heap 予約=00380000-003F1000 \(452 KiB\)',
                     r'定数: shlib=80000000-80100000 image起点=80100000',
                     r'定数: exec_heap 予約起点=88000000; stack top=90000000 既定=262144 B; lease=F0000000-FE000000',
-                    r'実測: app=2 state=2 flags=1 extent=6 \[1,1,2,1,1\] free=26 arena=3 heap_used=136 B',
-                    r'image=80100000-8010007B primary_end=80101000 libc 初期末尾=80102000',
-                    r'flags=0窓=80101000-88000000 exec_heap現在端=88020000 TOPDOWN=88020000-8FFBF000',
-                    r'stack=8FFC0000-90000000 \(262144 B\); 初期値: exec_heap=88000000\+65536 B']:
+                    r'実測: app=2 st=2 fl=1 ext=6 \[1,1,2,1,1\] free=26 ar=3 heap=136B',
+                    r'img=80100000-8010007B 主端=80101000 libc初=80102000',
+                    r'窓0=80101000-88000000',
+                    r'端/TD=88020000-8FFBF000 stk=8FFC0000-90000000/262144B 初=88000000\+65536B']:
         check(pattern, first, 'map output')
     assert first.count('実測: app=') == (1 if app else 2), 'FAIL: live count'
     if app:
@@ -254,11 +259,24 @@ def shell_output(output, app):
         check(r'実測: Shell band sbrk上限=00375000', first, 'resident limit')
         check(r'実測: app=4 ', first, 'all live IDs')
         for id in (3, 5):
-            check(rf'mem_stat app={id}: error=-2', first, 'NOTFOUND output')
+            assert f'mem_stat app={id}:' not in first, 'FAIL: NOTFOUND output'
     check(r'\(app なし\)', screens[1], 'empty output')
-    check(r'mem_stat app=.*: error=-2', screens[1], 'NOTFOUND output')
+    if app:
+        check(r'mem_stat app=-1: error=-2', screens[1], 'NOTFOUND output')
+    else:
+        assert 'mem_stat app=' not in screens[1], 'FAIL: NOTFOUND output'
+    for screen in screens:
+        lines = screen.splitlines()
+        for i, line in enumerate(lines):
+            if '実測: app=' in line:
+                assert i + 2 < len(lines), 'FAIL: app lines'
+                for row in lines[i:i+3]:
+                    width = sum(2 if unicodedata.east_asian_width(c) in 'WF' else 1 for c in row)
+                    assert width <= 80, 'FAIL: app width'
+                assert 'img=' in lines[i+1] and '端/TD=' in lines[i+2], 'FAIL: app lines'
     check(r'mem_stat system: error=-9', screens[2], 'INVAL output')
-    check(r'mem_stat app=.*: error=-9', screens[2], 'INVAL output')
+    for id in (-1,) if app else range(2, 6):
+        check(rf'mem_stat app={id}: error=-9', screens[2], 'INVAL output')
 
 
 def shell_run(body, runner, app):
@@ -287,6 +305,9 @@ def run_shell(runner, mutate):
         print(output.split('SCENARIO 1')[0], end='')
     if mutate:
         variants = [
+            ('NOTFOUND printed', 'if (rc == OS32_ERR_NOTFOUND) continue;', '', 'NOTFOUND output'),
+            ('app lines joined', 'heap=%uB\\n', 'heap=%uB ', 'app width'),
+            ('app field removed', 'libc初=', 'libc=', 'map output'),
             ('literal map', '(u32)MEM_EXEC_HEAP_BASE', '0x88000000U', 'literal map'),
             ('reservation line', 'exec_heap 予約起点=', 'exec_heap 起点=', 'map output'),
             ('CPL0 self only', 'int first = 2, last = 5;', 'int first = -1, last = -1;', 'caller queries'),

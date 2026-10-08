@@ -8,7 +8,35 @@ void *kmemcpy(void *dst, const void *src, u32 n)
     while (n--) *d++ = *s++;
     return dst;
 }
+static u32 snapshot_free_pages(void)
+{
+    CHECK("snapshot IRQ disabled", !_irq_enabled());
+    return pgalloc_free_pages();
+}
+static u32 snapshot_kheap_total(void)
+{
+    CHECK("KHEAP IRQ enabled", _irq_enabled());
+    return kmalloc_total();
+}
+static u32 snapshot_kheap_used(void)
+{
+    CHECK("KHEAP IRQ enabled", _irq_enabled());
+    return kmalloc_used();
+}
+static u32 snapshot_kheap_free(void)
+{
+    CHECK("KHEAP IRQ enabled", _irq_enabled());
+    return kmalloc_free();
+}
+#define pgalloc_free_pages snapshot_free_pages
+#define kmalloc_total snapshot_kheap_total
+#define kmalloc_used snapshot_kheap_used
+#define kmalloc_free snapshot_kheap_free
 #include "mem_stat_source.c"
+#undef pgalloc_free_pages
+#undef kmalloc_total
+#undef kmalloc_used
+#undef kmalloc_free
 
 static union { MemStat stat; u8 bytes[sizeof(MemStat) + 16]; } output;
 static void query(int id, int expected, int target)
@@ -36,13 +64,20 @@ static void matrix(void)
     g_slot[1].state = APP_STATE_RUNNING;
     g_slot[4] = g_slot[2]; g_slot[4].state = APP_STATE_FREE;
     g_slot[5].state = APP_STATE_RUNNING;
-    for (int mode = 0; mode < 6; mode++) {
+    for (int mode = 0; mode < 8; mode++) {
         ring3_in_syscall = 1; heap_select(2);
         struct caller_identity identity = caller_identity_get();
         CHECK("identity captured", identity.app_id == 2 && identity.owner == a.owner && identity.generation == a.generation);
         u32 owner = a.owner, generation = a.generation;
         if (mode == 0) ring3_wm_enter();
         if (mode == 1) { ring3_in_syscall = 0; current_slot = APP_ID_SHELL; caller_access_invalidate(); }
+        if (mode == 6) {
+            ring3_in_syscall = 0; caller_access_invalidate(); g_slot[2].cpl3 = 0;
+        }
+        if (mode == 7) {
+            ring3_in_syscall = 0; current_slot = APP_ID_SHELL;
+            caller_access_invalidate(); g_slot[1].cpl3 = 1;
+        }
         if (mode == 3) a.generation++;
         if (mode == 4) a.owner++;
         if (mode == 5) g_slot[2].as = 0;
@@ -56,8 +91,10 @@ static void matrix(void)
             struct caller_identity after = caller_identity_get();
             CHECK("WM identity preserved", equal(&identity, &after, sizeof(after)));
         }
+        g_slot[1].cpl3 = 0; g_slot[2].cpl3 = 1;
         a.owner = owner; a.generation = generation; g_slot[2].as = &a;
     }
+    ring3_in_syscall = 1;
     heap_select(2);
     ring3_wm_enter();
     for (u32 state = APP_STATE_RUNNING; state <= APP_STATE_FAULT_PENDING; state++) {
