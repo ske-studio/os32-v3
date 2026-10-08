@@ -9,15 +9,52 @@
 
 ## DESCRIPTION
 
-システムのメモリ状態とメモリマップを表示する。
-`heap` はエイリアス。
+システムのメモリ状態、定数のメモリマップ、アプリの実測値を表示する。
+`heap` はエイリアス。番地の範囲は `[base,end)` (末尾を含まない)。
 
-### 表示項目
+### システム情報
 
-- `Physical` — 物理メモリ容量 (KB/MB)
-- `Paging` — ページング有効/無効
-- `Heap Tot/Used/Free` — カーネルヒープの合計/使用中/空き (バイト)
-- メモリマップ — 各領域のアドレス範囲と用途
+`Memory Info:` の下に次の行を表示する。
+
+- `Physical` — RAM 上端アドレスから求めた容量 (KB/MB)。15–16MB のシステム空間を含む。
+- `RAM` — 起動時に登録した利用可能 RAM の合計 (KB/MB)。15–16MB のシステム空間を除く。
+- `Paging` — ページング有効 (`ENABLED`) / 無効 (`DISABLED`)。
+- `Heap Tot / Used / Free` — カーネルヒープの合計 / 使用中 / 空き (B)。
+- `実測: phys pages total / free; resident heap total / used` — 物理ページの総数 / 空き数と、常駐 exec_heap の総量 / 使用量 (B)。アプリのヒープ使用量とは別。
+
+### メモリマップ
+
+`Memory Map (ranges: [base,end)):` の下の `定数:` 行は予約帯の地図であり、使用量ではない。
+順に NULL guard と V86 窓、VRAM と Kernel band、SQLite band と DMA pool、
+kstack guard と kstack、Shell band のロード起点・sbrk 上限・stack、
+Shell exec_heap の予約範囲と KiB、shlib 帯と image 起点、
+アプリ exec_heap の予約起点・stack 上端と既定サイズ (B)・lease 帯を示す。
+
+CPL0 の常駐 `shell.bin` だけは、Shell band の定数行の直後に
+`実測: Shell band sbrk上限=...` を表示する。これは実際の KAPI の上限値。
+CPL3 の `sh.bin` にはこの実測行は出ない。両者とも定数行とシステムの実測行は出る。
+
+### アプリの実測値
+
+CPL0 の常駐シェルは ID 2–5 を調べ、AS のない対象の `OS32_ERR_NOTFOUND` は表示しない。
+CPL3 の `sh.bin` は自己だけを調べる。取得できたアプリ 1 本につき次の 3 行を表示する。
+
+- `実測: app=... st=... fl=... ext=... [...] free=... ar=... heap=...B`
+  — `app` は対象 ID、`st` は AppSlot の状態値、`fl` は flags (HAS_AS=1、POISONED=2、HEAP_INVALID=4 のビット和)。
+  `ext` は使用中 extent 数、角括弧は LIBC_INITIAL / EXEC_INITIAL / ANON / EXEC_ARENA / EXEC_LARGE の順の本数。
+  `free` は残り extent 枠数、`ar` は副 arena 数 (ANON + EXEC_ARENA)、`heap` は AS 側の exec_heap 使用量 (B)。
+  使用量が無効なら HEAP_INVALID が立ち、`heap` は 0 と表示される。
+- `img=... 主端=... libc初=... 窓0=...`
+  — `img` は image 起点から image/BSS 末尾まで、`主端` は主領域の末尾 (`primary_mapped_end`、image 末尾のページ切上げ。libc 初期域は extent として別管理)、
+  `libc初` は slot に記録された libc 初期末尾 (`sbrk_heap_limit`)。
+  `窓0` は image 末尾をページ切上げした番地から exec_heap 予約起点までの、flags=0 の `mem_map` 探索窓 (全域が写像済みという意味ではない)。
+- `端/TD=... stk=.../...B 初=...+...B`
+  — `端/TD` は現在の exec_heap 末尾から stack 下 guard の起点まで (TOPDOWN 探索窓)、
+  `stk` は stack 範囲とサイズ (B)、`初` は exec_heap の初期起点と初期量 (B)。初期量は現在量とは別。
+
+アプリ情報を 1 本も取得できなければ `(app なし)` を 1 行表示する。
+取得エラーは `mem_stat system: error=...` または `mem_stat app=...: error=...` に表示する
+(CPL0 の対象不存在は上記のとおり非表示)。
 
 ## SEE ALSO
 
