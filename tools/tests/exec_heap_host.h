@@ -16,9 +16,24 @@ static int heap_access_page(const struct addrspace *as, u32 va, int write, u32 *
     heap_page_walks++;
     return as_access_page(as, va, write, pa);
 }
+static u32 heap_map_calls, heap_trim_calls;
+static int heap_trim(struct addrspace *as, u32 base, u32 bytes) {
+    heap_trim_calls++;
+    return appmem_exec_trim(as, base, bytes);
+}
+#define appmem_exec_trim heap_trim
+static int heap_map(struct addrspace *as, struct appmem_table *table,
+                    const struct appmem_layout *layout, u32 bytes, u32 hint,
+                    u32 flags, u32 kind, u32 ef, u32 *out) {
+    heap_map_calls++;
+    return appmem_map(as, table, layout, bytes, hint, flags, kind, ef, out);
+}
+#define appmem_map heap_map
 #define as_access_page heap_access_page
 #include "heap_source.c"
 #undef as_access_page
+#undef appmem_map
+#undef appmem_exec_trim
 #define KAPI_HIT(slot) ((void)(slot))
 #include "heap_wrap_source.c"
 #undef KAPI_HIT
@@ -134,6 +149,7 @@ static void heap_reject(void *p, int disabled) {
     if (disabled) CHECK("corrupt alloc NULL", !wrap_mem_alloc(16));
     heap_other_snapshot(1);
 }
+static void heap_f10_cases(void);
 static void heap_cases(void) {
     integration = 1; watching = unmapping = 0; heap_alias_on = 1;
     CHECK("free address bypasses early guard", !kapi_argptr[KAPI_SLOT_MEM_FREE]);
@@ -312,40 +328,282 @@ static void heap_cases(void) {
     paging_addrspace_destroy(&b);
     CHECK("other owner retire", ledger_owner_retire(b.owner));
     heap_alias_on = 1;
-    heap_create_size(&a, 2, 4 * MEM_EXEC_HEAP_MIN);
-    void *large[2];
-    for (u32 n = 0; n < 2; n++) {
-        u32 bytes = MEM_EXEC_HEAP_MIN << n;
-        large[n] = wrap_mem_alloc(bytes);
-        CHECK("large INITIAL allocation", large[n] && (u32)large[n] >= MEM_EXEC_HEAP_BASE + BLK_HDR_SIZE &&
-              (u32)large[n] + bytes <= MEM_EXEC_HEAP_BASE + 4 * MEM_EXEC_HEAP_MIN);
-        for (u32 j = 0; j < bytes; j++) ((u8 *)large[n])[j] = (u8)(j ^ (0x5a + n));
-    }
-    struct addrspace large_before = a;
-    u32 large_pages = ledger_owner_pages(a.owner);
-    for (u32 n = 0; n < 2; n++)
-        CHECK("large growth deferred", !wrap_mem_alloc(MEM_EXEC_HEAP_MIN << n));
-    for (u32 n = 0; n < 7; n++)
-        CHECK("rounding overflow rejected", !wrap_mem_alloc(0xfffffff9U + n));
-    CHECK("large refusal metadata unchanged", equal(&a, &large_before, sizeof(a)) &&
-          ledger_owner_pages(a.owner) == large_pages);
-    void *edge = wrap_mem_alloc(MEM_EXEC_HEAP_MIN - 1);
-    CHECK("unaligned small growth", edge && (u32)edge >= MEM_EXEC_HEAP_BASE + 4 * MEM_EXEC_HEAP_MIN);
-    for (u32 j = 0; j < MEM_EXEC_HEAP_MIN - 1; j++) ((u8 *)edge)[j] = (u8)(j ^ 0x39);
-    for (u32 j = 0; j < MEM_EXEC_HEAP_MIN - 1; j++)
-        CHECK("unaligned small all bytes", ((u8 *)edge)[j] == (u8)(j ^ 0x39));
-    wrap_mem_free(edge);
-    for (u32 n = 0; n < 2; n++) {
-        u32 bytes = MEM_EXEC_HEAP_MIN << n;
-        for (u32 j = 0; j < bytes; j++)
-            CHECK("large all bytes preserved", ((u8 *)large[n])[j] == (u8)(j ^ (0x5a + n)));
-        wrap_mem_free(large[n]);
-    }
-    CHECK("large used returns zero", !a.exec_heap_used);
-    host_cr3 = roots[0]; heap_alias_on = 0;
-    paging_addrspace_free_user_range(&a, MEM_EXEC_HEAP_BASE, a.appmem_layout.exec_heap_cur_end);
-    paging_addrspace_destroy(&a);
-    CHECK("large owner retire", ledger_owner_retire(a.owner));
+    heap_f10_cases();
     caller_access_invalidate(); wrap_mem_free(resident);
     CHECK("resident no leak", !exec_heap.used);
+}
+
+/* f10: snapshot includes every PTE, allocator header, layout and owner count. */
+static struct addrspace f10_as;
+static u32 f10_pages, f10_frees;
+static void f10_snapshot(int compare) {
+    u32 pos = 0;
+    if (!compare) {
+        f10_as = a; f10_pages = ledger_owner_pages(a.owner); f10_frees = heap_free_calls;
+        heap_copy(pd_images[1], P2V(a.pd_phys), PAGE_SIZE);
+    } else {
+        CHECK("f10 unchanged AS", equal(&a, &f10_as, sizeof(a)));
+        CHECK("f10 unchanged ledger", f10_pages == ledger_owner_pages(a.owner) && f10_frees == heap_free_calls);
+        CHECK("f10 unchanged PD", equal(pd_images[1], P2V(a.pd_phys), PAGE_SIZE));
+    }
+    for (u32 k = 0; k < MEM_APP_BAND_MAX_PDES; k++) if (a.app_pt_phys[k]) {
+        if (!compare) heap_copy(pt_images[k], P2V(a.app_pt_phys[k]), PAGE_SIZE);
+        else CHECK("f10 unchanged PTE", equal(pt_images[k], P2V(a.app_pt_phys[k]), PAGE_SIZE));
+    }
+    for (u32 i = 0; i < APPMEM_EXTENT_MAX; i++) if (user_arena(&a.appmem.e[i])) {
+        u32 bytes = a.appmem.e[i].end - a.appmem.e[i].base;
+        CHECK("f10 snapshot capacity", pos + bytes <= sizeof(heap_arena_image));
+        if (!compare) heap_copy(heap_arena_image + pos, (void *)a.appmem.e[i].base, bytes);
+        else CHECK("f10 unchanged headers", equal(heap_arena_image + pos, (void *)a.appmem.e[i].base, bytes));
+        pos += bytes;
+    }
+}
+static void f10_done(void) {
+    u32 owner = a.owner, left = exec_as_leftover_pages;
+    host_cr3 = roots[0]; heap_alias_on = 0;
+    g_slot[2].stack_base = g_slot[2].stack_top = MEM_APP_STACK_TOP;
+    exec_teardown_app(&g_slot[2]);
+    CHECK("f10 teardown LARGE no leftover", exec_as_leftover_pages == left && !ledger_owner_pages(owner));
+    heap_alias_on = 1;
+}
+static struct appmem_extent *f10_extent(u32 va) {
+    for (u32 i = 0; i < APPMEM_EXTENT_MAX; i++)
+        if (a.appmem.e[i].base <= va && va < a.appmem.e[i].end) return &a.appmem.e[i];
+    return 0;
+}
+static void f10_pattern(void *ptr, u32 bytes, int write) {
+    for (u32 j = 0; j < bytes; j++) {
+        if (write) ((u8 *)ptr)[j] = (u8)(j ^ 0x59);
+        else CHECK("f10 live all bytes", ((u8 *)ptr)[j] == (u8)(j ^ 0x59));
+    }
+}
+static void heap_f10_cases(void) {
+    heap_create(&a, 2);
+    /* Adjacent extents cannot merge; forged USER headers cannot identify LARGE. */
+    for (u32 forged = 0; forged < 2; forged++) {
+        u8 *hi = wrap_mem_alloc(65536), *lo = wrap_mem_alloc(65536);
+        CHECK("f10 adjacent LARGE", hi && lo && lo + 65536 == hi &&
+              f10_extent((u32)hi) != f10_extent((u32)lo) &&
+              f10_extent((u32)hi)->kind == 5 && f10_extent((u32)lo)->kind == 5);
+        f10_pattern(hi, 65536, 1); f10_pattern(lo, 65536, 1);
+        *(BlkHdr *)hi = (BlkHdr){16, forged ? BLK_MAGIC_USED : 0};
+        ((BlkHdr *)hi)[-1] = (BlkHdr){16, forged ? BLK_MAGIC_USED : 0};
+        u32 pa, pages = ledger_owner_pages(a.owner);
+        wrap_mem_free(hi);
+        CHECK("f10 LARGE ignores USER header", !f10_extent((u32)hi) && as_va_to_pa(a.pd_phys, (u32)hi, &pa) &&
+              a.exec_heap_used == 65536 && ledger_owner_pages(a.owner) == pages - 16);
+        /* Restore only the fake header in the still-live neighbor. */
+        f10_pattern(lo + 65536 - BLK_HDR_SIZE, BLK_HDR_SIZE, 1);
+        /* Pattern index restarts on a multiple of 256 except the final header. */
+        for (u32 j = 65536 - BLK_HDR_SIZE; j < 65536; j++) lo[j] = (u8)(j ^ 0x59);
+        f10_pattern(lo, 65536, 0);
+        wrap_mem_free(lo);
+        CHECK("f10 adjacent free used", !a.exec_heap_used);
+    }
+    void *small = wrap_mem_alloc(65535);
+    CHECK("unaligned small growth", small && (u32)small % PAGE_SIZE == BLK_HDR_SIZE &&
+          f10_extent((u32)small)->kind == APPMEM_EXEC_ARENA);
+    CHECK("f10 small used", a.exec_heap_used == 65536 + BLK_HDR_SIZE);
+    f10_pattern(small, 65535, 1); f10_pattern(small, 65535, 0);
+    wrap_mem_free(small);
+    CHECK("f10 small free used", !a.exec_heap_used);
+    /* Rust raw = Layout.size + max(align,8)-1 + 16, including page alignment. */
+    const u32 sizes[] = {65536, 65537, 131072, 65513 + 8 - 1 + 16, 61441 + 4096 - 1 + 16};
+    for (u32 n = 0; n < sizeof(sizes)/sizeof(sizes[0]); n++) {
+        u32 bytes = sizes[n], pages = ledger_owner_pages(a.owner), pa;
+        void *p = wrap_mem_alloc(bytes);
+        CHECK("f10 LARGE classification", p && !((u32)p % PAGE_SIZE) && f10_extent((u32)p)->kind == 5);
+        CHECK("f10 LARGE used", a.exec_heap_used == PAGE_ALIGN_UP(bytes));
+        CHECK("f10 LARGE zero", all_zero(p, PAGE_ALIGN_UP(bytes)));
+        f10_pattern(p, bytes, 1); f10_pattern(p, bytes, 0);
+        wrap_mem_free(p);
+        CHECK("f10 LARGE free", !f10_extent((u32)p) && as_va_to_pa(a.pd_phys, (u32)p, &pa) &&
+              !a.exec_heap_used && ledger_owner_pages(a.owner) == pages);
+        f10_snapshot(0); wrap_mem_free(p); f10_snapshot(1); /* unused VA double free */
+        void *again = wrap_mem_alloc(bytes);
+        CHECK("f10 LARGE same VA", again == p);
+        wrap_mem_free(again);
+    }
+    /* Free the later allocation while the earlier one remains intact. */
+    void *hi = wrap_mem_alloc(65536), *lo = wrap_mem_alloc(65536);
+    f10_pattern(hi, 65536, 1); wrap_mem_free(lo); f10_pattern(hi, 65536, 0);
+    CHECK("f10 later free used", a.exec_heap_used == 65536);
+    f10_done(); /* hi deliberately left mapped */
+
+    for (u32 mode = 0; mode < 2; mode++) {
+        heap_create(&a, 2);
+        void *p = wrap_mem_alloc(65536), *other = wrap_mem_alloc(65536);
+        if (mode) {
+            wrap_mem_free(p);
+            u32 out;
+            CHECK("f10 double free ANON fixture", !appmem_map(&a, &a.appmem, &a.appmem_layout,
+                  65536, (u32)p, APPMEM_MAP_EXACT, APPMEM_ANON, 0, &out));
+        }
+        wrap_mem_free(mode ? p : (u8 *)p + 8);
+        CHECK("f10 interior or ANON disables", a.exec_heap_used == ~0U && !wrap_mem_alloc(16));
+        f10_snapshot(0); wrap_mem_free(other);
+        CHECK("f10 disabled trim", !exec_heap_user_trim(&a)); f10_snapshot(1);
+        f10_done();
+    }
+    /* Every map failure falls back only to existing free space. */
+    for (u32 mode = 0; mode < 4; mode++) {
+        heap_create_size(&a, 2, 4 * MEM_EXEC_HEAP_MIN);
+        u32 keep_guard = a.appmem_layout.guard_b;
+        if (!mode) { /* Real EFULL, using disjoint ANON pages. */
+            for (u32 i = 0; i < APPMEM_EXTENT_MAX - 1; i++) {
+                u32 out;
+                CHECK("f10 full fixture", !appmem_map(&a, &a.appmem, &a.appmem_layout,
+                      PAGE_SIZE, MEM_EXEC_LOAD_ADDR + (4 + 2*i)*PAGE_SIZE,
+                      APPMEM_MAP_EXACT, APPMEM_ANON, 0, &out));
+            }
+        } else if (mode == 1) a.appmem_layout.guard_b = a.appmem_layout.exec_heap_cur_end;
+        else if (mode == 3) _disable(); /* EINVAL at prepare. */
+        heap_alloc_fail = mode == 2;
+        struct appmem_plan plan;
+        int rc = appmem_prepare(&a.appmem, &a.appmem_layout, 65536, 0, APPMEM_MAP_TOPDOWN, APPMEM_EXEC_LARGE, 0, &plan);
+        CHECK("f10 EFULL fixture", mode != 0 || rc == APPMEM_EFULL);
+        CHECK("f10 ENOVA fixture", mode != 1 || rc == APPMEM_ENOVA);
+        void *p = wrap_mem_alloc(65536);
+        CHECK("f10 fallback existing", (u32)p == MEM_EXEC_HEAP_BASE + BLK_HDR_SIZE &&
+              a.exec_heap_used == 65536 + BLK_HDR_SIZE);
+        void *q = wrap_mem_alloc(131072);
+        CHECK("f10 fallback 128KiB", (u32)q == MEM_EXEC_HEAP_BASE + 65536 + 2*BLK_HDR_SIZE &&
+              a.exec_heap_used == 196608 + 2*BLK_HDR_SIZE);
+        f10_pattern(p, 65536, 1); f10_pattern(q, 131072, 1);
+        f10_snapshot(0);
+        u32 maps = heap_map_calls;
+        CHECK("f10 fallback no growth", !wrap_mem_alloc(65536) && heap_map_calls == maps + 1); f10_snapshot(1);
+        f10_pattern(p, 65536, 0); f10_pattern(q, 131072, 0);
+        wrap_mem_free(p);
+        CHECK("f10 fallback one free used", a.exec_heap_used == 131072 + BLK_HDR_SIZE);
+        wrap_mem_free(q);
+        CHECK("f10 fallback free used", !a.exec_heap_used);
+        _enable(); heap_alloc_fail = 0; a.appmem_layout.guard_b = keep_guard;
+        f10_done();
+    }
+    heap_create(&a, 2);
+    f10_snapshot(0);
+    for (u32 n = 0; n < 7; n++) CHECK("rounding overflow rejected", !wrap_mem_alloc(0xfffffff9U + n));
+    CHECK("LARGE rounding overflow rejected", !wrap_mem_alloc(0xfffff001U));
+    CHECK("LARGE rounding overflow rejected", !wrap_mem_alloc(0xfffffff0U));
+    f10_snapshot(1);
+    f10_done();
+
+    /* LARGE rollback poisons this AS while an existing arena could satisfy it. */
+    heap_create_size(&a, 2, 4 * MEM_EXEC_HEAP_MIN);
+    f10_snapshot(0);
+    u32 rollback_frees = heap_free_calls;
+    heap_alloc_rollback_fail = 2; /* Allocate one page, then fail; rollback cannot free it. */
+    void *poisoned = wrap_mem_alloc(65536);
+    CHECK("f10 map rollback poison fixture", !heap_alloc_rollback_fail &&
+          integration_free_fail && a.appmem_poisoned && heap_free_calls > rollback_frees);
+    CHECK("f10 poisoned fallback rejected", !poisoned);
+    CHECK("f10 poisoned fallback arena unchanged", !a.exec_heap_used &&
+          equal(&a.appmem, &f10_as.appmem, sizeof(a.appmem)) &&
+          equal(heap_arena_image, (void *)MEM_EXEC_HEAP_BASE, 4 * MEM_EXEC_HEAP_MIN));
+    /* Host-only cleanup: product quarantines this owner forever. */
+    host_cr3 = roots[0]; heap_alias_on = 0;
+    integration_free_fail = 0; a.appmem_poisoned = 0; live_addrspaces++;
+    u32 rollback_owner = a.owner, rollback_reclaimed;
+    paging_addrspace_destroy(&a);
+    CHECK("f10 rollback fixture reclaim", ledger_reclaim_owner(rollback_owner, &rollback_reclaimed));
+    CHECK("f10 rollback fixture retire", ledger_owner_retire(rollback_owner));
+    heap_alias_on = 1;
+
+    /* Boundary positions 0, 8, 4088; minimum payload forces the last into the next page. */
+    const u32 offsets[] = {0, 8, 4088};
+    for (u32 n = 0; n < 3; n++) {
+        heap_create(&a, 2);
+        void *initial = wrap_mem_alloc(65528);
+        u32 live = PAGE_SIZE + offsets[n] - BLK_HDR_SIZE;
+        void *p = wrap_mem_alloc(live);
+        u32 arena_base = (u32)p - BLK_HDR_SIZE, old_end = a.appmem_layout.exec_heap_cur_end;
+        u32 kept_end = arena_base + (n == 2 ? 3 : 2)*PAGE_SIZE;
+        u32 used = 65536 + live + BLK_HDR_SIZE, pages = ledger_owner_pages(a.owner);
+        f10_pattern(p, live, 1);
+        CHECK("f10 trim tail pages", exec_heap_user_trim(&a) == (old_end - kept_end)/PAGE_SIZE);
+        CHECK("f10 trim header boundary", f10_extent((u32)p)->end == kept_end &&
+              a.appmem_layout.exec_heap_cur_end == kept_end && a.exec_heap_used == used &&
+              ledger_owner_pages(a.owner) == pages - (old_end - kept_end)/PAGE_SIZE &&
+              ((BlkHdr *)(arena_base + PAGE_SIZE + offsets[n]))->size == kept_end - arena_base - PAGE_SIZE - offsets[n] - BLK_HDR_SIZE);
+        f10_pattern(p, live, 0);
+        f10_snapshot(0); CHECK("f10 trim zero pages", !exec_heap_user_trim(&a)); f10_snapshot(1);
+        /* EXACT growth at the new end merges back into the trimmed arena. */
+        void *q = wrap_mem_alloc(65528);
+        CHECK("f10 trim regrowth", (u32)q == kept_end + BLK_HDR_SIZE && a.exec_heap_used == used + 65536);
+        f10_pattern(p, live, 0); wrap_mem_free(q); wrap_mem_free(p);
+        CHECK("f10 empty trim", exec_heap_user_trim(&a) == (kept_end + 65536 - arena_base)/PAGE_SIZE &&
+              !f10_extent(arena_base) && a.appmem_layout.exec_heap_cur_end == arena_base && a.exec_heap_used == 65536);
+        void *regrow = wrap_mem_alloc(128);
+        CHECK("f10 whole trim regrowth", (u32)regrow == arena_base + BLK_HDR_SIZE && a.exec_heap_used == 65536 + 136);
+        wrap_mem_free(regrow);
+        CHECK("f10 whole regrowth return", exec_heap_user_trim(&a) == 16 && a.exec_heap_used == 65536);
+        wrap_mem_free(initial);
+        u32 trims = heap_trim_calls;
+        f10_snapshot(0); CHECK("f10 INITIAL never trim", !exec_heap_user_trim(&a) && heap_trim_calls == trims);
+        CHECK("f10 INITIAL internal refused", appmem_exec_unmap(&a, MEM_EXEC_HEAP_BASE, 65536) == APPMEM_EINVAL);
+        f10_snapshot(1); f10_done();
+    }
+    /* Adjacent FREE blocks after ARENA merge: only the last block shrinks. */
+    heap_create(&a, 2);
+    CHECK("f10 merged initial", wrap_mem_alloc(65528));
+    void *p = wrap_mem_alloc(128);
+    CHECK("f10 merged growth", wrap_mem_alloc(65528));
+    void *last = (void *)(a.appmem_layout.exec_heap_cur_end - 65536 + BLK_HDR_SIZE);
+    /* Fixture reproduces adjacent FREE at a merge boundary without coalescing free(). */
+    ((BlkHdr *)last)[-1].magic = BLK_MAGIC_FREE; a.exec_heap_used -= 65536;
+    CHECK("f10 adjacent FREE trim", exec_heap_user_trim(&a) == 15 && a.exec_heap_used == 65536 + 136);
+    CHECK("f10 adjacent FREE reallocate", wrap_mem_alloc(256) && a.exec_heap_used == 65536 + 136 + 264);
+    wrap_mem_free(p); f10_done();
+    /* Used tail must not be returned. */
+    heap_create(&a, 2); CHECK("f10 used initial", wrap_mem_alloc(65528)); CHECK("f10 used arena", wrap_mem_alloc(65528));
+    f10_snapshot(0); CHECK("f10 used tail stays", !exec_heap_user_trim(&a)); f10_snapshot(1); f10_done();
+
+    /* All validation precedes any unmap, including a bad INITIAL and a later arena. */
+    for (u32 mode = 0; mode < 4; mode++) {
+        heap_create(&a, 2); CHECK("f10 corrupt initial", wrap_mem_alloc(65528));
+        void *p1 = wrap_mem_alloc(128); u32 anon;
+        CHECK("f10 split fixture", !appmem_map(&a, &a.appmem, &a.appmem_layout, PAGE_SIZE,
+              a.appmem_layout.exec_heap_cur_end, APPMEM_MAP_EXACT, APPMEM_ANON, 0, &anon));
+        void *p2 = wrap_mem_alloc(65528); wrap_mem_free(p2);
+        u32 va = mode == 0 ? MEM_EXEC_HEAP_BASE : (u32)p1 - BLK_HDR_SIZE;
+        u32 *entry = &((u32 *)P2V(a.app_pt_phys[(va - MEM_APP_BAND_BASE) >> 22]))[(va >> PAGE_SHIFT) % PTE_COUNT];
+        u32 old = *entry;
+        if (mode < 2) ((BlkHdr *)va)->magic = 0;
+        else *entry = mode == 2 ? old & ~PTE_PRESENT : old & ~PTE_USER;
+        f10_snapshot(0);
+        CHECK("f10 corrupt trim rejects all", !exec_heap_user_trim(&a) && a.exec_heap_used == ~0U);
+        f10_as.exec_heap_used = ~0U; f10_snapshot(1);
+        *entry = old; f10_done();
+    }
+    /* Prepare rejection vs physical-free failure: preserve headers/used in both. */
+    for (u32 large = 0; large < 2; large++) for (u32 poison = 0; poison < 2; poison++) {
+        heap_create(&a, 2);
+        CHECK("f10 failure initial", wrap_mem_alloc(65528));
+        void *p = wrap_mem_alloc(large ? 65536 : 128);
+        u32 va = large ? (u32)p : PAGE_ALIGN_UP((u32)p + 128 + BLK_HDR_SIZE + BLK_ALIGN);
+        u32 pa; CHECK("f10 failure page", !as_va_to_pa(a.pd_phys, va, &pa));
+        BlkHdr *tail = large ? (BlkHdr *)p : (BlkHdr *)((u8 *)p + 128);
+        BlkHdr hdr = *tail;
+        if (poison) integration_free_fail = pa / PAGE_SIZE;
+        else _disable(); /* prepare EINVAL; USER validation itself still succeeds */
+        f10_snapshot(0);
+        if (large) wrap_mem_free(p); else CHECK("f10 failure trim zero", !exec_heap_user_trim(&a));
+        CHECK("f10 failure header used", equal(tail, &hdr, sizeof(hdr)) && a.exec_heap_used == f10_as.exec_heap_used &&
+              a.appmem_layout.exec_heap_cur_end == f10_as.appmem_layout.exec_heap_cur_end && equal(&a.appmem, &f10_as.appmem, sizeof(a.appmem)));
+        if (!poison) { f10_snapshot(1); _enable(); f10_done(); }
+        else {
+            CHECK("f10 free failure poisoned", a.appmem_poisoned && !wrap_mem_alloc(16) && !exec_heap_user_trim(&a));
+            u32 frees = heap_free_calls; wrap_mem_free(p); CHECK("f10 poison free ignored", frees == heap_free_calls);
+            u32 pages = ledger_owner_pages(a.owner), owner = a.owner, left = exec_as_leftover_pages;
+            host_cr3 = roots[0]; heap_alias_on = 0;
+            exec_teardown_app(&g_slot[2]);
+            CHECK("f10 poison leftover", exec_as_leftover_pages == left + pages && ledger_owner_pages(owner) == pages);
+            /* Host-only cleanup: product quarantines this owner forever. */
+            integration_free_fail = 0; a.appmem_poisoned = 0; live_addrspaces++;
+            paging_addrspace_destroy(&a);
+            u32 reclaimed; CHECK("f10 fixture reclaim", ledger_reclaim_owner(owner, &reclaimed));
+            CHECK("f10 fixture retire", ledger_owner_retire(owner)); heap_alias_on = 1;
+        }
+    }
 }

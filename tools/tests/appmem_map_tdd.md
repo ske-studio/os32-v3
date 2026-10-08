@@ -175,3 +175,17 @@ fix1: INITIAL 256KiB の 65536/131072 全バイト保持、伸長拒否/overflow
 所属/候補 arena の PTE walk 数と集計差分、早期64KiB拒否の独立変異を追加。
 65535 byte は整列後64KiBでも小要求として伸長し、丸め後で伸長を拒否する変異も検出する。
 証拠は `/home/hight/os32-tmp/run/f9/f9_fix1_report.md`。実ゲスト受入は台帳 F-10。
+
+### f10 LARGE と trim (2026-10-08)
+
+同じ実体ハーネスで境界 65535/65536/65537 と Rust の余白込み要求、zero/全バイト、
+隣接 LARGE 非併合、base/base-8 の偽 header、内部 pointer/ANON/未使用 VA の free、
+EFULL/ENOVA/ENOSPC/EINVAL の既存 arena fallback と伸長禁止、teardown を検査する。
+各段の used を数値で照合。trim は全 arena 検証先行、INITIAL 拒否、末尾 USED、
+header の page 内 0/8/4088、0 page 不変、空全返却、cur_end と EXACT 再伸長、
+併合後の隣接 FREE を実行する。prepare 失敗は AS/全 PTE/header/ledger/used 不変、
+free 段失敗は毒化・header/used 不変・以後拒否・teardown leftover を実行する。
+追加変異は分類の両閾値、USER header 依存、内部 pointer 許容、LARGE 回収欠落/併合、
+fallback 伸長、header page 返却、失敗確定、INITIAL trim/内部 unmap 許容、
+USED 末尾返却、検証省略、cur_end 更新欠落。f9 暫定の期待はこの契約へ置換。
+証拠 `/home/hight/os32-tmp/run/f10/f10_report.md`。ゲスト未実施は台帳 F-11/F-12。

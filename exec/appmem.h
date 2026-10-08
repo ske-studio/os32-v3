@@ -45,8 +45,10 @@ int appmem_unmap_plan_valid(const struct appmem_table *table,
 void appmem_unmap_publish(struct appmem_table *table, const struct appmem_unmap_plan *plan);
 /* Public-policy entry; EXEC kinds are never accepted here. */
 int appmem_unmap(struct addrspace *as, struct appmem_table *table, u32 base, u32 bytes);
-/* Whole owned EXEC extent only; no partial or mixed-kind returns. */
+/* Whole owned ARENA/LARGE only; INITIAL is reserved until teardown. */
 int appmem_exec_unmap(struct addrspace *as, u32 base, u32 bytes);
+/* Validated arena trim; partial remnants retain ARENA kind/flags. */
+int appmem_exec_trim(struct addrspace *as, u32 base, u32 bytes);
 
 /* Saved launch metadata and public-boundary translation. */
 void appmem_init(struct addrspace *as, u32 img_end, u32 primary_end,

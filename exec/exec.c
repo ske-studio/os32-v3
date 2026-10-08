@@ -1093,7 +1093,7 @@ static void exec_teardown_app(AppSlot *a)
     shlib_addrspace_detach(a->as);
     for (u32 i = 0; i < APPMEM_EXTENT_MAX; i++) {
         const struct appmem_extent *e = &a->as->appmem.e[i];
-        if (e->kind == APPMEM_ANON || e->kind == APPMEM_EXEC_ARENA) {
+        if (e->kind == APPMEM_ANON || e->kind == APPMEM_EXEC_ARENA || e->kind == APPMEM_EXEC_LARGE) {
             u32 pages = (e->end - e->base) / PAGE_SIZE;
             if (paging_addrspace_free_user_range(a->as, e->base, e->end) != pages) {
                 paging_addrspace_poison(a->as);

@@ -973,7 +973,7 @@
   - 'Record fault_kill_count and exec_as_leftover_pages before and after malloc_arena_test'
   - 'Require malloc_arena_test PASS and exit 0; primary EXACT blocker forces secondary nano allocation'
   - 'Require cross-arena realloc preserves all old bytes, free permits EXACT remap of the management page and whole secondary arena, printf output is visible'
-  - 'Require kill delta 0 and leftover 0; run heap_test (64KiB malloc now uses TOPDOWN direct maps; mem_alloc classification belongs to f10), sbrk_grow_test, db_test and db_v50_test regressions'
+  - 'Require kill delta 0 and leftover 0; run heap_test (64KiB malloc now uses TOPDOWN direct maps; 64KiB mem_alloc uses one EXEC_LARGE extent per allocation (f10)), sbrk_grow_test, db_test and db_v50_test regressions'
   expect:
     exit: 0
     kill_delta: 0
@@ -988,7 +988,7 @@
   entry: malloc_arena_test
   observe:
   - 'Require malloc_arena_test PASS and exit 0 for 65535/65536/65537, all calloc bytes zero, 65536/65537 free permits EXACT remap of the whole direct map'
-  - 'Run alloc_demo: require PASS and exit 0, align 4096 pointer, explicit zeroing and writable tail; kernel classification of raw bytes remains f10 acceptance'
+  - 'Run alloc_demo: require PASS and exit 0, align 4096 pointer, explicit zeroing and writable tail; raw bytes including Rust alignment/prefix use the f10 threshold'
   - 'Record fault_kill_count and exec_as_leftover_pages before and after; require kill delta 0 and leftover 0'
   - 'Run heap_test, sbrk_grow_test, db_test and db_v50_test regressions; 64KiB malloc uses direct map'
   expect:
@@ -1008,10 +1008,29 @@
   - 'Require pointers outside [0x88000000,0x88010000), parent full-byte patterns after nested exec, and successful allocation after freeing the parent blocks'
   - 'Require both child and parent exec_heap_test PASS, exit 0; forged BlkHdr free preserves header and subsequent mem_alloc returns NULL without killing the process'
   - 'Read kernel.map symbols before/after: resident exec_heap.used (offset 8) must be equal; fault_kill_count delta 0 and exec_as_leftover_pages 0'
-  - 'Run heap_test with default heap: require at least one 64KiB mem_alloc block and exit 0; requests fitting existing arenas remain supported until f10 TOPDOWN classification'
+  - 'heap_test は f10 から INITIAL 65536 (f10-exec-large を参照): require at least one 64KiB mem_alloc block and exit 0; f10 requires every block page aligned and nonoverlapping, record nk, free and retry with the same nk; nk=0 prints ENOMEM/EFULL/ENOVA candidates (NULL-only API; ENOVA means no hole in TOPDOWN window [cur_end, guard_b)), resolve using global nospc counter deltas before/after and the AS extent table read while heap_test is paused (break) during execution'
   - 'Run db_test and db_v50_test regressions; park/yield resident invariance is also covered by host context restoration'
   expect:
     exit: 0
     kill_delta: 0
     leftover: 0
   evidence: ~/os32-tmp/evidence/<日付>/f9-exec-heap/
+
+- id: f10-exec-large
+  gate: F-11
+  contract: userland/tests/exec_heap_test.c
+  mode: manual
+  prereq: KAPI 71, memory layout 2; PM deploy current kernel, exec_heap_test and heap_test with 65536-byte INITIAL
+  entry: exec_heap_test
+  observe:
+  - 'Require parent and --child PASS and exit 0: 65535 pointer modulo 4096 is 8, 65536/65537 modulo is 0, initial LARGE bytes zero and full write/read patterns preserved across nested exec'
+  - 'Require 65536 free/reallocate returns the same VA with zero bytes; LARGE is freed successfully after parent resumes'
+  - 'Record fault_kill_count delta 0, exec_as_leftover_pages 0 and resident exec_heap.used unchanged'
+  - 'Run heap_test: nk>=1, every 64KiB mem_alloc block page aligned and nonoverlapping, record nk and require retry nk equal after free; count reflects remaining physical pages/extent slots under malloc workload'
+  - 'If nk=0, output names ENOMEM/EFULL/ENOVA candidates because mem_alloc exposes only NULL (ENOVA means no hole in TOPDOWN window [cur_end, guard_b)); inspect global paging_app_pt_nospc_count/paging_app_data_nospc_count deltas before/after and pause (break) during heap_test execution to read the AS extent table and identify the cause'
+  - 'Run db_test and db_v50_test regressions; trim has no guest entry until g TRIM_DONE (F-12)'
+  expect:
+    exit: 0
+    kill_delta: 0
+    leftover: 0
+  evidence: ~/os32-tmp/evidence/<日付>/f10-exec-large/
