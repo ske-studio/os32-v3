@@ -690,7 +690,7 @@
   prereq: PM integrated generation-3 build deployed; new kernel.map; 17MB current ini
   entry: ring3_guard bb; ring3_guard lease; ring3_guard free; v86 -d; v86 -b
   observe:
-  - Confirm boot kselftest_pass=288 and kselftest_fail=0; map_user_keep still counts one check
+  - Confirm boot kselftest_pass=289 and kselftest_fail=0; map_user_keep still counts one check; f13a adds mem_stat:TRUSTED AS extents (288+1, source expectation; collect the actual boot result)
   - Use tools/accept/pt0_snapshot.py with the deployed kernel.map before and after applications and V86
   - Inspect every PTE for font 0x1000-0x49fff, Unicode 0x4a000-0x69fff, BB 0x6a000-0x89fff and TVRAM/BRG 0xa0000-0xbffff; USER must be clear
   - E marker BB?? has ARMD, completion zero, target 0x6a000; serial PF error 7 and fault_kill_count delta one
@@ -698,7 +698,7 @@
   - Observe audit_runs rising and audit_fail=0 at master, AS and post-exec stages, including both V86 returns; shell/ver respond
   - Run db_test and db_v50_test and require their existing PASS totals
   expect:
-    kselftest_pass: 288
+    kselftest_pass: 289
     kselftest_fail: 0
     old_alias_user_pages: 0
     E_completion: 0
@@ -727,16 +727,16 @@
   gate: e11
   contract: docs/tasks/v3/TASK_T2D_T2H.md#2-4-user切替の一括境界
   mode: manual
-  prereq: PM integrated generation-3 build and saved generation-2 binary; KAPI v71 in both
+  prereq: PM integrated generation-3 build and saved generation-2 binary; KAPI v72 in both
   entry: Launch saved generation-2 program, then rebuilt generation-3 program
   observe:
   - Confirm header memory_layout_generation differs while KAPI version and all other generations agree
   - Old binary is rejected with memory layout generation mismatch before entry/AS allocation
-  - New binary starts normally; verify generation manifests and shell/ver response
+  - '世代2の写しは現行v72 appのヘッダ memory_layout_generation (offset 52) だけを2にした隔離コピー。sdk/os32x_hdr.py parse_headerで要求版72と他3世代の一致を確認し、元とコピーのSHA256・差分を保存する (accept_f12/gen2.logと同じ形)。保存済みv71_originalsとは別物'
   expect:
     generation_2_rejected: true
     generation_3_runs: true
-    kapi_version: 71
+    kapi_version: 72
   evidence: ~/os32-tmp/evidence/<日付>/<case id>/
 
 # e12 configuration matrix; accepted scope is restricted to RESULT observations.
@@ -930,7 +930,7 @@
   gate: F-6
   contract: userland/tests/mem_map_test.c
   mode: manual
-  prereq: KAPI 71, 17MB, current ini; PM deploy and fresh kernel.map
+  prereq: KAPI 72, 17MB, current ini; PM deploy and fresh kernel.map
   entry: mem_map_test
   observe:
   - 'Run mem_map_test: require PASS mem_map invalid addresses survived and PASS mem_map control, exit 0, kill delta 0'
@@ -939,6 +939,8 @@
   - 'Require MEMMAP PF armed VA=x and serial #PF addr=x at the same VA'
   - 'Require kill delta 1, no survived message; shell/ver remains responsive'
   - 'Run db_test and db_v50_test regression; record owner leftovers and image sizes'
+  - '共通実手順: gfx_demo200はESC待ち。アプリへESCを届けて終了し、rshellへESCが届いて閉じた場合はCPL0 shellからrshellを開き直す。GUIはgshellのRunダイアログから起動 (tools/gui_gate.py)。f12-consumersのinstall dry/cdinst dryはdry引数ではなくf13-f14-installer-cancelの画面拒否経路を指す'
+  - 'extentの採取はtools/accept/as_extents_at_teardown.pyのteardown入口bp (f13-consumers observe参照): 終了直前の総数・kind別を保存。生存期間中の最大値はこの台本の観測ではない。resident usedはexec_heap+8とCPL0常駐shellから打つmemの実測システム行を前後照合する'
   expect:
     control_exit: 0
     control_kill_delta: 0
@@ -950,13 +952,15 @@
   gate: F-7
   contract: userland/tests/sbrk_grow_test.c
   mode: manual
-  prereq: KAPI 71, memory layout 3, 17MB, current ini; PM deploy USER CRT binaries and fresh kernel.map
+  prereq: KAPI 72, memory layout 3, 17MB, current ini; PM deploy USER CRT binaries and fresh kernel.map
   entry: sbrk_grow_test
   observe:
   - 'Record fault_kill_count and exec_as_leftover_pages before and after sbrk_grow_test'
   - 'Record initial sbrk limit = page_up(img_end)+PAGE_SIZE (BSS tail plus one page); require sbrk_grow_test PASS, exit 0; growth past initial mapped_end is contiguous and writable'
   - 'Require below-initial and INT_MIN refusal, shrink preserves mapped pages, EXACT collision leaves break unchanged, retry succeeds'
   - 'Require kill delta 0 and leftover 0; run db_test and db_v50_test regressions'
+  - '共通実手順: gfx_demo200はESC待ち。アプリへESCを届けて終了し、rshellへESCが届いて閉じた場合はCPL0 shellからrshellを開き直す。GUIはgshellのRunダイアログから起動 (tools/gui_gate.py)。f12-consumersのinstall dry/cdinst dryはdry引数ではなくf13-f14-installer-cancelの画面拒否経路を指す'
+  - 'extentの採取はtools/accept/as_extents_at_teardown.pyのteardown入口bp (f13-consumers observe参照): 終了直前の総数・kind別を保存。生存期間中の最大値はこの台本の観測ではない。resident usedはexec_heap+8とCPL0常駐shellから打つmemの実測システム行を前後照合する'
   expect:
     exit: 0
     kill_delta: 0
@@ -967,13 +971,15 @@
   gate: F-8
   contract: userland/tests/malloc_arena_test.c
   mode: manual
-  prereq: KAPI 71, memory layout 3, 17MB, current ini; PM deploy USER adapter binaries and fresh kernel.map
+  prereq: KAPI 72, memory layout 3, 17MB, current ini; PM deploy USER adapter binaries and fresh kernel.map
   entry: malloc_arena_test
   observe:
   - 'Record fault_kill_count and exec_as_leftover_pages before and after malloc_arena_test'
   - 'Require malloc_arena_test PASS and exit 0; explicitly grow primary to keep+3 pages or more, restore break, then primary EXACT blocker forces secondary nano allocation'
   - 'Require cross-arena realloc preserves all old bytes, free permits EXACT remap of the management page and whole secondary arena, printf output is visible'
   - 'Require kill delta 0 and leftover 0; run heap_test (64KiB malloc now uses TOPDOWN direct maps; 64KiB mem_alloc uses one EXEC_LARGE extent per allocation (f10)), sbrk_grow_test, db_test and db_v50_test regressions'
+  - '共通実手順: gfx_demo200はESC待ち。アプリへESCを届けて終了し、rshellへESCが届いて閉じた場合はCPL0 shellからrshellを開き直す。GUIはgshellのRunダイアログから起動 (tools/gui_gate.py)。f12-consumersのinstall dry/cdinst dryはdry引数ではなくf13-f14-installer-cancelの画面拒否経路を指す'
+  - 'extentの採取はtools/accept/as_extents_at_teardown.pyのteardown入口bp (f13-consumers observe参照): 終了直前の総数・kind別を保存。生存期間中の最大値はこの台本の観測ではない。resident usedはexec_heap+8とCPL0常駐shellから打つmemの実測システム行を前後照合する'
   expect:
     total: 196664
     exit: 0
@@ -985,13 +991,15 @@
   gate: F-8
   contract: sdk/allocator/nano_adapter.c
   mode: manual
-  prereq: KAPI 71, memory layout 3; PM deploy rebuilt malloc_arena_test and alloc_demo
+  prereq: KAPI 72, memory layout 3; PM deploy rebuilt malloc_arena_test and alloc_demo
   entry: malloc_arena_test
   observe:
   - 'Require malloc_arena_test PASS and exit 0 for 65535/65536/65537, all calloc bytes zero, 65536/65537 free permits EXACT remap of the whole direct map'
   - 'Run alloc_demo: require PASS and exit 0, align 4096 pointer, explicit zeroing and writable tail; raw bytes including Rust alignment/prefix use the f10 threshold'
   - 'Record fault_kill_count and exec_as_leftover_pages before and after; require kill delta 0 and leftover 0'
   - 'Run heap_test, sbrk_grow_test, db_test and db_v50_test regressions; 64KiB malloc uses direct map'
+  - '共通実手順: gfx_demo200はESC待ち。アプリへESCを届けて終了し、rshellへESCが届いて閉じた場合はCPL0 shellからrshellを開き直す。GUIはgshellのRunダイアログから起動 (tools/gui_gate.py)。f12-consumersのinstall dry/cdinst dryはdry引数ではなくf13-f14-installer-cancelの画面拒否経路を指す'
+  - 'extentの採取はtools/accept/as_extents_at_teardown.pyのteardown入口bp (f13-consumers observe参照): 終了直前の総数・kind別を保存。生存期間中の最大値はこの台本の観測ではない。resident usedはexec_heap+8とCPL0常駐shellから打つmemの実測システム行を前後照合する'
   expect:
     total: 196664
     exit: 0
@@ -1003,15 +1011,17 @@
   gate: F-10
   contract: userland/tests/exec_heap_test.c
   mode: manual
-  prereq: KAPI 71, memory layout 3; PM deploy current kernel and exec_heap_test with 65536-byte heap
+  prereq: KAPI 72, memory layout 3; PM deploy current kernel and exec_heap_test with 65536-byte heap
   entry: exec_heap_test
   observe:
   - 'Parent and child both run /usr/bin/exec_heap_test.bin registered in userland/deploy.yaml; child argument is --child'
   - 'Require pointers outside [0x88000000,0x88010000), parent full-byte patterns after nested exec, and successful allocation after freeing the parent blocks'
   - 'Require both child and parent exec_heap_test PASS, exit 0; forged BlkHdr free preserves header and subsequent mem_alloc returns NULL without killing the process'
-  - 'Read kernel.map symbols before/after: resident exec_heap.used (offset 8) must be equal; fault_kill_count delta 0 and exec_as_leftover_pages 0'
+  - '新kernel.elfのnmでexec_heapを解決しused (+8)を前後採取。CPL0常駐shellのプロンプトでmemの実測システム行 resident heap total/used (MemStat resident_heap_total/resident_heap_used) と照合しused不変。CPL3 shからのmemはresident sbrk上限の観測に使わない。fault_kill_count delta 0 and exec_as_leftover_pages 0'
   - 'heap_test は f10 から INITIAL 65536 (f10-exec-large を参照): require at least one 64KiB mem_alloc block and exit 0; f10 requires every block page aligned and nonoverlapping, record nk, free and retry with the same nk; nk=0 prints ENOMEM/EFULL/ENOVA candidates (NULL-only API; ENOVA means no hole in TOPDOWN window [cur_end, guard_b)), resolve using global nospc counter deltas before/after and the AS extent table read while heap_test is paused (break) during execution'
   - 'Run db_test and db_v50_test regressions; park/yield resident invariance is also covered by host context restoration'
+  - '共通実手順: gfx_demo200はESC待ち。アプリへESCを届けて終了し、rshellへESCが届いて閉じた場合はCPL0 shellからrshellを開き直す。GUIはgshellのRunダイアログから起動 (tools/gui_gate.py)。f12-consumersのinstall dry/cdinst dryはdry引数ではなくf13-f14-installer-cancelの画面拒否経路を指す'
+  - 'extentの採取はtools/accept/as_extents_at_teardown.pyのteardown入口bp (f13-consumers observe参照): 終了直前の総数・kind別を保存。生存期間中の最大値はこの台本の観測ではない。resident usedはexec_heap+8とCPL0常駐shellから打つmemの実測システム行を前後照合する'
   expect:
     exit: 0
     kill_delta: 0
@@ -1022,15 +1032,17 @@
   gate: F-11
   contract: userland/tests/exec_heap_test.c
   mode: manual
-  prereq: KAPI 71, memory layout 3; PM deploy current kernel, exec_heap_test and heap_test with 65536-byte INITIAL
+  prereq: KAPI 72, memory layout 3; PM deploy current kernel, exec_heap_test and heap_test with 65536-byte INITIAL
   entry: exec_heap_test
   observe:
   - 'Require parent and --child PASS and exit 0: 65535 pointer modulo 4096 is 8, 65536/65537 modulo is 0, initial LARGE bytes zero and full write/read patterns preserved across nested exec'
   - 'Require 65536 free/reallocate returns the same VA with zero bytes; LARGE is freed successfully after parent resumes'
-  - 'Record fault_kill_count delta 0, exec_as_leftover_pages 0 and resident exec_heap.used unchanged'
+  - 'Record fault_kill_count delta 0, exec_as_leftover_pages 0 and resident exec_heap.used (+8) unchanged; compare with the system resident heap total/used line of mem from the CPL0 resident shell prompt'
   - 'Run heap_test: nk>=1, every 64KiB mem_alloc block page aligned and nonoverlapping, record nk and require retry nk equal after free; count reflects remaining physical pages/extent slots under malloc workload'
   - 'If nk=0, output names ENOMEM/EFULL/ENOVA candidates because mem_alloc exposes only NULL (ENOVA means no hole in TOPDOWN window [cur_end, guard_b)); inspect global paging_app_pt_nospc_count/paging_app_data_nospc_count deltas before/after and pause (break) during heap_test execution to read the AS extent table and identify the cause'
   - 'Run db_test and db_v50_test regressions; trim has no guest entry until g TRIM_DONE (F-12)'
+  - '共通実手順: gfx_demo200はESC待ち。アプリへESCを届けて終了し、rshellへESCが届いて閉じた場合はCPL0 shellからrshellを開き直す。GUIはgshellのRunダイアログから起動 (tools/gui_gate.py)。f12-consumersのinstall dry/cdinst dryはdry引数ではなくf13-f14-installer-cancelの画面拒否経路を指す'
+  - 'extentの採取はtools/accept/as_extents_at_teardown.pyのteardown入口bp (f13-consumers observe参照): 終了直前の総数・kind別を保存。生存期間中の最大値はこの台本の観測ではない。resident usedはexec_heap+8とCPL0常駐shellから打つmemの実測システム行を前後照合する'
   expect:
     exit: 0
     kill_delta: 0
@@ -1041,7 +1053,7 @@
   gate: F-13
   contract: userland/tests/malloc_arena_test.c
   mode: manual
-  prereq: KAPI 71, memory layout 3, 17MB; PM deploy rebuilt USER malloc_arena_test and verify its binary
+  prereq: KAPI 72, memory layout 3, 17MB; PM deploy rebuilt USER malloc_arena_test and verify its binary
   entry: malloc_arena_test
   observe:
   - 'Require PASS 196664/196664 and exit 0; explicitly grow primary to keep+3 pages or more before the blocker, record primary_limit; after f8, restore the primary break to brk and trim at least one page'
@@ -1049,6 +1061,8 @@
   - 'The returned range ends at the adjacent EXACT block start: this removes an extent tail, not a middle split'
   - 'Record fault_kill_count and exec_as_leftover_pages before/after; require kill delta 0 and teardown leftover 0'
   - 'Run sbrk_grow_test, heap_test, db_test and db_v50_test regressions; notification delivery is deferred to g'
+  - '共通実手順: gfx_demo200はESC待ち。アプリへESCを届けて終了し、rshellへESCが届いて閉じた場合はCPL0 shellからrshellを開き直す。GUIはgshellのRunダイアログから起動 (tools/gui_gate.py)。f12-consumersのinstall dry/cdinst dryはdry引数ではなくf13-f14-installer-cancelの画面拒否経路を指す'
+  - 'extentの採取はtools/accept/as_extents_at_teardown.pyのteardown入口bp (f13-consumers observe参照): 終了直前の総数・kind別を保存。生存期間中の最大値はこの台本の観測ではない。resident usedはexec_heap+8とCPL0常駐shellから打つmemの実測システム行を前後照合する'
   expect:
     total: 196664
     exit: 0
@@ -1070,9 +1084,11 @@
   observe:
   - 'PM runs each entry; require exit 0, existing drawing/Japanese/fullscreen return and directory/completion/dry paths remain successful; provision font_test font before execution'
   - 'Record fault_kill_count delta 0 and exec_as_leftover_pages 0 for each application; shell/ver responds'
-  - '各アプリ終了直後に、終了した AS の extent 本数の最大値 (上限32に対する余り32-max) と副 arena の数を記録する。teardown前の当該ASの最大値/個数を採取して終了直後の記録に添え、破棄済みASを読まない'
+  - 'tools/accept/as_extents_at_teardown.py (f13-consumersの準備/採取手順) のnm入口bpで終了直前の総数・kind別・free=32-total・arenas=ANON+EXEC_ARENA・poisonedを採取する。最大値と呼ぶ場合もこの終了直前のサンプル群の最大であり、生存期間中の最大値ではない。破棄済みASは読まない'
   - 'heap_sz=0 のアプリで EXEC_LARGE が多いとき fallback の受け皿が64KiBに縮む (レビュー R-5) ことを確かめる観測。extent上限の余りと副arena数を負荷・fallback成否と併記する'
   - 'Require db_test PASS 9/9 and db_v50_test PASS 42/42'
+  - '共通実手順: gfx_demo200はESC待ち。アプリへESCを届けて終了し、rshellへESCが届いて閉じた場合はCPL0 shellからrshellを開き直す。GUIはgshellのRunダイアログから起動 (tools/gui_gate.py)。f12-consumersのinstall dry/cdinst dryはdry引数ではなくf13-f14-installer-cancelの画面拒否経路を指す'
+  - 'extentの採取はtools/accept/as_extents_at_teardown.pyのteardown入口bp (f13-consumers observe参照): 終了直前の総数・kind別を保存。生存期間中の最大値はこの台本の観測ではない。resident usedはexec_heap+8とCPL0常駐shellから打つmemの実測システム行を前後照合する'
   expect:
     exit: 0
     kill_delta: 0
@@ -1085,16 +1101,18 @@
   gate: f12
   contract: docs/09_exec.md
   mode: manual
-  prereq: 17MB; PM deploy matching memory layout 3 build and saved memory layout 2 app/shlib copies; KAPI 71 and other generations match
+  prereq: 17MB; PM deploy matching memory layout 3 build and saved memory layout 2 app/shlib copies; KAPI 72 and other generations match
   entry: saved memory layout 2 app and shlib; rebuilt memory layout 3 app and shlib
   observe:
   - 'Verify headers/manifests/hashes; reject both old app and old shlib with memory layout generation mismatch (reason 3) before entry/AS allocation'
-  - 'Rebuilt app and shlib start normally; shell/ver responds'
+  - '世代2のapp/shlibは現行v72成果物の隔離コピーでヘッダoffset52 (memory_layout_generation) だけを2にする。parse_headerで他3世代・min_api_ver=72・kapi_data_offを照合しSHA256/変更バイトを保存 (gen2.logと同じ形)。shlib実ゲスト拒否はf13-f14-generation-shlibで観測。Rebuilt app and shlib start normally; shell/ver responds'
+  - '共通実手順: gfx_demo200はESC待ち。アプリへESCを届けて終了し、rshellへESCが届いて閉じた場合はCPL0 shellからrshellを開き直す。GUIはgshellのRunダイアログから起動 (tools/gui_gate.py)。f12-consumersのinstall dry/cdinst dryはdry引数ではなくf13-f14-installer-cancelの画面拒否経路を指す'
+  - 'extentの採取はtools/accept/as_extents_at_teardown.pyのteardown入口bp (f13-consumers observe参照): 終了直前の総数・kind別を保存。生存期間中の最大値はこの台本の観測ではない。resident usedはexec_heap+8とCPL0常駐shellから打つmemの実測システム行を前後照合する'
   expect:
     generation_2_app_rejected: true
     generation_2_shlib_rejected: true
     generation_3_runs: true
-    kapi_version: 71
+    kapi_version: 72
   evidence: ~/os32-tmp/evidence/<日付>/f12-generation/
 
 - id: f12-startup
@@ -1107,7 +1125,9 @@
   - 'Record libc initial limit = page_up(img_end)+PAGE_SIZE; exec_heap heap_sz=0 is64KiB, explicit size is page-rounded with64KiB minimum; stack maps full exec_stack_bytes'
   - 'Require heap_test and sbrk_grow_test PASS; f9/f10 parent/child content and classification preserved; parent heap is restored without reinitialization'
   - 'Require f11 trim>=1page, EXACT remap of returned tail, malloc from primary and PASS196664/196664'
-  - 'Resident sbrk limit remains0x375000 and exec_heap452KiB (only smaller explicit request shrinks); record fault_kill_count delta0 and teardown leftover0'
+  - 'CPL0常駐shellのプロンプトでmemを実行 (shからではない): 実測 Shell band sbrk上限=00375000 (g_api->sbrk_heap_limit == MEM_SHELL_GUARD)、実測システム行 resident_heap_total=462848 B (452KiB)。only smaller explicit request shrinks; record fault_kill_count delta0 and teardown leftover0'
+  - '共通実手順: gfx_demo200はESC待ち。アプリへESCを届けて終了し、rshellへESCが届いて閉じた場合はCPL0 shellからrshellを開き直す。GUIはgshellのRunダイアログから起動 (tools/gui_gate.py)。f12-consumersのinstall dry/cdinst dryはdry引数ではなくf13-f14-installer-cancelの画面拒否経路を指す'
+  - 'extentの採取はtools/accept/as_extents_at_teardown.pyのteardown入口bp (f13-consumers observe参照): 終了直前の総数・kind別を保存。生存期間中の最大値はこの台本の観測ではない。resident usedはexec_heap+8とCPL0常駐shellから打つmemの実測システム行を前後照合する'
   expect:
     exit: 0
     kill_delta: 0
@@ -1131,3 +1151,140 @@
     leftover: 0
     kselftest_fail: 0
   evidence: ~/os32-tmp/evidence/<日付>/f12-8mb-startup/
+
+# f13: current v72 playbook. Host controls are not live guest acceptance.
+- id: f13-mem-stat
+  gate: f13
+  contract: userland/tests/mem_stat_test.c
+  mode: manual
+  prereq: 17MB; PM deploy matching v72 kernel/shell/sh and mem_stat_test, verify deployed binaries, new kernel.map and boot result
+  entry: mem_stat_test; CPL3 sh mem; CPL0 resident shell mem
+  observe:
+  - 'Require mem_stat_test PASS self=<2..5> others=<the other three IDs in ascending order> and mem_stat_test: PASS 14/14, exit 0. ID is read from self before other-ID tests; USER accepts system/self and rejects every other ID with INVAL and out unchanged, including short/zero-size refusal'
+  - 'CPL3 shでmem: 従来5行の順を保ち、実測システム行 (kheap_total/used/free, phys_total_pages/free_pages, resident_heap_total/used) と自分だけ。CPL0 resident sbrk上限の実測行は出ない'
+  - 'P3修正後のアプリ表示は1本3行: 実測 app=<id> st=<state> fl=<flags> ext=<extents_total> [LIBC_INITIAL,EXEC_INITIAL,ANON,EXEC_ARENA,EXEC_LARGE] free=<extents_free> ar=<arenas> heap=<exec_heap_used>B; img=<load_addr>-<img_end> 主端=<primary_mapped_end> libc初=<sbrk_heap_limit> 窓0=<page_up(img_end)>-88000000; 端/TD=<exec_heap_cur_end>-<guard_b> stk=<stack_top-stack_size>-<stack_top>/<stack_size>B 初=<exec_heap_base>+<exec_heap_size>B。fixtureの計数値をゲストの期待にしない'
+  - 'CPL3 sh終了後、CPL0常駐shellのプロンプトでmem: live appがなければ (app なし) の1行。FREE IDのNOTFOUNDは表示しない。live appを置いた場合はID2..5の該当だけ3行ずつ。system/他エラーはerror行で残す'
+  - '新kernel.mapとbinary hashでboot kselftest_pass=289, kselftest_fail=0を実測しmem_stat:TRUSTED AS extentsの正例を確認 (ソース予測288+1を実測合格と混同しない)'
+  - 'fault_kill_countを前後で採りkill delta0、exec_as_leftover_pages0。db_test9/9・db_v50_test42/42、shell/ver応答を確認'
+  expect:
+    total: 14
+    exit: 0
+    kselftest_pass: 289
+    kselftest_fail: 0
+    kill_delta: 0
+    leftover: 0
+  evidence: ~/os32-tmp/evidence/<日付>/f13-mem-stat/
+
+- id: f13-generation
+  gate: f13
+  contract: exec/os32x_hdr.c
+  mode: manual
+  prereq: PM deploy matching v72 build; genuine saved v71 originals in ~/os32-tmp/evidence/2026-10-08/v71_originals/ with SHA256SUMS
+  entry: saved genuine v71 hello_r3 app; rebuilt shell; rebuilt sh; rebuilt gshell
+  observe:
+  - '保存したv71_originals/SHA256SUMSを照合し、本物のhello_r3.binをv72 kernelで起動、正常終了・shell/ver応答。再生成した72ヘッダを書換えて71の代用にしない。原本は不変で実行用コピーだけをPMが使う'
+  - 'sdk/os32x_hdr.py parse_headerで保存済みhello_r3.binのmin_api_ver=71、ヘッダformat4/ABI1/memory3/shlib_protocol0とkapi_data_off=0x4B8を照合しhashを保存。appのprotocol0はshlib不要の正規値 (exec/os32x_hdr.c:15-16)。inputs.jsonの4世代=[4,1,3,1]とappヘッダのprotocol0を混同しない。同じABI/memory/配置であることが互換の前提'
+  - '実際に配備したshell.bin/sh.bin/gshell.binのヘッダmin_api_ver=72をそれぞれ確認。app.conf shell/sh=72, gshell=50と実ヘッダfloor72を区別する。inputs.jsonにはKAPI版の欄がないため要求版をそれから読まない'
+  expect:
+    genuine_v71_app_runs: true
+    shell_min_api_ver: 72
+    sh_min_api_ver: 72
+    gshell_min_api_ver: 72
+    kill_delta: 0
+    leftover: 0
+  evidence: ~/os32-tmp/evidence/<日付>/f13-generation/
+
+- id: f13-consumers
+  gate: f13
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 17MB current ini; PM deploy matching v72 memory-layout3 kernel/static SDK/shlib/programs, verify hashes/new map and running ver Image CRC
+  entry: hello; gfx200_test; gfx_demo200; pegcchk; blit_test; bench; hello_gfx; font_test; gdi_test; about; filer; gui_demo; t5a_display; sh dir/completion/hsync dry; Rust filer list/expand/refresh; install dry; cdinst dry; sqlite_standalone; alloc_demo; math_test_rs; db_test; db_v50_test
+  observe:
+  - 'f12-consumersと同じentryを再実施。font_testのフォントを事前用意し、描画・日本語・fullscreenからの復帰・dir/補完/hsync dryを確認。gfx_demo200はESC待ち、rshellにESCが届いて閉じたらCPL0 shellで開き直す。GUIはgshellのRunダイアログから起動する'
+  - 'install dry/cdinst dryはdry引数でなくf13-f14-installer-cancelの拒否経路、Rust filerはf13-f14-filerのtree_expand/F5操作。必要媒体と画面操作を満たした場合だけ観測に数える'
+  - 'bp準備: 同じILP32 CROSS_DIRで python3 tools/accept/as_extents_at_teardown.py prepare <deploy-layout.json> を実行。PMは配備時にこのJSON (ELF/map/image SHA256、nmのexec_teardown_app入口、生成offset、EAX=AppSlot*) を証跡と保存し、実行kernelのver Image CRCと配備経路を照合。配備したboot/vmkernel.lz4を読み戻したローカルファイルを用意する (build/outの写しで代用しない)'
+  - 'PMがprepareのbp番地だけに入口bpを張り対象を起動。trap時に python3 tools/accept/as_extents_at_teardown.py capture <sample.json> --deployment <deploy-layout.json> --deployed-image <readback-vmkernel.lz4> --cmd <launched-command> --id <actual-app-id> --live。cmdとIDはその起動と照合し親子は各trap別JSON。ツールは一致しないELF/map/image・entry EIP・EAX役割/ID・実行codeでは採取しない。入口+0x24のAS/EAX手順は使わない'
+  - 'ツールのJSON cmd/id/total/free/kinds/arenas/poisoned/elf_sha256を保存: totalは終了直前の総数、kindはLIBC_INITIAL/EXEC_INITIAL/ANON/EXEC_ARENA/EXEC_LARGE、free=32-total、arenas=ANON+EXEC_ARENA。生存期間中の最大値はこの観測にしない。保存後はPMがbpを削除してresumeし終了を確認、破棄済みASは読まない。ツール自体はbp/再開を操作しない'
+  - 'CPL0常駐shellのプロンプトでアプリ前後にmemの実測システム行 resident heap total/used (MemStat resident_heap_total/used) を採りexec_heap+8と照合、used不変。resident sbrk上限はこのshellの実測 Shell band sbrk上限で採り、CPL3 shのlibc初は自己ASの値として扱う'
+  - 'heap_sz=0でEXEC_LARGEが多い場合のfallback受け皿64KiBを、終了直前のextent余り・副arena数・負荷/fallback成否と併記 (f12 R-5)。f13a_fix1_report.mdの3行表示の欄名に合わせ、fixture値を実測にしない'
+  - '各アプリでfault_kill_count前後差0、exec_as_leftover_pages0、exit0、shell/ver応答。Require db_test PASS9/9 and db_v50_test PASS42/42'
+  expect:
+    exit: 0
+    kill_delta: 0
+    leftover: 0
+    db_test: 9/9
+    db_v50_test: 42/42
+  evidence: ~/os32-tmp/evidence/<日付>/f13-consumers/
+
+# F-14 remains open until PM observes these paths in the guest.
+- id: f13-f14-installer-cancel
+  gate: F-14
+  contract: userland/system/install.c
+  mode: manual
+  prereq: PM媒体バッチ; matching v72 install FD and CD; readable hd0 with valid geometry/capacity; new binary hashes/map. FD起動またはルートが完全なinstall FD、CDはcd0からmount可能
+  entry: install (no dry argument); cdinst (no dry argument); GUI/画面キーボードで拒否、rshell自動入力を使わない
+  observe:
+  - 'install: FDに /VMKRNL.LZ4, /sys/boot_hdd.bin, /sys/loader_h.bin, /sys/shell.bin と /sys,/bin,/sbin,/etc の完全な集合を用意 (install.c:62-65, :443-467, :506-516)。引数の特別経路はrecover/revert-settingsだけ (:527-534)、通常のinstallを起動'
+  - 'install: IDE検出/identify (:550-564) → precheck_media/measure_need/inst_hdd_check/check_media (:570-584) → 対象表示/confirm_install (:587-590)。Do you want to proceed? [y/N]: 画面でnを入力し Installation aborted. Nothing was written. とexit0を確認 (:245-259, :590-592)。Preparing/書込み経路 (:600以後) に入らない。媒体欠損エラーは確認画面到達の成功に数えない'
+  - 'cdinst: /cd0/BOOT.PKG とMINIMAL.PKG (分割版はMINIMAL2.PKG以降連続) に /boot/vmkernel.lz4 と /sys/shell.bin が必要、BOOTにboot_hdd.bin/loader_hdd.bin (cdinst.c:40-58)。Mounting CD-ROM/Checking CD-ROM OK (:646-663) → Select [0-3]: で1 (Minimal) (:684-699) → required packages/preflight (:708-714) → Continue? [y/N]: (:717-719) でnを入力。Installation cancelled. Nothing was written. を確認 (:724-730)。0を選ぶだけのキャンセルはpreflight経路の受入にしない'
+  - '両方で拒否の前後にhd0の同じ領域/ファイルのhashと資源を比較し書込みなし、fault_kill_count差0、teardown leftover0、shell/ver応答。必要媒体や画面操作が未実施ならF-14を保留する。ERASE/yの経路はこの観測に含めない'
+  expect:
+    install_cancel_exit: 0
+    install_message: Installation aborted. Nothing was written.
+    cdinst_message: Installation cancelled. Nothing was written.
+    writes: 0
+    kill_delta: 0
+    leftover: 0
+  evidence: ~/os32-tmp/evidence/<日付>/f13-f14-installer-cancel/
+
+- id: f13-f14-filer
+  gate: F-14
+  contract: userland/rust/filer/src/model.rs
+  mode: manual
+  prereq: PM matching v72 GUI build; populated directory tree; gshell Run dialog
+  entry: Rust filer list/expand/refresh (e11c3-ls observe)
+  observe:
+  - 'gshellのRunダイアログでfilerを起動し、e11c3-ls observeの一覧・枝展開・更新を再実施。ディレクトリ枝を開いてtree_expand (model.rs:744) の子一覧/順序を観測し、F5 (lib.rs:41) で再読込み。数百件でも窓境界で欠落しない'
+  - 'GUI切替の前後にCPL0常駐shellのmemシステム欄を採る。filer自身のASは終了直前のbp JSON (f13-consumers手順) で採り、fault_kill_count差0・leftover0・shell/ver応答とともに保存'
+  expect:
+    list_expand_refresh: success
+    kill_delta: 0
+    leftover: 0
+  evidence: ~/os32-tmp/evidence/<日付>/f13-f14-filer/
+
+- id: f13-f14-resident
+  gate: F-14
+  contract: userland/shell/cmd_sys.c
+  mode: manual
+  prereq: matching v72 build; CPL0 resident shell prompt, not CPL3 sh; default resident heap request
+  entry: CPL0常駐shellのプロンプトでmem (shからではない)
+  observe:
+  - '実測 Shell band sbrk上限=00375000 が g_api->sbrk_heap_limit == MEM_SHELL_GUARD を示す。定数 Shell band 行だけでは合格にしない。実測システム行 resident heap total=462848 B (452KiB) を確認し、exec_heap+8のusedと前後比較'
+  - 'CPL3 shのlibc初/sbrk_heap_limitは自己sbrk_endでresident上限ではない。f12-startupのshell/gshell子起動と復帰後に再びCPL0 shellの実測を採り、kill差0/leftover0を確認'
+  expect:
+    resident_sbrk_limit: 0x375000
+    resident_heap_total: 462848
+    kill_delta: 0
+    leftover: 0
+  evidence: ~/os32-tmp/evidence/<日付>/f13-f14-resident/
+
+- id: f13-f14-generation-shlib
+  gate: F-14
+  contract: exec/os32x_hdr.c
+  mode: manual
+  prereq: PM isolated cold-boot shlib rejection session; matching v72 gui_demo/shlib with memory layout3; record original SHA256, boot medium and /sys/lib/libos32gui.shlib readback; new kernel.elf/map
+  entry: cold boot with generation2 shlib copy, GUI request to CUI fallback, current gui_demo launch refusal; restored generation3 cold boot and gshell Run gui_demo
+  observe:
+  - '現行libos32gui.shlibの隔離コピーを作り、memory_layout_generationヘッダoffset52だけを2に変更 (accept_f12/gen2.logのapp写しと同じ形、gen_h2_fixtures.py:61-65)。parse_headerでmin_api_ver72/他3世代/kapi_data_off不変、差分がこの4B内だけ、元と写しのSHA256を保存。本物のv71_originalsは変更しない'
+  - 'shlib_initはbootで1回だけ (kernel/kernel.c:740)。PMが隔離媒体の /sys/lib/libos32gui.shlib に世代2コピーを置いて読み戻しhashを照合しcold boot。現行kernel.elfのnmでg_reject/g_loadedの番地を解決し、実メモリg_reject=SHLIB_REJECT_LAYOUT (1)、g_loaded=0を採る (kernel/shlib.c:18-35, kernel/shlib.h:26)。os32x_layout_checkの戻り値3とは別の状態。ロード済みセッションでファイルを差し替えただけの結果は数えない'
+  - 'GUI起動要求で GUI shlib: rebuild required (KAPI data layout) -> CUI shell の画面案内とCPL0 shellへの復帰を確認 (kernel/kernel.c:794-802)。同じv72のgui_demo.binはparse_headerでshlib_protocol=1を確認し、CPL0 shellから起動すると Error: required shared library is not loaded で拒否 (exec/exec.c:963-964, :1767-1773)。この起動の前後でexec_entry_calls/AS資源不変、shell/ver応答を確認。boot全体ではCUI shellが起動するため、そのentryを差に混ぜない'
+  - '正しい世代3をPMが復元して読み戻しhashを照合し、再びcold boot。g_reject=0/g_loaded=1とgshell起動・Runから同じgui_demoの正常起動/終了を確認。これはhost prev-memory-generation-shlibの成功とは別の実ゲスト観測、F-14を台本追加だけで閉じない'
+  expect:
+    generation_2_shlib_rejected: true
+    shlib_reject_reason: 1
+    shlib_loaded_on_reject: 0
+    gui_fallback_to_cui: true
+    entry_delta_on_reject: 0
+    generation_3_runs: true
+  evidence: ~/os32-tmp/evidence/<日付>/f13-f14-generation-shlib/
