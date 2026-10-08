@@ -159,3 +159,9 @@ X-2 の前半 (e8a の RO 日本語) は `accept_e11/RESULT.md` の GUI 日本�
 | ID | 閉じた項目 | 証拠 |
 |---|---|---|
 | F-11 | f10: exec_heap_test 親子 PASS (65535/65536/65537・同 VA 再確保・親の LARGE 保持)、heap_test LARGE 29×64KB・重なり 0・retry 同数、回帰 (mem_map/sbrk/malloc_arena/alloc_demo/db/hsync) kill+0・leftover 0 | `~/os32-tmp/evidence/2026-10-08/accept_f10/RESULT.md` |
+
+## f11 のゲスト受入 (2026-10-08、main 37976e7)
+
+| ID | 閉じた項目 | 証拠 |
+|---|---|---|
+| F-13 | f11: malloc_arena_test 196664/196664 (trim → EXACT 再 map → 再 malloc)、回帰 (sbrk/heap/exec_heap/alloc_demo/db/mem_map/hsync) kill+0・leftover 0 | `~/os32-tmp/evidence/2026-10-08/accept_f11/RESULT.md` |
