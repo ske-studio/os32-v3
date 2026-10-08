@@ -145,3 +145,11 @@ X-2 の前半 (e8a の RO 日本語) は `accept_e11/RESULT.md` の GUI 日本�
 | ID | 閉鎖した内容 | 証拠 |
 |---|---|---|
 | F-1 | 公開 USER 専用 mem_map/mem_unmap、KAPI 71・caller 接続・私有エラー翻訳を実装。ゲスト対照は F-6 に継承。 | `/home/hight/os32-tmp/run/f5/f5b_report.md` |
+
+## f5b〜f9 のまとめゲスト受入 (2026-10-08、main 8d244dd)
+
+| ID | 閉じた項目 | 証拠 |
+|---|---|---|
+| F-7 | f6 の USER CRT: sbrk_grow_test 397/397、kill+0・leftover 0、db 回帰 | `~/os32-tmp/evidence/2026-10-08/accept_f5b_f9/RESULT.md` |
+| F-8 | f7/f8: malloc_arena_test 196658/196658、alloc_demo 19/19 (align 4096)、heap_test・db 回帰、kill+0・leftover 0 | 同上 |
+| F-10 | f9: exec_heap_test 親子 PASS、resident exec_heap used 不変、heap_test の mem_alloc 64KB×19、hsync $?=0 | 同上 |
