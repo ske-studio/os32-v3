@@ -153,3 +153,9 @@ X-2 の前半 (e8a の RO 日本語) は `accept_e11/RESULT.md` の GUI 日本�
 | F-7 | f6 の USER CRT: sbrk_grow_test 397/397、kill+0・leftover 0、db 回帰 | `~/os32-tmp/evidence/2026-10-08/accept_f5b_f9/RESULT.md` |
 | F-8 | f7/f8: malloc_arena_test 196658/196658、alloc_demo 19/19 (align 4096)、heap_test・db 回帰、kill+0・leftover 0 | 同上 |
 | F-10 | f9: exec_heap_test 親子 PASS、resident exec_heap used 不変、heap_test の mem_alloc 64KB×19、hsync $?=0 | 同上 |
+
+## f10 のゲスト受入 (2026-10-08、main 53fd67a)
+
+| ID | 閉じた項目 | 証拠 |
+|---|---|---|
+| F-11 | f10: exec_heap_test 親子 PASS (65535/65536/65537・同 VA 再確保・親の LARGE 保持)、heap_test LARGE 29×64KB・重なり 0・retry 同数、回帰 (mem_map/sbrk/malloc_arena/alloc_demo/db/hsync) kill+0・leftover 0 | `~/os32-tmp/evidence/2026-10-08/accept_f10/RESULT.md` |
