@@ -4,7 +4,7 @@
  *
  *  実 paging.c / pgalloc.c / physmem.c と kselftest の ledger 手順を ILP32 で
  *  実行し、特権命令だけホスト用に差し替える。
- *  旧物理 byte 予算、高位の3つの疎 PDE、master USER 隔離、確保失敗の
+ *  高位の3つの疎 PDE、master USER 隔離、確保失敗の
  *  巻戻し、PT/PD の返却、8/17MB の boot ledger と先頭 lease PT を検査。
  * ======================================================================== */
 #include "types.h"
@@ -122,10 +122,6 @@ void _start(void)
     host_pool_boot(16384);
 
 
-    /* Old physical-budget ceiling remains separate from high VA capacity. */
-    CHECK(paging_app_band_pdes(MEM_PHYS_EXEC_FLOOR, 0, 0xE00000) == 1);
-    CHECK(paging_app_band_pdes(MEM_PHYS_EXEC_FLOOR, 0x400000, 0xE00000) == MEM_LEGACY_APP_PDES);
-    CHECK(paging_app_band_pdes(MEM_PHYS_EXEC_FLOOR, 0x400000, 0x600000) == 1);
     {
         struct addrspace a, b;
         u32 oa, ob, before = pgalloc_free_pages(), k, pa[3], va[3];

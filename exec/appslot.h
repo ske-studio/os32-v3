@@ -106,7 +106,7 @@ typedef struct {
     u32  frame[APP_FRAME_WORDS];    /* park した CPL=3 フレーム (D2 の (b)) */
 
     /* 旧 ExecContext の中身 (レイアウトは 1 バイトも動かさない — I12/I13) */
-    u32  guard_a;             /* sbrk ガード (= exec_heap の直下) */
+    u32  guard_a;             /* 初期 sbrk ガード (= page_up(img_end) + PAGE_SIZE) */
     u32  guard_b;             /* スタックガード */
     u32  sbrk_heap_limit;
     u32  exec_heap_base;

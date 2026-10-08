@@ -28,6 +28,7 @@
 /* ====================================================================== */
 /*  カーネル配置                                                            */
 /* ====================================================================== */
+#define MEM_PAGE_SIZE         0x1000UL    /* ページサイズ。paging.h の PAGE_SIZE と同値 */
 #define MEM_1MB               0x100000UL  /* 1MB */
 #define MEM_GUARD_SIZE        0x1000UL    /* ガードページ 1 枚 (= PAGE_SIZE) */
 #define KERNEL_LOAD_ADDR      0x100000UL  /* カーネルロードアドレス (1MB) */
@@ -358,11 +359,10 @@ extern u32 __sqlite_end;
 #define MEM_EXEC_HEAP_BASE    0x88000000UL
 #define MEM_APP_STACK_TOP     MEM_APP_BAND_MAX_TOP
 #define MEM_APP_STACK_MIN     0x4000UL
-/* T2c--T2e: preserve the old startup byte budget until T2f. */
+/* 物理 pool の起点と workspace。USER の VA 予算とは独立。 */
 #define MEM_PHYS_EXEC_FLOOR   0x500000UL
 #define MEM_PHYS_WORKSPACE_FLOOR 0xC00000UL
 #define MEM_LEGACY_APP_BASE   MEM_POOL_BASE
-#define MEM_LEGACY_APP_PDES   2UL
 
 /* ====================================================================== */
 /*  物理 RAM の地図 (K6-RAM, 2026-09-11)                                    */
@@ -443,11 +443,12 @@ extern u32 __sqlite_end;
 
 /* 外部アプリ image/sbrk は高位、heap と可変 stack は別予約。 */
 #define MEM_EXEC_LOAD_ADDR    MEM_SHLIB_END       /* 0x80100000 */
-/* T2c--T2e は旧物理予算から得た byte 数だけを高位 VA へ写す。
- * 起動時 heap 最小化・map allocator への変更は T2f。 */
-#define MEM_EXEC_SBRK_MIN     0x40000UL          /* sbrk に最低限残す 256KB */
 #define MEM_EXEC_HEAP_MIN     0x10000UL          /* exec_heap の最小 64KB */
 #define MEM_EXEC_STACK_SIZE   0x40000UL          /* スタックサイズ 256KB (-O0 SQLite対応) */
+/* boot pool が残す最小域: libc の初期追加は 1 page。
+ * memmap.h は paging.h に先行するため、同値の正典 MEM_PAGE_SIZE を使う。 */
+#define MEM_EXEC_BOOT_MIN (MEM_PHYS_EXEC_FLOOR + MEM_EXEC_STACK_SIZE + \
+                           MEM_PAGE_SIZE + MEM_EXEC_HEAP_MIN)
 
 /* ====================================================================== */
 /*  ホットデプロイ窓は撤去 (2026-09-09)                                    */

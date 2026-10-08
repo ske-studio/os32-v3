@@ -2,58 +2,20 @@
 
 ### 開発方針と現在の実装上限
 
-- **最低動作環境の数値は未確定**。「CUI 最低 8MB」という記述が 2026-09-09 に
-  一時入っていたが、根拠が無く、既存の設計制約と矛盾するため撤回した。
-  現時点で言えるのは設計上の下限が **物理 9.6MB 構成以上**であること
-  ([tasks/gui/DESIGN.md §9.3](tasks/gui/DESIGN.md)、2026-09-04)。
-  理由は CPL=3 アプリのスタックが物理 0x7C0000〜0x7FFFFF に固定で、
-  8MB ちょうどではアプリ帯がホットデプロイ窓と重なるため。
-- **CPL=3 のアプリ帯は 4MB (PDE) 単位で伸びる** (2026-09-10、票
-  [tasks/memory/APP_BAND_PDE.md](tasks/memory/APP_BAND_PDE.md))。
-  2026-09-09 までは PDE 1 枚固定の 3MB 窓 (0x500000〜0x800000) で、
-  `RING3_USTACK_TOP` も `RING3_HEAP_TOP` も定数だったため **RAM を増やしても
-  1 アプリの利用可能量は増えなかった** (8MB でも 15MB でも `heap_test` の
-  レイアウトは完全に同一、avail 2,605,056 バイト)。
-  現在はアプリ固有 PDE を **1〜2 枚** (`MEM_APP_BAND_MAX_PDES`) 取れる:
-
-  | 枚数 | 帯 | 条件 |
-  |---|---|---|
-  | 1 (既定) | 0x400000〜0x7FFFFF | OS32X ヘッダの `heap_size` が 0、または 1 枚に収まる。**従来と完全に同じレイアウト** |
-  | 2 | 0x400000〜0xBFFFFF | `heap_size` が 1 枚に収まらず、かつ空き RAM が届く (子の claim 範囲 A の末尾まで) |
-
-  上限が 2 枚なのは PDE 3 (0xC00000〜0xFFFFFF) に PEGC のリニア窓 0xF00000 が
-  入るため (`MEM_APP_BAND_DEVICE_FLOOR`)。枚数は `paging_app_band_pdes()` が
-  決め、`exec/exec.c` の `RING3_USTACK_TOP` / `RING3_HEAP_TOP` は
-  そこから導かれる実行時の値になった。空き RAM が足りず要求が入らないときは
-  切り詰めずに `EXEC_ERR_NOMEM` で拒否する (スワップは持たない)。
-- **ユーザーメモリを連続させる** (2026-09-09 方針)。目的は「1 アプリに渡せる
-  連続領域を最大化すること」であって、物理末尾を空けておくことではない。
-
-  ```
-  システム - ユーザー - システム   OK  (末尾 1MB が予約でも構わない)
-  ユーザー - システム - ユーザー   NG  (ユーザー帯に穴が開く)
-  ```
-
-  末尾側の予約 (旧 `sys_reserve_top`、T1e 以後は起動時の ⑥ が池のアリーナ内の上端から
-  BB を取り `sys_usable_mem_end()` をその下に凍結する — TASK_T1_LEDGER §3-6) はこの形を保つ限り問題ない。禁じるのは
-  **ユーザー帯の内側を割ること**。したがって予約は
-  「使用可能上限の直下から連続して」取り、アプリ帯 (CPL=3 は 0x500000 から
-  枚数ぶん、最大 0xC00000) に食い込ませない。食い込む構成は**その RAM 量を非対応とする**方が、
-  帯に穴を開けるより良い。
-  この方針でホットデプロイの物理末尾 256KB 窓を撤去した — 窓は CPL=3 スタック帯と
-  完全に同じ範囲で、8MB 構成ではユーザー帯を割っていた。ユーザーランドの配送は
-  HostDrv (`make deploy` → ゲストの `hsync`) に一本化した。
-  装置が実際に占める帯 (PEGC の 0xF00000、Cirrus の 0x1000000) は装置側の事実なので
-  `physmem` のモデルで MMIO として扱う。
-- **PEGC (640x480) を使う GUI の下限は物理 9MB** (2026-09-09 実測)。バックバッファ
-  300KB を末尾から取る (当時は `sys_reserve_top`、今は ⑥ の池からの確保) ので、それがアプリ帯 (既定 1 枚なら
-  0x500000〜0x800000) の外に収まる必要がある。8MB では収まらず食い込む (実測: 予約が 0x7B5000 から
-  始まりアプリ帯と重なる)。9MB では 0x8B3000 から始まりアプリ帯の外
-  (`hal_test` = `backend pegc 640x480 bpp=8`、`heap_test` の overlap check OK)。
-  PEGC VRAM は 512KB しかなく (Bible 3-2)、640x480x8 = 307200 の 2 面は入らないので
-  バックバッファは主記憶に置く。640x400 なら 2 面が VRAM に収まり
-  `I/O 00A4h` のハードウェアページフリップが使える (UNDOCUMENTED io_disp 452-460、846)
-  ため主記憶は不要になるが、480 ラインは採らない選択になる。
+- **最低動作環境の数値は未確定**。旧物理固定配置での9.6MB下限説明
+  ([tasks/gui/DESIGN.md §9.3](tasks/gui/DESIGN.md)、2026-09-04) は当時の設計記録。
+  現行は高位 VA と物理 pool を分離し、旧ホットデプロイ窓も撤去済み。
+  f12 の8MBホスト証拠をゲストや全バックエンドの最低動作環境へ一般化しない。
+- **CPL=3 は高位 VA の私有 AS**。image/libc は `MEM_EXEC_LOAD_ADDR` (0x80100000)、
+  exec_heap は `MEM_EXEC_HEAP_BASE` (0x88000000)、可変 stack は `MEM_APP_STACK_TOP` の下に置く。
+  PT は使用 PDE ごとに疎確保し、PD + lease 先頭 PT + 使用 PDE 集合 (重複は1回) +
+  shlib data + 実 data pages が起動予算。旧 `paging_app_band_pdes()` と物理0x00C00000天井は f12 で撤去。
+  VA または実 free pages が不足すれば切り詰めず `EXEC_ERR_NOMEM`、失敗時は全返却する。
+  8MB はホストで起動予算を確認済み、ゲスト構成確認は H-4 に持越し。
+- **物理 pool の供給と USER の VA は別管理**。装置窓は RAM と区別し、
+  boot の `gfx_boot_reserve` がバックバッファを池から確保する。旧物理末尾の
+  ホットデプロイ窓は撤去済み。PEGC 640x480 の9MB下限という2026-09-09の実測は
+  旧物理固定配置での記録であり、現行構成の下限は構成別ゲスト確認 (H-4) で判断する。
 - GUI の必要 RAM はバックエンド・常駐領域・アプリの実測から別途定義する。
   GUI 開発を特定の容量に収めることや、8MB GUI 互換維持を暗黙の受入条件にしない。
 - 32bit フラットアドレス空間の設計対象は 4GiB（0x00000000〜0xFFFFFFFF）。
@@ -97,36 +59,19 @@
 以下は搭載メモリ量・バイナリの大きさ・起動の仕方で変わるので手で持つ。
 
 ```
-[ 共有ライブラリ帯域 (0x400000 - 0x4FFFFF, K3 2026-09-06) ]
-0x400000 - text_end                libos32gui.shlib の先頭 4KB ジャンプ表 + .text/.rodata  RO, USER, 全 PD 共有
-data_vaddr - data_end              .data/.bss (アプリごとに物理ページを複製)         R/W, USER
-0x4FFFFF 直下                      .data/.bss の原本 (ロード時に退避)
-
-[ プログラム空間 (0x500000 - mem_end) ]
-0x500000 - code_end                .text + .data + .bss (固定上限なし)        R/W
-code_end - guard_a                 newlib sbrk (最低 MEM_EXEC_SBRK_MIN=256KB)  R/W
-guard_a  (4KB)                     ★ GUARD A: sbrk上限ガード (位置は動的)     NP
-guard_a+4KB - heap_top             exec_heap (KAPI mem_alloc)                 R/W
-                                   heap_top = CPL=3: アプリ帯上端のスタックガード
-                                   直下 (1 枚なら 0x7BF000、2 枚なら 0xBBF000)
-                                   / CPL=0: GUARD B - 動的確保リザーブ
-                                   大きさ: OS32X ヘッダ heap_size 指定があれば
-                                   それ、0 なら空きを sbrk と折半 (2026-09-04)
-  ...    - (mem_end-260KB)         (CPL=0 のみ) 動的確保リザーブの穴 1MB
-(mem_end-260KB) - (-256KB) 4KB     ★ GUARD B: スタックovrflowガード           NP
-(mem_end-256KB) - mem_end  256KB   プログラムスタック (下向き展開)            R/W
+[ USER の高位 VA (memory_layout 世代3) ]
+0x80000000 - 0x800FFFFF            shlib text RO共有 / data 私有複製
+0x80100000 - img_end               .text + .data + .bss
+img_end - sbrk_end                 libc 初期量: BSS 端の端数 + 1 page、RW
+sbrk_end = page_up(img_end)+PAGE_SIZE = guard_a (1 page NP)
+0x88000000 - exec_heap_end         exec_heap 初期量: 未指定64KiB、明示値はページ丸め/最低64KiB
+stack_top-stack_size-PAGE_SIZE     guard_b (1 page NP)
+stack_top-stack_size - stack_top   可変 stack 全量 RW
 ```
 
-  ※ mem_end = `sys_usable_mem_end()`。PEGC/Cirrus の 8bpp バックバッファを使う構成では
-    起動時の ⑥ (`gfx_boot_reserve`) が PEGC の BB 300KB をアリーナの上端から池で確保し
-    (owner = boot → gshell、台帳の SURFACE)、`sys_usable_mem_end()` をその下端に凍結する
-    (`ledger_arena_top`、TASK_T1_LEDGER §3-6。旧 `sys_reserve_top` は T1e で撤去)。
-    Cirrus の面はリニア窓の中 (MMIO) なので引かない
-  ※ カーネル帯域内の KAPI / SHM の番地は `__bss_end` を基点に動的算出される。
-    **だから生成した地図は `kernel.map` を読まないと書けない** (票 TASK_KSTACK_USER §4-bis)
-  ※ 入れ子起動は子として走り終了で親へ戻る (最大 4 段)。CPL=3 のプログラムは
-    PD ごとに独立したアプリ帯を持つ (09_exec.md)。帯は 0x400000 から 4MB (PDE)
-    単位で 1〜2 枚 (tasks/memory/APP_BAND_PDE.md)。0x400000 帯の shlib .text は共有、.data はアプリごと
+実行中の libc EXACT 伸長・副 arena・大塊と exec_heap の追加領域は `mem_map` を使う。
+固定初期域と extent の回収を分け、終了後の leftover は0。
+resident shell/gshell は sbrk 上限0x375000、exec_heap 452KiB (小さい明示値のみ縮小) を維持する。
 
 > シェルは newlib の sbrk ヒープと KAPI `mem_alloc` の exec_heap の 2 系統を
 > 持つ。かつては両方が BSS 終端から始まり互いを上書きしていた

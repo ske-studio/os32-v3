@@ -4,6 +4,8 @@
 >
 > 発行: PM (2026-09-10) / それまでの状態: **受入待ち (2026-09-10)**
 
+**設計記録 (v2.1)**: 下記の `MEM_EXEC_SBRK_MIN` と `paging_app_band_pdes()` は f12 で撤去。現行 USER は libc 初期末尾 `page_up(img_end)+PAGE_SIZE`、exec_heap は未指定64KiB・明示値はページ丸め/最低64KiB、実 data pages と使用 PDE 集合で起動予算を求める ([02_memory.md](../../02_memory.md))。
+
 実装は `b8dab24` で着地 (ホスト TDD は `make check` の `check-memory-host`)。§5 のゲスト受入は未記録。
 担当: コーダー (Opus 5、worktree 隔離) / 検証: PM + ローカル AI
 

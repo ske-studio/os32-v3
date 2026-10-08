@@ -7,6 +7,8 @@ check-memory-host:
 - exec/lease.c
 - exec/appslot.c
 - exec/exec.c
+- exec/appmem.c
+- kernel/shlib.c
 - kernel/kernel.c
 - kernel/memory_boot.c
 - kernel/paging.c
@@ -30,7 +32,7 @@ check-memory-host:
 - tools/tests/memory_boot_host.c
 - tools/tests/paging_rebuild_host.c
 - tools/tests/pgalloc_range_host.c
-- tools/tests/sbrk_tier_host.c
+- tools/tests/exec_budget_host.c
 - tools/tests/test_app_band_pde.py
 - tools/tests/test_app_bb_overlap.py
 - tools/tests/test_device_reservation.py
@@ -53,7 +55,11 @@ check-memory-host:
 - tools/tests/test_pgalloc_model.py
 - tools/tests/test_pgalloc_range.py
 - tools/tests/test_physmem.py
-- tools/tests/test_sbrk_tier.py
+- tools/tests/test_exec_budget.py
+# gui_demo.bin の入力は Rust (userland/tests/gui_demo.c は存在しない)。
+- userland/rust/gui_demo/src/lib.rs
+- userland/rust/gui_demo/Cargo.toml
+- build/app.conf
 - exec/exec_kapi_init.inc
 - tools/check_map.d/check-memory-host.yaml
 - build/checks.d/check-memory-host.mk

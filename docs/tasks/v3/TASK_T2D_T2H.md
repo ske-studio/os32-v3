@@ -300,7 +300,7 @@ nanoのtail trimは実free list上で末尾のfree chunkを確認し、header/�
 | f9 | USER は検証済み EXEC extent の一時 KHeap、WM/TRUSTED/get 失敗は resident。小要求の EXACT/TOPDOWN 伸長、公開 EXEC 拒否と内部全 extent 返却、ARENA teardown。AS 集計 4B (1,228B)、static resident は CPL3 復元で変更しない。KAPI 71・memory 2 据置。実測 +1,504B、f 残 4,096B。host/変異とゲスト親子試験の証拠 `/home/hight/os32-tmp/run/f9/f9_fix1_report.md`・`f9_fix1_sizes.json`、実ゲストは台帳 F-10。64KiB 以上は収まれば暫定で既存 arena、TOPDOWN 分類は f10。double free / ブロック頭でない pointer の free は当該 AS の heap を以後無効にする。 |
 | f10 | 要求≥64KiB は TOPDOWN の EXEC_LARGE、作れないときは理由を問わず伸長なしで既存 arena (§3-4 の補足、PM 決定)。識別は extent/base のみ、非併合・即返却・teardown 回収。trim は全 USER arena 検証後に ARENA 末尾/空 arena だけ返し、INITIAL は内部返却も拒否。失敗時は header/used 不変、free 段失敗は毒 AS として隔離。LARGE double free は未使用 VA なら無視、ANON 内なら無効化、再確保済みなら新割当を free。AS 1,228B・KAPI 71・memory 2 据置、基点 160342d 比 +480B (予算1,500B内)。F-4 の host 分を閉鎖、ゲストと trim 配送後の観測は台帳 F-11/F-12。証拠 `/home/hight/os32-tmp/run/f10/f10_report.md`・`f10_sizes.json`。 |
 | f11 | SDK 内部 `os32_nano_trim` (USER のみ)。実 free list の末尾を page_up(chunk+12) まで残し、primary は image 端 page も保持。arena ごとに unmap 成功後だけ size/brk/mapped_end 確定、失敗後も走査継続して成功ページ数を合算。空副 arena は既存 release_empty で再返却、busy 中は 0。実 nano の接続/末尾併合・失敗全状態・生存全バイト・再入と 6 変異を追加。KAPI 71・memory 2・kernel 不変。証拠 `/home/hight/os32-tmp/run/f11/f11_report.md`・`f11_sizes.json`・`f11_check_scope.json`。ゲスト/native と通知配送は台帳 F-13、性能は F-9 (f12)。 |
-| f12 | 起動予算・旧helper撤去・最小初期量/世代の一括切替<br>申し送り (2026-10-02): `test_sbrk_tier.py` を丸ごと削除し、`app_band_pde_host.c` の legacy byte budget、`memory_boot_host.c` の `MEM_EXEC_SBRK_MIN` 式、kselftest `test_pool_model` の `pool:exec range`、`heap_test` を新予算/heap契約へ更新する。 |
+| f12 | f12a: USER 起動を exec_heap 最低64KiB・libc BSS端のpage_up+1pageへ切替、可変stack全map。旧折半/tier/物理0xC00000天井を撤去。memory 3・KAPI 71据置、resident/親子回収は維持。PDE集合の実消費・不足/overflow/KHEAP失敗とresident 3条件をhostで検査。boot最小域は共通 `MEM_EXEC_BOOT_MIN`: 0x590000→0x551000 (bootstrap/init/selftest/host境界、8MB不変)。基点0a929e1比 kernel -352B、f残3,968B。K7形は空き768page中94page。証拠 `/home/hight/os32-tmp/run/f12/f12a_report.md`・`f12_sizes.json`。台本/文書固定値・F-5/F-9・性能・8MB延期登録はf12b、ゲスト受入はPM。 |
 | f13 | mem表示・変異結線・size/manifestとPM台本を確定 |
 
 > **記録は archive へ移した (2026-10-06)**: T2f — f1a〜f4 の実装記録 — [TASK_T2D_T2H_RECORDS.md の「元の行 1951–2370」](../../archive/v3/TASK_T2D_T2H_RECORDS.md#r1951)。
@@ -526,7 +526,7 @@ d6 の `__bss_end=0x18C270` が e の増分の基準。KHEAP は E11-BUD の一�
 | d6 確定 | `__bss_end=0x18C270`、d 正味 4,260B | 旧上限で 36,240B |
 | e11 / e12 修正前 (`83f2db7`) | `__bss_end=0x1936E0`、e 正味 **29,808B** | **22,816B** |
 | e12 ピーク修正後 | `__bss_end=0x193740`、e 正味 **29,904B** (+96B) | **22,720B** |
-| f (**ユーザー決定 2026-10-08: 予備から +4KB → 12,288B**) | 12,288B (f5b 後 6,688B、f9 +1,504B、f10 +480B → 8,672B、-Os 込み、残り 3,616B) | 10,432B |
+| f (**ユーザー決定 2026-10-08: 予備から +4KB → 12,288B**) | 12,288B (f5b 後 6,688B、f9 +1,504B、f10 +480B、f12a -352B → 8,320B、-Os 込み、残り 3,968B) | 10,432B |
 | g | 3,072B | 7,360B |
 | h (selftest/診断追加) | 3,072B | **4,288B** (予備) |
 

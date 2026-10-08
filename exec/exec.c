@@ -280,14 +280,6 @@ int exec_layout_rejected(void)
     return g_layout_reject;
 }
 
-/* sbrk 物理の二段構え (決裁 2026-09-11) の観測点。KAPI にはしない —
- * fault_kill_count と同じくカーネルシンボルを emu_read_mem で読む。
- *   exec_sbrk_tier_last  : 直近の CPL=3 起動が採った段 (1 = 従来式 / 2 = 最低分)
- *   exec_sbrk_tier_count : 段ごとの累計 ([0] = 段 1、[1] = 段 2)
- * 数えるのは 3 領域を実際に張り終えた起動だけ (途中で失敗したものは数えない)。*/
-volatile u32 exec_sbrk_tier_last = 0;
-volatile u32 exec_sbrk_tier_count[2] = { 0, 0 };
-
 /* ring3 syscall (wrap) 実行中フラグ (v2 M2e フォールトガードの核)。
  * dispatcher が kapi_invoke を挟む間だけ立てる。この間に #PF/#GP が起きたら
  * (wrap 内 = CPL=0 でも) カーネル停止でなくアプリだけ kill する。可変長 %s の
@@ -892,43 +884,7 @@ int ring3_user_range_ok(u32 p, u32 len)
 
 #include "ksetjmp.h"
 
-/* ======================================================================== */
-/*  sbrk 物理の二段構え (ユーザー決裁 2026-09-11)                            */
-/*                                                                          */
-/*  K5b-K で per-app 物理にしたとき、heap_size 未指定の CPL=3 プログラムの    */
-/*  sbrk に張る物理を最低分 (MEM_EXEC_SBRK_MIN = 256KB) へ固定した。8MB       */
-/*  構成で GUI アプリ 1 本を通すためだったが、identity だった頃は帯の残り     */
-/*  ぜんぶ (≒1.4MB) が黙って sbrk に使えたので、malloc を多用する CUI        */
-/*  プログラム (less 等) が割を食う。                                        */
-/*                                                                          */
-/*  そこで二段構えにする:                                                    */
-/*    段 1 = 従来式。sbrk 上端を guard_a まで伸ばす ([code_end, guard_a) 全部)*/
-/*    段 2 = 最低分。sbrk 上端を code_end + MEM_EXEC_SBRK_MIN に落とす        */
-/*  段 1 で 3 領域 (本体+sbrk / exec_heap / スタック) + PD + アプリ PT +      */
-/*  付随ページ (exec_ring3_extra_pages) が pgalloc の空きに収まるなら段 1、   */
-/*  収まらなければ段 2。段 2 でも収まらないときは呼び出し側が                 */
-/*  EXEC_ERR_NOMEM を返す (切り詰めない・スワップしない)。段 2 でも付随       */
-/*  ページは同じ式に入っているので、sbrk を削って作った空きを使い切らない。   */
-/*                                                                          */
-/*  heap_size を明示したプログラムはこの分岐に入らない (K5b-K のまま最低分)。 */
-/*  要求した exec_heap を必ず渡すのが先で、sbrk を伸ばす余地はそこに無い。    */
-/*  どちらの段で走ったかは exec_sbrk_tier_last / exec_sbrk_tier_count[] で    */
-/*  後から読める (KAPI にはしない。fault_kill_count と同じカーネルシンボル)。 */
-/* ======================================================================== */
-/* 3 領域 (本体+sbrk / exec_heap / スタック) の **外** で、この 1 本のために
- * 同じ pgalloc から取るページ数 (K7、2026-09-11)。
- *
- * いまは共有ライブラリの .data/.bss 複製 (shlib_addrspace_attach) だけ。
- * PD とアプリ PT は paging_addrspace_create_n が取るが、それは
- * exec_ring3_pages が疎 PT と lease PT を別に数えている。GFX のバックバッファは
- * 全アプリ共有 (gfx_bb_phys_range) で per-app には取らないので入らない。
- *
- * K7 の実測 (8MB 構成、PM 2026-09-11): アプリ帯の空き 768 ページに対し、
- * 段 1 の 3 領域 + PD + PT が **ちょうど** 768。ここを 0 と見なしていたため
- * 段 1 が空きを使い切り、直後の shlib の 4 ページが取れずに gui_demo が
- * 「shlib data attach failed (out of memory)」で立たなかった。
- * 付随ページを増やすときは必ずここに足すこと — 増やした先で pgalloc から
- * 取るだけだと、勘定に乗らないまま同じ形で落ちる。 */
+/* shlib の私有 data/BSS も起動時の物理予算に含める。 */
 static u32 exec_ring3_extra_pages(void)
 {
     return shlib_data_pages();
@@ -937,31 +893,18 @@ static u32 exec_ring3_extra_pages(void)
 static u32 exec_ring3_pages(u32 load_base, u32 sbrk_end, u32 exec_heap_size,
                             u32 stack_size)
 {
-    return (sbrk_end - load_base + exec_heap_size + stack_size) / PAGE_SIZE
-         + 2 /* PD + first lease PT */
-         + ((sbrk_end - 1) >> 22) - (load_base >> 22) + 1
-         + ((MEM_EXEC_HEAP_BASE + exec_heap_size - 1) >> 22) - (MEM_EXEC_HEAP_BASE >> 22) + 1
-         + ((MEM_APP_STACK_TOP - 1) >> 22) - ((MEM_APP_STACK_TOP - stack_size) >> 22) + 1
-         + exec_ring3_extra_pages();
-}
-
-/* 選んだ段 (1 or 2) を返し、*sbrk_end に sbrk の上端を書く。 */
-static int exec_sbrk_pick_tier(u32 load_base, u32 code_end, u32 guard_a,
-                               u32 exec_heap_size, u32 stack_size,
-                               u32 free_pages, u32 *sbrk_end)
-{
-    u32 lo = code_end + MEM_EXEC_SBRK_MIN;
-
-    if (lo > guard_a) lo = guard_a;
-    if (exec_ring3_pages(MEM_EXEC_LOAD_ADDR,
-            MEM_EXEC_LOAD_ADDR + guard_a - load_base, exec_heap_size, stack_size)
-            <= free_pages) {
-        *sbrk_end = guard_a;
-        return 1;
+    u32 pages = (sbrk_end - load_base + exec_heap_size + stack_size) / PAGE_SIZE
+              + 2 /* PD + first lease PT */ + exec_ring3_extra_pages();
+    /* 疎な PT の集合。image/shlib、heap/stack が同じ PDE を使っても 1 枚。 */
+    for (u32 pde = MEM_APP_BAND_BASE >> 22; pde < MEM_APP_STACK_TOP >> 22; pde++) {
+        if ((pde >= load_base >> 22 && pde <= (sbrk_end - 1) >> 22) ||
+            (pde >= MEM_EXEC_HEAP_BASE >> 22 &&
+             pde <= (MEM_EXEC_HEAP_BASE + exec_heap_size - 1) >> 22) ||
+            (pde >= (MEM_APP_STACK_TOP - stack_size) >> 22) ||
+            pde == MEM_SHLIB_BASE >> 22)
+            pages++;
     }
-    *sbrk_end = lo;
-    /* 帯の残りが最低分より狭いなら、落としても従来式と同じものを張っている。 */
-    return (lo >= guard_a) ? 1 : 2;
+    return pages;
 }
 
 /* ======================================================================== */
@@ -1066,7 +1009,7 @@ static int app_store(AppSlot *a, u32 va, const void *src, u32 len)
 /*  **master CR3 に戻してから**呼ぶこと (破棄する PD がアクティブだと         */
 /*  paging_addrspace_destroy が何もせずに戻る)。                             */
 /*  返すのはこのアプリ帯の 3 領域だけ:                                        */
-/*    [load_addr, sbrk_heap_limit)        本体 + data + bss + sbrk (最低分)   */
+/*    [load_addr, sbrk_heap_limit)        本体 + data + bss + sbrk (BSS 端の端数 + 1 page)   */
 /*    [exec_heap_base, +exec_heap_size)   exec_heap                          */
 /*    [band_top - stack, band_top)        ユーザスタック                     */
 /*  ガードページ (guard_a / guard_b) は「張っていない = 非 present」なので     */
@@ -1671,15 +1614,12 @@ static int exec_launch(const char *cmdline, int gui_arg)
     u32 guard_a, guard_b;
     u32 exec_heap_base, exec_heap_size;
     u32 sbrk_end;            /* 実際に物理を張る sbrk の上端 (= sbrk 上限) */
-    int sbrk_tier = 0;       /* sbrk 物理の段 (1 = 従来式 / 2 = 最低分、0 = 非CPL3) */
     u32 stack_size = MEM_EXEC_STACK_SIZE;
-    u32 legacy_pdes = 1;
     int is_shell;
     int launcher_id;
     int id;
     u32 need_pages;
 
-    u32 mem_end = sys_usable_mem_end();
     u8 *load_addr;
     OS32Header *hdr;
     int sz;
@@ -1857,37 +1797,17 @@ static int exec_launch(const char *cmdline, int gui_arg)
     }
 
     if (!is_shell) {
-        /* 子プロセス帯のレイアウト確定 (include/memmap.h 参照):
-         *   [load..code_end) 本体 / [code_end..guard_a) sbrk / [guard_a] ガード /
-         *   [exec_heap_base..heap_top) exec_heap */
-        u32 code_end = PAGE_ALIGN_UP(MEM_PHYS_EXEC_FLOOR + text_sz + bss_sz);
-        u32 heap_top, avail, old_exec, old_guard, old_sbrk;
-        legacy_pdes = paging_app_band_pdes(code_end, heap_sz, mem_end);
-        heap_top = MEM_LEGACY_APP_BASE + legacy_pdes * MEM_APP_BAND_PDE_SIZE;
-        if (mem_end < heap_top) heap_top = mem_end & ~(u32)(PAGE_SIZE - 1);
-        if (heap_top < MEM_EXEC_STACK_SIZE + PAGE_SIZE) return EXEC_ERR_NOMEM;
-        heap_top -= MEM_EXEC_STACK_SIZE + PAGE_SIZE;
-        if (heap_top < code_end || heap_top - code_end < MEM_EXEC_SBRK_MIN + PAGE_SIZE + MEM_EXEC_HEAP_MIN)
-            return EXEC_ERR_NOMEM;
-        avail = heap_top - code_end - MEM_EXEC_SBRK_MIN - PAGE_SIZE;
+        /* USER 初期量: libc は BSS 端の端数 + 1 page、exec_heap は最低 64KiB。 */
+        exec_heap_base = MEM_EXEC_HEAP_BASE;
+        exec_heap_size = MEM_EXEC_HEAP_MIN;
         if (heap_sz) {
-            if (heap_sz > 0xffffffffUL - (PAGE_SIZE - 1)) return EXEC_ERR_INVALID;
+            if (heap_sz > guard_b - exec_heap_base) return EXEC_ERR_NOMEM;
             exec_heap_size = PAGE_ALIGN_UP(heap_sz);
             if (exec_heap_size < MEM_EXEC_HEAP_MIN) exec_heap_size = MEM_EXEC_HEAP_MIN;
-            if (exec_heap_size > avail) return EXEC_ERR_NOMEM;
-        } else {
-            exec_heap_size = (avail / 2) & ~(u32)(PAGE_SIZE - 1);
-            if (exec_heap_size < MEM_EXEC_HEAP_MIN) exec_heap_size = MEM_EXEC_HEAP_MIN;
         }
-        old_exec = heap_top - exec_heap_size;
-        old_guard = old_exec - PAGE_SIZE;
-        if (heap_sz) { old_sbrk = code_end + MEM_EXEC_SBRK_MIN; sbrk_tier = 2; }
-        else sbrk_tier = exec_sbrk_pick_tier(MEM_PHYS_EXEC_FLOOR, code_end, old_guard,
-                                           exec_heap_size, stack_size, pgalloc_free_pages(), &old_sbrk);
-        if (!sbrk_tier) return EXEC_ERR_NOMEM;
-        sbrk_end = MEM_EXEC_LOAD_ADDR + (old_sbrk - MEM_PHYS_EXEC_FLOOR);
-        exec_heap_base = MEM_EXEC_HEAP_BASE;
+        sbrk_end = PAGE_ALIGN_UP(load_base + text_sz + bss_sz) + PAGE_SIZE;
         guard_a = sbrk_end;
+        /* 加算と必要ページの算出より先に VA を検査する。 */
         if (sbrk_end + PAGE_SIZE > exec_heap_base || exec_heap_size > guard_b - exec_heap_base)
             return EXEC_ERR_NOMEM;
     } else if (text_sz + bss_sz > max_size) {
@@ -1983,12 +1903,6 @@ static int exec_launch(const char *cmdline, int gui_arg)
             app_map_region(ctx->as, ctx->stack_base, ctx->stack_top) != 0) {
             shell_print("Error: out of physical memory for app\n", ATTR_RED);
             return exec_launch_abort(launcher_id, id, EXEC_ERR_NOMEM);
-        }
-
-        /* 3 領域を張り終えてから段を記録する (途中で失敗したものは数えない)。*/
-        if (sbrk_tier == 1 || sbrk_tier == 2) {
-            exec_sbrk_tier_last = (u32)sbrk_tier;
-            exec_sbrk_tier_count[sbrk_tier - 1]++;
         }
 
         /* --- K3: 共有ライブラリ帯域 (0x400000-0x4FFFFF) ---
@@ -2140,7 +2054,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
 
         if (want_ring3) {
             /* --- M2c: CPL=3 アプリには本物の表でなくトランポリン表を渡す ---
-             * CPL=3 の sbrk 上限は guard_a (exec_heap の直下のガード)。 */
+             * CPL=3 の初期 sbrk 上限は guard_a = sbrk_end = page_up(img_end) + PAGE_SIZE。 */
             ((u32 *)ring3_tramp_page)[KAPI_DATA_IDX_SBRK_HEAP_LIMIT] = sbrk_end;
             ((u32 *)ring3_tramp_page)[KAPI_DATA_IDX_SHM_BASE] = kapi->shm_base;
             frame[3] = ring3_tramp_page;   /* api = トランポリン */

@@ -66,7 +66,7 @@ def extract(source):
             parts += ['#define pgalloc_alloc_phys app_fail_alloc', slice_out(source, sig), '#undef pgalloc_alloc_phys']
         else:
             parts.append(slice_out(source, sig))
-    launch = source[source.index('\n        }', source.index('        /* 3 領域を張り終えて')) + len('\n        }'):source.index('        /* --- K3:')]
+    launch = source[source.index('\n        }', source.index('        /* 3 領域を per-app 物理で張る。')) + len('\n        }'):source.index('        /* --- K3:')]
     parts += ['#define paging_addrspace_map_user_range launch_map_attempt', 'static void launch_shared_maps(AppSlot *ctx) {', '(void)ctx;', launch, '}', '#undef paging_addrspace_map_user_range']
     return '\n'.join(parts) + '\n'
 

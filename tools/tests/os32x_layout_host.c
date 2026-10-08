@@ -18,8 +18,8 @@ int main(void)
 {
     OS32Header h = valid();
     u32 i;
-    CHECK(OS32_MEMORY_LAYOUT_GENERATION == 2);
-    h.memory_layout_generation = 1;
+    CHECK(OS32_MEMORY_LAYOUT_GENERATION == 3);
+    h.memory_layout_generation = OS32_MEMORY_LAYOUT_GENERATION - 1;
     CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF) == OS32X_LAYOUT_MISMATCH);
     h = valid();
     CHECK(sizeof(h) / sizeof(u32) == OS32X_HDR_SIZE / 4);

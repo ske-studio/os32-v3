@@ -828,46 +828,6 @@ void paging_load_cr3(u32 pd_phys)
     arch_mmu_load_root(pd_phys);
 }
 
-/* アプリ帯に必要な PDE 枚数 (票 §4-1)。純粋な算術なのでホスト試験から
- * 直接呼べる (tools/tests/app_band_pde_host.c)。 */
-u32 paging_app_band_pdes(u32 code_end, u32 heap_req, u32 ram_top)
-{
-    u32 need_top, n, by_ram;
-
-    /* heap_size 無指定 (0) は従来どおり 1 枚。指定しないプログラムの
-     * レイアウトを 1 バイトも動かさないための線引き (回帰ゼロ)。 */
-    if (heap_req == 0) return 1;
-
-    /* 要求を満たすのに帯の上端が最低どこまで要るか。
-     * exec/exec.c の子プロセス帯レイアウトと同じ並び:
-     *   本体 | sbrk (最低分) | guard_a | exec_heap | guard | ユーザスタック */
-    heap_req = PAGE_ALIGN_UP(heap_req);
-    if (heap_req < MEM_EXEC_HEAP_MIN) heap_req = MEM_EXEC_HEAP_MIN;
-    if (code_end < MEM_LEGACY_APP_BASE) code_end = MEM_LEGACY_APP_BASE;
-
-    need_top = MEM_EXEC_SBRK_MIN + PAGE_SIZE + PAGE_SIZE + MEM_EXEC_STACK_SIZE;
-    /* 桁あふれは「伸ばせない」に倒す (大きい枚数を返さない) */
-    if (heap_req > (u32)0xFFFFFFFFUL - need_top) return 1;
-    need_top += heap_req;
-    if (code_end > (u32)0xFFFFFFFFUL - need_top) return 1;
-    need_top += code_end;
-
-    if (need_top <= (MEM_LEGACY_APP_BASE + MEM_APP_BAND_PDE_SIZE)) return 1;
-    n = (need_top - MEM_LEGACY_APP_BASE + MEM_APP_BAND_PDE_SIZE - 1) /
-        MEM_APP_BAND_PDE_SIZE;
-    if (n > MEM_LEGACY_APP_PDES) n = MEM_LEGACY_APP_PDES;
-
-    /* 空き RAM (= 子が予約済みの範囲) を超えては伸ばさない。足りなければ
-     * 1 枚のまま返し、要求が入らなければ exec が EXEC_ERR_NOMEM で拒否する
-     * (切り詰めて「渡せたことにする」のは 2026-09-10 方針で禁止)。 */
-    by_ram = (ram_top > MEM_LEGACY_APP_BASE) ?
-             (ram_top - MEM_LEGACY_APP_BASE) / MEM_APP_BAND_PDE_SIZE : 0;
-    if (by_ram < 1) by_ram = 1;
-    if (n > by_ram) n = by_ram;
-    if (n < 1) n = 1;
-    return n;
-}
-
 static u32 as_generation; /* Saturate: never reuse a registered AS identity. */
 
 int paging_addrspace_create_n(struct addrspace *as, u32 owner, u32 pde_count)

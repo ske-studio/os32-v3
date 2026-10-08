@@ -1,7 +1,7 @@
 """Actual paging.c/pgalloc.c/physmem.c, ILP32; only privileged asm replaced.
 
 Covers TASK_T2_APPBAND: sparse high PTs and the actual kselftest ledger
-procedure on 8/17MB pools; retains the legacy physical byte-budget tests.
+procedure on 8/17MB pools.
 """
 import host32
 import pathlib

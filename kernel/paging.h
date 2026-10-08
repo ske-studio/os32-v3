@@ -267,16 +267,6 @@ void paging_addrspace_poison(struct addrspace *as);
 /* Exec-side notification; bounded slot lookup, safe with IRQs disabled. */
 void exec_addrspace_abort(struct addrspace *as);
 
-/* アプリ帯に必要な PDE 枚数を求める (票 §4-1 の規則、純関数)。
- *   code_end : 本体 (code+data+bss) 末尾のページ境界切り上げ済み仮想番地
- *   heap_req : exec_heap の要求量 (OS32X ヘッダの heap_size)。
- *              **0 = 指定なしは必ず 1 枚**を返す — 指定しないプログラムの
- *              レイアウトを従来から 1 バイトも動かさないため (回帰ゼロ)。
- *   ram_top  : 帯を伸ばしてよい物理上限。exec は子プロセスの claim 範囲 A の
- *              末尾を渡す (そこまでは子が予約済み = pgalloc と二重使用しない)。
- * 戻り値: 1..MEM_APP_BAND_MAX_PDES。桁あふれ・上限不足でも 1 は必ず返す。 */
-u32 paging_app_band_pdes(u32 code_end, u32 heap_req, u32 ram_top);
-
 /* アプリ AS の 1 ページを USER でマップする (M1c)。
  *   - virt が高位アプリ帯 (app_pde..app_pde_count) なら、疎確保した私有 PT に書く
  *     (このアプリの PD からしか見えない)。

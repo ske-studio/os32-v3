@@ -47,11 +47,11 @@ MUTATIONS = [
      "    if (reported > (MEM_PHYS_RAM_CEILING - MEM_HIGH_RAM_BASE) / MEM_1MB)\n"
      "        reported = (MEM_PHYS_RAM_CEILING - MEM_HIGH_RAM_BASE) / MEM_1MB;\n",
      "", ("detect_cap", 16384)),
-    # exec の最小域の fail-stop の境界を 1 ページずらす (0x58F000 で起動してしまう)。
+    # exec の最小域の fail-stop の境界を 1 ページずらす (0x550000 で起動してしまう)。
     ("minimum-off-by-page", "kernel/sys.c",
      "    } else if (l->kind == PGALLOC_BACKING_FIXED) {\n        if (top < minimum) goto done;",
      "    } else if (l->kind == PGALLOC_BACKING_FIXED) {\n        if (top + 1 < minimum) goto done;",
-     ("minimum_short", 5692)),
+     ("minimum_short", 5440)),
     # 同梱域の申告の範囲検査を外す (同梱域の外の申告を受け付けてしまう)。
     ("bundle-range-blind", "kernel/memory_boot.c",
      "    if (first >= end || first < lo || end > hi) return 0;",
@@ -248,10 +248,10 @@ class MemoryBoot(unittest.TestCase):
         self.run_case('detect_cap', 16384)
 
     def test_exec_minimum_failstop_boundary(self):
-        # T1a の訂正 5 (T1b で追加): 低位 RAM 0x590000 ちょうどは起動し、
+        # T1a の訂正 5 (T1b で追加): 低位 RAM 0x551000 ちょうどは起動し、
         # 1 ページ足りなければ何も変えずに fail-stop。
-        self.run_case('minimum', 0x590000 // 1024)
-        self.run_case('minimum_short', 0x58F000 // 1024)
+        self.run_case('minimum', 0x551000 // 1024)
+        self.run_case('minimum_short', 0x550000 // 1024)
 
     def test_bundle_staging_rule(self):
         # 集積域・同梱域の規則 (§3-3 ③、T1b): 申告あり / なし / 範囲外。

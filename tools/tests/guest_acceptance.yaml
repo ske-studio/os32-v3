@@ -687,7 +687,7 @@
   gate: e11
   contract: docs/tasks/v3/TASK_T2D_T2H.md#2-4-user切替の一括境界
   mode: manual
-  prereq: PM integrated generation-2 build deployed; new kernel.map; 17MB current ini
+  prereq: PM integrated generation-3 build deployed; new kernel.map; 17MB current ini
   entry: ring3_guard bb; ring3_guard lease; ring3_guard free; v86 -d; v86 -b
   observe:
   - Confirm boot kselftest_pass=288 and kselftest_fail=0; map_user_keep still counts one check
@@ -712,7 +712,7 @@
   gate: e11
   contract: docs/tasks/v3/TASK_T2D_T2H.md#2-4-user切替の一括境界
   mode: manual
-  prereq: PM integrated generation-2 build deployed; same binary hashes as build outputs
+  prereq: PM integrated generation-3 build deployed; same binary hashes as build outputs
   entry: hello; gfx200_test; gfx_demo200; pegcchk; blit_test; bench; hello_gfx; font_test; gdi_test; about; filer; gui_demo; t5a_display
   observe:
   - Run the e11c2 consumer list with old USER aliases removed; verify drawing and Japanese glyphs
@@ -727,16 +727,16 @@
   gate: e11
   contract: docs/tasks/v3/TASK_T2D_T2H.md#2-4-user切替の一括境界
   mode: manual
-  prereq: PM integrated generation-2 build and saved generation-1 binary; KAPI v70 in both
-  entry: Launch saved generation-1 program, then rebuilt generation-2 program
+  prereq: PM integrated generation-3 build and saved generation-2 binary; KAPI v71 in both
+  entry: Launch saved generation-2 program, then rebuilt generation-3 program
   observe:
   - Confirm header memory_layout_generation differs while KAPI version and all other generations agree
   - Old binary is rejected with memory layout generation mismatch before entry/AS allocation
   - New binary starts normally; verify generation manifests and shell/ver response
   expect:
-    generation_1_rejected: true
-    generation_2_runs: true
-    kapi_version: 70
+    generation_2_rejected: true
+    generation_3_runs: true
+    kapi_version: 71
   evidence: ~/os32-tmp/evidence/<日付>/<case id>/
 
 # e12 configuration matrix; accepted scope is restricted to RESULT observations.
@@ -748,7 +748,7 @@
   prereq: 8MB planar; H-4 configuration batch, TASK_T2D_T2H.md §12
   entry: Full T2e acceptance suite
   observe: &id001
-  - Use rebuilt generation-2 binaries and matching kernel.map; record hashes, __bss_end, backend and RAM.
+  - Use rebuilt generation-3 binaries and matching kernel.map; record hashes, __bss_end, backend and RAM.
   - Run gfx200_test/gfx_demo200, Japanese gdi_test/t5a_display and present; GUI -> CUI -> GUI; window
     -> fullscreen DISPLAY -> window.
   - Ordinary GUI low VRAM/device direct writes must kill; E low BB must kill while F+ legitimate CLIENT
@@ -950,11 +950,11 @@
   gate: F-7
   contract: userland/tests/sbrk_grow_test.c
   mode: manual
-  prereq: KAPI 71, 17MB, current ini; PM deploy USER CRT binaries and fresh kernel.map
+  prereq: KAPI 71, memory layout 3, 17MB, current ini; PM deploy USER CRT binaries and fresh kernel.map
   entry: sbrk_grow_test
   observe:
   - 'Record fault_kill_count and exec_as_leftover_pages before and after sbrk_grow_test'
-  - 'Require sbrk_grow_test PASS, exit 0; growth past initial mapped_end is contiguous and writable'
+  - 'Record initial sbrk limit = page_up(img_end)+PAGE_SIZE (BSS tail plus one page); require sbrk_grow_test PASS, exit 0; growth past initial mapped_end is contiguous and writable'
   - 'Require below-initial and INT_MIN refusal, shrink preserves mapped pages, EXACT collision leaves break unchanged, retry succeeds'
   - 'Require kill delta 0 and leftover 0; run db_test and db_v50_test regressions'
   expect:
@@ -967,11 +967,11 @@
   gate: F-8
   contract: userland/tests/malloc_arena_test.c
   mode: manual
-  prereq: KAPI 71, memory layout 2, 17MB, current ini; PM deploy USER adapter binaries and fresh kernel.map
+  prereq: KAPI 71, memory layout 3, 17MB, current ini; PM deploy USER adapter binaries and fresh kernel.map
   entry: malloc_arena_test
   observe:
   - 'Record fault_kill_count and exec_as_leftover_pages before and after malloc_arena_test'
-  - 'Require malloc_arena_test PASS and exit 0; primary EXACT blocker forces secondary nano allocation'
+  - 'Require malloc_arena_test PASS and exit 0; explicitly grow primary to keep+3 pages or more, restore break, then primary EXACT blocker forces secondary nano allocation'
   - 'Require cross-arena realloc preserves all old bytes, free permits EXACT remap of the management page and whole secondary arena, printf output is visible'
   - 'Require kill delta 0 and leftover 0; run heap_test (64KiB malloc now uses TOPDOWN direct maps; 64KiB mem_alloc uses one EXEC_LARGE extent per allocation (f10)), sbrk_grow_test, db_test and db_v50_test regressions'
   expect:
@@ -985,7 +985,7 @@
   gate: F-8
   contract: sdk/allocator/nano_adapter.c
   mode: manual
-  prereq: KAPI 71, memory layout 2; PM deploy rebuilt malloc_arena_test and alloc_demo
+  prereq: KAPI 71, memory layout 3; PM deploy rebuilt malloc_arena_test and alloc_demo
   entry: malloc_arena_test
   observe:
   - 'Require malloc_arena_test PASS and exit 0 for 65535/65536/65537, all calloc bytes zero, 65536/65537 free permits EXACT remap of the whole direct map'
@@ -1003,7 +1003,7 @@
   gate: F-10
   contract: userland/tests/exec_heap_test.c
   mode: manual
-  prereq: KAPI 71, memory layout 2; PM deploy current kernel and exec_heap_test with 65536-byte heap
+  prereq: KAPI 71, memory layout 3; PM deploy current kernel and exec_heap_test with 65536-byte heap
   entry: exec_heap_test
   observe:
   - 'Parent and child both run /usr/bin/exec_heap_test.bin registered in userland/deploy.yaml; child argument is --child'
@@ -1022,7 +1022,7 @@
   gate: F-11
   contract: userland/tests/exec_heap_test.c
   mode: manual
-  prereq: KAPI 71, memory layout 2; PM deploy current kernel, exec_heap_test and heap_test with 65536-byte INITIAL
+  prereq: KAPI 71, memory layout 3; PM deploy current kernel, exec_heap_test and heap_test with 65536-byte INITIAL
   entry: exec_heap_test
   observe:
   - 'Require parent and --child PASS and exit 0: 65535 pointer modulo 4096 is 8, 65536/65537 modulo is 0, initial LARGE bytes zero and full write/read patterns preserved across nested exec'
@@ -1041,11 +1041,11 @@
   gate: F-13
   contract: userland/tests/malloc_arena_test.c
   mode: manual
-  prereq: KAPI 71, memory layout 2, 17MB; PM deploy rebuilt USER malloc_arena_test and verify its binary
+  prereq: KAPI 71, memory layout 3, 17MB; PM deploy rebuilt USER malloc_arena_test and verify its binary
   entry: malloc_arena_test
   observe:
-  - 'Require PASS 196664/196664 and exit 0; after f8, restore the primary break to brk and trim at least one page'
-  - 'Require EXACT remap of [sbrk_heap_limit - pages*4096, sbrk_heap_limit), unmap, and malloc(TEST_REQUEST) from primary'
+  - 'Require PASS 196664/196664 and exit 0; explicitly grow primary to keep+3 pages or more before the blocker, record primary_limit; after f8, restore the primary break to brk and trim at least one page'
+  - 'Require EXACT remap of [primary_limit - pages*4096, primary_limit), unmap, and malloc(TEST_REQUEST) from primary'
   - 'The returned range ends at the adjacent EXACT block start: this removes an extent tail, not a middle split'
   - 'Record fault_kill_count and exec_as_leftover_pages before/after; require kill delta 0 and teardown leftover 0'
   - 'Run sbrk_grow_test, heap_test, db_test and db_v50_test regressions; notification delivery is deferred to g'
@@ -1059,3 +1059,75 @@
       fault_kill_count_delta: 0
       exec_as_leftover_pages: 0
   evidence: ~/os32-tmp/evidence/<日付>/f11-nano-trim/
+
+# f12: PM executes after landing f12 and before f13; host evidence is not guest acceptance.
+- id: f12-consumers
+  gate: f12
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 17MB, current ini; PM deploy matching memory layout 3 kernel/static SDK/shlib and rebuilt programs, verify hashes and kernel.map; after f12 landing and before f13
+  entry: hello; gfx200_test; gfx_demo200; pegcchk; blit_test; bench; hello_gfx; font_test; gdi_test; about; filer; gui_demo; t5a_display; sh dir/completion/hsync dry; Rust filer list/expand/refresh; install dry; cdinst dry; sqlite_standalone; alloc_demo; math_test_rs; db_test; db_v50_test
+  observe:
+  - 'PM runs each entry; require exit 0, existing drawing/Japanese/fullscreen return and directory/completion/dry paths remain successful; provision font_test font before execution'
+  - 'Record fault_kill_count delta 0 and exec_as_leftover_pages 0 for each application; shell/ver responds'
+  - '各アプリ終了直後に、終了した AS の extent 本数の最大値 (上限32に対する余り32-max) と副 arena の数を記録する。teardown前の当該ASの最大値/個数を採取して終了直後の記録に添え、破棄済みASを読まない'
+  - 'heap_sz=0 のアプリで EXEC_LARGE が多いとき fallback の受け皿が64KiBに縮む (レビュー R-5) ことを確かめる観測。extent上限の余りと副arena数を負荷・fallback成否と併記する'
+  - 'Require db_test PASS 9/9 and db_v50_test PASS 42/42'
+  expect:
+    exit: 0
+    kill_delta: 0
+    leftover: 0
+    db_test: 9/9
+    db_v50_test: 42/42
+  evidence: ~/os32-tmp/evidence/<日付>/f12-consumers/
+
+- id: f12-generation
+  gate: f12
+  contract: docs/09_exec.md
+  mode: manual
+  prereq: 17MB; PM deploy matching memory layout 3 build and saved memory layout 2 app/shlib copies; KAPI 71 and other generations match
+  entry: saved memory layout 2 app and shlib; rebuilt memory layout 3 app and shlib
+  observe:
+  - 'Verify headers/manifests/hashes; reject both old app and old shlib with memory layout generation mismatch (reason 3) before entry/AS allocation'
+  - 'Rebuilt app and shlib start normally; shell/ver responds'
+  expect:
+    generation_2_app_rejected: true
+    generation_2_shlib_rejected: true
+    generation_3_runs: true
+    kapi_version: 71
+  evidence: ~/os32-tmp/evidence/<日付>/f12-generation/
+
+- id: f12-startup
+  gate: f12
+  contract: include/memmap.h
+  mode: manual
+  prereq: 17MB; PM deploy memory layout 3 kernel and rebuilt USER programs, matching kernel.map
+  entry: heap_test; sbrk_grow_test; exec_heap_test parent/--child; malloc_arena_test; shell/gshell child launch and return
+  observe:
+  - 'Record libc initial limit = page_up(img_end)+PAGE_SIZE; exec_heap heap_sz=0 is64KiB, explicit size is page-rounded with64KiB minimum; stack maps full exec_stack_bytes'
+  - 'Require heap_test and sbrk_grow_test PASS; f9/f10 parent/child content and classification preserved; parent heap is restored without reinitialization'
+  - 'Require f11 trim>=1page, EXACT remap of returned tail, malloc from primary and PASS196664/196664'
+  - 'Resident sbrk limit remains0x375000 and exec_heap452KiB (only smaller explicit request shrinks); record fault_kill_count delta0 and teardown leftover0'
+  expect:
+    exit: 0
+    kill_delta: 0
+    leftover: 0
+    malloc_arena_total: 196664
+  evidence: ~/os32-tmp/evidence/<日付>/f12-startup/
+
+- id: f12-8mb-startup
+  gate: H-4
+  contract: docs/tasks/DEFERRED_TESTS.md#H-4
+  mode: manual
+  status: deferred
+  prereq: 8MB; PM configuration batch H-4 with matching memory layout 3 build/kernel.map
+  entry: gui_demo; heap_test; sbrk_grow_test; exec_heap_test; db_test; db_v50_test
+  observe:
+  - 'Record actual RAM/backend, hashes, boot kselftest_fail, launch/return and resources returned; host K7 gui_demo shape uses94/768pages including4shlib data pages, this is not guest acceptance'
+  - 'Require current programs start and exit0, fault_kill delta0, teardown leftover0; db_test9/9 and db_v50_test42/42'
+  expect:
+    exit: 0
+    kill_delta: 0
+    leftover: 0
+    kselftest_fail: 0
+  evidence: ~/os32-tmp/evidence/<日付>/f12-8mb-startup/

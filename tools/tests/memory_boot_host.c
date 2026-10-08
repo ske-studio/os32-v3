@@ -256,11 +256,10 @@ void _start(void)
     /* K6-RAM (2): 未初期化のうちは「実 RAM 合計」を名乗らない。 */
     CHECK(!memory_boot_ram_kb());
 #ifdef TEST_MINIMUM_SHORT
-    /* exec の最小域 (ロード起点 + スタック + sbrk + exec_heap = 0x590000) に
+    /* exec の最小域 (ロード起点 + スタック + sbrk + exec_heap = 0x551000) に
      * 1 ページ足りない低位 RAM は fail-stop (T1a の訂正 5、T1b で境界を直接)。
      * 何も変えずに断る。 */
-    CHECK(TEST_KB * 1024UL + PAGE_SIZE == MEM_PHYS_EXEC_FLOOR + MEM_EXEC_STACK_SIZE +
-          MEM_EXEC_SBRK_MIN + MEM_EXEC_HEAP_MIN);
+    CHECK(TEST_KB * 1024UL + PAGE_SIZE == MEM_EXEC_BOOT_MIN);
     CHECK(!memory_boot_init(TEST_KB));
     CHECK(bootstrap_calls == 1 && !stage_calls);
     CHECK(!initialized && !sys_model_staged && !sys_frozen_end);
@@ -347,8 +346,7 @@ void _start(void)
     }
 #endif
 #ifdef TEST_MINIMUM
-    CHECK(TEST_KB * 1024UL == MEM_PHYS_EXEC_FLOOR + MEM_EXEC_STACK_SIZE +
-          MEM_EXEC_SBRK_MIN + MEM_EXEC_HEAP_MIN);
+    CHECK(TEST_KB * 1024UL == MEM_EXEC_BOOT_MIN);
     CHECK(pgalloc_model_state() == PGALLOC_ONLINE && ledger_backing_mapped);
     CHECK(sys_usable_mem_end() == TEST_KB * 1024UL);
     die(0);
@@ -526,8 +524,7 @@ void _start(void)
          * 0x800000。backing の位置 (0x2F9000) とは無関係。 */
         CHECK(pgalloc_arena_end() == top);
         CHECK(sys_usable_mem_end() == TEST_KB * 1024UL);
-        CHECK(sys_usable_mem_end() >= MEM_PHYS_EXEC_FLOOR + MEM_EXEC_STACK_SIZE +
-              MEM_EXEC_SBRK_MIN + MEM_EXEC_HEAP_MIN);
+        CHECK(sys_usable_mem_end() >= MEM_EXEC_BOOT_MIN);
         /* backing は present / supervisor / RW、下のガードは NP のまま */
         CHECK(paging_verify_identity(meta, 2, (void *)MEM_LEDGER_META_BASE));
         CHECK(!paging_is_present(MEM_LEDGER_META_BASE - PAGE_SIZE));
