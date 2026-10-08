@@ -19,7 +19,7 @@ int main(int argc, char **argv, KernelAPI *api)
 {
     unsigned char *p = NULL, *q;
     void *block = NULL, *reused = NULL;
-    uintptr_t brk, secondary;
+    uintptr_t brk, secondary, primary_limit;
     size_t secondary_bytes = (TEST_REQUEST + 2u * TEST_PAGE - 1u + 16u) & ~(TEST_PAGE - 1u);
     size_t trim_bytes = 0;
     void *trim_map = NULL;
@@ -29,17 +29,23 @@ int main(int argc, char **argv, KernelAPI *api)
     p = malloc(32);
     CHECK(p != NULL);
     memset(p, TEST_PATTERN, 32);
-    block = api->mem_map(TEST_PAGE, (void *)api->sbrk_heap_limit, OS32_MEM_MAP_EXACT);
-    CHECK(block == (void *)api->sbrk_heap_limit);
+    /* f12: keep の先に 3 page を明示的に map して trim の前提を作る。
+     * break は戻し、nano の free list に未使用の大塊を追加しない。 */
     brk = (uintptr_t)sbrk(0);
-    CHECK(brk <= api->sbrk_heap_limit && api->sbrk_heap_limit - brk <= INT_MAX);
+    primary_limit = ((brk + TEST_PAGE - 1u) & ~(TEST_PAGE - 1u)) + 3u * TEST_PAGE;
+    CHECK(brk <= primary_limit && primary_limit - brk <= INT_MAX &&
+          (uintptr_t)sbrk((int)(primary_limit - brk)) == brk &&
+          (uintptr_t)sbrk(-(int)(primary_limit - brk)) == primary_limit);
+    block = api->mem_map(TEST_PAGE, (void *)primary_limit, OS32_MEM_MAP_EXACT);
+    CHECK(block == (void *)primary_limit);
+    brk = (uintptr_t)sbrk(0);
     /* Reserve the unused primary tail, without overwriting its live chunk.
      * malloc and direct sbrk intentionally share one primary break. */
-    CHECK((uintptr_t)sbrk((int)(api->sbrk_heap_limit - brk)) == brk);
+    CHECK((uintptr_t)sbrk((int)(primary_limit - brk)) == brk);
     q = realloc(p, TEST_REQUEST);
     CHECK(q != NULL);
     p = q;
-    CHECK((uintptr_t)p > api->sbrk_heap_limit + TEST_PAGE);
+    CHECK((uintptr_t)p > primary_limit + TEST_PAGE);
     for (unsigned i = 0; i < 32; i++) CHECK(p[i] == TEST_PATTERN);
     memset(p, TEST_PATTERN, TEST_REQUEST);
     CHECK(p[TEST_REQUEST - 1u] == TEST_PATTERN);
@@ -66,19 +72,19 @@ int main(int argc, char **argv, KernelAPI *api)
         } else { free(p); p=NULL; }
     }
     /* f11: restore the break to the old primary free chunk's end. The range
-     * ends at sbrk_heap_limit (the adjacent EXACT block's start), so this is
+     * ends at primary_limit (the adjacent EXACT block's start), so this is
      * an extent tail removal, not a middle split requiring another slot. */
-    CHECK((uintptr_t)sbrk(-(int)(api->sbrk_heap_limit - brk)) == api->sbrk_heap_limit);
+    CHECK((uintptr_t)sbrk(-(int)(primary_limit - brk)) == primary_limit);
     size_t pages=os32_nano_trim();
-    CHECK(pages >= 1 && pages <= (api->sbrk_heap_limit-(brk & ~(TEST_PAGE-1u)))/TEST_PAGE);
+    CHECK(pages >= 1 && pages <= (primary_limit-(brk & ~(TEST_PAGE-1u)))/TEST_PAGE);
     trim_bytes=pages*TEST_PAGE;
-    uintptr_t trim_base=api->sbrk_heap_limit-trim_bytes;
+    uintptr_t trim_base=primary_limit-trim_bytes;
     trim_map=api->mem_map(trim_bytes,(void *)trim_base,OS32_MEM_MAP_EXACT);
     CHECK(trim_map == (void *)trim_base);
     CHECK(api->mem_unmap(trim_map,trim_bytes) == 0);
     trim_map=NULL;
     p=malloc(TEST_REQUEST);
-    CHECK(p != NULL && (uintptr_t)p < api->sbrk_heap_limit);
+    CHECK(p != NULL && (uintptr_t)p < primary_limit);
     memset(p,TEST_PATTERN,TEST_REQUEST);
     CHECK(p[0] == TEST_PATTERN && p[TEST_REQUEST-1u] == TEST_PATTERN);
     free(p); p=NULL;

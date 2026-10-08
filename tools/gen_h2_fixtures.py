@@ -55,6 +55,11 @@ def generate(out, root=ROOT):
         damaged = bytearray(controls['app'])
         struct.pack_into('<I', damaged, offset, value)
         emit(name, damaged, INPUTS['app'], reason)
+    for kind in ('app', 'shlib'):
+        damaged = bytearray(controls[kind])
+        struct.pack_into('<I', damaged, 52, H.OS32_MEMORY_LAYOUT_GENERATION - 1)
+        emit('prev-memory-generation-' + kind, damaged, INPUTS[kind],
+             'generation or KAPI layout mismatch')
     damaged = bytearray(controls['shell'])
     struct.pack_into('<I', damaged, 48, H.OS32_KAPI_ABI_GENERATION + 1)
     emit('bad-shell-generation', damaged, INPUTS['shell'], 'generation or KAPI layout mismatch')

@@ -111,6 +111,8 @@ def test_fixtures(tmp):
         'unknown-format.fixture': 2,
         'bad-abi-generation.fixture': 3,
         'bad-memory-generation.fixture': 3,
+        'prev-memory-generation-app.fixture': 3,
+        'prev-memory-generation-shlib.fixture': 3,
         'old-cpl0-flag.fixture': 2,
         'bad-shlib-generation.fixture': 3,
         'bad-shell-generation.fixture': 3,

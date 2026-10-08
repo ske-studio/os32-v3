@@ -91,8 +91,11 @@ def wiring(sources):
     boot = 'paging_boot_user_shared(exec_tramp_page_addr())'
     assert boot in k and k.index('shm_init();') < k.index(boot) < k.index('kselftest_run();'), 'FAIL boot before AS'
     assert k.count(boot) == 1, 'FAIL boot once'
-    e = sources['exec/exec.c']
-    launch = e[e.index('        /* 3 領域を張り終えて'):e.index('/* --- K3:')]
+    e = function(sources['exec/exec.c'], 'exec_launch')
+    # f12 removed the tier bookkeeping after the three private mappings.
+    # Keep checking that interval through the shlib attach, using live calls.
+    start = e.index('        if (app_map_region(ctx->as, load_base, sbrk_end)')
+    launch = e[start:e.index('        if (shlib_addrspace_attach(ctx->as) < 0)', start)]
     assert 'TVRAM_CHAR_BASE' not in launch, 'FAIL launch TVRAM removed'
     assert 'MEM_FONT_CACHE_BASE' not in launch, 'FAIL launch font removed'
     assert 'MEM_SHM_BASE' not in launch, 'FAIL launch SHM removed'

@@ -20,7 +20,9 @@
 /* crt0.asm の入口。sdk/link/app.ld が .text.startup を先頭に置くので、
  * この番地がそのままロードアドレス (= カーネルの MEM_EXEC_LOAD_ADDR)。
  * 定数を書かずにリンク結果を表示するので、帯域が動いてもここは腐らない。 */
+#define TEST_PAGE 4096u
 extern char _start[];
+extern char __bss_end[];
 
 int main(int argc, char **argv, KernelAPI *api)
 {
@@ -33,6 +35,9 @@ int main(int argc, char **argv, KernelAPI *api)
 
     api->kprintf(0xE1, "load                      = 0x%x\n", (unsigned)_start);
     api->kprintf(0xE1, "sbrk_heap_limit (initial) = 0x%x\n", api->sbrk_heap_limit);
+    /* f12: 初期 libc の末尾は BSS の page_up + 1 page。 */
+    if (api->sbrk_heap_limit != (((unsigned)__bss_end + TEST_PAGE - 1u) & ~(TEST_PAGE - 1u)) + TEST_PAGE)
+        bad++;
     probe = (char *)malloc(16);
     api->kprintf(0xE1, "first malloc block         = 0x%x\n", (unsigned)probe);
 

@@ -12,15 +12,15 @@ KernelAPIポインタを引数として実行する。
 | ソースファイル | `exec/exec.c` / `exec/exec.h` / `exec/exec_heap.c` |
 | KAPIラッパー | `kapi/kapi_*.c` (自動生成分 + 手動分)。版は [KAPI_SPEC.md](KAPI_SPEC.md) |
 | KAPIテーブルアドレス | 動的算出 (KHEAP_BASE + KHEAP_SIZE) |
-| ロードアドレス | `MEM_EXEC_LOAD_ADDR` = 0x500000 (2026-09-06 K3。0x400000〜0x4FFFFF は共有ライブラリ帯域 `MEM_SHLIB_BASE`: [archive/gui_v11/TASK_K3](archive/gui_v11/TASK_K3_shared_lib_band.md)。OS32X ヘッダ v2 の `load_addr` が一致しないバイナリは `EXEC_ERR_INVALID`) |
+| ロードアドレス | USER は `MEM_EXEC_LOAD_ADDR` = 0x80100000。常駐 shell は低位配置。OS32X v4 のロード番地・4世代を完全一致検査し、不一致は `EXEC_ERR_INVALID` |
 | 特権レベル | **既定で CPL=3** (v2 M1〜M3, 2026-09-03)。例外は shell (CPL=0 常駐) と `OS32X_FLAG_FORCE_CPL0` (`mkos32x --cpl0`) |
 | アドレス空間 | プログラムごとに PD。カーネル帯 0x100000〜0x3FFFFF は全 PD 共有・非 USER。USER にするのは下の「Ring3 の USER 写像」の範囲だけ |
-| 共有ライブラリ | 0x400000〜0x4FFFFF に `/sys/lib/libos32gui.shlib` が常駐 (`kernel/shlib.c`)。.text はアプリ間で共有 (RO+USER)、.data/.bss はアプリ PD ごとに複製 (`shlib_addrspace_attach`、失敗は `EXEC_ERR_NOMEM`)。アプリは stub (ジャンプ表への薄いスタブ) を静的リンクし、版は先頭 4KB の `OS32ShlibHeader` で照合 |
-| ヒープ | [本体][newlib sbrk (最低 256KB)][ガード][exec_heap] を**ロード時に動的に決める** (固定 1MB 上限は 2026-09-04 に撤廃)。exec_heap の大きさは OS32X ヘッダ `heap_size` (`mkos32x --heap`) があればそれ、0 なら空きを sbrk と折半。実行中の拡張は無い |
+| 共有ライブラリ | 0x80000000〜0x800FFFFF に `/sys/lib/libos32gui.shlib` が常駐 (`kernel/shlib.c`)。.text はアプリ間で共有 (RO+USER)、.data/.bss はアプリ PD ごとに複製 (`shlib_addrspace_attach`、失敗は `EXEC_ERR_NOMEM`)。アプリは stub (ジャンプ表への薄いスタブ) を静的リンクし、版は先頭 4KB の `OS32ShlibHeader` で照合 |
+| ヒープ | USER の libc 初期末尾は `page_up(img_end)+PAGE_SIZE` (BSS 端の端数 + 1 page)、その直後に guard_a。exec_heap は別予約 `MEM_EXEC_HEAP_BASE` (0x88000000)、未指定64KiB・明示値はページ丸め/最低64KiB。実行中は EXACT 伸長・副 arena・大塊を `mem_map` で確保する。resident shell/gshell は固定 sbrk 上限0x375000、exec_heap 452KiB (小さい明示値のみ縮小) |
 | ネスト実行 | 最大 4 段 (ID の池 `exec/appslot.h` の `APP_MAX_APPS`)。Level 0 = カーネル、1 = シェル、2+ = アプリ。**子が終了すると親に戻る** (親の exec_heap は `exec_heap_restore_state()` で復元) |
 | 資源の所有者 | FD / リダイレクト / パイプは `res_owner_get()` (= ネスト段) でタグ付け、終了段の分だけ回収 ([10 §10-9](10_notes.md)) |
 | 不正ポインタ | ディスパッチャがアプリ帯 / SHM / VRAM の範囲で早期検証。検証しきれないものは「ring3 syscall 実行中フォールトガード」が捕捉し、**アプリだけ kill** (`fault_kill_count`)。設計: [archive/kernel_v2/](archive/kernel_v2/PLAN.md) |
-| プログラム専用スタック | CPL=3: アプリ帯の上端から 256KB + その直下にガード 1 ページ。帯 1 枚 (既定) なら 0x7C0000〜0x7FFFFF / ガード 0x7BF000、2 枚なら 0xBC0000〜0xBFFFFF / ガード 0xBBF000 ([tasks/memory/APP_BAND_PDE.md](tasks/memory/APP_BAND_PDE.md))。CPL=0: mem_end 付近 |
+| プログラム専用スタック | CPL=3: `MEM_APP_STACK_TOP` (0x90000000) から可変量 (既定256KiB) を全 map、その直下に guard_b 1 page。常駐 shell/gshell は固定配置 |
 | 呼び出し規約 | カーネル側 GCC (System V) + `__cdecl` ラッパー、外部プログラム System V i386 ABI |
 
 ### 実行方式
@@ -38,22 +38,22 @@ KernelAPIポインタを引数として実行する。
 
 | 範囲 | 属性 | 目的 |
 |---|---|---|
-| 0x500000〜スタック直下 (`RING3_HEAP_TOP`) | RW+USER (アプリ PD 固有 PT) | 本体 / sbrk / exec_heap |
-| ガード 0x7BF000 | 非 present | ヒープ / スタック境界 (`ring3_guard`) |
-| 0x7C0000〜0x7FFFFF | RW+USER | ユーザスタック 256KB (帯 1 枚のとき。2 枚なら 0xBC0000〜0xBFFFFF) |
+| image/libc 0x80100000〜sbrk_end、exec_heap 0x88000000〜exec_heap_end | RW+USER (私有・疎PT) | 初期域と実行中の mem_map 伸長 |
+| guard_a=sbrk_end、guard_b=stack_top-stack_size-PAGE_SIZE | 非 present | libc 初期末尾 / stack 境界 (`ring3_guard`) |
+| stack_top-stack_size〜stack_top | RW+USER | 可変ユーザスタック全量 |
 | 0xA0000〜0xBFFFF | supervisor (e11b1〜) | テキスト / グラフィック VRAM。CPL=3 は KAPI (`tvram_*`) か lease 経由だけ |
 | フォントキャッシュ 0x01000〜 | supervisor (e11b1〜) | `kcg_read_*` の KAPI 越し |
 | SHM | RW+USER (共有 PT、lock 中は RO) | boot 専用口で初期化し、SHM 専用口で RW だけ切替 |
 | Unicode 表 0x4A000〜 | supervisor (e11b2〜) | CPL=3 は RO の Unicode lease 経由 |
 | 0x6A000〜0x89FFF (9801 BB)、バックエンド固有 BB | supervisor (e11b2〜) | CLIENT lease の私有 VA で描画。Cirrus DISPLAY は授権された lease だけ RW |
 | KAPI トランポリン 1 ページ | RO+USER | `int 0x80` スタブ列 |
-| 0x400000〜 shlib .text | RO+USER (共有) / .data は per-app | 共有ライブラリ |
+| 0x80000000〜 shlib .text | RO+USER (共有) / .data は per-app | 共有ライブラリ |
 
 SHM の先頭 1 ブロック (16KB) は DB 結果・エラー文用、末尾 4 ブロックは GUI 用に固定予約する。
 `shm_alloc` が配るのは残り 9 ブロックで、解放・所有者回収・全回収でも固定予約を維持する。
 
 通常の AS map/unmap は私有 PT だけを操作し、共有 PT に掛かる要求は無変更で拒否する。
-旧低位 USER を前提とした成果物は memory_layout 世代 2 の完全一致検査で拒否する (KAPI v70 は不変)。
+旧低位 USER を前提とした成果物は memory_layout 世代 3 の完全一致検査で拒否する (KAPI v71 は不変)。
 
 ### 起動失敗の巻き戻しと強制脱出
 

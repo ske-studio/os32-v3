@@ -1,5 +1,5 @@
 /* GENERATED GENERATION REF BEGIN */
-__os32_abi_1_mem_2_fmt_4 = 0;
+__os32_abi_1_mem_3_fmt_4 = 0;
 /* GENERATED GENERATION REF END */
 /*
  * shlib.ld — 共有ライブラリ (OS32X_FLAG_SHLIB) のリンカスクリプト。票 C3。

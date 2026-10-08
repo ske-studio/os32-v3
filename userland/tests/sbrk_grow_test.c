@@ -21,7 +21,8 @@ int main(int argc, char **argv, KernelAPI *api)
     (void)argc; (void)argv;
 #define CHECK(c) do { total++; if (c) passed++; else goto done; } while (0)
     initial = (uintptr_t)sbrk(0);
-    CHECK(initial != UINTPTR_MAX && initial <= api->sbrk_heap_limit);
+    CHECK(initial != UINTPTR_MAX &&
+          api->sbrk_heap_limit == ((initial + TEST_PAGE - 1u) & ~(TEST_PAGE - 1u)) + TEST_PAGE);
     errno = 0;
     CHECK(sbrk(-1) == (void *)-1 && errno == ENOMEM && (uintptr_t)sbrk(0) == initial);
     errno = 0;
