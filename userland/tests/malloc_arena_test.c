@@ -12,6 +12,8 @@
 #define TEST_PATTERN 0x6d
 #define TEST_LARGE 65536u
 extern void *sbrk(int incr);
+/* SDK-internal test entry, deliberately absent from public application headers. */
+extern size_t os32_nano_trim(void);
 
 int main(int argc, char **argv, KernelAPI *api)
 {
@@ -19,6 +21,8 @@ int main(int argc, char **argv, KernelAPI *api)
     void *block = NULL, *reused = NULL;
     uintptr_t brk, secondary;
     size_t secondary_bytes = (TEST_REQUEST + 2u * TEST_PAGE - 1u + 16u) & ~(TEST_PAGE - 1u);
+    size_t trim_bytes = 0;
+    void *trim_map = NULL;
     int passed = 0, total = 0;
     (void)argc; (void)argv;
 #define CHECK(c) do { total++; if (c) passed++; else goto done; } while (0)
@@ -61,10 +65,28 @@ int main(int argc, char **argv, KernelAPI *api)
             CHECK(api->mem_unmap(exact,bytes) == 0);
         } else { free(p); p=NULL; }
     }
+    /* f11: restore the break to the old primary free chunk's end. The range
+     * ends at sbrk_heap_limit (the adjacent EXACT block's start), so this is
+     * an extent tail removal, not a middle split requiring another slot. */
+    CHECK((uintptr_t)sbrk(-(int)(api->sbrk_heap_limit - brk)) == api->sbrk_heap_limit);
+    size_t pages=os32_nano_trim();
+    CHECK(pages >= 1 && pages <= (api->sbrk_heap_limit-(brk & ~(TEST_PAGE-1u)))/TEST_PAGE);
+    trim_bytes=pages*TEST_PAGE;
+    uintptr_t trim_base=api->sbrk_heap_limit-trim_bytes;
+    trim_map=api->mem_map(trim_bytes,(void *)trim_base,OS32_MEM_MAP_EXACT);
+    CHECK(trim_map == (void *)trim_base);
+    CHECK(api->mem_unmap(trim_map,trim_bytes) == 0);
+    trim_map=NULL;
+    p=malloc(TEST_REQUEST);
+    CHECK(p != NULL && (uintptr_t)p < api->sbrk_heap_limit);
+    memset(p,TEST_PATTERN,TEST_REQUEST);
+    CHECK(p[0] == TEST_PATTERN && p[TEST_REQUEST-1u] == TEST_PATTERN);
+    free(p); p=NULL;
     CHECK(printf("malloc_arena_test: printf %d\n", TEST_PATTERN) > 0);
     CHECK(fflush(stdout) == 0);
 done:
     free(p);
+    if (trim_map) api->mem_unmap(trim_map,trim_bytes);
     if (reused) api->mem_unmap(reused, secondary_bytes);
     if (block) api->mem_unmap(block, TEST_PAGE);
     return os32_test_summary(api, "malloc_arena_test", passed, total);

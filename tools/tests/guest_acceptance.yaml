@@ -975,6 +975,7 @@
   - 'Require cross-arena realloc preserves all old bytes, free permits EXACT remap of the management page and whole secondary arena, printf output is visible'
   - 'Require kill delta 0 and leftover 0; run heap_test (64KiB malloc now uses TOPDOWN direct maps; 64KiB mem_alloc uses one EXEC_LARGE extent per allocation (f10)), sbrk_grow_test, db_test and db_v50_test regressions'
   expect:
+    total: 196664
     exit: 0
     kill_delta: 0
     leftover: 0
@@ -992,6 +993,7 @@
   - 'Record fault_kill_count and exec_as_leftover_pages before and after; require kill delta 0 and leftover 0'
   - 'Run heap_test, sbrk_grow_test, db_test and db_v50_test regressions; 64KiB malloc uses direct map'
   expect:
+    total: 196664
     exit: 0
     kill_delta: 0
     leftover: 0
@@ -1034,3 +1036,26 @@
     kill_delta: 0
     leftover: 0
   evidence: ~/os32-tmp/evidence/<日付>/f10-exec-large/
+
+- id: f11-nano-trim
+  gate: F-13
+  contract: userland/tests/malloc_arena_test.c
+  mode: manual
+  prereq: KAPI 71, memory layout 2, 17MB; PM deploy rebuilt USER malloc_arena_test and verify its binary
+  entry: malloc_arena_test
+  observe:
+  - 'Require PASS 196664/196664 and exit 0; after f8, restore the primary break to brk and trim at least one page'
+  - 'Require EXACT remap of [sbrk_heap_limit - pages*4096, sbrk_heap_limit), unmap, and malloc(TEST_REQUEST) from primary'
+  - 'The returned range ends at the adjacent EXACT block start: this removes an extent tail, not a middle split'
+  - 'Record fault_kill_count and exec_as_leftover_pages before/after; require kill delta 0 and teardown leftover 0'
+  - 'Run sbrk_grow_test, heap_test, db_test and db_v50_test regressions; notification delivery is deferred to g'
+  expect:
+    total: 196664
+    exit: 0
+    trim_pages_min: 1
+    kill_delta: 0
+    leftover: 0
+    teardown:
+      fault_kill_count_delta: 0
+      exec_as_leftover_pages: 0
+  evidence: ~/os32-tmp/evidence/<日付>/f11-nano-trim/

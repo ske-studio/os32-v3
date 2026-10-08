@@ -38,4 +38,15 @@ size_tへ修正。既存変異の期待ラベルを合わせる途中、free lis
 
 全runnerの正常対照はMake recipeで列挙し、変異は先頭runner。
 このsandboxではqemuのみ実施、nativeはPMホストで実施する。
-public link/実CRT/自動副arena/大塊/trim/Rust整列は未実装、担当段は票参照。
+public link/実CRT/自動副arena は f6/f7、大塊/Rust整列は f8、trim は f11 で実装。
+
+f11 (2026-10-08、基点 f43344c): 実 nano の末尾 free list のみを対象に、
+primary/副 arena の部分 unmap・再伸長・末尾不足分の併合を検査する。
+EFULL「中抜きで slot 不足」/EINVAL は callback で返し、全状態と生存全バイトを照合。
+page 先頭/中ほど/末尾の header、image page、USED 末尾、直接 sbrk、busy 再入、
+空副 arena の再返却、arena ごとの成功ページ数の和と失敗後継続も対象。
+非選択 arena の live size を毒値にしても結果は変わらず、物理 chunk の検査を足す変異を検出する。
+新規 6 変異は既存 32 変異と期待 CHECK の対応を維持する。image 端 page の floor 除去は
+有効な tail ≥ initial かつ page_up(tail+12) ≥ page_up(initial) なので等価変異として除外。
+ホスト正常/変異・リンク負例と検査対象は `/home/hight/os32-tmp/run/f11/f11_report.md`、
+`f11_check_scope.json` と `f11_*.log`。ゲストと native の持越しは台帳 F-13。

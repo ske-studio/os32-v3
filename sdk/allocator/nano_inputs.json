@@ -115,10 +115,10 @@
     }
   },
   "sdk_build": {
-    "status": "f8 USER TOPDOWN large blocks; resident fixed morecore with libc nano",
+    "status": "f11 USER tail trim; f8 TOPDOWN large blocks; resident fixed morecore with libc nano",
     "sources": {
-      "sdk/allocator/nano_adapter.c": "0726b01b05478bd432176b56194125934b5e406ae0807e7a8049a2efd895babf",
-      "sdk/allocator/nano_adapter.h": "54afe5277bffc4034cc0149e2dd8ba74b221433656f468ebfc6466536ac9bba9",
+      "sdk/allocator/nano_adapter.c": "bb5f62bc907b08736f08260318e48be48cab09162817dc5e0957cb5c7d39e176",
+      "sdk/allocator/nano_adapter.h": "04e737dcbe9dcc69937f12dccfb71092b03cbd9e8f47debc77f4f9d764dad9fb",
       "sdk/allocator/build_nano.py": "5ee17bf0d3d550c01f5abb083f3202ab580c158ceb41f7c85266ec0b980d3dde",
       "sdk/allocator/check_link.py": "12a6826d36eb95912e1d2739b3ee36d17d3bf5de2edd8457289761e5ef541302"
     },
