@@ -114,8 +114,8 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v68 | **実装済み (2026-09-26、手元ビルドとホスト試験のみ)** | 実機の ROM の INT 18h の I/O 記録 `v86_gdc_capture` 1 本 (slot 239 = 0x3C4)。`mode = V86G_MODE_ROM` は V86 で実機の ROM の AH=31h を呼んで今のモードを読み、その bit の並び (NP21/W の bit2 / Bible 3-2 の bit3) から 640x480 の AH=30h を決めて呼び、同じ AH=30h で元のモードへ戻して (戻れなければ OS32 の表 `pegc_restore_text_sync`) CUI を作り直す。その間に捕まえた OUT を**畳まずに**最大 512 件、IN をポートごとの回数で `V86Gcap` (8460 バイト) へ写す。`V86G_MODE_SELFTEST` は決まった I/O 列の試験ゲストで記録器を確かめる (実機へ通さない)。`v86 -g [-t]` が使う。実体は `kernel/v86_gcap.c` / `kernel/v86_gcap_math.c` | [tasks/realhw/TASK_PEGC480_REALHW.md](tasks/realhw/TASK_PEGC480_REALHW.md) §3 段 1 |
 | v69 | **実装済み (2026-10-01、手元ビルド・ホスト試験)** | T2c: OS32X v4 / 4 世代の正典・高位配置・可変 stack。KAPI slot の追加・並べ替えなし | [tasks/v3/TASK_T2_APPBAND.md](tasks/v3/TASK_T2_APPBAND.md) §4-6・T2c-R |
 | v70 | **実装 (2026-10-07、e11c1・統合ゲスト受入前)** | surface query/lease/bundle/unlease・値返し ls・本人識別の 6 本 (slot 240〜245)。公開値型・ページ/SHM 定数、pipe の CPL3 制限。e11b2 で memory_layout 世代 2 (版70は不変、旧世代1は拒否) | §4-10、[TASK_T2D_T2H](tasks/v3/TASK_T2D_T2H.md) e11 |
-| v72 | **実装 (ホスト試験・ゲスト受入前)** | `mem_stat` (slot 248)、サイズ引数つき MemStat。4 世代・データ欄は不変。 | 本書 §4-12 |
-| v71 | **実装 (2026-10-08、ホスト試験・ゲスト受入前)** | USER 専用 `mem_map` / `mem_unmap` (slot 246・247)。f12 で memory_layout 世代 3 (KAPI 71・slot・データ欄は不変)。USER の最小初期量と mem_map による伸長へ切替。旧世代は拒否。 |
+| v71 | **受入済み (2026-10-08、f12 ゲスト受入)** | USER 専用 `mem_map` / `mem_unmap` (slot 246・247)。f12 で memory_layout 世代 3 (KAPI 71・slot・データ欄は不変)。USER の最小初期量と mem_map による伸長へ切替。旧世代は拒否。 |
+| v72 | **受入済み (2026-10-09、f13 ゲスト受入)** | `mem_stat` (slot 248)、サイズ引数つき MemStat。4 世代・データ欄は不変。 | 本書 §4-12 |
 
 調停 (2026-09-06、同日改訂): GUI (K1〜W2) を先に実装するので **v42 = GUI、v43 = ネットワーク Host Services**
 に確定。実装順が入れ替わるときは、着手前にこの表を更新してから版番号を取ること。
@@ -1703,7 +1703,7 @@ hint/base はアドレス値の入力 (`out: none` と `in: [{arg: hint/base, ta
 | 0x3E8 | mem_stat | `i32(i32 app_id, void *out, u32 size)` |
 
 slot 248。`out` は `len=size` の生成ラッパで先に書込み範囲を検査する。
-`size < MEMSTAT_MIN` (0 を含む) は `OS32_ERR_INVAL` で出力不変。
+ラッパの検査を通った後、`out == NULL` または `size < MEMSTAT_MIN` (0 を含む) は `OS32_ERR_INVAL` で出力不変。
 それ以外は `min(size, sizeof(MemStat))` バイトだけ写し、その長さを戻り値と先頭 `size` に返す。
 構造体の拡張は末尾追記だけ。現行 ILP32 では `MEMSTAT_MIN=44`、`sizeof(MemStat)=120`。
 不正な USER 出力 (NULL、NP/RO/supervisor、overflow) は既存規約どおり kill。
@@ -1716,10 +1716,13 @@ ID 1、-2 以下、6 以上も `OS32_ERR_INVAL`。権限・対象のエラーは
 無効 USER の公開呼出しは size > 0 ならラッパで kill、size == 0 は本体で INVAL。
 本体を直接呼んでも無効 USER は INVAL であり、TRUSTED へ昇格しない。
 
-AS は state が FREE 以外なら PARKED / WAIT_KEY / WAIT_POLL / ABORT_PENDING /
-FAULT_PENDING でも読める。毒 AS は回収せず POISONED flag を写す。
+FREE 以外の state (PARKED / WAIT_KEY / WAIT_POLL / ABORT_PENDING / FAULT_PENDING)
+は AS / PD があれば読める。毒 AS は回収せず POISONED flag を写す。
 IRQ 保存中に kernel stack へ 32 本の表と計数を snapshot し、IRQ 復元後に copyout する。
 同じ関数内の snapshot と copyout の間に yield / callback / AS 切替はない。
+USER の exec_heap 使用量は常駐ヒープではなく AS 側から採る。~0U は無効値として
+HEAP_INVALID を立て、出力の使用量を 0 にする。CPL3 の可変引数の窓は
+`kprintf` の呼出し側の制限であり、固定引数と出力バッファを使う `mem_stat` には関係しない。
 
 以下は全欄 4B、app_id だけ i32、他は u32。システム対象では AS / slot 欄と state / flags は 0。
 範囲の端は特記しない限り exclusive、VA は仮想アドレス。
@@ -1737,13 +1740,13 @@ IRQ 保存中に kernel stack へ 32 本の表と計数を snapshot し、IRQ �
 | 32 | phys_free_pages | page、物理ページ空き |
 | 36 | resident_heap_total | B、resident exec_heap 総量 |
 | 40 | resident_heap_used | B、resident exec_heap 使用量 |
-| 44 | extents_total | 本、全 extent 数 (ここまでのシステム欄が MEMSTAT_MIN) |
+| 44 | extents_total | 本、全 extent 数 (この欄の直前までが MEMSTAT_MIN) |
 | 48,52,56,60,64 | extents[5] | 本、LIBC_INITIAL / EXEC_INITIAL / ANON / EXEC_ARENA / EXEC_LARGE 順 |
 | 68 | extents_free | 本、32 − extents_total |
 | 72 | arenas | 本、ANON + EXEC_ARENA |
 | 76 | exec_heap_used | B、AS 側の使用量。~0U は HEAP_INVALID を立て値を 0 にする |
 | 80 | img_end | VA、image/BSS 末尾 |
-| 84 | primary_mapped_end | VA、初期 libc の mapped 末尾 |
+| 84 | primary_mapped_end | VA、主領域末尾 (image 末尾のページ切上げ、libc 初期域は別 extent) |
 | 88 | exec_heap_cur_end | VA、現在の exec_heap 末尾 |
 | 92 | guard_b | VA、stack 下の guard 起点 |
 | 96 | load_addr | VA、slot のロード起点 |

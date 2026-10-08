@@ -72,6 +72,9 @@ stack_top-stack_size - stack_top   可変 stack 全量 RW
 実行中の libc EXACT 伸長・副 arena・大塊と exec_heap の追加領域は `mem_map` を使う。
 固定初期域と extent の回収を分け、終了後の leftover は0。
 resident shell/gshell は sbrk 上限0x375000、exec_heap 452KiB (小さい明示値のみ縮小) を維持する。
+`mem` の `実測: Shell band sbrk上限` は CPL0 の常駐 shell だけに出る実際の上限値。
+`実測: ... resident heap total / used` は常駐 exec_heap の総量 / 使用量 (B) であり、
+定数の予約帯や USER の AS 側使用量とは別。表示の詳細は [mem.1](manpages/mem.1) を参照。
 
 > シェルは newlib の sbrk ヒープと KAPI `mem_alloc` の exec_heap の 2 系統を
 > 持つ。かつては両方が BSS 終端から始まり互いを上書きしていた
