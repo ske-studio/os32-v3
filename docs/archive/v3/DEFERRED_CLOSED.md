@@ -165,3 +165,9 @@ X-2 の前半 (e8a の RO 日本語) は `accept_e11/RESULT.md` の GUI 日本�
 | ID | 閉じた項目 | 証拠 |
 |---|---|---|
 | F-13 | f11: malloc_arena_test 196664/196664 (trim → EXACT 再 map → 再 malloc)、回帰 (sbrk/heap/exec_heap/alloc_demo/db/mem_map/hsync) kill+0・leftover 0 | `~/os32-tmp/evidence/2026-10-08/accept_f11/RESULT.md` |
+
+## f12 のゲスト受入 (2026-10-08、main d75e27f)
+
+| ID | 閉じた項目 | 証拠 |
+|---|---|---|
+| F-5 | f12: 17MB で f12-startup (heap/sbrk_grow/exec_heap 親子/malloc_arena/mem_map)・f12-consumers (CUI 17 本 + GUI 7 本、kill+0・leftover 0、終了時 extent 最大 4/32・副 arena 最大 1)・f12-generation (世代 2 app 拒否・世代 3 起動)。kselftest 288/0。残りは F-14 | `~/os32-tmp/evidence/2026-10-08/accept_f12/RESULT.md` |
