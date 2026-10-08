@@ -1,6 +1,6 @@
 # TASK_T2D_T2H — T2d〜T2h 詳細設計
 
-> 状態: **実装中 (2026-10-07)** — T2d・T2e (e1〜e11) は受入済み。T2e は e12 の整理、T2f は f1a〜f4 (f2〜f4 は未結線)、T2h は h2・h3 の準備まで着地。残りは e12、f5 以降、g、h の統合受入 (現在地は [HANDOVER_2026-10-08](../agents/HANDOVER_2026-10-08.md))。
+> 状態: **実装中 (2026-10-07)** — T2d・T2e (e1〜e11) は受入済み。T2e は e12 の整理、T2f は f1a〜f4 (f2〜f4 は未結線)、T2h は h2・h3 の準備まで着地。残りは e12、f5 以降、g、h の統合受入 (現在地は [HANDOVER_2026-10-09](../agents/HANDOVER_2026-10-09.md))。
 > それまでの状態: 設計中 (2026-10-01) — 独立レビュー Opus 5.5 は 1 回目 Request changes (P1 2件 / P2 11件 / P3 8件) → 反映 → 2 回目 Approve (P3 5件は §11 の実装時の注記)。
 > 作成: GPT-6 / Codex。調査基点: main / docs/t2d-h-design 共通 **9ae6073406c2027fd50938e3870a3fb3888cd7f6**。
 > **実行記録は 2026-10-06 に [archive/v3/TASK_T2D_T2H_RECORDS.md](../../archive/v3/TASK_T2D_T2H_RECORDS.md) へ移した** (この票は契約・分割・受入条件・未実施の手順だけ)。延ばした試験と未実施は [DEFERRED_TESTS.md](../DEFERRED_TESTS.md) が正。段の記録は 1 段 10 行以内で書く ([ROLES §0](../agents/ROLES.md))。
@@ -301,7 +301,7 @@ nanoのtail trimは実free list上で末尾のfree chunkを確認し、header/�
 | f10 | 要求≥64KiB は TOPDOWN の EXEC_LARGE、作れないときは理由を問わず伸長なしで既存 arena (§3-4 の補足、PM 決定)。識別は extent/base のみ、非併合・即返却・teardown 回収。trim は全 USER arena 検証後に ARENA 末尾/空 arena だけ返し、INITIAL は内部返却も拒否。失敗時は header/used 不変、free 段失敗は毒 AS として隔離。LARGE double free は未使用 VA なら無視、ANON 内なら無効化、再確保済みなら新割当を free。AS 1,228B・KAPI 71・memory 2 据置、基点 160342d 比 +480B (予算1,500B内)。F-4 の host 分を閉鎖、ゲストと trim 配送後の観測は台帳 F-11/F-12。証拠 `/home/hight/os32-tmp/run/f10/f10_report.md`・`f10_sizes.json`。 |
 | f11 | SDK 内部 `os32_nano_trim` (USER のみ)。実 free list の末尾を page_up(chunk+12) まで残し、primary は image 端 page も保持。arena ごとに unmap 成功後だけ size/brk/mapped_end 確定、失敗後も走査継続して成功ページ数を合算。空副 arena は既存 release_empty で再返却、busy 中は 0。実 nano の接続/末尾併合・失敗全状態・生存全バイト・再入と 6 変異を追加。KAPI 71・memory 2・kernel 不変。証拠 `/home/hight/os32-tmp/run/f11/f11_report.md`・`f11_sizes.json`・`f11_check_scope.json`。ゲスト/native と通知配送は台帳 F-13、性能は F-9 (f12)。 |
 | f12 | f12a: USER 起動を exec_heap 最低64KiB・libc BSS端のpage_up+1pageへ切替、可変stack全map。旧折半/tier/物理0xC00000天井を撤去。memory 3・KAPI 71据置、resident/親子回収は維持。PDE集合の実消費・不足/overflow/KHEAP失敗とresident 3条件をhostで検査。boot最小域は共通 `MEM_EXEC_BOOT_MIN`: 0x590000→0x551000 (bootstrap/init/selftest/host境界、8MB不変)。基点0a929e1比 kernel -352B、f残3,968B。K7形は空き768page中94page。証拠 `/home/hight/os32-tmp/run/f12/f12a_report.md`・`f12_sizes.json`。台本/文書固定値・F-5/F-9・性能・8MB延期登録はf12b、ゲスト受入はPM。 |
-| f13 | mem表示・変異結線・size/manifestとPM台本を確定 |
+| f13 | f13a: `mem_stat(app_id,out,size)` slot 248・**KAPI 72** (WM/CPL0 常駐は任意 ID、USER は自己と ID 0、MemStat 120B・MIN 44B、USER 使用量は AS 側)、`mem` を作り直し (CPL0 は 2..5 を 3 行ずつ、NOTFOUND 非表示、CPL3 は自己だけ・resident sbrk 実測は CPL0 だけ)。kselftest +1 (289)。kernel `__bss_end` +1,184B (上限は PM が +800→+1,400B に改訂)。f13b: 変異の対応表の洗い、台本の版 72 追従と f13/F-14 項目、teardown の extent 採取ツール `tools/accept/as_extents_at_teardown.py` (入口 EAX=AppSlot*、offset 生成)。ゲスト受入 2026-10-09 で CPL3 sh の mem が kprintf の引数の窓 (14 個) を超えて壊れる不具合 → 1 行 1 回に分割 (6a393ac)。証拠 `/home/hight/os32-tmp/run/f13/`・`~/os32-tmp/evidence/2026-10-09/f13_acc/RESULT.md`。文書 (mem.1・07_shell・02_memory・KAPI_SPEC の文言と §3-2 の行順) は **f13c**。F-14 の残りは台帳。 |
 
 > **記録は archive へ移した (2026-10-06)**: T2f — f1a〜f4 の実装記録 — [TASK_T2D_T2H_RECORDS.md の「元の行 1951–2370」](../../archive/v3/TASK_T2D_T2H_RECORDS.md#r1951)。
 
@@ -526,7 +526,7 @@ d6 の `__bss_end=0x18C270` が e の増分の基準。KHEAP は E11-BUD の一�
 | d6 確定 | `__bss_end=0x18C270`、d 正味 4,260B | 旧上限で 36,240B |
 | e11 / e12 修正前 (`83f2db7`) | `__bss_end=0x1936E0`、e 正味 **29,808B** | **22,816B** |
 | e12 ピーク修正後 | `__bss_end=0x193740`、e 正味 **29,904B** (+96B) | **22,720B** |
-| f (**ユーザー決定 2026-10-08: 予備から +4KB → 12,288B**) | 12,288B (f5b 後 6,688B、f9 +1,504B、f10 +480B、f12a -352B → 8,320B、-Os 込み、残り 3,968B) | 10,432B |
+| f (**ユーザー決定 2026-10-08: 予備から +4KB → 12,288B**) | 12,288B (f5b 後 6,688B、f9 +1,504B、f10 +480B、f12a -352B → 8,320B、-Os 込み。6,688B は e12 の +96B を含むので e に帰属させ (PM 決定 2026-10-08) f12 時点 8,224B、f13a +1,184B → **9,408B、残り 2,880B**) | 10,432B |
 | g | 3,072B | 7,360B |
 | h (selftest/診断追加) | 3,072B | **4,288B** (予備) |
 

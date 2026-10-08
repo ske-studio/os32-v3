@@ -15,7 +15,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | 情報単位 | 正典 (ここだけ更新) | 参照側 (要約 + リンクのみ) |
 |---|---|---|
 | 制約規則 [C/HW/ABI/V/D] | [CONSTRAINTS.md](CONSTRAINTS.md) | CLAUDE.md (ID 参照、`make check` が照合)。Hermes 用の SOUL.md は 2026-09-29 に `SOUL.md` (非公開・リポジトリ外、`.gitignore`) へ (効力なし) |
-| 引き継ぎ (次の PM への申し送り)・現在地と残件 | [tasks/agents/HANDOVER_2026-10-08.md](tasks/agents/HANDOVER_2026-10-08.md) (入口の 1 枚、50 行以内・上書き。進捗の本文は持たない) | 前回は [archive/agents/HANDOVER_2026-10-06.md](archive/agents/HANDOVER_2026-10-06.md) |
+| 引き継ぎ (次の PM への申し送り)・現在地と残件 | [tasks/agents/HANDOVER_2026-10-09.md](tasks/agents/HANDOVER_2026-10-09.md) (入口の 1 枚、50 行以内・上書き。進捗の本文は持たない) | 前回は [archive/agents/HANDOVER_2026-10-08.md](archive/agents/HANDOVER_2026-10-08.md) |
 | エージェント運用体制 (役割・起動・規約) | [tasks/agents/ROLES.md](tasks/agents/ROLES.md) (§0 が現行の 1 表。経緯は持たない) | CLAUDE.md (体制 1 段落 + リンク)。経緯は [archive/agents/ROLES_HISTORY_2026-10-06.md](archive/agents/ROLES_HISTORY_2026-10-06.md)、見直しの根拠は [tasks/agents/REVIEW_2026-10-06.md](tasks/agents/REVIEW_2026-10-06.md) |
 | 延ばした試験・SKIP・ホストだけの合格・未結線 (持越し) | [tasks/DEFERRED_TESTS.md](tasks/DEFERRED_TESTS.md) (未完了だけを持つ。終わった行は消す) | 各票・引き継ぎは参照のみ。同じ延期を票や memory に写さない |
 | 番地・帯域 | `include/memmap.h` (定義)、[02_memory.md §2-1](02_memory.md) (説明)、`build/out/MEMMAP.md` (実ビルドの生成地図、`make docs-gen`) | CLAUDE.md は入口のみ |
@@ -172,7 +172,7 @@ T3 前の文書再整備の候補・未解決点は [DOCS_REORG_T3](tasks/v3/DOC
 
 | ドキュメント | 内容 |
 |-------------|------|
-| [tasks/agents/HANDOVER_2026-10-08.md](tasks/agents/HANDOVER_2026-10-08.md) | **引き継ぎ 2026-10-08 (現行)** — T2f の最終段 f13 の起草中の現在地、次の一手、段をまたぐ道具と罠。入口だけ (50 行以内) |
+| [tasks/agents/HANDOVER_2026-10-09.md](tasks/agents/HANDOVER_2026-10-09.md) | **引き継ぎ 2026-10-09 (現行)** — f13 の取り込み・受入後の現在地 (残り f13c と F-14)、次の一手、段をまたぐ道具と罠。入口だけ (50 行以内) |
 | [tasks/agents/REVIEW_2026-10-06.md](tasks/agents/REVIEW_2026-10-06.md) | **開発体制の見直し 2026-10-06 — 完了記録** — 遅さの原因 (根拠つき)、決めたこと、残りの作業 a〜e |
 | [tasks/DEFERRED_TESTS.md](tasks/DEFERRED_TESTS.md) | **持越し台帳** — 延ばした試験・SKIP・ホストだけの合格・未結線を 1 か所に |
 | [archive/agents/HANDOVER_2026-09-30.md](archive/agents/HANDOVER_2026-09-30.md) | 引き継ぎ 2026-09-30 (os32-v3 の初日、履歴) |
