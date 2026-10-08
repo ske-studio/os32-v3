@@ -99,15 +99,18 @@ static int cmd_mem(int argc, char **argv)
          * 端/TD=exec_heap current end (TOPDOWN start) through guard_b;
          * stk=stack range/size, 初=initial exec_heap base+size. */
         g_api->kprintf(ATTR_WHITE,
-            "  実測: app=%d st=%u fl=%u ext=%u [%u,%u,%u,%u,%u] free=%u ar=%u heap=%uB\n"
-            "  img=%08X-%08X 主端=%08X libc初=%08X 窓0=%08X-%08X\n"
-            "  端/TD=%08X-%08X stk=%08X-%08X/%uB 初=%08X+%uB\n",
+            "  実測: app=%d st=%u fl=%u ext=%u [%u,%u,%u,%u,%u] free=%u ar=%u heap=%uB\n",
             stat.app_id, stat.state, stat.flags, stat.extents_total,
             stat.extents[0], stat.extents[1], stat.extents[2], stat.extents[3], stat.extents[4],
-            stat.extents_free, stat.arenas, stat.exec_heap_used,
+            stat.extents_free, stat.arenas, stat.exec_heap_used);
+        g_api->kprintf(ATTR_WHITE,
+            "  img=%08X-%08X 主端=%08X libc初=%08X 窓0=%08X-%08X\n",
             (u32)MEM_EXEC_LOAD_ADDR, stat.img_end, stat.primary_mapped_end, stat.sbrk_heap_limit,
             (stat.img_end + (u32)MEM_PAGE_SIZE - 1) & ~((u32)MEM_PAGE_SIZE - 1),
-            (u32)MEM_EXEC_HEAP_BASE, stat.exec_heap_cur_end, stat.guard_b,
+            (u32)MEM_EXEC_HEAP_BASE);
+        g_api->kprintf(ATTR_WHITE,
+            "  端/TD=%08X-%08X stk=%08X-%08X/%uB 初=%08X+%uB\n",
+            stat.exec_heap_cur_end, stat.guard_b,
             stat.stack_top - stat.stack_size, stat.stack_top, stat.stack_size,
             stat.exec_heap_base, stat.exec_heap_size);
     }

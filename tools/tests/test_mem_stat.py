@@ -149,6 +149,8 @@ SHELL_FIXTURE = r'''
 #include "memmap.h"
 static KernelAPI api, *g_api = &api;
 static int scenario, calls[8], count;
+static int format_probe;
+RING3_WINDOW_DEFINE
 static u32 pmem(void) { return 17408; }
 static u32 ram(void) { return 16384; }
 static u32 ht(void) { return 180224; }
@@ -160,7 +162,25 @@ static void emit(char c) {
 }
 static void puts(const char *s) { while (*s) emit(*s++); emit('\n'); }
 static void print(u8 attr, const char *fmt, ...) {
-    (void)attr; va_list ap; va_start(ap, fmt);
+    (void)attr;
+#ifdef SHELL_AS_APP
+    unsigned nargs = 0;
+    for (const char *p = fmt; *p; p++) {
+        if (*p != '%') continue;
+        p++;
+        if (*p == '%') continue;
+        /* Kernel formats use optional decimal width and one conversion. */
+        while (*p >= '0' && *p <= '9') p++;
+        if (!*p) { puts("FAIL: kprintf format"); goto fail; }
+        nargs++;
+    }
+    if (nargs > (RING3_ARG_WINDOW - 8) / 4) {
+        puts("FAIL: kprintf argument window");
+        goto fail;
+    }
+#endif
+    if (format_probe) return;
+    va_list ap; va_start(ap, fmt);
     while (*fmt) {
         if (*fmt++ != '%') { emit(fmt[-1]); continue; }
         unsigned width = 0;
@@ -177,6 +197,12 @@ static void print(u8 attr, const char *fmt, ...) {
         }
     }
     va_end(ap);
+    return;
+#ifdef SHELL_AS_APP
+fail:
+    __asm__ volatile("int $0x80" : : "a"(1), "b"(1));
+    for (;;) {}
+#endif
 }
 static i32 stat(i32 id, void *out, u32 size) {
     calls[count++] = id;
@@ -211,6 +237,7 @@ int main(void) {
 #else
     api.sbrk_heap_limit=MEM_SHELL_GUARD;
 #endif
+    FORMAT_PROBES
     for (scenario=0; scenario<3; scenario++) {
         print(0, "SCENARIO %d\n", scenario); count=0;
         if (cmd_mem(0, 0)) return 1;
@@ -279,12 +306,37 @@ def shell_output(output, app):
         check(rf'mem_stat app={id}: error=-9', screens[2], 'INVAL output')
 
 
-def shell_run(body, runner, app):
+
+def kprintf_formats(source):
+    """Collect every call, including inactive preprocessor branches.
+
+    Require literal formats so a new dynamic format cannot silently evade
+    the all-call guard. Arguments themselves are tested by cmd_mem below.
+    """
+    calls = list(re.finditer(r'g_api->kprintf\s*\(', source))
+    pattern = re.compile(r'g_api->kprintf\s*\(\s*[^,]+,\s*((?:"(?:[^"\\]|\\.)*"\s*)+)[,)]')
+    formats = [m.group(1).strip() for m in pattern.finditer(source)]
+    assert len(formats) == len(calls), 'FAIL: nonliteral kprintf format'
+    return formats
+
+
+def ring3_window_define():
+    source = (ROOT / 'exec/exec.c').read_text()
+    match = re.search(r'^#define RING3_ARG_WINDOW\s+[^\n]+', source, re.M)
+    assert match, 'FAIL: RING3_ARG_WINDOW definition'
+    return match.group(0)
+
+def shell_run(body, runner, app, all_source=None):
     assert not re.search(r'0x[0-9A-Fa-f]{5,}', body), 'FAIL: literal map'
     with tempfile.TemporaryDirectory(prefix='memcmd-') as directory:
         tmp = pathlib.Path(directory)
         c, out = tmp / 'cmd.c', tmp / 'cmd'
-        c.write_text(SHELL_FIXTURE.replace('CMD_SOURCE', body))
+        formats = kprintf_formats(all_source if all_source is not None else body)
+        probes = 'format_probe = 1;\n' + '\n'.join(
+            'print(0, ' + fmt + ');' for fmt in formats) + '\nformat_probe = 0;'
+        c.write_text(SHELL_FIXTURE.replace('CMD_SOURCE', body)
+                     .replace('RING3_WINDOW_DEFINE', ring3_window_define())
+                     .replace('FORMAT_PROBES', probes))
         cmd = ['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-static',
                '-nostdlib', '-fno-builtin', '-fno-pie', '-no-pie', '-fno-stack-protector',
                '-I' + str(ROOT / 'sdk/include/os32'), '-I' + str(ROOT / 'include'),
@@ -298,12 +350,28 @@ def shell_run(body, runner, app):
 
 
 def run_shell(runner, mutate):
-    source = function((ROOT / 'userland/shell/cmd_sys.c').read_text(), 'static int cmd_mem(')
+    all_source = (ROOT / 'userland/shell/cmd_sys.c').read_text()
+    source = function(all_source, 'static int cmd_mem(')
     for app in (False, True):
-        output = shell_run(source, runner, app)
+        output = shell_run(source, runner, app, all_source)
         print('CPL3' if app else 'CPL0')
         print(output.split('SCENARIO 1')[0], end='')
     if mutate:
+        # Restore the original single call with all 25 variadic arguments.
+        joined = source
+        split = re.compile(r'\);\s*g_api->kprintf\(ATTR_WHITE,\s*("  (?:img=|端/TD=)[^"\n]*"),')
+        rows = re.findall(r'"  (?:img=|端/TD=)[^"\n]*"', source)
+        assert len(rows) == 2
+        joined, n = split.subn(',', joined)
+        assert n == 2
+        joined = joined.replace('heap=%uB\\n",', 'heap=%uB\\n"\n' + '\n'.join(rows) + ',')
+        try:
+            shell_run(joined, runner, True)
+        except AssertionError as error:
+            assert 'FAIL: kprintf argument window' in str(error), str(error)
+        else:
+            raise AssertionError('survived: app calls merged (25 arguments)')
+        print('RED: app calls merged (25 arguments)')
         variants = [
             ('NOTFOUND printed', 'if (rc == OS32_ERR_NOTFOUND) continue;', '', 'NOTFOUND output'),
             ('app lines joined', 'heap=%uB\\n', 'heap=%uB ', 'app width'),
