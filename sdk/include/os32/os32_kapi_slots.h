@@ -252,8 +252,9 @@
 #define KAPI_SLOT_CALLER_IDENTITY 245
 #define KAPI_SLOT_MEM_MAP 246
 #define KAPI_SLOT_MEM_UNMAP 247
+#define KAPI_SLOT_MEM_STAT 248
 
-#define KAPI_SLOT_COUNT 248
+#define KAPI_SLOT_COUNT 249
 #define KAPI_FUNC_CAPACITY 300
 #define KAPI_DATA_FIELDS_OFF 0x4B8
 #define OS32_KAPI_LAYOUT_STAMP() __asm__(".pushsection .os32_kapi_layout,\"\",@progbits\n\t.p2align 2\n\t.long 0x4B8\n\t.popsection")

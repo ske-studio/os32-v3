@@ -25,3 +25,4 @@ check-kapi-ranges-host:
 - build/checks.d/check-kapi-ranges-host.mk
 - fs/vfs.c
 - fs/vfs.h
+- kapi/kapi_sys.c

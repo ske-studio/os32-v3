@@ -1,4 +1,4 @@
-# KernelAPI v71 仕様書
+# KernelAPI v72 仕様書
 
 外部プログラム (OS32X) がカーネル機能を利用するためのAPIテーブル仕様。
 
@@ -16,8 +16,8 @@
 | 最大プログラムサイズ | image と暫定 heap 予算を起動時に検査 ([TASK_T2_APPBAND](tasks/v3/TASK_T2_APPBAND.md) §4) |
 | プログラム専用ヒープ | 動的配置 (sbrk_heap_limit, exec_heap 管理下) |
 | プログラム専用スタック | 動的配置 (メモリ終端付近、下向き展開) |
-| 現在のバージョン | **71** |
-| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 248・予約 52) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
+| 現在のバージョン | **72** |
+| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 249・予約 51) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
 
 ---
 
@@ -114,6 +114,7 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v68 | **実装済み (2026-09-26、手元ビルドとホスト試験のみ)** | 実機の ROM の INT 18h の I/O 記録 `v86_gdc_capture` 1 本 (slot 239 = 0x3C4)。`mode = V86G_MODE_ROM` は V86 で実機の ROM の AH=31h を呼んで今のモードを読み、その bit の並び (NP21/W の bit2 / Bible 3-2 の bit3) から 640x480 の AH=30h を決めて呼び、同じ AH=30h で元のモードへ戻して (戻れなければ OS32 の表 `pegc_restore_text_sync`) CUI を作り直す。その間に捕まえた OUT を**畳まずに**最大 512 件、IN をポートごとの回数で `V86Gcap` (8460 バイト) へ写す。`V86G_MODE_SELFTEST` は決まった I/O 列の試験ゲストで記録器を確かめる (実機へ通さない)。`v86 -g [-t]` が使う。実体は `kernel/v86_gcap.c` / `kernel/v86_gcap_math.c` | [tasks/realhw/TASK_PEGC480_REALHW.md](tasks/realhw/TASK_PEGC480_REALHW.md) §3 段 1 |
 | v69 | **実装済み (2026-10-01、手元ビルド・ホスト試験)** | T2c: OS32X v4 / 4 世代の正典・高位配置・可変 stack。KAPI slot の追加・並べ替えなし | [tasks/v3/TASK_T2_APPBAND.md](tasks/v3/TASK_T2_APPBAND.md) §4-6・T2c-R |
 | v70 | **実装 (2026-10-07、e11c1・統合ゲスト受入前)** | surface query/lease/bundle/unlease・値返し ls・本人識別の 6 本 (slot 240〜245)。公開値型・ページ/SHM 定数、pipe の CPL3 制限。e11b2 で memory_layout 世代 2 (版70は不変、旧世代1は拒否) | §4-10、[TASK_T2D_T2H](tasks/v3/TASK_T2D_T2H.md) e11 |
+| v72 | **実装 (ホスト試験・ゲスト受入前)** | `mem_stat` (slot 248)、サイズ引数つき MemStat。4 世代・データ欄は不変。 | 本書 §4-12 |
 | v71 | **実装 (2026-10-08、ホスト試験・ゲスト受入前)** | USER 専用 `mem_map` / `mem_unmap` (slot 246・247)。f12 で memory_layout 世代 3 (KAPI 71・slot・データ欄は不変)。USER の最小初期量と mem_map による伸長へ切替。旧世代は拒否。 |
 
 調停 (2026-09-06、同日改訂): GUI (K1〜W2) を先に実装するので **v42 = GUI、v43 = ネットワーク Host Services**
@@ -250,7 +251,7 @@ v62 まではデータ欄 (`sbrk_heap_limit` / `shm_base`) を関数表の**直�
 |---|---|---|
 | 関数表の容量 R | **300** スロット (`KAPI_FUNC_CAPACITY`) | `sdk/kapi.json` の `func_capacity` |
 | データ欄の先頭 | **0x4B8** = 8 + 4 × R (`KAPI_DATA_FIELDS_OFF`) | `sdk/gen_kapi.py` が生成 |
-| 予約スロット | 248〜299 (`kapi_reserved[52]`、v71 時点。v68 は 240〜299、v67 は 239〜299、v66 は 238〜299、v65 は 235〜299、v64 は 234〜299、v63 は 230〜299)。カーネルの表は `kapi_reserved_nosys` (= `OS32_ERR_NOSYS`)、CPL=3 のトランポリンは int 0x80 のスタブ (ディスパッチャが `slot >= KAPI_FUNC_COUNT` で kill)。**NULL にしない** | `exec/exec.c` |
+| 予約スロット | 249〜299 (`kapi_reserved[51]`、v72 時点。v68 は 240〜299、v67 は 239〜299、v66 は 238〜299、v65 は 235〜299、v64 は 234〜299、v63 は 230〜299)。カーネルの表は `kapi_reserved_nosys` (= `OS32_ERR_NOSYS`)、CPL=3 のトランポリンは int 0x80 のスタブ (ディスパッチャが `slot >= KAPI_FUNC_COUNT` で kill)。**NULL にしない** | `exec/exec.c` |
 | R の上限 | トランポリン 1 ページ: `sizeof(KernelAPI)` + スタブ 8B × R + 写し場 256B ≤ 4096 → **R ≤ 318** (`STATIC_ASSERT`) | `exec/exec.c` |
 
 関数を足すときは `kapi_reserved[]` が 1 本減るだけで、データ欄は動かない。**関数数が R を
@@ -1519,7 +1520,7 @@ shlib の末尾119番 `os32gui_gfx_detach` を追加 (120本、protocol世代は
 
 ### 予約スロット (v63〜)
 
-0x3E8〜0x4B4 (slot 248〜299、52 本、v71 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
+0x3EC〜0x4B4 (slot 249〜299、51 本、v72 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
 (§4-0)。カーネルの表は `kapi_reserved_nosys` (`OS32_ERR_NOSYS`)、トランポリンは
 int 0x80 のスタブで、CPL=3 からの呼び出しはアプリを kill する。
 
@@ -1694,3 +1695,60 @@ EXEC_INITIAL / EXEC_ARENA / EXEC_LARGE、image/BSS端ページ、stack/guard、s
 hint/base はアドレス値の入力 (`out: none` と `in: [{arg: hint/base, target: true}]`) で、
 ラッパーから直接参照しない。`kapi_argptr` の早期検査から外し、body の帯・extent 検査で
 帯外や stack/guard・lease を NULL / `OS32_ERR_INVAL` として拒否する (kill しない)。
+
+### §4-12 mem_stat (v72)
+
+| オフセット | 名前 | 型 |
+|---|---|---|
+| 0x3E8 | mem_stat | `i32(i32 app_id, void *out, u32 size)` |
+
+slot 248。`out` は `len=size` の生成ラッパで先に書込み範囲を検査する。
+`size < MEMSTAT_MIN` (0 を含む) は `OS32_ERR_INVAL` で出力不変。
+それ以外は `min(size, sizeof(MemStat))` バイトだけ写し、その長さを戻り値と先頭 `size` に返す。
+構造体の拡張は末尾追記だけ。現行 ILP32 では `MEMSTAT_MIN=44`、`sizeof(MemStat)=120`。
+不正な USER 出力 (NULL、NP/RO/supervisor、overflow) は既存規約どおり kill。
+
+WM と CPL0 常駐 shell (ID 1、syscall 外、CPL3 でない) は ID 0 / -1 でシステム欄、
+ID 2..5 で live AS を読む。FREE / AS 無し / PD 無しは `OS32_ERR_NOTFOUND`。
+有効 USER は ID 0 でシステム欄、-1 / 自己 ID で自分の AS を読む。
+他 ID は live / FREE / AS 無しを問わず対象検索より前に `OS32_ERR_INVAL`。
+ID 1、-2 以下、6 以上も `OS32_ERR_INVAL`。権限・対象のエラーは全出力バイト不変。
+無効 USER の公開呼出しは size > 0 ならラッパで kill、size == 0 は本体で INVAL。
+本体を直接呼んでも無効 USER は INVAL であり、TRUSTED へ昇格しない。
+
+AS は state が FREE 以外なら PARKED / WAIT_KEY / WAIT_POLL / ABORT_PENDING /
+FAULT_PENDING でも読める。毒 AS は回収せず POISONED flag を写す。
+IRQ 保存中に kernel stack へ 32 本の表と計数を snapshot し、IRQ 復元後に copyout する。
+同じ関数内の snapshot と copyout の間に yield / callback / AS 切替はない。
+
+以下は全欄 4B、app_id だけ i32、他は u32。システム対象では AS / slot 欄と state / flags は 0。
+範囲の端は特記しない限り exclusive、VA は仮想アドレス。
+
+| offset | 欄 | 単位・意味 |
+|---|---|---|
+| 0 | size | B、実際に写した長さ |
+| 4 | app_id | 対象 ID (システム=0) |
+| 8 | state | AppSlot の状態値 |
+| 12 | flags | HAS_AS=1、POISONED=2、HEAP_INVALID=4 |
+| 16 | kheap_total | B、kernel heap 総量 |
+| 20 | kheap_used | B、kernel heap 使用量 |
+| 24 | kheap_free | B、kernel heap 空き |
+| 28 | phys_total_pages | page、物理ページ総数 |
+| 32 | phys_free_pages | page、物理ページ空き |
+| 36 | resident_heap_total | B、resident exec_heap 総量 |
+| 40 | resident_heap_used | B、resident exec_heap 使用量 |
+| 44 | extents_total | 本、全 extent 数 (ここまでのシステム欄が MEMSTAT_MIN) |
+| 48,52,56,60,64 | extents[5] | 本、LIBC_INITIAL / EXEC_INITIAL / ANON / EXEC_ARENA / EXEC_LARGE 順 |
+| 68 | extents_free | 本、32 − extents_total |
+| 72 | arenas | 本、ANON + EXEC_ARENA |
+| 76 | exec_heap_used | B、AS 側の使用量。~0U は HEAP_INVALID を立て値を 0 にする |
+| 80 | img_end | VA、image/BSS 末尾 |
+| 84 | primary_mapped_end | VA、初期 libc の mapped 末尾 |
+| 88 | exec_heap_cur_end | VA、現在の exec_heap 末尾 |
+| 92 | guard_b | VA、stack 下の guard 起点 |
+| 96 | load_addr | VA、slot のロード起点 |
+| 100 | sbrk_heap_limit | VA、slot の libc 初期末尾 |
+| 104 | exec_heap_base | VA、slot の exec_heap 初期起点 |
+| 108 | exec_heap_size | B、slot の exec_heap 初期量 (現在量とは別) |
+| 112 | stack_top | VA、slot の stack 上端 |
+| 116 | stack_size | B、slot の stack サイズ |

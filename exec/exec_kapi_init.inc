@@ -246,10 +246,11 @@ extern int __cdecl wrap_sys_ls_window(const char *path, u32 skip, OS32_LsPacket 
 extern int __cdecl wrap_caller_identity(u32 *app, u32 *owner, u32 *generation);
 extern void * __cdecl wrap_mem_map(u32 bytes, void *hint, u32 flags);
 extern int __cdecl wrap_mem_unmap(void *base, u32 bytes);
+extern i32 __cdecl wrap_mem_stat(i32 app_id, void *out, u32 size);
 extern i32 __cdecl kapi_reserved_nosys(void);
 
 kapi->magic = 0x4B415049UL;
-kapi->version = 71;
+kapi->version = 72;
 
     kapi->gfx_init = wrap_gfx_init;
     kapi->gfx_init_200 = wrap_gfx_init_200;
@@ -499,6 +500,7 @@ kapi->version = 71;
     kapi->caller_identity = wrap_caller_identity;
     kapi->mem_map = wrap_mem_map;
     kapi->mem_unmap = wrap_mem_unmap;
+    kapi->mem_stat = wrap_mem_stat;
     {
         u32 _kr;
         for (_kr = 0; _kr < (u32)KAPI_FUNC_RESERVED; _kr++)

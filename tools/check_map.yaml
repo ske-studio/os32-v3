@@ -102,3 +102,4 @@ artifact_readers:
 - check-nano-inputs-host
 - check-nano-adapter-host
 - check-h3-park-resume-host
+- check-guest-acceptance-host

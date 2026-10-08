@@ -658,6 +658,7 @@ static void test_pool_model(void)
 /*  件数 (R1) は 1 行に出す。値そのものは kernel.map の番地で読む。          */
 /* ------------------------------------------------------------------------ */
 /* Internal f5a transaction smoke test: real owner/lease AS and enabled IF. */
+extern i32 kapi_mem_stat(i32 app_id, void *out, u32 size);
 static void test_appmem(void)
 {
     struct addrspace as;
@@ -674,6 +675,25 @@ static void test_appmem(void)
                             0, APPMEM_ANON, 0, &base) == 0;
     }
     check(mapped && base && as.appmem.e[0].base == base, "appmem:map extent");
+    {
+        MemStat stat;
+        int id = appslot_alloc_id();
+        AppSlot *slot = appslot_at(id);
+        int valid = 0;
+        if (mapped && slot) {
+            AppSlot saved = *slot;
+            slot->state = APP_STATE_PARKED;
+            slot->as = &as;
+            ring3_wm_enter();
+            valid = kapi_mem_stat(id, &stat, sizeof(stat)) == sizeof(stat) &&
+                    stat.app_id == id && stat.flags == MEMSTAT_HAS_AS &&
+                    stat.extents_total == 1 && stat.extents[APPMEM_ANON - 1] == 1 &&
+                    stat.extents_free == APPMEM_EXTENT_MAX - 1 && stat.arenas == 1;
+            ring3_wm_leave();
+            *slot = saved;
+        }
+        check(valid, "mem_stat:TRUSTED AS extents");
+    }
     ok = mapped && appmem_unmap(&as, &as.appmem, base, PAGE_SIZE) == 0;
     check(ok && !as.appmem.e[0].base, "appmem:unmap extent");
     if (created) paging_addrspace_destroy(&as);

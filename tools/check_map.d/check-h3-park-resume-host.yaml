@@ -1,5 +1,6 @@
 check-h3-park-resume-host:
 - exec/exec.c
+- exec/exec_kapi_init.inc
 - kernel/isr_stub.asm
 - tools/h3_layout.c
 - tools/h3_park_resume.py

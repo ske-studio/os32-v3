@@ -2,7 +2,7 @@
 Only private generated/source copies are mutated; compiler failure is not RED.
 """
 TARGET_SRC = ['sdk/gen_kapi.py', 'sdk/kapi.json', 'exec/exec.c', 'exec/ring3_str.c',
-              'exec/access_walk.c', 'exec/redir_access.c', 'tools/tests/kapi_ranges_host.c']
+              'exec/access_walk.c', 'exec/redir_access.c', 'kapi/kapi_sys.c', 'tools/tests/kapi_ranges_host.c']
 import argparse
 import json
 import pathlib
@@ -13,6 +13,7 @@ import test_kapi_out as generator
 
 ROOT = walk.ROOT
 MUTANTS = (
+    ('mem_stat out none', 'schema', None, None, 'mem_stat NULL'),
     ('legacy VRAM exception restored', 'exec', '    return 0;\n}', '    if (p >= 0xA0000UL && p < 0xC0000UL) return 1;\n    return 0;\n}', 'unleased VRAM refused'),
     ('output NULL bypass', 'generated', '((u32)(n))', '((p) ? (u32)(n) : 0u)', 'output NULL'),
     ('signed output NULL bypass', 'generated', '(((int)(n) > 0) ? (u32)(n) : 0u)', '(((p) && (int)(n) > 0) ? (u32)(n) : 0u)', 'signed output NULL'),
@@ -24,7 +25,13 @@ MUTANTS = (
 
 def run(runner, mutant=None, fixture_name="kapi_ranges_host.c"):
     with tempfile.TemporaryDirectory(prefix='kapinull-') as directory:
-        rc, output, generated = generator.gen(directory, json.loads(generator.KAPI_JSON.read_text()))
+        data = json.loads(generator.KAPI_JSON.read_text())
+        no_out = mutant and mutant[1] == 'schema'
+        if no_out:
+            entry = next(a for a in data['api'] if a['name'] == 'mem_stat')
+            assert entry['out'] == [{'arg': 'out', 'len': 'size'}]
+            entry['out'] = 'none'
+        rc, output, generated = generator.gen(directory, data)
         assert rc == 0, output
         sources = {k: (ROOT / p).read_text() for k, p in walk.FILES.items()}
         sources['generated'] = (generated / 'kapi/kapi_generated.c').read_text()
@@ -43,7 +50,9 @@ def run(runner, mutant=None, fixture_name="kapi_ranges_host.c"):
         end = vfs.index('/* 末尾の', start)
         sources['resolve'] = ('#include "' + str(ROOT / 'fs/vfs.h') + '"\n' +
                               'static char cwd[VFS_MAX_PATH] = "/";\n' + vfs[start:end])
-        if mutant:
+        memstat = (ROOT / 'kapi/kapi_sys.c').read_text()
+        sources['memstat'] = memstat[memstat.index('STATIC_ASSERT(sizeof(MemStat)'):memstat.index('/* カーネルビルド時')].replace('i32 kapi_mem_stat(', 'static i32 mem_stat_body(')
+        if mutant and not no_out:
             name, key, old, new, expected = mutant
             assert old in sources[key], name
             sources[key] = sources[key].replace(old, new, 1)
@@ -64,6 +73,7 @@ def run(runner, mutant=None, fixture_name="kapi_ranges_host.c"):
         sources['generated'] = re.sub(r'#include "([^"]+)"', resolve, sources['generated'])
         result = walk.run(sources, fixture=fixture_name, runner=runner)
         if mutant:
+            name, key, old, new, expected = mutant
             assert result.returncode == 1 and ('FAIL: ' + expected) in result.stdout, (name, result.returncode, result.stdout, result.stderr)
             print('RED:', name)
         else:

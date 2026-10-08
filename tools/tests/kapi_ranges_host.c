@@ -48,6 +48,18 @@ void gfx_present_raster(GFX_RasterPalTable *p) { (void)p; (void)touch(); }
 int fd_redirect_to_buffer(int fd, u8 *p, u32 size, u32 len) { (void)fd; (void)p; (void)size; (void)len; return touch(); }
 void palette_get(int idx, u8 *r, u8 *g, u8 *b) { (void)idx; (void)r; (void)g; (void)b; (void)touch(); }
 
+/* Real collector; only resident heap counters are host boundary values. */
+u32 kmalloc_total(void) { return 8192; }
+u32 kmalloc_used(void) { return 128; }
+u32 kmalloc_free(void) { return 8064; }
+u32 exec_heap_total(void) { return MEM_SHELL_HEAP_SIZE; }
+u32 exec_heap_used(void) { return 48; }
+#include "memstat_host_source.c"
+i32 kapi_mem_stat(i32 id, void *out, u32 size) {
+    reached++;
+    return mem_stat_body(id, out, size);
+}
+
 static void named(int ok, const char *name)
 {
     checks++;
@@ -108,11 +120,34 @@ static void caller_copy_tests(void)
     EXPECT("signed output negative", 0, wrap_np2_get_version(0, -1));
     EXPECT("signed output good", 0, wrap_np2_get_version((char *)va, 4));
     EXPECT("output length overflow", 1, wrap_sys_read(1, (void *)va, 0xffffffffU));
+    /* No invalid case may enter the collector, even with a stale USER frame. */
+    EXPECT("mem_stat NULL", 1, wrap_mem_stat(-1, 0, sizeof(MemStat)));
+    EXPECT("mem_stat NP tail", 1, wrap_mem_stat(-1, (void *)tail, sizeof(MemStat)));
+    EXPECT("mem_stat supervisor", 1, wrap_mem_stat(-1, (void *)MEM_SHELL_HEAP_BASE, sizeof(MemStat)));
+    EXPECT("mem_stat overflow", 1, wrap_mem_stat(-1, (void *)va, ~0U));
+    u32 generation = space.generation;
+    space.generation++;
+    EXPECT("mem_stat stale USER", 1, wrap_mem_stat(-1, (void *)va, sizeof(MemStat)));
+    MemStat untouched;
+    for (u32 i = 0; i < sizeof(untouched); i++) ((u8 *)&untouched)[i] = 0xa5;
+    EXPECT("mem_stat stale zero", 0, named(wrap_mem_stat(-1, &untouched, 0) == OS32_ERR_INVAL, "mem_stat zero INVAL"));
+    for (u32 i = 0; i < sizeof(untouched); i++) named(((u8 *)&untouched)[i] == 0xa5, "mem_stat zero unchanged");
+    space.generation = generation;
     named(!paging_addrspace_map_user(&space, va + PAGE_SIZE, payload + PAGE_SIZE,
                                     PAGE_RW | PTE_USER), "map second page");
+    /* Linux VA mapping supplies the host copyout destination. Product PTEs
+     * above independently drive the real USER/RW range gate. */
+    u32 map_args[6] = {va, 2 * PAGE_SIZE, 3, 0x32, ~0U, 0}, mapped;
+    __asm__ volatile("int $0x80" : "=a"(mapped) : "a"(90), "b"(map_args) : "memory");
+    named(mapped == va, "mem_stat host output");
+    MemStat expected;
+    named(mem_stat_body(-1, &expected, sizeof(expected)) == sizeof(expected), "mem_stat control snapshot");
+    EXPECT("mem_stat two pages", 0, named(wrap_mem_stat(-1, (void *)tail, sizeof(MemStat)) == sizeof(MemStat), "mem_stat return"));
+    for (u32 i = 0; i < sizeof(expected); i++) named(((u8 *)tail)[i] == ((u8 *)&expected)[i], "mem_stat all bytes");
     EXPECT("input two pages", 0, wrap_sys_write(1, (void *)tail, 2));
     EXPECT("output two pages", 0, wrap_sys_read(1, (void *)tail, 2));
     pt[index + 1] &= ~PTE_RW;
+    EXPECT("mem_stat RO tail", 1, wrap_mem_stat(-1, (void *)tail, sizeof(MemStat)));
     EXPECT("input RO tail", 0, wrap_sys_write(1, (void *)tail, 2));
     EXPECT("output RO tail", 1, wrap_sys_read(1, (void *)tail, 2));
     pt[index + 1] = 0;

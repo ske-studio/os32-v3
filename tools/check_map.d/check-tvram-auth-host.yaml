@@ -24,3 +24,4 @@ check-tvram-auth-host:
 - tools/tests/kapi_ranges_host.c
 - tools/tests/mutpar.py
 - tools/tests/test_kapi_out.py
+- kapi/kapi_sys.c

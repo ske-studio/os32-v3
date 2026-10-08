@@ -46,6 +46,8 @@ db_test                 # 下の「確かめていない 1 件」
 
 shm_reuse_test          # PASS 4/4: lock→free/exit→別 AS の同一 SHM 全ページ書込み
 
+mem_stat_test          # mem_stat sizes / self / system / other IDs
+
 # --- 入れなかったもの (前段 §8 の分類。理由を必ず書く) ---
 #
 # (c) 画面デモ — 描くのが目的で合否を言わない。終わりも人が見て決める。

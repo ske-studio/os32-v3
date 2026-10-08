@@ -3,6 +3,13 @@ check-guest-acceptance-host:
 - tools/tests/guest_tests.txt
 - tools/gen_guest_acceptance.py
 - tools/accept/pt0_snapshot.py
+- tools/accept/as_extents_at_teardown.py
+- exec/exec.c
+- exec/appslot.c
+- exec/exec_kapi_init.inc
+- exec/appslot.h
+- kernel/paging.h
+- include/appmem_types.h
 - tools/tvdump_recv.py
 - tools/tests/test_guest_acceptance.py
 - tools/tests/mutpar.py

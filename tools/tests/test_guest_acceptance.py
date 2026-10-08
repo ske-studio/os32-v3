@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
-"""Offline acceptance-index, PT0 and TVDM tests; --mutate checks four guards."""
+"""Offline acceptance-index, PT0 and TVDM tests; --mutate checks index, debugger guards and extent traversal."""
 import copy
+import contextlib
+import io
+from urllib.parse import parse_qs, urlsplit
 import json
+import os
+import struct
 from pathlib import Path
 import subprocess
 import sys
@@ -16,6 +21,7 @@ import gen_guest_acceptance as ga
 import tvdump_recv as tv
 sys.path.insert(0, str(ROOT / 'tools/accept'))
 import pt0_snapshot as pt
+import as_extents_at_teardown as ext
 sys.path.insert(0, str(ROOT / 'tools/tests'))
 import mutpar
 
@@ -127,11 +133,203 @@ class AcceptanceTests(unittest.TestCase):
                 pt.snapshot(path, read)
 
 
+class ExtentTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.layout = ext.make_layout(ROOT / 'build/out/kernel.elf',
+                                     ROOT / 'build/out/kernel.map',
+                                     ROOT / 'build/out/vmkernel.lz4')
+
+    def setUp(self):
+        self.o = self.layout['offsets']
+        self.assertEqual((self.o['slot_size'], self.o['as_size']), (204, 1228))
+        # Independent oracle: f13_pack.md D5 records the ILP32 AS offsets;
+        # appmem_types.h defines e[] and four consecutive u32 extent fields.
+        expected = dict(slot_as=0xb4, as_appmem=0x2b4, as_poisoned=1220,
+                        table_e=0, extent_count=32, extent_size=16,
+                        extent_base=0, extent_end=4, extent_kind=8, extent_flags=12)
+        for key, value in expected.items():
+            with self.subTest(offset=key):
+                self.assertEqual(self.o[key], value)
+        self.assertEqual(self.o['extent_count'] * self.o['extent_size'], 512)
+        self.app_id = 3
+        self.slot_ptr = self.layout['slots'] + self.app_id * self.o['slot_size']
+        self.as_ptr = 0x600000
+        self.slot = bytearray(self.o['slot_size'])
+        self.space = bytearray(self.o['as_size'])
+        def put(raw, key, value):
+            struct.pack_into('<I', raw, self.o[key], value)
+        put(self.slot, 'slot_state', 2)
+        put(self.slot, 'slot_cpl3', 1)
+        put(self.slot, 'slot_as', self.as_ptr)
+        put(self.space, 'as_pd', 0x610000)
+        put(self.space, 'as_poisoned', 1)
+        self.table = bytearray(self.o['extent_count'] * self.o['extent_size'])
+        for i, name in enumerate(('libc', 'exec', 'anon', 'anon', 'arena', 'large')):
+            off = i * self.o['extent_size']
+            for key, value in (('extent_base', 0x88000000 + i * 0x2000),
+                               ('extent_end', 0x88001000 + i * 0x2000),
+                               ('extent_kind', self.o['kind_' + name]),
+                               ('extent_flags', 0)):
+                struct.pack_into('<I', self.table, off + self.o[key], value)
+        begin = self.o['as_appmem'] + self.o['table_e']
+        self.space[begin:begin + len(self.table)] = self.table
+        self.calls = []
+        self.blocks = {self.layout['bp']: bytes.fromhex(self.layout['code_hex']),
+                       self.slot_ptr: self.slot, self.as_ptr: self.space}
+        self.regs = {'eip': self.layout['bp'], 'eax': self.slot_ptr}
+
+    def read(self, address, length):
+        self.calls.append((address, length))
+        for base, data in self.blocks.items():
+            if base <= address and address + length <= base + len(data):
+                return bytes(data[address - base:address - base + length])
+        raise ValueError('read outside fake AppSlot/AS objects')
+
+    def capture(self, **changes):
+        args = dict(layout=self.layout, deployment=self.layout,
+                    deployed_image_hash=self.layout['image_sha256'], regs=self.regs,
+                    read_mem=self.read, cmd='fixture --child', app_id=self.app_id)
+        args.update(changes)
+        return ext.snapshot(**args)
+
+    def test_entry_eax_traversal(self):
+        try:
+            result = self.capture()
+        except (ValueError, KeyError) as exc:
+            self.fail('entry traversal rejected the valid full objects: ' + str(exc))
+        self.assertEqual(result['cmd'], 'fixture --child')
+        self.assertEqual(result['id'], 3)
+        self.assertEqual(result['slot'], self.slot_ptr)
+        self.assertEqual(result['addrspace'], self.as_ptr)
+        self.assertEqual(result['poisoned'], 1)
+        self.assertEqual(result['elf_sha256'], self.layout['elf_sha256'])
+        self.assertEqual(result['total'], 6)
+        self.assertEqual(result['free'], 26)
+        self.assertEqual(result['arenas'], 3)
+        self.assertEqual(result['kinds'], dict(LIBC_INITIAL=1, EXEC_INITIAL=1,
+                                             ANON=2, EXEC_ARENA=1, EXEC_LARGE=1))
+        self.assertEqual(self.calls, [(self.layout['bp'], len(self.blocks[self.layout['bp']])),
+                                     (self.slot_ptr, 204), (self.as_ptr, 1228)])
+
+    def test_parse_kind_counts(self):
+        result = ext.parse_extents(bytes(self.table), self.o)
+        self.assertEqual(result['total'], 6)
+        self.assertEqual(result['kinds']['ANON'], 2)
+        self.assertEqual(result['kinds']['EXEC_ARENA'], 1)
+        self.assertEqual(result['kinds']['EXEC_LARGE'], 1)
+        empty = ext.parse_extents(bytes(len(self.table)), self.o)
+        self.assertEqual((empty['total'], empty['free'], empty['arenas']), (0, 32, 0))
+        with self.assertRaises(ValueError):
+            ext.parse_extents(bytes(self.table[:-1]), self.o)
+        bad = bytearray(self.table)
+        struct.pack_into('<I', bad, self.o['extent_kind'], 99)
+        with self.assertRaises(ValueError):
+            ext.parse_extents(bytes(bad), self.o)
+
+    def test_deployment_and_entry_guards(self):
+        for key in ('elf_sha256', 'map_sha256', 'image_sha256', 'bp', 'eax_role', 'offsets'):
+            deployed = copy.deepcopy(self.layout)
+            deployed[key] = None
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                self.capture(deployment=deployed)
+        with self.assertRaises(ValueError):
+            self.capture(deployed_image_hash='0' * 64)
+        for regs in ({'eip': self.layout['bp'] + 0x24, 'eax': self.as_ptr},
+                     {'eip': self.layout['bp'], 'eax': self.as_ptr}):
+            with self.assertRaises(ValueError):
+                self.capture(regs=regs)
+        self.assertEqual(self.calls, [])
+        self.blocks[self.layout['bp']] = bytes(len(self.blocks[self.layout['bp']]))
+        with self.assertRaisesRegex(ValueError, 'running ELF code mismatch'):
+            self.capture()
+        self.assertEqual(len(self.calls), 1)
+
+    def test_short_and_inactive_reads(self):
+        with self.assertRaisesRegex(ValueError, 'short memory read'):
+            self.capture(read_mem=lambda address, length: b'')
+        struct.pack_into('<I', self.slot, self.o['slot_state'], self.o['state_free'])
+        with self.assertRaisesRegex(ValueError, 'not a live USER'):
+            self.capture()
+        struct.pack_into('<I', self.slot, self.o['slot_state'], 2)
+        struct.pack_into('<I', self.slot, self.o['slot_as'], 0)
+        with self.assertRaisesRegex(ValueError, 'no AS'):
+            self.capture()
+
+    def test_layout_register_proof(self):
+        cross = Path(os.environ['CROSS_DIR']) / 'bin/i386-elf-objdump'
+        raw = subprocess.check_output([str(cross), '-d', '--disassemble=exec_teardown_app',
+                                       str(ROOT / 'build/out/kernel.elf')], text=True)
+        self.assertEqual(ext.entry_code(raw, self.layout['bp'], self.o), self.layout['code_hex'])
+        with self.assertRaisesRegex(ValueError, 'entry EAX convention'):
+            ext.entry_code(raw.replace('%eax,%eax', '%edx,%edx', 1), self.layout['bp'], self.o)
+        wrong = dict(self.o, slot_as=self.o['slot_as'] + 4)
+        with self.assertRaisesRegex(ValueError, 'AppSlot.as'):
+            ext.entry_code(raw, self.layout['bp'], wrong)
+        with self.assertRaisesRegex(ValueError, 'nm entry'):
+            ext.entry_code(raw, self.layout['bp'] + 0x24, self.o)
+
+    def test_capture_cli(self):
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td)
+            deployment, image, out = [work / x for x in ('deploy.json', 'readback.lz4', 'sample.json')]
+            deployment.write_text(json.dumps(self.layout))
+            image.write_bytes((ROOT / 'build/out/vmkernel.lz4').read_bytes())
+            args = ['ext', 'capture', str(out), '--deployment', str(deployment),
+                    '--deployed-image', str(image), '--cmd', 'fixture --child', '--id', '3', '--live']
+            def get(path, timeout):
+                self.assertEqual(timeout, 20)
+                if path == '/api/instance':
+                    return json.dumps(dict(ok=True, trap_pause=True, user_pause=False)).encode()
+                if path == '/api/regs':
+                    return json.dumps({key: hex(value) for key, value in self.regs.items()}).encode()
+                query = parse_qs(urlsplit(path).query)
+                self.assertEqual(query['space'], ['phys'])
+                raw = self.read(int(query['addr'][0], 16), int(query['len'][0]))
+                return json.dumps(dict(ok=True, hex=raw.hex())).encode()
+            with patch.object(sys, 'argv', args), patch.object(ext, 'make_layout', return_value=self.layout), \
+                    patch.object(ext.emu, 'get', side_effect=get), contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(ext.main(), 0)
+            self.assertEqual(json.loads(out.read_text())['kinds']['ANON'], 2)
+            # Hash mismatch must refuse before even requesting debugger state.
+            image.write_bytes(b'wrong deployed image')
+            with patch.object(sys, 'argv', args), patch.object(ext, 'make_layout', return_value=self.layout), \
+                    patch.object(ext.emu, 'get') as get_mock, contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(ext.main(), 1)
+                get_mock.assert_not_called()
+            image.write_bytes((ROOT / 'build/out/vmkernel.lz4').read_bytes())
+            with patch.object(sys, 'argv', args), patch.object(ext, 'make_layout', return_value=self.layout), \
+                    patch.object(ext.emu, 'get', return_value=b'{"ok":true,"trap_pause":false,"user_pause":false}'), \
+                    contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(ext.main(), 1)
+
+    def test_prepare_cli(self):
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / 'deploy.json'
+            result = subprocess.run([sys.executable, '-B', str(ROOT / 'tools/accept/as_extents_at_teardown.py'),
+                                     'prepare', str(out)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(out.read_text()), self.layout)
+            # Existing evidence is never overwritten.
+            self.assertEqual(subprocess.run([sys.executable, '-B', str(ROOT / 'tools/accept/as_extents_at_teardown.py'),
+                                            'prepare', str(out)], capture_output=True).returncode, 1)
+
+
 MUTATIONS = [
     ('tools/tests/guest_acceptance.yaml', '    tag: BB??\n    completion: 0', '    tag: BB??\n    completion: SURV'),
 
     ('tools/gen_guest_acceptance.py', 'or case["id"] in ids', 'or False'),
     ('tools/accept/pt0_snapshot.py', 'mask = ~AD_BITS if ignore_ad else ~0', 'mask = ~(AD_BITS | 4) if ignore_ad else ~0'),
+    ('tools/accept/as_extents_at_teardown.py', "as_ptr = word(slot, o['slot_as'])",
+     "as_ptr = word(slot, o['slot_as'] + WORD_BYTES)"),
+    ('tools/accept/as_extents_at_teardown.py',
+     'EMIT(as_appmem, offsetof(struct addrspace, appmem));',
+     'EMIT(as_appmem, offsetof(struct addrspace, appmem) + sizeof(u32));'),
+    ('tools/accept/as_extents_at_teardown.py', "table_start = o['as_appmem'] + o['table_e']",
+     "table_start = o['as_appmem'] + WORD_BYTES + o['table_e']"),
+    ('tools/accept/as_extents_at_teardown.py', "as_ptr = word(slot, o['slot_as'])", "as_ptr = slot_ptr"),
+    ('tools/accept/as_extents_at_teardown.py', "offsets['kind_anon']: 'ANON', offsets['kind_arena']: 'EXEC_ARENA'",
+     "offsets['kind_anon']: 'EXEC_ARENA', offsets['kind_arena']: 'ANON'"),
     ('tools/tvdump_recv.py', 'if (cols, rows) != (TVDM_COLS, TVDM_ROWS):', 'if False:'),
 ]
 
@@ -166,7 +364,8 @@ def mutations():
 
 
 if __name__ == '__main__':
-    suite = unittest.defaultTestLoader.loadTestsFromTestCase(AcceptanceTests)
+    suite = unittest.TestSuite(unittest.defaultTestLoader.loadTestsFromTestCase(cls)
+                               for cls in (AcceptanceTests, ExtentTests))
     result = unittest.TextTestRunner(verbosity=2).run(suite)
     failures = 0 if result.wasSuccessful() else 1
     if '--mutate' in sys.argv:
