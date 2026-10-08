@@ -36,9 +36,14 @@ int appmem_exec_unmap(struct addrspace *as, u32 base, u32 bytes)
     for (u32 i = 0; i < APPMEM_EXTENT_MAX; i++) {
         const struct appmem_extent *e = &as->appmem.e[i];
         if (e->base == base && e->end - e->base == bytes &&
-            (e->kind == APPMEM_EXEC_INITIAL || e->kind == APPMEM_EXEC_ARENA ||
-             e->kind == APPMEM_EXEC_LARGE))
+            (e->kind == APPMEM_EXEC_ARENA || e->kind == APPMEM_EXEC_LARGE))
             return unmap_mask(as, &as->appmem, base, bytes, APPMEM_KIND_MASK(e->kind));
     }
     return APPMEM_EINVAL;
+}
+
+int appmem_exec_trim(struct addrspace *as, u32 base, u32 bytes)
+{
+    if (!as) return APPMEM_EINVAL;
+    return unmap_mask(as, &as->appmem, base, bytes, APPMEM_KIND_MASK(APPMEM_EXEC_ARENA));
 }

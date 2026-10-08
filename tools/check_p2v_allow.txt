@@ -69,3 +69,4 @@ kapi/kapi_generated.c:wrap_mem_map:appmem_map が返すアプリ私有 VA (物�
 exec/exec_heap.c:user_view:所属 EXEC extent と PTE/owner を検証した USER 仮想ブロックの走査
 exec/exec_heap.c:exec_heap_user_init:起動時に map 済みの USER 初期 extent の仮想先頭
 exec/exec_heap.c:exec_heap_user_alloc:appmem_map が返した USER 仮想 arena の初期化
+exec/exec_heap.c:exec_heap_user_trim:全 arena の PTE/owner とブロック鎖の検証後に USER 仮想末尾を走査

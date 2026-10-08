@@ -1,5 +1,6 @@
-/* f8: malloc(CHUNK=64KiB) uses USER TOPDOWN direct maps; mem_alloc uses
- * kernel exec_heap (its TOPDOWN classification is accepted in f10). */
+/* f10: 64KiB mem_alloc blocks are one EXEC_LARGE extent each. nk measures
+ * remaining physical/extent capacity under this malloc workload, not arena size.
+ * Build with a 64KiB INITIAL so a 64KiB request cannot fall back into it. */
 /* ======================================================================== */
 /*  HEAP_TEST.C — 子プロセス帯レイアウトの検証 (2026-09-04)                  */
 /*                                                                          */
@@ -41,6 +42,8 @@ int main(int argc, char **argv, KernelAPI *api)
         ((unsigned *)mb[nm])[0] = 0x4D000000u | (unsigned)nm;   /* 'M' + index */
         nm++;
     }
+    /* Leave room for at least one LARGE, even if malloc exhausted physical RAM. */
+    if (nm) free(mb[--nm]);
     while (nk < MAXN) {
         kb[nk] = api->mem_alloc(CHUNK);
         if (!kb[nk]) break;
@@ -48,13 +51,22 @@ int main(int argc, char **argv, KernelAPI *api)
         nk++;
     }
     if (!nk) {
-        api->kprintf(0x41, "FAIL: mem_alloc could not allocate one 64KB block\n");
+        api->kprintf(0x41, "FAIL: nk=0 ENOMEM/EFULL/ENOVA (mem_alloc exposes NULL only; record kernel counters)\n");
         bad++;
     }
     for (i = 0; i < nm; i++) {
         if (((unsigned *)mb[i])[0] != (0x4D000000u | (unsigned)i)) bad++;
     }
     for (i = 0; i < nk; i++) {
+        if ((unsigned)kb[i] % 4096) bad++;
+        for (int j = 0; j < i; j++) {
+            unsigned x = (unsigned)kb[i], y = (unsigned)kb[j];
+            if (x < y + CHUNK && y < x + CHUNK) bad++;
+        }
+        for (int j = 0; j < nm; j++) {
+            unsigned x = (unsigned)kb[i], y = (unsigned)mb[j];
+            if (x < y + CHUNK && y < x + CHUNK) bad++;
+        }
         if (((unsigned *)kb[i])[0] != (0x4B000000u | (unsigned)i)) bad++;
     }
 
@@ -66,6 +78,14 @@ int main(int argc, char **argv, KernelAPI *api)
                  bad ? "FAIL" : "OK", bad);
 
     for (i = 0; i < nk; i++) api->mem_free(kb[i]);
+    int retry = 0;
+    while (retry < MAXN && (kb[retry] = api->mem_alloc(CHUNK)) != 0) {
+        if ((unsigned)kb[retry] % 4096) bad++;
+        retry++;
+    }
+    if (retry != nk) bad++;
+    api->kprintf(bad ? 0x41 : 0xC1, "LARGE nk=%d retry=%d: %s\n", nk, retry, bad ? "FAIL" : "PASS");
+    for (i = 0; i < retry; i++) api->mem_free(kb[i]);
     for (i = 0; i < nm; i++) free(mb[i]);
     free(probe);
     api->kprintf(0xC1, "%s", "heap_test done\n");

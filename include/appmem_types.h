@@ -21,8 +21,8 @@ enum appmem_kind {
 };
 
 struct appmem_extent { u32 base, end, kind, flags; };
-/* flags is internal metadata, independent of map_flags. EXEC_LARGE callers
- * carry allocation identity here; even equal IDs never permit merging. */
+/* flags is internal metadata, independent of map_flags. EXEC_LARGE identity
+ * is its extent/base, never USER metadata; adjacent LARGE extents never merge. */
 struct appmem_table { struct appmem_extent e[APPMEM_EXTENT_MAX]; };
 /* Native host fixtures use a wider u32 for pointer transport; byte budgets
  * are asserted in appmem.c with the real ILP32 build. */

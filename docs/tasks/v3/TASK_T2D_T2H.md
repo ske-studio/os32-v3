@@ -298,7 +298,7 @@ nanoのtail trimは実free list上で末尾のfree chunkを確認し、header/�
 | f7 | USER の malloc 8入口を私有 nano archive + adapter へ結線。arena 別状態・pointer routing・跨ぎ realloc・空副 arena の unmap rollback、CRT と primary 所有を単一化。resident は libc nano / 固定 sbrk。hash による link_guard 検査、SDK 配布と `malloc_arena_test` を追加。KAPI 71・memory 2・kernel 不変。64KiB 以上の直接map は f8、最小初期量は f12。host/変異・サイズの証拠 `/home/hight/os32-tmp/run/f7/f7_report.md`、実ゲスト受入は台帳 F-8。 |
 | f8 | USER C の要求≥65536をTOPDOWN直接map、一覧照合後のprefix検証・即unmap/失敗復元、callocの積/prefix/page丸め検査、realloc移行時の旧内容保持。Rust共通GlobalAllocはmem_alloc上で4/8/16/64/4096整列・元base解放・明示zeroing。KAPI 71・memory 2・kernel不変。host/変異と5成果物サイズの証拠 `/home/hight/os32-tmp/run/f8/f8_report.md`・`f8_sizes.json`。ゲスト65535/65536/65537・EXACT再map・alloc_demo整列は台帳F-8、kernel実byte分類はf10。 |
 | f9 | USER は検証済み EXEC extent の一時 KHeap、WM/TRUSTED/get 失敗は resident。小要求の EXACT/TOPDOWN 伸長、公開 EXEC 拒否と内部全 extent 返却、ARENA teardown。AS 集計 4B (1,228B)、static resident は CPL3 復元で変更しない。KAPI 71・memory 2 据置。実測 +1,504B、f 残 4,096B。host/変異とゲスト親子試験の証拠 `/home/hight/os32-tmp/run/f9/f9_fix1_report.md`・`f9_fix1_sizes.json`、実ゲストは台帳 F-10。64KiB 以上は収まれば暫定で既存 arena、TOPDOWN 分類は f10。double free / ブロック頭でない pointer の free は当該 AS の heap を以後無効にする。 |
-| f10 | exec_heap大塊と安全なtrim。空末尾/空arena/生存データ保持 |
+| f10 | 要求≥64KiB は TOPDOWN の EXEC_LARGE、作れないときは理由を問わず伸長なしで既存 arena (§3-4 の補足、PM 決定)。識別は extent/base のみ、非併合・即返却・teardown 回収。trim は全 USER arena 検証後に ARENA 末尾/空 arena だけ返し、INITIAL は内部返却も拒否。失敗時は header/used 不変、free 段失敗は毒 AS として隔離。LARGE double free は未使用 VA なら無視、ANON 内なら無効化、再確保済みなら新割当を free。AS 1,228B・KAPI 71・memory 2 据置、基点 160342d 比 +480B (予算1,500B内)。F-4 の host 分を閉鎖、ゲストと trim 配送後の観測は台帳 F-11/F-12。証拠 `/home/hight/os32-tmp/run/f10/f10_report.md`・`f10_sizes.json`。 |
 | f11 | nano trim。失敗rollback、再割当の実ソース試験 |
 | f12 | 起動予算・旧helper撤去・最小初期量/世代の一括切替<br>申し送り (2026-10-02): `test_sbrk_tier.py` を丸ごと削除し、`app_band_pde_host.c` の legacy byte budget、`memory_boot_host.c` の `MEM_EXEC_SBRK_MIN` 式、kselftest `test_pool_model` の `pool:exec range`、`heap_test` を新予算/heap契約へ更新する。 |
 | f13 | mem表示・変異結線・size/manifestとPM台本を確定 |
@@ -526,7 +526,7 @@ d6 の `__bss_end=0x18C270` が e の増分の基準。KHEAP は E11-BUD の一�
 | d6 確定 | `__bss_end=0x18C270`、d 正味 4,260B | 旧上限で 36,240B |
 | e11 / e12 修正前 (`83f2db7`) | `__bss_end=0x1936E0`、e 正味 **29,808B** | **22,816B** |
 | e12 ピーク修正後 | `__bss_end=0x193740`、e 正味 **29,904B** (+96B) | **22,720B** |
-| f (**ユーザー決定 2026-10-08: 予備から +4KB → 12,288B**) | 12,288B (f5b 後 6,688B、f9 +1,504B → 8,192B、-Os 込み、残り 4,096B) | 10,432B |
+| f (**ユーザー決定 2026-10-08: 予備から +4KB → 12,288B**) | 12,288B (f5b 後 6,688B、f9 +1,504B、f10 +480B → 8,672B、-Os 込み、残り 3,616B) | 10,432B |
 | g | 3,072B | 7,360B |
 | h (selftest/診断追加) | 3,072B | **4,288B** (予備) |
 

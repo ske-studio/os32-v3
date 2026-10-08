@@ -61,7 +61,8 @@ static struct appmem_layout layout;
 static u32 base, end, allocs[DATA_MAX + MEM_APP_BAND_MAX_PDES];
 static u32 alloc_count, need_pt, calls, reloads, publish_count;
 static int integration;
-static u32 integration_free_fail;
+static u32 integration_free_fail, heap_free_calls;
+static int heap_alloc_fail, heap_alloc_rollback_fail;
 int paging_free(u32 owner, u32 pfn, int n) {
     return integration && pfn == integration_free_fail ? 0 : pgalloc_free_n_owner(owner, pfn, n);
 }
@@ -152,7 +153,13 @@ static void prepublication(void) {
     }
 }
 u32 map_alloc(u32 owner, int n) {
-    if (integration) return pgalloc_alloc_phys(owner, n);
+    if (integration) {
+        if (heap_alloc_fail) return 0;
+        if (heap_alloc_rollback_fail && !--heap_alloc_rollback_fail) return 0;
+        u32 phys = pgalloc_alloc_phys(owner, n);
+        if (heap_alloc_rollback_fail) integration_free_fail = phys / PAGE_SIZE;
+        return phys;
+    }
     CHECK("alloc IF enabled", _irq_enabled());
     CHECK("one page allocations", n == 1);
     prepublication();
@@ -166,7 +173,7 @@ u32 map_alloc(u32 owner, int n) {
     return p;
 }
 int map_free(u32 owner, u32 pfn, int n) {
-    if (integration) return pfn == integration_free_fail ? 0 : pgalloc_free_n_owner(owner, pfn, n);
+    if (integration) { heap_free_calls++; return pfn == integration_free_fail ? 0 : pgalloc_free_n_owner(owner, pfn, n); }
     if (unmapping) return unmap_free_check(owner, pfn, n);
     CHECK("no free before publication", failed);
     CHECK("rollback IF enabled", _irq_enabled());

@@ -92,9 +92,17 @@ void *exec_heap_user_alloc(struct addrspace *as, u32 size)
         size > ~(u32)0 - (BLK_ALIGN - 1) - BLK_HDR_SIZE)
         return 0;
     size = (size + BLK_ALIGN - 1) & ~(BLK_ALIGN - 1);
+    if (request >= MEM_EXEC_HEAP_MIN) {
+        if (!appmem_map(as, &as->appmem, &as->appmem_layout, request, 0,
+                        APPMEM_MAP_TOPDOWN, APPMEM_EXEC_LARGE, 0, &base)) {
+            as->exec_heap_used += PAGE_ALIGN_UP(request);
+            return (void *)base;
+        }
+        if (as->appmem_poisoned) return 0;
+    }
     if (!user_view(as, size, 0, &view)) return 0;
     if (!view.base) {
-        if (request >= MEM_EXEC_HEAP_MIN) return 0; /* Large growth belongs to f10. */
+        if (request >= MEM_EXEC_HEAP_MIN) return 0; /* Existing arenas only on failure. */
         bytes = PAGE_ALIGN_UP(size + BLK_HDR_SIZE);
         if (bytes < MEM_EXEC_HEAP_MIN) bytes = MEM_EXEC_HEAP_MIN;
         int rc = appmem_map(as, &as->appmem, &as->appmem_layout, bytes,
@@ -124,8 +132,14 @@ void exec_heap_user_free(struct addrspace *as, void *ptr)
     /* Never even read a candidate header outside an owned EXEC arena. */
     for (u32 i = 0; i < APPMEM_EXTENT_MAX; i++) {
         const struct appmem_extent *e = &as->appmem.e[i];
+        if (e->kind == APPMEM_EXEC_LARGE && va == e->base) {
+            u32 bytes = e->end - e->base;
+            if (!appmem_exec_unmap(as, va, bytes)) as->exec_heap_used -= bytes;
+            return;
+        }
         if (user_arena(e) && va >= e->base && va < e->end) member = 1;
-        if (e->kind == APPMEM_ANON && va >= e->base && va < e->end) {
+        if ((e->kind == APPMEM_ANON || e->kind == APPMEM_EXEC_LARGE) &&
+            va >= e->base && va < e->end) {
             as->exec_heap_used = ~(u32)0;
             return; /* A forged header in this AS's mem_map is not an allocation. */
         }
@@ -136,6 +150,40 @@ void exec_heap_user_free(struct addrspace *as, void *ptr)
     u32 before = view.used;
     kheap_free(&view, ptr);
     as->exec_heap_used -= before - view.used;
+}
+
+u32 exec_heap_user_trim(struct addrspace *as)
+{
+    KHeap view;
+    u32 pages = 0;
+    if (kctx_irq_depth || kctx_exc_depth || !as || as->appmem_poisoned ||
+        as->exec_heap_used == ~(u32)0 || paging_current_cr3() != as->pd_phys)
+        return 0;
+    /* No match requested: validate ALL arenas, including INITIAL, first. */
+    if (!user_view(as, 0, 0, &view)) return 0;
+    /* Descend so whole returns may compact the table without skipping entries. */
+    for (u32 i = APPMEM_EXTENT_MAX; i-- > 0;) {
+        const struct appmem_extent e = as->appmem.e[i];
+        if (e.kind != APPMEM_EXEC_ARENA) continue;
+        u32 va = e.base, next;
+        BlkHdr *tail;
+        do {
+            tail = (BlkHdr *)va;
+            next = va + BLK_HDR_SIZE + tail->size;
+            if (next == e.end) break;
+            va = next;
+        } while (1);
+        if (tail->magic != BLK_MAGIC_FREE) continue;
+        /* Keep the header and the minimum payload, even across a page edge. */
+        u32 end = va == e.base ? e.base : PAGE_ALIGN_UP(va + BLK_HDR_SIZE + BLK_ALIGN);
+        if (end == e.end) continue;
+        if (appmem_exec_trim(as, end, e.end - end)) break;
+        if (end != e.base) tail->size = end - va - BLK_HDR_SIZE;
+        if (as->appmem_layout.exec_heap_cur_end == e.end)
+            as->appmem_layout.exec_heap_cur_end = end;
+        pages += (e.end - end) / PAGE_SIZE;
+    }
+    return pages;
 }
 
 /* ======================================================================== */

@@ -25,6 +25,8 @@ struct addrspace;
 void exec_heap_user_init(struct addrspace *as);
 void *exec_heap_user_alloc(struct addrspace *as, u32 size);
 void exec_heap_user_free(struct addrspace *as, void *ptr);
+/* Active USER AS only; returns pages released, never shrinks INITIAL. */
+u32 exec_heap_user_trim(struct addrspace *as);
 
 /* resident ヒープからメモリ確保 (8バイトアラインメント)
  * best-fit 方式で空きブロックを検索・分割
