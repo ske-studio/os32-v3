@@ -732,6 +732,7 @@
   observe:
   - Confirm header memory_layout_generation differs while KAPI version and all other generations agree
   - Old binary is rejected with memory layout generation mismatch before entry/AS allocation
+  - New binary starts normally; verify generation manifests and shell/ver response
   - '世代2の写しは現行v72 appのヘッダ memory_layout_generation (offset 52) だけを2にした隔離コピー。sdk/os32x_hdr.py parse_headerで要求版72と他3世代の一致を確認し、元とコピーのSHA256・差分を保存する (accept_f12/gen2.logと同じ形)。保存済みv71_originalsとは別物'
   expect:
     generation_2_rejected: true
@@ -1162,7 +1163,7 @@
   observe:
   - 'Require mem_stat_test PASS self=<2..5> others=<the other three IDs in ascending order> and mem_stat_test: PASS 14/14, exit 0. ID is read from self before other-ID tests; USER accepts system/self and rejects every other ID with INVAL and out unchanged, including short/zero-size refusal'
   - 'CPL3 shでmem: 従来5行の順を保ち、実測システム行 (kheap_total/used/free, phys_total_pages/free_pages, resident_heap_total/used) と自分だけ。CPL0 resident sbrk上限の実測行は出ない'
-  - 'P3修正後のアプリ表示は1本3行: 実測 app=<id> st=<state> fl=<flags> ext=<extents_total> [LIBC_INITIAL,EXEC_INITIAL,ANON,EXEC_ARENA,EXEC_LARGE] free=<extents_free> ar=<arenas> heap=<exec_heap_used>B; img=<load_addr>-<img_end> 主端=<primary_mapped_end> libc初=<sbrk_heap_limit> 窓0=<page_up(img_end)>-88000000; 端/TD=<exec_heap_cur_end>-<guard_b> stk=<stack_top-stack_size>-<stack_top>/<stack_size>B 初=<exec_heap_base>+<exec_heap_size>B。fixtureの計数値をゲストの期待にしない'
+  - 'P3修正後のアプリ表示は1本3行: 実測 app=<id> st=<state> fl=<flags> ext=<extents_total> [LIBC_INITIAL,EXEC_INITIAL,ANON,EXEC_ARENA,EXEC_LARGE] free=<extents_free> ar=<arenas> heap=<exec_heap_used>B; img=<MEM_EXEC_LOAD_ADDR 80100000>-<img_end> 主端=<primary_mapped_end> libc初=<sbrk_heap_limit> 窓0=<page_up(img_end)>-88000000; 端/TD=<exec_heap_cur_end>-<guard_b> stk=<stack_top-stack_size>-<stack_top>/<stack_size>B 初=<exec_heap_base>+<exec_heap_size>B。fixtureの計数値をゲストの期待にしない'
   - 'CPL3 sh終了後、CPL0常駐shellのプロンプトでmem: live appがなければ (app なし) の1行。FREE IDのNOTFOUNDは表示しない。live appを置いた場合はID2..5の該当だけ3行ずつ。system/他エラーはerror行で残す'
   - '新kernel.mapとbinary hashでboot kselftest_pass=289, kselftest_fail=0を実測しmem_stat:TRUSTED AS extentsの正例を確認 (ソース予測288+1を実測合格と混同しない)'
   - 'fault_kill_countを前後で採りkill delta0、exec_as_leftover_pages0。db_test9/9・db_v50_test42/42、shell/ver応答を確認'
@@ -1222,10 +1223,10 @@
   gate: F-14
   contract: userland/system/install.c
   mode: manual
-  prereq: PM媒体バッチ; matching v72 install FD and CD; readable hd0 with valid geometry/capacity; new binary hashes/map. FD起動またはルートが完全なinstall FD、CDはcd0からmount可能
+  prereq: 隔離した NHD の写し、または原本を退避済み ([D2]); PM媒体バッチ; matching v72 install FD and CD; readable hd0 with valid geometry/capacity; new binary hashes/map. FD起動またはルートが完全なinstall FD、CDはcd0からmount可能
   entry: install (no dry argument); cdinst (no dry argument); GUI/画面キーボードで拒否、rshell自動入力を使わない
   observe:
-  - 'install: FDに /VMKRNL.LZ4, /sys/boot_hdd.bin, /sys/loader_h.bin, /sys/shell.bin と /sys,/bin,/sbin,/etc の完全な集合を用意 (install.c:62-65, :443-467, :506-516)。引数の特別経路はrecover/revert-settingsだけ (:527-534)、通常のinstallを起動'
+  - 'install: FDに /VMKRNL.LZ4, /sys/boot_hdd.bin, /sys/loader_h.bin, /sys/shell.bin と /sys,/bin,/sbin,/etc の完全な集合を用意 (install.c:55-58, :443-467, :485-497)。引数の特別経路はrecover/revert-settingsだけ (:527-534)、通常のinstallを起動'
   - 'install: IDE検出/identify (:550-564) → precheck_media/measure_need/inst_hdd_check/check_media (:570-584) → 対象表示/confirm_install (:587-590)。Do you want to proceed? [y/N]: 画面でnを入力し Installation aborted. Nothing was written. とexit0を確認 (:245-259, :590-592)。Preparing/書込み経路 (:600以後) に入らない。媒体欠損エラーは確認画面到達の成功に数えない'
   - 'cdinst: /cd0/BOOT.PKG とMINIMAL.PKG (分割版はMINIMAL2.PKG以降連続) に /boot/vmkernel.lz4 と /sys/shell.bin が必要、BOOTにboot_hdd.bin/loader_hdd.bin (cdinst.c:40-58)。Mounting CD-ROM/Checking CD-ROM OK (:646-663) → Select [0-3]: で1 (Minimal) (:684-699) → required packages/preflight (:708-714) → Continue? [y/N]: (:717-719) でnを入力。Installation cancelled. Nothing was written. を確認 (:724-730)。0を選ぶだけのキャンセルはpreflight経路の受入にしない'
   - '両方で拒否の前後にhd0の同じ領域/ファイルのhashと資源を比較し書込みなし、fault_kill_count差0、teardown leftover0、shell/ver応答。必要媒体や画面操作が未実施ならF-14を保留する。ERASE/yの経路はこの観測に含めない'

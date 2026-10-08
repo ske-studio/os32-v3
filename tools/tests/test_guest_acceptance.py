@@ -143,6 +143,14 @@ class ExtentTests(unittest.TestCase):
     def setUp(self):
         self.o = self.layout['offsets']
         self.assertEqual((self.o['slot_size'], self.o['as_size']), (204, 1228))
+        # Independent oracle: f13_pack.md D5 records the ILP32 AS offsets;
+        # appmem_types.h defines e[] and four consecutive u32 extent fields.
+        expected = dict(slot_as=0xb4, as_appmem=0x2b4, as_poisoned=1220,
+                        table_e=0, extent_count=32, extent_size=16,
+                        extent_base=0, extent_end=4, extent_kind=8, extent_flags=12)
+        for key, value in expected.items():
+            with self.subTest(offset=key):
+                self.assertEqual(self.o[key], value)
         self.assertEqual(self.o['extent_count'] * self.o['extent_size'], 512)
         self.app_id = 3
         self.slot_ptr = self.layout['slots'] + self.app_id * self.o['slot_size']
@@ -314,6 +322,9 @@ MUTATIONS = [
     ('tools/accept/pt0_snapshot.py', 'mask = ~AD_BITS if ignore_ad else ~0', 'mask = ~(AD_BITS | 4) if ignore_ad else ~0'),
     ('tools/accept/as_extents_at_teardown.py', "as_ptr = word(slot, o['slot_as'])",
      "as_ptr = word(slot, o['slot_as'] + WORD_BYTES)"),
+    ('tools/accept/as_extents_at_teardown.py',
+     'EMIT(as_appmem, offsetof(struct addrspace, appmem));',
+     'EMIT(as_appmem, offsetof(struct addrspace, appmem) + sizeof(u32));'),
     ('tools/accept/as_extents_at_teardown.py', "table_start = o['as_appmem'] + o['table_e']",
      "table_start = o['as_appmem'] + WORD_BYTES + o['table_e']"),
     ('tools/accept/as_extents_at_teardown.py', "as_ptr = word(slot, o['slot_as'])", "as_ptr = slot_ptr"),
