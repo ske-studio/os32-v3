@@ -1,4 +1,5 @@
 #include "shell.h"
+#include "memmap.h"
 #include "config.h"   /* SYS_GSHELL_BIN, SYS_SYSTEM_CFG (K4: os32gui) */
 #include "kbd_watch.h" /* kbdstat -w の行 (票 TASK_KBD_NAV §3) */
 
@@ -45,19 +46,66 @@ static int cmd_mem(int argc, char **argv)
                    g_api->paging_enabled() ? "ENABLED" : "DISABLED");
     g_api->kprintf(ATTR_WHITE, "  Heap Tot : %u B, Used: %u B, Free: %u B\n",
                    g_api->kmalloc_total(), g_api->kmalloc_used(), g_api->kmalloc_free());
-    g_api->kprintf(ATTR_CYAN, "%s", "Memory Map:\n");
-    g_api->kprintf(ATTR_WHITE, "%s", "  0x00000 - 0x00FFF  NP (NULL guard)\n");
-    g_api->kprintf(ATTR_WHITE, "%s", "  0x01000 - 0x9FFFF  Font/Unicode/GFX (V86 guest window)\n");
-    g_api->kprintf(ATTR_WHITE, "%s", "  0xA0000 - 0xEFFFF  VRAM\n");
-    /* 番地の正典は include/memmap.h (地図の入口: docs/02_memory.md §2-1)。ここは
-     * 2026-09-17 の kstack 移設と 2026-09-23 の DMA プールを反映した写し。 */
-    g_api->kprintf(ATTR_WHITE, "%s", "  0x100000-0x1FFFFF  Kernel Band (code+heap+KAPI+SHM)\n");
-    g_api->kprintf(ATTR_WHITE, "%s", "  0x200000-0x2FFFFF  SQLite Band (code+alt stack, DMA pool 0x2E8000-0x2F7FFF)\n");
-    g_api->kprintf(ATTR_WHITE, "%s", "  0x2FB000-0x2FBFFF  NP (kernel stack guard)\n");
-    g_api->kprintf(ATTR_WHITE, "%s", "  0x2FC000-0x2FFFFF  Kernel Stack (16KB)\n");
-    g_api->kprintf(ATTR_WHITE, "%s", "  0x300000-0x3FFFFF  Shell Band (1MB)\n");
-    g_api->kprintf(ATTR_WHITE, "%s", "  0x80000000-0x800FFFFF  Shared Library Band (1MB)\n");
-    g_api->kprintf(ATTR_WHITE, "%s", "  0x80100000-          Program Space\n");
+    MemStat stat;
+    int rc = g_api->mem_stat(0, &stat, sizeof(stat));
+    if (rc < 0) g_api->kprintf(ATTR_WHITE, "  mem_stat system: error=%d\n", rc);
+    else g_api->kprintf(ATTR_WHITE,
+        "  実測: phys pages total=%u free=%u; resident heap total=%u used=%u B\n",
+        stat.phys_total_pages, stat.phys_free_pages,
+        stat.resident_heap_total, stat.resident_heap_used);
+    g_api->kprintf(ATTR_CYAN, "%s", "Memory Map (ranges: [base,end)):\n");
+    g_api->kprintf(ATTR_WHITE, "  定数: %08X-%08X NULL guard; %08X-%08X V86 窓\n",
+        0U, (u32)(MEM_NULL_GUARD_END + 1), (u32)MEM_FONT_CACHE_BASE, (u32)MEM_CONV_END);
+    g_api->kprintf(ATTR_WHITE, "  定数: %08X-%08X VRAM; %08X-%08X Kernel band\n",
+        (u32)MEM_CONV_END, (u32)MEM_BIOS_ROM_START,
+        (u32)KERNEL_LOAD_ADDR, (u32)(MEM_KERNEL_BAND_END + 1));
+    g_api->kprintf(ATTR_WHITE, "  定数: %08X-%08X SQLite band; DMA pool %08X-%08X\n",
+        (u32)(MEM_KERNEL_BAND_END + 1), (u32)MEM_SHELL_LOAD_ADDR,
+        (u32)MEM_DMA_POOL_BASE, (u32)(MEM_DMA_POOL_END + 1));
+    g_api->kprintf(ATTR_WHITE, "  定数: %08X-%08X kstack guard; %08X-%08X kstack\n",
+        (u32)MEM_STACK_GUARD, (u32)(MEM_STACK_GUARD_END + 1),
+        (u32)MEM_KSTACK_BASE, (u32)MEM_SHELL_LOAD_ADDR);
+    g_api->kprintf(ATTR_WHITE, "  定数: Shell band load=%08X sbrk上限=%08X stack=%08X-%08X\n",
+        (u32)MEM_SHELL_LOAD_ADDR, (u32)MEM_SHELL_GUARD,
+        (u32)(MEM_SHELL_STACK_TOP - MEM_SHELL_STACK_SIZE), (u32)MEM_SHELL_STACK_TOP);
+#ifndef SHELL_AS_APP
+    g_api->kprintf(ATTR_WHITE, "  実測: Shell band sbrk上限=%08X\n", g_api->sbrk_heap_limit);
+#endif
+    g_api->kprintf(ATTR_WHITE, "  定数: Shell exec_heap 予約=%08X-%08X (%u KiB)\n",
+        (u32)MEM_SHELL_HEAP_BASE, (u32)MEM_SHELL_HEAP_END, (u32)(MEM_SHELL_HEAP_SIZE / 1024));
+    g_api->kprintf(ATTR_WHITE, "  定数: shlib=%08X-%08X image起点=%08X\n",
+        (u32)MEM_SHLIB_BASE, (u32)MEM_SHLIB_END, (u32)MEM_EXEC_LOAD_ADDR);
+    g_api->kprintf(ATTR_WHITE, "  定数: exec_heap 予約起点=%08X; stack top=%08X 既定=%u B; lease=%08X-%08X\n",
+        (u32)MEM_EXEC_HEAP_BASE, (u32)MEM_APP_STACK_TOP, (u32)MEM_EXEC_STACK_SIZE,
+        (u32)MEM_LEASE_BASE, (u32)MEM_LEASE_END);
+    int found = 0;
+#ifdef SHELL_AS_APP
+    int first = -1, last = -1;
+#else
+    int first = 2, last = 5;
+#endif
+    for (int id = first; id <= last; id++) {
+        rc = g_api->mem_stat(id, &stat, sizeof(stat));
+        if (rc < 0) {
+            g_api->kprintf(ATTR_WHITE, "  mem_stat app=%d: error=%d\n", id, rc);
+            continue;
+        }
+        found++;
+        g_api->kprintf(ATTR_WHITE,
+            "  実測: app=%d state=%u flags=%u extent=%u [%u,%u,%u,%u,%u] free=%u arena=%u heap_used=%u B"
+            " image=%08X-%08X primary_end=%08X libc 初期末尾=%08X"
+            " flags=0窓=%08X-%08X exec_heap現在端=%08X TOPDOWN=%08X-%08X"
+            " stack=%08X-%08X (%u B); 初期値: exec_heap=%08X+%u B\n",
+            stat.app_id, stat.state, stat.flags, stat.extents_total,
+            stat.extents[0], stat.extents[1], stat.extents[2], stat.extents[3], stat.extents[4],
+            stat.extents_free, stat.arenas, stat.exec_heap_used,
+            (u32)MEM_EXEC_LOAD_ADDR, stat.img_end, stat.primary_mapped_end, stat.sbrk_heap_limit,
+            (stat.img_end + (u32)MEM_PAGE_SIZE - 1) & ~((u32)MEM_PAGE_SIZE - 1),
+            (u32)MEM_EXEC_HEAP_BASE, stat.exec_heap_cur_end, stat.exec_heap_cur_end, stat.guard_b,
+            stat.stack_top - stat.stack_size, stat.stack_top, stat.stack_size,
+            stat.exec_heap_base, stat.exec_heap_size);
+    }
+    if (!found) g_api->kprintf(ATTR_WHITE, "%s", "  (app なし)\n");
     return 0;
 }
 

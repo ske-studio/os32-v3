@@ -38,14 +38,16 @@ if __name__ == '__main__':
               (ROOT/'exec/surface_query.c').read_text(),
               (ROOT/'exec/ring3_ls.c').read_text(), (ROOT/'kernel/shm.c').read_text()]
     contract(*values)
+    version = values[0]['version']
     if '--mutate' in sys.argv:
         for idx, changed, label in [
-            (0, dict(values[0], version=70), 'version rollback'),
-            (1, values[1].replace('KAPI_VERSION      71','KAPI_VERSION      70'), 'shared version rollback'),
+            (0, dict(values[0], version=version-1), 'version rollback'),
+            (1, values[1].replace(f'KAPI_VERSION      {version}', f'KAPI_VERSION      {version-1}'), 'shared version rollback'),
             (2, re.sub(r'STATIC_ASSERT\([^;]+\babi_lease_view_size\);','',values[2]), 'STATIC_ASSERT removed'),
             (3, re.sub(r'STATIC_ASSERT[^;]+abi_LsEntry_size_offset\);', '', values[3]), 'ls size offset assertion removed'),
             (4, values[4].replace('STATIC_ASSERT(PAGE_SIZE == OS32_PAGE_SIZE, shm_sdk_page_size);',''), 'page assertion removed'),
         ]:
+            assert changed != values[idx], label + ': unchanged mutation'
             mutated = values.copy(); mutated[idx] = changed
             try: contract(*mutated)
             except AssertionError: print('RED (contract):', label)
@@ -60,7 +62,7 @@ if __name__ == '__main__':
     if '--mutate' in sys.argv:
         original_open = open
         doc = (ROOT/'docs/KAPI_SPEC.md').read_text()
-        stale = doc.replace('現在のバージョン | **71**', '現在のバージョン | **70**')
+        stale = doc.replace(f'現在のバージョン | **{version}**', f'現在のバージョン | **{version-1}**')
         assert stale != doc
         def stale_open(path, *args, **kwargs):
             if pathlib.Path(path).resolve() == ROOT/'docs/KAPI_SPEC.md': return io.StringIO(stale)

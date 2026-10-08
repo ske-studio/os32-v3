@@ -1,6 +1,6 @@
 {
   "generations": {"os32x_format": 4, "kapi_abi": 1, "memory_layout": 3, "shlib_protocol": 1},
-  "version": 71,
+  "version": 72,
   "func_capacity": 300,
   "crt_kapi_symbol": "os32_kapi_v63",
   "data_fields": [
@@ -64,7 +64,8 @@
     "extern int kapi_sys_set_mtime(const char *path, u32 mtime);",
     "extern int kapi_sys_time_now(u32 *lo, u32 *hi);",
     "extern int kapi_pci_bind_info(u32 idx, void *out);",
-    "extern int kapi_serial_diag(SerialDiag *out);"
+    "extern int kapi_serial_diag(SerialDiag *out);",
+    "extern i32 kapi_mem_stat(i32 app_id, void *out, u32 size);"
   ],
   "api": [
     {
@@ -1868,6 +1869,13 @@
         }
       ],
       "body": "struct caller_access caller;\nif (!caller_access_get(&caller) || caller.origin != CALLER_USER) return OS32_ERR_INVAL;\nreturn appmem_error_public(appmem_unmap(caller.as, &caller.as->appmem, (u32)base, bytes));"
+    },
+    {
+      "name": "mem_stat",
+      "ret": "i32",
+      "args": ["i32 app_id", "void *out", "u32 size"],
+      "target": "kapi_mem_stat",
+      "out": [{"arg": "out", "len": "size"}]
     }
   ]
 }

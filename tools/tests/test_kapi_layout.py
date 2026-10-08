@@ -238,14 +238,17 @@ def case_mkos32x(tmp):
           "kapi_data_off (0x%X) = ELF の .os32_kapi_layout (0x%X) = 0x4B8"
           % (h.get("kapi_data_off", 0), val))
     check(not (sec["flags"] & H.SHF_ALLOC), "刻印のセクションは非ロード (alloc でない)")
-    check(h["min_api_ver"] == H.OS32X_MIN_API, "--api 39 は 71 に引き上がる (旧カーネルが受け入れない)")
+    check(h["min_api_ver"] == H.OS32X_MIN_API, f"--api 39 は {H.OS32X_MIN_API} に引き上がる (旧カーネルが受け入れない)")
     check(h["text_size"] == len(raw.read_bytes()) == len(blob) - H.OS32X_HDR_SIZE,
           "本文は .raw そのまま (刻印は平らなバイナリに入らない)")
     check(h.get("load_addr") == 0x80100000, "load_addr は ELF の .text")
 
-    r = mkos32x(raw, tmp / "api71.bin", elf, api=71)
-    check(r.returncode == 0 and H.parse_header((tmp / "api71.bin").read_bytes())
-          ["min_api_ver"] == 71, "--api 71 はそのまま 71")
+    for api in (H.OS32X_MIN_API - 1, H.OS32X_MIN_API):
+        api_out = tmp / f"api{api}.bin"
+        r = mkos32x(raw, api_out, elf, api=api)
+        check(r.returncode == 0 and H.parse_header(api_out.read_bytes())
+              ["min_api_ver"] == H.OS32X_MIN_API,
+              f"--api {api}: 現行版未満は引き上げ、現行版はそのまま")
 
     check(h['kapi_abi_generation'] == H.OS32_KAPI_ABI_GENERATION and
           h['memory_layout_generation'] == H.OS32_MEMORY_LAYOUT_GENERATION and

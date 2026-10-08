@@ -56,11 +56,12 @@ extern int kapi_sys_set_mtime(const char *path, u32 mtime);
 extern int kapi_sys_time_now(u32 *lo, u32 *hi);
 extern int kapi_pci_bind_info(u32 idx, void *out);
 extern int kapi_serial_diag(SerialDiag *out);
+extern i32 kapi_mem_stat(i32 app_id, void *out, u32 size);
 
 #include "kapi_profile.h"
 
 #ifdef KAPI_PROFILE
-volatile u32 kapi_hits[248];
+volatile u32 kapi_hits[249];
 #endif
 
 /* 各スロットの cdecl 引数バイト数 (固定分)。int 0x80 ディスパッチャが
@@ -314,6 +315,7 @@ const u16 kapi_argsize[KAPI_FUNC_COUNT] = {
     12,  /* caller_identity */
     12,  /* mem_map */
     8,  /* mem_unmap */
+    12,  /* mem_stat */
 };
 
 /* 各スロットの固定引数のうち早期検査するポインタのビットマスク (bit k = 引数 k)。
@@ -567,6 +569,7 @@ const u16 kapi_argptr[KAPI_FUNC_COUNT] = {
     0x0000,  /* caller_identity */
     0x0000,  /* mem_map */
     0x0000,  /* mem_unmap */
+    0x0000,  /* mem_stat */
 };
 
 /* ---- 出力ポインタの書き込み可検査 (票 TASK_KAPI_OUTPUT_GUARD) --------
@@ -2390,5 +2393,16 @@ int __cdecl wrap_mem_unmap(void *base, u32 bytes)
     struct caller_access caller;
     if (!caller_access_get(&caller) || caller.origin != CALLER_USER) return OS32_ERR_INVAL;
     return appmem_error_public(appmem_unmap(caller.as, &caller.as->appmem, (u32)base, bytes));
+}
+
+i32 __cdecl wrap_mem_stat(i32 app_id, void *out, u32 size)
+{
+    KAPI_HIT(248);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)out, KAPI_OUT_LEN(out, size),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return kapi_mem_stat(app_id, out, size);
 }
 

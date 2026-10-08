@@ -9,6 +9,89 @@
 #include "sys.h"              /* sys_time_now (票 TASK_HAL_WIRING §1-5) */
 #include "pci_bind.h"         /* pci_bind_info_get (票 TASK_HAL_WIRING §1-4) */
 #include "serial.h"           /* serial_diag_get (票 TASK_SERIAL_HOSTFS §1-v2) */
+#include "appslot.h"
+#include "redir_access.h"
+#include "exec_heap.h"
+#include "kmalloc.h"
+#include "pgalloc.h"
+#include "io.h"
+
+extern volatile int ring3_in_syscall;
+
+STATIC_ASSERT(sizeof(MemStat) == 120, memstat_size);
+STATIC_ASSERT(__builtin_offsetof(MemStat, extents_total) == MEMSTAT_MIN, memstat_min);
+STATIC_ASSERT(__builtin_offsetof(MemStat, img_end) == 80, memstat_layout);
+STATIC_ASSERT(__builtin_offsetof(MemStat, load_addr) == 96, memstat_slot);
+
+/* The generated wrapper validates the entire output first. Snapshot and
+ * copyout never yield, call USER code, or switch AS. Only snapshot holds IF. */
+i32 kapi_mem_stat(i32 app_id, void *out, u32 size)
+{
+    MemStat snap = {0};
+    struct caller_access caller;
+    AppSlot *slot;
+    unsigned int irq;
+    int result = OS32_ERR_INVAL;
+
+    if (!out || size < MEMSTAT_MIN || app_id < -1 || app_id > APP_ID_MAX ||
+        app_id == APP_ID_SHELL) return OS32_ERR_INVAL;
+    irq = irq_save();
+    if (ring3_wm_depth > 0) {
+        if (app_id == -1) app_id = 0;
+    } else if (!ring3_in_syscall) {
+        slot = appslot_get(appslot_cur());
+        if (appslot_cur() != APP_ID_SHELL || !slot || slot->cpl3) goto done;
+        if (app_id == -1) app_id = 0;
+    } else {
+        if (!caller_access_get_user(&caller)) goto done;
+        if (app_id == -1) app_id = caller.app_id;
+        if (app_id != 0 && app_id != caller.app_id) goto done;
+    }
+    if (app_id) {
+        struct addrspace *as;
+        slot = appslot_get(app_id);
+        result = OS32_ERR_NOTFOUND;
+        if (!slot || !(as = slot->as) || !as->pd_phys) goto done;
+        snap.state = slot->state;
+        snap.flags = MEMSTAT_HAS_AS;
+        if (as->appmem_poisoned) snap.flags |= MEMSTAT_POISONED;
+        if (as->exec_heap_used == ~(u32)0) snap.flags |= MEMSTAT_HEAP_INVALID;
+        else snap.exec_heap_used = as->exec_heap_used;
+        for (u32 i = 0; i < APPMEM_EXTENT_MAX; i++) {
+            u32 kind = as->appmem.e[i].kind;
+            if (kind >= APPMEM_LIBC_INITIAL && kind <= APPMEM_EXEC_LARGE) {
+                snap.extents_total++;
+                snap.extents[kind - 1]++;
+            }
+        }
+        snap.extents_free = APPMEM_EXTENT_MAX - snap.extents_total;
+        snap.arenas = snap.extents[APPMEM_ANON - 1] + snap.extents[APPMEM_EXEC_ARENA - 1];
+        snap.img_end = as->appmem_layout.img_end;
+        snap.primary_mapped_end = as->appmem_layout.primary_mapped_end;
+        snap.exec_heap_cur_end = as->appmem_layout.exec_heap_cur_end;
+        snap.guard_b = as->appmem_layout.guard_b;
+        snap.load_addr = slot->load_addr;
+        snap.sbrk_heap_limit = slot->sbrk_heap_limit;
+        snap.exec_heap_base = slot->exec_heap_base;
+        snap.exec_heap_size = slot->exec_heap_size;
+        snap.stack_top = slot->stack_top;
+        snap.stack_size = slot->stack_size;
+    }
+    snap.size = size < sizeof(snap) ? size : sizeof(snap);
+    snap.app_id = app_id;
+    snap.kheap_total = kmalloc_total();
+    snap.kheap_used = kmalloc_used();
+    snap.kheap_free = kmalloc_free();
+    snap.phys_total_pages = pgalloc_total_pages();
+    snap.phys_free_pages = pgalloc_free_pages();
+    snap.resident_heap_total = exec_heap_total();
+    snap.resident_heap_used = exec_heap_used();
+    result = (int)snap.size;
+done:
+    irq_restore(irq);
+    if (result > 0) kmemcpy(out, &snap, snap.size);
+    return result;
+}
 
 /* カーネルビルド時の日時文字列を返す */
 void kapi_sys_get_build_info(char *buf, int size)

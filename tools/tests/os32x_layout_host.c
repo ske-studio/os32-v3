@@ -36,6 +36,7 @@ int main(void)
     h = valid(); h.flags = OS32X_FLAG_SHLIB; CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF));
     h.shlib_protocol = OS32_SHLIB_PROTOCOL; CHECK(!os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF));
     h = valid(); h.kapi_data_off++; CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF));
+    h = valid(); h.min_api_ver = KAPI_VERSION - 1; CHECK(!os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF));
     h = valid(); h.min_api_ver = KAPI_VERSION + 1; CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF));
     CHECK(os32x_layout_check(NULL, sizeof(h), KAPI_DATA_FIELDS_OFF));
     return failures ? 1 : 0;

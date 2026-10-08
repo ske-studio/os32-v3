@@ -39,3 +39,4 @@ check-disk-auth-host:
 - build/programs.mk
 - docs/07_shell.md
 - tools/check_artifacts.py
+- kapi/kapi_sys.c
