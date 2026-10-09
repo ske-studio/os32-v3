@@ -86,6 +86,7 @@
 /* 予備 (80〜)。GUI_OP_OWNER_EXIT はカーネルが exec_exit から WM ハンドラへ
  * 渡す内部 op (契約 T4 / U8)。アプリは送らない。 */
 #define GUI_OP_OWNER_EXIT      80
+#define GUI_OP_TRIM_DONE       81  /* USER completion, handled by kernel */
 
 /* ======================================================================== */
 /*  イベント種別 (GuiEvent.kind) — U2 の並び順どおり 1 から                  */
@@ -104,6 +105,7 @@
 #define GUI_EV_MODAL      11
 #define GUI_EV_QUIT       12  /* sub: 理由 */
 #define GUI_EV_PALETTE    13  /* sub: active 0/1。G8 */
+#define GUI_EV_TRIM       14  /* payload.raw[0..4]: pressure epoch (LE) */
 
 /* ======================================================================== */
 /*  Style.flags (u8) — G6                                                    */

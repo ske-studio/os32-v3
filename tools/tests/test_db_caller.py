@@ -15,6 +15,11 @@ def sources():
     src = (walk.ROOT / 'exec/exec.c').read_text()
     constants = '\n'.join(line for line in src.splitlines() if line.startswith('#define RING3_')) + '\n'
     result['guards'] = constants + src[src.index('int ring3_ptr_ok(u32 p)'):src.index('#include "ksetjmp.h"')]
+    # g1 inserted DONE between range guards. Keep this DB fixture's source
+    # closure limited to those guards; the real DONE path is in trim_kernel.
+    trim_start = result['guards'].index('i32 exec_trim_done(')
+    trim_end = result['guards'].index('\n}', trim_start) + 2
+    result['guards'] = result['guards'][:trim_start] + result['guards'][trim_end:]
     result['db'] = (walk.ROOT / 'kapi/kapi_db.c').read_text()
     result['str'] = (walk.ROOT / 'exec/ring3_str.c').read_text()
     result['vfs'] = (walk.ROOT / 'fs/vfs.c').read_text()

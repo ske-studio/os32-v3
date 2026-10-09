@@ -21,6 +21,7 @@ extern int res_owner_get(void);
  * フレームに印を立てる。実体は exec/appslot.c (kernel/ は -Iexec 非依存)。 */
 extern void appslot_gui_op_enter(int is_wait);
 extern void appslot_gui_op_leave(void);
+extern i32 exec_trim_done(u32 epoch);
 
 /* 「カーネルが WM のコードへ入っている」印 (exec/exec.c の ring3_wm_depth、
  * 2026-09-26)。WM はアプリの syscall の中で走るので、この印が無いと WM 自身の
@@ -65,6 +66,7 @@ i32 gui_call(u32 op, u32 arg)
 {
     i32 r;
     if (op == GUI_OP_OWNER_EXIT) return OS32_ERR_INVAL;
+    if (op == GUI_OP_TRIM_DONE) return exec_trim_done(arg);
     if (g_gui_handler == 0) {
         return OS32_ERR_NOSYS;
     }

@@ -49,6 +49,13 @@ int fd_redirect_to_buffer(int fd, u8 *p, u32 size, u32 len) { (void)fd; (void)p;
 void palette_get(int idx, u8 *r, u8 *g, u8 *b) { (void)idx; (void)r; (void)g; (void)b; (void)touch(); }
 
 /* Real collector; only resident heap counters are host boundary values. */
+u32 appslot_trim_epoch;
+static AppSlot other_slots[APP_SLOT_COUNT];
+AppSlot *appslot_at(int id)
+{
+    if (id < 0 || id >= APP_SLOT_COUNT) return 0;
+    return id == 2 ? &slot : &other_slots[id];
+}
 u32 kmalloc_total(void) { return 8192; }
 u32 kmalloc_used(void) { return 128; }
 u32 kmalloc_free(void) { return 8064; }

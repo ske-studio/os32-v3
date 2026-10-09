@@ -649,6 +649,12 @@ void shlib_addrspace_detach(struct addrspace *as) { (void)as; detached++; }
 void kfree(void *p) { CHECK("teardown AS control", p == &a); }
 static AppSlot g_slot[APP_SLOT_COUNT], *g_cur_app;
 static int current_slot = APP_ID_SHELL;
+/* Legacy map/heap fixtures only observe allocation; g1's trim fixture
+ * replaces this double with the complete product appslot.c. */
+u32 appslot_trim_epoch;
+volatile u32 appslot_trim_request_count, appslot_trim_mark_count;
+volatile u32 appslot_trim_done_count, appslot_trim_done_reject_count, appslot_trim_pages_total;
+void appslot_trim_request_as(struct addrspace *as) { (void)as; }
 static u32 ring3_abort_count, tick_count;
 static int ring3_in_syscall;
 static u32 *g_cur_frame;

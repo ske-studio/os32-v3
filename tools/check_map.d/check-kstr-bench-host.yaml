@@ -1,5 +1,7 @@
 check-kstr-bench-host:
 - tools/tests/host32.py
+- sdk/kapi.json
+- sdk/include/os32/os32_kapi_shared.h
 - build/app.conf
 - lib/kstring_asm.asm
 - lib/kstring_c.c

@@ -16,6 +16,8 @@ from unittest.mock import patch
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+# g1 preserves the 204-byte slot prefix and appends trim_pending/trim_epoch.
+SLOT_BYTES = 204 + 2 * struct.calcsize('<I')
 sys.path.insert(0, str(ROOT / 'tools'))
 import gen_guest_acceptance as ga
 import tvdump_recv as tv
@@ -142,7 +144,7 @@ class ExtentTests(unittest.TestCase):
 
     def setUp(self):
         self.o = self.layout['offsets']
-        self.assertEqual((self.o['slot_size'], self.o['as_size']), (204, 1228))
+        self.assertEqual((self.o['slot_size'], self.o['as_size']), (SLOT_BYTES, 1228))
         # Independent oracle: f13_pack.md D5 records the ILP32 AS offsets;
         # appmem_types.h defines e[] and four consecutive u32 extent fields.
         expected = dict(slot_as=0xb4, as_appmem=0x2b4, as_poisoned=1220,
@@ -210,7 +212,7 @@ class ExtentTests(unittest.TestCase):
         self.assertEqual(result['kinds'], dict(LIBC_INITIAL=1, EXEC_INITIAL=1,
                                              ANON=2, EXEC_ARENA=1, EXEC_LARGE=1))
         self.assertEqual(self.calls, [(self.layout['bp'], len(self.blocks[self.layout['bp']])),
-                                     (self.slot_ptr, 204), (self.as_ptr, 1228)])
+                                     (self.slot_ptr, SLOT_BYTES), (self.as_ptr, 1228)])
 
     def test_parse_kind_counts(self):
         result = ext.parse_extents(bytes(self.table), self.o)

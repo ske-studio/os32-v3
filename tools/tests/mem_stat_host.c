@@ -49,7 +49,10 @@ static void query(int id, int expected, int target)
     else {
         CHECK("caller target", output.stat.app_id == target);
         CHECK("caller flags", !!(output.stat.flags & MEMSTAT_HAS_AS) == !!target);
-        if (!target) CHECK("system AS zero", all_zero(output.bytes + MEMSTAT_MIN, sizeof(MemStat) - MEMSTAT_MIN));
+        if (!target) CHECK("system AS zero", all_zero(output.bytes + MEMSTAT_MIN,
+              __builtin_offsetof(MemStat, pressure_epoch) - MEMSTAT_MIN) && !output.stat.trim_epoch);
+        CHECK("pressure epoch", output.stat.pressure_epoch == appslot_trim_epoch);
+        CHECK("pending mask", output.stat.trim_pending_mask == ((1UL << 2) | (1UL << 3)));
     }
 }
 
@@ -57,12 +60,13 @@ static void matrix(void)
 {
     /* IDs: 2 self, 3 live, 4 FREE (with stale AS), 5 live without AS. */
     const int ids[] = {0, -1, 2, 3, 4, 5, 1, 99, -2};
-    const int trusted[] = {120, 120, 120, 120, OS32_ERR_NOTFOUND, OS32_ERR_NOTFOUND,
+    const int trusted[] = {sizeof(MemStat), sizeof(MemStat), sizeof(MemStat), sizeof(MemStat), OS32_ERR_NOTFOUND, OS32_ERR_NOTFOUND,
                            OS32_ERR_INVAL, OS32_ERR_INVAL, OS32_ERR_INVAL};
-    const int user[] = {120, 120, 120, OS32_ERR_INVAL, OS32_ERR_INVAL, OS32_ERR_INVAL,
+    const int user[] = {sizeof(MemStat), sizeof(MemStat), sizeof(MemStat), OS32_ERR_INVAL, OS32_ERR_INVAL, OS32_ERR_INVAL,
                         OS32_ERR_INVAL, OS32_ERR_INVAL, OS32_ERR_INVAL};
     g_slot[1].state = APP_STATE_RUNNING;
     g_slot[4] = g_slot[2]; g_slot[4].state = APP_STATE_FREE;
+    g_slot[4].trim_pending = 0;
     g_slot[5].state = APP_STATE_RUNNING;
     for (int mode = 0; mode < 8; mode++) {
         ring3_in_syscall = 1; heap_select(2);
@@ -110,7 +114,7 @@ static void matrix(void)
 
 static void sizes(void)
 {
-    const u32 sizes[] = {0, MEMSTAT_MIN - 1, MEMSTAT_MIN, 73, sizeof(MemStat), sizeof(output)};
+    const u32 sizes[] = {0, MEMSTAT_MIN - 1, MEMSTAT_MIN, 73, 120, sizeof(MemStat), sizeof(output)};
     MemStat full;
     CHECK("full size", kapi_mem_stat(-1, &full, sizeof(full)) == sizeof(full));
     CHECK("NULL direct", kapi_mem_stat(-1, 0, sizeof(full)) == OS32_ERR_INVAL);
@@ -152,6 +156,10 @@ static void values(void)
     CHECK("AS used", stat.exec_heap_used == (a.exec_heap_used == ~0U ? 0 : a.exec_heap_used));
     CHECK("heap invalid", !!(stat.flags & MEMSTAT_HEAP_INVALID) == (a.exec_heap_used == ~0U));
     CHECK("poison flag", !!(stat.flags & MEMSTAT_POISONED) == !!a.appmem_poisoned);
+    CHECK("trim flag", !!(stat.flags & MEMSTAT_TRIM_PENDING) == !!g_slot[2].trim_pending);
+    CHECK("app trim epoch", stat.trim_epoch == g_slot[2].trim_epoch);
+    CHECK("pressure epoch", stat.pressure_epoch == appslot_trim_epoch);
+    CHECK("pending mask", stat.trim_pending_mask == ((1UL << 2) | (1UL << 3)));
     CHECK("current end", stat.exec_heap_cur_end == a.appmem_layout.exec_heap_cur_end);
     CHECK("layout", stat.img_end == a.appmem_layout.img_end && stat.primary_mapped_end == a.appmem_layout.primary_mapped_end && stat.guard_b == a.appmem_layout.guard_b);
     CHECK("slot values", stat.load_addr == g_slot[2].load_addr && stat.sbrk_heap_limit == g_slot[2].sbrk_heap_limit && stat.exec_heap_base == g_slot[2].exec_heap_base && stat.exec_heap_size == g_slot[2].exec_heap_size && stat.stack_top == g_slot[2].stack_top && stat.stack_size == g_slot[2].stack_size);
@@ -174,6 +182,9 @@ void _start(void)
     g_slot[2].load_addr = MEM_EXEC_LOAD_ADDR;
     g_slot[2].sbrk_heap_limit = a.appmem_layout.primary_mapped_end;
     g_slot[2].stack_top = MEM_APP_STACK_TOP; g_slot[2].stack_size = MEM_EXEC_STACK_SIZE;
+    appslot_trim_epoch = 37;
+    g_slot[2].trim_pending = g_slot[3].trim_pending = 1;
+    g_slot[2].trim_epoch = 31; g_slot[3].trim_epoch = 36;
     matrix(); sizes(); values();
     u32 anon[2];
     for (u32 i = 0; i < 2; i++) {

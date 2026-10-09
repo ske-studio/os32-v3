@@ -258,5 +258,6 @@ int appmem_error_public(int error)
 {
     if (error == APPMEM_EINVAL || error == APPMEM_ENOVA) return OS32_ERR_INVAL;
     if (error == APPMEM_EFULL) return OS32_ERR_FULL;
-    return error; /* ENOSPC is private until the pressure path in g. */
+    if (error == APPMEM_ENOSPC) return OS32_ERR_NOSPC;
+    return error;
 }

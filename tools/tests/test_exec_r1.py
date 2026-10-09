@@ -276,7 +276,11 @@ static int host_handler(unsigned int irq, void *arg) { (void)irq; (void)arg; ret
 END = r'''
 static int test(void) {
     int gui, kind, resumed;
-    CHECK(sizeof(struct addrspace) == 1228 && sizeof(struct addrspace) - 1224 <= 32 && sizeof(AppSlot) == 204);
+    CHECK(sizeof(struct addrspace) == 1228 && sizeof(struct addrspace) - 1224 <= 32);
+    /* g1 appends two ILP32 words after the unchanged 204-byte slot prefix. */
+    CHECK(__builtin_offsetof(AppSlot, trim_pending) == 204);
+    CHECK(__builtin_offsetof(AppSlot, trim_epoch) == 204 + sizeof(int));
+    CHECK(sizeof(AppSlot) == 204 + sizeof(int) + sizeof(u32));
     CHECK(sizeof(RedirAccess) == 24 && sizeof(CallerAccessFrame) == 28);
     CHECK(sizeof(FdRedirect) == 52 && sizeof(FdRedirectState) == 156);
     CHECK(sizeof(Ring3CallContext) == 40);

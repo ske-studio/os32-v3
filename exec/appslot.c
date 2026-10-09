@@ -79,6 +79,10 @@ volatile u32 ring3_stop_park_count = 0;
 volatile u32 appslot_reclaim_count = 0;
 volatile int appslot_last_reclaim_id = 0;
 volatile u32 gfx_init_reject_count = 0;
+u32 appslot_trim_epoch;
+volatile u32 appslot_trim_request_count, appslot_trim_mark_count;
+volatile u32 appslot_trim_done_count, appslot_trim_done_reject_count;
+volatile u32 appslot_trim_pages_total;
 
 /* 画面の所有者 (票 T8 D1)。初期値は WM。CUI 中は誰も取らないのでここに
  * 留まる。static にしないのは kernel.map から emu_read_mem で読むため
@@ -142,6 +146,40 @@ AppSlot *appslot_get(int id)
     AppSlot *a = appslot_at(id);
     if (!a || a->state == APP_STATE_FREE) return (AppSlot *)0;
     return a;
+}
+
+/* Cooperative switching: an already pending request keeps its epoch. */
+void appslot_trim_request_as(struct addrspace *as)
+{
+    int requester = -1;
+    if (appslot_trim_epoch != ~(u32)0) appslot_trim_epoch++;
+    appslot_trim_request_count++;
+    for (int id = APP_ID_SHELL; id <= APP_ID_MAX; id++)
+        if (g_slot[id].as == as) requester = id;
+    if (requester < 0) return;
+    for (int id = APP_ID_MIN; id <= APP_ID_MAX; id++) {
+        AppSlot *a = &g_slot[id];
+        if (id == requester || !a->gui || !a->cpl3 || !a->as ||
+            !a->as->pd_phys || a->as->appmem_poisoned || a->trim_pending)
+            continue;
+        if (a->state != APP_STATE_PARKED && a->state != APP_STATE_WAIT_KEY &&
+            a->state != APP_STATE_WAIT_POLL) continue;
+        a->trim_pending = 1;
+        a->trim_epoch = appslot_trim_epoch;
+        appslot_trim_mark_count++;
+    }
+}
+
+int appslot_trim_done(int id, u32 epoch)
+{
+    AppSlot *a = appslot_get(id);
+    if (a && a->trim_pending && a->trim_epoch == epoch) {
+        a->trim_pending = 0;
+        appslot_trim_done_count++;
+        return 1;
+    }
+    appslot_trim_done_reject_count++;
+    return 0;
 }
 
 int appslot_cur(void) { return g_cur; }
@@ -217,6 +255,8 @@ void appslot_start_commit(int id, int gui, u32 pages)
     a->parked_from_stop = 0;
     a->stop_wm_req = 0;
     a->last_kernel_tick = 0;
+    a->trim_pending = 0;
+    a->trim_epoch = 0;
     g_cur = id;
     res_owner_set(id);
     /* 起動の iret は「生存アプリの集合が変わる瞬間」で、生存アプリ間の

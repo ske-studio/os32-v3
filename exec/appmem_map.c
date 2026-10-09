@@ -1,6 +1,7 @@
 /* T2f f3: one serialized transaction; private kernel entry. */
 #include "appmem.h"
 #include "paging_app.h"
+#include "appslot.h"
 #include "io.h"
 
 int appmem_map(struct addrspace *as, struct appmem_table *table,
@@ -14,6 +15,7 @@ int appmem_map(struct addrspace *as, struct appmem_table *table,
     if (rc) return rc;
     if (!appmem_plan_valid(table, &plan)) return APPMEM_EINVAL;
     rc = paging_app_stage(&tx, as, plan.base, plan.end);
+    if (rc == APPMEM_ENOSPC) appslot_trim_request_as(as);
     if (rc) return rc;
     if (!appmem_plan_valid(table, &plan)) {
         paging_app_abort(&tx);

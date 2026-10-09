@@ -690,6 +690,49 @@ static void test_appmem(void)
                     stat.extents_total == 1 && stat.extents[APPMEM_ANON - 1] == 1 &&
                     stat.extents_free == APPMEM_EXTENT_MAX - 1 && stat.arenas == 1;
             ring3_wm_leave();
+            {
+                AppSlot *requester = appslot_at(APP_ID_SHELL);
+                struct addrspace *saved_as = requester->as;
+                u32 epoch = appslot_trim_epoch;
+                u32 requests = appslot_trim_request_count, marks = appslot_trim_mark_count;
+                u32 dones = appslot_trim_done_count, rejects = appslot_trim_done_reject_count;
+                int last_reclaim = appslot_last_reclaim_id, stop = requester->stop_wm_req;
+                requester->as = (struct addrspace *)&saved;
+                slot->gui = slot->cpl3 = 1;
+                appslot_trim_request_as(requester->as);
+                /* ID 1 is a valid requester; app 0 remains a system query. */
+                check(slot->trim_pending, "trim:mark parked GUI");
+                u32 marked = slot->trim_epoch;
+                appslot_trim_request_as(requester->as);
+                check(slot->trim_epoch == marked && appslot_trim_mark_count == marks + 1,
+                      "trim:pending coalesces");
+                check(!appslot_trim_done(id, marked + 1) && appslot_trim_done(id, marked) &&
+                      !appslot_trim_done(id, marked), "trim:done and stale");
+                /* Eligible states are CUI here; all other states must exclude
+                 * even GUI. The borrowed slot is FREE, so its redirect is empty. */
+                for (int s = APP_STATE_FREE; s <= APP_STATE_FAULT_PENDING; s++) {
+                    slot->state = s;
+                    slot->gui = s < APP_STATE_PARKED || s > APP_STATE_WAIT_POLL;
+                    appslot_trim_request_as(requester->as);
+                }
+                int excluded = !slot->trim_pending;
+                slot->state = APP_STATE_PARKED;
+                slot->gui = 1;
+                appslot_trim_request_as(&as);
+                excluded &= !slot->trim_pending;
+                appslot_trim_request_as(requester->as);
+                appslot_reclaim(id);
+                check(excluded && !slot->trim_pending && !slot->trim_epoch, "trim:exclude/reclaim");
+                appslot_reclaim_count--;
+                appslot_last_reclaim_id = last_reclaim;
+                requester->stop_wm_req = stop;
+                requester->as = saved_as;
+                appslot_trim_epoch = epoch;
+                appslot_trim_request_count = requests;
+                appslot_trim_mark_count = marks;
+                appslot_trim_done_count = dones;
+                appslot_trim_done_reject_count = rejects;
+            }
             *slot = saved;
         }
         check(valid, "mem_stat:TRUSTED AS extents");

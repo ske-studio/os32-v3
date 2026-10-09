@@ -10,7 +10,7 @@ int main(int argc, char **argv, KernelAPI *api)
     union { MemStat align; u8 bytes[sizeof(MemStat) + 16]; } out;
     int passed = 0, total = 0, self, others[3], n = 0;
     int bad[] = {1, 99, -2};
-    u32 sizes[] = {0, MEMSTAT_MIN - 1, MEMSTAT_MIN, sizeof(MemStat), sizeof(out)};
+    u32 sizes[] = {0, MEMSTAT_MIN - 1, MEMSTAT_MIN, 120, sizeof(MemStat), sizeof(out)};
     (void)argc; (void)argv;
     int rc = api->mem_stat(-1, &stat, sizeof(stat));
     CHECK(rc == sizeof(stat) && stat.size == sizeof(stat) &&

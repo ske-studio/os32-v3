@@ -63,6 +63,8 @@ void *kmemset(void *dst, int c, u32 n)
 static int host_op_enter, host_op_leave;
 void appslot_gui_op_enter(int is_wait) { (void)is_wait; host_op_enter++; }
 void appslot_gui_op_leave(void) { host_op_leave++; }
+static int host_trim_calls;
+i32 exec_trim_done(u32 epoch) { host_trim_calls++; return (i32)epoch; }
 
 void kbd_set_gui_mode(int on) { (void)on; }
 /* kernel/ime.c の実物の代わり: 控えた表を覚えるだけ。初期値は「TVRAM 版」
@@ -227,6 +229,9 @@ static void case_gui_call(void)
     /* 未登録なら NOSYS で、印も立てない。 */
     check(gui_call(GUI_OP_WAIT, 0) == OS32_ERR_NOSYS, "2a no WM -> NOSYS");
     check(host_enter_calls == 0 && ring3_wm_depth == 0, "2b no WM -> no mark");
+    check(gui_call(GUI_OP_TRIM_DONE, 23) == 23 && host_trim_calls == 1,
+          "2 trim without WM reaches kernel");
+    check(!host_enter_calls && !host_op_enter, "2 trim never enters WM");
 
     /* シェル帯 (owner 1) からの登録。 */
     res_owner_set(1);
@@ -237,6 +242,9 @@ static void case_gui_call(void)
     check(gui_call(GUI_OP_OWNER_EXIT, EXEC_KIND_ABORTED) == OS32_ERR_INVAL,
           "2 owner exit cannot be forged");
     check(!host_enter_calls && !host_op_enter, "2 refusal never enters WM");
+    check(gui_call(GUI_OP_TRIM_DONE, 24) == 24 && host_trim_calls == 2,
+          "2 trim with WM reaches kernel");
+    check(!host_enter_calls && !host_op_enter, "2 trim never enters WM");
     r = gui_call(GUI_OP_WAIT, 5);
     check(r == 7, "2d handler result passes through");
     check(last_op == GUI_OP_WAIT, "2e op passes through");
