@@ -187,3 +187,8 @@ X-2 の前半 (e8a の RO 日本語) は `accept_e11/RESULT.md` の GUI 日本�
 | X-17 | install の ERASE 断りを cdinst と同じく 0 (「Installation aborted. Nothing was written.」、[FAIL] なし)。install_fresh_host の case_erase (拒否入力 17 × 表 5)、cdinst の prepare/mkdir 失敗の対照、変異 4 本 | `~/os32-tmp/run/x17/x17_report.md`、全体検査 `~/os32-tmp/run/land_x17/check.log` |
 | X-18 | check-kprintf-window に CPL3 の Rust (kprint!・kprint_attr!・(…kprintf)( 直呼び) を追加。140 ファイル・51 呼出し、最大 4。関数ポインタ経由・マクロの別名は対象外 (実物 0 件) | `~/os32-tmp/run/x18/x18_report.md`、独立レビュー (Approve) |
 
+## T2g F-12 (2026-10-09、GK-3 の G-4、main b469f8f 配備)
+
+| ID | 閉じた項目 | 証拠 |
+|---|---|---|
+| F-12 | exec_heap_user_trim の結線 (g1 の TRIM_DONE 横取り) をゲストで観測。17MB の GK-3 G-4 で、両 back が実 TRIM_DONE の後に ARENA1 の末尾返却 (`cur=88020000→88018000`)・空 ARENA の全返却 (`ARENA=2→1`)・`INITIAL=1→1`・`DATA=OK`。障害物を外した後の再伸長は cur +64KiB・ARENA=1・EXACT、終了行 hook=1・CRC=OK・regrow rc=0、終了後 free=2957・leftover=0。`mem <id>` と as_extents_at_teardown は未採取で fixture の自己観測で判断 (G-3 の成功の根拠には使わない)。native host runner は統合の全体検査 (native+qemu) で補った | `~/os32-tmp/evidence/2026-10-09/g23_gk/RESULT.md`・probe_log.txt・consink_G1_G4.txt |
