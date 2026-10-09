@@ -69,6 +69,7 @@ mod slot;
 mod startmenu;
 mod taskbar;
 mod timer;
+mod trim;
 mod visible;
 mod wm;
 
