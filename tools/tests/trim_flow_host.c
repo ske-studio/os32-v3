@@ -35,7 +35,7 @@ static int sent[APP_SLOT_COUNT], queued[APP_SLOT_COUNT];
 static GuiEvent ring_event[APP_SLOT_COUNT];
 static u32 ring_head[APP_SLOT_COUNT], ring_tail[APP_SLOT_COUNT];
 static u32 yields, wm_events, as_events, protected_events, rollback_pages;
-static u32 done_pages, hook_pages, hook_calls, obstacle, split, baseline_cur, initial_end;
+static u32 done_pages, hook_pages, hook_calls, c_hook_calls, obstacle, split, baseline_cur, initial_end;
 static struct appmem_extent initial_extent;
 static void *blocks[64], *nano_blocks[16];
 static u32 block_count, low_count, data_crc;
@@ -248,6 +248,12 @@ static void deliver(void)
         if (id == 3) event(DELIVER_B);
     }
 }
+static unsigned c_hook(void)
+{
+    c_hook_calls++;
+    line("C hook after requester retry");
+    return 0;
+}
 static void run_background(void)
 {
     for (;;) {
@@ -269,7 +275,7 @@ static void run_background(void)
             if (id == 3) event(POLL_B);
             if (FLOW_CASE != 1 && FLOW_CASE != 4) {
                 if (id == 3) B_serve(event_epoch[id], back_hook);
-                else C_serve(event_epoch[id], 0);
+                else C_serve(event_epoch[id], FLOW_CASE == 7 ? c_hook : 0);
             }
         }
         ma_set_ready(&sched, id, 0, 0);
@@ -286,11 +292,25 @@ void flow_yield(void)
     CHECK("CUI no yield", FLOW_CASE != 3);
     CHECK("raw map no yield", FLOW_CASE != 2);
     CHECK("requester initially excluded", !g_slot[2].trim_pending);
+    if (FLOW_CASE == 6) {
+        CHECK("blocked primary marks before first yield", g_slot[3].trim_pending &&
+              !delivered[3] && !hook_calls);
+        line("blocked primary: secondary ENOSPC marked back before first yield");
+    }
     event(UNLOCK); yields++; event(YIELD_PARK);
     CHECK("front yields once", yields == 1);
     CHECK("front poll park", ma_park_poll(&sched) == MA_OK);
     g_slot[2].state = APP_STATE_WAIT_POLL;
+    if (FLOW_CASE == 7) {
+        sched.focus = 2;
+        ma_set_ready(&sched, 2, 1, 0); /* target break still unread */
+        CHECK("input exception ready includes requester", ma_ready(&sched, &sched.app[0]));
+    }
     run_background();
+    if (FLOW_CASE == 7)
+        CHECK("input exception preserves pending before retry", delivered[3] == 1 &&
+              delivered[4] == 1 && !consumed[3] && !consumed[4] && !hook_calls &&
+              g_slot[3].trim_pending && g_slot[4].trim_pending);
     CHECK("poll resumes after inputs", ma_pick(&sched) == 2);
     CHECK("front model resume", ma_resume(&sched, 2) == MA_OK);
     select_app(2); g_slot[2].state = APP_STATE_RUNNING; event(RESUME_A);
@@ -339,18 +359,28 @@ void _start(void)
     heap_create(&b, 3); roots[2] = b.pd_phys;
     g_slot[2].gui = g_slot[3].gui = 1;
     prep_back();
-    if (FLOW_CASE == 5 || FLOW_CASE == 3) {
+    if (FLOW_CASE == 5 || FLOW_CASE == 3 || FLOW_CASE == 7) {
         heap_create(&c, 4); g_slot[4].gui = 1;
         u32 start = (u32)map_at(PAGE_SIZE, MEM_EXEC_LOAD_ADDR + 2 * PAGE_SIZE, APPMEM_MAP_EXACT); CHECK("C nano primary", start);
         C_init(start, PAGE_SIZE);
     }
     select_app(2);
-    u32 start = (u32)map_at(PAGE_SIZE, MEM_EXEC_LOAD_ADDR + 2 * PAGE_SIZE, APPMEM_MAP_EXACT); CHECK("A nano primary", start);
+    u32 primary_hint = FLOW_CASE == 6 ? MEM_EXEC_HEAP_BASE - 2 * PAGE_SIZE :
+                                       MEM_EXEC_LOAD_ADDR + 2 * PAGE_SIZE;
+    u32 start = (u32)map_at(PAGE_SIZE, primary_hint, APPMEM_MAP_EXACT); CHECK("A nano primary", start);
     A_init(start, PAGE_SIZE);
+    if (FLOW_CASE == 6) {
+        /* flags=0 searches the lower window from its HIGH end. Place the
+         * primary just below that raw map to test an actual EXACT obstacle. */
+        CHECK("raw map blocks primary end", (u32)map_at(PAGE_SIZE, 0, 0) == start + PAGE_SIZE);
+        struct appmem_plan plan;
+        CHECK("primary grow is ENOVA", appmem_prepare(&a.appmem, &a.appmem_layout,
+              PAGE_SIZE, start + PAGE_SIZE, APPMEM_MAP_EXACT, APPMEM_ANON, 0, &plan) == APPMEM_ENOVA);
+    }
     void *old = A_malloc(4000); CHECK("A free list exhausted", old);
     memset(old, 0xa7, 4000); u32 old_crc = crc(old, 4000);
     ma_init(&sched, 4096);
-    for (int id = 2; id <= (FLOW_CASE == 5 || FLOW_CASE == 3 ? 4 : 3); id++) {
+    for (int id = 2; id <= (FLOW_CASE == 5 || FLOW_CASE == 3 || FLOW_CASE == 7 ? 4 : 3); id++) {
         CHECK("model start", ma_start(&sched, 100, 1) == id);
         ma_gui_call(&sched, MA_OP_WAIT); ma_park(&sched);
         g_slot[id].state = APP_STATE_PARKED;
@@ -372,8 +402,24 @@ void _start(void)
     CHECK("no protected callbacks", protected_events == 0);
     CHECK("rollback exercised", rollback_pages > 0);
     CHECK("requester not marked", FLOW_CASE == 5 || !g_slot[2].trim_pending);
-    CHECK("mark target count", appslot_trim_mark_count == marks + (FLOW_CASE == 5 ? 3U : 1U));
-    if (FLOW_CASE == 2 || FLOW_CASE == 3) {
+    CHECK("mark target count", appslot_trim_mark_count == marks + (FLOW_CASE == 5 ? 3U : FLOW_CASE == 7 ? 2U : 1U));
+    if (FLOW_CASE == 7) {
+        CHECK("input exception ENOMEM retry=1", !p && A_nomem() && yields == 1 && A_retries() == 1 &&
+              appslot_trim_done_count == dones && !hook_calls);
+        CHECK("input exception retains allocation", crc(old, 4000) == old_crc);
+        u32 free_before = pgalloc_free_pages();
+        line("A input first: ENOMEM retry=1; B/C pending retained before hooks/DONE");
+        ma_set_ready(&sched, 2, 0, 0);
+        CHECK("front waits after retry", ma_gui_call(&sched, MA_OP_WAIT) == MA_OK && ma_park(&sched) == MA_OK);
+        g_slot[2].state = APP_STATE_PARKED;
+        run_background();
+        CHECK("input exception later DONE and resources", appslot_trim_done_count == dones + 2 &&
+              !g_slot[3].trim_pending && !g_slot[4].trim_pending && hook_calls == 1 && c_hook_calls == 1 &&
+              B_serves() == 2 && C_serves() == 1 && delivered[3] == 1 && delivered[4] == 1 &&
+              consumed[3] == 1 && consumed[4] == 1 && pgalloc_free_pages() > free_before);
+        regrow();
+        line("B/C later DONE: pending cleared, resources returned, DATA retained");
+    } else if (FLOW_CASE == 2 || FLOW_CASE == 3) {
         CHECK("raw CUI ENOMEM no retry", !p && !yields && !A_retries() && (FLOW_CASE == 2 || A_nomem()));
         CHECK("CUI back mark survives", g_slot[3].trim_pending && !delivered[3]);
         if (FLOW_CASE == 3) {
