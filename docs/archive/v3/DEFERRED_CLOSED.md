@@ -171,3 +171,12 @@ X-2 の前半 (e8a の RO 日本語) は `accept_e11/RESULT.md` の GUI 日本�
 | ID | 閉じた項目 | 証拠 |
 |---|---|---|
 | F-5 | f12: 17MB で f12-startup (heap/sbrk_grow/exec_heap 親子/malloc_arena/mem_map)・f12-consumers (CUI 17 本 + GUI 7 本、kill+0・leftover 0、終了時 extent 最大 4/32・副 arena 最大 1)・f12-generation (世代 2 app 拒否・世代 3 起動)。kselftest 288/0。残りは F-14 | `~/os32-tmp/evidence/2026-10-08/accept_f12/RESULT.md` |
+
+## 保守 X-14・X-15・X-16 (2026-10-09、main 8f4d27a)
+
+| ID | 閉じた項目 | 証拠 |
+|---|---|---|
+| X-14 | test_ci_stab の子 report を一時ファイル + os.replace で公開。open 後にパイプで止める決定的な対照で旧形の空読みと新形の完全な公開を固定 | `~/os32-tmp/run/x14/x14_report.md`、全体検査 `~/os32-tmp/run/land_x/check.log` |
+| X-15 | 新 check-kprintf-window: userland/sdk の .c・.inc・.h の kprintf を RING3_ARG_WINDOW 由来の上限 (14) と比べる。248 ファイル・1,143 呼出し、最大 12、非リテラル 0。Rust の kprint! と apps/game は対象外 (X-18) | `~/os32-tmp/run/x15/x15_fix1_report.md`、独立レビュー 2 回 (Approve) |
+| X-16 | cdinst の main を int に (断り 0・失敗 1・成功 0、install.c の流儀)、cdinst_host の終了値対照と変異 2 本。ゲストの `$?` は次の install 受入で見る (F-14 と同じ機会) | `~/os32-tmp/run/x16/x16_report.md`、独立レビュー (Approve) |
+
