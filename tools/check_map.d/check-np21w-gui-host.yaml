@@ -1,5 +1,10 @@
 check-np21w-gui-host:
 - tools/np21w_mcp/gui.py
+- tools/np21w_mcp/gui_desc.py
+- tools/tests/test_gui_desc.py
+- tools/tests/os32api_host.py
+- userland/gshell/**
+- sdk/rust/os32api/**
 - tools/np21w_mcp/server.py
 - tools/gui_gate.py
 - tools/h3_park_resume.py

@@ -48,9 +48,10 @@ class McpTests(unittest.TestCase):
         def get(path):
             self.assertEqual(path,'/api/status')
             return b'{"grph_disp":1,"scrn_ymax":480}',{}
-        g=gui.Gui(gui.Transport(post=lambda p,d:calls.append((p,d)),get=get,clock=Clock()))
+        g=gui.Gui(gui.Transport(post=lambda p,d:calls.append((p,d)),get=get,clock=Clock()),
+                  descriptor=gui.NO_DESCRIPTOR)
         state={'kernel':[{'owner':i,'state':0} for i in range(2,6)],'slots':[],
-               'version':1,'windows':[],'front':None}
+               'version':1,'windows':[],'front':0}
         sequence=[state,dict(state,kernel=[{'owner':i,'state':2 if i==4 else 0} for i in range(2,6)])]
         g.wm_state=lambda: sequence.pop(0) if sequence else state
         g.screen_text=lambda **kw: {'lines':['PASS'],'unknown_count':0,'path':kw.get('path')}

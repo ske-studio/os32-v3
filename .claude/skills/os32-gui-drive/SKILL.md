@@ -45,8 +45,9 @@ v1 の返り値は `owner` と `slot:null`。**owner と SHM slot の添字を�
 
 ## 観測・待ち・証拠
 
-- `emu_gui_state`: v1 の `slots[]` は SHM 0..3、`kernel[]` は owner 1..5、
-  `counters` は trim の値。窓・前景は v2 記述子があるときだけ埋まる。
+- `emu_gui_state`: `slots[]` は v1/v2 とも SHM 0..3、`kernel[]` は owner 1..5、
+  `counters` は trim の値。v2 は窓と `wm_slots[]` (used slot の owner 表) を追加する。
+  `front` は前景 owner、無ければ 0。窓 ID とは区別する。
 - `emu_consink`: GUI 中の fixture 出力の第一の読み口。
   前回の `since` (head 位置) を渡すと差分。`lost:true` はその位置が保持されていない。
   リング 1 周やリセットを読み逃すと位置だけでは検出できない。短い区間で採取し、
@@ -105,4 +106,6 @@ CUI の設定操作で `GUI=1` に書き戻す (既存の設定値を保つ)。
 ELF の既定は本体 `~/os32-v3/build/out/kernel.elf` と `~/os32-v3/userland/gshell.elf`。
 `OS32_KERNEL_ELF` / `OS32_GSHELL_ELF` (または Gui の引数) で差し替える。
 番地は毎回 nm -S で引く。実行中のゲストに対応する ELF を指定する。
-v2 差し込み口は `gui_desc.wm_state(gui)`。記述子が無ければ v1、読取り異常は隠さない。
+v2 差し込み口は `gui_desc.wm_state(gui)`。読み手の不在・読取り異常は
+`version:1` に後退し、`v2_error` に理由を残す。v2 が必要な受入では
+`version:2` と `v2_error` が無いことを確認する。

@@ -20,6 +20,7 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parents[2]
 BASE = os.environ.get("NP21W_AIDEBUG_URL", "http://127.0.0.1:8025")
+NO_DESCRIPTOR = object()  # Explicit v1 observation, without importing gui_desc.
 
 
 class Transport:
@@ -373,6 +374,11 @@ class Gui:
                 self.symbol_factory(self.gshell_elf).read())
 
     def wm_state(self):
+        """Return SHM slots and kernel owners; front is the foreground owner or 0.
+
+        v2 adds windows and wm_slots without replacing SHM slots. Reader
+        failures retain v1 observations and their reason in v2_error.
+        """
         kernel, shell = self.symbols()
         mem = c_constants(ROOT / 'include/memmap.h', {'__bss_end': kernel['__bss_end'][0]})
         app = c_constants(ROOT / 'exec/appslot.h')
@@ -395,21 +401,24 @@ class Gui:
                                 'appslot_trim_done_reject_count', 'appslot_trim_pages_total')}
         counters.update({name: self.word(shell[name][0]) for name in
                          ('gshell_trim_delivered', 'gshell_trim_skipped_full')})
-        result = {'front': None, 'windows': [], 'slots': slots,
+        result = {'front': 0, 'windows': [], 'slots': slots,
                   'kernel': owners, 'counters': counters, 'version': 1}
         descriptor = self.descriptor
-        if descriptor is None:
-            # gtool2 owns the module. Only its absence falls back to v1;
-            # a broken descriptor must not silently masquerade as success.
-            name = (__package__ + '.gui_desc') if __package__ else 'gui_desc'
-            try:
+        if descriptor is NO_DESCRIPTOR:
+            return result
+        try:
+            if descriptor is None:
+                name = (__package__ + '.gui_desc') if __package__ else 'gui_desc'
                 descriptor = importlib.import_module(name)
-            except ModuleNotFoundError as exc:
-                if exc.name != name:
-                    raise
-        if descriptor is not None:
-            result.update(descriptor.wm_state(self))
-            result['version'] = 2
+            state = dict(descriptor.wm_state(self))
+            state['wm_slots'] = state.pop('slots')
+        except Exception as exc:
+            # This optional reader boundary also covers import, ELF and I/O
+            # failures. Keep the already collected v1 data visibly downgraded.
+            result['v2_error'] = '%s: %s' % (type(exc).__name__, exc)
+            return result
+        result.update(state)
+        result['version'] = 2
         return result
 
     def launch(self, path, timeout=60, fallback=False):
@@ -472,7 +481,7 @@ class Gui:
         last = waited['last']
         result = {'ok': True, 'owner': owner, 'slot': None, 'last': last}
         if last['version'] == 2:
-            matches = [s for s in last['slots'] if s.get('owner') == owner and s.get('used')]
+            matches = [s for s in last['wm_slots'] if s.get('owner') == owner and s.get('used')]
             if len(matches) == 1:
                 result['slot'] = matches[0]['slot']
                 windows = [w for w in last['windows'] if w.get('owner') == owner]

@@ -20,6 +20,7 @@ import urllib.parse
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from tools.np21w_mcp import gui
+from tools.np21w_mcp import gui_desc
 from PIL import Image
 
 SRC = ROOT / "tools/np21w_mcp/gui.py"
@@ -135,7 +136,8 @@ class GuiTests(unittest.TestCase):
         self.guard.start()
         self.addCleanup(self.guard.stop)
         self.http = Http()
-        self.g = gui.Gui(self.http.transport(), 'kernel', 'shell', symbols)
+        self.g = gui.Gui(self.http.transport(), 'kernel', 'shell', symbols,
+                         descriptor=gui.NO_DESCRIPTOR)
 
     def test_coordinates_heights_and_bounds(self):
         for status, height in (({'scrn_ymax': 400, 'grph_disp': 1}, 400),
@@ -197,7 +199,7 @@ class GuiTests(unittest.TestCase):
         base = setup_state(self.http)
         result = self.g.wm_state()
         self.assertEqual(result['version'], 1)
-        self.assertEqual(result['front'], None)
+        self.assertEqual(result['front'], 0)
         self.assertEqual(result['windows'], [])
         self.assertEqual([s['slot'] for s in result['slots']], [0, 1, 2, 3])
         self.assertEqual(result['slots'][2], {'slot': 2, 'proto_version': 1, 'flags': 2,
@@ -209,18 +211,78 @@ class GuiTests(unittest.TestCase):
         self.assertIn('/api/mem?addr=0x%x&len=16&space=phys' % base, self.http.reads)
         calls = []
         self.g.descriptor = types.SimpleNamespace(wm_state=lambda observer: calls.append(observer) or
-            {'front': 91, 'windows': [{'id':91, 'owner':4, 'title':'demo'}],
+            {'front': 4, 'windows': [{'id':91, 'owner':4, 'title':'demo'}],
              'slots': [{'slot':0, 'owner':4, 'used':True}]})
-        self.assertEqual(self.g.wm_state()['version'], 2)
+        v2 = self.g.wm_state()
+        self.assertEqual(v2['version'], 2)
+        self.assertEqual(v2['front'], 4)
+        self.assertEqual(v2['slots'], result['slots'])
+        self.assertEqual(v2['wm_slots'], [{'slot':0, 'owner':4, 'used':True}])
         self.assertEqual(calls, [self.g])
+
+    def test_descriptor_failures_retain_v1_and_reason(self):
+        setup_state(self.http)
+        baseline = self.g.wm_state()
+        for error in (gui_desc.DescriptorError('invalid magic'), OSError('read failed')):
+            self.g.descriptor = types.SimpleNamespace(wm_state=lambda observer: None)
+            with patch.object(self.g.descriptor, 'wm_state', side_effect=error):
+                actual = self.g.wm_state()
+            self.assertEqual(actual.pop('v2_error'), '%s: %s' % (type(error).__name__, error))
+            self.assertEqual(actual, baseline)
+        self.g.descriptor = None
+        with patch.object(gui.importlib, 'import_module', side_effect=ModuleNotFoundError('no reader')):
+            actual = self.g.wm_state()
+        self.assertIn('no reader', actual.pop('v2_error'))
+        self.assertEqual(actual, baseline)
+        self.g.descriptor = gui.NO_DESCRIPTOR
+        with patch.object(gui.importlib, 'import_module', side_effect=AssertionError('v1 must not import')):
+            self.assertEqual(self.g.wm_state(), baseline)
+
+    def test_v2_real_descriptor_fixture(self):
+        # Reuse the roundtrip image compiled from actual gshell Rust types.
+        from tools.tests import test_gui_desc as fixture
+        setup_state(self.http)
+        baseline = self.g.wm_state()
+        with tempfile.TemporaryDirectory(prefix='gui-integration-') as temp:
+            out = Path(temp)
+            rlib = fixture.os32api_host.build(out)
+            exe, table, blobs, read = fixture.build_fixture(fixture.GSHELL, out, rlib)
+            fixture.roundtrip(exe, table, blobs, read)
+            original_mem = self.g.mem
+            def memory(address, size):
+                if any(start <= address < start + length for start, length in table.values()):
+                    return read(address, size)
+                return original_mem(address, size)
+            self.g.mem = memory
+            self.g.gshell_elf = exe
+            # v1 counters keep their synthetic shell symbols; the v2 reader
+            # independently resolves the fixture ELF with its own real nm.
+            self.g.symbol_factory = lambda path: symbols('shell' if path == exe else path)
+            self.g.descriptor = None  # Exercise automatic import and the real adapter.
+            actual = self.g.wm_state()
+            self.assertEqual(actual['version'], 2)
+            self.assertNotIn('v2_error', actual)
+            self.assertEqual(actual['front'], fixture.EXPECTED['front'])
+            self.assertEqual(actual['windows'], fixture.EXPECTED['windows'])
+            self.assertEqual(actual['trim_sent'], fixture.EXPECTED['trim_sent'])
+            self.assertEqual(actual['wm_slots'], [dict(s, slot=s['n'], used=True)
+                                                for s in fixture.EXPECTED['slots']])
+            for key in ('slots', 'kernel', 'counters'):
+                self.assertEqual(actual[key], baseline[key])
+            blobs['desc'] = b'\0' * len(blobs['desc'])
+            rejected = self.g.wm_state()
+            self.assertIn('DescriptorError: descriptor magic mismatch', rejected.pop('v2_error'))
+            self.assertEqual(rejected, baseline)
 
     def states(self, sequence, version=1):
         sequence = list(sequence)
         def observe():
             state = sequence.pop(0) if len(sequence) > 1 else sequence[0]
             return {'version': version, 'kernel': [{'owner':i, 'state':state if i == 4 else 0} for i in range(2,6)],
-                    'slots': [{'slot':0, 'used':True, 'owner':4}] if version == 2 else [],
-                    'windows': [{'id':91, 'owner':4, 'title':'demo'}] if version == 2 and state != 0 else [], 'front':None}
+                    'slots': [],
+                    'wm_slots': [{'slot':0, 'used':True, 'owner':4}] if version == 2 else [],
+                    'windows': [{'id':91, 'owner':4, 'title':'demo'}] if version == 2 and state != 0 else [],
+                    'front':4 if version == 2 and state != 0 else 0}
         self.g.wm_state = observe
 
     def test_launch_success_owner_not_shm(self):
@@ -448,6 +510,9 @@ def mutate():
         ("'slot': None, 'last': last", "'slot': owner - 2, 'last': last", 'test_launch_success_owner_not_shm'),
         ("'ok': False, 'last': last", "'ok': True, 'last': last", 'test_wait_mem_timeout_last_and_success'),
         ('owner * stride', 'owner * 4', 'test_state_symbols_stride_and_separate_tables'),
+        ("'front': 0, 'windows': []", "'front': None, 'windows': []", 'test_state_symbols_stride_and_separate_tables'),
+        ("state['wm_slots'] = state.pop('slots')", "state['wm_slots'] = state['slots']", 'test_state_symbols_stride_and_separate_tables'),
+        ("result['v2_error'] = '%s: %s' % (type(exc).__name__, exc)", "result['v2_error'] = ''", 'test_descriptor_failures_retain_v1_and_reason'),
         ("glyphs.get(signature, '') + chr(code)", "chr(code)", 'test_runtime_collision_groups_and_screen_regex'),
         ("elif len(candidates) > 1:", "elif False:", 'test_runtime_collision_groups_and_screen_regex'),
     ]
