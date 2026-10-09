@@ -42,5 +42,5 @@ def main():
         if args.mutate:
             for m in MUTATIONS:
                 r=run(m);assert r.returncode==101 and m[4] in r.stdout,(m[0],r.stdout,r.stderr)
-                print('RED '+m[0])
+                print('RED '+m[0]+' rc=101 -> '+m[4])
 if __name__=='__main__':main()

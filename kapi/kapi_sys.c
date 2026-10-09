@@ -22,6 +22,9 @@ STATIC_ASSERT(sizeof(MemStat) == 132, memstat_size);
 STATIC_ASSERT(__builtin_offsetof(MemStat, extents_total) == MEMSTAT_MIN, memstat_min);
 STATIC_ASSERT(__builtin_offsetof(MemStat, img_end) == 80, memstat_layout);
 STATIC_ASSERT(__builtin_offsetof(MemStat, load_addr) == 96, memstat_slot);
+STATIC_ASSERT(__builtin_offsetof(MemStat, pressure_epoch) == 120, memstat_pressure_epoch);
+STATIC_ASSERT(__builtin_offsetof(MemStat, trim_pending_mask) == 124, memstat_trim_pending_mask);
+STATIC_ASSERT(__builtin_offsetof(MemStat, trim_epoch) == 128, memstat_trim_epoch);
 
 /* The generated wrapper validates the entire output first. Snapshot and
  * copyout never yield, call USER code, or switch AS. Only snapshot holds IF. */

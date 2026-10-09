@@ -50,7 +50,7 @@ def main():
                 assert source.count(old)==1,old
                 result=run(source.replace(old,new))
                 assert result.returncode==101 and expected in result.stdout,(expected,result.stdout,result.stderr)
-                print('RED '+expected)
+                print('RED '+expected+' rc=101 -> '+expected)
             print(f'PASS {len(MUTATIONS)} runtime mutants')
     return 0
 if __name__=='__main__': raise SystemExit(main())

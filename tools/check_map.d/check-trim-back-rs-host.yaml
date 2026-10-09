@@ -85,3 +85,4 @@ check-trim-back-rs-host:
 - sdk/rust/os32api/**
 - sdk/rust/i686-os32-none.json
 - rust-toolchain.toml
+- tools/tests/trim_focus_host.rs

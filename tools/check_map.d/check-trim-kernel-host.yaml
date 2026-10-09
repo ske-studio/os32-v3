@@ -65,3 +65,5 @@ check-trim-kernel-host:
 - tools/tests/test_trim_kernel.py
 - tools/tests/trim_kernel_host.c
 - userland/shell/cmd_sys.c
+- userland/gshell/src/trim.rs
+- userland/rust/trim_back_rs/src/cache.rs

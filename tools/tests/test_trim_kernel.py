@@ -5,6 +5,8 @@ The shared f9/f13 fixture simulates MMU/IRQ and external resource side effects.
 """
 import argparse
 import pathlib
+import re
+import struct
 import subprocess
 import tempfile
 
@@ -20,6 +22,17 @@ TARGET_SRCS = base.TARGET_SRCS + [
 
 # Each substitution applies to exactly one product input, never the assertions.
 MUTANTS = [
+    ('fallback-removed', 'exec/exec_heap.c',
+     'if (rc) {\n            if (appmem_map(as, &as->appmem, &as->appmem_layout, bytes, 0,',
+     'if (rc) {\n            return 0;\n            if (appmem_map(as, &as->appmem, &as->appmem_layout, bytes, 0,',
+     'TOPDOWN 16 pages'),
+    ('saturation-stops-mark', 'exec/appslot.c',
+     'if (appslot_trim_epoch != ~(u32)0) appslot_trim_epoch++;',
+     'if (appslot_trim_epoch == ~(u32)0) return;\n    appslot_trim_epoch++;',
+     'epoch saturation'),
+    ('mark-excludes-wait-poll', 'exec/appslot.c',
+     'a->state != APP_STATE_WAIT_KEY &&\n            a->state != APP_STATE_WAIT_POLL',
+     'a->state != APP_STATE_WAIT_KEY', 'back states marked'),
     ('enova-marks', 'exec/appmem_map.c',
      'int rc = appmem_prepare(table, layout, bytes, hint, map_flags, kind, extent_flags, &plan);\n    if (rc) return rc;',
      'int rc = appmem_prepare(table, layout, bytes, hint, map_flags, kind, extent_flags, &plan);\n    if (rc) { if (rc == APPMEM_ENOVA) appslot_trim_request_as(as); return rc; }',
@@ -116,6 +129,40 @@ def execute(tmp, sources, runner):
                       timeout=host32.RUN_TIMEOUT)
 
 
+
+def memstat_wire_layout(tmp, header):
+    """Compile the real ILP32 header; read compiler-emitted offsetof values."""
+    (tmp / 'os32_kapi_shared.h').write_text(header)
+    fields = ('pressure_epoch', 'trim_pending_mask', 'trim_epoch', 'flags',
+              'extents[1]', 'extents[3]', 'extents[4]', 'exec_heap_cur_end',
+              'exec_heap_base', 'exec_heap_size')
+    values = ['sizeof(MemStat)'] + [f'__builtin_offsetof(MemStat, {f})' for f in fields]
+    src, obj, raw = tmp / 'layout.c', tmp / 'layout.o', tmp / 'layout.bin'
+    src.write_text('#include "os32_kapi_shared.h"\n'
+                   'const u32 layout[] = {' + ', '.join(values) + '};\n')
+    host32.build(['gcc', '-m32', '-std=gnu11', '-Werror', '-I' + str(ROOT / 'sdk/include/os32'), '-c', str(src),
+                  '-o', str(obj)], check=True, capture_output=True, text=True)
+    subprocess.run(['objcopy', '--dump-section', f'.rodata={raw}', str(obj)],
+                   check=True, capture_output=True, text=True)
+    layout = struct.unpack('<' + 'I' * len(values), raw.read_bytes())
+    trim = (ROOT / 'userland/gshell/src/trim.rs').read_text()
+    cache = (ROOT / 'userland/rust/trim_back_rs/src/cache.rs').read_text()
+    def constant(source, name):
+        return int(re.search(r'const ' + name + r': usize = (\d+)', source)[1])
+    expected = (constant(trim, 'MEMSTAT_SIZE'), 120,
+                constant(trim, 'PENDING_OFFSET'), constant(trim, 'EPOCH_OFFSET'),
+                *(4 * constant(cache, name) for name in
+                  ('FLAGS', 'INITIAL', 'ARENA', 'LARGE', 'CUR', 'EXEC_BASE', 'EXEC_SIZE')))
+    # WORDS is expressed as bytes / 4 in the fixture.
+    words = re.search(r'const WORDS: usize = (\d+) / 4;', cache)
+    assert words and int(words[1]) == layout[0], 'fixture MemStat size'
+    if layout != expected:
+        print(f'FAIL: MemStat wire offsets: header={layout} consumers={expected}')
+        return 1
+    print('PASS: MemStat wire offsets size=132 pressure=120 pending=124 epoch=128; Rust fixture fields match')
+    return 0
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--mutate', action='store_true')
@@ -127,6 +174,15 @@ def main():
     sources = {name: (ROOT / name).read_text() for name in paths}
     with tempfile.TemporaryDirectory(prefix='trim-kernel-') as directory:
         tmp = pathlib.Path(directory)
+        header = (ROOT / 'sdk/include/os32/os32_kapi_shared.h').read_text()
+        assert memstat_wire_layout(tmp, header) == 0
+        if args.mutate:
+            old = 'u32 pressure_epoch, trim_pending_mask;'
+            assert header.count(old) == 1
+            rc = memstat_wire_layout(tmp, header.replace(old, 'u32 trim_pending_mask, pressure_epoch;'))
+            assert rc != 0, 'MemStat field swap survived'
+            print(f'RED: memstat-pressure-pending-swapped rc={rc} -> FAIL: MemStat wire offsets')
+        (tmp / 'os32_kapi_shared.h').write_text(header)
         control = execute(tmp, sources, args.runner)
         print(control.stdout, end='')
         assert control.returncode == 0, (control.returncode, control.stdout, control.stderr)
@@ -138,7 +194,7 @@ def main():
                 result = execute(tmp, changed, args.runner)
                 assert result.returncode == 1 and 'FAIL: ' + label + '\n' in result.stdout, (
                     name, result.returncode, result.stdout, result.stderr)
-                print('RED:', name)
+                print('RED:', name, 'rc=1 -> FAIL: ' + label)
     return 0
 
 

@@ -17,7 +17,14 @@ static void finish(int rc)
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc));
     __builtin_unreachable();
 }
-#define REQUIRE(x) do { if (!(x)) finish(1); } while (0)
+static void fail(const char *message)
+{
+    unsigned len = 0;
+    while (message[len]) len++;
+    __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(message), "d"(len));
+    finish(1);
+}
+#define REQUIRE(x) do { if (!(x)) fail("FAIL: " #x "\n"); } while (0)
 static int contains(const char *s, const char *part)
 {
     for (; *s; s++) {

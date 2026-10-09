@@ -572,13 +572,27 @@ def one_mutation(item):
         if regen:
             subprocess.run([sys.executable, "-B", "sdk/gen_kapi.py"],
                            cwd=str(tree), check=True, capture_output=True)
-        rc = subprocess.run(
+        result = subprocess.run(
             [sys.executable, "-B", str(tree / SELF)],
-            cwd=str(tree), capture_output=True, timeout=600).returncode
+            cwd=str(tree), capture_output=True, timeout=600)
+        rc = result.returncode
+        if name == "generation-held":
+            expected = b"FAIL: OS32_SHLIB_PROTOCOL == 2"
+            if rc == 0 or expected not in result.stdout:
+                return "MUTATE generation-held ERROR (runtime predicate missing)", 1
+            return f"MUTATE generation-held runtime RED rc={rc} -> " + expected.decode(), 0
     if rc == 0:
         return ("MUTATE %-26s **GREEN のまま = 試験が規則を見ていない**" % name,
                 1)
-    return "MUTATE %-26s RED (期待どおり落ちた)" % name, 0
+    lines = result.stdout.decode(errors='replace').splitlines()
+    failures = [line for line in lines if 'FAIL' in line]
+    # Keep compile/link failures separate from executed semantic assertions.
+    build_failures = [line for line in failures if any(word in line for word in
+                      ('コンパイル', 'リンクできる', '組める'))]
+    classification = 'compile/link error' if build_failures else 'runtime RED'
+    if not failures:
+        return "MUTATE %-26s ERROR (no assertion failure)" % name, 1
+    return "MUTATE %-26s %s rc=%d -> %s" % (name, classification, rc, failures[0].strip()), 0
 
 
 def run_mutations():

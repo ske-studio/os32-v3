@@ -206,9 +206,9 @@ def main():
                 result = execute(tmp, cc, objects, case, args.runner)
                 assert result.returncode == 1 and 'FAIL: ' + label in result.stdout.splitlines(), (
                     name, result.returncode, result.stdout, result.stderr)
-                print('RED: ' + name + ' -> ' + label)
+                print('RED: ' + name + ' rc=1 -> FAIL: ' + label)
             print(f'trim flow: {len(MUTANTS)} runtime RED / 0 survived / 0 ERROR')
-    test_trim_fixtures.run()
+    test_trim_fixtures.run(args.mutate)
     g3fix_wm_probe.run()
     return 0
 
