@@ -46,7 +46,7 @@ MINI = ROOT / "tools/tests/ext2_mini_host.c"
 
 PURE_CASES = ["classify817", "classify1663", "paths", "bootfiles", "blocks", "space", "iplpt"]
 CDI_CASES = ["ok817", "ok1663", "modes", "preflight", "incomplete", "paths", "final",
-             "erase", "erase_fail", "erase_mount", "keys"]
+             "erase", "erase_fail", "erase_mount", "keys", "exit_status"]
 INS_CASES = ["nokernel", "precheck", "boot_fail", "sync_fail", "geom817", "geom1663",
              "modes", "preflight", "incomplete", "rerun", "erase", "erase_fail", "erase_mount"]
 MAX_IMAGE = 508 * 1024
@@ -367,6 +367,13 @@ def build_target(tmp):
 
 # ---- 否定側: (ファイル, 前, 後, 説明) -------------------------------------------
 MUTATIONS = [
+    ("userland/system/cdinst.c",
+     'println(COL_NORMAL, "Installation cancelled. Nothing was written.");\n            boot_img_free(&boot);\n            return 0;',
+     'println(COL_NORMAL, "Installation cancelled. Nothing was written.");\n            boot_img_free(&boot);\n            return 1;', "decline-nonzero"),
+    ("userland/system/cdinst.c",
+     "if (preflight(choice, &boot, &tgt) != 0) return 1;",
+     "if (preflight(choice, &boot, &tgt) != 0) return 0;", "failure-zero"),
+
     ("userland/system/inst_hdd.c",
      "if (api->ide_write_sectors(INST_DRIVE, 0, 0, NULL) != 0)",
      "if (0)", "installer ignores disk authorization denial"),
@@ -455,9 +462,9 @@ MUTATIONS = [
     ("userland/system/cdinst.c",
      "    if (ret != PKG_OK) inst_hdd_incomplete(api, \"package installation failed\", ret);",
      "    (void)ret;", "追加パッケージの失敗を INCOMPLETE にしない"),
-    ("userland/system/cdinst.c", "    boot_img_free(&boot);\n    if (ret != 0) return;",
+    ("userland/system/cdinst.c", "    boot_img_free(&boot);\n    if (ret != 0) return 1;",
      "    boot_img_free(&boot);\n    (void)ret;", "IPL の失敗の後も展開する"),
-    ("userland/system/cdinst.c", "    if (preflight(choice, &boot, &tgt) != 0) return;",
+    ("userland/system/cdinst.c", "    if (preflight(choice, &boot, &tgt) != 0) return 1;",
      "    (void)preflight(choice, &boot, &tgt);", "事前検査の失敗でも書く"),
     ("userland/system/install.c", "    if (measure_need(sizes[MEDIA_KERNEL], &need) != 0) {",
      "    if (measure_need(sizes[MEDIA_KERNEL], &need) != 0 && 0) {", "FD の列挙の失敗を書く前に見ない"),
@@ -656,12 +663,12 @@ MUTATIONS = [
      "        ih_host_hint(api);\n        (void)0;\n    }\n    api->kprintf(ATTR_GREEN, \"%s\", \"  Partition table written and verified.\\n\");",
      "区画表の書き込みの失敗の後もマウントしに行く"),
     # 呼び手 (cdinst / install)
-    ("userland/system/cdinst.c", "    if (inst_hdd_ask_erase(api, &tgt) != 0) {\n        boot_img_free(&boot);\n        return;\n    }",
+    ("userland/system/cdinst.c", "    if (inst_hdd_ask_erase(api, &tgt) != 0) {\n        boot_img_free(&boot);\n        return 0;\n    }",
      "    (void)inst_hdd_ask_erase(api, &tgt);", "cdinst が ERASE でない入力でも先へ進む (消す)"),
     ("userland/system/cdinst.c", "    if (inst_hdd_ask_erase(api, &tgt) != 0) {", "    if (0) {",
      "cdinst が ERASE を聞かずに消す"),
     ("userland/system/cdinst.c",
-     "            println(COL_NORMAL, \"Installation cancelled. Nothing was written.\");\n            boot_img_free(&boot);\n            return;",
+     "            println(COL_NORMAL, \"Installation cancelled. Nothing was written.\");\n            boot_img_free(&boot);\n            return 0;",
      "            println(COL_NORMAL, \"Installation cancelled. Nothing was written.\");",
      "cdinst が N でも書く"),
     ("userland/system/install.c", "    if (inst_hdd_ask_erase(api, &tgt) != 0) goto end;",
