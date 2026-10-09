@@ -1,6 +1,8 @@
 check-kprintf-window:
 - userland/**
 - sdk/**
+- sdk/rust/**/*.rs
+- userland/**/*.rs
 - exec/exec.c
 - exec/exec_kapi_init.inc
 - tools/check_kprintf_window.py
