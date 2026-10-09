@@ -826,7 +826,11 @@ int main(int argc, char **argv)
                 # no executable descendant may remain after killpg.
                 for _ in range(100):
                     status = pathlib.Path('/proc', pid, 'stat')
-                    if not status.exists() or status.read_text().split()[2] == 'Z':
+                    try:
+                        if status.read_text().split()[2] == 'Z':
+                            break
+                    except (FileNotFoundError, ProcessLookupError):
+                        # exists() と read の間に回収されることがある (2026-10-09 の全体検査で ProcessLookupError)
                         break
                     time.sleep(.01)
                 else:
