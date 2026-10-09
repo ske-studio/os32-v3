@@ -78,6 +78,8 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 | X-4 | 検査の整理の残り: ci-stab2 の P2-B の後の全体 check-changed と native の記録、6 時間超の対照の刈り取り、pending の 1 時間回収、生き残る弱い変異、f5a の full 候補検査に残る 5 SKIP、`net_link` の TMPDIR 長、選択の取りこぼし 3 種 | 既知の制限 | 3551、3627、3705、3740、3754–3768、3776、3800–3807、3828–3832 |
 | X-6 | `tools/tvdump_recv.py` は名前付きパイプ前提で今の NP21/W に接続できない → `/api/cmd` で生バイトを取り TVDM の長さ・寸法・内容を照合する形に (計画 3 番、受入索引と同枠) | 道具の不具合 | — |
 | X-11 | 監査分類 (`~/os32-tmp/evidence/2026-10-07/audit-classification.md`) の「意味変更 (e11c)」のうち pipe (E11-8) を除く 12 件 — IME 9 本 (trygetchar/toggle/set_mode/switch_dict/user_delete/user_export/user_clear/trygetkey/feed_key)・exec_last_result・gui_call・con_sink_read の授権/本人別の契約 → **T4 の設計票で扱う (ユーザー決定 2026-10-07)** | 契約の整理 | 分類表 :33/:43-55/:57/:60 |
+| X-19 | GUI 受入の道具 (gtool1/gtool2、2026-10-09 着地) の live 確認: `emu_gui_state` の v1/v2 (gshell 記述子、gshell.bin の配備が要る)・`emu_gui_launch`・`emu_screen_text` (実ゲストの ANK キャッシュ)・`emu_consink`・`emu_wait_*` を実ゲストで。手順は `~/os32-tmp/run/tool/s1/gtool1_report.md`・`s2/gtool2_report.md` の「PM の live 手順」→ **次の GK (GK-3 再受入・GK-4) で一緒に** | 未実施の確認 | — |
+| X-20 | gtool1 再レビューの P3: (N1) OCR の読めないセルと本物の `?` が文字列上で区別できず `\?`/`.` が一致する — 読めないセルにも私用文字を割り当て一致させない、(N2) `emu_gui_launch` の待ちの間に出た印を既定の `wait_text` が見逃す — launch の返り値に送信前の consink head を載せる。gtool2 レビューの P3 (G2-4 i686 記述子の照合を check に、G2-5 動いている像と ELF の照合) | 道具の改善 | — |
 
 
 ## 6. SKIP の登録 (ここにあるものだけを「延期」と数える)
