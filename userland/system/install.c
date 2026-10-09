@@ -591,7 +591,11 @@ int __cdecl main(int argc, char **argv, KernelAPI *api)
         goto end;
     }
     /* 表が使えないディスクは y の後に ERASE の打鍵 (受けなければ何も書かない) */
-    if (inst_hdd_ask_erase(api, &tgt) != 0) goto end;
+    if (inst_hdd_ask_erase(api, &tgt) != 0) {
+        api->kprintf(ATTR_WHITE, "%s", "Installation aborted. Nothing was written.\n");
+        rc = 0;
+        goto end;
+    }
 
     /* === Phase 1: (ERASE なら LBA 0/1 の消去 →) ext2 → 区画表 → 読み戻し →
      * マウント (R3-1) === */

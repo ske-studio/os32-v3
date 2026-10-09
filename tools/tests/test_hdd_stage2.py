@@ -367,6 +367,20 @@ def build_target(tmp):
 
 # ---- 否定側: (ファイル, 前, 後, 説明) -------------------------------------------
 MUTATIONS = [
+    # X-17 / X-16 R2: 断りは 0、実際の失敗は非 0。
+    ("userland/system/install.c",
+     '    if (inst_hdd_ask_erase(api, &tgt) != 0) {\n        api->kprintf(ATTR_WHITE, "%s", "Installation aborted. Nothing was written.\\n");\n        rc = 0;\n        goto end;\n    }',
+     '    if (inst_hdd_ask_erase(api, &tgt) != 0) {\n        api->kprintf(ATTR_WHITE, "%s", "Installation aborted. Nothing was written.\\n");\n        rc = 1;\n        goto end;\n    }',
+     "install-erase-decline-nonzero"),
+    ("userland/system/cdinst.c",
+     "    if (inst_hdd_ask_erase(api, &tgt) != 0) {\n        boot_img_free(&boot);\n        return 0;\n    }",
+     "    if (inst_hdd_ask_erase(api, &tgt) != 0) {\n        boot_img_free(&boot);\n        return 1;\n    }", "cdinst-erase-decline-nonzero"),
+    ("userland/system/cdinst.c",
+     "    if (inst_hdd_prepare(api, &tgt) != 0) {\n        boot_img_free(&boot);\n        return 1;\n    }",
+     "    if (inst_hdd_prepare(api, &tgt) != 0) {\n        boot_img_free(&boot);\n        return 0;\n    }", "cdinst-prepare-failure-zero"),
+    ("userland/system/cdinst.c",
+     '            inst_hdd_incomplete(api, "cannot create the directories", mr);\n            return 1;',
+     '            inst_hdd_incomplete(api, "cannot create the directories", mr);\n            return 0;', "cdinst-mkdir-failure-zero"),
     ("userland/system/cdinst.c",
      'println(COL_NORMAL, "Installation cancelled. Nothing was written.");\n            boot_img_free(&boot);\n            return 0;',
      'println(COL_NORMAL, "Installation cancelled. Nothing was written.");\n            boot_img_free(&boot);\n            return 1;', "decline-nonzero"),
@@ -671,14 +685,13 @@ MUTATIONS = [
      "            println(COL_NORMAL, \"Installation cancelled. Nothing was written.\");\n            boot_img_free(&boot);\n            return 0;",
      "            println(COL_NORMAL, \"Installation cancelled. Nothing was written.\");",
      "cdinst が N でも書く"),
-    ("userland/system/install.c", "    if (inst_hdd_ask_erase(api, &tgt) != 0) goto end;",
-     "    (void)inst_hdd_ask_erase(api, &tgt);", "install が ERASE でない入力でも先へ進む (消す)"),
-    ("userland/system/install.c", "    if (inst_hdd_ask_erase(api, &tgt) != 0) goto end;\n", "",
+    ("userland/system/install.c", "    if (inst_hdd_ask_erase(api, &tgt) != 0) {",
+     "    if (inst_hdd_ask_erase(api, &tgt) != 0 && 0) {",
+     "install が ERASE でない入力でも先へ進む (消す)"),
+    ("userland/system/install.c", "    if (inst_hdd_ask_erase(api, &tgt) != 0) {", "    if (0) {",
      "install が ERASE を聞かずに消す"),
-    ("userland/system/install.c",
-     "        api->kprintf(ATTR_WHITE, \"%s\", \"Installation aborted. Nothing was written.\\n\");\n        rc = 0;\n        goto end;",
-     "        api->kprintf(ATTR_WHITE, \"%s\", \"Installation aborted. Nothing was written.\\n\");\n        rc = 0;",
-     "install が N でも書く"),
+    ("userland/system/install.c", "    if (!confirm_install()) {",
+     "    if (!confirm_install() && 0) {", "install が N でも書く"),
     # y/N の読みは inst_hdd_getkey_after_key (選択 [0-3] の getkey は数字以外を読み飛ばすので、
     # 旧の鍵読みに替えても区別できない — y/N の側に当てる)
     ("userland/system/cdinst.c", "        int k = inst_hdd_getkey_after_key(api);",

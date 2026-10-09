@@ -1805,12 +1805,14 @@ static void case_erase(void)
                 keys_gap = i % 3;
                 /* y の行末を付ける (y の後の最初の行末は y のものとして読み捨てる) */
                 keys_line(((i >> 1) & 1) ? "y\n" : "y\r\n", &not_erase[i]);
-                CHECK(run() == 1);
+                CHECK(run() == 0);
                 CHECK_NOTHING_WRITTEN();
                 CHECK(memcmp(keep, disk, sizeof(keep)) == 0);
                 check_erase_screen(kind);
                 CHECK_STR("Type ERASE:");
                 CHECK_STR("Not erased. Nothing was written.");
+                CHECK_STR("Installation aborted. Nothing was written.");
+                CHECK_NOSTR("[FAIL]");
                 CHECK_BEFORE("Do you want to proceed?", "Type ERASE:");
                 CHECK_NOSTR("INCOMPLETE");
                 CHECK_NOSTR("erased and verified");
@@ -1876,10 +1878,12 @@ static void case_erase(void)
                     keys_serial = ser;
                     keys_gap = gap;
                     keys_line("", &ycancel[y]);
-                    CHECK(run() == 1);
+                    CHECK(run() == 0);
                     CHECK_NOTHING_WRITTEN();
                     CHECK(memcmp(keep, disk, sizeof(keep)) == 0);
                     CHECK_STR("Not erased. Nothing was written.");
+                    CHECK_STR("Installation aborted. Nothing was written.");
+                    CHECK_NOSTR("[FAIL]");
                     CHECK_NOSTR("erased and verified");
                     CHECK_NOSTR("[1/3]");
                     /* 2 つめの行末で止まり、それ以上は聞かない (末尾の CRLF の LF は、

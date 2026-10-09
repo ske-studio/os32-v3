@@ -212,6 +212,7 @@ static int fx_new(const char *p)
 #define FD_MAX 8
 static struct { int used; int fi; u32 pos; int wr; } fds[FD_MAX];
 
+static const char *inj_mkdir_fail;    /* この初期ディレクトリは作れない */
 static const char *inj_open_fail;     /* この /hd0 の名前は作れない */
 static const char *inj_stat_wrong;    /* この名前の stat は 1 バイト違う長さを名乗る */
 static int inj_sync_fail, inj_mount_fail, inj_format_fail, inj_readback_bad = -1;
@@ -316,6 +317,7 @@ static int __cdecl f_sys_mkdir(const char *path)
 {
     int fi;
     CHECK(h_strncmp(path, "/hd0", 4) == 0);
+    if (inj_mkdir_fail && h_strcmp(inj_mkdir_fail, path) == 0) return -5;
     fi = fx_find(path);
     if (fi >= 0) return -6;
     fi = fx_new(path);
@@ -608,6 +610,7 @@ static void setup(void)
     writes = fmt_calls = 0;
     first_write_mounts = -1;
     fmt_start = fmt_len = 0;
+    inj_mkdir_fail = 0;
     inj_open_fail = 0;
     inj_stat_wrong = 0;
     inj_sync_fail = inj_mount_fail = inj_format_fail = 0;
@@ -2049,6 +2052,22 @@ static void case_exit_status(void)
     boot_pkg(513u, LOADER_LEN, 1, 0);
     CHECK(run() != 0);
     CHECK_NOTHING_WRITTEN();
+
+    /* X-17 / X-16 R2: prepare と初期 mkdir の失敗は中止と区別する。 */
+    setup();
+    inj_format_fail = 1;
+    CHECK(run() != 0);
+    CHECK(fmt_calls == 1);
+    CHECK_STR("INCOMPLETE");
+    CHECK_NOSTR("Installation Complete");
+
+    setup();
+    inj_mkdir_fail = "/hd0/tmp";
+    CHECK(run() != 0);
+    CHECK_STR("mkdir /hd0/tmp failed");
+    CHECK_STR("INCOMPLETE");
+    CHECK_NOSTR("Installation Complete");
+    CHECK(fx_find("/hd0/boot/vmkernel.lz4") < 0);
 
     setup();
     inj_write_fail_lba = 2;
