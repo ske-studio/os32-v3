@@ -79,6 +79,24 @@ class McpTests(unittest.TestCase):
                     self.assertEqual((decoded['owner'],decoded['slot']),(4,None))
         self.assertTrue(calls)
 
+    def test_type_hold_schema_and_forwarding(self):
+        listed = {t['name']: t for t in self.request('tools/list')['tools']}
+        self.assertEqual(listed['emu_type']['inputSchema']['properties']['hold'],
+                         {'type': 'integer', 'minimum': 0, 'maximum': 5000})
+        calls = []
+        g = gui.Gui(gui.Transport(post=lambda p,d: calls.append((p,d)),
+            get=lambda p: (b'{"grph_disp":1,"scrn_ymax":480}', {})))
+        with patch.object(server, 'GUI', g), patch('urllib.request.urlopen',
+                side_effect=AssertionError('LIVE HTTP FORBIDDEN')):
+            result = self.request('tools/call', {'name': 'emu_type',
+                'arguments': {'seq': 'T', 'hold': 3000}})
+            self.assertNotIn('isError', result)
+            self.assertEqual(calls, [('/api/key', {'seq': 'T', 'hold': 3000})])
+            result = self.request('tools/call', {'name': 'emu_type',
+                'arguments': {'text': 't', 'hold': 3000}})
+            self.assertTrue(result['isError'])
+            self.assertIn('hold', result['content'][0]['text'])
+
     def test_server_script_tools_list_and_fallback_with_mock_transport(self):
         # Run the production script from outside the repo: no tools package on
         # sys.path. sitecustomize supplies offline I/O before server imports gui.
@@ -99,6 +117,7 @@ def init(self, *args, **kwargs):
     ready = dict(state,kernel=[{'owner':i,'state':2 if i==4 else 0} for i in range(2,6)])
     sequence = [state,ready]
     self.wm_state = lambda: sequence.pop(0) if sequence else ready
+    self.consink = lambda **kw: {'since': 44}
     self.mouse_posts = lambda: sum(p=='/api/mouse' for p,d in self.posts)
 gui.Gui.__init__ = init
 original_launch = gui.Gui.launch
