@@ -332,7 +332,7 @@ front SDKのmalloc/map失敗時はallocator lock/busyを解き、GUIクライア
 | 小段 (各45〜75分) | 成果 / 閉じる試験 |
 |---|---|
 | g1 (取り込み単位 L1) | カーネル: 固定bit/epoch/理由分類、`mem_stat` 末尾追記 (KAPI 73)、TRIM_DONEの横取りと `exec_heap_user_trim` の結線 (F-12)。slot再利用、保留中の再要求で不変、飽和、pool0無確保 **着地・GK-1 合格 (2026-10-09、1d4b3ea)**: kernel +1,432B (g1 上限は見積り誤りで 700→1,500B に改訂、g 枠 3,072B の残り 1,640B)、AppSlot 212B、MemStat 132B、kselftest 293/0、新 `check-trim-kernel-host` (変異 15)。証拠 `~/os32-tmp/evidence/2026-10-09/g1_gk1/RESULT.md`、`~/os32-tmp/run/g/g1/`。trim 経路の実動作は GK-3 |
-| g2 (取り込み単位 L2、WM側とSDK側の2パックでも取り込みは1回) | WMのX3配送 (PARKED・非前景・未配送に1件、満杯は後送、完了で `sent` 解除)、shlibのTRIM消費/hook/TRIM_DONE、C/Rust allocatorの1回再試行 (入口拒否・in_trim・size0・raw mapは除外)、`shlib_protocol` +1 と全consumer再生成 |
+| g2 (取り込み単位 L2、WM側とSDK側の2パックでも取り込みは1回) | WMのX3配送 (PARKED・非前景・未配送に1件、満杯は後送、完了で `sent` 解除)、shlibのTRIM消費/hook/TRIM_DONE、C/Rust allocatorの1回再試行 (入口拒否・in_trim・size0・raw mapは除外)、`shlib_protocol` +1 と全consumer再生成 **着地 (2026-10-09、L2 = 077eae9、GK-2 は未実施)**: g2w (gshell の trim.rs、+1,576B — 見積り +600B 超)・g2s (shlib・Rust/C allocator の 1 回再試行、`shlib_protocol` 2、resident CRT は世代刻印のみ変化)。C の size 0 は基点どおり nano (パックの誤りをレビュー R1 で修正)、C の retry/trim_serve は in-tree の SDK 内部口 (公開しない)。WM の MemStat offset は gshell 側の手写し (os32api に Rust 定義が無い、g2w レビュー R2)。証拠 `~/os32-tmp/run/g/g2w/`・`g2s/` |
 | g3 | C fixture (back×2・front、CUI子) とhost trace: A map開始→巻戻し→KAPI復帰→解錠→yield→X3配送→B resume→B trim→TRIM_DONE→B park→A resume→A再試行1回。未応答・raw map・CUI・旧内容保持 |
 | g4 | Rust fixture (shlib経由)、STOPとの統合trace、受入台本の確定 |
 | g5 | 変異対応表/小さなkselftest/予算とPM台帳 |

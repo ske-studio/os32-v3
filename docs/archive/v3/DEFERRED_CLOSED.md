@@ -180,3 +180,10 @@ X-2 の前半 (e8a の RO 日本語) は `accept_e11/RESULT.md` の GUI 日本�
 | X-15 | 新 check-kprintf-window: userland/sdk の .c・.inc・.h の kprintf を RING3_ARG_WINDOW 由来の上限 (14) と比べる。248 ファイル・1,143 呼出し、最大 12、非リテラル 0。Rust の kprint! と apps/game は対象外 (X-18) | `~/os32-tmp/run/x15/x15_fix1_report.md`、独立レビュー 2 回 (Approve) |
 | X-16 | cdinst の main を int に (断り 0・失敗 1・成功 0、install.c の流儀)、cdinst_host の終了値対照と変異 2 本。ゲストの `$?` は次の install 受入で見る (F-14 と同じ機会) | `~/os32-tmp/run/x16/x16_report.md`、独立レビュー (Approve) |
 
+## 保守 X-17・X-18 (2026-10-09、main a0ade40)
+
+| ID | 閉じた項目 | 証拠 |
+|---|---|---|
+| X-17 | install の ERASE 断りを cdinst と同じく 0 (「Installation aborted. Nothing was written.」、[FAIL] なし)。install_fresh_host の case_erase (拒否入力 17 × 表 5)、cdinst の prepare/mkdir 失敗の対照、変異 4 本 | `~/os32-tmp/run/x17/x17_report.md`、全体検査 `~/os32-tmp/run/land_x17/check.log` |
+| X-18 | check-kprintf-window に CPL3 の Rust (kprint!・kprint_attr!・(…kprintf)( 直呼び) を追加。140 ファイル・51 呼出し、最大 4。関数ポインタ経由・マクロの別名は対象外 (実物 0 件) | `~/os32-tmp/run/x18/x18_report.md`、独立レビュー (Approve) |
+
