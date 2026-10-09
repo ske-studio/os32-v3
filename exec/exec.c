@@ -858,6 +858,22 @@ int ring3_user_range_writable(u32 p, u32 len)
     return ring3_user_ranges_writable(p, len, 0, 0);
 }
 
+i32 exec_trim_done(u32 epoch)
+{
+    struct caller_access c;
+    AppSlot *slot;
+    u32 pages;
+    if (!caller_access_get_user(&c) || kctx_irq_depth || kctx_exc_depth || ring3_wm_depth)
+        return OS32_ERR_INVAL;
+    slot = appslot_get(c.app_id);
+    if (!slot || slot->as != c.as || !slot->gui || !slot->cpl3)
+        return OS32_ERR_INVAL;
+    if (!appslot_trim_done(c.app_id, epoch)) return OS32_ERR_STALE;
+    pages = exec_heap_user_trim(slot->as);
+    appslot_trim_pages_total += pages;
+    return (i32)pages;
+}
+
 int ring3_user_range_ok(u32 p, u32 len)
 {
     struct caller_access c;

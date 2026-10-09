@@ -37,6 +37,10 @@ def run(runner, mutant=None, fixture_name="kapi_ranges_host.c"):
         sources['generated'] = (generated / 'kapi/kapi_generated.c').read_text()
         source = (ROOT / 'exec/exec.c').read_text()
         sources['exec'] = source[source.index('int ring3_ptr_ok('):source.index('\n#include "ksetjmp.h"')]
+        # Keep every range guard, excluding the unrelated g1 DONE function.
+        trim_start = sources['exec'].index('i32 exec_trim_done(')
+        trim_end = sources['exec'].index('\n}', trim_start) + 2
+        sources['exec'] = sources['exec'][:trim_start] + sources['exec'][trim_end:]
         # Execute the actual dispatcher's early-check block, with generated
         # masks/argument sizes. The rest of int80 needs guest CPU state.
         start = source.index('    /* --- (補助) 明示ポインタ引数の早期範囲検証')

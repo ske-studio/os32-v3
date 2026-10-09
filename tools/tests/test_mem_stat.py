@@ -89,6 +89,10 @@ def build_fixture(tmp):
 
 
 MUTANTS = [
+    ('pressure absent', 'snap.pressure_epoch = appslot_trim_epoch;', '', 'pressure epoch'),
+    ('pending mask absent', 'snap.trim_pending_mask |= 1UL << id;', '(void)id;', 'pending mask'),
+    ('trim flag absent', 'if (slot->trim_pending) snap.flags |= MEMSTAT_TRIM_PENDING;', '', 'trim flag'),
+    ('app epoch absent', 'snap.trim_epoch = slot->trim_epoch;', '', 'app trim epoch'),
     ('CPL0 non-shell accepted', 'appslot_cur() != APP_ID_SHELL || ', '', 'caller matrix'),
     ('CPL0 cpl3 shell accepted', ' || slot->cpl3', '', 'caller matrix'),
     ('snapshot IRQ enabled', 'irq = irq_save();', 'irq = 0x202U;', 'snapshot IRQ disabled'),

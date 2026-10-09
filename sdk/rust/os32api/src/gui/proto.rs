@@ -56,6 +56,7 @@ pub const GUI_OP_SESSION_REQUEST: u32 = 66;
 
 /// カーネル内部 op (exec_exit → WM)。アプリは送らない。
 pub const GUI_OP_OWNER_EXIT: u32 = 80;
+pub const GUI_OP_TRIM_DONE: u32 = 81;
 
 /* ======================================================================== */
 /*  イベント種別 (GuiEvent.kind) — U2 の並び順どおり 1 から                  */
@@ -74,6 +75,7 @@ pub const GUI_EV_WIDGET: u8 = 10;
 pub const GUI_EV_MODAL: u8 = 11;
 pub const GUI_EV_QUIT: u8 = 12;
 pub const GUI_EV_PALETTE: u8 = 13;
+pub const GUI_EV_TRIM: u8 = 14;
 
 /* ======================================================================== */
 /*  Style.flags (u8) — G6                                                    */

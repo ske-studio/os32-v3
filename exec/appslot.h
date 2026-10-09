@@ -133,7 +133,16 @@ typedef struct {
     volatile int stop_wm_req;  /* IRQ: return to WM at completed syscall */
     int  parked_from_stop;     /* preserve every completed register on resume */
     int disk_write_authorized; /* loader-owned; never inherited by children */
+    int trim_pending;         /* T2g: one pending request per slot */
+    u32 trim_epoch;
 } AppSlot;
+
+extern u32 appslot_trim_epoch;
+extern volatile u32 appslot_trim_request_count, appslot_trim_mark_count;
+extern volatile u32 appslot_trim_done_count, appslot_trim_done_reject_count;
+extern volatile u32 appslot_trim_pages_total;
+void appslot_trim_request_as(struct addrspace *as);
+int appslot_trim_done(int id, u32 epoch);
 
 /* ---- 受入 G7 のカウンタ (D8 の C1/C2/C3/C6) --------------------------- */
 /* KAPI にしない。fault_kill_count / ring3_abort_count と同じくカーネル

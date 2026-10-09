@@ -265,7 +265,7 @@ pub struct KernelAPI {
 
 /* KernelAPI マジックナンバー */
 pub const KAPI_MAGIC: u32 = 0x4B415049;  /* "KAPI" */
-pub const KAPI_VERSION: u32 = 72;
+pub const KAPI_VERSION: u32 = 73;
 
 /* 関数表の容量とデータ欄の固定配置 (票 TASK_KAPI_DATA_FIELDS、v63) */
 pub const KAPI_FUNC_COUNT: u32 = 249;

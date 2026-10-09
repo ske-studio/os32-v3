@@ -18,7 +18,7 @@
 
 extern volatile int ring3_in_syscall;
 
-STATIC_ASSERT(sizeof(MemStat) == 120, memstat_size);
+STATIC_ASSERT(sizeof(MemStat) == 132, memstat_size);
 STATIC_ASSERT(__builtin_offsetof(MemStat, extents_total) == MEMSTAT_MIN, memstat_min);
 STATIC_ASSERT(__builtin_offsetof(MemStat, img_end) == 80, memstat_layout);
 STATIC_ASSERT(__builtin_offsetof(MemStat, load_addr) == 96, memstat_slot);
@@ -57,6 +57,8 @@ i32 kapi_mem_stat(i32 app_id, void *out, u32 size)
         if (!slot || !(as = slot->as) || !as->pd_phys) goto done;
         snap.state = slot->state;
         snap.flags = MEMSTAT_HAS_AS;
+        if (slot->trim_pending) snap.flags |= MEMSTAT_TRIM_PENDING;
+        snap.trim_epoch = slot->trim_epoch;
         if (as->appmem_poisoned) snap.flags |= MEMSTAT_POISONED;
         if (as->exec_heap_used == ~(u32)0) snap.flags |= MEMSTAT_HEAP_INVALID;
         else snap.exec_heap_used = as->exec_heap_used;
@@ -80,6 +82,9 @@ i32 kapi_mem_stat(i32 app_id, void *out, u32 size)
         snap.stack_top = slot->stack_top;
         snap.stack_size = slot->stack_size;
     }
+    snap.pressure_epoch = appslot_trim_epoch;
+    for (int id = APP_ID_MIN; id <= APP_ID_MAX; id++)
+        if (appslot_at(id)->trim_pending) snap.trim_pending_mask |= 1UL << id;
     snap.size = size < sizeof(snap) ? size : sizeof(snap);
     snap.app_id = app_id;
     snap.phys_total_pages = pgalloc_total_pages();

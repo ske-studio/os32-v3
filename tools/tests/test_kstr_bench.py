@@ -32,6 +32,9 @@ tools/tests/kstr_bench_host.c が実物の userland/tests/kstr_bench.c を 1 行
 make・エミュレータ・実配備には一切触れない。
 """
 import host32
+import contextlib
+import io
+import json
 import os
 import pathlib
 import re
@@ -202,9 +205,11 @@ def check_registration():
         kapi = ROOT / "sdk/include/os32/os32_kapi_shared.h"
         cur = re.search(r"^#define KAPI_VERSION\s+(\d+)",
                         kapi.read_text(encoding="utf-8"), re.M)
-        if cur and int(m.group(1)) != int(cur.group(1)):
-            print("REG **app.conf の要求 API 版 %s が現行 %s と違う**"
-                  % (m.group(1), cur.group(1)), flush=True)
+        # app.conf stores min_api_ver, not an exact generation requirement
+        # (KAPI_SPEC T2c). The loader refuses a newer required feature version.
+        if cur is None or not 0 < int(m.group(1)) <= int(cur.group(1)):
+            print("REG **app.conf の要求最低 API 版 %s が現行 %s と互換でない**"
+                  % (m.group(1), cur.group(1) if cur else "不明"), flush=True)
             bad += 1
     if "userland/tests/kstr_bench.bin" not in DEPLOY.read_text(encoding="utf-8"):
         print("REG **userland/deploy.yaml に kstr_bench.bin が無い ([V2])**",
@@ -212,6 +217,36 @@ def check_registration():
         bad += 1
     if not bad:
         print("REG app.conf / deploy.yaml 登録あり", flush=True)
+    return bad
+
+
+def check_registration_versions(tmp):
+    """Exercise real registration parsing with older/current/future/zero minima."""
+    global APP_CONF
+    original = APP_CONF
+    conf = original.read_text(encoding="utf-8")
+    current = json.loads((ROOT / "sdk/kapi.json").read_text())["version"]
+    probe = tmp / "app.conf"
+    bad = 0
+    try:
+        APP_CONF = probe
+        for required, expected in ((current - 1, 0), (current, 0),
+                                   (current + 1, 1), (0, 1)):
+            changed, count = re.subn(
+                r"^(userland/tests/kstr_bench\s+)\d+", r"\g<1>" + str(required),
+                conf, flags=re.M)
+            assert count == 1
+            probe.write_text(changed, encoding="utf-8")
+            with contextlib.redirect_stdout(io.StringIO()) as output:
+                result = check_registration()
+            if result != expected:
+                print("REG minimum %d: expected %d, got %d\n%s" %
+                      (required, expected, result, output.getvalue()), flush=True)
+                bad += 1
+    finally:
+        APP_CONF = original
+    if not bad:
+        print("REG older/current minima accepted; future/zero rejected PASS", flush=True)
     return bad
 
 
@@ -647,6 +682,7 @@ if __name__ == "__main__":
         failed += check_name_sets()
         failed += check_constants()
         failed += check_registration()
+        failed += check_registration_versions(tmp)
 
         for key in ("format", "double_once", "cap", "mismatch",
                     "short_write", "real"):

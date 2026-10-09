@@ -97,7 +97,7 @@ T3 前の文書再整備の候補・未解決点は [DOCS_REORG_T3](tasks/v3/DOC
 | [CONSTRAINTS.md](CONSTRAINTS.md) | **プロジェクト制約の正典** — C/ABI・ハードウェア・KernelAPI・検証・破壊的操作。CLAUDE.md は ここの規則行を ID で参照する (`make check` が照合) |
 | [POLICY_DEV.md](POLICY_DEV.md) | **開発ポリシー** — コーディング規約、ビルド/デプロイ、Gitコミット、テスト、リリース |
 | [POLICY_DEBUG.md](POLICY_DEBUG.md) | **デバッグポリシー** — 仮説駆動デバッグ、バイナリ反映確認、教訓集、AI協調ルール |
-| [KAPI_SPEC.md](KAPI_SPEC.md) | KernelAPI v72 仕様書 — 304 エントリの表 (ヘッダ 2 + 関数表の容量 300 (実装 249) + データフィールド 2、データ欄は 0x4B8 に固定) + API追加手順 |
+| [KAPI_SPEC.md](KAPI_SPEC.md) | KernelAPI v73 仕様書 — 304 エントリの表 (ヘッダ 2 + 関数表の容量 300 (実装 249) + データフィールド 2、データ欄は 0x4B8 に固定) + API追加手順 |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | **開発案内** — 作業別の参照先 (読む / 触る / 検証) と、ファイル → 役割 → 仕様のファイル地図。仕様本文は持たない |
 | [ROADMAP.md](ROADMAP.md) | リリースロードマップ — **§0 版数の対応表と v3 への fork の段取り** (正典)、v1.x GUI の記録、v3 以降の長期項目 |
 | [RELEASE_v2.1.md](RELEASE_v2.1.md) | **v2.1 のリリースノート** (2026-09-29、タグ `v2.1`、KAPI v68) — 実機 Ra266 で動くようになったもの、PEGC 640x480 の受け入れ条件、分かっている制限。版の対応は [ROADMAP.md §0](ROADMAP.md)、各版の要約は [CHANGELOG.md](../CHANGELOG.md) |
