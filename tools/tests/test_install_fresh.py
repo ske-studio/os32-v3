@@ -23,6 +23,7 @@ CASES = [
     "lower",      # (4) 宛先が小文字 / (5) profile は写らない
     "precheck",   # (2) Phase 0 の欠損・空で 1 バイトも書かない
     "decline",    # 承認しない (何も書かず 0)
+    "erase",      # ERASE の断りも 0・書込みなし・[FAIL] なし
     "boot_fail",  # (6) IPL / PT / ローダ / format / mount の失敗で 1
     "copy_fail",  # (6) read の負 / short write / mkdir / sys_ls の負 (頭・途中・末尾)
     "mkdir_init", # B1 初期ディレクトリ作成の失敗も終了 1
