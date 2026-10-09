@@ -16,3 +16,6 @@ check-h3-park-resume-host:
 - userland/tests/h3b.c
 - tools/check_map.d/check-h3-park-resume-host.yaml
 - build/checks.d/check-h3-park-resume-host.mk
+- tools/np21w_mcp/gui.py
+- userland/gshell/src/startmenu.rs
+- userland/gshell/src/taskbar.rs

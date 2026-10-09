@@ -12,3 +12,6 @@ check-caller-access-host:
 - include/redir_access.h
 - tools/h3_park_resume.py
 - tools/h3_layout.c
+- tools/np21w_mcp/gui.py
+- userland/gshell/src/startmenu.rs
+- userland/gshell/src/taskbar.rs

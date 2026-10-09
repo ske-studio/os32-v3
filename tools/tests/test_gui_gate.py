@@ -33,9 +33,12 @@ import re
 import sys
 import tempfile
 import types
+from unittest.mock import patch
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 SRC = ROOT / "tools/gui_gate.py"
+SHARED = ROOT / "tools/np21w_mcp/gui.py"
 MARK = "[Remote shell closed]"
 PROMPT = "/> "
 
@@ -506,6 +509,10 @@ def mutate(tmp):
     bad = 0
     for i, (pattern, repl, why) in enumerate(MUTATIONS, 1):
         text, n = re.subn(pattern, repl, original, count=1)
+        shared = False
+        if n == 0:
+            text, n = re.subn(pattern, repl, SHARED.read_text(encoding="utf-8"), count=1)
+            shared = True
         if n != 1:
             print("MUTATION %d NOT APPLICABLE: %s" % (i, why), flush=True)
             bad += 1
@@ -514,7 +521,15 @@ def mutate(tmp):
         path = pathlib.Path(tmp) / ("mut%d.py" % i)
         path.write_text(text, encoding="utf-8")
         try:
-            mod = load(path)
+            if shared:
+                spec = importlib.util.spec_from_file_location("shared_mutant", str(path))
+                mutant = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mutant)
+                mod = load()
+                mod.gui_entered = mutant.gui_entered
+                mod.gui_height = mutant.gui_height
+            else:
+                mod = load(path)
         except Exception:
             print("MUTATION %d RED (import): %s" % (i, why), flush=True)
             continue
@@ -536,7 +551,8 @@ def mutate(tmp):
 if __name__ == "__main__":
     args = sys.argv[1:]
     names = [a for a in args if not a.startswith("--")] or list(CASES)
-    with tempfile.TemporaryDirectory(prefix="os32-gui-gate-") as tmp:
+    with patch("urllib.request.urlopen", side_effect=AssertionError("LIVE HTTP FORBIDDEN")), \
+            tempfile.TemporaryDirectory(prefix="os32-gui-gate-") as tmp:
         mod = load()
         print("HOST import PASS (real tools/gui_gate.py)", flush=True)
         rc = run(mod, names, tmp)

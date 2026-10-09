@@ -320,11 +320,8 @@ class LiveDriver:
             name: _bind(getattr(agent, name), helpers)
             if isinstance(getattr(agent, name), FunctionType) else getattr(agent, name)
             for name in ('act_status', 'act_tvram', 'act_screenshot', 'act_wait')}
-        # Rebind the actual four-character pacing and Mouse implementations.
+        # Inject the shared four-character pacing and Mouse implementations.
         # Every POST acknowledgment is checked BEFORE their next sub-operation.
-        self._gui = dict(vars(gui))
-        self._gui['BASE'] = agent.emu.BASE
-
         def checked_post(path, data, timeout=20):
             operation = {'path': path, 'data': copy.deepcopy(data),
                          'ack': None, 'error': None}
@@ -359,11 +356,10 @@ class LiveDriver:
                 self._input_detail['last_acknowledged_buttons'] = data['btn']
             return raw
 
-        self._gui['post'] = checked_post
-        self._key = _bind(gui.key, self._gui)
-        self._mouse = type('CheckedMouse', (), {
-            name: _bind(value, self._gui) for name, value in vars(gui.Mouse).items()
-            if isinstance(value, FunctionType)})
+        from tools.np21w_mcp import gui as shared_gui
+        self._transport = shared_gui.Transport(post=checked_post, clock=gui.time)
+        self._key = lambda **kwargs: shared_gui.key(transport=self._transport, **kwargs)
+        self._mouse = lambda height: shared_gui.Mouse(height, transport=self._transport)
 
     def _checked(self, value):
         _observation(value)

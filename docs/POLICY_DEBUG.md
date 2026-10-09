@@ -340,7 +340,7 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
 - OS32 は NP21/W ではシームレスマウス (np2sysp `getmpos`) なので、`/api/mouse` は **`ax`/`ay`** (絶対座標
   0..65535、`ax = px*65535/639`、`ay = py*65535/(H-1)`)。`dx/dy` はバスマウス計数で効かない。検証後は `abs=off`。
 - `gfx_stats` のカウンタは起動からの累計。`gdi_test` の値は起動直後の 1 回目だけが基準。
-- `/api/key` の `text=` は **8 文字ずつ** 送る (`tools/gui_gate.py` の `key()`)。raw リングは 32 エントリ
+- `/api/key` の `text=` は **4 文字ずつ / 0.35s 間隔で** 送る (`tools/gui_gate.py` の `key()`)。raw リングは 32 エントリ
   (make+break で 1 文字 2 本) しか無く、長いパスを一度に注入すると後ろが落ちる (Run... のパスが
   `/usr/bin/gui_dem` で切れ「Launch failed」と誤診しかけた)。連打も 0.3s 間隔で。
 - 自己完結テストの終了は `int 0x80` で **eax=KAPI_SLOT_SYS_EXIT (84)**。eax=0 はスロット 0 = `gfx_init` で

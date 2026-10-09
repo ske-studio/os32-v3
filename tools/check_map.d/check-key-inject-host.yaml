@@ -1,6 +1,9 @@
 check-key-inject-host:
+- tools/np21w_mcp/gui.py
 - tools/gui_gate.py
 - tools/tests/key_inject_host.cpp
 - tools/tests/test_key_inject.py
 - tools/check_map.d/check-key-inject-host.yaml
 - build/checks.d/check-key-inject-host.mk
+- userland/gshell/src/taskbar.rs
+- userland/gshell/src/startmenu.rs

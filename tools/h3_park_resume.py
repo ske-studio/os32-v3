@@ -29,6 +29,9 @@ import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
+# Also support direct execution from tools/.
+import sys
+sys.path.insert(0, str(ROOT))
 MODES = {'pf': 1, 'gp': 2, 'de': 3, 'ud': 4, 'USER-loop': 5, 'KAPI-loop': 6}
 FIELDS = 'magic owner generation phase mode arm version fixture resumes consumed window gui_slot'.split()
 MAGIC = 0x48335031
@@ -386,8 +389,9 @@ class Emulator:
         require(reply.get('ok') is True, 'memory write rejected')
 
     def click(self, x, y, height):
-        position = (f'ax={(x * 65535 + 319) // 639}&'
-                    f'ay={(y * 65535 + (height - 1) // 2) // (height - 1)}')
+        from tools.np21w_mcp.gui import pixel_to_absolute
+        ax, ay = pixel_to_absolute(x, y, height)
+        position = f'ax={ax}&ay={ay}'
         debug_reply(json.loads(self.client.post('/api/mouse', position)), '/api/mouse')
         debug_reply(json.loads(self.client.post('/api/mouse', 'btn=1')), '/api/mouse')
         time.sleep(0.4)
