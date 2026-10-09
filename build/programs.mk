@@ -597,6 +597,8 @@ endef
 # --- Rustプログラム登録 ---
 $(eval $(call DEFINE_RUST_PROGRAM,hello_gfx,userland/tests,$$(GFX_OBJ)))
 $(eval $(call DEFINE_RUST_PROGRAM,alloc_demo,userland/tests,))
+$(eval $(call DEFINE_RUST_PROGRAM,trim_back_rs,userland/tests,))
+programs: trim_back_rs_rust
 $(eval $(call DEFINE_RUST_PROGRAM,math_test_rs,userland/tests,))
 $(eval $(call DEFINE_RUST_PROGRAM,font_test,userland/tests,$$(GFX_OBJ)))
 # gshell 配下の GUI アプリは libos32gui_stub をリンクし、描画とウィジェットの本体は

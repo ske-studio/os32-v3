@@ -277,6 +277,9 @@ filesystem:
     - host: userland/tests/hello_gfx.bin
       guest: /usr/bin/
       tags: [test]
+    - host: userland/tests/trim_back_rs.bin
+      guest: /usr/bin/
+      tags: [test]
     - host: userland/tests/alloc_demo.bin
       guest: /usr/bin/
       tags: [test]
