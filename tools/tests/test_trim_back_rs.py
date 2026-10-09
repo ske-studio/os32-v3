@@ -32,11 +32,17 @@ MUTANTS = [
      '(*SENT.0.get())[(id - multiapp::APP_ID_MIN) as usize] = false;',
      'let _ = id;', 1, 'WM sent cleared'),
     ('rust-large-cache', CACHE, 'pub const BLOCK_BYTES: usize = 4000;',
-     'pub const BLOCK_BYTES: usize = 65536;', 0, 'Rust PREP ARENA=2 LARGE=0'),
+     'pub const BLOCK_BYTES: usize = 65536;', 4, 'Rust PREP ARENA=2 LARGE unchanged'),
     ('rust-raw-map-retry', CACHE, 'unsafe { (api().mem_map)(bytes, hint, flags) }',
      'unsafe { let p = (api().mem_map)(bytes, hint, flags); if p.is_null() { '
      '(api().sys_yield)(); (api().mem_map)(bytes, hint, flags) } else { p } }',
      0, 'raw map no retry'),
+    ('rust-prep-large-zero', CACHE, 'stat.large() != self.initial.large()',
+     'stat.large() != 0', 4, 'Rust PREP ARENA=2 LARGE unchanged'),
+    ('rust-done-large-zero', CACHE, 's.large() != self.initial.large()',
+     's.large() != 0', 4, 'G4 tail whole INITIAL DATA pages'),
+    ('rust-regrow-large-zero', CACHE, 's.large() == self.initial.large()',
+     's.large() == 0', 4, 'Rust EXACT regrow'),
 ]
 
 
@@ -155,7 +161,8 @@ def main():
         tmp = Path(directory)
         focus_test(tmp, args.mutate)
         built = build(tmp, sources)
-        for case in range(4):
+        # Repeat all four paths with a live LARGE allocation predating prepare.
+        for case in range(8):
             r = run(tmp, built, case, args.runner)
             print(r.stdout, end='')
             assert r.returncode == 0, (case, r.returncode, r.stdout, r.stderr)
@@ -167,7 +174,7 @@ def main():
                 r = run(tmp, build(tmp, changed), case, args.runner)
                 assert r.returncode == 1 and 'FAIL: ' + label in r.stdout.splitlines(), (name, r.returncode, r.stdout, r.stderr)
                 print('RED: ' + name + ' -> ' + label)
-            print('trim back Rust: 4 runtime RED / 0 survived / 0 ERROR')
+            print(f'trim back Rust: {len(MUTANTS)} runtime RED / 0 survived / 0 ERROR')
     return 0
 
 

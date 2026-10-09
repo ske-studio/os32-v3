@@ -10,6 +10,7 @@ use cache::{Cache, Stat};
 extern "C" {
     fn g4_check(ok: i32, label: *const u8);
     fn g4_case() -> u32;
+    fn g4_initial_large() -> u32;
     fn g4_epoch() -> u32;
     fn g4_stop();
     fn g4_pass();
@@ -122,8 +123,10 @@ pub extern "C" fn g4_rust_run() {
     os32api::retry_enable();
     unsafe {
         check(!CACHE.passed(), b"unfinished exit fails\0");
-        check(CACHE.prepare().is_some(), b"Rust PREP ARENA=2 LARGE=0\0");
-        check(CACHE.before.large() == 0 && CACHE.before.arenas() == 2, b"Rust LARGE zero\0");
+        check(CACHE.prepare().is_some(), b"Rust PREP ARENA=2 LARGE unchanged\0");
+        check(CACHE.initial.large() == g4_initial_large() &&
+            CACHE.before.large() == CACHE.initial.large() && CACHE.before.arenas() == 2,
+            b"Rust LARGE baseline unchanged\0");
         check(CACHE.release() == 0 && !CACHE.released, b"unarmed keeps cache\0");
         if g4_case() == 3 { g4_unarmed_done(); }
         g4_raw_map_test();

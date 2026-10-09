@@ -29,8 +29,8 @@ pub extern "C" fn main(argc: i32, argv: *const *const u8, kapi: *mut KernelAPI) 
     };
     let c = unsafe { &mut *core::ptr::addr_of_mut!(CACHE) };
     if c.prepare().is_none() { return prep_fail(); }
-    kprint!(b"trim_back_rs PREP OK id=%u ARENA=2 LARGE=0 cur=%x cache-T=%u cache-E=%u CRC=%x\n\0",
-        c.before.id(), c.before.cur(), CACHE_T as u32, (c.count - c.keep - CACHE_T) as u32, c.crc);
+    kprint!(b"trim_back_rs PREP OK id=%u ARENA=2 LARGE=%u cur=%x cache-T=%u cache-E=%u CRC=%x\n\0",
+        c.before.id(), c.before.large(), c.before.cur(), CACHE_T as u32, (c.count - c.keep - CACHE_T) as u32, c.crc);
     kprint!(b"trim_back_rs keys: a=arm o=observe G-4 r=regrow after observation q=quit\n\0");
     unsafe { WINDOW = Some(window); }
     libos32gui::set_trim_hook(hook);
