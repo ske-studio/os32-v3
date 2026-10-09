@@ -1346,8 +1346,9 @@
   contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
   mode: manual
   prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
-  entry: '準備区間: 両 back 未 arm で front が物理と free list を使い切る。prep done で落ち着いた時点の trim_pages_total と各 back extent/cur_end
-    を G-3/G-4 基準値として採る。'
+  entry: '準備区間: 両 back 未 arm で front が物理と free list を使い切る。未 arm DONE の返却が front の OP_WAIT 中に届くので、front が
+    `prep done; DONE settled` (free=0 かつ pending=0) を出すまで p キーで再準備する (`prep unsettled` は未整定)。整定した時点の trim_pages_total
+    と各 back extent/cur_end を G-3/G-4 基準値として採る。'
   observe:
   - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
     appslot_reclaim_count, exec_as_leftover_pages, ledger_bad_free/retire_refused/claim_refused'
@@ -1361,14 +1362,15 @@
     trim_pages_total: 自然な末尾の返却は許容。増分0も正も記録
     free_pages: 0
     kills_delta: 0
-    front: prep done
+    front: 'prep done; DONE settled'
   evidence: ~/os32-tmp/evidence/<日付>/g-G-2/
 - id: g-G-3
   gate: GK-3
   contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
   mode: manual
   prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
-  entry: '両 back へ a キー。対象区間: front へキー、malloc(4000) を1回。G-2後の基準値との差を採る。'
+  entry: '両 back へ a キー。対象区間: front へ t キー、trim_front は自分のリングを空にしてから malloc(4000) を1回。対象の後は yield 中に
+    前景へ入力を足さない (前景の未読入力は応答性優先で A が先に起きる — 票 §4-2 の仕様。その場合は ENOMEM retry=1 で、別対照として記録)。G-2後の基準値との差を採る。'
   observe:
   - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
     appslot_reclaim_count, exec_as_leftover_pages, ledger_bad_free/retire_refused/claim_refused'
@@ -1450,7 +1452,8 @@
   contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
   mode: manual
   prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
-  entry: trim_back --slow-hook 300 で G-3、hook begin と終了の間に CTRL+STOP。
+  entry: 'trim_back --stop-focus --slow-hook 300 で G-3。back の窓は最小化しない (最小化中の SET_FOCUS は rc=0 のまま前景を変えない)。`trim_back focus
+    ok` の後、STOP の前に gui_state の front と abort_target が当該 back であることを確かめてから CTRL+STOP。CTRL+STOP は WM が確定した前景に当たる。'
   observe:
   - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
     appslot_reclaim_count, exec_as_leftover_pages, ledger_bad_free/retire_refused/claim_refused'
