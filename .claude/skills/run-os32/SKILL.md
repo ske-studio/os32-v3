@@ -188,6 +188,8 @@ Windows 側で `np21x64w.exe` を起動すると窓が開く。WSL からは見�
 
 ## 関連スキル
 
+- [os32-gui-drive](../os32-gui-drive/SKILL.md) — GUI の入力・起動・状態・出力の証拠採取
+
 - `os32-build-verify` — 変更に応じてどのビルドとどの検証が要るかを選ぶ
 - `os32-emu-debug` — ハング・例外・IRQ 不達の調査
 - `os32-emu-config` — `*.ini` の限定変更 ([D2] の承認対象)

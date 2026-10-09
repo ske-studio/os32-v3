@@ -269,6 +269,11 @@ class CLITests(unittest.TestCase):
 
 
 class LiveAdapterTests(unittest.TestCase):
+    def setUp(self):
+        guard = patch('urllib.request.urlopen', side_effect=AssertionError('LIVE HTTP FORBIDDEN'))
+        guard.start()
+        self.addCleanup(guard.stop)
+
     def setup_adapter(self):
         # gui_gate has no import-time I/O. Its real paced key / Mouse methods
         # run against these fake HTTP and sleep boundaries only.
@@ -366,11 +371,11 @@ class LiveAdapterTests(unittest.TestCase):
         # The existing helper must never send the third chunk or cleanup keys.
         original = driver.key
         def key(**kw):
-            original_sleep = driver._gui['time'].sleep
+            original_sleep = driver._transport.clock.sleep
             def fail_next(n):
                 original_sleep(n)
                 self.response = b'{"ok":false}'
-            driver._gui['time'] = types.SimpleNamespace(sleep=fail_next)
+            driver._transport.clock = types.SimpleNamespace(sleep=fail_next)
             return original(**kw)
         driver.key = key
         rows = []

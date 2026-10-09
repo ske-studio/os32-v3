@@ -1,0 +1,18 @@
+check-np21w-gui-host:
+- tools/np21w_mcp/gui.py
+- tools/np21w_mcp/server.py
+- tools/gui_gate.py
+- tools/h3_park_resume.py
+- tools/tests/test_np21w_gui.py
+- tools/tests/test_np21w_gui_mcp.py
+- tools/tests/fixtures/gui_about.png
+- tools/tests/fixtures/np21w_schema_before.json
+- tools/gen_font16.py
+- tools/gen_kcg_font.py
+- build/checks.d/check-np21w-gui-host.mk
+- tools/check_map.d/check-np21w-gui-host.yaml
+- include/memmap.h
+- include/con_sink.h
+- exec/appslot.h
+- userland/gshell/src/startmenu.rs
+- .claude/skills/os32-gui-drive/SKILL.md

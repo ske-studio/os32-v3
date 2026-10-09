@@ -39,6 +39,7 @@ import time
 import urllib.parse
 import urllib.request
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BASE = "http://127.0.0.1:8025"
 
 
@@ -54,102 +55,18 @@ def get(path, timeout=20):
         return r.read(), dict(r.headers)
 
 
-# 逃がし記法 (票 tools/TASK_KEY_INJECT.md §2-2)。展開はここ (台本の側) でやり、
-# `/api/key` の `text=` の意味は一切変えない。`text=` に `\` を載せると今までどおり
-# YEN キー (0x0d) が飛ぶ — 既存の台本と emu_agent はそのまま動く (受入 K2 / K6)。
-_ESC_CHR = {"e": 0x1b, "n": 0x0a, "r": 0x0d, "t": 0x09, "b": 0x08}
-# キー名で送るバイト。0x01〜0x1a の残りは CTRL+英字 で作る。
-_ESC_SEQ = {0x08: "BS", 0x09: "TAB", 0x0a: "RETURN", 0x0d: "RETURN",
-            0x1b: "ESC", 0x7f: "DEL"}
-_HEX = "0123456789abcdefABCDEF"
+# Pass the current module attributes: existing host tests patch these names.
+from tools.np21w_mcp import gui as _gui
+
+expand_escapes = _gui.expand_escapes
 
 
-def _byte_to_step(b):
-    """1 バイトを注入 1 手 ("text" か "seq") に落とす。
-
-    PC-98 のキーボードで作れないバイト (0x00、0x1c〜0x1f、0x80 以上) は
-    黙って捨てずに ValueError にする — 落ちたことに気付かないほうが困る ([V4])。"""
-    if b in _ESC_SEQ:
-        return ("seq", _ESC_SEQ[b])
-    if 0x01 <= b <= 0x1a:
-        return ("seq", "CTRL+" + chr(ord("A") + b - 1))   # 0x01=CTRL+A 〜 0x1a=CTRL+Z
-    if 0x20 <= b <= 0x7e:
-        return ("text", chr(b))
-    raise ValueError("0x%02x は PC-98 のキー注入では作れない "
-                     "(0x00 / 0x1c〜0x1f / 0x80 以上)。かなや漢字は FEP 経由で" % b)
-
-
-_ESC_RE = re.compile(r"\\\\|\\x[0-9A-Fa-f]{2}|\\.", re.S)
-
-
-def expand_escapes(text):
-    """`\\xNN` `\\e` `\\n` `\\r` `\\t` `\\b` `\\\\` を注入の手順に展開する。
-
-    返り値は ("text", 文字列) / ("seq", コード) の列。隣り合う文字はまとめて返すので、
-    呼び手は text の塊だけを 4 文字ずつに切ればよい (**記法の途中では切れない**)。
-
-    **`\\\\` を最優先で食う**のが肝 (`_ESC_RE` の並び)。`\\\\x41` は
-    「`\\` 1 個 + 文字列 `x41`」であって「逃がした 0x41」ではない。左から順に
-    食わないとこの区別が壊れる。"""
-    steps = []
-    buf = []
-    pos = 0
-
-    def flush():
-        if buf:
-            steps.append(("text", "".join(buf)))
-            del buf[:]
-
-    for m in _ESC_RE.finditer(text):
-        buf.extend(text[pos:m.start()])
-        tok = m.group(0)
-        pos = m.end()
-        if tok == "\\\\":
-            buf.append("\\")            # YEN キー = PC-98 の `\`
-            continue
-        if tok[1] == "x":
-            step = _byte_to_step(int(tok[2:], 16))
-        elif tok[1] in _ESC_CHR:
-            step = _byte_to_step(_ESC_CHR[tok[1]])
-        else:
-            raise ValueError("未知の逃がし記法 `%s`" % tok)
-        if step[0] == "text":
-            buf.append(step[1])
-        else:
-            flush()
-            steps.append(step)
-    tail = text[pos:]
-    if tail.endswith("\\"):
-        raise ValueError("末尾が単独の `\\`。`\\` 自身は `\\\\` と書く")
-    buf.extend(tail)
-    flush()
-    return steps
+def _transport():
+    return _gui.Transport(post=post, get=get, clock=time)
 
 
 def key(seq=None, text=None, escapes=True):
-    """文字列は 4 文字ずつ送る。raw リングは 32 エントリ (make+break で 1 文字 2 本) しか
-    無く、長い text を一度に注入すると後ろが落ちる (2026-09-06: Run... のパスが
-    `/usr/bin/gui_dem` で切れた)。8 文字 / 0.3 秒でも 9801 (planar) でアプリ実行中は
-    WM の drain が追いつかず 2 文字落ちた (2026-09-07: `v12_api_test.n`) ので 4 文字に。
-
-    `\\xNN` などの逃がし記法は**既定で有効** (2026-09-18)。`\\` 自身を送るなら `\\\\` と書く。
-    素通しにしたいときだけ `escapes=False`。ツリー内に `text=` で `\\` を送る利用者は
-    **調査の結果 1 件も無かった**ので、既定を有効にしても既存の台本は壊れない。
-    制御文字は `seq=` の和音に化けるので、**4 文字の分割が記法の途中で切れることは無い**。"""
-    if text is not None:
-        steps = expand_escapes(text) if escapes else [("text", text)]
-        for kind, payload in steps:
-            if kind == "seq":
-                post("/api/key", {"seq": payload})
-                time.sleep(0.35)
-                continue
-            i = 0
-            while i < len(payload):
-                post("/api/key", {"text": payload[i:i + 4]})
-                time.sleep(0.35)
-                i += 4
-    if seq is not None:
-        post("/api/key", {"seq": seq})   # urlencode が + を %2B にする
+    return _gui.key(seq, text, escapes, transport=_transport())
 
 
 def cmd(line, timeout=60):
@@ -232,31 +149,8 @@ def close_rshell(first_wait=5.0, extra_wait=3.0, max_extra=2, poll=0.5):
     return True
 
 
-def gui_entered(st, h):
-    """`status()` の値から、GUI (gshell) の画面に --h ラインで居るかを判定する。
-
-    98 の GDC / PEGC の GUI は --h ラインのグラフィック表示 (`grph_disp == 1`)。CUI は
-    400 ラインでグラフィックを消している (R2 の予備調査: CUI は `scrn_ymax 400 grph_disp 0`、
-    PEGC の GUI は `scrn_ymax 480 grph_disp 1`)。9801 (--h 400) では scrn_ymax が
-    CUI と同じなので、grph_disp が決め手になる。
-    Cirrus の GUI は WAB 中継 (`wab_relay == 1`) で、画面高は `wab_height`。このとき 98 の
-    表示レジスタは CUI と同じ `scrn_ymax 400 grph_disp 0` のまま (2026-09-29 夕の R2)。"""
-    if st.get("scrn_ymax") == h and st.get("grph_disp") == 1:
-        return True
-    return st.get("wab_relay") == 1 and st.get("wab_height") == h
-
-
-def gui_height(st):
-    """GUI に居るなら実際の画面高、居なければ None (`back_to_cui` が使う)。
-
-    `gui_entered` と同じ規則: WAB 中継中 (Cirrus) は `wab_height`、そうでなく
-    `grph_disp == 1` なら `scrn_ymax`。Cirrus では `scrn_ymax` が 400 のままなので、
-    それで座標を作ると Start に当たらない。値が無いときは 0 (呼び手が --h で補う)。"""
-    if st.get("wab_relay") == 1:
-        return st.get("wab_height") or 0
-    if st.get("grph_disp") == 1:
-        return st.get("scrn_ymax") or 0
-    return None
+gui_entered = _gui.gui_entered
+gui_height = _gui.gui_height
 
 
 def restore_rshell():
@@ -314,39 +208,13 @@ def back_to_cui(st, h):
     return restore_rshell()
 
 
-class Mouse:
+class Mouse(_gui.Mouse):
     def __init__(self, h):
         self.h = h
 
-    def move(self, px, py, settle=0.4):
-        ax = (px * 65535 + 319) // 639
-        ay = (py * 65535 + (self.h - 1) // 2) // (self.h - 1)
-        post("/api/mouse", {"ax": ax, "ay": ay})
-        time.sleep(settle)
-
-    def press(self, btn=1):
-        post("/api/mouse", {"btn": btn})
-        time.sleep(0.4)
-
-    def release(self):
-        post("/api/mouse", {"btn": 0})
-        time.sleep(0.6)
-
-    def click(self, px, py, btn=1):
-        self.move(px, py)
-        self.press(btn)
-        self.release()
-
-    def drag(self, x0, y0, x1, y1, mid=None):
-        self.move(x0, y0)
-        self.press()
-        for (mx, my) in (mid or []):
-            self.move(mx, my)
-        self.move(x1, y1)
-        self.release()
-
-    def off(self):
-        post("/api/mouse", {"abs": "off"})
+    @property
+    def transport(self):
+        return _transport()
 
 
 class Shots:

@@ -636,6 +636,54 @@ TOOLS = {
 }
 
 
+# GUI host library has its own injectable transport (screenshots include headers).
+try:
+    from .gui import Gui
+except ImportError:
+    from gui import Gui
+
+GUI = Gui()
+
+
+def _gui_handler(method):
+    def handler(args):
+        return getattr(GUI, method)(**args)
+    return handler
+
+
+_TIMEOUT = {"type": "number", "minimum": 15, "default": 60}
+_PIXEL = {"type": "integer", "minimum": 0}
+_GUI_TOOLS = {
+    "emu_mouse": ("mouse", "GUI pixel coordinates only. Finish with action=off.",
+                  {"action": {"type": "string", "enum": ["move", "click", "press", "release", "drag", "off"]},
+                   "x": dict(_PIXEL, maximum=639), "y": _PIXEL,
+                   "x1": dict(_PIXEL, maximum=639), "y1": _PIXEL,
+                   "btn": {"type": "integer", "enum": [1, 2], "default": 1}}, ["action"]),
+    "emu_type": ("type", "GUI ASCII input, 4 chars / 0.35s. CUI uses emu_cmd.",
+                 {"text": {"type": "string"}, "seq": {"type": "string"},
+                  "escapes": {"type": "boolean", "default": True}}, []),
+    "emu_gui_launch": ("launch", "Run an absolute ASCII path without args (<=255 bytes). Returns kernel owner; v1 slot=null.",
+                       {"path": {"type": "string"}, "timeout": _TIMEOUT,
+                        "fallback": {"type": "boolean", "default": False}}, ["path"]),
+    "emu_gui_state": ("wm_state", "SHM slots and kernel owners are separate tables; v2 descriptor supplies windows/front.", {}, []),
+    "emu_screen_text": ("screen_text", "Exact guest-font ASCII OCR. Same glyphs return ambiguous candidates separately from unknown_count; save PNG evidence.",
+                        {"path": {"type": "string"}, "region": {"type": "array", "items": {"type": "integer"},
+                         "minItems": 4, "maxItems": 4, "description": "[x,y,width,height], cell origin"}}, []),
+    "emu_consink": ("consink", "Decode GUI console ring. since is previous head; an unseen full lap/reset is undetectable.",
+                    {"since": {"type": "integer", "minimum": 0}, "grep": {"type": "string"}}, []),
+    "emu_wait_mem": ("wait_mem", "Poll a u32 symbol (kernel by default, gshell:name for shell). Timeout returns ok=false with last.",
+                     {"symbol": {"type": "string"}, "op": {"type": "string", "enum": ["eq", "ne", "lt", "le", "gt", "ge"]},
+                      "value": {"type": "integer"}, "timeout": _TIMEOUT}, ["symbol", "op", "value"]),
+    "emu_wait_text": ("wait_text", "Poll console/screen regex; screen accepts each exact font candidate. Timeout returns ok=false with last.",
+                      {"regex": {"type": "string"}, "source": {"type": "string", "enum": ["consink", "screen"], "default": "consink"},
+                       "timeout": _TIMEOUT}, ["regex"]),
+}
+for _name, (_method, _description, _properties, _required) in _GUI_TOOLS.items():
+    _schema = _obj(_properties, _required)
+    _schema['additionalProperties'] = False
+    TOOLS[_name] = (_gui_handler(_method), _description, _schema)
+
+
 # --------------------------------------------------------------------------
 # JSON-RPC / MCP plumbing
 # --------------------------------------------------------------------------

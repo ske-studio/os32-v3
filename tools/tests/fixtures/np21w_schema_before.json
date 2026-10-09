@@ -1,0 +1,393 @@
+{
+  "emu_status": {
+    "description": "Execution state, CS:EIP (symbol-annotated), CPU mode, display state (scrn_xmax/ymax, text_disp, grph_disp) and fault_generation (non-zero once the core has faulted).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  "emu_prof_start": {
+    "description": "Start guest profiling (clears counters). Counts the instructions that trap in V86 mode on a 386 and every I/O access per port.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  "emu_prof_stop": {
+    "description": "Stop guest profiling.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  "emu_prof": {
+    "description": "Guest profile: per-class counts and rates for INT/IRET/CLI/STI/PUSHF/POPF (the V86 #GP sources at IOPL<3), plus I/O totals and the busiest ports -- the ports that must be passed through via the TSS I/O permission bitmap.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "top": {
+          "type": "integer",
+          "default": 24,
+          "description": "how many ports to list"
+        }
+      },
+      "required": []
+    }
+  },
+  "emu_fault": {
+    "description": "Latest unrecoverable core fault (triple fault etc.): reason text with full register dump, CS:EIP, and a generation counter. The core freezes at the fault site, so emu_regs/emu_read_mem still show it until emu_resume.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  "emu_gdc": {
+    "description": "GDC / mode F/F / CRTC state: mode1 (68h), mode2 (6Ah), display and access page (A4h/A6h), display enable, GRCG, CRTC, and the uPD7220 parameter RAM (SYNC/CSRFORM/SCROLL/PITCH) for both GDCs. All of these are write-only or unreadable from the guest, so this is the only way to compare 'what mode is the machine in' between two runs.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  "emu_pic": {
+    "description": "8259A master/slave IMR/ISR/IRR/ICW. The mask register is write-only from the guest, so this is the only way to see which interrupts a machine is actually set up to take -- use it to check what mask a real BIOS leaves behind before handing a guest to a V86 monitor.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  "emu_sound": {
+    "description": "Audio output level and FM/SSG state: peak of the mixed output since the last call (0 = silence, regardless of synthesizer), key-on bitmask and key-on register, the full OPN register file, and the SSG mixer/volumes. Use this instead of I/O port counts to tell 'the guest is writing to the chip' from 'sound is coming out'.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  "emu_regs": {
+    "description": "All CPU registers, segment bases, CR0-4, GDTR/IDTR; EIP annotated with symbol+offset.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  "emu_tvram": {
+    "description": "Text VRAM as UTF-8 (the on-screen text; screenshot replacement).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  "emu_read_mem": {
+    "description": "Read guest memory as hex.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "addr": {
+          "type": "string",
+          "description": "hex address or kernel.map symbol (e.g. exec_run, timer_handler+0x10, 0x100000)"
+        },
+        "len": {
+          "type": "integer",
+          "default": 64
+        },
+        "space": {
+          "type": "string",
+          "enum": [
+            "phys",
+            "linear",
+            "virt"
+          ],
+          "default": "phys"
+        },
+        "seg": {
+          "type": "string",
+          "description": "segment for space=virt"
+        }
+      },
+      "required": [
+        "addr"
+      ]
+    }
+  },
+  "emu_write_mem": {
+    "description": "Write guest memory (hex string).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "addr": {
+          "type": "string",
+          "description": "hex address or kernel.map symbol (e.g. exec_run, timer_handler+0x10, 0x100000)"
+        },
+        "hex": {
+          "type": "string"
+        },
+        "space": {
+          "type": "string",
+          "default": "phys"
+        }
+      },
+      "required": [
+        "addr",
+        "hex"
+      ]
+    }
+  },
+  "emu_put_file": {
+    "description": "Place a host file at an arbitrary path inside the RUNNING guest, without a reboot or an NHD rewrite. Use this instead of the HostDrv+hsync round trip. guest_path may be omitted for a file the deploy manifests already know (e.g. apps/x/x.bin).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "local_path": {
+          "type": "string",
+          "description": "path on the host"
+        },
+        "guest_path": {
+          "type": "string",
+          "description": "absolute path in the guest, e.g. /usr/bin/x.bin"
+        }
+      },
+      "required": [
+        "local_path"
+      ]
+    }
+  },
+  "emu_deploy_status": {
+    "description": "State of the guest-side file-placement agent (present? staging window? last request).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  "emu_disasm": {
+    "description": "Disassemble n instructions of live guest memory via host objdump, with kernel.map symbols on labels and branch targets. Defaults to the current EIP.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "addr": {
+          "type": "string",
+          "description": "hex address or kernel.map symbol (e.g. exec_run, timer_handler+0x10, 0x100000)"
+        },
+        "n": {
+          "type": "integer",
+          "default": 8,
+          "description": "1..256"
+        },
+        "space": {
+          "type": "string",
+          "enum": [
+            "phys",
+            "linear",
+            "virt"
+          ],
+          "default": "linear"
+        },
+        "bits": {
+          "type": "integer",
+          "enum": [
+            16,
+            32
+          ],
+          "description": "default: from CPU mode"
+        }
+      },
+      "required": []
+    }
+  },
+  "emu_cmd": {
+    "description": "Run a shell command in the OS32 rshell over the embedded serial bridge; returns its output.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "command": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "command"
+      ]
+    }
+  },
+  "emu_key": {
+    "description": "Inject PC-98 keys. seq is comma-separated chords (SHIFT+SPACE,A,ENTER); text is literal ASCII.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "seq": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": []
+    }
+  },
+  "emu_pause": {
+    "description": "Pause emulation (frame granularity).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  "emu_resume": {
+    "description": "Resume from a pause or a breakpoint.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  "emu_reset": {
+    "description": "Hard-reset the emulated machine.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  "emu_break_add": {
+    "description": "Set a breakpoint at an address/symbol.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "addr": {
+          "type": "string",
+          "description": "hex address or kernel.map symbol (e.g. exec_run, timer_handler+0x10, 0x100000)"
+        },
+        "cs": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "addr"
+      ]
+    }
+  },
+  "emu_break_del": {
+    "description": "Delete a breakpoint (or all=true).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "addr": {
+          "type": "string",
+          "description": "hex address or kernel.map symbol (e.g. exec_run, timer_handler+0x10, 0x100000)"
+        },
+        "all": {
+          "type": "boolean"
+        }
+      },
+      "required": []
+    }
+  },
+  "emu_break_list": {
+    "description": "List breakpoints (EIP symbol-annotated).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  "emu_step": {
+    "description": "Single-step n instructions; returns the new EIP. Requires a breakpoint (trap) pause -- emu_pause alone is not enough, so set a breakpoint and wait for trap_pause=1 first.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "n": {
+          "type": "integer",
+          "default": 1
+        }
+      },
+      "required": []
+    }
+  },
+  "emu_trace": {
+    "description": "CS:EIP execution trace, symbol-annotated, one entry per line. Returns the tail by default and collapses repeated addresses to 'xN'.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "default": 100,
+          "description": "max lines, 1..4096"
+        },
+        "head": {
+          "type": "boolean",
+          "default": false,
+          "description": "oldest entries instead of newest"
+        },
+        "collapse": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "required": []
+    }
+  },
+  "emu_trace_start": {
+    "description": "Start recording the CS:EIP trace.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  "emu_trace_stop": {
+    "description": "Stop recording the CS:EIP trace.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  "emu_state_save": {
+    "description": "Save emulator state to a file (Windows path). Sends the aidebug token from np21w_aidebug_<port>.token.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "file"
+      ]
+    }
+  },
+  "emu_state_load": {
+    "description": "Load emulator state from a file.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "file"
+      ]
+    }
+  },
+  "emu_screenshot": {
+    "description": "Capture the screen to a BMP on the host filesystem (prefer emu_tvram for text screens).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "output BMP path; default: a temp file"
+        }
+      },
+      "required": []
+    }
+  }
+}
