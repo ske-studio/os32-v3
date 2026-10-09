@@ -52,7 +52,10 @@ C の rc=1、Rust test の rc=101 を区別し、ビルド不能を runtime RED 
 | blocked-primary の secondary mark 削除 | trim_flow | `blocked-primary-drops-secondary-mark` | `FAIL: blocked primary marks before first yield` (rc=1) |
 | STOP 後の bit 維持 | trim_back_rs | `stop-leaves-bit` | `FAIL: STOP slot trim cleared` (rc=1) |
 | WM forget 欠落 | trim_back_rs | `wm-forget-missing` | `FAIL: WM sent cleared` (rc=1) |
-| Rust cache が LARGE に化ける | trim_back_rs | `rust-large-cache` | `FAIL: Rust PREP ARENA=2 LARGE=0` (rc=1)。実4000B Boxの分類を検査 |
+| Rust cache が LARGE に化ける | trim_back_rs | `rust-large-cache` | `FAIL: Rust PREP ARENA=2 LARGE unchanged` (rc=1)。実4000B Boxの分類を検査。BLOCK_BYTES=65536 では ARENA が 2 に届かず、RED の原因は ARENA 側 (LARGE 比較そのものは下の 3 本が殺す。4000B Box が LARGE になる経路は構造上無い — g4fix レビュー C) |
+| LARGE の基準を 0 に戻す (prepare) | trim_back_rs | `rust-prep-large-zero` (g4fix追加) | `FAIL: Rust PREP ARENA=2 LARGE unchanged` (rc=1)。case 4 (libos32gui のサーフェスプール 131,648B が prepare 前に LARGE で先在) |
+| LARGE の基準を 0 に戻す (DONE 観測) | trim_back_rs | `rust-done-large-zero` (g4fix追加) | `FAIL: G4 tail whole INITIAL DATA pages` (rc=1)。case 4 |
+| LARGE の基準を 0 に戻す (regrow) | trim_back_rs | `rust-regrow-large-zero` (g4fix追加) | `FAIL: Rust EXACT regrow` (rc=1)。case 4 |
 | Rust raw-map retry | trim_back_rs | `rust-raw-map-retry` | `FAIL: raw map no retry` (rc=1)。fixture `cache::raw_map` 自身の自己防護。製品 wrapper の変異ではない。SDKに mem_map 関数定義がないことは別の静的assert |
 | C stop-focus 呼出し欠落 | trim_flow → trim_fixtures | `c-stop-focus-missing` (g5追加) | `FAIL: !stop_focus || (focus_calls == 1 && focus_printed == 1)` (rc=1) |
 | C focus error 無視 | trim_flow → trim_fixtures | `c-stop-focus-error-ignored` (g5追加) | `FAIL: !focus_rc` (rc=1)。失敗時に成功印を出さない |
@@ -75,13 +78,13 @@ C/Rust focus 試験は実 fixture の hook (Rust は arguments も) を使い、
 | --- | ---: | ---: | ---: | ---: | ---: |
 | check-trim-kernel-host | 19 | 19 | 0 | 0 | 0 |
 | check-trim-flow-host (C fixture 2件を含む) | 11 | 11 | 0 | 0 | 0 |
-| check-trim-back-rs-host (Rust focus 3件を含む) | 7 | 7 | 0 | 0 | 0 |
+| check-trim-back-rs-host (Rust focus 3件・g4fix 3件を含む) | 10 | 10 | 0 | 0 | 0 |
 | check-gshell-host (既存GUI変異を含む) | 71 | 71 | 0 | 0 | 0 |
 | check-nano-adapter-host (adapter47 + gate3) | 50 | 50 | 0 | 0 | 0 |
 | check-rust-alloc-host | 10 | 10 | 0 | 0 | 0 |
 | check-gui-host (gui_reattach15 + gui_trim5) | 20 | 20 | 0 | 0 | 0 |
 | check-kapi-layout-host | 17 | 16 | 1 | 0 | 0 |
-| 合計 | 205 | 204 | 1 | 0 | 0 |
+| 合計 | 208 | 207 | 1 | 0 | 0 |
 
 `short_read_trusted` は既存 KAPI layout の変異で、ホスト GNU11 -Werror の
 コンパイルに失敗するため **runtime RED ではない**。必須の世代据置は別の
