@@ -18,7 +18,8 @@ static KernelAPI *back_api;
 static void *blocks[BLOCK_LIMIT], *nano[NANO_COUNT];
 static u32 count, keep, obstacle, baseline_crc, slow_ticks;
 static u32 serves, pages, hooks, consumed, nano_pages;
-static int armed, released, bad, regrow_rc = -1, no_answer;
+static int armed, released, bad, regrow_rc = -1, no_answer, stop_focus;
+static i32 own_window;
 static MemStat initial, prepared, trimmed;
 static int snapshot(MemStat *out);
 static int prepare(void);
@@ -34,12 +35,13 @@ int main(int argc, char **argv, KernelAPI *api)
     back_api = api;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--no-answer")) no_answer = 1;
+        else if (!strcmp(argv[i], "--stop-focus")) stop_focus = 1;
         else if (!strcmp(argv[i], "--slow-hook") && i + 1 < argc) {
             char *end;
             slow_ticks = strtoul(argv[++i], &end, 10);
             if (!argv[i][0] || *end || slow_ticks > 0x7fffffffUL) return 2;
         } else {
-            api->kprintf(ATTR, "usage: trim_back [--slow-hook N] [--no-answer]\n");
+            api->kprintf(ATTR, "usage: trim_back [--slow-hook N] [--stop-focus] [--no-answer]\n");
             return 2;
         }
     }
@@ -122,6 +124,15 @@ static uint32_t trim_hook(void)
 {
     if (!armed || released) return 0;
     hooks++;
+    if (stop_focus) {
+        i32 rc = back_api->gui_call(GUI_OP_WIN_SET_FOCUS, (u32)own_window);
+        if (rc != 0) {
+            back_api->kprintf(ATTR, "trim_back focus FAIL rc=%d\n", (int)rc);
+            bad = 1;
+            return 0;
+        }
+        back_api->kprintf(ATTR, "trim_back focus ok\n");
+    }
     back_api->kprintf(ATTR, "trim_back hook begin slow=%u\n", (unsigned)slow_ticks);
     u32 start = back_api->get_tick();
     while ((u32)(back_api->get_tick() - start) < slow_ticks) { }
@@ -211,7 +222,9 @@ static int run_gui(void)
     spec.flags = GUI_WF_DEFAULT;
     for (u32 i = 0; i < sizeof(spec); i++) req[i] = ((u8 *)&spec)[i];
     i32 win = back_api->gui_call(GUI_OP_WIN_CREATE, 0);
-    if (win < 0 || !prepare()) goto prep_fail;
+    if (win < 0) goto prep_fail;
+    own_window = win;
+    if (!prepare()) goto prep_fail;
     back_api->kprintf(ATTR, "trim_back keys: a=arm r=regrow after G-4 q=quit\n");
     for (;;) {
         if (back_api->gui_call(GUI_OP_POLL, 0) < 0) return 1;

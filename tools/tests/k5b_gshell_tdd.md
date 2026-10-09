@@ -84,11 +84,22 @@ FAILED  snd_focus_is_called_once_per_focus_change
 |---|---|
 | `MA_INPUT_STREAK_MAX` = 4 | `INPUT_STREAK_MAX` |
 | `MA_STARVE_BOUND` = `(2N−2)×(STREAK+1)` = 30 | `STARVE_BOUND` |
+| `ma_input_group` | `input_ready` (GUI の WAIT_POLL も未読入力で true) |
+| `ma_ready` | `ready` + `round_remaining` / `pick_group` の実行対象フィルタ (WAIT_POLL も入力/導出ありなら round へ) |
+| `ma_pick_poll` | `pick_poll` (入力/導出が空のときだけ poll 群へ) |
 | `ma_should_park` | `should_park` |
 | `ma_pick` / `ma_pick_group` / `ma_round_remaining` | `pick` / `pick_group` / `round_remaining` |
 | `ma_resume` の `turn_used` / `last_run` / `input_streak` | `mark_resumed` |
 | `ma_launch` の同上 | `on_start` |
 | 試験が直接立てていた `input_ready` / `derived_ready` | **実物の WM 状態から算出** (D11-1 の棚卸し) |
+
+g3fix の照合は `multiapp_model_host.c` の `case_poll_gui_ready` と
+`g3fix_wm_probe.rs` の `g3fix_model_product_ready_matrix` が、PARKED / WAIT_POLL ×
+未読入力の有無 × 導出 ready の有無を同じ期待で実行する。
+`check-multiapp-model-host` / `check-trim-flow-host` に含まれる。
+従来のケース19はスロットなし・入力/導出なしの poll のみだったため、
+WAIT_POLL を入力/導出から除く模型の差を捕まえなかった。既存の飢餓上界の等号検査も
+この状態と入力の組合せを検証していなかった。
 
 `input_ready` / `derived_ready` の材料はすべて実物:
 

@@ -275,12 +275,18 @@ static int ma_key_ready(const MaState *st, const MaApp *a)
     return a->state == MA_WAIT_KEY && st->kbd_pending > 0;
 }
 
-/* 入力群か (D11-1 の 1 群目)。鍵待ちは打鍵そのものなので入力群に入れる。 */
+/* Product correspondence (userland/gshell/src/multiapp.rs):
+ * ma_input_group -> input_ready (ring/sticky Quit or WAIT_KEY injection).
+ * ma_ready -> ready + round_remaining/pick_group's runnable-app filter.
+ * WAIT_POLL with input/derived joins the round; only EMPTY WAIT_POLL falls
+ * through to ma_pick_poll. State x input x derived is checked in
+ * case_poll_gui_ready and tools/tests/g3fix_wm_probe.rs.
+ * The model stores readiness bits; the product derives them from WM state. */
 static int ma_input_group(const MaState *st, const MaApp *a) NOINST;
 static int ma_input_group(const MaState *st, const MaApp *a)
 {
     if (a->state == MA_WAIT_KEY) return ma_key_ready(st, a);
-    return a->state == MA_PARKED && a->input_ready;
+    return (a->state == MA_PARKED || a->state == MA_WAIT_POLL) && a->input_ready;
 }
 
 /* 起こせるか (止まっていて、起床の理由がある)。 */
@@ -288,7 +294,7 @@ static int ma_ready(const MaState *st, const MaApp *a) NOINST;
 static int ma_ready(const MaState *st, const MaApp *a)
 {
     if (a->state == MA_WAIT_KEY) return ma_key_ready(st, a);
-    if (a->state != MA_PARKED) return 0;
+    if (a->state != MA_PARKED && a->state != MA_WAIT_POLL) return 0;
     return a->input_ready || a->derived_ready;
 }
 
@@ -1317,9 +1323,9 @@ static void case_wait_key_joins_the_round(void)
 /*                                                                     */
 /*  GUI 中に kbd_trygetchar をポーリングする全画面 GFX プログラムは     */
 /*  第 3 の park 点 (MA_WAIT_POLL) で 1 周だけ WM へ譲る。**常に        */
-/*  ready** だが優先度は最下位 — 入力群 / 導出群 / LAUNCH 保留の        */
+/*  ready** な poll 群は最下位 — 入力群 / 導出群 / LAUNCH 保留の        */
 /*  どれも無い周にしか選ばない (複数居れば ID 昇順)。D11 の規則と       */
-/*  上界 (30) は不変で、そのために ma_ready は WAIT_POLL を数えない。   */
+/*  上界 (30) は不変。入力/導出が空の WAIT_POLL は round に数えない。   */
 /* ------------------------------------------------------------------ */
 static void case_poll_yield_is_lowest_priority(void) NOINST;
 static void case_poll_yield_is_lowest_priority(void)
@@ -1397,6 +1403,38 @@ static void case_poll_yield_is_lowest_priority(void)
     check(ma_pick(&st) == MA_ID_MIN, "19p ポーリングが複数なら ID 昇順");
 }
 
+/* g3fix: same state/input matrix as the real Rust WM probe. */
+static void case_poll_gui_ready(void) NOINST;
+static void case_poll_gui_ready(void)
+{
+    MaState st;
+    for (int state = MA_PARKED; state <= MA_WAIT_POLL; state++) {
+        if (state == MA_WAIT_KEY) continue;
+        for (int input = 0; input <= 1; input++) {
+            for (int derived = 0; derived <= 1; derived++) {
+                ma_init(&st, 4096);
+                ma_start(&st, 100, 1);
+                ma_gui_call(&st, MA_OP_WAIT); ma_park(&st);
+                ma_start(&st, 100, 1);
+                ma_gui_call(&st, MA_OP_WAIT); ma_park(&st);
+                st.app[0].state = state;
+                st.focus = 2;
+                ma_set_ready(&st, 2, input, derived);
+                ma_set_ready(&st, 3, 1, 0);
+                check(ma_input_group(&st, &st.app[0]) == input,
+                      "20a GUI WAIT_POLL input matches product");
+                check(ma_ready(&st, &st.app[0]) == (input || derived),
+                      "20b GUI WAIT_POLL derived matches product");
+                check(ma_pick(&st) == (input ? 2 : 3),
+                      "20c foreground input wins, back input beats derived");
+                ma_set_ready(&st, 3, 0, 0);
+                check(ma_round_remaining(&st) == (input || derived),
+                      "20d input/derived joins round, empty poll does not");
+            }
+        }
+    }
+}
+
 int main(void) NOINST;
 int main(void)
 {
@@ -1421,6 +1459,7 @@ int main(void)
     case_launch_pending_parks();
     case_wait_key_joins_the_round();
     case_poll_yield_is_lowest_priority();
+    case_poll_gui_ready();
     if (failures) {
         report("FAILURES\n");
         die(1);

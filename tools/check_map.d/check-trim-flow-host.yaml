@@ -74,5 +74,13 @@ check-trim-flow-host:
 - tools/tests/test_trim_kernel.py
 - tools/tests/trim_flow_host.c
 - tools/tests/trim_kernel_host.c
-- userland/gshell/src/trim.rs
 - userland/shell/cmd_sys.c
+- tools/tests/g3fix_wm_probe.py
+- tools/tests/g3fix_wm_probe.rs
+- userland/gshell/src/**
+- userland/gshell/host/**
+- tools/tests/test_trim_fixtures.py
+- tools/tests/trim_fixtures_host.c
+- userland/tests/trim_front.c
+- userland/tests/trim_back.c
+- tools/tests/os32api_host.py

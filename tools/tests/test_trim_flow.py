@@ -14,6 +14,8 @@ import subprocess
 import tempfile
 
 import host32
+import g3fix_wm_probe
+import test_trim_fixtures
 import test_trim_kernel as kernel
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -24,8 +26,20 @@ TARGET_SRCS = [
     'sdk/allocator/nano_adapter.c',
     'tools/tests/trim_flow_host.c', 'tools/tests/multiapp_model_host.c',
 ]
-CASES = ('success', 'noanswer', 'raw', 'cui', 'realloc', 'remark')
+CASES = ('success', 'noanswer', 'raw', 'cui', 'realloc', 'remark', 'blocked-primary', 'input-exception')
 MUTANTS = [
+    ('poll-excludes-input', 7, 'tools/tests/multiapp_model_host.c',
+     'return (a->state == MA_PARKED || a->state == MA_WAIT_POLL) && a->input_ready;',
+     'return a->state == MA_PARKED && a->input_ready;',
+     'input exception preserves pending before retry'),
+    ('poll-excludes-ready', 7, 'tools/tests/multiapp_model_host.c',
+     'if (a->state != MA_PARKED && a->state != MA_WAIT_POLL) return 0;',
+     'if (a->state != MA_PARKED) return 0;',
+     'input exception ready includes requester'),
+    ('blocked-primary-drops-secondary-mark', 6, 'exec/appmem_map.c',
+     'if (rc == APPMEM_ENOSPC) appslot_trim_request_as(as);',
+     '/* omit the secondary arena pressure request */',
+     'blocked primary marks before first yield'),
     ('map-mid-pump', 0, 'exec/appmem_map.c',
      'rc = paging_app_stage(&tx, as, plan.base, plan.end);',
      'rc = paging_app_stage(&tx, as, plan.base, plan.end);\n'
@@ -141,6 +155,7 @@ def build_fixture(tmp, sources):
     # synthetic caller. End that binding: the flow uses real active AS state.
     fixture.write_text(source.replace(anchor, '#undef caller_access_get\n' + anchor))
     (tmp / 'trim_flow_source.c').write_text(sources['tools/tests/trim_flow_host.c'])
+    (tmp / 'multiapp_model_host.c').write_text(sources['tools/tests/multiapp_model_host.c'])
     objects = []
     for index, name in enumerate(('exec/appmem.c', 'exec/appmem_map.c',
                                   'exec/appmem_unmap.c', 'kernel/paging_app.c',
@@ -192,7 +207,9 @@ def main():
                 assert result.returncode == 1 and 'FAIL: ' + label in result.stdout.splitlines(), (
                     name, result.returncode, result.stdout, result.stderr)
                 print('RED: ' + name + ' -> ' + label)
-            print('trim flow: 6 runtime RED / 0 survived / 0 ERROR')
+            print(f'trim flow: {len(MUTANTS)} runtime RED / 0 survived / 0 ERROR')
+    test_trim_fixtures.run()
+    g3fix_wm_probe.run()
     return 0
 
 
