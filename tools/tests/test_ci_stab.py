@@ -10,6 +10,14 @@ import host32
 import mutpar
 
 
+NET_REPORT_WRITE = (
+    'report = pathlib.Path(sys.argv[1])\n'
+    'pending = report.with_name(report.name + ".tmp")\n'
+    'pending.write_text(str(p.pid) + " " + os.environ["TMPDIR"])\n'
+    'os.replace(pending, report)\n'
+)
+
+
 def _process_timeout_fixture(item):
     import multiprocessing
     import sys
@@ -785,7 +793,7 @@ int main(int argc, char **argv)
             script.write_text(
                 'import os, pathlib, subprocess, sys, time\n'
                 'p = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])\n'
-                'pathlib.Path(sys.argv[1]).write_text(str(p.pid) + " " + os.environ["TMPDIR"])\n'
+                + NET_REPORT_WRITE +
                 'if sys.argv[2] == "exit": os._exit(9)\n'
                 'time.sleep(60)\n')
             for mode in ('exit', 'timeout', 'sigterm'):
@@ -824,6 +832,72 @@ int main(int argc, char **argv)
                 else:
                     os.kill(int(pid), signal.SIGKILL)
                     self.fail('live descendant leaked')
+
+    def test_net_report_publication_while_write_is_paused(self):
+        import select
+        import sys
+        # Pause write_text after open, before any bytes are written. The parent
+        # observes publication before releasing the writer; timing cannot decide
+        # whether the direct-write control exposes an empty report.
+        gate = (
+            'import os, pathlib, sys\n'
+            'from types import SimpleNamespace\n'
+            'p = SimpleNamespace(pid=4242)\n'
+            'original_open = pathlib.Path.open\n'
+            'def paused_open(path, *args, **kwargs):\n'
+            '    stream = original_open(path, *args, **kwargs)\n'
+            '    os.write(int(sys.argv[2]), b"O")\n'
+            '    assert os.read(int(sys.argv[3]), 1) == b"R"\n'
+            '    return stream\n'
+            'pathlib.Path.open = paused_open\n'
+        )
+        direct_write = NET_REPORT_WRITE.replace(
+            'pending.write_text(', 'report.write_text(').replace(
+            'os.replace(pending, report)\n', '')
+        self.assertNotEqual(direct_write, NET_REPORT_WRITE)
+        for label, source in (('atomic', NET_REPORT_WRITE),
+                              ('report-write-not-atomic', direct_write)):
+            with self.subTest(writer=label), tempfile.TemporaryDirectory() as directory:
+                report = pathlib.Path(directory) / 'pids'
+                ready_read, ready_write = os.pipe()
+                release_read, release_write = os.pipe()
+                child = None
+                try:
+                    child = subprocess.Popen(
+                        [sys.executable, '-c', gate + source, str(report),
+                         str(ready_write), str(release_read)],
+                        pass_fds=(ready_write, release_read),
+                        env={**os.environ, 'TMPDIR': directory},
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    os.close(ready_write)
+                    ready_write = None
+                    os.close(release_read)
+                    release_read = None
+                    self.assertTrue(select.select([ready_read], [], [], 10)[0],
+                                    'writer did not reach open gate')
+                    self.assertEqual(os.read(ready_read, 1), b'O')
+                    if label == 'atomic':
+                        self.assertFalse(report.exists())
+                        self.assertTrue(report.with_name('pids.tmp').exists())
+                    else:
+                        self.assertTrue(report.exists())
+                        with self.assertRaises(ValueError):
+                            pid, state = report.read_text().split()
+                        print('report-write-not-atomic: RED (empty report at open gate)')
+                    os.write(release_write, b'R')
+                    _, stderr = child.communicate(timeout=10)
+                    self.assertEqual(child.returncode, 0, stderr.decode())
+                    self.assertTrue(report.exists())
+                    pid, state = report.read_text().split()
+                    self.assertEqual((pid, state), ('4242', directory))
+                finally:
+                    if child is not None:
+                        if child.poll() is None:
+                            child.kill()
+                        child.communicate()
+                    for fd in (ready_read, ready_write, release_read, release_write):
+                        if fd is not None:
+                            os.close(fd)
 
     def test_real_artifacts_fail_before_work(self):
         import sys
