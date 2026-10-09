@@ -318,7 +318,7 @@ def one_mutation(k: int) -> tuple:
                     'e7 restore screen info': 'e7 restore geometry stale',
                     'e7 restore framebuffer': 'e7 restore framebuffer stale'}.get(name)
         if r.returncode != 0 and ran and int(ran[2]) > 0 and (expected is None or expected in r.stdout):
-            return True, f'RED  {name}  ({ran[2]} failed)'
+            return True, f'RED  {name}  (rc={r.returncode}, {ran[2]} failed) -> FAIL: {filt}'
         return False, f'SURVIVED  {name}  (filter {filt!r})'
 
 

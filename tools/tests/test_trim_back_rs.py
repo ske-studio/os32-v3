@@ -40,6 +40,36 @@ MUTANTS = [
 ]
 
 
+
+FOCUS = 'userland/rust/trim_back_rs/src/lib.rs'
+FOCUS_MUTANTS = [
+    ('rust-stop-focus-missing', 'if unsafe { STOP_FOCUS } {', 'if false {', 'stop-focus confirmed before hook'),
+    ('rust-stop-focus-error-ignored', 'if rc != 0 {', 'if false {', 'stop-focus error stops before ticks/release'),
+    ('rust-stop-focus-cli-missing', 'stop_focus = true;', 'stop_focus = false;', 'stop-focus CLI accepted'),
+]
+
+
+def focus_test(tmp, mutate):
+    original = (ROOT / FOCUS).read_text()
+    fixture = (ROOT / 'tools/tests/trim_focus_host.rs').read_text()
+    def run(source):
+        functions = '\n'.join(kernel.base.function(source, sig) for sig in
+                              ('fn arguments(', 'unsafe fn argument_is(', 'fn hook('))
+        path = tmp / 'focus.rs'
+        path.write_text(fixture.replace('// INSERT_GUEST_FUNCTIONS', functions))
+        subprocess.run(['rustc', '--edition=2021', '--test', str(path), '-o', str(tmp / 'focus')], check=True)
+        return subprocess.run([str(tmp / 'focus'), '--test-threads=1'], capture_output=True, text=True)
+    control = run(original)
+    print(control.stdout, end='')
+    assert control.returncode == 0, control.stdout + control.stderr
+    if mutate:
+        for name, old, new, expected in FOCUS_MUTANTS:
+            assert original.count(old) == 1, name
+            result = run(original.replace(old, new))
+            assert result.returncode == 101 and expected in result.stdout, (name, result)
+            print('RED: ' + name + ' rc=101 -> ' + expected)
+
+
 def rust_library(tmp, sources):
     work = tmp / 'rust'
     work.mkdir(exist_ok=True)
@@ -123,6 +153,7 @@ def main():
     sources = {name: (ROOT / name).read_text() for name in TARGET_SRCS}
     with tempfile.TemporaryDirectory(prefix='g4-rust-') as directory:
         tmp = Path(directory)
+        focus_test(tmp, args.mutate)
         built = build(tmp, sources)
         for case in range(4):
             r = run(tmp, built, case, args.runner)
