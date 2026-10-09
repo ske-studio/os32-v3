@@ -57,6 +57,7 @@ mem_stat_test          # mem_stat sizes / self / system / other IDs
 # (e) 対話・キー待ち — 末尾で入力を待つので**ランナーが必ず固まる**。
 #     自動回帰に載せるには `--batch` 相当が要る = 別の判断 (前段 §8)。
 #     kbd_echo / mouse_test / blit_test / tile_bench
+#     trim_back / trim_front: GK-3 の arm / target / regrow キーと観測が必要。
 #     (gfx200_test は (c) と (e) の両方)
 #
 # (b) 計測・ベンチ — 合否ではなく**数字を出すのが目的**なので約束事の対象外。

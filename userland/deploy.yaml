@@ -85,6 +85,13 @@ filesystem:
     - host: userland/tests/h3b.bin
       guest: /usr/bin/
       tags: [test]
+    # --- T2g / GK-3 cooperative trim fixtures (interactive) ---
+    - host: userland/tests/trim_back.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/trim_front.bin
+      guest: /usr/bin/
+      tags: [test]
     # --- K2 の完了条件アプリ (計算中の syscall 境界ポンプ、--nokapi で CTRL+STOP 脱出) ---
     - host: userland/tests/gui_busy.bin
       guest: /usr/bin/

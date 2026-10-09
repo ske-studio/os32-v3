@@ -13,6 +13,10 @@ INST_SHARED_SRC = userland/system/inst_disk.c userland/system/inst_hdd.c
 C_BASE_PROGRAMS = $(C_CMDS) $(C_TESTS) $(C_SYSTEM)
 BASE_PROGRAMS_BIN = $(C_BASE_PROGRAMS:.c=.bin) userland/shell.bin userland/tests/h2_stack512.bin
 
+# T2g in-tree fixtures use the private SDK allocator inspection/serve seam.
+userland/tests/trim_back.elf userland/tests/trim_front.elf: PROGRAM_FLAGS += -Isdk/allocator
+userland/tests/trim_back.elf userland/tests/trim_front.elf: sdk/allocator/nano_adapter.h
+
 # === CRT0 ビルドルール ===
 sdk/crt/crt0.o: sdk/crt/crt0.asm
 	$(AS) -f elf32 $< -o $@
