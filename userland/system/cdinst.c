@@ -62,6 +62,188 @@
 
 static KernelAPI *api;
 
+typedef struct {
+    u8        *data;            /* BOOT.PKG のデータ部 (mem_alloc) */
+    const u8  *ipl;
+    u32        ipl_len;
+    const u8  *loader;
+    u32        loader_len;
+} BootImg;
+
+/* 展開の前に作るディレクトリ (親が先)。新しく作った ext2 なのでどれも作れる
+ * はず — 1 つでも作れなければ未完成として止める */
+static const char *const init_dirs[] = {
+    "/hd0/sys", "/hd0/boot", "/hd0/bin", "/hd0/sbin", "/hd0/usr",
+    "/hd0/usr/bin", "/hd0/usr/man", "/hd0/etc", "/hd0/data", "/hd0/home",
+    "/hd0/home/user", "/hd0/tmp"
+};
+#define INIT_DIRS ((int)(sizeof(init_dirs) / sizeof(init_dirs[0])))
+
+/* 外部プログラムの入口を最初の関数に置く。 */
+static void print(u8 attr, const char *s);
+static void println(u8 attr, const char *s);
+static int getkey(void);
+static int check_cd(void);
+static int pkg_exists(const char *path);
+static void pkg_series_path(char *buf, const char *base, int n);
+static int pkg_series_count(const char *base);
+static int report_missing_packages(int choice);
+static void boot_img_free(BootImg *b);
+static int preflight(int choice, BootImg *b, InstTarget *t);
+static int install_packages(int choice);
+
+int __cdecl main(int argc, char **argv, KernelAPI *_api)
+{
+    static BootImg boot;
+    static InstTarget tgt;
+    int choice, i, ret;
+
+    (void)argc;
+    (void)argv;
+    api = _api;
+    dbg_init(api);
+    DBG("[cdinst] started");
+
+    println(COL_TITLE, "========================================");
+    println(COL_TITLE, "      OS32 CD Installer v3.0");
+    println(COL_TITLE, "========================================");
+    print(COL_NORMAL, "\n");
+
+    /* CD-ROMマウント */
+    print(COL_NORMAL, "Mounting CD-ROM... ");
+    {
+        int mr = api->sys_mount("/cd0", "cd0", "iso9660");
+        if (mr == 0)
+            println(COL_GREEN, "OK");
+        else
+            println(COL_YELLOW, "already mounted or skipped");
+    }
+
+    /* CD-ROM確認 */
+    print(COL_NORMAL, "Checking CD-ROM... ");
+    if (!check_cd()) {
+        println(COL_RED, "NOT FOUND");
+        println(COL_RED, "  BOOT.PKG not found on /cd0/");
+        return 1;
+    }
+    println(COL_GREEN, "OK");
+
+    /* パッケージ一覧 */
+    print(COL_NORMAL, "\n");
+    println(COL_NORMAL, "Available packages on CD:");
+    if (pkg_exists(PKG_BOOT))    println(COL_CYAN, "  [*] BOOT.PKG");
+    {
+        static const char *const bases[4] = {
+            PKG_BASE_MINIMAL, PKG_BASE_GUI, PKG_BASE_NORMAL, PKG_BASE_DEBUG
+        };
+        int b, n, count;
+        for (b = 0; b < 4; b++) {
+            count = pkg_series_count(bases[b]);
+            for (n = 1; n <= count; n++) {
+                char path[PKG_PATH_BUF];
+                pkg_series_path(path, bases[b], n);
+                api->kprintf(COL_CYAN, "  [*] %s\n", path + sizeof(CD_MOUNT));
+            }
+        }
+    }
+
+    /* インストールタイプ選択 (中身は build/packages.yaml の振り分け) */
+    print(COL_NORMAL, "\n");
+    println(COL_NORMAL, "Install type:");
+    /* 1 は「起動して、HDD に入れて、壊れたときに直して、残りを取ってこられる」
+     * レスキュー兼インストーラ (2026-09-25)。既定フォントと一般コマンドは 2 */
+    println(COL_NORMAL, "  1. Minimal  (CUI rescue + installer, same as the boot FD)");
+    println(COL_NORMAL, "  2. Normal   (+ GUI shell, commands, apps, manpages, font, IME, data)");
+    println(COL_NORMAL, "  3. Full     (+ test programs and test data)");
+    println(COL_NORMAL, "  0. Cancel");
+    print(COL_NORMAL, "\n");
+
+    print(COL_YELLOW, "Select [0-3]: ");
+    do {
+        choice = getkey();
+    } while (choice < '0' || choice > '3');
+    api->kprintf(COL_NORMAL, "%c\n", choice);
+
+    if (choice == '0') {
+        println(COL_NORMAL, "Installation cancelled.");
+        return 0;
+    }
+
+    /* 選んだ型に要るパッケージが媒体に揃っているか、HDD を消す前に見る。
+     * 欠けたものは名前を全部出す (古い CD / 焼き損じの切り分け用) */
+    if (report_missing_packages(choice) != 0) {
+        println(COL_RED, "ERROR: the CD lacks a package for this install type.");
+        return 1;
+    }
+
+    /* 全検査 (段 2-11 / N4 / N6 / N8)。1 つでも欠ければ 1 セクタも書かない */
+    if (preflight(choice, &boot, &tgt) != 0) return 1;
+
+    print(COL_NORMAL, "\n");
+    inst_hdd_describe(api, &tgt);
+    println(COL_RED, "WARNING: This will format the OS32 area of hd0 and install OS32.");
+    print(COL_YELLOW, "Continue? [y/N]: ");
+    {
+        /* [0-3] は 1 字で決まるので、選択の後の Enter (端末が「1」と一緒に送る
+         * CR / LF / CRLF、後から押した Enter) が残る。その最初の 1 つは選択の
+         * 行末として捨てる (取り消しにしない)。次の Enter だけなら取り消し */
+        int k = inst_hdd_getkey_after_key(api);
+        /* 表示できる字だけ映す (NUL や制御文字は答え = N として扱うが映さない) */
+        api->kprintf(COL_NORMAL, "%c\n", (k >= 0x20 && k <= 0x7E) ? k : ' ');
+        if (k != 'y' && k != 'Y') {
+            println(COL_NORMAL, "Installation cancelled. Nothing was written.");
+            boot_img_free(&boot);
+            return 0;
+        }
+    }
+    /* 表が使えないディスクは y の後に ERASE の打鍵 (受けなければ何も書かない) */
+    if (inst_hdd_ask_erase(api, &tgt) != 0) {
+        boot_img_free(&boot);
+        return 0;
+    }
+
+    /* === インストール実行 (R3-1) === */
+    print(COL_NORMAL, "\n");
+    println(COL_GREEN, "=== Installing OS32 ===");
+
+    /* hd0 のマウントを外す (起動時の自動マウントの ctx は旧 FS の
+     * スーパーブロック / GDT を持ったまま)。外れなければ消去も format もしない
+     * (umount 自身の sync は書き出し得る)。ERASE を受けていればここで LBA 0/1 を
+     * 消す (インストーラ自身の最初の書き込み) */
+    if (inst_hdd_release(api, &tgt) != 0) {
+        boot_img_free(&boot);
+        return 1;
+    }
+    /* ext2 → 区画表 → 読み戻し → /hd0 にマウント */
+    if (inst_hdd_prepare(api, &tgt) != 0) {
+        boot_img_free(&boot);
+        return 1;
+    }
+    /* ローダ → IPL (BIOS 幾何) */
+    ret = inst_hdd_write_boot(api, &tgt, boot.ipl, boot.ipl_len,
+                              boot.loader, boot.loader_len);
+    boot_img_free(&boot);
+    if (ret != 0) return 1;
+
+    /* ディレクトリ構造を作成 */
+    print(COL_CYAN, "  Creating directories...");
+    for (i = 0; i < INIT_DIRS; i++) {
+        int mr = api->sys_mkdir(init_dirs[i]);
+        if (mr != 0) {
+            api->kprintf(COL_RED, "\n    mkdir %s failed (rc=%d)\n", init_dirs[i], mr);
+            inst_hdd_incomplete(api, "cannot create the directories", mr);
+            return 1;
+        }
+    }
+    println(COL_GREEN, " OK");
+
+    /* パッケージの展開・同期・完了表示。展開の後の必須の実物は install_packages が
+     * 完了を出す前に見る (required_on_hd0) */
+    ret = install_packages(choice);
+    if (ret != PKG_OK) inst_hdd_incomplete(api, "package installation failed", ret);
+    return ret == PKG_OK ? 0 : 1;
+}
+
 /* ---- ユーティリティ ---- */
 
 static void print(u8 attr, const char *s)
@@ -170,14 +352,6 @@ static int str_endswith(const char *s, const char *suffix)
 /*  注: kernel.bin の生書き込みは廃止した (loader v3 は ext2 の             */
 /*  /boot/vmkernel.lz4 を読む)。                                            */
 /* ======================================================================== */
-
-typedef struct {
-    u8        *data;            /* BOOT.PKG のデータ部 (mem_alloc) */
-    const u8  *ipl;
-    u32        ipl_len;
-    const u8  *loader;
-    u32        loader_len;
-} BootImg;
 
 static void boot_img_free(BootImg *b)
 {
@@ -585,19 +759,6 @@ static int install_packages(int choice)
     return PKG_OK;
 }
 
-/* ======================================================================== */
-/*  メイン                                                                   */
-/* ======================================================================== */
-
-/* 展開の前に作るディレクトリ (親が先)。新しく作った ext2 なのでどれも作れる
- * はず — 1 つでも作れなければ未完成として止める */
-static const char *const init_dirs[] = {
-    "/hd0/sys", "/hd0/boot", "/hd0/bin", "/hd0/sbin", "/hd0/usr",
-    "/hd0/usr/bin", "/hd0/usr/man", "/hd0/etc", "/hd0/data", "/hd0/home",
-    "/hd0/home/user", "/hd0/tmp"
-};
-#define INIT_DIRS ((int)(sizeof(init_dirs) / sizeof(init_dirs[0])))
-
 /* 書く前の全検査。0 = 通る (b にブート像、t に hd0 の計画) */
 static int preflight(int choice, BootImg *b, InstTarget *t)
 {
@@ -624,155 +785,4 @@ static int preflight(int choice, BootImg *b, InstTarget *t)
         return -1;
     }
     return 0;
-}
-
-void __cdecl main(int argc, char **argv, KernelAPI *_api)
-{
-    static BootImg boot;
-    static InstTarget tgt;
-    int choice, i, ret;
-
-    (void)argc;
-    (void)argv;
-    api = _api;
-    dbg_init(api);
-    DBG("[cdinst] started");
-
-    println(COL_TITLE, "========================================");
-    println(COL_TITLE, "      OS32 CD Installer v3.0");
-    println(COL_TITLE, "========================================");
-    print(COL_NORMAL, "\n");
-
-    /* CD-ROMマウント */
-    print(COL_NORMAL, "Mounting CD-ROM... ");
-    {
-        int mr = api->sys_mount("/cd0", "cd0", "iso9660");
-        if (mr == 0)
-            println(COL_GREEN, "OK");
-        else
-            println(COL_YELLOW, "already mounted or skipped");
-    }
-
-    /* CD-ROM確認 */
-    print(COL_NORMAL, "Checking CD-ROM... ");
-    if (!check_cd()) {
-        println(COL_RED, "NOT FOUND");
-        println(COL_RED, "  BOOT.PKG not found on /cd0/");
-        return;
-    }
-    println(COL_GREEN, "OK");
-
-    /* パッケージ一覧 */
-    print(COL_NORMAL, "\n");
-    println(COL_NORMAL, "Available packages on CD:");
-    if (pkg_exists(PKG_BOOT))    println(COL_CYAN, "  [*] BOOT.PKG");
-    {
-        static const char *const bases[4] = {
-            PKG_BASE_MINIMAL, PKG_BASE_GUI, PKG_BASE_NORMAL, PKG_BASE_DEBUG
-        };
-        int b, n, count;
-        for (b = 0; b < 4; b++) {
-            count = pkg_series_count(bases[b]);
-            for (n = 1; n <= count; n++) {
-                char path[PKG_PATH_BUF];
-                pkg_series_path(path, bases[b], n);
-                api->kprintf(COL_CYAN, "  [*] %s\n", path + sizeof(CD_MOUNT));
-            }
-        }
-    }
-
-    /* インストールタイプ選択 (中身は build/packages.yaml の振り分け) */
-    print(COL_NORMAL, "\n");
-    println(COL_NORMAL, "Install type:");
-    /* 1 は「起動して、HDD に入れて、壊れたときに直して、残りを取ってこられる」
-     * レスキュー兼インストーラ (2026-09-25)。既定フォントと一般コマンドは 2 */
-    println(COL_NORMAL, "  1. Minimal  (CUI rescue + installer, same as the boot FD)");
-    println(COL_NORMAL, "  2. Normal   (+ GUI shell, commands, apps, manpages, font, IME, data)");
-    println(COL_NORMAL, "  3. Full     (+ test programs and test data)");
-    println(COL_NORMAL, "  0. Cancel");
-    print(COL_NORMAL, "\n");
-
-    print(COL_YELLOW, "Select [0-3]: ");
-    do {
-        choice = getkey();
-    } while (choice < '0' || choice > '3');
-    api->kprintf(COL_NORMAL, "%c\n", choice);
-
-    if (choice == '0') {
-        println(COL_NORMAL, "Installation cancelled.");
-        return;
-    }
-
-    /* 選んだ型に要るパッケージが媒体に揃っているか、HDD を消す前に見る。
-     * 欠けたものは名前を全部出す (古い CD / 焼き損じの切り分け用) */
-    if (report_missing_packages(choice) != 0) {
-        println(COL_RED, "ERROR: the CD lacks a package for this install type.");
-        return;
-    }
-
-    /* 全検査 (段 2-11 / N4 / N6 / N8)。1 つでも欠ければ 1 セクタも書かない */
-    if (preflight(choice, &boot, &tgt) != 0) return;
-
-    print(COL_NORMAL, "\n");
-    inst_hdd_describe(api, &tgt);
-    println(COL_RED, "WARNING: This will format the OS32 area of hd0 and install OS32.");
-    print(COL_YELLOW, "Continue? [y/N]: ");
-    {
-        /* [0-3] は 1 字で決まるので、選択の後の Enter (端末が「1」と一緒に送る
-         * CR / LF / CRLF、後から押した Enter) が残る。その最初の 1 つは選択の
-         * 行末として捨てる (取り消しにしない)。次の Enter だけなら取り消し */
-        int k = inst_hdd_getkey_after_key(api);
-        /* 表示できる字だけ映す (NUL や制御文字は答え = N として扱うが映さない) */
-        api->kprintf(COL_NORMAL, "%c\n", (k >= 0x20 && k <= 0x7E) ? k : ' ');
-        if (k != 'y' && k != 'Y') {
-            println(COL_NORMAL, "Installation cancelled. Nothing was written.");
-            boot_img_free(&boot);
-            return;
-        }
-    }
-    /* 表が使えないディスクは y の後に ERASE の打鍵 (受けなければ何も書かない) */
-    if (inst_hdd_ask_erase(api, &tgt) != 0) {
-        boot_img_free(&boot);
-        return;
-    }
-
-    /* === インストール実行 (R3-1) === */
-    print(COL_NORMAL, "\n");
-    println(COL_GREEN, "=== Installing OS32 ===");
-
-    /* hd0 のマウントを外す (起動時の自動マウントの ctx は旧 FS の
-     * スーパーブロック / GDT を持ったまま)。外れなければ消去も format もしない
-     * (umount 自身の sync は書き出し得る)。ERASE を受けていればここで LBA 0/1 を
-     * 消す (インストーラ自身の最初の書き込み) */
-    if (inst_hdd_release(api, &tgt) != 0) {
-        boot_img_free(&boot);
-        return;
-    }
-    /* ext2 → 区画表 → 読み戻し → /hd0 にマウント */
-    if (inst_hdd_prepare(api, &tgt) != 0) {
-        boot_img_free(&boot);
-        return;
-    }
-    /* ローダ → IPL (BIOS 幾何) */
-    ret = inst_hdd_write_boot(api, &tgt, boot.ipl, boot.ipl_len,
-                              boot.loader, boot.loader_len);
-    boot_img_free(&boot);
-    if (ret != 0) return;
-
-    /* ディレクトリ構造を作成 */
-    print(COL_CYAN, "  Creating directories...");
-    for (i = 0; i < INIT_DIRS; i++) {
-        int mr = api->sys_mkdir(init_dirs[i]);
-        if (mr != 0) {
-            api->kprintf(COL_RED, "\n    mkdir %s failed (rc=%d)\n", init_dirs[i], mr);
-            inst_hdd_incomplete(api, "cannot create the directories", mr);
-            return;
-        }
-    }
-    println(COL_GREEN, " OK");
-
-    /* パッケージの展開・同期・完了表示。展開の後の必須の実物は install_packages が
-     * 完了を出す前に見る (required_on_hd0) */
-    ret = install_packages(choice);
-    if (ret != PKG_OK) inst_hdd_incomplete(api, "package installation failed", ret);
 }

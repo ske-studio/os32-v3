@@ -657,7 +657,7 @@ static void setup(void)
     g_api.serial_trygetchar = f_serial_trygetchar;
 }
 
-static void run(void) { cdinst_main(1, (char **)0, &g_api); }
+static int run(void) { return cdinst_main(1, (char **)0, &g_api); }
 
 #define CHECK_NOTHING_WRITTEN() do { \
     CHECK(writes == 0); CHECK(fmt_calls == 0); CHECK(ev_len == 0); \
@@ -2019,6 +2019,55 @@ static void case_keys(void)
     CHECK(h_strcmp(cap, "AB\n") == 0);
 }
 
+/* X-16: 中止・前提不足・preflight・書込み・展開失敗と成功の終了値。 */
+static void case_exit_status(void)
+{
+    setup();
+    KEYS("0");
+    CHECK(run() == 0);
+    CHECK_STR("Installation cancelled.");
+    CHECK(writes == 0 && fmt_calls == 0);
+
+    setup();
+    KEYS("1n");
+    CHECK(run() == 0);
+    CHECK_NOTHING_WRITTEN();
+
+    setup();
+    bad_disk(BAD_FOREIGN);
+    KEYS("1yno\r");
+    CHECK(run() == 0);
+    CHECK_NOTHING_WRITTEN();
+
+    setup();
+    fx[fx_find("/cd0/BOOT.PKG")].used = 0;
+    CHECK(run() != 0);
+    CHECK_STR("NOT FOUND");
+    CHECK(writes == 0 && fmt_calls == 0);
+
+    setup();
+    boot_pkg(513u, LOADER_LEN, 1, 0);
+    CHECK(run() != 0);
+    CHECK_NOTHING_WRITTEN();
+
+    setup();
+    inj_write_fail_lba = 2;
+    CHECK(run() != 0);
+    CHECK_STR("INCOMPLETE");
+    CHECK_NOSTR("Installation Complete");
+
+    setup();
+    inj_sync_fail = 1;
+    CHECK(run() != 0);
+    CHECK_STR("INCOMPLETE");
+    CHECK_NOSTR("Installation Complete");
+
+    setup();
+    CHECK(run() == 0);
+    CHECK_STR("Installation Complete");
+    check_disk(1632u, 407864u, 8, 17, 409600u);
+}
+
 int os32_main(int argc, char **argv)
 {
     const char *c = argc > 1 ? argv[1] : "";
@@ -2033,6 +2082,7 @@ int os32_main(int argc, char **argv)
     else if (h_strcmp(c, "erase_fail") == 0) case_erase_fail();
     else if (h_strcmp(c, "erase_mount") == 0) case_erase_mount();
     else if (h_strcmp(c, "keys") == 0) case_keys();
+    else if (h_strcmp(c, "exit_status") == 0) case_exit_status();
     else { report("unknown case\n"); return 2; }
     report("cdinst: PASS (");
     report(c);
