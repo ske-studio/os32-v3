@@ -49,6 +49,7 @@ extern crate os32api;
 mod chrome;
 mod cursor;
 mod damage;
+mod dbgdesc;
 mod desktop;
 mod fep;
 mod ffi;

@@ -10,10 +10,10 @@ const MEMSTAT_SIZE: usize = 132;
 const PENDING_OFFSET: usize = 124;
 const EPOCH_OFFSET: usize = 128;
 
-struct SentCell(UnsafeCell<[bool; multiapp::MAX_APPS]>);
+pub(crate) struct SentCell(pub(crate) UnsafeCell<[bool; multiapp::MAX_APPS]>);
 unsafe impl Sync for SentCell {}
 // OS32 はシングルタスク・協調切替。配送中に park / yield はしない。
-static SENT: SentCell = SentCell(UnsafeCell::new([false; multiapp::MAX_APPS]));
+pub(crate) static SENT: SentCell = SentCell(UnsafeCell::new([false; multiapp::MAX_APPS]));
 
 /// ゲスト観測用。gshell ELF から名前を解決する。
 #[no_mangle]
