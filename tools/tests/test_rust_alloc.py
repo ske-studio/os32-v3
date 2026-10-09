@@ -20,6 +20,13 @@ MUTATIONS = [
      'if next.is_null() { self.dealloc(ptr, layout); }\n        if !next.is_null() {\n            core::ptr::copy_nonoverlapping',
      'failed realloc retains old block'),
     ('ptr.write_bytes(0, layout.size());', 'ptr.write_bytes(1, layout.size());', 'explicit zeroing'),
+    ('if base.is_null() && GUI_RETRY.0.get() && !IN_TRIM.0.get() {',
+     'while base.is_null() && GUI_RETRY.0.get() && !IN_TRIM.0.get() {', 'retry-unbounded'),
+    ('GUI_RETRY.0.get() && !IN_TRIM.0.get()', '!IN_TRIM.0.get()', 'retry-without-gui'),
+    ('GUI_RETRY.0.get() && !IN_TRIM.0.get()', 'GUI_RETRY.0.get()', 'retry-in-trim'),
+    ('if layout.size() == 0 { return core::ptr::null_mut(); }',
+     'if layout.size() == 0 { (api().sys_yield)(); return core::ptr::null_mut(); }', 'retry-size0'),
+
 ]
 
 def main():
@@ -27,7 +34,7 @@ def main():
     parser.add_argument('--mutate',action='store_true')
     args=parser.parse_args()
     source=SOURCE.read_text()
-    source=source[source.index('struct Os32Alloc;'):source.index('#[global_allocator]')]
+    source=source[source.index('// OS32 has one cooperative task'):source.index('#[global_allocator]')]
     fixture=(ROOT/'tools/tests/rust_alloc_host.rs').read_text()
     with tempfile.TemporaryDirectory(prefix='f8-rust-') as d:
         work=Path(d); rlib=os32api_host.build(work)

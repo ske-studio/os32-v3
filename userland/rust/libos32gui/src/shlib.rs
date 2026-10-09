@@ -210,7 +210,7 @@ core::arch::global_asm!(
 __os32_shlib_header:
     .long   0x42494C53                  /* 0x00 magic  'SLIB'            */
     .long   1                           /* 0x04 version = GUI_PROTO_VERSION */
-    .long   120                         /* 0x08 nfunc                    */
+    .long   121                         /* 0x08 nfunc                    */
     .long   __shlib_data_start          /* 0x0C data_vaddr               */
     .long   __shlib_data_pages          /* 0x10 data_pages               */
     .long   __shlib_text_pages          /* 0x14 text_pages               */
@@ -337,6 +337,7 @@ __os32_shlib_header:
     .long   os32gui_w_textarea_take_input       /* 117 */
     .long   os32gui_w_focused_in                /* 118 */
     .long   os32gui_gfx_detach                  /* 119 */
+    .long   os32gui_trim_hook_set               /* 120 */
     .text
 "#
 );
@@ -1431,4 +1432,11 @@ pub extern "C" fn os32gui_gfx_detach() {
     gate!();
     unsafe { crate::ffi::libos32gfx_detach() };
     crate::gstate::st().screen_valid = false;
+}
+
+/// Append-only entry 120; the app trampoline guards its own allocator.
+#[no_mangle]
+pub extern "C" fn os32gui_trim_hook_set(hook: Option<extern "C" fn() -> u32>) {
+    gate!();
+    crate::uistate::s().hook = hook;
 }

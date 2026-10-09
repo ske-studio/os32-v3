@@ -37,5 +37,12 @@ struct mallinfo os32_nano_info(struct _reent *r);
 #ifndef OS32_CRT_RESIDENT
 /* Internal USER tail reclamation; successful pages, or zero while busy. */
 size_t os32_nano_trim(void);
+void os32_gui_retry_enable(void);
+uint32_t os32_gui_trim_serve(uint32_t epoch, uint32_t (*hook)(void));
+struct os32_gui_retry_stats {
+    unsigned retry_count, retry_ok_count, retry_refused_count;
+    unsigned trim_serve_count, hook_pages_total;
+};
+struct os32_gui_retry_stats os32_gui_retry_stats(void);
 #endif
 #endif

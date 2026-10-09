@@ -397,6 +397,13 @@ pub struct UiState {
     pub damage: DamageBuf,
     /// `Quit` / 全ウィンドウ破棄 / アプリの要求で立つ。
     pub quit: bool,
+    pub trim_batch: bool,
+    pub trim_epoch: u32,
+    pub hook: Option<extern "C" fn() -> u32>,
+    pub trim_events: u32,
+    pub trim_done_sent: u32,
+    pub hook_calls: u32,
+    pub hook_pages: u32,
     /// `OVERFLOW` を受けた直後は入力状態を未知として扱う (契約 T3)。
     pub input_unknown: bool,
     /// マウスの最新位置 (クライアントローカル、フォーカス窓基準)。
@@ -417,6 +424,13 @@ impl UiState {
         paint: PaintQueue::EMPTY,
         damage: DamageBuf::EMPTY,
         quit: false,
+        trim_batch: false,
+        trim_epoch: 0,
+        hook: None,
+        trim_events: 0,
+        trim_done_sent: 0,
+        hook_calls: 0,
+        hook_pages: 0,
         input_unknown: false,
         ptr_x: 0,
         ptr_y: 0,

@@ -276,6 +276,40 @@ SHM (`MEM_SHM_BASE`, 256KB = 16KB × 16 ブロック) のうち、DB 結果は�
 - SHM ヘッダの `proto_version`。WM は自分の版より新しい要求を `ERR_VERSION` で返す。
 - op 番号・イベント種別・構造体は**末尾追記のみ**。
 
+### T5a. TRIM と allocator の再試行
+
+shlib protocol は2、SHM の `GUI_PROTO_VERSION` は1。ジャンプ表は121本で、
+末尾120の `E_TRIM_HOOK_SET` 以外の順序・意味は保つ。旧 protocol 1 は両方向で拒否する。
+`EV_TRIM=14` (window 0、payload 先頭4B は LE epoch) は SDK 内で消費し、
+型付き handler と `on_raw` には渡さない。複数件を同じ poll バッチで受けても
+hook / DONE は各1回、最後の epoch を使う。
+
+安全点は `commit`・`after_commit` の後、wait の前。
+任意 hook → `gui_call(GUI_OP_TRIM_DONE=81, epoch)` を行い、quit 周も送信後に戻る。
+Rust stub の `init` は OP_INIT 成功後だけ retry を有効化し、アプリ側 trampoline を登録する。
+`set_trim_hook(f: fn() -> u32)` は任意のキャッシュ解放 hook を置く。
+trampoline はアプリ allocator の IN_TRIM を前後で立て下ろしする。
+戻り page hint は `HOOK_PAGES_TOTAL` と shlib の `hook_pages` に記録するだけで、DONE の引数にはしない。
+
+in-tree の C (fixture) 向けの SDK 内部口は `sdk/allocator/nano_adapter.h` に宣言する。
+この header は `build/sdk` に入らず、公開 API にはしない。
+C (fixture) は OP_INIT 成功後に `os32_gui_retry_enable()` を呼ぶ。
+TRIM 周に `os32_gui_trim_serve(epoch, hook)` を1回呼び、nano trim → hook → DONE と進める。
+戻り値は nano の返却 page 数、busy / in_trim は0で hook / DONE も呼ばない。
+C の `retry_count / retry_ok_count / retry_refused_count / trim_serve_count / hook_pages_total` は
+`os32_gui_retry_stats()`、Rust の retry / retry成功 / hook page hint は `os32api::gui::retry_stats()` で観測する。
+shlib は `trim_events / trim_done_sent / hook_calls / hook_pages` を持つ。
+
+シングルタスク・協調切替のもと、GUI flag が有効な確保失敗だけ
+`sys_yield` 1回 → 確保操作全体1回を行う。2回目失敗は NULL。
+hook 中・flag 無し・allocator busy の再入・入口拒否・size 0 は yield 0。
+C の calloc 積 overflow も対象外。realloc は1回目失敗で旧内容を保ち、
+成功時だけ copy と旧解放を行う。C の size 0 は従来どおり nano に任せ、再試行しない
+(`malloc(0)`・`calloc(0,x)`・`calloc(x,0)`・`realloc(NULL,0)` は確保可能なら非 NULL、
+`realloc(p,0)` は旧領域を解放して NULL)。
+Rust の `Os32Alloc` の size 0 は NULL を返し、`mem_alloc(0)` を呼ばず、再試行しない。
+C resident CRT はこの欄を除外し、gshell は retry を有効化しない。
+
 ### T6. syscall 境界ポンプ (「1 アプリが戻らないと止まる」対策)
 
 - カーネルは int 0x80 の入口で gshell が登録したフック `gui_pump()` を**上限付きで**呼ぶ

@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import os32api_host
+import test_gui_trim
 from mutpar import run_ordered
 ROOT=Path(__file__).resolve().parents[2]
 GUI='userland/rust/libos32gui/src/'
@@ -28,6 +29,7 @@ MUTANTS=[
  ('gdi-no-rollback',GDI,'        os32api::gfx::detach();','', 'gdi static rollback missing'),
 ]
 def main():
+    test_gui_trim.main()
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--mutate',action='store_true');a=p.parse_args()
     with tempfile.TemporaryDirectory(prefix='os32-e7-rust-') as d:
         base=Path(d);rlib=os32api_host.build(base)

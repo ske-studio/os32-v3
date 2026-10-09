@@ -85,6 +85,16 @@ def case_check_fn(tmp):
     r = run([exe])
     sys.stdout.write(r.stdout)
     check(r.returncode == 0, "os32x_layout_host が全部通る")
+    old_exe = tmp / "os32x-layout-old-shlib"
+    r = run(["gcc", "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-D__cdecl=",
+             "-DOS32_TEST_OLD_SHLIB", "-I" + str(ROOT / "exec"),
+             "-I" + str(ROOT / "sdk/include/os32"),
+             str(ROOT / "tools/tests/os32x_layout_host.c"), "-o", str(old_exe)])
+    check(r.returncode == 0, "旧 shlib protocol 1 の同じ loader 判定を組める")
+    if r.returncode == 0:
+        r = run([old_exe])
+        sys.stdout.write(r.stdout)
+        check(r.returncode == 0, "app 2 × shlib 1 も拒否 (app 1 × shlib 2 と両方向)")
     r = run([TCC, "-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
              "-fno-stack-protector", "-O2", "-Wall", "-Wextra", "-Werror",
              "-D__KERNEL_BUILD__",
@@ -503,6 +513,8 @@ MUTATIONS = [
      "        if True:"),
     ("exec/os32x_hdr.c", "abi_generation_unchecked",
      "hdr->kapi_abi_generation != OS32_KAPI_ABI_GENERATION", "0"),
+    ("sdk/kapi.json", "generation-held",
+     '"shlib_protocol": 2', '"shlib_protocol": 1'),
     ("sdk/kapi.json", "memory_generation_rolled_back",
      '"memory_layout": 3', '"memory_layout": 2'),
     ("exec/os32x_hdr.c", "memory_generation_unchecked",

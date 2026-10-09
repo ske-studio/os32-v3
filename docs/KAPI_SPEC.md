@@ -295,6 +295,10 @@ shlibプロトコルは完全一致、非依存アプリだけ0。min_api_verは
 帯の容量超過、argvフレームが収まらない要求を拒否する。
 
 `sdk/kapi.json` の `generations` が4世代の唯一の正典。
+T2g g2 の現在値は `os32x_format=4 / kapi_abi=1 / memory_layout=3 / shlib_protocol=2`、
+KAPI は 73、`GUI_PROTO_VERSION` は 1。shlib protocol は完全一致なので、
+protocol 1 の app と 2 の shlib、2 の app と 1 の shlib は両方向で入口前に拒否する。
+世代を変えるときも [ABI1] の生成と [ABI3] の `make clean` → `make all` を行う。
 `sdk/gen_kapi.py` は C (`os32_generations.h` / `os32_unit_stamp.h`)、
 Python (`os32_generations.py`)、NASM (`crt/generations.inc`)、リンカ契約、
 Rust (`generations.rs`) を生成する。生成物を手で変更しない。
@@ -1518,6 +1522,32 @@ C の `libos32gfx_getchar` / `libos32gfx_trygetchar` / `libos32gfx_yield` / `lib
 明示 mode 変更後も再 attach し、失敗時は描画しない。static/shlib 混用時は両実体を check し、片方の失敗で両方 detach。
 shlib の末尾119番 `os32gui_gfx_detach` を追加 (120本、protocol世代は不変)。Unicode は checked attach の1か所で取得し、
 ユーザー版 utf8 は NULL から開始して port が渡す RO 表を検証する。残る consumer は c3、旧 USER 撤去は b2。
+
+### T2g g2: shlib TRIM と allocator の再試行
+
+ジャンプ表の既存 0..119 を保ち、末尾に次を追記 (計121本、shlib protocol 2)。
+
+| 表番号 | エントリ | 型と契約 |
+|---|---|---|
+| 120 | `os32gui_trim_hook_set` (`E_TRIM_HOOK_SET`) | `extern "C" fn(Option<extern "C" fn() -> u32>)`。アプリ側の TRIM trampoline を登録 |
+
+`EV_TRIM` は dispatch 前で消費し、アプリ handler / `on_raw` に渡さない。
+`commit`・`after_commit` 後、wait 前で hook → `GUI_OP_TRIM_DONE(epoch)` をバッチごと1回。
+同じ周の複数 TRIM は最後の epoch を使い、quit 周も DONE を送ってから戻る。
+Rust stub は OP_INIT 成功後に再試行を有効化し trampoline を登録する。
+アプリの任意 hook は `libos32gui_stub::set_trim_hook(f: fn() -> u32)`。
+hook の戻り値は観測用の page hint であり、DONE の引数は epoch のみ。
+
+C USER CRT には in-tree の C (fixture) 向けの SDK 内部口 `void os32_gui_retry_enable(void)` と
+`uint32_t os32_gui_trim_serve(uint32_t epoch, uint32_t (*hook)(void))` がある (`sdk/allocator/nano_adapter.h`、`build/sdk` に入らない — 公開 API ではない)。
+raw C ループは OP_INIT 成功後に有効化し、TRIM 周に serve を1回呼ぶ。
+serve は nano trim → 任意 hook → DONE、戻り値は nano の返却 page 数。
+busy / in_trim では0を返し、hook・DONE を呼ばない。
+C/Rust は GUI flag 下の確保失敗だけ、`sys_yield` 1回 → 操作全体1回。
+flag 無し・hook 中・入口拒否・size 0・calloc 積 overflow は再試行しない。
+realloc は失敗時に旧内容を保ち、成功した再試行で copy と旧解放を行う。
+resident C CRT にはこの欄を組み込まず、gshell の Rust flag も偽のまま。
+詳細なアプリ契約は [API_CONTRACTS T5a](tasks/gui/API_CONTRACTS.md#t5a-trim-と-allocator-の再試行)。
 
 ### 予約スロット (v63〜)
 

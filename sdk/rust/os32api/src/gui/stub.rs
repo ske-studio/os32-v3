@@ -272,8 +272,11 @@ pub const E_W_FOCUSED_IN: usize = 118;
 
 pub const E_GFX_DETACH: usize = 119;
 
+/// App-side allocator guard and optional cache trim trampoline.
+pub const E_TRIM_HOOK_SET: usize = 120;
+
 /// ジャンプ表の本数 (末尾追記のたびに増やす)。
-pub const SHLIB_NFUNC: usize = 120;
+pub const SHLIB_NFUNC: usize = 121;
 
 const _: () = assert!(SHLIB_NFUNC <= OS32_SHLIB_MAX_FUNC);
 

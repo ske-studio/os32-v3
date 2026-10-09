@@ -54,7 +54,7 @@ def build_host(prefix, work):
         prefix, 'ar', 'p', prefix / 'i386-elf/lib/libc.a', 'libc_a-reallocf.o'))
     command(prefix, 'gcc', '-std=gnu11', '-O2', '-ffreestanding', '-fno-builtin',
             '-fno-pie', '-Wall', '-Wextra', '-Werror', '-Werror=vla',
-            '-I' + str(ROOT / 'sdk/allocator'), '-c', ROOT / 'tools/tests/nano_adapter_host.c',
+            '-I' + str(ROOT / 'sdk/allocator'), '-I' + str(ROOT / 'sdk/include/os32'), '-c', ROOT / 'tools/tests/nano_adapter_host.c',
             '-o', work / 'host.o')
 
 
@@ -258,6 +258,21 @@ EXPECTED_CHECKS += [
 ]
 # image-page-floor removal is equivalent: every valid tail is >= initial and
 # page_up(tail + MINCHUNK) already covers page_up(initial); no fake RED.
+
+
+# g2s: one retry and the safe trim service, with named runtime failures.
+MUTATIONS += [
+    ('if (!p && retry_allowed(size)) {\n        p = malloc_once(r, size);', 'while (!p && retry_allowed(size)) {\n        p = malloc_once(r, size);', 1, 'retry-unbounded'),
+    ('if (busy) { retry_refused_count++; return 0; }', 'if (busy) { if (gui_retry) kapi->sys_yield(); retry_refused_count++; return 0; }', 1, 'retry-while-busy'),
+    ('last_failure == FAIL_ALLOC && kapi->sys_yield', 'kapi->sys_yield', 1, 'retry-on-enter-refused'),
+    ('gui_retry && !in_trim &&', 'gui_retry &&', 1, 'retry-in-trim'),
+    ('size && gui_retry &&', 'size &&', 1, 'retry-without-gui'),
+    ('    if (size && gui_retry &&', '    (void)size;\n    if (gui_retry &&', 1, 'retry-size0'),
+    ('memcpy(p, old, old_size < size ? old_size : size);', 'if (!retry_count) memcpy(p, old, old_size < size ? old_size : size);', 3, 'realloc-retry-no-copy'),
+    ('large_release(r, large_link(old));', 'if (!retry_count) large_release(r, large_link(old));', 1, 'realloc-retry-leaks-old'),
+    ('    if (hook) hook_pages_total += hook();', '    kapi->gui_call(GUI_OP_TRIM_DONE, epoch);\n    if (hook) hook_pages_total += hook();', 1, 'done-before-hook'),
+]
+EXPECTED_CHECKS += ['yields <= 1', 'yields <= 1', 'malloc(8) == NULL && yields == 0', 'malloc(65536) == NULL && yields == before', 'malloc(65536) == NULL && yields == 0', 'calloc(0,8) == NULL && yields == 0', '((const unsigned char *)p)[i] == byte', 'unmaps == old_unmaps+1 && mapped[0] == 0', 'done_calls == 0 && serve_probe == 2']
 
 assert len(EXPECTED_CHECKS) == len(MUTATIONS)
 
