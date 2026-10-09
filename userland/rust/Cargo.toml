@@ -6,6 +6,7 @@ members = [
     "os32_math",
     "hello_gfx",
     "alloc_demo",
+    "trim_back_rs",
     "math_test_rs",
     "font_test",
     # libos32gui = 共有ライブラリ本体 (0x400000 常駐、staticlib → libos32gui.shlib)
