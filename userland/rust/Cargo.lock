@@ -148,6 +148,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "trim_back_rs"
+version = "0.1.0"
+dependencies = [
+ "libos32gui_stub",
+ "os32api",
+]
+
+[[package]]
 name = "ttf-parser"
 version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

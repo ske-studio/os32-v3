@@ -544,9 +544,9 @@ pub fn next_gen(g: u16) -> u16 {
     }
 }
 
-struct GuiCell(UnsafeCell<GuiState>);
+pub(crate) struct GuiCell(pub(crate) UnsafeCell<GuiState>);
 unsafe impl Sync for GuiCell {}
-static GUI: GuiCell = GuiCell(UnsafeCell::new(GuiState::NEW));
+pub(crate) static GUI: GuiCell = GuiCell(UnsafeCell::new(GuiState::NEW));
 
 /// グローバル状態への可変参照 (単一スレッド前提)。
 #[inline]

@@ -1,0 +1,8 @@
+check-gui-desc-host:
+- userland/gshell/**
+- sdk/rust/os32api/**
+- tools/tests/os32api_host.py
+- tools/tests/test_gui_desc.py
+- tools/np21w_mcp/gui_desc.py
+- tools/check_map.d/check-gui-desc-host.yaml
+- build/checks.d/check-gui-desc-host.mk

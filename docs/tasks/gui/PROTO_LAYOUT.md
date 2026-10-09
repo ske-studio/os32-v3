@@ -5,8 +5,8 @@
 > Rust 側: `sdk/rust/os32api/src/gui/proto.rs` (C レーンが写す)
 
 この表は `sdk/include/os32/os32_gui_shared.h` の `STATIC_ASSERT` が固定している
-サイズとオフセットの写しである。PM の `tools/check_gui_proto.py` はこの表と
-C ヘッダ / Rust `proto.rs` の三者を突き合わせる。**数値を動かすときは 3 か所を同時に。
+サイズとオフセットを手で写したものである。`tools/check_gui_proto.py` が照合するのは
+C ヘッダと Rust `proto.rs` の 2 者であり、この表は照合しない。**数値を動かすときは 3 か所を同時に。
 以後は末尾追記のみ** (契約 T5)。単位はバイト。
 
 ## バージョン
@@ -14,7 +14,7 @@ C ヘッダ / Rust `proto.rs` の三者を突き合わせる。**数値を動か
 | 項目 | 値 |
 |---|---|
 | `GUI_PROTO_VERSION` | 1 |
-| KAPI 版 | 41 |
+| KAPI 版 | 現行値は [KAPI_SPEC.md](../../KAPI_SPEC.md) を参照 |
 
 ## GuiSlotHeader — 16B (契約 T2)
 
@@ -82,22 +82,12 @@ C ヘッダ / Rust `proto.rs` の三者を突き合わせる。**数値を動か
 `kernel/shm.c` がブロック 12〜15 を `SHM_RESERVED` に固定し、`shm_alloc` は配らず、
 `shm_free` / `shm_cleanup_all` は触らない。
 
-## op 番号 (gui_call 第1引数)
+## op 番号・イベント種別
 
-| 範囲 | op |
-|---|---|
-| 0 | 予約 (`GUI_OP_NONE`) |
-| 1〜7 | `INIT` 1, `POLL` 2, `WAIT` 3, `COMMIT` 4, `INVALIDATE` 5, `STATS` 6, `LEASE_PALETTE` 7 |
-| 16〜25 | ウィンドウ: `CREATE` 16, `DESTROY` 17, `MOVE` 18, `RESIZE` 19, `SHOW` 20, `SET_TITLE` 21, `CLIENT_RECT` 22, `RAISE` 23, `SET_FOCUS` 24, `SET_TEXT_CURSOR` 25 |
-| 32〜33 | サーフェス: `CREATE` 32, `DESTROY` 33 |
-| 48〜49 | タイマ: `SET` 48, `KILL` 49 |
-| 64 | モーダル: `OPEN` 64 |
-| 80 | `OWNER_EXIT` (カーネル内部。arg = EXEC_KIND_*、ABORTED は未処理 STOP を消費。gui_call からは OS32_ERR_INVAL) |
-
-## イベント種別 (GuiEvent.kind)
-
-`PAINT` 1, `CONFIGURE` 2, `CLOSE` 3, `FOCUS` 4, `KEY` 5, `TEXT` 6, `POINTER` 7,
-`BUTTON` 8, `TIMER` 9, `WIDGET` 10, `MODAL` 11, `QUIT` 12, `PALETTE` 13。
+番号の正典は [`os32_gui_shared.h`](../../../sdk/include/os32/os32_gui_shared.h)、
+契約は [API_CONTRACTS.md](API_CONTRACTS.md) T5 / T5a。
+TRIM の op・イベント番号、payload、SDK 内での消費と DONE の順序も T5a に従う。
+ここでは番号一覧を複製せず、上の構造体サイズ・オフセットだけを扱う。
 
 ## エラー番号 (os32_kapi_shared.h)
 

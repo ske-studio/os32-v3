@@ -1289,3 +1289,285 @@
     entry_delta_on_reject: 0
     generation_3_runs: true
   evidence: ~/os32-tmp/evidence/<日付>/f13-f14-generation-shlib/
+
+# T2g: current 17MB configuration; alternate hardware is H-4.
+- id: g-L-1
+  gate: GK-2
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
+  mode: manual
+  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  entry: filer/about の起動と操作、about の front/back 往復。GUI 下で alloc_demo / exec_heap_test / malloc_arena_test。
+  observe:
+  - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
+    appslot_reclaim_count, exec_as_leftover_pages, ledger_bad_free/retire_refused/claim_refused'
+  - '最新 gshell ELF: gshell_trim_delivered, gshell_trim_skipped_full, trim::SENT; MemStat 132B の trim_pending_mask
+    と各 slot の trim_pending/trim_epoch'
+  - fixture 出力と終了行、区間前後のカウンタ差分。配備 binary のサイズ/SHA256 を照合
+  expect:
+    result: PASS
+    kills_delta: 0
+    no_pressure: request_count=0 の区間で delivered=0、done=0
+  evidence: ~/os32-tmp/evidence/<日付>/g-L-1/
+- id: g-L-2
+  gate: GK-2
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
+  mode: manual
+  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  entry: mem_map_test / sbrk_grow_test / malloc_arena_test / exec_heap_test / alloc_demo / db_test / db_v50_test
+    / hsync
+  observe:
+  - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
+    appslot_reclaim_count, exec_as_leftover_pages, ledger_bad_free/retire_refused/claim_refused'
+  - '最新 gshell ELF: gshell_trim_delivered, gshell_trim_skipped_full, trim::SENT; MemStat 132B の trim_pending_mask
+    と各 slot の trim_pending/trim_epoch'
+  - fixture 出力と終了行、区間前後のカウンタ差分。配備 binary のサイズ/SHA256 を照合
+  expect:
+    result: 全件 PASS、kills +0、leftover 0
+  evidence: ~/os32-tmp/evidence/<日付>/g-L-2/
+- id: g-G-1
+  gate: GK-3
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
+  mode: manual
+  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  entry: trim_back を別 ID で2本と trim_front を起動し front を前景へ。他の GUI アプリは端末を含め起動しない。PREP FAIL なら終了して mem の free を確認後、起動し直す（4KiB
+    ループ/PT のため空き1ページで止まり得る）。
+  observe:
+  - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
+    appslot_reclaim_count, exec_as_leftover_pages, ledger_bad_free/retire_refused/claim_refused'
+  - '最新 gshell ELF: gshell_trim_delivered, gshell_trim_skipped_full, trim::SENT; MemStat 132B の trim_pending_mask
+    と各 slot の trim_pending/trim_epoch'
+  - fixture 出力と終了行、区間前後のカウンタ差分。配備 binary のサイズ/SHA256 を照合
+  expect:
+    back: 両方 PREP OK、EXEC_ARENA=2、LARGE=0
+    front: trim_front の ID
+  evidence: ~/os32-tmp/evidence/<日付>/g-G-1/
+- id: g-G-2
+  gate: GK-3
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
+  mode: manual
+  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  entry: '準備区間: 両 back 未 arm で front が物理と free list を使い切る。prep done で落ち着いた時点の trim_pages_total と各 back extent/cur_end
+    を G-3/G-4 基準値として採る。'
+  observe:
+  - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
+    appslot_reclaim_count, exec_as_leftover_pages, ledger_bad_free/retire_refused/claim_refused'
+  - '最新 gshell ELF: gshell_trim_delivered, gshell_trim_skipped_full, trim::SENT; MemStat 132B の trim_pending_mask
+    と各 slot の trim_pending/trim_epoch'
+  - fixture 出力と終了行、区間前後のカウンタ差分。配備 binary のサイズ/SHA256 を照合
+  expect:
+    request_count: '>=1'
+    mark: '>=2'
+    done: '>=2'
+    trim_pages_total: 自然な末尾の返却は許容。増分0も正も記録
+    free_pages: 0
+    kills_delta: 0
+    front: prep done
+  evidence: ~/os32-tmp/evidence/<日付>/g-G-2/
+- id: g-G-3
+  gate: GK-3
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
+  mode: manual
+  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  entry: '両 back へ a キー。対象区間: front へキー、malloc(4000) を1回。G-2後の基準値との差を採る。'
+  observe:
+  - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
+    appslot_reclaim_count, exec_as_leftover_pages, ledger_bad_free/retire_refused/claim_refused'
+  - '最新 gshell ELF: gshell_trim_delivered, gshell_trim_skipped_full, trim::SENT; MemStat 132B の trim_pending_mask
+    と各 slot の trim_pending/trim_epoch'
+  - fixture 出力と終了行、区間前後のカウンタ差分。配備 binary のサイズ/SHA256 を照合
+  expect:
+    request_count_delta: '>=1'
+    mark_delta: 2
+    delivered_delta: 2
+    done_delta: 2
+    returned: cache 解放による追加返却 >= cache-T + cache-E の page 数、DONE 後 free_pages 増加
+    front: retry ok retry=1
+    kills_delta: 0
+    leftover: 0
+  evidence: ~/os32-tmp/evidence/<日付>/g-G-3/
+- id: g-G-4
+  gate: GK-3
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
+  mode: manual
+  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  entry: G-2後の基準値と G-3後の mem <back id> を比較。G-4観測の後に各 back の r キーで障害物を unmap して regrow。終了行を必ず読む。終了時 extent は as_extents_at_teardown.py。
+  observe:
+  - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
+    appslot_reclaim_count, exec_as_leftover_pages, ledger_bad_free/retire_refused/claim_refused'
+  - '最新 gshell ELF: gshell_trim_delivered, gshell_trim_skipped_full, trim::SENT; MemStat 132B の trim_pending_mask
+    と各 slot の trim_pending/trim_epoch'
+  - fixture 出力と終了行、区間前後のカウンタ差分。配備 binary のサイズ/SHA256 を照合
+  expect:
+    tail: ARENA1 cur_end 減、本数不変（末尾返却を別記録）
+    whole: EXEC_ARENA 2->1（ARENA2 全返却を別記録）
+    initial: EXEC_INITIAL 不変
+    data: 両 back DATA OK
+    obstacle: obstacle unmapped rc=0、1ページを trim 返却量に混ぜない
+    regrow: regrow ok ... EXACT
+    exit: C版は未実施でも終了値0になり得る。終了行の hook/pages/CRC/regrow rc と全観測を必ず読む
+  evidence: ~/os32-tmp/evidence/<日付>/g-G-4/
+- id: g-G-5
+  gate: GK-3
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
+  mode: manual
+  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  entry: 両 back を trim_back --no-answer に替えて G-2〜G-3。対象区間後に front/back を往復し、通常 Focus による resume と TRIM 配送を数え分ける。
+  observe:
+  - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
+    appslot_reclaim_count, exec_as_leftover_pages, ledger_bad_free/retire_refused/claim_refused'
+  - '最新 gshell ELF: gshell_trim_delivered, gshell_trim_skipped_full, trim::SENT; MemStat 132B の trim_pending_mask
+    と各 slot の trim_pending/trim_epoch'
+  - fixture 出力と終了行、区間前後のカウンタ差分。配備 binary のサイズ/SHA256 を照合
+  expect:
+    preparation: delivered >=2、done +0、trim_pages_total +0、front prep done
+    delivery: 各 back に配送1回、消費1回（ring_head の進み）
+    done_delta: 0
+    pending: mask bit 保持
+    front: ENOMEM retry=1
+    free_pages: 0
+    focus: 通常 resume があっても delivered 不変（再配送0）、done 不変
+    wm: 生存
+  evidence: ~/os32-tmp/evidence/<日付>/g-G-5/
+- id: g-G-6
+  gate: GK-3
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
+  mode: manual
+  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  entry: 端末の exec_run 子として trim_front --cui。子が戻った後、端末 OP_WAIT の X3 を観測。その後 GUI の trim_front を再実行。
+  observe:
+  - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
+    appslot_reclaim_count, exec_as_leftover_pages, ledger_bad_free/retire_refused/claim_refused'
+  - '最新 gshell ELF: gshell_trim_delivered, gshell_trim_skipped_full, trim::SENT; MemStat 132B の trim_pending_mask
+    と各 slot の trim_pending/trim_epoch'
+  - fixture 出力と終了行、区間前後のカウンタ差分。配備 binary のサイズ/SHA256 を照合
+  expect:
+    child: ENOMEM、自身 mark 0、yield 0
+    back: mark +対象数、子終了後の親 OP_WAIT で delivered +、back done +
+    rerun: GUI 再実行成功
+  evidence: ~/os32-tmp/evidence/<日付>/g-G-6/
+- id: g-G-7
+  gate: GK-3
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
+  mode: manual
+  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  entry: trim_back --slow-hook 300 で G-3、hook begin と終了の間に CTRL+STOP。
+  observe:
+  - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
+    appslot_reclaim_count, exec_as_leftover_pages, ledger_bad_free/retire_refused/claim_refused'
+  - '最新 gshell ELF: gshell_trim_delivered, gshell_trim_skipped_full, trim::SENT; MemStat 132B の trim_pending_mask
+    と各 slot の trim_pending/trim_epoch'
+  - fixture 出力と終了行、区間前後のカウンタ差分。配備 binary のサイズ/SHA256 を照合
+  expect:
+    reclaim_delta: 1
+    owner_pages: 0
+    stop_park_delta: 1
+    slot: trim_pending=0、trim_epoch=0
+    mask: 当該 bit=0
+    wm: 生存、trim::SENT の該当要素=0
+    ledger: bad_free/retire_refused/claim_refused の増分0
+  evidence: ~/os32-tmp/evidence/<日付>/g-G-7/
+- id: g-G-8
+  gate: GK-3
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
+  mode: manual
+  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  entry: front を失敗したまま free_pages=0 で保持、back を閉じる → front を閉じる → 新しいアプリ起動。
+  observe:
+  - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
+    appslot_reclaim_count, exec_as_leftover_pages, ledger_bad_free/retire_refused/claim_refused'
+  - '最新 gshell ELF: gshell_trim_delivered, gshell_trim_skipped_full, trim::SENT; MemStat 132B の trim_pending_mask
+    と各 slot の trim_pending/trim_epoch'
+  - fixture 出力と終了行、区間前後のカウンタ差分。配備 binary のサイズ/SHA256 を照合
+  expect:
+    result: pool 0 でも閉じる操作と STOP が動く、free_pages が戻る、次の起動成功
+  evidence: ~/os32-tmp/evidence/<日付>/g-G-8/
+- id: g-G-9
+  gate: GK-3
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
+  mode: manual
+  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  entry: mem_map_test / sbrk_grow_test / malloc_arena_test / exec_heap_test / alloc_demo / db_test / db_v50_test
+    / hsync
+  observe:
+  - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
+    appslot_reclaim_count, exec_as_leftover_pages, ledger_bad_free/retire_refused/claim_refused'
+  - '最新 gshell ELF: gshell_trim_delivered, gshell_trim_skipped_full, trim::SENT; MemStat 132B の trim_pending_mask
+    と各 slot の trim_pending/trim_epoch'
+  - fixture 出力と終了行、区間前後のカウンタ差分。配備 binary のサイズ/SHA256 を照合
+  expect:
+    result: 全件 PASS、kills +0、leftover 0
+  evidence: ~/os32-tmp/evidence/<日付>/g-G-9/
+- id: g-R-1
+  gate: GK-4
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
+  mode: manual
+  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  entry: G-1の back 1本を trim_back_rs に替えて G-1/G-2。Rust --no-answer は SDK が必ず DONE を送るため未対応、G-5はC版で行う。
+  observe:
+  - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
+    appslot_reclaim_count, exec_as_leftover_pages, ledger_bad_free/retire_refused/claim_refused'
+  - '最新 gshell ELF: gshell_trim_delivered, gshell_trim_skipped_full, trim::SENT; MemStat 132B の trim_pending_mask
+    と各 slot の trim_pending/trim_epoch'
+  - fixture 出力と終了行、区間前後のカウンタ差分。配備 binary のサイズ/SHA256 を照合
+  expect:
+    prep: PREP OK、ARENA=2 LARGE=0、個別4000B Box、cache-T=8
+    baseline: G-2と同じ基準値を採る、未 arm はcache保持
+  evidence: ~/os32-tmp/evidence/<日付>/g-R-1/
+- id: g-R-2
+  gate: GK-4
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
+  mode: manual
+  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  entry: 'G-3と同じ（g3fix 後の trim_front を使用し、対象確保前に自身のリングを空にする）。C/Rust 両 back へ a、front で対象確保。'
+  observe:
+  - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
+    appslot_reclaim_count, exec_as_leftover_pages, ledger_bad_free/retire_refused/claim_refused'
+  - '最新 gshell ELF: gshell_trim_delivered, gshell_trim_skipped_full, trim::SENT; MemStat 132B の trim_pending_mask
+    と各 slot の trim_pending/trim_epoch'
+  - fixture 出力と終了行、区間前後のカウンタ差分。配備 binary のサイズ/SHA256 を照合
+  expect:
+    counters: G-3と同じ（g3fix 後の trim_front による観測）
+    front: G-3と同じ（g3fix 後の trim_front の出力と終了値）
+    rust: DATA OK、hook_calls=1、LARGE=0。hook hint は0、物理ページはDONEで返る
+  evidence: ~/os32-tmp/evidence/<日付>/g-R-2/
+- id: g-R-3
+  gate: GK-4
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
+  mode: manual
+  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  entry: G-4をRust backでも観測。次の通常イベントまたは o で DONE/G-4 行を出し、観測後 r は1回だけで障害物 unmap → EXACT regrow、その後 q。2回目の r は bad で終了値1。regrow が EXACT にならず FAIL したら、ARENA1 の端数（末尾72B以内）を疑う。
+  observe:
+  - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
+    appslot_reclaim_count, exec_as_leftover_pages, ledger_bad_free/retire_refused/claim_refused'
+  - '最新 gshell ELF: gshell_trim_delivered, gshell_trim_skipped_full, trim::SENT; MemStat 132B の trim_pending_mask
+    と各 slot の trim_pending/trim_epoch'
+  - fixture 出力と終了行、区間前後のカウンタ差分。配備 binary のサイズ/SHA256 を照合
+  expect:
+    tail: ARENA1 cur_end 減を別記録
+    whole: ARENA 2->1 を別記録
+    initial: INITIAL不変、DATA OK、LARGE=0
+    obstacle: rc=0、1ページはtrim pagesに含めない
+    regrow: regrow ok rc=0 ... EXACT、cur +65536、ARENA=1
+    exit: rc=0、RETRY_COUNT/RETRY_OK_COUNT/RETRY_HOOK_PAGES を記録、hook_calls=1、CRC=OK、regrow rc=0、pages>0。未実施はrc=1
+  evidence: ~/os32-tmp/evidence/<日付>/g-R-3/
+- id: g-R-4
+  gate: GK-4
+  contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
+  mode: manual
+  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  entry: trim_back_rs --stop-focus --slow-hook 300 を使用。trim_back_rs focus ok の後、STOP の前に front_owner/abort_target が Rust back であることを確かめ、hook中に CTRL+STOP（G-7相当）。別試行でDONE直後にも同じ宛先確認をしてSTOP。
+  observe:
+  - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
+    appslot_reclaim_count, exec_as_leftover_pages, ledger_bad_free/retire_refused/claim_refused'
+  - '最新 gshell ELF: gshell_trim_delivered, gshell_trim_skipped_full, trim::SENT; MemStat 132B の trim_pending_mask
+    と各 slot の trim_pending/trim_epoch'
+  - fixture 出力と終了行、区間前後のカウンタ差分。配備 binary のサイズ/SHA256 を照合
+  expect:
+    reclaim_delta: 1
+    owner_pages: 0
+    stop_park_delta: 1
+    slot: trim_pending=0、trim_epoch=0
+    mask: 当該 bit=0
+    wm: 生存、trim::SENT の該当要素=0
+    ledger: bad_free/retire_refused/claim_refused の増分0
+  evidence: ~/os32-tmp/evidence/<日付>/g-R-4/
