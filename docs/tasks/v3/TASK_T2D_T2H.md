@@ -313,33 +313,33 @@ fのmap失敗理由・allocator busy/trim・STOP全返却がGREEN。appslot/appm
 
 ### 4-2. 状態と配送契約
 
-各AppSlotに固定 `{pending_epoch, delivered_epoch}`、SDKにbusy/in_trimとlast_epoch、カーネルにu32 pressure_epochを置く (0=無し)。32bit満了はsaturateさせ、epoch一致だけで新要求を無視せずpending bitで管理する。動的queueは作らない。slot回収/再利用でpending/deliveredをゼロ、古いイベントを次のownerへ渡さない。
+> 2026-10-09 改訂 (U14、ユーザー承認): シングルタスク・協調切替 (走るのは 1 本、切替はアプリ自身の park / yield / 終了のときだけ) の前提で、厳密な一巡保証と kernel 側の前景判定を外し、状態を実設計に合わせた。詳細設計は `~/os32-tmp/run/g/T2G_DESIGN.md` (r4)。
 
-appmemは**data/PTの物理池不足**で準備を全巻戻しした後だけ、要求者以外の生きたback GUI slotにbitをORしてNULLを返す。VAの穴不足・extent満杯・KHEAP制御不足・引数不正は要求しない。front/backはWMが既存focus遷移の安全点でkernelへ伝える固定状態で判定し、USER申告を信用しない。その状態が未確定なら配送を遅らせる。kernelのepochは通知の合成であり再試行保証ではない。
+各AppSlotに固定の `trim_pending` (bit) と `trim_epoch` (bitを立てたときの値) を置き、カーネルにu32 `appslot_trim_epoch` (0=無し、巻戻しのたび+1、32bit満了はsaturate) を置く。保留の識別はbitで行い、epochはTRIM_DONEの値照合と観測にだけ使う (飽和しても配送は止まらない)。**bitが立っている slot への再要求は何もしない** — 走るアプリは1本なので、配送中の保留が別の要求者から書き換わることは無く、アプリはtrimする時点のheapを返すので後続の要求も同じtrimで満たされる。WMは slot ごとに `sent` (いまの保留にイベントを積んだ) の bit だけを持ち、SDKは `gui_retry` と `in_trim` を持つ。動的queueは作らない。slot回収/再利用で `trim_pending / trim_epoch` をゼロにし、古いイベントを次のownerへ渡さない。
 
-WM top-levelの既存park/resume配送でpendingを見て、固定イベント枠にtrim通知を出す。通常queue満杯ならbitを残して後送、既存イベントを捨てない。gshell multiappはこれをready理由にし、要求者Aが安全なyieldへ入った時点のtrim pending slot集合を固定し、**要求者のyield復帰より先に各slotを1回ずつresume**する。GUI_OP_WAITのtimeoutでAが即readyでもこの一巡を先に処理する。1 slotの試行は既存の安全なresume→park/終了までで、応答待ちを追加しない。busy/queue満杯/未応答ならbitを残して1巡で打切り、TRIM_DONEを待ち続けない。USER loopから戻らないslotの停止は既存STOP/P6境界で、
-今回新たな強制preempt保証は作らない。更新途中のwrapperやallocatorから起こさない。CUI/終了ASへは配送しない。SDK受信時はbusyなら保留し、allocatorを抜けた安全点でtrim→任意cache hookを1回→完了記録。GUI protoに内部のTRIM_DONE op (epochを値で渡す)を設け、saved callerの保留要求と一致する場合だけ受理する。この帰路でkernel側exec_heapの安全な末尾trimを同じcaller ASのまま実行し、他ASへ切り替えない。新しいメモリKAPIは増やさない。hook中はin_trim、同一要求の再配送やhookのmalloc失敗で再帰trimしない。SHMのUSER可変完了値はスケジューリング上のhintだけで、pool freeは台帳から測る。
+appmemは**data/PTの物理池不足**で準備を全巻戻しした後だけ、要求者以外の生きたGUI slot (PARKED / WAIT_KEY / WAIT_POLL) にbitを立ててNULLを返す。VAの穴不足・extent満杯・KHEAP制御不足・引数不正は要求しない。割当ての動作 (EXACT→TOPDOWNの fallback、allocatorのarena巡回) は変えず、1回の割当てでENOSPCが複数回出ても slot のbitは最初の1回で立つ。front/backの区別はカーネルではしない — **WM (CPL=0) が自分の `front_owner` で配送時に判定**し、前景の slot へは積まない (bitは残り、裏に戻った周に積む)。USER申告は使わない。kernelのepochは通知の合成であり再試行保証ではない。
 
-front SDKのmalloc/map失敗時はallocator lock/busyを解き、GUIかつ安全なイベントループに戻れる文脈だけ一巡yield→元要求を1回再試行する。raw mem_mapは自動retryしない。再試行も失敗ならENOMEM、未応答backを待たない。要求/配送/完了/retryは別カウンタで、成功の判定は実freeと再試行rc。pool0でも固定slot/eventで通知・閉じる・STOPが動く。
+WMは既存のX3周期 (`wm_cycle`、アプリのOP_WAIT内と単独ループ) で `mem_stat(0)` のpending maskを1回読み、bitの立つ slot が **PARKED で、前景でなく、未配送** (`sent` が偽) なら、その slot のリングに固定形の trim イベント (`GUI_EV_TRIM`、window 0、payloadにepoch) を1件積んで `sent` を立てる。通常queue満杯なら積まず次周に後送し、既存イベントを捨てない。`sent` は mask のbitが0になったとき (完了・回収) と owner の終了で下ろす。積まれた slot は既存の規則で**入力ready**になるので、**起こす順は既存の `pick` / `should_park` / ラウンド規則のまま**: 走っているアプリは「他にreadyが居る」で譲り、backは入力群としてID昇順・turnつきで1回ずつ起き、`sys_yield` した要求者 (WAIT_POLL = 最下位) はreadyが尽きてから戻り、OP_WAITのtimeoutで待つ要求者 (導出群) も入力群の後になる。**厳密な一巡保証はしない** — 前景のアプリに入力が来ていれば既存の応答性優先で先に起きる。専用の集合・要求者の追跡・`should_park` の項は置かない。1 slotの試行は既存の安全なresume→park/終了までで、応答待ちを追加しない。満杯なら次周、未応答 (TRIMを消費したがTRIM_DONEを送らない) ならbitと `sent` を残して再配送も再resumeもしない (1巡で打切り。そのアプリは終了まで再通知されない)。USER loopから戻らないslotの停止は既存STOP/P6境界で、今回新たな強制preempt保証は作らない。更新途中のwrapperやallocatorから起こさない。CUI/終了ASへは配送しない。SDK受信時はhandlerの外・allocatorの外の安全点でtrim→任意cache hookを1回→TRIM_DONE (受信バッチごとに1回)。GUI protoに内部のTRIM_DONE op (epochを値で渡す) を設け、**カーネルが `gui_call` で横取り**して、saved callerの slot に保留があり epoch が一致する場合だけ受理してbitを下ろし、この帰路でkernel側exec_heapの安全な末尾trimを同じcaller ASのまま実行し、他ASへ切り替えない。保留が無い/不一致はSTALEで状態不変 (重複DONEは無害)。新しいメモリKAPIは増やさない (`mem_stat` の末尾追記だけ)。hook中はin_trim、hookのmalloc失敗で再帰trim・再試行をしない。hookの戻り値はSDK内の観測用hintで、pool freeは台帳から測る。
+
+front SDKのmalloc/map失敗時はallocator lock/busyを解き、GUIクライアントの初期化で立つ `gui_retry` があり `in_trim` でない文脈だけ `sys_yield` 1回→**公開入口の操作全体**を1回再実行する (reallocは新確保→copy→旧解放まで含めて再実行し、1回目の失敗は旧内容を保つ)。allocatorへの再入による入口拒否は確保失敗ではなく再試行しない。raw mem_mapとsize 0は自動retryしない。再試行も失敗ならENOMEM、未応答backを待たない。要求/提示/配送/完了/retryは別カウンタで、成功の判定は実freeと再試行rc。pool0でも固定slot/eventで通知・閉じる・STOPが動く。
 
 `ring3_wm_depth`を更新排他とみなさない。appmem/leaseのtransaction busyとSDK allocator busyは別に持つ。syscall入口の既存 `ring3_gui_pump` は入力処理の役割を維持するが、ここからtrim hookや別AS実行を追加しない。park可能な操作をSDKが明示した帰路に限定する。
 
-端末配下CUI前景では失敗時bit記録→ENOMEM。CUIが親へ戻りWM top-levelを通った後でbackへ配送し、その後の**別要求**が成功し得る。CUIの失敗を同期pumpで成功へ偽装しない。
+端末配下CUI前景では失敗時にback GUIへbit記録→CUI自身はENOMEM。CUIが親へ戻り、親端末のOP_WAIT (X3) でbackへ配送され、backがreadyになって端末が譲り、その後の**別要求**が成功し得る。CUIの失敗を同期pumpで成功へ偽装しない。
 
 ### 4-3. 分割・試験・受入
 
 | 小段 (各45〜75分) | 成果 / 閉じる試験 |
 |---|---|
-| g1 | 固定bit/epoch/理由分類。slot再利用、飽和、pool0無確保 |
-| g2 | gshell multiappのpending集合/1回ずつresumeを要求者復帰より先に配置。timeout即ready、queue満杯、CUI/終了AS除外 |
-| g3 | SDK busy/hook/trim接続。保留、再入、未応答 |
-| g4 | front一巡/一再試行とg2順序の統合。未応答で1巡打切り、raw map/CUIと区別、失敗後旧内容保持 |
-| g5 | GUI proto両言語/世代・生成・STOPとの統合trace |
-| g6 | 変異/小さなkselftest/予算とPM台本 |
+| g1 (取り込み単位 L1) | カーネル: 固定bit/epoch/理由分類、`mem_stat` 末尾追記 (KAPI 73)、TRIM_DONEの横取りと `exec_heap_user_trim` の結線 (F-12)。slot再利用、保留中の再要求で不変、飽和、pool0無確保 |
+| g2 (取り込み単位 L2、WM側とSDK側の2パックでも取り込みは1回) | WMのX3配送 (PARKED・非前景・未配送に1件、満杯は後送、完了で `sent` 解除)、shlibのTRIM消費/hook/TRIM_DONE、C/Rust allocatorの1回再試行 (入口拒否・in_trim・size0・raw mapは除外)、`shlib_protocol` +1 と全consumer再生成 |
+| g3 | C fixture (back×2・front、CUI子) とhost trace: A map開始→巻戻し→KAPI復帰→解錠→yield→X3配送→B resume→B trim→TRIM_DONE→B park→A resume→A再試行1回。未応答・raw map・CUI・旧内容保持 |
+| g4 | Rust fixture (shlib経由)、STOPとの統合trace、受入台本の確定 |
+| g5 | 変異対応表/小さなkselftest/予算とPM台帳 |
 
-実appmem/execのtraceとSDKイベント処理を組み、A map開始→巻戻し→KAPI復帰→allocator解錠→park→B trim→A retryの順をassertする。変異はmap途中pump、VA不足通知、CUI配送、busy無視、slot再利用で古いbit維持、無制限retry、queue満杯でbit消失、GUI_OP_WAIT timeoutでAをB trimより先に復帰。epochの単なる値だけで試験を成立させない。
+実appmem/exec/allocatorのtraceとWMの配送を組み、A map開始→巻戻し→KAPI復帰→allocator解錠→yield→X3配送→B trim→TRIM_DONE→A retryの順をassertする。変異はmap途中pump、VA不足通知、CUI自身への配送、前景への配送、busy/入口拒否での再試行、slot再利用で古いbit維持、無制限retry、queue満杯でbit消失、保留中の再要求でepoch変化、未応答への再配送、hookの二重呼出し、realloc再試行のcopy欠落、世代据置。epochの単なる値だけで試験を成立させない。
 
-NP21/W8MBでback末尾返却によるfront成功、返せないback/未応答backでENOMEM、trim中STOP→owner0/WM生存、pool0から閉じる。17MBでも同順序、Ra266はhで繰り返す。CUI前景ケースは取得できた端末、またはin-treeのCUI子をexec_runする最小GUI試験で作り、別アプリの導入待ちにしない。予算は§6のg枠。
+NP21/W 17MB (§12、現iniのまま) でback末尾返却と空ARENA返却によるfront成功、返せないback/未応答backでENOMEM (TRIMの配送・消費が各1回、TRIM_DONE増分0、bit保持。通常イベントによるbackの起床は数え分ける)、準備中の自然な末尾返却は許容して基準値を枯渇が落ち着いた時点で採る、trim中STOP→owner0/WM生存、pool0から閉じる。8MB・Cirrus・Ra266は構成依存としてT2hへ持越す。CUI前景ケースは取得できた端末、またはin-treeのCUI子をexec_runする最小GUI試験で作り、別アプリの導入待ちにしない。予算は§6のg枠。
 
 ## 5. T2h — 統合受入と先行段の未実施を閉じる
 
