@@ -296,6 +296,33 @@ pub static KBD_PENDING: AtomicUsize = AtomicUsize::new(0);
 /// `exec_app_state(app_id)` が返す状態。添字 = app_id、既定は 2 (`PARKED`)。
 pub static APP_STATE: Mutex<Vec<i32>> = Mutex::new(Vec::new());
 
+/// MemStat の全体部 / ID 別 (flags, trim_epoch)。既定 mask 0。
+pub static MEMSTAT_GLOBAL: Mutex<(u32, u32)> = Mutex::new((0, 0));
+pub static MEMSTAT_APPS: Mutex<Vec<(u32, u32)>> = Mutex::new(Vec::new());
+pub static MEMSTAT_CALLS: Mutex<Vec<(i32, u32)>> = Mutex::new(Vec::new());
+unsafe extern "C" fn mem_stat(id: i32, out: *mut u8, size: u32) -> i32 {
+    lk(&MEMSTAT_CALLS).push((id, size));
+    assert_eq!(size, 132, "KAPI 73 の MemStat サイズ");
+    std::ptr::write_bytes(out, 0, size as usize);
+    let (pressure, mask) = *lk(&MEMSTAT_GLOBAL);
+    std::ptr::copy_nonoverlapping(pressure.to_le_bytes().as_ptr(), out.add(120), 4);
+    std::ptr::copy_nonoverlapping(mask.to_le_bytes().as_ptr(), out.add(124), 4);
+    if id > 0 {
+        let (flags, epoch) = lk(&MEMSTAT_APPS).get(id as usize).copied().unwrap_or((0, 0));
+        std::ptr::copy_nonoverlapping(flags.to_le_bytes().as_ptr(), out.add(12), 4);
+        std::ptr::copy_nonoverlapping(epoch.to_le_bytes().as_ptr(), out.add(128), 4);
+    }
+    /* 実物 (kapi_sys.c) は写したバイト数を返す。 */
+    size as i32
+}
+pub fn set_memstat_app(id: i32, flags: u32, epoch: u32) {
+    let mut v = lk(&MEMSTAT_APPS);
+    if v.len() <= id as usize {
+        v.resize(id as usize + 1, (0, 0));
+    }
+    v[id as usize] = (flags, epoch);
+}
+
 /* ---- 起動要求表 (KAPI v49、票 T9 D3) ---------------------------------- */
 /// `launch_pending()` が返す本数。
 pub static LAUNCH_PENDING: AtomicUsize = AtomicUsize::new(0);
@@ -881,6 +908,11 @@ pub fn init() {
     lk(&INJECTED).clear(); INJECT_CALLS.store(0, Ordering::SeqCst);
     a.kbd_inject_pending = kbd_inject_pending;
     a.exec_app_state = exec_app_state;
+    a.mem_stat = mem_stat;
+    *lk(&MEMSTAT_GLOBAL) = (0, 0);
+    lk(&MEMSTAT_APPS).clear();
+    lk(&MEMSTAT_CALLS).clear();
+    crate::trim::reset();
     /* 票 T9 (KAPI v49): 起動要求表。表そのものの遷移は実物で検査済み
      * (`tools/tests/launch_host.c`)。ここは WM が「いつ・何を渡したか」だけ見る。 */
     a.launch_pending = launch_pending;

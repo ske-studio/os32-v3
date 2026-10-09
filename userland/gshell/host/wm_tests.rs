@@ -781,6 +781,333 @@ fn four_app_state(shm: &crate::mocks::Shm) -> crate::wm::GuiState {
     st
 }
 
+/* T2g g2w: カーネルの MemStat だけを模型へ置き、配送・選択・resume は実物。
+ * A=2 / B=3 / C=4 / D=5。通常イベントと TRIM の起床を区別する。 */
+fn g2w_state(shm: &crate::mocks::Shm) -> crate::wm::GuiState {
+    crate::session::clear();
+    let mut st = four_app_state(shm);
+    // 周期の入力採取で初期マウス位置の差を Pointer として積ませない。
+    *crate::mocks::MOUSE.lock().unwrap() = (st.mouse_x as i16, st.mouse_y as i16, 0);
+    seed_four_apps();
+    focus_app(&mut st, 2);
+    crate::multiapp::set_last_run(2);
+    st
+}
+
+fn g2w_events(st: &crate::wm::GuiState, id: i32) -> Vec<os32api::gui::proto::GuiEvent> {
+    use crate::slot;
+    use os32api::gui::proto::{GuiEvent, GUI_RING_CAPACITY};
+    let s = st.slot_of_owner(id).unwrap();
+    let h = slot::read_header(st, s);
+    (0..h.ring_tail.wrapping_sub(h.ring_head)).map(|n| unsafe {
+        core::ptr::read_unaligned(slot::ring_ptr(st, s).add(
+            (h.ring_head.wrapping_add(n) as usize % GUI_RING_CAPACITY) * 16,
+        ) as *const GuiEvent)
+    }).collect()
+}
+
+fn g2w_counts() -> (u32, u32) {
+    unsafe { (crate::trim::gshell_trim_delivered, crate::trim::gshell_trim_skipped_full) }
+}
+
+fn g2w_pending(mask: u32) {
+    *crate::mocks::MEMSTAT_GLOBAL.lock().unwrap() = (0x12345678, mask);
+}
+
+fn g2w_check_trim(st: &crate::wm::GuiState, id: i32, epoch: u32) {
+    let events = g2w_events(st, id);
+    assert_eq!(events.len(), 1, "ID {id}: 保留 1 件に配送 1 件");
+    let ev = events[0];
+    assert_eq!((ev.kind, ev.sub, ev.serial, ev.window),
+               (os32api::gui::proto::GUI_EV_TRIM, 0, 0, 0));
+    let mut payload = [0; 8];
+    payload[..4].copy_from_slice(&epoch.to_le_bytes());
+    assert_eq!(ev.payload, payload, "全体 pressure_epoch ではなく app trim_epoch");
+}
+
+#[test]
+fn g2w_x3_and_standalone_deliver_once_and_resume_b_c_poll_a() {
+    use crate::{input::Ctx, mocks, multiapp, wm};
+    for ctx in [Ctx::Wait, Ctx::Standalone] {
+        mocks::init();
+        let shm = mocks::Shm::new();
+        let mut st = g2w_state(&shm);
+        wm::wm_cycle(&mut st, ctx);
+        assert_eq!(*mocks::MEMSTAT_CALLS.lock().unwrap(), vec![(0, 132)]);
+        assert_eq!(g2w_counts(), (0, 0));
+        for id in 2..=5 { assert!(g2w_events(&st, id).is_empty()); }
+        mocks::MEMSTAT_CALLS.lock().unwrap().clear();
+        mocks::set_app_state(2, multiapp::APP_STATE_WAIT_POLL);
+        mocks::set_memstat_app(3, 8, 0x87654321);
+        mocks::set_memstat_app(4, 8, 0xabcdef01);
+        g2w_pending((1 << 3) | (1 << 4));
+        wm::wm_cycle(&mut st, ctx);
+        assert_eq!(*mocks::MEMSTAT_CALLS.lock().unwrap(), vec![(0, 132), (3, 132), (4, 132)]);
+        g2w_check_trim(&st, 3, 0x87654321);
+        g2w_check_trim(&st, 4, 0xabcdef01);
+        assert_eq!(g2w_counts(), (2, 0));
+        for id in [3, 4, 2] {
+            assert!(multiapp::resume_one(&mut st));
+            assert_eq!(mocks::resume_calls().last().unwrap().0, id);
+            set_input_ready(&mut st, id, false); // app が POLL で消費し再 park
+            wm::wm_cycle(&mut st, ctx);
+        }
+        assert_eq!(mocks::resume_calls(), vec![(3, 1), (4, 1), (2, 0)]);
+        assert_eq!(g2w_counts(), (2, 0));
+        assert_eq!(mocks::MEMSTAT_CALLS.lock().unwrap().iter().filter(|&&(id, _)| id == 0).count(), 4);
+    }
+}
+
+#[test]
+fn g2w_timeout_a_is_derived_and_b_c_input_still_run_first() {
+    use crate::{input::Ctx, mocks, multiapp, wm};
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = g2w_state(&shm);
+    multiapp::note_parked(2, Some(0));
+    g2w_pending((1 << 3) | (1 << 4));
+    wm::wm_cycle(&mut st, Ctx::Wait);
+    assert!(multiapp::derived_ready(&st, 2));
+    for id in [3, 4, 2] {
+        assert!(multiapp::resume_one(&mut st));
+        assert_eq!(mocks::resume_calls().last().unwrap().0, id);
+        set_input_ready(&mut st, id, false);
+    }
+    assert_eq!(mocks::resume_calls(), vec![(3, 1), (4, 1), (2, 0)]);
+}
+
+#[test]
+fn g2w_full_preserves_events_and_retries_without_marking_sent() {
+    use crate::{input::Ctx, mocks, ring, slot, wm};
+    use os32api::gui::proto::{GUI_EV_CLOSE, GUI_RING_CAPACITY};
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = g2w_state(&shm);
+    for serial in 0..GUI_RING_CAPACITY {
+        let mut ev = ring::ev_simple(GUI_EV_CLOSE, 0, 99);
+        ev.serial = serial as u16;
+        assert!(ring::append(&st, 1, &ev));
+    }
+    let before = slot::read_header(&st, 1);
+    g2w_pending(1 << 3);
+    mocks::set_memstat_app(3, 8, 42);
+    for skipped in 1..=2 {
+        wm::wm_cycle(&mut st, Ctx::Wait);
+        assert_eq!(g2w_counts(), (0, skipped));
+        let h = slot::read_header(&st, 1);
+        assert_eq!((h.ring_head, h.ring_tail, h.flags, h.dropped),
+                   (before.ring_head, before.ring_tail, before.flags, before.dropped));
+        for (serial, ev) in g2w_events(&st, 3).iter().enumerate() {
+            assert_eq!((ev.kind, ev.serial, ev.window), (GUI_EV_CLOSE, serial as u16, 99));
+        }
+    }
+    let mut h = slot::read_header(&st, 1);
+    h.ring_head = h.ring_head.wrapping_add(1);
+    slot::write_header(&st, 1, &h);
+    wm::wm_cycle(&mut st, Ctx::Wait);
+    assert_eq!(g2w_counts(), (1, 2));
+    let events = g2w_events(&st, 3);
+    assert_eq!(events.len(), GUI_RING_CAPACITY);
+    for (n, ev) in events[..GUI_RING_CAPACITY - 1].iter().enumerate() {
+        assert_eq!((ev.kind, ev.serial, ev.window), (GUI_EV_CLOSE, (n + 1) as u16, 99));
+    }
+    let ev = events.last().unwrap();
+    assert_eq!(ev.kind, os32api::gui::proto::GUI_EV_TRIM);
+    assert_eq!(ev.payload, [42, 0, 0, 0, 0, 0, 0, 0]);
+    assert_eq!(slot::read_header(&st, 1).dropped, before.dropped);
+    wm::wm_cycle(&mut st, Ctx::Wait);
+    assert_eq!(g2w_counts(), (1, 2));
+}
+
+#[test]
+fn g2w_front_is_deferred_until_back() {
+    use crate::{input::Ctx, mocks, wm};
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = g2w_state(&shm);
+    g2w_pending(1 << 2);
+    mocks::set_memstat_app(2, 8, 19);
+    wm::wm_cycle(&mut st, Ctx::Wait);
+    assert!(g2w_events(&st, 2).is_empty());
+    assert_eq!(*mocks::MEMSTAT_CALLS.lock().unwrap(), vec![(0, 132)]);
+    focus_app(&mut st, 3);
+    wm::wm_cycle(&mut st, Ctx::Wait);
+    g2w_check_trim(&st, 2, 19);
+    assert_eq!(g2w_counts(), (1, 0));
+}
+
+#[test]
+fn g2w_only_tracked_parked_slots_receive_trim() {
+    use crate::{input::Ctx, mocks, multiapp, slot, wm};
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = g2w_state(&shm);
+    let saved = st.slots[3];
+    st.slots[3] = wm::Slot::EMPTY;
+    mocks::set_app_state(3, multiapp::APP_STATE_WAIT_KEY);
+    mocks::set_app_state(4, multiapp::APP_STATE_WAIT_POLL);
+    g2w_pending((1 << 3) | (1 << 4) | (1 << 5) | 3 | (1 << 6));
+    wm::wm_cycle(&mut st, Ctx::Wait);
+    assert!(g2w_events(&st, 3).is_empty() && g2w_events(&st, 4).is_empty());
+    assert_eq!(g2w_counts(), (0, 0));
+    assert_eq!(*mocks::MEMSTAT_CALLS.lock().unwrap(), vec![(0, 132)]);
+    // PARKED でも未追跡なら配送しない。
+    multiapp::on_owner_exit(4);
+    mocks::set_app_state(3, multiapp::APP_STATE_PARKED);
+    mocks::set_app_state(4, multiapp::APP_STATE_PARKED);
+    st.slots[3] = saved;
+    slot::init_header(&st, 3);
+    wm::wm_cycle(&mut st, Ctx::Wait);
+    g2w_check_trim(&st, 3, 0);
+    g2w_check_trim(&st, 5, 0);
+    assert!(g2w_events(&st, 4).is_empty());
+    multiapp::on_start(4);
+    wm::wm_cycle(&mut st, Ctx::Wait);
+    g2w_check_trim(&st, 4, 0);
+    assert_eq!(g2w_counts(), (3, 0));
+}
+
+#[test]
+fn g2w_owner_exit_and_forget_clear_sent_on_id_reuse() {
+    use crate::{input::Ctx, mocks, multiapp, wm};
+    for via_forget in [false, true] {
+        mocks::init();
+        let shm = mocks::Shm::new();
+        let mut st = g2w_state(&shm);
+        g2w_pending(1 << 3);
+        wm::wm_cycle(&mut st, Ctx::Wait);
+        set_input_ready(&mut st, 3, false);
+        if via_forget {
+            mocks::set_app_state(3, multiapp::APP_STATE_FREE);
+            multiapp::forget_freed(); // private forget -> on_owner_exit -> trim::forget
+        } else {
+            multiapp::on_owner_exit(3);
+        }
+        assert!(!multiapp::is_tracked(3));
+        assert!(multiapp::is_tracked(4));
+        mocks::set_app_state(3, multiapp::APP_STATE_PARKED);
+        multiapp::on_start(3);
+        mocks::set_memstat_app(3, 8, 101);
+        wm::wm_cycle(&mut st, Ctx::Wait);
+        g2w_check_trim(&st, 3, 101);
+        assert_eq!(g2w_counts(), (2, 0));
+    }
+}
+
+#[test]
+fn g2w_pending_is_once_and_zero_to_one_rearms() {
+    use crate::{input::Ctx, mocks, wm};
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = g2w_state(&shm);
+    g2w_pending(1 << 3);
+    wm::wm_cycle(&mut st, Ctx::Wait);
+    g2w_check_trim(&st, 3, 0);
+    for _ in 0..3 {
+        wm::wm_cycle(&mut st, Ctx::Wait);
+        g2w_check_trim(&st, 3, 0);
+    }
+    set_input_ready(&mut st, 3, false);
+    g2w_pending(0);
+    wm::wm_cycle(&mut st, Ctx::Wait);
+    g2w_pending(1 << 3);
+    mocks::set_memstat_app(3, 8, 202);
+    wm::wm_cycle(&mut st, Ctx::Wait);
+    g2w_check_trim(&st, 3, 202);
+    assert_eq!(g2w_counts(), (2, 0));
+}
+
+#[test]
+fn g2w_unanswered_has_one_trim_resume_and_focus_is_separate() {
+    use crate::{input::Ctx, mocks, multiapp, ring, wm};
+    use os32api::gui::proto::{GUI_EV_FOCUS, GUI_EV_TRIM};
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = g2w_state(&shm);
+    g2w_pending(1 << 3);
+    wm::wm_cycle(&mut st, Ctx::Wait);
+    let mut trim_consumed = 0;
+    let mut trim_resumes = 0;
+    let mut normal_resumes = 0;
+    for cycle in 0..12 {
+        if cycle == 6 {
+            assert!(ring::append(&st, 1, &ring::ev_simple(GUI_EV_FOCUS, 1, 0x10001)));
+        }
+        let events = g2w_events(&st, 3);
+        let trims = events.iter().filter(|ev| ev.kind == GUI_EV_TRIM).count();
+        if multiapp::resume_one(&mut st) {
+            assert_eq!(mocks::resume_calls().last().unwrap().0, 3);
+            if trims > 0 { trim_resumes += 1; } else { normal_resumes += 1; }
+            trim_consumed += trims;
+            set_input_ready(&mut st, 3, false); // DONE は送らず pending を保持
+        } else {
+            assert!(events.is_empty());
+        }
+        wm::wm_cycle(&mut st, Ctx::Wait);
+    }
+    assert_eq!((trim_consumed, trim_resumes, normal_resumes), (1, 1, 1));
+    assert_eq!(mocks::resume_calls(), vec![(3, 1), (3, 1)]);
+    assert_eq!(g2w_counts(), (1, 0));
+    assert_eq!(mocks::MEMSTAT_GLOBAL.lock().unwrap().1, 1 << 3);
+    assert!(g2w_events(&st, 3).is_empty());
+}
+
+#[test]
+fn g2w_terminal_op_wait_delivers_then_parks_at_existing_branch_b() {
+    use crate::{mocks, multiapp, wm};
+    mocks::init();
+    let shm = mocks::Shm::new();
+    *wm::g() = g2w_state(&shm);
+    wm::g().inited = true;
+    multiapp::mark_resumed(2);
+    assert!(!multiapp::should_park(wm::g(), 2), "配送前に ready はない");
+    g2w_pending(1 << 3);
+    drive_op_wait(2, 4);
+    g2w_check_trim(wm::g(), 3, 0);
+    assert_eq!(g2w_counts(), (1, 0));
+    assert!(mocks::PARKS.load(std::sync::atomic::Ordering::SeqCst) > 0);
+    assert!(multiapp::should_park(wm::g(), 2), "TRIM の入力 ready が (b) で譲らせる");
+    wm::g().inited = false;
+}
+
+#[test]
+fn g2w_third_party_input_advances_with_existing_turns() {
+    use crate::{input::Ctx, mocks, multiapp, wm};
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = g2w_state(&shm);
+    g2w_pending((1 << 3) | (1 << 4));
+    set_input_ready(&mut st, 5, true);
+    wm::wm_cycle(&mut st, Ctx::Wait);
+    // B/C 未応答でも、消費すれば再配送されず D へ既存の巡回が進む。
+    for id in [3, 4, 5] {
+        assert!(multiapp::resume_one(&mut st));
+        assert_eq!(mocks::resume_calls().last().unwrap().0, id);
+        assert!(multiapp::turn_used(id));
+        set_input_ready(&mut st, id, false);
+        wm::wm_cycle(&mut st, Ctx::Wait);
+    }
+    assert_eq!(mocks::resume_calls(), vec![(3, 1), (4, 1), (5, 1)]);
+    assert!(!multiapp::resume_one(&mut st));
+    assert_eq!(g2w_counts(), (2, 0));
+}
+
+#[test]
+fn g2w_pump_never_calls_memstat_or_delivers() {
+    use crate::{input::Ctx, mocks, wm};
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = g2w_state(&shm);
+    g2w_pending(1 << 3);
+    for _ in 0..3 { wm::wm_cycle(&mut st, Ctx::Pump); }
+    assert!(mocks::MEMSTAT_CALLS.lock().unwrap().is_empty(), "X1 KAPI 禁止 (T8)");
+    assert!(g2w_events(&st, 3).is_empty());
+    assert_eq!(g2w_counts(), (0, 0));
+    wm::wm_cycle(&mut st, Ctx::Wait);
+    g2w_check_trim(&st, 3, 0);
+    assert_eq!(*mocks::MEMSTAT_CALLS.lock().unwrap(), vec![(0, 132), (3, 132)]);
+}
+
 /// GUI アプリ 1 本 (owner 2、スロット 0 と窓 1 枚) だけの状態。票 K7 の
 /// 「端末から起動した CUI アプリ」は `OP_INIT` を通らないのでスロットも窓も
 /// 持たない — 表 (`multiapp`) にだけ載る本を作るための土台。

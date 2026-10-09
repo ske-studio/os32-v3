@@ -325,6 +325,7 @@ pub fn end_start(rc: i32) {
 /// `GUI_OP_OWNER_EXIT` (正常終了 / fault / CTRL+STOP / `exec_kill` のどれでも
 /// カーネルはここを通る)。**その ID の 1 本分だけ**を表から落とす。
 pub fn on_owner_exit(id: i32) {
+    crate::trim::forget(id);
     let i = match idx(id) {
         Some(i) => i,
         None => return,

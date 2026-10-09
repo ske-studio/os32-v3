@@ -1149,6 +1149,8 @@ pub fn wm_cycle(st: &mut GuiState, ctx: input::Ctx) {
         startmenu::x3_cycle(st);
         /* sticky な `GUI_EV_QUIT` の再配送 (契約 S5)。 */
         session::x3_cycle(st);
+        /* T2g: PARKED な裏の slot へ。KAPI は X3 / 単独ループだけ (T8)。 */
+        crate::trim::deliver(st);
         /* 時計 (1 秒粒度) と窓ボタンの変化 (契約 D1 / D3)。 */
         taskbar::x3_cycle(st);
         lease::reconcile(st);
