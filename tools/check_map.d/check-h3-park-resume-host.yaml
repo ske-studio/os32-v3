@@ -18,3 +18,4 @@ check-h3-park-resume-host:
 - build/checks.d/check-h3-park-resume-host.mk
 - tools/np21w_mcp/gui.py
 - userland/gshell/src/startmenu.rs
+- userland/gshell/src/taskbar.rs

@@ -7,6 +7,8 @@ import importlib.util
 import io
 import json
 import re
+import signal
+import time
 from pathlib import Path
 import struct
 import subprocess
@@ -341,9 +343,24 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(self.g.wait_text('xyz','screen',15),
                          {'ok':False, 'last':{'lines':['abc'],'unknown_count':0}})
         self.assertTrue(self.g.wait_text('abc','screen')['ok'])
-        chunks = iter(['fixt','ure PASS'])
+        chunks = iter(['old PASS','fixt','ure PASS'])
         self.g.consink = lambda since=None: {'text':next(chunks),'since':1}
         self.assertTrue(self.g.wait_text('fixture PASS')['ok'])
+
+    def test_wait_text_default_ignores_retained_marker_and_since_overrides(self):
+        setup_state(self.http)
+        data = b'\x01\x0f\x04PASS'
+        ring = data + bytes(8192 - len(data))
+        self.http.put(0x150000, ring)
+        for addr, value in ((0x152000,len(data)),(0x152004,0),(0x152008,len(data))):
+            self.http.put(addr, struct.pack('<I',value))
+        result = self.g.wait_text('PASS', timeout=15)
+        self.assertFalse(result['ok'])
+        self.assertEqual(result['last']['text'], '')
+        self.assertEqual(self.http.clock.now, 15)
+        self.assertTrue(self.g.wait_text('PASS', since=0)['ok'])
+        with self.assertRaisesRegex(ValueError, 'only valid for consink'):
+            self.g.wait_text('PASS', source='screen', since=0)
 
     def test_consink_wrap_since_and_snapshot(self):
         setup_state(self.http)
@@ -452,9 +469,15 @@ class OcrTests(unittest.TestCase):
         sample = {'lines':['?x?','?'], 'ambiguous':[
             {'pos':[0,0],'chars':'Il'}, {'pos':[0,2],'chars':'Il'}, {'pos':[1,0],'chars':'Il'}]}
         for regex, expected in ((r'^Ixl\nl$',True), (r'^[Il]x[Il]\nI$',True),
-                                (r'^[^Il]',False), (r'^J',False), (r'(I)x\1',True),
-                                (r'(?<=Ix)l',True), (r'IxI(?=\nI)',True)):
+                                (r'^[^Il]',False), (r'^J',False), (r'(?i)^ixi',True),
+                                (r'^\w+\nl$',True), (r'^\W',False),
+                                (r'^[A-Z]x[^J]',True), (r'^[^A-Za-z]',False),
+                                (r'^[\u0000-\uffff]',True), (r'^[\ue000-\uf8ff]',False)):
             self.assertEqual(gui.screen_matches(re.compile(regex),sample),expected,regex)
+        for regex in (r'(I)x\1', r'(?<=Ix)l', r'IxI(?=\nI)', r'\bI', r'(I)?(?(1)l|I)', r'I*+l', r'(?>I*)l'):
+            for observed in (sample, {'lines':['Ixl']}):
+                with self.assertRaisesRegex(ValueError, 'screen regex cannot expand'):
+                    gui.screen_matches(re.compile(regex), observed)
         # Bounded missing marker on many collisions must finish without 2**80 expansions.
         many = {'lines':['?'*80], 'ambiguous':[{'pos':[0,i],'chars':'Il'} for i in range(80)]}
         self.assertFalse(gui.screen_matches(re.compile('PASS'),many))
@@ -463,6 +486,37 @@ class OcrTests(unittest.TestCase):
         self.assertTrue(g.wait_text(r'^lxl\nI$','screen',15)['ok'])
         timed = g.wait_text('J','screen',15)
         self.assertEqual(timed, {'ok':False,'last':sample})
+
+    def test_unbounded_regex_64_collisions_finishes_with_deadline(self):
+        sample = {'lines':['Result:' + '?'*64 + 'OK'], 'ambiguous':[
+            {'pos':[0,7+i],'chars':'Il'} for i in range(64)]}
+        def expired(*_):
+            raise AssertionError('screen match exceeded 2 seconds')
+        old = signal.signal(signal.SIGALRM, expired)
+        signal.setitimer(signal.ITIMER_REAL, 2)
+        started = time.monotonic()
+        try:
+            for regex, expected in ((r'Result:.*OK',True), (r'Result:.*J.*OK',False),
+                                    (r'Result:I+l+OK',True), (r'Result:[^Il]+OK',False)):
+                self.assertEqual(gui.screen_matches(re.compile(regex),sample),expected)
+            self.assertLess(time.monotonic()-started,1)
+        finally:
+            signal.setitimer(signal.ITIMER_REAL,0)
+            signal.signal(signal.SIGALRM,old)
+
+    def test_unfetched_ank_is_unknown_without_space_collision(self):
+        fetched = bytearray([1]*256)
+        fetched[ord('A')] = 0
+        font = bytearray(self.font)
+        font[65*16:66*16] = bytes(16)  # Uninitialized cache must not alias space.
+        result = gui.read_ascii(draw(self.font,' A'),font,[13,19,16,16],fetched=fetched)
+        self.assertEqual(result['lines'],[' ?'])
+        self.assertEqual(result['unknown_count'],1)
+        self.assertEqual(result['ambiguous'],[])
+        fetched[ord('I')] = 0
+        result = gui.read_ascii(draw(self.font,'Il'),self.font,[13,19,16,16],fetched=fetched)
+        self.assertEqual(result['lines'],['ll'])
+        self.assertEqual(result['ambiguous'],[])
 
     def test_recorded_known_lines(self):
         result=gui.read_ascii(Image.open(RECORDED),self.font)
@@ -488,6 +542,7 @@ class OcrTests(unittest.TestCase):
             im=draw(self.font,'Evidence',origin=(13,19))
             stream=io.BytesIO();im.save(stream,format='BMP');http.bmp=stream.getvalue()
             http.put(0x1000+291588,self.font)
+            http.put(0x1000+295684,bytes([1])*256)
             g=gui.Gui(http.transport())
             with tempfile.TemporaryDirectory() as tmp:
                 out=str(Path(tmp)/'proof.png')
@@ -497,6 +552,10 @@ class OcrTests(unittest.TestCase):
                 self.assertEqual(result['source'],source)
                 self.assertEqual(Image.open(out).format,'PNG')
                 self.assertEqual(result['unknown_count'],0)
+                http.put(0x1000+295684+ord('E'),b'\x00')
+                result=g.screen_text([13,19,64,16])
+                self.assertEqual(result['lines'],['?vidence'])
+                self.assertEqual(result['unknown_count'],1)
 
 
 def mutate():
@@ -515,6 +574,9 @@ def mutate():
         ("result['v2_error'] = '%s: %s' % (type(exc).__name__, exc)", "result['v2_error'] = ''", 'test_descriptor_failures_retain_v1_and_reason'),
         ("glyphs.get(signature, '') + chr(code)", "chr(code)", 'test_runtime_collision_groups_and_screen_regex'),
         ("elif len(candidates) > 1:", "elif False:", 'test_runtime_collision_groups_and_screen_regex'),
+        ("position = self.consink()['since'] if source == 'consink' and since is None else since", "position = since", 'test_wait_text_default_ignores_retained_marker_and_since_overrides'),
+        ("if fetched is not None and not fetched[code]:", "if False:", 'test_unfetched_ank_is_unknown_without_space_collision'),
+        ("if any(matcher.fullmatch(char) for char in chars)", "if True", 'test_unbounded_regex_64_collisions_finishes_with_deadline'),
     ]
     failures = 0
     source = SRC.read_text()
@@ -528,7 +590,7 @@ def mutate():
             gui = importlib.util.module_from_spec(spec);spec.loader.exec_module(gui)
             gui.ROOT = ROOT
             result = unittest.TextTestRunner(stream=io.StringIO()).run(
-                unittest.TestSuite([(OcrTests if case.startswith('test_runtime_') else GuiTests)(case)]))
+                unittest.TestSuite([(OcrTests if case.startswith(('test_runtime_', 'test_unbounded_', 'test_unfetched_')) else GuiTests)(case)]))
             killed = not result.wasSuccessful()
             print('MUTATION %d %s: %s' % (index+1,'RED' if killed else 'MISSED',old))
             failures += not killed

@@ -277,7 +277,6 @@ def tb(h):
 # 項目数は
 # userland/gshell/src/startmenu.rs の ROOT_ITEMS、行高 ITEM_H=18、枠 BORDER=2、
 # taskbar.rs の TASKBAR_H=24 と一致させること。
-START_MENU_ITEMS = 6
 # 項目名 → 行番号 (startmenu.rs の IT_* と同じ順)。呼び出し側は数字ではなくこれを使う
 # (2026-09-13 S4: 6 項目化で「行 3」が Settings に当たった。start_row は座標を導く
 # だけで項目の意味は追従しない)。
@@ -287,15 +286,9 @@ ROW_RUN = 2
 ROW_SETTINGS = 3
 ROW_CUI = 4
 ROW_HALT = 5
-START_MENU_ITEM_H = 18
-START_MENU_BORDER = 2
-TASKBAR_H = 24
 
 
-def start_row(h, r):
-    top = h - TASKBAR_H - (START_MENU_ITEMS * START_MENU_ITEM_H + START_MENU_BORDER * 2)
-    return (82, top + START_MENU_BORDER + START_MENU_ITEM_H * r + START_MENU_ITEM_H // 2)
-
+start_row = _gui.start_row
 
 def enter_gshell():
     """CUI (rshell を抜けた状態) から `os32gui` で GUI へ入る。

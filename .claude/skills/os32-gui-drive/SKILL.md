@@ -41,6 +41,7 @@ MCP/共有実装が符号化するので、MCP 引数では `CTRL+ESC` のまま
 引数の必要な fixture は CUI 起動か fixture の対話キーを使う。
 新しい kernel owner (2..5) が空から非空に変わり、OP_WAIT の `PARKED` に入るまで待つ。
 v1 の返り値は `owner` と `slot:null`。**owner と SHM slot の添字を結びつけない**。
+launch が時間切れになった後は Start メニューが開いたままのことがある。画面で確かめてから再試行する (CTRL+ESC は開閉の切替)。
 マウス経路は明示的な `fallback:true`。時間切れ後の自動再起動は二重起動になりうるので行わない。
 
 ## 観測・待ち・証拠
@@ -52,19 +53,21 @@ v1 の返り値は `owner` と `slot:null`。**owner と SHM slot の添字を�
   前回の `since` (head 位置) を渡すと差分。`lost:true` はその位置が保持されていない。
   リング 1 周やリセットを読み逃すと位置だけでは検出できない。短い区間で採取し、
   受入では drop カウンタや fixture の区間印も照合する。
+  端末アプリが con_sink の読み手になるとリングが消費され、consink/wait_text に出ない。
 - `emu_screen_text`: 第二の読み口。ゲスト ANK キャッシュの 8×16 二色字形と完全一致する
   ASCII だけを読む。日本語・未知字形は `?`、戻りは `lines[]` と `unknown_count`、`ambiguous`。
   同形字は `?` とし、`ambiguous` に行・列と候補 (例 `Il`) を返す。未知字形と別に数える。
   screen の待ちは候補のどれにも一致する。候補外の文字へ推測しない。
-  候補が多い画面では、待ちの regex は長さが有限の fixture 印を使う。
-  無制限の繰返し・先読み・後読み・後方参照は候補の組合せを全探索するため高価になる。
+  同形セルを私用文字へ置き換え、regex を候補に合わせて広げて一度だけ照合する。
+  先読み・後読み・境界条件・後方参照・atomic group・所有的繰返しは候補契約を保てないため理由付きで拒否する。
   `region:[x,y,width,height]` はセル原点を固定する。省略時は ASCII の一致を足場に行を探すため、
   ASCII が 2 字以上一致しない行は発見できない。未知字形だけの領域は region を指定する。
   `path` に PNG の証拠パスを渡す。4bit の 98 面と 24bpp の WAB を RGB に展開する。
 - `emu_wait_mem {"symbol":"appslot_trim_epoch","op":"gt","value":0,"timeout":60}`。
   kernel の u32 が既定。gshell は `gshell:gshell_trim_delivered`。
 - `emu_wait_text {"regex":"PASS","source":"consink","timeout":60}`。
-  source は consink または screen、0.5s ポーリング。
+  source は consink または screen、0.5s ポーリング。consink は呼出し時点以降の差分だけが既定。
+  操作前に保存した位置から待つ場合は `since` を明示する (screen では不可)。
 
 待ちの下限は **15s**、既定 60s。時間切れは例外でなく `{"ok":false,"last":...}`。
 これを受入失敗として最後の値を残す。`ok:true` は条件を読んだというだけ。
@@ -83,7 +86,7 @@ v1 の返り値は `owner` と `slot:null`。**owner と SHM slot の添字を�
 重ねて起動しない。`ver` で確認する。
 この出口は `/etc/system.cfg` の **`GUI=0` を永続化**する。
 再び GUI へ入るには rshell を閉じて `os32gui`。次回の GUI 自動起動へ戻すときは、
-CUI の設定操作で `GUI=1` に書き戻す (既存の設定値を保つ)。
+CUI で `os32gui on` を実行して `GUI=1` を永続化する (既存の設定値を保つ)。
 
 ## 実際の出力例
 

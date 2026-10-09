@@ -5,3 +5,4 @@ check-gui-gate-host:
 - build/checks.d/check-gui-gate-host.mk
 - tools/np21w_mcp/gui.py
 - userland/gshell/src/startmenu.rs
+- userland/gshell/src/taskbar.rs

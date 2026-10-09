@@ -6,7 +6,6 @@ its module attributes on each call, so monkeypatches remain effective.
 """
 import importlib
 import io
-import itertools
 import json
 import operator
 import os
@@ -44,6 +43,22 @@ class Transport:
         if result.get("ok") is not True:
             raise ValueError("input rejected: %s" % result)
         return payload
+
+
+def start_row(h, r):
+    """Root-menu row centre derived from the running shell's source layout."""
+    source = (ROOT / 'userland/gshell/src/startmenu.rs').read_text()
+    taskbar = (ROOT / 'userland/gshell/src/taskbar.rs').read_text()
+    def constant(text, name):
+        return int(re.search(r'\bconst ' + name + r': \w+ = (\d+);', text)[1])
+    items = constant(source, 'ROOT_ITEMS')
+    item_h = constant(source, 'ITEM_H')
+    border = constant(source, 'BORDER')
+    taskbar_h = constant(taskbar, 'TASKBAR_H')
+    if not 0 <= r < items:
+        raise ValueError('Start menu row outside ROOT_ITEMS')
+    top = h - taskbar_h - (items * item_h + border * 2)
+    return (82, top + border + item_h * r + item_h // 2)
 
 
 def pixel_to_absolute(px, py, h):
@@ -443,10 +458,9 @@ class Gui:
         run_row = int(re.search(r'const IT_RUN: usize = (\d+);', source)[1])
         if fallback:
             # Explicit fallback only: retrying a timed-out launch could start it twice.
-            from tools import gui_gate
             mouse = Mouse(height, self.transport)
             mouse.click(30, height - 12)
-            mouse.click(*gui_gate.start_row(height, run_row))
+            mouse.click(*start_row(height, run_row))
         else:
             key(seq='CTRL+ESC', transport=self.transport)
             self.transport.clock.sleep(0.35)
@@ -517,12 +531,16 @@ class Gui:
             return self.word(table[name][0])
         return self._wait(read, lambda last: operations[op](last, value), timeout)
 
-    def wait_text(self, regex, source='consink', timeout=60):
+    def wait_text(self, regex, source='consink', timeout=60, since=None):
         if source not in ('consink', 'screen'):
             raise ValueError('source must be consink or screen')
+        self._timeout(timeout)
+        if source == 'screen' and since is not None:
+            raise ValueError('since is only valid for consink')
         pattern = re.compile(regex)
         chunks = []
-        position = None
+        # Discard the retained snapshot when taking the default starting cursor.
+        position = self.consink()['since'] if source == 'consink' and since is None else since
         def read():
             nonlocal position
             if source == 'screen':
@@ -562,7 +580,9 @@ class Gui:
         if path:
             image.convert('RGB').save(path, format='PNG')
         address = c_constants(ROOT / 'include/memmap.h')('MEM_FONT_CACHE_BASE') + 282752 + 8836
-        result = read_ascii(image, self.mem(address, 256 * 16), region)
+        cache = self.mem(address, 256 * 16)
+        fetched = self.mem(address + 256 * 16, 256)
+        result = read_ascii(image, cache, region, fetched=fetched)
         result.update(source=headers.get('X-Screen-Source', '?'), size=list(image.size))
         if path:
             result['path'] = path
@@ -619,7 +639,7 @@ def decode_ring(ring, head, tail, count, since=None, grep=None):
             'cursor_limit': 'an unseen full lap or reset cannot be detected from physical positions'}
 
 
-def read_ascii(image, font, region=None):
+def read_ascii(image, font, region=None, fetched=None):
     """Exact 8x16 ASCII recognition, independently of palette/RGB BMP storage.
 
     region=[x,y,w,h] specifies the cell origin and bounds (also counts entirely
@@ -630,10 +650,14 @@ def read_ascii(image, font, region=None):
     """
     if len(font) != 4096:
         raise ValueError('ANK cache must contain 256 x 16 bytes')
+    if fetched is not None and len(fetched) != 256:
+        raise ValueError('ANK fetched flags must contain 256 bytes')
     font = bytes(font)
     image = image.convert('RGB')
     glyphs = {}
     for code in range(32, 127):
+        if fetched is not None and not fetched[code]:
+            continue
         signature = font[code * 16:(code + 1) * 16]
         # Multiple ASCII codepoints may have identical guest bitmaps. Guessing
         # the last dictionary entry would silently misread I as l.
@@ -722,70 +746,74 @@ def read_ascii(image, font, region=None):
 
 
 def screen_matches(pattern, result):
-    """Existential regex match over exact font candidates; unknowns stay '?'.
+    """One regex search over private characters representing candidate groups.
 
-    Try candidates as input characters, never as regex syntax. This preserves
-    classes, anchors, backreferences and lookarounds, including across rows.
-    For bounded patterns without assertions/backreferences, only candidates
-    within the consuming window can affect a match. Unbounded or contextual
-    patterns use the full Cartesian product and can be expensive; prefer a
-    bounded fixture marker when the screen has many ambiguous cells.
+    Consuming atoms accept a group iff they accept at least one of its ASCII
+    candidates. Contextual assertions/backreferences cannot preserve that
+    existential contract and are rejected, even on an unambiguous screenshot.
+    Ordinary regex backtracking cost is still governed by the user's pattern.
     """
+    from re import _parser, _compiler, _constants as c
+
     lines = result.get('lines', [])
     text = list('\n'.join(lines))
     offsets, offset = [], 0
     for line in lines:
         offsets.append(offset)
         offset += len(line) + 1
-    choices = []
+    groups = {}
+    # Avoid collisions with literal text/pattern characters. Classes are guarded
+    # below, including broad Unicode ranges that contain the private characters.
+    occupied = set(text) | set(pattern.pattern)
+    private = (chr(code) for code in range(0xe000, 0xf900) if chr(code) not in occupied)
     for item in result.get('ambiguous', []):
+        chars = item['chars']
+        if not chars or any(ord(char) < 32 or ord(char) > 126 for char in chars):
+            raise ValueError('screen candidates must be printable ASCII')
+        if chars not in groups:
+            marker = next(private, None)
+            if marker is None:
+                raise ValueError('too many screen candidate groups')
+            groups[chars] = marker
         row, col = item['pos']
-        choices.append((offsets[row] + col, item['chars']))
-    if not choices:
-        return bool(pattern.search(''.join(text)))
-    for pos, chars in choices:
-        text[pos] = chars[0]
-    # The parser is the same stdlib parser used by re.compile; keep a full
-    # enumeration fallback if its internal API is unavailable.
-    try:
-        from re import _parser, _constants
-        parsed = _parser.parse(pattern.pattern, pattern.flags)
-        _, width = parsed.getwidth()
-        def contextual(nodes):
-            for op, arg in nodes:
-                if op in (_constants.ASSERT, _constants.ASSERT_NOT,
-                          _constants.GROUPREF, _constants.GROUPREF_EXISTS):
-                    return True
-                if op == _constants.AT and arg in (
-                        _constants.AT_BOUNDARY, _constants.AT_NON_BOUNDARY,
-                        _constants.AT_LOC_BOUNDARY, _constants.AT_LOC_NON_BOUNDARY,
-                        _constants.AT_UNI_BOUNDARY, _constants.AT_UNI_NON_BOUNDARY):
-                    return True
-                if op == _constants.SUBPATTERN and contextual(arg[-1]):
-                    return True
-                if op == _constants.BRANCH and any(contextual(b) for b in arg[1]):
-                    return True
-                if op in (_constants.MAX_REPEAT, _constants.MIN_REPEAT,
-                          _constants.POSSESSIVE_REPEAT) and contextual(arg[-1]):
-                    return True
-                if op == _constants.ATOMIC_GROUP and contextual(arg):
-                    return True
-            return False
-        bounded = width <= len(text) and not contextual(parsed)
-    except (ImportError, AttributeError):
-        bounded = False
+        text[offsets[row] + col] = groups[chars]
 
-    def variants(selected):
-        for values in itertools.product(*(chars for _, chars in selected)):
-            candidate = text.copy()
-            for (pos, _), char in zip(selected, values):
-                candidate[pos] = char
-            yield ''.join(candidate)
+    parsed = _parser.parse(pattern.pattern, pattern.flags)
+    markers = [(c.LITERAL, ord(marker)) for marker in groups.values()]
 
-    if bounded:
-        for start in range(len(text) + 1):
-            selected = [(pos, chars) for pos, chars in choices if start <= pos < start + width]
-            if any(pattern.match(candidate, start) for candidate in variants(selected)):
-                return True
-        return False
-    return any(pattern.search(candidate) for candidate in variants(choices))
+    def transform(nodes, flags):
+        transformed = []
+        for op, arg in nodes:
+            if op in (c.LITERAL, c.NOT_LITERAL, c.IN, c.CATEGORY, c.ANY):
+                atom = _parser.SubPattern(parsed.state, [(op, arg)])
+                matcher = _compiler.compile(atom, flags)
+                accepted = [(c.LITERAL, ord(marker)) for chars, marker in groups.items()
+                            if any(matcher.fullmatch(char) for char in chars)]
+                if markers:
+                    original = _parser.SubPattern(parsed.state, [
+                        (c.ASSERT_NOT, (1, _parser.SubPattern(parsed.state, [(c.IN, markers)]))),
+                        (op, arg)])
+                    branches = [original]
+                    if accepted:
+                        branches.append(_parser.SubPattern(parsed.state, [(c.IN, accepted)]))
+                    transformed.append((c.BRANCH, (None, branches)))
+                else:
+                    transformed.append((op, arg))
+            elif op == c.SUBPATTERN:
+                group, add, remove, child = arg
+                transformed.append((op, (group, add, remove,
+                                         transform(child, (flags | add) & ~remove))))
+            elif op == c.BRANCH:
+                transformed.append((op, (arg[0], [transform(b, flags) for b in arg[1]])))
+            elif op in (c.MAX_REPEAT, c.MIN_REPEAT):
+                transformed.append((op, (arg[0], arg[1], transform(arg[2], flags))))
+            elif op == c.AT and arg in (c.AT_BEGINNING, c.AT_BEGINNING_STRING,
+                                       c.AT_END, c.AT_END_STRING):
+                transformed.append((op, arg))
+            else:
+                raise ValueError('screen regex cannot expand %s: contextual assertions, '
+                                 'boundaries, backreferences, atomic groups and possessive repeats are unsupported' % op)
+        return _parser.SubPattern(parsed.state, transformed)
+
+    expanded = _compiler.compile(transform(parsed, parsed.state.flags), parsed.state.flags)
+    return bool(expanded.search(''.join(text)))

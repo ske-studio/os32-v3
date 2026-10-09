@@ -21,3 +21,5 @@ check-np21w-gui-host:
 - exec/appslot.h
 - userland/gshell/src/startmenu.rs
 - .claude/skills/os32-gui-drive/SKILL.md
+- tools/np21w_mcp/np21w_client.py
+- tools/np21w_mcp/symbols.py

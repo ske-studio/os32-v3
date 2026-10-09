@@ -674,9 +674,9 @@ _GUI_TOOLS = {
     "emu_wait_mem": ("wait_mem", "Poll a u32 symbol (kernel by default, gshell:name for shell). Timeout returns ok=false with last.",
                      {"symbol": {"type": "string"}, "op": {"type": "string", "enum": ["eq", "ne", "lt", "le", "gt", "ge"]},
                       "value": {"type": "integer"}, "timeout": _TIMEOUT}, ["symbol", "op", "value"]),
-    "emu_wait_text": ("wait_text", "Poll console/screen regex; screen accepts each exact font candidate. Timeout returns ok=false with last.",
+    "emu_wait_text": ("wait_text", "Poll new console output by default (since overrides cursor), or screen regex with exact font candidates; contextual screen regex is rejected. Timeout returns ok=false with last.",
                       {"regex": {"type": "string"}, "source": {"type": "string", "enum": ["consink", "screen"], "default": "consink"},
-                       "timeout": _TIMEOUT}, ["regex"]),
+                       "timeout": _TIMEOUT, "since": {"type": "integer", "minimum": 0}}, ["regex"]),
 }
 for _name, (_method, _description, _properties, _required) in _GUI_TOOLS.items():
     _schema = _obj(_properties, _required)

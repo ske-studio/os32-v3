@@ -5,6 +5,9 @@ The fixture records all original schemas/descriptions at b469f8f. No HTTP.
 import contextlib
 import io
 import json
+import os
+import subprocess
+import tempfile
 from pathlib import Path
 import sys
 import unittest
@@ -38,6 +41,8 @@ class McpTests(unittest.TestCase):
                              {'type':'number','minimum':15,'default':60})
         self.assertNotIn('ax',listed['emu_mouse']['inputSchema']['properties'])
         self.assertNotIn('args',listed['emu_gui_launch']['inputSchema']['properties'])
+        self.assertEqual(listed['emu_wait_text']['inputSchema']['properties']['since'],
+                         {'type':'integer','minimum':0})
         print('MCP schema: %d existing unchanged + %d GUI tools' % (len(before),len(new)))
 
     def test_each_new_tool_calls_real_gui_with_mock_observation(self):
@@ -63,7 +68,8 @@ class McpTests(unittest.TestCase):
                ('emu_screen_text',{'path':'proof.png','region':[0,0,8,16]}),
                ('emu_consink',{'since':0,'grep':'PASS'}),
                ('emu_wait_mem',{'symbol':'probe','op':'eq','value':7,'timeout':15}),
-               ('emu_wait_text',{'regex':'PASS','source':'screen','timeout':15})]
+               ('emu_wait_text',{'regex':'PASS','source':'screen','timeout':15}),
+               ('emu_wait_text',{'regex':'PASS','since':0,'timeout':15})]
         with patch.object(server,'GUI',g), patch('urllib.request.urlopen',side_effect=AssertionError('LIVE HTTP FORBIDDEN')):
             for name,args in tests:
                 result=self.request('tools/call',{'name':name,'arguments':args})
@@ -72,6 +78,53 @@ class McpTests(unittest.TestCase):
                 if name=='emu_gui_launch':
                     self.assertEqual((decoded['owner'],decoded['slot']),(4,None))
         self.assertTrue(calls)
+
+    def test_server_script_tools_list_and_fallback_with_mock_transport(self):
+        # Run the production script from outside the repo: no tools package on
+        # sys.path. sitecustomize supplies offline I/O before server imports gui.
+        bootstrap = """
+import sys, types, urllib.request
+sys.path.insert(0, %r)
+import gui
+urllib.request.urlopen = lambda *a, **k: (_ for _ in ()).throw(AssertionError('LIVE HTTP FORBIDDEN'))
+original_init = gui.Gui.__init__
+def init(self, *args, **kwargs):
+    original_init(self, *args, **kwargs)
+    self.posts = []
+    self.transport = gui.Transport(post=lambda p,d:self.posts.append((p,d)),
+        get=lambda p:(b'{"grph_disp":1,"scrn_ymax":480}',{}),
+        clock=types.SimpleNamespace(sleep=lambda n:None, monotonic=lambda:0))
+    state = {'kernel':[{'owner':i,'state':0} for i in range(2,6)],
+             'slots':[], 'windows':[], 'front':0, 'version':1}
+    ready = dict(state,kernel=[{'owner':i,'state':2 if i==4 else 0} for i in range(2,6)])
+    sequence = [state,ready]
+    self.wm_state = lambda: sequence.pop(0) if sequence else ready
+    self.mouse_posts = lambda: sum(p=='/api/mouse' for p,d in self.posts)
+gui.Gui.__init__ = init
+original_launch = gui.Gui.launch
+def launch(self, *args, **kwargs):
+    result = original_launch(self, *args, **kwargs)
+    assert self.mouse_posts() == 6
+    assert 'tools' not in sys.modules
+    return result
+gui.Gui.launch = launch
+""" % str(ROOT/'tools/np21w_mcp')
+        requests = [{'jsonrpc':'2.0','id':1,'method':'tools/list'},
+                    {'jsonrpc':'2.0','id':2,'method':'tools/call','params':{
+                        'name':'emu_gui_launch','arguments':{'path':'/x','fallback':True,'timeout':15}}}]
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp)/'sitecustomize.py').write_text(bootstrap)
+            env = dict(os.environ, PYTHONPATH=tmp)
+            proc = subprocess.run([sys.executable,'-B',str(ROOT/'tools/np21w_mcp/server.py')],
+                cwd=tmp, env=env, input=''.join(json.dumps(r)+'\n' for r in requests),
+                capture_output=True, text=True, timeout=10)
+        self.assertEqual(proc.returncode,0,proc.stderr)
+        self.assertNotIn('Error in sitecustomize',proc.stderr)
+        responses = [json.loads(line)['result'] for line in proc.stdout.splitlines()]
+        self.assertIn('emu_gui_launch',[t['name'] for t in responses[0]['tools']])
+        self.assertNotIn('isError',responses[1],responses[1])
+        result=json.loads(responses[1]['content'][0]['text'])
+        self.assertEqual((result['ok'],result['owner'],result['slot']),(True,4,None))
 
     def test_invalid_input_is_an_mcp_error(self):
         with patch('urllib.request.urlopen',side_effect=AssertionError('LIVE HTTP FORBIDDEN')):

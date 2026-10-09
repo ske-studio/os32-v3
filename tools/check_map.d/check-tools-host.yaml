@@ -1,4 +1,5 @@
 check-tools-host:
+- tools/np21w_mcp/gui.py
 - assets/fonts/IPA_Font_License_Agreement_v1.0.txt
 - assets/settings/defaults.tsv
 - build/core.yaml
@@ -53,3 +54,5 @@ check-tools-host:
 - tools/check_map.d/check-tools-host.yaml
 - build/checks.d/check-tools-host.mk
 - sdk/rust/os32api/src/**
+- userland/gshell/src/taskbar.rs
+- userland/gshell/src/startmenu.rs

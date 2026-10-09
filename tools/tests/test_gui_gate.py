@@ -33,6 +33,7 @@ import re
 import sys
 import tempfile
 import types
+from unittest.mock import patch
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
@@ -550,7 +551,8 @@ def mutate(tmp):
 if __name__ == "__main__":
     args = sys.argv[1:]
     names = [a for a in args if not a.startswith("--")] or list(CASES)
-    with tempfile.TemporaryDirectory(prefix="os32-gui-gate-") as tmp:
+    with patch("urllib.request.urlopen", side_effect=AssertionError("LIVE HTTP FORBIDDEN")), \
+            tempfile.TemporaryDirectory(prefix="os32-gui-gate-") as tmp:
         mod = load()
         print("HOST import PASS (real tools/gui_gate.py)", flush=True)
         rc = run(mod, names, tmp)
