@@ -1,5 +1,9 @@
 /* Real nano objects, freestanding ILP32 Linux entry; no host libc allocator. */
 #include "nano_adapter.h"
+#include "os32api.h"
+#include "os32_gui_shared.h"
+static KernelAPI mock_api;
+KernelAPI *kapi = &mock_api;
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -9,6 +13,7 @@ struct _reent *_impure_ptr = &reent;
 static unsigned char storage[4 * OS32_NANO_PAGE] __attribute__((aligned(OS32_NANO_PAGE)));
 static struct os32_nano_arena a, b;
 static int calls, fail_call, reenter, reentry_ok;
+static unsigned yields, done_calls, serve_probe;
 static uintptr_t map_base;
 static size_t map_bytes;
 static int checks;
@@ -195,10 +200,17 @@ static uintptr_t page_up(uintptr_t p)
 static void callback_checks(void)
 {
     struct _reent nested = {0};
+    unsigned before_yield=yields;
+    unsigned before_refused=os32_gui_retry_stats().retry_refused_count;
     CHECK(!os32_nano_select(&b));
     CHECK(!os32_nano_configure(&b, NULL, NULL, NULL));
     CHECK(_malloc_r(&nested, 8) == NULL && nested._errno == ENOMEM);
     CHECK(_realloc_r(&nested, NULL, 8) == NULL && nested._errno == ENOMEM);
+    CHECK(yields == before_yield);
+    CHECK(os32_gui_retry_stats().retry_refused_count == before_refused+2);
+    if (serve_probe) {
+        CHECK(os32_gui_trim_serve(99,NULL) == 0 && done_calls == 0);
+    }
 }
 static void *map_secondary(void *opaque, size_t bytes, unsigned flags)
 {
@@ -589,7 +601,101 @@ static void trim_tests(void)
     same_bytes(q,0x66,64); free(p); free(q); free(hole);
 }
 
+static int recover_on_yield;
+static void *retry_old;
+static i32 retry_yield(void)
+{
+    yields++;
+    CHECK(yields <= 1);
+    if (retry_old) {
+        same_bytes(retry_old,0x79,65536);
+        CHECK(mapped[0] != 0); /* First failure retained the old allocation. */
+    }
+    if (recover_on_yield) reject_map=0;
+    return 0;
+}
+static int retry_done(u32 op, u32 epoch)
+{
+    CHECK(op == GUI_OP_TRIM_DONE && epoch == 77);
+    CHECK(done_calls == 0 && serve_probe == 2);
+    done_calls++;
+    return 0;
+}
+static uint32_t retry_hook(void)
+{
+    CHECK(serve_probe == 1 && trim_unmaps == 1 && done_calls == 0);
+    CHECK(os32_gui_trim_serve(77,NULL) == 0 && done_calls == 0);
+    unsigned before=yields;
+    reject_map=1;
+    CHECK(malloc(65536) == NULL && yields == before);
+    serve_probe=2;
+    return 3;
+}
+static void retry_tests(void)
+{
+    void *p, *q;
+    struct os32_gui_retry_stats before, after;
+    mock_api.sys_yield=retry_yield;
+    mock_api.gui_call=retry_done;
+    trim_reset(0); reject_map=1; yields=0;
+    CHECK(malloc(65536) == NULL && yields == 0); /* GUI flag false, resident equivalent. */
+    os32_gui_retry_enable();
+    before=os32_gui_retry_stats(); recover_on_yield=1;
+    p=malloc(65536);
+    CHECK(p != NULL && yields == 1);
+    after=os32_gui_retry_stats();
+    CHECK(after.retry_count == before.retry_count+1 && after.retry_ok_count == before.retry_ok_count+1);
+    free(p);
+    trim_reset(0); reject_map=1; yields=0; recover_on_yield=0;
+    before=os32_gui_retry_stats();
+    CHECK(malloc(65536) == NULL && yields == 1);
+    after=os32_gui_retry_stats();
+    CHECK(after.retry_count == before.retry_count+1 && after.retry_ok_count == before.retry_ok_count);
+    yields=0;
+    /* Base 485f4a9: nano returns freeable, non-NULL zero-size allocations. */
+    void *zero[3] = {malloc(0), calloc(0,8), calloc(8,0)};
+    CHECK(zero[0] != NULL && zero[1] != NULL && zero[2] != NULL && yields == 0);
+    free(zero[0]); free(zero[1]); free(zero[2]);
+    CHECK(yields == 0);
+    reset(); a.limit=a.brk; /* No free chunks or growth: size-zero allocation fails. */
+    yields=0;
+    CHECK(calloc(0,8) == NULL && yields == 0);
+    trim_reset(0); reject_map=1;
+    CHECK(_calloc_r(&reent,0x80000000u,2) == NULL && yields == 0);
+    CHECK(os32_nano_select(NULL));
+    CHECK(malloc(8) == NULL && yields == 0);
+    CHECK(os32_nano_select(&a));
+    unsigned old_attempts=attempts;
+    CHECK(os32_nano_sbrk(&reent,16) == (void *)-1 && yields == 0 && attempts == old_attempts);
+    reject_map=0;
+    p=malloc(65536); CHECK(p); memset(p,0x79,65536);
+    retry_old=p; reject_map=1; yields=0; recover_on_yield=1;
+    unsigned old_unmaps=unmaps;
+    q=realloc(p,131072);
+    CHECK(q != NULL && yields == 1);
+    same_bytes(q,0x79,65536);
+    CHECK(unmaps == old_unmaps+1 && mapped[0] == 0);
+    retry_old=NULL; free(q);
+    p=malloc(65536); CHECK(p); memset(p,0x79,65536);
+    reject_map=1; yields=0; recover_on_yield=0; retry_old=p;
+    CHECK(realloc(p,131072) == NULL && yields == 1);
+    same_bytes(p,0x79,65536); retry_old=NULL;
+    yields=0; old_unmaps=unmaps;
+    CHECK(realloc(p,0) == NULL && yields == 0 && unmaps == old_unmaps+1);
+    reject_map=1; yields=0; recover_on_yield=1;
+    p=calloc(256,256); CHECK(p != NULL && yields == 1);
+    same_bytes(p,0,65536); free(p);
+    trim_reset(0); p=malloc(8192); CHECK(p); free(p);
+    done_calls=yields=0; serve_probe=1;
+    before=os32_gui_retry_stats();
+    CHECK(os32_gui_trim_serve(77,retry_hook) == 3);
+    after=os32_gui_retry_stats();
+    CHECK(done_calls == 1 && yields == 0 && after.trim_serve_count == before.trim_serve_count+1);
+    CHECK(after.hook_pages_total == before.hook_pages_total+3);
+    serve_probe=0;
+}
+
 void _start(void)
 {
-    tests(); trim_tests(); write_text("nano adapter: ",14); number(checks); write_text(" checks GREEN\n",14); stop(0);
+    tests(); trim_tests(); retry_tests(); write_text("nano adapter: ",14); number(checks); write_text(" checks GREEN\n",14); stop(0);
 }

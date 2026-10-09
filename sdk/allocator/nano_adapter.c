@@ -4,6 +4,11 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef OS32_CRT_RESIDENT
+#include "os32_gui_shared.h"
+#include "os32api.h"
+extern KernelAPI *kapi;
+#endif
 
 #ifndef OS32_NANO_FIXTURE
 #include "os32api.h"
@@ -48,6 +53,45 @@ static void *(*map_arena)(void *, size_t, unsigned);
 static int (*unmap_arena)(void *, uintptr_t, size_t);
 static void *map_opaque;
 static int busy;
+static int gui_retry, in_trim, last_failure;
+enum { FAIL_NONE, FAIL_ENTER, FAIL_ALLOC };
+static unsigned retry_count, retry_ok_count, retry_refused_count;
+static unsigned trim_serve_count, hook_pages_total;
+
+void os32_gui_retry_enable(void) { gui_retry = 1; }
+
+struct os32_gui_retry_stats os32_gui_retry_stats(void)
+{
+    struct os32_gui_retry_stats stats = {
+        retry_count, retry_ok_count, retry_refused_count,
+        trim_serve_count, hook_pages_total
+    };
+    return stats;
+}
+
+static int retry_allowed(size_t size)
+{
+    if (busy) { retry_refused_count++; return 0; }
+    if (size && gui_retry && !in_trim && last_failure == FAIL_ALLOC && kapi->sys_yield) {
+        kapi->sys_yield();
+        retry_count++;
+        return 1;
+    }
+    return 0;
+}
+
+uint32_t os32_gui_trim_serve(uint32_t epoch, uint32_t (*hook)(void))
+{
+    uint32_t pages;
+    if (in_trim || busy) return 0;
+    in_trim = 1;
+    pages = os32_nano_trim();
+    if (hook) hook_pages_total += hook();
+    in_trim = 0;
+    trim_serve_count++;
+    kapi->gui_call(GUI_OP_TRIM_DONE, epoch);
+    return pages;
+}
 
 #ifdef OS32_NANO_FIXTURE
 int os32_nano_select(struct os32_nano_arena *arena)
@@ -408,12 +452,15 @@ static __attribute__((noinline)) void *allocate(struct _reent *r, size_t n, size
     return p;
 }
 
-void *_malloc_r(struct _reent *r, size_t size)
+static void *malloc_once(struct _reent *r, size_t size)
 {
     void *p;
+    last_failure = FAIL_ENTER;
     if (!enter(r)) return NULL;
+    last_failure = FAIL_NONE;
     p = allocate(r, 1, size, 0, NULL);
     leave();
+    if (!p && size && r->_errno != EINVAL) last_failure = FAIL_ALLOC;
     return p;
 }
 static struct os32_nano_arena *owner(struct _reent *r, const void *p)
@@ -441,20 +488,25 @@ void _free_r(struct _reent *r, void *p)
     }
     leave();
 }
-void *_calloc_r(struct _reent *r, size_t n, size_t size)
+static void *calloc_once(struct _reent *r, size_t n, size_t size)
 {
     void *p;
+    last_failure = FAIL_ENTER;
     if (!enter(r)) return NULL;
+    last_failure = FAIL_NONE;
     p = allocate(r, n, size, 1, NULL);
     leave();
+    if (!p && size && r->_errno != EINVAL) last_failure = FAIL_ALLOC;
     return p;
 }
-void *_realloc_r(struct _reent *r, void *old, size_t size)
+static void *realloc_once(struct _reent *r, void *old, size_t size)
 {
     struct os32_nano_arena *a;
     void *p = NULL;
     size_t old_size;
+    last_failure = FAIL_ENTER;
     if (!enter(r)) return NULL;
+    last_failure = FAIL_NONE;
     if (!old) {
         p = allocate(r, 1, size, 0, NULL);
     } else if (large_link(old)) {
@@ -484,6 +536,7 @@ void *_realloc_r(struct _reent *r, void *old, size_t size)
                 release_empty(a);
             }
             leave();
+            if (!p) last_failure = FAIL_ALLOC;
             return p;
         }
         p = os32_private_realloc_r(r, old, size);
@@ -502,6 +555,36 @@ void *_realloc_r(struct _reent *r, void *old, size_t size)
         }
     }
     leave();
+    if (!p && size && r->_errno != EINVAL) last_failure = FAIL_ALLOC;
+    return p;
+}
+void *_malloc_r(struct _reent *r, size_t size)
+{
+    void *p;
+    p = malloc_once(r, size);
+    if (!p && retry_allowed(size)) {
+        p = malloc_once(r, size);
+        if (p) retry_ok_count++;
+    }
+    return p;
+}
+void *_calloc_r(struct _reent *r, size_t n, size_t size)
+{
+    void *p;
+    p = calloc_once(r, n, size);
+    if (!p && (!n || size <= SIZE_MAX / n) && retry_allowed(n * size)) {
+        p = calloc_once(r, n, size);
+        if (p) retry_ok_count++;
+    }
+    return p;
+}
+void *_realloc_r(struct _reent *r, void *old, size_t size)
+{
+    void *p = realloc_once(r, old, size);
+    if (!p && retry_allowed(size)) {
+        p = realloc_once(r, old, size);
+        if (p) retry_ok_count++;
+    }
     return p;
 }
 #ifdef OS32_NANO_FIXTURE

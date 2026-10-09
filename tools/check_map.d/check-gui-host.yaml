@@ -1,4 +1,8 @@
 check-gui-host:
+- tools/tests/test_gui_trim.py
+- tools/tests/gui_trim_host.rs
+- tools/tests/rust_alloc_host.rs
+- userland/rust/libos32gui_stub/src/lib.rs
 - tools/tests/mutpar.py
 - tools/tests/test_gui_reattach.py
 - tools/tests/gui_reattach_host.rs

@@ -156,6 +156,28 @@ pub fn get_tick() -> u32 {
 /* ================================================================ */
 /*  グローバルアロケータ                                             */
 /* ================================================================ */
+// OS32 has one cooperative task per address space; these cells need no locks.
+struct RetryCell<T>(core::cell::Cell<T>);
+unsafe impl<T> Sync for RetryCell<T> {}
+static GUI_RETRY: RetryCell<bool> = RetryCell(core::cell::Cell::new(false));
+static IN_TRIM: RetryCell<bool> = RetryCell(core::cell::Cell::new(false));
+static RETRY_COUNT: RetryCell<u32> = RetryCell(core::cell::Cell::new(0));
+static RETRY_OK_COUNT: RetryCell<u32> = RetryCell(core::cell::Cell::new(0));
+static HOOK_PAGES_TOTAL: RetryCell<u32> = RetryCell(core::cell::Cell::new(0));
+
+/// Enable one allocation retry after successful GUI OP_INIT.
+pub fn retry_enable() { GUI_RETRY.0.set(true); }
+/// App-side trampoline brackets its optional hook with this guard.
+pub fn trim_enter() { IN_TRIM.0.set(true); }
+pub fn trim_leave(pages: u32) {
+    HOOK_PAGES_TOTAL.0.set(HOOK_PAGES_TOTAL.0.get().wrapping_add(pages));
+    IN_TRIM.0.set(false);
+}
+/// Observation only: retries, successful retries, hook page hints.
+pub fn retry_stats() -> (u32, u32, u32) {
+    (RETRY_COUNT.0.get(), RETRY_OK_COUNT.0.get(), HOOK_PAGES_TOTAL.0.get())
+}
+
 struct Os32Alloc;
 
 #[repr(C, align(8))]
@@ -181,7 +203,15 @@ unsafe impl GlobalAlloc for Os32Alloc {
             .and_then(|n| n.checked_add(prefix as u32)) {
             Some(n) => n, None => return core::ptr::null_mut(),
         };
-        let base = (api().mem_alloc)(bytes);
+        let mut base = (api().mem_alloc)(bytes);
+        if base.is_null() && GUI_RETRY.0.get() && !IN_TRIM.0.get() {
+            (api().sys_yield)();
+            RETRY_COUNT.0.set(RETRY_COUNT.0.get().wrapping_add(1));
+            base = (api().mem_alloc)(bytes);
+            if !base.is_null() {
+                RETRY_OK_COUNT.0.set(RETRY_OK_COUNT.0.get().wrapping_add(1));
+            }
+        }
         if base.is_null() { return base; }
         // Offset arithmetic keeps both prefix and payload in the raw block.
         let offset = prefix + (align - ((base as usize + prefix) & (align - 1))) % align;

@@ -23,7 +23,7 @@ use crate::window;
 use os32api::gui::proto::{
     GuiEvent, GUI_COLOR_TEXT, GUI_COLOR_WINDOW, GUI_EV_BUTTON, GUI_EV_CLOSE, GUI_EV_CONFIGURE,
     GUI_EV_FOCUS, GUI_EV_KEY, GUI_EV_MODAL, GUI_EV_PAINT, GUI_EV_PALETTE, GUI_EV_POINTER,
-    GUI_EV_QUIT, GUI_EV_TEXT, GUI_EV_TIMER, GUI_RING_CAPACITY,
+    GUI_EV_QUIT, GUI_EV_TEXT, GUI_EV_TIMER, GUI_EV_TRIM, GUI_OP_TRIM_DONE, GUI_RING_CAPACITY,
 };
 use os32api::gui::stub::AppVTable;
 use os32api::gui::types::{Rect, Style};
@@ -176,7 +176,13 @@ pub fn run_vt(vt: *const AppVTable, this: *mut c_void, ui: &mut Ui) -> GuiResult
         client::enter_handler();
         let mut i = 0;
         while i < p.count {
-            dispatch(app, ui, &buf[i]);
+            if buf[i].kind == GUI_EV_TRIM {
+                s().trim_batch = true;
+                s().trim_epoch = u32::from_le_bytes(buf[i].payload[..4].try_into().unwrap());
+                s().trim_events = s().trim_events.wrapping_add(1);
+            } else {
+                dispatch(app, ui, &buf[i]);
+            }
             /* ハンドラの中で `widget::set_focus` を呼んだぶんを、**次の 1 件を
              * 配る前に**知らせる (穴 H13)。同じ周に打鍵が続くとき、古い
              * フォーカスで判断させないため。 */
@@ -196,6 +202,18 @@ pub fn run_vt(vt: *const AppVTable, this: *mut c_void, ui: &mut Ui) -> GuiResult
         client::enter_handler();
         app.after_commit(ui);
         client::leave_handler();
+
+        // Safe point: all handlers, painting and after_commit have returned.
+        if s().trim_batch {
+            s().trim_batch = false;
+            if let Some(h) = s().hook {
+                s().hook_calls = s().hook_calls.wrapping_add(1);
+                let pages = h();
+                s().hook_pages = s().hook_pages.wrapping_add(pages);
+            }
+            let _ = client::call(GUI_OP_TRIM_DONE, s().trim_epoch);
+            s().trim_done_sent = s().trim_done_sent.wrapping_add(1);
+        }
 
         if s().quit || window::count() == 0 {
             break;

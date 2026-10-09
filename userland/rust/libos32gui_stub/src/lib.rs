@@ -110,5 +110,21 @@ pub fn init(api: *mut os32api::KernelAPI) -> GuiResult<u32> {
         client::dbg_print(e.name());
         return Err(e);
     }
+    os32api::gui::retry_enable();
+    shcall!(os32api::gui::stub::E_TRIM_HOOK_SET,
+            extern "C" fn(Option<extern "C" fn() -> u32>), Some(trim_trampoline));
     Ok(r as u32)
+}
+
+struct HookCell(core::cell::Cell<Option<fn() -> u32>>);
+unsafe impl Sync for HookCell {}
+static TRIM_HOOK: HookCell = HookCell(core::cell::Cell::new(None));
+
+/// Set an optional cache reclamation hook. The return value is a page hint.
+pub fn set_trim_hook(f: fn() -> u32) { TRIM_HOOK.0.set(Some(f)); }
+extern "C" fn trim_trampoline() -> u32 {
+    os32api::gui::trim_enter();
+    let pages = TRIM_HOOK.0.get().map_or(0, |h| h());
+    os32api::gui::trim_leave(pages);
+    pages
 }

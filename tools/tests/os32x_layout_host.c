@@ -1,6 +1,12 @@
 /* D35: real admission predicate; no entry is invoked by rejected headers. */
 #include <stdio.h>
 #include <string.h>
+#include "os32_kapi_shared.h"
+/* Compile the same loader predicate as protocol 1 for the reverse direction. */
+#ifdef OS32_TEST_OLD_SHLIB
+#undef OS32_SHLIB_PROTOCOL
+#define OS32_SHLIB_PROTOCOL 1UL
+#endif
 #include "../../exec/os32x_hdr.c"
 static int failures;
 #define CHECK(x) do { if (!(x)) { printf("FAIL: %s\n", #x); failures++; } } while (0)
@@ -19,6 +25,16 @@ int main(void)
     OS32Header h = valid();
     u32 i;
     CHECK(OS32_MEMORY_LAYOUT_GENERATION == 3);
+#ifndef OS32_TEST_OLD_SHLIB
+    CHECK(OS32_SHLIB_PROTOCOL == 2);
+    h.shlib_protocol = 1; /* app 1 x shlib 2 */
+#else
+    h.shlib_protocol = 2; /* app 2 x shlib 1 */
+#endif
+    CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF) == OS32X_LAYOUT_MISMATCH);
+    h.flags = OS32X_FLAG_SHLIB;
+    CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF) == OS32X_LAYOUT_MISMATCH);
+    h = valid();
     h.memory_layout_generation = OS32_MEMORY_LAYOUT_GENERATION - 1;
     CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF) == OS32X_LAYOUT_MISMATCH);
     h = valid();

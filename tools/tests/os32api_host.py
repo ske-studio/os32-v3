@@ -49,6 +49,7 @@ use core::cell::UnsafeCell;
                 source.index("pub unsafe fn api_ptr"),
             )
         ]
+        + source[source.index("// OS32 has one cooperative task"):source.index("struct Os32Alloc;")]
         + source[source.index("pub mod gfx {") :]
     )
     adapter = adapter.replace("pub mod generations;", f'#[path="{SDK / "generations.rs"}"] pub mod generations;')

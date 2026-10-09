@@ -18,3 +18,4 @@ pub mod types;
 
 pub use proto::*;
 pub use types::*;
+pub use crate::{retry_enable, retry_stats, trim_enter, trim_leave};
