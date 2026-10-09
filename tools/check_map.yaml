@@ -24,6 +24,7 @@ broad:
 - check-c-dialect-host
 - check-arch-asm
 - check-privileged
+- check-kprintf-window
 - check-le-access
 - check-docs-links
 - check-docs-orphans

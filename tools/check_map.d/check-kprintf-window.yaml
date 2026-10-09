@@ -1,0 +1,10 @@
+check-kprintf-window:
+- userland/**
+- sdk/**
+- exec/exec.c
+- exec/exec_kapi_init.inc
+- tools/check_kprintf_window.py
+- tools/check_kprintf_window_allow.txt
+- tools/tests/test_kprintf_window.py
+- tools/check_map.d/check-kprintf-window.yaml
+- build/checks.d/check-kprintf-window.mk
