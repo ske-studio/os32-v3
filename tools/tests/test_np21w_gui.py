@@ -102,7 +102,7 @@ def symbols(path):
 
 def setup_state(http):
     for owner in range(6):
-        http.put(0x160000 + owner * 64, struct.pack('<I', 1 if owner == 1 else 0))
+        http.put(0x160000 + owner * 64, struct.pack('<6I', 1 if owner == 1 else 0, 0, 0, 0, 0, owner % 2))
     # Independent arithmetic from memmap.h: round bss, heap, KAPI, guard, GUI offset.
     base = 0x171000 + 0x2c000 + 0x1000 + 0x1000 + 0x28000
     for slot in range(4):
@@ -140,6 +140,78 @@ class GuiTests(unittest.TestCase):
         self.http = Http()
         self.g = gui.Gui(self.http.transport(), 'kernel', 'shell', symbols,
                          descriptor=gui.NO_DESCRIPTOR)
+        self.http.put(0x150000, bytes(8192))
+        for addr in (0x152000, 0x152004, 0x152008):
+            self.http.put(addr, struct.pack('<I', 0))
+
+    def test_type_hold_single_chord_and_validation(self):
+        for seq in ('T', 'CTRL+STOP'):
+            self.g.type(seq=seq, hold=3000)
+            self.assertEqual(self.http.posts[-1], ('/api/key', {'seq': seq, 'hold': 3000}))
+        self.g.type(seq='T', hold=0)
+        self.assertEqual(self.http.posts[-1][1], {'seq': 'T', 'hold': 0})
+        self.g.type(seq='T')
+        self.assertEqual(self.http.posts[-1][1], {'seq': 'T'})
+        for args in ({'text': 't'}, {'seq': 'T,A'}, {'seq': ''}, {'seq': 'T,'},
+                     {'seq': 'T', 'text': 't'}, {'seq': '   '}):
+            before = len(self.http.posts)
+            with self.assertRaisesRegex(ValueError, 'hold'):
+                self.g.type(hold=3000, **args)
+            self.assertEqual(len(self.http.posts), before)
+        for hold in (-1, 5001, 1.5, True, '3000'):
+            with self.assertRaisesRegex(ValueError, 'hold'):
+                self.g.type(seq='T', hold=hold)
+
+    def test_launch_running_op_wait_and_non_wait_running(self):
+        for version in (1, 2):
+            self.states([0, 1], version)
+            observe = self.g.wm_state
+            def in_wait():
+                last = observe()
+                for item in last['kernel']:
+                    item['in_op_wait'] = int(item['owner'] == 4 and item['state'] == 1)
+                return last
+            self.g.wm_state = in_wait
+            result = self.g.launch('/x', timeout=15)
+            self.assertTrue(result['ok'])
+            self.assertEqual(result['owner'], 4)
+            self.assertEqual(result['slot'], 0 if version == 2 else None)
+            for state in (1, 3, 4):
+                self.states([0, state], version)
+                observe = self.g.wm_state
+                def not_op_wait():
+                    last = observe()
+                    for item in last['kernel']:
+                        item['in_op_wait'] = 0 if state == 1 else 1
+                    return last
+                self.g.wm_state = not_op_wait
+                started = self.http.clock.now
+                self.assertFalse(self.g.launch('/x', timeout=15)['ok'])
+                self.assertGreaterEqual(self.http.clock.now - started, 15)
+
+    def test_launch_cursor_precedes_input_and_preserves_early_marker(self):
+        self.states([0, 2])
+        ring = bytearray(8192)
+        for addr, value in ((0x152000, 0), (0x152004, 0), (0x152008, 0)):
+            self.http.put(addr, struct.pack('<I', value))
+        self.http.put(0x150000, ring)
+        post = self.http.post
+        def emit_marker(path, data):
+            post(path, data)
+            if data == {'seq': 'CTRL+ESC'}:
+                marker = b'\x01\x07\x05READY'
+                self.http.put(0x150000, marker)
+                self.http.put(0x152000, struct.pack('<I', len(marker)))
+                self.http.put(0x152008, struct.pack('<I', len(marker)))
+        self.g.transport.post = emit_marker
+        result = self.g.launch('/x', timeout=15)
+        self.assertEqual(result['since'], 0)
+        self.assertTrue(self.g.wait_text('READY', since=result['since'], timeout=15)['ok'])
+        self.assertFalse(self.g.wait_text('READY', timeout=15)['ok'])
+        self.states([0, 1])
+        result = self.g.launch('/x', timeout=15)
+        self.assertFalse(result['ok'])
+        self.assertEqual(result['since'], 8)
 
     def test_coordinates_heights_and_bounds(self):
         for status, height in (({'scrn_ymax': 400, 'grph_disp': 1}, 400),
@@ -206,7 +278,8 @@ class GuiTests(unittest.TestCase):
         self.assertEqual([s['slot'] for s in result['slots']], [0, 1, 2, 3])
         self.assertEqual(result['slots'][2], {'slot': 2, 'proto_version': 1, 'flags': 2,
                          'seq': 12, 'ring_head': 2, 'ring_tail': 3, 'dropped': 4, 'reserved': 0})
-        self.assertEqual(result['kernel'], [{'owner': i, 'state': 1 if i == 1 else 0} for i in range(1,6)])
+        self.assertEqual(result['kernel'], [{'owner': i, 'state': 1 if i == 1 else 0,
+                                            'in_op_wait': i % 2} for i in range(1,6)])
         self.assertNotIn('owner', result['slots'][0])
         self.assertEqual(result['counters'], {'appslot_trim_epoch': 17, 'gshell_trim_delivered': 18,
                                             'gshell_trim_skipped_full': 19})
@@ -221,6 +294,26 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(v2['slots'], result['slots'])
         self.assertEqual(v2['wm_slots'], [{'slot':0, 'owner':4, 'used':True}])
         self.assertEqual(calls, [self.g])
+
+    def test_op_wait_offset_follows_appslot_source(self):
+        setup_state(self.http)
+        with tempfile.TemporaryDirectory(prefix='appslot-layout-') as temp:
+            root = Path(temp)
+            (root / 'exec').mkdir()
+            (root / 'include').mkdir()
+            source = (ROOT / 'exec/appslot.h').read_text()
+            (root / 'exec/appslot.h').write_text(source.replace('int  in_op_wait;',
+                'u32 added_field; int  in_op_wait;'))
+            (root / 'include/memmap.h').write_text((ROOT / 'include/memmap.h').read_text())
+            for owner in range(1, 6):
+                self.http.put(0x160000 + owner * 64 + 20, struct.pack('<II', 99, owner % 2))
+            with patch.object(gui, 'ROOT', root):
+                self.assertEqual([item['in_op_wait'] for item in self.g.wm_state()['kernel']],
+                                 [1, 0, 1, 0, 1])
+            # Reject a layout the narrow reader cannot derive, rather than guessing.
+            (root / 'exec/appslot.h').write_text(source.replace('int  parent;', 'void *parent;'))
+            with patch.object(gui, 'ROOT', root), self.assertRaisesRegex(ValueError, 'layout'):
+                self.g.wm_state()
 
     def test_descriptor_failures_retain_v1_and_reason(self):
         setup_state(self.http)
@@ -299,14 +392,19 @@ class GuiTests(unittest.TestCase):
         self.assertEqual((result['owner'], result['slot'], result['window_id'], result['title']), (4,0,91,'demo'))
 
     def test_launch_v2_requires_new_owner_window(self):
-        self.states([0, 2], version=2)
-        observe = self.g.wm_state
-        def without_window():
-            last = observe()
-            last['windows'] = []
-            return last
-        self.g.wm_state = without_window
-        self.assertFalse(self.g.launch('/x', timeout=15)['ok'])
+        for state in (1, 2, 3, 4):
+            for windows in ([], [{'id': 91, 'owner': 3, 'title': 'other'}],
+                            [{'id': 91, 'owner': 4, 'title': 'old'}]):
+                self.states([0, state], version=2)
+                observe = self.g.wm_state
+                def without_new_owner_window():
+                    last = observe()
+                    last['windows'] = windows
+                    for item in last['kernel']:
+                        item['in_op_wait'] = 1
+                    return last
+                self.g.wm_state = without_new_owner_window
+                self.assertFalse(self.g.launch('/x', timeout=15)['ok'])
 
     def test_launch_explicit_mouse_fallback(self):
         self.states([0, 2])
@@ -565,7 +663,12 @@ def mutate():
         ('px * 65535 + 319', 'px * 65534 + 319', 'test_coordinates_heights_and_bounds'),
         ('payload[i:i + 4]', 'payload[i:i + 8]', 'test_key_chunks_escapes_and_encoding'),
         ('time.sleep(0.35)', 'time.sleep(0.3)', 'test_key_chunks_escapes_and_encoding'),
-        ("states[owner] != app('APP_STATE_PARKED')", "states[owner] != app('APP_STATE_RUNNING')", 'test_launch_success_owner_not_shm'),
+        ("states[owner] == app('APP_STATE_PARKED')", "states[owner] == app('APP_STATE_RUNNING')", 'test_launch_success_owner_not_shm'),
+        ("owners[owner].get('in_op_wait') == 1", "True", 'test_launch_running_op_wait_and_non_wait_running'),
+        ("states[owner] == app('APP_STATE_RUNNING')", "False", 'test_launch_running_op_wait_and_non_wait_running'),
+        ("since = self.consink()['since']  # Before", "since = None  # Before", 'test_launch_cursor_precedes_input_and_preserves_early_marker'),
+        ("data['hold'] = hold", "data['hold'] = 0", 'test_type_hold_single_chord_and_validation'),
+        ("offsets['in_op_wait']", "offsets['state']", 'test_state_symbols_stride_and_separate_tables'),
         ("'slot': None, 'last': last", "'slot': owner - 2, 'last': last", 'test_launch_success_owner_not_shm'),
         ("'ok': False, 'last': last", "'ok': True, 'last': last", 'test_wait_mem_timeout_last_and_success'),
         ('owner * stride', 'owner * 4', 'test_state_symbols_stride_and_separate_tables'),

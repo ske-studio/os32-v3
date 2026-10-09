@@ -143,7 +143,7 @@ def expand_escapes(text):
     return steps
 
 
-def key(seq=None, text=None, escapes=True, transport=None):
+def key(seq=None, text=None, escapes=True, transport=None, hold=None):
     """文字列は 4 文字ずつ送る。raw リングは 32 エントリ (make+break で 1 文字 2 本) しか
     無く、長い text を一度に注入すると後ろが落ちる (2026-09-06: Run... のパスが
     `/usr/bin/gui_dem` で切れた)。8 文字 / 0.3 秒でも 9801 (planar) でアプリ実行中は
@@ -153,6 +153,11 @@ def key(seq=None, text=None, escapes=True, transport=None):
     素通しにしたいときだけ `escapes=False`。ツリー内に `text=` で `\\` を送る利用者は
     **調査の結果 1 件も無かった**ので、既定を有効にしても既存の台本は壊れない。
     制御文字は `seq=` の和音に化けるので、**4 文字の分割が記法の途中で切れることは無い**。"""
+    if hold is not None:
+        if type(hold) is not int or not 0 <= hold <= 5000:
+            raise ValueError('hold must be an integer from 0 to 5000 milliseconds')
+        if text is not None or not seq or not seq.strip() or ',' in seq:
+            raise ValueError('hold requires a single seq chord without text')
     post = (transport or default_transport).post
     time = (transport or default_transport).clock
     if text is not None:
@@ -168,7 +173,10 @@ def key(seq=None, text=None, escapes=True, transport=None):
                 time.sleep(0.35)
                 i += 4
     if seq is not None:
-        post("/api/key", {"seq": seq})   # urlencode が + を %2B にする
+        data = {"seq": seq}   # urlencode が + を %2B にする
+        if hold is not None:
+            data['hold'] = hold
+        post("/api/key", data)
 
 
 
@@ -310,6 +318,28 @@ def c_constants(path, extra=None):
     return resolve
 
 
+def c_word_offsets(path, name, through):
+    """Derive a struct's 32-bit scalar prefix from its C declaration.
+
+    Like c_constants, accept only the subset needed here and fail closed if
+    the source layout changes to a type/declarator this reader cannot handle.
+    AppSlot's prefix is int/u32 on the target i386 ABI, both four bytes.
+    """
+    source = re.sub(r'/\*.*?\*/|//[^\n]*', '', Path(path).read_text(), flags=re.S)
+    match = re.search(r'\btypedef\s+struct\s*\{([^{}]*)\}\s*' + re.escape(name) + r'\s*;', source)
+    if match is None:
+        raise ValueError('unsupported C struct layout: ' + name)
+    offsets = {}
+    for declaration in match[1].split(';'):
+        field = re.fullmatch(r'\s*(?:int|u32)\s+(\w+)\s*', declaration)
+        if field is None:
+            raise ValueError('unsupported C field layout: ' + declaration.strip())
+        offsets[field[1]] = len(offsets) * struct.calcsize('<I')
+        if field[1] == through:
+            return offsets
+    raise ValueError('missing C field layout: ' + through)
+
+
 class Gui:
     def __init__(self, transport=None, kernel_elf=None, gshell_elf=None,
                  symbol_factory=ElfSymbols, descriptor=None):
@@ -358,13 +388,13 @@ class Gui:
             raise ValueError('unknown mouse action: ' + action)
         return {'ok': True}
 
-    def type(self, text=None, seq=None, escapes=True):
+    def type(self, text=None, seq=None, escapes=True, hold=None):
         self.require_gui()
         if text is None and seq is None:
             raise ValueError('text or seq is required')
         if text is not None and any(ord(c) > 127 or ord(c) < 32 for c in text):
             raise ValueError('type accepts ASCII; use escape notation for controls')
-        key(seq=seq, text=text, escapes=escapes, transport=self.transport)
+        key(seq=seq, text=text, escapes=escapes, transport=self.transport, hold=hold)
         return {'ok': True}
 
     def mem(self, address, length):
@@ -402,8 +432,15 @@ class Gui:
         if not size or size % count:
             raise ValueError('g_slot size is not divisible by APP_SLOT_COUNT')
         stride = size // count
-        owners = [{'owner': owner, 'state': self.word(address + owner * stride)}
-                  for owner in range(1, count)]
+        offsets = c_word_offsets(ROOT / 'exec/appslot.h', 'AppSlot', 'in_op_wait')
+        prefix_size = offsets['in_op_wait'] + struct.calcsize('<I')
+        if prefix_size > stride:
+            raise ValueError('AppSlot prefix exceeds g_slot stride')
+        owners = []
+        for owner in range(1, count):
+            prefix = self.mem(address + owner * stride, prefix_size)
+            owners.append(dict(owner=owner, **{name: struct.unpack_from('<I', prefix, offsets[name])[0]
+                                              for name in ('state', 'in_op_wait')}))
         slots = []
         for slot in range(mem('GUI_SLOT_MAX')):
             addr = mem('MEM_SHM_GUI_BASE') + slot * mem('GUI_SLOT_SIZE')
@@ -452,8 +489,9 @@ class Gui:
         app = c_constants(ROOT / 'exec/appslot.h')
         free = {item['owner'] for item in before['kernel']
                 if item['owner'] >= app('APP_ID_MIN') and item['state'] == app('APP_STATE_FREE')}
+        since = self.consink()['since']  # Before any input, for wait_text(since=...).
         if not free:
-            return {'ok': False, 'reason': 'no free kernel owner', 'last': before}
+            return {'ok': False, 'reason': 'no free kernel owner', 'last': before, 'since': since}
         source = (ROOT / 'userland/gshell/src/startmenu.rs').read_text()
         run_row = int(re.search(r'const IT_RUN: usize = (\d+);', source)[1])
         if fallback:
@@ -475,25 +513,29 @@ class Gui:
         exited = set()
 
         def ready(last):
-            states = {item['owner']: item['state'] for item in last['kernel']}
+            owners = {item['owner']: item for item in last['kernel']}
+            states = {owner: item['state'] for owner, item in owners.items()}
             exited.update(owner for owner in seen if states[owner] == 0)
             seen.update(owner for owner in free if states[owner] != 0)
-            # PARKED is exclusively OP_WAIT; WAIT_KEY / WAIT_POLL don't prove GUI attach.
+            # OP_WAIT can run the WM while its owner stays RUNNING. PARKED
+            # is exclusively OP_WAIT; WAIT_KEY / WAIT_POLL don't prove GUI attach.
             if exited or len(seen) != 1:
                 return False
             owner = next(iter(seen))
-            if states[owner] != app('APP_STATE_PARKED'):
+            if not (states[owner] == app('APP_STATE_PARKED') or
+                    (states[owner] == app('APP_STATE_RUNNING') and owners[owner].get('in_op_wait') == 1)):
                 return False
             return last['version'] == 1 or any(
                 w.get('owner') == owner and w['id'] not in before_windows for w in last['windows'])
 
         waited = self._wait(self.wm_state, ready, timeout)
+        waited['since'] = since
         if not waited['ok']:
-            waited['reason'] = 'owner did not remain alive and enter OP_WAIT PARKED'
+            waited['reason'] = 'owner did not remain alive and enter OP_WAIT (PARKED or RUNNING in_op_wait=1)'
             return waited
         owner = next(iter(seen))
         last = waited['last']
-        result = {'ok': True, 'owner': owner, 'slot': None, 'last': last}
+        result = {'ok': True, 'owner': owner, 'slot': None, 'last': last, 'since': since}
         if last['version'] == 2:
             matches = [s for s in last['wm_slots'] if s.get('owner') == owner and s.get('used')]
             if len(matches) == 1:

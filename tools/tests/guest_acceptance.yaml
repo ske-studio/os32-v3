@@ -1369,7 +1369,7 @@
   contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
   mode: manual
   prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
-  entry: '両 back へ a キー。対象区間: front へ t キー、trim_front は自分のリングを空にしてから malloc(4000) を1回。対象の後は yield 中に
+  entry: '両 back へ a キー。対象区間: front への t は長押し (hold=3000、emu_type seq=T hold=3000) で送る — 短い打鍵の break が yield 中の前景入力になり A が先に起きる。trim_front は自分のリングを空にしてから malloc(4000) を1回。対象の後は yield 中に
     前景へ入力を足さない (前景の未読入力は応答性優先で A が先に起きる — 票 §4-2 の仕様。その場合は ENOMEM retry=1 で、別対照として記録)。G-2後の基準値との差を採る。'
   observe:
   - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
@@ -1452,7 +1452,7 @@
   contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
   mode: manual
   prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
-  entry: 'trim_back --stop-focus --slow-hook 300 で G-3。back の窓は最小化しない (最小化中の SET_FOCUS は rc=0 のまま前景を変えない)。`trim_back focus
+  entry: 'trim_back --stop-focus --slow-hook 1000 で G-3。back の窓は最小化しない (最小化中の SET_FOCUS は rc=0 のまま前景を変えない)。`trim_back focus
     ok` の後、STOP の前に gui_state の front と abort_target が当該 back であることを確かめてから CTRL+STOP。CTRL+STOP は WM が確定した前景に当たる。'
   observe:
   - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
@@ -1558,7 +1558,7 @@
   contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
   mode: manual
   prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
-  entry: trim_back_rs --stop-focus --slow-hook 300 を使用。trim_back_rs focus ok の後、STOP の前に front_owner/abort_target が Rust back であることを確かめ、hook中に CTRL+STOP（G-7相当）。別試行でDONE直後にも同じ宛先確認をしてSTOP。
+  entry: trim_back_rs --stop-focus --slow-hook 1000 を使用。trim_back_rs focus ok の後、STOP の前に front_owner/abort_target が Rust back であることを確かめ、hook中に CTRL+STOP（G-7相当）。別試行でDONE直後にも同じ宛先確認をしてSTOP。
   observe:
   - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
     appslot_reclaim_count, exec_as_leftover_pages, ledger_bad_free/retire_refused/claim_refused'
