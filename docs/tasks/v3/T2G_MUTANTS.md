@@ -52,7 +52,7 @@ C の rc=1、Rust test の rc=101 を区別し、ビルド不能を runtime RED 
 | blocked-primary の secondary mark 削除 | trim_flow | `blocked-primary-drops-secondary-mark` | `FAIL: blocked primary marks before first yield` (rc=1) |
 | STOP 後の bit 維持 | trim_back_rs | `stop-leaves-bit` | `FAIL: STOP slot trim cleared` (rc=1) |
 | WM forget 欠落 | trim_back_rs | `wm-forget-missing` | `FAIL: WM sent cleared` (rc=1) |
-| Rust cache が LARGE に化ける | trim_back_rs | `rust-large-cache` | `FAIL: Rust PREP ARENA=2 LARGE unchanged` (rc=1)。実4000B Boxの分類を検査。BLOCK_BYTES=65536 では ARENA が 2 に届かず、RED の原因は ARENA 側 (LARGE 比較そのものは下の 3 本が殺す。4000B Box が LARGE になる経路は構造上無い — g4fix レビュー C) |
+| Rust cache が LARGE に化ける | trim_back_rs | `rust-large-cache` | `FAIL: Rust PREP ARENA=2 LARGE unchanged` (rc=1)。実4000B Boxの分類を検査。BLOCK_BYTES=65536 では ARENA が 2 に届かず、RED の原因は ARENA 側 (下の 3 本が殺すのは「基準を 0 に戻す」退行だけ。LARGE 比較の削除は未検出 — 4000B Box が LARGE になる経路は構造上無く、増分を作る seam が無い。g4fix レビュー C・Fable 再レビュー R-1) |
 | LARGE の基準を 0 に戻す (prepare) | trim_back_rs | `rust-prep-large-zero` (g4fix追加) | `FAIL: Rust PREP ARENA=2 LARGE unchanged` (rc=1)。case 4 (libos32gui のサーフェスプール 131,648B が prepare 前に LARGE で先在) |
 | LARGE の基準を 0 に戻す (DONE 観測) | trim_back_rs | `rust-done-large-zero` (g4fix追加) | `FAIL: G4 tail whole INITIAL DATA pages` (rc=1)。case 4 |
 | LARGE の基準を 0 に戻す (regrow) | trim_back_rs | `rust-regrow-large-zero` (g4fix追加) | `FAIL: Rust EXACT regrow` (rc=1)。case 4 |
