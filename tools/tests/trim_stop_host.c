@@ -24,6 +24,7 @@ void ime_set_render(void *table) { (void)table; }
 extern void g4_forget(int id);
 extern void g4_rust_run(void);
 static u32 reclaimed, notified, raw_maps, yields;
+static u8 *gui_large;
 static void exec_reclaim_resources(int id) { CHECK("reclaim target", id == 2); reclaimed++; }
 static void exec_notify_owned(int id, int kind) {
     CHECK("STOP notification", id == 2 && kind == EXEC_KIND_ABORTED);
@@ -33,7 +34,8 @@ static int launch_chain(int id, int *chain, int max) { (void)id; (void)chain; (v
 #include "stop_source.c"
 static void line(const char *s) { u32 n=0; while(s[n]) n++; say(s,n); say("\n",1); }
 void g4_check(int ok, const char *label) { if (!ok) { say("FAIL: ",6); line(label); die(1); } }
-u32 g4_case(void) { return G4_CASE; }
+u32 g4_case(void) { return G4_CASE % 4; }
+u32 g4_initial_large(void) { return G4_CASE >= 4; }
 void *g4_alloc(u32 n) { return wrap_mem_alloc(n); }
 void g4_free(void *p) { wrap_mem_free(p); }
 int g4_stat(int id, void *p, u32 n) { return kapi_mem_stat(id,p,n); }
@@ -71,15 +73,22 @@ void g4_consume_returned(void) {
     heap_select(2);
 }
 void g4_pass(void) {
-    line("PASS Rust run_vt TRIM=1 hook=1 DONE=1 ARENA tail+whole LARGE=0 INITIAL unchanged DATA OK EXACT regrow; raw map retry=0");
-    if (G4_CASE == 3) line("PASS G-2 natural tail baseline; front consumption does not change returned-page accounting");
+    if (gui_large) {
+        MemStat s;
+        CHECK("existing GUI LARGE retained", kapi_mem_stat(-1,&s,sizeof(s)) == sizeof(s) &&
+              s.extents[APPMEM_EXEC_LARGE-1] == 1 && gui_large[0] == 0x5a &&
+              gui_large[2*MEM_EXEC_HEAP_MIN-1] == 0xa5);
+        line("PASS existing GUI LARGE=1 unchanged through PREP/DONE/EXACT regrow");
+    }
+    line("PASS Rust run_vt TRIM=1 hook=1 DONE=1 ARENA tail+whole LARGE unchanged INITIAL unchanged DATA OK EXACT regrow; raw map retry=0");
+    if (g4_case() == 3) line("PASS G-2 natural tail baseline; front consumption does not change returned-page accounting");
     die(0);
 }
 void g4_stop(void) {
     u32 owner=a.owner, count=appslot_reclaim_count;
     u32 bad=ledger_bad_free, retire=ledger_retire_refused, claim=ledger_claim_refused;
-    CHECK("STOP pending phase", !!g_slot[2].trim_pending == (G4_CASE == 2));
-    CHECK("STOP DONE phase", appslot_trim_done_count == (G4_CASE == 1 ? 1U : 0U));
+    CHECK("STOP pending phase", !!g_slot[2].trim_pending == (g4_case() == 2));
+    CHECK("STOP DONE phase", appslot_trim_done_count == (g4_case() == 1 ? 1U : 0U));
     // IRQ request then cooperative park: host has no iret/context switch.
     appslot_stop_request();
     CHECK("STOP requested", g_slot[2].stop_wm_req);
@@ -98,7 +107,7 @@ void g4_stop(void) {
     CHECK("STOP mask bit cleared", !(s.trim_pending_mask & (1U<<2)));
     CHECK("STOP ledger errors zero", ledger_bad_free == bad && ledger_retire_refused == retire && ledger_claim_refused == claim);
     CHECK("STOP repeat rejected", exec_kill(2) < 0 && appslot_reclaim_count == count+1 && reclaimed == 1);
-    line(G4_CASE == 1 ? "PASS STOP after DONE" : "PASS STOP inside hook");
+    line(g4_case() == 1 ? "PASS STOP after DONE" : "PASS STOP inside hook");
     line("reclaim=1 owner=0 trim_pending=0 trim_epoch=0 mask-bit=0 WM-sent=0 ledger-errors=0");
     die(0);
 }
@@ -112,6 +121,14 @@ void _start(void) {
     heap_create(&b,3); roots[2]=b.pd_phys;
     g_slot[2].gui=g_slot[3].gui=1;
     heap_select(2);
+    if (g4_initial_large()) {
+        /* Model the live GUI surface pool allocated before Cache::prepare.
+         * Use the real allocator's LARGE route, not a fabricated MemStat. */
+        gui_large = wrap_mem_alloc(2*MEM_EXEC_HEAP_MIN);
+        CHECK("existing GUI LARGE allocation", gui_large);
+        gui_large[0] = 0x5a;
+        gui_large[2*MEM_EXEC_HEAP_MIN-1] = 0xa5;
+    }
     g4_rust_run();
     CHECK("Rust entry must finish", 0);
 }

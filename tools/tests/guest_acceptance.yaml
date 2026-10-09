@@ -1513,7 +1513,7 @@
     と各 slot の trim_pending/trim_epoch'
   - fixture 出力と終了行、区間前後のカウンタ差分。配備 binary のサイズ/SHA256 を照合
   expect:
-    prep: PREP OK、ARENA=2 LARGE=0、個別4000B Box、cache-T=8
+    prep: PREP OK、ARENA=2、LARGE は prepare 前の本数から不変（実値を表示）、個別4000B Box、cache-T=8
     baseline: G-2と同じ基準値を採る、未 arm はcache保持
   evidence: ~/os32-tmp/evidence/<日付>/g-R-1/
 - id: g-R-2
@@ -1531,7 +1531,7 @@
   expect:
     counters: G-3と同じ（g3fix 後の trim_front による観測）
     front: G-3と同じ（g3fix 後の trim_front の出力と終了値）
-    rust: DATA OK、hook_calls=1、LARGE=0。hook hint は0、物理ページはDONEで返る
+    rust: DATA OK、hook_calls=1、LARGE は prepare 前の本数から不変。hook hint は0、物理ページはDONEで返る
   evidence: ~/os32-tmp/evidence/<日付>/g-R-2/
 - id: g-R-3
   gate: GK-4
@@ -1548,7 +1548,7 @@
   expect:
     tail: ARENA1 cur_end 減を別記録
     whole: ARENA 2->1 を別記録
-    initial: INITIAL不変、DATA OK、LARGE=0
+    initial: INITIAL不変、DATA OK、LARGE は prepare 前の本数から不変
     obstacle: rc=0、1ページはtrim pagesに含めない
     regrow: regrow ok rc=0 ... EXACT、cur +65536、ARENA=1
     exit: rc=0、RETRY_COUNT/RETRY_OK_COUNT/RETRY_HOOK_PAGES を記録、hook_calls=1、CRC=OK、regrow rc=0、pages>0。未実施はrc=1

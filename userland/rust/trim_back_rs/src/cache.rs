@@ -93,7 +93,9 @@ impl Cache {
             }
             if stat.arenas() == 2 { break; }
         }
-        if stat.arenas() != 2 || stat.large() != 0 || self.obstacle == 0 { return None; }
+        // GUI initialization may already own a LARGE surface pool. Individual
+        // cache Boxes must not add any LARGE extents to that baseline.
+        if stat.arenas() != 2 || stat.large() != self.initial.large() || self.obstacle == 0 { return None; }
         // Sort by address, not allocation order. INITIAL is retained with ARENA1.
         self.blocks[..self.count].sort_unstable_by_key(|b| b.as_ref().unwrap().as_ptr() as usize);
         let low = self.blocks[..self.count].iter()
@@ -152,7 +154,7 @@ impl Cache {
         self.observed = true;
         self.trimmed = s;
         self.pages = self.before.cur().saturating_sub(s.cur()) / PAGE + self.arena2_pages;
-        self.bad |= s.pending() || self.before.arenas() != 2 || s.arenas() != 1 || s.large() != 0 ||
+        self.bad |= s.pending() || self.before.arenas() != 2 || s.arenas() != 1 || s.large() != self.initial.large() ||
             s.cur() >= self.before.cur() || s.initial() != self.initial.initial() ||
             s.0[EXEC_BASE] != self.initial.0[EXEC_BASE] || s.0[EXEC_SIZE] != self.initial.0[EXEC_SIZE] ||
             self.data_crc() != self.crc || self.pages == 0;
@@ -167,7 +169,7 @@ impl Cache {
         let Some(s) = Stat::read() else { self.bad = true; return false; };
         // Kernel header + actual Os32Alloc prefix: user pointer is 16 bytes in.
         let ok = b.as_ptr() as u32 == self.trimmed.cur() + HEADER + PREFIX &&
-            s.cur() == self.trimmed.cur() + GROW && s.arenas() == 1 && s.large() == 0 && self.data_crc() == self.crc;
+            s.cur() == self.trimmed.cur() + GROW && s.arenas() == 1 && s.large() == self.initial.large() && self.data_crc() == self.crc;
         self.blocks[self.keep] = Some(b);
         self.regrow_rc = if ok { 0 } else { 1 };
         self.bad |= !ok;
