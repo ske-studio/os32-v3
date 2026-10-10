@@ -36,6 +36,8 @@ import re
 import struct
 import glob as globmod
 import yaml
+from pathlib import Path, PurePosixPath
+import nhd_profile
 
 # 通常配備が /etc/settings.db* を作らない・上書きしない・消さないための共通判定
 # (票 S0-D / D0)。書く・消す・切り詰める直前に 1 か所で止める。
@@ -76,7 +78,7 @@ NHD_LOCAL = os.environ.get("OS32_NHD_LOCAL") or os.path.join(PROJ_DIR, "build", 
 # 配備定義は所有する層ごとに分かれている。リストとマージ処理の実体は
 # tools/deploy_manifests.py。二重に持つと食い違うので参照だけにすること。
 # 各マニフェストは自層の成果物しか参照しない (make check-manifests で検査)。
-from deploy_manifests import DEPLOY_MANIFESTS, load_merged as _load_merged
+from deploy_manifests import DEPLOY_MANIFESTS, CORE_MANIFEST_RELPATHS, load_merged as _load_merged
 
 # === ext2パーティション オフセット ===
 # NHDヘッダ(512B) + ブート領域(LBA 0-1631) = 1633セクタ
@@ -94,6 +96,28 @@ PARTITION_OFFSET = PARTITION_SKIP * 512  # 836096 バイト (1633 * 512)
 # 丸ごと消える。そこで pull が「この local はこの remote から取った」来歴を残し、
 # deploy はそれが崩れていないときだけ書く (票 S0-D / TASK_S0 §2、往復 2 の 8)。
 STAMP_SUFFIX = '.pulled'
+
+PROFILE = None
+
+
+def configure_profile(name):
+    global PROFILE, NHD_REMOTE, NHD_LOCAL, MOUNT_POINT
+    if name != nhd_profile.PROFILE:
+        raise ValueError('unknown NHD profile: ' + name)
+    remote, local, mount, stamp = nhd_profile.paths(PROJ_DIR, NP21W_DIR)
+    overrides = ('OS32_NHD_REMOTE', 'OS32_NHD_LOCAL', 'OS32_NHD_MOUNT', 'OS32_NHD_STAMP')
+    values = tuple(os.environ.get(key) or value for key, value in
+                   zip(overrides, (remote, local, mount, stamp)))
+    nhd_profile.check_paths(PROJ_DIR, NP21W_DIR, *values)
+    NHD_REMOTE, NHD_LOCAL, MOUNT_POINT, _stamp = values
+    PROFILE = name
+
+
+def profile_guard():
+    if PROFILE:
+        nhd_profile.check_paths(PROJ_DIR, NP21W_DIR, NHD_REMOTE, NHD_LOCAL,
+                               MOUNT_POINT, stamp_path())
+
 
 
 def stamp_path(local_path=None):
@@ -173,6 +197,8 @@ def verify_pull_stamp(local_path=None, remote_path=None):
     # `[]` や `null` でも .get で落ちない (--force の判定まで進める、往復 2 の 7)
     if not isinstance(data, dict):
         return False, '来歴 {} が壊れている (オブジェクトではない)'.format(sp)
+    if data.get('guest_started'):
+        return False, 'pull 後にゲスト起動あり — umount → pull が必要'
     if data.get('local_path') != os.path.abspath(local_path):
         return False, '来歴の local_path {!r} が今の {!r} と違う'.format(
             data.get('local_path'), os.path.abspath(local_path))
@@ -607,7 +633,7 @@ def do_deploy(force=False):
 
     ok, reason = verify_pull_stamp()
     if not ok:
-        if not force:
+        if not force or PROFILE:
             print("Error: NHD 全体の上書きを中止: {}".format(reason),
                   file=sys.stderr)
             print("  remote 側 (稼働中のゲストが書いた /etc/settings.db 等) を"
@@ -1187,7 +1213,7 @@ def do_init():
 
 def load_deploy_yaml():
     """層ごとの配備定義をマージして返す (tools/deploy_manifests.py に委譲)"""
-    return _load_merged()
+    return _load_merged(CORE_MANIFEST_RELPATHS) if PROFILE else _load_merged()
 
 
 def resolve_files_from_entry(entry):
@@ -1589,12 +1615,117 @@ def do_push(local_path, remote_name=None, resolve=False):
 
 
 
+def do_verify_set(set_file):
+    """Read the mounted local image against h1's generation-bound deploy set."""
+    if PROFILE != nhd_profile.PROFILE:
+        print('Error: verify-set requires --profile t2h', file=sys.stderr)
+        return False
+    try:
+        profile_guard()
+        ok, reason = verify_pull_stamp()
+        if not ok:
+            print('Error: pull 後にゲスト起動あり、または来歴不一致: ' + reason,
+                  file=sys.stderr)
+            return False
+        with open(set_file, encoding='utf-8') as f:
+            expected = json.load(f)
+        if expected['format'] != 1 or not expected['generation_build_id'] or not expected['kernel_commit']:
+            raise ValueError('invalid generation binding')
+        if not isinstance(expected['files'], list) or not expected['files']:
+            raise ValueError('empty deployment set')
+        # h1 defines these managed trees; user data outside them is not extra.
+        managed = ('/boot', '/sys', '/bin', '/sbin', '/usr', '/etc')
+        allow = expected['allow_list']
+        allowed = {'/etc/settings.db', '/etc/system.cfg', '/var/log/*'}
+        if not isinstance(allow, list) or {a['guest'] for a in allow} != allowed or any(
+                a['check'] != 'exists' for a in allow):
+            raise ValueError('invalid allow-list')
+        files = {}
+        for item in expected['files']:
+            guest = item['guest']
+            path = PurePosixPath(guest)
+            if (not path.is_absolute() or '..' in path.parts or str(path) != guest or
+                    guest == '/' or
+                    guest in files or guest in allowed or
+                    not isinstance(item['host'], str) or not item['host'] or
+                    type(item['size']) is not int or item['size'] < 0 or
+                    not re.fullmatch('[0-9a-f]{64}', item['sha256'])):
+                raise ValueError('invalid deployment entry: ' + str(guest))
+            files[guest] = item
+        if not is_mounted():
+            raise ValueError('local is not mounted; umount → pull --profile t2h first')
+        if not guard_root():
+            return False
+        root = Path(MOUNT_POINT)
+        problems = []
+        def local(guest):
+            path = root / guest.lstrip('/')
+            # Never follow a guest symlink out of (or within) the managed tree.
+            for part in (path, *path.parents):
+                if part == root:
+                    break
+                if part.is_symlink():
+                    raise ValueError('symlink: ' + guest)
+            return path
+        for guest, item in sorted(files.items()):
+            path = local(guest)
+            if not path.is_file():
+                problems.append('missing: ' + guest)
+            elif path.stat().st_size != item['size'] or file_sha256(path) != item['sha256']:
+                problems.append('modified: ' + guest)
+        for item in allow:
+            guest = item['guest']
+            # A glob permits zero or more guest-created logs. Exact settings are required.
+            if '*' not in guest and not local(guest).is_file():
+                problems.append('missing allow-list: ' + guest)
+        def walk_error(exc):
+            raise exc
+        for directory in managed:
+            tree = local(directory)
+            if not tree.exists():
+                continue
+            for parent, dirs, names in os.walk(tree, onerror=walk_error, followlinks=False):
+                for name in dirs + names:
+                    path = Path(parent) / name
+                    guest = '/' + path.relative_to(root).as_posix()
+                    if path.is_symlink():
+                        problems.append('symlink: ' + guest)
+                    elif not path.is_dir() and guest not in files and guest not in allowed:
+                        problems.append('extra: ' + guest)
+        for problem in problems:
+            print(problem, file=sys.stderr)
+        if problems:
+            return False
+        print('verify-set: {} files match generation {}'.format(
+            len(files), expected['generation_build_id']))
+        return True
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        print('Error: verify-set: ' + str(exc), file=sys.stderr)
+        return False
+
+
 def main():
     """各サブコマンドの戻り値をそのまま終了コードにする (票 S0-D、往復 2 の 9)。
 
     False を返した操作は失敗。以前は copy / rm / sync の失敗が exit 0 のまま
     後続 (NHD deploy) へ進み、古い成果物を配っていた。
     """
+    if '--profile' in sys.argv:
+        i = sys.argv.index('--profile')
+        if i + 1 >= len(sys.argv):
+            print('Error: --profile requires a name', file=sys.stderr)
+            return False
+        try:
+            configure_profile(sys.argv[i + 1])
+        except ValueError as exc:
+            print('Error: ' + str(exc), file=sys.stderr)
+            return False
+        del sys.argv[i:i + 2]
+    try:
+        profile_guard()
+    except ValueError as exc:
+        print('Error: ' + str(exc), file=sys.stderr)
+        return False
     if len(sys.argv) < 2:
         print("NHD ext2 Deploy Tool (mount版)")
         print("")
@@ -1625,6 +1756,12 @@ def main():
         return True
 
     cmd = sys.argv[1]
+
+    if cmd == 'verify-set':
+        if len(sys.argv) != 4 or sys.argv[2] != '--set':
+            print('Usage: verify-set --profile t2h --set FILE', file=sys.stderr)
+            return False
+        return do_verify_set(sys.argv[3])
 
     if cmd == 'mount':
         return do_mount()

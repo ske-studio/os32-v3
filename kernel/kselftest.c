@@ -976,7 +976,7 @@ int kselftest_run_post_exec(void)
 
     check(kselftest_run_audit("post-exec") == 0, "post-exec: lifecycle audit");
     check(lease_selftest() == 0, "post-exec: synthetic AS S/T/U");
-    check(kstack_high_water() < MEM_KSTACK_TOP - MEM_KSTACK_BASE,
+    check((kstack_high_water() & 0xffffU) < MEM_KSTACK_TOP - MEM_KSTACK_BASE,
           "kstack bound");
     check(resident_heap_peak >= exec_heap_used(), "resident peak");
     test_tramp_user_str();

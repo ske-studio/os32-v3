@@ -220,6 +220,44 @@ KernelAPI の構造体を変えたときは `make clean` → `make all` が必�
 (古い `.o` が残ると ABI 不整合で静かに壊れる)。
 
 <a id="検査の3段"></a>
+#### T2h の試験専用 kernel と隔離 NHD
+
+`make kernel-r1` は `OS32_R1_FIXTURE` を付け、object / 依存ファイルを
+`build/out/r1/obj/`、像・map・`manifest.json` を `build/out/r1/` に作る。
+製品の object と像は共有しない。`check-r1-fixture-host` は CPU 入口を模擬して
+実台帳と停止経路を検査し、clean を挟まない両ビルド順で製品 hash が変わらないことを
+確認する。hash 比較では既存の `__DATE__` / `__TIME__` を `SOURCE_DATE_EPOCH` で固定する。
+
+試験像だけにある BSS `r1_fixture_arm[7]` の添字 1 / 2 / 4 に
+`R1_FIXTURE_ARM` (`kernel/r1_fixture.h`) を `emu_write_mem` で書くと一度だけ発火する。
+1 は次の timer IRQ で割当て、2 は次の #UD で解放を要求し、`R1 context` で停止する。
+4 は USER syscall 中の開いた V86 session の終了で #UD を起こし、
+`exec teardown stopped` に至る。arm は停止前に消費し、未 arm / 不正値は無操作。
+製品 KAPI には操作口を追加しない。実ゲストでの停止確認は PM の R1c で行う。
+
+`nhd_deploy.py <command> --profile t2h` は remote を
+`NP21W_DIR/os32_t2h_install.nhd`、local を `build/nhd/os32_t2h.nhd`、
+mount を `/tmp/os32_t2h`、来歴を `build/nhd/os32_t2h.nhd.pulled` に固定する。
+`OS32_NHD_REMOTE` / `OS32_NHD_LOCAL` / `OS32_NHD_MOUNT` / `OS32_NHD_STAMP` が
+異なる名前を指定すれば拒否する。既定像への symlink / hardlink も拒否する。
+
+各交換・復元は **stop → umount (残っていれば) → pull → copy または sync → deploy → start**。
+停止・起動には `np21w_ctl.py` を使う ([D1])。隔離 NHD の上書きも各回 [D2] の対象。
+`pull --profile t2h` は既存 local も必ず取り直す。
+正常一式は `sync --profile t2h` (本体全層、外部 apps/game は H-7 で除外) で同期する。
+`make deploy-kernel-r1 PROFILE=t2h` は試験像を隔離 local の `/boot/vmkernel.lz4` に
+copy する段だけを担当する。続けて `deploy --profile t2h` で反映する。
+
+`verify-set --profile t2h --set build/out/deploy-set.json` は h1 の期待表の全ファイルの
+存在・size・sha256 を読み取り照合し、管理ディレクトリ (`/boot`、`/sys`、`/bin`、
+`/sbin`、`/usr`、`/etc`) の余剰も列挙する。欠損・改変・余剰は非 0 終了。
+allow-list の設定は存在だけを検査し、`/var/log/*` は 0 本以上のゲスト生成ログを許す。
+期待表にある `/home` 等の配備ファイルも照合するが、その周囲のユーザーデータは余剰にしない。
+`generations-manifest.json` は配備集合ではないので渡さない。
+ゲストが書いた後は **stop → umount → pull → verify-set**。
+`np21w_ctl.py start` は起動前にこの作業木の t2h stamp を失効させる
+(別 ini の起動も安全側に失効)。remote の hash が変わった場合も、pull を省いた照合・配備を拒否する。
+
 #### 検査の 3 段 (`check-fast` / `check-changed` / `check`、2026-09-26)
 
 依頼パックの事実は `python3 tools/check_select.py --pack --files <触るファイル…>` の出力を貼る。着地前に `python3 tools/test_changes.py --base <SHA> --pack <依頼パック.md>` で試験変更を確認する。

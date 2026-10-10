@@ -1797,7 +1797,7 @@ HEAP_INVALID を立て、出力の使用量を 0 にする。CPL3 の可変引�
 
 | offset | 欄 |
 |---|---|
-| 132 | kstack_high_water (下位16bit: 固定 kstack の B、上位16bit: shell stack の B) |
+| 132 | kstack_high_water (下位16bit: 固定 kstack の B、上位16bit: shell stack の B)。MEM_APP_STACK 上の syscall (GUI から起動した USER) は非対象。 |
 | 136 | kheap_peak |
 | 140 | resident_heap_peak |
 | 144 | resident_heap_fail |
@@ -1817,6 +1817,6 @@ HEAP_INVALID を立て、出力の使用量を 0 にする。CPL3 の可変引�
 
 kheap_peak / resident_heap_peak は B、resident_heap_fail は常駐確保の失敗回数、leftover_pages は回収で発見した残 page の累計。lease_active は live slot の token 数、audit_runs / audit_fail は memmap・AS・V86 の各計数の和。固定 kstack (`MEM_KSTACK_BASE`〜`MEM_KSTACK_TOP`) と shell stack (`MEM_SHELL_STACK_TOP - MEM_SHELL_STACK_SIZE`〜`MEM_SHELL_STACK_TOP`) は boot で未使用部を印付けし、200B 拡張部の要求時だけ走査する (132B の trim 配送では走査しない)。両領域の観測済み high-water をそれぞれ保持する。shell から起動した USER の syscall は shell stack 側で測る。`mem` は `kstack=` / `shell_stack=` の 2 値に展開する。peak / fail は起動から保持し、heap reset では戻さない。
 
-固定シリアル診断は通常文脈のみ。commit で `OS32: owner-start id=<n> owner=<o> gen=<g>`、teardown の前後差で `OS32: owner-exit id=<n> owner=<o> gen=<g> pages=<p> leftover=<l> irq=<d> exc=<d>` を出す。pages は回収前、leftover は回収後の増分、深さは出力時の観測値。
+固定シリアル診断は通常文脈のみ。commit で `OS32: owner-start id=<n> owner=<o> gen=<g>`、teardown の前後差で `OS32: owner-exit id=<n> owner=<o> gen=<g> pages=<p> leftover=<l> irq=<d> exc=<d>` を出す。pages は回収前、leftover は回収後の増分、深さは出力時の観測値。起動中止は start 無しで exit を出す。
 
 gshell の CTRL+GRPH+f･10 は全 app slot (2〜5) の id/state/owner_pages/exec_heap_used/trim_pending をシリアルへ出す。X4 では入力を退避し X3 で採取する。

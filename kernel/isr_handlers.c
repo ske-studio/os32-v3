@@ -1,3 +1,6 @@
+#ifdef OS32_R1_FIXTURE
+#include "r1_fixture.h"
+#endif
 /* ======================================================================== */
 /*  ISR_HANDLERS.C — C言語割り込みハンドラ                                  */
 /*                                                                          */
@@ -241,6 +244,9 @@ void exception_handler(u32 error_code, u32 vector, u32 fault_eip,
     int row = 0;
 
     _disable();
+#ifdef OS32_R1_FIXTURE
+    r1_fixture_exception(vector);
+#endif
 
     /* ---- CPL=3 (リング3) 由来のフォールトはアプリだけ kill (v2 M1e/V4) ----
      * フォールトフレームの CS は PUSHAD 配列の上に CPU が積んだもの。
@@ -474,6 +480,9 @@ extern void snd_tick(void);  /* kernel/snd_engine.c */
 
 void timer_handler(void)
 {
+#ifdef OS32_R1_FIXTURE
+    r1_fixture_timer();
+#endif
     snd_tick();
     pcm_tick();
     ne2k_timer_tick();

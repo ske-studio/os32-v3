@@ -273,3 +273,59 @@ check-net-l3:
 	@python3 tools/net_l3_test.py
 
 .PHONY: check-net-m2 check-net-m2-cpl3 check-net-m4 check-net-l0 check-net-l1 check-net-l2 check-net-l3
+
+# T2h: entirely separate objects, dependencies, build ID, map and image.
+R1_OUT := build/out/r1
+R1_OBJ := $(R1_OUT)/obj
+R1_C := $(C_KERNEL) kernel/r1_fixture.c
+R1_OBJECTS := $(addprefix $(R1_OBJ)/,$(ASM_KERNEL:.asm=.o) exec/ring3_ls_shim.o $(R1_C:.c=.o)) $(R1_OBJ)/build_id.o $(addprefix $(R1_OBJ)/,$(C_SQLITE:.c=.o))
+R1_SMALL := exec/exec_heap.c exec/appmem.c exec/appmem_map.c exec/appmem_unmap.c kernel/paging_app.c
+
+$(R1_OBJ)/%.o: %.c
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS_BASE) $(if $(filter $<,$(R1_SMALL)),-Os) -DOS32_R1_FIXTURE $(if $(filter fs/fatfs/%,$<),$(INC_FATFS),$(INC_KERNEL)) -c $< -o $@
+
+$(R1_OBJ)/lib/sqlite3/%.o: lib/sqlite3/%.c lib/sqlite3/os32_sqlite_config.h
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS_SQLITE) $(if $(filter %/os32_sqlite_test.c,$<),-O0) -DOS32_R1_FIXTURE -include lib/sqlite3/os32_sqlite_config.h $(INC_SQLITE) -c $< -o $@
+
+$(R1_OBJ)/%.o: %.asm sdk/crt/generations.inc
+	@mkdir -p $(@D)
+	$(AS) -p sdk/crt/generations.inc -f elf32 $< -o $@
+
+$(R1_OBJ)/exec/ring3_ls_shim.o: exec/ring3_ls.S exec/ring3_ls.h sdk/include/os32/os32_generations.h
+	@mkdir -p $(@D)
+	$(CC) -m32 -Isdk/include/os32 -c $< -o $@
+
+$(R1_OUT)/build_id.c: .FORCE
+	@mkdir -p $(@D)
+	@python3 tools/gen_build_id.py -o $@
+
+$(R1_OBJ)/build_id.o: $(R1_OUT)/build_id.c
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS_BASE) -DOS32_R1_FIXTURE -Iinclude -c $< -o $@
+
+$(R1_OBJ)/exec/exec.o $(R1_OBJ)/kapi/kapi_generated.o: kapi/kapi_generated.c
+$(R1_OBJ)/drivers/lgy98.o $(R1_OBJ)/kapi/kapi_sys.o: .FORCE
+
+$(R1_OUT)/os32.ld: build/os32.ld
+	@mkdir -p $(@D)
+	sed -E 's@([a-zA-Z0-9_/]+\.o)@$(R1_OBJ)/\1@g' $< > $@
+
+$(R1_OUT)/kernel.elf: $(R1_OBJECTS) $(RUST_LZ4_LIB) $(R1_OUT)/os32.ld
+	$(LD) $(filter-out -Map=% -T build/os32.ld,$(LDFLAGS)) -T $(R1_OUT)/os32.ld -Map=$(R1_OUT)/kernel.map -o $@ $(R1_OBJECTS) $(RUST_LZ4_LIB) -lgcc
+
+$(R1_OUT)/kernel.bin: $(R1_OUT)/kernel.elf
+	$(OBJCOPY) -O binary --remove-section=.sqlite_text --remove-section=.sqlite_rodata --remove-section=.sqlite_data --remove-section=.sqlite_bss $< $@
+
+$(R1_OUT)/sqlite.bin: $(R1_OUT)/kernel.elf
+	$(OBJCOPY) -O binary --only-section=.sqlite_text --only-section=.sqlite_rodata --only-section=.sqlite_data $< $@
+
+$(R1_OUT)/vmkernel.lz4: $(R1_OUT)/kernel.bin $(R1_OUT)/sqlite.bin
+	python3 tools/mkvmkernel.py --kernel $(R1_OUT)/kernel.bin --kernel-addr 0x100000 --sqlite $(R1_OUT)/sqlite.bin --sqlite-addr 0x200000 -o $@
+
+kernel-r1: $(R1_OUT)/vmkernel.lz4
+	python3 tools/r1_manifest.py $(R1_OUT)
+
+-include $(R1_OBJECTS:.o=.d)
+.PHONY: kernel-r1

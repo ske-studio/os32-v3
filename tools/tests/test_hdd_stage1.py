@@ -322,7 +322,7 @@ def load_tools(tools_dir):
     os.environ["OS32_NHD_LOCAL"] = os.path.join(tempfile.gettempdir(),
                                                 "os32-hdd1-absent-%d.nhd" % os.getpid())
     sys.path.insert(0, str(tools_dir))
-    for name in ("pc98pt", "nhd_deploy", "deploy_protect", "deploy_manifests"):
+    for name in ("pc98pt", "nhd_profile", "nhd_deploy", "deploy_protect", "deploy_manifests"):
         sys.modules.pop(name, None)
     import pc98pt  # noqa: E402
     import nhd_deploy  # noqa: E402
@@ -840,7 +840,7 @@ MIRROR = ["drivers/ide.h", "drivers/pc98pt.c", "drivers/pc98pt.h", "drivers/ide_
           "fs/ext2_super.c", "fs/ext2_fmt.c", "fs/ext2_inode.c", "fs/ext2_dir.c",
           "fs/ext2_file.c"]
 PY_MIRROR = ["tools/pc98pt.py", "tools/nhd_deploy.py", "tools/deploy_protect.py",
-             "tools/deploy_manifests.py"]
+             "tools/deploy_manifests.py", "tools/nhd_profile.py"]
 
 
 def _tally(counts, status, why):

@@ -22,3 +22,4 @@ check-hdd-stage1-host:
 - userland/shell/hdprep_plan.c
 - tools/check_map.d/check-hdd-stage1-host.yaml
 - build/checks.d/check-hdd-stage1-host.mk
+- tools/nhd_profile.py

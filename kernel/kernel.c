@@ -180,12 +180,13 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     char tmp[16];
     int mb;
 
+    kstack_hw_init();
+
     /* **最初に** ブート情報域 (0x7E00、ローダが INT 1Bh AH=84h の結果を
      * 書いた) を写す。0x7E00 はフォントキャッシュの内側で、フォント・
      * ヒープ・その他の低位の再利用より前でなければ上書きされる。
      * memory_boot_detect も低位 (0594h) を読むだけだが、順序を固定する
      * ためここに置く。以後は写しだけを使う (bootinfo_get / _hdd_geom)。 */
-    kstack_hw_init();
     bootinfo_capture();
 
     /* ローダの 512KB プローブは 16MB 手前までしか見ない (その先は PC-98 の

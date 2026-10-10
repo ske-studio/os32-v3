@@ -1046,7 +1046,7 @@ static void exec_teardown_app(AppSlot *a)
 {
     u32 left;
     if (!a || !a->cpl3 || !a->as || !a->as->pd_phys) return;
-    u32 pages = ledger_owner_pages(a->as->owner);
+    u32 owner_pages_before = ledger_owner_pages(a->as->owner);
     u32 before = exec_as_leftover_pages;
     /* 共有ライブラリの .data 複製ページを返す (PD 破棄の前, K3) */
     if (lease_revoke_all(a->as))
@@ -1084,7 +1084,7 @@ poisoned:
     serial_puts_polled("OS32: appmem AS poisoned; owner pages retained\r\n");
     exec_as_leftover_pages += ledger_owner_pages(a->as->owner);
 done:
-    exec_owner_diag(a, 1, pages, exec_as_leftover_pages - before);
+    exec_owner_diag(a, 1, owner_pages_before, exec_as_leftover_pages - before);
     kfree(a->as);
     a->as = 0;
     a->cpl3 = 0;

@@ -868,6 +868,8 @@ class Ctl(object):
         args = ['/i' + self.paths.win_of(ini)]
         if fd:
             args.append(self.paths.win_of(fd))
+        from nhd_profile import mark_guest_started
+        mark_guest_started()
         pid = self.ops.start(self.expected_exe(exe), args, self.paths.win)
         self.say('started %s pid=%d (%s)' % (exe, pid, ' '.join(args)))
         self.verify_started(pid, exe, ini, alive, api_timeout)
