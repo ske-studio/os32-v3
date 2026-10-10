@@ -25,6 +25,111 @@ CHANGES = {'USEGD5430': 'true'}
 EXPECTED = RAW.replace(b'= false', b'= true', 1)
 
 
+class Derivation(unittest.TestCase):
+    RAW = RAW.replace(b'private=', b'SNDboard = 26 \t; sound\r\n'
+                      b'NP2NETSOCK = old:8026 \t# socket\n'
+                      b'e_resume=true\r\nHDD1FILE=C:\\NP21\\old.nhd\n'
+                      b'FDD1FILE=keep.d88\nFDD2FILE=\nprivate=')
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.source = self.root / 'original.ini'
+        self.source.write_bytes(self.RAW)
+        patch = mock.patch.object(ini, 'np21w_directory',
+                                  return_value=(str(self.root), r'C:\NP21'))
+        patch.start()
+        self.addCleanup(patch.stop)
+        (self.root / 'isolated.nhd').write_bytes(b'synthetic disk')
+
+    def cli(self, name, *operations):
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            rc = ini.main(['derive', str(self.source), name, *operations])
+        self.assertNotIn('DO_NOT_PRINT', out.getvalue() + err.getvalue())
+        return rc, err.getvalue()
+
+    def test_new_name_only_and_source_hash_unchanged(self):
+        before = ini._hash(self.source.read_bytes())
+        self.assertEqual(self.cli('derived.ini', 'ram-64mb')[0], 0)
+        self.assertEqual((self.root / 'derived.ini').read_bytes(),
+                         self.RAW.replace(b'ExMemory=16', b'ExMemory=65'))
+        self.assertEqual(ini._hash(self.source.read_bytes()), before)
+        for name in ('derived.ini', 'original.ini'):
+            self.assertNotEqual(self.cli(name, 'ram-8mb')[0], 0)
+        self.assertEqual(ini._hash(self.source.read_bytes()), before)
+        self.assertIn(b'ExMemory=65', (self.root / 'derived.ini').read_bytes())
+
+    def test_sequence_changes_only_selected_values(self):
+        self.assertEqual(self.cli('all.ini', 'cirrus-on', 'pegc-on', 'ram-8mb',
+                                 'ram-64mb', 'snd118-on', 'netsock=listen:8027',
+                                 'e_resume=false', 'hdd=isolated.nhd')[0], 0)
+        expected = self.RAW.replace(b'= false', b'= true', 1).replace(
+            b'USEPEGCP=false', b'USEPEGCP=true').replace(
+            b'ExMemory=16', b'ExMemory=65').replace(b'SNDboard = 26', b'SNDboard = 64').replace(
+            b'old:8026', b'listen:8027').replace(b'e_resume=true', b'e_resume=false').replace(
+            b'HDD1FILE=C:\\NP21\\old.nhd', b'HDD1FILE=C:\\NP21\\isolated.nhd')
+        self.assertEqual((self.root / 'all.ini').read_bytes(), expected)
+
+    def test_sound_off_uses_original_not_a_fixed_board(self):
+        for old in (b'0', b'8', b'26', b'64', b'AB'):
+            self.source.write_bytes(self.RAW.replace(b'SNDboard = 26', b'SNDboard = ' + old))
+            for ops in (('snd118-off',), ('snd118-on', 'snd118-off')):
+                name = 'off-' + str(len(list(self.root.glob('off-*')))) + '.ini'
+                self.assertEqual(self.cli(name, *ops)[0], 0)
+                self.assertEqual((self.root / name).read_bytes(), self.source.read_bytes())
+
+    def test_each_operation_preserves_every_other_byte(self):
+        cases = [('cirrus-off', self.RAW), ('pegc-off', self.RAW),
+                 ('snd118-on', self.RAW.replace(b'SNDboard = 26', b'SNDboard = 64')),
+                 ('ram-8mb', self.RAW.replace(b'ExMemory=16', b'ExMemory=7')),
+                 ('netsock=old:8026', self.RAW),
+                 ('netsock=127.0.0.1:8027', self.RAW.replace(b'old:8026', b'127.0.0.1:8027')),
+                 ('hdd=isolated.nhd', self.RAW.replace(b'HDD1FILE=C:\\NP21\\old.nhd',
+                                                     b'HDD1FILE=C:\\NP21\\isolated.nhd'))]
+        for i, (op, expected) in enumerate(cases):
+            self.assertEqual(self.cli('single%d.ini' % i, op)[0], 0)
+            self.assertEqual((self.root / ('single%d.ini' % i)).read_bytes(), expected)
+
+    def test_missing_netsock_fails_before_any_write_with_reason(self):
+        self.source.write_bytes(self.RAW.replace(b'NP2NETSOCK = old:8026 \t# socket\n', b''))
+        before = set(self.root.iterdir())
+        rc, err = self.cli('missing.ini', 'ram-64mb', 'netsock=listen:8026')
+        self.assertNotEqual(rc, 0)
+        self.assertIn('鍵欠落', err)
+        self.assertIn('NP2NETSOCK', err)
+        self.assertEqual(set(self.root.iterdir()), before)
+
+    def test_invalid_operations_fields_and_names_fail_without_output(self):
+        for op in ('unknown', 'netsock=x\nprivate=oops', 'netsock=x;comment',
+                   'netsock=x#comment', 'e_resume=true', 'hdd=../bad.nhd',
+                   'hdd=missing.nhd'):
+            self.assertNotEqual(self.cli('bad.ini', op)[0], 0)
+            self.assertFalse((self.root / 'bad.ini').exists())
+        for name in ('../bad.ini', '.bad.ini', 'bad.nhd', 'CON.ini'):
+            self.assertNotEqual(self.cli(name, 'ram-64mb')[0], 0)
+        for field, op in ((b'SNDboard = 26 \t; sound', 'snd118-on'),
+                          (b'e_resume=true', 'e_resume=false'),
+                          (b'NP2NETSOCK = old:8026 \t# socket', 'netsock=listen:8026')):
+            for raw in (self.RAW.replace(field, b''), self.RAW.replace(field, field + b'\n' + field)):
+                self.source.write_bytes(raw)
+                self.assertNotEqual(self.cli('bad.ini', op)[0], 0)
+                self.assertFalse((self.root / 'bad.ini').exists())
+
+    def test_destination_symlink_and_raced_existing_file_are_never_replaced(self):
+        (self.root / 'link.ini').symlink_to(self.source)
+        self.assertNotEqual(self.cli('link.ini', 'ram-64mb')[0], 0)
+        real = ini._new_file
+        def race(fd, name, data):
+            (self.root / name).write_bytes(b'other operator')
+            return real(fd, name, data)
+        with mock.patch.object(ini, '_new_file', side_effect=race):
+            self.assertNotEqual(self.cli('race.ini', 'ram-64mb')[0], 0)
+        self.assertEqual((self.root / 'race.ini').read_bytes(), b'other operator')
+        self.assertEqual(self.source.read_bytes(), self.RAW)
+
+
 class ExMemory(unittest.TestCase):
     """ExMemory は MB 単位の拡張メモリ (win9x/ini.cpp:477, PFTYPE_UINT16、
     SUPPORT_LARGE_MEMORY 有効時)。ブートローダが 1MB から 512KB 刻みで実測するので

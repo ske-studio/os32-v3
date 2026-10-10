@@ -93,6 +93,44 @@ class Fake:
         return True
 
 
+class SoundAnd64MB(unittest.TestCase):
+    def test_apply_receipt_and_restore_preserve_original_bytes(self):
+        for operation, old, new in (('snd118-on', b'SNDboard=26', b'SNDboard=64'),
+                                    ('ram-64mb', b'ExMemory=16', b'ExMemory=65')):
+            with self.subTest(operation=operation):
+                fake = Fake()
+                original = RAW + b'\nSNDboard=26\n'
+                fake.snapshot['data'] = original
+                service = live.Live(fake, TARGET)
+                applied = service.run(operation, live_apply=True, exclusive=True)
+                self.assertTrue(applied['applied'])
+                self.assertEqual(fake.snapshot['data'], original.replace(old, new))
+                self.assertEqual(fake.record['operation'], operation)
+                self.assertEqual(fake.record['original']['data'], original)
+                restored = service.run('snd118-off' if operation == 'snd118-on' else 'restore',
+                                       receipt=applied['receipt'], live_apply=True, exclusive=True)
+                self.assertTrue(restored['applied'])
+                self.assertEqual(fake.snapshot['data'], original)
+
+    def test_sound_off_requires_matching_receipt_before_stop(self):
+        fake = Fake()
+        service = live.Live(fake, TARGET)
+        with self.assertRaises(live.IniError):
+            service.run('snd118-off', live_apply=True, exclusive=True)
+        applied = service.run('ram-64mb', live_apply=True, exclusive=True)
+        fake.calls.clear()
+        with self.assertRaises(live.IniError):
+            service.run('snd118-off', receipt=applied['receipt'], live_apply=True, exclusive=True)
+        self.assertNotIn('stop', fake.calls)
+        self.assertNotIn('replace', fake.calls)
+
+    def test_missing_sound_fails_without_stopping(self):
+        fake = Fake()
+        with self.assertRaises(live.IniError):
+            live.Live(fake, TARGET).run('snd118-on', live_apply=True, exclusive=True)
+        self.assertNotIn('stop', fake.calls)
+
+
 class Identity(unittest.TestCase):
     def test_exact_identity(self):
         self.assertEqual(live.identify([ROW], TARGET, 42), ROW)
@@ -604,7 +642,8 @@ class ReceiptAndPathBoundaries(unittest.TestCase):
         starts = {'cirrus-on': RAW, 'cirrus-off': NEW,
                   'pegc-on': RAW, 'pegc-off': PEGC_ON,
                   'ram-8mb': RAW, 'ram-9mb': RAW, 'ram-15mb': RAM_8MB,
-                  'ram-32mb': RAW, 'ram-128mb': RAW}
+                  'ram-32mb': RAW, 'ram-64mb': RAW, 'ram-128mb': RAW,
+                  'snd118-on': RAW + b'\nSNDboard=26\n'}
         for operation in live.OPERATIONS:
             raw = starts[operation]
             candidate, diff = live.transform(raw, live.OPERATIONS[operation])
