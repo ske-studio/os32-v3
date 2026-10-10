@@ -67,6 +67,7 @@ HAL/PCM の完了実績は既に [HAL_RESULTS](../../archive/v3/TASK_HAL_WIRING_
 | 設計票の版の参照 (同上) | 確定版が「r2 と同じ」→ r2 が「r1 と同じ」と連鎖し、依頼パックで 3 版から写し直した (T2H_DESIGN r5) | 確定版は参照でなく本文を持つ。ROLES §0「設計票」の行に明記する |
 | 受入の観測スクリプト (同上) | `probe*.py`・`obs.py`・`consink.py` が evidence の dir ごとに 11 本の写し | `tools/accept/` に正式な 1 本 (T2h h4a の計画)、MCP の `emu_gui_state`・`emu_consink` で代わるものは写さない |
 | manifest の 3 種 (同上) | `generations-manifest.json` (ビルド)・`.deploy/manifest.txt` (HostDrv 名札)・`deploy-set.json` (配備集合、T2h h1) の役目の正が 1 か所に無い | `docs/08_build.md` §8-4 に 3 種の役目と正を 1 表で |
+
 細かな file:line は、次回更新時も関数名で引き直す。旧基点の調査表を最新版の事実と混在させない。実装の不具合修正・設計変更が必要なら、到達条件と既決 D への影響を別票で判断する。
 
 ## 5. アーカイブ候補 (実行は提示後)
