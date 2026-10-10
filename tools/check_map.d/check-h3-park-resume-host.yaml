@@ -17,5 +17,7 @@ check-h3-park-resume-host:
 - tools/check_map.d/check-h3-park-resume-host.yaml
 - build/checks.d/check-h3-park-resume-host.mk
 - tools/np21w_mcp/gui.py
+- tools/np21w_mcp/gui_desc.py
+- userland/gshell/src/wm.rs
 - userland/gshell/src/startmenu.rs
 - userland/gshell/src/taskbar.rs

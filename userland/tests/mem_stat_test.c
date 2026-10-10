@@ -1,5 +1,6 @@
 /* USER observation: errors preserve the whole buffer; no invalid pointer kills. */
 #include "os32api.h"
+#include <stdio.h>
 
 #define TEST_ATTR 0x07
 #define CHECK(test) do { total++; if (test) passed++; } while (0)
@@ -53,5 +54,6 @@ int main(int argc, char **argv, KernelAPI *api)
         api->kprintf(TEST_ATTR, "mem_stat_test PASS self=%d others=%d,%d,%d\n", self, others[0], others[1], others[2]);
 done:
     api->kprintf(TEST_ATTR, "mem_stat_test: %s %d/%d\n", passed == total ? "PASS" : "FAIL", passed, total);
+    printf("mem_stat_test: %s %d/%d\n", passed == total ? "PASS" : "FAIL", passed, total);
     return passed == total ? 0 : 1;
 }

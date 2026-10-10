@@ -10,6 +10,7 @@ import hashlib
 import time
 from unittest.mock import patch
 import pathlib
+import re
 import struct
 import subprocess
 import sys
@@ -496,16 +497,78 @@ class Tests(unittest.TestCase):
                                ('foreground_window',43), ('case_id','old'), ('phase',3),
                                ('identity',{})]:
                 bad = dict(trace); bad[key] = value
-                self.cli('stop', case, bad, expected='STOP foreground not confirmed')
-            self.cli('stop', case, dict(trace, observed_at=94), expected='STOP not sent')
+                with tempfile.TemporaryDirectory() as directory:
+                    path = pathlib.Path(directory) / 'front.json'
+                    path.write_text(json.dumps(dict(bad, map_sha256='map')))
+                    with patch.object(h3.time, 'time', return_value=100), \
+                         self.assertRaisesRegex(RuntimeError, 'STOP foreground not confirmed'):
+                        self.p.foreground(dict(case, map_sha256='map'), path)
             before = self.p.guest_tick()
-            sent = self.cli('stop', case, trace)
+            with patch.object(self.p, 'wm_snapshot', return_value=self.wm_state()):
+                sent = self.cli('stop', case, trace)
             self.assertGreaterEqual((self.p.guest_tick() - before) & 0xffffffff, 210)
             self.assertTrue(sent['stop_sent'])
             self.cli('stop', sent, trace, expected='STOP requires a resumed loop case')
         for value in (False, None):
             bad = dict(case, resume_verified=value)
             self.cli('stop', bad, trace, expected='STOP requires')
+
+    def wm_state(self, rect=(30, 60, 250, 130)):
+        return dict(front=2, windows=[dict(id=42, owner=2, rect=list(rect),
+                    visible=True, minimized=False, z=1)])
+
+    def test_wm_snapshot_uses_physical_reader_in_owned_freeze(self):
+        from tools.np21w_mcp import gui_desc
+        def read_state(read):
+            self.assertEqual(self.emu.depth, 1)
+            self.assertEqual(read(self.address, 4), struct.pack('<I', h3.MAGIC))
+            return self.wm_state()
+        with patch.object(gui_desc, 'read_state', side_effect=read_state), self.emu.freeze():
+            self.assertEqual(self.p.wm_snapshot(), self.wm_state())
+
+    def test_focus_click_uses_current_client_rect(self):
+        case = self.p.arm(self.ident, 1)
+        for rect in ((30, 60, 250, 130), (340, 60, 250, 130), (80, 160, 280, 160)):
+            calls = []
+            self.emu.click = lambda *args: calls.append(args)
+            with patch.object(self.p, 'wm_snapshot', return_value=self.wm_state(rect)):
+                self.p.focus_fixture(case, 480)
+            x, y, w, h = rect
+            self.assertEqual(calls, [(x + w // 2, y + 20 + (h - 22) // 2, 480)])
+            self.assertGreater(calls[0][1], y + 20, 'title click never wakes OP_WAIT')
+
+    def test_cli_arm_uses_fixture_click_and_internal_foreground(self):
+        with tempfile.TemporaryDirectory() as directory:
+            d = pathlib.Path(directory)
+            def capture(*args, **kwargs):
+                self.assertEqual(len(args), 3, 'CLI must not depend on an external foreground file')
+                kwargs['click']()
+            with patch.object(self.p, 'run_capture', side_effect=capture), \
+                 patch.object(self.p, 'focus_fixture') as focus:
+                case = self.cli('arm', dict(identity=self.ident),
+                    extra=('--mode', 'USER-loop', '--capture', str(d/'raw'), '--out', str(d/'out')))
+                focus.assert_called_once()
+                self.assertEqual(focus.call_args.args[0]['identity'], self.ident)
+                self.assertEqual(focus.call_args.args[1], 400)
+                self.assertEqual(case['mode'], 5)
+
+    def test_physical_foreground_rejects_wrong_owner_or_window(self):
+        case = self.p.arm(self.ident, 5)
+        case['map_sha256'] = 'map'
+        self.change('phase', 6)
+        for field, value in (('id', 43), ('owner', 3), ('visible', False),
+                             ('minimized', True), ('z', None)):
+            state = self.wm_state()
+            state['windows'][0][field] = value
+            with patch.object(self.p, 'wm_snapshot', return_value=state):
+                with self.assertRaises(RuntimeError), self.emu.freeze():
+                    self.p.foreground(case, None)
+        state = self.wm_state()
+        state['windows'].append(dict(state['windows'][0], id=43, owner=3, z=2))
+        state['front'] = 3
+        with patch.object(self.p, 'wm_snapshot', return_value=state):
+            with self.assertRaises(RuntimeError), self.emu.freeze():
+                self.p.foreground(case, None)
 
     def test_cli_hash_guards(self):
         # Do not mock digest: exercise both files independently through argv.
@@ -1014,7 +1077,7 @@ class Tests(unittest.TestCase):
         self.assertEqual(len(stops), 1)
         return stops[0]
 
-    def timed_http_capture(self, mode):
+    def timed_http_capture(self, mode, physical=False):
         # Real Emulator HTTP calls cost 0.1 host seconds. 22 ticks/s while
         # thawed produces ~8 ticks/s overall with the old repeated freezes
         # (~1/10 of the 100Hz PIT, 3000 ticks in ~365s). PM started the 90s
@@ -1037,7 +1100,7 @@ class Tests(unittest.TestCase):
                 memory.word(parent.s['tick_count'], int(clock['ticks']))
                 if clock['ticks'] >= 500:
                     parent.change('phase', 6)
-                if clock['wall'] >= clock['next_front'] and clock['wall'] + 18 < 90:
+                if not physical and clock['wall'] >= clock['next_front'] and clock['wall'] + 18 < 90:
                     front.write_text(json.dumps(dict(case_id=case['case_id'],
                         identity=parent.ident, map_sha256='map', phase=6,
                         foreground_window=42, foreground_app=2,
@@ -1084,10 +1147,18 @@ class Tests(unittest.TestCase):
                 stops.append((clock['wall'], clock['ticks']))
                 debugger.trap = True
             emu.stop = stop
+            def physical_state():
+                self.assertTrue(client.paused, 'foreground must share final identity freeze')
+                self.assertEqual(len(debugger.bps), 5, 'capture must own debugger')
+                # Exercise real physical HTTP reads while paused, with no guest RPC.
+                self.assertEqual(emu.read(self.address, 4), struct.pack('<I', h3.MAGIC))
+                return self.wm_state()
             with patch.object(h3.time, 'monotonic', side_effect=lambda: clock['wall']), \
-                 patch.object(h3.time, 'time', side_effect=lambda: case['armed_at'] + clock['wall']):
+                 patch.object(h3.time, 'time', side_effect=lambda: case['armed_at'] + clock['wall']), \
+                 patch.object(self.p, 'wm_snapshot', side_effect=physical_state):
                 try:
-                    self.p.run_capture(case, d/'raw.json', d/'out.json', front, click=click)
+                    self.p.run_capture(case, d/'raw.json', d/'out.json',
+                        None if physical else front, click=click)
                 finally:
                     self.assertEqual(debugger.bps, set())
                     self.assertFalse(debugger.trap or client.paused)
@@ -1097,6 +1168,69 @@ class Tests(unittest.TestCase):
             self.assertLessEqual(client.pauses, 6, 'waiting polls must not freeze')
             self.assertLessEqual(case['foreground_observation']['observed_at'],
                                  case['armed_at'] + stops[0][0])
+            if physical:
+                self.assertEqual(clock['writes'], 0, 'external foreground writer is unnecessary')
+                self.assertEqual(case['foreground_observation']['foreground_window'], 42)
+                self.assertEqual(case['foreground_observation']['foreground_app'], 2)
+
+    def test_physical_user_loop_foreground_during_pause(self):
+        self.timed_http_capture(5, physical=True)
+
+    def test_physical_kapi_loop_foreground_during_pause(self):
+        self.timed_http_capture(6, physical=True)
+
+    def test_standalone_physical_stop_records_trap_after_snapshot(self):
+        case = self.p.arm(self.ident, 5)
+        case.update(map_sha256='map', resume_verified=True)
+        self.change('phase', 6)
+        client = self.emu.client = self.cleanup_client()
+        events = []
+        def snapshot():
+            self.assertEqual(self.emu.depth, 1)
+            events.append('foreground')
+            return self.wm_state()
+        def stop():
+            self.assertEqual(self.emu.depth, 0)
+            self.assertEqual(events, ['foreground'])
+            events.append('stop')
+            client.trap = True
+        self.emu.stop = stop
+        self.p.sleep = lambda _: self.emu.word(self.s['tick_count'], self.p.guest_tick() + 25)
+        with patch.object(self.p, 'wm_snapshot', side_effect=snapshot):
+            capture = self.p.stop_loop(case)
+        self.assertTrue(case['stop_sent'])
+        self.assertEqual([s['site'] for s in capture['samples']], ['wm_kill'])
+        self.assertFalse(client.trap)
+        self.assertEqual(client.bps, set())
+
+    def test_physical_stop_stale_after_resume_never_sends_stop(self):
+        case = self.p.arm(self.ident, 5)
+        case.update(map_sha256='map', resume_verified=True)
+        self.change('phase', 6)
+        clock = [case['armed_at'] + 1]
+        original_freeze = self.emu.freeze
+        @contextmanager
+        def freeze():
+            outer = self.emu.depth == 0
+            with original_freeze():
+                yield
+            if outer:
+                clock[0] += 6  # Only the outer freeze posts /api/resume.
+        tick = [0]
+        self.p.guest_tick = lambda: tick[0]
+        def pump(p, value, **kwargs):
+            for elapsed in (0, 210, 420):
+                tick[0] = elapsed
+                kwargs['advance']()
+            return dict(samples=[])
+        self.emu.freeze = freeze
+        self.emu.stop = lambda: self.fail('stale physical proof sent STOP')
+        with patch.object(h3, 'capture_trace', side_effect=pump), \
+             patch.object(h3.time, 'time', side_effect=lambda: clock[0]), \
+             patch.object(self.p, 'wm_snapshot', return_value=self.wm_state()):
+            with self.assertRaisesRegex(RuntimeError, 'foreground evidence stale'):
+                self.p.stop_loop(case)
+        self.assertNotIn('stop_sent', case)
 
     def test_http_cost_slow_user_loop_periodic_foreground(self):
         self.timed_http_capture(5)
@@ -1124,7 +1258,7 @@ class Tests(unittest.TestCase):
                 self.assertEqual(self.emu.depth, 0)
                 clock['ticks'] += 25
                 clock['wall'] += 3  # 210 guest ticks take more than 5 host seconds.
-                self.assertLessEqual(clock['ticks'], 300)
+                self.assertLessEqual(clock['ticks'], 400)
                 self.emu.word(self.s['tick_count'], (initial + clock['ticks']) & 0xffffffff)
                 if clock['ticks'] == 300:
                     front.write_text(json.dumps(dict(evidence,
@@ -1509,17 +1643,17 @@ PY_MUTANTS += [
     ("now - progressed_at < TICK_STALL_SECONDS", "now - progressed_at < 30", 1),
     ("(tick - first_tick) & 0xffffffff", "tick - first_tick", 1),
     ("(self.guest_tick() - firing_at) & 0xffffffff", "self.guest_tick() - firing_at", 1),
-    ("< RUNAWAY_WAIT_TICKS or not Path(foreground).exists()", "< 0 or not Path(foreground).exists()", 1),
+    ("< RUNAWAY_WAIT_TICKS or (foreground", "< 0 or (foreground", 1),
 ]
 
 
 PY_MUTANTS += [
     ("TICK_STALL_SECONDS = 120", "TICK_STALL_SECONDS = 1000", 1),
     ("first_tick = tick", "first_tick = (tick - 1000) & 0xffffffff", 1),
-    ("firing_at = None\n        stop_at = None", "case['armed_in_running_wait'] = True\n        firing_at = None\n        stop_at = None", 1),
+    ("firing_at = None\n        stop_at = None", "case['armed_in_running_wait'] = True\n        firing_at = None\n        stop_at = None", 2),
     ("not case.get('stop_sent') and", "True and", 1),
     ("if evidence is None:", "if False:", 4),
-    ("p.stop_loop(case, args.trace, persist=lambda: args.case.write_bytes(json_bytes(case)))", "p.foreground(case, args.trace); p.emu.stop(); case['stop_sent'] = True", 1),
+    ("capture = p.stop_loop(case, persist=lambda: args.case.write_bytes(json_bytes(case)))", "p.foreground(case, args.trace); p.emu.stop(); case['stop_sent'] = True; capture = dict(started_at=time.time(), ended_at=time.time(), samples=[])", 1),
 ]
 
 
@@ -1527,8 +1661,8 @@ PY_MUTANTS += [
     ("    def guest_tick(self):", "    @frozen\n    def guest_tick(self):", 1),
     ("return self.word(case['identity']['address'] + FIELDS.index('phase') * 4)",
      "return self.checked(case['identity'])['phase']", 1),
-    ("evidence = self.loop_evidence(case, foreground, firing_at, status)\n            if evidence is None:\n                return\n            stop_at",
-     "# Omit the final freshness check.\n            stop_at", 1),
+    ("evidence = self.final_foreground(case, foreground, firing_at, status, evidence)\n            if evidence is None:\n                return\n            stop_at",
+     "# Omit the final freshness check.\n            stop_at", 2),
     ("'STOP not sent during capture: ' + status['reason']", "'STOP not sent during capture'", 2),
 ]
 
@@ -1539,12 +1673,20 @@ PY_MUTANTS += [
      "pass  # omit frozen phase check", 2),
     ("self.checked(case['identity'])['phase'] == PHASES['FIRING']",
      "self.block(case['identity']['address'])['phase'] == PHASES['FIRING']", 2),
-    ("# Identity reads also cost host time; refresh evidence after them.\n            evidence = self.loop_evidence(case, foreground, firing_at, status)\n            if evidence is None:\n                return",
+    ("# Identity reads also cost host time; refresh evidence after them.\n            evidence = self.final_foreground(case, foreground, firing_at, status, evidence)\n            if evidence is None:\n                return",
      "# Omit standalone STOP freshness recheck.", 1),
     ("(PHASES['ARMED'], PHASES['FIRING'], PHASES['ERROR'])",
      "(PHASES['ARMED'], PHASES['FIRING'])", 1),
     ("self.resume_wait_alive(case)", "pass", 1),
     ("require(firing_at is None, 'loop not firing: phase changed after FIRING')", "pass", 1),
+]
+
+PY_MUTANTS += [
+    ("self.emu.click(*point, height)", "self.emu.click(90 if case['fixture'] == 1 else 400, 68, height)", 1),
+    ("return read_state(self.emu.read)", "return read_state(lambda a, n: b'')", 1),
+    ("evidence = self.foreground(case, None)", "evidence = self.foreground(case, '/missing-front.json')", 2),
+    ("if not 0 <= time.time() - evidence['observed_at'] <= 5:", "if False:", 1),
+    ("# Keep the pump alive to drain STOP's watched traps before cleanup.", "return True", 1),
 ]
 
 
@@ -1572,7 +1714,8 @@ def main():
                 copy = pathlib.Path(directory) / 'playbook.py'
                 copy.write_text(source.replace(old, new))
                 p = subprocess.run([sys.executable, __file__, '--module', str(copy)], capture_output=True)
-                assert p.returncode == 1 and b'FAILED (failures=' in p.stderr and b'errors=' not in p.stderr, (old, p.stderr.decode())
+                assert p.returncode == 1 and b'FAILED (failures=' in p.stderr and not re.search(
+                    rb'^FAILED \([^\n]*\berrors=', p.stderr, re.M), (old, p.stderr.decode())
             print(f'mutations: {len(C_MUTANTS) + len(PY_MUTANTS)} runtime RED, compile failures 0')
     return 0
 

@@ -13,5 +13,7 @@ check-caller-access-host:
 - tools/h3_park_resume.py
 - tools/h3_layout.c
 - tools/np21w_mcp/gui.py
+- tools/np21w_mcp/gui_desc.py
+- userland/gshell/src/wm.rs
 - userland/gshell/src/startmenu.rs
 - userland/gshell/src/taskbar.rs
