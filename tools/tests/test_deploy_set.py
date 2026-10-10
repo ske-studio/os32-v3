@@ -23,10 +23,12 @@ parser.add_argument("--mutate", action="store_true")
 parser.add_argument("--tools-dir", type=Path, default=ROOT / "tools")
 args = parser.parse_args()
 sys.path.insert(0, str(args.tools_dir))
+sys.path.insert(0, str(ROOT / "sdk"))
 import check_manifests as cm
 import deploy_manifests as dm
 import deploy_source_check as sc
 import gen_deploy_set as gs
+import os32x_hdr as hdr
 
 GENERATION = {"build_id": "a" * 64, "kernel_commit": "fixture",
               "kapi_version": 74, "generations": {"memory_layout": 3}}
@@ -228,6 +230,42 @@ class DeploySet(unittest.TestCase):
             extra["filesystem"]["files"].pop(2)
             self.assertTrue(cm.check_generation_deploy(manifest, extra))
 
+    def test_generation_deploy_ignores_cargo_target_cache(self):
+        caches = [
+            "userland/libos32term/target/x86_64-unknown-linux-gnu/debug/incremental/fixture/dep-graph.bin",
+            "userland/rust/target/debug/incremental/fixture/query-cache.bin",
+            "userland/target/debug/cache.shlib",
+        ]
+        for name in caches:
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"Rust host test cache")
+        # 世代表の生成器と同じ glob で、実在する cache も集合に残す。
+        paths = {str(p.relative_to(self.root)) for p in self.root.glob("userland/**/*.bin")}
+        paths.discard("userland/tests/excluded.bin")
+        paths.update(["userland/libos32gui.shlib", caches[-1]])
+        self.assertTrue(set(caches).issubset(paths))
+        manifest = {"files": [{"path": p} for p in sorted(paths)]}
+        with patch.object(cm, "resolve_entry", side_effect=lambda e: dm.resolve_entry(e, str(self.root))):
+            self.assertEqual(cm.check_generation_deploy(manifest, self.merged), [])
+
+    def test_generation_deploy_rejects_undeployed_os32x(self):
+        # target はディレクトリ要素だけを除く。似た名前の実行物は検出する。
+        names = ["userland/unregistered.bin", "userland/target.bin",
+                 "userland/target-tools/unregistered.bin",
+                 "userland/unregistered.shlib"]
+        for name in names:
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            flags = hdr.OS32X_FLAG_SHLIB if name.endswith(".shlib") else hdr.OS32X_FLAG_RING3
+            path.write_bytes(hdr.build_header(flags, 0, 1, 0, 0, 0,
+                                             hdr.OS32X_APP_LOAD_ADDR, 1) + b"\xc3")
+        paths = ["userland/shell.bin", "userland/libos32gui.shlib", "userland/tests/a.bin"]
+        manifest = {"files": [{"path": p} for p in paths + names]}
+        with patch.object(cm, "resolve_entry", side_effect=lambda e: dm.resolve_entry(e, str(self.root))):
+            self.assertEqual(cm.check_generation_deploy(manifest, self.merged),
+                             [p + ": 配備定義にない" for p in sorted(names)])
+
     def test_crt_and_each_lib_existence(self):
         libraries = cm._dependencies(str(ROOT))["libs"]
         errors = cm.check_crt_libs(self.root, libraries)
@@ -249,6 +287,8 @@ def mutate():
     mutations = [
         ("check_manifests.py", "sorted(deployed - recorded)", "[]"),
         ("check_manifests.py", "sorted(recorded - deployed)", "[]"),
+        ("check_manifests.py", 'and "/target/" not in path', ""),
+        ("check_manifests.py", '"/target/" not in path', '"target" not in path'),
         ("deploy_source_check.py", "if actual_crc != crc:", "if False:"),
         ("deploy_source_check.py", "if len(data) != int(size):", "if False:"),
         ("deploy_source_check.py", 'if guest.lstrip("/") not in seen:', "if False:"),
