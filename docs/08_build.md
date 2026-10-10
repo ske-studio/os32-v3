@@ -228,12 +228,21 @@ KernelAPI の構造体を変えたときは `make clean` → `make all` が必�
 確認する。両順ビルドは先頭 runner だけが `$TMPDIR` 内のソースの写しで行い、
 その写しだけで `__DATE__` / `__TIME__` を `SOURCE_DATE_EPOCH` で固定する。
 
-試験像だけにある BSS `r1_fixture_arm[7]` の添字 1 / 2 / 4 に
+試験像だけにある BSS `r1_fixture_arm[7]` の各添字に
 `R1_FIXTURE_ARM` (`kernel/r1_fixture.h`) を `emu_write_mem` で書くと一度だけ発火する。
 1 は次の timer IRQ で割当て、2 は次の #UD で解放を要求し、`R1 context` で停止する。
 4 は USER syscall 中の開いた V86 session の終了で #UD を起こし、
 `exec teardown stopped` に至る。arm は停止前に消費し、未 arm / 不正値は無操作。
-製品 KAPI には操作口を追加しない。実ゲストでの停止確認は PM の R1c で行う。
+復旧型は 3 = V86 session 構築後の CPL0 #UD (K1)、5 = 子の終了時に生存親を毒化
+(5a)、0 = PARKED を resume commit 前に毒化 (5b)、6 = CLIENT lease attach の
+公開前に一度だけ FULL を返す。0 / 5 / 6 は同じ添字の `r1_fixture_id` と
+`r1_fixture_generation` に対象 app ID と AS 世代を先に書き、最後に arm を publish する。
+ID・世代不一致では arm を消費しない。0 は PARKED + `parked_from_wait`、5 は生存中の
+RUNNING 親に限る。3 は USER syscall 中の開いた session に限り、終了中には発火しない。
+host 試験は移譲後の通常文脈での解放・次起動、親の syscall 出口 kill、PARKED の abort 保持と
+PD 読込み前 kill、隔離 owner の page 保持と `owner-exit` の pages / leftover、
+lease 失敗後の描画停止と次の待機返却時の再 attach を検査する。
+製品 KAPI には操作口を追加しない。実ゲストでの停止・復旧確認は PM の R1c で行う。
 
 `nhd_deploy.py <command> --profile t2h` は remote を
 `NP21W_DIR/os32_t2h_install.nhd`、local を `build/nhd/os32_t2h.nhd`、

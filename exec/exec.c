@@ -1,4 +1,7 @@
 #include "v86_mem.h"
+#ifdef OS32_R1_FIXTURE
+#include "r1_fixture.h"
+#endif
 #include "../drivers/serial.h"
 #include "appmem.h"
 #include "v86.h"
@@ -1348,6 +1351,9 @@ static void exec_finish(int id, int status, int kind)
         res_owner_set(0);
         exec_reclaim_owned(id, kind);
     } else {
+#ifdef OS32_R1_FIXTURE
+        r1_fixture_parent(id);
+#endif
         parent = appslot_return_target(id);
         /* 装置・FD の利用終了を私有ページの返却より先に済ませる (R1)。 */
         exec_reclaim_resources(id);
@@ -2486,6 +2492,9 @@ i32 exec_resume(i32 app_id, i32 wait_ret)
         return 0;
     }
 
+#ifdef OS32_R1_FIXTURE
+    r1_fixture_resume((int)app_id);
+#endif
     appslot_resume_commit((int)app_id);
     appslot_mark_scheduled((int)app_id, tick_count);   /* 票 T9 §12 S6 */
     /* A parked AS may have been poisoned by a foreign lease revoke. Consume

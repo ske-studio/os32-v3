@@ -135,6 +135,9 @@ int v86_session_begin(u32 owner)
     /* I/O 許可ビットマップにゲスト用ポリシーを適用 */
     v86_io_apply_policy();
 
+#ifdef OS32_R1_FIXTURE
+    r1_fixture_v86_ready();
+#endif
     return 0;
 
 fail:

@@ -2,6 +2,7 @@
 #include "types.h"
 #include "v86_mem.h"
 #include "r1_fixture.h"
+#include "appslot.h"
 static void *stop_jmp[5];
 static unsigned int host_if = 0x202;
 static void _stop(void) { __builtin_longjmp(stop_jmp, 1); }
@@ -27,15 +28,13 @@ static void fail(int line) {
 }
 #define CHECK(x) do { if (!(x)) fail(__LINE__); } while (0)
 /* Unreached non-closing continuation is deliberately fatal in this fixture. */
-typedef struct { int state; u32 jmpbuf[16]; } AppSlot;
 static AppSlot app;
-static int appslot_cur(void) { return 2; }
-static AppSlot *appslot_get(int id) { return id == 2 ? &app : 0; }
+int appslot_cur(void) { return 2; }
+AppSlot *appslot_get(int id) { return id == 2 ? &app : 0; }
+void paging_addrspace_poison(struct addrspace *as) { (void)as; fail(__LINE__); }
 static int g_pending_id, g_pending_kind, g_longjmp_reason;
 #define EXEC_KIND_FAULT 3
 #define EXEC_KIND_ABORTED 2
-#define APP_STATE_ABORT_PENDING 4
-#define APP_STATE_FAULT_PENDING 5
 #define EXEC_LJ_PENDING 3
 static void ring3_context_clear(void) { fail(__LINE__); }
 void exec_longjmp(u32 *buf) { (void)buf; fail(__LINE__); }

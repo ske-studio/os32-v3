@@ -14,16 +14,22 @@ import subprocess
 import tempfile
 
 import host32
+from r1_recovery import recovery, lease_recovery, RECOVERY_MUTANTS, LEASE_MUTANTS
 
 ROOT = Path(__file__).resolve().parents[2]
 TARGET_SRCS = ['kernel/r1_fixture.c', 'kernel/r1_fixture.h', 'kernel/isr_handlers.c',
                'kernel/v86_mem.c', 'exec/exec.c', 'kernel/pgalloc.c',
-               'tools/tests/r1_fixture_host.c', 'tools/r1_manifest.py']
+               'tools/tests/r1_fixture_host.c', 'tools/r1_manifest.py',
+               'tools/tests/r1_recovery.py', 'tools/tests/r1_recovery_host.c',
+               'tools/tests/r1_lease_host.c', 'exec/appslot.c', 'exec/appslot.h',
+               'exec/owner_diag.h', 'kernel/paging.c', 'exec/lease.c']
 
 
 def function(source, signature):
-    start = source.index(signature)
-    brace = source.index('{', start)
+    match = re.search(re.escape(signature) + r'[^;{]*\{', source)
+    assert match, signature
+    start = match.start()
+    brace = match.end() - 1
     depth, end = 1, brace + 1
     while depth:
         depth += (source[end] == '{') - (source[end] == '}')
@@ -39,6 +45,7 @@ def fixture(tmp, mutation=None, runner="qemu"):
         assert old in fixture
         fixture = fixture.replace(old, new, 1)
     fixture = fixture.replace('__asm__ volatile("ud2")', 'host_raise_ud()')
+    fixture = fixture.replace('"../exec/appslot.h"', '"appslot.h"')
     (tmp / 'fixture_source.c').write_text(fixture)
     (tmp / 'pgalloc_source.c').write_text(read('kernel/pgalloc.c').replace('#include "io.h"', ''))
     exe = read('exec/exec.c')
@@ -59,7 +66,7 @@ def fixture(tmp, mutation=None, runner="qemu"):
            '-no-pie', '-ffunction-sections', '-Wl,--gc-sections', '-DOS32_R1_FIXTURE',
            '-I' + str(tmp)]
     cmd += ['-I' + str(ROOT / p) for p in ('include', 'kernel', 'lib', 'drivers',
-                                         'sdk/include/os32', 'tools/tests')]
+                                         'sdk/include/os32', 'tools/tests', 'exec')]
     cmd += [str(ROOT / 'tools/tests/r1_fixture_host.c'), str(ROOT / 'kernel/physmem.c'),
             '-o', str(tmp / 'probe')]
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -141,9 +148,23 @@ def main():
         tmp = Path(name)
         assert fixture(tmp, runner=args.runner) == 0, 'stop hooks'
         print('r1 stop hooks: PASS')
+        result = recovery(tmp, function, args.runner)
+        assert result.returncode == 0, result.stdout + result.stderr
+        print(result.stdout, end='')
+        result = lease_recovery(function, args.runner)
+        assert result.returncode == 0, result.stdout + result.stderr
+        print(result.stdout, end='')
         if args.runner == host32.selected_runner():
             builds(tmp)
         if args.mutate:
+            for name, path, old, new, expected in RECOVERY_MUTANTS:
+                result = recovery(tmp, function, args.runner, (path, old, new))
+                assert result.returncode == 1 and expected in result.stdout, (name, result.returncode, result.stdout, result.stderr)
+                print('RED: ' + name)
+            for name, path, old, new, expected in LEASE_MUTANTS:
+                result = lease_recovery(function, args.runner, (path, old, new))
+                assert result.returncode == 1 and expected in result.stdout, (name, result.returncode, result.stdout, result.stderr)
+                print('RED: ' + name)
             for old, new in [
                 ('r1_fixture_arm[slot] = 0;', '/* leave armed */'),
                 ('!= R1_FIXTURE_ARM', '== R1_FIXTURE_ARM'),
