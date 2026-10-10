@@ -15,6 +15,11 @@ int memcmp(const void *a, const void *b, u32 n) {
     const u8 *x=a,*y=b;
     while(n--) { if (*x != *y) return *x-*y; x++; y++; } return 0;
 }
+u32 kstack_high_water(void) { return 1024; }
+volatile u32 fault_kill_count;
+u32 memmap_audit_runs, as_audit_runs, v86_return_audit_runs;
+u32 memmap_audit_fail, as_audit_fail, v86_return_audit_fail;
+int kselftest_pass, kselftest_fail;
 #include "mem_stat_source.c"
 void appslot_trim_request_as(struct addrspace *as) { trim_product_request(as); }
 #include "trim_exec_source.c"

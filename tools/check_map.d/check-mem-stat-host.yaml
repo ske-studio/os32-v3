@@ -55,3 +55,7 @@ check-mem-stat-host:
 - tools/check_map.d/check-mem-stat-host.yaml
 - build/checks.d/check-mem-stat-host.mk
 - exec/exec_kapi_init.inc
+- exec/owner_diag.h
+- kernel/kstack_hw.c
+- kernel/kstack_hw.h
+- kernel/kernel.c

@@ -1040,10 +1040,14 @@ static int app_store(AppSlot *a, u32 va, const void *src, u32 len)
 u32 exec_as_leftover_pages;
 u32 exec_entry_calls; /* D35: rejected images leave this counter unchanged. */
 
+#include "owner_diag.h"
+
 static void exec_teardown_app(AppSlot *a)
 {
     u32 left;
     if (!a || !a->cpl3 || !a->as || !a->as->pd_phys) return;
+    u32 pages = ledger_owner_pages(a->as->owner);
+    u32 before = exec_as_leftover_pages;
     /* 共有ライブラリの .data 複製ページを返す (PD 破棄の前, K3) */
     if (lease_revoke_all(a->as))
         kprintf(ATTR_RED, "lease revoke failed during teardown\n");
@@ -1080,6 +1084,7 @@ poisoned:
     serial_puts_polled("OS32: appmem AS poisoned; owner pages retained\r\n");
     exec_as_leftover_pages += ledger_owner_pages(a->as->owner);
 done:
+    exec_owner_diag(a, 1, pages, exec_as_leftover_pages - before);
     kfree(a->as);
     a->as = 0;
     a->cpl3 = 0;
@@ -2101,6 +2106,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
             appslot_shell_commit();
         } else {
             appslot_start_commit(id, gui, need_pages);
+            if (want_ring3) exec_owner_diag(ctx, 0, 0, 0);
             /* 暴走判定の起点 (票 T9 §12 S6)。 */
             appslot_mark_scheduled(id, tick_count);
         }

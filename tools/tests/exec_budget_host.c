@@ -1,5 +1,6 @@
 /* f12: real launch allocation block, paging, ledger, appmem and teardown.
  * File I/O/entry/parent heap are boundary fixtures; no guest execution here. */
+#define APP_BB_SLOT_LOOKUP
 #include "budget_fixture.c"
 #include "exec.h"
 static AppSlot slots[APP_SLOT_COUNT];

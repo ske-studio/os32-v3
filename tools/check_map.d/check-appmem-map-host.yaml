@@ -25,3 +25,4 @@ check-appmem-map-host:
 - exec/redir_access.c
 - exec/access_walk.c
 - tools/tests/exec_heap_host.h
+- exec/owner_diag.h

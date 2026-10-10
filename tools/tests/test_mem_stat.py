@@ -62,7 +62,7 @@ def build_fixture(tmp):
     dispatch = function(exe, 'void __cdecl ring3_syscall_dispatch(')
     tail = dispatch[dispatch.index('syscall_complete:') + len('syscall_complete:'):dispatch.rfind('}')]
     parts.append('static void host_syscall_tail(u32 *frame) { int prev_caller=0, prev_in_syscall=0; u32 *prev_frame=0;\n' + tail + '\n}')
-    (tmp / 'exec_source.c').write_text('\n'.join(parts))
+    (tmp / 'exec_source.c').write_text('#include "owner_diag.h"\n' + '\n'.join(parts))
     (tmp / 'abort_clear_source.c').write_text(function(slot, 'int appslot_abort_clear('))
     lease = read('exec/lease.c')
     (tmp / 'lease_revoke_source.c').write_text(
@@ -89,6 +89,9 @@ def build_fixture(tmp):
 
 
 MUTANTS = [
+    ('owner absent', 'snap.owner_pages = ledger_owner_pages(as->owner);', '', 'owner pages'),
+    ('diagnostics absent', 'snap.fault_kill_count = fault_kill_count;', '', 'diagnostic system'),
+    ('lease absent', 'snap.lease_active += slot->as->leases[i].token != 0;', '(void)i;', 'active leases'),
     ('pressure absent', 'snap.pressure_epoch = appslot_trim_epoch;', '', 'pressure epoch'),
     ('pending mask absent', 'snap.trim_pending_mask |= 1UL << id;', '(void)id;', 'pending mask'),
     ('trim flag absent', 'if (slot->trim_pending) snap.flags |= MEMSTAT_TRIM_PENDING;', '', 'trim flag'),
@@ -115,6 +118,11 @@ MUTANTS = [
 
 
 def run_body(runner, mutate):
+    exe = (ROOT / 'exec/exec.c').read_text()
+    assert 'if (want_ring3) exec_owner_diag(ctx, 0, 0, 0);' in exe
+    assert exe.index('appslot_start_commit(id, gui, need_pages);') < exe.index('if (want_ring3) exec_owner_diag(ctx, 0, 0, 0);')
+    boot = (ROOT / 'kernel/kernel.c').read_text()
+    assert boot.count('kstack_hw_init();') == 1 and boot.index('kstack_hw_init();') < boot.index('bootinfo_capture();')
     source = (ROOT / 'kapi/kapi_sys.c').read_text()
     source = source[source.index('STATIC_ASSERT(sizeof(MemStat)'):source.index('/* カーネルビルド時')]
     with tempfile.TemporaryDirectory(prefix='memstat-') as directory:
@@ -145,6 +153,31 @@ def run_body(runner, mutate):
                 assert result.returncode == 1 and 'FAIL: ' + label in result.stdout, (
                     name, result.returncode, result.stdout, result.stderr)
                 print('RED:', name)
+            # The same runtime fixture observes product serial and stack/heap diagnostics.
+            variants = [
+                ('exec/owner_diag.h', 'owner_diag.h',
+                 'if (kctx_irq_depth || kctx_exc_depth) return;', '', 'owner context gate'),
+                ('exec/owner_diag.h', 'owner_diag.h',
+                 'a->as->generation, pages, leftover,', 'a->as->generation, leftover, pages,', 'owner wire'),
+                ('kernel/kstack_hw.c', 'kernel/kstack_hw.c',
+                 'while (p < low[index] &&', 'while (p < end &&', 'stack retained after marker reuse'),
+                ('kernel/kstack_hw.c', 'kernel/kstack_hw.c',
+                 'stack_water(SHELL_STACK_BASE, MEM_SHELL_STACK_TOP, 1)', '0U', 'shell stack under 4KiB'),
+                ('exec/exec_heap.c', 'heap_source.c',
+                 'resident_heap_fail++;', '(void)0;', 'resident failure'),
+                ('exec/exec_heap.c', 'heap_source.c',
+                 'resident_heap_peak = exec_heap.used;', 'resident_heap_peak = 0;', 'resident peak'),
+            ]
+            for path, target, old, new, label in variants:
+                original = (ROOT / path).read_text()
+                assert original.count(old) == 1
+                local = tmp / target
+                local.parent.mkdir(parents=True, exist_ok=True)
+                local.write_text(original.replace(old, new))
+                result = execute(source)
+                local.write_text(original)
+                assert result.returncode == 1 and 'FAIL: ' + label in result.stdout, (path, label, result.stdout, result.stderr)
+                print('RED:', label)
 
 
 SHELL_FIXTURE = r'''
@@ -213,6 +246,7 @@ static i32 stat(i32 id, void *out, u32 size) {
     if (scenario == 2) return OS32_ERR_INVAL;
     if (id && (scenario == 1 || id == 3 || id == 5)) return OS32_ERR_NOTFOUND;
     MemStat s = {0}; s.size = sizeof(s); s.app_id = id == -1 ? 2 : id;
+    s.kstack_high_water = 2048U | (12288U << 16);
     s.phys_total_pages = 4096; s.phys_free_pages = 3000;
     s.resident_heap_total = MEM_SHELL_HEAP_SIZE; s.resident_heap_used = 48;
     if (id) {
@@ -360,6 +394,12 @@ def run_shell(runner, mutate):
         output = shell_run(source, runner, app, all_source)
         print('CPL3' if app else 'CPL0')
         print(output.split('SCENARIO 1')[0], end='')
+        for line in (
+            '  diag: kstack=2048 shell_stack=12288 kheap_peak=0 resident_peak=0 resident_fail=0',
+            '  diag: leftover=0 irq_ops=0 exc_ops=0 bad_free=0 fault=0 reclaim=0 stop_park=0',
+            '  diag: lease=0 audit_runs=0 audit_fail=0 selftest_pass=0 selftest_fail=0',
+        ):
+            assert line + '\n' in output, 'fixed diagnostic line: ' + line
     if mutate:
         # Restore the original single call with all 25 variadic arguments.
         joined = source

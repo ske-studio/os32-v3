@@ -18,6 +18,8 @@
 /* ======================================================================== */
 
 #include "kselftest.h"
+#include "kstack_hw.h"
+#include "exec_heap.h"
 #include "serial.h"
 #include "pegc.h"
 #include "gfx_hal.h"
@@ -974,6 +976,9 @@ int kselftest_run_post_exec(void)
 
     check(kselftest_run_audit("post-exec") == 0, "post-exec: lifecycle audit");
     check(lease_selftest() == 0, "post-exec: synthetic AS S/T/U");
+    check(kstack_high_water() < MEM_KSTACK_TOP - MEM_KSTACK_BASE,
+          "kstack bound");
+    check(resident_heap_peak >= exec_heap_used(), "resident peak");
     test_tramp_user_str();
     test_kapi_layout();
     test_memmap();

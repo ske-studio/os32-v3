@@ -53,6 +53,18 @@ static int cmd_mem(int argc, char **argv)
         "  実測: phys pages total=%u free=%u; resident heap total=%u used=%u B\n",
         stat.phys_total_pages, stat.phys_free_pages,
         stat.resident_heap_total, stat.resident_heap_used);
+    if (rc >= (int)sizeof(stat)) {
+        g_api->kprintf(ATTR_WHITE,
+            "  diag: kstack=%u shell_stack=%u kheap_peak=%u resident_peak=%u resident_fail=%u\n",
+            stat.kstack_high_water & 0xffffU, stat.kstack_high_water >> 16, stat.kheap_peak, stat.resident_heap_peak, stat.resident_heap_fail);
+        g_api->kprintf(ATTR_WHITE,
+            "  diag: leftover=%u irq_ops=%u exc_ops=%u bad_free=%u fault=%u reclaim=%u stop_park=%u\n",
+            stat.leftover_pages, stat.ledger_irq_ops, stat.ledger_exc_ops, stat.ledger_bad_free,
+            stat.fault_kill_count, stat.reclaim_count, stat.stop_park_count);
+        g_api->kprintf(ATTR_WHITE,
+            "  diag: lease=%u audit_runs=%u audit_fail=%u selftest_pass=%u selftest_fail=%u\n",
+            stat.lease_active, stat.audit_runs, stat.audit_fail, stat.kselftest_pass, stat.kselftest_fail);
+    }
     g_api->kprintf(ATTR_CYAN, "%s", "Memory Map (ranges: [base,end)):\n");
     g_api->kprintf(ATTR_WHITE, "  定数: %08X-%08X NULL guard; %08X-%08X V86 窓\n",
         0U, (u32)(MEM_NULL_GUARD_END + 1), (u32)MEM_FONT_CACHE_BASE, (u32)MEM_CONV_END);
@@ -113,6 +125,8 @@ static int cmd_mem(int argc, char **argv)
             stat.exec_heap_cur_end, stat.guard_b,
             stat.stack_top - stat.stack_size, stat.stack_top, stat.stack_size,
             stat.exec_heap_base, stat.exec_heap_size);
+        if (rc >= (int)sizeof(stat))
+            g_api->kprintf(ATTR_WHITE, "  owner_pages=%u\n", stat.owner_pages);
     }
     if (!found) g_api->kprintf(ATTR_WHITE, "%s", "  (app なし)\n");
     return 0;

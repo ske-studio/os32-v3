@@ -61,6 +61,12 @@ u32 kmalloc_used(void) { return 128; }
 u32 kmalloc_free(void) { return 8064; }
 u32 exec_heap_total(void) { return MEM_SHELL_HEAP_SIZE; }
 u32 exec_heap_used(void) { return 48; }
+u32 kstack_high_water(void) { return 1024; }
+u32 kmalloc_peak_bytes, resident_heap_peak, resident_heap_fail, exec_as_leftover_pages;
+volatile u32 fault_kill_count, appslot_reclaim_count, ring3_stop_park_count;
+u32 memmap_audit_runs, as_audit_runs, v86_return_audit_runs;
+u32 memmap_audit_fail, as_audit_fail, v86_return_audit_fail;
+int kselftest_pass, kselftest_fail;
 #include "memstat_host_source.c"
 i32 kapi_mem_stat(i32 id, void *out, u32 size) {
     reached++;

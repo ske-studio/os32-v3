@@ -46,6 +46,7 @@ KERNEL_SRCS = [ROOT / "exec/ring3_str.c", ROOT / "kernel/gui.c", ROOT / "fs/fd_r
 
 # 否定側: 実物の 1 行を壊すと RED になることを見る (写しの上で。ソースは触らない)。
 MUTATIONS = [
+    ("kernel/isr_handlers.c", '        sputs(" err="); sput_hex32(error_code);\n', '', "PF error code absent"),
     ("kernel/gui.c", "    if (op == GUI_OP_OWNER_EXIT) return OS32_ERR_INVAL;", "",
      "OWNER_EXIT public forgery allowed"),
     ("exec/ring3_str.c",
@@ -173,7 +174,11 @@ def includes(root):
 
 def run_host(root, tmp, quiet=False):
     exe = tmp / "ring3-guard"
-    p = subprocess.run(["gcc", *FLAGS, "-O0", "-D__KERNEL_BUILD__", *includes(root),
+    isr = (root / "kernel/isr_handlers.c").read_text()
+    a = isr.index('        sputs("\\n[ring3] #PF')
+    b = isr.index('        ring3_fault_kill();', a)
+    (tmp / "pf_diag.inc").write_text(isr[a:b])
+    p = subprocess.run(["gcc", *FLAGS, "-I" + str(tmp), "-O0", "-D__KERNEL_BUILD__", *includes(root),
                         "-nostdlib", "-static", "-no-pie",
                         str(root / "tools/tests/ring3_guard_host.c"), "-o", str(exe)],
                        cwd=root, capture_output=True, text=True)

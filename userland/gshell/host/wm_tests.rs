@@ -3929,3 +3929,43 @@ fn e11_injection_hint_requires_bytes_and_does_not_survive_owner_exit() {
     assert!(!multiapp::key_ready(3), "reused ID has no stale injection hint");
     fullscreen::reset();
 }
+
+#[test]
+fn owner_diagnostics_defer_in_pump_and_print_all_slots() {
+    use crate::{input, mocks, diagnostics};
+    use std::sync::Mutex;
+    static SERIAL: Mutex<Vec<u8>> = Mutex::new(Vec::new());
+    static QUERIES: Mutex<Vec<(i32,u32)>> = Mutex::new(Vec::new());
+    unsafe extern "C" fn serial(s: *const u8) {
+        let mut p = s;
+        while *p != 0 { SERIAL.lock().unwrap().push(*p); p = p.add(1); }
+    }
+    unsafe extern "C" fn stat(id: i32, out: *mut u8, size: u32) -> i32 {
+        QUERIES.lock().unwrap().push((id,size));
+        if id == 4 { return -2; }
+        core::ptr::write_bytes(out, 0, size as usize);
+        for (offset, value) in [(12, 8u32), (76, id as u32 * 100), (196, id as u32 * 10)] {
+            if offset + 4 <= size as usize {
+                core::ptr::copy_nonoverlapping(value.to_le_bytes().as_ptr(),out.add(offset),4);
+            }
+        }
+        size as i32
+    }
+    unsafe extern "C" fn state(id: i32) -> i32 { if id == 4 { 0 } else { 2 } }
+    mocks::init();
+    { let mut api = unsafe { core::ptr::read(os32api::api()) }; api.mem_stat = stat; api.serial_puts = serial; api.exec_app_state = state; os32api::os32_init(Box::into_raw(Box::new(api))); }
+    SERIAL.lock().unwrap().clear(); QUERIES.lock().unwrap().clear();
+    let shm = mocks::Shm::new();
+    let mut st = one_window_state(&shm);
+    // Exact chord is disjoint from SHIFT+f10, GRPH+f4 and CTRL+ESC.
+    assert!(!diagnostics::shortcut(0x6b,1));
+    assert!(!diagnostics::shortcut(0x65,8));
+    assert!(!diagnostics::shortcut(0,16));
+    mocks::push_rawkeys(&[0x6b | 0x100 | (0x18 << 9), 0x6b | (0x18 << 9)]);
+    input::capture(&mut st, input::Ctx::Pump);
+    assert!(SERIAL.lock().unwrap().is_empty());
+    input::capture(&mut st, input::Ctx::Wait);
+    let lines = String::from_utf8(SERIAL.lock().unwrap().clone()).unwrap();
+    assert_eq!(lines, "OS32: slot id=2 state=2 owner_pages=20 exec_heap_used=200 trim_pending=1\r\nOS32: slot id=3 state=2 owner_pages=30 exec_heap_used=300 trim_pending=1\r\nOS32: slot id=4 state=0 owner_pages=0 exec_heap_used=0 trim_pending=0\r\nOS32: slot id=5 state=2 owner_pages=50 exec_heap_used=500 trim_pending=1\r\n");
+    assert_eq!(*QUERIES.lock().unwrap(), vec![(2,132),(2,200),(3,132),(3,200),(4,132),(4,200),(5,132),(5,200)]);
+}

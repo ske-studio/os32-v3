@@ -643,7 +643,28 @@ static void number(u32 n) {
     say(buf, len);
 }
 static u32 serial_lines, exec_as_leftover_pages, detached;
-void serial_puts_polled(const char *s) { (void)s; serial_lines++; }
+static char owner_serial[2048];
+static u32 owner_serial_len;
+void serial_puts_polled(const char *s) {
+    const char *prefix = "OS32: appmem";
+    u32 n = 0;
+    while (prefix[n] && s[n] == prefix[n]) n++;
+    if (!prefix[n]) serial_lines++;
+    while (*s && owner_serial_len + 1 < sizeof(owner_serial)) owner_serial[owner_serial_len++] = *s++;
+    owner_serial[owner_serial_len] = 0;
+}
+static u32 diagnostic_field(const char *key)
+{
+    for (u32 i = 0; i < owner_serial_len; i++) {
+        u32 j = 0, value = 0;
+        while (key[j] && owner_serial[i+j] == key[j]) j++;
+        if (key[j]) continue;
+        const char *p = owner_serial + i + j;
+        while (*p >= '0' && *p <= '9') value = value * 10 + (*p++ - '0');
+        return value;
+    }
+    return ~0U;
+}
 #include "lease_revoke_source.c"
 void shlib_addrspace_detach(struct addrspace *as) { (void)as; detached++; }
 void kfree(void *p) { CHECK("teardown AS control", p == &a); }
@@ -849,9 +870,15 @@ static void teardown_cases(void) {
     CHECK("teardown ARENA map", !appmem_map(&a, &a.appmem, &a.appmem_layout,
           2*PAGE_SIZE, 0, APPMEM_MAP_TOPDOWN, APPMEM_EXEC_ARENA, 0, &out));
     u32 before = exec_as_leftover_pages;
+    u32 before_pages = ledger_owner_pages(owner);
+    owner_serial_len = 0;
     exec_teardown_app(&slot);
     CHECK("teardown R5 no leftover", !slot.as && !slot.cpl3 && !ledger_owner_pages(owner) &&
           exec_as_leftover_pages == before && detached == 1 && !serial_lines);
+    CHECK("owner teardown wire", diagnostic_field(" pages=") == before_pages &&
+          diagnostic_field(" leftover=") == 0 && diagnostic_field(" owner=") == owner &&
+          diagnostic_field(" gen=") == a.generation && diagnostic_field(" irq=") == kctx_irq_depth &&
+          diagnostic_field(" exc=") == kctx_exc_depth);
     CHECK("poison owner", ledger_owner_new(LEDGER_KIND_AS, 0, "poison", &owner));
     make_as(owner); host_cr3 = roots[0];
     slot.as = &a; slot.cpl3 = 1;
@@ -865,7 +892,10 @@ static void teardown_cases(void) {
     CHECK("poison foreign lease", !paging_lease_map(&a, &lm, 1) && ledger_surfaces[0].lease_count == 1);
     u32 pages = ledger_owner_pages(owner), pd = a.pd_phys;
     paging_app_poison(&a);
+    owner_serial_len = 0;
     exec_teardown_app(&slot);
+    CHECK("owner retained wire", diagnostic_field(" pages=") == pages &&
+          diagnostic_field(" leftover=") == pages);
     CHECK("poison lease refs released", !a.leases[0].token && !ledger_surfaces[0].lease_count);
     CHECK("poison quarantined", !slot.as && !slot.cpl3 && a.pd_phys == pd &&
           ledger_owner_pages(owner) == pages && exec_as_leftover_pages == before + pages &&

@@ -36,6 +36,7 @@
 #include "utf8_internal.h"
 #include "system_surface.h"
 #include "kselftest.h"
+#include "kstack_hw.h"
 #include "exec.h"
 #include "pci.h"
 #include "pci_bind.h"   /* PCI の結線表 (票 TASK_HAL_WIRING §1-4) */
@@ -184,6 +185,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * ヒープ・その他の低位の再利用より前でなければ上書きされる。
      * memory_boot_detect も低位 (0594h) を読むだけだが、順序を固定する
      * ためここに置く。以後は写しだけを使う (bootinfo_get / _hdd_geom)。 */
+    kstack_hw_init();
     bootinfo_capture();
 
     /* ローダの 512KB プローブは 16MB 手前までしか見ない (その先は PC-98 の
