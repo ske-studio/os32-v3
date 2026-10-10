@@ -46,6 +46,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | v3 の目的・範囲・目標の 2 段・柱 (P0〜P10) と順序・v3 後半の票 | [tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md) (本案、2026-09-30 昇格) | ROADMAP.md の v3 の行、README.md (目的の一文)。メモリマップの決定の本文は TASK_MEMMAP_V3 (D 番号) |
 | v3 T2d〜T2h の詳細な実装契約・分割・受入 | [T2d〜T2h詳細](tasks/v3/TASK_T2D_T2H.md) (契約・分割・受入条件・未実施の手順だけ。実行記録は [archive/v3/TASK_T2D_T2H_RECORDS.md](archive/v3/TASK_T2D_T2H_RECORDS.md)、変異対応・分類別集計は [T2E_MUTANTS](tasks/v3/T2E_MUTANTS.md)、延期は [DEFERRED_TESTS](tasks/DEFERRED_TESTS.md)。決定はTASK_MEMMAP_V3とTASK_T2_APPBAND、a〜cの実績は後者§5-1) | TASK_T2_APPBAND §5-1は段の要約とリンク |
 | T2g の変異対応・分類別集計 | [T2G_MUTANTS](tasks/v3/T2G_MUTANTS.md) | T2d〜h詳細 §4-3、実行証拠は g5 の報告 |
+| T2h の外部再開ゲート・配備期待集合の扱い | [T2H_EXTERNAL_GATE](tasks/v3/T2H_EXTERNAL_GATE.md) (H-7 の追随 8 項目、KAPI 74 / MemStat 200B 再構築、deploy-set と配備元照合) | 持越しは DEFERRED_TESTS H-7、契約は T2d〜h詳細 §5 |
 | NHD ext2のerrors印の原因調査 | [ext2調査票](archive/v3/TASK_EXT2_ERRORS_INVESTIGATION.md) (受入完了 2026-10-01、再インストールで印を解消・原因の発生時点は未確定。T2h受入前ゲートの照合先) | T2d〜h詳細 §0・§5・§8は順序とリンク |
 | v3 T3以降の実装契約・分割・受入と後半接続 | [T3配置](tasks/v3/TASK_T3_LAYOUT.md)、[T4〜T6bモジュール/起動](tasks/v3/TASK_T4_T6_MODULES.md)、[T7/後半接続](tasks/v3/TASK_T7_AND_FOLLOWUPS.md) (設計中。D決定の本文はTASK_MEMMAP_V3) | V3_PLAN / TASK_MEMMAP_V3 はリンクのみ |
 | 実機 Ra266 の画面ドライバ (内蔵 Trident 1023:9660) の設計・資料・段取り | [tasks/realhw/TASK_TRIDENT_DRIVER.md](tasks/realhw/TASK_TRIDENT_DRIVER.md) (設計中 — 設計票 v5 が Codex 5 回目で Approve、実装は未着手) | [tasks/realhw/PLAN.md](tasks/realhw/PLAN.md) §7、[ROADMAP.md](ROADMAP.md) (1 行) |

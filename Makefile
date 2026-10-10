@@ -73,6 +73,7 @@ DEPFILES := $(shell find boot kernel drivers gfx fs exec kapi lib programs sdk \
 all: boot $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/sqlite.bin $(BUILD_OUT)/vmkernel.lz4 \
      images/os32_boot.d88 images/os32_boot144.img programs sdk assets-deployed iso
 	@python3 tools/gen_generation_manifest.py
+	@python3 tools/gen_deploy_set.py
 
 # === 外部リポジトリ (git submodule) ===
 # apps/ = ske-studio/os32-apps、game/ = ske-studio/os32-game。どちらも SDK だけで

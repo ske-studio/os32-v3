@@ -1,0 +1,19 @@
+check-deploy-set-host:
+- tools/gen_deploy_set.py
+- tools/deploy_source_check.py
+- tools/check_manifests.py
+- tools/deploy_manifests.py
+- tools/check_artifacts.py
+- tools/tests/test_deploy_set.py
+- tools/check_map.d/check-deploy-set-host.yaml
+- build/checks.d/check-deploy-set-host.mk
+- build/core.yaml
+- userland/deploy.yaml
+- CLAUDE.md
+- apps
+- game
+- assets/filetypes
+- build/app.conf
+- build/packages.yaml
+- build/programs.mk
+- docs/07_shell.md

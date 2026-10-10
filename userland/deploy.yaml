@@ -207,6 +207,9 @@ filesystem:
       guest: /usr/bin/
       tags: [test]
     # --- hello_r3 (M2 KAPI トランポリン検証, ソース無変更 hello の CPL=3 版) ---
+    - host: userland/tests/hello.bin
+      guest: /usr/bin/
+      tags: [test]
     - host: userland/tests/hello_r3.bin
       guest: /usr/bin/
       tags: [test]
@@ -288,6 +291,9 @@ filesystem:
       tags: [test]
     - host: userland/tests/e2test.bin
       guest: /sbin/
+      tags: [test]
+    - host: userland/tests/e2seek.bin
+      guest: /usr/bin/
       tags: [test]
     - host: userland/tests/sqlite_standalone/sqlite_standalone.bin
       guest: /usr/bin/sqlite_standalone.bin

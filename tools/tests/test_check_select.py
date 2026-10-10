@@ -7,7 +7,7 @@
     CLAUDE.md → check-manifests) が docs だけの変更でも回る
   * docs だけの変更では文書を読む検査 (docs_always:) を常に回す
   * 走査型 (broad:) の `**` glob にしか当たらない変更は安全側 (全部変異込み)
-  * サブモジュールの bump は check-manifests / check-packages-host だけ変異込み
+  * サブモジュールの bump は manifest / package / deploy-set の検査を変異込み
   * feat/gui の上でコミットした後は HEAD~1 を基点にする (merge-base == HEAD で
     「変更なし」に退化しない)
   * 実物の対応表に漏れが無い (--lint = 0)
@@ -176,7 +176,7 @@ def case_broad_only(cs):
 def case_submodule(cs):
     mode, st, mu = run_plan(cs, ["apps", "game"])
     assert mode == "sel", mode
-    assert mu == {"check-manifests", "check-packages-host"}, mu
+    assert mu == {"check-manifests", "check-packages-host", "check-deploy-set-host"}, mu
 
 
 def case_nothing(cs):
