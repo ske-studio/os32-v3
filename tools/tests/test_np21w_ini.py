@@ -102,7 +102,7 @@ class Derivation(unittest.TestCase):
         self.assertEqual(set(self.root.iterdir()), before)
 
     def test_invalid_operations_fields_and_names_fail_without_output(self):
-        for op in ('unknown', 'netsock=x\nprivate=oops', 'netsock=x;comment',
+        for op in ('unknown', 'netsock=', 'netsock=x\nprivate=oops', 'netsock=x;comment',
                    'netsock=x#comment', 'e_resume=true', 'hdd=../bad.nhd',
                    'hdd=missing.nhd'):
             self.assertNotEqual(self.cli('bad.ini', op)[0], 0)

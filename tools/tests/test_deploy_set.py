@@ -92,6 +92,9 @@ class DeploySet(unittest.TestCase):
         self.assertEqual(result["generation_build_id"], GENERATION["build_id"])
         self.assertEqual(result["allow_list"], [
             {"guest": "/etc/settings.db", "check": "exists"},
+            {"guest": "/etc/settings.db-journal", "check": "exists"},
+            {"guest": "/etc/settings.db.new", "check": "exists"},
+            {"guest": "/etc/settings.db.new-journal", "check": "exists"},
             {"guest": "/etc/system.cfg", "check": "exists"},
             {"guest": "/var/log/*", "check": "exists"}])
         for entry in result["files"]:

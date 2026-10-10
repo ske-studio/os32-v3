@@ -140,8 +140,9 @@ def cases(exe, runner):
 
 
 def extract(source, signature):
-    require(source.count(signature) == 1, 'unique extraction '+signature)
+    require(source.count(signature) == 1, '抽出マーカー更新が必要: '+signature)
     body = source[source.index(signature):]
+    require('\n}' in body, '抽出マーカー更新が必要: '+signature+' end')
     return body[:body.index('\n}')+3]+'\n'
 
 
@@ -149,8 +150,12 @@ def preentry(tmp, headers, runner):
     # Use the real exec physical-budget rejection block and real admission
     # predicate. Entry/file I/O are host boundaries; no guest fault simulated.
     source = (ROOT / 'exec/exec.c').read_text()
-    gate = source[source.index('    need_pages = 0;\n    if (want_ring3) {'):]
-    gate = gate[:gate.index('    /* ======== 起動元のヒープ')]
+    start = '    need_pages = 0;\n    if (want_ring3) {'
+    end = '    /* ======== 起動元のヒープ'
+    require(start in source and end in source[source.find(start):],
+            'exec.c: 抽出マーカー更新が必要')
+    gate = source[source.index(start):]
+    gate = gate[:gate.index(end)]
     funcs = ''.join(extract(source, s) for s in
                     ('static u32 exec_ring3_extra_pages(', 'static u32 exec_ring3_pages('))
     funcs += extract((ROOT / 'exec/appslot.c').read_text(), 'int appslot_start_admit(')

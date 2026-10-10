@@ -93,7 +93,14 @@ def builds(tmp):
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dest)
     # Reuse only the Rust archive; the C/ASM objects are built in the copy.
-    archive = Path('lib/os32_lz4/target/i686-os32-none/release/libos32_lz4.a')
+    if 'RUST_LZ4_LIB' in os.environ:
+        archive = Path(os.environ['RUST_LZ4_LIB'])
+    else:
+        result = subprocess.run(
+            ['make', '--no-print-directory', '-s', '--eval',
+             'print-r1-lz4:;@echo $(RUST_LZ4_LIB)', 'print-r1-lz4'],
+            cwd=ROOT, capture_output=True, text=True, check=True)
+        archive = Path(result.stdout.strip())
     (root / archive).parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(ROOT / archive, root / archive)
     env = dict(os.environ, SOURCE_DATE_EPOCH='1700000000')

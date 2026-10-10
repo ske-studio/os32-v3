@@ -25,6 +25,7 @@ check-h3b-fixtures-host:
 - tools/gen_v86_int80.py
 - tools/hostdrv_deploy.py
 - tools/nhd_deploy.py
+- tools/nhd_profile.py
 - tools/pc98pt.py
 - tools/check_map.d/check-h3b-fixtures-host.yaml
 - tools/tests/gfx_kernel_fb_host.c

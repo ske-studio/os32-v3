@@ -227,10 +227,11 @@ filesystem:
     - host: userland/tests/pegcchk.bin
       guest: /usr/bin/
       tags: [test]
-    # --- hello_r3 (M2 KAPI トランポリン検証, ソース無変更 hello の CPL=3 版) ---
+    # --- hello (KAPI 最小テスト、[V2] で登録 2026-10-10) ---
     - host: userland/tests/hello.bin
       guest: /usr/bin/
       tags: [test]
+    # --- hello_r3 (M2 KAPI トランポリン検証, ソース無変更 hello の CPL=3 版) ---
     - host: userland/tests/hello_r3.bin
       guest: /usr/bin/
       tags: [test]

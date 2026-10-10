@@ -215,6 +215,8 @@ Makefile ターゲットとの対応 (`build/deploy.mk`)。**このリポジト�
 | `make nhd-init` | 初回セットアップ — **フォーマットするのでゲスト側データが消える** |
 | `make nhd-mount` / `make nhd-umount` | 作業イメージの手動マウント・アンマウント |
 
+配備元が欠けると `make all` が `deploy-set.json` の生成で止まる。
+
 ビルド側のターゲットは `make all` / `kernel` / `libs` / `programs` / `sdk` /
 `apps` / `game` / `clean` / `clean-kernel` / `clean-libs` / `clean-programs`。
 KernelAPI の構造体を変えたときは `make clean` → `make all` が必須
@@ -238,6 +240,7 @@ KernelAPI の構造体を変えたときは `make clean` → `make all` が必�
 (5a)、0 = PARKED を resume commit 前に毒化 (5b)、6 = CLIENT lease attach の
 公開前に一度だけ FULL を返す。0 / 5 / 6 は同じ添字の `r1_fixture_id` と
 `r1_fixture_generation` に対象 app ID と AS 世代を先に書き、最後に arm を publish する。
+`r1_fixture_generation` に書く世代は `OS32: owner-start` 行の `gen=`、番地は `build/out/r1/kernel.map`。
 ID・世代不一致では arm を消費しない。0 は PARKED + `parked_from_wait`、5 は生存中の
 RUNNING 親に限る。3 は USER syscall 中の開いた session に限り、終了中には発火しない。
 host 試験は移譲後の通常文脈での解放・次起動、親の syscall 出口 kill、PARKED の abort 保持と

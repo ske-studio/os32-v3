@@ -100,12 +100,15 @@ class ProfileTests(unittest.TestCase):
         cfg = {'filesystem': {'files': entries, 'directories': []}}
         self.patches.enter_context(patch.object(nd, 'load_deploy_yaml', lambda: cfg))
         (self.mount / 'etc').mkdir(exist_ok=True)
-        for name in ('settings.db', 'system.cfg'):
+        for name in ('settings.db', 'settings.db-journal', 'settings.db.new',
+                     'settings.db.new-journal', 'system.cfg'):
             (self.mount / 'etc' / name).write_text('guest setting')
         data = {'format': 1, 'generation_build_id': 'L-h-test', 'kernel_commit': 'test',
                 'kapi_version': 74, 'generations': {}, 'files': expected,
                 'allow_list': [{'guest': p, 'check': 'exists'} for p in
-                               ('/etc/settings.db', '/etc/system.cfg', '/var/log/*')]}
+                               ('/etc/settings.db', '/etc/settings.db-journal',
+                                '/etc/settings.db.new', '/etc/settings.db.new-journal',
+                                '/etc/system.cfg', '/var/log/*')]}
         self.set_file = self.root / 'deploy-set.json'
         self.set_file.write_text(json.dumps(data))
         return data
@@ -213,6 +216,10 @@ class ProfileTests(unittest.TestCase):
         self.assertTrue(nd.do_sync())
         journal = self.mount / 'etc/settings.db-journal'
         journal.write_text('guest journal')
+        self.assertTrue(nd.do_verify_set(str(self.set_file)))
+        data['allow_list'] = [item for item in data['allow_list']
+                              if item['guest'] != '/etc/settings.db-journal']
+        self.set_file.write_text(json.dumps(data))
         self.assertFalse(nd.do_verify_set(str(self.set_file)))
         data['allow_list'].append({'guest': '/etc/settings.db-journal', 'check': 'exists'})
         self.set_file.write_text(json.dumps(data))
@@ -225,8 +232,9 @@ class ProfileTests(unittest.TestCase):
         data['allow_list'] = []
         self.set_file.write_text(json.dumps(data))
         self.assertFalse(nd.do_verify_set(str(self.set_file)))
-        for name in ('settings.db', 'system.cfg'):
-            (self.mount / 'etc' / name).unlink()
+        for name in ('settings.db', 'settings.db-journal', 'settings.db.new',
+                     'settings.db.new-journal', 'system.cfg'):
+            (self.mount / 'etc' / name).unlink(missing_ok=True)
         self.assertTrue(nd.do_verify_set(str(self.set_file)))
 
     def test_allow_list_glob_is_one_level(self):

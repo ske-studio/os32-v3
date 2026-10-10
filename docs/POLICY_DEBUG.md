@@ -769,6 +769,8 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
 
 ### NP21/W の停止・起動 (`tools/np21w_ctl.py`)
 
+例外は [SKILL os32-emu-config §2](../.claude/skills/os32-emu-config/SKILL.md#2-構成切替の-3-経路--開始停止復帰) (trial と live-apply は道具自身が止める)。
+
 NP21/W の停止と起動はこの道具で行う。`taskkill` や `Start-Process` を手で打たない —
 落とした直後に起動すると媒体がまだロックされていて、起動が途中で止まる (§4-60)。
 停止はエミュレータ自身に頼む (ai-debug フォークの `/api/instance` → `/api/quit`、

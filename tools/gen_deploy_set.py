@@ -11,6 +11,9 @@ from deploy_manifests import CORE_MANIFEST_RELPATHS, load_merged, resolve_entry
 ROOT = Path(__file__).resolve().parents[1]
 ALLOW_LIST = [
     {"guest": "/etc/settings.db", "check": "exists"},
+    {"guest": "/etc/settings.db-journal", "check": "exists"},
+    {"guest": "/etc/settings.db.new", "check": "exists"},
+    {"guest": "/etc/settings.db.new-journal", "check": "exists"},
     {"guest": "/etc/system.cfg", "check": "exists"},
     {"guest": "/var/log/*", "check": "exists"},
 ]

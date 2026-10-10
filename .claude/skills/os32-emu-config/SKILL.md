@@ -60,7 +60,7 @@ NP21/W の `initsave` は `s_IniItems[]` 表を丸ごと書くので、このエ
 | `pegc-on` / `pegc-off` | `USEPEGCP` のみ | `win9x/ini.cpp:687` が `np2cfg.usepegcplane` に束縛し、`io/pegc.c:375` が `pegc.enable` に写す。`mem/memvga.c` が PEGC の VRAM 経路ごとに見る |
 | `ram-8mb` / `ram-64mb` | `ExMemory` のみ (7 / 65) | `win9x/ini.cpp:477`、MB 単位。64MB は 16MB システム空間の穴を含め 65 を指定。**8MB は CUI の最低動作環境**で、GUI の最低要件ではない |
 | `ram-9mb` / `ram-15mb` / `ram-32mb` / `ram-128mb` (live の既存操作) | `ExMemory` のみ (8 / 16 / 33 / 129) | 既存構成を維持。派生 ini の操作列には含めない |
-| `snd118-on` / `snd118-off` | `SNDboard=64` / 原本の値 | `win9x/ini.cpp:523` の `%x`。派生 ini の off はコピー元の値を保持。live の off は on の receipt 必須で、`restore` と同じ復元経路 |
+| `snd118-on` / `snd118-off` | `SNDboard=64` / 原本の値 | `win9x/ini.cpp:523` の `%x`。派生 ini の off はコピー元の値を保持。live の off は on の receipt 必須で、`restore` と同じ復元経路。`SNDboard=64` は PC-9801-86 + Mate-X PCM (B460、CS4231) で、118 単体の 0x08 ではない (np21w `src/pccore.h:50,57`)。 |
 | `netsock=<spec>` (派生 ini) | `NP2NETSOCK` の値だけ | `win9x/ini.cpp:627`。鍵があれば置換、同値は保持、欠落は拒否。接続や鍵の追加はしない |
 | `e_resume=false` (派生 ini) | `e_resume` の値だけ | cold start。欠落・重複・未知値は拒否 |
 | `hdd=<name>` (派生 ini) | `HDD1FILE` の値だけ | `NP21W_DIR` 直下の既存通常ファイル `*.nhd` の名前から Windows 絶対パスへ解決 |

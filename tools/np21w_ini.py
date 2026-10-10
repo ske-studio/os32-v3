@@ -406,7 +406,10 @@ def derive(snapshot, name, operations):
             transform(original, {'SNDBOARD': '64'})  # validate, retain original
             changes.pop('SNDBOARD', None)
         elif operation.startswith('netsock='):
-            changes['NP2NETSOCK'] = operation.partition('=')[2]
+            spec = operation.partition('=')[2]
+            if not spec:
+                raise IniError('nonempty netsock spec required')
+            changes['NP2NETSOCK'] = spec
         elif operation.startswith('hdd='):
             changes['HDD1FILE'] = resolve_image(operation.partition('=')[2], '.nhd')[1]
         else:
@@ -533,7 +536,10 @@ def main(argv=None):
         print('error: ' + str(exc), file=sys.stderr)
         return 2
     except OSError:
-        print('error: offline file operation failed; retain any backup', file=sys.stderr)
+        message = ('derived ini may already be written; check NP21W_DIR'
+                   if args.command == 'derive' else
+                   'offline file operation failed; retain any backup')
+        print('error: ' + message, file=sys.stderr)
         return 2
 
 
