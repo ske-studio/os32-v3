@@ -399,7 +399,7 @@ def ensure_dir(guest_dir):
 
 def load_deploy_yaml():
     """層ごとの配備定義をマージして返す (tools/deploy_manifests.py に委譲)"""
-    return _load_merged()
+    return _load_merged(include_host_only=True)
 
 
 def resolve_files_from_entry(entry):

@@ -4,8 +4,14 @@
 #include "os32api.h"
 #include <limits.h>
 #include <string.h>
+#include <stdlib.h>
 
 #define AUDIT_MML_NOTES 1024
+#define AUDIT_SENTINEL_CODE 0x5A5A
+#define AUDIT_SENTINEL_ATTR 0xA5
+#define AUDIT_GUARD 0x19573246UL
+#define AUDIT_JIS 0x2422
+#define AUDIT_REVERSE_BIT 0x04
 
 int main(int argc, char **argv, KernelAPI *api)
 {
@@ -15,8 +21,63 @@ int main(int argc, char **argv, KernelAPI *api)
 
     if (argc != 2) {
         api->kprintf(ATTR_RED,
-                     "usage: audit_test cursor|fmch|mml|serial|ime|rshell\n");
+                     "usage: audit_test tvram|cursor|fmch|mml|serial|ime|rshell\n");
         return 1;
+    }
+    if (strcmp(argv[1], "tvram") == 0) {
+        struct cell { u16 code; u8 attr; };
+        struct audit_sentinel { u32 before; u16 code; u8 attr; u32 after; } sentinel;
+        struct cell *saved;
+        int w = 0, h = 0, fails = 0, x, y;
+        api->console_get_size(&w, &h);
+        if (w < 2 || h < 1 || w > INT_MAX / h ||
+            (u32)(w * h) > (u32)-1 / sizeof(*saved)) return 1;
+        saved = malloc((u32)(w * h) * sizeof(*saved));
+        if (!saved) return 1;
+        for (y = 0; y < h; y++) for (x = 0; x < w; x++)
+            api->tvram_readchar_at(x, y, &saved[y * w + x].code,
+                                  &saved[y * w + x].attr);
+        /* Independent axes, both axes, and overflow-sized coordinates.
+         * No diagnostics until all cells have been compared. */
+        for (i = 0; i < 10; i++) {
+            u16 code;
+            u8 attr;
+            x = i < 4 ? (i == 0 ? -1 : i == 1 ? w : i == 2 ? INT_MIN : INT_MAX) : 0;
+            y = i >= 4 && i < 8 ? (i == 4 ? -1 : i == 5 ? h : i == 6 ? INT_MIN : INT_MAX) : 0;
+            if (i >= 8) { x = i == 8 ? -1 : INT_MAX; y = x; }
+            sentinel.before = sentinel.after = AUDIT_GUARD;
+            sentinel.code = AUDIT_SENTINEL_CODE;
+            sentinel.attr = AUDIT_SENTINEL_ATTR;
+            api->tvram_putchar_at(x, y, 'X', ATTR_RED);
+            api->tvram_putkanji_at(x, y, AUDIT_JIS, ATTR_RED);
+            api->tvram_readchar_at(x, y, &sentinel.code, &sentinel.attr);
+            if (api->tvram_reverse_cell(x, y) != 0 ||
+                sentinel.code != AUDIT_SENTINEL_CODE || sentinel.attr != AUDIT_SENTINEL_ATTR ||
+                sentinel.before != AUDIT_GUARD || sentinel.after != AUDIT_GUARD) fails++;
+            for (y = 0; y < h; y++) for (x = 0; x < w; x++) {
+                api->tvram_readchar_at(x, y, &code, &attr);
+                if (code != saved[y * w + x].code || attr != saved[y * w + x].attr) fails++;
+            }
+        }
+        /* A two-cell kanji cannot start at the final column. */
+        api->tvram_putkanji_at(w - 1, h - 1, AUDIT_JIS, ATTR_RED);
+        u16 code;
+        u8 attr;
+        api->tvram_readchar_at(w - 1, h - 1, &code, &attr);
+        if (code != saved[w * h - 1].code || attr != saved[w * h - 1].attr) fails++;
+        api->tvram_readchar_at(w - 2, h - 1, &code, &attr);
+        if (code != saved[w * h - 2].code || attr != saved[w * h - 2].attr) fails++;
+        /* The next valid operation must still work, including reverse. */
+        api->tvram_putchar_at(w - 1, h - 1, 'Q', ATTR_WHITE);
+        api->tvram_readchar_at(w - 1, h - 1, &code, &attr);
+        if (code != 'Q' || attr != ATTR_WHITE ||
+            api->tvram_reverse_cell(w - 1, h - 1) != 1) fails++;
+        api->tvram_readchar_at(w - 1, h - 1, &code, &attr);
+        if (code != 'Q' || attr != (ATTR_WHITE ^ AUDIT_REVERSE_BIT)) fails++;
+        free(saved);
+        api->kprintf(fails ? ATTR_RED : ATTR_GREEN,
+                     "audit_test: tvram %s (%d failures)\n", fails ? "FAIL" : "PASS", fails);
+        return fails ? 1 : 0;
     }
     if (strcmp(argv[1], "cursor") == 0) {
         int w = 0, h = 0, fails = 0;

@@ -34,7 +34,7 @@ DEPLOY_MANIFESTS = [os.path.join(PROJ_DIR, p) for p in MANIFEST_RELPATHS]
 CORE_MANIFEST_RELPATHS = MANIFEST_RELPATHS[:2]
 
 
-def load_merged(relpaths=None):
+def load_merged(relpaths=None, include_host_only=False):
     """層ごとの配備定義をマージして返す。1 つも無ければ None。
 
     boot: と filesystem.directories: はカーネル層 (build/core.yaml) が持つ。
@@ -56,6 +56,9 @@ def load_merged(relpaths=None):
         merged['filesystem']['directories'].extend(fs.get('directories') or [])
         rel = os.path.relpath(path, PROJ_DIR)
         for e in fs.get('files') or []:
+            # Boot probes are exposed under /host/test only, never installed.
+            if e.get('host_only') and not include_host_only:
+                continue
             e = dict(e)
             e['_manifest'] = rel    # どの層の行か (検査の報告用)
             merged['filesystem']['files'].append(e)
@@ -69,6 +72,15 @@ def load_merged(relpaths=None):
 def is_glob_entry(entry):
     """files: の 1 行が glob か (type: glob、または host に * を含む)"""
     return entry.get('type') == 'glob' or '*' in entry['host']
+
+
+def host_only_paths():
+    """Guest paths excluded even when copying the already populated HostDrv."""
+    merged = load_merged(include_host_only=True)
+    if merged is None:
+        raise RuntimeError('deployment manifests unavailable')
+    return {guest for entry in merged['filesystem']['files'] if entry.get('host_only')
+            for _host, guest in resolve_entry(entry)}
 
 
 def resolve_entry(entry, proj_dir=PROJ_DIR):

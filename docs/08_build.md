@@ -411,6 +411,7 @@ NP21/W の停止が要る ([D1])。停止できるならこちらで一式を入
   (カーネルと `/sys` は不可)。
 - 配備マニフェストは所有層ごとに分かれている (`build/core.yaml`、`userland/deploy.yaml`、
   `apps/deploy.yaml`、`game/deploy.yaml`)。統合は `tools/deploy_manifests.py`。
+  `host_only: true` の fixture (`/test/int80.img`、`v86 -b` 用) は HostDrv 同期だけに含め、NHD 同期と CD パッケージには含めない。
   マニフェストに無いバイナリは配備先で stale 化するので、`make deploy*` が
   `tools/prune_stale.py` で刈る (`NO_PRUNE=1` で一覧のみ)。
 - **配備元には世代の名札が付く** (票 H4)。`make deploy` は全件成功の後にだけ
