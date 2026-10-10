@@ -175,6 +175,16 @@ filesystem:
     - host: userland/tests/h2_stack512.bin
       guest: /usr/bin/
       tags: [test]
+    # T2h 8MB shapes: CUI keyboard launch, free0 argv, P1/continue stdin.
+    - host: userland/tests/h5_shape_i.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/h5_shape_ii.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/h5_shape_iii.bin
+      guest: /usr/bin/
+      tags: [test]
     - host: userland/tests/mem_stat_test.bin
       guest: /usr/bin/
       tags: [test]
