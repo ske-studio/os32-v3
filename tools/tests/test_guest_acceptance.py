@@ -36,6 +36,61 @@ class AcceptanceTests(unittest.TestCase):
         self.assertEqual(ga.validate(self.cases), self.cases)
         self.assertIn('| id |', ga.render(self.cases))
 
+    def test_h_round_expected_sets(self):
+        # T2H_DESIGN r5 §3/§6: keep every manual session in the index.
+        rounds = {
+            'R0': {'install', 'lzss', 'winoptin'},
+            'R1a': {'matrix', 'h2', 'guard', 'f6', 'shellheap', 'e10', 'e11', 'regress'},
+            'R1b': {'h3', 'stop', 'identity', 'fullscreen', 'tvdump', 'perf', 'bud', 'shutdown'},
+            'R1c1': {'sync', 'r1-kernel', 'r1-stop', 'r1-recover', 'restore'},
+            'R1c2': {'oldshell', 'restore-shell', 'oldshlib', 'restore-shlib',
+                     'rehearsal', 'verify-stale'},
+            'R1d': {'planar', 'cirrus-off'},
+            'R3': {'cirrus'},
+            'R4': {'8mb-planar', 'guard-d', 'shapes', 'g'},
+            'R5': {'8mb-pegc'},
+            'R6': {'64mb', 'pcm'},
+            'R7': {'baseline', 'update', 'recover'},
+            'R7a': {'cui'},
+            'R7b': {'gui'},
+        }
+        expected = {'h-' + session + '-' + suffix
+                    for session, suffixes in rounds.items() for suffix in suffixes}
+        actual = {c['id'] for c in self.cases if c['id'].startswith('h-')}
+        self.assertEqual(actual, expected)
+        for case in self.cases:
+            if case['id'] in expected:
+                with self.subTest(case=case['id']):
+                    self.assertEqual(case['gate'], 'T2h')
+                    self.assertEqual(case['mode'], 'manual')
+                    self.assertIn('gfxmode', case['prereq'])
+                    self.assertIn('hal_test', case['prereq'])
+
+    def test_h_expectation_values(self):
+        def check_values(value):
+            if isinstance(value, dict):
+                self.assertTrue(value)
+                for item in value.values():
+                    check_values(item)
+            else:
+                self.assertIn(type(value), (int, float, str))
+                if isinstance(value, str):
+                    self.assertTrue(value.strip())
+        for case in self.cases:
+            if case['id'].startswith('h-'):
+                with self.subTest(case=case['id']):
+                    check_values(case['expect'])
+
+    def test_r4_stop_trial_expected_values(self):
+        case = next(c for c in self.cases if c['id'] == 'g-R-4')
+        self.assertNotIn('stop_park_delta', case['expect'])
+        self.assertEqual(case['expect']['trials'], {
+            'hook_in_progress': {'stop_park_delta': 1},
+            'immediately_after_done': {'stop_park_delta': 0},
+        })
+        self.assertEqual(case['expect']['reclaim_delta'], 1)
+        self.assertEqual(case['expect']['owner_pages'], 0)
+
     def test_e_rejects_legacy_bb(self):
         for name in ('e9-E', 'e10b-regression-E'):
             case = next(c for c in self.cases if c['id'] == name)

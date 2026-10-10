@@ -1565,12 +1565,1113 @@
   - '最新 gshell ELF: gshell_trim_delivered, gshell_trim_skipped_full, trim::SENT; MemStat 132B の trim_pending_mask
     と各 slot の trim_pending/trim_epoch'
   - fixture 出力と終了行、区間前後のカウンタ差分。配備 binary のサイズ/SHA256 を照合
+  # X-21(b): exec/appslot.c:521。各試行で同じ宛先確認と回収の照合を行う。
   expect:
     reclaim_delta: 1
     owner_pages: 0
-    stop_park_delta: 1
+    trials:
+      hook_in_progress:
+        stop_park_delta: 1
+      immediately_after_done:
+        stop_park_delta: 0
     slot: trim_pending=0、trim_epoch=0
     mask: 当該 bit=0
     wm: 生存、trim::SENT の該当要素=0
     ledger: bad_free/retire_refused/claim_refused の増分0
   evidence: ~/os32-tmp/evidence/<日付>/g-R-4/
+
+# T2h: PM guest playbooks, design r5 §3/§6. Host checks validate the index only.
+# L-h artifacts and h2/h3b/h4 fixtures land before these manual cases run.
+- id: h-R0-install
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R0: 現 ini の USEGD5430 / USEPEGCP / ExMemory / NP2NETSOCK の有無・値と元の GFX= を保存。新 NHD・ISO/FD の写しは [D2] 1 回、後続へ流用しない。Full
+    install 後に gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC を開始条件にする。'
+  entry: np21w_trial.py --hdd os32_t2h_install.nhd; 新ビルド FD 起動; cd <iso>; Full install; HDD 起動; ver
+  observe:
+  - trial は稼働 PID/生成時刻に束縛し自身が通常終了する。PM は先に stop しない。媒体写しと新 NHD の承認はこの回だけ。PRIO-1。X-3 は e1/f1a の過去 GitHub Actions run を対象 SHA・実行日時・結論と照合し、今の成功で過去を合格にしない。
+  - Full の終了値と PKG コピー結果、HDD ver の commit/API/Image CRC、ext2 異常印、S-1 のオプション構成を保存。trial 後は np21w_ctl.py start で原本へ復帰。
+  expect:
+    install_exit: 0
+    hdd_boot: ver 一致
+    ext2_error_mark: 0
+    packages: PKG 集合・内容一致
+    x3: 過去 run の対象 SHA・実行日時・結論を保存
+  evidence: ~/os32-tmp/evidence/<日付>/h-R0-install/
+- id: h-R0-lzss
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R0: 現 ini の USEGD5430 / USEPEGCP / ExMemory / NP2NETSOCK の有無・値と元の GFX= を保存。新 NHD・ISO/FD の写しは [D2] 1 回、後続へ流用しない。Full
+    install 後に gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC を開始条件にする。'
+  entry: Full install の LZSS-1 / X-16・X-17 を観測
+  observe:
+  - 'LZSS-1: 修正した圧縮器の種250の2ファイルを PKG にし cdinst で入れて存在・size・hash を元データと照合する。X-16・X-17 の PKG 展開/名札照合結果も保存。'
+  expect:
+    seed: 250
+    files: 2
+    package_mismatch: 0
+    install_exit: 0
+  evidence: ~/os32-tmp/evidence/<日付>/h-R0-lzss/
+- id: h-R0-winoptin
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R0: 現 ini の USEGD5430 / USEPEGCP / ExMemory / NP2NETSOCK の有無・値と元の GFX= を保存。新 NHD・ISO/FD の写しは [D2] 1 回、後続へ流用しない。Full
+    install 後に gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC を開始条件にする。'
+  entry: Windows opt-in 9 件の対照
+  observe:
+  - S-1 の既存 Windows opt-in 9 件をそれぞれ実施し、オプトインの有無、対象、結果の証拠を 9 件保存する。
+  expect:
+    cases: 9
+    result: PASS
+  evidence: ~/os32-tmp/evidence/<日付>/h-R0-winoptin/
+- id: h-R1a-matrix
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode
+    pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。'
+  entry: 台本 M; H-6a; PRIO-3 audit_test; S-2/S-5/S-6/S-7; E11-BUD CUI
+  observe:
+  - '台本 M: boot fail 0 → 指定 gfxmode / 読み戻し / reset / hal_test → CUI/GUI/FEP → 高位 HostDrv read/write → 親子 → lease 切替 → map
+    枯渇 → trim → fault/STOP → 次起動 → V86 往復。各操作前後に mem と owner-start/exit、PTE を採り audit_runs 増分 >=1 / audit_fail 増分0、通常回収の owner/leftover
+    0、IRQ/例外 ledger 操作増分0。終了時は ini と保存した元の GFX= を戻す。'
+  - '観測対応: ver / L-h manifest / hal_test で SHA・hash・size・RAM・backend、mem で kselftest / audit_runs・fail / phys_free_pages /
+    lease_active / leftover_pages / ledger ops / KHEAP・kstack high-water。CUI は mem <id> の owner_pages、GUI は gshell 診断キー CTRL+GRPH+f･10
+    の全 slot 行 (id/state/owner_pages/exec_heap_used/trim_pending)。owner-start/exit で owner・gen・pages/leftover・irq/exc の実測値、fault
+    行の err= と終了種別。NP21/W の PTE は pt0_snapshot.py、freeze の深さは emu_read_mem、画面は emu_screenshot。'
+  - v86 -d / -b 後の 6Ah と画面復帰を採る (H-6a、9801 実機分 H-6b は引渡し)。PRIO-3 audit_test cursor/fmch/mml/serial/ime/rshell の write リンクと対象番兵不変。
+  - S-5 e2test の 372KB×2 buffer を実測、確保不能なら根拠・未実施・引渡し先を記録。S-6 は NP2NETSOCK 鍵ありなら R1c の隔離媒体で netsock=<spec> の派生 ini にし host_agent
+    と host_test、鍵なしは未実施として network へ渡す。FAIL を延期へ変えない。
+  - S-2 は /etc/profile を用意して kout_test の該当1件を再実行。S-7 は blit_test / bench_scale2x Test 3 の packed/PEGC 適用外を SKIP と他計測継続で確認し、planar
+    試験を PASS に数えない。E11-BUD は boot/CUI 負荷の kheap_peak を mem で採り 180224B と照合。
+  expect:
+    kselftest_fail: 0
+    audit_fail: 0
+    audit_runs_delta_min: 1
+    leftover_pages: 0
+    ledger_irq_ops_delta: 0
+    ledger_exc_ops_delta: 0
+    backend: PEGC
+    ram_mb: 17
+    prio3: 番兵不変・PASS
+    kheap_total_bytes: 180224
+    s5_s6: 実施結果、または観測不能の根拠と未実施・引渡し先を記録
+    s2: profile 配備後 PASS
+    s7: packed 適用外 SKIP・他計測継続
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1a-matrix/
+- id: h-R1a-h2
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode
+    pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。'
+  entry: h2_stack; h2_stack512; h2_stack512 guard; h2-isolated の正常 app と拒否 fixture
+  observe:
+  - h2_stack の既定256KiB と明示512KiB を実行。512KiB は256KiB超の自動配列を全 page pattern で触り argv・park/resume・終了後 owner0 を採る。guard は実 stack
+    bottom - 1 page、PTE NP と err=6、kill +1。
+  - make h2-fixtures の manifest と各 .fixture の hash を確認。control-app の entry +1、old-app / unknown-format / bad-abi-generation
+    / bad-memory-generation / old-cpl0-flag / prev-memory-generation-app は HostDrv から起動して entry +0 / 拒否 +1。旧 shell/shlib の初回拒否は
+    R1c-2。新 SDK+旧.o は link/包装拒否の host 証拠と分ける。
+  - '観測対応: ver / L-h manifest / hal_test で SHA・hash・size・RAM・backend、mem で kselftest / audit_runs・fail / phys_free_pages /
+    lease_active / leftover_pages / ledger ops / KHEAP・kstack high-water。CUI は mem <id> の owner_pages、GUI は gshell 診断キー CTRL+GRPH+f･10
+    の全 slot 行 (id/state/owner_pages/exec_heap_used/trim_pending)。owner-start/exit で owner・gen・pages/leftover・irq/exc の実測値、fault
+    行の err= と終了種別。NP21/W の PTE は pt0_snapshot.py、freeze の深さは emu_read_mem、画面は emu_screenshot。'
+  expect:
+    default_stack_bytes: 262144
+    explicit_stack_bytes: 524288
+    stack_result: PASS
+    control_entry_delta: 1
+    rejected_entry_delta: 0
+    reject_delta_per_fixture: 1
+    guard_pf_error: 6
+    guard_kill_delta: 1
+    owner_pages_after: 0
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1a-h2/
+- id: h-R1a-guard
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode
+    pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。'
+  entry: ring3_guard; ring3_guard shlib; ring3_guard bb; ring3_guard lease; ring3_guard free
+  observe:
+  - A は ring3_guard 自身の256KiB stack 底直下 PTE NP → err=6。B は boot の shlib 読込み行と対象 AS の P/U/RO を先に確認 → err=7、未ロード NP の kill は代用しない。E
+    は低位 BB の err=7。
+  - F+ は正規 CLIENT lease の SURV、F- は revoke 後の kill。各試行の PF addr/err と fault_kill/reclaim/owner/leftover の差分、次の ver を保存。
+  - '観測対応: ver / L-h manifest / hal_test で SHA・hash・size・RAM・backend、mem で kselftest / audit_runs・fail / phys_free_pages /
+    lease_active / leftover_pages / ledger ops / KHEAP・kstack high-water。CUI は mem <id> の owner_pages、GUI は gshell 診断キー CTRL+GRPH+f･10
+    の全 slot 行 (id/state/owner_pages/exec_heap_used/trim_pending)。owner-start/exit で owner・gen・pages/leftover・irq/exc の実測値、fault
+    行の err= と終了種別。NP21/W の PTE は pt0_snapshot.py、freeze の深さは emu_read_mem、画面は emu_screenshot。'
+  expect:
+    A_pf_error: 6
+    B_pf_error: 7
+    E_pf_error: 7
+    kill_delta_per_A_B_E: 1
+    F_live: SURV
+    F_revoked_kill_delta: 1
+    owner_pages_after: 0
+    leftover_pages: 0
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1a-guard/
+- id: h-R1a-f6
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode
+    pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。'
+  entry: mem_map_test (F-6、17MB)
+  observe:
+  - f5b-mem-map を再実行。EXACT/ANY/TOPDOWN・保護・unmap・部分失敗の巻戻し、raw map の枯渇と次の成功を採る。通常ケースと R1c-1 の毒化保持を別に記録。
+  - '観測対応: ver / L-h manifest / hal_test で SHA・hash・size・RAM・backend、mem で kselftest / audit_runs・fail / phys_free_pages /
+    lease_active / leftover_pages / ledger ops / KHEAP・kstack high-water。CUI は mem <id> の owner_pages、GUI は gshell 診断キー CTRL+GRPH+f･10
+    の全 slot 行 (id/state/owner_pages/exec_heap_used/trim_pending)。owner-start/exit で owner・gen・pages/leftover・irq/exc の実測値、fault
+    行の err= と終了種別。NP21/W の PTE は pt0_snapshot.py、freeze の深さは emu_read_mem、画面は emu_screenshot。'
+  expect:
+    result: PASS
+    exit: 0
+    kill_delta: 0
+    owner_pages_after: 0
+    leftover_pages: 0
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1a-f6/
+- id: h-R1a-shellheap
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode
+    pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。'
+  entry: CPL0 shell の mem; 子ネスト; GUI→CUI; 既存16本; pool0 から閉じる
+  observe:
+  - 'T2a′: 常駐 shell の452KiB heap について resident_heap_peak/resident_heap_fail と used を開始前・各負荷後に mem で実測する。sh の mem と常駐の mem
+    を区別し、失敗を注入した区間は fail 増分も記録。'
+  - 常駐の固定 PD/PT、残余 NP を pt0_snapshot.py 相当で照合。pool0 で閉じてから次起動し used の復帰を確認。
+  - '観測対応: ver / L-h manifest / hal_test で SHA・hash・size・RAM・backend、mem で kselftest / audit_runs・fail / phys_free_pages /
+    lease_active / leftover_pages / ledger ops / KHEAP・kstack high-water。CUI は mem <id> の owner_pages、GUI は gshell 診断キー CTRL+GRPH+f･10
+    の全 slot 行 (id/state/owner_pages/exec_heap_used/trim_pending)。owner-start/exit で owner・gen・pages/leftover・irq/exc の実測値、fault
+    行の err= と終了種別。NP21/W の PTE は pt0_snapshot.py、freeze の深さは emu_read_mem、画面は emu_screenshot。'
+  expect:
+    resident_heap_bytes: 462848
+    resident_peak: 実測値を記録
+    resident_fail: 実測値と区間差分を記録
+    pd_pt: 不変
+    remainder: NP
+    next_launch: 成功
+    leftover_pages: 0
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1a-shellheap/
+- id: h-R1a-e10
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode
+    pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。'
+  entry: audit_test TVRAM 範囲外; v86 -d / -b 失敗出口; int80.img / int80.json
+  observe:
+  - 'E9-3: audit_test の TVRAM 範囲外で対象セル・番兵の before/after、reverse=0、次の有効操作。'
+  - 'E10-1: v86 -d / -b の失敗を各1回、g/tv/session を回収し PDE USER と alias UC が戻ること。K1 CPL0 例外は R1c-1。'
+  - 'E10-6: gen_v86_int80.py の int80.img と int80.json を用いる (COM を v86 -d に直接渡さない)。反射入口 breakpoint で IF=0 を実測し、その後 V86 と shell/ver
+    が復帰。X-2 も照合。'
+  expect:
+    tvram: 対象セル・番兵不変
+    reverse: 0
+    next_operation: 成功
+    v86_release: g/tv/session 回収・USER 復帰・alias UC
+    int80_IF: 0
+    ver: 応答
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1a-e10/
+- id: h-R1a-e11
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode
+    pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。'
+  entry: pipe_owner_test; ls | cat; kout_test; e12-17mb-pegc-v86-release
+  observe:
+  - 'E11-8: CPL3 本人の pipe_get_buf は NULL、本人 get_len は作った長さ、他 owner get_len は0。trusted の ls | cat は正常。'
+  - 'kout_test 2d/3c は N/A、exit0、SKIP なし。E11-9: V86 の正常/失敗/STOP 後の DISPLAY/TVRAM 再lease、master/AS/device/lease の alias UC、shlibの共有PTを照合。'
+  - '観測対応: ver / L-h manifest / hal_test で SHA・hash・size・RAM・backend、mem で kselftest / audit_runs・fail / phys_free_pages /
+    lease_active / leftover_pages / ledger ops / KHEAP・kstack high-water。CUI は mem <id> の owner_pages、GUI は gshell 診断キー CTRL+GRPH+f･10
+    の全 slot 行 (id/state/owner_pages/exec_heap_used/trim_pending)。owner-start/exit で owner・gen・pages/leftover・irq/exc の実測値、fault
+    行の err= と終了種別。NP21/W の PTE は pt0_snapshot.py、freeze の深さは emu_read_mem、画面は emu_screenshot。'
+  expect:
+    get_buf: 'NULL'
+    own_get_len: 作成した長さと一致
+    other_get_len: 0
+    pipe_exit: 0
+    kout_2d: N/A
+    kout_3c: N/A
+    kout_exit: 0
+    aliases: UC
+    reacquire: 成功
+    leftover_pages: 0
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1a-e11/
+- id: h-R1a-regress
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode
+    pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。'
+  entry: guest_tests.txt; db_test; db_v50_test; g-L-2 / g-G-9
+  observe:
+  - guest_tests.txt 全件、g-L-2/g-G-9、db_test 9/9、db_v50_test 42/42。各実行の出力と終了値を採り、FAIL/crash/timeout を延期にしない。
+  - '観測対応: ver / L-h manifest / hal_test で SHA・hash・size・RAM・backend、mem で kselftest / audit_runs・fail / phys_free_pages /
+    lease_active / leftover_pages / ledger ops / KHEAP・kstack high-water。CUI は mem <id> の owner_pages、GUI は gshell 診断キー CTRL+GRPH+f･10
+    の全 slot 行 (id/state/owner_pages/exec_heap_used/trim_pending)。owner-start/exit で owner・gen・pages/leftover・irq/exc の実測値、fault
+    行の err= と終了種別。NP21/W の PTE は pt0_snapshot.py、freeze の深さは emu_read_mem、画面は emu_screenshot。'
+  expect:
+    result: 全件 PASS
+    db_test_pass: 9
+    db_v50_test_pass: 42
+    exit: 0
+    kill_delta: 0
+    leftover_pages: 0
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1a-regress/
+- id: h-R1b-h3
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1b: R1a と同じ L-h / 本 NHD / 17MB。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC
+    一致後に GUI。切替は協調型で同時実行は 1 本。'
+  entry: h3a / h3b を2本起動; h3_park_resume.py の layout/init/arm --capture/verify、mode 1〜6
+  observe:
+  - 'H-2/H-3: 本人識別を確認し実 OP_WAIT の PARKED (RUNNING+in_op_wait は別) を待って mode/arm のみ書く。pf/gp/de/ud/USER-loop/KAPI-loop を各1回。arm
+    は resume 後1回消費、switch 増分と resume/fire の印を採り、両 setjmp 着地を capture 証拠で区別。古い世代/他ownerなら中止。'
+  - mode1〜5 は pending1回、mode6 は wm-kill または syscall-abort で pending0 (tools/h3_park_resume.py ROUTES/verify_trace)。USER-loop/KAPI-loop
+    の STOP は前景を確定し、STOP 後の時計と survivor を実測。KAPI-loop 中の時計停止は協調型の制約。
+  - 全 mode の owner0・ledger IRQ/例外増分0・深さ0・次起動を採る。失敗したケースだけ h3fix と再受入。
+  - '観測対応: ver / L-h manifest / hal_test で SHA・hash・size・RAM・backend、mem で kselftest / audit_runs・fail / phys_free_pages /
+    lease_active / leftover_pages / ledger ops / KHEAP・kstack high-water。CUI は mem <id> の owner_pages、GUI は gshell 診断キー CTRL+GRPH+f･10
+    の全 slot 行 (id/state/owner_pages/exec_heap_used/trim_pending)。owner-start/exit で owner・gen・pages/leftover・irq/exc の実測値、fault
+    行の err= と終了種別。NP21/W の PTE は pt0_snapshot.py、freeze の深さは emu_read_mem、画面は emu_screenshot。'
+  expect:
+    modes: 1,2,3,4,5,6 各1ケース
+    arm_consumed: 1
+    pending_modes_1_to_5: 1
+    pending_mode_6: 0
+    irq_depth_after: 0
+    exc_depth_after: 0
+    ledger_irq_ops_delta: 0
+    ledger_exc_ops_delta: 0
+    owner_pages_after: 0
+    next_launch: 成功
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1b-h3/
+- id: h-R1b-stop
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1b: R1a と同じ L-h / 本 NHD / 17MB。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC
+    一致後に GUI。切替は協調型で同時実行は 1 本。'
+  entry: h3 USER-loop / KAPI-loop; g-G-7; g-R-4 の hook中 / DONE直後
+  observe:
+  - 前景窓と front_owner/abort_target の一致を確認して CTRL+STOP。h3 は捕捉した landing と WM/syscall の経路を1件ずつ数える。
+  - g-G-7 と g-R-4 の hook中は slow-hook 1000 と stop-focus、DONE直後は別試行。回収/owner/mask/slot/sent と次起動、二重 kill を確認。
+  - '観測対応: ver / L-h manifest / hal_test で SHA・hash・size・RAM・backend、mem で kselftest / audit_runs・fail / phys_free_pages /
+    lease_active / leftover_pages / ledger ops / KHEAP・kstack high-water。CUI は mem <id> の owner_pages、GUI は gshell 診断キー CTRL+GRPH+f･10
+    の全 slot 行 (id/state/owner_pages/exec_heap_used/trim_pending)。owner-start/exit で owner・gen・pages/leftover・irq/exc の実測値、fault
+    行の err= と終了種別。NP21/W の PTE は pt0_snapshot.py、freeze の深さは emu_read_mem、画面は emu_screenshot。'
+  expect:
+    reclaim_delta_per_trial: 1
+    double_kill: 0
+    hook_stop_park_delta: 1
+    done_stop_park_delta: 0
+    owner_pages_after: 0
+    trim_pending: 0
+    trim_epoch: 0
+    mask_bit: 0
+    sent: 0
+    next_launch: 成功
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1b-stop/
+- id: h-R1b-identity
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1b: R1a と同じ L-h / 本 NHD / 17MB。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC
+    一致後に GUI。切替は協調型で同時実行は 1 本。'
+  entry: e11a2-self-identity; e11c3-identity; GUI 中の gshell 診断キー CTRL+GRPH+f･10
+  observe:
+  - 'E9-2/E11-12/E11-A2: h3a/h3b の自己公開 owner/generation とホスト identity(index)、owner-start、gshell 全slot診断を照合し、slot再利用後に旧世代を拒否。'
+  - 'X-21(a): g-G-4/g-R-3 の返却前後の owner_pages と exec_heap_used/trim_pending を診断キーで保存。as_extents_at_teardown.py は teardown 入口の生存
+    AS から total/kinds/free/arenas を採る。fixture自己観測だけで代用しない。'
+  - '観測対応: ver / L-h manifest / hal_test で SHA・hash・size・RAM・backend、mem で kselftest / audit_runs・fail / phys_free_pages /
+    lease_active / leftover_pages / ledger ops / KHEAP・kstack high-water。CUI は mem <id> の owner_pages、GUI は gshell 診断キー CTRL+GRPH+f･10
+    の全 slot 行 (id/state/owner_pages/exec_heap_used/trim_pending)。owner-start/exit で owner・gen・pages/leftover・irq/exc の実測値、fault
+    行の err= と終了種別。NP21/W の PTE は pt0_snapshot.py、freeze の深さは emu_read_mem、画面は emu_screenshot。'
+  expect:
+    identity: owner・generation 一致
+    stale_identity: 拒否
+    gui_owner: 全 slot の実測行を保存
+    extent_sample: teardown 入口の生存 AS
+    leftover_pages: 0
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1b-identity/
+- id: h-R1b-fullscreen
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1b: R1a と同じ L-h / 本 NHD / 17MB。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC
+    一致後に GUI。切替は協調型で同時実行は 1 本。'
+  entry: 'E11-5: 端末の子 / WAIT_POLL / 隠れた sh / 先行入力の4点'
+  observe:
+  - Run の1キー終了だけで済ませない。各4点を実施し対象 owner へのキー配送、fullscreen→desktop→CUI、DISPLAY再attach、SHM/lease回収、次起動を採る。既存 hello_gfx / gfx200_test
+    / e11a2-fullscreen-input と照合。
+  - '観測対応: ver / L-h manifest / hal_test で SHA・hash・size・RAM・backend、mem で kselftest / audit_runs・fail / phys_free_pages /
+    lease_active / leftover_pages / ledger ops / KHEAP・kstack high-water。CUI は mem <id> の owner_pages、GUI は gshell 診断キー CTRL+GRPH+f･10
+    の全 slot 行 (id/state/owner_pages/exec_heap_used/trim_pending)。owner-start/exit で owner・gen・pages/leftover・irq/exc の実測値、fault
+    行の err= と終了種別。NP21/W の PTE は pt0_snapshot.py、freeze の深さは emu_read_mem、画面は emu_screenshot。'
+  expect:
+    cases: 4
+    result: 4点 OK
+    reacquire: 成功
+    leftover_pages: 0
+    next_launch: 成功
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1b-fullscreen/
+- id: h-R1b-tvdump
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1b: R1a と同じ L-h / 本 NHD / 17MB。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC
+    一致後に GUI。切替は協調型で同時実行は 1 本。'
+  entry: 'tvdump_recv.py: GUI端末 sh / WM rshell / CPL3 sh / 常駐 CUI 対照'
+  observe:
+  - 'E9-1/E11-9: e11b1-tvdump-auth の各主体で別 raw を保存。認可されない GUI端末/WM はセル全0、常駐CUIの実セル対照と比較。GUI中のCUI出力sink/再接続も確認。'
+  expect:
+    gui_terminal_cells: 全0
+    wm_cells: 全0
+    dimensions: 80x25
+    cui_control: 実セル一致
+    sink: 成功
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1b-tvdump/
+- id: h-R1b-perf
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1b: R1a と同じ L-h / 本 NHD / 17MB。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC
+    一致後に GUI。切替は協調型で同時実行は 1 本。'
+  entry: 'E11-PERF: present/query; bench_scale2x Test 1; E10-4 v86 -g 中の kill'
+  observe:
+  - present/query の比較値と条件を記録。既存 bench_scale2x の320x200 40ms/100、640x400 10ms/100 を参照して新実測を保存。基準のない present は測定のみで合格範囲を捏造しない。
+  - 'E10-4: gcap 採取中の CTRL+STOP を試行し g/tv 解放・gcap_ops・TVRAM30行復帰を実測。採取が短く届かない場合だけ、観測不能の根拠・未実施・次の関門を記録。FAIL/crash/timeout は修正へ戻す。'
+  expect:
+    scale_320_baseline_ms_per_100: 40
+    scale_640_baseline_ms_per_100: 10
+    present: 比較値を記録、基準なしは測定のみ
+    e10_4: 採取中 kill と回収、または観測不能の根拠と未実施・次の関門を記録
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1b-perf/
+- id: h-R1b-bud
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1b: R1a と同じ L-h / 本 NHD / 17MB。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC
+    一致後に GUI。切替は協調型で同時実行は 1 本。'
+  entry: 'E11-BUD: mem を boot / GUI起動後 / GUI終了後で採取'
+  observe:
+  - 'S-8: /data/ipaexg.ttf を事前配備して font_test を実行。未配備対照は終了2/SKIP行を採り合格と分ける。'
+  - kmalloc_peak_bytes と mem kheap_peak は KHEAP のみ、exec_heap を混ぜない。3点の used/peak と kstack_high_water、resident_heap_peak/fail
+    を採り 176KiB 維持の判断材料を保存。
+  - '観測対応: ver / L-h manifest / hal_test で SHA・hash・size・RAM・backend、mem で kselftest / audit_runs・fail / phys_free_pages /
+    lease_active / leftover_pages / ledger ops / KHEAP・kstack high-water。CUI は mem <id> の owner_pages、GUI は gshell 診断キー CTRL+GRPH+f･10
+    の全 slot 行 (id/state/owner_pages/exec_heap_used/trim_pending)。owner-start/exit で owner・gen・pages/leftover・irq/exc の実測値、fault
+    行の err= と終了種別。NP21/W の PTE は pt0_snapshot.py、freeze の深さは emu_read_mem、画面は emu_screenshot。'
+  expect:
+    font_test: TTF 配備後 PASS
+    font_missing_exit: 2
+    font_missing: SKIP (合格に数えない)
+    samples: 3
+    kheap_total_bytes: 180224
+    peak: KHEAP のみの実測値
+    high_water: 実測値を記録
+    leftover_pages: 0
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1b-bud/
+- id: h-R1b-shutdown
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1b: R1a と同じ L-h / 本 NHD / 17MB。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC
+    一致後に GUI。切替は協調型で同時実行は 1 本。'
+  entry: shutdown_probe (非 owner gfx_shutdown); owner shutdown 正常対照
+  observe:
+  - 'E11-A2: GUI 正常起動を前提に非 owner から gfx_shutdown。backend / surface generation / 正規owner の lease と描画を前後比較する。正規owner shutdown
+    は従来どおり回収。attach失敗は R1c-1 hook6。'
+  expect:
+    nonowner_backend: 不変
+    nonowner_surface_generation: 不変
+    owner_shutdown: 従来どおり回収
+    exit: 0
+    leftover_pages: 0
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1b-shutdown/
+- id: h-R1c1-sync
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1c-1: PM が原本を残して作る t2h_fault.ini (hdd=os32_t2h_install.nhd)。17MB。初回も正常一式の同期・照合・deploy 後に np21w_ctl.py start --ini t2h_fault.ini。停止は np21w_ctl.py stop、強制停止なら記録。nhd_deploy.py
+    --profile t2h の remote/local/mount/stamp が本 NHD と別であること。上書きごとに対象・内容・復元を提示し [D2] 個別承認、[D1]。正常一式の sync と deploy-set.json
+    照合が hook の開始条件。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。'
+  entry: 正常一式 sync --profile t2h; verify-set --profile t2h --set build/out/deploy-set.json; deploy; start
+  observe:
+  - '交換・復元の毎回の順: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h (残っていれば) → pull --profile t2h → copy または sync --profile
+    t2h → deploy --profile t2h → np21w_ctl.py start --ini t2h_fault.ini。copy 前にも pull、ゲスト書込み後に local を再利用しない。'
+  - copy-all は使わず deploy_manifests.py の全層を sync。deploy 前の verify-set が L-h に束縛した deploy-set.json と集合/size/hash 一致を満たすまで hookへ進まない
+    (E3/D4)。
+  - 正常対照で ver/API74、shlib読込み行、gui_demo 起動、kselftest を採る。S-6 鍵ありの netsock 派生はこの隔離媒体で host_agent/host_test を確認し、元の派生へ戻す。
+  - '観測対応: ver / L-h manifest / hal_test で SHA・hash・size・RAM・backend、mem で kselftest / audit_runs・fail / phys_free_pages /
+    lease_active / leftover_pages / ledger ops / KHEAP・kstack high-water。CUI は mem <id> の owner_pages、GUI は gshell 診断キー CTRL+GRPH+f･10
+    の全 slot 行 (id/state/owner_pages/exec_heap_used/trim_pending)。owner-start/exit で owner・gen・pages/leftover・irq/exc の実測値、fault
+    行の err= と終了種別。NP21/W の PTE は pt0_snapshot.py、freeze の深さは emu_read_mem、画面は emu_screenshot。'
+  expect:
+    verify_set_rc: 0
+    missing: 0
+    modified: 0
+    extra: 0
+    kapi_version: 74
+    shlib: 読込み成功
+    gui_demo: 起動成功
+    kselftest_fail: 0
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1c1-sync/
+- id: h-R1c1-r1-kernel
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1c-1: PM が原本を残して作る t2h_fault.ini (hdd=os32_t2h_install.nhd)。17MB。初回も正常一式の同期・照合・deploy 後に np21w_ctl.py start --ini t2h_fault.ini。停止は np21w_ctl.py stop、強制停止なら記録。nhd_deploy.py
+    --profile t2h の remote/local/mount/stamp が本 NHD と別であること。上書きごとに対象・内容・復元を提示し [D2] 個別承認、[D1]。正常一式の sync と deploy-set.json
+    照合が hook の開始条件。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。'
+  entry: make kernel-r1; make deploy-kernel-r1 PROFILE=t2h; deploy --profile t2h; start
+  observe:
+  - '交換・復元の毎回の順: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h (残っていれば) → pull --profile t2h → copy または sync --profile
+    t2h → deploy --profile t2h → np21w_ctl.py start --ini t2h_fault.ini。copy 前にも pull、ゲスト書込み後に local を再利用しない。'
+  - L-h 製品hashを保存、build/out/r1/ の専用像/map/manifest は製品と別hash、r1_fixture記号は専用mapだけ。pull後のcopy --dest /boot 相当で試験像を配置。armなしの対照は全hookカウンタ
+    +0、GUI正常起動を hook6 の前提にする。
+  expect:
+    product_hash: 不変
+    fixture_hash: 製品と異なる
+    product_fixture_symbols: 0
+    unarmed_hook_delta: 0
+    gui_control: 正常起動
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1c1-r1-kernel/
+- id: h-R1c1-r1-stop
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1c-1: PM が原本を残して作る t2h_fault.ini (hdd=os32_t2h_install.nhd)。17MB。初回も正常一式の同期・照合・deploy 後に np21w_ctl.py start --ini t2h_fault.ini。停止は np21w_ctl.py stop、強制停止なら記録。nhd_deploy.py
+    --profile t2h の remote/local/mount/stamp が本 NHD と別であること。上書きごとに対象・内容・復元を提示し [D2] 個別承認、[D1]。正常一式の sync と deploy-set.json
+    照合が hook の開始条件。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。'
+  entry: 'hook (1) IRQ alloc / (2) #UD ledger free / (4) V86 end 再例外、各1 reset'
+  observe:
+  - 各試行を emu_reset (/api/reset) で独立に開始、指定hookだけ1回 arm。最新r1 map と pool/ledger の直前値を採る。
+  - (1)(2) は R1 context/op/owner/EIP を固定シリアルに残し pool会計変更前に停止、その後進行なし。(4) は exec_stop_mark の停止と exec_stop_count +1。次試行へ reset
+    でのみ復帰。freeze時は深さを emu_read_mem で実測。
+  expect:
+    resets: 3
+    hook1: R1 context
+    hook2: R1 context
+    pool_accounting_delta: 0
+    progress_after_stop: 0
+    hook4_exec_stop_count_delta: 1
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1c1-r1-stop/
+- id: h-R1c1-r1-recover
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1c-1: PM が原本を残して作る t2h_fault.ini (hdd=os32_t2h_install.nhd)。17MB。初回も正常一式の同期・照合・deploy 後に np21w_ctl.py start --ini t2h_fault.ini。停止は np21w_ctl.py stop、強制停止なら記録。nhd_deploy.py
+    --profile t2h の remote/local/mount/stamp が本 NHD と別であること。上書きごとに対象・内容・復元を提示し [D2] 個別承認、[D1]。正常一式の sync と deploy-set.json
+    照合が hook の開始条件。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。'
+  entry: hook (3) K1 / (5a) 生存親毒化 / (5b) PARKED毒化 / (6) attach失敗、各1 reset
+  observe:
+  - (3) V86 session の CPL0例外→exec_pending_transfer→通常文脈で回収→owner0→次起動。移譲/消費は各1回、v86_restore_mismatch0。
+  - (5a) 子終了時の appslot_return_target 前で生存親ASを毒化、親は USERへ戻らず syscall出口で kill。(5b) id/gen/parked_from_wait確認後 appslot_resume_commit
+    前で毒化、abortはresumeを越えて保持、PD読込み前にkill。通常 owner0 と区別し owner-exit pages/leftover、隔離owner page保持、leftover増分=pages を記録。
+  - (6) GUI正常対照の後、lease attach を1回だけ失敗。旧面を使わず次のattachで成功、世代/lease/描画復帰を保存。
+  - '観測対応: ver / L-h manifest / hal_test で SHA・hash・size・RAM・backend、mem で kselftest / audit_runs・fail / phys_free_pages /
+    lease_active / leftover_pages / ledger ops / KHEAP・kstack high-water。CUI は mem <id> の owner_pages、GUI は gshell 診断キー CTRL+GRPH+f･10
+    の全 slot 行 (id/state/owner_pages/exec_heap_used/trim_pending)。owner-start/exit で owner・gen・pages/leftover・irq/exc の実測値、fault
+    行の err= と終了種別。NP21/W の PTE は pt0_snapshot.py、freeze の深さは emu_read_mem、画面は emu_screenshot。'
+  expect:
+    resets: 4
+    hook3_pending_consumed: 1
+    hook3_owner_after: 0
+    hook3_v86_restore_mismatch: 0
+    hook3_next_launch: 成功
+    hook5a: USER 復帰前に syscall 出口 kill
+    hook5b: abort 保持・PD 読込み前に kill
+    poison_accounting: leftover 増分 = owner-exit pages、隔離 owner page 保持
+    hook6_failures: 1
+    hook6_next_attach: 成功
+    ledger_irq_ops_delta: 0
+    ledger_exc_ops_delta: 0
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1c1-r1-recover/
+- id: h-R1c1-restore
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1c-1: PM が原本を残して作る t2h_fault.ini (hdd=os32_t2h_install.nhd)。17MB。初回も正常一式の同期・照合・deploy 後に np21w_ctl.py start --ini t2h_fault.ini。停止は np21w_ctl.py stop、強制停止なら記録。nhd_deploy.py
+    --profile t2h の remote/local/mount/stamp が本 NHD と別であること。上書きごとに対象・内容・復元を提示し [D2] 個別承認、[D1]。正常一式の sync と deploy-set.json
+    照合が hook の開始条件。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。'
+  entry: 正常 vmkernel.lz4 を copy --dest /boot; deploy --profile t2h; start
+  observe:
+  - '交換・復元の毎回の順: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h (残っていれば) → pull --profile t2h → copy または sync --profile
+    t2h → deploy --profile t2h → np21w_ctl.py start --ini t2h_fault.ini。copy 前にも pull、ゲスト書込み後に local を再利用しない。'
+  - 保存した L-h の正常像へ復元し ver/hash/API・shlib読込み・gui_demo・kselftest の正常対照を採る。
+  - 'ゲスト書込み後の照合: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h → pull --profile t2h → verify-set --profile t2h --set
+    build/out/deploy-set.json。期待表は L-h 成果物に束縛し、core/userland/assets の集合・size・sha256、unicode.bin・vmkernel.lz4・.shlib を含める。非配備
+    kernel.bin/sqlite.bin/SDK/raw boot/apps/game は除外、設定 allow-list は存在だけ、管理対象の欠損/改変/余剰 0。'
+  - 照合後 np21w_ctl.py start --ini t2h_fault.ini。最終復帰は原本 ini で start、元の GFX= を戻す。
+  expect:
+    ver: L-h 一致
+    shlib: 読込み成功
+    gui_demo: 起動成功
+    verify_set_rc: 0
+    extra: 0
+    kselftest_fail: 0
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1c1-restore/
+- id: h-R1c2-oldshell
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と
+    [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので
+    hal_test を要求しない。'
+  entry: copy --profile t2h --dest /sys --rename shell.bin <old-shell.fixture>; deploy; start
+  observe:
+  - '交換・復元の毎回の順: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h (残っていれば) → pull --profile t2h → copy または sync --profile
+    t2h → deploy --profile t2h → np21w_ctl.py start --ini t2h_fault.ini。copy 前にも pull、ゲスト書込み後に local を再利用しない。'
+  - 'H-1: Full ext2 NHD の /sys/shell.bin を h2-isolated old-shell.fixture へ。FD/FAT8.3 で代用しない。manifest/hash と初回 entry差分0、unknown
+    format or flags の停止理由を固定シリアルで採る。正常shellのcopyを次の独立承認で行う。'
+  expect:
+    shell_entry_delta: 0
+    stop_reason: unknown format or flags
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1c2-oldshell/
+- id: h-R1c2-restore-shell
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と
+    [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので
+    hal_test を要求しない。'
+  entry: copy --profile t2h --dest /sys --rename shell.bin <L-h shell.bin>; deploy; start
+  observe:
+  - '交換・復元の毎回の順: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h (残っていれば) → pull --profile t2h → copy または sync --profile
+    t2h → deploy --profile t2h → np21w_ctl.py start --ini t2h_fault.ini。copy 前にも pull、ゲスト書込み後に local を再利用しない。'
+  - ver 一致・shlib読込み・gui_demo・kselftest を正常対照で採る。
+  - 'ゲスト書込み後の照合: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h → pull --profile t2h → verify-set --profile t2h --set
+    build/out/deploy-set.json。期待表は L-h 成果物に束縛し、core/userland/assets の集合・size・sha256、unicode.bin・vmkernel.lz4・.shlib を含める。非配備
+    kernel.bin/sqlite.bin/SDK/raw boot/apps/game は除外、設定 allow-list は存在だけ、管理対象の欠損/改変/余剰 0。'
+  expect:
+    ver: L-h 一致
+    verify_set_rc: 0
+    shlib: 読込み成功
+    gui_demo: 起動成功
+    kselftest_fail: 0
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1c2-restore-shell/
+- id: h-R1c2-oldshlib
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と
+    [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので
+    hal_test を要求しない。'
+  entry: copy --profile t2h --dest /sys/lib --rename libos32gui.shlib <old-shlib.fixture>; deploy; start; gui_demo
+  observe:
+  - '交換・復元の毎回の順: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h (残っていれば) → pull --profile t2h → copy または sync --profile
+    t2h → deploy --profile t2h → np21w_ctl.py start --ini t2h_fault.ini。copy 前にも pull、ゲスト書込み後に local を再利用しない。'
+  - /sys/lib/libos32gui.shlib の open成功を確認してから形式拒否 g_reject を採る。不在/ENOENTは合格でない。shlib未公開・依存app初回entry0、GUI要求のCUI fallbackと次のshell/verを記録。
+  expect:
+    open: 成功
+    format: g_reject
+    published: 0
+    dependent_entry_delta: 0
+    fallback: CUI
+    ver: 応答
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1c2-oldshlib/
+- id: h-R1c2-restore-shlib
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と
+    [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので
+    hal_test を要求しない。'
+  entry: copy --profile t2h --dest /sys/lib --rename libos32gui.shlib <L-h shlib>; deploy; start
+  observe:
+  - '交換・復元の毎回の順: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h (残っていれば) → pull --profile t2h → copy または sync --profile
+    t2h → deploy --profile t2h → np21w_ctl.py start --ini t2h_fault.ini。copy 前にも pull、ゲスト書込み後に local を再利用しない。'
+  - ver・shlib読込み・gui_demo・kselftest の正常対照を採る。
+  - 'ゲスト書込み後の照合: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h → pull --profile t2h → verify-set --profile t2h --set
+    build/out/deploy-set.json。期待表は L-h 成果物に束縛し、core/userland/assets の集合・size・sha256、unicode.bin・vmkernel.lz4・.shlib を含める。非配備
+    kernel.bin/sqlite.bin/SDK/raw boot/apps/game は除外、設定 allow-list は存在だけ、管理対象の欠損/改変/余剰 0。'
+  expect:
+    ver: L-h 一致
+    shlib: 読込み成功
+    gui_demo: 起動成功
+    verify_set_rc: 0
+    extra: 0
+    kselftest_fail: 0
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1c2-restore-shlib/
+- id: h-R1c2-rehearsal
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と
+    [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので
+    hal_test を要求しない。'
+  entry: 'U3 予行: deploy_source_check.py; FD起動; hsync 2段; --verify 2本; pull; verify-set; HDD起動'
+  observe:
+  - 同期前に deploy_source_check.py で .deploy/manifest.txt 全行の配備元の存在/size/CRC を照合し管理対象ゲストパス一覧を保存。欠け/不一致が1件でもあれば同期しない (E1)。SerialFS/HostDrvの根と
+    make deploy の名札の対応も確かめる。
+  - 本ビルドの新 FD で起動し FD の新 hsync を使用 → hsync --root /hd0 --no-backup (全体、/sys除外) 完遂 → hsync --root /hd0 sys 完遂。HDDのhsyncで更新しない。
+  - hsync --root /hd0 --no-backup --verify と hsync --root /hd0 sys --verify を両方実行、全件 byte比較の変更0/errors0/extra0を採る。サイズ+mtimeだけの2回目0件を証明にしない。
+  - 'ゲスト書込み後の照合: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h → pull --profile t2h → verify-set --profile t2h --set
+    build/out/deploy-set.json。期待表は L-h 成果物に束縛し、core/userland/assets の集合・size・sha256、unicode.bin・vmkernel.lz4・.shlib を含める。非配備
+    kernel.bin/sqlite.bin/SDK/raw boot/apps/game は除外、設定 allow-list は存在だけ、管理対象の欠損/改変/余剰 0。'
+  - verify-set が L-h deploy-set.json の欠損/改変/余剰0なら HDD 起動で ver 一致。FD→HDD の切替・停止起動は np21w_ctl.py。実機更新はこの予行を通してから。
+  expect:
+    source_missing: 0
+    source_mismatch: 0
+    sync_errors: 0
+    sync_extra: 0
+    verify_whole_changes: 0
+    verify_sys_changes: 0
+    verify_errors: 0
+    verify_extra: 0
+    verify_set_rc: 0
+    set_missing: 0
+    set_modified: 0
+    set_extra: 0
+    hdd_ver: L-h 一致
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1c2-rehearsal/
+- id: h-R1c2-verify-stale
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と
+    [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので
+    hal_test を要求しない。'
+  entry: 'E4 負例: remoteだけ1本改変; pull無しverify-set; pullありverify-set; 正常復元'
+  observe:
+  - ゲスト起動のstampがある状態で np21w_ctl.py stop、hostのcopyでremote隔離NHDだけの管理対象1本を改変 (localは触らない、別承認)。pull無しverify-setは「pull後にゲスト起動あり」でrc非0。
+  - umount → pull --profile t2h → verify-set --profile t2h --set build/out/deploy-set.json で改変1本を検出しrc非0。
+  - '交換・復元の毎回の順: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h (残っていれば) → pull --profile t2h → copy または sync --profile
+    t2h → deploy --profile t2h → np21w_ctl.py start --ini t2h_fault.ini。copy 前にも pull、ゲスト書込み後に local を再利用しない。'
+  - 正常ファイルを戻して deploy、start の ver/shlib/gui_demo 正常対照後、stop→umount→pull→verify-set で集合/hash一致を再確認。
+  expect:
+    without_pull: 拒否・rc 非0
+    with_pull: 改変検出・rc 非0
+    modified_files: 1
+    restored_verify_set_rc: 0
+    restored_ver: L-h 一致
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1c2-verify-stale/
+- id: h-R1d-planar
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1d: L-h、17MB、ini 不変。gfxmode pc98 → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 pc98 一致。cirrus-off
+    分岐は保存した USEGD5430 に従う。終了時は保存した元の GFX= を戻す。'
+  entry: e12-17mb-planar; gfx200_test; gfx_demo200; ring3_guard bb; 20回ループ
+  observe:
+  - e12-17mb-planar の全observe (日本語/present/GUI→CUI→GUI/全画面/alias UC/SHM/font) を実施。gfx_demo200 はアプリに ESC、rshellへ届いたら再接続。S-7
+    blit_test 全体 / bench_scale2x Test 3 の planar 試験を含め正常描画/終了→次起動20回を採る。
+  - '観測対応: ver / L-h manifest / hal_test で SHA・hash・size・RAM・backend、mem で kselftest / audit_runs・fail / phys_free_pages /
+    lease_active / leftover_pages / ledger ops / KHEAP・kstack high-water。CUI は mem <id> の owner_pages、GUI は gshell 診断キー CTRL+GRPH+f･10
+    の全 slot 行 (id/state/owner_pages/exec_heap_used/trim_pending)。owner-start/exit で owner・gen・pages/leftover・irq/exc の実測値、fault
+    行の err= と終了種別。NP21/W の PTE は pt0_snapshot.py、freeze の深さは emu_read_mem、画面は emu_screenshot。'
+  expect:
+    kselftest_fail: 0
+    audit_fail: 0
+    audit_runs_delta_min: 1
+    leftover_pages: 0
+    ledger_irq_ops_delta: 0
+    ledger_exc_ops_delta: 0
+    backend: pc98
+    A_pf_error: 6
+    B_pf_error: 7
+    E_pf_error: 7
+    iterations: 20
+    normal_kill_delta: 0
+    db_test_pass: 9
+    db_v50_test_pass: 42
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1d-planar/
+- id: h-R1d-cirrus-off
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R1d: L-h、17MB、ini 不変。gfxmode pc98 → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 pc98 一致。cirrus-off
+    分岐は保存した USEGD5430 に従う。終了時は保存した元の GFX= を戻す。'
+  entry: e12-cirrus-off; gfxmode cirrus; fallbackを読み戻し/reset/hal_testで確認
+  observe:
+  - 保存USEGD5430=falseなら現iniのまま gfxmode cirrus。trueならR3後にPMの派生cirrus-off iniで実施 ([D1])。原本は不変。
+  - 強制cirrus→system.cfg読み戻し→emu_reset (/api/reset)→hal_test実fallback一致 (有効なpc98/PEGC) を開始条件にする。描画・日本語・CLIENT/DISPLAY geometry・旧token
+    revoke・両SDK再attach・alias UCを照合、元GFXを戻す。
+  expect:
+    fallback: hal_test の実 pc98/PEGC 一致
+    drawing_failures: 0
+    stale_lease_faults: 0
+    audit_fail: 0
+    leftover_pages: 0
+  evidence: ~/os32-tmp/evidence/<日付>/h-R1d-cirrus-off/
+- id: h-R3-cirrus
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R3: L-h、17MB、PM の派生 t2h_cirrus.ini (cirrus-on)。np21w_ctl.py stop → start --ini t2h_cirrus.ini ([D1])、gfxmode cirrus
+    → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 Cirrus 一致。'
+  entry: M; e12-17mb-cirrus; ring3_guard cirrus; gdi_test CLIENT; V86往復; 20回ループ
+  observe:
+  - '台本 M: boot fail 0 → 指定 gfxmode / 読み戻し / reset / hal_test → CUI/GUI/FEP → 高位 HostDrv read/write → 親子 → lease 切替 → map
+    枯渇 → trim → fault/STOP → 次起動 → V86 往復。各操作前後に mem と owner-start/exit、PTE を採り audit_runs 増分 >=1 / audit_fail 増分0、通常回収の owner/leftover
+    0、IRQ/例外 ledger 操作増分0。終了時は ini と保存した元の GFX= を戻す。'
+  - e12-17mb-cirrus 全observeを実施。Cの低位VRAM直書きkill、CLIENT面の日本語/present、V86後master/AS/device/lease alias UC。正常描画/終了→次起動20回とguardの意図したkillを区別。
+  - '観測対応: ver / L-h manifest / hal_test で SHA・hash・size・RAM・backend、mem で kselftest / audit_runs・fail / phys_free_pages /
+    lease_active / leftover_pages / ledger ops / KHEAP・kstack high-water。CUI は mem <id> の owner_pages、GUI は gshell 診断キー CTRL+GRPH+f･10
+    の全 slot 行 (id/state/owner_pages/exec_heap_used/trim_pending)。owner-start/exit で owner・gen・pages/leftover・irq/exc の実測値、fault
+    行の err= と終了種別。NP21/W の PTE は pt0_snapshot.py、freeze の深さは emu_read_mem、画面は emu_screenshot。'
+  expect:
+    kselftest_fail: 0
+    audit_fail: 0
+    audit_runs_delta_min: 1
+    leftover_pages: 0
+    ledger_irq_ops_delta: 0
+    ledger_exc_ops_delta: 0
+    backend: Cirrus
+    ram_mb: 17
+    A_pf_error: 6
+    B_pf_error: 7
+    C_kill_delta: 1
+    client: 描画・present 成功
+    aliases: UC
+    iterations: 20
+    normal_kill_delta: 0
+    db_test_pass: 9
+    db_v50_test_pass: 42
+  evidence: ~/os32-tmp/evidence/<日付>/h-R3-cirrus/
+- id: h-R4-8mb-planar
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R4: L-h、PM の派生 t2h_8mb.ini (ram-8mb)。np21w_ctl.py stop → start --ini t2h_8mb.ini ([D1])、gfxmode pc98 → /etc/system.cfg
+    読み戻し → emu_reset (/api/reset) → hal_test 1 行目 pc98 一致、8MB を確認。'
+  entry: M; e12-8mb-planar; f12-8mb-startup; mem_map_test F-6; FEP; 20回ループ
+  observe:
+  - '台本 M: boot fail 0 → 指定 gfxmode / 読み戻し / reset / hal_test → CUI/GUI/FEP → 高位 HostDrv read/write → 親子 → lease 切替 → map
+    枯渇 → trim → fault/STOP → 次起動 → V86 往復。各操作前後に mem と owner-start/exit、PTE を採り audit_runs 増分 >=1 / audit_fail 増分0、通常回収の owner/leftover
+    0、IRQ/例外 ledger 操作増分0。終了時は ini と保存した元の GFX= を戻す。'
+  - e12-8mb-planar と f12-8mb-startup 全observeを実施。小さい app の正常起動と入口前ENOMEMを区別、ENOMEMはentry不変/kill+0。F-6のmap巻戻し・次成功、FEPとpool0から閉じるを採る。正常描画/終了→次起動20回。
+  - '観測対応: ver / L-h manifest / hal_test で SHA・hash・size・RAM・backend、mem で kselftest / audit_runs・fail / phys_free_pages /
+    lease_active / leftover_pages / ledger ops / KHEAP・kstack high-water。CUI は mem <id> の owner_pages、GUI は gshell 診断キー CTRL+GRPH+f･10
+    の全 slot 行 (id/state/owner_pages/exec_heap_used/trim_pending)。owner-start/exit で owner・gen・pages/leftover・irq/exc の実測値、fault
+    行の err= と終了種別。NP21/W の PTE は pt0_snapshot.py、freeze の深さは emu_read_mem、画面は emu_screenshot。'
+  expect:
+    kselftest_fail: 0
+    audit_fail: 0
+    audit_runs_delta_min: 1
+    leftover_pages: 0
+    ledger_irq_ops_delta: 0
+    ledger_exc_ops_delta: 0
+    backend: pc98
+    ram_mb: 8
+    A_pf_error: 6
+    B_pf_error: 7
+    enomem_entry_delta: 0
+    enomem_kill_delta: 0
+    iterations: 20
+    normal_kill_delta: 0
+    db_test_pass: 9
+    db_v50_test_pass: 42
+  evidence: ~/os32-tmp/evidence/<日付>/h-R4-8mb-planar/
+- id: h-R4-guard-d
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R4: L-h、PM の派生 t2h_8mb.ini (ram-8mb)。np21w_ctl.py stop → start --ini t2h_8mb.ini ([D1])、gfxmode pc98 → /etc/system.cfg
+    読み戻し → emu_reset (/api/reset) → hal_test 1 行目 pc98 一致、8MB を確認。'
+  entry: 'ring3_guard pegc (D): 実PTEを先に採って試行別に照合'
+  observe:
+  - PEGC窓の実PTEをpt0_snapshot.py相当の対象AS読みで採る。P=1で拡張窓写像が残る試行は保護fault7、P=0の試行は不在fault6。ハード鍵なしだけで不在を判定しない。
+  - fault addr/err・kill差分・owner回収・次verを保存。両分岐のうち実際に得た試行だけを記録、未実施を合格にしない。
+  expect:
+    trials:
+      mapped:
+        PTE_present: 1
+        pf_error: 7
+      not_present:
+        PTE_present: 0
+        pf_error: 6
+    kill_delta_per_trial: 1
+    owner_pages_after: 0
+    leftover_pages: 0
+  evidence: ~/os32-tmp/evidence/<日付>/h-R4-guard-d/
+- id: h-R4-shapes
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R4: L-h、PM の派生 t2h_8mb.ini (ram-8mb)。np21w_ctl.py stop → start --ini t2h_8mb.ini ([D1])、gfxmode pc98 → /etc/system.cfg
+    読み戻し → emu_reset (/api/reset) → hal_test 1 行目 pc98 一致、8MB を確認。'
+  entry: h5_shape_i <free0>; h5_shape_ii <free0>; h5_shape_iii <free0> (CUI emu_key)
+  observe:
+  - CUI 常駐プロンプトでfree0=memのphys_free_pagesを採り、画面キーボード emu_key text="h5_shape_i <free0>" + seq=RETURNで起動。ii/iiiも同じ。引数はfree0だけ、rshell
+    /api/cmd起動やGUI限定emu_typeは使わない。
+  - PREP free1=<n>で停止→PMが対象ASのPD/私有PT枚数P1を採る (共有PT除外)→emu_key text=<P1> + RETURN。ALLOC launch_private/add/allocated/shortで保持したまま停止→PMがfree2/P2を採る→任意行+RETURNで解放→終了値とemu_screen_textのPREP/ALLOC/終了行。
+  - 'page会計: launch_private=free0-free1-P1、add=512-launch_private、final_private=free0-free2-P2。PD/PTは1回だけ引く、shlib dataは私有量内数。公称i
+    code1500/stack256/heap252、ii code/bss64/stack512/heap1432、iii code200/stack256/exec_heap1552 KiB。final_private512±1 pageを全3本で照合。'
+  - short>0はexit1、非数P1はPREP FAIL/exit1。入口前ENOMEMはshellエラー/exec_entry_calls不変/fault_kill+0を記録し、成功往復3本の代用にしない。通常解放後owner0/leftover0を採る。
+  expect:
+    fixtures: h5_shape_i,h5_shape_ii,h5_shape_iii 全3本
+    prep: PREP free1=
+    alloc: ALLOC launch_private/add/allocated/short
+    private_pages: 512
+    tolerance_pages: 1
+    short: 0
+    success_exit: 0
+    short_exit: 1
+    bad_input: PREP FAIL
+    bad_input_exit: 1
+    enomem_entry_delta: 0
+    enomem_kill_delta: 0
+    owner_pages_after: 0
+    leftover_pages: 0
+  evidence: ~/os32-tmp/evidence/<日付>/h-R4-shapes/
+- id: h-R4-g
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R4: L-h、PM の派生 t2h_8mb.ini (ram-8mb)。np21w_ctl.py stop → start --ini t2h_8mb.ini ([D1])、gfxmode pc98 → /etc/system.cfg
+    読み戻し → emu_reset (/api/reset) → hal_test 1 行目 pc98 一致、8MB を確認。'
+  entry: g-G-1〜G-9 / g-R-1〜R-4 を8MBで再実行
+  observe:
+  - G-2未armの枯渇整定後に基準値→G-3 arm/対象確保→G-4末尾返却と全ARENA返却/INITIAL不変/CRC/EXACT regrow。G-5 no-answerはC版で配送/消費各1、DONE0/bit保持/再配送0。G-6
+    CUI子と次GUI、G-7 STOP、G-8 pool0から閉じる、G-9回帰。
+  - Rustは先在LARGEを基準から不変、g-R-4 hook中+1/DONE直後+0を別試行。X-21(a)はCTRL+GRPH+f･10でGUI中owner量、teardown入口でextent。
+  - '観測対応: ver / L-h manifest / hal_test で SHA・hash・size・RAM・backend、mem で kselftest / audit_runs・fail / phys_free_pages /
+    lease_active / leftover_pages / ledger ops / KHEAP・kstack high-water。CUI は mem <id> の owner_pages、GUI は gshell 診断キー CTRL+GRPH+f･10
+    の全 slot 行 (id/state/owner_pages/exec_heap_used/trim_pending)。owner-start/exit で owner・gen・pages/leftover・irq/exc の実測値、fault
+    行の err= と終了種別。NP21/W の PTE は pt0_snapshot.py、freeze の深さは emu_read_mem、画面は emu_screenshot。'
+  expect:
+    trim: G-1〜G-4 と各 g entry の数値・固定期待に一致
+    no_answer_done_delta: 0
+    no_answer_redelivery: 0
+    hook_stop_park_delta: 1
+    done_stop_park_delta: 0
+    owner_pages_after: 0
+    leftover_pages: 0
+    next_launch: 成功
+  evidence: ~/os32-tmp/evidence/<日付>/h-R4-g/
+- id: h-R5-8mb-pegc
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R5: L-h、R4 と同じ t2h_8mb.ini / 8MB。gfxmode pegc (auto は使わない) → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test
+    1 行目 PEGC 一致。'
+  entry: M; e12-8mb-pegc; f12-8mb-startup; h5_shape_i/ii/iii; g-G-1〜G-4; 20回
+  observe:
+  - '台本 M: boot fail 0 → 指定 gfxmode / 読み戻し / reset / hal_test → CUI/GUI/FEP → 高位 HostDrv read/write → 親子 → lease 切替 → map
+    枯渇 → trim → fault/STOP → 次起動 → V86 往復。各操作前後に mem と owner-start/exit、PTE を採り audit_runs 増分 >=1 / audit_fail 増分0、通常回収の owner/leftover
+    0、IRQ/例外 ledger 操作増分0。終了時は ini と保存した元の GFX= を戻す。'
+  - e12-8mb-pegc / f12-8mb-startup の全observe、G-1〜G-4の整定基準/末尾返却/全ARENA返却/INITIAL不変/CRC/EXACT regrowを採る。正常描画/終了→次起動20回。
+  - CUI 常駐プロンプトでfree0=memのphys_free_pagesを採り、画面キーボード emu_key text="h5_shape_i <free0>" + seq=RETURNで起動。ii/iiiも同じ。引数はfree0だけ、rshell
+    /api/cmd起動やGUI限定emu_typeは使わない。
+  - PREP free1=<n>で停止→PMが対象ASのPD/私有PT枚数P1を採る (共有PT除外)→emu_key text=<P1> + RETURN。ALLOC launch_private/add/allocated/shortで保持したまま停止→PMがfree2/P2を採る→任意行+RETURNで解放→終了値とemu_screen_textのPREP/ALLOC/終了行。
+  - 'page会計: launch_private=free0-free1-P1、add=512-launch_private、final_private=free0-free2-P2。PD/PTは1回だけ引く、shlib dataは私有量内数。公称i
+    code1500/stack256/heap252、ii code/bss64/stack512/heap1432、iii code200/stack256/exec_heap1552 KiB。final_private512±1 pageを全3本で照合。'
+  - short>0はexit1、非数P1はPREP FAIL/exit1。入口前ENOMEMはshellエラー/exec_entry_calls不変/fault_kill+0を記録し、成功往復3本の代用にしない。通常解放後owner0/leftover0を採る。
+  - '観測対応: ver / L-h manifest / hal_test で SHA・hash・size・RAM・backend、mem で kselftest / audit_runs・fail / phys_free_pages /
+    lease_active / leftover_pages / ledger ops / KHEAP・kstack high-water。CUI は mem <id> の owner_pages、GUI は gshell 診断キー CTRL+GRPH+f･10
+    の全 slot 行 (id/state/owner_pages/exec_heap_used/trim_pending)。owner-start/exit で owner・gen・pages/leftover・irq/exc の実測値、fault
+    行の err= と終了種別。NP21/W の PTE は pt0_snapshot.py、freeze の深さは emu_read_mem、画面は emu_screenshot。'
+  expect:
+    kselftest_fail: 0
+    audit_fail: 0
+    audit_runs_delta_min: 1
+    leftover_pages: 0
+    ledger_irq_ops_delta: 0
+    ledger_exc_ops_delta: 0
+    backend: PEGC
+    ram_mb: 8
+    shapes:
+      fixtures: h5_shape_i,h5_shape_ii,h5_shape_iii 全3本
+      prep: PREP free1=
+      alloc: ALLOC launch_private/add/allocated/short
+      private_pages: 512
+      tolerance_pages: 1
+      short: 0
+      success_exit: 0
+      short_exit: 1
+      bad_input: PREP FAIL
+      bad_input_exit: 1
+      enomem_entry_delta: 0
+      enomem_kill_delta: 0
+      owner_pages_after: 0
+      leftover_pages: 0
+    trim: G-1〜G-4 の数値・固定期待に一致
+    iterations: 20
+    normal_kill_delta: 0
+    db_test_pass: 9
+    db_v50_test_pass: 42
+  evidence: ~/os32-tmp/evidence/<日付>/h-R5-8mb-pegc/
+- id: h-R6-64mb
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R6: L-h、PM の派生 t2h_64mb_118.ini (ram-64mb、snd118-on / SNDboard=64)。np21w_ctl.py stop → start --ini t2h_64mb_118.ini
+    ([D1])、gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致、64MB を確認。終了後は原本 ini で start
+    し保存した元の GFX= を戻す。'
+  entry: Mの boot/地図/kselftest/高位HostDrv/親子 (32MB超)
+  observe:
+  - boot fail0、ONLINE/64MB、32MB超の恒等写像・workspacePT・固定10枚sup/RW/WB/非配布を確認。高位bufferでHostDrv read/writeと親子pattern往復、memのaudit_runs増分>=1/fail0、owner回収と次起動。
+  - '観測対応: ver / L-h manifest / hal_test で SHA・hash・size・RAM・backend、mem で kselftest / audit_runs・fail / phys_free_pages /
+    lease_active / leftover_pages / ledger ops / KHEAP・kstack high-water。CUI は mem <id> の owner_pages、GUI は gshell 診断キー CTRL+GRPH+f･10
+    の全 slot 行 (id/state/owner_pages/exec_heap_used/trim_pending)。owner-start/exit で owner・gen・pages/leftover・irq/exc の実測値、fault
+    行の err= と終了種別。NP21/W の PTE は pt0_snapshot.py、freeze の深さは emu_read_mem、画面は emu_screenshot。'
+  expect:
+    kselftest_fail: 0
+    audit_fail: 0
+    audit_runs_delta_min: 1
+    leftover_pages: 0
+    ledger_irq_ops_delta: 0
+    ledger_exc_ops_delta: 0
+    backend: PEGC
+    ram_mb: 64
+    workspace_pages: 10
+    workspace: supervisor/RW/WB・非配布
+    high_buffer: 32MB超の read/write・親子 pattern 一致
+    next_launch: 成功
+  evidence: ~/os32-tmp/evidence/<日付>/h-R6-64mb/
+- id: h-R6-pcm
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R6: L-h、PM の派生 t2h_64mb_118.ini (ram-64mb、snd118-on / SNDboard=64)。np21w_ctl.py stop → start --ini t2h_64mb_118.ini
+    ([D1])、gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致、64MB を確認。終了後は原本 ini で start
+    し保存した元の GFX= を戻す。'
+  entry: '[pcm] 起動行; pcm_test E5 (CPL3 CUI); GUI再生 park/resume'
+  observe:
+  - 起動行 [pcm] CS4231 v=100 irq 10 dma 1 fmt 0x5B を保存。pcm_testをCUI画面キーボードで起動しCTRL+STOPを届け、pcm_reclaimでPEN0/DMA mask/IRQ解除/次open成功。同期emu_cmd待ちでSTOPを送れない経路を避ける。
+  - GUI中の再生とpark/resumeを別に観測。E5のpark中kill/CPL0を合格範囲に入れない。終了後原本ini起動と元GFX復帰。
+  expect:
+    boot: '[pcm] CS4231 v=100 irq 10 dma 1 fmt 0x5B'
+    PEN_after_stop: 0
+    DMA_after_stop: masked
+    IRQ_after_reclaim: 解除
+    next_open: 成功
+    gui_park_resume: 再生継続
+  evidence: ~/os32-tmp/evidence/<日付>/h-R6-pcm/
+- id: h-R7-baseline
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R7: Ra266 実機、64MB / PEGC。FD 書込み・HDD 更新・電源・音の確認は各物理操作の個別承認。gfxmode pegc → /etc/system.cfg 読み戻し → 実機 reset (個別承認)
+    → hal_test 1 行目 PEGC 一致。更新前は v2.1、更新後は L-h (KAPI 74 / MemStat 200B)。NP21/W の観測で代用しない。'
+  entry: 更新前 v2.1 の ver / present / CG窓 / 画面を記録
+  observe:
+  - 'H-5: v2.1のcommit/API/hash、RAM/backend、同じ画面・解像度・反復数・負荷のpresent実測値を保存し更新後と比較する。基準が採れなければ測定のみと明記、±10%合格を捏造しない。'
+  expect:
+    version: v2.1
+    baseline: 同条件の present 実測値を保存
+    comparison: ±10%、基準なしは測定のみ
+  evidence: ~/os32-tmp/evidence/<日付>/h-R7-baseline/
+- id: h-R7-update
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R7: Ra266 実機、64MB / PEGC。FD 書込み・HDD 更新・電源・音の確認は各物理操作の個別承認。gfxmode pegc → /etc/system.cfg 読み戻し → 実機 reset (個別承認)
+    → hal_test 1 行目 PEGC 一致。更新前は v2.1、更新後は L-h (KAPI 74 / MemStat 200B)。NP21/W の観測で代用しない。'
+  entry: 新FD起動; deploy_source_check.py; hsync 2段; --verify 2本; 余剰照合; HDD起動
+  observe:
+  - '事前確認: 新FDの実機起動/SerialFS到達/対象/hd0到達。旧v2.1 FDも実機で起動・SerialFS到達・/hd0到達の3点を確認。名札つき旧一式 (/home/hight/os32 v2.1 build) をSerialFS側に保持、旧install
+    CDも確保。R1c-2(d)予行の合格証拠を要求。'
+  - 同期前に deploy_source_check.py で .deploy/manifest.txt 全行の配備元の存在/size/CRC を照合し管理対象ゲストパス一覧を保存。欠け/不一致が1件でもあれば同期しない (E1)。SerialFS/HostDrvの根と
+    make deploy の名札の対応も確かめる。
+  - 本ビルドの新 FD で起動し FD の新 hsync を使用 → hsync --root /hd0 --no-backup (全体、/sys除外) 完遂 → hsync --root /hd0 sys 完遂。HDDのhsyncで更新しない。
+  - hsync --root /hd0 --no-backup --verify と hsync --root /hd0 sys --verify を両方実行、全件 byte比較の変更0/errors0/extra0を採る。サイズ+mtimeだけの2回目0件を証明にしない。
+  - deploy_source_check.pyの管理対象ゲストパス一覧とシリアル ls -R (/boot /sys /sbin /usr /etc の配備物) を照合、期待一覧/allow-listにない余剰を列挙。欠け/内容差/余剰が1件でもあればHDD起動しない。verify-setはNP21/W専用なので実機の代用にしない。
+  - 個別承認した更新後HDD起動で ver(API74/Commit/Image CRC)、shlib、mem固定欄、owner-start/exit の正常対照。
+  expect:
+    old_fd_boot: 成功
+    old_fd_serialfs: 到達
+    old_fd_hd0: 到達
+    source_missing: 0
+    source_mismatch: 0
+    sync_errors: 0
+    sync_extra: 0
+    verify_whole_changes: 0
+    verify_sys_changes: 0
+    verify_errors: 0
+    managed_extra: 0
+    hdd_ver: L-h 一致
+    kapi_version: 74
+    shlib: 読込み成功
+  evidence: ~/os32-tmp/evidence/<日付>/h-R7-update/
+- id: h-R7-recover
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R7: Ra266 実機、64MB / PEGC。FD 書込み・HDD 更新・電源・音の確認は各物理操作の個別承認。gfxmode pegc → /etc/system.cfg 読み戻し → 実機 reset (個別承認)
+    → hal_test 1 行目 PEGC 一致。更新前は v2.1、更新後は L-h (KAPI 74 / MemStat 200B)。NP21/W の観測で代用しない。'
+  entry: '起動不能時: 旧一式の名札照合; v2.1 FD; 旧全体/sys同期; 両--verify; ls -R; HDD'
+  observe:
+  - 旧配備元についてもdeploy_source_check.pyで名札全行の存在/size/CRCを同期前に照合。v2.1 FDで起動、旧SerialFS配備元に対し hsync --root /hd0 --no-backup → hsync
+    --root /hd0 sys。旧FDのCRCと新HDDkernelのCRCが違うので --no-backup。
+  - hsync --root /hd0 --no-backup --verify と hsync --root /hd0 sys --verify の変更0/errors0、旧管理対象一覧とシリアルls -Rの余剰0を確認してHDD起動、v2.1のGUI含む旧一式へ復帰。欠け/差/余剰があれば起動しない。CD
+    MinimalはCUIまでの復旧と別記。
+  expect:
+    source_missing: 0
+    source_mismatch: 0
+    verify_whole_changes: 0
+    verify_sys_changes: 0
+    verify_errors: 0
+    managed_extra: 0
+    hdd_ver: v2.1
+    restoration: GUI を含む旧一式
+    cd_minimal: CUI までの復旧
+  evidence: ~/os32-tmp/evidence/<日付>/h-R7-recover/
+- id: h-R7a-cui
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R7: Ra266 実機、64MB / PEGC。FD 書込み・HDD 更新・電源・音の確認は各物理操作の個別承認。gfxmode pegc → /etc/system.cfg 読み戻し → 実機 reset (個別承認)
+    → hal_test 1 行目 PEGC 一致。更新前は v2.1、更新後は L-h (KAPI 74 / MemStat 200B)。NP21/W の観測で代用しない。'
+  entry: 'Ra26664MB: boot/ONLINE; SerialFS; 親子; map/trim/owner; PCM E6; T1f CUI'
+  observe:
+  - R7-update後。32MB超の恒等/workspacePT/固定10枚sup/RW/WB/非配布、SerialFS高位buffer read/write (HostDrv固有経路は実機で検証しない)、map枯渇/trim/STOP/次起動を記録。
+  - 'PCM E6: MODE1/INIT/MCE校正/上位Baseロード/初期mute/XTAL2/旧0F40h/1MB超DMA/DRQ停止/auto-init/実際の音をユーザーが記録。STOP→tick→IRQ解除→再open。NP21/Wで代用しない。T1f実機24件のうちCUI分を元票に対応付け、欠けは理由/担当/次の関門。'
+  - 実機の観測は ver/manifest/hal_test、mem の200B固定欄、owner-start/exit の owner/gen/pages/leftover/irq/exc 実測、GUIは CTRL+GRPH+f･10 の全slot行。PTE監査は対象操作ごとの
+    audit_runs 増分>=1 と audit_fail増分0、bootlog/シリアル/写真を保存。任意物理read APIは作らない。
+  expect:
+    kselftest_fail: 0
+    audit_fail: 0
+    audit_runs_delta_min: 1
+    leftover_pages: 0
+    ledger_irq_ops_delta: 0
+    ledger_exc_ops_delta: 0
+    ram_mb: 64
+    backend: PEGC
+    workspace_pages: 10
+    serialfs: 32MB超の read/write 一致
+    owner_pages_after: 0
+    pcm_E6: 実機観測・音のユーザー記録
+    pcm_next_open: 成功
+    t1f: CUI 分を元票に対応付け、未実施を明記
+  evidence: ~/os32-tmp/evidence/<日付>/h-R7a-cui/
+- id: h-R7b-gui
+  gate: T2h
+  contract: docs/tasks/v3/TASK_T2D_T2H.md
+  mode: manual
+  prereq: 'R7: Ra266 実機、64MB / PEGC。FD 書込み・HDD 更新・電源・音の確認は各物理操作の個別承認。gfxmode pegc → /etc/system.cfg 読み戻し → 実機 reset (個別承認)
+    → hal_test 1 行目 PEGC 一致。更新前は v2.1、更新後は L-h (KAPI 74 / MemStat 200B)。NP21/W の観測で代用しない。'
+  entry: H-5 present; CG窓WB; PEGC/日本語/全画面; GUI map/trim/owner/STOP; T1f; 31kHz STOP1/STOP2
+  observe:
+  - 更新前v2.1の同条件present基準と比較し±10%、基準なしは測定のみ。CG窓WB、GRCG/EGC/68h等の後始末を観測、PEGC日本語・fullscreen→window→CUI。
+  - map枯渇/trim/回収前後owner量は診断キー、回収後はowner-exit。STOP/次起動、T1f実機24件のGUI分・31kHz・STOP1/STOP2を元票に対応付ける。欠けは理由/担当/次の関門。終了時は保存した元GFXへ戻す。
+  - 実機の観測は ver/manifest/hal_test、mem の200B固定欄、owner-start/exit の owner/gen/pages/leftover/irq/exc 実測、GUIは CTRL+GRPH+f･10 の全slot行。PTE監査は対象操作ごとの
+    audit_runs 増分>=1 と audit_fail増分0、bootlog/シリアル/写真を保存。任意物理read APIは作らない。
+  expect:
+    kselftest_fail: 0
+    audit_fail: 0
+    audit_runs_delta_min: 1
+    leftover_pages: 0
+    ledger_irq_ops_delta: 0
+    ledger_exc_ops_delta: 0
+    backend: PEGC
+    present: v2.1 同条件比 ±10%、基準なしは測定のみ
+    cg_window: WB
+    cleanup: GRCG/EGC/68h 後始末確認
+    japanese: 表示成功
+    fullscreen: window/CUI 復帰
+    owner_pages_after: 0
+    next_launch: 成功
+    t1f: GUI 分・31kHz・STOP1/STOP2 を元票に対応付け、未実施を明記
+  evidence: ~/os32-tmp/evidence/<日付>/h-R7b-gui/
