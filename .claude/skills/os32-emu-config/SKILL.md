@@ -40,13 +40,17 @@ probe が本当に走ったかまで見たいときは、`kernel.map` の `s_pro
 ## 1. 扱えるキーの範囲
 
 現在ツールが扱うのは `[NekoProject21]` の **`USEGD5430` / `GD5430TYPE` /
-`USEPEGCP` / `ExMemory` / `e_resume`** だけ。`pc_model` `MEMswtch` `DIPswtch` などは
+`USEPEGCP` / `ExMemory` / `SNDboard` / `NP2NETSOCK` / `e_resume` /
+`HDD1FILE` / `FDD1FILE` / `FDD2FILE`**。`pc_model` `MEMswtch` `DIPswtch` などは
 **未対応**で、推測して追記・変更しない。ほかのキーが要る検証が出たら、
 ツールの拡張を別タスクとして起こし、その実装と実適用の承認を分ける。
 
 キーの照合は**大文字化して**行う。ini 側の綴り (`ExMemory`) は書き換えず、値だけ直す。
 
-`transform()` は**変更するキーが 1 つでも全キーの存在を要求して fail closed** する。
+`transform()` は従来の固定値 4 キーのどれかを変えると 4 キー全部、媒体キーの
+どれかを変えると媒体 3 キー全部の存在を要求する。追加の `SNDboard` /
+`NP2NETSOCK` / `e_resume` は操作対象のキーの存在を要求し、欠落・重複は
+追記せず fail closed。`netsock=` の鍵欠落は「鍵欠落: NP2NETSOCK」を出し、何も書かない。
 NP21/W の `initsave` は `s_IniItems[]` 表を丸ごと書くので、このエミュレータが
 書いた ini には常に揃っている。
 
@@ -54,19 +58,62 @@ NP21/W の `initsave` は `s_IniItems[]` 表を丸ごと書くので、このエ
 |---|---|---|
 | `cirrus-on` / `cirrus-off` | `USEGD5430` (+ `GD5430TYPE=91` 維持) | TASK_H3_cirrus §0 |
 | `pegc-on` / `pegc-off` | `USEPEGCP` のみ | `win9x/ini.cpp:687` が `np2cfg.usepegcplane` に束縛し、`io/pegc.c:375` が `pegc.enable` に写す。`mem/memvga.c` が PEGC の VRAM 経路ごとに見る |
-| `ram-8mb` / `ram-15mb` / `ram-32mb` / `ram-128mb` | `ExMemory` のみ (7 / 16 / 33 / 129。16 以上は 16MB システム空間の 1MB が抜けるのでゲスト報告量 + 1) | `win9x/ini.cpp:477` (`PFTYPE_UINT16`、MB 単位)。ブートローダが 1MB から 512KB 刻みで実測する (`boot/loader_fat.asm:248`)。**8MB は CUI の最低動作環境**で `memory_boot` の legacy フォールバックを通す構成。**GUI の最低要件ではない** (INSTALL.md / docs/02_memory.md / tasks/gui/DESIGN.md) |
+| `ram-8mb` / `ram-64mb` | `ExMemory` のみ (7 / 65) | `win9x/ini.cpp:477`、MB 単位。64MB は 16MB システム空間の穴を含め 65 を指定。**8MB は CUI の最低動作環境**で、GUI の最低要件ではない |
+| `ram-9mb` / `ram-15mb` / `ram-32mb` / `ram-128mb` (live の既存操作) | `ExMemory` のみ (8 / 16 / 33 / 129) | 既存構成を維持。派生 ini の操作列には含めない |
+| `snd118-on` / `snd118-off` | `SNDboard=64` / 原本の値 | `win9x/ini.cpp:523` の `%x`。派生 ini の off はコピー元の値を保持。live の off は on の receipt 必須で、`restore` と同じ復元経路 |
+| `netsock=<spec>` (派生 ini) | `NP2NETSOCK` の値だけ | `win9x/ini.cpp:627`。鍵があれば置換、同値は保持、欠落は拒否。接続や鍵の追加はしない |
+| `e_resume=false` (派生 ini) | `e_resume` の値だけ | cold start。欠落・重複・未知値は拒否 |
+| `hdd=<name>` (派生 ini) | `HDD1FILE` の値だけ | `NP21W_DIR` 直下の既存通常ファイル `*.nhd` の名前から Windows 絶対パスへ解決 |
 
 **`pc_model` は PEGC の gate ではない。** OS32 の `pegc_probe()` が見るのは BIOS
 ワークエリア 0x045C bit6 と 0x0597 bit2 で、2026-09-09 の実測では `pc_model=VX` の
 まま両方立っていた (`0x40` / `0x84`)。`pc_model` は VM/VX の 2 値 (CPU 世代) しか取らない。
 PEGC と Cirrus は独立に選べる (操作が触るキーが重ならない)。
 
+## 2. 構成切替の 3 経路 — 開始・停止・復帰
+
+**停止・起動は `tools/np21w_ctl.py` だけ。ただし trial と live-apply は道具自身が止める。**
+停止確認は [D1] に従う。強制終了に落ちたら記録し、通常終了と書かない。
+
+### trial (R0、媒体)
+
+開始は稼働中の PID / 生成時刻を `np21w_trial.py` に束縛し、trial 自身が
+通常終了→終了確認→新規 ini 作成→起動する。PM は先に止めない。
+試験後は `np21w_ctl.py stop` で停止し、原本 ini で `np21w_ctl.py start --ini <原本名>`。
+trial の baseline は以前の active ini の証明ではないので、戻り先は PM が事前に選ぶ。
+
+### 派生 ini (R1c、R3〜R6)
+
+`np21w_ctl.py stop` (`/api/quit save=0`、失敗時の強制終了を記録) →
+`derive` で原本から新しい名前へ作成 → `np21w_ctl.py start --ini <派生名>`。
+`derive` はエミュレータを照会・停止・起動せず、原本・既存名を上書きしない。
+`NP21W_DIR` は WSL の絶対パスを環境変数として明示し、`.env` は読み込まない。
+コピー元は WSL パス、出力は `NP21W_DIR` 直下の新しい `.ini` 名で渡す。
+
+```bash
+python3 tools/np21w_ini.py derive /path/to/original.ini t2h_64mb_118.ini ram-64mb snd118-on e_resume=false
+python3 tools/np21w_ini.py derive /path/to/original.ini t2h_isolated.ini hdd=os32_t2h_install.nhd netsock=127.0.0.1:8026 e_resume=false
+```
+
+操作列は左から適用し、同じキーは最後の指定を使う。`snd118-on snd118-off` は
+コピー元の音源値に戻す。他の鍵・コメント・文字コード・改行は全バイト保持。
+復帰は `np21w_ctl.py stop` → 原本名で `start --ini <原本名>` → 元の `GFX=` を戻し、
+読み戻し→reset→`hal_test` の実 backend 一致を確認する。派生 ini は残してよい。
+
+### live-apply (派生 ini が使えないときの代替)
+
+開始は `np21w_ini_live.py <操作> --live-apply --exclusive-operator`。
+道具自身が停止・保存・起動する。PM が先に止めない。終了時の復帰も道具自身が
+同じ receipt で `restore --live-apply --exclusive-operator` の停止・復元・起動を行う。
+`snd118-off --receipt <on の receipt>` も同じ復元経路。receipt は重ねず、各適用を
+戻してから次の適用へ進む。元の `GFX=` も戻して実 backend を確認する。
+
 ## 承認済み disk trial（通常終了・新規 ini、2026-09-14 に Cirrus trial から改訂）
 
 exe 隣接 baseline をコピーし、**稼働中の NP21/W を trial 自身が通常終了 → 終了確認 → 新 ini 作成 → 起動**する依頼は
 [tools/np21w_trial.py](../../../tools/np21w_trial.py) を使う (票 S3-I2)。trial が扱う変更集合は
 **`HDD1FILE` (`--hdd <name>` = `NP21W_DIR` 直下の `*.nhd`)、`FDD1FILE` / `FDD2FILE` の空化 (`--fdd-eject`)、
-`e_resume=false` の強制**だけで、Cirrus / PEGC / ExMemory は触らない (それらはライブ変更ツールの領分)。
+`e_resume=false` の強制**だけで、Cirrus / PEGC / ExMemory は触らない (それらは派生 ini / live の領分)。
 起動は `"<exe>" "/i<trial ini>" ["<d88>"]` (`--fdd-arg <name>` で `NP21W_DIR` 直下の `.d88` を FDD 引数に付ける)。
 **PM が先に NP21/W を終了しない** (稼働中プロセスの PID / 生成時刻を計画に束縛して trial に終了させる。
 taskkill は ini を書き戻さないので使わない)。使い捨て NHD は `tools/mk_blank_nhd.py --out <NP21W_DIR>/<name>.nhd` で作る。
@@ -144,7 +191,7 @@ taskkill は ini を書き戻さないので使わない)。使い捨て NHD は
 
 [TASK_H3_cirrus.md §0](../../../docs/archive/gui_v11/TASK_H3_cirrus.md) と
 [GUI TASKS.md の 2026-09-06 WAB OFF 記録](../../../docs/tasks/gui/TASKS.md) に従い、
-`[NekoProject21]` の `USEGD5430=true/false`、`GD5430TYPE=91` のみ扱う。
+Cirrus 操作は `[NekoProject21]` の `USEGD5430=true/false`、`GD5430TYPE=91` のみ扱う。
 91 は十進 Xe10 固定。欠落・重複・未知の既存値は追記や推測をせず拒否する。
 無関係なバイト・文字コード・コメント・空白・混在改行・BOM は既存 `transform()`
 で保持する。表示は変更フィールドだけ。原文や全設定を出力しない。

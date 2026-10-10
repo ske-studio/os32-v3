@@ -39,6 +39,8 @@ OPERATIONS = {'cirrus-on': {'USEGD5430': 'true', 'GD5430TYPE': '91'},
               'ram-9mb': {'EXMEMORY': '8'},
               'ram-15mb': {'EXMEMORY': '16'},
               'ram-32mb': {'EXMEMORY': '33'},
+              'ram-64mb': {'EXMEMORY': '65'},
+              'snd118-on': {'SNDBOARD': '64'},
               'ram-128mb': {'EXMEMORY': '129'}}
 SIGNATURE_LIMIT = 256  # FileIdentity.Signature: seven decimal integers + separators.
 SIGNATURE_JSON_BYTES = 12 * SIGNATURE_LIMIT  # Escaped UTF-16 surrogate pair per character.
@@ -240,6 +242,9 @@ class Live:
         self.executor, self.target = executor, dict(target)
 
     def run(self, operation, *, live_apply=False, exclusive=False, receipt=None):
+        sound_off = operation == 'snd118-off'
+        if sound_off:
+            operation = 'restore'  # off means original, proven by on's receipt
         if operation not in (*OPERATIONS, 'restore'):
             raise IniError('unsupported predefined operation')
         if live_apply and exclusive is not True:
@@ -268,6 +273,8 @@ class Live:
                     if (set(record) != {'target', 'operation', 'original', 'applied', 'diff', 'process'} or
                             record['target'] != self.target or record['operation'] not in OPERATIONS):
                         raise IniError('invalid receipt target or operation')
+                    if sound_off and record['operation'] != 'snd118-on':
+                        raise IniError('snd118-off requires a snd118-on receipt')
                     original = checked_snapshot(record['original'])
                     expected, forward = transform(original['data'], OPERATIONS[record['operation']])
                     if (checked_snapshot(record['applied'])['data'] != expected or
@@ -879,10 +886,10 @@ def bind_model_operation(executor, target, *, authorized_apply=False, exclusive=
 
 def main(argv=None, executor_factory=WindowsExecutor):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('operation', choices=(*OPERATIONS, 'restore'))
+    parser.add_argument('operation', choices=(*OPERATIONS, 'snd118-off', 'restore'))
     parser.add_argument('--exe', required=True, help='operator-selected absolute Windows np21x64w.exe')
     parser.add_argument('--ini', required=True, help='operator-selected absolute explicit .ini')
-    parser.add_argument('--receipt', help='opaque ID returned by apply, only for restore')
+    parser.add_argument('--receipt', help='opaque ID returned by apply, for restore/snd118-off')
     parser.add_argument('--live-apply', action='store_true', help='stop, write and restart (default: read-only preview)')
     parser.add_argument('--exclusive-operator', action='store_true', help='operator owns exclusive use through restart')
     args = parser.parse_args(argv)

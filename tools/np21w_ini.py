@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Narrow NP21/W byte transformation and OFFLINE preparation only.
+"""Narrow NP21/W byte transformation and OFFLINE preparation/derivation only.
 
 No emulator/credential imports, shell, network, process control or live writer.
 --apply requires --output: writes only a new private offline bundle, never the
@@ -47,7 +47,18 @@ import uuid
 # 8MB は CUI の最低動作環境であって GUI の最低要件ではない
 # (INSTALL.md / docs/02_memory.md / tasks/gui/DESIGN.md)。
 ALLOWED = {'USEGD5430': ('true', 'false'), 'GD5430TYPE': ('91',),
-           'USEPEGCP': ('true', 'false'), 'EXMEMORY': ('7', '8', '16', '33', '129')}
+           'USEPEGCP': ('true', 'false'), 'EXMEMORY': ('7', '8', '16', '33', '65', '129')}
+
+# Additional fields are required only when selected, keeping old receipts and
+# the original four-field backend contract valid. SNDboard is saved as hex.
+EXTRA = {'SNDBOARD', 'NP2NETSOCK', 'E_RESUME'}
+DERIVE_OPERATIONS = {
+    'cirrus-on': {'USEGD5430': 'true', 'GD5430TYPE': '91'},
+    'cirrus-off': {'USEGD5430': 'false', 'GD5430TYPE': '91'},
+    'pegc-on': {'USEPEGCP': 'true'}, 'pegc-off': {'USEPEGCP': 'false'},
+    'ram-8mb': {'EXMEMORY': '7'}, 'ram-64mb': {'EXMEMORY': '65'},
+    'snd118-on': {'SNDBOARD': '64'}, 'e_resume=false': {'E_RESUME': 'false'},
+}
 
 # パス値を持つキーは固定値の白リストでは表せないので別表にする (票 S3I2-T)。
 #   HDD1FILE  : IDE 第1スロットのイメージ。値は NP21W_DIR 直下の *.nhd の
@@ -173,9 +184,28 @@ def _changes(changes):
             resolved[key] = value
         elif key in ALLOWED_PATHS:
             resolved[key] = _path_value(key, value)
+        elif key in EXTRA:
+            resolved[key] = _extra_value(key, value)
         else:
             raise IniError('unsupported backend field or value')
     return resolved
+
+
+def _extra_value(key, value):
+    if not isinstance(value, str) or not value.isascii():
+        raise IniError('unsupported additional field value')
+    if key == 'SNDBOARD':
+        valid = re.fullmatch(r'[0-9A-Fa-f]{1,2}', value)
+    elif key == 'E_RESUME':
+        valid = value in ('true', 'false')
+    else:
+        # A socket spec is an opaque literal. Do not interpret addresses or
+        # connect; exclude ini separators, control bytes and outer whitespace.
+        valid = (value == value.strip() and
+                 not re.search(r'[;#\x00-\x20\x7f]', value))
+    if not valid:
+        raise IniError('unsupported additional field value')
+    return value
 
 
 def transform(raw, changes):
@@ -220,24 +250,33 @@ def transform(raw, changes):
         key = match[2].decode('ascii').upper()
         fixed = want_fixed and key in ALLOWED
         path = want_path and key in ALLOWED_PATHS
-        if not fixed and not path:
+        extra = key in changes and key in EXTRA
+        if not fixed and not path and not extra:
             continue
         if key in found:
             raise IniError('duplicate backend field')
         token = match[4].rstrip(b' \t')
         if fixed and token not in tuple(v.encode('ascii') for v in ALLOWED[key]):
             raise IniError('unsupported existing backend value')
+        if extra:
+            try:
+                _extra_value(key, token.decode('ascii'))
+            except UnicodeError:
+                raise IniError('unsupported existing additional value') from None
         if path and match[5] is not None:
             # A path value is opaque CP932, so a ';'/'#' tail cannot be told
             # apart from a comment. Refuse instead of guessing (fail closed).
             raise IniError('unsupported separator in path field')
         start = len(bom) + match.start(4)
         found[key] = (i, start, start + len(token), token)
-    required = (set(ALLOWED) if want_fixed else set()) | (set(ALLOWED_PATHS) if want_path else set())
+    required = ((set(ALLOWED) if want_fixed else set()) |
+                (set(ALLOWED_PATHS) if want_path else set()) | (set(changes) & EXTRA))
+    if sections == 1 and 'NP2NETSOCK' in changes and 'NP2NETSOCK' not in found:
+        raise IniError('鍵欠落: NP2NETSOCK (missing key); refusing derivation')
     if sections != 1 or set(found) != required:
         raise IniError('missing or duplicate target section/backend fields')
     diff = []
-    for key in list(ALLOWED) + list(ALLOWED_PATHS):
+    for key in list(ALLOWED) + list(ALLOWED_PATHS) + sorted(EXTRA):
         if key not in changes:
             continue
         i, start, end, old = found[key]
@@ -245,10 +284,10 @@ def transform(raw, changes):
         if old == new:
             continue
         parts[i] = parts[i][:start] + new + parts[i][end:]
-        if key in ALLOWED:
+        if key in ALLOWED or key in ('SNDBOARD', 'E_RESUME'):
             diff.append(f"{key}: {old.decode('ascii')} -> {resolved[key]}")
         else:
-            # Never print the previous opaque path; the new one is operator-chosen.
+            # Never print the previous opaque path/spec; new is operator-chosen.
             diff.append('%s: %s -> %s' % (key, 'set' if old else 'empty',
                                           resolved[key] or 'empty'))
     candidate = b''.join(parts)
@@ -346,6 +385,43 @@ def _hash(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def derive(snapshot, name, operations):
+    """Write a new named ini under NP21W_DIR, preserving the source bytes.
+
+    Operations are ordered; the last selection of a key wins. snd118-off
+    cancels the sound override, retaining the copy source's original value.
+    Validate the entire plan before CreateNew; never replace an existing name.
+    """
+    image_name(name, '.ini')
+    if not isinstance(operations, (list, tuple)) or not operations:
+        raise IniError('nonempty operation sequence required')
+    original = read_snapshot(snapshot)
+    changes = {}
+    for operation in operations:
+        if not isinstance(operation, str):
+            raise IniError('unsupported derivation operation')
+        if operation in DERIVE_OPERATIONS:
+            changes.update(DERIVE_OPERATIONS[operation])
+        elif operation == 'snd118-off':
+            transform(original, {'SNDBOARD': '64'})  # validate, retain original
+            changes.pop('SNDBOARD', None)
+        elif operation.startswith('netsock='):
+            changes['NP2NETSOCK'] = operation.partition('=')[2]
+        elif operation.startswith('hdd='):
+            changes['HDD1FILE'] = resolve_image(operation.partition('=')[2], '.nhd')[1]
+        else:
+            raise IniError('unsupported derivation operation')
+    candidate, diff = transform(original, changes) if changes else (original, [])
+    directory, windows = np21w_directory()
+    windows_path(windows + '\\' + name)
+    with _directory(directory) as fd:
+        _new_file(fd, name, candidate)
+        os.fsync(fd)
+        if _read(fd, name)[0] != candidate:
+            raise IniError('derived ini readback failed; retain file for diagnosis')
+    return Path(directory) / name, diff
+
+
 def prepare(snapshot, output, changes):
     """Create a unique offline bundle; NEVER write the supplied snapshot.
 
@@ -409,6 +485,10 @@ def restore(bundle, apply=False):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='command', required=True)
+    deriv = sub.add_parser('derive', help='write a NEW named ini under NP21W_DIR')
+    deriv.add_argument('snapshot', help='copy source; never overwritten')
+    deriv.add_argument('name', help='new .ini filename (no path components)')
+    deriv.add_argument('operations', nargs='+', help='ordered configuration operations')
     prep = sub.add_parser('prepare', help='dry-run an offline snapshot; never writes input')
     prep.add_argument('snapshot')
     prep.add_argument('--set', action='append', required=True, dest='settings', metavar='KEY=VALUE')
@@ -419,7 +499,10 @@ def main(argv=None):
     rest.add_argument('--apply', action='store_true')
     args = parser.parse_args(argv)
     try:
-        if args.command == 'restore':
+        if args.command == 'derive':
+            output, diff = derive(args.snapshot, args.name, args.operations)
+            print('derived ini: ' + str(output))
+        elif args.command == 'restore':
             diff = restore(args.bundle, args.apply)
         else:
             if args.apply and not args.output:
