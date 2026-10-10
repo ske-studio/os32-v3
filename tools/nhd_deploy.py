@@ -1636,17 +1636,33 @@ def do_verify_set(set_file):
         # h1 defines these managed trees; user data outside them is not extra.
         managed = ('/boot', '/sys', '/bin', '/sbin', '/usr', '/etc')
         allow = expected['allow_list']
-        allowed = {'/etc/settings.db', '/etc/system.cfg', '/var/log/*'}
-        if not isinstance(allow, list) or {a['guest'] for a in allow} != allowed or any(
-                a['check'] != 'exists' for a in allow):
+        if not isinstance(allow, list):
             raise ValueError('invalid allow-list')
+        # h1 owns the membership. Accept exact paths and non-recursive '*'
+        # patterns in the final component only, with the known check kind.
+        allowed = set()
+        for item in allow:
+            guest = item['guest']
+            path = PurePosixPath(guest)
+            if (not path.is_absolute() or '..' in path.parts or str(path) != guest or
+                    guest == '/' or guest.startswith('//') or
+                    any(c in guest for c in '?[]\x00') or '**' in guest or
+                    '*' in str(path.parent) or item['check'] != 'exists'):
+                raise ValueError('invalid allow-list entry: ' + str(guest))
+            allowed.add(guest)
+        def is_allowed(guest):
+            import fnmatch
+            path = PurePosixPath(guest)
+            return any(path.parent == PurePosixPath(pattern).parent and
+                       fnmatch.fnmatchcase(path.name, PurePosixPath(pattern).name)
+                       for pattern in allowed)
         files = {}
         for item in expected['files']:
             guest = item['guest']
             path = PurePosixPath(guest)
             if (not path.is_absolute() or '..' in path.parts or str(path) != guest or
                     guest == '/' or
-                    guest in files or guest in allowed or
+                    guest in files or is_allowed(guest) or
                     not isinstance(item['host'], str) or not item['host'] or
                     type(item['size']) is not int or item['size'] < 0 or
                     not re.fullmatch('[0-9a-f]{64}', item['sha256'])):
@@ -1690,7 +1706,7 @@ def do_verify_set(set_file):
                     guest = '/' + path.relative_to(root).as_posix()
                     if path.is_symlink():
                         problems.append('symlink: ' + guest)
-                    elif not path.is_dir() and guest not in files and guest not in allowed:
+                    elif not path.is_dir() and guest not in files and not is_allowed(guest):
                         problems.append('extra: ' + guest)
         for problem in problems:
             print(problem, file=sys.stderr)

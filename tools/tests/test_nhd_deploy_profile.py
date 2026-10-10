@@ -207,6 +207,68 @@ class ProfileTests(unittest.TestCase):
         self.set_file.write_text('{}')
         self.assertFalse(nd.do_verify_set(str(self.set_file)))
 
+    def test_allow_list_membership_from_set(self):
+        self.assertTrue(nd.do_pull())
+        data = self.manifest()
+        self.assertTrue(nd.do_sync())
+        journal = self.mount / 'etc/settings.db-journal'
+        journal.write_text('guest journal')
+        self.assertFalse(nd.do_verify_set(str(self.set_file)))
+        data['allow_list'].append({'guest': '/etc/settings.db-journal', 'check': 'exists'})
+        self.set_file.write_text(json.dumps(data))
+        self.assertTrue(nd.do_verify_set(str(self.set_file)))
+        journal.write_text('changed journal contents')
+        self.assertTrue(nd.do_verify_set(str(self.set_file)))
+        journal.unlink()
+        self.assertFalse(nd.do_verify_set(str(self.set_file)))
+        # The manifest may also omit the old default names, including all of them.
+        data['allow_list'] = []
+        self.set_file.write_text(json.dumps(data))
+        self.assertFalse(nd.do_verify_set(str(self.set_file)))
+        for name in ('settings.db', 'system.cfg'):
+            (self.mount / 'etc' / name).unlink()
+        self.assertTrue(nd.do_verify_set(str(self.set_file)))
+
+    def test_allow_list_glob_is_one_level(self):
+        self.assertTrue(nd.do_pull())
+        data = self.manifest()
+        self.assertTrue(nd.do_sync())
+        data['allow_list'].append({'guest': '/etc/logs/*.log', 'check': 'exists'})
+        self.set_file.write_text(json.dumps(data))
+        self.assertTrue(nd.do_verify_set(str(self.set_file)))  # Zero matches is valid.
+        logs = self.mount / 'etc/logs'
+        logs.mkdir()
+        (logs / 'guest.log').write_text('first log')
+        self.assertTrue(nd.do_verify_set(str(self.set_file)))
+        (logs / 'guest.log').write_text('changed log')
+        self.assertTrue(nd.do_verify_set(str(self.set_file)))
+        extra = logs / 'guest.txt'
+        extra.write_text('not a log')
+        self.assertFalse(nd.do_verify_set(str(self.set_file)))
+        extra.unlink()
+        (logs / 'nested').mkdir()
+        (logs / 'nested/guest.log').write_text('not a direct child')
+        self.assertFalse(nd.do_verify_set(str(self.set_file)))
+
+    def test_allow_list_invalid_shapes(self):
+        self.assertTrue(nd.do_pull())
+        data = self.manifest()
+        self.assertTrue(nd.do_sync())
+        for invalid in [
+            None, {}, [None], [{'guest': '/etc/settings.db'}],
+            [{'guest': '/etc/settings.db', 'check': 'sha256'}],
+            *[[{'guest': guest, 'check': 'exists'}] for guest in (
+                'etc/settings.db', '/', '//etc/settings.db', '/etc/../settings.db',
+                '/etc/./settings.db', '/etc//settings.db', '/etc/settings.db/',
+                '/etc/**', '/etc/*/log', '/etc/log?.txt', '/etc/log[12]', '/etc/\x00')],
+        ]:
+            with self.subTest(allow_list=invalid):
+                data['allow_list'] = invalid
+                self.set_file.write_text(json.dumps(data))
+                with patch.object(sys, 'argv', ['nhd_deploy.py', 'verify-set',
+                                               '--set', str(self.set_file)]):
+                    self.assertFalse(nd.main())
+
 
 def real_set(path):
     expected = json.loads(Path(path).read_text())
@@ -225,9 +287,11 @@ def real_set(path):
         cfg = nd._load_merged([str(ROOT / rel) for rel in nd.CORE_MANIFEST_RELPATHS])
         assert cfg
         case.patches.enter_context(patch.object(nd, 'load_deploy_yaml', lambda: cfg))
-        (case.mount / 'etc').mkdir(exist_ok=True)
-        for name in ('settings.db', 'system.cfg'):
-            (case.mount / 'etc' / name).write_text('guest-owned')
+        for item in expected['allow_list']:
+            if '*' not in item['guest']:
+                guest_file = case.mount / item['guest'].lstrip('/')
+                guest_file.parent.mkdir(parents=True, exist_ok=True)
+                guest_file.write_text('guest-owned')
         assert nd.do_sync()
         assert nd.do_verify_set(str(Path(path).resolve()))
         assert any(item['guest'] == '/sys/unicode.bin' for item in expected['files'])

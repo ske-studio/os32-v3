@@ -219,14 +219,14 @@ Makefile ターゲットとの対応 (`build/deploy.mk`)。**このリポジト�
 KernelAPI の構造体を変えたときは `make clean` → `make all` が必須
 (古い `.o` が残ると ABI 不整合で静かに壊れる)。
 
-<a id="検査の3段"></a>
 #### T2h の試験専用 kernel と隔離 NHD
 
 `make kernel-r1` は `OS32_R1_FIXTURE` を付け、object / 依存ファイルを
 `build/out/r1/obj/`、像・map・`manifest.json` を `build/out/r1/` に作る。
 製品の object と像は共有しない。`check-r1-fixture-host` は CPU 入口を模擬して
 実台帳と停止経路を検査し、clean を挟まない両ビルド順で製品 hash が変わらないことを
-確認する。hash 比較では既存の `__DATE__` / `__TIME__` を `SOURCE_DATE_EPOCH` で固定する。
+確認する。両順ビルドは先頭 runner だけが `$TMPDIR` 内のソースの写しで行い、
+その写しだけで `__DATE__` / `__TIME__` を `SOURCE_DATE_EPOCH` で固定する。
 
 試験像だけにある BSS `r1_fixture_arm[7]` の添字 1 / 2 / 4 に
 `R1_FIXTURE_ARM` (`kernel/r1_fixture.h`) を `emu_write_mem` で書くと一度だけ発火する。
@@ -251,13 +251,16 @@ copy する段だけを担当する。続けて `deploy --profile t2h` で反映
 `verify-set --profile t2h --set build/out/deploy-set.json` は h1 の期待表の全ファイルの
 存在・size・sha256 を読み取り照合し、管理ディレクトリ (`/boot`、`/sys`、`/bin`、
 `/sbin`、`/usr`、`/etc`) の余剰も列挙する。欠損・改変・余剰は非 0 終了。
-allow-list の設定は存在だけを検査し、`/var/log/*` は 0 本以上のゲスト生成ログを許す。
+allow-list の集合は `deploy-set.json` を正とし、`check: exists` の絶対パスを受け付ける。
+完全一致の設定は存在だけを検査し、末尾要素の `*` は同じ階層の 0 本以上を許す
+(例: `/var/log/*`)。再帰 glob と未知の検査種別は拒否する。
 期待表にある `/home` 等の配備ファイルも照合するが、その周囲のユーザーデータは余剰にしない。
 `generations-manifest.json` は配備集合ではないので渡さない。
 ゲストが書いた後は **stop → umount → pull → verify-set**。
 `np21w_ctl.py start` は起動前にこの作業木の t2h stamp を失効させる
 (別 ini の起動も安全側に失効)。remote の hash が変わった場合も、pull を省いた照合・配備を拒否する。
 
+<a id="検査の3段"></a>
 #### 検査の 3 段 (`check-fast` / `check-changed` / `check`、2026-09-26)
 
 依頼パックの事実は `python3 tools/check_select.py --pack --files <触るファイル…>` の出力を貼る。着地前に `python3 tools/test_changes.py --base <SHA> --pack <依頼パック.md>` で試験変更を確認する。

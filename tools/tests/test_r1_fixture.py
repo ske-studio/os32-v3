@@ -1,7 +1,7 @@
 """T2h: real stop hooks and separate build products, no emulator or disk image.
 
 CPU ud2/stop are replaced; allocator and closing exception path are real source.
-Product __DATE__/__TIME__ are fixed with SOURCE_DATE_EPOCH for build comparisons.
+Only the temporary source copy uses SOURCE_DATE_EPOCH for build comparisons.
 """
 import argparse
 import hashlib
@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import tempfile
 
@@ -72,46 +73,62 @@ def digest(path):
 
 
 def builds(tmp):
+    # Copy source bytes, never link back to the live tree: make also regenerates
+    # KAPI files and build IDs. Include untracked sources, but not ignored data.
+    root = tmp / 'tree'
+    listed = subprocess.check_output(
+        ['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard'], cwd=ROOT)
+    for name in sorted(set(os.fsdecode(listed).split('\0')) - {''}):
+        src = ROOT / name
+        if not src.is_file() or '.env' in src.parts:
+            continue
+        dest = root / name
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+    # Reuse only the Rust archive; the C/ASM objects are built in the copy.
+    archive = Path('lib/os32_lz4/target/i686-os32-none/release/libos32_lz4.a')
+    (root / archive).parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(ROOT / archive, root / archive)
     env = dict(os.environ, SOURCE_DATE_EPOCH='1700000000')
     def make(target):
         with (tmp / (target + '.log')).open('w') as log:
-            rc = subprocess.run(['make', target], cwd=ROOT, env=env, stdout=log,
+            rc = subprocess.run(['make', target], cwd=root, env=env, stdout=log,
                                 stderr=subprocess.STDOUT).returncode
         assert rc == 0, (tmp / (target + '.log')).read_text()[-4000:]
     def snapshot():
         return {str(p): (p.stat().st_mtime_ns, digest(p)) for p in
-                (ROOT / 'kernel').glob('*.o')}
+                (root / 'kernel').glob('*.o')}
     make('kernel')
-    product = ROOT / 'build/out/kernel.bin'
+    product = root / 'build/out/kernel.bin'
     original = digest(product)
-    original_map = digest(ROOT / 'build/out/kernel.map')
+    original_map = digest(root / 'build/out/kernel.map')
     original_objects = snapshot()
     # P -> R -> P -> R includes both required no-clean orderings.
     make('kernel-r1')
     assert snapshot() == original_objects, 'fixture changed product objects'
     assert digest(product) == original, 'fixture changed product image'
-    assert digest(ROOT / 'build/out/kernel.map') == original_map
+    assert digest(root / 'build/out/kernel.map') == original_map
     make('kernel')
     assert digest(product) == original, 'R -> P changed product image'
     original_objects = snapshot()
     make('kernel-r1')
     assert snapshot() == original_objects and digest(product) == original
-    assert 'r1_fixture_' not in (ROOT / 'build/out/kernel.map').read_text()
-    trial_map = (ROOT / 'build/out/r1/kernel.map').read_text()
+    assert 'r1_fixture_' not in (root / 'build/out/kernel.map').read_text()
+    trial_map = (root / 'build/out/r1/kernel.map').read_text()
     assert 'r1_fixture_arm' in trial_map and 'r1_fixture_timer' in trial_map
-    assert digest(ROOT / 'build/out/vmkernel.lz4') != digest(ROOT / 'build/out/r1/vmkernel.lz4')
-    manifest = json.loads((ROOT / 'build/out/r1/manifest.json').read_text())
-    assert manifest['files']['kernel.bin']['sha256'] == digest(ROOT / 'build/out/r1/kernel.bin')
+    assert digest(root / 'build/out/vmkernel.lz4') != digest(root / 'build/out/r1/vmkernel.lz4')
+    manifest = json.loads((root / 'build/out/r1/manifest.json').read_text())
+    assert manifest['files']['kernel.bin']['sha256'] == digest(root / 'build/out/r1/kernel.bin')
     # Exercise the real make target with a forbidden production local name.
-    bad_env = dict(env, OS32_NHD_LOCAL=str(ROOT / 'build/nhd/os32.nhd'))
-    result = subprocess.run(['make', 'deploy-kernel-r1', 'PROFILE=t2h'], cwd=ROOT,
+    bad_env = dict(env, OS32_NHD_LOCAL=str(root / 'build/nhd/os32.nhd'))
+    result = subprocess.run(['make', 'deploy-kernel-r1', 'PROFILE=t2h'], cwd=root,
                             env=bad_env, capture_output=True, text=True)
     assert result.returncode != 0 and 't2h profile path mismatch' in result.stderr
-    result = subprocess.run(['make', 'deploy-kernel-r1', 'PROFILE=production'], cwd=ROOT,
+    result = subprocess.run(['make', 'deploy-kernel-r1', 'PROFILE=production'], cwd=root,
                             env=bad_env, capture_output=True, text=True)
     assert result.returncode != 0 and 'requires PROFILE=t2h' in result.stdout
     # Same kselftest source and KAPI generation; no fixture bypass of tests.
-    assert 'OS32_R1_FIXTURE' not in (ROOT / 'kernel/kselftest.c').read_text()
+    assert 'OS32_R1_FIXTURE' not in (root / 'kernel/kselftest.c').read_text()
     print('r1 build isolation: both orders PASS, product bytes=' + str(product.stat().st_size))
 
 
@@ -124,7 +141,8 @@ def main():
         tmp = Path(name)
         assert fixture(tmp, runner=args.runner) == 0, 'stop hooks'
         print('r1 stop hooks: PASS')
-        builds(tmp)
+        if args.runner == host32.selected_runner():
+            builds(tmp)
         if args.mutate:
             for old, new in [
                 ('r1_fixture_arm[slot] = 0;', '/* leave armed */'),
