@@ -1,4 +1,7 @@
 #include "v86_mem.h"
+#ifdef OS32_R1_FIXTURE
+#include "r1_fixture.h"
+#endif
 #include "../drivers/serial.h"
 #include "appmem.h"
 #include "v86.h"
@@ -1040,10 +1043,14 @@ static int app_store(AppSlot *a, u32 va, const void *src, u32 len)
 u32 exec_as_leftover_pages;
 u32 exec_entry_calls; /* D35: rejected images leave this counter unchanged. */
 
+#include "owner_diag.h"
+
 static void exec_teardown_app(AppSlot *a)
 {
     u32 left;
     if (!a || !a->cpl3 || !a->as || !a->as->pd_phys) return;
+    u32 owner_pages_before = ledger_owner_pages(a->as->owner);
+    u32 before = exec_as_leftover_pages;
     /* 共有ライブラリの .data 複製ページを返す (PD 破棄の前, K3) */
     if (lease_revoke_all(a->as))
         kprintf(ATTR_RED, "lease revoke failed during teardown\n");
@@ -1080,6 +1087,7 @@ poisoned:
     serial_puts_polled("OS32: appmem AS poisoned; owner pages retained\r\n");
     exec_as_leftover_pages += ledger_owner_pages(a->as->owner);
 done:
+    exec_owner_diag(a, 1, owner_pages_before, exec_as_leftover_pages - before);
     kfree(a->as);
     a->as = 0;
     a->cpl3 = 0;
@@ -1343,6 +1351,9 @@ static void exec_finish(int id, int status, int kind)
         res_owner_set(0);
         exec_reclaim_owned(id, kind);
     } else {
+#ifdef OS32_R1_FIXTURE
+        r1_fixture_parent(id);
+#endif
         parent = appslot_return_target(id);
         /* 装置・FD の利用終了を私有ページの返却より先に済ませる (R1)。 */
         exec_reclaim_resources(id);
@@ -2101,6 +2112,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
             appslot_shell_commit();
         } else {
             appslot_start_commit(id, gui, need_pages);
+            if (want_ring3) exec_owner_diag(ctx, 0, 0, 0);
             /* 暴走判定の起点 (票 T9 §12 S6)。 */
             appslot_mark_scheduled(id, tick_count);
         }
@@ -2480,6 +2492,9 @@ i32 exec_resume(i32 app_id, i32 wait_ret)
         return 0;
     }
 
+#ifdef OS32_R1_FIXTURE
+    r1_fixture_resume((int)app_id);
+#endif
     appslot_resume_commit((int)app_id);
     appslot_mark_scheduled((int)app_id, tick_count);   /* 票 T9 §12 S6 */
     /* A parked AS may have been poisoned by a foreign lease revoke. Consume

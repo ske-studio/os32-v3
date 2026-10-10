@@ -56,3 +56,4 @@ check-tools-host:
 - sdk/rust/os32api/src/**
 - userland/gshell/src/taskbar.rs
 - userland/gshell/src/startmenu.rs
+- tools/nhd_profile.py

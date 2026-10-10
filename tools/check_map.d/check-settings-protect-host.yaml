@@ -16,3 +16,4 @@ check-settings-protect-host:
 - userland/system/hsync_protect.inc
 - tools/check_map.d/check-settings-protect-host.yaml
 - build/checks.d/check-settings-protect-host.mk
+- tools/nhd_profile.py

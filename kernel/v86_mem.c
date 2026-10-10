@@ -1,3 +1,6 @@
+#ifdef OS32_R1_FIXTURE
+#include "r1_fixture.h"
+#endif
 /* ======================================================================== */
 /*  V86_MEM.C — V86 ゲスト用アドレス空間                                    */
 /* ======================================================================== */
@@ -132,6 +135,9 @@ int v86_session_begin(u32 owner)
     /* I/O 許可ビットマップにゲスト用ポリシーを適用 */
     v86_io_apply_policy();
 
+#ifdef OS32_R1_FIXTURE
+    r1_fixture_v86_ready();
+#endif
     return 0;
 
 fail:
@@ -148,6 +154,9 @@ void v86_session_end(void)
     u32 flags = irq_save();
     if (v86_session.closing) { irq_restore(flags); return; }
     v86_session.closing = 1;
+#ifdef OS32_R1_FIXTURE
+    r1_fixture_v86_end();
+#endif
     if (!v86_session.open) goto release;
     /* Preserve this context's IF, but leave guest IOPL/other flags behind. */
     if (v86_session.running)

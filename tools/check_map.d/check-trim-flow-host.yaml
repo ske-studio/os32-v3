@@ -85,3 +85,5 @@ check-trim-flow-host:
 - userland/tests/trim_back.c
 - tools/tests/os32api_host.py
 - userland/rust/trim_back_rs/src/cache.rs
+- kernel/kernel.c
+- kernel/kstack_hw.c

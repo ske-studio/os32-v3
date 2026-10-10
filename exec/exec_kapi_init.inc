@@ -250,7 +250,7 @@ extern i32 __cdecl wrap_mem_stat(i32 app_id, void *out, u32 size);
 extern i32 __cdecl kapi_reserved_nosys(void);
 
 kapi->magic = 0x4B415049UL;
-kapi->version = 73;
+kapi->version = 74;
 
     kapi->gfx_init = wrap_gfx_init;
     kapi->gfx_init_200 = wrap_gfx_init_200;

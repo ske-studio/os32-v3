@@ -97,3 +97,11 @@ deploy-fd: images/os32_boot.d88 images/os32_boot144.img
 	cp images/os32_boot144.img '$(NP21W_DIR)/os32_boot144.img'
 
 .PHONY: deploy-fd
+
+# Caller performs stop -> umount -> pull --profile t2h before this copy,
+# then deploy --profile t2h -> start. Never route a fixture to production.
+deploy-kernel-r1: kernel-r1
+	@test "$(PROFILE)" = t2h || { echo 'deploy-kernel-r1 requires PROFILE=t2h'; exit 1; }
+	$(NHD_DEPLOY) copy --profile t2h --dest /boot $(R1_OUT)/vmkernel.lz4
+
+.PHONY: deploy-kernel-r1

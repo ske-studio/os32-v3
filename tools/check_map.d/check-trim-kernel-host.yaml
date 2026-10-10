@@ -67,3 +67,6 @@ check-trim-kernel-host:
 - userland/shell/cmd_sys.c
 - userland/gshell/src/trim.rs
 - userland/rust/trim_back_rs/src/cache.rs
+- exec/owner_diag.h
+- kernel/kernel.c
+- kernel/kstack_hw.c

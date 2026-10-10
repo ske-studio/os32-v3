@@ -15,6 +15,7 @@
 #include "io.h"
 
 static KHeap exec_heap;
+u32 resident_heap_peak, resident_heap_fail;
 
 static int user_arena(const struct appmem_extent *e)
 {
@@ -200,7 +201,10 @@ void exec_heap_init_at(u32 base, u32 size)
 void *exec_heap_alloc(u32 size)
 {
     if (kctx_irq_depth || kctx_exc_depth) return 0;
-    return kheap_alloc(&exec_heap, size);
+    void *p = kheap_alloc(&exec_heap, size);
+    if (!p) resident_heap_fail++;
+    if (exec_heap.used > resident_heap_peak) resident_heap_peak = exec_heap.used;
+    return p;
 }
 
 void exec_heap_free(void *ptr)

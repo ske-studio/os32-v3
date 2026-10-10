@@ -1,3 +1,6 @@
+#ifdef OS32_R1_FIXTURE
+#include "r1_fixture.h"
+#endif
 /* ======================================================================== */
 /*  ISR_HANDLERS.C — C言語割り込みハンドラ                                  */
 /*                                                                          */
@@ -241,6 +244,9 @@ void exception_handler(u32 error_code, u32 vector, u32 fault_eip,
     int row = 0;
 
     _disable();
+#ifdef OS32_R1_FIXTURE
+    r1_fixture_exception(vector);
+#endif
 
     /* ---- CPL=3 (リング3) 由来のフォールトはアプリだけ kill (v2 M1e/V4) ----
      * フォールトフレームの CS は PUSHAD 配列の上に CPU が積んだもの。
@@ -345,6 +351,7 @@ void page_fault_handler(u32 error_code, u32 fault_addr, u32 fault_eip, u32 *regs
     if ((regs[10] & 3) == 3 || ring3_in_syscall) {
         sputs("\n[ring3] #PF (CPL=3 / syscall) addr=");
         sput_hex32(fault_addr);
+        sputs(" err="); sput_hex32(error_code);
         sputs(" EIP="); sput_hex32(fault_eip);
         /* 共有ライブラリ帯域 (K3) の切り分け。.text/.rodata は read-only +
          * USER なので、ここへの書き込みは保護違反 (error_code bit0=1,
@@ -473,6 +480,9 @@ extern void snd_tick(void);  /* kernel/snd_engine.c */
 
 void timer_handler(void)
 {
+#ifdef OS32_R1_FIXTURE
+    r1_fixture_timer();
+#endif
     snd_tick();
     pcm_tick();
     ne2k_timer_tick();

@@ -210,7 +210,7 @@ def main():
                 dispatch = function(source, 'void __cdecl ring3_syscall_dispatch(')
                 tail = dispatch[dispatch.index('syscall_complete:') + len('syscall_complete:'):dispatch.rfind('}')]
                 parts.append('static void host_syscall_tail(u32 *frame) { int prev_caller = 0, prev_in_syscall = 0; u32 *prev_frame = 0;\n' + tail + '\n}')
-                return '\n'.join(parts)
+                return '#include "owner_diag.h"\n' + '\n'.join(parts)
 
             def heap_context_parts(source):
                 body = function(source, 'static void exec_restore_context(').replace('exec_restore_context', 'heap_restore_context')

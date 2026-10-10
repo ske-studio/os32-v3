@@ -71,6 +71,7 @@ mod startmenu;
 mod taskbar;
 mod timer;
 mod trim;
+mod diagnostics;
 mod visible;
 mod wm;
 

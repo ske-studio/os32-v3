@@ -117,3 +117,4 @@ check-memory-host:
 - userland/rust/libos32gui_stub/src/timer.rs
 - userland/rust/libos32gui_stub/src/widget.rs
 - userland/rust/libos32gui_stub/src/window.rs
+- exec/owner_diag.h

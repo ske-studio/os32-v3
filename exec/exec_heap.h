@@ -53,6 +53,7 @@ void exec_heap_save_state(u32 *out_used);
 void exec_heap_restore_state(u32 base, u32 size, u32 used);
 
 /* 統計 */
+extern u32 resident_heap_peak, resident_heap_fail;
 u32 exec_heap_total(void);
 u32 exec_heap_used(void);
 

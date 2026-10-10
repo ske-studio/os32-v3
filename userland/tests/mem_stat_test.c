@@ -10,16 +10,20 @@ int main(int argc, char **argv, KernelAPI *api)
     union { MemStat align; u8 bytes[sizeof(MemStat) + 16]; } out;
     int passed = 0, total = 0, self, others[3], n = 0;
     int bad[] = {1, 99, -2};
-    u32 sizes[] = {0, MEMSTAT_MIN - 1, MEMSTAT_MIN, 120, sizeof(MemStat), sizeof(out)};
+    u32 sizes[] = {0, MEMSTAT_MIN - 1, MEMSTAT_MIN, 120, 132, sizeof(MemStat), sizeof(out)};
     (void)argc; (void)argv;
     int rc = api->mem_stat(-1, &stat, sizeof(stat));
     CHECK(rc == sizeof(stat) && stat.size == sizeof(stat) &&
           (stat.flags & MEMSTAT_HAS_AS) && stat.app_id >= 2 && stat.app_id <= 5);
     if (passed != total) goto done;
+    CHECK(sizeof(MemStat) == 200 && stat.owner_pages > 0);
     self = stat.app_id;
     CHECK(api->mem_stat(self, &stat, sizeof(stat)) == sizeof(stat) && stat.app_id == self);
     CHECK(api->mem_stat(0, &stat, sizeof(stat)) == sizeof(stat) &&
           stat.app_id == 0 && !(stat.flags & MEMSTAT_HAS_AS));
+    CHECK(stat.owner_pages == 0 && stat.kstack_high_water > 0 &&
+          stat.kheap_peak >= stat.kheap_used && stat.resident_heap_peak >= stat.resident_heap_used &&
+          stat.kselftest_fail == 0 && stat.kselftest_pass >= 295);
     for (int id = 2; id <= 5; id++) {
         if (id == self) continue;
         others[n++] = id;

@@ -18,6 +18,7 @@ docs_only:
 - docs/logs/**
 broad:
 - check-deploy-set-host
+- check-r1-fixture-host
 - check-sbrk-crt-host
 - check-build-no-deploy
 - check-p2v

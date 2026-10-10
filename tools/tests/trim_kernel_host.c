@@ -8,6 +8,11 @@ void *kmemcpy(void *dst, const void *src, u32 n)
     CHECK("copyout IRQ enabled", _irq_enabled());
     heap_copy(dst, src, n); return dst;
 }
+u32 kstack_high_water(void) { return 1024; }
+volatile u32 fault_kill_count;
+u32 memmap_audit_runs, as_audit_runs, v86_return_audit_runs;
+u32 memmap_audit_fail, as_audit_fail, v86_return_audit_fail;
+int kselftest_pass, kselftest_fail;
 #include "mem_stat_source.c"
 
 static int watch_request;

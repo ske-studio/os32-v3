@@ -36,6 +36,7 @@
 #include "utf8_internal.h"
 #include "system_surface.h"
 #include "kselftest.h"
+#include "kstack_hw.h"
 #include "exec.h"
 #include "pci.h"
 #include "pci_bind.h"   /* PCI の結線表 (票 TASK_HAL_WIRING §1-4) */
@@ -178,6 +179,8 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
 {
     char tmp[16];
     int mb;
+
+    kstack_hw_init();
 
     /* **最初に** ブート情報域 (0x7E00、ローダが INT 1Bh AH=84h の結果を
      * 書いた) を写す。0x7E00 はフォントキャッシュの内側で、フォント・

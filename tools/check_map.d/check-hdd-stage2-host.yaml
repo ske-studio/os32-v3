@@ -39,3 +39,4 @@ check-hdd-stage2-host:
 - tools/check_map.d/check-hdd-stage2-host.yaml
 - build/checks.d/check-hdd-stage2-host.mk
 - sdk/kapi.json
+- tools/nhd_profile.py

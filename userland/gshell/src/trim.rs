@@ -21,7 +21,7 @@ pub static mut gshell_trim_delivered: u32 = 0;
 #[no_mangle]
 pub static mut gshell_trim_skipped_full: u32 = 0;
 
-fn stat(id: i32) -> Option<[u8; MEMSTAT_SIZE]> {
+pub(crate) fn stat(id: i32) -> Option<[u8; MEMSTAT_SIZE]> {
     let mut out = [0u8; MEMSTAT_SIZE];
     let rc = unsafe { (os32api::api().mem_stat)(id, out.as_mut_ptr(), MEMSTAT_SIZE as u32) };
     if rc < 0 { None } else { Some(out) }

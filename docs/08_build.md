@@ -220,6 +220,56 @@ Makefile ターゲットとの対応 (`build/deploy.mk`)。**このリポジト�
 KernelAPI の構造体を変えたときは `make clean` → `make all` が必須
 (古い `.o` が残ると ABI 不整合で静かに壊れる)。
 
+#### T2h の試験専用 kernel と隔離 NHD
+
+`make kernel-r1` は `OS32_R1_FIXTURE` を付け、object / 依存ファイルを
+`build/out/r1/obj/`、像・map・`manifest.json` を `build/out/r1/` に作る。
+製品の object と像は共有しない。`check-r1-fixture-host` は CPU 入口を模擬して
+実台帳と停止経路を検査し、clean を挟まない両ビルド順で製品 hash が変わらないことを
+確認する。両順ビルドは先頭 runner だけが `$TMPDIR` 内のソースの写しで行い、
+その写しだけで `__DATE__` / `__TIME__` を `SOURCE_DATE_EPOCH` で固定する。
+
+試験像だけにある BSS `r1_fixture_arm[7]` の各添字に
+`R1_FIXTURE_ARM` (`kernel/r1_fixture.h`) を `emu_write_mem` で書くと一度だけ発火する。
+1 は次の timer IRQ で割当て、2 は次の #UD で解放を要求し、`R1 context` で停止する。
+4 は USER syscall 中の開いた V86 session の終了で #UD を起こし、
+`exec teardown stopped` に至る。arm は停止前に消費し、未 arm / 不正値は無操作。
+復旧型は 3 = V86 session 構築後の CPL0 #UD (K1)、5 = 子の終了時に生存親を毒化
+(5a)、0 = PARKED を resume commit 前に毒化 (5b)、6 = CLIENT lease attach の
+公開前に一度だけ FULL を返す。0 / 5 / 6 は同じ添字の `r1_fixture_id` と
+`r1_fixture_generation` に対象 app ID と AS 世代を先に書き、最後に arm を publish する。
+ID・世代不一致では arm を消費しない。0 は PARKED + `parked_from_wait`、5 は生存中の
+RUNNING 親に限る。3 は USER syscall 中の開いた session に限り、終了中には発火しない。
+host 試験は移譲後の通常文脈での解放・次起動、親の syscall 出口 kill、PARKED の abort 保持と
+PD 読込み前 kill、隔離 owner の page 保持と `owner-exit` の pages / leftover、
+lease 失敗後の描画停止と次の待機返却時の再 attach を検査する。
+製品 KAPI には操作口を追加しない。実ゲストでの停止・復旧確認は PM の R1c で行う。
+
+`nhd_deploy.py <command> --profile t2h` は remote を
+`NP21W_DIR/os32_t2h_install.nhd`、local を `build/nhd/os32_t2h.nhd`、
+mount を `/tmp/os32_t2h`、来歴を `build/nhd/os32_t2h.nhd.pulled` に固定する。
+`OS32_NHD_REMOTE` / `OS32_NHD_LOCAL` / `OS32_NHD_MOUNT` / `OS32_NHD_STAMP` が
+異なる名前を指定すれば拒否する。既定像への symlink / hardlink も拒否する。
+
+各交換・復元は **stop → umount (残っていれば) → pull → copy または sync → deploy → start**。
+停止・起動には `np21w_ctl.py` を使う ([D1])。隔離 NHD の上書きも各回 [D2] の対象。
+`pull --profile t2h` は既存 local も必ず取り直す。
+正常一式は `sync --profile t2h` (本体全層、外部 apps/game は H-7 で除外) で同期する。
+`make deploy-kernel-r1 PROFILE=t2h` は試験像を隔離 local の `/boot/vmkernel.lz4` に
+copy する段だけを担当する。続けて `deploy --profile t2h` で反映する。
+
+`verify-set --profile t2h --set build/out/deploy-set.json` は h1 の期待表の全ファイルの
+存在・size・sha256 を読み取り照合し、管理ディレクトリ (`/boot`、`/sys`、`/bin`、
+`/sbin`、`/usr`、`/etc`) の余剰も列挙する。欠損・改変・余剰は非 0 終了。
+allow-list の集合は `deploy-set.json` を正とし、`check: exists` の絶対パスを受け付ける。
+完全一致の設定は存在だけを検査し、末尾要素の `*` は同じ階層の 0 本以上を許す
+(例: `/var/log/*`)。再帰 glob と未知の検査種別は拒否する。
+期待表にある `/home` 等の配備ファイルも照合するが、その周囲のユーザーデータは余剰にしない。
+`generations-manifest.json` は配備集合ではないので渡さない。
+ゲストが書いた後は **stop → umount → pull → verify-set**。
+`np21w_ctl.py start` は起動前にこの作業木の t2h stamp を失効させる
+(別 ini の起動も安全側に失効)。remote の hash が変わった場合も、pull を省いた照合・配備を拒否する。
+
 <a id="検査の3段"></a>
 #### 検査の 3 段 (`check-fast` / `check-changed` / `check`、2026-09-26)
 

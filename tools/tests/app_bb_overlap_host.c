@@ -99,6 +99,10 @@ static int __attribute__((unused)) launch_map_attempt(struct addrspace *as, u32 
     launch_map_attempts++;
     return paging_addrspace_map_user_range(as, start, end, flags);
 }
+#ifndef APP_BB_SLOT_LOOKUP
+AppSlot *appslot_at(int id) { (void)id; return 0; }
+#endif
+#include "owner_diag.h"
 #include "exec_bb_overlap.inc"
 static u8 heap[192 * 1024];
 static u32 pte(struct addrspace *as, u32 va) {

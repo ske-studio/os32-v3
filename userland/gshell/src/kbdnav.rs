@@ -361,6 +361,7 @@ pub fn is_wm_raw(st: &GuiState, raw: i32) -> bool {
     let scan = (raw & 0x7F) as u8;
     let down = ((raw >> 8) & 1) != 0;
     let mods = ((raw >> 9) & 0x7F) as u32;
+    if crate::diagnostics::shortcut(scan, mods) { return true; }
     if scan == SC_KANA {
         return true;
     }
@@ -454,7 +455,10 @@ pub fn on_key(st: &mut GuiState, scan: u8, down: bool, mods: u32) -> bool {
         /* 念のため (窓が消えたときは wm::drop_drag_frame が drop_kmove で戻す) */
         st.kn.kmode = KM_NONE;
     }
-    let c = make(st, scan, mods);
+    let c = if crate::diagnostics::shortcut(scan, mods) {
+        crate::diagnostics::dump();
+        true
+    } else { make(st, scan, mods) };
     if c {
         set_consumed(st, scan, true);
     }

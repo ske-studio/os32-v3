@@ -15,10 +15,20 @@
 #include "kmalloc.h"
 #include "pgalloc.h"
 #include "io.h"
+#include "kstack_hw.h"
+extern u32 exec_as_leftover_pages;
+extern volatile u32 fault_kill_count;
+extern u32 memmap_audit_runs, as_audit_runs, v86_return_audit_runs;
+extern u32 memmap_audit_fail, as_audit_fail, v86_return_audit_fail;
+extern int kselftest_pass, kselftest_fail;
 
 extern volatile int ring3_in_syscall;
 
-STATIC_ASSERT(sizeof(MemStat) == 132, memstat_size);
+i32 kapi_mem_stat(i32 app_id, void *out, u32 size) __attribute__((cold));
+
+STATIC_ASSERT(sizeof(MemStat) == 200, memstat_size);
+STATIC_ASSERT(__builtin_offsetof(MemStat, kstack_high_water) == 132, memstat_v73_prefix);
+STATIC_ASSERT(__builtin_offsetof(MemStat, owner_pages) == 196, memstat_owner_pages);
 STATIC_ASSERT(__builtin_offsetof(MemStat, extents_total) == MEMSTAT_MIN, memstat_min);
 STATIC_ASSERT(__builtin_offsetof(MemStat, img_end) == 80, memstat_layout);
 STATIC_ASSERT(__builtin_offsetof(MemStat, load_addr) == 96, memstat_slot);
@@ -38,6 +48,8 @@ i32 kapi_mem_stat(i32 app_id, void *out, u32 size)
 
     if (!out || size < MEMSTAT_MIN || app_id < -1 || app_id > APP_ID_MAX ||
         app_id == APP_ID_SHELL) return OS32_ERR_INVAL;
+    if (size > __builtin_offsetof(MemStat, kstack_high_water))
+        snap.kstack_high_water = kstack_high_water();
     snap.kheap_total = kmalloc_total();
     snap.kheap_used = kmalloc_used();
     snap.kheap_free = kmalloc_free();
@@ -58,6 +70,7 @@ i32 kapi_mem_stat(i32 app_id, void *out, u32 size)
         slot = appslot_get(app_id);
         result = OS32_ERR_NOTFOUND;
         if (!slot || !(as = slot->as) || !as->pd_phys) goto done;
+        snap.owner_pages = ledger_owner_pages(as->owner);
         snap.state = slot->state;
         snap.flags = MEMSTAT_HAS_AS;
         if (slot->trim_pending) snap.flags |= MEMSTAT_TRIM_PENDING;
@@ -86,8 +99,27 @@ i32 kapi_mem_stat(i32 app_id, void *out, u32 size)
         snap.stack_size = slot->stack_size;
     }
     snap.pressure_epoch = appslot_trim_epoch;
-    for (int id = APP_ID_MIN; id <= APP_ID_MAX; id++)
-        if (appslot_at(id)->trim_pending) snap.trim_pending_mask |= 1UL << id;
+    for (int id = APP_ID_MIN; id <= APP_ID_MAX; id++) {
+        slot = appslot_at(id);
+        if (slot->trim_pending) snap.trim_pending_mask |= 1UL << id;
+        if (slot->state != APP_STATE_FREE && slot->as)
+            for (u32 i = 0; i < MEM_LEASE_MAX; i++)
+                snap.lease_active += slot->as->leases[i].token != 0;
+    }
+    snap.kheap_peak = kmalloc_peak_bytes;
+    snap.resident_heap_peak = resident_heap_peak;
+    snap.resident_heap_fail = resident_heap_fail;
+    snap.leftover_pages = exec_as_leftover_pages;
+    snap.ledger_irq_ops = ledger_irq_ops;
+    snap.ledger_exc_ops = ledger_exc_ops;
+    snap.ledger_bad_free = ledger_bad_free;
+    snap.fault_kill_count = fault_kill_count;
+    snap.reclaim_count = appslot_reclaim_count;
+    snap.stop_park_count = ring3_stop_park_count;
+    snap.audit_runs = memmap_audit_runs + as_audit_runs + v86_return_audit_runs;
+    snap.audit_fail = memmap_audit_fail + as_audit_fail + v86_return_audit_fail;
+    snap.kselftest_pass = kselftest_pass;
+    snap.kselftest_fail = kselftest_fail;
     snap.size = size < sizeof(snap) ? size : sizeof(snap);
     snap.app_id = app_id;
     snap.phys_total_pages = pgalloc_total_pages();

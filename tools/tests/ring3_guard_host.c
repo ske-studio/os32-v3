@@ -544,8 +544,29 @@ static void case_register_gate(void)
     gui_owner_exit(GUI_SHELL_OWNER, 1);
 }
 
+#include "memmap.h"
+static char pf_line[256];
+static unsigned pf_len;
+static void sputs(const char *s) { while (*s) pf_line[pf_len++] = *s++; pf_line[pf_len] = 0; }
+static void sput_hex32(u32 x) {
+    for (int i = 28; i >= 0; i -= 4) { char b[] = {"0123456789ABCDEF"[(x >> i) & 15], 0}; sputs(b); }
+}
+static void pf_diagnostic(void) {
+    u32 fault_addr = MEM_SHLIB_BASE, fault_eip = 0x12345678U, error_code = 7;
+    pf_len = 0;
+#include "pf_diag.inc"
+    const char *expected = " err=00000007 EIP=";
+    int found = 0;
+    for (unsigned i = 0; i < pf_len; i++) {
+        unsigned j = 0;
+        while (expected[j] && pf_line[i+j] == expected[j]) j++;
+        if (!expected[j]) found = 1;
+    }
+    check(found, "PF err=00000007");
+}
 int main(void)
 {
+    pf_diagnostic();
     case_table();
     case_gui_call();
     case_owner_exit();
