@@ -705,6 +705,16 @@ clean-programs: clean-rust clean-gshell
 .PHONY: unicode_bin fep_dic
 .PHONY: clean-programs
 
+# T2h: 8MB code/stack/LARGE shapes, keyboard stdin stops, CUI-only headers.
+H5_SHAPE_BINS := $(addprefix userland/tests/,h5_shape_i.bin h5_shape_ii.bin h5_shape_iii.bin)
+userland/tests/h5_shape_i.elf userland/tests/h5_shape_ii.elf userland/tests/h5_shape_iii.elf: userland/tests/h5_shape.inc include/memmap.h
+userland/tests/h5_shape_i.bin userland/tests/h5_shape_iii.bin: userland/tests/%.bin: userland/tests/%.raw userland/tests/%.elf sdk/mkos32x.py
+	python3 sdk/mkos32x.py $< $@ --elf userland/tests/$*.elf --cui-only
+userland/tests/h5_shape_ii.bin: userland/tests/h5_shape_ii.raw userland/tests/h5_shape_ii.elf sdk/mkos32x.py
+	python3 sdk/mkos32x.py $< $@ --elf userland/tests/h5_shape_ii.elf --stack $(H2_STACK512_BYTES) --cui-only
+.PHONY: h5-shapes
+h5-shapes: $(H5_SHAPE_BINS)
+
 # T2h h2: same guest, default 256KiB and explicit 512KiB; no public format change.
 H2_STACK512_BYTES := 524288
 userland/tests/h2_stack.elf: userland/tests/h2_stack_probe.h userland/tests/h2_stack_probe.inc include/memmap.h sdk/include/os32/os32_gui_shared.h
