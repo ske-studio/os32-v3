@@ -41,3 +41,4 @@ check-h3b-fixtures-host:
 - userland/tests/kout_test.c
 - userland/tests/pipe_owner_test.c
 - userland/tests/shutdown_probe.c
+- tools/gen_deploy_set.py

@@ -1280,6 +1280,18 @@ def remove_partial(dest_file):
             dest_file, result.stderr.strip()))
 
 
+def refresh_deploy_set():
+    """配備に使った成果物を読み直す。期待表を生成できなければ成功にしない。"""
+    result = subprocess.run(
+        [sys.executable, os.path.join(PROJ_DIR, 'tools/gen_deploy_set.py'),
+         '--root', PROJ_DIR], capture_output=True, text=True)
+    if result.returncode != 0:
+        print('Error: deploy-set: ' + result.stderr.strip(), file=sys.stderr)
+        return False
+    print(result.stdout.strip())
+    return True
+
+
 def do_sync(tag_filter=None):
     """deploy.yaml に基づくフルデプロイ
 
@@ -1406,6 +1418,8 @@ def do_sync(tag_filter=None):
                   total_failed, total_copied, total_size))
         print("  配備は完了していない。ゲストの成果物は古いままか消えている。")
         print("=" * 55)
+        return False
+    if not refresh_deploy_set():
         return False
     print("  完了! {} ファイル ({:,} bytes){}".format(
         total_copied, total_size,
@@ -1651,7 +1665,7 @@ def do_verify_set(set_file):
             if (not path.is_absolute() or '..' in path.parts or str(path) != guest or
                     guest == '/' or guest.startswith('//') or
                     any(c in guest for c in '?[]\x00') or '**' in guest or
-                    '*' in str(path.parent) or item['check'] != 'exists'):
+                    '*' in str(path.parent) or item['check'] != 'optional'):
                 raise ValueError('invalid allow-list entry: ' + str(guest))
             allowed.add(guest)
         def is_allowed(guest):
@@ -1693,11 +1707,6 @@ def do_verify_set(set_file):
                 problems.append('missing: ' + guest)
             elif path.stat().st_size != item['size'] or file_sha256(path) != item['sha256']:
                 problems.append('modified: ' + guest)
-        for item in allow:
-            guest = item['guest']
-            # A glob permits zero or more guest-created logs. Exact settings are required.
-            if '*' not in guest and not local(guest).is_file():
-                problems.append('missing allow-list: ' + guest)
         def walk_error(exc):
             raise exc
         for directory in managed:

@@ -30,7 +30,9 @@ L-h で **KAPI 74 / MemStat 200B** となる SDK で `make clean-external` →
 ## T2h の配備集合と配備元の照合
 
 `make all` の最後に世代表の後で `tools/gen_deploy_set.py` が
-`build/out/deploy-set.json` を生成する。`format=1` の表は L-h の
+`build/out/deploy-set.json` を生成する。`make deploy` / `deploy-fd` / `deploy-kernel` /
+`deploy-nhd` と `nhd_deploy.py sync` の成功時にも、その配備に使った成果物から
+再生成する (配備で kernel の build 日時が変わるため)。`format=1` の表は L-h の
 `generations-manifest.json` の `build_id` を `generation_build_id` に保持し、
 `kernel_commit` / `kapi_version` / `generations` も保持する。`files` の各行は
 プロジェクト相対 `host` → 絶対 `guest` / `size` / `sha256`。並びは guest・host 順、
@@ -41,9 +43,10 @@ L-h で **KAPI 74 / MemStat 200B** となる SDK で `make clean-external` →
 `vmkernel.lz4` / `unicode.bin` / `.shlib` と配備するデータも含む。
 非配備成果物の `kernel.bin` / `sqlite.bin` / SDK、install が LBA に書く raw boot の
 `boot_hdd.bin` / `loader_hdd.bin`、H-7 の apps / game はファイル集合に入れない。
-`allow_list` は `/etc/settings.db`、`/etc/system.cfg`、`/var/log/*` の 3 種で
-`check=exists` (存在だけ、内容 hash は照合しない)。ログの wildcard は実在するログに
-適用し、新規ログの作成を要求するものではない。世代表の既存集合・形式は維持する。
+`allow_list` は `/etc/settings.db`、`/etc/settings.db-journal`、`/etc/settings.db.new`、
+`/etc/settings.db.new-journal`、`/etc/system.cfg`、`/var/log/*` で `check=optional`。
+存在してもよく、無くてもよく、内容 hash は照合しない。旧 `exists` は拒否する。
+ログの wildcard は同じ階層の 0 本以上を許し、再帰しない。世代表の既存集合・形式は維持する。
 
 名札照合は host で実施する (配備元ルートを明示する):
 
@@ -55,6 +58,16 @@ python3 tools/deploy_source_check.py --root <HostDrv-or-SerialFS-root> \
 `.deploy/manifest.txt` の全ファイル行 (format 1 / 2) を配備元の存在・size・CRC-32 で
 照合する。count 不一致・不正行・重複・管理対象行の欠落も列挙して rc≠0。
 外部など期待集合外の名札行も照合を省かない。mtime は内容照合に使わない。
+期待集合の size/sha256 も配備元と比較し、古い期待表を検出する。
+hsync の全体同期 + 明示 sys 同期が配る全範囲 (根直下・data も含む) の名札外ファイルを
+列挙し rc≠0。名札自身・allow-list・hsync が配送しない設定保護対象と
+予約名 `.hs~*` (ディレクトリ経路も含む) は除外する。
+`sys` や host_only は hsync の 2 段配送から外れないので、余剰検出からも外さない。
+既存 `prune-stale` はシステム側直下の `.bin` だけ。その他は同じ道具の
+`--prune-extra` (dry-run) で確認し、`--prune-extra --delete` で名札外の通常ファイルだけ
+を掃除できる (`make prune-source-extra` / `prune-source-extra-delete`)。
+名札や期待表に欠損・内容差があれば掃除も拒否し、設定保護対象には触れない。
+予行・更新・復旧の先頭で配備元の余剰 0 を確認し、余剰があれば掃除して再照合する。
 成功時は deploy-set の guest 列を並べた管理対象一覧を stdout と指定ファイルへ出す。
 失敗時は同期・HDD 起動へ進まない。旧一式を使う復旧時も旧一式の名札と管理対象集合で
 同じ照合をする (新一式の deploy-set を旧一式の照合に流用しない)。

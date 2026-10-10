@@ -107,7 +107,7 @@ GUI アプリ      → libos32gui_stub (ジャンプ表への薄いスタブ) �
 (`apps` + `game`)。検査: `make check-fast` / `make check-changed` / `make check` の 3 通り
 ([§8-4 検査の 3 段](#検査の3段))。`emu_agent` (ローカル AI) の `make` は
 許可リスト (`tools/emu_agent/agent.py` の `MAKE_TARGETS`) に載ったターゲットしか実行しない。
-`make all` の最後に `build/out/deploy-set.json` を生成する。期待集合・allow-list・名札照合と外部対象外の扱いは [T2H_EXTERNAL_GATE](tasks/v3/T2H_EXTERNAL_GATE.md)。
+`make all` と各配備 (`deploy` / `deploy-fd` / `deploy-kernel` / `deploy-nhd` / `nhd_deploy.py sync`) の最後に、使った成果物から `build/out/deploy-set.json` を生成する。期待集合・allow-list・名札照合と外部対象外の扱いは [T2H_EXTERNAL_GATE](tasks/v3/T2H_EXTERNAL_GATE.md)。
 
 **GitHub Actions** (`.github/workflows/check.yml`、os32-v3 で 2026-09-30 に作り直し): push / PR で、
 クロスツールチェーンも rustc も無しで回せる検査だけを自動ゲートにする — KAPI 版番号の一致、
@@ -206,6 +206,7 @@ Makefile ターゲットとの対応 (`build/deploy.mk`)。**このリポジト�
 | `make nhd-migrate-pt` | 旧配置の区画表を PC-98 標準配置へ + ローダ + カーネルを同時に (KAPI v64 への初回だけ、[下の節](#区画表の移行-v64))。NP21/W 停止中 ([D1]) |
 | `make deploy-boot` | ブートローダー (loader_hdd.bin) をNHDブート領域へ書き込み |
 | `make deploy-nhd` | deploy.yaml フルデプロイ + NHDコピー — **要NP21/W再起動** |
+| `make prune-source-extra` / `make prune-source-extra-delete` | HostDrv 配備元の名札外ファイルを一覧 (dry-run) / 削除。拡張子を限定せず、設定保護・allow-list は除外。正典は [T2H_EXTERNAL_GATE](tasks/v3/T2H_EXTERNAL_GATE.md) |
 | `make prune-stale` / `make prune-stale-delete` | 配備先 (HostDrv + NHD) に残ったマニフェストに無い *.bin を一覧 / 削除。deploy 系は既定で削除まで行う (`NO_PRUNE=1` で一覧のみ) |
 | `make apps` / `make game` | 外部リポジトリ (git submodule `apps/` = os32-apps、`game/` = os32-game) を SDK 経由でビルド。空なら `git submodule update --init` を促す |
 | `make external` | 上記 2 つをまとめて。KAPI / SDK ライブラリ変更後に再ビルドする。ポインタ更新条件は下記参照 |
@@ -264,9 +265,9 @@ copy する段だけを担当する。続けて `deploy --profile t2h` で反映
 `verify-set --profile t2h --set build/out/deploy-set.json` は h1 の期待表の全ファイルの
 存在・size・sha256 を読み取り照合し、管理ディレクトリ (`/boot`、`/sys`、`/bin`、
 `/sbin`、`/usr`、`/etc`) の余剰も列挙する。欠損・改変・余剰は非 0 終了。
-allow-list の集合は `deploy-set.json` を正とし、`check: exists` の絶対パスを受け付ける。
-完全一致の設定は存在だけを検査し、末尾要素の `*` は同じ階層の 0 本以上を許す
-(例: `/var/log/*`)。再帰 glob と未知の検査種別は拒否する。
+allow-list の集合は `deploy-set.json` を正とし、`check: optional` の絶対パスを受け付ける。
+設定は無くてもよく、存在時も内容は検査しない。末尾要素の `*` は同じ階層の 0 本以上を許す
+(例: `/var/log/*`)。再帰 glob・旧 `exists`・未知の検査種別は拒否する。
 期待表にある `/home` 等の配備ファイルも照合するが、その周囲のユーザーデータは余剰にしない。
 `generations-manifest.json` は配備集合ではないので渡さない。
 ゲストが書いた後は **stop → umount → pull → verify-set**。

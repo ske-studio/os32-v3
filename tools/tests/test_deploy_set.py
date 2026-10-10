@@ -8,6 +8,7 @@ import argparse
 import copy
 import hashlib
 import json
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -23,11 +24,13 @@ parser.add_argument("--mutate", action="store_true")
 parser.add_argument("--tools-dir", type=Path, default=ROOT / "tools")
 args = parser.parse_args()
 sys.path.insert(0, str(args.tools_dir))
+sys.path.insert(1, str(ROOT / "tools"))
 sys.path.insert(0, str(ROOT / "sdk"))
 import check_manifests as cm
 import deploy_manifests as dm
 import deploy_source_check as sc
 import gen_deploy_set as gs
+import nhd_deploy as nd
 import os32x_hdr as hdr
 
 GENERATION = {"build_id": "a" * 64, "kernel_commit": "fixture",
@@ -93,12 +96,12 @@ class DeploySet(unittest.TestCase):
                              for h in hosts))
         self.assertEqual(result["generation_build_id"], GENERATION["build_id"])
         self.assertEqual(result["allow_list"], [
-            {"guest": "/etc/settings.db", "check": "exists"},
-            {"guest": "/etc/settings.db-journal", "check": "exists"},
-            {"guest": "/etc/settings.db.new", "check": "exists"},
-            {"guest": "/etc/settings.db.new-journal", "check": "exists"},
-            {"guest": "/etc/system.cfg", "check": "exists"},
-            {"guest": "/var/log/*", "check": "exists"}])
+            {"guest": "/etc/settings.db", "check": "optional"},
+            {"guest": "/etc/settings.db-journal", "check": "optional"},
+            {"guest": "/etc/settings.db.new", "check": "optional"},
+            {"guest": "/etc/settings.db.new-journal", "check": "optional"},
+            {"guest": "/etc/system.cfg", "check": "optional"},
+            {"guest": "/var/log/*", "check": "optional"}])
         for entry in result["files"]:
             data = (self.root / entry["host"]).read_bytes()
             self.assertEqual(entry["size"], len(data))
@@ -143,6 +146,166 @@ class DeploySet(unittest.TestCase):
         self.assertEqual(subprocess.run(cmd, capture_output=True).returncode, 0)
         self.assertNotEqual(first, out.read_bytes())
 
+    def deployment_fixture(self):
+        """実生成器を temp 木に置く。配備の mount/sudo 境界だけ差し替える。"""
+        import yaml
+        for rel, entries in (("build/core.yaml", self.entries[:2]),
+                             ("userland/deploy.yaml", self.entries[2:])):
+            (self.root / rel).write_text(yaml.safe_dump({"filesystem": {"files": entries}}))
+        (self.root / "build/out/generations-manifest.json").write_text(json.dumps(GENERATION))
+        (self.root / "tools").mkdir(exist_ok=True)
+        for name in ("gen_deploy_set.py", "deploy_manifests.py"):
+            shutil.copyfile(args.tools_dir / name, self.root / "tools" / name)
+
+    def test_each_make_deployment_refreshes_actual_bytes(self):
+        self.deployment_fixture()
+        # Execute the actual deploy.mk recipes in a fixture with no OS build,
+        # emulator, NHD or real HostDrv. Every invocation rebuilds the kernel.
+        (self.root / "build/deploy.mk").write_text((ROOT / "build/deploy.mk").read_text())
+        for name in ("os32_boot.d88", "os32_boot144.img"):
+            path = self.root / "images" / name
+            path.parent.mkdir(exist_ok=True)
+            path.write_bytes(b"FD fixture")
+        destination = self.root / "deployed"
+        destination.mkdir()
+        makefile = self.root / "fixture.mk"
+        # Parent make exports command-line overrides through MAKEFLAGS. Keep
+        # every destination and deployment command inside this temp fixture.
+        makefile.write_text('''override BUILD_OUT = build/out
+override NP21W_DIR = deployed
+override HOSTDRV_DEPLOY = python3 tools/deploy_stub.py
+override NHD_DEPLOY = python3 tools/deploy_stub.py
+include build/deploy.mk
+override PRUNE_STALE = true
+build/out/vmkernel.lz4: FORCE
+	@echo rebuilt >> $@
+images/os32_boot.d88 images/os32_boot144.img: build/out/vmkernel.lz4
+programs unicode_bin FORCE:
+.PHONY: programs unicode_bin FORCE
+''')
+        (self.root / "tools/deploy_stub.py").write_text(
+            "import shutil\nshutil.copyfile('build/out/vmkernel.lz4', 'deployed/vmkernel.lz4')\n")
+        for target in ("deploy", "deploy-fd", "deploy-kernel", "deploy-nhd"):
+            with self.subTest(target=target):
+                out = self.root / "build/out/deploy-set.json"
+                out.write_text(json.dumps(self.generate()))
+                before = out.read_bytes()
+                result = subprocess.run(["make", "-f", str(makefile), "-j1", target],
+                                        cwd=self.root, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertNotEqual(before, out.read_bytes(), "配備後に古い期待表が残った")
+                self.assertEqual(json.loads(out.read_text()), self.generate())
+                if target != "deploy-fd":
+                    self.assertEqual((destination / "vmkernel.lz4").read_bytes(),
+                                     (self.root / "build/out/vmkernel.lz4").read_bytes())
+
+    def test_nhd_sync_refresh_and_generator_failure(self):
+        self.deployment_fixture()
+        mount = self.root / "mounted"
+        mount.mkdir()
+        real_run = subprocess.run
+
+        def command(argv, **kw):
+            if argv[:3] == ["sudo", "cp", "--"]:
+                shutil.copyfile(argv[-2], argv[-1])
+                return subprocess.CompletedProcess(argv, 0, "", "")
+            if argv == ["sync"]:
+                return subprocess.CompletedProcess(argv, 0, "", "")
+            return real_run(argv, **kw)
+
+        def ensure_dir(guest):
+            path = mount / guest.lstrip("/")
+            path.mkdir(parents=True, exist_ok=True)
+            return str(path), "ok"
+
+        import contextlib
+        with contextlib.ExitStack() as stack:
+            for name, value in (("PROJ_DIR", str(self.root)), ("MOUNT_POINT", str(mount)),
+                                ("ensure_local_nhd", lambda: True), ("legacy_pt_guard", lambda: True),
+                                ("ensure_mounted_for_kernel", lambda: True), ("guard_root", lambda: True),
+                                ("load_deploy_yaml", lambda: {"filesystem": self.merged["filesystem"]}), ("ensure_dir", ensure_dir),
+                                ("guard_dest", lambda guest, **kw: (str(mount / guest.lstrip("/")), "ok")),
+                                ("resolve_files_from_entry", lambda entry: [
+                                    (str(self.root / host), guest)
+                                    for host, guest in dm.resolve_entry(entry, str(self.root))])):
+                stack.enter_context(patch.object(nd, name, value))
+            stack.enter_context(patch.object(nd.subprocess, "run", command))
+            out = self.root / "build/out/deploy-set.json"
+            out.write_text(json.dumps(self.generate()))
+            before = out.read_bytes()
+            (self.root / "build/out/vmkernel.lz4").write_bytes(b"new deployment build time")
+            self.assertTrue(nd.do_sync())
+            self.assertNotEqual(before, out.read_bytes())
+            self.assertEqual(json.loads(out.read_text()), self.generate())
+            for entry in json.loads(out.read_text())["files"]:
+                self.assertEqual(hashlib.sha256((mount / entry["guest"].lstrip("/")).read_bytes()).hexdigest(),
+                                 entry["sha256"])
+            # Successful copies cannot hide failure to refresh the expectation.
+            (self.root / "build/out/generations-manifest.json").unlink()
+            self.assertFalse(nd.do_sync())
+
+    def test_source_rejects_stale_set_even_when_manifest_matches(self):
+        expected, hostdrv, text = self.source()
+        kernel = self.root / "build/out/vmkernel.lz4"
+        kernel.write_bytes(b"x" * kernel.stat().st_size)
+        current, hostdrv, text = self.source()
+        self.assertEqual(sc.check_source(hostdrv, text, current)[0], [])
+        errors, _ = sc.check_source(hostdrv, text, expected)
+        self.assertTrue(any("deploy-set" in e and "vmkernel.lz4" in e for e in errors), errors)
+
+    def test_source_extras_match_hsync_two_stages(self):
+        hsync = (ROOT / "userland/system/hsync.c").read_text()
+        prefix = re.search(r'^#define HS_TEMP_PREFIX\s+"([^"]+)"', hsync, re.M).group(1)
+        self.assertEqual(sc.HS_TEMP_PREFIX, prefix)
+        expected, hostdrv, text = self.source()
+        extras = ("sys/fep.dic", "sys/font/mincho.kcgfont", "usr/man/test_table.1",
+                  "old.done", "data/old.ttf", ".deploy/old.txt", "etc/logs/nested/boot.log")
+        exempt = (".deploy/manifest.txt", "etc/system.cfg", "etc/settings.db.bak",
+                  "etc/SETTINGS.DB-wal", "var/log/boot.log", "etc/logs/boot.log",
+                  "sys/.hs~shell.bin", ".hs~unfinished/sub/file.bin")
+        expected = copy.deepcopy(expected)
+        expected["allow_list"].append({"guest": "/etc/logs/*.log", "check": "optional"})
+        for name in extras + exempt:
+            path = hostdrv / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"unlisted")
+        errors, _ = sc.check_source(hostdrv, text, expected)
+        self.assertEqual(errors, ["extra: /" + name for name in sorted(extras)])
+        # sys is included even though whole-tree hsync alone excludes it.
+        self.assertIn("extra: /sys/fep.dic", errors)
+
+    def test_source_extra_cli_dry_run_delete_and_invalid_manifest(self):
+        expected, hostdrv, text = self.source()
+        manifest = hostdrv / ".deploy/manifest.txt"
+        manifest.parent.mkdir()
+        manifest.write_text(text)
+        set_file = self.root / "set.json"
+        set_file.write_text(json.dumps(expected))
+        extra = hostdrv / "sys/font/stale.kcgfont"
+        extra.parent.mkdir()
+        extra.write_bytes(b"old font")
+        protected = hostdrv / "etc/settings.db.recover-state"
+        protected.write_bytes(b"recovery")
+        cmd = [sys.executable, "-B", str(args.tools_dir / "deploy_source_check.py"),
+               "--root", str(hostdrv), "--deploy-set", str(set_file)]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("extra: /sys/font/stale.kcgfont", result.stderr)
+        result = subprocess.run(cmd + ["--prune-extra"], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("dry-run:", result.stdout)
+        self.assertTrue(extra.exists())
+        manifest.write_text(text.replace("count=7", "count=0"))
+        result = subprocess.run(cmd + ["--prune-extra", "--delete"], capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue(extra.exists())
+        manifest.write_text(text)
+        result = subprocess.run(cmd + ["--prune-extra", "--delete"], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(extra.exists())
+        self.assertEqual(protected.read_bytes(), b"recovery")
+        self.assertEqual(subprocess.run(cmd, capture_output=True).returncode, 0)
+
     def test_source_all_lines_and_listing(self):
         expected, hostdrv, text = self.source()
         errors, guests = sc.check_source(hostdrv, text, expected)
@@ -184,7 +347,7 @@ class DeploySet(unittest.TestCase):
         self.assertTrue(any("count=" in e for e in errors), errors)
         lines = [line.replace("count=7", "count=6") for line in lines]
         errors, _ = sc.check_source(hostdrv, "\n".join(lines), expected)
-        self.assertTrue(any(removed.split()[0] in e for e in errors), errors)
+        self.assertIn("名札に管理対象の行がない: /" + removed.split()[0], errors)
         for row in ("../escape 1 00000000 0", "/absolute 1 00000000 0",
                     "bad garbage", "bad 1 zz 0", "bad 1 00000000 -1", ""):
             errors, _ = sc.check_source(hostdrv, text + row + "\n", expected)
@@ -293,12 +456,14 @@ def mutate():
         ("deploy_source_check.py", "if len(data) != int(size):", "if False:"),
         ("deploy_source_check.py", 'if guest.lstrip("/") not in seen:', "if False:"),
         ("gen_deploy_set.py", '"size": len(data)', '"size": len(data) + 1'),
+        ("deploy_source_check.py", '    return sorted(extras)', '    return []'),
+        ("deploy_source_check.py", 'hashlib.sha256(data).hexdigest() != entry["sha256"]', 'False'),
     ]
     for number, (name, old, new) in enumerate(mutations, 1):
         with tempfile.TemporaryDirectory(prefix="os32-deploy-mut-") as tmp:
             target = Path(tmp)
             for module in ("check_manifests.py", "deploy_manifests.py",
-                           "gen_deploy_set.py", "deploy_source_check.py", "check_artifacts.py"):
+                           "gen_deploy_set.py", "deploy_source_check.py", "deploy_protect.py", "check_artifacts.py"):
                 shutil.copyfile(args.tools_dir / module, target / module)
             path = target / name
             text = path.read_text()

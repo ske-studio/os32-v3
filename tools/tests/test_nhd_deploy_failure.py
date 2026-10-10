@@ -45,13 +45,15 @@ class SyncFailure(unittest.TestCase):
         self.saved = {}
         for name in ('ensure_local_nhd', 'ensure_mounted', 'load_deploy_yaml',
                      'do_write_boot', 'resolve_files_from_entry', 'legacy_pt_guard',
-                     'NHD_LOCAL'):
+                     'NHD_LOCAL', 'refresh_deploy_set'):
             self.saved[name] = getattr(nd, name)
         self.saved['MOUNT_POINT'] = nd.MOUNT_POINT
         # 実物の NHD を読まない: NHD_LOCAL は試験ごとの一時の名前 (作らない)、
         # 旧配置の門は通す贋物
         nd.NHD_LOCAL = str(self.root / 'os32.nhd')
         nd.legacy_pt_guard = lambda *a, **kw: True
+        # Artifact regeneration is covered by test_deploy_set's temp tree.
+        nd.refresh_deploy_set = lambda: True
         self.saved['run'] = subprocess.run
         nd.MOUNT_POINT = str(self.mount)
         nd.ensure_local_nhd = lambda: True

@@ -40,3 +40,4 @@ check-hdd-stage2-host:
 - build/checks.d/check-hdd-stage2-host.mk
 - sdk/kapi.json
 - tools/nhd_profile.py
+- tools/gen_deploy_set.py

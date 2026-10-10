@@ -52,7 +52,11 @@ class ProfileTests(unittest.TestCase):
         self.patches.enter_context(patch.object(nd.subprocess, 'run', self.command))
 
     def command(self, args, **kw):
-        if args[0] == 'sync':
+        if len(args) > 1 and args[1].endswith('gen_deploy_set.py'):
+            # Real generation is covered by test_deploy_set; these fixtures
+            # use an in-memory deploy definition without YAML/generation files.
+            pass
+        elif args[0] == 'sync':
             pass
         elif args[:3] == ['sudo', 'cp', '--']:
             shutil.copyfile(args[-2], args[-1])
@@ -105,7 +109,7 @@ class ProfileTests(unittest.TestCase):
             (self.mount / 'etc' / name).write_text('guest setting')
         data = {'format': 1, 'generation_build_id': 'L-h-test', 'kernel_commit': 'test',
                 'kapi_version': 74, 'generations': {}, 'files': expected,
-                'allow_list': [{'guest': p, 'check': 'exists'} for p in
+                'allow_list': [{'guest': p, 'check': 'optional'} for p in
                                ('/etc/settings.db', '/etc/settings.db-journal',
                                 '/etc/settings.db.new', '/etc/settings.db.new-journal',
                                 '/etc/system.cfg', '/var/log/*')]}
@@ -221,13 +225,13 @@ class ProfileTests(unittest.TestCase):
                               if item['guest'] != '/etc/settings.db-journal']
         self.set_file.write_text(json.dumps(data))
         self.assertFalse(nd.do_verify_set(str(self.set_file)))
-        data['allow_list'].append({'guest': '/etc/settings.db-journal', 'check': 'exists'})
+        data['allow_list'].append({'guest': '/etc/settings.db-journal', 'check': 'optional'})
         self.set_file.write_text(json.dumps(data))
         self.assertTrue(nd.do_verify_set(str(self.set_file)))
         journal.write_text('changed journal contents')
         self.assertTrue(nd.do_verify_set(str(self.set_file)))
         journal.unlink()
-        self.assertFalse(nd.do_verify_set(str(self.set_file)))
+        self.assertTrue(nd.do_verify_set(str(self.set_file)))
         # The manifest may also omit the old default names, including all of them.
         data['allow_list'] = []
         self.set_file.write_text(json.dumps(data))
@@ -237,11 +241,24 @@ class ProfileTests(unittest.TestCase):
             (self.mount / 'etc' / name).unlink(missing_ok=True)
         self.assertTrue(nd.do_verify_set(str(self.set_file)))
 
+    def test_allow_list_all_optional_absent_via_cli(self):
+        self.assertTrue(nd.do_pull())
+        self.manifest()
+        self.assertTrue(nd.do_sync())
+        for path in (self.mount / 'etc').iterdir():
+            path.unlink()
+        with patch.object(sys, 'argv', ['nhd_deploy.py', 'verify-set', '--set', str(self.set_file)]):
+            self.assertTrue(nd.main())
+        extra = self.mount / 'etc/unlisted-journal'
+        extra.write_text('unlisted temporary file')
+        with patch.object(sys, 'argv', ['nhd_deploy.py', 'verify-set', '--set', str(self.set_file)]):
+            self.assertFalse(nd.main())
+
     def test_allow_list_glob_is_one_level(self):
         self.assertTrue(nd.do_pull())
         data = self.manifest()
         self.assertTrue(nd.do_sync())
-        data['allow_list'].append({'guest': '/etc/logs/*.log', 'check': 'exists'})
+        data['allow_list'].append({'guest': '/etc/logs/*.log', 'check': 'optional'})
         self.set_file.write_text(json.dumps(data))
         self.assertTrue(nd.do_verify_set(str(self.set_file)))  # Zero matches is valid.
         logs = self.mount / 'etc/logs'
@@ -264,8 +281,9 @@ class ProfileTests(unittest.TestCase):
         self.assertTrue(nd.do_sync())
         for invalid in [
             None, {}, [None], [{'guest': '/etc/settings.db'}],
+            [{'guest': '/etc/settings.db', 'check': 'exists'}],
             [{'guest': '/etc/settings.db', 'check': 'sha256'}],
-            *[[{'guest': guest, 'check': 'exists'}] for guest in (
+            *[[{'guest': guest, 'check': 'optional'}] for guest in (
                 'etc/settings.db', '/', '//etc/settings.db', '/etc/../settings.db',
                 '/etc/./settings.db', '/etc//settings.db', '/etc/settings.db/',
                 '/etc/**', '/etc/*/log', '/etc/log?.txt', '/etc/log[12]', '/etc/\x00')],

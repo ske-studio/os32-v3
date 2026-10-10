@@ -8,6 +8,7 @@ deploy: $(BUILD_OUT)/vmkernel.lz4 programs unicode_bin
 	@echo "=== HostDrv Deploy ==="
 	$(HOSTDRV_DEPLOY) sync
 	$(PRUNE_STALE) hostdrv $(PRUNE_FLAG)
+	python3 tools/gen_deploy_set.py
 
 # deploy-kernel: vmkernel.lz4 と全ビルド成果物をNHDのext2に配置
 #   (NP21/W再起動が必要)。HostDrv を先に同期するので、HostDrv 側が古いまま
@@ -19,6 +20,7 @@ deploy-kernel: $(BUILD_OUT)/vmkernel.lz4
 	$(NHD_DEPLOY) sync-from-hostdrv
 	$(PRUNE_STALE) both $(PRUNE_FLAG)
 	$(NHD_DEPLOY) deploy
+	python3 tools/gen_deploy_set.py
 
 # deploy-boot: ブートローダーのみNHDブート領域 (LBA 2-17) に書き込み
 #   boot/loader_hdd.bin を変更した場合のみ実行する
@@ -41,6 +43,7 @@ deploy-nhd: $(BUILD_OUT)/vmkernel.lz4 programs unicode_bin
 	$(NHD_DEPLOY) sync
 	$(PRUNE_STALE) both $(PRUNE_FLAG)
 	$(NHD_DEPLOY) deploy
+	python3 tools/gen_deploy_set.py
 
 # prune-stale: 配備先 (HostDrv + NHD) に残ったマニフェストに無い *.bin を掃除する。
 #   配備は書くだけで消さないので、KAPI 変更後の stale バイナリ (別関数へ飛んで
@@ -95,6 +98,7 @@ deploy-fd: images/os32_boot.d88 images/os32_boot144.img
 	@echo "=== Boot FD Deploy ==="
 	cp images/os32_boot.d88 '$(NP21W_DIR)/os32_boot.d88'
 	cp images/os32_boot144.img '$(NP21W_DIR)/os32_boot144.img'
+	python3 tools/gen_deploy_set.py
 
 .PHONY: deploy-fd
 
@@ -105,3 +109,11 @@ deploy-kernel-r1: kernel-r1
 	$(NHD_DEPLOY) copy --profile t2h --dest /boot $(R1_OUT)/vmkernel.lz4
 
 .PHONY: deploy-kernel-r1
+
+# hsync 全体 + sys が配送する、名札外のファイル (拡張子を限定しない)。
+prune-source-extra:
+	python3 tools/deploy_source_check.py --root '$(HOSTDRV_DIR)' --prune-extra
+prune-source-extra-delete:
+	python3 tools/deploy_source_check.py --root '$(HOSTDRV_DIR)' --prune-extra --delete
+
+.PHONY: prune-source-extra prune-source-extra-delete

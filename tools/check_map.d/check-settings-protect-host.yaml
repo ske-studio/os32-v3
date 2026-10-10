@@ -17,3 +17,4 @@ check-settings-protect-host:
 - tools/check_map.d/check-settings-protect-host.yaml
 - build/checks.d/check-settings-protect-host.mk
 - tools/nhd_profile.py
+- tools/gen_deploy_set.py

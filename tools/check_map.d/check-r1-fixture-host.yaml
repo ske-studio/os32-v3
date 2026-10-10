@@ -72,3 +72,4 @@ check-r1-fixture-host:
 - tools/tests/host_arch/**
 - platform/pc98/platform_io.h
 - tools/tests/mutpar.py
+- tools/gen_deploy_set.py
