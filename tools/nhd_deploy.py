@@ -1280,13 +1280,30 @@ def remove_partial(dest_file):
             dest_file, result.stderr.strip()))
 
 
+def refresh_deploy_set():
+    """配備に使う成果物から期待表を生成する。失敗なら配備へ進まない。"""
+    result = subprocess.run(
+        [sys.executable, os.path.join(PROJ_DIR, 'tools/gen_deploy_set.py'),
+         '--root', PROJ_DIR], capture_output=True, text=True)
+    if result.returncode != 0:
+        print('Error: deploy-set: ' + result.stderr.strip(), file=sys.stderr)
+        return False
+    print(result.stdout.strip())
+    return True
+
+
 def do_sync(tag_filter=None):
     """deploy.yaml に基づくフルデプロイ
 
-    1. ブートローダー書き込み (write-boot)
-    2. ディレクトリ構造作成
-    3. 全ファイルコピー
+    1. 期待表生成 (全体同期のみ、書込み前)
+    2. ブートローダー書き込み (write-boot)
+    3. ディレクトリ構造作成・全ファイルコピー
     """
+    if tag_filter:
+        print("sync --tag: 部分同期のため deploy-set は再生成しない。"
+              "更新後の一式とは不一致になり得る。")
+    elif not refresh_deploy_set():
+        return False
     if not ensure_local_nhd():
         return False
     if not legacy_pt_guard():
@@ -1651,7 +1668,7 @@ def do_verify_set(set_file):
             if (not path.is_absolute() or '..' in path.parts or str(path) != guest or
                     guest == '/' or guest.startswith('//') or
                     any(c in guest for c in '?[]\x00') or '**' in guest or
-                    '*' in str(path.parent) or item['check'] != 'exists'):
+                    '*' in str(path.parent) or item['check'] != 'optional'):
                 raise ValueError('invalid allow-list entry: ' + str(guest))
             allowed.add(guest)
         def is_allowed(guest):
@@ -1693,11 +1710,6 @@ def do_verify_set(set_file):
                 problems.append('missing: ' + guest)
             elif path.stat().st_size != item['size'] or file_sha256(path) != item['sha256']:
                 problems.append('modified: ' + guest)
-        for item in allow:
-            guest = item['guest']
-            # A glob permits zero or more guest-created logs. Exact settings are required.
-            if '*' not in guest and not local(guest).is_file():
-                problems.append('missing allow-list: ' + guest)
         def walk_error(exc):
             raise exc
         for directory in managed:

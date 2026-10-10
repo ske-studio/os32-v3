@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""T2h/E3: make all の配備期待集合を固定する。媒体・配備元には書かない。"""
+"""T2h/E3: ビルド/配備時の成果物から配備期待集合を固定する。媒体・配備元には書かない。"""
 import argparse
 import hashlib
 import json
@@ -10,12 +10,12 @@ from deploy_manifests import CORE_MANIFEST_RELPATHS, load_merged, resolve_entry
 
 ROOT = Path(__file__).resolve().parents[1]
 ALLOW_LIST = [
-    {"guest": "/etc/settings.db", "check": "exists"},
-    {"guest": "/etc/settings.db-journal", "check": "exists"},
-    {"guest": "/etc/settings.db.new", "check": "exists"},
-    {"guest": "/etc/settings.db.new-journal", "check": "exists"},
-    {"guest": "/etc/system.cfg", "check": "exists"},
-    {"guest": "/var/log/*", "check": "exists"},
+    {"guest": "/etc/settings.db", "check": "optional"},
+    {"guest": "/etc/settings.db-journal", "check": "optional"},
+    {"guest": "/etc/settings.db.new", "check": "optional"},
+    {"guest": "/etc/settings.db.new-journal", "check": "optional"},
+    {"guest": "/etc/system.cfg", "check": "optional"},
+    {"guest": "/var/log/*", "check": "optional"},
 ]
 
 
@@ -37,7 +37,7 @@ def generate(root, merged, generation):
         for host, guest in resolve_entry(entry, str(root)):
             if not valid_path(host) or not valid_path(guest, absolute=True):
                 raise ValueError("不正な配備パス: {} -> {}".format(host, guest))
-            # ゲストが書く設定は存在だけの別欄。初期内容を期待 hash にしない。
+            # ゲストが書く設定は任意存在の別欄。初期内容を期待 hash にしない。
             if any(PurePosixPath(guest).match(item["guest"]) for item in ALLOW_LIST):
                 continue
             if guest in guests:

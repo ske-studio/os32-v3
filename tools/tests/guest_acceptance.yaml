@@ -2004,7 +2004,7 @@
   mode: manual
   prereq: 'R1c-1: PM が原本を残して作る t2h_fault.ini (hdd=os32_t2h_install.nhd)。17MB。初回も正常一式の同期・照合・deploy 後に np21w_ctl.py start --ini t2h_fault.ini。停止は np21w_ctl.py stop、強制停止なら記録。nhd_deploy.py
     --profile t2h の remote/local/mount/stamp が本 NHD と別であること。上書きごとに対象・内容・復元を提示し [D2] 個別承認、[D1]。正常一式の sync と deploy-set.json
-    照合が hook の開始条件。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。'
+    照合が hook の開始条件。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。'
   entry: 正常一式 sync --profile t2h; verify-set --profile t2h --set build/out/deploy-set.json; deploy; start
   observe:
   - '交換・復元の毎回の順: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h (残っていれば) → pull --profile t2h → copy または sync --profile
@@ -2032,7 +2032,7 @@
   mode: manual
   prereq: 'R1c-1: PM が原本を残して作る t2h_fault.ini (hdd=os32_t2h_install.nhd)。17MB。初回も正常一式の同期・照合・deploy 後に np21w_ctl.py start --ini t2h_fault.ini。停止は np21w_ctl.py stop、強制停止なら記録。nhd_deploy.py
     --profile t2h の remote/local/mount/stamp が本 NHD と別であること。上書きごとに対象・内容・復元を提示し [D2] 個別承認、[D1]。正常一式の sync と deploy-set.json
-    照合が hook の開始条件。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。'
+    照合が hook の開始条件。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。'
   entry: make kernel-r1; make deploy-kernel-r1 PROFILE=t2h; deploy --profile t2h; start
   observe:
   - '交換・復元の毎回の順: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h (残っていれば) → pull --profile t2h → copy または sync --profile
@@ -2052,11 +2052,11 @@
   mode: manual
   prereq: 'R1c-1: PM が原本を残して作る t2h_fault.ini (hdd=os32_t2h_install.nhd)。17MB。初回も正常一式の同期・照合・deploy 後に np21w_ctl.py start --ini t2h_fault.ini。停止は np21w_ctl.py stop、強制停止なら記録。nhd_deploy.py
     --profile t2h の remote/local/mount/stamp が本 NHD と別であること。上書きごとに対象・内容・復元を提示し [D2] 個別承認、[D1]。正常一式の sync と deploy-set.json
-    照合が hook の開始条件。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。'
+    照合が hook の開始条件。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。'
   entry: 'hook (1) IRQ alloc / (2) #UD ledger free / (4) V86 end 再例外、各1 reset'
   observe:
   - 各試行を emu_reset (/api/reset) で独立に開始、指定hookだけ1回 arm。最新r1 map と pool/ledger の直前値を採る。
-  - (1)(2) は R1 context/op/owner/EIP を固定シリアルに残し pool会計変更前に停止、その後進行なし。(4) は exec_stop_mark の停止と exec_stop_count +1。次試行へ reset
+  - (1)(2) は build/out/r1/kernel.map の記号で ledger_check_tag (4Bのポインタを読み、その参照先の文字列を読む) と ledger_irq_last / ledger_exc_last (12B、u32のop/owner/EIP)、ledger_irq_ops / ledger_exc_ops を emu_read_mem で読み、R1 context を確認。pool会計変更前に停止、その後進行なし。(4) は exec_stop_mark の停止と exec_stop_count +1。次試行へ reset
     でのみ復帰。freeze時は深さを emu_read_mem で実測。
   expect:
     resets: 3
@@ -2072,7 +2072,7 @@
   mode: manual
   prereq: 'R1c-1: PM が原本を残して作る t2h_fault.ini (hdd=os32_t2h_install.nhd)。17MB。初回も正常一式の同期・照合・deploy 後に np21w_ctl.py start --ini t2h_fault.ini。停止は np21w_ctl.py stop、強制停止なら記録。nhd_deploy.py
     --profile t2h の remote/local/mount/stamp が本 NHD と別であること。上書きごとに対象・内容・復元を提示し [D2] 個別承認、[D1]。正常一式の sync と deploy-set.json
-    照合が hook の開始条件。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。'
+    照合が hook の開始条件。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。'
   entry: hook (3) K1 / (5a) 生存親毒化 / (5b) PARKED毒化 / (6) attach失敗、各1 reset
   observe:
   - (3) V86 session の CPL0例外→exec_pending_transfer→通常文脈で回収→owner0→次起動。移譲/消費は各1回、v86_restore_mismatch0。
@@ -2103,7 +2103,7 @@
   mode: manual
   prereq: 'R1c-1: PM が原本を残して作る t2h_fault.ini (hdd=os32_t2h_install.nhd)。17MB。初回も正常一式の同期・照合・deploy 後に np21w_ctl.py start --ini t2h_fault.ini。停止は np21w_ctl.py stop、強制停止なら記録。nhd_deploy.py
     --profile t2h の remote/local/mount/stamp が本 NHD と別であること。上書きごとに対象・内容・復元を提示し [D2] 個別承認、[D1]。正常一式の sync と deploy-set.json
-    照合が hook の開始条件。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。'
+    照合が hook の開始条件。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。'
   entry: 正常 vmkernel.lz4 を copy --dest /boot; deploy --profile t2h; start
   observe:
   - '交換・復元の毎回の順: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h (残っていれば) → pull --profile t2h → copy または sync --profile
@@ -2111,7 +2111,7 @@
   - 保存した L-h の正常像へ復元し ver/hash/API・shlib読込み・gui_demo・kselftest の正常対照を採る。
   - 'ゲスト書込み後の照合: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h → pull --profile t2h → verify-set --profile t2h --set
     build/out/deploy-set.json。期待表は L-h 成果物に束縛し、core/userland/assets の集合・size・sha256、unicode.bin・vmkernel.lz4・.shlib を含める。非配備
-    kernel.bin/sqlite.bin/SDK/raw boot/apps/game は除外、設定 allow-list は存在だけ、管理対象の欠損/改変/余剰 0。'
+    kernel.bin/sqlite.bin/SDK/raw boot/apps/game は除外、設定 allow-list は任意存在・内容不問、管理対象の欠損/改変/余剰 0。'
   - 照合後 np21w_ctl.py start --ini t2h_fault.ini。最終復帰は原本 ini で start、元の GFX= を戻す。
   expect:
     ver: L-h 一致
@@ -2127,7 +2127,7 @@
   mode: manual
   prereq: 'R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と
     [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので
-    hal_test を要求しない。'
+    hal_test を要求しない。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。'
   entry: copy --profile t2h --dest /sys --rename shell.bin <old-shell.fixture>; deploy; start
   observe:
   - '交換・復元の毎回の順: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h (残っていれば) → pull --profile t2h → copy または sync --profile
@@ -2144,7 +2144,7 @@
   mode: manual
   prereq: 'R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と
     [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので
-    hal_test を要求しない。'
+    hal_test を要求しない。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。'
   entry: copy --profile t2h --dest /sys --rename shell.bin <L-h shell.bin>; deploy; start
   observe:
   - '交換・復元の毎回の順: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h (残っていれば) → pull --profile t2h → copy または sync --profile
@@ -2152,7 +2152,7 @@
   - ver 一致・shlib読込み・gui_demo・kselftest を正常対照で採る。
   - 'ゲスト書込み後の照合: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h → pull --profile t2h → verify-set --profile t2h --set
     build/out/deploy-set.json。期待表は L-h 成果物に束縛し、core/userland/assets の集合・size・sha256、unicode.bin・vmkernel.lz4・.shlib を含める。非配備
-    kernel.bin/sqlite.bin/SDK/raw boot/apps/game は除外、設定 allow-list は存在だけ、管理対象の欠損/改変/余剰 0。'
+    kernel.bin/sqlite.bin/SDK/raw boot/apps/game は除外、設定 allow-list は任意存在・内容不問、管理対象の欠損/改変/余剰 0。'
   expect:
     ver: L-h 一致
     verify_set_rc: 0
@@ -2166,7 +2166,7 @@
   mode: manual
   prereq: 'R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と
     [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので
-    hal_test を要求しない。'
+    hal_test を要求しない。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。'
   entry: copy --profile t2h --dest /sys/lib --rename libos32gui.shlib <old-shlib.fixture>; deploy; start; gui_demo
   observe:
   - '交換・復元の毎回の順: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h (残っていれば) → pull --profile t2h → copy または sync --profile
@@ -2186,7 +2186,7 @@
   mode: manual
   prereq: 'R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と
     [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので
-    hal_test を要求しない。'
+    hal_test を要求しない。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。'
   entry: copy --profile t2h --dest /sys/lib --rename libos32gui.shlib <L-h shlib>; deploy; start
   observe:
   - '交換・復元の毎回の順: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h (残っていれば) → pull --profile t2h → copy または sync --profile
@@ -2194,7 +2194,7 @@
   - ver・shlib読込み・gui_demo・kselftest の正常対照を採る。
   - 'ゲスト書込み後の照合: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h → pull --profile t2h → verify-set --profile t2h --set
     build/out/deploy-set.json。期待表は L-h 成果物に束縛し、core/userland/assets の集合・size・sha256、unicode.bin・vmkernel.lz4・.shlib を含める。非配備
-    kernel.bin/sqlite.bin/SDK/raw boot/apps/game は除外、設定 allow-list は存在だけ、管理対象の欠損/改変/余剰 0。'
+    kernel.bin/sqlite.bin/SDK/raw boot/apps/game は除外、設定 allow-list は任意存在・内容不問、管理対象の欠損/改変/余剰 0。'
   expect:
     ver: L-h 一致
     shlib: 読込み成功
@@ -2209,20 +2209,22 @@
   mode: manual
   prereq: 'R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と
     [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので
-    hal_test を要求しない。'
+    hal_test を要求しない。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。'
   entry: 'U3 予行: deploy_source_check.py; FD起動; hsync 2段; --verify 2本; pull; verify-set; HDD起動'
   observe:
+  - 先頭で deploy_source_check.py --root <配備元> --deploy-set <その一式のdeploy-set.json> により配備元の余剰0を確認。余剰があれば --prune-extra で候補を確認し --prune-extra --delete で掃除して再照合、rc=0まで同期しない。新一式は make deploy-u3 HOSTDRV_DIR=<配備元の根> で FD→HostDrv を同じ build で配り、その期待表を使う。
   - 同期前に deploy_source_check.py で .deploy/manifest.txt 全行の配備元の存在/size/CRC を照合し管理対象ゲストパス一覧を保存。欠け/不一致が1件でもあれば同期しない (E1)。SerialFS/HostDrvの根と
     make deploy の名札の対応も確かめる。
   - 本ビルドの新 FD で起動し FD の新 hsync を使用 → hsync --root /hd0 --no-backup (全体、/sys除外) 完遂 → hsync --root /hd0 sys 完遂。HDDのhsyncで更新しない。
   - hsync --root /hd0 --no-backup --verify と hsync --root /hd0 sys --verify を両方実行、全件 byte比較の変更0/errors0/extra0を採る。サイズ+mtimeだけの2回目0件を証明にしない。
   - 'ゲスト書込み後の照合: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h → pull --profile t2h → verify-set --profile t2h --set
     build/out/deploy-set.json。期待表は L-h 成果物に束縛し、core/userland/assets の集合・size・sha256、unicode.bin・vmkernel.lz4・.shlib を含める。非配備
-    kernel.bin/sqlite.bin/SDK/raw boot/apps/game は除外、設定 allow-list は存在だけ、管理対象の欠損/改変/余剰 0。'
+    kernel.bin/sqlite.bin/SDK/raw boot/apps/game は除外、設定 allow-list は任意存在・内容不問、管理対象の欠損/改変/余剰 0。'
   - verify-set が L-h deploy-set.json の欠損/改変/余剰0なら HDD 起動で ver 一致。FD→HDD の切替・停止起動は np21w_ctl.py。実機更新はこの予行を通してから。
   expect:
     source_missing: 0
     source_mismatch: 0
+    source_extra: 0
     sync_errors: 0
     sync_extra: 0
     verify_whole_changes: 0
@@ -2241,7 +2243,7 @@
   mode: manual
   prereq: 'R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と
     [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので
-    hal_test を要求しない。'
+    hal_test を要求しない。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。'
   entry: 'E4 負例: remoteだけ1本改変; pull無しverify-set; pullありverify-set; 正常復元'
   observe:
   - ゲスト起動のstampがある状態で np21w_ctl.py stop、host側でremote隔離NHDを直接改変して管理対象1本を置換 (nhd_deploy.py copy は local に書くので使わない、localは触らない、別承認)。pull無しverify-setは「pull後にゲスト起動あり」でrc非0。
@@ -2571,6 +2573,7 @@
     → hal_test 1 行目 PEGC 一致。更新前は v2.1、更新後は L-h (KAPI 74 / MemStat 200B)。NP21/W の観測で代用しない。'
   entry: 新FD起動; deploy_source_check.py; hsync 2段; --verify 2本; 余剰照合; HDD起動
   observe:
+  - 先頭で deploy_source_check.py --root <配備元> --deploy-set <その一式のdeploy-set.json> により配備元の余剰0を確認。余剰があれば --prune-extra で候補を確認し --prune-extra --delete で掃除して再照合、rc=0まで同期しない。新一式は make deploy-u3 HOSTDRV_DIR=<配備元の根> で FD→HostDrv を同じ build で配り、その期待表を使う。
   - '事前確認: 新FDの実機起動/SerialFS到達/対象/hd0到達。旧v2.1 FDも実機で起動・SerialFS到達・/hd0到達の3点を確認。名札つき旧一式 (/home/hight/os32 v2.1 build) をSerialFS側に保持、旧install
     CDも確保。R1c-2(d)予行の合格証拠を要求。'
   - 同期前に deploy_source_check.py で .deploy/manifest.txt 全行の配備元の存在/size/CRC を照合し管理対象ゲストパス一覧を保存。欠け/不一致が1件でもあれば同期しない (E1)。SerialFS/HostDrvの根と
@@ -2585,6 +2588,7 @@
     old_fd_hd0: 到達
     source_missing: 0
     source_mismatch: 0
+    source_extra: 0
     sync_errors: 0
     sync_extra: 0
     verify_whole_changes: 0
@@ -2603,6 +2607,7 @@
     → hal_test 1 行目 PEGC 一致。更新前は v2.1、更新後は L-h (KAPI 74 / MemStat 200B)。NP21/W の観測で代用しない。'
   entry: '起動不能時: 旧一式の名札照合; v2.1 FD; 旧全体/sys同期; 両--verify; ls -R; HDD'
   observe:
+  - 先頭で deploy_source_check.py --root <配備元> --deploy-set <その一式のdeploy-set.json> により配備元の余剰0を確認。余剰があれば --prune-extra で候補を確認し --prune-extra --delete で掃除して再照合、rc=0まで同期しない。新一式は make deploy-u3 HOSTDRV_DIR=<配備元の根> で FD→HostDrv を同じ build で配り、その期待表を使う。
   - 旧配備元についてもdeploy_source_check.pyで名札全行の存在/size/CRCを同期前に照合。v2.1 FDで起動、旧SerialFS配備元に対し hsync --root /hd0 --no-backup → hsync
     --root /hd0 sys。旧FDのCRCと新HDDkernelのCRCが違うので --no-backup。
   - hsync --root /hd0 --no-backup --verify と hsync --root /hd0 sys --verify の変更0/errors0、旧管理対象一覧とシリアルls -Rの余剰0を確認してHDD起動、v2.1のGUI含む旧一式へ復帰。欠け/差/余剰があれば起動しない。CD
@@ -2610,6 +2615,7 @@
   expect:
     source_missing: 0
     source_mismatch: 0
+    source_extra: 0
     verify_whole_changes: 0
     verify_sys_changes: 0
     verify_errors: 0

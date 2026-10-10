@@ -57,3 +57,4 @@ check-tools-host:
 - userland/gshell/src/taskbar.rs
 - userland/gshell/src/startmenu.rs
 - tools/nhd_profile.py
+- tools/gen_deploy_set.py

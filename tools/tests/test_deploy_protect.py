@@ -213,6 +213,9 @@ class Base(unittest.TestCase):
         self.fake = FakeRun(sandbox=str(self.root))
         self._saved = {}
         self._patch(subprocess, 'run', self.fake)
+        # This suite isolates settings protection; regeneration has its own
+        # artifact/deployment fixtures in test_deploy_set.
+        self._patch(nd, 'refresh_deploy_set', lambda: True)
         self._patch(nd, 'MOUNT_POINT', str(self.mount))
         self._patch(nd, 'NHD_LOCAL', str(self.root / 'os32.nhd'))
         self._patch(nd, 'NHD_REMOTE', str(self.root / 'remote' / 'os32.nhd'))

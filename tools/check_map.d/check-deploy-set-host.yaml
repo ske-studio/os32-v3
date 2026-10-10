@@ -1,6 +1,8 @@
 check-deploy-set-host:
 - tools/gen_deploy_set.py
 - tools/deploy_source_check.py
+- tools/deploy_protect.py
+- tools/nhd_deploy.py
 - tools/check_manifests.py
 - tools/deploy_manifests.py
 - tools/check_artifacts.py
@@ -19,3 +21,9 @@ check-deploy-set-host:
 - build/packages.yaml
 - build/programs.mk
 - docs/07_shell.md
+- tools/nhd_profile.py
+- tools/pc98pt.py
+- userland/system/hsync.c
+- userland/system/hsync_protect.inc
+- userland/system/hsync_bootold.inc
+- lib/crc32_core.inc
