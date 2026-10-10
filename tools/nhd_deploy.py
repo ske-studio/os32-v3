@@ -1281,7 +1281,7 @@ def remove_partial(dest_file):
 
 
 def refresh_deploy_set():
-    """配備に使った成果物を読み直す。期待表を生成できなければ成功にしない。"""
+    """配備に使う成果物から期待表を生成する。失敗なら配備へ進まない。"""
     result = subprocess.run(
         [sys.executable, os.path.join(PROJ_DIR, 'tools/gen_deploy_set.py'),
          '--root', PROJ_DIR], capture_output=True, text=True)
@@ -1295,10 +1295,15 @@ def refresh_deploy_set():
 def do_sync(tag_filter=None):
     """deploy.yaml に基づくフルデプロイ
 
-    1. ブートローダー書き込み (write-boot)
-    2. ディレクトリ構造作成
-    3. 全ファイルコピー
+    1. 期待表生成 (全体同期のみ、書込み前)
+    2. ブートローダー書き込み (write-boot)
+    3. ディレクトリ構造作成・全ファイルコピー
     """
+    if tag_filter:
+        print("sync --tag: 部分同期のため deploy-set は再生成しない。"
+              "更新後の一式とは不一致になり得る。")
+    elif not refresh_deploy_set():
+        return False
     if not ensure_local_nhd():
         return False
     if not legacy_pt_guard():
@@ -1418,8 +1423,6 @@ def do_sync(tag_filter=None):
                   total_failed, total_copied, total_size))
         print("  配備は完了していない。ゲストの成果物は古いままか消えている。")
         print("=" * 55)
-        return False
-    if not refresh_deploy_set():
         return False
     print("  完了! {} ファイル ({:,} bytes){}".format(
         total_copied, total_size,

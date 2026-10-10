@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """T2h/E1-a: 配備元の名札・期待集合・hsync が配る余剰を照合する。"""
 import argparse
-import fnmatch
 import hashlib
 import json
 import os
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 import re
 import stat
 import sys
@@ -18,22 +17,14 @@ from gen_deploy_set import ROOT, valid_path
 HS_TEMP_PREFIX = ".hs~"
 
 
-def source_extras(root, names, deploy_set):
+def source_extras(root, names):
     """全体 + 明示 sys 同期の範囲。根直下・data も hsync が配る。
 
-    名札自身と任意存在欄、hsync_protect.inc と同じ設定保護は除外。
+    名札自身、hsync_protect.inc と同じ設定保護、.hs~* は除外。
+    ゲストの allow_list は配備元の除外ではない (system.cfg とログも配る)。
     sys は第2段で配るので除外しない。host_only は hsync の除外ではない。
     """
     root = Path(root).resolve()
-    patterns = []
-    for item in deploy_set["allow_list"]:
-        guest = item["guest"]
-        path = PurePosixPath(guest)
-        if (not valid_path(guest, absolute=True) or guest.startswith("//") or
-                any(ch in guest for ch in "?[]\x00") or "**" in guest or
-                "*" in str(path.parent) or item["check"] != "optional"):
-            raise ValueError("invalid allow-list entry: " + str(guest))
-        patterns.append(path)
     protect.check_tree(str(root))
     extras = []
 
@@ -43,16 +34,14 @@ def source_extras(root, names, deploy_set):
     for parent, dirs, files in os.walk(root, onerror=walk_error, followlinks=False):
         # 保護されたディレクトリ経路へは hsync も入らない。
         dirs[:] = sorted(name for name in dirs if not name.startswith(HS_TEMP_PREFIX) and not
-                         protect.protected_ancestor(str(root), os.path.join(parent, name)))
+                         protect.protected_ancestor(str(root), os.path.join(parent, name)) and not
+                         protect.is_protected(str(root), os.path.join(parent, name)))
         for name in sorted(files):
             if name.startswith(HS_TEMP_PREFIX):
                 continue
             path = Path(parent) / name
             guest = "/" + path.relative_to(root).as_posix()
-            pp = PurePosixPath(guest)
             if (guest.lstrip("/") in names or guest == "/.deploy/manifest.txt" or
-                    any(pp.parent == pattern.parent and
-                        fnmatch.fnmatchcase(pp.name, pattern.name) for pattern in patterns) or
                     protect.protected_ancestor(str(root), str(path)) or
                     protect.is_protected(str(root), str(path))):
                 continue
@@ -135,7 +124,7 @@ def check_source(root, text, deploy_set):
             if len(data) != entry["size"] or hashlib.sha256(data).hexdigest() != entry["sha256"]:
                 errors.append("deploy-set と配備元が不一致: " + guest)
     try:
-        errors.extend("extra: " + guest for guest in source_extras(root, seen, deploy_set))
+        errors.extend("extra: " + guest for guest in source_extras(root, seen))
     except (OSError, protect.ProtectError) as exc:
         errors.append("配備元を走査できない: " + str(exc))
     return errors, sorted(guests)

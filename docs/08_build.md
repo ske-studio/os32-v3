@@ -107,7 +107,7 @@ GUI アプリ      → libos32gui_stub (ジャンプ表への薄いスタブ) �
 (`apps` + `game`)。検査: `make check-fast` / `make check-changed` / `make check` の 3 通り
 ([§8-4 検査の 3 段](#検査の3段))。`emu_agent` (ローカル AI) の `make` は
 許可リスト (`tools/emu_agent/agent.py` の `MAKE_TARGETS`) に載ったターゲットしか実行しない。
-`make all` と各配備 (`deploy` / `deploy-fd` / `deploy-kernel` / `deploy-nhd` / `nhd_deploy.py sync`) の最後に、使った成果物から `build/out/deploy-set.json` を生成する。期待集合・allow-list・名札照合と外部対象外の扱いは [T2H_EXTERNAL_GATE](tasks/v3/T2H_EXTERNAL_GATE.md)。
+`make all` の最後、および各配備 (`deploy` / `deploy-kernel` / `deploy-nhd` / `nhd_deploy.py sync`) の書込み前に、使う成果物から `build/out/deploy-set.json` を生成する。生成に失敗した場合は配備先へ書き込まない。配備時の期待表は最後に HostDrv/NHD へ配ったものの表で、FD の中身は含まない。`deploy-fd` と部分同期 `sync --tag` は期待表を再生成しない。期待集合・allow-list・名札照合と外部対象外の扱いは [T2H_EXTERNAL_GATE](tasks/v3/T2H_EXTERNAL_GATE.md)。
 
 **GitHub Actions** (`.github/workflows/check.yml`、os32-v3 で 2026-09-30 に作り直し): push / PR で、
 クロスツールチェーンも rustc も無しで回せる検査だけを自動ゲートにする — KAPI 版番号の一致、
@@ -455,6 +455,7 @@ NP21/W の停止が要る ([D1])。停止できるならこちらで一式を入
 | **ブートセクタ** | `make deploy-boot` | `boot/loader_hdd.bin` を NHD のブート領域 (LBA 2〜17) へ。ローダを変えたときだけ | **必要** |
 
 起動 FD 2 種は `make all` で生成だけ行い、`NP21W_DIR` へのコピーは `make deploy-fd` で明示する。
+U3 の予行・実機更新の準備は `make deploy-u3 HOSTDRV_DIR=<配備元の根>` を使う。1 回の make 呼出しで FD → HostDrv の順に同じ build を配り、HostDrv の書込み前に期待表を生成する。`make deploy` → `make deploy-fd` を別々に呼ぶとカーネルが再生成され、FD と HostDrv は別 build になる。
 
 - **NHD への書き込みは NP21/W を止めてから** ([D1])。停止 → 配備 → 起動の順。
   `emu_pause`、breakpoint 停止、HTTP 無応答はプロセス終了の証拠にならない。

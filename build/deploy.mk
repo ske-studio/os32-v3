@@ -4,23 +4,23 @@
 
 # deploy: HostDrv方式 — ビルド成果物をC:\os32にコピー (sudo不要, 再起動不要)
 # ゲストOSは /host 経由で直接アクセス可能
-deploy: $(BUILD_OUT)/vmkernel.lz4 programs unicode_bin
+deploy deploy-u3: $(BUILD_OUT)/vmkernel.lz4 programs unicode_bin
+	python3 tools/gen_deploy_set.py
 	@echo "=== HostDrv Deploy ==="
 	$(HOSTDRV_DEPLOY) sync
 	$(PRUNE_STALE) hostdrv $(PRUNE_FLAG)
-	python3 tools/gen_deploy_set.py
 
 # deploy-kernel: vmkernel.lz4 と全ビルド成果物をNHDのext2に配置
 #   (NP21/W再起動が必要)。HostDrv を先に同期するので、HostDrv 側が古いまま
 #   ext2 を上書きして中身を失う事故を防げる。
 #   ブートローダー自体を変更した場合は deploy-boot を別途実行すること。
 deploy-kernel: $(BUILD_OUT)/vmkernel.lz4
+	python3 tools/gen_deploy_set.py
 	@echo "=== Sync to HostDrv before NHD deploy ==="
 	$(HOSTDRV_DEPLOY) sync
 	$(NHD_DEPLOY) sync-from-hostdrv
 	$(PRUNE_STALE) both $(PRUNE_FLAG)
 	$(NHD_DEPLOY) deploy
-	python3 tools/gen_deploy_set.py
 
 # deploy-boot: ブートローダーのみNHDブート領域 (LBA 2-17) に書き込み
 #   boot/loader_hdd.bin を変更した場合のみ実行する
@@ -39,11 +39,11 @@ nhd-migrate-pt: boot/loader_hdd.bin $(BUILD_OUT)/vmkernel.lz4
 
 # deploy-nhd: NHDフルデプロイ (ローダー+全ファイル)
 deploy-nhd: $(BUILD_OUT)/vmkernel.lz4 programs unicode_bin
+	# sync は書込み前に期待表を生成し、失敗なら配備しない。
 	@echo "=== NHD Deploy (using deploy.yaml) ==="
 	$(NHD_DEPLOY) sync
 	$(PRUNE_STALE) both $(PRUNE_FLAG)
 	$(NHD_DEPLOY) deploy
-	python3 tools/gen_deploy_set.py
 
 # prune-stale: 配備先 (HostDrv + NHD) に残ったマニフェストに無い *.bin を掃除する。
 #   配備は書くだけで消さないので、KAPI 変更後の stale バイナリ (別関数へ飛んで
@@ -98,9 +98,12 @@ deploy-fd: images/os32_boot.d88 images/os32_boot144.img
 	@echo "=== Boot FD Deploy ==="
 	cp images/os32_boot.d88 '$(NP21W_DIR)/os32_boot.d88'
 	cp images/os32_boot144.img '$(NP21W_DIR)/os32_boot144.img'
-	python3 tools/gen_deploy_set.py
 
-.PHONY: deploy-fd
+# U3 の準備: 同じ make 呼出しの build を FD → HostDrv の順で配る。
+# 上の共有 recipe は deploy-fd 完了後に実行する (並列 make でも同じ順)。
+deploy-u3: deploy-fd
+
+.PHONY: deploy-fd deploy-u3
 
 # Caller performs stop -> umount -> pull --profile t2h before this copy,
 # then deploy --profile t2h -> start. Never route a fixture to production.

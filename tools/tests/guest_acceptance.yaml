@@ -2212,7 +2212,7 @@
     hal_test を要求しない。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。'
   entry: 'U3 予行: deploy_source_check.py; FD起動; hsync 2段; --verify 2本; pull; verify-set; HDD起動'
   observe:
-  - 先頭で deploy_source_check.py --root <配備元> --deploy-set <その一式のdeploy-set.json> により配備元の余剰0を確認。余剰があれば --prune-extra で候補を確認し --prune-extra --delete で掃除して再照合、rc=0まで同期しない。新一式は make deploy / deploy-fd 後に再生成した期待表を使う。
+  - 先頭で deploy_source_check.py --root <配備元> --deploy-set <その一式のdeploy-set.json> により配備元の余剰0を確認。余剰があれば --prune-extra で候補を確認し --prune-extra --delete で掃除して再照合、rc=0まで同期しない。新一式は make deploy-u3 HOSTDRV_DIR=<配備元の根> で FD→HostDrv を同じ build で配り、その期待表を使う。
   - 同期前に deploy_source_check.py で .deploy/manifest.txt 全行の配備元の存在/size/CRC を照合し管理対象ゲストパス一覧を保存。欠け/不一致が1件でもあれば同期しない (E1)。SerialFS/HostDrvの根と
     make deploy の名札の対応も確かめる。
   - 本ビルドの新 FD で起動し FD の新 hsync を使用 → hsync --root /hd0 --no-backup (全体、/sys除外) 完遂 → hsync --root /hd0 sys 完遂。HDDのhsyncで更新しない。
@@ -2573,7 +2573,7 @@
     → hal_test 1 行目 PEGC 一致。更新前は v2.1、更新後は L-h (KAPI 74 / MemStat 200B)。NP21/W の観測で代用しない。'
   entry: 新FD起動; deploy_source_check.py; hsync 2段; --verify 2本; 余剰照合; HDD起動
   observe:
-  - 先頭で deploy_source_check.py --root <配備元> --deploy-set <その一式のdeploy-set.json> により配備元の余剰0を確認。余剰があれば --prune-extra で候補を確認し --prune-extra --delete で掃除して再照合、rc=0まで同期しない。新一式は make deploy / deploy-fd 後に再生成した期待表を使う。
+  - 先頭で deploy_source_check.py --root <配備元> --deploy-set <その一式のdeploy-set.json> により配備元の余剰0を確認。余剰があれば --prune-extra で候補を確認し --prune-extra --delete で掃除して再照合、rc=0まで同期しない。新一式は make deploy-u3 HOSTDRV_DIR=<配備元の根> で FD→HostDrv を同じ build で配り、その期待表を使う。
   - '事前確認: 新FDの実機起動/SerialFS到達/対象/hd0到達。旧v2.1 FDも実機で起動・SerialFS到達・/hd0到達の3点を確認。名札つき旧一式 (/home/hight/os32 v2.1 build) をSerialFS側に保持、旧install
     CDも確保。R1c-2(d)予行の合格証拠を要求。'
   - 同期前に deploy_source_check.py で .deploy/manifest.txt 全行の配備元の存在/size/CRC を照合し管理対象ゲストパス一覧を保存。欠け/不一致が1件でもあれば同期しない (E1)。SerialFS/HostDrvの根と
@@ -2607,7 +2607,7 @@
     → hal_test 1 行目 PEGC 一致。更新前は v2.1、更新後は L-h (KAPI 74 / MemStat 200B)。NP21/W の観測で代用しない。'
   entry: '起動不能時: 旧一式の名札照合; v2.1 FD; 旧全体/sys同期; 両--verify; ls -R; HDD'
   observe:
-  - 先頭で deploy_source_check.py --root <配備元> --deploy-set <その一式のdeploy-set.json> により配備元の余剰0を確認。余剰があれば --prune-extra で候補を確認し --prune-extra --delete で掃除して再照合、rc=0まで同期しない。新一式は make deploy / deploy-fd 後に再生成した期待表を使う。
+  - 先頭で deploy_source_check.py --root <配備元> --deploy-set <その一式のdeploy-set.json> により配備元の余剰0を確認。余剰があれば --prune-extra で候補を確認し --prune-extra --delete で掃除して再照合、rc=0まで同期しない。新一式は make deploy-u3 HOSTDRV_DIR=<配備元の根> で FD→HostDrv を同じ build で配り、その期待表を使う。
   - 旧配備元についてもdeploy_source_check.pyで名札全行の存在/size/CRCを同期前に照合。v2.1 FDで起動、旧SerialFS配備元に対し hsync --root /hd0 --no-backup → hsync
     --root /hd0 sys。旧FDのCRCと新HDDkernelのCRCが違うので --no-backup。
   - hsync --root /hd0 --no-backup --verify と hsync --root /hd0 sys --verify の変更0/errors0、旧管理対象一覧とシリアルls -Rの余剰0を確認してHDD起動、v2.1のGUI含む旧一式へ復帰。欠け/差/余剰があれば起動しない。CD
