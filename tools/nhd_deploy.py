@@ -76,7 +76,7 @@ NHD_LOCAL = os.environ.get("OS32_NHD_LOCAL") or os.path.join(PROJ_DIR, "build", 
 # 配備定義は所有する層ごとに分かれている。リストとマージ処理の実体は
 # tools/deploy_manifests.py。二重に持つと食い違うので参照だけにすること。
 # 各マニフェストは自層の成果物しか参照しない (make check-manifests で検査)。
-from deploy_manifests import DEPLOY_MANIFESTS, load_merged as _load_merged
+from deploy_manifests import DEPLOY_MANIFESTS, load_merged as _load_merged, host_only_paths
 
 # === ext2パーティション オフセット ===
 # NHDヘッダ(512B) + ブート領域(LBA 0-1631) = 1633セクタ
@@ -1392,10 +1392,11 @@ def do_sync(tag_filter=None):
 def do_sync_from_hostdrv():
     """HostDrvディレクトリ (C:\\os32) の内容をNHDのext2パーティションに同期
 
-    deploy.yaml を参照せず、HostDrvディレクトリの全ファイルを再帰的にコピーする。
+    HostDrvディレクトリを再帰的にコピーする (manifest の host_only は除外)。
     これにより HostDrv が唯一のソースとなり、管理漏れを防止する。
     """
     hostdrv_dir = os.environ.get('HOSTDRV_DIR', '/mnt/c/os32')
+    host_only = host_only_paths()
 
     if not os.path.isdir(hostdrv_dir):
         print("Error: HostDrvディレクトリが見つかりません: {}".format(hostdrv_dir),
@@ -1468,6 +1469,9 @@ def do_sync_from_hostdrv():
                 guest_path = '/' + rel_dir.replace(os.sep, '/') + '/' + fname
             else:
                 guest_path = '/' + fname
+            if guest_path in host_only:
+                print("  HostDrv only: {}".format(guest_path))
+                continue
             # HostDrv に古い etc/settings.db が残っていても NHD の本体を触らない
             dest_path, state = guard_dest(guest_path, host_src=src_path)
             if state == 'error':

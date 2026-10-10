@@ -104,8 +104,7 @@ int main(int argc, char **argv, KernelAPI *api)
     /* 長さ 0 は検査も書き込みも無い。np2_recv_str も maxlen<=0 で戻る。 */
     api->np2_get_version((char *)0, 0);
     api->kprintf(0xE1, "2c len=0: survived\n");
-    api->kprintf(0x46, "2d NULL: SKIP (NULL + 非零長は wrap で kill、ホスト試験で確認)\n");
-    skips++;
+    api->kprintf(0x46, "2d NULL: N/A (NULL + 非零長は wrap で kill、ホスト試験で確認)\n");
 
     /* --- 3. rtc_read (B 型: 固定長 7 バイト) ----------------------------- */
     rtc.month = 0; rtc.day = 0;
@@ -119,8 +118,7 @@ int main(int argc, char **argv, KernelAPI *api)
     rc = (heap[1] >= 1 && heap[1] <= 12);
     if (!rc) fails++;
     api->kprintf(rc ? 0xE1 : 0x41, "3b heap: month=%d\n", heap[1]);
-    api->kprintf(0x46, "3c NULL: SKIP (NULL + 非零長は wrap で kill、ホスト試験で確認)\n");
-    skips++;
+    api->kprintf(0x46, "3c NULL: N/A (NULL + 非零長は wrap で kill、ホスト試験で確認)\n");
 
     /* --- 4. console_get_size (B 型: 出力 2 本) --------------------------- */
     w = 0; h = 0;

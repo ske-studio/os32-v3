@@ -100,6 +100,17 @@ filesystem:
     - host: userland/tests/audit_test.bin
       guest: /usr/bin/
       tags: [test]
+    # T2h/h3b: sequential owner probes and the v86 -b IPL image.
+    - host: userland/tests/pipe_owner_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/shutdown_probe.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: build/out/int80.img
+      guest: /test/int80.img
+      tags: [test]
+      host_only: true
     - host: userland/tests/blit_test.bin
       guest: /usr/bin/
       tags: [test]
