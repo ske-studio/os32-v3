@@ -2174,7 +2174,7 @@
   - /sys/lib/libos32gui.shlib の open成功を確認してから形式拒否 g_reject を採る。不在/ENOENTは合格でない。shlib未公開・依存app初回entry0、GUI要求のCUI fallbackと次のshell/verを記録。
   expect:
     open: 成功
-    format: g_reject
+    g_reject: 1
     published: 0
     dependent_entry_delta: 0
     fallback: CUI
@@ -2244,7 +2244,7 @@
     hal_test を要求しない。'
   entry: 'E4 負例: remoteだけ1本改変; pull無しverify-set; pullありverify-set; 正常復元'
   observe:
-  - ゲスト起動のstampがある状態で np21w_ctl.py stop、hostのcopyでremote隔離NHDだけの管理対象1本を改変 (localは触らない、別承認)。pull無しverify-setは「pull後にゲスト起動あり」でrc非0。
+  - ゲスト起動のstampがある状態で np21w_ctl.py stop、host側でremote隔離NHDを直接改変して管理対象1本を置換 (nhd_deploy.py copy は local に書くので使わない、localは触らない、別承認)。pull無しverify-setは「pull後にゲスト起動あり」でrc非0。
   - umount → pull --profile t2h → verify-set --profile t2h --set build/out/deploy-set.json で改変1本を検出しrc非0。
   - '交換・復元の毎回の順: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h (残っていれば) → pull --profile t2h → copy または sync --profile
     t2h → deploy --profile t2h → np21w_ctl.py start --ini t2h_fault.ini。copy 前にも pull、ゲスト書込み後に local を再利用しない。'
@@ -2309,7 +2309,7 @@
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
   prereq: 'R3: L-h、17MB、PM の派生 t2h_cirrus.ini (cirrus-on)。np21w_ctl.py stop → start --ini t2h_cirrus.ini ([D1])、gfxmode cirrus
-    → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 Cirrus 一致。'
+    → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 Cirrus 一致。派生 ini が使えないとき (R1c・R3〜R6 共通) の代替は np21w_ini_live.py の live-apply (道具自身が停止・起動し、同じ receipt で restore — SKILL os32-emu-config §2)。'
   entry: M; e12-17mb-cirrus; ring3_guard cirrus; gdi_test CLIENT; V86往復; 20回ループ
   observe:
   - '台本 M: boot fail 0 → 指定 gfxmode / 読み戻し / reset / hal_test → CUI/GUI/FEP → 高位 HostDrv read/write → 親子 → lease 切替 → map
