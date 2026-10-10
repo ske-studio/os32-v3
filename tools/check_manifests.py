@@ -29,8 +29,14 @@ check_manifests.py — 配備マニフェストと app.conf の参照先を検�
 """
 
 import glob
+import json
 import os
+from pathlib import Path
+import re
 import sys
+
+from deploy_manifests import CORE_MANIFEST_RELPATHS, load_merged, resolve_entry
+from check_artifacts import _dependencies
 
 try:
     import yaml
@@ -39,10 +45,7 @@ except ImportError:
     sys.exit(2)
 
 # 配備定義は所有する層ごとに分かれている。
-DEPLOY_MANIFESTS = [
-    "build/core.yaml",
-    "userland/deploy.yaml",
-]
+DEPLOY_MANIFESTS = CORE_MANIFEST_RELPATHS
 # CD のパッケージの構成。中身は配備マニフェストのタグから作るので、ここに
 # 直に書いてあるのは媒体だけの物 (ブートセクタ、settings.db) だけ。振り分けの
 # 検査は make check-packages-host (tools/tests/test_packages.py)。
@@ -424,6 +427,49 @@ def check_undeployed(bins):
     return sorted(bins - deployed)
 
 
+def is_os32x_path(path):
+    """世代表の逆照合は in-tree の OS32X 実行物だけ (T2h/h1)。"""
+    return path.startswith("userland/") and path.endswith((".bin", ".shlib"))
+
+
+def check_generation_deploy(manifest=None, merged=None):
+    """deploy (glob 展開後) ↔ 世代表。非配備の kernel/boot/SDK は保つ。"""
+    if manifest is None:
+        try:
+            manifest = json.loads(Path("build/out/generations-manifest.json").read_text())
+        except (OSError, ValueError) as exc:
+            return ["generations-manifest.json: " + str(exc)]
+    if merged is None:
+        merged = load_merged(CORE_MANIFEST_RELPATHS)
+    if merged is None:
+        return ["配備定義がない"]
+    deployed = {host for entry in merged["filesystem"]["files"]
+                for host, _ in resolve_entry(entry) if is_os32x_path(host)}
+    recorded = {entry["path"] for entry in manifest["files"]
+                if is_os32x_path(entry["path"])}
+    return ([path + ": 世代表にない" for path in sorted(deployed - recorded)] +
+            [path + ": 配備定義にない" for path in sorted(recorded - deployed)])
+
+
+def check_crt_libs(root=Path("."), libraries=None):
+    """USER CRT / SDK staging、resident CRT、全 libos32 archive が必要。"""
+    root = Path(root)
+    if libraries is None:
+        libraries = _dependencies(str(root)).get("libs", ())
+    libs = [Path(path).name for path in libraries
+            if Path(path).name.startswith("libos32") and path.endswith(".a")]
+    if not libs:
+        return ["Make libs: libos32 archive がない"]
+    libs = sorted(set(libs + ["libos32nano.a"]))
+    paths = [directory + "/" + name
+             for directory in ("sdk/crt", "build/sdk/crt")
+             for name in ("crt0.o", "crt0_c.o", "syscalls.o")]
+    paths += ["sdk/crt/resident/syscalls.o", "sdk/crt/resident/nano_adapter.o"]
+    paths += [directory + "/" + name
+              for directory in ("build/out/lib", "build/sdk/lib") for name in libs]
+    return [path + ": ファイルなし" for path in paths if not (root / path).is_file()]
+
+
 def check_disk_write_paths(config=None, manifest=None):
     """Disk writer allowlist must match the installers' deployed guest paths."""
     import re
@@ -468,6 +514,15 @@ def main():
                         *sorted(bins)])
 
     rc = 0
+
+    print("== OS32X deploy / generations-manifest、CRT / libs ==")
+    errors = check_generation_deploy() + check_crt_libs()
+    for error in errors:
+        print("  [NG] " + error)
+    if errors:
+        rc = 1
+    else:
+        print("  PASS")
 
     print("== Disk writer authorization / deployed guest paths ==")
     disk_paths = check_disk_write_paths()

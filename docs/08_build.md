@@ -107,6 +107,7 @@ GUI アプリ      → libos32gui_stub (ジャンプ表への薄いスタブ) �
 (`apps` + `game`)。検査: `make check-fast` / `make check-changed` / `make check` の 3 通り
 ([§8-4 検査の 3 段](#検査の3段))。`emu_agent` (ローカル AI) の `make` は
 許可リスト (`tools/emu_agent/agent.py` の `MAKE_TARGETS`) に載ったターゲットしか実行しない。
+`make all` の最後に `build/out/deploy-set.json` を生成する。期待集合・allow-list・名札照合と外部対象外の扱いは [T2H_EXTERNAL_GATE](tasks/v3/T2H_EXTERNAL_GATE.md)。
 
 **GitHub Actions** (`.github/workflows/check.yml`、os32-v3 で 2026-09-30 に作り直し): push / PR で、
 クロスツールチェーンも rustc も無しで回せる検査だけを自動ゲートにする — KAPI 版番号の一致、

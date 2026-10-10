@@ -9,6 +9,7 @@ check-manifests:
 - build/packages.yaml
 - docs/07_shell.md
 - tools/check_manifests.py
+- tools/deploy_manifests.py
 - CLAUDE.md
 - tools/check_map.d/check-manifests.yaml
 - build/checks.d/check-manifests.mk
