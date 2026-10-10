@@ -5,6 +5,8 @@ check-deploy-set-host:
 - tools/deploy_manifests.py
 - tools/check_artifacts.py
 - tools/tests/test_deploy_set.py
+- sdk/os32x_hdr.py
+- sdk/os32_generations.py
 - tools/check_map.d/check-deploy-set-host.yaml
 - build/checks.d/check-deploy-set-host.mk
 - build/core.yaml

@@ -429,7 +429,9 @@ def check_undeployed(bins):
 
 def is_os32x_path(path):
     """世代表の逆照合は in-tree の OS32X 実行物だけ (T2h/h1)。"""
-    return path.startswith("userland/") and path.endswith((".bin", ".shlib"))
+    # cargo のホスト試験 cache (.bin) も世代表には残るが、配備対象ではない。
+    return (path.startswith("userland/") and "/target/" not in path
+            and path.endswith((".bin", ".shlib")))
 
 
 def check_generation_deploy(manifest=None, merged=None):
