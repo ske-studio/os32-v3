@@ -63,7 +63,10 @@ HAL/PCM の完了実績は既に [HAL_RESULTS](../../archive/v3/TASK_HAL_WIRING_
 | `docs/tasks/v3/TASK_T7_AND_FOLLOWUPS.md:30` / `kernel/v86_io.c:239` | 設計のKCG CODE復帰/cache失効と、着地済みCUI表示復帰は異なる | **未実装契約**。T7で継承すべき表示復帰を基点表へ追記。68h・GRCG/EGC・6Ahなどの未観測項目はT2hで照合、今回復帰値を決めない |
 | `docs/tasks/v3/TASK_T3_LAYOUT.md:35` / `kernel/memory_boot.c:24` | core BSS backing設計に対して旧DMA/stack隣接式が存続 | **予定された移行差**。T3a/b一体着地を維持。T2最終実測から8KiBと整列分の予算を再評価 |
 | `docs/tasks/v3/TASK_HAL_WIRING.md:16`・`:30` | 導入前のIRQ/PIT説明が現在形。状態行は実装済み | 設計当時の前提と注記する候補。W7未完了は維持、HAL契約本文は動かさない |
-
+| 受入の結果の書き方 (2026-10-10 の棚卸し、ユーザー承認) | 同じ受入結果を証拠の `RESULT.md`・票 §4-3 の行・`DEFERRED_TESTS`・`HANDOVER` §1 の 4 か所に同じ密度で書いている。票の g3/g4 行は 1 行約 1,200 字 | 票と台帳は「合否 1 語 + 証拠のパス」だけにし、中身は `RESULT.md` へ。ROLES §0「記録」の行に明記する |
+| 設計票の版の参照 (同上) | 確定版が「r2 と同じ」→ r2 が「r1 と同じ」と連鎖し、依頼パックで 3 版から写し直した (T2H_DESIGN r5) | 確定版は参照でなく本文を持つ。ROLES §0「設計票」の行に明記する |
+| 受入の観測スクリプト (同上) | `probe*.py`・`obs.py`・`consink.py` が evidence の dir ごとに 11 本の写し | `tools/accept/` に正式な 1 本 (T2h h4a の計画)、MCP の `emu_gui_state`・`emu_consink` で代わるものは写さない |
+| manifest の 3 種 (同上) | `generations-manifest.json` (ビルド)・`.deploy/manifest.txt` (HostDrv 名札)・`deploy-set.json` (配備集合、T2h h1) の役目の正が 1 か所に無い | `docs/08_build.md` §8-4 に 3 種の役目と正を 1 表で |
 細かな file:line は、次回更新時も関数名で引き直す。旧基点の調査表を最新版の事実と混在させない。実装の不具合修正・設計変更が必要なら、到達条件と既決 D への影響を別票で判断する。
 
 ## 5. アーカイブ候補 (実行は提示後)
