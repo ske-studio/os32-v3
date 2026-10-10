@@ -346,6 +346,7 @@ NP21/W 17MB (§12、現iniのまま) でback末尾返却と空ARENA返却によ�
 ### 5-1. 条件・成果物
 
 **詳細設計票 (確定 2026-10-10)**: `~/os32-tmp/run/h/T2H_DESIGN.md` r5 (Fable 5.1 が設計、astra のレビュー 5 往復、U1〜U9 はユーザー決定 — U3 Ra266 は修正版 B (新 FD 起動 + 全体同期と `/sys` 同期を別々に)、U9 MemStat 200B・KAPI 74 + 固定シリアル診断)。実装の段 h0t・h1・h1b・h2・h3b・h4a→h4b→h4c (+h3fix 条件付き)、受入の回 R0・R1a〜d・R3〜R7 (7 回 12 セッション)。往復の記録は同じ dir の `astra_r*_final.md` / `fable_r*_response.md`。
+**L-h 着地 (2026-10-10、f1bd680)**: h0t・h1・h1b・h2・h3b・h4a〜c (各段 Fable レビュー Approve、h4b は P1 1 件を直して再確認) と P3 の小直しを統合、`make clean → all` / `make check` rc=0。KAPI 74・MemStat 200B・製品 kernel +888B (h 枠の上限 900B)。H-10 は h0t で閉じた。受入の回で PM が守ること: 「記録」型の expect は PASS に数えない、R4 で h2 (i) が add<16 page に当たったら仕様の分岐として扱う (fixture で直さない)、R4 の記録に free0 と need pages、5b は wait 起きに限る、R1c の初回 derive は DrvFs で rc と生成物を照合。証拠 `~/os32-tmp/run/h/`
 
 d〜gの対象host/変異・独立レビューとNP21/W受入が揃って統合実行へ進む。ext2調査票の原因判定・必要な修正/再検証をh受入前のゲートとする。新機能をまとめて実装する段ではなく、guest試験/build・deploy登録/観測、host結線の不足、正典の実装説明と結果を更新する段。機能の欠陥は該当d/e/f/g小段へ戻す。T3の帯変更・SLACK回収、T4のmodule/MEMSYS5を足さない。
 
