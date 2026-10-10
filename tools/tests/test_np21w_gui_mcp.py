@@ -12,6 +12,7 @@ from pathlib import Path
 import sys
 import unittest
 from unittest.mock import patch
+from urllib.parse import parse_qs
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
@@ -20,6 +21,37 @@ from tools.np21w_mcp import gui
 
 
 class McpTests(unittest.TestCase):
+    def test_key_form_encoding_preserves_chords_and_text(self):
+        for args in ({'seq': 'CTRL+STOP'},
+                     {'text': 'a+b &c=1% 日本語'},
+                     {'seq': 'CTRL+STOP', 'text': '+&='}):
+            with self.subTest(args=args), patch.object(server.emu, 'post',
+                    return_value=b'{"ok":true}') as post:
+                result = self.request('tools/call', {'name': 'emu_key', 'arguments': args})
+                self.assertNotIn('isError', result)
+                path, body = post.call_args.args
+                self.assertEqual(path, '/api/key')
+                self.assertEqual(parse_qs(body), {k: [v] for k, v in args.items()})
+                if 'seq' in args:
+                    self.assertIn('CTRL%2BSTOP', body)
+
+    def test_key_encoding_survives_direct_and_curl_client(self):
+        for direct in (True, False):
+            with self.subTest(direct=direct), \
+                 patch.object(server.emu, '_direct_available', return_value=direct), \
+                 patch.object(server.emu, '_http', return_value=b'{"ok":true}') as http, \
+                 patch.object(server.emu, '_run', return_value=b'{"ok":true}') as curl:
+                self.request('tools/call', {'name': 'emu_key',
+                    'arguments': {'seq': 'CTRL+STOP', 'text': '+ &='}})
+                if direct:
+                    body = http.call_args.args[1]
+                    curl.assert_not_called()
+                else:
+                    args = curl.call_args.args[0]
+                    body = args[args.index('--data-binary') + 1]
+                    http.assert_not_called()
+                self.assertEqual(parse_qs(body), {'seq': ['CTRL+STOP'], 'text': ['+ &=']})
+
     def request(self, method, params=None):
         stream = io.StringIO()
         with contextlib.redirect_stdout(stream):

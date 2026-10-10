@@ -18,6 +18,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from urllib.parse import urlencode
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -321,12 +322,8 @@ def tool_cmd(args):
 
 
 def tool_key(args):
-    body = []
-    if "seq" in args:
-        body.append("seq=" + args["seq"])
-    if "text" in args:
-        body.append("text=" + args["text"])
-    return _json(emu.post("/api/key", "&".join(body)))
+    body = {key: args[key] for key in ("seq", "text") if key in args}
+    return _json(emu.post("/api/key", urlencode(body)))
 
 
 def tool_pause(_):

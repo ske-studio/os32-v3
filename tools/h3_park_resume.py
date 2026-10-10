@@ -7,9 +7,12 @@ arm --capture: require a real OP_WAIT state; arm, install breakpoints BEFORE the
      focus click, then capture resume/fire. Loops check foreground, send STOP,
      and record observations in this same process.
 verify: require e9/PM evidence JSON, reclamation, then a newly launched fixture.
+stop: capture a physical foreground snapshot, drain STOP traps for ten seconds,
+     save --capture (or a unique case-adjacent file) and bind it to the case.
+arm/loop-watch/stop no longer read --trace or need an external foreground writer.
 
-The landing/pending capture is produced by the serialized capture pump; foreground/vector remain
-REQUIRED external evidence:
+The landing/pending capture and physical foreground snapshot share the serialized
+capture pump. Vector remains REQUIRED external evidence:
 current kernel has no counters for both setjmp landings or pending consumption.
 See TASK_T2D_T2H §5-2. Missing evidence is an error, never a synthetic PASS.
 """
@@ -413,6 +416,35 @@ class Playbook:
     def put(self, address, value):
         self.emu.write(address, struct.pack('<I', value))
 
+    def wm_snapshot(self):
+        from tools.np21w_mcp.gui_desc import read_state
+        # Caller owns freeze; this reader only uses physical /api/mem reads.
+        return read_state(self.emu.read)
+
+    def fixture_window(self, case, state):
+        windows = [w for w in state['windows'] if w['id'] == case['window']]
+        require(len(windows) == 1 and windows[0]['owner'] == case['identity']['app'] and
+                windows[0]['visible'] and not windows[0]['minimized'] and
+                windows[0]['z'] is not None, 'fixture window missing/hidden or owner mismatch')
+        return windows[0]
+
+    def focus_fixture(self, case, height):
+        with self.emu.freeze():
+            window = self.fixture_window(case, self.wm_snapshot())
+            x, y, w, h = window['rect']
+            source = (ROOT / 'userland/gshell/src/wm.rs').read_text()
+            def constant(name):
+                match = re.search(r'\bconst ' + name + r': i32 = (\d+);', source)
+                require(match is not None, 'missing WM geometry: ' + name)
+                return int(match[1])
+            border, title = constant('BORDER_W'), constant('TITLEBAR_H')
+            cw, ch = w - 2 * border, h - 2 * border - title
+            require(cw > 0 and ch > 0, 'fixture has no client area')
+            point = (x + border + cw // 2, y + border + title + ch // 2)
+            require(0 <= point[0] < 640 and 0 <= point[1] < height,
+                    'fixture client centre outside screen')
+        self.emu.click(*point, height)
+
     def block(self, address):
         return dict(zip(FIELDS, struct.unpack('<12I', self.emu.read(address, 48))))
 
@@ -635,7 +667,20 @@ class Playbook:
 
     def foreground(self, case, path):
         try:
-            trace = json.loads(Path(path).read_text())
+            if path is None:
+                state = self.wm_snapshot()
+                window = self.fixture_window(case, state)
+                front = max((w for w in state['windows'] if w['visible'] and
+                             not w['minimized'] and w['z'] is not None),
+                            key=lambda w: w['z'])
+                trace = dict(case_id=case['case_id'], observed_at=time.time(),
+                    phase=self.loop_phase(case), identity=case['identity'],
+                    map_sha256=case['map_sha256'], foreground_window=front['id'],
+                    foreground_app=state['front'])
+                require(front['id'] == window['id'] and front['owner'] == state['front'],
+                        'physical foreground mismatch')
+            else:
+                trace = json.loads(Path(path).read_text())
             required = ('case_id', 'observed_at', 'phase', 'identity', 'map_sha256',
                         'foreground_window', 'foreground_app')
             require(isinstance(trace, dict) and all(key in trace for key in required) and
@@ -679,19 +724,25 @@ class Playbook:
     def loop_evidence(self, case, foreground, firing_at, status):
         elapsed = (self.guest_tick() - firing_at) & 0xffffffff
         status['reason'] = f'210 ticks not reached: FIRING elapsed={elapsed}'
-        if elapsed < RUNAWAY_WAIT_TICKS or not Path(foreground).exists():
+        if elapsed < RUNAWAY_WAIT_TICKS or (foreground is not None and not Path(foreground).exists()):
             if elapsed >= RUNAWAY_WAIT_TICKS:
                 status['reason'] = 'foreground evidence missing'
             return None
+        if foreground is None:
+            return True  # Time gate only; physical proof comes in the final freeze.
         evidence = self.foreground(case, foreground)
         status['reason'] = 'foreground evidence stale (host age > 5s)'
         return evidence
 
-    def stop_loop(self, case, foreground, persist=lambda: None):
+    def stop_loop(self, case, foreground=None, persist=lambda: None):
+        require(case.get('stop_sent') is not True, 'STOP requires a resumed loop case')
         firing_at = None
+        stop_at = None
         status = dict(reason='FIRING not observed')
         def advance():
-            nonlocal firing_at
+            nonlocal firing_at, stop_at
+            if case.get('stop_sent'):
+                return time.monotonic() - stop_at >= 10
             require(self.loop_phase(case) == PHASES['FIRING'], 'loop not firing')
             if firing_at is None:
                 firing_at = self.guest_tick()
@@ -700,20 +751,23 @@ class Playbook:
                 return
             with self.emu.freeze():
                 require(self.checked(case['identity'])['phase'] == PHASES['FIRING'], 'loop not firing')
+                if foreground is None:
+                    evidence = self.foreground(case, None)
             # Identity reads also cost host time; refresh evidence after them.
-            evidence = self.loop_evidence(case, foreground, firing_at, status)
+            evidence = self.final_foreground(case, foreground, firing_at, status, evidence)
             if evidence is None:
                 return
+            stop_at = time.monotonic()
             self.emu.stop()
             case['stop_sent'] = True
             case['foreground_observation'] = evidence
             persist()
-            return True
-        capture_trace(self, case, seconds=30, advance=advance, guest_time=True)
+            # Keep the pump alive to drain STOP's watched traps before cleanup.
+        capture = capture_trace(self, case, seconds=30, advance=advance, guest_time=True)
         require(case.get('stop_sent') is True, 'STOP not sent during capture: ' + status['reason'])
+        return capture
 
     def run_capture(self, case, capture_path, out, foreground=None, click=None, persist=lambda: None):
-        require(case['mode'] < 5 or foreground is not None, 'loop requires --trace foreground evidence')
         status = dict(reason='FIRING not observed')
         firing_at = None
         stop_at = None
@@ -753,7 +807,9 @@ class Playbook:
             with self.emu.freeze():
                 require(self.checked(case['identity'])['phase'] == PHASES['FIRING'], 'loop not firing')
                 observations['before_stop'] = self.observe(case)
-            evidence = self.loop_evidence(case, foreground, firing_at, status)
+                if foreground is None:
+                    evidence = self.foreground(case, None)
+            evidence = self.final_foreground(case, foreground, firing_at, status, evidence)
             if evidence is None:
                 return
             stop_at = time.monotonic()
@@ -772,6 +828,14 @@ class Playbook:
             output.write(json_bytes(dict(case_id=case['case_id'], observations=observations)))
         return capture
 
+    def final_foreground(self, case, path, firing_at, status, evidence):
+        if path is not None:
+            return self.loop_evidence(case, path, firing_at, status)
+        status['reason'] = 'foreground evidence stale (host age > 5s)'
+        if not 0 <= time.time() - evidence['observed_at'] <= 5:
+            return None
+        return evidence
+
     def next_launch(self, case):
         # Publication can still be in INIT. Wait with the emulator running,
         # then verify the self-published identity in a frozen snapshot.
@@ -789,7 +853,8 @@ def main():
     parser.add_argument('--case', type=Path)
     parser.add_argument('--fixture', type=int, choices=(1, 2))
     parser.add_argument('--mode', choices=MODES)
-    parser.add_argument('--trace', type=Path)
+    parser.add_argument('--trace', type=Path,
+                        help='verify evidence / trace-watch output; loops capture foreground internally')
     parser.add_argument('--capture', type=Path)
     parser.add_argument('--out', type=Path)
     parser.add_argument('--height', type=int, choices=(400, 480), default=400)
@@ -820,21 +885,20 @@ def live_main(args):
         require('mode' not in case, 'case already armed')
         require(args.capture is not None and args.out is not None, 'arm requires --capture and --out')
         require(not args.capture.exists() and not args.out.exists(), 'capture/output file already exists')
-        require(MODES[args.mode] < 5 or args.trace is not None, 'loop requires --trace foreground evidence')
         case.update(p.arm(case['identity'], MODES[args.mode]))
         def persist():
             args.case.write_bytes(json_bytes(case))
         persist()
-        p.run_capture(case, args.capture, args.out, args.trace,
-            click=lambda: p.emu.click(90 if case['fixture'] == 1 else 400, 68, args.height), persist=persist)
+        p.run_capture(case, args.capture, args.out,
+            click=lambda: p.focus_fixture(case, args.height), persist=persist)
         return
     if args.action == 'loop-watch':
         require(case['mode'] >= 5 and case.get('resume_verified') is True and not case.get('stop_sent'),
                 'loop-watch requires resumed loop without STOP')
-        require(args.capture is not None and args.out is not None and args.trace is not None,
-                'loop-watch requires --capture, --out and --trace')
+        require(args.capture is not None and args.out is not None,
+                'loop-watch requires --capture and --out')
         require(not args.capture.exists() and not args.out.exists(), 'capture/output file already exists')
-        p.run_capture(case, args.capture, args.out, args.trace,
+        p.run_capture(case, args.capture, args.out,
             persist=lambda: args.case.write_bytes(json_bytes(case)))
         return
     if args.action == 'trace-watch':
@@ -852,10 +916,12 @@ def live_main(args):
     if args.action == 'stop':
         require(case['mode'] >= 5 and case.get('resume_verified') is True and not case.get('stop_sent'),
                 'STOP requires a resumed loop case')
-        require(args.trace is not None, 'STOP requires fresh foreground evidence --trace')
         require(p.checked(case['identity'])['phase'] == PHASES['FIRING'], 'loop not firing')
+        capture_path = args.capture or args.case.with_name(args.case.stem + '.stop-' + uuid.uuid4().hex + '.json')
+        require(not capture_path.exists(), 'capture file already exists')
         # Use the same guest grace, freshness retry and bounded pump as arm.
-        p.stop_loop(case, args.trace, persist=lambda: args.case.write_bytes(json_bytes(case)))
+        capture = p.stop_loop(case, persist=lambda: args.case.write_bytes(json_bytes(case)))
+        save_capture(case, capture, capture_path)
         args.case.write_text(json.dumps(case, indent=2) + '\n')
         return
     if args.action == 'reclaim':
