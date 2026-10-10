@@ -345,6 +345,8 @@ NP21/W 17MB (§12、現iniのまま) でback末尾返却と空ARENA返却によ�
 
 ### 5-1. 条件・成果物
 
+**詳細設計票 (確定 2026-10-10)**: `~/os32-tmp/run/h/T2H_DESIGN.md` r5 (Fable 5.1 が設計、astra のレビュー 5 往復、U1〜U9 はユーザー決定 — U3 Ra266 は修正版 B (新 FD 起動 + 全体同期と `/sys` 同期を別々に)、U9 MemStat 200B・KAPI 74 + 固定シリアル診断)。実装の段 h0t・h1・h1b・h2・h3b・h4a→h4b→h4c (+h3fix 条件付き)、受入の回 R0・R1a〜d・R3〜R7 (7 回 12 セッション)。往復の記録は同じ dir の `astra_r*_final.md` / `fable_r*_response.md`。
+
 d〜gの対象host/変異・独立レビューとNP21/W受入が揃って統合実行へ進む。ext2調査票の原因判定・必要な修正/再検証をh受入前のゲートとする。新機能をまとめて実装する段ではなく、guest試験/build・deploy登録/観測、host結線の不足、正典の実装説明と結果を更新する段。機能の欠陥は該当d/e/f/g小段へ戻す。T3の帯変更・SLACK回収、T4のmodule/MEMSYS5を足さない。
 
 **h1** manifest/世代/全consumer台帳、**h2** stack/旧形式fixture、**h3** resume/fault/STOP fixture、**h4** panic専用fixture/診断読み口、**h5** 8MB planar、**h6** 8MB PEGC、**h7** 17MB各backend、**h8** Ra266、**h9** 結果/残件の照合に分ける。準備は各45〜75分、PM実行は各構成/試験群を120分以内に切る。h2/h3準備はf以前へ前倒ししてよく、受入の証拠は最終一式でも取り直す。
