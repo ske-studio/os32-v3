@@ -23,7 +23,7 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 | ID | 何を | 種類 | 元の行 |
 |---|---|---|---|
 | E9-1 | CPL3 sh 経由の tvdump をゲストで確かめる。常駐 CUI は受入済み。sh に -c が無く対話入力はキーボードのため、入力の道具が要る | 未実施の確認 | 1185、1571 |
-| E9-2 | h3 の本人識別・前景の証拠 writer を正式な経路へ切り替える (h3 の初期化も) | 申し送り | 2605、2747–2893 |
+| E9-2 | h3 の本人識別は接続済み、前景の証拠は h3fix (2026-10-10) で物理読みに替えて writer 不要。残りは R1b 再回の live で確かめるだけ | 未実施の確認 | 2605、2747–2893 |
 | E9-3 | TVRAM 範囲外の呼び出しの拒否をゲストで (`6e4df78` はホスト試験だけ) | ホストのみ | 1432–1548 |
 | E10-1 | V86 の `-d` / `-b` の失敗出口と K1 (session 中の CPL0 例外) のゲスト確認。正常・STOP 出口は e11 統合受入済み、故障画像と注入手段が要る | 未実施の確認 | e10c |
 | E10-4 | `v86 -g` の採取の途中の kill で g/tv の解放・gcap_ops・TVRAM 30 行が戻ることのゲスト確認 (ホストのみ。採取が 1 秒未満で途中を狙えない — 長い採取か注入が要る)。e11 受入の持越し理由: 採取が 1 秒未満で途中を狙えない | ホストのみ | T2h 統合受入 |
@@ -76,7 +76,7 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 | X-6 | `tools/tvdump_recv.py` は名前付きパイプ前提で今の NP21/W に接続できない → `/api/cmd` で生バイトを取り TVDM の長さ・寸法・内容を照合する形に (計画 3 番、受入索引と同枠) | 道具の不具合 | — |
 | X-11 | 監査分類 (`~/os32-tmp/evidence/2026-10-07/audit-classification.md`) の「意味変更 (e11c)」のうち pipe (E11-8) を除く 12 件 — IME 9 本 (trygetchar/toggle/set_mode/switch_dict/user_delete/user_export/user_clear/trygetkey/feed_key)・exec_last_result・gui_call・con_sink_read の授権/本人別の契約 → **T4 の設計票で扱う (ユーザー決定 2026-10-07)** | 契約の整理 | 分類表 :33/:43-55/:57/:60 |
 | X-21 | T2g のゲスト受入の残り。**GK-3 (2026-10-09、063c515) と GK-4 R-1〜R-4 (2026-10-10、0ecaf98) は合格** (証拠 `~/os32-tmp/evidence/2026-10-09/g_x21/`・`2026-10-10/gk4/RESULT.md`)。残り: (a) G-4/R-3 の `mem <id>` と `as_extents_at_teardown` は未採取 (GUI 中に rshell が無い。fixture の自己観測で代用) — CUI から GUI アプリの extent を採る手段を作るときに、(b) 台本 g-R-4 の `stop_park_delta: 1` は hook 中の試行の期待。DONE 直後の STOP は back が自分の OP_WAIT 中で park を通らず +0 が設計どおり (`exec/appslot.c:521`) — 台本の期待を試行別に書き分ける (次に台本を触る段で) | 台本の整理 / 未採取 | — |
-| X-20 | gtool1 再レビューの P3: (N1) OCR の読めないセルと本物の `?` が文字列上で区別できず `\?`/`.` が一致する — 読めないセルにも私用文字を割り当て一致させない、(N2) は gtool3 で閉じた (launch が `since` を返す)。gtool2 レビューの P3 (G2-4 i686 記述子の照合を check に、G2-5 動いている像と ELF の照合)。abort_target を読む道具 (G-7 で導出に頼った)。gtool3 レビューの P3: launch が送信前の consink の例外で止まる (fail closed、害なし)、hold 中に np21w の core_lock が失敗すると鍵が押下のまま残る (`core_busy`、台本 g-G-3 に「ok:false なら同じ seq を hold 無しで 1 回送って離す」を足す、Fable 再レビュー R-2) | 道具の改善 | — |
+| X-20 | gtool1 再レビューの P3: (N1) OCR の読めないセルと本物の `?` が文字列上で区別できず `\?`/`.` が一致する — 読めないセルにも私用文字を割り当て一致させない、(N2) は gtool3 で閉じた (launch が `since` を返す)。gtool2 レビューの P3 (G2-4 i686 記述子の照合を check に、G2-5 動いている像と ELF の照合)。abort_target を読む道具 (G-7 で導出に頼った)。h3fix レビューの P3 (mem_stat_test を os32_test_summary に、h3 の layout に gshell.elf の sha、単独 stop の後は stop の capture を trace に、v1 経路の試験)、h1fix の P3 (配備元は target/ の外の注記)。gtool3 レビューの P3: launch が送信前の consink の例外で止まる (fail closed、害なし)、hold 中に np21w の core_lock が失敗すると鍵が押下のまま残る (`core_busy`、台本 g-G-3 に「ok:false なら同じ seq を hold 無しで 1 回送って離す」を足す、Fable 再レビュー R-2) | 道具の改善 | — |
 
 
 ## 6. SKIP の登録 (ここにあるものだけを「延期」と数える)
