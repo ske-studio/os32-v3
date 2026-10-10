@@ -5,6 +5,7 @@ separately by test_shutdown_probe.py through host32 (qemu in Codex).
 """
 import argparse
 import importlib.util
+import json
 import os
 from pathlib import Path
 import re
@@ -35,7 +36,7 @@ def function(source, name):
     return source[match.start():end] + '\n'
 
 
-def run_harness(mutation=None):
+def run_harness(mutation=None, pipe_mutation=None):
     with tempfile.TemporaryDirectory(prefix='os32-h3b-') as directory:
         tmp = Path(directory)
         console = (ROOT / 'kernel/console.c').read_text()
@@ -46,7 +47,12 @@ def run_harness(mutation=None):
             assert console.count(old) == 1, old
             console = console.replace(old, new)
         (tmp / 'console_source.c').write_text(console)
-        (tmp / 'pipe_source.c').write_text((ROOT / 'fs/pipe_buffer.c').read_text())
+        pipe = (ROOT / 'fs/pipe_buffer.c').read_text()
+        if pipe_mutation:
+            old, new = pipe_mutation
+            assert pipe.count(old) == 1, old
+            pipe = pipe.replace(old, new)
+        (tmp / 'pipe_source.c').write_text(pipe)
         (tmp / 'pipe_guest.c').write_text((ROOT / 'userland/tests/pipe_owner_test.c').read_text())
         (tmp / 'audit_guest.c').write_text((ROOT / 'userland/tests/audit_test.c').read_text())
         (tmp / 'kout_guest.c').write_text((ROOT / 'userland/tests/kout_test.c').read_text())
@@ -64,8 +70,24 @@ def check_image_and_deploy():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     data = module.image_bytes()
-    assert len(data) == 1261568 and data[:3] == bytes.fromhex('cd 80 f4')
-    assert data[3:] == bytes(len(data) - 3)
+    expected_ipl = (bytes.fromhex('fa 31 c0 8e d8 c7 06 00 02 20 00 8c c8 a3 02 02 fb cd 80 f4')
+                    + bytes(12) + bytes.fromhex('9c 58 2e a3 40 00 cf')
+                    + bytes(25) + bytes.fromhex('ff ff'))
+    assert len(data) == 1261568 and data[:66] == expected_ipl
+    assert data[66:] == bytes(len(data) - 66)
+    expected_metadata = {
+        'flags_segment': 0x1FC0, 'flags_offset': 0x40,
+        'flags_guest_phys': 0x1FC40, 'flags_bytes': 2,
+        'flags_initial': 0xFFFF, 'if_mask': 0x200, 'expected_if': 0,
+        'backing_offset': 0x1EC40, 'backing_phys': None, 'flags_phys': None,
+        'read_before_teardown': True,
+    }
+    assert module.observation() == expected_metadata
+    header = (ROOT / 'kernel/v86.h').read_text()
+    assert re.search(r'#define V86_IPL_SEG\s+0x1FC0U', header)
+    memory = (ROOT / 'kernel/v86_mem.c').read_text()
+    assert 'paging_v86_map_range(V86_REMAP_START + PAGE_SIZE, V86_REMAP_END,' in memory
+    assert 'backing_phys, PAGE_RW | PTE_USER)' in memory
     geometry = re.search(r'\{\s*1261568,\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+)\s*\}',
                          (ROOT / 'drivers/loop_dev.c').read_text())
     assert geometry and tuple(map(int, geometry.groups())) == (77, 2, 8, 1024)
@@ -75,8 +97,19 @@ def check_image_and_deploy():
     with tempfile.TemporaryDirectory(prefix='os32-int80-') as directory:
         paths = [Path(directory) / n for n in ('one.img', 'two.img')]
         for path in paths:
-            subprocess.run([sys.executable, str(ROOT / 'tools/gen_v86_int80.py'), '--out', str(path)], check=True)
+            result = subprocess.run([sys.executable, str(ROOT / 'tools/gen_v86_int80.py'), '--out', str(path)],
+                                    check=True, capture_output=True, text=True)
+            assert '0x1fc40' in result.stdout and 'expected IF=0' in result.stdout
+            assert json.loads(path.with_suffix('.json').read_text()) == expected_metadata
         assert paths[0].read_bytes() == paths[1].read_bytes() == data
+        assert paths[0].with_suffix('.json').read_bytes() == paths[1].with_suffix('.json').read_bytes()
+        result = subprocess.run([sys.executable, str(ROOT / 'tools/gen_v86_int80.py'),
+                                 '--out', str(paths[0]), '--backing-phys', '0x300000'],
+                                check=True, capture_output=True, text=True)
+        assert paths[0].read_bytes() == data
+        actual_metadata = dict(expected_metadata, backing_phys=0x300000, flags_phys=0x31EC40)
+        assert json.loads(paths[0].with_suffix('.json').read_text()) == actual_metadata
+        assert 'FLAGS emulator physical=0x31ec40' in result.stdout
     normal = deploy_manifests.load_merged()
     host = deploy_manifests.load_merged(include_host_only=True)
     assert not any(e['host'] == 'build/out/int80.img' for e in normal['filesystem']['files'])
@@ -138,6 +171,17 @@ def main():
     print(result.stdout + result.stderr, end='')
     assert result.returncode == 0, result.returncode
     if args.mutate:
+        for name, old, new, label in [
+            ('pipe-user-buf-allowed', '    if (ring3_call_from_user()) return (u8 *)0;\n', '',
+             'FAIL pipe USER get_buf'),
+            ('pipe-foreign-len-allowed',
+             '    if (id >= 0 && id < PIPE_BUF_COUNT &&\n'
+             '        ring3_call_from_user() && pipe_owner[id] != res_owner_get()) return 0;\n', '',
+             'FAIL pipe foreign get_len'),
+        ]:
+            result = run_harness(pipe_mutation=(old, new))
+            assert result.returncode == 1 and label in result.stdout, (name, result)
+            print('RED ' + name + ': ' + label)
         for name, old, new in [
             ('read-sentinel', 'if (x < 0 || x >= TVRAM_COLS || y < 0 || y >= TVRAM_ROWS) return;\n    u32 offset = (u32)y * TVRAM_BPR + (u32)x * 2;\n    if (code)',
              'if (x < 0 || x >= TVRAM_COLS || y < 0 || y >= TVRAM_ROWS) { if (code) *code = 0; return; }\n    u32 offset = (u32)y * TVRAM_BPR + (u32)x * 2;\n    if (code)'),

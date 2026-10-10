@@ -15,14 +15,30 @@ int memcmp(const void *a, const void *b, __SIZE_TYPE__ bytes)
     return 0;
 }
 static u32 shutdown_calls, leave_calls;
+static int identity_error, query_error, query_empty;
+static const char *probe_message;
+static void __cdecl probe_print(u8 attr, const char *fmt, ...)
+{ (void)attr; probe_message = fmt; }
+static int probe_message_is(const char *expected)
+{
+    if (!probe_message) return 0;
+    const char *actual = probe_message;
+    while (*actual && *actual == *expected) { actual++; expected++; }
+    return *actual == *expected;
+}
 void host_shutdown_event(int event)
 { if (event) shutdown_calls++; else leave_calls++; }
 static int probe_identity(u32 *app, u32 *owner, u32 *generation)
-{ *app = 2; *owner = space.owner; *generation = space.generation; return 0; }
+{
+    if (identity_error) return OS32_ERR_INVAL;
+    *app = 2; *owner = space.owner; *generation = space.generation; return 0;
+}
 static int probe_query(u32 role, OS32_SurfaceQueryResult *out)
 {
     struct surface_query_source source;
     struct caller_access caller;
+    if (query_error) return OS32_ERR_INVAL;
+    if (query_empty) { kmemset(out, 0, sizeof(*out)); return 0; }
     int rc = gfx_surface_source(role, &source);
     if (rc) return rc;
     rc = surface_query_authorize(&source, &caller);
@@ -43,7 +59,7 @@ static void run(void)
     u32 owner, gens[LEDGER_MAX_SURFACES];
     CallerAccessFrame previous;
     static KernelAPI api;
-    api.kprintf = kprintf;
+    api.kprintf = probe_print;
     api.caller_identity = probe_identity;
     api.gfx_screen_owner = gfx_screen_owner;
     api.surface_query = probe_query;
@@ -63,6 +79,20 @@ static void run(void)
         u32 backend = gfx_sf_backend(), shutdown_before = shutdown_calls, leave_before = leave_calls;
         for (u32 i = 0; i < LEDGER_MAX_SURFACES; i++) gens[i] = ledger_surfaces[i].gen;
         host_gui = 1; host_gfx_owner = 3;
+        identity_error = 1;
+        probe_message = 0;
+        CHECK(shutdown_guest_main(0, 0, &api) == 1);
+        CHECK(probe_message_is("shutdown_probe: FAIL (precondition caller_identity)\n"));
+        identity_error = 0; query_error = 1;
+        probe_message = 0;
+        CHECK(shutdown_guest_main(0, 0, &api) == 1);
+        CHECK(probe_message_is("shutdown_probe: FAIL (precondition surface_query)\n"));
+        query_error = 0; query_empty = 1;
+        probe_message = 0;
+        CHECK(shutdown_guest_main(0, 0, &api) == 1);
+        CHECK(probe_message_is("shutdown_probe: FAIL (precondition count 0)\n"));
+        query_empty = 0;
+        CHECK(shutdown_calls == shutdown_before && leave_calls == leave_before);
         CHECK(shutdown_guest_main(0, 0, &api) == 0);
         CHECK(gfx_sf_backend() == backend && shutdown_calls == shutdown_before && leave_calls == leave_before);
         for (u32 i = 0; i < LEDGER_MAX_SURFACES; i++) CHECK(ledger_surfaces[i].gen == gens[i]);

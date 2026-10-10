@@ -19,6 +19,7 @@ check-h3b-fixtures-host:
 - kernel/shlib.c
 - kernel/sys.c
 - kernel/v86.c
+- kernel/v86_mem.c
 - tools/deploy_manifests.py
 - tools/deploy_protect.py
 - tools/gen_v86_int80.py

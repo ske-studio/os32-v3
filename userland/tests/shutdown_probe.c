@@ -8,15 +8,25 @@ int main(int argc, char **argv, KernelAPI *api)
     u32 app, owner, generation;
     int screen_owner, fails;
     (void)argc; (void)argv;
-    if (api->caller_identity(&app, &owner, &generation) != 0) return 1;
+    if (api->caller_identity(&app, &owner, &generation) != 0) {
+        api->kprintf(ATTR_RED, "shutdown_probe: FAIL (precondition caller_identity)\n");
+        return 1;
+    }
     screen_owner = api->gfx_screen_owner();
     if (screen_owner == (int)app || screen_owner < 0) {
-        api->kprintf(ATTR_RED, "shutdown_probe: FAIL (requires another screen owner)\n");
+        api->kprintf(ATTR_RED, "shutdown_probe: FAIL (precondition requires another screen owner)\n");
         return 1;
     }
     memset(&before, 0, sizeof(before));
     memset(&after, 0, sizeof(after));
-    if (api->surface_query(OS32_SURFACE_CLIENT, &before) != 0 || !before.count) return 1;
+    if (api->surface_query(OS32_SURFACE_CLIENT, &before) != 0) {
+        api->kprintf(ATTR_RED, "shutdown_probe: FAIL (precondition surface_query)\n");
+        return 1;
+    }
+    if (!before.count) {
+        api->kprintf(ATTR_RED, "shutdown_probe: FAIL (precondition count 0)\n");
+        return 1;
+    }
     api->gfx_shutdown();
     fails = api->gfx_screen_owner() != screen_owner ||
             api->surface_query(OS32_SURFACE_CLIENT, &after) != 0 ||

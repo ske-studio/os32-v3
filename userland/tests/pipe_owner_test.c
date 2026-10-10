@@ -1,5 +1,7 @@
 /* CPL3 pipe opacity. The child runs sequentially under another owner.
- * Nonzero lengths are seeded in the host test: there is no public setter. */
+ * Nonzero lengths are seeded in the host test: there is no public setter.
+ * sys_redirect_fd_buf registers separate USER storage, not a pipe ID, and
+ * neither it nor sys_write updates pipe_len. USER get_buf is always NULL. */
 #include "os32api.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,6 +26,8 @@ int main(int argc, char **argv, KernelAPI *api)
         id = api->sys_pipe_alloc();
         if (id < 0) return 1;
         length = PIPE_OWNER_LENGTH; /* Newly allocated: 0; host seed: nonzero. */
+        if (length == 0)
+            api->kprintf(ATTR_WHITE, "pipe_owner_test: 長さ 0: 本人/他 owner の区別は host と trusted 対照で\n");
         if (api->sys_pipe_get_buf(id) != (u8 *)0) fails++;
         if (api->sys_pipe_get_len(id) != length) fails++;
         snprintf(command, sizeof(command), "%s foreign %d", PIPE_OWNER_CHILD, id);

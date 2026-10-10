@@ -105,6 +105,19 @@ int main(void)
     api.exec_run = run_child;
     api.exec_last_result = last_result;
     pipe_buffer_init();
+    int seeded = alloc_seeded();
+    assert(seeded >= 0);
+    if (pipe_get_buf(seeded) != NULL) {
+        puts("FAIL pipe USER get_buf");
+        return 1;
+    }
+    owner = 3;
+    if (pipe_get_len(seeded) != 0) {
+        puts("FAIL pipe foreign get_len");
+        return 1;
+    }
+    owner = 2;
+    pipe_free(seeded);
     assert(pipe_guest_main(1, args, &api) == 0);
     for (int i = 0; i < 3; i++) {
         break_buf = i == 0; break_own = i == 1; break_foreign = i == 2;
