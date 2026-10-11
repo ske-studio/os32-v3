@@ -54,18 +54,19 @@ class ClangTest(unittest.TestCase):
             with mock.patch.dict(os.environ, {'OS32_CLANG_CROSS_FREE': '0'}):
                 full_rc, full_out, full_err = a.build.dry_run(ROOT)
             self.assertEqual(full_rc, 0, full_err)
-            def commands(text, cross_dir):
+            def commands(text):
                 result = []
                 for u in a.build.parse_compile_lines(text):
                     # BUILD_OUT and CROSS_DIR change only paths, never flags.
-                    args = [arg.replace(cross_dir, '<cross>') for arg in u['argv']]
+                    args = list(u['argv'])
+                    for cross_dir in ('/nonexistent', os.environ.get('CROSS_DIR', '/usr/local/cross')):
+                        args = [arg.replace(cross_dir, '<cross>') for arg in args]
                     args = [arg.replace(u['src'], '<build_id>') if
                             u['src'].endswith('/build_id.c') else arg for arg in args]
                     result.append((u['src'] if not u['src'].endswith('/build_id.c')
                                    else '<build_id>', tuple(args)))
                 return sorted(result)
-            self.assertEqual(commands(out, '/nonexistent'),
-                             commands(full_out, os.environ.get('CROSS_DIR', '/usr/local/cross')))
+            self.assertEqual(commands(out), commands(full_out))
 
     def test_cross_free_newlib_headers(self):
         with tempfile.TemporaryDirectory() as tmp:

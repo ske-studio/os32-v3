@@ -123,9 +123,10 @@ _STD_BY_VERSION = {None: "89", "199409L": "94", "199901L": "99", "201112L": "11"
 
 def compiler_args(cc, flags, root):
     """Keep GCC probes intact; explicit cross-free CI probes clang instead."""
-    if ast.cross_compiler(cc) is None and os.environ.get("OS32_CLANG_CROSS_FREE") == "1":
+    cross = ast.cross_compiler(cc)
+    if cross is None and os.environ.get("OS32_CLANG_CROSS_FREE") == "1":
         return ["clang"] + ast.flags(flags, root, cc)
-    return [cc] + list(flags)
+    return [cross or cc] + list(flags)
 
 
 def effective_std(flags, root, cc=None):
