@@ -3931,6 +3931,85 @@ fn e11_injection_hint_requires_bytes_and_does_not_survive_owner_exit() {
 }
 
 #[test]
+fn fullscreen_diagnostics_print_once_and_preserve_other_input() {
+    use crate::{fep, fullscreen, input, mocks, modal, ring, startmenu, wm};
+    use std::sync::{Mutex, atomic::Ordering::SeqCst};
+    static SERIAL: Mutex<Vec<u8>> = Mutex::new(Vec::new());
+    unsafe extern "C" fn serial(s: *const u8) {
+        let mut p = s;
+        while *p != 0 {
+            SERIAL.lock().unwrap().push(*p);
+            p = p.add(1);
+        }
+    }
+    unsafe extern "C" fn stat(_id: i32, out: *mut u8, size: u32) -> i32 {
+        core::ptr::write_bytes(out, 0, size as usize);
+        size as i32
+    }
+    let expected: String = (2..=5).map(|id| format!(
+        "OS32: slot id={id} state=2 owner_pages=0 exec_heap_used=0 trim_pending=0\r\n"
+    )).collect();
+    for background_windows in [false, true] {
+        for ctx in [input::Ctx::Standalone, input::Ctx::Wait] {
+            for pumped in [false, true] {
+                for release_mods in [0, 0x18] {
+                    mocks::init();
+                    let mut api = unsafe { core::ptr::read(os32api::api()) };
+                    api.mem_stat = stat;
+                    api.serial_puts = serial;
+                    os32api::os32_init(Box::into_raw(Box::new(api)));
+                    SERIAL.lock().unwrap().clear();
+                    let shm = mocks::Shm::new();
+                    let mut st = if background_windows {
+                        four_app_state(&shm)
+                    } else {
+                        wm::GuiState::NEW
+                    };
+                    fullscreen::arm(&[0; 48]);
+                    mocks::set_screen_owner(3);
+                    fullscreen::observe();
+                    assert!(input::focus_target(&st).is_none());
+                    let presents = mocks::present_counts();
+                    mocks::push_rawkeys(&[0x6b | 0x100 | (0x18 << 9)]);
+                    if pumped {
+                        input::capture(&mut st, input::Ctx::Pump);
+                        assert!(SERIAL.lock().unwrap().is_empty(), "X4 must defer diagnostics");
+                        assert_eq!(st.pending_raw_n, 1);
+                    }
+                    input::capture(&mut st, ctx);
+                    assert_eq!(String::from_utf8(SERIAL.lock().unwrap().clone()).unwrap(),
+                               expected, "fullscreen make must dump every slot exactly once");
+                    // Release may arrive after CTRL/GRPH have already been released.
+                    mocks::push_rawkeys(&[0x6b | (release_mods << 9)]);
+                    if pumped { input::capture(&mut st, input::Ctx::Pump); }
+                    input::capture(&mut st, ctx);
+                    assert_eq!(SERIAL.lock().unwrap().len(), expected.len(), "break dumped again");
+                    assert_eq!(mocks::INJECT_CALLS.load(SeqCst), 0, "diagnostic key leaked");
+                    // Ordinary text, FEP toggle and other WM chords keep the fullscreen route.
+                    for (scan, mods) in [(0x1d, 0), (0x34, 1), (0, 0x10),
+                                         (0x65, 8), (0x6b, 1)] {
+                        mocks::push_rawkeys(&[scan | 0x100 | (mods << 9), scan | (mods << 9)]);
+                    }
+                    if pumped { input::capture(&mut st, input::Ctx::Pump); }
+                    input::capture(&mut st, ctx);
+                    assert_eq!(*mocks::INJECTED.lock().unwrap(), b"a \x1b");
+                    assert_eq!(mocks::INJECT_CALLS.load(SeqCst), 3, "break injected a byte");
+                    assert_eq!(SERIAL.lock().unwrap().len(), expected.len(), "another chord dumped");
+                    assert!(!fep::is_on() && !fep::toggle_pending(), "fullscreen toggled FEP");
+                    assert!(!modal::is_open() && !startmenu::is_open(), "fullscreen opened WM UI");
+                    assert_eq!(mocks::present_counts(), presents, "fullscreen drew WM content");
+                    for slot in 0..4 {
+                        if st.slots[slot].used { assert_eq!(ring::pending(&st, slot), 0); }
+                    }
+                    assert_eq!(st.pending_raw_n, 0);
+                    fullscreen::reset();
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn owner_diagnostics_defer_in_pump_and_print_all_slots() {
     use crate::{input, mocks, diagnostics};
     use std::sync::Mutex;

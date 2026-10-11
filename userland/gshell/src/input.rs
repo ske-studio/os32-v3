@@ -426,6 +426,14 @@ pub(crate) fn capture_keyboard(st: &mut GuiState, ctx: Ctx) {
             continue;
         }
 
+        /* Serial-only diagnostics also work without a fullscreen launcher's
+         * window. X4 already deferred this chord; on_key dumps only on make.
+         * Keep every other WM shortcut behind the fullscreen injection path. */
+        if ctx.wm_ui() && crate::diagnostics::shortcut(scan, mods) {
+            kbdnav::on_key(st, scan, down, mods);
+            continue;
+        }
+
         /* Fullscreen without its launcher's window: cooked input goes only to
          * the injection ring. The kernel refuses terminal descendants, even
          * when their window is hidden; no background window receives this key. */
