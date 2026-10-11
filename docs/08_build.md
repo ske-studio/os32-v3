@@ -1055,9 +1055,10 @@ tools/ci_fetch.sh --dry-run             # 選ばれる run と artifact を表�
 **R7 の更新準備**: `ci_fetch.sh --sha <対象 SHA>` → SHA-256 照合成功を確認 →
 取得先で `tar -xzf hostdrv.tar.gz` → ソース木の `python3 tools/deploy_source_check.py
 --root <取得先>/hostdrv --deploy-set <取得先>/deploy-set.json` が rc=0 になることを確認 →
-同じ取得先の `os32_boot.img` (2HD 生) を FD へ書込む → `tools/rshell_serial.py` の
-`--serve-host <取得先>/hostdrv` で SerialFS に渡す。実機の物理操作は個別承認 [D2]。新 FD からの 2 段同期は
-[T2d〜h詳細 §5](tasks/v3/TASK_T2D_T2H.md) の R7 手順に従う。
+同じ取得先の `os32_boot.img` (2HD 生) の FD への書込みは**ユーザー自身**が行う (ノートの USB FDD、2026-10-11 決定) →
+`tools/rshell_serial.py` の `--serve-host <取得先>/hostdrv` で SerialFS に渡す。配備元は取得先に展開した `hostdrv/`
+をそのまま使い、作業場の `C:\os32` は使わない (名札外のファイルが常にある)。実機のそのほかの物理操作は個別承認。
+新 FD からの 2 段同期は [T2d〜h詳細 §5-1](tasks/v3/TASK_T2D_T2H.md) が指す設計票 §3-4 (修正版 B) の 0〜7 に従う。
 
 > ⚠️ artifact は「ビルドが通った」ことしか保証しない。NP21/W でも実機でも起動していない
 > ([V4])。実機へ入れたら kselftest の値を**その artifact の `kernel.map`** の番地で読む。
