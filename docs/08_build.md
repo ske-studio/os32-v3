@@ -1014,7 +1014,7 @@ Windows 表記へ変換して使う。変換が合わない環境では環境変
 | 項目 | 内容 |
 |---|---|
 | 起動 | `main` / `wt/**` への push、tag `v*` の push、手動 (workflow_dispatch)。同じ ref の古い run は打ち切る |
-| ビルド | `make -j$(nproc) all` (core。`all` は 2 種の起動 FD と ISO を含む) → `make check-fast`。`NP21W_DIR` は存在しない場所で、コピー失敗は Warning で続行する |
+| ビルド | `make -j$(nproc) all` → `make check-fast` → `make -j$(nproc) deploy-u3 iso` (一時 `HOSTDRV_DIR` / `NP21W_DIR`)。最後の 1 呼出しで起動 FD 2 種・ISO・HostDrv を同じ build に揃え、世代表・期待表を今の成果物から再生成する |
 | submodule | **`apps/` と `game/` (private submodule) は v3 の CI では組まない** (ユーザー決定 2026-09-30: 今回の開発に要らないので `SUBMODULE_TOKEN` は登録しない)。必要になったら secret `SUBMODULE_TOKEN` (os32-apps / os32-game の Contents: read を持つ fine-grained PAT) で submodule 取得 + `make external` の step を足す ([FORK_PLAN §3 d ③](tasks/v3/FORK_PLAN.md)) |
 | フォント | IPAex の TTF はリポジトリに無く `tools/fetch_fonts.py` が IPA の公式配布から取る (§8-2)。CI は `OS32_ACCEPT_IPA_LICENSE=1` で非対話に同意し (リポジトリ所有者が同意済みの前提)、取れた ttf を key `ipaex-<zip の SHA-256>` (`fetch_fonts.py --print-zip-sha256`) で `actions/cache` に置く |
 | 文書だけの push | `docs/**`・`*.md`・`.claude/**` だけの push では回さない (`paths-ignore`。文書の検査は `check.yml`)。同じ ref の run は 1 つ (`cancel-in-progress`) なので、**run の途中でその ref へ push すると打ち切られる** |
@@ -1032,9 +1032,11 @@ Windows 表記へ変換して使う。変換が合わない環境では環境変
 | `os32_install.iso` | インストール ISO |
 | `packages/*.PKG` | パッケージ |
 | `vmkernel.lz4` / `kernel.map` | カーネルとシンボル (kselftest の番地はこの map で引く) |
-| `BUILD_INFO.txt` / `SHA256SUMS` | コミット・ref・日時・run の URL・gcc / rustc の版・各ファイルのサイズと sha256 (`tools/ci_fetch.sh` が読む) |
+| `hostdrv.tar.gz` | 同じ build の HostDrv 一式 (`hostdrv/`、hsync の名札 `.deploy/manifest.txt` を含む)。SerialFS の配備元 |
+| `deploy-set.json` / `generations-manifest.json` (生成済みなら) | 配備期待集合 (各ファイルの SHA-256) と世代表 |
+| `BUILD_INFO.txt` / `SHA256SUMS` | コミット・ref・日時・run の URL・gcc / rustc の版・各ファイルのサイズと sha256。同じ build の照合結果 (両 FD 内のカーネルと HostDrv の SHA-256 一致、D88 と生像の一致、`deploy_source_check --deploy-set` の rc=0) を記録し、不一致なら CI は失敗 (`tools/ci_fetch.sh` が読む) |
 
-os32 の `build.yml` にあった配備ツリー (`hostdrv.tar.gz`)、埋め込み commit id の照合、tag → Release の job は
+os32 の `build.yml` にあった埋め込み commit id の照合、tag → Release の job は
 最小構成に含めていない (要るときに足す)。
 
 **実機ホスト側の取り方** — `tools/ci_fetch.sh` (要 `gh`、`gh auth login` を 1 回。
@@ -1049,6 +1051,13 @@ tools/ci_fetch.sh --dry-run             # 選ばれる run と artifact を表�
 
 保存先は `./os32-ci/<artifact 名>/` (`--dir` で変更)。取得後に `BUILD_INFO.txt` を表示し、
 `SHA256SUMS` で全ファイルを照合する (不一致は終了 1、`gh` が無い / 未認証は終了 2)。
+
+**R7 の更新準備**: `ci_fetch.sh --sha <対象 SHA>` → SHA-256 照合成功を確認 →
+取得先で `tar -xzf hostdrv.tar.gz` → ソース木の `python3 tools/deploy_source_check.py
+--root <取得先>/hostdrv --deploy-set <取得先>/deploy-set.json` が rc=0 になることを確認 →
+同じ取得先の `os32_boot.img` (2HD 生) を FD へ書込む → `tools/rshell_serial.py` の
+`--serve-host <取得先>/hostdrv` で SerialFS に渡す。実機の物理操作は個別承認 [D2]。新 FD からの 2 段同期は
+[T2d〜h詳細 §5](tasks/v3/TASK_T2D_T2H.md) の R7 手順に従う。
 
 > ⚠️ artifact は「ビルドが通った」ことしか保証しない。NP21/W でも実機でも起動していない
 > ([V4])。実機へ入れたら kselftest の値を**その artifact の `kernel.map`** の番地で読む。
