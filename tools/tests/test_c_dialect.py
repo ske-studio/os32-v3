@@ -145,6 +145,25 @@ def case_effective(cd):
     check(cd.strip_jobserver("") == "", "空はそのまま")
 
 
+def case_cross_free(cd):
+    from unittest import mock
+    env = {'PATH': '/usr/bin:/bin', 'CROSS_DIR': '/nonexistent',
+           'OS32_CLANG_CROSS_FREE': '1'}
+    with mock.patch.dict(os.environ, env):
+        check(cd.ast.cross_compiler() is None, 'cross-free regression has no cross GCC')
+        check(cd.effective_std(GOOD, ROOT) == 'gnu11', 'cross-free clang gnu11 mode')
+        check(cd.effective_std(['-std=gnu11', '-std=gnu89'], ROOT) == 'gnu89',
+              'cross-free clang honors the last -std')
+        check(cd.probe_rejects(GOOD, ROOT) == [], 'cross-free clang rejection probes')
+        check('vla' in cd.probe_rejects([f for f in GOOD if f != '-Werror=vla'], ROOT),
+              'cross-free missing VLA rejection flag is detected')
+        check(cd.check_sdk_sample(ROOT) == [], 'cross-free gnu89 SDK example')
+        with mock.patch.dict(os.environ, {'OS32_CLANG_CROSS_FREE': '0'}):
+            check(cd.main([]) == 2, 'missing cross GCC fails closed without explicit opt-in')
+    check(cd.compiler_args(cd.CC, GOOD, ROOT) == [cd.CC] + GOOD,
+          'normal GCC probes preserve the compiler and every flag')
+
+
 # --------------------------------------------------------------------------
 #  4. 拒否の探り (暗黙宣言・暗黙 int・VLA・偽の STATIC_ASSERT・非定数式)
 # --------------------------------------------------------------------------
@@ -501,6 +520,7 @@ def main(argv):
     case_lex(cd)
     case_parse(cd)
     case_effective(cd)
+    case_cross_free(cd)
     case_probe(cd)
     case_sdk(cd)
     case_internal(cd)

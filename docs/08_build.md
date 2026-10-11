@@ -723,6 +723,11 @@ PYTHONPATH=tools python3 -c 'from clang_ast.type_occurrences import visitor_bina
 
 クロス GCC を導入しない静的 CI では、C AST 検査の標準ヘッダを Ubuntu の
 `libnewlib-dev` (`/usr/include/newlib`) から取る。クロス newlib があればそちらを優先する。
+`OS32_CLANG_CROSS_FREE=1` の dry-run は、外部リンク入力 `libc.a` の空規則と、
+GCC が PATH に無い場合の libgcc パス問い合わせ専用 shim を一時ディレクトリに置く。
+実際の C コンパイル規則・依存はすべて辿る。通常ビルドには適用しない。
+この明示的な限定モードで GCC が無いときだけ、`check-c-dialect` の言語モード・
+拒否の探り・SDK 例の検査も clang を使う。GCC の定義マクロ・条件分岐との同等性は未検証。
 clang の解析失敗・不足入力は非0で終了する。`make all` の後に検査する。
 実ビルドで選ばれたソースとそこから取り込むヘッダが対象で、未使用ヘッダ・
 非選択の `#if` 分岐は対象外。旗の読み替え・判定・比較の詳細は

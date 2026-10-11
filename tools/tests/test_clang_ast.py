@@ -34,6 +34,39 @@ class ClangTest(unittest.TestCase):
         return a.parse('kernel/clang_probe.c', ['-std=gnu11','-ffreestanding']+list(flags),
                        ROOT,text=body)
 
+    def test_cross_free_build_commands(self):
+        # Exercise the real make graph with neither cross GCC nor libc.a.
+        env = {'PATH': '/usr/bin:/bin', 'CROSS_DIR': '/nonexistent',
+               'OS32_CLANG_CROSS_FREE': '1'}
+        with mock.patch.dict(os.environ, env):
+            self.assertIsNone(a.cross_compiler())
+            rc, out, err = a.build.dry_run(ROOT)
+        self.assertEqual(rc, 0, err)
+        self.assertEqual(err, '')
+        units = a.build.parse_compile_lines(out)
+        sources = {u['src'] for u in units}
+        self.assertTrue({'kernel/kernel.c', 'boot/boot_main.c',
+                         'lib/sqlite3/sqlite3.c', 'sdk/crt/syscalls.c',
+                         'sdk/allocator/nano_adapter.c'} <= sources)
+        self.assertTrue(any(u['src'] == 'sdk/crt/syscalls.c' and
+                            '-DOS32_CRT_RESIDENT' in u['sig'] for u in units))
+        if a.cross_compiler():
+            with mock.patch.dict(os.environ, {'OS32_CLANG_CROSS_FREE': '0'}):
+                full_rc, full_out, full_err = a.build.dry_run(ROOT)
+            self.assertEqual(full_rc, 0, full_err)
+            def commands(text, cross_dir):
+                result = []
+                for u in a.build.parse_compile_lines(text):
+                    # BUILD_OUT and CROSS_DIR change only paths, never flags.
+                    args = [arg.replace(cross_dir, '<cross>') for arg in u['argv']]
+                    args = [arg.replace(u['src'], '<build_id>') if
+                            u['src'].endswith('/build_id.c') else arg for arg in args]
+                    result.append((u['src'] if not u['src'].endswith('/build_id.c')
+                                   else '<build_id>', tuple(args)))
+                return sorted(result)
+            self.assertEqual(commands(out, '/nonexistent'),
+                             commands(full_out, os.environ.get('CROSS_DIR', '/usr/local/cross')))
+
     def test_cross_free_newlib_headers(self):
         with tempfile.TemporaryDirectory() as tmp:
             inc = pathlib.Path(tmp)

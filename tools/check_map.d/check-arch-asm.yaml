@@ -5,6 +5,10 @@ check-arch-asm:
 - tools/tests/mutpar.py
 - tools/clang_ast/**
 - tools/tests/test_clang_ast.py
+- boot/boot_main.c
+- sdk/allocator/nano_adapter.c
+- sdk/crt/syscalls.c
+- userland/lib/rt/ls.c
 - kernel/**
 - drivers/**
 - exec/**
