@@ -71,7 +71,6 @@ PM 起票の候補。公開 KAPI の形と版を保つ修正を e11 より先に
 |---|---|---|---|
 | X-1 | NUL 終端の文字列入力と `kprintf` 可変引数の B1 化 → T4・T5a の担当境界で確定。ページ 0 の NP 化 → T7 | 既知の制限 | 1499、1647、1757、1885 |
 | X-2 | `font_load_test` の stat 段の SKIP 理由 → 次にその試験を回す前に確定 | 未実施の確認 / SKIP | 1250、1294 |
-| X-3 | GitHub Actions の結果が票に無い。**2026-10-11 に照合: check (static-check の check-arch-asm) が f7/f8 (2026-10-07、f60a734) 以来ずっと failure** — CI はクロス無し (`OS32_CLANG_CROSS_FREE=1`) で、make dry-run が newlib の libc.a と i386-elf-gcc を要求するようになったと推定。build は success。→ ci-fix 段で直し、push 後の CI で確かめて閉じる。今の成功で過去を合格にしない | 未実施の確認 | 335–345、2003–2009 |
 | X-4 | 検査の整理の残り: ci-stab2 の P2-B の後の全体 check-changed と native の記録、6 時間超の対照の刈り取り、pending の 1 時間回収、生き残る弱い変異、f5a の full 候補検査に残る 5 SKIP、`net_link` の TMPDIR 長、選択の取りこぼし 3 種 | 既知の制限 | 3551、3627、3705、3740、3754–3768、3776、3800–3807、3828–3832 |
 | X-6 | `tools/tvdump_recv.py` は名前付きパイプ前提で今の NP21/W に接続できない → `/api/cmd` で生バイトを取り TVDM の長さ・寸法・内容を照合する形に (計画 3 番、受入索引と同枠) | 道具の不具合 | — |
 | X-11 | 監査分類 (`~/os32-tmp/evidence/2026-10-07/audit-classification.md`) の「意味変更 (e11c)」のうち pipe (E11-8) を除く 12 件 — IME 9 本 (trygetchar/toggle/set_mode/switch_dict/user_delete/user_export/user_clear/trygetkey/feed_key)・exec_last_result・gui_call・con_sink_read の授権/本人別の契約 → **T4 の設計票で扱う (ユーザー決定 2026-10-07)** | 契約の整理 | 分類表 :33/:43-55/:57/:60 |
