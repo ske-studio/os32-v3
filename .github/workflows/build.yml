@@ -100,7 +100,7 @@ jobs:
 
       # ③ core のビルド。OS32_ACCEPT_IPA_LICENSE=1 は、リポジトリ所有者が IPA Font License v1.0 に
       #    同意している前提で CI では非対話に同意する (未取得のときだけ fetch_fonts.py が見る)。
-      #    NP21W_DIR は存在しない場所 (イメージのコピーは Warning で続行する)。
+      #    all は配備しない。配布用の FD / ISO は後段で HostDrv と同じ build に揃える。
       - name: Build core (make all)
         env:
           OS32_ACCEPT_IPA_LICENSE: "1"
@@ -126,14 +126,18 @@ jobs:
         id: name
         run: echo "artifact=os32-${GITHUB_REF_NAME//\//-}-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
-      # 実機の HDD 起動のままシリアル経由で更新する配備元 (hsync の名札 .deploy/manifest.txt を含む)。
-      # v2 の CI にあった段を戻した (docs/tasks/realhw/PLAN.md の手順が hostdrv.tar.gz を展開して使う)。
-      - name: Deploy tree (make deploy into a temp HOSTDRV_DIR)
+      # kapi_sys.o は make ごとに再コンパイルされる。FD / ISO / HostDrv を 1 呼出しで作る。
+      # deploy-u3 は FD を作ってから HostDrv を同期する (hsync の名札も含む)。
+      # 生 2HD は D88 の副生成物、ISO は phony の iso で必ず作り直す。
+      - name: Deploy set (same-build FD, ISO and HostDrv)
         run: |
           export PATH="$CROSS_DIR/bin:$PATH"
-          mkdir -p "$RUNNER_TEMP/hostdrv"
-          make deploy CROSS_DIR="$CROSS_DIR" NP21W_DIR="$RUNNER_TEMP/np21w" \
+          mkdir -p "$RUNNER_TEMP/hostdrv" "$RUNNER_TEMP/np21w"
+          make -j"$(nproc)" deploy-u3 iso CROSS_DIR="$CROSS_DIR" NP21W_DIR="$RUNNER_TEMP/np21w" \
             HOSTDRV_DIR="$RUNNER_TEMP/hostdrv" NO_PRUNE=1
+          # make all の古い世代 hash を、今の成果物で更新する (make は再度呼ばない)。
+          python3 tools/gen_generation_manifest.py
+          python3 tools/gen_deploy_set.py
           test -f "$RUNNER_TEMP/hostdrv/.deploy/manifest.txt"
 
       - name: Collect outputs
@@ -142,7 +146,44 @@ jobs:
           rm -rf out && mkdir -p out/packages
           cp build/out/vmkernel.lz4 build/out/kernel.map out/
           cp images/os32_boot.d88 images/os32_boot.img images/os32_boot144.img images/os32_install.iso out/
+          cp build/out/deploy-set.json out/
+          if [ -f build/out/generations-manifest.json ]; then
+            cp build/out/generations-manifest.json out/
+          fi
           cp packages/*.PKG out/packages/
+          # 既存の媒体試験の FAT12 / D88 reader で、配布する像の中身を読む。
+          python3 - "$RUNNER_TEMP/hostdrv" > "$RUNNER_TEMP/deploy-check.txt" <<'PY'
+          import hashlib
+          from pathlib import Path
+          import sys
+
+          sys.path.insert(0, "tools/tests")
+          from test_packages import d88_to_raw, fat12_files
+
+          host_sha = hashlib.sha256((Path(sys.argv[1]) / "boot/vmkernel.lz4").read_bytes()).hexdigest()
+          print(f"hostdrv boot/vmkernel.lz4 sha256: {host_sha}")
+          for name in ("os32_boot.img", "os32_boot144.img"):
+              files, _, _ = fat12_files(Path("out") / name)
+              fd_sha = hashlib.sha256(files["/VMKRNL.LZ4"]).hexdigest()
+              print(f"FD {name} VMKRNL.LZ4 sha256: {fd_sha}", flush=True)
+              if fd_sha != host_sha:
+                  raise SystemExit(f"FD / hostdrv kernel mismatch: {name}")
+          if d88_to_raw(Path("out/os32_boot.d88").read_bytes()) != Path("out/os32_boot.img").read_bytes():
+              raise SystemExit("D88 / raw FD mismatch")
+          if hashlib.sha256(Path("out/vmkernel.lz4").read_bytes()).hexdigest() != host_sha:
+              raise SystemExit("artifact / hostdrv kernel mismatch")
+          print("FD / hostdrv kernel sha256: MATCH; D88 / raw FD: MATCH")
+          PY
+          cat "$RUNNER_TEMP/deploy-check.txt"
+          if python3 tools/deploy_source_check.py --root "$RUNNER_TEMP/hostdrv" \
+              --deploy-set out/deploy-set.json > /dev/null; then
+            echo "deploy_source_check --deploy-set: rc=0 (FD / hostdrv / deploy-set: same build)" \
+              >> "$RUNNER_TEMP/deploy-check.txt"
+          else
+            rc=$?
+            echo "deploy_source_check --deploy-set: rc=$rc" >&2
+            exit "$rc"
+          fi
           tar -C "$RUNNER_TEMP" -czf out/hostdrv.tar.gz hostdrv
           {
             echo "commit:  $GITHUB_SHA"
@@ -152,6 +193,7 @@ jobs:
             echo "gcc:     $("$CROSS_DIR/bin/i386-elf-gcc" -dumpversion)"
             echo "rustc:   $(rustc --version)"
             echo "external: 0 (apps/game are not built in v3 CI)"
+            cat "$RUNNER_TEMP/deploy-check.txt"
             echo
             echo "# size  path"
             (cd out && find . -type f -printf '%s  %P\n' | sort -k2)
