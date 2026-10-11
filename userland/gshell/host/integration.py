@@ -42,6 +42,14 @@ def build(gshell: Path, name: str, quiet: bool = False) -> Path:
 # 票 KBD_NAV (docs/tasks/gui/TASK_KBD_NAV.md) の受け入れ K1 の変異。
 # (名前, ファイル, 置き換え前 (ちょうど 1 か所), 置き換え後, RED になるべき試験の絞り込み)
 MUTATIONS = [
+    ('fullscreen diagnostics bypassed', 'src/input.rs',
+     '        if ctx.wm_ui() && crate::diagnostics::shortcut(scan, mods) {',
+     '        if false && ctx.wm_ui() && crate::diagnostics::shortcut(scan, mods) {',
+     'fullscreen_diagnostics_print_once_and_preserve_other_input'),
+    ('fullscreen diagnostics intercept other chords', 'src/input.rs',
+     '        if ctx.wm_ui() && crate::diagnostics::shortcut(scan, mods) {',
+     '        if ctx.wm_ui() {',
+     'fullscreen_diagnostics_print_once_and_preserve_other_input'),
     ('deliver-front', 'src/trim.rs',
      ' || id == st.front_owner()', '',
      'g2w_front_is_deferred_until_back'),
