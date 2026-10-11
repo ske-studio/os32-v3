@@ -66,7 +66,7 @@ SAMPLE_STD = "gnu89"
 PROBES = (
     ("vla",
      "void t0_vla(int n);\nvoid t0_vla(int n) { char a[n]; a[0] = 0; (void)a; }\n",
-     "reject", r"-Werror=vla"),
+     "reject", r"-W(?:error=|error,-W)vla"),
     ("implicit_decl",
      "int t0_f(void);\nint t0_f(void) { return t0_undeclared_fn(1); }\n",
      "reject", r"implicit-function-declaration"),
@@ -121,10 +121,18 @@ _STD_BY_VERSION = {None: "89", "199409L": "94", "199901L": "99", "201112L": "11"
                    "201710L": "17"}
 
 
+def compiler_args(cc, flags, root):
+    """Keep GCC probes intact; explicit cross-free CI probes clang instead."""
+    cross = ast.cross_compiler(cc)
+    if cross is None and os.environ.get("OS32_CLANG_CROSS_FREE") == "1":
+        return ["clang"] + ast.flags(flags, root, cc)
+    return [cross or cc] + list(flags)
+
+
 def effective_std(flags, root, cc=None):
     """flags で実際に効く言語モード ("gnu11" / "gnu89" / "c11" / "gnu17" …)。
     コンパイラが通らなければ "error: …"。"""
-    r = subprocess.run([cc or CC] + list(flags) + ["-E", "-dM", "-x", "c", os.devnull],
+    r = subprocess.run(compiler_args(cc or CC, flags, root) + ["-E", "-dM", "-x", "c", os.devnull],
                        cwd=str(root), capture_output=True, text=True)
     if r.returncode != 0:
         return "error: " + (r.stderr.strip().splitlines() or ["?"])[0]
@@ -143,7 +151,7 @@ def effective_std(flags, root, cc=None):
 def _compile(cc, flags, body, root, tmp, name, incs=()):
     src = pathlib.Path(tmp) / (name + ".c")
     src.write_text(body, encoding="utf-8")
-    args = [cc] + list(flags) + ["-fsyntax-only"]
+    args = compiler_args(cc, flags, root) + ["-fsyntax-only"]
     for d in incs:
         args += ["-I", str(d)]
     args.append(str(src))
@@ -312,7 +320,7 @@ def check_sdk_sample(root, cc=None):
     dirs, _ = sdk_lib_headers(root)
     probs = []
     for src in sorted((root / SAMPLE_DIR).glob("*.c")):
-        args = [cc, "-std=" + SAMPLE_STD] + SDK_BASE + ["-Wall"]
+        args = compiler_args(cc, ["-std=" + SAMPLE_STD] + SDK_BASE + ["-Wall"], root)
         for d in _lib_incs(root, cc, dirs):
             args += ["-I", str(d)]
         r = subprocess.run(args + [str(src)], cwd=str(root), capture_output=True, text=True)
@@ -409,7 +417,7 @@ def main(argv):
     root = ROOT
     if "--root" in argv:
         root = pathlib.Path(argv[argv.index("--root") + 1]).resolve()
-    if shutil.which(CC) is None:
+    if shutil.which(CC) is None and os.environ.get("OS32_CLANG_CROSS_FREE") != "1":
         print("check_c_dialect: コンパイラ %s が無い" % CC, file=sys.stderr)
         return 2
     if shutil.which("make") is None:
