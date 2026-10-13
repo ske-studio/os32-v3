@@ -1,6 +1,6 @@
 # 持越し台帳 — 延ばした試験・SKIP・ホストだけの合格・未結線
 
-> 状態: **現行 (2026-10-13、h9 で T2h の照合済み)** — R0〜R7 (NP21/W の 5 構成 + 実機 Ra266) の結果で閉じた行は [閉鎖台帳](../archive/v3/DEFERRED_CLOSED.md) の「T2h R0〜R7」へ移した (閉 22・部分閉 9)。残るのは **渡す 20** (次のゲスト受入 7、後続の段 12、実機 1)・**持越し 3** (決定)・**実機の所見 4**。分類の一覧は `~/os32-tmp/run/h/h9/H9_CLASSIFY.md`。
+> 状態: **現行 (2026-10-13、h9 で T2h の照合済み)** — R0〜R7 (NP21/W の 5 構成 + 実機 Ra266) の結果で閉じた行は [閉鎖台帳](../archive/v3/DEFERRED_CLOSED.md) の「T2h R0〜R7」へ移した (閉 21・部分閉 10)。残るのは **渡す 21** (次のゲスト受入 8、後続の段 12、実機 1)・**持越し 3** (決定)・**実機の所見 4**。分類の一覧は `~/os32-tmp/run/h/h9/H9_CLASSIFY.md`。
 > 規則: **未完了だけを持つ**。終わった行は、証拠の所在を票に書いてから [閉鎖台帳](../archive/v3/DEFERRED_CLOSED.md) へ移す。実行ログを貼らない。同じ延期を票・引き継ぎ・memory に写さない。
 > ここに行が無い SKIP・未実行は合格に数えない ([ROLES §4](agents/ROLES.md))。FAIL・crash・timeout を延期に書き換えない。関門に着いたら、その関門の行を全部消すまで次へ進まない。
 
@@ -12,10 +12,10 @@
 
 | 関門 | 行 | 進む条件 |
 |---|---|---|
-| 次のゲスト受入の回 (NP21/W。R7-1 の修正の受入と同じ回でよい) | E9-1、X-6、E11-9、E11-5、H-1、H-2、PRIO-3 | 7 行を全部消す |
+| 次のゲスト受入の回 (NP21/W。R7-1 の修正の受入と同じ回でよい) | E9-1、X-6、E11-9、E11-5、H-1、H-2、PRIO-3、X-21 | 8 行を全部消す |
 | 次の実機セッション | H-5 (kstack の転記) | 画面確認の要らない分は立会い無しで可 |
 | カーネル層の不具合 ([POLICY_DEV §1](../POLICY_DEV.md)) | R7-1 | T3 より先に直す候補。順序は反省会 |
-| T3 (帯変更) | F-9、H-4 (a) | 着手前に扱いを決める |
+| T3 (帯変更) | F-9、H-4 (a) | 着手前に扱いを決める。H-4 の構成別の残り (Cirrus / 8MB PEGC の M、cirrus-off、台本の残り) は次のゲスト受入 |
 | T3 前の文書再整備計画 ([DOCS_REORG_T3](v3/DOCS_REORG_T3.md)) | X-4 | — |
 | T4 | X-11、E11-A2b、X-1 の一部 | 設計票で扱う |
 | T5a / T7 | X-1 の一部、E10-4、H-6b、H-5 (CG 窓 WB・68h) | — |
@@ -33,7 +33,8 @@
 | E11-9 | WM の tvdump 0 埋めのゲスト確認 (GUI 端末の分は H-7) | R1b の tvdump が未実施。V86 後の DISPLAY/TVRAM 再 lease (PT0 MATCH) と全 alias UC (PEGC / Cirrus) は閉じた | 同上 |
 | E11-5 | 全画面の WAIT_POLL と先行入力の 2 点 (端末の子・隠れた sh は端末アプリが v3 に無く H-7) | R1b で時間の都合で未実施。Run からの全画面の 1 キー終了と窓への復帰は 17MB planar (h9 再回) と実機 R7b で PASS | 次のゲスト受入 / 端末の 2 点は H-7 |
 | H-1 | h2_stack512 の park → resume → 終了 owner 0 (512KiB stack のまま OP_WAIT に入れる) | R1a は run と guard だけ (h2_stack の park は GUI 前提で、park/resume は h3 側で実施)。fixture の再生成・hash 照合・旧 app / shell / shlib の拒否・故障画像は閉じた | 次のゲスト受入 |
-| H-2 | 打鍵を重ねた STOP (二重 kill 0) と前景以外の張本人の明示観測 | R1b 再回で h3 6 mode・PARKED の arm・park 中の WM kill・STOP 3 試行は PASS だが、この 2 点は RESULT_2 に明示の記載が無い (h3fix の host 試験 77 本に含まれるかは未照合) | 次のゲスト受入 |
+| H-2 | (1) 実行中 OP_WAIT (RUNNING+in_wait、前景) の fixture への arm → resume → 発火、(2) 打鍵を重ねた STOP (二重 kill 0)、(3) 前景以外の張本人の明示観測 | (1) は R1b 再回の 1 回目 (pf) で**失敗の記録**: h3a が前景 = RUNNING+in_wait のまま arm し、道具のクリックで WAIT が返らず `resume not captured`、arm=1 が残った (手でクリックして発火させ片付けた。推定: capture の breakpoint trap 中に press/release が収まり、状態読みのマウスが押下を見ない — `RESULT_2.md` R1b-h3)。成功した 6 mode は**回避策** (先に別窓を前景にして fixture を PARKED にしてから arm) での試行で、実行中 OP_WAIT の arm の義務は閉じていない。(2)(3) は RESULT_2 に PASS の証拠が無い | 次のゲスト受入: (1) は道具を trap 中にクリックしない順序 (か arm 後にクリックで起こす手順) に直してから、前景の fixture に arm して resume 印と発火を観測。(2)(3) は同じ回で |
+| X-21 | (a) G-4 / R-3 の trim 対象 (C の trim_back・Rust の trim_back_rs) の返却前後の `mem <id>` と teardown の `as_extents_at_teardown` | 未採取。h9 再回の as_extents は gui_demo (別アプリ) で道具の経路を確かめただけで、台本 (`guest_acceptance.yaml` の X-21(a) 行) が求める trim 対象の観測ではない。GUI 中の `mem <id>` は rshell が無く、診断キーの全 slot 行は owner_pages だけ。(b) の台本の書き分けは閉じた | 次のゲスト受入: trim_back / trim_back_rs を G-4 / R-3 の手順で回し、DONE の前後を診断キー (owner_pages) で、teardown を bp で採る |
 | PRIO-3 | GUI→CUI→GUI の往復で TVRAM generation の値が進むことの明示観測 | R1d / h9 再回の往復は表示と rshell 応答で判定し、generation の値を読んでいない。シリアル待ちの CTRL+STOP (`audit_test serial`、$?=130) は閉じた | 次のゲスト受入 |
 
 ## 2. 渡す — 後続の段
@@ -44,7 +45,7 @@
 | PRIO-1 | `install` (FD 起動、CD でない方) の通し (授権・区画・format・書込み) | R0 は cdinst Full だけ (閉鎖台帳)。install は F-14 で確認画面まで (n で中断) | 保守: LZSS-1 と同じ機会 |
 | E10-4 | `v86 -g` の採取の途中の kill で g/tv の解放・gcap_ops・TVRAM 30 行が戻ること | R1b で観測不能: 起動 0.25s 後の CTRL+STOP でも採取が先に終わる (`E end`、gcap alloc 2・free 2・kills +0)。採取の途中を狙う hook (長い採取か注入) が要る | T7 |
 | F-9 | 副 arena が要求量に応じた大きさで作られるため、小さい割当ての継続で arena が N 個に増え、伸長失敗の syscall が N+1 回・free が O(N) になる。f8 の大塊も同じ: 全 free/realloc が大塊一覧を O(N) 走査し、TOPDOWN の大塊が隣どうし併合されるため虫食いの free で extent 表 (32 本) が満杯になると unmap が EFULL で返却されない (一覧は復元、exit で回収)。大塊 realloc で旧 unmap だけ失敗すると成功を返しつつ errno=ENOMEM と旧ブロックが残る (f8 レビュー P3-a/b/c)。f9 の USER exec_heap は 1 回の alloc/free が O(所属 arena のページ数 + ブロック数) で、INITIAL 1 本を走査する (f12ではheap_sz=0の初期量64KiB、旧avail/2は撤去) (f9 レビュー R1)。f10 の trim は全 USER arena (INITIAL 含む) のページ/ブロック検証 + ARENA の末尾走査で O(全 arena のページ数 + ブロック数)。LARGE は非併合・extent/base 識別。最小 arena サイズまたは EXACT 失敗の印を検討・検証する。f12-consumers の実測は終了時 extent 最大 4/32・副 arena 最大 1、heap_sz=0 の 64KiB fallback は確認済み (F-5)。R11性能: 基点/f12の所要時間・mem_map回数は取得不可。cfg_benchホストfixtureはtickを固定刻みで模擬しUSER AS/allocatorを通さず、sqlite_standaloneはKernelAPI/VFSを要するOS32XのためLinux/qemu-userで実行不可。ホストSQLite時間を代用しない。調査証拠: ~/os32-tmp/run/f12/f12b_perf.log | 設計変更 (最小 arena / EXACT 失敗の印) で T2h の範囲外 | T3 |
-| H-4 | (a) 64MB の高位 buffer の通過の証明、(b) GUI での再生の park/resume、(c) PEN (CS4231 I9 bit0) と 8237 DMA マスクのレジスタ読み | (a) アプリのページは pool の下から割り当てられ (gui_demo の私有 156 PTE は 0x400000〜、32MB 超 0 本)、32MB 超に I/O buffer を置く fixture が無い。(b) GUI で鳴らす fixture が無い (CUI の pcm_test は OP_WAIT に入らず park の機会が無い)。(c) 読む API が無い (IMR の変化と STOP 後の解除は PASS)。構成の一括 (8MB planar / PEGC、17MB planar / PEGC / Cirrus、64MB、`gfx200_test` / `gfx_demo200`、M 全通し、g の 8MB 台本、workspace PTE、20 回往復) は閉じた | (a) T3 (帯変更、fixture と一緒)、(b)(c) TASK_PCM_CS4231 |
+| H-4 | 構成別に閉じていないもの — **17MB Cirrus**: 台本 M の全通し (FEP・高位 HostDrv・lease 切替・map 枯渇・trim・STOP)、`e12-17mb-cirrus` の残りの observe (R3 は guard C・20 回・V86 往復・gdi_test だけ)。**17MB planar**: V86 往復後の alias UC の PTE 照合 (h9 再回 §2 は全画面 DISPLAY・SHM lock・font_load_test・旧 token 失効だけ、alias UC は PEGC と Cirrus で採った)。**cirrus-off (fallback)**: 日本語 present・CLIENT/DISPLAY geometry・旧 token revoke・両 SDK 再 attach・alias UC (R1d は gfx200_test・blit_test・db_test だけ。planar での旧 token / 再 attach は h9 再回 §2 だが fallback 経路での実施ではない)。**8MB planar**: shapes の入口前 ENOMEM の対照、`f12-8mb-startup` (同等の試験 mem_map/sbrk_grow/malloc_arena/exec_heap/alloc_demo は h_small G-9 で PASS、台本 entry そのものは未実行)。**8MB PEGC**: 台本 M の全通し、`e12-8mb-pegc` の残りの observe、`f12-8mb-startup` (R5 は guard・db・shapes・20 回、h9 再回 §5 は G-1〜G-4 と guard D)。**64MB**: (a) 高位 buffer の通過の証明、(b) GUI での再生の park/resume、(c) PEN (CS4231 I9 bit0) と 8237 DMA マスクのレジスタ読み | 時間の都合で各回の M を 17MB PEGC と 8MB planar でしか通していない (h9 再回 §1・§4)。(a) はアプリのページが pool の下から割り当てられ (32MB 超 0 本) 32MB 超に I/O buffer を置く fixture が無い、(b) は GUI で鳴らす fixture が無い (CUI の pcm_test は OP_WAIT に入らない)、(c) は読む API が無い (IMR の変化と STOP 後の解除は PASS)。閉じた分 (R1d・R3〜R6・h9 再回・h_small の対応表) は閉鎖台帳 | Cirrus / planar / cirrus-off / 8MB の残り → 次のゲスト受入 (派生 ini は t2h_cirrus / t2h_8mb、M は `guest_acceptance.yaml` の h-R*-* 行)。(a) → T3 (帯変更、fixture と一緒)、(b)(c) → TASK_PCM_CS4231 |
 | H-6b | V86 の出口で 6Ah の標準 / 拡張を戻していない (9821 で E0000h が MMIO のまま残り得る)、9801 構成での `gui_gate` | 未対処。NP21/W では `v86 -b` / `-d` / hal_test の前後で 6Ah=0x01・mode1=0x88・E0000h/A8000h の読みが不変 (H-6a、記録) で表示は壊れていない。9801 構成はこの NP21/W に無い | T7 (V86 復元検査)。表示が壊れる構成が見つかれば e10b の fix 段 |
 | E11-A2b | raw KAPI 待機利用者の明示 check | host だけで、ゲストに観測が無い | T4 (X-11 と一緒) |
 | X-1 | NUL 終端の文字列入力と `kprintf` 可変引数の B1 化 → T4・T5a の担当境界で確定。ページ 0 の NP 化 → T7 (元の行 1499、1647、1757、1885) | 既決の既知の制限 | T4 / T5a / T7 |

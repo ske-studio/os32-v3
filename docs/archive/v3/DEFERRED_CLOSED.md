@@ -320,7 +320,8 @@ X-2 の前半 (e8a の RO 日本語) は `accept_e11/RESULT.md` の GUI 日本�
 
 ## H-2 (部分閉)
 
-閉鎖 (2026-10-13): `evidence/2026-10-10/h_R1/RESULT_2.md` (R1b-h3: h3fix 後の道具で pf / gp / de / ud / USER-loop / KAPI-loop の 6 本とも `h3 case PASS (PM trace + physical diagnostics + next launch)`、verify、h3b への交換、PARKED の arm (別窓を前景にしてから)、KAPI-loop は wm-kill・pending 0、loop-watch / 単独 stop / trace-watch の live、各 owner-exit leftover 0)。残り (打鍵を重ねた STOP・前景以外の張本人の明示観測) は現行台帳。
+閉鎖 (2026-10-13): `evidence/2026-10-10/h_R1/RESULT_2.md` (R1b-h3: h3fix 後の道具で pf / gp / de / ud / USER-loop / KAPI-loop の 6 本とも `h3 case PASS (PM trace + physical diagnostics + next launch)`、verify、h3b への交換、PARKED の arm (先に別窓を前景にして fixture を PARKED にしてから)、KAPI-loop は wm-kill・pending 0 = park 中の WM kill、loop-watch / 単独 stop / trace-watch の live、各 owner-exit leftover 0)。**閉じていない**: 実行中 OP_WAIT (RUNNING+in_wait) の arm は 1 回目 (pf) で `resume not captured`・arm=1 残り (失敗の記録、RESULT_2 R1b-h3 の「残る道具の不足」)、打鍵を重ねた STOP・前景以外の張本人は PASS の証拠が無い — 3 点は現行台帳。
+
 
 | ID | 何を | 種類 | 元の行 |
 |---|---|---|---|
@@ -336,7 +337,15 @@ X-2 の前半 (e8a の RO 日本語) は `accept_e11/RESULT.md` の GUI 日本�
 
 ## H-4 (部分閉)
 
-閉鎖 (2026-10-13): 17MB planar / cirrus-off = `evidence/2026-10-10/h_R1d/RESULT.md` (gfx200_test 20 回・gfx_demo200・blit_test 11/11・bench_scale2x 全 Test・GUI 往復)、+ `2026-10-11/h_h9/RESULT.md` §2 (全画面 DISPLAY・SHM lock・font_load_test・旧 token 失効と両 SDK 再 attach); 17MB Cirrus = `2026-10-11/h_R3R6/RESULT.md` R3 (guard C・20 回・V86 往復・gdi_test) + `h_h9` §3 (alias UC); 8MB planar = `h_R3R6` R4 (shapes i/ii/iii、guard、20 回) + `h_h9` §4 (M 全通し、g の G-1/2/4/8・R-1/2) + `2026-10-11/h_small/RESULT.md` (G-3/5/6/7/9・R-3/4); 8MB PEGC = `h_R3R6` R5 + `h_h9` §5 (G-1〜G-4、guard D の両分岐 err=7 / 6); 64MB + 音源 = `h_R3R6` R6 (66MB ONLINE、`[pcm] CS4231 v=100`、pcm_test と STOP → 再 open) + `h_h9` §6 (workspace PTE 10 枚と 32MB 超の恒等写像、IMR の変化と解除)。派生 ini は t2h_cirrus / t2h_8mb / t2h_64mb_118、原本 ini と本 NHD は不変。残り (64MB 高位 buffer・GUI 再生 park/resume・PEN/DMA 読み) は現行台帳。
+閉鎖 (2026-10-13、構成 × 項目の対応表。ここに無い項目は現行台帳の H-4 に残る):
+- 17MB planar (`evidence/2026-10-10/h_R1d/RESULT.md` + `2026-10-11/h_h9/RESULT.md` §2): guard A/B/E、db、kselftest 294/0 (記録)、gfx200_test 20 回・gfx_demo200、blit_test 11/11・bench_scale2x 全 Test (S-7)、GUI (gdi_test・gui_demo・STOP・GUI/CUI 往復)、全画面 DISPLAY と窓への復帰、SHM lock 4/4、font_load_test、旧 token 失効と両 SDK 再 attach。
+- cirrus-off (`h_R1d`): `gfxmode cirrus` が pc98 planar へ fallback、gfx200_test・blit_test・db_test、drawing_failures 0・stale_lease_faults 0。
+- 17MB Cirrus (`2026-10-11/h_R3R6/RESULT.md` R3 + `h_h9` §3): hal_test cirrus、guard A/B/C、db、blit_test ×20 (packed SKIP の往復) leftover 0、V86 往復後も cirrus、gdi_test (WAB 中継)、alias UC (リニア窓 512 PTE PCD=1・U=0)。
+- 8MB planar (`h_R3R6` R4 + `h_h9` §4 + `2026-10-11/h_small/RESULT.md`): guard A/B、db、mem_map_test、hal_test ×20・blit_test 8 回、shapes i/ii/iii (final 512、P1=5、非数 P1 は FAIL $?=1)、**台本 M の全通し** (高位 HostDrv・親子・map・fault・V86・GUI・trim・STOP・全画面・FEP・次起動)、g の 8MB 台本 G-1〜G-9・R-1〜R-4 全部 PASS (G-8 = pool 0 から閉じる)、G-9 の CUI 回帰 (mem_map / sbrk_grow / malloc_arena / exec_heap / alloc_demo / db / hsync)。
+- 8MB PEGC (`h_R3R6` R5 + `h_h9` §5): guard A/B、db、shapes i/ii/iii、hal_test ×20 leftover 0、G-1〜G-4 (pages +18)、guard D の保護分岐 err=7 (R4 の err=6 と両分岐)。
+- 64MB + 音源 (`h_R3R6` R6 + `h_h9` §6): 66MB ONLINE・kselftest 295/0、`[pcm] CS4231 v=100` (SNDboard=64 の期待)、HostDrv 往復 790KB cmp 一致、親子 (shm_reuse_test 4/4・pipe_owner_test)、workspace の固定 10 枚 (sup/RW/WB/非配布) と 32MB 超の恒等写像の PTE、pcm_test 5 秒完走 → STOP → 次 open 成功、IMR の変化 (0xf3) と STOP 後の再マスク (0xf7)。
+- 共通: 派生 ini t2h_cirrus / t2h_8mb / t2h_64mb_118 (原本 ini・本 NHD は不変)、各回 `gfxmode` 明示 → 読み戻し → reset → hal_test 一致。
+
 
 | ID | 何を | 種類 | 元の行 |
 |---|---|---|---|
@@ -382,9 +391,10 @@ X-2 の前半 (e8a の RO 日本語) は `accept_e11/RESULT.md` の GUI 日本�
 |---|---|---|---|
 | X-2 | `font_load_test` の stat 段の SKIP 理由 → 次にその試験を回す前に確定 | 未実施の確認 / SKIP | 1250、1294 |
 
-## X-21
+## X-21 (部分閉)
 
-閉鎖 (2026-10-13): (a) `evidence/2026-10-11/h_h9/RESULT.md` §1 (as_extents: teardown 入口 BP で gui_demo を採取、total 3・free 29・poisoned 0、稼働像と ELF の照合つき)、GUI 中の owner 量は gshell の診断キー (`h_R1/RESULT.md` R1b-identity) で採った。(b) `tools/tests/guest_acceptance.yaml` の g-R-4 は `hook_stop_park_delta: 1` / `done_stop_park_delta: 0` に試行別で書き分け済み (h1b)、`h_R1/RESULT_2.md` R1b-stop と `h_small` R-4 で両試行 PASS。
+閉鎖 (2026-10-13): (b) だけ — `tools/tests/guest_acceptance.yaml` の g-R-4 は `hook_stop_park_delta: 1` / `done_stop_park_delta: 0` に試行別で書き分け済み (h1b)、`evidence/2026-10-10/h_R1/RESULT_2.md` R1b-stop と `2026-10-11/h_small/RESULT.md` R-4 で両試行 PASS。(a) G-4 / R-3 の trim 対象の `mem <id>` と teardown extent は**未採取** (h9 再回 §1 の as_extents は gui_demo で道具の経路を確かめただけ、台本 :1893 の対象ではない) — 現行台帳に残る。
+
 
 | ID | 何を | 種類 | 元の行 |
 |---|---|---|---|
