@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: OS32 の独立レビュアー (読み取りだけ)。PM が実装者の差分・設計票・受入条件の確認を依頼するときに使う。書き手と別のモデルであること。
+description: OS32 の独立レビュアー (読み取りだけ、Fable)。PM が実装者 (sol / astra) の差分・受入条件の確認を依頼するときに使う。Fable が書いた設計票・文書はこのエージェントに出さず astra (ROLES §2 の Codex read-only) へ。書き手と別のモデルであること。
 tools: Read, Grep, Glob, Bash
 model: fable
 ---

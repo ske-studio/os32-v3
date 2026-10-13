@@ -28,7 +28,7 @@ Which build and which verification a change actually needs: skill **`os32-build-
 
 ```bash
 make all / kernel / programs              # build (SDK and images come with `all`)
-make external                             # apps/ + game/ — after any KAPI or SDK library change
+make external                             # apps/ + game/ — not built in v3 (H-7 reopen gate, docs/tasks/v3/T2H_EXTERNAL_GATE.md); do not run until reopened
 make check-<name> / check-fast / check     # the checks named in your request / everything without mutants / everything with mutants (PM, once per landing batch) — docs/08_build.md §8-4
 make clean                                # required after a KAPI struct change ([ABI3])
 make deploy                               # HostDrv (C:\os32) — no reboot, not verification ([V1])
@@ -80,8 +80,8 @@ Guest (NP21/W): drive it through skill **`run-os32`** and `tools/np21w_mcp/`; st
 
 **External programs** — OS32X flat ELF binaries (`sdk/link/app.ld`, `sdk/crt/crt0.asm`); `main()` must be the
 **first function** in the source file. In-tree sources live under `userland/` (`cmds/` (25 commands), `shell/`,
-`system/`, `tests/`, `rust/`, `lib/`); `apps/` and `game/` are submodules built by `make external` — rebuild
-them after any KAPI **or SDK library** change.
+`system/`, `tests/`, `rust/`, `lib/`); `apps/` and `game/` are submodules built by `make external` — **not built in v3** (H-7);
+when reopened, rebuild them after any KAPI **or SDK library** change ([`T2H_EXTERNAL_GATE.md`](docs/tasks/v3/T2H_EXTERNAL_GATE.md)).
 
 ## Documentation
 
