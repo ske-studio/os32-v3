@@ -6,6 +6,7 @@
 /*  WM からアプリへのコールバック経路は作らない (契約 T1: 再入の根絶)。       */
 /* ======================================================================== */
 
+#include "serial_diag.h"
 #include "gui.h"
 #include "kstring.h"
 #include "kbd.h"      /* kbd_set_gui_mode (K2-B) */
@@ -94,6 +95,11 @@ i32 gui_call(u32 op, u32 arg)
 /*  gshell の top-level (ディスパッチの外、ring3_in_syscall = 0) で、これは  */
 /*  通る (tools/tests/ring3_guard_host.c §6)。                               */
 /* ======================================================================== */
+static void __attribute__((cold)) gui_diag_register(void)
+{
+    if (!serial_gate_active()) serial_puts_polled("[gui] register\r\n");
+}
+
 i32 gui_register(void *handler, void *pump)
 {
     if (res_owner_get() != GUI_SHELL_OWNER || ring3_call_from_user()) {
@@ -110,6 +116,7 @@ i32 gui_register(void *handler, void *pump)
      * 32 打鍵で溢れて kbd_dropped が増え、実際には落ちていない打鍵が
      * 偽の OVERFLOW として WM → アプリへ伝わる。GUI 中は積まない。 */
     kbd_set_gui_mode(1);
+    gui_diag_register();
     return 0;
 }
 

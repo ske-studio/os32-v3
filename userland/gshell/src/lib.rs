@@ -46,6 +46,11 @@
 
 extern crate os32api;
 
+#[cold]
+fn loop_notice() {
+    unsafe { (os32api::api().serial_puts)(b"[gshell] loop\r\n\0".as_ptr()); }
+}
+
 mod chrome;
 mod cursor;
 mod damage;
@@ -186,6 +191,7 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
      * は con_sink に入って CUI 画面には残らないので、WM のメッセージが利用者に
      * 届く唯一の経路。 */
     settings::startup_notice(&st.cfg);
+    loop_notice();
 
     /* ---- 単独ループ (契約 T8: アプリが居ないときは gshell が X3 を回す) ---- */
     if !standalone_loop(st) {

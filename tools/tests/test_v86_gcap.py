@@ -37,7 +37,7 @@ GCAP_C = ROOT / "kernel/v86_gcap.c"
 
 TARGET_SRCS = ["kernel/v86_gcap_math.c", "kernel/v86_gcap.c"]
 
-CASES = ["port_list", "insn", "record_order", "overflow", "in_table",
+CASES = ["phase_diag", "port_list", "insn", "record_order", "overflow", "in_table",
          "pass_ops", "decide", "mode_31k", "restore"]
 
 # -Wno-attributes: __cdecl は x86-64 のホストでは無視される (警告だけ)。
@@ -46,6 +46,7 @@ INCLUDES = ["-I" + str(ROOT / p) for p in ("sdk/include/os32", "kernel")]
 
 # 否定側。実装を 1 か所だけ壊して RED になることを見る。
 MUTATIONS = [
+    (r"after.in - before.in", "after.in", "phase delta forgets baseline"),
     (r"    if \(!set_ran\) return 1;\n    return \(\(set_ah & 0xFFU\) == 0x05U\) \? 1 : 0;",
      "    (void)set_ran; (void)set_ah;\n    return 1;",
      "③ が断られても (無変化) ④ を呼ぶ — ④ も断られると OS32 の表で同期を書き換え、"
@@ -161,6 +162,10 @@ def host_build(tmp, source_text=None):
         mut = src_dir / "kernel"
         mut.mkdir(exist_ok=True)
         (mut / "v86_gcap_math.c").write_text(source_text, encoding="utf-8")
+        (mut / "v86_gcap_diag.h").write_text((ROOT / "kernel/v86_gcap_diag.h").read_text())
+        (src_dir / "lib").mkdir(exist_ok=True)
+        (src_dir / "lib/serial_diag.h").write_text((ROOT / "lib/serial_diag.h").read_text())
+        (src_dir / "serial_diag_host.h").write_text((ROOT / "tools/tests/serial_diag_host.h").read_text())
         (mut / "v86_gcap_math.h").write_text(
             (ROOT / "kernel/v86_gcap_math.h").read_text(encoding="utf-8"),
             encoding="utf-8")

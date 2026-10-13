@@ -112,7 +112,7 @@ def main():
         for name in ('surface_query.h', 'lease.h', 'appslot.h'):
             shutil.copyfile(ROOT / 'exec' / name, tree / 'exec' / name)
         (tree / 'tools/tests').mkdir(parents=True)
-        for name in ('display_cleanup_host.c', 'boot_splash_native_host.c'):
+        for name in ('display_cleanup_host.c', 'boot_splash_native_host.c', 'serial_diag_host.h'):
             shutil.copyfile(ROOT / 'tools/tests' / name, tree / 'tools/tests' / name)
         for name, path, old, new, hits, kind, expected_fail in MUTATIONS:
             target = tree / path

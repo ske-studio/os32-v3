@@ -27,3 +27,5 @@ check-kapi-bounds-host:
 - tools/tests/gfx_bounds_cases.inc
 - tools/check_map.d/check-kapi-bounds-host.yaml
 - build/checks.d/check-kapi-bounds-host.mk
+- lib/serial_diag.h
+- tools/tests/serial_diag_host.h

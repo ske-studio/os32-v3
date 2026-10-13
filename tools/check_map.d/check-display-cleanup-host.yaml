@@ -11,3 +11,5 @@ check-display-cleanup-host:
 - tools/tests/test_display_cleanup.py
 - tools/check_map.d/check-display-cleanup-host.yaml
 - build/checks.d/check-display-cleanup-host.mk
+- tools/tests/serial_diag_host.h
+- lib/serial_diag.h

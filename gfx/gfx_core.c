@@ -1,3 +1,4 @@
+#include "serial_diag.h"
 #include "memmap.h"
 #include "gfx_internal.h"
 #include "gfx_hal.h"
@@ -45,6 +46,31 @@ GfxCounters gfx_counters = { 0, 0, 0, 0 };
 
 const GfxBackend *g_backend = &gfx_backend_pc98;
 
+static int gfx_started;
+static u32 gfx_init_gen;
+static u32 present_logged_gen;
+
+static void __attribute__((cold)) gfx_diag_init(void)
+{
+    if (serial_gate_active()) return;
+    serial_puts_polled("[gfx] init gen="); serial_diag_u32(gfx_init_gen);
+    serial_puts_polled(" be="); serial_puts_polled(g_backend ? g_backend->name : "none");
+    serial_puts_polled(" started="); serial_diag_u32(gfx_started);
+    serial_puts_polled(" bb="); serial_diag_hex(bb[0] ? V2P(bb[0]) : 0, 8);
+    serial_puts_polled(" h="); serial_diag_u32(gfx_current_height);
+    serial_puts_polled("\r\n");
+}
+
+void __attribute__((cold)) gfx_diag_first_present(u32 before)
+{
+    if (!gfx_init_gen || present_logged_gen == gfx_init_gen) return;
+    if (serial_gate_active()) return;
+    present_logged_gen = gfx_init_gen;
+    serial_puts_polled("[gfx] first present gen="); serial_diag_u32(gfx_init_gen);
+    serial_puts_polled(" bytes="); serial_diag_u32(gfx_counters.present_bytes - before);
+    serial_puts_polled("\r\n");
+}
+
 /* probe 順のバックエンド一覧。速い/高機能な順に前から並べ、最初に probe() が
  * 1 を返したものを使う (Cirrus → PEGC → 9801)。
  * 9801 の probe は常に 1 なので、末尾が必ず受け皿になる。 */
@@ -57,7 +83,7 @@ static const GfxBackend *const g_backend_list[] = {
 /* 起動設定 (/etc/system.cfg GFX=) から渡される希望バックエンド (票 H2b)。
  * kernel.c が gfx_init より前に gfx_set_backend_pref() で設定する。 */
 static int g_backend_pref = GFX_PREF_AUTO;
-static int gfx_started;
+
 STATIC_ASSERT(LEDGER_MAX_SURFACES <= 32, gfx_surface_bitmap_width);
 /* The not-ready bitmap lives with the ledger (pgalloc.c); ledger_surface_create clears it on slot reuse (e8a). */
 static u32 gfx_reinit_pending;
@@ -581,23 +607,52 @@ void gfx_bb_phys_range(u32 *base, u32 *size)
  * owner だけ)。2 回目以降 (GUI → CUI → GUI) は同じ owner なので何もしない —
  * BB は返さず保持する (R5 (b))。revoke failure / exhausted gen prevents
  * ownership transfer; the surface stays not-ready and kernel backing survives. */
+static void __attribute__((cold)) gfx_diag_client(const struct ledger_surface *sf,
+        u32 owner, u32 gen, u32 failures, int revoke, int transfer, int regen)
+{
+    if (serial_gate_active()) return;
+    serial_puts_polled("[gfx] client sid=");
+    if (sf) serial_diag_u32((u32)(sf - ledger_surfaces));
+    else serial_puts_polled("skip");
+    serial_puts_polled(" owner="); serial_diag_u32(owner);
+    serial_puts_polled("->"); serial_diag_u32(sf ? sf->owner : 0);
+    serial_puts_polled(" gen="); serial_diag_u32(gen);
+    serial_puts_polled("->"); serial_diag_u32(sf ? sf->gen : 0);
+    serial_puts_polled(" lease="); serial_diag_u32(sf ? sf->lease_count : 0);
+    const char *labels[] = {" revoke=", " transfer=", " regen="};
+    int results[] = {revoke, transfer, regen};
+    for (u32 i = 0; i < 3; i++) {
+        serial_puts_polled(labels[i]);
+        if (results[i] < 0) serial_puts_polled("skip");
+        else serial_diag_i32(results[i]);
+    }
+    serial_puts_polled(" fail+="); serial_diag_u32(gfx_reinit_fail_count - failures);
+    serial_puts_polled(" unready="); serial_diag_hex(gfx_surface_unready, 8);
+    serial_puts_polled("\r\n");
+}
+
 void __attribute__((cold)) gfx_client_to_gshell(void)
 {
     struct ledger_surface *sf =
         ledger_surface_find(gfx_sf_backend(), LEDGER_ROLE_CLIENT);
+    u32 owner = sf ? sf->owner : 0, gen = sf ? sf->gen : 0;
+    u32 failures = gfx_reinit_fail_count;
+    int revoke = -1, transfer = -1, regen = -1;
     if (sf && sf->owner != LEDGER_OWNER_GSHELL) {
         unsigned int flags = irq_save();
         u32 cr3 = paging_current_cr3(), sid = (u32)(sf - ledger_surfaces);
         paging_load_cr3(paging_kernel_pd_phys());
         gfx_surface_unready |= 1U << sid;
-        (void)lease_revoke_surface(sid);
+        revoke = lease_revoke_surface(sid);
+        /* Ledger operations return boolean success; diagnostics use rc=0. */
         if (!sf->lease_count && sf->gen != LEDGER_SURFACE_GEN_MAX &&
-            ledger_surface_transfer(sid, LEDGER_OWNER_GSHELL) &&
-            ledger_surface_regen(sid, 0)) gfx_surface_unready &= ~(1U << sid);
+            (transfer = !ledger_surface_transfer(sid, LEDGER_OWNER_GSHELL)) == 0 &&
+            (regen = !ledger_surface_regen(sid, 0)) == 0) gfx_surface_unready &= ~(1U << sid);
         else gfx_reinit_fail_count++;
         paging_load_cr3(cr3);
         irq_restore(flags);
     }
+    gfx_diag_client(sf, owner, gen, failures, revoke, transfer, regen);
     gfx_reinit_tvram();
     kselftest_run_audit("gui");
 }
@@ -847,12 +902,14 @@ void gfx_clear_planar_pages(u32 plane_size)
 
 void gfx_init(void)
 {
+    gfx_init_gen++;
     /* ⑤: GDC 初期化より前にバックエンドを決める */
     if (gfx_select_and_init_backend()) {
         gfx_bind_client(); /* bind packed init */
         gfx_reinit_surfaces(1);
         gfx_started = bb[0] != 0;
         if (g_backend->enter) g_backend->enter();
+        gfx_diag_init();
         return;   /* 9821 等: モード設定もバックバッファも init() が済ませた */
     }
 
@@ -885,10 +942,12 @@ void gfx_init(void)
 
     /* 表示出力を有効化 (9801 の enter は空)。バックエンドの選択は先頭で済み。 */
     if (g_backend && g_backend->enter) g_backend->enter();
+    gfx_diag_init();
 }
 
 void gfx_init_200(void)
 {
+    gfx_init_gen++;
     /* ⑤: GDC 初期化より前にバックエンドを決める。
      * 200 ラインは 9801 プレーン専用のモードなので、パックド系が選ばれた
      * ときはそのバックエンドのネイティブ解像度で立ち上げる (200 ラインの
@@ -898,6 +957,7 @@ void gfx_init_200(void)
         gfx_reinit_surfaces(1);
         gfx_started = bb[0] != 0;
         if (g_backend->enter) g_backend->enter();
+        gfx_diag_init();
         return;
     }
 
@@ -930,6 +990,7 @@ void gfx_init_200(void)
 
     /* 表示出力を有効化 (9801 の enter は空)。バックエンドの選択は先頭で済み。 */
     if (g_backend && g_backend->enter) g_backend->enter();
+    gfx_diag_init();
 }
 
 /* ======================================================================== */

@@ -30,6 +30,7 @@
 /*       (io/gdc.c gdc_work, vram/scrndraw.c scrndraw_draw)                  */
 /* ======================================================================== */
 
+#include "serial_diag.h"
 #include "memmap.h"
 #include "gfx_internal.h"   /* gfx.h (PAL_*_PORT), pc98.h, memmap.h, _out/_in */
 #include "gfx_hal.h"
@@ -788,6 +789,20 @@ static void pegc_diag_print(const char *tag, const PegcDiag *d)
             (unsigned int)d->vs_to);
 }
 
+static void __attribute__((cold)) pegc_diag_serial(const PegcDiag *d)
+{
+    if (serial_gate_active()) return;
+    serial_puts_polled("[pegc] enter 09a8="); serial_diag_hex(d->hs, 2);
+    const char *labels[] = {" msk=", " dsp=", " lcd=", " clk=", " ext=", " 800l=", " fifo_to=", " vs_to="};
+    u32 values[] = {d->msk, d->dsp, d->lcd, d->clk, d->ext, d->pgc, d->fifo_to, d->vs_to};
+    for (u32 i = 0; i < 8; i++) {
+        serial_puts_polled(labels[i]);
+        if (i == 3) serial_diag_hex(values[i], 1);
+        else serial_diag_u32(values[i]);
+    }
+    serial_puts_polled("\r\n");
+}
+
 static void pegc_init(void)
 {
     if (!pegc_probe()) return;
@@ -837,6 +852,7 @@ static void pegc_init(void)
      * pegc_apply_timing が実機の ROM の値で入れる (以前は起動時の BIOS 状態に
      * 頼っていた — 票 TASK_PEGC480_REALHW §2 H5、§3-3)。 */
     pegc_diag_take(&s_diag_enter);
+    pegc_diag_serial(&s_diag_enter);
 
     /* HAL 共通の状態。PEGC ではハードウェアページ切替を使わない
      * (800 ライン構成では 00A4h が使えない — pegc.h の PEGC_FF2_VRAM_800L)。 */

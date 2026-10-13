@@ -257,3 +257,21 @@ int v86g_mode_is_31k(int layout, unsigned int al)
     if (layout == V86G_LAYOUT_BIT3) return (al & 0x08U) ? 1 : 0;
     return 0;
 }
+
+V86gPhaseCounts v86g_phase_counts(const V86Gcap *g)
+{
+    return (V86gPhaseCounts){g->in_total, g->in_other, g->n_out,
+                             g->seq_next - g->in_total};
+}
+
+V86gPhaseCounts v86g_phase_delta(const V86Gcap *g, V86gPhaseCounts before)
+{
+    V86gPhaseCounts after = v86g_phase_counts(g);
+    return (V86gPhaseCounts){after.in - before.in, after.inother - before.inother,
+                             after.outrec - before.outrec, after.outexec - before.outexec};
+}
+
+int v86g_result(const V86Gcap *g)
+{
+    return (int)g->status;
+}

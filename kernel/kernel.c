@@ -6,6 +6,7 @@
  * Phase 2+: IDT/PIC/PIT + キーボード + ミニシェル
  * ============================================================ */
 
+#include "serial_diag.h"
 #include "idt.h"
 #include "tss.h"
 #include "v86.h"
@@ -88,6 +89,19 @@ extern void console_text_gdc_start(void);     /* console.c (K4): CUI 復帰で�
 extern int gui_take_next_shell(char *out, int cap);
 
 /* 文字列表示 */
+static void __attribute__((cold)) boot_diag_exec(const char *path, int rc, int gui, int streak)
+{
+    if (serial_gate_active()) return;
+    if (path) {
+        serial_puts_polled("[boot] exec "); serial_puts_polled(path);
+    } else {
+        serial_puts_polled("[boot] exec ret rc="); serial_diag_i32(rc);
+        serial_puts_polled(" gui="); serial_diag_i32(gui);
+        serial_puts_polled(" streak="); serial_diag_i32(streak);
+    }
+    serial_puts_polled("\r\n");
+}
+
 static void tvram_print(int x, int y, const char *str, u8 color)
 {
     u32 offset;
@@ -835,7 +849,9 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
                     tvram_putchar_at(col, 0, ' ', TATTR_GRAY);
             }
 
+            boot_diag_exec(cur_shell, 0, 0, 0);
             rc = exec_run(cur_shell);
+            boot_diag_exec(0, rc, is_gui, gui_fault_streak);
 
             /* gshell がロードできない (未存在、不正バイナリ等) → 警告して CUI に
              * 落ちる。fault (実行後のクラッシュ) は別扱い。要求は取り出し済みで

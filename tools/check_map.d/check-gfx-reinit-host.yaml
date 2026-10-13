@@ -22,3 +22,6 @@ check-gfx-reinit-host:
 - tools/tests/test_gfx_reinit.py
 - tools/check_map.d/check-gfx-reinit-host.yaml
 - build/checks.d/check-gfx-reinit-host.mk
+- lib/serial_diag.h
+- tools/tests/serial_diag_host.h
+- gfx/gfx_internal.h

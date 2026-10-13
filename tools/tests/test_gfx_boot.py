@@ -177,6 +177,12 @@ class GfxBoot(unittest.TestCase):
     def setUpClass(cls):
         cls.texts = load()
 
+    def test_present_lifecycle(self):
+        # Includes the real gfx_vram present entries alongside gfx_core.
+        from test_gfx_kernel_fb import run_case as lifecycle
+        out = lifecycle(None, host32.selected_runner())
+        self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
+
     def test_text(self):
         self.assertEqual(text_problems(), [])
 
@@ -245,8 +251,8 @@ MUTATIONS = [
      '        ledger_surface_find(LEDGER_SF_PC98, LEDGER_ROLE_CLIENT);\n    if (base)'),
     # ⑨ が選択中でない CLIENT を移す
     ('gshell-wrong-client', 'gfx/gfx_core.c',
-     '        ledger_surface_find(gfx_sf_backend(), LEDGER_ROLE_CLIENT);\n    if (sf && sf->owner != LEDGER_OWNER_GSHELL)',
-     '        ledger_surface_find(LEDGER_SF_PEGC, LEDGER_ROLE_CLIENT);\n    if (sf && sf->owner != LEDGER_OWNER_GSHELL)'),
+     '        ledger_surface_find(gfx_sf_backend(), LEDGER_ROLE_CLIENT);\n    u32 owner = sf ? sf->owner : 0, gen = sf ? sf->gen : 0;',
+     '        ledger_surface_find(LEDGER_SF_PEGC, LEDGER_ROLE_CLIENT);\n    u32 owner = sf ? sf->owner : 0, gen = sf ? sf->gen : 0;'),
     # RAM の面の移譲で L2 のページを移さない
     ('transfer-surface-only', 'kernel/pgalloc.c',
      '    ok = from == to || sf->backing != LEDGER_SB_RAM ||\n'

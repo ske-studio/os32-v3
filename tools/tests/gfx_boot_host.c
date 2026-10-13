@@ -48,6 +48,7 @@
  *
  *  GNU11 ([C1])。libc は使わない (-nostdlib で直接走る)。
  * ======================================================================== */
+#include "serial_diag_host.h"
 #include "types.h"
 static u32 host_cr3;
 static unsigned int host_if = 0x202U;
@@ -203,6 +204,7 @@ int lease_revoke_surface(u32 sid) { (void)sid; return 0; } /* no live AS at boot
 static u8 *bb[4], *bb_b, *bb_r, *bb_g, *bb_i;
 static void gfx_bind_client(void) { } /* binding covered by gfx_kernel_fb_host */
 int kselftest_run_audit(const char *tag) { return !ledger_selfcheck(tag); }
+#include "serial_diag.h"
 #include "gfx_boot_slice.inc"
 
 /* ---- 起動 (memory_boot_init の ③ と同じ段) ---- */
@@ -453,7 +455,15 @@ void _start(void)
 
     /* ⑨ 選択中の CLIENT だけを boot → gshell */
     for (i = 0; i < LEDGER_MAX_SURFACES; i++) snap[i] = ledger_surfaces[i];
+    u32 old_owner=cl->owner, old_gen=cl->gen;
+    host_serial_reset();
     gfx_client_to_gshell();
+    CHECK(host_serial_transition(" owner=",old_owner,cl->owner));
+    CHECK(host_serial_transition(" gen=",old_gen,cl->gen));
+    CHECK(host_serial_value("sid=") == (u32)(cl-ledger_surfaces));
+    CHECK(host_serial_hex_value(" unready=") == gfx_surface_unready);
+    CHECK(host_serial_count("[gfx] client ") == 1);
+    CHECK(host_serial_find(" lease=0 revoke=0 transfer=0 regen=0 fail+=0 "));
     CHECK(cl->owner == LEDGER_OWNER_GSHELL);
     for (i = 0; i < LEDGER_MAX_SURFACES; i++)
         if (&ledger_surfaces[i] != cl) CHECK(ledger_surfaces[i].owner == snap[i].owner);
@@ -474,7 +484,13 @@ void _start(void)
     }
     /* 2 回目 (GUI → CUI → GUI) は無操作、BB の番地も変わらない */
     for (i = 0; i < LEDGER_MAX_SURFACES; i++) snap[i] = ledger_surfaces[i];
+    host_serial_reset();
     gfx_client_to_gshell();
+    CHECK(host_serial_find(" revoke=skip transfer=skip regen=skip fail+=0 "));
+    host_serial_reset(); host_serial_gate = 1;
+    gfx_client_to_gshell();
+    CHECK(!host_serial_len && !host_serial_calls);
+    host_serial_gate = 0;
     for (i = 0; i < LEDGER_MAX_SURFACES; i++)
         CHECK(ledger_surfaces[i].owner == snap[i].owner &&
               ledger_surfaces[i].first == snap[i].first);

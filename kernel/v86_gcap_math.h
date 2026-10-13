@@ -93,4 +93,13 @@ unsigned int v86g_restore_kind(int rst_ran, unsigned int rst_ah);
 /* その並びで AL が 31kHz を表すか (ROM で戻れなかったときの OS32 側の戻し用)。 */
 int  v86g_mode_is_31k(int layout, unsigned int al);
 
+/* Internal snapshots only; the public V86Gcap ABI remains unchanged. */
+typedef struct {
+    u32 in, inother, outrec, outexec;
+} V86gPhaseCounts;
+V86gPhaseCounts v86g_phase_counts(const V86Gcap *g);
+V86gPhaseCounts v86g_phase_delta(const V86Gcap *g, V86gPhaseCounts before);
+/* Keep failed captures as reference data; the status is never promoted. */
+int v86g_result(const V86Gcap *g);
+
 #endif /* __V86_GCAP_MATH_H */

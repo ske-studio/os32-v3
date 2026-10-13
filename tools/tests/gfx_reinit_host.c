@@ -95,7 +95,9 @@ static void run(void)
     host_cr3=space.pd_phys;
     CHECK(caller_access_enter(&previous,CALLER_USER));
     host_cr3=paging_kernel_pd_phys();
+    host_serial_reset();
     gfx_set_backend_pref(GFX_PREF_PC98);gfx_init();
+    diag_present_check(1);
     struct ledger_surface *pc=ledger_surface_find(LEDGER_SF_PC98,LEDGER_ROLE_CLIENT);
     struct ledger_surface *pegc=ledger_surface_find(LEDGER_SF_PEGC,LEDGER_ROLE_CLIENT);
     struct surface_ref unrelated=ref_of(pegc);
@@ -116,7 +118,9 @@ static void run(void)
         host_arch_if=caller_flags;
         host_cr3=caller_root;watching=1;seen_bind=0;
         pixels_prepare();
+        host_serial_reset();
         gfx_init_200();
+        if (mode == 0) diag_present_check(0);
         watching=0;
         CHECK(host_cr3 == caller_root && host_arch_if == caller_flags);
         host_arch_if=0x202U;
@@ -226,7 +230,22 @@ static void run(void)
     host_cr3=paging_kernel_pd_phys();host_arch_if=0x202U;
     CHECK(pc->owner == LEDGER_OWNER_GSHELL && pc->gen == before+1 && !pc->lease_count);
     CHECK(lease_release(&other,bv.token) == LEASE_INVAL);
+    struct ledger_surface *tv = ledger_surface_find(LEDGER_SF_PC98,LEDGER_ROLE_DISPLAY);
+    CHECK(tv);
+    u32 tvgen = tv->gen, tv_unready = gfx_surface_unready;
+    tv->role = LEDGER_ROLE_TVRAM;
+    tv->gen = LEDGER_SURFACE_GEN_MAX;
+    u32 before_fail = gfx_reinit_fail_count;
+    host_serial_reset();
     gfx_client_to_gshell();CHECK(pc->gen == before+1);
+    CHECK(host_serial_find(" revoke=skip transfer=skip regen=skip fail+=0 "));
+    CHECK(gfx_reinit_fail_count == before_fail+1);
+    tv->gen = tvgen; tv->role = LEDGER_ROLE_DISPLAY;
+    gfx_surface_unready = tv_unready;
+    host_serial_reset(); host_serial_gate=1;
+    gfx_client_to_gshell();
+    CHECK(!host_serial_len && !host_serial_calls);
+    host_serial_gate=0;
     /* Exhausted generation remains unpublishable; kernel alias stays usable. */
     pc->gen=0xffffffffU;
     u32 fails=gfx_reinit_fail_count;
@@ -274,7 +293,12 @@ static void run(void)
         borrow(&other,&ref,1,LEDGER_ROLE_CLIENT,backends[k],&bv);
         saved=other.leases[0].base;other.leases[0].base=MEM_LEASE_END-PAGE_SIZE;
         host_cr3=space.pd_phys;host_arch_if=k ? 2U : 0x202U;
+        host_serial_reset();
         gfx_client_to_gshell();
+        CHECK(host_serial_find(" revoke=1 transfer=skip regen=skip fail+=1 "));
+        CHECK(host_serial_transition(" owner=",owner,sf->owner));
+        CHECK(host_serial_transition(" gen=",ref.generation,sf->gen));
+        CHECK(host_serial_value(" lease=") == sf->lease_count);
         CHECK(host_cr3 == space.pd_phys && host_arch_if == (k ? 2U : 0x202U));
         CHECK(sf->owner == owner && sf->gen == ref.generation);
         CHECK(gfx_surface_source(LEDGER_ROLE_CLIENT,&fresh) == OS32_ERR_INVAL);
@@ -282,7 +306,10 @@ static void run(void)
         other.leases[0].base=saved;CHECK(!lease_revoke_all(&other));
         sf->gen=LEDGER_SURFACE_GEN_MAX;
         host_cr3=space.pd_phys;
+        host_serial_reset();
         gfx_client_to_gshell();
+        CHECK(host_serial_find(" revoke=0 transfer=skip regen=skip fail+=1 "));
+        CHECK(host_serial_transition(" gen=",LEDGER_SURFACE_GEN_MAX,sf->gen));
         CHECK(host_cr3 == space.pd_phys && host_arch_if == 0x202U);
         CHECK(sf->owner == owner && sf->gen == LEDGER_SURFACE_GEN_MAX);
         CHECK(gfx_surface_source(LEDGER_ROLE_CLIENT,&fresh) == OS32_ERR_INVAL);

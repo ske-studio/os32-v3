@@ -1,4 +1,5 @@
 /* Real target bodies; only MMIO and unused dependencies are substituted. */
+#include "serial_diag_host.h"
 #include "types.h"
 #include "memmap.h"
 #include "tvram.h"

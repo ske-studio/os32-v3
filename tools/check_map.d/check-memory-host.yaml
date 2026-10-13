@@ -118,3 +118,13 @@ check-memory-host:
 - userland/rust/libos32gui_stub/src/widget.rs
 - userland/rust/libos32gui_stub/src/window.rs
 - exec/owner_diag.h
+- lib/serial_diag.h
+- tools/tests/serial_diag_host.h
+- gfx/gfx_internal.h
+- exec/access_walk.c
+- exec/surface_query.c
+- gfx/backend_pc98.c
+- gfx/gfx_scroll.c
+- gfx/gfx_vram.c
+- tools/tests/gfx_kernel_fb_host.c
+- tools/tests/test_gfx_kernel_fb.py
