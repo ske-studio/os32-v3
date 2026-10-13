@@ -174,7 +174,7 @@ T3 前の文書再整備の候補・未解決点は [DOCS_REORG_T3](tasks/v3/DOC
 
 | ドキュメント | 内容 |
 |-------------|------|
-| [tasks/agents/HANDOVER_2026-10-09.md](tasks/agents/HANDOVER_2026-10-09.md) | **引き継ぎ 2026-10-09 (現行)** — f13 (a/b/c) の取り込み・受入後の現在地 (次は T2g)、次の一手、段をまたぐ道具と罠。入口だけ (50 行以内) |
+| [tasks/agents/HANDOVER_2026-10-09.md](tasks/agents/HANDOVER_2026-10-09.md) | **引き継ぎ 2026-10-09 (現行)** — T2h R0〜R7 一巡後の現在地 (次は h9 の締め・反省会)、次の一手、段をまたぐ道具と罠。入口だけ (50 行以内) |
 | [tasks/agents/REVIEW_2026-10-06.md](tasks/agents/REVIEW_2026-10-06.md) | **開発体制の見直し 2026-10-06 — 完了記録** — 遅さの原因 (根拠つき)、決めたこと、残りの作業 a〜e |
 | [tasks/DEFERRED_TESTS.md](tasks/DEFERRED_TESTS.md) | **持越し台帳** — 延ばした試験・SKIP・ホストだけの合格・未結線を 1 か所に |
 | [archive/agents/HANDOVER_2026-09-30.md](archive/agents/HANDOVER_2026-09-30.md) | 引き継ぎ 2026-09-30 (os32-v3 の初日、履歴) |
