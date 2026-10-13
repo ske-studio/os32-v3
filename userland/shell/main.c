@@ -20,6 +20,7 @@ KernelAPI *g_api;
 /* ------------------------------------------------------------------------ */
 int sh_exit_flag = 0;
 int sh_exit_code = 0;
+int sh_in_sfs = 0;
 
 /* `$?`。環境変数表には入れない (子に継承させない、票 §2-4)。 */
 static int g_last_status = SH_STATUS_OK;

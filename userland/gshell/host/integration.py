@@ -42,6 +42,20 @@ def build(gshell: Path, name: str, quiet: bool = False) -> Path:
 # 票 KBD_NAV (docs/tasks/gui/TASK_KBD_NAV.md) の受け入れ K1 の変異。
 # (名前, ファイル, 置き換え前 (ちょうど 1 か所), 置き換え後, RED になるべき試験の絞り込み)
 MUTATIONS = [
+    ('gserial deadline reversed', 'src/gserial.rs', '(st.now.wrapping_sub(st.gserial.deadline) as i32) >= 0', '(st.now.wrapping_sub(st.gserial.deadline) as i32) < 0', 'gserial_watchdog'),
+    ('gserial break omitted', 'src/gserial.rs', 'out[n] = raw(scan, false, mods); n += 1;', 'out[n] = 0; n += 1;', 'gserial_queue_atomic'),
+    ('gserial length unchecked', 'src/gserial.rs', 'if q.len == LINE_MAX { q.long = true; }', 'if q.len == LINE_MAX { q.long = false; }', 'gserial_framing'),
+    ('gserial SOH keeps fragment', 'src/gserial.rs', 'q.synced = true; q.len = 0; q.junk = false;', 'q.synced = true; q.junk = false;', 'gserial_framing'),
+    ('gserial controls accepted', 'src/gserial.rs', 'if !(0x20..=0x7e).contains(&b) { q.junk = true; }', 'if false { q.junk = true; }', 'gserial_framing'),
+    ('gserial prior pending ignored', 'src/gserial.rs', '4 + 2 * st.pending_raw_n + n_ev', '4 + n_ev', 'gserial_pending'),
+    ('gserial modifiers undercounted', 'src/gserial.rs', 'let n_raw = st.gserial.lengths[0] as usize;', 'let n_raw = 2;', 'gserial_pending'),
+    ('gserial notification tagged as response', 'src/gserial.rs', 'reply(b"!", format_args!("{}", message))', 'reply(b"aBcD0123", format_args!("{}", message))', 'gserial_cui_two'),
+    ('gserial response ID omitted', 'src/gserial.rs', 'write!(line, "gs:{} {}", id, args)', 'write!(line, "gs: {}", args)', 'gserial_config_default'),
+    ('gserial atomic capacity removed', 'src/gserial.rs', 'if q.keys+nk > KEY_MAX || q.raws+nr > RAW_MAX { return Err("full"); }', 'if q.keys+nk > KEY_MAX || q.raws+nr > RAW_MAX { return Ok(nk); }', 'gserial_queue_atomic'),
+    ('gserial hold discards queue', 'src/gserial.rs', 'if st.pending_raw.len() - st.pending_raw_n < n_raw { break; }', 'if st.pending_raw.len() - st.pending_raw_n < n_raw { st.gserial.keys = 0; st.gserial.raws = 0; break; }', 'gserial_pending'),
+    ('gserial cfg failure keeps watchdog', 'src/lib.rs', '        gserial::disarm(st);\n', '', 'gserial_watchdog_cfg_failure'),
+    ('gserial lost not counted', 'src/gserial.rs', 'st.inj_lost = st.inj_lost.wrapping_add(1);', 'let _ = st;', 'gserial_lost'),
+
     ('fullscreen diagnostics bypassed', 'src/input.rs',
      '        if ctx.wm_ui() && crate::diagnostics::shortcut(scan, mods) {',
      '        if false && ctx.wm_ui() && crate::diagnostics::shortcut(scan, mods) {',

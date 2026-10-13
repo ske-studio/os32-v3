@@ -428,6 +428,7 @@ static void build_api(void)
 /* ---- ui.c の周辺 (sh_redraw.inc が引くもの) ---------------------------- */
 
 int sh_exit_flag = 0;
+int sh_in_sfs = 0;
 /* 票 TASK_EXIT_STATUS: 要求と値は別の変数。`$?` の実体もここに置く
  * (main.c を取り込まない試験なので、実体だけ同じ形で用意する)。 */
 int sh_exit_code = 0;

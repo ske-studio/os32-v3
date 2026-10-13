@@ -135,7 +135,7 @@ static SC2A_SHIFT: [u8; 128] = [
 ];
 
 /// スキャンコード + 修飾 → ASCII (drivers/kbd.c と同じ規則。無ければ 0)。
-fn translate(scan: u8, mods: u32) -> u8 {
+pub(crate) fn translate(scan: u8, mods: u32) -> u8 {
     let i = (scan & 0x7F) as usize;
     let mut a = if (mods & MOD_SHIFT) != 0 { SC2A_SHIFT[i] } else { SC2A[i] };
     if (mods & MOD_CAPS) != 0 {
@@ -253,6 +253,17 @@ pub fn focus_target(st: &GuiState) -> Option<Target> {
         cox,
         coy,
     })
+}
+
+/// Inverse of the same tables used for local raw keys (GSERIAL §2-5).
+pub(crate) fn ascii_key(ch: u8) -> Option<(u8, u32)> {
+    if !(0x20..=0x7e).contains(&ch) { return None; }
+    for mods in [0, MOD_SHIFT] {
+        for scan in 0..128 {
+            if translate(scan, mods) == ch { return Some((scan, mods)); }
+        }
+    }
+    None
 }
 
 /* ================================================================ */
@@ -395,6 +406,7 @@ pub(crate) fn capture_keyboard(st: &mut GuiState, ctx: Ctx) {
                 break;
             } else if let Some(t) = focus_target(st) {
                 ring::add_dropped(st, t.slot, 1);
+                crate::gserial::lost(st);
             }
             continue;
         }
@@ -443,6 +455,8 @@ pub(crate) fn capture_keyboard(st: &mut GuiState, ctx: Ctx) {
                 let owner = unsafe { (os32api::api().gfx_screen_owner)() };
                 if unsafe { (os32api::api().kbd_inject)(&ch, 1) } > 0 {
                     crate::multiapp::note_injected_key(owner);
+                } else {
+                    crate::gserial::lost(st);
                 }
             }
             continue;

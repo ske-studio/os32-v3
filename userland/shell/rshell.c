@@ -606,7 +606,9 @@ static int sfs_run_child(const char *child)
 
     /* 子の中の `sfs run` は組込みが断る (sfs_begin も BUSY)。子の行の中の
      * パイプやリダイレクトはセッションの中で普通に動く */
+    sh_in_sfs = 1;
     status = execute_command(child);
+    sh_in_sfs = 0;
 
     /* 子がどう終わってもここへ来る。**ここより後は何も出さない** —
      * ゲートを下ろした後の文字はフレームの外の生の文字としてホストへ行く */

@@ -347,6 +347,11 @@ static int  g_open_log_len;
 static int  g_open_calls;
 static u32  g_data_written;
 static int  g_data_writes;
+static char g_cfg_written[1152 + 1];
+static int g_cfg_write_fail;
+static int g_switch_calls, g_switch_rc, g_exit_calls;
+static int g_sfs_begin_rc, g_sfs_end_calls, g_sfs_end_status;
+static int g_sfs_end_in_sfs;
 
 static void files_reset(void)
 {
@@ -361,6 +366,8 @@ static void files_reset(void)
     g_open_calls = 0;
     g_data_written = 0;
     g_data_writes = 0;
+    g_cfg_written[0] = '\0';
+    g_cfg_write_fail = 0;
 }
 
 /* <want> という綴りで open されたか */
@@ -446,6 +453,8 @@ static void __cdecl h_mem_free(void *p) { (void)p; g_frees++; }
 static int __cdecl h_sys_open(const char *path, int flags)
 {
     int i;
+    if (g_cfg_write_fail && flags != KAPI_O_RDONLY &&
+        strcmp(path, SYS_SYSTEM_CFG) == 0) return -1;
     g_open_calls++;
     for (i = 0; path[i] && g_open_log_len < OPEN_LOG_CAP - 2; i++)
         g_open_log[g_open_log_len++] = path[i];
@@ -485,6 +494,12 @@ static int __cdecl h_sys_write(int fd, const void *buf, u32 size)
          * 「切れた設定を書き戻していないか」(T22) の窓。 */
         g_data_written += size;
         g_data_writes++;
+        if (fd >= FD_BASE && fd - FD_BASE < g_file_count &&
+            strcmp(g_files[fd - FD_BASE].path, SYS_SYSTEM_CFG) == 0 &&
+            size < (u32)sizeof(g_cfg_written)) {
+            memcpy(g_cfg_written, buf, size);
+            g_cfg_written[size] = '\0';
+        }
     }
     return (int)size;
 }
@@ -986,6 +1001,26 @@ static int  __cdecl h_console_get_cursor_y(void)   { return 0; }
 static void __cdecl h_console_set_cursor(int x, int y) { (void)x; (void)y; }
 static void __cdecl h_tvram_clear(void) {}
 
+static int __cdecl h_sys_switch_shell(const char *path)
+{
+    check(strcmp(path, SYS_GSHELL_BIN) == 0, "GSERIAL switch uses gshell path");
+    g_switch_calls++;
+    return g_switch_rc;
+}
+static void __cdecl h_sys_exit(int rc)
+{
+    check(rc == 0, "GSERIAL switch exits with zero");
+    g_exit_calls++;
+}
+static int __cdecl h_sfs_begin(void) { return g_sfs_begin_rc; }
+static int __cdecl h_sfs_end(int status)
+{
+    g_sfs_end_calls++;
+    g_sfs_end_status = status;
+    g_sfs_end_in_sfs = sh_in_sfs;
+    return 0;
+}
+
 static KernelAPI g_fake;
 KernelAPI *g_api;
 
@@ -1056,6 +1091,10 @@ static void build_api(void)
     g_fake.console_get_cursor_y = h_console_get_cursor_y;
     g_fake.console_set_cursor = h_console_set_cursor;
     g_fake.tvram_clear = h_tvram_clear;
+    g_fake.sys_switch_shell = h_sys_switch_shell;
+    g_fake.sys_exit = h_sys_exit;
+    g_fake.sfs_begin = h_sfs_begin;
+    g_fake.sfs_end = h_sfs_end;
     g_api = &g_fake;
 }
 
@@ -1235,6 +1274,11 @@ static void fresh(void)
     g_popup[0] = '\0';
     sh_exit_flag = 0;
     sh_exit_code = 0;
+    sh_in_sfs = 0;
+    g_switch_calls = g_exit_calls = 0;
+    g_switch_rc = 0;
+    g_sfs_begin_rc = g_sfs_end_calls = g_sfs_end_status = 0;
+    g_sfs_end_in_sfs = 0;
     sh_refused_flag = 0;
     g_glob_alloc_budget = -1;
     g_glob_allocs = 0;
@@ -2038,6 +2082,99 @@ static void case_s14_s15_records(void)
 /* ========================================================================
  *  R2 — 実物の登録表を通っていることの確認
  * ======================================================================== */
+static int gui_timeout(const char *seconds)
+{
+    char *argv[] = { "os32gui", "-t", (char *)seconds };
+    return cmd_os32gui(3, argv);
+}
+
+static void case_gserial_gui(void)
+{
+    char *plain[] = { "os32gui" };
+    char *on[] = { "os32gui", "on" };
+    char *off[] = { "os32gui", "off" };
+    char *missing[] = { "os32gui", "-t" };
+    char *extra[] = { "os32gui", "-t", "20", "extra" };
+    const char *invalid[] = { "", "-1", "+1", "abc", "1x", "21474837",
+                              "4294967296", "999999999999999999999999" };
+    int i;
+
+    report("GSERIAL os32gui timeout / SerialFS guard\n");
+    fresh();
+    file_add(SYS_SYSTEM_CFG, "GUI=1\nOTHER=keep\nGSERIAL_TIMEOUT=7\n");
+    check(gui_timeout("20") == 0 && g_switch_calls == 1 && g_exit_calls == 1,
+          "GSERIAL -t 20 persists timeout then enters GUI");
+    check(strcmp(g_cfg_written, "GUI=1\nOTHER=keep\nGSERIAL_TIMEOUT=20\n") == 0,
+          "GSERIAL replaces only timeout and preserves other settings");
+    fresh();
+    check(gui_timeout("0") == 0 && g_switch_calls == 1 && g_exit_calls == 1 &&
+          strcmp(g_cfg_written, "GSERIAL_TIMEOUT=0\n") == 0,
+          "GSERIAL -t 0 disables watchdog and enters GUI");
+    fresh();
+    check(gui_timeout("21474836") == 0 && g_switch_calls == 1,
+          "GSERIAL accepts maximum wrap-safe timeout");
+    for (i = 0; i < (int)(sizeof(invalid) / sizeof(invalid[0])); i++) {
+        fresh();
+        check(gui_timeout(invalid[i]) == SH_STATUS_USAGE && !g_switch_calls &&
+              !g_exit_calls && !g_data_writes,
+              "GSERIAL invalid timeout cannot change cfg or enter GUI");
+    }
+    fresh();
+    check(cmd_os32gui(2, missing) == SH_STATUS_USAGE &&
+          cmd_os32gui(4, extra) == SH_STATUS_USAGE && !g_switch_calls && !g_data_writes,
+          "GSERIAL -t requires exactly one value");
+    fresh();
+    g_cfg_write_fail = 1;
+    check(gui_timeout("20") == SH_STATUS_ERROR && !g_switch_calls && !g_exit_calls,
+          "GSERIAL cfg failure blocks GUI entry");
+    fresh();
+    g_switch_rc = OS32_ERR_INVAL;
+    check(gui_timeout("20") == SH_STATUS_ERROR && g_switch_calls == 1 && !g_exit_calls,
+          "GSERIAL denied switch does not exit");
+    fresh();
+    check(cmd_os32gui(1, plain) == 0 && g_switch_calls == 1 && g_exit_calls == 1 &&
+          !g_data_writes, "GSERIAL legacy bare os32gui still enters without cfg write");
+    fresh();
+    sh_in_sfs = 1;
+    check(cmd_os32gui(1, plain) == SH_STATUS_ERROR &&
+          gui_timeout("20") == SH_STATUS_ERROR && !g_switch_calls && !g_exit_calls &&
+          !g_data_writes && out_has("os32gui: not inside 'sfs run'"),
+          "GSERIAL GUI entry denied within SFS including -t");
+    check(cmd_os32gui(2, on) == 0 && strcmp(g_cfg_written, "GUI=1\n") == 0 &&
+          !g_switch_calls, "GSERIAL on remains allowed inside SFS");
+    check(cmd_os32gui(2, off) == 0 && strcmp(g_cfg_written, "GUI=0\n") == 0 &&
+          !g_switch_calls, "GSERIAL off remains allowed inside SFS");
+#ifndef SHELL_AS_APP
+    fresh();
+    g_fake.version = KAPI_VERSION;
+    check(sfs_run_child("time os32gui -t 20") == SH_STATUS_ERROR &&
+          !g_switch_calls && !g_exit_calls && !g_data_writes &&
+          g_sfs_end_calls == 1 && g_sfs_end_status == SH_STATUS_ERROR &&
+          !sh_in_sfs && !g_sfs_end_in_sfs,
+          "GSERIAL nested execute cannot escape SFS and gate is closed");
+    fresh();
+    check(sfs_run_child("os32gui on") == 0 && !g_switch_calls &&
+          g_sfs_end_calls == 1 && !sh_in_sfs,
+          "GSERIAL SFS cfg-only command completes normally");
+    fresh();
+    check(sfs_run_child("exit 7") == 7 && g_sfs_end_calls == 1 &&
+          g_sfs_end_status == 7 && !sh_in_sfs,
+          "GSERIAL exit child clears SFS flag before cleanup");
+    fresh();
+    prog_add("fault.bin", EXEC_KIND_FAULT, 0);
+    check(sfs_run_child("fault.bin") == SH_STATUS_FAULT && g_sfs_end_calls == 1 &&
+          g_sfs_end_status == SH_STATUS_FAULT && !sh_in_sfs && !g_sfs_end_in_sfs,
+          "GSERIAL fault child clears SFS flag before cleanup");
+    fresh();
+    g_sfs_begin_rc = OS32_ERR_IO;
+    check(sfs_run_child("os32gui") == SH_STATUS_ERROR &&
+          !sh_in_sfs && !g_switch_calls && !g_sfs_end_calls,
+          "GSERIAL failed SFS begin never enters child");
+    g_fake.version = 0;
+#endif
+    fresh();
+}
+
 static void case_r2_real_table(void)
 {
     int n = 0;
@@ -2113,6 +2250,7 @@ void _start(void)
     case_profile_status();
     case_s13_zero_rows();
     case_s14_s15_records();
+    case_gserial_gui();
 
     if (failures) {
         report("SOME FAIL\n");
