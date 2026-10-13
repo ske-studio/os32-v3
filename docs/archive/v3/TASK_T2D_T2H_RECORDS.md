@@ -3629,3 +3629,29 @@ tvdump: `/api/cmd` で取った生バイトが TVDM 80×25・4,000 B、内容は
 - shlib 119 番に detach、120 本。gdi_test の両実体 rollback、Unicode の二重取得を除去。protocol/ABI 世代は不変。
 - ユーザー utf8 は NULL 開始、t5a_display の静的実体も port 初期化。ring3_guard F の有効書込と revoke 後 kill を追加。
 - ホスト証拠・予算・指定検査は `~/os32-tmp/run/e11/c2_report.md`。ゲストは台帳 E11-1/6/A1 と guest_acceptance の e11c2-* で PM 受入。
+
+## T2h 受入 (2026-10-10〜13)
+
+> 票 [TASK_T2D_T2H §5-1](../../tasks/v3/TASK_T2D_T2H.md) から 2026-10-14 に移した (反省会の決定、DOCS_REORG_T3 §5)。票には回ごとに合否 1 語と証拠だけを残した。
+
+**L-h 着地 (2026-10-10、f1bd680)**: h0t・h1・h1b・h2・h3b・h4a〜c (各段 Fable レビュー Approve、h4b は P1 1 件を直して再確認) と P3 の小直しを統合、`make clean → all` / `make check` rc=0。KAPI 74・MemStat 200B・製品 kernel +888B (h 枠の上限 900B)。H-10 は h0t で閉じた。受入の回で PM が守ること: 「記録」型の expect は PASS に数えない、R4 で h2 (i) が add<16 page に当たったら仕様の分岐として扱う (fixture で直さない)、R4 の記録に free0 と need pages、5b は wait 起きに限る、R1c の初回 derive は DrvFs で rc と生成物を照合。証拠 `~/os32-tmp/run/h/`
+
+**R1a/R1b (2026-10-10、f1bd680、本 NHD)**: 部分合格 — ver v74・kselftest 295/0・mem 新 3 行・owner-start/exit 対・E10-6 IF=0 (FLAGS 0x3046)・h2 拒否 6 本・h3 mode 1〜4 は PASS。h3fix 候補 2 件と道具の小直し 2 件 (MCP `emu_key` の `+`、mem_stat_test の一括) は h3fix 段へ。未実施は R1a の S-5/S-6/S-7/H-6a/M 全通し、R1b の stop/fullscreen/tvdump/perf/bud/KAPI-loop — h3fix の後の R1b 再回で。証拠 `~/os32-tmp/evidence/2026-10-10/h_R1/RESULT.md`
+
+**R1a/R1b 再回 (同日、50a5a94 の道具)**: regress (mem_stat_test 一括 18/18)・h3 mode 1〜6・stop 3 試行 (g-G-7 / g-R-4 hook 中 +1・DONE 直後 +0)・E10-1/E11-9 (PT0 MATCH)・bud・S-5 は PASS。記録: H-6a・E11-BUD (kheap_peak 134,872B / 180,224B)・perf (E10-4 は観測不能)。未実施: identity の旧世代拒否と as_extents、fullscreen/tvdump (端末アプリが v3 に無い H-7)、M の単一全通し。h3 の道具の残り: arm 時に fixture が前景 (RUNNING+in_wait) だとクリックで resume しない (回避: 別窓を前景にして PARKED にしてから arm)。証拠 `RESULT_2.md`
+
+**R1d (同日)**: planar・cirrus-off とも PASS (ini 不変、gfxmode で切替・PEGC に復帰、kselftest planar 294/0 は記録)、未実施は全画面 DISPLAY・alias UC・旧 token 失効。**R0 (同日、派生 ini 経路 — ユーザー決定で U8 の trial を置換、FLM 不応答のため)**: 新 NHD `os32_t2h_install.nhd` に cdinst Full で install PASS (API v74・kselftest 295/0・hsync --verify で 196 件一致、違いは /boot/vmkernel.lz4 の日時のみ)、本 NHD hash 不変、derive 初回は DrvFs で rc=0・差分 HDD1FILE 1 行。未実施: h-R0-lzss (試験 PKG を媒体に載せる手段が無い)、winoptin 残り 4 件の特定、X-3。証拠 `~/os32-tmp/evidence/2026-10-10/h_R1d/`・`h_R0/`
+
+**R1c (同日、隔離 NHD — ユーザー承認「気にせず上書き」)**: R1c-1 5 本 (hook 7 本) と R1c-2 の oldshell・oldshlib・各 restore・verify-stale、S-6 (host_test 26/26) は PASS、本 NHD hash 不変。**予行 (U3) は FAIL** — HostDrv の配備元の名札外ファイルを hsync が写した (余剰 109/2) のと、配備のたびのカーネル再ビルドで deploy-set.json と hash が食い違う。verify-set の allow_list を「必須」と読む不具合 (L-h の PM 判断の誤り) も → h1c で直してから予行だけ再回。証拠 `~/os32-tmp/evidence/2026-10-10/h_R1c/`
+
+**予行の再回 (2026-10-11、6172b02)**: PASS (deploy-u3 で FD と HostDrv が同じ build、配備元の余剰 0、2 段同期と --verify 2 本で errors/extra 0、verify-set 201 件一致、HDD 起動の ver が deploy-u3 の build と一致、本 NHD hash 不変)。R7 への注記: HostDrv の配備元 `C:\os32` は作業場を兼ねて名札外 (私物を含む) が常にある — 実機の更新では配備元を専用の dir にするか、退避して戻す手順を R7 の台本に書く。証拠 `~/os32-tmp/evidence/2026-10-11/h_R1c_rehearsal/`
+
+**R3〜R6 (2026-10-11、派生 ini、原本 ini・本 NHD 不変)**: FAIL 0。R4 shapes PASS (i/ii/iii とも final_private 512、P1=5)、R3・R4 planar・R5・R6 は部分 PASS (hal_test で backend 一致、guard・db・20 回往復 leftover 0、R6 は 66MB ONLINE・`[pcm] CS4231 v=100`・pcm_test 再生と STOP→再 open)。前回の v=101 は原本 SNDboard=8 のときの値。記録: R4 guard-d (保護分岐を得られず)。未実施: 各回の M 全通し・alias UC、R4 の g 8MB 台本、R5 の G-1〜G-4、R6 の workspace PTE・高位 buffer の通過・PEN/DMA/IRQ・GUI park/resume。派生 ini は t2h_cirrus / t2h_8mb / t2h_64mb_118。証拠 `~/os32-tmp/evidence/2026-10-11/h_R3R6/`
+
+**h9 の再回 (2026-10-11)**: 17MB PEGC の M 全通し・alias UC・identity の旧世代拒否・as_extents、17MB planar の全画面 DISPLAY・SHM lock・font_load_test・旧 token 失効と再 attach、Cirrus の alias UC (リニア窓 512 PTE PCD=1・U=0)、8MB planar の M 全通し、8MB PEGC の G-1〜G-4 と guard D 保護分岐 (err=7、R4 の err=6 と両分岐)、64MB の workspace PTE は PASS。8MB の g は G-1/2/4/8・R-1/2 PASS、G-3 は部分 (窓の重なりで 1 本だけ arm)、R-3 は 1 回目 FAIL (front が free 0 を抱えたまま regrow — 操作順の誤り) → 2 回目 PASS。PEN/DMA/IRQ は部分 (IMR の変化と STOP 後の解除、PEN/DMA マスクは読む API が無い)。渡す: 64MB の高位 buffer 通過 (32MB 超に I/O buffer を置く fixture が無い)・GUI での再生の park/resume (fixture 無し)。気づき: 全画面 gdi_test の間は gshell の診断キーの出力がシリアルに出ない → 原因は `input.rs` の全画面の枝が診断キーの処理より前にあったこと、diagkey (2026-10-11、Fable Approve) で直した、ゲストでの確認は次の受入で。8MB の g の残り (G-3/5/6/7/9・R-3・R-4) は 2026-10-11 に全部 PASS (`~/os32-tmp/evidence/2026-10-11/h_small/`)。証拠 `~/os32-tmp/evidence/2026-10-11/h_h9/`
+
+**X-3 を閉じた (2026-10-11)**: GitHub Actions の check が f7/f8 (2026-10-07) 以来 failure だった — CI のクロス無し (`OS32_CLANG_CROSS_FREE=1`) で make dry-run が f7 で入った newlib の libc.a を要求。ci-fix (d3c74ff) で check・build とも success。
+
+**R7 (2026-10-12、実機 Ra266、9545e27)**: 修正版 B で更新 — 新 FD 起動 (シリアルの reboot で) → SerialFS で全体 (22m49s、copied 124) と /sys (copied 2) → `--verify` 2 本とも copied 0・errors 0・extra 0 → HDD 起動で v74・selftest 295/0。**R7a 合格**: 回帰一式・mem の前後 (leftover/irq/exc/bad_free/fault 0、free 不変)・SerialFS・更新前に #PF で落ちた bench_scale2x / blit_test が正常 (H-5 は Test1/2 が更新前と ±10% 内)・pcm_test は鳴った (ただし不規則な音切れ → R7-2)。**R7b 合格 (planar・24kHz で)**: gui_demo / gdi_test の日本語・全画面 gfx200_test と窓への復帰・CTRL+STOP と再起動・診断キー (全画面中も出る = diagkey を実機で確認)、owner-exit 4 本とも leftover 0。GFX=pegc + 24kHz では GUI が真っ暗 (R7-1)。所見 R7-1〜R7-4 は台帳。手順の学び: 再起動はシリアルの `cmd reboot`、起動待ちの連続ポーリング禁止、rshell から入れ子の sh を起動しない、HDD 起動では `hsync --root /hd0` でなく `hsync`。証拠はノート `~/os32-r7/`
+
+**h9 (2026-10-13、Fable 5.1、文書だけ)**: 台帳の全行を R0〜R7 の RESULT と照合 — 閉 21 + 部分閉 10 (合格した部分、閉鎖台帳「T2h R0〜R7」へ、台帳から消した F-14・X-19・X-3・H-10 も追記)、渡す 21 (関門つき: 次のゲスト受入 8・後続の段 12・実機 1、astra レビュー r1 の P1 3 件 X-21(a)・H-4 構成別・H-2 実行中 OP_WAIT の arm を反映)、持越し 3 (H-7・S-4・E11-A3)、実機の所見 4 (R7-1 はカーネル層の不具合として T3 より先に直す候補)。分類の一覧 `~/os32-tmp/run/h/h9/H9_CLASSIFY.md`。`guest_acceptance.yaml` の status 化と HANDOVER は PM

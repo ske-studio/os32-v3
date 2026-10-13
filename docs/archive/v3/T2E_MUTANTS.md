@@ -1,9 +1,9 @@
 # T2e 変異対応表 — e12
 
-正典: [T2d〜T2h §2-5 / §6-2](TASK_T2D_T2H.md)。2026-10-07、基点 `83f2db7`。
+正典: [T2d〜T2h §2-5 / §6-2](../../tasks/v3/TASK_T2D_T2H.md)。2026-10-07、基点 `83f2db7`。
 試験は `tools/tests/test_<名前>.py` の実ソース / fixture 変異。
 ホストの MMU / I/O 足場では実デバイスを証明できないため、ゲスト構成別台本は
-`tools/tests/guest_acceptance.yaml`、未確認は [持越し台帳](../DEFERRED_TESTS.md) に残す。
+`tools/tests/guest_acceptance.yaml`、未確認は [持越し台帳](../../tasks/DEFERRED_TESTS.md) に残す。
 
 ## 必須 12 種類
 

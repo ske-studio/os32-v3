@@ -44,8 +44,8 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | 移植性 (CPU / 機種の 2 軸、ARM 計測、順序 1〜4 の経過) | [tasks/portability/ARM_GAUGE.md](tasks/portability/ARM_GAUGE.md) (計測と経過)、[../arch/README.md](../arch/README.md) (足し方) | [archive/portability/SURVEY_N1.md](archive/portability/SURVEY_N1.md) (調査)、`archive/arch_port/` は**別リポジトリ `pw-sh4-research` の調査の快照** (正典はそちら。本リポジトリでは更新しない)、[archive/portability/TASK_KSTRING_BENCH.md](archive/portability/TASK_KSTRING_BENCH.md) (kstring の速度実測 **完了 2026-09-17** — x86 は asm 維持、C 版は他 32 ビットアーキ向け。数字は ARM_GAUGE §9、語長の前提は §10) |
 | 版数 (カーネル 2.1 / GUI 1.4 で閉じた / 現行の開発 v3 / v4 草案) と v3 の fork の段取り | [ROADMAP.md §0](ROADMAP.md) | 各版の要約は [CHANGELOG.md](../CHANGELOG.md) (3〜5 行 + リリースノートへのリンク)、詳細は `RELEASE_vX.md` ([RELEASE_v2.1.md](RELEASE_v2.1.md))。`ver` の文字列、タグ |
 | v3 の目的・範囲・目標の 2 段・柱 (P0〜P10) と順序・v3 後半の票 | [tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md) (本案、2026-09-30 昇格) | ROADMAP.md の v3 の行、README.md (目的の一文)。メモリマップの決定の本文は TASK_MEMMAP_V3 (D 番号) |
-| v3 T2d〜T2h の詳細な実装契約・分割・受入 | [T2d〜T2h詳細](tasks/v3/TASK_T2D_T2H.md) (契約・分割・受入条件・未実施の手順だけ。実行記録は [archive/v3/TASK_T2D_T2H_RECORDS.md](archive/v3/TASK_T2D_T2H_RECORDS.md)、変異対応・分類別集計は [T2E_MUTANTS](tasks/v3/T2E_MUTANTS.md)、延期は [DEFERRED_TESTS](tasks/DEFERRED_TESTS.md)。決定はTASK_MEMMAP_V3とTASK_T2_APPBAND、a〜cの実績は後者§5-1) | TASK_T2_APPBAND §5-1は段の要約とリンク |
-| T2g の変異対応・分類別集計 | [T2G_MUTANTS](tasks/v3/T2G_MUTANTS.md) | T2d〜h詳細 §4-3、実行証拠は g5 の報告 |
+| v3 T2d〜T2h の詳細な実装契約・分割・受入 | [T2d〜T2h詳細](tasks/v3/TASK_T2D_T2H.md) (契約・分割・受入条件・未実施の手順だけ。実行記録は [archive/v3/TASK_T2D_T2H_RECORDS.md](archive/v3/TASK_T2D_T2H_RECORDS.md)、変異対応・分類別集計は [T2E_MUTANTS](archive/v3/T2E_MUTANTS.md)、延期は [DEFERRED_TESTS](tasks/DEFERRED_TESTS.md)。決定はTASK_MEMMAP_V3とTASK_T2_APPBAND、a〜cの実績は後者§5-1) | TASK_T2_APPBAND §5-1は段の要約とリンク |
+| T2g の変異対応・分類別集計 | [T2G_MUTANTS](archive/v3/T2G_MUTANTS.md) | T2d〜h詳細 §4-3、実行証拠は g5 の報告 |
 | T2h の外部再開ゲート・配備期待集合の扱い | [T2H_EXTERNAL_GATE](tasks/v3/T2H_EXTERNAL_GATE.md) (H-7 の追随 8 項目、KAPI 74 / MemStat 200B 再構築、deploy-set と配備元照合) | 持越しは DEFERRED_TESTS H-7、契約は T2d〜h詳細 §5 |
 | NHD ext2のerrors印の原因調査 | [ext2調査票](archive/v3/TASK_EXT2_ERRORS_INVESTIGATION.md) (受入完了 2026-10-01、再インストールで印を解消・原因の発生時点は未確定。T2h受入前ゲートの照合先) | T2d〜h詳細 §0・§5・§8は順序とリンク |
 | v3 T3以降の実装契約・分割・受入と後半接続 | [T3配置](tasks/v3/TASK_T3_LAYOUT.md)、[T4〜T6bモジュール/起動](tasks/v3/TASK_T4_T6_MODULES.md)、[T7/後半接続](tasks/v3/TASK_T7_AND_FOLLOWUPS.md) (設計中。D決定の本文はTASK_MEMMAP_V3) | V3_PLAN / TASK_MEMMAP_V3 はリンクのみ |
@@ -54,7 +54,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | 現行 / 未実装 / 過去 の区別 | 各文書の冒頭に「現行仕様」「計画」「YYYY-MM-DD 時点のスナップショット」を明記 | — |
 | 票の状態行の語彙 | [POLICY_DEV.md §8](POLICY_DEV.md) の表 (`tools/check_docs_status.py` がそこから読む) | 下の「タスク」節の冒頭 (語の列挙のみ) |
 
-T3 前の文書再整備の候補・未解決点は [DOCS_REORG_T3](tasks/v3/DOCS_REORG_T3.md) (草案)。正典の差替えやアーカイブ移動の承認を意味しない。
+T3 前の反省会と文書整理の計画は [DOCS_REORG_T3](tasks/v3/DOCS_REORG_T3.md) (r2、2026-10-14 にユーザー承認、決定は [REVIEW_2026-10-14](tasks/agents/REVIEW_2026-10-14.md))。
 
 ## 生成文書の見方
 
@@ -175,6 +175,7 @@ T3 前の文書再整備の候補・未解決点は [DOCS_REORG_T3](tasks/v3/DOC
 | ドキュメント | 内容 |
 |-------------|------|
 | [tasks/agents/HANDOVER_2026-10-09.md](tasks/agents/HANDOVER_2026-10-09.md) | **引き継ぎ 2026-10-09 (現行)** — T2h R0〜R7 一巡後の現在地 (次は h9 の締め・反省会)、次の一手、段をまたぐ道具と罠。入口だけ (50 行以内) |
+| [tasks/agents/REVIEW_2026-10-14.md](tasks/agents/REVIEW_2026-10-14.md) | **T3 前の反省会 2026-10-14 — 完了記録** — 判断 7 点の決定、議題 10 件の結論、残りの作業 |
 | [tasks/agents/REVIEW_2026-10-06.md](tasks/agents/REVIEW_2026-10-06.md) | **開発体制の見直し 2026-10-06 — 完了記録** — 遅さの原因 (根拠つき)、決めたこと、残りの作業 a〜e |
 | [tasks/DEFERRED_TESTS.md](tasks/DEFERRED_TESTS.md) | **持越し台帳** — 延ばした試験・SKIP・ホストだけの合格・未結線を 1 か所に |
 | [archive/agents/HANDOVER_2026-09-30.md](archive/agents/HANDOVER_2026-09-30.md) | 引き継ぎ 2026-09-30 (os32-v3 の初日、履歴) |

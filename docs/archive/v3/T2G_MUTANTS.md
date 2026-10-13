@@ -1,7 +1,7 @@
 # T2g 変異対応表 — g5
 
 2026-10-09 時点の実装・試験対応。基点 `b43e814`。
-契約の正典: [T2d〜T2h §4-2 / §4-3](TASK_T2D_T2H.md)。
+契約の正典: [T2d〜T2h §4-2 / §4-3](../../tasks/v3/TASK_T2D_T2H.md)。
 書式の前例: [T2e 変異対応表](T2E_MUTANTS.md)。
 シングルタスク・協調切替を前提とし、製品の挙動は変更しない。
 
@@ -108,4 +108,4 @@ C fixtureは欄名で参照し、gui.pyにMemStatの手写しoffsetは無い。
 
 実MMU/CR3切替、17MBでのGK-3再受入・GK-4、GUI操作でのSTOP宛先はホスト表の外。
 ゲスト台本は `tools/tests/guest_acceptance.yaml` のg entry (17MBだけ)、
-未受入は [持越し台帳](../DEFERRED_TESTS.md) のPM更新対象とする。
+未受入は [持越し台帳](../../tasks/DEFERRED_TESTS.md) のPM更新対象とする。
