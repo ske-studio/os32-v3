@@ -13,7 +13,7 @@ static V86gIoOps gcap_dry_ops, gcap_hw_ops;
 static int gcap_keep_if;
 static u32 kctx_irq_depth, kctx_exc_depth, v86_gcap_alloc_count, v86_gcap_free_count;
 static u32 freed, restored, cursor, polled, exec_stop_count, allocations;
-static int kill_capture, setup_fail;
+static int kill_capture, setup_fail, rom_status;
 static struct { int aborting; } v86_session;
 static void *jump[5];
 static void die(int rc) { __asm__ volatile("int $0x80"::"a"(1),"b"(rc)); for (;;) {} }
@@ -43,7 +43,8 @@ static void v86_mem_teardown(void) {}
 void v86_gcap_release(void);
 static void gcap_selftest(V86Gcap *g) { (void)g; }
 static void gcap_rom(V86Gcap *g) {
-    (void)g;
+    g->status = rom_status;
+    if (rom_status != V86G_ST_OK) { g->n_in = 2; g->n_out = 3; }
     if (kill_capture) {
         kctx_exc_depth=1;
         v86_gcap_rec=0; /* exception-time disconnect */
@@ -67,6 +68,12 @@ static void run(void) {
     freed=0;
     CHECK(v86_gdc_capture(V86G_MODE_ROM,&out) == 0);
     CHECK(freed == 2 && restored == 1 && cursor == 1);
+    freed=0; restored=0; cursor=0;
+    rom_status=V86G_ST_GUEST;
+    CHECK(v86_gdc_capture(V86G_MODE_ROM,&out) == rom_status);
+    CHECK(out.n_in == 2 && out.n_out == 3);
+    CHECK(freed == 2 && restored == 1 && cursor == 1);
+    rom_status=V86G_ST_OK;
     freed=0; restored=0; cursor=0;
     storage.mode = V86G_MODE_SELFTEST;
     gcap_owned = &storage; gcap_tv = tvstorage;

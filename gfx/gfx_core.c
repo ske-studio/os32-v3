@@ -918,7 +918,7 @@ void gfx_init(void)
     prev_dirty.count = 0;
 
     gfx_bind_client();
-    if (!bb[0]) { gfx_reinit_surfaces(1); return; }
+    if (!bb[0]) { gfx_reinit_surfaces(1); gfx_diag_init(); return; }
     _gfx_common_init(GFX_PLANE_SZ);
 
     /* GDC CSRFORM: L/R=0 (400ライン) */
@@ -964,7 +964,7 @@ void gfx_init_200(void)
     gfx_current_height = GFX_HEIGHT_200;  /* 200ラインモード */
 
     gfx_bind_client(); /* bind before init_200; retain 400-line plane stride */
-    if (!bb[0]) { gfx_reinit_surfaces(1); return; }
+    if (!bb[0]) { gfx_reinit_surfaces(1); gfx_diag_init(); return; }
     _gfx_common_init(GFX_PLANE_SZ_200);
 
     /* GDC CSRFORM: L/R=1 (各ライン2倍表示 → 200ライン) */

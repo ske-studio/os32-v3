@@ -42,7 +42,7 @@ CASES = ["phase_diag", "port_list", "insn", "record_order", "overflow", "in_tabl
 
 # -Wno-attributes: __cdecl は x86-64 のホストでは無視される (警告だけ)。
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror", "-Wno-attributes"]
-INCLUDES = ["-I" + str(ROOT / p) for p in ("sdk/include/os32", "kernel")]
+INCLUDES = ["-I" + str(ROOT / p) for p in ("sdk/include/os32", "kernel", "lib")]
 
 # 否定側。実装を 1 か所だけ壊して RED になることを見る。
 MUTATIONS = [
@@ -163,8 +163,6 @@ def host_build(tmp, source_text=None):
         mut.mkdir(exist_ok=True)
         (mut / "v86_gcap_math.c").write_text(source_text, encoding="utf-8")
         (mut / "v86_gcap_diag.h").write_text((ROOT / "kernel/v86_gcap_diag.h").read_text())
-        (src_dir / "lib").mkdir(exist_ok=True)
-        (src_dir / "lib/serial_diag.h").write_text((ROOT / "lib/serial_diag.h").read_text())
         (src_dir / "serial_diag_host.h").write_text((ROOT / "tools/tests/serial_diag_host.h").read_text())
         (mut / "v86_gcap_math.h").write_text(
             (ROOT / "kernel/v86_gcap_math.h").read_text(encoding="utf-8"),
@@ -175,7 +173,7 @@ def host_build(tmp, source_text=None):
                 '"../../kernel/v86_gcap_math.c"', '"kernel/v86_gcap_math.c"'),
             encoding="utf-8")
         cmd = ["gcc", *FLAGS, "-I" + str(ROOT / "sdk/include/os32"),
-               "-I" + str(src_dir), "-I" + str(mut), str(shim), "-o", str(exe)]
+               "-I" + str(ROOT / "lib"), "-I" + str(src_dir), "-I" + str(mut), str(shim), "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True)
     return exe
 
