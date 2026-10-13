@@ -21,7 +21,7 @@
 | T4 | X-11、E11-A2b、X-1 の一部 | 設計票で扱う |
 | T5a / T7 | X-1 の一部、E10-4、H-6b、H-5 (CG 窓 WB・68h) | — |
 | [TASK_PCM_CS4231](v3/TASK_PCM_CS4231.md) | R7-2、H-4 (b)(c) | — |
-| 保守 (道具・媒体) | LZSS-1、PRIO-1、S-1、X-20 | 次にその道具・媒体を触る段 |
+| 保守 (道具・媒体) | LZSS-1、PRIO-1、S-1、X-20、PRE-1 | 次にその道具・媒体を触る段 |
 | 決定による持越し | H-7、S-4、E11-A3 | 再開時ゲート (H-7) / U6 で足さない (E11-A3) |
 | 記録 | R7-3、R7-4 | — |
 
@@ -53,6 +53,7 @@
 | X-4 | 検査の整理の残り: ci-stab2 の P2-B の後の全体 check-changed と native の記録、6 時間超の対照の刈り取り、pending の 1 時間回収、生き残る弱い変異、f5a の full 候補検査に残る 5 SKIP、`net_link` の TMPDIR 長、選択の取りこぼし 3 種 (元の行 3551、3627、3705、3740、3754–3768、3776、3800–3807、3828–3832) | T2h に観測が無い | 選択の取りこぼし 3 種は T3 の最初の依頼パックの前、残りは次に `check_select.py` / ci-stab を触る保守の段 (遅くとも T3 の最初の取り込みの全体検査)。ユーザー承認 2026-10-14 |
 | X-11 | 監査分類 (`~/os32-tmp/evidence/2026-10-07/audit-classification.md`) の「意味変更 (e11c)」のうち pipe (E11-8、閉鎖) を除く 12 件 — IME 9 本 (trygetchar/toggle/set_mode/switch_dict/user_delete/user_export/user_clear/trygetkey/feed_key)・exec_last_result・gui_call・con_sink_read の授権/本人別の契約 (分類表 :33/:43-55/:57/:60) | **T4 の設計票で扱う (ユーザー決定 2026-10-07)** | T4 |
 | X-20 | gtool1 再レビューの P3: (N1) OCR の読めないセルと本物の `?` が文字列上で区別できず `\?`/`.` が一致する — 読めないセルにも私用文字を割り当て一致させない、(N2) は gtool3 で閉じた (launch が `since` を返す)。gtool2 レビューの P3 (G2-4 i686 記述子の照合を check に、G2-5 動いている像と ELF の照合)。abort_target を読む道具 (G-7 で導出に頼った)。h3fix レビューの P3 (mem_stat_test を os32_test_summary に、h3 の layout に gshell.elf の sha、単独 stop の後は stop の capture を trace に、v1 経路の試験)、h1fix の P3 (配備元は target/ の外の注記)。ci-r7 の P3 (build.yml の照合失敗時に両方の sha256 を CI ログへ tee、ISO / PKG 内の vmkernel.lz4 の照合)、h1c の P3 (PRUNE_STALE に HOSTDRV_DIR を渡す、08_build の deploy-kernel 行に「make all 済みの木で」と gen_deploy_set の OSError 文、deploy.mk の recipe 内コメント)。gtool3 レビューの P3: launch が送信前の consink の例外で止まる (fail closed、害なし)、hold 中に np21w の core_lock が失敗すると鍵が押下のまま残る (`core_busy`、台本 g-G-3 に「ok:false なら同じ seq を hold 無しで 1 回送って離す」を足す、Fable 再レビュー R-2)。R1c の気づき: 試験像 (`kernel-r1`) では `Gui.launch` に `OS32_KERNEL_ELF=build/out/r1/kernel.elf` が要る (注記候補)。h3 の道具: 前景 (RUNNING+in_wait) の fixture を arm するときは先に別窓を前景にする手順が要る | 道具の改善 | 保守 |
+| PRE-1 | `tools/tests/test_preflight.py` がどの `make check-*` にも `tools/check_map.d` にも載っていない (smallfix の Fable レビュー S-2、2026-10-14、それ以前から)。preflight を変えても全体検査で走らない | 道具の不足 | 次に preflight を触る段で `check-preflight-host` と対応表を足す |
 | S-1 | Windows opt-in の集約 9 件のうち所在を特定できない 4 件 | R0 で 5 件 (`test_np21w_trial.py --windows-parser` 1 + `test_np21w_ini_live.py --windows-fixtures` 4) は PASS。残り 4 件は台本の数え方の確認から | 保守: 次に Windows opt-in を回す前 |
 
 ## 3. 持越し (決定)
