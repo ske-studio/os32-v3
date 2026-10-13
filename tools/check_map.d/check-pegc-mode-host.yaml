@@ -7,3 +7,5 @@ check-pegc-mode-host:
 - tools/tests/test_pegc_mode.py
 - tools/check_map.d/check-pegc-mode-host.yaml
 - build/checks.d/check-pegc-mode-host.mk
+- lib/serial_diag.h
+- tools/tests/serial_diag_host.h

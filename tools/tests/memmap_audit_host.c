@@ -1,6 +1,7 @@
 /* Real paging/ledger/lease/gfx and the counted lifecycle check from kselftest. */
 unsigned int host_arch_if = 0x202U;
 #define E10C_REAL_AUDIT
+#define HOST_SERIAL_CUSTOM
 #define run e4_run
 #include "gfx_kernel_fb_host.c"
 #undef run
@@ -289,6 +290,7 @@ static void run(void)
     CHECK(!kselftest_run_audit("skip"));
     CHECK(memmap_audit_runs == runs && memmap_audit_skip == 1);
     v86_map_session = 0;
+    serial_len=0; /* Observe the audit line independently of gfx diagnostics. */
     pt[idx] &= ~PTE_PCD;
     CHECK(kselftest_run_audit("host-first") > 0);
     CHECK(audit_first_fail_tag[0] == 'h' && audit_first_fail_tag[5] == 'f');

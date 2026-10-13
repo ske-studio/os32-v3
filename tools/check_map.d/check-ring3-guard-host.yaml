@@ -11,3 +11,5 @@ check-ring3-guard-host:
 - tools/tests/test_ring3_guard.py
 - tools/check_map.d/check-ring3-guard-host.yaml
 - build/checks.d/check-ring3-guard-host.mk
+- lib/serial_diag.h
+- tools/tests/serial_diag_host.h

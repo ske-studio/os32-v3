@@ -221,11 +221,12 @@ static void _flip_page(void)
 /* ======================================================================== */
 void __cdecl gfx_present_dirty(void)
 {
-    if (!bb_b) return;
-    if (_present_dirty_packed()) return;
+    u32 before = gfx_counters.present_bytes;
+    if (!bb_b) goto diag;
+    if (_present_dirty_packed()) goto diag;
     if (gfx_flip_enabled) {
         DirtyRectQueue snapshot;
-        if (dirty_queue.count == 0 && prev_dirty.count == 0) return;
+        if (dirty_queue.count == 0 && prev_dirty.count == 0) goto diag;
         gfx_counters.commits++;
         /* 今フレームのオリジナルdirtyを保存 (マージ前) */
         snapshot = dirty_queue;
@@ -234,12 +235,14 @@ void __cdecl gfx_present_dirty(void)
         prev_dirty = snapshot;
         _flip_page();
     } else {
-        if (dirty_queue.count == 0) return;
+        if (dirty_queue.count == 0) goto diag;
         gfx_counters.commits++;
         /* VSYNC期間になるまで待つ */
         while ((_in(0x60) & 0x20) == 0) { }
         _flush_dirty_queue();
     }
+diag:
+    gfx_diag_first_present(before);
 }
 
 /* ======================================================================== */
@@ -250,11 +253,12 @@ void __cdecl gfx_present_dirty(void)
 /* ======================================================================== */
 void __cdecl gfx_present_nosync(void)
 {
-    if (!bb_b) return;
-    if (_present_dirty_packed()) return;
+    u32 before = gfx_counters.present_bytes;
+    if (!bb_b) goto diag;
+    if (_present_dirty_packed()) goto diag;
     if (gfx_flip_enabled) {
         DirtyRectQueue snapshot;
-        if (dirty_queue.count == 0 && prev_dirty.count == 0) return;
+        if (dirty_queue.count == 0 && prev_dirty.count == 0) goto diag;
         gfx_counters.commits++;
         snapshot = dirty_queue;
         _merge_prev_dirty();
@@ -262,10 +266,12 @@ void __cdecl gfx_present_nosync(void)
         prev_dirty = snapshot;
         _flip_page();
     } else {
-        if (dirty_queue.count == 0) return;
+        if (dirty_queue.count == 0) goto diag;
         gfx_counters.commits++;
         _flush_dirty_queue();
     }
+diag:
+    gfx_diag_first_present(before);
 }
 
 /* ======================================================================== */
@@ -273,17 +279,23 @@ void __cdecl gfx_present_nosync(void)
 /* ======================================================================== */
 void __cdecl gfx_present(void)
 {
-    if (!bb_b) return;
+    u32 before = gfx_counters.present_bytes;
+    if (!bb_b) goto diag;
     /* HAL バックエンド経由 (契約 G4 の present_rect)。全画面 present。 */
     if (g_backend && g_backend->present_rect)
         g_backend->present_rect(0, 0, GFX_WIDTH, gfx_current_height);
+diag:
+    gfx_diag_first_present(before);
 }
 
 void __cdecl gfx_present_rect(int rx, int ry, int rw, int rh)
 {
-    if (!bb_b) return;
+    u32 before = gfx_counters.present_bytes;
+    if (!bb_b) goto diag;
     if (g_backend && g_backend->present_rect)
         g_backend->present_rect(rx, ry, rw, rh);
+diag:
+    gfx_diag_first_present(before);
 }
 
 /* ======================================================================== */
@@ -375,17 +387,18 @@ static void _raster_delay_open(unsigned int *flags)
 
 void __cdecl gfx_present_raster(GFX_RasterPalTable *table)
 {
-    if (!bb_b) return;
+    u32 before = gfx_counters.present_bytes;
+    if (!bb_b) goto diag;
     int entry_idx, line;
     int has_dirty;
     unsigned int flags;
 
-    if (!table || table->count <= 0 || table->count > GFX_RASTER_MAX_ENTRIES) return;
+    if (!table || table->count <= 0 || table->count > GFX_RASTER_MAX_ENTRIES) goto diag;
 
     /* ラスタパレットは 16 色プレーン機の HBLANK 同期パレット書き換え。
      * パックド系 (PEGC 256 色) には対応物が無いので、v1 では普通の present に
      * 落とす (色は化けず、ラスタ効果だけが出ない)。 */
-    if (_present_dirty_packed()) return;
+    if (_present_dirty_packed()) goto diag;
 
     gfx_counters.commits++;
 
@@ -413,7 +426,7 @@ void __cdecl gfx_present_raster(GFX_RasterPalTable *table)
             _raster_delay_open(&flags);
         }
         irq_restore(flags);
-        return;
+        goto diag;
     }
 
     has_dirty = (dirty_queue.count > 0);
@@ -461,4 +474,6 @@ void __cdecl gfx_present_raster(GFX_RasterPalTable *table)
     irq_restore(flags);
 
     dirty_queue.count = 0;
+diag:
+    gfx_diag_first_present(before);
 }

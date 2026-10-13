@@ -53,6 +53,8 @@ def target_cmd(obj):
 
 
 MUTATIONS = [
+    ("drop_enter_serial", MUT_TARGET,
+     "    pegc_diag_serial(&s_diag_enter);", ""),
     # (名前, 対象ファイル, 元, 変異後)
     # --- FIFO 待ち (H3) ---
     ("no_wait_cmd", MUT_TARGET,

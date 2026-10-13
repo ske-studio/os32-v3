@@ -20,3 +20,6 @@ check-gfx-kernel-fb-host:
 - tools/tests/test_gfx_kernel_fb.py
 - tools/check_map.d/check-gfx-kernel-fb-host.yaml
 - build/checks.d/check-gfx-kernel-fb-host.mk
+- lib/serial_diag.h
+- tools/tests/serial_diag_host.h
+- gfx/gfx_internal.h

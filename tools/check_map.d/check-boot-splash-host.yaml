@@ -7,3 +7,5 @@ check-boot-splash-host:
 - tools/tests/test_boot_splash_native.py
 - tools/check_map.d/check-boot-splash-host.yaml
 - build/checks.d/check-boot-splash-host.mk
+- tools/tests/serial_diag_host.h
+- lib/serial_diag.h

@@ -1,5 +1,6 @@
 /* Real splash + gfx dispatch + PC98 lifecycle; only hardware edges stubbed. */
 #define _GNU_SOURCE
+#include "serial_diag_host.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -32,6 +32,7 @@
 /*  書くので (bios18.c)、ROM の採取では記録器を試験できない (票 B4)。         */
 /* ======================================================================== */
 
+#include "v86_gcap_diag.h"
 #include "memmap.h"
 #include "v86_gcap.h"
 #include "v86_gcap_math.h"
@@ -302,6 +303,7 @@ static void gcap_rom(V86Gcap *g)
     u16 ax, bx;
     int done, reason, dec, set_ran;
     u32 st, st3;
+    V86gPhaseCounts before;
     unsigned int al480, bh480;
 
     /* INT 18h はゲストの IVT (起動時に保存した実機の値) へ流れる。ROM を
@@ -314,10 +316,12 @@ static void gcap_rom(V86Gcap *g)
     }
 
     /* 1. AH=31h — 印 (FFh) を入れて呼ぶ */
+    before = v86g_phase_counts(g);
     reason = gcap_run(g, GCAP_ENTRY_ROM, V86G_PH_READ31,
                       (u16)(0x3100U | V86G_SENTINEL_AL),
                       (u16)(V86G_SENTINEL_BH << 8), &ax, &bx, &done,
                       1, GCAP_TICK_LIMIT);
+    v86g_phase_diag(g, before, V86G_PH_READ31, reason, done, ax);
     g->r31_ax = ax;
     g->r31_bx = bx;
     st = gcap_run_status(g, reason, done);
@@ -341,8 +345,10 @@ static void gcap_rom(V86Gcap *g)
     /* 3. AH=30h → 640x480 */
     g->set_ax = (u16)(0x3000U | al480);
     g->set_bx = (u16)(bh480 << 8);
+    before = v86g_phase_counts(g);
     reason = gcap_run(g, GCAP_ENTRY_ROM, V86G_PH_SET480, g->set_ax, g->set_bx,
                       &ax, &bx, &done, 1, GCAP_TICK_LIMIT);
+    v86g_phase_diag(g, before, V86G_PH_SET480, reason, done, ax);
     g->set_ret_ax = ax;
     g->set_ret_bx = bx;
     st = gcap_run_status(g, reason, done);
@@ -368,9 +374,11 @@ static void gcap_rom(V86Gcap *g)
         g->rst_ax = (u16)(0x3000U | (g->r31_ax & 0xFFU));
         g->rst_bx = g->r31_bx;
         g->abort_kind = V86G_ABORT_NONE;
+        before = v86g_phase_counts(g);
         reason = gcap_run(g, GCAP_ENTRY_ROM, V86G_PH_RESTORE,
                           g->rst_ax, g->rst_bx, &ax, &bx, &done,
                           1, GCAP_TICK_LIMIT);
+        v86g_phase_diag(g, before, V86G_PH_RESTORE, reason, done, ax);
         g->rst_ret_ax = ax;
         g->rst_ret_bx = bx;
 
@@ -657,17 +665,8 @@ int v86_gdc_capture(int mode, V86Gcap *out)
     v86_gcap_rec = 0;
     gcap_ops = 0;
 
-    if (mode == V86G_MODE_ROM) {
-        /* 失敗した採取は列を出さない (溢れ・05h 以外・打ち切り・暴走)。
-         * 回数と理由は残す。 */
-        if (g->status != V86G_ST_OK) {
-            g->n_out = 0;
-            g->n_in = 0;
-        }
-    }
-
     kmemcpy(out, g, (u32)sizeof(*g));
-    rc = (int)g->status;
+    rc = v86g_result(g);
     v86_gcap_release();
     return rc;
 }

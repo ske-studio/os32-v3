@@ -7,11 +7,13 @@
 /*                                                                          */
 /*  票: docs/tasks/realhw/TASK_PEGC480_REALHW.md §3 段 1                    */
 /* ======================================================================== */
+#include "serial_diag_host.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
 #include "../../kernel/v86_gcap_math.c"
+#include "v86_gcap_diag.h"
 
 static int fails = 0;
 
@@ -339,10 +341,49 @@ static int case_restore(void)
     return 0;
 }
 
+static void case_phase_diag(void)
+{
+    fresh();
+    V86Gcap *g = &box.g;
+    V86gPhaseCounts before = v86g_phase_counts(g);
+    v86g_note_in(g, 0x60, 1, 4, 1);
+    v86g_note_out(g, 0x62, 1, 1, 0xf000, 0x100, 1, V86G_PH_READ31);
+    host_serial_reset();
+    v86g_phase_diag(g, before, V86G_PH_READ31, 1, 1, 0x3109);
+    CHECK(!strcmp(host_serial, "[gcap] ph=1 reason=1 done=1 ax=3109 in=+1 inother=+0 outrec=+1 outexec=+1\r\n"));
+    before = v86g_phase_counts(g);
+    for (unsigned int i=0; i<1234; i++) v86g_note_in(g, 0x60, 1, 4, 1);
+    for (unsigned int i=0; i<37; i++) v86g_note_out(g, 0x62, 1, i, 0xf000, 0x100, 1, V86G_PH_SET480);
+    V86gPhaseCounts d = v86g_phase_delta(g, before);
+    CHECK(d.in == 1234 && d.inother == 0 && d.outrec == 37 && d.outexec == 37);
+    host_serial_reset();
+    v86g_phase_diag(g, before, V86G_PH_SET480, 1, 1, 0x0500);
+    CHECK(!strcmp(host_serial, "[gcap] ph=2 reason=1 done=1 ax=0500 in=+1234 inother=+0 outrec=+37 outexec=+37\r\n"));
+    printf("%s", host_serial);
+    before = v86g_phase_counts(g);
+    for (unsigned int i=0; i<V86G_IN_MAX+1; i++) v86g_note_in(g, i, 1, 0, 0);
+    for (unsigned int i=0; i<V86G_OUT_MAX; i++) v86g_note_out(g, 0x62, 1, i, 0xf000, 0x100, 1, V86G_PH_RESTORE);
+    d = v86g_phase_delta(g, before);
+    CHECK(d.in == V86G_IN_MAX+1 && d.inother > 0);
+    CHECK(d.outrec == V86G_OUT_MAX-38 && d.outexec == V86G_OUT_MAX);
+    for (unsigned int status=V86G_ST_OK; status<=V86G_ST_GUEST; status++) {
+        V86Gcap saved = *g;
+        g->status = status; saved.status = status;
+        CHECK(v86g_result(g) == (int)status);
+        CHECK(!memcmp(g, &saved, sizeof(saved)));
+    }
+    CHECK(g->n_in > 0 && g->n_out == V86G_OUT_MAX && guard_intact());
+    host_serial_reset(); host_serial_gate=1;
+    v86g_phase_diag(g, before, V86G_PH_RESTORE, 2, 0, 0);
+    CHECK(!host_serial_len && !host_serial_calls);
+    host_serial_gate=0;
+}
+
 int main(int argc, char **argv)
 {
     const char *c = argc > 1 ? argv[1] : "";
-    if (!strcmp(c, "port_list"))         case_port_list();
+    if (!strcmp(c, "phase_diag")) case_phase_diag();
+    else if (!strcmp(c, "port_list"))         case_port_list();
     else if (!strcmp(c, "insn"))         case_insn();
     else if (!strcmp(c, "record_order")) case_record_order();
     else if (!strcmp(c, "overflow"))     case_overflow();

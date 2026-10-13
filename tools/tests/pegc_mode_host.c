@@ -23,6 +23,7 @@
  *  比べないもの: 起動時の記録 (pegc_boot_sync_record) と診断 (pegc_diag_take) —
  *  どちらも 09A0h の選択と読み・09A8h の読みだけ。5Fh (io_wait) は比べない。
  * ========================================================================= */
+#include "serial_diag_host.h"
 #include "types.h"
 
 #include "../../gfx/backend_pegc.c"
@@ -194,7 +195,10 @@ void *kmemcpy(void *dst, const void *src, u32 n)
     return dst;
 }
 void *memset(void *dst, int val, u32 n) { return kmemset(dst, val, n); }
-void kprintf(unsigned char attr, const char *fmt, ...) { (void)attr; (void)fmt; }
+static const char *printf_formats[32];
+static unsigned int printf_count;
+void kprintf(unsigned char attr, const char *fmt, ...)
+{ (void)attr; if (printf_count < 32) printf_formats[printf_count++] = fmt; }
 /* master AS ではない扱い = bios_flag は 0 を返す (ワークエリアを読まない) */
 u32 paging_current_cr3(void) { return 1; }
 u32 paging_kernel_pd_phys(void) { return 2; }
@@ -206,7 +210,7 @@ u32 sys_usable_mem_end(void) { return 0; }
 struct ledger_surface *ledger_surface_find(u32 b, u32 r)
 { (void)b; (void)r; return (struct ledger_surface *)0; }
 void palette_init(void) { }
-const PaletteEntry *palette_get_all(void) { return (const PaletteEntry *)0; }
+const PaletteEntry *palette_get_all(void) { static const PaletteEntry p[PALETTE_COUNT]; return p; }
 void palette_shadow_set(int i, u8 r, u8 g, u8 b) { (void)i; (void)r; (void)g; (void)b; }
 
 /* ========================================================================
@@ -469,6 +473,7 @@ static void vsync_falls_by_gap(int *falls, int n_outs)
 
 static void world_reset(void)
 {
+    host_serial_reset(); host_serial_gate=0; printf_count=0;
     ev_n = 0;
     fake_full_reads = 0;
     fake_busy_reads = 0;
@@ -1114,10 +1119,48 @@ static void case_defaults(void)
     CHECK(PEGC_VSYNC_POLL_US != PEGC_GDC_FIFO_POLL_US);   /* 試験が数え分ける */
 }
 
+
+static void case_serial_enter(void)
+{
+    static u16 saved_port[EV_MAX];
+    static u8 saved_val[EV_MAX], saved_kind[EV_MAX];
+    static const char *saved_formats[32];
+    int saved_n;
+    unsigned int saved_prints;
+    u32 args[6] = {0x10000, 0xff0000, 3, 0x32, ~0U, 0}, result;
+    __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
+    CHECK(result == 0x10000);
+    s_case = "serial_enter";
+    world_reset();
+    fake_09a8_raw=RA266_09A8;
+    fake_09a0_clk=RA266_CLK;
+    s_bb_phys=MEM_GFX_BB_BASE;
+    pegc_init();
+    CHECK(host_serial_count("[pegc] enter ") == 1);
+    CHECK(host_serial_find("[pegc] enter 09a8=81 msk=0 dsp=0 lcd=0 clk=0 ext=0 800l=0 fifo_to=0 vs_to=0\r\n"));
+    output(host_serial);
+    unsigned int prints_before = printf_count;
+    pegc_shutdown();
+    CHECK(printf_count == prints_before+2); /* existing enter/exit console lines */
+    saved_n=ev_n; saved_prints=printf_count;
+    for (int i=0;i<ev_n;i++) { saved_port[i]=ev_port[i]; saved_val[i]=ev_val[i]; saved_kind[i]=ev_kind[i]; }
+    for (unsigned int i=0;i<printf_count;i++) saved_formats[i]=printf_formats[i];
+    world_reset(); host_serial_gate=1;
+    fake_09a8_raw=RA266_09A8;
+    fake_09a0_clk=RA266_CLK;
+    pegc_init(); pegc_shutdown();
+    CHECK(!host_serial_calls && !host_serial_len);
+    CHECK(ev_n == saved_n && printf_count == saved_prints);
+    for (int i=0;i<ev_n;i++) CHECK(saved_port[i] == ev_port[i] && saved_val[i] == ev_val[i] && saved_kind[i] == ev_kind[i]);
+    for (unsigned int i=0;i<printf_count;i++) CHECK(saved_formats[i] == printf_formats[i]);
+    host_serial_gate=0;
+}
+
 void _start(void)
 {
     /* 資料の規則・記録の数値での検査を先に回す (変異がヘッダ由来の期待列では
      * なくこちらで落ちることを --mutate の行で見られるように) */
+    case_serial_enter();
     case_restore_matrix();
     case_defaults();
     case_rom_s480();
@@ -1130,6 +1173,6 @@ void _start(void)
     case_fifo_busy();
     case_fifo_stuck();
     case_vsync_stuck();
-    output("PASS pegc_mode_host (12 cases)\n");
+    output("PASS pegc_mode_host (13 cases)\n");
     finish(0);
 }

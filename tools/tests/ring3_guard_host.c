@@ -37,6 +37,7 @@
  *  libc は使わない (-nostdlib、Linux の int 0x80 で write/exit するだけ)。
  * ======================================================================== */
 
+#include "serial_diag_host.h"
 #include "types.h"
 
 /* ---- カーネル帯の代わり ------------------------------------------------ */
@@ -513,7 +514,13 @@ static void case_register_gate(void)
     /* 6a-6b gshell の top-level (owner 1、ディスパッチの外) の登録は通る。 */
     res_owner_set(1);
     host_in_syscall = 0;
+    host_serial_reset();
     check(gui_register((void *)wm_handler_a, (void *)0) == 0, "6a owner 1 CPL0 registers");
+    check(host_serial_count("[gui] register\r\n") == 1, "register serial success");
+    host_serial_reset(); host_serial_gate=1;
+    check(gui_register((void *)wm_handler_a, (void *)0) == 0, "register gate success");
+    check(!host_serial_len && !host_serial_calls, "register gate silence");
+    host_serial_gate=0;
     res_owner_set(2);
     check(gui_call(GUI_OP_POLL, 0) == 11, "6b registered WM handler receives gui_call");
 
@@ -541,6 +548,7 @@ static void case_register_gate(void)
     host_in_syscall = 0;
     check(gui_register((void *)0, (void *)0) == OS32_ERR_INVAL, "6g NULL handler -> INVAL");
 
+    check(!host_serial_len && !host_serial_calls, "register refusal silence");
     gui_owner_exit(GUI_SHELL_OWNER, 1);
 }
 

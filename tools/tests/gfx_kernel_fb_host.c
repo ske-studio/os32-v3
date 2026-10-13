@@ -1,5 +1,6 @@
 /* T2e e4: real gfx lifecycle/three backends and ledger/query/lease/B1.
  * Hardware discovery and I/O are host fixtures. No device/emulator access. */
+#include "serial_diag_host.h"
 #include "types.h"
 static u32 host_cr3;
 #include "paging_host_source.c"
@@ -33,7 +34,8 @@ static u32 checks;
 #define CFG_KB 17408
 void *kmemset(void *d, int c, u32 n) { u8 *p=d; while(n--) *p++=c; return d; }
 void *kmemcpy(void *d, const void *s, u32 n) { u8 *p=d; const u8 *q=s; while(n--) *p++=*q++; return d; }
-void __cdecl kprintf(u8 a,const char *f,...) { (void)a;(void)f; }
+static u32 host_kprintf_count;
+void __cdecl kprintf(u8 a,const char *f,...) { (void)a;(void)f; host_kprintf_count++; }
 static u32 arena_top_pfn;   /* 凍結した exec 上端 (PFN) */
 
 static u32 ws_pages(u32 limit)
@@ -266,6 +268,35 @@ static void bridge_check(int started)
     CHECK(space.leases[0].token == token && !lease_check(&space));
     CHECK(!lease_release(&space,token));
 }
+static u32 diag_previous_gen;
+static void diag_present_check(int empty)
+{
+    u32 gen = host_serial_value("[gfx] init gen=");
+    CHECK(gen == diag_previous_gen + 1);
+    diag_previous_gen = gen;
+    CHECK(host_serial_count("[gfx] init ") == 1);
+    CHECK(host_serial_find(" started=1 bb="));
+    CHECK(host_serial_hex_value(" bb=") == V2P(bb[0]));
+    CHECK(host_serial_value(" h=") == (u32)gfx_current_height);
+    CHECK(host_serial_find(g_backend->name));
+    report(host_serial,host_serial_len);
+    host_serial_reset();
+    dirty_queue.count = prev_dirty.count = 0;
+    u32 commits = gfx_counters.commits, bytes = gfx_counters.present_bytes;
+    u32 print_count = host_kprintf_count;
+    if (empty) gfx_present_dirty(); else gfx_present();
+    CHECK(host_serial_value("[gfx] first present gen=") == gen);
+    CHECK(host_serial_value(" bytes=") == gfx_counters.present_bytes - bytes);
+    report(host_serial,host_serial_len);
+    CHECK(empty || g_backend == &gfx_backend_cirrus ? gfx_counters.present_bytes == bytes : gfx_counters.present_bytes > bytes);
+    if (empty) CHECK(gfx_counters.commits == commits);
+    host_serial_reset();
+    gfx_present(); gfx_present_dirty(); gfx_present_nosync();
+    gfx_present_rect(0,0,32,1); gfx_present_raster(0);
+    CHECK(!host_serial_count("[gfx] first present "));
+    CHECK(host_kprintf_count == print_count);
+}
+
 static u8 stack[65536] __attribute__((aligned(16),used));
 static void run(void) __attribute__((used));
 __asm__(".text\n.globl _start\n_start: lea stack+65536,%esp\ncall run\n");
@@ -317,13 +348,17 @@ static void run(void)
         CHECK(gfx_sf_backend() == selected);
         view_check(LEDGER_SF_PC98,GFX_HEIGHT,0);
         bridge_check(0);
+        host_serial_reset();
         gfx_init();
+        diag_present_check(1);
         view_check(selected,selected == LEDGER_SF_PC98 ? GFX_HEIGHT : MEM_GFX_BB8_HEIGHT,1);
         bridge_check(1);
         display_check(selected);
         /* Poison aliases: init_200 must rebind, even on the same backend. */
         bb[0]=bb_b=0;
+        host_serial_reset();
         gfx_init_200();
+        diag_present_check(0);
         CHECK(ledger_surface_find(LEDGER_SF_PC98,LEDGER_ROLE_CLIENT)->height == GFX_HEIGHT);
         CHECK(ledger_surface_find(LEDGER_SF_PC98,LEDGER_ROLE_CLIENT)->plane_offset[1] == GFX_PLANE_SZ);
         view_check(selected,selected == LEDGER_SF_PC98 ? GFX_HEIGHT_200 : MEM_GFX_BB8_HEIGHT,1);
@@ -369,6 +404,22 @@ static void run(void)
     CHECK(caller_access_enter(&previous,CALLER_USER));
     /* Same failure state as a rejected CLIENT registration: no usable entry. */
     struct ledger_surface *pc=ledger_surface_find(LEDGER_SF_PC98,LEDGER_ROLE_CLIENT);
+    u32 old_owner=pc->owner, old_gen=pc->gen, old_prints=host_kprintf_count;
+    host_serial_reset();
+    gfx_client_to_gshell();
+    CHECK(host_serial_find(" revoke=0 transfer=0 regen=0 fail+=0 "));
+    CHECK(host_serial_transition(" owner=",old_owner,pc->owner));
+    CHECK(host_serial_transition(" gen=",old_gen,pc->gen));
+    CHECK(host_serial_value("sid=") == (u32)(pc-ledger_surfaces));
+    CHECK(host_serial_hex_value(" unready=") == gfx_surface_unready);
+    CHECK(host_kprintf_count == old_prints);
+    report(host_serial,host_serial_len);
+    host_serial_reset(); host_serial_gate=1;
+    gfx_client_to_gshell(); gfx_init(); gfx_present();
+    CHECK(!host_serial_calls && !host_serial_len);
+    host_serial_gate=0;
+    gfx_present();
+    CHECK(host_serial_count("[gfx] first present ") == 1);
     pc->npages=0;
     gfx_set_backend_pref(GFX_PREF_PC98);gfx_init_200();
     CHECK(!bb_b && !bb_r && !bb_g && !bb_i && !gfx_backend_pc98.bb_base);

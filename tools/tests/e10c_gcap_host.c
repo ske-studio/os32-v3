@@ -26,6 +26,7 @@ static void kmemcpy(void *d,const void *s,u32 n) { u8 *x=d; const u8 *y=s; while
 static int v86_gui_refuse(void) { return 0; }
 static int v86_is_active(void) { return 0; }
 static int gfx_get_height(void) { return GFX_HEIGHT; }
+int v86g_result(const V86Gcap *g) { return (int)g->status; }
 void v86g_reset(V86Gcap *g) { u8 *p=(void *)g; for(u32 i=0;i<sizeof(*g);i++)p[i]=0; }
 static void tv_save(u16 *p) { for(u32 i=0;i<GCAP_TV_CELLS*2;i++)p[i]=(u16)i; }
 static void tv_restore(const u16 *p) { for(u32 i=0;i<GCAP_TV_CELLS*2;i++)CHECK(p[i]==(u16)i); restored++; }
