@@ -23,6 +23,7 @@ static void __attribute__((cold, unused)) serial_diag_i32(int n)
 static void __attribute__((cold, unused)) serial_diag_hex(unsigned int n, unsigned int digits)
 {
     char buf[9];
+    if (digits > 8) digits = 8;
     buf[digits] = 0;
     while (digits) {
         buf[--digits] = "0123456789abcdef"[n & 15U];

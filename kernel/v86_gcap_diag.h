@@ -1,7 +1,7 @@
 #ifndef OS32_V86_GCAP_DIAG_H
 #define OS32_V86_GCAP_DIAG_H
 #include "v86_gcap_math.h"
-#include "../lib/serial_diag.h"
+#include "serial_diag.h"
 
 static void __attribute__((cold, unused)) v86g_phase_diag(const V86Gcap *g,
         V86gPhaseCounts before, u32 phase, int reason, int done, u16 ax)

@@ -421,7 +421,18 @@ static void run(void)
     gfx_present();
     CHECK(host_serial_count("[gfx] first present ") == 1);
     pc->npages=0;
-    gfx_set_backend_pref(GFX_PREF_PC98);gfx_init_200();
+    gfx_set_backend_pref(GFX_PREF_PC98);
+    u32 failed_gen=0;
+    for (u32 mode=0; mode<2; mode++) {
+        host_serial_reset();
+        if (mode) gfx_init_200(); else gfx_init();
+        CHECK(host_serial_count("[gfx] init ") == 1);
+        u32 gen=host_serial_value("[gfx] init gen=");
+        if (mode) CHECK(gen == failed_gen + 1);
+        failed_gen=gen;
+        CHECK(host_serial_find(" started=0 bb=00000000 "));
+        CHECK(host_serial_value(" h=") == (mode ? GFX_HEIGHT_200 : GFX_HEIGHT));
+    }
     CHECK(!bb_b && !bb_r && !bb_g && !bb_i && !gfx_backend_pc98.bb_base);
     CHECK(gfx_kernel_framebuffer(&fb) == OS32_ERR_INVAL && !fb.planes[0]);
     u32 commits=gfx_counters.commits;
