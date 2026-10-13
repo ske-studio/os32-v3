@@ -131,7 +131,7 @@ int surface_unlease(u32 token);
 - query は **選択中 backend の、呼出元に許可した role だけ** (Unicode表はbackend非依存のシステムRO roleとして別判定)。単なる sid の知識は権限にならず、lease 時も caller / role / generation を照合する。`access` は RO / RW だけ、PWT/PCD や任意の物理は渡させない。ユーザー指定 AS は受け取らず、保存済み caller AS に貸す。
 - token は boot 内の単調 u32 (0無効)、AS に紐付く。周回時は新規貸与を拒否し、再 boot まで再利用しない。別 AS の token、二重解除、revoke 済み token は負の誤りで無変更。
 - **lease 結果の VA は記述子とは別**の `OS32_LeaseView` に返す。同じ参照でも AS ごとに異なる VA になり得る。同じ AS の明示 lease 呼出しは別 token。SDK の attach は保持中 token を再利用し、繰返し query だけで参照数を増やさない。
-- out / ref は B1 の checked copy で kernel 内に確定し、出力範囲を事前検査する。失敗時は out・PTE・refcount・owner 会計がすべて元のまま。誤りは INVAL (参照/権限/範囲)、NOMEM (物理/PT)、FULL (固定表)、旧世代は INVAL と診断理由で区別する。実際の `OS32_ERR_*` への対応を生成時に固定する。
+- out / ref は B1 の checked copy で kernel 内に確定し、出力範囲を事前検査する。失敗時は out・PTE・refcount・owner 会計がすべて元のまま。誤りは INVAL (参照/権限/範囲)、NOMEM (物理/PT)、FULL (固定表)、旧世代は INVAL と診断理由で区別する。 (実装は e11 で旧世代を STALE (-11) に確定 — [T2d〜h §8](TASK_T2D_T2H.md)。新しいエラー番号は予約しない)実際の `OS32_ERR_*` への対応を生成時に固定する。
 - `gfx_get_framebuffer` のソース互換は SDK の薄い橋で保つ。CPL=3 には lease view の plane VA を返す。新しい失敗可能な attach を SDK 内で使い、失敗を無視して NULL 面へ描かない。古い void API のカーネル入口を残す場合は失敗を明示的なアプリ終了に変換する。trusted kernel / WM には内部 `gfx_kernel_framebuffer` で恒等のポインタを返す。公開 query の出力と内部 framebuffer の型を流用しない。
 - API は `sdk/kapi.json` から C/Rust とラッパを生成 ([C3][ABI1])、既存 slot は通常追記 ([ABI2])。P7 が D35 の1回の整理を実施するときだけ、世代を切る同じ成果物集合で統合する。T2 が独自にスロットを並べ替えない。各追加で version と KAPI_VERSION を揃え全再ビルド ([ABI3])。
 
@@ -162,7 +162,7 @@ owner が返却を要求した面は新規貸与を拒否する状態にし、�
 - 再 init は **新規貸与停止 → 全関連 lease revoke → TLB → refcount0 → backend 初期化/geometry更新 → generation更新 → 面公開**。失敗時は失効した旧 token を復活させず、予約済み fallback の面を新世代として公開する。GUI → CUI → GUI でも RAM backing の確保し直しは不要。SDK は保存済み framebuffer を捨て、resume / attach 時に再取得してから描く。生ポインタの失効を魔法で検出できるとはしない: 旧 mapping は NP、旧 token での操作は拒否、後の VA 再利用は通常の解放後ポインタと同じ禁止契約。
 - **libos32gfx の2実体**: アプリ静的リンク側と libos32gui.shlib 内側は保存状態が別 (`userland/lib/gfx/libos32gfx_core.c:25`、`userland/rust/libos32gui/src/client.rs:185` (attach_gfx、shlib側からの呼出しは `shlib.rs:437`))。両方を使う GUI アプリは同一 AS の CLIENT lease を **2本**消費し、8本/AS の内数。token の再利用は各実体内で行う。Unicode の各実体分も含め容量を検査し、満杯時は一括巻戻し。再 init / resume 後は両方の保存 pointer/token を捨て、双方を再 attach してから各描画経路を再開する。受入は両方で描画し、片方だけ再取得する変異を検出する。
 - **U20 の確定対象**: tvdump は TVRAM の文字/属性を値で返す checked-copy KAPI に置換し、`tools/tvdump_recv.py` の TVDM 形式を保つ。通常 GUI の権限を広げず、CUI 全画面所有者だけへ提供 (非所有者は明示拒否)。nop / ring3_hello / ring3_fault / ring3_guard の判定用マーカーは、テストに割り当てた SHM 枠へ移す。SHM の番地取得・初期化を CRT 非依存試験にも用意し、観測側も同時に更新。保護違反を試す VRAM アクセス自体は残し、直前マーカーと目的の fault を区別する。
-- **Unicode の移行穴を閉じる**: `lib/utf8.c` のユーザー用ビルドは、低位固定表でなく起動時取得した **RO lease** のポインタを使う (CRT と shlib 初期化の両方)。kernel 版は恒等のまま。表128KBは kernel 所有の固定 RAM SURFACE とし、T7 の新表 / 廃止までの橋とする。これは共有グリフキャッシュ U21 の採用ではない。字形は既存 `kcg_read_*` を用い、フォント低位全域の USER を消す。apps/game を含め直読が残るなら同じ移行段で直す。
+- **Unicode の移行穴を閉じる**: `lib/utf8.c` のユーザー用ビルドは、低位固定表でなく起動時取得した **RO lease** のポインタを使う (CRT と shlib 初期化の両方)。kernel 版は恒等のまま。表128KBは kernel 所有の固定 RAM SURFACE とし、T7 の新表 / 廃止までの橋とする。 (撤去は T3 で KAPI 化と同時 — [T2d〜h §7](TASK_T2D_T2H.md) で引き渡し済み)これは共有グリフキャッシュ U21 の採用ではない。字形は既存 `kcg_read_*` を用い、フォント低位全域の USER を消す。apps/game を含め直読が残るなら同じ移行段で直す。
 
 ## 4. exec / 仮想メモリの設計
 
