@@ -487,3 +487,11 @@ X-2 の前半 (e8a の RO 日本語) は `accept_e11/RESULT.md` の GUI 日本�
 | ID | 何を | 種類 | 元の行 |
 |---|---|---|---|
 | H-10 | 音源ボード (SNDboard) の ini キーを `np21w_ini_live.py` 系が扱えない (emu-config §1 の対応キー外) → 道具の拡張 (sol) を h の音源構成の準備前に | 道具の不足 | — |
+
+## GSERIAL-1
+
+閉鎖 (2026-10-14、63b5b06): NP21/W の受入 (`~/os32-tmp/evidence/2026-10-14/gserial_np21/RESULT.md`) と実機 Ra266 d14a (ノート `~/os32-r7/d14a_*.txt`) で合格 — `gs:! ready`、ping・state・type・key (sent=4 lost=0)、`cui` の 2 段応答で CUI に戻り rshell が応答、`-t` の自動復帰 (NP21/W)、`sfs run os32gui` の拒否 (実機)。拒否の文言が逆に読める件は smallfix で直す。GUI=1 の直接起動 (serial 未初期化) は次段の票で扱う。
+
+| ID | 何を | 種類 | 元の行 |
+|---|---|---|---|
+| GSERIAL-1 | GUI 中のシリアル受け口 (gshell の gserial、票 `~/os32-tmp/run/gserial/GSERIAL_DESIGN.r3a.md`) の実機 Ra266 での確認: rshell → `os32gui` で `gs:! ready`、`ping`・`state`・`key`/`type`・`cui` の 2 段応答で CUI に戻り rshell が再び応答する、`os32gui -t` の自動復帰。GUI=1 直接起動 (serial 未初期化) は次段。配送は best effort で `state lost=` に破棄件数 (保証外 3 件は票 §6-8) | 実機の受入 | — |

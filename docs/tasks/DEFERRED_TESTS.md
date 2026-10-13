@@ -1,6 +1,6 @@
 # 持越し台帳 — 延ばした試験・SKIP・ホストだけの合格・未結線
 
-> 状態: **現行 (2026-10-13、h9 で T2h の照合済み)** — R0〜R7 (NP21/W の 5 構成 + 実機 Ra266) の結果で閉じた行は [閉鎖台帳](../archive/v3/DEFERRED_CLOSED.md) の「T2h R0〜R7」へ移した (閉 21・部分閉 10)。残るのは **渡す 21** (次のゲスト受入 8、後続の段 12、実機 1)・**持越し 3** (決定)・**実機の所見 4**。分類の一覧は `~/os32-tmp/run/h/h9/H9_CLASSIFY.md`。
+> 状態: **現行 (2026-10-14、反省会の決定と GSERIAL-1 の閉鎖を反映。h9 で T2h の照合済み)** — R0〜R7 (NP21/W の 5 構成 + 実機 Ra266) の結果で閉じた行は [閉鎖台帳](../archive/v3/DEFERRED_CLOSED.md) の「T2h R0〜R7」へ移した (閉 21・部分閉 10)。残るのは **渡す 21** (次のゲスト受入 8、後続の段 12、実機 1)・**持越し 3** (決定)・**実機の所見 4**。分類の一覧は `~/os32-tmp/run/h/h9/H9_CLASSIFY.md`。
 > 規則: **未完了だけを持つ**。終わった行は、証拠の所在を票に書いてから [閉鎖台帳](../archive/v3/DEFERRED_CLOSED.md) へ移す。実行ログを貼らない。同じ延期を票・引き継ぎ・memory に写さない。
 > ここに行が無い SKIP・未実行は合格に数えない ([ROLES §4](agents/ROLES.md))。FAIL・crash・timeout を延期に書き換えない。関門に着いたら、その関門の行を全部消すまで次へ進まない。
 
@@ -14,9 +14,10 @@
 |---|---|---|
 | 次のゲスト受入の回 (NP21/W。R7-1 の修正の受入と同じ回でよい) | E9-1、X-6、E11-9、E11-5、H-1、H-2、PRIO-3、X-21 | 8 行を全部消す |
 | 次の実機セッション | H-5 (kstack の転記) | 画面確認の要らない分は立会い無しで可 |
-| カーネル層の不具合 ([POLICY_DEV §1](../POLICY_DEV.md)) | R7-1 | T3 より先に直す候補。順序は反省会 |
+| カーネル層の不具合 ([POLICY_DEV §1](../POLICY_DEV.md)) | R7-1 | T3・LAN L-B より先 (反省会 2026-10-14 の順序: R7-1 と CRTFREQ → ゲスト受入と実機 → LAN L-B → T3)。次の立会いで 24k の GUI 画面を目視して修正票の中身を決める |
 | T3 (帯変更) | F-9、H-4 (a) | 着手前に扱いを決める。H-4 の構成別の残り (Cirrus / 8MB PEGC の M、cirrus-off、台本の残り) は次のゲスト受入 |
-| T3 前の文書再整備計画 ([DOCS_REORG_T3](v3/DOCS_REORG_T3.md)) | X-4 | — |
+| T3 の最初の依頼パックの前 | X-4 (選択の取りこぼし 3 種) | 関門の変更はユーザー承認 2026-10-14 |
+| 次に `check_select.py` / ci-stab を触る保守の段 (遅くとも T3 の最初の取り込みの全体検査) | X-4 (残り) | 記録の分はその全体検査で残す |
 | T4 | X-11、E11-A2b、X-1 の一部 | 設計票で扱う |
 | T5a / T7 | X-1 の一部、E10-4、H-6b、H-5 (CG 窓 WB・68h) | — |
 | [TASK_PCM_CS4231](v3/TASK_PCM_CS4231.md) | R7-2、H-4 (b)(c) | — |
@@ -49,7 +50,7 @@
 | H-6b | V86 の出口で 6Ah の標準 / 拡張を戻していない (9821 で E0000h が MMIO のまま残り得る)、9801 構成での `gui_gate` | 未対処。NP21/W では `v86 -b` / `-d` / hal_test の前後で 6Ah=0x01・mode1=0x88・E0000h/A8000h の読みが不変 (H-6a、記録) で表示は壊れていない。9801 構成はこの NP21/W に無い | T7 (V86 復元検査)。表示が壊れる構成が見つかれば e10b の fix 段 |
 | E11-A2b | raw KAPI 待機利用者の明示 check | host だけで、ゲストに観測が無い | T4 (X-11 と一緒) |
 | X-1 | NUL 終端の文字列入力と `kprintf` 可変引数の B1 化 → T4・T5a の担当境界で確定。ページ 0 の NP 化 → T7 (元の行 1499、1647、1757、1885) | 既決の既知の制限 | T4 / T5a / T7 |
-| X-4 | 検査の整理の残り: ci-stab2 の P2-B の後の全体 check-changed と native の記録、6 時間超の対照の刈り取り、pending の 1 時間回収、生き残る弱い変異、f5a の full 候補検査に残る 5 SKIP、`net_link` の TMPDIR 長、選択の取りこぼし 3 種 (元の行 3551、3627、3705、3740、3754–3768、3776、3800–3807、3828–3832) | T2h に観測が無い | T3 前の文書再整備計画 (DOCS_REORG_T3) |
+| X-4 | 検査の整理の残り: ci-stab2 の P2-B の後の全体 check-changed と native の記録、6 時間超の対照の刈り取り、pending の 1 時間回収、生き残る弱い変異、f5a の full 候補検査に残る 5 SKIP、`net_link` の TMPDIR 長、選択の取りこぼし 3 種 (元の行 3551、3627、3705、3740、3754–3768、3776、3800–3807、3828–3832) | T2h に観測が無い | 選択の取りこぼし 3 種は T3 の最初の依頼パックの前、残りは次に `check_select.py` / ci-stab を触る保守の段 (遅くとも T3 の最初の取り込みの全体検査)。ユーザー承認 2026-10-14 |
 | X-11 | 監査分類 (`~/os32-tmp/evidence/2026-10-07/audit-classification.md`) の「意味変更 (e11c)」のうち pipe (E11-8、閉鎖) を除く 12 件 — IME 9 本 (trygetchar/toggle/set_mode/switch_dict/user_delete/user_export/user_clear/trygetkey/feed_key)・exec_last_result・gui_call・con_sink_read の授権/本人別の契約 (分類表 :33/:43-55/:57/:60) | **T4 の設計票で扱う (ユーザー決定 2026-10-07)** | T4 |
 | X-20 | gtool1 再レビューの P3: (N1) OCR の読めないセルと本物の `?` が文字列上で区別できず `\?`/`.` が一致する — 読めないセルにも私用文字を割り当て一致させない、(N2) は gtool3 で閉じた (launch が `since` を返す)。gtool2 レビューの P3 (G2-4 i686 記述子の照合を check に、G2-5 動いている像と ELF の照合)。abort_target を読む道具 (G-7 で導出に頼った)。h3fix レビューの P3 (mem_stat_test を os32_test_summary に、h3 の layout に gshell.elf の sha、単独 stop の後は stop の capture を trace に、v1 経路の試験)、h1fix の P3 (配備元は target/ の外の注記)。ci-r7 の P3 (build.yml の照合失敗時に両方の sha256 を CI ログへ tee、ISO / PKG 内の vmkernel.lz4 の照合)、h1c の P3 (PRUNE_STALE に HOSTDRV_DIR を渡す、08_build の deploy-kernel 行に「make all 済みの木で」と gen_deploy_set の OSError 文、deploy.mk の recipe 内コメント)。gtool3 レビューの P3: launch が送信前の consink の例外で止まる (fail closed、害なし)、hold 中に np21w の core_lock が失敗すると鍵が押下のまま残る (`core_busy`、台本 g-G-3 に「ok:false なら同じ seq を hold 無しで 1 回送って離す」を足す、Fable 再レビュー R-2)。R1c の気づき: 試験像 (`kernel-r1`) では `Gui.launch` に `OS32_KERNEL_ELF=build/out/r1/kernel.elf` が要る (注記候補)。h3 の道具: 前景 (RUNNING+in_wait) の fixture を arm するときは先に別窓を前景にする手順が要る | 道具の改善 | 保守 |
 | S-1 | Windows opt-in の集約 9 件のうち所在を特定できない 4 件 | R0 で 5 件 (`test_np21w_trial.py --windows-parser` 1 + `test_np21w_ini_live.py --windows-fixtures` 4) は PASS。残り 4 件は台本の数え方の確認から | 保守: 次に Windows opt-in を回す前 |
@@ -67,11 +68,10 @@
 | ID | 何を | 種類 | 関門 |
 |---|---|---|---|
 | H-5 | 実機の残り: CG 窓の WB、表示の後始末 (GRCG / EGC・68h の残り)、kernel stack の high-water の値の票への転記。UC 化で present が遅くならないこと (bench_scale2x Test1/2 が更新前と ±10% 内) は閉じた | 構成持越し (実機) | kstack は `mem` でシリアルから採れる → 次の実機セッション (立会い無し可)。CG 窓の WB と 68h の後始末は実機に読む口が無い (設計票 §8 (m) で公開の物理 read は作らない) → **読む道具が要る、T7 (V86 / 表示の段) へ渡す** |
-| R7-1 | GFX=pegc のまま 24kHz で起動すると、カーネルが PEGC 640x480 (31kHz 要) を選び GUI が真っ暗 (起動ログ `[pegc] hsync=24k`。10/12 に「gshell は exc=0 で即時終了」としたのは別アプリの owner-exit の読み違えで撤回、10/13)。`gfxmode pc98` + GRPH+1 (24kHz) で起動すれば GUI 正常。表示方式の選択が今の水平同期を見ていない — 24kHz なら PEGC 480 を選ばない (planar へ落とす) か、31kHz へ切り替えてから入るかをハード資料で決めて直す。31kHz 起動 (09a8=81) でも 9545e27 では `gshell: cfg OK` の後に応答が無く、24k 専用の問題とは限らない。観測用の計装 (L1〜L8、2f99a78) は実機に配備済み (10/13)。**カーネル層の不具合 — T3 より先に直す候補 ([POLICY_DEV §1](../POLICY_DEV.md))、順序は反省会で (LAN 転送と合わせて)**。周波数は起動時の GRPH+1 (24k) / GRPH+2 (31k) で切り替わる | 実機の不具合 (カーネル層) | 修正の段 → 次のゲスト受入 + 次の実機セッション (24kHz での起動は画面確認が要る) |
+| R7-1 | GFX=pegc のまま 24kHz で起動すると、カーネルが PEGC 640x480 (31kHz 要) を選び GUI が真っ暗 (起動ログ `[pegc] hsync=24k`。10/12 に「gshell は exc=0 で即時終了」としたのは別アプリの owner-exit の読み違えで撤回、10/13)。`gfxmode pc98` + GRPH+1 (24kHz) で起動すれば GUI 正常。表示方式の選択が今の水平同期を見ていない — 24kHz なら PEGC 480 を選ばない (planar へ落とす) か、31kHz へ切り替えてから入るかをハード資料で決めて直す。31kHz 起動 (09a8=81) でも 9545e27 では `gshell: cfg OK` の後に応答が無く、24k 専用の問題とは限らない。観測用の計装 (L1〜L8、2f99a78) は実機に配備済み (10/13)。**10/14 (63b5b06、実機 d14a)**: 24k 起動でも GUI 入場で 09a8=81 に切り替わり、`[gfx] init be=pegc-256`・first present・`[gshell] loop`・`gs:! ready` まで進み、gserial のキー注入も通った (ノート `~/os32-r7/d14a_*.txt`) — ソフトは止まっていない。残るのは画面に映るかの目視だけ (真っ暗ならモニタの 31k 追従など表示信号の側)。**カーネル層の不具合 — T3 より先に直す候補 ([POLICY_DEV §1](../POLICY_DEV.md))、順序は反省会で (LAN 転送と合わせて)**。周波数は起動時の GRPH+1 (24k) / GRPH+2 (31k) で切り替わる | 実機の不具合 (カーネル層) | 修正の段 → 次のゲスト受入 + 次の実機セッション (24kHz での起動は画面確認が要る) |
 | R7-2 | 実機 Ra266 の PCM: pcm_test は under=0・rep=0・resync=0・close 0 で 5 秒鳴ったが、**不規則な音切れ**をユーザーが聞いた (カウンタに出ない欠け — DMA 境界・auto-init の折返し・CS4231 FIFO / XTAL2・IRQ の遅れが候補)。起動行は `[pcm] CS4231 v=101 irq 10 dma 1 fmt 0x5B` (NP21/W の 64MB + SNDboard=64 では v=100) | 実機の不具合 | TASK_PCM_CS4231 |
 | R7-3 | 実機 Ra266 の GUI で、KANA をオンにしてマウスキーでカーソルを動かすと、スピーカーからうっすら「ププププ」とクリック音のような音がする (ユーザー観測 2026-10-12、使用感に問題なし)。キーごとのビープ / ポート 37h・35h の操作 / PIT ch2 の扱いが候補 | 実機の事象 (記録) | — |
 | R7-4 | 実機 Ra266 の GUI で、起動の初めに画面中央に描かれたマウスカーソルが残る (ユーザー観測 2026-10-12)。**動かした後のカーソルは残像を出さない** — 残るのは起動時の最初の 1 回の描画だけ (初回の背景の保存より前に描いた、または最初の合成がカーソルの位置を描き直していない)。gshell の起動時の `cursor` の初期位置 (`lib.rs` の st.mouse_x/y = 画面中央) と、最初の合成・カーソルの保存/復元の順が候補。NP21/W では未観測 | 実機の事象 (記録) | — |
-| GSERIAL-1 | GUI 中のシリアル受け口 (gshell の gserial、票 `~/os32-tmp/run/gserial/GSERIAL_DESIGN.r3a.md`) の実機 Ra266 での確認: rshell → `os32gui` で `gs:! ready`、`ping`・`state`・`key`/`type`・`cui` の 2 段応答で CUI に戻り rshell が再び応答する、`os32gui -t` の自動復帰。GUI=1 直接起動 (serial 未初期化) は次段。配送は best effort で `state lost=` に破棄件数 (保証外 3 件は票 §6-8) | 実機の受入 (立会い無し可、ユーザー許可 2026-10-13) | 配備の後、ノート経由で `tools/gserial.py` |
 
 ## 5. 一括ゲスト一覧に入っていない受入
 
