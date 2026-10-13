@@ -1,7 +1,7 @@
-# 持越し台帳の閉じた行 — e11 統合受入
+# 持越し台帳の閉じた行 — e11 統合受入 〜 T2h R0〜R7
 
-状態: **完了記録 (2026-10-07)**。元の行は閉鎖時のまま保持。
-証拠の基点: `~/os32-tmp/`。統合受入は `evidence/2026-10-07/accept_e11/RESULT.md`。
+状態: **完了記録 (2026-10-13 更新、T2h R0〜R7 の閉鎖を末尾に追加)**。元の行は閉鎖時のまま保持。
+証拠の基点: `~/os32-tmp/`。統合受入は `evidence/2026-10-07/accept_e11/RESULT.md`、T2h は `evidence/2026-10-10/` と `2026-10-11/` の `h_*/RESULT*.md` (実機 R7 は票 §5-1 とノート `~/os32-r7/`)。
 現行の残件は [DEFERRED_TESTS.md](../../tasks/DEFERRED_TESTS.md)。
 
 ## E11-1
@@ -192,3 +192,288 @@ X-2 の前半 (e8a の RO 日本語) は `accept_e11/RESULT.md` の GUI 日本�
 | ID | 閉じた項目 | 証拠 |
 |---|---|---|
 | F-12 | exec_heap_user_trim の結線 (g1 の TRIM_DONE 横取り) をゲストで観測。17MB の GK-3 G-4 で、両 back が実 TRIM_DONE の後に ARENA1 の末尾返却 (`cur=88020000→88018000`)・空 ARENA の全返却 (`ARENA=2→1`)・`INITIAL=1→1`・`DATA=OK`。障害物を外した後の再伸長は cur +64KiB・ARENA=1・EXACT、終了行 hook=1・CRC=OK・regrow rc=0、終了後 free=2957・leftover=0。`mem <id>` と as_extents_at_teardown は未採取で fixture の自己観測で判断 (G-3 の成功の根拠には使わない)。native host runner は統合の全体検査 (native+qemu) で補った | `~/os32-tmp/evidence/2026-10-09/g23_gk/RESULT.md`・probe_log.txt・consink_G1_G4.txt |
+
+## T2h R0〜R7 の閉鎖 (2026-10-13、h9 の照合、Fable 5.1)
+
+受入の回: R0 (`evidence/2026-10-10/h_R0/RESULT.md`)、R1a/R1b (`2026-10-10/h_R1/RESULT.md`、再回 `RESULT_2.md`)、R1c (`2026-10-10/h_R1c/RESULT.md`、予行の再回 `2026-10-11/h_R1c_rehearsal/RESULT.md`)、R1d (`2026-10-10/h_R1d/RESULT.md`)、R3〜R6 (`2026-10-11/h_R3R6/RESULT.md`)、h9 再回 (`2026-10-11/h_h9/RESULT.md`)、8MB の g の残り (`2026-10-11/h_small/RESULT.md`)、R7 実機 (票 §5-1 の R7 段落、ノート `~/os32-r7/`)。
+「部分閉」の行は、合格した部分だけをここに書き、残りは [DEFERRED_TESTS.md](../../tasks/DEFERRED_TESTS.md) の同じ ID の行 (縮めた形) に残る。元の行は閉鎖時のまま。
+
+## PRIO-3 (部分閉)
+
+閉鎖 (2026-10-13): シリアルの待ちの CTRL+STOP = `evidence/2026-10-10/h_R1/RESULT.md` (R1a-matrix: `audit_test serial` を画面キーボードから起動し CTRL+STOP で `$?=130`、cursor / fmch PASS)。GUI→CUI→GUI の往復自体は `2026-10-10/h_R1d/RESULT.md` と `2026-10-11/h_h9/RESULT.md` §1 で正常だが、TVRAM generation の値は読んでいない — その部分は現行台帳に残る。
+
+| ID | 何を | 種類 | 関門 |
+|---|---|---|---|
+| PRIO-3 | シリアルの待ちの CTRL+STOP (`audit_test serial` — rshell の通信路とぶつかるのでキーボードから起動)、GUI→CUI→GUI の TVRAM generation。e11 受入ではローカル起動が必要で未実施 | 未実施の確認 | T2h 統合受入 |
+
+## PRIO-1 (部分閉)
+
+閉鎖 (2026-10-13): `evidence/2026-10-10/h_R0/RESULT.md` — 新 NHD `os32_t2h_install.nhd` (200MB、派生 ini `t2h_install.ini`、FD 起動 + ISO) に `cdinst` Full: 検査 (C/H/S 3011/8/17、empty disk) → y → ext2 format・区画表・IPL/loader 検証・MINIMAL 18 / GUI 10 / NORMAL 101 / DEBUG 96 展開 → `Installation Complete`・`$?=0` (X-16 のゲスト `$?` もここで)、HDD 起動で API v74・kselftest 295/0・ext2 印 0、本 NHD hash 不変。残り (`install` の通し) は現行台帳。
+
+| ID | 何を | 種類 | 関門 |
+|---|---|---|---|
+| PRIO-1 | install / cdinst の通しの実行 (授権が通り、区画・format・書込みまで) を別のディスクイメージで — 取り込み済みの DISK-AUTH の受入の残り。e11 受入では別イメージが必要で未実施 | 未実施の確認 | T2h の構成試験の前 |
+
+## E9-2
+
+閉鎖 (2026-10-13): `evidence/2026-10-10/h_R1/RESULT_2.md` (R1b-h3: 6 mode とも `h3 case PASS`、identity の owner / gen が owner-start 行と一致)、`2026-10-11/h_h9/RESULT.md` §1 (identity: 自己公開の owner/generation = host identity、STOP → 再起動後の旧 case は `owner/generation/address changed` で拒否)。
+
+| ID | 何を | 種類 | 元の行 |
+|---|---|---|---|
+| E9-2 | h3 の本人識別は接続済み、前景の証拠は h3fix (2026-10-10) で物理読みに替えて writer 不要。残りは R1b 再回の live で確かめるだけ | 未実施の確認 | 2605、2747–2893 |
+
+## E9-3
+
+閉鎖 (2026-10-13): `evidence/2026-10-10/h_R1/RESULT.md` (R1a-e10: `audit_test tvram PASS (0 failures)`)。
+
+| ID | 何を | 種類 | 元の行 |
+|---|---|---|---|
+| E9-3 | TVRAM 範囲外の呼び出しの拒否をゲストで (`6e4df78` はホスト試験だけ) | ホストのみ | 1432–1548 |
+
+## E10-1
+
+閉鎖 (2026-10-13): `evidence/2026-10-10/h_R1/RESULT.md` (R1a-e10: `v86 -d <無い>` / `v86 -b <非画像>` とも rc=-1、owner-exit leftover 0、lease 0)、`RESULT_2.md` (V86 往復 + 表示アプリの前後で pt0_snapshot MATCH、v86_restore_mismatch 0)、`2026-10-10/h_R1c/RESULT.md` (hook 3 = K1: session 中の CPL0 例外 → kill app、leftover 0、次の `v86 -b` も正常)。
+
+| ID | 何を | 種類 | 元の行 |
+|---|---|---|---|
+| E10-1 | V86 の `-d` / `-b` の失敗出口と K1 (session 中の CPL0 例外) のゲスト確認。正常・STOP 出口は e11 統合受入済み、故障画像と注入手段が要る | 未実施の確認 | e10c |
+
+## E10-5
+
+閉鎖 (2026-10-13): `evidence/2026-10-10/h_R1c/RESULT.md` (hook 4: `v86 -b` の end 中の再例外 → `[ring3] exception vec=6 EIP=0x156976 (r1_fixture_v86_end)` → `OS32: exec teardown stopped`、`exec_stop_count` 0→1、exec_pending_transfer で停止)。
+
+| ID | 何を | 種類 | 元の行 |
+|---|---|---|---|
+| E10-5 | V86 session の end 中の再例外での停止の印 (シリアル 1 行と `exec_stop_count`) のゲスト確認 (ホストのみ、注入の手段が要る)。e11 受入の持越し理由: 故障画像と再例外の注入手段が要る | ホストのみ | T2h 統合受入 |
+
+## E10-6
+
+閉鎖 (2026-10-13): `evidence/2026-10-10/h_R1/RESULT.md` (R1a-e10: `v86 -b /host/test/int80.img`、bp v86_session_end で linear 0x1FC40 = 0x3046 → IF (bit9) = 0、IOPL=3、ISR 実行済み)。
+
+| ID | 何を | 種類 | 元の行 |
+|---|---|---|---|
+| E10-6 | V86 の INT 80h を反射する間 IF=0 のゲスト確認 (ホストのみ、INT 80h を出す V86 の画像が要る)。e11 受入の持越し理由: INT 80h を出す V86 の画像が要る | ホストのみ | T2h 統合受入 |
+
+## E11-8
+
+閉鎖 (2026-10-13): `evidence/2026-10-10/h_R1/RESULT.md` (R1a-e11: pipe_owner_test PASS、子 id=3 も PASS、他 owner の長さ 0 は設計票 §1-2 の期待どおり、trusted の `ls / | cat` 正常)。
+
+| ID | 何を | 種類 | 元の行 | 関門 |
+|---|---|---|---|---|
+| E11-8 | pipe_get_buf の kernel 番地返却・pipe_get_len の他 owner 照会の意味変更と範囲検査はホスト確認のみ。ゲストで本人成功・他 owner 拒否の対照を確認 | 契約接続待ち | 1502、1504、1546 | T2h 統合受入 |
+
+## E11-9 (部分閉)
+
+閉鎖 (2026-10-13): `evidence/2026-10-10/h_R1/RESULT_2.md` (V86 往復 + gfx200_test の前後で PT0 MATCH、v86_return_audit_fail 0・memmap_audit_fail 0)、`2026-10-11/h_h9/RESULT.md` §1 (17MB PEGC: VRAM 系の装置フレームは master PT と全画面 AS で全て PCD=1・U=0、lease 帯 214 PTE は RAM の面で WB、装置の alias 0) と §3 (Cirrus: リニア窓 512 PTE PCD=1・U=0・RW=1)。CUI の tvdump は受入済み。残り (WM / GUI 端末の tvdump 0 埋め) は現行台帳と H-7。
+
+| ID | 何を | 種類 | 元の行 | 関門 |
+|---|---|---|---|---|
+| E11-9 | CUI の tvdump は受入済み。GUI 端末と WM の 0 埋めのゲスト確認 (ホストのみ)、V86 後の DISPLAY/TVRAM 再 lease と全 alias UC の明示観測 (e12-17mb-pegc-v86-release) | 申し送り | e9 (2026-10-02 PM 決定) | T2h 統合受入 |
+
+## E11-12
+
+閉鎖 (2026-10-13): E9-2 と同じ証拠 (`evidence/2026-10-10/h_R1/RESULT_2.md` R1b-h3、`2026-10-11/h_h9/RESULT.md` §1 identity) — h3a/h3b の実ゲストで自己公開と host identity が一致、CRT 非依存の marker (物理読み) で受入。
+
+| ID | 何を | 種類 | 元の行 | 関門 |
+|---|---|---|---|---|
+| E11-12 | c3: h3 caller_identity自己公開とhost identity()照合を接続、qemuホスト確認。PM: h3a/b実ゲスト・CRT非依存marker受入 | ホスト確認・統合ゲスト未確認 | E9-2 / e9 | T2h の h3 (本人識別のゲスト照合は h3 の手順一式で) |
+
+## E11-BUD
+
+閉鎖 (2026-10-13): `evidence/2026-10-10/h_R1/RESULT_2.md` (E11-BUD 記録: kheap_peak boot 3,784B → GUI・回帰後 134,872B (GUI 中の `kmalloc_peak_bytes` の物理読みと同値) → GUI 終了後も 134,872B、KHEAP 180,224B に対し余り 45,352B、resident_peak 131,656・fail 0)。決定は設計票 U5 (ユーザー決定 2026-10-10): **KHEAP 176KiB 維持**、実機の peak は `mem` で。測定と決定で閉じる (PASS ではなく記録)。
+
+| ID | 何を | 種類 | 元の行 | 関門 |
+|---|---|---|---|---|
+| E11-BUD | kmalloc_peak_bytes は exec ヒープの確保も数える (kheap_alloc が全 KHeap 共通で更新) — GUI 後 1,286,752B。カーネルヒープの使用は `mem` で 2,544/180,224B。ピークはカーネルヒープだけに直した (e12)、測り直しは統合ゲストで、KHEAP を戻すか決める。b2 実測は b2_sizes.json | ホスト検証・統合ゲスト未実施 | `c1_sizes.json` | T2h 前 |
+
+## E11-A2 (本体閉、E11-A2b を分割して現行台帳へ)
+
+閉鎖 (2026-10-13): 本人識別 = E9-2 の証拠。attach 失敗の注入 = `evidence/2026-10-10/h_R1c/RESULT.md` (hook 6: about の初回 attach 失敗 → 次の attach で成功し窓は完全に描かれた)。非 owner shutdown = `2026-10-10/h_R1/RESULT.md` (R1b-shutdown: `shutdown_probe: PASS`、backend・surface・screen owner 不変。正規 owner の対照は未実施)。raw KAPI 待機利用者の明示 check は E11-A2b (渡す、T4)。全画面入力 4 点は E11-5 に集約。
+
+| ID | 何を | 種類 | 元の行 | 関門 |
+|---|---|---|---|---|
+| E11-A2 | h3 本人識別のゲスト照合は h3 の手順一式で。attach 失敗の注入・非 owner shutdown・raw KAPI 待機利用者の明示 check はホストのみ。全画面入力 4 点は E11-5 に集約、日本語は受入済み | ホスト確認・統合ゲスト未確認 | e11a2 / guest_acceptance e11a2-* | T2h の h3 |
+
+## E11-PERF
+
+閉鎖 (2026-10-13): `evidence/2026-10-10/h_R1/RESULT_2.md` (R1b-perf: bench_scale2x Test 1 = 320x200 40ms/100・640x400 10ms/100 で accept_e11 の基準と同値)、実機は票 §5-1 R7a (Test1/2 が更新前と ±10% 内)。present ごとの query の前後比較は基準が無く**測定のみ、合格判定ではない** (設計の期待どおり、PM 判断 2026-10-13)。比較値を採る目的は果たした (以後の基準は R1b の値)。
+
+| ID | 何を | 種類 | 元の行 | 関門 |
+|---|---|---|---|---|
+| E11-PERF | present ごとの query の前後比較は基準値が無く未実施。bench_scale2x Test 1 の基準は 320x200 40ms/100、640x400 10ms/100 (accept_e11/RESULT.md)。比較値を採取する | 未実施の確認 | E11-1 の比較残件 | T2h 統合受入 |
+
+## F-6
+
+閉鎖 (2026-10-13): 17MB = `evidence/2026-10-10/h_R1/RESULT.md` (R1a-f6: mem_map_test の invalid / control PASS、R1a-h2: h2_stack512 `stack=524288 pages=104`・guard err=6、kstack high-water は `mem` の `kstack=` 欄で記録)、8MB = `2026-10-11/h_R3R6/RESULT.md` R4 (mem_map_test 2 PASS、free 987 復帰)、毒 AS の kill = `2026-10-10/h_R1c/RESULT.md` (hook 5a: 生存親が子の後 USER へ戻らず syscall 出口で kill、leftover = pages 100 (P3-c); hook 5b: PARKED の resume で kill、leftover 134 (P3-d); 次起動は新 owner で正常)。leftover==0 は全回の owner-exit 行。
+
+| ID | 何を | 種類 | 元の行 |
+|---|---|---|---|
+| F-6 | f の受入一式の残り (f5b-mem-map の対照と pf は 2026-10-08 に合格、`~/os32-tmp/evidence/2026-10-08/accept_f5b_f9/`): 8MB / 17MB での伸長と unmap、512KiB stack、kernel stack high-water (f5a の AS +532B / map pending 256B、lease_selftest 1,676→2,732B (AS 2 個)・test_ledger 812→1,340B・test_appmem 1,232B を含む)、leftover==0、毒 AS の kill (syscall 帰路と resume)。f5a レビュー: 入れ子で親 A が毒の後に子の終了で A の PD が一時的に CR3 に載る (USER へは戻らず syscall 出口で kill — P3-c)、resume の中断も h3 の `syscall_abort` 地点に当たる (P3-d) — ゲストの h3 の数え方で確かめる | 未実施の確認 | 2369 |
+
+## H-1 (部分閉)
+
+閉鎖 (2026-10-13): `evidence/2026-10-10/h_R1/RESULT.md` (R1a-h2: fixture 15 本の sha256 が manifest と一致、control-app entry +1、old-app / unknown-format / old-cpl0-flag は `unknown format or flags`、bad-abi / bad-memory / prev-generation は `generation or KAPI layout mismatch` で entry +0、guard `addr=8ff7f000 err=0x6`、owner-exit leftover 0)、`2026-10-10/h_R1c/RESULT.md` (R1c-2: 旧 shell は boot FATAL・entry 0、旧 shlib は `g_reject=1`・依存 app entry 0・CUI fallback、各 restore で verify-set 一致; R1c-1: 故障画像 `kernel-r1` の hook 7 本と製品 hash 不変)。残り (h2_stack512 の park/resume) は現行台帳。
+
+| ID | 何を | 種類 | 元の行 |
+|---|---|---|---|
+| H-1 | h2: fixture の再生成と hash 照合、隔離媒体で旧 app / shell / shlib を拒否、owner 回収、park、guard の error=6 とカウンタ、故障画像・旧 shell の試験 | 未実施の確認 | 2463–2509、2909、2914 |
+
+## H-2 (部分閉)
+
+閉鎖 (2026-10-13): `evidence/2026-10-10/h_R1/RESULT_2.md` (R1b-h3: h3fix 後の道具で pf / gp / de / ud / USER-loop / KAPI-loop の 6 本とも `h3 case PASS (PM trace + physical diagnostics + next launch)`、verify、h3b への交換、PARKED の arm (別窓を前景にしてから)、KAPI-loop は wm-kill・pending 0、loop-watch / 単独 stop / trace-watch の live、各 owner-exit leftover 0)。残り (打鍵を重ねた STOP・前景以外の張本人の明示観測) は現行台帳。
+
+| ID | 何を | 種類 | 元の行 |
+|---|---|---|---|
+| H-2 | h3: 台本経由の KAPI-loop、pf / gp / de / ud、verify、h3b への交換、PARKED の arm、実行中 OP_WAIT の arm、park 中の WM kill、打鍵を重ねた STOP、前景以外の張本人。h3fix4 の後のゲスト再実行。loop-watch / 単独 stop / trace-watch の live 実行 | 未実施の確認 | 2692–2830、2894–2905、3059–3069、3082、3365–3368 |
+
+## H-3
+
+閉鎖 (2026-10-13): `evidence/2026-10-10/h_R1/RESULT_2.md` (R1b-h3 の KAPI-loop: wm-kill・pending 0、slot 全 0、owner-exit leftover 0 = ページ返却; R1b-stop の 3 試行で reclaim / stop_park の増分と slot 0)。「FIRING の後 約 1 秒は STOP が効かない」と制限 3 件は既知の制限として記録 (試験ではない)。
+
+| ID | 何を | 種類 | 元の行 |
+|---|---|---|---|
+| H-3 | GUI KAPI-loop の STOP: ホストだけで見た分岐群、ページ返却の観測、FIRING の後 約 1 秒は STOP が効かない、制限 3 件 | ホストのみ / 既知の制限 | 3218–3262、3278、3305、3367 |
+
+## H-4 (部分閉)
+
+閉鎖 (2026-10-13): 17MB planar / cirrus-off = `evidence/2026-10-10/h_R1d/RESULT.md` (gfx200_test 20 回・gfx_demo200・blit_test 11/11・bench_scale2x 全 Test・GUI 往復)、+ `2026-10-11/h_h9/RESULT.md` §2 (全画面 DISPLAY・SHM lock・font_load_test・旧 token 失効と両 SDK 再 attach); 17MB Cirrus = `2026-10-11/h_R3R6/RESULT.md` R3 (guard C・20 回・V86 往復・gdi_test) + `h_h9` §3 (alias UC); 8MB planar = `h_R3R6` R4 (shapes i/ii/iii、guard、20 回) + `h_h9` §4 (M 全通し、g の G-1/2/4/8・R-1/2) + `2026-10-11/h_small/RESULT.md` (G-3/5/6/7/9・R-3/4); 8MB PEGC = `h_R3R6` R5 + `h_h9` §5 (G-1〜G-4、guard D の両分岐 err=7 / 6); 64MB + 音源 = `h_R3R6` R6 (66MB ONLINE、`[pcm] CS4231 v=100`、pcm_test と STOP → 再 open) + `h_h9` §6 (workspace PTE 10 枚と 32MB 超の恒等写像、IMR の変化と解除)。派生 ini は t2h_cirrus / t2h_8mb / t2h_64mb_118、原本 ini と本 NHD は不変。残り (64MB 高位 buffer・GUI 再生 park/resume・PEN/DMA 読み) は現行台帳。
+
+| ID | 何を | 種類 | 元の行 |
+|---|---|---|---|
+| H-4 | **構成を変える試験の一括** (全段が 17MB・今の ini だけで受入した): 8MB、planar / PEGC / Cirrus の切替、音源 (PC-9801-118 の PCM)、Ra266 64MB。`gfx200_test` / `gfx_demo200`、e12 の構成別台本 (guest_acceptance.yaml の e12-8mb-* / e12-17mb-planar / e12-17mb-cirrus / e12-cirrus-off)、f12-8mb-startup (status deferred。f12の8MB証拠はK7ホスト94/768pageのみ、実ゲストはこの構成関門でPMが実行) | 構成持越し | 278、418、557、894、897、1009、1112、1276、1340、1431、1601、1887、2908、3364 |
+
+## H-5 (部分閉)
+
+閉鎖 (2026-10-13): 票 §5-1 R7a (2026-10-12、実機 Ra266 9545e27: 更新前に #PF で落ちた bench_scale2x / blit_test が正常、Test1/2 が更新前と ±10% 内 = UC 化で present が遅くならない)。残り (CG 窓の WB・後始末・kstack の転記) は現行台帳。
+
+| ID | 何を | 種類 | 元の行 |
+|---|---|---|---|
+| H-5 | 実機 Ra266: UC 化で present が遅くならないかの計測と CG 窓の WB、表示の後始末 (GRCG / EGC・68h の残り)、kernel stack の high-water | 構成持越し (実機) | 709–712、790–793、2253、2338 |
+
+## H-6 (H-6a 閉、H-6b を分割して現行台帳へ)
+
+閉鎖 (2026-10-13): H-6a = `evidence/2026-10-10/h_R1/RESULT_2.md` (`v86 -b` / `v86 -d` / hal_test の前後で /api/gdc mode2 (6Ah) = 0x01・mode1 = 0x88・text 表示復帰が不変、phys E0000h / A8000h の読みも不変 — 記録)。6Ah の復元の未対処と 9801 構成の `gui_gate` は H-6b (渡す、T7)。
+
+| ID | 何を | 種類 | 元の行 |
+|---|---|---|---|
+| H-6 | V86 の出口で 6Ah の標準 / 拡張を戻していない (9821 で E0000h が MMIO のまま残り得る)。`v86 -d` / `-b` の後の表示確認、9801 構成での `gui_gate` | 未対処・未観測 | 788–789、3503 |
+
+## H-8
+
+閉鎖 (2026-10-13): `evidence/2026-10-10/h_R1/RESULT.md` (R1a-guard: A `addr=0x8FFBF000 err=6` = 256KiB 底直下; 可変 stack は h2_stack512 の guard `addr=8ff7f000 err=0x6` = 0x90000000−512KiB−1page、設計票 §1-2 の期待どおり)。
+
+| ID | 何を | 種類 | 元の行 |
+|---|---|---|---|
+| H-8 | `ring3_guard` A の固定 target (`MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE - MEM_GUARD_SIZE`) は T2c 可変スタックで実 stack 直下と一致しないことがある。h 受入で A が実 stack 直下 NP を指すことを確認 | 未実施の確認 | e9 R6 |
+
+## H-9
+
+閉鎖 (2026-10-13): `evidence/2026-10-10/h_R1/RESULT.md` (R1a-guard: B `addr=0x80000000 err=7 [shlib band, WRITE]`、shlib 読込み済み、h4a の `err=` 欄)。planar / Cirrus / 8MB でも同値 (`h_R1d`、`h_R3R6`)。
+
+| ID | 何を | 種類 | 元の行 |
+|---|---|---|---|
+| H-9 | `ring3_guard` B (shlib 帯) を shlib を読み込んだ AS で走らせ、RO の error=7 を確かめる (2026-10-06 の受入は未ロードで、帯の fault だけを確認。今のシリアル行は error_code を出さない) | 未実施の確認 | — |
+
+## X-2
+
+閉鎖 (2026-10-13): `evidence/2026-10-11/h_h9/RESULT.md` §2 (font_load_test: stat SKIP ではなく NOSYS の場合を実行、`result: -10`・`PASS 1/1`。「stat 段の SKIP」は今の版では出ない)。
+
+| ID | 何を | 種類 | 元の行 |
+|---|---|---|---|
+| X-2 | `font_load_test` の stat 段の SKIP 理由 → 次にその試験を回す前に確定 | 未実施の確認 / SKIP | 1250、1294 |
+
+## X-21
+
+閉鎖 (2026-10-13): (a) `evidence/2026-10-11/h_h9/RESULT.md` §1 (as_extents: teardown 入口 BP で gui_demo を採取、total 3・free 29・poisoned 0、稼働像と ELF の照合つき)、GUI 中の owner 量は gshell の診断キー (`h_R1/RESULT.md` R1b-identity) で採った。(b) `tools/tests/guest_acceptance.yaml` の g-R-4 は `hook_stop_park_delta: 1` / `done_stop_park_delta: 0` に試行別で書き分け済み (h1b)、`h_R1/RESULT_2.md` R1b-stop と `h_small` R-4 で両試行 PASS。
+
+| ID | 何を | 種類 | 元の行 |
+|---|---|---|---|
+| X-21 | T2g のゲスト受入の残り。**GK-3 (2026-10-09、063c515) と GK-4 R-1〜R-4 (2026-10-10、0ecaf98) は合格** (証拠 `~/os32-tmp/evidence/2026-10-09/g_x21/`・`2026-10-10/gk4/RESULT.md`)。残り: (a) G-4/R-3 の `mem <id>` と `as_extents_at_teardown` は未採取 (GUI 中に rshell が無い。fixture の自己観測で代用) — CUI から GUI アプリの extent を採る手段を作るときに、(b) 台本 g-R-4 の `stop_park_delta: 1` は hook 中の試行の期待。DONE 直後の STOP は back が自分の OP_WAIT 中で park を通らず +0 が設計どおり (`exec/appslot.c:521`) — 台本の期待を試行別に書き分ける (次に台本を触る段で) | 台本の整理 / 未採取 | — |
+
+## S-1 (部分閉)
+
+閉鎖 (2026-10-13): `evidence/2026-10-10/h_R0/RESULT.md` (h-R0-winoptin: `test_np21w_trial.py --windows-parser` 31 本 OK で通常 skipped の 1 件を実行、`test_np21w_ini_live.py --windows-fixtures` 89 本 OK で通常 skipped の 4 件を実行 = 5 件 PASS)。集約 9 件のうち残り 4 件の所在は現行台帳。
+
+| ID | 試験 | SKIP の理由 | 区別 | いつ必ず回すか |
+|---|---|---|---|---|
+| S-1 | Windows opt-in のホスト試験 (全段で 5 件、集約では 9 件) | WSL から Windows 側の道具を既定で起動しない | 環境 | T2h 統合受入の前に 1 回、opt-in で |
+
+## S-2
+
+閉鎖 (2026-10-13): `evidence/2026-10-10/h_R1/RESULT.md` (R1a-e11: `/etc/profile` 配置後 kout_test `0 skip(s)`、exit 0)。
+
+| ID | 試験 | SKIP の理由 | 区別 | いつ必ず回すか |
+|---|---|---|---|---|
+| S-2 | `kout_test` の 1 件 | ゲストに `/etc/profile` が無い | **環境不足** (合格ではない) | 次のゲスト受入で `/etc/profile` を置いて回す |
+
+## S-3
+
+閉鎖 (2026-10-13): `evidence/2026-10-10/h_R1/RESULT.md` (R1a-e11: kout_test 2d / 3c は `N/A` と出る、h3b で試験側を修正)。
+
+| ID | 試験 | SKIP の理由 | 区別 | いつ必ず回すか |
+|---|---|---|---|---|
+| S-3 | `kout_test` の 2d / 3c | 設計上の適用外 | 適用外 | — (延期ではない。試験側で SKIP ではなく N/A と出すようにする) |
+
+## S-7
+
+閉鎖 (2026-10-13): planar = `evidence/2026-10-10/h_R1d/RESULT.md` (blit_test 正当性 11/11・`PASS 1/1`、bench_scale2x 全 Test 完走、Test 3 = 5 ticks)、PEGC の SKIP と他の計測の継続 = `2026-10-10/h_R1/RESULT_2.md` (blit_test `SKIP packed framebuffer` $?=2、bench_scale2x Test 3 SKIP で Test 1/2/4〜7 は計測)。Cirrus (packed) でも同じ SKIP (`h_R3R6` R3)。
+
+| ID | 試験 | SKIP の理由 | 区別 | いつ必ず回すか |
+|---|---|---|---|---|
+| S-7 | blit_test 全体 / bench_scale2x Test 3 | packed は planar 4 面試験の適用外 | 適用外 (PASS に数えない) | H-4 planar 構成で実行、PEGC は SKIP と他の計測の継続を確認 |
+
+## S-8
+
+閉鎖 (2026-10-13): `evidence/2026-10-10/h_R1/RESULT_2.md` (R1b-bud: TTF 無しで `SKIP font not deployed` $?=2 (合格に数えない)、/data に ipaexg.ttf・ipaexm.ttf を置いて `$?=0`、終了後に削除して非配備に戻した。描画の目視は screenshot API が 98 面だけで PEGC 画面を採れず未確認)。
+
+| ID | 試験 | SKIP の理由 | 区別 | いつ必ず回すか |
+|---|---|---|---|---|
+| S-8 | font_test | /data/ipaexg.ttf は意図的に非配備 | 環境不足 | H-4 前に TTF を置いて実行、未配備は終了 2 と SKIP 行を確認。SKIP 行の `os32api::print` (kprintf) はリダイレクトを素通りする既知の制限 (Rust の fd1 helper ができるまで) |
+
+## S-5
+
+閉鎖 (2026-10-13): `evidence/2026-10-10/h_R1/RESULT_2.md` (R1a-matrix: e2test Test 3/4 で 372,632B ×2 (1 回書き・64KB 分割) を書いて読み戻し一致、owner-exit pages=340 leftover 0 — 「372KB×2 が取れない」は f の exec ヒープで解消)。
+
+| ID | 試験 | SKIP の理由 | 区別 | いつ必ず回すか |
+|---|---|---|---|---|
+| S-5 | e2test | 372KB × 2 のバッファが取れない | 環境の前提不足 | exec ヒープの上限を見直す f の段 |
+
+## S-6
+
+閉鎖 (2026-10-13): `evidence/2026-10-10/h_R1c/RESULT.md` (S-6: 原本 ini に `NP2NETSOCK=127.0.0.1:8026` の鍵あり、`tools/host_agent.py --listen` を起動して隔離構成で host_test `PASS 26/26`。agent 再起動の stale ケース (`host_test stale`) は未実施)。
+
+| ID | 試験 | SKIP の理由 | 区別 | いつ必ず回すか |
+|---|---|---|---|---|
+| S-6 | host_test | host_agent 不在 | 環境の前提不足 | T2h の Host Services の受入 |
+
+## F-14 (台帳からは 2026-10-10 に消した行の追記)
+
+閉鎖 (2026-10-10、a96a3a2): `evidence/2026-10-10/f14_filer/RESULT.md` (filer で /tmp/f14 の 300 件: PAGEDOWN 7 回で各頁 15 行が窓に収まり継ぎ目の欠け・重複なし、F5 → HOME でも同一。`MAX_ENTRIES=96` の `[truncated list]` は v1.2 CONTRACTS.md:205 の契約どおり。前後 kills 0・leftover 0)。先行分は `2026-10-09/` の f13_acc・f13_f14_shlib・f13_f14_installer。
+
+| ID | 何を | 種類 | 関門 |
+|---|---|---|---|
+| F-14 | f12 受入の残り。2026-10-09 に resident・Rust filer (一覧/展開/F5)・generation-shlib・installer-cancel (install / cdinst とも FD 起動で確認画面まで進め n、NHD 全体のハッシュ不変) をゲストで観測 (`~/os32-tmp/evidence/2026-10-09/` の f13_acc・f13_f14_shlib・f13_f14_installer の RESULT.md)。残りは filer の数百件で窓境界から欠けないことだけ | ゲスト一部未受入 | f12 |
+
+## X-19 (台帳からは 2026-10-10 に消した行の追記)
+
+閉鎖 (2026-10-10、042bcab): `evidence/2026-10-10/x19_mcp/RESULT.md` (Claude Code 再起動後の MCP で `emu_gui_launch` が gui_demo / trim_back に ok:true と `since` を返し、`emu_wait_text ... since=` で起動中の行を拾い、`emu_type seq=Q hold=1500` で 1 回だけ終了)。
+
+| ID | 何を | 種類 | 元の行 |
+|---|---|---|---|
+| X-19 | GUI 受入の道具の live 確認。**2026-10-09 に state/screen_text/consink/wait_*/type/mouse、2026-10-10 に gtool3 の `Gui.launch` (12/12 ok:true)・`since` を wait_text に渡す形・`type(hold=)` を gui.py の直呼びで合格**。残り: **MCP 経由 (`emu_gui_launch`・`emu_type` の hold) の 1 回** — MCP サーバが旧コードのまま (Claude Code の再起動で読み込まれる)。次にセッションを立てたときに確かめる | 未実施の確認 | — |
+
+## X-3 (台帳からは 2026-10-11 に消した行の追記)
+
+閉鎖 (2026-10-11、3204b6d): 票 §5-1「X-3 を閉じた (2026-10-11)」— GitHub Actions の check が f7/f8 (2026-10-07) 以来 failure (CI のクロス無しで make dry-run が newlib の libc.a を要求)。ci-fix (d3c74ff) の push 後に check・build とも success。過去の run は合格にしない。
+
+| ID | 何を | 種類 | 元の行 |
+|---|---|---|---|
+| X-3 | GitHub Actions の結果が票に無い。**2026-10-11 に照合: check (static-check の check-arch-asm) が f7/f8 (2026-10-07、f60a734) 以来ずっと failure** — CI はクロス無し (`OS32_CLANG_CROSS_FREE=1`) で、make dry-run が newlib の libc.a と i386-elf-gcc を要求するようになったと推定。build は success。→ ci-fix 段で直し、push 後の CI で確かめて閉じる。今の成功で過去を合格にしない | 未実施の確認 | 335–345、2003–2009 |
+
+## H-10 (台帳からは 2026-10-10 に消した行の追記)
+
+閉鎖 (2026-10-10、7bc7cfb): 票 §5-1「L-h 着地」(H-10 は h0t で閉じた)、`run/h/h0t/PACK_h0t.md`。実使用は R3〜R6 の派生 ini (`np21w_ini.py derive ... SNDboard 8→64`、`evidence/2026-10-11/h_R3R6/RESULT.md`)。
+
+| ID | 何を | 種類 | 元の行 |
+|---|---|---|---|
+| H-10 | 音源ボード (SNDboard) の ini キーを `np21w_ini_live.py` 系が扱えない (emu-config §1 の対応キー外) → 道具の拡張 (sol) を h の音源構成の準備前に | 道具の不足 | — |
