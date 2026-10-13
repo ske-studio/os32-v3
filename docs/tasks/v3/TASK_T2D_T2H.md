@@ -167,7 +167,7 @@ guest台本/host成功経路期待も同時更新。表/BB/mailbox不変はkself
 5. tvdumpはCUI授権済みchecked copy KAPIへ移しTVDM wire形式を維持。nop/ring3_hello/fault/guardの観測マーカーは割当済みSHMへ (CRT非依存入口も同じ取得/初期化)。保護違反そのもののVRAM書込みは残す。db_v50_testのVRAM許可期待をRAM境界成功と未貸与VRAM拒否へ変更。
 6. memory世代更新と現行ビルド対象の全再ビルド。apps/gameはユーザー決定により対象外。caller追随要件と再開時ゲートをhへ渡し、決定による持越しと記録する (§5/§8)。
 
-**e11 結線表** ([持越し台帳 §2](../DEFERRED_TESTS.md#2-関門-e11-公開-kapi-の一括版の更新は-1-回) の ID。§2-4 項の「—」は内部準備・契約補足)
+**e11 結線表** ([閉鎖台帳](../../archive/v3/DEFERRED_CLOSED.md) の ID。§2-4 項の「—」は内部準備・契約補足)
 
 | ID | §2-4 項 | 担当パック (a/b/c、複数可) | 何を | 接続先 (port・KAPI) | 撤去する旧経路 | 期待が変わる試験 | 受入 |
 |---|---|---|---|---|---|---|---|
@@ -201,7 +201,7 @@ guest台本/host成功経路期待も同時更新。表/BB/mailbox不変はkself
 - a=内部結線 (旧USER下は準備確認)、b=低位USER/旧例外撤去・SHM/V86契約・拒否、c=正規lease対照・公開KAPI/caller/SDK/生成/版/manifest。**順序は b1 → c → b2** (aの後。b1は直接consumerの無いTVRAM/font/VRAM例外、b2はUnicode/BB/共有PT)。a/b/cは独立公開・配備せず、**版の更新は統合でだけ行う** (b1のTVRAM wrap本体は宣言・slot・版不変で再生成可)。統合で§2-4全6項を同時成立、現行対象再ビルド・配備を一括。受入は§2-5末尾のNP21/W一式とe12の変異一覧による。apps/gameは§5/§8へ。E11-5は2026-10-03決定の「全画面中のowner 1または専用のKAPI」、追加ならcで版一括へ含める。
 > 記録は archive へ移した (2026-10-07): [e11b2・e11a2](../../archive/v3/TASK_T2D_T2H_RECORDS.md#land-r231)。
 
-- **KAPI-CALLBACK**: 未完了は[台帳の優先段](../DEFERRED_TESTS.md#関門-新機能より先-優先段)。公開KAPIの形と版を変えずCPL0実行を塞ぎ、**e11より先に配備・受入する**。hsync・install・filerを壊す単純拒否は不可。候補はkernel生成trampolineのslot 12 stubをCPL3 shimへ替え、kernel内部の列挙口で項目を写しcallbackをCPL3で呼ぶ。CPL0不実行・既存callerの列挙正常・`man -l` crash解消を受入。値返し列挙KAPI追加とcaller移行はe11c。
+- **KAPI-CALLBACK**: 未完了は[台帳の優先段](../DEFERRED_TESTS.md#関門の表)。公開KAPIの形と版を変えずCPL0実行を塞ぎ、**e11より先に配備・受入する**。hsync・install・filerを壊す単純拒否は不可。候補はkernel生成trampolineのslot 12 stubをCPL3 shimへ替え、kernel内部の列挙口で項目を写しcallbackをCPL3で呼ぶ。CPL0不実行・既存callerの列挙正常・`man -l` crash解消を受入。値返し列挙KAPI追加とcaller移行はe11c。
 - **KAPI-OWNER**: 台帳の優先段でSHM lock/free・pipe free/clear/get_buf・DB slotをwrapで所有者照合し、既存の-1で他owner操作を無変更拒否。本人成功・trusted回収も先行受入。`pipe_get_buf`がkernel番地を返す件の意味変更はE11-8のe11c。
 - **KAPI-DISK-AUTH**: 台帳の優先段でkernelが知るexec経路・`/sys`由来・CUI前景の識別を授権に使い、拒否＋許可リストを先行配備。無授権I/Oゼロと隔離媒体での正規caller `inst_hdd` (CPL3)・常駐シェル`cmd_hdprep`を受入。OS32Xヘッダへflagを足す方式はE11-4のe11c。
 - **KAPI-AUDIT-FIX**: 台帳の優先段で`console_set_cursor`の後の`cursor_x++`の符号付きあふれをclampで防ぎ、FM/SSGのch無検査、`fm_play_mml`/`serial_getchar`のCTRL+STOP不能DoS、`wrap_rshell_set_active`の無授権を先行修正・配備・受入。残りの未監査区分 (pipe/redirect/host_*、exec_*/launch_*/appslot、ime_*、gui_call/register、con_sink) はe11a着手前に分類し、到達可能な穴は新機能より先に修正。公開意味変更・範囲検査P3変異はE11-8へ。
