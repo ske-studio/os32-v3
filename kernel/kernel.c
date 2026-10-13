@@ -74,6 +74,7 @@ extern void fatfs_init(void);
 #include "os32_sqlite_vfs.h"
 #include "kapi_db.h"
 #include "bootlog.h"
+#include "crt_diag.h"
 
 #define SHELL_RELOAD_DELAY 10
 
@@ -734,6 +735,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * 写像と PEGC の BB は ⑥ (gfx_boot_reserve) が済ませてあり、probe はそれを
      * 使うだけ (⑦、TASK_T1_LEDGER §3-3)。init まで済ませたら表示はテキストへ
      * 戻る。 */
+    crt_diag_bootlog();
     gfx_prepare_backend();
     kselftest_run_post_probe();
 
