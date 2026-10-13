@@ -1,0 +1,11 @@
+check-crt-diag-host:
+- kernel/crt_diag.c
+- kernel/kernel.c
+- kernel/bootlog.c
+- tools/tests/crt_diag_host.c
+- tools/tests/crt_diag_hostshim/io.h
+- tools/tests/test_crt_diag.py
+- tools/tests/host32.py
+- tools/tests/mutpar.py
+- tools/check_map.d/check-crt-diag-host.yaml
+- build/checks.d/check-crt-diag-host.mk
