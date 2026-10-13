@@ -1059,6 +1059,7 @@ tools/ci_fetch.sh --dry-run             # 選ばれる run と artifact を表�
 `tools/rshell_serial.py` の `--serve-host <取得先>/hostdrv` で SerialFS に渡す。配備元は取得先に展開した `hostdrv/`
 をそのまま使い、作業場の `C:\os32` は使わない (名札外のファイルが常にある)。実機のそのほかの物理操作は個別承認。
 新 FD からの 2 段同期は [T2d〜h詳細 §5-1](tasks/v3/TASK_T2D_T2H.md) が指す設計票 §3-4 (修正版 B) の 0〜7 に従う。
+**再起動と再同期** (R7 の教訓、2026-10-14 反省会): 実機の再起動は rshell の `reboot` (シリアル) で行う — 本体のリセットボタンが効かないことがあった。起動待ちは出力の待ち受け (`wait_text` の類) で 1 回だけ待ち、`ver` を連打しない (連打がリセット直後の起動を邪魔した)。
 
 > ⚠️ artifact は「ビルドが通った」ことしか保証しない。NP21/W でも実機でも起動していない
 > ([V4])。実機へ入れたら kselftest の値を**その artifact の `kernel.map`** の番地で読む。
