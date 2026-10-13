@@ -225,6 +225,8 @@ static int cmd_play(int argc, char **argv)
 /* /etc/system.cfg の読み書きバッファ幅 ([C4])。読みは実効 CFG_READ_MAX - 1。 */
 #define CFG_READ_MAX     1024
 #define CFG_OUT_MAX      1152
+/* 秒×100 tick の期限を符号付き差分で比較できる範囲。 */
+#define GSERIAL_TIMEOUT_MAX (0x7FFFFFFFUL / 100UL)
 
 /* 行 [p, p+len) が "KEY=" (前後空白許容) の代入行か判定する。 */
 static int cfg_line_is_key(const char *p, int len, const char *key)
@@ -319,7 +321,7 @@ static int cfg_set_key(const char *key, const char *val)
 
 static int cmd_os32gui(int argc, char **argv)
 {
-    if (argc >= 2) {
+    if (argc >= 2 && !str_eq(argv[1], "-t")) {
         /* on|off: system.cfg の GUI= を書き換える (次回起動から有効) */
         if (str_eq(argv[1], "on")) {
             if (cfg_set_key("GUI", "1") == 0)
@@ -338,7 +340,32 @@ static int cmd_os32gui(int argc, char **argv)
         return 0;
     }
 
-    /* 引数なし: 今すぐ gshell へ切替。カーネルに次シェルを記録して自分は
+    if (argc >= 2) {
+        const char *s;
+        unsigned long seconds = 0;
+        if (argc != 3 || !argv[2][0]) {
+            shell_print_help(argv[0]);
+            return SH_STATUS_USAGE;
+        }
+        for (s = argv[2]; *s; s++) {
+            if (*s < '0' || *s > '9' ||
+                seconds > (GSERIAL_TIMEOUT_MAX - (unsigned long)(*s - '0')) / 10UL) {
+                shell_print_help(argv[0]);
+                return SH_STATUS_USAGE;
+            }
+            seconds = seconds * 10UL + (unsigned long)(*s - '0');
+        }
+    }
+    if (sh_in_sfs) {
+        g_api->kprintf(ATTR_RED, "%s", "os32gui: not inside 'sfs run'\n");
+        return SH_STATUS_ERROR;
+    }
+    if (argc >= 2 && cfg_set_key("GSERIAL_TIMEOUT", argv[2]) != 0) {
+        g_api->kprintf(ATTR_RED, "%s", "os32gui: failed to write /etc/system.cfg\n");
+        return SH_STATUS_ERROR;
+    }
+
+    /* 引数なし / -t: 今すぐ gshell へ切替。カーネルに次シェルを記録して自分は
      * 終了する → 起動ループが gshell を 0x300000 に載せる (契約 T9)。 */
     {
         int rc = g_api->sys_switch_shell(SYS_GSHELL_BIN);
@@ -510,7 +537,7 @@ static const ShellCmd sys_cmds[] = {
     { "ide",    cmd_ide,    "[0-3]",         "Show IDE drive geometry" },
     { "format", cmd_format, "[0-3] [sects]", "Format a drive to ext2" },
     { "play",   cmd_play,   "MML",           "Play MML via FM synth" },
-    { "os32gui",cmd_os32gui,"[on|off]",      "Switch to GUI shell now, or set GUI at boot" },
+    { "os32gui",cmd_os32gui,"[on|off|-t seconds]", "Switch to GUI shell now, or set GUI at boot" },
     { "gfxmode",cmd_gfxmode,"pc98|pegc|cirrus|auto","Force the graphics backend at next boot" },
     { "kbdstat",cmd_kbdstat,"[-w]",          "Show keyboard 8251 counters (-w: log each byte, ESC/30s)" },
     { (const char *)0, 0, 0, 0 }

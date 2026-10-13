@@ -44,6 +44,10 @@
   付けたときだけこのハーネスを選ぶが、`check-memory-host` は引数なしで呼ぶ。
 - **`apps/` と `game/` はサブモジュール**で、切り出した worktree では空のことがある。
   それらの中のホスト試験はこの表に出ない (`make external` 側)。
+`check-gserial-host` は [`tools/gserial.py`](../tools/gserial.py) の実物を偽ポートで走らせ、
+乱数 id の終端照合、通知・付随行、GUI 入場、CUI 復帰の 3 段と EOT 後続の保持を検査する。
+[`test_gserial_host.py`](../tools/tests/test_gserial_host.py) の `--mutate` は正常対照の後に
+受信・照合の変異を回す。実機 UART・gshell の起動時間はこの試験では確認しない。
 <!-- /manual:intro -->
 
 ## 4. `make check` の外にある試験

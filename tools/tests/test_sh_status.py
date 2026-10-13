@@ -120,6 +120,21 @@ def run_variants(tmp, shim, prefix):
 #  変異 (否定側)。(ファイル, 置換前, 置換後) — 置換前は 1 か所だけに出ること。
 # ---------------------------------------------------------------------------
 MUTATIONS = [
+    ("gserial_sfs_guard", "userland/shell/cmd_sys.c",
+     "    if (sh_in_sfs) {", "    if (0) {"),
+    ("gserial_sfs_flag", "userland/shell/rshell.c",
+     "    sh_in_sfs = 1;\n    status = execute_command(child);",
+     "    sh_in_sfs = 0;\n    status = execute_command(child);"),
+    ("gserial_sfs_cleanup", "userland/shell/rshell.c",
+     "    status = execute_command(child);\n    sh_in_sfs = 0;",
+     "    status = execute_command(child);\n    sh_in_sfs = 1;"),
+    ("gserial_cfg_failure", "userland/shell/cmd_sys.c",
+     '    if (argc >= 2 && cfg_set_key("GSERIAL_TIMEOUT", argv[2]) != 0) {',
+     '    if (argc >= 2 && (cfg_set_key("GSERIAL_TIMEOUT", argv[2]), 0)) {'),
+    ("gserial_timeout_range", "userland/shell/cmd_sys.c",
+     "                seconds > (GSERIAL_TIMEOUT_MAX - (unsigned long)(*s - '0')) / 10UL) {",
+     "                0) {"),
+
     # (1) 種別を値から作る版。exit(-2) が fault に、exit(-3) が not found に化ける。
     ("kind_from_value", "userland/shell/main.c",
      "    case EXEC_KIND_EXITED:\n"

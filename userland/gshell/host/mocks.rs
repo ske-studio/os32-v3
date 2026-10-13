@@ -302,7 +302,7 @@ pub static MEMSTAT_APPS: Mutex<Vec<(u32, u32)>> = Mutex::new(Vec::new());
 pub static MEMSTAT_CALLS: Mutex<Vec<(i32, u32)>> = Mutex::new(Vec::new());
 unsafe extern "C" fn mem_stat(id: i32, out: *mut u8, size: u32) -> i32 {
     lk(&MEMSTAT_CALLS).push((id, size));
-    assert_eq!(size, 132, "KAPI 73 の MemStat サイズ");
+    assert!(size == 132 || size == 200, "MemStat prefix or full snapshot");
     std::ptr::write_bytes(out, 0, size as usize);
     let (pressure, mask) = *lk(&MEMSTAT_GLOBAL);
     std::ptr::copy_nonoverlapping(pressure.to_le_bytes().as_ptr(), out.add(120), 4);
@@ -868,9 +868,36 @@ pub fn set_app_state(app_id: i32, state: i32) {
     v[app_id as usize] = state;
 }
 
+pub static SERIAL_IN: Mutex<Vec<u8>> = Mutex::new(Vec::new());
+pub static SERIAL_OUT: Mutex<Vec<u8>> = Mutex::new(Vec::new());
+pub static SERIAL_INITIALIZED: AtomicUsize = AtomicUsize::new(0);
+pub static RSHELL_ACTIVE: Mutex<Vec<i32>> = Mutex::new(Vec::new());
+pub static SWITCHES: Mutex<Vec<Vec<u8>>> = Mutex::new(Vec::new());
+unsafe extern "C" fn serial_trygetchar() -> i32 {
+    let mut q = lk(&SERIAL_IN);
+    if q.is_empty() { -1 } else { q.remove(0) as i32 }
+}
+unsafe extern "C" fn serial_puts(s: *const u8) {
+    let mut n = 0; while *s.add(n) != 0 { n += 1; }
+    lk(&SERIAL_OUT).extend_from_slice(std::slice::from_raw_parts(s,n));
+}
+unsafe extern "C" fn serial_initialized() -> i32 { SERIAL_INITIALIZED.load(Ordering::SeqCst) as i32 }
+unsafe extern "C" fn rshell_active(active: i32) { lk(&RSHELL_ACTIVE).push(active); }
+unsafe extern "C" fn switch_shell(s: *const u8) -> i32 {
+    let mut n = 0; while *s.add(n) != 0 { n += 1; }
+    lk(&SWITCHES).push(std::slice::from_raw_parts(s,n).to_vec()); 0
+}
+
 pub fn init() {
     let mut a = os32api::mock_api();
     a.get_tick = get_tick;
+    a.serial_trygetchar = serial_trygetchar;
+    a.serial_puts = serial_puts;
+    a.serial_is_initialized = serial_initialized;
+    a.rshell_set_active = rshell_active;
+    a.sys_switch_shell = switch_shell;
+    lk(&SERIAL_IN).clear(); lk(&SERIAL_OUT).clear(); lk(&RSHELL_ACTIVE).clear(); lk(&SWITCHES).clear();
+    SERIAL_INITIALIZED.store(0, Ordering::SeqCst);
     a.sys_time = sys_time;
     a.kbd_dropped_count = zero;
     a.kbd_trygetrawkey = raw_key;

@@ -77,6 +77,7 @@ mod taskbar;
 mod timer;
 mod trim;
 mod diagnostics;
+mod gserial;
 mod visible;
 mod wm;
 
@@ -143,6 +144,8 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
     /* SHM の先頭 (KAPI のデータフィールド)。スロットは +192KB から 16KB ずつ。 */
     st.shm_base = unsafe { (*api).shm_base };
 
+    let serial_timeout = gserial::load_timeout();
+
     /* GFX モードへ (libos32gfx_init → gfx_init + framebuffer + surface/sprite)。 */
     gfx::init();
     /* 640×400 / 16 色を決め打ちしない (契約 G5)。起動時に 1 回だけ読む。 */
@@ -192,6 +195,7 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
      * 届く唯一の経路。 */
     settings::startup_notice(&st.cfg);
     loop_notice();
+    gserial::open(st, serial_timeout);
 
     /* ---- 単独ループ (契約 T8: アプリが居ないときは gshell が X3 を回す) ---- */
     if !standalone_loop(st) {
@@ -211,6 +215,8 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
         (a.ime_set_render)(core::ptr::null_mut());
         (a.gfx_shutdown)();
         (a.tvram_clear)();
+        gserial::cui_done(st);
+        (a.rshell_set_active)(1);
         (a.sys_switch_shell)(CUI_SHELL.as_ptr());
     }
     0
@@ -660,6 +666,8 @@ fn switch_cui(st: &mut wm::GuiState) -> bool {
         visible::recompute_and_expose(st);
         wm::composite_full(st);
         session::clear();
+        gserial::notify(st, "cui failed cfg");
+        gserial::disarm(st);
         modal::open_wm_message(
             st,
             GUI_MODAL_OK,
@@ -672,6 +680,8 @@ fn switch_cui(st: &mut wm::GuiState) -> bool {
     unsafe {
         let a = os32api::api();
         (a.tvram_clear)();
+        gserial::cui_done(st);
+        (a.rshell_set_active)(1);
         (a.sys_switch_shell)(CUI_SHELL.as_ptr());
     }
     false

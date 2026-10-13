@@ -132,6 +132,7 @@ int  sh_status_from_kind(int kind, int code);
 /* ------------------------------------------------------------------------ */
 extern int sh_exit_flag;   /* 終了要求が立ったか */
 extern int sh_exit_code;   /* そのときの終了値 */
+extern int sh_in_sfs;      /* SerialFS の子実行中 (GUI 切替を断る) */
 
 /* `exit [N]` の引数を読む。0 = *code に値が入った / -1 = 不正 (実行しない)。
  * 引数なしは直前の `$?`。非数値・255 超・2 つ以上は -1 (呼び手は 2 を返す)。 */

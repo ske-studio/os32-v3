@@ -475,6 +475,8 @@ pub struct GuiState {
      * 変換 (辞書検索) は X3 でだけ行う。次の X3 が先頭から取り込む。 */
     pub pending_raw: [i32; 32],
     pub pending_raw_n: usize,
+    pub inj_lost: u32,
+    pub gserial: crate::gserial::Serial,
     /// CTRL+STOP を raw で見た (契約 T6)。OP_WAIT の待ちループがこれで抜けて
     /// アプリへ戻し、カーネルが syscall の出口で畳む。消費したら 0 に戻す。
     pub abort_seen: bool,
@@ -524,6 +526,8 @@ impl GuiState {
         launch_pending: false,
         pending_raw: [0; 32],
         pending_raw_n: 0,
+        inj_lost: 0,
+        gserial: crate::gserial::Serial::NEW,
         abort_seen: false,
         launch_path: [0; 256],
         launch_path_len: 0,
@@ -1140,6 +1144,9 @@ pub fn flush_screen_dirty(st: &mut GuiState) {
 /// その上に FEP が乗る (逆順にすると「描く → 次の周で消される → また描く」で
 /// ちらつく)。
 pub fn wm_cycle(st: &mut GuiState, ctx: input::Ctx) {
+    if ctx != input::Ctx::Pump {
+        crate::gserial::poll_x3(st);
+    }
     input::capture(st, ctx);
     if ctx != input::Ctx::Pump {
         /* モーダルの X3 分 (W4): 保留していた VFS 走査と、sticky な
