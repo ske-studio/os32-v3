@@ -2138,7 +2138,7 @@ static void case_gserial_gui(void)
     sh_in_sfs = 1;
     check(cmd_os32gui(1, plain) == SH_STATUS_ERROR &&
           gui_timeout("20") == SH_STATUS_ERROR && !g_switch_calls && !g_exit_calls &&
-          !g_data_writes && out_has("os32gui: not inside 'sfs run'"),
+          !g_data_writes && out_has("os32gui: refused inside 'sfs run'"),
           "GSERIAL GUI entry denied within SFS including -t");
     check(cmd_os32gui(2, on) == 0 && strcmp(g_cfg_written, "GUI=1\n") == 0 &&
           !g_switch_calls, "GSERIAL on remains allowed inside SFS");

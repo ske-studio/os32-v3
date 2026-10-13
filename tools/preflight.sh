@@ -129,6 +129,10 @@ PYCODE
         *) ng 'runner: 未知の指定 — native または qemu を設定してください' ;;
     esac
 done
+# Do not follow symlinks or descend into build outputs or cargo caches.
+cargo_targets=$(find . -type d \( -name .git -o -path ./build \) -prune -o \
+    -type d -name target -printf '.' -prune 2>/dev/null | wc -c)
+ok "試験キャッシュ: cargo target/ $cargo_targets 個 (main の実木と状態が違いうる)"
 head_time=$(git show -s --format=%ct HEAD)
 for artifact in build/out/vmkernel.lz4 build/out/kernel.map; do
     if [[ ! -f $artifact ]]; then ng "成果物: $artifact 無し — make all が要る";

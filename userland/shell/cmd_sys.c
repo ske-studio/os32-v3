@@ -357,7 +357,7 @@ static int cmd_os32gui(int argc, char **argv)
         }
     }
     if (sh_in_sfs) {
-        g_api->kprintf(ATTR_RED, "%s", "os32gui: not inside 'sfs run'\n");
+        g_api->kprintf(ATTR_RED, "%s", "os32gui: refused inside 'sfs run'\n");
         return SH_STATUS_ERROR;
     }
     if (argc >= 2 && cfg_set_key("GSERIAL_TIMEOUT", argv[2]) != 0) {

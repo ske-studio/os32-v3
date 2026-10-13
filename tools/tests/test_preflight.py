@@ -96,6 +96,26 @@ class PreflightTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn('NG 基点:', result.stdout)
 
+    def test_cargo_cache_presence(self):
+        # Caches outside the worktree, in build/, or under .git are excluded.
+        for path in (self.main / 'target', self.work / 'build/target',
+                     self.work / 'nested/.git/target'):
+            path.mkdir(parents=True)
+        (self.work / 'outside').symlink_to(self.main, target_is_directory=True)
+        result = self.run_preflight('--fix-fonts')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('OK 試験キャッシュ: cargo target/ 0 個 (main の実木と状態が違いうる)',
+                      result.stdout)
+        caches = (self.work / 'userland/rust/example/target', self.work / 'sdk/target')
+        for path in caches:
+            (path / 'debug/nested/target').mkdir(parents=True)
+        result = self.run_preflight()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('OK 試験キャッシュ: cargo target/ 2 個 (main の実木と状態が違いうる)',
+                      result.stdout)
+        for path in caches:
+            self.assertTrue((path / 'debug/nested/target').is_dir())
+
     def test_dotenv_literal_and_env_precedence(self):
         secret = 'SECRET_DO_NOT_PRINT'
         (self.work / '.env').write_text('TOKEN=' + secret + '\nexport CROSS_DIR="' +
