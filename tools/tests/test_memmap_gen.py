@@ -96,6 +96,7 @@ def make_tree(tmp, bss_end):
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(ROOT / rel, dst)
     shutil.copy(ROOT / "include/memmap.h", root / "include/memmap.h")
+    shutil.copy(ROOT / "include/pegc.h", root / "include/pegc.h")
     shutil.copy(ROOT / "docs/02_memory.md", root / "docs/02_memory.md")
     for rel in MIRROR_FILES:
         dst = root / rel
@@ -163,6 +164,9 @@ def cases(script):
         check(w.returncode == 0, "--write が失敗した: " + w.stderr)
         original = (root / "docs/02_memory.md").read_text(encoding="utf-8")
         doc = (root / "build/out/MEMMAP.md").read_text(encoding="utf-8")
+        check("0xFFF00000" in doc and "0xFFF7FFFF" in doc and
+              "PEGC リニア窓の別名" in doc, "PEGC alt window missing")
+        check("0x3FB000" in doc and "固定 MMIO top PT" in doc, "top PT missing")
         check("0x140000" in doc, "生成ブロックに __bss_end が入っていない")
         # 表の行は必ず絶対番地で始まる (「+4KB - +260KB」のような相対表記を禁じる)
         block = doc.split("<!-- 生成")[1].split("<!-- /生成")[0]
@@ -243,6 +247,8 @@ def fixed_paging_cases(script):
         ('unaligned-paging', 'MEM_FIXED_PAGING_BASE', '0x3F1001UL'),
         ('one-page-overlap', 'MEM_SHELL_HEAP_END', '(MEM_FIXED_PAGING_BASE + MEM_GUARD_SIZE)'),
         ('boot-count', 'MEM_FIXED_BOOT_PT_COUNT', '7'),
+        ('top-overlap', 'MEM_FIXED_MMIO_TOP_PT_BASE', 'MEM_FIXED_APERTURE_PT_BASE'),
+        ('old-tail', 'MEM_FIXED_PAGING_END', '(MEM_FIXED_MMIO_TOP_PT_BASE + 2 * MEM_GUARD_SIZE)'),
     )
     for label, name, expr in changes:
         with tempfile.TemporaryDirectory(prefix='os32-fixed-map-') as tmp:
@@ -265,6 +271,14 @@ def fixed_paging_cases(script):
             link = link_fixture(root)
             check(link.returncode != 0 and ('fixed paging' in link.stderr or 'shell heap' in link.stderr),
                   label + ' escaped linker ASSERT: ' + link.stderr)
+    with tempfile.TemporaryDirectory(prefix='os32-top-mirror-') as tmp:
+        root = make_tree(tmp, CLEAN)
+        ld = root / 'build/os32.ld'
+        ld.write_text(ld.read_text().replace('MEM_FIXED_MMIO_TOP_PT_BASE = 0x3FB000;',
+                                            'MEM_FIXED_MMIO_TOP_PT_BASE = 0x3FA000;'))
+        out = run(script, root, '--check')
+        check(out.returncode != 0 and '写しのずれ' in out.stdout and
+              'MEM_FIXED_MMIO_TOP_PT_BASE' in out.stdout, 'top PT mirror mismatch escaped')
     with tempfile.TemporaryDirectory(prefix='os32-fixed-link-') as tmp:
         root = make_tree(tmp, CLEAN)
         check(link_fixture(root).returncode == 0, 'baseline linker failed')

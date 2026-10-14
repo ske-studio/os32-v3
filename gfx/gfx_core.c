@@ -240,8 +240,8 @@ static void gfx_bind_client(void)
 /*       identify (BIOS ワークと物理地図を読むだけ)。                        */
 /*    2. 予約: 候補の窓を owner = DEVICE gfx の **1 回の** ledger_reserve_set */
 /*       に入れる (PEGC と Xe10 の銀行窓は重なるので候補ごとの owner に      */
-/*       しない、B3)。資源レコードは PEGC / Xe10-bank / Xe10-linear の 3 本で */
-/*       span も 3 本、各 span が自分のレコードを指す (B10)。                */
+/*       しない、B3)。PEGC / Xe10-bank / Xe10-linear / PEGC-alt の 4 本で、   */
+/*       各 span が自分の資源レコードを指す (B10)。                         */
 /*    3. 写像: レコードの写像範囲だけを supervisor + PCD (PEGC は窓全体     */
 /*       512KB、Xe10 のリニア窓は decode 4MB のうち 2MB)。戻り値を全部見て、 */
 /*       落ちた候補を外す。予約と写像は probe が落ちても永久に保持する。     */
@@ -262,7 +262,7 @@ static void gfx_bind_client(void)
  * raw_bar, decode_first/end, map_first/end, bdf, vendor, device, bus,
  * revision, bar, width_basis, boot_gen。Xe10 の 2 本は glue の定数 =
  * **NP21/W の窓の値で、実機 Xe10 の実測ではない** (GLUE_CONST)。 */
-static const struct ledger_resource gfx_res[3] = {
+static const struct ledger_resource gfx_res[4] = {
     /* PEGC: 拡張グラフィックスのリニア窓 512KB (資料の値) */
     { 0, GFX_PFN(PEGC_LINEAR_BASE), GFX_PFN(PEGC_LINEAR_BASE + PEGC_LINEAR_SIZE),
       GFX_PFN(PEGC_LINEAR_BASE), GFX_PFN(PEGC_LINEAR_BASE + PEGC_LINEAR_SIZE),
@@ -275,7 +275,11 @@ static const struct ledger_resource gfx_res[3] = {
       GFX_PFN(WAB_XE10_LINEARWIN_BASE + WAB_XE10_LINEARWIN_DECODE),
       GFX_PFN(WAB_XE10_LINEARWIN_BASE),
       GFX_PFN(WAB_XE10_LINEARWIN_BASE + WAB_XE10_LINEARWIN_SIZE),
-      0, 0, 0, LEDGER_BUS_CBUS, 0, 0, LEDGER_WB_GLUE_CONST, 0, 0 }
+      0, 0, 0, LEDGER_BUS_CBUS, 0, 0, LEDGER_WB_GLUE_CONST, 0, 0 },
+    /* PEGC-alt: 16MB システム空間を RAM にした機械の別名 (512KB)。 */
+    { 0, GFX_PFN(PEGC_LINEAR_ALT_BASE), GFX_PFN(PEGC_LINEAR_ALT_BASE + PEGC_LINEAR_SIZE),
+      GFX_PFN(PEGC_LINEAR_ALT_BASE), GFX_PFN(PEGC_LINEAR_ALT_BASE + PEGC_LINEAR_SIZE),
+      0, 0, 0, LEDGER_BUS_FIXED, 0, 0, LEDGER_WB_DATASHEET, 0, 0 }
 };
 
 /* SURFACE の型板。plane offset は pitch × height (ページ丸めなし)。
@@ -348,10 +352,10 @@ static const struct ledger_surface system_tvram = {
     .plane_offset = {0, TVRAM_ATTR_BASE - TVRAM_CHAR_BASE}
 };
 
-/* 資源レコード i (と SURFACE の型板 i + 1) がどの候補のものか。 */
+/* 資源レコード i がどの候補のものか。先頭3本は SURFACE 型板 i + 1 に対応。 */
 static u32 gfx_cand_of(u32 i)
 {
-    return i ? GFX_CAND_CIRRUS : GFX_CAND_PEGC;
+    return i == 1 || i == 2 ? GFX_CAND_CIRRUS : GFX_CAND_PEGC;
 }
 
 /* 副作用のない識別。GFX= と機種 (9821 系) と各 backend の identify だけ。 */
@@ -372,23 +376,23 @@ static u32 gfx_identify_candidates(void)
  * TASK_T1_LEDGER §4-5-R)。判定は変わらない。 */
 void __attribute__((cold)) gfx_boot_reserve(void)
 {
-    struct ledger_span sp[3];
+    struct ledger_span sp[4];
     struct ledger_surface sf;
     const struct ledger_resource *r;
     u32 i, n, m, rid, pfn, cand, display_fail = 0;
-    u32 resource_ids[3] = {LEDGER_MAX_RESOURCES, LEDGER_MAX_RESOURCES, LEDGER_MAX_RESOURCES};
+    u32 resource_ids[4] = {LEDGER_MAX_RESOURCES, LEDGER_MAX_RESOURCES,
+                           LEDGER_MAX_RESOURCES, LEDGER_MAX_RESOURCES};
     rid = 0;
 
     cand = m = gfx_identify_candidates();
     pfn = 0;
-    /* 2. 候補の窓をまとめて 1 回で予約 (失敗なら候補なし = PC98)。 */
-    for (i = n = 0; m && i < 3; i++) {
+    /* 2. 登録できた窓をまとめて予約。登録に失敗した候補から先は登録しない
+     *    (先に登録した窓は保持する。PEGC は F00 だけ登録済みでも alt が無ければ落ちる)。 */
+    for (i = n = 0; m && i < 4; i++) {
         if (!(m & gfx_cand_of(i))) continue;
-        if (!ledger_resource_add(&gfx_res[i], &rid)) m = 0;
-        else {
-            resource_ids[i] = rid;
-            (void)ledger_resource_set_map(rid, 0, 0);
-        }
+        if (!ledger_resource_add(&gfx_res[i], &rid)) break;
+        resource_ids[i] = rid;
+        (void)ledger_resource_set_map(rid, 0, 0);
         sp[n].first = gfx_res[i].decode_first;
         sp[n].end = gfx_res[i].decode_end;
         sp[n].kind = LEDGER_SPAN_MMIO;
@@ -396,9 +400,11 @@ void __attribute__((cold)) gfx_boot_reserve(void)
     }
     if (m && !ledger_reserve_set(LEDGER_OWNER_GFX, sp, n)) m = 0;
     /* 3. 写像範囲だけを supervisor + PCD。落ちた候補は外す (予約は残る)。 */
-    for (i = 0; i < 3; i++) {
+    for (i = 0; i < 4; i++) {
         r = &gfx_res[i];
-        if ((m & gfx_cand_of(i)) && r->map_first < r->map_end &&
+        if (resource_ids[i] == LEDGER_MAX_RESOURCES)
+            m &= ~gfx_cand_of(i);
+        else if ((m & gfx_cand_of(i)) && r->map_first < r->map_end &&
             paging_map_phys(r->map_first * PAGE_SIZE, r->map_first * PAGE_SIZE,
                             r->map_end - r->map_first, PAGE_RW | PTE_PCD) != 0)
             m &= ~gfx_cand_of(i);

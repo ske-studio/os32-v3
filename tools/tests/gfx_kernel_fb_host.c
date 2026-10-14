@@ -33,6 +33,9 @@ static u32 checks;
 #include "surface_query.h"
 #include "appslot.h"
 #define CFG_KB 17408
+#ifndef HOST_ALT_WINDOW
+#define HOST_ALT_WINDOW 0
+#endif
 void *kmemset(void *d, int c, u32 n) { u8 *p=d; while(n--) *p++=c; return d; }
 void *kmemcpy(void *d, const void *s, u32 n) { u8 *p=d; const u8 *q=s; while(n--) *p++=*q++; return d; }
 static u32 host_kprintf_count;
@@ -224,7 +227,7 @@ static void display_check(u32 backend)
         for(u32 i=0;i<4;i++) CHECK(ledger_surfaces[source.refs[i].sid].first*PAGE_SIZE == planes[i]);
     } else {
         const struct ledger_surface *sf=&ledger_surfaces[source.refs[0].sid];
-        CHECK(sf->first*PAGE_SIZE == (backend == LEDGER_SF_CIRRUS ? WAB_XE10_LINEARWIN_BASE : PEGC_LINEAR_BASE));
+        CHECK(sf->first*PAGE_SIZE == (backend == LEDGER_SF_CIRRUS ? WAB_XE10_LINEARWIN_BASE : pegc_window_base()));
         CHECK(sf->cache == LEDGER_CACHE_UC && sf->backing == (backend == LEDGER_SF_CIRRUS ? LEDGER_SB_MMIO : LEDGER_SB_VRAM) && sf->perm_max == LEDGER_PERM_RW);
         struct lease_view *out=P2V(payload+64);
         *(struct surface_ref *)P2V(payload)=source.refs[0];
@@ -236,6 +239,7 @@ static void display_check(u32 backend)
         CHECK(!surface_lease(&source,(void *)MEM_EXEC_LOAD_ADDR,LEDGER_PERM_RW,(void *)(MEM_EXEC_LOAD_ADDR+64)));
         CHECK(out->token && out->bytes == PEGC_FB_SIZE_480);
         CHECK((paging_lease_pte(&space,out->base) & (PTE_PCD|PTE_RW|PTE_USER)) == (PTE_PCD|PTE_RW|PTE_USER));
+        CHECK((paging_lease_pte(&space,out->base) & ~(u32)(PAGE_SIZE-1)) == sf->first*PAGE_SIZE);
         CHECK(!lease_release(&space,out->token));
     }
 }
@@ -284,7 +288,7 @@ static void diag_px_check(void)
     }
     const u32 a = OS32_GUI_DIAG_P1_Y * PEGC_PITCH + OS32_GUI_DIAG_P1_X;
     const u32 b = OS32_GUI_DIAG_P2_Y * PEGC_PITCH + OS32_GUI_DIAG_P2_X;
-    volatile u8 *vram = P2V_IO(PEGC_LINEAR_BASE);
+    volatile u8 *vram = P2V_IO(pegc_window_base());
     for (int entry = 0; entry < 3; entry++) {
         host_serial_reset();
         u32 before = gfx_counters.commits;
@@ -376,11 +380,18 @@ static void run(void)
     map_host(0x10000,0xFF0000);
     map_host(WAB_XE10_LINEARWIN_BASE,WAB_XE10_LINEARWIN_SIZE);
     map_host(MEM_EXEC_LOAD_ADDR,PAGE_SIZE); /* observable old direct copyout */
+    if (HOST_ALT_WINDOW) map_host(PEGC_LINEAR_ALT_BASE,PEGC_LINEAR_SIZE);
     boot();
     gfx_boot_reserve();
     CHECK(bb_b == (u8 *)P2V(MEM_GFX_BB_BASE));
     CHECK(bb_r-bb_b == GFX_PLANE_SZ && bb_g-bb_b == 2*GFX_PLANE_SZ && bb_i-bb_b == 3*GFX_PLANE_SZ);
     CHECK(ledger_surface_find(LEDGER_SF_PEGC,LEDGER_ROLE_DISPLAY) != 0);
+    CHECK(pegc_window_base() == PEGC_LINEAR_BASE);
+    if (HOST_ALT_WINDOW) {
+        CHECK(pegc_select_window(PEGC_LINEAR_ALT_BASE));
+        CHECK(pegc_window_base() == PEGC_LINEAR_ALT_BASE);
+        CHECK(ledger_surface_find(LEDGER_SF_PEGC,LEDGER_ROLE_DISPLAY)->first == PEGC_LINEAR_ALT_BASE/PAGE_SIZE);
+    }
     struct ledger_resource *rr=&ledger_resources[0];
     u32 mf=rr->map_first, me=rr->map_end;
     CHECK(!ledger_resource_set_map(LEDGER_MAX_RESOURCES,0,0));

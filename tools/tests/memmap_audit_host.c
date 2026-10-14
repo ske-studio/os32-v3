@@ -58,6 +58,9 @@ static void run(void)
     page_directory[PAGING_APERTURE_PDI] |= PTE_USER;
     CHECK(!fixed_paging_valid());
     page_directory[PAGING_APERTURE_PDI] &= ~PTE_USER;
+    page_directory[PAGING_MMIO_TOP_PDI] |= PTE_USER;
+    CHECK(!fixed_paging_valid());
+    page_directory[PAGING_MMIO_TOP_PDI] &= ~PTE_USER;
     SAY("PASS failed-map/selected-Cirrus");
     die(0);
 #endif
@@ -95,6 +98,9 @@ static void run(void)
     page_directory[PAGING_APERTURE_PDI] |= PTE_USER;
     CHECK(paging_master_audit(exec_tramp_page_addr()) > 0);
     page_directory[PAGING_APERTURE_PDI] &= ~PTE_USER;
+    page_directory[PAGING_MMIO_TOP_PDI] |= PTE_USER;
+    CHECK(paging_master_audit(exec_tramp_page_addr()) > 0);
+    page_directory[PAGING_MMIO_TOP_PDI] &= ~PTE_USER;
     gfx_prepare_backend();
     CHECK(!kselftest_run_post_probe());
     u8 *saved_bb = bb[0]; bb[0] = 0;

@@ -67,7 +67,7 @@ def replace_function(body, signature, replacement):
         end += 1
     return body[:brace] + '{\n' + replacement + '\n}' + body[end:]
 
-def run_case(mutation, runner, extra_changes=(), fixture_body=None, source_texts=None, object_cache=None, stage=None):
+def run_case(mutation, runner, extra_changes=(), fixture_body=None, source_texts=None, object_cache=None, stage=None, alt_window=False):
     with tempfile.TemporaryDirectory(prefix='os32-e4-') as name:
         tmp = pathlib.Path(name)
         arch = (ROOT/'tools/tests/host_arch/arch_io.h').read_text().replace(
@@ -138,6 +138,7 @@ static inline void io_wait_n(int n) {(void)n;}
                '-fno-stack-protector','-ffunction-sections','-fdata-sections',
                '-Wall','-Wextra','-Werror','-Wno-unused-function','-Wno-unused-variable',
                '-DPHYSMEM_HOST_TEST=1','-I'+str(tmp)]
+        if alt_window: flags.append('-DHOST_ALT_WINDOW=1')
         flags += ['-I'+str(ROOT/p) for p in ('tools/tests','tools/tests/host_arch','include',
                   'arch/x86','platform/pc98','kernel','exec','gfx','drivers','lib','fs',
                   'kapi','lib/sqlite3','sdk/include/os32')]
@@ -168,9 +169,11 @@ def main():
     host32.begin_control(args.mutate, args.runner, ROOT)
     with host32.control(args.mutate, args.runner, ROOT) as normal:
         if normal:
-            result=run_case(None,args.runner)
-            print(result.stdout+result.stderr,end='')
-            assert result.returncode == 0,result.returncode
+            for alt in (False, True):
+                result=run_case(None,args.runner,alt_window=alt)
+                print(('alternate' if alt else 'default')+' PEGC window')
+                print(result.stdout+result.stderr,end='')
+                assert result.returncode == 0,result.returncode
     if args.mutate:
         def one(m):
             result=run_case(m,args.runner)

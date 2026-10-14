@@ -23,16 +23,21 @@
  *  比べないもの: 起動時の記録 (pegc_boot_sync_record) と診断 (pegc_diag_take) —
  *  どちらも 09A0h の選択と読み・09A8h の読みだけ。5Fh (io_wait) は比べない。
  * ========================================================================= */
+#include <stdarg.h>
 #include "serial_diag_host.h"
 #include "types.h"
 #include "memmap.h"
 #include "pegc.h"
 /* Model the two CPU windows, without changing the driver under test. */
-static int host_alias;
+static int host_alias, host_candidate;
+static u8 host_bios[MEM_PAGE_SIZE];
 static volatile void *host_pegc_window(u32 pa)
 {
-    if (host_alias && pa >= PEGC_BANK_WIN0 && pa < PEGC_BANK_WIN0 + MEM_PAGE_SIZE)
+    if ((host_alias & 1) && pa >= PEGC_BANK_WIN0 && pa < PEGC_BANK_WIN0 + MEM_PAGE_SIZE)
         pa += PEGC_LINEAR_BASE - PEGC_BANK_WIN0;
+    if (pa >= PEGC_LINEAR_ALT_BASE && pa < PEGC_LINEAR_ALT_BASE + PEGC_LINEAR_SIZE)
+        pa = (host_alias & 2 ? (host_alias & 1 ? PEGC_LINEAR_BASE : PEGC_BANK_WIN0) : 0x00f80000) + pa - PEGC_LINEAR_ALT_BASE;
+    if (pa < MEM_PAGE_SIZE) return host_bios + pa;
     return P2V_IO(pa);
 }
 #define P2V_IO(pa) host_pegc_window(pa)
@@ -103,6 +108,7 @@ static u32 palette_writes;
 static int watch_stripe_init;
 static int fake_np2;
 static unsigned int fake_np2_pos;
+static int fake_unlock, fake_ext, fake_sys16m;
 
 static void ev_add(int kind, unsigned int port, unsigned int val)
 {
@@ -152,6 +158,10 @@ unsigned int pegc_shim_inp(unsigned int port)
         if (fake_09a0_sel == PEGC_STAT_SEL_GDCCLK1) {
             v |= (u8)(fake_09a0_clk & PEGC_STAT_BIT);
         }
+        if (host_candidate && fake_09a0_sel == PEGC_STAT_SEL_UNLOCK) v |= fake_unlock;
+        if (host_candidate && fake_09a0_sel == PEGC_STAT_SEL_GFXMODE) v |= fake_ext;
+    } else if (port == PEGC_SYS16M_PORT) {
+        v = fake_sys16m ? PEGC_SYS16M_NORMAL_RAM : 0;
     } else if (port == PEGC_HSYNC_PORT) {
         v = fake_09a8_raw;
     } else if (port == NP2PORT_STR) {
@@ -165,6 +175,12 @@ unsigned int pegc_shim_inp(unsigned int port)
 
 void pegc_shim_outp(unsigned int port, unsigned int value)
 {
+    if (port == MODE_FF2_PORT) {
+        if (value == PEGC_FF2_UNLOCK) fake_unlock = 1;
+        if (value == PEGC_FF2_LOCK) fake_unlock = 0;
+        if (value == PEGC_FF2_EXT_GFX) fake_ext = 1;
+        if (value == PEGC_FF2_STD_GFX) fake_ext = 0;
+    }
     if (port == PAL_IDX_PORT) palette_writes++;
     if (port == PEGC_STAT_PORT) fake_09a0_sel = (u8)value;
     if (port == PEGC_HSYNC_PORT) {
@@ -230,18 +246,52 @@ void *kmemcpy(void *dst, const void *src, u32 n)
 void *memset(void *dst, int val, u32 n) { return kmemset(dst, val, n); }
 static const char *printf_formats[32];
 static unsigned int printf_count;
+static int starts_with(const char *a, const char *b)
+{ while (*b) if (*a++ != *b++) return 0; return 1; }
+static const char *win_log, *f00_log, *fff_log, *disp_log;
+static int sys16m_log, force_log, win_logs;
 void kprintf(unsigned char attr, const char *fmt, ...)
-{ (void)attr; if (printf_count < 32) printf_formats[printf_count++] = fmt; }
+{
+    (void)attr;
+    if (printf_count < 32) printf_formats[printf_count++] = fmt;
+    if (starts_with(fmt, "[pegc] win=")) {
+        va_list ap;
+        va_start(ap, fmt);
+        win_log = va_arg(ap, const char *); sys16m_log = va_arg(ap, int);
+        f00_log = va_arg(ap, const char *); fff_log = va_arg(ap, const char *);
+        force_log = va_arg(ap, int); disp_log = va_arg(ap, const char *);
+        va_end(ap); win_logs++;
+    }
+}
 /* master AS ではない扱い = bios_flag は 0 を返す (ワークエリアを読まない) */
-u32 paging_current_cr3(void) { return 1; }
+u32 paging_current_cr3(void) { return host_candidate ? 2 : 1; }
 u32 paging_kernel_pd_phys(void) { return 2; }
 int paging_map_phys(u32 v, u32 p, u32 n, u32 f)
 { (void)v; (void)p; (void)n; (void)f; fail("paging_map_phys", __LINE__); return -1; }
-int pgalloc_range_has_ram(u32 f, u32 e) { (void)f; (void)e; return 1; }
+int pgalloc_range_has_ram(u32 f, u32 e) { (void)f; (void)e; return !host_candidate; }
 u32 sys_usable_mem_end(void) { return 0; }
-/* T1e: BB は起動時の ⑥ が台帳に置く。この試験は probe を通さない。 */
+struct ledger_surface ledger_surfaces[LEDGER_MAX_SURFACES];
+static int display_fail, release_calls, create_calls;
 struct ledger_surface *ledger_surface_find(u32 b, u32 r)
-{ (void)b; (void)r; return (struct ledger_surface *)0; }
+{
+    if (b == LEDGER_SF_PEGC && r == LEDGER_ROLE_DISPLAY && ledger_surfaces[0].npages)
+        return &ledger_surfaces[0];
+    return 0;
+}
+int ledger_surface_release(u32 sid)
+{
+    CHECK(sid == 0); release_calls++;
+    if (display_fail == 1) return 0;
+    ledger_surfaces[0].npages = 0;
+    return 1;
+}
+int ledger_surface_create(const struct ledger_surface *sf, u32 *sid)
+{
+    (void)sid; create_calls++;
+    if (display_fail == 2) return 0;
+    ledger_surfaces[0] = *sf;
+    return 1;
+}
 void palette_init(void) { }
 const PaletteEntry *palette_get_all(void) { static const PaletteEntry p[PALETTE_COUNT]; return p; }
 void palette_shadow_set(int i, u8 r, u8 g, u8 b) { (void)i; (void)r; (void)g; (void)b; }
@@ -506,7 +556,11 @@ static void vsync_falls_by_gap(int *falls, int n_outs)
 
 static void world_reset(void)
 {
-    host_alias = gfx_diag_stripes = 0;
+    host_alias = host_candidate = gfx_diag_stripes = gfx_diag_altwin = 0;
+    fake_unlock = fake_ext = fake_sys16m = 0;
+    s_window_base = PEGC_LINEAR_BASE;
+    display_fail = release_calls = create_calls = win_logs = 0;
+    kmemset(ledger_surfaces, 0, sizeof(ledger_surfaces));
     fake_np2 = 0; fake_np2_pos = 0;
     tick_count = stripe_delays = 0;
     palette_writes = 0; watch_stripe_init = 0;
@@ -1219,6 +1273,62 @@ static void case_diag_alias(void)
     world_reset();
 }
 
+/* Actual probe, including both restored windows and DISPLAY failure paths. */
+static void case_window_selection(void)
+{
+    static const struct {
+        int sys16m, force, aliases, failure, ok, selected_alt;
+        const char *f00, *fff, *disp;
+    } rows[] = {
+        {0,0,3,0,1,0,"ok","skip","skip"},
+        {0,0,2,0,1,1,"ng","ok","ok"},
+        {1,0,3,0,1,1,"skip","ok","ok"},
+        {1,0,1,0,1,0,"ok","ng","skip"},
+        {0,1,3,0,1,1,"skip","ok","ok"},
+        {1,0,0,0,0,0,"ng","ng","skip"},
+        {1,0,2,1,0,1,"skip","ok","fail"},
+        {1,0,2,2,0,1,"skip","ok","fail"},
+        {1,1,1,0,1,0,"ok","ng","skip"},
+        {0,0,0,0,0,0,"ng","ng","skip"}
+    };
+    s_case = "window_selection";
+    for (u32 i = 0; i < sizeof(rows)/sizeof(rows[0]); i++) {
+        world_reset();
+        host_candidate = 1; host_alias = rows[i].aliases;
+        host_bios[PEGC_BIOS_ARCH_FLAG] = PEGC_BIOS_ARCH_EXTGFX;
+        host_bios[PEGC_BIOS_MODE_FLAG] = PEGC_BIOS_MODE_EXTGFX;
+        fake_sys16m = rows[i].sys16m; gfx_diag_altwin = rows[i].force;
+        display_fail = rows[i].failure;
+        s_probed = 0; s_bb_phys = MEM_GFX_BB_BASE;
+        ledger_surfaces[0].first = PEGC_LINEAR_BASE / PAGE_SIZE;
+        ledger_surfaces[0].npages = PEGC_FB_SIZE_480 / PAGE_SIZE;
+        volatile u8 *a = P2V_IO(PEGC_BANK_WIN0 + 16);
+        volatile u8 *f = P2V_IO(PEGC_LINEAR_BASE + 16);
+        volatile u8 *alt = P2V_IO(PEGC_LINEAR_ALT_BASE + 16);
+        *a = 0x37; *f = 0x52; *alt = 0x91;
+        u8 saved_a = *a, saved_f = *f, saved_alt = *alt;
+        *(volatile u16 *)P2V_IO(PEGC_MMIO_BANK0) = 7;
+        CHECK(pegc_probe() == rows[i].ok);
+        CHECK(*a == saved_a && *f == saved_f && *alt == saved_alt);
+        CHECK(!fake_ext && !fake_unlock);
+        CHECK(*(volatile u16 *)P2V_IO(PEGC_MMIO_LINEAR) == PEGC_LINEAR_OFF);
+        CHECK(*(volatile u16 *)P2V_IO(PEGC_MMIO_BANK0) == 0);
+        CHECK(win_logs == 1 && sys16m_log == rows[i].sys16m && force_log == rows[i].force);
+        CHECK(starts_with(f00_log, rows[i].f00) && starts_with(fff_log, rows[i].fff));
+        CHECK(starts_with(disp_log, rows[i].disp));
+        CHECK(starts_with(win_log, rows[i].selected_alt ? "fff00000" :
+                          rows[i].ok ? "00f00000" : "none"));
+        CHECK(pegc_window_base() == (rows[i].ok && rows[i].selected_alt ?
+                                    PEGC_LINEAR_ALT_BASE : PEGC_LINEAR_BASE));
+        CHECK(release_calls == rows[i].selected_alt);
+        CHECK(create_calls == (rows[i].selected_alt && rows[i].failure != 1));
+        CHECK(ledger_surfaces[0].first == pegc_window_base() / PAGE_SIZE);
+        CHECK(pegc_probe() == rows[i].ok && win_logs == 1); /* cached */
+    }
+    output("PASS window_selection (10 rows; release/create failures, both windows restored)\n");
+    world_reset();
+}
+
 static void case_diag_stripes(void)
 {
     s_case = "diag_stripes";
@@ -1353,6 +1463,7 @@ void _start(void)
      * なくこちらで落ちることを --mutate の行で見られるように) */
     case_serial_enter();
     case_diag_alias();
+    case_window_selection();
     case_diag_stripes();
     case_gate_24k_real();
     case_gate_24k_np2();
@@ -1369,6 +1480,6 @@ void _start(void)
     case_fifo_busy();
     case_fifo_stuck();
     case_vsync_stuck();
-    output("PASS pegc_mode_host (18 cases)\n");
+    output("PASS pegc_mode_host (19 cases)\n");
     finish(0);
 }

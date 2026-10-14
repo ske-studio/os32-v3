@@ -186,5 +186,6 @@ int cirrus_identify(void) __attribute__((weak));
 
 /* R7FIX2 boot-only stripes setting (internal, not KAPI). */
 extern int gfx_diag_stripes;
+extern int gfx_diag_altwin;
 
 #endif /* __GFX_HAL_H */

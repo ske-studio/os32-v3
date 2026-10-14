@@ -174,6 +174,11 @@ void _start(void)
     }
     CHECK(host_loads == 1 && host_enables == 1 && pg_enabled);
     CHECK(fixed_paging_valid() && host_cr3 == MEM_FIXED_PD_BASE);
+    CHECK(MEM_FIXED_PAGING_END - MEM_FIXED_PAGING_BASE == 11 * PAGE_SIZE);
+    CHECK(MEM_POOL_BASE - MEM_FIXED_PAGING_END == 4 * PAGE_SIZE);
+    CHECK(memmap_want_at(MEM_FIXED_MMIO_TOP_PT_BASE, 0) == MM_RW);
+    for (u32 i = 0; i < PTE_COUNT; i++)
+        CHECK(page_tables[PAGING_MMIO_TOP_PDI][i] == PAGE_NOT_PRESENT);
     {
         u32 i, hash = fixed_hash();
         for (i = MEM_FIXED_PAGING_BASE / PAGE_SIZE; i < MEM_FIXED_PAGING_END / PAGE_SIZE; i++)
@@ -207,6 +212,8 @@ void _start(void)
         u32 a, pa, hash = fixed_hash();
         CHECK(paging_addrspace_create(&as, LEDGER_OWNER_KERNEL) == 0);
         CHECK((((u32 *)as.pd_phys)[0] & ~(u32)(PAGE_SIZE - 1)) == MEM_FIXED_BOOT_PT_BASE);
+        CHECK(((u32 *)as.pd_phys)[PAGING_MMIO_TOP_PDI] ==
+              page_directory[PAGING_MMIO_TOP_PDI]);
         for (a = MEM_FIXED_PAGING_BASE; a < MEM_FIXED_PAGING_END; a += PAGE_SIZE)
             CHECK(as_va_to_pa(as.pd_phys, a, &pa) != 0);
         paging_addrspace_destroy(&as);

@@ -2091,6 +2091,7 @@ static int gui_timeout(const char *seconds)
 static void case_gfxmode_diag(void)
 {
     char *stripes[] = { "gfxmode", "diag", "stripes" };
+    char *altwin[] = { "gfxmode", "diag", "altwin" };
     char *off[] = { "gfxmode", "diag", "off" };
     char *bad[] = { "gfxmode", "diag", "bad", "extra" };
     report("R7FIX2 gfxmode diagnostics preserve system.cfg keys\n");
@@ -2101,6 +2102,11 @@ static void case_gfxmode_diag(void)
           "diag stripes appends only GFXDIAG");
     fresh();
     file_add(SYS_SYSTEM_CFG, "GFX=pegc\nGFXDIAG=stripes\nGUI=1\nGSERIAL_TIMEOUT=7\nOTHER=keep\n");
+    check(cmd_gfxmode(3, altwin) == 0 &&
+          strcmp(g_cfg_written, "GFX=pegc\nGUI=1\nGSERIAL_TIMEOUT=7\nOTHER=keep\nGFXDIAG=altwin\n") == 0,
+          "diag altwin replaces only GFXDIAG");
+    fresh();
+    file_add(SYS_SYSTEM_CFG, "GFX=pegc\nGFXDIAG=altwin\nGUI=1\nGSERIAL_TIMEOUT=7\nOTHER=keep\n");
     check(cmd_gfxmode(3, off) == 0 &&
           strcmp(g_cfg_written, "GFX=pegc\nGUI=1\nGSERIAL_TIMEOUT=7\nOTHER=keep\nGFXDIAG=off\n") == 0,
           "diag off preserves other keys and writes explicit off");

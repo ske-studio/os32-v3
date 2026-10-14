@@ -84,16 +84,19 @@ resident shell/gshell は sbrk 上限0x375000、exec_heap 452KiB (小さい明�
 
 #### ページング (H3b 2026-09-06 / K6-RAM 2026-09-11)
 
-静的 PT (bootstrap) の守備範囲は 32MB (PAGING_BOOT_MAP_SIZE = PAGING_MAP_SIZE、PT 8 枚 = +16KB BSS)。
+静的 PT (bootstrap) の守備範囲は 32MB (PAGING_BOOT_MAP_SIZE = PAGING_MAP_SIZE、固定 PT 8 枚、画像外)。
 **実 RAM の人為的な上限は無い** (K6-RAM で PAGING_RAM_LIMIT を撤廃)。paging_init が恒等で張るのは
 min(検出量, 32MB) — その上端が paging_boot_identity_end() — で、それより上の RAM は
 pgalloc_stage_online() が paging_map_phys() で張り、PT はブート workspace から動的に取る。
-15〜16MB (F00000h-FFFFFFh) は PC-98 のシステム空間で RAM にはしない (MEM_SYSTEM_SPACE_*)。ただしセットアップで「16MB システム空間: 切り離す」(I/O 043Bh bit2=1) の機械では、そこは通常 RAM で PEGC の VRAM は F00000h に出ない (FFF00000h の別名でだけ見える — undocumented io_mem.md)。実機 Ra266 はこの構成 (R7-1、2026-10-14)。扱いは R7FIX2 段 3b。
+15〜16MB (F00000h-FFFFFFh) は PC-98 のシステム空間で RAM にはしない (MEM_SYSTEM_SPACE_*)。ただしセットアップで「16MB システム空間: 切り離す」(I/O 043Bh bit2=1) の機械では、そこは通常 RAM で PEGC の VRAM は F00000h に出ない (FFF00000h の別名でだけ見える — undocumented io_mem.md)。実機 Ra266 はこの構成 (R7-1、2026-10-14)。v3 ではこの構成でも RAM にしない (損失 1MB、v4 の物理地図で見直す)。
+PEGC 候補は F00000h と FFF00000h の両窓 (各512KB) を supervisor + PCD で恒等に張り、043Bh bit2=1 または `GFXDIAG=altwin` なら別名から双方向の別名試験を行う。最初に成立した窓を DISPLAY に使い、両方不成立または DISPLAY 付け替え失敗なら pc98 へ落ちる。Ra266 の別名は実機未確認。
 16MB 超で RAM が載っていない範囲は既定 Not-Present で、必要な範囲だけ paging_map_phys() で張る。
 **OS が番地を決めるデバイス窓は v3 のデバイス窓の帯 `[0xFE000000, 0xFF000000)`** (`MEM_DEVICE_APERTURE_*`、
 2026-09-29) に置く。RAM の量に関係なく RAM と重ならないよう物理地図で MMIO にし (RAM として登録できる上端 =
-`MEM_PHYS_RAM_CEILING` = 2GB、D11 — `[2GB, 4GB)` は窓の帯も含めて RAM にしない、T1a)、帯の先頭 4MB の PT を paging_init が**静的に 1 枚** (+4KB BSS) 持つ —
+`MEM_PHYS_RAM_CEILING` = 2GB、D11 — `[2GB, 4GB)` は窓の帯も含めて RAM にしない、T1a)、帯の先頭 4MB の PT を paging_init が**静的に 1 枚** (画像外の固定域) 持つ —
 新しい PDE は live AS が 0 の間しか足せないが、gfx の init は exec の後にも走るため。
+最上位4MB (FFC00000h〜FFFFFFFFh、PDE 0x3FF) にも静的 PT (003FB000h) を持ち、全アプリ PD に共有する。固定 PD/PT は 1/8/1/1 の11ページ、003FC000h〜003FFFFFh の4ページは NP。最上位 PT は初期には全 NP、PEGC 候補の写像成功後だけ FFF00000h〜FFF7FFFFh の128ページを公開する。
+監査は候補の有無でなく台帳の公開済み map 範囲に一致させる。正常時は両窓 RW|PCD、F00 成功後の FFF 失敗時は F00 の予約・写像・公開を残して FFF は NP、候補なしなら最上位 PT の全 PTE は NP。
 帯を物理地図で MMIO に登録するのは 16MB 超の RAM を登録する経路 (`memory_boot_add_high`) だけで、高位 RAM の無い
 構成 (8MB〜15MB、台帳の置き場は FIXED / ARENA_TOP — TASK_T1_LEDGER §3-3) では帯は明示の MMIO 登録でなく UNKNOWN のまま — RAM にはならないので現状の RAM 判定・窓のマップには
 支障は無く、明示の登録は v3 の資源割当で引き継ぐ:

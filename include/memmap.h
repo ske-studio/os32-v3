@@ -341,13 +341,14 @@ extern u32 __sqlite_end;
 #define MEM_SHELL_HEAP_BASE   0x380000UL  /* シェル exec_heap 先頭 (mem_alloc) */
 #define MEM_SHELL_HEAP_END    MEM_FIXED_PAGING_BASE
 #define MEM_SHELL_HEAP_SIZE   (MEM_SHELL_HEAP_END - MEM_SHELL_HEAP_BASE) /* 452KiB */
-/* T2a′: 画像外の固定 PD 1 + boot PT 8 + device PT 1 (恒久予約)。 */
+/* T2a′: 画像外の固定 PD 1 + boot PT 8 + device PT 1 + 最上位 MMIO PT 1 (恒久予約)。 */
 #define MEM_FIXED_PAGING_BASE 0x3F1000UL
 #define MEM_FIXED_BOOT_PT_COUNT 8
 #define MEM_FIXED_PD_BASE     MEM_FIXED_PAGING_BASE
 #define MEM_FIXED_BOOT_PT_BASE (MEM_FIXED_PD_BASE + MEM_GUARD_SIZE)
 #define MEM_FIXED_APERTURE_PT_BASE (MEM_FIXED_BOOT_PT_BASE + MEM_FIXED_BOOT_PT_COUNT * MEM_GUARD_SIZE)
-#define MEM_FIXED_PAGING_END  (MEM_FIXED_APERTURE_PT_BASE + MEM_GUARD_SIZE)
+#define MEM_FIXED_MMIO_TOP_PT_BASE (MEM_FIXED_APERTURE_PT_BASE + MEM_GUARD_SIZE)
+#define MEM_FIXED_PAGING_END  (MEM_FIXED_MMIO_TOP_PT_BASE + MEM_GUARD_SIZE)
 #define MEM_SHELL_BAND_END    0x3FFFFFUL  /* シェル帯域終端 */
 
 /* T2c: private virtual bands; physical supply has separate policy below. */
@@ -389,7 +390,8 @@ extern u32 __sqlite_end;
 /*        PT を静的に用意する (最初のアプリ AS より前に PDE が要るため)。   */
 /*    [MEM_PHYS_MMIO_TOP, 4GB)                                              */
 /*        32bit 空間の最上位。BIOS ROM ミラーと PCI 機の MMIO 窓が          */
-/*        居る帯で、RAM にはならない (Win32 の実効 ≈3.2GB と同じ理由)。     */
+/*        居る帯で、v3 では RAM を登録しない。最上位 4MB の PT を静的に持ち、 */
+/*        PEGC の別名 FFF00000h〜FFF7FFFFh だけを必要時に恒等で張る。     */
 /*                                                                          */
 /*  RAM として登録してよい上端は MEM_PHYS_RAM_CEILING (2GB、D11)。          */
 /*  それより上 [2GB, 4GB) は窓の帯も含めて RAM にしない。                   */
@@ -398,6 +400,7 @@ extern u32 __sqlite_end;
 #define MEM_SYSTEM_SPACE_END  0x01000000UL              /* 16MB */
 #define MEM_HIGH_RAM_BASE     MEM_SYSTEM_SPACE_END      /* 16MB */
 #define MEM_PHYS_MMIO_TOP     0xFF000000UL              /* 4GB - 16MB */
+#define MEM_MMIO_TOP_PT_BASE 0xFFC00000UL              /* 最上位 PT 1 枚 = 4MB */
 #define MEM_DEVICE_APERTURE_BASE 0xFE000000UL           /* 4GB - 32MB */
 #define MEM_DEVICE_APERTURE_END  MEM_PHYS_MMIO_TOP      /* exclusive */
 #define MEM_DEVICE_APERTURE_PDE_SIZE 0x00400000UL       /* PT 1 枚 = 4MB */
