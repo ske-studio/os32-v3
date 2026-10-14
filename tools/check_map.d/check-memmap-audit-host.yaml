@@ -18,7 +18,10 @@ check-memmap-audit-host:
 - gfx/gfx_vram.c
 - include/**
 - kernel/kernel.c
-- kernel/kselftest.*
+- kernel/kaudit.c
+- kernel/kselftest.h
+- kernel/kselftest_report.c
+- kdebug/kselftest.c
 - kernel/paging.c
 - kernel/pgalloc.c
 - kernel/physmem.c

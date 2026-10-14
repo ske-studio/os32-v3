@@ -1,5 +1,6 @@
 /* Real module.c + module_image.c, fake VFS/ledger and executable i386 body. */
 #include "kernel/module.h"
+#include "kernel/kselftest.h"
 #include "kernel/module_image.h"
 #include "kernel/pgalloc.h"
 #include "kernel/sysconfig.h"
@@ -110,6 +111,14 @@ void kprintf(unsigned char color, const char *format, ...)
     if (!memcmp(format, "[kdebug] rejected: %s\n", sizeof("[kdebug] rejected: %s\n"))) logs++;
     else imports++;
 }
+void kdebug_forbidden_import(void) { imports++; finish(199); }
+u32 kdebug_test_fail(void) { imports++; return 0; }
+int kdebug_test_skipped(int tag)
+{
+    CHECK(tag == KAUDIT_POST_EXEC);
+    imports++;
+    return 1;
+}
 void _start(void)
 {
     read_input(input, sizeof(input)); CHECK(input[3] <= CAP);
@@ -124,11 +133,17 @@ void _start(void)
     CHECK(closes == (opens && input[1] != 1));
     if (input[2] == KDEBUG_RUNNING) {
         CHECK(pages == kdebug.pages && pages > 0 && retires == 0 && logs == 0);
-        CHECK(kdebug.pair_crc == bi.img_crc && kdebug.base == (u32)pool + MODULE_PAGE_SIZE);
+        u32 prefix = ((const u32 *)file)[11];
+        CHECK(kdebug.pair_crc == bi.img_crc && kdebug.base == (u32)pool + prefix);
         CHECK(kdebug.ops.version == KDEBUG_OPS_VERSION && kdebug.ops.crt_diag_bootlog);
-        CHECK((u32)kdebug.ops.crt_diag_bootlog >= kdebug.base &&
-              (u32)kdebug.ops.crt_diag_bootlog < kdebug.base + pages * PAGE_SIZE);
-        for (u32 i = 0; i < MODULE_PAGE_SIZE; i++) CHECK(pool[i] == 0xdd);
+        const u32 *ops = (const u32 *)&kdebug.ops;
+        for (u32 slot = 1; slot <= 5; slot++)
+            CHECK(ops[slot] >= kdebug.base && ops[slot] < kdebug.base + pages * PAGE_SIZE);
+        /* The actual relocated post-exec returns before every later test
+         * when the kernel audit reports an open V86 session. */
+        kdebug.ops.selftest_post_exec();
+        CHECK(imports == 2);
+        for (u32 i = 0; i < prefix; i++) CHECK(pool[i] == 0xdd);
     } else {
         CHECK(!pages && retires == owners && logs == (input[2] != 0));
         CHECK(!kdebug.base && !kdebug.pages);

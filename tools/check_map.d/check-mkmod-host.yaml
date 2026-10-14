@@ -46,7 +46,8 @@ check-mkmod-host:
 - kernel/irq_math.h
 - kernel/kdebug_imports.def
 - kernel/kmalloc.h
-- kernel/kselftest.c
+- kdebug/kselftest.c
+- kernel/kaudit.c
 - kernel/kselftest.h
 - kernel/kstack_hw.h
 - kernel/ktime.h

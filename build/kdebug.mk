@@ -3,9 +3,9 @@ ifeq ($(origin KERNEL_CFLAGS),undefined)
 include build/config.mk
 endif
 KDEBUG_OUT ?= $(BUILD_OUT)/kdebug
-KDEBUG_STAGE := S1
+KDEBUG_STAGE := S2
 KDEBUG_GEN := kdebug/generated
-KDEBUG_OBJS := $(KDEBUG_OUT)/crt_diag.o $(KDEBUG_OUT)/kdebug_main.o \
+KDEBUG_OBJS := $(KDEBUG_OUT)/kselftest.o $(KDEBUG_OUT)/crt_diag.o $(KDEBUG_OUT)/kdebug_main.o \
                $(KDEBUG_OUT)/kdebug_import_slots.o $(KDEBUG_OUT)/kdebug_import_stubs.o
 KDEBUG_KEXPORT_OBJ := $(KDEBUG_OUT)/kdebug_kexports.o
 C_KERNEL_OBJ += $(KDEBUG_KEXPORT_OBJ)
@@ -24,7 +24,7 @@ $(KDEBUG_GENERATED) &: kernel/kdebug_imports.def tools/gen_kdebug_imports.py too
 kernel/module.o: kernel/module.c build/config.mk build/kdebug.mk $(KDEBUG_GEN)/kdebug_imports.h
 	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -I$(KDEBUG_GEN) -c kernel/module.c -o $@
 
-$(KDEBUG_OUT)/%.o: kdebug/%.c build/config.mk build/kdebug.mk
+$(KDEBUG_OUT)/%.o: kdebug/%.c build/config.mk build/kdebug.mk $(KDEBUG_GEN)/kdebug_import_macros.h
 	mkdir -p $(@D)
 	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -c $< -o $@
 

@@ -525,7 +525,7 @@
       "stage": "S2",
       "kind": "FUNC",
       "symbol": "kapi_mem_stat",
-      "source": "kernel/kselftest.c",
+      "source": "kdebug/kselftest.c",
       "context_safe": false,
       "index": 65
     },
@@ -1261,7 +1261,7 @@
       "stage": "S2",
       "kind": "GETTER",
       "symbol": "ring3_in_syscall",
-      "source": "kernel/kselftest.c",
+      "source": "kdebug/kselftest.c",
       "context_safe": false,
       "index": 157
     },
@@ -1269,7 +1269,7 @@
       "stage": "S2",
       "kind": "SETTER",
       "symbol": "ring3_in_syscall",
-      "source": "kernel/kselftest.c",
+      "source": "kdebug/kselftest.c",
       "context_safe": false,
       "index": 158
     },

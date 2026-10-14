@@ -6,12 +6,13 @@ import tempfile
 import host32
 from test_shm_user import function, ROOT
 
-PATHS = ('kernel/v86_gcap.c','exec/exec.c','kernel/ring3_entry.asm','kernel/kernel.c','kernel/kselftest.c')
+PATHS = ('kernel/v86_gcap.c','exec/exec.c','kernel/ring3_entry.asm','kernel/kernel.c','kdebug/kselftest.c')
 MUTANTS = [
  ('gcap-failure-zero',PATHS[0],'    kmemcpy(out, g, (u32)sizeof(*g));',
   '    if (mode == V86G_MODE_ROM && g->status != V86G_ST_OK) { g->n_out = 0; g->n_in = 0; }\n    kmemcpy(out, g, (u32)sizeof(*g));',
   'FAIL out.n_in == 2 && out.n_out == 3'),
- ('post-exec-body',PATHS[4],'    check(kselftest_run_audit("post-exec") == 0, "post-exec: lifecycle audit");','', 'FAIL post-exec body audit'),
+ ('post-exec-body',PATHS[4],'    check(kdi_kaudit_last_rc(KAUDIT_POST_EXEC) == 0, "post-exec: lifecycle audit");','', 'FAIL post-exec body audit'),
+ ('post-exec-skip',PATHS[4],'    if (kdi_kaudit_skipped(KAUDIT_POST_EXEC)) return 0;','', 'FAIL post-exec skipped'),
  ('selftest-rebuild',PATHS[0],'    if (g->mode == V86G_MODE_ROM || v86_session.aborting)','    if (1)', 'FAIL restored == 0 && cursor == 0'),
  ('gcap-free',PATHS[0],'    kfree(tv);\n    kfree(g);\n    v86_gcap_free_count', '    v86_gcap_free_count','FAIL freed == 2'),
  ('gcap-ops',PATHS[0],'    gcap_ops = 0;','    (void)0;','FAIL !gcap_owned'),
@@ -19,7 +20,7 @@ MUTANTS = [
  ('stop-mark',PATHS[1],'    exec_stop_count++;','    (void)0;','FAIL exec_stop_count == 1 && polled == 1'),
  ('stop-serial',PATHS[1],'    serial_puts_polled("OS32: exec teardown stopped\\r\\n");','    (void)0;','FAIL exec_stop_count == 1 && polled == 1'),
  ('VM-gate',PATHS[2],'        jnz     .dispatch','        nop','FAIL host_vm_gate(0x20000) == 0'),
- ('probe-before-only',PATHS[3],'    kselftest_run_post_probe();','','FAIL audit after probe'),
+ ('probe-before-only',PATHS[3],'    kaudit_post_probe();','','FAIL audit after probe'),
 ]
 
 def run(runner, mutant=None):
@@ -35,9 +36,13 @@ def run(runner, mutant=None):
             texts[path]=texts[path].replace(old,new)
     k=texts[PATHS[3]]
     try:
-        assert 'kselftest_run_post_probe();' in k and k.index('gfx_prepare_backend();') < k.index('kselftest_run_post_probe();'), 'FAIL audit after probe'
+        assert 'kaudit_post_probe();' in k and k.index('gfx_prepare_backend();') < k.index('kaudit_post_probe();'), 'FAIL audit after probe'
         body = function(texts[PATHS[4]],'kselftest_run_post_exec')
-        assert 'check(kselftest_run_audit("post-exec") == 0,' in body, 'FAIL post-exec body audit'
+        assert 'if (kdi_kaudit_skipped(KAUDIT_POST_EXEC)) return 0;' in body, 'FAIL post-exec skipped'
+        assert k.count('kaudit_post_exec();') == 1 and k.count('kaudit_post_probe();') == 1, 'FAIL boot audit count'
+        for op in ('selftest_run', 'selftest_post_exec', 'selftest_post_unicode', 'selftest_post_probe'):
+            assert f'if (kdebug.ops.{op}) kdebug.ops.{op}();' in k, 'FAIL optional selftest'
+        assert 'check(kdi_kaudit_last_rc(KAUDIT_POST_EXEC) == 0,' in body, 'FAIL post-exec body audit'
         assert 'kselftest_run_audit("AS-resume")' not in texts[PATHS[1]], 'FAIL resume audit'
         for name in ('exec_exit','exec_pending_transfer','exec_pending_finish'):
             b=function(texts[PATHS[1]],name)

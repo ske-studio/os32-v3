@@ -137,11 +137,9 @@ static const u8 v86_gcap_code[] = {
 /*  しない (セッションが戻らないときに PM が emu_read_mem で覗く)。           */
 /* ------------------------------------------------------------------------ */
 V86Gcap *v86_gcap_rec = 0;
-u32 v86_gcap_phase = 0;
 static const V86gIoOps *gcap_ops = 0;
 static V86Gcap *gcap_owned;
 static u16 *gcap_tv;
-u32 v86_gcap_alloc_count, v86_gcap_free_count;
 static int gcap_keep_if = 0;    /* 1 = ゲストの INT n で IF を落とさない */
 
 int v86_gcap_active(void)

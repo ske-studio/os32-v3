@@ -17,7 +17,7 @@
 
 突き合わせる入力: 空 / 1 バイト / 4・8・16 の前後 / 0x80 以上のバイトを含む列
 (日本語の UTF-8) / n が長さより長い・短い・0 / 重なりコピー (前方・後方) /
-kstrncpy の埋め。kernel/kselftest.c の test_str の既存ケースも両版で通す。
+kstrncpy の埋め。kdebug/kselftest.c の test_str の既存ケースも両版で通す。
 
   python3 -B tools/tests/test_kstring_c.py [--mutate]
 

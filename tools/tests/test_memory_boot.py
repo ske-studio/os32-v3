@@ -155,12 +155,12 @@ class MemoryBoot(unittest.TestCase):
         s = (ROOT / 'kernel/kernel.c').read_text()
         boot = 'paging_boot_user_shared(exec_tramp_page_addr())'
         self.assertLess(s.index('shm_init();'), s.index(boot))
-        self.assertLess(s.index(boot), s.index('kselftest_run();'))
+        self.assertLess(s.index(boot), s.index('kdebug.ops.selftest_run();'))
         gate = 'if (!memory_boot_init(mem_kb))'
         self.assertIn(gate, s)
         start = s.index(gate)
         downstream = min(s.index(f'{name}();') for name in
-                         ('shm_init', 'kselftest_run', 'shlib_init'))
+                         ('shm_init', 'kdebug.ops.selftest_run', 'shlib_init'))
         # K6-RAM: detection decides the paging extent and the table sizes, so it
         # must run before paging_init, which must run before the model gate.
         self.assertLess(s.index('mem_kb = memory_boot_detect(mem_kb);'),

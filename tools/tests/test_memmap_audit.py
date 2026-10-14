@@ -41,17 +41,17 @@ MUTANTS = [
        ('bb', 'a >= MEM_GFX_BB_BASE && a < MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE'),
        ('tvram', 'a >= TVRAM_CHAR_BASE && a < GVRAM_BRG_END'))],
 
- ('audit-line-ending', 'kernel/kselftest.c', 'serial_puts_polled("\\r\\n");', 'serial_puts_polled("\\n");', 'FAIL serial_len >= 2'),
+ ('audit-line-ending', 'kernel/kaudit.c', 'serial_puts_polled("\\r\\n");', 'serial_puts_polled("\\n");', 'FAIL serial_len >= 2'),
 
  ('compat-unlease', 'exec/surface_query.c', 'lease->token == token && (lease->flags & AS_LEASE_GFX_COMPAT)', '0', 'FAIL surface_api_unlease(compat) == OS32_ERR_INVAL'),
- ('audit-session', 'kernel/kselftest.c', 'if (!serial_gate_active())', 'if (1)', "FAIL audit_first_fail_tag[0] == 's' && !serial_len"),
+ ('audit-session', 'kernel/kaudit.c', 'if (!serial_gate_active())', 'if (1)', "FAIL audit_first_fail_tag[0] == 's' && !serial_len"),
 
  ('unlease-WM-caller', 'exec/surface_query.c',
   'int valid = !kctx_irq_depth && !kctx_exc_depth && caller_access_get(&caller) &&',
   'int valid = !kctx_irq_depth && !kctx_exc_depth && caller_access_get_user(&caller) &&',
   'FAIL surface_api_unlease(token) == OS32_ERR_INVAL'),
- ('audit-no-mark', 'kernel/kselftest.c', '    if (bad && !audit_fail) {', '    if (0) {', 'FAIL audit_first_fail_tag[0]'),
- ('audit-every-failure', 'kernel/kselftest.c', '    if (bad && !audit_fail) {', '    if (bad) {', 'FAIL serial_len == first_len'),
+ ('audit-no-mark', 'kernel/kaudit.c', '    if (bad && !audit_fail) {', '    if (0) {', 'FAIL audit_first_fail_tag[0]'),
+ ('audit-every-failure', 'kernel/kaudit.c', '    if (bad && !audit_fail) {', '    if (bad) {', 'FAIL serial_len == first_len'),
 
  ('lease-scan-duplicate', 'exec/lease.c', '    for (u32 di = 0; di < MEM_LEASE_MAX_PDES; di++) {', '    for (u32 repeat = 0; repeat < 2; repeat++)\n    for (u32 di = 0; di < MEM_LEASE_MAX_PDES; di++) {', 'FAIL scan_max[0] == PTE_COUNT'),
  ('AS-IRQ-unbounded', 'exec/lease.c', '        irq_restore(flags);\n    }\n    /* Alias/descriptor', '        (void)flags;\n    }\n    /* Alias/descriptor', 'FAIL scan_max[0] == PTE_COUNT'),
@@ -59,7 +59,7 @@ MUTANTS = [
  ('tvram-unready', 'exec/system_surface.c', '!(gfx_surface_unready & (1U << (sf - ledger_surfaces)))', '1', 'FAIL !system_surface_source(LEDGER_ROLE_TVRAM, &tvsrc) && !tvsrc.ready'),
  ('aperture-user', 'kernel/paging.c', '    if (entry & PTE_USER) return 0;', '', 'FAIL paging_master_audit(exec_tramp_page_addr()) > 0'),
  ('failed-map-published', 'gfx/gfx_core.c', '        (void)ledger_resource_set_map(rid, 0, 0);', '', 'FAIL !paging_master_audit(exec_tramp_page_addr())'),
- ('lifetime-boot-count', 'kernel/kselftest.c', '    audit_runs++;', '    audit_runs++;\n    ksel_pass++;', 'FAIL ksel_pass == boot_pass && ksel_fail == boot_fail'),
+ ('lifetime-boot-count', 'kernel/kaudit.c', '    audit_runs++;', '    audit_runs++;\n    kselftest_count(1);', 'FAIL ksel_pass == boot_pass && ksel_fail == boot_fail'),
  ('selected-check', 'gfx/gfx_core.c', 'int gfx_selected_selfcheck(void)\n{\n    struct surface_query_source client, display;\n    if (gfx_selected_source(LEDGER_ROLE_CLIENT, &client) ||\n        gfx_selected_source(LEDGER_ROLE_DISPLAY, &display) ||\n        !client.ready || !display.ready || client.count != 1) return 0;\n    for (u32 i = 0; i < display.count; i++)\n        if (!ledger_surface_validate(&ledger_surfaces[display.refs[i].sid])) return 0;\n    const struct ledger_surface *sf = &ledger_surfaces[client.refs[0].sid];\n    if (!ledger_surface_validate(sf) || !g_backend ||\n        g_backend->bb_base != bb[0] || g_backend->bb_size != sf->npages * PAGE_SIZE ||\n        g_backend->bb_pitch != sf->pitch || g_backend->bb_format != sf->format) return 0;\n    u8 *base = sf->backing >= LEDGER_SB_VRAM ?\n               (u8 *)P2V_IO(sf->first * PAGE_SIZE) : (u8 *)P2V(sf->first * PAGE_SIZE);\n    for (u32 i = 0; i < 4; i++)\n        if (bb[i] != (i < sf->planes ? base + sf->plane_offset[i] : 0)) return 0;\n    return bb_b == bb[0] && bb_r == bb[1] && bb_g == bb[2] && bb_i == bb[3];\n}', 'int gfx_selected_selfcheck(void)\n{\n    return 1;\n}', 'FAIL !gfx_selected_selfcheck()'),
 
  ('shlib-owner-only', 'kernel/paging.c', 'shared_ro && shared_ro(va, e & ~(u32)(PAGE_SIZE - 1))', '(shared_ro != 0 && pgalloc_page_owned(e >> PAGE_SHIFT, LEDGER_OWNER_SHLIB))', 'FAIL lease_audit_all() > 0'),
@@ -72,13 +72,14 @@ MUTANTS = [
 ]
 
 def stage(tmp, sources, changes=()):
-    text = (ROOT/'kernel/kselftest.c').read_text()
+    text = (ROOT/'kernel/kaudit.c').read_text()
     for path, old, new in changes:
-        if path == 'kernel/kselftest.c':
+        if path == 'kernel/kaudit.c':
             assert text.count(old) == 1
             text = text.replace(old, new)
     text = text[text.index('/* Lifecycle diagnostics,'):]
     (tmp/'audit_slice.inc').write_text(text)
+    (tmp/'post_probe_slice.inc').write_text(function((ROOT/'kdebug/kselftest.c').read_text(), 'kselftest_run_post_probe'))
     # Count real scan iterations and the largest interval with IF clear.
     arch = tmp/'arch_io.h'
     s = arch.read_text().replace('static inline void irq_restore(unsigned int flags) { host_arch_if = flags; }',

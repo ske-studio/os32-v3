@@ -24,7 +24,7 @@ check-memory-host:
 - kernel/irq_math.c
 - kernel/v86.c
 - tools/tests/mutpar.py
-- kernel/kselftest.c
+- kdebug/kselftest.c
 - tools/tests/app_band_pde_host.c
 - tools/tests/app_bb_overlap_host.c
 - tools/tests/device_reservation_stage_host.c

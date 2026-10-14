@@ -37,7 +37,7 @@ check-trim-back-rs-host:
 - kernel/ime.h
 - kernel/kmalloc.c
 - kernel/kmalloc.h
-- kernel/kselftest.c
+- kdebug/kselftest.c
 - kernel/paging.c
 - kernel/paging.h
 - kernel/paging_app.c

@@ -5,6 +5,8 @@
 #ifndef __KSELFTEST_H
 #define __KSELFTEST_H
 
+#include "types.h"
+
 /* カーネルが実際に使うプリミティブ (kstring_asm / kmalloc / kprintf) の
  * 境界ケースを実機上で検証する。ブート時に 1 回呼ぶ。
  * 戻り値: 失敗した項目数 (0 = 全て通過)。 */
@@ -21,5 +23,18 @@ int kselftest_run_post_unicode(void);
 int kselftest_run_audit(const char *tag);
 int kselftest_run_post_probe(void);
 void kselftest_audit_v86_return(void);
+
+/* These diagnostics remain in the kernel in both KDEBUG modes. */
+enum kaudit_tag { KAUDIT_POST_EXEC, KAUDIT_POST_PROBE, KAUDIT_POST_EXEC_SHM, KAUDIT_TAG_COUNT };
+void kaudit_post_exec(void);
+void kaudit_post_probe(void);
+int kdi_kaudit_last_rc(int tag);
+int kdi_kaudit_skipped(int tag);
+void kselftest_count(int pass);
+void kdi_kselftest_count(int pass);
+void kdi_kselftest_reset(void);
+u32 kdi_get_kselftest_pass(void);
+u32 kdi_get_kselftest_fail(void);
+void kselftest_skipped(void);
 
 #endif /* __KSELFTEST_H */

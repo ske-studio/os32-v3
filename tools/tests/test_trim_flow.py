@@ -20,7 +20,7 @@ import test_trim_kernel as kernel
 
 ROOT = Path(__file__).resolve().parents[2]
 TARGET_SRCS = [
-    'exec/appslot.c', 'exec/exec.c', 'kernel/gui.c', 'kernel/kselftest.c',
+    'exec/appslot.c', 'exec/exec.c', 'kernel/gui.c', 'kdebug/kselftest.c',
     'kapi/kapi_sys.c', 'exec/exec_heap.c', 'exec/appmem.c', 'exec/appmem_map.c',
     'exec/appmem_unmap.c', 'kernel/paging_app.c', 'kernel/physmem.c',
     'sdk/allocator/nano_adapter.c',

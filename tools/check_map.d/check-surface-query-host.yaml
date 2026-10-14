@@ -3,7 +3,7 @@ check-surface-query-host:
 - exec/access_walk.c
 - exec/redir_access.c
 - exec/surface_query.c
-- kernel/kselftest.c
+- kdebug/kselftest.c
 - kernel/paging.c
 - kernel/pgalloc.c
 - kernel/physmem.c
