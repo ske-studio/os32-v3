@@ -36,6 +36,7 @@
 #include "gfx_internal.h"   /* gfx.h (PAL_*_PORT), pc98.h, memmap.h, _out/_in */
 #include "gfx_hal.h"
 #include "pegc.h"
+#include "np2sysp.h"
 #include "paging.h"
 #include "pgalloc.h"
 #include "sys.h"
@@ -712,6 +713,7 @@ static int pegc_reserve_backbuffer(void)
 /*                                                                          */
 /*  **表示のモードも同期も変えない**。やるのは                               */
 /*    1. 起動時の同期状態の記録 (と診断の 1 行)                              */
+/*    2. 24kHz の実機では probe を取り下げ、480 ラインへ進ませない           */
 /*  だけ (窓の予約・写像と BB は起動時の ⑥ が probe より前に済ませている)。 */
 /*  かつては init → shutdown で済ませていたため、CUI しか使わない      */
 /*  起動でも 31kHz/480 ラインへ入って 24kHz/400 ラインの標準 SYNC で戻して   */
@@ -737,6 +739,13 @@ static void pegc_prepare(void)
 {
     if (!pegc_probe()) return;
     pegc_boot_sync_record();
+    if (s_boot_hsync == PEGC_HSYNC_24KHZ) {
+        int np2 = np2_detect();
+        if (!np2) s_probe_ok = 0;
+        if (!serial_gate_active())
+            serial_puts_polled(np2 ? "[pegc] np2=1 fallback=none\r\n" :
+                                    "[pegc] np2=0 fallback=pc98\r\n");
+    }
 }
 
 /* 480 ラインへ入るポート操作の全部 (MMIO の前まで)。ホスト試験

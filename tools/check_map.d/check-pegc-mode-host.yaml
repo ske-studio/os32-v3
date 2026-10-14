@@ -1,6 +1,7 @@
 check-pegc-mode-host:
 - tools/tests/host32.py
 - gfx/backend_pegc.c
+- drivers/np2sysp.c
 - kernel/console.c
 - tools/tests/mutpar.py
 - tools/tests/pegc_mode_host.c

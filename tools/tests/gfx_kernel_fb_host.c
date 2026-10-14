@@ -128,6 +128,9 @@ AppSlot *appslot_get(int id) { return id == 2 ? &slot : 0; }
 int appslot_gfx_owner(void) { return host_gfx_owner; }
 int appslot_gfx_claim(int gui) { (void)gui;return 0; }
 int con_sink_is_enabled(void) { return host_gui; }
+/* These graphics lifecycle cases model NP21/W; gate rejection is covered
+ * with the real detector in pegc_mode_host.c. */
+int np2_detect(void) { return 1; }
 #ifndef E10C_REAL_AUDIT
 int kselftest_run_audit(const char *tag) { return !ledger_selfcheck(tag); }
 #endif
