@@ -398,7 +398,8 @@ static int cmd_gfxmode(int argc, char **argv)
         return SH_STATUS_USAGE;
     }
     if (str_eq(argv[1], "diag")) {
-        if (argc != 3 || (!str_eq(argv[2], "stripes") && !str_eq(argv[2], "off"))) {
+        if (argc != 3 || (!str_eq(argv[2], "stripes") &&
+                         !str_eq(argv[2], "altwin") && !str_eq(argv[2], "off"))) {
             shell_print_help(argv[0]);
             return SH_STATUS_USAGE;
         }
@@ -550,7 +551,7 @@ static const ShellCmd sys_cmds[] = {
     { "format", cmd_format, "[0-3] [sects]", "Format a drive to ext2" },
     { "play",   cmd_play,   "MML",           "Play MML via FM synth" },
     { "os32gui",cmd_os32gui,"[on|off|-t seconds]", "Switch to GUI shell now, or set GUI at boot" },
-    { "gfxmode",cmd_gfxmode,"pc98|pegc|cirrus|auto|diag stripes|off","Force the graphics backend at next boot" },
+    { "gfxmode",cmd_gfxmode,"pc98|pegc|cirrus|auto|diag stripes|altwin|off","Force the graphics backend at next boot" },
     { "kbdstat",cmd_kbdstat,"[-w]",          "Show keyboard 8251 counters (-w: log each byte, ESC/30s)" },
     { (const char *)0, 0, 0, 0 }
 };

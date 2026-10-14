@@ -134,10 +134,11 @@ STATIC_ASSERT((PAGING_BOOT_MAP_SIZE % (PTE_COUNT * PAGE_SIZE)) == 0,
               map_size_pde_aligned);
 /* T2a′: PD/PT backing は画像外の恒久 FIXED。ポインタ表だけを BSS に置く。 */
 STATIC_ASSERT(MEM_FIXED_BOOT_PT_COUNT == 8 &&
-              MEM_FIXED_PAGING_END - MEM_FIXED_PAGING_BASE == 10 * PAGE_SIZE,
-              fixed_paging_ten_pages);
+              MEM_FIXED_PAGING_END - MEM_FIXED_PAGING_BASE == 11 * PAGE_SIZE,
+              fixed_paging_eleven_pages);
 STATIC_ASSERT(((MEM_FIXED_PAGING_BASE | MEM_FIXED_PD_BASE |
                 MEM_FIXED_BOOT_PT_BASE | MEM_FIXED_APERTURE_PT_BASE |
+                MEM_FIXED_MMIO_TOP_PT_BASE |
                 MEM_FIXED_PAGING_END | MEM_SHELL_HEAP_BASE | MEM_SHELL_HEAP_END |
                 (MEM_SHELL_BAND_END + 1)) & (PAGE_SIZE - 1)) == 0,
               fixed_paging_page_aligned);
@@ -145,7 +146,8 @@ STATIC_ASSERT(MEM_FIXED_PD_BASE == MEM_FIXED_PAGING_BASE &&
               MEM_FIXED_BOOT_PT_BASE == MEM_FIXED_PD_BASE + PAGE_SIZE &&
               MEM_FIXED_APERTURE_PT_BASE == MEM_FIXED_BOOT_PT_BASE +
                   PAGING_BOOT_PT_COUNT * PAGE_SIZE &&
-              MEM_FIXED_PAGING_END == MEM_FIXED_APERTURE_PT_BASE + PAGE_SIZE,
+              MEM_FIXED_MMIO_TOP_PT_BASE == MEM_FIXED_APERTURE_PT_BASE + PAGE_SIZE &&
+              MEM_FIXED_PAGING_END == MEM_FIXED_MMIO_TOP_PT_BASE + PAGE_SIZE,
               fixed_paging_contiguous);
 STATIC_ASSERT(MEM_SHELL_STACK_TOP <= MEM_SHELL_HEAP_BASE &&
               MEM_SHELL_HEAP_BASE < MEM_SHELL_HEAP_END &&
@@ -154,7 +156,7 @@ STATIC_ASSERT(MEM_SHELL_STACK_TOP <= MEM_SHELL_HEAP_BASE &&
               shell_heap_below_fixed_paging);
 STATIC_ASSERT(MEM_FIXED_PAGING_END <= MEM_SHELL_BAND_END + 1 &&
               MEM_SHELL_BAND_END + 1 == MEM_POOL_BASE &&
-              MEM_POOL_BASE - MEM_FIXED_PAGING_END == 5 * PAGE_SIZE,
+              MEM_POOL_BASE - MEM_FIXED_PAGING_END == 4 * PAGE_SIZE,
               fixed_paging_tail_reserved);
 STATIC_ASSERT(MEM_KERNEL_BAND_END < MEM_SHELL_LOAD_ADDR &&
               MEM_DMA_POOL_END < MEM_SHELL_LOAD_ADDR &&
@@ -170,6 +172,7 @@ STATIC_ASSERT(MEM_KERNEL_BAND_END < MEM_SHELL_LOAD_ADDR &&
  * おけば、以後のアプリ PD は PDE ごとこの PT を写し、paging_map_phys は PTE を
  * 書くだけで済む (PDE 4-7 の 16MB〜32MB と同じやり方)。legacy 経路 (8MB) には
  * 動的 PT の置き場が無いので、動的確保にはしない。 */
+#define PAGING_MMIO_TOP_PDI (MEM_MMIO_TOP_PT_BASE / MEM_DEVICE_APERTURE_PDE_SIZE)
 #define PAGING_APERTURE_PDI (MEM_DEVICE_APERTURE_BASE / MEM_DEVICE_APERTURE_PDE_SIZE)
 STATIC_ASSERT(MEM_DEVICE_APERTURE_PDE_SIZE == (u32)PTE_COUNT * PAGE_SIZE,
               aperture_pt_covers_one_pde);
@@ -180,6 +183,9 @@ STATIC_ASSERT(MEM_DEVICE_APERTURE_BASE + MEM_DEVICE_APERTURE_PDE_SIZE <=
 STATIC_ASSERT(PAGING_APERTURE_PDI >= PAGING_BOOT_PT_COUNT &&
               PAGING_APERTURE_PDI < PAGING_PT_COUNT, aperture_pdi_static_free);
 
+
+STATIC_ASSERT((MEM_MMIO_TOP_PT_BASE % MEM_DEVICE_APERTURE_PDE_SIZE) == 0 &&
+              PAGING_MMIO_TOP_PDI == PAGING_PT_COUNT - 1, mmio_top_last_pde);
 
 static u32 *page_directory;          /* アライン済みポインタ */
 static u32 *page_tables[PAGING_PT_COUNT];
@@ -203,7 +209,7 @@ u32 paging_range_reject_count = 0;
 /* paging_init が実際に恒等マップした範囲の上端 PFN (exclusive)。 */
 static u32 boot_identity_end;
 
-/* CR3/PDE frame と固定10枚の恒等 sup/RW/WB を照合。A/D bit は無視する。
+/* CR3/PDE frame と固定11枚の恒等 sup/RW/WB を照合。A/D bit は無視する。
  * PDE0 の USER 単独は SHM/trampoline のため許可し、実効権限は PTE で拒否。 */
 static int fixed_paging_valid(void)
 {
@@ -217,11 +223,16 @@ static int fixed_paging_valid(void)
             (entry & (mask | PAGE_RW | PTE_PS | PTE_PCD | PTE_PWT)) !=
             (a | PAGE_RW)) return 0;
     }
-    entry = page_directory[PAGING_APERTURE_PDI];
-    if (entry & PTE_USER) return 0;
-    if (V2P(page_tables[PAGING_APERTURE_PDI]) != MEM_FIXED_APERTURE_PT_BASE ||
-        (entry & (mask | PAGE_RW | PTE_PS | PTE_PCD | PTE_PWT)) !=
-        (MEM_FIXED_APERTURE_PT_BASE | PAGE_RW)) return 0;
+    for (i = PAGING_APERTURE_PDI; (u32)i <= PAGING_MMIO_TOP_PDI;
+         i += PAGING_MMIO_TOP_PDI - PAGING_APERTURE_PDI) {
+        a = i == PAGING_APERTURE_PDI ? MEM_FIXED_APERTURE_PT_BASE :
+                                     MEM_FIXED_MMIO_TOP_PT_BASE;
+        entry = page_directory[i];
+        if (entry & PTE_USER) return 0;
+        if (V2P(page_tables[i]) != a ||
+            (entry & (mask | PAGE_RW | PTE_PS | PTE_PCD | PTE_PWT)) !=
+            (a | PAGE_RW)) return 0;
+    }
     for (a = MEM_FIXED_PAGING_BASE; a < MEM_FIXED_PAGING_END; a += PAGE_SIZE) {
         entry = page_tables[0][a / PAGE_SIZE];
         if ((entry & (mask | PAGE_RW | PTE_USER | PTE_PCD | PTE_PWT)) !=
@@ -304,13 +315,17 @@ void paging_init(u32 mem_kb)
         page_directory[i] = V2P(page_tables[i]) | PAGE_RW;
     }
 
-    /* デバイス窓の帯の PT (静的 1 枚)。中身は全 Not-Present、PDE は present。
+    /* デバイス窓と最上位 MMIO の PT (各静的 1 枚)。中身は全 Not-Present、PDE は present。
      * 窓を張るのは gfx バックエンドの paging_map_phys (supervisor + PCD)。 */
-    page_tables[PAGING_APERTURE_PDI] = (u32 *)P2V_BOOT(MEM_FIXED_APERTURE_PT_BASE);
-    for (j = 0; j < PTE_COUNT; j++)
-        page_tables[PAGING_APERTURE_PDI][j] = PAGE_NOT_PRESENT;
-    page_directory[PAGING_APERTURE_PDI] =
-        V2P(page_tables[PAGING_APERTURE_PDI]) | PAGE_RW;
+    for (i = PAGING_APERTURE_PDI; (u32)i <= PAGING_MMIO_TOP_PDI;
+         i += PAGING_MMIO_TOP_PDI - PAGING_APERTURE_PDI) {
+        phys = i == PAGING_APERTURE_PDI ? MEM_FIXED_APERTURE_PT_BASE :
+                                        MEM_FIXED_MMIO_TOP_PT_BASE;
+        page_tables[i] = (u32 *)P2V_BOOT(phys);
+        for (j = 0; j < PTE_COUNT; j++)
+            page_tables[i][j] = PAGE_NOT_PRESENT;
+        page_directory[i] = phys | PAGE_RW;
+    }
 
     /* ========================================================
      *  保護属性の設定
@@ -357,7 +372,7 @@ void paging_init(u32 mem_kb)
     /* シェルスタックガード: Not-Present */
     paging_set_not_present(MEM_SHELL_GUARD, MEM_SHELL_GUARD + PAGE_SIZE - 1);
 
-    /* heap の末尾を一旦 NP にし、固定10枚だけを最後に張り直す。 */
+    /* heap の末尾を一旦 NP にし、固定11枚だけを最後に張り直す。 */
     paging_set_not_present(MEM_SHELL_HEAP_END, MEM_SHELL_BAND_END);
 
     /* SQLite帯域 + 代替スタック (0x200000〜): 強制R/W

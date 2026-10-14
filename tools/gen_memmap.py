@@ -272,7 +272,9 @@ def bands(m, sym):
     add(SHELL, "固定 bootstrap PT (8枚)", v("MEM_FIXED_BOOT_PT_BASE"),
         (v("MEM_FIXED_APERTURE_PT_BASE") or 0) - 1, "RW", "恒久FIXED / supervisor / WB")
     add(SHELL, "固定 device aperture PT", v("MEM_FIXED_APERTURE_PT_BASE"),
-        (v("MEM_FIXED_PAGING_END") or 0) - 1, "RW", "backing は WB、MMIO PTE は PCD/PWT")
+        (v("MEM_FIXED_MMIO_TOP_PT_BASE") or 0) - 1, "RW", "backing は WB、MMIO PTE は PCD/PWT")
+    add(SHELL, "固定 MMIO top PT", v("MEM_FIXED_MMIO_TOP_PT_BASE"),
+        (v("MEM_FIXED_PAGING_END") or 0) - 1, "RW", "backing は WB、PEGC 別名 PTE は PCD")
     add(SHELL, "上端残余予約", v("MEM_FIXED_PAGING_END"), v("MEM_SHELL_BAND_END"),
         "NP", "恒久FIXED、T3 の guard+kstack 用")
 
@@ -301,6 +303,10 @@ def bands(m, sym):
         "NP / supervisor+PCD",
         "RAM として登録しない (D11)。PCI の BAR・デバイス窓の帯 (0xFE000000〜)・"
         "最上位の ROM / MMIO")
+    add(DEV, "PEGC リニア窓の別名", v("PEGC_LINEAR_ALT_BASE"),
+        plus("PEGC_LINEAR_ALT_BASE", "PEGC_LINEAR_SIZE", -1), "supervisor+PCD",
+        "043Bh bit2=1 の機械で表示面。候補の map 公開後だけ present",
+        parent="RAM の登録上限 (2GB) 以上")
     return rows
 
 
@@ -387,6 +393,7 @@ MIRRORS = (
     ("build/os32.ld", r"^\s*MEM_FIXED_BOOT_PT_BASE\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_FIXED_BOOT_PT_BASE"),
     ("build/os32.ld", r"^\s*MEM_FIXED_BOOT_PT_COUNT\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_FIXED_BOOT_PT_COUNT"),
     ("build/os32.ld", r"^\s*MEM_FIXED_APERTURE_PT_BASE\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_FIXED_APERTURE_PT_BASE"),
+    ("build/os32.ld", r"^\s*MEM_FIXED_MMIO_TOP_PT_BASE\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_FIXED_MMIO_TOP_PT_BASE"),
     ("build/os32.ld", r"^\s*MEM_FIXED_PAGING_END\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_FIXED_PAGING_END"),
     ("build/os32.ld", r"^\s*MEM_SHELL_HEAP_BASE\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_SHELL_HEAP_BASE"),
     ("build/os32.ld", r"^\s*MEM_SHELL_HEAP_END\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_SHELL_HEAP_END"),
@@ -494,21 +501,22 @@ def defects(rows, m=None, sym=None, root=None):
                          % (human(b[1]), human(b[0]), human(b[1] - b[0])))
     if m is not None:
         names = ("MEM_FIXED_PAGING_BASE", "MEM_FIXED_PD_BASE", "MEM_FIXED_BOOT_PT_BASE",
-                 "MEM_FIXED_BOOT_PT_COUNT", "MEM_FIXED_APERTURE_PT_BASE", "MEM_FIXED_PAGING_END",
+                 "MEM_FIXED_BOOT_PT_COUNT", "MEM_FIXED_APERTURE_PT_BASE",
+                 "MEM_FIXED_MMIO_TOP_PT_BASE", "MEM_FIXED_PAGING_END",
                  "MEM_SHELL_HEAP_BASE", "MEM_SHELL_HEAP_END", "MEM_SHELL_HEAP_SIZE",
                  "MEM_SHELL_BAND_END", "MEM_POOL_BASE", "MEM_SHELL_STACK_TOP")
         v = {n: m.get(n) for n in names}
         if any(x is None for x in v.values()):
             lines.append("固定paging: 境界定数を解けない")
         else:
-            b, pd, pt, count, apt, end, hb, he, size, band, pool, stack = (v[n] for n in names)
-            if any(a % PAGE for a in (b, pd, pt, apt, end, hb, he, band + 1, pool, stack)):
+            b, pd, pt, count, apt, mpt, end, hb, he, size, band, pool, stack = (v[n] for n in names)
+            if any(a % PAGE for a in (b, pd, pt, apt, mpt, end, hb, he, band + 1, pool, stack)):
                 lines.append("固定paging: 境界が4KB非整列")
             if not (pd == b and pt == pd + PAGE and count == 8 and apt == pt + count * PAGE
-                    and end == apt + PAGE and end - b == 10 * PAGE):
-                lines.append("固定paging: 連続1/8/1枚ではない")
+                    and mpt == apt + PAGE and end == mpt + PAGE and end - b == 11 * PAGE):
+                lines.append("固定paging: 連続1/8/1/1枚ではない")
             if not (stack <= hb < he == b and hb + size == he and end <= band + 1 == pool
-                    and pool - end == 5 * PAGE):
+                    and pool - end == 4 * PAGE):
                 lines.append("固定paging: shell heap/上端予約の境界不一致")
     for r in reversed_ranges(rows):
         lines.append("逆転: %s  開始 0x%06X > 終端 0x%06X "
@@ -711,7 +719,9 @@ def render(m, sym, rows, map_path, root):
 
 def load(root, map_path):
     sym = read_symbols(map_path)
-    m = Macros(read_defines(os.path.join(root, HDR_REL)), sym)
+    defines = read_defines(os.path.join(root, HDR_REL))
+    defines.update(read_defines(os.path.join(root, "include/pegc.h")))
+    m = Macros(defines, sym)
     return m, sym, bands(m, sym)
 
 

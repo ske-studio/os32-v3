@@ -21,7 +21,8 @@
  *    PREF        GFX_PREF_*          IS9821  BIOS ワーク 045Ch bit6
  *    PEGC_ID / CIRRUS_ID  各 backend の副作用のない識別の答え
  *    HW          模擬選択で使う装置 (0 = 無し / LEDGER_SF_PEGC / _CIRRUS)
- *    FAIL_MAP    写像を失敗させる窓 (0 / LEDGER_SF_PEGC / LEDGER_SF_CIRRUS)
+ *    FAIL_MAP    写像を失敗させる窓 (0 / LEDGER_SF_PEGC / LEDGER_SF_CIRRUS / 4=alt)
+ *    FAIL_ALT_RESOURCE  1 = alt 資源の登録拒否 (F00 の予約・写像は残る)
  *    FAIL_BB     1 = アリーナを AS owner で埋めて BB を取れなくする
  *
  *  見るもの:
@@ -105,6 +106,10 @@ static void report(const char *s, u32 n)
 #ifndef FAIL_MAP
 #define FAIL_MAP 0
 #endif
+#define FAIL_MAP_ALT 4
+#ifndef FAIL_ALT_RESOURCE
+#define FAIL_ALT_RESOURCE 0
+#endif
 #ifndef FAIL_BB
 #define FAIL_BB 0
 #endif
@@ -156,11 +161,17 @@ static const struct ledger_region *gfx_region(u32 first, u32 end)
     return 0;
 }
 
+int host_resource(const struct ledger_resource *r, u32 *rid)
+{
+    if (FAIL_ALT_RESOURCE && r->decode_first == PEGC_LINEAR_ALT_BASE/PAGE_SIZE)
+        return 0;
+    return ledger_resource_add(r, rid);
+}
 int host_reserve(u32 owner, const struct ledger_span *s, u32 n)
 {
     note('R');
     CHECK(owner == LEDGER_OWNER_GFX);
-    CHECK(count('R') == 1);                 /* 候補は 1 回の一括 commit (B3) */
+    CHECK(count('R') == 1); /* Commit all candidate reservations together. */
     return ledger_reserve_set(owner, s, n);
 }
 int host_map(u32 virt, u32 phys, u32 n, u32 flags)
@@ -170,7 +181,8 @@ int host_map(u32 virt, u32 phys, u32 n, u32 flags)
     /* 予約 → 写像: 張る窓は予約済み (装置の予約の内側だけを張る) */
     CHECK(gfx_region(phys / PAGE_SIZE, phys / PAGE_SIZE + n) != 0);
     if ((FAIL_MAP == LEDGER_SF_PEGC && phys == PEGC_LINEAR_BASE) ||
-        (FAIL_MAP == LEDGER_SF_CIRRUS && phys == WAB_XE10_LINEARWIN_BASE))
+        (FAIL_MAP == LEDGER_SF_CIRRUS && phys == WAB_XE10_LINEARWIN_BASE) ||
+        (FAIL_MAP == FAIL_MAP_ALT && phys == PEGC_LINEAR_ALT_BASE))
         return -1;
     return paging_map_phys(virt, phys, n, flags);
 }
@@ -297,7 +309,7 @@ void _start(void)
 {
     u32 args[6] = {0x200000, 0xE00000, 3, 0x32, 0xffffffffUL, 0};
     u32 result, i, p, filler = 0, base, size, bb_first = 0;
-    int is_c, pc, cc, map_pegc, map_cirrus, bb, cirrus_ok, sel;
+    int is_c, pc, cc, map_pegc, map_alt, map_cirrus, bb, cirrus_ok, sel;
     const struct ledger_surface *sp, *se, *sc, *sd, *cl;
     struct ledger_surface snap[LEDGER_MAX_SURFACES];
     char want[40];
@@ -312,15 +324,17 @@ void _start(void)
     cc = is_c && PREF != GFX_PREF_PEGC && CIRRUS_ID;
     map_pegc = pc && FAIL_MAP != LEDGER_SF_PEGC;
     map_cirrus = cc && FAIL_MAP != LEDGER_SF_CIRRUS;
-    bb = map_pegc && !FAIL_BB;
+    map_alt = map_pegc && FAIL_MAP != FAIL_MAP_ALT && !FAIL_ALT_RESOURCE;
+    bb = map_alt && !FAIL_BB;
     cirrus_ok = map_cirrus;
     if (is_c && PREF != GFX_PREF_CIRRUS) want[nw++] = 'P';
     if (is_c && PREF != GFX_PREF_PEGC) want[nw++] = 'C';
     if (pc || cc) want[nw++] = 'R';
     if (pc) want[nw++] = 'M';
     if (cc) want[nw++] = 'M';
-    if (map_pegc) want[nw++] = 'S'; /* PEGC DISPLAY precedes BB allocation */
-    if (map_pegc) want[nw++] = 'B';
+    if (map_pegc && !FAIL_ALT_RESOURCE) want[nw++] = 'M';
+    if (map_alt) want[nw++] = 'S'; /* PEGC DISPLAY precedes BB allocation */
+    if (map_alt) want[nw++] = 'B';
     want[nw++] = 'S';
     if (bb) want[nw++] = 'S';
     if (cirrus_ok) { want[nw++] = 'S'; want[nw++] = 'S'; }
@@ -341,6 +355,35 @@ void _start(void)
     if (bb) kmemset((void *)((arena_top_pfn - 75) * PAGE_SIZE), 0xA5, 75 * PAGE_SIZE);
 
     gfx_boot_reserve();
+
+    /* Independent resource and PTE assertions catch either omitted half. */
+    {
+        const struct ledger_resource *alt = 0, *normal = 0;
+        for (i = 0; i < LEDGER_MAX_RESOURCES; i++) {
+            const struct ledger_resource *r = &ledger_resources[i];
+            if (r->decode_first == PEGC_LINEAR_ALT_BASE/PAGE_SIZE) alt = r;
+            if (r->decode_first == PEGC_LINEAR_BASE/PAGE_SIZE &&
+                r->decode_end == (PEGC_LINEAR_BASE+PEGC_LINEAR_SIZE)/PAGE_SIZE) normal = r;
+        }
+        CHECK(!(pc && !FAIL_ALT_RESOURCE) == !alt);
+        if (alt) {
+            CHECK(alt->decode_end == (PEGC_LINEAR_ALT_BASE+PEGC_LINEAR_SIZE)/PAGE_SIZE);
+            CHECK(alt->map_first == (map_alt ? PEGC_LINEAR_ALT_BASE/PAGE_SIZE : 0));
+            CHECK(alt->map_end == (map_alt ? (PEGC_LINEAR_ALT_BASE+PEGC_LINEAR_SIZE)/PAGE_SIZE : 0));
+        }
+        if (map_pegc) CHECK(normal && normal->map_first == PEGC_LINEAR_BASE/PAGE_SIZE &&
+            normal->map_end == (PEGC_LINEAR_BASE+PEGC_LINEAR_SIZE)/PAGE_SIZE);
+    }
+    if (map_alt) CHECK(mapped(PEGC_LINEAR_ALT_BASE, PEGC_LINEAR_SIZE));
+    else for (i = 0; i < PEGC_LINEAR_SIZE; i += PAGE_SIZE)
+        CHECK(!(pte(PEGC_LINEAR_ALT_BASE+i) & PTE_PRESENT));
+    CHECK(!(pte(PEGC_LINEAR_ALT_BASE+PEGC_LINEAR_SIZE) & PTE_PRESENT));
+
+    paging_reclaim_conventional();
+    paging_set_not_present(MEM_SHM_GUARD_LO, MEM_SHM_GUARD_LO + PAGE_SIZE - 1);
+    paging_set_not_present(MEM_SHM_GUARD_HI, MEM_SHM_GUARD_HI + PAGE_SIZE - 1);
+    CHECK(!paging_boot_user_shared(0x170000));
+    CHECK(paging_master_audit(0x170000) == 0);
 
     /* 順序 */
     CHECK(ntrace == nw);
@@ -398,7 +441,7 @@ void _start(void)
     CHECK(sp->planes == 4 && sp->pitch == 80 && sp->height == 400);
     {
         const struct ledger_surface *display = ledger_surface_find(LEDGER_SF_PEGC, LEDGER_ROLE_DISPLAY);
-        CHECK(!display == !map_pegc);
+        CHECK(!display == !map_alt);
         if (display) CHECK(display->first == PEGC_LINEAR_BASE / PAGE_SIZE &&
             display->npages == PEGC_FB_SIZE_480 / PAGE_SIZE &&
             display->width == MEM_GFX_BB8_WIDTH && display->height == MEM_GFX_BB8_HEIGHT &&

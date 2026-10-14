@@ -882,6 +882,8 @@ static void __attribute__((cold)) test_gfx_ledger(void)
           p->backing == LEDGER_SB_FIXED_RAM && p->owner == LEDGER_OWNER_BOOT,
           "gfx:planar surface");
     {
+        /* probe より前の値 (kernel.c の post-exec)。probe が FFF00000h に付け替えた後は
+         * pegc_window_base() と比べること (R7FIX2 段 3b、Fable R2)。 */
         const struct ledger_surface *pd = ledger_surface_find(LEDGER_SF_PEGC, LEDGER_ROLE_DISPLAY);
         check(!pd || (pd->first == PEGC_LINEAR_BASE / PAGE_SIZE &&
               pd->npages == PEGC_FB_SIZE_480 / PAGE_SIZE &&

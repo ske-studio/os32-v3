@@ -14,7 +14,7 @@ static void __attribute__((cold)) gfx_diag_px(void)
     static u32 previous;
     static u32 generation;
     if (g_backend != &gfx_backend_pegc || !gfx_init_gen || !bb_b || serial_gate_active()) return;
-    volatile u8 *vram = P2V_IO(PEGC_LINEAR_BASE);
+    volatile u8 *vram = P2V_IO(pegc_window_base());
     const u32 a = OS32_GUI_DIAG_P1_Y * PEGC_PITCH + OS32_GUI_DIAG_P1_X;
     const u32 b = OS32_GUI_DIAG_P2_Y * PEGC_PITCH + OS32_GUI_DIAG_P2_X;
     u32 sample = bb_b[a] | (u32)vram[a] << 8 |

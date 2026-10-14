@@ -639,9 +639,10 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * K4 の GUI= と同じ流儀: ここで読み、サブシステム側の変数へ渡す。 */
     {
         char gfxmode[16];
-        gfx_diag_stripes =
-            sysconfig_get_str(SYS_SYSTEM_CFG, "GFXDIAG", gfxmode, sizeof(gfxmode)) > 0 &&
-            kstrcmp(gfxmode, "stripes") == 0;
+        if (sysconfig_get_str(SYS_SYSTEM_CFG, "GFXDIAG", gfxmode, sizeof(gfxmode)) > 0) {
+            gfx_diag_stripes = kstrcmp(gfxmode, "stripes") == 0;
+            gfx_diag_altwin = kstrcmp(gfxmode, "altwin") == 0;
+        }
         if (sysconfig_get_str(SYS_SYSTEM_CFG, "GFX", gfxmode, (int)sizeof(gfxmode)) > 0) {
             if (kstrcmp(gfxmode, "pc98") == 0) {
                 gfx_set_backend_pref(GFX_PREF_PC98);

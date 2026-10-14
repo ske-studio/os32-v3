@@ -72,10 +72,16 @@ void _start(void)
     CHECK(!paging_is_present(MEM_SYSTEM_SPACE_END - PAGE_SIZE));
     CHECK(!paging_is_present(PAGING_BOOT_MAP_SIZE / 2));
     CHECK(!paging_is_present(0xFFFFFFFFUL));
-    CHECK(paging_set_page(0xFFFFF000UL, 0, PAGE_RW) == -1);
+    CHECK(paging_set_page(0xFFFFF000UL, 0, PAGE_RW) == 0);
+    CHECK(paging_is_present(0xFFFFFFFFUL));
+    CHECK(paging_set_page(0xFFFFF000UL, 0, PAGE_NOT_PRESENT) == 0);
+    CHECK(!paging_is_present(0xFFFFFFFFUL));
     CHECK(used == 0);
-    /* T2a′: 画像外の1/8/1枚、固定番地と4KB整列。 */
+    /* T2a′: 画像外の1/8/1/1枚、固定番地と4KB整列。 */
     CHECK(MEM_FIXED_APERTURE_PT_BASE - MEM_FIXED_BOOT_PT_BASE == 8 * PAGE_SIZE);
+    CHECK(MEM_FIXED_MMIO_TOP_PT_BASE == 0x3FB000UL);
+    CHECK(MEM_FIXED_PAGING_END - MEM_FIXED_PAGING_BASE == 11 * PAGE_SIZE);
+    CHECK(page_directory[PAGING_MMIO_TOP_PDI] == (MEM_FIXED_MMIO_TOP_PT_BASE | PAGE_RW));
     CHECK(!(MEM_FIXED_BOOT_PT_BASE & (PAGE_SIZE - 1)));
     CHECK(MEM_FIXED_BOOT_PT_BASE - MEM_FIXED_PD_BASE == PAGE_SIZE);
     CHECK(!(MEM_FIXED_PD_BASE & (PAGE_SIZE - 1)));

@@ -54,6 +54,10 @@
  * MEM_SYSTEM_SPACE_BASE を PEGC_LINEAR_BASE に合わせ直すこと。 */
 STATIC_ASSERT(MEM_SYSTEM_SPACE_BASE == PEGC_LINEAR_BASE,
               app_band_device_floor_is_pegc_window);
+STATIC_ASSERT(PEGC_LINEAR_ALT_BASE >= MEM_MMIO_TOP_PT_BASE &&
+              PEGC_LINEAR_ALT_BASE - MEM_MMIO_TOP_PT_BASE <=
+              MEM_DEVICE_APERTURE_PDE_SIZE - PEGC_LINEAR_SIZE,
+              pegc_alt_window_in_mmio_top_pt);
 
 /* ------------------------------------------------------------------------ */
 /*  GDC 表示タイミング表 (値と出典は include/pegc.h §9)                      */
@@ -86,6 +90,25 @@ static int s_probed    = 0;   /* probe を 1 回でも走らせたか */
 static int s_probe_ok  = 0;   /* probe の結果 (キャッシュ) */
 static int s_active    = 0;   /* init 済み = 拡張グラフィックモード中か */
 int gfx_diag_stripes;
+int gfx_diag_altwin;
+static u32 s_window_base = PEGC_LINEAR_BASE;
+
+u32 pegc_window_base(void) { return s_window_base; }
+
+/* Boot-only: no AS/lease exists yet. Keep the old base on either failure. */
+int __attribute__((cold)) pegc_select_window(u32 base)
+{
+    if (base != s_window_base) {
+        struct ledger_surface *sf = ledger_surface_find(LEDGER_SF_PEGC, LEDGER_ROLE_DISPLAY);
+        if (!sf) return 0;
+        struct ledger_surface next = *sf;
+        next.first = base / PAGE_SIZE;
+        if (!ledger_surface_release((u32)(sf - ledger_surfaces)) ||
+            !ledger_surface_create(&next, 0)) return 0;
+    }
+    s_window_base = base;
+    return 1;
+}
 static int s_sys16m_ram = 0;  /* 043Bh bit2 の読み値 (1 = 通常 RAM 扱い) */
 
 /* 起動時 (BIOS が作ったまま) の水平走査周波数。pegc_boot_sync_record() が
@@ -520,11 +543,12 @@ static u8 pegc_restore_hsync(void)
 /*    4. 09A0h の解錠フラグが 6Ah の施錠/解錠に追随するか。open bus で常に   */
 /*       FFh を返す機種 (As2 の設定 / Ts はポート自体が無い) を弾くために、   */
 /*       「1 が返る」ではなく「0→1 が切り替わる」ことを見る。                */
-/*    5. 実際に拡張モードへ入り、⑥ が張ったリニア窓で書き込み読み戻し試験。 */
+/*    5. 拡張モードで両窓の双方向別名試験を行い、DISPLAY を選び直す。 */
 /*       終わったら **必ず標準グラフィックモードへ戻す** (probe は副作用を    */
 /*       残さない)。本番のモード設定は init() が行う。                       */
 /* ------------------------------------------------------------------------ */
-static int pegc_linear_selftest(void);
+static int __attribute__((cold, noinline)) pegc_linear_selftest(void);
+static int __attribute__((cold, noinline)) pegc_alias_test(u32 base, u8 v[4]);
 static int pegc_reserve_backbuffer(void);
 
 /* 窓は起動時の静的な恒等写像 (PAGING_BOOT_MAP_SIZE = 32MB) の中に入ること。 */
@@ -552,6 +576,7 @@ int pegc_identify(void)
                                   MEM_HIGH_RAM_BASE / PAGE_SIZE);
 }
 
+static int __attribute__((cold)) pegc_probe(void);
 static int pegc_probe(void)
 {
     int unlocked, locked;
@@ -584,32 +609,32 @@ static int pegc_probe(void)
  * 戻り値 1 = 使える。終了時はハードを呼び出し前の状態に戻す。窓の写像は ⑥ が
  * 張ったもの (supervisor + PCD) で、失敗しても剥がさない (予約・写像は永久
  * 保持、TASK_T1_LEDGER §3-8)。 */
-static int pegc_linear_selftest(void)
+static int __attribute__((cold, noinline)) pegc_linear_selftest(void)
 {
-    volatile u8 *fb = (volatile u8 *)P2V_IO(PEGC_LINEAR_BASE);
-    int ok = 0;
-    u8 s0, s1;
+    int ok = 0, which = s_sys16m_ram || gfx_diag_altwin;
+    const char *result[2] = {"skip", "skip"};
+    const char *win = "none", *disp = "skip";
+    u8 v[4];
 
-    /* 拡張グラフィックモードへ。E0000h の意味が変わるのはこの瞬間から。 */
     ff2_locked_write(PEGC_FF2_EXT_GFX);
     if (!pegc_stat(PEGC_STAT_SEL_GFXMODE)) goto restore_mode;
-
     mmio_w8(PEGC_MMIO_PIXFMT, PEGC_PIXFMT_PACKED);
     mmio_w16(PEGC_MMIO_LINEAR, PEGC_LINEAR_ON);
-
-    /* 2 か所に別の値を書いて読み戻す。同じ値が両方から返る (エイリアス) /
-     * 何も返らない (open bus) を弾く。試験に使うのは表示されない末尾側。 */
-    s0 = fb[0];
-    s1 = fb[PEGC_FB_SIZE_480 - 1];
-    fb[0] = 0x5A;
-    fb[PEGC_FB_SIZE_480 - 1] = 0xA5;
-    if (fb[0] == 0x5A && fb[PEGC_FB_SIZE_480 - 1] == 0xA5) ok = 1;
-    fb[0] = s0;
-    fb[PEGC_FB_SIZE_480 - 1] = s1;
-
+    for (int i = 0; i < 2; i++, which ^= 1) {
+        u32 base = which ? PEGC_LINEAR_ALT_BASE : PEGC_LINEAR_BASE;
+        ok = pegc_alias_test(base, v);
+        result[which] = ok ? "ok" : "ng";
+        if (!ok) continue;
+        win = which ? "fff00000" : "00f00000";
+        ok = pegc_select_window(base);
+        if (which) disp = ok ? "ok" : "fail";
+        break;
+    }
     mmio_w16(PEGC_MMIO_LINEAR, PEGC_LINEAR_OFF);
 restore_mode:
     ff2_locked_write(PEGC_FF2_STD_GFX);
+    kprintf(0x07, "[pegc] win=%s sys16m=%d f00=%s fff=%s force=%d disp=%s\n",
+            win, s_sys16m_ram, result[0], result[1], gfx_diag_altwin, disp);
     return ok;
 }
 
@@ -819,11 +844,11 @@ static void __attribute__((cold)) pegc_diag_serial(const PegcDiag *d)
 #define PEGC_DIAG_ALIAS_OFFSET 16
 #define PEGC_DIAG_STRIPE_WIDTH 16
 #define PEGC_DIAG_SECONDS 3
-static void __attribute__((cold, noinline)) pegc_diag_alias(void)
+static int __attribute__((cold, noinline)) pegc_alias_test(u32 base, u8 v[4])
 {
     volatile u8 *a = P2V_IO(PEGC_BANK_WIN0 + PEGC_DIAG_ALIAS_OFFSET);
-    volatile u8 *f = P2V_IO(PEGC_LINEAR_BASE + PEGC_DIAG_ALIAS_OFFSET);
-    u8 saved[2], v[4];
+    volatile u8 *f = P2V_IO(base + PEGC_DIAG_ALIAS_OFFSET);
+    u8 saved[2];
     mmio_w16(PEGC_MMIO_BANK0, 0);
     saved[0] = *a; saved[1] = *f;
     *a = 0x5a; v[0] = *f;
@@ -831,10 +856,17 @@ static void __attribute__((cold, noinline)) pegc_diag_alias(void)
     *f = 0x5a; v[2] = *a;
     *f = 0xa5; v[3] = *a;
     *a = saved[0]; *f = saved[1];
+    return v[0] == 0x5a && v[1] == 0xa5 &&
+                       v[2] == 0x5a && v[3] == 0xa5;
+}
+
+static void __attribute__((cold, noinline)) pegc_diag_alias(void)
+{
+    u8 v[4];
+    int ok = pegc_alias_test(s_window_base, v);
     if (serial_gate_active()) return;
     serial_puts_polled("[pegc] alias=");
-    serial_puts_polled(v[0] == 0x5a && v[1] == 0xa5 &&
-                       v[2] == 0x5a && v[3] == 0xa5 ? "ok" : "ng");
+    serial_puts_polled(ok ? "ok" : "ng");
     for (u32 i = 0; i < 4; i++) {
         serial_puts_polled(i == 0 ? " ab=" : i == 2 ? " ba=" : ",");
         serial_diag_hex(v[i], 2);
@@ -846,7 +878,7 @@ static void __attribute__((cold, noinline)) pegc_diag_alias(void)
 static void __attribute__((cold, noinline)) pegc_diag_stripes(void)
 {
     if (!gfx_diag_stripes) return;
-    volatile u8 *vram = P2V_IO(PEGC_LINEAR_BASE);
+    volatile u8 *vram = P2V_IO(s_window_base);
     for (u32 y = 0; y < PEGC_HEIGHT_480; y++)
         for (u32 x = 0; x < PEGC_PITCH; x++)
             *vram++ = (x / PEGC_DIAG_STRIPE_WIDTH) & 15;
@@ -896,7 +928,7 @@ static void pegc_init(void)
 
     /* --- 画面をクリア --- */
     kmemset((u8 *)P2V(s_bb_phys), 0, (u32)MEM_GFX_BB8_SIZE);
-    kmemset((u8 *)P2V(PEGC_LINEAR_BASE), 0, (u32)PEGC_FB_SIZE_480);
+    kmemset((u8 *)P2V_IO(s_window_base), 0, (u32)PEGC_FB_SIZE_480);
 
     /* テキスト VRAM もクリアする (9801 の _gfx_common_init と同じ扱い)。
      * 480 ラインでは 30 行ぶんが見えるので 25 行では足りない (票 H2c)。
@@ -978,7 +1010,7 @@ static void pegc_present_rect(int x, int y, int w, int h)
     if (!gfx_clip_screen(&x, &y, &w, &h, PEGC_WIDTH, PEGC_HEIGHT_480)) return;
 
     src = (u8 *)P2V(s_bb_phys) + (u32)y * PEGC_PITCH + (u32)x;
-    dst = (u8 *)P2V(PEGC_LINEAR_BASE) + (u32)y * PEGC_PITCH + (u32)x;
+    dst = (u8 *)P2V_IO(s_window_base) + (u32)y * PEGC_PITCH + (u32)x;
     bytes = (u32)w;
 
     for (row = 0; row < h; row++) {

@@ -53,6 +53,10 @@ def target_cmd(obj):
 
 
 MUTATIONS = [
+    ("window_always_f00_first", MUT_TARGET,
+     "which = s_sys16m_ram || gfx_diag_altwin", "which = 0"),
+    ("window_accepts_ng", MUT_TARGET,
+     "        if (!ok) continue;", "        if (0) continue;"),
     ("gate_24k_inverted", MUT_TARGET,
      "    if (s_boot_hsync == PEGC_HSYNC_24KHZ) {",
      "    if (s_boot_hsync != PEGC_HSYNC_24KHZ) {"),

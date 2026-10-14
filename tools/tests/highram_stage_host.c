@@ -41,6 +41,10 @@ extern int sys_memory_bootstrap_model(struct physmem *, const struct pgalloc_lay
                                      int (*)(u32, u32, void *)) __attribute__((weak));
 extern int sys_memory_stage_online(void) __attribute__((weak));
 extern int paging_verify_identity(u32, u32, void *) __attribute__((weak));
+/* The last PDE has a static MMIO PT. Keep a separate dynamic PT sentinel
+ * immediately below it so workspace exhaustion still exercises allocation. */
+#define HIGH_DYNAMIC_PDI (PAGING_MMIO_TOP_PDI - 1)
+#define HIGH_DYNAMIC_PFN ((HIGH_DYNAMIC_PDI + 1) * PTE_COUNT - 1)
 void _start(void)
 {
     u32 args[6] = {0x800000, 0x800000, 3, 0x32, 0xffffffffUL, 0};
@@ -57,7 +61,10 @@ void _start(void)
     physmem_bootstrap_legacy(&m, MEM_SYSTEM_SPACE_BASE / 1024);
     CHECK(physmem_add_trusted(&m, 4096, TEST_END, PHYSMEM_SOURCE_SYNTHETIC));
     CHECK(physmem_exclude(&m, 5000, 5002, PHYSMEM_MMIO));
+    CHECK(physmem_add_trusted(&m, HIGH_DYNAMIC_PFN, HIGH_DYNAMIC_PFN + 1,
+                              PHYSMEM_SOURCE_SYNTHETIC));
     CHECK(physmem_add_trusted(&m, 1048575, 1048576, PHYSMEM_SOURCE_SYNTHETIC));
+    CHECK(V2P(page_tables[PAGING_MMIO_TOP_PDI]) == MEM_FIXED_MMIO_TOP_PT_BASE);
     l.kind = 0;   /* PGALLOC_BACKING_ARENA_TOP */
     l.capacity = pgalloc_metadata_bytes(&m);
     l.metadata_first = MEM_SYSTEM_SPACE_BASE / PAGE_SIZE - l.capacity / PAGE_SIZE;
@@ -127,7 +134,8 @@ void _start(void)
     live_addrspaces = 1;
 #endif
     CHECK(!sys_memory_stage_online());
-    CHECK(!page_tables[4][0] && !page_tables[8] && !page_tables[1023]);
+    CHECK(!page_tables[4][0] && !page_tables[8] && !page_tables[HIGH_DYNAMIC_PDI]);
+    CHECK(!paging_is_present(0xffffffffUL));
     CHECK(pgalloc_model_state() == PGALLOC_BOOTSTRAP && !pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, 1));
     for (i = 0; i < 4096; i++) CHECK(low[i] == page_tables[i / PTE_COUNT][i % PTE_COUNT]);
     die(0);
@@ -140,7 +148,8 @@ void _start(void)
     CHECK(!sys_memory_stage_online());
     CHECK(pgalloc_model_state() == PGALLOC_BOOTSTRAP);
     CHECK(!pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, 1) && !pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, 4096, TEST_END, LEDGER_BOTTOM_UP, &p));
-    CHECK(!page_tables[1023]);
+    CHECK(!page_tables[HIGH_DYNAMIC_PDI]);
+    CHECK(!paging_is_present(0xffffffffUL));
 #ifndef TEST_LATE_OOM
     for (i = 8; i < TEST_END / PTE_COUNT; i++) CHECK(!page_tables[i] && !page_directory[i]);
     for (i = 0; i < WORKSPACE_WORDS; i++) CHECK(!workspace_used[i]);
@@ -198,8 +207,10 @@ void _start(void)
         CHECK((u32)page_tables[i] >= l.workspace_first * PAGE_SIZE);
         CHECK((u32)page_tables[i] < l.workspace_end * PAGE_SIZE);
     }
-    CHECK((u32)page_tables[1023] >= l.workspace_first * PAGE_SIZE);
-    CHECK((u32)page_tables[1023] < l.workspace_end * PAGE_SIZE);
+    CHECK(V2P(page_tables[HIGH_DYNAMIC_PDI]) >= l.workspace_first * PAGE_SIZE);
+    CHECK(V2P(page_tables[HIGH_DYNAMIC_PDI]) < l.workspace_end * PAGE_SIZE);
+    CHECK(paging_is_present(HIGH_DYNAMIC_PFN * PAGE_SIZE));
+    CHECK(V2P(page_tables[PAGING_MMIO_TOP_PDI]) == MEM_FIXED_MMIO_TOP_PT_BASE);
     CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, 1048575, 1048576, LEDGER_BOTTOM_UP, &p) && p == 1048575);
     CHECK(pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, p, 1));
     CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, (int)(pgalloc_arena_end() - MEM_POOL_BASE / PAGE_SIZE),

@@ -47,6 +47,7 @@ SLICE_END = '/* ================================================================
 # 切り出しの中だけ、台帳・写像の呼び出しを記録係へ付け替える。
 HOOKS = (
     ('*(volatile u8 *)P2V_IO(arch)', 'host_bda(arch)'),
+    ('ledger_resource_add(', 'host_resource('),
     ('ledger_reserve_set(', 'host_reserve('),
     ('paging_map_phys(', 'host_map('),
     ('pgalloc_alloc_n_owner(', 'host_alloc('),
@@ -74,6 +75,8 @@ CASES = [
     ('17m-pc98-no-pegc-id', dict(CFG_KB=17408, PREF=PC98, PEGC_ID=0)),
     ('17m-not-9821', dict(CFG_KB=17408, IS9821=0, HW=PEGC)),
     ('17m-pegc-map-fails', dict(CFG_KB=17408, FAIL_MAP=PEGC, HW=PEGC)),
+    ('17m-pegc-alt-resource-fails', dict(CFG_KB=17408, FAIL_ALT_RESOURCE=1, HW=PEGC)),
+    ('17m-pegc-alt-map-fails', dict(CFG_KB=17408, FAIL_MAP=4, HW=PEGC)),
     ('17m-cirrus-map-fails', dict(CFG_KB=17408, FAIL_MAP=CIRRUS, HW=PEGC)),
     ('17m-bb-short', dict(CFG_KB=17408, FAIL_BB=1, HW=PEGC)),
 ]
@@ -210,6 +213,12 @@ def _swap_reserve_and_map():
 RESERVE_THEN_MAP, MAP_THEN_RESERVE = _swap_reserve_and_map()
 
 MUTATIONS = [
+    ('pegc-alt-resource-missing', 'gfx/gfx_core.c',
+     'for (i = n = 0; m && i < 4; i++)',
+     'for (i = n = 0; m && i < 3; i++)'),
+    ('pegc-alt-map-missing', 'gfx/gfx_core.c',
+     'if ((m & gfx_cand_of(i)) && r->map_first < r->map_end &&',
+     'if (i != 3 && (m & gfx_cand_of(i)) && r->map_first < r->map_end &&'),
     ('planar-plane-stride-rounded', 'gfx/gfx_core.c',
      '.plane_offset = {0, GFX_BPL * GFX_HEIGHT, 2 * GFX_BPL * GFX_HEIGHT,\n                       3 * GFX_BPL * GFX_HEIGHT}',
      '.plane_offset = {0, GVRAM_PLANE_SIZE, 2 * GVRAM_PLANE_SIZE, 3 * GVRAM_PLANE_SIZE}'),
@@ -225,7 +234,8 @@ MUTATIONS = [
      'pgalloc_limit_pfn(),\n                              LEDGER_TOP_DOWN'),
     # 1 つの窓の写像失敗で候補を全部捨てる (B3: Xe10 の失敗が PEGC を妨げる)
     ('map-failure-drops-all', 'gfx/gfx_core.c',
-     '            m &= ~gfx_cand_of(i);\n        else if', '            m = 0;\n        else if'),
+     'r->map_end - r->map_first, PAGE_RW | PTE_PCD) != 0)\n            m &= ~gfx_cand_of(i);',
+     'r->map_end - r->map_first, PAGE_RW | PTE_PCD) != 0)\n            m = 0;'),
     # 写像を予約より先に行う (識別 → 予約 → 写像の順、D33)
     ('map-before-reserve', 'gfx/gfx_core.c', RESERVE_THEN_MAP, MAP_THEN_RESERVE),
     # アリーナの上端を凍結しない (CPL=0 の子が BB まで伸びる)

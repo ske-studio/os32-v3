@@ -63,6 +63,7 @@ static void check_clear(const char *reason, int plane_size)
 
 static int cirrus_probe_stub(void) { cirrus_probes++; return cirrus_ok; }
 static int pegc_probe_stub(void) { pegc_probes++; return pegc_ok; }
+u32 pegc_window_base(void) { return PEGC_LINEAR_BASE; }
 static void optional_init(void)
 {
     optional_inits++;
