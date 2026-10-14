@@ -63,6 +63,8 @@ live allocator の正典は frozen eligibility + broker 台帳とする。boot m
 
 ## 5. exec/BB と起動境界の決定
 
+> §2 の実装一覧および以下は策定当時の記録。EXEC_DYN_RESERVE と sys_reserve_top() は D3 で撤去済み、装置予約は P4 で改訂。現在の PEGC BB は gfx_boot_reserve が arena 上端から確保する。
+
 `exec/exec.c:exec_child_claim` は A/B の間を `EXEC_DYN_RESERVE` として空け、起動時 mark/終了時 free する。broker はその時点の bit だけを見ず、**`[MEM_EXEC_LOAD_ADDR, sys_usable_mem_end())` 全体を将来用途として禁止**する。子不在・動的穴が空きでも同じ。16MiB legacy 構成では PEGC 窓・Xe10 銀行窓がこの arena と衝突するので拒否する。窓を通すために上端を暗黙に15MiBへ縮めない。
 
 PEGC BB は具体的な未解決依存である。PC98-only splash では従来の boot BB がもう作られず、現行 `sys_reserve_top()` を後発 GUI で呼ぶのは契約違反。**本票の最小実装は、既存同 owner BB を再利用、または ONLINE の確認済み・mapped RAM から arena/私有帯外の連続 BB を §4 の一括要求として永久取得する。無ければ probe 前に PEGC を拒否する。** legacy boot にはその空きがない場合があり、従来8MiB PEGC の動作維持を本票だけで達成したとはしない。idle 時の exec 縮小/BB carve-out を必要とする場合は別設計・別受入ゲート（A/B cleanup、minimum、guard、hotdeploy 不変まで）を先に承認する。CUI 用に boot BB を常時確保する迂回は禁止。

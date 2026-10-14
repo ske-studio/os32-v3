@@ -1,6 +1,6 @@
 # ホットデプロイ再設計
 
-> 発行: PM (2026-09-01) / 状態: **受入完了 (2026-09-01)**
+> 発行: PM (2026-09-01) / 状態: **受入完了 (2026-09-01)** — 窓は 2026-09-09 に撤去、HostDrv に一本化。以下は当時の実装・実測の記録
 > 段 1〜3 実装済み (2026-09-01)。
 > 関連: `docs/POLICY_DEBUG.md`、`~/np21w-src/docs/02-architecture.md`
 
@@ -37,7 +37,7 @@ aidebug は既に必要な原始関数を持っている (`src/win9x/aidebug/aid
 | `POST /api/cmd` | rshell へコマンド行を送る |
 | `POST /api/serial/write` | 生バイト host→guest |
 
-ゲスト側は 15MB 実装で、`0x400000-` が Program Space。
+2026-09-01 当時のゲスト側は 15MB 実装で、`0x400000-` が Program Space。現在は RAM 検出量に応じた管理と高位私有 VA (include/memmap.h) に置き換わっている。
 `MEM_SHM_BASE` (256KB) は既に存在するが KHEAP 末尾からの動的配置なので、
 ホストが番地を知るには読み出しが要る。
 

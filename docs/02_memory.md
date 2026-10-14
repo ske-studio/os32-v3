@@ -15,9 +15,9 @@
 - **物理 pool の供給と USER の VA は別管理**。装置窓は RAM と区別し、
   boot の `gfx_boot_reserve` がバックバッファを池から確保する。旧物理末尾の
   ホットデプロイ窓は撤去済み。PEGC 640x480 の9MB下限という2026-09-09の実測は
-  旧物理固定配置での記録であり、現行構成の下限は構成別ゲスト確認 (H-4) で判断する。
+  旧物理固定配置での記録であり、現行構成の下限は v3 の最終段の構成別ゲスト確認で判断する。
 - GUI の必要 RAM はバックエンド・常駐領域・アプリの実測から別途定義する。
-  GUI 開発を特定の容量に収めることや、8MB GUI 互換維持を暗黙の受入条件にしない。
+  v3 の最低条件「8MB 機で GUI + 私有 2MB のアプリ」は目標として維持する (V3_PLAN §2-2)。構成別の判定は v3 の最終段、それまでのゲスト受入は 64MB の 1 構成 (DEFERRED_TESTS)。
 - 32bit フラットアドレス空間の設計対象は 4GiB（0x00000000〜0xFFFFFFFF）。
   これは全域が利用可能 RAM、単一アプリの利用可能領域、または実装済み容量を意味しない。
   ROM・MMIO・予約帯・ガード・カーネル領域を区別し、物理 RAM の利用可能範囲を管理する。
@@ -102,10 +102,11 @@ PEGC 候補は F00000h と FFF00000h の両窓 (各512KB) を supervisor + PCD �
 支障は無く、明示の登録は v3 の資源割当で引き継ぐ:
 
 ```
-0x00F00000 - 0x00F4AFFF          PEGC のリニア窓 (H2、9821 で PEGC 有効時のみ)  supervisor + PCD
+0x00F00000 - 0x00F4AFFF          PEGC のリニア窓 (H2、043Bh bit2=0 のとき)  supervisor + PCD
 0x00F60000 - 0x00F67FFF          WAB (Cirrus Xe10) のバンク窓 (ITF の既定。backend は使わない)
 0xFE000000 - 0xFE1FFFFF          WAB (Cirrus Xe10) の 2MB リニア窓 (NP21/W は 4MB を窓として出す) supervisor + PCD
   +000000h 表示面 / +04B000h クライアント面 (300KB) / +096000h 塗りパターン
+0xFFF00000 - 0xFFF7FFFF          PEGC 別名窓 (043Bh bit2=1 では15〜16MBは通常 RAM、OS32 はこの窓を使用) supervisor + PCD
 0xFF000000 - 0xFFFFFFFF          ROM ミラー / PCI 機の MMIO (MEM_PHYS_MMIO_TOP、RAM にしない)
 ```
 

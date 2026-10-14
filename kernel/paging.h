@@ -156,31 +156,17 @@ u32 paging_pte_flags(u32 virt_addr);
 /* ======================================================================== */
 /*  リング3 アドレス空間 (M1b: PD 複製)                                     */
 /*                                                                          */
-/*  CPL=3 プログラムごとに独立したページディレクトリ (PD) を持たせるための   */
-/*  基盤。カーネル帯域・SHM・VRAM・ホットデプロイ窓は全 PD で共有し          */
-/*  (同一物理を指す)、0x400000 帯 (プログラム code/data/heap/stack) だけ     */
-/*  アプリ固有のページテーブルに差し替える (CONTRACTS C2)。                  */
-/*                                                                          */
-/*  共有/非共有の境界は PDE 単位:                                            */
-/*    PDE 0 (0x000000-0x3FFFFF) : 共有 — カーネル/SQLite/シェル/SHM/VRAM     */
-/*    PDE 1 (0x400000-0x7FFFFF) : アプリ固有 — プログラム帯 (APP_BAND_PDE)   */
-/*    PDE 2 (0x800000-0xBFFFFF) : 共有                                       */
-/*    PDE 3 (0xC00000-0xFFFFFF) : 共有 — 物理末尾のホットデプロイ窓を含む     */
-/*    PDE 4-7 (0x1000000-0x1FFFFFF) : 共有 — 16MB 超の RAM の恒等写像。     */
-/*      RAM が無ければ全 Not-Present。                                       */
-/*    PDE 0x3F8 (0xFE000000-0xFE3FFFFF) : 共有 — OS が割り当てるデバイス窓の */
-/*      帯の先頭 (memmap.h MEM_DEVICE_APERTURE_*、Cirrus のリニア窓)。PT は  */
-/*      paging_init が静的に 1 枚用意し、既定は全 Not-Present。              */
-/*      paging_addrspace_create は PDE を 1024 本すべてコピーするので、       */
-/*      master に張った窓はそのまま全アプリ PD から見える (H3b)。            */
-/*                                                                          */
-/*  M1b の時点ではアプリ PT を master と同一の identity で初期化する          */
-/*  (0x400000 帯も present/RW/identity)。これにより CPL=0 のまま CR3 を       */
-/*  新 PD に載せてもカーネルは動き続ける (V1)。CPL=3 用の USER マッピングは    */
-/*  M1c で overlay する。 */
-
+/*  CPL=3 プログラムごとに独立した PD を持つ (T2c)。                      */
+/*  低位のカーネル・物理 RAM・装置窓は supervisor の共有写像。              */
+/*  PDE 0〜7 は 32MB までの静的な恒等写像 (RAM が無ければ NP)。             */
+/*  32MB より上の RAM は検出量だけ動的に恒等写像する。                      */
+/*  高位 APP PDE 512〜 は code/data/heap/stack の私有 VA。                  */
+/*  [MEM_APP_BAND_BASE, MEM_APP_BAND_MAX_TOP) がアプリ帯で、                 */
+/*  lease は [MEM_LEASE_BASE, MEM_LEASE_END) の私有 VA に張る。              */
+/*  デバイス窓 (MEM_DEVICE_APERTURE_BASE〜) は共有 supervisor+PCD。          */
+/*  旧 0x400000 アプリ帯とホットデプロイ窓は撤去済み。                       */
 /* アプリ帯域の **先頭** PDE インデックス (= MEM_APP_BAND_BASE >> 22 = 512)。
- * 共有ライブラリ帯域 (0x400000-0x4FFFFF)・プログラム本体
+ * 共有ライブラリ帯域 (0x80000000-0x800FFFFF)・プログラム本体
  * (MEM_EXEC_LOAD_ADDR 0x80100000-)・ヒープ・ユーザスタックがここから載る。
  *
  * 2026-09-10 (票 docs/tasks/memory/APP_BAND_PDE.md): アプリ固有 PDE は
@@ -317,14 +303,14 @@ int paging_addrspace_map_user_keep(struct addrspace *as, u32 vstart,
                                    u32 vend, u32 flags);
 
 /* ⚠ **走っているアプリの PD を、そのアプリの syscall 中に歩いてはならない**
- * (票 S0-K / 実機 K2、2026-09-13)。カーネルはページテーブルを「物理 = 仮想」で
+ * (票 S0-K / 実機 K2、2026-09-13 当時の旧配置の記録)。カーネルはページテーブルを「物理 = 仮想」で
  * 読むが、PD もアプリ PT も pgalloc から取られ (`MEM_POOL_BASE` は 0x400000 =
  * **アプリ帯そのもの**)、アプリの PD ではその仮想番地が per-app 物理へ
  * 張り替わっている。したがって CR3 = アプリ PD のまま表を辿ると、PT の
  * つもりで **アプリ自身のデータ** を読む (#PF も起きないまま健全なページを
  * 非 present と答える)。`struct addrspace` の控えから引いても PDE から引いても
  * 同じ物理を指すので結果は同じ。表を歩けるのは master CR3 の下だけ。
- * KAPI のポインタ検証は PTE を見ず、帯 (`ring3_ptr_ok`) と長さだけで判断する。 */
+ * 当時の KAPI 検証は帯と長さだけだった。現在の物理池と高位私有 VA は別。 */
 
 /* PD 複製の自己診断 (V1)。CPL=0 のまま:
  *   1. アプリ AS を作る

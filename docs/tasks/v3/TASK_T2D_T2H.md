@@ -339,7 +339,7 @@ front SDKのmalloc/map失敗時はallocator lock/busyを解き、GUIクライア
 
 実appmem/exec/allocatorのtraceとWMの配送を組み、A map開始→巻戻し→KAPI復帰→allocator解錠→yield→X3配送→B trim→TRIM_DONE→A retryの順をassertする。変異はmap途中pump、VA不足通知、CUI自身への配送、前景への配送、busy/入口拒否での再試行、slot再利用で古いbit維持、無制限retry、queue満杯でbit消失、保留中の再要求でepoch変化、未応答への再配送、hookの二重呼出し、realloc再試行のcopy欠落、世代据置。epochの単なる値だけで試験を成立させない。
 
-NP21/W 17MB (§12、現iniのまま) でback末尾返却と空ARENA返却によるfront成功、返せないback/未応答backでENOMEM (TRIMの配送・消費が各1回、TRIM_DONE増分0、bit保持。通常イベントによるbackの起床は数え分ける)、準備中の自然な末尾返却は許容して基準値を枯渇が落ち着いた時点で採る、trim中STOP→owner0/WM生存、pool0から閉じる。8MB・Cirrus・Ra266は構成依存としてT2hへ持越す。CUI前景ケースは取得できた端末、またはin-treeのCUI子をexec_runする最小GUI試験で作り、別アプリの導入待ちにしない。予算は§6のg枠。
+NP21/W 17MB (§12、当時の ini) でback末尾返却と空ARENA返却によるfront成功、返せないback/未応答backでENOMEM (TRIMの配送・消費が各1回、TRIM_DONE増分0、bit保持。通常イベントによるbackの起床は数え分ける)、準備中の自然な末尾返却は許容して基準値を枯渇が落ち着いた時点で採る、trim中STOP→owner0/WM生存、pool0から閉じる。8MB・Cirrus・Ra266は構成依存として v3 の最終段へ持越す (2026-10-14 決定)。CUI前景ケースは取得できた端末、またはin-treeのCUI子をexec_runする最小GUI試験で作り、別アプリの導入待ちにしない。予算は§6のg枠。
 
 ## 5. T2h — 統合受入と先行段の未実施を閉じる
 
@@ -626,8 +626,8 @@ T2で2MBが成立しても最終P1/P6合格ではない。SQLite/FEP/モジュ�
 
 「ハードウェア構成の変更でのテストは行わない。切りの良いところで一括」「(RAM 量・音源の) 二点は最後に確認すれば良い」。
 
-- **d〜g の各段の NP21/W 受入は、今の構成 (17MB、今の `np21x64w.ini`) だけで行う。** ini を切り替えない。
-- 本票の各段にある **8MB、planar / PEGC / Cirrus の切替、音源 (PC-9801-118 の PCM) など構成を変える確認は、受入記録に「構成依存は一括確認へ持越し」と書いて溜め、T2h の統合受入でまとめて行う** (§5 の h1〜h4 に加える)。Ra266 64MB も T2h。
+- **d〜g の各段の NP21/W 受入は、現行構成 (64MB、`np21x64w.ini`、2026-10-14) だけで行う。** ini を切り替えない。
+- 本票の各段にある **8MB、planar / PEGC / Cirrus の切替、音源 (PC-9801-118 の PCM) など構成を変える確認は、受入記録に「構成依存は一括確認へ持越し」と書いて溜め、v3 の最終段でまとめて行う** (DEFERRED_TESTS の同名関門)。Ra266 64MB の構成別確認も最終段。それまでのゲスト受入は 64MB の 1 構成。
 - ゲスト側の設定 (`gfxmode` など) で済む確認は、構成の変更に当たらない — 段の受入で行ってよい。
   - V86 の出口は 6Ah の標準/拡張 (20h/21h) も戻さない — 9821 でゲストが拡張モードのまま戻ると A6h が効かず E0000h が MMIO のまま ([U] 00A6h)。未対処・未観測。
 > **記録は archive へ移した (2026-10-06)**: §12 の P3 対応の記録、§13 検査の仕組みの整理 (ci-stab / ci-select / ci-stab2) — [TASK_T2D_T2H_RECORDS.md の「元の行 3504–4013」](../../archive/v3/TASK_T2D_T2H_RECORDS.md#r3504)。

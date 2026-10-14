@@ -35,7 +35,7 @@
 | `kernel.c` `kentry.asm` | 起動、シェル起動ループ (CUI `/sys/shell.bin` ⇄ GUI `/bin/gshell.bin` を `gui_take_next_shell()` で往復)、`/etc/system.cfg` の反映 | [01 §1-2](01_system.md) |
 | `sysconfig.c` | `/etc/system.cfg` の解析 (`GUI=0/1`、`GFX=pc98\|pegc\|cirrus\|auto`) | [01 §1-2](01_system.md)、[archive/gui_v11/TASK_K4](archive/gui_v11/TASK_K4_gui_boot.md) |
 | `gui.c` | GUI の背骨: `gui_call` (アプリ → WM の唯一の入口)、`gui_register`、所有者回収 `gui_owner_exit`、次シェル要求 | [tasks/gui/API_CONTRACTS.md T1〜T9](tasks/gui/API_CONTRACTS.md) |
-| `shlib.c` | 共有ライブラリ帯 0x400000〜 のロード (`OS32ShlibHeader`) と、アプリ PD ごとの .data/.bss 複製 (`shlib_addrspace_attach`) | [02 §2-1](02_memory.md)、[09](09_exec.md)、[archive/gui_v11/TASK_K3](archive/gui_v11/TASK_K3_shared_lib_band.md) |
+| `shlib.c` | 共有ライブラリ帯 0x80000000〜 (高位 VA、AS ごと) のロード (`OS32ShlibHeader`) と、アプリ PD ごとの .data/.bss 複製 (`shlib_addrspace_attach`) | [02 §2-1](02_memory.md)、[09](09_exec.md)、[archive/gui_v11/TASK_K3](archive/gui_v11/TASK_K3_shared_lib_band.md) |
 | `paging.c` `pgalloc.c` | ページテーブル (現行実装: 静的な恒等写像 32MB、それより上の RAM は検出量だけ動的に写像、RAM の登録上端 2GB。設計上限ではない — 02_memory.md §2-1)、ガードページ、物理ページ確保。PD はプログラムごと (v2 M1)。デバイス窓は `paging_map_phys` (supervisor+PCD)、CLIENT は lease の私有 VA、共有 PT の通常 map/unmap は拒否 | [02](02_memory.md)、[archive/kernel_v2/M1_RING3.md](archive/kernel_v2/M1_RING3.md) |
 | `kmalloc.c` | カーネルヒープ (320KB) | [02 §2-1](02_memory.md) |
 | `shm.c` | 共有メモリ 16 ブロック × 16KB。ブロック 0 = DB 結果、12〜15 = GUI (K1 票) | [02](02_memory.md)、[tasks/gui/API_CONTRACTS.md T2](tasks/gui/API_CONTRACTS.md) |
@@ -67,7 +67,7 @@
 | `sdk/include/os32/os32_kapi_shared.h` | 構造体・`KAPI_VERSION`・`OS32_ERR_*` (エラーコードの正典)・OS32X ヘッダ v2・`OS32ShlibHeader` | 同上 |
 | `sdk/include/os32/os32_kapi_slots.h` | `KAPI_SLOT_*` = `int 0x80` のスロット番号 (生成物、型非依存) | [KAPI_SPEC §3-1](KAPI_SPEC.md) |
 | `sdk/include/os32/os32_gui_shared.h` `sdk/rust/os32api/src/gui/` | GUI の op / イベント / SHM レイアウト (C と Rust に同じ値) | [tasks/gui/API_CONTRACTS.md](tasks/gui/API_CONTRACTS.md)、[tasks/gui/PROTO_LAYOUT.md](tasks/gui/PROTO_LAYOUT.md) |
-| `sdk/link/app.ld` `app_sys.ld` `shlib.ld` `sdk/crt/crt0.asm` | アプリ (0x500000) / シェル帯 (0x300000、gshell) / 共有ライブラリ (0x400000) のリンク | [09](09_exec.md)、[02 §2-1](02_memory.md) |
+| `sdk/link/app.ld` `app_sys.ld` `shlib.ld` `sdk/crt/crt0.asm` | アプリ (私有 VA 0x80100000) / シェル帯 (0x300000、gshell) / 共有ライブラリ (私有 VA 0x80000000) のリンク | [09](09_exec.md)、[02 §2-1](02_memory.md) |
 | `sdk/gen_kapi.py` `kapi_rust_gen.py` `mkos32x.py` `tools/mkshlib.py` | KAPI 生成、OS32X ヘッダ付与、`.shlib` 生成と番号表照合 (`make check-shlib`) | [08 §8-4](08_build.md) |
 
 ### ドライバ `drivers/`
@@ -109,7 +109,7 @@
 | ファイル | 役割 | 仕様 |
 |---|---|---|
 | `gfx/gfx_core.c` `gfx_vram.c` `palette.c` | HAL の入口: バックエンド選択 (probe 順 Cirrus → PEGC → 9801 (auto で Cirrus を試すのは NP21/W の上だけ、Cirrus のリニア窓はデバイス窓の帯 0xFE000000〜 — v2.1)、`GFX=` の強制)、present (ページフリップ)、パレット、カウンタ (`gfx_stats`)、`gfx_bb_phys_range` | [05 §5-5](05_drivers.md) |
-| `gfx/backend_pc98.c` `backend_pegc.c` `backend_cirrus.c` `include/gfx_hal.h` | バックエンド表 `GfxBackend` (probe / init / query / present_rect / fill / blit / enter / leave / shutdown) と 3 実装: 9801 4 プレーン (主記憶 BB 0x6A000)、PEGC 640×480×256 (F00000h 窓、BB は物理末尾 300KB)、Cirrus GD5430 (01000000h リニア窓、表示面 + クライアント面、エンジン BLT) | [05 §5-5](05_drivers.md)、[02 §2-1](02_memory.md)、[tasks/gui/DESIGN.md](tasks/gui/DESIGN.md) |
+| `gfx/backend_pc98.c` `backend_pegc.c` `backend_cirrus.c` `include/gfx_hal.h` | バックエンド表 `GfxBackend` (probe / init / query / present_rect / fill / blit / enter / leave / shutdown) と 3 実装: 9801 4 プレーン (主記憶 BB 0x6A000)、PEGC 640×480×256 (F00000h/FFF00000h 窓 (043Bh bit2=1 は後者)、BB は arena 上端の 300KB (gfx_boot_reserve))、Cirrus GD5430 (0xFE000000 リニア窓、表示面 + クライアント面、エンジン BLT) | [05 §5-5](05_drivers.md)、[02 §2-1](02_memory.md)、[tasks/gui/DESIGN.md](tasks/gui/DESIGN.md) |
 | `lib/sqlite3/os32_sqlite_vfs.c` `os32_sqlite_config.h` `sqlite_stack.asm` | カーネル内 SQLite (0x200000 帯、MEMSYS5 384KB、代替スタック) | [archive/v21/sqlite/](archive/v21/sqlite/00_INDEX.md) |
 | `boot/boot_*.asm` `loader_*.asm` `boot_main.c` `ext2_mini.c` `lz4_mini.c` | IPL、第 2 段ローダ (PM 遷移を含む、分割禁止)、LZ4 展開 | [01 §1-2](01_system.md)、[10 §10-2, §10-3](10_notes.md)、[archive/v21/boot_reform/](archive/v21/boot_reform/00_OVERVIEW.md) |
 
@@ -119,7 +119,7 @@
 |---|---|---|
 | `shell/main.c` `ui.c` `cmd_*.c` `cmd_script.c` `rshell.c` | 常駐 CUI シェル (0x300000, CPL=0)。コマンド登録 (`ShellCmd`, 最大 128)、行編集・補完・履歴、スクリプト、シリアル rshell、`os32gui` / `gfxmode` | [07](07_shell.md) |
 | `gshell/` (Rust) | GUI シェル = WM (シェル帯 0x300000 に CUI と入れ替わりで常駐、`/bin/gshell.bin`)。`wm.rs` 窓 / Z 順 / 所有者、`handler.rs` op 表、`input.rs` X3/X4 の入力取り込み (raw キー・FEP 退避・ボタンエッジの領分)、`visible.rs` 可視領域、`fep.rs` (カーネル FEP を `ime_feed_key` で駆動)、`lease.rs` `modal.rs` `timer.rs` `chrome.rs` `cursor.rs` | [archive/gui_v11/TASK_W1](archive/gui_v11/TASK_W1_wm_core.md)、[TASK_W2](archive/gui_v11/TASK_W2_fep_lease_modal.md)、[API_CONTRACTS.md](tasks/gui/API_CONTRACTS.md) |
-| `rust/libos32gui/` `libos32gui_stub/` | GUI クライアント (G 描画 / `gui_call` / U3 ループ / ウィジェット木 / 箱レイアウト)。`.shlib` として 0x400000 に常駐、アプリは stub (ジャンプ表) をリンク | [archive/gui_v11/TASK_C1〜C3](archive/gui_v11/TASK_C3_shared_lib.md) |
+| `rust/libos32gui/` `libos32gui_stub/` | GUI クライアント (G 描画 / `gui_call` / U3 ループ / ウィジェット木 / 箱レイアウト)。`.shlib` として私有 VA 0x80000000 に写像、アプリは stub (ジャンプ表) をリンク | [archive/gui_v11/TASK_C1〜C3](archive/gui_v11/TASK_C3_shared_lib.md) |
 | `cmds/` `system/` `tests/` `rust/` | コマンド、システムユーティリティ、テスト (`hal_test` `gdi_test` `ring3_guard` `gui_busy` `lease_test` `gui_bench` …)、Rust (Cargo ワークスペース、`os32api` クレート) | 一覧は各 `deploy.yaml` と [07 §7-1](07_shell.md) |
 | `system/cdinst.c` `install.c` `inst_hdd.c` `inst_disk.c` `shell/hdprep_plan.c` | CD からの HDD インストール (段 1・2、他 OS の区画を消す ERASE) — v2.1 | [archive/realhw_v21/TASK_HDD_INSTALL](archive/realhw_v21/TASK_HDD_INSTALL.md) |
 | `tests/pegcchk.c` `pcm_test.c` `time_test.c` | 実機の確認用: PEGC 640x480 の入り・戻りの状態 (`pegcchk`、受け入れ (C)) / PCM の再生 / µs 時計 (`timetest`) — v2.1 | [tasks/realhw/TASK_PEGC480_REALHW](tasks/realhw/TASK_PEGC480_REALHW.md) §5、[tasks/v3/TASK_HAL_WIRING](tasks/v3/TASK_HAL_WIRING.md) |
