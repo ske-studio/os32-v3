@@ -209,7 +209,7 @@ T3 の前のデバッグ環境の整理 (起動時に読むデバッグ部品 `/
 
 | ドキュメント | 内容 |
 |-------------|------|
-| [tasks/memory/APP_BAND_PDE.md](tasks/memory/APP_BAND_PDE.md) | アプリ帯の可変 PDE 化 **受入待ち** — 実装 `b8dab24` は v2.1 に入り kselftest で毎起動検証、§5 のゲスト受入 (8MB / 15MB、`heap_test`、`ring3_guard` 否定試験) は未記録 |
+| [APP_BAND_PDE](tasks/memory/APP_BAND_PDE.md) | 完了記録 — 0x400000 帯の機構は T2c/f12 で撤去、置換済みのため旧機構の受入は不要 |
 | [archive/kernel_v21/TASK_KSTACK_USER.md](archive/kernel_v21/TASK_KSTACK_USER.md) | SHM 帯がカーネルスタックに食い込んでいた (スタックは設計の 16KB ではなく 4KB だった) — 受入完了 (2026-09-17) |
 | [archive/kernel_v21/TASK_DB_ERRSTR.md](archive/kernel_v21/TASK_DB_ERRSTR.md) | `db_last_error()` がカーネル番地を返していた (CPL=3 のアプリが #PF) — 受入完了 (2026-09-17) |
 | [archive/kernel_v21/TASK_EXT2_EMPTY_NAME.md](archive/kernel_v21/TASK_EXT2_EMPTY_NAME.md) / [TASK_VFS_FD_PATH.md](archive/kernel_v21/TASK_VFS_FD_PATH.md) | NHD のルートの名前の無いディレクトリ項目 / FD のパスの引き直しと長いパスの切り詰め (VFS の既存欠陥) — 受入完了 (2026-09-24) |

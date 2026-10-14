@@ -192,6 +192,8 @@ T6bは最後に集積を上位票の `[0x500000,0x600000)` へ移し上限1MiB�
 | T5c driver lifecycle | `kernel/irq.c`, tick broker、各driver、module manifest、splash | IRQ登録後失敗、tick残存、DMA停止不能、隔離保持と永久予約不変、GUI=0識別のみ |
 | T6b staging | HDD/FD loader、VK32生成器、区間検査 | 508KiB超〜1MiBの成功、1MiB超拒否、source重複、8MB各段ピーク、CRC同一fixture |
 
+> 2026-10-14 ユーザー決定: 搭載メモリ量ごとの確認は v3 の最終段にまとめる (DEFERRED_TESTS の関門「v3 の最終段」)。それまでのゲスト受入は 64MB の 1 構成。以下の構成一覧は最終段用として残す。
+
 各段は `make check-changed` と必要なbuildを通し、ABI段は [ABI1]〜[ABI3] に従う。外部apps/gameは現行の対象外決定を維持し、再開時の全再ビルドを引継ぎゲートへ残す。故障注入は別の使い捨て媒体で行い、本番辞書へ書かない。通常ゲスト8MB planar/PEGC・17MB・Ra266とFDの受入を上位票§7へ紐付け、MINIMAL落ちは標準成功とは別結果で記録する。ログにはimageのbuild ID/世代、module状態、owner別ページ、callback/DMA参照、例外分類、未実施構成を残す [V4]。
 
 ## 8. 独立レビュー対応 (往復1)

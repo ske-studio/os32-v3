@@ -45,7 +45,7 @@ boot_main.c (32bit プロテクトモード) — Cメインロジック
   └── return 0 (ASMに復帰)
   ↓
 loader_hdd.asm (32bit PM 復帰)
-  ├── メモリプロービング (1MB-16MB, 512KB刻み)
+  ├── メモリプロービング (1MB-16MB, 512KB刻み)。16MB 超はカーネルが 0594h で追加 (K6-RAM、旧 16MB 上限なし、登録上端は MEM_PHYS_RAM_CEILING)
   └── far jmp 0x08:0x100000 (kernel_main へジャンプ)
   ↓
 kernel.c :: kernel_main(u32 mem_kb, u32 boot_drive)

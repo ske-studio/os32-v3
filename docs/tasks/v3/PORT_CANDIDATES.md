@@ -23,7 +23,7 @@
 | **ファイル** | VFS (ext2 / FAT / iso9660 / HostDrv / SerialFS)、`OS32_ERR_*`、パスは `/`。`stdio` は newlib 経由で動く | ディレクトリ列挙の libc 側、`fopen` の `"rb"`/`"wb"` は動く。大きなファイル (ROM 4MB、WAD 12MB、ScummVM のデータ数十 MB) の**読みの速さ** — IDE は PIO (P5 の追加項目)。`mmap` 相当は無い (`mem_map` + 読み込みで代える) | P5 (IDE DMA)、P9 |
 | **時間** | `get_tick` (10ms)、`sys_time_now` (µs、KAPI v59)、`rtc_read`、`sys_time` | `SDL_GetTicks` (ms) と `SDL_Delay` は `sys_time_now` + `sys_yield` で組める。**1kHz tick** は P3 の候補。VSync 待ちは Video HAL に | P9 (SDL 層) |
 | **スレッド** | **無い**。協調型 (`OP_WAIT` / `sys_yield`)、前景 1 本 | `SDL_CreateThread` / mutex / semaphore は**提供しない** (協調型なので `SDL_INIT_NOTHREADS` 相当で組み、スレッドを使う移植元は書き換える)。ZSNES は SDL 版でも音をコールバックに頼る → 上の (a) | P9 (SDL 層の「しないこと」) |
-| **メモリ** | アプリ帯は `0x500000〜`、`--heap` で上限 | v3: 私有写像 0x80000000〜、**8MB 機は私有 2MB が受入条件** (D9)、32MB / 64MB 機はそれ以上を池から借りる (R2)。ROM 4MB + エミュレート RAM + BB を持つ ZSNES は **32MB 機以上**が前提 | P1 (決定済み) |
+| **メモリ** | アプリ帯は `0x80000000〜` の私有 VA (image は MEM_EXEC_LOAD_ADDR)、`mem_map` で伸長 | v3: 私有写像 0x80000000〜、**8MB 機は私有 2MB が受入条件** (D9)、32MB / 64MB 機はそれ以上を池から借りる (R2)。ROM 4MB + エミュレート RAM + BB を持つ ZSNES は **32MB 機以上**が前提 | P1 (決定済み) |
 | **ビルド** | `sdk/` (静的アーカイブ 25 本)、`mkos32x.py`、`main()` が最初の関数、OS32X ヘッダ | 移植元の `configure` / CMake は使わず、**OS32 側に Makefile を書く** (`apps/` の流儀)。`-march=pentium` / `-mmmx` は移植ごとに許す (カーネルは i386 のまま)。NASM は有る (ZSNES に要る) | 各移植の票 |
 
 ### 1-1. ライセンスと同梱の扱い (提案、ユーザー決裁待ち)

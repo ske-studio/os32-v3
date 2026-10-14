@@ -56,12 +56,12 @@ API は Win16 の再現ではなく、その欠点を 386 で払える範囲の�
 | 再描画モデル | InvalidateRect 方式 (damage + commit)、window move は XOR 枠、全画面 backbuffer + clip |
 | GUI API | **libos32gui** — 非同期・ID参照・型付き16B event + retained widget tree + stateless drawing + box layout |
 | app ⇄ WM | KAPI `gui_call(op,arg)` 1 本 + GUI SHM slot 4 本。wire protocol に pointer を載せない |
-| GUI library | shared library band 0x400000〜0x4FFFFF、app は 0x500000 から |
+| GUI library | 私有 VA の shlib は 0x80000000、app image は 0x80100000 (正典: include/memmap.h / build/out/MEMMAP.md) |
 | 色 | system 16色 + focused app の 14色 lease。lease 中 WM chrome は2色 |
 | CUI/GUI | `/etc/system.cfg` の GUI=0/1 は**次回 boot の既定値**。実行中 shell の切替は `sys_switch_shell` |
 | FEP | gshell が GFX renderer を保持。CUI へ戻る前に renderer callback を解除 |
 | 性能目標 | Pentium 100MHz / 32MB で「超快適」を目標とするが、32MB をメモリの設計上限にしない |
-| メモリ方針 | CUI 最低 8MB は GUI 要件・開発制約ではない。GUI 必要 RAM は実測で定義。32bit フラット空間の設計対象と現行実装上限は [02_memory.md](02_memory.md) を参照 |
+| メモリ方針 | v3 の最低条件は 8MB 機で GUI + 私有 2MB のアプリ (目標、V3_PLAN §2-2)。構成別の判定は v3 最終段、それまでのゲスト受入は 64MB の 1 構成。設計対象と現行実装は [02_memory.md](02_memory.md) を参照 |
 
 ### 技術基盤
 

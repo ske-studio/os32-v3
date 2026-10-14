@@ -326,7 +326,8 @@ extern u32 __sqlite_end;
 /*    (〜0x372000)        BSS終端 → ここから newlib の sbrk ヒープ (malloc) */
 /*    0x375000            ガードページ (Not-Present, 4KB) = sbrk 上限        */
 /*    0x376000-0x37FFFF   スタック (40KB, ESP初期値=0x380000)               */
-/*    0x380000-0x3FFFFF   exec_heap (KAPI mem_alloc/mem_free 用, 512KB)      */
+/*    0x380000-0x3F0FFF   exec_heap (KAPI mem_alloc/mem_free 用, 452KiB)     */
+/*    0x3F1000-          固定 PD/PT (MEM_FIXED_PAGING_BASE〜END)             */
 /*                                                                          */
 /*  sbrk ヒープと exec_heap は **必ず別領域** にすること。かつて両方が BSS   */
 /*  終端から始まっていたため、newlib の stdio バッファと mem_alloc のブロック */
@@ -368,14 +369,16 @@ extern u32 __sqlite_end;
 /* ====================================================================== */
 /*  物理 RAM の地図 (K6-RAM, 2026-09-11)                                    */
 /*                                                                          */
-/*  OS 側に人為的な RAM 上限は持たない。上限は 32bit x86 のアーキテクチャ    */
-/*  (PAE なし = 物理 4GB = PHYSMEM_MAX_PFN) だけで、そこから「RAM に         */
-/*  ならない領域」を予約として引いた残りが実効の上限になる。                 */
+/*  RAM 登録の上端は MEM_PHYS_RAM_CEILING=2GB (D11、v4 で見直す)。          */
+/*  K6-RAM で旧 16MB 上限を撤廃。設計対象は物理 4GiB (PAE なし)。           */
+/*  静的な恒等写像は 32MB まで、それより上は検出量だけ動的に張る。           */
 /*                                                                          */
 /*    [MEM_SYSTEM_SPACE_BASE, MEM_SYSTEM_SPACE_END)                         */
 /*        PC-98 の 15〜16MB システム空間。9821 の PEGC リニア窓             */
 /*        (include/pegc.h PEGC_LINEAR_BASE) がここに出るので、ローダの      */
 /*        書き込みプローブが通っても RAM として配ってはならない。           */
+/*        ただし 043Bh bit2=1 (切り離す) では通常 RAM、PEGC は別名          */
+/*        FFF00000h のみ。OS32 はこの窓を使う (R7FIX2 段 3b)。             */
 /*    [MEM_HIGH_RAM_BASE, ...)                                              */
 /*        16MB 以上に載る実 RAM。検出量ぶんだけ pgalloc の池に入る。        */
 /*    [MEM_DEVICE_APERTURE_BASE, MEM_DEVICE_APERTURE_END)                   */
@@ -431,7 +434,7 @@ extern u32 __sqlite_end;
 #define MEM_BOOT_BUNDLE_SIZE  0x100000UL   /* 1MB */
 
 /* ====================================================================== */
-/*  共有ライブラリ帯域 (0x400000-0x4FFFFF, 1MB)  — GUI v1.1 K3              */
+/*  共有ライブラリ帯域 (仮想 0x80000000-, MEM_SHLIB_BASE, 1MB)              */
 /*                                                                          */
 /*  固定アドレス常駐の位置依存ライブラリ (再配置なし、ロードアドレスは 1 つ)。 */
 /*  カーネル (kernel/shlib.c) が /sys/lib/libos32gui.shlib を起動時にここへ  */

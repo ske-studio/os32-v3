@@ -699,7 +699,7 @@ mkpkg が先に断る)。**`core` / `base` に足した物は FD にも入る** 
 `launcher` は「このプログラムは `launch_req` で WM に外部プログラムの起動を頼む」という宣言
 (票 T9 D1a)。カーネルの要求表はこの宣言を持たない CPL=3 からの `launch_req` を `OS32_ERR_INVAL`
 で断る (認証ではなく協調的な宣言)。端末 (`userland/tests/t5a_display`) と
-`userland/sh` — 常駐シェルと同じソースを `-DSHELL_AS_APP` で 0x500000 にリンクした CPL=3 版 — に
+`userland/sh` — 常駐シェルと同じソースを `-DSHELL_AS_APP` で app.ld の 0x80100000 (私有 VA) にリンクした CPL=3 版 — に
 立てる。GUI アプリの通常の起動経路 (`session_launch`) はこの宣言と無関係。
 
 `gfx` / `cui` は `make check-manifests` がソースの呼び出しと突き合わせて検出する (§2b)。

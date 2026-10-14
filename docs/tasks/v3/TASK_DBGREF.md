@@ -306,8 +306,10 @@ ROLES §0 の 3 段: S0 は (2)、S1a〜S3 は (3) 全体。
 - 増分の実測: `__bss_end` の**増分 300 B 以下**。
 - 検査の候補: `check-mem-stat-host check-kapi-out check-kapi-version check-kapi-layout-host check-kapi-bounds-host check-gshell-host check-shlib check-deploy-set-host check-packages-host check-guest-acceptance-host check-tests-inventory` + 静的 5 本。[ABI3] `make clean` → `make all`、`/sys` の再配備。
 
+> 2026-10-14 ユーザー決定: 搭載メモリ量ごとの確認は v3 の最終段にまとめる (DEFERRED_TESTS の関門「v3 の最終段」)。それまでのゲスト受入は 64MB の 1 構成。以下の構成一覧は最終段用として残す。
+
 ### G1 — S1a + S1b のゲスト受入 (両モード) と運用受入 (PM)
-- ゲスト受入: S1a の 10 項と S1b の 10 項を NP21/W (17MB PEGC) で、`KDEBUG=1` と `0` の両方の起動で。
+- ゲスト受入: S1a の 10 項と S1b の 10 項を NP21/W (64MB PEGC、np21x64w.ini) で、`KDEBUG=1` と `0` の両方の起動で。
 - 運用受入 (4): (1) `deploy-set.json` と `verify-set` が `kdebug.bin` を含む。(2) `hsync boot` の後に `ver` の pair が一致。(3) NHD の対の配備 (停止 → `deploy-kernel` → 起動、[D1]) の後に `ver` の pair が一致。(4) 不一致の注入 (停止 → 旧部品 → 起動 → 停止 → 戻す → 起動) が §3-9 の 5 の手順で再現し、戻した後に `state == 1`。
 - G1 の完了が S2 の着手条件。
 

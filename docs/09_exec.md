@@ -1,6 +1,6 @@
 ## 第9部 外部プログラム実行 (exec)
 
-OS32Xバイナリ形式の実行ファイルをext2から0x500000 (`MEM_EXEC_LOAD_ADDR`) にロードし、
+OS32Xバイナリ形式の実行ファイルをext2から私有 VA 0x80100000 (`MEM_EXEC_LOAD_ADDR`) にロードし、
 KernelAPIポインタを引数として実行する。
 
 詳細は **[KAPI_SPEC.md](KAPI_SPEC.md)** を参照。

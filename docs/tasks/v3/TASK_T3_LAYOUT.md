@@ -94,6 +94,8 @@ KAPI 追加は [ABI1]〜[ABI3]、番号予約は [KAPI_SPEC §3-2](../../KAPI_SP
 
 T3aでは `boot/loader_fat_new.asm` のVK32_LOAD_END写しと `tools/mkvmkernel.py` も対象とし、core展開上端をMEM_DMA_POOL_BASEまで広げる。`tools/gen_memmap.py` の写し照合とC/ASMの共通fixtureで確認する。T3cの直書き監査には `userland/lib/rt/dbgserial.c`、`tools/memmap_audit_live.py`、gen_memmapの旧帯表示、gshellの旧番地コメントも含める。T3a/T3dは圧縮 `vmkernel.lz4 <= 508KiB` を必須ゲートとし、超過はT6bを黙って前倒しせず段取りを再レビューする。Unicode KAPI追加で1字2トラップになる経路はcold/warm日本語描画の時間を測り、D15未達なら文字列変換口の別設計へ送る。
 
+> 2026-10-14 ユーザー決定: 搭載メモリ量ごとの確認は v3 の最終段にまとめる (DEFERRED_TESTS の関門「v3 の最終段」)。それまでのゲスト受入は 64MB の 1 構成。以下の構成一覧は最終段用として残す。
+
 **T3aとT3bは一体の差分で着地**し、symbol化・runtime区間・pagingの新期待を分割してビルド不能な段を作らない。T3a〜d はレビュー可能な差分単位で、**配置の半分だけを配備しない**。同一世代の統合成果物を 8MB planar/PEGC、17MB、Ra266 64MB で検証する。kselftest・地図検査ゼロ、CPL=3 fault/STOP→次起動、DMA境界、shell子ネスト、2MB試験3種、GUI終了後CUIを確認する。T3 時点は未分離 SQLite のため最終余裕値とは区別し、実ページ・SLACK・shell peak・kstack high-water を記録する。
 
 失敗時は旧新を混ぜず直前の一式へ戻す。配備・故障注入はテスター、NHD/実機操作は [D1]〜[D3] と既存手順に従う。文書段階ではビルド・実行結果を作らない。

@@ -126,6 +126,8 @@ V86の4入口 `v86_smoke_test` / `v86_disk_test` / `v86_boot2` / `v86_gdc_captur
 
 FD/MINIMAL起動はフォントfileを載せない構成としてKCGのcold/warm/fallbackだけを計測する。OpenType cold I/Oは管理下ext2上の原本fontをsourceとして測り、起動媒体・source媒体・FSを別々に記録する。FD起動後にHDD ext2をsourceにする追加ケースも「FD上のfont性能」とは呼ばない。FD FAT/HostDrvからの直接OpenType読込はこの受入に含めない。
 
+> 2026-10-14 ユーザー決定: 搭載メモリ量ごとの確認は v3 の最終段にまとめる (DEFERRED_TESTS の関門「v3 の最終段」)。それまでのゲスト受入は 64MB の 1 構成。以下の構成一覧は最終段用として残す。
+
 8MB planar/PEGC、17MB、Ra266、FDを区別する。coldはboot直後のfile/cache状態、warmは同じ画面2回目と定義し、機種/CPU/表示mode/字数/cache hit/miss/peak bytesを記録する。D15の速度目標を未測定推測から合格にしない。U4/U5/U6/U7/U12/U14/U15をそれぞれ閉じ、未達ならどの上限/方式を改訂するかをレビューする。
 
 ## 4. P3〜P10 へ渡す契約と着手ゲート
