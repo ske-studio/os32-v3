@@ -56,6 +56,10 @@ NP21/W 上でコード変更が反映されていないように見える場合�
 `/api/mem`) で読む。**番地は新しい `build/out/kernel.map` から引くこと** —
 古い map の番地で読んだ値や、初期化前のゼロ値を合格と判定しない。
 
+デバッグ部品 (`/boot/kdebug.bin`、票 TASK_DBGREF) が入ってからは、`ver` の `kdebug:` 行で前提を先に確かめる。
+受入と採取は `kdebug on` → `reboot` の後に、`kdebug: on (pair <CRC>, …)` の CRC が同じ `ver` の Image CRC と一致する状態で行う。
+`rejected (<code> …)` は OFF と同じに扱わず、理由コードを記録する。OFF の起動の到達確認は、`ver` の Image CRC と `boot.log` で行う。
+
 - `kstring` / `kmalloc` / `kprintf` のプリミティブを触ったら、kselftest に項目を足す。
 - `userland/tests/klibc_test` は newlib をリンクするので、カーネル側の検証にはならない。
 

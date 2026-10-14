@@ -495,3 +495,11 @@ X-2 の前半 (e8a の RO 日本語) は `accept_e11/RESULT.md` の GUI 日本�
 | ID | 何を | 種類 | 元の行 |
 |---|---|---|---|
 | GSERIAL-1 | GUI 中のシリアル受け口 (gshell の gserial、票 `~/os32-tmp/run/gserial/GSERIAL_DESIGN.r3a.md`) の実機 Ra266 での確認: rshell → `os32gui` で `gs:! ready`、`ping`・`state`・`key`/`type`・`cui` の 2 段応答で CUI に戻り rshell が再び応答する、`os32gui -t` の自動復帰。GUI=1 直接起動 (serial 未初期化) は次段。配送は best effort で `state lost=` に破棄件数 (保証外 3 件は票 §6-8) | 実機の受入 | — |
+
+## GSERIAL-2
+
+閉鎖 (2026-10-15、d702b51): 引数なしの `os32gui` は `GSERIAL_TIMEOUT` を 0 に戻してから GUI に入る (書けなくても入る)。ホスト試験 (`sh_status_host.c` の 3 条件、変異 1 本) と NP21/W (cfg に 60 が残った状態から `os32gui` → wd=0、cfg も 0。`~/os32-tmp/evidence/2026-10-15/dbgref_g1/RESULT.md`) で合格。実機では次の立会いで使うときに見る。
+
+| ID | 何を | 種類 | 元の行 |
+|---|---|---|---|
+| GSERIAL-2 | `os32gui -t N` の秒数が `/etc/system.cfg` の `GSERIAL_TIMEOUT` に残り、次の GUI 入場でも自動復帰が効く (d14c で 2 回、手で `-t 0` に戻した)。その回だけ効かせるか、自動復帰の後に消す | 道具の不足 (運用) | R7-1 の修正と同じ回の小さな直し |

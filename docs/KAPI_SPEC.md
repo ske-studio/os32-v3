@@ -116,6 +116,7 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v70 | **実装 (2026-10-07、e11c1・統合ゲスト受入前)** | surface query/lease/bundle/unlease・値返し ls・本人識別の 6 本 (slot 240〜245)。公開値型・ページ/SHM 定数、pipe の CPL3 制限。e11b2 で memory_layout 世代 2 (版70は不変、旧世代1は拒否) | §4-10、[TASK_T2D_T2H](tasks/v3/TASK_T2D_T2H.md) e11 |
 | v71 | **受入済み (2026-10-08、f12 ゲスト受入)** | USER 専用 `mem_map` / `mem_unmap` (slot 246・247)。f12 で memory_layout 世代 3 (KAPI 71・slot・データ欄は不変)。USER の最小初期量と mem_map による伸長へ切替。旧世代は拒否。 |
 | v72 | **受入済み (2026-10-09、f13 ゲスト受入)** | `mem_stat` (slot 248)、サイズ引数つき MemStat。4 世代・データ欄は不変。 | 本書 §4-12 |
+| v75 | **受入済み (2026-10-15、DBGREF G1)** | MemStat 末尾に kdebug の 5 欄を追記 (220B)。slot・4 世代は据置 (OS32X_MIN_API は 75)。 | 本書 §4-12 |
 | v74 | **実装 (T2h h4a、ゲスト受入は R1)** | MemStat 診断 17 欄を末尾追記 (200B)。slot・4 世代は据置。 | 本書 §4-12 |
 | v73 | **実装 (T2g g1、ゲストは GK-1)** | MemStat 末尾に圧力 epoch・保留 mask・app epoch を追記 (132B)。slot・4 世代は据置。 | 本書 §4-12 |
 
@@ -1728,7 +1729,7 @@ hint/base はアドレス値の入力 (`out: none` と `in: [{arg: hint/base, ta
 ラッパーから直接参照しない。`kapi_argptr` の早期検査から外し、body の帯・extent 検査で
 帯外や stack/guard・lease を NULL / `OS32_ERR_INVAL` として拒否する (kill しない)。
 
-### §4-12 mem_stat (v72、v73/v74 末尾追記)
+### §4-12 mem_stat (v72、v73/v74/v75 末尾追記)
 
 | オフセット | 名前 | 型 |
 |---|---|---|
@@ -1737,7 +1738,7 @@ hint/base はアドレス値の入力 (`out: none` と `in: [{arg: hint/base, ta
 slot 248。`out` は `len=size` の生成ラッパで先に書込み範囲を検査する。
 ラッパの検査を通った後、`out == NULL` または `size < MEMSTAT_MIN` (0 を含む) は `OS32_ERR_INVAL` で出力不変。
 それ以外は `min(size, sizeof(MemStat))` バイトだけ写し、その長さを戻り値と先頭 `size` に返す。
-構造体の拡張は末尾追記だけ。現行 ILP32 では `MEMSTAT_MIN=44`、`sizeof(MemStat)=200`。
+構造体の拡張は末尾追記だけ。現行 ILP32 では `MEMSTAT_MIN=44`、`sizeof(MemStat)=220`。
 不正な USER 出力 (NULL、NP/RO/supervisor、overflow) は既存規約どおり kill。
 
 WM と CPL0 常駐 shell (ID 1、syscall 外、CPL3 でない) は ID 0 / -1 でシステム欄、
@@ -1814,6 +1815,18 @@ HEAP_INVALID を立て、出力の使用量を 0 にする。CPL3 の可変引�
 | 188 | kselftest_pass |
 | 192 | kselftest_fail |
 | 196 | owner_pages |
+
+#### v75 kdebug 欄 (末尾追記、票 TASK_DBGREF §3-7)
+
+旧 200B 呼び手は従来の prefix のみ受け取る。値は起動時に部品 `/boot/kdebug.bin` を読んだ結果で、再起動まで変わらない。
+
+| offset | 欄 |
+|---|---|
+| 200 | kdebug_state (0 OFF / 1 RUNNING / 2 NOT_FOUND / 3 BAD_HEADER / 4 PAIR_MISMATCH / 5 NO_IMAGE_CRC / 6 ABI_MISMATCH / 7 NO_PAGES / 8 SHORT_READ / 9 BAD_CRC / 10 INIT_FAILED / 11 RELOC_INVALID / 12 IMPORT_INVALID) |
+| 204 | kdebug_pair_crc (部品のヘッダから読めた対の Image CRC、読めなければ 0) |
+| 208 | kdebug_pages (部品の body のページ数) |
+| 212 | kdebug_owner_pages (RUNNING のときだけ台帳の owner のページ数、それ以外は 0) |
+| 216 | kdebug_open_count (起動時に部品を開こうとした回数) |
 
 kheap_peak / resident_heap_peak は B、resident_heap_fail は常駐確保の失敗回数、leftover_pages は回収で発見した残 page の累計。lease_active は live slot の token 数、audit_runs / audit_fail は memmap・AS・V86 の各計数の和。固定 kstack (`MEM_KSTACK_BASE`〜`MEM_KSTACK_TOP`) と shell stack (`MEM_SHELL_STACK_TOP - MEM_SHELL_STACK_SIZE`〜`MEM_SHELL_STACK_TOP`) は boot で未使用部を印付けし、200B 拡張部の要求時だけ走査する (132B の trim 配送では走査しない)。両領域の観測済み high-water をそれぞれ保持する。shell から起動した USER の syscall は shell stack 側で測る。`mem` は `kstack=` / `shell_stack=` の 2 値に展開する。peak / fail は起動から保持し、heap reset では戻さない。
 

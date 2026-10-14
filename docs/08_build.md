@@ -74,6 +74,8 @@ boot_hdd.asm    →  nasm (-f bin)             →  boot_hdd.bin (512B IPL, LBA 
 loader_hdd.asm + boot_main.c + ext2_mini.c + lz4_mini.c
                 →  nasm + gcc + ld (-T loader.ld) → loader_hdd.bin (LBA 2-5)
 build/out/vmkernel.lz4 → ext2 FS 内 /boot/vmkernel.lz4 に配置 (nhd_deploy.py)
+build/out/kdebug.bin   → ext2 FS 内 /boot/kdebug.bin (デバッグ部品、vmkernel.lz4 の Image CRC と対。
+                         対で配る — nhd_deploy の copy --dest /boot、hsync boot、FD インストール。票 TASK_DBGREF §3-9)
 
 === FDD デプロイ (FAT12) ===
 boot_fat.asm    →  nasm (-f bin)             →  boot_fat.bin (1024B FAT12 IPL)
