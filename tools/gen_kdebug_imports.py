@@ -128,16 +128,27 @@ def check_nm(entries, nm=None, root=ROOT):
     cumulative = set()
     for stage, stems in groups.items():
         paths = ([root / 'build/out/kdebug/crt_diag.o'] if stage == 'S1' else
+                 [root / 'build/out/kdebug/kselftest.o', root / 'kernel/kaudit.o'] if stage == 'S2' else
                  [root / 'kernel' / (name + '.o') for name in stems])
         missing = [str(p) for p in paths if not p.exists()]
         if missing:
             raise SystemExit('gen_kdebug_imports: run make kernel first (missing: ' + ', '.join(missing) + ')')
         refs = symbols(nm, paths, True) - symbols(nm, paths, False)
         # Linker contracts are not imports: module.ld defines the ABI marker;
-        # __bss_end belongs to the retained kernel lifecycle audit (S2 split).
+        # __bss_end belongs to the retained kernel SHM boot observation.
         refs.discard(ABI_SYMBOL)
         if stage == 'S2':
             refs.discard('__bss_end')
+            # The module now uses accessors; the retained audit accounts for
+            # the original audit-only references. Keep the S0 inventory fixed.
+            module_refs = symbols(nm, paths[:1], True)
+            operations = {e['name'] for e in entries[:STAGES[stage]] if e['kind_name'] == 'OP'}
+            if not operations <= module_refs:
+                raise ValueError('S2 missing operation references: ' + str(sorted(operations-module_refs)))
+            refs = {next((e['symbol'] for e in entries if e['kind_name'] in ('GETTER', 'SETTER', 'PTR') and e['name'] == name), name)
+                    for name in refs - operations}
+        if stage == 'S3':
+            refs -= {'v86_gcap_phase', 'v86_gcap_alloc_count', 'v86_gcap_free_count'}
         cumulative |= refs
         expected = {e['symbol'] for e in entries[:STAGES[stage]] if e['kind_name'] != 'OP'}
         if cumulative != expected:

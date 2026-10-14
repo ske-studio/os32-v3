@@ -24,8 +24,11 @@ int main(int argc, char **argv, KernelAPI *api)
           stat.app_id == 0 && !(stat.flags & MEMSTAT_HAS_AS));
     CHECK(stat.owner_pages == 0 && stat.kstack_high_water > 0 &&
           stat.kheap_peak >= stat.kheap_used && stat.resident_heap_peak >= stat.resident_heap_used &&
-          stat.kselftest_fail == 0 && stat.kselftest_pass >= 295);
-    /* S1b: selftests still run in the kernel, in both KDEBUG modes. */
+          (stat.kdebug_state == 1 ?
+           (stat.kselftest_pass >= 295 && stat.kselftest_fail == 0) :
+           (stat.kselftest_pass == 0 && stat.kselftest_fail == 0)));
+    /* Rejection is a failure, distinct from an intentional OFF boot. */
+    CHECK(stat.kdebug_state < 2);
     CHECK(stat.kdebug_state == 1 ? stat.kdebug_owner_pages > 0 : stat.kdebug_owner_pages == 0);
     for (int id = 2; id <= 5; id++) {
         if (id == self) continue;

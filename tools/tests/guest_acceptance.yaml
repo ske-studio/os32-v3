@@ -3,7 +3,7 @@
   gate: e9
   contract: userland/tests/ring3_marker.h
   mode: manual
-  prereq: 17MB, current ini
+  prereq: "17MB, current ini; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: nop
   observe:
   - 'kernel.map: __bss_end, fault_kill_count'
@@ -21,7 +21,7 @@
   gate: e9
   contract: userland/tests/ring3_marker.h
   mode: manual
-  prereq: 17MB, current ini
+  prereq: "17MB, current ini; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: ring3_hello
   observe:
   - 'kernel.map: __bss_end, fault_kill_count'
@@ -39,7 +39,7 @@
   gate: e9
   contract: userland/tests/ring3_marker.h
   mode: manual
-  prereq: 17MB, current ini
+  prereq: "17MB, current ini; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: ring3_fault
   observe:
   - 'kernel.map: __bss_end, fault_kill_count'
@@ -57,7 +57,7 @@
   gate: e9
   contract: userland/tests/ring3_marker.h
   mode: manual
-  prereq: 17MB, current ini
+  prereq: "17MB, current ini; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: ring3_guard
   observe:
   - 'kernel.map: __bss_end, fault_kill_count'
@@ -75,8 +75,7 @@
   gate: e9
   contract: userland/tests/ring3_marker.h
   mode: manual
-  prereq: '17MB, current ini; B: mapped shlib for RO proof (2026-10-06 B had no shlib;
-    H-9) '
+  prereq: "17MB, current ini; B: mapped shlib for RO proof (2026-10-06 B had no shlib; H-9) ; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: ring3_guard shlib
   observe:
   - 'kernel.map: __bss_end, fault_kill_count'
@@ -94,7 +93,7 @@
   gate: e9
   contract: userland/tests/ring3_marker.h
   mode: manual
-  prereq: 17MB, current ini
+  prereq: "17MB, current ini; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: ring3_guard cirrus
   observe:
   - 'kernel.map: __bss_end, fault_kill_count'
@@ -112,7 +111,7 @@
   gate: e9
   contract: userland/tests/ring3_marker.h
   mode: manual
-  prereq: 17MB, current ini
+  prereq: "17MB, current ini; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: ring3_guard pegc
   observe:
   - 'kernel.map: __bss_end, fault_kill_count'
@@ -130,7 +129,7 @@
   gate: e9
   contract: userland/tests/ring3_marker.h
   mode: manual
-  prereq: 17MB, current ini
+  prereq: "17MB, current ini; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: ring3_guard bb
   observe:
   - 'kernel.map: __bss_end, fault_kill_count'
@@ -149,7 +148,7 @@
   gate: e9
   contract: docs/tasks/v3/TASK_T2D_T2H.md#2-5-分割試験受入
   mode: batch
-  prereq: 17MB, current ini
+  prereq: "17MB, current ini; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry:
     guest_tests: shm_reuse_test
   observe:
@@ -163,7 +162,7 @@
   gate: e9
   contract: docs/tasks/v3/TASK_T2D_T2H.md#2-5-分割試験受入
   mode: batch
-  prereq: 17MB, current ini
+  prereq: "17MB, current ini; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry:
     guest_tests: db_test
   observe:
@@ -177,7 +176,7 @@
   gate: e9
   contract: docs/tasks/v3/TASK_T2D_T2H.md#2-5-分割試験受入
   mode: batch
-  prereq: 17MB, current ini
+  prereq: "17MB, current ini; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry:
     guest_tests: db_v50_test
   observe:
@@ -191,7 +190,7 @@
   gate: e10b
   contract: docs/tasks/v3/TASK_T2D_T2H.md#2-5-分割試験受入
   mode: batch
-  prereq: 17MB, current ini
+  prereq: "17MB, current ini; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry:
     guest_tests: shm_reuse_test
   observe:
@@ -205,7 +204,7 @@
   gate: e10b
   contract: docs/tasks/v3/TASK_T2D_T2H.md#2-5-分割試験受入
   mode: batch
-  prereq: 17MB, current ini
+  prereq: "17MB, current ini; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry:
     guest_tests: db_test
   observe:
@@ -219,7 +218,7 @@
   gate: e10b
   contract: docs/tasks/v3/TASK_T2D_T2H.md#2-5-分割試験受入
   mode: batch
-  prereq: 17MB, current ini
+  prereq: "17MB, current ini; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry:
     guest_tests: db_v50_test
   observe:
@@ -233,7 +232,7 @@
   gate: e9
   contract: docs/tasks/v3/TASK_T2D_T2H.md#2-5-分割試験受入
   mode: tool
-  prereq: 17MB, current ini
+  prereq: "17MB, current ini; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: python3 tools/tvdump_recv.py --raw <evidence>/tvdump.bin
   observe:
   - /api/cmd raw TVDM
@@ -250,7 +249,7 @@
   gate: e10b
   contract: docs/tasks/v3/TASK_T2D_T2H.md#2-5-分割試験受入
   mode: tool
-  prereq: 17MB, current ini
+  prereq: "17MB, current ini; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry:
     snapshot: python3 tools/accept/pt0_snapshot.py <out.json>
     compare: python3 tools/accept/pt0_snapshot.py --compare base.json other.json --ignore-ad
@@ -279,7 +278,7 @@
   gate: e10b
   contract: userland/tests/ring3_marker.h
   mode: manual
-  prereq: 17MB, current ini
+  prereq: "17MB, current ini; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: ring3_guard bb
   observe:
   - SHM marker row E
@@ -294,19 +293,22 @@
   mode: manual
   status: deferred
   contract: docs/tasks/DEFERRED_TESTS.md#E10-1
+  prereq: kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC
 - id: E10-1-b
   mode: manual
   status: deferred
   contract: docs/tasks/DEFERRED_TESTS.md#E10-1
+  prereq: kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC
 - id: E10-1-K1
   mode: manual
   status: deferred
   contract: docs/tasks/DEFERRED_TESTS.md#E10-1
+  prereq: kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC
 - id: prio3-audit-cursor
   gate: PRIO-3
   contract: userland/tests/audit_test.c
   mode: manual
-  prereq: current CPL3 audit_test binary, CUI console, KAPI-AUDIT-FIX kernel
+  prereq: "current CPL3 audit_test binary, CUI console, KAPI-AUDIT-FIX kernel; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: audit_test cursor
   observe:
   - audit_test cursor output, shell/ver after probe
@@ -318,7 +320,7 @@
   gate: PRIO-3
   contract: userland/tests/audit_test.c
   mode: manual
-  prereq: current CPL3 audit_test binary, CUI console, KAPI-AUDIT-FIX kernel
+  prereq: "current CPL3 audit_test binary, CUI console, KAPI-AUDIT-FIX kernel; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: audit_test fmch
   observe:
   - audit_test fmch output, shell/ver after probe
@@ -329,7 +331,7 @@
   gate: PRIO-3
   contract: userland/tests/audit_test.c
   mode: manual
-  prereq: current CPL3 audit_test binary, CUI console, KAPI-AUDIT-FIX kernel
+  prereq: "current CPL3 audit_test binary, CUI console, KAPI-AUDIT-FIX kernel; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: audit_test mml
   observe:
   - 'audit_test: waiting mml; PM sends CTRL+STOP externally only after this line'
@@ -343,8 +345,7 @@
   gate: PRIO-3
   contract: userland/tests/audit_test.c
   mode: manual
-  prereq: current CPL3 audit_test binary, CUI console, KAPI-AUDIT-FIX kernel; launch
-    locally with serial RX empty, no serial command traffic during wait
+  prereq: "current CPL3 audit_test binary, CUI console, KAPI-AUDIT-FIX kernel; launch locally with serial RX empty, no serial command traffic during wait; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: audit_test serial
   observe:
   - 'audit_test: waiting serial; PM sends CTRL+STOP externally only after this line'
@@ -357,8 +358,7 @@
   gate: PRIO-3
   contract: userland/tests/audit_test.c
   mode: manual
-  prereq: current CPL3 audit_test binary, CUI console, KAPI-AUDIT-FIX kernel; keyboard
-    queue empty, no input until CTRL+STOP
+  prereq: "current CPL3 audit_test binary, CUI console, KAPI-AUDIT-FIX kernel; keyboard queue empty, no input until CTRL+STOP; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: audit_test ime
   observe:
   - 'audit_test: waiting ime; PM sends CTRL+STOP externally only after this line'
@@ -371,7 +371,7 @@
   gate: PRIO-3
   contract: userland/tests/audit_test.c
   mode: manual
-  prereq: current CPL3 audit_test binary, CUI console, KAPI-AUDIT-FIX kernel
+  prereq: "current CPL3 audit_test binary, CUI console, KAPI-AUDIT-FIX kernel; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: audit_test rshell
   observe:
   - audit_test rshell output, shell/ver after probe
@@ -385,7 +385,7 @@
   gate: e10c
   contract: docs/tasks/v3/TASK_T2D_T2H.md#5-3-統合matrixと観測
   mode: manual
-  prereq: PM deploys this build and matching kernel.map; 8MB planar/PEGC and 17MB planar/PEGC/Cirrus
+  prereq: "PM deploys this build and matching kernel.map; 8MB planar/PEGC and 17MB planar/PEGC/Cirrus; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: boot, capture bootlog and tools/accept/pt0_snapshot.py output, then run a CUI app
   observe:
   - kselftest_pass/fail; memmap_audit_runs/fail; as_audit_runs/fail; ledger_check_fail
@@ -406,7 +406,7 @@
   gate: e10c
   contract: docs/tasks/DEFERRED_TESTS.md#E10-2
   mode: manual
-  prereq: e10c-boot-audit; snapshot after one normal app, matching deployed map
+  prereq: "e10c-boot-audit; snapshot after one normal app, matching deployed map; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: snapshot; v86 -t; snapshot; v86 -g -t; snapshot; repeat and compare PT0 ignoring A/D
   observe:
   - v86_return_audit_runs/fail; memmap_audit_fail; as_audit_fail; v86_restore_mismatch
@@ -425,10 +425,10 @@
   gate: e10c
   contract: docs/tasks/DEFERRED_TESTS.md#E10-4
   mode: manual
-  prereq: capture baseline and saved TVRAM 30 rows; stop while capture session is open
+  prereq: "capture baseline and saved TVRAM 30 rows; stop while capture session is open; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: start v86 -g; CTRL+STOP during capture; snapshot; repeat v86 -g -t; run ver
   observe:
-  - v86_session open/closing/release_pending; v86_gcap_rec
+  - v86_session open/closing/release_pending; gcap_detach の後に v86 -g が再採取できること
   - v86_gcap_alloc_count/free_count; exec_stop_count; return audit counters
   - TVRAM all 30 rows and cursor; normal prompt and ver response
   expect:
@@ -444,7 +444,7 @@
   gate: e10c
   contract: docs/tasks/DEFERRED_TESTS.md#E10-2
   mode: manual
-  prereq: e10c build; public lease acquisition remains deferred to E11-1
+  prereq: "e10c build; public lease acquisition remains deferred to E11-1; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: record TVRAM surface; GUI start; GUI exit to CUI; repeat GUI start; snapshot
   observe:
   - ledger_surfaces TVRAM gen and lease_count, gfx_surface_unready, gfx_reinit_fail_count
@@ -460,7 +460,7 @@
   gate: e10c
   contract: docs/tasks/DEFERRED_TESTS.md#E10-5
   mode: manual
-  prereq: separate PM fault-injection run for closing reexception; regular boot remains separate
+  prereq: "separate PM fault-injection run for closing reexception; regular boot remains separate; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: trigger closing reexception, record serial line and exec_stop_count; separate normal V86 INT80 reflection run
   observe:
   - serial OS32 exec teardown stopped line, exec_stop_count
@@ -477,7 +477,7 @@
   gate: e11
   contract: docs/KAPI_SPEC.md
   mode: manual
-  prereq: PM integrates e11; deploy matching kernel, gshell and programs; verify ver image and kernel.map; 17MB current ini
+  prereq: "PM integrates e11; deploy matching kernel, gshell and programs; verify ver image and kernel.map; 17MB current ini; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: GUI Run hello_gfx with and without another window open; press a key; repeat from terminal; run a WAIT_POLL graphics program (gfx200_test)
   observe:
   - Run child exits on one key; previous window receives neither Key nor Text
@@ -500,7 +500,7 @@
   gate: e11
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: PM integrated e11 build and matching map; failure-injection build only for attach failure and USER shutdown probes
+  prereq: "PM integrated e11 build and matching map; failure-injection build only for attach failure and USER shutdown probes; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: boot Japanese font display; call kcg_init after boot closure; GUI gdi_test; inject one attach failure across wait then allow next attach; probe nonowner gfx_shutdown
   observe:
   - Japanese glyph pixels and fetched flags unchanged after late init; set scale 2 first and confirm init restores scale 1
@@ -518,7 +518,7 @@
   gate: e11
   contract: userland/tests/h3/protocol.h
   mode: manual
-  prereq: e11c connects the public value slot and H3_SELF_IDENTITY adapter; a2 default remains host publication; protocol unchanged
+  prereq: "e11c connects the public value slot and H3_SELF_IDENTITY adapter; a2 default remains host publication; protocol unchanged; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: launch h3a and h3b with opt-in adapter; freeze before host publication; compare each self-published owner and generation to tools/h3_park_resume.py identity(index); repeat after slot reuse
   observe:
   - Internal caller_identity_get app_id, owner and generation match live AS and host observer
@@ -533,7 +533,7 @@
   gate: e11
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: PM deploys matching b1 kernel and shm_reuse_child; verify ver image and new kernel.map; 17MB current ini
+  prereq: "PM deploys matching b1 kernel and shm_reuse_child; verify ver image and new kernel.map; 17MB current ini; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: record fault_kill_count then run shm_reuse_child lockwrite first; capture marker and fault before any next SHM allocation; run ver
   observe:
   - Find SL marker (label 0x4c53 at B+16, self B at B+20), separate from locked target block
@@ -552,7 +552,7 @@
   gate: e11
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: same matching b1 build as e11b1-lockwrite-first; a separate launch is required because the first store kills
+  prereq: "same matching b1 build as e11b1-lockwrite-first; a separate launch is required because the first store kills; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: record fault_kill_count then run shm_reuse_child lockwrite last; capture marker and fault before next SHM allocation; run ver and shm_reuse_test
   observe:
   - Same SL/SLK? marker protocol as first; B+8 equals locked block start plus 0x3000 (last 4KB page of 16KB block)
@@ -570,7 +570,7 @@
   gate: e11
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: PM matching b1 kernel/programs and kernel.map; 17MB current ini; run before b2 as well as final integrated acceptance
+  prereq: "PM matching b1 kernel/programs and kernel.map; 17MB current ini; run before b2 as well as final integrated acceptance; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: run hello_gfx, gdi_test, gfx200_test and Japanese display; db_test and db_v50_test; take tools/accept/pt0_snapshot.py snapshots after boot and launches, then each V86 exit below
   observe:
   - Low PT0 font [0x1000,0x4a000) and TVRAM through BRG [0xa0000,0xc0000) have USER clear; native VRAM PCD remains set
@@ -591,7 +591,7 @@
   gate: e11
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: PM matching b1 shell.bin, sh.bin and kernel; CUI and GUI sessions; verify image and map
+  prereq: "PM matching b1 shell.bin, sh.bin and kernel; CUI and GUI sessions; verify image and map; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: run python3 tools/tvdump_recv.py --raw <evidence>/cui.bin in resident CUI; repeat foreground CPL3 sh; then GUI terminal sh and WM rshell into separate raw files
   observe:
   - CUI resident shell and foreground CPL3 return the expected text cells; compare /api/tvram lines
@@ -610,7 +610,7 @@
   gate: e11
   contract: userland/tests/ring3_marker.h
   mode: manual
-  prereq: 17MB, CUI, newly deployed c2 kernel and programs
+  prereq: "17MB, CUI, newly deployed c2 kernel and programs; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: ring3_guard lease
   observe:
   - SHM marker F+, fault_kill_count, lease PTE, shell/ver
@@ -624,7 +624,7 @@
   gate: e11
   contract: userland/tests/ring3_marker.h
   mode: manual
-  prereq: 17MB, CUI, newly deployed c2 kernel and programs
+  prereq: "17MB, CUI, newly deployed c2 kernel and programs; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: ring3_guard free
   observe:
   - SHM marker F-, fault_kill_count, serial PF target, shell/ver
@@ -639,7 +639,7 @@
   gate: e11
   contract: docs/tasks/v3/TASK_T2D_T2H.md#2-3-面alias再attach
   mode: manual
-  prereq: 17MB, new c2 kernel/static SDK/shlib and rebuilt programs, PC98 then PEGC/Cirrus
+  prereq: "17MB, new c2 kernel/static SDK/shlib and rebuilt programs, PC98 then PEGC/Cirrus; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: hello, gfx200_test, gfx_demo200, pegcchk, blit_test, bench, hello_gfx, font_test, gdi_test, about, filer, gui_demo, t5a_display
   observe:
   - pt0_snapshot and write observation at BB alias, CLIENT lease VA and Unicode RO PTEs
@@ -660,7 +660,7 @@
   gate: e11
   contract: userland/lib/rt/ls.c
   mode: manual
-  prereq: PMが統合ビルドをNHDに配備して反映照合
+  prereq: "PMが統合ビルドをNHDに配備して反映照合; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: sh.bin / shell.bin / filer
   observe:
   - 'CPL3 sh: dir / 補完 / man -l / find / du / hsync dryで件数・順序・エラーを確認'
@@ -674,7 +674,7 @@
   gate: e11
   contract: tools/h3_park_resume.py
   mode: manual
-  prereq: PMが統合ビルドをNHDに配備して反映照合
+  prereq: "PMが統合ビルドをNHDに配備して反映照合; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: h3a / h3b / shm_reuse_test
   observe:
   - 'h3a/b自己公開owner/generation == host identity()、initがSHMを書かない'
@@ -687,7 +687,7 @@
   gate: e11
   contract: docs/tasks/v3/TASK_T2D_T2H.md#2-4-user切替の一括境界
   mode: manual
-  prereq: PM integrated generation-3 build deployed; new kernel.map; 17MB current ini
+  prereq: "PM integrated generation-3 build deployed; new kernel.map; 17MB current ini; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: ring3_guard bb; ring3_guard lease; ring3_guard free; v86 -d; v86 -b
   observe:
   - Confirm boot kselftest_pass=289 and kselftest_fail=0; map_user_keep still counts one check; f13a adds mem_stat:TRUSTED AS extents (288+1, source expectation; collect the actual boot result)
@@ -698,7 +698,7 @@
   - Observe audit_runs rising and audit_fail=0 at master, AS and post-exec stages, including both V86 returns; shell/ver respond
   - Run db_test and db_v50_test and require their existing PASS totals
   expect:
-    kselftest_pass: 289
+    kselftest_pass: 289  # 当時の値
     kselftest_fail: 0
     old_alias_user_pages: 0
     E_completion: 0
@@ -712,7 +712,7 @@
   gate: e11
   contract: docs/tasks/v3/TASK_T2D_T2H.md#2-4-user切替の一括境界
   mode: manual
-  prereq: PM integrated generation-3 build deployed; same binary hashes as build outputs
+  prereq: "PM integrated generation-3 build deployed; same binary hashes as build outputs; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: hello; gfx200_test; gfx_demo200; pegcchk; blit_test; bench; hello_gfx; font_test; gdi_test; about; filer; gui_demo; t5a_display
   observe:
   - Run the e11c2 consumer list with old USER aliases removed; verify drawing and Japanese glyphs
@@ -727,7 +727,7 @@
   gate: e11
   contract: docs/tasks/v3/TASK_T2D_T2H.md#2-4-user切替の一括境界
   mode: manual
-  prereq: PM integrated generation-3 build and saved generation-2 binary; KAPI v72 in both
+  prereq: "PM integrated generation-3 build and saved generation-2 binary; KAPI v72 in both; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: Launch saved generation-2 program, then rebuilt generation-3 program
   observe:
   - Confirm header memory_layout_generation differs while KAPI version and all other generations agree
@@ -746,7 +746,7 @@
   mode: manual
   status: deferred
   contract: docs/tasks/DEFERRED_TESTS.md#H-4
-  prereq: 8MB planar; H-4 configuration batch, TASK_T2D_T2H.md §12
+  prereq: "8MB planar; H-4 configuration batch, TASK_T2D_T2H.md §12; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: Full T2e acceptance suite
   observe: &id001
   - Use rebuilt generation-3 binaries and matching kernel.map; record hashes, __bss_end, backend and RAM.
@@ -775,7 +775,7 @@
   mode: manual
   status: deferred
   contract: docs/tasks/DEFERRED_TESTS.md#H-4
-  prereq: 8MB PEGC; H-4 configuration batch, TASK_T2D_T2H.md §12
+  prereq: "8MB PEGC; H-4 configuration batch, TASK_T2D_T2H.md §12; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: Full T2e acceptance suite
   observe: *id001
   expect:
@@ -789,7 +789,7 @@
   mode: manual
   status: deferred
   contract: docs/tasks/DEFERRED_TESTS.md#H-4
-  prereq: 17MB planar; H-4 configuration batch, TASK_T2D_T2H.md §12
+  prereq: "17MB planar; H-4 configuration batch, TASK_T2D_T2H.md §12; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: Full T2e acceptance suite
   observe: *id001
   expect:
@@ -803,7 +803,7 @@
   mode: manual
   status: deferred
   contract: docs/tasks/DEFERRED_TESTS.md#H-4
-  prereq: 17MB Cirrus; H-4 configuration batch, TASK_T2D_T2H.md §12
+  prereq: "17MB Cirrus; H-4 configuration batch, TASK_T2D_T2H.md §12; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: Full T2e acceptance suite
   observe: *id001
   expect:
@@ -817,7 +817,7 @@
   mode: manual
   status: deferred
   contract: docs/tasks/DEFERRED_TESTS.md#H-4
-  prereq: 'H-4: Cirrus unavailable, force cirrus preference; §12 configuration batch'
+  prereq: "H-4: Cirrus unavailable, force cirrus preference; §12 configuration batch; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: Force cirrus then run drawing and lease suite
   observe:
   - Record actual fallback backend and valid CLIENT/DISPLAY geometry; draw/present Japanese with fallback.
@@ -832,7 +832,7 @@
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
   status: accepted
-  prereq: 17MB PEGC; e11 integrated build v70, commit 1d222ac
+  prereq: "17MB PEGC; e11 integrated build v70, commit 1d222ac; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: e11b2-isolation; e11b2-consumers; e11b2-generation; e11c2-consumers; e11a2-fullscreen-input
   observe:
   - Reference e11 entries for Japanese/drawing/present, fullscreen return and generation checks.
@@ -844,7 +844,7 @@
   - Acceptance excludes blit_test and bench Test 3 crash (fixed in e12), font_test missing font, PF error
     codes, and other unobserved details.
   expect:
-    kselftest_pass: 283
+    kselftest_pass: 283  # 当時の値
     kselftest_fail: 0
     audit_fail: 0
     v86_restore_mismatch: 0
@@ -855,7 +855,7 @@
   mode: manual
   status: deferred
   contract: docs/tasks/DEFERRED_TESTS.md#H-8
-  prereq: 17MB PEGC; pending H-8
+  prereq: "17MB PEGC; pending H-8; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: Explicit e12 supplemental checks
   observe:
   - Record actual stack bottom and marker target; PTE NP, fault at that page; obtain PF error_code=6 (e11
@@ -869,7 +869,7 @@
   mode: manual
   status: deferred
   contract: docs/tasks/DEFERRED_TESTS.md#H-9
-  prereq: 17MB PEGC; pending H-9
+  prereq: "17MB PEGC; pending H-9; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: Explicit e12 supplemental checks
   observe:
   - Load shlib in the same AS before B; snapshot PTE P=1/U=1/RW=0 and record PF error_code=7. e11 fault
@@ -885,7 +885,7 @@
   mode: manual
   status: deferred
   contract: docs/tasks/DEFERRED_TESTS.md#X-2
-  prereq: 17MB PEGC; pending X-2
+  prereq: "17MB PEGC; pending X-2; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: Explicit e12 supplemental checks
   observe:
   - Run font_load_test; record exact reason if stat SKIP; run postboot NOSYS check with table/BB/mailbox
@@ -899,7 +899,7 @@
   mode: manual
   status: deferred
   contract: docs/tasks/DEFERRED_TESTS.md#E11-9
-  prereq: 17MB PEGC; pending E11-9
+  prereq: "17MB PEGC; pending E11-9; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: Explicit e12 supplemental checks
   observe:
   - Reference e11b2-isolation for PT0/V86 audit accepted evidence; explicitly reacquire DISPLAY/TVRAM
@@ -913,7 +913,7 @@
   mode: manual
   status: deferred
   contract: docs/tasks/DEFERRED_TESTS.md#E11-BUD
-  prereq: 17MB PEGC; pending E11-BUD
+  prereq: "17MB PEGC; pending E11-BUD; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: Explicit e12 supplemental checks
   observe:
   - 'blit_test: SKIP packed framebuffer (planar test), exit=2 (S-7).'
@@ -931,7 +931,7 @@
   gate: F-6
   contract: userland/tests/mem_map_test.c
   mode: manual
-  prereq: KAPI 72, 17MB, current ini; PM deploy and fresh kernel.map
+  prereq: "KAPI 72, 17MB, current ini; PM deploy and fresh kernel.map; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: mem_map_test
   observe:
   - 'Run mem_map_test: require PASS mem_map invalid addresses survived and PASS mem_map control, exit 0, kill delta 0'
@@ -953,7 +953,7 @@
   gate: F-7
   contract: userland/tests/sbrk_grow_test.c
   mode: manual
-  prereq: KAPI 72, memory layout 3, 17MB, current ini; PM deploy USER CRT binaries and fresh kernel.map
+  prereq: "KAPI 72, memory layout 3, 17MB, current ini; PM deploy USER CRT binaries and fresh kernel.map; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: sbrk_grow_test
   observe:
   - 'Record fault_kill_count and exec_as_leftover_pages before and after sbrk_grow_test'
@@ -972,7 +972,7 @@
   gate: F-8
   contract: userland/tests/malloc_arena_test.c
   mode: manual
-  prereq: KAPI 72, memory layout 3, 17MB, current ini; PM deploy USER adapter binaries and fresh kernel.map
+  prereq: "KAPI 72, memory layout 3, 17MB, current ini; PM deploy USER adapter binaries and fresh kernel.map; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: malloc_arena_test
   observe:
   - 'Record fault_kill_count and exec_as_leftover_pages before and after malloc_arena_test'
@@ -992,7 +992,7 @@
   gate: F-8
   contract: sdk/allocator/nano_adapter.c
   mode: manual
-  prereq: KAPI 72, memory layout 3; PM deploy rebuilt malloc_arena_test and alloc_demo
+  prereq: "KAPI 72, memory layout 3; PM deploy rebuilt malloc_arena_test and alloc_demo; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: malloc_arena_test
   observe:
   - 'Require malloc_arena_test PASS and exit 0 for 65535/65536/65537, all calloc bytes zero, 65536/65537 free permits EXACT remap of the whole direct map'
@@ -1012,7 +1012,7 @@
   gate: F-10
   contract: userland/tests/exec_heap_test.c
   mode: manual
-  prereq: KAPI 72, memory layout 3; PM deploy current kernel and exec_heap_test with 65536-byte heap
+  prereq: "KAPI 72, memory layout 3; PM deploy current kernel and exec_heap_test with 65536-byte heap; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: exec_heap_test
   observe:
   - 'Parent and child both run /usr/bin/exec_heap_test.bin registered in userland/deploy.yaml; child argument is --child'
@@ -1033,7 +1033,7 @@
   gate: F-11
   contract: userland/tests/exec_heap_test.c
   mode: manual
-  prereq: KAPI 72, memory layout 3; PM deploy current kernel, exec_heap_test and heap_test with 65536-byte INITIAL
+  prereq: "KAPI 72, memory layout 3; PM deploy current kernel, exec_heap_test and heap_test with 65536-byte INITIAL; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: exec_heap_test
   observe:
   - 'Require parent and --child PASS and exit 0: 65535 pointer modulo 4096 is 8, 65536/65537 modulo is 0, initial LARGE bytes zero and full write/read patterns preserved across nested exec'
@@ -1054,7 +1054,7 @@
   gate: F-13
   contract: userland/tests/malloc_arena_test.c
   mode: manual
-  prereq: KAPI 72, memory layout 3, 17MB; PM deploy rebuilt USER malloc_arena_test and verify its binary
+  prereq: "KAPI 72, memory layout 3, 17MB; PM deploy rebuilt USER malloc_arena_test and verify its binary; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: malloc_arena_test
   observe:
   - 'Require PASS 196664/196664 and exit 0; explicitly grow primary to keep+3 pages or more before the blocker, record primary_limit; after f8, restore the primary break to brk and trim at least one page'
@@ -1080,7 +1080,7 @@
   gate: f12
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 17MB, current ini; PM deploy matching memory layout 3 kernel/static SDK/shlib and rebuilt programs, verify hashes and kernel.map; after f12 landing and before f13
+  prereq: "17MB, current ini; PM deploy matching memory layout 3 kernel/static SDK/shlib and rebuilt programs, verify hashes and kernel.map; after f12 landing and before f13; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: hello; gfx200_test; gfx_demo200; pegcchk; blit_test; bench; hello_gfx; font_test; gdi_test; about; filer; gui_demo; t5a_display; sh dir/completion/hsync dry; Rust filer list/expand/refresh; install dry; cdinst dry; sqlite_standalone; alloc_demo; math_test_rs; db_test; db_v50_test
   observe:
   - 'PM runs each entry; require exit 0, existing drawing/Japanese/fullscreen return and directory/completion/dry paths remain successful; provision font_test font before execution'
@@ -1102,7 +1102,7 @@
   gate: f12
   contract: docs/09_exec.md
   mode: manual
-  prereq: 17MB; PM deploy matching memory layout 3 build and saved memory layout 2 app/shlib copies; KAPI 72 and other generations match
+  prereq: "17MB; PM deploy matching memory layout 3 build and saved memory layout 2 app/shlib copies; KAPI 72 and other generations match; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: saved memory layout 2 app and shlib; rebuilt memory layout 3 app and shlib
   observe:
   - 'Verify headers/manifests/hashes; reject both old app and old shlib with memory layout generation mismatch (reason 3) before entry/AS allocation'
@@ -1120,7 +1120,7 @@
   gate: f12
   contract: include/memmap.h
   mode: manual
-  prereq: 17MB; PM deploy memory layout 3 kernel and rebuilt USER programs, matching kernel.map
+  prereq: "17MB; PM deploy memory layout 3 kernel and rebuilt USER programs, matching kernel.map; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: heap_test; sbrk_grow_test; exec_heap_test parent/--child; malloc_arena_test; shell/gshell child launch and return
   observe:
   - 'Record libc initial limit = page_up(img_end)+PAGE_SIZE; exec_heap heap_sz=0 is64KiB, explicit size is page-rounded with64KiB minimum; stack maps full exec_stack_bytes'
@@ -1141,7 +1141,7 @@
   contract: docs/tasks/DEFERRED_TESTS.md#H-4
   mode: manual
   status: deferred
-  prereq: 8MB; PM configuration batch H-4 with matching memory layout 3 build/kernel.map
+  prereq: "8MB; PM configuration batch H-4 with matching memory layout 3 build/kernel.map; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: gui_demo; heap_test; sbrk_grow_test; exec_heap_test; db_test; db_v50_test
   observe:
   - 'Record actual RAM/backend, hashes, boot kselftest_fail, launch/return and resources returned; host K7 gui_demo shape uses94/768pages including4shlib data pages, this is not guest acceptance'
@@ -1158,7 +1158,7 @@
   gate: f13
   contract: userland/tests/mem_stat_test.c
   mode: manual
-  prereq: Paired module RUNNING (kdebug_state == 1 and kdebug_pair_crc == ver Image CRC); PM deploy matching v75 kernel/shell/sh and both mem_stat tests, verify deployed binaries, new kernel.map and boot result
+  prereq: "Paired module RUNNING (kdebug_state == 1 and kdebug_pair_crc == ver Image CRC); PM deploy matching v75 kernel/shell/sh and both mem_stat tests, verify deployed binaries, new kernel.map and boot result; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: mem_stat_test; CPL3 sh mem; CPL0 resident shell mem
   observe:
   - 'Require mem_stat_test PASS self=<2..5> others=<the other three IDs in ascending order> and mem_stat_test: PASS 19/19 and mem_stat_compat_test: PASS 17/17, exit 0. ID is read from self before other-ID tests; USER accepts system/self and rejects every other ID with INVAL and out unchanged, including short/zero-size refusal'
@@ -1180,7 +1180,7 @@
   gate: f13
   contract: exec/os32x_hdr.c
   mode: manual
-  prereq: PM deploy matching v72 build; genuine saved v71 originals in ~/os32-tmp/evidence/2026-10-08/v71_originals/ with SHA256SUMS
+  prereq: "PM deploy matching v72 build; genuine saved v71 originals in ~/os32-tmp/evidence/2026-10-08/v71_originals/ with SHA256SUMS; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: saved genuine v71 hello_r3 app; rebuilt shell; rebuilt sh; rebuilt gshell
   observe:
   - '保存したv71_originals/SHA256SUMSを照合し、本物のhello_r3.binをv72 kernelで起動、正常終了・shell/ver応答。再生成した72ヘッダを書換えて71の代用にしない。原本は不変で実行用コピーだけをPMが使う'
@@ -1199,7 +1199,7 @@
   gate: f13
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 17MB current ini; PM deploy matching v72 memory-layout3 kernel/static SDK/shlib/programs, verify hashes/new map and running ver Image CRC
+  prereq: "17MB current ini; PM deploy matching v72 memory-layout3 kernel/static SDK/shlib/programs, verify hashes/new map and running ver Image CRC; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: hello; gfx200_test; gfx_demo200; pegcchk; blit_test; bench; hello_gfx; font_test; gdi_test; about; filer; gui_demo; t5a_display; sh dir/completion/hsync dry; Rust filer list/expand/refresh; install dry; cdinst dry; sqlite_standalone; alloc_demo; math_test_rs; db_test; db_v50_test
   observe:
   - 'f12-consumersと同じentryを再実施。font_testのフォントを事前用意し、描画・日本語・fullscreenからの復帰・dir/補完/hsync dryを確認。gfx_demo200はESC待ち、rshellにESCが届いて閉じたらCPL0 shellで開き直す。GUIはgshellのRunダイアログから起動する'
@@ -1223,7 +1223,7 @@
   gate: F-14
   contract: userland/system/install.c
   mode: manual
-  prereq: 隔離した NHD の写し、または原本を退避済み ([D2]); PM媒体バッチ; matching v72 install FD and CD; readable hd0 with valid geometry/capacity; new binary hashes/map. FD起動またはルートが完全なinstall FD、CDはcd0からmount可能
+  prereq: "隔離した NHD の写し、または原本を退避済み ([D2]); PM媒体バッチ; matching v72 install FD and CD; readable hd0 with valid geometry/capacity; new binary hashes/map. FD起動またはルートが完全なinstall FD、CDはcd0からmount可能; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: install (no dry argument); cdinst (no dry argument); GUI/画面キーボードで拒否、rshell自動入力を使わない
   observe:
   - 'install: FDに /VMKRNL.LZ4, /sys/boot_hdd.bin, /sys/loader_h.bin, /sys/shell.bin と /sys,/bin,/sbin,/etc の完全な集合を用意 (install.c:55-58, :443-467, :485-497)。引数の特別経路はrecover/revert-settingsだけ (:527-534)、通常のinstallを起動'
@@ -1243,7 +1243,7 @@
   gate: F-14
   contract: userland/rust/filer/src/model.rs
   mode: manual
-  prereq: PM matching v72 GUI build; populated directory tree; gshell Run dialog
+  prereq: "PM matching v72 GUI build; populated directory tree; gshell Run dialog; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: Rust filer list/expand/refresh (e11c3-ls observe)
   observe:
   - 'gshellのRunダイアログでfilerを起動し、e11c3-ls observeの一覧・枝展開・更新を再実施。ディレクトリ枝を開いてtree_expand (model.rs:744) の子一覧/順序を観測し、F5 (lib.rs:41) で再読込み。数百件でも窓境界で欠落しない'
@@ -1258,7 +1258,7 @@
   gate: F-14
   contract: userland/shell/cmd_sys.c
   mode: manual
-  prereq: matching v72 build; CPL0 resident shell prompt, not CPL3 sh; default resident heap request
+  prereq: "matching v72 build; CPL0 resident shell prompt, not CPL3 sh; default resident heap request; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: CPL0常駐shellのプロンプトでmem (shからではない)
   observe:
   - '実測 Shell band sbrk上限=00375000 が g_api->sbrk_heap_limit == MEM_SHELL_GUARD を示す。定数 Shell band 行だけでは合格にしない。実測システム行 resident heap total=462848 B (452KiB) を確認し、exec_heap+8のusedと前後比較'
@@ -1274,7 +1274,7 @@
   gate: F-14
   contract: exec/os32x_hdr.c
   mode: manual
-  prereq: PM isolated cold-boot shlib rejection session; matching v72 gui_demo/shlib with memory layout3; record original SHA256, boot medium and /sys/lib/libos32gui.shlib readback; new kernel.elf/map
+  prereq: "PM isolated cold-boot shlib rejection session; matching v72 gui_demo/shlib with memory layout3; record original SHA256, boot medium and /sys/lib/libos32gui.shlib readback; new kernel.elf/map; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: cold boot with generation2 shlib copy, GUI request to CUI fallback, current gui_demo launch refusal; restored generation3 cold boot and gshell Run gui_demo
   observe:
   - '現行libos32gui.shlibの隔離コピーを作り、memory_layout_generationヘッダoffset52だけを2に変更 (accept_f12/gen2.logのapp写しと同じ形、gen_h2_fixtures.py:61-65)。parse_headerでmin_api_ver72/他3世代/kapi_data_off不変、差分がこの4B内だけ、元と写しのSHA256を保存。本物のv71_originalsは変更しない'
@@ -1295,7 +1295,7 @@
   gate: GK-2
   contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
   mode: manual
-  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  prereq: "17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: filer/about の起動と操作、about の front/back 往復。GUI 下で alloc_demo / exec_heap_test / malloc_arena_test。
   observe:
   - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
@@ -1312,7 +1312,7 @@
   gate: GK-2
   contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
   mode: manual
-  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  prereq: "17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: mem_map_test / sbrk_grow_test / malloc_arena_test / exec_heap_test / alloc_demo / db_test / db_v50_test
     / hsync
   observe:
@@ -1328,7 +1328,7 @@
   gate: GK-3
   contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
   mode: manual
-  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  prereq: "17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: trim_back を別 ID で2本と trim_front を起動し front を前景へ。他の GUI アプリは端末を含め起動しない。PREP FAIL なら終了して mem の free を確認後、起動し直す（4KiB
     ループ/PT のため空き1ページで止まり得る）。
   observe:
@@ -1345,7 +1345,7 @@
   gate: GK-3
   contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
   mode: manual
-  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  prereq: "17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: '準備区間: 両 back 未 arm で front が物理と free list を使い切る。未 arm DONE の返却が front の OP_WAIT 中に届くので、front が
     `prep done; DONE settled` (free=0 かつ pending=0) を出すまで p キーで再準備する (`prep unsettled` は未整定)。整定した時点の trim_pages_total
     と各 back extent/cur_end を G-3/G-4 基準値として採る。'
@@ -1368,7 +1368,7 @@
   gate: GK-3
   contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
   mode: manual
-  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  prereq: "17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: '両 back へ a キー。対象区間: front への t は長押し (hold=3000、emu_type seq=T hold=3000) で送る — 短い打鍵の break が yield 中の前景入力になり A が先に起きる。trim_front は自分のリングを空にしてから malloc(4000) を1回。対象の後は yield 中に
     前景へ入力を足さない (前景の未読入力は応答性優先で A が先に起きる — 票 §4-2 の仕様。その場合は ENOMEM retry=1 で、別対照として記録)。G-2後の基準値との差を採る。'
   observe:
@@ -1391,7 +1391,7 @@
   gate: GK-3
   contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
   mode: manual
-  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  prereq: "17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: G-2後の基準値と G-3後の mem <back id> を比較。G-4観測の後に各 back の r キーで障害物を unmap して regrow。終了行を必ず読む。終了時 extent は as_extents_at_teardown.py。
   observe:
   - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
@@ -1412,7 +1412,7 @@
   gate: GK-3
   contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
   mode: manual
-  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  prereq: "17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: 両 back を trim_back --no-answer に替えて G-2〜G-3。対象区間後に front/back を往復し、通常 Focus による resume と TRIM 配送を数え分ける。
   observe:
   - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
@@ -1434,7 +1434,7 @@
   gate: GK-3
   contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
   mode: manual
-  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  prereq: "17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: 端末の exec_run 子として trim_front --cui。子が戻った後、端末 OP_WAIT の X3 を観測。その後 GUI の trim_front を再実行。
   observe:
   - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
@@ -1451,7 +1451,7 @@
   gate: GK-3
   contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
   mode: manual
-  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  prereq: "17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: 'trim_back --stop-focus --slow-hook 1000 で G-3。back の窓は最小化しない (最小化中の SET_FOCUS は rc=0 のまま前景を変えない)。`trim_back focus
     ok` の後、STOP の前に gui_state の front と abort_target が当該 back であることを確かめてから CTRL+STOP。CTRL+STOP は WM が確定した前景に当たる。'
   observe:
@@ -1473,7 +1473,7 @@
   gate: GK-3
   contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
   mode: manual
-  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  prereq: "17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: front を失敗したまま free_pages=0 で保持、back を閉じる → front を閉じる → 新しいアプリ起動。
   observe:
   - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
@@ -1488,7 +1488,7 @@
   gate: GK-3
   contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
   mode: manual
-  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  prereq: "17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: mem_map_test / sbrk_grow_test / malloc_arena_test / exec_heap_test / alloc_demo / db_test / db_v50_test
     / hsync
   observe:
@@ -1504,7 +1504,7 @@
   gate: GK-4
   contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
   mode: manual
-  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  prereq: "17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: G-1の back 1本を trim_back_rs に替えて G-1/G-2。Rust --no-answer は SDK が必ず DONE を送るため未対応、G-5はC版で行う。
   observe:
   - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
@@ -1520,7 +1520,7 @@
   gate: GK-4
   contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
   mode: manual
-  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  prereq: "17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: 'G-3と同じ（g3fix 後の trim_front を使用し、対象確保前に自身のリングを空にする）。C/Rust 両 back へ a、front で対象確保。'
   observe:
   - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
@@ -1537,7 +1537,7 @@
   gate: GK-4
   contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
   mode: manual
-  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  prereq: "17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: G-4をRust backでも観測。次の通常イベントまたは o で DONE/G-4 行を出し、観測後 r は1回だけで障害物 unmap → EXACT regrow、その後 q。2回目の r は bad で終了値1。regrow が EXACT にならず FAIL したら、ARENA1 の端数（末尾72B以内）を疑う。
   observe:
   - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
@@ -1557,7 +1557,7 @@
   gate: GK-4
   contract: docs/tasks/v3/TASK_T2D_T2H.md#4-2-状態と配送契約
   mode: manual
-  prereq: 17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。
+  prereq: "17MB, current ini。構成依存の 8MB planar/PEGC・音源・Cirrus・Ra266 は T2h H-4。17MB で達せる観測はここで実施。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: trim_back_rs --stop-focus --slow-hook 1000 を使用。trim_back_rs focus ok の後、STOP の前に front_owner/abort_target が Rust back であることを確かめ、hook中に CTRL+STOP（G-7相当）。別試行でDONE直後にも同じ宛先確認をしてSTOP。
   observe:
   - '最新 kernel.map: appslot_trim_{epoch,request_count,mark_count,done_count,done_reject_count,pages_total}, ring3_stop_park_count,
@@ -1586,8 +1586,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R0: 現 ini の USEGD5430 / USEPEGCP / ExMemory / NP2NETSOCK の有無・値と元の GFX= を保存。新 NHD・ISO/FD の写しは [D2] 1 回、後続へ流用しない。Full
-    install 後に gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC を開始条件にする。'
+  prereq: "R0: 現 ini の USEGD5430 / USEPEGCP / ExMemory / NP2NETSOCK の有無・値と元の GFX= を保存。新 NHD・ISO/FD の写しは [D2] 1 回、後続へ流用しない。Full install 後に gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC を開始条件にする。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: np21w_trial.py --hdd os32_t2h_install.nhd; 新ビルド FD 起動; cd <iso>; Full install; HDD 起動; ver
   observe:
   - trial は稼働 PID/生成時刻に束縛し自身が通常終了する。PM は先に stop しない。媒体写しと新 NHD の承認はこの回だけ。PRIO-1。X-3 は e1/f1a の過去 GitHub Actions run を対象 SHA・実行日時・結論と照合し、今の成功で過去を合格にしない。
@@ -1603,8 +1602,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R0: 現 ini の USEGD5430 / USEPEGCP / ExMemory / NP2NETSOCK の有無・値と元の GFX= を保存。新 NHD・ISO/FD の写しは [D2] 1 回、後続へ流用しない。Full
-    install 後に gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC を開始条件にする。'
+  prereq: "R0: 現 ini の USEGD5430 / USEPEGCP / ExMemory / NP2NETSOCK の有無・値と元の GFX= を保存。新 NHD・ISO/FD の写しは [D2] 1 回、後続へ流用しない。Full install 後に gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC を開始条件にする。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: Full install の LZSS-1 / X-16・X-17 を観測
   observe:
   - 'LZSS-1: 修正した圧縮器の種250の2ファイルを PKG にし cdinst で入れて存在・size・hash を元データと照合する。X-16・X-17 の PKG 展開/名札照合結果も保存。'
@@ -1618,8 +1616,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R0: 現 ini の USEGD5430 / USEPEGCP / ExMemory / NP2NETSOCK の有無・値と元の GFX= を保存。新 NHD・ISO/FD の写しは [D2] 1 回、後続へ流用しない。Full
-    install 後に gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC を開始条件にする。'
+  prereq: "R0: 現 ini の USEGD5430 / USEPEGCP / ExMemory / NP2NETSOCK の有無・値と元の GFX= を保存。新 NHD・ISO/FD の写しは [D2] 1 回、後続へ流用しない。Full install 後に gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC を開始条件にする。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: Windows opt-in 9 件の対照
   observe:
   - S-1 の既存 Windows opt-in 9 件をそれぞれ実施し、オプトインの有無、対象、結果の証拠を 9 件保存する。
@@ -1631,8 +1628,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode
-    pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。'
+  prereq: "R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: 台本 M; H-6a; PRIO-3 audit_test; S-2/S-5/S-6/S-7; E11-BUD CUI
   observe:
   - '台本 M: boot fail 0 → 指定 gfxmode / 読み戻し / reset / hal_test → CUI/GUI/FEP → 高位 HostDrv read/write → 親子 → lease 切替 → map
@@ -1666,8 +1662,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode
-    pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。'
+  prereq: "R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: h2_stack; h2_stack512; h2_stack512 guard; h2-isolated の正常 app と拒否 fixture
   observe:
   - h2_stack の既定256KiB と明示512KiB を実行。512KiB は256KiB超の自動配列を全 page pattern で触り argv・park/resume・終了後 owner0 を採る。guard は実 stack
@@ -1694,8 +1689,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode
-    pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。'
+  prereq: "R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: ring3_guard; ring3_guard shlib; ring3_guard bb; ring3_guard lease; ring3_guard free
   observe:
   - A は ring3_guard 自身の256KiB stack 底直下 PTE NP → err=6。B は boot の shlib 読込み行と対象 AS の P/U/RO を先に確認 → err=7、未ロード NP の kill は代用しない。E
@@ -1719,8 +1713,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode
-    pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。'
+  prereq: "R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: mem_map_test (F-6、17MB)
   observe:
   - f5b-mem-map を再実行。EXACT/ANY/TOPDOWN・保護・unmap・部分失敗の巻戻し、raw map の枯渇と次の成功を採る。通常ケースと R1c-1 の毒化保持を別に記録。
@@ -1739,8 +1732,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode
-    pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。'
+  prereq: "R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: CPL0 shell の mem; 子ネスト; GUI→CUI; 既存16本; pool0 から閉じる
   observe:
   - 'T2a′: 常駐 shell の452KiB heap について resident_heap_peak/resident_heap_fail と used を開始前・各負荷後に mem で実測する。sh の mem と常駐の mem
@@ -1763,8 +1755,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode
-    pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。'
+  prereq: "R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: audit_test TVRAM 範囲外; v86 -d / -b 失敗出口; int80.img / int80.json
   observe:
   - 'E9-3: audit_test の TVRAM 範囲外で対象セル・番兵の before/after、reverse=0、次の有効操作。'
@@ -1783,8 +1774,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode
-    pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。'
+  prereq: "R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: pipe_owner_test; ls | cat; kout_test; e12-17mb-pegc-v86-release
   observe:
   - 'E11-8: CPL3 本人の pipe_get_buf は NULL、本人 get_len は作った長さ、他 owner get_len は0。trusted の ls | cat は正常。'
@@ -1809,8 +1799,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode
-    pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。'
+  prereq: "R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: guest_tests.txt; db_test; db_v50_test; g-L-2 / g-G-9
   observe:
   - guest_tests.txt 全件、g-L-2/g-G-9、db_test 9/9、db_v50_test 42/42。各実行の出力と終了値を採り、FAIL/crash/timeout を延期にしない。
@@ -1830,8 +1819,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1b: R1a と同じ L-h / 本 NHD / 17MB。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC
-    一致後に GUI。切替は協調型で同時実行は 1 本。'
+  prereq: "R1b: R1a と同じ L-h / 本 NHD / 17MB。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致後に GUI。切替は協調型で同時実行は 1 本。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: h3a / h3b を2本起動; h3_park_resume.py の layout/init/arm --capture/verify、mode 1〜6
   observe:
   - 'H-2/H-3: 本人識別を確認し実 OP_WAIT の PARKED (RUNNING+in_op_wait は別) を待って mode/arm のみ書く。pf/gp/de/ud/USER-loop/KAPI-loop を各1回。arm
@@ -1859,8 +1847,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1b: R1a と同じ L-h / 本 NHD / 17MB。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC
-    一致後に GUI。切替は協調型で同時実行は 1 本。'
+  prereq: "R1b: R1a と同じ L-h / 本 NHD / 17MB。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致後に GUI。切替は協調型で同時実行は 1 本。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: h3 USER-loop / KAPI-loop; g-G-7; g-R-4 の hook中 / DONE直後
   observe:
   - 前景窓と front_owner/abort_target の一致を確認して CTRL+STOP。h3 は捕捉した landing と WM/syscall の経路を1件ずつ数える。
@@ -1885,8 +1872,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1b: R1a と同じ L-h / 本 NHD / 17MB。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC
-    一致後に GUI。切替は協調型で同時実行は 1 本。'
+  prereq: "R1b: R1a と同じ L-h / 本 NHD / 17MB。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致後に GUI。切替は協調型で同時実行は 1 本。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: e11a2-self-identity; e11c3-identity; GUI 中の gshell 診断キー CTRL+GRPH+f･10
   observe:
   - 'E9-2/E11-12/E11-A2: h3a/h3b の自己公開 owner/generation とホスト identity(index)、owner-start、gshell 全slot診断を照合し、slot再利用後に旧世代を拒否。'
@@ -1907,8 +1893,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1b: R1a と同じ L-h / 本 NHD / 17MB。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC
-    一致後に GUI。切替は協調型で同時実行は 1 本。'
+  prereq: "R1b: R1a と同じ L-h / 本 NHD / 17MB。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致後に GUI。切替は協調型で同時実行は 1 本。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: 'E11-5: 端末の子 / WAIT_POLL / 隠れた sh / 先行入力の4点'
   observe:
   - Run の1キー終了だけで済ませない。各4点を実施し対象 owner へのキー配送、fullscreen→desktop→CUI、DISPLAY再attach、SHM/lease回収、次起動を採る。既存 hello_gfx / gfx200_test
@@ -1928,8 +1913,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1b: R1a と同じ L-h / 本 NHD / 17MB。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC
-    一致後に GUI。切替は協調型で同時実行は 1 本。'
+  prereq: "R1b: R1a と同じ L-h / 本 NHD / 17MB。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致後に GUI。切替は協調型で同時実行は 1 本。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: 'tvdump_recv.py: GUI端末 sh / WM rshell / CPL3 sh / 常駐 CUI 対照'
   observe:
   - 'E9-1/E11-9: e11b1-tvdump-auth の各主体で別 raw を保存。認可されない GUI端末/WM はセル全0、常駐CUIの実セル対照と比較。GUI中のCUI出力sink/再接続も確認。'
@@ -1944,8 +1928,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1b: R1a と同じ L-h / 本 NHD / 17MB。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC
-    一致後に GUI。切替は協調型で同時実行は 1 本。'
+  prereq: "R1b: R1a と同じ L-h / 本 NHD / 17MB。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致後に GUI。切替は協調型で同時実行は 1 本。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: 'E11-PERF: present/query; bench_scale2x Test 1; E10-4 v86 -g 中の kill'
   observe:
   - present/query の比較値と条件を記録。既存 bench_scale2x の320x200 40ms/100、640x400 10ms/100 を参照して新実測を保存。基準のない present は測定のみで合格範囲を捏造しない。
@@ -1960,8 +1943,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1b: R1a と同じ L-h / 本 NHD / 17MB。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC
-    一致後に GUI。切替は協調型で同時実行は 1 本。'
+  prereq: "R1b: R1a と同じ L-h / 本 NHD / 17MB。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致後に GUI。切替は協調型で同時実行は 1 本。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: 'E11-BUD: mem を boot / GUI起動後 / GUI終了後で採取'
   observe:
   - 'S-8: /data/ipaexg.ttf を事前配備して font_test を実行。未配備対照は終了2/SKIP行を採り合格と分ける。'
@@ -1985,8 +1967,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1b: R1a と同じ L-h / 本 NHD / 17MB。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC
-    一致後に GUI。切替は協調型で同時実行は 1 本。'
+  prereq: "R1b: R1a と同じ L-h / 本 NHD / 17MB。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致後に GUI。切替は協調型で同時実行は 1 本。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: shutdown_probe (非 owner gfx_shutdown); owner shutdown 正常対照
   observe:
   - 'E11-A2: GUI 正常起動を前提に非 owner から gfx_shutdown。backend / surface generation / 正規owner の lease と描画を前後比較する。正規owner shutdown
@@ -2002,9 +1983,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1c-1: PM が原本を残して作る t2h_fault.ini (hdd=os32_t2h_install.nhd)。17MB。初回も正常一式の同期・照合・deploy 後に np21w_ctl.py start --ini t2h_fault.ini。停止は np21w_ctl.py stop、強制停止なら記録。nhd_deploy.py
-    --profile t2h の remote/local/mount/stamp が本 NHD と別であること。上書きごとに対象・内容・復元を提示し [D2] 個別承認、[D1]。正常一式の sync と deploy-set.json
-    照合が hook の開始条件。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。'
+  prereq: "R1c-1: PM が原本を残して作る t2h_fault.ini (hdd=os32_t2h_install.nhd)。17MB。初回も正常一式の同期・照合・deploy 後に np21w_ctl.py start --ini t2h_fault.ini。停止は np21w_ctl.py stop、強制停止なら記録。nhd_deploy.py --profile t2h の remote/local/mount/stamp が本 NHD と別であること。上書きごとに対象・内容・復元を提示し [D2] 個別承認、[D1]。正常一式の sync と deploy-set.json 照合が hook の開始条件。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: 正常一式 sync --profile t2h; verify-set --profile t2h --set build/out/deploy-set.json; deploy; start
   observe:
   - '交換・復元の毎回の順: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h (残っていれば) → pull --profile t2h → copy または sync --profile
@@ -2030,9 +2009,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1c-1: PM が原本を残して作る t2h_fault.ini (hdd=os32_t2h_install.nhd)。17MB。初回も正常一式の同期・照合・deploy 後に np21w_ctl.py start --ini t2h_fault.ini。停止は np21w_ctl.py stop、強制停止なら記録。nhd_deploy.py
-    --profile t2h の remote/local/mount/stamp が本 NHD と別であること。上書きごとに対象・内容・復元を提示し [D2] 個別承認、[D1]。正常一式の sync と deploy-set.json
-    照合が hook の開始条件。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。'
+  prereq: "R1c-1: PM が原本を残して作る t2h_fault.ini (hdd=os32_t2h_install.nhd)。17MB。初回も正常一式の同期・照合・deploy 後に np21w_ctl.py start --ini t2h_fault.ini。停止は np21w_ctl.py stop、強制停止なら記録。nhd_deploy.py --profile t2h の remote/local/mount/stamp が本 NHD と別であること。上書きごとに対象・内容・復元を提示し [D2] 個別承認、[D1]。正常一式の sync と deploy-set.json 照合が hook の開始条件。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: make kernel-r1; make deploy-kernel-r1 PROFILE=t2h; deploy --profile t2h; start
   observe:
   - '交換・復元の毎回の順: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h (残っていれば) → pull --profile t2h → copy または sync --profile
@@ -2050,9 +2027,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1c-1: PM が原本を残して作る t2h_fault.ini (hdd=os32_t2h_install.nhd)。17MB。初回も正常一式の同期・照合・deploy 後に np21w_ctl.py start --ini t2h_fault.ini。停止は np21w_ctl.py stop、強制停止なら記録。nhd_deploy.py
-    --profile t2h の remote/local/mount/stamp が本 NHD と別であること。上書きごとに対象・内容・復元を提示し [D2] 個別承認、[D1]。正常一式の sync と deploy-set.json
-    照合が hook の開始条件。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。'
+  prereq: "R1c-1: PM が原本を残して作る t2h_fault.ini (hdd=os32_t2h_install.nhd)。17MB。初回も正常一式の同期・照合・deploy 後に np21w_ctl.py start --ini t2h_fault.ini。停止は np21w_ctl.py stop、強制停止なら記録。nhd_deploy.py --profile t2h の remote/local/mount/stamp が本 NHD と別であること。上書きごとに対象・内容・復元を提示し [D2] 個別承認、[D1]。正常一式の sync と deploy-set.json 照合が hook の開始条件。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: 'hook (1) IRQ alloc / (2) #UD ledger free / (4) V86 end 再例外、各1 reset'
   observe:
   - 各試行を emu_reset (/api/reset) で独立に開始、指定hookだけ1回 arm。最新r1 map と pool/ledger の直前値を採る。
@@ -2070,9 +2045,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1c-1: PM が原本を残して作る t2h_fault.ini (hdd=os32_t2h_install.nhd)。17MB。初回も正常一式の同期・照合・deploy 後に np21w_ctl.py start --ini t2h_fault.ini。停止は np21w_ctl.py stop、強制停止なら記録。nhd_deploy.py
-    --profile t2h の remote/local/mount/stamp が本 NHD と別であること。上書きごとに対象・内容・復元を提示し [D2] 個別承認、[D1]。正常一式の sync と deploy-set.json
-    照合が hook の開始条件。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。'
+  prereq: "R1c-1: PM が原本を残して作る t2h_fault.ini (hdd=os32_t2h_install.nhd)。17MB。初回も正常一式の同期・照合・deploy 後に np21w_ctl.py start --ini t2h_fault.ini。停止は np21w_ctl.py stop、強制停止なら記録。nhd_deploy.py --profile t2h の remote/local/mount/stamp が本 NHD と別であること。上書きごとに対象・内容・復元を提示し [D2] 個別承認、[D1]。正常一式の sync と deploy-set.json 照合が hook の開始条件。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: hook (3) K1 / (5a) 生存親毒化 / (5b) PARKED毒化 / (6) attach失敗、各1 reset
   observe:
   - (3) V86 session の CPL0例外→exec_pending_transfer→通常文脈で回収→owner0→次起動。移譲/消費は各1回、v86_restore_mismatch0。
@@ -2101,9 +2074,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1c-1: PM が原本を残して作る t2h_fault.ini (hdd=os32_t2h_install.nhd)。17MB。初回も正常一式の同期・照合・deploy 後に np21w_ctl.py start --ini t2h_fault.ini。停止は np21w_ctl.py stop、強制停止なら記録。nhd_deploy.py
-    --profile t2h の remote/local/mount/stamp が本 NHD と別であること。上書きごとに対象・内容・復元を提示し [D2] 個別承認、[D1]。正常一式の sync と deploy-set.json
-    照合が hook の開始条件。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。'
+  prereq: "R1c-1: PM が原本を残して作る t2h_fault.ini (hdd=os32_t2h_install.nhd)。17MB。初回も正常一式の同期・照合・deploy 後に np21w_ctl.py start --ini t2h_fault.ini。停止は np21w_ctl.py stop、強制停止なら記録。nhd_deploy.py --profile t2h の remote/local/mount/stamp が本 NHD と別であること。上書きごとに対象・内容・復元を提示し [D2] 個別承認、[D1]。正常一式の sync と deploy-set.json 照合が hook の開始条件。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: 正常 vmkernel.lz4 を copy --dest /boot; deploy --profile t2h; start
   observe:
   - '交換・復元の毎回の順: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h (残っていれば) → pull --profile t2h → copy または sync --profile
@@ -2125,9 +2096,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と
-    [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので
-    hal_test を要求しない。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。'
+  prereq: "R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので hal_test を要求しない。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: copy --profile t2h --dest /sys --rename shell.bin <old-shell.fixture>; deploy; start
   observe:
   - '交換・復元の毎回の順: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h (残っていれば) → pull --profile t2h → copy または sync --profile
@@ -2142,9 +2111,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と
-    [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので
-    hal_test を要求しない。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。'
+  prereq: "R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので hal_test を要求しない。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: copy --profile t2h --dest /sys --rename shell.bin <L-h shell.bin>; deploy; start
   observe:
   - '交換・復元の毎回の順: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h (残っていれば) → pull --profile t2h → copy または sync --profile
@@ -2164,9 +2131,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と
-    [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので
-    hal_test を要求しない。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。'
+  prereq: "R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので hal_test を要求しない。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: copy --profile t2h --dest /sys/lib --rename libos32gui.shlib <old-shlib.fixture>; deploy; start; gui_demo
   observe:
   - '交換・復元の毎回の順: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h (残っていれば) → pull --profile t2h → copy または sync --profile
@@ -2184,9 +2149,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と
-    [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので
-    hal_test を要求しない。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。'
+  prereq: "R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので hal_test を要求しない。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: copy --profile t2h --dest /sys/lib --rename libos32gui.shlib <L-h shlib>; deploy; start
   observe:
   - '交換・復元の毎回の順: np21w_ctl.py stop → nhd_deploy.py umount --profile t2h (残っていれば) → pull --profile t2h → copy または sync --profile
@@ -2207,9 +2170,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と
-    [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので
-    hal_test を要求しない。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。'
+  prereq: "R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので hal_test を要求しない。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: 'U3 予行: deploy_source_check.py; FD起動; hsync 2段; --verify 2本; pull; verify-set; HDD起動'
   observe:
   - 先頭で deploy_source_check.py --root <配備元> --deploy-set <その一式のdeploy-set.json> により配備元の余剰0を確認。余剰があれば --prune-extra で候補を確認し --prune-extra --delete で掃除して再照合、rc=0まで同期しない。新一式は make deploy-u3 HOSTDRV_DIR=<配備元の根> で FD→HostDrv を同じ build で配り、その期待表を使う。
@@ -2241,9 +2202,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と
-    [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので
-    hal_test を要求しない。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。'
+  prereq: "R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので hal_test を要求しない。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: 'E4 負例: remoteだけ1本改変; pull無しverify-set; pullありverify-set; 正常復元'
   observe:
   - ゲスト起動のstampがある状態で np21w_ctl.py stop、host側でremote隔離NHDを直接改変して管理対象1本を置換 (nhd_deploy.py copy は local に書くので使わない、localは触らない、別承認)。pull無しverify-setは「pull後にゲスト起動あり」でrc非0。
@@ -2262,8 +2221,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1d: L-h、17MB、ini 不変。gfxmode pc98 → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 pc98 一致。cirrus-off
-    分岐は保存した USEGD5430 に従う。終了時は保存した元の GFX= を戻す。'
+  prereq: "R1d: L-h、17MB、ini 不変。gfxmode pc98 → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 pc98 一致。cirrus-off 分岐は保存した USEGD5430 に従う。終了時は保存した元の GFX= を戻す。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: e12-17mb-planar; gfx200_test; gfx_demo200; ring3_guard bb; 20回ループ
   observe:
   - e12-17mb-planar の全observe (日本語/present/GUI→CUI→GUI/全画面/alias UC/SHM/font) を実施。gfx_demo200 はアプリに ESC、rshellへ届いたら再接続。S-7
@@ -2292,8 +2250,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R1d: L-h、17MB、ini 不変。gfxmode pc98 → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 pc98 一致。cirrus-off
-    分岐は保存した USEGD5430 に従う。終了時は保存した元の GFX= を戻す。'
+  prereq: "R1d: L-h、17MB、ini 不変。gfxmode pc98 → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 pc98 一致。cirrus-off 分岐は保存した USEGD5430 に従う。終了時は保存した元の GFX= を戻す。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: e12-cirrus-off; gfxmode cirrus; fallbackを読み戻し/reset/hal_testで確認
   observe:
   - 保存USEGD5430=falseなら現iniのまま gfxmode cirrus。trueならR3後にPMの派生cirrus-off iniで実施 ([D1])。原本は不変。
@@ -2310,8 +2267,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R3: L-h、17MB、PM の派生 t2h_cirrus.ini (cirrus-on)。np21w_ctl.py stop → start --ini t2h_cirrus.ini ([D1])、gfxmode cirrus
-    → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 Cirrus 一致。派生 ini が使えないとき (R1c・R3〜R6 共通) の代替は np21w_ini_live.py の live-apply (道具自身が停止・起動し、同じ receipt で restore — SKILL os32-emu-config §2)。'
+  prereq: "R3: L-h、17MB、PM の派生 t2h_cirrus.ini (cirrus-on)。np21w_ctl.py stop → start --ini t2h_cirrus.ini ([D1])、gfxmode cirrus → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 Cirrus 一致。派生 ini が使えないとき (R1c・R3〜R6 共通) の代替は np21w_ini_live.py の live-apply (道具自身が停止・起動し、同じ receipt で restore — SKILL os32-emu-config §2)。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: M; e12-17mb-cirrus; ring3_guard cirrus; gdi_test CLIENT; V86往復; 20回ループ
   observe:
   - '台本 M: boot fail 0 → 指定 gfxmode / 読み戻し / reset / hal_test → CUI/GUI/FEP → 高位 HostDrv read/write → 親子 → lease 切替 → map
@@ -2345,8 +2301,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R4: L-h、PM の派生 t2h_8mb.ini (ram-8mb)。np21w_ctl.py stop → start --ini t2h_8mb.ini ([D1])、gfxmode pc98 → /etc/system.cfg
-    読み戻し → emu_reset (/api/reset) → hal_test 1 行目 pc98 一致、8MB を確認。'
+  prereq: "R4: L-h、PM の派生 t2h_8mb.ini (ram-8mb)。np21w_ctl.py stop → start --ini t2h_8mb.ini ([D1])、gfxmode pc98 → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 pc98 一致、8MB を確認。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: M; e12-8mb-planar; f12-8mb-startup; mem_map_test F-6; FEP; 20回ループ
   observe:
   - '台本 M: boot fail 0 → 指定 gfxmode / 読み戻し / reset / hal_test → CUI/GUI/FEP → 高位 HostDrv read/write → 親子 → lease 切替 → map
@@ -2379,8 +2334,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R4: L-h、PM の派生 t2h_8mb.ini (ram-8mb)。np21w_ctl.py stop → start --ini t2h_8mb.ini ([D1])、gfxmode pc98 → /etc/system.cfg
-    読み戻し → emu_reset (/api/reset) → hal_test 1 行目 pc98 一致、8MB を確認。'
+  prereq: "R4: L-h、PM の派生 t2h_8mb.ini (ram-8mb)。np21w_ctl.py stop → start --ini t2h_8mb.ini ([D1])、gfxmode pc98 → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 pc98 一致、8MB を確認。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: 'ring3_guard pegc (D): 実PTEを先に採って試行別に照合'
   observe:
   - PEGC窓の実PTEをpt0_snapshot.py相当の対象AS読みで採る。P=1で拡張窓写像が残る試行は保護fault7、P=0の試行は不在fault6。ハード鍵なしだけで不在を判定しない。
@@ -2401,8 +2355,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R4: L-h、PM の派生 t2h_8mb.ini (ram-8mb)。np21w_ctl.py stop → start --ini t2h_8mb.ini ([D1])、gfxmode pc98 → /etc/system.cfg
-    読み戻し → emu_reset (/api/reset) → hal_test 1 行目 pc98 一致、8MB を確認。'
+  prereq: "R4: L-h、PM の派生 t2h_8mb.ini (ram-8mb)。np21w_ctl.py stop → start --ini t2h_8mb.ini ([D1])、gfxmode pc98 → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 pc98 一致、8MB を確認。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: h5_shape_i <free0>; h5_shape_ii <free0>; h5_shape_iii <free0> (CUI emu_key)
   observe:
   - CUI 常駐プロンプトでfree0=memのphys_free_pagesを採り、画面キーボード emu_key text="h5_shape_i <free0>" + seq=RETURNで起動。ii/iiiも同じ。引数はfree0だけ、rshell
@@ -2431,8 +2384,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R4: L-h、PM の派生 t2h_8mb.ini (ram-8mb)。np21w_ctl.py stop → start --ini t2h_8mb.ini ([D1])、gfxmode pc98 → /etc/system.cfg
-    読み戻し → emu_reset (/api/reset) → hal_test 1 行目 pc98 一致、8MB を確認。'
+  prereq: "R4: L-h、PM の派生 t2h_8mb.ini (ram-8mb)。np21w_ctl.py stop → start --ini t2h_8mb.ini ([D1])、gfxmode pc98 → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 pc98 一致、8MB を確認。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: g-G-1〜G-9 / g-R-1〜R-4 を8MBで再実行
   observe:
   - G-2未armの枯渇整定後に基準値→G-3 arm/対象確保→G-4末尾返却と全ARENA返却/INITIAL不変/CRC/EXACT regrow。G-5 no-answerはC版で配送/消費各1、DONE0/bit保持/再配送0。G-6
@@ -2456,8 +2408,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R5: L-h、R4 と同じ t2h_8mb.ini / 8MB。gfxmode pegc (auto は使わない) → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test
-    1 行目 PEGC 一致。'
+  prereq: "R5: L-h、R4 と同じ t2h_8mb.ini / 8MB。gfxmode pegc (auto は使わない) → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: M; e12-8mb-pegc; f12-8mb-startup; h5_shape_i/ii/iii; g-G-1〜G-4; 20回
   observe:
   - '台本 M: boot fail 0 → 指定 gfxmode / 読み戻し / reset / hal_test → CUI/GUI/FEP → 高位 HostDrv read/write → 親子 → lease 切替 → map
@@ -2508,9 +2459,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R6: L-h、PM の派生 t2h_64mb_118.ini (ram-64mb、snd118-on / SNDboard=64)。np21w_ctl.py stop → start --ini t2h_64mb_118.ini
-    ([D1])、gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致、64MB を確認。終了後は原本 ini で start
-    し保存した元の GFX= を戻す。'
+  prereq: "R6: L-h、PM の派生 t2h_64mb_118.ini (ram-64mb、snd118-on / SNDboard=64)。np21w_ctl.py stop → start --ini t2h_64mb_118.ini ([D1])、gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致、64MB を確認。終了後は原本 ini で start し保存した元の GFX= を戻す。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: Mの boot/地図/kselftest/高位HostDrv/親子 (32MB超)
   observe:
   - boot fail0、ONLINE/64MB、32MB超の恒等写像・workspacePT・固定10枚sup/RW/WB/非配布を確認。高位bufferでHostDrv read/writeと親子pattern往復、memのaudit_runs増分>=1/fail0、owner回収と次起動。
@@ -2536,9 +2485,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R6: L-h、PM の派生 t2h_64mb_118.ini (ram-64mb、snd118-on / SNDboard=64)。np21w_ctl.py stop → start --ini t2h_64mb_118.ini
-    ([D1])、gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致、64MB を確認。終了後は原本 ini で start
-    し保存した元の GFX= を戻す。'
+  prereq: "R6: L-h、PM の派生 t2h_64mb_118.ini (ram-64mb、snd118-on / SNDboard=64)。np21w_ctl.py stop → start --ini t2h_64mb_118.ini ([D1])、gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致、64MB を確認。終了後は原本 ini で start し保存した元の GFX= を戻す。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: '[pcm] 起動行; pcm_test E5 (CPL3 CUI); GUI再生 park/resume'
   observe:
   - 起動行 [pcm] CS4231 v=100 irq 10 dma 1 fmt 0x5B を保存。pcm_testをCUI画面キーボードで起動しCTRL+STOPを届け、pcm_reclaimでPEN0/DMA mask/IRQ解除/次open成功。同期emu_cmd待ちでSTOPを送れない経路を避ける。
@@ -2555,8 +2502,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R7: Ra266 実機、64MB / PEGC。FD 書込み・HDD 更新・電源・音の確認は各物理操作の個別承認。gfxmode pegc → /etc/system.cfg 読み戻し → 実機 reset (個別承認)
-    → hal_test 1 行目 PEGC 一致。更新前は v2.1、更新後は L-h (KAPI 74 / MemStat 200B)。NP21/W の観測で代用しない。'
+  prereq: "R7: Ra266 実機、64MB / PEGC。FD 書込み・HDD 更新・電源・音の確認は各物理操作の個別承認。gfxmode pegc → /etc/system.cfg 読み戻し → 実機 reset (個別承認) → hal_test 1 行目 PEGC 一致。更新前は v2.1、更新後は L-h (KAPI 74 / MemStat 200B)。NP21/W の観測で代用しない。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: 更新前 v2.1 の ver / present / CG窓 / 画面を記録
   observe:
   - 'H-5: v2.1のcommit/API/hash、RAM/backend、同じ画面・解像度・反復数・負荷のpresent実測値を保存し更新後と比較する。基準が採れなければ測定のみと明記、±10%合格を捏造しない。'
@@ -2569,8 +2515,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R7: Ra266 実機、64MB / PEGC。FD 書込み・HDD 更新・電源・音の確認は各物理操作の個別承認。gfxmode pegc → /etc/system.cfg 読み戻し → 実機 reset (個別承認)
-    → hal_test 1 行目 PEGC 一致。更新前は v2.1、更新後は L-h (KAPI 74 / MemStat 200B)。NP21/W の観測で代用しない。'
+  prereq: "R7: Ra266 実機、64MB / PEGC。FD 書込み・HDD 更新・電源・音の確認は各物理操作の個別承認。gfxmode pegc → /etc/system.cfg 読み戻し → 実機 reset (個別承認) → hal_test 1 行目 PEGC 一致。更新前は v2.1、更新後は L-h (KAPI 74 / MemStat 200B)。NP21/W の観測で代用しない。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: 新FD起動; deploy_source_check.py; hsync 2段; --verify 2本; 余剰照合; HDD起動
   observe:
   - 先頭で deploy_source_check.py --root <配備元> --deploy-set <その一式のdeploy-set.json> により配備元の余剰0を確認。余剰があれば --prune-extra で候補を確認し --prune-extra --delete で掃除して再照合、rc=0まで同期しない。新一式は make deploy-u3 HOSTDRV_DIR=<配備元の根> で FD→HostDrv を同じ build で配り、その期待表を使う。
@@ -2603,8 +2548,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R7: Ra266 実機、64MB / PEGC。FD 書込み・HDD 更新・電源・音の確認は各物理操作の個別承認。gfxmode pegc → /etc/system.cfg 読み戻し → 実機 reset (個別承認)
-    → hal_test 1 行目 PEGC 一致。更新前は v2.1、更新後は L-h (KAPI 74 / MemStat 200B)。NP21/W の観測で代用しない。'
+  prereq: "R7: Ra266 実機、64MB / PEGC。FD 書込み・HDD 更新・電源・音の確認は各物理操作の個別承認。gfxmode pegc → /etc/system.cfg 読み戻し → 実機 reset (個別承認) → hal_test 1 行目 PEGC 一致。更新前は v2.1、更新後は L-h (KAPI 74 / MemStat 200B)。NP21/W の観測で代用しない。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: '起動不能時: 旧一式の名札照合; v2.1 FD; 旧全体/sys同期; 両--verify; ls -R; HDD'
   observe:
   - 先頭で deploy_source_check.py --root <配備元> --deploy-set <その一式のdeploy-set.json> により配備元の余剰0を確認。余剰があれば --prune-extra で候補を確認し --prune-extra --delete で掃除して再照合、rc=0まで同期しない。新一式は make deploy-u3 HOSTDRV_DIR=<配備元の根> で FD→HostDrv を同じ build で配り、その期待表を使う。
@@ -2628,8 +2572,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R7: Ra266 実機、64MB / PEGC。FD 書込み・HDD 更新・電源・音の確認は各物理操作の個別承認。gfxmode pegc → /etc/system.cfg 読み戻し → 実機 reset (個別承認)
-    → hal_test 1 行目 PEGC 一致。更新前は v2.1、更新後は L-h (KAPI 74 / MemStat 200B)。NP21/W の観測で代用しない。'
+  prereq: "R7: Ra266 実機、64MB / PEGC。FD 書込み・HDD 更新・電源・音の確認は各物理操作の個別承認。gfxmode pegc → /etc/system.cfg 読み戻し → 実機 reset (個別承認) → hal_test 1 行目 PEGC 一致。更新前は v2.1、更新後は L-h (KAPI 74 / MemStat 200B)。NP21/W の観測で代用しない。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: 'Ra26664MB: boot/ONLINE; SerialFS; 親子; map/trim/owner; PCM E6; T1f CUI'
   observe:
   - R7-update後。32MB超の恒等/workspacePT/固定10枚sup/RW/WB/非配布、SerialFS高位buffer read/write (HostDrv固有経路は実機で検証しない)、map枯渇/trim/STOP/次起動を記録。
@@ -2656,8 +2599,7 @@
   gate: T2h
   contract: docs/tasks/v3/TASK_T2D_T2H.md
   mode: manual
-  prereq: 'R7: Ra266 実機、64MB / PEGC。FD 書込み・HDD 更新・電源・音の確認は各物理操作の個別承認。gfxmode pegc → /etc/system.cfg 読み戻し → 実機 reset (個別承認)
-    → hal_test 1 行目 PEGC 一致。更新前は v2.1、更新後は L-h (KAPI 74 / MemStat 200B)。NP21/W の観測で代用しない。'
+  prereq: "R7: Ra266 実機、64MB / PEGC。FD 書込み・HDD 更新・電源・音の確認は各物理操作の個別承認。gfxmode pegc → /etc/system.cfg 読み戻し → 実機 reset (個別承認) → hal_test 1 行目 PEGC 一致。更新前は v2.1、更新後は L-h (KAPI 74 / MemStat 200B)。NP21/W の観測で代用しない。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: H-5 present; CG窓WB; PEGC/日本語/全画面; GUI map/trim/owner/STOP; T1f; 31kHz STOP1/STOP2
   observe:
   - 更新前v2.1の同条件present基準と比較し±10%、基準なしは測定のみ。CG窓WB、GRCG/EGC/68h等の後始末を観測、PEGC日本語・fullscreen→window→CUI。

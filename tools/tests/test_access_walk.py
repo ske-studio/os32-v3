@@ -1,7 +1,7 @@
 """T2d d3: real paging/allocator/shlib/access source, ILP32 host MMU/IRQ.
 Only a fixed source closure is copied; compile failures never count as RED.
 """
-TARGET_SRC = ['exec/access_walk.c', 'exec/redir_access.c', 'kernel/paging.c', 'kernel/pgalloc.c', 'kernel/shlib.c', 'kernel/kselftest.c']
+TARGET_SRC = ['exec/access_walk.c', 'exec/redir_access.c', 'kernel/paging.c', 'kernel/pgalloc.c', 'kernel/shlib.c', 'kdebug/kselftest.c']
 
 import argparse
 import hashlib
@@ -16,7 +16,7 @@ FILES = {
     'paging': 'kernel/paging.c', 'pgalloc': 'kernel/pgalloc.c',
     'shlib': 'kernel/shlib.c', 'access_walk': 'exec/access_walk.c',
     'redir_access': 'exec/redir_access.c',
-    'boot': 'kernel/kselftest.c',
+    'boot': 'kdebug/kselftest.c',
 }
 MUTANTS = [
     ('access_walk', '!sf->lease_count', '0', 'lease live reference'),

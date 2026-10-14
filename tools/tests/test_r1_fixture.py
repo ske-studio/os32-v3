@@ -142,7 +142,7 @@ def builds(tmp):
                             env=bad_env, capture_output=True, text=True)
     assert result.returncode != 0 and 'requires PROFILE=t2h' in result.stdout
     # Same kselftest source and KAPI generation; no fixture bypass of tests.
-    assert 'OS32_R1_FIXTURE' not in (root / 'kernel/kselftest.c').read_text()
+    assert 'OS32_R1_FIXTURE' not in (root / 'kdebug/kselftest.c').read_text()
     print('r1 build isolation: both orders PASS, product bytes=' + str(product.stat().st_size))
 
 

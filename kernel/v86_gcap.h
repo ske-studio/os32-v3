@@ -13,6 +13,9 @@
 #include "types.h"
 #include "os32_kapi_shared.h"   /* V86Gcap */
 
+/* Stable diagnostic counters remain in kaudit.c. */
+extern u32 v86_gcap_phase, v86_gcap_alloc_count, v86_gcap_free_count;
+
 /* KAPI v68 v86_gdc_capture の本体。mode = V86G_MODE_ROM / V86G_MODE_SELFTEST。
  * 記録を out へ写し、status (V86G_ST_*、>= 0) を返す。始められなければ負
  * (OS32_ERR_INVAL / OS32_ERR_BUSY / OS32_ERR_NOSPC、out は触らない)。 */

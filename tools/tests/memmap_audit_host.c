@@ -5,8 +5,10 @@ unsigned int host_arch_if = 0x202U;
 #define run e4_run
 #include "gfx_kernel_fb_host.c"
 #undef run
-static int ksel_fail, ksel_pass;
-static void check(int ok, const char *why) { (void)why; if (ok) ksel_pass++; else ksel_fail++; }
+#include "../../kernel/kselftest_report.c"
+#define ksel_pass kselftest_pass
+#define ksel_fail kselftest_fail
+static void check(int ok, const char *why) { (void)why; kdi_kselftest_count(ok); }
 static char serial_line[128];
 static u32 serial_len;
 static int serial_session;
@@ -16,6 +18,7 @@ void serial_puts_polled(const char *s)
 char *kstrncpy(char *d, const char *s, u32 n)
 { char *ret=d; if (n) { while (--n && *s) *d++=*s++; *d=0; } return ret; }
 #include "audit_slice.inc"
+#include "post_probe_slice.inc"
 #include "system_surface.h"
 int utf8_jis_table_ready(void) { return 1; }
 int host_map_fail;
@@ -102,7 +105,19 @@ static void run(void)
     CHECK(paging_master_audit(exec_tramp_page_addr()) > 0);
     page_directory[PAGING_MMIO_TOP_PDI] &= ~PTE_USER;
     gfx_prepare_backend();
+    /* OFF audits run at both boot points without changing test counts. */
+    u32 boot_runs = audit_runs;
+    int boot_pass = ksel_pass, boot_fail = ksel_fail;
+    kaudit_post_exec();
+    kaudit_post_probe();
+    CHECK(audit_runs == boot_runs + 2 && !audit_fail);
+    CHECK(ksel_pass == boot_pass && ksel_fail == boot_fail);
+    CHECK(!kdi_kaudit_skipped(KAUDIT_POST_EXEC));
+    CHECK(!kdi_kaudit_last_rc(KAUDIT_POST_EXEC));
+    CHECK(!kdi_kaudit_last_rc(KAUDIT_POST_EXEC_SHM));
+    /* ON consumes the stored probe result, never repeats the audit. */
     CHECK(!kselftest_run_post_probe());
+    CHECK(audit_runs == boot_runs + 2 && ksel_pass == 2 && !ksel_fail);
     u8 *saved_bb = bb[0]; bb[0] = 0;
     CHECK(!gfx_selected_selfcheck()); bb[0] = saved_bb;
     struct ledger_surface *selected = ledger_surface_find(gfx_sf_backend(), LEDGER_ROLE_DISPLAY);
@@ -177,7 +192,7 @@ static void run(void)
     CHECK(!lease_audit_all());
     /* Audit master while another CR3 is current; preserve CR3 and IF. */
     host_cr3 = space.pd_phys;
-    int boot_pass = ksel_pass, boot_fail = ksel_fail;
+    boot_pass = ksel_pass; boot_fail = ksel_fail;
     CHECK(!kselftest_run_audit("host-AS"));
     CHECK(ksel_pass == boot_pass && ksel_fail == boot_fail);
     CHECK(audit_runs && !audit_fail);
@@ -295,7 +310,14 @@ static void run(void)
     u32 runs = memmap_audit_runs;
     CHECK(!kselftest_run_audit("skip"));
     CHECK(memmap_audit_runs == runs && memmap_audit_skip == 1);
+    kaudit_post_exec();
+    CHECK(kdi_kaudit_skipped(KAUDIT_POST_EXEC));
+    CHECK(!kdi_kaudit_last_rc(KAUDIT_POST_EXEC));
+    CHECK(memmap_audit_runs == runs && memmap_audit_skip == 2);
     v86_map_session = 0;
+    kaudit_post_exec();
+    CHECK(!kdi_kaudit_skipped(KAUDIT_POST_EXEC));
+    CHECK(memmap_audit_runs == runs + 1);
     serial_len=0; /* Observe the audit line independently of gfx diagnostics. */
     pt[idx] &= ~PTE_PCD;
     CHECK(kselftest_run_audit("host-first") > 0);
@@ -318,6 +340,19 @@ static void run(void)
     pt[idx] |= PTE_PCD;
     CHECK(!lease_selftest());
     CHECK(!lease_audit_all());
+    /* The cached SHM observation sees a bad permission and then recovery. */
+    u32 shm_idx = (MEM_SHM_BASE >> PAGE_SHIFT) % PTE_COUNT;
+    u32 shm_pte = pt[shm_idx];
+    pt[shm_idx] &= ~(PAGE_RW & ~PTE_PRESENT);
+    kaudit_post_exec();
+    CHECK(kdi_kaudit_last_rc(KAUDIT_POST_EXEC_SHM) != 0);
+    pt[shm_idx] = shm_pte;
+    kaudit_post_exec();
+    CHECK(!kdi_kaudit_last_rc(KAUDIT_POST_EXEC_SHM));
+    kdi_kselftest_count(0);
+    CHECK(kdi_get_kselftest_fail() > 0);
+    kselftest_skipped();
+    CHECK(!kdi_get_kselftest_pass() && !kdi_get_kselftest_fail());
     SAY("PASS e10c master/AS/lifecycle/TVRAM/DISPLAY/IRQ-bounds");
     die(0);
 }

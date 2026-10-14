@@ -22,7 +22,7 @@ FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werro
          '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-D__KERNEL_BUILD__']
 INCLUDES = ['-I' + str(ROOT / d) for d in
             ('.', 'include', 'kernel', 'lib', 'fs', 'arch/x86', 'platform/pc98',
-             'sdk/include', 'sdk/include/os32')]
+             'sdk/include', 'sdk/include/os32', 'exec', 'gfx', 'drivers', 'kapi')]
 
 
 def command(args):
@@ -38,7 +38,7 @@ def seal(image):
 def main():
     with tempfile.TemporaryDirectory(prefix='kdebug-init-') as td:
         folder = Path(td)
-        meta = gen.generate(gen.load_def(), folder, 'S1')
+        meta = gen.generate(gen.load_def(), folder, 'S2')
         for generated in (ROOT / 'kdebug/generated').iterdir():
             if generated.suffix in ('.c', '.h', '.S', '.json'):
                 assert generated.read_bytes() == (folder / generated.name).read_bytes(), generated
@@ -60,11 +60,12 @@ def main():
                 mutant = folder / (label + '.c')
                 mutant.write_text('#include "kprintf.h"\n' + source.read_text().replace(old, new))
                 command([*host, harness, mutant, '-o', exe])
-                assert host32.run([str(exe)]).returncode == 1, label
+                for runner in os.environ.get('HOST32_RUNNERS', 'native qemu').split():
+                    assert host32.run([str(exe)], runner=runner).returncode == 1, label
                 print('MUTATE', label, 'RED', flush=True)
         # Build the real module independently of pre-existing product artifacts.
         objects = []
-        for src in (ROOT / 'kdebug/crt_diag.c', source,
+        for src in (ROOT / 'kdebug/crt_diag.c', ROOT / 'kdebug/kselftest.c', source,
                     folder / 'kdebug_import_slots.c', folder / 'kdebug_import_stubs.S'):
             obj = folder / (src.stem + '.o')
             command([cross / 'i386-elf-gcc', *FLAGS, *inc, '-c', src, '-o', obj])
@@ -76,9 +77,21 @@ def main():
         kapi = json.loads((ROOT / 'sdk/kapi.json').read_text())['version']
         image, stats = mkmod.build(elf.read_bytes(), meta, kernel, kapi_abi_gen=kapi)
         exe = folder / 'loader'
+        # All real S2 imports bind to a counting trap: init must call none.
+        exports = (folder / 'kdebug_kexports.c').read_text()
+        start = exports.index('void (*const kdebug_kexports[])(void) = {')
+        end = exports.index('};', start) + 2
+        targets = {'kdi_get_kselftest_fail': 'kdebug_test_fail',
+                   'kdi_kaudit_skipped': 'kdebug_test_skipped'}
+        exports = ('#include "kdebug_imports.h"\nextern void kdebug_forbidden_import(void);\n' +
+                   'extern u32 kdebug_test_fail(void);\nextern int kdebug_test_skipped(int tag);\n' +
+                   'void (*const kdebug_kexports[])(void) = {\n' +
+                   ''.join('    (void (*)(void))' + targets.get(e['name'], 'kdebug_forbidden_import') + ',\n'
+                           for e in meta['imports']) + '};\n' + exports[end:])
+        (folder / 'loader_exports.c').write_text(exports)
         command([*host, ROOT / 'tools/tests/kdebug_loader_host.c',
                  ROOT / 'kernel/module.c', ROOT / 'kernel/module_image.c',
-                 folder / 'kdebug_kexports.c', '-o', exe])
+                 folder / 'loader_exports.c', '-o', exe])
         cases = [('off', 0, 0, 0, image), ('other-config', 2, 0, 0, image),
                  ('running', 1, 0, 1, image)]
         for fail, state in ((1, 2), (2, 8), (3, 8), (4, 7), (5, 7), (6, 8), (7, 5)):

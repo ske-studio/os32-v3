@@ -95,7 +95,7 @@ if __name__ == "__main__":
                                 ["-Iexec", "-Ikapi", "-Igfx", "-Ikernel"]),
                                (ROOT / "kernel/paging.c",
                                 ["-Ikernel", "-Iexec", "-Ikapi", "-Igfx"]),
-                               (ROOT / "kernel/kselftest.c",
+                               (ROOT / "kdebug/kselftest.c",
                                 ["-Ikernel", "-Iexec", "-Ikapi", "-Igfx"])):
                 subprocess.run(["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                                 "-ffreestanding", "-fno-pie", "-fno-stack-protector",

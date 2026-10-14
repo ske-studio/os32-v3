@@ -1,7 +1,7 @@
 # 配備後の定型回帰。1 タスク = 空行区切り。モデルは観測を転記するだけで、
 # 合否は steps.jsonl の obs を読む側 (人間 / 上位モデル) が判断する。
 
-Read the kernel self-test counters with the selftest action and report both numbers verbatim.
+Read kselftest_pass/fail with the selftest action and kdebug_state with kdebug_probe; report all three numbers verbatim. If kdebug_state is not 1, record the self-tests as not run.
 
 Run the shell command 'klibc_test' on OS32, then run 'echo $?'. Report the final
 summary line verbatim (it looks like 'klibc_test: PASS <n>/<m>') and the value of $?.

@@ -347,13 +347,6 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
         /* 流れる側 (kprintf) にも同じ内容を残す — 属性変換で実機でも読める。 */
         kprintf(TATTR_WHITE, "[fdc] %s\n", line);
     }
-    {   /* 一時の診断 (2026-10-14): IEEE 1284 双方向パラレルの有無を読むだけ。
-         * 05B3h bit7 = 1284 対応、bit6,5 = モード、0458h bit2 = 入出力可
-         * ([US] memsys.md)。ポートには触らない。DBGREF の後段で部品へ移す。 */
-        volatile u32 prn_cap = 0x05B3, prn_mode = 0x0458;
-        kprintf(TATTR_WHITE, "[prn] bios05b3=%02x bios0458=%02x\n",
-                *(volatile u8 *)P2V_IO(prn_cap), *(volatile u8 *)P2V_IO(prn_mode));
-    }
     /* FD から起動したなら、その DA/UA でメディアを選ぶ。
      * 1.44MB (DA/UA 0x30 系) は 512B×18セクタで、2HD のまま読むと
      * ゴミを掴んで root マウントが落ちる (2026-09-18 に実測)。
@@ -603,7 +596,8 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * 外部プログラムの klibc_test は newlib 側を試すだけで、カーネルが
      * 実際に使う kstring_asm / kmalloc / kprintf は一度も踏んでいない。
      * ここで境界ケースだけを実機で毎回確認する (全通過なら 1 行)。 */
-    kselftest_run();
+    if (kdebug.ops.selftest_run) kdebug.ops.selftest_run();
+    else kselftest_skipped();
 
     /* PCI の結線 (票 §1-4)。**pgalloc と DMA プールの初期化の後**で、
      * pci_init() の直後ではない。**kselftest_run より後**なのは、
@@ -674,7 +668,8 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     exec_init();
     /* トランポリンページができてからでないと踏めない自己診断 (票 T9 §12 R1)。
      * kselftest_run() はここより前に走っている。 */
-    kselftest_run_post_exec();
+    kaudit_post_exec();
+    if (kdebug.ops.selftest_post_exec) kdebug.ops.selftest_post_exec();
     tvram_print(56, 2, "OK", TATTR_WHITE);
 
     /* Unicodeテーブルロード */
@@ -697,7 +692,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     }
 
     (void)system_unicode_register();
-    kselftest_run_post_unicode();
+    if (kdebug.ops.selftest_post_unicode) kdebug.ops.selftest_post_unicode();
 
     /* IME (FEP) 初期化 — 辞書は初回使用時に遅延ロード */
     tvram_print(0, 4, "IME..", TATTR_GREEN);
@@ -763,7 +758,8 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * 戻る。 */
     if (kdebug.ops.crt_diag_bootlog) kdebug.ops.crt_diag_bootlog();
     gfx_prepare_backend();
-    kselftest_run_post_probe();
+    kaudit_post_probe();
+    if (kdebug.ops.selftest_post_probe) kdebug.ops.selftest_post_probe();
 
     /* 共有ライブラリ (0x400000 帯) を常駐させる — シェルを載せる **前** に
      * 1 回だけ (票 K3)。ここより後だと pgalloc が帯域のページを配ってしまう。

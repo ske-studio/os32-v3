@@ -1,6 +1,6 @@
 check-caller-copy-host:
 - tools/tests/host32.py
-- kernel/kselftest.c
+- kdebug/kselftest.c
 - exec/access_walk.c
 - exec/redir_access.c
 - kernel/paging.c

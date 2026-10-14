@@ -17,7 +17,7 @@ check-disk-auth-host:
 - exec/exec_kapi_init.inc
 - exec/ring3_str.c
 - kapi/kapi_generated.c
-- kernel/kselftest.c
+- kdebug/kselftest.c
 - kernel/paging.c
 - kernel/pgalloc.c
 - kernel/physmem.c

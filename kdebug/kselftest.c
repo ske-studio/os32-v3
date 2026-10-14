@@ -58,14 +58,9 @@
 #include "gui.h"          /* gui_ime_set_render (ime_set_render の門) */
 #include "pgalloc.h"      /* pgalloc_model_state (T1a: legacy 経路の撤去) */
 
-/* 結果はホストから読めるようにグローバルにする。
- * ブート時の出力はスプラッシュで流れてしまい、rshell も未起動なので
- * シリアルにも出ない。kernel.map 経由で emu_read_mem するのが確実。
- * (v86.c の観測値と同じ理由で static にしない) */
-int kselftest_pass = 0;
-int kselftest_fail = 0;
-#define ksel_pass kselftest_pass
-#define ksel_fail kselftest_fail
+/* Data imports use accessors; include macros only after declarations. */
+extern volatile int ring3_in_syscall;
+#include "generated/kdebug_import_macros.h"
 
 /* **`noinline` はカーネルの予算のため** (票 TASK_HAL_WIRING、A+B 合流後に
  * 残り 1.2KB まで詰まった)。-O2 はこの 6 行を呼び出し 194 か所すべてに
@@ -75,9 +70,9 @@ int kselftest_fail = 0;
 static void __attribute__((noinline)) check(int cond, const char *name)
 {
     if (cond) {
-        ksel_pass++;
+        kdi_kselftest_count(1);
     } else {
-        ksel_fail++;
+        kdi_kselftest_count(0);
         kprintf(0xC1, "[selftest] FAIL: %s\n", name);
     }
 }
@@ -564,9 +559,8 @@ static void test_memmap(void)
     u32 i, n;
     if (paging_v86_session_open()) return;
 
-    u32 *pt = (u32 *)P2V(paging_registered_pt(MEM_SHM_BASE));
-    check(pt && (pt[(MEM_SHM_BASE >> PAGE_SHIFT) % PTE_COUNT] &
-          (PAGE_RW | PTE_USER | PTE_PCD | PTE_PWT)) == (PAGE_RW | PTE_USER),
+    /* The floating SHM address belongs to the kernel's __bss_end. */
+    check(kdi_kaudit_last_rc(KAUDIT_POST_EXEC_SHM) == 0,
           "paging: SHM boot USER RW WB");
 
     check(paging_range_reject_count == 0,
@@ -725,15 +719,15 @@ static void test_appmem(void)
                 appslot_trim_request_as(requester->as);
                 appslot_reclaim(id);
                 check(excluded && !slot->trim_pending && !slot->trim_epoch, "trim:exclude/reclaim");
-                appslot_reclaim_count--;
-                appslot_last_reclaim_id = last_reclaim;
+                kdi_set_appslot_reclaim_count(appslot_reclaim_count - 1);
+                kdi_set_appslot_last_reclaim_id(last_reclaim);
                 requester->stop_wm_req = stop;
                 requester->as = saved_as;
-                appslot_trim_epoch = epoch;
-                appslot_trim_request_count = requests;
-                appslot_trim_mark_count = marks;
-                appslot_trim_done_count = dones;
-                appslot_trim_done_reject_count = rejects;
+                kdi_set_appslot_trim_epoch(epoch);
+                kdi_set_appslot_trim_request_count(requests);
+                kdi_set_appslot_trim_mark_count(marks);
+                kdi_set_appslot_trim_done_count(dones);
+                kdi_set_appslot_trim_done_reject_count(rejects);
             }
             *slot = saved;
         }
@@ -961,7 +955,7 @@ static void test_kapi_layout(void)
 
 int kselftest_run_post_unicode(void)
 {
-    int before = ksel_fail;
+    u32 before = ksel_fail;
     const struct ledger_surface *sf = ledger_surface_find(0, LEDGER_ROLE_UNICODE);
     check(sf && sf->owner == LEDGER_OWNER_KERNEL && !sf->backend &&
           sf->perm_max == LEDGER_PERM_RO && sf->backing == LEDGER_SB_FIXED_RAM &&
@@ -973,10 +967,10 @@ int kselftest_run_post_unicode(void)
 
 int kselftest_run_post_exec(void)
 {
-    int before = ksel_fail;
-    if (paging_v86_session_open()) return kselftest_run_audit("post-exec");
+    u32 before = ksel_fail;
+    if (kdi_kaudit_skipped(KAUDIT_POST_EXEC)) return 0;
 
-    check(kselftest_run_audit("post-exec") == 0, "post-exec: lifecycle audit");
+    check(kdi_kaudit_last_rc(KAUDIT_POST_EXEC) == 0, "post-exec: lifecycle audit");
     check(lease_selftest() == 0, "post-exec: synthetic AS S/T/U");
     check((kstack_high_water() & 0xffffU) < MEM_KSTACK_TOP - MEM_KSTACK_BASE,
           "kstack bound");
@@ -1515,10 +1509,10 @@ static void test_irq_dynamic(void)
      * 実機 Ra266 では内蔵 LAN の 82557 が IRQ3 を上げたままのはず (未確認)。 */
     pending = ksel_irq_pending(KSEL_IRQ_LINE);
     unexpected_before = irq_unexpected;
-    irq_test_quiet = 1;
+    kdi_set_irq_test_quiet(1);
     test_irq_dynamic_body(pending);
-    irq_test_quiet = 0;
-    irq_unexpected = unexpected_before;
+    kdi_set_irq_test_quiet(0);
+    kdi_set_irq_unexpected(unexpected_before);
     ksel_irq_snap_take(&after);
     irq_restore(saved);
 
@@ -1693,7 +1687,7 @@ static void ksel_time_feed(int n, int p1a, int p2a, int p1b, int p2b)
     time_test_feed[1].p1 = p1b; time_test_feed[1].p2 = p2b;
     time_test_feed[1].count = -1;
     time_test_feed[2] = time_test_feed[1];
-    time_test_feed_n = n;
+    kdi_set_time_test_feed_n(n);
 }
 
 static void test_time_now(void)
@@ -1779,7 +1773,7 @@ static void test_time_now(void)
      * 「終わり」→「はじめ」の巻き戻りがそのまま観測できる。 */
     time_test_feed[0].p1 = 0; time_test_feed[0].p2 = 0;
     time_test_feed[0].count = 1;              /* 周期の終わり */
-    time_test_feed_n = 1;
+    kdi_set_time_test_feed_n(1);
     {
         unsigned int saved = irq_save();
         rc = sys_time_now(&t0lo, &t0hi);
@@ -1894,8 +1888,6 @@ static void test_bootlog(void)
 /*  不正なポインタは kill)、深さ 1 以上なら素通し。純関数の表はホスト         */
 /*  (tools/tests/ring3_guard_host.c) が持つ。                                  */
 /* ------------------------------------------------------------------------ */
-extern volatile int ring3_in_syscall;
-
 static void test_ring3_wm_guard(void)
 {
     u32 local = 0;
@@ -1903,8 +1895,8 @@ static void test_ring3_wm_guard(void)
     int saved_depth = ring3_wm_depth;
     u32 base;
 
-    ring3_wm_depth = 0;
-    ring3_in_syscall = 1;               /* ディスパッチ中を装う */
+    kdi_set_ring3_wm_depth(0);
+    kdi_set_ring3_in_syscall(1);               /* ディスパッチ中を装う */
     base = ring3_range_reject_count;
 
     /* 深さ 0 = アプリ由来: カーネル帯 (USER 無し) は書けないと言う。
@@ -1955,12 +1947,12 @@ static void test_ring3_wm_guard(void)
     }
 
     /* 負の深さ (壊れた状態) は安全側 = ガードを効かせる。 */
-    ring3_wm_depth = -1;
+    kdi_set_ring3_wm_depth(-1);
     check(ring3_user_range_writable((u32)&local, sizeof(u32)) == 0,
           "wm-guard: negative depth still guards");
 
-    ring3_wm_depth = saved_depth;
-    ring3_in_syscall = saved;
+    kdi_set_ring3_wm_depth(saved_depth);
+    kdi_set_ring3_in_syscall(saved);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -1980,22 +1972,22 @@ static void test_ime_render_gate(void)
     int saved_owner = res_owner_get();
     u32 base = gui_ime_render_rejected;
 
-    ring3_wm_depth = 0;
-    ring3_in_syscall = 1;               /* アプリ (ID 2) の syscall を装う */
+    kdi_set_ring3_wm_depth(0);
+    kdi_set_ring3_in_syscall(1);               /* アプリ (ID 2) の syscall を装う */
     res_owner_set(2);
     gui_ime_set_render((void *)0);
     check(gui_ime_render_rejected == base + 1u,
           "ime-render: app-origin registration refused");
 
-    ring3_in_syscall = 0;               /* 常駐側 (owner 1) の直呼び */
+    kdi_set_ring3_in_syscall(0);               /* 常駐側 (owner 1) の直呼び */
     res_owner_set(1);
     gui_ime_set_render((void *)0);
     check(gui_ime_render_rejected == base + 1u,
           "ime-render: resident shell registration passes");
 
     res_owner_set(saved_owner);
-    ring3_wm_depth = saved_depth;
-    ring3_in_syscall = saved;
+    kdi_set_ring3_wm_depth(saved_depth);
+    kdi_set_ring3_in_syscall(saved);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -2019,8 +2011,8 @@ static void test_fd_redirect_access_guard(void)
     r.owner = 2;                        /* アプリ (ID 2) が張った */
     r.access.origin = REDIR_USER;
 
-    ring3_in_syscall = 1;               /* ディスパッチ中を装う */
-    ring3_wm_depth = 0;
+    kdi_set_ring3_in_syscall(1);               /* ディスパッチ中を装う */
+    kdi_set_ring3_wm_depth(0);
     ring3_wm_enter();                   /* WM の文脈 (gui_call のハンドラ) */
     base = ring3_range_reject_count;
 
@@ -2044,14 +2036,13 @@ static void test_fd_redirect_access_guard(void)
     check(!fd_is_redirected(2),
           "access-guard: refused registration leaves the table");
 
-    ring3_wm_depth = saved_depth;
-    ring3_in_syscall = saved;
+    kdi_set_ring3_wm_depth(saved_depth);
+    kdi_set_ring3_in_syscall(saved);
 }
 
 int kselftest_run(void)
 {
-    ksel_pass = 0;
-    ksel_fail = 0;
+    kdi_kselftest_reset();
 
     test_mem();
     test_str();
@@ -2093,46 +2084,11 @@ int kselftest_run(void)
     return ksel_fail;
 }
 
-/* Lifecycle diagnostics, intentionally externally visible in kernel.map. */
-u32 memmap_audit_fail, as_audit_fail, memmap_audit_runs, as_audit_runs;
-u32 memmap_audit_skip, v86_return_audit_fail, v86_return_audit_runs;
-u32 audit_runs, audit_fail;
-char audit_first_fail_tag[32];
-int kselftest_run_audit(const char *tag)
-{
-    int a, b, bad;
-    if (paging_v86_session_open()) { memmap_audit_skip++; return 0; }
-    a = paging_master_audit(exec_tramp_page_addr());
-    b = lease_audit_all();
-    memmap_audit_runs++;
-    as_audit_runs++;
-    memmap_audit_fail += a != 0;
-    as_audit_fail += b != 0;
-    bad = (a != 0) + (b != 0) + !ledger_selfcheck(tag);
-    audit_runs++;
-    if (bad && !audit_fail) {
-        kstrncpy(audit_first_fail_tag, tag ? tag : "unknown", sizeof(audit_first_fail_tag));
-        audit_first_fail_tag[sizeof(audit_first_fail_tag) - 1] = 0;
-        if (!serial_gate_active()) {
-            serial_puts_polled("[audit] first failure: ");
-            serial_puts_polled(audit_first_fail_tag);
-            serial_puts_polled("\r\n");
-        }
-    }
-    audit_fail += bad;
-    return bad;
-}
-
 int kselftest_run_post_probe(void)
 {
-    int before = ksel_fail;
-    check(kselftest_run_audit("post-probe") == 0, "post-probe: lifecycle audit");
+    u32 before = ksel_fail;
+    check(kdi_kaudit_last_rc(KAUDIT_POST_PROBE) == 0, "post-probe: lifecycle audit");
     check(gfx_selected_selfcheck(), "post-probe: selected sources/bind/BB");
     return ksel_fail - before;
 }
 
-void kselftest_audit_v86_return(void)
-{
-    v86_return_audit_runs++;
-    v86_return_audit_fail += kselftest_run_audit("v86-return") != 0;
-}

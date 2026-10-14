@@ -186,7 +186,7 @@ def check_wiring():
     root = k.find('vfs_mount("/", root_dev, root_fs)')
     call = k.find("bootlog_save();")
     shell = k.find("rc = exec_run(cur_shell);")
-    selftest = k.find("kselftest_run();")
+    selftest = k.find("kdebug.ops.selftest_run();")
     print(f"WIRING kernel.c bootlog_save x{n}", flush=True)
     if n != 1 or not (0 <= root < selftest < call < shell):
         print("  FAIL ルートのマウントと自己試験の後、シェルの exec の前に 1 回だけ",

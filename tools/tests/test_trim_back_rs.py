@@ -19,7 +19,7 @@ WM = 'userland/gshell/src/trim.rs'
 SLOT = 'exec/appslot.c'
 APP = 'userland/rust/libos32gui/src/app.rs'
 STUB = 'userland/rust/libos32gui_stub/src/lib.rs'
-TARGET_SRCS = ['exec/appslot.c', 'exec/exec.c', 'kernel/gui.c', 'kernel/kselftest.c',
+TARGET_SRCS = ['exec/appslot.c', 'exec/exec.c', 'kernel/gui.c', 'kdebug/kselftest.c',
          'kapi/kapi_sys.c', 'exec/exec_heap.c', 'exec/appmem.c', 'exec/appmem_map.c',
          'exec/appmem_unmap.c', 'kernel/paging_app.c', 'kernel/physmem.c',
          CACHE, WM, APP, STUB]

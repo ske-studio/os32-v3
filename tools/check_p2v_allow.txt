@@ -1,5 +1,5 @@
 # file:function:reason (function-scoped; line numbers intentionally omitted)
-kernel/kselftest.c:test_heap:無効な仮想ポインタを渡すヒープ否定試験
+kdebug/kselftest.c:test_heap:無効な仮想ポインタを渡すヒープ否定試験
 kernel/v86.c:v86_ptr:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
 kernel/v86.c:v86_do_int:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
 kernel/v86.c:v86_smoke_test:V86 のリマップ済みゲスト線形番地 (物理番地ではない)

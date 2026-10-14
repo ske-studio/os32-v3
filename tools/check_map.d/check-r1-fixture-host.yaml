@@ -8,7 +8,7 @@ check-r1-fixture-host:
 - kernel/pgalloc.h
 - kernel/physmem.c
 - kernel/physmem.h
-- kernel/kselftest.c
+- kdebug/kselftest.c
 - exec/exec.c
 - tools/r1_manifest.py
 - tools/nhd_profile.py
