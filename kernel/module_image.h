@@ -1,4 +1,4 @@
-/* KMOD v1 validation only; deliberately not linked into the kernel in S0. */
+/* KMOD v1 validation; shared by the POST_ROOT loader and host tests. */
 #ifndef MODULE_IMAGE_H
 #define MODULE_IMAGE_H
 

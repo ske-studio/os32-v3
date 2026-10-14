@@ -103,6 +103,19 @@ class GserialTests(unittest.TestCase):
         self.assertNotIn("[notice]", self.err.getvalue())
         self.assertEqual(self.mod.read_buffered(port, 100, 0.3), b"gs:! next\n")
 
+    def test_px_cli_receives_sample_and_matching_end(self):
+        payload = b"px ff,ff pb=4294967295 cm=4294967295"
+        port = FakePort([b"gs:1234abcd " + payload + b"\r\ngs:1234abcd en", b"d 0\r\n"])
+        with patch.object(self.mod.secrets, "token_hex", return_value="1234abcd"):
+            with patch.object(self.mod, "open_port", return_value=port):
+                with patch.object(self.mod.sys, "stdout", self.out):
+                    self.assertEqual(self.mod.main(["--port", "COM3", "px"]), 0)
+        self.assertEqual(port.writes, [b"\x011234abcd px\n"])
+        self.assertIn(payload.decode(), self.out.getvalue())
+        self.assertIn("end 0", self.out.getvalue())
+        self.assertTrue(port.closed)
+        self.assertEqual(port.chunks, [])
+
     def test_no_matching_end_times_out(self):
         for response in (b"", b"gs:deadbeef end 0\n", b"gs:1234abcd pong\n"):
             with self.subTest(response=response):

@@ -8,6 +8,7 @@ written) and require the named tests to go RED.
 """
 from pathlib import Path
 import re
+import os
 import shutil
 import subprocess
 import sys
@@ -20,6 +21,11 @@ def run(args):
 sys.path.insert(0, str(ROOT / 'tools/tests'))
 import os32api_host
 os32api_host.build(OUT)
+# Use the guest build's shared-header reader for the host tests as well.
+run(['rustc', '--edition=2021', str(ROOT/'userland/gshell/build.rs'), '-o', str(OUT/'diag-build')])
+os.environ['OUT_DIR'] = str(OUT)
+os.environ['CARGO_MANIFEST_DIR'] = str(ROOT/'userland/gshell')
+run([str(OUT/'diag-build')])
 
 
 def build(gshell: Path, name: str, quiet: bool = False) -> Path:

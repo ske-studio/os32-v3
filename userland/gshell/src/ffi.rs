@@ -8,6 +8,9 @@
 //! `userland/gshell/**` 以外を触らない約束なのでここに置いた)。
 
 extern "C" {
+    /// Zero when this libos32gfx instance has no drawable framebuffer.
+    pub static gfx_ready: i32;
+
     /// バックバッファの 1 画素を読む (libos32gfx.h)。
     pub fn gfx_get_pixel(x: i32, y: i32) -> u8;
 

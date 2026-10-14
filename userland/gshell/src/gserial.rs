@@ -2,6 +2,8 @@
 use core::fmt::{self, Write};
 use crate::{input, modal, ring, session, startmenu, wm::GuiState};
 use os32api::gui::proto::GUI_SESSION_SWITCH_CUI;
+use os32api::gui::types::{ScreenInfo, Stats, GFX_FMT_PACKED8, GFX_CAP_TEXT_OVERLAY};
+include!(concat!(env!("OUT_DIR"), "/diag_points.rs"));
 const LINE_MAX: usize = 128; // shell.h SHELL_MAX_LINE
 const KEY_MAX: usize = 128;
 const RAW_MAX: usize = 512;
@@ -120,13 +122,13 @@ pub fn load_timeout() -> u32 {
 
 #[derive(Debug, PartialEq)]
 pub enum Cmd<'a> {
-    Ping, State, Dump, Key(&'a [u8]), Type(&'a [u8]), Cui, Wd(u32), Flush,
+    Ping, State, Px, Dump, Key(&'a [u8]), Type(&'a [u8]), Cui, Wd(u32), Flush,
     Invalid, Unknown,
 }
 pub fn parse(body: &[u8]) -> Cmd<'_> {
     match body {
         b"ping" => Cmd::Ping, b"state" => Cmd::State, b"dump" => Cmd::Dump,
-        b"cui" => Cmd::Cui, b"flush" => Cmd::Flush,
+        b"px" => Cmd::Px, b"cui" => Cmd::Cui, b"flush" => Cmd::Flush,
         _ => {
             let cut = body.iter().position(|b| *b == b' ').unwrap_or(body.len());
             let (verb, rest) = body.split_at(cut);
@@ -135,7 +137,7 @@ pub fn parse(body: &[u8]) -> Cmd<'_> {
                 b"key" if !arg.is_empty() => Cmd::Key(arg),
                 b"type" if !arg.is_empty() => Cmd::Type(arg),
                 b"wd" => decimal(arg).map_or(Cmd::Invalid, Cmd::Wd),
-                b"ping" | b"state" | b"dump" | b"cui" | b"flush" | b"key" | b"type" | b"" => Cmd::Invalid,
+                b"ping" | b"state" | b"px" | b"dump" | b"cui" | b"flush" | b"key" | b"type" | b"" => Cmd::Invalid,
                 _ => Cmd::Unknown,
             }
         }
@@ -232,6 +234,23 @@ fn execute(st: &mut GuiState, id: &[u8], body: &[u8]) {
             u8::from(crate::fep::is_on()), session::pending_action(), st.mouse_x, st.mouse_y,
             st.gserial.keys, st.gserial.sent, st.inj_lost,
             unsafe { (os32api::api().kbd_dropped_count)() }, st.gserial.remaining(st.now))),
+        Cmd::Px => unsafe {
+            let api = os32api::api();
+            let mut info = ScreenInfo::ZERO;
+            (api.gfx_screen_info)(&mut info as *mut ScreenInfo as *mut u8);
+            // Existing backend capabilities distinguish PEGC from Cirrus/planar.
+            if info.height != 480 || info.bpp != 8 || info.format != GFX_FMT_PACKED8 ||
+                info.flags != GFX_CAP_TEXT_OVERLAY || crate::ffi::gfx_ready == 0 {
+                reply(id, format_args!("px na"));
+            } else {
+                let mut stats = Stats::ZERO;
+                (api.gfx_stats)(&mut stats as *mut Stats as *mut u8);
+                reply(id, format_args!("px {:02x},{:02x} pb={} cm={}",
+                    crate::ffi::gfx_get_pixel(OS32_GUI_DIAG_P1_X, OS32_GUI_DIAG_P1_Y),
+                    crate::ffi::gfx_get_pixel(OS32_GUI_DIAG_P2_X, OS32_GUI_DIAG_P2_Y),
+                    stats.present_bytes, stats.commits));
+            }
+        },
         Cmd::Dump => crate::diagnostics::dump_with(|args| reply(id, args)),
         Cmd::Cui => {
             if session::set_wm(st, GUI_SESSION_SWITCH_CUI, b"") != 0 { error(id, "busy", 4); return; }

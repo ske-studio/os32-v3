@@ -27,6 +27,7 @@ static u32 checks;
 #include "gfx_internal.h"
 #include "gfx_hal.h"
 #include "pegc.h"
+#include "os32_gui_shared.h"
 #include "wab_xe10.h"
 #include "wab_glue.h"
 #include "surface_query.h"
@@ -127,13 +128,17 @@ AppSlot *appslot_get(int id) { return id == 2 ? &slot : 0; }
 int appslot_gfx_owner(void) { return host_gfx_owner; }
 int appslot_gfx_claim(int gui) { (void)gui;return 0; }
 int con_sink_is_enabled(void) { return host_gui; }
+/* These graphics lifecycle cases model NP21/W; gate rejection is covered
+ * with the real detector in pegc_mode_host.c. */
+int np2_detect(void) { return 1; }
 #ifndef E10C_REAL_AUDIT
 int kselftest_run_audit(const char *tag) { return !ledger_selfcheck(tag); }
 #endif
 u32 exec_tramp_page_addr(void) { return 0x170000; }
 void shell_print(const char *s,u8 c) {(void)s;(void)c;}
 void console_hw_cursor_enable(void) { }
-void cpu_delay_us(u32 n) {(void)n;}
+volatile u32 tick_count;
+void cpu_delay_us(u32 n) {(void)n; tick_count++;}
 void palette_init(void) { }
 void palette_set(int i,u8 r,u8 g,u8 b) {(void)i;(void)r;(void)g;(void)b;}
 void palette_shadow_set(int i,u8 r,u8 g,u8 b) {(void)i;(void)r;(void)g;(void)b;}
@@ -269,6 +274,61 @@ static void bridge_check(int started)
     CHECK(!lease_release(&space,token));
 }
 static u32 diag_previous_gen;
+static void diag_px_check(void)
+{
+    host_serial_reset();
+    if (g_backend != &gfx_backend_pegc) {
+        gfx_present(); gfx_present_rect(0,0,32,1); gfx_present_dirty();
+        CHECK(!host_serial_count("[gfx] px "));
+        return;
+    }
+    const u32 a = OS32_GUI_DIAG_P1_Y * PEGC_PITCH + OS32_GUI_DIAG_P1_X;
+    const u32 b = OS32_GUI_DIAG_P2_Y * PEGC_PITCH + OS32_GUI_DIAG_P2_X;
+    volatile u8 *vram = P2V_IO(PEGC_LINEAR_BASE);
+    for (int entry = 0; entry < 3; entry++) {
+        host_serial_reset();
+        u32 before = gfx_counters.commits;
+        bb_b[a] = (u8)(0x12 + entry); bb_b[b] = (u8)(0x34 + entry);
+        if (entry == 0) gfx_present();
+        if (entry == 1) gfx_present_rect(0,0,640,480);
+        if (entry == 2) {
+            dirty_queue.count = prev_dirty.count = 0;
+            gfx_add_dirty_rect(OS32_GUI_DIAG_P1_X,OS32_GUI_DIAG_P1_Y,1,1);
+            gfx_add_dirty_rect(OS32_GUI_DIAG_P2_X,OS32_GUI_DIAG_P2_Y,1,1);
+            CHECK(dirty_queue.count == 2);
+            gfx_present_dirty();
+        }
+        CHECK(gfx_counters.commits == before + 1);
+        CHECK(host_serial_count("[gfx] px ") == 1);
+        CHECK(host_serial_value("[gfx] px n=") == before + 1);
+        CHECK(host_serial_find(entry == 0 ? " a=12/12 b=34/34\r\n" :
+                               entry == 1 ? " a=13/13 b=35/35\r\n" :
+                                            " a=14/14 b=36/36\r\n"));
+        CHECK(vram[a] == bb_b[a] && vram[b] == bb_b[b]);
+        report(host_serial,host_serial_len);
+        host_serial_reset();
+        gfx_present(); gfx_present_rect(0,0,640,480); gfx_present_dirty();
+        CHECK(!host_serial_count("[gfx] px "));
+    }
+    /* Each of the four values must independently trigger a sample. An empty
+     * dirty queue preserves intentionally different BB and VRAM values. */
+    for (int component = 0; component < 4; component++) {
+        volatile u8 *p = component == 0 ? bb_b+a : component == 1 ? vram+a :
+                         component == 2 ? bb_b+b : vram+b;
+        host_serial_reset(); (*p)++;
+        gfx_present_dirty();
+        CHECK(host_serial_count("[gfx] px ") == 1);
+        CHECK(host_serial_value("[gfx] px n=") == gfx_counters.commits);
+        host_serial_reset(); gfx_present_dirty();
+        CHECK(!host_serial_calls);
+    }
+    host_serial_gate = 1; bb_b[a]++;
+    gfx_present_dirty(); CHECK(!host_serial_calls);
+    host_serial_gate = 0; gfx_present_dirty();
+    CHECK(host_serial_count("[gfx] px ") == 1); /* Gate must not consume changes. */
+    host_serial_reset(); gfx_present_dirty(); CHECK(!host_serial_calls);
+}
+
 static void diag_present_check(int empty)
 {
     u32 gen = host_serial_value("[gfx] init gen=");
@@ -285,6 +345,7 @@ static void diag_present_check(int empty)
     u32 commits = gfx_counters.commits, bytes = gfx_counters.present_bytes;
     u32 print_count = host_kprintf_count;
     if (empty) gfx_present_dirty(); else gfx_present();
+    CHECK(host_serial_count("[gfx] px ") == (g_backend == &gfx_backend_pegc));
     CHECK(host_serial_value("[gfx] first present gen=") == gen);
     CHECK(host_serial_value(" bytes=") == gfx_counters.present_bytes - bytes);
     report(host_serial,host_serial_len);
@@ -295,6 +356,7 @@ static void diag_present_check(int empty)
     gfx_present_rect(0,0,32,1); gfx_present_raster(0);
     CHECK(!host_serial_count("[gfx] first present "));
     CHECK(host_kprintf_count == print_count);
+    diag_px_check();
 }
 
 static u8 stack[65536] __attribute__((aligned(16),used));

@@ -1,6 +1,6 @@
 """Read-only CRT diagnostic: design CRTFREQ_DESIGN.r2.md §3 tests ①–⑦.
 
-Real kernel/crt_diag.c, independent I/O shim and protected 1MB BIOS memory.
+Real kdebug/crt_diag.c, independent I/O shim and protected 1MB BIOS memory.
 記録: tools/tests/crt_diag_tdd.md
 Run: python3 -B tools/tests/test_crt_diag.py [--mutate]
 """
@@ -15,7 +15,7 @@ import mutpar
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SRC = ROOT / "tools/tests/crt_diag_host.c"
-TARGET_SRC = ROOT / "kernel/crt_diag.c"
+TARGET_SRC = ROOT / "kdebug/crt_diag.c"
 FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
          "-fno-stack-protector", "-Wall", "-Wextra", "-Werror", "-O2"]
 INCLUDES = ["-I" + str(ROOT / p) for p in
@@ -45,7 +45,7 @@ def one_mutation(item):
     with tempfile.TemporaryDirectory(prefix="crt-mut-") as td:
         exe = pathlib.Path(td) / "crt-host"
         tree = mutpar.build_in_tree(
-            ROOT, td, {"kernel/crt_diag.c": source.replace(old, new, 1) if old else source},
+            ROOT, td, {"kdebug/crt_diag.c": source.replace(old, new, 1) if old else source},
             [host_cmd(exe)], capture_output=True)
         result = host32.run([str(exe)], cwd=tree, capture_output=True, text=True)
     if result.returncode == 0:

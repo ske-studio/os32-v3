@@ -53,6 +53,12 @@ def target_cmd(obj):
 
 
 MUTATIONS = [
+    ("gate_24k_inverted", MUT_TARGET,
+     "    if (s_boot_hsync == PEGC_HSYNC_24KHZ) {",
+     "    if (s_boot_hsync != PEGC_HSYNC_24KHZ) {"),
+    ("alias_one_way", MUT_TARGET,
+     "v[0] == 0x5a && v[1] == 0xa5 &&\n                       v[2] == 0x5a && v[3] == 0xa5",
+     "v[0] == 0x5a"),
     ("drop_enter_serial", MUT_TARGET,
      "    pegc_diag_serial(&s_diag_enter);", ""),
     # (名前, 対象ファイル, 元, 変異後)

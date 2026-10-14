@@ -75,7 +75,7 @@ extern void fatfs_init(void);
 #include "os32_sqlite_vfs.h"
 #include "kapi_db.h"
 #include "bootlog.h"
-#include "crt_diag.h"
+#include "module.h"
 
 #define SHELL_RELOAD_DELAY 10
 
@@ -589,6 +589,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     /* DMA プール (票 §1-3)。paging_init が 0x2E8000-0x2F7FFF を present/RW で
      * 張った後、**pci_bind_all より前**。probe が dma_alloc を呼ぶ。 */
     dma_pool_init();
+    kdebug_load();
 
 
     /* カーネル内プリミティブの自己診断。
@@ -638,6 +639,9 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * K4 の GUI= と同じ流儀: ここで読み、サブシステム側の変数へ渡す。 */
     {
         char gfxmode[16];
+        gfx_diag_stripes =
+            sysconfig_get_str(SYS_SYSTEM_CFG, "GFXDIAG", gfxmode, sizeof(gfxmode)) > 0 &&
+            kstrcmp(gfxmode, "stripes") == 0;
         if (sysconfig_get_str(SYS_SYSTEM_CFG, "GFX", gfxmode, (int)sizeof(gfxmode)) > 0) {
             if (kstrcmp(gfxmode, "pc98") == 0) {
                 gfx_set_backend_pref(GFX_PREF_PC98);
@@ -749,7 +753,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * 写像と PEGC の BB は ⑥ (gfx_boot_reserve) が済ませてあり、probe はそれを
      * 使うだけ (⑦、TASK_T1_LEDGER §3-3)。init まで済ませたら表示はテキストへ
      * 戻る。 */
-    crt_diag_bootlog();
+    if (kdebug.ops.crt_diag_bootlog) kdebug.ops.crt_diag_bootlog();
     gfx_prepare_backend();
     kselftest_run_post_probe();
 

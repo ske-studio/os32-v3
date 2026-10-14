@@ -207,7 +207,7 @@ def main(argv=None):
     parser.add_argument("--baud", type=int, default=9600)
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT)
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("ping", "state", "dump", "cui", "flush", "enter", "leave"):
+    for name in ("ping", "state", "px", "dump", "cui", "flush", "enter", "leave"):
         commands.add_parser(name)
     commands.add_parser("key").add_argument("sequence")
     commands.add_parser("type").add_argument("text")

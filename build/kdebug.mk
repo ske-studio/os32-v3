@@ -1,34 +1,64 @@
-# S0 standalone scaffold; intentionally NOT included by Makefile/kernel.mk.
-# Future product integration supplies CFLAGS_BASE, INC_KERNEL and KDEBUG_OBJS.
-# Example: make -f build/kdebug.mk kdebug-empty VMKERNEL=build/out/vmkernel.lz4
-KDEBUG_OUT ?= build/out/kdebug-s0
-KDEBUG_CC ?= $(CROSS_DIR)/bin/i386-elf-gcc
-KDEBUG_LD ?= $(CROSS_DIR)/bin/i386-elf-ld
-VMKERNEL ?= build/out/vmkernel.lz4
-CFLAGS_BASE ?= -std=gnu11 -m32 -march=i386 -ffreestanding -fno-pie -fno-stack-protector
-KDEBUG_STAGE ?= S1
-KDEBUG_OBJS ?= $(KDEBUG_OUT)/empty.o
+# The module and kernel share the actual machine/ABI/optimization flags.
+ifeq ($(origin KERNEL_CFLAGS),undefined)
+include build/config.mk
+endif
+KDEBUG_OUT ?= $(BUILD_OUT)/kdebug
+KDEBUG_STAGE := S1
+KDEBUG_GEN := kdebug/generated
+KDEBUG_OBJS := $(KDEBUG_OUT)/crt_diag.o $(KDEBUG_OUT)/kdebug_main.o \
+               $(KDEBUG_OUT)/kdebug_import_slots.o $(KDEBUG_OUT)/kdebug_import_stubs.o
+KDEBUG_KEXPORT_OBJ := $(KDEBUG_OUT)/kdebug_kexports.o
+C_KERNEL_OBJ += $(KDEBUG_KEXPORT_OBJ)
+# kernel.elf's prerequisites were expanded before this include.
+$(BUILD_OUT)/kernel.elf: $(KDEBUG_KEXPORT_OBJ)
 
-.PHONY: kdebug-empty
-kdebug-empty: $(KDEBUG_OUT)/kdebug.bin
+# Generate all contracts from the same .def and source declarations.
+KDEBUG_DEF_SOURCES := $(shell python3 -c 'import json; print(" ".join(sorted({e["source"] for e in json.load(open("kernel/kdebug_imports.def"))["imports"] if "source" in e})))')
+# Keep generated source inputs in the tree, like the KAPI contract: read-only
+# static checks (including CI without a cross compiler) need these under -n.
+KDEBUG_GENERATED := $(addprefix $(KDEBUG_GEN)/,kdebug_imports.h kdebug_imports.json \
+    kdebug_kexports.c kdebug_import_slots.c kdebug_import_stubs.S kdebug_import_macros.h)
+$(KDEBUG_GENERATED) &: kernel/kdebug_imports.def tools/gen_kdebug_imports.py tools/mkmod.py $(KDEBUG_DEF_SOURCES)
+	python3 tools/gen_kdebug_imports.py --stage $(KDEBUG_STAGE) --out-dir $(KDEBUG_GEN)
 
-$(KDEBUG_OUT):
-	mkdir -p $@
+kernel/module.o: kernel/module.c build/config.mk build/kdebug.mk $(KDEBUG_GEN)/kdebug_imports.h
+	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -I$(KDEBUG_GEN) -c kernel/module.c -o $@
 
-$(KDEBUG_OUT)/empty.c: | $(KDEBUG_OUT)
-	printf '%s\n' 'int kdebug_init(void) { return 0; }' > $@
+$(KDEBUG_OUT)/%.o: kdebug/%.c build/config.mk build/kdebug.mk
+	mkdir -p $(@D)
+	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -c $< -o $@
 
-$(KDEBUG_OUT)/empty.o: $(KDEBUG_OUT)/empty.c
-	$(KDEBUG_CC) $(CFLAGS_BASE) $(INC_KERNEL) -c $< -o $@
+$(KDEBUG_OUT)/kdebug_kexports.o $(KDEBUG_OUT)/kdebug_import_slots.o: $(KDEBUG_OUT)/%.o: $(KDEBUG_GEN)/%.c $(KDEBUG_GEN)/kdebug_imports.h build/config.mk build/kdebug.mk
+	mkdir -p $(@D)
+	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -I$(KDEBUG_GEN) -c $< -o $@
 
-$(KDEBUG_OUT)/%.o: kdebug/%.c | $(KDEBUG_OUT)
-	$(KDEBUG_CC) $(CFLAGS_BASE) $(INC_KERNEL) -c $< -o $@
-
-$(KDEBUG_OUT)/empty.json: kernel/kdebug_imports.def tools/gen_kdebug_imports.py | $(KDEBUG_OUT)
-	python3 -c 'import sys; sys.path.insert(0,"tools"); import gen_kdebug_imports as g; import json; from pathlib import Path; e=g.load_def(); g.generate(e,Path("$(KDEBUG_OUT)"),stage="$(KDEBUG_STAGE)"); p=Path("$(KDEBUG_OUT)/kdebug_imports.json"); m=json.loads(p.read_text()); m["imports"]=[]; Path("$@").write_text(json.dumps(m))'
+$(KDEBUG_OUT)/kdebug_import_stubs.o: $(KDEBUG_GEN)/kdebug_import_stubs.S build/config.mk build/kdebug.mk
+	mkdir -p $(@D)
+	$(CC) $(CFLAGS_MACHINE) -c $< -o $@
 
 $(KDEBUG_OUT)/kdebug.elf: $(KDEBUG_OBJS) build/module.ld
-	$(KDEBUG_LD) -m elf_i386 --emit-relocs -T build/module.ld $(KDEBUG_OBJS) -o $@
+	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/module.ld $(KDEBUG_OBJS) -o $@
 
-$(KDEBUG_OUT)/kdebug.bin: $(KDEBUG_OUT)/kdebug.elf $(KDEBUG_OUT)/empty.json $(VMKERNEL) tools/mkmod.py
-	python3 tools/mkmod.py --elf $< --metadata $(KDEBUG_OUT)/empty.json --vmkernel $(VMKERNEL) -o $@
+# Values come from their authoritative definitions, including before S1b's bump.
+KDEBUG_KAPI_GEN = $(shell python3 -c 'import json; print(json.load(open("sdk/kapi.json"))["version"])')
+KDEBUG_LAYOUT_GEN = $(shell sed -n 's/^\#define OS32_MEMORY_LAYOUT_GENERATION \([0-9]*\).*/\1/p' sdk/include/os32/os32_generations.h)
+
+define pack_kdebug
+	python3 tools/mkmod.py --elf $(KDEBUG_OUT)/kdebug.elf --metadata $(KDEBUG_GEN)/kdebug_imports.json --vmkernel $(1) --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
+endef
+
+$(BUILD_OUT)/kdebug.bin: $(KDEBUG_OUT)/kdebug.elf $(KDEBUG_GEN)/kdebug_imports.json $(BUILD_OUT)/vmkernel.lz4 tools/mkmod.py sdk/kapi.json sdk/include/os32/os32_generations.h build/kdebug.mk
+	$(call pack_kdebug,$(BUILD_OUT)/vmkernel.lz4)
+
+$(R1_OUT)/kdebug.bin: $(KDEBUG_OUT)/kdebug.elf $(KDEBUG_GEN)/kdebug_imports.json $(R1_OUT)/vmkernel.lz4 tools/mkmod.py sdk/kapi.json sdk/include/os32/os32_generations.h build/kdebug.mk
+	$(call pack_kdebug,$(R1_OUT)/vmkernel.lz4)
+
+$(R1_OBJ)/kernel/module.o: kernel/module.c build/config.mk build/kdebug.mk $(KDEBUG_GEN)/kdebug_imports.h
+	mkdir -p $(@D)
+	$(CC) $(KERNEL_CFLAGS) -DOS32_R1_FIXTURE $(INC_KERNEL) -I$(KDEBUG_GEN) -c kernel/module.c -o $@
+$(R1_OUT)/kernel.elf: $(KDEBUG_KEXPORT_OBJ)
+R1_OBJECTS += $(KDEBUG_KEXPORT_OBJ)
+
+all kernel: $(BUILD_OUT)/kdebug.bin
+kernel-r1: $(R1_OUT)/kdebug.bin
+-include $(KDEBUG_OBJS:.o=.d) $(KDEBUG_KEXPORT_OBJ:.o=.d)

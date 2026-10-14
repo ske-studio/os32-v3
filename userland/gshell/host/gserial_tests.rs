@@ -236,3 +236,49 @@ fn gserial_disabled_sends_no_notifications_or_cui_output() {
     cycle(&mut st);
     assert!(mocks::SERIAL_OUT.lock().unwrap().is_empty());
 }
+
+#[test]
+fn gserial_px_reply_maximum_and_unavailable_backends() {
+    use os32api::gui::types::{GFX_FMT_PLANAR4, GFX_CAP_HW_FILL, GFX_CAP_HW_BLT};
+    static INFO: std::sync::Mutex<ScreenInfo> = std::sync::Mutex::new(ScreenInfo::ZERO);
+    unsafe extern "C" fn screen(out: *mut u8) {
+        *(out as *mut ScreenInfo) = *INFO.lock().unwrap();
+    }
+    unsafe extern "C" fn stats(out: *mut u8) -> i32 {
+        *(out as *mut Stats) = Stats { present_bytes: u32::MAX, commits: u32::MAX, ..Stats::ZERO };
+        0
+    }
+    let mut st = setup();
+    let mut api = unsafe { core::ptr::read(os32api::api()) };
+    api.gfx_screen_info = screen; api.gfx_stats = stats;
+    os32api::os32_init(Box::into_raw(Box::new(api)));
+    let pegc = ScreenInfo { width: 640, height: 480, bpp: 8, format: GFX_FMT_PACKED8,
+                            flags: GFX_CAP_TEXT_OVERLAY, ..ScreenInfo::ZERO };
+    *INFO.lock().unwrap() = pegc;
+    mocks::gfx_pixel(OS32_GUI_DIAG_P1_X, OS32_GUI_DIAG_P1_Y, 0xff);
+    mocks::gfx_pixel(OS32_GUI_DIAG_P2_X, OS32_GUI_DIAG_P2_Y, 0xff);
+    let output = command(&mut st, "px");
+    assert_eq!(output, "gs:aBcD0123 px ff,ff pb=4294967295 cm=4294967295\r\ngs:aBcD0123 end 0\r\n");
+    assert_eq!(output.lines().next().unwrap().len(), 48);
+    assert!(output.lines().all(|line| line.len() <= 198));
+    mocks::gfx_pixel(OS32_GUI_DIAG_P1_X, OS32_GUI_DIAG_P1_Y, 0x12);
+    mocks::gfx_pixel(OS32_GUI_DIAG_P2_X, OS32_GUI_DIAG_P2_Y, 0x34);
+    assert!(command(&mut st, "px").contains("px 12,34 pb="));
+    for info in [ScreenInfo { height: 400, ..pegc },
+                 ScreenInfo { bpp: 4, format: GFX_FMT_PLANAR4, ..pegc },
+                 ScreenInfo { flags: GFX_CAP_HW_FILL | GFX_CAP_HW_BLT, ..pegc }] {
+        *INFO.lock().unwrap() = info;
+        assert_eq!(command(&mut st, "px"), "gs:aBcD0123 px na\r\ngs:aBcD0123 end 0\r\n");
+    }
+    *INFO.lock().unwrap() = pegc;
+    unsafe { mocks::gfx_ready = 0; }
+    assert_eq!(command(&mut st, "px"), "gs:aBcD0123 px na\r\ngs:aBcD0123 end 0\r\n");
+    unsafe { mocks::gfx_ready = 1; }
+    assert!(command(&mut st, "px extra").contains("end 1"));
+    st.screen_w = 640; st.screen_h = 480;
+    startmenu::toggle_start(&mut st);
+    assert!(startmenu::rect().contains(OS32_GUI_DIAG_P1_X, OS32_GUI_DIAG_P1_Y));
+    assert!(!startmenu::rect().contains(OS32_GUI_DIAG_P2_X, OS32_GUI_DIAG_P2_Y));
+    assert!(!crate::taskbar::rect(&st).contains(OS32_GUI_DIAG_P1_X, OS32_GUI_DIAG_P1_Y));
+    startmenu::toggle_start(&mut st);
+}

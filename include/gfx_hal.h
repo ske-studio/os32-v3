@@ -183,4 +183,8 @@ void gfx_client_to_gshell(void);
 int pegc_identify(void) __attribute__((weak));
 int cirrus_identify(void) __attribute__((weak));
 
+
+/* R7FIX2 boot-only stripes setting (internal, not KAPI). */
+extern int gfx_diag_stripes;
+
 #endif /* __GFX_HAL_H */

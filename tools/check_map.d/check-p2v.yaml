@@ -15,3 +15,4 @@ check-p2v:
 - tools/check_map.d/check-p2v.yaml
 - build/checks.d/check-p2v.mk
 - include/**
+- kdebug/**

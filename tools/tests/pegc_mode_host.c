@@ -25,8 +25,20 @@
  * ========================================================================= */
 #include "serial_diag_host.h"
 #include "types.h"
+#include "memmap.h"
+#include "pegc.h"
+/* Model the two CPU windows, without changing the driver under test. */
+static int host_alias;
+static volatile void *host_pegc_window(u32 pa)
+{
+    if (host_alias && pa >= PEGC_BANK_WIN0 && pa < PEGC_BANK_WIN0 + MEM_PAGE_SIZE)
+        pa += PEGC_LINEAR_BASE - PEGC_BANK_WIN0;
+    return P2V_IO(pa);
+}
+#define P2V_IO(pa) host_pegc_window(pa)
 
 #include "../../gfx/backend_pegc.c"
+#include "../../drivers/np2sysp.c"
 /* 戻りの後のカーソル復帰 (console_hw_cursor_enable) も実物の OUT を記録する */
 /* カーネルは -Wall だけで組む (build/config.mk)。この試験の -Wextra -Werror で
  * console.c 側の既存の警告 2 種を止める (console.c そのものは写さず変えない)。 */
@@ -85,6 +97,12 @@ static u32 text_stat_reads;
 static int fake_con_sink;      /* con_sink_is_enabled の返り値 */
 static int fake_v86_active;    /* v86_is_active の返り値 */
 static unsigned int fake_busy_port; /* 0 = 両 GDC、それ以外 = そのステータスだけ詰まる */
+volatile u32 tick_count;
+static u32 stripe_delays;
+static u32 palette_writes;
+static int watch_stripe_init;
+static int fake_np2;
+static unsigned int fake_np2_pos;
 
 static void ev_add(int kind, unsigned int port, unsigned int val)
 {
@@ -136,6 +154,10 @@ unsigned int pegc_shim_inp(unsigned int port)
         }
     } else if (port == PEGC_HSYNC_PORT) {
         v = fake_09a8_raw;
+    } else if (port == NP2PORT_STR) {
+        const char *reply = fake_np2 ? "NP2" : "";
+        v = (u8)reply[fake_np2_pos];
+        if (v) fake_np2_pos++;
     }
     ev_add(EV_IN, port, v);
     return v;
@@ -143,6 +165,7 @@ unsigned int pegc_shim_inp(unsigned int port)
 
 void pegc_shim_outp(unsigned int port, unsigned int value)
 {
+    if (port == PAL_IDX_PORT) palette_writes++;
     if (port == PEGC_STAT_PORT) fake_09a0_sel = (u8)value;
     if (port == PEGC_HSYNC_PORT) {
         fake_09a8_raw = (u8)((fake_09a8_raw & 0xFCU) | (value & 0x03U));
@@ -156,6 +179,16 @@ void pegc_shim_outp(unsigned int port, unsigned int value)
 
 void cpu_delay_us(u32 us)
 {
+    if (us == 1000) {
+        if (watch_stripe_init && !stripe_delays) {
+            CHECK(palette_writes == 256);
+            volatile u16 *chars = P2V_IO(TVRAM_CHAR_BASE);
+            volatile u8 *attrs = P2V_IO(TVRAM_ATTR_BASE);
+            for (u32 i = 0; i < 80 * 30; i++) CHECK(!chars[i] && !attrs[i * 2]);
+            CHECK(!gfx_counters.commits && !gfx_counters.present_bytes);
+        }
+        tick_count++; stripe_delays++;
+    }
     if (us == PEGC_GDC_FIFO_POLL_US) fifo_delays++;
     if (us == PEGC_VSYNC_POLL_US) vsync_delays++;
     ev_add(EV_DELAY, 0, us);
@@ -473,6 +506,10 @@ static void vsync_falls_by_gap(int *falls, int n_outs)
 
 static void world_reset(void)
 {
+    host_alias = gfx_diag_stripes = 0;
+    fake_np2 = 0; fake_np2_pos = 0;
+    tick_count = stripe_delays = 0;
+    palette_writes = 0; watch_stripe_init = 0;
     host_serial_reset(); host_serial_gate=0; printf_count=0;
     ev_n = 0;
     fake_full_reads = 0;
@@ -1156,11 +1193,170 @@ static void case_serial_enter(void)
     host_serial_gate=0;
 }
 
+static void case_diag_alias(void)
+{
+    s_case = "diag_alias";
+    for (int shared = 0; shared < 2; shared++) {
+        world_reset(); host_alias = shared;
+        volatile u8 *a = P2V_IO(PEGC_BANK_WIN0 + 16);
+        volatile u8 *f = P2V_IO(PEGC_LINEAR_BASE + 16);
+        *a = 0x37; *f = 0x5a;
+        u8 before_a = *a, before_f = *f;
+        *(volatile u16 *)P2V_IO(PEGC_MMIO_BANK0) = 7;
+        s_sys16m_ram = !shared;
+        pegc_diag_alias();
+        CHECK(ev_n == 0); /* No IN/OUT added by the alias observation. */
+        CHECK(*(volatile u16 *)P2V_IO(PEGC_MMIO_BANK0) == 0);
+        CHECK(*a == before_a && *f == before_f);
+        CHECK(host_serial_find(shared ?
+              "[pegc] alias=ok ab=5a,a5 ba=5a,a5 sys16m=0\r\n" :
+              "[pegc] alias=ng ab=5a,5a ba=a5,a5 sys16m=1\r\n"));
+        output(host_serial);
+        host_serial_reset(); host_serial_gate = 1;
+        pegc_diag_alias();
+        CHECK(!host_serial_calls && *a == before_a && *f == before_f);
+    }
+    world_reset();
+}
+
+static void case_diag_stripes(void)
+{
+    s_case = "diag_stripes";
+    volatile u8 *vram = P2V_IO(PEGC_LINEAR_BASE);
+    world_reset();
+    kmemset((void *)vram, 0xcc, PEGC_FB_SIZE_480 + 1);
+    pegc_diag_stripes();
+    for (u32 i = 0; i <= PEGC_FB_SIZE_480; i++) CHECK(vram[i] == 0xcc);
+    CHECK(!stripe_delays && !tick_count && !host_serial_calls && !ev_n);
+    for (int gated = 0; gated < 2; gated++) {
+        world_reset(); gfx_diag_stripes = 1; host_serial_gate = gated;
+        tick_count = ~0U - 100; /* Also exercise unsigned tick wrap. */
+        u32 start = tick_count;
+        pegc_diag_stripes();
+        CHECK(tick_count - start == 3 * PIT_HZ && stripe_delays == 3 * PIT_HZ);
+        for (u32 y = 0; y < 480; y++)
+            for (u32 x = 0; x < 640; x++) CHECK(vram[y * 640 + x] == ((x / 16) & 15));
+        CHECK(vram[PEGC_FB_SIZE_480] == 0xcc);
+        if (gated) CHECK(!host_serial_calls);
+        else {
+            CHECK(host_serial_count("[pegc] stripes ") == 2);
+            CHECK(host_serial_value("t0=") == start);
+            CHECK(host_serial_value("t1=") - start == 3 * PIT_HZ);
+            output(host_serial);
+        }
+    }
+    /* Exercise the actual init placement too: earlier clears must not erase
+     * stripes, and enabling diagnostics must leave the complete OUT stream. */
+    static u16 ports[EV_MAX];
+    static u8 values[EV_MAX];
+    int count = 0;
+    world_reset(); s_bb_phys = MEM_GFX_BB_BASE;
+    pegc_init();
+    CHECK(!stripe_delays && !host_serial_count("[pegc] stripes "));
+    for (int i = 0; i < ev_n; i++) if (ev_kind[i] == EV_OUT) {
+        ports[count] = ev_port[i]; values[count++] = ev_val[i];
+    }
+    world_reset(); gfx_diag_stripes = 1; watch_stripe_init = 1;
+    kmemset((void *)P2V_IO(TVRAM_CHAR_BASE), 0xcc, 80 * 30 * 2);
+    kmemset((void *)P2V_IO(TVRAM_ATTR_BASE), 0xcc, 80 * 30 * 2);
+    pegc_init();
+    CHECK(host_serial_count("[pegc] stripes ") == 2);
+    CHECK(stripe_delays == 3 * PIT_HZ);
+    for (u32 y = 0; y < 480; y++)
+        for (u32 x = 0; x < 640; x++) CHECK(vram[y * 640 + x] == ((x / 16) & 15));
+    int n = 0;
+    for (int i = 0; i < ev_n; i++) if (ev_kind[i] == EV_OUT) {
+        CHECK(n < count && ports[n] == ev_port[i] && values[n] == ev_val[i]); n++;
+    }
+    CHECK(n == count);
+    output(host_serial);
+    world_reset();
+}
+
+/* probe の I/O は既存の成功キャッシュで区切る。門から init までを測り、
+ * 09A8h / GDC と、07EFh の検出通信を別々に数える。 */
+static int count_out(unsigned int port)
+{
+    int n = 0;
+    for (int i = 0; i < ev_n; i++)
+        if (ev_kind[i] == EV_OUT && ev_port[i] == port) n++;
+    return n;
+}
+
+static int count_gdc_out(void)
+{
+    return count_out(GDC_TEXT_CMD) + count_out(GDC_TEXT_PARAM) +
+           count_out(GDC_GFX_CMD) + count_out(GDC_GFX_PARAM);
+}
+
+static void case_gate_24k_real(void)
+{
+    s_case = "gate_24k_real";
+    world_reset();
+    pegc_prepare();
+    CHECK(s_boot_hsync == PEGC_HSYNC_24KHZ);
+    CHECK(s_probed == 1 && pegc_probe() == 0);
+    CHECK(count_out(NP2PORT_STR) == 3);
+    CHECK(host_serial_find("[pegc] np2=0 fallback=pc98\r\n"));
+    output(host_serial);
+    int before = ev_n;
+    pegc_prepare();
+    pegc_init();
+    CHECK(pegc_probe() == 0 && s_probed == 1 && s_probe_ok == 0);
+    CHECK(ev_n == before && !s_active);
+    CHECK(count_out(PEGC_HSYNC_PORT) == 0 && count_gdc_out() == 0);
+    output("PASS gate_24k_real OUT 09a8=0 gdc=0 np2=3\n");
+
+    world_reset(); host_serial_gate = 1;
+    pegc_prepare();
+    CHECK(!host_serial_calls && !pegc_probe());
+}
+
+static void case_gate_24k_np2(void)
+{
+    s_case = "gate_24k_np2";
+    world_reset(); fake_np2 = 1;
+    pegc_prepare();
+    CHECK(s_boot_hsync == PEGC_HSYNC_24KHZ && pegc_probe() == 1);
+    CHECK(count_out(NP2PORT_STR) == 3 && fake_np2_pos == 3);
+    CHECK(host_serial_find("[pegc] np2=1 fallback=none\r\n"));
+    output(host_serial);
+    ev_n = 0;
+    pegc_enter_480_ports();
+    x_from_rom(ROM_S480, (const Edit *)0, 0, ADD_S480, 2, 5, 0x9A8, 0x01);
+    check_outs();
+    CHECK(count_out(PEGC_HSYNC_PORT) == 1 && count_gdc_out() == 62);
+    output("PASS gate_24k_np2 OUT 09a8=1 gdc=62 np2=3 (prepare)\n");
+}
+
+static void case_gate_31k_real(void)
+{
+    s_case = "gate_31k_real";
+    world_reset(); fake_09a8_raw = RA266_09A8;
+    pegc_prepare();
+    CHECK(s_boot_hsync == PEGC_HSYNC_31KHZ && pegc_probe() == 1);
+    CHECK(count_out(NP2PORT_STR) == 0 && !fake_np2_pos);
+    CHECK(!host_serial_find("[pegc] np2="));
+    for (int i = 0; i < ev_n; i++) CHECK(ev_port[i] != NP2PORT_STR);
+    ev_n = 0;
+    pegc_enter_480_ports();
+    x_from_rom(ROM_S480, (const Edit *)0, 0, ADD_S480, 2, -1, 0, 0);
+    check_outs();
+    CHECK(count_out(PEGC_HSYNC_PORT) == 0 && count_gdc_out() == 62);
+    CHECK(count_out(NP2PORT_STR) == 0);
+    output("PASS gate_31k_real OUT 09a8=0 gdc=62 np2=0\n");
+}
+
 void _start(void)
 {
     /* 資料の規則・記録の数値での検査を先に回す (変異がヘッダ由来の期待列では
      * なくこちらで落ちることを --mutate の行で見られるように) */
     case_serial_enter();
+    case_diag_alias();
+    case_diag_stripes();
+    case_gate_24k_real();
+    case_gate_24k_np2();
+    case_gate_31k_real();
     case_restore_matrix();
     case_defaults();
     case_rom_s480();
@@ -1173,6 +1369,6 @@ void _start(void)
     case_fifo_busy();
     case_fifo_stuck();
     case_vsync_stuck();
-    output("PASS pegc_mode_host (13 cases)\n");
+    output("PASS pegc_mode_host (18 cases)\n");
     finish(0);
 }

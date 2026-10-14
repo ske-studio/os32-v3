@@ -15,6 +15,14 @@ static void irq_restore(unsigned int flags) { (void)flags; }
 static void outp(unsigned int port, unsigned int value);
 #include "../../gfx/gfx_core.c"
 #include "../../gfx/backend_pc98.c"
+/* This fixture is LP64. Read the GUI wire layouts with their target widths;
+ * keep their assertions active. gfx_vram only needs the shared coordinates. */
+#include <stdint.h>
+#define u32 uint32_t
+#define i32 int32_t
+#include "os32_gui_shared.h"
+#undef i32
+#undef u32
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable" /* existing bottom in gfx_vram.c */
 #include "../../gfx/gfx_vram.c"

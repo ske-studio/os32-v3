@@ -19,6 +19,13 @@
 #ifndef OS32_GUI_SHARED_H
 #define OS32_GUI_SHARED_H
 
+/* R7FIX2: P1 is inside Start menu (2,344,160,112), above taskbar y=456.
+ * P2 is the stationary desktop control point (640x480 PEGC only). */
+#define OS32_GUI_DIAG_P1_X 16
+#define OS32_GUI_DIAG_P1_Y 400
+#define OS32_GUI_DIAG_P2_X 320
+#define OS32_GUI_DIAG_P2_Y 240
+
 /* 基本型 (u8/u16/u32/i16/i32) と OS32_ERR_* / GFX_Stats の SSoT。 */
 #include "os32_kapi_shared.h"
 

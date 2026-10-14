@@ -2088,6 +2088,32 @@ static int gui_timeout(const char *seconds)
     return cmd_os32gui(3, argv);
 }
 
+static void case_gfxmode_diag(void)
+{
+    char *stripes[] = { "gfxmode", "diag", "stripes" };
+    char *off[] = { "gfxmode", "diag", "off" };
+    char *bad[] = { "gfxmode", "diag", "bad", "extra" };
+    report("R7FIX2 gfxmode diagnostics preserve system.cfg keys\n");
+    fresh();
+    file_add(SYS_SYSTEM_CFG, "GFX=pegc\nGUI=1\nGSERIAL_TIMEOUT=7\nOTHER=keep\n");
+    check(cmd_gfxmode(3, stripes) == 0 &&
+          strcmp(g_cfg_written, "GFX=pegc\nGUI=1\nGSERIAL_TIMEOUT=7\nOTHER=keep\nGFXDIAG=stripes\n") == 0,
+          "diag stripes appends only GFXDIAG");
+    fresh();
+    file_add(SYS_SYSTEM_CFG, "GFX=pegc\nGFXDIAG=stripes\nGUI=1\nGSERIAL_TIMEOUT=7\nOTHER=keep\n");
+    check(cmd_gfxmode(3, off) == 0 &&
+          strcmp(g_cfg_written, "GFX=pegc\nGUI=1\nGSERIAL_TIMEOUT=7\nOTHER=keep\nGFXDIAG=off\n") == 0,
+          "diag off preserves other keys and writes explicit off");
+    fresh();
+    check(cmd_gfxmode(2, bad) == SH_STATUS_USAGE &&
+          cmd_gfxmode(3, bad) == SH_STATUS_USAGE &&
+          cmd_gfxmode(4, bad) == SH_STATUS_USAGE && !g_data_writes,
+          "diag rejects missing, invalid and excess values without writing");
+    g_cfg_write_fail = 1;
+    check(cmd_gfxmode(3, stripes) == SH_STATUS_ERROR,
+          "diag reports cfg write failure");
+}
+
 static void case_gserial_gui(void)
 {
     char *plain[] = { "os32gui" };
@@ -2251,6 +2277,7 @@ void _start(void)
     case_s13_zero_rows();
     case_s14_s15_records();
     case_gserial_gui();
+    case_gfxmode_diag();
 
     if (failures) {
         report("SOME FAIL\n");

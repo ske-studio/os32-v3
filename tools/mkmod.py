@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build an uncompressed KMOD v1 container from a VA-zero i386 --emit-relocs ELF.
 
-S0 tool only: this does not add a module to the product build. Import metadata
+The product build packages kdebug separately from the resident kernel. Metadata
 comes from gen_kdebug_imports.py; exports come from the linked kdebug_ops
 initializer (version followed by the sixteen function pointers).
 """

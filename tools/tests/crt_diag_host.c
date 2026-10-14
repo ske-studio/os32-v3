@@ -12,7 +12,7 @@ static int mem_io[EVENT_MAX], mem_n;
 static void *fake_map(u32 pa, int io);
 #define P2V(pa) fake_map((pa), 0)
 #define P2V_IO(pa) fake_map((pa), 1)
-#include "../../kernel/crt_diag.c"
+#include "../../kdebug/crt_diag.c"
 
 static void output(const char *s)
 {

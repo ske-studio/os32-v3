@@ -889,6 +889,7 @@ unsafe extern "C" fn switch_shell(s: *const u8) -> i32 {
 }
 
 pub fn init() {
+    unsafe { gfx_ready = 1; }
     let mut a = os32api::mock_api();
     a.get_tick = get_tick;
     a.serial_trygetchar = serial_trygetchar;
@@ -997,7 +998,7 @@ pub fn init() {
 pub static FB_ATTACHES: AtomicUsize = AtomicUsize::new(0);
 pub static SCREEN_READS: AtomicUsize = AtomicUsize::new(0);
 #[no_mangle]
-pub static gfx_ready: i32 = 1;
+pub static mut gfx_ready: i32 = 1;
 #[no_mangle]
 pub unsafe extern "C" fn libos32gfx_init(api: *mut os32api::KernelAPI) {
     ((*api).gfx_init)();

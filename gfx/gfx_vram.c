@@ -1,9 +1,33 @@
+#include "serial_diag.h"
+#include "pegc.h"
+#include "os32_gui_shared.h"
 #include "memmap.h"
 #include "gfx_internal.h"
 #include "gfx_hal.h"
 #include "os32_kapi_shared.h"
 #include "cpu_calibrate.h"
 #include "io.h"
+
+/* Compare with the last printed sample; a closed serial gate cannot consume it. */
+static void __attribute__((cold)) gfx_diag_px(void)
+{
+    static u32 previous;
+    static u32 generation;
+    if (g_backend != &gfx_backend_pegc || !gfx_init_gen || !bb_b || serial_gate_active()) return;
+    volatile u8 *vram = P2V_IO(PEGC_LINEAR_BASE);
+    const u32 a = OS32_GUI_DIAG_P1_Y * PEGC_PITCH + OS32_GUI_DIAG_P1_X;
+    const u32 b = OS32_GUI_DIAG_P2_Y * PEGC_PITCH + OS32_GUI_DIAG_P2_X;
+    u32 sample = bb_b[a] | (u32)vram[a] << 8 |
+                 (u32)bb_b[b] << 16 | (u32)vram[b] << 24;
+    if (generation == gfx_init_gen && sample == previous) return;
+    generation = gfx_init_gen; previous = sample;
+    serial_puts_polled("[gfx] px n="); serial_diag_u32(gfx_counters.commits);
+    for (u32 i = 0; i < 4; i++) {
+        serial_puts_polled(i == 0 ? " a=" : i == 2 ? " b=" : "/");
+        serial_diag_hex(sample & 255, 2); sample >>= 8;
+    }
+    serial_puts_polled("\r\n");
+}
 
 static void _flush_dirty_queue(void);
 static void _merge_prev_dirty(void);
@@ -243,6 +267,7 @@ void __cdecl gfx_present_dirty(void)
     }
 diag:
     gfx_diag_first_present(before);
+    gfx_diag_px();
 }
 
 /* ======================================================================== */
@@ -286,6 +311,7 @@ void __cdecl gfx_present(void)
         g_backend->present_rect(0, 0, GFX_WIDTH, gfx_current_height);
 diag:
     gfx_diag_first_present(before);
+    gfx_diag_px();
 }
 
 void __cdecl gfx_present_rect(int rx, int ry, int rw, int rh)
@@ -296,6 +322,7 @@ void __cdecl gfx_present_rect(int rx, int ry, int rw, int rh)
         g_backend->present_rect(rx, ry, rw, rh);
 diag:
     gfx_diag_first_present(before);
+    gfx_diag_px();
 }
 
 /* ======================================================================== */
