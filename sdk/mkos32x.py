@@ -10,6 +10,7 @@ mkos32x.py - フラットバイナリに OS32X ヘッダを付加する
     --heap SIZE    要求ヒープサイズ (バイト, デフォルト: 0=64KB)
     --bss SIZE     BSSサイズ (バイト, 手動指定。--elfと併用時はelfが優先)
     --api VER      最低APIバージョン (デフォルト: 1)
+    --compat-api   静的リンクの互換試験のみ、指定要求版をそのまま刻む
     --entry OFF    エントリポイントオフセット (デフォルト: 0)
     --gfx          GFXフラグを設定
     --ring3        CPL=3 (リング3) フラグを設定 (v2 M1)
@@ -67,6 +68,7 @@ def main():
     heap_size = 0
     bss_size = 0
     min_api_ver = 1
+    compat_api = False
     entry_offset = 0
     load_addr = 0
     flags = 0
@@ -86,6 +88,9 @@ def main():
         elif sys.argv[i] == '--api' and i + 1 < len(sys.argv):
             min_api_ver = int(sys.argv[i + 1], 0)
             i += 2
+        elif sys.argv[i] == '--compat-api':
+            compat_api = True
+            i += 1
         elif sys.argv[i] == '--entry' and i + 1 < len(sys.argv):
             entry_offset = int(sys.argv[i + 1], 0)
             i += 2
@@ -164,9 +169,11 @@ def main():
         shlib_dependency = '__os32_shlib_dependency' in elf.symbols
         if shlib_dependency and load_addr != H.OS32X_APP_LOAD_ADDR:
             raise H.HeaderError("resident shell must be statically linked")
-        eff_api = H.effective_min_api(min_api_ver)
+        if compat_api and (shlib_dependency or flags & OS32X_FLAG_SHLIB):
+            raise H.HeaderError("compatibility probe must be statically linked")
+        eff_api = H.effective_min_api(min_api_ver, compat_api)
         header = H.build_header(flags, entry_offset, text_size, bss_size,
-                                heap_size, min_api_ver, load_addr, kapi_data_off, stack_size, H.OS32_SHLIB_PROTOCOL if shlib_dependency else 0)
+                                heap_size, min_api_ver, load_addr, kapi_data_off, stack_size, H.OS32_SHLIB_PROTOCOL if shlib_dependency else 0, compat_api=compat_api)
     except H.HeaderError as e:
         print(f"mkos32x: {e}", file=sys.stderr)
         sys.exit(1)

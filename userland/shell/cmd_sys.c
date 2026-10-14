@@ -225,6 +225,8 @@ static int cmd_play(int argc, char **argv)
 /* /etc/system.cfg の読み書きバッファ幅 ([C4])。読みは実効 CFG_READ_MAX - 1。 */
 #define CFG_READ_MAX     1024
 #define CFG_OUT_MAX      1152
+/* 起動パーサ (kernel/sysconfig.c) が読める全体の長さ。ホスト試験で照合。 */
+#define CFG_WRITE_MAX    (CFG_READ_MAX - 1)
 /* 秒×100 tick の期限を符号付き差分で比較できる範囲。 */
 #define GSERIAL_TIMEOUT_MAX (0x7FFFFFFFUL / 100UL)
 
@@ -243,13 +245,14 @@ static int cfg_line_is_key(const char *p, int len, const char *key)
 }
 
 /* /etc/system.cfg の KEY= 行を val に差し替える (無ければ追記)。
+ * only_existing なら、キーが無いときはファイルを変えない。
  * 既存の他キー行は保存する。成功で 0、失敗で -1。
  * K4 の os32gui on/off と H2b の gfxmode が共用する。 */
-static int cfg_set_key(const char *key, const char *val)
+static int cfg_update_key(const char *key, const char *val, int only_existing)
 {
     char buf[CFG_READ_MAX];
     char out[CFG_OUT_MAX];
-    int fd, n, i, o;
+    int fd, n, i, o, found = 0;
 
     /* 既存内容を読む (無ければ空から作る)。
      * T22: **読み切れなければ書き戻さない**。以前は 1023 バイトで切って
@@ -261,15 +264,18 @@ static int cfg_set_key(const char *key, const char *val)
         int more = 0;
         if (r == (int)sizeof(buf) - 1) {
             char probe;
-            if (g_api->sys_read(fd, &probe, 1) > 0) more = 1;
+            int extra = g_api->sys_read(fd, &probe, 1);
+            if (extra < 0) r = extra;
+            else if (extra > 0) more = 1;
         }
         g_api->sys_close(fd);
+        if (r < 0) return -1;
         if (more) {
             sh_refuse("system.cfg", (int)sizeof(buf) - 1);
             return -1;
         }
         if (r > 0) n = r;
-    }
+    } else if (fd != OS32_ERR_NOTFOUND) return -1;
 
     /* 行ごとにコピー。旧 KEY= 行は捨てる。 */
     o = 0;
@@ -280,7 +286,10 @@ static int cfg_set_key(const char *key, const char *val)
         while (i < n && buf[i] != '\n') i++;
         len = i - ls;          /* 改行を含まない行長 */
         if (i < n) i++;        /* 改行を飛ばす */
-        if (cfg_line_is_key(&buf[ls], len, key)) continue;
+        if (cfg_line_is_key(&buf[ls], len, key)) {
+            found = 1;
+            continue;
+        }
         {
             int k;
             /* T22: 収まらない行を切って書き戻すと、その行の設定が変わる。 */
@@ -293,14 +302,17 @@ static int cfg_set_key(const char *key, const char *val)
         }
     }
 
+    /* 引数なし os32gui は、既存のタイムアウトだけ解除する。 */
+    if (only_existing && !found) return 0;
+
     /* 新しい KEY=VALUE 行を追記 */
     {
         int k;
         int need = 2;                    /* '=' と '\n' */
         for (k = 0; key[k]; k++) need++;
         for (k = 0; val[k]; k++) need++;
-        if (o + need > (int)sizeof(out)) {
-            sh_refuse("system.cfg", (int)sizeof(out));
+        if (o + need > CFG_WRITE_MAX) {
+            sh_refuse("system.cfg", CFG_WRITE_MAX);
             return -1;
         }
         for (k = 0; key[k]; k++) out[o++] = key[k];
@@ -317,6 +329,70 @@ static int cfg_set_key(const char *key, const char *val)
         if (w != o) return -1;
     }
     return 0;
+}
+
+static int cfg_set_key(const char *key, const char *val)
+{
+    return cfg_update_key(key, val, 0);
+}
+
+/* Match the boot parser: first KDEBUG assignment, default 0. */
+static int cfg_get_kdebug(int *value)
+{
+    char buf[CFG_READ_MAX];
+    int fd, n, i = 0;
+    *value = 0;
+    fd = g_api->sys_open(SYS_SYSTEM_CFG, KAPI_O_RDONLY);
+    if (fd == OS32_ERR_NOTFOUND) return 0;
+    if (fd < 0) return -1;
+    n = g_api->sys_read(fd, buf, sizeof(buf) - 1);
+    g_api->sys_close(fd);
+    if (n < 0) return -1;
+    while (i < n) {
+        int start = i;
+        while (i < n && buf[i] != '\n') i++;
+        if (cfg_line_is_key(buf + start, i - start, "KDEBUG")) {
+            int j = start, neg = 0;
+            u32 number = 0;
+            while (j < i && buf[j] != '=') j++;
+            j++;
+            while (j < i && (buf[j] == ' ' || buf[j] == '\t')) j++;
+            if (j < i && (buf[j] == '-' || buf[j] == '+')) neg = buf[j++] == '-';
+            while (j < i && buf[j] >= '0' && buf[j] <= '9')
+                number = number * 10 + (u32)(buf[j++] - '0');
+            *value = (int)(neg ? 0U - number : number);
+            return 0;
+        }
+        if (i < n) i++;
+    }
+    return 0;
+}
+
+static int cmd_kdebug(int argc, char **argv)
+{
+    int rc = 0;
+    if (argc > 2 || (argc == 2 && !str_eq(argv[1], "on") && !str_eq(argv[1], "off"))) {
+        g_api->kprintf(ATTR_RED, "%s", "Usage: kdebug [on|off]\n");
+        return SH_STATUS_USAGE;
+    }
+    if (argc == 2) {
+        const char *value = str_eq(argv[1], "on") ? "1" : "0";
+        if (cfg_set_key("KDEBUG", value) != 0) {
+            g_api->kprintf(ATTR_RED, "%s", "kdebug: failed to write /etc/system.cfg\n");
+            return SH_STATUS_ERROR;
+        }
+        g_api->kprintf(ATTR_GREEN, "KDEBUG=%s (system.cfg)\n", value);
+    } else {
+        int value;
+        if (cfg_get_kdebug(&value) != 0) {
+            g_api->kprintf(ATTR_RED, "%s", "kdebug: failed to read /etc/system.cfg\n");
+            return SH_STATUS_ERROR;
+        }
+        g_api->kprintf(ATTR_WHITE, "KDEBUG=%d (system.cfg)\n", value);
+        rc = shell_print_kdebug(1);
+    }
+    g_api->kprintf(ATTR_WHITE, "%s", "Actual state changes only after reboot.\n");
+    return rc;
 }
 
 static int cmd_os32gui(int argc, char **argv)
@@ -364,6 +440,9 @@ static int cmd_os32gui(int argc, char **argv)
         g_api->kprintf(ATTR_RED, "%s", "os32gui: failed to write /etc/system.cfg\n");
         return SH_STATUS_ERROR;
     }
+    if (argc == 1 && cfg_update_key("GSERIAL_TIMEOUT", "0", 1) != 0)
+        g_api->kprintf(ATTR_YELLOW, "%s",
+                       "os32gui: warning: failed to clear GSERIAL_TIMEOUT\n");
 
     /* 引数なし / -t: 今すぐ gshell へ切替。カーネルに次シェルを記録して自分は
      * 終了する → 起動ループが gshell を 0x300000 に載せる (契約 T9)。 */
@@ -552,6 +631,7 @@ static const ShellCmd sys_cmds[] = {
     { "play",   cmd_play,   "MML",           "Play MML via FM synth" },
     { "os32gui",cmd_os32gui,"[on|off|-t seconds]", "Switch to GUI shell now, or set GUI at boot" },
     { "gfxmode",cmd_gfxmode,"pc98|pegc|cirrus|auto|diag stripes|altwin|off","Force the graphics backend at next boot" },
+    { "kdebug", cmd_kdebug, "[on|off]",       "Show debug module state or set it at next boot" },
     { "kbdstat",cmd_kbdstat,"[-w]",          "Show keyboard 8251 counters (-w: log each byte, ESC/30s)" },
     { (const char *)0, 0, 0, 0 }
 };

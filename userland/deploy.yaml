@@ -196,6 +196,12 @@ filesystem:
     - host: userland/tests/h5_shape_iii.bin
       guest: /usr/bin/
       tags: [test]
+    - host: userland/tests/mem_stat_compat_test.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/kdebug_probe.bin
+      guest: /usr/bin/
+      tags: [test]
     - host: userland/tests/mem_stat_test.bin
       guest: /usr/bin/
       tags: [test]

@@ -4,7 +4,7 @@
 
 # deploy: HostDrv方式 — ビルド成果物をC:\os32にコピー (sudo不要, 再起動不要)
 # ゲストOSは /host 経由で直接アクセス可能
-deploy deploy-u3: $(BUILD_OUT)/vmkernel.lz4 programs unicode_bin
+deploy deploy-u3: $(BUILD_OUT)/vmkernel.lz4 $(BUILD_OUT)/kdebug.bin programs unicode_bin
 	python3 tools/gen_deploy_set.py
 	@echo "=== HostDrv Deploy ==="
 	$(HOSTDRV_DEPLOY) sync
@@ -14,7 +14,7 @@ deploy deploy-u3: $(BUILD_OUT)/vmkernel.lz4 programs unicode_bin
 #   (NP21/W再起動が必要)。HostDrv を先に同期するので、HostDrv 側が古いまま
 #   ext2 を上書きして中身を失う事故を防げる。
 #   ブートローダー自体を変更した場合は deploy-boot を別途実行すること。
-deploy-kernel: $(BUILD_OUT)/vmkernel.lz4
+deploy-kernel: $(BUILD_OUT)/vmkernel.lz4 $(BUILD_OUT)/kdebug.bin
 	python3 tools/gen_deploy_set.py
 	@echo "=== Sync to HostDrv before NHD deploy ==="
 	$(HOSTDRV_DEPLOY) sync
@@ -38,7 +38,7 @@ nhd-migrate-pt: boot/loader_hdd.bin $(BUILD_OUT)/vmkernel.lz4
 	$(NHD_DEPLOY) migrate-pt --loader boot/loader_hdd.bin --kernel $(BUILD_OUT)/vmkernel.lz4
 
 # deploy-nhd: NHDフルデプロイ (ローダー+全ファイル)
-deploy-nhd: $(BUILD_OUT)/vmkernel.lz4 programs unicode_bin
+deploy-nhd: $(BUILD_OUT)/vmkernel.lz4 $(BUILD_OUT)/kdebug.bin programs unicode_bin
 	# sync は書込み前に期待表を生成し、失敗なら配備しない。
 	@echo "=== NHD Deploy (using deploy.yaml) ==="
 	$(NHD_DEPLOY) sync

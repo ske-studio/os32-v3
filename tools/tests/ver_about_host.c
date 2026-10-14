@@ -58,6 +58,15 @@ static int fk_boot_image_info(BootImageInfo *out)
     return fk_bi_rc;
 }
 
+static i32 fk_mem_stat(i32 id, void *out, u32 size)
+{
+    MemStat st = {0};
+    if (id != 0 || size != sizeof(st)) return OS32_ERR_INVAL;
+    st.size = sizeof(st);
+    memcpy(out, &st, sizeof(st));
+    return sizeof(st);
+}
+
 /* 変異試験は cmd_base.c の写しを -DVER_CMD_BASE_C="\"<写し>\"" で差し替える。 */
 #ifndef VER_CMD_BASE_C
 #define VER_CMD_BASE_C "../../userland/shell/cmd_base.c"
@@ -82,6 +91,7 @@ int main(int argc, char **argv)
     g_fake.kprintf = fk_kprintf;
     g_fake.sys_get_build_info = fk_sys_get_build_info;
     g_fake.boot_image_info = fk_boot_image_info;
+    g_fake.mem_stat = fk_mem_stat;
     g_fake.version = (u32)strtoul(argv[1], NULL, 10);
     fk_build = argv[2];
     fk_bi_rc = atoi(argv[3]);

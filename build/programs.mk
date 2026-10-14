@@ -547,6 +547,7 @@ userland/%.bin: userland/%.raw userland/%.elf
 	_api=$${_api:-7}; \
 	_heap=$${_heap:-0}; \
 	_opts=""; \
+	if [ "$*" = "tests/mem_stat_compat_test" ]; then _opts="$$_opts --compat-api"; fi; \
 	if [ "$$_heap" != "0" ]; then _opts="$$_opts --heap $$_heap"; fi; \
 	if [ "$$_decl" = "gfx" ]; then _opts="$$_opts --gfx"; fi; \
 	if [ "$$_decl" = "cui" ]; then _opts="$$_opts --cui-only"; fi; \

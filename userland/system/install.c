@@ -482,7 +482,7 @@ static const char *const init_dirs[] = {
 #define INIT_DIRS ((int)(sizeof(init_dirs) / sizeof(init_dirs[0])))
 
 /* FD から写すディレクトリ (媒体の名前 → /hd0 の下の名前) */
-static const char *const copy_dirs[] = { "/sys", "/bin", "/sbin", "/etc" };
+static const char *const copy_dirs[] = { "/boot", "/sys", "/bin", "/sbin", "/etc" };
 #define COPY_DIRS ((int)(sizeof(copy_dirs) / sizeof(copy_dirs[0])))
 
 /* 展開先に要る量を**書く前に**数える。列挙の失敗は失敗の件数で返す。 */

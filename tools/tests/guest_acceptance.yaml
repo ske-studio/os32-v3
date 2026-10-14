@@ -1158,19 +1158,19 @@
   gate: f13
   contract: userland/tests/mem_stat_test.c
   mode: manual
-  prereq: 17MB; PM deploy matching v72 kernel/shell/sh and mem_stat_test, verify deployed binaries, new kernel.map and boot result
+  prereq: Paired module RUNNING (kdebug_state == 1 and kdebug_pair_crc == ver Image CRC); PM deploy matching v75 kernel/shell/sh and both mem_stat tests, verify deployed binaries, new kernel.map and boot result
   entry: mem_stat_test; CPL3 sh mem; CPL0 resident shell mem
   observe:
-  - 'Require mem_stat_test PASS self=<2..5> others=<the other three IDs in ascending order> and mem_stat_test: PASS 14/14, exit 0. ID is read from self before other-ID tests; USER accepts system/self and rejects every other ID with INVAL and out unchanged, including short/zero-size refusal'
+  - 'Require mem_stat_test PASS self=<2..5> others=<the other three IDs in ascending order> and mem_stat_test: PASS 19/19 and mem_stat_compat_test: PASS 17/17, exit 0. ID is read from self before other-ID tests; USER accepts system/self and rejects every other ID with INVAL and out unchanged, including short/zero-size refusal'
   - 'CPL3 shでmem: 従来5行の順を保ち、実測システム行 (kheap_total/used/free, phys_total_pages/free_pages, resident_heap_total/used) と自分だけ。CPL0 resident sbrk上限の実測行は出ない'
   - 'P3修正後のアプリ表示は1本3行: 実測 app=<id> st=<state> fl=<flags> ext=<extents_total> [LIBC_INITIAL,EXEC_INITIAL,ANON,EXEC_ARENA,EXEC_LARGE] free=<extents_free> ar=<arenas> heap=<exec_heap_used>B; img=<MEM_EXEC_LOAD_ADDR 80100000>-<img_end> 主端=<primary_mapped_end> libc初=<sbrk_heap_limit> 窓0=<page_up(img_end)>-88000000; 端/TD=<exec_heap_cur_end>-<guard_b> stk=<stack_top-stack_size>-<stack_top>/<stack_size>B 初=<exec_heap_base>+<exec_heap_size>B。fixtureの計数値をゲストの期待にしない'
   - 'CPL3 sh終了後、CPL0常駐shellのプロンプトでmem: live appがなければ (app なし) の1行。FREE IDのNOTFOUNDは表示しない。live appを置いた場合はID2..5の該当だけ3行ずつ。system/他エラーはerror行で残す'
-  - '新kernel.mapとbinary hashでboot kselftest_pass=289, kselftest_fail=0を実測しmem_stat:TRUSTED AS extentsの正例を確認 (ソース予測288+1を実測合格と混同しない)'
+  - '新kernel.mapとbinary hashでboot kselftest_pass>=295, kselftest_fail=0を実測しmem_stat:TRUSTED AS extentsの正例を確認 (S1bはKDEBUGに関係なく自己試験を本体で実行)'
   - 'fault_kill_countを前後で採りkill delta0、exec_as_leftover_pages0。db_test9/9・db_v50_test42/42、shell/ver応答を確認'
   expect:
-    total: 14
+    total: 19
     exit: 0
-    kselftest_pass: 289
+    kselftest_pass: 295
     kselftest_fail: 0
     kill_delta: 0
     leftover: 0

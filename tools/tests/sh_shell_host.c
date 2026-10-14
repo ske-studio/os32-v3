@@ -503,6 +503,8 @@ static void show_prompt(void) { out_str("sh> "); }
 
 void shell_register_cmds(const ShellCmd *cmds) { (void)cmds; }
 void shell_print_help(const char *cmd_name) { (void)cmd_name; }
+/* 表示の実物は kdebug_cli_host.c で検査する。この試験はスクリプト経路。 */
+int shell_print_kdebug(int detail) { (void)detail; return 0; }
 
 /* 実行した行の記録。source / goto / exit だけ意味を持たせ、他は記録のみ。 */
 #define TRACE_MAX   16

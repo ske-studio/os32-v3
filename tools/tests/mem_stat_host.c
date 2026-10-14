@@ -87,6 +87,8 @@ static u32 snapshot_kheap_free(void)
 #define kmalloc_total snapshot_kheap_total
 #define kmalloc_used snapshot_kheap_used
 #define kmalloc_free snapshot_kheap_free
+#include "module.h"
+struct kdebug kdebug;
 #include "mem_stat_source.c"
 #undef pgalloc_free_pages
 #undef kmalloc_total
@@ -191,7 +193,7 @@ static void matrix(void)
 
 static void sizes(void)
 {
-    const u32 sizes[] = {0, MEMSTAT_MIN - 1, MEMSTAT_MIN, 73, 120, 132, 133, 199, sizeof(MemStat), sizeof(output)};
+    const u32 sizes[] = {0, MEMSTAT_MIN - 1, MEMSTAT_MIN, 73, 120, 132, 133, 199, 200, sizeof(MemStat), sizeof(output)};
     MemStat full;
     CHECK("full size", kapi_mem_stat(-1, &full, sizeof(full)) == sizeof(full));
     CHECK("NULL direct", kapi_mem_stat(-1, 0, sizeof(full)) == OS32_ERR_INVAL);
@@ -246,6 +248,44 @@ static void values(void)
 }
 
 
+static void module_status(void)
+{
+    MemStat st;
+    u32 owner, phys, reclaimed;
+    CHECK("module fixture owner", ledger_owner_new(LEDGER_KIND_MODULE, 1, "kdebug", &owner));
+    phys = pgalloc_alloc_phys(owner, 3);
+    CHECK("module fixture pages", phys && ledger_owner_pages(owner) == 3);
+    for (u32 state = 0; state <= 12; state++) {
+        kdebug.state = state;
+        kdebug.pair_crc = 0x1234abcd;
+        kdebug.pages = 1; /* Deliberately independent of the ledger's three. */
+        kdebug.owner = owner;
+        kdebug.open_count = 7;
+        CHECK("module snapshot", kapi_mem_stat(0, &st, sizeof(st)) == 220);
+        CHECK("module state", st.kdebug_state == state);
+        CHECK("module pair", st.kdebug_pair_crc == kdebug.pair_crc);
+        CHECK("module body", st.kdebug_pages == 1);
+        CHECK("module owner ledger", st.kdebug_owner_pages == (state == KDEBUG_RUNNING ? 3U : 0U));
+        CHECK("module opens", st.kdebug_open_count == 7);
+    }
+    CHECK("module reclaim", ledger_reclaim_owner(owner, &reclaimed) && reclaimed == 3);
+    CHECK("module retire", ledger_owner_retire(owner));
+    CHECK("module retired snapshot", kapi_mem_stat(0, &st, sizeof(st)) == 220);
+    CHECK("module retired owner", !st.kdebug_owner_pages);
+    u32 reused;
+    CHECK("module owner reused", ledger_owner_new(LEDGER_KIND_AS, 5, "other AS", &reused) && reused == owner);
+    CHECK("reused owner pages", pgalloc_alloc_phys(reused, 2) && ledger_owner_pages(reused) == 2);
+    kdebug.state = 9; /* Rejected record retains the now-reused number. */
+    CHECK("reused owner snapshot", kapi_mem_stat(0, &st, sizeof(st)) == 220);
+    CHECK("module owner ledger", !st.kdebug_owner_pages);
+    CHECK("reused owner reclaim", ledger_reclaim_owner(reused, &reclaimed) && reclaimed == 2);
+    CHECK("reused owner retire", ledger_owner_retire(reused));
+    kdebug.owner = 0;
+    CHECK("module zero snapshot", kapi_mem_stat(0, &st, sizeof(st)) == 220);
+    CHECK("module zero owner", !st.kdebug_owner_pages);
+    kdebug = (struct kdebug){0};
+}
+
 static void owner_diagnostics(void)
 {
     struct addrspace diag = {0};
@@ -298,6 +338,7 @@ void _start(void)
     on_stack(shell_syscall, MEM_SHELL_STACK_TOP);
     /* Include the copyout/return path after the syscall snapshot was taken. */
     expected_stack_water = actual_kstack_high_water();
+    module_status();
     matrix(); sizes(); values();
     u32 anon[2];
     for (u32 i = 0; i < 2; i++) {

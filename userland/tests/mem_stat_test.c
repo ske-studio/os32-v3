@@ -17,7 +17,7 @@ int main(int argc, char **argv, KernelAPI *api)
     CHECK(rc == sizeof(stat) && stat.size == sizeof(stat) &&
           (stat.flags & MEMSTAT_HAS_AS) && stat.app_id >= 2 && stat.app_id <= 5);
     if (passed != total) goto done;
-    CHECK(sizeof(MemStat) == 200 && stat.owner_pages > 0);
+    CHECK(sizeof(MemStat) == 220 && stat.owner_pages > 0);
     self = stat.app_id;
     CHECK(api->mem_stat(self, &stat, sizeof(stat)) == sizeof(stat) && stat.app_id == self);
     CHECK(api->mem_stat(0, &stat, sizeof(stat)) == sizeof(stat) &&
@@ -25,6 +25,8 @@ int main(int argc, char **argv, KernelAPI *api)
     CHECK(stat.owner_pages == 0 && stat.kstack_high_water > 0 &&
           stat.kheap_peak >= stat.kheap_used && stat.resident_heap_peak >= stat.resident_heap_used &&
           stat.kselftest_fail == 0 && stat.kselftest_pass >= 295);
+    /* S1b: selftests still run in the kernel, in both KDEBUG modes. */
+    CHECK(stat.kdebug_state == 1 ? stat.kdebug_owner_pages > 0 : stat.kdebug_owner_pages == 0);
     for (int id = 2; id <= 5; id++) {
         if (id == self) continue;
         others[n++] = id;

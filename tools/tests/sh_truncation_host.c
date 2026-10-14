@@ -3214,7 +3214,9 @@ static void case_cfg_set_key(void)
     /* `os32gui` は sh.bin では sh_is_cui_only が先に断つので、
      * 書き戻しの本体 (cfg_set_key) を直に呼ぶ。 */
     fresh();
-    bigscript_build("GUI=0\n", "K=v\n", 400);   /* 6 + 1600 = 1606B */
+    /* 消す GUI 行が長くても、ファイル全体を読み切ってから書く。
+     * 出力長の拒否だけでは probe の変異を見逃すので、置換後は短くする。 */
+    bigscript_build("GUI=", "0", 1600);
     file_add("/etc/system.cfg", g_bigscript);
     check(cfg_set_key("GUI", "1") == -1, "26a 読み切れない設定を断る");
     check(refused_msg("system.cfg"), "26b 何が上限を超えたかを報告する");

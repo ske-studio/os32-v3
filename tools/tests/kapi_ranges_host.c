@@ -67,6 +67,8 @@ volatile u32 fault_kill_count, appslot_reclaim_count, ring3_stop_park_count;
 u32 memmap_audit_runs, as_audit_runs, v86_return_audit_runs;
 u32 memmap_audit_fail, as_audit_fail, v86_return_audit_fail;
 int kselftest_pass, kselftest_fail;
+#include "module.h"
+struct kdebug kdebug;
 #include "memstat_host_source.c"
 i32 kapi_mem_stat(i32 id, void *out, u32 size) {
     reached++;

@@ -70,3 +70,6 @@ check-trim-kernel-host:
 - exec/owner_diag.h
 - kernel/kernel.c
 - kernel/kstack_hw.c
+- tools/tests/kdebug_cli_host.c
+- userland/shell/cmd_base.c
+- kernel/sysconfig.c
