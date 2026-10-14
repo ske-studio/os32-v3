@@ -47,6 +47,8 @@ db_test                 # 下の「確かめていない 1 件」
 shm_reuse_test          # PASS 4/4: lock→free/exit→別 AS の同一 SHM 全ページ書込み
 
 mem_stat_test          # mem_stat sizes / self / system / other IDs
+mem_stat_compat_test    # v72: 200B prefix compatibility
+kdebug_probe            # v75: module state and owner pages
 
 # --- 入れなかったもの (前段 §8 の分類。理由を必ず書く) ---
 #

@@ -16,6 +16,7 @@
 #include "pgalloc.h"
 #include "io.h"
 #include "kstack_hw.h"
+#include "module.h"
 extern u32 exec_as_leftover_pages;
 extern volatile u32 fault_kill_count;
 extern u32 memmap_audit_runs, as_audit_runs, v86_return_audit_runs;
@@ -26,8 +27,9 @@ extern volatile int ring3_in_syscall;
 
 i32 kapi_mem_stat(i32 app_id, void *out, u32 size) __attribute__((cold));
 
-STATIC_ASSERT(sizeof(MemStat) == 200, memstat_size);
+STATIC_ASSERT(sizeof(MemStat) == 220, memstat_size);
 STATIC_ASSERT(__builtin_offsetof(MemStat, kstack_high_water) == 132, memstat_v73_prefix);
+STATIC_ASSERT(__builtin_offsetof(MemStat, kdebug_state) == 200, memstat_v74_prefix);
 STATIC_ASSERT(__builtin_offsetof(MemStat, owner_pages) == 196, memstat_owner_pages);
 STATIC_ASSERT(__builtin_offsetof(MemStat, extents_total) == MEMSTAT_MIN, memstat_min);
 STATIC_ASSERT(__builtin_offsetof(MemStat, img_end) == 80, memstat_layout);
@@ -120,6 +122,14 @@ i32 kapi_mem_stat(i32 app_id, void *out, u32 size)
     snap.audit_fail = memmap_audit_fail + as_audit_fail + v86_return_audit_fail;
     snap.kselftest_pass = kselftest_pass;
     snap.kselftest_fail = kselftest_fail;
+    snap.kdebug_state = kdebug.state;
+    snap.kdebug_pair_crc = kdebug.pair_crc;
+    snap.kdebug_pages = kdebug.pages;
+    /* A rejected module keeps its retired owner number for diagnostics; an
+     * app may already have reused that number. Only RUNNING owns these pages. */
+    snap.kdebug_owner_pages = kdebug.state == KDEBUG_RUNNING && kdebug.owner ?
+        ledger_owner_pages(kdebug.owner) : 0;
+    snap.kdebug_open_count = kdebug.open_count;
     snap.size = size < sizeof(snap) ? size : sizeof(snap);
     snap.app_id = app_id;
     snap.phys_total_pages = pgalloc_total_pages();

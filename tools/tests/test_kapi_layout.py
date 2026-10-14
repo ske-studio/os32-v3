@@ -223,11 +223,11 @@ def build_elf(tmp, name, stamp=True, extra_asm=None, pad=0, fill=1):
     return elf, raw
 
 
-def mkos32x(raw, out, elf=None, api=39):
+def mkos32x(raw, out, elf=None, api=39, opts=()):
     cmd = [sys.executable, "-B", "sdk/mkos32x.py", raw, out, "--api", str(api)]
     if elf is not None:
         cmd += ["--elf", elf]
-    return run(cmd)
+    return run(cmd + list(opts))
 
 
 def case_mkos32x(tmp):
@@ -252,6 +252,18 @@ def case_mkos32x(tmp):
     check(h["text_size"] == len(raw.read_bytes()) == len(blob) - H.OS32X_HDR_SIZE,
           "本文は .raw そのまま (刻印は平らなバイナリに入らない)")
     check(h.get("load_addr") == 0x80100000, "load_addr は ELF の .text")
+
+    compat_out = tmp / "compat72.bin"
+    r = mkos32x(raw, compat_out, elf, api=72, opts=['--compat-api'])
+    check(r.returncode == 0 and H.parse_header(compat_out.read_bytes())["min_api_ver"] == 72,
+          "explicit static compatibility probe retains KAPI 72")
+    r = mkos32x(raw, tmp / "compat-shlib.bin", elf, api=72, opts=['--compat-api', '--shlib'])
+    check(r.returncode != 0, "compatibility API cannot wrap a shlib")
+    r = mkos32x(raw, tmp / "compat-no-stamp.bin", api=72, opts=['--compat-api'])
+    check(r.returncode != 0, "compatibility API still requires ELF generation stamps")
+    for api in (H.OS32X_HDR_V3_MIN_API - 1, H.OS32X_MIN_API + 1):
+        r = mkos32x(raw, tmp / "compat-bad.bin", elf, api=api, opts=['--compat-api'])
+        check(r.returncode != 0, "compatibility probe rejects unsupported API version")
 
     for api in (H.OS32X_MIN_API - 1, H.OS32X_MIN_API):
         api_out = tmp / f"api{api}.bin"

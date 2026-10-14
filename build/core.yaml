@@ -40,6 +40,10 @@ filesystem:
     - host: build/out/vmkernel.lz4
       guest: /boot/vmkernel.lz4
       tags: [core]
+    # --- Paired debug module (also copied by hsync boot) ---
+    - host: build/out/kdebug.bin
+      guest: /boot/kdebug.bin
+      tags: [core]
     # --- カーネルデータ ---
     - host: build/out/unicode.bin
       guest: /sys/unicode.bin

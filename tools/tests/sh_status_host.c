@@ -349,7 +349,7 @@ static u32  g_data_written;
 static int  g_data_writes;
 static char g_cfg_written[1152 + 1];
 static int g_cfg_write_fail;
-static int g_switch_calls, g_switch_rc, g_exit_calls;
+static int g_switch_calls, g_switch_rc, g_exit_calls, g_writes_at_switch;
 static int g_sfs_begin_rc, g_sfs_end_calls, g_sfs_end_status;
 static int g_sfs_end_in_sfs;
 
@@ -474,7 +474,7 @@ static int __cdecl h_sys_open(const char *path, int flags)
         g_read_pos[g_file_count - 1] = 0;
         return g_file_count - 1 + FD_BASE;
     }
-    return -1;
+    return OS32_ERR_NOTFOUND;
 }
 
 /* fd 1 / 2 への書き込みは出力に残す。`echo` は kprintf ではなく
@@ -1005,6 +1005,7 @@ static int __cdecl h_sys_switch_shell(const char *path)
 {
     check(strcmp(path, SYS_GSHELL_BIN) == 0, "GSERIAL switch uses gshell path");
     g_switch_calls++;
+    g_writes_at_switch = g_data_writes;
     return g_switch_rc;
 }
 static void __cdecl h_sys_exit(int rc)
@@ -2166,6 +2167,24 @@ static void case_gserial_gui(void)
     fresh();
     check(cmd_os32gui(1, plain) == 0 && g_switch_calls == 1 && g_exit_calls == 1 &&
           !g_data_writes, "GSERIAL legacy bare os32gui still enters without cfg write");
+    fresh();
+    file_add(SYS_SYSTEM_CFG, "GUI=1\nOTHER=keep\n GSERIAL_TIMEOUT = 7\n");
+    check(cmd_os32gui(1, plain) == 0 && g_switch_calls == 1 && g_exit_calls == 1 &&
+          g_writes_at_switch == 1 &&
+          strcmp(g_cfg_written, "GUI=1\nOTHER=keep\nGSERIAL_TIMEOUT=0\n") == 0,
+          "GSERIAL bare os32gui clears previous timeout before switching");
+    fresh();
+    file_add(SYS_SYSTEM_CFG, "GUI=1\nOTHER=keep\n# GSERIAL_TIMEOUT=7\n");
+    check(cmd_os32gui(1, plain) == 0 && g_switch_calls == 1 && g_exit_calls == 1 &&
+          !g_data_writes && g_open_calls == 1 && strcmp(g_files[0].body,
+                                 "GUI=1\nOTHER=keep\n# GSERIAL_TIMEOUT=7\n") == 0,
+          "GSERIAL missing timeout leaves existing file unchanged");
+    fresh();
+    file_add(SYS_SYSTEM_CFG, "GUI=1\nGSERIAL_TIMEOUT=7\n");
+    g_cfg_write_fail = 1;
+    check(cmd_os32gui(1, plain) == 0 && g_switch_calls == 1 && g_exit_calls == 1 &&
+          !g_data_writes && out_has("os32gui: warning: failed to clear GSERIAL_TIMEOUT"),
+          "GSERIAL bare os32gui warns on cfg failure and still switches");
     fresh();
     sh_in_sfs = 1;
     check(cmd_os32gui(1, plain) == SH_STATUS_ERROR &&

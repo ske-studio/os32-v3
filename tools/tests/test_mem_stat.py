@@ -16,8 +16,9 @@ import test_appmem_map as base
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 TARGET_SRCS = base.TARGET_SRCS + [
-    'kapi/kapi_sys.c', 'userland/shell/cmd_sys.c',
-    'tools/tests/mem_stat_host.c', 'tools/tests/test_mem_stat.py',
+    'kapi/kapi_sys.c', 'userland/shell/cmd_sys.c', 'userland/shell/cmd_base.c', 'kernel/module.h',
+    'tools/tests/mem_stat_host.c', 'tools/tests/kdebug_cli_host.c', 'tools/tests/test_mem_stat.py',
+    'kernel/sysconfig.c',
 ]
 
 
@@ -89,6 +90,12 @@ def build_fixture(tmp):
 
 
 MUTANTS = [
+    ('module state absent', 'snap.kdebug_state = kdebug.state;', '', 'module state'),
+    ('module pair absent', 'snap.kdebug_pair_crc = kdebug.pair_crc;', '', 'module pair'),
+    ('module body absent', 'snap.kdebug_pages = kdebug.pages;', '', 'module body'),
+    ('module owner from body', 'kdebug.state == KDEBUG_RUNNING && kdebug.owner ?\n        ledger_owner_pages(kdebug.owner) : 0', 'kdebug.pages', 'module owner ledger'),
+    ('module retired owner reused', 'kdebug.state == KDEBUG_RUNNING && kdebug.owner', 'kdebug.owner', 'module owner ledger'),
+    ('module opens absent', 'snap.kdebug_open_count = kdebug.open_count;', '', 'module opens'),
     ('owner absent', 'snap.owner_pages = ledger_owner_pages(as->owner);', '', 'owner pages'),
     ('diagnostics absent', 'snap.fault_kill_count = fault_kill_count;', '', 'diagnostic system'),
     ('lease absent', 'snap.lease_active += slot->as->leases[i].token != 0;', '(void)i;', 'active leases'),
@@ -440,6 +447,67 @@ def run_shell(runner, mutate):
     print('PASS cmd_mem CPL0/CPL3 normal/empty/errors')
 
 
+def run_kdebug_cli(runner, mutate=False):
+    base_source = (ROOT / 'userland/shell/cmd_base.c').read_text()
+    sys_source = (ROOT / 'userland/shell/cmd_sys.c').read_text()
+    cfg_defines = '\n'.join(re.findall(r'^#define CFG_.*$', sys_source, re.M))
+    shell_max = int(re.search(r'^#define CFG_READ_MAX\s+(\d+)', sys_source, re.M)[1])
+    kernel_source = (ROOT / 'kernel/sysconfig.c').read_text()
+    kernel_max = int(re.search(r'^#define SYSCONFIG_MAX\s+(\d+)', kernel_source, re.M)[1])
+    assert shell_max == kernel_max, 'shell/boot system.cfg read limits differ [C4]'
+    table = base_source[base_source.index('static const char *const kdebug_state_names'):base_source.index('int shell_print_kdebug(')]
+    source = table + '\n'.join(function(base_source, sig) for sig in
+        ('int shell_print_kdebug(', 'static int cmd_ver(')) + '\n' + '\n'.join(
+        function(sys_source, sig) for sig in ('static int cfg_line_is_key(',
+        'static int cfg_update_key(', 'static int cfg_set_key(',
+        'static int cfg_get_kdebug(', 'static int cmd_kdebug('))
+    fixture = (ROOT / 'tools/tests/kdebug_cli_host.c').read_text().replace('/* CFG_DEFINES */', cfg_defines).replace('/* PRODUCT_SOURCE */', source).replace('RING3_WINDOW_DEFINE', ring3_window_define())
+    variants = [('control', fixture)]
+    if mutate:
+        for name, old, new in (
+            ('cfg open error ignored', '} else if (fd != OS32_ERR_NOTFOUND) return -1;', '}'),
+            ('cfg read error ignored', 'if (r < 0) return -1;', 'if (0) return -1;'),
+            ('cfg probe error ignored', 'if (extra < 0) r = extra;', 'if (extra < 0) r = 0;'),
+            ('cfg output exceeds boot limit', 'if (o + need > CFG_WRITE_MAX)',
+             'if (o + need > (int)sizeof(out))'),
+        ):
+            assert source.count(old) == 1, name
+            variants.append((name, fixture.replace(old, new, 1)))
+    for app, (name, body) in ((app, variant) for app in (False, True) for variant in variants):
+        with tempfile.TemporaryDirectory(prefix='kdebug-cli-') as directory:
+            tmp = pathlib.Path(directory)
+            c, out = tmp / 'test.c', tmp / 'test'
+            c.write_text(body)
+            host32.build(['gcc', '-m32', '-march=i386', '-std=gnu11', '-ffreestanding',
+                '-fno-builtin', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static',
+                '-no-pie', '-Wall', '-Wextra', '-Werror',
+                '-I' + str(ROOT / 'sdk/include'), '-I' + str(ROOT / 'sdk/include/os32'),
+                '-I' + str(ROOT / 'include'), *(['-DSHELL_AS_APP'] if app else []),
+                str(c), '-o', str(out)], check=True, capture_output=True, text=True)
+            result = host32.run([str(out)], runner=runner, capture_output=True,
+                                text=True, timeout=host32.RUN_TIMEOUT)
+            if name != 'control':
+                assert result.returncode == 1 and 'FAIL: cfg_set_key(' in result.stdout, (
+                    name, result.returncode, result.stdout, result.stderr)
+                print('RED:', name, 'CPL3' if app else 'CPL0')
+                continue
+            assert result.returncode == 0, result.stdout + result.stderr
+            output = result.stdout
+            for line in ('kdebug: off',
+                'kdebug: on (pair 1234abcd, body 2 pages, owner 3 pages)',
+                'kdebug: rejected (4 PAIR_MISMATCH, file pair 1234abcd)',
+                'state=1 pair=1234abcd body=2 owner=3 open_count=7',
+                'Actual state changes only after reboot.'):
+                assert line in output, line
+            names = ('NOT_FOUND', 'BAD_HEADER', 'PAIR_MISMATCH', 'NO_IMAGE_CRC',
+                     'ABI_MISMATCH', 'NO_PAGES', 'SHORT_READ', 'BAD_CRC', 'INIT_FAILED',
+                     'RELOC_INVALID', 'IMPORT_INVALID', 'UNKNOWN')
+            for code, name in enumerate(names, 2):
+                assert f'rejected ({code} {name}, file pair 1234abcd)' in output
+            assert 'Image CRC: 1234abcd (0 bytes, HDD loader)\nkdebug: on' in output
+            print('PASS kdebug CLI CPL3' if app else 'PASS kdebug CLI CPL0')
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--runner', choices=('native', 'qemu'), default='qemu')
@@ -449,6 +517,7 @@ if __name__ == '__main__':
         run_body(args.runner, args.mutate)
         # cmd_mem controls are below; both paths run even with --mutate.
         run_shell(args.runner, args.mutate)
+        run_kdebug_cli(args.runner, args.mutate)
     except subprocess.CalledProcessError as error:
         print(error.stdout or '', error.stderr or '')
         raise

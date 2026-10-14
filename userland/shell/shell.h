@@ -163,6 +163,7 @@ int  sh_refused_peek(void);                   /* 読むだけ (消さない) */
 extern const char *cmd_names[];  /* タブ補完用 */
 const ShellCmd *shell_get_cmds(int *count);
 void shell_print_help(const char *cmd_name);
+int shell_print_kdebug(int detail);
 
 /* メインループ・UI制御 (ui.c) */
 void shell_run(void);

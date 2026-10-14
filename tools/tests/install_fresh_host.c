@@ -696,6 +696,8 @@ static void media_fixture(void)
     fx_reset();
     fx_dir("/");
     fx_put("/VMKRNL.LZ4", LZ4_SIZE);
+    fx_dir("/BOOT");
+    fx_put("/BOOT/KDEBUG.BIN", 1320);
     fx_dir("/SYS");
     fx_put("/SYS/BOOT_HDD.BIN", 512);
     fx_put("/SYS/LOADER_H.BIN", LOADER_LEN);
@@ -761,6 +763,7 @@ static void case_vmkernel(void)
     CHECK(fx_exists("/hd0/boot/vmkernel.lz4"));
     CHECK(fx_size("/hd0/boot/vmkernel.lz4") == LZ4_SIZE);
     CHECK(fx_content_ok("/hd0/boot/vmkernel.lz4", LZ4_SIZE));
+    CHECK(fx_content_ok("/hd0/boot/kdebug.bin", 1320));
     CHECK_STR("vmkernel.lz4 -> /boot (470000 bytes)");
     CHECK_STR("Installation complete");
 }

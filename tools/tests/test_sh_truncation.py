@@ -587,7 +587,9 @@ MUTATIONS = [
     ("t22_cfg_no_probe", "userland/shell/cmd_sys.c",
      "        if (r == (int)sizeof(buf) - 1) {\n"
      "            char probe;\n"
-     "            if (g_api->sys_read(fd, &probe, 1) > 0) more = 1;\n"
+     "            int extra = g_api->sys_read(fd, &probe, 1);\n"
+     "            if (extra < 0) r = extra;\n"
+     "            else if (extra > 0) more = 1;\n"
      "        }",
      "        if (0) {\n"
      "            more = 1;\n"

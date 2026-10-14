@@ -56,6 +56,44 @@ static int cmd_tick(int argc, char **argv)
     return 0;
 }
 
+/* Names follow TASK_DBGREF §3-7; one table for ver and kdebug. */
+static const char *const kdebug_state_names[] = {
+    "OFF", "RUNNING", "NOT_FOUND", "BAD_HEADER", "PAIR_MISMATCH",
+    "NO_IMAGE_CRC", "ABI_MISMATCH", "NO_PAGES", "SHORT_READ", "BAD_CRC",
+    "INIT_FAILED", "RELOC_INVALID", "IMPORT_INVALID"
+};
+
+int shell_print_kdebug(int detail)
+{
+    MemStat st;
+    int rc;
+    if (g_api->version < 75) {
+        if (detail) g_api->kprintf(ATTR_RED, "%s", "kdebug: requires KAPI v75\n");
+        return SH_STATUS_ERROR;
+    }
+    rc = g_api->mem_stat(0, &st, sizeof(st));
+    if (rc != sizeof(st)) {
+        g_api->kprintf(ATTR_RED, "kdebug: mem_stat failed (rc=%d)\n", rc);
+        return SH_STATUS_ERROR;
+    }
+    if (st.kdebug_state == 0)
+        g_api->kprintf(ATTR_WHITE, "%s", "kdebug: off\n");
+    else if (st.kdebug_state == 1)
+        g_api->kprintf(ATTR_WHITE, "kdebug: on (pair %08x, body %u pages, owner %u pages)\n",
+                       st.kdebug_pair_crc, st.kdebug_pages, st.kdebug_owner_pages);
+    else {
+        const char *name = st.kdebug_state < sizeof(kdebug_state_names) / sizeof(kdebug_state_names[0]) ?
+            kdebug_state_names[st.kdebug_state] : "UNKNOWN";
+        g_api->kprintf(ATTR_WHITE, "kdebug: rejected (%u %s, file pair %08x)\n",
+                       st.kdebug_state, name, st.kdebug_pair_crc);
+    }
+    if (detail)
+        g_api->kprintf(ATTR_WHITE, "  state=%u pair=%08x body=%u owner=%u open_count=%u\n",
+                       st.kdebug_state, st.kdebug_pair_crc, st.kdebug_pages,
+                       st.kdebug_owner_pages, st.kdebug_open_count);
+    return 0;
+}
+
 static int cmd_ver(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -88,6 +126,7 @@ static int cmd_ver(int argc, char **argv)
                 g_api->kprintf(ATTR_WHITE, "%s", "  Image CRC: none (loader did not record)\n");
         }
     }
+    if (g_api->version >= 75) (void)shell_print_kdebug(0);
     return 0;
 }
 

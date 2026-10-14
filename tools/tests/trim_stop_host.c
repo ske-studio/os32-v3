@@ -20,6 +20,8 @@ volatile u32 fault_kill_count;
 u32 memmap_audit_runs, as_audit_runs, v86_return_audit_runs;
 u32 memmap_audit_fail, as_audit_fail, v86_return_audit_fail;
 int kselftest_pass, kselftest_fail;
+#include "module.h"
+struct kdebug kdebug;
 #include "mem_stat_source.c"
 void appslot_trim_request_as(struct addrspace *as) { trim_product_request(as); }
 #include "trim_exec_source.c"

@@ -267,7 +267,14 @@ class AboutMatchesVer(unittest.TestCase):
         r = subprocess.run([str(self.c), *case_args(c)],
                            capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
-        return r.stdout.split('\n')[:-1]
+        lines = r.stdout.split('\n')[:-1]
+        # S1b adds a module line to ver; About still shares the boot/image lines.
+        if c[0] >= 75:
+            self.assertEqual(lines[-1], 'kdebug: off')
+            lines = lines[:-1]
+        else:
+            self.assertFalse(any(line.startswith('kdebug:') for line in lines))
+        return lines
 
     # ---- ver と同じ ------------------------------------------------------
 

@@ -69,6 +69,7 @@ packages:
   minimal:
     version: 2
     lzss: false
+    # core includes /boot/vmkernel.lz4 and its paired /boot/kdebug.bin.
     tags: [core, base]
     # 媒体だけが持つ物 (通常配備は /etc/settings.tsv を配り、DB は作らない。
     # 票 TASK_S0 §3。生成は build/assets.mk)

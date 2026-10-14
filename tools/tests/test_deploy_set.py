@@ -44,6 +44,7 @@ class DeploySet(unittest.TestCase):
         self.root = Path(self.tmp.name)
         self.entries = [
             {"host": "build/out/vmkernel.lz4", "guest": "/boot/vmkernel.lz4"},
+            {"host": "build/out/kdebug.bin", "guest": "/boot/kdebug.bin"},
             {"host": "build/out/unicode.bin", "guest": "/sys/unicode.bin"},
             {"host": "userland/shell.bin", "guest": "/sys/shell.bin"},
             {"host": "userland/libos32gui.shlib", "guest": "/sys/lib/"},
@@ -52,7 +53,7 @@ class DeploySet(unittest.TestCase):
             {"host": "assets/*.dat", "guest": "/data/", "type": "glob"},
             {"host": "assets/filetypes", "guest": "/etc/filetypes"},
         ]
-        for name in ("build/out/vmkernel.lz4", "build/out/unicode.bin",
+        for name in ("build/out/vmkernel.lz4", "build/out/kdebug.bin", "build/out/unicode.bin",
                      "userland/shell.bin", "userland/libos32gui.shlib",
                      "userland/tests/a.bin", "userland/tests/excluded.bin",
                      "assets/a.dat", "assets/filetypes", "build/out/kernel.bin",
@@ -86,10 +87,11 @@ class DeploySet(unittest.TestCase):
     def test_scope_hashes_and_determinism(self):
         result = self.generate()
         self.assertEqual(result, self.generate())
-        self.assertEqual(len(result["files"]), 7)
+        self.assertEqual(len(result["files"]), 8)
         hosts = {e["host"] for e in result["files"]}
         self.assertIn("build/out/unicode.bin", hosts)
         self.assertIn("build/out/vmkernel.lz4", hosts)
+        self.assertIn("build/out/kdebug.bin", hosts)
         self.assertIn("userland/libos32gui.shlib", hosts)
         self.assertFalse(any(h.startswith(("boot/", "build/sdk/", "apps/", "game/"))
                              or h.endswith(("kernel.bin", "sqlite.bin", "excluded.bin"))
@@ -113,7 +115,7 @@ class DeploySet(unittest.TestCase):
         self.entries += [{"host": "not-built.db", "guest": "/etc/settings.db"},
                          {"host": "not-built.cfg", "guest": "/etc/system.cfg"},
                          {"host": "not-built.log", "guest": "/var/log/boot.log"}]
-        self.assertEqual(len(self.generate()["files"]), 7)
+        self.assertEqual(len(self.generate()["files"]), 8)
 
     def test_missing_and_duplicate_rejected(self):
         (self.root / "build/out/unicode.bin").unlink()
@@ -127,8 +129,8 @@ class DeploySet(unittest.TestCase):
     def test_generator_cli_and_merged_layers(self):
         # 既存の load_merged/resolve_entry から全層を読む。外部定義は在っても除く。
         import yaml
-        for rel, entries in (("build/core.yaml", self.entries[:2]),
-                             ("userland/deploy.yaml", self.entries[2:]),
+        for rel, entries in (("build/core.yaml", self.entries[:3]),
+                             ("userland/deploy.yaml", self.entries[3:]),
                              ("apps/deploy.yaml", [{"host": "apps/a.bin", "guest": "/bin/a.bin"}]),
                              ("game/deploy.yaml", [{"host": "game/b.bin", "guest": "/bin/b.bin"}])):
             (self.root / rel).write_text(yaml.safe_dump({"filesystem": {"files": entries}}))
@@ -149,8 +151,8 @@ class DeploySet(unittest.TestCase):
     def deployment_fixture(self):
         """実生成器を temp 木に置く。配備の mount/sudo 境界だけ差し替える。"""
         import yaml
-        for rel, entries in (("build/core.yaml", self.entries[:2]),
-                             ("userland/deploy.yaml", self.entries[2:])):
+        for rel, entries in (("build/core.yaml", self.entries[:3]),
+                             ("userland/deploy.yaml", self.entries[3:])):
             (self.root / rel).write_text(yaml.safe_dump({"filesystem": {"files": entries}}))
         (self.root / "build/out/generations-manifest.json").write_text(json.dumps(GENERATION))
         (self.root / "tools").mkdir(exist_ok=True)
@@ -375,7 +377,7 @@ manifest.write_text('format=1\\nbuild=fixture\\ngenerated=fixture\\ncount={}\\n-
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("dry-run:", result.stdout)
         self.assertTrue(extra.exists())
-        manifest.write_text(text.replace("count=7", "count=0"))
+        manifest.write_text(text.replace("count=8", "count=0"))
         result = subprocess.run(cmd + ["--prune-extra", "--delete"], capture_output=True, text=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertTrue(extra.exists())
@@ -484,7 +486,7 @@ manifest.write_text('format=1\\nbuild=fixture\\ngenerated=fixture\\ncount={}\\n-
             missing["files"].pop(0)
             self.assertTrue(cm.check_generation_deploy(missing, self.merged))
             extra = copy.deepcopy(self.merged)
-            extra["filesystem"]["files"].pop(2)
+            extra["filesystem"]["files"].pop(3)
             self.assertTrue(cm.check_generation_deploy(manifest, extra))
 
     def test_generation_deploy_ignores_cargo_target_cache(self):

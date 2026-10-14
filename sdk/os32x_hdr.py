@@ -261,16 +261,23 @@ def check_raw_matches_elf(elf, raw, what='raw'):
         raise HeaderError(f"{elf.path}: .raw と突き合わせる PT_LOAD が無い")
 
 
-def effective_min_api(min_api):
+def effective_min_api(min_api, compat=False):
     """v3 のバイナリは OS32X_HDR_V3_MIN_API 以上を要求する。"""
+    if compat:
+        # Explicit compatibility probes still carry/check all generation stamps.
+        if not OS32X_HDR_V3_MIN_API <= int(min_api) <= OS32X_MIN_API:
+            raise HeaderError("compatibility API version outside supported range")
+        return int(min_api)
     return max(int(min_api), OS32X_MIN_API)
 
 
 def build_header(flags, entry_offset, text_size, bss_size, heap_size,
-                 min_api_ver, load_addr, kapi_data_off, stack_size=0, shlib_protocol=0):
+                 min_api_ver, load_addr, kapi_data_off, stack_size=0, shlib_protocol=0, compat_api=False):
     """現行形式を返す。世代と最低機能版は生成した正典から読む。"""
     if kapi_data_off is None or kapi_data_off == 0:
         raise HeaderError("kapi_data_off が無い (刻印を読めていない)")
+    if compat_api and (shlib_protocol or flags & OS32X_FLAG_SHLIB):
+        raise HeaderError("compatibility probe must be statically linked")
     hdr = struct.pack('<15I',
                       OS32X_MAGIC,
                       OS32X_HDR_SIZE,
@@ -281,7 +288,7 @@ def build_header(flags, entry_offset, text_size, bss_size, heap_size,
                       bss_size,
                       heap_size,
                       stack_size,
-                      effective_min_api(min_api_ver),
+                      effective_min_api(min_api_ver, compat_api),
                       load_addr,
                       kapi_data_off,
                       OS32_KAPI_ABI_GENERATION,

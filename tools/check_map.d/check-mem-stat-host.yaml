@@ -49,9 +49,16 @@ check-mem-stat-host:
 - kapi/kapi_sys.c
 - userland/shell/cmd_sys.c
 - tools/tests/mem_stat_host.c
+- tools/tests/kdebug_cli_host.c
 - tools/tests/test_mem_stat.py
 - exec/ring3_str.c
 - userland/tests/mem_stat_test.c
+- userland/tests/mem_stat_compat_test.c
+- userland/tests/kdebug_probe.c
+- userland/shell/cmd_base.c
+- userland/shell/shell.h
+- kernel/module.h
+- kernel/sysconfig.c
 - tools/check_map.d/check-mem-stat-host.yaml
 - build/checks.d/check-mem-stat-host.mk
 - exec/exec_kapi_init.inc

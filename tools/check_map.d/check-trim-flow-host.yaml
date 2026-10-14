@@ -88,3 +88,6 @@ check-trim-flow-host:
 - userland/rust/trim_back_rs/src/cache.rs
 - kernel/kernel.c
 - kernel/kstack_hw.c
+- tools/tests/kdebug_cli_host.c
+- userland/shell/cmd_base.c
+- kernel/sysconfig.c
