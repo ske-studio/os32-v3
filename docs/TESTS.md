@@ -58,7 +58,7 @@
 
 | 名前 | 種類 | 何を守っているか | いつ走る |
 |---|---|---|---|
-| [`kernel/kselftest.c`](../kdebug/kselftest.c) | 起動時自己試験 | カーネルが**実際に使う**プリミティブ (`kstring_asm.asm` / `kmalloc.c` / `kprintf`) の境界ケース。外部プログラムの `klibc_test` は newlib を測るので代替にならない。f5a の appmem owner 往復 5 件を含む標準起動の期待は 288/0 (ゲスト未確認、台帳 F-6)。結果は `kselftest_pass` / `kselftest_fail` に残り `kernel.map` 経由で読む | 毎起動 (実機) |
+| [`kdebug/kselftest.c`](../kdebug/kselftest.c) | 起動時自己試験 (KDEBUG=1 のときだけ。OFF は 0/0) | カーネルが**実際に使う**プリミティブ (`kstring_asm.asm` / `kmalloc.c` / `kprintf`) の境界ケース。外部プログラムの `klibc_test` は newlib を測るので代替にならない。f5a の appmem owner 往復 5 件を含む標準起動の期待は 288/0 (ゲスト未確認、台帳 F-6)。結果は `kselftest_pass` / `kselftest_fail` に残り `kernel.map` 経由で読む | 毎起動 (実機) |
 | `link_selftest()` ([`drivers/lgy98.c`](../drivers/lgy98.c)) | 起動時自己試験 | LGY-98 リンク層の HELLO + PING/PONG。**`make kernel-lgy98-link` (LGY98_FLAG_LINKTEST) でビルドしたカーネルでのみ**走る。判定は `tools/net_l0_test.py` が `link_*` グローバルを `/api/mem` で読む | LINKTEST 版の毎起動 |
 | [`tools/gui_gate.py`](../tools/gui_gate.py) | ゲスト観測 (判定は人) | GUI のゲート操作列 (`v11` / `v12g1` / `v12g4` / `shot` / `click`)。**自動照合は `wab_relay` / `scrn_ymax` / `fault_generation` の 3 数値だけ**、他は PM が目で見る | 手動 |
 | `tools/emu_agent/tasks/regress.txt` | ゲスト観測 (ローカル AI) | 配備後の定型回帰 — kselftest カウンタ / `klibc_test` / `alloc_demo` / `ring3_fault` で落ちてもシェルが生きている / パイプライン 2 本 / screenshot。**モデルは観測を転記するだけで合否は人** | 手動 (スキル `os32-local-ai`) |
@@ -102,7 +102,7 @@ CI の静的ゲート (`.github/workflows/check.yml`、os32-v3 で 2026-09-30 �
 | **c1** | [`tools/tests/test_gui_button_dispatch.py`](../tools/tests/test_gui_button_dispatch.py) | docstring が自認:「**挙動試験ではない。**」中身は `arm.find("widget::on_button_down") > arm.find("MOUSE_BTN_LEFT")` という**文字位置の比較**。`if` を `match` に書き換える / ガードを別関数に括り出す / 定数名を変える、のどれでも黙って通る (または黙って落ちる) | `libos32gui` には既に `host_tests/` クレートがある。`app.rs` の `on_event` を `#[path]` で取り込み、`GuiEvent { kind: GUI_EV_BUTTON, button: MOUSE_BTN_RIGHT }` を 1 つ流して贋物で数える。2〜3 ケースで置き換えられる |
 | **c2** | [`tools/tests/test_filer_normalize.py`](../tools/tests/test_filer_normalize.py) の 3 件目 | docstring は「両実装を**実ソースから抜き出して**ホストでビルドし突き合わせる」と書くが、**ビルドして走るのは Rust 側だけ**。C 側は `fs/vfs.c` の窓を切って 3 つの文字列を `assertIn` するだけで、空白 1 つ変えれば落ち、`.` の畳み方を変えても文字列が残れば通る | `vfs_resolve_path` は純関数。`test_vfs_mount_dev.py` と同じやり方で `fs/vfs.c` を `#include` し、Rust 側と**同じ 10 ケース**を C でも回す |
 | **c3** | [`tools/tests/test_hsync_protect.py`](../tools/tests/test_hsync_protect.py) | docstring:「**実体規則 (`sys_stat` の inode 比較) は `hsync.c` 側にあり、ここではコンパイルが通ることだけを見る**」。72 表明はすべて字句正規化と名前規則に掛かっており、最後の砦 (inode 一致判定) は 1 表明も無い | inode 比較部分を `.inc` に切り出し、`sys_stat` の贋物 (同 inode / 別 inode / stat 失敗) を 3 通り差し替えて「truncate に進むか進まないか」を見る |
-| **c4** | `kernel/kselftest.c` の 1 表明グループ 4 本 — `test_kprintf` / `test_ring3_pd` / `test_map_user_keep` / `test_app_band_pde` | それぞれ `check()` 1 回。実質「その経路が呼べて落ちなかった」の確認で、境界も反例も踏んでいない | `test_app_band_pde` はホスト側が 107 表明で覆っているので実機側は「境界の 1 点だけ」で妥当とも言える。**削除でも増強でもなく、意図の明文化**が要る |
+| **c4** | `kdebug/kselftest.c` の 1 表明グループ 4 本 — `test_kprintf` / `test_ring3_pd` / `test_map_user_keep` / `test_app_band_pde` | それぞれ `check()` 1 回。実質「その経路が呼べて落ちなかった」の確認で、境界も反例も踏んでいない | `test_app_band_pde` はホスト側が 107 表明で覆っているので実機側は「境界の 1 点だけ」で妥当とも言える。**削除でも増強でもなく、意図の明文化**が要る |
 
 ### (d) 守るべきなのに試験が無い契約 (目についたもの。網羅ではない)
 

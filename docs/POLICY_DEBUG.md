@@ -51,7 +51,7 @@ NP21/W 上でコード変更が反映されていないように見える場合�
 
 ### カーネルの到達確認は kselftest で行う
 
-`kernel/kselftest.c` のブート時セルフテストは毎回走り、失敗項目を赤で表示する。
+`kdebug/kselftest.c` のブート時セルフテストは KDEBUG=1 の起動で走り (デバッグ部品の中、2026-10-15 の DBGREF S2 から)、失敗項目を赤で表示する。KDEBUG=0 では `[selftest] skipped (KDEBUG=0)` の 1 行だけで計数は 0/0、監査 (`audit_runs`) は同じ回数走る。
 画面を見ない場合は `kselftest_pass` / `kselftest_fail` を `emu_read_mem` (または
 `/api/mem`) で読む。**番地は新しい `build/out/kernel.map` から引くこと** —
 古い map の番地で読んだ値や、初期化前のゼロ値を合格と判定しない。
@@ -908,7 +908,7 @@ KAPI ではない**カーネルの大域変数** (カウンタ・印)。番地�
 | `ring3_wm_depth` | `exec/exec.c` | いまカーネルが WM (gshell) のコードへ入っている深さ。ふだん 0、アプリの syscall の中で WM を呼んでいる間だけ 1 以上 |
 | `ring3_wm_depth_underflow` | `exec/exec.c` | WM の出入りの対が崩れて深さを 0 未満へ下げかけた数 (0 でなければ対の崩れ) |
 | `ring3_wm_fault_count` | `exec/exec.c` | WM (gshell) のコードへ入っている間 (`ring3_wm_depth` 1 以上) にアプリをフォールトで畳んだ数。WM の中の #PF/#GP も KAPI の門の拒否もアプリの kill として畳まれ、`fault_kill_count` しか増えない (§4-61) — これが一緒に増えたら落ちた場所は WM の文脈。ISR の kill の行にも ` (in WM)` が付く |
-| `kselftest_pass` / `kselftest_fail` | `kernel/kselftest.c` | 起動時の自己試験 (§2) |
+| `kselftest_pass` / `kselftest_fail` | `kernel/kselftest_report.c` (計数は本体、試験は `kdebug/kselftest.c`) | 起動時の自己試験 (§2) |
 
 ### 有用なゲスト側コマンド
 
