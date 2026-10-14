@@ -55,6 +55,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | 票の状態行の語彙 | [POLICY_DEV.md §8](POLICY_DEV.md) の表 (`tools/check_docs_status.py` がそこから読む) | 下の「タスク」節の冒頭 (語の列挙のみ) |
 
 T3 前の反省会と文書整理の計画は [DOCS_REORG_T3](tasks/v3/DOCS_REORG_T3.md) (r2、2026-10-14 にユーザー承認、決定は [REVIEW_2026-10-14](tasks/agents/REVIEW_2026-10-14.md))。
+T3 の前のデバッグ環境の整理 (起動時に読むデバッグ部品 `/boot/kdebug.bin`、対象を絞った 1 段目) は [TASK_DBGREF](tasks/v3/TASK_DBGREF.md)。
 
 ## 生成文書の見方
 
