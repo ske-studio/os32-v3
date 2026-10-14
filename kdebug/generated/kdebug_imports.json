@@ -1,0 +1,22 @@
+{
+  "module_abi_gen": 2456417081,
+  "stage": "S1",
+  "count": 1,
+  "imports": [
+    {
+      "stage": "S1",
+      "kind": 1,
+      "symbol": "kprintf",
+      "source": "include/kprintf.h",
+      "context_safe": false,
+      "index": 0,
+      "name": "kprintf",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "void __cdecl kprintf(u8 attr, const char *fmt, ...);",
+      "source_declaration": "void __cdecl kprintf(u8 attr, const char *fmt, ...);",
+      "dtype": null,
+      "array": false
+    }
+  ]
+}

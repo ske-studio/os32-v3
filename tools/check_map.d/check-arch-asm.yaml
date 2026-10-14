@@ -23,3 +23,4 @@ check-arch-asm:
 - tools/check_arch_asm.py
 - tools/check_map.d/check-arch-asm.yaml
 - build/checks.d/check-arch-asm.mk
+- kdebug/**

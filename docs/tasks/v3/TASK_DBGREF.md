@@ -296,7 +296,8 @@ ROLES §0 の 3 段: S0 は (2)、S1a〜S3 は (3) 全体。
 ### S1a — loader・拒否・所有権 + 最初の中身 crt_diag (astra 候補)
 - 内容: `kernel/module.c` (record・load・start・回収)、読み込み点と `KDEBUG=` の読み、`kdebug_kexports[]` (S1 は 1 本)、`struct kdebug_ops`、動的 MODULE owner、`kdebug/crt_diag.c` (移動) と `kdebug/kdebug_main.c` (init)、`[kdebug] rejected: …` の文字。MemStat はまだ触らない (観測は `kernel.map` の record と `ledger_owners` を `/api/mem` で)。**自己試験は本体のまま** (`kernel.c:598` は変えない)。
 - 受入 (10): (1) `KDEBUG=0`: `kdebug.state == 0` かつ `open_count == 0`。(2) `KDEBUG=0`: `kdebug.owner == 0`。(3) `KDEBUG=1`: `state == 1` かつ `pair_crc == bootinfo の img_crc`。(4) `KDEBUG=1`: `ledger_owners[kdebug.owner].pages == kdebug.pages` (定常 = body、prefix は返した)。(5) `KDEBUG=1` で `[crt]`/`[crt2]` が boot.log に今と同じ形。(6) `KDEBUG=0` で `[crt]` が出ない。(7) 拒否 (a) 1 つ前のビルドの部品 → `state == 4`、起動継続。(8) 拒否 (c) `image_crc` の書き換え → `state == 9`。(9) 拒否 (d) `module_abi_gen` の書き換え → `state == 6`。(10) 拒否 (7)〜(9) の後に `ledger_owners[owner].kind == 0` かつ `pages == 0` (回収と retire)。
-- 増分の実測: `__bss_end` の**増分 800 B 以下** (最小 loader の費用) を票に記録。
+- 増分の実測: `__bss_end` の**増分 2,700 B 以下** (最小 loader と検証器の費用。当初の 800 B は見積もりの誤り — 検証 14 経路を本体に置く費用を約 1,000 B と見ていた。`-Os` 後の実測 +2,688 B、ユーザー承認 2026-10-14「推奨」で改めた。検証は削らない)。
+- S1a 作業木の実測 (2026-10-14、基点 `6a712a8`): `-Os` 前 +3,456 B → `module.c`・`module_image.c` だけ `-Os` で +2,720 B → 最終 **+2,688 B** (`__bss_end` `0x197300` → `0x197d80`。`kdebug_load` 1,097 B、`module_image_header` 899 B、`module_image_validate` 1,109 B、crt 3 関数 −1,035 B)。部品は prefix 実データ 313 B (1 ページ)、body 1,320 B (1 ページ)。検証は削っていない。閾値は上の行のとおり 2,700 B に改めた。
 - 検査の候補: `check-crt-diag-host check-module-image-host check-mkmod-host check-kdebug-init-host check-memmap-audit-host check-memory-host check-p2v` + 静的 5 本。
 
 ### S1b — 状態・CLI・互換試験 (sol、KAPI 75)
@@ -330,18 +331,18 @@ ROLES §0 の 3 段: S0 は (2)、S1a〜S3 は (3) 全体。
 | 段 | 移る節 | その段で足すもの (本体) | 像の予算: 計画値 | **閾値** | OFF で常駐から消える | 部品の body (段ごとの丸め) |
 |---|---:|---|---:|---:|---:|---:|
 | S0 | 0 | 0 | 0 | **sha256 不変** | 0 | 0 |
-| S1a | crt 1,201 | loader + 検証 約 1,000、record 96、`kdebug_kexports` 1 本 4 + abi/count 50、結線 1 点 12、文字 約 100、cfg 読み 60 | **+121** | **増分 800 B 以下** | 1,201 | crt 1.2 KB + init 0.3 + スタブ 7 B → **1 ページ** |
+| S1a | crt 1,201 | loader + 検証 約 1,000、record 96、`kdebug_kexports` 1 本 4 + abi/count 50、結線 1 点 12、文字 約 100、cfg 読み 60 | **+121** | **増分 2,700 B 以下** (旧 800 B、2026-10-14 改) | 1,201 | crt 1.2 KB + init 0.3 + スタブ 7 B → **1 ページ** |
 | S1b | 0 | MemStat 5 欄の写し 約 60 + bss 20 | **+80** | **増分 300 B 以下** | 0 | 0 |
 | S2 | 29,890 | `.def` 添字 1〜193: 表 772 + getter 272 + setter 120 + ptr 42 + 口 72 = 1,278、結線 4 点 50、`kaudit` の分離 50、`[selftest] skipped` 40 | **−28,472** | **純減 25,000 B 以上** | 29,890 | text 18.6 + rodata 9.2 + bss 2.3 + スタブ 193 × 7 ≈ 1.4 + slot 0.8 → 32.3 KB → **8 ページ** |
 | S3 | 6,976 | `.def` 添字 194〜210: 表 68 + getter 16 + ptr 6 = 90、結線 11 点 約 130、NOSYS 20 | **−6,736** | **純減 6,000 B 以上** | 6,976 | 7.0 KB + スタブ 0.1 → **2 ページ** |
-| **1 段目の合計** | **38,067** | | **−35,007** | **合成 −29,900** (+800 + 300 − 25,000 − 6,000) | **38,067 (≈ 37.2 KiB)** | **段ごとの丸め 1 + 8 + 2 = 11、全体の詰め直し (41.5 KB → 10.1 → 11) = 11 ページ** |
+| **1 段目の合計** | **38,067** | | **−35,007** | **合成 −28,000** (+2,700 + 300 − 25,000 − 6,000、2026-10-14 改。旧 −29,900) | **38,067 (≈ 37.2 KiB)** | **段ごとの丸め 1 + 8 + 2 = 11、全体の詰め直し (41.5 KB → 10.1 → 11) = 11 ページ** |
 
 - **prefix**: ヘッダ 144 + reloc (約 1,500 件 × 4 ≈ 6 KB [推]、`mkmod.py` が実数を出す) + import 211 × 12 = 2,532 + export 16 × 12 = 192 + 名前表 約 4.3 KB → 約 13.2 KB → **4 ページ [推]**。ピーク = body 11 + prefix 4 = **15 ページ**、定常 = 11 ページ (prefix は init 後に返す)。実数は S0 の `check-mkmod-host` が表示する値で票を書き直す。
 - 二重計上なし: kselftest の監査 635 と報告 150 は「移る」に入れない。gcap は `v86_gcap.o` の 4,966 (`v86g_phase_diag` を含む) + math 1,410 を 1 回だけ。`.def` の表は段ごとに足す本数だけ計上。
 - 閾値に届かない段は着地させず、原因を票に書いて計画値を直す。各段の着地で `kernel.map` の `__bss_end` と `ls -l vmkernel.lz4` を T2D_T2H §6-1 に実測の行として足す。
 
 ### 6-3. LAN L-B への効き (Q2、単位 B)
-着手条件: **S1 + S2 の着地後に残りが ≥ 19,456 B** (15 KiB + 4 KiB — 計画上の着手条件)。閾値どおりなら 7,424 − 800 − 300 + 25,000 = **31,324 B**、計画値なら 7,424 − 121 − 80 + 28,472 = **35,695 B** で成立。届かなければ 2026-09-22 の決定 (b) (SHM −16 KB) を予備として使う。
+着手条件: **S1 + S2 の着地後に残りが ≥ 19,456 B** (15 KiB + 4 KiB — 計画上の着手条件)。閾値どおりなら 7,424 − 2,700 − 300 + 25,000 = **29,424 B** (旧 31,324 B)、計画値なら 7,424 − 121 − 80 + 28,472 = **35,695 B** で成立。届かなければ 2026-09-22 の決定 (b) (SHM −16 KB) を予備として使う。
 
 ### 6-4. 達成範囲の表示 (Q1、全面達成とは記録しない)
 OFF で常駐から消えるのは移した 3 対象の **38,067 B**。本体に残る診断関連は**約 43 KB** (§0-3: 仕組み 2.4 + 監査 2.7 + 他ファイルの試験本体 12.5 + bootlog 16.7 + 計装 2.5 + 例外ダンプ 2.9 + link 2.8)。1 段目は「対象を絞った 1 段目」と記録する。
@@ -365,7 +366,7 @@ PM の推奨の範囲で進めるもの: 版 75 (MemStat 220 B、slot なし)、
 - 触らない: 監査の実体 (paging/lease/pgalloc 内)、他ファイルの自己試験の本体 (§0-3 (c))、bootlog の配列と手順と置き場、R7-1 の計装、`owner_diag.h` / `serial_diag.h`、起動進行の kprintf、`net/link.c`、`con_sink` / `kbd_inject`、例外ダンプ、KAPI の既存 slot の ABI (239 は実体の置き場だけ)、`BootImageInfo`、gshell / shlib / sh.bin の要求版。
 - [未] 8MB 構成で `KDEBUG=1` のとき池に 15 ページ (ピーク) の余裕 (G2 の H-4 の行で)。
 - [未] prefix の実サイズ (S0 の `check-mkmod-host` で確定し §6 を書き直す)。`.def` の 211 本は `nm -u` の集合との一致検査で固定する。
-- [未] S1a / S1b で loader と MemStat の実測費用 (増分 800 / 300 B 以下)。
+- [未] S1a / S1b で loader と MemStat の実測費用 (増分 2,700 / 300 B 以下。S1a は実測 +2,688 B)。
 - [推] 併合後の文字列の減り (9,196 → 約 9,000)。着地で map の kernel.o の `.rodata.str1.1` の行の前後差を記録。
 - 文書の更新先 (正典 1 か所): 到達確認の規則 → POLICY_DEBUG §2、読み口の一覧 → POLICY_DEBUG §5、KAPI → KAPI_SPEC §3-2 (v75)、予算 → T2D_T2H §6-1、ファイル地図 → DEVELOPMENT §2 と 08_build §8-3 (`kdebug/`、`build/kdebug.mk`、`kernel/module*.c`、`kernel/kaudit.c`、`kernel/kselftest_report.c`)、配備 → 08_build §8-4 (対で配る、[D1])、モジュール形式 → TASK_T4_T6_MODULES §2-1 (§3-2 のスキーマ、`pair_image_crc`、`ops_version`、最初の実例 = kdebug)、台帳 → DEFERRED_TESTS に S3 の関門 (R7-1 / CRTFREQ の閉鎖) と 8MB の行。
 

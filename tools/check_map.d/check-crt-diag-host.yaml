@@ -1,5 +1,5 @@
 check-crt-diag-host:
-- kernel/crt_diag.c
+- kdebug/crt_diag.c
 - kernel/kernel.c
 - kernel/bootlog.c
 - tools/tests/crt_diag_host.c

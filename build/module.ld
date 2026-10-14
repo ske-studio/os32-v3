@@ -1,5 +1,5 @@
 /* KMOD body VA zero; --emit-relocs is required by tools/mkmod.py.
- * S0 scaffold, deliberately not included in the product link. */
+ * Separate module link; never part of the resident kernel link. */
 OUTPUT_FORMAT(elf32-i386)
 OUTPUT_ARCH(i386)
 ENTRY(kdebug_init)

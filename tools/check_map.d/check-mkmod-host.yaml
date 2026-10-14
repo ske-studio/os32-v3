@@ -38,7 +38,7 @@ check-mkmod-host:
 - kapi/kapi_db.h
 - kernel/cpu_calibrate.h
 - kernel/cpu_calibrate_math.h
-- kernel/crt_diag.c
+- kdebug/crt_diag.c
 - kernel/dma_pool.h
 - kernel/gui.h
 - kernel/idt.h

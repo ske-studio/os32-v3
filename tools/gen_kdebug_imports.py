@@ -127,7 +127,8 @@ def check_nm(entries, nm=None, root=ROOT):
     groups = {'S1': ['crt_diag'], 'S2': ['kselftest'], 'S3': ['v86_gcap', 'v86_gcap_math']}
     cumulative = set()
     for stage, stems in groups.items():
-        paths = [root / 'kernel' / (name + '.o') for name in stems]
+        paths = ([root / 'build/out/kdebug/crt_diag.o'] if stage == 'S1' else
+                 [root / 'kernel' / (name + '.o') for name in stems])
         missing = [str(p) for p in paths if not p.exists()]
         if missing:
             raise SystemExit('gen_kdebug_imports: run make kernel first (missing: ' + ', '.join(missing) + ')')
@@ -155,6 +156,10 @@ def generate(entries, out_dir, stage='S3'):
     declarations = [e['signature'] for e in selected if e['kind_name'] != 'FUNC']
     header = common + declarations
     header += [f'#define KDEBUG_IMPORT_COUNT {len(selected)}', f'#define KDEBUG_ABI_GEN 0x{abi_hash(selected):08x}u']
+    header += ['#include "kernel/module_image.h"',
+               'extern void (*const kdebug_kexports[])(void);',
+               'extern const struct module_symbol_contract kdebug_import_contracts[];',
+               'extern const struct module_symbol_contract kdebug_export_contracts[MODULE_OPS_SLOTS];']
     header += ['extern unsigned long kdebug_import_slots[KDEBUG_IMPORT_COUNT];']
     (out / 'kdebug_imports.h').write_text('#ifndef KDEBUG_IMPORTS_GENERATED_H\n#define KDEBUG_IMPORTS_GENERATED_H\n' + '\n'.join(header) + '\n#endif\n')
     kernel = ['#include "kdebug_imports.h"']
@@ -171,6 +176,13 @@ def generate(entries, out_dir, stage='S3'):
     kernel += ['void (*const kdebug_kexports[])(void) = {']
     kernel += [f'    (void (*)(void)){e["name"]},' for e in selected]
     kernel += ['};', 'const unsigned long kdebug_abi_gen = KDEBUG_ABI_GEN;', 'const unsigned long kdebug_kexport_count = KDEBUG_IMPORT_COUNT;']
+    kernel += ['const struct module_symbol_contract kdebug_import_contracts[] = {']
+    kernel += [f'    {{0x{fnv1a(e["name"].encode()):08x}u, {e["type_ver"]}, {e["kind"]}}},' for e in selected]
+    kernel += ['};', 'const struct module_symbol_contract kdebug_export_contracts[MODULE_OPS_SLOTS] = {']
+    from mkmod import OPS_NAMES
+    slots = [5] if stage == 'S1' else list(range(1, 6 if stage == 'S2' else 17))
+    kernel += [f'    [{slot - 1}] = {{0x{fnv1a(OPS_NAMES[slot - 1].encode()):08x}u, 1, 0}},' for slot in slots]
+    kernel += ['};']
     (out / 'kdebug_kexports.c').write_text('\n'.join(kernel) + '\n')
     (out / 'kdebug_import_macros.h').write_text('\n'.join(macros) + '\n')
     (out / 'kdebug_import_slots.c').write_text('#include "kdebug_imports.h"\nunsigned long kdebug_import_slots[KDEBUG_IMPORT_COUNT]\n__attribute__((section(".data.kdebug_import_slots"), aligned(4))) = {0};\n')

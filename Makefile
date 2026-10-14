@@ -43,6 +43,7 @@ endif
 include build/config.mk
 include build/boot.mk
 include build/kernel.mk
+include build/kdebug.mk
 include build/libs.mk
 include build/programs.mk
 include build/deploy.mk
