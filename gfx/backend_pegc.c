@@ -527,7 +527,7 @@ static u8 pegc_restore_hsync(void)
 static int pegc_linear_selftest(void);
 static int pegc_reserve_backbuffer(void);
 
-/* ページングは先頭 16MB しか固定の PT を持たない。窓の末尾まで入ること。 */
+/* 窓は起動時の静的な恒等写像 (PAGING_BOOT_MAP_SIZE = 32MB) の中に入ること。 */
 STATIC_ASSERT(PEGC_LINEAR_BASE + PEGC_LINEAR_SIZE <= PAGING_MAP_SIZE,
               pegc_window_in_boot_map);
 

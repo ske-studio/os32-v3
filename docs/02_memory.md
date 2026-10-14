@@ -21,7 +21,7 @@
 - 32bit フラットアドレス空間の設計対象は 4GiB（0x00000000〜0xFFFFFFFF）。
   これは全域が利用可能 RAM、単一アプリの利用可能領域、または実装済み容量を意味しない。
   ROM・MMIO・予約帯・ガード・カーネル領域を区別し、物理 RAM の利用可能範囲を管理する。
-- 下記の 16MB RAM 管理・32MB マッピングは現行実装の制約であり、製品の設計上限ではない。
+- 実 RAM の人為的な上限は無い (K6-RAM、2026-09-11 に 16MB の RAM 管理を撤廃)。起動時の静的な恒等写像は 32MB までで、それより上は検出量だけ動的に張る (下の「ページング」)。RAM として登録できる上端は 2GB (D11、`MEM_PHYS_RAM_CEILING`)。これらは現行実装の値であり、製品の設計上限ではない (2GB の上端は v4 で見直す — ROADMAP「他アーキテクチャへの移植」)。
   大容量対応には RAM 検出、ページ割当、ページ表、exec 配置、デバイス窓、媒体・転送用予約、
   境界演算を一貫して拡張し、検証する。定数だけの拡大で対応済みとは扱わない。
 - 4GiB の exclusive end は u32 に格納できない。上端・長さの計算は広い整数または
@@ -88,7 +88,7 @@ resident shell/gshell は sbrk 上限0x375000、exec_heap 452KiB (小さい明�
 **実 RAM の人為的な上限は無い** (K6-RAM で PAGING_RAM_LIMIT を撤廃)。paging_init が恒等で張るのは
 min(検出量, 32MB) — その上端が paging_boot_identity_end() — で、それより上の RAM は
 pgalloc_stage_online() が paging_map_phys() で張り、PT はブート workspace から動的に取る。
-15〜16MB (F00000h-FFFFFFh) は PC-98 のシステム空間で RAM にはしない (MEM_SYSTEM_SPACE_*)。
+15〜16MB (F00000h-FFFFFFh) は PC-98 のシステム空間で RAM にはしない (MEM_SYSTEM_SPACE_*)。ただしセットアップで「16MB システム空間: 切り離す」(I/O 043Bh bit2=1) の機械では、そこは通常 RAM で PEGC の VRAM は F00000h に出ない (FFF00000h の別名でだけ見える — undocumented io_mem.md)。実機 Ra266 はこの構成 (R7-1、2026-10-14)。扱いは R7FIX2 段 3b。
 16MB 超で RAM が載っていない範囲は既定 Not-Present で、必要な範囲だけ paging_map_phys() で張る。
 **OS が番地を決めるデバイス窓は v3 のデバイス窓の帯 `[0xFE000000, 0xFF000000)`** (`MEM_DEVICE_APERTURE_*`、
 2026-09-29) に置く。RAM の量に関係なく RAM と重ならないよう物理地図で MMIO にし (RAM として登録できる上端 =

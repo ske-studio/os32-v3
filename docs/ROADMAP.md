@@ -357,6 +357,7 @@ v3 で行う。**この 2 つは同時に動かさない** — どちらも全�
 (ARM コンパイル計測 `make check-arm-compile` 55/93、`hlt`/`cli`/`sti` を `io.h` 経由に、`arch/x86` + `platform/pc98`
 の骨格、kstring の C 版、LE アクセサ `include/endian_le.h`。基準値と経過は [tasks/portability/ARM_GAUGE.md](tasks/portability/ARM_GAUGE.md))。
 残りは `gdt`/`tss`/`cr3` と CPL=3 降下 asm の `arch/x86/` への移設、ARM 実装、KAPI 生成器の arch 対応 (**v3 まで保留**、ユーザー決裁)。
+**移植の必須項目 (ユーザー決定 2026-10-14、v4 のあたりで対応)**: 物理 RAM の登録上端を、32bit CPU の上限 (4GiB) まで使い切れる設計にする。今の v3 は `MEM_PHYS_RAM_CEILING` = 2GB (D11、`[2GB, 4GB)` は窓・MMIO の帯として RAM にしない) で、PC-98 の実機 (最大 512MB 程度) には足りるが、ほかのアーキテクチャへ移すときに上限になる。RAM と装置窓の帯の分け方 (固定の帯ではなく物理地図で決める) を合わせて見直す。
 習慣として今から守るもの: ワイヤ / ディスク上の構造は LE アクセサで読む、非アラインアクセスをしない、
 絶対番地は `memmap.h` 以外に書かない、割込み制御は既存ヘルパー経由。
 
