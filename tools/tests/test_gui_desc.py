@@ -40,11 +40,19 @@ def build_fixture(gshell, out, rlib):
     text += f'#[path="{gshell / "host/dbgdesc_fixture.rs"}"] mod dbgdesc_fixture;\n'
     root = out / "root.rs"
     root.write_text(text)
+    # gserial.rs includes OUT_DIR/diag_points.rs, which cargo makes with build.rs.
+    header = (ROOT / "sdk/include/os32/os32_gui_shared.h").read_text()
+    points = "".join(
+        f"const {m[1]}: i32 = {m[2]};\n"
+        for m in re.finditer(r"^#define\s+(OS32_GUI_DIAG_P[12]_[XY])\s+(\d+)", header, re.M))
+    assert points.count("const ") == 4, "OS32_GUI_DIAG_P* missing"
+    (out / "diag_points.rs").write_text(points)
     exe = out / "fixture"
     subprocess.run(["rustc", "--edition=2021", "--test", "--crate-name=gshell",
                     "-C", "symbol-mangling-version=v0", str(root),
                     "--extern", f"os32api={rlib}", "-L", str(rlib.parent),
-                    "-o", str(exe)], cwd=ROOT, check=True)
+                    "-o", str(exe)], cwd=ROOT, check=True,
+                   env={**os.environ, "OUT_DIR": str(out)})
     subprocess.run([str(exe), "--exact", "dbgdesc_fixture::dbgdesc_fixture", "--test-threads=1"],
                    check=True, env={**os.environ, "GSHELL_FIXTURE_DIR": str(out)})
     symbols = gui_desc.elf_symbols(exe)
