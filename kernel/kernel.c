@@ -347,6 +347,13 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
         /* 流れる側 (kprintf) にも同じ内容を残す — 属性変換で実機でも読める。 */
         kprintf(TATTR_WHITE, "[fdc] %s\n", line);
     }
+    {   /* 一時の診断 (2026-10-14): IEEE 1284 双方向パラレルの有無を読むだけ。
+         * 05B3h bit7 = 1284 対応、bit6,5 = モード、0458h bit2 = 入出力可
+         * ([US] memsys.md)。ポートには触らない。DBGREF の後段で部品へ移す。 */
+        volatile u32 prn_cap = 0x05B3, prn_mode = 0x0458;
+        kprintf(TATTR_WHITE, "[prn] bios05b3=%02x bios0458=%02x\n",
+                *(volatile u8 *)P2V_IO(prn_cap), *(volatile u8 *)P2V_IO(prn_mode));
+    }
     /* FD から起動したなら、その DA/UA でメディアを選ぶ。
      * 1.44MB (DA/UA 0x30 系) は 512B×18セクタで、2HD のまま読むと
      * ゴミを掴んで root マウントが落ちる (2026-09-18 に実測)。
