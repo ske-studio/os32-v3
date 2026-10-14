@@ -47,7 +47,7 @@ GfxCounters gfx_counters = { 0, 0, 0, 0 };
 const GfxBackend *g_backend = &gfx_backend_pc98;
 
 static int gfx_started;
-static u32 gfx_init_gen;
+u32 gfx_init_gen;
 static u32 present_logged_gen;
 
 static void __attribute__((cold)) gfx_diag_init(void)

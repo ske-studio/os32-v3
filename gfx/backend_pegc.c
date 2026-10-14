@@ -31,6 +31,7 @@
 /* ======================================================================== */
 
 #include "serial_diag.h"
+#include "idt.h"
 #include "memmap.h"
 #include "gfx_internal.h"   /* gfx.h (PAL_*_PORT), pc98.h, memmap.h, _out/_in */
 #include "gfx_hal.h"
@@ -83,6 +84,7 @@ static u32 s_bb_phys   = 0;   /* バックバッファ先頭 (物理 = 仮想, 4
 static int s_probed    = 0;   /* probe を 1 回でも走らせたか */
 static int s_probe_ok  = 0;   /* probe の結果 (キャッシュ) */
 static int s_active    = 0;   /* init 済み = 拡張グラフィックモード中か */
+int gfx_diag_stripes;
 static int s_sys16m_ram = 0;  /* 043Bh bit2 の読み値 (1 = 通常 RAM 扱い) */
 
 /* 起動時 (BIOS が作ったまま) の水平走査周波数。pegc_boot_sync_record() が
@@ -803,6 +805,54 @@ static void __attribute__((cold)) pegc_diag_serial(const PegcDiag *d)
     serial_puts_polled("\r\n");
 }
 
+/* R7FIX2: normalize bank 0, then save both windows before either write.
+ * The result establishes aliasing only, not the GDC scanout source. */
+#define PEGC_DIAG_ALIAS_OFFSET 16
+#define PEGC_DIAG_STRIPE_WIDTH 16
+#define PEGC_DIAG_SECONDS 3
+static void __attribute__((cold, noinline)) pegc_diag_alias(void)
+{
+    volatile u8 *a = P2V_IO(PEGC_BANK_WIN0 + PEGC_DIAG_ALIAS_OFFSET);
+    volatile u8 *f = P2V_IO(PEGC_LINEAR_BASE + PEGC_DIAG_ALIAS_OFFSET);
+    u8 saved[2], v[4];
+    mmio_w16(PEGC_MMIO_BANK0, 0);
+    saved[0] = *a; saved[1] = *f;
+    *a = 0x5a; v[0] = *f;
+    *a = 0xa5; v[1] = *f;
+    *f = 0x5a; v[2] = *a;
+    *f = 0xa5; v[3] = *a;
+    *a = saved[0]; *f = saved[1];
+    if (serial_gate_active()) return;
+    serial_puts_polled("[pegc] alias=");
+    serial_puts_polled(v[0] == 0x5a && v[1] == 0xa5 &&
+                       v[2] == 0x5a && v[3] == 0xa5 ? "ok" : "ng");
+    for (u32 i = 0; i < 4; i++) {
+        serial_puts_polled(i == 0 ? " ab=" : i == 2 ? " ba=" : ",");
+        serial_diag_hex(v[i], 2);
+    }
+    serial_puts_polled(" sys16m="); serial_diag_u32(s_sys16m_ram);
+    serial_puts_polled("\r\n");
+}
+
+static void __attribute__((cold, noinline)) pegc_diag_stripes(void)
+{
+    if (!gfx_diag_stripes) return;
+    volatile u8 *vram = P2V_IO(PEGC_LINEAR_BASE);
+    for (u32 y = 0; y < PEGC_HEIGHT_480; y++)
+        for (u32 x = 0; x < PEGC_PITCH; x++)
+            *vram++ = (x / PEGC_DIAG_STRIPE_WIDTH) & 15;
+    u32 start = tick_count;
+    for (u32 i = 0; i < 2; i++) {
+        if (!serial_gate_active()) {
+            serial_puts_polled("[pegc] stripes t"); serial_diag_u32(i);
+            serial_puts_polled("="); serial_diag_u32(tick_count);
+            serial_puts_polled("\r\n");
+        }
+        if (!i) while ((u32)(tick_count - start) < PEGC_DIAG_SECONDS * PIT_HZ)
+            cpu_delay_us(1000);
+    }
+}
+
 static void pegc_init(void)
 {
     if (!pegc_probe()) return;
@@ -827,6 +877,7 @@ static void pegc_init(void)
     /* --- VRAM の見せ方: パックトピクセル + F00000h にリニア窓 --- */
     mmio_w8(PEGC_MMIO_PIXFMT, PEGC_PIXFMT_PACKED);
     mmio_w16(PEGC_MMIO_LINEAR, PEGC_LINEAR_ON);
+    pegc_diag_alias();
 
     /* リニア窓は ⑥ が master PD に supervisor + PCD で張ってある (USER は
      * 付けない — F00000h は表示面そのもの。BB は主記憶側で、exec が
@@ -847,6 +898,7 @@ static void pegc_init(void)
     pegc_tvram_clear(0, PEGC_TEXT_ROWS_480);
 
     pegc_palette_init();
+    pegc_diag_stripes();
 
     /* グラフィック GDC の CSRFORM (L/R = 0)・PITCH・GDC クロックも
      * pegc_apply_timing が実機の ROM の値で入れる (以前は起動時の BIOS 状態に
