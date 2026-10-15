@@ -2226,6 +2226,41 @@ static void case_gserial_gui(void)
     fresh();
 }
 
+static void case_sfs_lan_cfg(void)
+{
+    char *on[] = {"sfs", "lan", "on"};
+    char *off[] = {"sfs", "lan", "off"};
+    char *peer[] = {"sfs", "lan", "peer", "fc:61:98:70:9f:52"};
+    char *auto_peer[] = {"sfs", "lan", "peer", "auto"};
+    char *bad[] = {"sfs", "lan", "peer", "invalid"};
+    report("LANFS config commands\n");
+    fresh();
+    file_add(SYS_SYSTEM_CFG, "GUI=0\nSFS_LAN=0\nOTHER=keep\n");
+    check(shell_sfs_lan(3, on) == 0 && strcmp(g_cfg_written,
+          "GUI=0\nOTHER=keep\nSFS_LAN=1\n") == 0, "sfs lan on preserves other keys");
+    fresh();
+    check(shell_sfs_lan(3, off) == 0 && strcmp(g_cfg_written, "SFS_LAN=0\n") == 0,
+          "sfs lan off selects serial next session");
+    fresh();
+    check(shell_sfs_lan(4, peer) == 0 && strcmp(g_cfg_written,
+          "SFS_LAN_PEER=fc:61:98:70:9f:52\n") == 0, "sfs lan peer persists MAC");
+    fresh();
+    check(shell_sfs_lan(4, auto_peer) == 0 && strcmp(g_cfg_written, "SFS_LAN_PEER=\n") == 0,
+          "sfs lan peer auto clears fixed peer");
+    fresh();
+    check(shell_sfs_lan(4, bad) == SH_STATUS_USAGE && !g_data_writes,
+          "sfs lan rejects invalid MAC without writes");
+    g_cfg_write_fail = 1;
+    check(shell_sfs_lan(3, on) == SH_STATUS_ERROR, "sfs lan reports config write error");
+#ifndef SHELL_AS_APP
+    fresh();
+    check(cmd_sfs(3, on) == 0, "sfs lan routes through resident command");
+#endif
+    fresh(); sh_in_sfs = 1;
+    check(shell_sfs_lan(3, on) == SH_STATUS_ERROR && !g_data_writes,
+          "sfs lan refuses changes within child");
+}
+
 static void case_r2_real_table(void)
 {
     int n = 0;
@@ -2302,6 +2337,7 @@ void _start(void)
     case_s13_zero_rows();
     case_s14_s15_records();
     case_gserial_gui();
+    case_sfs_lan_cfg();
     case_gfxmode_diag();
 
     if (failures) {

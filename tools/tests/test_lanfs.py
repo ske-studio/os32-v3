@@ -6,13 +6,17 @@ No raw sockets, emulator or UART. --mutate includes the unchanged controls;
 compile errors and mutation-anchor failures are errors, never kills.
 """
 import ctypes as C
+import errno
 import importlib.util
+import io
 import os
 import pathlib
 import struct
 import subprocess
 import sys
 import tempfile
+from contextlib import redirect_stderr
+from unittest.mock import patch
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/lanfs_host.c"
@@ -152,6 +156,7 @@ def run_suite(lib_path, py_path, root):
     lib.test_init.argtypes = [SEND, RECV, MAC]
     lib.test_data.restype = C.POINTER(C.c_ubyte)
     lib.test_hello.argtypes = [C.c_ulong]
+    lib.test_peer.argtypes = [C.c_char_p]
     for name in ("test_len", "test_ticks", "test_resends", "test_gates", "test_pending"):
         getattr(lib, name).restype = C.c_ulong
     host = load_host(py_path)
@@ -267,6 +272,68 @@ def run_suite(lib_path, py_path, root):
     rig.check()
     print("PASS Ethernet destination, peer and SFS marker", flush=True)
 
+    # The configured guest-side peer applies to HELLO responses too.
+    rig = Rig(lib, host, root)
+    assert lib.test_peer(b"02:00:00:00:00:03") == 0
+    assert lib.test_hello(7) != 0 and lib.test_ticks() < 2000
+    assert lib.test_peer(b"02:00:00:00:00:01") == 0
+    rig.hello()
+    rig.read()
+    for bad in (b"x", b"02:00:00:00:00", b"02:00:00:00:00:01:00", b"gg:00:00:00:00:01"):
+        assert lib.test_peer(bad) != 0
+    print("PASS configured client HELLO peer", flush=True)
+
+    hello = sfs.encode(sfs.T_HELLO, 0, 0, struct.pack("<HHI", 1, 512, 123))
+    other = bytes.fromhex("020000000003")
+    for explicit in (None, GUEST):
+        server = sfs.Server(sfs.HostFS(root))
+        lan = host.LanServer(HOST, server, peer=explicit)
+        if explicit:
+            assert lan.handle(packet(hello, BCAST, other)) is None
+            assert server.sid == 0
+        # Non-HELLO traffic must not claim the first peer.
+        lan.handle(packet(sfs.encode(sfs.T_STAT, 999, 1, b""), HOST, other))
+        assert lan.peer == explicit
+        assert lan.handle(packet(hello, BCAST)) is not None
+        sid = server.sid
+        assert lan.peer == GUEST
+        new_hello = sfs.encode(sfs.T_HELLO, 0, 0, struct.pack("<HHI", 1, 512, 124))
+        assert lan.handle(packet(new_hello, BCAST, other)) is None
+        assert server.sid == sid
+        assert lan.handle(packet(sfs.encode(sfs.T_BYE, sid, 0), HOST)) is None
+        assert lan.handle(packet(new_hello, BCAST, other)) is None
+        assert lan.peer == GUEST
+        assert lan.handle(packet(new_hello, BCAST)) is not None
+        assert lan.peer == GUEST
+        # Reserve 0xffff and never let seq wrap within this session.
+        assert lan.handle(packet(sfs.encode(sfs.T_STAT, server.sid, 0xffff, b""))) is None
+    print("PASS explicit/first-HELLO host peer survives BYE and replacement", flush=True)
+
+    # sockaddr_ll pkttype, rather than MAC coincidence, rejects outgoing copies.
+    class Sock:
+        def recvfrom(self, cap):
+            assert cap == host.lan_bridge.MAX_FRAME
+            return b"frame", ("eth0", 0x88b5, self.kind, 1, b"")
+    port = host.NicPort.__new__(host.NicPort)
+    port.sock = Sock()
+    port.sock.kind = 4
+    assert port.recv_frames() == []
+    port.sock.kind = 0
+    assert port.recv_frames() == [b"frame"]
+    assert host.peer_mac("02:00:00:00:00:02") == GUEST
+    for bad in ("0:0:0:0:0:0", "02-00-00-00-00-02", "zz:00:00:00:00:02"):
+        try:
+            host.peer_mac(bad)
+        except host.argparse.ArgumentTypeError:
+            pass
+        else:
+            raise AssertionError("invalid --peer accepted")
+    with patch.object(host.Path, "read_text", side_effect=["down\n", "0\n"]):
+        assert host.link_status("enp1s0") == "operstate=down carrier=0"
+    with patch.object(host.Path, "read_text", side_effect=OSError()):
+        assert host.link_status("enp1s0") == "operstate=unknown carrier=unknown"
+    print("PASS AF_PACKET outgoing filter and startup link state", flush=True)
+
     # Exercise the foreground AF_PACKET serving loop through its port seam.
     # Only the socket is fake; framing and Server execution remain real.
     rig = Rig(lib, host, root)
@@ -312,6 +379,43 @@ def run_suite(lib_path, py_path, root):
     rig.check()
     print("PASS host foreground serve loop", flush=True)
 
+    # Real server continues after recv/send OSError and unexpected handle errors.
+    class Stop(BaseException):
+        pass
+
+    class FlakyPort(Port):
+        def recv_frames(self):
+            self.reads += 1
+            if self.reads == 1:
+                raise OSError(errno.ENETDOWN, "link down")
+            if self.reads == 6:
+                raise Stop()
+            return [wire]
+
+        def send(self, response):
+            if self.reads == 3:
+                raise OSError(errno.ENOBUFS, "queue full")
+            self.response = response
+
+    port = FlakyPort()
+    real_handle = rig.host.handle
+    def handle(frame):
+        if port.reads == 2:
+            raise ValueError("request failed")
+        return real_handle(frame)
+    errors = io.StringIO()
+    with patch.object(host.select, "select", return_value=([port], [], [])), \
+            patch.object(host.time, "sleep"), \
+            patch.object(rig.host, "handle", side_effect=handle), redirect_stderr(errors):
+        try:
+            host.serve(port, rig.host, now=lambda: 0.0)
+        except Stop:
+            pass
+    assert port.reads == 6 and port.response is not None
+    assert errors.getvalue().count("lanfs:") == 3
+    assert "ENETDOWN" not in errors.getvalue() or "link down" in errors.getvalue()
+    print("PASS serve survives receive/send/handler failures", flush=True)
+
 
 def build(work, changes=None, target=False):
     changes = changes or {}
@@ -353,6 +457,8 @@ def run_mutations(tmp, root):
          "f->sid != c->sid"),
         ("old_seq", "tools/lanfs_host.py", "elif fr.seq <= self.high_seq:",
          "elif False:"),
+        ("host_peer", "tools/lanfs_host.py",
+         "if self.peer is not None and src != self.peer:", "if False:"),
         ("put_deadline", "fs/sfs_lan.c",
          "(u32)(lan_now(ctx) - start) >= sfs_ms_ticks(SFS_LAN_PUT_MS)",
          "0"),

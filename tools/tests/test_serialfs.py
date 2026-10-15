@@ -74,7 +74,7 @@ C_CASES = ["crc_and_frames", "timing_and_seq", "vfs_contract", "mount_permit",
 GATE_CASES = ["gate_tx", "hold_overflow", "gate_rx", "gate_init_refused",
               "isr_counts"]
 SESSION_CASES = ["flow", "hello_fail_quiet", "hello_fail_flood", "end_late_hold",
-                 "end_not_quiet"]
+                 "end_not_quiet", "lan_session"]
 
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-D_DEFAULT_SOURCE", "-D__cdecl=",
@@ -147,7 +147,7 @@ FAKE_ARCH_IO_SESSION = FAKE_ARCH_IO.replace(
     "static inline void _idle(void) {}",
     "static inline void _idle(void) { fake_halt(); }")
 SESSION_SRCS = ("drivers/serial.c", "fs/sfs_proto.c", "fs/sfs_client.c",
-                "fs/serialfs_session.c", "lib/crc32.c")
+                "fs/serialfs_session.c", "fs/sfs_lan.c", "lib/crc32.c")
 
 
 def session_build(tmp, mutated=None, name="session"):
@@ -172,7 +172,8 @@ def session_build(tmp, mutated=None, name="session"):
     exe = work / "serialfs-session-host"
     cmd = ["gcc", *flags_for(mutated), "-I" + str(work), "-I" + str(ROOT / "include"),
            "-I" + str(ROOT / "drivers"), "-I" + str(ROOT / "fs"),
-           "-I" + str(ROOT / "lib"), "-I" + str(ROOT / "sdk/include/os32"),
+           "-I" + str(ROOT / "lib"), "-I" + str(ROOT / "kernel"),
+           "-I" + str(ROOT / "sdk/include/os32"),
            str(SESSION_HARNESS), "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True,
                    stderr=subprocess.DEVNULL if mutated is not None else None)
@@ -1525,6 +1526,11 @@ GATE_MUTATIONS = [
      "            break;", "ゲートの上げ下げで UART / FIFO の残りを読み捨てない"),
 ]
 SESSION_MUTATIONS = [
+    ("fs/serialfs_session.c",
+     r'    g_use_lan = sysconfig_get_int\(SYS_SYSTEM_CFG, "SFS_LAN", 0\) == 1;',
+     '    g_use_lan = 0;', "SFS_LAN を読まない"),
+    ("fs/serialfs_session.c", r"        sfs_lan_reset\(&g_lan\);",
+     "        ;", "LAN end で受信状態を捨てない"),
     ("fs/serialfs_session.c", r"(static SfsClient g_cli;)", r"\1", IDENTITY),
     ("fs/serialfs_session.c",
      r"    quiet = sfs_client_quiesce\(&g_cli, SFS_QUIET_MS, SFS_QUIET_MAX_MS\);",
@@ -1604,7 +1610,7 @@ PY_MUTATIONS = [
      "        pass\n\n    # 要求", "行ごとに結果を空にしない (REPL で前の EXIT を取り違える)"),
     ("tools/rshell_serial.py", r"        chunk = port.read\(read_size\(port\)\)",
      "        chunk = port.read(256)", "send_cmd が 256 バイト待つ (要求ごとに 200ms)"),
-    ("tools/rshell_serial.py", r"    if is_sfs and server is None:",
+    ("tools/rshell_serial.py", r'    if is_sfs and server is None and not getattr\(args, "sfs_lan", False\):',
      "    if False:", "--serve-host 無しでも `sfs run` を送る"),
     ("tools/serialfs_host.py", r"        if fr.sid in self.closed:\n            return None ",
      "        if False:\n            return None ", "BYE の後も答える"),

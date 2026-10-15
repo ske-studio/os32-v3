@@ -4,6 +4,10 @@ check-serialfs-host:
 - drivers/serial_plan.c
 - fs/serialfs.c
 - fs/serialfs_session.c
+- fs/sfs_lan.c
+- fs/sfs_lan.h
+- drivers/e82557.h
+- kernel/sysconfig.h
 - fs/sfs_client.c
 - fs/sfs_proto.c
 - kernel/sys.c

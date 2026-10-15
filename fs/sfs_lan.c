@@ -41,7 +41,8 @@ static int lan_receive(SfsLan *lan)
         lan->rx[13] != (SFS_LAN_ETHERTYPE & 0xff) ||
         !mac_equal(lan->rx, lan->mac) ||
         mac_equal(lan->rx + SFS_LAN_MAC_LEN, lan->mac)) return 0;
-    if (lan->linked && !mac_equal(lan->rx + SFS_LAN_MAC_LEN, lan->peer))
+    if ((lan->linked || lan->peer_fixed) &&
+        !mac_equal(lan->rx + SFS_LAN_MAC_LEN, lan->peer))
         return 0;
     if (lan->rx[SFS_LAN_HDR_LEN] != SFS_ENQ ||
         lan->rx[SFS_LAN_HDR_LEN + 1] != SFS_MAGIC1 ||
@@ -145,8 +146,43 @@ void sfs_lan_init(SfsLan *lan, const SfsLanNic *nic,
     lan->nic = nic;
     lan->clock = clock;
     lan->clock_ctx = clock_ctx;
-    lan->linked = lan->hello = lan->prepared = 0;
+    lan->linked = lan->hello = lan->prepared = lan->peer_fixed = 0;
     lan->nonce = 0;
     lan->rx_pos = lan->rx_end = 0;
     nic->mac(lan->mac);
+}
+
+int sfs_lan_set_peer(SfsLan *lan, const char *mac)
+{
+    u8 peer[SFS_LAN_MAC_LEN];
+    u32 i, j;
+    if (!mac[0]) { lan->peer_fixed = 0; return 0; }
+    for (i = 0; i < SFS_LAN_MAC_LEN; i++) {
+        u32 value = 0;
+        for (j = 0; j < 2; j++) {
+            unsigned char c = (unsigned char)*mac++;
+            if (c >= '0' && c <= '9') value = value * 16 + c - '0';
+            else if (c >= 'a' && c <= 'f') value = value * 16 + c - 'a' + 10;
+            else if (c >= 'A' && c <= 'F') value = value * 16 + c - 'A' + 10;
+            else return -1;
+        }
+        peer[i] = (u8)value;
+        if (i + 1 < SFS_LAN_MAC_LEN && *mac++ != ':') return -1;
+    }
+    if (*mac) return -1;
+    for (i = 0; i < SFS_LAN_MAC_LEN; i++) lan->peer[i] = peer[i];
+    lan->peer_fixed = 1;
+    return 0;
+}
+
+void sfs_lan_reset(SfsLan *lan)
+{
+    u32 i, n;
+    /* Never wait for quiet: continuous unrelated traffic cannot hold end. */
+    for (i = 0; i < SFS_LAN_RX_BUDGET; i++)
+        if (lan->nic->recv(lan->rx, sizeof(lan->rx), &n) != 0) break;
+    lan->rx_pos = lan->rx_end = 0;
+    lan->linked = lan->hello = lan->prepared = lan->peer_fixed = 0;
+    lan->nonce = 0;
+    for (i = 0; i < SFS_LAN_MAC_LEN; i++) lan->peer[i] = 0;
 }

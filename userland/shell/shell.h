@@ -176,6 +176,7 @@ void shell_cmd_file_init(void);
 void shell_cmd_dir_init(void);
 void shell_cmd_mnt_init(void);
 void shell_cmd_sys_init(void);
+int shell_sfs_lan(int argc, char **argv);
 void shell_cmd_pci_init(void);   /* cmd_pci.c: lspci / pcidump */
 void shell_cmd_hdprep_init(void); /* cmd_hdprep.c: hdprep (票 TASK_HDD_INSTALL 段 1) */
 void shell_rshell_init(void);

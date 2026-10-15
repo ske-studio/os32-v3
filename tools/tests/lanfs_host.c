@@ -29,6 +29,7 @@ void test_init(int (*send)(const void *, u32),
     sfs_client_init(&client, &sfs_lan_io, &lan, SFS_LAN_BAUD);
 }
 int test_hello(u32 nonce) { return sfs_client_hello(&client, nonce); }
+int test_peer(const char *mac) { return sfs_lan_set_peer(&lan, mac); }
 int test_read(void)
 {
     u8 payload[32];

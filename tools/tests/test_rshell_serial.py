@@ -313,7 +313,60 @@ def case_bauds(r):
           "bauds: matches the V-FAST table in drivers/serial_plan.c")
 
 
+def case_lan(r):
+    import io
+    from types import SimpleNamespace
+    from unittest.mock import patch
+    line = "sfs run cat /host/data"
+    start = "sfs: transport=lan nic=82557 peer=02:00:00:00:00:01 sid=42\n"
+    prefix = "> " + line + "\n"
+    good = prefix + start + "data\nsfs: requests=1 resent=0 timeouts=0\nsfs: exit=0\n"
+    check(r.lan_result(good, line, True) == 0, "LAN complete result")
+    check(r.lan_result(good.replace("exit=0", "exit=7"), line, True) == 7,
+          "LAN child failure")
+    for text, eot in ((good, False), (good.replace(start, ""), True),
+                      (good.replace("sfs: exit=0\n", ""), True),
+                      (good.replace(prefix, "> ver\n"), True),
+                      (good.replace("sid=42", "sid=0"), True),
+                      (good + "sfs: exit=0\n", True),
+                      (prefix + "sfs: exit=0\n" + start, True),
+                      (good.replace("transport=lan", "transport=serial"), True)):
+        check(r.lan_result(text, line, eot) is None, "LAN incomplete reply refused")
+    check(r.lan_result(good.replace("\n", "\r\n"), line, True) == 0, "LAN CRLF")
+
+    class Port:
+        def __init__(self, body):
+            self.body = body
+            self.sent = b""
+        def reset_input_buffer(self): pass
+        def write(self, data): self.sent += data
+        def flush(self): pass
+        def read(self, size):
+            data, self.body = self.body[:size], self.body[size:]
+            return data
+        @property
+        def in_waiting(self): return len(self.body)
+    args = SimpleNamespace(sfs_lan=True, timeout=0.01)
+    port = Port(good.encode() + r.EOT)
+    with patch("builtins.print"):
+        rc, text = r.run_line(args, port, line, out=io.StringIO())
+    check(rc == 0 and text == good and port.sent == (line + "\n").encode(),
+          "LAN run_line sends exact whole line over serial")
+    # Parser rejects conflicting transports before attempting to open the port.
+    with patch.object(r.sys, "argv", ["rshell_serial.py", "--port", "none",
+            "--sfs-lan", "--serve-host", ".", "cmd", "ver"]), \
+            patch.object(r.sys, "stderr", io.StringIO()), patch.object(r, "open_port") as opened:
+        try:
+            r.main()
+        except SystemExit as exc:
+            check(exc.code == 2, "LAN/serial mutually exclusive")
+        else:
+            check(False, "conflicting transports accepted")
+        check(not opened.called, "conflicting transports never open serial")
+
+
 CASES = {
+    "lan": case_lan,
     "echo": case_echo,
     "ack": case_ack,
     "wait_ack": case_wait_ack,

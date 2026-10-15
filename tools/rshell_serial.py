@@ -42,7 +42,11 @@ Windows 側の Python (pyserial 入り) で動かす:
 ゲストの出力は溜められ、終わりに長さ付きのフレームで届く (`sfs: exit=N` を含む)。
 終了コードはゲストの子の終了コードが 0 なら 0、それ以外は 1。
 **ゲストからの書き込みは既定で禁止** — push の宛先などは `--allow-write <相対パス>`
-(複数可) で明示する (票 B-7')。`--serve-host` 無しの `sfs run` は送らずに断る。
+(複数可) で明示する (票 B-7')。
+LAN 版は `--sfs-lan --timeout 600 cmd sfs run hsync boot`。
+ゲストの `sfs lan on` を先に設定し、ノートでは lanfs_host.py を別途起動する。
+`--sfs-lan` は `--serve-host` と排他。開始行・exit 行・echo・EOT を照合する。
+このどちらの指定も無い `sfs run` は送らずに断る。
 プロトコルは tools/serialfs_host.py と fs/sfs_proto.h。
 NP21/W (ai-debug) では `--port aidebug:http://127.0.0.1:8025` で COM1 を HTTP の
 /api/serial/read・write 越しに使える (ini は変えない。/api/cmd と同時に使わない)。
@@ -54,6 +58,7 @@ NP21/W (ai-debug) では `--port aidebug:http://127.0.0.1:8025` で COM1 を HTT
 """
 import argparse
 import os
+import re
 import sys
 import time
 
@@ -439,7 +444,10 @@ def main():
     ap.add_argument("--keep-fast", action="store_true",
                     help="終わるときに --baud へ戻さず、ゲストを --fast の"
                          " 速度に残す (次の呼び出しは --baud N で開く)")
-    ap.add_argument("--serve-host", metavar="DIR", default=None,
+    transport = ap.add_mutually_exclusive_group()
+    transport.add_argument("--sfs-lan", action="store_true",
+                           help="LAN の 'sfs run ...' を送り、開始行・exit・EOT を照合")
+    transport.add_argument("--serve-host", metavar="DIR", default=None,
                     help="`sfs run ...` の行のあいだ DIR をゲストの /host として"
                          "シリアル越しに出す (票 TASK_SERIAL_HOSTFS 部品 B)")
     ap.add_argument("--allow-write", metavar="RELPATH", action="append",
@@ -505,12 +513,20 @@ def run_line(args, port, line, server=None, out=None):
     out = out or sys.stdout
     is_sfs = (serialfs_host is not None and
               serialfs_host.sfs_child(line) is not None)
-    if is_sfs and server is None:
+    if is_sfs and server is None and not getattr(args, "sfs_lan", False):
         # 答える者が居ないのに送ると、ゲストは HELLO の期限 (約 10 秒) まで
         # 線を占有して断るだけ (Fable m4)。送らずに断る。
-        print("[rshell_serial] 'sfs run' needs --serve-host DIR "
+        print("[rshell_serial] 'sfs run' needs --serve-host DIR or --sfs-lan "
               "(not sent)")
         return 2, ""
+    if is_sfs and getattr(args, "sfs_lan", False):
+        text, ok = send_cmd(port, line, args.timeout)
+        out.write(text)
+        code = lan_result(text, line, ok)
+        if code is None:
+            print("[rshell_serial] LAN session incomplete: need echo, LAN start, exit and EOT")
+            return 1, text
+        return (0 if code == 0 else 1), text
     if is_sfs:
         r = serialfs_host.serve_line(port, line, server, args.timeout, out)
         text = r["text"].decode("utf-8", errors="replace")
@@ -543,6 +559,21 @@ def run_line(args, port, line, server=None, out=None):
         print("[rshell_serial] desync: expected echo of %r" % line)
         return 1, text
     return 0, text
+
+
+def lan_result(text, line, eot):
+    """Accept one mounted LAN session, followed by its exit and serial EOT."""
+    if not eot or not check_echo(text, line):
+        return None
+    starts = list(re.finditer(
+        r"^sfs: transport=lan nic=82557 peer=(?:[0-9a-fA-F]{2}:){5}"
+        r"[0-9a-fA-F]{2} sid=([0-9]+)\r?$", text, re.M))
+    exits = list(re.finditer(r"^sfs: exit=(-?[0-9]+)\r?$", text, re.M))
+    if (len(starts) != 1 or len(exits) != 1 or
+            not 0 < int(starts[0][1]) <= 0xffffffff or
+            starts[0].end() >= exits[0].start()):
+        return None
+    return int(exits[0][1])
 
 
 def make_server(args):

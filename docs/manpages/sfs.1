@@ -6,6 +6,10 @@
 
 `sfs run COMMAND...`
 
+`sfs lan on|off`
+
+`sfs lan peer MAC|auto`
+
 ## DESCRIPTION
 
 実機でファイルを入れる口 (票 TASK_SERIAL_HOSTFS 部品 B)。**常駐シェルだけ**が持ち、
@@ -45,6 +49,38 @@ rshell を抜ける。
   以後の要求を即座に失敗させる
 - シリアル越しの読み書きは遅い。`hsync` の全体同期ではなく `hsync boot` /
   `hsync bin` と範囲を絞って使う
+
+## LAN 版 (82557)
+
+`sfs lan on` は `/etc/system.cfg` の `SFS_LAN=1`、`sfs lan off` は `0` を
+保存する。既定は 0 (従来のシリアル)。他の設定行は保持し、次の `sfs run` から
+反映する。再起動は不要。`sfs run` の子からの設定変更は断る。
+`sfs lan peer fc:61:98:70:9f:52` で `SFS_LAN_PEER` に相手の MAC を固定できる。
+`sfs lan peer auto` は固定を解除する。未指定・空なら最初の正しい HELLO 応答に固定。
+
+ノートで読み取り専用サーバを起動する (`--peer` は OS32 の NIC の MAC):
+
+    ~/os32-r7/py-raw tools/lanfs_host.py --iface enp1s0 --root ./hostdrv --peer <OS32-MAC>
+
+`--peer` を省くと最初の HELLO の送り元に固定し、BYE 後も別 MAC へ切り替えない。
+起動時に NIC の MAC・operstate・carrier を出し、リンク断の送受信エラーや
+要求処理の例外はログを出して継続する。
+
+シリアルから `sfs lan on` と必要なら `sfs lan peer <ノート-MAC>` を設定した後:
+
+    python3 tools/rshell_serial.py --port /dev/ttyUSB0 --sfs-lan --timeout 600 cmd sfs run hsync boot
+
+`--sfs-lan` と `--serve-host` は排他。LAN でもコマンドと出力はシリアル経由で、
+echo、`sfs: transport=lan nic=82557 peer=<MAC> sid=<ID>`、`sfs: exit=N`、EOT を
+照合する。開始行は mount 成功後だけ出す。終了時に requests/resent/timeouts も出す。
+LAN では UART gate/hold/LOG/EXIT フレームを使わず、子の出力を直接送る。
+
+82557 が RUNNING または RX_WAIT のときだけ開始できる。NIC が無い場合や HELLO の
+時間切れは有限で IO を返す。シリアルへ自動では切り替えない。終了・開始失敗の際は
+BYE を有限で送ってから unmount し、未消費の受信状態を捨てる。HostDrv が `/host` を
+使用中なら BUSY。LAN 枠は平文で、MAC の固定は相手の取り違えを避けるためのもの。
+seq は LE16、1 セッション最大 65,534 要求で周回しない。上限に達した場合は対象を
+分けて新しい `sfs run` で続ける。実行途中の自動再接続は行わない。
 
 ## ホスト側の規則 (tools/rshell_serial.py --serve-host)
 

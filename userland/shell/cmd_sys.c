@@ -336,6 +336,39 @@ static int cfg_set_key(const char *key, const char *val)
     return cfg_update_key(key, val, 0);
 }
 
+int shell_sfs_lan(int argc, char **argv)
+{
+    const char *key, *value;
+    int i;
+    if (sh_in_sfs != 0) {
+        g_api->kprintf(ATTR_RED, "%s", "sfs: settings refused inside 'sfs run'\n");
+        return SH_STATUS_ERROR;
+    }
+    if (argc == 3 && (!strcmp(argv[2], "on") || !strcmp(argv[2], "off"))) {
+        key = "SFS_LAN";
+        value = !strcmp(argv[2], "on") ? "1" : "0";
+    } else if (argc == 4 && !strcmp(argv[2], "peer")) {
+        key = "SFS_LAN_PEER";
+        value = argv[3];
+        if (!strcmp(value, "auto")) value = "";
+        else {
+            if (strlen(value) != 17) return SH_STATUS_USAGE;
+            for (i = 0; i < 17; i++) {
+                char c = value[i];
+                if (i % 3 == 2) { if (c != ':') return SH_STATUS_USAGE; }
+                else if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
+                           (c >= 'A' && c <= 'F'))) return SH_STATUS_USAGE;
+            }
+        }
+    } else {
+        g_api->kprintf(ATTR_YELLOW, "%s", "sfs lan on|off|peer MAC|peer auto\n");
+        return SH_STATUS_USAGE;
+    }
+    if (cfg_set_key(key, value) != 0) return SH_STATUS_ERROR;
+    g_api->kprintf(ATTR_CYAN, "sfs: %s=%s (next session)\n", key, value);
+    return SH_STATUS_OK;
+}
+
 /* Match the boot parser: first KDEBUG assignment, default 0. */
 static int cfg_get_kdebug(int *value)
 {
