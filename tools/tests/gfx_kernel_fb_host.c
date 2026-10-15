@@ -108,10 +108,57 @@ static void boot(void)
 }
 
 
+static void host_map_hex(u32 value)
+{
+    static const char digits[] = "0123456789abcdef";
+    char text[8];
+    for (u32 i = 0; i < sizeof(text); i++)
+        text[i] = digits[(value >> (28 - 4 * i)) & 15];
+    report(text, sizeof(text));
+}
+
+static void host_map_failure(u32 base, u32 size, u32 result)
+{
+    /* No libc: old_mmap returns -errno directly in eax. Keep the raw value
+     * too, so an unexpected successful address is distinguishable. */
+    SAY("FAIL host fixed mmap: required address unavailable; retry CI job");
+    SAY("base, size, result, errno (hex):");
+    host_map_hex(base); SAY("");
+    host_map_hex(size); SAY("");
+    host_map_hex(result); SAY("");
+    host_map_hex(result >= (u32)-4095 ? 0U - result : 0); SAY("");
+    SAY("/proc/self/maps:");
+    const char path[] = "/proc/self/maps";
+    int fd;
+    __asm__ volatile("int $0x80" : "=a"(fd)
+                     : "a"(5), "b"(path), "c"(0), "d"(0) : "memory");
+    if (fd >= 0) {
+        char buf[1024];
+        int count;
+        for (;;) {
+            __asm__ volatile("int $0x80" : "=a"(count)
+                             : "a"(3), "b"(fd), "c"(buf), "d"(sizeof(buf)) : "memory");
+            if (count <= 0) break;
+            report(buf, (u32)count);
+        }
+        __asm__ volatile("int $0x80" : : "a"(6), "b"(fd) : "memory");
+    } else {
+        SAY("maps unavailable; open errno (hex):");
+        host_map_hex(0U - (u32)fd); SAY("");
+    }
+    die(1);
+}
+
 static void map_host(u32 base, u32 size)
 {
-    u32 a[6]={base,size,3,0x32,0xffffffffU,0}, result;
+    /* MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE. A randomized
+     * native vDSO/vvar can occupy the high device window. Never replace
+     * an existing mapping; fail with evidence and keep the exact VA check.
+     * Kernels that ignore NOREPLACE may return another VA: reject it too. */
+    enum { HOST_MAP_FLAGS = 0x100022 };
+    u32 a[6]={base,size,3,HOST_MAP_FLAGS,0xffffffffU,0}, result;
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(a) : "memory");
+    if (result != base) host_map_failure(base, size, result);
     CHECK(result == base);
 }
 int host_pegc_available = 1, host_cirrus_available = 1;
