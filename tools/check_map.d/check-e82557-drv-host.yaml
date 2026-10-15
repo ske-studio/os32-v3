@@ -20,3 +20,6 @@ check-e82557-drv-host:
 - drivers/pci_bind_match.c
 - kernel/kernel.c
 - kernel/dma_pool.h
+- kernel/isr_handlers.c
+- kernel/irq.h
+- kernel/irq_math.h

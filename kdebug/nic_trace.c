@@ -6,7 +6,7 @@
 #include "fs/vfs.h"
 #include "generated/kdebug_import_macros.h"
 
-#define NIC_TRACE_CAP 512U /* all LB2b stages (STAT three times), u32 seq/tick at full width */
+#define NIC_TRACE_CAP 768U /* LB3 stages, u32 seq/tick at full width */
 static char trace_buf[NIC_TRACE_CAP];
 static u32 trace_len;
 static int trace_off;
@@ -54,14 +54,15 @@ static int begin(void)
 void nic_trace(u32 stage)
 {
     static const char *const names[] = {
-        "try", "win", "rst", "base", "eeprom", "dma", "cfg", "ia", "tx", "stop", "phy", "link", "tx2", "stat", "done"
+        "try", "win", "rst", "base", "eeprom", "dma", "cfg", "ia", "tx", "stop", "phy", "link", "tx2", "stat", "done",
+        "irq", "ring", "lb", "cmp", "rst2", "cfg2", "ia2", "ru", "swi", "bound"
     };
     char number[11];
     if (trace_off) return;
     if (stage == E82557_TRACE_TRY) trace_len = 0;
-    if (stage < E82557_TRACE_TRY || stage > E82557_TRACE_DONE ||
+    if (stage < E82557_TRACE_TRY || stage > E82557_TRACE_BOUND ||
         (!trace_len && !begin())) goto failed;
-    append("LB2b ");
+    append("LB3 ");
     append(names[stage - E82557_TRACE_TRY]);
     append(" tick=");
     kutoa_dec(tick_count, number, sizeof(number));

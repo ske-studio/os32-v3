@@ -14,3 +14,4 @@ check-e82557-desc-host:
 - drivers/pci_decode.c
 - kernel/kernel.c
 - tools/tests/e82557_drv_host.c
+- kernel/isr_handlers.c

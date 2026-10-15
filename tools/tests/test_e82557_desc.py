@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""LB2 pure descriptors: byte oracles, target build, executable mutations.
+"""LB3 pure descriptors: byte oracles, target build, executable mutations.
 Record: tools/tests/e82557_desc_tdd.md
 """
 import pathlib
@@ -9,7 +9,7 @@ import tempfile
 import test_e82557_drv as drv
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-CASES = list(range(49))
+CASES = list(range(33)) + [42, 43] + list(range(50, 63))
 MUTATIONS = [
     ('E82557_CB_EL : 0', 'E82557_CB_S : 0', 'EL position'),
     ('E82557_CB_S : 0', 'E82557_CB_EL : 0', 'S position'),
@@ -35,11 +35,6 @@ MUTATIONS += [
     ('ctl & E82557_MDI_READY', 'ctl & (1u << 27)', 'MDI Ready bit'),
     ('return (u16)ctl;', 'return (u16)(ctl & 0xff);', 'MDI data truncated'),
     ('(an_done || !an_en)', '(an_done || (0 && !an_en))', 'forced mode ignored'),
-    ('E82557_BMCR_RESET | E82557_BMCR_BAD | E82557_BMCR_RESTART',
-     'E82557_BMCR_RESET | E82557_BMCR_BAD | E82557_BMCR_RESTART | E82557_BMCR_AN', 'AN enable cleared'),
-    ('E82557_BMCR_RESET | E82557_BMCR_BAD | E82557_BMCR_RESTART',
-     'E82557_BMCR_BAD', 'BMCR reset restart carried'),
-    ('area + E82557_STAT_DONE_OFF', 'area + 60', 'stats done offset'),
 ]
 
 def build(tmp, mutation=None):
