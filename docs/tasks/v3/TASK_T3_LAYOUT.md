@@ -1,37 +1,61 @@
 # TASK_T3_LAYOUT — T3 カーネル帯・常駐シェルの詳細設計
 
-> 状態: **設計中 (2026-10-03)** — 実装用の設計。独立レビュー Opus 5.5 (`claude-opus-5-5`) 往復3でApprove。実装・受入は未実施。
-> 設計: Codex gpt-6-astra。調査基点 `3c4171a784cc47720392ab55b3c4a24aee17e6f3` (2026-10-03、main)。元の設計レビュー基点は `59c4285`。今回の更新は実装事実・参照の照合で、D番号・契約・順序とレビュー履歴は変更しない。
-> 決定の正典は [TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) D1〜D36、配置の定義は `include/memmap.h`、実装済み地図は [02_memory](../../02_memory.md)。本票は実装順・追加契約・試験だけを持つ。
+> 状態: **設計中 (2026-10-15、再照合 r2、ユーザー確認待ち)** — 共通依頼の状態行を維持。本文は **r3 (2026-10-16、Opus r1対応)**。実装・受入は未実施。旧版の承認と今回のレビューは §5 で区別する。
+> **レビューの経過 (PM、2026-10-16)**: astra が起草 (r2・r3) → Opus 5.5 が独立レビュー 2 往復 (r1「直してから」、r2「確定してよい (未決の争点はユーザーへ)」)。往復の記録は `~/os32-tmp/run/t3design/T3_LAYOUT/` (`opus_r1.md`・`astra_r2_response.md`・`opus_r2.md`)。**ユーザーに決めていただく争点**: 0x3FB000 の衝突 (4 案) — 末尾の「未決の争点」。実装の前にユーザーが確認する。
+> 設計: Codex。再照合基点 main `c81b27bed7c1b0d05e5e7d9de9763c4eded844e5` (2026-10-15)。旧基点 `3c4171a784cc47720392ab55b3c4a24aee17e6f3`、元の設計レビュー基点 `59c4285`。根拠の file:line は今回の木。実測は既存成果物の読取で、新規ビルド・ゲスト実行はしていない。
+> 決定の正典は [TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) D1〜D36、定義は `include/memmap.h`、実装済み地図は [02_memory](../../02_memory.md)。D・契約・順序は変えない。リンクは `docs/tasks/v3/` 配置時の相対パス。本票は本文を全部持つ。
+> OS32 は PC-98・MIT・単一利用者・単一タスク・協調切替。攻撃者を想定せず、バグ/装置誤動作から戻せることと像の予算を守る。認証・暗号・権限分離強化は足さず、性能は P100/32MB の D15 まで。[CONSTRAINTS](../../CONSTRAINTS.md):16-205 ([C1]〜[D3])、装置の扱いを追加するなら [HW3]:92-98 のメーカー資料と BSD/MIT 実装を先に示し、GPL から写さない。
+
+## 0. 再照合
+
+| 元票の前提・着手条件 | 分類 | 今回の照合と扱い (根拠) |
+|---|---|---|
+| T2c〜h の統合・受入後に着手 | 維持 | T2 の本体は受入済み、残項目は台帳で管理。受入済みと残関門の閉鎖を混同しない (`HANDOVER_2026-10-09.md:11-16`、`TASK_T2D_T2H.md:3`、§1) |
+| e5 未統合、公開 query/lease・可変 map・trim 待ち | 吸収済み | e11 公開、f1〜f13、g1〜g5 の引渡し済み (`TASK_T2D_T2H.md:190-196,290-306,334-339`)。実装済みを再開発しない |
+| resident CRT を USER CRT から分離 | 吸収済み | `build/programs.mk:39-49,83-84,144-147`、`sdk/allocator/nano_adapter.c:127-136`。T3 は新しい固定限界へ接続 |
+| boot 後 kcg_load_font を NOSYS 化 | 吸収済み | `drivers/kcg.c:247-263`。BB/mailbox 初期化と公開順は維持し、Unicode 再検証だけ撤去 (§3) |
+| SQLite 固定帯・旧 shell heap・FIXED backing を移す | 維持 | `build/os32.ld:71-108`、`include/memmap.h:317-344`、`kernel/memory_boot.c:211-246`。連結配置/SLACK は未実装 |
+| 固定 PD/PT は画像外・最終位置の10枚 | 要改訂 | 先頭10枚は移設不要だが、R7FIX2 の最上位 MMIO PT が `0x3FB000` に追加済み (`memmap.h:345-352`、`paging.c:226-229`)。上位票の guard と衝突、§6 の決着まで切替不可 |
+| e3のnative VRAM UC・CLIENT/USER接続 | 吸収済み | `kernel/v86_mem.c:36-42,170-180` のsetup/teardown UC、`gfx/gfx_core.c:192,213,489` のCLIENT/publisherを継承。旧WB/未結線として扱わずT3のPTE回帰対象にする |
+| Unicode は低位表と暫定 RO lease | 維持 | `lib/utf8.c:28-105`、`exec/system_surface.c:7-35`、`userland/lib/gfx/libos32gfx_core.c:78-106`。kernel/静的SDK/shlib/常駐の全経路を同時移行 |
+| KAPI の版と自己試験の置き場 | 要改訂 | KAPI 75 (`sdk/kapi.json:3`)、自己試験は `kdebug/kselftest.c`。DBGREF S0〜S2 後も木は進み `build/kdebug.mk:6-9` は S4/nic_trace 構成。票 `TASK_DBGREF.md:3` の進捗と実物を分ける |
+| LAN 前の予算・配備前提 | 要改訂 | LB-2c 送信まで、LB-3 は未受入 (`realhw/TASK_LAN_82557.md:3,8`)。LAN /host 段1は `fs/sfs_lan.c:12-32` と `tools/tests/test_lanfs.py:18-21`、実機 hsync 完了とはしない |
+| KHEAP 192KiB・SHM224KiB・508KiB圧縮上限 | 維持 | 192KiB は上位票:82 の設計値。現行176KiBは暫定 (`memmap.h:42-44`) なので T3 で戻す。SHM は削らない、圧縮上限は `boot/boot_defs.h:93` |
+| 文書計画提示・台帳引渡し | 維持 | `DOCS_REORG_T3.md:3,23,89` の承認済み計画と F-9/H-4(a) を §1 で受ける。設計を現状へ弱めない |
+| SLACK、2heap peak、kstack、Unicode 時間 | 未測定 (T3配置) | 現配置の基準値は H-5 (`DEFERRED_TESTS.md:81`、10/14 d14b): kstack=4,348 B、shell_stack=20,840 B、kheap_peak=111,960 B、resident_peak=131,656 B。resident_peakを2heap各々のpeakと同一視せず、T3c2で同じ指標と新しい個別peakを採る。SLACK算術は下記、T7将来分は未測定 |
+| 構成別のゲスト受入 | 要改訂 | `V3_PLAN.md:41-46`、`DEFERRED_TESTS.md:19` の10/14決定に従い当面64MB一構成。8/17MB等の最低条件は最終段に残す |
+
+**現行予算 [既存成果物の実測]**: `build/out/kernel.map:4452` の `__bss_end=0x1940C0` → 本体606,400 B。`memmap.h:259-261` の上限は `0x99000=626,688 B` (`build/os32.ld:23` と一致)、残り **20,288 B**。DBGREF 後30,176 B (`TASK_T2D_T2H.md:547`) から差引9,888 B増であり「LAN約+6.5KB」だけでは説明しない。KHEAPを今の帯のまま192KiBへ戻すと残り3,904 Bに減るため、Unicode表の先行投入は不可。
+`build/out/vmkernel.lz4` は **500,430 / 520,192 B、残り19,762 B** (ファイル長、`generations-manifest.json:62-64`)、manifest:3-9 は基点/KAPI75/形式4・ABI1・配置3・shlib2を示す。kernel.bin と圧縮像の SHA256 は manifest と一致。これは T3 の圧縮後サイズではない。後続 LAN 統合で基点が動けば実装パックで再計算する。
 
 ## 1. 着手条件と成果物
 
-T3 は [T2](TASK_T2_APPBAND.md) の **T2c〜h が統合・受入済み**になってから実装する。調査基点では T2a・T2a′・T2b・T2c と T2d の checked copy、T2e1〜e4、T2f1a/f1b、T2h2/h3 の準備が着地している。T2 全体の受入完了ではない。現在地と残件の正典は [T2d〜h](TASK_T2D_T2H.md) の各実装結果・§5・§12。e5 は別 worktree で実装・レビュー Approve 済みだが本基点には未取り込み (作業依頼時の申し送り)、e6〜e12・f2〜f13・g・h 最終一式は未着手。T2 のゲスト未確認項目を T3 の成功で消さない。
+T3 は T2c〜h の統合・受入後に実装する。旧「e5は別worktree」「T2完了後に確定」は吸収済み (§0)。T2 の未確認は T3 の成功で消さず、`DEFERRED_TESTS.md:15-21,82` の次回ゲスト8行・R7-1目視等と LAN L-B の関門を PM が閉鎖根拠で照合する。順序は R7FIX2 → ゲスト/実機 → LAN L-B → T3 (`DOCS_REORG_T3.md:123-126`) のまま、文書の再照合は並行可。§6 の PT 衝突も配置切替前の関門とする。
+固定 PD/PT の既存先頭10枚は再移設しない。旧 shell heap 周囲を DMA・guard・kstack に替える設計は維持するが、追加11枚目を無かったことにしない。後続は [T4〜T6b](TASK_T4_T6_MODULES.md)、[T7 と後半](TASK_T7_AND_FOLLOWUPS.md)。
 
-T2a′ の固定 PD/PT 10 ページは既に画像外・最終位置にある。再移設せず、周囲の旧 shell heap を解放し DMA・ガード・kstack に替える。旧 T3 行の「PT を画像の外へ」は残作業ではない。後続は [T4〜T6b](TASK_T4_T6_MODULES.md)、[T7 と後半](TASK_T7_AND_FOLLOWUPS.md)。
+| 引渡し ID | T3 の責務と閉じる観測 |
+|---|---|
+| **F-9** | **着手前の扱いは、既知限界を台帳に残し、c3で現行USER allocatorを再現・測定、c4で正しさと性能を別判定し、必要時だけ副arena最小64KiBを比較する方針**とする (本票提示時にPM照合、`DOCS_REORG_T3.md:89,126`)。EFULL時の一覧保持/exit回収とrealloc成功時の旧領域残存/errnoは性能良否で閉じず、常駐2heap変更でも閉じない。f12の最大4/32・副arena1は対照のみ (`DEFERRED_TESTS.md:58`) |
+| **H-4(a)** | 64MBで実bufferの物理ページを32MiB超へ置く専用fixtureとI/O往復を T3b2/b3 で実施 (`DEFERRED_TESTS.md:59`)。(b)(c)はPCM票、構成別の残りはv3最終段のまま |
+| **X-4** | 選択漏れ3種は最初の依頼パック前、残りは遅くとも最初の取り込みの全体検査まで (`DEFERRED_TESTS.md:20-21,63`)。本票の文書完成では閉じない |
 
 | 成果物 | 責務 |
 |---|---|
-| 一組の新配置成果物 | kernel、resident shell/gshell、SDK、shlib、同梱ユーザーランドを同じ配置世代で再ビルド。旧 shell は入口前に拒否 |
-| 配置 manifest | ELF シンボルから code/data/bss・暫定 SQLite・浮動鎖・SLACK・shell の半開区間を生成。手書きの実測値を増やさない |
-| 起動診断 | 固定占有、SLACK、一般池、メタデータ、BB のページ数を別々に記録。推測予算を合格根拠にしない |
+| 一組の新配置成果物 | kernel・loader・resident shell/gshell・SDK/CRT・shlib・同梱userland・対のkdebugを同じ配置世代で再ビルド。旧shellは入口前に拒否。apps/gameはH-7再開時ゲートを維持 |
+| 配置 manifest | ELFからcode/data/bss・暫定SQLite/stack・浮動鎖・SLACK・shellの半開区間、owner/用途/ページ数と世代・hashを生成。手書き実測の写しを増やさない |
+| 起動診断 | 固定占有・SLACK・一般池・metadata・BB・kdebugを別勘定。KDEBUG=1は対の部品がRUNNINGで実試験が走ったこと、KDEBUG=0は監査継続を記録 |
 
 ### 1-1. 基点の実物と引渡し待ち
 
-参照は上記基点の行番号とシンボルで照合したもの。将来の配置値ではない。
-
-| 実物 (file:line / シンボル) | 確認した境界 |
+| 実物 (今回の file:line / シンボル) | 確認した境界と残作業 |
 |---|---|
-| `build/os32.ld:75` (`__bss_end`)、`:81` / `:84` (`__sqlite_start`)、`:107` (`__sqlite_end`) | SQLite は固定帯のまま。T3 の連結配置は未実装 |
-| `build/kernel.mk:199` (`mkvmkernel.py`)、`:201` (`--sqlite-addr`) | SQLite 別圧縮の宛先はまだ固定値 |
-| `kernel/memory_boot.c:24` (`MEMORY_BOOT_FIXED_FIRST`)、`include/memmap.h:304` (`MEM_LEDGER_META_BASE`) | FIXED backing は旧 DMA/stack 隣接式。§2-2 の core BSS 移動は未実装 |
-| `exec/redir_access.c:257` (`copy_caller_cstr`)、`exec/lease.c:174` / `:231` (`surface_lease` / `surface_lease_bundle`) | B1・単面/4面束の内部入口はある。公開 KAPI 接続とは別 |
-| `kernel/v86_mem.c:26` (`v86_ident_map`) | e3 の native VRAM UC は setup/teardown 両方に着地。旧 WB 問題を未修正扱いにしない |
-| `gfx/gfx_core.c:158` / `:178` (`gfx_kernel_framebuffer` / `gfx_bind_client`)、`:398` (`gfx_surface_source`) | kernel は CLIENT backing を使用。互換 KAPI は起動前も選択 backend の geometry を返す。USER publisher は未結線 |
+| `build/os32.ld:76,82-108` / `__bss_end,__sqlite_start/end` | SQLiteは固定0x200000、BSS込み770,560 B (`kernel.map:4456,8010`)。T3の連結配置は未実装 |
+| `build/kernel.mk:210-212,334`、`boot/boot_defs.h:58`、`boot/loader_fat_new.asm:405` | 通常像/試験像ともSQLite宛先が固定。C/ASMの展開上端と生成器を一緒に追随 |
+| `kernel/memory_boot.c:22-23,211-246`、`kernel/paging.c:351-357,399` | 固定backingは旧番地、NP期待。runtime区間・core BSS・SLACKへの変更は未実装 |
+| `sdk/allocator/nano_adapter.c:127-190`、`exec/exec.c:1885` | residentの固定break検査は存在。新しいexec_baseをsbrk限界へ渡す変更と2heapの共通計算が残る |
+| `lib/utf8.c:288-308`、`drivers/kcg.c:220-221,247-263` | かなの算術変換・BMP外0と低位表参照、scratchのUnicode名依存が残る。NOSYSは既に実装済み |
 
-**T2 完了後に確定**: 公開 query/lease と版 (e11 で一括)、再init/revoke/fallback・200行 geometry と SDK の実接続 (e5〜e12)、可変 map/allocator と resident CRT の分離 (f2〜f13)、trim 安全点 (g)、構成別受入 (h)。以下の契約はその引渡し後の設計で、現在の実装済み機能とはしない。
-
-T3 前の予算再計算と文書計画提示は [T2d〜h §6-1・§11](TASK_T2D_T2H.md) の関門。e4 の計測値を最終予算へ流用せず、T2h 受入後の一式で再計算する。文書計画の先行草案は [DOCS_REORG_T3](DOCS_REORG_T3.md)。
+T3前の予算再計算と文書計画提示は `TASK_T2D_T2H.md:532-553`、`DOCS_REORG_T3.md:89` の関門。旧版の未結線リストは再利用せず、公開KAPI75とT2のquery/lease・revoke/fallback・可変map・resident分離・trimを引渡し基準にする。
 
 ## 2. 配置の計算と起動契約
 
@@ -39,7 +63,7 @@ T3 前の予算再計算と文書計画提示は [T2d〜h §6-1・§11](TASK_T2D
 
 `build/os32.ld` は現在 SQLite を 0x200000 へ飛ばし、`__bss_end` と `__sqlite_end` を別々に扱う。T3 ではコアの BSS の後をページ整列して SQLite の text/rodata/data/bss を連結し、**SQLite の全 BSS と暫定代替スタック 128KiB を含む占有終端**から KHEAP → KAPI → guard → SHM → guard を計算する。
 
-設計シンボル `__kernel_resident_end` をこの占有終端に設ける。`__bss_end` はゼロ化対象の終端であり、鎖の起点へ無条件に流用しない。SQLite の BSS は独立範囲として `kentry.asm` でゼロ化し、NOLOAD の隙間をファイル長と混同しない。T4 で SQLite が外れたら `__kernel_resident_end` はコア BSS の整列終端になる。KHEAP 192KiB・KAPI・SHM のサイズは既決値を維持する。
+設計シンボル `__kernel_resident_end` をこの占有終端に設ける。`__bss_end` はゼロ化対象の終端であり、鎖の起点へ無条件に流用しない。SQLite の BSS は独立範囲として `kentry.asm` でゼロ化し、NOLOAD の隙間をファイル長と混同しない。T4 で SQLite が外れたら `__kernel_resident_end` はコア BSS の整列終端になる。KHEAP 192KiB・KAPI 4KiB・SHM 224KiB の既決値を維持し、E11-BUDの暫定176KiBを戻す (§0)。coreの `__bss_start/end` とSQLiteの `__sqlite_data_end/__sqlite_end` は各開始を4byte整列、各終端を全BSS格納後に4byteへ切り上げ、両端の整列・順序・guard非交差をlink ASSERTで保証する。paddingも占有に含め、現行DWORD単位のゼロ化で全域を覆う (`kernel/kentry.asm:32-46`、現行未保証箇所は `build/os32.ld:71-76,97-108`)。
 
 暫定代替スタックは下端に1ページのNP guardを置き、guardも占有終端と予算へ含める。guard用ページは全BSSゼロ化対象から除外し、PG有効化後にNPへする。暫定代替スタックは linker symbol で表し、現行 `sqlite_stack.asm` の引数へ渡す。T4 の可変ポインタ化までの移行橋であり、固定 SQLite 帯を別の番地に再作成しない。`build/kernel.mk` の別圧縮 SQLite エントリは T3 中は維持してよいが、宛先は ELF の `__sqlite_start` から導出し `--sqlite-addr 0x200000` を撤去する。全エントリのロード先・BSS・スタックを含む非重複検査を追加する。T4 でこの暫定エントリを廃止する。
 
@@ -47,62 +71,75 @@ SLACK は `[align_up(chain_end, PAGE_SIZE), MEM_DMA_POOL_BASE)`。終端を切�
 
 ### 2-2. 固定領域とページング
 
-最終番地の表は上位票 §2-1 を参照し、値は `memmap.h` だけで更新する。`MEM_POOL_BASE` は shell 新帯の直後へ移り、台帳の L0/固定用途、メタデータ置場、workspace、DMA、BB 探索下限、起動最小 RAM 判定も同じ差分で追随させる。旧 SQLite 予約と旧 shell heap 予約の削除漏れ・二重供給を検査する。
+最終番地の表は上位票 §2-1 を参照し、値の正典は `memmap.h` とし、linker/boot ASMの必要な写しも同じ差分で更新して生成検査で一致させる。`MEM_POOL_BASE` は shell 新帯の直後へ移り、台帳の L0/固定用途、メタデータ置場、workspace、DMA、BB 探索下限、起動最小 RAM 判定も同じ差分で追随させる。旧 SQLite 予約と旧 shell heap 予約の削除漏れ・二重供給を検査する。
 
 順序は PG=0 で固定 PD/PT をゼロ化・構築 → 予約/NP 範囲を適用 → 固定 PD/PT 自身と kstack を supervisor/RW で確認・必要なら再写像 → CR3 → PG=1。固定 PT を旧 shell 帯の未使用領域として NP にする処理を残さない。PDE 1 の shell の PTE は全 AS 共通 supervisor。APP_BAND の私有 PT と同じ番号だという旧仮定は T2 で消えていることを再監査する。
 
-**FIXED 型の台帳 backing は core 常駐BSSの末尾へ移す。** 2ページ (metadata1 + workspace1) をページ整列した専用NOLOAD sectionとして `__bss_end` の内側に置き、`__ledger_fixed_start/end` をexportする。旧DMA末尾/stack guard隣接の導出式は廃止し、`MEM_LEDGER_META_BASE/END` はそのlinker symbol参照へ替える。従来の番地STATIC_ASSERTは、サイズ/枚数のSTATIC_ASSERTと、整列・core内包含・他section非重複のlink ASSERTへ分ける。`memory_boot.c` の固定区間表はcore占有をこの2ページの前後に分割し、metadata用途との二重登録を避ける。旧 `[0x2F9000,0x2FB000)` は新地図の他の占有が無ければ通常のSLACKとして扱う。
+**FIXED 型の台帳 backing は core 常駐BSSの末尾へ移す。** 2ページ (metadata1 + workspace1) をページ整列した専用NOLOAD sectionとして `__bss_end` の内側に置き、`__ledger_fixed_start/end` をexportする。旧DMA末尾/stack guard隣接の導出式は廃止し、`MEM_LEDGER_META_BASE/END` はそのlinker symbol参照へ替える。従来の番地STATIC_ASSERTは、サイズ/枚数のSTATIC_ASSERTと、整列・core内包含・他section非重複のlink ASSERTへ分ける。`memory_boot.c` の固定区間表はcore占有をこの2ページの前後に分割し、metadata用途との二重登録を避ける。旧 `[0x2F9000,0x2FB000)` は新地図の他の占有が無ければ通常のSLACKとして扱う。区間はbyte半開→整列済PFN半開の順で変換し、空区間は登録を省く。
 
-この2ページは **paging_init時点で全機種ともcore BSSとして恒等sup/RW/WBでpresent** にする。旧 `boot_range_valid(..., 0)` のNP期待は廃止し、present・USERなし・物理一致の期待へ替える。FIXED機の `paging_map_ledger_backing()` はその既存写像を検査する専用入口として残し、NPからpresentへ切替える責務は持たせない。ARENA_TOP機では動的backingを使い、core内の予備2ページは未使用のままkernel owner/sup RWで保持し、途中でSLACKへ返さない。`memory_boot_fixed[]` のsymbol由来区間 (core分割/metadata/SLACK) は実行時に配列を構築し、linker symbolを割った値をstatic const PFN初期化子へ入れない。`tools/gen_memmap.py` は固定数値の正規表現からELF symbolを読む経路へ替え、`test_memory_boot.py` の定数変異と `memmap_boot_host.c` / `memory_boot_host.c` の旧NP期待も同じT3aで変更する。
+この2ページは **paging_init時点で全機種ともcore BSSとして恒等sup/RW/WBでpresent** にする。旧 `boot_range_valid(..., 0)` のNP期待は廃止し、present・USERなし・物理一致の期待へ替える。FIXED機の `paging_map_ledger_backing()` はその既存写像を検査する専用入口として残し、NPからpresentへ切替える責務は持たせない。ARENA_TOP機では動的backingを使い、core内の予備2ページは未使用のままkernel owner/sup RWで保持し、途中でSLACKへ返さない。`memory_boot_fixed[]` のsymbol由来区間 (core分割/metadata/SLACK) は実行時に配列を構築し、linker symbolを割った値をstatic const PFN初期化子へ入れない。`tools/gen_memmap.py` は固定数値の正規表現からELF symbolを読む経路へ替え、`test_memory_boot.py` の定数変異と `memmap_boot_host.c` / `memory_boot_host.c` の旧NP期待も同じT3abの切替差分で変更する。
 
 全機種でcore常駐が8KiB (別途ELF整列差) 増えてSLACKが同量減ることを予算へ記録する。新しい固定番地の穴をDMA直前へ作らず、Dの帯を変えない。
 
 SHM後方guardとDMA手前のSLACKは区別し、旧「後方予約をまとめてNP」にする処理を撤去する。SLACK全域はPG開始時から恒等sup/RW/WB、guardだけNP。
 
-リンク ASSERT は、鎖終端≤DMA、DMA の64KiB整列とサイズ、DMA/guard/PT/guard/stack の非重複、固定 PT の 1/8/1 枚、shell 帯と池の隣接、画像に固定 PT を含まないことを検査する。SLACK と shell の恒等写像を T2 の master/AS 検査へ追加する。ISR の stack 切替、TSS.esp0、初期 ESP は同じ kstack シンボルを使う。
+リンク ASSERT は、鎖終端≤DMA、DMA の64KiB整列とサイズ、DMA/guard/PT/guard/stack の非重複、上位設計の固定 PT 1/8/1 枚 (現行1/8/1/1との衝突は§6で未決)、shell 帯と池の隣接、画像に固定 PT を含まないことを検査する。SLACK と shell の恒等写像を T2 の master/AS 検査へ追加する。ISR の stack 切替、TSS.esp0、初期 ESP は同じ kstack シンボルを使う。
 
 ### 2-3. シェル 1 箱・2 ヒープ
 
-`app_sys.ld` は shell 画像を新帯起点へ置き、末尾 `_end` を出力する。帯上端から 40KiB stack とその下の guard を引いた地点を heap ceiling とする。画像/BSS の上に sbrk と exec_heap の共通供給領域を置く。
+`app_sys.ld` は shell 画像を新帯起点へ置き、既存の `_end` (`sdk/link/app_sys.ld:29`) を使う。帯上端から 40KiB stack とその下の guard を引いた地点を heap ceiling とする。上位票:89の1MiB帯なら、stack `[0x4F6000,0x500000)`、guard `[0x4F5000,0x4F6000)`、exec_heap `[0x4B5000,0x4F5000)`、最低sbrk余裕を引いたimage_end上限は `0x495000` (帯起点から596KiB) となる [式から算出]。値は共通定数から生成し直書きしない。画像/BSS の上に sbrk と exec_heap の共通供給領域を置く。
 
-**T3では固定分割を採用する。** D8の「API2・供給元1」は、同じshell専用帯の残りを起動時の一つの境界計算で分配する意味とし、実行中の両heap間の貸し借りは行わない。`shell_heap_claim/release_tail` 案は採用しない。heap ceiling直下の **256KiBをexec_heap**、その下の画像終端からexec_heap開始までをsbrkへ固定する。`MEM_SHELL_EXEC_HEAP_SIZE` を `memmap.h` に定義し、共通初期化が `{image_end, sbrk_limit=exec_base, exec_base, exec_end=heap_ceiling}` を一度だけ作る。sbrkの最低余裕128KiBをリンク/起動検査し、足りなければそのshell画像を拒否する。実行中にexec_baseを下げないのでCRTの現在breakをkernelが知る必要はない。
+**T3では固定分割を採用する。** D8の「API2・供給元1」は、同じshell専用帯の残りを起動時の一つの境界計算で分配する意味とし、実行中の両heap間の貸し借りは行わない。`shell_heap_claim/release_tail` 案は採用しない。heap ceiling直下の **256KiBをexec_heap**、その下の画像終端からexec_heap開始までをsbrkへ固定する。`MEM_SHELL_EXEC_HEAP_SIZE` を `memmap.h` に定義し、共通初期化が `{image_end, sbrk_limit=exec_base, exec_base, exec_end=heap_ceiling}` を一度だけ作る。`image_end=align_up(_end, allocator_alignment)` とし、`image_end≤exec_base≤heap_ceiling<stack_top` とsbrkの最低余裕128KiBをリンク/起動検査し、足りなければそのshell画像を拒否する。実行中にexec_baseを下げないのでCRTの現在breakをkernelが知る必要はない。
 
-T2fのCPL=3用 `_sbrk` (EXACT mem_map) と **常駐shell/gshell用CRTの `_sbrk` をビルドで分ける**。`build/programs.mk` でapp_sysリンク対象にだけresident CRTを渡し、resident版は固定 `sbrk_heap_limit` を使い、範囲/符号/overflowを検査して自身のbreakを進める。ユーザー入力のフラグでresident経路を選べない。exec_heapは上の固定256KiB内で現行allocatorを初期化する。shellヘッダのheap_szは0なら256KiB、0超256KiB以下なら固定exec_baseから下詰めでその長さを使い、余りをsbrkへ渡さない。256KiB超はヘッダ不適合として起動前に拒否する。公開後のブロック移動・再分割はしない。子終了は `exec_heap_restore_state()`、shell heapの再初期化は禁止。
+T2fのCPL=3用 `_sbrk` (EXACT mem_map) と **常駐shell/gshell用CRTのビルド分離は既にある** (`build/programs.mk:39-49`)。resident版は `nano_adapter.c:127-190` の固定 `sbrk_heap_limit` と範囲/符号/overflow検査を継承し、exec側が共通計算した `exec_base` を限界に渡す。ユーザー入力フラグでresident経路を選ばせない。exec_heapは固定256KiB内で現行allocatorを初期化する。shellヘッダheap_szは0なら256KiB、0超256KiB以下ならexec_baseから下詰めでその長さを使い、余りをsbrkへ渡さない。256KiB超は入口前に拒否。公開後の移動・再分割はせず、子終了は `exec_heap_restore_state()`、shell heapの再初期化は禁止。
 
 この256KiBはT3用の暫定設計値としてT3cでshell/gshellと子ネストのpeakを実測し、T7bでfont込みの再ゲートを通す。全体のSLACK再計測にはT7のpage0 snapshot増分 (+2,560Bの設計値とELFページ丸め、[T7詳細](TASK_T7_AND_FOLLOWUPS.md)) も含め、現時点の実測値とはしない。T7bの未来の実測をT3完了の前提にはしない。足りなければ同じ1MiB内の固定分割定数を変更・全再ビルドして再受入し、実行中の境界移動で救済しない。
 
+**T3 の予算式 [推、未リンク]**: `C=align_up(現行__bss_end,4096)+8192`、`R=align_up(C+770560,4096)+4096+131072`、`chain_end=R+196608+4096+2×4096+229376` とするとT3abは `0x2E0000`、SLACKは1,048,576 B (256頁)。FIXEDの2頁は全機種常駐で、ARENA_TOPの動的metadataは別勘定。SQLiteの128KiBは既存占有の移動、guard4KiBとKHEAP復元16KiBは増分として数える。
+Unicodeの7,063組×4 B=28,252 B (`lib/unicode_jis_table.h:2-8`)、FIXED8,192 B、実装code/data/BSS増分の仮枠16,384 B [推] を現行像に足し、各境界を丸めると `chain_end≈0x2EA000`、SLACK≈1,007,616 B (246頁)。仮枠はT3ab8KiB・c2KiB・d2KiB・予備4KiB、SDK/試験部品は別測定。§6の追加PT処置は未算入。圧縮増分はT3d0の試作像とd1の完成像の実長で確認し、shellは1MiB内、kdebugは池の実ページで別ゲートにする。H-4(a)の試験本体はkdebugへ置くが、範囲指定割当のimport追加はexport表は少なくとも1枠4 B＋整列差を常駐仮枠に計上する [推] (`kernel/pgalloc.h:215-218`、`build/kdebug.mk:10-13`、`kdebug/generated/kdebug_kexports.c:58`)。製品像増分0とは断定しない。
+
 ## 3. Unicode の前倒しと ABI
 
-T3 で Unicode 組表を kernel `.rodata` と二分探索へ移す。既存 `lib/unicode_jis_table.h` の並び/重複/端点をホスト検査し、Unicode→JIS の失敗値は現行 `utf8` 契約を維持する。ユーザー側の変換は **KAPI `unicode_to_jis` を選ぶ設計案**とし、`lib/utf8.c` の kernel/user ビルドを分ける。アプリが kernel の表ポインタを取得する API は設けない。
-
-T2 の暫定 Unicode RO lease は全同梱 caller が KAPI へ移行してから撤去する。**T2 完了後に確定**: e8 の CRT/shlib 取得・解除と e11 の公開接続を照合して撤去対象を確定する (本基点で移行済みとはしない)。apps/game は現行ビルド対象外のため変更要件を引き渡し、再ビルド再開時の受入ゲートとする。`unicode.bin` 読込・ready/4点照合・暫定RO leaseは同一差分で撤去し、leaseだけ残して未初期化領域を読ませない。
-
-boot後の旧 `kcg_load_font` NOSYS化・bootフェーズ制限・font_load_test/台本/host期待値/公開説明の変更は [T2e8b](TASK_T2D_T2H.md) §2-3へ前倒しする (実装は未着手)。公開Unicode/BBの実行中上書きをT2eの受入前に防ぐためで、D7は変更しない。T3はこの契約の継承確認と次のscratch定数整理を行う。
-
-`kcg.c` のLZ4 scratchはT7aまで旧低位FIXED領域に保持し、専用定数 `MEM_KCG_LZ4_TEMP_BASE/END` (従来の0x4A000〜MEM_CONV_END、344KiB) でUnicodeから名前を分離する。poolの追加確保・常駐予算追加はしない。ただしこの範囲はplanar BBとmailboxを重ねるため、**旧kcg_load_fontの実行はboot時のBB公開/host操作/V86開始より前に限定**する。bootフェーズを閉じた後の旧KAPI呼出しはNOSYSで副作用なし (D7の意味変更)。実行中の再ロードを温存してGUIやmailboxを上書きしない。scratchが有効なboot期間は通常AS/USER leaseがゼロ。boot期間終了でscratchを失効させ、重なるplanar BBは全消去・初期化してからT2のSURFACE/leaseとして公開する。公開後の低位BB leaseはscratchの漏出とは数えず、kcgからの上書きを禁止する。mailboxもhost操作開始前に初期化する。T7aまではV86の現行636KiB backingによる扱いを維持し、低位を直接渡さない。T7aで旧scratch/BB用途を撤去してV86へ専有を移す。低位の占有を解いて V86 へ専有を引き渡すのは T7a (一般池へは返さない)。T2e8bの意味変更と同じ差分で `userland/tests/font_load_test.c` を **期待NOSYSのPASS試験 (BB/mailbox不変はhost読取またはkselftestで別に照合し、未貸与mailboxをCPL=3試験が直読しない)** へ変更し、`tools/tests/guest_tests.txt` と `tools/tests/test_result_conv_host.c` の成功経路期待も更新する。SKIPで回帰を隠さない。`sdk/kapi.json` の説明はboot専用内部読込/公開口NOSYSを明記し、説明/NOSYS化のKAPI版更新はT2e11の一括公開で行い、T3ではUnicode追加分を更新する (同じ意味変更を二重計上しない)。生成・clean再ビルドは [KAPI_SPEC §3-1](../../KAPI_SPEC.md) と [ABI1]〜[ABI3]。
-
-KAPI 追加は [ABI1]〜[ABI3]、番号予約は [KAPI_SPEC §3-2](../../KAPI_SPEC.md) に従い、D35 の世代を勝手に別定義しない。
+T3でUnicode組表をkernel `.rodata` と二分探索へ移す。`lib/unicode_jis_table.h:2-8` の7,063組/28,252 Bは今回の読取でも厳密昇順・重複なしを確認した。単一翻訳単位だけに置き、kernel内は直接呼出し、ユーザー側は **KAPI `unicode_to_jis` を選ぶ設計案** (`u32 cp` → `u16 JIS`、未収録/BMP外は0)。`lib/utf8.c:288-308` のかな範囲の算術変換も含め、全BMPと範囲外の結果一致を条件とし、表ポインタを公開するAPIは作らない。
+T2の暫定Unicode RO leaseは全同梱callerのKAPI移行と同一切替で撤去する。対象はkernel読込/register、`exec/system_surface.c:7-35`、静的SDKとshlibの `userland/lib/gfx/libos32gfx_core.c:78-110,198`、CPL0常駐の低位直読、関連初期化/解除、生成/配備のunicode.bin。`lib/utf8.c:60-105` のready/4点照合とsetter、`kcg_boot_phase_close()` のUnicode再検証も同時撤去し、未初期化領域を読む経路を残さない。公開queryのUnicode roleは未登録と同じ `OS32_ERR_INVAL` (`exec/system_surface.c:29-32`) とし、TVRAM等のroleと既存slot番号は維持する。apps/gameはH-7再開時にcaller追随・再ビルド・日本語描画を受入ゲートにする。
+boot後の旧 `kcg_load_font` NOSYS化とfont_load_testの期待変更はT2e8bで吸収済み (`drivers/kcg.c:263`、`TASK_T2D_T2H.md:154-157,221`)。T3では継承を確認し、同じ意味変更を版更新へ二重計上しない。Unicode KAPI追加の版は現在75を起点に実装時に予約し、`sdk/kapi.json`と`KAPI_VERSION`を揃え、生成物は手編集しない ([ABI1]〜[ABI3]、`KAPI_SPEC.md:49-83`)。
+`kcg.c:220-221` のLZ4 scratchはT7aまで旧低位FIXEDに保持し、専用定数 `MEM_KCG_LZ4_TEMP_BASE/END` (従来0x4A000〜MEM_CONV_END、344KiB)へ名前を分離する。poolの連続確保や常駐増はしない。Unicode用途を外しても低位128KiBを一般池へ返さず、kernelのFIXED用途としてT7aまで保持する。scratchがplanar BB/mailboxと重なるため、boot読込→scratch失効→BB全消去/初期化・mailbox初期化→host操作/V86/通常AS・USER leaseの開始を守る。現在のclose順は `kernel/kernel.c:773-776`、消去は `drivers/kcg.c:247-253`。公開後のBB leaseは禁止せず、kcgからの上書きを禁止する。
+T7aまではV86の636KiB backingを維持し、低位を直接渡さない。T7aで旧scratch/BB用途を撤去してV86へ専有を引き渡す (一般池へ返さない)。font_load_testは期待NOSYSのPASS試験を維持し、BB/mailbox不変はhost読取かkdebug自己試験で照合する。未貸与mailboxをCPL3試験が直読せず、SKIPで回帰を隠さない。`tools/tests/guest_tests.txt`・`test_result_conv_host.c`・`test_unicode_surface.py:15-35,60-65` の旧期待も新しい不成立/変換口へ置換する。
+D35の4世代を再定義しない。配置切替時は現行memory_layout=3 (`generations-manifest.json:8`) を更新し、Unicodeは機能版の末尾追加とする。旧shell・旧shlib・新SDK+旧.o・NHD/HostDrv混在は入口前拒否。kernelのImage CRCが変わるたびに対の `/boot/kdebug.bin` を再生成し、古い部品による「自己試験0件」を合格にしない (`TASK_DBGREF.md:6-9`)。
 
 ## 4. 実装分割と受入
 
-| 段 | 主な変更ファイル | 閉じる試験 |
+各行は実装・対象試験・レビュー直しを含む半日〜1日の独立受入単位 [推]。番号付き受入は各段10項以下とし、パックで増えたら分割する。新しいfixture/診断の結線先を示し、単に未使用コードを置いて完了にしない。T3a/T3bは下記の準備段と**一体切替T3ab**へ分け、symbol化・runtime区間・paging期待を別々に配備しない。
+
+| 段 (依存) | 変更範囲・独立して閉じるもの | 観測可能な受入条件 / 代表変異 |
 |---|---|---|
-| T3a 配置式 | `include/memmap.h`, `build/os32.ld`, `tools/gen_memmap.py`, `kernel/kentry.asm`, `boot/boot_defs.h`, `build/kernel.mk` | ELF の BSS込み区間、鎖終端とDMA境界の±1ページ変異、画像外PT、暫定SQLiteエントリの実宛先 |
-| T3b 起動/台帳 | `kernel/paging.c`, `kernel/memory_boot.c`, `kernel/physmem.c`, `kernel/pgalloc.c`, `kernel/dma_pool.c`, `kernel/kselftest.c` | SLACK全ページを一度だけ配り返せる、固定/guardを配らない、PG直後とAS生成後の地図 |
-| T3c shell | `sdk/link/app_sys.ld`, `exec/exec.c`, `exec/exec_heap.c`, `sdk/crt/syscalls.c`, shell/gshell build | 2 heap交差失敗の原状維持、子実行前後の親データ、stack guard、旧shell拒否 |
-| T3d Unicode/統合 | `lib/utf8.c`, `kernel/kernel.c`, `drivers/kcg.c`, `sdk/kapi.json` と生成器、ユーザー側caller | JIS既知対・未収録・境界、全再ビルド、GUI/CUI日本語、低位直読残存ゼロ |
+| T3a0 (関門照合後、0.5日) | ELF配置manifest・予算/写し検査の準備。`tools/gen_memmap.py`、`test_memmap_gen.py`。現配置も検査可能にする | ①現ELFと既存manifestの値一致 ②code/data/BSS/NOLOADを半開区間で出力 ③鎖終端DMA−1頁/一致は通り+1頁は失敗 ④BSS省略・区間重複・C/ASM写し不一致の変異を検出。製品像増分0 |
+| T3a1 (a0、0.5〜1日) | `mkvmkernel.py`・`build/kernel.mk` の通常/R1像のSQLite宛先をELFから導出、C/ASM loader fixture | ①現配置の展開先/CRC不変 ②連結配置fixtureも同じ生成器で通る ③ロード先+長さのoverflow/重複/BSS食込みを拒否 ④BSSゼロ化区間の両端4byte整列・全BSS包含・guard非交差をELF/link ASSERTで確認 ⑤圧縮像≤508KiB。旧0x200000強制・NOLOADをファイル長扱いの変異を検出 |
+| T3b0 (a0、0.5〜1日) | 台帳runtime区間とpagingのhost fixtureを先行。`test_memory_boot.py`、`memory_boot_host.c`、`memmap_boot_host.c` | ①新旧地図を同じ入力で検証 ②FIXED/ARENA_TOP両方でmetadata二重登録0 ③SLACK空/逆転/境界を区別 ④PT/stack/guardの重なりを拒否。旧NP期待・SLACK二重供給の変異で失敗 |
+| **T3ab (a1,b0,§6決着後、1日)** | `memmap.h`・linker/kentry・paging/memory_boot/physmem/pgalloc/dma・shellリンク/exec限界を一体切替。既検証の式/fixtureを結線し世代を更新 | ①同世代一式と対kdebugの配備予行が通り、ONでRUNNINGと実試験実行を確認 ②link ASSERT/manifest/予算一致、固定PTは承認配置 ③PG直後とAS生成後のSLACK/shell/metadataは恒等sup/RW/WB、guardはNP ④SLACK全頁を一度だけ割当/返却、固定頁混入0 ⑤SQLite正常DB/FEP・BSS全域/stack guard成立 ⑥NP21/W 64MBの起動/地図監査0fail、PEGC通常経路とLGY-98 L0〜L3回帰が通る (FFF00000hと82557はbRへ) ⑦圧縮≤508KiB・KHEAP192KiB。NP化/旧pool下限/metadata重複の変異を検出 |
+| T3b1 (ab直後、0.5日) | kdebug/監査、`tools/accept/` の地図採取、DBGREF配備結線の受入 | ①KDEBUG=1でCRC一致/RUNNING、追加自己試験の実行と0fail ②KDEBUG=0で部品読込/割当0・常時監査0fail ③古い部品は診断付き不採用、ONの受入は未成立と表示 ④SLACK/一般池/metadata/BB/部品の頁数保存と総和一致。RUNNING判定省略変異を検出 |
+| **T3bR (b1、実機セッション、0.5日)** | Ra266の配置変更回帰をシリアルで判定、立会い不要。PT処置後にも必須 (`TASK_LAN_82557.md:3,24,41`、`DEFERRED_TESTS.md:82`) | ①同世代一式と対kdebugを照合 ②sys16m=1で `[pegc] win=fff00000`・`fff=ok`・GUI入場時 `alias=ok` ③LB-R5相当のMAC/EEPROM値が既受入値と一致し、T3着手前に受入済みの送受信経路も再実行 ④監査/自己試験0fail・fault 0。実機待ちは日数見積から分け、未実施ならT3全体は未受入。R7-1の目視関門 (§1) を代替しない |
+| T3b2 (b1、0.5〜1日) | H-4(a)用の高位backing fixture/入口は `kdebug/kselftest.c` に置く。既存 `pgalloc_alloc_n_owner` をimportしてowner付きで物理32MiB超を選ぶ (§2-3の微増)。製品allocatorの方針と公開KAPIは変えない | ①USER VA→PFNを全頁採取し全bufferが物理32MiB超 ②通常割当の低位対照も通る ③ページ跨ぎbufferに異なる既知パターン ④確保失敗は未実施と明示し入口へ進めず、終了/失敗でowner頁0。高位をVAだけで判定する変異を検出 |
+| T3b3 (b2、0.5日) | H-4(a)の実I/O受入、DMA pool境界の再確認 | ①64MBで同bufferを使うファイルwrite/readの内容完全一致 ②高位bufferを通るHostDrv経路も同じ確認 ③DMA pool割当は新帯内/64KiB非跨ぎ、FDCは既存BSS窓のまま16MiB未満/非跨ぎを確認 (`drivers/fdc.c:50-79`)、HostDrv経路とISA DMAの証拠を混同しない。PFN証拠と結果を揃えてH-4(a)を閉じる、PCM(b)(c)は閉じない |
+| T3c1 (b1、0.5〜1日) | shell2heap共通境界・resident adapterの接続、heap_sz検査。`exec.c`/`exec_heap.c`/`app_sys.ld` | ①image_end〜exec_base余裕128KiB以上 ②heap_sz=0/1/256KiBが規定どおり、+1は入口前拒否 ③sbrkの上限+1/負方向下限超え/overflowでbreakと両heapデータ不変 ④exec枯渇も親データ不変 ⑤USER mem_map経路は従来どおり。上限混同・失敗後break更新・余り再供給の変異を検出 |
+| T3c2 (c1、0.5日) | shell/gshell・子ネスト・CUI/GUI復帰、番地直書き監査 | ①親sentinelを子正常終了/fault/STOP後も保存 ②同じ操作20回でpool/owner/heap消費が累積しない ③stack guardのhost検査と既存fault回収試験 ④sbrk/exec_heap個別peakに加えH-5と同じ4指標を採取し、§0の現配置基準と同条件で比較、各上限未満 (異なる構成の値は参考扱い) ⑤旧shell入口未到達、新shell起動。`dbgserial.c`/`memmap_audit_live.py`/gen_memmap/gshellコメントの旧帯残存も検出 |
+| T3c3 (c2、0.5日) | F-9の測定fixture、現行USER allocatorを通る基準採取 | ①小割当N=16/64/256でarena数・EXACT失敗回数・map回数・free/trim時間を採取 ②64KiB閾値±1と大塊の虫食いでextent32本到達/EFULLを観測 ③realloc旧unmap失敗の残ブロック・errno・exit回収を確認 ④同じゲスト/入力で変更前後を測れる。模擬tickのcfg_benchやLinux SQLite時間で代用しない |
+| T3c4 (c3、0.5〜1日) | §1で決めたF-9方針の結果を確定。副arena最小64KiBは必要時の比較候補 [推] (`nano_adapter.c:245-262`) | ①正しさ: EFULL後の一覧/owner保持とexit回収、realloc成功時の新データ・旧領域残存・errno=ENOMEMを個別判定 (`nano_adapter.c:402-416,520-524`)。性能良好でもこの既知限界を閉じず、差異/破損/回収漏れは修正対象としてPMへ返す ②性能: 同条件の時間・EXACT/map回数を記録、D15未測定と分けて不要な最適化は採らない ③改善が必要なら最小64KiB案を同入力で比較し、確保不能時は従来の要求丸め量で再試行 ④正味map失敗/余剰常駐/時間と失敗原状維持・trim/exit回収で採否を記録。最小量変更でO(N)/EFULLまで解消扱いにせず、残項目はF-9の内訳としてPMへ返す |
+| T3d0 (b1、0.5〜1日) | Unicode二分探索とkernel/user分離のhost fixture、配備しない試作像で圧縮予算を事前実測 | ①全7,063組と全BMPを旧変換結果と照合 ②先頭/末尾/未収録/BMP外/かな端点で一致 ③kernelは直接・SDKはKAPI経路を確認 ④順序/重複/二分探索の端点/失敗値変異を検出、表1実体28,252 B ⑤LAN L-B統合後のT3配置に表・変換コード・KAPI接続の試作を入れ、通常/R1それぞれを本番と同じ `mkvmkernel.py:123-176` で圧縮し長さ/余裕/基点を記録。削除予定分は実際に削った分だけ差し引き、≤508KiBでd1へ。超過ならd1を止め§6へ実測値と両案を追記 |
+| T3d1 (c2,d0、1日) | Unicode追加・全caller/lease/読込撤去・scratch名整理・KAPI生成を一体切替 | ①版/生成物/C・Rust stamp一致とclean全再ビルド ②静的SDK/shlib/常駐/kernelの日本語一致 ③低位表直読・unicode.bin読込・Unicode lease取得が0 ④boot close後NOSYS、BB/mailbox不変、次描画成功 ⑤旧query不成立と他role維持 ⑥圧縮≤508KiB/表1実体/全予算更新。leaseだけ残す・CPL0直読残存・scratch再開の変異を検出 |
+| T3d2 (b3,bR,c4,d1、0.5〜1日) | 統合と引渡し。予算・世代・日本語時間の最終計測 | ①同世代manifestと対kdebugを照合 ②64MBで地図監査/自己試験0fail、CPL3 fault/STOP→次起動 ③2MB試験3種・GUI終了後CUI・DB/FEPが通る ④日本語の起動/入力→描画時間を同じ文面・環境で記録 (D15判定は未測定として台帳へ) ⑤全占有/SLACK/shell/KHEAP/kstackの実測と未測定を区別し後続へ渡す |
 
-T3aでは `boot/loader_fat_new.asm` のVK32_LOAD_END写しと `tools/mkvmkernel.py` も対象とし、core展開上端をMEM_DMA_POOL_BASEまで広げる。`tools/gen_memmap.py` の写し照合とC/ASMの共通fixtureで確認する。T3cの直書き監査には `userland/lib/rt/dbgserial.c`、`tools/memmap_audit_live.py`、gen_memmapの旧帯表示、gshellの旧番地コメントも含める。T3a/T3dは圧縮 `vmkernel.lz4 <= 508KiB` を必須ゲートとし、超過はT6bを黙って前倒しせず段取りを再レビューする。Unicode KAPI追加で1字2トラップになる経路はcold/warm日本語描画の時間を測り、D15未達なら文字列変換口の別設計へ送る。
-
-> 2026-10-14 ユーザー決定: 搭載メモリ量ごとの確認は v3 の最終段にまとめる (DEFERRED_TESTS の関門「v3 の最終段」)。それまでのゲスト受入は 64MB の 1 構成。以下の構成一覧は最終段用として残す。
-
-**T3aとT3bは一体の差分で着地**し、symbol化・runtime区間・pagingの新期待を分割してビルド不能な段を作らない。T3a〜d はレビュー可能な差分単位で、**配置の半分だけを配備しない**。同一世代の統合成果物を 8MB planar/PEGC、17MB、Ra266 64MB で検証する。kselftest・地図検査ゼロ、CPL=3 fault/STOP→次起動、DMA境界、shell子ネスト、2MB試験3種、GUI終了後CUIを確認する。T3 時点は未分離 SQLite のため最終余裕値とは区別し、実ページ・SLACK・shell peak・kstack high-water を記録する。
-
-失敗時は旧新を混ぜず直前の一式へ戻す。配備・故障注入はテスター、NHD/実機操作は [D1]〜[D3] と既存手順に従う。文書段階ではビルド・実行結果を作らない。
+T3abに必要なshellの最小境界結線はc1待ちにしない (新帯を旧sbrk限界で起動しない)。a0/a1/b0は現配置を保ったhost受入、abで実配置を切替え、d0はその受入済み配置の試作像をhostで測る。危険度の高いheap/exec/paging変更は64MBゲスト受入を終えてから次を積み、実機bRは統合d2の必須依存とする。H-4(a)はkdebugから範囲指定割当→試験ASのUSER VAへ写像→全頁PFNを記録→既存caller試験経路でI/O往復→AS/ownerを回収する (`kselftest.c:750-838`、`kernel/kdebug_imports.def:183-199,815`)。低位対照と頁を跨ぐ高位bufferのbyte一致を取り、専用の途中I/O失敗注入・境界長の総当たりは追加しない。各段が1日または10項を越えるなら準備fixture・台本をさらに分け、不可分な切替自体は分断しない (`ROLES.md:19`)。
+変異は一度に一欠陥を入れ、正常対照PASSと対応するassert/観測FAILを対に残す。コンパイル失敗を検出成功と数えない。対象host検査を途中はMUTATE=0、最後の変更後は選択候補をMUTATE=1、新規/変更試験のMUTATE=0・静的5本・lintで確認する (`ROLES.md:17`)。取り込みの全体検査はPMが節目の実木で一度。ABI変更後は [ABI3] のclean→all、386命令/生成物/世代/配備manifest検査も通す。試験は `check_slot.sh` を通し同時2本まで (`ROLES.md:18-20`)。文書段階で合格ログを作らない。
+`vmkernel.lz4≤508KiB` はa1/ab/d0/d1で必須。現余裕19,762 Bに表が入るかは未測定で、d0の試作測定をd1開始条件とし、以後基点/コードが変われば再測定する。超過時は§6へ「表の一括移行を維持して像を削る側」と「508KiBを守るため段取り再検討を求める側」の根拠・不足量を残し、T6b/SQLite分離の前倒しや上限変更を本票で決めない。F-9/Unicodeの時間は同条件の記録だけとし、D15のP100/32MBで起動2秒・入力→描画100msという目標を維持し、達成判定は未測定として台帳へ渡す (c4でF-9の正しさを別判定し、性能を合格扱いにしない)。
+> 2026-10-14ユーザー決定: 今のゲスト受入はNP21/W 64MB一構成。8MB planar/PEGC、17MB (Cirrus/fallback含む)、Ra266 64MBの構成一覧と最低条件はv3最終段へ残す (`DEFERRED_TESTS.md:19,59`)。構成別の全通しとは別に、今回の配置変更に対するRa266のPEGC最上位窓/82557回帰はT3bRで省略しない。
+失敗時は旧新を混ぜず直前の一式へ戻す。NHD/HostDrv/実機の配備予行とhash確認、停止→配備→起動は [V1]・[D1]〜[D3] と既存手順に従いテスターが行う。既存データを新masterで上書きしない。T3のSLACKは未分離SQLiteを含み最終余裕とは区別する。T7のpage0 snapshot +2,560 BとELF丸め、T7b font込みshell peakは将来再ゲートで、T3の測定や完了条件に先取りしない。
 
 ## 5. 独立レビュー対応 (往復1)
 
-レビュアー `claude-opus-5-5` (Opus 5.5)、2026-10-01、判定Request changes。実装検証ではなく文書/コード照合。修正後の確認は未了。
+以下の往復1〜3は旧版の履歴。再照合r2は Opus 5.5 が2026-10-16に独立レビューし「直してから」(P1なし、P2×3/P3×5、`opus_r1.md`)。本r3でA1〜A5/A8を採用、A6/A7を一部採用し、各根拠は `astra_r2_response.md` に記録。r3の独立再レビュー・ユーザー確認は未実施。
+
+レビュアー `claude-opus-5-5` (Opus 5.5)、2026-10-01、判定Request changes。実装検証ではなく文書/コード照合。この行は当時の記録で、修正後の確認結果は下の往復2/3。
 
 | 指摘 | 到達性の確認と対応 |
 |---|---|
@@ -124,3 +161,13 @@ T3aでは `boot/loader_fat_new.asm` のVK32_LOAD_END写しと `tools/mkvmkernel.
 | 自己点検 scratch寿命 | 低位BBと重なるscratchはboot中のみ有効、失効→BB全初期化→lease公開の順。公開後のBB leaseを禁止しない |
 
 往復3: 同じ `claude-opus-5-5` が **Approve**。N1/N2/N3とscratch寿命はclosed。最終非blocker R1〜R3はT3a/b一体着地、T7aまでの現行V86 backing維持、BB/mailbox観測をhost/kselftestへ分離する注記で対応。PM方針に従いこの文言追記の追加レビューは行わない。実装・各測定ゲートは未実施。
+
+## 6. 未決の争点
+
+| 論点 | 両方の言い分・根拠 | 決着までの扱い |
+|---|---|---|
+| **R7FIX2の追加PTとT3のguardが同じ0x3FB000** | 上位票 `TASK_MEMMAP_V3.md:85-88` は10枚の画像外PT・前後NP guard・16KiB kstack。一方 `memmap.h:345-352` と `paging.c:226-229,320-323` は11枚目を使い、PEGC実機復旧は `DEFERRED_TESTS.md:82`。上位契約を守る側にも、復旧を維持する側にも根拠があり、10枚へ戻す/guardを消すことを黙って選べない | 本文の配置・枚数は維持、T3abはPM/ユーザーの判断まで着手しない。以下は選択肢の比較で採用ではない。常駐/圧縮増分は別々に測り、採択後にmanifest・予算・PG/AS検査を更新、実機T3bRを必須とする |
+| 案1: 11枚目をcore BSSへ | 両guardと16KiB stackを維持できるが、上位票:86の「固定PTは画像外」に抵触。core常駐+4KiB＋整列差、SLACK同量減。NOLOADならPT自体のファイルpayloadは0、圧縮差はコード/配置込み未測定 | PM/ユーザー判断。実機bRでFFF窓・alias・82557回帰、core PTの恒等sup/RWとAS継承も確認 |
+| 案2: guard/stack一式を別位置へ | 11枚の連続PTとguard/16KiBを残せるが、上位票:86-89のPT枚数/位置とshell隣接に影響。移設先未定なので新しい固定占有/SLACK差は未算定、移設だけのpayload増は0、コード/圧縮差は未測定 | PM/ユーザー判断。代替区間の非重複を具体化するまで採れず、実機bRとstack高水位の再取得が必要 |
+| 案3 (Opus A3-i): 11枚目を0x3F0000へ | kstack手前のguardと16KiBを残し、core像を増やさない。一方、上位票:85のDMA/PT間NP guardを消し、:86の固定PT配置/枚数を変更する。PT常駐は既存11枚分で同量、リンク像へPT追加0、圧縮差は未測定 | PM/ユーザー判断。DMA側のguard喪失を許すかが争点。実機bRに加えDMA/PT非重複と新PTのPG/AS写像を確認 |
+| 案4 (Opus A3-ii): kstackを12KiBへ | 11枚目を0x3FB000に残しguardを0x3FC000、stackを[0x3FD000,0x400000)へ。H-5の4,348 Bは12KiBに収まる根拠だが、一負荷の高水位で最大使用を保証しない (`DEFERRED_TESTS.md:81`)。上位票:86-88のPT枚数/位置/16KiBを変更。PT追加とstack減が相殺し上位配置の占有総量は同じ、PT payload追加0、圧縮差は未測定 | PM/ユーザー判断。既測余裕を使う側と未観測の割込み/ネスト余裕を保つ側の争点。実機bRと対象負荷のstack高水位/guardを再確認 |
