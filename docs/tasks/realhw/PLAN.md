@@ -35,6 +35,24 @@
 出典: [PC-9821Ra266 データベース](https://www.pc-9800.net/db_98/data/pc-9821ra266.htm)。サウンドは NEC の仕様表 (support.nec-lavie.jp 98071001-1: 「PCM録音・再生機能 (ステレオ、量子化8ビット／16ビット)」) と 第三研究所 (nakajima-jr/com/rmate/ra40.htm: MATE-X PCM = CS4231、C バスサブボード、86 相当 FM 無し、CD-DA 出力可)。
 `docs/hw/` (Bible / UNDOCUMENTED) にこの機種の記述は**無い** (調査済み)。
 
+## 1-1. 基準構成 (2026-10-15 のスナップショット)
+
+ユーザー指示 (2026-10-15): 「しばらくカードの差し替えが無いので、この構成でスナップショット」。以後、実機の結果に食い違いが出たら、まずここと照らす。
+生データ (17 コマンド、`pcidump` は 7 台すべての 256 B): `~/os32-tmp/evidence/2026-10-15/ra266_snapshot/ra266_snapshot_2026-10-15.txt` (16,937 B、sha256 `81ee934e…94bcf7`、ノートの `~/os32-r7/` と一致)。採取時の版は main 796bc04 (KAPI 75、Image CRC 02628212、KDEBUG=0、31kHz)。
+
+| 項目 | 値 |
+|---|---|
+| メモリ | 物理 64MB、RAM として使うのは 63MB (15〜16MB のシステム空間を除く)。16MB システム空間は「切り離す」(sys16m=1)、PEGC は FFF00000h の窓 |
+| HDD | IDE 0 = Maxtor 6L300R0、C/H/S 16382/16/63、LBA 16,514,063 セクタ (約 8GB として見えている)。ext2 区画 LBA 2016 + 524,160 |
+| FDD | fd0・fd1 (1232 セクタ)。採取時は媒体なし |
+| シリアル | 互換モード 9600、FIFO あり、エラー 0 |
+| 画面 | 31kHz (09a8=81)、PEGC 256 色 |
+| 音源 | CS4231 (MATE-X PCM) irq 10、dma 1。YM2203 |
+| PCI (7 台) | 0:0.0 8086:1237 (82441FX) / 0:6.0 1033:002c (C バスブリッジ) / 0:7.0 1033:0009 (NEC Display) / 0:8.0 1023:9660 (Trident、irq 未割当) / **0:11.0 8086:1229 (82557、irq 3、io 0x6000、MAC 00:00:4c:07:21:0e)** / **0:12.0 1103:0004 (HighPoint、class 01.80、rev 03、subsys 1103:0005、irq 5、io 0x6020/0x6028/0x6030/0x602c/0xc000)** / **0:13.0 10de:0221 (NVIDIA、class 03.00、rev a1、subsys 10fc:1270、irq 6、mem 0x24000000/0x30000000/0x25000000)** |
+
+2026-09-23 (§6 の R1) との違い: 0:12.0 は CA0106 (1102:0007、irq 6) から HighPoint (irq 5) に替わり、0:13.0 の NVIDIA が増えた (ユーザーがカードを差し替えた)。C バスブリッジ 0:6.0 の 0x50〜0x5F の IRQ 表と 0x60 (05 06) もそれに合わせて変わった。
+気づいた点: 起動ログに `[lgy98] init failed rc=-2 (base 0x10d0 irq 5) -> NIC disabled` が残る (LGY-98 は無い。irq 5 は今は HighPoint の線)。OS32 は HighPoint と NVIDIA のドライバを持たない (列挙だけ、結線なし)。
+
 ## 2. ディスク — 8GB は未知の領域
 
 **確かめた事実**: `drivers/ide.c` は **CHS 専用**。`IDENTIFY` で `cylinders` /
