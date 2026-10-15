@@ -1,5 +1,6 @@
 check-lanfs-host:
 - fs/sfs_lan.c
+- fs/sfs_lan.h
 - fs/sfs_client.c
 - fs/sfs_proto.c
 - lib/crc32.c

@@ -31,6 +31,14 @@
 #include "kstring.h"
 #include "appslot.h"            /* APP_ID_SHELL */
 #include "os32_kapi_shared.h"
+#include "sfs_lan.h"
+#include "e82557.h"
+#include "sysconfig.h"
+#include "config.h"
+
+/* SFS_LAN=1 selects the foreground 82557 transport at every begin. It shares
+ * the client/mount lifecycle below, but bypasses UART gate/hold/LOG/EXIT and
+ * reports start, counters and exit directly through the serial console. */
 
 extern volatile u32 tick_count;
 extern int res_owner_get(void);
@@ -41,7 +49,10 @@ extern int res_owner_get(void);
 #define SFS_ATTR_ERR   0x0C
 
 static SfsClient g_cli;
-static int g_active;            /* ゲートを上げてから下ろすまで */
+static SfsLan g_lan;
+static int g_use_lan;
+static const SfsLanNic g_nic = { e82557_send, e82557_recv, e82557_get_mac };
+static int g_active;            /* begin の準備から finish の解放まで */
 static u32 g_nonce_ctr;
 
 /* ---- 線への出入り (ゲートの口) ---- */
@@ -129,6 +140,22 @@ static int sfs_finish(int code)
             vfs_umount(SERIALFS_PREFIX);
     }
 
+    if (g_use_lan) {
+        sfs_lan_reset(&g_lan);
+        if (g_cli.dead != SFS_DEAD_NONE)
+            kprintf(SFS_ATTR_ERR, "sfs: line declared dead (%s)\n",
+                    sfs_dead_name(g_cli.dead));
+        kprintf(SFS_ATTR_INFO,
+                "sfs: requests=%u resent=%u timeouts=%u stray=%u bad_crc=%u bad_len=%u\n",
+                g_cli.calls, g_cli.resends, g_cli.timeouts, g_cli.stray,
+                g_cli.dec.bad_crc, g_cli.dec.bad_len);
+        kprintf(SFS_ATTR_INFO, "sfs: exit=%d\n", code);
+        sfs_dec_reset(&g_cli.dec);
+        g_cli.sid = 0;
+        g_active = g_use_lan = 0;
+        return 0;
+    }
+
     quiet = sfs_client_quiesce(&g_cli, SFS_QUIET_MS, SFS_QUIET_MAX_MS);
     if (!quiet) {
         flags |= SFS_XF_NOT_QUIET;
@@ -186,16 +213,35 @@ int serialfs_session_begin(void)
     /* (1) /host が空いているか (HostDrv や既存のマウント) */
     if (vfs_fstype(SERIALFS_PREFIX)[0] != '\0') return OS32_ERR_BUSY;
 
-    (void)serial_get_status(&mode, &baud, &fifo);
-    sfs_client_init(&g_cli, &g_sio, (void *)0, baud);
+    g_use_lan = sysconfig_get_int(SYS_SYSTEM_CFG, "SFS_LAN", 0) == 1;
+    if (g_use_lan) {
+        /* These driver entry points belong exclusively to the foreground. */
+        int state = e82557_state();
+        char peer[32]; /* room to detect a too-long configured MAC */
+        sfs_lan_init(&g_lan, &g_nic, &g_sio, 0);
+        sfs_client_init(&g_cli, &sfs_lan_io, &g_lan, SFS_LAN_BAUD);
+        g_active = 1;
+        (void)sysconfig_get_str(SYS_SYSTEM_CFG, "SFS_LAN_PEER", peer, sizeof(peer));
+        if ((state != E82557_RUNNING && state != E82557_RX_WAIT) ||
+            sfs_lan_set_peer(&g_lan, peer) != 0) {
+            kprintf(SFS_ATTR_ERR, "sfs: LAN unavailable or invalid SFS_LAN_PEER\n");
+            (void)sfs_finish(OS32_ERR_IO);
+            return OS32_ERR_IO;
+        }
+    } else {
+        (void)serial_get_status(&mode, &baud, &fifo);
+        sfs_client_init(&g_cli, &g_sio, (void *)0, baud);
+    }
     g_active = 1;
 
     /* (2) ゲート → (3) HELLO */
-    serial_gate_set(1);
+    if (!g_use_lan) serial_gate_set(1);
     g_nonce_ctr++;
     rc = sfs_client_hello(&g_cli, tick_count ^ (g_nonce_ctr * 0x9E3779B9UL));
     if (rc != 0) {
-        kprintf(SFS_ATTR_ERR,
+        if (g_use_lan)
+            kprintf(SFS_ATTR_ERR, "sfs: no answer to LAN HELLO\n");
+        else kprintf(SFS_ATTR_ERR,
                 "sfs: no answer to HELLO at %ubps (host must run "
                 "rshell_serial.py --serve-host)\n", baud);
         (void)sfs_finish(rc);
@@ -212,6 +258,11 @@ int serialfs_session_begin(void)
         (void)sfs_finish(rc);
         return rc;
     }
+    if (g_use_lan)
+        kprintf(SFS_ATTR_INFO,
+                "sfs: transport=lan nic=82557 peer=%02x:%02x:%02x:%02x:%02x:%02x sid=%u\n",
+                (u32)g_lan.peer[0], (u32)g_lan.peer[1], (u32)g_lan.peer[2],
+                (u32)g_lan.peer[3], (u32)g_lan.peer[4], (u32)g_lan.peer[5], g_cli.sid);
     return 0;
 }
 

@@ -564,13 +564,15 @@ static void sfs_restore_cwd(const char *saved)
  * `sfs` はここへ来た時点で必ず断る (本体のキーボード・スクリプト・パイプの中)。 */
 static int cmd_sfs(int argc, char **argv)
 {
+    if (argc >= 2 && strcmp(argv[1], "lan") == 0)
+        return shell_sfs_lan(argc, argv);
     if (argc < 3 || strcmp(argv[1], "run") != 0) {
         shell_print_help(argv[0]);
         return SH_STATUS_USAGE;
     }
     g_api->kprintf(ATTR_RED, "%s",
                    "sfs: 'sfs run' works only as a whole line sent by the "
-                   "host over rshell (rshell_serial.py --serve-host)\n");
+                   "host over rshell (rshell_serial.py --serve-host or --sfs-lan)\n");
     return SH_STATUS_USAGE;
 }
 
@@ -926,8 +928,8 @@ static const ShellCmd rshell_cmds[] = {
     { "push",     cmd_push,     "LOCAL host:PATH",     "Upload file to host via SerialFS" },
     { "tvdump",   cmd_tvdump,   "",              "Dump Text VRAM over serial" },
 #ifndef SHELL_AS_APP
-    { "sfs",      cmd_sfs,      "run COMMAND...",
-      "Run COMMAND with the host directory on /host over serial (from rshell_serial.py --serve-host only)" },
+    { "sfs",      cmd_sfs,      "run COMMAND... | lan on|off|peer MAC|peer auto",
+      "Run COMMAND with /host from rshell, or select LAN/serial for the next session" },
 #endif
     { (const char *)0, 0, 0, 0 }
 };

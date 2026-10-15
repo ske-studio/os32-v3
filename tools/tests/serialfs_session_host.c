@@ -57,6 +57,71 @@ void ring3_abort_check(void) { fprintf(stderr, "internal serial abort\n"); abort
 #include "crc32.c"
 #include "sfs_proto.c"
 #include "sfs_client.c"
+#include "sfs_lan.c"
+#include "e82557.h"
+#include "sysconfig.h"
+
+static int g_cfg_lan, g_cfg_reads, g_nic_state = E82557_RUNNING;
+static const char *g_cfg_peer = "";
+int sysconfig_get_int(const char *path, const char *key, int def)
+{
+    (void)path; (void)def;
+    if (strcmp(key, "SFS_LAN")) abort();
+    g_cfg_reads++;
+    return g_cfg_lan;
+}
+int sysconfig_get_str(const char *path, const char *key, char *out, int cap)
+{
+    (void)path; (void)key;
+    snprintf(out, cap, "%s", g_cfg_peer);
+    return (int)strlen(out);
+}
+int e82557_state(void) { return g_nic_state; }
+static const u8 g_guest_mac[6] = {2, 0, 0, 0, 0, 2};
+static const u8 g_host_mac[6] = {2, 0, 0, 0, 0, 1};
+static u8 g_nic_rx[SFS_LAN_RX_CAP];
+static u32 g_nic_rx_n;
+static int g_nic_hello, g_nic_bye, g_nic_answer = 1, g_nic_bad_uart;
+static int g_nic_busy;
+void e82557_get_mac(u8 *mac) { memcpy(mac, g_guest_mac, 6); }
+int e82557_send(const void *buf, u32 len)
+{
+    const u8 *p = buf;
+    SfsDec dec;
+    SfsFrame frame;
+    u32 i;
+    if (serial_gate_active()) g_nic_bad_uart++;
+    if (g_nic_busy) return OS32_ERR_AGAIN;
+    sfs_dec_reset(&dec);
+    for (i = 14; i < len; i++) {
+        if (sfs_dec_feed(&dec, p[i], &frame) != 1) continue;
+        if (frame.type == SFS_T_HELLO) {
+            u8 pl[12];
+            g_nic_hello++;
+            if (!g_nic_answer) break;
+            sfs_put32(pl, 0);
+            sfs_put16(pl + 4, SFS_VERSION);
+            sfs_put16(pl + 6, SFS_MAX_PAYLOAD);
+            sfs_put32(pl + 8, sfs_get32(frame.payload + 4));
+            memcpy(g_nic_rx, g_guest_mac, 6);
+            memcpy(g_nic_rx + 6, g_host_mac, 6);
+            g_nic_rx[12] = 0x88; g_nic_rx[13] = 0xb5;
+            g_nic_rx_n = 14 + sfs_encode(g_nic_rx + 14,
+                SFS_T_HELLO | SFS_T_RESP, 0x1234ABCDUL, 0, pl, 12);
+        } else if (frame.type == SFS_T_BYE) g_nic_bye++;
+        else abort(); /* LOG/EXIT must never go to the LAN NIC. */
+        break;
+    }
+    return 0;
+}
+int e82557_recv(void *buf, u32 cap, u32 *len)
+{
+    if (cap != SFS_LAN_RX_CAP) abort();
+    if (!g_nic_rx_n) return OS32_ERR_AGAIN;
+    memcpy(buf, g_nic_rx, g_nic_rx_n);
+    *len = g_nic_rx_n; g_nic_rx_n = 0;
+    return 0;
+}
 
 void cpu_delay_us(u32 us) { (void)us; }
 volatile u32 tick_count;
@@ -67,6 +132,7 @@ int res_owner_get(void) { return g_owner; }
 
 static char g_fstype[16];               /* /host に付いているもの ("" = 空き) */
 static int g_mount_calls, g_umount_calls, g_permit_now, g_permit_at_mount;
+static int g_mount_fail;
 static char g_mount_args[3][16];
 static SfsClient *g_permit_cli;
 
@@ -78,6 +144,7 @@ int vfs_mount(const char *prefix, const char *dev_name, const char *fstype)
     strncpy(g_mount_args[1], dev_name, 15);
     strncpy(g_mount_args[2], fstype, 15);
     g_permit_at_mount = g_permit_now;
+    if (g_mount_fail) return OS32_ERR_IO;
     strncpy(g_fstype, fstype, 15);
     return VFS_OK;
 }
@@ -237,6 +304,13 @@ static int failed;
 
 static void reset(void)
 {
+    g_nonce_ctr = 0; /* native host u32 is unsigned long (64 bits here) */
+    g_cfg_lan = g_cfg_reads = g_mount_fail = 0;
+    g_cfg_peer = "";
+    g_nic_state = E82557_RUNNING;
+    g_nic_rx_n = 0;
+    g_nic_hello = g_nic_bye = g_nic_bad_uart = g_nic_busy = 0;
+    g_nic_answer = 1;
     g_tx_n = 0;
     g_rxq_head = g_rxq_n = 0;
     g_cmd_writes = 0;
@@ -450,6 +524,65 @@ static void end_not_quiet(void)
     CHECK(serial_gate_active() == 0);
 }
 
+static void lan_session(void)
+{
+    int state;
+    reset();
+    /* Config is re-read at each begin; the default path remains serial. */
+    CHECK(serialfs_session_begin() == 0);
+    CHECK(g_cfg_reads == 1 && g_nic_hello == 0);
+    CHECK(serialfs_session_end(0) == 0);
+    g_cfg_lan = 1;
+    g_nonce_ctr = 0;
+    CHECK(serialfs_session_begin() == 0);
+    CHECK(g_cfg_reads == 2 && g_nic_hello == 1 && g_hello_n == 1);
+    CHECK(g_mount_calls == 2 && g_permit_at_mount && !g_permit_now);
+    CHECK(strstr(g_kout, "transport=lan nic=82557 peer=02:00:00:00:00:01 sid=") != NULL);
+    CHECK(!serial_gate_active() && g_nic_bad_uart == 0);
+    /* Leave a partial frame and a queued datagram for end to discard. */
+    g_lan.rx_pos = 14; g_lan.rx_end = 30; g_lan.prepared = 1;
+    g_nic_rx_n = 60;
+    g_nic_busy = 1; /* Even BYE failing to queue must finish within 1 second. */
+    u32 start = tick_count;
+    CHECK(serialfs_session_end(7) == 0);
+    CHECK(tick_count - start <= sfs_ms_ticks(SFS_LAN_PUT_MS) + 1);
+    CHECK(g_lan.rx_pos == 0 && g_lan.rx_end == 0 && !g_lan.linked && !g_lan.prepared);
+    CHECK(g_nic_rx_n == 0 && !g_active && !g_cli.sid && g_umount_calls == 2);
+    CHECK(raw_has("sfs: exit=7") && raw_has("requests="));
+    CHECK(!serial_gate_active() && g_nic_bad_uart == 0);
+
+    reset(); g_cfg_lan = 1; g_nic_state = E82557_RX_WAIT;
+    g_cfg_peer = "02:00:00:00:00:01";
+    CHECK(serialfs_session_begin() == 0);
+    CHECK(serialfs_session_end(0) == 0 && g_nic_bye == 1);
+    for (state = E82557_OFF; state <= E82557_QUARANTINED; state++) {
+        if (state == E82557_RUNNING || state == E82557_RX_WAIT) continue;
+        reset(); g_cfg_lan = 1; g_nic_state = state;
+        CHECK(serialfs_session_begin() == OS32_ERR_IO);
+        CHECK(!g_active && !g_cli.sid && !g_lan.linked && !g_lan.rx_end);
+        CHECK(!g_nic_hello && !g_hello_n && !g_mount_calls && !serial_gate_active());
+    }
+    reset(); g_cfg_lan = 1; g_nic_answer = 0;
+    CHECK(serialfs_session_begin() == OS32_ERR_IO);
+    CHECK(!g_active && !g_mount_calls && !g_lan.rx_end && !g_hello_n);
+    CHECK(strstr(g_kout, "transport=lan") == NULL);
+    CHECK(tick_count < 4000);
+    reset(); g_cfg_lan = 1; g_mount_fail = 1;
+    CHECK(serialfs_session_begin() == OS32_ERR_IO);
+    CHECK(g_mount_calls == 1 && g_nic_bye == 1 && !g_active && !g_cli.sid);
+    CHECK(!g_lan.rx_end && !g_lan.linked && !g_permit_now);
+    CHECK(strstr(g_kout, "transport=lan") == NULL);
+    reset(); g_cfg_lan = 1; g_cfg_peer = "02:00:00:00:00:03";
+    CHECK(serialfs_session_begin() == OS32_ERR_IO);
+    CHECK(!g_active && !g_mount_calls && !g_lan.linked);
+    reset(); g_cfg_lan = 1; g_cfg_peer = "invalid";
+    CHECK(serialfs_session_begin() == OS32_ERR_IO && !g_nic_hello && !g_active);
+    reset(); g_cfg_lan = 1; strcpy(g_fstype, "hostdrv");
+    CHECK(serialfs_session_begin() == OS32_ERR_BUSY && !g_nic_hello);
+    reset(); g_cfg_lan = 1; g_if = 0;
+    CHECK(serialfs_session_begin() == OS32_ERR_INVAL && !g_nic_hello);
+}
+
 int main(int argc, char **argv)
 {
     const char *c = argc > 1 ? argv[1] : "";
@@ -458,6 +591,7 @@ int main(int argc, char **argv)
     else if (!strcmp(c, "hello_fail_flood")) hello_fail_flood();
     else if (!strcmp(c, "end_late_hold")) end_late_hold();
     else if (!strcmp(c, "end_not_quiet")) end_not_quiet();
+    else if (!strcmp(c, "lan_session")) lan_session();
     else {
         fprintf(stderr, "usage: serialfs-session-host <case>\n");
         return 2;

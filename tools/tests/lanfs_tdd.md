@@ -35,3 +35,13 @@ PM 台帳転記用 (この段では未実施):
 
 Validation evidence lives under `/home/hight/os32-tmp/run/lanfs/lf1-*.log`;
 only logs after the last source change count. Emulator/hardware are not run.
+## L-F2 session / CLI / peer
+
+`test_serialfs.py` の `lan_session` は実 SfsClient/SfsLan/session と実 UART gate、
+偽 NIC/VFS/config/tick で mount/end、RX_WAIT、NIC 不在、HELLO/mount 失敗、
+BYE 詰まり、受信状態の破棄、設定の再読、既定シリアル、固定 peer を検査する。
+`test_lanfs.py` は実 Python Server に対する --peer/最初の HELLO 固定 (BYE 後も)、
+クライアント HELLO peer、OUTGOING、起動時のリンク状態、送受信/handle の例外継続を検査。
+`test_rshell_serial.py` は echo/開始行/exit/EOT、CRLF、排他オプション、実 run_line を検査。
+`sh_status_host.c` は設定の保存・他キー保持・MAC 拒否・書込み失敗・子からの拒否を検査。
+追加変異: SFS_LAN 無視、end の受信破棄除去、サーバの peer 照合除去。

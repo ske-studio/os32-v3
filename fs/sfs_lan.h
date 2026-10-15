@@ -30,6 +30,7 @@ typedef struct {
     u8 mac[SFS_LAN_MAC_LEN];
     u8 peer[SFS_LAN_MAC_LEN];
     u8 linked;
+    u8 peer_fixed;
     u8 hello;
     u8 prepared;
     u32 nonce;
@@ -40,6 +41,10 @@ typedef struct {
 
 void sfs_lan_init(SfsLan *lan, const SfsLanNic *nic,
                   const SfsIo *clock, void *clock_ctx);
+/* Optional configured peer, before HELLO. Empty string restores discovery. */
+int sfs_lan_set_peer(SfsLan *lan, const char *mac);
+/* Discard partial frames/peer and finitely drain queued NIC frames. */
+void sfs_lan_reset(SfsLan *lan);
 extern const SfsIo sfs_lan_io;
 
 #endif

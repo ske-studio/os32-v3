@@ -97,7 +97,7 @@ OS32カーネルは内蔵シェルを持たず、起動時に外部プログラ�
 | `rshell` | `rshell` | リモートシェルモード開始 (ESCで終了) |
 | `send` | `send TEXT...` | RS-232C文字列送信 |
 | `hotdeploy` | `hotdeploy [PATH LEN CRC32]` | ステージング領域の内容をファイル化 (引数なしで領域の番地を報告)。ホスト側は `tools/hotdeploy.py` から使う |
-| `sfs` | `sfs run COMMAND...` | **常駐シェルだけ**。ホストが rshell へ送った 1 行が丸ごと `sfs run ...` のときだけ動き、シリアル越しの `/host` (SerialFS) を開いて COMMAND を走らせる。ホストは `tools/rshell_serial.py --serve-host <dir>`。セッション中の出力は溜めて終わりに長さ付きのフレームで送る (`sfs: exit=N` を含む)。rshell のシリアルの ESC は行頭の単独のときだけ閉じる (票 TASK_SERIAL_HOSTFS 部品 B、`man sfs`) |
+| `sfs` | `sfs run COMMAND...` / `sfs lan on\|off\|peer MAC\|peer auto` | **常駐シェルだけ**。ホストが rshell へ送った 1 行が丸ごと `sfs run ...` のときだけ `/host` を開いて COMMAND を走らせる。既定のシリアルは `tools/rshell_serial.py --serve-host <dir>`、出力は終了時の LOG/EXIT フレーム。`sfs lan on` で次回から 82557 の LAN を使う (`--sfs-lan` と別途 `lanfs_host.py`)。LAN の出力・開始行・exit はシリアルへ直接送る。`sfs lan peer MAC` で相手を固定、`peer auto` で解除。詳細は `man sfs` |
 | `recv` | `recv [host:PATH [LOCAL]]` | ファイル受信 (SerialFS または旧プロトコル) |
 | `push` | `push LOCAL host:PATH` | SerialFS 経由でホストへファイル送信 |
 | `tvdump` | `tvdump` | テキストVRAMダンプをシリアル送信 |
