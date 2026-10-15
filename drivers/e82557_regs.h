@@ -82,4 +82,43 @@
 #define E82557_EE_CS_LOW_US    1u
 #define E82557_MAC_LEN         6
 #define E82557_LOG_ATTR        0x07
+/* MDI (SDM Tables 24/26), clause 22 PHY, and statistics (Table 17). */
+#define E82557_MDI             0x10u
+#define E82557_MDI_READ        2u
+#define E82557_MDI_WRITE       1u
+#define E82557_MDI_READY       (1u << 28)
+#define E82557_MDI_WAIT_US     2000u
+#define E82557_MDI_POLL_US     10u
+#define E82557_PHY_MASK        31u
+#define E82557_PHY_BMCR        0u
+#define E82557_PHY_BMSR        1u
+#define E82557_PHY_ID1         2u
+#define E82557_PHY_ID2         3u
+#define E82557_PHY_ANAR        4u
+#define E82557_PHY_ANLPAR      5u
+#define E82557_EE_PHY          6u
+#define E82557_BMCR_RESET      0x8000u
+#define E82557_BMCR_BAD        0x4C00u /* loopback, power down, isolate */
+#define E82557_BMCR_RESTART    0x0200u
+#define E82557_BMCR_AN         0x1000u
+#define E82557_BMSR_LINK       0x0004u
+#define E82557_BMSR_AN         0x0020u
+#define E82557_PHY_POLL_TICKS  10u
+#define E82557_PHY_RESET_WAIT_TICKS 50u
+#define E82557_LINK_WAIT_TICKS 300u
+#define E82557_TICK_MS         10u /* PIT_HZ = 100 */
+#define E82557_CU_STAT_ADDR    4u
+#define E82557_CU_STAT_DUMP    5u
+#define E82557_STAT_OFF        14032u
+#define E82557_STAT_SIZE       68u
+#define E82557_STAT_DONE_OFF   64u
+#define E82557_STAT_DONE       0xA005u
+#define E82557_STAT_GOOD       0u
+#define E82557_STAT_MAXCOL     1u
+#define E82557_STAT_LATECOL    2u
+#define E82557_STAT_UNDER      3u
+#define E82557_STAT_LOSTCRS    4u
+#define E82557_STAT_DEFER      5u
+#define E82557_TXDONE_WAIT_MS  100u
+#define E82557_TXDONE_POLL_TICKS 1u
 #endif

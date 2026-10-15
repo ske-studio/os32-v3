@@ -55,7 +55,7 @@ def main():
         command([*host, ROOT / 'tools/tests/nic_trace_host.c', '-o', trace_exe])
         for runner in os.environ.get('HOST32_RUNNERS', 'native qemu').split():
             assert host32.run([str(trace_exe)], runner=runner).returncode == 0
-        print('PASS nic_trace: identity, append/sync, read/write/sync failure latch (13 scenarios, all LB2 stages at u32 width)')
+        print('PASS nic_trace: identity, append/sync, read/write/sync failure latch (13 scenarios, all LB2b stages plus repeated STAT at u32 width)')
         # A called import and a missing export must each fail by assertion.
         if '--mutate' in sys.argv:
             for label, old, new in (

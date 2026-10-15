@@ -66,15 +66,18 @@ void kprintf(u8 color, const char *fmt, ...)
 void _start(void)
 {
     nic_trace(E82557_TRACE_TRY);
-    if (!equal(saved, "seq=42 crc=1234abcd\nLB2 try tick=123\n")) bad++;
+    if (!equal(saved, "seq=42 crc=1234abcd\nLB2b try tick=123\n")) bad++;
     nic_trace(E82557_TRACE_DONE);
-    if (!equal(saved, "seq=42 crc=1234abcd\nLB2 try tick=123\nLB2 done tick=123\n") ||
+    if (!equal(saved, "seq=42 crc=1234abcd\nLB2b try tick=123\nLB2b done tick=123\n") ||
         writes != 2 || syncs != 2 || logs) bad++;
     nic_trace(E82557_TRACE_TRY);
-    if (!equal(saved, "seq=42 crc=1234abcd\nLB2 try tick=123\n")) bad++;
+    if (!equal(saved, "seq=42 crc=1234abcd\nLB2b try tick=123\n")) bad++;
     full_width=1; writes=syncs=logs=0;
     for (u32 stage=E82557_TRACE_TRY;stage<=E82557_TRACE_DONE;stage++) nic_trace(stage);
     if (trace_off || logs || writes!=E82557_TRACE_DONE || syncs!=writes) bad++;
+    nic_trace(E82557_TRACE_STAT);
+    nic_trace(E82557_TRACE_STAT); /* Load + each HELLO, all at full tick width. */
+    if (trace_off || logs || writes!=E82557_TRACE_DONE+2 || syncs!=writes) bad++;
     full_width=0;
     for (u32 scenario = 1; scenario <= 11; scenario++) {
         trace_len = 0; trace_off = 0; writes = syncs = logs = 0;

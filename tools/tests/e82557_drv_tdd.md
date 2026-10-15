@@ -107,3 +107,34 @@ F1: Base受理失敗時に模型は status を2040へ変え、その新値がロ
 段の印は LB2 dma/cfg/ia/tx/stop を含む。部品のバッファは全11段をu32最大桁で
 収めるため256→384 B (本体BSSには加算されない)。nic_trace_host はその全段も検査。
 実機の合否・配備・エミュレータ起動は本依頼の対象外であり、このホスト試験からは未確認。
+
+## LB-2b (r3b_PHY.r2 + r2a)
+
+追加30ケース、合計98: TX2のC timeout/OK=0/pre/post (4)、PHY15、統計11。
+模型はMDIの32 bit命令・IE/Ready=0・遅延Ready、32番地のPHY表、BMSR latch-low、
+reset自己消去/消えない、bit15/9の書込み禁止、読み戻し不一致、PHYFIX=0の書込み0回を検査。
+リンク即時/50 tick/永久down/AN offを注入し、downでも2本送り、good1=0/good2=1は
+2本目成功としてtxdone=yesになる。印は#1/#2、初期行・観測値と通常行78桁以下も照合。
+DumpはLoad一回の後だけ。初期領域にも古いA005を置き、毎回の0書き→公開障壁→Dump、
+完了語読取り→取得障壁→計数読取りを事象列で検査する。C後30msの線上完了で再取得、
+永久未送信でtxdone=no、Dump15msを含む100ms期限、25ms遅延/永遠に未完了、
+Load/Dumpのpre/post失敗を注入。Dump未完了時は再発行禁止、停止成功でpending取消、
+停止失敗では遅れたDMA完了も解放前に扱い、leaked/QUARANTINEとする。
+追加変異17本 (合計47): MDI無期限(phy_timeout)、BMSR一読(phy_latch)、reset待ち無し(phy_reset)、
+readback無し(phy_fix*)、PHYFIX無視(phy_kill)、done消去無し・公開/取得障壁無し(pass)、
+再取得無し(stat_delay)、#2期待値2固定(phy_late)、good2累積(pass)、待ちを#1前へ(phy_late)、
+down時#2省略(phy_down)、link期限0(phy_late)、未完了Dump再発行(stat_timeout)、
+Dump中に停止証拠無しfree(stat_late)、Dump時間を期限から除外(stat_never)。
+traceはPHY/LINK/TX2/STATを追加し、部品領域512 Bに全15段+STAT追加2回を最大桁で検査。
+
+前景の待ち上限は保守的に約3,900 ms (I/O命令・ログ/VFS処理時間を除いた待機時間)。
+初期MDI最大40回×2ms=80、reset窓500+末尾MDI2、fix write/readback/BMSR=8、
+link窓3000+末尾BMSR/ANLPAR=6、最後BMSR=4、統計2回計約202.4、
+4 CB=80.8、Base/Load受理=0.6、PORT=0.08、EEPROM(フォールバック込み)=1.952 ms。
+各統計の100msはDump待ち込みのtick経過。総期限時点でDump未完了ならstat=timeoutとして停止する。
+同条件の前後測定は基点f3c525c・worktree既定make・同じフォント/クロスコンパイラ、
+`before.json` と最終ビルド後の `after.json` を run/lb2b に保存する。見積との差は実測で報告する。
+実機/NP21/Wとnative runnerは依頼対象外。ホスト試験を線上の送信証拠とは扱わない。
+
+LB-2bの初回driver変異では#2期待値2固定が生存。最終goodの値だけでは余計な待ちを
+見逃すため、phy_lateで#2のw2=0も照合する (累積2を待つ版はw2=100になる)。

@@ -92,6 +92,7 @@ __asm__(".global _start\n_start:\n"
 #include "../../drivers/e82557_eeprom.c"
 #undef e82557_ee_read_word
 #include "../../fs/vfs.h"
+#include "../../drivers/e82557.h"
 #include "../../kernel/module.h"
 #include "../../include/bootinfo.h"
 _Static_assert(sizeof(u32) == 4, "ILP32 required");
@@ -119,6 +120,55 @@ static u32 now, reset_at, cu_base=0x1000, ru_base=0x1000, pointer;
 static u16 status=0xA000;
 static u8 command, mask;
 static char output[8192];
+/* LB2b independent device model: time, Clause 22 and delayed bus writes. */
+static u16 phy_regs[32][6];
+static int phyfix=1, mdi_timeout, mdi_reads, mdi_writes, mdi_total, bmsr_reads;
+static int reset_reads, reset_never, fix_ignore, link_tick, an_off, scan_none;
+static int tx_delay, tx_never, tx_count, tx_good, lost_crs, collision;
+static u32 mdi_ctl, tx_due[2], stat_ptr, dump_due, dump_delay;
+static int tx_pending[2], dump_pending, dumps, loads, stat_pre, stat_post;
+static int stat_complete, stat_acquired, dump_timeout, late_dump, new_case;
+static u32 stat_store, stat_read_event, current_stage, clock_reads;
+static int cb_pre_pending;
+static void model_time(void)
+{
+    for (int i=0;i<2;i++) if (tx_pending[i] && now>=tx_due[i]) {
+        tx_pending[i]=0;
+        if (link_tick<0 || (int)(now/10000)<link_tick) lost_crs++;
+        else if (!tx_never) tx_good++;
+    }
+    if (dump_pending && !dump_timeout && now>=dump_due) {
+        CHECK(!freed && !leaked);
+        u32 counts[6]={(u32)tx_good,collision?1u:0u,collision?2u:0u,0,(u32)lost_crs,0};
+        for (int i=0;i<6;i++) for (int j=0;j<4;j++) memory[14032+i*4+j]=(u8)(counts[i]>>(j*8));
+        memory[14096]=5; memory[14097]=0xa0; memory[14098]=memory[14099]=0;
+        dump_pending=0;
+    }
+}
+static u32 fake_ticks(void)
+{
+    CHECK(!irq_depth);
+    if (++clock_reads>100000) { fprintf(stderr,"FAIL unbounded tick wait\n"); exit(22); }
+    now+=100; model_time(); return now/10000;
+}
+static u32 inpd(u16 port)
+{
+    CHECK(port==0x6010 && !irq_depth && resets==2);
+    if (++mdi_total>20000) { fprintf(stderr,"FAIL unbounded MDI wait\n"); exit(23); }
+    if (mdi_timeout || ++mdi_reads<3) return mdi_ctl;
+    unsigned int addr=(mdi_ctl>>21)&31, reg=(mdi_ctl>>16)&31, op=(mdi_ctl>>26)&3;
+    CHECK(reg<6);
+    u16 value=phy_regs[addr][reg];
+    if (op==2 && reg==0 && (value&0x8000) && !reset_never && ++reset_reads>=3)
+        value=phy_regs[addr][0]&=~0x8000;
+    if (op==2 && reg==1) {
+        bmsr_reads++;
+        value=0x7809;
+        if (link_tick>=0 && (int)(now/10000)>=link_tick && !(bmsr_reads&1))
+            value|=an_off?4:0x24;
+    }
+    return (mdi_ctl&~0xffffu) | 0x10000000u | value;
+}
 static struct file *file_for(const char *path)
 {
     if (!strcmp(path,"/var/log/lan.try")) return &files[0];
@@ -126,7 +176,9 @@ static struct file *file_for(const char *path)
     CHECK(0); return &files[0];
 }
 int sysconfig_get_int(const char *path, const char *key, int def)
-{ CHECK(!fs_calls && !io_count); CHECK(!strcmp(key,"E82557")); (void)path; (void)def; return cfg; }
+{ (void)path; CHECK(def==1);
+  if (!strcmp(key,"E82557_PHYFIX")) return phyfix;
+  CHECK(!fs_calls && !io_count); CHECK(!strcmp(key,"E82557")); return cfg; }
 int boot_image_info(void *out)
 { BootImageInfo *b=out; memset(b,0,sizeof(*b)); b->crc_valid=!bad_crc; b->image_crc=0x1234abcd; return 0; }
 int vfs_mkdir(const char *path)
@@ -161,18 +213,18 @@ static void kprintf(int attr, const char *fmt, ...)
 #include "../../drivers/pci_bind_match.c"
 static u32 irq_save(void) { CHECK(!irq_depth); irq_depth++; return 0x200; }
 static void irq_restore(u32 flags) { CHECK(irq_depth==1 && flags==0x200); irq_depth--; }
-static void trace(u32 stage) { CHECK(!irq_depth); CHECK(stage!=0); trace_count++; trace_bits |= 1u << stage; }
+static void trace(u32 stage) { CHECK(!irq_depth); CHECK(stage!=0); trace_count++; current_stage=stage; trace_bits |= 1u << stage; }
 struct kdebug kdebug;
 static void guard_io(u16 port)
 {
-    if (++operations>1000) { fprintf(stderr,"FAIL unbounded SCB wait\n"); exit(21); }
+    if (++operations>25000) { fprintf(stderr,"FAIL unbounded SCB wait\n"); exit(21); }
     io_count++; CHECK(port>=0x6000 && port<0x6020);
     CHECK(files[0].verified && files[1].verified);
     if (port!=0x6008) CHECK(resets>=2 && now-reset_at>=20);
 }
 static void cpu_delay_us(u32 us)
 {
-    now+=us;
+    now+=us; model_time();
     if (active_cb && now >= cb_due && cb_fail != starts) {
         active_cb[0]=0; active_cb[1]=(u8)(cb_ng == starts ? 0x80 : 0xa0);
     }
@@ -180,10 +232,12 @@ static void cpu_delay_us(u32 us)
 static u8 inp(u16 port)
 {
     guard_io(port); CHECK(port==0x6002);
-    if ((pre_busy && !commands) || (cu_pre && allocated && published && !command && commands == cu_pre + 1)) {
+    if ((pre_busy && !commands) || (cu_pre && allocated && published && cb_pre_pending && !command && starts + 1 == cu_pre)) {
         status=0x2040; return 1;
     }
-    if (command && !(post_busy && commands>=post_busy) &&
+    if (!command && current_stage==E82557_TRACE_STAT &&
+        ((stat_pre==1 && !loads) || (stat_pre==2 && loads && starts>=3))) return 1;
+    if (command && !((stat_post==1 && command==0x40) || (stat_post==2 && command==0x50)) && !(post_busy && commands>=post_busy) &&
         !(cu_post && starts==cu_post) && ++busy_reads>=3) {
         if(command==0x60) cu_base=pointer;
         if(command==0x06) ru_base=pointer;
@@ -199,13 +253,25 @@ static void outp(u16 port, u8 value)
     if(port==0x6001) { CHECK(value==(u8)(status>>8)); ack_writes++; status&=(u16)~((u16)value<<8); }
     else if(port==0x6003) { mask=value; mask_writes++; CHECK(value==1); }
     else { CHECK(port==0x6002 && irq_depth); CHECK(!command); CHECK(mask==1);
-        command=value; commands++; busy_reads=0; CHECK(value==0x60 || value==0x06 || value==0x10);
+        command=value; commands++; busy_reads=0; CHECK(value==0x60 || value==0x06 || value==0x10 || value==0x40 || value==0x50);
+        if (value==0x40) {
+            CHECK(starts==2 && !loads && pointer==0x2e8000u+14032);
+            stat_ptr=pointer; loads++;
+        } else if (value==0x50) {
+            CHECK(loads==1 && stat_ptr==0x2e8000u+14032 && !dump_pending);
+            CHECK(!memory[14096] && !memory[14097] && !memory[14098] && !memory[14099]);
+            CHECK(last_barrier>stat_store && stat_store>0);
+            dumps++; dump_pending=1; dump_due=now+dump_delay;
+            stat_complete=stat_acquired=0;
+            model_time();
+        }
         if (value==0x10) {
+            cb_pre_pending=0;
             CHECK(allocated && (pci_command & 4) && !cu_base && !ru_base);
             CHECK(published && last_barrier > last_store); published=0;
             if (starts) CHECK(saw_complete && acquired);
             starts++; last_start_reset=resets;
-            CHECK(pointer==0x2e8000u+(starts==3?64u:0u));
+            CHECK(pointer==0x2e8000u+(starts>=3?64u:0u));
             CHECK(pointer>=0x2e8000u && pointer<0x2e8000u+sizeof(memory));
             active_cb=memory+pointer-0x2e8000u+cu_base;
             CHECK(active_cb[0]==0 && active_cb[1]==0);
@@ -223,7 +289,12 @@ static void outp(u16 port, u8 value)
                 CHECK(active_cb[8]==0xff && active_cb[9]==0xff && active_cb[10]==0xff && active_cb[11]==0xff);
                 CHECK(active_cb[12]==60 && active_cb[13]==0x80 && active_cb[14]==0x10 && active_cb[15]==0);
                 CHECK(!memcmp(active_cb+16,header,14));
-                CHECK(!memcmp(active_cb+30,"OS32-LB-HELLO\0\0\0",16));
+                CHECK(!memcmp(active_cb+30,starts==3?"OS32-LB-HELLO#1\0":"OS32-LB-HELLO#2\0",16));
+                CHECK(loads==1);
+                if (starts==4) CHECK(dumps && (trace_bits&(1u<<E82557_TRACE_LINK) || !kdebug.ops.nic_trace));
+                CHECK(tx_count<2);
+                tx_pending[tx_count]=1; tx_due[tx_count]=now+cb_delay+(u32)tx_delay;
+                tx_count++;
                 CHECK(!memcmp(active_cb+46,header+6,6));
                 for (int j=52;j<76;j++) CHECK(active_cb[j]==0);
             }
@@ -239,16 +310,30 @@ static __attribute__((unused)) void outpw(u16 port, u16 value)
 static void outpd(u16 port, u32 value)
 {
     guard_io(port);
-    if(port==0x6008) { CHECK(value==(resets?2u:0u)); if(resets) CHECK(now-reset_at>=20);
+    if(port==0x6010) {
+        CHECK(!irq_depth && resets==2 && !(value&0xf0000000u));
+        unsigned int op=(value>>26)&3, addr=(value>>21)&31, reg=(value>>16)&31;
+        CHECK((op==1 || op==2) && reg<6);
+        mdi_ctl=value; mdi_reads=0;
+        if (op==1) {
+            CHECK(!starts && phyfix && !(value&0x8200) && reg==0);
+            CHECK(!(phy_regs[addr][0]&0x8000)); mdi_writes++;
+            if (!fix_ignore) phy_regs[addr][0]=(u16)value;
+        }
+    }
+    else if(port==0x6008) { CHECK(value==(resets?2u:0u)); if(resets) CHECK(now-reset_at>=20);
         resets++; reset_at=now; mask=0;
         status=(idle_fail || (resets>2 && (stop_fail==2 || (stop_fail==1 && resets==3)))) ? 0xA014 : 0xA000;
         if(resets==1) cu_base=ru_base=0x1000;
+        if (resets>2 && !(status&0xfc)) dump_pending=0;
+        if (late_dump && dump_pending) { now=dump_due; model_time(); }
         command=0; active_cb=NULL; }
     else { CHECK(port==0x6004 && irq_depth); CHECK(!command && !pre_busy); pointer=value; pointers++; }
 }
 int e82557_ee_read_word(const struct e82557_ee_pins *p, int mode, int *width, u16 addr, u16 *word, int *dummy)
 {
     static const u16 words[]={0,0x074c,0x0e21};
+    if (addr==6) { CHECK(mode==E82557_EE_FIXED && *width==6); *word=0x4a01; *dummy=0; return E82557_OK; }
     (void)p; CHECK(!irq_depth);
     if (mode==E82557_EE_AUTO) {
         CHECK(ee_mode && auto_calls==0); auto_calls++; *width=8;
@@ -265,6 +350,7 @@ int e82557_ee_read_word(const struct e82557_ee_pins *p, int mode, int *width, u1
 static void barrier_event(void)
 {
     last_barrier=++event_seq; published=1;
+    if (stat_complete && last_barrier>stat_read_event) stat_acquired=1;
     if (saw_complete) { CHECK(last_barrier>last_complete); acquired=1; }
 }
 static void desc_event(const volatile void *p, u32 n, int write)
@@ -273,7 +359,14 @@ static void desc_event(const volatile void *p, u32 n, int write)
     event_seq++;
     if (b < memory || b >= memory+sizeof(memory)) return;
     CHECK(allocated && !freed && !leaked);
-    if (write) { if (starts && saw_complete) CHECK(acquired); last_store=event_seq; published=0; }
+    if (b>=memory+14032 && b<memory+14100) {
+        if (write) { CHECK(b>=memory+14096); stat_store=event_seq; stat_complete=stat_acquired=0; }
+        else if (b>=memory+14096) {
+            if (memory[14096]==5 && memory[14097]==0xa0) { stat_complete=1; stat_read_event=event_seq; }
+        } else CHECK(stat_complete && stat_acquired && last_barrier>stat_read_event);
+        return;
+    }
+    if (write) { cb_pre_pending=1; if (starts && saw_complete) CHECK(acquired); last_store=event_seq; published=0; }
     else if (b==active_cb) {
         completion_reads++;
         if (b[1]&0x80) { last_complete=event_seq; saw_complete=1; }
@@ -300,13 +393,14 @@ int dma_alloc(u32 size, u32 align, u32 limit, struct dma_buf *out)
     CHECK(size==16384 && align==16 && limit==0xffffffffu);
     if (alloc_fail) return -4;
     allocated=1; memset(memory,0xcc,sizeof(memory));
+    memory[14096]=5; memory[14097]=0xa0; memory[14098]=memory[14099]=0;
     out->pa=0x2e8000; out->va=memory; out->size=size; return 0;
 }
 int dma_free(const struct dma_buf *b)
 {
     CHECK(allocated && b->pa==0x2e8000 && b->va==memory && !freed && !leaked);
     CHECK(resets>last_start_reset && resets>=3 && now-reset_at>=20 && !(status&0xfc));
-    CHECK(mask==1 && !(status&0xff00));
+    CHECK(mask==1 && !(status&0xff00) && !dump_pending);
     CHECK(pci_command==0x0143 || (pci_command==0x0147 && bm_writes==0));
     freed++; return 0;
 }
@@ -317,6 +411,7 @@ int dma_mark_leaked(const struct dma_buf *b)
     leaked++; return 0;
 }
 static int kutoa_dec(u32 value, char *buf, u32 cap) { return snprintf(buf,cap,"%u",value); }
+#define tick_count fake_ticks()
 #define E82557_HOST_TEST
 #include "../../drivers/e82557.c"
 #include "pci_table.h"
@@ -329,6 +424,36 @@ int main(int argc, char **argv)
     dev.class=PCI_CLASS_NETWORK; dev.subclass=PCI_SUB_NET_ETHERNET;
     dev.dev=11; dev.bar[1]=0x6001; dev.command=1; dev.irq_line=3;
     kdebug.ops.nic_trace=trace;
+    memset(phy_regs,0xff,sizeof(phy_regs));
+    const u16 defaults[]={0x3000,0x782d,0x2000,0x5c01,0x01e1,0x45e1};
+    memcpy(phy_regs[1],defaults,sizeof(defaults));
+    new_case=!strncmp(c,"phy_",4) || !strncmp(c,"stat_",5);
+    if (!strcmp(c,"phy_latch")) {}
+    if (!strcmp(c,"phy_late")) link_tick=50;
+    if (!strcmp(c,"phy_down")) link_tick=-1;
+    if (!strcmp(c,"phy_off")) { an_off=1; phy_regs[1][0]=0x2100; }
+    if (!strcmp(c,"phy_fix14")) phy_regs[1][0]=0x7100;
+    if (!strcmp(c,"phy_fix11")) phy_regs[1][0]=0x3900;
+    if (!strcmp(c,"phy_fix10")) phy_regs[1][0]=0x3500;
+    if (!strcmp(c,"phy_fixall") || !strcmp(c,"phy_kill") || !strcmp(c,"phy_ng")) phy_regs[1][0]=0x7f00;
+    if (!strcmp(c,"phy_reset") || !strcmp(c,"phy_reset_busy")) phy_regs[1][0]=0xff00;
+    if (!strcmp(c,"phy_reset_busy")) reset_never=1;
+    if (!strcmp(c,"phy_ng")) fix_ignore=1;
+    if (!strcmp(c,"phy_kill")) phyfix=0;
+    if (!strcmp(c,"phy_scan")) { memcpy(phy_regs[0],defaults,sizeof(defaults)); phy_regs[1][2]=0xffff; }
+    if (!strcmp(c,"phy_none")) { memset(phy_regs,0xff,sizeof(phy_regs)); scan_none=1; }
+    if (!strcmp(c,"phy_timeout")) mdi_timeout=1;
+    if (!strcmp(c,"stat_delay")) tx_delay=30000;
+    if (!strcmp(c,"stat_never")) tx_never=1;
+    if (!strcmp(c,"stat_dump_delay")) { dump_delay=15000; tx_never=1; }
+    if (!strcmp(c,"stat_collision")) collision=1;
+    if (!strcmp(c,"stat_timeout")) dump_timeout=1;
+    if (!strcmp(c,"stat_late") || !strcmp(c,"stat_quarantine")) { dump_delay=25000; late_dump=1; }
+    if (!strcmp(c,"stat_quarantine")) stop_fail=2;
+    if (!strcmp(c,"stat_load_pre")) stat_pre=1;
+    if (!strcmp(c,"stat_load_post")) stat_post=1;
+    if (!strcmp(c,"stat_dump_pre")) stat_pre=2;
+    if (!strcmp(c,"stat_dump_post")) stat_post=2;
     if(!strcmp(c,"kill")) { cfg=0; skip=1; }
     else if(!strcmp(c,"mkdir")) { mkdir_fail=1; skip=1; }
     else if(!strcmp(c,"same")) { seed(0,"1234abcd 7\n"); skip=1; }
@@ -382,36 +507,36 @@ int main(int argc, char **argv)
         struct pci_bind_info info;
         rc=pci_bind_one(pci_drivers, PCI_DRIVER_COUNT, &dev, &info);
         CHECK(info.result==PCI_BIND_DECLINED && info.reason==PCI_BIND_DECLINED_UNSPECIFIED);
-        CHECK(io_count && starts==3);
+        CHECK(io_count && starts==4);
     } else rc=e82557_driver.probe(&dev);
     CHECK(!irq_depth);
     CHECK(rc==((idle_fail || stop_fail==2)?PCI_PROBE_QUARANTINE:PCI_PROBE_DECLINE));
-    if(skip) { CHECK(!io_count && !ee_calls); CHECK(!strstr(output,"LB2=PASS")); }
+    if(skip) { CHECK(!io_count && !ee_calls); CHECK(!strstr(output,"LB2b=PASS")); }
     else {
         CHECK(resets==(allocated ? (stop_fail ? 4 : 3) : 2));
         CHECK(mask==1);
         CHECK(mask_writes==(allocated?2:1) && ack_writes==(allocated?2:1));
-        CHECK(now>=40 && now<70000);
+        CHECK(now>=40 && now<4000000);
         if(idle_fail) { CHECK(pci_bind_reason_get()==PCI_BIND_RESET_FAILED); CHECK(!commands && !ee_calls); }
         else if(pre_busy) { CHECK(!pointers && !commands && !ee_calls); CHECK(strstr(output,"base=timeout scb=2040")); CHECK(now==140); }
         else if(post_busy) { CHECK(pointers==post_busy && commands==post_busy && !ee_calls); CHECK(strstr(output,"base=timeout scb=2040")); CHECK(now==(post_busy==1?140u:160u)); }
         else if(ee_mode>=2) {
             CHECK(auto_calls==1 && ee_calls==(ee_mode==2?4:1));
-            CHECK(strstr(output,"LB2=FAIL(ee:mac)")); CHECK(!files[0].present);
+            CHECK(strstr(output,"LB2b=FAIL(ee:mac)")); CHECK(!files[0].present);
         } else {
             CHECK(cu_base==0 && ru_base==0 && !command); CHECK(ee_calls==(ee_mode?4:3));
-            if (alloc_fail || bm_fail || cb_fail || cb_ng || cu_pre || cu_post || stop_fail==2)
-                CHECK(strstr(output,"LB2=FAIL") && !strstr(output,"LB2=PASS"));
-            else CHECK(strstr(output,"LB2=PASS") && strstr(output,"cfg=ok ia=ok tx=ok(60) stop=ok"));
+            if (alloc_fail || bm_fail || cb_fail || cb_ng || cu_pre || cu_post || stop_fail==2 || mdi_timeout || scan_none || dump_timeout || late_dump || (dump_delay && tx_never) || stat_pre || stat_post)
+                CHECK(strstr(output,"LB2b=FAIL") && !strstr(output,"LB2b=PASS"));
+            else CHECK(strstr(output,"LB2b=PASS") && strstr(output,"cfg=ok ia=ok tx=ok(60) stop=ok"));
             if (alloc_fail) CHECK(!allocated && !starts && !bm_writes && strstr(output,"FAIL(dma:alloc)"));
             else {
                 CHECK(allocated && (stop_fail==2 ? leaked==1 && !freed : freed==1 && !leaked));
                 CHECK(bm_writes==(!strcmp(c,"bm_present") || !strcmp(c,"bm_present_ng") || bm_fail ? 0 : !strcmp(c,"stop_bm_present") ? 1 : 2));
                 if (bm_fail) CHECK(!starts && strstr(output,"FAIL(dma:bm)"));
                 else {
-                    int fail_at=cb_fail?cb_fail:cb_ng?cb_ng:cu_pre?cu_pre:cu_post?cu_post:3;
-                    CHECK(starts==fail_at-(cu_pre?1:0));
-                    CHECK(commands==2+starts && pointers==commands);
+                    int fail_at=cb_fail?cb_fail:cb_ng?cb_ng:cu_pre?cu_pre:cu_post?cu_post:4;
+                    if (!new_case) CHECK(starts==fail_at-(cu_pre?1:0));
+                    CHECK(commands==2+starts+loads+dumps && pointers==2+starts+loads);
                     if (cb_fail) CHECK(strstr(output,":timeout)") && completion_reads>=21);
                     if (cb_ng) CHECK(strstr(output,":ng)"));
                     if (cu_pre) CHECK(strstr(output,":pre)"));
@@ -419,7 +544,7 @@ int main(int argc, char **argv)
                     if (stop_fail==2) CHECK(strstr(output,"FAIL(stop:idle)") && strstr(output,"QUARANTINE"));
                 }
             }
-            if (!alloc_fail && !bm_fail && !cb_fail && !cb_ng && !cu_pre && !cu_post && kdebug.ops.nic_trace)
+            if (!alloc_fail && !bm_fail && !cb_fail && !cb_ng && !cu_pre && !cu_post && !new_case && kdebug.ops.nic_trace)
                 CHECK((trace_bits & ((1u<<E82557_TRACE_DMA)|(1u<<E82557_TRACE_CFG)|(1u<<E82557_TRACE_IA)|(1u<<E82557_TRACE_TX)|(1u<<E82557_TRACE_STOP))) ==
                       ((1u<<E82557_TRACE_DMA)|(1u<<E82557_TRACE_CFG)|(1u<<E82557_TRACE_IA)|(1u<<E82557_TRACE_TX)|(1u<<E82557_TRACE_STOP)));
             CHECK(!strcmp(c,"no_trace") ? trace_count==0 : trace_count>0);
@@ -438,5 +563,40 @@ int main(int argc, char **argv)
     }
     if(!cfg) CHECK(!fs_calls);
     if(read_fail) CHECK(!files[0].writes && !files[1].writes);
+    if (!strcmp(c,"pass")) {
+        CHECK(strstr(output,"phy=1 id=2000:5c01 bmcr=3000 bmsr=782d anar=01e1 anlpar=45e1\n"));
+        CHECK(strstr(output,"fix=none rb=3000 bmsr=782d\n"));
+        CHECK(strstr(output,"link=up an=done wait=0 bmsr=782d anlpar=45e1\n"));
+        CHECK(strstr(output,"good1=1") && strstr(output,"good2=1") && strstr(output,"txdone=yes\n"));
+        CHECK(strstr(output,"stat maxcol=0 latecol=0 lostcrs=0 under=0 defer=0 bmsr=782d\n"));
+        const char *line=output;
+        while (*line) {
+            const char *end=line; while (*end && *end!='\n') end++;
+            CHECK(end-line<=78); line=*end?end+1:end;
+        }
+    }
+    if (new_case) {
+        if (!strcmp(c,"phy_latch")) CHECK(strstr(output,"link=up an=done wait=0"));
+        if (!strcmp(c,"phy_late")) {
+            CHECK(strstr(output,"link=up") && strstr(output,"good1=0") && strstr(output,"good2=1") && strstr(output,"txdone=yes"));
+            CHECK(now>=500000 && now<700000 && strstr(output,"w2=0 txdone=yes"));
+        }
+        if (!strcmp(c,"phy_down")) CHECK(starts==4 && now>=3000000 && strstr(output,"link=down") && strstr(output,"txdone=no"));
+        if (!strcmp(c,"phy_off")) CHECK(strstr(output,"link=up an=off wait=0"));
+        if (!strncmp(c,"phy_fix",7) || !strcmp(c,"phy_reset")) CHECK(mdi_writes==1 && strstr(output,"rb=3100"));
+        if (!strcmp(c,"phy_reset")) CHECK(reset_reads>=3 && now>=200000);
+        if (!strcmp(c,"phy_reset_busy")) CHECK(!mdi_writes && strstr(output,"skip(reset)") && now>=500000);
+        if (!strcmp(c,"phy_ng")) CHECK(mdi_writes==1 && strstr(output,"fix=ng rb=7f00"));
+        if (!strcmp(c,"phy_kill")) CHECK(!mdi_writes && strstr(output,"fix=off"));
+        if (!strcmp(c,"phy_scan")) CHECK(strstr(output,"phy=scan:0 id=2000:5c01"));
+        if (scan_none || mdi_timeout) CHECK(starts==4 && strstr(output,scan_none?"FAIL(mdi:none)":"FAIL(mdi:timeout)") && strstr(output,"bmsr=-"));
+        if (!strcmp(c,"stat_delay")) CHECK(dumps>=6 && strstr(output,"good1=1") && strstr(output,"good2=1") && strstr(output,"txdone=yes"));
+        if (!strcmp(c,"stat_never")) CHECK(dumps>2 && starts==4 && strstr(output,"txdone=no") && now<250000);
+        if (!strcmp(c,"stat_dump_delay")) CHECK(dumps<=10 && now<260000);
+        if (dump_timeout || late_dump) CHECK(dumps==1 && starts==3 && strstr(output,"stat=timeout"));
+        if (stat_pre || stat_post) CHECK(strstr(output,stat_pre?"FAIL(stat:pre)":"FAIL(stat:post)"));
+        if (collision) CHECK(strstr(output,"maxcol=1 latecol=2"));
+    }
+    if (!strcmp(c,"pass") || !strcmp(c,"phy_late")) fprintf(1,"%s",output);
     return !!failed;
 }
