@@ -347,6 +347,32 @@ def trial(exe, py_path, root, timeout=10):
                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
 
+def run_mutations(tmp, root):
+    mutations = [
+        ("seq", "fs/sfs_client.c", "f->sid != c->sid || f->seq != seq",
+         "f->sid != c->sid"),
+        ("old_seq", "tools/lanfs_host.py", "elif fr.seq <= self.high_seq:",
+         "elif False:"),
+        ("put_deadline", "fs/sfs_lan.c",
+         "(u32)(lan_now(ctx) - start) >= sfs_ms_ticks(SFS_LAN_PUT_MS)",
+         "0"),
+        ("uart_gate", "fs/sfs_lan.c", "    nic->mac(lan->mac);",
+         "    extern void serial_gate_set(int on);\n"
+         "    serial_gate_set(1);\n    nic->mac(lan->mac);"),
+    ]
+    for name, rel, old, new in mutations:
+        text = (ROOT / rel).read_text()
+        assert text.count(old) == 1, (name, "mutation anchor")
+        exe, py_path = build(tmp / name, {rel: text.replace(old, new)})
+        try:
+            result = trial(exe, py_path, root)
+            assert result.returncode != 0, name + " survived"
+            print("RED", name, result.stdout.decode().splitlines()[-1])
+        except subprocess.TimeoutExpired:
+            assert name == "put_deadline", name + " unexpected timeout"
+            print("RED put_deadline timeout")
+
+
 def main():
     if "--run" in sys.argv:
         run_suite(*sys.argv[2:])
@@ -360,31 +386,9 @@ def main():
         control = trial(exe, py_path, root)
         print(control.stdout.decode(), end="")
         assert control.returncode == 0, "unchanged control failed"
-        if "--mutate" not in sys.argv:
-            return
-        mutations = [
-            ("seq", "fs/sfs_client.c", "f->sid != c->sid || f->seq != seq",
-             "f->sid != c->sid"),
-            ("old_seq", "tools/lanfs_host.py", "elif fr.seq <= self.high_seq:",
-             "elif False:"),
-            ("put_deadline", "fs/sfs_lan.c",
-             "(u32)(lan_now(ctx) - start) >= sfs_ms_ticks(SFS_LAN_PUT_MS)",
-             "0"),
-            ("uart_gate", "fs/sfs_lan.c", "    nic->mac(lan->mac);",
-             "    extern void serial_gate_set(int on);\n"
-             "    serial_gate_set(1);\n    nic->mac(lan->mac);"),
-        ]
-        for name, rel, old, new in mutations:
-            text = (ROOT / rel).read_text()
-            assert text.count(old) == 1, (name, "mutation anchor")
-            exe, py_path = build(tmp / name, {rel: text.replace(old, new)})
-            try:
-                result = trial(exe, py_path, root)
-                assert result.returncode != 0, name + " survived"
-                print("RED", name, result.stdout.decode().splitlines()[-1])
-            except subprocess.TimeoutExpired:
-                assert name == "put_deadline", name + " unexpected timeout"
-                print("RED put_deadline timeout")
+        if "--mutate" in sys.argv:
+            run_mutations(tmp, root)
+
 
 
 if __name__ == "__main__":
