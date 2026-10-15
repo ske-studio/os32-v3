@@ -26,13 +26,6 @@
 | 決定による持越し | H-7、S-4、E11-A3 | 再開時ゲート (H-7) / U6 で足さない (E11-A3) |
 | 記録 | R7-3、R7-4 | — |
 
-## LAN LB-2b の受入待ち
-
-| ID | 何を残したか | 理由 | 次の関門 |
-|---|---|---|---|
-| LAN-LB2b | Ra266のMDI/PHY、統計good1/good2、tcpdumpの#1/#2、KDEBUG=1の新4段、NP21/Wの非搭載起動、native host runner | 依頼パックは実装とqemu host検査まで。実機・エミュレータ操作を含まない | PMのLB-2b受入 (実装証拠: `/home/hight/os32-tmp/run/lb2b/`) |
-| LAN-LB2c | Ra266 の PCR・HELLO 1 本の線上受信、PHYVENDOR=0 対照、NP21/W 非搭載起動・DBGREF/gserial/rshell、native runner | 依頼は実装と qemu host 検査まで。実機・エミュレータ操作禁止 | PM の LB-2c 受入 (実装証拠: `/home/hight/os32-tmp/run/lb2c/`) |
-
 ## 1. 渡す — 次のゲスト受入の回 (NP21/W、道具は揃っている)
 
 | ID | 何を残したか | 理由 | 次の関門 |
@@ -50,7 +43,8 @@
 
 | ID | 何を残したか | 理由 | 渡し先 |
 |---|---|---|---|
-| LANFS-1 | lanfs_host.py を起動して最初のセッションだけ resent=1 timeouts=1 (2026-10-16、段 3 の初回と段 4 の -n boot の 2 回)。2 回目以降は 0。原因は未解明 (ノートの NIC か、サーバの最初の受信まわり [推]) | 実害は 1 要求の再送 (約 2.6 秒) だけ | LAN の後始末の段 (ノートの担当と調べる) |
+| LANFS-1 | lanfs_host.py の最初のセッションで resent=1 timeouts=1 (2026-10-16、段 3 の初回と段 4 の -n boot)。ノートの観測 (06:30): サーバを起動し直さずに約 4 時間空けたあとの初回でも同じ → 条件は「サーバの初回」ではなく「しばらく空いたあとの初回」[推]。ノートの NIC の省電力 (EEE・ASPM) か、ゲストの受信の初回が候補 | 実害は 1 要求の再送 (約 2.6 秒) だけ | ノートで切り分け中 (空き 1・5・15 分 × tcpdump、`~/os32-tmp/evidence/2026-10-16/lanfs1/`) |
+| PHYVENDOR-1 | `E82557_PHYVENDOR=0` (DP83840A の PCR を書かない) で HELLO が線に出ないことの対照。PCR の初期化 (6045a6e) が送信の不具合の原因だったことの裏付け | LB-2c の受入では PCR=1 の合格だけを採った。対照は実機で設定を 1 行変えて戻すだけ | LANFS-1 の切り分けの後、ノートの担当で (画面不要・立会い不要) |
 | REPRO-1 | CI の成果物の `bin/gshell.bin` が、材料 (userland/gshell・sdk・lib) の変わっていない ce30be3 → 5971615 で content_changed になった (ノートの hsync -n、2026-10-15)。CI の Rust ビルドに再現性が無い疑い [推] (時刻・パス・並列の順の埋め込みなど) | 配備のたびに無関係な差分が出ると、実機に何が入ったかの照合がぶれる | 道具の小さな調べ (sol): 同じコミットを 2 回組んで gshell.bin を比べ、差の出所を特定する |
 | CI-FLAKY-1 | `check-gfx-attach-host` の SDK 段が CI の 32 ビット native で 1 回 `FAIL result == base` (`tools/tests/gfx_kernel_fb_host.c:115` の `map_host`、決まった番地への MAP_FIXED の mmap) で落ちた (2026-10-15、ce30be3 の build、再実行で success、手元は 3 回とも PASS)。決まった番地が、アドレス空間のランダム配置で既に使われていた疑い [推] | LAN の変更とは無関係。たまたまの失敗が続くと CI の信頼が落ちる | 道具の小さな直し (sol): 番地が塞がっていたら、試験側で別の番地を選ぶか、失敗を明示して native をやり直す |
 | LZSS-1 | 修正した圧縮器の PKG (種 250 の 2 ファイル) を cdinst で入れて照合 | cdinst は MINIMAL / GUI / NORMAL / DEBUG の名前だけを展開し、試験 PKG を媒体に載せる道具の経路が無い。R0 の Full install (225 files、`hsync -n --verify` で内容一致) は代替の観測で PASS に数えない。host の `test_lzss_pkg.py` は合格 | 保守: 次に ISO / PKG の道具を触る段 |

@@ -511,3 +511,10 @@ X-2 の前半 (e8a の RO 日本語) は `accept_e11/RESULT.md` の GUI 日本�
 | ID | 何を残したか | 理由 | 渡し先 |
 |---|---|---|---|
 | LB-R5-1 | R5 の診断 (観測行・最終行の整形、begin/end マーカー、先頭 64 語のダンプと u16[64]) を本体から外し、EEPROM の語バッファを MAC 用の 3 語に縮める (約 1.5 KB、astra の内訳 `~/os32-tmp/run/lan/astra_impl.log`) | R5 は実機で 1 回採れば用が済む。本番に残すと予算を使う | LAN L-B の本番の依頼パック (R5 の実機の結果が出た後) |
+
+閉鎖 (2026-10-16): LAN LB-2b・LB-2c の受入待ち。実機の受入は LB-2c (PCR→HELLO の線上受信) と LB-3 (`~/os32-tmp/evidence/2026-10-15/lb3_realhw/`)、LAN 版 /host の実機 (`~/os32-tmp/evidence/2026-10-16/lanfs_realhw/RESULT.md`) で済んだ。NP21/W の非搭載起動は main cd1e8dd で PASS (`~/os32-tmp/evidence/2026-10-16/lf_np21w/RESULT.md`、LF-NP21W も同時に閉じる)。LB-2b・LB-2c のレビューの P3 7 件 (`~/os32-tmp/run/lan/P3_CARRYOVER_LB2b_LB2c.md`) は LB-3 の書き直しで解消済み (幅の受け渡し `drivers/e82557.c:304`、`- mdi=` の表示 `:365`、模型の PCR read/write の timeout `tools/tests/e82557_drv_host.c:683-686`、ケースごとの待ちの上限 `:763`)。PHYVENDOR=0 の対照だけを PHYVENDOR-1 として台帳に残す。F3 (import の死荷重) は DBGREF S3 の依頼に入れた。
+
+| ID | 何を残したか | 理由 | 次の関門 |
+|---|---|---|---|
+| LAN-LB2b | Ra266のMDI/PHY、統計good1/good2、tcpdumpの#1/#2、KDEBUG=1の新4段、NP21/Wの非搭載起動、native host runner | 依頼パックは実装とqemu host検査まで。実機・エミュレータ操作を含まない | PMのLB-2b受入 (実装証拠: `/home/hight/os32-tmp/run/lb2b/`) |
+| LAN-LB2c | Ra266 の PCR・HELLO 1 本の線上受信、PHYVENDOR=0 対照、NP21/W 非搭載起動・DBGREF/gserial/rshell、native runner | 依頼は実装と qemu host 検査まで。実機・エミュレータ操作禁止 | PM の LB-2c 受入 (実装証拠: `/home/hight/os32-tmp/run/lb2c/`) |
