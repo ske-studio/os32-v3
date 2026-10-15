@@ -41,5 +41,8 @@
 #define paging_memmap_bad (kdi_ptr_paging_memmap_bad())
 #define time_branch_hits (kdi_ptr_time_branch_hits())
 #define time_test_feed (kdi_ptr_time_test_feed())
+#define v86_gp_cs (kdi_get_v86_gp_cs())
+#define v86_gp_ip (kdi_get_v86_gp_ip())
+#define v86_session (*kdi_ptr_v86_session())
 #define ksel_pass (kdi_get_kselftest_pass())
 #define ksel_fail (kdi_get_kselftest_fail())

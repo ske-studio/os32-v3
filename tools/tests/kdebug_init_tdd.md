@@ -11,3 +11,9 @@ import 呼出しゼロを検査する。`--mutate` は kprintf 呼出し・候�
 正常では prefix を破壊しても body の関数だけが公開され、body ページだけが残る。
 
 ゲストの実 ledger・boot.log と起動継続の判定は PM の G1 受入で行う。
+
+## LB-1 ABI v2 / nic_trace
+
+- 18 slots, slot 17 NULL, slot 18 relocated into the retained body; version 1 rejects with ABI_MISMATCH before init. S4 imports = 223.
+- Trace harness includes actual nic_trace.c: seq/crc, append then sync, fresh TRY, malformed/overflow/stale marker, write/sync/short-write failure and sticky trace=off (12 scenarios plus fresh TRY).
+- Mutants: omitted sync, failure latch, image CRC comparison, and fresh TRY reset must each fail.

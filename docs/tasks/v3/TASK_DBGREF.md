@@ -126,6 +126,8 @@ r4a = r4 + astra r4 の確認 (判定「依頼パックで直せば実装に出�
 
 ### 3-2. 部品の形式 — T4 と同じ形式として 1 つのスキーマに確定 (Q3)
 
+LB-1: ops は版 2、18 口。版 1 の部品は init 前に ABI_MISMATCH で拒否する。
+
 **容器 (container、ファイル = 読み込んだ像)**: `header (144 B) → reloc 表 → import 表 → export 表 → 名前表 → (ページ整列) → payload (text / rodata / data) → bss (ファイルには無い)`。
 **基点**: `reloc_offset` / `import_offset` / `export_offset` / `names_offset` / `payload_offset` は **container の先頭 (バイト 0) 基点**。節 (`text/ro/data/bss` の offset)、reloc の書込位置、import slot、`init_offset`、export の `entry_off` は **body 基点** (`body_base = container_base + payload_offset`、body は VA 0 でリンクした像)。
 **固定の読み込み長**: 本体は最初に **144 B** を固定バッファへ読み、ヘッダの全欄を検査してから `load_span` を確保する。
@@ -154,14 +156,14 @@ r4a = r4 + astra r4 の確認 (判定「依頼パックで直せば実装に出�
 | 30 `stop_offset` | 0 (無し) | 0 以外は拒否 |
 | 31 `pair_image_crc` | 対の `vmkernel.lz4` の Image CRC (§3-3) | `bootinfo` と一致 |
 | 32 `image_crc` (バイト 128〜131) | **容器 `[0, image_size)` 全体の CRC32 を、この欄を 0 として計算** | 一致 |
-| 33 `ops_version` | export 表の契約版 (= `KDEBUG_OPS_VERSION` 1)。record の `ops.version` に写す。**関数の入口とは別の欄** | 一致 |
+| 33 `ops_version` | export 表の契約版 (= `KDEBUG_OPS_VERSION` 2)。record の `ops.version` に写す。**関数の入口とは別の欄** | 一致 |
 | 34〜35 予約 | 0 | 0 でなければ拒否 |
 
 4 つの表は互いに非重複 (`[off, off+len)` を昇順に並べて隣接比較)。
 **表のレコード**:
 - reloc: `u32 off` (body 基点、`R_386_32` の書込位置)。**非整列を許す** (i386 の絶対即値は非整列の位置にある)。検査: `payload_size ≥ 4 && off ≤ payload_size − 4` (T4:44 の減算前提の形 `off ≤ limit && 4 ≤ limit − off`)、**4 バイト全体の区間 `[off, off+4)` が互いに重ならず** (昇順に並べて `off[i+1] ≥ off[i] + 4`)、import slot の区間とも重ならない、bss・prefix への書込みは範囲の検査で自動的に拒否。元の値 (リンク時の VA 0 基点) が `≤ mem_size` (one-past を許す)。実行時にも同じ範囲検査をしてから `+= body_base`。
 - import: `{u32 name_hash; u16 type_ver; u16 kind; u32 slot_off}` 12 B。`kind` = 1 FUNC / 2 GETTER / 3 SETTER / 4 PTR / 5 OP (§3-6)。`slot_off` は body 基点で `.data` 内: `data_size ≥ 4 && slot_off ≥ data_off && slot_off − data_off ≤ data_size − 4 && slot_off % 4 == 0` (wrap しない形)、重複なし。解決した本体の関数の番地をその slot に書く。
-- export: `{u32 name_hash; u16 slot; u16 ver; u32 entry_off}` 12 B。**関数の export は slot 1〜16** (`struct kdebug_ops` の添字。slot 0 は version の欄で export 表には置かず、0 があれば拒否)、`entry_off` は text 内、slot の重複・範囲外は拒否。
+- export: `{u32 name_hash; u16 slot; u16 ver; u32 entry_off}` 12 B。**関数の export は slot 1〜18** (`struct kdebug_ops` の添字。slot 0 は version の欄で export 表には置かず、0 があれば拒否)、`entry_off` は text 内、slot の重複・範囲外は拒否。
 - 名前表: NUL 区切りの文字列、import/export の順に並ぶ (hash と突き合わせて不一致は拒否)。
 
 **生成**: `tools/mkmod.py`。`build/kdebug.mk` が `kdebug/*.c` を本体と同じ `CFLAGS_BASE` で組み、`build/module.ld` で VA 0 に `ld --emit-relocs` → `R_386_32` だけを抜き (PC32 は内部で解決済み、それ以外の種別・未解決記号は生成失敗)、import slot は `.data` 先頭の `kdebug_import_slots[]` (生成した C の配列)、export は生成した `kdebug_ops` の初期化子から取る。世代記号 `__os32_abi_1_mem_3_fmt_4` は `module.ld` でも定義。`make kernel` の成果物に `build/out/kdebug.bin` (kernel-r1 は `build/out/r1/kdebug.bin`)。
@@ -180,7 +182,7 @@ r4a = r4 + astra r4 の確認 (判定「依頼パックで直せば実装に出�
 - 保証 B (init の戻り ≠ 0、理由 10 `INIT_FAILED`): 候補表を捨てて A と同じ回収。これが許されるのは **この部品の `init` が候補表を埋めて返すだけで副作用 (割当・IRQ/tick/DMA の登録・装置の操作・import の呼出し) を持たない**契約があるから (`check-kdebug-init-host` が固定)。T4 の一般規則とは別の、kdebug 固有の保証。
 - OFF: 割当なし、ファイルを開かない → 0 B。
 
-### 3-5. 口の表 (export) — 関数は slot 1〜16
+### 3-5. 口の表 (export) — 関数は slot 1〜18
 
 | slot | 口 | 呼ぶ文脈 | OFF |
 |---:|---|---|---|
@@ -194,7 +196,14 @@ r4a = r4 + astra r4 の確認 (判定「依頼パックで直せば実装に出�
 | 15 | `gcap_detach()` — 記録参照を 0 に (割当・解放・VFS なし) | IRQ 停止中・例外スタック | nop |
 | 16 | `gcap_release()` — `kfree` を含む回収 | 通常文脈 (`kctx_*depth` 0) | nop |
 
-record (本体、bss、**単一の記号 `kdebug` が正典**): `struct kdebug { u32 state; u32 pair_crc; u32 base; u32 pages; u32 owner; u32 open_count; struct kdebug_ops ops; }` ≈ 96 B。独立の `kdebug_base` / `kdebug_pages` の記号は作らない。
+| 17 | `nic_selftest(void)` — LB-1 は NULL、LB-4 で結線 | 通常文脈のみ | nop |
+| 18 | `nic_trace(u32 stage)` — lan.log の段の印 | probe の通常文脈のみ (IRQ/tick/irq_save 内は禁止) | nop |
+
+LB-1 の trace は 256 B に seq/crc と段を積み、毎段の全文書き直しと sync を行う。
+`void` ABI のため保存失敗は部品から本体の `kprintf` で `[e82557] trace=off` を一度出し、以後書かない (probe の最終行より前)。
+bootlog は止めない。lan.log は boot.log の try seq/crc と一致するものだけを今回の証拠とする。
+
+record (本体、bss、**単一の記号 `kdebug` が正典**): `struct kdebug { u32 state; u32 pair_crc; u32 base; u32 pages; u32 owner; u32 open_count; struct kdebug_ops ops; }` 100 B。独立の `kdebug_base` / `kdebug_pages` の記号は作らない。
 
 ### 3-6. import — `.def` の一覧 (型と順序)、データ参照の分類、段ごとの集合と費用
 
@@ -221,7 +230,10 @@ T4 どおりデータの import は禁止し、データ記号 44 本 (kselftest
 | S3 | 194〜207 | FUNC | gcap だけの外部関数 14: `console_hw_cursor_enable`、`exec_ledger_owner`、`gfx_get_height`、`kfree`、`kmalloc`、`kzalloc`、`pegc_restore_text_sync`、`v86_cui_display_restore`、`v86_gui_refuse`、`v86_is_active`、`v86_mem_setup`、`v86_mem_teardown`、`v86_pic_set_imr`、`v86_run_limit` | 14 |
 | S3 | 208〜209 | GETTER | `v86_gp_cs`、`v86_gp_ip` | 2 |
 | S3 | 210 | PTR | `v86_session` (構造体実体) | 1 |
-| 合計 | 0〜210 | | **211** (関数 149 + アクセサ 56 + 新しい口 6) | **211** |
+| S4 | 211〜222 | FUNC | NIC 6 本 (`send/recv/get_mac/state/loopback/stat`)、VFS 5 本 (`mkdir/read/write/rm/sync`)、`boot_image_info`。tick_count getter は S2 の既存 slot 137 を使う | 12 |
+| 合計 | 0〜222 | | **223** (関数 161 + アクセサ 56 + 新しい口 6)、schema 2 | **223** |
+
+LB-1 の生成段は S4、export は既存 1〜5 と 18。gcap の移動はこの段では行わず、6〜17 は NULL。未実装の NIC import は NOSYS/DOWN/0 のスタブを持つ。
 
 - 本体側の費用 (実数で): `kdebug_kexports[]` 4 B × 本数、getter 約 8 B、setter 約 10 B、ポインタ getter 約 6 B、新しい口 約 12 B。段別: S1 = 4 B。S2 = 193 × 4 = 772 + getter 34 × 8 = 272 + setter 12 × 10 = 120 + ptr 7 × 6 = 42 + 口 6 × 12 = 72 → **1,278 B**。S3 = 17 × 4 = 68 + getter 2 × 8 = 16 + ptr 6 → **90 B**。
 - 部品側: import slot `kdebug_import_slots[211]` (`.data`、844 B) とスタブ `jmp *slot` (約 7 B × 211 ≈ 1.5 KB、text) — 部品の中 (像の予算の外)。

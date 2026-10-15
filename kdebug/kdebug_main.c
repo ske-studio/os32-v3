@@ -1,5 +1,6 @@
 #include "kernel/module.h"
 #include "crt_diag.h"
+#include "nic_trace.h"
 #include "kernel/kselftest.h"
 
 static void selftest_run(void) { (void)kselftest_run(); }
@@ -14,7 +15,9 @@ const struct kdebug_ops kdebug_ops = {
     .selftest_post_exec = selftest_post_exec,
     .selftest_post_unicode = selftest_post_unicode,
     .selftest_post_probe = selftest_post_probe,
-    .crt_diag_bootlog = crt_diag_bootlog
+    .crt_diag_bootlog = crt_diag_bootlog,
+    .nic_selftest = 0,
+    .nic_trace = nic_trace
 };
 
 /* No imports, allocation, device access or registration during init. */

@@ -139,6 +139,8 @@ void _start(void)
         const u32 *ops = (const u32 *)&kdebug.ops;
         for (u32 slot = 1; slot <= 5; slot++)
             CHECK(ops[slot] >= kdebug.base && ops[slot] < kdebug.base + pages * PAGE_SIZE);
+        CHECK(!ops[17] && ops[18] >= kdebug.base &&
+              ops[18] < kdebug.base + pages * PAGE_SIZE);
         /* The actual relocated post-exec returns before every later test
          * when the kernel audit reports an open V86 session. */
         kdebug.ops.selftest_post_exec();

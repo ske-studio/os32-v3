@@ -1,82 +1,61 @@
-# 82557 R5 EEPROM ホスト試験
+# 82557 EEPROM ホスト試験
 
-票: `docs/tasks/realhw/TASK_LAN_82557.md` §2 L-B・§5-2 R5。
-契約: `/home/hight/os32-tmp/run/lan/LB_R5_DESIGN.r3.md` §3–5 と
-`PACK_lb_r5.md` の PM 決定 (2026-10-15)。実機 R5 の合否をここでは主張しない。
+票: `docs/tasks/realhw/TASK_LAN_82557.md` §2 L-B。
+契約: `/home/hight/os32-tmp/run/lan/LB_MAIN_DESIGN.r3.md` §2 LB-1、§5。
+LB-1 で R5 の全語読み・和・診断整形・3方式の再試行を撤去する。
 
-実物の `drivers/e82557_eeprom.c`・`drivers/e82557.c` と PCI 復号・結線を
-ハーネスに include する。ホストも `-m32 -static` で組み、明示した
-`HOST32_RUNNERS` (この依頼では qemu) で実行し、u32=4を静的assertする。模型は試験側だけに置き、93C46 (6 bit / 64 語)、
-93C66 (8 bit / 256 語)、dummy の SK↑ / SK↓ 出力を独立に持つ。
-`--target` は実物の EEPROM と probe を i386-elf GNU11、`-Os -Werror` で通す。
-本体も起動時だけの処理として `-Os` にする (既存オブジェクトの旗は変えない)。
+実物の `drivers/e82557_eeprom.c` と `drivers/pci_decode.c` を include する。
+ホストは `-m32 -static`、`HOST32_RUNNERS=qemu` で実行し、u32=4 を静的 assert。
+模型は 93C46 (6 bit) / 93C66 (8 bit)、dummy の SK↑ / SK↓ 出力を持つ。
+`--target` は EEPROM 実装を i386-elf GNU11、`-Os -Werror` で通す。
+probe、reset、SCB、試行の印、固定6から自動判定1回への分岐は
+`tools/tests/e82557_drv_tdd.md` の別試験で扱う。
 
-## 正常の対照 (43 ケース)
+## 正常の対照 (27 ケース)
 
 - window0–9: BAR 0x6001 / 1 / 0 / 0x20410008 / 0x6004 / 0x6005 /
-  0xFFE1 / 0x10001 / 0xFFFFFFE1 と Command bit0=0。順序・理由・出力引数の
-  不変を確認。skip は実物の probe を通し、ピン read/write/delay 全て 0 回。
+  0xFFE1 / 0x10001 / 0xFFFFFFE1 と Command bit0=0。
+  優先順位・理由・失敗時の出力引数不変を確認。
 - frame: SDM の `110 000010`、8 bit の非対称アドレス、範囲外。
 - auto6rise/fall・auto8rise/fall、nowin・width1・width7:
-  自動判定の値・標本位置・終了、全て CS=0。
-- read6rise/fall・read8rise/fall: 全語を模型の非対称データと照合し、
-  語 0–2 の下位バイト先、全語の和 (最後の語を含む)、64 語だけの格納と前後ガード。
-- erased・empty・stuck1fixed・stuck0fixed: 内容と dummy を分け、固定 6 bit の救済。
-- interpret・badchecksum: zero/ff/mcast/ローカルMAC、和 0xBABA と 1 語だけ異なる像。
-- story0–5: §5-1 の 6 行を実物 observe/next/verdict で実行。
-  story6–7: try1 A は addr=6/form=ff、try2 S(A) で幅を再検出し、
-  常時1 → FAIL(nowin)、幅7 → FAIL(width)。最大3回、最初のPASSで停止。
-- format: 観測/最終/ダンプ/マーカーの桁、5種のFAIL理由、和badでもPASS、
-  幅異常時の `-`、4行×16語、dump=64/256、cap=0/1を含む境界。
-- probe・gated: ポートは基底+0x0Eのみ、beginは最初のread/write前、
-  endはCS解除後、bootlogとpolled serialの両経路、gate有効時はserial抑止。
-- proberelearn: PM追加の筋をprobeで通し、FAIL(nowin)の際に古いダンプを出さない。
-  probeff・probezero: 常時1/0の3回実行と最終FAIL・ダンプ。
-- binding: 実物pci_bind_allの列挙0件で出力/I/Oなし。Trident/CA0106は
-  表を0→1件に変えても結果の全フィールドが同じ、82557だけ一致してDECLINE。
+  自動判定の値・標本位置・有界終了、全て CS=0。
+- read6rise/fall・read8rise/fall: 固定幅で語 0〜2 だけを読み、
+  3 トランザクション、前後ガード、非対称データ、MAC の下位バイト先を照合。
+  8 bit は自動判定後の読み取りに使う同じプリミティブの検査。
+- erased・empty・stuck1fixed・stuck0fixed: 内容と dummy を区別する。
+- interpret: zero / ff / multicast の拒否とローカル MAC の受理。
 
 ## 独立した模型の検査
 
-- プロトコル: CS↑で初期化、SK↑で命令を取り込み、READ以外はfatal。
-  無限ループ変異は試験側の操作数上限でfatal。CS=0でSKを上げてもfatal。
-- T: 仮想時計と `e82557_regs.h` の最小時間を照合。
-  high≥1 / low≥3 / 周期≥4 / CS low≥1 µs、終了時CS=0を検査。
-- S: 実装のframe/read関数を使わず、契約のW/D/R列を組み立てて全イベントを照合。
-  通常は先頭W0/D・CS/D・命令3×(3+n)・データ2×16・末尾W0/D。
-  自動判定はデータなしで終了する別の列:
-  早期成功は3+6または3+8クロック、nowinは3+8、幅異常は3+1または3+7、
-  それぞれ最後のアドレスの立ち下がり後RからW0/Dへ進む。
-  Tだけ/Sだけを選んで独立に検査できる。
+- プロトコル: CS↑で初期化、SK↑で命令を取り込み、READ以外は fatal。
+  無限ループ変異は操作数上限で fatal。CS=0 で SK を上げても fatal。
+- T: 仮想時計と最小時間を照合。high≥1 / low≥3 / 周期≥4 / CS low≥1 µs、
+  終了時 CS=0 を検査。
+- S: 実装の frame/read 関数を使わず、契約の W/D/R 列を組み立てて全イベントを照合。
+  固定読みは先頭 W0/D・CS/D・命令 3×(3+n)・データ 2×16・末尾 W0/D。
+  自動判定はデータなし: 成功は 3+6 / 3+8、nowin は 3+8、幅異常は
+  3+1 / 3+7 クロック。最後のアドレスの立下り後 R から W0/D へ進む。
+  T だけ / S だけの選択でも実物を実行し、検査を独立に行う。
 
-## 変異 (24本)
+## 変異 (21 本)
 
-実装の写しだけを1か所ずつ変える。必ず正常の対照43件を先に通す。
-コンパイル失敗はREDに数えない。各変異で検出ケースと検査を標準出力へ残す。
+実装の写しだけを 1 か所ずつ変える。正常の対照 27 件を必ず先に通す。
+コンパイル失敗は RED に数えず、各変異の検出ケースと検査を出力する。
 
 | 変異 | 検出する契約 / 検査 |
 |---|---|
-| opcode READ→WRITE | 模型fatal、frame |
-| MSB→LSB | 模型fatal、非対称語 |
-| dummyをSK↑後に読む | SK↓出力模型の幅検出、S |
-| 幅の1 bitずれ | 幅・終了値 |
-| 0xBABA→0xBABB | 和 |
-| MACバイト順 | 非対称MAC |
-| 末尾W0を削除 | Tの終了CS=0、S |
+| opcode READ→WRITE | 模型 fatal、frame |
+| MSB→LSB | 模型 fatal、非対称語 |
+| dummy を SK↑後に読む | SK↓出力模型の幅検出、S |
+| 幅の 1 bit ずれ | 幅・終了値 |
+| MAC バイト順 | 非対称 MAC |
+| 末尾 W0 を削除 | T の終了 CS=0、S |
 | 自動判定の上限を削除 | 常時1で模型の操作数上限 |
-| step 4→1 / 4→0 (2本) | T |
-| 遅延削除8本: 先頭、CS選択、命令low/high/fall、データhigh/low、末尾 | 全件SでRED。Tを通る削除もSで検出 |
-| BAR上限を排他的にする | 0xFFE1 |
-| BAR比較を加算に戻す | 0xFFFFFFE1の桁あふれ |
-| 整列 / 種別検査を削除 (2本) | 0x6005 / 0x6004 |
-| PASSで停止しない / 固定6を飛ばす (2本) | story全行 |
+| step 4→1 / 4→0 (2 本) | T |
+| 遅延削除 8 本: 先頭、CS選択、命令 low/high/fall、データ high/low、末尾 | 全件 S で RED。T を通る削除も S で検出 |
+| BAR 上限を排他的にする | 0xFFE1 |
+| BAR 比較を加算に戻す | 0xFFFFFFE1 の 32 bit 桁あふれ |
+| 整列 / 種別検査を削除 (2 本) | 0x6005 / 0x6004 |
 
-開発中の対照は43/43 GREEN。最初のtarget試行はkernelヘッダ探索パス不足で失敗し、
-probeのincludeを `kernel/cpu_calibrate.h` に合わせて修正した。
-変異の初回試行は上限削除のアンカーが2か所一致して停止したため、命令ループを
-一意に指すアンカーへ修正した (コンパイル/実行前の不備、REDには数えない)。
-初回の最終変異試行ではBAR加算変異がLP64ホストで生き残った。u32が実機と
-同じ幅になるILP32ビルド＋明示qemu runnerへ修正し、桁あふれを実行で検証する。
-32bit glibcがないため、試験内の文字列・整形・Linux syscallだけの小さな補助を使う。
-最終の検査ログと前後の像サイズは `/home/hight/os32-tmp/run/lb-r5/`。
-NP21/W・実機・配備は依頼パックの指定どおり実行しない。実機のI/O復号、dummy、
-MAC/OUI、チェックサム規則、遅延精度、マーカー受信速度はR5の実機受入で確認する。
+検査ログは `/home/hight/os32-tmp/run/lan/`。NP21/W・実機・配備は依頼範囲外。
+このホスト模型では実機の I/O 復号・MAC・遅延精度を確認したとは扱わない。

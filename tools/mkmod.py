@@ -21,7 +21,7 @@ OPS_NAMES = ('selftest_run', 'selftest_post_exec', 'selftest_post_unicode',
              'selftest_post_probe', 'crt_diag_bootlog', 'gcap_capture',
              'gcap_active', 'gcap_keep_if', 'gcap_insn_abort', 'gcap_port_passed',
              'gcap_pass_in', 'gcap_pass_out', 'gcap_note_in', 'gcap_note_out',
-             'gcap_detach', 'gcap_release')
+             'gcap_detach', 'gcap_release', 'nic_selftest', 'nic_trace')
 SECTION_NAMES = ('.text', '.rodata', '.data', '.bss')
 
 
@@ -239,14 +239,14 @@ def build(elf_data, metadata, vmkernel, kapi_abi_gen=75, layout_gen=3):
                 'import slot must be initially zero')
         import_table += struct.pack('<IHHI', fnv1a(name), ver, kind, slot_off)
         names += name + b'\0'
-    ops_version = 1
+    ops_version = 2
     if 'kdebug_ops' in elf.symbols:
         ops = elf.symbol('kdebug_ops')
         require(ops['size'] == 4 * (len(OPS_NAMES) + 1), 'invalid kdebug_ops size')
         require(any(off <= ops['value'] and ops['value'] - off <= size and
                     ops['size'] <= size - (ops['value'] - off) for off, size in ranges[:3]),
                 'kdebug_ops outside payload sections')
-        values = struct.unpack_from('<17I', payload, ops['value'])
+        values = struct.unpack_from('<' + 'I' * (len(OPS_NAMES) + 1), payload, ops['value'])
         require(values[0] == ops_version, 'unsupported kdebug_ops version')
         for slot, (name, entry) in enumerate(zip(OPS_NAMES, values[1:]), 1):
             pointer_off = ops['value'] + slot * 4

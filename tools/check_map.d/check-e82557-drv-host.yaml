@@ -1,0 +1,17 @@
+check-e82557-drv-host:
+- drivers/e82557.c
+- drivers/e82557.h
+- drivers/e82557_regs.h
+- drivers/e82557_eeprom.c
+- drivers/e82557_eeprom.h
+- drivers/pci_decode.c
+- drivers/pci_decode.h
+- kernel/module.h
+- include/config.h
+- include/bootinfo.h
+- fs/vfs.h
+- tools/tests/e82557_drv_host.c
+- tools/tests/test_e82557_drv.py
+- tools/tests/host32.py
+- tools/check_map.d/check-e82557-drv-host.yaml
+- build/checks.d/check-e82557-drv-host.mk

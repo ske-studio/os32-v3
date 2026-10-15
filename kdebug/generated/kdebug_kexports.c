@@ -52,6 +52,9 @@ struct irq_line *kdi_ptr_irq_lines(void) { return irq_lines; }
 u32 *kdi_ptr_paging_memmap_bad(void) { return paging_memmap_bad; }
 unsigned int *kdi_ptr_time_branch_hits(void) { return time_branch_hits; }
 struct time_test_feed *kdi_ptr_time_test_feed(void) { return time_test_feed; }
+u32 kdi_get_v86_gp_cs(void) { return v86_gp_cs; }
+u32 kdi_get_v86_gp_ip(void) { return v86_gp_ip; }
+struct v86_session_state *kdi_ptr_v86_session(void) { return &v86_session; }
 void (*const kdebug_kexports[])(void) = {
     (void (*)(void))kprintf,
     (void (*)(void))appmem_init,
@@ -247,6 +250,35 @@ void (*const kdebug_kexports[])(void) = {
     (void (*)(void))kdi_get_kselftest_fail,
     (void (*)(void))kdi_kaudit_last_rc,
     (void (*)(void))kdi_kaudit_skipped,
+    (void (*)(void))console_hw_cursor_enable,
+    (void (*)(void))exec_ledger_owner,
+    (void (*)(void))gfx_get_height,
+    (void (*)(void))kfree,
+    (void (*)(void))kmalloc,
+    (void (*)(void))kzalloc,
+    (void (*)(void))pegc_restore_text_sync,
+    (void (*)(void))v86_cui_display_restore,
+    (void (*)(void))v86_gui_refuse,
+    (void (*)(void))v86_is_active,
+    (void (*)(void))v86_mem_setup,
+    (void (*)(void))v86_mem_teardown,
+    (void (*)(void))v86_pic_set_imr,
+    (void (*)(void))v86_run_limit,
+    (void (*)(void))kdi_get_v86_gp_cs,
+    (void (*)(void))kdi_get_v86_gp_ip,
+    (void (*)(void))kdi_ptr_v86_session,
+    (void (*)(void))e82557_send,
+    (void (*)(void))e82557_recv,
+    (void (*)(void))e82557_get_mac,
+    (void (*)(void))e82557_state,
+    (void (*)(void))e82557_loopback,
+    (void (*)(void))e82557_stat,
+    (void (*)(void))vfs_mkdir,
+    (void (*)(void))vfs_read,
+    (void (*)(void))vfs_write,
+    (void (*)(void))vfs_rm,
+    (void (*)(void))vfs_sync,
+    (void (*)(void))boot_image_info,
 };
 const unsigned long kdebug_abi_gen = KDEBUG_ABI_GEN;
 const unsigned long kdebug_kexport_count = KDEBUG_IMPORT_COUNT;
@@ -445,6 +477,35 @@ const struct module_symbol_contract kdebug_import_contracts[] = {
     {0x294801c3u, 1, 5},
     {0x585b9047u, 1, 5},
     {0xf92b9d05u, 1, 5},
+    {0xa293c861u, 1, 1},
+    {0x00be8be4u, 1, 1},
+    {0x05e2a293u, 1, 1},
+    {0x77db0b60u, 1, 1},
+    {0xd7fb90d6u, 1, 1},
+    {0xae8ba225u, 1, 1},
+    {0xbc6d4c41u, 1, 1},
+    {0x2e253adbu, 1, 1},
+    {0x2938dd48u, 1, 1},
+    {0x600a118fu, 1, 1},
+    {0x1f695827u, 1, 1},
+    {0x00ae4afau, 1, 1},
+    {0xaa5498e4u, 1, 1},
+    {0xc67da7ddu, 1, 1},
+    {0x2521dfa4u, 1, 2},
+    {0x2439e2f7u, 1, 2},
+    {0x7e454668u, 1, 4},
+    {0x114537c8u, 1, 1},
+    {0x242bb67eu, 1, 1},
+    {0xef33472eu, 1, 1},
+    {0x3e66697fu, 1, 1},
+    {0x07626a03u, 1, 1},
+    {0x906b9b80u, 1, 1},
+    {0xc036b696u, 1, 1},
+    {0xbeb0ad13u, 1, 1},
+    {0xd103a4b2u, 1, 1},
+    {0xf5a9fd5eu, 1, 1},
+    {0xaa14d5a8u, 1, 1},
+    {0xe6a3dc58u, 1, 1},
 };
 const struct module_symbol_contract kdebug_export_contracts[MODULE_OPS_SLOTS] = {
     [0] = {0xbcb84611u, 1, 0},
@@ -452,4 +513,5 @@ const struct module_symbol_contract kdebug_export_contracts[MODULE_OPS_SLOTS] = 
     [2] = {0x013e1126u, 1, 0},
     [3] = {0x9ac18c77u, 1, 0},
     [4] = {0x28752bcbu, 1, 0},
+    [17] = {0x51f56217u, 1, 0},
 };
