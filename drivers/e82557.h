@@ -7,10 +7,11 @@
 #define E82557_TRY_CAP 32
 enum e82557_trace_stage {
     E82557_TRACE_TRY = 1, E82557_TRACE_WIN, E82557_TRACE_RST,
-    E82557_TRACE_BASE, E82557_TRACE_EEPROM, E82557_TRACE_STOP,
+    E82557_TRACE_BASE, E82557_TRACE_EEPROM, E82557_TRACE_DMA,
+    E82557_TRACE_CFG, E82557_TRACE_IA, E82557_TRACE_TX, E82557_TRACE_STOP,
     E82557_TRACE_DONE
 };
-/* Reserved S4 imports: LB-1 has no running NIC. */
+/* Reserved S4 imports: LB-2 stops and declines; packet API remains inactive. */
 int e82557_send(const void *buf, u32 len);
 int e82557_recv(void *buf, u32 cap, u32 *len);
 void e82557_get_mac(u8 *mac);

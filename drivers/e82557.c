@@ -1,6 +1,8 @@
-/* LB-1: reset/Base bring-up. No DMA, IRQ registration or packet traffic. */
+/* LB-2: one DMA span, serialized CU commands, proven stop, then DECLINE. */
 #include "e82557.h"
 #include "e82557_eeprom.h"
+#include "e82557_desc.h"
+#include "kernel/dma_pool.h"
 #ifndef E82557_HOST_TEST
 #include "io.h"
 #include "kernel/cpu_calibrate.h"
@@ -139,7 +141,7 @@ static int scb_issue(u16 base, u8 cuc, u8 ruc, u32 ptr, int need_ptr, int *after
     *after = 0;
     if (!scb_wait(base)) return ISSUE_TIMEOUT;
     if (need_ptr) outpd(base + E82557_SCB_POINTER, ptr);
-    outp(base + E82557_SCB_COMMAND, (u8)((cuc << 4) | ruc));
+    outp(base + E82557_SCB_COMMAND, e82557_scb_cmd(cuc, ruc));
     *after = 1;
     return scb_wait(base) ? ISSUE_OK : ISSUE_TIMEOUT;
 }
@@ -178,19 +180,84 @@ static int ee_mac_read(u16 base, u8 *mac)
     return 0;
 }
 
+/* Foreground only. All three CBs share this publication/completion protocol. */
+static const char *cb_run(u16 base, struct dma_buf *dma, u32 off,
+                          struct e82557_stop *stop)
+{
+    u8 *cb = (u8 *)dma->va + off;
+    int after, issued;
+    unsigned int flags;
+    E82557_BARRIER(); /* publish: last descriptor store precedes SCB */
+    flags = irq_save();
+    stop->start_seq = stop->reset_seq;
+    issued = scb_issue(base, E82557_CU_START, 0, dma->pa + off, 1, &after);
+    irq_restore(flags);
+    if (issued != ISSUE_OK) return after ? "post" : "pre";
+    for (u32 ms = 0; ; ms++) {
+        u16 st = e82557_rd16(cb);
+        if (st & E82557_CB_C) {
+            E82557_BARRIER(); /* acquire: C before completion/body consumption */
+            return (st & E82557_CB_OK) ? NULL : "ng";
+        }
+        if (ms == E82557_CB_WAIT_MS) return "timeout";
+        cpu_delay_us(E82557_CB_POLL_US);
+    }
+}
+
+static int stop_dma(u16 base, struct e82557_stop *stop)
+{
+    u32 before = stop->reset_seq;
+    for (u32 attempt = 0; attempt < E82557_STOP_ATTEMPTS; attempt++) {
+        outpd(base + E82557_PORT, E82557_PORT_SELECTIVE);
+        stop->reset_seq++;
+        cpu_delay_us(E82557_RESET_US);
+        if (e82557_stop_evidence(stop, before, inpw(base + E82557_SCB_STATUS)))
+            return 1;
+    }
+    return 0;
+}
+
+static void bm_restore(const struct pci_dev *dev, int changed)
+{
+    if (changed) {
+        u16 cmd = (u16)pci_cfg_read32(dev->bus, dev->dev, dev->fn, PCI_CFG_COMMAND);
+        (void)pci_cfg_write16(dev->bus, dev->dev, dev->fn, PCI_CFG_COMMAND,
+                             cmd & ~E82557_COMMAND_BM);
+    }
+}
+
+static void hello_build(u8 *frame, const u8 *mac)
+{
+    const char mark[E82557_HELLO_MARK_LEN] = "OS32-LB-HELLO";
+    for (u32 i = 0; i < E82557_HELLO_LEN; i++) frame[i] = 0;
+    for (u32 i = 0; i < E82557_MAC_LEN; i++) {
+        frame[i] = 0xff;
+        frame[E82557_MAC_LEN + i] = mac[i];
+        frame[E82557_FRAME_MIN + E82557_HELLO_MARK_LEN + i] = mac[i];
+    }
+    frame[E82557_FRAME_MIN - 2] = E82557_HELLO_TYPE >> 8;
+    frame[E82557_FRAME_MIN - 1] = E82557_HELLO_TYPE & 0xff;
+    for (u32 i = 0; i < E82557_HELLO_MARK_LEN; i++)
+        frame[E82557_FRAME_MIN + i] = (u8)mark[i];
+}
+
 static int e82557_probe(const struct pci_dev *dev)
 {
     const char *why = try_begin();
     const char *stage = "win";
     u16 base, status = 0;
-    u8 mac[E82557_MAC_LEN];
+    u8 mac[E82557_MAC_LEN], cfg[E82557_CFG_LEN], frame[E82557_HELLO_LEN];
+    struct dma_buf dma;
+    struct e82557_stop stop = { 0, 0 };
+    int allocated = 0, changed_bm = 0, rc;
+    u16 command, tx_len = 0;
     unsigned int flags;
     int reason, after = 0, issued, result = PCI_PROBE_DECLINE;
     if (why) {
         if (kstrncmp(why, "seq-", 4) == 0)
             kprintf(E82557_LOG_ATTR, "[e82557] trace=off\n");
         kprintf(E82557_LOG_ATTR, "[e82557] skip(%s)\n", why);
-        kprintf(E82557_LOG_ATTR, "[e82557] LB1=FAIL(try:%s)\n", why);
+        kprintf(E82557_LOG_ATTR, "[e82557] LB2=FAIL(try:%s)\n", why);
         return result;
     }
     nic_trace(E82557_TRACE_TRY);
@@ -224,6 +291,7 @@ static int e82557_probe(const struct pci_dev *dev)
         issued = scb_issue(base, 0, E82557_RU_BASE, 0, 1, &after);
     irq_restore(flags);
     if (issued != ISSUE_OK) {
+        status = inpw(base + E82557_SCB_STATUS);
         kprintf(E82557_LOG_ATTR, "[e82557] rst=ok base=timeout scb=%04x\n", status);
         why = after ? "post" : "pre";
         goto done;
@@ -231,22 +299,83 @@ static int e82557_probe(const struct pci_dev *dev)
     kprintf(E82557_LOG_ATTR, "[e82557] rst=ok base=ok scb=%04x\n", status);
     stage = "ee";
     nic_trace(E82557_TRACE_EEPROM);
-    if (!ee_mac_read(base, mac)) why = "mac";
+    if (!ee_mac_read(base, mac)) { why = "mac"; goto done; }
+    stage = "dma";
+    nic_trace(E82557_TRACE_DMA);
+    rc = dma_alloc(E82557_DMA_SIZE, E82557_DMA_ALIGN, E82557_DMA_LIMIT, &dma);
+    if (rc < 0) {
+        kprintf(E82557_LOG_ATTR, "[e82557] dma rc=%d\n", rc);
+        why = "alloc";
+        goto done;
+    }
+    allocated = 1;
+    kprintf(E82557_LOG_ATTR, "[e82557] dma pa=%08x size=%u\n", dma.pa, dma.size);
+    command = (u16)pci_cfg_read32(dev->bus, dev->dev, dev->fn, PCI_CFG_COMMAND);
+    if (!(command & E82557_COMMAND_BM)) {
+        rc = pci_cfg_write16(dev->bus, dev->dev, dev->fn, PCI_CFG_COMMAND,
+                             command | E82557_COMMAND_BM);
+        if (rc < 0) { why = "bm"; goto done; }
+        changed_bm = 1;
+    }
+    stage = "cfg";
+    nic_trace(E82557_TRACE_CFG);
+    e82557_config_bytes(cfg, E82557_CFG_NORMAL);
+    e82557_cb_config((u8 *)dma.va + E82557_CB_OFF, cfg);
+    why = cb_run(base, &dma, E82557_CB_OFF, &stop);
+    if (why) goto done;
+    stage = "ia";
+    nic_trace(E82557_TRACE_IA);
+    e82557_cb_ia((u8 *)dma.va + E82557_CB_OFF, mac);
+    why = cb_run(base, &dma, E82557_CB_OFF, &stop);
+    if (why) goto done;
+    stage = "tx";
+    nic_trace(E82557_TRACE_TX);
+    hello_build(frame, mac);
+    (void)e82557_tcb_build((u8 *)dma.va + E82557_TCB_OFF, frame,
+                           E82557_HELLO_LEN, E82557_TX_THRESH, E82557_TBD_NONE, 0);
+    why = cb_run(base, &dma, E82557_TCB_OFF, &stop);
+    if (!why)
+        tx_len = e82557_rd16((u8 *)dma.va + E82557_TCB_OFF + 12) & ~E82557_TCB_EOF;
  done:
     nic_trace(E82557_TRACE_STOP);
+    if (allocated) {
+        if (why) kprintf(E82557_LOG_ATTR, "[e82557] %s=%s\n", stage, why);
+        if (stop_dma(base, &stop)) {
+            scb_mask(base, 1);
+            status = inpw(base + E82557_SCB_STATUS);
+            outp(base + E82557_SCB_ACK, (u8)((status & E82557_STAT_MASK) >> 8));
+            bm_restore(dev, changed_bm);
+            (void)dma_free(&dma);
+            if (!why)
+                kprintf(E82557_LOG_ATTR, "[e82557] cfg=ok ia=ok tx=ok(%u) stop=ok\n", tx_len);
+            else
+                kprintf(E82557_LOG_ATTR, "[e82557] stop=ok\n");
+        } else {
+            scb_mask(base, 1);
+            status = inpw(base + E82557_SCB_STATUS);
+            outp(base + E82557_SCB_ACK, (u8)((status & E82557_STAT_MASK) >> 8));
+            /* Safety shutdown is unconditional; normal restoration is owned. */
+            bm_restore(dev, 1);
+            (void)dma_mark_leaked(&dma);
+            pci_bind_set_reason(PCI_BIND_RESET_FAILED);
+            result = PCI_PROBE_QUARANTINE;
+            stage = "stop";
+            why = "idle";
+            kprintf(E82557_LOG_ATTR, "[e82557] stop=fail leaked QUARANTINE\n");
+        }
+    }
     /* DECLINE/QUARANTINE both returned normally, so permit a later boot. */
     if (vfs_rm(E82557_TRY_PATH) < 0 || vfs_sync() < 0)
         kprintf(E82557_LOG_ATTR, "[e82557] try-rm=fail\n");
     nic_trace(E82557_TRACE_DONE);
     if (why)
-        kprintf(E82557_LOG_ATTR, "[e82557] LB1=FAIL(%s:%s)\n", stage, why);
+        kprintf(E82557_LOG_ATTR, "[e82557] LB2=FAIL(%s:%s)\n", stage, why);
     else
-        kprintf(E82557_LOG_ATTR, "[e82557] LB1=PASS io=0x%04x irq=%u mac=%02x:%02x:%02x:%02x:%02x:%02x\n",
-                base, dev->irq_line, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        kprintf(E82557_LOG_ATTR, "[e82557] LB2=PASS\n");
     return result;
 }
 
-/* S4 ABI reservations; LB-2+ will supply actual packet operations. */
+/* S4 ABI reservations; LB-3 will supply actual packet operations. */
 int e82557_send(const void *buf, u32 len) { (void)buf; (void)len; return OS32_ERR_NOSYS; }
 int e82557_recv(void *buf, u32 cap, u32 *len)
 {

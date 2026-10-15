@@ -15,3 +15,8 @@ check-e82557-drv-host:
 - tools/tests/host32.py
 - tools/check_map.d/check-e82557-drv-host.yaml
 - build/checks.d/check-e82557-drv-host.mk
+- drivers/e82557_desc.c
+- drivers/e82557_desc.h
+- drivers/pci_bind_match.c
+- kernel/kernel.c
+- kernel/dma_pool.h
