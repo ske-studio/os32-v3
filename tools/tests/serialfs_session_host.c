@@ -62,6 +62,9 @@ void ring3_abort_check(void) { fprintf(stderr, "internal serial abort\n"); abort
 #include "sysconfig.h"
 
 static int g_cfg_lan, g_cfg_reads, g_nic_state = E82557_RUNNING;
+static int g_ru_ready = 1, g_ru_stuck, g_stale, g_rx_flood, g_drained;
+static int g_hello_ready, g_hello_stale, g_hello_drained;
+static u32 g_rnr, g_hello_tick;
 static const char *g_cfg_peer = "";
 int sysconfig_get_int(const char *path, const char *key, int def)
 {
@@ -77,6 +80,9 @@ int sysconfig_get_str(const char *path, const char *key, char *out, int cap)
     return (int)strlen(out);
 }
 int e82557_state(void) { return g_nic_state; }
+int e82557_rx_ready(void)
+{ return g_nic_state == E82557_RUNNING && g_ru_ready; }
+u32 e82557_stat(u32 idx) { return idx == 2 ? g_rnr : 0; }
 static const u8 g_guest_mac[6] = {2, 0, 0, 0, 0, 2};
 static const u8 g_host_mac[6] = {2, 0, 0, 0, 0, 1};
 static u8 g_nic_rx[SFS_LAN_RX_CAP];
@@ -98,6 +104,12 @@ int e82557_send(const void *buf, u32 len)
         if (frame.type == SFS_T_HELLO) {
             u8 pl[12];
             g_nic_hello++;
+            if (g_nic_hello == 1) {
+                g_hello_tick = tick_count;
+                g_hello_ready = e82557_rx_ready();
+                g_hello_stale = g_stale;
+                g_hello_drained = g_drained;
+            }
             if (!g_nic_answer) break;
             sfs_put32(pl, 0);
             sfs_put16(pl + 4, SFS_VERSION);
@@ -117,6 +129,12 @@ int e82557_send(const void *buf, u32 len)
 int e82557_recv(void *buf, u32 cap, u32 *len)
 {
     if (cap != SFS_LAN_RX_CAP) abort();
+    if (g_stale || g_rx_flood) {
+        if (g_stale) g_stale--;
+        g_drained++;
+        memset(buf, 0, 60); *len = 60;
+        return 0;
+    }
     if (!g_nic_rx_n) return OS32_ERR_AGAIN;
     memcpy(buf, g_nic_rx, g_nic_rx_n);
     *len = g_nic_rx_n; g_nic_rx_n = 0;
@@ -287,6 +305,12 @@ unsigned fake_inp(unsigned port)
 void fake_halt(void)
 {
     tick_count++;
+    /* A stopped RU restarts on ticks only, after foreground frees its ring.
+     * Keep RUNNING with a non-ready RU for one tick as well. */
+    if (g_cfg_lan && !g_ru_stuck && !g_stale) {
+        if (g_nic_state == E82557_RX_WAIT) g_nic_state = E82557_RUNNING;
+        else if (g_nic_state == E82557_RUNNING) g_ru_ready = 1;
+    }
     if (g_garbage_forever || tick_count < g_garbage_until) {
         unsigned char g = 'g';
         rx_at(tick_count, &g, 1);
@@ -308,6 +332,9 @@ static void reset(void)
     g_cfg_lan = g_cfg_reads = g_mount_fail = 0;
     g_cfg_peer = "";
     g_nic_state = E82557_RUNNING;
+    g_ru_ready = 1; g_ru_stuck = g_stale = g_rx_flood = g_drained = 0;
+    g_hello_ready = g_hello_stale = g_hello_drained = 0;
+    g_rnr = g_hello_tick = 0;
     g_nic_rx_n = 0;
     g_nic_hello = g_nic_bye = g_nic_bad_uart = g_nic_busy = 0;
     g_nic_answer = 1;
@@ -561,6 +588,7 @@ static void lan_session(void)
         CHECK(serialfs_session_begin() == OS32_ERR_IO);
         CHECK(!g_active && !g_cli.sid && !g_lan.linked && !g_lan.rx_end);
         CHECK(!g_nic_hello && !g_hello_n && !g_mount_calls && !serial_gate_active());
+        CHECK(tick_count == 1000);
     }
     reset(); g_cfg_lan = 1; g_nic_answer = 0;
     CHECK(serialfs_session_begin() == OS32_ERR_IO);
@@ -583,6 +611,42 @@ static void lan_session(void)
     CHECK(serialfs_session_begin() == OS32_ERR_INVAL && !g_nic_hello);
 }
 
+static void lan_start(void)
+{
+    reset(); g_cfg_lan = 1;
+    g_nic_state = E82557_RX_WAIT; g_ru_ready = 0;
+    g_stale = SFS_LAN_RX_BUDGET; g_rnr = 17;
+    g_cfg_peer = "02:00:00:00:00:01";
+    CHECK(serialfs_session_begin() == 0);
+    CHECK(g_hello_drained == SFS_LAN_RX_BUDGET && !g_hello_stale);
+    CHECK(g_hello_ready && g_hello_tick == 1002 && g_nic_hello == 1);
+    CHECK(g_lan.peer_fixed && g_cli.resends == 0 && g_cli.timeouts == 0);
+    g_rnr += 3;
+    CHECK(serialfs_session_end(0) == 0);
+    CHECK(strstr(g_kout, "bad_len=0 rnr=3\n") != NULL);
+    g_rnr += 9;
+    g_nonce_ctr = 0; /* LP64 host: keep nonce within the wire's 32 bits. */
+    CHECK(serialfs_session_begin() == 0);
+    CHECK(serialfs_session_end(0) == 0);
+    CHECK(strstr(g_kout, "bad_len=0 rnr=0\n") != NULL);
+
+    reset(); g_cfg_lan = 1; g_ru_ready = 0;
+    CHECK(serialfs_session_begin() == 0);
+    CHECK(g_hello_ready && g_hello_tick == 1001);
+    CHECK(serialfs_session_end(0) == 0);
+
+    reset(); g_cfg_lan = 1; g_ru_ready = 0; g_ru_stuck = 1;
+    g_nic_state = E82557_RX_WAIT; g_rx_flood = 1;
+    CHECK(serialfs_session_begin() == OS32_ERR_IO);
+    CHECK(g_hello_drained == SFS_LAN_RX_BUDGET);
+    CHECK(g_hello_tick == 1000 + sfs_ms_ticks(SFS_LAN_READY_MS));
+    CHECK(!g_hello_ready && g_nic_hello > 0 && !g_active);
+    const char *warning = strstr(g_kout, "LAN RX not ready after 100ms");
+    CHECK(warning != NULL);
+    CHECK(warning && strstr(warning + 1, "LAN RX not ready") == NULL);
+    CHECK(tick_count < 4000);
+}
+
 int main(int argc, char **argv)
 {
     const char *c = argc > 1 ? argv[1] : "";
@@ -592,6 +656,7 @@ int main(int argc, char **argv)
     else if (!strcmp(c, "end_late_hold")) end_late_hold();
     else if (!strcmp(c, "end_not_quiet")) end_not_quiet();
     else if (!strcmp(c, "lan_session")) lan_session();
+    else if (!strcmp(c, "lan_start")) lan_start();
     else {
         fprintf(stderr, "usage: serialfs-session-host <case>\n");
         return 2;

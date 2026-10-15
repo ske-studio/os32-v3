@@ -47,6 +47,7 @@ extern int res_owner_get(void);
 #define SFS_ATTR_INFO  0x0B
 #define SFS_ATTR_WARN  0x0E
 #define SFS_ATTR_ERR   0x0C
+#define SFS_LAN_READY_MS 100
 
 static SfsClient g_cli;
 static SfsLan g_lan;
@@ -54,6 +55,7 @@ static int g_use_lan;
 static const SfsLanNic g_nic = { e82557_send, e82557_recv, e82557_get_mac };
 static int g_active;            /* begin の準備から finish の解放まで */
 static u32 g_nonce_ctr;
+static u32 g_lan_rnr_start;
 
 /* ---- 線への出入り (ゲートの口) ---- */
 static int sio_put(void *ctx, const u8 *buf, u32 n)
@@ -146,9 +148,10 @@ static int sfs_finish(int code)
             kprintf(SFS_ATTR_ERR, "sfs: line declared dead (%s)\n",
                     sfs_dead_name(g_cli.dead));
         kprintf(SFS_ATTR_INFO,
-                "sfs: requests=%u resent=%u timeouts=%u stray=%u bad_crc=%u bad_len=%u\n",
+                "sfs: requests=%u resent=%u timeouts=%u stray=%u bad_crc=%u bad_len=%u rnr=%u\n",
                 g_cli.calls, g_cli.resends, g_cli.timeouts, g_cli.stray,
-                g_cli.dec.bad_crc, g_cli.dec.bad_len);
+                g_cli.dec.bad_crc, g_cli.dec.bad_len,
+                (u32)(e82557_stat(2) - g_lan_rnr_start));
         kprintf(SFS_ATTR_INFO, "sfs: exit=%d\n", code);
         sfs_dec_reset(&g_cli.dec);
         g_cli.sid = 0;
@@ -218,15 +221,31 @@ int serialfs_session_begin(void)
         /* These driver entry points belong exclusively to the foreground. */
         int state = e82557_state();
         char peer[32]; /* room to detect a too-long configured MAC */
+        u32 start;
+        g_lan_rnr_start = e82557_stat(2);
         sfs_lan_init(&g_lan, &g_nic, &g_sio, 0);
         sfs_client_init(&g_cli, &sfs_lan_io, &g_lan, SFS_LAN_BAUD);
         g_active = 1;
+        /* Free stale frames before waiting for the existing tick recovery.
+         * Reset clears peer configuration, so apply SFS_LAN_PEER afterwards. */
+        if (state == E82557_RUNNING || state == E82557_RX_WAIT)
+            sfs_lan_reset(&g_lan);
         (void)sysconfig_get_str(SYS_SYSTEM_CFG, "SFS_LAN_PEER", peer, sizeof(peer));
         if ((state != E82557_RUNNING && state != E82557_RX_WAIT) ||
             sfs_lan_set_peer(&g_lan, peer) != 0) {
             kprintf(SFS_ATTR_ERR, "sfs: LAN unavailable or invalid SFS_LAN_PEER\n");
             (void)sfs_finish(OS32_ERR_IO);
             return OS32_ERR_IO;
+        }
+        start = tick_count;
+        while (!e82557_rx_ready()) {
+            if ((u32)(tick_count - start) >= sfs_ms_ticks(SFS_LAN_READY_MS)) {
+                kprintf(SFS_ATTR_WARN,
+                        "sfs: LAN RX not ready after %ums; trying HELLO anyway\n",
+                        (u32)SFS_LAN_READY_MS);
+                break;
+            }
+            sio_idle(0);
         }
     } else {
         (void)serial_get_status(&mode, &baud, &fifo);

@@ -74,7 +74,7 @@ C_CASES = ["crc_and_frames", "timing_and_seq", "vfs_contract", "mount_permit",
 GATE_CASES = ["gate_tx", "hold_overflow", "gate_rx", "gate_init_refused",
               "isr_counts"]
 SESSION_CASES = ["flow", "hello_fail_quiet", "hello_fail_flood", "end_late_hold",
-                 "end_not_quiet", "lan_session"]
+                 "end_not_quiet", "lan_session", "lan_start"]
 
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-D_DEFAULT_SOURCE", "-D__cdecl=",
@@ -1526,6 +1526,10 @@ GATE_MUTATIONS = [
      "            break;", "ゲートの上げ下げで UART / FIFO の残りを読み捨てない"),
 ]
 SESSION_MUTATIONS = [
+    ("fs/serialfs_session.c", r"            sfs_lan_reset\(&g_lan\);",
+     "            ;", "LAN start の読み捨てを外す"),
+    ("fs/serialfs_session.c", r"        while \(!e82557_rx_ready\(\)\) \{",
+     "        while (0) {", "LAN start の RU ready 待ちを外す"),
     ("fs/serialfs_session.c",
      r'    g_use_lan = sysconfig_get_int\(SYS_SYSTEM_CFG, "SFS_LAN", 0\) == 1;',
      '    g_use_lan = 0;', "SFS_LAN を読まない"),
