@@ -54,6 +54,7 @@ Guest (NP21/W): drive it through skill **`run-os32`** and `tools/np21w_mcp/`; st
 - **[C5]** Physical addresses become pointers through `P2V` / `P2V_IO` (`P2V_CONST` / `P2V_IO_CONST` only for constant initializers); pointers passed to device/PTE/CR3 use `V2P`. App/lease virtual addresses use AS/SURFACE translation. Exceptions are recorded in `tools/check_p2v_allow.txt`.
 - **[HW1]** Never use EGC / GRCG / GDC drawing commands. The CPU writes straight to VRAM at `0xA8000`.
 - **[HW2]** DMA buffers must not straddle a 64KB boundary.
+- **[HW3]** New hardware drivers: before designing, consult the vendor manual **and** a license-compatible existing implementation (FreeBSD/NetBSD/OpenBSD or other BSD/MIT code) and cite it in the design ticket. Never copy code or structure from GPL implementations (e.g. Linux); use them only for behavior not found in BSD code or manuals, and say so.
 - **[ABI1]** `sdk/kapi.json` is the single source of truth. Never hand-edit the generated files.
 - **[ABI2]** Append KAPI entries only. Never reorder or delete an existing slot.
 - **[ABI3]** After a KAPI change, bump the version and run `make clean` → `make all`.
