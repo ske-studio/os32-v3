@@ -50,6 +50,7 @@
 
 | ID | 何を残したか | 理由 | 渡し先 |
 |---|---|---|---|
+| LANFS-1 | lanfs_host.py を起動して最初のセッションだけ resent=1 timeouts=1 (2026-10-16、段 3 の初回と段 4 の -n boot の 2 回)。2 回目以降は 0。原因は未解明 (ノートの NIC か、サーバの最初の受信まわり [推]) | 実害は 1 要求の再送 (約 2.6 秒) だけ | LAN の後始末の段 (ノートの担当と調べる) |
 | REPRO-1 | CI の成果物の `bin/gshell.bin` が、材料 (userland/gshell・sdk・lib) の変わっていない ce30be3 → 5971615 で content_changed になった (ノートの hsync -n、2026-10-15)。CI の Rust ビルドに再現性が無い疑い [推] (時刻・パス・並列の順の埋め込みなど) | 配備のたびに無関係な差分が出ると、実機に何が入ったかの照合がぶれる | 道具の小さな調べ (sol): 同じコミットを 2 回組んで gshell.bin を比べ、差の出所を特定する |
 | CI-FLAKY-1 | `check-gfx-attach-host` の SDK 段が CI の 32 ビット native で 1 回 `FAIL result == base` (`tools/tests/gfx_kernel_fb_host.c:115` の `map_host`、決まった番地への MAP_FIXED の mmap) で落ちた (2026-10-15、ce30be3 の build、再実行で success、手元は 3 回とも PASS)。決まった番地が、アドレス空間のランダム配置で既に使われていた疑い [推] | LAN の変更とは無関係。たまたまの失敗が続くと CI の信頼が落ちる | 道具の小さな直し (sol): 番地が塞がっていたら、試験側で別の番地を選ぶか、失敗を明示して native をやり直す |
 | LZSS-1 | 修正した圧縮器の PKG (種 250 の 2 ファイル) を cdinst で入れて照合 | cdinst は MINIMAL / GUI / NORMAL / DEBUG の名前だけを展開し、試験 PKG を媒体に載せる道具の経路が無い。R0 の Full install (225 files、`hsync -n --verify` で内容一致) は代替の観測で PASS に数えない。host の `test_lzss_pkg.py` は合格 | 保守: 次に ISO / PKG の道具を触る段 |
