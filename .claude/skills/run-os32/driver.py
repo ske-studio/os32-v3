@@ -28,8 +28,6 @@ import os
 import subprocess
 import sys
 import time
-import urllib.error
-import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__)))))
@@ -43,6 +41,9 @@ POLL_MAX = 3600       # --wait の上限 (秒)
 # ゲスト → ホストの持ち出し口。ゲストの /host がホストのここに見える。
 HOSTDRV = "/mnt/c/os32"
 
+sys.path.insert(0, os.path.join(ROOT, "tools", "np21w_mcp"))
+import np21w_client  # noqa: E402
+
 
 def die(msg, code=2):
     sys.stderr.write("driver: %s\n" % msg)
@@ -50,17 +51,15 @@ def die(msg, code=2):
 
 
 def _http(path, body=None, timeout=T_SHORT, raw=False):
-    url = BASE + path
-    data = body.encode("utf-8") if body is not None else None
-    req = urllib.request.Request(url, data=data)
+    # 直接届かなければ Windows の curl.exe に切り替える (WSL の NAT モード、2026-10-16)。
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            blob = r.read()
-    except urllib.error.URLError as exc:
-        die("%s に届かない (%s)。NP21/W が動いているか、ini の "
-            "aidebug=true / aidbport=8025 を確かめる" % (url, exc))
-    except OSError as exc:
-        die("%s で失敗: %s" % (url, exc))
+        if body is None:
+            blob = np21w_client.get(path, timeout=timeout)
+        else:
+            blob = np21w_client.post(path, body, timeout=timeout)
+    except np21w_client.EmuError as exc:
+        die("%s%s に届かない (%s)。NP21/W が動いているか、ini の "
+            "aidebug=true / aidbport=8025 を確かめる" % (BASE, path, exc))
     return blob if raw else blob.decode("utf-8", "replace")
 
 
