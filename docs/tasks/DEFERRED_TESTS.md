@@ -31,6 +31,7 @@
 | ID | 何を残したか | 理由 | 次の関門 |
 |---|---|---|---|
 | LAN-LB2b | Ra266のMDI/PHY、統計good1/good2、tcpdumpの#1/#2、KDEBUG=1の新4段、NP21/Wの非搭載起動、native host runner | 依頼パックは実装とqemu host検査まで。実機・エミュレータ操作を含まない | PMのLB-2b受入 (実装証拠: `/home/hight/os32-tmp/run/lb2b/`) |
+| LAN-LB2c | Ra266 の PCR・HELLO 1 本の線上受信、PHYVENDOR=0 対照、NP21/W 非搭載起動・DBGREF/gserial/rshell、native runner | 依頼は実装と qemu host 検査まで。実機・エミュレータ操作禁止 | PM の LB-2c 受入 (実装証拠: `/home/hight/os32-tmp/run/lb2c/`) |
 
 ## 1. 渡す — 次のゲスト受入の回 (NP21/W、道具は揃っている)
 

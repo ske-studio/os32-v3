@@ -44,6 +44,16 @@
 
 L-A と L-D は独立 (並行できる)。**L-B の前に結線の土台** ([`../v3/TASK_HAL_WIRING.md`](../v3/TASK_HAL_WIRING.md): 共有 IRQ の動的登録、`dma_alloc`、PCI の結線表) を入れる。L-B は L-A の上、L-C は L-B と同時、L-E は全部の上。
 
+### LB-2c: DP83840A PCR 初期化 (2026-10-15)
+
+- 契約: `~/os32-tmp/run/lan/PACK_lb2c.md` (補遺 r3c より優先)。BMCR fix → PCR → リンク待ち → Configure/IA → HELLO 1 本 → 統計 → 停止の証拠 → free、停止失敗は leaked/QUARANTINE。
+- [HW3] メーカー: Intel 8255x SDM §8.1.2 (`docs/hw/intel/8255x_open_source_sdm.txt:7531-7535`)、National Semiconductor [DP83840A datasheet](https://www.digikey.com/htmldatasheets/production/93502/0/0/1/dp83840a.pdf) §4.9–4.15 (PCR R/W と予約 bit、PAR、カウンタ)。
+- [HW3] 既存実装: FreeBSD main (2026-10-15 取得、BSD-2-Clause) `sys/dev/mii/nsphy.c:145-179`、`nsphyreg.h:41-102`、`sys/dev/fxp/if_fxp.c:2354-2382` (`~/os32-tmp/ref/freebsd-main/`)。GPL のコード・構造は使用しない。
+- ID `2000:(5c00〜5c0f)` だけ PCR に `old | 0562`、同値なら省略、読み戻しは `0062` だけ照合 (不一致 `pcr=ng`)。資料の予約 bit は書込み 0 指定だが、依頼どおり FreeBSD の 0100/0400 設定を採用し効用は実機未確認。`E82557_PHYVENDOR=0` は読出しだけ (既定 1)。
+- 観測は nsc、link、tx の 3 種。全項目を 78 桁に収めるため tx は 3 行に分割 (計 5 行)。BMSR は履歴/現在の両方、PAR と DCR/FCSCR/RECR は生の hex 値 (差分なし)。別 ID では vendor reg を読まず、その欄の ffff は未取得。
+- `LB2c=PASS` は mdi/cfg/ia/tx/stat/stop の成功だけ。good、link、PCR の照合不一致は合否外。HELLO は `OS32-LB-HELLO`、60 B。TX2 の段 ID は ABI 用に残し呼ばない。
+- 模型・変異の契約は [e82557_drv_tdd.md](../../../tools/tests/e82557_drv_tdd.md)、検査ログと同条件の像の比較は `~/os32-tmp/run/lb2c/`。実機での送信・原因は未確認、受入の持越しは [DEFERRED_TESTS.md](../DEFERRED_TESTS.md)。
+
 ### 2-1. L-D の使い方 (Ubuntu ノート)
 
 AF_PACKET の raw ソケットには **root か `CAP_NET_RAW`** が要る。どちらかを選ぶ:

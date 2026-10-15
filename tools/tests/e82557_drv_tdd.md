@@ -138,3 +138,32 @@ link窓3000+末尾BMSR/ANLPAR=6、最後BMSR=4、統計2回計約202.4、
 
 LB-2bの初回driver変異では#2期待値2固定が生存。最終goodの値だけでは余計な待ちを
 見逃すため、phy_lateで#2のw2=0も照合する (累積2を待つ版はw2=100になる)。
+
+
+## LB-2c (PACK_lb2c)
+
+HELLO #2 の C/OK/pre/post の 4 ケースと差分・2 本目専用の 4 変異を撤去。
+HELLO はリンク待ち後の 1 本 (Configure/IA より前に待つ)、印は `OS32-LB-HELLO`。
+PCR/PAR/SRR/DCR/FCSCR/RECR を独立模型へ追加。PCR 書込みは literal oracle
+`old | 0x0562` と ID と PHYVENDOR で照合し、違反を fatal にする。
+TXOFF/REPEATER/NRZI/LED1 の保存、revision 違い、ID1/ID2 各不一致、82555、
+既設定時の書込み 0 回、PHYVENDOR=0 の書込み 0 回、予約 bit 0500 の変化、
+R/W bit 0002/0020/0040 各欠落、vendor MDI の 6 箇所の timeout を検査する。
+PCR 書込み前に BMCR fix の印があり、link の印がまだないこと、PCR の初回読出しが
+1 回あること、書込み後の管理 read が 1 回あることを確認する。
+ID が違えば vendor reg は読まない。カウンタは統計後に各 1 回だけ読み、生値を照合。
+phy_latch は BMSR 初回だけ 0000、2 回目 782d とし、link と tx 両方のログに残す。
+PHY の非対象・未検出、MDI timeout、永久 down、good=0、pcr=ng も停止・合否を照合。
+全 nsc/link/tx 行は 78 桁以下、stat_max は全 32 bit 統計に UINT32_MAX を注入する。
+依頼の tx 全項目は 1 行に入らないため tx を 3 行に分割する (合計 5 行)。
+新規変異: PCR の 5 bit 各欠落、他 bit の破壊、ID guard 全体/ID1/ID2、readback 削除、
+同値書込み、PHYVENDOR 無視、予約 bit の照合、PCR を link 待ちの後へ、BMSR 初回の破棄、
+link 待ち削除。統計の完了語 0・両障壁・100ms (Dump 込み)・timeout 再発行禁止の
+既存変異は 1 本の HELLO に適用。停止の証拠と free/leaked の oracle は維持。
+証拠: `/home/hight/os32-tmp/run/lb2c/`。最初の対照実行の失敗は模型が MDI WRITE の
+完了確認まで PCR READ 回数に数えたためで、READ opcode の時だけ計数するよう修正。
+対照 111/111、変異 59/59 RED、target GNU11 -Werror は rc=0。
+同条件 (基点 41ba30a、worktree 既定 make all、同じフォント・CROSS_DIR) で
+vmkernel.lz4 500446→500437 B (−9)、kernel.bin 389652→389724 B (+72)、
+text/data/bss 730484/34091/612256→730420/34227/612256 B、
+__bss_end 00194080→001940c0 (+64)。KDEBUG のビルド条件は変更していない。
