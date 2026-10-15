@@ -14,6 +14,11 @@ check-kdebug-init-host:
 - kernel/pgalloc.h
 - kernel/sysconfig.h
 - kernel/kdebug_imports.def
+- kdebug/nic_trace.c
+- kdebug/nic_trace.h
+- drivers/e82557.h
+- fs/vfs.h
+- tools/tests/nic_trace_host.c
 - kdebug/kdebug_main.c
 - kdebug/kselftest.c
 - kernel/kselftest.h

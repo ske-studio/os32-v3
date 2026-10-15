@@ -4,9 +4,9 @@
 #include "types.h"
 #include "os32_kapi_shared.h"
 
-#define KDEBUG_OPS_VERSION 1U
+#define KDEBUG_OPS_VERSION 2U
 
-/* Wire slots 1..16 follow version; kept stable across S1/S2/S3. */
+/* Wire slots 1..18 follow version; 17 is reserved until LB-4. */
 struct kdebug_ops {
     u32 version;
     void (*selftest_run)(void);
@@ -25,6 +25,8 @@ struct kdebug_ops {
     void (*gcap_note_out)(u16 port, int size, u32 value);
     void (*gcap_detach)(void);
     void (*gcap_release)(void);
+    void (*nic_selftest)(void);
+    void (*nic_trace)(u32 stage); /* Normal context only: uses VFS. */
 };
 
 struct kdebug {

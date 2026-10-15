@@ -3,9 +3,9 @@ ifeq ($(origin KERNEL_CFLAGS),undefined)
 include build/config.mk
 endif
 KDEBUG_OUT ?= $(BUILD_OUT)/kdebug
-KDEBUG_STAGE := S2
+KDEBUG_STAGE := S4
 KDEBUG_GEN := kdebug/generated
-KDEBUG_OBJS := $(KDEBUG_OUT)/kselftest.o $(KDEBUG_OUT)/crt_diag.o $(KDEBUG_OUT)/kdebug_main.o \
+KDEBUG_OBJS := $(KDEBUG_OUT)/nic_trace.o $(KDEBUG_OUT)/kselftest.o $(KDEBUG_OUT)/crt_diag.o $(KDEBUG_OUT)/kdebug_main.o \
                $(KDEBUG_OUT)/kdebug_import_slots.o $(KDEBUG_OUT)/kdebug_import_stubs.o
 KDEBUG_KEXPORT_OBJ := $(KDEBUG_OUT)/kdebug_kexports.o
 C_KERNEL_OBJ += $(KDEBUG_KEXPORT_OBJ)

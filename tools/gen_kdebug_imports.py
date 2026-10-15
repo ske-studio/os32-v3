@@ -17,7 +17,16 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DEF = ROOT / 'kernel/kdebug_imports.def'
 KINDS = {'FUNC': 1, 'GETTER': 2, 'SETTER': 3, 'PTR': 4, 'OP': 5}
-STAGES = {'S1': 1, 'S2': 194, 'S3': 211}
+STAGE_KINDS = {
+    'S1': ('FUNC',),
+    'S2': ('FUNC',) * 134 + ('GETTER',) * 22 +
+          ('GETTER', 'SETTER') * 12 + ('PTR',) * 7 + ('OP',) * 6,
+    'S3': ('FUNC',) * 14 + ('GETTER',) * 2 + ('PTR',),
+    'S4': ('FUNC',) * 12,
+}
+STAGES = {}
+for _stage, _kinds in STAGE_KINDS.items():
+    STAGES[_stage] = (list(STAGES.values())[-1] if STAGES else 0) + len(_kinds)
 ABI_SYMBOL = '__os32_abi_1_mem_3_fmt_4'
 
 
@@ -62,17 +71,14 @@ def declaration(row, root):
 def load_def(path=DEFAULT_DEF, root=ROOT):
     document = json.loads(Path(path).read_text())
     rows = document['imports']
-    if document['schema'] != 1 or len(rows) != 211:
-        raise ValueError('expected schema 1 and 211 imports')
+    if document['schema'] != 2 or len(rows) != STAGES['S4']:
+        raise ValueError('expected schema 2 and complete stage table')
+    contracts = [(stage, kind) for stage, kinds in STAGE_KINDS.items() for kind in kinds]
     entries = []
     names = set()
     for index, row in enumerate(rows):
         kind = row['kind']
-        expected_stage = 'S1' if index == 0 else 'S2' if index < 194 else 'S3'
-        expected_kind = ('FUNC' if index < 135 or 194 <= index < 208 else
-                         'GETTER' if index < 157 or 208 <= index < 210 else
-                         ('GETTER' if (index - 157) % 2 == 0 else 'SETTER') if index < 181 else
-                         'PTR' if index < 188 or index == 210 else 'OP')
+        expected_stage, expected_kind = contracts[index]
         if row['index'] != index or row['stage'] != expected_stage or kind != expected_kind:
             raise ValueError(f'invalid index/stage/kind at {index}')
         symbol = row['symbol']
@@ -156,7 +162,7 @@ def check_nm(entries, nm=None, root=ROOT):
     return True
 
 
-def generate(entries, out_dir, stage='S3'):
+def generate(entries, out_dir, stage='S4'):
     selected = entries[:STAGES[stage]]
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -191,7 +197,8 @@ def generate(entries, out_dir, stage='S3'):
     kernel += [f'    {{0x{fnv1a(e["name"].encode()):08x}u, {e["type_ver"]}, {e["kind"]}}},' for e in selected]
     kernel += ['};', 'const struct module_symbol_contract kdebug_export_contracts[MODULE_OPS_SLOTS] = {']
     from mkmod import OPS_NAMES
-    slots = [5] if stage == 'S1' else list(range(1, 6 if stage == 'S2' else 17))
+    slots = {'S1': [5], 'S2': list(range(1, 6)),
+             'S3': list(range(1, 17)), 'S4': list(range(1, 6)) + [18]}[stage]
     kernel += [f'    [{slot - 1}] = {{0x{fnv1a(OPS_NAMES[slot - 1].encode()):08x}u, 1, 0}},' for slot in slots]
     kernel += ['};']
     (out / 'kdebug_kexports.c').write_text('\n'.join(kernel) + '\n')
@@ -211,7 +218,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--def', dest='definition', type=Path, default=DEFAULT_DEF)
     parser.add_argument('--out-dir', type=Path)
-    parser.add_argument('--stage', choices=STAGES, default='S3')
+    parser.add_argument('--stage', choices=STAGES, default='S4')
     parser.add_argument('--check-nm', action='store_true')
     parser.add_argument('--nm')
     args = parser.parse_args()

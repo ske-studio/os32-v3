@@ -22,7 +22,7 @@ FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werro
          '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-D__KERNEL_BUILD__']
 INCLUDES = ['-I' + str(ROOT / d) for d in
             ('.', 'include', 'kernel', 'lib', 'fs', 'arch/x86', 'platform/pc98',
-             'sdk/include', 'sdk/include/os32', 'exec', 'gfx', 'drivers', 'kapi')]
+             'sdk/include', 'sdk/include/os32', 'exec', 'gfx', 'drivers', 'kapi', 'kdebug')]
 
 
 def command(args):
@@ -38,7 +38,7 @@ def seal(image):
 def main():
     with tempfile.TemporaryDirectory(prefix='kdebug-init-') as td:
         folder = Path(td)
-        meta = gen.generate(gen.load_def(), folder, 'S2')
+        meta = gen.generate(gen.load_def(), folder, 'S4')
         for generated in (ROOT / 'kdebug/generated').iterdir():
             if generated.suffix in ('.c', '.h', '.S', '.json'):
                 assert generated.read_bytes() == (folder / generated.name).read_bytes(), generated
@@ -51,6 +51,11 @@ def main():
         command([*host, harness, source, '-o', exe])
         for runner in os.environ.get('HOST32_RUNNERS', 'native qemu').split():
             assert host32.run([str(exe)], runner=runner).returncode == 0
+        trace_exe = folder / 'trace'
+        command([*host, ROOT / 'tools/tests/nic_trace_host.c', '-o', trace_exe])
+        for runner in os.environ.get('HOST32_RUNNERS', 'native qemu').split():
+            assert host32.run([str(trace_exe)], runner=runner).returncode == 0
+        print('PASS nic_trace: identity, append/sync, read/write/sync failure latch (12 scenarios)')
         # A called import and a missing export must each fail by assertion.
         if '--mutate' in sys.argv:
             for label, old, new in (
@@ -63,9 +68,27 @@ def main():
                 for runner in os.environ.get('HOST32_RUNNERS', 'native qemu').split():
                     assert host32.run([str(exe)], runner=runner).returncode == 1, label
                 print('MUTATE', label, 'RED', flush=True)
+        if '--mutate' in sys.argv:
+            trace_source = (ROOT / 'kdebug/nic_trace.c').read_text()
+            trace_harness = (ROOT / 'tools/tests/nic_trace_host.c').read_text()
+            for label, old, new in (
+                ('trace-sync', 'vfs_sync() != VFS_OK', '0'),
+                ('trace-latch', 'if (trace_off) return;', 'if (0) return;'),
+                ('trace-crc', 'crc != image.image_crc', '0'),
+                ('trace-fresh', 'if (stage == E82557_TRACE_TRY) trace_len = 0;', '')):
+                assert old in trace_source
+                mutant = folder / (label + '.c')
+                mutant.write_text(trace_source.replace(old, new))
+                harness_copy = folder / (label + '-host.c')
+                harness_copy.write_text(trace_harness.replace('../../kdebug/nic_trace.c', str(mutant)))
+                command([*host, '-I' + str(ROOT / 'kdebug'), harness_copy, '-o', trace_exe])
+                for runner in os.environ.get('HOST32_RUNNERS', 'native qemu').split():
+                    assert host32.run([str(trace_exe)], runner=runner).returncode == 1, label
+                print('MUTATE', label, 'RED', flush=True)
         # Build the real module independently of pre-existing product artifacts.
         objects = []
-        for src in (ROOT / 'kdebug/crt_diag.c', ROOT / 'kdebug/kselftest.c', source,
+        for src in (ROOT / 'kdebug/crt_diag.c', ROOT / 'kdebug/kselftest.c',
+                    ROOT / 'kdebug/nic_trace.c', source,
                     folder / 'kdebug_import_slots.c', folder / 'kdebug_import_stubs.S'):
             obj = folder / (src.stem + '.o')
             command([cross / 'i386-elf-gcc', *FLAGS, *inc, '-c', src, '-o', obj])
@@ -98,7 +121,8 @@ def main():
             cases.append((f'failure-{fail}', 1, fail, state, image))
         for label, word, value, state in (
             ('header', 0, 0, 3), ('old-pair', 31, pair ^ 1, 4),
-            ('abi', 6, meta['module_abi_gen'] ^ 1, 6), ('crc', 32, 0, 9)):
+            ('abi', 6, meta['module_abi_gen'] ^ 1, 6), ('old-ops-v1', 33, 1, 6),
+            ('crc', 32, 0, 9)):
             bad = bytearray(image)
             struct.pack_into('<I', bad, word * 4, value)
             if word != 32:

@@ -27,6 +27,8 @@ T2d の完了範囲と T4/T5a へ残した DB/FEP 境界は [T2d〜h §7](TASK_T
 
 ### 2-1. バイト形式案
 
+kdebug 固有の現行契約は [TASK_DBGREF §3-2](TASK_DBGREF.md#3-2-部品の形式--t4-と同じ形式として-1-つのスキーマに確定-q3)。LB-1 で ops は**版 2、18 口**となり、旧版は ABI_MISMATCH で拒否する。
+
 little-endian u32 の明示的 decode を使い、C 構造体の cast/sizeof でファイルを読まない。ヘッダの項目順は実装開始時に一つのスキーマへ固定し、C/ASM/Python を生成・照合する。
 
 | 項目 | 意味と検査 |

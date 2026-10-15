@@ -13,6 +13,7 @@ int kselftest_run(void) { calls++; return 0; }
 int kselftest_run_post_exec(void) { calls++; return 0; }
 int kselftest_run_post_unicode(void) { calls++; return 0; }
 int kselftest_run_post_probe(void) { calls++; return 0; }
+void nic_trace(u32 stage) { (void)stage; calls++; }
 extern const struct kdebug_ops kdebug_ops;
 
 void _start(void)
@@ -26,7 +27,8 @@ void _start(void)
         candidate.crt_diag_bootlog != crt_diag_bootlog || !candidate.selftest_run ||
         !candidate.selftest_post_exec || !candidate.selftest_post_unicode ||
         !candidate.selftest_post_probe ||
-        candidate.gcap_release) rc = 1;
+        candidate.gcap_release || candidate.nic_selftest ||
+        candidate.nic_trace != nic_trace) rc = 1;
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     for (;;) { }
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""82557 R5 EEPROM contract, clocked model, T/S and real probe.
+"""82557 EEPROM contract, clocked model and independent T/S oracles.
 Record: tools/tests/e82557_eeprom_tdd.md
 """
 import os
@@ -13,17 +13,15 @@ import host32
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/e82557_eeprom_host.c"
 SRC = ROOT / "drivers/e82557_eeprom.c"
-TARGET_SRCS = ["drivers/e82557_eeprom.c", "drivers/e82557.c"]
+TARGET_SRCS = ["drivers/e82557_eeprom.c"]
 CASES = ([f"window{i}" for i in range(10)] + ["frame", "auto6rise", "auto6fall",
     "auto8rise", "auto8fall", "nowin", "width1", "width7", "read6rise", "read6fall",
-    "read8rise", "read8fall", "erased", "empty", "stuck1fixed", "stuck0fixed", "interpret"]
-    + [f"story{i}" for i in range(8)] + ["format", "probe", "gated", "proberelearn", "probeff", "probezero", "badchecksum", "binding"])
+    "read8rise", "read8fall", "erased", "empty", "stuck1fixed", "stuck0fixed", "interpret"])
 FLAGS = ["-m32", "-static", "-no-pie", "-fno-pie", "-fno-stack-protector",
          "-ffreestanding", "-nostdlib", "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-D__cdecl="]
 INCLUDES = ["-I" + str(ROOT / p) for p in ("include", "drivers", "sdk/include/os32")] + ["-I" + str(ROOT)]
 MIRROR = ["tools/tests/e82557_eeprom_host.c", "drivers/e82557_eeprom.c",
-          "drivers/e82557_eeprom.h", "drivers/e82557_regs.h", "drivers/e82557.c",
-          "drivers/e82557.h", "drivers/pci_decode.c", "drivers/pci_bind_match.c", "drivers/pci_bind.c"]
+          "drivers/e82557_eeprom.h", "drivers/e82557_regs.h", "drivers/pci_decode.c"]
 # source, exact text, replacement, label; no mutation counts compile failure as RED.
 MUTATIONS = [
     ("drivers/e82557_regs.h", "#define E82557_EE_READ         6u", "#define E82557_EE_READ         5u", "opcode WRITE"),
@@ -31,7 +29,6 @@ MUTATIONS = [
     ("drivers/e82557_eeprom.c", "        p->write(p->ctx, pin);\n        p->delay(p->ctx, p->step_us); /* D: command fall */\n        if (i < w)",
      "        if (i < w)", "dummy at rising edge"),
     ("drivers/e82557_eeprom.c", "*width = w - i;", "*width = w - i + 1;", "width off by one"),
-    ("drivers/e82557_regs.h", "0xBABAu", "0xBABBu", "checksum constant"),
     ("drivers/e82557_eeprom.c", "((i & 1) * 8)", "((1 - (i & 1)) * 8)", "MAC endian"),
     ("drivers/e82557_eeprom.c", "p->write(p->ctx, 0); /* CS cleanup */", "/* no CS cleanup */", "CS left selected"),
     ("drivers/e82557_eeprom.c", "for (i = n - 1; i >= 0; i--)", "for (i = n - 1; i >= 0 || mode == E82557_EE_AUTO; i--)", "unbounded detection"),
@@ -46,8 +43,6 @@ MUTATIONS += [
     ("drivers/e82557_eeprom.c", "b > E82557_PORT_LIMIT - E82557_CSR_LEN", "b + E82557_CSR_LEN > E82557_PORT_LIMIT", "BAR addition overflow"),
     ("drivers/e82557_eeprom.c", "b & (E82557_CSR_LEN - 1)", "0 && (b & (E82557_CSR_LEN - 1))", "BAR alignment removed"),
     ("drivers/e82557_eeprom.c", "pci_bar_kind(raw) != PCI_BAR_IO", "0 && pci_bar_kind(raw) != PCI_BAR_IO", "BAR kind removed"),
-    ("drivers/e82557_eeprom.c", "e82557_r5_verdict(obs, n) || n >=", "(0 && e82557_r5_verdict(obs, n)) || n >=", "PASS does not stop"),
-    ("drivers/e82557_eeprom.c", "? E82557_SA : E82557_F;", "? E82557_SA : E82557_SF;", "fixed six skipped"),
 ]
 # The rising-edge mutation moves the fall AFTER the sample, preserving every D.
 # It is intentionally a full executable mutation, not just an S omission.

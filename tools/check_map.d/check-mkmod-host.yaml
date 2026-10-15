@@ -1,4 +1,7 @@
 check-mkmod-host:
+- drivers/e82557.h
+- fs/vfs.h
+- kernel/module.h
 - build/checks.d/check-mkmod-host.mk
 - build/kdebug.mk
 - build/module.ld

@@ -971,4 +971,149 @@ kdi_kaudit_last_rc:
 kdi_kaudit_skipped:
     jmp *kdebug_import_slots+772
 .size kdi_kaudit_skipped, .-kdi_kaudit_skipped
+.globl console_hw_cursor_enable
+.type console_hw_cursor_enable, @function
+console_hw_cursor_enable:
+    jmp *kdebug_import_slots+776
+.size console_hw_cursor_enable, .-console_hw_cursor_enable
+.globl exec_ledger_owner
+.type exec_ledger_owner, @function
+exec_ledger_owner:
+    jmp *kdebug_import_slots+780
+.size exec_ledger_owner, .-exec_ledger_owner
+.globl gfx_get_height
+.type gfx_get_height, @function
+gfx_get_height:
+    jmp *kdebug_import_slots+784
+.size gfx_get_height, .-gfx_get_height
+.globl kfree
+.type kfree, @function
+kfree:
+    jmp *kdebug_import_slots+788
+.size kfree, .-kfree
+.globl kmalloc
+.type kmalloc, @function
+kmalloc:
+    jmp *kdebug_import_slots+792
+.size kmalloc, .-kmalloc
+.globl kzalloc
+.type kzalloc, @function
+kzalloc:
+    jmp *kdebug_import_slots+796
+.size kzalloc, .-kzalloc
+.globl pegc_restore_text_sync
+.type pegc_restore_text_sync, @function
+pegc_restore_text_sync:
+    jmp *kdebug_import_slots+800
+.size pegc_restore_text_sync, .-pegc_restore_text_sync
+.globl v86_cui_display_restore
+.type v86_cui_display_restore, @function
+v86_cui_display_restore:
+    jmp *kdebug_import_slots+804
+.size v86_cui_display_restore, .-v86_cui_display_restore
+.globl v86_gui_refuse
+.type v86_gui_refuse, @function
+v86_gui_refuse:
+    jmp *kdebug_import_slots+808
+.size v86_gui_refuse, .-v86_gui_refuse
+.globl v86_is_active
+.type v86_is_active, @function
+v86_is_active:
+    jmp *kdebug_import_slots+812
+.size v86_is_active, .-v86_is_active
+.globl v86_mem_setup
+.type v86_mem_setup, @function
+v86_mem_setup:
+    jmp *kdebug_import_slots+816
+.size v86_mem_setup, .-v86_mem_setup
+.globl v86_mem_teardown
+.type v86_mem_teardown, @function
+v86_mem_teardown:
+    jmp *kdebug_import_slots+820
+.size v86_mem_teardown, .-v86_mem_teardown
+.globl v86_pic_set_imr
+.type v86_pic_set_imr, @function
+v86_pic_set_imr:
+    jmp *kdebug_import_slots+824
+.size v86_pic_set_imr, .-v86_pic_set_imr
+.globl v86_run_limit
+.type v86_run_limit, @function
+v86_run_limit:
+    jmp *kdebug_import_slots+828
+.size v86_run_limit, .-v86_run_limit
+.globl kdi_get_v86_gp_cs
+.type kdi_get_v86_gp_cs, @function
+kdi_get_v86_gp_cs:
+    jmp *kdebug_import_slots+832
+.size kdi_get_v86_gp_cs, .-kdi_get_v86_gp_cs
+.globl kdi_get_v86_gp_ip
+.type kdi_get_v86_gp_ip, @function
+kdi_get_v86_gp_ip:
+    jmp *kdebug_import_slots+836
+.size kdi_get_v86_gp_ip, .-kdi_get_v86_gp_ip
+.globl kdi_ptr_v86_session
+.type kdi_ptr_v86_session, @function
+kdi_ptr_v86_session:
+    jmp *kdebug_import_slots+840
+.size kdi_ptr_v86_session, .-kdi_ptr_v86_session
+.globl e82557_send
+.type e82557_send, @function
+e82557_send:
+    jmp *kdebug_import_slots+844
+.size e82557_send, .-e82557_send
+.globl e82557_recv
+.type e82557_recv, @function
+e82557_recv:
+    jmp *kdebug_import_slots+848
+.size e82557_recv, .-e82557_recv
+.globl e82557_get_mac
+.type e82557_get_mac, @function
+e82557_get_mac:
+    jmp *kdebug_import_slots+852
+.size e82557_get_mac, .-e82557_get_mac
+.globl e82557_state
+.type e82557_state, @function
+e82557_state:
+    jmp *kdebug_import_slots+856
+.size e82557_state, .-e82557_state
+.globl e82557_loopback
+.type e82557_loopback, @function
+e82557_loopback:
+    jmp *kdebug_import_slots+860
+.size e82557_loopback, .-e82557_loopback
+.globl e82557_stat
+.type e82557_stat, @function
+e82557_stat:
+    jmp *kdebug_import_slots+864
+.size e82557_stat, .-e82557_stat
+.globl vfs_mkdir
+.type vfs_mkdir, @function
+vfs_mkdir:
+    jmp *kdebug_import_slots+868
+.size vfs_mkdir, .-vfs_mkdir
+.globl vfs_read
+.type vfs_read, @function
+vfs_read:
+    jmp *kdebug_import_slots+872
+.size vfs_read, .-vfs_read
+.globl vfs_write
+.type vfs_write, @function
+vfs_write:
+    jmp *kdebug_import_slots+876
+.size vfs_write, .-vfs_write
+.globl vfs_rm
+.type vfs_rm, @function
+vfs_rm:
+    jmp *kdebug_import_slots+880
+.size vfs_rm, .-vfs_rm
+.globl vfs_sync
+.type vfs_sync, @function
+vfs_sync:
+    jmp *kdebug_import_slots+884
+.size vfs_sync, .-vfs_sync
+.globl boot_image_info
+.type boot_image_info, @function
+boot_image_info:
+    jmp *kdebug_import_slots+888
+.size boot_image_info, .-boot_image_info
 .section .note.GNU-stack,"",@progbits
