@@ -473,6 +473,7 @@ void isr_unexpected_report(u32 irq)
 /*  tick_countのインクリメントはASMスタブで行う                             */
 /* ======================================================================== */
 extern void snd_tick(void);  /* kernel/snd_engine.c */
+#include "e82557.h"
 #include "ne2000.h"          /* ne2k_timer_tick: 予算超過の残り・OVW 復旧・送信タイムアウト */
 #include "lgy98.h"           /* lgy98_tick: 反射モード (M2 試験) */
 #include "pcm_cs4231.h"      /* pcm_tick: PCM の観測と補充 (IRQ は加速器) */
@@ -486,6 +487,7 @@ void timer_handler(void)
     snd_tick();
     pcm_tick();
     ne2k_timer_tick();
+    e82557_tick();
     /* リンク層はここでしか進まない (TASK_N0 §2a)。KAPI からは呼ばない。
      * 反射モード (LGY98_FLAG_REFLECT) では drivers/lgy98.c が link_init を
      * 呼ばないので、link_tick は何もせずに戻る = RX キューの消費者は

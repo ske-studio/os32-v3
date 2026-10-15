@@ -1,4 +1,4 @@
-/* Independent byte oracles for the LB2 descriptor contract. ILP32/qemu. */
+/* Independent byte oracles for the LB3 descriptor and RFD ring contract. ILP32/qemu. */
 #include "../../drivers/e82557_desc.c"
 STATIC_ASSERT(sizeof(u32) == 4, ilp32);
 static int failed;
@@ -87,15 +87,6 @@ int main(int argc, char **argv)
         int link,done,en;
         e82557_phy_decode(0x1000,0x24,&link,&done,&en); CHECK(link && done && en);
         e82557_phy_decode(0,0,&link,&done,&en); CHECK(!link && !done && !en);
-    } else if (which>=33 && which<=40) {
-        const u16 input[]={0x7100,0x3900,0x3500,0x7f00,0xff00,0x3100,0x0200,0x4e00};
-        const u16 expected[]={0x3100,0x3100,0x3100,0x3100,0xabcd,0xabcd,0xabcd,0};
-        const int action[]={1,1,1,1,2,0,0,1}; u16 out=0xabcd;
-        CHECK(e82557_bmcr_fix(input[which-33],&out)==action[which-33]);
-        CHECK(out==expected[which-33]);
-    } else if (which==41) {
-        CHECK(e82557_bmcr_fixed(0x3100));
-        CHECK(!e82557_bmcr_fixed(0x4000) && !e82557_bmcr_fixed(0x800) && !e82557_bmcr_fixed(0x400));
     } else if (which==42) {
         CHECK(e82557_link_wait_step(1,1,1,0,300)==E82557_DONE);
         CHECK(e82557_link_wait_step(1,0,0,0,300)==E82557_DONE);
@@ -104,23 +95,44 @@ int main(int argc, char **argv)
         CHECK(e82557_link_wait_step(0,1,1,299,300)==E82557_WAIT);
         CHECK(e82557_link_wait_step(0,1,1,300,300)==E82557_TIMEOUT);
         CHECK(e82557_link_wait_step(1,1,1,300,300)==E82557_DONE);
-    } else if (which==44) {
-        fill(cb,68,0); cb[60]=5; cb[61]=0xa0; CHECK(!e82557_stats_done(cb));
-        cb[64]=5; cb[65]=0xa0; CHECK(e82557_stats_done(cb));
-        cb[66]=1; CHECK(!e82557_stats_done(cb));
-    } else if (which==45) {
-        cb[4]=0x78; cb[5]=0x56; cb[6]=0x34; cb[7]=0x12;
-        CHECK(e82557_stats_read(cb,1)==0x12345678);
-    } else if (which==46) {
-        CHECK(e82557_stats_step(0,1,99,100)==E82557_WAIT);
-        CHECK(e82557_stats_step(0,1,100,100)==E82557_TIMEOUT);
-        CHECK(e82557_stats_step(1,1,100,100)==E82557_DONE);
-    } else if (which==47) {
-        CHECK(e82557_stats_step(1,1,0,100)==E82557_DONE); /* good1=0, #2 made one */
-        CHECK(e82557_stats_step(1,2,0,100)==E82557_WAIT);
-    } else if (which==48) {
-        CHECK(E82557_STAT_OFF==14032 && E82557_STAT_SIZE==68);
-        CHECK(E82557_STAT_OFF>=E82557_RFD_OFF+E82557_RFD_COUNT*E82557_RFD_STRIDE);
+    } else if (which>=50 && which<=62) {
+        u8 ring[8*1552]; struct e82557_rx rx; int rnr=0;
+        fill(ring,sizeof(ring),0xcc); e82557_rx_init(ring,0x2e8650,&rx);
+        CHECK(rx.cons==0 && rx.dev==0 && rx.ready==0);
+        for(u32 i=0;i<8;i++) {
+            u8 *r=ring+i*1552;
+            CHECK(e82557_rd16(r)==0 && e82557_rd16(r+12)==0);
+            CHECK(e82557_rd16(r+2)==(i==7?0x8000:0));
+            CHECK(e82557_rd32(r+4)==0x2e8650+((i+1)%8)*1552);
+            CHECK(e82557_rd32(r+8)==0xffffffffu && e82557_rd16(r+14)==1536);
+        }
+        if(which>=51 && which<=58) {
+            u32 n=(u32)which-50;
+            for(u32 i=0;i<n;i++) { e82557_wr16(ring+i*1552,0xa000); e82557_wr16(ring+i*1552+12,0xc03c); }
+            e82557_rx_scan(ring,&rx,&rnr); CHECK(rx.ready==n && rx.dev==n%8);
+            for(u32 i=0;i<n;i++) e82557_rfd_recycle(ring,&rx);
+            CHECK(rx.ready==0 && rx.cons==n%8 && rx.dev==n%8);
+            for(u32 i=0;i<8;i++) CHECK(e82557_rd16(ring+i*1552+2)==(i==(n+7)%8?0x8000:0));
+        }
+        if(which==59) {
+            for(u32 i=0;i<8;i++) e82557_wr16(ring+i*1552,0xa000);
+            e82557_rx_scan(ring,&rx,&rnr); CHECK(rx.ready==8 && rx.dev==rx.cons);
+            e82557_rx_reown(ring,&rx);
+            for(u32 i=0;i<8;i++) CHECK(e82557_rd16(ring+i*1552)==0xa000);
+        }
+        if(which==60) {
+            e82557_wr16(ring,0x8200); e82557_rx_scan(ring,&rx,&rnr); CHECK(rnr && rx.ready==1);
+        }
+        if(which==61) {
+            e82557_wr16(ring,0xa000); e82557_wr16(ring+12,0xc03c);
+            e82557_rx_scan(ring,&rx,&rnr); e82557_rx_reown(ring,&rx);
+            CHECK(e82557_rd16(ring)==0xa000 && e82557_rd16(ring+12)==0xc03c);
+        }
+        if(which==62) {
+            e82557_wr16(ring,0xa000); e82557_wr16(ring+12,0xc03c);
+            e82557_rx_scan(ring,&rx,&rnr); e82557_rfd_recycle(ring,&rx);
+            CHECK(e82557_rd16(ring)==0 && e82557_rd16(ring+12)==0);
+        }
     } else CHECK(0);
     return !!failed;
 }

@@ -55,6 +55,7 @@ static void __attribute__((unused)) host_raise_ud(void) {
 static void snd_tick(void) {}
 static void pcm_tick(void) {}
 static void ne2k_timer_tick(void) {}
+static void e82557_tick(void) {}
 static void link_tick(void) {}
 static void lgy98_tick(void) {}
 #include "timer_source.c"

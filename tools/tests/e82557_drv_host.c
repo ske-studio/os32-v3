@@ -1,4 +1,4 @@
-/* Real LB2 driver with persistent VFS and byte-accurate SCB model.
+/* Real LB3 driver with persistent VFS and byte-accurate SCB model.
  * Contract/T/S are separate oracles. Record: tools/tests/e82557_drv_tdd.md */
 /* Freestanding ILP32: this host has no 32-bit glibc. These helpers serve
  * the test oracle/log capture only; none are compiled into the kernel. */
@@ -105,80 +105,78 @@ static struct file files[2];
 static int cfg=1, fs_calls, mkdir_fail, read_fail, write_fail, short_write, sync_fail;
 static int corrupt_read, remove_fail, write_zero, bad_crc, irq_depth, trace_count;
 static int io_count, resets, mask_writes, ack_writes, commands, pointers, ee_calls;
-static int ee_mode, auto_calls;
+static int ee_mode, auto_calls, compat_reads;
 static int idle_fail, pre_busy, post_busy, busy_reads, operations;
 static int alloc_fail, bm_fail, stop_fail, cb_fail, cb_ng, cu_pre, cu_post;
 static int allocated, freed, leaked, bm_writes, starts, last_start_reset;
-static int rm_calls, completion_reads, published, acquired, saw_complete;
-static u32 event_seq, last_store, last_barrier, last_complete;
+static int rm_calls, completion_reads, registered, irq_fail, unregistered;
+static u32 event_seq, last_store, last_barrier, last_complete[9];
 static u32 cb_due, cb_delay=3000;
-static u16 pci_command = 0x0143;
-static u8 memory[16384];
-static u8 *active_cb;
-static u32 trace_bits;
-static u32 now, reset_at, cu_base=0x1000, ru_base=0x1000, pointer;
+static u16 pci_command=0x0143;
+static u8 memory[16384], *active_cb;
+static u32 trace_bits, now, reset_at, cu_base=0x1000, ru_base=0x1000, pointer;
 static u16 status=0xA000;
 static u8 command, mask;
 static char output[8192];
-/* LB2c independent device model: time, Clause 22 and delayed bus writes. */
 static u16 phy_regs[32][32];
 static int phyvendor=1, pcr_writes, pcr_reads, pcr_reserved, pcr_drop;
-static int vendor_reads[32], vendor_timeout, vendor_error;
-static int phyfix=1, mdi_timeout, mdi_reads, mdi_writes, mdi_total, bmsr_reads;
-static int reset_reads, reset_never, fix_ignore, link_tick, an_off, scan_none;
-static int latch_zero, max_counts;
-static int tx_delay, tx_never, tx_count, tx_good, lost_crs, collision;
-static u32 mdi_ctl, tx_due[2], stat_ptr, dump_due, dump_delay;
-static int tx_pending[2], dump_pending, dumps, loads, stat_pre, stat_post;
-static int stat_complete, stat_acquired, dump_timeout, late_dump, new_case;
-static u32 stat_store, stat_read_event, current_stage, clock_reads;
-static int cb_pre_pending;
+static int vendor_reads[32], vendor_timeout, pcr_timeout_first, pcr_timeout_write;
+static int mdi_timeout, mdi_reads, mdi_total, bmsr_reads, link_tick, an_off, latch_zero;
+static u32 mdi_ctl, current_stage, clock_reads;
+static int cb_pre_pending, loopback, lb_timeout, lb_corrupt, ru_starts, ru_fail;
+static int swi_lost, irq0_first, irq_deliveries, runtime, inject_rus, inject_reset;
+static int yield_mode, ack_repeat, status_reads, cb_completed;
+static u32 ru_pointer, model_ticks;
+static u8 rx_frame[1600];
+#include "../../kernel/irq.h"
+static irq_handler_fn handler;
+static void model_assert_ring(u32 pa);
+static void yield_event(void);
+static void model_rx(const u8 *frame, u32 len);
+static void deliver_irq(void);
+static void service_tick(void);
+static void check_pending(void);
+static u32 raw16(u32 off) { return memory[off] | ((u32)memory[off+1]<<8); }
+static u32 raw32(u32 off) { return raw16(off) | (raw16(off+2)<<16); }
+static void put16(u32 off,u16 v) { memory[off]=(u8)v; memory[off+1]=(u8)(v>>8); }
 static void model_time(void)
 {
-    for (int i=0;i<2;i++) if (tx_pending[i] && now>=tx_due[i]) {
-        tx_pending[i]=0;
-        if (link_tick<0 || (int)(now/10000)<link_tick) lost_crs++;
-        else if (!tx_never) tx_good++;
-    }
-    if (dump_pending && !dump_timeout && now>=dump_due) {
-        CHECK(!freed && !leaked);
-        u32 counts[6]={(u32)tx_good,collision?1u:0u,collision?2u:0u,0,(u32)lost_crs,0};
-        if (max_counts) for (int i=0;i<6;i++) counts[i]=0xffffffffu;
-        for (int i=0;i<6;i++) for (int j=0;j<4;j++) memory[14032+i*4+j]=(u8)(counts[i]>>(j*8));
-        memory[14096]=5; memory[14097]=0xa0; memory[14098]=memory[14099]=0;
-        dump_pending=0;
+    if (active_cb && !cb_completed && now>=cb_due && cb_fail!=starts) {
+        u32 off=(u32)(active_cb-memory);
+        put16(off,cb_ng==starts?0x8000:0xa000); cb_completed=1;
+        status|=0xA000;
+        if ((active_cb[2]&7)==4 && loopback && !lb_timeout) {
+            model_rx(active_cb+16,raw16(off+12)&0x3fff);
+            if (lb_corrupt) memory[1616+16]^=1;
+        }
     }
 }
 static u32 fake_ticks(void)
 {
-    CHECK(!irq_depth);
-    if (++clock_reads>100000) { fprintf(stderr,"FAIL unbounded tick wait\n"); exit(22); }
-    now+=100; model_time(); return now/10000;
+    if (++clock_reads>100000) exit(22);
+    if (!runtime) now+=100;
+    model_time(); return runtime?model_ticks:now/10000;
 }
 static u32 inpd(u16 port)
 {
     CHECK(port==0x6010 && !irq_depth && resets==2);
-    if (++mdi_total>20000) { fprintf(stderr,"FAIL unbounded MDI wait\n"); exit(23); }
+    if (++mdi_total>20000) exit(23);
     if (mdi_timeout || ++mdi_reads<3) return mdi_ctl;
-    unsigned int addr=(mdi_ctl>>21)&31, reg=(mdi_ctl>>16)&31, op=(mdi_ctl>>26)&3;
-    CHECK(reg<32);
+    u32 addr=(mdi_ctl>>21)&31,reg=(mdi_ctl>>16)&31,op=(mdi_ctl>>26)&3;
+    if ((pcr_timeout_first && reg==0x17 && !pcr_writes) ||
+        (pcr_timeout_write && reg==0x17 && op==1) ||
+        (vendor_timeout && vendor_timeout==(int)reg && (reg!=0x17 || pcr_writes))) return mdi_ctl;
     if (op==2 && reg>=0x12) {
         CHECK(phy_regs[addr][2]==0x2000 && (phy_regs[addr][3]&0xfff0)==0x5c00);
-        if (vendor_timeout==(int)reg && (reg!=0x17 || pcr_writes)) return mdi_ctl;
-        vendor_reads[reg]++;
-        if (reg==0x17) pcr_reads++;
+        vendor_reads[reg]++; if (reg==0x17) pcr_reads++;
     }
     u16 value=phy_regs[addr][reg];
-    if (reg==0x17 && pcr_writes) value=(value ^ (pcr_reserved?0x0500:0)) & ~(u16)pcr_drop;
-    if (op==2 && reg==0 && (value&0x8000) && !reset_never && ++reset_reads>=3)
-        value=phy_regs[addr][0]&=~0x8000;
+    if (reg==0x17 && pcr_writes) value=(value^(pcr_reserved?0x0500:0))&~(u16)pcr_drop;
     if (op==2 && reg==1) {
-        bmsr_reads++;
-        value=(latch_zero && (bmsr_reads&1))?0:0x7809;
-        if (link_tick>=0 && (int)(now/10000)>=link_tick && !(bmsr_reads&1))
-            value|=an_off?4:0x24;
+        bmsr_reads++; value=(latch_zero && (bmsr_reads&1))?0:0x7809;
+        if (link_tick>=0 && (int)(now/10000)>=link_tick && !(bmsr_reads&1)) value|=an_off?4:0x24;
     }
-    return (mdi_ctl&~0xffffu) | 0x10000000u | value;
+    return (mdi_ctl&~0xffffu)|0x10000000u|value;
 }
 static struct file *file_for(const char *path)
 {
@@ -188,7 +186,6 @@ static struct file *file_for(const char *path)
 }
 int sysconfig_get_int(const char *path, const char *key, int def)
 { (void)path; CHECK(def==1);
-  if (!strcmp(key,"E82557_PHYFIX")) return phyfix;
   if (!strcmp(key,"E82557_PHYVENDOR")) return phyvendor;
   CHECK(!fs_calls && !io_count); CHECK(!strcmp(key,"E82557")); return cfg; }
 int boot_image_info(void *out)
@@ -223,284 +220,476 @@ int vfs_rm(const char *path)
 static void kprintf(int attr, const char *fmt, ...)
 { va_list ap; size_t n=strlen(output); (void)attr; va_start(ap,fmt); vsnprintf(output+n,sizeof(output)-n,fmt,ap); va_end(ap); }
 #include "../../drivers/pci_bind_match.c"
-static u32 irq_save(void) { CHECK(!irq_depth); irq_depth++; return 0x200; }
-static void irq_restore(u32 flags) { CHECK(irq_depth==1 && flags==0x200); irq_depth--; }
-static void trace(u32 stage) { CHECK(!irq_depth); CHECK(stage!=0); trace_count++; current_stage=stage; trace_bits |= 1u << stage; }
+static u32 irq_save(void) { u32 f=irq_depth?0:0x200; irq_depth++; return f; }
+static void irq_restore(u32 flags) { CHECK(irq_depth>0); irq_depth--; CHECK(!!(flags&0x200)==!irq_depth); }
+static void trace(u32 stage)
+{ CHECK(!irq_depth && stage); trace_count++; current_stage=stage; trace_bits|=1u<<stage; }
 struct kdebug kdebug;
 static void guard_io(u16 port)
 {
-    if (++operations>25000) { fprintf(stderr,"FAIL unbounded SCB wait\n"); exit(21); }
+    if (++operations>25000) exit(21);
     io_count++; CHECK(port>=0x6000 && port<0x6020);
-    CHECK(files[0].verified && files[1].verified);
+    CHECK(files[1].verified && (runtime || files[0].verified));
     if (port!=0x6008) CHECK(resets>=2 && now-reset_at>=20);
 }
-static void cpu_delay_us(u32 us)
-{
-    now+=us; model_time();
-    if (active_cb && now >= cb_due && cb_fail != starts) {
-        active_cb[0]=0; active_cb[1]=(u8)(cb_ng == starts ? 0x80 : 0xa0);
-    }
-}
+static void cpu_delay_us(u32 us) { now+=us; model_time(); if (!irq_depth) deliver_irq(); }
 static u8 inp(u16 port)
 {
     guard_io(port); CHECK(port==0x6002);
-    if ((pre_busy && !commands) || (cu_pre && allocated && published && cb_pre_pending && !command && starts + 1 == cu_pre)) {
+    if ((pre_busy && !commands) || (cu_pre && cb_pre_pending && starts+1==cu_pre && !command)) {
         status=0x2040; return 1;
     }
-    if (!command && current_stage==E82557_TRACE_STAT &&
-        ((stat_pre==1 && !loads) || (stat_pre==2 && loads && starts>=3))) return 1;
-    if (command && !((stat_post==1 && command==0x40) || (stat_post==2 && command==0x50)) && !(post_busy && commands>=post_busy) &&
-        !(cu_post && starts==cu_post) && ++busy_reads>=3) {
+    if (command && !(post_busy && commands>=post_busy) &&
+        !(cu_post && starts==cu_post) && !(ru_fail && command==1 && ru_starts>=ru_fail) && ++busy_reads>=3) {
         if(command==0x60) cu_base=pointer;
         if(command==0x06) ru_base=pointer;
         command=0;
     }
-    if (command) status=0x2040;
+    if (command && command!=1) status=(status&0xff00)|0x40|(status&0x3c);
+    else if (!command) status&=~0xc0;
     return command;
 }
-static u16 inpw(u16 port) { guard_io(port); CHECK(port==0x6000); return status; }
-static void outp(u16 port, u8 value)
+static u16 inpw(u16 port)
+{
+    guard_io(port); CHECK(port==0x6000); status_reads++;
+    if (inject_rus) { inject_rus=0; model_rx(rx_frame,60); }
+    return status;
+}
+static void outp(u16 port,u8 value)
 {
     guard_io(port);
-    if(port==0x6001) { CHECK(value==(u8)(status>>8)); ack_writes++; status&=(u16)~((u16)value<<8); }
-    else if(port==0x6003) { mask=value; mask_writes++; CHECK(value==1); }
-    else { CHECK(port==0x6002 && irq_depth); CHECK(!command); CHECK(mask==1);
-        command=value; commands++; busy_reads=0; CHECK(value==0x60 || value==0x06 || value==0x10 || value==0x40 || value==0x50);
-        if (value==0x40) {
-            CHECK(starts==2 && !loads && pointer==0x2e8000u+14032);
-            stat_ptr=pointer; loads++;
-        } else if (value==0x50) {
-            CHECK(loads==1 && stat_ptr==0x2e8000u+14032 && !dump_pending);
-            CHECK(!memory[14096] && !memory[14097] && !memory[14098] && !memory[14099]);
-            CHECK(last_barrier>stat_store && stat_store>0);
-            dumps++; dump_pending=1; dump_due=now+dump_delay;
-            stat_complete=stat_acquired=0;
-            model_time();
+    if (port==0x6001) {
+        CHECK(value==(u8)(status>>8)); ack_writes++; status&=~((u16)value<<8);
+        if (ack_repeat) { status|=0x4000; ack_repeat--; }
+    } else if (port==0x6003) {
+        if (runtime && mask && value==0) CHECK(!(status&0xff00));
+        CHECK(value==0 || value==1 || value==2); mask=value&1; mask_writes++;
+        if (value&2) {
+            if (!swi_lost) status|=0x0400;
+            if (irq0_first) {
+                u16 old=status; int a=ack_writes;
+                service_tick(); CHECK(status==old && ack_writes==a);
+            }
+            deliver_irq();
+        }
+    } else {
+        CHECK(port==0x6002 && irq_depth && !command);
+        CHECK(value==0x60 || value==0x06 || value==0x10 || value==1);
+        if (value==0x60 || value==0x06) CHECK(mask==1);
+        command=value; commands++; busy_reads=0;
+        if (value==1) {
+            CHECK(allocated && (pci_command&4) && !ru_base && !cu_base);
+            CHECK((status&0x3c)!=0x10); model_assert_ring(pointer);
+            CHECK(last_barrier>last_store);
+            ru_starts++; ru_pointer=pointer; status=(status&~0x3c)|0x10;
+            last_start_reset=resets;
         }
         if (value==0x10) {
             cb_pre_pending=0;
-            CHECK(allocated && (pci_command & 4) && !cu_base && !ru_base);
-            CHECK(published && last_barrier > last_store); published=0;
-            if (starts) CHECK(saw_complete && acquired);
+            CHECK(allocated && (pci_command&4) && !cu_base && !ru_base);
+            CHECK(last_barrier>last_store);
             starts++; last_start_reset=resets;
-            CHECK(pointer==0x2e8000u+(starts>=3?64u:0u));
-            CHECK(pointer>=0x2e8000u && pointer<0x2e8000u+sizeof(memory));
-            active_cb=memory+pointer-0x2e8000u+cu_base;
-            CHECK(active_cb[0]==0 && active_cb[1]==0);
-            CHECK(active_cb[2]==(starts==1?2:starts==2?1:4));
-            CHECK(active_cb[3]==0x80); /* EL only, no S/I/flexible mode */
-            CHECK(active_cb[4]==0xff && active_cb[5]==0xff && active_cb[6]==0xff && active_cb[7]==0xff);
-            if (starts==1) {
-                CHECK(strstr(output,"[e82557] link="));
+            CHECK(pointer==0x2e8000u || pointer==0x2e8040u);
+            active_cb=memory+pointer-0x2e8000u;
+            CHECK(!raw16(pointer-0x2e8000u));
+            int cmd=active_cb[2]&7;
+            CHECK(cmd==1 || cmd==2 || cmd==4);
+            CHECK(active_cb[3]==(runtime?0xa0:0x80));
+            CHECK(raw32((u32)(active_cb-memory)+4)==0xffffffffu);
+            if (cmd==2) {
+                CHECK((status&0x3c)!=0x10);
+                CHECK(starts==1 || starts==4);
+                CHECK(strstr(output,"link="));
                 const u8 cfg_bytes[]={0x16,8,0,0,0,0x80,0x32,3,1,0,0x2e,0,0x60,0,0xf2,0x48,0,0x40,0xf2,0x80,0x3f,5};
-                CHECK(!memcmp(active_cb+8,cfg_bytes,22));
-            } else if (starts==2) {
-                const u8 mac[]={0,0,0x4c,7,0x21,0x0e};
-                CHECK(!memcmp(active_cb+8,mac,6));
+                for(int i=0;i<22;i++) CHECK(active_cb[8+i]==(i==10 && starts==1?0x6e:cfg_bytes[i]));
+                loopback=active_cb[18]==0x6e;
+            } else if (cmd==1) {
+                const u8 mac[]={0,0,0x4c,7,0x21,0xe};
+                CHECK(starts==2 || starts==5); CHECK(!memcmp(active_cb+8,mac,6));
             } else {
-                const u8 header[]={0xff,0xff,0xff,0xff,0xff,0xff,0,0,0x4c,7,0x21,0x0e,0x88,0xb5};
-                CHECK(active_cb[8]==0xff && active_cb[9]==0xff && active_cb[10]==0xff && active_cb[11]==0xff);
-                CHECK(active_cb[12]==60 && active_cb[13]==0x80 && active_cb[14]==0x10 && active_cb[15]==0);
-                CHECK(!memcmp(active_cb+16,header,14));
-                CHECK(!memcmp(active_cb+30,"OS32-LB-HELLO\0",14));
-                CHECK(loads==1);
-                CHECK(tx_count==0 && starts==3);
-                tx_pending[tx_count]=1; tx_due[tx_count]=now+cb_delay+(u32)tx_delay;
-                tx_count++;
-                CHECK(!memcmp(active_cb+44,header+6,6));
-                for (int j=50;j<76;j++) CHECK(active_cb[j]==0);
-            }
-            saw_complete=acquired=0;
-            cb_due=now+cb_delay; /* several initial CUS=Idle reads are not proof */
-            status=0;
-        } }
-}
-static __attribute__((unused)) void outpw(u16 port, u16 value)
-{
-    guard_io(port); CHECK(port==0x6000); CHECK(value==0xA000); ack_writes++; status&=(u16)~value;
-}
-static void outpd(u16 port, u32 value)
-{
-    guard_io(port);
-    if(port==0x6010) {
-        CHECK(!irq_depth && resets==2 && !(value&0xf0000000u));
-        unsigned int op=(value>>26)&3, addr=(value>>21)&31, reg=(value>>16)&31;
-        CHECK((op==1 || op==2) && reg<32);
-        mdi_ctl=value; mdi_reads=0;
-        if (op==1) {
-            CHECK(!starts);
-            if (reg==0x17) {
-                /* Literal oracle independent of production masks; illegal writes fatal. */
-                if (!phyvendor || phy_regs[addr][2]!=0x2000 ||
-                    (phy_regs[addr][3]&0xfff0)!=0x5c00 ||
-                    (u16)value!=(u16)(phy_regs[addr][reg]|0x0562)) {
-                    fprintf(stderr,"FAIL illegal PCR write\n"); exit(24);
+                CHECK(raw32(64+8)==0xffffffffu && (raw16(64+12)&0x8000));
+                if (!runtime) {
+                    CHECK(starts==3 && loopback && ru_starts==1);
+                    const u8 header[]={255,255,255,255,255,255,0,0,0x4c,7,0x21,0xe,0x88,0xb5};
+                    CHECK(raw16(64+12)==0x803c && raw16(64+14)==0x10);
+                    CHECK(!memcmp(active_cb+16,header,14));
+                    CHECK(!memcmp(active_cb+30,"OS32-LB-HELLO\0",14));
                 }
-                CHECK(strstr(output,"[e82557] fix=") && !strstr(output,"[e82557] link="));
-                CHECK(pcr_reads==1 && !pcr_writes);
-                pcr_writes++;
-                phy_regs[addr][reg]=(u16)value;
-            } else {
-                CHECK(phyfix && !(value&0x8200) && reg==0);
-                CHECK(!(phy_regs[addr][0]&0x8000)); mdi_writes++;
-                if (!fix_ignore) phy_regs[addr][0]=(u16)value;
             }
+            cb_due=now+cb_delay; cb_completed=0;
         }
     }
-    else if(port==0x6008) { CHECK(value==(resets?2u:0u)); if(resets) CHECK(now-reset_at>=20);
-        resets++; reset_at=now; mask=0;
-        status=(idle_fail || (resets>2 && (stop_fail==2 || (stop_fail==1 && resets==3)))) ? 0xA014 : 0xA000;
-        if(resets==1) cu_base=ru_base=0x1000;
-        if (resets>2 && !(status&0xfc)) dump_pending=0;
-        if (late_dump && dump_pending) { now=dump_due; model_time(); }
-        command=0; active_cb=NULL; }
-    else { CHECK(port==0x6004 && irq_depth); CHECK(!command && !pre_busy); pointer=value; pointers++; }
+    check_pending();
 }
-int e82557_ee_read_word(const struct e82557_ee_pins *p, int mode, int *width, u16 addr, u16 *word, int *dummy)
+static __attribute__((unused)) void outpw(u16 port,u16 value) { (void)port; (void)value; CHECK(0); }
+static void outpd(u16 port,u32 value)
+{
+    guard_io(port);
+    if (port==0x6010) {
+        CHECK(!irq_depth && resets==2 && !(value&0xf0000000u));
+        u32 op=(value>>26)&3,addr=(value>>21)&31,reg=(value>>16)&31;
+        CHECK(op==1 || op==2); mdi_ctl=value; mdi_reads=0;
+        if (op==1) {
+            CHECK(!starts && phyvendor && reg==0x17);
+            CHECK(phy_regs[addr][2]==0x2000 && (phy_regs[addr][3]&0xfff0)==0x5c00);
+            CHECK((u16)value==(u16)(phy_regs[addr][reg]|0x0562));
+            CHECK(pcr_reads==1 && !pcr_writes && !bmsr_reads);
+            pcr_writes++; phy_regs[addr][reg]=(u16)value;
+        }
+    } else if (port==0x6008) {
+        CHECK(value==(resets?2u:0u)); if (resets) CHECK(now-reset_at>=20);
+        if (inject_reset) { inject_reset=0; model_rx(rx_frame,60); }
+        resets++; reset_at=now; mask=0;
+        status=(idle_fail || (resets>2 && (stop_fail==2 || (stop_fail==1 && resets==3))))?0xA014:0xA000;
+        if (resets==1) cu_base=ru_base=0x1000;
+        command=0; active_cb=NULL;
+        /* PORT may post CNA but SCB cannot be accessed until reset delay ends. */
+    } else { CHECK(port==0x6004 && irq_depth && !command && !pre_busy); pointer=value; pointers++; }
+}
+int e82557_ee_read_word(const struct e82557_ee_pins *p,int mode,int *width,u16 addr,u16 *word,int *dummy)
 {
     static const u16 words[]={0,0x074c,0x0e21};
-    if (addr==6) { CHECK(mode==E82557_EE_FIXED && *width==6); *word=0x4a01; *dummy=0; return E82557_OK; }
     (void)p; CHECK(!irq_depth);
-    if (mode==E82557_EE_AUTO) {
-        CHECK(ee_mode && auto_calls==0); auto_calls++; *width=8;
-        return ee_mode==3 ? E82557_NOWIN : E82557_OK;
+    if(mode==E82557_EE_AUTO) { CHECK(ee_mode && !auto_calls); auto_calls++; *width=8; return ee_mode==3?E82557_NOWIN:E82557_OK; }
+    CHECK(mode==E82557_EE_FIXED && *width==(auto_calls?8:6));
+    if (addr==6 || addr==3) {
+        if (addr==3) compat_reads++;
+        *word=addr==6?0x4a01:0x1233; *dummy=0; return E82557_OK;
     }
-    CHECK(mode==E82557_EE_FIXED && *width==(auto_calls?8:6) && addr<3);
+    CHECK(addr<3);
     if(ee_mode && !auto_calls) { ee_calls++; *dummy=1; *word=0xffff; return E82557_OK; }
     if(ee_mode==2) { ee_calls++; *dummy=0; *word=0; return E82557_OK; }
-    CHECK(cu_base==0 && ru_base==0 && command==0); ee_calls++; *word=words[addr%3]; *dummy=0; return E82557_OK;
+    CHECK(!cu_base && !ru_base && !command); ee_calls++; *word=words[addr%3]; *dummy=0; return E82557_OK;
 }
 #include "../../include/config.h"
 #define kstrncmp strncmp
+#define kstrcmp strcmp
 #include "../../kernel/dma_pool.h"
-static void barrier_event(void)
-{
-    last_barrier=++event_seq; published=1;
-    if (stat_complete && last_barrier>stat_read_event) stat_acquired=1;
-    if (saw_complete) { CHECK(last_barrier>last_complete); acquired=1; }
-}
-static void desc_event(const volatile void *p, u32 n, int write)
-{
-    const volatile u8 *b=p;
-    event_seq++;
-    if (b < memory || b >= memory+sizeof(memory)) return;
-    CHECK(allocated && !freed && !leaked);
-    if (b>=memory+14032 && b<memory+14100) {
-        if (write) { CHECK(b>=memory+14096); stat_store=event_seq; stat_complete=stat_acquired=0; }
-        else if (b>=memory+14096) {
-            if (memory[14096]==5 && memory[14097]==0xa0) { stat_complete=1; stat_read_event=event_seq; }
-        } else CHECK(stat_complete && stat_acquired && last_barrier>stat_read_event);
-        return;
-    }
-    if (write) { cb_pre_pending=1; if (starts && saw_complete) CHECK(acquired); last_store=event_seq; published=0; }
-    else if (b==active_cb) {
-        completion_reads++;
-        if (b[1]&0x80) { last_complete=event_seq; saw_complete=1; }
-    } else {
-        CHECK(n==2 && saw_complete && acquired && last_barrier>last_complete);
-    }
-}
+static void desc_event(const volatile void *p,u32 n,int write);
+static void barrier_event(void) { last_barrier=++event_seq; }
 #define E82557_BARRIER() barrier_event()
-#define E82557_DESC_ACCESS(p, n, w) desc_event(p, n, w)
+#define E82557_DESC_ACCESS(p,n,w) desc_event(p,n,w)
+#define E82557_HOST_YIELD() yield_event()
 #include "../../drivers/e82557_desc.c"
-u32 pci_cfg_read32(u32 bus, u32 dev, u32 fn, u32 reg)
+u32 pci_cfg_read32(u32 bus,u32 dev,u32 fn,u32 reg)
 { CHECK(!bus && dev==11 && !fn && reg==4); return pci_command; }
-int pci_cfg_write16(u32 bus, u32 dev, u32 fn, u32 reg, u16 value)
+int pci_cfg_write16(u32 bus,u32 dev,u32 fn,u32 reg,u16 value)
 {
-    CHECK(!bus && dev==11 && !fn && reg==4);
-    CHECK((value&~4u)==(pci_command&~4u));
-    if (value&4) { CHECK(allocated && !starts); if(bm_fail) return -1; }
-    else CHECK(!starts || resets>last_start_reset);
+    CHECK(!bus && dev==11 && !fn && reg==4 && (value&~4u)==(pci_command&~4u));
+    if(value&4) { CHECK(allocated && registered && !starts); if(bm_fail) return -1; }
+    else CHECK(!starts || resets>last_start_reset || runtime);
     pci_command=value; bm_writes++; return 0;
 }
-int dma_alloc(u32 size, u32 align, u32 limit, struct dma_buf *out)
+int dma_alloc(u32 size,u32 align,u32 limit,struct dma_buf *out)
 {
     CHECK(!irq_depth && !allocated && !command && !cu_base && !ru_base);
     CHECK(size==16384 && align==16 && limit==0xffffffffu);
-    if (alloc_fail) return -4;
+    if(alloc_fail) return -4;
     allocated=1; memset(memory,0xcc,sizeof(memory));
-    memory[14096]=5; memory[14097]=0xa0; memory[14098]=memory[14099]=0;
     out->pa=0x2e8000; out->va=memory; out->size=size; return 0;
 }
 int dma_free(const struct dma_buf *b)
 {
-    CHECK(allocated && b->pa==0x2e8000 && b->va==memory && !freed && !leaked);
+    CHECK(allocated && b->pa==0x2e8000 && b->va==memory && !freed && !leaked && !registered);
     CHECK(resets>last_start_reset && resets>=3 && now-reset_at>=20 && !(status&0xfc));
-    CHECK(mask==1 && !(status&0xff00) && !dump_pending);
-    CHECK(pci_command==0x0143 || (pci_command==0x0147 && bm_writes==0));
-    freed++; return 0;
+    CHECK(mask==1 && !(status&0xff00));
+    CHECK(pci_command==0x0143 || (pci_command==0x0147 && !bm_writes)); freed++; return 0;
 }
 int dma_mark_leaked(const struct dma_buf *b)
-{
-    CHECK(allocated && b->pa==0x2e8000 && !freed && !leaked);
-    CHECK(resets==4 && mask==1 && !(status&0xff00) && !(pci_command&4));
-    leaked++; return 0;
-}
-static int kutoa_dec(u32 value, char *buf, u32 cap) { return snprintf(buf,cap,"%u",value); }
+{ CHECK(allocated && b->pa==0x2e8000 && !freed && !leaked && mask==1 && !(pci_command&4)); leaked++; return 0; }
+int irq_register(unsigned int irq,irq_handler_fn fn,void *arg,unsigned int flags)
+{ CHECK(!irq_depth && allocated && !bm_writes && irq==3 && !arg && flags==IRQ_F_SHARED); if(irq_fail) return -1; handler=fn; registered=1; return 0; }
+int irq_unregister(unsigned int irq,irq_handler_fn fn,void *arg)
+{ CHECK(!irq_depth && irq==3 && fn==handler && !arg && registered && !freed && resets>last_start_reset && mask==1); registered=0; unregistered++; return 0; }
+static int kutoa_dec(u32 value,char *buf,u32 cap) { return snprintf(buf,cap,"%u",value); }
 #define tick_count fake_ticks()
 #define E82557_HOST_TEST
 #include "../../drivers/e82557.c"
 #include "pci_table.h"
-static void seed(int idx, const char *data)
-{ struct file *f=&files[idx]; f->present=1; f->len=(int)strlen(data); memcpy(f->data,data,(size_t)f->len+1); }
-int main(int argc, char **argv)
+static void check_pending(void)
 {
-    struct pci_dev dev; const char *c=argc>1?argv[1]:"pass"; int rc, skip=0;
-    memset(&dev,0,sizeof(dev)); dev.vendor=0x8086; dev.device=0x1229;
+    if (!mask && registered && (status&0xff00)) CHECK(nic.state==E82557_RUNNING);
+}
+static void deliver_irq(void)
+{
+    if (!irq_depth && registered && !mask && (status&0xff00)) {
+        irq_depth++; irq_deliveries++; CHECK(handler(3, NULL)==IRQ_HANDLED); irq_depth--;
+    }
+}
+static void service_tick(void)
+{
+    int cmd=commands; u32 start=now;
+    irq_depth++; e82557_tick(); irq_depth--;
+    CHECK(commands-cmd<=1 && now-start<=300);
+}
+static void model_assert_ring(u32 pa)
+{
+    CHECK(nic.rx.ready<8);
+    CHECK(pa==0x2e8000u+1616+nic.rx.dev*1552);
+    CHECK(nic.rx.dev==(nic.rx.cons+nic.rx.ready)%8);
+    for(u32 n=0;n<8;n++) {
+        u32 i=(nic.rx.cons+n)%8, off=1616+i*1552;
+        CHECK(raw32(off+4)==0x2e8000u+1616+((i+1)%8)*1552);
+        CHECK(raw32(off+8)==0xffffffffu && raw16(off+14)==1536);
+        if(n<nic.rx.ready) CHECK(raw16(off)&0x8000);
+        else CHECK(!raw16(off) && !raw16(off+12));
+        /* Completed old EL can remain only while full, never when restarted. */
+        CHECK(raw16(off+2)==(n==7?0x8000u:0u));
+    }
+}
+static void model_rx(const u8 *frame,u32 len)
+{
+    CHECK((status&0x3c)==0x10 && !freed && !leaked);
+    CHECK(ru_pointer>=0x2e8000u+1616 && ru_pointer<0x2e8000u+14032);
+    u32 off=ru_pointer-0x2e8000u;
+    CHECK(!raw16(off) && !raw16(off+12));
+    u32 count=len>1536?1536:len;
+    memcpy(memory+off+16,frame,count);
+    put16(off+12,(u16)(0xc000|count));
+    put16(off,len>1536?0x8200:0xa000);
+    status|=0x4000;
+    if ((raw16(off+2)&0x8000) || len>1536) status=(status&~0x3c)|0x1008;
+    else ru_pointer=raw32(off+4);
+}
+static u32 zero_event[8], el_event, el_index;
+static void desc_event(const volatile void *p,u32 n,int write)
+{
+    const volatile u8 *b=p;
+    event_seq++;
+    if(b<memory || b>=memory+sizeof(memory)) return;
+    CHECK(allocated && !freed && !leaked);
+    u32 off=(u32)(b-memory);
+    if(off>=1616 && off<14032) {
+        u32 i=(off-1616)/1552, word=(off-1616)%1552;
+        if(write) {
+            last_store=event_seq;
+            if(word==12 && !raw16(off)) zero_event[i]=event_seq;
+            if(word==2 && (raw16(off)&0x8000)) {
+                CHECK(!raw16(1616+i*1552) && !raw16(1616+i*1552+12));
+                CHECK(zero_event[i] && last_barrier>zero_event[i]);
+                if(runtime && (nic.state==E82557_RUNNING || nic.state==E82557_RX_WAIT)) {
+                    if(nic.rx.ready==8) CHECK(el_event && el_index==(i+7)%8 && last_barrier>el_event);
+                    el_event=event_seq; el_index=i;
+                }
+            } else if(word==2 && !raw16(off) && runtime &&
+                      (nic.state==E82557_RUNNING || nic.state==E82557_RX_WAIT)) {
+                if(nic.rx.ready<8) CHECK(el_event && el_index==nic.rx.cons && last_barrier>el_event);
+                el_event=event_seq; el_index=i;
+            }
+        } else if(word==0) {
+            if(raw16(off)&0x8000) last_complete[i]=event_seq;
+        } else if(word==12 || word==16) {
+            CHECK(last_complete[i] && last_barrier>last_complete[i]);
+        }
+        return;
+    }
+    if(write) {
+        cb_pre_pending=1;
+        if(last_complete[8]) CHECK(last_barrier>last_complete[8]);
+        last_store=event_seq;
+    } else if(b==active_cb) {
+        completion_reads++;
+        if(b[1]&0x80) last_complete[8]=event_seq;
+    } else { (void)n; CHECK(last_complete[8] && last_barrier>last_complete[8]); }
+}
+static void yield_event(void)
+{
+    int mode=yield_mode; yield_mode=0;
+    if(!mode) return;
+    if(mode==1 || mode==2 || mode==3) {
+        CHECK(nic.tx==TX_RESERVED && nic.tx_issued==0);
+        CHECK(e82557_send(rx_frame,60)==OS32_ERR_AGAIN);
+        if(mode==2) { status&=~0x3c; ru_fail=ru_starts+1; }
+        service_tick();
+        CHECK(nic.tx==TX_RESERVED && nic.state==E82557_RUNNING);
+        if(mode==2) { CHECK(nic.recover_pending); ru_fail=0; command=0; }
+        if(mode==3) nic.gen++; /* fault injection, must prevent CU Start */
+    } else if(mode==4) {
+        u8 saved[60]; memcpy(saved,memory+1616+nic.rx.cons*1552+16,60);
+        recover_begin(); service_tick(); service_tick(); service_tick();
+        CHECK(!memcmp(saved,memory+1616+nic.rx.cons*1552+16,60));
+    }
+}
+static void seed(int idx,const char *data)
+{ struct file *f=&files[idx]; f->present=1; f->len=(int)strlen(data); memcpy(f->data,data,(size_t)f->len+1); }
+static void runtime_tests(const char *c)
+{
+    u8 buf[1600], mac[6]; u32 len;
+    runtime=1; model_ticks=100;
+    for(u32 i=0;i<sizeof(rx_frame);i++) rx_frame[i]=(u8)(i*7+3);
+    CHECK(e82557_state()==E82557_RUNNING && e82557_rx_free()==8);
+    e82557_get_mac(mac); const u8 expected[]={0,0,0x4c,7,0x21,0xe}; CHECK(!memcmp(mac,expected,6));
+    CHECK(e82557_loopback(1)==OS32_ERR_NOSYS && e82557_loopback(0)==OS32_ERR_NOSYS);
+    CHECK(e82557_stat(12)==0 && e82557_stat(0xffffffffu)==0);
+    (void)e82557_irq(0, NULL); nic.rnr_pending=0;
+    if(!strncmp(c,"rx",2)) {
+        if(!strcmp(c,"rx_empty")) {
+            CHECK(e82557_recv(buf,sizeof(buf),&len)==OS32_ERR_AGAIN && !len);
+        } else if(!strncmp(c,"rx_wrap",7)) {
+            int count=atoi(c+7);
+            for(int round=0;round<3;round++) {
+                for(int n=0;n<count;n++) model_rx(rx_frame,60);
+                for(int n=0;n<count;n++) {
+                    CHECK(e82557_recv(buf,sizeof(buf),&len)==0 && len==60 && !memcmp(buf,rx_frame,60));
+                    service_tick();
+                }
+            }
+            CHECK(nic.stats[7]==(u32)(3*count) && e82557_rx_free()==8);
+        } else if(!strcmp(c,"rx_full")) {
+            for(int n=0;n<8;n++) model_rx(rx_frame,60);
+            service_tick(); CHECK(nic.rx.ready==8 && nic.rx.dev==nic.rx.cons && ru_starts==2);
+            CHECK(e82557_recv(buf,59,&len)==OS32_ERR_NOSPC && nic.rx.ready==8);
+            CHECK(e82557_recv(buf,sizeof(buf),&len)==0 && nic.rx.ready==7);
+            service_tick(); CHECK(ru_starts==3);
+            model_rx(rx_frame,60); CHECK((status&0x3c)==8);
+            service_tick(); CHECK(nic.rx.ready==8 && ru_starts==3);
+        } else if(!strcmp(c,"rx_p1")) {
+            for(int n=0;n<7;n++) model_rx(rx_frame,60);
+            rx_scan(); CHECK(nic.rx.ready==7); inject_rus=1;
+            service_tick(); CHECK(nic.rx.ready==8 && ru_starts==2);
+        } else if(!strcmp(c,"rx_ready")) {
+            nic.rnr_pending=1; service_tick(); CHECK(!nic.rnr_pending && ru_starts==2);
+        } else if(!strcmp(c,"rx_idle")) {
+            status=0; service_tick(); CHECK(ru_starts==3 && !nic.rnr_pending);
+        } else if(!strcmp(c,"rx_copy_tick")) {
+            model_rx(rx_frame,60); yield_mode=4;
+            CHECK(e82557_recv(buf,sizeof(buf),&len)==0 && len==60 && !memcmp(buf,rx_frame,60));
+            CHECK(nic.state==E82557_RUNNING && nic.rx.ready==0);
+        } else {
+            u32 length=!strcmp(c,"rx_short")?13:!strcmp(c,"rx_long")?1519:!strcmp(c,"rx_overrun")?1600:60;
+            u32 off=ru_pointer-0x2e8000u;
+            model_rx(rx_frame,length);
+            if(!strcmp(c,"rx_bad")) put16(off,0x8000);
+            rx_scan();
+            if(length>1536) { CHECK(nic.rnr_pending); status&=~0xff00; }
+            CHECK(e82557_recv(buf,sizeof(buf),&len)==OS32_ERR_AGAIN && !len);
+            CHECK(nic.stats[8]==1 && nic.rx.ready==0);
+        }
+    } else if(!strncmp(c,"irq_",4)) {
+        for(int i=0;i<5;i++) nic.stats[i]=0;
+        nic.rnr_pending=0;
+        u16 event=0;
+        if(!strcmp(c,"irq_cx")) event=0x8000;
+        if(!strcmp(c,"irq_cna")) event=0x2000;
+        if(!strcmp(c,"irq_fr")) event=0x4000;
+        if(!strcmp(c,"irq_rnr")) event=0x1000;
+        if(!strcmp(c,"irq_swi")) event=0x0400;
+        if(!strcmp(c,"irq_mdi")) event=0x0800;
+        if(!strcmp(c,"irq_all")) event=0xfc00;
+        if(!strcmp(c,"irq_dead")) event=0xff00;
+        if(!strcmp(c,"irq_again")) { event=0x8000; ack_repeat=1; }
+        if(!strcmp(c,"irq_limit")) { event=0x8000; ack_repeat=2; }
+        if(!strcmp(c,"irq_starting")) { event=0xfc00; nic.state=E82557_STARTING; }
+        if(!strcmp(c,"irq_stopping")) { event=0xfc00; nic.state=E82557_STOPPING; }
+        if(!strcmp(c,"irq_recover")) { event=0xfc00; nic.state=E82557_RECOVER; }
+        if(!strcmp(c,"irq_failed")) { event=0xfc00; nic.state=E82557_FAILED; }
+        status=event; int before=io_count,a=ack_writes,r=status_reads;
+        irq_depth++; int rc=e82557_irq(0, NULL); irq_depth--;
+        if(nic.state==E82557_STARTING || nic.state==E82557_STOPPING) { service_tick(); CHECK(rc==IRQ_NONE && io_count==before); }
+        else if(event==0xff00) { CHECK(rc==IRQ_NONE && nic.stats[4]==1 && ack_writes==a); CHECK(!nic.stats[0]&&!nic.stats[1]&&!nic.stats[2]&&!nic.stats[3]); }
+        else {
+            CHECK(rc==(event?IRQ_HANDLED:IRQ_NONE));
+            CHECK(status_reads-r<=2);
+            CHECK(nic.stats[0]==!!(event&0xa000)); CHECK(nic.stats[2]==!!(event&0x1000));
+            CHECK(nic.stats[3]==!!(event&0x400)); CHECK(nic.stats[4]==!!(event&0x800));
+            if(!strcmp(c,"irq_again") || !strcmp(c,"irq_limit")) CHECK(nic.stats[1]==1 && ack_writes-a==2);
+            else CHECK(nic.stats[1]==!!(event&0x4000));
+            if(!strcmp(c,"irq_limit")) CHECK(status==0x4000); else CHECK(!status);
+            CHECK(nic.rnr_pending==(nic.state==E82557_RUNNING && !!(event&0x1000)));
+        }
+    } else if(!strncmp(c,"tx_",3) || !strncmp(c,"recover_",8)) {
+        if(!strcmp(c,"tx_reserved")) yield_mode=1;
+        if(!strcmp(c,"tx_pending")) yield_mode=2;
+        if(!strcmp(c,"tx_generation")) yield_mode=3;
+        int initial=starts;
+        if(!strcmp(c,"tx_pre")) cu_pre=starts+1;
+        if(!strcmp(c,"tx_post")) cu_post=starts+1;
+        int rc=e82557_send(rx_frame,60);
+        if(cu_pre || cu_post) {
+            CHECK(rc==OS32_ERR_AGAIN && nic.recover_pending && nic.tx==TX_IDLE);
+            CHECK(e82557_send(rx_frame,60)==OS32_ERR_AGAIN);
+            service_tick(); CHECK(nic.state==E82557_RECOVER && !nic.recover_pending);
+            return;
+        }
+        if(!strcmp(c,"tx_generation")) { CHECK(rc==OS32_ERR_AGAIN && starts==initial); return; }
+        CHECK(rc==0 && nic.tx==TX_ISSUED && starts==initial+1);
+        if(!strcmp(c,"tx_done") || !strcmp(c,"tx_bad") || !strcmp(c,"tx_reserved")) {
+            put16(64,!strcmp(c,"tx_bad")?0x8000:0xa000); service_tick();
+            CHECK(nic.tx==TX_IDLE && nic.state==E82557_RUNNING);
+            CHECK(nic.stats[5]==(strcmp(c,"tx_bad")!=0) && nic.stats[6]==!strcmp(c,"tx_bad"));
+            CHECK(!nic.stats[9]); yield_mode=1;
+            CHECK(e82557_send(rx_frame,60)==0 && nic.tx==TX_ISSUED);
+        } else if(!strcmp(c,"tx_pending")) {
+            service_tick(); CHECK(nic.state==E82557_RECOVER && !nic.recover_pending);
+        } else {
+            cb_fail=starts;
+            if(!strcmp(c,"recover_full")) for(int n=0;n<8;n++) model_rx(rx_frame,60);
+            if(!strcmp(c,"recover_final")) inject_reset=1;
+            model_ticks=150; service_tick(); CHECK(nic.state==E82557_RUNNING);
+            model_ticks=151; service_tick(); CHECK(nic.state==E82557_RECOVER && nic.recover_step==1);
+            CHECK(e82557_send(rx_frame,60)==OS32_ERR_AGAIN && e82557_recv(buf,sizeof(buf),&len)==OS32_ERR_AGAIN);
+            if(!strcmp(c,"recover_stopfail")) stop_fail=2;
+            if(!strcmp(c,"recover_r3fail")) ru_fail=ru_starts+1;
+            service_tick();
+            if(stop_fail==2) { CHECK(nic.state==E82557_RECOVER); service_tick(); CHECK(nic.state==E82557_FAILED && leaked==1); CHECK(e82557_recv(buf,sizeof(buf),&len)==OS32_ERR_NOSYS); return; }
+            CHECK(nic.recover_step==2);
+            if(!strcmp(c,"recover_final")) CHECK(nic.rx.ready==1 && (raw16(1616+1552)&0x8000));
+            service_tick(); CHECK(nic.recover_step==3 && nic.tx==TX_IDLE && nic.stats[6]==1);
+            status|=0xa000; /* Pending before R3 must be drained before M=0. */
+            service_tick();
+            if(!strcmp(c,"recover_full")) {
+                CHECK(nic.state==E82557_RX_WAIT && nic.rx.ready==8);
+                CHECK(e82557_send(rx_frame,60)==OS32_ERR_AGAIN);
+                CHECK(e82557_recv(buf,sizeof(buf),&len)==0 && len==60 && nic.rx.ready==7);
+                service_tick(); CHECK(nic.state==E82557_RUNNING && nic.stats[10]==1);
+            } else if(ru_fail) {
+                for(int i=0;i<10 && nic.state!=E82557_FAILED;i++) service_tick();
+                CHECK(nic.state==E82557_FAILED && leaked==1 && nic.stop.reset_seq-nic.reset_begin==3);
+            } else CHECK(nic.state==E82557_RUNNING && nic.stats[10]==1);
+        }
+    } else if(!strcmp(c,"ru_timeout")) {
+        status=0; ru_fail=ru_starts+1; service_tick();
+        CHECK(nic.state==E82557_RECOVER && nic.stats[11]);
+    } else if(!strcmp(c,"recovery_limit")) {
+        for(int i=0;i<11;i++) {
+            recover_begin();
+            if(i<10) { service_tick(); service_tick(); service_tick(); CHECK(nic.state==E82557_RUNNING); }
+        }
+        CHECK(nic.state==E82557_FAILED && nic.stats[9]==11 && leaked==1);
+    } else if(!strcmp(c,"api_invalid")) {
+        CHECK(e82557_send(NULL,60)==OS32_ERR_INVAL && e82557_send(buf,13)==OS32_ERR_INVAL && e82557_send(buf,1519)==OS32_ERR_INVAL);
+        CHECK(e82557_recv(NULL,60,&len)==OS32_ERR_INVAL && e82557_recv(buf,60,NULL)==OS32_ERR_INVAL);
+    }
+}
+int main(int argc,char **argv)
+{
+    const char *c=argc>1?argv[1]:"pass"; int rc,skip=0;
+    struct pci_dev dev={0}; dev.vendor=0x8086; dev.device=0x1229;
     dev.class=PCI_CLASS_NETWORK; dev.subclass=PCI_SUB_NET_ETHERNET;
     dev.dev=11; dev.bar[1]=0x6001; dev.command=1; dev.irq_line=3;
     kdebug.ops.nic_trace=trace;
     memset(phy_regs,0xff,sizeof(phy_regs));
-    const u16 defaults[]={0x3000,0x782d,0x2000,0x5c01,0x01e1,0x45e1};
+    const u16 defaults[]={0x3000,0x782d,0x2000,0x5c01};
     memcpy(phy_regs[1],defaults,sizeof(defaults));
-    phy_regs[1][0x17]=0x9014; /* Preserve TXOFF, repeater, NRZI and LED1. */
-    phy_regs[1][0x19]=0x0081; phy_regs[1][0x16]=1;
-    phy_regs[1][0x12]=3; phy_regs[1][0x13]=5; phy_regs[1][0x15]=7;
-    new_case=!strncmp(c,"phy_",4) || !strncmp(c,"stat_",5) || !strncmp(c,"nsc_",4);
-    if (!strcmp(c,"nsc_rev")) phy_regs[1][3]=0x5c0f;
-    if (!strcmp(c,"nsc_id1")) phy_regs[1][2]=0x2001;
-    if (!strcmp(c,"nsc_id2")) phy_regs[1][3]=0x5c11;
-    if (!strcmp(c,"nsc_other")) { phy_regs[1][2]=0x02a8; phy_regs[1][3]=0x0154; }
-    if (!strcmp(c,"nsc_same")) phy_regs[1][0x17]|=0x0562;
-    if (!strcmp(c,"nsc_off")) phyvendor=0;
-    if (!strcmp(c,"nsc_reserved")) pcr_reserved=1;
-    if (!strcmp(c,"nsc_drop1")) pcr_drop=0x0002;
-    if (!strcmp(c,"nsc_drop5")) pcr_drop=0x0020;
-    if (!strcmp(c,"nsc_drop6")) pcr_drop=0x0040;
-    if (!strcmp(c,"nsc_timeout_pcr")) vendor_timeout=0x17;
-    if (!strcmp(c,"nsc_timeout_par")) vendor_timeout=0x19;
-    if (!strcmp(c,"nsc_timeout_srr")) vendor_timeout=0x16;
-    if (!strcmp(c,"nsc_timeout_dcr")) vendor_timeout=0x12;
-    if (!strcmp(c,"nsc_timeout_fcscr")) vendor_timeout=0x13;
-    if (!strcmp(c,"nsc_timeout_recr")) vendor_timeout=0x15;
-    vendor_error=vendor_timeout!=0;
-    if (!strcmp(c,"phy_latch")) latch_zero=1;
-    if (!strcmp(c,"stat_max")) max_counts=1;
-    if (!strcmp(c,"phy_late")) link_tick=50;
-    if (!strcmp(c,"phy_down")) link_tick=-1;
-    if (!strcmp(c,"phy_off")) { an_off=1; phy_regs[1][0]=0x2100; }
-    if (!strcmp(c,"phy_fix14")) phy_regs[1][0]=0x7100;
-    if (!strcmp(c,"phy_fix11")) phy_regs[1][0]=0x3900;
-    if (!strcmp(c,"phy_fix10")) phy_regs[1][0]=0x3500;
-    if (!strcmp(c,"phy_fixall") || !strcmp(c,"phy_kill") || !strcmp(c,"phy_ng")) phy_regs[1][0]=0x7f00;
-    if (!strcmp(c,"phy_reset") || !strcmp(c,"phy_reset_busy")) phy_regs[1][0]=0xff00;
-    if (!strcmp(c,"phy_reset_busy")) reset_never=1;
-    if (!strcmp(c,"phy_ng")) fix_ignore=1;
-    if (!strcmp(c,"phy_kill")) phyfix=0;
-    if (!strcmp(c,"phy_scan")) { memcpy(phy_regs[0],phy_regs[1],sizeof(phy_regs[0])); phy_regs[1][2]=0xffff; }
-    if (!strcmp(c,"phy_none")) { memset(phy_regs,0xff,sizeof(phy_regs)); scan_none=1; }
-    if (!strcmp(c,"phy_timeout")) mdi_timeout=1;
-    if (!strcmp(c,"stat_delay")) tx_delay=30000;
-    if (!strcmp(c,"stat_never")) tx_never=1;
-    if (!strcmp(c,"stat_dump_delay")) { dump_delay=15000; tx_never=1; }
-    if (!strcmp(c,"stat_collision")) collision=1;
-    if (!strcmp(c,"stat_timeout")) dump_timeout=1;
-    if (!strcmp(c,"stat_late") || !strcmp(c,"stat_quarantine")) { dump_delay=25000; late_dump=1; }
-    if (!strcmp(c,"stat_quarantine")) stop_fail=2;
-    if (!strcmp(c,"stat_load_pre")) stat_pre=1;
-    if (!strcmp(c,"stat_load_post")) stat_post=1;
-    if (!strcmp(c,"stat_dump_pre")) stat_pre=2;
-    if (!strcmp(c,"stat_dump_post")) stat_post=2;
+    phy_regs[1][0x17]=0x9014; phy_regs[1][0x19]=0x81;
+    e82557_tick(); CHECK(!io_count); /* NP21/W: no probe, no I/O */
+    if(!strcmp(c,"nsc_rev")) phy_regs[1][3]=0x5c0f;
+    if(!strcmp(c,"nsc_id1")) phy_regs[1][2]=0x2001;
+    if(!strcmp(c,"nsc_id2")) phy_regs[1][3]=0x5c11;
+    if(!strcmp(c,"nsc_same")) phy_regs[1][0x17]|=0x0562;
+    if(!strcmp(c,"nsc_off")) phyvendor=0;
+    if(!strcmp(c,"nsc_reserved")) pcr_reserved=1;
+    if(!strncmp(c,"nsc_drop",8)) pcr_drop=1<<atoi(c+8);
+    if(!strcmp(c,"nsc_timeout_pcr")) vendor_timeout=0x17;
+    if(!strcmp(c,"nsc_timeout_par")) vendor_timeout=0x19;
+    if(!strcmp(c,"nsc_timeout_read")) pcr_timeout_first=1;
+    if(!strcmp(c,"nsc_timeout_write")) pcr_timeout_write=1;
+    if(!strcmp(c,"phy_latch")) latch_zero=1;
+    if(!strcmp(c,"phy_late")) link_tick=50;
+    if(!strcmp(c,"phy_down")) link_tick=-1;
+    if(!strcmp(c,"phy_off")) { an_off=1; phy_regs[1][0]=0x2100; }
+    if(!strcmp(c,"phy_none")) phy_regs[1][2]=0xffff;
+    if(!strcmp(c,"phy_timeout")) mdi_timeout=1;
     if(!strcmp(c,"kill")) { cfg=0; skip=1; }
     else if(!strcmp(c,"mkdir")) { mkdir_fail=1; skip=1; }
     else if(!strcmp(c,"same")) { seed(0,"1234abcd 7\n"); skip=1; }
@@ -537,149 +726,99 @@ int main(int argc, char **argv)
         const char *bad[]={"", "1", "-1\n", "4294967296\n", "1\nx", "1\n\n", "4294967295\n"};
         seed(1,bad[atoi(c+7)]); skip=1;
     }
+
     if(!strcmp(c,"dma_fail")) alloc_fail=1;
     if(!strcmp(c,"bm_fail")) bm_fail=1;
     if(!strcmp(c,"bm_present") || !strcmp(c,"bm_present_ng")) pci_command=0x0147;
     if(!strcmp(c,"bm_present_ng")) cb_ng=1;
     if(!strcmp(c,"cb_edge")) cb_delay=20000;
-    if(!strcmp(c,"cb_late")) { cb_delay=21000; cb_fail=1; }
+    if(!strcmp(c,"cb_late")) cb_delay=21000;
     if(!strcmp(c,"stop_retry")) stop_fail=1;
-    if(!strcmp(c,"stop_fail") || !strcmp(c,"stop_bm_present")) stop_fail=2;
-    if(!strcmp(c,"stop_bm_present")) pci_command=0x0147;
+    if(!strcmp(c,"stop_fail")) stop_fail=2;
+    if(!strcmp(c,"probe_irq_fail")) irq_fail=1;
     if(!strncmp(c,"cb_timeout",10)) cb_fail=atoi(c+10);
     if(!strncmp(c,"cb_ng",5)) cb_ng=atoi(c+5);
     if(!strncmp(c,"cu_pre",6)) cu_pre=atoi(c+6);
     if(!strncmp(c,"cu_post",7)) cu_post=atoi(c+7);
+    if(!strcmp(c,"probe_ring_fail")) ru_fail=1;
+    if(!strcmp(c,"probe_ru_fail")) ru_fail=2;
+    if(!strcmp(c,"lb_timeout")) lb_timeout=1;
+    if(!strcmp(c,"lb_corrupt")) lb_corrupt=1;
+    if(!strcmp(c,"swi_lost")) swi_lost=1;
+    if(!strcmp(c,"swi_irq0")) irq0_first=1;
+    u16 initial_command=pci_command;
+    int expect_fail=skip || idle_fail || pre_busy || post_busy || ee_mode>=2 || alloc_fail || bm_fail ||
+        cb_fail || cb_ng || cu_pre || cu_post || cb_delay>20000 || stop_fail==2 || irq_fail || ru_fail ||
+        lb_timeout || lb_corrupt || mdi_timeout || vendor_timeout || pcr_timeout_first || pcr_timeout_write ||
+        !strcmp(c,"phy_none");
     if(!strcmp(c,"table")) {
         struct pci_bind_info info;
-        rc=pci_bind_one(pci_drivers, PCI_DRIVER_COUNT, &dev, &info);
-        CHECK(info.result==PCI_BIND_DECLINED && info.reason==PCI_BIND_DECLINED_UNSPECIFIED);
-        CHECK(io_count && starts==3);
+        rc=pci_bind_one(pci_drivers,PCI_DRIVER_COUNT,&dev,&info);
+        CHECK(info.result==PCI_BIND_BOUND && info.reason==PCI_BIND_OK);
     } else rc=e82557_driver.probe(&dev);
     CHECK(!irq_depth);
-    CHECK(rc==((idle_fail || stop_fail==2)?PCI_PROBE_QUARANTINE:PCI_PROBE_DECLINE));
-    if(skip) { CHECK(!io_count && !ee_calls); CHECK(!strstr(output,"LB2c=PASS")); }
+    CHECK(rc==(idle_fail || stop_fail==2?PCI_PROBE_QUARANTINE:expect_fail?PCI_PROBE_DECLINE:PCI_PROBE_OK));
+    if(skip) { CHECK(!io_count && !ee_calls && !strstr(output,"LB3=PASS")); }
     else {
-        CHECK(resets==(allocated ? (stop_fail ? 4 : 3) : 2));
-        CHECK(mask==1);
-        CHECK(mask_writes==(allocated?2:1) && ack_writes==(allocated?2:1));
-        CHECK(now>=40 && now<4000000);
-        if(idle_fail) { CHECK(pci_bind_reason_get()==PCI_BIND_RESET_FAILED); CHECK(!commands && !ee_calls); }
-        else if(pre_busy) { CHECK(!pointers && !commands && !ee_calls); CHECK(strstr(output,"base=timeout scb=2040")); CHECK(now==140); }
-        else if(post_busy) { CHECK(pointers==post_busy && commands==post_busy && !ee_calls); CHECK(strstr(output,"base=timeout scb=2040")); CHECK(now==(post_busy==1?140u:160u)); }
-        else if(ee_mode>=2) {
-            CHECK(auto_calls==1 && ee_calls==(ee_mode==2?4:1));
-            CHECK(strstr(output,"LB2c=FAIL(ee:mac)")); CHECK(!files[0].present);
-        } else {
-            CHECK(cu_base==0 && ru_base==0 && !command); CHECK(ee_calls==(ee_mode?4:3));
-            if (alloc_fail || bm_fail || cb_fail || cb_ng || cu_pre || cu_post || stop_fail==2 || mdi_timeout || vendor_error || scan_none || dump_timeout || late_dump || (dump_delay && tx_never) || stat_pre || stat_post)
-                CHECK(strstr(output,"LB2c=FAIL") && !strstr(output,"LB2c=PASS"));
-            else CHECK(strstr(output,"LB2c=PASS") && strstr(output,"cfg=ok ia=ok tx=ok(60) stop=ok"));
-            if (alloc_fail) CHECK(!allocated && !starts && !bm_writes && strstr(output,"FAIL(dma:alloc)"));
-            else {
-                CHECK(allocated && (stop_fail==2 ? leaked==1 && !freed : freed==1 && !leaked));
-                CHECK(bm_writes==(!strcmp(c,"bm_present") || !strcmp(c,"bm_present_ng") || bm_fail ? 0 : !strcmp(c,"stop_bm_present") ? 1 : 2));
-                if (bm_fail) CHECK(!starts && strstr(output,"FAIL(dma:bm)"));
-                else {
-                    int fail_at=cb_fail?cb_fail:cb_ng?cb_ng:cu_pre?cu_pre:cu_post?cu_post:3;
-                    if (!new_case) CHECK(starts==fail_at-(cu_pre?1:0));
-                    CHECK(commands==2+starts+loads+dumps && pointers==2+starts+loads);
-                    if (cb_fail) CHECK(strstr(output,":timeout)") && completion_reads>=21);
-                    if (cb_ng) CHECK(strstr(output,":ng)"));
-                    if (cu_pre) CHECK(strstr(output,":pre)"));
-                    if (cu_post) CHECK(strstr(output,":post)"));
-                    if (stop_fail==2) CHECK(strstr(output,"FAIL(stop:idle)") && strstr(output,"QUARANTINE"));
-                }
+        u32 limit=70000;
+        if(!strcmp(c,"phy_down")) limit=3100000;
+        if(!strcmp(c,"phy_late")) limit=600000;
+        if(!strcmp(c,"cb_edge")) limit=110000;
+        if(!strcmp(c,"lb_timeout")) limit=80000;
+        CHECK(now>=40 && now<limit);
+        if(!expect_fail) {
+            CHECK(nic.state==E82557_RUNNING && starts==5 && ru_starts==2 && registered && !freed && !leaked && !mask);
+            CHECK(compat_reads==1 && strstr(output,"compat=1233"));
+            CHECK(strstr(output,"lb=ok len=60 cmp=ok rst2=ok cfg2=ok ia2=ok ru=ok"));
+            CHECK(swi_lost ? strstr(output,"LB3=FAIL(swi:irq)")!=NULL : strstr(output,"LB3=PASS")!=NULL);
+            CHECK(swi_lost ? nic.stats[3]==0 : nic.stats[3]==1 && irq_deliveries>0);
+            CHECK((trace_bits&(1u<<E82557_TRACE_TX))==0 && (trace_bits&(1u<<E82557_TRACE_STAT))==0);
+            if(kdebug.ops.nic_trace) CHECK(trace_bits&(1u<<E82557_TRACE_IA2));
+            if(phy_regs[1][2]!=0x2000 || (phy_regs[1][3]&0xfff0)!=0x5c00) {
+                CHECK(!pcr_reads && !pcr_writes && strstr(output,"pcr=skip") && strstr(output,"par=-"));
+            } else {
+                CHECK(pcr_reads==(pcr_writes?2:1));
+                CHECK(pcr_writes==(phyvendor && strcmp(c,"nsc_same")!=0));
+                CHECK(vendor_reads[0x19]==1);
+                CHECK(strstr(output,pcr_drop?"pcr=ng":phyvendor?(!strcmp(c,"nsc_same")?"pcr=9576->9576":"pcr=9014->9576"):"pcr=off"));
             }
-            if (!alloc_fail && !bm_fail && !cb_fail && !cb_ng && !cu_pre && !cu_post && !new_case && kdebug.ops.nic_trace)
-                CHECK((trace_bits & ((1u<<E82557_TRACE_DMA)|(1u<<E82557_TRACE_CFG)|(1u<<E82557_TRACE_IA)|(1u<<E82557_TRACE_TX)|(1u<<E82557_TRACE_STOP))) ==
-                      ((1u<<E82557_TRACE_DMA)|(1u<<E82557_TRACE_CFG)|(1u<<E82557_TRACE_IA)|(1u<<E82557_TRACE_TX)|(1u<<E82557_TRACE_STOP)));
-            CHECK(!strcmp(c,"no_trace") ? trace_count==0 : trace_count>0);
-            if(!strcmp(c,"monotonic")) CHECK(!strcmp(files[1].data,"42\n"));
-            else if(!strcmp(c,"other") || !strcmp(c,"seq_missing_old")) CHECK(!strcmp(files[1].data,"8\n"));
-            else if(!strcmp(c,"seq_ahead")) CHECK(!strcmp(files[1].data,"13\n"));
-            else CHECK(!strcmp(files[1].data,"1\n"));
-            CHECK(files[0].present==remove_fail);
+            CHECK(bmsr_reads>=2 && !(bmsr_reads&1));
+            if(latch_zero) CHECK(phy_regs[1][1]==0x782d && strstr(output,"link=up"));
+            if(link_tick<0) CHECK(now>=3000000 && strstr(output,"link=down"));
+            if(link_tick>0) CHECK(now>=500000 && strstr(output,"link=up"));
+            if(an_off) CHECK(strstr(output,"link=up an=no"));
+        } else {
+            CHECK(strstr(output,"LB3=FAIL") && !strstr(output,"LB3=PASS"));
+            if(cb_ng==3) CHECK(strstr(output,"FAIL(lb:txng)"));
+            if(cb_fail==3) CHECK(strstr(output,"FAIL(lb:timeout)"));
+            if(cu_pre==3) CHECK(strstr(output,"FAIL(lb:pre)"));
+            if(cu_post==3) CHECK(strstr(output,"FAIL(lb:post)"));
+            if(pre_busy) CHECK(strstr(output,"base=timeout scb=2040"));
+            if(post_busy) CHECK(strstr(output,"base=timeout scb=0040"));
+            if(lb_timeout) CHECK(strstr(output,"FAIL(lb:timeout)"));
+            if(lb_corrupt) CHECK(strstr(output,"FAIL(cmp:ng)"));
+            if(allocated) CHECK(stop_fail==2?leaked==1 && !freed:freed==1 && !leaked);
+            if(freed && !irq_fail) CHECK(unregistered==1);
+            if(freed) {
+                CHECK(pci_command==initial_command);
+                if(initial_command&4) CHECK(bm_writes==0);
+            }
+            if(pcr_timeout_first || pcr_timeout_write || vendor_timeout || mdi_timeout)
+                CHECK(strstr(output,"pcr=- mdi=timeout") && strstr(output,"par=-"));
         }
+        for(int i=0x12;i<32;i++) if(i!=0x17 && i!=0x19) CHECK(!vendor_reads[i]);
     }
-    if(idle_fail || pre_busy || post_busy || !strcmp(c,"bad_bar") || !strcmp(c,"io_disabled"))
-        CHECK(!files[0].present);
-    if(!strcmp(c,"same")) {
-        CHECK(files[0].present && !strcmp(files[0].data,"1234abcd 7\n"));
-        CHECK(!rm_calls && !files[0].writes && !files[1].writes);
-    }
+    if(!strcmp(c,"same")) CHECK(files[0].present && !rm_calls && !files[0].writes && !files[1].writes);
     if(!cfg) CHECK(!fs_calls);
     if(read_fail) CHECK(!files[0].writes && !files[1].writes);
-    if (!strcmp(c,"pass")) {
-        CHECK(strstr(output,"phy=1 id=2000:5c01 bmcr=3000 bmsr=782d anar=01e1 anlpar=45e1\n"));
-        CHECK(strstr(output,"fix=none rb=3000 bmsr=782d\n"));
-        CHECK(strstr(output,"link=up an=done wait=0 bmsr=7809/782d par=0081\n"));
-        CHECK(strstr(output,"tx good=1 lostcrs=0 maxcol=0\n"));
-        CHECK(strstr(output,"tx latecol=0 under=0 defer=0\n"));
-        const char *line=output;
-        while (*line) {
-            const char *end=line; while (*end && *end!='\n') end++;
-            CHECK(end-line<=78); line=*end?end+1:end;
-        }
+    if(!skip) {
+        CHECK(files[0].present==remove_fail);
+        if(!strcmp(c,"monotonic")) CHECK(!strcmp(files[1].data,"42\n"));
+        else if(!strcmp(c,"other") || !strcmp(c,"seq_missing_old")) CHECK(!strcmp(files[1].data,"8\n"));
+        else if(!strcmp(c,"seq_ahead")) CHECK(!strcmp(files[1].data,"13\n"));
+        else CHECK(!strcmp(files[1].data,"1\n"));
     }
-    if (new_case) {
-        if (!strcmp(c,"phy_latch")) CHECK(strstr(output,"link=up an=done wait=0 bmsr=0000/782d"));
-        if (!strcmp(c,"phy_late")) {
-            CHECK(strstr(output,"link=up") && strstr(output,"tx good=1 lostcrs=0"));
-            CHECK(now>=500000 && now<700000);
-        }
-        if (!strcmp(c,"phy_down")) CHECK(starts==3 && now>=3000000 && strstr(output,"link=down") && strstr(output,"tx good=0"));
-        if (!strcmp(c,"phy_off")) CHECK(strstr(output,"link=up an=no wait=0"));
-        if (!strncmp(c,"phy_fix",7) || !strcmp(c,"phy_reset")) CHECK(mdi_writes==1 && strstr(output,"rb=3100"));
-        if (!strcmp(c,"phy_reset")) CHECK(reset_reads>=3 && now>=200000);
-        if (!strcmp(c,"phy_reset_busy")) CHECK(!mdi_writes && strstr(output,"skip(reset)") && now>=500000);
-        if (!strcmp(c,"phy_ng")) CHECK(mdi_writes==1 && strstr(output,"fix=ng rb=7f00"));
-        if (!strcmp(c,"phy_kill")) CHECK(!mdi_writes && strstr(output,"fix=off"));
-        if (!strcmp(c,"phy_scan")) CHECK(strstr(output,"phy=scan:0 id=2000:5c01"));
-        if (scan_none || mdi_timeout) CHECK(starts==3 && strstr(output,scan_none?"FAIL(mdi:none)":"FAIL(mdi:timeout)") && strstr(output,"bmsr=-"));
-        if (!strcmp(c,"stat_delay")) CHECK(dumps>=3 && strstr(output,"tx good=1"));
-        if (!strcmp(c,"stat_never")) CHECK(dumps>2 && starts==3 && strstr(output,"tx good=0") && now<250000);
-        if (!strcmp(c,"stat_dump_delay")) CHECK(dumps<=10 && now<260000);
-        if (dump_timeout || late_dump) CHECK(dumps==1 && starts==3 && strstr(output,"stat=timeout"));
-        if (stat_pre || stat_post) CHECK(strstr(output,stat_pre?"FAIL(stat:pre)":"FAIL(stat:post)"));
-        if (collision) CHECK(strstr(output,"maxcol=1\n") && strstr(output,"latecol=2"));
-    }
-    if ((!strcmp(c,"pass") || new_case) && !scan_none && !mdi_timeout) {
-        int nsc=phy_regs[1][2]==0x2000 && (phy_regs[1][3]&0xfff0)==0x5c00;
-        if (!strcmp(c,"phy_scan")) nsc=1;
-        if (nsc) {
-            CHECK(pcr_writes==(phyvendor && strcmp(c,"nsc_same")));
-            if (!vendor_error) {
-                CHECK(pcr_reads==(pcr_writes?2:1));
-                CHECK(vendor_reads[0x16]==1 && vendor_reads[0x19]>=2);
-                CHECK(!!strstr(output,"pcr=ng") == !!pcr_drop);
-                if (phyvendor) CHECK(strstr(output,"pcr=9014->9576") || !strcmp(c,"nsc_same"));
-                else CHECK(strstr(output,"pcr=9014->9014 rb=9014") && strstr(output,"pcr=off"));
-                if (pcr_reserved) CHECK(strstr(output,"rb=9076"));
-                if (!dump_timeout && !late_dump && !stat_pre && !stat_post && !dump_delay) {
-                    CHECK(strstr(output,"dcr=0003 fcscr=0005 recr=0007"));
-                    CHECK(vendor_reads[0x12]==1 && vendor_reads[0x13]==1 && vendor_reads[0x15]==1);
-                    CHECK(strstr(output,latch_zero?"tx bmsr=0000/782d":"tx bmsr=7809/"));
-                }
-            } else CHECK(strstr(output,"FAIL(mdi:timeout)"));
-            if (!vendor_error) {
-                const char *n=strstr(output,"[e82557] nsc"), *l=strstr(output,"[e82557] link");
-                CHECK(n && l && n<l);
-            }
-        } else {
-            CHECK(!pcr_writes && !pcr_reads && strstr(output,"pcr=skip(id)"));
-            for (int r=0x12;r<32;r++) CHECK(!vendor_reads[r]);
-        }
-        CHECK(!strstr(output,"good1=") && !strstr(output,"good2="));
-        CHECK(!(trace_bits&(1u<<E82557_TRACE_TX2)));
-    }
-    if (max_counts) CHECK(strstr(output,"good=4294967295 lostcrs=4294967295 maxcol=4294967295"));
-    for (const char *line=output; *line;) {
-        const char *end=line; while (*end && *end!='\n') end++;
-        if (!strncmp(line,"[e82557] nsc ",12) || !strncmp(line,"[e82557] link=",13) ||
-            !strncmp(line,"[e82557] tx ",11)) CHECK(end-line<=78);
-        line=*end?end+1:end;
-    }
-    if (!strcmp(c,"pass") || !strcmp(c,"phy_late")) fprintf(1,"%s",output);
+    if(rc==PCI_PROBE_OK && !swi_lost) runtime_tests(c);
+    if(!strcmp(c,"pass")) fprintf(1,"%s",output);
     return !!failed;
 }

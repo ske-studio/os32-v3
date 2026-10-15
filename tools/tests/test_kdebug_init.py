@@ -55,7 +55,7 @@ def main():
         command([*host, ROOT / 'tools/tests/nic_trace_host.c', '-o', trace_exe])
         for runner in os.environ.get('HOST32_RUNNERS', 'native qemu').split():
             assert host32.run([str(trace_exe)], runner=runner).returncode == 0
-        print('PASS nic_trace: identity, append/sync, read/write/sync failure latch (13 scenarios, all LB2b stages plus repeated STAT at u32 width)')
+        print('PASS nic_trace: identity, append/sync, read/write/sync failure latch (13 scenarios, all 25 LB3 stage IDs at u32 width)')
         # A called import and a missing export must each fail by assertion.
         if '--mutate' in sys.argv:
             for label, old, new in (
@@ -72,6 +72,7 @@ def main():
             trace_source = (ROOT / 'kdebug/nic_trace.c').read_text()
             trace_harness = (ROOT / 'tools/tests/nic_trace_host.c').read_text()
             for label, old, new in (
+                ('trace-cap', '#define NIC_TRACE_CAP 768U', '#define NIC_TRACE_CAP 512U'),
                 ('trace-sync', 'vfs_sync() != VFS_OK', '0'),
                 ('trace-latch', 'if (trace_off) return;', 'if (0) return;'),
                 ('trace-crc', 'crc != image.image_crc', '0'),

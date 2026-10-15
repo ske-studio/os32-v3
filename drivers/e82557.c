@@ -1,8 +1,9 @@
-/* LB-2c: DP83840 PCR initialization, one HELLO; stop then DECLINE. */
+/* LB-3: probe loopback, bounded IRQ/tick service and foreground packet API. */
 #include "e82557.h"
 #include "e82557_eeprom.h"
 #include "e82557_desc.h"
 #include "kernel/dma_pool.h"
+#include "kernel/irq.h"
 #ifndef E82557_HOST_TEST
 #include "io.h"
 #include "kernel/idt.h"
@@ -23,6 +24,21 @@
 
 enum try_result { TRY_NONE, TRY_SAME_CRC, TRY_OTHER_CRC, TRY_READ_FAIL };
 enum issue_result { ISSUE_OK, ISSUE_TIMEOUT };
+enum tx_state { TX_IDLE, TX_RESERVED, TX_ISSUED };
+#ifndef E82557_HOST_YIELD
+#define E82557_HOST_YIELD() ((void)0)
+#endif
+static struct {
+    struct dma_buf dma;
+    struct e82557_stop stop;
+    struct e82557_rx rx;
+    struct pci_dev dev;
+    u32 stats[12], gen, tx_issued, reset_begin, stop_tries;
+    u16 base;
+    u8 mac[E82557_MAC_LEN];
+    int state, tx, recover_step, recover_pending, rnr_pending;
+    int swi_wait;
+} nic;
 
 /* Exact, bounded decimal parse; no wrap, signs, trailing data or empty record. */
 static int seq_parse(const char *buf, int len, u32 *seq)
@@ -140,11 +156,13 @@ static int scb_wait(u16 base)
 static int scb_issue(u16 base, u8 cuc, u8 ruc, u32 ptr, int need_ptr, int *after)
 {
     *after = 0;
-    if (!scb_wait(base)) return ISSUE_TIMEOUT;
+    if (!scb_wait(base)) { nic.stats[11]++; return ISSUE_TIMEOUT; }
     if (need_ptr) outpd(base + E82557_SCB_POINTER, ptr);
     outp(base + E82557_SCB_COMMAND, e82557_scb_cmd(cuc, ruc));
     *after = 1;
-    return scb_wait(base) ? ISSUE_OK : ISSUE_TIMEOUT;
+    if (scb_wait(base)) return ISSUE_OK;
+    nic.stats[11]++;
+    return ISSUE_TIMEOUT;
 }
 
 static void ee_write(void *ctx, u8 value)
@@ -161,7 +179,7 @@ static void ee_delay(void *ctx, u32 us)
     cpu_delay_us(us);
 }
 
-static int ee_mac_read(u16 base, u8 *mac)
+static int ee_mac_read(u16 base, u8 *mac, int *selected_width)
 {
     struct e82557_ee_pins pins = { &base, ee_write, ee_read, ee_delay, E82557_EE_STEP_US };
     u16 words[3], ignored;
@@ -176,7 +194,7 @@ static int ee_mac_read(u16 base, u8 *mac)
         }
         if (addr != 3) continue;
         e82557_ee_mac(words, mac);
-        if (e82557_mac_form(mac) == E82557_OK) return 1;
+        if (e82557_mac_form(mac) == E82557_OK) { *selected_width = width; return 1; }
     }
     return 0;
 }
@@ -205,13 +223,15 @@ static const char *cb_run(u16 base, struct dma_buf *dma, u32 off,
     }
 }
 
-static int stop_dma(u16 base, struct e82557_stop *stop)
+static int stop_dma(u16 base, struct e82557_stop *stop, u32 attempts)
 {
     u32 before = stop->reset_seq;
-    for (u32 attempt = 0; attempt < E82557_STOP_ATTEMPTS; attempt++) {
+    for (u32 attempt = 0; attempt < attempts; attempt++) {
         outpd(base + E82557_PORT, E82557_PORT_SELECTIVE);
         stop->reset_seq++;
         cpu_delay_us(E82557_RESET_US);
+        /* Reset loses M: first SCB access, as FreeBSD if_fxp.c:2177-2180. */
+        scb_mask(base, 1);
         if (e82557_stop_evidence(stop, before, inpw(base + E82557_SCB_STATUS)))
             return 1;
     }
@@ -244,8 +264,9 @@ static void hello_build(u8 *frame, const u8 *mac)
 
 struct phy_observation {
     u8 addr;
-    u16 bmcr, bmsr_first, bmsr, anlpar;
-    int nsc;
+    u16 bmcr, bmsr_first, bmsr, id1, id2, old, value, par;
+    int nsc, pcr_valid, par_valid, pcr_off, pcr_bad, link, an_done;
+    u32 waited;
     const char *error;
 };
 
@@ -280,197 +301,342 @@ static void tick_wait(u32 start, u32 ticks)
 {
     while ((u32)(tick_count - start) < ticks) { /* IF=1, foreground only */ }
 }
-static void phy_prepare(u16 base, struct phy_observation *p)
+static void phy_prepare(u16 base, struct phy_observation *p, int width)
 {
     struct e82557_ee_pins pins = { &base, ee_write, ee_read, ee_delay, E82557_EE_STEP_US };
-    u16 word = 0, id1 = 0, id2 = 0, anar = 0, old, value = 0;
-    int width = E82557_EE_WIDTH6, dummy, scan = 0, fix;
-    const char *fix_name = "none";
+    u16 word;
+    int dummy;
     if (e82557_ee_read_word(&pins, E82557_EE_FIXED, &width,
-                          E82557_EE_PHY, &word, &dummy) != E82557_OK || dummy)
-        word = 0; /* Still discover by ID if the EEPROM hint is unavailable. */
+                          E82557_EE_PHY, &word, &dummy) != E82557_OK || dummy) {
+        p->error = "id";
+        return;
+    }
     p->addr = word & E82557_PHY_MASK;
-    if (!mdi_read(base, p, E82557_PHY_ID1, &id1) ||
-        !mdi_read(base, p, E82557_PHY_ID2, &id2)) goto unavailable;
-    if (!e82557_phy_id_valid(id1)) {
-        scan = 1;
-        for (p->addr = 0; p->addr <= E82557_PHY_MASK; p->addr++) {
-            if (!mdi_read(base, p, E82557_PHY_ID1, &id1)) goto unavailable;
-            if (e82557_phy_id_valid(id1)) break;
-        }
-        if (p->addr > E82557_PHY_MASK) {
-            p->error = "none";
-            kprintf(E82557_LOG_ATTR, "[e82557] phy=none\n");
-            goto no_fix;
-        }
-        if (!mdi_read(base, p, E82557_PHY_ID2, &id2)) goto unavailable;
-    }
-    p->nsc = id1 == E82557_NSC_ID1 &&
-             (id2 & E82557_NSC_ID2_MASK) == E82557_NSC_ID2;
-    if (!mdi_read(base, p, E82557_PHY_BMCR, &p->bmcr) || !phy_status(base, p) ||
-        !mdi_read(base, p, E82557_PHY_ANAR, &anar) ||
-        !mdi_read(base, p, E82557_PHY_ANLPAR, &p->anlpar)) goto unavailable;
-    kprintf(E82557_LOG_ATTR,
-            "[e82557] phy=%s%u id=%04x:%04x bmcr=%04x bmsr=%04x anar=%04x anlpar=%04x\n",
-            scan ? "scan:" : "", p->addr, id1, id2, p->bmcr, p->bmsr, anar, p->anlpar);
-    if (!sysconfig_get_int(SYS_SYSTEM_CFG, "E82557_PHYFIX", 1)) {
-        fix_name = "off";
-    } else {
-        u32 start = tick_count;
-        while (p->bmcr & E82557_BMCR_RESET) {
-            u32 elapsed = tick_count - start;
-            if (elapsed >= E82557_PHY_RESET_WAIT_TICKS) break;
-            u32 next = elapsed + E82557_PHY_POLL_TICKS;
-            tick_wait(start, next < E82557_PHY_RESET_WAIT_TICKS ? next : E82557_PHY_RESET_WAIT_TICKS);
-            if (!mdi_read(base, p, E82557_PHY_BMCR, &p->bmcr)) goto no_fix;
-        }
-        old = p->bmcr;
-        fix = e82557_bmcr_fix(old, &value);
-        if (fix == E82557_FIX_RESET_BUSY) fix_name = "skip(reset)";
-        if (fix == E82557_FIX_WRITE) {
-            u16 written = value;
-            if (!mdi_xfer(base, E82557_MDI_WRITE, p->addr, E82557_PHY_BMCR, &value)) {
-                p->error = "timeout";
-                goto no_fix;
-            }
-            if (!mdi_read(base, p, E82557_PHY_BMCR, &p->bmcr) || !phy_status(base, p))
-                goto no_fix;
-            if (e82557_bmcr_fixed(p->bmcr))
-                kprintf(E82557_LOG_ATTR, "[e82557] fix=bmcr:%04x->%04x rb=%04x bmsr=%04x\n",
-                        old, written, p->bmcr, p->bmsr);
-            else
-                kprintf(E82557_LOG_ATTR, "[e82557] fix=ng rb=%04x bmsr=%04x\n", p->bmcr, p->bmsr);
-            return;
-        }
-    }
-    kprintf(E82557_LOG_ATTR, "[e82557] fix=%s rb=%04x bmsr=%04x\n", fix_name, p->bmcr, p->bmsr);
-    return;
-unavailable:
-    kprintf(E82557_LOG_ATTR, "[e82557] phy=%u mdi=timeout\n", p->addr);
-no_fix:
-    kprintf(E82557_LOG_ATTR, "[e82557] fix=- rb=- bmsr=-\n");
+    if (!mdi_read(base, p, E82557_PHY_ID1, &p->id1) ||
+        !mdi_read(base, p, E82557_PHY_ID2, &p->id2)) return;
+    if (!e82557_phy_id_valid(p->id1)) { p->error = "id"; return; }
+    p->nsc = p->id1 == E82557_NSC_ID1 &&
+             (p->id2 & E82557_NSC_ID2_MASK) == E82557_NSC_ID2;
+    (void)mdi_read(base, p, E82557_PHY_BMCR, &p->bmcr);
 }
-/* FreeBSD main sys/dev/mii/nsphy.c:145-179 (fxp): preserve every other bit.
+/* FreeBSD main sys/dev/mii/nsphy.c:145-179: old | 0x0562.
  * Reserved bits 10/8 are written but only documented R/W bits are verified. */
 static void phy_vendor(u16 base, struct phy_observation *p)
 {
-    u16 old, value, rb, par, srr;
-    const char *note = "";
-    if (!p->nsc) {
-        kprintf(E82557_LOG_ATTR, "[e82557] nsc pcr=skip(id)\n");
-        return;
-    }
-    if (!mdi_read(base, p, E82557_NSC_PCR, &old)) goto unavailable;
-    value = old;
-    rb = old;
-    if (!sysconfig_get_int(SYS_SYSTEM_CFG, "E82557_PHYVENDOR", 1)) {
-        note = " pcr=off";
-    } else {
-        value = old | E82557_NSC_PCR_SET;
-        if (value != old) {
-            u16 write = value;
+    u16 rb;
+    if (p->error || !p->nsc) return;
+    if (!mdi_read(base, p, E82557_NSC_PCR, &p->old)) return;
+    p->value = rb = p->old;
+    p->pcr_off = !sysconfig_get_int(SYS_SYSTEM_CFG, "E82557_PHYVENDOR", 1);
+    if (!p->pcr_off) {
+        p->value = p->old | E82557_NSC_PCR_SET;
+        if (p->value != p->old) {
+            u16 write = p->value;
             if (!mdi_xfer(base, E82557_MDI_WRITE, p->addr, E82557_NSC_PCR, &write)) {
                 p->error = "timeout";
-                goto unavailable;
+                return;
             }
-            if (!mdi_read(base, p, E82557_NSC_PCR, &rb)) goto unavailable;
+            if (!mdi_read(base, p, E82557_NSC_PCR, &rb)) return;
         }
-        if ((rb & E82557_NSC_PCR_VERIFY) != (value & E82557_NSC_PCR_VERIFY))
-            note = " pcr=ng";
+        if ((rb & E82557_NSC_PCR_VERIFY) != (p->value & E82557_NSC_PCR_VERIFY))
+            p->pcr_bad = 1;
     }
-    if (!mdi_read(base, p, E82557_NSC_PAR, &par) ||
-        !mdi_read(base, p, E82557_NSC_SRR, &srr)) goto unavailable;
-    kprintf(E82557_LOG_ATTR, "[e82557] nsc pcr=%04x->%04x rb=%04x par=%04x srr=%04x%s\n",
-            old, value, rb, par, srr, note);
-    return;
-unavailable:
-    kprintf(E82557_LOG_ATTR, "[e82557] nsc pcr=- mdi=timeout\n");
+    p->pcr_valid = 1;
 }
-
 static void phy_link_wait(u16 base, struct phy_observation *p)
 {
     u32 start = tick_count, elapsed = 0;
-    int link = 0, an_done = 0, an_en = 0;
-    u16 par = 0xffff; /* No vendor register access on another PHY. */
+    int an_en;
     while (phy_status(base, p)) {
         elapsed = tick_count - start;
-        e82557_phy_decode(p->bmcr, p->bmsr, &link, &an_done, &an_en);
-        if (e82557_link_wait_step(link, an_done, an_en, elapsed,
+        e82557_phy_decode(p->bmcr, p->bmsr, &p->link, &p->an_done, &an_en);
+        if (e82557_link_wait_step(p->link, p->an_done, an_en, elapsed,
                                   E82557_LINK_WAIT_TICKS) != E82557_WAIT) break;
         u32 next = elapsed + E82557_PHY_POLL_TICKS;
         tick_wait(start, next < E82557_LINK_WAIT_TICKS ? next : E82557_LINK_WAIT_TICKS);
     }
-    if (p->error || (p->nsc && !mdi_read(base, p, E82557_NSC_PAR, &par))) {
-        kprintf(E82557_LOG_ATTR, "[e82557] link=- an=- wait=- bmsr=-/- par=-\n");
-        return;
-    }
-    kprintf(E82557_LOG_ATTR, "[e82557] link=%s an=%s wait=%u bmsr=%04x/%04x par=%04x\n",
-            link ? "up" : "down", an_done ? "done" : "no",
-            elapsed * E82557_TICK_MS, p->bmsr_first, p->bmsr, par);
+    p->waited = elapsed * E82557_TICK_MS;
+    if (p->nsc && mdi_read(base, p, E82557_NSC_PAR, &p->par)) p->par_valid = 1;
 }
-
-/* No reissue after an incomplete Dump: the device can still own this area. */
-static const char *stats_until(u16 base, struct dma_buf *dma, u32 expect,
-                              u32 *good, u32 *waited)
+static void phy_report(const struct phy_observation *p, u16 compat)
 {
-    u8 *area = (u8 *)dma->va + E82557_STAT_OFF;
-    u32 start = tick_count;
-    for (;;) {
-        int after, issued;
-        unsigned int flags;
-        e82557_wr32(area + E82557_STAT_DONE_OFF, 0);
-        E82557_BARRIER(); /* stats publish */
-        flags = irq_save();
-        issued = scb_issue(base, E82557_CU_STAT_DUMP, 0, 0, 0, &after);
-        irq_restore(flags);
-        if (issued != ISSUE_OK) return after ? "post" : "pre";
-        for (u32 ms = 0; ; ms++) {
-            if (e82557_stats_done(area)) break;
-            if (ms == E82557_CB_WAIT_MS ||
-                (u32)(tick_count - start) * E82557_TICK_MS >= E82557_TXDONE_WAIT_MS)
-                return "timeout";
-            cpu_delay_us(E82557_CB_POLL_US);
-        }
-        E82557_BARRIER(); /* stats acquire */
-        *good = e82557_stats_read(area, E82557_STAT_GOOD);
-        *waited = (tick_count - start) * E82557_TICK_MS;
-        if (e82557_stats_step(*good, expect, *waited, E82557_TXDONE_WAIT_MS) != E82557_WAIT)
-            return NULL;
-        tick_wait(tick_count, E82557_TXDONE_POLL_TICKS);
-        *waited = (tick_count - start) * E82557_TICK_MS;
-        if (*waited >= E82557_TXDONE_WAIT_MS) return NULL;
-    }
+    kprintf(E82557_LOG_ATTR, "[e82557] phy=%u id=%04x:%04x pcr=", p->addr, p->id1, p->id2);
+    if (p->error) kprintf(E82557_LOG_ATTR, "- mdi=%s", p->error);
+    else if (!p->nsc) kprintf(E82557_LOG_ATTR, "skip");
+    else if (p->pcr_bad) kprintf(E82557_LOG_ATTR, "ng");
+    else if (p->pcr_off) kprintf(E82557_LOG_ATTR, "off");
+    else if (p->pcr_valid) kprintf(E82557_LOG_ATTR, "%04x->%04x", p->old, p->value);
+    else kprintf(E82557_LOG_ATTR, "-");
+    kprintf(E82557_LOG_ATTR, " link=%s an=%s wait=%u par=",
+            p->link ? "up" : "down", p->an_done ? "done" : "no", p->waited);
+    if (p->par_valid && !p->error) kprintf(E82557_LOG_ATTR, "%04x", p->par);
+    else kprintf(E82557_LOG_ATTR, "-");
+    kprintf(E82557_LOG_ATTR, " compat=%04x\n", compat);
 }
 
+static u8 *rx_ring(void) { return (u8 *)nic.dma.va + E82557_RFD_OFF; }
+static void rx_scan(void) { e82557_rx_scan(rx_ring(), &nic.rx, &nic.rnr_pending); }
+static u32 rx_pa(void) { return nic.dma.pa + E82557_RFD_OFF + nic.rx.dev * E82557_RFD_STRIDE; }
+
+/* IF=0. FreeBSD if_fxp.c:1706-1724: acknowledge exactly the observed byte.
+ * Two passes only; tick drains remaining events even if the PIC loses an edge. */
+static int e82557_irq(unsigned int irq, void *arg)
+{
+    int handled = IRQ_NONE;
+    (void)irq; (void)arg;
+    if (nic.state == E82557_OFF || nic.state == E82557_STARTING ||
+        nic.state == E82557_STOPPING) return IRQ_NONE;
+    for (u32 pass = 0; pass < 2; pass++) {
+        u16 st = inpw(nic.base + E82557_SCB_STATUS);
+        u8 ack = (u8)(st >> 8);
+        if (ack == 0xff) { nic.stats[4]++; return IRQ_NONE; }
+        if (!ack) break;
+        outp(nic.base + E82557_SCB_ACK, ack);
+        handled = IRQ_HANDLED;
+        if (st & (E82557_STAT_CX | E82557_STAT_CNA)) nic.stats[0]++;
+        if (st & E82557_STAT_FR) nic.stats[1]++;
+        if (st & E82557_STAT_RNR) nic.stats[2]++;
+        if (st & E82557_STAT_SWI) nic.stats[3]++;
+        if (st & E82557_STAT_MDI) nic.stats[4]++;
+        if (nic.state == E82557_RUNNING) {
+            if (st & E82557_STAT_RNR) nic.rnr_pending = 1;
+        }
+    }
+    return handled;
+}
+static void failed_dma(void)
+{
+    nic.state = E82557_FAILED;
+    scb_mask(nic.base, 1);
+    (void)e82557_irq(0, NULL); /* drain only; no flags in FAILED */
+    bm_restore(&nic.dev, 1);
+    (void)dma_mark_leaked(&nic.dma); /* retained until reboot, never reused */
+}
+static void recover_begin(void)
+{
+    if (nic.tx == TX_RESERVED) { nic.recover_pending = 1; return; }
+    nic.recover_pending = 0;
+    nic.gen++;
+    nic.stats[9]++;
+    if (nic.stats[9] > E82557_RECOVER_MAX) { failed_dma(); return; }
+    nic.state = E82557_RECOVER;
+    scb_mask(nic.base, 1);
+    nic.stop_tries = 0;
+    nic.recover_step = 1;
+    nic.reset_begin = nic.stop.reset_seq;
+}
+/* IF=0. Unlike fxp's continuous consume/restart (if_fxp.c:1994-1998),
+ * foreground consumption is separate here. IF=0 does not stop DMA: read RUS,
+ * then scan again after RU has stopped, before deciding count and pointer. */
+static int ru_restart(void)
+{
+    u16 st = inpw(nic.base + E82557_SCB_STATUS);
+    u32 rus = (st & E82557_RUS_MASK) >> 2;
+    int after;
+    if (rus == E82557_RUS_READY) { nic.rnr_pending = 0; return ISSUE_OK; }
+    if ((st >> 8) == 0xff || rus > 2) return ISSUE_TIMEOUT;
+    rx_scan(); /* stopped RU: settle DMA completions since the earlier scan */
+    if (nic.rx.ready == E82557_RFD_COUNT) return ISSUE_OK;
+    E82557_BARRIER(); /* publish recycled descriptors before RU Start */
+    nic.stop.start_seq = nic.stop.reset_seq;
+    int rc = scb_issue(nic.base, 0, E82557_RU_START, rx_pa(), 1, &after);
+    if (rc == ISSUE_OK) nic.rnr_pending = 0;
+    return rc;
+}
+void e82557_tick(void)
+{
+    if (nic.state == E82557_RUNNING) {
+        if (nic.recover_pending && nic.tx != TX_RESERVED) {
+            recover_begin();
+        } else {
+            if (nic.tx == TX_ISSUED) {
+                u16 st = e82557_rd16((u8 *)nic.dma.va + E82557_TCB_OFF);
+                if (st & E82557_CB_C) {
+                    E82557_BARRIER(); /* TX DMA completion */
+                    nic.tx = TX_IDLE;
+                    /* SDM :4648-4663: C implies OK, and means DMA done.
+                     * !OK is defensive handling of an anomalous value. */
+                    nic.stats[(st & E82557_CB_OK) ? 5 : 6]++;
+                }
+            }
+            rx_scan();
+            if (ru_restart() != ISSUE_OK) recover_begin();
+            if (nic.state == E82557_RUNNING && nic.tx == TX_ISSUED &&
+                (u32)(tick_count - nic.tx_issued) > E82557_TX_WAIT_TICKS)
+                recover_begin();
+            /* SWI proof belongs to IRQ3: tick may read status, but must not ack. */
+            if (!nic.swi_wait) (void)e82557_irq(0, NULL);
+            return; /* never issue a second SCB command in this tick */
+        }
+    }
+    if (nic.state == E82557_RX_WAIT) {
+        if (nic.rx.ready == E82557_RFD_COUNT) return;
+        nic.state = E82557_RECOVER;
+        nic.recover_step = 3;
+    }
+    if (nic.state != E82557_RECOVER) return;
+    switch (nic.recover_step) {
+    case 1:
+        if (nic.stop.reset_seq - nic.reset_begin >= E82557_RECOVER_RESETS) {
+            failed_dma(); return;
+        }
+        if (!stop_dma(nic.base, &nic.stop, 1)) {
+            if (++nic.stop_tries >= E82557_STOP_ATTEMPTS) failed_dma();
+            return; /* retry R1 on the next tick, never twice in one tick */
+        }
+        nic.stop_tries = 0;
+        rx_scan(); /* R1 final scan: reset has now stopped all DMA writes */
+        nic.recover_step = 2;
+        break;
+    case 2:
+        if (nic.tx == TX_ISSUED) { nic.tx = TX_IDLE; nic.stats[6]++; }
+        e82557_rx_reown(rx_ring(), &nic.rx); /* only rx_free, preserve C=1 */
+        nic.recover_step = 3;
+        break;
+    case 3:
+        if (nic.rx.ready == E82557_RFD_COUNT) { nic.state = E82557_RX_WAIT; break; }
+        if (ru_restart() == ISSUE_OK) {
+            /* Drain while still RECOVER and masked, before exposing INTA. */
+            if (!nic.swi_wait) (void)e82557_irq(0, NULL);
+            nic.state = E82557_RUNNING;
+            scb_mask(nic.base, 0);
+            nic.stats[10]++;
+            return;
+        } else if (nic.stop.reset_seq - nic.reset_begin >= E82557_RECOVER_RESETS) {
+            failed_dma();
+        } else nic.recover_step = 1;
+        break;
+    }
+    /* Reset has M=1; also drain events that arrived before R1. */
+    if (nic.state != E82557_FAILED && !nic.swi_wait) (void)e82557_irq(0, NULL);
+}
+static int packet_unavailable(void)
+{
+    return nic.state == E82557_RECOVER || nic.state == E82557_RX_WAIT ?
+           OS32_ERR_AGAIN : OS32_ERR_NOSYS;
+}
+int e82557_send(const void *buf, u32 len)
+{
+    u32 gen;
+    int after, rc;
+    unsigned int flags = irq_save();
+    if (nic.state != E82557_RUNNING) { rc = packet_unavailable(); goto out; }
+    if (!buf || len < E82557_FRAME_MIN || len > E82557_FRAME_MAX) {
+        rc = OS32_ERR_INVAL; goto out;
+    }
+    if (nic.tx != TX_IDLE || nic.recover_pending) { rc = OS32_ERR_AGAIN; goto out; }
+    nic.tx = TX_RESERVED;
+    nic.tx_issued = 0;
+    gen = nic.gen;
+    irq_restore(flags);
+    (void)e82557_tcb_build((u8 *)nic.dma.va + E82557_TCB_OFF, buf, len,
+                           E82557_TX_THRESH, E82557_TBD_NONE, 1);
+    E82557_HOST_YIELD();
+    E82557_BARRIER(); /* send publication */
+    flags = irq_save();
+    if (nic.state != E82557_RUNNING || nic.gen != gen || nic.tx != TX_RESERVED) {
+        /* Never clear a reservation belonging to a different generation. */
+        if (nic.gen == gen && nic.tx == TX_RESERVED) nic.tx = TX_IDLE;
+        rc = OS32_ERR_AGAIN; goto out;
+    }
+    nic.stop.start_seq = nic.stop.reset_seq;
+    rc = scb_issue(nic.base, E82557_CU_START, 0, nic.dma.pa + E82557_TCB_OFF, 1, &after);
+    if (rc != ISSUE_OK) {
+        nic.tx = TX_IDLE;
+        nic.recover_pending = 1; /* stop before any subsequent use of the TCB */
+        rc = OS32_ERR_AGAIN;
+    } else {
+        nic.tx = TX_ISSUED;
+        nic.tx_issued = tick_count;
+        rc = 0;
+    }
+ out:
+    irq_restore(flags);
+    return rc;
+}
+int e82557_recv(void *buf, u32 cap, u32 *len)
+{
+    unsigned int flags = irq_save();
+    int rc;
+    if (len) *len = 0;
+    if (nic.state != E82557_RUNNING && nic.state != E82557_RX_WAIT) {
+        rc = packet_unavailable(); goto out;
+    }
+    if (!buf || !len) { rc = OS32_ERR_INVAL; goto out; }
+    rx_scan();
+    if (!nic.rx.ready) { rc = OS32_ERR_AGAIN; goto out; }
+    u8 *rfd = e82557_rfd(rx_ring(), nic.rx.cons);
+    irq_restore(flags);
+    u16 st = e82557_rd16(rfd);
+    E82557_BARRIER(); /* recv completion acquisition */
+    u32 count = e82557_rd16(rfd + 12) & E82557_RFD_COUNT_MASK;
+    int drop = !(st & E82557_RFD_OK) || count < E82557_FRAME_MIN || count > E82557_FRAME_MAX;
+    if (!drop && count > cap) return OS32_ERR_NOSPC;
+    if (!drop) {
+        E82557_DESC_ACCESS(rfd + E82557_RFD_HEADER, count, 0);
+        for (u32 i = 0; i < count; i++) ((u8 *)buf)[i] = rfd[E82557_RFD_HEADER + i];
+        *len = count;
+    }
+    E82557_HOST_YIELD(); /* completed RFD stays CPU-owned through any recovery */
+    flags = irq_save();
+    /* FAILED DMA is deliberately retained. Do not publish more buffers to it. */
+    if (nic.state != E82557_FAILED)
+        e82557_rfd_recycle(rx_ring(), &nic.rx);
+    nic.stats[drop ? 8 : 7]++;
+    rc = drop ? OS32_ERR_AGAIN : 0;
+ out:
+    irq_restore(flags);
+    return rc;
+}
+void e82557_get_mac(u8 *mac)
+{
+    if (mac) for (u32 i = 0; i < E82557_MAC_LEN; i++) mac[i] = nic.mac[i];
+}
+int e82557_state(void) { return nic.state; }
+u32 e82557_rx_free(void)
+{
+    unsigned int flags = irq_save();
+    u32 free = 0;
+    if (nic.state == E82557_RUNNING || nic.state == E82557_RX_WAIT) {
+        rx_scan(); free = E82557_RFD_COUNT - nic.rx.ready;
+    }
+    irq_restore(flags);
+    return free;
+}
+int e82557_loopback(int on) { (void)on; return OS32_ERR_NOSYS; }
+u32 e82557_stat(u32 idx) { return idx < 12 ? nic.stats[idx] : 0; }
+
+static int probe_ru(void)
+{
+    unsigned int flags = irq_save();
+    int after;
+    E82557_BARRIER(); /* probe RU publication */
+    nic.stop.start_seq = nic.stop.reset_seq;
+    int rc = scb_issue(nic.base, 0, E82557_RU_START, rx_pa(), 1, &after);
+    irq_restore(flags);
+    return rc;
+}
 static int e82557_probe(const struct pci_dev *dev)
 {
-    const char *why = try_begin();
-    const char *stage = "win";
-    u16 base, status = 0;
-    u8 mac[E82557_MAC_LEN], cfg[E82557_CFG_LEN], frame[E82557_HELLO_LEN];
-    struct dma_buf dma;
-    struct e82557_stop stop = { 0, 0 };
+    const char *why, *stage = "win";
+    u16 base, status = 0, compat = 0, lb_len = 0;
+    u8 cfg[E82557_CFG_LEN], frame[E82557_HELLO_LEN];
     struct phy_observation phy = { 0 };
-    u32 good = 0, waited = 0;
-    int observed = 0, stats_valid = 0;
-    const char *stat_error = NULL;
-    int allocated = 0, changed_bm = 0, rc;
-    u16 command, tx_len = 0;
-    unsigned int flags;
+    int allocated = 0, registered = 0, changed_bm = 0, width = 0, dummy;
     int reason, after = 0, issued, result = PCI_PROBE_DECLINE;
+    unsigned int flags;
+    nic.state = E82557_STARTING;
+    why = try_begin();
     if (why) {
-        if (kstrncmp(why, "seq-", 4) == 0)
-            kprintf(E82557_LOG_ATTR, "[e82557] trace=off\n");
-        kprintf(E82557_LOG_ATTR, "[e82557] skip(%s)\n", why);
-        kprintf(E82557_LOG_ATTR, "[e82557] LB2c=FAIL(try:%s)\n", why);
+        if (kstrncmp(why, "seq-", 4) == 0) kprintf(E82557_LOG_ATTR, "[e82557] trace=off\n");
+        kprintf(E82557_LOG_ATTR, "[e82557] skip(%s)\n[e82557] LB3=FAIL(try:%s)\n", why, why);
+        nic.state = E82557_OFF;
         return result;
     }
     nic_trace(E82557_TRACE_TRY);
     nic_trace(E82557_TRACE_WIN);
-    if (!e82557_io_window(dev, &base, &reason)) {
-        why = e82557_window_name(reason);
-        goto done;
-    }
+    if (!e82557_io_window(dev, &base, &reason)) { why = e82557_window_name(reason); goto done; }
+    nic.base = base; nic.dev = *dev;
     stage = "rst";
     nic_trace(E82557_TRACE_RST);
     outpd(base + E82557_PORT, E82557_PORT_SOFTWARE);
@@ -482,170 +648,165 @@ static int e82557_probe(const struct pci_dev *dev)
     outp(base + E82557_SCB_ACK, (u8)((status & E82557_STAT_MASK) >> 8));
     status = inpw(base + E82557_SCB_STATUS);
     if (status & (E82557_CUS_MASK | E82557_RUS_MASK)) {
-        kprintf(E82557_LOG_ATTR, "[e82557] rst=fail scb=%04x\n", status);
         pci_bind_set_reason(PCI_BIND_RESET_FAILED);
-        result = PCI_PROBE_QUARANTINE;
-        why = "idle";
-        goto done;
+        result = PCI_PROBE_QUARANTINE; why = "idle"; goto done;
     }
     stage = "base";
     nic_trace(E82557_TRACE_BASE);
     flags = irq_save();
     issued = scb_issue(base, E82557_CU_BASE, 0, 0, 1, &after);
-    if (issued == ISSUE_OK)
-        issued = scb_issue(base, 0, E82557_RU_BASE, 0, 1, &after);
+    if (issued == ISSUE_OK) issued = scb_issue(base, 0, E82557_RU_BASE, 0, 1, &after);
     irq_restore(flags);
     if (issued != ISSUE_OK) {
         status = inpw(base + E82557_SCB_STATUS);
         kprintf(E82557_LOG_ATTR, "[e82557] rst=ok base=timeout scb=%04x\n", status);
-        why = after ? "post" : "pre";
-        goto done;
+        why = after ? "post" : "pre"; goto done;
     }
-    kprintf(E82557_LOG_ATTR, "[e82557] rst=ok base=ok scb=%04x\n", status);
     stage = "ee";
     nic_trace(E82557_TRACE_EEPROM);
-    if (!ee_mac_read(base, mac)) { why = "mac"; goto done; }
+    if (!ee_mac_read(base, nic.mac, &width)) { why = "mac"; goto done; }
+    struct e82557_ee_pins pins = { &base, ee_write, ee_read, ee_delay, E82557_EE_STEP_US };
+    /* FreeBSD if_fxp.c:537-544: report RX lockup compatibility word, no workaround yet. */
+    if (e82557_ee_read_word(&pins, E82557_EE_FIXED, &width,
+                          E82557_EE_COMPAT, &compat, &dummy) != E82557_OK || dummy) {
+        why = "compat"; goto done;
+    }
     stage = "dma";
     nic_trace(E82557_TRACE_DMA);
-    rc = dma_alloc(E82557_DMA_SIZE, E82557_DMA_ALIGN, E82557_DMA_LIMIT, &dma);
-    if (rc < 0) {
-        kprintf(E82557_LOG_ATTR, "[e82557] dma rc=%d\n", rc);
-        why = "alloc";
-        goto done;
+    if (dma_alloc(E82557_DMA_SIZE, E82557_DMA_ALIGN, E82557_DMA_LIMIT, &nic.dma) < 0) {
+        why = "alloc"; goto done;
     }
     allocated = 1;
-    kprintf(E82557_LOG_ATTR, "[e82557] dma pa=%08x size=%u\n", dma.pa, dma.size);
-    command = (u16)pci_cfg_read32(dev->bus, dev->dev, dev->fn, PCI_CFG_COMMAND);
+    stage = "irq";
+    nic_trace(E82557_TRACE_IRQ);
+    if (irq_register(dev->irq_line, e82557_irq, NULL, IRQ_F_SHARED) < 0) { why = "register"; goto done; }
+    registered = 1;
+    u16 command = (u16)pci_cfg_read32(dev->bus, dev->dev, dev->fn, PCI_CFG_COMMAND);
     if (!(command & E82557_COMMAND_BM)) {
-        rc = pci_cfg_write16(dev->bus, dev->dev, dev->fn, PCI_CFG_COMMAND,
-                             command | E82557_COMMAND_BM);
-        if (rc < 0) { why = "bm"; goto done; }
+        if (pci_cfg_write16(dev->bus, dev->dev, dev->fn, PCI_CFG_COMMAND,
+                            command | E82557_COMMAND_BM) < 0) { why = "bm"; goto done; }
         changed_bm = 1;
     }
+    stage = "phy";
     nic_trace(E82557_TRACE_PHY);
-    phy_prepare(base, &phy);
-    observed = 1;
+    phy_prepare(base, &phy, width);
     phy_vendor(base, &phy);
     nic_trace(E82557_TRACE_LINK);
     phy_link_wait(base, &phy);
+    phy_report(&phy, compat);
+    if (phy.error) { why = phy.error; goto done; }
     stage = "cfg";
     nic_trace(E82557_TRACE_CFG);
-    e82557_config_bytes(cfg, E82557_CFG_NORMAL);
-    e82557_cb_config((u8 *)dma.va + E82557_CB_OFF, cfg);
-    why = cb_run(base, &dma, E82557_CB_OFF, &stop);
+    e82557_config_bytes(cfg, E82557_CFG_LOOPBACK);
+    e82557_cb_config(nic.dma.va, cfg);
+    why = cb_run(base, &nic.dma, E82557_CB_OFF, &nic.stop);
     if (why) goto done;
     stage = "ia";
     nic_trace(E82557_TRACE_IA);
-    e82557_cb_ia((u8 *)dma.va + E82557_CB_OFF, mac);
-    why = cb_run(base, &dma, E82557_CB_OFF, &stop);
+    e82557_cb_ia(nic.dma.va, nic.mac);
+    why = cb_run(base, &nic.dma, E82557_CB_OFF, &nic.stop);
     if (why) goto done;
-    stage = "stat";
-    nic_trace(E82557_TRACE_STAT);
-    flags = irq_save();
-    issued = scb_issue(base, E82557_CU_STAT_ADDR, 0,
-                       dma.pa + E82557_STAT_OFF, 1, &after);
-    irq_restore(flags);
-    if (issued != ISSUE_OK) {
-        why = stat_error = after ? "post" : "pre";
+    stage = "ring";
+    nic_trace(E82557_TRACE_RING);
+    e82557_rx_init(rx_ring(), nic.dma.pa + E82557_RFD_OFF, &nic.rx);
+    if (probe_ru() != ISSUE_OK) { why = "timeout"; goto done; }
+    stage = "lb";
+    nic_trace(E82557_TRACE_LB);
+    hello_build(frame, nic.mac);
+    (void)e82557_tcb_build((u8 *)nic.dma.va + E82557_TCB_OFF, frame,
+                           E82557_HELLO_LEN, E82557_TX_THRESH, E82557_TBD_NONE, 0);
+    why = cb_run(base, &nic.dma, E82557_TCB_OFF, &nic.stop);
+    if (why) {
+        if (kstrcmp(why, "ng") == 0) why = "txng";
         goto done;
     }
-    stage = "tx";
-    nic_trace(E82557_TRACE_TX);
-    hello_build(frame, mac);
-    (void)e82557_tcb_build((u8 *)dma.va + E82557_TCB_OFF, frame,
-                           E82557_HELLO_LEN, E82557_TX_THRESH, E82557_TBD_NONE, 0);
-    why = cb_run(base, &dma, E82557_TCB_OFF, &stop);
+    for (u32 ms = 0; !(e82557_rd16(rx_ring()) & E82557_RFD_C); ms++) {
+        if (ms == E82557_LB_WAIT_MS) { why = "timeout"; goto done; }
+        cpu_delay_us(E82557_CB_POLL_US);
+    }
+    E82557_BARRIER(); /* loopback completion acquisition */
+    stage = "cmp";
+    nic_trace(E82557_TRACE_CMP);
+    lb_len = e82557_rd16(rx_ring() + 12) & E82557_RFD_COUNT_MASK;
+    if (!(e82557_rd16(rx_ring()) & E82557_RFD_OK) || lb_len != E82557_HELLO_LEN) {
+        why = "ng"; goto done;
+    }
+    E82557_BARRIER();
+    E82557_DESC_ACCESS(rx_ring() + E82557_RFD_HEADER, lb_len, 0);
+    for (u32 i = 0; i < lb_len; i++) if (rx_ring()[E82557_RFD_HEADER + i] != frame[i]) {
+        why = "ng"; goto done;
+    }
+    stage = "rst2";
+    nic_trace(E82557_TRACE_RST2);
+    flags = irq_save();
+    int stopped = stop_dma(base, &nic.stop, E82557_STOP_ATTEMPTS);
+    irq_restore(flags);
+    if (!stopped) { why = "idle"; goto done; }
+    stage = "cfg2";
+    nic_trace(E82557_TRACE_CFG2);
+    e82557_config_bytes(cfg, E82557_CFG_NORMAL);
+    e82557_cb_config(nic.dma.va, cfg);
+    why = cb_run(base, &nic.dma, E82557_CB_OFF, &nic.stop);
     if (why) goto done;
-    tx_len = e82557_rd16((u8 *)dma.va + E82557_TCB_OFF + 12) & ~E82557_TCB_EOF;
-    stage = "stat";
-    nic_trace(E82557_TRACE_STAT);
-    why = stat_error = stats_until(base, &dma, 1, &good, &waited);
+    stage = "ia2";
+    nic_trace(E82557_TRACE_IA2);
+    e82557_cb_ia(nic.dma.va, nic.mac);
+    why = cb_run(base, &nic.dma, E82557_CB_OFF, &nic.stop);
     if (why) goto done;
-    stats_valid = 1;
+    stage = "ru";
+    nic_trace(E82557_TRACE_RU);
+    nic.rx.cons = nic.rx.dev = 1; nic.rx.ready = 0;
+    e82557_rx_reown(rx_ring(), &nic.rx);
+    if (probe_ru() != ISSUE_OK) { why = "timeout"; goto done; }
+    flags = irq_save();
+    nic.state = E82557_RUNNING;
+    nic.swi_wait = 1;
+    scb_mask(base, 0);
+    irq_restore(flags);
+    stage = "swi";
+    nic_trace(E82557_TRACE_SWI);
+    outp(base + E82557_SCB_INTCTL, E82557_SCB_SI);
+    for (u32 us = 0; !nic.stats[3] && us < E82557_SWI_WAIT_MS * 1000; us += E82557_SWI_POLL_US)
+        cpu_delay_us(E82557_SWI_POLL_US);
+    flags = irq_save();
+    nic.swi_wait = 0;
+    irq_restore(flags);
+    if (!nic.stats[3]) why = "irq";
+    nic_trace(E82557_TRACE_BOUND);
+    kprintf(E82557_LOG_ATTR, "[e82557] lb=ok len=%u cmp=ok rst2=ok cfg2=ok ia2=ok ru=ok irq=%s bound irq=%u\n",
+            lb_len, why ? "ng" : "ok(swi)", dev->irq_line);
+    result = PCI_PROBE_OK;
  done:
-    if (observed) {
-        if (stats_valid) {
-            u8 *area = (u8 *)dma.va + E82557_STAT_OFF;
-            u16 par = 0xffff, dcr = 0xffff, fcscr = 0xffff, recr = 0xffff;
-            kprintf(E82557_LOG_ATTR, "[e82557] tx good=%u lostcrs=%u maxcol=%u\n",
-                    good, e82557_stats_read(area, E82557_STAT_LOSTCRS),
-                    e82557_stats_read(area, E82557_STAT_MAXCOL));
-            kprintf(E82557_LOG_ATTR, "[e82557] tx latecol=%u under=%u defer=%u\n",
-                    e82557_stats_read(area, E82557_STAT_LATECOL),
-                    e82557_stats_read(area, E82557_STAT_UNDER),
-                    e82557_stats_read(area, E82557_STAT_DEFER));
-            (void)phy_status(base, &phy);
-            if (phy.nsc) {
-                (void)mdi_read(base, &phy, E82557_NSC_PAR, &par);
-                (void)mdi_read(base, &phy, E82557_NSC_DCR, &dcr);
-                (void)mdi_read(base, &phy, E82557_NSC_FCSCR, &fcscr);
-                (void)mdi_read(base, &phy, E82557_NSC_RECR, &recr);
+    if (result != PCI_PROBE_OK) {
+        nic.state = E82557_STOPPING;
+        nic_trace(E82557_TRACE_STOP);
+        if (allocated) {
+            flags = irq_save();
+            int stopped = stop_dma(base, &nic.stop, E82557_STOP_ATTEMPTS);
+            status = inpw(base + E82557_SCB_STATUS);
+            outp(base + E82557_SCB_ACK, (u8)(status >> 8));
+            irq_restore(flags);
+            if (stopped) {
+                if (registered) (void)irq_unregister(dev->irq_line, e82557_irq, NULL);
+                bm_restore(dev, changed_bm);
+                (void)dma_free(&nic.dma);
+            } else {
+                bm_restore(dev, 1);
+                (void)dma_mark_leaked(&nic.dma);
+                pci_bind_set_reason(PCI_BIND_RESET_FAILED);
+                result = PCI_PROBE_QUARANTINE;
+                kprintf(E82557_LOG_ATTR, "[e82557] stop=fail leaked QUARANTINE\n");
             }
-            if (phy.error)
-                kprintf(E82557_LOG_ATTR, "[e82557] tx bmsr=-/- par=- dcr=- fcscr=- recr=-\n");
-            else
-                kprintf(E82557_LOG_ATTR, "[e82557] tx bmsr=%04x/%04x par=%04x dcr=%04x fcscr=%04x recr=%04x\n",
-                        phy.bmsr_first, phy.bmsr, par, dcr, fcscr, recr);
-        } else {
-            kprintf(E82557_LOG_ATTR, "[e82557] stat=%s bmsr=-\n", stat_error ? stat_error : "-");
         }
-        if (!why && phy.error) { stage = "mdi"; why = phy.error; }
+        nic.state = result == PCI_PROBE_QUARANTINE ? E82557_QUARANTINED : E82557_OFF;
+        kprintf(E82557_LOG_ATTR, "[e82557] %s=%s\n", stage, why ? why : "ng");
     }
-    nic_trace(E82557_TRACE_STOP);
-    if (allocated) {
-        if (why) kprintf(E82557_LOG_ATTR, "[e82557] %s=%s\n", stage, why);
-        if (stop_dma(base, &stop)) {
-            scb_mask(base, 1);
-            status = inpw(base + E82557_SCB_STATUS);
-            outp(base + E82557_SCB_ACK, (u8)((status & E82557_STAT_MASK) >> 8));
-            bm_restore(dev, changed_bm);
-            (void)dma_free(&dma);
-            if (!why)
-                kprintf(E82557_LOG_ATTR, "[e82557] cfg=ok ia=ok tx=ok(%u) stop=ok\n", tx_len);
-            else
-                kprintf(E82557_LOG_ATTR, "[e82557] stop=ok\n");
-        } else {
-            scb_mask(base, 1);
-            status = inpw(base + E82557_SCB_STATUS);
-            outp(base + E82557_SCB_ACK, (u8)((status & E82557_STAT_MASK) >> 8));
-            /* Safety shutdown is unconditional; normal restoration is owned. */
-            bm_restore(dev, 1);
-            (void)dma_mark_leaked(&dma);
-            pci_bind_set_reason(PCI_BIND_RESET_FAILED);
-            result = PCI_PROBE_QUARANTINE;
-            stage = "stop";
-            why = "idle";
-            kprintf(E82557_LOG_ATTR, "[e82557] stop=fail leaked QUARANTINE\n");
-        }
-    }
-    /* DECLINE/QUARANTINE both returned normally, so permit a later boot. */
-    if (vfs_rm(E82557_TRY_PATH) < 0 || vfs_sync() < 0)
-        kprintf(E82557_LOG_ATTR, "[e82557] try-rm=fail\n");
+    if (vfs_rm(E82557_TRY_PATH) < 0 || vfs_sync() < 0) kprintf(E82557_LOG_ATTR, "[e82557] try-rm=fail\n");
     nic_trace(E82557_TRACE_DONE);
-    if (why)
-        kprintf(E82557_LOG_ATTR, "[e82557] LB2c=FAIL(%s:%s)\n", stage, why);
-    else
-        kprintf(E82557_LOG_ATTR, "[e82557] LB2c=PASS\n");
+    if (why) kprintf(E82557_LOG_ATTR, "[e82557] LB3=FAIL(%s:%s)\n", stage, why);
+    else kprintf(E82557_LOG_ATTR, "[e82557] LB3=PASS\n");
     return result;
 }
-
-/* S4 ABI reservations; LB-3 will supply actual packet operations. */
-int e82557_send(const void *buf, u32 len) { (void)buf; (void)len; return OS32_ERR_NOSYS; }
-int e82557_recv(void *buf, u32 cap, u32 *len)
-{
-    (void)buf; (void)cap;
-    if (len) *len = 0;
-    return OS32_ERR_NOSYS;
-}
-void e82557_get_mac(u8 *mac)
-{
-    int i;
-    if (mac) for (i = 0; i < E82557_MAC_LEN; i++) mac[i] = 0;
-}
-int e82557_state(void) { return 0; }
-int e82557_loopback(int on) { (void)on; return OS32_ERR_NOSYS; }
-u32 e82557_stat(u32 idx) { (void)idx; return 0; }
-
 const struct pci_driver e82557_driver = {
     sizeof(struct pci_driver), E82557_VENDOR, E82557_DEVICE,
     PCI_CLASS_NETWORK, PCI_SUB_NET_ETHERNET, "e82557", e82557_probe

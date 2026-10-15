@@ -95,9 +95,6 @@ int e82557_stop_evidence(const struct e82557_stop *stop, u32 before, u16 st)
            !(st & (E82557_CUS_MASK | E82557_RUS_MASK));
 }
 
-STATIC_ASSERT(E82557_STAT_OFF >= E82557_DMA_END, stat_no_overlap);
-STATIC_ASSERT(E82557_STAT_OFF % E82557_DMA_ALIGN == 0, stat_alignment);
-STATIC_ASSERT(E82557_STAT_OFF + E82557_STAT_SIZE <= E82557_DMA_SIZE, stat_fits);
 u32 e82557_mdi_ctl(u8 op, u8 phy, u8 reg, u16 data)
 {
     return ((u32)op << 26) | ((u32)(phy & E82557_PHY_MASK) << 21) |
@@ -112,29 +109,71 @@ void e82557_phy_decode(u16 bmcr, u16 bmsr, int *link, int *an_done, int *an_en)
     *an_done = !!(bmsr & E82557_BMSR_AN);
     *an_en = !!(bmcr & E82557_BMCR_AN);
 }
-int e82557_bmcr_fix(u16 bmcr, u16 *out)
-{
-    if (bmcr & E82557_BMCR_RESET) return E82557_FIX_RESET_BUSY;
-    if (!(bmcr & E82557_BMCR_BAD)) return E82557_FIX_NONE;
-    *out = bmcr & ~(E82557_BMCR_RESET | E82557_BMCR_BAD | E82557_BMCR_RESTART);
-    return E82557_FIX_WRITE;
-}
-int e82557_bmcr_fixed(u16 readback) { return !(readback & E82557_BMCR_BAD); }
 int e82557_link_wait_step(int link, int an_done, int an_en, u32 elapsed, u32 limit)
 {
     if (link && (an_done || !an_en)) return E82557_DONE;
     return elapsed >= limit ? E82557_TIMEOUT : E82557_WAIT;
 }
-int e82557_stats_done(const void *area)
+
+STATIC_ASSERT(E82557_RFD_HEADER + E82557_RFD_SIZE == E82557_RFD_STRIDE, rfd_fits);
+u8 *e82557_rfd(void *ring, u32 i)
 {
-    return e82557_rd32((const u8 *)area + E82557_STAT_DONE_OFF) == E82557_STAT_DONE;
+    return (u8 *)ring + i * E82557_RFD_STRIDE;
 }
-u32 e82557_stats_read(const void *area, u32 idx)
+static u32 rx_next(u32 i) { return (i + 1) % E82557_RFD_COUNT; }
+void e82557_rx_init(void *ring, u32 pa, struct e82557_rx *rx)
 {
-    return e82557_rd32((const u8 *)area + idx * sizeof(u32));
+    rx->cons = rx->dev = rx->ready = 0;
+    for (u32 i = 0; i < E82557_RFD_COUNT; i++) {
+        u8 *rfd = e82557_rfd(ring, i);
+        e82557_wr32(rfd + 4, pa + rx_next(i) * E82557_RFD_STRIDE);
+        e82557_wr32(rfd + 8, E82557_TBD_NONE);
+        e82557_wr16(rfd + 14, E82557_RFD_SIZE);
+    }
+    e82557_rx_reown(ring, rx);
 }
-int e82557_stats_step(u32 good, u32 expect, u32 elapsed, u32 limit)
+/* SDM :5592-5603; FreeBSD if_fxp.c:2631-2646,2717-2719.
+ * Called only after reset proof (or before the first RU Start). */
+void e82557_rx_reown(void *ring, const struct e82557_rx *rx)
 {
-    if (good >= expect) return E82557_DONE;
-    return elapsed >= limit ? E82557_TIMEOUT : E82557_WAIT;
+    u32 free = E82557_RFD_COUNT - rx->ready;
+    for (u32 n = 0, i = rx->dev; n < free; n++, i = rx_next(i)) {
+        u8 *rfd = e82557_rfd(ring, i);
+        e82557_wr16(rfd, 0);
+        e82557_wr16(rfd + 12, 0);
+        E82557_BARRIER(); /* reown zero before EL */
+        e82557_wr16(rfd + 2, n + 1 == free ? E82557_RFD_EL : 0);
+    }
+}
+void e82557_rx_scan(void *ring, struct e82557_rx *rx, int *rnr)
+{
+    while (rx->ready < E82557_RFD_COUNT) {
+        u16 st = e82557_rd16(e82557_rfd(ring, rx->dev));
+        if (!(st & E82557_RFD_C)) break;
+        E82557_BARRIER(); /* scan completion acquisition */
+        if (st & E82557_RFD_RNR) *rnr = 1; /* if_fxp.c:1924-1925 */
+        rx->dev = rx_next(rx->dev);
+        rx->ready++;
+    }
+}
+void e82557_rfd_recycle(void *ring, struct e82557_rx *rx)
+{
+    u8 *rfd = e82557_rfd(ring, rx->cons);
+    u8 *tail = e82557_rfd(ring, (rx->cons + E82557_RFD_COUNT - 1) % E82557_RFD_COUNT);
+    e82557_wr16(rfd, 0);
+    e82557_wr16(rfd + 12, 0);
+    E82557_BARRIER(); /* recycle zero before EL */
+    if (rx->ready == E82557_RFD_COUNT) {
+        /* Full: RU stopped on the old EL. Remove it before publishing one slot. */
+        e82557_wr16(tail + 2, 0);
+        E82557_BARRIER(); /* full old before new */
+        e82557_wr16(rfd + 2, E82557_RFD_EL);
+    } else {
+        /* FreeBSD if_fxp.c:2679-2692: publish new tail before releasing old. */
+        e82557_wr16(rfd + 2, E82557_RFD_EL);
+        E82557_BARRIER(); /* nonfull new before old */
+        e82557_wr16(tail + 2, 0);
+    }
+    rx->cons = rx_next(rx->cons);
+    rx->ready--;
 }
