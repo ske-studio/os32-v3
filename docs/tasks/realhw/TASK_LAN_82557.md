@@ -6,6 +6,7 @@
 > 発行: PM (Claude Code `claude-fable-5-1`、2026-09-22) / それまでの状態: **L-A (PCI 列挙、KAPI v58) と L-D (Linux の橋) を着地 (2026-09-22)。**R1〜R4 は実機で取得 (2026-09-23、§6)**: 82557 = `0:11.0`、Interrupt Line **3** / PIN A、I/O BAR **0x6000** (BIOS 割当済み)、Command 0x0147 (IO/MEM/BM 有効)、PCMC = 82441FX (メカニズム #1 で可)。次は L-B (EEPROM 読み = R5)**。決裁: §3 の 1 は (b) 推奨案、2 は Ubuntu ノート、3 はスイッチ直結 (ユーザー、2026-09-22)。
 > ユーザー指示 2026-09-22: 「シリアル転送が実用的な速度になったので、次は内蔵 LAN によるホストサービスの稼働を目指す」
 > **ゴールの改定 (ユーザー決定 2026-10-15)**: ゴールは **`hsync` が LAN 経由で動くこと** — 実機の `/host` (今はシリアル越しの SerialFS、ノートの `tools/serialfs_host.py`) を LAN 越しにも出せるようにし、`hsync` 自体は変えずに LAN の速度で配備できるようにする。**印刷 (`lpr`) とダウンロード (`wget`) は後回し** (L-D2・L-E のうちその部分)。新しい段 **L-F (LAN 版の `/host`)** を本命に置き、L-C は L-F に要る分に絞る。L-F の設計は L-B の後に起こす (astra が書き Opus がレビュー、規則 [HW3])。
+> **通信の安全の方針 (ユーザー決定 2026-10-15)**: PC-9821 とホスト (ノート) のあいだの LAN は**平文でよい** — 家庭内のローカルで、狙う者はいない。OS32 の側に暗号・認証は入れない。**ホストから外へ出ていく通信の暗号化はホストの側が担う** (ダウンロード等を再開するとき)。相手の MAC の固定 (`SFS_LAN_PEER` / `lanfs_host.py --peer`) は取り違えを防ぐための設定で、防御ではない。キーによるペアリング (ホストがキーを出す → OS32 で入力 → 0x88B5 で MAC を交換して保存) は使い勝手の改善として後の段に残す。
 
 正典: [`PLAN.md`](PLAN.md) §5 (82557 を狙う理由)・§6 (PCI の土台)、[`../../archive/v3/PLAN.md`](../../archive/v3/PLAN.md) §1 (順序) ・§3 (ドライバの動的読み込み)、
 リンク層と Host Services は [`../network/LINK_PLAN.md`](../network/LINK_PLAN.md) / [`../network/HOST_SERVICES_PLAN.md`](../network/HOST_SERVICES_PLAN.md)。
