@@ -25,6 +25,7 @@ int e82557_recv(void *buf, u32 cap, u32 *len);
 void e82557_get_mac(u8 *mac);
 int e82557_state(void);
 u32 e82557_rx_free(void);
+int e82557_rx_ready(void); /* RUNNING and hardware RU ready; no restart/ack. */
 void e82557_tick(void); /* IRQ0, IF=0, at most one SCB issue per tick */
 int e82557_loopback(int on);
 /* 0 cx(+cna), 1 fr, 2 rnr, 3 swi, 4 other(mdi/dead), 5 tx_dma_done,

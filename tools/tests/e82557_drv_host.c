@@ -548,6 +548,15 @@ static void runtime_tests(const char *c)
             rx_scan(); CHECK(nic.rx.ready==7); inject_rus=1;
             service_tick(); CHECK(nic.rx.ready==8 && ru_starts==2);
         } else if(!strcmp(c,"rx_ready")) {
+            CHECK(e82557_rx_ready());
+            status = (u16)((status & ~E82557_RUS_MASK) | (2u << 2));
+            CHECK(!e82557_rx_ready() && e82557_rx_free()==8);
+            status = (u16)((status & ~E82557_RUS_MASK) | (E82557_RUS_READY << 2));
+            for(int state=E82557_OFF;state<=E82557_QUARANTINED;state++) {
+                nic.state=state;
+                CHECK(e82557_rx_ready()==(state==E82557_RUNNING));
+            }
+            nic.state=E82557_RUNNING;
             nic.rnr_pending=1; service_tick(); CHECK(!nic.rnr_pending && ru_starts==2);
         } else if(!strcmp(c,"rx_idle")) {
             status=0; service_tick(); CHECK(ru_starts==3 && !nic.rnr_pending);

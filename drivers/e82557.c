@@ -593,6 +593,15 @@ void e82557_get_mac(u8 *mac)
     if (mac) for (u32 i = 0; i < E82557_MAC_LEN; i++) mac[i] = nic.mac[i];
 }
 int e82557_state(void) { return nic.state; }
+int e82557_rx_ready(void)
+{
+    unsigned int flags = irq_save();
+    int ready = nic.state == E82557_RUNNING &&
+        ((inpw(nic.base + E82557_SCB_STATUS) & E82557_RUS_MASK) >> 2) ==
+        E82557_RUS_READY;
+    irq_restore(flags);
+    return ready;
+}
 u32 e82557_rx_free(void)
 {
     unsigned int flags = irq_save();
