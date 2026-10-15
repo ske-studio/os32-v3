@@ -40,6 +40,7 @@
 #include "kstack_hw.h"
 #include "exec.h"
 #include "pci.h"
+#include "e82557.h"
 #include "pci_bind.h"   /* PCI の結線表 (票 TASK_HAL_WIRING §1-4) */
 #include "irq.h"        /* irq_line_quarantined / irq_storm_masked (§1-1、結線表の line_state に差す) */
 #include "dma8237.h"    /* 8237 の共通部 + 0439h (同 §1-2) */
@@ -156,18 +157,15 @@ static char *tv_cat_dec(char *dst, int val)
 /* ======================================================================== */
 /*  PCI の結線表 (票 docs/tasks/v3/TASK_HAL_WIRING.md §1-4)                 */
 /*                                                                          */
-/*  **いまは空**。82557 の driver は別票 (L-B) で、ここに 1 行足るだけ。    */
-/*  空でも pci_bind_all を毎回通すのは、「候補が 0 本」と「PCI が無い」を   */
-/*  同じ経路で扱うため — 実機で初めて動く経路を実機の日に初めて通す、を     */
-/*  避ける。                                                                */
+/*  82557 の R5 EEPROM 観測。未一致の装置は今までどおり候補なし。         */
 /*                                                                          */
 /*  1 件ずつのポインタ配列にしてあるのは、将来 §3 の動的読み込みが来た      */
 /*  ときに表を差し替えるのが 1 ポインタで済むから (`size` で版を確かめる)。 */
 /* ======================================================================== */
 static const struct pci_driver *const pci_drivers[] = {
-    (const struct pci_driver *)0   /* C89 は空の初期化子を許さない番兵 */
+    &e82557_driver
 };
-#define PCI_DRIVER_COUNT  0
+#define PCI_DRIVER_COUNT  (sizeof(pci_drivers) / sizeof(pci_drivers[0]))
 
 /* dev_findをPathDeviceValidatorとして使用するラッパー */
 static int dev_find_validator(const char *name)
