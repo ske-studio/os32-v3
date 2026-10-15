@@ -1,10 +1,10 @@
-"""`v86 -g` の記録器と引数の判定 (kernel/v86_gcap_math.c) のホスト試験。
+"""`v86 -g` の記録器と引数の判定 (kdebug/v86_gcap_math.c) のホスト試験。
 
 記録: tools/tests/v86_gcap_tdd.md
 票: docs/tasks/realhw/TASK_PEGC480_REALHW.md §3 段 1 (実機の ROM の INT 18h
     AH=31h/30h を V86 で呼び、その間の OUT を記録する)
 
-実物の kernel/v86_gcap_math.c を 1 行も写さずに #include して回す。ポートにも
+実物の kdebug/v86_gcap_math.c を 1 行も写さずに #include して回す。ポートにも
 V86 にも触らない部分 (記録の列・溢れ・IN の表・幅で ops の口を選ぶこと・
 打ち切る命令・通すポート・AH=31h の値から AH=30h の引数を決めること) を見る。
 
@@ -14,8 +14,8 @@ V86 にも触らない部分 (記録の列・溢れ・IN の表・幅で ops の
     印のまま (未対応) を表で固定する。
   - 溢れ — 実機の ROM が 512 件を超えるかは分からない。
 
-ゲストのバイト列 (kernel/v86_gcap.c の v86_gcap_code[]) が正本の
-kernel/v86_test16_gcap.asm を組んだものと同じかも見る (nasm が無ければ SKIP)。
+ゲストのバイト列 (kdebug/v86_gcap.c の v86_gcap_code[]) が正本の
+kdebug/v86_test16_gcap.asm を組んだものと同じかも見る (nasm が無ければ SKIP)。
 自己試験 (`v86 -g -t`) はそのゲストで記録器をゲスト内から確かめる。
 
   python3 -B tools/tests/test_v86_gcap.py            # ホストで全ケース
@@ -31,18 +31,18 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/v86_gcap_host.c"
-SRC = ROOT / "kernel/v86_gcap_math.c"
-ASM = ROOT / "kernel/v86_test16_gcap.asm"
-GCAP_C = ROOT / "kernel/v86_gcap.c"
+SRC = ROOT / "kdebug/v86_gcap_math.c"
+ASM = ROOT / "kdebug/v86_test16_gcap.asm"
+GCAP_C = ROOT / "kdebug/v86_gcap.c"
 
-TARGET_SRCS = ["kernel/v86_gcap_math.c", "kernel/v86_gcap.c"]
+TARGET_SRCS = ["kdebug/v86_gcap_math.c", "kdebug/v86_gcap.c"]
 
 CASES = ["phase_diag", "port_list", "insn", "record_order", "overflow", "in_table",
          "pass_ops", "decide", "mode_31k", "restore"]
 
 # -Wno-attributes: __cdecl は x86-64 のホストでは無視される (警告だけ)。
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror", "-Wno-attributes"]
-INCLUDES = ["-I" + str(ROOT / p) for p in ("sdk/include/os32", "kernel", "lib")]
+INCLUDES = ["-I" + str(ROOT / p) for p in ("sdk/include/os32", "kernel", "lib", "kdebug")]
 
 # 否定側。実装を 1 か所だけ壊して RED になることを見る。
 MUTATIONS = [
@@ -159,10 +159,10 @@ def host_build(tmp, source_text=None):
     if source_text is None:
         cmd = ["gcc", *FLAGS, *INCLUDES, str(HARNESS), "-o", str(exe)]
     else:
-        mut = src_dir / "kernel"
+        mut = src_dir / "kdebug"
         mut.mkdir(exist_ok=True)
         (mut / "v86_gcap_math.c").write_text(source_text, encoding="utf-8")
-        (mut / "v86_gcap_diag.h").write_text((ROOT / "kernel/v86_gcap_diag.h").read_text())
+        (mut / "v86_gcap_diag.h").write_text((ROOT / "kdebug/v86_gcap_diag.h").read_text())
         (src_dir / "serial_diag_host.h").write_text((ROOT / "tools/tests/serial_diag_host.h").read_text())
         (mut / "v86_gcap_math.h").write_text(
             (ROOT / "kernel/v86_gcap_math.h").read_text(encoding="utf-8"),
@@ -170,7 +170,7 @@ def host_build(tmp, source_text=None):
         shim = src_dir / "harness.c"
         shim.write_text(
             HARNESS.read_text(encoding="utf-8").replace(
-                '"../../kernel/v86_gcap_math.c"', '"kernel/v86_gcap_math.c"'),
+                '"../../kdebug/v86_gcap_math.c"', '"kdebug/v86_gcap_math.c"'),
             encoding="utf-8")
         cmd = ["gcc", *FLAGS, "-I" + str(ROOT / "sdk/include/os32"),
                "-I" + str(ROOT / "lib"), "-I" + str(src_dir), "-I" + str(mut), str(shim), "-o", str(exe)]
@@ -192,7 +192,7 @@ def c_bytes():
     text = GCAP_C.read_text(encoding="utf-8")
     m = re.search(r"static const u8 v86_gcap_code\[\] = \{(.*?)\};", text, re.S)
     if not m:
-        raise SystemExit("v86_gcap_code[] not found in kernel/v86_gcap.c")
+        raise SystemExit("v86_gcap_code[] not found in kdebug/v86_gcap.c")
     return bytes(int(x, 16) for x in re.findall(r"0x([0-9A-Fa-f]{2})", m.group(1)))
 
 
@@ -285,7 +285,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-v86-gcap-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real kernel/v86_gcap_math.c)",
+        print("HOST GNU11 -Werror compile PASS (real kdebug/v86_gcap_math.c)",
               flush=True)
         rc = check_guest_bytes(tmp)
         if "--target" in args:

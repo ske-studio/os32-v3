@@ -120,7 +120,9 @@ static int kernel_tss;
 void ring3_resume(const u32 *f,u32 pd,void *tss) { (void)f;(void)pd;(void)tss; CHECK(0); }
 #include "tails_source.c"
 
-V86Gcap *v86_gcap_rec;
+#include "module.h"
+void v86_gcap_release(void);
+struct kdebug kdebug = { .ops = { .gcap_release = v86_gcap_release } };
 static u32 releases;
 void v86_bios_save_real(void) {}
 void v86_bios_restore_real(void) {}

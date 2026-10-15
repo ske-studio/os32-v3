@@ -29,6 +29,7 @@ check-memmap-audit-host:
 - kernel/shlib.c
 - kernel/sys.c
 - kernel/v86_gcap.*
+- kdebug/v86_gcap.*
 - kernel/v86_gcap_math.h
 - kernel/v86_mem.*
 - platform/pc98/**

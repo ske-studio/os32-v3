@@ -22,14 +22,14 @@ ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
     ('return-audit', 'kernel/v86_mem.c', '    kselftest_audit_v86_return();', '', 'FAIL V86 return audited'),
     ('return-gfx', 'kernel/v86_mem.c', '    gfx_v86_return();', '', 'FAIL audit after gfx return'),
-    ('kill-gcap-release', 'kernel/v86_mem.c', '    if (v86_session.aborting) v86_gcap_release();', '', 'FAIL kill gcap release audited'),
+    ('kill-gcap-release', 'kernel/v86_mem.c', '    if (v86_session.aborting && kdebug.ops.gcap_release) kdebug.ops.gcap_release();', '', 'FAIL kill gcap release audited'),
     ('end-guest-iopl', 'kernel/v86_mem.c', 'flags = (v86_session.saved_eflags & ~EFLAGS_IF) | (flags & EFLAGS_IF);', 'flags = flags;', 'FAIL kill restores caller IOPL'),
     ('direct-kill-no-end', 'exec/exec.c', '    v86_session_end();\n    ring3_context_clear();\n    exec_finish', '    ring3_context_clear();\n    exec_finish', 'FAIL kill release before owner reclaim'),
     ('end-reentry', 'kernel/v86_mem.c', 'if (v86_session.closing) { irq_restore(flags); return; }', 'if (0) { irq_restore(flags); return; }', 'FAIL end recursion'),
     ('landing-if', 'exec/exec.c', '    _enable();\n    v86_session_end();', '    v86_session_end();\n    _enable();', 'FAIL release IF enabled'),
     ('restore-flush', 'kernel/paging.c', '        page_tables[0][i] = saved;', '        page_tables[0][i] = saved; arch_mmu_flush_tlb();', 'FAIL V86 active TLB'),
     ('restore-current-pde', 'kernel/paging.c', '        page_tables[0][i] = saved;', '        page_tables[0][i] = saved; if (saved & PTE_USER) ((u32 *)P2V(paging_current_cr3()))[0] |= PTE_USER;', 'FAIL unrelated current PDE unchanged'),
-    ('int80-offset', 'kernel/v86.c', 'V86I_EIP, V86I_CS, V86I_EFLAGS, V86I_ESP, V86I_SS,\n                    v86_gcap_keep_if()', 'V86F_EIP, V86F_CS, V86F_EFLAGS, V86F_ESP, V86F_SS,\n                    v86_gcap_keep_if()', 'FAIL int80 IVT target'),
+    ('int80-offset', 'kernel/v86.c', 'V86I_EIP, V86I_CS, V86I_EFLAGS, V86I_ESP, V86I_SS,\n                    (kdebug.ops.gcap_keep_if ? kdebug.ops.gcap_keep_if() : 0)', 'V86F_EIP, V86F_CS, V86F_EFLAGS, V86F_ESP, V86F_SS,\n                    (kdebug.ops.gcap_keep_if ? kdebug.ops.gcap_keep_if() : 0)', 'FAIL int80 IVT target'),
 
     ('exec-gate', 'exec/exec.c', '    if (paging_v86_session_open()) return EXEC_ERR_INVALID;', '', 'FAIL session exec gate'),
     ('resume-gate', 'exec/exec.c', '    if (paging_v86_session_open()) return OS32_ERR_BUSY;', '', 'FAIL session exec gate'),

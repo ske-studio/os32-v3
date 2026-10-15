@@ -1056,64 +1056,39 @@ kdi_get_v86_gp_ip:
 kdi_ptr_v86_session:
     jmp *kdebug_import_slots+840
 .size kdi_ptr_v86_session, .-kdi_ptr_v86_session
-.globl e82557_send
-.type e82557_send, @function
-e82557_send:
+.globl kdi_ptr_v86_gcap_phase
+.type kdi_ptr_v86_gcap_phase, @function
+kdi_ptr_v86_gcap_phase:
     jmp *kdebug_import_slots+844
-.size e82557_send, .-e82557_send
-.globl e82557_recv
-.type e82557_recv, @function
-e82557_recv:
+.size kdi_ptr_v86_gcap_phase, .-kdi_ptr_v86_gcap_phase
+.globl kdi_ptr_v86_gcap_alloc_count
+.type kdi_ptr_v86_gcap_alloc_count, @function
+kdi_ptr_v86_gcap_alloc_count:
     jmp *kdebug_import_slots+848
-.size e82557_recv, .-e82557_recv
-.globl e82557_get_mac
-.type e82557_get_mac, @function
-e82557_get_mac:
+.size kdi_ptr_v86_gcap_alloc_count, .-kdi_ptr_v86_gcap_alloc_count
+.globl kdi_ptr_v86_gcap_free_count
+.type kdi_ptr_v86_gcap_free_count, @function
+kdi_ptr_v86_gcap_free_count:
     jmp *kdebug_import_slots+852
-.size e82557_get_mac, .-e82557_get_mac
-.globl e82557_state
-.type e82557_state, @function
-e82557_state:
-    jmp *kdebug_import_slots+856
-.size e82557_state, .-e82557_state
-.globl e82557_loopback
-.type e82557_loopback, @function
-e82557_loopback:
-    jmp *kdebug_import_slots+860
-.size e82557_loopback, .-e82557_loopback
-.globl e82557_stat
-.type e82557_stat, @function
-e82557_stat:
-    jmp *kdebug_import_slots+864
-.size e82557_stat, .-e82557_stat
-.globl vfs_mkdir
-.type vfs_mkdir, @function
-vfs_mkdir:
-    jmp *kdebug_import_slots+868
-.size vfs_mkdir, .-vfs_mkdir
+.size kdi_ptr_v86_gcap_free_count, .-kdi_ptr_v86_gcap_free_count
 .globl vfs_read
 .type vfs_read, @function
 vfs_read:
-    jmp *kdebug_import_slots+872
+    jmp *kdebug_import_slots+856
 .size vfs_read, .-vfs_read
 .globl vfs_write
 .type vfs_write, @function
 vfs_write:
-    jmp *kdebug_import_slots+876
+    jmp *kdebug_import_slots+860
 .size vfs_write, .-vfs_write
-.globl vfs_rm
-.type vfs_rm, @function
-vfs_rm:
-    jmp *kdebug_import_slots+880
-.size vfs_rm, .-vfs_rm
 .globl vfs_sync
 .type vfs_sync, @function
 vfs_sync:
-    jmp *kdebug_import_slots+884
+    jmp *kdebug_import_slots+864
 .size vfs_sync, .-vfs_sync
 .globl boot_image_info
 .type boot_image_info, @function
 boot_image_info:
-    jmp *kdebug_import_slots+888
+    jmp *kdebug_import_slots+868
 .size boot_image_info, .-boot_image_info
 .section .note.GNU-stack,"",@progbits

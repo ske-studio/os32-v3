@@ -1,0 +1,17 @@
+check-kdebug-ctx-host:
+- build/checks.d/check-kdebug-ctx-host.mk
+- kdebug/v86_gcap.c
+- kdebug/v86_gcap_math.c
+- kdebug/v86_gcap_diag.h
+- kdebug/kdebug_main.c
+- kdebug/generated/**
+- kernel/v86_gcap.c
+- kernel/v86_gcap.h
+- kernel/v86_gcap_math.h
+- kernel/module.h
+- kernel/kdebug_imports.def
+- tools/gen_kdebug_imports.py
+- tools/mkmod.py
+- tools/tests/test_kdebug_ctx.py
+- tools/tests/host32.py
+- tools/check_map.d/check-kdebug-ctx-host.yaml

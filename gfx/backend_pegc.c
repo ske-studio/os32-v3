@@ -1157,7 +1157,7 @@ static void pegc_shutdown(void)
 /* ------------------------------------------------------------------------ */
 /*  pegc_restore_text_sync — ROM で戻れなかったときの OS32 側の戻し          */
 /*                                                                          */
-/*  `v86 -g` (kernel/v86_gcap.c、票 TASK_PEGC480_REALHW §3 段 1) は実機の    */
+/*  `v86 -g` (kdebug/v86_gcap.c、票 TASK_PEGC480_REALHW §3 段 1) は実機の    */
 /*  ROM の INT 18h AH=30h で 480 ラインへ入り、同じ AH=30h で元のモードへ     */
 /*  戻す。その戻しが失敗した (AH≠05h・打ち切り・暴走) ときだけここへ来る。    */
 /*  やることは pegc_shutdown の後半と同じ考え方 — 拡張モードを抜け、        */

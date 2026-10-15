@@ -64,9 +64,10 @@ check-mkmod-host:
 - kernel/time_math.h
 - kernel/v86.h
 - kernel/v86_gcap.c
+- kdebug/v86_gcap.c
 - kernel/v86_gcap.h
-- kernel/v86_gcap_diag.h
-- kernel/v86_gcap_math.c
+- kdebug/v86_gcap_diag.h
+- kdebug/v86_gcap_math.c
 - kernel/v86_gcap_math.h
 - kernel/v86_io.h
 - kernel/v86_mem.h

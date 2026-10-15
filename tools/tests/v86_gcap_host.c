@@ -1,7 +1,7 @@
 /* ======================================================================== */
 /*  v86_gcap_host.c — `v86 -g` の記録器と引数の判定のホスト試験              */
 /*                                                                          */
-/*  実物の kernel/v86_gcap_math.c を 1 行も写さずに #include する (変異は    */
+/*  実物の kdebug/v86_gcap_math.c を 1 行も写さずに #include する (変異は    */
 /*  写しの上で。tools/tests/test_v86_gcap.py)。ポートにも V86 にも触らない   */
 /*  部分だけなので、模型は ops (関数ポインタ) の記録係 1 つで足りる。        */
 /*                                                                          */
@@ -12,7 +12,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "../../kernel/v86_gcap_math.c"
+#include "../../kdebug/v86_gcap_math.c"
 #include "v86_gcap_diag.h"
 
 static int fails = 0;

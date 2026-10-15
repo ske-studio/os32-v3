@@ -12,10 +12,9 @@
 #include "io.h"
 #include "v86_io.h"
 #include "v86_bios.h"
-#include "v86_gcap.h"
+#include "module.h"
 #include "kselftest.h"
 #include "../gfx/gfx.h"
-extern V86Gcap *v86_gcap_rec;
 
 struct v86_session_state v86_session;
 u32 v86_restore_mismatch;
@@ -185,9 +184,9 @@ void v86_session_end(void)
     }
     v86_restore_mismatch += paging_v86_restore(&v86_session);
     /* All backing aliases are gone before owner reclamation can run. */
-    if (v86_session.aborting) v86_gcap_rec = 0;
+    if (v86_session.aborting && kdebug.ops.gcap_detach) kdebug.ops.gcap_detach();
     v86_io_reset_policy();
-    v86_gcap_rec = 0;
+    if (kdebug.ops.gcap_detach) kdebug.ops.gcap_detach();
     v86_session.open = 0;
     v86_session.release_pending = 1;
 release:
@@ -202,7 +201,7 @@ release:
     backing_phys = 0;
     backing_owner = 0;
     v86_session.release_pending = 0;
-    if (v86_session.aborting) v86_gcap_release();
+    if (v86_session.aborting && kdebug.ops.gcap_release) kdebug.ops.gcap_release();
     gfx_v86_return();
     kselftest_audit_v86_return();
 done:

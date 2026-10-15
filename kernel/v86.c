@@ -14,7 +14,7 @@
 #include "v86_io.h"
 #include "v86_pic.h"
 #include "v86_bios.h"
-#include "v86_gcap.h"
+#include "module.h"
 #include "loop_dev.h"
 #include "idt.h"
 #include "kprintf.h"
@@ -248,8 +248,8 @@ int v86_gp_handler(u32 *frame)
 
     /* `v86 -g` の採取中だけ: 記録を嘘にする命令 (INS/OUTS、66h 付きの
      * IN/OUT EAX) は扱わずに打ち切る。採取中でなければ常に 0
-     * (票 TASK_PEGC480_REALHW §3 段 1、kernel/v86_gcap.c)。 */
-    if (v86_gcap_insn_abort(opsize16, pc[len])) {
+     * (票 TASK_PEGC480_REALHW §3 段 1、kdebug/v86_gcap.c)。 */
+    if (kdebug.ops.gcap_insn_abort && kdebug.ops.gcap_insn_abort(opsize16, pc[len])) {
         v86_exit_reason = V86_EXIT_UNKNOWN_OP;
         return 1;
     }
@@ -451,7 +451,7 @@ int v86_inject_int(u32 *frame, u32 vector)
      * 実 IRQ は OS32 の ISR へ行くだけでゲストへは反射しない。 */
     return v86_do_int(frame, vector,
                       V86F_EIP, V86F_CS, V86F_EFLAGS, V86F_ESP, V86F_SS,
-                      v86_gcap_keep_if());
+                      (kdebug.ops.gcap_keep_if ? kdebug.ops.gcap_keep_if() : 0));
 }
 
 /* INT 80h reaches the DPL3 gate without #GP at IOPL3. Reuse the
@@ -461,7 +461,7 @@ void v86_int80(u32 *frame)
 {
     if (!v86_do_int(frame, RING3_SYSCALL_VECTOR,
                     V86I_EIP, V86I_CS, V86I_EFLAGS, V86I_ESP, V86I_SS,
-                    v86_gcap_keep_if())) {
+                    (kdebug.ops.gcap_keep_if ? kdebug.ops.gcap_keep_if() : 0))) {
         extern void v86_exit_to_kernel(void);
         v86_exit_reason = V86_EXIT_FAULT;
         v86_exit_to_kernel();

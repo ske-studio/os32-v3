@@ -37,3 +37,5 @@ check-kdebug-init-host:
 - tools/tests/module_image_host.c
 - tools/tests/test_module_image.py
 - kdebug/generated/**
+- kdebug/v86_gcap.c
+- kdebug/v86_gcap_math.c

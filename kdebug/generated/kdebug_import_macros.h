@@ -44,5 +44,8 @@
 #define v86_gp_cs (kdi_get_v86_gp_cs())
 #define v86_gp_ip (kdi_get_v86_gp_ip())
 #define v86_session (*kdi_ptr_v86_session())
+#define v86_gcap_phase (*kdi_ptr_v86_gcap_phase())
+#define v86_gcap_alloc_count (*kdi_ptr_v86_gcap_alloc_count())
+#define v86_gcap_free_count (*kdi_ptr_v86_gcap_free_count())
 #define ksel_pass (kdi_get_kselftest_pass())
 #define ksel_fail (kdi_get_kselftest_fail())

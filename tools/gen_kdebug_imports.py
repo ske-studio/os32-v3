@@ -21,8 +21,8 @@ STAGE_KINDS = {
     'S1': ('FUNC',),
     'S2': ('FUNC',) * 134 + ('GETTER',) * 22 +
           ('GETTER', 'SETTER') * 12 + ('PTR',) * 7 + ('OP',) * 6,
-    'S3': ('FUNC',) * 14 + ('GETTER',) * 2 + ('PTR',),
-    'S4': ('FUNC',) * 12,
+    'S3': ('FUNC',) * 14 + ('GETTER',) * 2 + ('PTR',) * 4,
+    'S4': ('FUNC',) * 4,
 }
 STAGES = {}
 for _stage, _kinds in STAGE_KINDS.items():
@@ -135,7 +135,7 @@ def check_nm(entries, nm=None, root=ROOT):
     for stage, stems in groups.items():
         paths = ([root / 'build/out/kdebug/crt_diag.o'] if stage == 'S1' else
                  [root / 'build/out/kdebug/kselftest.o', root / 'kernel/kaudit.o'] if stage == 'S2' else
-                 [root / 'kernel' / (name + '.o') for name in stems])
+                 [root / 'build/out/kdebug' / (name + '.o') for name in stems])
         missing = [str(p) for p in paths if not p.exists()]
         if missing:
             raise SystemExit('gen_kdebug_imports: run make kernel first (missing: ' + ', '.join(missing) + ')')
@@ -154,7 +154,7 @@ def check_nm(entries, nm=None, root=ROOT):
             refs = {next((e['symbol'] for e in entries if e['kind_name'] in ('GETTER', 'SETTER', 'PTR') and e['name'] == name), name)
                     for name in refs - operations}
         if stage == 'S3':
-            refs -= {'v86_gcap_phase', 'v86_gcap_alloc_count', 'v86_gcap_free_count'}
+            refs = {next((e['symbol'] for e in entries if e['name'] == name), name) for name in refs}
         cumulative |= refs
         expected = {e['symbol'] for e in entries[:STAGES[stage]] if e['kind_name'] != 'OP'}
         if cumulative != expected:
@@ -198,7 +198,7 @@ def generate(entries, out_dir, stage='S4'):
     kernel += ['};', 'const struct module_symbol_contract kdebug_export_contracts[MODULE_OPS_SLOTS] = {']
     from mkmod import OPS_NAMES
     slots = {'S1': [5], 'S2': list(range(1, 6)),
-             'S3': list(range(1, 17)), 'S4': list(range(1, 6)) + [18]}[stage]
+             'S3': list(range(1, 17)), 'S4': list(range(1, 17)) + [18]}[stage]
     kernel += [f'    [{slot - 1}] = {{0x{fnv1a(OPS_NAMES[slot - 1].encode()):08x}u, 1, 0}},' for slot in slots]
     kernel += ['};']
     (out / 'kdebug_kexports.c').write_text('\n'.join(kernel) + '\n')
@@ -226,7 +226,7 @@ def main():
         entries = load_def(args.definition)
         if args.check_nm:
             check_nm(entries, args.nm)
-            print('kdebug imports: actual nm -u sets match S1=1 S2=194 S3=211 (data -> accessors, six new operations)')
+            print('kdebug imports: actual nm -u sets match S1=1 S2=194 S3=214 (data -> accessors, six new operations)')
         if args.out_dir:
             generate(entries, args.out_dir, args.stage)
     except (ValueError, KeyError, OSError, subprocess.CalledProcessError) as exc:

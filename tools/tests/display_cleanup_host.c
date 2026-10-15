@@ -2,9 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "types.h"
-#include "pc98.h"
 #undef __cdecl
 #define __cdecl
+#include "module.h"
+#include "pc98.h"
 #include "gfx.h"
 int gfx_current_height = 200, gfx_flip_enabled = 1;
 #define CHECK(c, msg) do { if (!(c)) { fprintf(stderr, "FAIL: %s\n", msg); exit(1); } } while (0)
@@ -20,6 +21,7 @@ static void palette_init(void) { palette++; }
 static void console_hw_cursor_enable(void) { cursor++; }
 static void tss_iomap_deny_all(void) { deny++; }
 static int v86_gcap_active(void) { return active; }
+struct kdebug kdebug = { .ops = { .gcap_active = v86_gcap_active } };
 static void snd_state_for_os32(void) { sound++; }
 static void tv_restore(const u16 *tv) { CHECK(*tv == 123, "saved TVRAM"); restored++; }
 #include "display_cleanup_slice.inc"
