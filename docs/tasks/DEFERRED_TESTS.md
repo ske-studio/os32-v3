@@ -43,6 +43,7 @@
 
 | ID | 何を残したか | 理由 | 渡し先 |
 |---|---|---|---|
+| LB-R5-1 | R5 の診断 (観測行・最終行の整形、begin/end マーカー、先頭 64 語のダンプと u16[64]) を本体から外し、EEPROM の語バッファを MAC 用の 3 語に縮める (約 1.5 KB、astra の内訳 `~/os32-tmp/run/lan/astra_impl.log`) | R5 は実機で 1 回採れば用が済む。本番に残すと予算を使う | LAN L-B の本番の依頼パック (R5 の実機の結果が出た後) |
 | LZSS-1 | 修正した圧縮器の PKG (種 250 の 2 ファイル) を cdinst で入れて照合 | cdinst は MINIMAL / GUI / NORMAL / DEBUG の名前だけを展開し、試験 PKG を媒体に載せる道具の経路が無い。R0 の Full install (225 files、`hsync -n --verify` で内容一致) は代替の観測で PASS に数えない。host の `test_lzss_pkg.py` は合格 | 保守: 次に ISO / PKG の道具を触る段 |
 | PRIO-1 | `install` (FD 起動、CD でない方) の通し (授権・区画・format・書込み) | R0 は cdinst Full だけ (閉鎖台帳)。install は F-14 で確認画面まで (n で中断) | 保守: LZSS-1 と同じ機会 |
 | E10-4 | `v86 -g` の採取の途中の kill で g/tv の解放・gcap_ops・TVRAM 30 行が戻ること | R1b で観測不能: 起動 0.25s 後の CTRL+STOP でも採取が先に終わる (`E end`、gcap alloc 2・free 2・kills +0)。採取の途中を狙う hook (長い採取か注入) が要る | T7 |
