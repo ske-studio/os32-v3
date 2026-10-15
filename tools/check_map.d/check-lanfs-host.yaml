@@ -1,0 +1,14 @@
+check-lanfs-host:
+- fs/sfs_lan.c
+- fs/sfs_client.c
+- fs/sfs_proto.c
+- lib/crc32.c
+- lib/crc32_core.inc
+- tools/lanfs_host.py
+- tools/serialfs_host.py
+- tools/lan_bridge.py
+- tools/tests/lanfs_host.c
+- tools/tests/test_lanfs.py
+- tools/tests/lanfs_tdd.md
+- build/checks.d/check-lanfs-host.mk
+- tools/check_map.d/check-lanfs-host.yaml
