@@ -26,4 +26,17 @@ void e82557_cb_config(void *cb, const u8 *cfg);
 void e82557_config_bytes(u8 *out, int mode);
 int e82557_tcb_build(void *tcb, const u8 *frame, u32 len, u8 thresh, u32 link, int i);
 int e82557_stop_evidence(const struct e82557_stop *stop, u32 before, u16 st);
+enum e82557_fix { E82557_FIX_NONE, E82557_FIX_WRITE, E82557_FIX_RESET_BUSY };
+enum e82557_wait { E82557_WAIT, E82557_DONE, E82557_TIMEOUT };
+u32 e82557_mdi_ctl(u8 op, u8 phy, u8 reg, u16 data);
+int e82557_mdi_ready(u32 ctl);
+u16 e82557_mdi_data(u32 ctl);
+int e82557_phy_id_valid(u16 id1);
+void e82557_phy_decode(u16 bmcr, u16 bmsr, int *link, int *an_done, int *an_en);
+int e82557_bmcr_fix(u16 bmcr, u16 *out);
+int e82557_bmcr_fixed(u16 readback);
+int e82557_link_wait_step(int link, int an_done, int an_en, u32 elapsed, u32 limit);
+int e82557_stats_done(const void *area);
+u32 e82557_stats_read(const void *area, u32 idx);
+int e82557_stats_step(u32 good, u32 expect, u32 elapsed, u32 limit);
 #endif

@@ -94,3 +94,47 @@ int e82557_stop_evidence(const struct e82557_stop *stop, u32 before, u16 st)
     return stop->reset_seq != before && stop->reset_seq != stop->start_seq &&
            !(st & (E82557_CUS_MASK | E82557_RUS_MASK));
 }
+
+STATIC_ASSERT(E82557_STAT_OFF >= E82557_DMA_END, stat_no_overlap);
+STATIC_ASSERT(E82557_STAT_OFF % E82557_DMA_ALIGN == 0, stat_alignment);
+STATIC_ASSERT(E82557_STAT_OFF + E82557_STAT_SIZE <= E82557_DMA_SIZE, stat_fits);
+u32 e82557_mdi_ctl(u8 op, u8 phy, u8 reg, u16 data)
+{
+    return ((u32)op << 26) | ((u32)(phy & E82557_PHY_MASK) << 21) |
+           ((u32)(reg & E82557_PHY_MASK) << 16) | data;
+}
+int e82557_mdi_ready(u32 ctl) { return !!(ctl & E82557_MDI_READY); }
+u16 e82557_mdi_data(u32 ctl) { return (u16)ctl; }
+int e82557_phy_id_valid(u16 id1) { return id1 != 0 && id1 != 0xffff; }
+void e82557_phy_decode(u16 bmcr, u16 bmsr, int *link, int *an_done, int *an_en)
+{
+    *link = !!(bmsr & E82557_BMSR_LINK);
+    *an_done = !!(bmsr & E82557_BMSR_AN);
+    *an_en = !!(bmcr & E82557_BMCR_AN);
+}
+int e82557_bmcr_fix(u16 bmcr, u16 *out)
+{
+    if (bmcr & E82557_BMCR_RESET) return E82557_FIX_RESET_BUSY;
+    if (!(bmcr & E82557_BMCR_BAD)) return E82557_FIX_NONE;
+    *out = bmcr & ~(E82557_BMCR_RESET | E82557_BMCR_BAD | E82557_BMCR_RESTART);
+    return E82557_FIX_WRITE;
+}
+int e82557_bmcr_fixed(u16 readback) { return !(readback & E82557_BMCR_BAD); }
+int e82557_link_wait_step(int link, int an_done, int an_en, u32 elapsed, u32 limit)
+{
+    if (link && (an_done || !an_en)) return E82557_DONE;
+    return elapsed >= limit ? E82557_TIMEOUT : E82557_WAIT;
+}
+int e82557_stats_done(const void *area)
+{
+    return e82557_rd32((const u8 *)area + E82557_STAT_DONE_OFF) == E82557_STAT_DONE;
+}
+u32 e82557_stats_read(const void *area, u32 idx)
+{
+    return e82557_rd32((const u8 *)area + idx * sizeof(u32));
+}
+int e82557_stats_step(u32 good, u32 expect, u32 elapsed, u32 limit)
+{
+    if (good >= expect) return E82557_DONE;
+    return elapsed >= limit ? E82557_TIMEOUT : E82557_WAIT;
+}

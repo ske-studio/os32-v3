@@ -11,7 +11,9 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/e82557_drv_host.c"
 TARGET_SRCS = ["drivers/e82557.c", "drivers/e82557_desc.c"]
 CASES = ["pass", "kill", "mkdir", "same", "other", "seq_missing_old", "seq_ahead", "monotonic", "try_read", "seq_read", "try_write", "seq_write", "try_short", "seq_short", "try_back", "seq_back", "sync", "write_zero", "remove", "crc_missing", "bad_bar", "io_disabled", "reset_fail", "pre_wait", "post_wait", "ru_post_wait", "no_trace", "ee_fallback", "ee_badmac", "ee_detect_fail"] + [f"bad_try{i}" for i in range(9)] + [f"bad_seq{i}" for i in range(7)]
-CASES += ["table", "dma_fail", "bm_fail", "bm_present", "stop_retry", "stop_fail", "stop_bm_present", "cb_edge", "cb_late", "bm_present_ng"] + [f"{kind}{n}" for kind in ("cb_timeout", "cb_ng", "cu_pre", "cu_post") for n in range(1, 4)]
+CASES += ["table", "dma_fail", "bm_fail", "bm_present", "stop_retry", "stop_fail", "stop_bm_present", "cb_edge", "cb_late", "bm_present_ng"] + [f"{kind}{n}" for kind in ("cb_timeout", "cb_ng", "cu_pre", "cu_post") for n in range(1, 5)]
+CASES += ["phy_" + n for n in ("latch", "late", "down", "off", "fix14", "fix11", "fix10", "fixall", "reset", "reset_busy", "ng", "kill", "scan", "none", "timeout")]
+CASES += ["stat_" + n for n in ("delay", "never", "dump_delay", "collision", "timeout", "late", "quarantine", "load_pre", "load_post", "dump_pre", "dump_post")]
 FLAGS = ["-m32", "-static", "-no-pie", "-fno-pie", "-fno-stack-protector", "-ffreestanding", "-nostdlib", "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-D__cdecl="]
 INCLUDES = ["-I" + str(ROOT / p) for p in ("include", "drivers", "sdk/include/os32", "fs", "kernel", "lib", "arch/x86", "platform/pc98")] + ["-I" + str(ROOT)]
 MIRROR = ["tools/tests/e82557_drv_host.c", "drivers/e82557.c", "drivers/e82557.h", "drivers/e82557_regs.h", "drivers/e82557_eeprom.c", "drivers/e82557_eeprom.h", "drivers/pci_decode.c", "fs/vfs.h", "kernel/module.h", "include/bootinfo.h", "include/config.h"]
@@ -105,6 +107,78 @@ MUTATIONS += [
  ("drivers/e82557.c", 'bm_restore(dev, changed_bm);\n            (void)dma_free(&dma);', '(void)dma_free(&dma);\n            bm_restore(dev, changed_bm);', "free before BM restore"),
  ("drivers/e82557.c", '(void)dma_mark_leaked(&dma);', '(void)dma_free(&dma);', "free unproven DMA"),
 ]
+MUTATIONS += [('drivers/e82557.c',
+  'if (us == E82557_MDI_WAIT_US) return 0;',
+  'if (0 && us == E82557_MDI_WAIT_US) return 0;',
+  'MDI wait unbounded'),
+ ('drivers/e82557.c',
+  'return mdi_read(base, p, E82557_PHY_BMSR, &p->bmsr) &&\n'
+  '           mdi_read(base, p, E82557_PHY_BMSR, &p->bmsr);',
+  'return mdi_read(base, p, E82557_PHY_BMSR, &p->bmsr);',
+  'BMSR single read'),
+ ('drivers/e82557.c',
+  'while (p->bmcr & E82557_BMCR_RESET)',
+  'while (0 && (p->bmcr & E82557_BMCR_RESET))',
+  'reset wait omitted'),
+ ('drivers/e82557.c',
+  'if (!mdi_read(base, p, E82557_PHY_BMCR, &p->bmcr) || !phy_status(base, p))',
+  'if ((0 && !mdi_read(base, p, E82557_PHY_BMCR, &p->bmcr)) || !phy_status(base, p))',
+  'fix readback omitted'),
+ ('drivers/e82557.c',
+  'if (!sysconfig_get_int(SYS_SYSTEM_CFG, "E82557_PHYFIX", 1))',
+  'if (0 && !sysconfig_get_int(SYS_SYSTEM_CFG, "E82557_PHYFIX", 1))',
+  'PHYFIX ignored'),
+ ('drivers/e82557.c',
+  'e82557_wr32(area + E82557_STAT_DONE_OFF, 0);',
+  '/* stale done retained */',
+  'stats done clear omitted'),
+ ('drivers/e82557.c',
+  'E82557_BARRIER(); /* stats publish */',
+  '/* stats publish omitted */',
+  'stats publication barrier omitted'),
+ ('drivers/e82557.c',
+  'E82557_BARRIER(); /* stats acquire */',
+  '/* stats acquire omitted */',
+  'stats acquisition barrier omitted'),
+ ('drivers/e82557.c',
+  'if (e82557_stats_step(*good, expect, *waited, E82557_TXDONE_WAIT_MS) != E82557_WAIT)',
+  'if (e82557_stats_step(*good, expect, *waited, E82557_TXDONE_WAIT_MS) != E82557_WAIT || 1)',
+  'stats retry omitted'),
+ ('drivers/e82557.c',
+  'n == 1 ? 1 : good1 + 1,',
+  'n == 1 ? 1 : 2,',
+  'second expectation cumulative two'),
+ ('drivers/e82557.c',
+  'tx1, good1, w1, tx2, good2 - good1, w2,',
+  'tx1, good1, w1, tx2, good2, w2,',
+  'second count not delta'),
+ ('drivers/e82557.c',
+  'if (n == 2) {\n            nic_trace(E82557_TRACE_LINK);',
+  'if (n == 1) {\n            nic_trace(E82557_TRACE_LINK);',
+  'HELLO link wait before first'),
+ ('drivers/e82557.c',
+  '        hello_build(frame, mac, n);',
+  '        if (n == 2 && !(phy.bmsr & E82557_BMSR_LINK)) continue;\n'
+  '        hello_build(frame, mac, n);',
+  'HELLO2 omitted when down'),
+ ('drivers/e82557.c',
+  '                                  E82557_LINK_WAIT_TICKS) != E82557_WAIT)',
+  '                                  0) != E82557_WAIT)',
+  'link deadline zero'),
+ ('drivers/e82557.c',
+  '        if (why) goto done;\n        stats_valid = (int)n;',
+  '        if (why) why = stat_error = stats_until(base, &dma, 1, &good1, &w1);\n'
+  '        stats_valid = (int)n;',
+  'reissue incomplete dump'),
+ ('drivers/e82557.c',
+  'if (stop_dma(base, &stop)) {',
+  'if (stat_error || stop_dma(base, &stop)) {',
+  'free during delayed dump'),
+ ('drivers/e82557.c',
+  '        *waited = (tick_count - start) * E82557_TICK_MS;\n        if (e82557_stats_step',
+  '        start = tick_count;\n        *waited = 0;\n        if (e82557_stats_step',
+  'Dump time excluded from deadline')]
+
 def mutation_text(rel, old, new, label):
     text = (ROOT / rel).read_text()
     if text.count(old) != 1:
