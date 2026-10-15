@@ -46,7 +46,7 @@
 #define E82557_FRAME_MIN       14u
 #define E82557_FRAME_MAX       1518u
 #define E82557_HELLO_LEN       60u
-#define E82557_HELLO_MARK_LEN  16u
+#define E82557_HELLO_MARK_LEN  14u
 #define E82557_HELLO_TYPE      0x88B5u
 #define E82557_CB_IA           1u
 #define E82557_CB_CONFIG       2u
@@ -96,6 +96,18 @@
 #define E82557_PHY_ID2         3u
 #define E82557_PHY_ANAR        4u
 #define E82557_PHY_ANLPAR      5u
+/* DP83840A datasheet 4.9-4.15; FreeBSD nsphyreg.h / nsphy.c. */
+#define E82557_NSC_ID1         0x2000u
+#define E82557_NSC_ID2         0x5C00u
+#define E82557_NSC_ID2_MASK    0xFFF0u
+#define E82557_NSC_DCR         0x12u
+#define E82557_NSC_FCSCR       0x13u
+#define E82557_NSC_RECR        0x15u
+#define E82557_NSC_SRR         0x16u
+#define E82557_NSC_PCR         0x17u
+#define E82557_NSC_PAR         0x19u
+#define E82557_NSC_PCR_SET     0x0562u
+#define E82557_NSC_PCR_VERIFY  0x0062u
 #define E82557_EE_PHY          6u
 #define E82557_BMCR_RESET      0x8000u
 #define E82557_BMCR_BAD        0x4C00u /* loopback, power down, isolate */

@@ -120,10 +120,13 @@ static u32 now, reset_at, cu_base=0x1000, ru_base=0x1000, pointer;
 static u16 status=0xA000;
 static u8 command, mask;
 static char output[8192];
-/* LB2b independent device model: time, Clause 22 and delayed bus writes. */
-static u16 phy_regs[32][6];
+/* LB2c independent device model: time, Clause 22 and delayed bus writes. */
+static u16 phy_regs[32][32];
+static int phyvendor=1, pcr_writes, pcr_reads, pcr_reserved, pcr_drop;
+static int vendor_reads[32], vendor_timeout, vendor_error;
 static int phyfix=1, mdi_timeout, mdi_reads, mdi_writes, mdi_total, bmsr_reads;
 static int reset_reads, reset_never, fix_ignore, link_tick, an_off, scan_none;
+static int latch_zero, max_counts;
 static int tx_delay, tx_never, tx_count, tx_good, lost_crs, collision;
 static u32 mdi_ctl, tx_due[2], stat_ptr, dump_due, dump_delay;
 static int tx_pending[2], dump_pending, dumps, loads, stat_pre, stat_post;
@@ -140,6 +143,7 @@ static void model_time(void)
     if (dump_pending && !dump_timeout && now>=dump_due) {
         CHECK(!freed && !leaked);
         u32 counts[6]={(u32)tx_good,collision?1u:0u,collision?2u:0u,0,(u32)lost_crs,0};
+        if (max_counts) for (int i=0;i<6;i++) counts[i]=0xffffffffu;
         for (int i=0;i<6;i++) for (int j=0;j<4;j++) memory[14032+i*4+j]=(u8)(counts[i]>>(j*8));
         memory[14096]=5; memory[14097]=0xa0; memory[14098]=memory[14099]=0;
         dump_pending=0;
@@ -157,13 +161,20 @@ static u32 inpd(u16 port)
     if (++mdi_total>20000) { fprintf(stderr,"FAIL unbounded MDI wait\n"); exit(23); }
     if (mdi_timeout || ++mdi_reads<3) return mdi_ctl;
     unsigned int addr=(mdi_ctl>>21)&31, reg=(mdi_ctl>>16)&31, op=(mdi_ctl>>26)&3;
-    CHECK(reg<6);
+    CHECK(reg<32);
+    if (op==2 && reg>=0x12) {
+        CHECK(phy_regs[addr][2]==0x2000 && (phy_regs[addr][3]&0xfff0)==0x5c00);
+        if (vendor_timeout==(int)reg && (reg!=0x17 || pcr_writes)) return mdi_ctl;
+        vendor_reads[reg]++;
+        if (reg==0x17) pcr_reads++;
+    }
     u16 value=phy_regs[addr][reg];
+    if (reg==0x17 && pcr_writes) value=(value ^ (pcr_reserved?0x0500:0)) & ~(u16)pcr_drop;
     if (op==2 && reg==0 && (value&0x8000) && !reset_never && ++reset_reads>=3)
         value=phy_regs[addr][0]&=~0x8000;
     if (op==2 && reg==1) {
         bmsr_reads++;
-        value=0x7809;
+        value=(latch_zero && (bmsr_reads&1))?0:0x7809;
         if (link_tick>=0 && (int)(now/10000)>=link_tick && !(bmsr_reads&1))
             value|=an_off?4:0x24;
     }
@@ -178,6 +189,7 @@ static struct file *file_for(const char *path)
 int sysconfig_get_int(const char *path, const char *key, int def)
 { (void)path; CHECK(def==1);
   if (!strcmp(key,"E82557_PHYFIX")) return phyfix;
+  if (!strcmp(key,"E82557_PHYVENDOR")) return phyvendor;
   CHECK(!fs_calls && !io_count); CHECK(!strcmp(key,"E82557")); return cfg; }
 int boot_image_info(void *out)
 { BootImageInfo *b=out; memset(b,0,sizeof(*b)); b->crc_valid=!bad_crc; b->image_crc=0x1234abcd; return 0; }
@@ -279,6 +291,7 @@ static void outp(u16 port, u8 value)
             CHECK(active_cb[3]==0x80); /* EL only, no S/I/flexible mode */
             CHECK(active_cb[4]==0xff && active_cb[5]==0xff && active_cb[6]==0xff && active_cb[7]==0xff);
             if (starts==1) {
+                CHECK(strstr(output,"[e82557] link="));
                 const u8 cfg_bytes[]={0x16,8,0,0,0,0x80,0x32,3,1,0,0x2e,0,0x60,0,0xf2,0x48,0,0x40,0xf2,0x80,0x3f,5};
                 CHECK(!memcmp(active_cb+8,cfg_bytes,22));
             } else if (starts==2) {
@@ -289,14 +302,13 @@ static void outp(u16 port, u8 value)
                 CHECK(active_cb[8]==0xff && active_cb[9]==0xff && active_cb[10]==0xff && active_cb[11]==0xff);
                 CHECK(active_cb[12]==60 && active_cb[13]==0x80 && active_cb[14]==0x10 && active_cb[15]==0);
                 CHECK(!memcmp(active_cb+16,header,14));
-                CHECK(!memcmp(active_cb+30,starts==3?"OS32-LB-HELLO#1\0":"OS32-LB-HELLO#2\0",16));
+                CHECK(!memcmp(active_cb+30,"OS32-LB-HELLO\0",14));
                 CHECK(loads==1);
-                if (starts==4) CHECK(dumps && (trace_bits&(1u<<E82557_TRACE_LINK) || !kdebug.ops.nic_trace));
-                CHECK(tx_count<2);
+                CHECK(tx_count==0 && starts==3);
                 tx_pending[tx_count]=1; tx_due[tx_count]=now+cb_delay+(u32)tx_delay;
                 tx_count++;
-                CHECK(!memcmp(active_cb+46,header+6,6));
-                for (int j=52;j<76;j++) CHECK(active_cb[j]==0);
+                CHECK(!memcmp(active_cb+44,header+6,6));
+                for (int j=50;j<76;j++) CHECK(active_cb[j]==0);
             }
             saw_complete=acquired=0;
             cb_due=now+cb_delay; /* several initial CUS=Idle reads are not proof */
@@ -313,12 +325,26 @@ static void outpd(u16 port, u32 value)
     if(port==0x6010) {
         CHECK(!irq_depth && resets==2 && !(value&0xf0000000u));
         unsigned int op=(value>>26)&3, addr=(value>>21)&31, reg=(value>>16)&31;
-        CHECK((op==1 || op==2) && reg<6);
+        CHECK((op==1 || op==2) && reg<32);
         mdi_ctl=value; mdi_reads=0;
         if (op==1) {
-            CHECK(!starts && phyfix && !(value&0x8200) && reg==0);
-            CHECK(!(phy_regs[addr][0]&0x8000)); mdi_writes++;
-            if (!fix_ignore) phy_regs[addr][0]=(u16)value;
+            CHECK(!starts);
+            if (reg==0x17) {
+                /* Literal oracle independent of production masks; illegal writes fatal. */
+                if (!phyvendor || phy_regs[addr][2]!=0x2000 ||
+                    (phy_regs[addr][3]&0xfff0)!=0x5c00 ||
+                    (u16)value!=(u16)(phy_regs[addr][reg]|0x0562)) {
+                    fprintf(stderr,"FAIL illegal PCR write\n"); exit(24);
+                }
+                CHECK(strstr(output,"[e82557] fix=") && !strstr(output,"[e82557] link="));
+                CHECK(pcr_reads==1 && !pcr_writes);
+                pcr_writes++;
+                phy_regs[addr][reg]=(u16)value;
+            } else {
+                CHECK(phyfix && !(value&0x8200) && reg==0);
+                CHECK(!(phy_regs[addr][0]&0x8000)); mdi_writes++;
+                if (!fix_ignore) phy_regs[addr][0]=(u16)value;
+            }
         }
     }
     else if(port==0x6008) { CHECK(value==(resets?2u:0u)); if(resets) CHECK(now-reset_at>=20);
@@ -427,8 +453,29 @@ int main(int argc, char **argv)
     memset(phy_regs,0xff,sizeof(phy_regs));
     const u16 defaults[]={0x3000,0x782d,0x2000,0x5c01,0x01e1,0x45e1};
     memcpy(phy_regs[1],defaults,sizeof(defaults));
-    new_case=!strncmp(c,"phy_",4) || !strncmp(c,"stat_",5);
-    if (!strcmp(c,"phy_latch")) {}
+    phy_regs[1][0x17]=0x9014; /* Preserve TXOFF, repeater, NRZI and LED1. */
+    phy_regs[1][0x19]=0x0081; phy_regs[1][0x16]=1;
+    phy_regs[1][0x12]=3; phy_regs[1][0x13]=5; phy_regs[1][0x15]=7;
+    new_case=!strncmp(c,"phy_",4) || !strncmp(c,"stat_",5) || !strncmp(c,"nsc_",4);
+    if (!strcmp(c,"nsc_rev")) phy_regs[1][3]=0x5c0f;
+    if (!strcmp(c,"nsc_id1")) phy_regs[1][2]=0x2001;
+    if (!strcmp(c,"nsc_id2")) phy_regs[1][3]=0x5c11;
+    if (!strcmp(c,"nsc_other")) { phy_regs[1][2]=0x02a8; phy_regs[1][3]=0x0154; }
+    if (!strcmp(c,"nsc_same")) phy_regs[1][0x17]|=0x0562;
+    if (!strcmp(c,"nsc_off")) phyvendor=0;
+    if (!strcmp(c,"nsc_reserved")) pcr_reserved=1;
+    if (!strcmp(c,"nsc_drop1")) pcr_drop=0x0002;
+    if (!strcmp(c,"nsc_drop5")) pcr_drop=0x0020;
+    if (!strcmp(c,"nsc_drop6")) pcr_drop=0x0040;
+    if (!strcmp(c,"nsc_timeout_pcr")) vendor_timeout=0x17;
+    if (!strcmp(c,"nsc_timeout_par")) vendor_timeout=0x19;
+    if (!strcmp(c,"nsc_timeout_srr")) vendor_timeout=0x16;
+    if (!strcmp(c,"nsc_timeout_dcr")) vendor_timeout=0x12;
+    if (!strcmp(c,"nsc_timeout_fcscr")) vendor_timeout=0x13;
+    if (!strcmp(c,"nsc_timeout_recr")) vendor_timeout=0x15;
+    vendor_error=vendor_timeout!=0;
+    if (!strcmp(c,"phy_latch")) latch_zero=1;
+    if (!strcmp(c,"stat_max")) max_counts=1;
     if (!strcmp(c,"phy_late")) link_tick=50;
     if (!strcmp(c,"phy_down")) link_tick=-1;
     if (!strcmp(c,"phy_off")) { an_off=1; phy_regs[1][0]=0x2100; }
@@ -440,7 +487,7 @@ int main(int argc, char **argv)
     if (!strcmp(c,"phy_reset_busy")) reset_never=1;
     if (!strcmp(c,"phy_ng")) fix_ignore=1;
     if (!strcmp(c,"phy_kill")) phyfix=0;
-    if (!strcmp(c,"phy_scan")) { memcpy(phy_regs[0],defaults,sizeof(defaults)); phy_regs[1][2]=0xffff; }
+    if (!strcmp(c,"phy_scan")) { memcpy(phy_regs[0],phy_regs[1],sizeof(phy_regs[0])); phy_regs[1][2]=0xffff; }
     if (!strcmp(c,"phy_none")) { memset(phy_regs,0xff,sizeof(phy_regs)); scan_none=1; }
     if (!strcmp(c,"phy_timeout")) mdi_timeout=1;
     if (!strcmp(c,"stat_delay")) tx_delay=30000;
@@ -507,11 +554,11 @@ int main(int argc, char **argv)
         struct pci_bind_info info;
         rc=pci_bind_one(pci_drivers, PCI_DRIVER_COUNT, &dev, &info);
         CHECK(info.result==PCI_BIND_DECLINED && info.reason==PCI_BIND_DECLINED_UNSPECIFIED);
-        CHECK(io_count && starts==4);
+        CHECK(io_count && starts==3);
     } else rc=e82557_driver.probe(&dev);
     CHECK(!irq_depth);
     CHECK(rc==((idle_fail || stop_fail==2)?PCI_PROBE_QUARANTINE:PCI_PROBE_DECLINE));
-    if(skip) { CHECK(!io_count && !ee_calls); CHECK(!strstr(output,"LB2b=PASS")); }
+    if(skip) { CHECK(!io_count && !ee_calls); CHECK(!strstr(output,"LB2c=PASS")); }
     else {
         CHECK(resets==(allocated ? (stop_fail ? 4 : 3) : 2));
         CHECK(mask==1);
@@ -522,19 +569,19 @@ int main(int argc, char **argv)
         else if(post_busy) { CHECK(pointers==post_busy && commands==post_busy && !ee_calls); CHECK(strstr(output,"base=timeout scb=2040")); CHECK(now==(post_busy==1?140u:160u)); }
         else if(ee_mode>=2) {
             CHECK(auto_calls==1 && ee_calls==(ee_mode==2?4:1));
-            CHECK(strstr(output,"LB2b=FAIL(ee:mac)")); CHECK(!files[0].present);
+            CHECK(strstr(output,"LB2c=FAIL(ee:mac)")); CHECK(!files[0].present);
         } else {
             CHECK(cu_base==0 && ru_base==0 && !command); CHECK(ee_calls==(ee_mode?4:3));
-            if (alloc_fail || bm_fail || cb_fail || cb_ng || cu_pre || cu_post || stop_fail==2 || mdi_timeout || scan_none || dump_timeout || late_dump || (dump_delay && tx_never) || stat_pre || stat_post)
-                CHECK(strstr(output,"LB2b=FAIL") && !strstr(output,"LB2b=PASS"));
-            else CHECK(strstr(output,"LB2b=PASS") && strstr(output,"cfg=ok ia=ok tx=ok(60) stop=ok"));
+            if (alloc_fail || bm_fail || cb_fail || cb_ng || cu_pre || cu_post || stop_fail==2 || mdi_timeout || vendor_error || scan_none || dump_timeout || late_dump || (dump_delay && tx_never) || stat_pre || stat_post)
+                CHECK(strstr(output,"LB2c=FAIL") && !strstr(output,"LB2c=PASS"));
+            else CHECK(strstr(output,"LB2c=PASS") && strstr(output,"cfg=ok ia=ok tx=ok(60) stop=ok"));
             if (alloc_fail) CHECK(!allocated && !starts && !bm_writes && strstr(output,"FAIL(dma:alloc)"));
             else {
                 CHECK(allocated && (stop_fail==2 ? leaked==1 && !freed : freed==1 && !leaked));
                 CHECK(bm_writes==(!strcmp(c,"bm_present") || !strcmp(c,"bm_present_ng") || bm_fail ? 0 : !strcmp(c,"stop_bm_present") ? 1 : 2));
                 if (bm_fail) CHECK(!starts && strstr(output,"FAIL(dma:bm)"));
                 else {
-                    int fail_at=cb_fail?cb_fail:cb_ng?cb_ng:cu_pre?cu_pre:cu_post?cu_post:4;
+                    int fail_at=cb_fail?cb_fail:cb_ng?cb_ng:cu_pre?cu_pre:cu_post?cu_post:3;
                     if (!new_case) CHECK(starts==fail_at-(cu_pre?1:0));
                     CHECK(commands==2+starts+loads+dumps && pointers==2+starts+loads);
                     if (cb_fail) CHECK(strstr(output,":timeout)") && completion_reads>=21);
@@ -566,9 +613,9 @@ int main(int argc, char **argv)
     if (!strcmp(c,"pass")) {
         CHECK(strstr(output,"phy=1 id=2000:5c01 bmcr=3000 bmsr=782d anar=01e1 anlpar=45e1\n"));
         CHECK(strstr(output,"fix=none rb=3000 bmsr=782d\n"));
-        CHECK(strstr(output,"link=up an=done wait=0 bmsr=782d anlpar=45e1\n"));
-        CHECK(strstr(output,"good1=1") && strstr(output,"good2=1") && strstr(output,"txdone=yes\n"));
-        CHECK(strstr(output,"stat maxcol=0 latecol=0 lostcrs=0 under=0 defer=0 bmsr=782d\n"));
+        CHECK(strstr(output,"link=up an=done wait=0 bmsr=7809/782d par=0081\n"));
+        CHECK(strstr(output,"tx good=1 lostcrs=0 maxcol=0\n"));
+        CHECK(strstr(output,"tx latecol=0 under=0 defer=0\n"));
         const char *line=output;
         while (*line) {
             const char *end=line; while (*end && *end!='\n') end++;
@@ -576,26 +623,62 @@ int main(int argc, char **argv)
         }
     }
     if (new_case) {
-        if (!strcmp(c,"phy_latch")) CHECK(strstr(output,"link=up an=done wait=0"));
+        if (!strcmp(c,"phy_latch")) CHECK(strstr(output,"link=up an=done wait=0 bmsr=0000/782d"));
         if (!strcmp(c,"phy_late")) {
-            CHECK(strstr(output,"link=up") && strstr(output,"good1=0") && strstr(output,"good2=1") && strstr(output,"txdone=yes"));
-            CHECK(now>=500000 && now<700000 && strstr(output,"w2=0 txdone=yes"));
+            CHECK(strstr(output,"link=up") && strstr(output,"tx good=1 lostcrs=0"));
+            CHECK(now>=500000 && now<700000);
         }
-        if (!strcmp(c,"phy_down")) CHECK(starts==4 && now>=3000000 && strstr(output,"link=down") && strstr(output,"txdone=no"));
-        if (!strcmp(c,"phy_off")) CHECK(strstr(output,"link=up an=off wait=0"));
+        if (!strcmp(c,"phy_down")) CHECK(starts==3 && now>=3000000 && strstr(output,"link=down") && strstr(output,"tx good=0"));
+        if (!strcmp(c,"phy_off")) CHECK(strstr(output,"link=up an=no wait=0"));
         if (!strncmp(c,"phy_fix",7) || !strcmp(c,"phy_reset")) CHECK(mdi_writes==1 && strstr(output,"rb=3100"));
         if (!strcmp(c,"phy_reset")) CHECK(reset_reads>=3 && now>=200000);
         if (!strcmp(c,"phy_reset_busy")) CHECK(!mdi_writes && strstr(output,"skip(reset)") && now>=500000);
         if (!strcmp(c,"phy_ng")) CHECK(mdi_writes==1 && strstr(output,"fix=ng rb=7f00"));
         if (!strcmp(c,"phy_kill")) CHECK(!mdi_writes && strstr(output,"fix=off"));
         if (!strcmp(c,"phy_scan")) CHECK(strstr(output,"phy=scan:0 id=2000:5c01"));
-        if (scan_none || mdi_timeout) CHECK(starts==4 && strstr(output,scan_none?"FAIL(mdi:none)":"FAIL(mdi:timeout)") && strstr(output,"bmsr=-"));
-        if (!strcmp(c,"stat_delay")) CHECK(dumps>=6 && strstr(output,"good1=1") && strstr(output,"good2=1") && strstr(output,"txdone=yes"));
-        if (!strcmp(c,"stat_never")) CHECK(dumps>2 && starts==4 && strstr(output,"txdone=no") && now<250000);
+        if (scan_none || mdi_timeout) CHECK(starts==3 && strstr(output,scan_none?"FAIL(mdi:none)":"FAIL(mdi:timeout)") && strstr(output,"bmsr=-"));
+        if (!strcmp(c,"stat_delay")) CHECK(dumps>=3 && strstr(output,"tx good=1"));
+        if (!strcmp(c,"stat_never")) CHECK(dumps>2 && starts==3 && strstr(output,"tx good=0") && now<250000);
         if (!strcmp(c,"stat_dump_delay")) CHECK(dumps<=10 && now<260000);
         if (dump_timeout || late_dump) CHECK(dumps==1 && starts==3 && strstr(output,"stat=timeout"));
         if (stat_pre || stat_post) CHECK(strstr(output,stat_pre?"FAIL(stat:pre)":"FAIL(stat:post)"));
-        if (collision) CHECK(strstr(output,"maxcol=1 latecol=2"));
+        if (collision) CHECK(strstr(output,"maxcol=1\n") && strstr(output,"latecol=2"));
+    }
+    if ((!strcmp(c,"pass") || new_case) && !scan_none && !mdi_timeout) {
+        int nsc=phy_regs[1][2]==0x2000 && (phy_regs[1][3]&0xfff0)==0x5c00;
+        if (!strcmp(c,"phy_scan")) nsc=1;
+        if (nsc) {
+            CHECK(pcr_writes==(phyvendor && strcmp(c,"nsc_same")));
+            if (!vendor_error) {
+                CHECK(pcr_reads==(pcr_writes?2:1));
+                CHECK(vendor_reads[0x16]==1 && vendor_reads[0x19]>=2);
+                CHECK(!!strstr(output,"pcr=ng") == !!pcr_drop);
+                if (phyvendor) CHECK(strstr(output,"pcr=9014->9576") || !strcmp(c,"nsc_same"));
+                else CHECK(strstr(output,"pcr=9014->9014 rb=9014") && strstr(output,"pcr=off"));
+                if (pcr_reserved) CHECK(strstr(output,"rb=9076"));
+                if (!dump_timeout && !late_dump && !stat_pre && !stat_post && !dump_delay) {
+                    CHECK(strstr(output,"dcr=0003 fcscr=0005 recr=0007"));
+                    CHECK(vendor_reads[0x12]==1 && vendor_reads[0x13]==1 && vendor_reads[0x15]==1);
+                    CHECK(strstr(output,latch_zero?"tx bmsr=0000/782d":"tx bmsr=7809/"));
+                }
+            } else CHECK(strstr(output,"FAIL(mdi:timeout)"));
+            if (!vendor_error) {
+                const char *n=strstr(output,"[e82557] nsc"), *l=strstr(output,"[e82557] link");
+                CHECK(n && l && n<l);
+            }
+        } else {
+            CHECK(!pcr_writes && !pcr_reads && strstr(output,"pcr=skip(id)"));
+            for (int r=0x12;r<32;r++) CHECK(!vendor_reads[r]);
+        }
+        CHECK(!strstr(output,"good1=") && !strstr(output,"good2="));
+        CHECK(!(trace_bits&(1u<<E82557_TRACE_TX2)));
+    }
+    if (max_counts) CHECK(strstr(output,"good=4294967295 lostcrs=4294967295 maxcol=4294967295"));
+    for (const char *line=output; *line;) {
+        const char *end=line; while (*end && *end!='\n') end++;
+        if (!strncmp(line,"[e82557] nsc ",12) || !strncmp(line,"[e82557] link=",13) ||
+            !strncmp(line,"[e82557] tx ",11)) CHECK(end-line<=78);
+        line=*end?end+1:end;
     }
     if (!strcmp(c,"pass") || !strcmp(c,"phy_late")) fprintf(1,"%s",output);
     return !!failed;

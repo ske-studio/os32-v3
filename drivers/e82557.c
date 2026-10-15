@@ -1,4 +1,4 @@
-/* LB-2b: PHY observation, two HELLOs and wire statistics; stop then DECLINE. */
+/* LB-2c: DP83840 PCR initialization, one HELLO; stop then DECLINE. */
 #include "e82557.h"
 #include "e82557_eeprom.h"
 #include "e82557_desc.h"
@@ -227,9 +227,9 @@ static void bm_restore(const struct pci_dev *dev, int changed)
     }
 }
 
-static void hello_build(u8 *frame, const u8 *mac, unsigned int number)
+static void hello_build(u8 *frame, const u8 *mac)
 {
-    const char mark[E82557_HELLO_MARK_LEN] = "OS32-LB-HELLO#1";
+    const char mark[E82557_HELLO_MARK_LEN] = "OS32-LB-HELLO";
     for (u32 i = 0; i < E82557_HELLO_LEN; i++) frame[i] = 0;
     for (u32 i = 0; i < E82557_MAC_LEN; i++) {
         frame[i] = 0xff;
@@ -240,12 +240,12 @@ static void hello_build(u8 *frame, const u8 *mac, unsigned int number)
     frame[E82557_FRAME_MIN - 1] = E82557_HELLO_TYPE & 0xff;
     for (u32 i = 0; i < E82557_HELLO_MARK_LEN; i++)
         frame[E82557_FRAME_MIN + i] = (u8)mark[i];
-    frame[E82557_FRAME_MIN + sizeof("OS32-LB-HELLO#") - 1] = (u8)('0' + number);
 }
 
 struct phy_observation {
     u8 addr;
-    u16 bmcr, bmsr, anlpar;
+    u16 bmcr, bmsr_first, bmsr, anlpar;
+    int nsc;
     const char *error;
 };
 
@@ -272,8 +272,8 @@ static int mdi_read(u16 base, struct phy_observation *p, u8 reg, u16 *value)
 }
 static int phy_status(u16 base, struct phy_observation *p)
 {
-    /* BMSR link is latched low: only the second read describes now. */
-    return mdi_read(base, p, E82557_PHY_BMSR, &p->bmsr) &&
+    /* Preserve latched-low history as well as the current (second) value. */
+    return mdi_read(base, p, E82557_PHY_BMSR, &p->bmsr_first) &&
            mdi_read(base, p, E82557_PHY_BMSR, &p->bmsr);
 }
 static void tick_wait(u32 start, u32 ticks)
@@ -305,6 +305,8 @@ static void phy_prepare(u16 base, struct phy_observation *p)
         }
         if (!mdi_read(base, p, E82557_PHY_ID2, &id2)) goto unavailable;
     }
+    p->nsc = id1 == E82557_NSC_ID1 &&
+             (id2 & E82557_NSC_ID2_MASK) == E82557_NSC_ID2;
     if (!mdi_read(base, p, E82557_PHY_BMCR, &p->bmcr) || !phy_status(base, p) ||
         !mdi_read(base, p, E82557_PHY_ANAR, &anar) ||
         !mdi_read(base, p, E82557_PHY_ANLPAR, &p->anlpar)) goto unavailable;
@@ -348,10 +350,48 @@ unavailable:
 no_fix:
     kprintf(E82557_LOG_ATTR, "[e82557] fix=- rb=- bmsr=-\n");
 }
+/* FreeBSD main sys/dev/mii/nsphy.c:145-179 (fxp): preserve every other bit.
+ * Reserved bits 10/8 are written but only documented R/W bits are verified. */
+static void phy_vendor(u16 base, struct phy_observation *p)
+{
+    u16 old, value, rb, par, srr;
+    const char *note = "";
+    if (!p->nsc) {
+        kprintf(E82557_LOG_ATTR, "[e82557] nsc pcr=skip(id)\n");
+        return;
+    }
+    if (!mdi_read(base, p, E82557_NSC_PCR, &old)) goto unavailable;
+    value = old;
+    rb = old;
+    if (!sysconfig_get_int(SYS_SYSTEM_CFG, "E82557_PHYVENDOR", 1)) {
+        note = " pcr=off";
+    } else {
+        value = old | E82557_NSC_PCR_SET;
+        if (value != old) {
+            u16 write = value;
+            if (!mdi_xfer(base, E82557_MDI_WRITE, p->addr, E82557_NSC_PCR, &write)) {
+                p->error = "timeout";
+                goto unavailable;
+            }
+            if (!mdi_read(base, p, E82557_NSC_PCR, &rb)) goto unavailable;
+        }
+        if ((rb & E82557_NSC_PCR_VERIFY) != (value & E82557_NSC_PCR_VERIFY))
+            note = " pcr=ng";
+    }
+    if (!mdi_read(base, p, E82557_NSC_PAR, &par) ||
+        !mdi_read(base, p, E82557_NSC_SRR, &srr)) goto unavailable;
+    kprintf(E82557_LOG_ATTR, "[e82557] nsc pcr=%04x->%04x rb=%04x par=%04x srr=%04x%s\n",
+            old, value, rb, par, srr, note);
+    return;
+unavailable:
+    kprintf(E82557_LOG_ATTR, "[e82557] nsc pcr=- mdi=timeout\n");
+}
+
 static void phy_link_wait(u16 base, struct phy_observation *p)
 {
     u32 start = tick_count, elapsed = 0;
     int link = 0, an_done = 0, an_en = 0;
+    u16 par = 0xffff; /* No vendor register access on another PHY. */
     while (phy_status(base, p)) {
         elapsed = tick_count - start;
         e82557_phy_decode(p->bmcr, p->bmsr, &link, &an_done, &an_en);
@@ -360,13 +400,13 @@ static void phy_link_wait(u16 base, struct phy_observation *p)
         u32 next = elapsed + E82557_PHY_POLL_TICKS;
         tick_wait(start, next < E82557_LINK_WAIT_TICKS ? next : E82557_LINK_WAIT_TICKS);
     }
-    if (!mdi_read(base, p, E82557_PHY_ANLPAR, &p->anlpar)) {
-        kprintf(E82557_LOG_ATTR, "[e82557] link=- an=- wait=- bmsr=- anlpar=-\n");
+    if (p->error || (p->nsc && !mdi_read(base, p, E82557_NSC_PAR, &par))) {
+        kprintf(E82557_LOG_ATTR, "[e82557] link=- an=- wait=- bmsr=-/- par=-\n");
         return;
     }
-    kprintf(E82557_LOG_ATTR, "[e82557] link=%s an=%s wait=%u bmsr=%04x anlpar=%04x\n",
-            link ? "up" : "down", !an_en ? "off" : an_done ? "done" : "no",
-            elapsed * E82557_TICK_MS, p->bmsr, p->anlpar);
+    kprintf(E82557_LOG_ATTR, "[e82557] link=%s an=%s wait=%u bmsr=%04x/%04x par=%04x\n",
+            link ? "up" : "down", an_done ? "done" : "no",
+            elapsed * E82557_TICK_MS, p->bmsr_first, p->bmsr, par);
 }
 
 /* No reissue after an incomplete Dump: the device can still own this area. */
@@ -410,10 +450,9 @@ static int e82557_probe(const struct pci_dev *dev)
     u8 mac[E82557_MAC_LEN], cfg[E82557_CFG_LEN], frame[E82557_HELLO_LEN];
     struct dma_buf dma;
     struct e82557_stop stop = { 0, 0 };
-    struct phy_observation phy = { 0, 0, 0, 0, NULL };
-    u32 good1 = 0, good2 = 0, w1 = 0, w2 = 0;
-    u16 tx1 = 0, tx2 = 0;
-    int observed = 0, link_logged = 0, stats_valid = 0;
+    struct phy_observation phy = { 0 };
+    u32 good = 0, waited = 0;
+    int observed = 0, stats_valid = 0;
     const char *stat_error = NULL;
     int allocated = 0, changed_bm = 0, rc;
     u16 command, tx_len = 0;
@@ -423,7 +462,7 @@ static int e82557_probe(const struct pci_dev *dev)
         if (kstrncmp(why, "seq-", 4) == 0)
             kprintf(E82557_LOG_ATTR, "[e82557] trace=off\n");
         kprintf(E82557_LOG_ATTR, "[e82557] skip(%s)\n", why);
-        kprintf(E82557_LOG_ATTR, "[e82557] LB2b=FAIL(try:%s)\n", why);
+        kprintf(E82557_LOG_ATTR, "[e82557] LB2c=FAIL(try:%s)\n", why);
         return result;
     }
     nic_trace(E82557_TRACE_TRY);
@@ -486,6 +525,9 @@ static int e82557_probe(const struct pci_dev *dev)
     nic_trace(E82557_TRACE_PHY);
     phy_prepare(base, &phy);
     observed = 1;
+    phy_vendor(base, &phy);
+    nic_trace(E82557_TRACE_LINK);
+    phy_link_wait(base, &phy);
     stage = "cfg";
     nic_trace(E82557_TRACE_CFG);
     e82557_config_bytes(cfg, E82557_CFG_NORMAL);
@@ -507,53 +549,47 @@ static int e82557_probe(const struct pci_dev *dev)
         why = stat_error = after ? "post" : "pre";
         goto done;
     }
-    for (unsigned int n = 1; n <= 2; n++) {
-        if (n == 2) {
-            nic_trace(E82557_TRACE_LINK);
-            phy_link_wait(base, &phy);
-            link_logged = 1;
-        }
-        stage = "tx";
-        nic_trace(n == 1 ? E82557_TRACE_TX : E82557_TRACE_TX2);
-        hello_build(frame, mac, n);
-        (void)e82557_tcb_build((u8 *)dma.va + E82557_TCB_OFF, frame,
-                               E82557_HELLO_LEN, E82557_TX_THRESH, E82557_TBD_NONE, 0);
-        why = cb_run(base, &dma, E82557_TCB_OFF, &stop);
-        if (n == 1) tx1 = e82557_rd16((u8 *)dma.va + E82557_TCB_OFF);
-        else tx2 = e82557_rd16((u8 *)dma.va + E82557_TCB_OFF);
-        if (why) goto done;
-        E82557_BARRIER(); /* reacquire after raw TX status observation */
-        tx_len = e82557_rd16((u8 *)dma.va + E82557_TCB_OFF + 12) & ~E82557_TCB_EOF;
-        stage = "stat";
-        nic_trace(E82557_TRACE_STAT);
-        why = stat_error = stats_until(base, &dma, n == 1 ? 1 : good1 + 1,
-                                       n == 1 ? &good1 : &good2, n == 1 ? &w1 : &w2);
-        if (why) goto done;
-        stats_valid = (int)n;
-    }
-    (void)phy_status(base, &phy);
-    if (phy.error) { stage = "mdi"; why = phy.error; }
+    stage = "tx";
+    nic_trace(E82557_TRACE_TX);
+    hello_build(frame, mac);
+    (void)e82557_tcb_build((u8 *)dma.va + E82557_TCB_OFF, frame,
+                           E82557_HELLO_LEN, E82557_TX_THRESH, E82557_TBD_NONE, 0);
+    why = cb_run(base, &dma, E82557_TCB_OFF, &stop);
+    if (why) goto done;
+    tx_len = e82557_rd16((u8 *)dma.va + E82557_TCB_OFF + 12) & ~E82557_TCB_EOF;
+    stage = "stat";
+    nic_trace(E82557_TRACE_STAT);
+    why = stat_error = stats_until(base, &dma, 1, &good, &waited);
+    if (why) goto done;
+    stats_valid = 1;
  done:
     if (observed) {
-        if (!link_logged)
-            kprintf(E82557_LOG_ATTR, "[e82557] link=- an=- wait=- bmsr=- anlpar=-\n");
-        if (stats_valid == 2) {
-            kprintf(E82557_LOG_ATTR,
-                    "[e82557] tx1=%04x good1=%u w1=%u tx2=%04x good2=%u w2=%u txdone=%s\n",
-                    tx1, good1, w1, tx2, good2 - good1, w2, good2 > good1 ? "yes" : "no");
+        if (stats_valid) {
             u8 *area = (u8 *)dma.va + E82557_STAT_OFF;
-            kprintf(E82557_LOG_ATTR, "[e82557] stat maxcol=%u latecol=%u lostcrs=%u under=%u defer=%u bmsr=",
-                    e82557_stats_read(area, E82557_STAT_MAXCOL),
+            u16 par = 0xffff, dcr = 0xffff, fcscr = 0xffff, recr = 0xffff;
+            kprintf(E82557_LOG_ATTR, "[e82557] tx good=%u lostcrs=%u maxcol=%u\n",
+                    good, e82557_stats_read(area, E82557_STAT_LOSTCRS),
+                    e82557_stats_read(area, E82557_STAT_MAXCOL));
+            kprintf(E82557_LOG_ATTR, "[e82557] tx latecol=%u under=%u defer=%u\n",
                     e82557_stats_read(area, E82557_STAT_LATECOL),
-                    e82557_stats_read(area, E82557_STAT_LOSTCRS),
                     e82557_stats_read(area, E82557_STAT_UNDER),
                     e82557_stats_read(area, E82557_STAT_DEFER));
-            if (phy.error) kprintf(E82557_LOG_ATTR, "-\n");
-            else kprintf(E82557_LOG_ATTR, "%04x\n", phy.bmsr);
+            (void)phy_status(base, &phy);
+            if (phy.nsc) {
+                (void)mdi_read(base, &phy, E82557_NSC_PAR, &par);
+                (void)mdi_read(base, &phy, E82557_NSC_DCR, &dcr);
+                (void)mdi_read(base, &phy, E82557_NSC_FCSCR, &fcscr);
+                (void)mdi_read(base, &phy, E82557_NSC_RECR, &recr);
+            }
+            if (phy.error)
+                kprintf(E82557_LOG_ATTR, "[e82557] tx bmsr=-/- par=- dcr=- fcscr=- recr=-\n");
+            else
+                kprintf(E82557_LOG_ATTR, "[e82557] tx bmsr=%04x/%04x par=%04x dcr=%04x fcscr=%04x recr=%04x\n",
+                        phy.bmsr_first, phy.bmsr, par, dcr, fcscr, recr);
         } else {
-            kprintf(E82557_LOG_ATTR, "[e82557] tx1=%04x good1=- w1=- tx2=%04x good2=- w2=- txdone=no\n", tx1, tx2);
             kprintf(E82557_LOG_ATTR, "[e82557] stat=%s bmsr=-\n", stat_error ? stat_error : "-");
         }
+        if (!why && phy.error) { stage = "mdi"; why = phy.error; }
     }
     nic_trace(E82557_TRACE_STOP);
     if (allocated) {
@@ -587,9 +623,9 @@ static int e82557_probe(const struct pci_dev *dev)
         kprintf(E82557_LOG_ATTR, "[e82557] try-rm=fail\n");
     nic_trace(E82557_TRACE_DONE);
     if (why)
-        kprintf(E82557_LOG_ATTR, "[e82557] LB2b=FAIL(%s:%s)\n", stage, why);
+        kprintf(E82557_LOG_ATTR, "[e82557] LB2c=FAIL(%s:%s)\n", stage, why);
     else
-        kprintf(E82557_LOG_ATTR, "[e82557] LB2b=PASS\n");
+        kprintf(E82557_LOG_ATTR, "[e82557] LB2c=PASS\n");
     return result;
 }
 
