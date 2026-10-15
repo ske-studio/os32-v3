@@ -43,6 +43,7 @@
 
 | ID | 何を残したか | 理由 | 渡し先 |
 |---|---|---|---|
+| CI-FLAKY-1 | `check-gfx-attach-host` の SDK 段が CI の 32 ビット native で 1 回 `FAIL result == base` (`tools/tests/gfx_kernel_fb_host.c:115` の `map_host`、決まった番地への MAP_FIXED の mmap) で落ちた (2026-10-15、ce30be3 の build、再実行で success、手元は 3 回とも PASS)。決まった番地が、アドレス空間のランダム配置で既に使われていた疑い [推] | LAN の変更とは無関係。たまたまの失敗が続くと CI の信頼が落ちる | 道具の小さな直し (sol): 番地が塞がっていたら、試験側で別の番地を選ぶか、失敗を明示して native をやり直す |
 | LZSS-1 | 修正した圧縮器の PKG (種 250 の 2 ファイル) を cdinst で入れて照合 | cdinst は MINIMAL / GUI / NORMAL / DEBUG の名前だけを展開し、試験 PKG を媒体に載せる道具の経路が無い。R0 の Full install (225 files、`hsync -n --verify` で内容一致) は代替の観測で PASS に数えない。host の `test_lzss_pkg.py` は合格 | 保守: 次に ISO / PKG の道具を触る段 |
 | PRIO-1 | `install` (FD 起動、CD でない方) の通し (授権・区画・format・書込み) | R0 は cdinst Full だけ (閉鎖台帳)。install は F-14 で確認画面まで (n で中断) | 保守: LZSS-1 と同じ機会 |
 | E10-4 | `v86 -g` の採取の途中の kill で g/tv の解放・gcap_ops・TVRAM 30 行が戻ること | R1b で観測不能: 起動 0.25s 後の CTRL+STOP でも採取が先に終わる (`E end`、gcap alloc 2・free 2・kills +0)。採取の途中を狙う hook (長い採取か注入) が要る | T7 |
