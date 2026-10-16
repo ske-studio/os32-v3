@@ -242,6 +242,15 @@ void exec_heap_save_state(u32 *out_used)
 /* ======================================================================== */
 void exec_heap_restore_state(u32 base, u32 size, u32 used)
 {
+    /* Match kheap_init's descriptor normalization without touching heap bytes.
+     * A short resident heap (including heap_sz=1) must stay empty on return. */
+    u32 aligned = (base + BLK_ALIGN - 1) & ~(u32)(BLK_ALIGN - 1);
+    size = aligned - base < size ? size - (aligned - base) : 0;
+    size &= ~(u32)(BLK_ALIGN - 1);
+    base = aligned;
+    if (size < BLK_HDR_SIZE + BLK_ALIGN) {
+        base = size = used = 0;
+    }
     /* WM allocations made while a USER child ran are already accounted for. */
     if (exec_heap.base == (u8 *)base && exec_heap.size == size) return;
     exec_heap.base = (u8 *)base;

@@ -459,7 +459,7 @@ def budget(m, sym):
 # 写しにだけ許し、一致は必ずここで見る ([C4])。
 MIRRORS = (
     ("sdk/os32x_hdr.py", r"OS32X_APP_LOAD_ADDR = (0x[0-9A-Fa-f]+)", "MEM_EXEC_LOAD_ADDR"),
-    ("sdk/os32x_hdr.py", r"OS32X_SHELL_LOAD_ADDR = (0x[0-9A-Fa-f]+)", "MEM_SHELL_LOAD_ADDR"),
+    ("sdk/link/app_sys.ld", r"__os32_shell_load_addr = (0x[0-9A-Fa-f]+);", "MEM_SHELL_LOAD_ADDR"),
     ("tools/mkshlib.py", r"MEM_SHLIB_BASE = (0x[0-9A-Fa-f]+)", "MEM_SHLIB_BASE"),
     ("sdk/link/app.ld", r"\. = (0x[0-9A-Fa-f]+);", "MEM_EXEC_LOAD_ADDR"),
     ("sdk/link/shlib.ld", r"\. = (0x[0-9A-Fa-f]+);", "MEM_SHLIB_BASE"),
@@ -549,7 +549,7 @@ def mirrors(root, m):
             continue
         with open(path, encoding="utf-8") as f:
             source = f.read()
-        if rel in ("build/os32.ld", "boot/boot_defs.h", "boot/loader_fat_new.asm"):
+        if rel in ("build/os32.ld", "sdk/link/app_sys.ld", "boot/boot_defs.h", "boot/loader_fat_new.asm"):
             source = preprocess_layout(root, source, m.get("MEM_LAYOUT_V5") or 0,
                                        rel.endswith(".asm"))
             if rel == "boot/boot_defs.h":

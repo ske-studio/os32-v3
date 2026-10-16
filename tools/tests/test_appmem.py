@@ -2,6 +2,7 @@
 記録: tools/tests/appmem_tdd.md
 Compile/link errors, signals, timeouts and unexpected FAIL labels are ERROR.
 """
+import os
 import argparse
 import hashlib
 import pathlib
@@ -69,7 +70,7 @@ def main():
     host32.begin_control(args.mutate, args.runner, ROOT)
     before = {path: hashlib.sha256((ROOT / path).read_bytes()).digest() for path in TARGET_SRCS}
     body = (ROOT / 'exec/appmem.c').read_text()
-    cc = ['gcc', '-std=gnu11', '-m32', '-march=i386', '-ffreestanding', '-fno-builtin',
+    cc = ['gcc', '-DMEM_LAYOUT_V5='+os.environ.get('MEM_LAYOUT_V5', '0'), '-std=gnu11', '-m32', '-march=i386', '-ffreestanding', '-fno-builtin',
           '-fno-pie', '-fno-stack-protector', '-Wall', '-Wextra', '-Werror',
           '-Werror=implicit-function-declaration', '-Werror=implicit-int', '-Werror=vla',
           *['-I' + str(ROOT / path) for path in ('include', 'kernel', 'exec', 'sdk/include/os32')]]

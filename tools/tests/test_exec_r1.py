@@ -3,6 +3,7 @@
 AppSlot/CR3/IF と資源利用終了は記録する足場。全 loader/PCM 実機の代替ではない。
 写しだけを変異し、コンパイル成功後の実行失敗だけを RED とする。
 """
+import os
 import host32
 import pathlib
 import subprocess
@@ -35,6 +36,7 @@ def landing(s, start, buf, name):
 PRE = r'''
 #include "appslot.h"
 #include "exec.h"
+#include "exec_heap.h"
 #include "ring3_ls.h"
 int ring3_ls_dispatch(u32 user_esp) { (void)user_esp; __builtin_trap(); }
 #include "v86.h"
@@ -73,14 +75,27 @@ static void _enable(void) { CHECK(!kctx_irq_depth && !kctx_exc_depth); host_if =
 u32 paging_kernel_pd_phys(void) { return 1; }
 void paging_load_cr3(u32 p) { cr3 = (int)p; }
 int paging_set_page(u32 a, u32 b, u32 c) { (void)a; (void)b; (void)c; return 0; }
-static void exec_heap_reset(void) {}
+static u8 resident_bytes[4096] __attribute__((aligned(8)));
+static u8 child_heap_bytes[4096] __attribute__((aligned(8)));
+static u32 resident_used, *resident_sentinel;
+void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; die(__LINE__); }
 static void ring3_band_set(int n) { (void)n; }
 void res_owner_set(int id) { owner = id; }
 static void exec_cpl0_release(void) {}
 int appslot_return_target(int id) { CHECK(id == 2); return slots[id].parent; }
 u32 appslot_reclaim(int id) { CHECK(teardown == 1); slots[id].state = APP_STATE_FREE; return 0; }
 void appslot_switch_to(int id) { cur = owner = id; }
-static void exec_restore_context(int id) { CHECK(id == 3 || id == 1); cr3 = id; }
+static void exec_restore_context(int id) {
+    CHECK(id == 3 || id == 1); cr3 = id;
+    /* CR3/slot are fixture boundaries; restore actual resident heap bytes
+     * through the same return callback for normal, fault and STOP landings. */
+    exec_heap_restore_state((u32)resident_bytes, sizeof(resident_bytes), resident_used);
+    CHECK(exec_heap_used() == resident_used && *resident_sentinel == 0xABCDEF12);
+    void *probe = exec_heap_alloc(16);
+    CHECK(probe && probe != resident_sentinel && *resident_sentinel == 0xABCDEF12);
+    exec_heap_free(probe);
+    CHECK(exec_heap_used() == resident_used);
+}
 static void exec_teardown_app(AppSlot *a) {
     CHECK(a == &slots[2] && cleanup == 7 && cr3 == 1 && host_if);
     CHECK(!kctx_irq_depth && !kctx_exc_depth);
@@ -189,7 +204,6 @@ static u32 kapi_invoke(void *fn, const void *args, u32 n) {
     if (dispatch_action) simulate_action();
     return 73;
 }
-void exec_heap_save_state(u32 *v) { *v = 0; }
 int appslot_park_check(void) { return 0; }
 int appslot_park_kbd_check(void) { return 0; }
 int appslot_park_poll_check(u32 tick) { (void)tick; return 0; }
@@ -247,6 +261,13 @@ static void simulate_action(void) {
     }
 }
 static void setup(int gui, int kind) {
+    exec_heap_init_at((u32)resident_bytes, sizeof(resident_bytes));
+    resident_sentinel = exec_heap_alloc(32);
+    CHECK(resident_sentinel);
+    *resident_sentinel = 0xABCDEF12;
+    exec_heap_save_state(&resident_used);
+    exec_heap_init_at((u32)child_heap_bytes, sizeof(child_heap_bytes));
+    CHECK(exec_heap_alloc(64));
     cur = owner = cr3 = 2; host_if = 1; host_gui = gui;
     cleanup = teardown = notices = transfers = stop_discards = 0;
     ring3_context_clear(); nested_parent = 0;
@@ -396,11 +417,11 @@ def run(source=None, irq=None):
                            capture_output=True, text=True)
         if r.returncode:
             return 'compile', r.stderr
-        inc = ['-I' + str(ROOT / p) for p in ('include', 'kernel', 'exec', 'fs', 'lib', 'sdk/include/os32')]
-        r = subprocess.run(['gcc', '-m32', '-std=gnu11', '-O0', '-Wall', '-Werror',
+        inc = ['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'include', 'kernel', 'exec', 'fs', 'lib', 'sdk/include/os32', 'arch/x86', 'platform/pc98')]
+        r = subprocess.run(['gcc', '-DMEM_LAYOUT_V5='+os.environ.get('MEM_LAYOUT_V5', '0'), '-m32', '-std=gnu11', '-O0', '-Wall', '-Werror',
                             '-Wno-unused-function', '-ffreestanding', '-fno-pie',
-                            '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
-                            *inc, str(tmp / 't.c'), str(tmp / 's.o'), str(ROOT / 'kernel/irq_math.c'), '-o', str(tmp / 't')],
+                            '-fno-stack-protector', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections', '-nostdlib', '-static', '-no-pie',
+                            *inc, str(tmp / 't.c'), str(tmp / 's.o'), str(ROOT / 'kernel/irq_math.c'), str(ROOT / 'exec/exec_heap.c'), str(ROOT / 'kernel/kmalloc.c'), '-o', str(tmp / 't')],
                            capture_output=True, text=True)
         if r.returncode:
             return 'compile', r.stderr

@@ -159,7 +159,10 @@ def main():
             code_data = f.read()
         H.check_raw_matches_elf(elf, code_data, input_path)
 
-        if load_addr != text_addr or load_addr not in (H.OS32X_SHELL_LOAD_ADDR, H.OS32X_APP_LOAD_ADDR):
+        # Resident links carry the address from the kernel's generated layout.
+        # The fallback accepts pre-T3 standalone SDK resident links as before.
+        shell_load = elf.symbols.get('__os32_shell_load_addr', H.OS32X_SHELL_LOAD_ADDR)
+        if load_addr != text_addr or load_addr not in (shell_load, H.OS32X_APP_LOAD_ADDR):
             raise H.HeaderError("load address differs from ELF/image contract")
         text_size = len(code_data)
         if stack_size < 0 or stack_size > 0x7fffffff or heap_size < 0 or heap_size > 0xffffffff:

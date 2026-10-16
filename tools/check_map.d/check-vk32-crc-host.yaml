@@ -1,4 +1,5 @@
 check-vk32-crc-host:
+- sdk/link/app_sys.ld
 - tools/tests/host32.py
 - tools/tests/mutpar.py
 - boot/loader_fat_new.asm

@@ -51,6 +51,20 @@ sdk/crt/resident/syscalls.o: sdk/crt/syscalls.c $(CRT_SYSCALLS_DEPS) userland/li
 userland/lib/rt/dbgserial.o: userland/lib/rt/dbgserial.c userland/lib/rt/dbgserial.h $(SDK_KAPI_HDR)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
+# V5 resident images are never written over the deployable legacy images.
+RESIDENT_OUT = $(if $(filter 1,$(MEM_LAYOUT_V5)),$(BUILD_OUT)/resident,userland)
+ifeq ($(MEM_LAYOUT_V5),1)
+.PHONY: userland/shell.bin userland/gshell.bin
+userland/shell.bin: $(RESIDENT_OUT)/shell.bin
+userland/gshell.bin: $(RESIDENT_OUT)/gshell.bin
+$(RESIDENT_OUT)/%.raw: $(RESIDENT_OUT)/%.elf
+	$(OBJCOPY) -O binary $< $@
+$(RESIDENT_OUT)/%.bin: $(RESIDENT_OUT)/%.raw $(RESIDENT_OUT)/%.elf build/app.conf sdk/mkos32x.py
+	@_api=$$(awk '$$1 == "userland/$*" { print $$2 }' build/app.conf); \
+	_opts=""; if [ "$*" = "gshell" ]; then _opts="--gfx"; fi; \
+	python3 sdk/mkos32x.py $< $@ --elf $(RESIDENT_OUT)/$*.elf --api $$_api --heap 0 $$_opts
+endif
+
 # === Shell Module ===
 SHELL_SRC = $(wildcard userland/shell/*.c)
 SHELL_OBJ = $(SHELL_SRC:.c=.o)
@@ -80,8 +94,12 @@ PC98PT_USER_OBJ = userland/shell/pc98pt_user.o
 $(PC98PT_USER_OBJ): drivers/pc98pt.c drivers/pc98pt.h
 	$(CC) $(PROGRAM_FLAGS) -Idrivers -c drivers/pc98pt.c -o $@
 
-userland/shell.elf: sdk/link/app_sys.ld $(CRT0_RESIDENT_OBJ) $(SHELL_OBJ) $(PCI_DECODE_USER_OBJ) $(PC98PT_USER_OBJ) $(FILER_DRAW_OBJ)
-	$(LD) -m elf_i386 -T sdk/link/app_sys.ld -nostdlib --nmagic --gc-sections -L$(LIBDIR) -L$(CROSS_DIR)/i386-elf/lib -L$(CROSS_DIR)/lib/gcc/i386-elf/13.2.0 -o $@ $(CRT0_RESIDENT_OBJ) $(SHELL_OBJ) $(PCI_DECODE_USER_OBJ) $(PC98PT_USER_OBJ) $(LGRP_BEG) $(FILER_DRAW_OBJ) -los32save $(LGRP_END) -lc -lgcc
+$(BUILD_OUT)/app_sys.ld: sdk/link/app_sys.ld $(LAYOUT_HEADER)
+	$(CC) -E -P -x c -I$(BUILD_OUT) $< -o $@
+
+$(RESIDENT_OUT)/shell.elf: $(BUILD_OUT)/app_sys.ld $(CRT0_RESIDENT_OBJ) $(SHELL_OBJ) $(PCI_DECODE_USER_OBJ) $(PC98PT_USER_OBJ) $(FILER_DRAW_OBJ) $(LIBSAVE_OBJ)
+	@mkdir -p $(@D)
+	$(LD) -m elf_i386 -T $(BUILD_OUT)/app_sys.ld -nostdlib --nmagic --gc-sections -L$(LIBDIR) -L$(CROSS_DIR)/i386-elf/lib -L$(CROSS_DIR)/lib/gcc/i386-elf/13.2.0 -o $@ $(CRT0_RESIDENT_OBJ) $(SHELL_OBJ) $(PCI_DECODE_USER_OBJ) $(PC98PT_USER_OBJ) $(LGRP_BEG) $(FILER_DRAW_OBJ) -los32save $(LGRP_END) -lc -lgcc
 
 # === sh — 同じシェルのソースを CPL=3 の外部アプリとして (票 T9 D1) ===
 # 常駐 shell.bin (app_sys.ld = 0x300000) の規則は上のまま一切変えない。同じ
@@ -141,8 +159,9 @@ GSHELL_LIB = $(GSHELL_DIR)/target/i686-os32-none/release/libgshell.a
 $(GSHELL_LIB): FORCE $(RUST_KAPI_RS)
 	cd $(GSHELL_DIR) && RUSTC_WRAPPER=$(CURDIR)/sdk/rustc_stamp.py cargo build --release
 
-userland/gshell.elf: sdk/link/app_sys.ld $(CRT0_RESIDENT_OBJ) $(GSHELL_LIB) $(GFX_OBJ) $(LIBCFG_OBJ)
-	$(LD) -m elf_i386 -T sdk/link/app_sys.ld -nostdlib --nmagic --gc-sections --allow-multiple-definition \
+$(RESIDENT_OUT)/gshell.elf: $(BUILD_OUT)/app_sys.ld $(CRT0_RESIDENT_OBJ) $(GSHELL_LIB) $(GFX_OBJ) $(LIBCFG_OBJ)
+	@mkdir -p $(@D)
+	$(LD) -m elf_i386 -T $(BUILD_OUT)/app_sys.ld -nostdlib --nmagic --gc-sections --allow-multiple-definition \
 		-L$(LIBDIR) -L$(CROSS_DIR)/i386-elf/lib -L$(CROSS_DIR)/lib/gcc/i386-elf/13.2.0 \
 		-o $@ $(CRT0_RESIDENT_OBJ) $(LGRP_BEG) $(GFX_OBJ) $(LIBCFG_OBJ) $(GSHELL_LIB) $(LGRP_END) -lc -lgcc
 

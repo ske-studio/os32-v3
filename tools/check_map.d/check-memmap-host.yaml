@@ -38,3 +38,4 @@ check-memmap-host:
 - tools/mkvmkernel.py
 # Layout selection reads build rules and generated linker/header artifacts.
 - build/**
+- sdk/link/app_sys.ld

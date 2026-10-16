@@ -72,8 +72,6 @@ def check_fixture(work, layout):
     generation = dict(build_id='fixture', kernel_commit='fixture',
                       kapi_version=canon['version'], generations=canon['generations'], files=files)
     (directory / 'generations-manifest.json').write_text(json.dumps(generation))
-    # A does not switch the shipped shell consumer (F/G). Model that consumer
-    # explicitly in this manifest fixture; the real-tree mirror still rejects it.
     manifest_root = make_tree(directory / 'manifest-root', CLEAN)
     manifest_out = manifest_root / 'build/out'
     for name in ('kernel.elf', 'kernel.map', 'kernel.bin', 'sqlite.bin',
@@ -83,10 +81,6 @@ def check_fixture(work, layout):
     for entry in generation['files']:
         entry['path'] = 'build/out/' + Path(entry['path']).name
     (manifest_out / 'generations-manifest.json').write_text(json.dumps(generation))
-    if layout:
-        shell = manifest_root / 'sdk/os32x_hdr.py'
-        shell.write_text(shell.read_text().replace('OS32X_SHELL_LOAD_ADDR = 0x300000',
-                                                  'OS32X_SHELL_LOAD_ADDR = 0x400000'))
     manifest = gen.layout_manifest(manifest_root, manifest_out / 'kernel.map',
                                    manifest_out / 'kernel.elf', layout=layout)
     assert not gen.layout_defects(manifest, sections, syms)
@@ -127,7 +121,7 @@ def check_switch(work):
         obj = out / ('obj/layout%d/kernel/kentry.o' % mode)
         targets = [out / 'os32.ld', out / 'r1/os32.ld', obj,
                    out / ('boot/layout%d/loader_fat_new.bin' % mode),
-                   out / ('boot/layout%d/vk32_boot.o' % mode)]
+                   out / ('boot/layout%d/vk32_boot.o' % mode), out / 'app_sys.ld']
         run(['make', '-s', 'MEM_LAYOUT_V5=' + str(mode), 'BUILD_OUT=' + str(out), *targets])
         header = out / 'memmap_layout.h'
         definitions = gen.Macros(gen.read_defines(header), {})
@@ -145,7 +139,7 @@ def check_switch(work):
         elif mode == 0:
             assert [x[1] for x in stamp] == [x[1] for x in initial]
         previous = stamp
-    print('selection 0 -> 1 -> 0: header, normal/R1 ld, kernel ASM, loader ASM/C rebuilt PASS')
+    print('selection 0 -> 1 -> 0: header, normal/R1 ld, kernel ASM, loader ASM/C, resident ld rebuilt PASS')
 
 
 def main():

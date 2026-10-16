@@ -1,6 +1,7 @@
 """f12 startup budget: real exec launch allocation/teardown with real paging/ledger.
 Normal control always precedes runtime mutants. File I/O and entry are boundaries.
 """
+import os
 import pathlib
 import struct
 import subprocess
@@ -19,14 +20,15 @@ MUTANTS = [
      'sbrk_end = PAGE_ALIGN_UP(load_base + text_sz + bss_sz) + 0x40000;'),
     ('duplicate-shlib-PDE', '            pages++;', '            pages++;\n        if (pde == MEM_SHLIB_BASE >> 22) pages++;'),
     ('omit-extra', '+ exec_ring3_extra_pages();', '+ 0 * exec_ring3_extra_pages();'),
-    ('resident-budget', 'exec_heap_size = MEM_SHELL_HEAP_SIZE;', 'exec_heap_size = MEM_EXEC_HEAP_MIN;'),
-    ('resident-limit', 'ctx->sbrk_heap_limit = is_shell ? guard_b : sbrk_end;',
-     'ctx->sbrk_heap_limit = is_shell ? guard_b - PAGE_SIZE : sbrk_end;'),
+    ('resident-budget', '*exec_size = MEM_SHELL_HEAP_SIZE;', '*exec_size = MEM_EXEC_HEAP_MIN;'),
+    ('resident-limit', 'ctx->sbrk_heap_limit = sbrk_end;',
+     'ctx->sbrk_heap_limit = sbrk_end - PAGE_SIZE;'),
     ('VA-after-admit', None, None),
 ]
 
 def extract(source):
     parts = [bb.slice_out(source, sig) for sig in ('static u32 exec_ring3_extra_pages(', 'static u32 exec_ring3_pages(')]
+    parts.append(bb.slice_out(source, 'static int exec_shell_layout('))
     parts.append(bb.slice_out((ROOT / 'exec/appmem.c').read_text(), 'void appmem_init('))
     start = source.index('    want_ring3 = !is_shell;')
     end = source.index('    /* ======== setjmp', start)
@@ -45,6 +47,7 @@ static int budget_launch(int is_shell, u32 image, u32 heap_sz, u32 requested_sta
     OS32Header header = {0}, *hdr = &header;
     hdr->stack_size = requested_stack;
 '''+layout+source[start:end]+shell+'''
+    (void)max_size;
     return id;
 }
 #undef kmalloc
@@ -59,6 +62,9 @@ def run(source):
         fixture = bb.SRC.read_text().replace('void _start(void)', 'void unused_legacy_start(void)')
         fixture = fixture.replace('void shlib_addrspace_detach(struct addrspace *as) { (void)as; }',
             '/* real shlib detach is included below */')
+        fixture += '''\n__asm__(".globl __kernel_resident_end\\n.set __kernel_resident_end, 0x260000\\n"
+                            ".globl __ledger_fixed_start\\n.set __ledger_fixed_start, 0x17E000\\n"
+                            ".globl __ledger_fixed_end\\n.set __ledger_fixed_end, 0x180000\\n");\n'''
         (tmp / 'budget_fixture.c').write_text(fixture)
         (tmp / 'exec_bb_overlap.inc').write_text(bb.extract(source))
         (tmp / 'budget_launch.inc').write_text(extract(source))
@@ -78,7 +84,7 @@ def run(source):
         need = n + 1 + 16 + 64 + 2 + pdes + 4
         inc = ['-I'+str(ROOT / p) for p in ('tools/tests/host_arch', 'tools/tests', 'include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec', 'sdk/include/os32')]
         exe = tmp / 'budget'
-        cmd = ['gcc', *bb.FLAGS, '-ffunction-sections', '-fdata-sections', '-DPHYSMEM_HOST_TEST=1',
+        cmd = ['gcc', *bb.FLAGS, '-DMEM_LAYOUT_V5='+os.environ.get('MEM_LAYOUT_V5', '0'), '-ffunction-sections', '-fdata-sections', '-DPHYSMEM_HOST_TEST=1',
                f'-DGUI_IMAGE_BYTES={image}', f'-DGUI_NEED_PAGES={need}', '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                *inc, '-I'+str(tmp), str(ROOT / 'tools/tests/exec_budget_host.c'), str(ROOT / 'kernel/physmem.c'), str(ROOT / 'kernel/kmalloc.c'), '-o', str(exe)]
         built = subprocess.run(cmd, capture_output=True, text=True)
@@ -88,14 +94,58 @@ def run(source):
         return result, {'image_pages': n, 'need_pages': need, 'shlib_data_pages': 4}
 
 
+def resident_link_contract():
+    sys.path.insert(0, str(ROOT / 'sdk'))
+    import os32x_hdr as hdr
+    mode = int(os.environ.get('MEM_LAYOUT_V5', '0'))
+    out = ROOT / ('build/out/v5' if mode else 'build/out')
+    resident = out / 'resident' if mode else ROOT / 'userland'
+    address = 0x400000 if mode else 0x300000
+    cross = pathlib.Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross')) / 'bin'
+    with tempfile.TemporaryDirectory(prefix='os32-resident-link-') as directory:
+        tmp = pathlib.Path(directory)
+        for name in ('shell', 'gshell'):
+            elfpath = resident / (name + '.elf')
+            elf = hdr.Elf32(elfpath)
+            h = hdr.parse_header((resident / (name + '.bin')).read_bytes())
+            assert elf.text_addr() == elf.symbols['__os32_shell_load_addr'] == h['load_addr'] == address
+            assert h['heap_size'] == (0 if mode else 1048576)
+            subprocess.run([str(cross / 'i386-elf-objcopy'), '-O', 'binary', str(elfpath), str(tmp / 'image.raw')], check=True)
+            cmd = [sys.executable, str(ROOT / 'sdk/mkos32x.py'), str(tmp / 'image.raw'),
+                   str(tmp / 'image.bin'), '--elf', str(elfpath), '--heap', str(h['heap_size'])]
+            r = subprocess.run(cmd, capture_output=True, text=True)
+            assert r.returncode == 0, r.stderr
+            r = subprocess.run(cmd + ['--load', hex(address + 4096)], capture_output=True, text=True)
+            assert r.returncode != 0 and 'load address' in r.stderr, r.stderr
+        if mode:
+            # Link the actual generated script at the exact 128KiB margin and +1.
+            for extra in (0, 1):
+                (tmp / 'image.s').write_text('.globl _start\n.text\n_start: ret\n.bss\n.space '+str(0x95000 - 1 + extra)+'\n')
+                subprocess.run([str(cross / 'i386-elf-as'), '--32', str(tmp / 'image.s'), '-o', str(tmp / 'image.o')], check=True)
+                r = subprocess.run([str(cross / 'i386-elf-ld'), '-m', 'elf_i386', '-T', str(out / 'app_sys.ld'),
+                                    str(tmp / 'image.o'), '-o', str(tmp / 'image.elf')], capture_output=True, text=True)
+                assert (r.returncode == 0) == (extra == 0), r.stderr
+                if extra: assert '128KiB' in r.stderr, r.stderr
+    print('PASS resident ELF/header selection, mismatched load refusal, link headroom')
+
+
 def main():
     source = (ROOT / 'exec/exec.c').read_text()
     r, sizes = run(source)
     print(r.stdout, end='')
     assert r.returncode == 0, (r.returncode, r.stderr)
     print('K7', sizes)
+    resident_link_contract()
     if '--mutate' in sys.argv:
-        for name, old, new in MUTANTS:
+        mutants = list(MUTANTS)
+        if os.environ.get('MEM_LAYOUT_V5', '0') == '1':
+            mutants = [m for m in mutants if m[0] != 'resident-budget']
+            mutants += [
+                ('resident-limit-confused', '*sbrk_limit = base;', '*sbrk_limit = exec_end;'),
+                ('resident-tail-reused', '*sbrk_limit = base;', '*sbrk_limit = base + (heap ? MEM_SHELL_EXEC_HEAP_SIZE - heap : 0);'),
+                ('resident-oversize-accepted', 'heap > MEM_SHELL_EXEC_HEAP_SIZE)', '0)'),
+            ]
+        for name, old, new in mutants:
             if name == 'VA-after-admit':
                 a = '            if (heap_sz > guard_b - exec_heap_base) return EXEC_ERR_NOMEM;'
                 b = '        if (sbrk_end + PAGE_SIZE > exec_heap_base || exec_heap_size > guard_b - exec_heap_base)\n            return EXEC_ERR_NOMEM;'

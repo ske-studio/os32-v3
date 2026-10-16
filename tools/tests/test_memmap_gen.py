@@ -101,7 +101,7 @@ def make_tree(tmp, bss_end):
     (root / "include").mkdir(parents=True)
     (root / "docs").mkdir(parents=True)
     (root / "build/out").mkdir(parents=True)
-    for rel in ('sdk/os32x_hdr.py', 'tools/mkshlib.py', 'sdk/link/app.ld', 'sdk/link/shlib.ld', 'sdk/rust/os32api/src/gui/stub.rs'):
+    for rel in ('sdk/os32x_hdr.py', 'tools/mkshlib.py', 'sdk/link/app.ld', 'sdk/link/app_sys.ld', 'sdk/link/shlib.ld', 'sdk/rust/os32api/src/gui/stub.rs'):
         dst = root / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(ROOT / rel, dst)

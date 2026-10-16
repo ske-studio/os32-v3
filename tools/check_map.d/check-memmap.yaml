@@ -1,4 +1,5 @@
 check-memmap:
+- sdk/link/app_sys.ld
 - userland/rust/libos32gui/src/shlib.rs
 - tools/mkshlib.py
 - sdk/os32x_hdr.py
