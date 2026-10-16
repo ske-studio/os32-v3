@@ -2,9 +2,6 @@
 #  deploy.mk — デプロイターゲット
 # ============================================================================
 
-# カーネルを運ぶ経路は、再リンク後の世代表・配置表まで確定してから配備する。
-deploy deploy-u3 deploy-kernel deploy-nhd nhd-migrate-pt deploy-fd: $(BUILD_OUT)/layout-manifest.json
-
 # deploy: HostDrv方式 — ビルド成果物をC:\os32にコピー (sudo不要, 再起動不要)
 # ゲストOSは /host 経由で直接アクセス可能
 deploy deploy-u3: $(BUILD_OUT)/vmkernel.lz4 $(BUILD_OUT)/kdebug.bin programs unicode_bin
