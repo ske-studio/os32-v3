@@ -209,14 +209,14 @@ def synthetic():
     return kernel, sqlite
 
 
-def make_image(script, work, kernel, sqlite, label):
+def make_image(script, work, kernel, sqlite, label, sqlite_addr=0x200000):
     work = pathlib.Path(work)
     kp, sp, op = work / (label + "_k.bin"), work / (label + "_s.bin"), work / (label + ".lz4")
     kp.write_bytes(kernel)
     sp.write_bytes(sqlite)
     r = subprocess.run([sys.executable, "-B", str(script),
                         "--kernel", str(kp), "--kernel-addr", "0x100000",
-                        "--sqlite", str(sp), "--sqlite-addr", "0x200000",
+                        "--sqlite", str(sp), "--sqlite-addr", hex(sqlite_addr),
                         "--limit-header", str(DEFS), "-o", str(op)],
                        capture_output=True)
     if r.returncode != 0:

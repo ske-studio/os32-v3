@@ -99,8 +99,10 @@ def main():
         command([cross / 'i386-elf-ld', '-m', 'elf_i386', '--emit-relocs',
                  '-T', ROOT / 'build/module.ld', *objects, '-o', elf])
         kernel, pair = vk32()
-        kapi = json.loads((ROOT / 'sdk/kapi.json').read_text())['version']
-        image, stats = mkmod.build(elf.read_bytes(), meta, kernel, kapi_abi_gen=kapi)
+        spec = json.loads((ROOT / 'sdk/kapi.json').read_text())
+        image, stats = mkmod.build(elf.read_bytes(), meta, kernel,
+                                  kapi_abi_gen=spec['version'],
+                                  layout_gen=spec['generations']['memory_layout'])
         exe = folder / 'loader'
         # All real S2 imports bind to a counting trap: init must call none.
         exports = (folder / 'kdebug_kexports.c').read_text()

@@ -14,9 +14,7 @@ static u32 host_cr3;
 #define pgalloc_free_n_owner host_free_hook
 #include "paging_host_source.c"
 #undef pgalloc_free_n_owner
-__asm__(".globl __sqlite_start\n.set __sqlite_start, 0x200000\n"
-        ".globl __sqlite_end\n.set __sqlite_end, 0x240000\n"
-        ".globl __bss_end\n.set __bss_end, 0x180000\n");
+/* Layout symbols are supplied by kernel_layout.linker_flags(). */
 static void die(int code)
 {
     __asm__ volatile("int $0x80" : : "a"(1), "b"(code));
@@ -102,12 +100,12 @@ static u32 pte(struct addrspace *as, u32 va) {
     return pt ? ((u32 *)P2V(pt))[(va >> 12) & 1023] : 0;
 }
 void _start(void) {
-    u32 args[6] = {0x400000, 0xC00000, 3, 0x32, 0xFFFFFFFF, 0};
+    u32 args[6] = {KERNEL_LOAD_ADDR, 0x1000000 - KERNEL_LOAD_ADDR, 3, 0x32, 0xFFFFFFFF, 0};
     u32 result, before, i, owner, shpages;
     struct addrspace as;
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
-    CHECK(result == 0x400000); host_map_fixed_paging(); paging_init(8192); host_pool_boot(8192);
-    for (i = MEM_POOL_BASE / PAGE_SIZE + 1; i < MEM_POOL_BASE / PAGE_SIZE + 32; i += 2)
+    CHECK(result == KERNEL_LOAD_ADDR); host_map_fixed_paging(); paging_init(8192); host_pool_boot(8192);
+    for (i = MEM_SHM_RESV_START / PAGE_SIZE + 1; i < MEM_SHM_RESV_START / PAGE_SIZE + 32; i += 2)
         CHECK(ledger_claim_fixed(LEDGER_OWNER_BOOT, i, i + 1));
     before = used_pages; make_file();
     for (i = 1; i <= 4; i++) {

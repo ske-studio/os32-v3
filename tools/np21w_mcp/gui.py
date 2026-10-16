@@ -287,7 +287,7 @@ def c_constants(path, extra=None):
     """Evaluate the numeric #define subset used by the memory/slot headers.
 
     No execution of C or arbitrary Python: only integer arithmetic AST nodes.
-    The dynamic __bss_end is supplied from the current kernel ELF.
+    Dynamic linker symbols are supplied from the current kernel ELF.
     """
     import ast
     source = re.sub(r'/\*.*?\*/', '', Path(path).read_text(), flags=re.S)
@@ -312,7 +312,7 @@ def c_constants(path, extra=None):
     def resolve(name):
         if name not in cache:
             expr = re.sub(r'\b(0x[0-9A-Fa-f]+|[0-9]+)[uUlL]+\b', r'\1', definitions[name])
-            expr = re.sub(r'\(u32\)|&(?=__bss_end)', '', expr)
+            expr = re.sub(r'\(u32\)|&(?=__[A-Za-z_][A-Za-z_0-9]*)', '', expr)
             cache[name] = visit(ast.parse(expr.strip(), mode='eval').body)
         return cache[name]
     return resolve
@@ -425,7 +425,7 @@ class Gui:
         failures retain v1 observations and their reason in v2_error.
         """
         kernel, shell = self.symbols()
-        mem = c_constants(ROOT / 'include/memmap.h', {'__bss_end': kernel['__bss_end'][0]})
+        mem = c_constants(ROOT / 'include/memmap.h', {name: kernel[name][0] for name in ('__bss_end', '__kernel_resident_end')})
         app = c_constants(ROOT / 'exec/appslot.h')
         count = app('APP_SLOT_COUNT')
         address, size = kernel['g_slot']

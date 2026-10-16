@@ -1,4 +1,5 @@
 """R1 recovery probes: real lifecycle slices and real SDK/lease attachment."""
+from kernel_layout import linker_flags
 import re
 import subprocess
 from pathlib import Path
@@ -51,7 +52,7 @@ def recovery(tmp, function, runner, mutation=None):
     entry = entry.replace('    const char *name;\n    int row = 0;', '    (void)error_code;')
     stage('entry_source.c', entry)
     stage('fixture_source.c', read('kernel/r1_fixture.c').replace('__asm__ volatile("ud2")', 'host_raise_ud()'))
-    flags = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
+    flags = ['gcc', *linker_flags(), '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
              '-ffreestanding', '-fno-builtin', '-fno-pie', '-fno-stack-protector',
              '-ffunction-sections', '-fdata-sections', '-nostdlib', '-static', '-no-pie',
              '-Wl,--gc-sections', '-DOS32_R1_FIXTURE', '-DPHYSMEM_HOST_TEST=1', '-I'+str(tmp)]

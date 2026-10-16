@@ -4,6 +4,7 @@ The appmem_map/exec_heap fixture supplies only host MMU/IRQ and side effects.
 Product functions are extracted verbatim; mutations must compile and fail a
 named runtime assertion (compiler failure is never RED).
 """
+from kernel_layout import linker_flags
 import argparse
 import pathlib
 import re
@@ -85,9 +86,7 @@ def build_fixture(tmp):
     return ['gcc', '-m32', '-march=i386', '-std=gnu11', '-ffreestanding', '-fno-builtin',
             '-fno-pie', '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
             '-Wall', '-Wextra', '-Werror', '-DPHYSMEM_HOST_TEST=1',
-            '-Wl,--defsym=__kernel_resident_end=0x375000',
-            '-Wl,--defsym=__ledger_fixed_start=0x17E000',
-            '-Wl,--defsym=__ledger_fixed_end=0x180000', '-I' + str(tmp),
+            *linker_flags(), '-I' + str(tmp),
             *['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', '.', 'include',
                 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec', 'fs', 'sdk/include/os32', 'tools/tests')]]
 

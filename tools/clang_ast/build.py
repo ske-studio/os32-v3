@@ -1,5 +1,7 @@
 import os, pathlib, re, shlex, shutil, subprocess, tempfile
 MAKE_TARGETS = ["all"]
+# Compile commands outlive dry_run; keep their generated inputs until exit.
+_DRY_RUN_DIRS = []
 ARG_DROP = {"-o", "-MF", "-MT", "-MQ", "-I", "-isystem", "-iquote", "-idirafter"}
 FLAG_DROP = {"-c", "-MMD", "-MD", "-MP", "-M", "-MM"}
 ARG_KEEP = {"-include", "-imacros", "-x"}
@@ -118,34 +120,38 @@ def dry_run(root):
         env.pop(k, None)
     if mf:
         env["MAKEFLAGS"] = mf
-    with tempfile.TemporaryDirectory(prefix="c_dialect_out_") as tmp:
-        out_dir = os.path.join(tmp, "out")
-        os.makedirs(out_dir)
-        for name in SAVED_SETTINGS:
-            src = pathlib.Path(root, REAL_BUILD_OUT, name)
-            if src.is_file():
-                shutil.copyfile(str(src), os.path.join(out_dir, name))
-        cmd = (["make", "--no-print-directory", "-n", "-B"] + MAKE_TARGETS
-               + ["BUILD_OUT=" + os.path.join(tmp, "out")])
-        if env.get("OS32_CLANG_CROSS_FREE") == "1":
-            # Supply only external link inputs, keeping all C prerequisites and
-            # recipes in the real make graph. Never apply these to a build.
-            inputs = pathlib.Path(tmp, "cross-free.mk")
-            inputs.write_text("$(CROSS_DIR)/i386-elf/lib/libc.a: ;\n")
-            cmd += ["-f", "Makefile", "-f", str(inputs)]
-            if shutil.which("i386-elf-gcc", path=env.get("PATH")) is None:
-                # Link flags query libgcc even under -n. This shim refuses every
-                # other invocation, so an accidental compilation fails closed.
-                compiler = pathlib.Path(tmp, "i386-elf-gcc")
-                compiler.write_text(
-                    '#!/bin/sh\n'
-                    'if [ "$#" = 1 ] && [ "$1" = -print-libgcc-file-name ]; then\n'
-                    '    echo "${0%/*}/libgcc.a"\n'
-                    'else\n'
-                    '    echo "cross-free dry-run: unexpected GCC invocation" >&2\n'
-                    '    exit 1\n'
-                    'fi\n')
-                compiler.chmod(0o700)
-                env["PATH"] = tmp + os.pathsep + env.get("PATH", os.defpath)
-        r = subprocess.run(cmd, cwd=str(root), capture_output=True, text=True, env=env, stdin=subprocess.DEVNULL)
+    workspace = tempfile.TemporaryDirectory(prefix="c_dialect_out_")
+    _DRY_RUN_DIRS.append(workspace)
+    tmp = workspace.name
+    out_dir = os.path.join(tmp, "out")
+    os.makedirs(out_dir)
+    from gen_memmap import write_layout_header
+    write_layout_header(root, os.path.join(out_dir, "memmap_layout.h"))
+    for name in SAVED_SETTINGS:
+        src = pathlib.Path(root, REAL_BUILD_OUT, name)
+        if src.is_file():
+            shutil.copyfile(str(src), os.path.join(out_dir, name))
+    cmd = (["make", "--no-print-directory", "-n", "-B"] + MAKE_TARGETS
+           + ["BUILD_OUT=" + os.path.join(tmp, "out")])
+    if env.get("OS32_CLANG_CROSS_FREE") == "1":
+        # Supply only external link inputs, keeping all C prerequisites and
+        # recipes in the real make graph. Never apply these to a build.
+        inputs = pathlib.Path(tmp, "cross-free.mk")
+        inputs.write_text("$(CROSS_DIR)/i386-elf/lib/libc.a: ;\n")
+        cmd += ["-f", "Makefile", "-f", str(inputs)]
+        if shutil.which("i386-elf-gcc", path=env.get("PATH")) is None:
+            # Link flags query libgcc even under -n. This shim refuses every
+            # other invocation, so an accidental compilation fails closed.
+            compiler = pathlib.Path(tmp, "i386-elf-gcc")
+            compiler.write_text(
+                '#!/bin/sh\n'
+                'if [ "$#" = 1 ] && [ "$1" = -print-libgcc-file-name ]; then\n'
+                '    echo "${0%/*}/libgcc.a"\n'
+                'else\n'
+                '    echo "cross-free dry-run: unexpected GCC invocation" >&2\n'
+                '    exit 1\n'
+                'fi\n')
+            compiler.chmod(0o700)
+            env["PATH"] = tmp + os.pathsep + env.get("PATH", os.defpath)
+    r = subprocess.run(cmd, cwd=str(root), capture_output=True, text=True, env=env, stdin=subprocess.DEVNULL)
     return r.returncode, r.stdout, r.stderr

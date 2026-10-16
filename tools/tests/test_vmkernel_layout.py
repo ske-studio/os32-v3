@@ -188,8 +188,10 @@ def run_cases(vk, exes, script, work, real=False):
         r = generate(script, d, real/'kernel.elf')
         assert r.returncode == 0, r.stderr.decode()
         img = (d/'image.lz4').read_bytes()
+        _, syms = gen.read_elf(real/'kernel.elf')
         legacy = vk.make_image(script, work, (d/'kernel.bin').read_bytes(),
-                               (d/'sqlite.bin').read_bytes(), 'legacy-layout')
+                               (d/'sqlite.bin').read_bytes(), 'legacy-layout',
+                               sqlite_addr=syms['__sqlite_start'])
         assert img == legacy == (real/'vmkernel.lz4').read_bytes(), 'current image/CRC changed'
         assert len(img) <= vk.MAX_IMAGE, 'compressed budget'
         assert check_real_bss(real/'kernel.elf'), 'real ELF BSS/guard constraints'

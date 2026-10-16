@@ -8,4 +8,19 @@ check-c-dialect:
 - tools/check_map.d/check-c-dialect.yaml
 - build/checks.d/check-c-dialect.mk
 # Conservative artifact-path audit (including indirect helpers/fixtures).
+- tools/gen_memmap.py
+- boot/loader_fat_new.asm
+- build/os32.ld
+- kernel/kentry.asm
+- sdk/kapi.json
+- sdk/link/app.ld
+- sdk/link/app_sys.ld
+- sdk/link/shlib.ld
+- sdk/os32x_hdr.py
+- sdk/rust/os32api/src/gui/proto.rs
+- sdk/rust/os32api/src/gui/stub.rs
+- tools/check_artifacts.py
+- tools/mkshlib.py
+- tools/tests/test_owner_reclaim.py
+- userland/rust/libos32gui/src/shlib.rs
 artifact_reader: true

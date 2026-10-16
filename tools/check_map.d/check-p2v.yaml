@@ -16,3 +16,4 @@ check-p2v:
 - build/checks.d/check-p2v.mk
 - include/**
 - kdebug/**
+- tools/gen_memmap.py

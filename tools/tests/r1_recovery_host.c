@@ -12,9 +12,7 @@ static void check_cr3(u32 root);
 #include "paging_source.c"
 #include "pgalloc_source.c"
 #include "pgalloc_host_fixture.h"
-__asm__(".globl __sqlite_start\n.set __sqlite_start, 0x200000\n"
-        ".globl __sqlite_end\n.set __sqlite_end, 0x240000\n"
-        ".globl __bss_end\n.set __bss_end, 0x180000\n");
+/* Layout symbols are supplied by kernel_layout.linker_flags(). */
 static void die(int rc) __attribute__((noreturn));
 static void die(int rc) {
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc));

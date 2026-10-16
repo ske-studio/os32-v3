@@ -176,11 +176,11 @@ def findings(tu, root=ROOT):
                     ch = list(cast.get_children())
                     # memmap's linker-address constants are integer layout values,
                     # not explicit pointer operands at this call site.
-                    layout = any(macro.spelling in ('MEM_SHM_BASE','MEM_SQLITE_STACK_BASE')
+                    layout = any(macro.spelling in ('MEM_SHM_BASE','MEM_SQLITE_STACK_BASE','MEM_LEDGER_META_BASE')
                                  for macro in inside(arg))
                     refs = [x.spelling for x in expression_nodes(ch[-1])
                             if x.kind == K.DECL_REF_EXPR] if ch else []
-                    linker_layout = layout and refs and set(refs) <= {'__bss_end','__sqlite_end'}
+                    linker_layout = layout and refs and set(refs) <= {'__bss_end','__sqlite_end','__kernel_resident_end','__ledger_fixed_start'}
                     if ch and ast.pointer(ch[-1].type) and raw_pointer(ch[-1]) and not linker_layout:
                         add('physical-sink')
     for c in macros:

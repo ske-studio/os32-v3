@@ -92,4 +92,5 @@ check-trim-back-rs-host:
 - userland/shell/cmd_base.c
 - kernel/sysconfig.c
 # Conservative artifact-path audit (including indirect helpers/fixtures).
+- tools/tests/kernel_layout.py
 artifact_reader: true

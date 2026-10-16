@@ -20,3 +20,5 @@ check-kcallback-host:
 - tools/check_map.d/check-kcallback-host.yaml
 - userland/tests/kcallback_test.c
 - tools/tests/kcallback_result_host.c
+- tools/tests/kernel_layout.py
+artifact_reader: true

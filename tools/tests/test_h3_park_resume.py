@@ -104,7 +104,7 @@ class Tests(unittest.TestCase):
                          ledger_count=64, block_size=16384, block_count=2,
                          shm_delta=4096, app_min=2, app_max=5, parked=2, free=0)
         self.s = s = dict(g_slot=0x1000, shm_state=0x2000, shm_block_owner=0x2100,
-                         shm_block_span=0x2200, ledger_owners=0x3000, __bss_end=0x10001)
+                         shm_block_span=0x2200, ledger_owners=0x3000, __kernel_resident_end=0x10001)
         s.update(g_cur=0x4100, tick_count=0x4104)
         s.update({name: 0x4000 + i * 4 for i, name in enumerate(h3.COUNTERS)})
         e.mem[0x2000] = 1
@@ -1559,7 +1559,7 @@ C_MUTANTS = [
 ]
 PY_MUTANTS = [
     ("self.checked(ident)  # fixture values must equal host identity()", "pass", 1),
-    ("((s['__bss_end'] + 4095) & ~4095)", "(s['__bss_end'] & ~4095)", 1),
+    ("((s['__kernel_resident_end'] + 4095) & ~4095)", "(s['__kernel_resident_end'] & ~4095)", 1),
     ("base + index * o['block_size']", "base", 1),
     ("self.identity(ident['index']) == ident", 'True', 1),
     ("(b['owner'], b['generation']) == (ident['owner'], ident['generation'])", 'True', 1),

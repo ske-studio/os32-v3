@@ -37,6 +37,8 @@ import tempfile
 import mutpar  # noqa: E402  (tools/tests/mutpar.py、同じディレクトリ)
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tools"))
+import gen_memmap as gen
 HARNESS = ROOT / "tools/tests/hdd_stage1_host.c"
 PART_HARNESS = ROOT / "tools/tests/ext2_part_host.c"
 PT_SRC = ROOT / "drivers/pc98pt.c"
@@ -811,6 +813,8 @@ def run_py(tools_dir, c_exe, quiet=False):
 # ======================================================================== #
 
 def build_target(tmp):
+    layout = pathlib.Path(tmp) / "memmap_layout.h"
+    gen.write_layout_header(ROOT, str(layout))
     base = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
             "-fno-pie", "-fno-stack-protector", "-nostdlib", "-mno-red-zone",
             "-fcommon", "-O2", "-Wall", "-Werror", 
@@ -825,7 +829,8 @@ def build_target(tmp):
     # ローダと同じフラグ (-Os、-Iboot の型) でも共有部が通る
     run(["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
          "-fno-pie", "-fno-stack-protector", "-nostdlib", "-mno-red-zone", "-Os",
-         "-Wall", "-Werror", "-fcommon", "-Iboot", "-Idrivers", "-c",
+         "-Wall", "-Werror", "-fcommon", "-Iboot", "-Idrivers",
+         "-include", str(layout), "-c",
          str(ROOT / "boot/boot_main.c"), "-o", str(pathlib.Path(tmp) / "bm.o")], check=True)
     print("TARGET i386-elf GNU11 -Werror COMPILE PASS", flush=True)
 
