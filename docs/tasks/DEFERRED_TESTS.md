@@ -12,7 +12,6 @@
 
 | 関門 | 行 | 進む条件 |
 |---|---|---|
-| 次のゲスト受入の回 (NP21/W) | E9-1、X-6、E11-9、E11-5、H-1、H-2、PRIO-3、X-21 | 8 行を全部消す |
 | T3 (帯変更) | F-9、H-4 (a) | 着手前に扱いを決める |
 | **v3 の最終段 (搭載メモリ量ごとの動作確認)** | H-4 の構成別の残り (8MB・17MB・Cirrus など、メモリ量・構成ごとの M の全通し) | ユーザー決定 2026-10-14: 搭載メモリ量ごとの確認は v3 の最終段まで後回し。それまでのゲスト受入は NP21/W 64MB (`np21x64w.ini` の ExMemory=64、実機 Ra266 と同じ) の 1 構成で回す。8MB の最低条件 (V3_PLAN §2-2) は目標のまま、その判定を最終段で行う |
 | 次に `check_select.py` / ci-stab を触る保守の段 (遅くとも T3 の最初の取り込みの全体検査) | X-4 (残り) | 記録の分はその全体検査で残す |
@@ -23,23 +22,13 @@
 | 決定による持越し | H-7、S-4、E11-A3 | 再開時ゲート (H-7) / U6 で足さない (E11-A3) |
 | 記録 | R7-3、R7-4 | — |
 
-## 1. 渡す — 次のゲスト受入の回 (NP21/W、道具は揃っている)
-
-| ID | 何を残したか | 理由 | 次の関門 |
-|---|---|---|---|
-| E9-1 | CPL3 sh 経由の tvdump (CUI 対照つき) をゲストで確かめる | R1b で時間の都合で未実施。入力は CUI 画面キーボード (`emu_key` / `emu_type`、R4 shapes で実績) で足りる | 次のゲスト受入 (X-6 の道具で照合) |
-| X-6 | `tools/tvdump_recv.py` の HTTP・実機シリアル共通 TVD2 (EOT/ESC 逃がし) の長さ・寸法・全セルを照合 | X-6 修正はホスト試験のみ。依頼により NP21/W・実機は未操作 | 次のゲスト受入で平仮名を含む CUI と実機 rshell を照合 |
-| E11-9 | WM の tvdump 0 埋めのゲスト確認 (GUI 端末の分は H-7) | R1b の tvdump が未実施。V86 後の DISPLAY/TVRAM 再 lease (PT0 MATCH) と全 alias UC (PEGC / Cirrus) は閉じた | 同上 |
-| E11-5 | 全画面の WAIT_POLL と先行入力の 2 点 (端末の子・隠れた sh は端末アプリが v3 に無く H-7) | R1b で時間の都合で未実施。Run からの全画面の 1 キー終了と窓への復帰は 17MB planar (h9 再回) と実機 R7b で PASS | 次のゲスト受入 / 端末の 2 点は H-7 |
-| H-1 | h2_stack512 の park → resume → 終了 owner 0 (512KiB stack のまま OP_WAIT に入れる) | R1a は run と guard だけ (h2_stack の park は GUI 前提で、park/resume は h3 側で実施)。fixture の再生成・hash 照合・旧 app / shell / shlib の拒否・故障画像は閉じた | 次のゲスト受入 |
-| H-2 | (1) 実行中 OP_WAIT (RUNNING+in_wait、前景) の fixture への arm → resume → 発火、(2) 打鍵を重ねた STOP (二重 kill 0)、(3) 前景以外の張本人の明示観測 | (1) は R1b 再回の 1 回目 (pf) で**失敗の記録**: h3a が前景 = RUNNING+in_wait のまま arm し、道具のクリックで WAIT が返らず `resume not captured`、arm=1 が残った (手でクリックして発火させ片付けた。推定: capture の breakpoint trap 中に press/release が収まり、状態読みのマウスが押下を見ない — `RESULT_2.md` R1b-h3)。成功した 6 mode は**回避策** (先に別窓を前景にして fixture を PARKED にしてから arm) での試行で、実行中 OP_WAIT の arm の義務は閉じていない。(2)(3) は RESULT_2 に PASS の証拠が無い | 次のゲスト受入: (1) は道具を trap 中にクリックしない順序 (か arm 後にクリックで起こす手順) に直してから、前景の fixture に arm して resume 印と発火を観測。(2)(3) は同じ回で |
-| X-21 | (a) G-4 / R-3 の trim 対象 (C の trim_back・Rust の trim_back_rs) の返却前後の `mem <id>` と teardown の `as_extents_at_teardown` | 未採取。h9 再回の as_extents は gui_demo (別アプリ) で道具の経路を確かめただけで、台本 (`guest_acceptance.yaml` の X-21(a) 行) が求める trim 対象の観測ではない。GUI 中の `mem <id>` は rshell が無く、診断キーの全 slot 行は owner_pages だけ。(b) の台本の書き分けは閉じた | 次のゲスト受入: trim_back / trim_back_rs を G-4 / R-3 の手順で回し、DONE の前後を診断キー (owner_pages) で、teardown を bp で採る |
-| PRIO-3 | GUI→CUI→GUI の往復で TVRAM generation の値が進むことの明示観測 | R1d / h9 再回の往復は表示と rshell 応答で判定し、generation の値を読んでいない。シリアル待ちの CTRL+STOP (`audit_test serial`、$?=130) は閉じた | 次のゲスト受入 |
-
 ## 2. 渡す — 後続の段
 
 | ID | 何を残したか | 理由 | 渡し先 |
 |---|---|---|---|
+| E9-1 | CPL3 sh 経由の tvdump (CUI 対照つき) | v3 の sh.bin はシリアル系コマンドを持たず (D2(a))、sh の中の tvdump は「external programs need the GUI terminal」で $?=126 — 台本の前提が v3 で成り立たない。代わりに CPL3 の CUI 前景で `audit_test tvram` が PASS (2026-10-16、`~/os32-tmp/evidence/2026-10-16/guest8/E9-1/`) | H-7 (端末アプリの再開) の再開時ゲートで |
+| E11-9 | WM の tvdump 0 埋めのゲスト確認 | v3 の GUI には rshell が無く gserial にも tvdump が無い。代わりに GUI の Run から `audit_test tvram` を回すと FAIL 12 (範囲外の読み 10 回の番兵が 0 で上書き + 'Q' 2 件) — GUI 中の TVRAM の読みは 0 埋めという設計と整合するが、試験の期待との関係は未確認 (`guest8/E11-9/`) | H-7 の再開時ゲートで。`audit_test tvram` の GUI での期待はその前に確かめる |
+| H-2 | (3) 前景以外の張本人の明示観測 (猶予中に別アプリをクリックしても前景が移らず、形を作れなかった)。(1) は 2026-10-16 に道具を組み替えて PASS、(2) の STOP の連打は 6d5549f で直して PASS (`guest8/H-2b/`) | 観測の形が作れない | 次に gshell の入力・前景を触る段で、観測の手順から考える |
 | REPRO-1 | CI の成果物の `bin/gshell.bin` が、材料の変わっていない ce30be3 → 5971615 で content_changed になった (ノートの hsync -n、2026-10-15)。2026-10-16 の調べ (sol、`~/os32-tmp/run/tools1/repro.txt`): 手元の clean ビルド 2 回と CI 相当のパスで gshell.bin は一致、配備物 204 個中 202 個が一致 (差は `vmkernel.lz4`・`kdebug.bin` のビルド時刻と CRC で、想定どおり)。再現せず、CI 側の道具の版の変化 [推] | 配備のたびに無関係な差分が出ると、実機に何が入ったかの照合がぶれる | 次に CI の成果物で材料不変の content_changed が出たとき、その 2 回の CI 成果物と rustc の版を比べる |
 | CI-FLAKY-1 | `check-gfx-attach-host`・`check-gfx-kernel-fb-host` の SDK 段が CI の 32 ビット native でたまに落ちる。**原因確定 (2026-10-16、wt/guistall の CI run 38836386732)**: 固定窓 `0xFFF00000`+512 KiB の確保が、ASLR で `ffee5000-fff07000` に置かれた 32 ビットのスタックと重なり EEXIST (f7d8673 の NOREPLACE が出した maps で判明) | たまの失敗が残る | 道具の小さな直し: native の 32 ビット試験を `setarch -R` (配置をランダムにしない) で起動する |
 | GUISTALL-1 | 実機 Ra266 の 31k PEGC の GUI で、マウスが時折約 1 秒止まる (体感 3 秒、2026-10-16)。ff6f372 で 82557 結線ありのとき出て、`E82557=0` で出ない。efc5bbe の LAN の速度の直し (送信完了をその場で拾う) を含む 8fa6f09 では、観測あり・`E82557_WATCH=0` とも出なかった (マウス・キーボード)。観測版では 82557 の遅い処理・割り込みの嵐・回復・状態変化は 0 件。GUI 中は送信しないはずで、なぜ消えたかは未解明 [推] | ユーザー判断 (2026-10-16): ループ処理の深掘りは後回し | 再発したら観測版 (ブランチ `wt/guistall`、`E82557_WATCH`) を当てて止まった時刻の行を見る。証拠 `~/os32-tmp/evidence/2026-10-16/gui_stall/` |
