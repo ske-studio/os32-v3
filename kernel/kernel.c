@@ -584,25 +584,19 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
         for (;;) { _stop(); }
     }
 
-    /* DMA プール (票 §1-3)。paging_init が 0x2E8000-0x2F7FFF を present/RW で
-     * 張った後、**pci_bind_all より前**。probe が dma_alloc を呼ぶ。 */
-    dma_pool_init();
+    /* D の予約・恒等写像確認の後だけ池を使う。自己診断は池を
+     * 再初期化するので、PCI/PCM が span を取るより前に済ませる。 */
+    if (memory_boot_dma_available()) {
+        dma_pool_init();
+    } else {
+        kprintf(0x07, "[dma] RAM short; pool/selftest/PCI/PCM skipped\n");
+    }
     kdebug_load();
+    if (memory_boot_dma_available()) {
+        if (kdebug.ops.selftest_run) kdebug.ops.selftest_run();
+        else kselftest_skipped();
+    }
 
-
-    /* カーネル内プリミティブの自己診断。
-     * 外部プログラムの klibc_test は newlib 側を試すだけで、カーネルが
-     * 実際に使う kstring_asm / kmalloc / kprintf は一度も踏んでいない。
-     * ここで境界ケースだけを実機で毎回確認する (全通過なら 1 行)。 */
-    if (kdebug.ops.selftest_run) kdebug.ops.selftest_run();
-    else kselftest_skipped();
-
-    /* PCI の結線 (票 §1-4)。**pgalloc と DMA プールの初期化の後**で、
-     * pci_init() の直後ではない。**kselftest_run より後**なのは、
-     * プールの自己診断が最後に dma_pool_init() で池を作り直すから —
-     * 先に結線すると driver が取った span をそこで消してしまう。
-     * 表はいまのところ空 (82557 の driver は別票 L-B) で、ここは
-     * 「候補が 0 本でも安全に回る」ことを起動のたびに踏むための呼び出し。 */
     /* ⑥-0 (TASK_T1_LEDGER §3-3、B4): pci_init は台帳より前に走るので、g_pci の
      * メモリ BAR をここで資源表へ RAW (採取値、予約権限なし) として取り込む。
      * 実機では [pci] の行のメモリ BAR の本数と raw= が一致し ovf=0 のこと。 */
@@ -614,11 +608,15 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
                 pci_raw, ledger_res_overflow);
     }
     pci_bind_set_line_state_hook(kernel_pci_line_bits);
-    pci_bind_all(pci_drivers, PCI_DRIVER_COUNT);
+    if (memory_boot_dma_available()) {
+        pci_bind_all(pci_drivers, PCI_DRIVER_COUNT);
+    }
 
     /* CS4231 (MATE-X PCM) の検出だけ (票 TASK_PCM_CS4231 §2-1)。
      * 無い機械では `[pcm] none` を出して静かに戻る — 以降の起動は変わらない。 */
-    pcm_init();
+    if (memory_boot_dma_available()) {
+        pcm_init();
+    }
 
     /* FDリダイレクト初期化 (プログラムローダーより前に) */
     fd_redirect_init();

@@ -3,6 +3,7 @@
 /* Freestanding ILP32: this host has no 32-bit glibc. These helpers serve
  * the test oracle/log capture only; none are compiled into the kernel. */
 #include <stdarg.h>
+#include "memmap.h"
 typedef unsigned long size_t;
 #define stderr 2
 static __attribute__((noreturn)) void exit(int code)
@@ -289,9 +290,9 @@ static void outp(u16 port,u8 value)
             CHECK(allocated && (pci_command&4) && !cu_base && !ru_base);
             CHECK(last_barrier>last_store);
             starts++; last_start_reset=resets;
-            CHECK(pointer==0x2e8000u || pointer==0x2e8040u);
-            active_cb=memory+pointer-0x2e8000u;
-            CHECK(!raw16(pointer-0x2e8000u));
+            CHECK(pointer==MEM_DMA_POOL_BASE || pointer==(MEM_DMA_POOL_BASE + 0x40u));
+            active_cb=memory+pointer-MEM_DMA_POOL_BASE;
+            CHECK(!raw16(pointer-MEM_DMA_POOL_BASE));
             int cmd=active_cb[2]&7;
             CHECK(cmd==1 || cmd==2 || cmd==4);
             CHECK(active_cb[3]==(runtime?0xa0:0x80));
@@ -386,17 +387,17 @@ int dma_alloc(u32 size,u32 align,u32 limit,struct dma_buf *out)
     CHECK(size==16384 && align==16 && limit==0xffffffffu);
     if(alloc_fail) return -4;
     allocated=1; memset(memory,0xcc,sizeof(memory));
-    out->pa=0x2e8000; out->va=memory; out->size=size; return 0;
+    out->pa=MEM_DMA_POOL_BASE; out->va=memory; out->size=size; return 0;
 }
 int dma_free(const struct dma_buf *b)
 {
-    CHECK(allocated && b->pa==0x2e8000 && b->va==memory && !freed && !leaked && !registered);
+    CHECK(allocated && b->pa==MEM_DMA_POOL_BASE && b->va==memory && !freed && !leaked && !registered);
     CHECK(resets>last_start_reset && resets>=3 && now-reset_at>=20 && !(status&0xfc));
     CHECK(mask==1 && !(status&0xff00));
     CHECK(pci_command==0x0143 || (pci_command==0x0147 && !bm_writes)); freed++; return 0;
 }
 int dma_mark_leaked(const struct dma_buf *b)
-{ CHECK(allocated && b->pa==0x2e8000 && !freed && !leaked && mask==1 && !(pci_command&4)); leaked++; return 0; }
+{ CHECK(allocated && b->pa==MEM_DMA_POOL_BASE && !freed && !leaked && mask==1 && !(pci_command&4)); leaked++; return 0; }
 int irq_register(unsigned int irq,irq_handler_fn fn,void *arg,unsigned int flags)
 { CHECK(!irq_depth && allocated && !bm_writes && irq==3 && !arg && flags==IRQ_F_SHARED); if(irq_fail) return -1; handler=fn; registered=1; return 0; }
 int irq_unregister(unsigned int irq,irq_handler_fn fn,void *arg)
@@ -425,11 +426,11 @@ static void service_tick(void)
 static void model_assert_ring(u32 pa)
 {
     CHECK(nic.rx.ready<8);
-    CHECK(pa==0x2e8000u+1616+nic.rx.dev*1552);
+    CHECK(pa==MEM_DMA_POOL_BASE+1616+nic.rx.dev*1552);
     CHECK(nic.rx.dev==(nic.rx.cons+nic.rx.ready)%8);
     for(u32 n=0;n<8;n++) {
         u32 i=(nic.rx.cons+n)%8, off=1616+i*1552;
-        CHECK(raw32(off+4)==0x2e8000u+1616+((i+1)%8)*1552);
+        CHECK(raw32(off+4)==MEM_DMA_POOL_BASE+1616+((i+1)%8)*1552);
         CHECK(raw32(off+8)==0xffffffffu && raw16(off+14)==1536);
         if(n<nic.rx.ready) CHECK(raw16(off)&0x8000);
         else CHECK(!raw16(off) && !raw16(off+12));
@@ -440,8 +441,8 @@ static void model_assert_ring(u32 pa)
 static void model_rx(const u8 *frame,u32 len)
 {
     CHECK((status&0x3c)==0x10 && !freed && !leaked);
-    CHECK(ru_pointer>=0x2e8000u+1616 && ru_pointer<0x2e8000u+14032);
-    u32 off=ru_pointer-0x2e8000u;
+    CHECK(ru_pointer>=MEM_DMA_POOL_BASE+1616 && ru_pointer<MEM_DMA_POOL_BASE+14032);
+    u32 off=ru_pointer-MEM_DMA_POOL_BASE;
     CHECK(!raw16(off) && !raw16(off+12));
     u32 count=len>1536?1536:len;
     memcpy(memory+off+16,frame,count);
@@ -566,7 +567,7 @@ static void runtime_tests(const char *c)
             CHECK(nic.state==E82557_RUNNING && nic.rx.ready==0);
         } else {
             u32 length=!strcmp(c,"rx_short")?13:!strcmp(c,"rx_long")?1519:!strcmp(c,"rx_overrun")?1600:60;
-            u32 off=ru_pointer-0x2e8000u;
+            u32 off=ru_pointer-MEM_DMA_POOL_BASE;
             model_rx(rx_frame,length);
             if(!strcmp(c,"rx_bad")) put16(off,0x8000);
             rx_scan();

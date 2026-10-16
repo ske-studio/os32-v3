@@ -1321,8 +1321,9 @@ static void test_dma8237(void)
     check(dma_chan_setup(2, MEM_DMA_POOL_BASE, 0, DMA_DIR_TO_MEM,
                          DMA_MODE_SINGLE) < 0,
           "dma:0 bytes refused");
-    /* 64KB バンクまたぎ ([HW2])。プールの境界 0x2F0000 の手前から。 */
-    check(dma_chan_setup(3, MEM_DMA_POOL_BASE + 0x7000UL, 0x4000UL,
+    /* 64KB バンクまたぎ ([HW2])。両配置とも次の境界の手前から。 */
+    check(dma_chan_setup(3, (MEM_DMA_POOL_BASE & ~(DMA_BANK_SIZE - 1)) +
+                         DMA_BANK_SIZE - 0x1000UL, 0x4000UL,
                          DMA_DIR_TO_MEM, DMA_MODE_SINGLE) < 0,
           "dma:64KB cross refused");
     /* 16MB 以上 */

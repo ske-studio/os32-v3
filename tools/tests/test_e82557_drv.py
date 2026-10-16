@@ -21,6 +21,7 @@ CASES += ["tx_" + n for n in ("done", "bad", "reserved", "pending", "generation"
 CASES += ["recover_" + n for n in ("full", "final", "stopfail", "r3fail")] + ["ru_timeout", "recovery_limit", "api_invalid"]
 CASES += ["tx_send_done", "tx_send_bad", "tx_irq_cx", "tx_irq_cna", "tx_irq_bad"]
 FLAGS = ["-m32", "-static", "-no-pie", "-fno-pie", "-fno-stack-protector", "-ffreestanding", "-nostdlib", "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-D__cdecl="]
+FLAGS += ["-DMEM_LAYOUT_V5=" + os.environ.get("MEM_LAYOUT_V5", "0")]
 INCLUDES = ["-I" + str(ROOT / p) for p in ("include", "drivers", "sdk/include/os32", "fs", "kernel", "lib", "arch/x86", "platform/pc98")] + ["-I" + str(ROOT)]
 MIRROR = ["tools/tests/e82557_drv_host.c", "drivers/e82557.c", "drivers/e82557.h", "drivers/e82557_regs.h", "drivers/e82557_eeprom.c", "drivers/e82557_eeprom.h", "drivers/pci_decode.c", "fs/vfs.h", "kernel/module.h", "include/bootinfo.h", "include/config.h"]
 MIRROR += ["drivers/e82557_desc.c", "drivers/e82557_desc.h", "drivers/pci_bind_match.c", "kernel/dma_pool.h"]
