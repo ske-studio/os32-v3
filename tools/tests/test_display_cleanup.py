@@ -11,7 +11,7 @@ import tempfile
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
-TARGET_SRCS = ('kernel/v86_io.c', 'kernel/v86_gcap.c', 'kernel/boot_splash.c', 'gfx/gfx_core.c')
+TARGET_SRCS = ('kernel/v86_io.c', 'kdebug/v86_gcap.c', 'kernel/boot_splash.c', 'gfx/gfx_core.c')
 
 
 def function(text, name):
@@ -102,7 +102,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='display-mut-') as td:
         tree = Path(td)
         # Only source/header files, never build outputs or hardware documents.
-        for directory in ('include', 'sdk/include', 'gfx', 'kernel', 'lib'):
+        for directory in ('include', 'sdk/include', 'gfx', 'kernel', 'kdebug', 'lib'):
             for source in (ROOT / directory).rglob('*'):
                 if source.is_file() and source.suffix in ('.h', '.c'):
                     target = tree / source.relative_to(ROOT)

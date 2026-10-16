@@ -4,6 +4,7 @@ check-display-cleanup-host:
 - gfx/gfx_vram.c
 - kernel/boot_splash.c
 - kernel/v86_gcap.c
+- kdebug/v86_gcap.c
 - kernel/v86_io.c
 - tools/tests/boot_splash_native_host.c
 - tools/tests/display_cleanup_host.c

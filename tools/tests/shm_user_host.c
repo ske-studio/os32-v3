@@ -53,9 +53,10 @@ void v86_io_apply_policy(void) {}
 void v86_io_reset_policy(void) {}
 
 void v86_bios_detach_disk(void);
-V86Gcap *v86_gcap_rec;
-static u32 release_calls, return_calls, audit_calls;
+#include "module.h"
 void v86_gcap_release(void);
+struct kdebug kdebug = { .ops = { .gcap_release = v86_gcap_release } };
+static u32 release_calls, return_calls, audit_calls;
 void gfx_v86_return(void);
 void kselftest_audit_v86_return(void);
 static void exec_stop_mark(void) {}

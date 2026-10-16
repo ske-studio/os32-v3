@@ -55,6 +55,9 @@ struct time_test_feed *kdi_ptr_time_test_feed(void) { return time_test_feed; }
 u32 kdi_get_v86_gp_cs(void) { return v86_gp_cs; }
 u32 kdi_get_v86_gp_ip(void) { return v86_gp_ip; }
 struct v86_session_state *kdi_ptr_v86_session(void) { return &v86_session; }
+u32 *kdi_ptr_v86_gcap_phase(void) { return &v86_gcap_phase; }
+u32 *kdi_ptr_v86_gcap_alloc_count(void) { return &v86_gcap_alloc_count; }
+u32 *kdi_ptr_v86_gcap_free_count(void) { return &v86_gcap_free_count; }
 void (*const kdebug_kexports[])(void) = {
     (void (*)(void))kprintf,
     (void (*)(void))appmem_init,
@@ -267,16 +270,11 @@ void (*const kdebug_kexports[])(void) = {
     (void (*)(void))kdi_get_v86_gp_cs,
     (void (*)(void))kdi_get_v86_gp_ip,
     (void (*)(void))kdi_ptr_v86_session,
-    (void (*)(void))e82557_send,
-    (void (*)(void))e82557_recv,
-    (void (*)(void))e82557_get_mac,
-    (void (*)(void))e82557_state,
-    (void (*)(void))e82557_loopback,
-    (void (*)(void))e82557_stat,
-    (void (*)(void))vfs_mkdir,
+    (void (*)(void))kdi_ptr_v86_gcap_phase,
+    (void (*)(void))kdi_ptr_v86_gcap_alloc_count,
+    (void (*)(void))kdi_ptr_v86_gcap_free_count,
     (void (*)(void))vfs_read,
     (void (*)(void))vfs_write,
-    (void (*)(void))vfs_rm,
     (void (*)(void))vfs_sync,
     (void (*)(void))boot_image_info,
 };
@@ -494,16 +492,11 @@ const struct module_symbol_contract kdebug_import_contracts[] = {
     {0x2521dfa4u, 1, 2},
     {0x2439e2f7u, 1, 2},
     {0x7e454668u, 1, 4},
-    {0x114537c8u, 1, 1},
-    {0x242bb67eu, 1, 1},
-    {0xef33472eu, 1, 1},
-    {0x3e66697fu, 1, 1},
-    {0x07626a03u, 1, 1},
-    {0x906b9b80u, 1, 1},
-    {0xc036b696u, 1, 1},
+    {0xb28c1fd7u, 1, 4},
+    {0x6428975du, 1, 4},
+    {0xedcc0ae2u, 1, 4},
     {0xbeb0ad13u, 1, 1},
     {0xd103a4b2u, 1, 1},
-    {0xf5a9fd5eu, 1, 1},
     {0xaa14d5a8u, 1, 1},
     {0xe6a3dc58u, 1, 1},
 };
@@ -513,5 +506,16 @@ const struct module_symbol_contract kdebug_export_contracts[MODULE_OPS_SLOTS] = 
     [2] = {0x013e1126u, 1, 0},
     [3] = {0x9ac18c77u, 1, 0},
     [4] = {0x28752bcbu, 1, 0},
+    [5] = {0xfdf492cbu, 1, 0},
+    [6] = {0x9c25277du, 1, 0},
+    [7] = {0x6fc7c974u, 1, 0},
+    [8] = {0xd833bef8u, 1, 0},
+    [9] = {0x4aa0ff0du, 1, 0},
+    [10] = {0x000f6958u, 1, 0},
+    [11] = {0x238d03ddu, 1, 0},
+    [12] = {0x0bd5e63bu, 1, 0},
+    [13] = {0x11662068u, 1, 0},
+    [14] = {0x2492b85cu, 1, 0},
+    [15] = {0x75aae460u, 1, 0},
     [17] = {0x51f56217u, 1, 0},
 };

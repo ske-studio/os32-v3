@@ -119,7 +119,7 @@ def fat12_layout(img, names, spt=8, heads=2):
     """names (ディレクトリ..., ファイル) の置き場所を LBA で返す。
 
     戻り値: {"meta": [FAT・ルート・途中のディレクトリの LBA...],
-             "data": [ファイル本体の LBA...]}。
+             "data": [ファイル本体の LBA...], "fat_data": 本体が使う FAT セクタ集合}。
     font_replay の上限 (シーク回数・まとめ読みの回数) をこの配置から導く —
     ローダの大きさが変わって配置がずれても意味が保たれるように (PM 判断
     2026-09-24。以前は 14 / 27 の固定値で、ローダが 1 クラスタ増えただけで落ちた)。"""
@@ -159,27 +159,27 @@ def fat12_layout(img, names, spt=8, heads=2):
     for d in names[:-1]:
         cur = chain_lbas(find(cur, d))
         meta += cur
-    return {"meta": meta, "data": chain_lbas(find(cur, names[-1]))}
+    data = chain_lbas(find(cur, names[-1]))
+    # FAT12 entries occupy two bytes; an entry itself may straddle sectors.
+    clusters = {(lba - data0) // spc + 2 for lba in data}
+    fat_data = {rsv + (c * 3 // 2 + byte) // bps
+                for c in clusters for byte in (0, 1)}
+    return {"meta": meta, "data": data, "fat_data": fat_data}
 
 
-# FAT (シリンダ 0) への往復。FatFs はクラスタ列を辿るとき FAT の区画を読み直し、
-# 先読みの表から追い出されていれば 1 回だけシリンダ 0 へ戻って帰ってくる
-# (実測: 基点の配置でも今の配置でも SEEK 64 -> 0 -> 64 が 1 回)。
-# まとめ読みはその往復で FAT / ルートのトラックを 1 本読み直す。
-FONT_FAT_ROUNDTRIP_SEEKS = 2
-FONT_FAT_ROUNDTRIP_READS = 1
-
-
+# A newly needed FAT sector can require an out-and-back seek and a track
+# refill. Count the sectors used by this file, rather than assuming one trip:
+# the S3 image's clusters 557..684 cross the 1024-byte FAT sector boundary.
 def font_bounds(img, spt=8, heads=2):
     """font_replay の上限を配置から出す。
 
     シーク ≦ データが跨ぐシリンダの数
             + データの外にあるメタデータのシリンダの数 (シリンダ 0 を除く —
               マウントの後でヘッドはシリンダ 0 に居る)
-            + FAT への往復 (FONT_FAT_ROUNDTRIP_SEEKS)
+            + FAT への往復 (本体のクラスタ列が使う FAT セクタ数 × 2)
     まとめ読み ≦ データが跨ぐトラックの数
                 + データの外にあるメタデータのトラックの数
-                + FAT への往復で読み直す分 (FONT_FAT_ROUNDTRIP_READS)"""
+                + FAT への往復で読み直す分 (本体のクラスタ列が使う FAT セクタ数)"""
     lay = fat12_layout(img, FONT_GUEST, spt, heads)
     cyl = lambda l: l // (spt * heads)
     trk = lambda l: l // spt
@@ -187,8 +187,9 @@ def font_bounds(img, spt=8, heads=2):
     dtrk = {trk(l) for l in lay["data"]}
     mcyl = {cyl(l) for l in lay["meta"]} - dcyl - {0}
     mtrk = {trk(l) for l in lay["meta"]} - dtrk
-    seek_max = len(dcyl) + len(mcyl) + FONT_FAT_ROUNDTRIP_SEEKS
-    multi_max = len(dtrk) + len(mtrk) + FONT_FAT_ROUNDTRIP_READS
+    fat_trips = len(lay["fat_data"])
+    seek_max = len(dcyl) + len(mcyl) + 2 * fat_trips
+    multi_max = len(dtrk) + len(mtrk) + fat_trips
     desc = (f"data {len(dtrk)} trk / {len(dcyl)} cyl (C{min(dcyl)}-C{max(dcyl)}), "
             f"meta {len(mtrk)} trk / {len(mcyl)} cyl 外 {sorted(mcyl)}")
     return seek_max, multi_max, desc

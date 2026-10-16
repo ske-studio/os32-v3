@@ -3,8 +3,9 @@
 /*  その間の I/O を記録する管理者用の診断                                   */
 /*                                                                          */
 /*  票 docs/tasks/realhw/TASK_PEGC480_REALHW.md §3 段 1。記録の形・判定は    */
-/*  v86_gcap_math.h (ホスト試験で実物のまま回す)。ここはセッションの段取り、 */
-/*  #GP / I/O 経路の差し込み口、CUI の作り直し。                            */
+/*  v86_gcap_math.h (ホスト試験で実物のまま回す)。本体は起動時に読む部品    */
+/*  kdebug/v86_gcap.c で、カーネルからは kdebug.ops.gcap_* 経由で呼ぶ。     */
+/*  kernel/v86_gcap.c は KAPI slot 239 の受け口だけ。                       */
 /* ======================================================================== */
 
 #ifndef __V86_GCAP_H
@@ -13,7 +14,7 @@
 #include "types.h"
 #include "os32_kapi_shared.h"   /* V86Gcap */
 
-/* Stable diagnostic counters remain in kaudit.c. */
+/* 診断の数え。実体は kaudit.c に残る (部品からは kdi_ptr_* で触る) */
 extern u32 v86_gcap_phase, v86_gcap_alloc_count, v86_gcap_free_count;
 
 /* KAPI v68 v86_gdc_capture の本体。mode = V86G_MODE_ROM / V86G_MODE_SELFTEST。
@@ -47,5 +48,7 @@ void v86_gcap_note_emul_in(u16 port, int size, u32 value);
 void v86_gcap_note_emul_out(u16 port, int size, u32 value);
 
 void v86_gcap_release(void);
+void v86_gcap_detach(void);             /* 採取中の印だけ外す (例外終了) */
+int  v86_gcap_port_passed(u16 port);    /* v86g_port_passed (v86_io.c の方針用) */
 
 #endif /* __V86_GCAP_H */

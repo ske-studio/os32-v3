@@ -1,7 +1,7 @@
 ;; V86 ゲスト: `v86 -g` (票 TASK_PEGC480_REALHW §3 段 1)
 ;;
-;; 正本はこのファイル。kernel/v86_gcap.c の v86_gcap_code[] はこれを
-;;   nasm -f bin kernel/v86_test16_gcap.asm -o /tmp/g.bin
+;; 正本はこのファイル。kdebug/v86_gcap.c の v86_gcap_code[] はこれを
+;;   nasm -f bin kdebug/v86_test16_gcap.asm -o /tmp/g.bin
 ;; で組んだバイト列そのもの (tools/tests/test_v86_gcap.py が組み直して照合する)。
 ;;
 ;; 配置: CS = 0x8A00 (linear 0x8A000)。入口は 0x40 刻みの固定オフセット

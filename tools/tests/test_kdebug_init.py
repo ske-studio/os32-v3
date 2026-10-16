@@ -89,7 +89,8 @@ def main():
         # Build the real module independently of pre-existing product artifacts.
         objects = []
         for src in (ROOT / 'kdebug/crt_diag.c', ROOT / 'kdebug/kselftest.c',
-                    ROOT / 'kdebug/nic_trace.c', source,
+                    ROOT / 'kdebug/nic_trace.c', ROOT / 'kdebug/v86_gcap.c',
+                    ROOT / 'kdebug/v86_gcap_math.c', source,
                     folder / 'kdebug_import_slots.c', folder / 'kdebug_import_stubs.S'):
             obj = folder / (src.stem + '.o')
             command([cross / 'i386-elf-gcc', *FLAGS, *inc, '-c', src, '-o', obj])

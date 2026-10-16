@@ -29,12 +29,12 @@ class ImportsTests(unittest.TestCase):
             gen.check_nm(altered)
 
     def test_exact_order_kinds_context_and_hash(self):
-        self.assertEqual(len(self.entries), 223)
+        self.assertEqual(len(self.entries), 218)
         self.assertEqual(self.entries[0]['name'], 'kprintf')
         self.assertEqual(self.entries[210]['name'], 'kdi_ptr_v86_session')
         self.assertEqual({e['name'] for e in self.entries if e['context_safe']}, {
             'serial_puts_polled', 'kdi_get_kctx_irq_depth', 'kdi_get_kctx_exc_depth',
-            'kdi_get_v86_gp_cs', 'kdi_get_v86_gp_ip', 'kdi_ptr_v86_session'})
+            'kdi_ptr_v86_gcap_phase', 'kdi_get_v86_gp_cs', 'kdi_get_v86_gp_ip', 'kdi_ptr_v86_session'})
         for field, value in [('name', 'changed'), ('signature', 'int changed(void);'), ('index', 9)]:
             changed = copy.deepcopy(self.entries)
             changed[0][field] = value

@@ -1669,7 +1669,7 @@
       "stage": "S3",
       "kind": "GETTER",
       "symbol": "v86_gp_cs",
-      "source": "kernel/v86_gcap.c",
+      "source": "kdebug/v86_gcap.c",
       "context_safe": true,
       "index": 208
     },
@@ -1677,7 +1677,7 @@
       "stage": "S3",
       "kind": "GETTER",
       "symbol": "v86_gp_ip",
-      "source": "kernel/v86_gcap.c",
+      "source": "kdebug/v86_gcap.c",
       "context_safe": true,
       "index": 209
     },
@@ -1690,60 +1690,28 @@
       "index": 210
     },
     {
-      "stage": "S4",
-      "kind": "FUNC",
-      "symbol": "e82557_send",
-      "source": "drivers/e82557.h",
-      "context_safe": false,
+      "stage": "S3",
+      "kind": "PTR",
+      "symbol": "v86_gcap_phase",
+      "source": "kernel/v86_gcap.h",
+      "context_safe": true,
       "index": 211
     },
     {
-      "stage": "S4",
-      "kind": "FUNC",
-      "symbol": "e82557_recv",
-      "source": "drivers/e82557.h",
+      "stage": "S3",
+      "kind": "PTR",
+      "symbol": "v86_gcap_alloc_count",
+      "source": "kernel/v86_gcap.h",
       "context_safe": false,
       "index": 212
     },
     {
-      "stage": "S4",
-      "kind": "FUNC",
-      "symbol": "e82557_get_mac",
-      "source": "drivers/e82557.h",
+      "stage": "S3",
+      "kind": "PTR",
+      "symbol": "v86_gcap_free_count",
+      "source": "kernel/v86_gcap.h",
       "context_safe": false,
       "index": 213
-    },
-    {
-      "stage": "S4",
-      "kind": "FUNC",
-      "symbol": "e82557_state",
-      "source": "drivers/e82557.h",
-      "context_safe": false,
-      "index": 214
-    },
-    {
-      "stage": "S4",
-      "kind": "FUNC",
-      "symbol": "e82557_loopback",
-      "source": "drivers/e82557.h",
-      "context_safe": false,
-      "index": 215
-    },
-    {
-      "stage": "S4",
-      "kind": "FUNC",
-      "symbol": "e82557_stat",
-      "source": "drivers/e82557.h",
-      "context_safe": false,
-      "index": 216
-    },
-    {
-      "stage": "S4",
-      "kind": "FUNC",
-      "symbol": "vfs_mkdir",
-      "source": "fs/vfs.h",
-      "context_safe": false,
-      "index": 217
     },
     {
       "stage": "S4",
@@ -1751,7 +1719,7 @@
       "symbol": "vfs_read",
       "source": "fs/vfs.h",
       "context_safe": false,
-      "index": 218
+      "index": 214
     },
     {
       "stage": "S4",
@@ -1759,15 +1727,7 @@
       "symbol": "vfs_write",
       "source": "fs/vfs.h",
       "context_safe": false,
-      "index": 219
-    },
-    {
-      "stage": "S4",
-      "kind": "FUNC",
-      "symbol": "vfs_rm",
-      "source": "fs/vfs.h",
-      "context_safe": false,
-      "index": 220
+      "index": 215
     },
     {
       "stage": "S4",
@@ -1775,7 +1735,7 @@
       "symbol": "vfs_sync",
       "source": "fs/vfs.h",
       "context_safe": false,
-      "index": 221
+      "index": 216
     },
     {
       "stage": "S4",
@@ -1783,7 +1743,7 @@
       "symbol": "boot_image_info",
       "source": "include/bootinfo.h",
       "context_safe": false,
-      "index": 222
+      "index": 217
     }
   ]
 }

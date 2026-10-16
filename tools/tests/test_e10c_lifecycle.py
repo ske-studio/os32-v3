@@ -6,7 +6,7 @@ import tempfile
 import host32
 from test_shm_user import function, ROOT
 
-PATHS = ('kernel/v86_gcap.c','exec/exec.c','kernel/ring3_entry.asm','kernel/kernel.c','kdebug/kselftest.c')
+PATHS = ('kdebug/v86_gcap.c','exec/exec.c','kernel/ring3_entry.asm','kernel/kernel.c','kdebug/kselftest.c')
 MUTANTS = [
  ('gcap-failure-zero',PATHS[0],'    kmemcpy(out, g, (u32)sizeof(*g));',
   '    if (mode == V86G_MODE_ROM && g->status != V86G_ST_OK) { g->n_out = 0; g->n_in = 0; }\n    kmemcpy(out, g, (u32)sizeof(*g));',

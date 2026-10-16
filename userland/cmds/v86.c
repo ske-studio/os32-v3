@@ -97,6 +97,7 @@ static int do_gcap(int selftest)
     rc = api->v86_gdc_capture(mode, &cap);
     if (rc < 0) {
         printf("  could not start (rc=%d)\n", rc);
+        printf("    -10 = NOSYS: kdebug unavailable (enable KDEBUG=1 and reboot)\n");
         printf("    -9  = GUI mode / bad argument\n");
         printf("    -17 = V86 busy / 640x480 graphics active\n");
         printf("    -4  = no kernel memory for the record\n");
