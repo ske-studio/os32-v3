@@ -224,7 +224,7 @@ def cases(script):
             root2 = make_tree(directory, CLEAN)
             asm = root2 / "kernel/kentry.asm"
             asm.write_text(asm.read_text(encoding="utf-8")
-                           .replace("mov     esp, MEM_KSTACK_TOP",
+                           .replace("mov     esp, LAYOUT_MEM_KSTACK_TOP",
                                     "mov     esp, 002FFFFCh"), encoding="utf-8")
             out = run(script, root2, "--check")
             check(out.returncode != 0, "kentry.asm の数値直書きに気づかない")

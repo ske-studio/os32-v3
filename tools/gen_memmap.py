@@ -530,9 +530,9 @@ MIRRORS = (
 )
 
 # ASM は値ではなくシンボルで引くこと。数値直書きに戻したらここで気づく。
-ASM_SYMBOLIC = (("kernel/kentry.asm", "mov     esp, MEM_KSTACK_TOP",
-                 "ESP の初期値を数値で書かず build/os32.ld の "
-                 "MEM_KSTACK_TOP を extern で引くこと"),)
+ASM_SYMBOLIC = (("kernel/kentry.asm", "mov     esp, LAYOUT_MEM_KSTACK_TOP",
+                 "ESP の初期値を数値で書かず生成ヘッダの "
+                 "LAYOUT_MEM_KSTACK_TOP を使うこと"),)
 
 
 def mirrors(root, m):

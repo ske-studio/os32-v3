@@ -7,6 +7,17 @@ check-vk32-crc-host:
 - tools/mkvmkernel.py
 - tools/tests/test_vk32_crc.py
 - tools/tests/test_vmkernel_layout.py
+- tools/tests/test_stack_entry.py
+- tools/tests/stack_entry_host.c
+- kernel/kstack_hw.c
+- kernel/kstack_hw.h
+- kernel/tss.c
+- kernel/tss.h
+- kernel/setjmp.asm
+- include/ksetjmp.h
+- kernel/kernel.c
+- kernel/isr_handlers.c
+- lib/sqlite3/sqlite_stack.asm
 - tools/gen_memmap.py
 - build/kernel.mk
 - build/os32.ld

@@ -117,6 +117,9 @@ def edit_elf(elf, output, symbol=None, value=None, bss_end=None):
 def check_real_bss(elf):
     manifest = gen.layout_manifest(str(ROOT), str(elf.with_suffix('.map')), str(elf))
     syms = manifest['symbols']
+    # The executable entry must lead directly into the product BSS/stack path.
+    _, linked = gen.read_elf(elf)
+    assert linked['kentry'] == linked['KERNEL_LOAD_ADDR'], 'entry != core start'
     zeros = [(syms[a], syms[b]) for a, b in (('__bss_start', '__bss_end'),
                                             ('__sqlite_data_end', '__sqlite_end'))]
     assert all(a <= b and not ((a | b) & 3) for a, b in zeros)

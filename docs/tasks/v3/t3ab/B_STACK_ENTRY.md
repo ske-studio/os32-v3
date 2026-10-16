@@ -1,4 +1,4 @@
-状態: **設計中** (2026-10-16、実装・検査未実施)。
+状態: **実装中** (2026-10-16、旧/新の入口・スタック直接ホスト検査を実装、ゲスト受入待ち)。
 
 ## 目的
 [T3票](../TASK_T3_LAYOUT.md) §2-1・§2-2・§4 T3ab の入口・ゼロ化・stack参照を揃える。
@@ -37,3 +37,8 @@ Aの記号を使い、現在の起動順と復帰経路を保ったままCへ渡
 ## 次の段へ渡すもの・未確認
 Cへ入口・BSS・stackの共通記号と起動順を渡す。SQLite DB/FEPと例外復帰のゲスト観測は未実施。
 DMA可否の起動結線はE（[索引](README.md)のPMの判断1〜4）。TSSへは既にMEM_KSTACK_TOPを渡しており、不要な変更を足さない。
+
+## 実装記録 (2026-10-16)
+- 入口ESPは生成ヘッダの `LAYOUT_MEM_KSTACK_TOP`、fault表示境界は `__sqlite_start`。TSS/SQLite引数/高水位は既存の共通マクロを維持。
+- 製品入口ASM・TSS/高水位C・SQLite trampoline・setjmp/longjmpを0/1で直接実行。core/SQLite全byteゼロ、guard不変、引数/ESP/TSS、正常復帰とfault復帰分岐を観測。CR0/LTRとexec teardownはホスト代替。
+- 検査と固定部/浮動端の比較は `~/os32-tmp/run/t3ab/REPORT_B.md` と `b-*.log`。持越しは [台帳](../../DEFERRED_TESTS.md) T3AB-B。

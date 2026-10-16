@@ -36,6 +36,12 @@ check-ci-stab-host:
 - kernel/boot_font.c
 - kernel/isr_handlers.c
 - kernel/kentry.asm
+- kernel/kstack_hw.c
+- kernel/setjmp.asm
+- kernel/tss.c
+- lib/sqlite3/sqlite_stack.asm
+- tools/tests/stack_entry_host.c
+- tools/tests/test_stack_entry.py
 - kernel/kernel.c
 - kernel/paging.c
 - kernel/paging_app.c

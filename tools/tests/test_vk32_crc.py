@@ -698,6 +698,8 @@ def run_all(srcs, script, target, real):
         lines += check_corrupt(exes["2hd"], img, "synthetic")
         for g in GEOMS:
             lines += check_fat(exes[g], g)
+        import test_stack_entry
+        lines.append(test_stack_entry.run_case(work, LAYOUT))
         import test_vmkernel_layout
         try:
             lines += test_vmkernel_layout.run_cases(sys.modules[__name__], exes, script, work, real)
