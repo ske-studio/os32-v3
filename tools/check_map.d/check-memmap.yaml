@@ -15,6 +15,10 @@ check-memmap:
 - kernel/shm.c
 - sdk/rust/os32api/src/gui/proto.rs
 - tools/gen_memmap.py
+- tools/tests/test_memmap_gen.py
+- boot/boot_defs.h
+- sdk/kapi.json
+- tools/gen_generation_manifest.py
 - tools/tests/owner_reclaim_host.c
 - tools/tests/test_owner_reclaim.py
 - tools/check_map.d/check-memmap.yaml

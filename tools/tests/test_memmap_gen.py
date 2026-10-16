@@ -27,6 +27,9 @@
                → memmap.h だけ直して他が古いまま通る
 """
 import argparse
+import copy
+import hashlib
+import json
 import pathlib
 import re
 import importlib.util
@@ -48,6 +51,13 @@ MAP_TEMPLATE = (
     "                0x002bc060                        __sqlite_end = .\n")
 
 MUTATIONS = {
+    "no-layout-bss-coverage": (
+        '    for lo, hi in (("__bss_start", "__bss_end"), ("__sqlite_data_end", "__sqlite_end")):',
+        '    for lo, hi in ():'),
+    "no-layout-overlap": (
+        '            out.append("半開区間の重複: %s / %s" % (a["name"], b["name"]))',
+        '            pass'),
+    "no-chain-budget": ('    if start > limit:', '    if False:'),
     "no-budget": ("    return limit, sym[\"__bss_end\"] - load",
                   "    return None"),
     "no-escape": ("def escaped_children(rows):",
@@ -234,6 +244,7 @@ def cases(script):
         log.append("NOMAP   --check = %d (推測せず止まる)" % out.returncode)
 
     log.extend(fixed_paging_cases(script))
+    log.extend(layout_cases(script))
     return log
 
 
@@ -313,6 +324,138 @@ def link_fixture(root, sqlite_end=0x2bc060):
     return subprocess.run([str(ld), '-T', 'build/os32.ld', 'kernel/kentry.o',
                            'lib/sqlite3/sqlite3.o', '-o', 'build/out/fixture.elf'],
                           cwd=root, capture_output=True, text=True)
+
+
+def layout_cases(script):
+    """T3a0: real ELF acceptance, then one defect per PASS/FAIL pair.
+
+    These are input defects, also run with MUTATE=0. --mutate separately checks
+    whether disabling the checker makes the corresponding assertion fail.
+    No rejected compilation counts as detection.
+    """
+    spec = importlib.util.spec_from_file_location('genmm_layout_test', script)
+    gen = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gen)
+    elf = ROOT / 'build/out/kernel.elf'
+    sections, symbols = gen.read_elf(elf)
+    result = run(script, ROOT, '--manifest')
+    check(result.returncode == 0, 'layout control failed: ' + result.stderr)
+    manifest = json.loads(result.stdout)
+    check(not gen.layout_defects(manifest, sections, symbols), 'layout control defects')
+    old = json.loads((ROOT / 'build/out/generations-manifest.json').read_text())
+    check(all(manifest[k] == old[k] for k in ('build_id', 'kernel_commit', 'kapi_version', 'generations')),
+          'existing manifest generations differ')
+    recorded = {x['path']: x for x in old['files']}
+    for x in manifest['artifacts']:
+        data = (ROOT / x['path']).read_bytes()
+        check(x['size'] == len(data) and x['sha256'] == hashlib.sha256(data).hexdigest(),
+              'artifact size/hash differs: ' + x['path'])
+        if x['path'] in recorded:
+            check(x == recorded[x['path']], 'existing artifact manifest differs')
+    mapped = gen.read_symbols(ROOT / 'build/out/kernel.map')
+    check(all(symbols[k] == mapped[k] == manifest['symbols'][k] for k in mapped),
+          'ELF/map/manifest symbols differ')
+    # Independent binutils reading guards against a self-consistent ELF parser error.
+    dump = subprocess.run(['i386-elf-objdump', '-h', str(elf)], capture_output=True,
+                          text=True, check=True).stdout
+    table = {m[1]: (int(m[2], 16), int(m[3], 16)) for m in
+             re.finditer(r'^\s*\d+\s+(\S+)\s+([0-9a-f]+)\s+([0-9a-f]+)', dump, re.M)}
+    for s in sections:
+        check(table[s['name']] == (s['end'] - s['start'], s['start']), 'ELF section differs from objdump')
+        r = next(r for r in manifest['ranges'] if r['name'] == s['name'])
+        check((r['start'], r['end'], r['noload']) == (s['start'], s['end'], s['noload']),
+              'ELF section not emitted as half-open interval')
+    check({'code', 'data', 'bss'} <= {r.get('kind') for r in manifest['ranges']}, 'section kinds missing')
+    check(all(next(r for r in manifest['ranges'] if r['name'] == name)['noload']
+              for name in ('.bss', '.sqlite_bss')), 'BSS must be NOLOAD')
+    log = ['LAYOUT real ELF/map/manifest + objdump PASS; code/data/BSS/NOLOAD half-open PASS']
+
+    defines = gen.read_defines(ROOT / 'include/memmap.h')
+    # Exercise identical budget code with both layouts; the future constant is
+    # introduced only in this fixture, not into product headers.
+    defines['MEM_FIXED_PAGING_GUARD_BASE'] = '0x3E0000UL'
+    macros = gen.Macros(defines, symbols)
+    for name in ('MEM_DMA_POOL_BASE', 'MEM_FIXED_PAGING_GUARD_BASE'):
+        limit = macros.get(name)
+        for delta in (-gen.PAGE, 0):
+            slack = gen.chain_slack(limit + delta, limit)
+            check((slack['start'], slack['end'], slack['pages']) ==
+                  (limit + delta, limit, -delta // gen.PAGE), 'chain boundary control failed')
+        try:
+            gen.chain_slack(limit + gen.PAGE, limit)
+        except ValueError as e:
+            check('鎖の予算超過' in str(e), 'wrong chain failure')
+        else:
+            raise AssertionError('chain +1 page escaped budget assertion: ' + name)
+        log.append('BOUNDARY ' + name + ': -1/0 page PASS; +1 page budget FAIL')
+
+    for name in ('.bss', '.sqlite_bss'):
+        check(not gen.layout_defects(manifest, sections, symbols), 'BSS control failed')
+        broken = copy.deepcopy(manifest)
+        broken['ranges'] = [r for r in broken['ranges'] if r['name'] != name]
+        errors = gen.layout_defects(broken, sections, symbols)
+        check(any('BSS/NOLOAD省略' in e for e in errors) and
+              any('ELF区間の欠落/不一致: ' + name in e for e in errors), 'BSS omission escaped: ' + name)
+        log.append('BSS ' + name + ': control PASS / omission assertion FAIL')
+    check(not gen.layout_defects(manifest, sections, symbols), 'overlap control failed')
+    broken = copy.deepcopy(manifest)
+    r = next(r for r in broken['ranges'] if r['name'] == 'KAPI')
+    # Enlarge one runtime interval by one page, retaining consistent size/pages.
+    r.update(gen.layout_range(r['name'], r['start'] - gen.PAGE, r['end'], r['purpose']))
+    errors = gen.layout_defects(broken, sections, symbols)
+    check(any('半開区間の重複: KHEAP / KAPI' in e for e in errors), 'overlap escaped assertion')
+    log.append('OVERLAP control PASS / one-page overlap assertion FAIL')
+
+    with tempfile.TemporaryDirectory(prefix='os32-layout-') as tmp:
+        root = make_tree(tmp, CLEAN)
+        for rel in ('build/out/kernel.elf', 'build/out/kernel.map',
+                    'build/out/kernel.bin', 'build/out/sqlite.bin', 'build/out/vmkernel.lz4',
+                    'build/out/generations-manifest.json', 'sdk/kapi.json'):
+            dst = root / rel
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(ROOT / rel, dst)
+        for rel, old_text, new_text in (
+                ('boot/boot_defs.h', '#define VK32_LOAD_END      0x2E8000UL',
+                 '#define VK32_LOAD_END      0x2E9000UL'),
+                ('boot/loader_fat_new.asm', 'VK32_LOAD_END     EQU 0x2E8000',
+                 'VK32_LOAD_END     EQU 0x2E9000')):
+            check(run(script, root, '--manifest', '--check').returncode == 0, 'mirror control failed')
+            path = root / rel
+            text = path.read_text()
+            # Avoid silently exercising an unchanged fixture if spacing changes.
+            if old_text not in text:
+                pattern = r'(^\s*(?:#define\s+)?VK32_LOAD_END\s+(?:EQU\s+)?)(0x[0-9A-Fa-f]+)'
+                changed, count = re.subn(pattern, lambda m: m[1] + '0x2E9000', text, flags=re.M)
+                check(count == 1, 'mirror mutation target missing')
+            else:
+                changed = text.replace(old_text, new_text, 1)
+            path.write_text(changed)
+            failed = run(script, root, '--manifest', '--check')
+            check(failed.returncode == 1 and '写しのずれ' in failed.stderr and rel in failed.stderr,
+                  'C/ASM mismatch escaped layout assertion: ' + failed.stderr)
+            path.write_text(text)
+            log.append('MIRROR ' + rel + ': control PASS / mismatch assertion FAIL')
+        # Test selection by the future name without mixing its new ceiling with
+        # the old shell band. The actual 0x3E0000 boundaries were tested above.
+        header = root / 'include/memmap.h'
+        header.write_text(header.read_text() + '\n#define MEM_FIXED_PAGING_GUARD_BASE MEM_DMA_POOL_BASE\n')
+        auto = run(script, root, '--manifest')
+        explicit = run(script, root, '--manifest', '--chain-limit', 'MEM_FIXED_PAGING_GUARD_BASE')
+        check(auto.returncode == explicit.returncode == 0,
+              'future ceiling selection failed: ' + auto.stderr + explicit.stderr)
+        check(json.loads(auto.stdout) == json.loads(explicit.stdout), 'explicit/auto ceiling differs')
+        check(json.loads(auto.stdout)['chain_limit'] ==
+              {'constant': 'MEM_FIXED_PAGING_GUARD_BASE', 'value': macros.get('MEM_DMA_POOL_BASE')},
+              'future ceiling ignored')
+        # Reset the only altered header before checking a single stale-hash defect.
+        shutil.copy(ROOT / 'include/memmap.h', header)
+        check(run(script, root, '--manifest', '--check').returncode == 0, 'hash control failed')
+        binary = root / 'build/out/kernel.bin'
+        binary.write_bytes(binary.read_bytes() + b'\0')
+        failed = run(script, root, '--manifest', '--check')
+        check(failed.returncode == 1 and 'artifact mismatch: build/out/kernel.bin' in failed.stderr,
+              'stale artifact hash escaped')
+    return log + ['CEILING auto/explicit future constant PASS; stale artifact control PASS / mismatch FAIL']
 
 
 def main():
