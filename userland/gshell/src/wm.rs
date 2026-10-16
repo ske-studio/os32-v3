@@ -480,6 +480,10 @@ pub struct GuiState {
     /// CTRL+STOP を raw で見た (契約 T6)。OP_WAIT の待ちループがこれで抜けて
     /// アプリへ戻し、カーネルが syscall の出口で畳む。消費したら 0 に戻す。
     pub abort_seen: bool,
+    /// ABORTED 後の連打を合流。500 ms、新しい打鍵・マウス押下で解除。
+    pub stop_suppressed: bool,
+    pub stop_tick: u32,
+    pub stop_mouse_buttons: u8,
     /// F2 のファイル選択で選んだ実行ファイル (NUL 終端)。0 長なら既定のデモ。
     pub launch_path: [u8; 256],
     pub launch_path_len: usize,
@@ -529,6 +533,9 @@ impl GuiState {
         inj_lost: 0,
         gserial: crate::gserial::Serial::NEW,
         abort_seen: false,
+        stop_suppressed: false,
+        stop_tick: 0,
+        stop_mouse_buttons: 0,
         launch_path: [0; 256],
         launch_path_len: 0,
         cfg: crate::settings::GuiCfg::NEW,

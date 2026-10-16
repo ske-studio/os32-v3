@@ -446,6 +446,12 @@ exec_start が同じ周の X3 より後に戻った場合も、未読 raw / defe
 ABORTED の OWNER_EXIT は raw の未読 CTRL+STOP make、WM の abort_seen と
 pending_raw 内の CTRL+STOP make を消費し、次の前景への二重 kill を防ぐ。
 STOP 以外の打鍵・break は保つ。複数の未処理 STOP は既存 bool と同じく合流する。
+H-2 (2): ABORTED 後に遅着する CTRL+STOP make も、STOP・修飾キー以外の
+次の make、新しいマウスボタンの押下、ABORTED から 500 ms (PIT 50 tick) 経過の
+いずれかまで合流して捨てる。終了に伴う自動の前景切替では解除しない。
+修飾キー・break・ボタン解放・押しっぱなしでは解除しない。解除後の STOP は新しい前景へ効く。
+カーネルは raw への追加と abort 要求の両方より前で除外し、WM も pending_raw を
+含めて同じ条件を適用する。CUI と GUI セッションの切替時にはこの抑止を持ち越さない。
 STOP と無関係な ABORTED (request_kill_all、resume 失敗の exec_kill_one) でも、
 その時点の実打鍵 STOP はこの合流に含めて消費する。
 IRQ/例外では ledger を触らず、通常回収の深さ0、owner別回収、R1 pending一回消費を維持。

@@ -140,6 +140,7 @@ extern volatile u8 kbd_shift_state;
 
 /* Internal: discard coalesced CTRL+STOP makes after an ABORTED owner exit. */
 void kbd_discard_stop(void);
+void kbd_stop_mouse_sample(u8 buttons);
 
 int kbd_getchar_kapi(void);
 int kbd_getkey_kapi(void);
