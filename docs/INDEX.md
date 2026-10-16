@@ -49,6 +49,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | T2h の外部再開ゲート・配備期待集合の扱い | [T2H_EXTERNAL_GATE](tasks/v3/T2H_EXTERNAL_GATE.md) (H-7 の追随 8 項目、KAPI 74 / MemStat 200B 再構築、deploy-set と配備元照合) | 持越しは DEFERRED_TESTS H-7、契約は T2d〜h詳細 §5 |
 | NHD ext2のerrors印の原因調査 | [ext2調査票](archive/v3/TASK_EXT2_ERRORS_INVESTIGATION.md) (受入完了 2026-10-01、再インストールで印を解消・原因の発生時点は未確定。T2h受入前ゲートの照合先) | T2d〜h詳細 §0・§5・§8は順序とリンク |
 | v3 T3以降の実装契約・分割・受入と後半接続 | [T3配置](tasks/v3/TASK_T3_LAYOUT.md)、[T4〜T6bモジュール/起動](tasks/v3/TASK_T4_T6_MODULES.md)、[T7/後半接続](tasks/v3/TASK_T7_AND_FOLLOWUPS.md) (設計中。D決定の本文はTASK_MEMMAP_V3) | V3_PLAN / TASK_MEMMAP_V3 はリンクのみ |
+| T3abの段別実装順序 | [T3ab A〜G](tasks/v3/t3ab/README.md) (設計中) | T3配置の決定を継承 |
 | 実機 Ra266 の画面ドライバ (内蔵 Trident 1023:9660) の設計・資料・段取り | [tasks/realhw/TASK_TRIDENT_DRIVER.md](tasks/realhw/TASK_TRIDENT_DRIVER.md) (設計中 — 設計票 v5 が Codex 5 回目で Approve、実装は未着手) | [tasks/realhw/PLAN.md](tasks/realhw/PLAN.md) §7、[ROADMAP.md](ROADMAP.md) (1 行) |
 | 実機 Ra266 の PEGC 640x480 (実機 ROM の OUT 列に合わせたモード設定と受け入れ) | [tasks/realhw/TASK_PEGC480_REALHW.md](tasks/realhw/TASK_PEGC480_REALHW.md) | [RELEASE_v2.1.md](RELEASE_v2.1.md) §2-1、[POLICY_DEBUG.md §4-62](POLICY_DEBUG.md)、`archive/realhw_v21/TASK_PEGC_RA266_TIMING.md` (起票の完了記録) |
 | 現行 / 未実装 / 過去 の区別 | 各文書の冒頭に「現行仕様」「計画」「YYYY-MM-DD 時点のスナップショット」を明記 | — |
