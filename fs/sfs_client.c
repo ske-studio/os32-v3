@@ -13,6 +13,7 @@ void sfs_client_init(SfsClient *c, const SfsIo *io, void *ctx, u32 baud)
     c->io = io;
     c->ctx = ctx;
     c->baud = baud;
+    c->max_payload = SFS_MAX_PAYLOAD;
     sfs_dec_reset(&c->dec);
 }
 
@@ -68,7 +69,7 @@ static int sfs_match(const SfsClient *c, const SfsFrame *f, u8 type,
 static int sfs_exchange(SfsClient *c, u16 flen, u8 type, u16 seq,
                         int hello, u32 nonce, SfsFrame *got)
 {
-    u32 trial = sfs_trial_ticks(c->baud);
+    u32 trial = sfs_trial_ticks_limit(c->baud, c->max_payload);
     u32 gap = sfs_ms_ticks(SFS_GAP_MS);
     u32 start, last, t;
     int attempt, b, r;
@@ -130,11 +131,17 @@ int sfs_client_hello(SfsClient *c, u32 nonce)
 
     if (!c->io->can_wait(c->ctx)) return OS32_ERR_IO;
     sfs_put16(pl, (u16)SFS_VERSION);
-    sfs_put16(pl + 2, (u16)SFS_MAX_PAYLOAD);
+    sfs_put16(pl + 2, c->max_payload);
     sfs_put32(pl + 4, nonce);
     flen = sfs_encode(c->tx, SFS_T_HELLO, 0, 0, pl, 8);
     if (sfs_exchange(c, flen, SFS_T_HELLO, 0, 1, nonce, &f) != 0)
         return OS32_ERR_IO;
+    if (sfs_get16(f.payload + 4) != SFS_VERSION ||
+        sfs_get16(f.payload + 6) < SFS_MAX_PAYLOAD) return OS32_ERR_IO;
+    if (sfs_get16(f.payload + 6) < c->max_payload)
+        /* Supported wire sizes are 512 and 1024, preserving read sectors. */
+        c->max_payload = SFS_MAX_PAYLOAD;
+    c->dec.max_payload = c->max_payload;
     c->sid = f.sid;
     c->seq = 0;
     c->fails = 0;
@@ -142,11 +149,27 @@ int sfs_client_hello(SfsClient *c, u32 nonce)
     return 0;
 }
 
+static void sfs_note_rtt(SfsClient *c, u32 lo, u32 hi, int valid)
+{
+    u32 end_lo, end_hi;
+    unsigned long long elapsed;
+    if (!valid || c->time_us(&end_lo, &end_hi) != 0) return;
+    elapsed = (((unsigned long long)end_hi << 32) | end_lo) -
+              (((unsigned long long)hi << 32) | lo);
+    /* Saturate a single sample rather than wrap after 71 minutes. */
+    if (elapsed > 0xffffffffULL) elapsed = 0xffffffffULL;
+    c->rtt_total_us += elapsed;
+    c->rtt_samples++;
+    if ((u32)elapsed > c->rtt_max_us) c->rtt_max_us = (u32)elapsed;
+}
+
 int sfs_client_call(SfsClient *c, u8 type, const u8 *payload, u16 len,
                     const u8 **resp, u16 *resp_len)
 {
     u16 flen;
     SfsFrame f;
+    u32 lo = 0, hi = 0;
+    int timed;
 
     if (c->sid == 0 || c->dead != SFS_DEAD_NONE) return OS32_ERR_IO;
     if (!c->io->can_wait(c->ctx)) return OS32_ERR_IO;
@@ -155,13 +178,16 @@ int sfs_client_call(SfsClient *c, u8 type, const u8 *payload, u16 len,
         c->dead = SFS_DEAD_SEQ;
         return OS32_ERR_IO;
     }
-    flen = sfs_encode(c->tx, type, c->sid, c->seq, payload, len);
+    flen = sfs_encode_limit(c->tx, type, c->sid, c->seq, payload, len, c->max_payload);
     if (flen == 0) return OS32_ERR_INVAL;
     c->calls++;
+    timed = c->time_us && c->time_us(&lo, &hi) == 0;
     if (sfs_exchange(c, flen, type, c->seq, 0, 0, &f) != 0) {
+        sfs_note_rtt(c, lo, hi, timed);
         sfs_note_fail(c);
         return OS32_ERR_IO;
     }
+    sfs_note_rtt(c, lo, hi, timed);
     if (f.type == SFS_T_ERR) {
         /* ホストがこのセッションを知らない (再起動した) — 続けても同じ */
         c->dead = SFS_DEAD_STALE;
@@ -175,7 +201,7 @@ int sfs_client_call(SfsClient *c, u8 type, const u8 *payload, u16 len,
 
 int sfs_client_oneway(SfsClient *c, u8 type, const u8 *payload, u16 len)
 {
-    u16 flen = sfs_encode(c->tx, type, c->sid, 0, payload, len);
+    u16 flen = sfs_encode_limit(c->tx, type, c->sid, 0, payload, len, c->max_payload);
 
     if (flen == 0) return OS32_ERR_INVAL;
     return c->io->put(c->ctx, c->tx, flen) == 0 ? 0 : OS32_ERR_IO;

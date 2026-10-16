@@ -32,6 +32,7 @@
 #include "appslot.h"            /* APP_ID_SHELL */
 #include "os32_kapi_shared.h"
 #include "sfs_lan.h"
+#include "sys.h"
 #include "e82557.h"
 #include "sysconfig.h"
 #include "config.h"
@@ -55,7 +56,7 @@ static int g_use_lan;
 static const SfsLanNic g_nic = { e82557_send, e82557_recv, e82557_get_mac };
 static int g_active;            /* begin の準備から finish の解放まで */
 static u32 g_nonce_ctr;
-static u32 g_lan_rnr_start;
+static u32 g_lan_rxfull;
 
 /* ---- 線への出入り (ゲートの口) ---- */
 static int sio_put(void *ctx, const u8 *buf, u32 n)
@@ -148,10 +149,12 @@ static int sfs_finish(int code)
             kprintf(SFS_ATTR_ERR, "sfs: line declared dead (%s)\n",
                     sfs_dead_name(g_cli.dead));
         kprintf(SFS_ATTR_INFO,
-                "sfs: requests=%u resent=%u timeouts=%u stray=%u bad_crc=%u bad_len=%u rnr=%u\n",
+                "sfs: requests=%u resent=%u timeouts=%u stray=%u bad_crc=%u bad_len=%u rxfull=%u avg_us=%u max_us=%u\n",
                 g_cli.calls, g_cli.resends, g_cli.timeouts, g_cli.stray,
                 g_cli.dec.bad_crc, g_cli.dec.bad_len,
-                (u32)(e82557_stat(2) - g_lan_rnr_start));
+                g_lan_rxfull,
+                g_cli.rtt_samples ? (u32)(g_cli.rtt_total_us / g_cli.rtt_samples) : 0,
+                g_cli.rtt_max_us);
         kprintf(SFS_ATTR_INFO, "sfs: exit=%d\n", code);
         sfs_dec_reset(&g_cli.dec);
         g_cli.sid = 0;
@@ -173,9 +176,11 @@ static int sfs_finish(int code)
     }
     if (g_cli.sid != 0) {
         kprintf(SFS_ATTR_INFO,
-                "sfs: requests=%u resent=%u timeouts=%u stray=%u bad_crc=%u bad_len=%u\n",
+                "sfs: requests=%u resent=%u timeouts=%u stray=%u bad_crc=%u bad_len=%u avg_us=%u max_us=%u\n",
                 g_cli.calls, g_cli.resends, g_cli.timeouts, g_cli.stray,
-                g_cli.dec.bad_crc, g_cli.dec.bad_len);
+                g_cli.dec.bad_crc, g_cli.dec.bad_len,
+                g_cli.rtt_samples ? (u32)(g_cli.rtt_total_us / g_cli.rtt_samples) : 0,
+                g_cli.rtt_max_us);
         sfs_send_log();
         dropped = serial_hold_dropped();
         if (dropped)
@@ -222,9 +227,10 @@ int serialfs_session_begin(void)
         int state = e82557_state();
         char peer[32]; /* room to detect a too-long configured MAC */
         u32 start;
-        g_lan_rnr_start = e82557_stat(2);
+        g_lan_rxfull = state == E82557_RX_WAIT;
         sfs_lan_init(&g_lan, &g_nic, &g_sio, 0);
         sfs_client_init(&g_cli, &sfs_lan_io, &g_lan, SFS_LAN_BAUD);
+        g_cli.max_payload = SFS_LAN_MAX_PAYLOAD;
         g_active = 1;
         /* Free stale frames before waiting for the existing tick recovery.
          * Reset clears peer configuration, so apply SFS_LAN_PEER afterwards. */
@@ -252,6 +258,8 @@ int serialfs_session_begin(void)
         sfs_client_init(&g_cli, &g_sio, (void *)0, baud);
     }
     g_active = 1;
+
+    g_cli.time_us = sys_time_now;
 
     /* (2) ゲート → (3) HELLO */
     if (!g_use_lan) serial_gate_set(1);

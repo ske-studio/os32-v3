@@ -41,10 +41,16 @@ u32 sfs_crc32(const u8 *p, u32 n)
 u16 sfs_encode(u8 *out, u8 type, u32 sid, u16 seq,
                const u8 *payload, u16 len)
 {
+    return sfs_encode_limit(out, type, sid, seq, payload, len, SFS_MAX_PAYLOAD);
+}
+
+u16 sfs_encode_limit(u8 *out, u8 type, u32 sid, u16 seq,
+                     const u8 *payload, u16 len, u16 limit)
+{
     u16 i;
     u32 crc;
 
-    if (len > SFS_MAX_PAYLOAD) return 0;
+    if (limit > SFS_LAN_MAX_PAYLOAD || len > limit) return 0;
     out[0] = SFS_ENQ;
     out[1] = SFS_MAGIC1;
     out[2] = SFS_MAGIC2;
@@ -65,6 +71,7 @@ void sfs_dec_reset(SfsDec *d)
     d->need = 0;
     d->bad_crc = 0;
     d->bad_len = 0;
+    d->max_payload = SFS_MAX_PAYLOAD;
 }
 
 void sfs_dec_abort(SfsDec *d)
@@ -105,7 +112,7 @@ int sfs_dec_feed(SfsDec *d, u8 byte, SfsFrame *out)
     if (d->pos == SFS_HDR_LEN) {
         /* **長さは確保・コピーの前に上限と照合する** (§1-v2 B-5') */
         len = sfs_get16(d->buf + 10);
-        if (len > SFS_MAX_PAYLOAD) {
+        if (len > d->max_payload || len > SFS_LAN_MAX_PAYLOAD) {
             d->bad_len++;
             d->pos = 0;
             d->need = 0;
@@ -147,7 +154,12 @@ u32 sfs_ms_ticks(u32 ms)
 
 u32 sfs_trial_ticks(u32 baud)
 {
-    u32 frame_ms = ((u32)SFS_MAX_FRAME * sfs_byte_us(baud) * 2UL + 999UL)
+    return sfs_trial_ticks_limit(baud, SFS_MAX_PAYLOAD);
+}
+
+u32 sfs_trial_ticks_limit(u32 baud, u16 limit)
+{
+    u32 frame_ms = ((u32)(SFS_HDR_LEN + limit + SFS_CRC_LEN) * sfs_byte_us(baud) * 2UL + 999UL)
                    / 1000UL;
     return sfs_ms_ticks((u32)SFS_FIRST_BYTE_MS + frame_ms + (u32)SFS_SLACK_MS);
 }

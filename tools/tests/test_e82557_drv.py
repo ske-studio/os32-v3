@@ -19,11 +19,18 @@ CASES += ["rx_" + n for n in ("empty", "full", "p1", "ready", "idle", "copy_tick
 CASES += ["irq_" + n for n in ("none", "cx", "cna", "fr", "rnr", "swi", "mdi", "all", "dead", "again", "limit", "starting", "stopping", "recover", "failed")]
 CASES += ["tx_" + n for n in ("done", "bad", "reserved", "pending", "generation", "timeout", "pre", "post")]
 CASES += ["recover_" + n for n in ("full", "final", "stopfail", "r3fail")] + ["ru_timeout", "recovery_limit", "api_invalid"]
+CASES += ["tx_send_done", "tx_send_bad", "tx_irq_cx", "tx_irq_cna", "tx_irq_bad"]
 FLAGS = ["-m32", "-static", "-no-pie", "-fno-pie", "-fno-stack-protector", "-ffreestanding", "-nostdlib", "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-D__cdecl="]
 INCLUDES = ["-I" + str(ROOT / p) for p in ("include", "drivers", "sdk/include/os32", "fs", "kernel", "lib", "arch/x86", "platform/pc98")] + ["-I" + str(ROOT)]
 MIRROR = ["tools/tests/e82557_drv_host.c", "drivers/e82557.c", "drivers/e82557.h", "drivers/e82557_regs.h", "drivers/e82557_eeprom.c", "drivers/e82557_eeprom.h", "drivers/pci_decode.c", "fs/vfs.h", "kernel/module.h", "include/bootinfo.h", "include/config.h"]
 MIRROR += ["drivers/e82557_desc.c", "drivers/e82557_desc.h", "drivers/pci_bind_match.c", "kernel/dma_pool.h"]
 MUTATIONS = [('drivers/e82557.c',
+  'if (nic.tx == TX_ISSUED) tx_complete();',
+  '/* send completion omitted */', 'send completion omitted'),
+ ('drivers/e82557.c',
+  'if (st & (E82557_STAT_CX | E82557_STAT_CNA)) tx_complete();',
+  '/* IRQ completion omitted */', 'IRQ completion omitted'),
+ ('drivers/e82557.c',
   'if (rc == VFS_ERR_NOTFOUND) return TRY_NONE;',
   'if (rc < 0) return TRY_NONE;',
   'read IO treated as missing'),
@@ -116,8 +123,8 @@ MUTATIONS = [('drivers/e82557.c',
   'nic.state == E82557_OFF ||',
   'STARTING touches SCB'),
  ('drivers/e82557.c',
-  'if (nic.state == E82557_RUNNING) {\n            if (st & E82557_STAT_RNR)',
-  'if (1) {\n            if (st & E82557_STAT_RNR)',
+  'if (nic.state == E82557_RUNNING) {\n            if (st & (E82557_STAT_CX',
+  'if (1) {\n            if (st & (E82557_STAT_CX',
   'RECOVER sets flags'),
  ('drivers/e82557.c',
   'if (!nic.swi_wait) (void)e82557_irq(0, NULL);\n            return; /* never issue',

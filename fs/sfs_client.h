@@ -44,6 +44,10 @@ typedef struct {
     const SfsIo *io;
     void *ctx;
     u32 baud;
+    u16 max_payload;       /* default 512; LAN offers 1024 before HELLO */
+    int (*time_us)(u32 *lo, u32 *hi); /* optional sys_time_now-compatible clock */
+    unsigned long long rtt_total_us;
+    u32 rtt_samples, rtt_max_us;
     u32 sid;               /* 0 = HELLO 前 */
     u16 seq;               /* 最後に使った番号 */
     u8  dead;              /* SFS_DEAD_* */
@@ -54,7 +58,7 @@ typedef struct {
     u32 timeouts;
     u32 stray;             /* 揃ったが自分宛てでなかったフレーム */
     SfsDec dec;
-    u8  tx[SFS_MAX_FRAME];
+    u8  tx[SFS_BUFFER_FRAME];
 } SfsClient;
 
 void sfs_client_init(SfsClient *c, const SfsIo *io, void *ctx, u32 baud);

@@ -42,7 +42,7 @@ class LanServer:
                 packet[12:14] != struct.pack(">H", ETHERTYPE) or
                 packet[14:17] != MARK or packet[6:12] == self.mac):
             return None
-        parsed = sfs.try_frame(packet, ETH_HDR)
+        parsed = sfs.try_frame(packet, ETH_HDR, sfs.LAN_MAX_PAYLOAD)
         if parsed[0] != "frame":
             return None
         fr = parsed[2]
@@ -164,7 +164,7 @@ def main():
         print("lanfs: iface=%s %s" % (args.iface, link_status(args.iface)),
               file=sys.stderr, flush=True)
         port = NicPort(args.iface, ETHERTYPE)
-        server = LanServer(port.mac, sfs.Server(fs, log=lambda msg: print(
+        server = LanServer(port.mac, sfs.Server(fs, max_payload=sfs.LAN_MAX_PAYLOAD, log=lambda msg: print(
             msg, file=sys.stderr, flush=True)), peer=args.peer)
         print("lanfs: iface=%s mac=%s root=%s (read only)" % (
             args.iface, lan_bridge.mac_str(port.mac), args.root),

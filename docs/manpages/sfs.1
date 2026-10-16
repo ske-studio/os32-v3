@@ -73,6 +73,10 @@ rshell を抜ける。
 `--sfs-lan` と `--serve-host` は排他。LAN でもコマンドと出力はシリアル経由で、
 echo、`sfs: transport=lan nic=82557 peer=<MAC> sid=<ID>`、`sfs: exit=N`、EOT を
 照合する。開始行は mount 成功後だけ出す。終了時に requests/resent/timeouts も出す。
+HELLO でペイロード上限を交渉し、LAN は最大 1024 B、旧ホストなら 512 B に落とす。
+1024 B には status 4 B を含むため、読みのデータは 512 B 単位 (シリアルは従来どおり)。
+終了行の `rxfull=0|1` は開始時の RX_WAIT、`avg_us` / `max_us` は要求往復の平均・最大 µs。
+HELLO と片道送信を除き再送を含む。時計取得失敗の要求は集計せず、有効な標本が無ければ 0。
 LAN では UART gate/hold/LOG/EXIT フレームを使わず、子の出力を直接送る。
 
 82557 が RUNNING または RX_WAIT のときだけ開始できる。NIC が無い場合や HELLO の

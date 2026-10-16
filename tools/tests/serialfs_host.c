@@ -227,6 +227,7 @@ static void host_handle(const SfsFrame *q)
         g_sid = HOST_SID;
         sfs_put32(pl, 0);
         sfs_put16(pl + 4, SFS_VERSION);
+        CHECK(sfs_get16(p + 2) == 512);
         sfs_put16(pl + 6, SFS_MAX_PAYLOAD);
         sfs_put32(pl + 8, sfs_get32(p + 4) ^ (u32)(inj_hello_nonce ? 1 : 0));
         resp_send(SFS_T_HELLO | SFS_T_RESP, g_sid, 0, pl, 12);

@@ -378,6 +378,22 @@ static u8 *rx_ring(void) { return (u8 *)nic.dma.va + E82557_RFD_OFF; }
 static void rx_scan(void) { e82557_rx_scan(rx_ring(), &nic.rx, &nic.rnr_pending); }
 static u32 rx_pa(void) { return nic.dma.pa + E82557_RFD_OFF + nic.rx.dev * E82557_RFD_STRIDE; }
 
+/* IF=0, RUNNING only. Preserve the completion barrier before reusing DMA. */
+static void tx_complete(void)
+{
+    if (nic.state != E82557_RUNNING) return;
+    if (nic.tx == TX_ISSUED) {
+        u16 st = e82557_rd16((u8 *)nic.dma.va + E82557_TCB_OFF);
+        if (st & E82557_CB_C) {
+            E82557_BARRIER(); /* TX DMA completion */
+            nic.tx = TX_IDLE;
+            /* SDM :4648-4663: C implies OK, and means DMA done.
+             * !OK is defensive handling of an anomalous value. */
+            nic.stats[(st & E82557_CB_OK) ? 5 : 6]++;
+        }
+    }
+}
+
 /* IF=0. FreeBSD if_fxp.c:1706-1724: acknowledge exactly the observed byte.
  * Two passes only; tick drains remaining events even if the PIC loses an edge. */
 static int e82557_irq(unsigned int irq, void *arg)
@@ -399,6 +415,7 @@ static int e82557_irq(unsigned int irq, void *arg)
         if (st & E82557_STAT_SWI) nic.stats[3]++;
         if (st & E82557_STAT_MDI) nic.stats[4]++;
         if (nic.state == E82557_RUNNING) {
+            if (st & (E82557_STAT_CX | E82557_STAT_CNA)) tx_complete();
             if (st & E82557_STAT_RNR) nic.rnr_pending = 1;
         }
     }
@@ -449,16 +466,7 @@ void e82557_tick(void)
         if (nic.recover_pending && nic.tx != TX_RESERVED) {
             recover_begin();
         } else {
-            if (nic.tx == TX_ISSUED) {
-                u16 st = e82557_rd16((u8 *)nic.dma.va + E82557_TCB_OFF);
-                if (st & E82557_CB_C) {
-                    E82557_BARRIER(); /* TX DMA completion */
-                    nic.tx = TX_IDLE;
-                    /* SDM :4648-4663: C implies OK, and means DMA done.
-                     * !OK is defensive handling of an anomalous value. */
-                    nic.stats[(st & E82557_CB_OK) ? 5 : 6]++;
-                }
-            }
+            tx_complete();
             rx_scan();
             if (ru_restart() != ISSUE_OK) recover_begin();
             if (nic.state == E82557_RUNNING && nic.tx == TX_ISSUED &&
@@ -524,6 +532,7 @@ int e82557_send(const void *buf, u32 len)
     if (!buf || len < E82557_FRAME_MIN || len > E82557_FRAME_MAX) {
         rc = OS32_ERR_INVAL; goto out;
     }
+    if (nic.tx == TX_ISSUED) tx_complete();
     if (nic.tx != TX_IDLE || nic.recover_pending) { rc = OS32_ERR_AGAIN; goto out; }
     nic.tx = TX_RESERVED;
     nic.tx_issued = 0;

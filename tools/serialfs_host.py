@@ -49,6 +49,7 @@ VERSION = 1
 HDR_LEN = 12
 CRC_LEN = 4
 MAX_PAYLOAD = 512
+LAN_MAX_PAYLOAD = MAX_PAYLOAD * 2
 MAX_FRAME = HDR_LEN + MAX_PAYLOAD + CRC_LEN
 READ_MAX = MAX_PAYLOAD - 4
 PATH_MAX = 255
@@ -119,9 +120,9 @@ def crc32(data):
     return zlib.crc32(bytes(data)) & 0xFFFFFFFF
 
 
-def encode(ftype, sid, seq, payload=b""):
+def encode(ftype, sid, seq, payload=b"", max_payload=MAX_PAYLOAD):
     payload = bytes(payload)
-    if len(payload) > MAX_PAYLOAD:
+    if len(payload) > max_payload:
         raise ValueError("payload too long")
     head = struct.pack("<BIHH", ftype, sid & 0xFFFFFFFF, seq & 0xFFFF,
                        len(payload))
@@ -144,7 +145,7 @@ class Frame(object):
             self.type, self.sid, self.seq, len(self.payload))
 
 
-def try_frame(buf, i):
+def try_frame(buf, i, max_payload=MAX_PAYLOAD):
     """buf[i] が ENQ のとき、そこからのフレームを判定する。
 
     戻り値:
@@ -163,7 +164,7 @@ def try_frame(buf, i):
     if avail < HDR_LEN:
         return ("need", 0)
     ftype, sid, seq, ln = struct.unpack_from("<BIHH", bytes(buf[i + 3:i + HDR_LEN]))
-    if ln > MAX_PAYLOAD:
+    if ln > max_payload:
         return ("text", 1)
     total = HDR_LEN + ln + CRC_LEN
     if avail < total:
@@ -502,8 +503,8 @@ class HostFS(object):
         nxt = idx if idx < len(ents) else 0
         return 0, struct.pack("<I", nxt) + bytes(out)
 
-    def read(self, wire, offset, count):
-        count = min(count, READ_MAX)
+    def read(self, wire, offset, count, max_payload=MAX_PAYLOAD):
+        count = min(count, max_payload - 4)
         comps = self._comps(wire)
         if self.secure:
             if not comps:
@@ -642,8 +643,11 @@ def _take_path(p, at):
 class Server(object):
     """要求フレーム → 応答フレーム。時計と乱数は差し替えられる (試験用)。"""
 
-    def __init__(self, fs, now=time.monotonic, rng=None, log=None):
+    def __init__(self, fs, now=time.monotonic, rng=None, log=None,
+                 max_payload=MAX_PAYLOAD):
         self.fs = fs
+        self.payload_cap = max_payload
+        self.max_payload = MAX_PAYLOAD
         self.now = now
         self.rng = rng or random.SystemRandom()
         self.log = log or (lambda msg: None)
@@ -717,8 +721,12 @@ class Server(object):
         while sid == 0 or sid in self.closed:
             sid = self.rng.getrandbits(32)
         self.sid = sid
+        self.max_payload = min(self.payload_cap, maxp)
+        if self.max_payload < MAX_PAYLOAD:
+            self.sid = 0
+            return None
         resp = encode(T_HELLO | T_RESP, sid, 0,
-                      struct.pack("<iHHI", 0, VERSION, MAX_PAYLOAD, nonce))
+                      struct.pack("<iHHI", 0, VERSION, self.max_payload, nonce))
         self.cache_key = key
         self.cache_resp = resp
         self.log("[serve-host] HELLO v%d max=%d -> session %08x" % (ver, maxp, sid))
@@ -726,6 +734,8 @@ class Server(object):
 
     def _execute(self, fr):
         p = fr.payload
+        if len(p) > self.max_payload:
+            return encode(T_ERR, fr.sid, fr.seq, struct.pack("<i", ERR_INVAL))
         t = fr.type
         body = b""
         self.executed += 1
@@ -744,7 +754,7 @@ class Server(object):
                     raise SfsError(ERR_INVAL)
                 off, cnt = struct.unpack_from("<IH", p)
                 path, _ = _take_path(p, 6)
-                st, body = self.fs.read(path, off, cnt)
+                st, body = self.fs.read(path, off, cnt, self.max_payload)
             elif t == T_WRITE:
                 if len(p) < 5:
                     raise SfsError(ERR_INVAL)
@@ -764,7 +774,8 @@ class Server(object):
                 raise SfsError(ERR_INVAL)
         except Exception as e:          # noqa: BLE001 — 何でも status にする
             st, body = _err(e), b""
-        return encode(t | T_RESP, fr.sid, fr.seq, struct.pack("<i", st) + body)
+        return encode(t | T_RESP, fr.sid, fr.seq, struct.pack("<i", st) + body,
+                      max_payload=self.max_payload)
 
 
 def sfs_child(line):
