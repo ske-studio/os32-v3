@@ -7,8 +7,7 @@
 #
 #  使用法:
 #    python3 tools/mkvmkernel.py \
-#        --kernel kernel.bin --kernel-addr 0x100000 \
-#        --sqlite sqlite.bin --sqlite-addr 0x300000 \
+#        --elf kernel.elf --kernel kernel.bin --sqlite sqlite.bin \
 #        -o vmkernel.lz4
 #
 #  必要パッケージ: pip install lz4
@@ -17,7 +16,9 @@
 #  展開側 (boot/lz4_mini.c・boot/loader_fat_new.asm の pm_lz4_decode) は無変更。
 #  生成したイメージが HDD ローダの上限 MAX_IMAGE_SIZE (boot/boot_defs.h) を
 #  超えたら**出力を書かずに失敗**する (TASK_HDD_INSTALL N8 の生成側)。
-#  ホスト試験: tools/tests/test_vmkernel_lz4.py
+#  ホスト試験: tools/tests/test_vmkernel_lz4.py / test_vk32_crc.py
+#  明示 --kernel-addr / --sqlite-addr は旧CLI/合成fixture用。ELFとの併用時は
+#  一致を要求する。製品の通常/R1ビルドは --elf を使う。
 #
 #  VK32ヘッダ仕様 (v2、票 TASK_SERIAL_HOSTFS 部品 A-4。正典の説明は
 #  boot/boot_defs.h、n = entry_count):
@@ -42,6 +43,7 @@ import sys
 import struct
 import argparse
 import zlib
+import subprocess
 
 try:
     import lz4.block
@@ -94,16 +96,101 @@ def parse_addr(s):
     return int(s, 0)
 
 
+def elf_load_addresses(path, sections):
+    """Read BFD's LMA interpretation, matching objcopy's flat binary layout."""
+    result = subprocess.run(['objdump', '-h', '-f', path], capture_output=True,
+                            text=True, env=dict(os.environ, LC_ALL='C'))
+    if result.returncode:
+        raise ValueError('ELF: objdump failed: ' + result.stderr.strip())
+    addresses = {}
+    for line in result.stdout.splitlines():
+        m = re.match(r'^\s*\d+\s+(\S+)\s+[0-9a-fA-F]+\s+'
+                     r'([0-9a-fA-F]+)\s+([0-9a-fA-F]+)\s', line)
+        if m:
+            addresses[m[1]] = (int(m[2], 16), int(m[3], 16))
+    for section in sections:
+        pair = addresses.get(section['name'])
+        if pair is None or pair[0] != section['start']:
+            raise ValueError('ELF: missing/inconsistent section addresses: ' + section['name'])
+        if pair[0] != pair[1]:
+            raise ValueError('ELF: VMA/LMA mismatch: {} VMA=0x{:x} LMA=0x{:x}'.format(
+                section['name'], *pair))
+    entry = re.search(r'^start address 0x([0-9a-fA-F]+)\s*$', result.stdout, re.MULTILINE)
+    if not entry:
+        raise ValueError('ELF: missing ELF entry address')
+    return int(entry[1], 16)
+
+
+def elf_layout(path):
+    """Use T3a0's ELF manifest intervals, without its post-build artifact hashes.
+
+    The complete manifest depends on vmkernel itself, so cannot be a build input.
+    NOBITS occupies memory but never contributes bytes to either flat binary.
+    """
+    import gen_memmap
+    from gen_memmap import read_elf, layout_range, Macros, read_defines
+    sections, symbols = read_elf(path)
+    entry = elf_load_addresses(path, sections)
+    rows = [layout_range(s['name'], s['start'], s['end'],
+                         'sqlite' if s['name'].startswith('.sqlite') else 'core',
+                         noload=s['noload']) for s in sections if s['end'] > s['start']]
+    spans = {}
+    for purpose in ('core', 'sqlite'):
+        stored = [r for r in rows if r['purpose'] == purpose and not r['noload']]
+        if not stored:
+            raise ValueError('ELF: missing file sections: ' + purpose)
+        spans[purpose] = (min(r['start'] for r in stored), max(r['end'] for r in stored))
+    if spans['sqlite'][0] != symbols['__sqlite_start']:
+        raise ValueError('ELF: SQLite file start != __sqlite_start')
+    zeros = [('core', symbols['__bss_start'], symbols['__bss_end']),
+             ('sqlite', symbols['__sqlite_data_end'], symbols['__sqlite_end'])]
+    for purpose, start, end in zeros:
+        if start > end or (start | end) & 3:
+            raise ValueError('ELF: unaligned/reversed BSS zero range: ' + purpose)
+    for r in rows:
+        if not 0 <= r['start'] <= r['end'] <= 0xFFFFFFFF:
+            raise ValueError('ELF: section address overflow: ' + r['name'])
+        if r['noload'] and not any(p == r['purpose'] and a <= r['start'] <= r['end'] <= b
+                                   for p, a, b in zeros):
+            raise ValueError('ELF: BSS outside zero range: ' + r['name'])
+    # Check file extents (including objcopy padding) against every BSS range.
+    occupied = [(p, a, b) for p, (a, b) in spans.items()] + zeros
+    for i, (p, a, b) in enumerate(occupied):
+        for q, c, d in occupied[i + 1:]:
+            if a < b and c < d and a < d and c < b:
+                raise ValueError('ELF: file/BSS overlap: {} / {}'.format(p, q))
+    layout_root = os.path.dirname(os.path.dirname(os.path.abspath(gen_memmap.__file__)))
+    macros = Macros(read_defines(os.path.join(layout_root, 'include', 'memmap.h')), symbols)
+    load_addr = macros.get('KERNEL_LOAD_ADDR')
+    if load_addr is None:
+        raise ValueError('ELF: unresolved KERNEL_LOAD_ADDR')
+    for label, addr in (('core start', spans['core'][0]), ('ELF entry', entry)):
+        if addr != load_addr:
+            raise ValueError('ELF: {} 0x{:x} != loader KERNEL_LOAD_ADDR 0x{:x}'.format(
+                label, addr, load_addr))
+    for name in ('MEM_SHM_GUARD_LO', 'MEM_SHM_GUARD_HI', 'MEM_STACK_GUARD',
+                 'MEM_SHELL_GUARD', 'MEM_SQLITE_STACK_GUARD', 'MEM_FIXED_PAGING_GUARD_BASE'):
+        if name not in macros.defines:
+            continue
+        guard, size = macros.get(name), macros.get('MEM_GUARD_SIZE')
+        if guard is None or size is None:
+            raise ValueError('ELF: unresolved guard: ' + name)
+        if any(a < guard + size and guard < b for _, a, b in zeros if a < b):
+            raise ValueError('ELF: BSS intersects guard: ' + name)
+    return spans
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='VK32圧縮カーネルイメージ (vmkernel.lz4) 生成ツール')
     parser.add_argument('--kernel', required=True,
                         help='カーネルバイナリ (kernel.bin)')
-    parser.add_argument('--kernel-addr', required=True, type=parse_addr,
+    parser.add_argument('--elf', help='linked kernel ELF (derive and validate both destinations)')
+    parser.add_argument('--kernel-addr', type=parse_addr,
                         help='カーネル展開先アドレス (例: 0x100000)')
     parser.add_argument('--sqlite', required=True,
                         help='SQLiteバイナリ (sqlite.bin)')
-    parser.add_argument('--sqlite-addr', required=True, type=parse_addr,
+    parser.add_argument('--sqlite-addr', type=parse_addr,
                         help='SQLite展開先アドレス (例: 0x300000)')
     parser.add_argument('-o', '--output', required=True,
                         help='出力ファイル名 (vmkernel.lz4)')
@@ -113,6 +200,18 @@ def main():
 
     try:
         max_image_size = read_max_image_size(args.limit_header)
+        spans = elf_layout(args.elf) if args.elf else None
+        for label, purpose in (('kernel', 'core'), ('sqlite', 'sqlite')):
+            explicit = getattr(args, label + '_addr')
+            if spans:
+                addr = spans[purpose][0]
+                if explicit is not None and explicit != addr:
+                    raise ValueError('ELF: conflicting --' + label + '-addr')
+                setattr(args, label + '_addr', addr)
+                if os.path.getsize(getattr(args, label)) != spans[purpose][1] - addr:
+                    raise ValueError('ELF: file size mismatch (NOLOAD is not file data): ' + label)
+            elif explicit is None:
+                raise ValueError('--elf or --' + label + '-addr is required')
     except (OSError, ValueError) as e:
         print('Error: {}'.format(e), file=sys.stderr)
         sys.exit(1)
