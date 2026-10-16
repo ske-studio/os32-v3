@@ -623,8 +623,12 @@ class InfrastructureTests(unittest.TestCase):
                     return subprocess.CompletedProcess(args, int(index is not None), output, '')
                 ticks = iter(itertools.chain.from_iterable((i * 32, i * 32 + 31)
                                                           for i in range(len(module.MUTANTS))))
+                # This tests elapsed-time reporting with build/run mocked out,
+                # not kernel layout. Exclude the ELF prerequisite explicitly:
+                # the subprocess mock would also intercept linker_flags' nm.
                 with patch.object(module.argparse.ArgumentParser, 'parse_args',
                                   return_value=SimpleNamespace(runner='qemu', mutate=True)), \
+                     patch.object(module, 'linker_flags', return_value=[], create=True), \
                      patch.object(module.host32, 'control',
                                   return_value=contextlib.nullcontext(True), create=True), \
                      patch.object(module.host32, 'begin_control', create=True), \

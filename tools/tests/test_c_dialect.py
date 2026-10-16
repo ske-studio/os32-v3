@@ -123,6 +123,33 @@ def case_parse(cd):
           "前処理用の引数は -I とソースを残し、依存生成・-c・-o を外す")
 
 
+def case_dry_run_lifetime(cd):
+    # Overlap producers, then consume their headers after both have returned.
+    # A tiny make graph keeps this independent of the full AST scan.
+    from concurrent.futures import ThreadPoolExecutor
+    with tempfile.TemporaryDirectory(prefix="c_dialect_lifetime_") as td:
+        root = pathlib.Path(td)
+        (root / "include").mkdir()
+        (root / "include/memmap.h").write_text("#define MEM_TEST 123\n")
+        (root / "Makefile").write_text(
+            "all:\n\t i386-elf-gcc -include $(BUILD_OUT)/memmap_layout.h "
+            "-c probe.c -o probe.o\n")
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(cd.dry_run, [root, root]))
+        headers = []
+        for rc, out, err in results:
+            check(rc == 0, "parallel dry-run succeeds: " + err)
+            units = cd.parse_compile_lines(out)
+            check(len(units) == 1, "parallel dry-run retains its command")
+            argv = units[0]['argv']
+            headers.append(pathlib.Path(argv[argv.index('-include') + 1]))
+        check(headers[0] != headers[1], "parallel dry-runs own distinct headers")
+        check(all(h.is_file() and '#define LAYOUT_MEM_TEST 0x7B' in h.read_text()
+                  for h in headers), "headers survive both producers returning")
+        headers[0].unlink()
+        check(headers[1].is_file(), "removing one header leaves the other intact")
+
+
 # --------------------------------------------------------------------------
 #  3. 実際に効いている言語モード (コンパイラに聞く)
 # --------------------------------------------------------------------------
@@ -417,7 +444,10 @@ MUTANTS = [
      lambda: rep(CFG, "CFLAGS_SQLITE = $(C_STD_SQLITE) $(CFLAGS_MACHINE) -Os",
                  "CFLAGS_SQLITE = $(CFLAGS_COMMON) -Os")),
     ("os32_sqlite_test.o を本体の言語指定で組む", "RED",
-     lambda: rep("build/kernel.mk", "$(CC) $(C_STD_SQLITE) -m32", "$(CC) $(C_STD) -m32")),
+     # dry_run uses an alternate BUILD_OUT, hence the prefixed object rule.
+     lambda: rep("build/kernel.mk",
+                 "$(if $(filter %/os32_sqlite_test.c,$<),-O0) -include",
+                 "$(if $(filter %/os32_sqlite_test.c,$<),-O0 $(C_STD)) -include")),
     ("userland の SQLite 単体を gnu11 で組む", "RED",
      lambda: rep("build/programs.mk", "SQLITE_SA_CFLAGS = $(C_STD_SQLITE)",
                  "SQLITE_SA_CFLAGS = $(C_STD)")),
@@ -502,8 +532,9 @@ def mutate_one(item):
         got = "GREEN" if r.returncode == 0 else "RED"
         if want == 'RED' and ('clang parse failure' in r.stdout or r.returncode != 1):
             got = 'PARSE_FAILURE_NOT_COUNTED'
-        tail = (r.stdout + r.stderr).strip().splitlines()[-1:] if got == "RED" else []
-        return (i, desc, want, got, tail[0] if tail else "")
+        tail = ((r.stdout + r.stderr).strip().splitlines()[-1:] if got == "RED"
+                else (r.stdout + r.stderr).strip().splitlines() if got != want else [])
+        return (i, desc, want, got, "\n".join(tail))
 
 
 def run_mutations():
@@ -527,10 +558,30 @@ def run_mutations():
     return bad == 0
 
 
+def case_sqlite_rule(cd):
+    # Check the previously missed recipe even when MUTATE=0; no full AST run.
+    edits = MUTANTS[7][2]()
+    check(edits is not None, "SQLite test mode edit matches the alternate rule")
+    if edits is None:
+        return
+    with tempfile.TemporaryDirectory(prefix="c_dialect_rule_") as td:
+        tree = mutpar.mutant_tree(ROOT, pathlib.Path(td) / 'tree', edits,
+                                  real=set(edits))
+        rc, out, err = cd.dry_run(tree)
+        check(rc == 0, "SQLite recipe dry-run succeeds: " + err)
+        units = [u for u in cd.parse_compile_lines(out)
+                 if u['src'] == 'lib/sqlite3/os32_sqlite_test.c']
+        check(bool(units) and all(cd.effective_std(u['sig'], tree, u['cc']) == 'gnu11'
+                                  for u in units),
+              "SQLite test mode edit reaches the actual compile command")
+
+
 def main(argv):
     cd = load()
     case_lex(cd)
     case_parse(cd)
+    case_dry_run_lifetime(cd)
+    case_sqlite_rule(cd)
     case_effective(cd)
     case_cross_free(cd)
     case_probe(cd)
