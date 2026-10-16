@@ -314,6 +314,20 @@ void _start(void)
     CHECK(paging_memmap_selftest(0) == bad + 1);
     CHECK(paging_memmap_selftest(tramp) == bad);
 
+    /* DMA moved across the PDE boundary; audit both ends of the pool. */
+    if (HOST_RAM_KB * 1024UL >= MEM_DMA_POOL_END + 1) {
+        CHECK(MEM_DMA_POOL_BASE == 0x7F0000UL);
+        CHECK(paging_poke_user_bit(MEM_DMA_POOL_BASE, 1) == 0);
+        CHECK(paging_memmap_selftest(tramp) == bad + 1);
+        CHECK(paging_memmap_bad[bad * 3] == MEM_DMA_POOL_BASE);
+        CHECK(paging_poke_user_bit(MEM_DMA_POOL_BASE, 0) == 0);
+        CHECK(paging_poke_user_bit(MEM_DMA_POOL_END, 1) == 0);
+        CHECK(paging_memmap_selftest(tramp) == bad + 1);
+        CHECK(paging_memmap_bad[bad * 3 + 1] == MEM_DMA_POOL_END);
+        CHECK(paging_poke_user_bit(MEM_DMA_POOL_END, 0) == 0);
+        CHECK(paging_memmap_selftest(tramp) == bad);
+    }
+
     /* 連続して食い違うページは **1 本の区間** にまとまること。
      * 1 ページずつ数えると「4KB のずれ」と「帯ごと丸ごと違う」が
      * 同じ顔になり、件数が意味を失う。 */

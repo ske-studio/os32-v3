@@ -589,13 +589,11 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     if (memory_boot_dma_available()) {
         dma_pool_init();
     } else {
-        kprintf(0x07, "[dma] RAM short; pool/selftest/PCI/PCM skipped\n");
+        kprintf(0x07, "[dma] RAM short; pool/PCI/PCM skipped\n");
     }
     kdebug_load();
-    if (memory_boot_dma_available()) {
-        if (kdebug.ops.selftest_run) kdebug.ops.selftest_run();
-        else kselftest_skipped();
-    }
+    if (kdebug.ops.selftest_run) kdebug.ops.selftest_run();
+    else kselftest_skipped();
 
     /* ⑥-0 (TASK_T1_LEDGER §3-3、B4): pci_init は台帳より前に走るので、g_pci の
      * メモリ BAR をここで資源表へ RAW (採取値、予約権限なし) として取り込む。
@@ -757,7 +755,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     kaudit_post_probe();
     if (kdebug.ops.selftest_post_probe) kdebug.ops.selftest_post_probe();
 
-    /* 共有ライブラリ (0x400000 帯) を常駐させる — シェルを載せる **前** に
+    /* 共有ライブラリ (0x80000000 帯、常駐シェルの 0x400000 帯とは別) を常駐させる — シェルを載せる **前** に
      * 1 回だけ (票 K3)。ここより後だと pgalloc が帯域のページを配ってしまう。
      * ライブラリが無ければ静かに未ロードで続行し、CUI は従来どおり動く。 */
     shlib_init();

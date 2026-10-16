@@ -773,7 +773,7 @@ u32 paging_pte_flags(u32 virt_addr)
 /*                                                                          */
 /*  カーネル全体は identity マッピング (仮想=物理) なので、pgalloc が返す     */
 /*  物理アドレスはそのまま仮想アドレスとして読み書きできる。新 PD / アプリ    */
-/*  PT のバッキングは 0x400000 帯 (APP_BAND_PDE の範囲) から取られるが、      */
+/*  PT のバッキングは常駐シェル帯 (0x400000) を除く物理 pool から取られ、      */
 /*  アプリ PT を master と同一 identity で初期化するため、CR3 を新 PD に      */
 /*  載せた後もそれらのページは自分自身を identity で見られる。               */
 /* ======================================================================== */
@@ -1311,9 +1311,12 @@ static u8 memmap_want_at(u32 a, u32 tramp)
     if (a >= MEM_LEDGER_META_BASE && a < MEM_LEDGER_META_END)
         return MM_RW;
     if (a >= MEM_KSTACK_BASE && a < MEM_SHELL_LOAD_ADDR) return MM_RW;
+    if (a < MEM_SHELL_LOAD_ADDR) return MM_RW;
+
+    /* DMA を含め、実 RAM の上端より先は not-present。 */
+    if (a / PAGE_SIZE >= boot_identity_end) return MM_NP;
     /* DMA プールは USER なしの RW (票 §1-3)。 */
     if (a >= MEM_DMA_POOL_BASE && a <= MEM_DMA_POOL_END) return MM_RW;
-    if (a < MEM_SHELL_LOAD_ADDR) return MM_RW;
 
     /* シェル常駐帯域 */
     if (a < MEM_SHELL_GUARD) return MM_RW;
@@ -1338,13 +1341,12 @@ u32 paging_memmap_bad_count;
 /* 自己診断の変異専用 (paging.h の註)。PDE には触らない。 */
 int paging_poke_user_bit(u32 virt, int set_user)
 {
-    u32 idx;
+    u32 pdi = virt / (PTE_COUNT * PAGE_SIZE);
+    u32 idx = (virt / PAGE_SIZE) % PTE_COUNT;
 
-    if (!pg_enabled || !page_tables[0]) return -1;
-    if (virt >= (u32)PTE_COUNT * PAGE_SIZE) return -1;
-    idx = virt / PAGE_SIZE;
-    if (set_user) page_tables[0][idx] |= (u32)PTE_USER;
-    else          page_tables[0][idx] &= ~(u32)PTE_USER;
+    if (!pg_enabled || pdi >= PAGING_PT_COUNT || !page_tables[pdi]) return -1;
+    if (set_user) page_tables[pdi][idx] |= (u32)PTE_USER;
+    else          page_tables[pdi][idx] &= ~(u32)PTE_USER;
     arch_mmu_flush_tlb();
     return 0;
 }
@@ -1361,13 +1363,13 @@ int paging_memmap_selftest(u32 tramp_page)
         V2P(page_directory) != MEM_FIXED_PD_BASE) return -1;
 
     i = 0;
-    while (i < (MEM_SHELL_BAND_END + 1) / PAGE_SIZE) {
+    while (i < (MEM_DMA_POOL_END + 1) / PAGE_SIZE) {
         a = i * PAGE_SIZE;
         want = memmap_want_at(a, tramp_page);
         seen = memmap_seen_at(page_tables[i / PTE_COUNT][i % PTE_COUNT]);
         if (want == seen) { i++; continue; }
         /* 同じ (期待, 実物) の組が続くあいだを 1 本の区間にまとめる */
-        for (j = i + 1; j < (MEM_SHELL_BAND_END + 1) / PAGE_SIZE; j++) {
+        for (j = i + 1; j < (MEM_DMA_POOL_END + 1) / PAGE_SIZE; j++) {
             a = j * PAGE_SIZE;
             if (memmap_want_at(a, tramp_page) != want) break;
             if (memmap_seen_at(page_tables[j / PTE_COUNT][j % PTE_COUNT]) != seen) break;

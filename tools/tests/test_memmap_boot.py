@@ -84,7 +84,7 @@ MUTATIONS = {
         "    pg_enabled = 1;\n    irq_restore(flags);",
         "    pg_enabled = 1;\n    _enable();"),
     "no-coalesce": ("kernel/paging.c",
-                    "        for (j = i + 1; j < (MEM_SHELL_BAND_END + 1) / PAGE_SIZE; j++) {",
+                    "        for (j = i + 1; j < (MEM_DMA_POOL_END + 1) / PAGE_SIZE; j++) {",
                     "        for (j = i + 1; j < i + 1; j++) {"),
 }
 

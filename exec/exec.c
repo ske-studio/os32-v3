@@ -1946,7 +1946,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
             return exec_launch_abort(launcher_id, id, EXEC_ERR_NOMEM);
         }
 
-        /* --- K3: 共有ライブラリ帯域 (0x400000-0x4FFFFF) ---
+        /* --- K3: 共有ライブラリ帯域 (0x80000000、常駐シェル帯とは別) ---
          * .text/.rodata は RO+USER、.data/.bss は同じ仮想番地にこのアプリ
          * 専用の物理ページ (原本から複製)。**master CR3 のまま**行う —
          * 原本 g_data_master は共有ライブラリ帯の末尾 = アプリ固有 PDE の

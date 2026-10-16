@@ -571,7 +571,7 @@ static void test_memmap(void)
     }
 
     if (bad <= 0) {
-        check(bad == 0, "memmap: PDE 0 matches include/memmap.h");
+        check(bad == 0, "memmap: low memory matches include/memmap.h");
         return;
     }
 
@@ -600,10 +600,24 @@ static void test_memmap(void)
 /*  **見分けられることを毎回確かめる**ために、PTE 1 本に USER を立てて       */
 /*  検査が落ちるところまで見て、戻す (往復 3 B6)。                          */
 /* ------------------------------------------------------------------------ */
+/* The boot ledger records the pool only when its entire range is RAM. */
+static int selftest_dma_available(void)
+{
+    for (u32 i = 0; i < ledger_region_count; i++) {
+        const struct ledger_region *r = &ledger_regions[i];
+        if (r->type == LEDGER_R_DMA &&
+            r->first == MEM_DMA_POOL_BASE / PAGE_SIZE &&
+            r->end == (MEM_DMA_POOL_END + 1) / PAGE_SIZE) return 1;
+    }
+    return 0;
+}
+
 static void test_memmap_pool_user(void)
 {
     u32 tramp = exec_tramp_page_addr();
     int clean, poked;
+
+    if (!selftest_dma_available()) return;
 
     /* 変異の前。ここが 0 でなければ test_memmap が既に報告している。 */
     clean = paging_memmap_selftest(tramp);
@@ -2069,7 +2083,8 @@ int kselftest_run(void)
     test_bootinfo();
     test_bootlog();
     test_dma8237();
-    test_dma_pool();
+    if (selftest_dma_available()) test_dma_pool();
+    else kprintf(0xA1, "[selftest] DMA pool skipped (RAM short)\n");
     test_irq_dynamic();
     test_time_now();
     test_ring3_wm_guard();

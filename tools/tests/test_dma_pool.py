@@ -134,6 +134,12 @@ def boot_gate(tmp):
     gate = kernel[start:end].replace('for (;;) { _stop(); }', 'longjmp(halt, 1);')
     (d / "kernel_dma_gate.c").write_text(
         'static void host_kernel_dma(u32 mem_kb) {\n' + gate + '\n}\n')
+    selftests = (ROOT / "kdebug/kselftest.c").read_text()
+    helper = re.search(r"static int selftest_dma_available\(void\).*?\n}\n", selftests, re.S).group()
+    gate = selftests[selftests.index('    if (selftest_dma_available()) test_dma_pool();'):]
+    gate = gate[:gate.index('    test_irq_dynamic();')]
+    (d / "selftest_dma_gate.c").write_text(
+        helper + 'static void host_selftest_dma(void) {\n' + gate + '}\n')
     (d / "dma_pool_source.c").write_text((ROOT / "kernel/dma_pool.c").read_text())
     (d / "io.h").write_text(
         'static unsigned int irq_save(void) { return 0; }\n'

@@ -13,3 +13,4 @@ check-dma-pool-host:
 - drivers/fdc.c
 - drivers/fdc.h
 - kdebug/kselftest.c
+- kernel/pgalloc.h
