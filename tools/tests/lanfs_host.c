@@ -9,7 +9,7 @@ static SfsClient client;
 static SfsLanNic nic;
 static u32 ticks;
 static int wait_ok, gates;
-static u8 result[SFS_LAN_MAX_PAYLOAD];
+static u8 result[10 * 1024];
 static u16 result_len;
 
 static u32 clock_now(void *ctx) { (void)ctx; return ticks; }
@@ -76,8 +76,8 @@ int test_stream(u32 size)
 int test_write(void)
 {
     u32 i;
-    for (i=0; i<sizeof(result); i++) result[i]=(u8)(i%251);
-    return serialfs_get_ops()->write_file(&client, "/out", result, sizeof(result));
+    for (i=0; i<1024; i++) result[i]=(u8)(i%251);
+    return serialfs_get_ops()->write_file(&client, "/out", result, 1024);
 }
 static u32 us_reads;
 static int us_fail;
@@ -91,3 +91,5 @@ void test_clock(int fail) { us_reads=0; us_fail=fail; client.time_us=clock_us; }
 u32 test_samples(void) { return client.rtt_samples; }
 u32 test_avg(void) { return client.rtt_samples ? (u32)(client.rtt_total_us/client.rtt_samples) : 0; }
 u32 test_max(void) { return client.rtt_max_us; }
+
+u32 test_trial(u32 baud) { return sfs_trial_ticks_limit(baud, client.max_payload); }

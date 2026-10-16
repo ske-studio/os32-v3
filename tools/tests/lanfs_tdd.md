@@ -54,3 +54,15 @@ BYE 詰まり、受信状態の破棄、設定の再読、既定シリアル、�
 取得失敗時の標本除外。縮退を外す変異はRED。serial既定上限を1024にする変異は
 check-serialfs-hostでRED。check-e82557-drv-hostはsendのC/非C/!OKとCX/CNAの
 完了をtickなしで検査し、send/IRQの完了取得除去を別々にREDにする。
+
+## LAN 1024 B data regression
+
+`test_lanfs.py` checks HELLO 1028 B, a 10 KiB VFS read as exactly ten
+1024 B requests, full data contents and a maximum 1058 B Ethernet response.
+Serial offers and old 512 B hosts retain 508 B reads (512 B VFS read = 508+4).
+A 1024 B write to `/out` carries 1018+6 B of data: offset/flags/path consume
+10 B of each payload. The serial fallback writes 502+502+20 B.
+Trial deadlines for 1028/512 B payloads are 270/261 ticks at 115200 baud
+and 469/362 ticks at 9600 baud (10 ms ticks, unchanged rounding/slack).
+RED before the constant change: HELLO returned 1024 rather than 1028.
+Evidence: `/home/hight/os32-tmp/run/lan1024/{red,green,build-final}.log`.
