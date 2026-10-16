@@ -8,3 +8,4 @@ check-kbd-dlog-host:
 - tools/check_map.d/check-kbd-dlog-host.yaml
 - build/checks.d/check-kbd-dlog-host.mk
 - tools/tests/mutpar.py
+- drivers/mouse.c
