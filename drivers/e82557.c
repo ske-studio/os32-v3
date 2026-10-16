@@ -6,6 +6,7 @@
 #include "kernel/irq.h"
 #ifndef E82557_HOST_TEST
 #include "io.h"
+#include "sys.h"
 #include "kernel/idt.h"
 #include "kernel/cpu_calibrate.h"
 #include "kernel/sysconfig.h"
@@ -39,6 +40,98 @@ static struct {
     int state, tx, recover_step, recover_pending, rnr_pending;
     int swi_wait;
 } nic;
+
+/* Watch is cached at probe time: no sysconfig/VFS access from an ISR.
+ * ktime.c saves/restores IF and bounds its PIT snapshot retries, so stack
+ * outputs are safe at IF=0. Its clock loses periods if IF=0 spans >=10ms;
+ * these measurements cannot establish the true length of such stalls.
+ * console/con_sink accept ISR output; serial.c:ser_tx_byte bounds IF=0
+ * polling without hlt. Emit only after the measured work, outside SerialFS
+ * the normal rshell console copy carries these lines to the serial port. */
+enum watch_kind { WATCH_TICK, WATCH_IRQ, WATCH_RATE, WATCH_RECOVER,
+                  WATCH_STATE, WATCH_KINDS };
+static struct {
+    int enabled;
+    u32 seen, last[WATCH_KINDS], rate_start, irqs, stats[3];
+    const char *reason;
+    int state_pending, old_state, new_state;
+} watch;
+
+static int watch_allow(enum watch_kind kind)
+{
+    u32 now = tick_count, bit = 1u << kind;
+    if ((watch.seen & bit) && (u32)(now - watch.last[kind]) < E82557_WATCH_TICKS)
+        return 0;
+    watch.seen |= bit;
+    watch.last[kind] = now;
+    return 1;
+}
+static const char *watch_state_name(int state)
+{
+    switch (state) {
+    case E82557_RUNNING: return "RUNNING";
+    case E82557_RX_WAIT: return "RX_WAIT";
+    case E82557_RECOVER: return "RECOVER";
+    case E82557_FAILED: return "FAILED";
+    default: return "other";
+    }
+}
+/* Only the four runtime states pass here. Preserve the first event in a
+ * rate-limited interval, including short-lived RX_WAIT -> RECOVER changes. */
+static void runtime_state(int state)
+{
+    if (watch.enabled && nic.state != state && watch_allow(WATCH_STATE)) {
+        watch.old_state = nic.state;
+        watch.new_state = state;
+        watch.state_pending = 1;
+    }
+    nic.state = state;
+}
+static int watch_start(u32 *start)
+{
+    return watch.enabled &&
+        (nic.state == E82557_RUNNING || nic.state == E82557_RX_WAIT ||
+         nic.state == E82557_RECOVER || nic.state == E82557_FAILED) &&
+        sys_time_now(start, NULL) == 0;
+}
+static void watch_finish(enum watch_kind kind, int timed, u32 start)
+{
+    u32 end;
+    /* Low-word subtraction also handles a single 32-bit us wrap. Failure
+     * of either snapshot skips this sample rather than inventing a duration. */
+    if (timed && sys_time_now(&end, NULL) == 0 &&
+        (u32)(end - start) > E82557_WATCH_SLOW_US && watch_allow(kind)) {
+        u16 st = inpw(nic.base + E82557_SCB_STATUS);
+        kprintf(E82557_LOG_ATTR,
+                "[e82557] slow %s us=%u state=%s step=%d tx=%d ready=%u st=%04x\n",
+                kind == WATCH_TICK ? "tick" : "irq", end - start,
+                watch_state_name(nic.state), nic.recover_step, nic.tx, nic.rx.ready, st);
+    }
+    if (watch.reason) {
+        const char *reason = watch.reason;
+        watch.reason = NULL;
+        kprintf(E82557_LOG_ATTR, "[e82557] recover %s\n", reason);
+    }
+    if (watch.state_pending) {
+        watch.state_pending = 0;
+        kprintf(E82557_LOG_ATTR, "[e82557] state %s->%s\n",
+                watch_state_name(watch.old_state), watch_state_name(watch.new_state));
+    }
+    if (kind == WATCH_TICK) {
+        u32 now = tick_count, elapsed = now - watch.rate_start;
+        if (elapsed >= E82557_WATCH_TICKS) {
+            u32 rate = watch.irqs * E82557_WATCH_TICKS / elapsed;
+            if (rate > E82557_WATCH_IRQ_RATE && watch_allow(WATCH_RATE))
+                kprintf(E82557_LOG_ATTR,
+                        "[e82557] irq rate=%u/s fr=%u rnr=%u cx=%u\n", rate,
+                        nic.stats[1] - watch.stats[1], nic.stats[2] - watch.stats[2],
+                        nic.stats[0] - watch.stats[0]);
+            watch.rate_start = now;
+            watch.irqs = 0;
+            for (u32 i = 0; i < 3; i++) watch.stats[i] = nic.stats[i];
+        }
+    }
+}
 
 /* Exact, bounded decimal parse; no wrap, signs, trailing data or empty record. */
 static int seq_parse(const char *buf, int len, u32 *seq)
@@ -396,7 +489,7 @@ static void tx_complete(void)
 
 /* IF=0. FreeBSD if_fxp.c:1706-1724: acknowledge exactly the observed byte.
  * Two passes only; tick drains remaining events even if the PIC loses an edge. */
-static int e82557_irq(unsigned int irq, void *arg)
+static int irq_work(unsigned int irq, void *arg)
 {
     int handled = IRQ_NONE;
     (void)irq; (void)arg;
@@ -421,22 +514,35 @@ static int e82557_irq(unsigned int irq, void *arg)
     }
     return handled;
 }
+/* irq=0 is a software drain, not an IRQ3 arrival. */
+static int e82557_irq(unsigned int irq, void *arg)
+{
+    u32 start = 0;
+    int timed, handled;
+    if (!irq || !watch.enabled) return irq_work(irq, arg);
+    timed = watch_start(&start);
+    watch.irqs++;
+    handled = irq_work(irq, arg);
+    watch_finish(WATCH_IRQ, timed, start);
+    return handled;
+}
 static void failed_dma(void)
 {
-    nic.state = E82557_FAILED;
+    runtime_state(E82557_FAILED);
     scb_mask(nic.base, 1);
     (void)e82557_irq(0, NULL); /* drain only; no flags in FAILED */
     bm_restore(&nic.dev, 1);
     (void)dma_mark_leaked(&nic.dma); /* retained until reboot, never reused */
 }
-static void recover_begin(void)
+static void recover_begin(const char *reason)
 {
+    if (watch.enabled && watch_allow(WATCH_RECOVER)) watch.reason = reason;
     if (nic.tx == TX_RESERVED) { nic.recover_pending = 1; return; }
     nic.recover_pending = 0;
     nic.gen++;
     nic.stats[9]++;
     if (nic.stats[9] > E82557_RECOVER_MAX) { failed_dma(); return; }
-    nic.state = E82557_RECOVER;
+    runtime_state(E82557_RECOVER);
     scb_mask(nic.base, 1);
     nic.stop_tries = 0;
     nic.recover_step = 1;
@@ -460,18 +566,18 @@ static int ru_restart(void)
     if (rc == ISSUE_OK) nic.rnr_pending = 0;
     return rc;
 }
-void e82557_tick(void)
+static void tick_work(void)
 {
     if (nic.state == E82557_RUNNING) {
         if (nic.recover_pending && nic.tx != TX_RESERVED) {
-            recover_begin();
+            recover_begin("pending");
         } else {
             tx_complete();
             rx_scan();
-            if (ru_restart() != ISSUE_OK) recover_begin();
+            if (ru_restart() != ISSUE_OK) recover_begin("ru-restart");
             if (nic.state == E82557_RUNNING && nic.tx == TX_ISSUED &&
                 (u32)(tick_count - nic.tx_issued) > E82557_TX_WAIT_TICKS)
-                recover_begin();
+                recover_begin("tx-timeout");
             /* SWI proof belongs to IRQ3: tick may read status, but must not ack. */
             if (!nic.swi_wait) (void)e82557_irq(0, NULL);
             return; /* never issue a second SCB command in this tick */
@@ -479,7 +585,7 @@ void e82557_tick(void)
     }
     if (nic.state == E82557_RX_WAIT) {
         if (nic.rx.ready == E82557_RFD_COUNT) return;
-        nic.state = E82557_RECOVER;
+        runtime_state(E82557_RECOVER);
         nic.recover_step = 3;
     }
     if (nic.state != E82557_RECOVER) return;
@@ -502,11 +608,11 @@ void e82557_tick(void)
         nic.recover_step = 3;
         break;
     case 3:
-        if (nic.rx.ready == E82557_RFD_COUNT) { nic.state = E82557_RX_WAIT; break; }
+        if (nic.rx.ready == E82557_RFD_COUNT) { runtime_state(E82557_RX_WAIT); break; }
         if (ru_restart() == ISSUE_OK) {
             /* Drain while still RECOVER and masked, before exposing INTA. */
             if (!nic.swi_wait) (void)e82557_irq(0, NULL);
-            nic.state = E82557_RUNNING;
+            runtime_state(E82557_RUNNING);
             scb_mask(nic.base, 0);
             nic.stats[10]++;
             return;
@@ -517,6 +623,15 @@ void e82557_tick(void)
     }
     /* Reset has M=1; also drain events that arrived before R1. */
     if (nic.state != E82557_FAILED && !nic.swi_wait) (void)e82557_irq(0, NULL);
+}
+void e82557_tick(void)
+{
+    u32 start = 0;
+    int timed;
+    if (!watch.enabled) { tick_work(); return; }
+    timed = watch_start(&start);
+    tick_work();
+    watch_finish(WATCH_TICK, timed, start);
 }
 static int packet_unavailable(void)
 {
@@ -651,6 +766,7 @@ static int e82557_probe(const struct pci_dev *dev)
         nic.state = E82557_OFF;
         return result;
     }
+    watch.enabled = sysconfig_get_int(SYS_SYSTEM_CFG, "E82557_WATCH", 1) != 0;
     nic_trace(E82557_TRACE_TRY);
     nic_trace(E82557_TRACE_WIN);
     if (!e82557_io_window(dev, &base, &reason)) { why = e82557_window_name(reason); goto done; }
@@ -778,6 +894,10 @@ static int e82557_probe(const struct pci_dev *dev)
     if (probe_ru() != ISSUE_OK) { why = "timeout"; goto done; }
     flags = irq_save();
     nic.state = E82557_RUNNING;
+    if (watch.enabled) {
+        watch.rate_start = tick_count;
+        for (u32 i = 0; i < 3; i++) watch.stats[i] = nic.stats[i];
+    }
     nic.swi_wait = 1;
     scb_mask(base, 0);
     irq_restore(flags);

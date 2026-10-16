@@ -102,6 +102,8 @@ static void *memcpy(void *d, const void *s, size_t n)
 { unsigned char *a=d; const unsigned char *b=s; while(n--) *a++=*b++; return d; }
 struct file { char data[96]; int len, present, reads, writes, synced, verified; };
 static struct file files[2];
+static int watch_cfg=1, time_calls, time_fail;
+static u32 time_cost;
 static int cfg=1, fs_calls, mkdir_fail, read_fail, write_fail, short_write, sync_fail;
 static int corrupt_read, remove_fail, write_zero, bad_crc, irq_depth, trace_count;
 static int io_count, resets, mask_writes, ack_writes, commands, pointers, ee_calls;
@@ -186,6 +188,7 @@ static struct file *file_for(const char *path)
 }
 int sysconfig_get_int(const char *path, const char *key, int def)
 { (void)path; CHECK(def==1);
+  if (!strcmp(key,"E82557_WATCH")) return watch_cfg;
   if (!strcmp(key,"E82557_PHYVENDOR")) return phyvendor;
   CHECK(!fs_calls && !io_count); CHECK(!strcmp(key,"E82557")); return cfg; }
 int boot_image_info(void *out)
@@ -403,6 +406,16 @@ int irq_unregister(unsigned int irq,irq_handler_fn fn,void *arg)
 { CHECK(!irq_depth && irq==3 && fn==handler && !arg && registered && !freed && resets>last_start_reset && mask==1); registered=0; unregistered++; return 0; }
 static int kutoa_dec(u32 value,char *buf,u32 cap) { return snprintf(buf,cap,"%u",value); }
 #define tick_count fake_ticks()
+static int sys_time_now(u32 *lo, u32 *hi)
+{
+    time_calls++;
+    CHECK(irq_depth); /* Production callers retain IF=0. */
+    if (time_fail == 1 || (time_fail == 2 && !(time_calls & 1)))
+        return OS32_ERR_AGAIN;
+    *lo = now + (u32)(time_calls & 1 ? 0 : time_cost);
+    if (hi) *hi = 0;
+    return 0;
+}
 #define E82557_HOST_TEST
 #include "../../drivers/e82557.c"
 #include "pci_table.h"
@@ -506,12 +519,138 @@ static void yield_event(void)
         if(mode==3) nic.gen++; /* fault injection, must prevent CU Start */
     } else if(mode==4) {
         u8 saved[60]; memcpy(saved,memory+1616+nic.rx.cons*1552+16,60);
-        recover_begin(); service_tick(); service_tick(); service_tick();
+        recover_begin("host"); service_tick(); service_tick(); service_tick();
         CHECK(!memcmp(saved,memory+1616+nic.rx.cons*1552+16,60));
     }
 }
 static void seed(int idx,const char *data)
 { struct file *f=&files[idx]; f->present=1; f->len=(int)strlen(data); memcpy(f->data,data,(size_t)f->len+1); }
+static int occurrences(const char *part)
+{
+    int n = 0;
+    const char *p = output;
+    while ((p = strstr(p, part))) { n++; p += strlen(part); }
+    return n;
+}
+static void watch_irq(void)
+{
+    irq_depth++;
+    (void)handler(3, NULL);
+    irq_depth--;
+}
+static void watch_tests(const char *c)
+{
+    /* Close the probe window before testing exact one-second intervals. */
+    service_tick();
+    output[0] = 0;
+    time_calls = 0;
+    if (!strcmp(c, "watch_tick") || !strcmp(c, "watch_irq")) {
+        int is_irq = !strcmp(c, "watch_irq");
+        const char *line = is_irq ? "[e82557] slow irq us=2001 state=RUNNING step=0 tx=0 ready=0 st=0010\n" :
+            "[e82557] slow tick us=2001 state=RUNNING step=0 tx=0 ready=0 st=0010\n";
+        time_cost = 2000;
+        if (is_irq) watch_irq(); else service_tick();
+        CHECK(!output[0]); /* Strictly greater than 2000us. */
+        time_cost = 2001;
+        if (is_irq) watch_irq(); else service_tick();
+        CHECK(!strcmp(output, line));
+        for (int i = 0; i < 3; i++) {
+            if (is_irq) watch_irq(); else service_tick();
+        }
+        model_ticks += 99;
+        if (is_irq) watch_irq(); else service_tick();
+        CHECK(occurrences("[e82557] slow ") == 1);
+        model_ticks++;
+        if (is_irq) watch_irq(); else service_tick();
+        CHECK(occurrences("[e82557] slow ") == 2);
+    } else if (!strcmp(c, "watch_rate")) {
+        /* Polling drains run every tick but never count as IRQ arrivals. */
+        for (int i = 0; i < 201; i++) (void)e82557_irq(0, NULL);
+        model_ticks += 100; service_tick(); CHECK(!output[0]);
+        for (int round = 0; round < 3; round++) {
+            int count = round == 0 ? 200 : 201;
+            for (int i = 0; i < count; i++) {
+                status |= 0xd000; watch_irq();
+            }
+            model_ticks += 99; service_tick();
+            CHECK(occurrences("irq rate=") == (round == 2 ? 1 : 0));
+            model_ticks++; service_tick();
+            CHECK(occurrences("irq rate=") == round);
+        }
+        CHECK(occurrences("[e82557] irq rate=201/s fr=201 rnr=201 cx=201\n") == 2);
+    } else if (!strcmp(c, "watch_recover")) {
+        status = 0; ru_fail = ru_starts + 1;
+        service_tick();
+        CHECK(strstr(output, "[e82557] recover ru-restart\n"));
+        CHECK(strstr(output, "[e82557] state RUNNING->RECOVER\n"));
+        CHECK(occurrences("recover ") == 1 && occurrences("state ") == 1);
+        ru_fail = 0; service_tick(); service_tick(); service_tick();
+        CHECK(nic.state == E82557_RUNNING);
+        CHECK(occurrences("state ") == 1); /* Suppress quick recovery. */
+        nic.recover_pending = 1; service_tick();
+        service_tick(); service_tick();
+        CHECK(nic.state == E82557_RUNNING);
+        CHECK(occurrences("recover ") == 1 && occurrences("state ") == 1);
+        model_ticks += 100;
+        nic.recover_pending = 1; service_tick();
+        CHECK(strstr(output, "[e82557] recover pending\n"));
+        CHECK(occurrences("state ") == 2);
+        service_tick(); /* R2 */
+        model_ticks += 100; service_tick(); /* R3 */
+        CHECK(strstr(output, "[e82557] state RECOVER->RUNNING\n"));
+    } else if (!strcmp(c, "watch_tx")) {
+        put16(E82557_TCB_OFF, 0);
+        nic.tx = TX_ISSUED; nic.tx_issued = model_ticks;
+        model_ticks += E82557_TX_WAIT_TICKS + 1;
+        service_tick();
+        CHECK(strstr(output, "[e82557] recover tx-timeout\n"));
+    } else if (!strcmp(c, "watch_states")) {
+        for (u32 i = 0; i < 8; i++) model_rx(rx_frame, 60);
+        irq_depth++; recover_begin("host"); irq_depth--; service_tick();
+        service_tick(); /* R2 */
+        model_ticks += 100; service_tick();
+        CHECK(strstr(output, "[e82557] state RECOVER->RX_WAIT\n"));
+        time_cost = 2001; service_tick(); time_cost = 0;
+        CHECK(strstr(output, "slow tick us=2001 state=RX_WAIT step=3 tx=0 ready=8 st=0000\n"));
+        u8 buf[1600]; u32 len;
+        CHECK(e82557_recv(buf, sizeof(buf), &len) == 0);
+        model_ticks += 100; service_tick();
+        CHECK(strstr(output, "[e82557] state RX_WAIT->RECOVER\n"));
+        CHECK(nic.state == E82557_RUNNING);
+        model_ticks += 100;
+        nic.stats[9] = E82557_RECOVER_MAX;
+        irq_depth++; recover_begin("host"); irq_depth--; service_tick();
+        CHECK(strstr(output, "[e82557] state RUNNING->FAILED\n"));
+    } else if (!strcmp(c, "watch_off")) {
+        CHECK(!watch.enabled);
+        time_cost = 3000;
+        for (int i = 0; i < 201; i++) { status |= 0xd000; watch_irq(); }
+        model_ticks += 100; service_tick();
+        nic.recover_pending = 1; service_tick();
+        service_tick(); service_tick(); service_tick();
+        CHECK(nic.state == E82557_RUNNING);
+        CHECK(!time_calls && !output[0]);
+    } else if (!strcmp(c, "watch_clock_fail")) {
+        time_fail = 1; time_cost = 3000;
+        service_tick(); watch_irq();
+        CHECK(time_calls == 2 && !output[0]);
+        time_fail = 2; time_calls = 0;
+        service_tick(); watch_irq();
+        CHECK(time_calls == 4 && !output[0]);
+    } else if (!strcmp(c, "watch_wrap")) {
+        now = 0xfffffff0u; time_cost = 2001;
+        service_tick();
+        CHECK(strstr(output, "[e82557] slow tick us=2001 "));
+        model_ticks = 0xfffffff0u;
+        service_tick();
+        CHECK(occurrences("slow tick") == 2);
+        model_ticks += 99; service_tick();
+        CHECK(occurrences("slow tick") == 2);
+        model_ticks++; service_tick();
+        CHECK(occurrences("slow tick") == 3);
+    }
+    time_cost = 0;
+}
 static void runtime_tests(const char *c)
 {
     u8 buf[1600], mac[6]; u32 len;
@@ -522,6 +661,7 @@ static void runtime_tests(const char *c)
     CHECK(e82557_loopback(1)==OS32_ERR_NOSYS && e82557_loopback(0)==OS32_ERR_NOSYS);
     CHECK(e82557_stat(12)==0 && e82557_stat(0xffffffffu)==0);
     (void)e82557_irq(0, NULL); nic.rnr_pending=0;
+    if(!strncmp(c,"watch_",6)) { watch_tests(c); return; }
     if(!strncmp(c,"rx",2)) {
         if(!strcmp(c,"rx_empty")) {
             CHECK(e82557_recv(buf,sizeof(buf),&len)==OS32_ERR_AGAIN && !len);
@@ -678,7 +818,7 @@ static void runtime_tests(const char *c)
         CHECK(nic.state==E82557_RECOVER && nic.stats[11]);
     } else if(!strcmp(c,"recovery_limit")) {
         for(int i=0;i<11;i++) {
-            recover_begin();
+            recover_begin("host");
             if(i<10) { service_tick(); service_tick(); service_tick(); CHECK(nic.state==E82557_RUNNING); }
         }
         CHECK(nic.state==E82557_FAILED && nic.stats[9]==11 && leaked==1);
@@ -698,7 +838,8 @@ int main(int argc,char **argv)
     const u16 defaults[]={0x3000,0x782d,0x2000,0x5c01};
     memcpy(phy_regs[1],defaults,sizeof(defaults));
     phy_regs[1][0x17]=0x9014; phy_regs[1][0x19]=0x81;
-    e82557_tick(); CHECK(!io_count); /* NP21/W: no probe, no I/O */
+    e82557_tick(); CHECK(!io_count && !time_calls); /* NP21/W: no probe, no I/O */
+    if(!strcmp(c,"watch_off")) watch_cfg=0;
     if(!strcmp(c,"nsc_rev")) phy_regs[1][3]=0x5c0f;
     if(!strcmp(c,"nsc_id1")) phy_regs[1][2]=0x2001;
     if(!strcmp(c,"nsc_id2")) phy_regs[1][3]=0x5c11;

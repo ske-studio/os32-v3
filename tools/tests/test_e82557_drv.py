@@ -20,6 +20,7 @@ CASES += ["irq_" + n for n in ("none", "cx", "cna", "fr", "rnr", "swi", "mdi", "
 CASES += ["tx_" + n for n in ("done", "bad", "reserved", "pending", "generation", "timeout", "pre", "post")]
 CASES += ["recover_" + n for n in ("full", "final", "stopfail", "r3fail")] + ["ru_timeout", "recovery_limit", "api_invalid"]
 CASES += ["tx_send_done", "tx_send_bad", "tx_irq_cx", "tx_irq_cna", "tx_irq_bad"]
+CASES += ["watch_" + n for n in ("tick", "irq", "rate", "recover", "tx", "states", "off", "clock_fail", "wrap")]
 FLAGS = ["-m32", "-static", "-no-pie", "-fno-pie", "-fno-stack-protector", "-ffreestanding", "-nostdlib", "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-D__cdecl="]
 INCLUDES = ["-I" + str(ROOT / p) for p in ("include", "drivers", "sdk/include/os32", "fs", "kernel", "lib", "arch/x86", "platform/pc98")] + ["-I" + str(ROOT)]
 MIRROR = ["tools/tests/e82557_drv_host.c", "drivers/e82557.c", "drivers/e82557.h", "drivers/e82557_regs.h", "drivers/e82557_eeprom.c", "drivers/e82557_eeprom.h", "drivers/pci_decode.c", "fs/vfs.h", "kernel/module.h", "include/bootinfo.h", "include/config.h"]
@@ -188,8 +189,8 @@ MUTATIONS = [('drivers/e82557.c',
   'if (0 && !drop && count > cap) return OS32_ERR_NOSPC;',
   'NOSPC consumes packet'),
  ('drivers/e82557.c',
-  'if (ru_restart() != ISSUE_OK) recover_begin();',
-  'if (ru_restart() != ISSUE_OK) recover_begin();\n'
+  'if (ru_restart() != ISSUE_OK) recover_begin("ru-restart");',
+  'if (ru_restart() != ISSUE_OK) recover_begin("ru-restart");\n'
   '            { int after; (void)scb_issue(nic.base, 0, E82557_RU_START, rx_pa(), 1, &after); }',
   'two issues per tick'),
  ('drivers/e82557.c', '> E82557_TX_WAIT_TICKS)', '>= E82557_TX_WAIT_TICKS)', 'TX timeout boundary'),
@@ -305,6 +306,25 @@ MUTATIONS = [('drivers/e82557.c',
   'recovery reset budget exceeded')]
 
 
+MUTATIONS += [
+ ('drivers/e82557.c', '(u32)(end - start) > E82557_WATCH_SLOW_US',
+  '(u32)(end - start) >= E82557_WATCH_SLOW_US', 'watch slow threshold inclusive'),
+ ('drivers/e82557.c', 'if (!irq || !watch.enabled) return irq_work(irq, arg);',
+  'if (!watch.enabled) return irq_work(irq, arg);', 'watch counts software drains'),
+ ('drivers/e82557.c', 'rate > E82557_WATCH_IRQ_RATE',
+  'rate >= E82557_WATCH_IRQ_RATE', 'watch rate threshold inclusive'),
+ ('drivers/e82557.c', '(u32)(now - watch.last[kind]) < E82557_WATCH_TICKS',
+  '(u32)(now - watch.last[kind]) < 1', 'watch throttle omitted'),
+ ('drivers/e82557.c', '"E82557_WATCH", 1) != 0',
+  '"E82557_WATCH", 1) != 0 || 1', 'watch switch ignored'),
+ ('drivers/e82557.c', 'sys_time_now(start, NULL) == 0',
+  '(sys_time_now(start, NULL), 1)', 'watch failed clock accepted'),
+ ('drivers/e82557.c', 'watch.reason = reason;',
+  '(void)reason;', 'watch recovery omitted'),
+ ('drivers/e82557.c', 'watch.state_pending = 1;',
+  'watch.state_pending = 0;', 'watch state omitted'),
+]
+
 # LB-1/LB-2 regression mutations retained across the LB-3 rewrite.
 MUTATIONS += [
  ('drivers/e82557.c',
@@ -352,8 +372,8 @@ MUTATIONS += [
   '    nic_trace(E82557_TRACE_LINK);\n    phy_link_wait(base, &phy);\n    phy_vendor(base, &phy);',
   'PCR after link wait'),
  ('drivers/e82557.c',
-  '            if (!nic.swi_wait) (void)e82557_irq(0, NULL);\n            nic.state = E82557_RUNNING;\n            scb_mask(nic.base, 0);',
-  '            nic.state = E82557_RUNNING;\n            scb_mask(nic.base, 0);\n            if (!nic.swi_wait) (void)e82557_irq(0, NULL);',
+  '            if (!nic.swi_wait) (void)e82557_irq(0, NULL);\n            runtime_state(E82557_RUNNING);\n            scb_mask(nic.base, 0);',
+  '            runtime_state(E82557_RUNNING);\n            scb_mask(nic.base, 0);\n            if (!nic.swi_wait) (void)e82557_irq(0, NULL);',
   'recovery drain after unmask'),
  ('drivers/e82557.c',
   'if (kstrcmp(why, "ng") == 0) why = "txng";',

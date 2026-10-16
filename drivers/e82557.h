@@ -5,6 +5,10 @@
 #define E82557_SEQ_PATH "/var/log/lan.seq"
 #define E82557_LOG_PATH "/var/log/lan.log"
 #define E82557_TRY_CAP 32
+/* Observation only; each line category is limited independently to 1/s. */
+#define E82557_WATCH_TICKS (1000u / E82557_TICK_MS)
+#define E82557_WATCH_SLOW_US 2000u
+#define E82557_WATCH_IRQ_RATE 200u
 enum e82557_trace_stage {
     E82557_TRACE_TRY = 1, E82557_TRACE_WIN, E82557_TRACE_RST,
     E82557_TRACE_BASE, E82557_TRACE_EEPROM, E82557_TRACE_DMA,
