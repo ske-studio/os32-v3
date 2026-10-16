@@ -13,10 +13,8 @@
 | 関門 | 行 | 進む条件 |
 |---|---|---|
 | 次のゲスト受入の回 (NP21/W) | E9-1、X-6、E11-9、E11-5、H-1、H-2、PRIO-3、X-21 | 8 行を全部消す |
-| 次の実機セッション | H-5 (kstack の転記) | 画面確認の要らない分は立会い無しで可 |
 | T3 (帯変更) | F-9、H-4 (a) | 着手前に扱いを決める |
 | **v3 の最終段 (搭載メモリ量ごとの動作確認)** | H-4 の構成別の残り (8MB・17MB・Cirrus など、メモリ量・構成ごとの M の全通し) | ユーザー決定 2026-10-14: 搭載メモリ量ごとの確認は v3 の最終段まで後回し。それまでのゲスト受入は NP21/W 64MB (`np21x64w.ini` の ExMemory=64、実機 Ra266 と同じ) の 1 構成で回す。8MB の最低条件 (V3_PLAN §2-2) は目標のまま、その判定を最終段で行う |
-| T3 の最初の依頼パックの前 | X-4 (選択の取りこぼし 3 種) | 関門の変更はユーザー承認 2026-10-14 |
 | 次に `check_select.py` / ci-stab を触る保守の段 (遅くとも T3 の最初の取り込みの全体検査) | X-4 (残り) | 記録の分はその全体検査で残す |
 | T4 | X-11、E11-A2b、X-1 の一部 | 設計票で扱う |
 | T5a / T7 | X-1 の一部、E10-4、H-6b、H-5 (CG 窓 WB・68h) | — |
@@ -55,7 +53,7 @@
 | H-6b | V86 の出口で 6Ah の標準 / 拡張を戻していない (9821 で E0000h が MMIO のまま残り得る)、9801 構成での `gui_gate` | 未対処。NP21/W では `v86 -b` / `-d` / hal_test の前後で 6Ah=0x01・mode1=0x88・E0000h/A8000h の読みが不変 (H-6a、記録) で表示は壊れていない。9801 構成はこの NP21/W に無い | T7 (V86 復元検査)。表示が壊れる構成が見つかれば e10b の fix 段 |
 | E11-A2b | raw KAPI 待機利用者の明示 check | host だけで、ゲストに観測が無い | T4 (X-11 と一緒) |
 | X-1 | NUL 終端の文字列入力と `kprintf` 可変引数の B1 化 → T4・T5a の担当境界で確定。ページ 0 の NP 化 → T7 (元の行 1499、1647、1757、1885) | 既決の既知の制限 | T4 / T5a / T7 |
-| X-4 | 検査の整理の残り: ci-stab2 の P2-B の後の全体 check-changed と native の記録、6 時間超の対照の刈り取り、pending の 1 時間回収、生き残る弱い変異、f5a の full 候補検査に残る 5 SKIP、`net_link` の TMPDIR 長、選択の取りこぼし 3 種 (元の行 3551、3627、3705、3740、3754–3768、3776、3800–3807、3828–3832) | T2h に観測が無い | 選択の取りこぼし 3 種は T3 の最初の依頼パックの前、残りは次に `check_select.py` / ci-stab を触る保守の段 (遅くとも T3 の最初の取り込みの全体検査)。ユーザー承認 2026-10-14 |
+| X-4 | 検査の整理の残り: ci-stab2 の P2-B の後の全体 check-changed と native の記録、6 時間超の対照の刈り取り、pending の 1 時間回収、生き残る弱い変異、f5a の full 候補検査に残る 5 SKIP、`net_link` の TMPDIR 長。**選択の取りこぼし 3 種は 2110924 で閉じた** (設定ファイルの変更は full、成果物読みと動的な生成物パスを lint で検出)。そのとき残った指摘: `check-disk-auth-host`・`check-ci-stab-host` の対応が広すぎる (余分な候補、見逃しではない、astra 3 往復の後に PM 判断) | T2h に観測が無い | 次に `check_select.py` / ci-stab を触る保守の段 (遅くとも T3 の最初の取り込みの全体検査) |
 | X-11 | 監査分類 (`~/os32-tmp/evidence/2026-10-07/audit-classification.md`) の「意味変更 (e11c)」のうち pipe (E11-8、閉鎖) を除く 12 件 — IME 9 本 (trygetchar/toggle/set_mode/switch_dict/user_delete/user_export/user_clear/trygetkey/feed_key)・exec_last_result・gui_call・con_sink_read の授権/本人別の契約 (分類表 :33/:43-55/:57/:60) | **T4 の設計票で扱う (ユーザー決定 2026-10-07)** | T4 |
 | X-20 | gtool1 再レビューの P3: (N1) OCR の読めないセルと本物の `?` が文字列上で区別できず `\?`/`.` が一致する — 読めないセルにも私用文字を割り当て一致させない、(N2) は gtool3 で閉じた (launch が `since` を返す)。gtool2 レビューの P3 (G2-4 i686 記述子の照合を check に、G2-5 動いている像と ELF の照合)。abort_target を読む道具 (G-7 で導出に頼った)。h3fix レビューの P3 (mem_stat_test を os32_test_summary に、h3 の layout に gshell.elf の sha、単独 stop の後は stop の capture を trace に、v1 経路の試験)、h1fix の P3 (配備元は target/ の外の注記)。ci-r7 の P3 (build.yml の照合失敗時に両方の sha256 を CI ログへ tee、ISO / PKG 内の vmkernel.lz4 の照合)、h1c の P3 (PRUNE_STALE に HOSTDRV_DIR を渡す、08_build の deploy-kernel 行に「make all 済みの木で」と gen_deploy_set の OSError 文、deploy.mk の recipe 内コメント)。gtool3 レビューの P3: launch が送信前の consink の例外で止まる (fail closed、害なし)、hold 中に np21w の core_lock が失敗すると鍵が押下のまま残る (`core_busy`、台本 g-G-3 に「ok:false なら同じ seq を hold 無しで 1 回送って離す」を足す、Fable 再レビュー R-2)。R1c の気づき: 試験像 (`kernel-r1`) では `Gui.launch` に `OS32_KERNEL_ELF=build/out/r1/kernel.elf` が要る (注記候補)。h3 の道具: 前景 (RUNNING+in_wait) の fixture を arm するときは先に別窓を前景にする手順が要る | 道具の改善 | 保守 |
 | PRE-1 | `tools/tests/test_preflight.py` がどの `make check-*` にも `tools/check_map.d` にも載っていない (smallfix の Fable レビュー S-2、2026-10-14、それ以前から)。preflight を変えても全体検査で走らない | 道具の不足 | 次に preflight を触る段で `check-preflight-host` と対応表を足す |
@@ -73,7 +71,7 @@
 
 | ID | 何を | 種類 | 関門 |
 |---|---|---|---|
-| H-5 | 実機の残り: CG 窓の WB、表示の後始末 (GRCG / EGC・68h の残り)、kernel stack の high-water の値の票への転記 (**10/14 d14b で採取: `diag: kstack=4348`、shell_stack=20840、kheap_peak=111960、resident_peak=131656 — 転記先の票は未定、値はここが正**)。UC 化で present が遅くならないこと (bench_scale2x Test1/2 が更新前と ±10% 内) は閉じた | 構成持越し (実機) | kstack は `mem` でシリアルから採れる → 次の実機セッション (立会い無し可)。CG 窓の WB と 68h の後始末は実機に読む口が無い (設計票 §8 (m) で公開の物理 read は作らない) → **読む道具が要る、T7 (V86 / 表示の段) へ渡す** |
+| H-5 | 実機の残り: CG 窓の WB、表示の後始末 (GRCG / EGC・68h の残り)。kernel stack の high-water は **10/16 に T3 の票 §0 の表へ転記して閉じた** (86ba40c で kstack=3,544 B、10/14 は 4,348 B)。UC 化で present が遅くならないことは閉じた | 構成持越し (実機) | CG 窓の WB と 68h の後始末は実機に読む口が無い (設計票 §8 (m) で公開の物理 read は作らない) → **読む道具が要る、T7 (V86 / 表示の段) へ渡す** |
 | R7-2 | 実機 Ra266 の PCM: pcm_test は under=0・rep=0・resync=0・close 0 で 5 秒鳴ったが、**不規則な音切れ**をユーザーが聞いた (カウンタに出ない欠け — DMA 境界・auto-init の折返し・CS4231 FIFO / XTAL2・IRQ の遅れが候補)。起動行は `[pcm] CS4231 v=101 irq 10 dma 1 fmt 0x5B` (NP21/W の 64MB + SNDboard=64 では v=100) | 実機の不具合 | TASK_PCM_CS4231 |
 | R7-3 | 実機 Ra266 の GUI で、KANA をオンにしてマウスキーでカーソルを動かすと、スピーカーからうっすら「ププププ」とクリック音のような音がする (ユーザー観測 2026-10-12、使用感に問題なし)。キーごとのビープ / ポート 37h・35h の操作 / PIT ch2 の扱いが候補 | 実機の事象 (記録) | — |
 | R7-4 | 実機 Ra266 の GUI で、起動の初めに画面中央に描かれたマウスカーソルが残る (ユーザー観測 2026-10-12)。**動かした後のカーソルは残像を出さない** — 残るのは起動時の最初の 1 回の描画だけ (初回の背景の保存より前に描いた、または最初の合成がカーソルの位置を描き直していない)。gshell の起動時の `cursor` の初期位置 (`lib.rs` の st.mouse_x/y = 画面中央) と、最初の合成・カーソルの保存/復元の順が候補。NP21/W では未観測 | 実機の事象 (記録) | — |
