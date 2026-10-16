@@ -6,7 +6,7 @@ __os32_shell_load_addr = LAYOUT_MEM_SHELL_LOAD_ADDR;
 ENTRY(_start)
 SECTIONS
 {
-    /* Same generated selection as the kernel and loader. */
+    /* シェル常駐帯域 (memmap.h: MEM_SHELL_LOAD_ADDR、カーネルと同じ生成ヘッダ) */
     . = LAYOUT_MEM_SHELL_LOAD_ADDR;
 
     .text : {

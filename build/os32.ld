@@ -1,6 +1,7 @@
 ENTRY(kentry)
 
-/* Values come from the selected memmap_layout.h via CPP. */
+/* 値は include/memmap.h から生成した $(BUILD_OUT)/memmap_layout.h を CPP で読む。
+   正典との一致は tools/gen_memmap.py --check が見る ([C4])。 */
 KERNEL_LOAD_ADDR = LAYOUT_KERNEL_LOAD_ADDR;
 MEM_KSTACK_TOP = LAYOUT_MEM_KSTACK_TOP;
 MEM_KERNEL_IMAGE_MAX = LAYOUT_MEM_KERNEL_IMAGE_MAX;
@@ -56,9 +57,7 @@ SECTIONS
         . = ALIGN(4);
     }
 
-    /* ================================================================ */
-    /*  SQLite 拡張域 (core BSS 直後、ページ整列)                       */
-    /* ================================================================ */
+    /* 台帳の FIXED 型 backing (2 頁)。core BSS の末尾、__bss_end まで。 */
     .ledger_fixed ALIGN(LAYOUT_MEM_PAGE_SIZE) (NOLOAD) : {
         __ledger_fixed_start = .;
         . += LAYOUT_MEM_LEDGER_META_SIZE;
@@ -67,6 +66,9 @@ SECTIONS
     }
     . = ALIGN(LAYOUT_MEM_PAGE_SIZE);
 
+    /* ================================================================ */
+    /*  SQLite (core BSS 直後、ページ整列)                              */
+    /* ================================================================ */
     .sqlite_text : {
         __sqlite_start = .;
         KEEP(lib/sqlite3/sqlite3.o(.text .text.*))
@@ -96,7 +98,6 @@ SECTIONS
         __sqlite_end = .;
     }
 
-
     MEM_SQLITE_STACK_BASE = LAYOUT_MEM_SQLITE_STACK_BASE;
     MEM_SQLITE_STACK_TOP = LAYOUT_MEM_SQLITE_STACK_TOP;
     MEM_SQLITE_STACK_END = MEM_SQLITE_STACK_BASE + MEM_SQLITE_STACK_SIZE;
@@ -109,6 +110,15 @@ SECTIONS
     ASSERT(__bss_end <= __sqlite_start && __sqlite_end <= MEM_SQLITE_STACK_GUARD &&
            MEM_SQLITE_STACK_BASE == MEM_SQLITE_STACK_GUARD + LAYOUT_MEM_GUARD_SIZE,
            "SQLite chain overlaps BSS/guard")
+    /* ==================================================================== */
+    /*  カーネル本体の予算 (2026-09-17 決裁 D2、票                            */
+    /*  docs/archive/kernel_v21/TASK_KSTACK_USER.md)                          */
+    /*                                                                       */
+    /*  KHEAP_BASE は __kernel_resident_end を 4KB に切り上げた位置で、そこから */
+    /*  ヒープ → KAPI → SHM が芋づるで動く。SHM の後方ガードが固定 PD/PT 枠の  */
+    /*  guard を越えると、**静かに**他人のページを壊す。                      */
+    /*  それを **ここで、リンク時に** 止める (MEM_KERNEL_IMAGE_MAX と同値)。  */
+    /* ==================================================================== */
     ASSERT(LAYOUT_MEM_SHM_RESV_START <= LAYOUT_MEM_FIXED_PAGING_GUARD_BASE,
            "resident chain exceeds SLACK ceiling")
     ASSERT(LAYOUT_MEM_FIXED_PAGING_GUARD_BASE + LAYOUT_MEM_GUARD_SIZE == MEM_FIXED_PAGING_BASE &&
@@ -141,17 +151,6 @@ SECTIONS
     ASSERT(((__bss_start | __bss_end | __sqlite_data_end | __sqlite_end) & 3) == 0 &&
            __bss_start <= __bss_end && __sqlite_data_end <= __sqlite_end,
            "BSS zero ranges must be ordered and DWORD aligned")
-    /* ==================================================================== */
-    /*  カーネル本体の予算 (2026-09-17 決裁 D2、票                            */
-    /*  docs/archive/kernel_v21/TASK_KSTACK_USER.md)                               */
-    /*                                                                       */
-    /*  KHEAP_BASE は __bss_end を 4KB に切り上げた位置で、そこから           */
-    /*  ヒープ → KAPI → SHM が芋づるで動く。カーネルが予算を超えると SHM の   */
-    /*  後方ガードがカーネル帯域を突き抜け、**静かに**他人のページを          */
-    /*  not-present にする。2026-09-17 にはカーネルスタックの真ん中に         */
-    /*  居座り、あと 224 バイトで三重フォルトするところまで来ていた。         */
-    /*  それを **ここで、リンク時に** 止める。                                */
-    /* ==================================================================== */
 
     .os32_generations 0 (INFO) : { KEEP(*(.os32_generations)) }
     .os32_generation_ref 0 (INFO) : { KEEP(*(.os32_generation_ref)) }

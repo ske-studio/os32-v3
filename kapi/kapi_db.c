@@ -91,7 +91,7 @@ STATIC_ASSERT(MEM_SHM_DB_OFFSET == 0, db_shm_at_band_start);
 /*  ヘルパー: CPL=3 から読める文字列 (票 TASK_DB_ERRSTR §4)                  */
 /*                                                                          */
 /*  共有メモリはアプリの PD に RW+USER で見えているが、カーネルの            */
-/*  .rodata / .data と SQLite の帯 (0x200000〜0x2FFFFF) は見えない。         */
+/*  .rodata / .data と SQLite (カーネル常駐鎖の中) は見えない。              */
 /*  だから `const char *` を返す KAPI は、返す前に共有メモリの**診断領域**   */
 /*  (ブロック 0 の末尾、os32_kapi_shared.h の DB_SHM_DIAG_* が唯一の管理元)  */
 /*  へ写す。結果データ側の上限は DB_SHM_RESULT_LIMIT なので、両者は重ならない。*/

@@ -6,9 +6,9 @@
 /*    (a) 64KB バンクをまたぐと 8237 が折り返す ([HW2])                      */
 /*    (b) 割り込み文脈から取る / 返すので、動的確保を挟めない                */
 /*    (c) 番地が全 PD で同じでなければならない (割り込みは**そのときの       */
-/*        CR3**、つまりアプリの PD で走る。池は全 PD に恒等共有される)    */
-/*  固定番地は include/memmap.h の MEM_DMA_POOL_* (旧・案5で切替)。        */
-/*  4KB × 16 ページのビットマップで配る。                                 */
+/*        CR3**、つまりアプリの PD で走る。池は全 PD に恒等共有される)      */
+/*  だから include/memmap.h の MEM_DMA_POOL_* (64KB 整列の固定番地) を       */
+/*  4KB × 16 ページのビットマップで配るだけの池にする。                      */
 /*                                                                          */
 /*  表を触る算数は kernel/dma_pool_math.c (ホスト試験つき)。ここと           */
 /*  kernel/dma_pool.c は「唯一の池」と irq_save の殻だけ。                   */
@@ -33,8 +33,8 @@
 #define DMA_POOL_PAGES       ((u32)(MEM_DMA_POOL_SIZE / DMA_POOL_PAGE_SIZE))
 #define DMA_POOL_SPANS       16
 
-/* 受付上限は両配置とも32KB。旧池は64KB境界の両側が32KBずつなので
- * この上限が必要。案5の64KB整列池でも割当/返却の契約を維持する。 */
+/* 受付上限 32KB。池は 64KB 整列で境界をまたがないが、64KB 境界を
+ * またいでいた頃の割当/返却の契約 (33〜64KB は断る) を維持する (票 §1-3)。 */
 #define DMA_POOL_MAX_BYTES   0x8000UL    /* 32KB */
 #define DMA_POOL_MIN_BYTES   1UL
 #define DMA_POOL_DEF_ALIGN   DMA_POOL_PAGE_SIZE

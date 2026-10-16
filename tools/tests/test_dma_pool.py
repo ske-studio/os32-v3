@@ -11,7 +11,7 @@
 **NP21/W では踏めない**のは 64KB またぎの飛ばし。エミュレータは 8237 の
 折り返しを模擬しないので、またいだ配置でも「動いて見える」(§4-51 と同じ型)。
 番地は実物の MEM_DMA_POOL_BASE を使う。
-旧池の境界跨越は合成入力でも保持し、案5の64KiB整列も確認する。
+64KB 境界を跨ぐ池は合成入力 (0x2E8000) で残し、実物の池の 64KiB 整列も確かめる。
 
   python3 -B tools/tests/test_dma_pool.py            # ホストで全ケース
   python3 -B tools/tests/test_dma_pool.py --target   # + i386-elf で実物を通す
@@ -143,7 +143,7 @@ def boot_gate(tmp):
                     str(ROOT / "tools/tests/dma_boot_host.c"), "-o", str(exe)], check=True)
     for case in ("ready", "short", "conflict", "nodebug"):
         subprocess.run([str(exe), case], check=True)
-    # FDC's early boot buffer must stay independent of the pool in either layout.
+    # FDC's early boot buffer must stay independent of the pool.
     fdc = (ROOT / "drivers/fdc.c").read_text()
     assert 'static u8 s_fdbuf[FDC_BUF_BYTES]' in fdc
     assert not re.search(r'\bdma_(?:alloc|free)\s*\(', fdc)

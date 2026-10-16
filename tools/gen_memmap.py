@@ -28,7 +28,8 @@ gen_memmap.py — メモリ地図の生成と、重なり・逆転の検出
     --root <dir>  別のツリーを見る (試験用)
     --map <path>  kernel.map の場所 (既定 <root>/build/out/kernel.map)
     --elf <path>  kernel.elf の場所 (既定 <root>/build/out/kernel.elf)
-    --chain-limit <定数名>  鎖の上限 (memmap.hから解決、新配置への切替用)
+    --chain-limit <定数名>  鎖の上限 (memmap.hから解決、既定は固定paging guard)
+    --layout-header <path>  ld/NASM/C 共通の生成ヘッダを書き出す (Make が使う)
 
 `make check-memmap` は生成文書によらず配置を検査する。
 
@@ -107,8 +108,8 @@ def read_defines(header_path):
     with open(header_path, encoding="utf-8") as f:
         text = f.read()
     text = re.sub(r"\\\n", " ", text)
-    # Use the C preprocessor for the selected branch. Includes carry types only;
-    # omit them so isolated header fixtures need no copy of the include tree.
+    # 式はビルドと同じく C プリプロセッサで解く。#include は型だけなので外し、
+    # 試験の切り出したヘッダが include ツリーの写しを要らないようにする。
     if os.path.basename(header_path) == "memmap.h":
         source = re.sub(r'^\s*#include[^\n]*', '', text, flags=re.M)
         text = subprocess.run(["cpp", "-dM", "-E", "-x", "c",
@@ -124,10 +125,10 @@ def read_defines(header_path):
 
 
 def write_layout_header(root, path):
-    """One C-preprocessor input for C, linker scripts and NASM sources.
+    """C・リンカスクリプト・NASM が共通に読む生成ヘッダ (memmap_layout.h)。
 
-    Prefix macros so ld can still export the original names as ELF symbols.
-    Keep linker references as expressions; never invent floating addresses.
+    ld が元の名前を ELF シンボルとして出せるよう LAYOUT_ を前置する。
+    リンカシンボル由来の値は式のまま残し、浮動番地を決め打ちしない。
     """
     defines = read_defines(os.path.join(root, HDR_REL))
     names = sorted(n for n in defines if n.startswith("MEM_") or
@@ -149,8 +150,8 @@ def write_layout_header(root, path):
             f.write(text)
 
 
-def selected_layout_defects(root, elf_path, header_path):
-    """Reject an ELF/header/selected source mixture, including floating values."""
+def layout_header_defects(root, elf_path, header_path):
+    """ELF・生成ヘッダ・memmap.h の食い違い (浮動番地を含む) を拒む。"""
     _, symbols = read_elf(elf_path)
     source = Macros(read_defines(os.path.join(root, HDR_REL)), symbols)
     generated = Macros(read_defines(header_path), symbols)
@@ -168,7 +169,7 @@ def selected_layout_defects(root, elf_path, header_path):
 
 
 def preprocess_layout(root, source, traditional=False):
-    """Preprocess a linker/NASM fixture by the same header as Make."""
+    """リンカスクリプト・NASM の写しを Make と同じ生成ヘッダで展開する。"""
     with tempfile.TemporaryDirectory(prefix="memmap-cpp-") as work:
         header = os.path.join(work, "memmap_layout.h")
         write_layout_header(root, header)
@@ -482,10 +483,8 @@ MIRRORS = (
      "MEM_KSTACK_TOP"),
     ("build/os32.ld", r"^\s*MEM_KERNEL_IMAGE_MAX\s*=\s*(0x[0-9A-Fa-f]+)\s*;",
      "MEM_KERNEL_IMAGE_MAX"),
-    # SQLite の伸び代を **リンク時に** 止めるための 2 つ (票 TASK_HAL_WIRING
-    # §1-3)。ld の ASSERT が
-    #   __sqlite_end + MEM_SQLITE_STACK_SIZE + 0x1000 <= MEM_DMA_POOL_BASE
-    # を見るので、C 側とずれると「重なっていないはずの帯が重なる」。
+    # SQLite の代替スタックと DMA プール (票 TASK_HAL_WIRING §1-3)。ld の
+    # ASSERT が鎖と池の位置を見るので、C 側とずれると重なりを見逃す。
     ("build/os32.ld", r"^\s*MEM_SQLITE_STACK_SIZE\s*=\s*(0x[0-9A-Fa-f]+)\s*;",
      "MEM_SQLITE_STACK_SIZE"),
     ("build/os32.ld", r"^\s*MEM_DMA_POOL_BASE\s*=\s*(0x[0-9A-Fa-f]+)\s*;",
@@ -545,7 +544,7 @@ def mirrors(root, m):
             source = preprocess_layout(root, source,
                                        rel.endswith(".asm"))
             if rel == "boot/boot_defs.h":
-                # -dM retains the expanded macro uses for C headers.
+                # C ヘッダはマクロを使う側を EQU 行に展開して値を読む。
                 source = preprocess_layout(root, "\n".join(
                     "#include \"%s\"\nVALUE_%s EQU %s" %
                     (os.path.join(root, rel), n, n)
@@ -914,7 +913,7 @@ def layout_manifest(root, map_path, elf_path, limit_name=None):
     sections, symbols = read_elf(elf_path)
     output_dir = os.path.dirname(os.path.abspath(elf_path))
     header_path = os.path.join(output_dir, "memmap_layout.h")
-    errors = selected_layout_defects(root, elf_path, header_path)
+    errors = layout_header_defects(root, elf_path, header_path)
     if errors:
         raise ValueError("; ".join(errors))
     for name, value in read_symbols(map_path).items():
@@ -1032,8 +1031,8 @@ def main():
     ap.add_argument("--manifest", action="store_true",
                     help="ELF由来の半開区間JSONを出す (--write: layout-manifest.json)")
     ap.add_argument("--chain-limit", default=None,
-                    help="鎖の上限のmemmap.h定数名 (既定: 固定paging guard、無ければDMA)")
-    ap.add_argument("--layout-header", help="emit common ld/NASM/C definitions")
+                    help="鎖の上限のmemmap.h定数名 (既定: 固定paging guard)")
+    ap.add_argument("--layout-header", help="ld/NASM/C 共通の生成ヘッダ (memmap_layout.h) を書き出す")
     args = ap.parse_args()
 
     root = args.root or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

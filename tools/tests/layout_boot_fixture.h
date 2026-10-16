@@ -1,6 +1,6 @@
 /* T3b0 test-only runtime inputs. No proposed addresses enter product sources.
  * Both harnesses use the same synthetic chain end and detected RAM inputs.
- * The real adapter is tested separately by memory_boot_host in both modes. */
+ * The real adapter is tested separately by memory_boot_host. */
 struct layout_fixture {
     u32 meta, slack_end, guard_lo, pt, pt_end, guard_hi, stack, stack_end, dma;
     int resident_meta, slack_rw;
@@ -164,7 +164,7 @@ static void layout_boot_fixture(u32 kb)
                                        (f->dma + LF_DMA_SIZE) / LF_PAGE));
         }
         /* Test-side replay of supplied attributes through real PTE helpers.
-         * Production paging_init is covered separately in both layouts. */
+         * Production paging_init is covered separately by product-source tests. */
         CHECK(paging_map_range(first, f->slack_end, first, PAGE_RW) == 0);
         if (!f->slack_rw) CHECK(paging_set_not_present(first, f->slack_end - 1) == 0);
         CHECK(paging_map_range(f->pt, f->pt_end, f->pt, PAGE_RW) == 0);

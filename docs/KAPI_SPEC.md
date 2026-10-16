@@ -12,7 +12,7 @@
 | ヘッダマジック | 0x4F533332 ('OS32') |
 | KAPIテーブルアドレス | 動的算出 (KHEAP_BASE + KHEAP_SIZE) |
 | KAPIマジック | 0x4B415049 ('KAPI') |
-| プログラムロード先 | 0x80100000 (shlib 0x80000000、常駐 shell 0x300000) |
+| プログラムロード先 | 0x80100000 (shlib 0x80000000、常駐 shell 0x400000) |
 | 最大プログラムサイズ | image と暫定 heap 予算を起動時に検査 ([TASK_T2_APPBAND](tasks/v3/TASK_T2_APPBAND.md) §4) |
 | プログラム専用ヒープ | 動的配置 (sbrk_heap_limit, exec_heap 管理下) |
 | プログラム専用スタック | 動的配置 (メモリ終端付近、下向き展開) |

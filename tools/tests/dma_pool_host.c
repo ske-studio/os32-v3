@@ -78,7 +78,7 @@ static void sizes(void)
 {
     u32 a, b;
 
-    /* 16KB は空の池なら必ず入り、0x2F0000 を跨がない。 */
+    /* 16KB は空の池なら必ず入り、64KB 境界を跨がない。 */
     fresh();
     a = A(KB(16), 0);
     CHECK(a == POOL_BASE);
@@ -126,7 +126,7 @@ static void skip_boundary(void)
 {
     u32 a, b;
 
-    /* Keep the old crossing geometry even when the selected pool is aligned. */
+    /* 64KB 境界を跨ぐ池 (旧番地 0x2E8000) の合成入力。跨ぐ候補を飛ばす。 */
     dma_pool_state_init(&P, 0x2E8000UL, DMA_POOL_PAGES);
     a = A(KB(28), 0);
     CHECK(a == 0x2E8000UL);

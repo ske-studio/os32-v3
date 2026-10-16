@@ -102,7 +102,7 @@ $(RESIDENT_OUT)/shell.elf: $(BUILD_OUT)/app_sys.ld $(CRT0_RESIDENT_OBJ) $(SHELL_
 	$(LD) -m elf_i386 -T $(BUILD_OUT)/app_sys.ld -nostdlib --nmagic --gc-sections -L$(LIBDIR) -L$(CROSS_DIR)/i386-elf/lib -L$(CROSS_DIR)/lib/gcc/i386-elf/13.2.0 -o $@ $(CRT0_RESIDENT_OBJ) $(SHELL_OBJ) $(PCI_DECODE_USER_OBJ) $(PC98PT_USER_OBJ) $(LGRP_BEG) $(FILER_DRAW_OBJ) -los32save $(LGRP_END) -lc -lgcc
 
 # === sh — 同じシェルのソースを CPL=3 の外部アプリとして (票 T9 D1) ===
-# 常駐 shell.bin (app_sys.ld = 0x300000) の規則は上のまま一切変えない。同じ
+# 常駐 shell.bin (app_sys.ld = MEM_SHELL_LOAD_ADDR) の規則は上のまま一切変えない。同じ
 # $(SHELL_SRC) を -DSHELL_AS_APP 付きで**専用の出力先** $(SH_OBJDIR) へ
 # コンパイルし、crt0 + sdk/link/app.ld (0x500000) でリンクして sh.bin にする。
 # .o を常駐の $(SHELL_OBJ) と混ぜないのが肝 — 混ぜると -DSHELL_AS_APP 付きの
@@ -147,7 +147,7 @@ clean-sh:
 .PHONY: sh clean-sh
 
 # === gshell — GUI シェル (Rust、票 W1) ===
-# shell.bin と同じシェル帯 (0x400000, app_sys.ld) に常駐する WM。userland/rust の
+# shell.bin と同じシェル帯 (MEM_SHELL_LOAD_ADDR, app_sys.ld) に常駐する WM。userland/rust の
 # ワークスペース外 (userland/gshell/、独立ワークスペース) にあるので
 # DEFINE_RUST_PROGRAM は使わず個別に書く。カーネルが /bin/gshell.bin を
 # シェル帯へ直接ロードする (config.h SYS_GSHELL_BIN、K4)。

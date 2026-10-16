@@ -42,7 +42,7 @@ def check_fixture(work):
     elf = fixture(directory, core_bss=33, sqlite_bss=35)
     header = directory / 'memmap_layout.h'
     gen.write_layout_header(ROOT, header)
-    assert not gen.selected_layout_defects(ROOT, elf, header)
+    assert not gen.layout_header_defects(ROOT, elf, header)
     sections, syms = gen.read_elf(elf)
     m = gen.Macros(gen.read_defines(ROOT / 'include/memmap.h'), syms)
     for lo, hi in (('__bss_start', '__bss_end'), ('__sqlite_data_end', '__sqlite_end')):
@@ -86,10 +86,10 @@ def check_fixture(work):
     original = header.read_text()
     header.write_text(original.replace('#define LAYOUT_MEM_FIXED_PAGING_USED_END ',
                                        '#define LAYOUT_MEM_FIXED_PAGING_USED_END 0x3FB000 + 0 * '))
-    assert gen.selected_layout_defects(ROOT, elf, header)
+    assert gen.layout_header_defects(ROOT, elf, header)
     header.write_text(original)
     broken = edit_elf(elf, directory / 'mixed.elf', 'MEM_KSTACK_TOP', syms['MEM_KSTACK_TOP'] + 4096)
-    assert gen.selected_layout_defects(ROOT, broken, header)
+    assert gen.layout_header_defects(ROOT, broken, header)
     broken = edit_elf(elf, directory / 'bss-omitted.elf', '__bss_end', syms['__bss_end'] - 4)
     result = generate(ROOT / 'tools/mkvmkernel.py', directory, broken)
     assert result.returncode != 0 and b'outside zero range' in result.stderr
@@ -139,7 +139,7 @@ def check_product(outputs):
         out = ROOT / rel
         _, symbols = gen.read_elf(out / 'kernel.elf')
         header = out / 'memmap_layout.h' if (out / 'memmap_layout.h').exists() else out.parent / 'memmap_layout.h'
-        assert not gen.selected_layout_defects(ROOT, out / 'kernel.elf', header)
+        assert not gen.layout_header_defects(ROOT, out / 'kernel.elf', header)
         m = gen.Macros(gen.read_defines(ROOT / 'include/memmap.h'), symbols)
         assert all(m.get(k) == v for k, v in EXPECTED.items()), rel
         assert m.get('MEM_SHM_RESV_START') <= m.get('MEM_FIXED_PAGING_GUARD_BASE')

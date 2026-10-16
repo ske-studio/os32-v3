@@ -632,7 +632,7 @@ static void test_memmap_pool_user(void)
 /*  モデル経路で ONLINE でなければならない (legacy に戻ったら落ちる)。       */
 /*  exec の上端は台帳の置き場ではなくアリーナの上端から決まるので、8MB でも */
 /*  exec の最小域 (ロード起点 + スタック + sbrk + exec_heap) が残る (B2)。    */
-/*  置き場 (FIXED 型の [0x2F9000, 0x2FB000)) の RW / USER なしは             */
+/*  置き場 (FIXED 型、core BSS 内の MEM_LEDGER_META_*) の RW / USER なしは   */
 /*  test_memmap の MM 検査が見る (T1-U1)。                                  */
 /* ------------------------------------------------------------------------ */
 static void test_pool_model(void)
@@ -1321,7 +1321,7 @@ static void test_dma8237(void)
     check(dma_chan_setup(2, MEM_DMA_POOL_BASE, 0, DMA_DIR_TO_MEM,
                          DMA_MODE_SINGLE) < 0,
           "dma:0 bytes refused");
-    /* 64KB バンクまたぎ ([HW2])。両配置とも次の境界の手前から。 */
+    /* 64KB バンクまたぎ ([HW2])。プールの次の境界の手前から。 */
     check(dma_chan_setup(3, (MEM_DMA_POOL_BASE & ~(DMA_BANK_SIZE - 1)) +
                          DMA_BANK_SIZE - 0x1000UL, 0x4000UL,
                          DMA_DIR_TO_MEM, DMA_MODE_SINGLE) < 0,

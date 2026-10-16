@@ -48,7 +48,7 @@ boot/*.asm      →  nasm (-f bin / -f elf32)  →  boot/*.bin / boot/*.o
 kernel/*.asm    →  nasm (-f elf32)           →  kernel/*.o
 */*.c           →  gcc (-m32 -ffreestanding) →  */*.o
                                                ↓
-*.o + kernel/*.o → ld (-T os32.ld)           → build/out/kernel.elf (0x100000〜 + SQLite 0x200000〜)
+*.o + kernel/*.o → ld (-T os32.ld)           → build/out/kernel.elf (0x100000〜、SQLite は core BSS の直後)
                                                (+ build/out/kernel.map)
 kernel.elf      →  objcopy (-O binary)       → build/out/kernel.bin (カーネル本体)
                 →  objcopy (--only-section)  → build/out/sqlite.bin (SQLite拡張域)
@@ -98,7 +98,7 @@ Makefile が同じ流れを回す。OS のソースツリーは参照しない�
 
 === GUI シェルと共有ライブラリ (2026-09-06) ===
 userland/gshell (Rust, cargo)  → libgshell.a
-  + crt0 + libos32gfx (GFX_OBJ) → ld -T sdk/link/app_sys.ld → userland/gshell.bin (シェル帯 0x300000、make gshell)
+  + crt0 + libos32gfx (GFX_OBJ) → ld -T sdk/link/app_sys.ld → userland/gshell.bin (シェル帯 0x400000、make gshell)
 userland/rust/libos32gui       → ld -T sdk/link/shlib.ld     → userland/libos32gui.elf/.raw
                 → tools/mkshlib.py --api 42 → userland/libos32gui.shlib (/sys/lib、make shlib)
                    (make check-shlib = 番号表の突き合わせ。ジャンプ表は末尾追記のみ)

@@ -35,9 +35,8 @@
 
 /* ====================================================================== */
 /*  カーネルヒープ (kmalloc)                                                */
-/*  __bss_end から動的算出 (4KBアライン)                                    */
+/*  __kernel_resident_end (SQLite 代替スタックの末尾) から動的算出 (4KB)    */
 /* ====================================================================== */
-extern u32 __bss_end;
 extern u32 __kernel_resident_end;
 extern u32 __ledger_fixed_start, __ledger_fixed_end;
 #define KHEAP_BASE ((((u32)&__kernel_resident_end) + 0xFFF) & ~0xFFFUL)
@@ -67,10 +66,9 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 #define MEM_KSTACK_BASE 0x3FC000UL
 #define MEM_KSTACK_TOP 0x3FFFFCUL
 
-/* kernel/kentry.asm は ESP をここへ張り替える。ASM から C のマクロは引けない
- * ので、値は build/os32.ld が同じ名前の絶対シンボルとして持ち、kentry.asm は
- * それを extern で参照する。**二重定義の一致は
- * `python3 tools/gen_memmap.py --check` が機械的に照合する** ([C4])。 */
+/* kernel/kentry.asm は ESP をここへ張り替える。ASM・ld は tools/gen_memmap.py
+ * が生成する $(BUILD_OUT)/memmap_layout.h の LAYOUT_MEM_KSTACK_TOP を CPP で
+ * 読む。直書きに戻していないことは `gen_memmap.py --check` が見る ([C4])。 */
 
 /* ブート時スタック (ローダー専用)。
  *
@@ -152,7 +150,7 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 /* KernelAPIテーブルアドレスは os32_kapi_shared.h で定義 (KAPI_ADDR) */
 
 /* ====================================================================== */
-/*  カーネル常駐鎖の動的配置 (固定 paging guard より下)                             */
+/*  カーネル常駐鎖の動的配置 (固定 paging guard より下)                     */
 /*  KAPI + SHM はヒープの直後に動的配置される                               */
 /* ====================================================================== */
 
@@ -208,12 +206,14 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 /* ====================================================================== */
 /*  カーネル本体の予算と「最悪の配置」 (決裁 D2、2026-09-17)                */
 /*                                                                          */
-/*  KHEAP_BASE は __kernel_resident_end 由来で浮かせたまま。固定にしても使われない       */
-/*  バイト数は同じで、変わるのは余りがどこに溜まるかと尽きたときの挙動だけ   */
-/*  だから。代わりに **上限をリンク時に保証する**:                          */
+/*  KHEAP_BASE は __kernel_resident_end 由来で浮かせたまま。固定にしても     */
+/*  使われないバイト数は同じで、変わるのは余りがどこに溜まるかと尽きたとき   */
+/*  の挙動だけだから。代わりに **上限をリンク時に保証する**:                */
 /*                                                                          */
 /*      build/os32.ld の                                                     */
-/*        ASSERT(__kernel_resident_end <= KERNEL_LOAD_ADDR + MEM_KERNEL_IMAGE_MAX, ...)  */
+/*        ASSERT(MEM_SHM_RESV_START <= MEM_FIXED_PAGING_GUARD_BASE, ...)     */
+/*      (__kernel_resident_end <= KERNEL_LOAD_ADDR + MEM_KERNEL_IMAGE_MAX    */
+/*       と同値)                                                             */
 /*                                                                          */
 /*  上限が保証されれば「予算いっぱいまで育った場合の配置」が **定数式** で   */
 /*  書ける。重なりの検査はその最悪配置に対して行う — 実値 (KHEAP_BASE) は    */
@@ -263,9 +263,9 @@ extern u32 __sqlite_end;
 /* ---------------------------------------------------------------------- */
 /*  DMA プール (票 docs/tasks/v3/TASK_HAL_WIRING.md §1-3、決裁 2026-09-23)  */
 /*                                                                          */
-/*  0x7F0000〜0x800000 の64KiB整列池。RAM全域の存在を確認して先行予約。 */
-/*  不足時はDMA装置だけ省略する。全PDで supervisor/RW/WB を共有する。     */
-/*  各割当は装置のlimitと64KiB境界を検査する ([HW2])。                    */
+/*  0x7F0000〜0x7FFFFF の 64KiB 整列池。RAM 全域の存在を確認して先行予約、 */
+/*  不足時は DMA 装置だけ省略する。全 PD で supervisor/RW/WB を共有する。    */
+/*  各割当は装置の limit と 64KiB 境界を検査する ([HW2])。                   */
 /* ---------------------------------------------------------------------- */
 #define MEM_DMA_POOL_BASE 0x7F0000UL
 #define MEM_DMA_POOL_SIZE      0x010000UL   /* 64KB */
@@ -277,16 +277,16 @@ extern u32 __sqlite_end;
 /*  低位 RAM の末尾に metadata + workspace を置くと下端がアプリ帯の最大上端 */
 /*  (MEM_APP_BAND_MAX_TOP) を割る構成 (8MB・9MB・12MB。高位 RAM は無い) は、 */
 /*  ここ [BASE, END) に置く: metadata 1 ページ + workspace 1 ページ。       */
-/*  core BSS内の2頁を全構成で恒久保持し、present / supervisor / R/W。     */
-/*  ARENA_TOPでも池に戻さない。END は排他 (半開区間)。                     */
+/*  core BSS 内の 2 頁を全構成で恒久保持し、present / supervisor / R/W。    */
+/*  ARENA_TOP でも池に戻さない。END は排他 (半開区間)。                     */
 /* ---------------------------------------------------------------------- */
 #define MEM_LEDGER_META_BASE ((u32)&__ledger_fixed_start)
 #define MEM_LEDGER_META_END ((u32)&__ledger_fixed_end)
 
 /* ====================================================================== */
-/*  シェル常駐帯域 (0x400000-0x4FFFFF, 1MiB)                              */
-/*  image + sbrk は 0x4B5000 まで。画像末尾から128KiB以上を確保する。      */
-/*  exec_heap: 0x4B5000-0x4F5000、guard: 0x4F5000、stack: 0x4F6000-。    */
+/*  シェル常駐帯域 (0x400000-0x4FFFFF, 1MiB)                                */
+/*  image + sbrk は 0x4B5000 まで。画像末尾から 128KiB 以上を確保する。     */
+/*  exec_heap: 0x4B5000-0x4F4FFF、guard: 0x4F5000、stack: 0x4F6000-。       */
 /*                                                                          */
 /*  sbrk ヒープと exec_heap は **必ず別領域** にすること。かつて両方が BSS   */
 /*  終端から始まっていたため、newlib の stdio バッファと mem_alloc のブロック */

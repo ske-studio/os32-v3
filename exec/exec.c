@@ -197,7 +197,7 @@ static void ring3_trampoline_init(void)
 /*  従来どおり 段 = ID になる (D3)。                                         */
 /*                                                                          */
 /*  シェル常駐モデル (レイアウトは 1 バイトも変わっていない):                */
-/*    ID 1 (シェル): 0x300000 に常駐。CPL=0、AS は作らない                    */
+/*    ID 1 (シェル): MEM_SHELL_LOAD_ADDR に常駐。CPL=0、AS は作らない        */
 /*    ID 2〜5 (子) : MEM_EXEC_LOAD_ADDR、CPL=3、アプリごとの物理を使う。      */
 /*                   高位の固定仮想 MEM_EXEC_LOAD_ADDR〜 へ写す (D1)。      */
 /* ======================================================================== */
@@ -1249,7 +1249,6 @@ static void exec_reclaim_owned(int id, int kind)
     exec_notify_owned(id, kind);
 }
 
-
 /* ======================================================================== */
 /*  exec_launch_abort — 起動途中で失敗したときの唯一の巻き戻し口             */
 /*                                                                          */
@@ -1619,8 +1618,8 @@ void ring3_abort_kill(void)
 /* ======================================================================== */
 extern void ring3_resume(const u32 *frame, u32 pd_phys, void *tss);
 
-/* One resident split, computed before publishing the context or loading bytes.
- * The unused tail of a short exec heap remains reserved, never lent to sbrk. */
+/* 常駐シェル帯の分割 (画像+sbrk / exec_heap)。文脈の公開と読み込みより前に
+ * 1 回だけ決める。短い exec_heap の残りは予約のままで、sbrk には貸さない。 */
 static int exec_shell_layout(u32 text, u32 bss, u32 heap,
                              u32 *sbrk_limit, u32 *exec_base, u32 *exec_size)
 {
@@ -1638,7 +1637,6 @@ static int exec_shell_layout(u32 text, u32 bss, u32 heap,
     *exec_size = heap ? heap : MEM_SHELL_EXEC_HEAP_SIZE;
     return 0;
 }
-
 
 /* ======================================================================== */
 /*  exec_launch — 外部プログラムのロードと実行 (exec_run / exec_start の実体) */
@@ -1729,7 +1727,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
 
     /* ====== Level に応じたメモリレイアウト決定 ====== */
     if (is_shell) {
-        /* 常駐シェル: 選択した配置の専用帯。 */
+        /* 常駐シェル: 専用のシェル帯。 */
         load_base = MEM_SHELL_LOAD_ADDR;
         max_size  = MEM_SHELL_MAX_SIZE;
         stack_top = MEM_SHELL_STACK_TOP;
@@ -2010,7 +2008,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
 
     /* ヒープ・ガードページ設定 */
     if (is_shell) {
-        /* The admitted split also supplies the resident CRT's fixed limit. */
+        /* exec_shell_layout の分割が常駐 CRT の sbrk 上限も決める。 */
         ctx->exec_heap_base = exec_heap_base;
         ctx->exec_heap_size = exec_heap_size;
         kapi->sbrk_heap_limit = sbrk_end;

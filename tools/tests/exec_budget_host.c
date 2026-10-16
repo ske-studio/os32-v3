@@ -85,7 +85,7 @@ static void launch_case(u32 image, u32 requested, u32 stack, u32 extra, u32 expe
     CHECK(!exec_as_leftover_pages && !ledger_bad_free && parent_heap == 73);
 }
 void _start(void) {
-    /* V5 supplies SLACK below the fixed PT frame as ordinary RAM. */
+    /* SLACK below the fixed PT frame is supplied as ordinary RAM. */
     u32 args[6] = {0x100000, 0xF00000, 3, 0x32, 0xFFFFFFFF, 0}, result;
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
     CHECK(result == 0x100000);

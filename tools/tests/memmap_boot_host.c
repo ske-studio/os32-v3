@@ -161,7 +161,7 @@ static void say_run(u32 start, u32 end, u32 code)
 
 void _start(void)
 {
-    /* Include V5 SLACK: AS page tables can now be allocated below the pool. */
+    /* Include SLACK: AS page tables can be allocated below the pool. */
     u32 args[6] = {0x180000, 0xE80000, 3, 0x32, 0xFFFFFFFF, 0};
     u32 result, i, tramp;
     int bad;

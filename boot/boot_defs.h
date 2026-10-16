@@ -51,7 +51,7 @@ typedef unsigned long  u32;
 
 /* 展開先の帯 [MIN, END)。正典は include/memmap.h。
  * build/boot.mk が共通生成 memmap_layout.h を preinclude する。
- * 旧配置は DMA 手前、新配置は固定 paging guard 手前まで。 */
+ * 上端は固定 paging guard の手前 (MEM_LAYOUT_LOAD_END)。 */
 #define VK32_LOAD_MIN      LAYOUT_KERNEL_LOAD_ADDR
 #define VK32_LOAD_END      LAYOUT_MEM_LAYOUT_LOAD_END
 

@@ -11,7 +11,7 @@ extern __bss_start
 extern __bss_end
 extern __sqlite_data_end
 extern __sqlite_end
-;; LAYOUT_* comes from $(BUILD_OUT)/memmap_layout.h via LAYOUT_CPP.
+;; LAYOUT_* は $(BUILD_OUT)/memmap_layout.h (LAYOUT_CPP で展開) から。
 
 section .text
 

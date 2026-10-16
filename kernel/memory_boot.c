@@ -28,7 +28,7 @@
 #define MEMORY_BOOT_FIXED_MAX_TOP    (MEM_PHYS_WORKSPACE_FLOOR / PAGE_SIZE + \
                                       MEMORY_BOOT_FIXED_META_PAGES + \
                                       MEMORY_BOOT_WORKSPACE_PAGES - 1)
-/* Addresses now come from BSS symbols; os32.ld checks alignment/containment.
+/* Addresses come from BSS symbols; os32.ld checks alignment/containment.
  * Only the constant capacity belongs in a C static assertion. */
 STATIC_ASSERT(MEM_LEDGER_META_SIZE ==
               (MEMORY_BOOT_FIXED_META_PAGES + MEMORY_BOOT_WORKSPACE_PAGES) * PAGE_SIZE,

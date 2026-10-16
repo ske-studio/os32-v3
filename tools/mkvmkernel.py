@@ -196,15 +196,15 @@ def main():
                         help='出力ファイル名 (vmkernel.lz4)')
     parser.add_argument('--limit-header', default=DEFAULT_LIMIT_HEADER,
                         help='MAX_IMAGE_SIZE を読むヘッダ (既定: boot/boot_defs.h)')
-    parser.add_argument('--layout-header', help='selected common generated layout header')
+    parser.add_argument('--layout-header', help='ELF と照合する生成ヘッダ (memmap_layout.h、--elf が要る)')
     args = parser.parse_args()
 
     try:
         if args.layout_header is not None:
             if not args.elf:
                 raise ValueError('--layout-header requires --elf')
-            from gen_memmap import selected_layout_defects
-            errors = selected_layout_defects(ROOT, args.elf, args.layout_header)
+            from gen_memmap import layout_header_defects
+            errors = layout_header_defects(ROOT, args.elf, args.layout_header)
             if errors:
                 raise ValueError('; '.join(errors))
         max_image_size = read_max_image_size(args.limit_header)

@@ -33,7 +33,7 @@
 
 > 番地の定義の正典は `include/memmap.h`。ここが食い違ったらそちらが正しい。
 > カーネルスタックは 0x90000 → 0x1FC000 (V86 ゲストに 640KB を渡すため) →
-> **0x2FC000** (2026-09-17 決裁 D1) と動いてきた。最後の移設は
+> 0x2FC000 (2026-09-17 決裁 D1) → **0x3FC000** (T3ab、固定 PD/PT 枠の後) と動いてきた。D1 の移設は
 > 「浮いた番地と固定番地を同じ帯で隣り合わせにしない」ため —
 > カーネル帯域は `KHEAP_BASE` 以降が `__bss_end` 由来で浮くので、カーネルが
 > 育つと共有メモリが固定番地のスタックへ食い込む
@@ -55,8 +55,7 @@
 
 `sys_usable_mem_end()` は `MEM_PHYS_EXEC_FLOOR` から最初の PERSIST 所有頁までの
 低位連続上端を返す（起動時の `ledger_arena_freeze()` で確定）。検出 RAM の最高番地ではない。
-T3ab の試作分岐 `MEM_LAYOUT_V5=1`（既定は 0）では DMA の恒久予約もここで止めるため、
-BB がさらに上に置かれても、この上端は DMA 開始番地になる。配置切替は段 G で行う。
+DMA の恒久予約もここで止めるため、BB がさらに上に置かれても、この上端は DMA 開始番地になる。
 
 #### 動的レイアウト (番地が実行時に決まるので生成できない部分)
 
@@ -64,7 +63,7 @@ BB がさらに上に置かれても、この上端は DMA 開始番地になる
 以下は搭載メモリ量・バイナリの大きさ・起動の仕方で変わるので手で持つ。
 
 ```
-[ USER の高位 VA (memory_layout 世代3) ]
+[ USER の高位 VA (memory_layout 世代4) ]
 0x80000000 - 0x800FFFFF            shlib text RO共有 / data 私有複製
 0x80100000 - img_end               .text + .data + .bss
 img_end - sbrk_end                 libc 初期量: BSS 端の端数 + 1 page、RW
@@ -76,7 +75,7 @@ stack_top-stack_size - stack_top   可変 stack 全量 RW
 
 実行中の libc EXACT 伸長・副 arena・大塊と exec_heap の追加領域は `mem_map` を使う。
 固定初期域と extent の回収を分け、終了後の leftover は0。
-resident shell/gshell は sbrk 上限0x375000、exec_heap 452KiB (小さい明示値のみ縮小) を維持する。
+resident shell/gshell は sbrk 上限0x4B5000、exec_heap 256KiB (小さい明示値のみ縮小) を維持する。
 `mem` の `実測: Shell band sbrk上限` は CPL0 の常駐 shell だけに出る実際の上限値。
 `実測: ... resident heap total / used` は常駐 exec_heap の総量 / 使用量 (B) であり、
 定数の予約帯や USER の AS 側使用量とは別。表示の詳細は [mem.1](manpages/mem.1) を参照。
@@ -84,7 +83,8 @@ resident shell/gshell は sbrk 上限0x375000、exec_heap 452KiB (小さい明�
 > シェルは newlib の sbrk ヒープと KAPI `mem_alloc` の exec_heap の 2 系統を
 > 持つ。かつては両方が BSS 終端から始まり互いを上書きしていた
 > (`ls > file` の化け、`pipe: out of memory`、double free 警告)。
-> 2026-09-03 に exec_heap を 0x380000 (旧 NP ギャップ) へ分離した。
+> 2026-09-03 に exec_heap を 0x380000 (旧 NP ギャップ) へ分離した (今はシェル帯の
+> `MEM_SHELL_HEAP_BASE` から)。
 > PTE に USER は立てないので CPL=3 のアプリからは見えない。
 
 #### ページング (H3b 2026-09-06 / K6-RAM 2026-09-11)

@@ -109,7 +109,7 @@ static void crosses(void)
     CHECK(dma_crosses_64k(0x0012FFFFUL, 1) == 0);
     /* 1 バイトはみ出す */
     CHECK(dma_crosses_64k(0x0012FFFFUL, 2) == 1);
-    /* **プールが跨ぐ境界 0x2F0000 のすぐ手前から 16KB** — 票 §1-3 の例 */
+    /* **64KB 境界 0x2F0000 のすぐ手前から 16KB** — 票 §1-3 の例 */
     CHECK(dma_crosses_64k(0x002EF000UL, 0x4000UL) == 1);
     CHECK(dma_crosses_64k(0x002F0000UL, 0x4000UL) == 0);
     /* 0 バイトは「またぐ」= 断る側 (積めないので入口で拾う) */
@@ -164,7 +164,7 @@ static void check_args(void)
 
     CHECK(dma_check_args(2, ok_phys, 512, DMA_DIR_TO_MEM, DMA_MODE_SINGLE) == 0);
     CHECK(dma_check_args(0, ok_phys, 512, DMA_DIR_FROM_MEM, DMA_MODE_CYCLIC) == 0);
-    /* 64KB ちょうどはバンク先頭と案5の池先頭から通る。 */
+    /* 64KB ちょうどはバンク先頭と池の先頭 (64KB 整列) から通る。 */
     CHECK(dma_check_args(3, 0x002E0000UL, 0x10000UL, DMA_DIR_TO_MEM,
                          DMA_MODE_SINGLE) == 0);
     CHECK(dma_check_args(3, ok_phys, 0x10000UL, DMA_DIR_TO_MEM,

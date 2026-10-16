@@ -64,7 +64,7 @@ $(BUILD_ID_SRC): .FORCE
 $(BUILD_ID_OBJ): $(BUILD_ID_SRC)
 	$(CC) $(CFLAGS_BASE) -Iinclude -c $< -o $@
 
-# === SQLite関連 (カーネル拡張域 0x200000 に配置) ===
+# === SQLite関連 (core BSS の直後に連結、build/os32.ld) ===
 C_SQLITE = lib/sqlite3/sqlite3.c lib/sqlite3/os32_sqlite_vfs.c lib/sqlite3/os32_sqlite_test.c
 C_SQLITE_OBJ = $(addprefix $(KERNEL_OBJ_PREFIX),$(C_SQLITE:.c=.o))
 
@@ -340,8 +340,8 @@ kernel-r1: $(R1_OUT)/vmkernel.lz4
 -include $(R1_OBJECTS:.o=.d)
 .PHONY: kernel-r1
 
-# One selected header drives every language; FORCE checks the selection while
-# write-if-changed keeps an unchanged build incremental.
+# One generated header drives C, ld and NASM; FORCE re-runs the generator
+# while write-if-changed keeps an unchanged build incremental.
 $(LAYOUT_HEADER): include/memmap.h tools/gen_memmap.py .FORCE
 	@python3 tools/gen_memmap.py --layout-header $@
 

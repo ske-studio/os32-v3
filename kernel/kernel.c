@@ -711,7 +711,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     tvram_print(18, 4, "SQ..", TATTR_GREEN);
     kprintf(0x07, "[BOOT] sqlite_init...\n");
 
-    /* SQLite エンジン初期化 (ブートローダーが 0x200000 にロード済み、
+    /* SQLite エンジン初期化 (ブートローダーが __sqlite_start にロード済み、
      * kentry.asm が .sqlite_bss をゼロクリア済み) */
     tvram_print(0, 4, "SQLite...", TATTR_GREEN);
     {
@@ -774,7 +774,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     kcg_boot_phase_close();
 
     /* 外部シェル起動 — CUI(shell.bin) と GUI(gshell.bin) を同じシェル帯
-     * (0x300000, Level 1) で入れ替えながら回す (契約 T9)。両者は同時に
+     * (MEM_SHELL_LOAD_ADDR, Level 1) で入れ替えながら回す (契約 T9)。両者は同時に
      * 載らない。終了/クラッシュ時のフォールバックとして再起動ループにする。
      *
      * 起動シェルの決定順:

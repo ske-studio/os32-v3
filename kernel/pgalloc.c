@@ -1058,7 +1058,7 @@ done:
 
 /* 0 = 未凍結。凍結は ⑥ の 1 回だけ (§3-6)。
  * MEM_PHYS_EXEC_FLOOR から最初の PERSIST までの低位連続上端。
- * V5 の DMA/kernel 予約もここで止める。最高 RAM 番地や BB の下端とは限らない。 */
+ * DMA/kernel の予約もここで止める。最高 RAM 番地や BB の下端とは限らない。 */
 static u32 arena_top;
 
 void ledger_arena_freeze(void)
