@@ -4,6 +4,7 @@ check-memory-host:
 - kernel/kmalloc.c
 - tools/tests/lease_host.c
 - tools/tests/test_lease.py
+- tools/tests/kernel_layout.py
 - exec/lease.c
 - exec/appslot.c
 - exec/exec.c

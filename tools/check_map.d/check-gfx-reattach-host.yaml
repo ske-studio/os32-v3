@@ -19,6 +19,7 @@ check-gfx-reattach-host:
 - tools/tests/host32.py
 - tools/tests/mutpar.py
 - tools/tests/test_gfx_kernel_fb.py
+- tools/tests/kernel_layout.py
 - tools/tests/gfx_attach_host.c
 - tools/tests/test_gfx_attach.py
 - userland/lib/gfx/**
@@ -26,3 +27,4 @@ check-gfx-reattach-host:
 - tools/tests/gfx_reattach_host.c
 - tools/check_map.d/check-gfx-reattach-host.yaml
 - build/checks.d/check-gfx-reattach-host.mk
+artifact_reader: true

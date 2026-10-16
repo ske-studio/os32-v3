@@ -19,8 +19,10 @@ check-gfx-attach-host:
 - tools/tests/host32.py
 - tools/tests/mutpar.py
 - tools/tests/test_gfx_kernel_fb.py
+- tools/tests/kernel_layout.py
 - tools/tests/gfx_attach_host.c
 - tools/tests/test_gfx_attach.py
 - userland/lib/gfx/**
 - tools/check_map.d/check-gfx-attach-host.yaml
 - build/checks.d/check-gfx-attach-host.mk
+artifact_reader: true

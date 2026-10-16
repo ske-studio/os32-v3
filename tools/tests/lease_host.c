@@ -8,9 +8,7 @@ static void *host_surface_pointer(u32 pa);
 static u32 host_lease_alloc(u32 owner, int n);
 static int host_lease_free(u32 owner, u32 pfn, int n);
 #include "paging_host_source.c"
-__asm__(".globl __sqlite_start\n.set __sqlite_start, 0x200000\n"
-        ".globl __sqlite_end\n.set __sqlite_end, 0x240000\n"
-        ".globl __bss_end\n.set __bss_end, 0x180000\n");
+/* Layout symbols are supplied by kernel_layout.linker_flags(). */
 static void die(int code)
 {
     __asm__ volatile("int $0x80" : : "a"(1), "b"(code));
@@ -128,7 +126,7 @@ static void snapshot_ledger(int compare) {
     snapshot_bytes(&pos, owner_map, limit_pfn, compare);
 }
 void _start(void) {
-    u32 args[6] = {MEM_POOL_BASE, 0x4000000, 3, 0x32, 0xffffffffUL, 0}, result;
+    u32 args[6] = {KERNEL_LOAD_ADDR, MEM_POOL_BASE + 0x4000000 - KERNEL_LOAD_ADDR, 3, 0x32, 0xffffffffUL, 0}, result;
     struct addrspace a, b;
     u32 oa, ob, owner, sid, pa, before, i, count;
     struct ledger_surface sf = {.width=1, .height=1, .pitch=1, .planes=1,
@@ -138,7 +136,7 @@ void _start(void) {
     struct lease_view v[MEM_LEASE_MAX], out[MEM_LEASE_MAX];
     struct lease_authority auth;
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
-    CHECK(result == MEM_POOL_BASE);
+    CHECK(result == KERNEL_LOAD_ADDR);
     host_map_fixed_paging(); paging_init(17408); host_pool_boot(17408);
     before = used_pages;
     CHECK(!lease_selftest()); CHECK(used_pages == before);

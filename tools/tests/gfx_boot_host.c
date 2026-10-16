@@ -63,9 +63,7 @@ static void host_irq_restore(unsigned int f) { host_if = f; }
 #include "paging_host_source.c"
 #include "pgalloc_host_source.c"
 #include "sys_host_source.c"
-__asm__(".globl __sqlite_start\n.set __sqlite_start, 0x200000\n"
-        ".globl __sqlite_end\n.set __sqlite_end, 0x240000\n"
-        ".globl __bss_end\n.set __bss_end, 0x180000\n");
+/* Layout symbols are supplied by kernel_layout.linker_flags(). */
 static void die(int code)
 {
     if (!code && host_if != 0x202U) code = 2;
@@ -140,8 +138,8 @@ static u32 count(char c)
     return n;
 }
 
-int pegc_identify(void) { note('P'); CHECK(ledger_region_count == 4); return PEGC_ID; }
-int cirrus_identify(void) { note('C'); CHECK(ledger_region_count == 4); return CIRRUS_ID; }
+int pegc_identify(void) { note('P'); CHECK(ledger_region_count == 5); return PEGC_ID; }
+int cirrus_identify(void) { note('C'); CHECK(ledger_region_count == 5); return CIRRUS_ID; }
 static u8 host_bda(volatile u32 addr)
 {
     CHECK(addr == PEGC_BIOS_ARCH_FLAG);
@@ -220,7 +218,8 @@ int kselftest_run_audit(const char *tag) { return !ledger_selfcheck(tag); }
 #include "gfx_boot_slice.inc"
 
 /* ---- 起動 (memory_boot_init の ③ と同じ段) ---- */
-static u32 arena_top_pfn;   /* 凍結した exec 上端 (PFN) */
+static u32 arena_top_pfn;   /* 凍結前の低位 RAM 上端 (PFN) */
+static u32 bb_top_pfn;      /* DMA を避けた BB の連続確保上端 */
 
 static u32 ws_pages(u32 limit)
 {
@@ -283,6 +282,10 @@ static void boot(void)
     CHECK(ledger_register_region(LEDGER_R_BACKGROUND, LEDGER_OWNER_KERNEL,
                                  MEM_PHYS_RAM_CEILING / PAGE_SIZE, PHYSMEM_MAX_PFN,
                                  LEDGER_CACHE_UC, 0));
+    bb_top_pfn = arena_top_pfn;
+    if (bb_top_pfn > MEM_DMA_POOL_BASE / PAGE_SIZE &&
+        bb_top_pfn - 75 < (MEM_DMA_POOL_END + 1) / PAGE_SIZE)
+        bb_top_pfn = MEM_DMA_POOL_BASE / PAGE_SIZE;
     CHECK(pgalloc_arena_end() == arena_top_pfn);
     CHECK(sys_usable_mem_end() == arena_top_pfn * PAGE_SIZE);
 }
@@ -307,7 +310,7 @@ static u32 pte_before_pegc, pte_before_cirrus, pte_before_decode;
 
 void _start(void)
 {
-    u32 args[6] = {0x200000, 0xE00000, 3, 0x32, 0xffffffffUL, 0};
+    u32 args[6] = {KERNEL_LOAD_ADDR, 0x1000000 - KERNEL_LOAD_ADDR, 3, 0x32, 0xffffffffUL, 0};
     u32 result, i, p, filler = 0, base, size, bb_first = 0;
     int is_c, pc, cc, map_pegc, map_alt, map_cirrus, bb, cirrus_ok, sel;
     const struct ledger_surface *sp, *se, *sc, *sd, *cl;
@@ -315,7 +318,7 @@ void _start(void)
     char want[40];
     u32 nw = 0;
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
-    CHECK(result == 0x200000);
+    CHECK(result == KERNEL_LOAD_ADDR);
     boot();
 
     /* 期待値 (§3-8 の表): 候補 → 写像 → BB → SURFACE */
@@ -348,11 +351,11 @@ void _start(void)
     if (FAIL_BB) {
         /* アリーナを AS owner で埋める (AS は凍結の対象外 = 上端は動かない) */
         CHECK(ledger_owner_new(LEDGER_KIND_AS, 9, "fill", &filler));
-        CHECK(pgalloc_alloc_n_owner(filler, (int)(arena_top_pfn - 0x500), 0x500,
-                                    arena_top_pfn, LEDGER_BOTTOM_UP, &p));
+        while (pgalloc_alloc_n_owner(filler, 1, MEM_PHYS_EXEC_FLOOR / PAGE_SIZE,
+                                     arena_top_pfn, LEDGER_BOTTOM_UP, &p)) {}
     }
     /* BB の置き場には前の中身があったことにする (0 で埋めることを見る) */
-    if (bb) kmemset((void *)((arena_top_pfn - 75) * PAGE_SIZE), 0xA5, 75 * PAGE_SIZE);
+    if (bb) kmemset((void *)((bb_top_pfn - 75) * PAGE_SIZE), 0xA5, 75 * PAGE_SIZE);
 
     gfx_boot_reserve();
 
@@ -456,8 +459,8 @@ void _start(void)
     if (bb) {
         bb_first = se->first;
         /* アリーナ内の上端 (旧 sys_reserve_top と同じ区間、X14) */
-        CHECK(bb_first == arena_top_pfn - 75);
-        CHECK(CFG_KB != 8192 || bb_first * PAGE_SIZE == 0x7B5000UL);
+        CHECK(bb_first == bb_top_pfn - 75);
+        CHECK(CFG_KB != 8192 || bb_first * PAGE_SIZE == MEM_DMA_POOL_BASE - 75 * PAGE_SIZE);
         CHECK(CFG_KB != 17408 || bb_first * PAGE_SIZE == 0xEB2000UL);
         CHECK(bb_first * PAGE_SIZE + MEM_GFX_BB8_SIZE <= MEM_SYSTEM_SPACE_BASE);
         CHECK(se->npages == 75 && se->backing == LEDGER_SB_RAM &&
@@ -465,12 +468,14 @@ void _start(void)
         for (i = 0; i < 75; i++) CHECK(owner_map[bb_first + i] == LEDGER_OWNER_BOOT);
         for (i = 0; i < MEM_GFX_BB8_SIZE; i++)
             CHECK(((const u8 *)(bb_first * PAGE_SIZE))[i] == 0);
-        CHECK(sys_usable_mem_end() == bb_first * PAGE_SIZE);
-        CHECK(ledger_arena_top() == bb_first);
+        CHECK(sys_usable_mem_end() == (bb_first * PAGE_SIZE < MEM_DMA_POOL_BASE ?
+                                      bb_first * PAGE_SIZE : MEM_DMA_POOL_BASE));
+        CHECK(ledger_arena_top() == (bb_first < MEM_DMA_POOL_BASE / PAGE_SIZE ?
+                                     bb_first : MEM_DMA_POOL_BASE / PAGE_SIZE));
     } else {
-        /* 永続確保が無ければアリーナの上端 = 凍結した exec 上端のまま */
-        CHECK(ledger_arena_top() == pgalloc_arena_end());
-        CHECK(sys_usable_mem_end() == arena_top_pfn * PAGE_SIZE);
+        /* BB が無くても DMA の kernel PERSIST 予約で止まる。 */
+        CHECK(ledger_arena_top() == MEM_DMA_POOL_BASE / PAGE_SIZE);
+        CHECK(sys_usable_mem_end() == MEM_DMA_POOL_BASE);
     }
     CHECK(!sc == !cirrus_ok && !sd == !cirrus_ok);
     if (cirrus_ok) {

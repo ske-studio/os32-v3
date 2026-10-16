@@ -27,6 +27,7 @@
 復元を抜く) を写しに当て、どれかの試験が RED になることを見る。実物の
 ソースは書き換えない (メモリ上の写しをハーネスへ書き出すだけ)。
 """
+from kernel_layout import linker_flags
 import host32
 import pathlib
 import re
@@ -173,7 +174,7 @@ def run_c(texts, body):
         (tmp / 'pgalloc_host_fixture.h').write_text(texts['tools/tests/pgalloc_host_fixture.h'])
         src = texts['kernel/pgalloc.c'].replace('#include "io.h"', '')
         (tmp / 'test.c').write_text(PRE + src + POST + body + END)
-        cmd = ['gcc'] + FLAGS + ['-I' + str(tmp)]
+        cmd = ['gcc', *linker_flags()] + FLAGS + ['-I' + str(tmp)]
         cmd += ['-I' + str(ROOT / p) for p in ('include', 'kernel', 'lib', 'drivers', 'sdk/include/os32')]
         build = subprocess.run(cmd + [str(tmp / 'test.c'), str(ROOT / 'kernel/physmem.c'),
                                       '-o', str(tmp / 'test')], capture_output=True, text=True)
@@ -203,7 +204,7 @@ BODIES['alloc_free_transfer_reclaim'] = r'''
     CHECK(pgalloc_free_n_owner(b, 2149, 1));
     CHECK(ledger_owner_pages(a) == 4 && ledger_owner_pages(b) == 2);
     CHECK(owner_map[2048] == a && owner_map[2151] == b && owner_map[2052] == 0);
-    CHECK(pgalloc_alloc_phys(a, 1) == MEM_POOL_BASE);   /* 汎用の池は下から */
+    CHECK(pgalloc_alloc_phys(a, 1) == MEM_SHM_RESV_START);   /* 汎用の池は下から */
     /* 移譲 */
     CHECK(ledger_transfer(p, 2, a, b));
     CHECK(ledger_owner_pages(a) == 3 && ledger_owner_pages(b) == 4);
@@ -265,7 +266,7 @@ BODIES['refusals_keep_accounting'] = r'''
     CHECK(!pgalloc_alloc_n_owner(a, 101, 2500, 2600, LEDGER_TOP_DOWN, &n));
     CHECK(!pgalloc_alloc_n_owner(a, 1, 2600, 2500, LEDGER_BOTTOM_UP, &n));
     CHECK(!pgalloc_alloc_n_owner(a, 1, 4095, 4097, 2, &n));
-    CHECK(!pgalloc_alloc_n_owner(a, 1, 0, 1024, LEDGER_TOP_DOWN, &n)); /* 池の下は eligible でない */
+    CHECK(!pgalloc_alloc_n_owner(a, 1, 0, MEM_SHM_RESV_START / PAGE_SIZE, LEDGER_TOP_DOWN, &n)); /* 池の下は eligible でない */
     CHECK(n == 77);
     /* B11: boot で確保 → SURFACE 登録 → gshell へ L2 ごと移譲。 */
     CHECK(!pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, 2, 2502, 2504,

@@ -15,6 +15,7 @@ check-shm-user-host:
 - platform/pc98/**
 - tools/tests/shm_user_host.c
 - tools/tests/test_shm_user.py
+- tools/tests/kernel_layout.py
 - tools/tests/host_arch/**
 - tools/tests/host32.py
 - exec/exec_kapi_init.inc
@@ -25,3 +26,4 @@ check-shm-user-host:
 - tools/check_map.d/check-shm-user-host.yaml
 - build/checks.d/check-shm-user-host.mk
 - tools/tests/mutpar.py
+artifact_reader: true

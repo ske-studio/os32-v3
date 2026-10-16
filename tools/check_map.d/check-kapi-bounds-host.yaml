@@ -23,9 +23,11 @@ check-kapi-bounds-host:
 - tools/tests/mutpar.py
 - tools/tests/test_gfx_bounds.py
 - tools/tests/test_gfx_kernel_fb.py
+- tools/tests/kernel_layout.py
 - tools/tests/test_kapi_bounds.py
 - tools/tests/gfx_bounds_cases.inc
 - tools/check_map.d/check-kapi-bounds-host.yaml
 - build/checks.d/check-kapi-bounds-host.mk
 - lib/serial_diag.h
 - tools/tests/serial_diag_host.h
+artifact_reader: true

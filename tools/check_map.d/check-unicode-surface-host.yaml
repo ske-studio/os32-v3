@@ -18,6 +18,7 @@ check-unicode-surface-host:
 - tools/tests/host32.py
 - tools/tests/mutpar.py
 - tools/tests/test_gfx_kernel_fb.py
+- tools/tests/kernel_layout.py
 - tools/tests/gfx_attach_host.c
 - tools/tests/test_gfx_attach.py
 - userland/lib/gfx/**
@@ -29,3 +30,4 @@ check-unicode-surface-host:
 - tools/tests/unicode_surface_host.c
 - tools/check_map.d/check-unicode-surface-host.yaml
 - build/checks.d/check-unicode-surface-host.mk
+artifact_reader: true

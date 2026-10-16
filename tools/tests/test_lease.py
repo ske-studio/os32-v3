@@ -1,4 +1,5 @@
 """T2b: actual paging/ledger/lease ILP32 runtime and compiled runtime mutants."""
+from kernel_layout import linker_flags
 import host32
 import pathlib
 import subprocess
@@ -73,7 +74,7 @@ def run(changes=None):
         includes = ['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'include',
                     'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec', 'sdk/include/os32')] + ['-I' + str(tmp)]
         exe = tmp / 'lease'
-        subprocess.run(['gcc', *FLAGS, '-DPHYSMEM_HOST_TEST=1', '-nostdlib', '-static',
+        subprocess.run(['gcc', *linker_flags(), *FLAGS, '-DPHYSMEM_HOST_TEST=1', '-nostdlib', '-static',
                         '-no-pie', '-Wl,--gc-sections', *includes, str(ROOT / 'tools/tests/lease_host.c'),
                         str(ROOT / 'kernel/physmem.c'), '-o', str(exe)], check=True)
         return host32.run([str(exe)], capture_output=True, text=True, timeout=60)

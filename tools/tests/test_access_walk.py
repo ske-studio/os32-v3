@@ -1,6 +1,7 @@
 """T2d d3: real paging/allocator/shlib/access source, ILP32 host MMU/IRQ.
 Only a fixed source closure is copied; compile failures never count as RED.
 """
+from kernel_layout import linker_flags
 TARGET_SRC = ['exec/access_walk.c', 'exec/redir_access.c', 'kernel/paging.c', 'kernel/pgalloc.c', 'kernel/shlib.c', 'kdebug/kselftest.c']
 
 import argparse
@@ -77,7 +78,7 @@ def run(sources, mutant=None, fixture="access_walk_host.c", high_stack=False, ru
                 body = body.replace(old, new)
             (tmp / (key + '_host_source.c')).write_text(body)
         exe = tmp / 'walk'
-        cmd = ['gcc', '-std=gnu11', '-m32', '-march=i386', '-ffreestanding',
+        cmd = ['gcc', *linker_flags(), '-std=gnu11', '-m32', '-march=i386', '-ffreestanding',
                '-fno-pie', '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
                '-Wall', '-Wextra', '-Werror', '-DPHYSMEM_HOST_TEST=1', '-nostdlib',
                *(['-DHOST_HIGH_ENTRY_STACK=1'] if high_stack else []),

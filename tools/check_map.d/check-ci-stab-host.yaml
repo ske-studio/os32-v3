@@ -105,6 +105,7 @@ check-ci-stab-host:
 - tools/tests/test_ring3_guard.py
 - tools/tests/test_memory_boot.py
 - tools/tests/test_ledger.py
+- tools/tests/kernel_layout.py
 - tools/tests/test_gfx_boot.py
 - tools/tests/test_device_reservation.py
 - tools/tests/test_app_bb_overlap.py

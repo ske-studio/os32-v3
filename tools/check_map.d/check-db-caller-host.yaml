@@ -10,6 +10,7 @@ check-db-caller-host:
 - tools/tests/access_walk_host.c
 - tools/tests/mutpar.py
 - tools/tests/test_access_walk.py
+- tools/tests/kernel_layout.py
 - exec/exec.c
 - exec/ring3_str.c
 - kapi/kapi_db.c
@@ -21,3 +22,4 @@ check-db-caller-host:
 - exec/exec_kapi_init.inc
 - tools/check_map.d/check-db-caller-host.yaml
 - build/checks.d/check-db-caller-host.mk
+artifact_reader: true

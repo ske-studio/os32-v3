@@ -19,6 +19,7 @@ check-kapi-ranges-host:
 - tools/tests/kapi_ranges_host.c
 - tools/tests/mutpar.py
 - tools/tests/test_access_walk.py
+- tools/tests/kernel_layout.py
 - tools/tests/test_kapi_out.py
 - tools/tests/test_kapi_ranges.py
 - tools/check_map.d/check-kapi-ranges-host.yaml
@@ -28,3 +29,4 @@ check-kapi-ranges-host:
 - kapi/kapi_sys.c
 # Finite include search roots in test_kapi_ranges.resolve.
 - sdk/include/os32/*.h
+artifact_reader: true

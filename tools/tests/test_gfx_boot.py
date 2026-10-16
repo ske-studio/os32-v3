@@ -30,6 +30,7 @@ gfx_client_to_gshell)。
 --mutate は要の行を写しで壊し、どれかの構成が実行時に RED になることを見る。
 実物のソースは書き換えない。コンパイルの失敗は RED に数えない。
 """
+from kernel_layout import linker_flags
 import host32
 import pathlib
 import re
@@ -109,7 +110,7 @@ def build(texts, tmp):
             'irq_restore(flags)', 'host_irq_restore(flags)')
         (tmp / f'{unit}_host_source.c').write_text(source)
     (tmp / 'gfx_boot_slice.inc').write_text(slice_gfx(texts['gfx/gfx_core.c']))
-    cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
+    cmd = ['gcc', *linker_flags(), '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
            '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static',
            '-no-pie', '-ffunction-sections', '-Wl,--gc-sections', '-DPHYSMEM_HOST_TEST=1',
            '-Wno-unused-function',

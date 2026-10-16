@@ -62,9 +62,6 @@ def run(source):
         fixture = bb.SRC.read_text().replace('void _start(void)', 'void unused_legacy_start(void)')
         fixture = fixture.replace('void shlib_addrspace_detach(struct addrspace *as) { (void)as; }',
             '/* real shlib detach is included below */')
-        fixture += '''\n__asm__(".globl __kernel_resident_end\\n.set __kernel_resident_end, 0x260000\\n"
-                            ".globl __ledger_fixed_start\\n.set __ledger_fixed_start, 0x17E000\\n"
-                            ".globl __ledger_fixed_end\\n.set __ledger_fixed_end, 0x180000\\n");\n'''
         (tmp / 'budget_fixture.c').write_text(fixture)
         (tmp / 'exec_bb_overlap.inc').write_text(bb.extract(source))
         (tmp / 'budget_launch.inc').write_text(extract(source))
@@ -84,7 +81,7 @@ def run(source):
         need = n + 1 + 16 + 64 + 2 + pdes + 4
         inc = ['-I'+str(ROOT / p) for p in ('tools/tests/host_arch', 'tools/tests', 'include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec', 'sdk/include/os32')]
         exe = tmp / 'budget'
-        cmd = ['gcc', *bb.FLAGS, '-ffunction-sections', '-fdata-sections', '-DPHYSMEM_HOST_TEST=1',
+        cmd = ['gcc', *bb.linker_flags(), *bb.FLAGS, '-ffunction-sections', '-fdata-sections', '-DPHYSMEM_HOST_TEST=1',
                f'-DGUI_IMAGE_BYTES={image}', f'-DGUI_NEED_PAGES={need}', '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                *inc, '-I'+str(tmp), str(ROOT / 'tools/tests/exec_budget_host.c'), str(ROOT / 'kernel/physmem.c'), str(ROOT / 'kernel/kmalloc.c'), '-o', str(exe)]
         built = subprocess.run(cmd, capture_output=True, text=True)

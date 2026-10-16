@@ -15,6 +15,7 @@ check-surface-lease-host:
 - tools/tests/mutpar.py
 - tools/tests/surface_lease_host.c
 - tools/tests/test_access_walk.py
+- tools/tests/kernel_layout.py
 - tools/tests/test_surface_lease.py
 - tools/check_map.d/check-surface-lease-host.yaml
 - build/checks.d/check-surface-lease-host.mk
@@ -46,3 +47,4 @@ check-surface-lease-host:
 - tools/tests/test_kcallback.py
 - userland/rust/libos32gui/src/cfgro.rs
 - userland/tests/kcallback_test.c
+artifact_reader: true

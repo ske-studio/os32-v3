@@ -8,6 +8,7 @@ check-tvram-auth-host:
 - tools/tests/tvram_auth_host.c
 - tools/tests/test_kapi_ranges.py
 - tools/tests/test_access_walk.py
+- tools/tests/kernel_layout.py
 - tools/tests/access_walk_host.c
 - tools/check_map.d/check-tvram-auth-host.yaml
 - exec/access_walk.c
@@ -27,3 +28,4 @@ check-tvram-auth-host:
 - kapi/kapi_sys.c
 # Finite include search roots in test_kapi_ranges.resolve.
 - sdk/include/os32/*.h
+artifact_reader: true
