@@ -138,17 +138,22 @@ class AidebugPort(object):
     """
 
     def __init__(self, url, timeout=0.2, urlopen=None):
-        import urllib.request
+        try:
+            from .np21w_mcp import np21w_client
+        except ImportError:  # Direct script / standalone test import
+            from np21w_mcp import np21w_client
+        self._client = np21w_client
         self.url = url.rstrip("/")
         self.timeout = timeout
         self.pending = bytearray()
-        self._urlopen = urlopen or urllib.request.urlopen
+        self._urlopen = urlopen
         self._cancel = False
 
     def _read_once(self):
         import json
-        with self._urlopen(self.url + "/api/serial/read", timeout=10) as r:
-            obj = json.loads(r.read().decode("utf-8"))
+        payload = self._client.get("/api/serial/read", timeout=10,
+                                   base=self.url, urlopen=self._urlopen)
+        obj = json.loads(payload.decode("utf-8"))
         return bytes.fromhex(obj.get("hex", ""))
 
     @property
@@ -175,12 +180,14 @@ class AidebugPort(object):
         self._cancel = True
 
     def write(self, data):
-        import urllib.request
-        req = urllib.request.Request(self.url + "/api/serial/write",
-                                     data=bytes(data).hex().encode("ascii"),
-                                     method="POST")
-        with self._urlopen(req, timeout=10) as r:
-            r.read()
+        import io
+        import urllib.error
+        status, payload, headers = self._client.post(
+            "/api/serial/write", bytes(data).hex().encode("ascii"),
+            timeout=10, base=self.url, urlopen=self._urlopen, response=True)
+        if status >= 400:
+            raise urllib.error.HTTPError(self.url + "/api/serial/write", status,
+                                         "serial write failed", headers, io.BytesIO(payload))
         return len(data)
 
     def flush(self):

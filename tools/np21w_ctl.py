@@ -86,9 +86,11 @@ import re
 import subprocess
 import sys
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
+try:
+    from .np21w_mcp import np21w_client as emu
+except ImportError:  # Direct script / standalone test import
+    from np21w_mcp import np21w_client as emu
 
 TOOLS_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJ_DIR = os.path.dirname(TOOLS_DIR)
@@ -116,7 +118,6 @@ FDD_POST_TIMEOUT = 25
 WIN_SYS = '/mnt/c/Windows/System32'
 TASKKILL = WIN_SYS + '/taskkill.exe'
 POWERSHELL = WIN_SYS + '/WindowsPowerShell/v1.0/powershell.exe'
-CURL = WIN_SYS + '/curl.exe'
 AIDEBUG_URL = os.environ.get('NP21W_AIDEBUG_URL', 'http://127.0.0.1:8025')
 TOKEN_HEADER = 'X-Aidebug-Token'
 TOKEN_FILE_FMT = 'np21w_aidebug_%d.token'   # NP21/W aidebug_app.cpp token_write
@@ -487,41 +488,24 @@ def parse_probe(win_paths, rc, out, err):
 
 class Http(object):
     """aidebug への HTTP。WSL から直に届かなければ Windows の curl.exe を使う
-    (tools/np21w_mcp/np21w_client.py と同じ逃げ道)。届かなければ None を返す。"""
+    (tools/np21w_mcp/np21w_client.py に委譲)。届かなければ None を返す。"""
 
     def __init__(self, base=None):
         self.base = base or AIDEBUG_URL
 
     def request(self, method, path, body=None, timeout=10, headers=None):
         """(status, text) か None (届かない)。headers は {名前: 値}。"""
-        data = body.encode('utf-8') if body is not None else None
-        req = urllib.request.Request(self.base + path, data=data, method=method,
-                                     headers=dict(headers or {}))
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                return r.status, r.read().decode('utf-8', 'replace')
-        except urllib.error.HTTPError as e:
-            return e.code, e.read().decode('utf-8', 'replace')
-        except (urllib.error.URLError, OSError):
-            pass
-        args = [CURL, '-s', '-m', str(max(1, int(timeout))), '-w', '\n%{http_code}',
-                '-X', method, self.base + path]
-        for k, v in (headers or {}).items():
-            args += ['-H', '%s: %s' % (k, v)]
-        if body is not None:
-            args += ['--data-binary', body]
-        try:
-            p = subprocess.run(args, capture_output=True, timeout=timeout + 5,
-                               cwd='/mnt/c' if os.path.isdir('/mnt/c') else None)
-        except (OSError, subprocess.SubprocessError):
+            if method == 'GET':
+                status, payload, _ = emu.get(path, timeout=timeout,
+                                             base=self.base, response=True)
+            else:
+                status, payload, _ = emu.post(path, body, timeout=timeout,
+                                              headers=headers, base=self.base,
+                                              response=True)
+            return status, payload.decode('utf-8', 'replace')
+        except emu.EmuError:
             return None
-        if p.returncode != 0:
-            return None
-        text = p.stdout.decode('utf-8', 'replace')
-        head, _, code = text.rpartition('\n')
-        if not code.strip().isdigit() or code.strip() == '000':
-            return None
-        return int(code.strip()), head
 
 
 # ---------------------------------------------------------------------------

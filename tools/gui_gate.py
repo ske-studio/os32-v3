@@ -37,22 +37,19 @@ import sys
 import re
 import time
 import urllib.parse
-import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-BASE = "http://127.0.0.1:8025"
+from tools.np21w_mcp import np21w_client as emu
 
 
 def post(path, data, timeout=20):
     body = urllib.parse.urlencode(data).encode()
-    req = urllib.request.Request(BASE + path, data=body, method="POST")
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return r.read()
+    return emu.post(path, body, timeout=timeout)
 
 
 def get(path, timeout=20):
-    with urllib.request.urlopen(BASE + path, timeout=timeout) as r:
-        return r.read(), dict(r.headers)
+    _, payload, headers = emu.get(path, timeout=timeout, response=True)
+    return payload, headers
 
 
 # Pass the current module attributes: existing host tests patch these names.
@@ -74,9 +71,7 @@ def cmd(line, timeout=60):
 
 
 def _cmd_raw(line, timeout):
-    req = urllib.request.Request(BASE + "/api/cmd", data=line.encode(), method="POST")
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return r.read().decode("utf-8", "replace")
+    return emu.post("/api/cmd", line.encode(), timeout=timeout).decode("utf-8", "replace")
 
 
 STATUS_KEYS = ("scrn_ymax", "grph_disp", "wab_relay", "wab_width", "wab_height",

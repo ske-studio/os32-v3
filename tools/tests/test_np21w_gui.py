@@ -2,6 +2,8 @@
 
 No HTTP may escape a test double, even when a transport injection is removed.
 """
+import os
+os.environ["NP21W_NO_CURL_FALLBACK"] = "1"  # Offline guards must never reach Windows curl.
 import contextlib
 import importlib.util
 import io
@@ -27,6 +29,141 @@ from PIL import Image
 
 SRC = ROOT / "tools/np21w_mcp/gui.py"
 RECORDED = ROOT / 'tools/tests/fixtures/gui_about.png'
+
+
+class SharedClientTests(unittest.TestCase):
+    def test_nat_post_sends_literal_body_via_stdin(self):
+        client = gui.emu
+        reply = types.SimpleNamespace(returncode=0, stdout=b'{"ok":true}')
+        with patch.dict(os.environ, {'NP21W_NO_CURL_FALLBACK': '0'}), \
+             patch.object(client, '_direct', False), \
+             patch('urllib.request.urlopen', side_effect=AssertionError('LIVE HTTP FORBIDDEN')), \
+             patch.object(client.subprocess, 'run', return_value=reply) as run:
+            for body in ('@missing.txt', b'@file\x00\xff\r\n', '', None):
+                with self.subTest(body=body):
+                    self.assertEqual(client.post('/api/cmd', body, headers={'X-Test': 'yes'}),
+                                     reply.stdout)
+                    args = run.call_args.args[0]
+                    if body is not None:
+                        self.assertEqual(args[args.index('--data-binary') + 1], '@-')
+                        self.assertEqual(run.call_args.kwargs['input'],
+                                         body.encode('utf-8') if isinstance(body, str) else body)
+                    else:
+                        self.assertNotIn('--data-binary', args)
+                    self.assertIn('X-Test: yes', args)
+
+    def test_serial_write_raises_on_http_error_direct_and_nat(self):
+        import urllib.error
+        from tools import rshell_serial
+        client = gui.emu
+        body = b'{"ok":false,"dialog":true}'
+        def failed(*args, **kwargs):
+            raise urllib.error.HTTPError(client.BASE + '/api/serial/write', 503,
+                                         'Busy', {}, io.BytesIO(body))
+        for nat in (False, True):
+            with self.subTest(nat=nat), \
+                 patch.dict(os.environ, {'NP21W_NO_CURL_FALLBACK': '0' if nat else '1'}), \
+                 patch.object(client, '_direct', False), \
+                 patch('urllib.request.urlopen', side_effect=failed), \
+                 patch.object(client.subprocess, 'run', return_value=types.SimpleNamespace(
+                     returncode=0, stdout=b'HTTP/1.1 503 Busy\r\n\r\n' + body)) as run:
+                port = rshell_serial.AidebugPort(client.BASE)
+                with self.assertRaises(urllib.error.HTTPError) as raised:
+                    port.write(b'ver\n')
+                self.assertEqual(raised.exception.code, 503)
+                self.assertEqual(raised.exception.read(), body)
+                raised.exception.close()
+                self.assertEqual(run.call_count, int(nat))
+
+    def test_custom_url_probe_is_cached_per_url(self):
+        client = gui.emu
+        urls = ('http://fake:9001', 'http://fake:9002')
+        for reachable in (False, True):
+            reply = contextlib.nullcontext(types.SimpleNamespace(read=lambda: b'{}'))
+            with self.subTest(reachable=reachable), \
+                 patch.dict(os.environ, {'NP21W_NO_CURL_FALLBACK': '0'}), \
+                 patch.dict(getattr(client, '_direct_by_base', {}), clear=True), \
+                 patch('urllib.request.urlopen', return_value=reply,
+                       side_effect=None if reachable else TimeoutError('NAT')) as probe, \
+                 patch.object(client.subprocess, 'run') as run:
+                for url in urls:
+                    for _ in range(3):
+                        self.assertEqual(client._direct_available(url), reachable)
+                self.assertEqual([call.args[0] for call in probe.call_args_list],
+                                 [url + '/api/status' for url in urls])
+                run.assert_not_called()
+
+    def test_offline_guard_blocks_curl_even_with_cached_nat_result(self):
+        client = gui.emu
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(client, '_direct', False), \
+             patch('urllib.request.urlopen', side_effect=AssertionError('LIVE HTTP FORBIDDEN')), \
+             patch.object(client.subprocess, 'run') as run:
+            for call in (lambda: client.get('/api/status'),
+                         lambda: client.post('/api/key', 'text=x'),
+                         lambda: client.get_to_file('/api/screenshot', str(Path(tmp) / 'shot.bmp'))):
+                with self.assertRaisesRegex(AssertionError, 'LIVE HTTP FORBIDDEN'):
+                    call()
+            with self.assertRaisesRegex(client.EmuError, 'disabled'):
+                client._run(['fake-curl'], 1)
+            run.assert_not_called()
+
+    def test_nat_gui_keeps_binary_headers_encoding_and_timeout(self):
+        client = gui.emu
+        raw = b'BM\x00\xff\r\n\r\nbody'
+        reply = types.SimpleNamespace(returncode=0, stdout=(
+            b'HTTP/1.1 200 OK\r\nX-Screen-Source: wab\r\n\r\n' + raw))
+        with patch.dict(os.environ, {'NP21W_NO_CURL_FALLBACK': '0'}), \
+             patch('urllib.request.urlopen', side_effect=OSError('NAT')), \
+             patch.object(client, '_direct', None), \
+             patch.object(client.subprocess, 'run', return_value=reply) as run:
+            body, headers = gui.Transport._get('/api/screenshot', timeout=21)
+            self.assertEqual(body, raw)
+            self.assertEqual(headers['X-Screen-Source'], 'wab')
+            self.assertEqual(run.call_args.kwargs['timeout'], 26)
+            self.assertIn('21', run.call_args.args[0])
+            reply.stdout = b'{"ok":true}'
+            gui.Transport._post('/api/key', {'seq': 'CTRL+ESC', 'text': '+ &='}, timeout=60)
+            args = run.call_args.args[0]
+            self.assertEqual(args[args.index('--data-binary')+1], '@-')
+            self.assertEqual(urllib.parse.parse_qs(run.call_args.kwargs['input'].decode()),
+                             {'seq': ['CTRL+ESC'], 'text': ['+ &=']})
+            self.assertEqual(run.call_args.kwargs['timeout'], 65)
+
+    def test_direct_http_error_returns_status_json_and_headers(self):
+        import urllib.error
+        from email.message import Message
+        client = gui.emu
+        headers = Message()
+        headers['Content-Type'] = 'application/json'
+        def failed(*a, **k):
+            raise urllib.error.HTTPError('http://fake/api/status', 503, 'Busy', headers,
+                                         io.BytesIO(b'{"ok":false}'))
+        with patch('urllib.request.urlopen', side_effect=failed), \
+             patch.object(client.subprocess, 'run') as run:
+            self.assertEqual(client.get('/api/status', response=True),
+                             (503, b'{"ok":false}', {'Content-Type': 'application/json'}))
+            self.assertEqual(client.post('/api/key', ''), b'{"ok":false}')
+            with self.assertRaisesRegex(ValueError, 'input rejected'):
+                gui.Transport._post('/api/key', {'seq': 'ESC'})
+            run.assert_not_called()
+
+    def test_gate_and_serial_use_shared_client_with_custom_url(self):
+        from tools import gui_gate, rshell_serial
+        client = gui_gate.emu
+        with patch.object(client, 'get', return_value=(200, b'{}', {'X-Screen-Source': '98'})) as get, \
+             patch.object(client, 'post', return_value=b'answer\xff') as post:
+            self.assertEqual(gui_gate.get('/api/status'), (b'{}', {'X-Screen-Source': '98'}))
+            self.assertEqual(gui_gate.cmd('ver', timeout=61), 'answer\ufffd')
+            post.assert_called_once_with('/api/cmd', b'ver', timeout=61)
+        port = rshell_serial.AidebugPort('http://fake:9000/')
+        with patch.object(port._client, 'get', return_value=b'{"hex":"00ff"}') as get, \
+             patch.object(port._client, 'post', return_value=(200, b'{}', {})) as post:
+            self.assertEqual(port.read(2), b'\x00\xff')
+            self.assertEqual(port.write(b'\x00\xff'), 2)
+            get.assert_called_once_with('/api/serial/read', timeout=10, base='http://fake:9000', urlopen=None)
+            post.assert_called_once_with('/api/serial/write', b'00ff', timeout=10,
+                                         base='http://fake:9000', urlopen=None, response=True)
 
 
 class Clock:

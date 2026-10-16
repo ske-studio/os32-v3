@@ -6,3 +6,4 @@ check-gui-gate-host:
 - tools/np21w_mcp/gui.py
 - userland/gshell/src/startmenu.rs
 - userland/gshell/src/taskbar.rs
+- tools/np21w_mcp/np21w_client.py

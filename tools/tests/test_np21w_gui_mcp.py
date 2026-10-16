@@ -6,6 +6,7 @@ import contextlib
 import io
 import json
 import os
+os.environ["NP21W_NO_CURL_FALLBACK"] = "1"  # Offline guards must never reach Windows curl.
 import subprocess
 import tempfile
 from pathlib import Path
@@ -48,7 +49,8 @@ class McpTests(unittest.TestCase):
                     curl.assert_not_called()
                 else:
                     args = curl.call_args.args[0]
-                    body = args[args.index('--data-binary') + 1]
+                    self.assertEqual(args[args.index('--data-binary') + 1], '@-')
+                    body = curl.call_args.kwargs['input'].decode('utf-8')
                     http.assert_not_called()
                 self.assertEqual(parse_qs(body), {'seq': ['CTRL+STOP'], 'text': ['+ &=']})
 

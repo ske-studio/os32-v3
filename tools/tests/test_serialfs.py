@@ -39,6 +39,7 @@ import errno
 import importlib.util
 import io
 import os
+os.environ["NP21W_NO_CURL_FALLBACK"] = "1"  # Offline guards must never reach Windows curl.
 import pathlib
 import re
 import select
