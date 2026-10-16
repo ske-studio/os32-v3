@@ -22,9 +22,13 @@ gen_memmap.py — メモリ地図の生成と、重なり・逆転の検出
     python3 tools/gen_memmap.py --write      # build/out/MEMMAP.md を書き出す
     python3 tools/gen_memmap.py --check      # 重なり・逆転・予算超過・定数のずれがあれば 1 で終わる
     python3 tools/gen_memmap.py --headroom   # カーネルがあと何 KB 育つと何が壊れるか
+    python3 tools/gen_memmap.py --manifest --write  # ELF由来のlayout-manifest.json
+    python3 tools/gen_memmap.py --manifest --check  # ELF/map/既存manifestも照合
 
     --root <dir>  別のツリーを見る (試験用)
     --map <path>  kernel.map の場所 (既定 <root>/build/out/kernel.map)
+    --elf <path>  kernel.elf の場所 (既定 <root>/build/out/kernel.elf)
+    --chain-limit <定数名>  鎖の上限 (memmap.hから解決、新配置への切替用)
 
 `make check-memmap` は生成文書によらず配置を検査する。
 
@@ -33,12 +37,17 @@ kernel.map が無いときは**推測しない**。__bss_end を決め打ちに�
 """
 
 import argparse
+import hashlib
+import json
 import os
 import re
+import struct
 import sys
 
 OUT_REL = "build/out/MEMMAP.md"
 MAP_REL = "build/out/kernel.map"
+ELF_REL = "build/out/kernel.elf"
+LAYOUT_REL = "build/out/layout-manifest.json"
 HDR_REL = "include/memmap.h"
 
 BEGIN = "<!-- 生成: tools/gen_memmap.py --write (この印の中は手で書かない) -->"
@@ -717,6 +726,192 @@ def render(m, sym, rows, map_path, root):
 #  6. 読み込みと CLI
 # ---------------------------------------------------------------------------
 
+def read_elf(path):
+    """Read linked ELF32/i386 sections and symbols, retaining every SHF_ALLOC.
+
+    NOBITS occupies memory, without bytes in the file. Orphan sections count too.
+    """
+    with open(path, "rb") as f:
+        data = f.read()
+    if data[:7] != b"\x7fELF\x01\x01\x01":
+        raise ValueError("ELF: expected little-endian ELF32")
+    h = struct.unpack_from("<16sHHIIIIIHHHHHH", data)
+    if h[1:3] != (2, 3) or h[11] != 40 or not h[12]:
+        raise ValueError("ELF: expected linked i386 section table")
+    sections = [struct.unpack_from("<10I", data, h[6] + i * 40) for i in range(h[12])]
+
+    def contents(s):
+        start, size = s[4:6]
+        if start + size > len(data):
+            raise ValueError("ELF: truncated section")
+        return data[start:start + size]
+
+    def string(table, offset):
+        return table[offset:table.index(b"\0", offset)].decode("utf-8")
+
+    names = contents(sections[h[13]])
+    allocated, symbols = [], {}
+    for s in sections:
+        if s[2] & 2:
+            allocated.append({"name": string(names, s[0]), "start": s[3],
+                              "end": s[3] + s[5], "noload": s[1] == 8,
+                              "kind": "bss" if s[1] == 8 else "code" if s[2] & 4 else "data"})
+        if s[1] == 2:
+            if s[9] != 16 or s[5] % 16:
+                raise ValueError("ELF: invalid symbol table")
+            strings, table = contents(sections[s[6]]), contents(s)
+            for off in range(0, len(table), 16):
+                name, value, _, _, _, index = struct.unpack_from("<IIIBBH", table, off)
+                if name and index:
+                    symbols[string(strings, name)] = value
+    for name in SYMBOLS + ("__bss_start", "__sqlite_data_end"):
+        if name not in symbols:
+            raise ValueError("ELF: missing symbol " + name)
+    return allocated, symbols
+
+
+def layout_range(name, start, end, purpose, **extra):
+    """Byte half-open interval; pages counts pages touched, and is not additive."""
+    return dict(name=name, start=start, end=end, size=end - start,
+                pages=((end + PAGE - 1) // PAGE - start // PAGE) if end > start else 0,
+                owner="kernel", purpose=purpose, **extra)
+
+
+def chain_slack(chain_end, limit):
+    """Same budget check for the current DMA ceiling and the T3 fixed guard."""
+    start = (chain_end + PAGE - 1) & -PAGE
+    if start > limit:
+        raise ValueError("鎖の予算超過: 0x%X > 0x%X" % (start, limit))
+    if limit % PAGE:
+        raise ValueError("鎖の上限がページ非整列")
+    return layout_range("SLACK", start, limit, "kernel_slack", noload=True)
+
+
+def layout_defects(manifest, sections, symbols):
+    """Check emission independently, so dropping BSS cannot silently pass."""
+    out, rows = [], manifest["ranges"]
+    emitted = {r["name"]: r for r in rows if r.get("source") == "elf"}
+    for s in sections:
+        r = emitted.get(s["name"])
+        if r is None or any(r[k] != s[k] for k in ("start", "end", "kind", "noload")):
+            out.append("ELF区間の欠落/不一致: " + s["name"])
+    for lo, hi in (("__bss_start", "__bss_end"), ("__sqlite_data_end", "__sqlite_end")):
+        cursor = symbols[lo]
+        for r in sorted((r for r in rows if r.get("noload") and
+                         r["end"] > symbols[lo] and r["start"] < symbols[hi]),
+                        key=lambda r: r["start"]):
+            if r["start"] > cursor:
+                break
+            cursor = max(cursor, r["end"])
+        if cursor < symbols[hi]:
+            out.append("BSS/NOLOAD省略: " + lo)
+    good = sorted((r for r in rows if r["end"] > r["start"]), key=lambda r: r["start"])
+    for i, a in enumerate(good):
+        for b in good[i + 1:]:
+            if b["start"] >= a["end"]:
+                break
+            out.append("半開区間の重複: %s / %s" % (a["name"], b["name"]))
+    for r in rows:
+        expected = layout_range(r["name"], r["start"], r["end"], r["purpose"])
+        if r["start"] > r["end"] or any(r[k] != expected[k] for k in ("size", "pages")):
+            out.append("半開区間の逆転/寸法不一致: " + r["name"])
+    if len({r["name"] for r in rows}) != len(rows):
+        out.append("区間名の重複")
+    try:
+        expected = chain_slack(manifest["chain_end"], manifest["chain_limit"]["value"])
+        slack = next(r for r in rows if r["name"] == "SLACK")
+        if any(slack[k] != expected[k] for k in ("start", "end")):
+            out.append("SLACK境界不一致")
+    except (ValueError, StopIteration) as e:
+        out.append(str(e) or "SLACK欠落")
+    return out
+
+
+def layout_manifest(root, map_path, elf_path, limit_name=None):
+    sections, symbols = read_elf(elf_path)
+    for name, value in read_symbols(map_path).items():
+        if symbols[name] != value:
+            raise ValueError("ELF/map symbol mismatch: " + name)
+    m = Macros(read_defines(os.path.join(root, HDR_REL)), symbols)
+
+    def v(name):
+        value = m.get(name)
+        if value is None:
+            raise ValueError("memmap.h: unresolved " + name)
+        return value
+
+    limit_name = limit_name or ("MEM_FIXED_PAGING_GUARD_BASE"
+                               if "MEM_FIXED_PAGING_GUARD_BASE" in m.defines else "MEM_DMA_POOL_BASE")
+    rows = [layout_range(s["name"], s["start"], s["end"],
+                         "sqlite" if s["name"].startswith(".sqlite") else "core",
+                         source="elf", kind=s["kind"], noload=s["noload"])
+            for s in sections]
+    # Include alignment gaps inside each image, not the current core/SQLite gap.
+    for purpose in ("core", "sqlite"):
+        group = sorted((r for r in rows if r["purpose"] == purpose), key=lambda r: r["start"])
+        for a, b in zip(group, group[1:]):
+            if a["end"] < b["start"]:
+                rows.append(layout_range("padding:" + b["name"], a["end"], b["start"],
+                                         purpose, noload=b["noload"], kind="padding"))
+
+    def add(name, start, end, purpose, **extra):
+        rows.append(layout_range(name, start, end, purpose, source="memmap.h", **extra))
+
+    add("core tail padding", symbols["__bss_end"], v("KHEAP_BASE"), "core", noload=True)
+    add("KHEAP", v("KHEAP_BASE"), v("KHEAP_BASE") + v("KHEAP_SIZE"), "heap")
+    add("KAPI", v("KHEAP_BASE") + v("KHEAP_SIZE"), v("MEM_SHM_GUARD_LO"), "kapi")
+    add("SHM guard lo", v("MEM_SHM_GUARD_LO"), v("MEM_SHM_BASE"), "guard")
+    add("SHM", v("MEM_SHM_BASE"), v("MEM_SHM_END") + 1, "shared_memory")
+    shm_end = v("MEM_SHM_GUARD_HI") + v("MEM_GUARD_SIZE")
+    add("SHM guard hi", v("MEM_SHM_GUARD_HI"), shm_end, "guard")
+    add("sqlite tail padding", symbols["__sqlite_end"], v("MEM_SQLITE_STACK_BASE"), "sqlite", noload=True)
+    add("SQLite stack", v("MEM_SQLITE_STACK_BASE"),
+        v("MEM_SQLITE_STACK_BASE") + v("MEM_SQLITE_STACK_SIZE"), "sqlite_stack", noload=True)
+    chain_end = max([r["end"] for r in rows] + [symbols.get("__kernel_resident_end", 0)])
+    slack = chain_slack(chain_end, v(limit_name))
+    # In the current layout SLACK is reserved NP; T3ab changes this policy.
+    slack["state"] = "present" if limit_name == "MEM_FIXED_PAGING_GUARD_BASE" else "reserved"
+    rows.append(slack)
+    add("shell image/sbrk", v("MEM_SHELL_LOAD_ADDR"), v("MEM_SHELL_GUARD"), "shell_image_and_sbrk")
+    add("shell guard", v("MEM_SHELL_GUARD"), v("MEM_SHELL_GUARD") + v("MEM_GUARD_SIZE"), "guard")
+    add("shell stack", v("MEM_SHELL_STACK_TOP") - v("MEM_SHELL_STACK_SIZE"),
+        v("MEM_SHELL_STACK_TOP"), "shell_stack")
+    add("shell exec heap", v("MEM_SHELL_HEAP_BASE"),
+        v("MEM_SHELL_HEAP_BASE") + v("MEM_SHELL_HEAP_SIZE"), "shell_heap")
+
+    def artifact(path):
+        with open(path, "rb") as f:
+            data = f.read()
+        return {"path": os.path.relpath(path, root), "size": len(data),
+                "sha256": hashlib.sha256(data).hexdigest()}
+
+    generation_path = os.path.join(root, "build/out/generations-manifest.json")
+    with open(generation_path, encoding="utf-8") as f:
+        generation = json.load(f)
+    with open(os.path.join(root, "sdk/kapi.json"), encoding="utf-8") as f:
+        canon = json.load(f)
+    if generation["kapi_version"] != canon["version"] or generation["generations"] != canon["generations"]:
+        raise ValueError("generations-manifest: generation mismatch")
+    artifacts = [artifact(p) for p in (elf_path, map_path, os.path.join(root, HDR_REL), generation_path)]
+    recorded = {entry["path"]: entry for entry in generation["files"]}
+    for rel in ("build/out/kernel.bin", "build/out/sqlite.bin", "build/out/vmkernel.lz4"):
+        actual = artifact(os.path.join(root, rel))
+        if actual != recorded.get(rel):
+            raise ValueError("generations-manifest: artifact mismatch: " + rel)
+        artifacts.append(actual)
+    manifest = {"schema_version": 1, "interval": "[start,end)", "page_size": PAGE,
+                "page_counting": "pages touched per interval; not additive",
+                "build_id": generation["build_id"], "kernel_commit": generation["kernel_commit"],
+                "kapi_version": generation["kapi_version"], "generations": generation["generations"],
+                "artifacts": artifacts, "symbols": {k: v for k, v in symbols.items() if k.startswith("__")},
+                "chain_end": chain_end, "chain_limit": {"constant": limit_name, "value": v(limit_name)},
+                "ranges": sorted(rows, key=lambda r: (r["start"], r["name"]))}
+    errors = layout_defects(manifest, sections, symbols) + mirrors(root, m)
+    if errors:
+        raise ValueError("; ".join(errors))
+    return manifest
+
+
 def load(root, map_path):
     sym = read_symbols(map_path)
     defines = read_defines(os.path.join(root, HDR_REL))
@@ -735,6 +930,11 @@ def main():
                     help="カーネルがあと何 KB 育つと何が壊れるかだけ出す")
     ap.add_argument("--root", default=None, help="別のツリーを見る (試験用)")
     ap.add_argument("--map", default=None, help="kernel.map の場所")
+    ap.add_argument("--elf", default=None, help="kernel.elf の場所")
+    ap.add_argument("--manifest", action="store_true",
+                    help="ELF由来の半開区間JSONを出す (--write: layout-manifest.json)")
+    ap.add_argument("--chain-limit", default=None,
+                    help="鎖の上限のmemmap.h定数名 (既定: 固定paging guard、無ければDMA)")
     args = ap.parse_args()
 
     root = args.root or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -743,6 +943,25 @@ def main():
         require_fresh(root, [MAP_REL], ['build/os32.ld', 'include/memmap.h'],
                       targets={MAP_REL: 'build/out/kernel.elf'})
     map_path = args.map or os.path.join(root, MAP_REL)
+
+    if args.manifest:
+        try:
+            manifest = layout_manifest(root, map_path, args.elf or os.path.join(root, ELF_REL),
+                                       args.chain_limit)
+        except (OSError, ValueError, KeyError, IndexError, struct.error, MissingMap) as e:
+            sys.stderr.write("gen_memmap: %s\n" % e)
+            return 1
+        if args.write:
+            path = os.path.join(root, LAYOUT_REL)
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(manifest, f, indent=2, ensure_ascii=False)
+                f.write("\n")
+            print(LAYOUT_REL + " を書き出した")
+        elif args.check:
+            print("ELF配置manifest: 半開区間・BSS/NOLOAD・鎖予算・写し・世代/hash 一致")
+        else:
+            print(json.dumps(manifest, indent=2, ensure_ascii=False))
+        return 0
 
     try:
         m, sym, rows = load(root, map_path)
