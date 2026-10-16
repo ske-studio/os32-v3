@@ -26,6 +26,7 @@
 
 | ID | 何を残したか | 理由 | 渡し先 |
 |---|---|---|---|
+| T3AB-C | 段Cは旧新のpaging製品ソース取込ホスト試験とリンクまで。実CR0/CR3、旧新の起動/AS生成のゲスト受入は未実施。実memory_bootの新台帳供給はD、DMA装置の可否はEへ | パック指定で配備・エミュレータ/実機操作なし、make all・変異・全体検査はG後 | T3ab D/Eの結線、G後のレビュー/ゲスト受入 ([C票](v3/t3ab/C_PAGING.md)) |
 | T3AB-B | 段Bの入口/BSS/stackは旧新ホスト検査のみ。CR0/LTR、実際のfault teardown・SQLite DB/FEP、起動/復帰のゲスト観測とR1一式は未実施 | パック指定で配備/エミュレータ操作なし。ホストは特権操作とexec teardownを代替 | T3ab G後のレビュー/ゲスト受入 ([B票](v3/t3ab/B_STACK_ENTRY.md)) |
 | T3AB-A | 段Aは旧/新の定義・ELFリンク・製品ローダーのホスト検査まで。新配置の入口/ページング/台帳/DMA/shell実行時結線、既定0の実起動、V5と通常/R1の一式でのゲスト受入は未確認。実木V5のmanifestは旧shell写しを拒否する (新配置manifestの正常対照はshell値も揃えたfixture) | Aの依頼は配備・エミュレータ操作禁止、実行時の移行はB〜F、世代切替はG | [T3ab B〜G](v3/t3ab/README.md) で実装/各段の製品host検査を進め、G後のOpusレビュー・指定統合検査・NP21/W受入で閉じる。実機回帰はT3bR |
 | E9-1 | CPL3 sh 経由の tvdump (CUI 対照つき) | v3 の sh.bin はシリアル系コマンドを持たず (D2(a))、sh の中の tvdump は「external programs need the GUI terminal」で $?=126 — 台本の前提が v3 で成り立たない。代わりに CPL3 の CUI 前景で `audit_test tvram` が PASS (2026-10-16、`~/os32-tmp/evidence/2026-10-16/guest8/E9-1/`) | H-7 (端末アプリの再開) の再開時ゲートで |

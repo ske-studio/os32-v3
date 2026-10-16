@@ -6,9 +6,9 @@ struct layout_fixture {
     int resident_meta, slack_rw;
 };
 static const struct layout_fixture layout_fixtures[] = {
-    { MEM_LEDGER_META_BASE, 0x200000, 0x3F0000,
-      MEM_FIXED_PAGING_BASE, MEM_FIXED_PAGING_END, MEM_STACK_GUARD,
-      MEM_KSTACK_BASE, MEM_KSTACK_TOP + 4, MEM_DMA_POOL_BASE, 0, 0 },
+    { 0x2F9000, 0x200000, 0x3F0000,
+      0x3F1000, 0x3FC000, 0x2FB000,
+      0x2FC000, 0x300000, 0x2E8000, 0, 0 },
     { 0x17E000, 0x3E0000, 0x3E0000, 0x3E1000, 0x3FB000,
       0x3FB000, 0x3FC000, 0x400000, 0x7F0000, 1, 1 },
 };
@@ -163,7 +163,7 @@ static void layout_boot_fixture(u32 kb)
                                        (f->dma + LF_DMA_SIZE) / LF_PAGE));
         }
         /* Test-side replay of supplied attributes through real PTE helpers.
-         * Production paging_init remains covered separately, with old inputs. */
+         * Production paging_init is covered separately in both layouts. */
         CHECK(paging_map_range(first, f->slack_end, first, PAGE_RW) == 0);
         if (!f->slack_rw) CHECK(paging_set_not_present(first, f->slack_end - 1) == 0);
         CHECK(paging_map_range(f->pt, f->pt_end, f->pt, PAGE_RW) == 0);

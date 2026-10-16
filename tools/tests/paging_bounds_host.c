@@ -4,6 +4,11 @@ static u32 host_cr3;
 __asm__(".globl __sqlite_start\n.set __sqlite_start, 0x200000\n"
         ".globl __sqlite_end\n.set __sqlite_end, 0x240000\n"
         ".globl __bss_end\n.set __bss_end, 0x180000\n");
+#if MEM_LAYOUT_V5
+__asm__(".globl __kernel_resident_end\n.set __kernel_resident_end, 0x261000\n"
+        ".globl __ledger_fixed_start\n.set __ledger_fixed_start, 0x17E000\n"
+        ".globl __ledger_fixed_end\n.set __ledger_fixed_end, 0x180000\n");
+#endif
 static u32 limit = 16, calls;
 static void die(int code)
 {
@@ -79,7 +84,7 @@ void _start(void)
     CHECK(used == 0);
     /* T2a′: 画像外の1/8/1/1枚、固定番地と4KB整列。 */
     CHECK(MEM_FIXED_APERTURE_PT_BASE - MEM_FIXED_BOOT_PT_BASE == 8 * PAGE_SIZE);
-    CHECK(MEM_FIXED_MMIO_TOP_PT_BASE == 0x3FB000UL);
+    CHECK(MEM_FIXED_MMIO_TOP_PT_BASE == (MEM_LAYOUT_V5 ? 0x3EB000UL : 0x3FB000UL));
     CHECK(MEM_FIXED_PAGING_END - MEM_FIXED_PAGING_BASE == 11 * PAGE_SIZE);
     CHECK(page_directory[PAGING_MMIO_TOP_PDI] == (MEM_FIXED_MMIO_TOP_PT_BASE | PAGE_RW));
     CHECK(!(MEM_FIXED_BOOT_PT_BASE & (PAGE_SIZE - 1)));

@@ -20,6 +20,7 @@
 そこを崩すと自己診断そのものが穴を隠す。
 """
 import host32
+import os
 import argparse
 import pathlib
 import re
@@ -27,6 +28,7 @@ import subprocess
 import sys
 import tempfile
 
+LAYOUT = int(os.environ.get("MEM_LAYOUT_V5", "0"))
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 # build/config.mk の INC_KERNEL と同じ並び。ホスト側は模型のヘッダだけ先頭に足す。
 KERNEL_INCLUDES = ['-I' + str(ROOT / p) for p in
@@ -76,7 +78,7 @@ MUTATIONS = {
                      "        return MM_NP;"),
     # 食い違いを 1 本にまとめない = 区間の本数が意味を失う
     "fixed-remap-missing": ("kernel/paging.c",
-        "paging_map_range(MEM_FIXED_PAGING_BASE, MEM_FIXED_PAGING_END,",
+        "paging_map_range(MEM_FIXED_PAGING_BASE, MEM_FIXED_PAGING_FRAME_END,",
         "paging_map_range(MEM_FIXED_PAGING_BASE, MEM_FIXED_PAGING_BASE,"),
     "fixed-user": ("kernel/paging.c",
         "MEM_FIXED_PAGING_BASE, PAGE_RW) != 0 ||",
@@ -99,7 +101,7 @@ MUTATIONS = {
         "    pg_enabled = 1;\n    irq_restore(flags);",
         "    pg_enabled = 1;\n    _enable();"),
     "no-coalesce": ("kernel/paging.c",
-                    "        for (j = i + 1; j < PTE_COUNT; j++) {",
+                    "        for (j = i + 1; j < (MEM_SHELL_BAND_END + 1) / PAGE_SIZE; j++) {",
                     "        for (j = i + 1; j < i + 1; j++) {"),
 }
 
@@ -143,8 +145,8 @@ def build_and_run(tmp, case, mutation=None, kb=8192, initial_if=0x202):
     if case[0] == 'PG-failure':
         path = ROOT / 'kernel/paging.c'
         sources[path] = sources[path].replace(
-            "paging_map_range(MEM_FIXED_PAGING_BASE, MEM_FIXED_PAGING_END,",
-            "paging_map_range(MEM_FIXED_PAGING_BASE, MEM_FIXED_PAGING_BASE,")
+            "paging_map_range(MEM_FIXED_PAGING_BASE, MEM_FIXED_PAGING_FRAME_END,",
+            "paging_map_range(MEM_FIXED_PAGING_BASE, MEM_FIXED_PAGING_BASE - PAGE_SIZE,")
     (tmp / "paging_host_source.c").write_text(sources[ROOT / "kernel/paging.c"],
                                               encoding="utf-8")
     alloc = sources[ROOT / "kernel/pgalloc.c"]
@@ -155,8 +157,9 @@ def build_and_run(tmp, case, mutation=None, kb=8192, initial_if=0x202):
         sources[ROOT / "tools/tests/layout_boot_fixture.h"])
     includes = ['-I' + str(ROOT / 'tools/tests/host_arch'), '-I' + str(tmp)] + KERNEL_INCLUDES
     exe = tmp / ("memmap_" + re.sub(r"\W", "", str(bss)))
-    defines = ['-DPHYSMEM_HOST_TEST=1',
-               '-DHOST_BSS_END=0x%X' % bss,
+    defines = ['-DPHYSMEM_HOST_TEST=1', f'-DMEM_LAYOUT_V5={LAYOUT}',
+               f'-DHOST_RESIDENT_END=0x{bss:X}',
+               '-DHOST_BSS_END=0x%X' % (0x180000 if LAYOUT else bss),
                '-DHOST_EXPECT_REJECT=%d' % reject,
                '-DHOST_EXPECT_BAD=%d' % bad, f'-DHOST_RAM_KB={kb}', f'-DHOST_INITIAL_IF={initial_if}', f'-DHOST_EXPECT_INIT_FAIL={int(case[0] == "PG-failure")}']
     subprocess.run(['gcc', *FLAGS, *HOST_OPT, *defines, '-nostdlib', '-static', '-no-pie',
@@ -173,6 +176,10 @@ def main():
     args = ap.parse_args()
 
     check_shm_replay()
+    if LAYOUT:
+        # Resident chain (not core BSS) is the V5 moving boundary.
+        CASES[:] = [("V5 typical", 0x280000, 0, 0),
+                    ("V5 empty SLACK", 0x375000, 0, 0)]
 
     for kb in (8088, 8192, 17408, 65536):
         for initial_if in (2, 0x202):
@@ -206,7 +213,7 @@ def main():
     # -Werror は付けない — 本番が付けていないし、shm.c の STATIC_ASSERT は
     # (u32)&__bss_end を含むので "variably modified at file scope" の警告が出る
     # (コンパイラが畳めないだけで、値としては正しい)。
-    target = ['-std=gnu11', '-m32', '-march=i386', '-ffreestanding', '-fno-pie',
+    target = [f'-DMEM_LAYOUT_V5={LAYOUT}', '-std=gnu11', '-m32', '-march=i386', '-ffreestanding', '-fno-pie',
               '-fno-stack-protector', '-O2', '-Wall', '-D__KERNEL_BUILD__']
     with tempfile.TemporaryDirectory(prefix='os32-memmap-') as tmp:
         for src in ('kernel/paging.c', 'kernel/shm.c'):

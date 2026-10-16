@@ -1,4 +1,4 @@
-状態: **設計中** (2026-10-16、実装・検査未実施)。
+状態: **実装中** (2026-10-16、旧新の実装・直接ホスト検査済み。ゲスト受入はG後)。
 
 ## 目的
 [T3票](../TASK_T3_LAYOUT.md) §2-2・§4 T3ab の恒等写像とguardを担当する。
@@ -37,3 +37,13 @@ A/Bの区間を使う形に直し、新配置fixtureと現在のPG開始時の�
 ## 次の段へ渡すもの・未確認
 Dへ区間ごとのPTE期待とbacking入口の契約を渡す。
 未確認: 新配置の実PG起動・AS生成はGまで未受入。旧NP期待をCだけでpresentへ変更しない。
+
+## 実装記録 (2026-10-16、基点 d587d97)
+- `paging.c` は旧NP期待を保ち、新配置でSLACK/metadata/26頁枠をsup/RW/WB、両guardとSQLite stack guardをNPにする。CR3/PG前に検査。
+- FIXED入口は新配置の既存写像を検証し、不正PTEを修復しない。ARENA_TOP経路は保持。台帳供給の結線はD。
+- shellのPDEを全ASで共有し、APP_BANDより下の静的条件を追加。自己診断はshell終端まで、master/AS監査は新しい区間を照合。
+- 製品取込のmemmap/paging bounds試験を0/1で実行。8088/8192/17408/65536KiB、IF=0/1、PG前後・AS後の属性/物理・guard・予備15頁保持・破損検出を確認。
+- `make kernel MUTATE=0` は0/1ともrc=0。0のBSS終端−32B、1は0B、KHEAPは両方0B。固定シンボル/旧manifest固定区間/展開先/SQLite宛先/ASSERTは一致。
+- 圧縮像0/1は500053/500039B。証拠は `~/os32-tmp/run/t3ab/c-final-*.log`・`c-comparison.json`・`REPORT_C.md`。
+- 票外: boundsハーネスと本持越し記録へ追随。新DMAはRAM検出どおりの初期PTEを維持し、旧穴の強制再写像を適用しない (装置判断はE)。
+- 未確認・未実施の正典: [持越し台帳 T3AB-C](../../DEFERRED_TESTS.md)。検査登録は既存のmemmap/memory入力集合を使用。
