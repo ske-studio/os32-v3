@@ -319,7 +319,7 @@ SQLiteのpool/stackはbodyから外してowner付き連続割当とし、BSSの�
 | 論点 | 両方の言い分・根拠 | 決着が必要な段 |
 |---|---|---|
 | **決定 (ユーザー 2026-10-16)**: 3 SQL入口の拒否時のstmt/slotとfinalize時期 (F1/F2) | 古い行が返るのは、戻り値を見ずに `db_step` を呼んだアプリ自身の文だけで、シングルタスクでは他のアプリや OS のデータに及ばない — **アプリ側の書き方の問題**として扱う (ユーザー)。第三案 (保留 stmt) は採らない。拒否時は「何も変えない」(`docs/tasks/settings/FEP_BOUNDARY.md:140,141,213`) にそろえ、`docs/KAPI_SPEC.md:1396` の prepare_only の入口 finalize は「受け付けた入力のときだけ」と書き直す。KAPI_SPEC に「拒否の戻り値を見ずに step すると前の文の続きが返る」と注記 | T4b-1 の前に KAPI_SPEC と本票の該当行を直す |
-| X-11の共有サービスの呼出し主体 | 監査分類:43〜60はフォーカス/端末/本人別の整理を要求し、先着readerが端末の読取りを妨げる等の通常利用順の問題も含む。一方レビューF4と本依頼は単一利用者で新しい授権・本人別保存を求めず、§1-2の共有契約と既存配送で足りるという立場。新たな権限分離は足さず、通常の親子/park-resumeで二重消費・別ownerへの副作用・寿命が守れるかをT4b-5で観測する。攻撃者を置かないことだけを理由に未観測の不具合を閉じない | T4b-5の契約表と通常順の反例を照合。共有意味の変更が必要な部分だけ判断し、受入自体は§7の観測値で判定 |
+| **決定 (ユーザー 2026-10-16)**: X-11の共有サービスの呼出し主体 | 端末ごと・本人ごとの**新しい権限の分離は足さない** (単一利用者)。T4b-5 で通常の親子・park/resume の順を観測し、二重消費・別 owner への副作用・寿命の不具合が出たら、そこだけ直す。攻撃者を置かないことを理由に未観測の不具合を閉じない | T4b-5 の契約表と通常順の反例で照合 |
 | **決定 (ユーザー 2026-10-16)**: HostDrv rootの管理DB配置 | **HostDrv を root にしない**。管理 DB は通常の root (NHD の ext2) に置く。§3-5 の `/persist` ext2 案と、HostDrv root のための移行手順は不要 | T5b-6 で §3-5 の該当記述を外す |
 
 F1/F2の第三案 (契約判断前の実装案、未採用): 有効handle/通常文脈を確認後、SQL copy前にactive_stmtを同じslot/owner/groupの固定1本分pendingへ移し、active=NULL・bind不可・次step=DONEとする。拒否時はengine/finalize/VFS呼出し0、固定診断だけを返し、ファイル/transactionを変えない。column/bindからもpendingへ触れず、反復拒否でpendingを増やさない。次のcopy成功済みexec/prepare/prepare_onlyではB4/代替stack上でpendingを一度finalizeしてから新stmtを作る。db_finalize/close・owner終了もpendingを回収対象とし、正常回収前にslot/groupを再利用しない。finalizeの非OKでも同stmtを二度呼ばず、診断とclose失敗時の隔離は `docs/tasks/settings/F2_OWNERSHIP.md:188,194,199` に従う。pendingの資源は生存分として勘定し、最大1本/接続とメタデータ増分をT4bの予算へ含める。
