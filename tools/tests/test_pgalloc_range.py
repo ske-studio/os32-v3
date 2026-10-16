@@ -1,10 +1,17 @@
 """A0 real-source ILP32 harness; no Make, emulator, deployment or libc needed."""
 import host32
+import os
 import pathlib
 import subprocess
 import tempfile
 
+LAYOUT = int(os.environ.get("MEM_LAYOUT_V5", "0"))
 ROOT = pathlib.Path(__file__).resolve().parents[2]
+# Unit models use an empty SLACK; memory_boot_host covers the real provider.
+LAYOUT_FLAGS = [f'-DMEM_LAYOUT_V5={LAYOUT}',
+                '-Wl,--defsym=__kernel_resident_end=0x375000',
+                '-Wl,--defsym=__ledger_fixed_start=0x17e000',
+                '-Wl,--defsym=__ledger_fixed_end=0x180000']
 FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
          "-fno-stack-protector", "-Wall", "-Wextra", "-Werror"]
 # arch/x86 + platform/pc98: include/io.h は契約だけで、実装は固定名
@@ -17,13 +24,13 @@ INCLUDES = ["-I" + str(ROOT / p)
 if __name__ == "__main__":
     with tempfile.TemporaryDirectory(prefix="os32-a0-") as tmp:
         exe = pathlib.Path(tmp) / "pgalloc-range"
-        subprocess.run(["gcc", *FLAGS, "-Wno-unused-function", "-O0",
+        subprocess.run(["gcc", *LAYOUT_FLAGS, *FLAGS, "-Wno-unused-function", "-O0",
                         "-finstrument-functions", "-ffunction-sections", "-Wl,--gc-sections", "-nostdlib", "-static", "-no-pie",
                         *INCLUDES, str(ROOT / "tools/tests/pgalloc_range_host.c"),
                         "-o", str(exe)], cwd=ROOT, check=True)
         print("HOST ILP32 GNU11 COMPILE PASS", flush=True)
         host32.run([str(exe)], cwd=ROOT, check=True, timeout=60)
-        subprocess.run(["i386-elf-gcc", *FLAGS, "-O2", *INCLUDES,
+        subprocess.run(["i386-elf-gcc", f"-DMEM_LAYOUT_V5={LAYOUT}", *FLAGS, "-O2", *INCLUDES,
                         "-c", str(ROOT / "kernel/pgalloc.c"),
                         "-o", str(pathlib.Path(tmp) / "pgalloc.o")],
                        cwd=ROOT, check=True)

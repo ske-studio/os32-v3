@@ -171,12 +171,13 @@ static void say_run(u32 start, u32 end, u32 code)
 
 void _start(void)
 {
-    u32 args[6] = {0x380000, 0xC80000, 3, 0x32, 0xFFFFFFFF, 0};
+    /* Include V5 SLACK: AS page tables can now be allocated below the pool. */
+    u32 args[6] = {0x180000, 0xE80000, 3, 0x32, 0xFFFFFFFF, 0};
     u32 result, i, tramp;
     int bad;
 
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
-    CHECK(result == 0x380000);
+    CHECK(result == 0x180000);
 
     /* ---- カーネルの起動順そのもの (kernel/kernel.c) ---- */
     host_map_fixed_paging();

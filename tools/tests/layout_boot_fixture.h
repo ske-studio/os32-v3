@@ -1,6 +1,6 @@
 /* T3b0 test-only runtime inputs. No proposed addresses enter product sources.
  * Both harnesses use the same synthetic chain end and detected RAM inputs.
- * This is a contract fixture, not an implementation of the future boot adapter. */
+ * The real adapter is tested separately by memory_boot_host in both modes. */
 struct layout_fixture {
     u32 meta, slack_end, guard_lo, pt, pt_end, guard_hi, stack, stack_end, dma;
     int resident_meta, slack_rw;
@@ -19,6 +19,7 @@ static const struct {
     int fixed, old_dma, new_dma, boot_continues, fdc;
 } layout_ram_inputs[] = {
     { 8088,  1, 1, 0, 1, 1 },
+    { 8188,  1, 1, 0, 1, 1 },
     { 8192,  1, 1, 1, 1, 1 },
     { 17408, 0, 1, 1, 1, 1 },
     { 65536, 0, 1, 1, 1, 1 },

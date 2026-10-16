@@ -53,6 +53,11 @@
 `__bss_end` が伸びると `KHEAP_BASE` 以降の KAPI / SHM / ガードも動くため、
 数値の地図はコミットせず、説明をこの節に残す。
 
+`sys_usable_mem_end()` は `MEM_PHYS_EXEC_FLOOR` から最初の PERSIST 所有頁までの
+低位連続上端を返す（起動時の `ledger_arena_freeze()` で確定）。検出 RAM の最高番地ではない。
+T3ab の試作分岐 `MEM_LAYOUT_V5=1`（既定は 0）では DMA の恒久予約もここで止めるため、
+BB がさらに上に置かれても、この上端は DMA 開始番地になる。配置切替は段 G で行う。
+
 #### 動的レイアウト (番地が実行時に決まるので生成できない部分)
 
 生成される地図に出るのは `include/memmap.h` と `kernel.map` で決まる固定の番地だけ。

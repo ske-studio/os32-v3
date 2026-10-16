@@ -13,6 +13,7 @@ backing の写像・FIXED の RAM 拒否を壊した版で、試験が RED に�
 変異は一時ディレクトリの写しに当てる (実物のソースは書き換えない)。
 """
 import host32
+import os
 import pathlib
 import re
 import subprocess
@@ -20,6 +21,7 @@ import sys
 import tempfile
 import unittest
 
+LAYOUT = int(os.environ.get("MEM_LAYOUT_V5", "0"))
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 # (名前, 当てるファイル, 置き換え前, 置き換え後, 落とすべき場面 (case, kb))
@@ -82,6 +84,22 @@ MUTATIONS = [
 ]
 
 
+if LAYOUT == 1:
+    # Old fixed-address/NP mutations apply only to layout 0.
+    MUTATIONS = [m for m in MUTATIONS if m[0] not in
+                 ('ledger-base-shift', 'ledger-end-shift', 'backing-unmapped')]
+    MUTATIONS += [
+        ('v5-metadata-double', 'kernel/memory_boot.c',
+         '{ KERNEL_LOAD_ADDR, MEM_LEDGER_META_BASE }',
+         '{ KERNEL_LOAD_ADDR, MEM_LEDGER_META_END }', ('ledger', 8192)),
+        ('v5-old-pool-floor', 'kernel/pgalloc.c',
+         'MEM_SHM_RESV_START / PAGE_SIZE,',
+         'MEM_POOL_BASE / PAGE_SIZE,', ('fixed_paging', 8192)),
+        ('v5-dma-missing', 'kernel/pgalloc.c',
+         'int dma = ws_first &&', 'int dma = 0 && ws_first &&', ('ledger', 8192)),
+    ]
+
+
 def run_case(case='default', kb=16384, defines=(), mutation=None):
     with tempfile.TemporaryDirectory(prefix='os32-memory-boot-') as tmp:
         d = pathlib.Path(tmp)
@@ -119,7 +137,7 @@ def run_case(case='default', kb=16384, defines=(), mutation=None):
                 raise AssertionError('P2V_BOOT probe sites changed')
             mb = mb.replace('P2V_BOOT(', 'host_boot_ptr(')
         (d / 'memory_boot_host_source.c').write_text(mb)
-        cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie', '-ffunction-sections', '-Wl,--gc-sections', f'-DTEST_{case.upper()}', f'-DTEST_KB={kb}UL'] + list(defines)
+        cmd = ['gcc', f'-DMEM_LAYOUT_V5={LAYOUT}', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie', '-ffunction-sections', '-Wl,--gc-sections', f'-DTEST_{case.upper()}', f'-DTEST_KB={kb}UL'] + list(defines)
         # arch/x86 + platform/pc98: include/io.h / include/cpu.h は契約
         # だけで、実装は固定名 arch_io.h / arch_cpu.h / platform_io.h を
         # 引く (順序 3・5)。CR0 / CR3 を触る arch_cpu.h だけは、ホストでは
@@ -144,6 +162,17 @@ def run_case(case='default', kb=16384, defines=(), mutation=None):
 
 
 class MemoryBoot(unittest.TestCase):
+    @unittest.skipUnless(LAYOUT == 1, 'V5 ledger supply')
+    def test_v5_ledger_supply_and_dma(self):
+        for kb in (8088, 8188, 8192, 12292, 12296, 65536):
+            with self.subTest(kb=kb):
+                self.run_case('ledger', kb)
+        self.run_case('dma_conflict', 8192)
+        self.run_case('reversed', 8192, ('-DHOST_RESIDENT_END=0x376000',))
+        # Zero SLACK and a one-page SLACK use the actual linker-derived macros.
+        self.run_case('ledger', 8192, ('-DHOST_RESIDENT_END=0x375000',))
+        self.run_case('ledger', 8192, ('-DHOST_RESIDENT_END=0x374000',))
+
     def run_case(self, case='default', kb=16384, defines=()):
         run_case(case, kb, defines)
 
@@ -154,7 +183,7 @@ class MemoryBoot(unittest.TestCase):
 
     def test_runtime_layouts_same_ram_inputs(self):
         # 7.9MiB (page aligned), exactly 8MiB, 64MiB: FIXED and ARENA_TOP.
-        for kb in (8088, 8192, 65536):
+        for kb in (8088, 8188, 8192, 65536):
             with self.subTest(kb=kb):
                 self.run_case('layout', kb)
 

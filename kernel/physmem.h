@@ -45,6 +45,9 @@ void physmem_init(struct physmem *m);
 #define PHYSMEM_SOURCE_LEGACY 1UL
 #define PHYSMEM_SOURCE_MACHINE 2UL
 #define PHYSMEM_SOURCE_SYNTHETIC 4UL
+/* Linker-owned whole-page gap supplied only by bootstrap_legacy (V5).
+ * Not accepted by physmem_add_trusted and never obtained by reclaim. */
+#define PHYSMEM_SOURCE_KERNEL_SLACK 8UL
 /* Caller attests to verified page-aligned RAM, not a size hint. MACHINE is the
  * authoritative machine source — the boot detector in kernel/memory_boot.c,
  * which reads the PC-98 BIOS work area and re-verifies each megabyte before
@@ -66,8 +69,8 @@ int physmem_count(const struct physmem *m, u32 first, u32 end,
                   u32 kind, u32 *pages);
 /* Old loader compatibility policy only: clamp mem_kb BEFORE arithmetic to the
  * most the 512KiB write probe can report (16MiB); reserve below the allocator
- * band. Does not detect RAM or import any reported memory above 16MiB, and is
- * NOT a ceiling on physical RAM (K6-RAM, 2026-09-11): the only ceiling is
+ * band (V5 supplies the linker-defined SLACK gap separately). Does not detect
+ * RAM or import any reported memory above 16MiB, and is NOT a ceiling on physical RAM (K6-RAM, 2026-09-11): the only ceiling is
  * PHYSMEM_MAX_PFN. RAM above MEM_HIGH_RAM_BASE is attested separately with
  * PHYSMEM_SOURCE_MACHINE and bounds neither the legacy arena nor this value.
  * No inactive-device aperture exclusions; the 15-16MiB PC-98 system space and

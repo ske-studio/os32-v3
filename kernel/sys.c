@@ -148,7 +148,9 @@ static u32 sys_phys_end(void)
  * = min(凍結した exec 上端, CPL=0 子のアリーナの上端) (TASK_T1_LEDGER §3-6)。
  * アリーナの上端は ⑥ で PEGC の BB (owner = boot) を池のアリーナ内の上端から
  * 取った後に台帳が凍結する (ledger_arena_freeze) — 旧 sys_reserve_top が
- * 上限を下げていた役はここが引き継ぐ (T1e で撤去)。 */
+ * 上限を下げていた役はここが引き継ぐ (T1e で撤去)。V5 では
+ * MEM_PHYS_EXEC_FLOOR から最初の PERSIST (DMA/kernel の予約も含む) までの
+ * 低位連続上端であり、検出 RAM の最高番地や BB の下端とは限らない。 */
 u32 sys_usable_mem_end(void)
 {
     u32 top;

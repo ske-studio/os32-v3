@@ -6,6 +6,9 @@
  * Every configuration takes the model path (ARENA_TOP or FIXED backing,
  * TASK_T1_LEDGER §3-3); there is no legacy allocator to fall back to. */
 int memory_boot_init(u32 mem_kb);
+/* Call only after memory_boot_init succeeded: 0 = RAM too short for DMA,
+ * 1 = permanent DMA/kernel/WB reservation. Conflicts fail boot, not absence. */
+int memory_boot_dma_available(void);
 
 /* Physical RAM extent in KiB (top-of-RAM address / 1024), folding the old
  * loader's 512KiB probe report together with RAM at/above MEM_HIGH_RAM_BASE.
