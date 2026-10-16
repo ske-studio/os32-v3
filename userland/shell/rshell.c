@@ -889,6 +889,16 @@ static int cmd_push(int argc, char **argv)
     return 0;
 }
 
+/* TVD2: quote EOT and ESC so command transports cannot end a cell frame. */
+static void tvdump_put_byte(u8 value)
+{
+    if (value == 0x04 || value == 0x1B) {
+        g_api->serial_putchar(0x1B);
+        value ^= 0x40;
+    }
+    g_api->serial_putchar(value);
+}
+
 static int cmd_tvdump(int argc, char **argv)
 {
     int row, col;
@@ -900,7 +910,7 @@ static int cmd_tvdump(int argc, char **argv)
     }
 
     g_api->serial_putchar('T'); g_api->serial_putchar('V');
-    g_api->serial_putchar('D'); g_api->serial_putchar('M');
+    g_api->serial_putchar('D'); g_api->serial_putchar('2');
     g_api->serial_putchar(80);  g_api->serial_putchar(25);
 
     for (row = 0; row < 25; row++) {
@@ -908,8 +918,8 @@ static int cmd_tvdump(int argc, char **argv)
             u16 ch_val = 0;
             u8 at = 0;
             g_api->tvram_readchar_at(col, row, &ch_val, &at);
-            g_api->serial_putchar((u8)(ch_val & 0xFF));
-            g_api->serial_putchar(at);
+            tvdump_put_byte((u8)(ch_val & 0xFF));
+            tvdump_put_byte(at);
         }
     }
     g_api->kprintf(ATTR_GREEN, "%s", "TVRAM dump sent\n");

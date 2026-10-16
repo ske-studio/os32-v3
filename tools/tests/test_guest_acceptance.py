@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline acceptance-index, PT0 and TVDM tests; --mutate checks index, debugger guards and extent traversal."""
+"""Offline acceptance-index, PT0 and TVD2 tests; --mutate checks index, debugger guards and extent traversal."""
 import copy
 import contextlib
 import io
@@ -131,21 +131,69 @@ class AcceptanceTests(unittest.TestCase):
 
     def test_tvdump(self):
         cells = bytes([ord('A'), 0xe1]) * 2000
-        raw = b'> tvdump\nTVDM' + bytes([80, 25]) + cells + b'\nDone\x04'
+        raw = b'> tvdump\nTVD2' + bytes([80, 25]) + cells + b'\nDone\x04'
         self.assertEqual(tv.parse_tvdump(raw), (80, 25, cells))
         with patch.object(tv.emu, 'post', return_value=raw) as post:
             self.assertEqual(tv.receive_tvdump(), raw)
             post.assert_called_once_with('/api/cmd', b'tvdump', timeout=20)
 
     def test_tvdump_short(self):
-        for raw in (b'', b'TVDM', b'TVDM\x50', b'TVDM\x50\x19' + b'\0' * 3999):
+        for raw in (b'', b'TVD2', b'TVD2\x50', b'TVD2\x50\x19' + b'\0' * 3999,
+                    b'TVD2\x50\x19' + b'A' * 3999 + b'\x1b'):
             with self.subTest(length=len(raw)), self.assertRaises(ValueError):
                 tv.parse_tvdump(raw)
 
     def test_tvdump_dimensions(self):
         for cols, rows in ((79, 25), (80, 24), (0, 0)):
             with self.subTest(cols=cols, rows=rows), self.assertRaises(ValueError):
-                tv.parse_tvdump(b'TVDM' + bytes([cols, rows]) + b'\0' * 4000)
+                tv.parse_tvdump(b'TVD2' + bytes([cols, rows]) + b'\0' * 4000)
+
+    def test_tvdump_control_bytes(self):
+        # Independent wire vectors: EOT -> ESC D, ESC -> ESC [.
+        cells = bytes([0x04, 0x1b, 0x00, 0xe1]) * 1000
+        wire = b'TVD2\x50\x19' + b'\x1bD\x1b[\x00\xe1' * 1000
+        # Both command transports stop at the first EOT.
+        for trailer in (b'\nTVRAM dump sent\n\x04', b'\x04'):
+            response = (b'> tvdump\n' + wire + trailer).split(b'\x04', 1)[0]
+            self.assertEqual(tv.parse_tvdump(response), (80, 25, cells))
+
+    def test_tvdump_all_bytes(self):
+        cells = (bytes(range(256)) * 16)[:4000]
+        encoded = cells.replace(b'\x1b', b'\x1b[').replace(b'\x04', b'\x1bD')
+        self.assertNotIn(b'\x04', encoded)
+        self.assertEqual(tv.parse_tvdump(b'TVD2\x50\x19' + encoded), (80, 25, cells))
+
+    def test_tvdump_bad_encoding_and_old_version(self):
+        for payload in (b'\x1b', b'\x1bX', b'\x04'):
+            with self.subTest(payload=payload), self.assertRaises(ValueError):
+                tv.parse_tvdump(b'TVD2\x50\x19' + payload + b'A' * 4000)
+        with self.assertRaises(ValueError):
+            tv.parse_tvdump(b'TVDM\x50\x19' + b'A' * 4000)
+
+    def test_tvdump_serial(self):
+        import rshell_serial
+        from unittest.mock import Mock
+        cells = (bytes(range(256)) * 16)[:4000]
+        wire = b'TVD2\x50\x19' + cells.replace(b'\x1b', b'\x1b[').replace(b'\x04', b'\x1bD')
+        response = b'> tvdump\r\n' + wire + b'\nTVRAM dump sent\r\n'
+        port = Mock(in_waiting=len(response) + 1)
+        # Exercise the real EOT reader across split escape sequences too.
+        split = response.index(b'\x1b') + 1
+        port.read.side_effect = [response[:split], response[split:split+1], response[split+1:], b'\x04']
+        with patch.object(rshell_serial, 'open_port', return_value=port) as opened:
+            self.assertEqual(tv.parse_tvdump(tv.receive_tvdump('COM3', 19200)), (80, 25, cells))
+            opened.assert_called_once_with('COM3', 19200)
+        port.write.assert_called_once_with(b'tvdump\n')
+        port.reset_input_buffer.assert_called_once()
+        port.flush.assert_called_once()
+        port.close.assert_called_once()
+        for raw, complete in ((b'', False), (wire, True)):
+            port.reset_mock()
+            with patch.object(rshell_serial, 'open_port', return_value=port), \
+                 patch.object(rshell_serial, 'read_until_eot', return_value=(raw, complete)), \
+                 self.assertRaises(ValueError):
+                tv.receive_tvdump('COM3')
+            port.close.assert_called_once()
 
     def test_pt_compare_cli(self):
         base = {'pde0': 0x2007, 'ptes': [0x1003] * 256}

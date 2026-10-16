@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Receive TVDM via NP21/W HTTP: tvdump_recv.py [--raw response.bin]."""
+"""Receive TVD2 via NP21/W HTTP or --port SERIAL [--raw response.bin]."""
 import argparse
 from pathlib import Path
 import sys
 from np21w_mcp import np21w_client as emu
 
-TVDM_MAGIC = b"TVDM"
+TVDM_MAGIC = b"TVD2"
 TVDM_COLS = 80
 TVDM_ROWS = 25
 TVDM_HEADER_BYTES = 6
@@ -33,25 +33,52 @@ def pc98_attr_to_ansi(attr):
     }
     return f"\033[{ansi_map.get(color_bits, '37')}m"
 
-def receive_tvdump():
-    """Preserve binary bytes (including control characters) from /api/cmd."""
-    return emu.post("/api/cmd", b"tvdump", timeout=20)
+def receive_tvdump(port=None, baud=9600):
+    """Use identical binary frames on HTTP and an already active rshell."""
+    if port is None:
+        return emu.post("/api/cmd", b"tvdump", timeout=20)
+    import rshell_serial as serial
+    connection = serial.open_port(port, baud)
+    try:
+        connection.reset_input_buffer()
+        connection.write(b"tvdump\n")
+        connection.flush()
+        raw, complete = serial.read_until_eot(connection, 20)
+        if not complete:
+            raise ValueError("timeout waiting for tvdump EOT")
+        if not serial.check_echo(raw.decode("utf-8", errors="replace"), "tvdump"):
+            raise ValueError("tvdump command echo missing")
+        return raw
+    finally:
+        connection.close()
 
 
 def parse_tvdump(raw):
-    """Validate the complete TVDM frame; shell echo/trailer may surround it."""
+    """Decode TVD2; reject legacy TVDM rather than guessing its encoding."""
     start = raw.find(TVDM_MAGIC)
     if start < 0:
-        raise ValueError("TVDM header missing")
+        raise ValueError("TVD2 header missing (legacy TVDM is unsupported)")
     if len(raw) - start < TVDM_HEADER_BYTES:
-        raise ValueError("TVDM header truncated")
+        raise ValueError("TVD2 header truncated")
     cols, rows = raw[start + 4:start + TVDM_HEADER_BYTES]
     if (cols, rows) != (TVDM_COLS, TVDM_ROWS):
-        raise ValueError("TVDM dimensions must be 80x25")
-    end = start + TVDM_HEADER_BYTES + cols * rows * 2
-    if len(raw) < end:
-        raise ValueError("TVDM cell data truncated")
-    return cols, rows, raw[start + TVDM_HEADER_BYTES:end]
+        raise ValueError("TVD2 dimensions must be 80x25")
+    cells = bytearray()
+    pos = start + TVDM_HEADER_BYTES
+    while len(cells) < cols * rows * 2:
+        if pos >= len(raw):
+            raise ValueError("TVD2 cell data truncated")
+        value = raw[pos]
+        pos += 1
+        if value == 0x1b:
+            if pos >= len(raw) or raw[pos] not in (0x44, 0x5b):
+                raise ValueError("TVD2 invalid escape")
+            value = raw[pos] ^ 0x40
+            pos += 1
+        elif value == 0x04:
+            raise ValueError("TVD2 unexpected EOT")
+        cells.append(value)
+    return cols, rows, bytes(cells)
 
 
 def parse_and_display(raw):
@@ -85,10 +112,12 @@ def parse_and_display(raw):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--raw", type=Path, help="save the complete HTTP response")
+    parser.add_argument("--raw", type=Path, help="save the received response bytes")
+    parser.add_argument("--port", help="serial port with rshell already active")
+    parser.add_argument("--baud", type=int, default=9600, help="serial baud (default: 9600)")
     args = parser.parse_args()
     try:
-        raw = receive_tvdump()
+        raw = receive_tvdump(args.port, args.baud)
         if args.raw:
             args.raw.write_bytes(raw)
         parse_and_display(raw)

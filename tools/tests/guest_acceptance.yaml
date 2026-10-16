@@ -235,13 +235,14 @@
   prereq: "17MB, current ini; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: python3 tools/tvdump_recv.py --raw <evidence>/tvdump.bin
   observe:
-  - /api/cmd raw TVDM
+  - /api/cmd raw TVD2
   - /api/tvram lines
   expect:
     cols: 80
     rows: 25
     cell_bytes: 4000
-    frame_bytes: 4006
+    frame_bytes_min: 4006
+    frame_bytes_max: 8006
     line_match: true
     scroll_rows_excluded: 1
   evidence: ~/os32-tmp/evidence/<日付>/<case id>/
@@ -595,15 +596,16 @@
   entry: run python3 tools/tvdump_recv.py --raw <evidence>/cui.bin in resident CUI; repeat foreground CPL3 sh; then GUI terminal sh and WM rshell into separate raw files
   observe:
   - CUI resident shell and foreground CPL3 return the expected text cells; compare /api/tvram lines
-  - GUI terminal and WM return TVDM header 80x25 and all 4000 payload bytes zero
-  - Every frame remains 4006 bytes; denied output does not expose a character or attribute
+  - GUI terminal and WM return TVD2 header 80x25 and all 4000 payload bytes zero
+  - Every decoded cell payload remains 4000 bytes (TVD2 wire 4006..8006 bytes); denied output does not expose a character or attribute
   expect:
     cui_line_match: true
     gui_payload_nonzero: 0
     wm_payload_nonzero: 0
     cols: 80
     rows: 25
-    frame_bytes: 4006
+    frame_bytes_min: 4006
+    frame_bytes_max: 8006
   evidence: ~/os32-tmp/evidence/<日付>/<case id>/
 
 - id: e11c2-F-live

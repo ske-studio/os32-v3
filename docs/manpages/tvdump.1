@@ -14,6 +14,20 @@ PC-98のテキストVRAM (0xA0000-0xA1FFF) とアトリビュートRAMの
 
 事前に `serial` コマンドでポートを初期化すること。
 
+## WIRE FORMAT
+
+HTTP (`/api/cmd`) と実機のシリアルで共通の `TVD2` 形式を使う。
+ヘッダは ASCII `TVD2` + 列数 80 (1 バイト) + 行数 25 (1 バイト)。
+続いて各セルの文字の下位バイト、属性の順に計 4,000 バイトを符号化して送る。
+セル中の `0x04` は `0x1B 0x44`、`0x1B` は `0x1B 0x5B` とし、ほかはそのまま。
+フレーム長は 4,006〜8,006 バイト。コマンド終了の EOT はフレームの外に置く。
+旧形式 `TVDM` と互換性はなく、送り手と受け手を同時に更新する。
+新受け手は旧形式を拒否し、旧受け手は新しい版印を認識しない。
+
+受信は `python3 tools/tvdump_recv.py --raw response.bin` (HTTP)、
+または `python3 tools/tvdump_recv.py --port COM3 --baud 9600 --raw response.bin`
+(実機。事前に `rshell` を起動し、速度を合わせる)。両方で同じ復号を行う。
+
 ## SEE ALSO
 
 serial, rshell
