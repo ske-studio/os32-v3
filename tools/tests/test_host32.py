@@ -9,6 +9,10 @@ import host32
 
 
 class Host32(unittest.TestCase):
+    def setUp(self):
+        host32.native_launcher.cache_clear()
+        self.addCleanup(host32.native_launcher.cache_clear)
+
     def test_prune_old_pending(self):
         with tempfile.TemporaryDirectory() as directory:
             cache = pathlib.Path(directory)
@@ -63,6 +67,47 @@ class Host32(unittest.TestCase):
         with patch.object(subprocess, 'Popen', lambda *a, **kw: None):
             with self.assertRaisesRegex(RuntimeError, 'subprocess was replaced'):
                 host32.verify_native()
+
+    def test_native_command_disables_aslr(self):
+        with tempfile.TemporaryDirectory(prefix='os32-runner-') as directory:
+            exe = pathlib.Path(directory, 'fixture')
+            exe.write_bytes(b'\x7fELF\x01' + bytes(13) + b'\x03\x00')
+            launcher = pathlib.Path(directory, 'setarch')
+            launcher.write_text('#!/bin/sh\necho "$*" >> "$0.calls"\nexit 0\n')
+            launcher.chmod(0o755)
+            with patch.object(host32.shutil, 'which', return_value=str(launcher)):
+                for _ in range(2):
+                    self.assertEqual(host32.command([str(exe), 'arg'], 'native'),
+                                     [str(launcher), os.uname().machine,
+                                      '-R', str(exe), 'arg'])
+            self.assertEqual(pathlib.Path(str(launcher) + '.calls').read_text(),
+                             f'{os.uname().machine} -R true\n')
+
+    def test_native_requires_setarch(self):
+        with tempfile.TemporaryDirectory(prefix='os32-runner-') as directory:
+            exe = pathlib.Path(directory, 'fixture')
+            exe.write_bytes(b'\x7fELF\x01' + bytes(13) + b'\x03\x00')
+            with patch.object(host32.shutil, 'which', return_value=None):
+                with self.assertRaisesRegex(RuntimeError, 'native: setarch.*-R'):
+                    host32.run([str(exe)], runner='native')
+
+    def test_native_setarch_failure_does_not_fall_back(self):
+        # A stand-in launcher fails before exec: no native ILP32 runs here.
+        with tempfile.TemporaryDirectory(prefix='os32-runner-') as directory:
+            exe = pathlib.Path(directory, 'fixture')
+            exe.write_bytes(b'\x7fELF\x01' + bytes(13) + b'\x03\x00')
+            launcher = pathlib.Path(directory, 'setarch')
+            launcher.write_text('#!/bin/sh\necho "$*" >> "$0.calls"\n'
+                                'echo "setarch: personality denied" >&2\nexit 1\n')
+            launcher.chmod(0o755)
+            with patch.object(host32.shutil, 'which', return_value=str(launcher)):
+                for _ in range(2):
+                    with self.assertRaisesRegex(RuntimeError,
+                            'native: setarch -R probe failed.*personality denied'):
+                        host32.run([str(exe)], runner='native',
+                                   capture_output=True, text=True)
+            self.assertEqual(pathlib.Path(str(launcher) + '.calls').read_text(),
+                             f'{os.uname().machine} -R true\n')
 
     def test_qemu_command_and_signal(self):
         with tempfile.TemporaryDirectory(prefix='os32-runner-') as directory:
