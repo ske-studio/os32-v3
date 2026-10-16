@@ -541,3 +541,11 @@ X-2 の前半 (e8a の RO 日本語) は `accept_e11/RESULT.md` の GUI 日本�
 | H-1 | h2_stack512 の park → resume → 終了 owner 0 (512KiB stack のまま OP_WAIT に入れる) | R1a は run と guard だけ (h2_stack の park は GUI 前提で、park/resume は h3 側で実施)。fixture の再生成・hash 照合・旧 app / shell / shlib の拒否・故障画像は閉じた | 次のゲスト受入 |
 | PRIO-3 | GUI→CUI→GUI の往復で TVRAM generation の値が進むことの明示観測 | R1d / h9 再回の往復は表示と rshell 応答で判定し、generation の値を読んでいない。シリアル待ちの CTRL+STOP (`audit_test serial`、$?=130) は閉じた | 次のゲスト受入 |
 | X-21 | (a) G-4 / R-3 の trim 対象 (C の trim_back・Rust の trim_back_rs) の返却前後の `mem <id>` と teardown の `as_extents_at_teardown` | 未採取。h9 再回の as_extents は gui_demo (別アプリ) で道具の経路を確かめただけで、台本 (`guest_acceptance.yaml` の X-21(a) 行) が求める trim 対象の観測ではない。GUI 中の `mem <id>` は rshell が無く、診断キーの全 slot 行は owner_pages だけ。(b) の台本の書き分けは閉じた | 次のゲスト受入: trim_back / trim_back_rs を G-4 / R-3 の手順で回し、DONE の前後を診断キー (owner_pages) で、teardown を bp で採る |
+
+閉鎖 (2026-10-16、T3ab を 6b4e37e で main へ。NP21/W 64MB の受入 7 項: ①③⑤⑦ 合格、② 合格、④ 未判定 (T3AB-4)、⑥ 条件つき合格 (LGY98-L12 は既存)。証拠 `~/os32-tmp/evidence/2026-10-16/t3ab_np21w/`): 段 A〜C で足した「旧新のホスト検査まで、ゲストは未」の行。実機は T3AB-R へ。
+
+| ID | 何を残したか | 理由 | 次の関門 |
+|---|---|---|---|
+| T3AB-C | 段Cは旧新のpaging製品ソース取込ホスト試験とリンクまで。実CR0/CR3、旧新の起動/AS生成のゲスト受入は未実施。実memory_bootの新台帳供給はD、DMA装置の可否はEへ | パック指定で配備・エミュレータ/実機操作なし、make all・変異・全体検査はG後 | T3ab D/Eの結線、G後のレビュー/ゲスト受入 ([C票](../../tasks/v3/t3ab/C_PAGING.md)) |
+| T3AB-B | 段Bの入口/BSS/stackは旧新ホスト検査のみ。CR0/LTR、実際のfault teardown・SQLite DB/FEP、起動/復帰のゲスト観測とR1一式は未実施 | パック指定で配備/エミュレータ操作なし。ホストは特権操作とexec teardownを代替 | T3ab G後のレビュー/ゲスト受入 ([B票](../../tasks/v3/t3ab/B_STACK_ENTRY.md)) |
+| T3AB-A | 段Aは旧/新の定義・ELFリンク・製品ローダーのホスト検査まで。新配置の入口/ページング/台帳/DMA/shell実行時結線、既定0の実起動、V5と通常/R1の一式でのゲスト受入は未確認。実木V5のmanifestは旧shell写しを拒否する (新配置manifestの正常対照はshell値も揃えたfixture) | Aの依頼は配備・エミュレータ操作禁止、実行時の移行はB〜F、世代切替はG | [T3ab B〜G](../../tasks/v3/t3ab/README.md) で実装/各段の製品host検査を進め、G後のOpusレビュー・指定統合検査・NP21/W受入で閉じる。実機回帰はT3bR |

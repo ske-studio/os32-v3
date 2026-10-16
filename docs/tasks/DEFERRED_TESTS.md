@@ -26,9 +26,9 @@
 
 | ID | 何を残したか | 理由 | 渡し先 |
 |---|---|---|---|
-| T3AB-C | 段Cは旧新のpaging製品ソース取込ホスト試験とリンクまで。実CR0/CR3、旧新の起動/AS生成のゲスト受入は未実施。実memory_bootの新台帳供給はD、DMA装置の可否はEへ | パック指定で配備・エミュレータ/実機操作なし、make all・変異・全体検査はG後 | T3ab D/Eの結線、G後のレビュー/ゲスト受入 ([C票](v3/t3ab/C_PAGING.md)) |
-| T3AB-B | 段Bの入口/BSS/stackは旧新ホスト検査のみ。CR0/LTR、実際のfault teardown・SQLite DB/FEP、起動/復帰のゲスト観測とR1一式は未実施 | パック指定で配備/エミュレータ操作なし。ホストは特権操作とexec teardownを代替 | T3ab G後のレビュー/ゲスト受入 ([B票](v3/t3ab/B_STACK_ENTRY.md)) |
-| T3AB-A | 段Aは旧/新の定義・ELFリンク・製品ローダーのホスト検査まで。新配置の入口/ページング/台帳/DMA/shell実行時結線、既定0の実起動、V5と通常/R1の一式でのゲスト受入は未確認。実木V5のmanifestは旧shell写しを拒否する (新配置manifestの正常対照はshell値も揃えたfixture) | Aの依頼は配備・エミュレータ操作禁止、実行時の移行はB〜F、世代切替はG | [T3ab B〜G](v3/t3ab/README.md) で実装/各段の製品host検査を進め、G後のOpusレビュー・指定統合検査・NP21/W受入で閉じる。実機回帰はT3bR |
+| T3AB-R | T3ab (6b4e37e) の実機 Ra266 の回帰 T3bR: PEGC の最上位の窓 (`win=fff00000`・`alias=ok`)、82557 (LB3・LAN の sfs)、監査・自己診断、`diag:`。R1 像の一式のゲスト受入も未実施 | NP21/W 64MB の受入 (7 項) は 2026-10-16 に済み (`~/os32-tmp/evidence/2026-10-16/t3ab_np21w/`) | ノートで実施中 (立会い不要)。R1 像は次の R1 の回で |
+| T3AB-4 | T3 票 §4 T3ab の受入 ④「SLACK の全ページを一度だけ配って返す」のゲストでの観測: ゲストに専用の自己診断が無い。ホストの模型 (段 D、`tools/tests/memory_boot_host.c`) では確認済み、ゲストでは空きページ数の不変と leftover 0 が傍証 | 未判定 (専用の観測口が無い) | T3b1 (kdebug・監査の段) で、ゲストの自己診断に SLACK の一巡を足すかを決める |
+| LGY98-L12 | LGY-98 の L1 (131/200 フレーム) と L2 (66,132/131,072 B) が FAIL — main 9aaaf39 でも同じ数値で FAIL (T3ab の後退ではない)。台本 `tools/net_l0..l3_test.py` は urllib で 127.0.0.1:8025 を直接叩くので、WSL の NAT では届かない (受入では手元の shim で `np21w_client` の curl 経路へ回した) | 既存の失敗、原因は台本か host_agent v2 の側 [推] | 次に LGY-98 / net の台本を触る段: 台本を np21w_client に寄せ、L1/L2 の欠落の原因を調べる |
 | E9-1 | CPL3 sh 経由の tvdump (CUI 対照つき) | v3 の sh.bin はシリアル系コマンドを持たず (D2(a))、sh の中の tvdump は「external programs need the GUI terminal」で $?=126 — 台本の前提が v3 で成り立たない。代わりに CPL3 の CUI 前景で `audit_test tvram` が PASS (2026-10-16、`~/os32-tmp/evidence/2026-10-16/guest8/E9-1/`) | H-7 (端末アプリの再開) の再開時ゲートで |
 | E11-9 | WM の tvdump 0 埋めのゲスト確認 | v3 の GUI には rshell が無く gserial にも tvdump が無い。代わりに GUI の Run から `audit_test tvram` を回すと FAIL 12 (範囲外の読み 10 回の番兵が 0 で上書き + 'Q' 2 件) — GUI 中の TVRAM の読みは 0 埋めという設計と整合するが、試験の期待との関係は未確認 (`guest8/E11-9/`) | H-7 の再開時ゲートで。`audit_test tvram` の GUI での期待はその前に確かめる |
 | H-2 | (3) 前景以外の張本人の明示観測 (猶予中に別アプリをクリックしても前景が移らず、形を作れなかった)。(1) は 2026-10-16 に道具を組み替えて PASS、(2) の STOP の連打は 6d5549f で直して PASS (`guest8/H-2b/`) | 観測の形が作れない | 次に gshell の入力・前景を触る段で、観測の手順から考える |
