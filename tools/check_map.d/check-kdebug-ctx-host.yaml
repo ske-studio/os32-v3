@@ -15,3 +15,5 @@ check-kdebug-ctx-host:
 - tools/tests/test_kdebug_ctx.py
 - tools/tests/host32.py
 - tools/check_map.d/check-kdebug-ctx-host.yaml
+# Conservative artifact-path audit (including indirect helpers/fixtures).
+artifact_reader: true

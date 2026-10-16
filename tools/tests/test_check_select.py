@@ -848,7 +848,146 @@ def case_mk_real_tree(cs):
 
 
 
-CASES = [case_mk_fixture_cleanup, case_recipe_semicolon, case_inc_extract, case_hsync_protect, case_sh_pipe, case_bare_extract,
+@contextlib.contextmanager
+def path_audit_fixture(cs, source, helper=None, suffix=".py"):
+    """Tiny lint repository: no real build artifacts or git subprocess needed."""
+    from unittest.mock import patch
+    import copy
+    with tempfile.TemporaryDirectory(prefix="os32-path-audit-") as directory:
+        root = pathlib.Path(directory)
+        script = "tools/tests/" + "test_reader" + suffix
+        output = "sdk/include/os32/" + "os32_kapi_generated.h"
+        generator = "sdk/" + "gen_kapi.py"
+        files = {script: source, output: "", generator: ""}
+        if helper is not None:
+            files["tools/tests/reader_helper.py"] = helper
+        for path, text in files.items():
+            dest = root / path
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(text)
+        mapping = copy.deepcopy(FX_MAP)
+        mapping["checks"] = {"check-reader": [script]}
+        if helper is not None:
+            mapping["checks"]["check-reader"].append("tools/tests/reader_helper.py")
+        rules = {"check-reader": [("python3 " if suffix == ".py" else "bash ") + script]}
+        with patch.object(cs, "ROOT", directory), patch.object(cs, "_TRACKED", set(files)), \
+                patch.object(cs, "load_map", lambda: mapping), \
+                patch.object(cs, "read_makefiles", lambda: (rules, {})), \
+                patch.object(cs, "check_lists", lambda _: ["check-reader"]), \
+                patch.object(cs, "compiler_headers", lambda *args: frozenset()):
+            yield mapping, output, generator
+
+
+def captured_lint(cs):
+    errors = io.StringIO()
+    with contextlib.redirect_stderr(errors), contextlib.redirect_stdout(io.StringIO()):
+        rc = cs.lint()
+    return rc, errors.getvalue()
+
+
+def case_artifact_reader_lint(cs):
+    for expression in ('ROOT / "build/out/kernel.elf"',
+                       'ROOT / "build" / "out" / "kernel.elf"',
+                       'ROOT / "build"', '"build/sdk/lib.a"',
+                       'Path("images", "disk.nhd")'):
+        # Imported helper, rather than only the test's own text, is audited.
+        with path_audit_fixture(cs, 'import reader_helper\n',
+                               'image = ' + expression + '\nimage.read_bytes()\n') as (m, _, _):
+            rc, error = captured_lint(cs)
+            assert rc == 1 and 'check-reader' in error and 'artifact_readers' in error, error
+            assert 'reader_helper.py:' in error, error
+            m['artifact_readers'] = ['check-reader']
+            assert captured_lint(cs) == (0, ''), captured_lint(cs)
+
+
+def case_dynamic_generated_lint(cs):
+    for expression in ('ROOT / "sdk/include/os32" / ("os32_kapi_" + name + ".h")',
+                       'ROOT / f"sdk/include/os32/os32_kapi_{name}.h"',
+                       'f"{ROOT}/sdk/include/os32/os32_kapi_{name}.h"',
+                       'Path(ROOT, "sdk", "include", "os32", f"os32_kapi_{name}.h")',
+                       'ROOT / "sdk" / "include" / "os32" / f"os32_kapi_{name}.h"',
+                       'ROOT.joinpath("sdk", "include", "os32", "os32_kapi_" + name + ".h")'):
+        with path_audit_fixture(cs, 'path = ' + expression + '\npath.read_text()\n') as (m, output, generator):
+            rc, error = captured_lint(cs)
+            assert rc == 1 and '動的な生成物' in error and output in error, error
+            m['checks']['check-reader'] += [output, 'sdk/include/os32/' + 'os32_kapi_*.h']
+            rc, error = captured_lint(cs)
+            assert rc == 1 and '生成器' in error, error
+            m['checks']['check-reader'].append(generator)
+            assert captured_lint(cs) == (0, ''), captured_lint(cs)
+            mode, stage, mutations, _ = cs.plan([output])
+            assert mode == 'sel' and mutations == stage == ['check-reader']
+    with path_audit_fixture(cs, 'path = ROOT / f"build/out/{name}.bin"\n') as (m, _, _):
+        m['artifact_readers'] = ['check-reader']
+        rc, error = captured_lint(cs)
+        assert rc == 1 and '動的な成果物' in error, error
+        m['checks']['check-reader'].append('build/out/' + '*.bin')
+        assert captured_lint(cs) == (0, ''), captured_lint(cs)
+
+
+def case_shell_artifact_reader_lint(cs):
+    for suffix in (".sh", ""):
+        with path_audit_fixture(cs, '#!/bin/sh\ntest -s build/out/kernel.elf\n', suffix=suffix) as (m, _, _):
+            rc, error = captured_lint(cs)
+            assert rc == 1 and 'test_reader' + suffix + ':' in error and 'artifact_readers' in error, error
+            m['artifact_readers'] = ['check-reader']
+            assert captured_lint(cs) == (0, ''), captured_lint(cs)
+
+
+def case_finite_artifact_paths(cs):
+    for expression in ('f"build/out/{name}.bin"',
+                       'ROOT / "build" / "out" / f"{name}.bin"',
+                       'Path(ROOT, "build", "out", f"{name}.bin")'):
+        for source in (
+                'for name in ("a", "b"):\n    path = ' + expression + '\n    path.read_bytes()\n',
+                'def read():\n    for name in ("a", "b"):\n        path = ' + expression + '\n        path.read_bytes()\n',
+                'paths = [' + expression + ' for name in ("a", "b")]\n'):
+            with path_audit_fixture(cs, source) as (m, _, _):
+                m['artifact_readers'] = ['check-reader']
+                m['checks']['check-reader'].append('build/out/a.bin')
+                rc, error = captured_lint(cs)
+                assert rc == 1 and 'build/out/b.bin' in error, error
+                m['checks']['check-reader'].append('build/out/b.bin')
+                assert captured_lint(cs) == (0, ''), captured_lint(cs)
+
+
+def case_finite_loop_scope(cs):
+    path = 'Path(f"sdk/include/os32/os32_kapi_{name}.h").read_text()'
+    for source in (
+            'for name in ("a", "b"):\n    pass\ndef read(name):\n    return ' + path + '\nread("generated")\n',
+            'def unrelated():\n    for name in ("a", "b"):\n        pass\ndef read(name):\n    return ' + path + '\nread("generated")\n',
+            'for name in ("a", "b"):\n    def read(name):\n        return ' + path + '\n    read("generated")\n',
+            'for name in ("a", "b"):\n    pass\n' + path + '\n',
+            'for name in ("a", "b"):\n    for name in unknown:\n        ' + path + '\n'):
+        with path_audit_fixture(cs, source) as (m, output, generator):
+            rc, error = captured_lint(cs)
+            assert rc == 1 and '動的な生成物' in error and output in error, error
+            m['checks']['check-reader'] += [output, generator, 'sdk/include/os32/' + 'os32_kapi_*.h']
+            assert captured_lint(cs) == (0, ''), captured_lint(cs)
+
+
+def case_build_configuration_full(cs):
+    # Explicitly map the paths: otherwise the unknown-input fallback hides bugs.
+    paths = ['Makefile', 'build/config.mk', 'build/kernel.mk', 'build/libs.mk',
+             'build/programs.mk', 'build/checks.d/check-a.mk',
+             '.cargo/config.toml', 'userland/rust/.cargo/config.toml',
+             '.cargo/config', 'sdk/rust/Cargo.toml', 'rust-toolchain.toml',
+             'sdk/rust/i686-os32-none.json', 'sdk/example/hello/Makefile']
+    with fixture(cs) as fx:
+        import copy
+        mapping = copy.deepcopy(FX_MAP)
+        mapping['full'].append('build/checks.d/*.mk')
+        mapping['checks']['check-a'] += paths
+        for path in paths:
+            _full(fx.plan(files=[path], base=None, map_=mapping))
+        for path in ['build/config.mk', 'build/kernel.mk', 'build/libs.mk', 'build/programs.mk']:
+            fx.write(path, 'CFLAGS = -O3 -DCONFIG_TEST\n')
+            _full(fx.plan(files=[path], map_=mapping))
+        fx.append('Makefile', 'CFLAGS += -DCONFIG_TEST\n')
+        _full(fx.plan(files=['Makefile'], map_=mapping))
+
+
+CASES = [case_finite_loop_scope, case_shell_artifact_reader_lint, case_finite_artifact_paths, case_artifact_reader_lint, case_dynamic_generated_lint, case_build_configuration_full, case_mk_fixture_cleanup, case_recipe_semicolon, case_inc_extract, case_hsync_protect, case_sh_pipe, case_bare_extract,
          case_readme, case_claude, case_docs_always, case_broad_only,
          case_submodule, case_nothing, case_single_stage, case_inc_dir_extract,
          case_notest_fast, case_notest_glob_wins, case_notest_guard,

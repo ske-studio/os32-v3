@@ -24,3 +24,5 @@ check-arch-asm:
 - tools/check_map.d/check-arch-asm.yaml
 - build/checks.d/check-arch-asm.mk
 - kdebug/**
+# Conservative artifact-path audit (including indirect helpers/fixtures).
+artifact_reader: true

@@ -23,3 +23,5 @@ check-guest-host:
 - build/programs.mk
 - include/memmap.h
 - sdk/include/os32/os32_kapi_slots.h
+# Conservative artifact-path audit (including indirect helpers/fixtures).
+artifact_reader: true

@@ -16,3 +16,9 @@ check-manifests:
 - build/programs.mk
 - tools/check_artifacts.py
 - include/config.h
+# Conservative artifact-path audit (including indirect helpers/fixtures).
+- build/sdk/crt/**
+- build/out/lib/**
+- build/sdk/lib/**
+- sdk/crt/**
+- sdk/gen_kapi.py

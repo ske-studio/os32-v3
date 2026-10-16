@@ -39,3 +39,5 @@ check-kdebug-init-host:
 - kdebug/generated/**
 - kdebug/v86_gcap.c
 - kdebug/v86_gcap_math.c
+# Conservative artifact-path audit (including indirect helpers/fixtures).
+artifact_reader: true

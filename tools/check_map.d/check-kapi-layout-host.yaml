@@ -77,3 +77,5 @@ check-kapi-layout-host:
 - userland/rust/libos32gui/src/utf8core.rs
 - userland/rust/libos32gui/src/widget.rs
 - userland/rust/libos32gui/src/window.rs
+# Conservative artifact-path audit (including indirect helpers/fixtures).
+artifact_reader: true

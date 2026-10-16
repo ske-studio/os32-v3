@@ -18,3 +18,5 @@ check-ext2-empty-name-host:
 - fs/vfs_fd.c
 - tools/check_map.d/check-ext2-empty-name-host.yaml
 - build/checks.d/check-ext2-empty-name-host.mk
+# Conservative artifact-path audit (including indirect helpers/fixtures).
+artifact_reader: true

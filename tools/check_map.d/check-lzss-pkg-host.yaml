@@ -9,3 +9,5 @@ check-lzss-pkg-host:
 - tools/tests/host32.py
 - tools/check_map.d/check-lzss-pkg-host.yaml
 - build/checks.d/check-lzss-pkg-host.mk
+# Conservative artifact-path audit (including indirect helpers/fixtures).
+artifact_reader: true
