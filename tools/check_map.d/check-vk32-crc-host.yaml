@@ -6,6 +6,11 @@ check-vk32-crc-host:
 - boot/vk32_boot.c
 - tools/mkvmkernel.py
 - tools/tests/test_vk32_crc.py
+- tools/tests/test_vmkernel_layout.py
+- tools/gen_memmap.py
+- build/kernel.mk
+- build/os32.ld
+- include/memmap.h
 - tools/tests/vk32_old_lz4_3e22825.asm
 - tools/tests/vk32_host.c
 - lib/crc32_core.inc

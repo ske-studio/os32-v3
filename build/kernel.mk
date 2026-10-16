@@ -197,7 +197,7 @@ $(BUILD_OUT)/kernel.bin: $(BUILD_OUT)/kernel.elf
 		--remove-section=.sqlite_bss \
 		$< $@
 
-# SQLite 拡張域バイナリ (0x200000 にロードされる)
+# SQLite 拡張域バイナリ (ロード先は ELF の __sqlite_start)
 $(BUILD_OUT)/sqlite.bin: $(BUILD_OUT)/kernel.elf
 	$(OBJCOPY) -O binary \
 		--only-section=.sqlite_text \
@@ -206,10 +206,10 @@ $(BUILD_OUT)/sqlite.bin: $(BUILD_OUT)/kernel.elf
 		$< $@
 
 # === VK32 圧縮カーネルイメージ ===
-$(BUILD_OUT)/vmkernel.lz4: $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/sqlite.bin
+$(BUILD_OUT)/vmkernel.lz4: $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/sqlite.bin $(BUILD_OUT)/kernel.elf tools/mkvmkernel.py tools/gen_memmap.py include/memmap.h boot/boot_defs.h
 	python3 tools/mkvmkernel.py \
-		--kernel $(BUILD_OUT)/kernel.bin --kernel-addr 0x100000 \
-		--sqlite $(BUILD_OUT)/sqlite.bin --sqlite-addr 0x200000 \
+		--elf $(BUILD_OUT)/kernel.elf --kernel $(BUILD_OUT)/kernel.bin \
+		--sqlite $(BUILD_OUT)/sqlite.bin \
 		-o $(BUILD_OUT)/vmkernel.lz4
 
 # === カーネル単独ターゲット ===
@@ -330,8 +330,8 @@ $(R1_OUT)/kernel.bin: $(R1_OUT)/kernel.elf
 $(R1_OUT)/sqlite.bin: $(R1_OUT)/kernel.elf
 	$(OBJCOPY) -O binary --only-section=.sqlite_text --only-section=.sqlite_rodata --only-section=.sqlite_data $< $@
 
-$(R1_OUT)/vmkernel.lz4: $(R1_OUT)/kernel.bin $(R1_OUT)/sqlite.bin
-	python3 tools/mkvmkernel.py --kernel $(R1_OUT)/kernel.bin --kernel-addr 0x100000 --sqlite $(R1_OUT)/sqlite.bin --sqlite-addr 0x200000 -o $@
+$(R1_OUT)/vmkernel.lz4: $(R1_OUT)/kernel.bin $(R1_OUT)/sqlite.bin $(R1_OUT)/kernel.elf tools/mkvmkernel.py tools/gen_memmap.py include/memmap.h boot/boot_defs.h
+	python3 tools/mkvmkernel.py --elf $(R1_OUT)/kernel.elf --kernel $(R1_OUT)/kernel.bin --sqlite $(R1_OUT)/sqlite.bin -o $@
 
 kernel-r1: $(R1_OUT)/vmkernel.lz4
 	python3 tools/r1_manifest.py $(R1_OUT)

@@ -691,6 +691,11 @@ def run_all(srcs, script, target, real):
         lines += check_corrupt(exes["2hd"], img, "synthetic")
         for g in GEOMS:
             lines += check_fat(exes[g], g)
+        import test_vmkernel_layout
+        try:
+            lines += test_vmkernel_layout.run_cases(sys.modules[__name__], exes, script, work, real)
+        except AssertionError as e:
+            raise Fail('[layout] ' + str(e)) from e
         if real:
             lines += check_real(exes, script, work)
     return lines
@@ -701,6 +706,9 @@ def run_all(srcs, script, target, real):
 MUTATIONS = [
     # (対象キー, パターン, 置換, 何回目 (0 始まり、-1 = すべて), 説明)
     ("none", "", "", 0, "対照: 何も変えない (GREEN であること)"),
+    ("script", "addr = spans[purpose][0]", "addr = 0x200000 if purpose == 'sqlite' else spans[purpose][0]",
+     0, "T3a1: SQLite の宛先を旧 0x200000 に強制"),
+    ("script", "and not r['noload']", "", 0, "T3a1: NOLOAD をファイル長として扱う"),
     ("vk32", "    if (rd32(file + VK32_OFF_IMAGE_SIZE(n)) != file_size) return VK32_ERR_LENGTH;\n",
      "", 0, "C: 完全長を見ない"),
     ("vk32", "        return VK32_ERR_FILE_CRC;", "        ;", 0, "C: ファイル全体の CRC を見ない"),

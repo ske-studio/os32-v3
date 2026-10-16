@@ -4,6 +4,7 @@ check-vmkernel-lz4-host:
 - boot/lz4_mini.c
 - lib/lz4.c
 - tools/mkvmkernel.py
+- tools/gen_memmap.py
 - tools/tests/test_vmkernel_lz4.py
 - tools/tests/vmkernel_lz4_host.c
 - tools/check_map.d/check-vmkernel-lz4-host.yaml
