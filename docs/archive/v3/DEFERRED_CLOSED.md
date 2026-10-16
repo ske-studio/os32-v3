@@ -518,3 +518,10 @@ X-2 の前半 (e8a の RO 日本語) は `accept_e11/RESULT.md` の GUI 日本�
 |---|---|---|---|
 | LAN-LB2b | Ra266のMDI/PHY、統計good1/good2、tcpdumpの#1/#2、KDEBUG=1の新4段、NP21/Wの非搭載起動、native host runner | 依頼パックは実装とqemu host検査まで。実機・エミュレータ操作を含まない | PMのLB-2b受入 (実装証拠: `/home/hight/os32-tmp/run/lb2b/`) |
 | LAN-LB2c | Ra266 の PCR・HELLO 1 本の線上受信、PHYVENDOR=0 対照、NP21/W 非搭載起動・DBGREF/gserial/rshell、native runner | 依頼は実装と qemu host 検査まで。実機・エミュレータ操作禁止 | PM の LB-2c 受入 (実装証拠: `/home/hight/os32-tmp/run/lb2c/`) |
+
+閉鎖 (2026-10-16、実機 Ra266 で ff6f372、証拠 `~/os32-tmp/evidence/2026-10-16/lanfs1_fix/`): LANFS-1 — 開始で受信の環を空けて RU の ready を待つ直し (ff6f372) で、空き 5 分・15 分の後の初回とも requests=2 resent=0 timeouts=0 (直す前は両方 resent=1)、pcap も HELLO 1 本。終了行の rnr は 0: 環が埋まって RU が止まるのは空いている間 (セッションの前) なので、開始時を基準にしたセッション中の差は構造上 0 になる (PM の依頼の作りの誤り)。「RU が止まっていた」は観測では裏付けておらず [推]、開始時に環を空けたことが効いた、までが事実。PHYVENDOR-1 — `E82557_PHYVENDOR=0` で `pcr=off`、LB3=PASS・bound のまま、`sfs run ls /host` は no answer to LAN HELLO (resent=3 timeouts=4、11.4 秒で有限に失敗)、ノートの pcap に HELLO が 1 本も来ない (送信が線に出ない)。戻すと `pcr=8060->8562`、ls は exit=0 resent=0。PCR の初期化 (6045a6e) が送信の不具合の原因だったことの対照が取れた。
+
+| ID | 何を残したか | 理由 | 次の関門 |
+|---|---|---|---|
+| LANFS-1 | lanfs_host.py の最初のセッションで resent=1 timeouts=1 (2026-10-16、段 3 の初回と段 4 の -n boot)。ノートの観測 (06:30): サーバを起動し直さずに約 4 時間空けたあとの初回でも同じ → 条件は「サーバの初回」ではなく「しばらく空いたあとの初回」[推]。ノートの NIC の省電力 (EEE・ASPM) か、ゲストの受信の初回が候補 | 実害は 1 要求の再送 (約 2.6 秒) だけ | ノートで切り分け中 (空き 1・5・15 分 × tcpdump、`~/os32-tmp/evidence/2026-10-16/lanfs1/`) |
+| PHYVENDOR-1 | `E82557_PHYVENDOR=0` (DP83840A の PCR を書かない) で HELLO が線に出ないことの対照。PCR の初期化 (6045a6e) が送信の不具合の原因だったことの裏付け | LB-2c の受入では PCR=1 の合格だけを採った。対照は実機で設定を 1 行変えて戻すだけ | LANFS-1 の切り分けの後、ノートの担当で (画面不要・立会い不要) |

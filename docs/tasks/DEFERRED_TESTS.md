@@ -43,8 +43,6 @@
 
 | ID | 何を残したか | 理由 | 渡し先 |
 |---|---|---|---|
-| LANFS-1 | lanfs_host.py の最初のセッションで resent=1 timeouts=1 (2026-10-16、段 3 の初回と段 4 の -n boot)。ノートの観測 (06:30): サーバを起動し直さずに約 4 時間空けたあとの初回でも同じ → 条件は「サーバの初回」ではなく「しばらく空いたあとの初回」[推]。ノートの NIC の省電力 (EEE・ASPM) か、ゲストの受信の初回が候補 | 実害は 1 要求の再送 (約 2.6 秒) だけ | ノートで切り分け中 (空き 1・5・15 分 × tcpdump、`~/os32-tmp/evidence/2026-10-16/lanfs1/`) |
-| PHYVENDOR-1 | `E82557_PHYVENDOR=0` (DP83840A の PCR を書かない) で HELLO が線に出ないことの対照。PCR の初期化 (6045a6e) が送信の不具合の原因だったことの裏付け | LB-2c の受入では PCR=1 の合格だけを採った。対照は実機で設定を 1 行変えて戻すだけ | LANFS-1 の切り分けの後、ノートの担当で (画面不要・立会い不要) |
 | REPRO-1 | CI の成果物の `bin/gshell.bin` が、材料の変わっていない ce30be3 → 5971615 で content_changed になった (ノートの hsync -n、2026-10-15)。2026-10-16 の調べ (sol、`~/os32-tmp/run/tools1/repro.txt`): 手元の clean ビルド 2 回と CI 相当のパスで gshell.bin は一致、配備物 204 個中 202 個が一致 (差は `vmkernel.lz4`・`kdebug.bin` のビルド時刻と CRC で、想定どおり)。再現せず、CI 側の道具の版の変化 [推] | 配備のたびに無関係な差分が出ると、実機に何が入ったかの照合がぶれる | 次に CI の成果物で材料不変の content_changed が出たとき、その 2 回の CI 成果物と rustc の版を比べる |
 | CI-FLAKY-1 | `check-gfx-attach-host` の SDK 段が CI の 32 ビット native で 1 回 `FAIL result == base` (2026-10-15、再実行で success)。2026-10-16 (f7d8673): 固定窓を `MAP_FIXED_NOREPLACE` で取り、塞がっていたら番地・errno・`/proc/self/maps` を出して止める形にした (既存の写像を黙って置き換えない。native 20/20・qemu 20/20)。原因の候補は無作為配置の vdso/vvar との衝突 [推] (64 ビットの補助実験で vvar の部分置換が EINVAL) | たまの失敗は残る (今度は原因が出る) | 次に CI で落ちたとき、出た maps で番地を選び直すか試験の側で避ける |
 | LZSS-1 | 修正した圧縮器の PKG (種 250 の 2 ファイル) を cdinst で入れて照合 | cdinst は MINIMAL / GUI / NORMAL / DEBUG の名前だけを展開し、試験 PKG を媒体に載せる道具の経路が無い。R0 の Full install (225 files、`hsync -n --verify` で内容一致) は代替の観測で PASS に数えない。host の `test_lzss_pkg.py` は合格 | 保守: 次に ISO / PKG の道具を触る段 |
