@@ -4,6 +4,7 @@ signals are test failures: preserve the negative return code for the suite
 (including mutation checks), and report signal N (runner=...).
 """
 import os
+import functools
 import pathlib
 import shutil
 import signal
@@ -95,6 +96,24 @@ def is_ilp32(args, cwd=None):
     return header[:5] == b'\x7fELF\x01' and header[18:20] == b'\x03\x00'
 
 
+@functools.cache
+def native_launcher():
+    """Probe once, caching failures too so they cannot become test verdicts."""
+    setarch = shutil.which('setarch')
+    if setarch is None:
+        return None, 'native: setarch is required to disable ASLR (-R)'
+    launcher = [setarch, os.uname().machine, '-R']
+    try:
+        result = subprocess.run([*launcher, 'true'], capture_output=True,
+                                text=True, timeout=RUN_TIMEOUT)
+    except (OSError, subprocess.SubprocessError) as error:
+        return None, f'native: setarch -R probe failed: {error}; not a test verdict'
+    if result.returncode:
+        return None, (f'native: setarch -R probe failed (rc={result.returncode}): '
+                      f'{result.stderr.strip()}; not a test verdict')
+    return launcher, None
+
+
 def command(args, runner=None, cwd=None):
     """Select an explicit runner for an ILP32 fixture, including stream I/O."""
     if not is_ilp32(args, cwd):
@@ -102,7 +121,10 @@ def command(args, runner=None, cwd=None):
     runner = selected_runner(runner)
     if runner == 'native':
         verify_native()
-        return args
+        launcher, error = native_launcher()
+        if error is not None:
+            raise RuntimeError(error)
+        return [*launcher, *args]
     if runner == 'qemu':
         return [shutil.which('qemu-i386') or 'qemu-i386', *args]
     raise ValueError(runner)
