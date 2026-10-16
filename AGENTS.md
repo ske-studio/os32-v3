@@ -22,8 +22,9 @@ Run images in NP21/W. Stop the emulator before `make deploy-kernel`, then restar
 Worktrees have no `.env`. Before anything else, export
 `CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp/run/<stage> HOST32_RUNNERS=qemu`
 (TMPDIR must be on disk; `/tmp` is RAM; native runners hit SIGSYS in the Codex sandbox), then run
-`tools/preflight.sh --base <SHA from the request> --fix-fonts` and fix every NG. Run checks in the foreground and wait for
-them to finish instead of re-reading partial logs. Only logs produced after your last source change count as passing.
+`tools/preflight.sh --base <SHA from the request> --fix-fonts` and fix every NG. Run only `make all` and the tests you added or touched, with `MUTATE=0`; do not run
+mutation passes, the full `--select` candidate set, the static checks or `--lint` (the PM runs them once after review).
+Run checks in the foreground and wait for them to finish instead of re-reading partial logs; never abort and restart a run. Only logs produced after your last source change count as passing.
 Never commit (the sandbox keeps `.git` read-only; the PM commits).
 
 ## Coding Style & Naming Conventions
