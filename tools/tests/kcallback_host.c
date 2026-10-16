@@ -73,7 +73,7 @@ int ring3_user_ranges_writable(u32 a, u32 n, u32 b, u32 m)
 #define PAGE_SIZE 4096u
 #define P2V(p) ((void *)(p))
 static u8 tramp[PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
-u32 __bss_end;
+/* Layout symbols are supplied by kernel_layout.linker_flags(). */
 static KernelAPI real_kapi;
 static KernelAPI *kapi = &real_kapi;
 #define os32_ls client_ls

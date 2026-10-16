@@ -1,0 +1,118 @@
+"""T3ab-B direct product entry/stack fixture, invoked by VK32 tests."""
+import pathlib
+import re
+
+import host32
+from test_vmkernel_layout import ROOT, command, fixture
+import gen_memmap as gen
+
+
+def run_case(work):
+    work = pathlib.Path(work) / 'stack-entry'
+    elf = fixture(work, core_bss=35, sqlite_bss=39)
+    _, syms = gen.read_elf(elf)
+    m = gen.Macros(gen.read_defines(ROOT / 'include/memmap.h'), syms)
+    guards = ['MEM_STACK_GUARD', 'MEM_SHELL_GUARD', 'MEM_SHM_GUARD_LO', 'MEM_SHM_GUARD_HI']
+    guards += ['MEM_SQLITE_STACK_GUARD', 'MEM_FIXED_PAGING_GUARD_BASE']
+    header = ['static const unsigned long guard_ranges[][2] = {']
+    header += ['{%d, %d},' % (m.get(n), m.get(n) + m.get('MEM_GUARD_SIZE')) for n in guards]
+    header += ['};', 'static void boot_tss(void);', 'static int boot_sqlite(void);',
+               'static void check_classification(void);', 'static void check_fault_return(void);']
+    for name, symbol in [('ZERO_CORE_START', '__bss_start'), ('ZERO_CORE_END', '__bss_end'),
+                         ('ZERO_SQLITE_START', '__sqlite_data_end'), ('ZERO_SQLITE_END', '__sqlite_end')]:
+        header += ['#define %s %d' % (name, syms[symbol])]
+    (work / 'fixture_values.h').write_text('\n'.join(header))
+    (work / 'x86_desc.h').write_text('static void x86_load_tr(unsigned int sel) {(void)sel;}\n')
+    entry = (ROOT / 'kernel/kentry.asm').read_text()
+    # CR0 cannot execute in host user mode; retain the complete BSS/ESP/argument path.
+    start = entry.index('        mov     eax, cr0')
+    end = entry.index('        fninit', start)
+    entry = entry[:start] + entry[end:]
+    entry = entry.replace('__bss_start', 'fixture_bss_start')
+    entry = entry.replace('extern kernel_main', 'extern host_kernel_main\n%define kernel_main entry_probe')
+    entry += '''
+entry_probe:
+    mov [entry_sp], esp
+    mov [entry_bp], ebp
+    jmp host_kernel_main
+global enter_kernel
+enter_kernel:
+    push dword 0x80
+    push dword 65536
+    push dword 0
+    cld
+    jmp kentry
+section .data
+global entry_sp, entry_bp
+entry_sp: dd 0
+entry_bp: dd 0
+'''
+    (work / 'entry.asm').write_text(gen.preprocess_layout(ROOT, entry, True))
+    command(['nasm', '-f', 'elf32', work / 'entry.asm', '-o', work / 'entry.o'])
+    command(['nasm', '-f', 'elf32', ROOT / 'lib/sqlite3/sqlite_stack.asm', '-o', work / 'sqlite_stack.o'])
+    command(['nasm', '-f', 'elf32', ROOT / 'kernel/setjmp.asm', '-o', work / 'setjmp.o'])
+    boot = (ROOT / 'kernel/kernel.c').read_text()
+    tss = re.search(r'tss_init\([^;]+;', boot).group()
+    sqlite = re.search(r'int trc = sqlite_call_on_alt_stack\([^;]+;', boot).group()
+    calls = ('\nstatic void boot_tss(void) { ' + tss + ' }\nstatic int boot_sqlite(void) { ' +
+             sqlite.replace('os32_sqlite_test', 'sqlite_body') + ' return trc; }\n')
+    # Execute each product diagnostic classification block with boundary EIPs.
+    isr = (ROOT / 'kernel/isr_handlers.c').read_text()
+    classify = '''
+static const char *label;
+static void tvram_puts_at(int row, int col, const char *s, int attr)
+{ (void)row; (void)col; (void)attr; label = s; }
+static void sputs(const char *s) { (void)s; }
+'''
+    classify += '''
+static u32 jumpbuf[KSETJMP_BUF_LEN];
+u32 kctx_irq_depth, kctx_exc_depth;
+static int exec_nest_level = 1;
+/* Model exec's teardown at its boundary; execute the product longjmp itself. */
+static void exec_fault_recover(void) { exec_longjmp(jumpbuf); }
+'''
+    for i, name in enumerate(('exception_handler', 'page_fault_handler')):
+        start = isr.index('        extern u32 __sqlite_start, __sqlite_end;', isr.index('void ' + name))
+        end = isr.index('\n    }', start)
+        classify += 'static void classify%d(u32 fault_eip) { int row = 0;\n%s\n}\n' % (i, isr[start:end])
+        start = isr.index('    if (exec_nest_level > 0)', end)
+        end = isr.index('\n    }', start) + len('\n    }')
+        classify += 'static int recover%d(void) { kctx_exc_depth = 1;\n%s\nreturn 0; }\n' % (i, isr[start:end])
+    classify += '''
+static void check_fault_return(void)
+{
+    volatile u32 marker = 0x12345678;
+    for (volatile int i = 0; i < 2; i++) {
+        if (!exec_setjmp(jumpbuf)) {
+            sqlite_call_on_alt_stack(i ? recover1 : recover0, MEM_SQLITE_STACK_TOP);
+            finish(32);
+        }
+        CHECK(marker == 0x12345678 && (u32)&marker >= MEM_KSTACK_BASE &&
+              (u32)&marker < MEM_KSTACK_TOP && kctx_exc_depth == 0, 33);
+    }
+}
+'''
+    classify += 'static void check_classification(void) {\n'
+    for i in range(2):
+        for addr, expected in [(m.get('KERNEL_LOAD_ADDR') - 1, 'O'),
+                               (m.get('KERNEL_LOAD_ADDR'), '.'),
+                               (syms['__sqlite_start'] - 1, '.'),
+                               (syms['__sqlite_start'], 's' if i == 0 else '.'),
+                               (syms['__sqlite_end'], 'O'), (0x200000, 'O')]:
+            classify += "classify%d(%d); CHECK(label[1] == '%s', 30);\n" % (i, addr, expected)
+    classify += '}\n'
+    source = (ROOT / 'tools/tests/stack_entry_host.c').read_text()
+    source = source.replace('void kernel_main(', 'void host_kernel_main(')
+    (work / 'host.c').write_text(source + calls + classify)
+    cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O0', '-ffreestanding', '-fno-builtin',
+           '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
+           '-Wall', '-Wextra', '-Werror',
+           *['-I' + str(p) for p in (work, ROOT, ROOT / 'include', ROOT / 'kernel', ROOT / 'lib')],
+           work / 'host.c', work / 'entry.o', work / 'sqlite_stack.o', work / 'setjmp.o', '-o', work / 'host']
+    for name in ('__bss_start', '__bss_end', '__sqlite_start', '__sqlite_data_end', '__sqlite_end'):
+        host_name = 'fixture_bss_start' if name == '__bss_start' else name
+        cmd += ['-Wl,--defsym,%s=%d' % (host_name, syms[name])]
+    command(cmd)
+    result = host32.run([str(work / 'host')], capture_output=True)
+    assert result.returncode == 0, 'entry/stack observation rc=%d %s' % (result.returncode, result.stderr)
+    return '[entry] product ASM BSS/guards/ESP/args, C TSS/watermarks, SQLite/shell return, fault classification/recovery boundary PASS'

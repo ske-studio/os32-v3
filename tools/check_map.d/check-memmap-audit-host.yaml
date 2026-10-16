@@ -45,6 +45,7 @@ check-memmap-audit-host:
 - tools/tests/mutpar.py
 - tools/tests/test_e10c_lifecycle.py
 - tools/tests/test_gfx_kernel_fb.py
+- tools/tests/kernel_layout.py
 - tools/tests/test_gfx_reinit.py
 - tools/tests/test_memmap_audit.py
 - tools/tests/test_shm_user.py
@@ -55,3 +56,4 @@ check-memmap-audit-host:
 - tools/tests/shm_user_host.c
 - tools/tests/serial_diag_host.h
 - lib/serial_diag.h
+artifact_reader: true

@@ -197,7 +197,7 @@ static void ring3_trampoline_init(void)
 /*  従来どおり 段 = ID になる (D3)。                                         */
 /*                                                                          */
 /*  シェル常駐モデル (レイアウトは 1 バイトも変わっていない):                */
-/*    ID 1 (シェル): 0x300000 に常駐。CPL=0、AS は作らない                    */
+/*    ID 1 (シェル): MEM_SHELL_LOAD_ADDR に常駐。CPL=0、AS は作らない        */
 /*    ID 2〜5 (子) : MEM_EXEC_LOAD_ADDR、CPL=3、アプリごとの物理を使う。      */
 /*                   高位の固定仮想 MEM_EXEC_LOAD_ADDR〜 へ写す (D1)。      */
 /* ======================================================================== */
@@ -1618,6 +1618,26 @@ void ring3_abort_kill(void)
 /* ======================================================================== */
 extern void ring3_resume(const u32 *frame, u32 pd_phys, void *tss);
 
+/* 常駐シェル帯の分割 (画像+sbrk / exec_heap)。文脈の公開と読み込みより前に
+ * 1 回だけ決める。短い exec_heap の残りは予約のままで、sbrk には貸さない。 */
+static int exec_shell_layout(u32 text, u32 bss, u32 heap,
+                             u32 *sbrk_limit, u32 *exec_base, u32 *exec_size)
+{
+    if (text > MEM_SHELL_MAX_SIZE || bss > MEM_SHELL_MAX_SIZE - text)
+        return EXEC_ERR_NOMEM;
+    u32 image_end = (MEM_SHELL_LOAD_ADDR + text + bss + MEM_SHELL_HEAP_ALIGN - 1)
+                   & ~(MEM_SHELL_HEAP_ALIGN - 1);
+    u32 exec_end = MEM_SHELL_STACK_TOP - MEM_SHELL_STACK_SIZE - PAGE_SIZE;
+    u32 base = exec_end - MEM_SHELL_EXEC_HEAP_SIZE;
+    if (image_end > base || base - image_end < MEM_SHELL_IMAGE_HEADROOM ||
+        heap > MEM_SHELL_EXEC_HEAP_SIZE)
+        return EXEC_ERR_NOMEM;
+    *sbrk_limit = base;
+    *exec_base = base;
+    *exec_size = heap ? heap : MEM_SHELL_EXEC_HEAP_SIZE;
+    return 0;
+}
+
 /* ======================================================================== */
 /*  exec_launch — 外部プログラムのロードと実行 (exec_run / exec_start の実体) */
 /*                                                                          */
@@ -1707,11 +1727,11 @@ static int exec_launch(const char *cmdline, int gui_arg)
 
     /* ====== Level に応じたメモリレイアウト決定 ====== */
     if (is_shell) {
-        /* シェル: 常駐帯域 0x300000-0x37FFFF */
+        /* 常駐シェル: 専用のシェル帯。 */
         load_base = MEM_SHELL_LOAD_ADDR;
         max_size  = MEM_SHELL_MAX_SIZE;
         stack_top = MEM_SHELL_STACK_TOP;
-        guard_a   = 0; /* シェルは sbrk/exec_heap 未使用 */
+        guard_a   = 0; /* 固定分割の両 heap 間には guard を置かない */
         guard_b   = MEM_SHELL_GUARD;
         sbrk_end  = 0;
         exec_heap_base = 0;
@@ -1837,14 +1857,8 @@ static int exec_launch(const char *cmdline, int gui_arg)
         /* 加算と必要ページの算出より先に VA を検査する。 */
         if (sbrk_end + PAGE_SIZE > exec_heap_base || exec_heap_size > guard_b - exec_heap_base)
             return EXEC_ERR_NOMEM;
-    } else if (text_sz + bss_sz > max_size) {
-        shell_print("[DBG] NOMEM: text=", 0xE1);
-        shell_print_dec(text_sz, 0xE1);
-        shell_print(" bss=", 0xE1);
-        shell_print_dec(bss_sz, 0xE1);
-        shell_print(" max=", 0xE1);
-        shell_print_dec(max_size, 0xE1);
-        shell_print("\n", 0xE1);
+    } else if (exec_shell_layout(text_sz, bss_sz, heap_sz,
+                                 &sbrk_end, &exec_heap_base, &exec_heap_size)) {
         return EXEC_ERR_NOMEM;
     }
 
@@ -1882,7 +1896,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
     ctx->exec_heap_base = exec_heap_base;
     ctx->exec_heap_size = exec_heap_size;
     ctx->exec_heap_used = 0;
-    ctx->sbrk_heap_limit = is_shell ? guard_b : sbrk_end;
+    ctx->sbrk_heap_limit = sbrk_end;
     ctx->cpl3 = 0;
     ctx->disk_write_authorized = exec_disk_write_path_allowed(resolved);
     /* 票 T8 D1a: 全画面 GFX の宣言 (OS32X_FLAG_GFX) を見るのは gfx_init を
@@ -1932,7 +1946,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
             return exec_launch_abort(launcher_id, id, EXEC_ERR_NOMEM);
         }
 
-        /* --- K3: 共有ライブラリ帯域 (0x400000-0x4FFFFF) ---
+        /* --- K3: 共有ライブラリ帯域 (0x80000000、常駐シェル帯とは別) ---
          * .text/.rodata は RO+USER、.data/.bss は同じ仮想番地にこのアプリ
          * 専用の物理ページ (原本から複製)。**master CR3 のまま**行う —
          * 原本 g_data_master は共有ライブラリ帯の末尾 = アプリ固有 PDE の
@@ -1994,15 +2008,10 @@ static int exec_launch(const char *cmdline, int gui_arg)
 
     /* ヒープ・ガードページ設定 */
     if (is_shell) {
-        /* シェルのヒープは 2 系統あり、領域を分ける (include/memmap.h 参照):
-         *   - newlib の sbrk (malloc / stdio バッファ): BSS 終端 〜 guard_b
-         *   - KAPI mem_alloc (exec_heap): スタック上の MEM_SHELL_HEAP_BASE 〜 */
-        exec_heap_base = MEM_SHELL_HEAP_BASE;
-        exec_heap_size = MEM_SHELL_HEAP_SIZE;
-        if (heap_sz > 0 && heap_sz < exec_heap_size) exec_heap_size = heap_sz;
+        /* exec_shell_layout の分割が常駐 CRT の sbrk 上限も決める。 */
         ctx->exec_heap_base = exec_heap_base;
         ctx->exec_heap_size = exec_heap_size;
-        kapi->sbrk_heap_limit = guard_b;
+        kapi->sbrk_heap_limit = sbrk_end;
     }
 
 

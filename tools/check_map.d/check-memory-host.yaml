@@ -4,6 +4,7 @@ check-memory-host:
 - kernel/kmalloc.c
 - tools/tests/lease_host.c
 - tools/tests/test_lease.py
+- tools/tests/kernel_layout.py
 - exec/lease.c
 - exec/appslot.c
 - exec/exec.c
@@ -129,3 +130,8 @@ check-memory-host:
 - gfx/gfx_vram.c
 - tools/tests/gfx_kernel_fb_host.c
 - tools/tests/test_gfx_kernel_fb.py
+- exec/exec_heap.c
+- exec/exec_heap.h
+- sdk/link/app_sys.ld
+- tools/gen_memmap.py
+artifact_reader: true

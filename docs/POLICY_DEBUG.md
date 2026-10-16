@@ -158,8 +158,8 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
 - VFS: エラーは `OS32_ERR_*` (FS の境界で翻訳)、`mount(dev_id)` は `(dev_type << 8) | unit`、`sys_ls` のコールバックから専用バッファ無しで FS を触らない。→ [`docs/06_filesystem.md`](06_filesystem.md) §6-1、§4-30、§4-26
 - デバイス窓は物理地図 (`pgalloc_range_has_ram`) で判定する (RAM の上端 `sys_get_mem_kb` ではない)。→ §4-34
 - CPL=3 の KAPI は IF=1 で走る (`int80_stub` の出口は IF=0)。KAPI の検査は `ring3_guard_active(ring3_in_syscall, ring3_wm_depth)` で (WM はアプリの syscall の中で走る)。→ §4-19、§4-61
-- シェルは 2 ヒープ (`kernel/paging.c` は shell heap 0x380000–0x3F0FFF を present に保つ。0x3F1000–0x3FAFFF は固定 PD/PT 10 枚、0x3FB000–0x3FFFFF は NP — 番地の正典は `include/memmap.h`、生成した地図は `build/out/MEMMAP.md` (`make docs-gen`))。exit の資源回収は所有者タグ (exec のネスト段) — カーネル常駐の FD は `vfs_fd_set_protect(fd, 1)`、親へ戻るときは `exec_heap_restore_state()` (`exec_heap_init_at()` ではない)。→ §4-15、§4-16、[`09_exec.md`](09_exec.md)
-- SQLite はカーネル内 (0x200000) の固定 384KB MEMSYS5 プールを全接続 (FEP 辞書を含む) で共有する — `*_init()` の末尾で接続を閉じる。枯渇は `db_query` の `-2`、`db_last_error()` を必ず出す。→ §4-13
+- シェルは 2 ヒープ (`kernel/paging.c` はシェル帯 0x400000–0x4FFFFF を present に保ち、shell heap は 0x4B5000–0x4F4FFF、0x4F5000 だけ NP のガード — 番地の正典は `include/memmap.h`、生成した地図は `build/out/MEMMAP.md` (`make docs-gen`))。exit の資源回収は所有者タグ (exec のネスト段) — カーネル常駐の FD は `vfs_fd_set_protect(fd, 1)`、親へ戻るときは `exec_heap_restore_state()` (`exec_heap_init_at()` ではない)。→ §4-15、§4-16、[`09_exec.md`](09_exec.md)
+- SQLite はカーネル内 (core BSS の直後) の固定 384KB MEMSYS5 プールを全接続 (FEP 辞書を含む) で共有する — `*_init()` の末尾で接続を閉じる。枯渇は `db_query` の `-2`、`db_last_error()` を必ず出す。→ §4-13
 - 日本語は 1 文字 3 バイト・2 桁、切り詰めは UTF-8 の境界で。外部プログラムの漢字は既知の対で JIS 表を確かめてから `utf8_set_jis_table_ready(1)`。フォントは `tools/gen_font16.py`。→ §4-27、§4-11、§4-10
 - 物理 0x90000 は自動プレイのメールボックス — 配置を変えたら `game/tools/autoplay/driver.py` も同じコミットで。→ [`docs/02_memory.md`](02_memory.md) §2-1
 - ブートローダ: PM 遷移は `loader_fat.asm` に内蔵、`boot_fat.asm` は `.8086`、HDD IPL の INT 1Bh は 16 回 (上限の理由は未確認)。→ [`docs/10_notes.md`](10_notes.md) §10-2、§10-3
@@ -1477,7 +1477,7 @@ read-modify-write で保つ。
   `RING3_RANGE_WR_*` (7〜10) で数える。試験は `tools/tests/ring3_guard_tdd.md` (ホスト) + kselftest `test_ring3_wm_guard` (ゲスト)。
 - **見分け方**: 「例外 0 件・窓だけ出ない・`fault_kill_count` が増える」なら §4-42 (古い shlib) ではなくこれ。
   `ring3_fault_kill` にブレークを置き、呼び手が **`wrap_*+小さなオフセット`** (= ラッパ先頭の出力検査) で、
-  渡されたポインタが **0x300000 台 (シェル帯)** なら確定。`ring3_range_reject_last` が 7〜10 なら書き側の拒否。
+  渡されたポインタが **0x400000 台 (シェル帯)** なら確定。`ring3_range_reject_last` が 7〜10 なら書き側の拒否。
 - **教訓**: 「CPL=0 の直呼びは `ring3_in_syscall = 0` で見分けられる」は、**カーネルが CPL=0 のシェルのコードを
   syscall の中から呼び返す**設計 (契約 T8) では成り立たない。呼び手の判定は「いまどの文脈のコードが走っているか」で
   持つ。検査を足したら、その検査が**常駐側の経路**でも通ることを GUI アプリの起動まで見て確かめる — デスクトップの

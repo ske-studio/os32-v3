@@ -51,6 +51,20 @@ sdk/crt/resident/syscalls.o: sdk/crt/syscalls.c $(CRT_SYSCALLS_DEPS) userland/li
 userland/lib/rt/dbgserial.o: userland/lib/rt/dbgserial.c userland/lib/rt/dbgserial.h $(SDK_KAPI_HDR)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
+# Default images retain the paths consumed by deployment; alternate builds stay isolated.
+RESIDENT_OUT = $(if $(filter-out build/out,$(BUILD_OUT)),$(BUILD_OUT)/resident,userland)
+ifneq ($(RESIDENT_OUT),userland)
+.PHONY: userland/shell.bin userland/gshell.bin
+userland/shell.bin: $(RESIDENT_OUT)/shell.bin
+userland/gshell.bin: $(RESIDENT_OUT)/gshell.bin
+$(RESIDENT_OUT)/%.raw: $(RESIDENT_OUT)/%.elf
+	$(OBJCOPY) -O binary $< $@
+$(RESIDENT_OUT)/%.bin: $(RESIDENT_OUT)/%.raw $(RESIDENT_OUT)/%.elf build/app.conf sdk/mkos32x.py
+	@_api=$$(awk '$$1 == "userland/$*" { print $$2 }' build/app.conf); \
+	_opts=""; if [ "$*" = "gshell" ]; then _opts="--gfx"; fi; \
+	python3 sdk/mkos32x.py $< $@ --elf $(RESIDENT_OUT)/$*.elf --api $$_api --heap 0 $$_opts
+endif
+
 # === Shell Module ===
 SHELL_SRC = $(wildcard userland/shell/*.c)
 SHELL_OBJ = $(SHELL_SRC:.c=.o)
@@ -80,11 +94,15 @@ PC98PT_USER_OBJ = userland/shell/pc98pt_user.o
 $(PC98PT_USER_OBJ): drivers/pc98pt.c drivers/pc98pt.h
 	$(CC) $(PROGRAM_FLAGS) -Idrivers -c drivers/pc98pt.c -o $@
 
-userland/shell.elf: sdk/link/app_sys.ld $(CRT0_RESIDENT_OBJ) $(SHELL_OBJ) $(PCI_DECODE_USER_OBJ) $(PC98PT_USER_OBJ) $(FILER_DRAW_OBJ)
-	$(LD) -m elf_i386 -T sdk/link/app_sys.ld -nostdlib --nmagic --gc-sections -L$(LIBDIR) -L$(CROSS_DIR)/i386-elf/lib -L$(CROSS_DIR)/lib/gcc/i386-elf/13.2.0 -o $@ $(CRT0_RESIDENT_OBJ) $(SHELL_OBJ) $(PCI_DECODE_USER_OBJ) $(PC98PT_USER_OBJ) $(LGRP_BEG) $(FILER_DRAW_OBJ) -los32save $(LGRP_END) -lc -lgcc
+$(BUILD_OUT)/app_sys.ld: sdk/link/app_sys.ld $(LAYOUT_HEADER)
+	$(CC) -E -P -x c -I$(BUILD_OUT) $< -o $@
+
+$(RESIDENT_OUT)/shell.elf: $(BUILD_OUT)/app_sys.ld $(CRT0_RESIDENT_OBJ) $(SHELL_OBJ) $(PCI_DECODE_USER_OBJ) $(PC98PT_USER_OBJ) $(FILER_DRAW_OBJ) $(LIBSAVE_OBJ)
+	@mkdir -p $(@D)
+	$(LD) -m elf_i386 -T $(BUILD_OUT)/app_sys.ld -nostdlib --nmagic --gc-sections -L$(LIBDIR) -L$(CROSS_DIR)/i386-elf/lib -L$(CROSS_DIR)/lib/gcc/i386-elf/13.2.0 -o $@ $(CRT0_RESIDENT_OBJ) $(SHELL_OBJ) $(PCI_DECODE_USER_OBJ) $(PC98PT_USER_OBJ) $(LGRP_BEG) $(FILER_DRAW_OBJ) -los32save $(LGRP_END) -lc -lgcc
 
 # === sh — 同じシェルのソースを CPL=3 の外部アプリとして (票 T9 D1) ===
-# 常駐 shell.bin (app_sys.ld = 0x300000) の規則は上のまま一切変えない。同じ
+# 常駐 shell.bin (app_sys.ld = MEM_SHELL_LOAD_ADDR) の規則は上のまま一切変えない。同じ
 # $(SHELL_SRC) を -DSHELL_AS_APP 付きで**専用の出力先** $(SH_OBJDIR) へ
 # コンパイルし、crt0 + sdk/link/app.ld (0x500000) でリンクして sh.bin にする。
 # .o を常駐の $(SHELL_OBJ) と混ぜないのが肝 — 混ぜると -DSHELL_AS_APP 付きの
@@ -129,7 +147,7 @@ clean-sh:
 .PHONY: sh clean-sh
 
 # === gshell — GUI シェル (Rust、票 W1) ===
-# shell.bin と同じシェル帯 (0x300000, app_sys.ld) に常駐する WM。userland/rust の
+# shell.bin と同じシェル帯 (MEM_SHELL_LOAD_ADDR, app_sys.ld) に常駐する WM。userland/rust の
 # ワークスペース外 (userland/gshell/、独立ワークスペース) にあるので
 # DEFINE_RUST_PROGRAM は使わず個別に書く。カーネルが /bin/gshell.bin を
 # シェル帯へ直接ロードする (config.h SYS_GSHELL_BIN、K4)。
@@ -141,8 +159,9 @@ GSHELL_LIB = $(GSHELL_DIR)/target/i686-os32-none/release/libgshell.a
 $(GSHELL_LIB): FORCE $(RUST_KAPI_RS)
 	cd $(GSHELL_DIR) && RUSTC_WRAPPER=$(CURDIR)/sdk/rustc_stamp.py cargo build --release
 
-userland/gshell.elf: sdk/link/app_sys.ld $(CRT0_RESIDENT_OBJ) $(GSHELL_LIB) $(GFX_OBJ) $(LIBCFG_OBJ)
-	$(LD) -m elf_i386 -T sdk/link/app_sys.ld -nostdlib --nmagic --gc-sections --allow-multiple-definition \
+$(RESIDENT_OUT)/gshell.elf: $(BUILD_OUT)/app_sys.ld $(CRT0_RESIDENT_OBJ) $(GSHELL_LIB) $(GFX_OBJ) $(LIBCFG_OBJ)
+	@mkdir -p $(@D)
+	$(LD) -m elf_i386 -T $(BUILD_OUT)/app_sys.ld -nostdlib --nmagic --gc-sections --allow-multiple-definition \
 		-L$(LIBDIR) -L$(CROSS_DIR)/i386-elf/lib -L$(CROSS_DIR)/lib/gcc/i386-elf/13.2.0 \
 		-o $@ $(CRT0_RESIDENT_OBJ) $(LGRP_BEG) $(GFX_OBJ) $(LIBCFG_OBJ) $(GSHELL_LIB) $(LGRP_END) -lc -lgcc
 
@@ -546,6 +565,7 @@ userland/%.bin: userland/%.raw userland/%.elf
 	_decl=$$(awk '$$1 == "userland/$*" { print $$4 }' build/app.conf); \
 	_api=$${_api:-7}; \
 	_heap=$${_heap:-0}; \
+	if [ "$*" = "shell" ] || [ "$*" = "gshell" ]; then _heap=0; fi; \
 	_opts=""; \
 	if [ "$*" = "tests/mem_stat_compat_test" ]; then _opts="$$_opts --compat-api"; fi; \
 	if [ "$$_heap" != "0" ]; then _opts="$$_opts --heap $$_heap"; fi; \

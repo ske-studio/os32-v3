@@ -48,7 +48,7 @@ boot/*.asm      →  nasm (-f bin / -f elf32)  →  boot/*.bin / boot/*.o
 kernel/*.asm    →  nasm (-f elf32)           →  kernel/*.o
 */*.c           →  gcc (-m32 -ffreestanding) →  */*.o
                                                ↓
-*.o + kernel/*.o → ld (-T os32.ld)           → build/out/kernel.elf (0x100000〜 + SQLite 0x200000〜)
+*.o + kernel/*.o → ld (-T os32.ld)           → build/out/kernel.elf (0x100000〜、SQLite は core BSS の直後)
                                                (+ build/out/kernel.map)
 kernel.elf      →  objcopy (-O binary)       → build/out/kernel.bin (カーネル本体)
                 →  objcopy (--only-section)  → build/out/sqlite.bin (SQLite拡張域)
@@ -98,7 +98,7 @@ Makefile が同じ流れを回す。OS のソースツリーは参照しない�
 
 === GUI シェルと共有ライブラリ (2026-09-06) ===
 userland/gshell (Rust, cargo)  → libgshell.a
-  + crt0 + libos32gfx (GFX_OBJ) → ld -T sdk/link/app_sys.ld → userland/gshell.bin (シェル帯 0x300000、make gshell)
+  + crt0 + libos32gfx (GFX_OBJ) → ld -T sdk/link/app_sys.ld → userland/gshell.bin (シェル帯 0x400000、make gshell)
 userland/rust/libos32gui       → ld -T sdk/link/shlib.ld     → userland/libos32gui.elf/.raw
                 → tools/mkshlib.py --api 42 → userland/libos32gui.shlib (/sys/lib、make shlib)
                    (make check-shlib = 番号表の突き合わせ。ジャンプ表は末尾追記のみ)
@@ -284,6 +284,19 @@ allow-list の集合は `deploy-set.json` を正とし、`check: optional` の�
 ゲストが書いた後は **stop → umount → pull → verify-set**。
 `np21w_ctl.py start` は起動前にこの作業木の t2h stamp を失効させる
 (別 ini の起動も安全側に失効)。remote の hash が変わった場合も、pull を省いた照合・配備を拒否する。
+
+`make kernel` とカーネルを運ぶ配備ターゲットは、ELF/bin/VK32 の更新後に
+世代表 → 配置表の順で生成する。`make all` は全成果物が揃ってから同じ順で生成する。
+再リンク時の追従は、配備せず次の手順で確認できる (各照合の終了コードは 0):
+
+```sh
+make all MUTATE=0
+python3 tools/gen_memmap.py --manifest --check
+make kernel MUTATE=0
+python3 tools/gen_memmap.py --manifest --check
+make kernel MUTATE=0
+python3 tools/gen_memmap.py --manifest --check
+```
 
 <a id="検査の3段"></a>
 #### 検査の 3 段 (`check-fast` / `check-changed` / `check`、2026-09-26)

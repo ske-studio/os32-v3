@@ -34,6 +34,7 @@ check-h3b-fixtures-host:
 - tools/tests/mutpar.py
 - tools/tests/shutdown_probe_host.c
 - tools/tests/test_gfx_kernel_fb.py
+- tools/tests/kernel_layout.py
 - tools/tests/test_h3b_fixtures.py
 - tools/tests/test_shutdown_probe.py
 - userland/deploy.yaml

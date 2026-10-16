@@ -6,3 +6,11 @@ check-dma-pool-host:
 - tools/tests/test_dma_pool.py
 - tools/check_map.d/check-dma-pool-host.yaml
 - build/checks.d/check-dma-pool-host.mk
+- tools/tests/dma_boot_host.c
+- kernel/kernel.c
+- kernel/dma_pool.h
+- include/memmap.h
+- drivers/fdc.c
+- drivers/fdc.h
+- kdebug/kselftest.c
+- kernel/pgalloc.h

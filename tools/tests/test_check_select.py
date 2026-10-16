@@ -835,7 +835,8 @@ def case_mk_real_tree(cs):
         shutil.rmtree(os.path.join(fx.d, "tools"))
         os.symlink(os.path.join(cs.ROOT, "tools"), os.path.join(fx.d, "tools"))
         r = fx.plan(files=["build/sdk.mk", "Makefile"], map_=m)
-        _fast(r)
+        # Layout artifact readers now track build/** even with no recipe delta.
+        _only(r, "check-memmap-host")
         assert any("新しい検査 0 本" in l and "追加選択なし" in l for l in r[3]), r[3]
         rel = "build/checks.d/check-time-math-host.mk"
         text = pathlib.Path(fx.d, rel).read_text()
@@ -843,7 +844,7 @@ def case_mk_real_tree(cs):
                 "\tpython3 -B tools/tests/test_time_math.py --target $(MUT)\n"
                 "\tpython3 -B tools/tests/test_time_math.py --target --again $(MUT)\n")
         r = fx.plan(files=[rel], map_=m)
-        _only(r, "check-time-math-host", "check-map", "check-ci-stab-host")
+        _only(r, "check-memmap-host", "check-time-math-host", "check-map", "check-ci-stab-host")
         assert len(r[1]) == len(cs.check_lists(cs.read_makefiles()[1])), r[1]
 
 

@@ -3,9 +3,7 @@
 #include "idt.h"
 static u32 host_cr3, host_flushes, host_flushed_cr3;
 #include "paging.c"
-__asm__(".globl __sqlite_start\n.set __sqlite_start, 0x200000\n"
-        ".globl __sqlite_end\n.set __sqlite_end, 0x240000\n"
-        ".globl __bss_end\n.set __bss_end, 0x180000\n");
+/* Layout symbols are supplied by kernel_layout.linker_flags(). */
 #include "pgalloc_host_source.c"
 #define HOST_POOL_IRQ_SAVE() 0U
 #define HOST_POOL_IRQ_RESTORE(f) ((void)(f))

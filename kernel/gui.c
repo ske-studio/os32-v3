@@ -135,7 +135,7 @@ void gui_owner_exit(int owner, int kind)
         ring3_wm_leave();
     }
     /* WM 自身 (gshell = shell 帯 owner 1) が終了するなら登録を解除する。
-     * これをしないと、gshell.bin が抜けて同じ 0x300000 に shell.bin が
+     * これをしないと、gshell.bin が抜けて同じシェル帯に shell.bin が
      * 載った後も g_gui_handler / g_gui_pump が旧コードを指したままになり、
      * K2 の syscall 境界ポンプが別コードを呼んでしまう (レビュー ①)。 */
     if (owner == GUI_SHELL_OWNER) {
@@ -145,7 +145,7 @@ void gui_owner_exit(int owner, int kind)
          * これをしないと shell.bin が載っても打鍵が届かない (K2-B)。 */
         kbd_set_gui_mode(0);
         /* FEP の描画先を TVRAM 版へ戻す (レビュー #4 ①)。gshell は自分でも
-         * NULL を渡すが、クラッシュで抜けた場合も 0x300000 の旧コードを
+         * NULL を渡すが、クラッシュで抜けた場合もシェル帯の旧コードを
          * 指したままにしない。 */
         ime_set_render((void *)0);
     }

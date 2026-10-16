@@ -17,4 +17,4 @@ SECTIONS
     .os32_generation_ref 0 (INFO) : { KEEP(*(.os32_generation_ref)) }
     /DISCARD/ : { *(.comment) *(.note.GNU-stack) *(.eh_frame) }
 }
-__os32_abi_1_mem_3_fmt_4 = 0;
+INCLUDE sdk/link/generations.ld

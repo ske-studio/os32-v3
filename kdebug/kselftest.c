@@ -571,7 +571,7 @@ static void test_memmap(void)
     }
 
     if (bad <= 0) {
-        check(bad == 0, "memmap: PDE 0 matches include/memmap.h");
+        check(bad == 0, "memmap: low memory matches include/memmap.h");
         return;
     }
 
@@ -600,10 +600,24 @@ static void test_memmap(void)
 /*  **見分けられることを毎回確かめる**ために、PTE 1 本に USER を立てて       */
 /*  検査が落ちるところまで見て、戻す (往復 3 B6)。                          */
 /* ------------------------------------------------------------------------ */
+/* The boot ledger records the pool only when its entire range is RAM. */
+static int selftest_dma_available(void)
+{
+    for (u32 i = 0; i < ledger_region_count; i++) {
+        const struct ledger_region *r = &ledger_regions[i];
+        if (r->type == LEDGER_R_DMA &&
+            r->first == MEM_DMA_POOL_BASE / PAGE_SIZE &&
+            r->end == (MEM_DMA_POOL_END + 1) / PAGE_SIZE) return 1;
+    }
+    return 0;
+}
+
 static void test_memmap_pool_user(void)
 {
     u32 tramp = exec_tramp_page_addr();
     int clean, poked;
+
+    if (!selftest_dma_available()) return;
 
     /* 変異の前。ここが 0 でなければ test_memmap が既に報告している。 */
     clean = paging_memmap_selftest(tramp);
@@ -632,7 +646,7 @@ static void test_memmap_pool_user(void)
 /*  モデル経路で ONLINE でなければならない (legacy に戻ったら落ちる)。       */
 /*  exec の上端は台帳の置き場ではなくアリーナの上端から決まるので、8MB でも */
 /*  exec の最小域 (ロード起点 + スタック + sbrk + exec_heap) が残る (B2)。    */
-/*  置き場 (FIXED 型の [0x2F9000, 0x2FB000)) の RW / USER なしは             */
+/*  置き場 (FIXED 型、core BSS 内の MEM_LEDGER_META_*) の RW / USER なしは   */
 /*  test_memmap の MM 検査が見る (T1-U1)。                                  */
 /* ------------------------------------------------------------------------ */
 static void test_pool_model(void)
@@ -1321,8 +1335,9 @@ static void test_dma8237(void)
     check(dma_chan_setup(2, MEM_DMA_POOL_BASE, 0, DMA_DIR_TO_MEM,
                          DMA_MODE_SINGLE) < 0,
           "dma:0 bytes refused");
-    /* 64KB バンクまたぎ ([HW2])。プールの境界 0x2F0000 の手前から。 */
-    check(dma_chan_setup(3, MEM_DMA_POOL_BASE + 0x7000UL, 0x4000UL,
+    /* 64KB バンクまたぎ ([HW2])。プールの次の境界の手前から。 */
+    check(dma_chan_setup(3, (MEM_DMA_POOL_BASE & ~(DMA_BANK_SIZE - 1)) +
+                         DMA_BANK_SIZE - 0x1000UL, 0x4000UL,
                          DMA_DIR_TO_MEM, DMA_MODE_SINGLE) < 0,
           "dma:64KB cross refused");
     /* 16MB 以上 */
@@ -2068,7 +2083,8 @@ int kselftest_run(void)
     test_bootinfo();
     test_bootlog();
     test_dma8237();
-    test_dma_pool();
+    if (selftest_dma_available()) test_dma_pool();
+    else kprintf(0xA1, "[selftest] DMA pool skipped (RAM short)\n");
     test_irq_dynamic();
     test_time_now();
     test_ring3_wm_guard();

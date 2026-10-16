@@ -1,4 +1,5 @@
 check-mkmod-host:
+- sdk/kapi.json
 - drivers/e82557.h
 - fs/vfs.h
 - kernel/module.h

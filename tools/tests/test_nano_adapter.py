@@ -58,6 +58,31 @@ def build_host(prefix, work):
             '-o', work / 'host.o')
 
 
+def resident_heap(prefix, work):
+    source = (ROOT / 'exec/exec.c').read_text()
+    parts = []
+    for signature in ('static int exec_shell_layout(', 'static void exec_restore_context('):
+        start = source.index(signature)
+        parts.append(source[start:source.index('\n}', start) + 2])
+    (work / 'resident_exec.inc').write_text('\n'.join(parts))
+    inc = ['-I'+str(ROOT / p) for p in ('tools/tests/host_arch', 'include', 'kernel',
+           'exec', 'lib', 'sdk/allocator', 'sdk/include/os32', 'arch/x86', 'platform/pc98')]
+    objects = []
+    for rel in ('tools/tests/resident_heap_host.c', 'exec/exec_heap.c', 'kernel/kmalloc.c'):
+        obj = work / (Path(rel).stem + '.o')
+        command(prefix, 'gcc', '-std=gnu11', '-O2', '-ffreestanding', '-fno-builtin',
+                '-ffunction-sections', '-fdata-sections', '-Wall', '-Wextra', '-Werror',
+                *inc, '-I'+str(work), '-c', ROOT / rel, '-o', obj)
+        objects.append(obj)
+    exe = work / 'resident'
+    command(prefix, 'ld', '-m', 'elf_i386', '--gc-sections',
+            '--defsym=resident_image_end='+hex(0x400000+4099),
+            '-o', exe, *objects)
+    result = host32.run([str(exe)], capture_output=True, text=True, timeout=30)
+    assert result.returncode == 0, ('resident', result.returncode, result.stdout, result.stderr)
+    print('PASS resident CRT/split/restore: bounds, overflow, unchanged heaps, tiny heap')
+
+
 def rejection(prefix, work, archive, text, checker=gate, after=False):
     probe = work / 'probe.c'
     probe.write_text(text)
@@ -306,6 +331,7 @@ def main():
                 result = host32.run([str(exe)], runner=args.runner, capture_output=True, text=True, timeout=host32.RUN_TIMEOUT)
                 assert result.returncode == 0, result.stdout + result.stderr
                 print(result.stdout.strip())
+                resident_heap(prefix, work)
                 public_link(prefix, work)
                 hash_providers(prefix, work, archive)
                 negative_links = 0

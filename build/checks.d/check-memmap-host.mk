@@ -10,6 +10,7 @@ CHECK_PAR_ORDER += 038:check-memmap-host
 #                      番地に依存しないので、番地を動かしても腐らない。
 # 2026-09-17 (決裁 D1/D2) の配置で両方とも緑になったので check: の列に入れた。
 check-memmap-host:
+	python3 -B tools/tests/test_layout_defs.py
 	python3 -B tools/tests/test_memmap_gen.py $(MUT)
 	python3 -B tools/tests/test_memmap_boot.py $(MUT)
 

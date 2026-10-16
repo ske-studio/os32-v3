@@ -108,7 +108,7 @@ typedef struct {
  *   0                                       ^DIAG_OFFSET       ^EMPTY_OFFSET
  *
  * 共有メモリはアプリの PD に見えているが、カーネルの .rodata / .data と
- * SQLite の帯 (0x200000〜0x2FFFFF) は見えない。だから `const char *` を返す
+ * SQLite (カーネル常駐鎖の中) は見えない。だから `const char *` を返す
  * KAPI (`db_last_error` / `db_column_text`) は、返す前にここへ写す。
  *
  * **結果データの上限は必ず DB_SHM_RESULT_LIMIT から引く** ([C4])。

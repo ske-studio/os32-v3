@@ -22,9 +22,10 @@
 static int failed;
 
 /* 期待値は**数で書く** ([C4] の写しではなく、設計の数そのもの)。 */
-#define POOL_BASE   0x2E8000UL
-#define POOL_END    0x2F7FFFUL
-#define POOL_BANK   0x2F0000UL   /* 池が跨ぐ 64KB 境界 */
+#define POOL_BASE   0x7F0000UL
+#define POOL_END    0x7FFFFFUL
+#define POOL_HALF   (POOL_BASE + 0x8000UL)
+#define POOL_BANK   ((POOL_BASE & ~0xFFFFUL) + 0x10000UL)
 #define KB(n)       ((u32)(n) * 1024UL)
 
 static struct dma_pool_state P;
@@ -65,15 +66,9 @@ static void layout(void)
     CHECK((u32)MEM_DMA_POOL_SIZE == KB(64));
     CHECK((u32)MEM_DMA_POOL_END == POOL_END);
     CHECK(DMA_POOL_PAGES == 16);
-    /* **池は 64KB 境界を跨ぐ**。跨がない池なら以下の試験は全部素通し
-     * なので、跨いでいること自体をここで固定する。 */
-    CHECK(POOL_BASE < POOL_BANK && POOL_BANK <= POOL_END);
-    /* 予約域 (カーネルスタックガード 0x2FB000) を越えない。 */
-    CHECK(POOL_END < 0x2FB000UL);
-    /* 受付上限は境界の片側ぶん。 */
+    CHECK((POOL_BASE & 0xFFFFUL) == 0);
+    CHECK(!dma_crosses_64k(POOL_BASE, KB(64)));
     CHECK(DMA_POOL_MAX_BYTES == KB(32));
-    CHECK(POOL_BANK - POOL_BASE == KB(32));
-    CHECK(POOL_END + 1 - POOL_BANK == KB(32));
 }
 
 /* ------------------------------------------------------------------ */
@@ -83,7 +78,7 @@ static void sizes(void)
 {
     u32 a, b;
 
-    /* 16KB は空の池なら必ず入り、0x2F0000 を跨がない。 */
+    /* 16KB は空の池なら必ず入り、64KB 境界を跨がない。 */
     fresh();
     a = A(KB(16), 0);
     CHECK(a == POOL_BASE);
@@ -111,7 +106,7 @@ static void sizes(void)
     a = A(KB(32), 0);
     b = A(KB(32), 0);
     CHECK(a == POOL_BASE);
-    CHECK(b == POOL_BANK);
+    CHECK(b == POOL_HALF);
     CHECK(dma_crosses_64k(a, KB(32)) == 0);
     CHECK(dma_crosses_64k(b, KB(32)) == 0);
     CHECK(A(KB(4), 0) == 0);          /* もう空きが無い */
@@ -131,16 +126,13 @@ static void skip_boundary(void)
 {
     u32 a, b;
 
-    fresh();
-    /* 28KB (7 ページ) = 0x2E8000〜0x2EEFFF */
+    /* 64KB 境界を跨ぐ池 (旧番地 0x2E8000) の合成入力。跨ぐ候補を飛ばす。 */
+    dma_pool_state_init(&P, 0x2E8000UL, DMA_POOL_PAGES);
     a = A(KB(28), 0);
-    CHECK(a == POOL_BASE);
-    /* 次の 16KB。最初適合なら 0x2EF000 だが、そこは 0x2F0000 を跨ぐので
-     * **飛ばして** 0x2F0000 に置く。「跨ぐから諦める」ではない。 */
+    CHECK(a == 0x2E8000UL);
     b = A(KB(16), 0);
-    CHECK(b == POOL_BANK);
-    CHECK(dma_crosses_64k(b, KB(16)) == 0);
-    /* 飛ばした 1 ページ (0x2EF000) はまだ空いていて、4KB なら入る。 */
+    CHECK(b == 0x2F0000UL);
+    CHECK(!dma_crosses_64k(b, KB(16)));
     CHECK(A(KB(4), 0) == 0x2EF000UL);
 }
 
@@ -155,12 +147,12 @@ static void alignment(void)
     CHECK(A(KB(4), 0) == POOL_BASE);         /* 既定は 4KB */
     /* 次は 8KB 整列を頼む。0x2E9000 は 8KB 整列ではないので 0x2EA000。 */
     a = A(KB(4), KB(8));
-    CHECK(a == 0x2EA000UL);
+    CHECK(a == POOL_BASE + KB(8));
     CHECK(a % KB(8) == 0);
     /* 32KB 整列は池の中に 2 か所しかない (0x2E8000 と 0x2F0000)。
      * 前者は埋まっているので後者。 */
     b = A(KB(4), KB(32));
-    CHECK(b == POOL_BANK);
+    CHECK(b == POOL_HALF);
     CHECK(b % KB(32) == 0);
 }
 
@@ -176,8 +168,8 @@ static void frees(void)
     b = A(KB(16), 0);   /* 0x2EC000  4 ページ */
     c = A(KB(16), 0);   /* 0x2F0000  4 ページ (0x2EF000 は跨ぐので飛ぶ) */
     CHECK(a == POOL_BASE);
-    CHECK(b == 0x2EC000UL);
-    CHECK(c == POOL_BANK);
+    CHECK(b == POOL_BASE + KB(16));
+    CHECK(c == POOL_HALF);
 
     /* **真ん中だけ**を返す。隣が生きているので、先頭一致でなければ
      * どれを外すか決まらない。 */
@@ -185,7 +177,7 @@ static void frees(void)
     CHECK(P.bad_free == 0);
     /* 返した 16KB の中に 8KB が入る (前後は埋まったまま)。 */
     d = A(KB(8), 0);
-    CHECK(d == 0x2EC000UL);
+    CHECK(d == POOL_BASE + KB(16));
 
     /* 途中ポインタ: span の先頭ではないので断り、bad_free を数える。 */
     CHECK(dma_pool_state_free(&P, a + KB(4)) < 0);
@@ -205,7 +197,7 @@ static void frees(void)
 
     /* **隣接の曖昧さ**: a を返した後、b の隣 (0x2EE000) を渡しても
      * span の先頭ではないので通らない。 */
-    CHECK(dma_pool_state_free(&P, 0x2EE000UL) < 0);
+    CHECK(dma_pool_state_free(&P, POOL_BASE + KB(24)) < 0);
     CHECK(P.bad_free == 6);
 
     CHECK(dma_pool_state_free(&P, c) == 0);
@@ -236,8 +228,8 @@ static void leaked(void)
     /* 残りの 32KB だけが配られる。**LEAKED の番地は二度と出てこない**。 */
     for (i = 0; i < 8; i++) {
         b = A(KB(4), 0);
-        CHECK(b >= POOL_BANK);
-        CHECK(b < a + KB(32) ? b >= POOL_BANK : 1);
+        CHECK(b >= POOL_HALF);
+        CHECK(b < a + KB(32) ? b >= POOL_HALF : 1);
     }
     CHECK(A(KB(4), 0) == 0);   /* 枯渇 */
 

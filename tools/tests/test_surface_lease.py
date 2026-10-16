@@ -1,6 +1,7 @@
 """T2e e2: real lease/query/B1/managed paging, ILP32 runtime mutations."""
 TARGET_SRC = ['exec/lease.c', 'exec/surface_query.c', 'exec/redir_access.c',
               'exec/access_walk.c', 'kernel/paging.c', 'kernel/pgalloc.c']
+from kernel_layout import linker_flags
 import argparse
 import host32
 import hashlib
@@ -122,7 +123,7 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
                     objs[unit] = obj
                 compile_source(src, obj)
             exe = tmp / (key + '.elf')
-            host32.build(['gcc', '-m32', '-nostdlib', '-static', '-no-pie',
+            host32.build(['gcc', *linker_flags(), '-m32', '-nostdlib', '-static', '-no-pie',
                 '-Wl,--gc-sections', *map(str, objs.values()), '-o', str(exe)],
                 check=True, capture_output=True, text=True)
             # Full checks run alongside other compiler/MMU fixtures. Keep

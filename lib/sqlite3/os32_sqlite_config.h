@@ -7,7 +7,7 @@
 /*  ビルドオプション:                                                        */
 /*    - 最適化: -Os (サイズ最適化必須。-O2比で30%削減)                        */
 /*    - amalgamation: OMITマクロ付きでソースから再生成したもの                */
-/*    - 配置先: カーネル拡張域 0x200000-0x2FFFFF (1MB)                       */
+/*    - 配置先: カーネル core BSS の直後 (__sqlite_start、build/os32.ld)     */
 /* ======================================================================== */
 #ifndef OS32_SQLITE_CONFIG_H
 #define OS32_SQLITE_CONFIG_H

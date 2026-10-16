@@ -298,7 +298,7 @@ void exception_handler(u32 error_code, u32 vector, u32 fault_eip,
         u32 sq_e = (u32)&__sqlite_end;
         if (fault_eip >= sq_s && fault_eip < sq_e) {
             tvram_puts_at(row+3, 17, "[sqlite]", 0xA1);
-        } else if (fault_eip >= KERNEL_LOAD_ADDR && fault_eip < 0x200000) {
+        } else if (fault_eip >= KERNEL_LOAD_ADDR && fault_eip < sq_s) {
             tvram_puts_at(row+3, 17, "[.text]", 0xA1);
         } else {
             tvram_puts_at(row+3, 17, "[OUT OF CODE!]", 0xC1);
@@ -398,7 +398,7 @@ void page_fault_handler(u32 error_code, u32 fault_addr, u32 fault_eip, u32 *regs
         if (fault_eip >= sq_s && fault_eip < sq_e) {
             tvram_puts_at(row+2, 18, "[.sqlite_text]", 0xA1);
             sputs(" [.sqlite_text]\n");
-        } else if (fault_eip >= KERNEL_LOAD_ADDR && fault_eip < 0x200000) {
+        } else if (fault_eip >= KERNEL_LOAD_ADDR && fault_eip < sq_s) {
             tvram_puts_at(row+2, 18, "[.text]", 0xA1);
             sputs(" [.text]\n");
         } else {

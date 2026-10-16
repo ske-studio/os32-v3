@@ -30,7 +30,7 @@ def command(cmd, cwd=None, ok=True):
     return r
 
 
-def fixture(work, chain=False, core_bss=32, sqlite_data=4, sqlite_bss=32,
+def fixture(work, core_bss=32, sqlite_data=4, sqlite_bss=32,
             link_edit=None):
     work.mkdir()
     objects = []
@@ -47,9 +47,7 @@ def fixture(work, chain=False, core_bss=32, sqlite_data=4, sqlite_bss=32,
         p.with_suffix('.asm').write_text(data)
         command(['nasm', '-f', 'elf32', p.with_suffix('.asm'), '-o', p.with_suffix('.o')])
         objects.append(p.with_suffix('.o').relative_to(work))
-    script = (ROOT / 'build/os32.ld').read_text()
-    if chain:
-        script = script.replace('. = 0x200000;', '. = ALIGN(__bss_end, 4096);')
+    script = gen.preprocess_layout(ROOT, (ROOT / 'build/os32.ld').read_text())
     if link_edit:
         before, after = link_edit
         assert before in script
@@ -59,7 +57,7 @@ def fixture(work, chain=False, core_bss=32, sqlite_data=4, sqlite_bss=32,
                                 '.sqlite_data : AT(ADDR(.sqlite_data)) {')
     (work / 'layout.ld').write_text(script)
     elf = work / 'kernel.elf'
-    command(['ld', '-m', 'elf_i386', '-T', 'layout.ld', '-o', elf, *objects], cwd=work)
+    command(['ld', '-m', 'elf_i386', '-T', 'layout.ld', '-Map=kernel.map', '-o', elf, *objects], cwd=work)
     for name, flags in (('kernel', ['--remove-section=.sqlite_' + s for s in ('text', 'rodata', 'data', 'bss')]),
                         ('sqlite', ['--only-section=.sqlite_' + s for s in ('text', 'rodata', 'data')])):
         command(['objcopy', '-O', 'binary', *flags, elf, work / (name + '.bin')])
@@ -79,6 +77,7 @@ def link_asserts(work, elf):
     m = gen.Macros(gen.read_defines(ROOT / 'include/memmap.h'), syms)
     assertions = []
     for lo, hi, section in (('__bss_start', '__bss_end', '.bss'),
+                            ('__bss_start', '__bss_end', '.ledger_fixed'),
                             ('__sqlite_data_end', '__sqlite_end', '.sqlite_bss')):
         assertions += [f'ASSERT((({lo} | {hi}) & 3) == 0, "BSS alignment")',
                        f'ASSERT({lo} <= ADDR({section}) && '
@@ -117,6 +116,9 @@ def edit_elf(elf, output, symbol=None, value=None, bss_end=None):
 def check_real_bss(elf):
     manifest = gen.layout_manifest(str(ROOT), str(elf.with_suffix('.map')), str(elf))
     syms = manifest['symbols']
+    # The executable entry must lead directly into the product BSS/stack path.
+    _, linked = gen.read_elf(elf)
+    assert linked['kentry'] == linked['KERNEL_LOAD_ADDR'], 'entry != core start'
     zeros = [(syms[a], syms[b]) for a, b in (('__bss_start', '__bss_end'),
                                             ('__sqlite_data_end', '__sqlite_end'))]
     assert all(a <= b and not ((a | b) & 3) for a, b in zeros)
@@ -162,7 +164,7 @@ def run_cases(vk, exes, script, work, real=False):
     for name, edit, diagnostic in (
             ('lma-shift', ('.sqlite_rodata : {',
                            '.sqlite_rodata : AT(ADDR(.sqlite_rodata) - 4) {'), b'VMA/LMA'),
-            ('core-shift', ('. = 0x100000;', '. = 0x101000;'), b'core start'),
+            ('core-shift', ('. = KERNEL_LOAD_ADDR;', '. = 0x101000;'), b'core start'),
             ('entry-shift', ('ENTRY(kentry)',
                              'ENTRY(shifted_entry)\nshifted_entry = kentry + 4;'), b'ELF entry')):
         d = work / name
@@ -186,46 +188,50 @@ def run_cases(vk, exes, script, work, real=False):
         r = generate(script, d, real/'kernel.elf')
         assert r.returncode == 0, r.stderr.decode()
         img = (d/'image.lz4').read_bytes()
+        _, syms = gen.read_elf(real/'kernel.elf')
         legacy = vk.make_image(script, work, (d/'kernel.bin').read_bytes(),
-                               (d/'sqlite.bin').read_bytes(), 'legacy-layout')
+                               (d/'sqlite.bin').read_bytes(), 'legacy-layout',
+                               sqlite_addr=syms['__sqlite_start'])
         assert img == legacy == (real/'vmkernel.lz4').read_bytes(), 'current image/CRC changed'
         assert len(img) <= vk.MAX_IMAGE, 'compressed budget'
         assert check_real_bss(real/'kernel.elf'), 'real ELF BSS/guard constraints'
         lines.append('[layout real] destinations/bytes/CRC unchanged, {} bytes image_crc={:08x}'.format(
             len(img), vk.parse(img)['icrc']))
-    for chain in (False, True):
-        d = work / ('chain' if chain else 'fixed')
-        elf = fixture(d, chain)
-        r = generate(script, d, elf)
-        assert r.returncode == 0, r.stderr.decode()
-        img = (d / 'image.lz4').read_bytes()
-        _, syms = gen.read_elf(elf)
-        assert vk.parse(img)['ents'][1][0] == syms['__sqlite_start'], 'SQLite destination != ELF'
-        assert link_asserts(d, elf).returncode == 0, 'link ASSERT control'
-        for exe in exes.values():
-            lines += vk.check_good(exe, img, (d/'kernel.bin').read_bytes(),
-                                   (d/'sqlite.bin').read_bytes(), d.name)
-        # NOLOAD must never contribute file bytes. Include both ends and padding.
-        assert vk.parse(img)['ents'][1][1] == syms['__sqlite_data_end'] - syms['__sqlite_start']
-        loader_reservation_cases(vk, exes, (d/'kernel.bin').read_bytes(),
-                                 (d/'sqlite.bin').read_bytes(), syms['__bss_start'],
-                                 syms['__bss_end'], syms['__sqlite_start'])
-        r = generate(script, d, elf, '--sqlite-addr', hex(syms['__sqlite_start'] + 4))
-        assert r.returncode != 0 and b'conflicting' in r.stderr, 'explicit address conflict accepted'
-        # A destination inside the other image's BSS must fail at generation time.
-        bad = edit_elf(elf, d/'overlap.elf', bss_end=syms['__sqlite_start'] + 4)
-        bad = edit_elf(bad, bad, '__bss_end', syms['__sqlite_start'] + 4)
-        r = generate(script, d, bad)
-        assert r.returncode != 0 and b'overlap' in r.stderr, 'BSS collision accepted'
+    d = work / 'chain'
+    elf = fixture(d)
+    r = generate(script, d, elf)
+    assert r.returncode == 0, r.stderr.decode()
+    img = (d / 'image.lz4').read_bytes()
+    _, syms = gen.read_elf(elf)
+    assert vk.parse(img)['ents'][1][0] == syms['__sqlite_start'], 'SQLite destination != ELF'
+    assert link_asserts(d, elf).returncode == 0, 'link ASSERT control'
+    for exe in exes.values():
+        lines += vk.check_good(exe, img, (d/'kernel.bin').read_bytes(),
+                               (d/'sqlite.bin').read_bytes(), d.name)
+    # NOLOAD must never contribute file bytes. Include both ends and padding.
+    assert vk.parse(img)['ents'][1][1] == syms['__sqlite_data_end'] - syms['__sqlite_start']
+    loader_reservation_cases(vk, exes, (d/'kernel.bin').read_bytes(),
+                             (d/'sqlite.bin').read_bytes(), syms['__bss_start'],
+                             syms['__bss_end'], syms['__sqlite_start'])
+    r = generate(script, d, elf, '--sqlite-addr', hex(syms['__sqlite_start'] + 4))
+    assert r.returncode != 0 and b'conflicting' in r.stderr, 'explicit address conflict accepted'
+    # A destination inside the other image's BSS must fail at generation time.
+    bad = edit_elf(elf, d/'overlap.elf', bss_end=syms['__sqlite_start'] + 4)
+    bad = edit_elf(bad, bad, '__bss_end', syms['__sqlite_start'] + 4)
+    r = generate(script, d, bad)
+    assert r.returncode != 0 and b'overlap' in r.stderr, 'BSS collision accepted'
     for name, opts in (('unaligned-start', dict(sqlite_data=3)),
                        ('unaligned-end', dict(core_bss=33))):
         d = work / name
         elf = fixture(d, **opts)
         r = generate(script, d, elf)
+        assert r.returncode == 0, name + ' must be rounded up by product linker'
+        assert link_asserts(d, elf).returncode == 0, name + ' aligned coverage'
+        _, aligned = gen.read_elf(elf)
+        bad = edit_elf(elf, d/'unaligned.elf', '__bss_end', aligned['__bss_end'] - 1)
+        r = generate(script, d, bad)
         assert r.returncode != 0 and b'BSS zero range' in r.stderr, name
-        r = link_asserts(d, elf)
-        assert r.returncode != 0 and b'BSS alignment' in r.stderr, name + ' link ASSERT'
-    d = work / 'fixed'
+    d = work / 'chain'
     elf = d/'kernel.elf'
     _, syms = gen.read_elf(elf)
     for name in ('__bss_start', '__bss_end', '__sqlite_data_end', '__sqlite_end'):
@@ -259,5 +265,5 @@ def run_cases(vk, exes, script, work, real=False):
         f.write(bytes(32))
     r = generate(script, d, elf)
     assert r.returncode != 0 and b'file size mismatch' in r.stderr, 'NOLOAD bytes accepted'
-    lines.append('[layout] fixed/chain ELF -> identical generator; BSS alignment/coverage/guard and NOLOAD rejection PASS')
+    lines.append('[layout] chain ELF -> generator; BSS alignment/coverage/guard and NOLOAD rejection PASS')
     return lines

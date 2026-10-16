@@ -3,6 +3,7 @@
 Covers TASK_T2_APPBAND: sparse high PTs and the actual kselftest ledger
 procedure on 8/17MB pools.
 """
+from kernel_layout import linker_flags
 import host32
 import pathlib
 import subprocess
@@ -57,7 +58,7 @@ def run(mutation=None):
         # プロセスでは触れない)。-I の順で本物より先に見つかるよう先頭に置く。
         host_includes = ['-I' + str(ROOT / 'tools/tests/host_arch')] + includes
         exe = tmp / 'app_band_pde'
-        build = subprocess.run(['gcc', *FLAGS, '-DPHYSMEM_HOST_TEST=1', '-nostdlib', '-static', '-no-pie',
+        build = subprocess.run(['gcc', *linker_flags(), *FLAGS, '-DPHYSMEM_HOST_TEST=1', '-nostdlib', '-static', '-no-pie',
                         *host_includes, str(ROOT / 'tools/tests/app_band_pde_host.c'),
                         str(ROOT / 'kernel/physmem.c'), '-o', str(exe)], capture_output=bool(mutation))
         if build.returncode:

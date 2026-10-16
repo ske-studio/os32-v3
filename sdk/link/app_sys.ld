@@ -1,11 +1,13 @@
+#include "memmap_layout.h"
 /* GENERATED GENERATION REF BEGIN */
-__os32_abi_1_mem_3_fmt_4 = 0;
+__os32_abi_1_mem_4_fmt_4 = 0;
 /* GENERATED GENERATION REF END */
+__os32_shell_load_addr = LAYOUT_MEM_SHELL_LOAD_ADDR;
 ENTRY(_start)
 SECTIONS
 {
-    /* シェル常駐帯域: 0x300000 (memmap.h: MEM_SHELL_LOAD_ADDR) */
-    . = 0x300000;
+    /* シェル常駐帯域 (memmap.h: MEM_SHELL_LOAD_ADDR、カーネルと同じ生成ヘッダ) */
+    . = LAYOUT_MEM_SHELL_LOAD_ADDR;
 
     .text : {
         /* crt0.asm の _start を必ず先頭に配置 */
@@ -27,6 +29,8 @@ SECTIONS
         __bss_end = .;
     }
     _end = .;
+    ASSERT(ALIGN(_end, LAYOUT_MEM_SHELL_HEAP_ALIGN) + LAYOUT_MEM_SHELL_IMAGE_HEADROOM
+           <= LAYOUT_MEM_SHELL_HEAP_BASE, "resident image leaves less than 128KiB sbrk")
 
     /* KAPI データ欄の配置の刻印 (票 TASK_KAPI_DATA_FIELDS、ヘッダ v3)。
      * crt0 / os32api が置く 1 語を mkos32x.py が OS32X ヘッダの kapi_data_off

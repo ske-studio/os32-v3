@@ -41,4 +41,19 @@ check-map:
 - tools/pack_name_tables.txt
 - tools/pack_notes.txt
 # Conservative artifact-path audit (including indirect helpers/fixtures).
+- boot/bootinfo.inc
+- boot/loader_fat_new.asm
+- fs/fd_redirect.c
+- fs/pipe_buffer.c
+- kernel/kentry.asm
+- kernel/shm.c
+- sdk/os32x_hdr.py
+- sdk/rust/os32api/src/gui/proto.rs
+- sdk/rust/os32api/src/gui/stub.rs
+- tools/check_artifacts.py
+- tools/gen_memmap.py
+- tools/mkshlib.py
+- tools/tests/owner_reclaim_host.c
+- tools/tests/test_owner_reclaim.py
+- userland/rust/libos32gui/src/shlib.rs
 artifact_reader: true

@@ -1,11 +1,17 @@
 """Real ILP32 allocator/model integration; privileged IRQ only is substituted."""
 import host32
+import os
 import pathlib
 import subprocess
 import tempfile
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
+# Unit models use an empty SLACK; memory_boot_host covers the real provider.
+LAYOUT_FLAGS = [
+                '-Wl,--defsym=__kernel_resident_end=0x375000',
+                '-Wl,--defsym=__ledger_fixed_start=0x17e000',
+                '-Wl,--defsym=__ledger_fixed_end=0x180000']
 
 class Integration(unittest.TestCase):
     def run_c(self, body, flags=(), physical_core=False):
@@ -94,6 +100,7 @@ return 0;
 void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"(r) : "memory"); for (;;) {} }
 ''')
             cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie', '-ffunction-sections', '-finstrument-functions', '-Wl,--gc-sections']
+            cmd += LAYOUT_FLAGS
             cmd += ['-I' + str(ROOT / p) for p in ('include', 'kernel', 'lib', 'drivers', 'sdk/include/os32')]
             subprocess.run(cmd + list(flags) + [str(tmp / 'test.c'), str(ROOT / 'kernel/physmem.c'), '-o', str(tmp / 'test')], check=True)
             result = host32.run([str(tmp / 'test')])

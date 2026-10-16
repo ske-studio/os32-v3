@@ -17,6 +17,7 @@ docs_only:
 - docs/images/**
 - docs/logs/**
 broad:
+- check-memmap-host
 - check-deploy-set-host
 - check-r1-fixture-host
 - check-sbrk-crt-host

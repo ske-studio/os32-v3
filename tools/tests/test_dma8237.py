@@ -14,6 +14,7 @@
   python3 -B tools/tests/test_dma8237.py --target   # + i386-elf で実物を通す
   python3 -B tools/tests/test_dma8237.py --mutate   # 否定側 (変異が RED になるか)
 """
+import os
 import pathlib
 import re
 import subprocess

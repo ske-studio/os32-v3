@@ -20,6 +20,7 @@
   python3 -B tools/tests/test_pcm_cs4231.py --target   # + i386-elf で実物を通す
   python3 -B tools/tests/test_pcm_cs4231.py --mutate   # 否定側 (変異が RED か)
 """
+import os
 import pathlib
 import re
 import mutpar

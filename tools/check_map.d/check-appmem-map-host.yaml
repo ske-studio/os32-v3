@@ -26,3 +26,5 @@ check-appmem-map-host:
 - exec/access_walk.c
 - tools/tests/exec_heap_host.h
 - exec/owner_diag.h
+- tools/tests/kernel_layout.py
+artifact_reader: true

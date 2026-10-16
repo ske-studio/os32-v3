@@ -73,7 +73,9 @@ DEPFILES := $(shell find boot kernel drivers gfx fs exec kapi lib programs sdk \
 # 足した物が FD の容量に収まらなければここで落ちる (build/image.mk)。
 all: boot $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/sqlite.bin $(BUILD_OUT)/vmkernel.lz4 \
      images/os32_boot.d88 images/os32_boot144.img programs sdk assets-deployed iso
+	# 全成果物が揃った世代表に配置表を合わせる (kernel 単独の表より広い集合)。
 	@python3 tools/gen_generation_manifest.py
+	@python3 tools/gen_memmap.py --manifest --write
 	@python3 tools/gen_deploy_set.py
 
 # === 外部リポジトリ (git submodule) ===

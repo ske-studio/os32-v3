@@ -58,7 +58,10 @@ static void heap_ram(void) {
     CHECK("RAM memfd", heap_fd >= 0);
     __asm__ volatile("int $0x80" : "=a"(rc) : "a"(93), "b"(heap_fd), "c"(MEM_POOL_BASE + 0x4000000) : "memory");
     CHECK("RAM file size", !rc);
-    heap_mmap(MEM_POOL_BASE, 0x4000000, MEM_POOL_BASE);
+    /* The allocator also supplies linker-chain slack below MEM_POOL_BASE.
+     * Its identity and USER aliases must share the same backing file. */
+    heap_mmap(KERNEL_LOAD_ADDR, MEM_POOL_BASE + 0x4000000 - KERNEL_LOAD_ADDR,
+              KERNEL_LOAD_ADDR);
 }
 static void heap_alias(u32 root) {
     if (!heap_alias_on) return;

@@ -4,7 +4,10 @@
 
 # ビルド成果物出力ディレクトリ (kernel.bin / sqlite.bin / vmkernel.lz4 /
 # unicode.bin / kernel.elf / kernel.map をリポジトリルートから分離する)
-BUILD_OUT = build/out
+BUILD_OUT ?= build/out
+LAYOUT_HEADER = $(BUILD_OUT)/memmap_layout.h
+LAYOUT_CPP = $(CC) -E -P -x c -imacros $(LAYOUT_HEADER)
+KERNEL_OBJ_PREFIX = $(if $(filter-out build/out,$(BUILD_OUT)),$(BUILD_OUT)/obj/)
 $(shell mkdir -p $(BUILD_OUT))
 
 # ユーザー空間ライブラリのアーカイブ (.a) 出力先。
@@ -176,7 +179,7 @@ CFLAGS_BASE = $(KERNEL_CFLAGS)
 # 機械・ABI の旗 (CFLAGS_MACHINE) だけを継ぐ。
 CFLAGS_SQLITE = $(C_STD_SQLITE) $(CFLAGS_MACHINE) -Os -ffunction-sections -fdata-sections \
                 -Wno-long-long -w -DNDEBUG -D__KERNEL_BUILD__
-LDFLAGS = -m elf_i386 -T build/os32.ld -Map=$(BUILD_OUT)/kernel.map -nostdlib --nmagic --gc-sections \
+LDFLAGS = -m elf_i386 -T $(BUILD_OUT)/os32.ld -Map=$(BUILD_OUT)/kernel.map -nostdlib --nmagic --gc-sections \
 	-L$(shell $(CC) -print-libgcc-file-name | xargs dirname)
 
 # === 外部プログラム用フラグ ===

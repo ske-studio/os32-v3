@@ -2,6 +2,7 @@
 記録: tools/tests/appmem_map_tdd.md
 Only intended runtime FAIL labels count as RED; errors/timeouts are separate.
 """
+from kernel_layout import linker_flags
 import argparse
 import hashlib
 import pathlib
@@ -289,7 +290,7 @@ def main():
 
             def run(objs, key):
                 exe = tmp / (key + '.elf')
-                host32.build(['gcc', '-m32', '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
+                host32.build(['gcc', *linker_flags(), '-m32', '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                                 *map(str, (objects if len(objs) == 4 else objects[1:]) + objs), '-o', str(exe)], check=True,
                                capture_output=True, text=True, timeout=30)
                 return host32.run([str(exe)], runner=args.runner, capture_output=True, text=True, timeout=host32.RUN_TIMEOUT)

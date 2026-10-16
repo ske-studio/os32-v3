@@ -2,6 +2,7 @@
 記録: tools/tests/appmem_tdd.md
 Compile/link errors, signals, timeouts and unexpected FAIL labels are ERROR.
 """
+import os
 import argparse
 import hashlib
 import pathlib

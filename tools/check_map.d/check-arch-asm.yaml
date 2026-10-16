@@ -25,4 +25,5 @@ check-arch-asm:
 - build/checks.d/check-arch-asm.mk
 - kdebug/**
 # Conservative artifact-path audit (including indirect helpers/fixtures).
+- tools/gen_memmap.py
 artifact_reader: true

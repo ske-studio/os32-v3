@@ -6,6 +6,7 @@ import io
 import os
 from unittest import mock
 import pathlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -44,6 +45,11 @@ class ClangTest(unittest.TestCase):
         self.assertEqual(rc, 0, err)
         self.assertEqual(err, '')
         units = a.build.parse_compile_lines(out)
+        # Forced generated headers must still exist after dry_run returns.
+        for unit in units:
+            for i, arg in enumerate(unit['argv'][:-1]):
+                if arg == '-include':
+                    self.assertTrue(pathlib.Path(unit['argv'][i + 1]).is_file())
         sources = {u['src'] for u in units}
         self.assertTrue({'kernel/kernel.c', 'boot/boot_main.c',
                          'lib/sqlite3/sqlite3.c', 'sdk/crt/syscalls.c',
@@ -63,6 +69,8 @@ class ClangTest(unittest.TestCase):
                         args = [arg.replace(cross_dir, '<cross>') for arg in args]
                     args = [arg.replace(u['src'], '<build_id>') if
                             u['src'].endswith('/build_id.c') else arg for arg in args]
+                    args = [re.sub(r'[^ ]*/c_dialect_out_[^/]+/out', '<out>', arg)
+                            for arg in args]
                     result.append((u['src'] if not u['src'].endswith('/build_id.c')
                                    else '<build_id>', tuple(args)))
                 return sorted(result)
@@ -368,6 +376,11 @@ class ClangTest(unittest.TestCase):
                 'void paging_map_range(u32 vstart,u32 vend,u32 phys,u32 flags);\n'
                 'void f(void) { paging_map_range(0,0,MEM_SHM_BASE,0); }')
         self.assertEqual(p2v.scan(body),[])
+        self.assertEqual(p2v.scan(body.replace('__bss_end', '__kernel_resident_end')), [])
+        self.assertEqual(p2v.scan(body.replace('__bss_end', '__ledger_fixed_start')
+                                 .replace('MEM_SHM_BASE', 'MEM_LEDGER_META_BASE')), [])
+        self.assertIn('physical-sink', [r for _, _, r in
+                      p2v.scan(body.replace('__bss_end', 'unrelated_pointer'))])
 
     def test_inline_v2p(self):
         body = ('typedef unsigned long u32; static inline u32 V2P(const void *p) { return (u32)p; }\n'

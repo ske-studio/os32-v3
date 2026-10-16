@@ -1,57 +1,38 @@
 ENTRY(kentry)
 
-/* ======================================================================== */
-/*  include/memmap.h からの写し (2026-09-17 決裁 D2)                         */
-/*                                                                          */
-/*  リンカスクリプトは C のヘッダを読めないので、ここだけ値を二重に持つ。    */
-/*  **一致は `python3 tools/gen_memmap.py --check` が機械的に照合する**      */
-/*  (make check の中)。片方だけ直すと赤になる ([C4])。                       */
-/*                                                                          */
-/*  MEM_KSTACK_TOP  kernel/kentry.asm が `extern` で参照する ESP の初期値。  */
-/*                  ASM からは C のマクロを引けないので絶対シンボルで渡す。  */
-/*  MEM_KERNEL_IMAGE_MAX  カーネル本体 (.text+.data+.bss) に使える最大。     */
-/*                  カーネル帯域 1MB から、ヒープ 176KB・KAPI 4KB・          */
-/*                  ガード 2 枚・SHM 224KB を引いた残り。                    */
-/*  MEM_SQLITE_STACK_SIZE / MEM_DMA_POOL_BASE                                */
-/*                  SQLite の伸び代を止めるための 2 つ (票 TASK_HAL_WIRING   */
-/*                  §1-3)。DMA プールは予約域の中の**固定番地**なので、      */
-/*                  SQLite が育ってプールを飲むとページングを張る前に        */
-/*                  設計が壊れる。**リンク時に**止める。                     */
-/* ======================================================================== */
-KERNEL_LOAD_ADDR     = 0x100000;
-MEM_KSTACK_TOP       = 0x2FFFFC;
-MEM_KERNEL_IMAGE_MAX = 0x99000;
-
-/*  名前が長いので列は揃えない。**上の 3 行の綴りは変えないこと** —
- *  tools/tests/test_memmap_gen.py が「写しがずれたら気づくか」を
- *  `MEM_KSTACK_TOP       = 0x2FFFFC;` の文字列置換で試す。 */
-MEM_SQLITE_STACK_SIZE = 0x20000;
-MEM_DMA_POOL_BASE = 0x2E8000;
-
-/* T2a′: 絶対シンボル。画像に BSS/NOLOAD を追加しない。 */
-MEM_FIXED_PAGING_BASE = 0x3F1000;
-MEM_FIXED_PD_BASE = 0x3F1000;
-MEM_FIXED_BOOT_PT_BASE = 0x3F2000;
-MEM_FIXED_BOOT_PT_COUNT = 0x8;
-MEM_FIXED_APERTURE_PT_BASE = 0x3FA000;
-MEM_FIXED_MMIO_TOP_PT_BASE = 0x3FB000;
-MEM_FIXED_PAGING_END = 0x3FC000;
-MEM_SHELL_HEAP_BASE = 0x380000;
-MEM_SHELL_HEAP_END = 0x3F1000;
-MEM_SHELL_HEAP_SIZE = 0x71000;
-MEM_SHELL_BAND_END = 0x3FFFFF;
-MEM_POOL_BASE = 0x400000;
-MEM_SHELL_STACK_TOP = 0x380000;
-MEM_SHELL_LOAD_ADDR = 0x300000;
-MEM_KERNEL_BAND_END = 0x1FFFFF;
-MEM_LEDGER_META_END = 0x2FB000;
-MEM_STACK_GUARD = 0x2FB000;
-MEM_DMA_POOL_END = 0x2F7FFF;
+/* 値は include/memmap.h から生成した $(BUILD_OUT)/memmap_layout.h を CPP で読む。
+   正典との一致は tools/gen_memmap.py --check が見る ([C4])。 */
+KERNEL_LOAD_ADDR = LAYOUT_KERNEL_LOAD_ADDR;
+MEM_KSTACK_TOP = LAYOUT_MEM_KSTACK_TOP;
+MEM_KERNEL_IMAGE_MAX = LAYOUT_MEM_KERNEL_IMAGE_MAX;
+MEM_SQLITE_STACK_SIZE = LAYOUT_MEM_SQLITE_STACK_SIZE;
+MEM_DMA_POOL_BASE = LAYOUT_MEM_DMA_POOL_BASE;
+MEM_FIXED_PAGING_BASE = LAYOUT_MEM_FIXED_PAGING_BASE;
+MEM_FIXED_PD_BASE = LAYOUT_MEM_FIXED_PD_BASE;
+MEM_FIXED_BOOT_PT_BASE = LAYOUT_MEM_FIXED_BOOT_PT_BASE;
+MEM_FIXED_BOOT_PT_COUNT = LAYOUT_MEM_FIXED_BOOT_PT_COUNT;
+MEM_FIXED_APERTURE_PT_BASE = LAYOUT_MEM_FIXED_APERTURE_PT_BASE;
+MEM_FIXED_MMIO_TOP_PT_BASE = LAYOUT_MEM_FIXED_MMIO_TOP_PT_BASE;
+MEM_FIXED_PAGING_END = LAYOUT_MEM_FIXED_PAGING_END;
+MEM_SHELL_HEAP_BASE = LAYOUT_MEM_SHELL_HEAP_BASE;
+MEM_SHELL_HEAP_END = LAYOUT_MEM_SHELL_HEAP_END;
+MEM_SHELL_HEAP_SIZE = LAYOUT_MEM_SHELL_HEAP_SIZE;
+MEM_SHELL_BAND_END = LAYOUT_MEM_SHELL_BAND_END;
+MEM_POOL_BASE = LAYOUT_MEM_POOL_BASE;
+MEM_SHELL_STACK_TOP = LAYOUT_MEM_SHELL_STACK_TOP;
+MEM_SHELL_LOAD_ADDR = LAYOUT_MEM_SHELL_LOAD_ADDR;
+MEM_KERNEL_BAND_END = LAYOUT_MEM_KERNEL_BAND_END;
+MEM_LEDGER_META_END = LAYOUT_MEM_LEDGER_META_END;
+MEM_STACK_GUARD = LAYOUT_MEM_STACK_GUARD;
+MEM_DMA_POOL_END = LAYOUT_MEM_DMA_POOL_END;
+MEM_FIXED_PAGING_USED_END = LAYOUT_MEM_FIXED_PAGING_USED_END;
+MEM_FIXED_PAGING_FRAME_END = LAYOUT_MEM_FIXED_PAGING_FRAME_END;
+MEM_LAYOUT_LOAD_END = LAYOUT_MEM_LAYOUT_LOAD_END;
 
 SECTIONS
 {
     /* カーネルは 0x100000 (1MB) にロードされる */
-    . = 0x100000;
+    . = KERNEL_LOAD_ADDR;
 
     .text : {
         /* kernel/kentry.o が確実に関数の先頭になるようにする */
@@ -68,19 +49,26 @@ SECTIONS
         *(EXCLUDE_FILE(lib/sqlite3/sqlite3.o lib/sqlite3/os32_sqlite_vfs.o lib/sqlite3/os32_sqlite_test.o) .rodata.*)
     }
 
-    .bss : {
+    .bss ALIGN(4) : {
         __bss_start = .;
         *(EXCLUDE_FILE(lib/sqlite3/sqlite3.o lib/sqlite3/os32_sqlite_vfs.o lib/sqlite3/os32_sqlite_test.o) .bss)
         *(EXCLUDE_FILE(lib/sqlite3/sqlite3.o lib/sqlite3/os32_sqlite_vfs.o lib/sqlite3/os32_sqlite_test.o) .bss.*)
         *(EXCLUDE_FILE(lib/sqlite3/sqlite3.o lib/sqlite3/os32_sqlite_vfs.o lib/sqlite3/os32_sqlite_test.o) COMMON)
-        __bss_end = .;
+        . = ALIGN(4);
     }
 
-    /* ================================================================ */
-    /*  SQLite 拡張域 (0x200000 - 0x2FFFFF, 1MB)                       */
-    /* ================================================================ */
-    . = 0x200000;
+    /* 台帳の FIXED 型 backing (2 頁)。core BSS の末尾、__bss_end まで。 */
+    .ledger_fixed ALIGN(LAYOUT_MEM_PAGE_SIZE) (NOLOAD) : {
+        __ledger_fixed_start = .;
+        . += LAYOUT_MEM_LEDGER_META_SIZE;
+        __ledger_fixed_end = .;
+        __bss_end = .;
+    }
+    . = ALIGN(LAYOUT_MEM_PAGE_SIZE);
 
+    /* ================================================================ */
+    /*  SQLite (core BSS 直後、ページ整列)                              */
+    /* ================================================================ */
     .sqlite_text : {
         __sqlite_start = .;
         KEEP(lib/sqlite3/sqlite3.o(.text .text.*))
@@ -98,6 +86,7 @@ SECTIONS
         KEEP(lib/sqlite3/sqlite3.o(.data .data.*))
         KEEP(lib/sqlite3/os32_sqlite_vfs.o(.data .data.*))
         KEEP(lib/sqlite3/os32_sqlite_test.o(.data .data.*))
+        . = ALIGN(4);
         __sqlite_data_end = .;
     }
 
@@ -105,67 +94,68 @@ SECTIONS
         lib/sqlite3/sqlite3.o(.bss .bss.* COMMON)
         lib/sqlite3/os32_sqlite_vfs.o(.bss .bss.* COMMON)
         lib/sqlite3/os32_sqlite_test.o(.bss .bss.* COMMON)
+        . = ALIGN(4);
         __sqlite_end = .;
     }
 
+    MEM_SQLITE_STACK_BASE = LAYOUT_MEM_SQLITE_STACK_BASE;
+    MEM_SQLITE_STACK_TOP = LAYOUT_MEM_SQLITE_STACK_TOP;
+    MEM_SQLITE_STACK_END = MEM_SQLITE_STACK_BASE + MEM_SQLITE_STACK_SIZE;
+    MEM_SQLITE_STACK_GUARD = LAYOUT_MEM_SQLITE_STACK_GUARD;
+    __kernel_resident_end = MEM_SQLITE_STACK_END;
+    ASSERT(__ledger_fixed_start % LAYOUT_MEM_PAGE_SIZE == 0 &&
+           __ledger_fixed_end - __ledger_fixed_start == LAYOUT_MEM_LEDGER_META_SIZE &&
+           __bss_start <= __ledger_fixed_start && __ledger_fixed_end == __bss_end,
+           "ledger backing must be two pages inside core BSS")
+    ASSERT(__bss_end <= __sqlite_start && __sqlite_end <= MEM_SQLITE_STACK_GUARD &&
+           MEM_SQLITE_STACK_BASE == MEM_SQLITE_STACK_GUARD + LAYOUT_MEM_GUARD_SIZE,
+           "SQLite chain overlaps BSS/guard")
     /* ==================================================================== */
     /*  カーネル本体の予算 (2026-09-17 決裁 D2、票                            */
-    /*  docs/archive/kernel_v21/TASK_KSTACK_USER.md)                               */
+    /*  docs/archive/kernel_v21/TASK_KSTACK_USER.md)                          */
     /*                                                                       */
-    /*  KHEAP_BASE は __bss_end を 4KB に切り上げた位置で、そこから           */
-    /*  ヒープ → KAPI → SHM が芋づるで動く。カーネルが予算を超えると SHM の   */
-    /*  後方ガードがカーネル帯域を突き抜け、**静かに**他人のページを          */
-    /*  not-present にする。2026-09-17 にはカーネルスタックの真ん中に         */
-    /*  居座り、あと 224 バイトで三重フォルトするところまで来ていた。         */
-    /*  それを **ここで、リンク時に** 止める。                                */
+    /*  KHEAP_BASE は __kernel_resident_end を 4KB に切り上げた位置で、そこから */
+    /*  ヒープ → KAPI → SHM が芋づるで動く。SHM の後方ガードが固定 PD/PT 枠の  */
+    /*  guard を越えると、**静かに**他人のページを壊す。                      */
+    /*  それを **ここで、リンク時に** 止める (MEM_KERNEL_IMAGE_MAX と同値)。  */
     /* ==================================================================== */
-    ASSERT(__bss_end <= KERNEL_LOAD_ADDR + MEM_KERNEL_IMAGE_MAX,
-        "kernel image exceeds MEM_KERNEL_IMAGE_MAX (include/memmap.h): the floating KHEAP_BASE/KAPI/SHM chain would run past the kernel band and silently unmap someone else's pages. Fix: shrink the kernel, or reduce MEM_SHM_SIZE in 16KB steps (keep SHM_BLOCK_COUNT in kernel/shm.h in sync), or reduce KHEAP_SIZE. Run 'python3 tools/gen_memmap.py --check' for the exact numbers; background is docs/archive/kernel_v21/TASK_KSTACK_USER.md")
-
-    /* ==================================================================== */
-    /*  SQLite の伸び代 (票 docs/tasks/v3/TASK_HAL_WIRING.md §1-3)            */
-    /*                                                                       */
-    /*  __sqlite_end の後ろには代替スタック 128KB が続き、その後ろの予約域    */
-    /*  (NOT PRESENT) の中に DMA プールを 0x2E8000 固定で開ける。+0x1000 は   */
-    /*  代替スタックの 4KB 切り上げぶん (MEM_SQLITE_STACK_BASE の式)。        */
-    /*  ここが赤くなったら、プールを動かすか SQLite を削るかの判断が要る —    */
-    /*  **黙って重ねてはいけない** (プールは割り込み文脈から DMA に渡す       */
-    /*  メモリで、重なれば SQLite の .bss が装置に書き潰される)。             */
-    /* ==================================================================== */
-    ASSERT(__sqlite_end + MEM_SQLITE_STACK_SIZE + 0x1000 <= MEM_DMA_POOL_BASE,
-        "SQLite band overruns DMA pool")
-
-    ASSERT(((MEM_FIXED_PAGING_BASE | MEM_FIXED_PD_BASE | MEM_FIXED_BOOT_PT_BASE |
-             MEM_FIXED_APERTURE_PT_BASE | MEM_FIXED_MMIO_TOP_PT_BASE | MEM_FIXED_PAGING_END | MEM_SHELL_HEAP_BASE |
-             MEM_SHELL_HEAP_END | MEM_SHELL_STACK_TOP | (MEM_SHELL_BAND_END + 1)) & 0xFFF) == 0,
-        "fixed paging/shell boundaries unaligned")
-    ASSERT(MEM_FIXED_BOOT_PT_COUNT == 8 && MEM_FIXED_PD_BASE == MEM_FIXED_PAGING_BASE &&
-           MEM_FIXED_BOOT_PT_BASE == MEM_FIXED_PD_BASE + 0x1000 &&
-           MEM_FIXED_APERTURE_PT_BASE == MEM_FIXED_BOOT_PT_BASE + MEM_FIXED_BOOT_PT_COUNT * 0x1000 &&
-           MEM_FIXED_MMIO_TOP_PT_BASE == MEM_FIXED_APERTURE_PT_BASE + 0x1000 &&
-           MEM_FIXED_PAGING_END == MEM_FIXED_MMIO_TOP_PT_BASE + 0x1000 &&
-           MEM_FIXED_PAGING_END - MEM_FIXED_PAGING_BASE == 11 * 0x1000,
-        "fixed paging must be contiguous 1/8/1/1 pages")
-    ASSERT(MEM_SHELL_STACK_TOP <= MEM_SHELL_HEAP_BASE &&
-           MEM_SHELL_HEAP_BASE < MEM_SHELL_HEAP_END &&
-           MEM_SHELL_HEAP_BASE + MEM_SHELL_HEAP_SIZE == MEM_SHELL_HEAP_END &&
-           MEM_SHELL_HEAP_END == MEM_FIXED_PAGING_BASE,
-        "shell heap overlaps fixed paging")
-    ASSERT(MEM_FIXED_PAGING_END <= MEM_SHELL_BAND_END + 1 &&
-           MEM_SHELL_BAND_END + 1 == MEM_POOL_BASE &&
-           MEM_POOL_BASE - MEM_FIXED_PAGING_END == 4 * 0x1000,
-        "fixed paging tail must reserve four pages")
-    ASSERT(MEM_KERNEL_BAND_END < MEM_SHELL_LOAD_ADDR &&
-           __sqlite_end + MEM_SQLITE_STACK_SIZE + 0x1000 <= MEM_DMA_POOL_BASE &&
-           MEM_DMA_POOL_END < MEM_SHELL_LOAD_ADDR &&
-           MEM_LEDGER_META_END <= MEM_STACK_GUARD && MEM_KSTACK_TOP < MEM_SHELL_LOAD_ADDR &&
-           MEM_SHELL_LOAD_ADDR <= MEM_SHELL_HEAP_BASE,
-        "fixed paging overlaps kernel/SQLite/DMA/metadata/stack")
+    ASSERT(LAYOUT_MEM_SHM_RESV_START <= LAYOUT_MEM_FIXED_PAGING_GUARD_BASE,
+           "resident chain exceeds SLACK ceiling")
+    ASSERT(LAYOUT_MEM_FIXED_PAGING_GUARD_BASE + LAYOUT_MEM_GUARD_SIZE == MEM_FIXED_PAGING_BASE &&
+           MEM_FIXED_PAGING_FRAME_END - MEM_FIXED_PAGING_BASE == 26 * LAYOUT_MEM_PAGE_SIZE &&
+           MEM_FIXED_PAGING_FRAME_END - MEM_FIXED_PAGING_USED_END == 15 * LAYOUT_MEM_PAGE_SIZE &&
+           MEM_FIXED_PAGING_FRAME_END == MEM_STACK_GUARD &&
+           MEM_STACK_GUARD + LAYOUT_MEM_GUARD_SIZE == LAYOUT_MEM_KSTACK_BASE &&
+           LAYOUT_MEM_KSTACK_BASE + LAYOUT_MEM_KSTACK_SIZE == MEM_SHELL_LOAD_ADDR,
+           "fixed guard/PT/guard/stack must be 1/26/1/4 pages")
+    ASSERT(MEM_FIXED_PD_BASE == MEM_FIXED_PAGING_BASE &&
+           MEM_FIXED_BOOT_PT_BASE == MEM_FIXED_PD_BASE + LAYOUT_MEM_PAGE_SIZE &&
+           MEM_FIXED_BOOT_PT_COUNT == 8 &&
+           MEM_FIXED_APERTURE_PT_BASE == MEM_FIXED_BOOT_PT_BASE + 8 * LAYOUT_MEM_PAGE_SIZE &&
+           MEM_FIXED_MMIO_TOP_PT_BASE == MEM_FIXED_APERTURE_PT_BASE + LAYOUT_MEM_PAGE_SIZE &&
+           MEM_FIXED_PAGING_USED_END == MEM_FIXED_MMIO_TOP_PT_BASE + LAYOUT_MEM_PAGE_SIZE &&
+           MEM_FIXED_PAGING_USED_END - MEM_FIXED_PAGING_BASE == 11 * LAYOUT_MEM_PAGE_SIZE,
+           "fixed paging used extent must be 1/8/1/1 pages")
+    ASSERT(MEM_SHELL_BAND_END + 1 == MEM_POOL_BASE &&
+           MEM_SHELL_HEAP_END == LAYOUT_MEM_SHELL_GUARD &&
+           MEM_SHELL_HEAP_SIZE == 0x40000 &&
+           LAYOUT_MEM_SHELL_STACK_SIZE == 0xA000 &&
+           MEM_SHELL_HEAP_BASE - LAYOUT_MEM_SHELL_IMAGE_HEADROOM ==
+               MEM_SHELL_LOAD_ADDR + LAYOUT_MEM_SHELL_MAX_SIZE,
+           "shell image/heap/guard/stack budget")
+    ASSERT(MEM_DMA_POOL_BASE == 0x7F0000 && MEM_DMA_POOL_END + 1 == 0x800000 &&
+           MEM_DMA_POOL_BASE % 0x10000 == 0 && LAYOUT_MEM_DMA_POOL_SIZE == 0x10000 &&
+           MEM_DMA_POOL_BASE >= (LAYOUT_MEM_BOOT_BUNDLE_BASE + LAYOUT_MEM_BOOT_BUNDLE_SIZE) &&
+           MEM_DMA_POOL_END < LAYOUT_MEM_SYSTEM_SPACE_BASE,
+           "DMA window must be outside boot bundle and system space")
+    ASSERT(((__bss_start | __bss_end | __sqlite_data_end | __sqlite_end) & 3) == 0 &&
+           __bss_start <= __bss_end && __sqlite_data_end <= __sqlite_end,
+           "BSS zero ranges must be ordered and DWORD aligned")
 
     .os32_generations 0 (INFO) : { KEEP(*(.os32_generations)) }
     .os32_generation_ref 0 (INFO) : { KEEP(*(.os32_generation_ref)) }
     /* GENERATED GENERATION REF BEGIN */
-__os32_abi_1_mem_3_fmt_4 = 0;
+__os32_abi_1_mem_4_fmt_4 = 0;
 /* GENERATED GENERATION REF END */
 
     /DISCARD/ : {

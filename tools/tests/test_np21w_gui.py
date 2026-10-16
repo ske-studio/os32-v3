@@ -216,7 +216,8 @@ class Http:
 
 
 # A real nm -S shape, including local symbols and sizeof(g_slot)=6*64.
-KERNEL_NM = '''00170001 B __bss_end
+KERNEL_NM = '''00160001 B __bss_end
+00170001 B __kernel_resident_end
 00160000 00000180 b g_slot
 00150000 00002000 b g_ring
 00152000 00000004 b g_head
@@ -240,8 +241,8 @@ def symbols(path):
 def setup_state(http):
     for owner in range(6):
         http.put(0x160000 + owner * 64, struct.pack('<6I', 1 if owner == 1 else 0, 0, 0, 0, 0, owner % 2))
-    # Independent arithmetic from memmap.h: round bss, heap, KAPI, guard, GUI offset.
-    base = 0x171000 + 0x2c000 + 0x1000 + 0x1000 + 0x28000
+    # Independent arithmetic from memmap.h: round resident end, heap, KAPI, guard, GUI offset.
+    base = 0x171000 + 0x30000 + 0x1000 + 0x1000 + 0x28000
     for slot in range(4):
         http.put(base + slot * 0x4000, struct.pack('<HHIHHHH', 1, slot, 10 + slot, 2, 3, 4, 0))
     for addr, value in ((0x15200c, 17), (0x600000, 18), (0x600004, 19)):

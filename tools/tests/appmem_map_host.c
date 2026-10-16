@@ -25,9 +25,7 @@ u32 map_alloc(u32 owner, int n);
 int map_free(u32 owner, u32 pfn, int n);
 unsigned int publish_save(void);
 unsigned int host_arch_if = 0x202U;
-__asm__(".globl __sqlite_start\n.set __sqlite_start, 0x200000\n"
-        ".globl __sqlite_end\n.set __sqlite_end, 0x240000\n"
-        ".globl __bss_end\n.set __bss_end, 0x180000\n");
+/* Layout symbols are supplied by kernel_layout.linker_flags(). */
 static void say(const char *s, u32 n) {
     __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(s), "d"(n) : "memory");
 }
@@ -958,9 +956,9 @@ static void teardown_cases(void) {
 #include "exec_heap_host.h"
 
 void _start(void) {
-    u32 args[6] = {MEM_POOL_BASE, 0x4000000, 3, 0x32, 0xffffffffUL, 0}, result;
+    u32 args[6] = {KERNEL_LOAD_ADDR, MEM_POOL_BASE + 0x4000000 - KERNEL_LOAD_ADDR, 3, 0x32, 0xffffffffUL, 0}, result;
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
-    CHECK("host RAM", result == MEM_POOL_BASE);
+    CHECK("host RAM", result == KERNEL_LOAD_ADDR);
     heap_ram();
     host_map_fixed_paging(); paging_init(17408); host_pool_boot(17408);
     u32 oa, ob;

@@ -1,3 +1,4 @@
+from kernel_layout import linker_flags
 #!/usr/bin/env python3
 """T2e e10a real paging/SHM/V86; record: tools/tests/shm_user_tdd.md."""
 import argparse
@@ -138,7 +139,7 @@ def run(runner, mutation=None):
             (work/Path(p).name).write_text(source)
         alloc = (ROOT/'kernel/pgalloc.c').read_text().replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags')
         (work/'pgalloc_host_source.c').write_text(alloc)
-        cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
+        cmd = ['gcc', *linker_flags(), '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
                '-ffreestanding', '-fno-builtin', '-fno-pie', '-fno-stack-protector',
                '-ffunction-sections', '-fdata-sections', '-nostdlib', '-static', '-no-pie',
                '-Wl,--gc-sections', '-DPHYSMEM_HOST_TEST=1']

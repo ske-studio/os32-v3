@@ -114,6 +114,7 @@ static u32 model_limit(const struct physmem *m)
     if (!m || !m->count || m->count > PHYSMEM_MAX_RANGES ||
         m->legacy_ceiling > PHYSMEM_LEGACY_MAX_PFN) return 0;
     allowed = PHYSMEM_SOURCE_LEGACY | PHYSMEM_SOURCE_MACHINE;
+    allowed |= PHYSMEM_SOURCE_KERNEL_SLACK;
 #if defined(PHYSMEM_HOST_TEST) && PHYSMEM_HOST_TEST == 1 && !defined(__KERNEL_BUILD__)
     allowed |= PHYSMEM_SOURCE_SYNTHETIC;
 #endif
@@ -190,6 +191,12 @@ static int init_model(struct physmem *m, void *backing, u32 capacity,
     if (backing != P2V(first * PAGE_SIZE)) goto done;
 #endif
     next = *m;
+    /* Only the boot layout has workspace. Reserve DMA before metadata or any
+     * general/BB allocation. A short RAM report is absence; overlap is failure.
+     * Keep the original low arena bound for the later PERSIST freeze. */
+    int dma = ws_first && m->legacy_ceiling >= (MEM_DMA_POOL_END + 1) / PAGE_SIZE;
+    if (dma && !physmem_reserve_ram(&next, MEM_DMA_POOL_BASE / PAGE_SIZE,
+                                    (MEM_DMA_POOL_END + 1) / PAGE_SIZE)) goto done;
     if ((kind == PGALLOC_BACKING_ARENA_TOP &&
          !physmem_reserve_ram(&next, first, first + pages)) ||
         !verify(first, pages, backing)) goto done;
@@ -209,10 +216,25 @@ static int init_model(struct physmem *m, void *backing, u32 capacity,
         if (!verify(ws_first, ws_end - ws_first, P2V(ws_first * PAGE_SIZE)))
             goto done;
     }
-    /* No fallible work follows. Never zero before reservation/checks succeed. */
+    /* Never zero before all RAM reservations and mapping checks succeed. */
+    /* DMA splits RAM eligibility, but ARENA_TOP placement still uses the
+     * detected low tail. freeze later finds DMA's kernel PERSIST ownership. */
+    generic_end = dma ? (kind == PGALLOC_BACKING_ARENA_TOP ? ws_first :
+                        physmem_legacy_end(m)) : physmem_legacy_end(&next);
     *m = next;
     init_core(&next, (u32 *)backing, limit);
-    generic_end = physmem_legacy_end(&next);
+    if (dma) {
+        for (u32 p = MEM_DMA_POOL_BASE / PAGE_SIZE;
+             p < (MEM_DMA_POOL_END + 1) / PAGE_SIZE; p++) {
+            owner_map[p] = LEDGER_OWNER_KERNEL;
+            ledger_owners[LEDGER_OWNER_KERNEL].pages++;
+        }
+        /* Ineligible permanent pages cannot be freed or reclaimed as RAM. */
+        if (!ledger_register_region(LEDGER_R_DMA, LEDGER_OWNER_KERNEL,
+                                    MEM_DMA_POOL_BASE / PAGE_SIZE,
+                                    (MEM_DMA_POOL_END + 1) / PAGE_SIZE,
+                                    LEDGER_CACHE_WB, LEDGER_RF_PERMANENT)) goto done;
+    }
     arena_end = generic_end;
     workspace_first = ws_first;
     workspace_end = ws_end;
@@ -495,7 +517,8 @@ u32 pgalloc_alloc_phys(u32 owner, int n)
     int ok;
     flags = irq_save();
     ledger_note(LEDGER_OP_ALLOC, owner, LEDGER_CALLER());
-    ok = n > 0 && alloc_owner(owner, (u32)n, MEM_POOL_BASE / PAGE_SIZE,
+    ok = n > 0 && alloc_owner(owner, (u32)n,
+                              MEM_SHM_RESV_START / PAGE_SIZE,
                               generic_end, LEDGER_BOTTOM_UP, &pfn);
     irq_restore(flags);
     return ok ? pfn * PAGE_SIZE : 0;
@@ -1033,7 +1056,9 @@ done:
     return ok;
 }
 
-/* 0 = 未凍結。凍結は ⑥ の 1 回だけ (§3-6)。 */
+/* 0 = 未凍結。凍結は ⑥ の 1 回だけ (§3-6)。
+ * MEM_PHYS_EXEC_FLOOR から最初の PERSIST までの低位連続上端。
+ * DMA/kernel の予約もここで止める。最高 RAM 番地や BB の下端とは限らない。 */
 static u32 arena_top;
 
 void ledger_arena_freeze(void)

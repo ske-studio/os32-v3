@@ -27,7 +27,8 @@ STAGE_KINDS = {
 STAGES = {}
 for _stage, _kinds in STAGE_KINDS.items():
     STAGES[_stage] = (list(STAGES.values())[-1] if STAGES else 0) + len(_kinds)
-ABI_SYMBOL = '__os32_abi_1_mem_3_fmt_4'
+GENERATIONS = json.loads((ROOT / 'sdk/kapi.json').read_text())['generations']
+ABI_SYMBOL = '__os32_abi_{kapi_abi}_mem_{memory_layout}_fmt_{os32x_format}'.format(**GENERATIONS)
 
 
 def fnv1a(data):
@@ -145,6 +146,7 @@ def check_nm(entries, nm=None, root=ROOT):
         refs.discard(ABI_SYMBOL)
         if stage == 'S2':
             refs.discard('__bss_end')
+            refs.discard('__kernel_resident_end')
             # The module now uses accessors; the retained audit accounts for
             # the original audit-only references. Keep the S0 inventory fixed.
             module_refs = symbols(nm, paths[:1], True)

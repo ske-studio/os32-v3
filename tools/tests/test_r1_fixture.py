@@ -3,6 +3,7 @@
 CPU ud2/stop are replaced; allocator and closing exception path are real source.
 Only the temporary source copy uses SOURCE_DATE_EPOCH for build comparisons.
 """
+from kernel_layout import linker_flags
 import argparse
 import hashlib
 import json
@@ -61,7 +62,7 @@ def fixture(tmp, mutation=None, runner="qemu"):
     end = end[:end.index('    if (!v86_session.open)')] + '    irq_restore(flags);\n}\n'
     (tmp / 'entry_source.c').write_text(entry + end)
     (tmp / 'timer_source.c').write_text(function(isr, 'void timer_handler('))
-    cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
+    cmd = ['gcc', *linker_flags(), '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
            '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static',
            '-no-pie', '-ffunction-sections', '-Wl,--gc-sections', '-DOS32_R1_FIXTURE',
            '-I' + str(tmp)]

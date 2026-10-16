@@ -28,4 +28,14 @@ check-c-dialect-host:
 - tools/pack_name_tables.txt
 - tools/pack_notes.txt
 # Conservative artifact-path audit (including indirect helpers/fixtures).
+- tools/gen_memmap.py
+- boot/loader_fat_new.asm
+- kernel/kentry.asm
+- sdk/os32x_hdr.py
+- sdk/rust/os32api/src/gui/proto.rs
+- sdk/rust/os32api/src/gui/stub.rs
+- tools/check_artifacts.py
+- tools/mkshlib.py
+- tools/tests/test_owner_reclaim.py
+- userland/rust/libos32gui/src/shlib.rs
 artifact_reader: true

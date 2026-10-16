@@ -29,8 +29,8 @@
 /* MEMSYS5 固定プール。
    200KB では game (econ 常時接続 + battle/rpg/items/events の順次ロード) が
    最後の battle.db 二回目 open の prepare で out of memory になった
-   (使用中 188KB で枯渇)。SQLite 拡張域 0x200000-0x2FFFFF は
-   text+rodata+data で 374KB 使用なので、384KB に広げても 240KB 余る。 */
+   (使用中 188KB で枯渇) ので 384KB に広げた。置き場は SQLite の .bss で、
+   常駐鎖の予算 (build/os32.ld の ASSERT) に含まれる。 */
 #define SQLITE_MEMSYS5_SIZE  (384 * 1024)
 #define CANARY_VALUE 0xDEADBEEFUL
 static u32 canary_before[4] = {

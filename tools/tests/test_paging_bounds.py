@@ -4,6 +4,7 @@ import pathlib
 import subprocess
 import tempfile
 import argparse
+import os
 parser = argparse.ArgumentParser()
 parser.add_argument('--mutate', action='store_true')
 parser.add_argument('--rebuild', choices=['nonmaster', 'rollback'])
@@ -28,13 +29,13 @@ with tempfile.TemporaryDirectory(prefix='os32-paging-') as tmp:
     host_includes = ['-I' + str(ROOT / 'tools/tests/host_arch')] + includes
     exe = tmp / 'paging'
     harness = 'paging_rebuild_host.c' if args.rebuild else 'paging_bounds_host.c'
-    defines = ['-DPHYSMEM_HOST_TEST=1']
+    defines = ['-DPHYSMEM_HOST_TEST=1', ]
     if args.rebuild:
         defines.append('-DTEST_' + args.rebuild.upper())
     build = ['gcc', *FLAGS, *defines, '-nostdlib', '-static', '-no-pie', *host_includes, str(ROOT / 'tools/tests' / harness), str(ROOT / 'kernel/physmem.c'), '-o', str(exe)]
     subprocess.run(build, check=True)
     host32.run([str(exe)], check=True, timeout=60)
-    subprocess.run(['i386-elf-gcc', *FLAGS, '-O2', *includes, '-c', str(ROOT / 'kernel/paging.c'), '-o', str(tmp / 'paging.o')], check=True)
+    subprocess.run(['i386-elf-gcc', *FLAGS, *defines, '-O2', *includes, '-c', str(ROOT / 'kernel/paging.c'), '-o', str(tmp / 'paging.o')], check=True)
     print('HOST ILP32 + TARGET GNU11 PASS')
 
     if args.mutate:

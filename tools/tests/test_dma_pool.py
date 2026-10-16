@@ -10,15 +10,14 @@
 
 **NP21/W では踏めない**のは 64KB またぎの飛ばし。エミュレータは 8237 の
 折り返しを模擬しないので、またいだ配置でも「動いて見える」(§4-51 と同じ型)。
-番地は実物の MEM_DMA_POOL_BASE (0x2E8000) をそのまま使う — 池が 0x2F0000 を
-**跨ぐこと自体**が試験の前提なので、それも `layout` で固定する。
-ただし R4 の最悪の並び (`worst`) は**池の番地を焼かない** — 64KB バンクの
-中の 16 通りの先頭で回す (T3 で池が 64KB 整列の番地へ移っても通る)。
+番地は実物の MEM_DMA_POOL_BASE を使う。
+64KB 境界を跨ぐ池は合成入力 (0x2E8000) で残し、実物の池の 64KiB 整列も確かめる。
 
   python3 -B tools/tests/test_dma_pool.py            # ホストで全ケース
   python3 -B tools/tests/test_dma_pool.py --target   # + i386-elf で実物を通す
   python3 -B tools/tests/test_dma_pool.py --mutate   # 否定側
 """
+import os
 import pathlib
 import re
 import subprocess
@@ -127,6 +126,37 @@ def host_build(tmp, source_text=None, d8237_text=None):
     return exe
 
 
+def boot_gate(tmp):
+    d = pathlib.Path(tmp)
+    kernel = (ROOT / "kernel/kernel.c").read_text()
+    start = kernel.index('    if (!memory_boot_init(mem_kb))')
+    end = kernel.index('    /* FDリダイレクト初期化', start)
+    gate = kernel[start:end].replace('for (;;) { _stop(); }', 'longjmp(halt, 1);')
+    (d / "kernel_dma_gate.c").write_text(
+        'static void host_kernel_dma(u32 mem_kb) {\n' + gate + '\n}\n')
+    selftests = (ROOT / "kdebug/kselftest.c").read_text()
+    helper = re.search(r"static int selftest_dma_available\(void\).*?\n}\n", selftests, re.S).group()
+    gate = selftests[selftests.index('    if (selftest_dma_available()) test_dma_pool();'):]
+    gate = gate[:gate.index('    test_irq_dynamic();')]
+    (d / "selftest_dma_gate.c").write_text(
+        helper + 'static void host_selftest_dma(void) {\n' + gate + '}\n')
+    (d / "dma_pool_source.c").write_text((ROOT / "kernel/dma_pool.c").read_text())
+    (d / "io.h").write_text(
+        'static unsigned int irq_save(void) { return 0; }\n'
+        'static void irq_restore(unsigned int f) { (void)f; }\n')
+    exe = d / "dma-boot-host"
+    subprocess.run(["gcc", *FLAGS, "-I" + str(d), *INCLUDES,
+                    str(ROOT / "tools/tests/dma_boot_host.c"), "-o", str(exe)], check=True)
+    for case in ("ready", "short", "conflict", "nodebug"):
+        subprocess.run([str(exe), case], check=True)
+    # FDC's early boot buffer must stay independent of the pool.
+    fdc = (ROOT / "drivers/fdc.c").read_text()
+    assert 'static u8 s_fdbuf[FDC_BUF_BYTES]' in fdc
+    assert not re.search(r'\bdma_(?:alloc|free)\s*\(', fdc)
+    assert kernel.index('fdc_init(') < start
+    print("BOOT reservation/init/selftest/probe, short RAM, conflict, FDC PASS")
+
+
 def run_cases(exe, cases):
     failed = 0
     for case in cases:
@@ -187,6 +217,7 @@ def mutate(tmp):
 if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-dma-pool-") as tmp:
+        boot_gate(tmp)
         exe = host_build(tmp)
         print("HOST GNU11 -Werror compile PASS (real kernel/dma_pool_math.c)",
               flush=True)

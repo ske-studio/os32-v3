@@ -1,4 +1,5 @@
 check-ci-stab-host:
+- sdk/link/app_sys.ld
 - tools/tests/test_ci_stab.py
 - tools/tests/host32.py
 - tools/tests/mutpar.py
@@ -36,6 +37,12 @@ check-ci-stab-host:
 - kernel/boot_font.c
 - kernel/isr_handlers.c
 - kernel/kentry.asm
+- kernel/kstack_hw.c
+- kernel/setjmp.asm
+- kernel/tss.c
+- lib/sqlite3/sqlite_stack.asm
+- tools/tests/stack_entry_host.c
+- tools/tests/test_stack_entry.py
 - kernel/kernel.c
 - kernel/paging.c
 - kernel/paging_app.c
@@ -98,6 +105,7 @@ check-ci-stab-host:
 - tools/tests/test_ring3_guard.py
 - tools/tests/test_memory_boot.py
 - tools/tests/test_ledger.py
+- tools/tests/kernel_layout.py
 - tools/tests/test_gfx_boot.py
 - tools/tests/test_device_reservation.py
 - tools/tests/test_app_bb_overlap.py

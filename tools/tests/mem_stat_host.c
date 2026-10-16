@@ -312,8 +312,10 @@ void _start(void)
 {
     owner_diagnostics();
     heap_ram();
+    /* The fixed-map fixture covers the new stack bands; map before marking. */
+    host_map_fixed_paging();
     stack_diagnostics();
-    host_map_fixed_paging(); paging_init(17408); host_pool_boot(17408);
+    paging_init(17408); host_pool_boot(17408);
     roots[0] = paging_kernel_pd_phys();
     integration = 1; heap_alias_on = 1;
     heap_mmap(MEM_SHELL_HEAP_BASE, MEM_SHELL_HEAP_SIZE, 0);

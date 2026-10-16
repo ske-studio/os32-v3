@@ -2,6 +2,7 @@
 
 Only int80 is replaced by a host bridge; mutants must compile and fail at runtime.
 """
+from kernel_layout import linker_flags
 import argparse
 import pathlib
 import subprocess
@@ -63,7 +64,7 @@ def run(args, mutant=None):
         offset = next(line for line in source.splitlines() if line.startswith('#define RING3_LS_SHIM_OFF'))
         (tmp / 'trampoline.inc').write_text(offset + '\n' + function(source, 'static void ring3_trampoline_init(void)'))
         exe = tmp / 'test'
-        subprocess.run(['gcc', '-m32', '-static', '-fno-pie', '-no-pie', '-nostdlib',
+        subprocess.run(['gcc', *linker_flags(), '-m32', '-static', '-fno-pie', '-no-pie', '-nostdlib',
                         '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-fno-stack-protector', '-ffreestanding',
                         *['-I' + str(ROOT / p) for p in
                           ('include', 'fs', 'exec', 'kernel', 'lib', 'sdk/include/os32')],

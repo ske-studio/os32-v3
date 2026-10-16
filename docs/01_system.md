@@ -38,7 +38,7 @@ loader_hdd.asm (16bit → 32bit) — 第2段階ローダー (ELF + C)
 boot_main.c (32bit プロテクトモード) — Cメインロジック
   ├── PC-98パーティションテーブル (LBA 1) からext2パーティション特定
   ├── ext2 ミニドライバで /boot/vmkernel.lz4 を 0x10000 に読み込み
-  ├── VK32 v2 の検査 + LZ4展開 (kernel.bin→0x100000, sqlite.bin→0x200000) — boot/vk32_boot.c
+  ├── VK32 v2 の検査 + LZ4展開 (kernel.bin→0x100000, sqlite.bin→__sqlite_start) — boot/vk32_boot.c
   │   完全長・entry_count・入力と展開先の範囲・decoded == raw_size・展開後とファイル全体の
   │   CRC32 を見て、外れたら 5 行目に理由を出して止まる
   ├── 起動したイメージの CRC をブート情報域 (0x7E00) のイメージ欄へ
@@ -69,7 +69,7 @@ kernel.c :: kernel_main(u32 mem_kb, u32 boot_drive)
   └── シェル起動ループ: exec_run("/sys/shell.bin" または GUI=1 なら "/bin/gshell.bin")
       ├── シェル内で /etc/profile を自動実行 (環境変数・パス初期化)
       ├── CUI の `os32gui` / gshell の ESC は sys_switch_shell() で次シェルを予約して exit →
-      │   ループが gui_take_next_shell() (consume 方式) で読んで入れ替える (両方ともシェル帯 0x300000)
+      │   ループが gui_take_next_shell() (consume 方式) で読んで入れ替える (両方ともシェル帯 0x400000)
       └── gshell はロード失敗 / 連続 fault なら CUI へ戻す (保険)
 ```
 
@@ -90,7 +90,7 @@ loader_fat_new.asm (16bit → 32bit) — 第2段階
   ├── FAT12から /VMKRNL.LZ4 を検索、読む前に FAT チェーン全体を検査
   │   (長さ・早期終端・範囲外・循環 = fat_chain_check) してから読み込み (DMA境界対応)
   ├── A20ゲート有効化 / GDT設定 / PM遷移
-  ├── VK32 v2 の検査 + LZ4展開 (kernel.bin→0x100000, sqlite.bin→0x200000) — pm_vk32_boot
+  ├── VK32 v2 の検査 + LZ4展開 (kernel.bin→0x100000, sqlite.bin→__sqlite_start) — pm_vk32_boot
   │   (HDD ローダと同じ検査・同じ VK32_ERR_*)。起動したイメージの CRC を 0x7E00 へ
   ├── メモリプロービング
   └── far jmp 0x08:0x100000 (kernel_main へジャンプ)
@@ -108,7 +108,7 @@ loader_fat_new.asm (16bit → 32bit) — 第2段階
         |        [ 共有ライブラリ ] (libos32gui.shlib @0x400000)
         |                 |
         v                 v
-[ シェル層 ] CUI shell.bin / GUI gshell.bin (WM) — シェル帯 0x300000、CPL=0、gui_call の受け手
+[ シェル層 ] CUI shell.bin / GUI gshell.bin (WM) — シェル帯 0x400000、CPL=0、gui_call の受け手
         |
         v
 [ API・システムコール層 ] (kapi/) <--- (kapi.json から自動生成)、int 0x80 トランポリン

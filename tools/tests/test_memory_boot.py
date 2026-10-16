@@ -13,6 +13,7 @@ backing の写像・FIXED の RAM 拒否を壊した版で、試験が RED に�
 変異は一時ディレクトリの写しに当てる (実物のソースは書き換えない)。
 """
 import host32
+import os
 import pathlib
 import re
 import subprocess
@@ -36,14 +37,6 @@ MUTATIONS = [
      "CHECK(physmem_reserve_ram(&supply, first / LF_PAGE, f->slack_end / LF_PAGE));"
      "CHECK(physmem_reserve_ram(&supply, first / LF_PAGE, f->slack_end / LF_PAGE));",
      ("layout", 8192)),
-    # §4-1 変異 1: 置き場の境界を 1 ページずらす (DMA プールの上側ガードを食う)。
-    ("ledger-base-shift", "include/memmap.h",
-     "#define MEM_LEDGER_META_BASE   0x2F9000UL",
-     "#define MEM_LEDGER_META_BASE   0x2F8000UL", ("fixed", 8192)),
-    # 同じく上端を 1 ページずらす (カーネルスタックのガードを食う)。
-    ("ledger-end-shift", "include/memmap.h",
-     "#define MEM_LEDGER_META_END    0x2FB000UL",
-     "#define MEM_LEDGER_META_END    0x2FC000UL", ("fixed", 8192)),
     # §4-1 変異 2: exec の上端を workspace の位置から決める旧式に戻す (B2)。
     ("frozen-exec-ws", "kernel/sys.c",
      "    sys_frozen_exec = pgalloc_arena_end() * PAGE_SIZE;\n    sys_frozen_end = top * PAGE_SIZE;\n    sys_model_staged = 1;",
@@ -68,10 +61,6 @@ MUTATIONS = [
     ("bundle-range-blind", "kernel/memory_boot.c",
      "    if (first >= end || first < lo || end > hi) return 0;",
      "    if (first >= end) return 0;", ("bundle", 16384)),
-    # FIXED のとき backing を張り忘れる (verify が落ちて 8MB が起動しない)。
-    ("backing-unmapped", "kernel/memory_boot.c",
-     "        if (!paging_map_ledger_backing()) return 0;\n",
-     "", ("fixed", 8192)),
     # FIXED の metadata / workspace が RAM (RESERVED でない) でも受け付けてしまう。
     ("fixed-meta-on-ram", "kernel/pgalloc.c",
      "            !all_reserved(m, first, first + pages)) goto done;",
@@ -79,6 +68,18 @@ MUTATIONS = [
     ("fixed-ws-on-ram", "kernel/pgalloc.c",
      "                !all_reserved(&next, ws_first, ws_end)) goto done;",
      "                0) goto done;", ("fixed_reject", 8192)),
+]
+
+
+MUTATIONS += [
+    ('v5-metadata-double', 'kernel/memory_boot.c',
+     '{ KERNEL_LOAD_ADDR, MEM_LEDGER_META_BASE }',
+     '{ KERNEL_LOAD_ADDR, MEM_LEDGER_META_END }', ('ledger', 8192)),
+    ('v5-old-pool-floor', 'kernel/pgalloc.c',
+     'MEM_SHM_RESV_START / PAGE_SIZE,',
+     'MEM_POOL_BASE / PAGE_SIZE,', ('fixed_paging', 8192)),
+    ('v5-dma-missing', 'kernel/pgalloc.c',
+     'int dma = ws_first &&', 'int dma = 0 && ws_first &&', ('ledger', 8192)),
 ]
 
 
@@ -144,6 +145,16 @@ def run_case(case='default', kb=16384, defines=(), mutation=None):
 
 
 class MemoryBoot(unittest.TestCase):
+    def test_v5_ledger_supply_and_dma(self):
+        for kb in (8088, 8188, 8192, 12292, 12296, 65536):
+            with self.subTest(kb=kb):
+                self.run_case('ledger', kb)
+        self.run_case('dma_conflict', 8192)
+        self.run_case('reversed', 8192, ('-DHOST_RESIDENT_END=0x376000',))
+        # Zero SLACK and a one-page SLACK use the actual linker-derived macros.
+        self.run_case('ledger', 8192, ('-DHOST_RESIDENT_END=0x375000',))
+        self.run_case('ledger', 8192, ('-DHOST_RESIDENT_END=0x374000',))
+
     def run_case(self, case='default', kb=16384, defines=()):
         run_case(case, kb, defines)
 
@@ -154,7 +165,7 @@ class MemoryBoot(unittest.TestCase):
 
     def test_runtime_layouts_same_ram_inputs(self):
         # 7.9MiB (page aligned), exactly 8MiB, 64MiB: FIXED and ARENA_TOP.
-        for kb in (8088, 8192, 65536):
+        for kb in (8088, 8188, 8192, 65536):
             with self.subTest(kb=kb):
                 self.run_case('layout', kb)
 

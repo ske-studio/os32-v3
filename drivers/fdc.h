@@ -109,7 +109,7 @@
 /*  I/O 0439h — DMA アクセス制御 (Undocumented)                             */
 /*                                                                          */
 /*  **扱いは drivers/dma8237.c の dma8237_init() へ移した** (票 §1-2)。     */
-/*  DMA プール (0x2E8000) もカーネル (0x100000〜) も 1MB 超にあるので、     */
+/*  DMA プールもカーネル (0x100000〜) も 1MB 超にあるので、                */
 /*  これは FDC だけの都合ではない。定数 (SYSPORT_DMA_CTRL /                 */
 /*  SYSPORT_DMA_MASK_1MB) と経緯の註は drivers/dma8237.h にある。           */
 /*  fdc_get_last_init_status() が返す 0439h の前後は dma_above_1mb_raw()    */
@@ -240,8 +240,8 @@
  * 取れる。**揃え指定に頼らない** — 16KB 揃えにしていたころは、その前に
  * 最大 16KB の詰め物が出ていた (レビューの指摘)。
  *
- * DMA プール (0x2E8000) は使わない: fdc_init() は dma_pool_init() より前に
- * 走り、kselftest_run() がプールを作り直す (kernel/kernel.c の注記)。 */
+ * DMA プール (MEM_DMA_POOL_BASE) は使わない: fdc_init() は dma_pool_init()
+ * より前に走り、kselftest_run() がプールを作り直す (kernel/kernel.c の注記)。 */
 #define FDC_TRACK_MAX_BYTES  (18 * 512)  /* 1.44MB の 1 トラック = 9216B */
 #define FDC_DMA_BUF_SIZE     FDC_TRACK_MAX_BYTES
 /* 先読みのスロット数と、1 セクタの読みを覚えるセクタキャッシュの数。

@@ -3,12 +3,18 @@ Run: python3 tools/tests/test_physmem.py
 Uses real ILP32 types.h and GNU11 core, no libc/multilib runtime required.
 """
 import host32
+import os
 import pathlib
 import subprocess
 import tempfile
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
+# Unit models use an empty SLACK; memory_boot_host covers the real provider.
+LAYOUT_FLAGS = [
+                '-Wl,--defsym=__kernel_resident_end=0x375000',
+                '-Wl,--defsym=__ledger_fixed_start=0x17e000',
+                '-Wl,--defsym=__ledger_fixed_end=0x180000']
 
 
 class PhysmemTests(unittest.TestCase):
@@ -41,7 +47,7 @@ void _start(void) {
                 '-fno-pie', '-fno-stack-protector', '-nostdlib', '-no-pie',
                 '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'kernel'),
                 str(src), str(ROOT / 'kernel/physmem.c'), '-o', str(exe)
-            ] + list(flags), capture_output=True, text=True)
+            ] + LAYOUT_FLAGS + list(flags), capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             result = host32.run([str(exe)])
             self.assertEqual(result.returncode, 0,

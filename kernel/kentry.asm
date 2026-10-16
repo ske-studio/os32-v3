@@ -11,7 +11,7 @@ extern __bss_start
 extern __bss_end
 extern __sqlite_data_end
 extern __sqlite_end
-extern MEM_KSTACK_TOP
+;; LAYOUT_* は $(BUILD_OUT)/memmap_layout.h (LAYOUT_CPP で展開) から。
 
 section .text
 
@@ -56,7 +56,7 @@ kentry:
         ;;
         ;; ここより上の BSS クリアは rep stosd だけで CALL を挟まないので、
         ;; 切り替え地点として安全。ページングはまだ有効でなく、
-        ;; 0x2FC000 は実 RAM (SQLite 帯域の末尾) なのでそのまま使える。
+        ;; MEM_KSTACK_BASE からの領域は実 RAM なのでそのまま使える。
         ;;
         ;; **ローダーが積んだ引数を載せ替えること。**
         ;; kernel_main(u32 mem_kb, u32 boot_drive) は __cdecl で、
@@ -68,18 +68,14 @@ kentry:
         ;; ゴミになる。**症状はブート失敗ではなく `mem` の表示が
         ;; 3229946883 KB になるだけ**なので気づきにくい (実際これで一度踏んだ)。
         ;;
-        ;; ESP は **build/os32.ld の絶対シンボル MEM_KSTACK_TOP** から引く。
-        ;; ASM から C のマクロは引けないので、番地の正典 include/memmap.h の
-        ;; 値をリンカスクリプトが写して持ち、ここは extern で参照する。
-        ;; 写しの一致は `python3 tools/gen_memmap.py --check` が照合する
-        ;; ([C4]。2026-09-17 まではここに 001FFFFCh と直書きしていた)。
+        ;; ESP は C/ld と同じ生成ヘッダの LAYOUT_MEM_KSTACK_TOP を使う。
         ;; EBP は 0 にしておく — 例外時のスタックトレースが
         ;; ここで止まれるようにするため。
         ;; ============================================================
         mov     eax, [esp + 4]          ;; mem_kb
         mov     edx, [esp + 8]          ;; boot_drive
 
-        mov     esp, MEM_KSTACK_TOP     ;; build/os32.ld の絶対シンボル
+        mov     esp, LAYOUT_MEM_KSTACK_TOP
         push    edx                     ;; 第2引数: boot_drive
         push    eax                     ;; 第1引数: mem_kb
         push    dword 0                 ;; ダミーリターンアドレス

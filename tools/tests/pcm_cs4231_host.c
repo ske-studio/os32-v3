@@ -130,7 +130,10 @@ void dma_chan_ack_tc(unsigned int ch) { (void)ch; sim_acktc_calls++; }
 
 int dma_chan_setup(unsigned int ch, u32 phys, u32 bytes, int dir, int mode)
 {
-    (void)ch; (void)phys;
+    (void)ch;
+    CHECK(phys == MEM_DMA_POOL_BASE || phys == MEM_DMA_POOL_BASE + PCM_RING_BYTES);
+    CHECK(phys < DMA_PHYS_LIMIT && bytes <= DMA_PHYS_LIMIT - phys);
+    CHECK((phys & 0xffffUL) + bytes <= 0x10000UL);
     sim_setup_calls++;
     if (sim_setup_fail) return OS32_ERR_INVAL;
     if (bytes != PCM_RING_BYTES) return OS32_ERR_INVAL;
@@ -173,7 +176,7 @@ int dma_alloc(u32 size, u32 align, u32 limit, struct dma_buf *out)
     for (i = 0; i < 2; i++) {
         if (!pool_used[i]) {
             pool_used[i] = 1;
-            out->pa = (u32)(0x2E8000UL + (u32)i * size);
+            out->pa = (u32)(MEM_DMA_POOL_BASE + (u32)i * size);
             out->va = pool_mem[i];
             out->size = size;
             return 0;

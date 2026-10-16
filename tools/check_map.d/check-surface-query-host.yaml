@@ -10,8 +10,10 @@ check-surface-query-host:
 - kernel/shlib.c
 - tools/tests/mutpar.py
 - tools/tests/test_access_walk.py
+- tools/tests/kernel_layout.py
 - tools/tests/test_surface_query.py
 - tools/tests/surface_query_host.c
 - tools/tests/access_walk_host.c
 - tools/check_map.d/check-surface-query-host.yaml
 - build/checks.d/check-surface-query-host.mk
+artifact_reader: true

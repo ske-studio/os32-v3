@@ -323,13 +323,13 @@ def make_layout(elf, kernel_map):
                         'tools/h3_layout.c', '-o', obj], cwd=ROOT, check=True)
         offsets = symbols(subprocess.check_output([nm, '--defined-only', obj], text=True))
     required = ('g_cur', 'tick_count', 'exec_kill', 'exec_pending_finish', 'g_slot', 'shm_state', 'shm_block_owner', 'shm_block_span',
-                'ledger_owners', '__bss_end', *COUNTERS)
+                'ledger_owners', '__kernel_resident_end', *COUNTERS)
     sym = symbols(subprocess.check_output([nm, '--defined-only', str(elf)], text=True), required)
     for name in required:
         require(name in sym, 'missing current diagnostic symbol: ' + name)
     # map/ELF consistency for global anchors; locals come from nm, not map guesses.
     map_text = Path(kernel_map).read_text()
-    for name in ('__bss_end', 'ring3_switch_count'):
+    for name in ('__kernel_resident_end', 'ring3_switch_count'):
         import re
         require(any(int(m, 16) == sym[name] for m in re.findall(
             r'(0x[0-9a-fA-F]+)\s+' + name + r'\b', map_text)), 'map/ELF mismatch: ' + name)
@@ -462,7 +462,7 @@ class Playbook:
         state = self.word(slot + o['slot_state'])
         require(state != o['free'], 'dead appslot')
         address_space = self.word(slot + o['slot_as'])
-        require(0 < address_space < s['__bss_end'] + o['shm_delta'], 'invalid AS pointer')
+        require(0 < address_space < s['__kernel_resident_end'] + o['shm_delta'], 'invalid AS pointer')
         owner = self.word(address_space + o['as_owner'])
         generation = self.word(address_space + o['as_generation'])
         require(0 < owner < o['ledger_count'] and generation > 0, 'invalid AS identity')
@@ -470,7 +470,7 @@ class Playbook:
         require(self.emu.read(ledger + o['ledger_kind'], 1)[0] == o['ledger_as'], 'not a live AS owner')
         require(self.emu.read(ledger + o['ledger_id'], 1)[0] == app, 'ledger/appslot mismatch')
         require(self.word(ledger + o['ledger_pages']) > 0, 'empty AS owner')
-        base = ((s['__bss_end'] + 4095) & ~4095) + o['shm_delta']
+        base = ((s['__kernel_resident_end'] + 4095) & ~4095) + o['shm_delta']
         return {'index': index, 'address': base + index * o['block_size'],
                 'app': app, 'owner': owner, 'generation': generation, 'slot': slot}
 
@@ -652,7 +652,7 @@ class Playbook:
     def observe(self, case):
         ident = case['identity']
         space = self.word(ident['slot'] + self.o['slot_as'])
-        require(space == 0 or space < self.s['__bss_end'] + self.o['shm_delta'], 'invalid AS pointer')
+        require(space == 0 or space < self.s['__kernel_resident_end'] + self.o['shm_delta'], 'invalid AS pointer')
         return dict(case_id=case['case_id'], identity=ident, counters=self.counters(),
             current=self.word(self.s['g_cur']), tick=self.word(self.s['tick_count']),
             addresses={name: self.s[name] for name in (*COUNTERS, 'g_cur', 'tick_count')},
@@ -714,7 +714,7 @@ class Playbook:
                 self.word(ident['slot'] + self.o['slot_state']) != self.o['free'],
                 'fixture died before resume')
         space = self.word(ident['slot'] + self.o['slot_as'])
-        require(0 < space < self.s['__bss_end'] + self.o['shm_delta'], 'invalid AS pointer')
+        require(0 < space < self.s['__kernel_resident_end'] + self.o['shm_delta'], 'invalid AS pointer')
         require(self.word(space + self.o['as_owner']) == ident['owner'] and
                 self.word(space + self.o['as_generation']) == ident['generation'] and
                 self.word(ident['address'] + 4) == ident['owner'] and

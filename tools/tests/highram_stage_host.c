@@ -16,9 +16,7 @@ static void host_irq_restore(unsigned int f) { host_if = f; }
 #include "paging_host_source.c"
 #include "pgalloc_host_source.c"
 #include "sys_host_source.c"
-__asm__(".globl __sqlite_start\n.set __sqlite_start, 0x200000\n"
-        ".globl __sqlite_end\n.set __sqlite_end, 0x240000\n"
-        ".globl __bss_end\n.set __bss_end, 0x180000\n");
+/* Layout symbols are supplied by kernel_layout.linker_flags(). */
 static void die(int code)
 {
     if (!code && host_if != HOST_IF) code = 2;
@@ -187,7 +185,7 @@ void _start(void)
         CHECK(base + need <= 4096 * PAGE_SIZE);        /* not in high RAM */
         CHECK(sys_usable_mem_end() == ceiling);        /* not frozen yet */
         ledger_arena_freeze();
-        CHECK(sys_usable_mem_end() == base);
+        CHECK(sys_usable_mem_end() == (base < MEM_DMA_POOL_BASE ? base : MEM_DMA_POOL_BASE));
         CHECK(ledger_owner_pages(LEDGER_OWNER_BOOT) == need / PAGE_SIZE);
         /* The BB pages never allocate to anyone else. */
         CHECK(!pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, base / PAGE_SIZE, (base + need) / PAGE_SIZE, LEDGER_BOTTOM_UP, &p));
@@ -213,8 +211,9 @@ void _start(void)
     CHECK(V2P(page_tables[PAGING_MMIO_TOP_PDI]) == MEM_FIXED_MMIO_TOP_PT_BASE);
     CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, 1048575, 1048576, LEDGER_BOTTOM_UP, &p) && p == 1048575);
     CHECK(pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, p, 1));
-    CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, (int)(pgalloc_arena_end() - MEM_POOL_BASE / PAGE_SIZE),
-                                MEM_POOL_BASE / PAGE_SIZE, pgalloc_arena_end(), LEDGER_TOP_DOWN, &p));
+    /* Drain both SLACK and low RAM; DMA splits the low pool. */
+    while (pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, 1, 0,
+                                 pgalloc_arena_end(), LEDGER_TOP_DOWN, &p)) {}
     CHECK(pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, 1) == 4096 * PAGE_SIZE);
     CHECK(!sys_memory_stage_online());
     die(0);

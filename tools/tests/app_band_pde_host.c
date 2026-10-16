@@ -12,9 +12,7 @@ static u32 host_cr3;
 #define pgalloc_alloc_phys test_failphys
 #include "paging_host_source.c"
 #undef pgalloc_alloc_phys
-__asm__(".globl __sqlite_start\n.set __sqlite_start, 0x200000\n"
-        ".globl __sqlite_end\n.set __sqlite_end, 0x240000\n"
-        ".globl __bss_end\n.set __bss_end, 0x180000\n");
+/* Layout symbols are supplied by kernel_layout.linker_flags(). */
 static void die(int code)
 {
     __asm__ volatile("int $0x80" : : "a"(1), "b"(code));
@@ -109,10 +107,10 @@ static void ledger_boot_regression(u32 kb)
 void _start(void)
 {
     /* 17MB 構成の pool backing を恒等で読み書きできるよう張る。 */
-    u32 args[6] = {0x400000, 0xD00000, 3, 0x32, 0xFFFFFFFF, 0};
+    u32 args[6] = {KERNEL_LOAD_ADDR, 0x1100000 - KERNEL_LOAD_ADDR, 3, 0x32, 0xFFFFFFFF, 0};
     u32 result;
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
-    CHECK(result == 0x400000);
+    CHECK(result == KERNEL_LOAD_ADDR);
 
     host_map_fixed_paging();
     ledger_boot_regression(17408);

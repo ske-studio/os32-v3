@@ -4,26 +4,20 @@
 import json, struct, sys
 
 SC = "/tmp/claude-1000/-home-hight-os32/0d4e51c0-865c-48b5-a375-eba7544fdd4a/scratchpad"
-BSS_END = 0x16BF20                       # build/out/kernel.map の実値
+from pathlib import Path
+from gen_memmap import Macros, read_defines, read_elf, layout_header_defects
 
-# --- memmap.h の定数を実値で解く -----------------------------------------
-K = {}
-K['KHEAP_BASE']        = (BSS_END + 0xFFF) & ~0xFFF
-K['KHEAP_SIZE']        = 0x30000
-K['MEM_KAPI_SIZE']     = 0x1000
-K['MEM_KAPI_BASE']     = K['KHEAP_BASE'] + K['KHEAP_SIZE']
-K['MEM_SHM_GUARD_LO']  = K['KHEAP_BASE'] + K['KHEAP_SIZE'] + K['MEM_KAPI_SIZE']
-K['MEM_SHM_BASE']      = K['MEM_SHM_GUARD_LO'] + 0x1000
-K['MEM_SHM_SIZE']      = 0x40000
-K['MEM_SHM_END']       = K['MEM_SHM_BASE'] + K['MEM_SHM_SIZE'] - 1
-K['MEM_SHM_GUARD_HI']  = K['MEM_SHM_BASE'] + K['MEM_SHM_SIZE']
-K['MEM_SHM_RESV_START']= K['MEM_SHM_GUARD_HI'] + 0x1000
-K['MEM_STACK_GUARD']   = 0x1FB000
-K['MEM_SHM_RESV_END']  = K['MEM_STACK_GUARD'] - 1
-K['MEM_KSTACK_BASE']   = 0x1FC000
-K['MEM_KSTACK_TOP']    = 0x1FFFFC
-K['MEM_SHM_GUI_BASE']  = K['MEM_SHM_BASE'] + 0x30000
-K['MEM_SHM_GUI_SIZE']  = 0x10000
+ROOT = Path(__file__).resolve().parents[1]
+ELF = ROOT / 'build/out/kernel.elf'
+HEADER = ROOT / 'build/out/memmap_layout.h'
+defects = layout_header_defects(ROOT, ELF, HEADER)
+if defects:
+    raise RuntimeError('; '.join(defects) + '; run make kernel')
+_, symbols = read_elf(ELF)
+BSS_END = symbols['__bss_end']
+macros = Macros(read_defines(ROOT / 'include/memmap.h'), symbols)
+K = {name: macros.get(name) for name in macros.defines}
+K['MEM_KAPI_BASE'] = K['KHEAP_BASE'] + K['KHEAP_SIZE']
 
 def pte_all():
     out = {}
@@ -90,16 +84,16 @@ print()
 
 total = 0
 checks = [
-    ("カーネル .text/.data/.bss", 0x100000, BSS_END, 1, 0),
-    ("カーネルヒープ (320KB)", K['KHEAP_BASE'], K['MEM_KAPI_BASE'] - 1, 1, 0),
+    ("カーネル .text/.data/.bss", K['KERNEL_LOAD_ADDR'], BSS_END - 1, 1, 0),
+    ("カーネルヒープ", K['KHEAP_BASE'], K['MEM_KAPI_BASE'] - 1, 1, 0),
     ("KAPI テーブル (4KB)", K['MEM_KAPI_BASE'], K['MEM_SHM_GUARD_LO'] - 1, 1, 0),
     ("SHM 前方ガード (NP のはず)", K['MEM_SHM_GUARD_LO'], K['MEM_SHM_GUARD_LO'] + 0xFFF, 0, None),
     ("SHM 本体 (present + USER)", K['MEM_SHM_BASE'], K['MEM_SHM_END'], 1, 1),
     ("SHM 後方ガード (NP のはず)", K['MEM_SHM_GUARD_HI'], K['MEM_SHM_GUARD_HI'] + 0xFFF, 0, None),
     ("スタックガード (NP のはず)", K['MEM_STACK_GUARD'], K['MEM_STACK_GUARD'] + 0xFFF, 0, None),
-    ("カーネルスタック 16KB (present, US=0)", K['MEM_KSTACK_BASE'], 0x1FFFFF, 1, 0),
-    ("SQLite 帯", 0x200000, 0x2FFFFF, None, 0),
-    ("常駐シェル帯", 0x300000, 0x3FFFFF, None, 0),
+    ("カーネルスタック 16KB (present, US=0)", K['MEM_KSTACK_BASE'], K['MEM_KSTACK_BASE'] + K['MEM_KSTACK_SIZE'] - 1, 1, 0),
+    ("SQLite 帯", symbols['__sqlite_start'], symbols['__sqlite_end'] - 1, None, 0),
+    ("常駐シェル帯", K['MEM_SHELL_LOAD_ADDR'], K['MEM_SHELL_BAND_END'], None, 0),
 ]
 for label, lo, hi, wp, wu in checks:
     print("--- %s  (0x%06X-0x%06X)" % (label, lo, hi))

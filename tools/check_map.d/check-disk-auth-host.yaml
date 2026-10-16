@@ -11,6 +11,7 @@ check-disk-auth-host:
 - tools/tests/test_kapi_ranges.py
 - tools/tests/access_walk_host.c
 - tools/tests/test_access_walk.py
+- tools/tests/kernel_layout.py
 - build/checks.d/check-disk-auth-host.mk
 - tools/check_map.d/check-disk-auth-host.yaml
 - exec/access_walk.c

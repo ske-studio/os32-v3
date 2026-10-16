@@ -100,7 +100,7 @@ def compare_host_identity(output):
              ledger_size=16, ledger_kind=0, ledger_id=1, ledger_pages=4,
              ledger_as=2, shm_delta=4096, block_size=16384)
     symbols = dict(shm_state=0x100, shm_block_span=0x200, shm_block_owner=0x300,
-                   g_slot=0x400, ledger_owners=0x1000, __bss_end=0x5000)
+                   g_slot=0x400, ledger_owners=0x1000, __kernel_resident_end=0x5000)
     observer = object.__new__(h3.Playbook)
     observer.o, observer.s, observer.emu = o, symbols, memory
     for index, app in enumerate((2, 3)):

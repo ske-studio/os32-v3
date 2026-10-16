@@ -33,3 +33,10 @@ check-memmap-host:
 - tools/check_map.d/check-memmap-host.yaml
 - build/checks.d/check-memmap-host.mk
 - tools/check_artifacts.py
+- tools/tests/test_layout_defs.py
+- tools/tests/test_vmkernel_layout.py
+- tools/mkvmkernel.py
+# test_layout_defs builds the generated linker/header artifacts from build rules.
+- build/**
+- sdk/link/app_sys.ld
+- sdk/os32_generations.py

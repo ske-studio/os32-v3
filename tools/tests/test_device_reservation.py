@@ -34,6 +34,7 @@ irq_restore の度に L1 / L2 の不変条件を全ページ検査する — tes
 RED になることを見る。実物のソースは書き換えない。コンパイルの失敗は RED に
 数えない。
 """
+from kernel_layout import linker_flags
 import host32
 import pathlib
 import subprocess
@@ -561,7 +562,7 @@ def run_c(texts, body):
         (tmp / 'pgalloc_host_fixture.h').write_text(texts['tools/tests/pgalloc_host_fixture.h'])
         src = texts['kernel/pgalloc.c'].replace('#include "io.h"', '')
         (tmp / 'test.c').write_text(L.PRE + src + post + body + L.END)
-        cmd = ['gcc'] + L.FLAGS + ['-I' + str(tmp)]
+        cmd = ['gcc', *linker_flags()] + L.FLAGS + ['-I' + str(tmp)]
         cmd += ['-I' + str(ROOT / p) for p in ('include', 'kernel', 'lib', 'drivers', 'sdk/include/os32')]
         build = subprocess.run(cmd + [str(tmp / 'test.c'), str(ROOT / 'kernel/physmem.c'),
                                       str(ROOT / 'drivers/pci_decode.c'),
@@ -580,7 +581,7 @@ def stage_run(texts):
             source = texts['kernel/%s.c' % unit]
             source = source.replace('irq_save()', 'host_irq_save()').replace('irq_restore(flags)', 'host_irq_restore(flags)')
             (tmp / f'{unit}_host_source.c').write_text(source)
-        cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie', '-ffunction-sections', '-Wl,--gc-sections', '-DPHYSMEM_HOST_TEST=1']
+        cmd = ['gcc', *linker_flags(), '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie', '-ffunction-sections', '-Wl,--gc-sections', '-DPHYSMEM_HOST_TEST=1']
         # arch/x86 + platform/pc98: include/io.h / include/cpu.h は契約
         # だけで、実装は固定名 arch_io.h / arch_cpu.h / platform_io.h を
         # 引く (順序 3・5)。CR0 / CR3 を触る arch_cpu.h だけは、ホストでは

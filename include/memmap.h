@@ -35,13 +35,12 @@
 
 /* ====================================================================== */
 /*  カーネルヒープ (kmalloc)                                                */
-/*  __bss_end から動的算出 (4KBアライン)                                    */
+/*  __kernel_resident_end (SQLite 代替スタックの末尾) から動的算出 (4KB)    */
 /* ====================================================================== */
-extern u32 __bss_end;
-#define KHEAP_BASE            ((((u32)&__bss_end) + 0xFFF) & ~0xFFFUL)
-#define KHEAP_SIZE            0x02C000UL  /* 176KB。一時の像予算増枠 +16KB (E11-BUD)。
-                                         * 17MB/NHD main: kmalloc_peak_bytes=21,328B、kselftest 281/0。
-                                         * b2 の撤去の後と T2h 前に再計測して戻すか決める。 */
+extern u32 __kernel_resident_end;
+extern u32 __ledger_fixed_start, __ledger_fixed_end;
+#define KHEAP_BASE ((((u32)&__kernel_resident_end) + 0xFFF) & ~0xFFFUL)
+#define KHEAP_SIZE 0x030000UL /* 192KiB */
 
 /* ====================================================================== */
 /*  ページング保護範囲                                                      */
@@ -59,44 +58,17 @@ extern u32 __bss_end;
 #define MEM_LOADER_END        0x08FFFUL
 
 /* ====================================================================== */
-/*  カーネルスタック (SQLite 帯域の末尾, 下向き成長)                         */
-/*                                                                          */
-/*  2026-09-17 (決裁 D1、票 docs/archive/kernel_v21/TASK_KSTACK_USER.md §4 の 4):  */
-/*  **カーネル帯域の末尾 0x1FC000 から SQLite 帯域の末尾 0x2FC000 へ移した。**  */
-/*  理由は「浮いた番地と固定番地を同じ帯で隣り合わせにしない」こと。         */
-/*  カーネル帯域は KHEAP_BASE 以降が __bss_end 由来で浮くので、カーネルが    */
-/*  育つと SHM が固定番地のスタックへ食い込む。実際 2026-09-17 には SHM の   */
-/*  後方ガードがスタックの真ん中に居座り、**あと 224 バイト育つと            */
-/*  実際に使っているスタックページが not-present になる**ところまで来ていた。 */
-/*  移設先はカーネル予約域 (0x2DD000-0x2FFFFF, 140KB, もともと NP) の末尾で、 */
-/*  ここは固定番地しか無いので浮動番地とぶつかりようがない。                 */
-/*                                                                          */
-/*  **低位に置いてはいけない。** V86 のゲストが見るリニアアドレスは CPU が   */
-/*  (seg<<4)+off で作るので 0x00000-0x10FFEF に固定されている。カーネル      */
-/*  スタックが低位のリニアを占有していると、その分だけゲストに渡せる         */
-/*  コンベンショナルメモリが減る。しかも PC-98 は 128KB 単位でしか申告       */
-/*  できないので、中途半端に空けても切り捨てで 512KB のままになる。          */
-/*  0x00000-0x9FFFF を丸ごと空けて初めて 640KB を渡せる。                    */
-/*                                                                          */
-/*  サイズは実測にもとづく。ブート直後からシェル起動までの最深到達点は       */
-/*  3,068 バイト (0x9F400) で、その後は誰もこのスタックを使わない            */
-/*  (GDT はリング 0 のみ = 割り込みで特権遷移が起きない / exec_run() は      */
-/*   子ごとに ESP を張り替える / V86 の #GP フレームは v86_enter が          */
-/*   TSS.ESP0 を呼び出し元の ESP にするので v86 プログラムのスタックに載る)。 */
-/*  16KB は実測の 5 倍強。**リング 3 のユーザプログラムを導入したら          */
-/*  ここが全プログラムの ISR ネストを受けることになるので、その時は          */
-/*  measure し直すこと。**                                                  */
-/*  → docs/archive/v21/v86v2/09_memmap.md                                   */
+/*  カーネルスタック: 固定 PT 枠の後、guard 1頁 + stack 16KiB。             */
+/*  低位は V86 のために維持する。ISR ネストの高水位は別途実測する。          */
 /* ====================================================================== */
-#define MEM_STACK_GUARD       0x2FB000UL
-#define MEM_STACK_GUARD_END   0x2FBFFFUL
-#define MEM_KSTACK_BASE       0x2FC000UL
-#define MEM_KSTACK_TOP        0x2FFFFCUL
+#define MEM_STACK_GUARD 0x3FB000UL
+#define MEM_STACK_GUARD_END 0x3FBFFFUL
+#define MEM_KSTACK_BASE 0x3FC000UL
+#define MEM_KSTACK_TOP 0x3FFFFCUL
 
-/* kernel/kentry.asm は ESP をここへ張り替える。ASM から C のマクロは引けない
- * ので、値は build/os32.ld が同じ名前の絶対シンボルとして持ち、kentry.asm は
- * それを extern で参照する。**二重定義の一致は
- * `python3 tools/gen_memmap.py --check` が機械的に照合する** ([C4])。 */
+/* kernel/kentry.asm は ESP をここへ張り替える。ASM・ld は tools/gen_memmap.py
+ * が生成する $(BUILD_OUT)/memmap_layout.h の LAYOUT_MEM_KSTACK_TOP を CPP で
+ * 読む。直書きに戻していないことは `gen_memmap.py --check` が見る ([C4])。 */
 
 /* ブート時スタック (ローダー専用)。
  *
@@ -178,7 +150,7 @@ extern u32 __bss_end;
 /* KernelAPIテーブルアドレスは os32_kapi_shared.h で定義 (KAPI_ADDR) */
 
 /* ====================================================================== */
-/*  カーネル帯域内の動的配置 (0x100000-0x1FFFFF)                             */
+/*  カーネル常駐鎖の動的配置 (固定 paging guard より下)                     */
 /*  KAPI + SHM はヒープの直後に動的配置される                               */
 /* ====================================================================== */
 
@@ -224,28 +196,24 @@ extern u32 __bss_end;
 #define GUI_SLOT_MAX          4                            /* スロット 0〜3 */
 
 /* カーネル帯域終端 */
-#define MEM_KERNEL_BAND_END   0x1FFFFFUL
+#define MEM_KERNEL_BAND_END 0x3DFFFFUL
 
-/* SHM後方予約域 (NOT PRESENT): SHM 後方ガードの後 〜 カーネル帯域の終端。
- * カーネルスタックは 2026-09-17 に SQLite 帯域の末尾へ出ていったので、
- * ここはカーネル帯域の終わりまで丸ごと予約になる。
- *
- * **カーネルが予算いっぱいまで育つと、この帯は空になる** (START == END + 1)。
- * 空は正しい状態で、逆転 (START > END + 1) は設計ミス。区別は
- * kernel/paging.c の STATIC_ASSERT (最悪配置) が固定し、
- * paging_init は空のときに範囲指定を呼ばない。 */
+/* SHM 後方の SLACK: 鎖の終端から固定 paging guard までの全頁を一度だけ
+ * 一般池へ供給する。空 (START == END + 1) は許すが、逆転は拒否する。 */
 #define MEM_SHM_RESV_START    (MEM_SHM_GUARD_HI + MEM_GUARD_SIZE)
 #define MEM_SHM_RESV_END      MEM_KERNEL_BAND_END
 
 /* ====================================================================== */
 /*  カーネル本体の予算と「最悪の配置」 (決裁 D2、2026-09-17)                */
 /*                                                                          */
-/*  KHEAP_BASE は __bss_end 由来で浮かせたまま。固定にしても使われない       */
-/*  バイト数は同じで、変わるのは余りがどこに溜まるかと尽きたときの挙動だけ   */
-/*  だから。代わりに **上限をリンク時に保証する**:                          */
+/*  KHEAP_BASE は __kernel_resident_end 由来で浮かせたまま。固定にしても     */
+/*  使われないバイト数は同じで、変わるのは余りがどこに溜まるかと尽きたとき   */
+/*  の挙動だけだから。代わりに **上限をリンク時に保証する**:                */
 /*                                                                          */
 /*      build/os32.ld の                                                     */
-/*        ASSERT(__bss_end <= KERNEL_LOAD_ADDR + MEM_KERNEL_IMAGE_MAX, ...)  */
+/*        ASSERT(MEM_SHM_RESV_START <= MEM_FIXED_PAGING_GUARD_BASE, ...)     */
+/*      (__kernel_resident_end <= KERNEL_LOAD_ADDR + MEM_KERNEL_IMAGE_MAX    */
+/*       と同値)                                                             */
 /*                                                                          */
 /*  上限が保証されれば「予算いっぱいまで育った場合の配置」が **定数式** で   */
 /*  書ける。重なりの検査はその最悪配置に対して行う — 実値 (KHEAP_BASE) は    */
@@ -261,7 +229,7 @@ extern u32 __bss_end;
                                2UL * MEM_GUARD_SIZE - MEM_SHM_SIZE)
 
 /* 予算いっぱいまで育った場合の配置。全部が定数式であることが肝心で、
- * ここに KHEAP_BASE (= (u32)&__bss_end 由来) を混ぜてはいけない。 */
+ * ここに KHEAP_BASE (= (u32)&__kernel_resident_end 由来) を混ぜてはいけない。 */
 #define MEM_KHEAP_BASE_MAX     (KERNEL_LOAD_ADDR + MEM_KERNEL_IMAGE_MAX)
 #define MEM_SHM_GUARD_LO_MAX   (MEM_KHEAP_BASE_MAX + KHEAP_SIZE + MEM_KAPI_SIZE)
 #define MEM_SHM_BASE_MAX       (MEM_SHM_GUARD_LO_MAX + MEM_GUARD_SIZE)
@@ -270,35 +238,36 @@ extern u32 __bss_end;
 #define MEM_SHM_RESV_START_MAX (MEM_SHM_GUARD_HI_MAX + MEM_GUARD_SIZE)
 
 /* ====================================================================== */
-/*  SQLite帯域 (0x200000-0x2FFFFF, 1MB)                                     */
+/*  SQLite帯域 (core BSS直後の連結配置)                                     */
 /*  SQLite code+BSS + 代替スタック (128KB)                                  */
 /* ====================================================================== */
 extern u32 __sqlite_end;
-#define MEM_SQLITE_STACK_BASE  ((((u32)&__sqlite_end) + 0xFFF) & ~0xFFFUL)
+#define MEM_SQLITE_STACK_GUARD ((((u32)&__sqlite_end) + 0xFFF) & ~0xFFFUL)
+#define MEM_FIXED_PAGING_GUARD_BASE 0x3E0000UL
+#define MEM_FIXED_PAGING_FRAME_END 0x3FB000UL
+#define MEM_FIXED_PAGING_FRAME_PAGES 26UL
+#define MEM_FIXED_PAGING_SPARE_PAGES 15UL
+#define MEM_SHELL_IMAGE_HEADROOM 0x020000UL
+#define MEM_SHELL_EXEC_HEAP_SIZE 0x040000UL
+#define MEM_SHELL_HEAP_ALIGN 4UL
+#define MEM_LAYOUT_LOAD_END MEM_FIXED_PAGING_GUARD_BASE
+#define MEM_FIXED_PAGING_USED_END MEM_FIXED_PAGING_END
+#define MEM_FIXED_PAGING_USED_PAGES 11UL
+#define MEM_LEDGER_META_SIZE 0x2000UL
+#define MEM_KSTACK_SIZE 0x4000UL
+#define MEM_SQLITE_STACK_BASE (MEM_SQLITE_STACK_GUARD + MEM_GUARD_SIZE)
 #define MEM_SQLITE_STACK_SIZE  0x020000UL  /* 128KB */
 #define MEM_SQLITE_STACK_TOP   (MEM_SQLITE_STACK_BASE + MEM_SQLITE_STACK_SIZE - 16)
 
-/* SQLite帯域後の予約: NOT PRESENT */
-#define MEM_KERNEL_RESV_START  ((MEM_SQLITE_STACK_BASE + MEM_SQLITE_STACK_SIZE + 0xFFF) & ~0xFFFUL)
-#define MEM_KERNEL_RESV_END    (MEM_STACK_GUARD - 1)  /* カーネルスタックガードの直前まで */
 
 /* ---------------------------------------------------------------------- */
 /*  DMA プール (票 docs/tasks/v3/TASK_HAL_WIRING.md §1-3、決裁 2026-09-23)  */
 /*                                                                          */
-/*  予約域の**中**に開ける 64KB の穴。上下は予約域のまま NP なので、        */
-/*  はみ出しはそこで止まる。割り込みは「そのときの CR3 (アプリの PD)」で    */
-/*  走るが、全 PD が共有するのは PDE 0 (0〜4MB) なのでここは全 PD で同じ    */
-/*  写像になる (kernel/paging.h の契約 C2)。                               */
-/*                                                                          */
-/*  **純粋な定数式**にしてあるのが肝心 — 浮動番地 (__bss_end / __sqlite_end */
-/*  由来) を混ぜると STATIC_ASSERT で固定できない。SQLite がここまで        */
-/*  育たないことは build/os32.ld の ASSERT がリンク時に止める。             */
-/*                                                                          */
-/*  0x2E8000-0x2F7FFF (64KB)。**0x2F0000 の 64KB バンク境界をまたぐ**ので、 */
-/*  dma_alloc は候補ごとに 64KB またぎを見る ([HW2]、dma_range_ok)。        */
-/*  暫定 (ユーザー決裁 2026-09-23): v3 のメモリマップ見直しで再配置し得る。 */
+/*  0x7F0000〜0x7FFFFF の 64KiB 整列池。RAM 全域の存在を確認して先行予約、 */
+/*  不足時は DMA 装置だけ省略する。全 PD で supervisor/RW/WB を共有する。    */
+/*  各割当は装置の limit と 64KiB 境界を検査する ([HW2])。                   */
 /* ---------------------------------------------------------------------- */
-#define MEM_DMA_POOL_BASE      0x2E8000UL
+#define MEM_DMA_POOL_BASE 0x7F0000UL
 #define MEM_DMA_POOL_SIZE      0x010000UL   /* 64KB */
 #define MEM_DMA_POOL_END       (MEM_DMA_POOL_BASE + MEM_DMA_POOL_SIZE - 1)
 
@@ -308,49 +277,39 @@ extern u32 __sqlite_end;
 /*  低位 RAM の末尾に metadata + workspace を置くと下端がアプリ帯の最大上端 */
 /*  (MEM_APP_BAND_MAX_TOP) を割る構成 (8MB・9MB・12MB。高位 RAM は無い) は、 */
 /*  ここ [BASE, END) に置く: metadata 1 ページ + workspace 1 ページ。       */
-/*  DMA プールの上側ガード (0x2F8000) は 1 ページ NP のまま残し、その上の   */
-/*  8KB だけを使う。上端は MEM_STACK_GUARD (カーネルスタックのガード) に    */
-/*  接する。present / supervisor / R/W にするのは FIXED 型のときだけで      */
-/*  (paging_map_ledger_backing)、それ以外の構成では予約域 (NP) のまま。     */
-/*  **END は排他** (半開区間)。                                             */
+/*  core BSS 内の 2 頁を全構成で恒久保持し、present / supervisor / R/W。    */
+/*  ARENA_TOP でも池に戻さない。END は排他 (半開区間)。                     */
 /* ---------------------------------------------------------------------- */
-#define MEM_LEDGER_META_BASE   0x2F9000UL
-#define MEM_LEDGER_META_END    0x2FB000UL   /* exclusive (= MEM_STACK_GUARD) */
+#define MEM_LEDGER_META_BASE ((u32)&__ledger_fixed_start)
+#define MEM_LEDGER_META_END ((u32)&__ledger_fixed_end)
 
 /* ====================================================================== */
-/*  シェル常駐帯域 (0x300000-0x3FFFFF, 1MB)                                 */
-/*  シェルはここに常駐し、子プロセスは一切触れない。PD切り替え不要。         */
-/*                                                                          */
-/*  レイアウト:                                                             */
-/*    0x300000-           .text + .data + .bss (~466KB)                     */
-/*    (〜0x372000)        BSS終端 → ここから newlib の sbrk ヒープ (malloc) */
-/*    0x375000            ガードページ (Not-Present, 4KB) = sbrk 上限        */
-/*    0x376000-0x37FFFF   スタック (40KB, ESP初期値=0x380000)               */
-/*    0x380000-0x3F0FFF   exec_heap (KAPI mem_alloc/mem_free 用, 452KiB)     */
-/*    0x3F1000-          固定 PD/PT (MEM_FIXED_PAGING_BASE〜END)             */
+/*  シェル常駐帯域 (0x400000-0x4FFFFF, 1MiB)                                */
+/*  image + sbrk は 0x4B5000 まで。画像末尾から 128KiB 以上を確保する。     */
+/*  exec_heap: 0x4B5000-0x4F4FFF、guard: 0x4F5000、stack: 0x4F6000-。       */
 /*                                                                          */
 /*  sbrk ヒープと exec_heap は **必ず別領域** にすること。かつて両方が BSS   */
 /*  終端から始まっていたため、newlib の stdio バッファと mem_alloc のブロック */
 /*  ヘッダが互いを上書きし、`ls > file` の化け・`pipe: out of memory`・     */
 /*  double free 警告として現れていた (2026-09-03 実測)。                     */
 /* ====================================================================== */
-#define MEM_SHELL_LOAD_ADDR   0x300000UL  /* シェルロードアドレス */
-#define MEM_SHELL_MAX_SIZE    0x075000UL  /* シェルcode+bss最大 (468KB) */
-#define MEM_SHELL_GUARD       0x375000UL  /* シェルスタックガード (= sbrk 上限) */
-#define MEM_SHELL_STACK_TOP   0x380000UL  /* シェルスタック先頭 (下向き成長) */
+#define MEM_SHELL_LOAD_ADDR 0x400000UL
+#define MEM_SHELL_MAX_SIZE 0x095000UL
+#define MEM_SHELL_GUARD 0x4F5000UL
+#define MEM_SHELL_STACK_TOP 0x500000UL
 #define MEM_SHELL_STACK_SIZE  0x00A000UL  /* シェルスタックサイズ (40KB) */
-#define MEM_SHELL_HEAP_BASE   0x380000UL  /* シェル exec_heap 先頭 (mem_alloc) */
-#define MEM_SHELL_HEAP_END    MEM_FIXED_PAGING_BASE
-#define MEM_SHELL_HEAP_SIZE   (MEM_SHELL_HEAP_END - MEM_SHELL_HEAP_BASE) /* 452KiB */
+#define MEM_SHELL_HEAP_BASE 0x4B5000UL
+#define MEM_SHELL_HEAP_END MEM_SHELL_GUARD
+#define MEM_SHELL_HEAP_SIZE   (MEM_SHELL_HEAP_END - MEM_SHELL_HEAP_BASE) /* 256KiB */
 /* T2a′: 画像外の固定 PD 1 + boot PT 8 + device PT 1 + 最上位 MMIO PT 1 (恒久予約)。 */
-#define MEM_FIXED_PAGING_BASE 0x3F1000UL
+#define MEM_FIXED_PAGING_BASE 0x3E1000UL
 #define MEM_FIXED_BOOT_PT_COUNT 8
 #define MEM_FIXED_PD_BASE     MEM_FIXED_PAGING_BASE
 #define MEM_FIXED_BOOT_PT_BASE (MEM_FIXED_PD_BASE + MEM_GUARD_SIZE)
 #define MEM_FIXED_APERTURE_PT_BASE (MEM_FIXED_BOOT_PT_BASE + MEM_FIXED_BOOT_PT_COUNT * MEM_GUARD_SIZE)
 #define MEM_FIXED_MMIO_TOP_PT_BASE (MEM_FIXED_APERTURE_PT_BASE + MEM_GUARD_SIZE)
 #define MEM_FIXED_PAGING_END  (MEM_FIXED_MMIO_TOP_PT_BASE + MEM_GUARD_SIZE)
-#define MEM_SHELL_BAND_END    0x3FFFFFUL  /* シェル帯域終端 */
+#define MEM_SHELL_BAND_END 0x4FFFFFUL
 
 /* T2c: private virtual bands; physical supply has separate policy below. */
 #define MEM_APP_BAND_BASE     0x80000000UL
@@ -416,10 +375,9 @@ extern u32 __sqlite_end;
 /* ====================================================================== */
 /*  物理ページの池 (pgalloc の管理範囲の下端)                               */
 /*                                                                          */
-/*  T1 の間は 0x400000 のまま (旧 PGALLOC_BASE)。シェル帯が 0x400000 へ     */
-/*  来る T3 で 0x500000 にする (TASK_T1_LEDGER §4-1、§6 X9)。               */
+/*  シェル帯の直後 0x500000。別供給の SLACK と重複させない。               */
 /* ====================================================================== */
-#define MEM_POOL_BASE         0x400000UL
+#define MEM_POOL_BASE 0x500000UL
 
 /* ====================================================================== */
 /*  ブート時の集積域・同梱域 (TASK_MEMMAP_V3 §4-5)                          */

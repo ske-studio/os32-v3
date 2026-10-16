@@ -1,4 +1,4 @@
-状態: **設計中** (2026-10-16、実装・検査未実施)。
+状態: **実装中** (2026-10-16、段Aの実装・直接ホスト検査済み、PMのコミットとG後のレビュー待ち)。
 
 ## 目的
 [T3票](../TASK_T3_LAYOUT.md) §2-1〜§2-3・§4 T3ab の配置定義を準備する。
@@ -41,3 +41,12 @@
 ## 次の段へ渡すもの・未確認
 Bへ旧値に解決する記号一覧と通常/R1の比較根拠を渡す。
 共通生成物と切替依存・別出力の規則をB/Fへ渡す。選択未対応をGへ持ち越さない（[索引](README.md)のPMの判断1〜4）。
+
+## 段Aの実装記録 (2026-10-16)
+- 基点 `9aaaf39`。既定0を維持し、案5の定義・常駐終端/ゼロ化終端・ledger BSS 2頁・SQLite guardを追加。
+- `gen_memmap.py --layout {0,1} --layout-header PATH` の共通ヘッダをld/NASM/Cへ渡す。V5の中間物は `build/out/v5/` 内、通常/R1のldは同じ前処理入力。
+- ELF/共通ヘッダ/選択したmemmapの照合を通常/R1の像生成に結線。両配置fixtureでNOLOAD・混在拒否・0→1→0のld/ASM/C再生成を検査。
+- 既定0の固定シンボル・manifest固定区間・既存ASSERT 7本は一致。`__bss_end`/KHEAP/SQLite両端は移動0、`__bss_start`だけ−4B (直前paddingをゼロ化範囲へ包含)。
+- 票と違う判断: `paging.c`/`memory_boot.c` は旧配置専用ASSERTのみ分岐 (実行時処理は未変更)。`boot.mk`・`mkvmkernel.py`・関連試験/検査登録も生成入力と切替依存へ追随。
+- 証拠: `~/os32-tmp/run/t3ab/` の `final-*.log`、`a-build1.log`、`baseline-compare.log`、`layout-comparison.json`。初期のASSERT/fixture不整合は修正後に再検査。
+- 統合時の未確認・未結線は [持越し台帳 T3AB-A](../../DEFERRED_TESTS.md) に集約。段AのV5像はリンク検査用で、起動可能という判定はしない。

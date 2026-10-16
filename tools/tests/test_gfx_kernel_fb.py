@@ -2,6 +2,7 @@
 Normal controls run on every requested runner; mutants on the first runner.
 Hardware discovery and port I/O are stubbed, lifecycle and ledger are real.
 """
+from kernel_layout import linker_flags
 import argparse
 import hashlib
 import pathlib
@@ -134,7 +135,7 @@ static inline void io_wait_n(int n) {(void)n;}
         (tmp/'fixture.c').write_text(fixture_body or fixture)
         sources.append(tmp/'fixture.c')
         if stage is not None: stage(tmp, sources)
-        flags=['gcc','-std=gnu11','-m32','-march=i386','-ffreestanding','-fno-pie',
+        flags=['gcc', *linker_flags(),'-std=gnu11','-m32','-march=i386','-ffreestanding','-fno-pie',
                '-fno-stack-protector','-ffunction-sections','-fdata-sections',
                '-Wall','-Wextra','-Werror','-Wno-unused-function','-Wno-unused-variable',
                '-DPHYSMEM_HOST_TEST=1','-I'+str(tmp)]

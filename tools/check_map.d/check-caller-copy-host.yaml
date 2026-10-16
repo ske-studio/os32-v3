@@ -10,7 +10,9 @@ check-caller-copy-host:
 - tools/tests/access_walk_host.c
 - tools/tests/mutpar.py
 - tools/tests/test_access_walk.py
+- tools/tests/kernel_layout.py
 - tools/tests/caller_copy_host.c
 - tools/tests/test_caller_copy.py
 - tools/check_map.d/check-caller-copy-host.yaml
 - build/checks.d/check-caller-copy-host.mk
+artifact_reader: true

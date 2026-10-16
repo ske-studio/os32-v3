@@ -73,3 +73,5 @@ check-trim-kernel-host:
 - tools/tests/kdebug_cli_host.c
 - userland/shell/cmd_base.c
 - kernel/sysconfig.c
+- tools/tests/kernel_layout.py
+artifact_reader: true

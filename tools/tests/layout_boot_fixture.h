@@ -1,14 +1,14 @@
 /* T3b0 test-only runtime inputs. No proposed addresses enter product sources.
  * Both harnesses use the same synthetic chain end and detected RAM inputs.
- * This is a contract fixture, not an implementation of the future boot adapter. */
+ * The real adapter is tested separately by memory_boot_host. */
 struct layout_fixture {
     u32 meta, slack_end, guard_lo, pt, pt_end, guard_hi, stack, stack_end, dma;
     int resident_meta, slack_rw;
 };
 static const struct layout_fixture layout_fixtures[] = {
-    { MEM_LEDGER_META_BASE, 0x200000, 0x3F0000,
-      MEM_FIXED_PAGING_BASE, MEM_FIXED_PAGING_END, MEM_STACK_GUARD,
-      MEM_KSTACK_BASE, MEM_KSTACK_TOP + 4, MEM_DMA_POOL_BASE, 0, 0 },
+    { 0x2F9000, 0x200000, 0x3F0000,
+      0x3F1000, 0x3FC000, 0x2FB000,
+      0x2FC000, 0x300000, 0x2E8000, 0, 0 },
     { 0x17E000, 0x3E0000, 0x3E0000, 0x3E1000, 0x3FB000,
       0x3FB000, 0x3FC000, 0x400000, 0x7F0000, 1, 1 },
 };
@@ -19,6 +19,7 @@ static const struct {
     int fixed, old_dma, new_dma, boot_continues, fdc;
 } layout_ram_inputs[] = {
     { 8088,  1, 1, 0, 1, 1 },
+    { 8188,  1, 1, 0, 1, 1 },
     { 8192,  1, 1, 1, 1, 1 },
     { 17408, 0, 1, 1, 1, 1 },
     { 65536, 0, 1, 1, 1, 1 },
@@ -163,7 +164,7 @@ static void layout_boot_fixture(u32 kb)
                                        (f->dma + LF_DMA_SIZE) / LF_PAGE));
         }
         /* Test-side replay of supplied attributes through real PTE helpers.
-         * Production paging_init remains covered separately, with old inputs. */
+         * Production paging_init is covered separately by product-source tests. */
         CHECK(paging_map_range(first, f->slack_end, first, PAGE_RW) == 0);
         if (!f->slack_rw) CHECK(paging_set_not_present(first, f->slack_end - 1) == 0);
         CHECK(paging_map_range(f->pt, f->pt_end, f->pt, PAGE_RW) == 0);
