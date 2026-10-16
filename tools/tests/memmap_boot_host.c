@@ -152,6 +152,8 @@ static void say_run(u32 start, u32 end, u32 code)
     report(line, 26);
 }
 
+#include <layout_boot_fixture.h>
+
 void _start(void)
 {
     u32 args[6] = {0x380000, 0xC80000, 3, 0x32, 0xFFFFFFFF, 0};
@@ -314,6 +316,7 @@ void _start(void)
     (void)paging_poke_user_bit(MEM_LEDGER_META_BASE, 0);
     CHECK(paging_memmap_selftest(tramp) == bad);
 
+    layout_boot_fixture(HOST_RAM_KB);
     SAY("PASS");
     die(0);
 }

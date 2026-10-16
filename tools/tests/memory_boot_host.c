@@ -80,6 +80,9 @@ static void host_failstop(void)
     die(0);
 }
 #include "kernel_boot_gate.c"
+#ifdef TEST_LAYOUT
+#include <layout_boot_fixture.h>
+#endif
 void _start(void)
 {
     u32 args[6] = {0x800000, 0x700000, 3, 0x32, 0xffffffffUL, 0};
@@ -267,6 +270,10 @@ void _start(void)
     die(0);
 #endif
     CHECK(memory_boot_init(TEST_KB));
+#ifdef TEST_LAYOUT
+layout_boot_fixture(TEST_KB);
+die(0);
+#endif
     /* 区間の表 (T1b、§3-3 ③): 固定用途 12 本 + ARENA_TOP 型の backing +
      * 背景 2 本。不変条件が成り立ち、背景は 15〜16MB と [2GB, 4GiB)。 */
     {

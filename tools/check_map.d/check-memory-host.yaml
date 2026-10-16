@@ -29,6 +29,7 @@ check-memory-host:
 - tools/tests/app_bb_overlap_host.c
 - tools/tests/device_reservation_stage_host.c
 - tools/tests/highram_stage_host.c
+- tools/tests/layout_boot_fixture.h
 - tools/tests/memory_boot_host.c
 - tools/tests/paging_rebuild_host.c
 - tools/tests/pgalloc_range_host.c

@@ -24,6 +24,18 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 # (名前, 当てるファイル, 置き換え前, 置き換え後, 落とすべき場面 (case, kb))
 MUTATIONS = [
+    ("layout-lowram-stop", "tools/tests/layout_boot_fixture.h",
+     "result.boot_continues = 1;", "result.boot_continues = result.dma;",
+     ("layout", 8088)),
+    ("layout-lowram-fdc-off", "tools/tests/layout_boot_fixture.h",
+     "result.fdc = 1;", "result.fdc = result.dma;", ("layout", 8088)),
+    ("layout-old-np", "tools/tests/layout_boot_fixture.h",
+     "if (!f->resident_meta && !fixed)", "if (!fixed)", ("layout", 65536)),
+    ("layout-slack-double", "tools/tests/layout_boot_fixture.h",
+     "CHECK(physmem_reserve_ram(&supply, first / LF_PAGE, f->slack_end / LF_PAGE));",
+     "CHECK(physmem_reserve_ram(&supply, first / LF_PAGE, f->slack_end / LF_PAGE));"
+     "CHECK(physmem_reserve_ram(&supply, first / LF_PAGE, f->slack_end / LF_PAGE));",
+     ("layout", 8192)),
     # §4-1 変異 1: 置き場の境界を 1 ページずらす (DMA プールの上側ガードを食う)。
     ("ledger-base-shift", "include/memmap.h",
      "#define MEM_LEDGER_META_BASE   0x2F9000UL",
@@ -75,7 +87,8 @@ def run_case(case='default', kb=16384, defines=(), mutation=None):
         d = pathlib.Path(tmp)
         texts = {}
         for rel in ('kernel/paging.c', 'kernel/pgalloc.c', 'kernel/sys.c',
-                    'kernel/memory_boot.c', 'include/memmap.h'):
+                    'kernel/memory_boot.c', 'include/memmap.h',
+                    'tools/tests/layout_boot_fixture.h'):
             texts[rel] = (ROOT / rel).read_text()
         if mutation:
             _, rel, old, new, _ = mutation
@@ -88,6 +101,7 @@ def run_case(case='default', kb=16384, defines=(), mutation=None):
             (d / f'{unit}_host_source.c').write_text(s)
         # 写しの memmap.h を -I の先頭に置く (変異を当てたときだけ中身が違う)。
         (d / 'memmap.h').write_text(texts['include/memmap.h'])
+        (d / 'layout_boot_fixture.h').write_text(texts['tools/tests/layout_boot_fixture.h'])
         kernel = (ROOT / 'kernel/kernel.c').read_text()
         start = kernel.index('    if (!memory_boot_init(mem_kb))')
         end = kernel.index('    shm_init();', start) + len('    shm_init();')
@@ -137,6 +151,12 @@ class MemoryBoot(unittest.TestCase):
         for kb in (8192, 17408, 65536):
             with self.subTest(kb=kb):
                 self.run_case('fixed_paging', kb)
+
+    def test_runtime_layouts_same_ram_inputs(self):
+        # 7.9MiB (page aligned), exactly 8MiB, 64MiB: FIXED and ARENA_TOP.
+        for kb in (8088, 8192, 65536):
+            with self.subTest(kb=kb):
+                self.run_case('layout', kb)
 
     def test_huge_hint_no_promotion(self):
         self.run_case('online', 0xffffffff)

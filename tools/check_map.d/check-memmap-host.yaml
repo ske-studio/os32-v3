@@ -21,6 +21,7 @@ check-memmap-host:
 - kernel/shm.c
 - sdk/rust/os32api/src/gui/proto.rs
 - tools/gen_memmap.py
+- tools/tests/layout_boot_fixture.h
 - tools/tests/memmap_boot_host.c
 - tools/tests/owner_reclaim_host.c
 - tools/tests/test_memmap_boot.py

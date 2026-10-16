@@ -128,7 +128,8 @@ def build_and_run(tmp, case, mutation=None, kb=8192, initial_if=0x202):
     name, bss, reject, bad = case
     tmp = pathlib.Path(tmp)
     sources = {}
-    for src in TARGET_SRCS + [ROOT / "kernel/pgalloc.c"]:
+    for src in TARGET_SRCS + [ROOT / "kernel/pgalloc.c",
+                               ROOT / "tools/tests/layout_boot_fixture.h"]:
         sources[src] = src.read_text(encoding="utf-8")
     if mutation:
         rel, old, new = MUTATIONS[mutation]
@@ -150,6 +151,8 @@ def build_and_run(tmp, case, mutation=None, kb=8192, initial_if=0x202):
     alloc = alloc.replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags')
     (tmp / "pgalloc_host_source.c").write_text(alloc, encoding="utf-8")
 
+    (tmp / "layout_boot_fixture.h").write_text(
+        sources[ROOT / "tools/tests/layout_boot_fixture.h"])
     includes = ['-I' + str(ROOT / 'tools/tests/host_arch'), '-I' + str(tmp)] + KERNEL_INCLUDES
     exe = tmp / ("memmap_" + re.sub(r"\W", "", str(bss)))
     defines = ['-DPHYSMEM_HOST_TEST=1',
@@ -171,7 +174,7 @@ def main():
 
     check_shm_replay()
 
-    for kb in (8192, 17408, 65536):
+    for kb in (8088, 8192, 17408, 65536):
         for initial_if in (2, 0x202):
             with tempfile.TemporaryDirectory(prefix='os32-fixed-paging-') as tmp:
                 out = build_and_run(tmp, CASES[0], kb=kb, initial_if=initial_if)
