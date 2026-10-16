@@ -30,9 +30,10 @@ SOURCES = {
     "d": "drivers/kbd_dlog.c",
     "k": "drivers/kbd.c",
     "w": "userland/shell/kbd_watch.c",
+    "m": "drivers/mouse.c",
 }
 
-CASES = ["ring_basic", "ring_wrap", "irq_skip", "irq_mods", "irq_flags_api",
+CASES = ["stop_timeout", "stop_mouse", "stop_burst", "ring_basic", "ring_wrap", "irq_skip", "irq_mods", "irq_flags_api",
          "irq_locks", "watch_fmt", "watch_lost"]
 
 # -Wno-attributes: __cdecl は x86-64 のホストでは無視される (警告だけ)。

@@ -44,6 +44,8 @@ impl Ctx {
 /// ABORTED owner exit consumes the same STOP in every WM input representation.
 pub fn discard_stop(st: &mut GuiState) {
     st.abort_seen = false;
+    st.stop_suppressed = true;
+    st.stop_tick = unsafe { (os32api::api().get_tick)() };
     let mut kept = 0;
     for i in 0..st.pending_raw_n {
         let raw = st.pending_raw[i];
@@ -73,6 +75,8 @@ const SC_F4: u8 = 0x65;
 const SC_F5: u8 = 0x66;
 /* KEY_SPACE。SHIFT+SPACE で FEP を切り替える (契約 U2a)。 */
 const SC_SPACE: u8 = 0x34;
+// PIT is 100 Hz (memmap.h PIT_HZ); 50 ticks = 500 ms after ABORTED.
+const STOP_SUPPRESS_TICKS: u32 = 50;
 const SC_STOP: u8 = 0x60; /* STOP キー (kbd.h KEY_STOP)。CTRL+STOP = 強制脱出 (契約 T6) */
 
 /* drivers/mouse.h の MOUSE_BTN_*。`GuiEvtButton.button` にもこの値を載せる
@@ -385,6 +389,21 @@ pub(crate) fn capture_keyboard(st: &mut GuiState, ctx: Ctx) {
         if raw < 0 {
             break;
         }
+        let scan = (raw & 0x7F) as u8;
+        let down = ((raw >> 8) & 1) != 0;
+        let mods = ((raw >> 9) & 0x7F) as u32;
+        /* Mirror kbd.c for WM-deferred raw as well. Inspect before defer and
+         * overflow handling, so Pump/FEP and full event rings obey the same
+         * boundary. Breaks and modifier makes never start a new operation. */
+        if (st.stop_suppressed
+            && unsafe { (os32api::api().get_tick)() }.wrapping_sub(st.stop_tick) >= STOP_SUPPRESS_TICKS)
+            || (down && scan != SC_STOP && !(SC_SHIFT..=SC_CTRL).contains(&scan))
+        {
+            st.stop_suppressed = false;
+        }
+        if st.stop_suppressed && scan == SC_STOP && down && (mods & MOD_CTRL) != 0 {
+            continue;
+        }
         /* WM のショートカットとマウスキーは状態機械を動かすので X3 でだけ
          * 実行する (票 KBD_NAV §1-4)。X4 で見つけたら FEP と同じく、この raw と
          * 以後を全部退避して次の X3 へ回す (順序を保つ)。 */
@@ -394,9 +413,6 @@ pub(crate) fn capture_keyboard(st: &mut GuiState, ctx: Ctx) {
             st.pending_raw_n += 1;
             continue;
         }
-        let scan = (raw & 0x7F) as u8;
-        let down = ((raw >> 8) & 1) != 0;
-        let mods = ((raw >> 9) & 0x7F) as u32; /* イベント時点の修飾状態 */
         /* X3 must reach STOP behind undeliverable input. Count every discarded
          * raw event, without running FEP/WM actions for it. */
         if !space_ok {
@@ -576,6 +592,11 @@ fn capture_mouse(st: &mut GuiState, ctx: Ctx) {
     unsafe {
         (os32api::api().mouse_poll)(&mut mi as *mut MouseInfo as *mut u8);
     }
+    // Observe physical edges in Pump too; prev_buttons belongs to X3 UI.
+    if mi.buttons & !st.stop_mouse_buttons != 0 {
+        st.stop_suppressed = false;
+    }
+    st.stop_mouse_buttons = mi.buttons;
     /* 全画面 GFX 中はマウスを**誰にも配らない** (票 T8 D4c: タスクバー /
      * Start / 窓を含めて無視)。位置と押下だけ同期しておき、復帰した最初の
      * 周期で古いエッジが「クリック」に化けるのを防ぐ。カーソルも描かない

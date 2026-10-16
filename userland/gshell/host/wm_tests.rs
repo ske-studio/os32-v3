@@ -3646,6 +3646,83 @@ fn kstop_aborted_exit_consumes_captured_and_deferred_stop() {
 }
 
 #[test]
+fn h2stop_late_repeat_after_owner_exit_does_not_kill_next_foreground() {
+    use crate::{handler, input, mocks, multiapp, wm};
+    use os32api::gui::proto::GUI_OP_OWNER_EXIT;
+    for ctx in [input::Ctx::Pump, input::Ctx::Wait, input::Ctx::Standalone] {
+        mocks::init();
+        multiapp::reset();
+        let shm = mocks::Shm::new();
+        two_app_global(&shm);
+        handler::gshell_gui_handler(GUI_OP_OWNER_EXIT, 3, 3);
+        assert_eq!(input::focus_target(wm::g()).unwrap().slot, 0);
+        let stop = 0x60 | 0x100 | (0x10 << 9);
+        // Even a full release/repress of the chord belongs to the same burst.
+        mocks::push_rawkeys(&[stop & !0x100, 0x10, 0x74, 0x174, stop, stop]);
+        input::capture_keyboard(wm::g(), ctx);
+        input::capture_keyboard(wm::g(), input::Ctx::Wait);
+        assert!(!wm::g().abort_seen, "late repeat became a new abort");
+        assert_eq!(crate::top_level_abort(wm::g()), 0);
+        assert!(mocks::kill_calls().is_empty());
+        wm::g().inited = false;
+    }
+}
+
+#[test]
+fn h2stop_new_key_rearms_stop_for_the_new_foreground() {
+    use crate::{handler, input, mocks, multiapp, slot, wm};
+    use os32api::gui::proto::GUI_OP_OWNER_EXIT;
+    mocks::init();
+    multiapp::reset();
+    let shm = mocks::Shm::new();
+    two_app_global(&shm);
+    handler::gshell_gui_handler(GUI_OP_OWNER_EXIT, 3, 3);
+    // A new non-STOP make marks the next keyboard operation. Its break alone
+    // and modifier makes do not. Preserve ordinary key delivery as well.
+    let stop = 0x60 | 0x100 | (0x10 << 9);
+    let before = slot::read_header(wm::g(), 0).ring_tail;
+    mocks::push_rawkeys(&[0x110, 0x10, stop]);
+    input::capture_keyboard(wm::g(), input::Ctx::Wait);
+    assert_eq!(slot::read_header(wm::g(), 0).ring_tail.wrapping_sub(before), 3,
+               "new key make/text/break must survive rearming");
+    assert!(wm::g().abort_seen);
+    mocks::set_app_state(2, 4);
+    mocks::set_kill_frees(&[2]);
+    assert_eq!(crate::top_level_abort(wm::g()), 2);
+    assert_eq!(mocks::kill_calls(), vec![2]);
+    wm::g().inited = false;
+}
+
+#[test]
+fn h2stop_full_ring_and_deferred_raw_do_not_bypass_suppression() {
+    use crate::{handler, input, mocks, multiapp, slot, wm};
+    use os32api::gui::proto::{GUI_OP_OWNER_EXIT, GUI_RING_CAPACITY};
+    for deferred in [false, true] {
+        mocks::init();
+        multiapp::reset();
+        let shm = mocks::Shm::new();
+        two_app_global(&shm);
+        handler::gshell_gui_handler(GUI_OP_OWNER_EXIT, 3, 3);
+        let st = wm::g();
+        let mut h = slot::read_header(st, 0);
+        h.ring_tail = h.ring_head.wrapping_add(GUI_RING_CAPACITY as u16 - 3);
+        slot::write_header(st, 0, &h);
+        let stop = 0x60 | 0x100 | (0x10 << 9);
+        if deferred {
+            st.pending_raw[0] = stop;
+            st.pending_raw_n = 1;
+        } else {
+            mocks::push_rawkeys(&[stop]);
+        }
+        input::capture_keyboard(st, input::Ctx::Wait);
+        assert!(!st.abort_seen);
+        assert_eq!(slot::read_header(st, 0).dropped, h.dropped);
+        assert_eq!(st.pending_raw_n, 0);
+        st.inited = false;
+    }
+}
+
+#[test]
 fn kstop_completion_and_s6_resolve_foreground_once() {
     use crate::{input, mocks, multiapp, wm};
     // STOP completion and ordinary polling both expose WAIT_POLL to the WM.
@@ -4047,4 +4124,38 @@ fn owner_diagnostics_defer_in_pump_and_print_all_slots() {
     let lines = String::from_utf8(SERIAL.lock().unwrap().clone()).unwrap();
     assert_eq!(lines, "OS32: slot id=2 state=2 owner_pages=20 exec_heap_used=200 trim_pending=1\r\nOS32: slot id=3 state=2 owner_pages=30 exec_heap_used=300 trim_pending=1\r\nOS32: slot id=4 state=0 owner_pages=0 exec_heap_used=0 trim_pending=0\r\nOS32: slot id=5 state=2 owner_pages=50 exec_heap_used=500 trim_pending=1\r\n");
     assert_eq!(*QUERIES.lock().unwrap(), vec![(2,132),(2,200),(3,132),(3,200),(4,132),(4,200),(5,132),(5,200)]);
+}
+
+#[test]
+fn h2stop_timeout_rearms_at_500ms() {
+    use crate::{input, mocks, wm};
+    mocks::init();
+    let mut st = wm::GuiState::NEW;
+    mocks::set_tick(0xfffffff0);
+    input::discard_stop(&mut st);
+    for (elapsed, expected) in [(49, false), (50, true)] {
+        mocks::set_tick(0xfffffff0u32.wrapping_add(elapsed));
+        mocks::push_rawkeys(&[0x60 | 0x100 | (0x10 << 9)]);
+        input::capture(&mut st, input::Ctx::Wait);
+        assert_eq!(st.abort_seen, expected, "elapsed={elapsed}");
+    }
+}
+
+#[test]
+fn h2stop_mouse_press_rearms_but_hold_and_release_do_not() {
+    use crate::{input, mocks, wm};
+    for ctx in [input::Ctx::Pump, input::Ctx::Wait] {
+        mocks::init();
+        let mut st = wm::GuiState::NEW;
+        *mocks::MOUSE.lock().unwrap() = (0, 0, 1);
+        input::capture(&mut st, ctx);
+        input::discard_stop(&mut st);
+        for (buttons, expected) in [(1, false), (0, false), (2, true)] {
+            *mocks::MOUSE.lock().unwrap() = (0, 0, buttons);
+            input::capture(&mut st, ctx);
+            mocks::push_rawkeys(&[0x60 | 0x100 | (0x10 << 9)]);
+            input::capture(&mut st, ctx);
+            assert_eq!(st.abort_seen, expected, "buttons={buttons}");
+        }
+    }
 }

@@ -146,6 +146,11 @@ static volatile u32 kbd_raw_dropped = 0;
  * 変わらない。ASCII 化は WM が自前の写し (gshell の input::translate) で行う。
  * rshell のシリアル入力は kbd_count を経由しないので影響を受けない。 */
 static volatile int kbd_gui_mode = 0;
+/* Join late STOP makes until a new key/button press or 500 ms after ABORTED. */
+#define KBD_STOP_SUPPRESS_TICKS (PIT_HZ / 2)
+static volatile int kbd_stop_suppressed = 0;
+static volatile u32 kbd_stop_tick;
+static u8 kbd_stop_mouse_buttons;
 
 /* ======================================================================== */
 /*  スキャンコード → ASCII 変換テーブル                                    */
@@ -402,6 +407,14 @@ static void kbd_deliver(u8 scancode)
      * 溜めると次の gshell に古い打鍵が届き、kbd_raw_dropped も水増しになる
      * (レビュー #3 ③)。 */
     if (kbd_gui_mode) {
+        if ((u32)(tick_count - kbd_stop_tick) >= KBD_STOP_SUPPRESS_TICKS ||
+            (!is_break && keycode != KEY_STOP &&
+             (keycode < KEY_SHIFT || keycode > KEY_CTRL)))
+            kbd_stop_suppressed = 0;
+        /* Filter before both raw enqueue and ring3_abort_request: filtering
+         * only in the WM leaves an IRQ abort_req on the next running app. */
+        if (kbd_stop_suppressed && !is_break && keycode == KEY_STOP &&
+            (kbd_shift_state & SHIFT_CTRL)) return;
         if (kbd_raw_count < KBD_BUF_SIZE) {
             kbd_raw_buf[kbd_raw_tail] = (u16)keycode
                                       | (is_break ? 0 : 0x100)
@@ -525,6 +538,7 @@ void kbd_init(void)
      * IRQ1 はまだ閉じているので ISR の所有権に触れない。 */
     kbd_shift_state = kbd_lock_bits_from_bios(kbd_bios_shift_peek());
     kbd_gui_mode = 0;       /* 起動直後は CUI (WM 未登録) */
+    kbd_stop_suppressed = 0;
 
     /* キー状態ビットマップクリア */
     {
@@ -865,10 +879,23 @@ int kbd_is_pressed(int scancode)
     return (kbd_key_pressed[scancode >> 3] >> (scancode & 7)) & 1;
 }
 
+/* mouse_poll supplies physical button samples, including during WM Pump.
+ * Keep a separate history: the WM UI intentionally defers its edges to X3. */
+void kbd_stop_mouse_sample(u8 buttons)
+{
+    u32 flags = irq_save();
+    if (buttons & (u8)~kbd_stop_mouse_buttons)
+        kbd_stop_suppressed = 0;
+    kbd_stop_mouse_buttons = buttons;
+    irq_restore(flags);
+}
+
 /* Preserve order and all non-STOP input, including modifier/break events. */
 void kbd_discard_stop(void)
 {
     u32 flags = irq_save();
+    kbd_stop_suppressed = kbd_gui_mode;
+    kbd_stop_tick = tick_count;
     int n = kbd_raw_count;
     int read = kbd_raw_head;
     int write = read;
@@ -923,6 +950,7 @@ void kbd_set_gui_mode(int on)
 
     flags = irq_save();
     kbd_gui_mode = next;
+    kbd_stop_suppressed = 0;
     if (next) {
         /* GUI セッションの起点で取りこぼし累計を 0 に戻す (レビュー #4 ③)。
          * gshell は last_kbd_dropped=0 から差分を取るので、前回セッションや

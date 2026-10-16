@@ -83,6 +83,9 @@ static u16 kbd_raw_buf[KBD_BUF_SIZE];
 static int kbd_raw_count, kbd_raw_head, kbd_raw_tail;
 static u32 kbd_raw_dropped;
 static int kbd_gui_mode=1;
+static int kbd_stop_suppressed;
+static u32 kbd_stop_tick;
+#define KBD_STOP_SUPPRESS_TICKS 50
 static GuiHandler g_gui_handler;
 static void *g_gui_pump;
 void ring3_wm_enter(void) { ring3_wm_depth++; }

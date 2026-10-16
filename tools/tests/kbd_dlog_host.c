@@ -35,6 +35,7 @@ u8 kbd_host_bios_shift;
 #include "drivers/kbd_dlog.c"
 #include "drivers/kbd.c"
 #include "userland/shell/kbd_watch.c"
+#include "drivers/mouse.c"
 
 #define CHECK(x) do { if (!(x)) { \
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); failed++; \
@@ -69,7 +70,8 @@ void irq_enable(unsigned int irq) { (void)irq; }
 int  v86_is_active(void) { return stub_v86; }
 void v86_request_exit(void) { }
 int  v86_kbd_push(u8 scancode) { (void)scancode; stub_v86_pushed++; return 0; }
-void ring3_abort_request(void) { }
+static int stub_abort_requests;
+void ring3_abort_request(void) { stub_abort_requests++; }
 void ring3_abort_check(void) { }
 int ring3_call_from_user(void) { return 0; }
 int ring3_wait_pending(void) { return 0; }
@@ -83,6 +85,16 @@ u32  kbd_inject_pending(void) { return 0; }
 int  kbd_inject_take(u8 *out) { (void)out; return 0; }
 int  kbd_inject_peek(u8 *out) { (void)out; return 0; }
 void kbd_inject_discard(void) { }
+
+static u8 stub_mouse_buttons;
+int np2_detect(void) { return 0; }
+int bus_mouse_init(void) { return 1; }
+int seamless_mouse_init(void) { return 0; }
+int seamless_mouse_poll(i16 *x, i16 *y) { (void)x; (void)y; return 0; }
+u8 mouse_read_buttons(void) { return stub_mouse_buttons; }
+void bus_mouse_get(i16 *dx, i16 *dy, u8 *buttons)
+{ *dx = 0; *dy = 0; *buttons = stub_mouse_buttons; }
+int tvram_reverse_cell(int x, int y) { (void)x; (void)y; return 1; }
 
 /* 1 回の IRQ1: 0043h = st、0041h = data */
 static void irq(unsigned int st, unsigned int data)
@@ -400,7 +412,82 @@ static void case_watch_lost(void)
     CHECK_STR(buf, "LOST seq=6..6 (1): cannot judge this span");
 }
 
+static void case_stop_burst(void)
+{
+    fresh();
+    kbd_set_gui_mode(1);
+    stub_abort_requests = 0;
+    irq(KBD_STAT_RXRDY, KEY_CTRL);
+    irq(KBD_STAT_RXRDY, KEY_STOP);
+    CHECK(stub_abort_requests == 1); /* Single STOP still works. */
+    kbd_discard_stop(); /* ABORTED owner exit, before the second make arrives. */
+    while (kbd_trygetrawkey() >= 0) { }
+    irq(KBD_STAT_RXRDY, KEY_STOP | SCANCODE_BREAK);
+    irq(KBD_STAT_RXRDY, 0x10 | SCANCODE_BREAK);
+    irq(KBD_STAT_RXRDY, KEY_CTRL | SCANCODE_BREAK);
+    irq(KBD_STAT_RXRDY, KEY_CTRL);
+    irq(KBD_STAT_RXRDY, KEY_STOP);
+    CHECK(stub_abort_requests == 1);
+    int raw;
+    while ((raw = kbd_trygetrawkey()) >= 0)
+        CHECK((raw & 0x1ff) != (KEY_STOP | 0x100));
+    irq(KBD_STAT_RXRDY, 0x10); /* New key rearms, and is delivered unchanged. */
+    CHECK((kbd_trygetrawkey() & 0x1ff) == 0x110);
+    irq(KBD_STAT_RXRDY, KEY_STOP);
+    CHECK(stub_abort_requests == 2);
+    CHECK((kbd_trygetrawkey() & 0x1ff) == (KEY_STOP | 0x100));
+    kbd_discard_stop();
+    kbd_set_gui_mode(0);
+    irq(KBD_STAT_RXRDY, KEY_STOP);
+    CHECK(stub_abort_requests == 3); /* CUI never inherits suppression. */
+    kbd_set_gui_mode(1);
+    irq(KBD_STAT_RXRDY, KEY_STOP);
+    CHECK(stub_abort_requests == 4); /* A new GUI session starts armed. */
+}
+
+static void case_stop_timeout(void)
+{
+    fresh();
+    kbd_set_gui_mode(1);
+    stub_abort_requests = 0;
+    irq(KBD_STAT_RXRDY, KEY_CTRL);
+    tick_count = 0xfffffff0U; /* Also exercise PIT counter wrap. */
+    kbd_discard_stop();
+    tick_count += 49;
+    irq(KBD_STAT_RXRDY, KEY_STOP);
+    CHECK(stub_abort_requests == 0); /* (a) less than 500 ms */
+    tick_count++;
+    irq(KBD_STAT_RXRDY, KEY_STOP);
+    CHECK(stub_abort_requests == 1); /* (b) 500 ms */
+}
+
+static void case_stop_mouse(void)
+{
+    fresh();
+    kbd_set_gui_mode(1);
+    stub_abort_requests = 0;
+    stub_mouse_buttons = MOUSE_BTN_LEFT;
+    mouse_init();
+    mouse_poll(NULL);
+    irq(KBD_STAT_RXRDY, KEY_CTRL);
+    kbd_discard_stop();
+    mouse_poll(NULL); /* Holding a button is not a new press. */
+    irq(KBD_STAT_RXRDY, KEY_STOP);
+    CHECK(stub_abort_requests == 0);
+    stub_mouse_buttons = 0;
+    mouse_poll(NULL);
+    irq(KBD_STAT_RXRDY, KEY_STOP);
+    CHECK(stub_abort_requests == 0); /* Release alone does not rearm. */
+    stub_mouse_buttons = MOUSE_BTN_RIGHT;
+    mouse_poll(NULL);
+    irq(KBD_STAT_RXRDY, KEY_STOP);
+    CHECK(stub_abort_requests == 1); /* (c) new mouse press */
+}
+
 static const struct { const char *name; void (*fn)(void); } cases[] = {
+    { "stop_timeout", case_stop_timeout },
+    { "stop_mouse", case_stop_mouse },
+    { "stop_burst",     case_stop_burst },
     { "ring_basic",     case_ring_basic },
     { "ring_wrap",      case_ring_wrap },
     { "irq_skip",       case_irq_skip },

@@ -6,6 +6,7 @@
 /* ======================================================================== */
 
 #include "mouse.h"
+#include "kbd.h"
 #include "np2sysp.h"
 #include "pc98.h"
 #include "io.h"
@@ -116,6 +117,8 @@ void mouse_poll(MouseState *state)
         /* ボタンは8255ポートAから直接読取 (両モード共用) */
         buttons = mouse_read_buttons();
     }
+
+    kbd_stop_mouse_sample(buttons);
 
     if (state) {
         state->x = cursor_x;
