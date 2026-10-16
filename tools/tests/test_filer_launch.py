@@ -64,23 +64,22 @@ def main():
         out = pathlib.Path(tmp)
         api = os32api_host.build(out)
         rc = build_and_run(out, src, api)
-        if rc or not mutate:
-            return rc
-        mutations = (
-            ("relaunch_blocked", "fn launch(&mut self, path: &[u8]) {",
-             "fn launch(&mut self, path: &[u8]) { return;"),
-            ("operations_blocked", "fn busy(&mut self) -> bool {",
-             "fn busy(&mut self) -> bool { return true;"),
-            ("quit_leaks_fds",
-             "fn shutdown(&mut self) {\n        self.timer = None;\n        self.job.abort();",
-             "fn shutdown(&mut self) {\n        self.timer = None;"),
-        )
-        for name, before, after in mutations:
-            assert src.count(before) == 1, name
-            if build_and_run(out, src.replace(before, after), api) == 0:
-                raise AssertionError("survived: " + name)
-            print("KILLED " + name, flush=True)
-    return 0
+        if mutate and rc == 0:
+            mutations = (
+                ("relaunch_blocked", "fn launch(&mut self, path: &[u8]) {",
+                 "fn launch(&mut self, path: &[u8]) { return;"),
+                ("operations_blocked", "fn busy(&mut self) -> bool {",
+                 "fn busy(&mut self) -> bool { return true;"),
+                ("quit_leaks_fds",
+                 "fn shutdown(&mut self) {\n        self.timer = None;\n        self.job.abort();",
+                 "fn shutdown(&mut self) {\n        self.timer = None;"),
+            )
+            for name, before, after in mutations:
+                assert src.count(before) == 1, name
+                if build_and_run(out, src.replace(before, after), api) == 0:
+                    raise AssertionError("survived: " + name)
+                print("KILLED " + name, flush=True)
+    return rc
 
 
 if __name__ == "__main__":
