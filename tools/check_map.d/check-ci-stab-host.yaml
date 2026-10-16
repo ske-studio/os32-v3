@@ -113,4 +113,8 @@ check-ci-stab-host:
 - build/sdk/lib/**
 - sdk/crt/**
 - sdk/gen_kapi.py
+- build/kernel.mk
+- build/out/kernel.bin
+- build/out/sqlite.bin
+- build/out/*
 artifact_reader: true

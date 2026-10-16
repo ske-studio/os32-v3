@@ -17,3 +17,23 @@ check-vk32-crc-host:
 - tools/check_map.d/check-vk32-crc-host.yaml
 - build/checks.d/check-vk32-crc-host.mk
 - tools/check_artifacts.py
+- boot/bootinfo.inc
+- fs/fd_redirect.c
+- fs/pipe_buffer.c
+- kernel/kentry.asm
+- kernel/shm.c
+- sdk/kapi.json
+- sdk/link/app.ld
+- sdk/link/shlib.ld
+- sdk/os32x_hdr.py
+- sdk/rust/os32api/src/gui/proto.rs
+- sdk/rust/os32api/src/gui/stub.rs
+- tools/mkshlib.py
+- tools/tests/owner_reclaim_host.c
+- tools/tests/test_owner_reclaim.py
+- userland/rust/libos32gui/src/shlib.rs
+- build/out/kernel.bin
+- build/out/sqlite.bin
+- build/out/*
+# T3a1: build/out の kernel.elf を丸ごと読む (成果物の読み手)。
+artifact_reader: true
