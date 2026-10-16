@@ -220,6 +220,10 @@ $(BUILD_OUT)/generations-manifest.json: $(BUILD_OUT)/vmkernel.lz4 tools/gen_gene
 $(BUILD_OUT)/layout-manifest.json: $(BUILD_OUT)/generations-manifest.json tools/gen_memmap.py $(LAYOUT_HEADER)
 	python3 tools/gen_memmap.py --manifest --write
 
+# カーネルを運ぶ経路は、再リンク後の世代表・配置表まで確定してから配備する。
+# 生成規則と一緒に結線し、deploy.mk 単独の利用者には生成済み成果物を渡せる。
+deploy deploy-u3 deploy-kernel deploy-nhd nhd-migrate-pt deploy-fd: $(BUILD_OUT)/layout-manifest.json
+
 kernel: $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/sqlite.bin $(BUILD_OUT)/vmkernel.lz4 $(BUILD_OUT)/layout-manifest.json
 
 # === カーネルクリーン ===
