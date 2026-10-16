@@ -285,6 +285,19 @@ allow-list の集合は `deploy-set.json` を正とし、`check: optional` の�
 `np21w_ctl.py start` は起動前にこの作業木の t2h stamp を失効させる
 (別 ini の起動も安全側に失効)。remote の hash が変わった場合も、pull を省いた照合・配備を拒否する。
 
+`make kernel` とカーネルを運ぶ配備ターゲットは、ELF/bin/VK32 の更新後に
+世代表 → 配置表の順で生成する。`make all` は全成果物が揃ってから同じ順で生成する。
+再リンク時の追従は、配備せず次の手順で確認できる (各照合の終了コードは 0):
+
+```sh
+make all MUTATE=0
+python3 tools/gen_memmap.py --manifest --check
+make kernel MUTATE=0
+python3 tools/gen_memmap.py --manifest --check
+make kernel MUTATE=0
+python3 tools/gen_memmap.py --manifest --check
+```
+
 <a id="検査の3段"></a>
 #### 検査の 3 段 (`check-fast` / `check-changed` / `check`、2026-09-26)
 

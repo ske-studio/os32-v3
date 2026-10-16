@@ -213,7 +213,14 @@ $(BUILD_OUT)/vmkernel.lz4: $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/sqlite.bin $(BUI
 		-o $(BUILD_OUT)/vmkernel.lz4
 
 # === カーネル単独ターゲット ===
-kernel: $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/sqlite.bin $(BUILD_OUT)/vmkernel.lz4
+# ELF → bin → VK32 → 世代 → 配置の順。配備だけの再リンクでも照合表を更新する。
+$(BUILD_OUT)/generations-manifest.json: $(BUILD_OUT)/vmkernel.lz4 tools/gen_generation_manifest.py sdk/kapi.json .FORCE
+	python3 tools/gen_generation_manifest.py
+
+$(BUILD_OUT)/layout-manifest.json: $(BUILD_OUT)/generations-manifest.json tools/gen_memmap.py $(LAYOUT_HEADER)
+	python3 tools/gen_memmap.py --manifest --write
+
+kernel: $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/sqlite.bin $(BUILD_OUT)/vmkernel.lz4 $(BUILD_OUT)/layout-manifest.json
 
 # === カーネルクリーン ===
 clean-kernel:
