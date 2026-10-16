@@ -31,7 +31,7 @@ def body(src, head):
     return src[start:end]
 
 
-def run(code, runner):
+def run(code, runner, tvdump_wire=False):
     with tempfile.TemporaryDirectory(prefix='e9-host-') as d:
         d = Path(d)
         p = d / 'probe.c'
@@ -39,8 +39,17 @@ def run(code, runner):
         subprocess.run(['gcc', *FLAGS, '-I' + str(ROOT / 'include'),
                         '-I' + str(ROOT / 'sdk/include/os32'), '-I' + str(ROOT / 'userland/tests'), str(p), '-o', str(d / 'probe')],
                        check=True, capture_output=True, text=True)
-        return host32.run([str(d / 'probe')], runner=runner, timeout=30,
-                          capture_output=True).returncode
+        result = host32.run([str(d / 'probe')], runner=runner, timeout=30,
+                            capture_output=True)
+        if tvdump_wire and result.returncode == 0:
+            import sys
+            sys.path.insert(0, str(ROOT / 'tools'))
+            import tvdump_recv
+            expected = bytes(value & 255 for i in range(2000) for value in (i*7, i*13))
+            # Model both /api/cmd and rshell_serial stopping at the first EOT.
+            raw = (result.stdout + b'\x04').split(b'\x04', 1)[0]
+            assert tvdump_recv.parse_tvdump(raw) == (80, 25, expected)
+        return result.returncode
 
 
 def tvdump(src):
@@ -48,10 +57,10 @@ def tvdump(src):
 #define ATTR_RED 1
 #define ATTR_GREEN 2
 #define SH_STATUS_ERROR 1
-static u8 wire[4006];
+static u8 wire[8006];
 static int pos, reads, ready = 1;
 static int initialized(void) { return ready; }
-static void put(int c) { CHECK(pos < 4006); wire[pos++] = c; }
+static void put(int c) { CHECK(pos < 8006); wire[pos++] = c; }
 static void print(int a, const char *fmt, const char *s) { (void)a; (void)fmt; (void)s; }
 static void readcell(int x, int y, u16 *ch, u8 *attr) {
     CHECK(x == reads % 80 && y == reads / 80);
@@ -63,17 +72,30 @@ static struct {
     void (*kprintf)(int, const char *, const char *);
     void (*tvram_readchar_at)(int, int, u16 *, u8 *);
 } api = {initialized, put, print, readcell}, *g_api = &api;
-''' + body(src, 'static int cmd_tvdump(') + r'''
+''' + (body(src, 'static void tvdump_put_byte(') if 'static void tvdump_put_byte(' in src else '') + body(src, 'static int cmd_tvdump(') + r'''
 void _start(void) {
-    int i;
+    int i, offset = 6;
     CHECK(cmd_tvdump(0, 0) == 0);
-    CHECK(pos == 4006 && reads == 2000);
-    CHECK(wire[0]=='T' && wire[1]=='V' && wire[2]=='D' && wire[3]=='M');
+    CHECK(reads == 2000);
+    CHECK(wire[0]=='T' && wire[1]=='V' && wire[2]=='D' && wire[3]=='2');
     CHECK(wire[4]==80 && wire[5]==25);
     for (i=0; i<2000; i++) {
-        CHECK(wire[6+i*2] == (u8)(i*7));
-        CHECK(wire[7+i*2] == (u8)(i*13));
+        u8 expected[2] = {(u8)(i*7), (u8)(i*13)};
+        for (int j=0; j<2; j++) {
+            CHECK(offset < pos);
+            if (expected[j] == 4 || expected[j] == 27) {
+                CHECK(wire[offset++] == 27 && offset < pos);
+                CHECK(wire[offset++] == (expected[j] ^ 0x40));
+            } else {
+                CHECK(wire[offset++] == expected[j]);
+            }
+        }
     }
+    CHECK(offset == pos);
+    int written;
+    __asm__ volatile("int $0x80" : "=a"(written)
+                     : "a"(4), "b"(1), "c"(wire), "d"(pos) : "memory");
+    CHECK(written == pos);
     pos = reads = 0; ready = 0;
     CHECK(cmd_tvdump(0, 0) == SH_STATUS_ERROR && pos == 0 && reads == 0);
     finish(0);
@@ -388,7 +410,7 @@ def main():
         parent = (ROOT / 'userland/tests/shm_reuse_test.c').read_text()
         cases.append(('SHM reuse parent verdicts/errors/reset', reuse_parent(parent)))
     for name, code in cases:
-        rc = run(code, runner)
+        rc = run(code, runner, tvdump_wire=(name == 'tvdump wire/copy'))
         assert (rc != 0) if args.baseline else (rc == 0), (name, rc)
         print(('RED baseline: ' if args.baseline else 'GREEN: ') + name, flush=True)
     if args.mutate:
@@ -398,7 +420,7 @@ def main():
             ('CLIENT revoke omitted', client_marker(sources['ring3_guard'].replace('(void)r3_call(KAPI_SLOT_GFX_SHUTDOWN, 0);', ''), header, True)),
             ('CLIENT first write omitted', client_marker(sources['ring3_guard'].replace('*client = 0;', '(void)client;', 1), header, True)),
             ('CLIENT completion stale', client_marker(sources['ring3_guard'].replace('            mark[1] = 0;', '            mark[1] = R3_SURV;'), header, True)),
-            ('wire attr', tvdump(shell.replace('serial_putchar(at)', 'serial_putchar(0)'))),
+            ('wire attr', tvdump(shell.replace('tvdump_put_byte(at)', 'tvdump_put_byte(0)'))),
             ('wire high byte', tvdump(shell.replace('ch_val & 0xFF', 'ch_val >> 8'))),
             ('missing armed', marker(sources['ring3_fault'], header.replace('mark[3] = R3_ARMED;', 'mark[3] = 0;'), 'ring3_fault')),
             ('wrong target', marker(sources['ring3_fault'], header.replace('mark[2] = target;', 'mark[2] = target + 4;'), 'ring3_fault')),

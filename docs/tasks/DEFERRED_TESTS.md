@@ -28,7 +28,7 @@
 | ID | 何を残したか | 理由 | 次の関門 |
 |---|---|---|---|
 | E9-1 | CPL3 sh 経由の tvdump (CUI 対照つき) をゲストで確かめる | R1b で時間の都合で未実施。入力は CUI 画面キーボード (`emu_key` / `emu_type`、R4 shapes で実績) で足りる | 次のゲスト受入 (X-6 の道具で照合) |
-| X-6 | `tools/tvdump_recv.py` の `/api/cmd` 経路 (`:36-56`) で TVDM の長さ・寸法・内容を照合 | 実装は済み。ゲスト確認が E9-1 と同じ回で未実施 | 同上 |
+| X-6 | `tools/tvdump_recv.py` の HTTP・実機シリアル共通 TVD2 (EOT/ESC 逃がし) の長さ・寸法・全セルを照合 | X-6 修正はホスト試験のみ。依頼により NP21/W・実機は未操作 | 次のゲスト受入で平仮名を含む CUI と実機 rshell を照合 |
 | E11-9 | WM の tvdump 0 埋めのゲスト確認 (GUI 端末の分は H-7) | R1b の tvdump が未実施。V86 後の DISPLAY/TVRAM 再 lease (PT0 MATCH) と全 alias UC (PEGC / Cirrus) は閉じた | 同上 |
 | E11-5 | 全画面の WAIT_POLL と先行入力の 2 点 (端末の子・隠れた sh は端末アプリが v3 に無く H-7) | R1b で時間の都合で未実施。Run からの全画面の 1 キー終了と窓への復帰は 17MB planar (h9 再回) と実機 R7b で PASS | 次のゲスト受入 / 端末の 2 点は H-7 |
 | H-1 | h2_stack512 の park → resume → 終了 owner 0 (512KiB stack のまま OP_WAIT に入れる) | R1a は run と guard だけ (h2_stack の park は GUI 前提で、park/resume は h3 側で実施)。fixture の再生成・hash 照合・旧 app / shell / shlib の拒否・故障画像は閉じた | 次のゲスト受入 |
