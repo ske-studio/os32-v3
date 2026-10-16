@@ -60,7 +60,7 @@ T3 票へ渡す物理境界 (半開区間。固定 PD/PT 以外の最終配置�
 
 | 範囲 | T2a′ の占有・属性 | T3 の引継ぎ |
 |---|---|---|
-| [0x380000,0x3F1000) | 常駐shell exec_heap、452KiB、sup/RW/WB | shellを0x400000へ移して解放し、最終地図の鎖/SLACK・DMA [0x3E0000,0x3F0000)・NP guard [0x3F0000,0x3F1000)へ分割 |
+| [0x380000,0x3F1000) | 常駐shell exec_heap、452KiB、sup/RW/WB | shellを0x400000へ移して解放し、最終地図の鎖/SLACK・DMA [0x3E0000,0x3F0000)・NP guard [0x3F0000,0x3F1000)へ分割 (**2026-10-16 注**: 最終地図は案 5 で改めた — DMA は 0x7F0000、0x3E0000〜0x3FFFFF は見張り・PT の枠・見張り・スタック。正は [TASK_MEMMAP_V3 §2-1](TASK_MEMMAP_V3.md) と [T3 §2-2](TASK_T3_LAYOUT.md)) |
 | [0x3F1000,0x3FB000) | 固定PD/PT 10枚、sup/RW/WB、恒久FIXED | 同じ番地・枚数を維持。再移設なし、周辺NP化後の再写像は再検証 |
 | [0x3FB000,0x400000) | 未使用20KiB、恒久FIXED・NP | guard [0x3FB000,0x3FC000) と kstack [0x3FC000,0x400000)へ。T2ではstackを動かさない |
 | [0x400000,0x500000) | T2c以後は物理池の一部 | 常駐shellの新しい1箱。MEM_POOL_BASEを0x500000へ変更 |
