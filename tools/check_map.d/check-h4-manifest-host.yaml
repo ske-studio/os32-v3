@@ -15,3 +15,5 @@ check-h4-manifest-host:
 - tools/tests/mutpar.py
 - tools/check_map.d/check-h4-manifest-host.yaml
 - build/checks.d/check-h4-manifest-host.mk
+# Conservative artifact-path audit (including indirect helpers/fixtures).
+artifact_reader: true

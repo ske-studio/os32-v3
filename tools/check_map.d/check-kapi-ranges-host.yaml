@@ -26,3 +26,5 @@ check-kapi-ranges-host:
 - fs/vfs.c
 - fs/vfs.h
 - kapi/kapi_sys.c
+# Finite include search roots in test_kapi_ranges.resolve.
+- sdk/include/os32/*.h

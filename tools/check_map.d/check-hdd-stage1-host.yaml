@@ -24,3 +24,5 @@ check-hdd-stage1-host:
 - build/checks.d/check-hdd-stage1-host.mk
 - tools/nhd_profile.py
 - tools/gen_deploy_set.py
+# Conservative artifact-path audit (including indirect helpers/fixtures).
+artifact_reader: true

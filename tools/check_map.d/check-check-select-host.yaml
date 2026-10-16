@@ -62,3 +62,5 @@ check-check-select-host:
 - tools/check_p2v_allow.txt
 - tools/pack_name_tables.txt
 - tools/pack_notes.txt
+# Conservative artifact-path audit (including indirect helpers/fixtures).
+artifact_reader: true

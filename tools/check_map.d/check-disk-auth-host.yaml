@@ -41,3 +41,10 @@ check-disk-auth-host:
 - docs/07_shell.md
 - tools/check_artifacts.py
 - kapi/kapi_sys.c
+- sdk/include/os32/*.h
+# Conservative artifact-path audit (including indirect helpers/fixtures).
+- build/sdk/crt/**
+- build/out/lib/**
+- build/sdk/lib/**
+- sdk/crt/**
+artifact_reader: true

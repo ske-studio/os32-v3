@@ -41,3 +41,5 @@ check-hdd-stage2-host:
 - sdk/kapi.json
 - tools/nhd_profile.py
 - tools/gen_deploy_set.py
+# Conservative artifact-path audit (including indirect helpers/fixtures).
+artifact_reader: true

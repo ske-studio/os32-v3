@@ -7,3 +7,5 @@ check-c-dialect:
 - tools/check_c_dialect.py
 - tools/check_map.d/check-c-dialect.yaml
 - build/checks.d/check-c-dialect.mk
+# Conservative artifact-path audit (including indirect helpers/fixtures).
+artifact_reader: true

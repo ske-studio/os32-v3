@@ -107,3 +107,10 @@ check-ci-stab-host:
 - exec/appslot.c
 - exec/access_walk.c
 - exec/redir_access.c
+# Conservative artifact-path audit (including indirect helpers/fixtures).
+- build/sdk/crt/**
+- build/out/lib/**
+- build/sdk/lib/**
+- sdk/crt/**
+- sdk/gen_kapi.py
+artifact_reader: true

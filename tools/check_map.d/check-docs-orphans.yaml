@@ -42,3 +42,5 @@ check-docs-orphans:
 - userland/tests/sqlite_standalone/sqlite_user_vfs.c
 - tools/pack_name_tables.txt
 - tools/pack_notes.txt
+# Conservative artifact-path audit (including indirect helpers/fixtures).
+artifact_reader: true

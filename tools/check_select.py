@@ -11,6 +11,7 @@ manual source/script/data entries without headers. Global policy stays in
 check_map.yaml. Selection is a work-in-progress shortcut; full make check is
 required after integration.
 """
+import ast
 import os
 import glob
 import fnmatch
@@ -91,11 +92,13 @@ def load_map():
         with open(path, encoding="utf-8") as f:
             shard = yaml.safe_load(f)
         name = os.path.basename(path)[:-5]
-        if not isinstance(shard, dict) or set(shard) != {name}:
+        if not isinstance(shard, dict) or not {name} <= set(shard) <= {name, "artifact_reader"}:
             raise SystemExit("check-map: shard name mismatch: " + path)
         if name in m.get("checks", {}):
             raise SystemExit("check-map: duplicate: " + name)
-        m.setdefault("checks", {}).update(shard)
+        m.setdefault("checks", {})[name] = shard[name]
+        if shard.get("artifact_reader"):
+            m.setdefault("artifact_readers", []).append(name)
     m.setdefault("ignore", [])
     m.setdefault("full", [])
     m.setdefault("docs_only", [])
@@ -126,9 +129,8 @@ def is_notest(path, cnotest):
 
 
 # ---------------------------------------------------------------- Makefile
-# make の入力のうち、基点版との差分を型で絞るもの (`full:` の中の Makefile)。
+# Require explicit source dependency coverage for these build inputs in lint.
 ROUTED_BUILD = {"build/kernel.mk", "build/libs.mk", "build/programs.mk"}
-CHECK_CONTROL = re.compile(r"check-|MUT|HOST32|\.ONESHELL|export|override|CHECK_PAR|\bBASE\b|mut_on|host32_check", re.IGNORECASE)
 
 # Outputs of sdk/gen_kapi.py and sdk/kapi_rust_gen.py, including rewritten link scripts.
 KAPI_GENERATED = (
@@ -143,7 +145,11 @@ KAPI_GENERATED = (
 
 
 def routed_build_safe(base, path):
-    """Only route build changes whose added AND removed lines contain no check controls."""
+    """Only whitespace-only build diffs can retain the old reader routing.
+
+    Any setting/recipe change can alter mutant reachability, even if the normal
+    tests see no input difference. Both added and removed lines must be blank.
+    """
     if base is None:
         return False
     try:
@@ -158,9 +164,14 @@ def routed_build_safe(base, path):
         return False
     import difflib
     delta = difflib.ndiff(before.stdout.splitlines(), after.splitlines())
-    return not any(CHECK_CONTROL.search(line[2:]) for line in delta
+    return not any(line[2:].strip() for line in delta
                    if line.startswith(("+ ", "- ")))
 
+
+BUILD_CONFIG_GLOBS = ("**/Makefile", "build/**/*.mk", "**/Cargo.lock",
+                      "**/.cargo/config", "**/.cargo/config.toml", "**/Cargo.toml",
+                      "**/rust-toolchain", "**/rust-toolchain.toml", "**/*-target.json",
+                      "sdk/rust/i686-os32-none.json")
 
 MAKE_INPUT_GLOBS = ("Makefile", "build/*.mk", "build/checks.d/*.mk")
 
@@ -952,6 +963,218 @@ def effective_checks(m, rules):
             for t, g in m["checks"].items()}
 
 
+# A static audit, not Python execution: unknown path components become globs.
+# Keep exceptions source-specific and explain why they cannot read real artifacts.
+PATH_AUDIT_ALLOW = {
+    "tools/tests/" + "test_check_select.py": "selector fixtures describe synthetic inputs",
+    "tools/tests/" + "test_checkinfra.py": "selector fixtures use private repository roots",
+    "tools/tests/" + "host32.py": "cache contains only freshly compiled host fixtures",
+    # Limit helper exceptions to these offline targets: other callers may read images.
+    ("check-np21w-ctl-host", "tools/" + "nhd_profile" + ".py"):
+        "FakeOps/FakeHttp replace image and process I/O; profile paths are only names",
+    ("check-np21w-gui-host", "tools/" + "gui_gate" + ".py"):
+        "mock HTTP contract tests never call main or use its screenshot output directory",
+    ("check-np21w-gui-host", "tools/np21w_mcp/" + "server" + ".py"):
+        "MCP tests inject GUI observations/symbols; default build paths are never read",
+    ("check-gui-gate-host", "tools/" + "gui_gate" + ".py"):
+        "fake guest replaces HTTP/time/screenshots; main's output directory is unused",
+    ("check-key-inject-host", "tools/" + "gui_gate" + ".py"):
+        "key expansion and mocked key sends only; main's output directory is unused",
+    ("check-caller-access-host", "tools/" + "h3_park_resume" + ".py"):
+        "identity observer uses synthetic memory; main's ELF/map defaults are unused",
+    "tools/" + "check_select.py": "selector audits path names without reading build payloads",
+}
+ARTIFACT_DIRS = ("build/out", "build/sdk", "build/nhd", "images")
+
+
+@lru_cache(maxsize=512)
+def test_path_refs(text):
+    """Return (line, path pattern, dynamic) for literal/assembled Python paths.
+
+    Follow simple aliases, str/Path, joinpath/os.path.join, +, /, %, format and
+    f-strings. Unknown components are kept as '*' so a loop-built generated
+    filename is checked even though it does not exist as a literal in the test.
+    Literal loop choices remain separate paths so individual registrations suffice.
+    This deliberately over-approximates writes and fixture paths too.
+    """
+    tree = ast.parse(text)
+    bindings = {}
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Assign, ast.AnnAssign)):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            for target in targets:
+                if isinstance(target, ast.Name) and node.value is not None:
+                    bindings.setdefault(target.id, []).append(node.value)
+
+    parents = {child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
+
+    def loop_choice(node):
+        """Only the enclosing loop body can supply finite choices for a name.
+
+        Stop at lexical scopes, and let an inner loop (even an unknown one)
+        shadow an outer loop. A loop's iterable and else suite are outside
+        the finite binding we can prove here.
+        """
+        child = node
+        for_scope = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
+        comp_scope = (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
+        while child in parents:
+            parent = parents[child]
+            if isinstance(parent, for_scope):
+                break
+            if isinstance(parent, (ast.For, ast.AsyncFor)):
+                names = {n.id for n in ast.walk(parent.target) if isinstance(n, ast.Name)}
+                if node.id in names:
+                    return parent.iter if child in parent.body and isinstance(parent.target, ast.Name) else None
+            if isinstance(parent, comp_scope):
+                # Iterables see earlier generators; result/filters see their
+                # own binding too. Comprehension targets never escape.
+                generators = parent.generators
+                if isinstance(child, ast.comprehension):
+                    index = generators.index(child)
+                    if node not in ast.walk(child.iter):
+                        index += 1
+                    generators = generators[:index]
+                for generator in reversed(generators):
+                    names = {n.id for n in ast.walk(generator.target) if isinstance(n, ast.Name)}
+                    if node.id in names:
+                        return generator.iter if isinstance(generator.target, ast.Name) else None
+                break
+            child = parent
+        return None
+
+    def combine(vals, separator):
+        paths, dynamic = {""}, False
+        for index, (parts, dyn) in enumerate(vals):
+            paths = {a + (separator if index else "") + b for a in paths for b in parts}
+            dynamic |= dyn
+        return paths, dynamic
+
+    def value(node, seen=frozenset()):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return {node.value}, False
+        if isinstance(node, ast.Name):
+            if node.id == "ROOT":
+                return {""}, False
+            choice = loop_choice(node)
+            if isinstance(choice, (ast.Tuple, ast.List, ast.Set)) and node.id not in bindings and node.id not in seen:
+                vals = [value(n, seen | {node.id}) for n in choice.elts]
+                return {p for parts, _ in vals for p in parts}, any(d for _, d in vals)
+            choices = bindings.get(node.id, [])
+            if node.id not in seen and len(choices) == 1:
+                choice = choices[0]
+                return value(choice, seen | {node.id})
+        if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Add, ast.Div, ast.Mod)):
+            left = value(node.left, seen)
+            right = value(node.right, seen)
+            if isinstance(node.op, ast.Mod):
+                return {re.sub(r"%[-+0-9.]*[sdr]", "*", p) for p in left[0]}, True
+            paths, dynamic = combine([left, right], "/" if isinstance(node.op, ast.Div) else "")
+            return paths, dynamic or isinstance(node.op, ast.Add)
+        if isinstance(node, ast.JoinedStr):
+            paths, _ = combine([value(n.value if isinstance(n, ast.FormattedValue) else n, seen)
+                                for n in node.values], "")
+            return paths, True
+        if isinstance(node, ast.Call):
+            name = node.func.id if isinstance(node.func, ast.Name) else getattr(node.func, "attr", "")
+            if name == "str" and node.args:
+                return value(node.args[0], seen)
+            if name in ("Path", "join", "joinpath") and node.args:
+                args = list(node.args)
+                if name == "joinpath":
+                    args.insert(0, node.func.value)
+                return combine([value(n, seen) for n in args], "/")
+            if name == "format" and isinstance(node.func, ast.Attribute):
+                templates, _ = value(node.func.value, seen)
+                return {re.sub(r"\{[^}]*\}", "*", p) for p in templates}, True
+        return {"*"}, True
+
+    refs = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.Constant, ast.BinOp, ast.JoinedStr, ast.Call)):
+            continue
+        paths, dynamic = value(node)
+        for path in paths:
+            path = path.removeprefix("/").removeprefix("./")
+            if "/" not in path and path != "build":
+                continue
+            if not path or any(c.isspace() for c in path) or path.startswith("*"):
+                continue
+            refs.add((node.lineno, path, dynamic))
+    return sorted(refs)
+
+
+def script_path_refs(text):
+    """Conservatively audit literal paths in non-Python test scripts too."""
+    refs = set()
+    for line, text_line in enumerate(text.splitlines(), 1):
+        if text_line.lstrip().startswith("#"):
+            continue
+        for path in re.findall(r"[\w./*?${}+-]+", text_line):
+            path = path.removeprefix("./")
+            if "/" in path and not path.startswith(("$", "*", "/")):
+                dynamic = any(c in path for c in "$*?{")
+                path = re.sub(r"\$\{[^}]*\}|\$[A-Za-z_][A-Za-z_0-9]*", "*", path)
+                refs.add((line, path, dynamic))
+    return sorted(refs)
+
+
+def lint_test_paths(m, rules):
+    errors = []
+    readers = set(m.get("artifact_readers", []))
+    generated = set(KAPI_GENERATED) | {f for f in tracked()
+                  if "_generated." in os.path.basename(f) or "generations." in os.path.basename(f)
+                  or "/generated/" in f}
+    for target in sorted(m["checks"]):
+        covered = compile_globs(m["checks"][target])
+        # extract follows imported helpers and scripts invoked indirectly too.
+        for source in sorted(extract(rules, target)):
+            if not (source.startswith("tools/") and source.endswith(".py") or
+                    source.startswith("tools/tests/")):
+                continue
+            if source in PATH_AUDIT_ALLOW or (target, source) in PATH_AUDIT_ALLOW:
+                continue
+            try:
+                with open(os.path.join(ROOT, source), "rb") as f:
+                    data = f.read()
+                if not source.endswith((".py", ".sh", ".bash", ".pl", ".rb", ".awk")) and not data.startswith(b"#!"):
+                    continue
+                refs = (test_path_refs if source.endswith(".py") else script_path_refs)(data.decode("utf-8"))
+            except (OSError, SyntaxError, UnicodeError) as error:
+                errors.append("%s: %s: パスを検査できない: %s" % (target, source, error))
+                continue
+            artifact_reported = False
+            missing = set()
+            for line, path, dynamic in refs:
+                if any(path == d or path.startswith(d + "/") or
+                       (path == "build" and d.startswith("build/")) for d in ARTIFACT_DIRS):
+                    if target not in readers and not artifact_reported:
+                        errors.append("%s: %s:%d: 成果物 %s の読み手が artifact_readers に無い"
+                                      % (target, source, line, path))
+                        artifact_reported = True
+                if not dynamic:
+                    continue
+                if any(path.startswith(d + "/") for d in ARTIFACT_DIRS) \
+                        and not matches(path, covered):
+                    errors.append("%s: %s:%d: 動的な成果物 %s が glob に入っていない"
+                                  % (target, source, line, path))
+                for output in sorted(generated):
+                    if not fnmatch.fnmatchcase(output, path):
+                        continue
+                    if not matches(output, covered) and output not in missing:
+                        errors.append("%s: %s:%d: 動的な生成物 %s (%s) が glob に入っていない"
+                                      % (target, source, line, output, path))
+                        missing.add(output)
+                    if output in KAPI_GENERATED:
+                        producer = ("sdk/" + "kapi_rust_gen.py" if output.endswith("/kapi_generated.rs")
+                                    else "sdk/" + "gen_kapi.py")
+                        if not matches(producer, covered) and producer not in missing:
+                            errors.append("%s: %s:%d: 動的な生成物の生成器 %s が glob に入っていない"
+                                          % (target, source, line, producer))
+                            missing.add(producer)
+    return errors
+
+
 # ---------------------------------------------------------------- --lint
 def lint():
     m = load_map()
@@ -969,7 +1192,7 @@ def lint():
             if t not in listed:
                 errs.append("%s: に列に無い検査がある: %s" % (key, t))
     trk = tracked()
-    full = compile_globs(m["full"])
+    full = compile_globs(m["full"] + list(BUILD_CONFIG_GLOBS))
     ign = compile_globs(m["ignore"])
     notest = compile_notest(m["notest"])
     for g, r, ex in notest:
@@ -982,6 +1205,7 @@ def lint():
         if is_notest(f, notest) and matches(f, full):
             errs.append("notest: と full: の両方に当たる: %s" % f)
     effective = effective_checks(m, rules)
+    errs.extend(lint_test_paths(m, rules))
     leaks = 0
     for t in sorted(mapped & listed):
         globs = m["checks"][t] or []
@@ -990,7 +1214,7 @@ def lint():
             continue
         cg = compile_globs(effective[t])
         for g, r in cg:
-            if not any(r.match(f) for f in trk):
+            if not any(r.match(f) for f in trk) and not any(g.startswith(d + "/") for d in ARTIFACT_DIRS):
                 errs.append("%s: glob %r が追跡されているどのファイルにも当たらない"
                             % (t, g))
         for f in sorted(extract(rules, t)):
@@ -1053,7 +1277,7 @@ def plan(files, base=None):
     rules, vars_ = read_makefiles()
     par = check_lists(vars_)
     ign = compile_globs(m["ignore"])
-    full = compile_globs(m["full"])
+    full = compile_globs(m["full"] + list(BUILD_CONFIG_GLOBS))
     docs = compile_globs(m["docs_only"])
     notest = compile_notest(m["notest"])
     mk = compile_globs(MAKE_INPUT_GLOBS)
@@ -1069,8 +1293,7 @@ def plan(files, base=None):
     cover = {t: [(g, r) for g, r in cg if not (t in broad and "**" in g)]
              for t, cg in checks.items()}
     changed = [f for f in files if not matches(f, ign)]
-    # Build flags affect scanners and checks consuming built artifacts. KAPI input
-    # reaches readers through generated files even before regeneration.
+    # KAPI input reaches artifact readers through generated files before regeneration.
     artifact_targets = set(m.get("artifact_readers", [])) | {t for t, globs in m["checks"].items()
                         if any(g.startswith(("build/out/", "build/sdk/")) for g in globs)}
     generated = KAPI_GENERATED + ("sdk/gen_kapi.py", "sdk/kapi_rust_gen.py")
@@ -1082,7 +1305,7 @@ def plan(files, base=None):
         if f in ROUTED_BUILD:
             if not routed_build_safe(base, f):
                 full_hits.append(f)
-                lines.append("%s: 全部 — 検査制御の変更または基点版なし" % f)
+                lines.append("%s: 全部 — ビルド設定の変更または基点版なし" % f)
                 continue
             hit |= broad | artifact_targets
             lines.append("%s: build scanners + artifact readers" % f)

@@ -10,3 +10,5 @@ check-kapi-out:
 - sdk/link/app.ld
 - sdk/link/app_sys.ld
 - sdk/link/shlib.ld
+# Conservative artifact-path audit (including indirect helpers/fixtures).
+artifact_reader: true

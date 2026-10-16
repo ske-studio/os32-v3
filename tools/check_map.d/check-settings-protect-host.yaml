@@ -18,3 +18,7 @@ check-settings-protect-host:
 - build/checks.d/check-settings-protect-host.mk
 - tools/nhd_profile.py
 - tools/gen_deploy_set.py
+- build/os32.ld
+- sdk/gen_kapi.py
+# Conservative artifact-path audit (including indirect helpers/fixtures).
+artifact_reader: true

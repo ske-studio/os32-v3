@@ -12,3 +12,5 @@ check-fdc-track-host:
 - tools/check_map.d/check-fdc-track-host.yaml
 - build/checks.d/check-fdc-track-host.mk
 - tools/check_artifacts.py
+# Conservative artifact-path audit (including indirect helpers/fixtures).
+artifact_reader: true
