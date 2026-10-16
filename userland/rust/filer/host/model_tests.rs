@@ -53,7 +53,7 @@ fn install() {
     }
 }
 
-fn setup() {
+pub(crate) fn setup() {
     static ONCE: std::sync::Once = std::sync::Once::new();
     ONCE.call_once(|| {
         os32api::os32_init(Box::into_raw(Box::new(os32api::mock_api())));

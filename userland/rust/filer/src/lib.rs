@@ -24,8 +24,8 @@
 //!   判定の対象外なので、クリックは自前で拾える)。
 //! - **入れ子ループ禁止**。確認・入力はすべて非同期モーダル。
 //!   `open → on_modal → modal_result` の 1 往復で、続きは [`PEND_*`] の状態機械。
-//! - **起動は `session_launch`**。`exec_run` は呼ばない (契約 F1)。受理されると
-//!   WM が `Quit{REPLACE_APP}` を投げるので、[`App::on_quit`] で fd を畳んで戻る。
+//! - **起動は `session_launch`**。`exec_run` は呼ばない (契約 F1)。v1.3 では
+//!   受理後も動き続け、次の起動・ファイル操作を受け付ける (K5b-W)。
 //! - **大きいコピーはタイマ駆動**で 1 周 16KB (4 チャンク) まで。カーソル・時計・
 //!   Quit が生き続ける (契約 F3 / V12-P)。
 //!
@@ -211,8 +211,6 @@ struct Filer {
 
     status: [u8; 64],
     status_len: usize,
-    /// `session_launch` が受理された後は新しい操作を始めない (§10)。
-    launched: bool,
 }
 
 impl Filer {
@@ -277,7 +275,6 @@ impl Filer {
             timer: None,
             status: [0; 64],
             status_len: 0,
-            launched: false,
         };
 
         /* 起点は `/` (§1)。 */
@@ -670,14 +667,13 @@ impl Filer {
 
     /// `.bin` を起動してもらう (契約 F1: `exec_run` は呼ばない)。
     fn launch(&mut self, path: &[u8]) {
-        if self.launched {
-            return;
-        }
         let n = cstr_len(path);
         match session::session_launch(&path[..n]) {
             Ok(()) => {
-                self.launched = true;
-                self.status_msg(b"launch accepted - waiting for Quit");
+                let mut buf = [0u8; 64];
+                let k = fmt::put(&mut buf, 0, b"launched ");
+                let k = fmt::put(&mut buf, k, &path[basename_off(&path[..n])..n]);
+                self.status_msg(&buf[..k]);
                 self.repaint_path();
             }
             /* ERR_FULL / NOSYS / INVAL は終了せずに見せる (§4)。 */
@@ -815,13 +811,8 @@ impl Filer {
     /*  ファイル操作 (§5 / §6) — すべて非同期モーダル経由             */
     /* ------------------------------------------------------------ */
 
-    /// 新しい操作を始められるか (モーダル待ち / コピー中 / 起動要求後は不可)。
+    /// 新しい操作を始められるか (モーダル待ち / コピー中は不可)。
     fn busy(&mut self) -> bool {
-        if self.launched {
-            self.status_msg(b"launch pending");
-            self.repaint_path();
-            return true;
-        }
         if self.pending != PEND_NONE || self.job.active {
             self.status_msg(b"busy");
             self.repaint_path();
@@ -1535,7 +1526,7 @@ impl App for Filer {
         }
     }
 
-    /// WM からの終了要求 (`REPLACE_APP` など)。fd を残さず戻る (§4 / §10)。
+    /// WM からの終了要求 (`SWITCH_CUI` / `SHUTDOWN`)。fd を残さず戻る。
     fn on_quit(&mut self, ui: &mut Ui, _reason: u8) {
         self.shutdown();
         ui.quit();
