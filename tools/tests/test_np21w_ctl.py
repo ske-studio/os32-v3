@@ -15,6 +15,7 @@ import importlib.util
 import io
 import json
 import os
+os.environ["NP21W_NO_CURL_FALLBACK"] = "1"  # Offline guards must never reach Windows curl.
 from pathlib import Path
 import sys
 import tempfile
@@ -1437,16 +1438,33 @@ class Resolve(unittest.TestCase):
 
 
 class HttpFallback(unittest.TestCase):
+    def test_direct_status_error_and_offline_timeout(self):
+        import urllib.error
+        h = ctl.Http('http://fake:9000')
+        with mock.patch('urllib.request.urlopen', side_effect=urllib.error.HTTPError(
+                h.base, 401, 'Token', {}, io.BytesIO(b'{"ok":false}'))), \
+             mock.patch.object(ctl.subprocess, 'run') as run:
+            self.assertEqual(h.request('POST', '/api/fdd', 'drive=1', timeout=7,
+                                      headers={'X-Aidebug-Token': 'fake'}),
+                             (401, '{"ok":false}'))
+            run.assert_not_called()
+        with mock.patch('urllib.request.urlopen', side_effect=TimeoutError('timeout')), \
+             mock.patch.object(ctl.subprocess, 'run') as run:
+            self.assertIsNone(h.request('GET', '/api/status', timeout=0.2))
+            run.assert_not_called()
+
     def test_curl_status_parsing(self):
         h = ctl.Http('http://127.0.0.1:1')
-        res = mock.Mock(returncode=0, stdout=b'{"dialog":true}\n503')
-        with mock.patch.object(ctl.urllib.request, 'urlopen',
-                               side_effect=ctl.urllib.error.URLError('x')), \
+        res = mock.Mock(returncode=0, stdout=b'HTTP/1.1 503 Busy\r\nContent-Type: application/json\r\n\r\n{"dialog":true}')
+        with mock.patch.dict(os.environ, {'NP21W_NO_CURL_FALLBACK': '0'}), \
+                mock.patch.object(ctl.emu.urllib.request, 'urlopen',
+                               side_effect=ctl.emu.urllib.error.URLError('x')), \
                 mock.patch.object(ctl.subprocess, 'run', return_value=res):
             self.assertEqual(h.request('GET', '/api/status'), (503, '{"dialog":true}'))
-        res = mock.Mock(returncode=0, stdout=b'\n000')
-        with mock.patch.object(ctl.urllib.request, 'urlopen',
-                               side_effect=ctl.urllib.error.URLError('x')), \
+        res = mock.Mock(returncode=0, stdout=b'HTTP/1.1 000 Invalid\r\n\r\n')
+        with mock.patch.dict(os.environ, {'NP21W_NO_CURL_FALLBACK': '0'}), \
+                mock.patch.object(ctl.emu.urllib.request, 'urlopen',
+                               side_effect=ctl.emu.urllib.error.URLError('x')), \
                 mock.patch.object(ctl.subprocess, 'run', return_value=res):
             self.assertIsNone(h.request('GET', '/api/status'))
 

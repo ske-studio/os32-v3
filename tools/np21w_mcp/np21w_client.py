@@ -16,6 +16,7 @@ itself is never logged.
 """
 
 import json
+import email.parser
 import os
 import re
 import subprocess
@@ -28,6 +29,7 @@ BASE = os.environ.get("NP21W_AIDEBUG_URL", "http://127.0.0.1:8025")
 TOKEN_HEADER = "X-Aidebug-Token"
 
 _direct = None  # None = not probed yet, True/False = probe result
+_direct_by_base = {}  # Non-default URLs: cache both success and failure.
 
 
 class EmuError(Exception):
@@ -48,13 +50,17 @@ def _hint(rc):
     return None
 
 
-def _run(args, timeout):
+def _run(args, timeout, input=None):
+    if os.environ.get("NP21W_NO_CURL_FALLBACK") == "1":
+        raise EmuError("Windows curl fallback is disabled")
     try:
-        p = subprocess.run(args, capture_output=True, timeout=timeout)
+        p = subprocess.run(args, capture_output=True, timeout=timeout, input=input)
     except FileNotFoundError:
         raise EmuError("curl.exe not found at %s" % CURL)
     except subprocess.TimeoutExpired:
         raise EmuError("request timed out")
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise EmuError("curl failed: %s" % exc)
     if p.returncode != 0:
         raise EmuError(_hint(p.returncode) or
                        "curl failed (rc=%d): %s"
@@ -63,55 +69,110 @@ def _run(args, timeout):
     return p.stdout
 
 
-def _direct_available():
+def _direct_available(base=None, timeout=3):
     """Probe once whether WSL can reach the emulator without Windows curl."""
     global _direct
+    if os.environ.get("NP21W_NO_CURL_FALLBACK") == "1":
+        return True
+    if base is not None and base != BASE:
+        if base not in _direct_by_base:
+            try:
+                with urllib.request.urlopen(base + "/api/status", timeout=timeout) as r:
+                    r.read()
+                _direct_by_base[base] = True
+            except Exception:
+                _direct_by_base[base] = False
+        return _direct_by_base[base]
     if _direct is None:
         try:
-            urllib.request.urlopen(BASE + "/api/status", timeout=3).read()
+            urllib.request.urlopen(BASE + "/api/status", timeout=timeout).read()
             _direct = True
         except Exception:
             _direct = False
     return _direct
 
 
-def _http(path, body=None, timeout=20, headers=None):
+def _http(path, body=None, timeout=20, headers=None, *, base=None,
+          urlopen=None, response=False):
     """Direct request. body=None -> GET, otherwise POST. Returns bytes."""
     data = None
     if body is not None:
         data = body if isinstance(body, bytes) else body.encode("utf-8")
-    req = urllib.request.Request(BASE + path, data=data,
+    req = urllib.request.Request((base or BASE) + path, data=data,
                                  method="POST" if data is not None else "GET",
                                  headers=dict(headers or {}))
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            return r.read()
+        with (urlopen or urllib.request.urlopen)(req, timeout=timeout) as r:
+            payload = r.read()
+            return (getattr(r, "status", 200), payload,
+                    dict(getattr(r, "headers", {}))) if response else payload
     except urllib.error.HTTPError as e:
         # The API reports its own errors as JSON bodies; hand them back
         # rather than raising, so callers see the message.
-        return e.read()
+        payload = e.read()
+        return (e.code, payload, dict(e.headers or {})) if response else payload
+    except AssertionError:
+        raise  # Preserve offline tests' live-I/O guards.
     except Exception as exc:
-        raise EmuError("direct request to %s failed: %s" % (BASE + path, exc))
+        raise EmuError("direct request to %s failed: %s" % ((base or BASE) + path, exc))
 
 
-def get(path, timeout=15):
-    """GET path (may include ?query); returns response bytes."""
-    if _direct_available():
-        return _http(path, None, timeout)
-    return _run([CURL, "-s", "-m", str(timeout), BASE + path], timeout + 5)
+def _curl_response(raw):
+    """Split curl -i output without decoding a binary body (e.g. a BMP)."""
+    while True:
+        head, sep, payload = raw.partition(b"\r\n\r\n")
+        if not sep:
+            raise EmuError("curl returned no HTTP headers")
+        first, _, fields = head.partition(b"\r\n")
+        try:
+            status = int(first.split()[1])
+        except (ValueError, IndexError):
+            raise EmuError("curl returned an invalid HTTP status")
+        if 100 <= status < 200 or (status == 200 and b"Connection established" in first):
+            raw = payload
+            continue
+        if status == 0:
+            raise EmuError("curl could not connect")
+        headers = dict(email.parser.Parser().parsestr(fields.decode("iso-8859-1")))
+        return status, payload, headers
 
 
-def post(path, body=None, timeout=20, headers=None):
-    """POST path with an optional raw string body; returns response bytes.
-    headers: extra request headers ({name: value}), e.g. token_headers()."""
-    if _direct_available():
-        return _http(path, body if body is not None else b"", timeout, headers)
-    args = [CURL, "-s", "-m", str(timeout), "-X", "POST", BASE + path]
+def get(path, timeout=15, *, base=None, urlopen=None, response=False):
+    """GET path; bytes, or (status, bytes, headers) when response=True.
+
+    base overrides the server URL. An injected urlopen bypasses probing and
+    curl entirely. NP21W_NO_CURL_FALLBACK=1 also forces direct-only I/O for tests.
+    """
+    if urlopen is not None or _direct_available(base, timeout=min(3, timeout)):
+        if base is None and urlopen is None and not response:
+            return _http(path, None, timeout)
+        return _http(path, None, timeout, base=base, urlopen=urlopen, response=response)
+    args = [CURL, "-s", "-m", str(timeout)]
+    if response:
+        args += ["-i"]
+    raw = _run(args + [(base or BASE) + path], timeout + 5)
+    return _curl_response(raw) if response else raw
+
+
+def post(path, body=None, timeout=20, headers=None, *, base=None,
+         urlopen=None, response=False):
+    """POST raw body; bytes, or (status, bytes, headers) when response=True."""
+    if urlopen is not None or _direct_available(base, timeout=min(3, timeout)):
+        if base is None and urlopen is None and not response:
+            return _http(path, body if body is not None else b"", timeout, headers)
+        return _http(path, body if body is not None else b"", timeout, headers,
+                     base=base, urlopen=urlopen, response=response)
+    args = [CURL, "-s", "-m", str(timeout), "-X", "POST", (base or BASE) + path]
+    if response:
+        args += ["-i"]
     for k, v in (headers or {}).items():
         args += ["-H", "%s: %s" % (k, v)]
+    data = None
     if body is not None:
-        args += ["--data-binary", body]
-    return _run(args, timeout + 5)
+        args += ["--data-binary", "@-"]
+        data = body if isinstance(body, bytes) else body.encode("utf-8")
+    raw = _run(args, timeout + 5, input=data)
+    return _curl_response(raw) if response else raw
 
 
 def _np21w_dir():

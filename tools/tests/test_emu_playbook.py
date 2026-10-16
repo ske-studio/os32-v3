@@ -8,6 +8,7 @@ from pathlib import Path
 import struct
 import re
 import os
+os.environ["NP21W_NO_CURL_FALLBACK"] = "1"  # Offline guards must never reach Windows curl.
 import tempfile
 import types
 import unittest
@@ -601,7 +602,7 @@ class ReviewTests(unittest.TestCase):
         tree = ast.parse(Path('tools/np21w_mcp/np21w_client.py').read_text())
         nodes = [n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.ClassDef))]
         fallback = Mock(side_effect=AssertionError('unexpected Windows curl fallback'))
-        ns = dict(BASE='http://fake.invalid', CURL='fake-curl', _direct=None,
+        ns = dict(os=os, BASE='http://fake.invalid', CURL='fake-curl', _direct=None,
                   urllib=types.SimpleNamespace(request=types.SimpleNamespace(
                       Request=urllib.request.Request, urlopen=urlopen), error=urllib.error),
                   subprocess=types.SimpleNamespace(run=fallback))

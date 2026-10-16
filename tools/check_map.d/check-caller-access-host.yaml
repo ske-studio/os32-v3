@@ -17,3 +17,4 @@ check-caller-access-host:
 - userland/gshell/src/wm.rs
 - userland/gshell/src/startmenu.rs
 - userland/gshell/src/taskbar.rs
+- tools/np21w_mcp/np21w_client.py

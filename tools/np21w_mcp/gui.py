@@ -15,10 +15,12 @@ import struct
 import subprocess
 import time
 import urllib.parse
-import urllib.request
+try:
+    from . import np21w_client as emu
+except ImportError:  # server.py launched directly, outside the repository
+    import np21w_client as emu
 
 ROOT = Path(__file__).resolve().parents[2]
-BASE = os.environ.get("NP21W_AIDEBUG_URL", "http://127.0.0.1:8025")
 NO_DESCRIPTOR = object()  # Explicit v1 observation, without importing gui_desc.
 
 
@@ -30,15 +32,13 @@ class Transport:
 
     @staticmethod
     def _get(path, timeout=20):
-        with urllib.request.urlopen(BASE + path, timeout=timeout) as reply:
-            return reply.read(), dict(reply.headers)
+        _, payload, headers = emu.get(path, timeout=timeout, response=True)
+        return payload, headers
 
     @staticmethod
     def _post(path, data, timeout=20):
         body = urllib.parse.urlencode(data).encode()
-        request = urllib.request.Request(BASE + path, data=body, method="POST")
-        with urllib.request.urlopen(request, timeout=timeout) as reply:
-            payload = reply.read()
+        payload = emu.post(path, body, timeout=timeout)
         result = json.loads(payload)
         if result.get("ok") is not True:
             raise ValueError("input rejected: %s" % result)

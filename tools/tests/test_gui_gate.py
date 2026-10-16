@@ -25,6 +25,8 @@ import して、post / get / _cmd_raw / time を偽物に差し替える。
   python3 -B tools/tests/test_gui_gate.py --mutate   # 否定側
 """
 import contextlib
+import os
+os.environ["NP21W_NO_CURL_FALLBACK"] = "1"  # Offline guards must never reach Windows curl.
 import importlib.util
 import io
 import json
