@@ -28,6 +28,13 @@
 #define MEMORY_BOOT_FIXED_MAX_TOP    (MEM_PHYS_WORKSPACE_FLOOR / PAGE_SIZE + \
                                       MEMORY_BOOT_FIXED_META_PAGES + \
                                       MEMORY_BOOT_WORKSPACE_PAGES - 1)
+#if MEM_LAYOUT_V5
+/* Addresses now come from BSS symbols; os32.ld checks alignment/containment.
+ * Only the constant capacity belongs in a C static assertion. */
+STATIC_ASSERT(MEM_LEDGER_META_SIZE ==
+              (MEMORY_BOOT_FIXED_META_PAGES + MEMORY_BOOT_WORKSPACE_PAGES) * PAGE_SIZE,
+              ledger_backing_is_meta_plus_ws);
+#else
 STATIC_ASSERT((MEM_LEDGER_META_BASE & (PAGE_SIZE - 1)) == 0 &&
               (MEM_LEDGER_META_END & (PAGE_SIZE - 1)) == 0,
               ledger_backing_page_aligned);
@@ -38,6 +45,7 @@ STATIC_ASSERT(MEM_LEDGER_META_BASE == MEM_DMA_POOL_END + 1 + MEM_GUARD_SIZE,
               ledger_backing_keeps_dma_guard);
 STATIC_ASSERT(MEM_LEDGER_META_END == MEM_STACK_GUARD,
               ledger_backing_below_kstack_guard);
+#endif
 /* 8MB 型の metadata (L1 の bitmap 2 面 + L2 の owner 1B/PFN) は常に 1 ページ
  * に入る (T1-R2、上端 3,073 PFN で 776 + 3,073 = 3,849B)。式は
  * pgalloc_metadata_bytes と同じ PGALLOC_META_BYTES。 */

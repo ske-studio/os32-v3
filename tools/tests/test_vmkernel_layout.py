@@ -31,7 +31,7 @@ def command(cmd, cwd=None, ok=True):
 
 
 def fixture(work, chain=False, core_bss=32, sqlite_data=4, sqlite_bss=32,
-            link_edit=None):
+            link_edit=None, layout=0):
     work.mkdir()
     objects = []
     for rel, data in (
@@ -47,7 +47,7 @@ def fixture(work, chain=False, core_bss=32, sqlite_data=4, sqlite_bss=32,
         p.with_suffix('.asm').write_text(data)
         command(['nasm', '-f', 'elf32', p.with_suffix('.asm'), '-o', p.with_suffix('.o')])
         objects.append(p.with_suffix('.o').relative_to(work))
-    script = (ROOT / 'build/os32.ld').read_text()
+    script = gen.preprocess_layout(ROOT, (ROOT / 'build/os32.ld').read_text(), layout)
     if chain:
         script = script.replace('. = 0x200000;', '. = ALIGN(__bss_end, 4096);')
     if link_edit:
@@ -59,7 +59,7 @@ def fixture(work, chain=False, core_bss=32, sqlite_data=4, sqlite_bss=32,
                                 '.sqlite_data : AT(ADDR(.sqlite_data)) {')
     (work / 'layout.ld').write_text(script)
     elf = work / 'kernel.elf'
-    command(['ld', '-m', 'elf_i386', '-T', 'layout.ld', '-o', elf, *objects], cwd=work)
+    command(['ld', '-m', 'elf_i386', '-T', 'layout.ld', '-Map=kernel.map', '-o', elf, *objects], cwd=work)
     for name, flags in (('kernel', ['--remove-section=.sqlite_' + s for s in ('text', 'rodata', 'data', 'bss')]),
                         ('sqlite', ['--only-section=.sqlite_' + s for s in ('text', 'rodata', 'data')])):
         command(['objcopy', '-O', 'binary', *flags, elf, work / (name + '.bin')])
@@ -162,7 +162,7 @@ def run_cases(vk, exes, script, work, real=False):
     for name, edit, diagnostic in (
             ('lma-shift', ('.sqlite_rodata : {',
                            '.sqlite_rodata : AT(ADDR(.sqlite_rodata) - 4) {'), b'VMA/LMA'),
-            ('core-shift', ('. = 0x100000;', '. = 0x101000;'), b'core start'),
+            ('core-shift', ('. = KERNEL_LOAD_ADDR;', '. = 0x101000;'), b'core start'),
             ('entry-shift', ('ENTRY(kentry)',
                              'ENTRY(shifted_entry)\nshifted_entry = kentry + 4;'), b'ELF entry')):
         d = work / name
@@ -222,9 +222,12 @@ def run_cases(vk, exes, script, work, real=False):
         d = work / name
         elf = fixture(d, **opts)
         r = generate(script, d, elf)
+        assert r.returncode == 0, name + ' must be rounded up by product linker'
+        assert link_asserts(d, elf).returncode == 0, name + ' aligned coverage'
+        _, aligned = gen.read_elf(elf)
+        bad = edit_elf(elf, d/'unaligned.elf', '__bss_end', aligned['__bss_end'] - 1)
+        r = generate(script, d, bad)
         assert r.returncode != 0 and b'BSS zero range' in r.stderr, name
-        r = link_asserts(d, elf)
-        assert r.returncode != 0 and b'BSS alignment' in r.stderr, name + ' link ASSERT'
     d = work / 'fixed'
     elf = d/'kernel.elf'
     _, syms = gen.read_elf(elf)

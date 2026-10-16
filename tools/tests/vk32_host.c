@@ -27,7 +27,8 @@ int pm_vk32_boot(const u8 *file, u32 file_size, u8 *window, u32 *out_crc);
 int fat_check_c(u32 start, u32 size, const u8 *fat, u32 *count);
 
 #define IN_MAX   (2u * 1024u * 1024u)
-#define WINDOW   (0x2E8000u - 0x100000u)
+#include "memmap_layout.h"
+#define WINDOW   (LAYOUT_MEM_LAYOUT_LOAD_END - LAYOUT_KERNEL_LOAD_ADDR)
 #define GUARD    4096u
 
 static u8 in_buf[IN_MAX];

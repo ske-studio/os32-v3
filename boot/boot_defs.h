@@ -49,13 +49,11 @@ typedef unsigned long  u32;
 #define VK32_OFF_IMAGE_SIZE(n) (VK32_COMMON_SIZE + (u32)(n) * (VK32_ENTRY_SIZE + 4UL))
 #define VK32_OFF_IMAGE_CRC(n)  (VK32_OFF_IMAGE_SIZE(n) + 4UL)
 
-/* 展開先として許す帯 [VK32_LOAD_MIN, VK32_LOAD_END)。
- * 正典は include/memmap.h (KERNEL_LOAD_ADDR / MEM_DMA_POOL_BASE)。
- * ローダはカーネルのヘッダを読まないので写しを持ち、一致は
- * tools/gen_memmap.py --check (MIRRORS) が見る。
- * 上端を DMA プール (その上はカーネルスタック) で切る — SQLite の帯の終わり。 */
-#define VK32_LOAD_MIN      0x100000UL
-#define VK32_LOAD_END      0x2E8000UL
+/* 展開先の帯 [MIN, END)。正典は include/memmap.h。
+ * build/boot.mk が共通生成 memmap_layout.h を preinclude する。
+ * 旧配置は DMA 手前、新配置は固定 paging guard 手前まで。 */
+#define VK32_LOAD_MIN      LAYOUT_KERNEL_LOAD_ADDR
+#define VK32_LOAD_END      LAYOUT_MEM_LAYOUT_LOAD_END
 
 /* vk32_boot / pm_vk32_boot の戻り値 (0 = 成功)。FD の ASM も同じ番号 */
 #define VK32_OK             0

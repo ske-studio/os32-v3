@@ -149,6 +149,21 @@ STATIC_ASSERT(MEM_FIXED_PD_BASE == MEM_FIXED_PAGING_BASE &&
               MEM_FIXED_MMIO_TOP_PT_BASE == MEM_FIXED_APERTURE_PT_BASE + PAGE_SIZE &&
               MEM_FIXED_PAGING_END == MEM_FIXED_MMIO_TOP_PT_BASE + PAGE_SIZE,
               fixed_paging_contiguous);
+#if MEM_LAYOUT_V5
+/* Symbol-derived metadata bounds are checked by os32.ld. Runtime mapping
+ * and reservation of this layout are wired in T3ab C/D. */
+STATIC_ASSERT(MEM_FIXED_PAGING_GUARD_BASE + PAGE_SIZE == MEM_FIXED_PAGING_BASE &&
+              MEM_FIXED_PAGING_FRAME_END - MEM_FIXED_PAGING_BASE == 26 * PAGE_SIZE &&
+              MEM_FIXED_PAGING_FRAME_END - MEM_FIXED_PAGING_USED_END == 15 * PAGE_SIZE &&
+              MEM_FIXED_PAGING_FRAME_END == MEM_STACK_GUARD,
+              fixed_paging_v5_frame);
+STATIC_ASSERT(MEM_KSTACK_BASE + MEM_KSTACK_SIZE == MEM_SHELL_LOAD_ADDR &&
+              MEM_SHELL_BAND_END + 1 == MEM_POOL_BASE &&
+              MEM_SHELL_HEAP_END == MEM_SHELL_GUARD &&
+              MEM_SHELL_HEAP_SIZE == 0x40000UL &&
+              MEM_SHELL_GUARD + MEM_GUARD_SIZE + MEM_SHELL_STACK_SIZE == MEM_SHELL_STACK_TOP,
+              shell_v5_boundaries);
+#else
 STATIC_ASSERT(MEM_SHELL_STACK_TOP <= MEM_SHELL_HEAP_BASE &&
               MEM_SHELL_HEAP_BASE < MEM_SHELL_HEAP_END &&
               MEM_SHELL_HEAP_BASE + MEM_SHELL_HEAP_SIZE == MEM_SHELL_HEAP_END &&
@@ -164,6 +179,7 @@ STATIC_ASSERT(MEM_KERNEL_BAND_END < MEM_SHELL_LOAD_ADDR &&
               MEM_KSTACK_TOP < MEM_SHELL_LOAD_ADDR &&
               MEM_SHELL_LOAD_ADDR <= MEM_SHELL_HEAP_BASE,
               fixed_paging_above_kernel_regions);
+#endif
 
 /* OS が割り当てるデバイス窓の帯 (memmap.h MEM_DEVICE_APERTURE_*) の先頭 4MB を
  * 覆う PT。**静的に 1 枚** 持つ (2026-09-29、Cirrus のリニア窓 FE000000h)。

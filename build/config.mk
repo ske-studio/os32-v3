@@ -4,7 +4,20 @@
 
 # ビルド成果物出力ディレクトリ (kernel.bin / sqlite.bin / vmkernel.lz4 /
 # unicode.bin / kernel.elf / kernel.map をリポジトリルートから分離する)
-BUILD_OUT = build/out
+MEM_LAYOUT_V5 ?= 0
+ifneq ($(filter $(MEM_LAYOUT_V5),0 1),$(MEM_LAYOUT_V5))
+$(error MEM_LAYOUT_V5 must be 0 or 1)
+endif
+BUILD_OUT ?= $(if $(filter 1,$(MEM_LAYOUT_V5)),build/out/v5,build/out)
+LAYOUT_HEADER = $(BUILD_OUT)/memmap_layout.h
+LAYOUT_CPP = $(CC) -E -P -x c -imacros $(LAYOUT_HEADER)
+LAYOUT_FLAGS = -DMEM_LAYOUT_V5=$(MEM_LAYOUT_V5)
+KERNEL_OBJ_PREFIX = $(if $(filter-out build/out,$(BUILD_OUT)),$(BUILD_OUT)/obj/layout$(MEM_LAYOUT_V5)/)
+ifeq ($(MEM_LAYOUT_V5),1)
+ifeq ($(BUILD_OUT),build/out)
+$(error V5 requires a separate BUILD_OUT, e.g. build/out/v5)
+endif
+endif
 $(shell mkdir -p $(BUILD_OUT))
 
 # ユーザー空間ライブラリのアーカイブ (.a) 出力先。
@@ -134,7 +147,7 @@ CFLAGS_COMMON = $(C_STD) $(C_DIALECT_ERRORS) $(CFLAGS_MACHINE)
 KERNEL_CFLAGS = -include sdk/include/os32/os32_unit_stamp.h $(CFLAGS_COMMON) -O2 -Wall -D__KERNEL_BUILD__
 # 計測やデバッグ用の一時フラグをコマンドラインから足す口。
 #   例: make kernel KERNEL_CFLAGS_EXTRA=-DKAPI_PROFILE
-KERNEL_CFLAGS += $(KERNEL_CFLAGS_EXTRA)
+KERNEL_CFLAGS += $(KERNEL_CFLAGS_EXTRA) $(LAYOUT_FLAGS)
 
 # LAN (LGY-98)。**既定で有効** (Host Services を製品機能に、ユーザー決裁 2026-09-14)。
 #   既定 (stamp 無し) = 有効・FLAGS 0 (driver + リンク層のみ、DIAG/REFLECT/LINKTEST 無し)。
@@ -174,9 +187,9 @@ CFLAGS_BASE = $(KERNEL_CFLAGS)
 # SQLite専用フラグ: -Os (サイズ最適化, -O0のスタック肥大化回避) + -Wno-long-long (int64リテラル)
 # 言語指定は C_STD_SQLITE (gnu89)。CFLAGS_COMMON を継承すると gnu11 になるので
 # 機械・ABI の旗 (CFLAGS_MACHINE) だけを継ぐ。
-CFLAGS_SQLITE = $(C_STD_SQLITE) $(CFLAGS_MACHINE) -Os -ffunction-sections -fdata-sections \
+CFLAGS_SQLITE = $(LAYOUT_FLAGS) $(C_STD_SQLITE) $(CFLAGS_MACHINE) -Os -ffunction-sections -fdata-sections \
                 -Wno-long-long -w -DNDEBUG -D__KERNEL_BUILD__
-LDFLAGS = -m elf_i386 -T build/os32.ld -Map=$(BUILD_OUT)/kernel.map -nostdlib --nmagic --gc-sections \
+LDFLAGS = -m elf_i386 -T $(BUILD_OUT)/os32.ld -Map=$(BUILD_OUT)/kernel.map -nostdlib --nmagic --gc-sections \
 	-L$(shell $(CC) -print-libgcc-file-name | xargs dirname)
 
 # === 外部プログラム用フラグ ===

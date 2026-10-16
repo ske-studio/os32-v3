@@ -22,7 +22,7 @@ ASM_KERNEL    = $(ASM_KERNEL_PRE) $(ASM_KERNEL_POST)
 KSTRING_C_SRC = lib/kstring_c.c
 endif
 
-ASM_KERNEL_OBJ = $(ASM_KERNEL:.asm=.o) exec/ring3_ls_shim.o
+ASM_KERNEL_OBJ = $(addprefix $(KERNEL_OBJ_PREFIX),$(ASM_KERNEL:.asm=.o) exec/ring3_ls_shim.o)
 
 exec/ring3_ls_shim.o: exec/ring3_ls.S exec/ring3_ls.h sdk/include/os32/os32_generations.h
 	$(CC) -m32 -Isdk/include/os32 -c $< -o $@
@@ -49,7 +49,7 @@ C_KERNEL = \
     lib/path.c lib/utf8.c lib/kprintf.c lib/kprintf_attr.c lib/os_time.c lib/kstring.c lib/kutf16.c lib/kmath.c lib/crc32.c \
     $(KSTRING_C_SRC)
 
-C_KERNEL_OBJ = $(C_KERNEL:.c=.o)
+C_KERNEL_OBJ = $(addprefix $(KERNEL_OBJ_PREFIX),$(C_KERNEL:.c=.o))
 
 # === コミット ID (票 TASK_SERIAL_HOSTFS A-4) ===
 # 生成器は毎回走るが、中身が変わったときだけ build_id.c を書き直す。
@@ -66,7 +66,7 @@ $(BUILD_ID_OBJ): $(BUILD_ID_SRC)
 
 # === SQLite関連 (カーネル拡張域 0x200000 に配置) ===
 C_SQLITE = lib/sqlite3/sqlite3.c lib/sqlite3/os32_sqlite_vfs.c lib/sqlite3/os32_sqlite_test.c
-C_SQLITE_OBJ = $(C_SQLITE:.c=.o)
+C_SQLITE_OBJ = $(addprefix $(KERNEL_OBJ_PREFIX),$(C_SQLITE:.c=.o))
 
 # === モジュール別コンパイルルール ===
 
@@ -186,7 +186,7 @@ lib/sqlite3/os32_sqlite_test.o: lib/sqlite3/os32_sqlite_test.c lib/sqlite3/os32_
 	$(CC) $(C_STD_SQLITE) -m32 -include sdk/include/os32/os32_unit_stamp.h -march=i386 -ffreestanding -fno-pie -fno-stack-protector -nostdlib -mno-red-zone -O0 -fcommon -Wno-long-long -w $(DEPFLAGS) -include lib/sqlite3/os32_sqlite_config.h $(INC_SQLITE) -c $< -o $@
 
 # === カーネルリンク ===
-$(BUILD_OUT)/kernel.elf: $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(BUILD_ID_OBJ) $(C_SQLITE_OBJ) $(RUST_LZ4_LIB)
+$(BUILD_OUT)/kernel.elf: $(BUILD_OUT)/os32.ld $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(BUILD_ID_OBJ) $(C_SQLITE_OBJ) $(RUST_LZ4_LIB)
 	$(LD) $(LDFLAGS) -o $@ $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(BUILD_ID_OBJ) $(C_SQLITE_OBJ) $(RUST_LZ4_LIB) -lgcc
 
 $(BUILD_OUT)/kernel.bin: $(BUILD_OUT)/kernel.elf
@@ -207,7 +207,7 @@ $(BUILD_OUT)/sqlite.bin: $(BUILD_OUT)/kernel.elf
 
 # === VK32 圧縮カーネルイメージ ===
 $(BUILD_OUT)/vmkernel.lz4: $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/sqlite.bin $(BUILD_OUT)/kernel.elf tools/mkvmkernel.py tools/gen_memmap.py include/memmap.h boot/boot_defs.h
-	python3 tools/mkvmkernel.py \
+	python3 tools/mkvmkernel.py --layout $(MEM_LAYOUT_V5) --layout-header $(LAYOUT_HEADER) \
 		--elf $(BUILD_OUT)/kernel.elf --kernel $(BUILD_OUT)/kernel.bin \
 		--sqlite $(BUILD_OUT)/sqlite.bin \
 		-o $(BUILD_OUT)/vmkernel.lz4
@@ -284,7 +284,7 @@ check-net-l3:
 .PHONY: check-net-m2 check-net-m2-cpl3 check-net-m4 check-net-l0 check-net-l1 check-net-l2 check-net-l3
 
 # T2h: entirely separate objects, dependencies, build ID, map and image.
-R1_OUT := build/out/r1
+R1_OUT := $(BUILD_OUT)/r1
 R1_OBJ := $(R1_OUT)/obj
 R1_C := $(C_KERNEL) kernel/r1_fixture.c
 R1_OBJECTS := $(addprefix $(R1_OBJ)/,$(ASM_KERNEL:.asm=.o) exec/ring3_ls_shim.o $(R1_C:.c=.o)) $(R1_OBJ)/build_id.o $(addprefix $(R1_OBJ)/,$(C_SQLITE:.c=.o))
@@ -300,7 +300,8 @@ $(R1_OBJ)/lib/sqlite3/%.o: lib/sqlite3/%.c lib/sqlite3/os32_sqlite_config.h
 
 $(R1_OBJ)/%.o: %.asm sdk/crt/generations.inc
 	@mkdir -p $(@D)
-	$(AS) -p sdk/crt/generations.inc -f elf32 $< -o $@
+	$(LAYOUT_CPP) -traditional-cpp $< -o $@.asm
+	$(AS) -p sdk/crt/generations.inc -f elf32 $@.asm -o $@
 
 $(R1_OBJ)/exec/ring3_ls_shim.o: exec/ring3_ls.S exec/ring3_ls.h sdk/include/os32/os32_generations.h
 	@mkdir -p $(@D)
@@ -317,12 +318,12 @@ $(R1_OBJ)/build_id.o: $(R1_OUT)/build_id.c
 $(R1_OBJ)/exec/exec.o $(R1_OBJ)/kapi/kapi_generated.o: kapi/kapi_generated.c
 $(R1_OBJ)/drivers/lgy98.o $(R1_OBJ)/kapi/kapi_sys.o: .FORCE
 
-$(R1_OUT)/os32.ld: build/os32.ld
+$(R1_OUT)/os32.ld: $(BUILD_OUT)/os32.raw.ld
 	@mkdir -p $(@D)
 	sed -E 's@([a-zA-Z0-9_/]+\.o)@$(R1_OBJ)/\1@g' $< > $@
 
 $(R1_OUT)/kernel.elf: $(R1_OBJECTS) $(RUST_LZ4_LIB) $(R1_OUT)/os32.ld
-	$(LD) $(filter-out -Map=% -T build/os32.ld,$(LDFLAGS)) -T $(R1_OUT)/os32.ld -Map=$(R1_OUT)/kernel.map -o $@ $(R1_OBJECTS) $(RUST_LZ4_LIB) -lgcc
+	$(LD) $(filter-out -Map=% -T $(BUILD_OUT)/os32.ld,$(LDFLAGS)) -T $(R1_OUT)/os32.ld -Map=$(R1_OUT)/kernel.map -o $@ $(R1_OBJECTS) $(RUST_LZ4_LIB) -lgcc
 
 $(R1_OUT)/kernel.bin: $(R1_OUT)/kernel.elf
 	$(OBJCOPY) -O binary --remove-section=.sqlite_text --remove-section=.sqlite_rodata --remove-section=.sqlite_data --remove-section=.sqlite_bss $< $@
@@ -331,10 +332,51 @@ $(R1_OUT)/sqlite.bin: $(R1_OUT)/kernel.elf
 	$(OBJCOPY) -O binary --only-section=.sqlite_text --only-section=.sqlite_rodata --only-section=.sqlite_data $< $@
 
 $(R1_OUT)/vmkernel.lz4: $(R1_OUT)/kernel.bin $(R1_OUT)/sqlite.bin $(R1_OUT)/kernel.elf tools/mkvmkernel.py tools/gen_memmap.py include/memmap.h boot/boot_defs.h
-	python3 tools/mkvmkernel.py --elf $(R1_OUT)/kernel.elf --kernel $(R1_OUT)/kernel.bin --sqlite $(R1_OUT)/sqlite.bin -o $@
+	python3 tools/mkvmkernel.py --layout $(MEM_LAYOUT_V5) --layout-header $(LAYOUT_HEADER) --elf $(R1_OUT)/kernel.elf --kernel $(R1_OUT)/kernel.bin --sqlite $(R1_OUT)/sqlite.bin -o $@
 
 kernel-r1: $(R1_OUT)/vmkernel.lz4
 	python3 tools/r1_manifest.py $(R1_OUT)
 
 -include $(R1_OBJECTS:.o=.d)
 .PHONY: kernel-r1
+
+# One selected header drives every language; FORCE checks the selection while
+# write-if-changed keeps an unchanged build incremental.
+$(LAYOUT_HEADER): include/memmap.h tools/gen_memmap.py .FORCE
+	@python3 tools/gen_memmap.py --layout $(MEM_LAYOUT_V5) --layout-header $@
+
+$(BUILD_OUT)/os32.raw.ld: build/os32.ld $(LAYOUT_HEADER)
+	$(LAYOUT_CPP) $< -o $@
+
+$(BUILD_OUT)/os32.ld: $(BUILD_OUT)/os32.raw.ld
+	sed -E 's@([a-zA-Z0-9_/]+\.o)@$(KERNEL_OBJ_PREFIX)\1@g' $< > $@
+
+$(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(C_SQLITE_OBJ) $(BUILD_ID_OBJ) $(R1_OBJECTS): $(LAYOUT_HEADER) build/kernel.mk build/config.mk
+
+# Keep the original source-adjacent legacy objects. All alternate output trees
+# use separate objects/dependencies, including SQLite and assembler inputs.
+ifneq ($(KERNEL_OBJ_PREFIX),)
+LAYOUT_SMALL = $(R1_SMALL) kernel/module.c kernel/module_image.c drivers/e82557.c drivers/e82557_eeprom.c drivers/e82557_desc.c
+$(KERNEL_OBJ_PREFIX)%.o: %.c
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS_BASE) $(if $(filter $<,$(LAYOUT_SMALL)),-Os) $(if $(filter kernel/module.c,$<),-Ikdebug/generated) $(if $(filter fs/fatfs/%,$<),$(INC_FATFS),$(INC_KERNEL)) -c $< -o $@
+
+$(KERNEL_OBJ_PREFIX)lib/sqlite3/%.o: lib/sqlite3/%.c lib/sqlite3/os32_sqlite_config.h
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS_SQLITE) $(if $(filter %/os32_sqlite_test.c,$<),-O0) -include lib/sqlite3/os32_sqlite_config.h $(INC_SQLITE) -c $< -o $@
+
+$(KERNEL_OBJ_PREFIX)exec/ring3_ls_shim.o: exec/ring3_ls.S exec/ring3_ls.h sdk/include/os32/os32_generations.h
+	@mkdir -p $(@D)
+	$(CC) $(LAYOUT_FLAGS) -m32 -Isdk/include/os32 -c $< -o $@
+
+$(KERNEL_OBJ_PREFIX)kernel/module.o: kdebug/generated/kdebug_imports.h
+
+$(KERNEL_OBJ_PREFIX)exec/exec.o $(KERNEL_OBJ_PREFIX)kapi/kapi_generated.o: kapi/kapi_generated.c
+$(KERNEL_OBJ_PREFIX)drivers/lgy98.o $(KERNEL_OBJ_PREFIX)kapi/kapi_sys.o: .FORCE
+-include $(C_KERNEL_OBJ:.o=.d) $(C_SQLITE_OBJ:.o=.d)
+endif
+
+$(addprefix $(KERNEL_OBJ_PREFIX),$(ASM_KERNEL:.asm=.o)): $(KERNEL_OBJ_PREFIX)%.o: %.asm sdk/crt/generations.inc
+	@mkdir -p $(@D) $(dir $(BUILD_OUT)/asm/$<)
+	$(LAYOUT_CPP) -traditional-cpp $< -o $(BUILD_OUT)/asm/$<
+	$(AS) -p sdk/crt/generations.inc -f elf32 $(BUILD_OUT)/asm/$< -o $@

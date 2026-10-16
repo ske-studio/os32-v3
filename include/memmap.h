@@ -25,6 +25,13 @@
 
 #include "types.h"
 
+#ifndef MEM_LAYOUT_V5
+#define MEM_LAYOUT_V5 0
+#endif
+#if MEM_LAYOUT_V5 != 0 && MEM_LAYOUT_V5 != 1
+#error MEM_LAYOUT_V5 must be 0 or 1
+#endif
+
 /* ====================================================================== */
 /*  カーネル配置                                                            */
 /* ====================================================================== */
@@ -38,10 +45,20 @@
 /*  __bss_end から動的算出 (4KBアライン)                                    */
 /* ====================================================================== */
 extern u32 __bss_end;
+extern u32 __kernel_resident_end;
+extern u32 __ledger_fixed_start, __ledger_fixed_end;
+#if MEM_LAYOUT_V5
+#define KHEAP_BASE ((((u32)&__kernel_resident_end) + 0xFFF) & ~0xFFFUL)
+#else
 #define KHEAP_BASE            ((((u32)&__bss_end) + 0xFFF) & ~0xFFFUL)
+#endif
+#if MEM_LAYOUT_V5
+#define KHEAP_SIZE 0x030000UL /* 192KiB */
+#else
 #define KHEAP_SIZE            0x02C000UL  /* 176KB。一時の像予算増枠 +16KB (E11-BUD)。
                                          * 17MB/NHD main: kmalloc_peak_bytes=21,328B、kselftest 281/0。
                                          * b2 の撤去の後と T2h 前に再計測して戻すか決める。 */
+#endif
 
 /* ====================================================================== */
 /*  ページング保護範囲                                                      */
@@ -88,10 +105,26 @@ extern u32 __bss_end;
 /*  measure し直すこと。**                                                  */
 /*  → docs/archive/v21/v86v2/09_memmap.md                                   */
 /* ====================================================================== */
+#if MEM_LAYOUT_V5
+#define MEM_STACK_GUARD 0x3FB000UL
+#else
 #define MEM_STACK_GUARD       0x2FB000UL
+#endif
+#if MEM_LAYOUT_V5
+#define MEM_STACK_GUARD_END 0x3FBFFFUL
+#else
 #define MEM_STACK_GUARD_END   0x2FBFFFUL
+#endif
+#if MEM_LAYOUT_V5
+#define MEM_KSTACK_BASE 0x3FC000UL
+#else
 #define MEM_KSTACK_BASE       0x2FC000UL
+#endif
+#if MEM_LAYOUT_V5
+#define MEM_KSTACK_TOP 0x3FFFFCUL
+#else
 #define MEM_KSTACK_TOP        0x2FFFFCUL
+#endif
 
 /* kernel/kentry.asm は ESP をここへ張り替える。ASM から C のマクロは引けない
  * ので、値は build/os32.ld が同じ名前の絶対シンボルとして持ち、kentry.asm は
@@ -224,7 +257,11 @@ extern u32 __bss_end;
 #define GUI_SLOT_MAX          4                            /* スロット 0〜3 */
 
 /* カーネル帯域終端 */
+#if MEM_LAYOUT_V5
+#define MEM_KERNEL_BAND_END 0x3DFFFFUL
+#else
 #define MEM_KERNEL_BAND_END   0x1FFFFFUL
+#endif
 
 /* SHM後方予約域 (NOT PRESENT): SHM 後方ガードの後 〜 カーネル帯域の終端。
  * カーネルスタックは 2026-09-17 に SQLite 帯域の末尾へ出ていったので、
@@ -274,7 +311,29 @@ extern u32 __bss_end;
 /*  SQLite code+BSS + 代替スタック (128KB)                                  */
 /* ====================================================================== */
 extern u32 __sqlite_end;
+#if MEM_LAYOUT_V5
+#define MEM_SQLITE_STACK_GUARD ((((u32)&__sqlite_end) + 0xFFF) & ~0xFFFUL)
+#define MEM_FIXED_PAGING_GUARD_BASE 0x3E0000UL
+#define MEM_FIXED_PAGING_FRAME_END 0x3FB000UL
+#define MEM_FIXED_PAGING_FRAME_PAGES 26UL
+#define MEM_FIXED_PAGING_SPARE_PAGES 15UL
+#define MEM_SHELL_IMAGE_HEADROOM 0x020000UL
+#define MEM_LAYOUT_LOAD_END MEM_FIXED_PAGING_GUARD_BASE
+#else
+#define MEM_FIXED_PAGING_FRAME_END MEM_FIXED_PAGING_END
+#define MEM_FIXED_PAGING_FRAME_PAGES 11UL
+#define MEM_FIXED_PAGING_SPARE_PAGES 0UL
+#define MEM_LAYOUT_LOAD_END MEM_DMA_POOL_BASE
+#endif
+#define MEM_FIXED_PAGING_USED_END MEM_FIXED_PAGING_END
+#define MEM_FIXED_PAGING_USED_PAGES 11UL
+#define MEM_LEDGER_META_SIZE 0x2000UL
+#define MEM_KSTACK_SIZE 0x4000UL
+#if MEM_LAYOUT_V5
+#define MEM_SQLITE_STACK_BASE (MEM_SQLITE_STACK_GUARD + MEM_GUARD_SIZE)
+#else
 #define MEM_SQLITE_STACK_BASE  ((((u32)&__sqlite_end) + 0xFFF) & ~0xFFFUL)
+#endif
 #define MEM_SQLITE_STACK_SIZE  0x020000UL  /* 128KB */
 #define MEM_SQLITE_STACK_TOP   (MEM_SQLITE_STACK_BASE + MEM_SQLITE_STACK_SIZE - 16)
 
@@ -298,7 +357,11 @@ extern u32 __sqlite_end;
 /*  dma_alloc は候補ごとに 64KB またぎを見る ([HW2]、dma_range_ok)。        */
 /*  暫定 (ユーザー決裁 2026-09-23): v3 のメモリマップ見直しで再配置し得る。 */
 /* ---------------------------------------------------------------------- */
+#if MEM_LAYOUT_V5
+#define MEM_DMA_POOL_BASE 0x7F0000UL
+#else
 #define MEM_DMA_POOL_BASE      0x2E8000UL
+#endif
 #define MEM_DMA_POOL_SIZE      0x010000UL   /* 64KB */
 #define MEM_DMA_POOL_END       (MEM_DMA_POOL_BASE + MEM_DMA_POOL_SIZE - 1)
 
@@ -314,8 +377,16 @@ extern u32 __sqlite_end;
 /*  (paging_map_ledger_backing)、それ以外の構成では予約域 (NP) のまま。     */
 /*  **END は排他** (半開区間)。                                             */
 /* ---------------------------------------------------------------------- */
+#if MEM_LAYOUT_V5
+#define MEM_LEDGER_META_BASE ((u32)&__ledger_fixed_start)
+#else
 #define MEM_LEDGER_META_BASE   0x2F9000UL
+#endif
+#if MEM_LAYOUT_V5
+#define MEM_LEDGER_META_END ((u32)&__ledger_fixed_end)
+#else
 #define MEM_LEDGER_META_END    0x2FB000UL   /* exclusive (= MEM_STACK_GUARD) */
+#endif
 
 /* ====================================================================== */
 /*  シェル常駐帯域 (0x300000-0x3FFFFF, 1MB)                                 */
@@ -334,23 +405,55 @@ extern u32 __sqlite_end;
 /*  ヘッダが互いを上書きし、`ls > file` の化け・`pipe: out of memory`・     */
 /*  double free 警告として現れていた (2026-09-03 実測)。                     */
 /* ====================================================================== */
+#if MEM_LAYOUT_V5
+#define MEM_SHELL_LOAD_ADDR 0x400000UL
+#else
 #define MEM_SHELL_LOAD_ADDR   0x300000UL  /* シェルロードアドレス */
+#endif
+#if MEM_LAYOUT_V5
+#define MEM_SHELL_MAX_SIZE 0x095000UL
+#else
 #define MEM_SHELL_MAX_SIZE    0x075000UL  /* シェルcode+bss最大 (468KB) */
+#endif
+#if MEM_LAYOUT_V5
+#define MEM_SHELL_GUARD 0x4F5000UL
+#else
 #define MEM_SHELL_GUARD       0x375000UL  /* シェルスタックガード (= sbrk 上限) */
+#endif
+#if MEM_LAYOUT_V5
+#define MEM_SHELL_STACK_TOP 0x500000UL
+#else
 #define MEM_SHELL_STACK_TOP   0x380000UL  /* シェルスタック先頭 (下向き成長) */
+#endif
 #define MEM_SHELL_STACK_SIZE  0x00A000UL  /* シェルスタックサイズ (40KB) */
+#if MEM_LAYOUT_V5
+#define MEM_SHELL_HEAP_BASE 0x4B5000UL
+#else
 #define MEM_SHELL_HEAP_BASE   0x380000UL  /* シェル exec_heap 先頭 (mem_alloc) */
+#endif
+#if MEM_LAYOUT_V5
+#define MEM_SHELL_HEAP_END MEM_SHELL_GUARD
+#else
 #define MEM_SHELL_HEAP_END    MEM_FIXED_PAGING_BASE
+#endif
 #define MEM_SHELL_HEAP_SIZE   (MEM_SHELL_HEAP_END - MEM_SHELL_HEAP_BASE) /* 452KiB */
 /* T2a′: 画像外の固定 PD 1 + boot PT 8 + device PT 1 + 最上位 MMIO PT 1 (恒久予約)。 */
+#if MEM_LAYOUT_V5
+#define MEM_FIXED_PAGING_BASE 0x3E1000UL
+#else
 #define MEM_FIXED_PAGING_BASE 0x3F1000UL
+#endif
 #define MEM_FIXED_BOOT_PT_COUNT 8
 #define MEM_FIXED_PD_BASE     MEM_FIXED_PAGING_BASE
 #define MEM_FIXED_BOOT_PT_BASE (MEM_FIXED_PD_BASE + MEM_GUARD_SIZE)
 #define MEM_FIXED_APERTURE_PT_BASE (MEM_FIXED_BOOT_PT_BASE + MEM_FIXED_BOOT_PT_COUNT * MEM_GUARD_SIZE)
 #define MEM_FIXED_MMIO_TOP_PT_BASE (MEM_FIXED_APERTURE_PT_BASE + MEM_GUARD_SIZE)
 #define MEM_FIXED_PAGING_END  (MEM_FIXED_MMIO_TOP_PT_BASE + MEM_GUARD_SIZE)
+#if MEM_LAYOUT_V5
+#define MEM_SHELL_BAND_END 0x4FFFFFUL
+#else
 #define MEM_SHELL_BAND_END    0x3FFFFFUL  /* シェル帯域終端 */
+#endif
 
 /* T2c: private virtual bands; physical supply has separate policy below. */
 #define MEM_APP_BAND_BASE     0x80000000UL
@@ -419,7 +522,11 @@ extern u32 __sqlite_end;
 /*  T1 の間は 0x400000 のまま (旧 PGALLOC_BASE)。シェル帯が 0x400000 へ     */
 /*  来る T3 で 0x500000 にする (TASK_T1_LEDGER §4-1、§6 X9)。               */
 /* ====================================================================== */
+#if MEM_LAYOUT_V5
+#define MEM_POOL_BASE 0x500000UL
+#else
 #define MEM_POOL_BASE         0x400000UL
+#endif
 
 /* ====================================================================== */
 /*  ブート時の集積域・同梱域 (TASK_MEMMAP_V3 §4-5)                          */

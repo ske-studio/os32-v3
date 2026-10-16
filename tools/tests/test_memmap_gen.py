@@ -212,7 +212,7 @@ def cases(script):
         check(run(script, root, "--check").returncode == 0, "素の状態で落ちた")
         ld = root / "build/os32.ld"
         ld.write_text(ld.read_text(encoding="utf-8")
-                      .replace("MEM_KSTACK_TOP       = 0x2FFFFC;",
+                      .replace("MEM_KSTACK_TOP = LAYOUT_MEM_KSTACK_TOP;",
                                "MEM_KSTACK_TOP       = 0x1FFFFC;"),
                       encoding="utf-8")
         out = run(script, root, "--check")
@@ -285,7 +285,7 @@ def fixed_paging_cases(script):
     with tempfile.TemporaryDirectory(prefix='os32-top-mirror-') as tmp:
         root = make_tree(tmp, CLEAN)
         ld = root / 'build/os32.ld'
-        ld.write_text(ld.read_text().replace('MEM_FIXED_MMIO_TOP_PT_BASE = 0x3FB000;',
+        ld.write_text(ld.read_text().replace('MEM_FIXED_MMIO_TOP_PT_BASE = LAYOUT_MEM_FIXED_MMIO_TOP_PT_BASE;',
                                             'MEM_FIXED_MMIO_TOP_PT_BASE = 0x3FA000;'))
         out = run(script, root, '--check')
         check(out.returncode != 0 and '写しのずれ' in out.stdout and
@@ -299,7 +299,7 @@ def fixed_paging_cases(script):
         check(out.returncode != 0 and 'SQLite band overruns DMA pool' in out.stderr,
               'SQLite exceeded DMA budget without rejection')
         ld = root / 'build/os32.ld'
-        ld.write_text(ld.read_text().replace('MEM_FIXED_PD_BASE = 0x3F1000;',
+        ld.write_text(ld.read_text().replace('MEM_FIXED_PD_BASE = LAYOUT_MEM_FIXED_PD_BASE;',
                                              'MEM_FIXED_PD_BASE = 0x3F2000;'))
         check(run(script, root, '--write').returncode == 0, 'write failed')
         out = run(script, root, '--check')
@@ -321,7 +321,11 @@ def link_fixture(root, sqlite_end=0x2bc060):
         src.write_text(asm)
         subprocess.run([str(cc), '-c', str(src), '-o', str(root / (rel + '.o'))], check=True,
                        capture_output=True)
-    return subprocess.run([str(ld), '-T', 'build/os32.ld', 'kernel/kentry.o',
+    sys.path.insert(0, str(ROOT / 'tools'))
+    import gen_memmap
+    source = (root / 'build/os32.ld').read_text()
+    (root / 'build/out/fixture.ld').write_text(gen_memmap.preprocess_layout(root, source))
+    return subprocess.run([str(ld), '-T', 'build/out/fixture.ld' , 'kernel/kentry.o',
                            'lib/sqlite3/sqlite3.o', '-o', 'build/out/fixture.elf'],
                           cwd=root, capture_output=True, text=True)
 
@@ -410,14 +414,14 @@ def layout_cases(script):
         root = make_tree(tmp, CLEAN)
         for rel in ('build/out/kernel.elf', 'build/out/kernel.map',
                     'build/out/kernel.bin', 'build/out/sqlite.bin', 'build/out/vmkernel.lz4',
-                    'build/out/generations-manifest.json', 'sdk/kapi.json'):
+                    'build/out/generations-manifest.json', 'build/out/memmap_layout.h', 'sdk/kapi.json'):
             dst = root / rel
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(ROOT / rel, dst)
         for rel, old_text, new_text in (
-                ('boot/boot_defs.h', '#define VK32_LOAD_END      0x2E8000UL',
+                ('boot/boot_defs.h', '#define VK32_LOAD_END      LAYOUT_MEM_LAYOUT_LOAD_END',
                  '#define VK32_LOAD_END      0x2E9000UL'),
-                ('boot/loader_fat_new.asm', 'VK32_LOAD_END     EQU 0x2E8000',
+                ('boot/loader_fat_new.asm', 'VK32_LOAD_END       EQU LAYOUT_MEM_LAYOUT_LOAD_END',
                  'VK32_LOAD_END     EQU 0x2E9000')):
             check(run(script, root, '--manifest', '--check').returncode == 0, 'mirror control failed')
             path = root / rel
@@ -439,6 +443,7 @@ def layout_cases(script):
         # the old shell band. The actual 0x3E0000 boundaries were tested above.
         header = root / 'include/memmap.h'
         header.write_text(header.read_text() + '\n#define MEM_FIXED_PAGING_GUARD_BASE MEM_DMA_POOL_BASE\n')
+        gen.write_layout_header(root, root / 'build/out/memmap_layout.h', 0)
         auto = run(script, root, '--manifest')
         explicit = run(script, root, '--manifest', '--chain-limit', 'MEM_FIXED_PAGING_GUARD_BASE')
         check(auto.returncode == explicit.returncode == 0,
@@ -447,8 +452,9 @@ def layout_cases(script):
         check(json.loads(auto.stdout)['chain_limit'] ==
               {'constant': 'MEM_FIXED_PAGING_GUARD_BASE', 'value': macros.get('MEM_DMA_POOL_BASE')},
               'future ceiling ignored')
-        # Reset the only altered header before checking a single stale-hash defect.
+        # Reset both source and generated header before the stale-hash defect.
         shutil.copy(ROOT / 'include/memmap.h', header)
+        gen.write_layout_header(root, root / 'build/out/memmap_layout.h', 0)
         check(run(script, root, '--manifest', '--check').returncode == 0, 'hash control failed')
         binary = root / 'build/out/kernel.bin'
         binary.write_bytes(binary.read_bytes() + b'\0')
