@@ -58,7 +58,7 @@ OS32 側の契約は小さく保つ。*
 | **P3 HAL の結線** | HAL_WIRING の残 (W7)、NIC 境界 (L-C)、音源バックエンド、1kHz tick | [TASK_HAL_WIRING.md](TASK_HAL_WIRING.md)、[realhw/TASK_LAN_82557.md](../realhw/TASK_LAN_82557.md) | 一部着地 (v2.1)。1kHz tick は票が無い |
 | **P4 デバイス窓の資源割当** | 予約の核は T1 の台帳の MMIO 登録、P4 には順序契約 (識別 → 予約 → 写像 → probe / enable → 面公開) と検証済み資源レコード (実測 BAR) | TASK_MEMMAP_V3 D33・§4-5、[settings/DEVICE_RESERVATION.md](../settings/DEVICE_RESERVATION.md) (改訂は P4 着手時) | T1 / T2 の後 |
 | **P5 実機ドライバ** | 82557 L-B〜L-E (最初、静的で入る)、PCM E4〜E6 → 合成器、Trident、FD144、KBD_NAV K3、実機の画面取得 (PLAN §5-4) | [TASK_LAN_82557.md](../realhw/TASK_LAN_82557.md)、[TASK_PCM_CS4231.md](TASK_PCM_CS4231.md)、[TASK_TRIDENT_DRIVER.md](../realhw/TASK_TRIDENT_DRIVER.md)、[realhw/PLAN.md](../realhw/PLAN.md) | 82557 は P1 を待たない |
-| **P5 (追加) ディスクの速さ** | IDE の DMA 転送と ext2 の読み書きの経路 (ブロックキャッシュ・先読み) | ユーザー決定 2026-09-30 (草案 §3 の行) — 票は無い | Ra266 の実測から |
+| **P5 (追加) ディスクの速さ** | IDE の DMA 転送と ext2 の読み書きの経路 (ブロックキャッシュ・先読み)。**実測 (2026-10-16、Ra266、86ba40c)**: 実機の中だけで 10 MiB を `cp /data → /data` が 53.6 秒 (0.20 MB/s)、LAN で読んでディスクへ書く `cp /host → /data` は 56.6 秒で、ほとんどがディスク側 (`~/os32-tmp/evidence/2026-10-16/lan_10m/split/`)。台帳 DISKPERF-1 | ユーザー決定 2026-09-30 (草案 §3 の行)。**起票の指示 (ユーザー 2026-10-16)**: v3 のドライバ関係で起票する。現状の使用には足りている | 票は未起票。T3 の後、NP21/W と Ra266 で cp の時間の内訳 (IDE の転送方式・1 回の転送量・ext2 のメタデータの書き戻し) を測ってから |
 | **P6 実行モデル** | 協調型を基本に、前景が固まったらカーネルが取り戻す (番犬・CTRL+STOP)。スケジューリングとしてのプリエンプションは求めない | 意図はユーザー決定 2026-09-30、票の要件は TASK_MEMMAP_V3 §3-5-3 (Codex X5) | 実装方式の票は未起票 (P1 の後) |
 | **P7 KAPI / ABI** | 後方互換は基本考えない、fork 時に 1 回整理 (スロット順を変えてよい)、世代の識別と旧新混在の試験が必須 | TASK_MEMMAP_V3 D7・**D35** | P1 と同時 |
 | **P8 GUI 層** | 8bpp のまま、音 (PCM リング) と入力の層、microUI へのマウスキー、F3a〜c 等 | TASK_MEMMAP_V3 D19 | v3 後半 (§5) |
