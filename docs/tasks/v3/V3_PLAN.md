@@ -112,7 +112,7 @@ PLAN §5 の残り (5-1 ホストを仮想メモリに、5-2 V86 の装置要求
 | メモリマップ・モジュール・ABI・実行モデルの要件の決定 (D1〜D36) | [TASK_MEMMAP_V3.md](TASK_MEMMAP_V3.md) §0 (経緯 §11、Codex X1〜X8 の補足 §8-4) |
 | ユーザー判断 U1〜U11 と Codex の論点 X1〜X8 の往復 | [V3_PLAN_DRAFT.md](../../archive/v3/V3_PLAN_DRAFT.md) §7 |
 | 草案の一覧と振り分け、食い違い D1〜D21、v2.x 互換の論点 C1〜C8 | 同 §1、§4、§5 (C1 は D35 で決着、C7 は二段移行) |
-| 版数と fork の決定、os32 v2.x の扱い | [ROADMAP.md §0](../../ROADMAP.md)、[FORK_PLAN.md](FORK_PLAN.md) |
+| 版数と fork の決定、os32 v2.x の扱い | [ROADMAP.md §0](../../ROADMAP.md)、[FORK_PLAN.md](../../archive/v3/FORK_PLAN.md) |
 | 保留 5 件の拾い方 | [U6_PENDING_REVIEW.md](../../archive/v3/U6_PENDING_REVIEW.md)、TASK_MEMMAP_V3 D29〜D34 |
 | Rust と C11 の分担、386 下限 | [RUST_VS_C11.md](RUST_VS_C11.md)、TASK_MEMMAP_V3 D36 |
 | 現在地と残件 (日々の進捗) | 最新の引き継ぎ ([INDEX.md](../../INDEX.md) 冒頭の正典表の「引き継ぎ」の行) と各票の状態行 |

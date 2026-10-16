@@ -225,7 +225,7 @@ replacements = {
 - [V3_PLAN_DRAFT](V3_PLAN_DRAFT.md) §3 P0 (根拠は Codex X1 で改訂済み)、§4 D9、§5 C3、§6-4 の 4
 - [TASK_MEMMAP_V3](../../tasks/v3/TASK_MEMMAP_V3.md) §6 T0、D35 (Rust 生成器の未知型)、D36 (SDK ヘッダは C89 互換)
 - [RUST_VS_C11](../../tasks/v3/RUST_VS_C11.md) §1-1 (訂正は §2)、§5 C3、§7 (386 下限 — T0 の対象外だが `_Atomic` を入れない理由)
-- [FORK_PLAN](../../tasks/v3/FORK_PLAN.md) §3 g (v3 の最初の票 = この票)
+- [FORK_PLAN](FORK_PLAN.md) §3 g (v3 の最初の票 = この票)
 - [PLAN](PLAN.md) §1 の 1 (C11 へ、SHM の記述は §2 F3 で訂正)
 - [CONSTRAINTS](../../CONSTRAINTS.md) [C1]、[POLICY_DEV](../../POLICY_DEV.md) §2、`tools/check_constraints.py`
 - Codex 提案: `scratchpad/x18/c11.md` (2026-09-30、gpt-6-astra、読み取りのみ。リポジトリには置かない)

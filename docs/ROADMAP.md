@@ -19,7 +19,7 @@
   新しい履歴で始め、v2.x までの履歴は os32 に)。本案は [tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md) (2026-09-30 確定)、草案と票は `docs/tasks/v3/` ほか (INDEX の「v3」節)。
 - **[os32](https://github.com/ske-studio/os32) の v2.x — タグ `v2.1`、`main` — は「戻り先」として保つ**。新機能は入れない。
   手を入れるのは、**戻る必要が生じたとき**と**致命的な不具合のとき**だけ。os32 側の docs は v2.1 時点の記録で、更新しない。
-- fork の段取りで**決まっていること** (未決は無い。**2026-09-30 に実施、os32-v3** — 段取りと結果は [tasks/v3/FORK_PLAN.md §3](tasks/v3/FORK_PLAN.md)):
+- fork の段取りで**決まっていること** (未決は無い。**2026-09-30 に実施、os32-v3** — 段取りと結果は [tasks/v3/FORK_PLAN.md §3](archive/v3/FORK_PLAN.md)):
 
 | 項目 | 決定 |
 |---|---|

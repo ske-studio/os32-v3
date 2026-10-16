@@ -272,6 +272,15 @@ allow-list の集合は `deploy-set.json` を正とし、`check: optional` の�
 (例: `/var/log/*`)。再帰 glob・旧 `exists`・未知の検査種別は拒否する。
 期待表にある `/home` 等の配備ファイルも照合するが、その周囲のユーザーデータは余剰にしない。
 `generations-manifest.json` は配備集合ではないので渡さない。
+
+**manifest の一覧** (取り違えやすいので 1 表にまとめる。2026-10-16、反省会 10/14 の 6):
+
+| 名前 | 作る道具 | 中身 | 読む側 |
+|---|---|---|---|
+| `build/out/deploy-set.json` | `tools/gen_deploy_set.py` | 配備の期待集合 (ゲストのパス・size・SHA-256、`check` の種別) | `nhd_deploy.py verify-set`、`deploy_source_check.py`、CI の成果物 |
+| `build/out/generations-manifest.json` | `tools/gen_generation_manifest.py` | 成果物の世代表 (build ID と各成果物の hash、apps/game は除く)。配備集合ではない | `gen_deploy_set.py`、世代の照合 |
+| `.deploy/manifest.txt` (HostDrv の `C:\os32` と NHD) | `tools/hostdrv_deploy.py` | hsync の名札 (この配備元の一式と KAPI の版)。1 件でも失敗したら消す | ゲストの `hsync` (KAPI の門、無ければ `manifest_absent`) |
+| `build/out/layout-manifest.json` | `tools/gen_memmap.py --manifest --write` (T3a0) | ELF から導いた配置の半開区間 (code/data/BSS/NOLOAD・鎖・SLACK・shell、owner/用途/ページ数/世代/hash) | `make check-memmap`、T3 の予算と写しの検査 |
 ゲストが書いた後は **stop → umount → pull → verify-set**。
 `np21w_ctl.py start` は起動前にこの作業木の t2h stamp を失効させる
 (別 ini の起動も安全側に失効)。remote の hash が変わった場合も、pull を省いた照合・配備を拒否する。
@@ -1006,7 +1015,7 @@ Windows 表記へ変換して使う。変換が合わない環境では環境変
 ### §8-6 GitHub Actions での本体ビルド
 
 `.github/workflows/build.yml` (workflow 名 `build`、os32-v3 で 2026-09-30 に最小から作り直し —
-[FORK_PLAN §3 d](tasks/v3/FORK_PLAN.md)) が、素の clone から core を完全ビルドし、`make check-fast`
+[FORK_PLAN §3 d](archive/v3/FORK_PLAN.md)) が、素の clone から core を完全ビルドし、`make check-fast`
 を回して、成果物を artifact に置く。静的ゲートの `check.yml` とは別 (変異込みの `make check` は回さない)。
 
 **狙い**: 開発ホストの回線が従量課金のことがあるので、ホストからはソースを push する
@@ -1017,7 +1026,7 @@ Windows 表記へ変換して使う。変換が合わない環境では環境変
 |---|---|
 | 起動 | `main` / `wt/**` への push、tag `v*` の push、手動 (workflow_dispatch)。同じ ref の古い run は打ち切る |
 | ビルド | `make -j$(nproc) all` → `make check-fast` → `make -j$(nproc) deploy-u3 iso` (一時 `HOSTDRV_DIR` / `NP21W_DIR`)。最後の 1 呼出しで起動 FD 2 種・ISO・HostDrv を同じ build に揃え、世代表・期待表を今の成果物から再生成する |
-| submodule | **`apps/` と `game/` (private submodule) は v3 の CI では組まない** (ユーザー決定 2026-09-30: 今回の開発に要らないので `SUBMODULE_TOKEN` は登録しない)。必要になったら secret `SUBMODULE_TOKEN` (os32-apps / os32-game の Contents: read を持つ fine-grained PAT) で submodule 取得 + `make external` の step を足す ([FORK_PLAN §3 d ③](tasks/v3/FORK_PLAN.md)) |
+| submodule | **`apps/` と `game/` (private submodule) は v3 の CI では組まない** (ユーザー決定 2026-09-30: 今回の開発に要らないので `SUBMODULE_TOKEN` は登録しない)。必要になったら secret `SUBMODULE_TOKEN` (os32-apps / os32-game の Contents: read を持つ fine-grained PAT) で submodule 取得 + `make external` の step を足す ([FORK_PLAN §3 d ③](archive/v3/FORK_PLAN.md)) |
 | フォント | IPAex の TTF はリポジトリに無く `tools/fetch_fonts.py` が IPA の公式配布から取る (§8-2)。CI は `OS32_ACCEPT_IPA_LICENSE=1` で非対話に同意し (リポジトリ所有者が同意済みの前提)、取れた ttf を key `ipaex-<zip の SHA-256>` (`fetch_fonts.py --print-zip-sha256`) で `actions/cache` に置く |
 | 文書だけの push | `docs/**`・`*.md`・`.claude/**` だけの push では回さない (`paths-ignore`。文書の検査は `check.yml`)。同じ ref の run は 1 つ (`cancel-in-progress`) なので、**run の途中でその ref へ push すると打ち切られる** |
 | ツールチェーン | `tools/ci/build_cross.sh` (§8-5) で `~/opt/cross` に作り、`actions/cache` で保存。キーは `cross-i386-elf-<OS>-gcc<版>-newlib<版>-<構築入力/builder/inventory名のSHA256>` (`check_nano_inputs.py --cache-key`)。**構築入力・builder・inventory名を変えたときに作り直す**。SDK用ソース/patch・local hash値の変更はキーを変えない。os32 での実測 (2026-09-23): 初回はツールチェーン約 25 分、キャッシュが効けば run 全体で約 2 分 (ubuntu-latest 4 vCPU、キャッシュ 335MB)。os32-v3 での実走はまだ (最初の push で見る) |

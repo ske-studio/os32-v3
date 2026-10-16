@@ -1,7 +1,7 @@
 # ケーススタディ — os32 (v2.x) で得た普遍的な教訓
 
 > 状態: **現行 (2026-09-30)** — os32-v3 へ持っていく教訓集。os32 側の写しは fork の準備時点 (2026-09-30) の快照で、以後は os32-v3 側で足す。
-> 発行: コーダー `claude-fable-5-1` (feat/gui `8e00edec`)、[FORK_PLAN](tasks/v3/FORK_PLAN.md) §1-4 / §3 b による。事実確認は Codex (read-only、PM が依頼)。
+> 発行: コーダー `claude-fable-5-1` (feat/gui `8e00edec`)、[FORK_PLAN](archive/v3/FORK_PLAN.md) §1-4 / §3 b による。事実確認は Codex (read-only、PM が依頼)。
 > 書き方: 1 件 = 何が起きたか (1 段落) + 何を学んだか (1 段落) + 出典。**os32 固有の番地・手順・定数の値は書かない** (それは os32 の票にある)。
 > 出典のパスは **os32 リポジトリ (v2.1 時点の記録、タグ `v2.1` と feat/gui 2026-09-30)** の `docs/` 配下。os32-v3 には無いものがある (archive の票)。
 

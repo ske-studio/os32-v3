@@ -25,7 +25,7 @@
 | [TASK_T7_AND_FOLLOWUPS](TASK_T7_AND_FOLLOWUPS.md) | 189 | 設計中 (10-03、同) | 同上。台帳から渡る E10-4・H-6b・H-5 (CG 窓 WB・68h)・X-1 の一部を §1 に ID で受ける |
 | [TASK_HAL_WIRING](TASK_HAL_WIRING.md) | 646 | 受入完了・実機確認待ち (09-23) | HAL 契約。保持。残 W7 は LAN L-B の実機の回に載せる候補 |
 | [TASK_PCM_CS4231](TASK_PCM_CS4231.md) | 271 | 受入待ち (09-29) | PCM 契約。保持。台帳から R7-2・H-4 (b)(c) が渡る → 状態行に ID を足す |
-| [FORK_PLAN](FORK_PLAN.md) | 202 | 実装中 (09-30、残 f・g) | g (T0) は済。f (U9 古い数字の修正) の閉鎖根拠を PM が確かめてから「完了記録」→ `docs/archive/v3/`。INDEX の説明「計画」も古い |
+| [FORK_PLAN](../../archive/v3/FORK_PLAN.md) | 202 | 実装中 (09-30、残 f・g) | g (T0) は済。f (U9 古い数字の修正) の閉鎖根拠を PM が確かめてから「完了記録」→ `docs/archive/v3/`。INDEX の説明「計画」も古い |
 | [PORT_CANDIDATES](PORT_CANDIDATES.md) / [RUST_VS_C11](RUST_VS_C11.md) | 191 / 283 | 計画 / 設計中・方針確定 | v3 後半の正典。保持、触らない |
 | [DOCS_REORG_T3](DOCS_REORG_T3.md) | 120 | 草案 (10-03) | 本草案で置き換える。承認後に `docs/tasks/v3/` へ写し、旧版は git 履歴に任せる (archive に写しを作らない) |
 | [ROLES](../agents/ROLES.md) | 115 | 現行 (10-06) | 体制の正典。§0 の「記録」「設計票」行に §4-2 の承認済み 2 件を 1 文ずつ足すだけ。§0 末尾の「見直し」(次の REVIEW で §4-1 を機械化 / 人 / 出ていないに分ける) は反省会の成果物 |
