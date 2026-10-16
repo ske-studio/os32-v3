@@ -84,7 +84,10 @@ def build_fixture(tmp):
         '\n'.join(function(exe, sig) for sig in ('void ring3_wm_enter(', 'void ring3_wm_leave(')))
     return ['gcc', '-m32', '-march=i386', '-std=gnu11', '-ffreestanding', '-fno-builtin',
             '-fno-pie', '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
-            '-Wall', '-Wextra', '-Werror', '-DPHYSMEM_HOST_TEST=1', '-I' + str(tmp),
+            '-Wall', '-Wextra', '-Werror', '-DPHYSMEM_HOST_TEST=1',
+            '-Wl,--defsym=__kernel_resident_end=0x375000',
+            '-Wl,--defsym=__ledger_fixed_start=0x17E000',
+            '-Wl,--defsym=__ledger_fixed_end=0x180000', '-I' + str(tmp),
             *['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', '.', 'include',
                 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec', 'fs', 'sdk/include/os32', 'tools/tests')]]
 
@@ -197,9 +200,9 @@ static int format_probe;
 RING3_WINDOW_DEFINE
 static u32 pmem(void) { return 17408; }
 static u32 ram(void) { return 16384; }
-static u32 ht(void) { return 180224; }
+static u32 ht(void) { return KHEAP_SIZE; }
 static u32 hu(void) { return 8192; }
-static u32 hf(void) { return 172032; }
+static u32 hf(void) { return KHEAP_SIZE - 8192; }
 static int enabled(void) { return 1; }
 static void emit(char c) {
     __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(&c), "d"(1) : "memory");
@@ -280,7 +283,7 @@ int main(void) {
 #ifdef SHELL_AS_APP
     api.sbrk_heap_limit=MEM_EXEC_LOAD_ADDR + 2*MEM_PAGE_SIZE;
 #else
-    api.sbrk_heap_limit=MEM_SHELL_GUARD;
+    api.sbrk_heap_limit=MEM_SHELL_HEAP_BASE;
 #endif
     FORMAT_PROBES
     for (scenario=0; scenario<3; scenario++) {
@@ -309,14 +312,14 @@ def shell_output(output, app):
     screens = output.split('SCENARIO ')[1:]
     assert len(screens) == 3, 'FAIL: scenarios'
     first = screens[0]
-    check(r'Memory Info:\n  Physical : 17408 KB \(17 MB\)\n  RAM      : 16384 KB \(16 MB\).*\n  Paging   : ENABLED\n  Heap Tot : 180224 B, Used: 8192 B, Free: 172032 B', first, 'existing lines')
-    for pattern in [r'実測: phys pages total=4096 free=3000; resident heap total=462848 used=48 B',
+    check(r'Memory Info:\n  Physical : 17408 KB \(17 MB\)\n  RAM      : 16384 KB \(16 MB\).*\n  Paging   : ENABLED\n  Heap Tot : 196608 B, Used: 8192 B, Free: 188416 B', first, 'existing lines')
+    for pattern in [r'実測: phys pages total=4096 free=3000; resident heap total=262144 used=48 B',
                     r'定数: 00000000-00001000 NULL guard; 00001000-000A0000 V86 窓',
-                    r'定数: 000A0000-000F0000 VRAM; 00100000-00200000 Kernel band',
-                    r'定数: 00200000-00300000 SQLite band; DMA pool 002E8000-002F8000',
-                    r'定数: 002FB000-002FC000 kstack guard; 002FC000-00300000 kstack',
-                    r'定数: Shell band load=00300000 sbrk上限=00375000 stack=00376000-00380000',
-                    r'定数: Shell exec_heap 予約=00380000-003F1000 \(452 KiB\)',
+                    r'定数: 000A0000-000F0000 VRAM; 00100000-003E0000 Kernel band',
+                    r'定数: 003E0000-003FB000 paging guard/PT; DMA pool 007F0000-00800000',
+                    r'定数: 003FB000-003FC000 kstack guard; 003FC000-00400000 kstack',
+                    r'定数: Shell band load=00400000 sbrk上限=004B5000 stack=004F6000-00500000',
+                    r'定数: Shell exec_heap 予約=004B5000-004F5000 \(256 KiB\)',
                     r'定数: shlib=80000000-80100000 image起点=80100000',
                     r'定数: exec_heap 予約起点=88000000; stack top=90000000 既定=262144 B; lease=F0000000-FE000000',
                     r'実測: app=2 st=2 fl=1 ext=6 \[1,1,2,1,1\] free=26 ar=3 heap=136B',
@@ -328,7 +331,7 @@ def shell_output(output, app):
     if app:
         assert '実測: Shell band' not in output, 'FAIL: CPL3 resident limit'
     else:
-        check(r'実測: Shell band sbrk上限=00375000', first, 'resident limit')
+        check(r'実測: Shell band sbrk上限=004B5000', first, 'resident limit')
         check(r'実測: app=4 ', first, 'all live IDs')
         for id in (3, 5):
             assert f'mem_stat app={id}:' not in first, 'FAIL: NOTFOUND output'

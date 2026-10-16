@@ -36,7 +36,7 @@ $(KDEBUG_OUT)/kdebug_import_stubs.o: $(KDEBUG_GEN)/kdebug_import_stubs.S build/c
 	mkdir -p $(@D)
 	$(CC) $(CFLAGS_MACHINE) -c $< -o $@
 
-$(KDEBUG_OUT)/kdebug.elf: $(KDEBUG_OBJS) build/module.ld
+$(KDEBUG_OUT)/kdebug.elf: $(KDEBUG_OBJS) build/module.ld sdk/link/generations.ld
 	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/module.ld $(KDEBUG_OBJS) -o $@
 
 # Values come from their authoritative definitions, including before S1b's bump.

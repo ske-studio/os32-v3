@@ -24,7 +24,7 @@ int main(void)
 {
     OS32Header h = valid();
     u32 i;
-    CHECK(OS32_MEMORY_LAYOUT_GENERATION == 3);
+    CHECK(OS32_MEMORY_LAYOUT_GENERATION == 4);
 #ifndef OS32_TEST_OLD_SHLIB
     CHECK(OS32_SHLIB_PROTOCOL == 2);
     h.shlib_protocol = 1; /* app 1 x shlib 2 */
@@ -36,6 +36,8 @@ int main(void)
     CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF) == OS32X_LAYOUT_MISMATCH);
     h = valid();
     h.memory_layout_generation = OS32_MEMORY_LAYOUT_GENERATION - 1;
+    CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF) == OS32X_LAYOUT_MISMATCH);
+    h.flags = OS32X_FLAG_SHLIB;
     CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF) == OS32X_LAYOUT_MISMATCH);
     h = valid();
     CHECK(sizeof(h) / sizeof(u32) == OS32X_HDR_SIZE / 4);

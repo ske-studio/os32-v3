@@ -28,7 +28,6 @@ import subprocess
 import sys
 import tempfile
 
-LAYOUT = int(os.environ.get("MEM_LAYOUT_V5", "0"))
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 # build/config.mk の INC_KERNEL と同じ並び。ホスト側は模型のヘッダだけ先頭に足す。
 KERNEL_INCLUDES = ['-I' + str(ROOT / p) for p in
@@ -44,14 +43,8 @@ FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-ffreestanding', '-fno-pie',
 # 「variably modified at file scope」になる。出荷と同じ -O2 で組む。
 HOST_OPT = ['-O2']
 
-# (名前, __bss_end, 逆転を出すか, 食い違い本数, ESP のページが生きているか)
-# (名前, __bss_end, 逆転を撥ねた数, 食い違い本数)
-# 予算 MEM_KERNEL_IMAGE_MAX = 0x99000 (KHEAP 176KB、E11-BUD) → 上限は __bss_end = 0x199000。
-CASES = [
-    ("典型 (今のカーネルとほぼ同じ)", 0x16C560, 0, 0),
-    ("予算ちょうど (後方予約が空)",   0x199000, 0, 0),
-    ("予算を 1 ページ超過",           0x19A000, 1, 1),
-]
+# (name, resident chain end, rejected ranges, audit discrepancies)
+CASES = [("typical", 0x280000, 0, 0), ("empty SLACK", 0x375000, 0, 0)]
 
 MUTATIONS = {
     # 逆転を撥ねても数えない = 空振りが成功に見えていた元の姿
@@ -63,19 +56,9 @@ MUTATIONS = {
     "band-unbounded": ("kernel/paging.c",
                        "    if (a >= KERNEL_LOAD_ADDR && a <= MEM_KERNEL_BAND_END) {",
                        "    if (a >= KERNEL_LOAD_ADDR) {"),
-    # 空と逆転を区別せず、空の予約域にも範囲指定を投げる
-    "resv-blind": ("kernel/paging.c",
-                   "    if (MEM_SHM_RESV_START <= MEM_SHM_RESV_END)\n"
-                   "        paging_set_not_present(MEM_SHM_RESV_START, MEM_SHM_RESV_END);\n"
-                   "    else if (MEM_SHM_RESV_START > MEM_SHM_RESV_END + 1)\n"
-                   "        paging_range_reject_count++;"
-                   "   /* \u9006\u8ee2 = \u8a2d\u8a08\u304c\u58ca\u308c\u3066\u3044\u308b\u3002\u7a7a\u3068\u306f\u5225 */",
-                   "    paging_set_not_present(MEM_SHM_RESV_START, MEM_SHM_RESV_END);"),
-    # 台帳の backing (FIXED 型) を張っても期待値が NP のまま = 張った構成で
-    # 自己診断が必ず落ちる (T1a、TASK_T1_LEDGER §4-1)
-    "ledger-blind": ("kernel/paging.c",
-                     "        return ledger_backing_mapped ? MM_RW : MM_NP;",
-                     "        return MM_NP;"),
+    "slack-old-np": ("kernel/paging.c",
+        "        return MM_RW;                           /* SLACK */",
+        "        return MM_NP;                           /* SLACK */"),
     # 食い違いを 1 本にまとめない = 区間の本数が意味を失う
     "fixed-remap-missing": ("kernel/paging.c",
         "paging_map_range(MEM_FIXED_PAGING_BASE, MEM_FIXED_PAGING_FRAME_END,",
@@ -157,9 +140,9 @@ def build_and_run(tmp, case, mutation=None, kb=8192, initial_if=0x202):
         sources[ROOT / "tools/tests/layout_boot_fixture.h"])
     includes = ['-I' + str(ROOT / 'tools/tests/host_arch'), '-I' + str(tmp)] + KERNEL_INCLUDES
     exe = tmp / ("memmap_" + re.sub(r"\W", "", str(bss)))
-    defines = ['-DPHYSMEM_HOST_TEST=1', f'-DMEM_LAYOUT_V5={LAYOUT}',
+    defines = ['-DPHYSMEM_HOST_TEST=1',
                f'-DHOST_RESIDENT_END=0x{bss:X}',
-               '-DHOST_BSS_END=0x%X' % (0x180000 if LAYOUT else bss),
+               '-DHOST_BSS_END=0x%X' % (0x180000),
                '-DHOST_EXPECT_REJECT=%d' % reject,
                '-DHOST_EXPECT_BAD=%d' % bad, f'-DHOST_RAM_KB={kb}', f'-DHOST_INITIAL_IF={initial_if}', f'-DHOST_EXPECT_INIT_FAIL={int(case[0] == "PG-failure")}']
     subprocess.run(['gcc', *FLAGS, *HOST_OPT, *defines, '-nostdlib', '-static', '-no-pie',
@@ -176,10 +159,6 @@ def main():
     args = ap.parse_args()
 
     check_shm_replay()
-    if LAYOUT:
-        # Resident chain (not core BSS) is the V5 moving boundary.
-        CASES[:] = [("V5 typical", 0x280000, 0, 0),
-                    ("V5 empty SLACK", 0x375000, 0, 0)]
 
     for kb in (8088, 8192, 17408, 65536):
         for initial_if in (2, 0x202):
@@ -213,7 +192,7 @@ def main():
     # -Werror は付けない — 本番が付けていないし、shm.c の STATIC_ASSERT は
     # (u32)&__bss_end を含むので "variably modified at file scope" の警告が出る
     # (コンパイラが畳めないだけで、値としては正しい)。
-    target = [f'-DMEM_LAYOUT_V5={LAYOUT}', '-std=gnu11', '-m32', '-march=i386', '-ffreestanding', '-fno-pie',
+    target = ['-std=gnu11', '-m32', '-march=i386', '-ffreestanding', '-fno-pie',
               '-fno-stack-protector', '-O2', '-Wall', '-D__KERNEL_BUILD__']
     with tempfile.TemporaryDirectory(prefix='os32-memmap-') as tmp:
         for src in ('kernel/paging.c', 'kernel/shm.c'):

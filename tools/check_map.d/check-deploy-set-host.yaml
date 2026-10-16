@@ -1,4 +1,5 @@
 check-deploy-set-host:
+- sdk/kapi.json
 - tools/gen_deploy_set.py
 - tools/deploy_source_check.py
 - tools/deploy_protect.py

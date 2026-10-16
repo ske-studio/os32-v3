@@ -98,7 +98,6 @@ void physmem_bootstrap_legacy(struct physmem *m, u32 mem_kb)
     /* ホットデプロイ窓の撤去 (2026-09-09) で末尾の予約は無くなった。
      * legacy アリーナは実 RAM の末尾までそのまま使える。 */
     /* At most five normalized intervals; capacity cannot fail here. */
-#if MEM_LAYOUT_V5
     /* The linker-owned chain ends before the fixed paging guard. Only whole
      * pages in this gap are a second RAM provider, never reclaimed FIXED RAM.
      * memory_boot rejects a reversed chain before calling this constructor. */
@@ -110,7 +109,6 @@ void physmem_bootstrap_legacy(struct physmem *m, u32 mem_kb)
             overlay(m, slack, stop, PHYSMEM_RAM, PHYSMEM_SOURCE_KERNEL_SLACK);
         physmem_exclude(m, stop, low, PHYSMEM_RESERVED);
     } else
-#endif
     physmem_exclude(m, 0, low, PHYSMEM_RESERVED);
     if (end > low) overlay(m, low, end, PHYSMEM_RAM, PHYSMEM_SOURCE_LEGACY);
     if (end > MEM_PHYS_EXEC_FLOOR / PHYSMEM_PAGE_SIZE)

@@ -7,14 +7,13 @@ from test_vmkernel_layout import ROOT, command, fixture
 import gen_memmap as gen
 
 
-def run_case(work, layout):
-    work = pathlib.Path(work) / ('stack-entry-%d' % layout)
-    elf = fixture(work, layout=layout, core_bss=35, sqlite_bss=39)
+def run_case(work):
+    work = pathlib.Path(work) / 'stack-entry'
+    elf = fixture(work, core_bss=35, sqlite_bss=39)
     _, syms = gen.read_elf(elf)
-    m = gen.Macros(gen.read_defines(ROOT / 'include/memmap.h', layout), syms)
+    m = gen.Macros(gen.read_defines(ROOT / 'include/memmap.h'), syms)
     guards = ['MEM_STACK_GUARD', 'MEM_SHELL_GUARD', 'MEM_SHM_GUARD_LO', 'MEM_SHM_GUARD_HI']
-    if layout:
-        guards += ['MEM_SQLITE_STACK_GUARD', 'MEM_FIXED_PAGING_GUARD_BASE']
+    guards += ['MEM_SQLITE_STACK_GUARD', 'MEM_FIXED_PAGING_GUARD_BASE']
     header = ['static const unsigned long guard_ranges[][2] = {']
     header += ['{%d, %d},' % (m.get(n), m.get(n) + m.get('MEM_GUARD_SIZE')) for n in guards]
     header += ['};', 'static void boot_tss(void);', 'static int boot_sqlite(void);',
@@ -48,7 +47,7 @@ global entry_sp, entry_bp
 entry_sp: dd 0
 entry_bp: dd 0
 '''
-    (work / 'entry.asm').write_text(gen.preprocess_layout(ROOT, entry, layout, True))
+    (work / 'entry.asm').write_text(gen.preprocess_layout(ROOT, entry, True))
     command(['nasm', '-f', 'elf32', work / 'entry.asm', '-o', work / 'entry.o'])
     command(['nasm', '-f', 'elf32', ROOT / 'lib/sqlite3/sqlite_stack.asm', '-o', work / 'sqlite_stack.o'])
     command(['nasm', '-f', 'elf32', ROOT / 'kernel/setjmp.asm', '-o', work / 'setjmp.o'])
@@ -100,9 +99,6 @@ static void check_fault_return(void)
                                (syms['__sqlite_start'] - 1, '.'),
                                (syms['__sqlite_start'], 's' if i == 0 else '.'),
                                (syms['__sqlite_end'], 'O'), (0x200000, 'O')]:
-            # SQLite bounds in the small fixture end below 2MB only for V5.
-            if addr == 0x200000 and not layout:
-                continue
             classify += "classify%d(%d); CHECK(label[1] == '%s', 30);\n" % (i, addr, expected)
     classify += '}\n'
     source = (ROOT / 'tools/tests/stack_entry_host.c').read_text()
@@ -110,7 +106,7 @@ static void check_fault_return(void)
     (work / 'host.c').write_text(source + calls + classify)
     cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O0', '-ffreestanding', '-fno-builtin',
            '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
-           '-Wall', '-Wextra', '-Werror', '-DMEM_LAYOUT_V5=%d' % layout,
+           '-Wall', '-Wextra', '-Werror',
            *['-I' + str(p) for p in (work, ROOT, ROOT / 'include', ROOT / 'kernel', ROOT / 'lib')],
            work / 'host.c', work / 'entry.o', work / 'sqlite_stack.o', work / 'setjmp.o', '-o', work / 'host']
     for name in ('__bss_start', '__bss_end', '__sqlite_start', '__sqlite_data_end', '__sqlite_end'):
@@ -118,5 +114,5 @@ static void check_fault_return(void)
         cmd += ['-Wl,--defsym,%s=%d' % (host_name, syms[name])]
     command(cmd)
     result = host32.run([str(work / 'host')], capture_output=True)
-    assert result.returncode == 0, 'entry/stack layout %d observation rc=%d %s' % (layout, result.returncode, result.stderr)
-    return '[entry layout %d] product ASM BSS/guards/ESP/args, C TSS/watermarks, SQLite/shell return, fault classification/recovery boundary PASS' % layout
+    assert result.returncode == 0, 'entry/stack observation rc=%d %s' % (result.returncode, result.stderr)
+    return '[entry] product ASM BSS/guards/ESP/args, C TSS/watermarks, SQLite/shell return, fault classification/recovery boundary PASS'

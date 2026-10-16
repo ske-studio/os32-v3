@@ -39,3 +39,4 @@ check-memmap-host:
 # Layout selection reads build rules and generated linker/header artifacts.
 - build/**
 - sdk/link/app_sys.ld
+- sdk/os32_generations.py

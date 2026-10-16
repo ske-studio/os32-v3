@@ -104,15 +104,9 @@ void _start(void) {
     unchanged_failure(MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE - PAGE_SIZE - MEM_EXEC_HEAP_BASE + 1, 0);
     unchanged_failure(12 * 1024 * 1024, 0);
     unchanged_failure(0, 1);
-#if MEM_LAYOUT_V5
     const u32 resident[] = {0, 1, 256 * 1024};
     const u32 limit = 0x4B5000;
     CHECK(MEM_SHELL_LOAD_ADDR == 0x400000 && MEM_SHELL_HEAP_END == 0x4F5000);
-#else
-    const u32 resident[] = {0, 1, 65536, 1024 * 1024};
-    const u32 limit = 0x375000;
-    CHECK(MEM_SHELL_LOAD_ADDR == 0x300000 && MEM_SHELL_HEAP_BASE == 0x380000);
-#endif
     for (u32 i = 0; i < sizeof(resident) / sizeof(resident[0]); i++) {
         CHECK(budget_launch(1, PAGE_SIZE, resident[i], 0) == 1);
         CHECK(slots[1].sbrk_heap_limit == limit && api.sbrk_heap_limit == limit);
@@ -122,10 +116,8 @@ void _start(void) {
     CHECK(budget_launch(1, MEM_SHELL_MAX_SIZE, 0, 0) == 1);
     AppSlot saved = slots[1];
     CHECK(budget_launch(1, MEM_SHELL_MAX_SIZE + 1, 0, 0) == EXEC_ERR_NOMEM);
-#if MEM_LAYOUT_V5
     CHECK(budget_launch(1, PAGE_SIZE, 256 * 1024 + 1, 0) == EXEC_ERR_NOMEM);
     CHECK(budget_launch(1, PAGE_SIZE, 1024 * 1024, 0) == EXEC_ERR_NOMEM);
-#endif
     CHECK(digest(&saved, sizeof(saved)) == digest(&slots[1], sizeof(saved)));
     CHECK(api.sbrk_heap_limit == limit);
     SAY("PASS resident split, heap requests, image headroom, reject before publication");

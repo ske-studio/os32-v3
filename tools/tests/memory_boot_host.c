@@ -18,7 +18,7 @@ static int observed_bootstrap(struct physmem *m, const struct pgalloc_layout *l,
                               int (*verify)(u32, u32, void *))
 {
     bootstrap_calls++;
-#if MEM_LAYOUT_V5 && defined(TEST_DMA_CONFLICT)
+#if defined(TEST_DMA_CONFLICT)
     if (!physmem_reserve_ram(m, MEM_DMA_POOL_BASE / PAGE_SIZE,
                              MEM_DMA_POOL_BASE / PAGE_SIZE + 1)) return 0;
 #endif
@@ -63,14 +63,10 @@ static void *host_boot_ptr(u32 addr)
 #ifndef HOST_RESIDENT_END
 #define HOST_RESIDENT_END 0x261000
 #endif
-#if MEM_LAYOUT_V5
 __asm__(".globl __sqlite_start\n.set __sqlite_start, 0x180000\n"
         ".globl __kernel_resident_end\n.set __kernel_resident_end, " HOST_QUOTE(HOST_RESIDENT_END) "\n"
         ".globl __ledger_fixed_start\n.set __ledger_fixed_start, 0x17E000\n"
         ".globl __ledger_fixed_end\n.set __ledger_fixed_end, 0x180000\n");
-#else
-__asm__(".globl __sqlite_start\n.set __sqlite_start, 0x200000\n");
-#endif
 __asm__(".globl __sqlite_end\n.set __sqlite_end, 0x240000\n"
         ".globl __bss_end\n.set __bss_end, 0x180000\n");
 static void die(int code)
@@ -99,7 +95,6 @@ static void host_failstop(void)
 #ifdef TEST_LAYOUT
 #include <layout_boot_fixture.h>
 #endif
-#if MEM_LAYOUT_V5
 static void check_v5_ledger(void)
 {
     u32 first = MEM_SHM_RESV_START / PAGE_SIZE;
@@ -124,6 +119,24 @@ static void check_v5_ledger(void)
             }
         }
         CHECK(hits == 1);
+    }
+    /* Former SQLite band and shell heap must follow the new chain/SLACK/PT
+     * map, with neither stale reservations nor a second RAM provider. */
+    {
+        const u32 old_ranges[][2] = {{0x200000, 0x300000}, {0x380000, 0x3F1000}};
+        u32 j;
+        for (j = 0; j < 2; j++) {
+            for (p = old_ranges[j][0] / PAGE_SIZE; p < old_ranges[j][1] / PAGE_SIZE; p++) {
+                int slack = p >= first && p < end;
+                CHECK(!!bit(eligible, p) == slack);
+                hits = 0;
+                for (i = 0; i < ledger_region_count; i++) {
+                    const struct ledger_region *r = &ledger_regions[i];
+                    if (r->first <= p && p < r->end) hits++;
+                }
+                CHECK(hits == (slack ? 0U : 1U));
+            }
+        }
     }
     CHECK(ledger_owner_new(LEDGER_KIND_AS, 91, "slack", &owner));
     for (p = first; p < end; p++) {
@@ -175,7 +188,6 @@ static void check_v5_ledger(void)
                                   pgalloc_arena_end() * PAGE_SIZE));
 #endif
 }
-#endif
 void _start(void)
 {
     u32 args[6] = {0x800000, 0x700000, 3, 0x32, 0xffffffffUL, 0};
@@ -202,7 +214,7 @@ void _start(void)
     CHECK(memory_boot_detect(15360) == (MEM_HIGH_RAM_BASE + 17UL * MEM_1MB) / 1024UL);
     die(0);
 #endif
-#if MEM_LAYOUT_V5 && defined(TEST_REVERSED)
+#if defined(TEST_REVERSED)
     CHECK(MEM_SHM_RESV_START > MEM_FIXED_PAGING_GUARD_BASE);
     CHECK(!memory_boot_init(TEST_KB) && !bootstrap_calls && !initialized);
     die(0);
@@ -257,7 +269,7 @@ void _start(void)
         CHECK(MEM_BOOT_BUNDLE_BASE + MEM_BOOT_BUNDLE_SIZE <= 0x800000UL);
         CHECK(MEM_BOOT_STAGING_BASE >= MEM_POOL_BASE &&
               MEM_BOOT_STAGING_BASE >= MEM_PHYS_EXEC_FLOOR);
-        CHECK(MEM_POOL_BASE == (MEM_LAYOUT_V5 ? 0x500000UL : 0x400000UL));
+        CHECK(MEM_POOL_BASE == 0x500000UL);
         CHECK(host_if == 0x202U);
         die(0);
     }
@@ -366,17 +378,15 @@ void _start(void)
     CHECK(!ledger_region_count && host_if == 0x202U);
     die(0);
 #endif
-#if MEM_LAYOUT_V5 && defined(TEST_DMA_CONFLICT)
+#if defined(TEST_DMA_CONFLICT)
     CHECK(!memory_boot_init(TEST_KB));
     CHECK(bootstrap_calls == 1 && !stage_calls && !initialized);
     die(0);
 #endif
     CHECK(memory_boot_init(TEST_KB));
-#if MEM_LAYOUT_V5
     check_v5_ledger();
 #ifdef TEST_LEDGER
     die(0);
-#endif
 #endif
 #ifdef TEST_LAYOUT
 layout_boot_fixture(TEST_KB);
@@ -388,9 +398,9 @@ die(0);
         u32 k, n, bg, backing = 0, fixed = 0;
         CHECK(ledger_selfcheck("boot"));
         n = sizeof(memory_boot_fixed) / sizeof(memory_boot_fixed[0]);
-        CHECK(n == (MEM_LAYOUT_V5 ? 6 : 14));
+        CHECK(n == 6);
         CHECK(ledger_region_count == n + 2 + (ledger_backing_mapped ? 0 : 1) +
-              (MEM_LAYOUT_V5 ? 7 + memory_boot_dma_available() : 0));
+              (7 + memory_boot_dma_available()));
         bg = 0;
         for (k = 0; k < ledger_region_count; k++) {
             const struct ledger_region *r = &ledger_regions[k];
@@ -449,7 +459,7 @@ die(0);
             hash = hash * 33U + *(u32 *)i;
         while ((pages[n] = pgalloc_alloc_phys(owner, 1)) != 0) {
             CHECK((pages[n] >= MEM_POOL_BASE ||
-                   (MEM_LAYOUT_V5 && pages[n] >= MEM_SHM_RESV_START &&
+                   (pages[n] >= MEM_SHM_RESV_START &&
                     pages[n] <= MEM_SHM_RESV_END)) && ++n < sizeof(pages) / sizeof(pages[0]));
         }
         CHECK(n == free_before && !pgalloc_free_pages());
@@ -464,7 +474,8 @@ die(0);
     }
 #endif
 #ifdef TEST_MINIMUM
-    CHECK(TEST_KB * 1024UL == MEM_EXEC_BOOT_MIN);
+    CHECK(MEM_EXEC_BOOT_MIN == 0x551000UL);
+        CHECK(TEST_KB * 1024UL == MEM_EXEC_BOOT_MIN);
     CHECK(pgalloc_model_state() == PGALLOC_ONLINE && ledger_backing_mapped);
     CHECK(sys_usable_mem_end() == TEST_KB * 1024UL);
     die(0);
@@ -637,8 +648,8 @@ die(0);
         CHECK(physmem_count(&device_boot_map, meta, workspace_end,
                             PHYSMEM_RESERVED, &count) && count == 2);
         CHECK(pgalloc_total_pages() == top - MEM_POOL_BASE / PAGE_SIZE +
-              (MEM_LAYOUT_V5 ? (MEM_SHM_RESV_END + 1 - MEM_SHM_RESV_START) / PAGE_SIZE -
-               (memory_boot_dma_available() ? MEM_DMA_POOL_SIZE / PAGE_SIZE : 0) : 0));
+              ((MEM_SHM_RESV_END + 1 - MEM_SHM_RESV_START) / PAGE_SIZE -
+               (memory_boot_dma_available() ? MEM_DMA_POOL_SIZE / PAGE_SIZE : 0)));
         CHECK(pgalloc_limit_pfn() == top);
         /* exec の上端はアリーナの上端 = 低位 RAM の上端 (B2)。8MB なら
          * 0x800000。backing の位置 (0x2F9000) とは無関係。 */
@@ -647,8 +658,8 @@ die(0);
         CHECK(sys_usable_mem_end() >= MEM_EXEC_BOOT_MIN);
         /* backing は present / supervisor / RW、下のガードは NP のまま */
         CHECK(paging_verify_identity(meta, 2, (void *)MEM_LEDGER_META_BASE));
-        CHECK(!!paging_is_present(MEM_LEDGER_META_BASE - PAGE_SIZE) == MEM_LAYOUT_V5);
-        CHECK(!!paging_is_present(MEM_LEDGER_META_END) == MEM_LAYOUT_V5);
+        CHECK(!!paging_is_present(MEM_LEDGER_META_BASE - PAGE_SIZE) == 1);
+        CHECK(!!paging_is_present(MEM_LEDGER_META_END) == 1);
         /* 8MiB 構成では上端と実 RAM 合計が一致する (穴が上端より上にある) */
         CHECK(memory_boot_ram_kb() == TEST_KB && sys_mem_kb == TEST_KB);
         /* master PT の workspace は backing の 2 ページ目 */
@@ -656,7 +667,7 @@ die(0);
         CHECK(pgalloc_alloc_pt() == 0);
         pgalloc_free_pt(MEM_LEDGER_META_BASE + PAGE_SIZE);
         CHECK(pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, 1) ==
-              (MEM_LAYOUT_V5 ? MEM_SHM_RESV_START : MEM_POOL_BASE));
+              MEM_SHM_RESV_START);
     }
 #elif defined(TEST_ARENA)
     /* 低位の上端が 3,074 PFN 以上 (12MB + 8KB〜15MB)、高位 RAM なし:
@@ -667,7 +678,7 @@ die(0);
         CHECK(top > MEMORY_BOOT_FIXED_MAX_TOP);
         CHECK(pgalloc_model_state() == PGALLOC_ONLINE);
         CHECK(!ledger_backing_mapped);
-        CHECK(!!paging_is_present(MEM_LEDGER_META_BASE) == MEM_LAYOUT_V5);
+        CHECK(!!paging_is_present(MEM_LEDGER_META_BASE) == 1);
         {
             /* metadata = L1 + L2 (T1b): 3,074 PFN は 1 ページ、15MB は 2 ページ */
             u32 mp = pgalloc_metadata_bytes(&device_boot_map) / PAGE_SIZE;

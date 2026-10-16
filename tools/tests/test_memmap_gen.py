@@ -42,13 +42,14 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "tools/gen_memmap.py"
 
 # 予算 MEM_KERNEL_IMAGE_MAX = 0x99000 (KHEAP 176KB、E11-BUD) → 上限は __bss_end = 0x199000。
-BROKEN = 0x1A0000        # 予算超過。SHM がカーネル帯域を突き抜ける
-CLEAN = 0x140000         # 予算内。重なりも逆転も無い
+BROKEN = 0x380000        # 予算超過。SHM がカーネル帯域を突き抜ける
+CLEAN = 0x280000         # 予算内。重なりも逆転も無い
 
-MAP_TEMPLATE = (
-    "                0x%08x                        __bss_end = .\n"
-    "                0x00200000                        __sqlite_start = .\n"
-    "                0x002bc060                        __sqlite_end = .\n")
+def map_symbols(resident):
+    return {'__bss_end': 0x140000, '__sqlite_start': 0x140000,
+            '__sqlite_end': resident - 0x21000, '__kernel_resident_end': resident,
+            '__ledger_fixed_start': 0x13e000, '__ledger_fixed_end': 0x140000}
+
 
 MUTATIONS = {
     "no-layout-bss-coverage": (
@@ -58,7 +59,7 @@ MUTATIONS = {
         '            out.append("半開区間の重複: %s / %s" % (a["name"], b["name"]))',
         '            pass'),
     "no-chain-budget": ('    if start > limit:', '    if False:'),
-    "no-budget": ("    return limit, sym[\"__bss_end\"] - load",
+    "no-budget": ("    return limit, sym[\"__kernel_resident_end\"] - load",
                   "    return None"),
     "no-escape": ("def escaped_children(rows):",
                   "def escaped_children(rows):\n    return []\ndef _unused_escaped_children(rows):"),
@@ -113,7 +114,7 @@ def make_tree(tmp, bss_end):
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(ROOT / rel, dst)
     if bss_end is not None:
-        (root / "build/out/kernel.map").write_text(MAP_TEMPLATE % bss_end,
+        (root / "build/out/kernel.map").write_text(''.join('  0x%08x %s = .\n' % (v, k) for k, v in map_symbols(bss_end).items()),
                                                    encoding="utf-8")
     return root
 
@@ -144,9 +145,9 @@ def cases(script):
         found = [x for x in out.stdout.split("\n") if x.startswith("gen_memmap: ")]
         rev = [x for x in found if x.startswith("gen_memmap: 逆転:")]
         ovl = [x for x in found if x.startswith("gen_memmap: 重なり:")]
-        check(len(rev) == 1, "SHM 後方予約の逆転を 1 件報告しない: %r" % rev)
-        check(any("共有メモリ本体" in x and "SQLite" in x for x in ovl),
-              "SHM 帯と SQLite 帯の重なりを報告しない: %r" % ovl)
+        check(len(rev) == 1, "SLACKの逆転を 1 件報告しない: %r" % rev)
+        check(any("共有メモリ本体" in x and "固定" in x for x in ovl),
+              "SHM 帯と固定 PT 枠の重なりを報告しない: %r" % ovl)
         bud = [x for x in found if x.startswith("gen_memmap: 予算超過:")]
         check(len(bud) == 1, "カーネル本体の予算超過を報告しない: %r" % bud)
         log.append("BROKEN  --check = %d (予算超過 1 / 逆転 %d / 重なり %d)"
@@ -176,7 +177,7 @@ def cases(script):
         doc = (root / "build/out/MEMMAP.md").read_text(encoding="utf-8")
         check("0xFFF00000" in doc and "0xFFF7FFFF" in doc and
               "PEGC リニア窓の別名" in doc, "PEGC alt window missing")
-        check("0x3FB000" in doc and "固定 MMIO top PT" in doc, "top PT missing")
+        check("0x3EB000" in doc and "固定 MMIO top PT" in doc, "top PT missing")
         check("0x140000" in doc, "生成ブロックに __bss_end が入っていない")
         # 表の行は必ず絶対番地で始まる (「+4KB - +260KB」のような相対表記を禁じる)
         block = doc.split("<!-- 生成")[1].split("<!-- /生成")[0]
@@ -255,8 +256,8 @@ def fixed_paging_cases(script):
     spec.loader.exec_module(gen)
     changes = (
         ('old-512k-heap', 'MEM_SHELL_HEAP_SIZE', '0x080000UL'),
-        ('unaligned-paging', 'MEM_FIXED_PAGING_BASE', '0x3F1001UL'),
-        ('one-page-overlap', 'MEM_SHELL_HEAP_END', '(MEM_FIXED_PAGING_BASE + MEM_GUARD_SIZE)'),
+        ('unaligned-paging', 'MEM_FIXED_PAGING_BASE', '0x3E1001UL'),
+        ('one-page-overlap', 'MEM_SHELL_HEAP_END', '(MEM_SHELL_GUARD + MEM_GUARD_SIZE)'),
         ('boot-count', 'MEM_FIXED_BOOT_PT_COUNT', '7'),
         ('top-overlap', 'MEM_FIXED_MMIO_TOP_PT_BASE', 'MEM_FIXED_APERTURE_PT_BASE'),
         ('old-tail', 'MEM_FIXED_PAGING_END', '(MEM_FIXED_MMIO_TOP_PT_BASE + 2 * MEM_GUARD_SIZE)'),
@@ -268,8 +269,7 @@ def fixed_paging_cases(script):
             header.write_text(re.sub(r'(^#define\s+' + name + r'\s+).*$',
                                      lambda m: m[1] + expr, header.read_text(), flags=re.M))
             # 写し一致の偶然の拒否で済ませず、境界の検査だけでも拒否させる。
-            macros = gen.Macros(gen.read_defines(header), {'__bss_end': CLEAN,
-                                '__sqlite_start': 0x200000, '__sqlite_end': 0x2bc060})
+            macros = gen.Macros(gen.read_defines(header), map_symbols(CLEAN))
             ld = root / 'build/os32.ld'
             text = ld.read_text()
             for rel, pattern, macro in gen.MIRRORS:
@@ -280,7 +280,7 @@ def fixed_paging_cases(script):
             out = run(script, root, '--check')
             check(out.returncode != 0 and '固定paging:' in out.stdout, label + ' escaped map checks')
             link = link_fixture(root)
-            check(link.returncode != 0 and ('fixed paging' in link.stderr or 'shell heap' in link.stderr),
+            check(link.returncode != 0 and ('fixed paging' in link.stderr or 'fixed guard/PT' in link.stderr or 'shell image/heap' in link.stderr),
                   label + ' escaped linker ASSERT: ' + link.stderr)
     with tempfile.TemporaryDirectory(prefix='os32-top-mirror-') as tmp:
         root = make_tree(tmp, CLEAN)
@@ -295,9 +295,9 @@ def fixed_paging_cases(script):
         check(link_fixture(root).returncode == 0, 'baseline linker failed')
         # SQLite 末尾が旧PD案0x2DD000への上限を越えても、既存DMA予算内は許可。
         check(link_fixture(root, sqlite_end=0x2c0000).returncode == 0, 'SQLite growth restricted')
-        out = link_fixture(root, sqlite_end=0x2c7001)
-        check(out.returncode != 0 and 'SQLite band overruns DMA pool' in out.stderr,
-              'SQLite exceeded DMA budget without rejection')
+        out = link_fixture(root, sqlite_end=0x460000)
+        check(out.returncode != 0 and 'resident chain exceeds SLACK ceiling' in out.stderr,
+              'SQLite exceeded resident budget without rejection')
         ld = root / 'build/os32.ld'
         ld.write_text(ld.read_text().replace('MEM_FIXED_PD_BASE = LAYOUT_MEM_FIXED_PD_BASE;',
                                              'MEM_FIXED_PD_BASE = 0x3F2000;'))
@@ -305,7 +305,7 @@ def fixed_paging_cases(script):
         out = run(script, root, '--check')
         check(out.returncode != 0 and '写しのずれ' in out.stdout, 'fixed paging mirror mismatch escaped')
     return ['FIXED   map/link rejected 512KiB heap / unaligned / overlap / count; mirror rejected',
-            'SQLITE  growth past old PT limit accepted; DMA budget excess rejected']
+            'SQLITE  growth past old PT limit accepted; resident chain budget excess rejected']
 
 
 def link_fixture(root, sqlite_end=0x2bc060):
@@ -375,11 +375,8 @@ def layout_cases(script):
     log = ['LAYOUT real ELF/map/manifest + objdump PASS; code/data/BSS/NOLOAD half-open PASS']
 
     defines = gen.read_defines(ROOT / 'include/memmap.h')
-    # Exercise identical budget code with both layouts; the future constant is
-    # introduced only in this fixture, not into product headers.
-    defines['MEM_FIXED_PAGING_GUARD_BASE'] = '0x3E0000UL'
     macros = gen.Macros(defines, symbols)
-    for name in ('MEM_DMA_POOL_BASE', 'MEM_FIXED_PAGING_GUARD_BASE'):
+    for name in ('MEM_FIXED_PAGING_GUARD_BASE',):
         limit = macros.get(name)
         for delta in (-gen.PAGE, 0):
             slack = gen.chain_slack(limit + delta, limit)
@@ -439,22 +436,12 @@ def layout_cases(script):
                   'C/ASM mismatch escaped layout assertion: ' + failed.stderr)
             path.write_text(text)
             log.append('MIRROR ' + rel + ': control PASS / mismatch assertion FAIL')
-        # Test selection by the future name without mixing its new ceiling with
-        # the old shell band. The actual 0x3E0000 boundaries were tested above.
-        header = root / 'include/memmap.h'
-        header.write_text(header.read_text() + '\n#define MEM_FIXED_PAGING_GUARD_BASE MEM_DMA_POOL_BASE\n')
-        gen.write_layout_header(root, root / 'build/out/memmap_layout.h', 0)
         auto = run(script, root, '--manifest')
         explicit = run(script, root, '--manifest', '--chain-limit', 'MEM_FIXED_PAGING_GUARD_BASE')
-        check(auto.returncode == explicit.returncode == 0,
-              'future ceiling selection failed: ' + auto.stderr + explicit.stderr)
+        check(auto.returncode == explicit.returncode == 0, 'ceiling selection failed')
         check(json.loads(auto.stdout) == json.loads(explicit.stdout), 'explicit/auto ceiling differs')
         check(json.loads(auto.stdout)['chain_limit'] ==
-              {'constant': 'MEM_FIXED_PAGING_GUARD_BASE', 'value': macros.get('MEM_DMA_POOL_BASE')},
-              'future ceiling ignored')
-        # Reset both source and generated header before the stale-hash defect.
-        shutil.copy(ROOT / 'include/memmap.h', header)
-        gen.write_layout_header(root, root / 'build/out/memmap_layout.h', 0)
+              {'constant': 'MEM_FIXED_PAGING_GUARD_BASE', 'value': 0x3E0000}, 'wrong ceiling')
         check(run(script, root, '--manifest', '--check').returncode == 0, 'hash control failed')
         binary = root / 'build/out/kernel.bin'
         binary.write_bytes(binary.read_bytes() + b'\0')

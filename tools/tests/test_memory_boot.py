@@ -21,7 +21,6 @@ import sys
 import tempfile
 import unittest
 
-LAYOUT = int(os.environ.get("MEM_LAYOUT_V5", "0"))
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 # (名前, 当てるファイル, 置き換え前, 置き換え後, 落とすべき場面 (case, kb))
@@ -38,14 +37,6 @@ MUTATIONS = [
      "CHECK(physmem_reserve_ram(&supply, first / LF_PAGE, f->slack_end / LF_PAGE));"
      "CHECK(physmem_reserve_ram(&supply, first / LF_PAGE, f->slack_end / LF_PAGE));",
      ("layout", 8192)),
-    # §4-1 変異 1: 置き場の境界を 1 ページずらす (DMA プールの上側ガードを食う)。
-    ("ledger-base-shift", "include/memmap.h",
-     "#define MEM_LEDGER_META_BASE   0x2F9000UL",
-     "#define MEM_LEDGER_META_BASE   0x2F8000UL", ("fixed", 8192)),
-    # 同じく上端を 1 ページずらす (カーネルスタックのガードを食う)。
-    ("ledger-end-shift", "include/memmap.h",
-     "#define MEM_LEDGER_META_END    0x2FB000UL",
-     "#define MEM_LEDGER_META_END    0x2FC000UL", ("fixed", 8192)),
     # §4-1 変異 2: exec の上端を workspace の位置から決める旧式に戻す (B2)。
     ("frozen-exec-ws", "kernel/sys.c",
      "    sys_frozen_exec = pgalloc_arena_end() * PAGE_SIZE;\n    sys_frozen_end = top * PAGE_SIZE;\n    sys_model_staged = 1;",
@@ -70,10 +61,6 @@ MUTATIONS = [
     ("bundle-range-blind", "kernel/memory_boot.c",
      "    if (first >= end || first < lo || end > hi) return 0;",
      "    if (first >= end) return 0;", ("bundle", 16384)),
-    # FIXED のとき backing を張り忘れる (verify が落ちて 8MB が起動しない)。
-    ("backing-unmapped", "kernel/memory_boot.c",
-     "        if (!paging_map_ledger_backing()) return 0;\n",
-     "", ("fixed", 8192)),
     # FIXED の metadata / workspace が RAM (RESERVED でない) でも受け付けてしまう。
     ("fixed-meta-on-ram", "kernel/pgalloc.c",
      "            !all_reserved(m, first, first + pages)) goto done;",
@@ -84,20 +71,16 @@ MUTATIONS = [
 ]
 
 
-if LAYOUT == 1:
-    # Old fixed-address/NP mutations apply only to layout 0.
-    MUTATIONS = [m for m in MUTATIONS if m[0] not in
-                 ('ledger-base-shift', 'ledger-end-shift', 'backing-unmapped')]
-    MUTATIONS += [
-        ('v5-metadata-double', 'kernel/memory_boot.c',
-         '{ KERNEL_LOAD_ADDR, MEM_LEDGER_META_BASE }',
-         '{ KERNEL_LOAD_ADDR, MEM_LEDGER_META_END }', ('ledger', 8192)),
-        ('v5-old-pool-floor', 'kernel/pgalloc.c',
-         'MEM_SHM_RESV_START / PAGE_SIZE,',
-         'MEM_POOL_BASE / PAGE_SIZE,', ('fixed_paging', 8192)),
-        ('v5-dma-missing', 'kernel/pgalloc.c',
-         'int dma = ws_first &&', 'int dma = 0 && ws_first &&', ('ledger', 8192)),
-    ]
+MUTATIONS += [
+    ('v5-metadata-double', 'kernel/memory_boot.c',
+     '{ KERNEL_LOAD_ADDR, MEM_LEDGER_META_BASE }',
+     '{ KERNEL_LOAD_ADDR, MEM_LEDGER_META_END }', ('ledger', 8192)),
+    ('v5-old-pool-floor', 'kernel/pgalloc.c',
+     'MEM_SHM_RESV_START / PAGE_SIZE,',
+     'MEM_POOL_BASE / PAGE_SIZE,', ('fixed_paging', 8192)),
+    ('v5-dma-missing', 'kernel/pgalloc.c',
+     'int dma = ws_first &&', 'int dma = 0 && ws_first &&', ('ledger', 8192)),
+]
 
 
 def run_case(case='default', kb=16384, defines=(), mutation=None):
@@ -137,7 +120,7 @@ def run_case(case='default', kb=16384, defines=(), mutation=None):
                 raise AssertionError('P2V_BOOT probe sites changed')
             mb = mb.replace('P2V_BOOT(', 'host_boot_ptr(')
         (d / 'memory_boot_host_source.c').write_text(mb)
-        cmd = ['gcc', f'-DMEM_LAYOUT_V5={LAYOUT}', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie', '-ffunction-sections', '-Wl,--gc-sections', f'-DTEST_{case.upper()}', f'-DTEST_KB={kb}UL'] + list(defines)
+        cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie', '-ffunction-sections', '-Wl,--gc-sections', f'-DTEST_{case.upper()}', f'-DTEST_KB={kb}UL'] + list(defines)
         # arch/x86 + platform/pc98: include/io.h / include/cpu.h は契約
         # だけで、実装は固定名 arch_io.h / arch_cpu.h / platform_io.h を
         # 引く (順序 3・5)。CR0 / CR3 を触る arch_cpu.h だけは、ホストでは
@@ -162,7 +145,6 @@ def run_case(case='default', kb=16384, defines=(), mutation=None):
 
 
 class MemoryBoot(unittest.TestCase):
-    @unittest.skipUnless(LAYOUT == 1, 'V5 ledger supply')
     def test_v5_ledger_supply_and_dma(self):
         for kb in (8088, 8188, 8192, 12292, 12296, 65536):
             with self.subTest(kb=kb):

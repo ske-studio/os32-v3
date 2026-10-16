@@ -8,10 +8,10 @@
 #undef _start
 void _start(void)
 {
-    u32 args[6] = {0x400000, 0xC00000, 3, 0x32, 0xFFFFFFFF, 0};
+    u32 args[6] = {0x100000, 0xF00000, 3, 0x32, 0xFFFFFFFF, 0};
     u32 result, before, c;
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
-    CHECK(result == 0x400000);
+    CHECK(result == 0x100000);
     host_map_fixed_paging();
     paging_init(16384);
     host_pool_boot_ws(16384, HOST_WS_FIRST, HOST_WS_END);

@@ -34,7 +34,7 @@ import nhd_deploy as nd
 import os32x_hdr as hdr
 
 GENERATION = {"build_id": "a" * 64, "kernel_commit": "fixture",
-              "kapi_version": 74, "generations": {"memory_layout": 3}}
+              "kapi_version": json.loads((ROOT / 'sdk/kapi.json').read_text())['version'], "generations": {"memory_layout": hdr.OS32_MEMORY_LAYOUT_GENERATION}}
 
 
 class DeploySet(unittest.TestCase):

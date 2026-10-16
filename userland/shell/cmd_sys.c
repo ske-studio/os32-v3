@@ -71,14 +71,14 @@ static int cmd_mem(int argc, char **argv)
     g_api->kprintf(ATTR_WHITE, "  定数: %08X-%08X VRAM; %08X-%08X Kernel band\n",
         (u32)MEM_CONV_END, (u32)MEM_BIOS_ROM_START,
         (u32)KERNEL_LOAD_ADDR, (u32)(MEM_KERNEL_BAND_END + 1));
-    g_api->kprintf(ATTR_WHITE, "  定数: %08X-%08X SQLite band; DMA pool %08X-%08X\n",
-        (u32)(MEM_KERNEL_BAND_END + 1), (u32)MEM_SHELL_LOAD_ADDR,
+    g_api->kprintf(ATTR_WHITE, "  定数: %08X-%08X paging guard/PT; DMA pool %08X-%08X\n",
+        (u32)MEM_FIXED_PAGING_GUARD_BASE, (u32)MEM_FIXED_PAGING_FRAME_END,
         (u32)MEM_DMA_POOL_BASE, (u32)(MEM_DMA_POOL_END + 1));
     g_api->kprintf(ATTR_WHITE, "  定数: %08X-%08X kstack guard; %08X-%08X kstack\n",
         (u32)MEM_STACK_GUARD, (u32)(MEM_STACK_GUARD_END + 1),
         (u32)MEM_KSTACK_BASE, (u32)MEM_SHELL_LOAD_ADDR);
     g_api->kprintf(ATTR_WHITE, "  定数: Shell band load=%08X sbrk上限=%08X stack=%08X-%08X\n",
-        (u32)MEM_SHELL_LOAD_ADDR, (u32)MEM_SHELL_GUARD,
+        (u32)MEM_SHELL_LOAD_ADDR, (u32)MEM_SHELL_HEAP_BASE,
         (u32)(MEM_SHELL_STACK_TOP - MEM_SHELL_STACK_SIZE), (u32)MEM_SHELL_STACK_TOP);
 #ifndef SHELL_AS_APP
     g_api->kprintf(ATTR_WHITE, "  実測: Shell band sbrk上限=%08X\n", g_api->sbrk_heap_limit);

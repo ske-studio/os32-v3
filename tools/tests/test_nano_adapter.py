@@ -29,7 +29,7 @@ gate = load('nano_link_gate', ROOT / 'sdk/allocator/check_link.py')
 
 
 def command(prefix, tool, *args):
-    result = host32.build([str(prefix / ('bin/i386-elf-' + tool)), *(['-DMEM_LAYOUT_V5='+os.environ.get('MEM_LAYOUT_V5', '0')] if tool == 'gcc' else []), *map(str, args)],
+    result = host32.build([str(prefix / ('bin/i386-elf-' + tool)), *map(str, args)],
                             capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError(result.stdout + result.stderr)
@@ -65,7 +65,6 @@ def resident_heap(prefix, work):
         start = source.index(signature)
         parts.append(source[start:source.index('\n}', start) + 2])
     (work / 'resident_exec.inc').write_text('\n'.join(parts))
-    mode = int(os.environ.get('MEM_LAYOUT_V5', '0'))
     inc = ['-I'+str(ROOT / p) for p in ('tools/tests/host_arch', 'include', 'kernel',
            'exec', 'lib', 'sdk/allocator', 'sdk/include/os32', 'arch/x86', 'platform/pc98')]
     objects = []
@@ -77,10 +76,10 @@ def resident_heap(prefix, work):
         objects.append(obj)
     exe = work / 'resident'
     command(prefix, 'ld', '-m', 'elf_i386', '--gc-sections',
-            '--defsym=resident_image_end='+hex((0x400000 if mode else 0x300000)+4099),
+            '--defsym=resident_image_end='+hex(0x400000+4099),
             '-o', exe, *objects)
     result = host32.run([str(exe)], capture_output=True, text=True, timeout=30)
-    assert result.returncode == 0, ('resident', mode, result.returncode, result.stdout, result.stderr)
+    assert result.returncode == 0, ('resident', result.returncode, result.stdout, result.stderr)
     print('PASS resident CRT/split/restore: bounds, overflow, unchanged heaps, tiny heap')
 
 

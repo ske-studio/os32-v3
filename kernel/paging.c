@@ -64,8 +64,6 @@ STATIC_ASSERT((MEM_STACK_GUARD & (PAGE_SIZE - 1)) == 0,
 STATIC_ASSERT(MEM_STACK_GUARD > MEM_KERNEL_BAND_END, kstack_outside_kernel_band);
 /* シェル常駐帯域には食い込まない */
 STATIC_ASSERT(MEM_KSTACK_TOP < MEM_SHELL_LOAD_ADDR, kstack_below_shell_band);
-/* SQLite 帯域の予約域 (NP) はスタックガードの手前で終わる */
-STATIC_ASSERT(MEM_KERNEL_RESV_END < MEM_STACK_GUARD, kernel_resv_below_kstack);
 
 /* ------------------------------------------------------------------------ */
 /*  帯どうしの重なりと範囲の逆転 (票 TASK_KSTACK_USER §4 の 1、決裁 D2)      */
@@ -149,7 +147,6 @@ STATIC_ASSERT(MEM_FIXED_PD_BASE == MEM_FIXED_PAGING_BASE &&
               MEM_FIXED_MMIO_TOP_PT_BASE == MEM_FIXED_APERTURE_PT_BASE + PAGE_SIZE &&
               MEM_FIXED_PAGING_END == MEM_FIXED_MMIO_TOP_PT_BASE + PAGE_SIZE,
               fixed_paging_contiguous);
-#if MEM_LAYOUT_V5
 /* Symbol-derived metadata bounds are checked by os32.ld. */
 STATIC_ASSERT(MEM_FIXED_PAGING_GUARD_BASE + PAGE_SIZE == MEM_FIXED_PAGING_BASE &&
               MEM_FIXED_PAGING_FRAME_END - MEM_FIXED_PAGING_BASE == 26 * PAGE_SIZE &&
@@ -162,23 +159,6 @@ STATIC_ASSERT(MEM_KSTACK_BASE + MEM_KSTACK_SIZE == MEM_SHELL_LOAD_ADDR &&
               MEM_SHELL_HEAP_SIZE == 0x40000UL &&
               MEM_SHELL_GUARD + MEM_GUARD_SIZE + MEM_SHELL_STACK_SIZE == MEM_SHELL_STACK_TOP,
               shell_v5_boundaries);
-#else
-STATIC_ASSERT(MEM_SHELL_STACK_TOP <= MEM_SHELL_HEAP_BASE &&
-              MEM_SHELL_HEAP_BASE < MEM_SHELL_HEAP_END &&
-              MEM_SHELL_HEAP_BASE + MEM_SHELL_HEAP_SIZE == MEM_SHELL_HEAP_END &&
-              MEM_SHELL_HEAP_END == MEM_FIXED_PAGING_BASE,
-              shell_heap_below_fixed_paging);
-STATIC_ASSERT(MEM_FIXED_PAGING_END <= MEM_SHELL_BAND_END + 1 &&
-              MEM_SHELL_BAND_END + 1 == MEM_POOL_BASE &&
-              MEM_POOL_BASE - MEM_FIXED_PAGING_END == 4 * PAGE_SIZE,
-              fixed_paging_tail_reserved);
-STATIC_ASSERT(MEM_KERNEL_BAND_END < MEM_SHELL_LOAD_ADDR &&
-              MEM_DMA_POOL_END < MEM_SHELL_LOAD_ADDR &&
-              MEM_LEDGER_META_END <= MEM_STACK_GUARD &&
-              MEM_KSTACK_TOP < MEM_SHELL_LOAD_ADDR &&
-              MEM_SHELL_LOAD_ADDR <= MEM_SHELL_HEAP_BASE,
-              fixed_paging_above_kernel_regions);
-#endif
 
 /* OS が割り当てるデバイス窓の帯 (memmap.h MEM_DEVICE_APERTURE_*) の先頭 4MB を
  * 覆う PT。**静的に 1 枚** 持つ (2026-09-29、Cirrus のリニア窓 FE000000h)。
@@ -273,7 +253,6 @@ static int boot_range_valid(u32 first, u32 end, int present)
     return 1;
 }
 
-#if MEM_LAYOUT_V5
 /* Shared supervisor ranges, independent of the ledger backing policy.
  * SHM permissions are installed later by shm_init / boot_user_shared. */
 static int boot_layout_valid(void)
@@ -289,7 +268,6 @@ static int boot_layout_valid(void)
         boot_range_valid(MEM_SHELL_GUARD, MEM_SHELL_GUARD + PAGE_SIZE, 0) &&
         boot_range_valid(MEM_SHELL_GUARD + PAGE_SIZE, MEM_SHELL_BAND_END + 1, 1);
 }
-#endif
 
 /* ======================================================================== */
 /*  paging_init — ページテーブル構築 + ページング有効化                      */
@@ -379,47 +357,14 @@ void paging_init(u32 mem_kb)
     /* スタックガードページ: Not-Present */
     paging_set_not_present(MEM_STACK_GUARD, MEM_STACK_GUARD_END);
 
-#if !MEM_LAYOUT_V5
-    /* カーネル帯域内 SHM 後方予約: Not-Present (カーネル帯域の終端まで)。
-     * カーネルが予算いっぱいまで育つとこの帯は **空** になる
-     * (START == END + 1)。空のときに呼ぶと逆転として撥ねられるので呼ばない。
-     * 逆転 (START > END + 1) は上の STATIC_ASSERT が最悪配置で禁じている。 */
-    if (MEM_SHM_RESV_START <= MEM_SHM_RESV_END)
-        paging_set_not_present(MEM_SHM_RESV_START, MEM_SHM_RESV_END);
-    else if (MEM_SHM_RESV_START > MEM_SHM_RESV_END + 1)
-        paging_range_reject_count++;   /* 逆転 = 設計が壊れている。空とは別 */
-
-    /* カーネル予約域 (SQLite帯域後 〜 シェル帯域前): Not-Present */
-    paging_set_not_present(MEM_KERNEL_RESV_START, MEM_KERNEL_RESV_END);
-
-#else
     /* SLACK and resident metadata keep the initial identity sup/RW/WB map. */
     paging_set_not_present(MEM_FIXED_PAGING_GUARD_BASE,
                            MEM_FIXED_PAGING_BASE - 1);
-#endif
 
-#if !MEM_LAYOUT_V5
-    /* DMA プール (票 TASK_HAL_WIRING §1-3): 予約域の中に開ける 64KB の穴。
-     * present / supervisor / R/W。上下は予約域のまま NP がガードになる。
-     *
-     * **NP 化の範囲から外すのではなく、張り直す。** 除外で済ませると、
-     * ここが「上のメモリ量ループが決めた属性のまま」になり、プローブ量が
-     * 小さい機械では Not-Present のまま残る (= 割り込み文脈の DMA 設定で
-     * 三重フォルト)。順序も大事で、**NP の後**に張らないと消される。
-     *
-     * USER は立てない — CPL=3 から装置の記述子を書けてはいけない。
-     * 立っていないことは kselftest の MM 検査 (MM_RW vs MM_RWU) が見る。 */
-    paging_map_range(MEM_DMA_POOL_BASE, MEM_DMA_POOL_BASE + MEM_DMA_POOL_SIZE,
-                     MEM_DMA_POOL_BASE, PAGE_RW);
-#endif /* V5 DMA retains the detected-RAM mapping; activation is stage E. */
 
     /* シェルスタックガード: Not-Present */
     paging_set_not_present(MEM_SHELL_GUARD, MEM_SHELL_GUARD + PAGE_SIZE - 1);
 
-#if !MEM_LAYOUT_V5
-    /* heap の末尾を一旦 NP にし、固定11枚だけを最後に張り直す。 */
-    paging_set_not_present(MEM_SHELL_HEAP_END, MEM_SHELL_BAND_END);
-#endif
 
     /* SQLite帯域 + 代替スタック (0x200000〜): 強制R/W
      * ブートローダーが sqlite.bin を 0x200000 にロード済み。
@@ -430,9 +375,7 @@ void paging_init(u32 mem_kb)
         paging_map_range(sq_start, sq_end, sq_start, PAGE_RW);
     }
 
-#if MEM_LAYOUT_V5
     paging_set_not_present(MEM_SQLITE_STACK_GUARD, MEM_SQLITE_STACK_BASE - 1);
-#endif
 
     /* BIOS ROM: Read-Only */
     paging_set_readonly(MEM_BIOS_ROM_START, MEM_BIOS_ROM_END);
@@ -443,22 +386,10 @@ void paging_init(u32 mem_kb)
     if (paging_map_range(MEM_FIXED_PAGING_BASE, MEM_FIXED_PAGING_FRAME_END,
                          MEM_FIXED_PAGING_BASE, PAGE_RW) != 0 ||
         !fixed_paging_valid() ||
-#if MEM_LAYOUT_V5
         !boot_layout_valid() ||
         !boot_range_valid(PAGE_ALIGN_DOWN((u32)&__sqlite_start), MEM_SQLITE_STACK_GUARD, 1) ||
         !boot_range_valid(MEM_SQLITE_STACK_BASE,
                           PAGE_ALIGN_DOWN(MEM_SQLITE_STACK_TOP + PAGE_SIZE), 1) ||
-#else
-        !boot_range_valid(PAGE_ALIGN_DOWN((u32)&__sqlite_start),
-                          PAGE_ALIGN_DOWN(MEM_SQLITE_STACK_TOP + PAGE_SIZE), 1) ||
-        !boot_range_valid(MEM_DMA_POOL_BASE, MEM_DMA_POOL_END + 1, 1) ||
-        !boot_range_valid(MEM_LEDGER_META_BASE, MEM_LEDGER_META_END, 0) ||
-        !boot_range_valid(MEM_STACK_GUARD, MEM_KSTACK_BASE, 0) ||
-        !boot_range_valid(MEM_KSTACK_BASE, MEM_SHELL_LOAD_ADDR, 1) ||
-        !boot_range_valid(MEM_SHELL_GUARD, MEM_SHELL_GUARD + PAGE_SIZE, 0) ||
-        !boot_range_valid(MEM_SHELL_HEAP_BASE, MEM_SHELL_HEAP_END, 1) ||
-        !boot_range_valid(MEM_FIXED_PAGING_END, MEM_POOL_BASE, 0) ||
-#endif
         0) {
         irq_restore(flags);
         return; /* PG は立てない。後段の memory_boot_init が fail-stop。 */
@@ -537,15 +468,10 @@ static int ledger_backing_mapped;
 int paging_map_ledger_backing(void)
 {
     if (!paging_boot_context()) return 0;
-#if MEM_LAYOUT_V5
     /* Resident BSS is already mapped. Do not repair a corrupted mapping. */
     if (!paging_verify_identity(MEM_LEDGER_META_BASE / PAGE_SIZE,
                                 MEM_LEDGER_META_SIZE / PAGE_SIZE,
                                 P2V(MEM_LEDGER_META_BASE))) return 0;
-#else
-    if (paging_map_range(MEM_LEDGER_META_BASE, MEM_LEDGER_META_END,
-                         MEM_LEDGER_META_BASE, PAGE_RW) != 0) return 0;
-#endif
     ledger_backing_mapped = 1;
     return 1;
 }
@@ -1365,11 +1291,9 @@ static u8 memmap_want_at(u32 a, u32 tramp)
     if (a < MEM_BIOS_ROM_START) return MM_RW;   /* VRAM */
     if (a <= MEM_BIOS_ROM_END) return MM_RO;
 
-#if MEM_LAYOUT_V5
     if (a >= MEM_SQLITE_STACK_GUARD && a < MEM_SQLITE_STACK_BASE) return MM_NP;
     if (a >= MEM_FIXED_PAGING_GUARD_BASE && a < MEM_FIXED_PAGING_BASE) return MM_NP;
     if (a >= MEM_FIXED_PAGING_BASE && a < MEM_FIXED_PAGING_FRAME_END) return MM_RW;
-#endif
 
     /* カーネル帯域 — ここは KHEAP_BASE 以降が全部浮動番地。
      * **浮動番地の規則は帯の中にだけ適用する。** 帯の境界 MEM_KERNEL_BAND_END
@@ -1386,11 +1310,7 @@ static u8 memmap_want_at(u32 a, u32 tramp)
         if (a >= MEM_SHM_GUARD_HI && a < MEM_SHM_GUARD_HI + PAGE_SIZE)
             return MM_NP;
         if (a < MEM_SHM_GUARD_LO) return MM_RW; /* 本体 + ヒープ + KAPI */
-#if MEM_LAYOUT_V5
         return MM_RW;                           /* SLACK */
-#else
-        return MM_NP;                           /* SHM 後方予約 */
-#endif
     }
 
     /* SQLite 帯域 — 固定番地 (スタックとそのガード) を浮動番地 (SQLite の
@@ -1401,26 +1321,16 @@ static u8 memmap_want_at(u32 a, u32 tramp)
      * (T1-U1: USER は立たない)。それ以外は予約域 (NP) のまま。予約域の
      * 分岐より先に見る (DMA プールと同じ理由)。 */
     if (a >= MEM_LEDGER_META_BASE && a < MEM_LEDGER_META_END)
-#if MEM_LAYOUT_V5
         return MM_RW;
-#else
-        return ledger_backing_mapped ? MM_RW : MM_NP;
-#endif
     if (a >= MEM_KSTACK_BASE && a < MEM_SHELL_LOAD_ADDR) return MM_RW;
     /* **予約域を NP とする分岐より先に** DMA プールを見る (票 §1-3)。
      * 逆にすると、張り忘れて NP のままの池を「期待どおり」と読む。 */
     if (a >= MEM_DMA_POOL_BASE && a <= MEM_DMA_POOL_END) return MM_RW;
-#if !MEM_LAYOUT_V5
-    if (a >= MEM_KERNEL_RESV_START && a <= MEM_KERNEL_RESV_END) return MM_NP;
-#endif
     if (a < MEM_SHELL_LOAD_ADDR) return MM_RW;  /* SQLite code+BSS+代替スタック */
 
     /* シェル常駐帯域 */
     if (a < MEM_SHELL_GUARD) return MM_RW;
     if (a < MEM_SHELL_GUARD + PAGE_SIZE) return MM_NP;
-#if !MEM_LAYOUT_V5
-    if (a >= MEM_FIXED_PAGING_END) return MM_NP;
-#endif
     return MM_RW;                               /* スタック + heap + 固定PD/PT */
 }
 
@@ -1720,9 +1630,7 @@ int paging_as_audit(const struct addrspace *as, int (*shared_ro)(u32, u32))
     u32 *pd;
     if (!as || !as->pd_phys || as->pd_phys % PAGE_SIZE ||
         !pgalloc_page_owned(as->pd_phys / PAGE_SIZE, as->owner)) return 1;
-#if MEM_LAYOUT_V5
     if (!fixed_paging_valid() || !boot_layout_valid()) return 1;
-#endif
     pd = P2V(as->pd_phys);
     for (u32 di = 0; di < PDE_COUNT; di++) {
         u32 d = pd[di];

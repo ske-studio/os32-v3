@@ -28,24 +28,11 @@
 #define MEMORY_BOOT_FIXED_MAX_TOP    (MEM_PHYS_WORKSPACE_FLOOR / PAGE_SIZE + \
                                       MEMORY_BOOT_FIXED_META_PAGES + \
                                       MEMORY_BOOT_WORKSPACE_PAGES - 1)
-#if MEM_LAYOUT_V5
 /* Addresses now come from BSS symbols; os32.ld checks alignment/containment.
  * Only the constant capacity belongs in a C static assertion. */
 STATIC_ASSERT(MEM_LEDGER_META_SIZE ==
               (MEMORY_BOOT_FIXED_META_PAGES + MEMORY_BOOT_WORKSPACE_PAGES) * PAGE_SIZE,
               ledger_backing_is_meta_plus_ws);
-#else
-STATIC_ASSERT((MEM_LEDGER_META_BASE & (PAGE_SIZE - 1)) == 0 &&
-              (MEM_LEDGER_META_END & (PAGE_SIZE - 1)) == 0,
-              ledger_backing_page_aligned);
-STATIC_ASSERT(MEMORY_BOOT_FIXED_WS_END - MEMORY_BOOT_FIXED_WS_FIRST ==
-              MEMORY_BOOT_WORKSPACE_PAGES, ledger_backing_is_meta_plus_ws);
-/* DMA プールの上側ガードを 1 ページ残し、カーネルスタックのガードに接する。 */
-STATIC_ASSERT(MEM_LEDGER_META_BASE == MEM_DMA_POOL_END + 1 + MEM_GUARD_SIZE,
-              ledger_backing_keeps_dma_guard);
-STATIC_ASSERT(MEM_LEDGER_META_END == MEM_STACK_GUARD,
-              ledger_backing_below_kstack_guard);
-#endif
 /* 8MB 型の metadata (L1 の bitmap 2 面 + L2 の owner 1B/PFN) は常に 1 ページ
  * に入る (T1-R2、上端 3,073 PFN で 776 + 3,073 = 3,849B)。式は
  * pgalloc_metadata_bytes と同じ PGALLOC_META_BYTES。 */
@@ -233,32 +220,10 @@ static const struct {
     /* VRAM と BIOS ROM */
     { MB_PFN(MEM_CONV_END), MB_PFN(KERNEL_LOAD_ADDR),
       LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_UC, 0 },
-#if !MEM_LAYOUT_V5
-    { MB_PFN(KERNEL_LOAD_ADDR), MB_PFN(MEM_KERNEL_BAND_END + 1),
-      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
-    /* SQLite 帯 (DMA プールの下まで) */
-    { MB_PFN(MEM_KERNEL_BAND_END + 1), MB_PFN(MEM_DMA_POOL_BASE),
-      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
-    { MB_PFN(MEM_DMA_POOL_BASE), MB_PFN(MEM_DMA_POOL_END + 1),
-      LEDGER_R_DMA, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
-    /* DMA プールの上側ガード + 台帳の FIXED 型 backing */
-    { MB_PFN(MEM_DMA_POOL_END + 1), MB_PFN(MEM_STACK_GUARD),
-      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
-    /* カーネルスタックのガード + カーネルスタック */
-    { MB_PFN(MEM_STACK_GUARD), MB_PFN(MEM_SHELL_LOAD_ADDR),
-      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
-    { MB_PFN(MEM_SHELL_LOAD_ADDR), MB_PFN(MEM_FIXED_PAGING_BASE),
-      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
-    { MB_PFN(MEM_FIXED_PAGING_BASE), MB_PFN(MEM_FIXED_PAGING_END),
-      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
-    { MB_PFN(MEM_FIXED_PAGING_END), MB_PFN(MEM_SHELL_BAND_END + 1),
-      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
-#endif
 };
 STATIC_ASSERT(MEM_SHELL_BAND_END + 1 == MEM_POOL_BASE, fixed_regions_end_at_pool);
 STATIC_ASSERT(MEM_SHELL_BAND_END / PAGE_SIZE < 0x10000UL, fixed_regions_fit_u16);
 
-#if MEM_LAYOUT_V5
 /* Symbol-derived byte intervals are built at runtime. The linker and paging
  * validate the chain; refuse reversed/unaligned ranges, omit empty ones. */
 static int memory_boot_fixed_region(u32 first, u32 end)
@@ -268,7 +233,6 @@ static int memory_boot_fixed_region(u32 first, u32 end)
         LEDGER_OWNER_KERNEL, first / PAGE_SIZE, end / PAGE_SIZE,
         LEDGER_CACHE_WB, LEDGER_RF_PERMANENT);
 }
-#endif
 
 /* Available only after a successful boot. Short RAM leaves no DMA region;
  * conflicting reservations make memory_boot_init fail instead. */
@@ -322,7 +286,6 @@ static int memory_boot_regions(u32 top, u32 ws_first)
                                     memory_boot_fixed[i].end,
                                     memory_boot_fixed[i].cache,
                                     LEDGER_RF_PERMANENT)) return 0;
-#if MEM_LAYOUT_V5
     const u32 fixed[][2] = {
         { KERNEL_LOAD_ADDR, MEM_LEDGER_META_BASE },
         { MEM_LEDGER_META_BASE, MEM_LEDGER_META_END },
@@ -334,7 +297,6 @@ static int memory_boot_regions(u32 top, u32 ws_first)
     };
     for (i = 0; i < sizeof(fixed) / sizeof(fixed[0]); i++)
         if (!memory_boot_fixed_region(fixed[i][0], fixed[i][1])) return 0;
-#endif
     /* ARENA_TOP 型の backing (workspace + metadata、低位 RAM の末尾) */
     if (ws_first && !ledger_register_region(LEDGER_R_FIXED, LEDGER_OWNER_KERNEL,
                                             ws_first, top, LEDGER_CACHE_WB,
@@ -355,9 +317,7 @@ int memory_boot_init(u32 mem_kb)
 {
     struct pgalloc_layout layout;
     u32 admitted_kb, top, pages, ws_pages, high_end;
-#if MEM_LAYOUT_V5
     if (MEM_SHM_RESV_START > MEM_FIXED_PAGING_GUARD_BASE) return 0;
-#endif
     admitted_kb = mem_kb;
     if (admitted_kb > MEMORY_BOOT_LEGACY_END / 1024UL)
         admitted_kb = MEMORY_BOOT_LEGACY_END / 1024UL;
@@ -396,7 +356,7 @@ int memory_boot_init(u32 mem_kb)
         if (high_end || pages > MEMORY_BOOT_FIXED_META_PAGES ||
             ws_pages > MEMORY_BOOT_FIXED_WS_END - MEMORY_BOOT_FIXED_WS_FIRST)
             return 0;
-        /* 旧配置は NP から張り、新配置は core 内の既存写像を検査する。 */
+        /* core 内の既存写像を検査する。 */
         if (!paging_map_ledger_backing()) return 0;
         layout.kind = PGALLOC_BACKING_FIXED;
         layout.metadata_first = MEMORY_BOOT_FIXED_FIRST;

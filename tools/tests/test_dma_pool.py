@@ -10,7 +10,7 @@
 
 **NP21/W では踏めない**のは 64KB またぎの飛ばし。エミュレータは 8237 の
 折り返しを模擬しないので、またいだ配置でも「動いて見える」(§4-51 と同じ型)。
-番地は MEM_LAYOUT_V5=0/1 の実物の MEM_DMA_POOL_BASE を使う。
+番地は実物の MEM_DMA_POOL_BASE を使う。
 旧池の境界跨越は合成入力でも保持し、案5の64KiB整列も確認する。
 
   python3 -B tools/tests/test_dma_pool.py            # ホストで全ケース
@@ -38,7 +38,6 @@ CASES = ["layout", "sizes", "skip_boundary", "alignment", "frees",
 
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-D__cdecl="]
-FLAGS += ["-DMEM_LAYOUT_V5=" + os.environ.get("MEM_LAYOUT_V5", "0")]
 INCLUDES = ["-I" + str(ROOT / p)
             for p in ("include", "kernel", "drivers", "sdk/include/os32")]
 

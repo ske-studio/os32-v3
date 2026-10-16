@@ -1626,7 +1626,6 @@ static int exec_shell_layout(u32 text, u32 bss, u32 heap,
 {
     if (text > MEM_SHELL_MAX_SIZE || bss > MEM_SHELL_MAX_SIZE - text)
         return EXEC_ERR_NOMEM;
-#if MEM_LAYOUT_V5
     u32 image_end = (MEM_SHELL_LOAD_ADDR + text + bss + MEM_SHELL_HEAP_ALIGN - 1)
                    & ~(MEM_SHELL_HEAP_ALIGN - 1);
     u32 exec_end = MEM_SHELL_STACK_TOP - MEM_SHELL_STACK_SIZE - PAGE_SIZE;
@@ -1637,12 +1636,6 @@ static int exec_shell_layout(u32 text, u32 bss, u32 heap,
     *sbrk_limit = base;
     *exec_base = base;
     *exec_size = heap ? heap : MEM_SHELL_EXEC_HEAP_SIZE;
-#else
-    *sbrk_limit = MEM_SHELL_GUARD;
-    *exec_base = MEM_SHELL_HEAP_BASE;
-    *exec_size = MEM_SHELL_HEAP_SIZE;
-    if (heap > 0 && heap < *exec_size) *exec_size = heap;
-#endif
     return 0;
 }
 

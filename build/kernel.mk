@@ -207,7 +207,7 @@ $(BUILD_OUT)/sqlite.bin: $(BUILD_OUT)/kernel.elf
 
 # === VK32 圧縮カーネルイメージ ===
 $(BUILD_OUT)/vmkernel.lz4: $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/sqlite.bin $(BUILD_OUT)/kernel.elf tools/mkvmkernel.py tools/gen_memmap.py include/memmap.h boot/boot_defs.h
-	python3 tools/mkvmkernel.py --layout $(MEM_LAYOUT_V5) --layout-header $(LAYOUT_HEADER) \
+	python3 tools/mkvmkernel.py --layout-header $(LAYOUT_HEADER) \
 		--elf $(BUILD_OUT)/kernel.elf --kernel $(BUILD_OUT)/kernel.bin \
 		--sqlite $(BUILD_OUT)/sqlite.bin \
 		-o $(BUILD_OUT)/vmkernel.lz4
@@ -332,7 +332,7 @@ $(R1_OUT)/sqlite.bin: $(R1_OUT)/kernel.elf
 	$(OBJCOPY) -O binary --only-section=.sqlite_text --only-section=.sqlite_rodata --only-section=.sqlite_data $< $@
 
 $(R1_OUT)/vmkernel.lz4: $(R1_OUT)/kernel.bin $(R1_OUT)/sqlite.bin $(R1_OUT)/kernel.elf tools/mkvmkernel.py tools/gen_memmap.py include/memmap.h boot/boot_defs.h
-	python3 tools/mkvmkernel.py --layout $(MEM_LAYOUT_V5) --layout-header $(LAYOUT_HEADER) --elf $(R1_OUT)/kernel.elf --kernel $(R1_OUT)/kernel.bin --sqlite $(R1_OUT)/sqlite.bin -o $@
+	python3 tools/mkvmkernel.py --layout-header $(LAYOUT_HEADER) --elf $(R1_OUT)/kernel.elf --kernel $(R1_OUT)/kernel.bin --sqlite $(R1_OUT)/sqlite.bin -o $@
 
 kernel-r1: $(R1_OUT)/vmkernel.lz4
 	python3 tools/r1_manifest.py $(R1_OUT)
@@ -343,7 +343,7 @@ kernel-r1: $(R1_OUT)/vmkernel.lz4
 # One selected header drives every language; FORCE checks the selection while
 # write-if-changed keeps an unchanged build incremental.
 $(LAYOUT_HEADER): include/memmap.h tools/gen_memmap.py .FORCE
-	@python3 tools/gen_memmap.py --layout $(MEM_LAYOUT_V5) --layout-header $@
+	@python3 tools/gen_memmap.py --layout-header $@
 
 $(BUILD_OUT)/os32.raw.ld: build/os32.ld $(LAYOUT_HEADER)
 	$(LAYOUT_CPP) $< -o $@
@@ -367,7 +367,7 @@ $(KERNEL_OBJ_PREFIX)lib/sqlite3/%.o: lib/sqlite3/%.c lib/sqlite3/os32_sqlite_con
 
 $(KERNEL_OBJ_PREFIX)exec/ring3_ls_shim.o: exec/ring3_ls.S exec/ring3_ls.h sdk/include/os32/os32_generations.h
 	@mkdir -p $(@D)
-	$(CC) $(LAYOUT_FLAGS) -m32 -Isdk/include/os32 -c $< -o $@
+	$(CC) -m32 -Isdk/include/os32 -c $< -o $@
 
 $(KERNEL_OBJ_PREFIX)kernel/module.o: kdebug/generated/kdebug_imports.h
 

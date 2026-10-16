@@ -51,9 +51,9 @@ sdk/crt/resident/syscalls.o: sdk/crt/syscalls.c $(CRT_SYSCALLS_DEPS) userland/li
 userland/lib/rt/dbgserial.o: userland/lib/rt/dbgserial.c userland/lib/rt/dbgserial.h $(SDK_KAPI_HDR)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
-# V5 resident images are never written over the deployable legacy images.
-RESIDENT_OUT = $(if $(filter 1,$(MEM_LAYOUT_V5)),$(BUILD_OUT)/resident,userland)
-ifeq ($(MEM_LAYOUT_V5),1)
+# Default images retain the paths consumed by deployment; alternate builds stay isolated.
+RESIDENT_OUT = $(if $(filter-out build/out,$(BUILD_OUT)),$(BUILD_OUT)/resident,userland)
+ifneq ($(RESIDENT_OUT),userland)
 .PHONY: userland/shell.bin userland/gshell.bin
 userland/shell.bin: $(RESIDENT_OUT)/shell.bin
 userland/gshell.bin: $(RESIDENT_OUT)/gshell.bin
@@ -147,7 +147,7 @@ clean-sh:
 .PHONY: sh clean-sh
 
 # === gshell — GUI シェル (Rust、票 W1) ===
-# shell.bin と同じシェル帯 (0x300000, app_sys.ld) に常駐する WM。userland/rust の
+# shell.bin と同じシェル帯 (0x400000, app_sys.ld) に常駐する WM。userland/rust の
 # ワークスペース外 (userland/gshell/、独立ワークスペース) にあるので
 # DEFINE_RUST_PROGRAM は使わず個別に書く。カーネルが /bin/gshell.bin を
 # シェル帯へ直接ロードする (config.h SYS_GSHELL_BIN、K4)。
@@ -565,6 +565,7 @@ userland/%.bin: userland/%.raw userland/%.elf
 	_decl=$$(awk '$$1 == "userland/$*" { print $$4 }' build/app.conf); \
 	_api=$${_api:-7}; \
 	_heap=$${_heap:-0}; \
+	if [ "$*" = "shell" ] || [ "$*" = "gshell" ]; then _heap=0; fi; \
 	_opts=""; \
 	if [ "$*" = "tests/mem_stat_compat_test" ]; then _opts="$$_opts --compat-api"; fi; \
 	if [ "$$_heap" != "0" ]; then _opts="$$_opts --heap $$_heap"; fi; \

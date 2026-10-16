@@ -5,10 +5,9 @@ import pathlib
 import subprocess
 import tempfile
 
-LAYOUT = int(os.environ.get("MEM_LAYOUT_V5", "0"))
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 # Unit models use an empty SLACK; memory_boot_host covers the real provider.
-LAYOUT_FLAGS = [f'-DMEM_LAYOUT_V5={LAYOUT}',
+LAYOUT_FLAGS = [
                 '-Wl,--defsym=__kernel_resident_end=0x375000',
                 '-Wl,--defsym=__ledger_fixed_start=0x17e000',
                 '-Wl,--defsym=__ledger_fixed_end=0x180000']
@@ -30,7 +29,7 @@ if __name__ == "__main__":
                         "-o", str(exe)], cwd=ROOT, check=True)
         print("HOST ILP32 GNU11 COMPILE PASS", flush=True)
         host32.run([str(exe)], cwd=ROOT, check=True, timeout=60)
-        subprocess.run(["i386-elf-gcc", f"-DMEM_LAYOUT_V5={LAYOUT}", *FLAGS, "-O2", *INCLUDES,
+        subprocess.run(["i386-elf-gcc", *FLAGS, "-O2", *INCLUDES,
                         "-c", str(ROOT / "kernel/pgalloc.c"),
                         "-o", str(pathlib.Path(tmp) / "pgalloc.o")],
                        cwd=ROOT, check=True)

@@ -24,7 +24,6 @@ MEM_KERNEL_BAND_END = LAYOUT_MEM_KERNEL_BAND_END;
 MEM_LEDGER_META_END = LAYOUT_MEM_LEDGER_META_END;
 MEM_STACK_GUARD = LAYOUT_MEM_STACK_GUARD;
 MEM_DMA_POOL_END = LAYOUT_MEM_DMA_POOL_END;
-MEM_LAYOUT_V5 = LAYOUT_MEM_LAYOUT_V5;
 MEM_FIXED_PAGING_USED_END = LAYOUT_MEM_FIXED_PAGING_USED_END;
 MEM_FIXED_PAGING_FRAME_END = LAYOUT_MEM_FIXED_PAGING_FRAME_END;
 MEM_LAYOUT_LOAD_END = LAYOUT_MEM_LAYOUT_LOAD_END;
@@ -55,15 +54,11 @@ SECTIONS
         *(EXCLUDE_FILE(lib/sqlite3/sqlite3.o lib/sqlite3/os32_sqlite_vfs.o lib/sqlite3/os32_sqlite_test.o) .bss.*)
         *(EXCLUDE_FILE(lib/sqlite3/sqlite3.o lib/sqlite3/os32_sqlite_vfs.o lib/sqlite3/os32_sqlite_test.o) COMMON)
         . = ALIGN(4);
-#if !LAYOUT_MEM_LAYOUT_V5
-        __bss_end = .;
-#endif
     }
 
     /* ================================================================ */
-    /*  SQLite 拡張域 (0x200000 - 0x2FFFFF, 1MB)                       */
+    /*  SQLite 拡張域 (core BSS 直後、ページ整列)                       */
     /* ================================================================ */
-#if LAYOUT_MEM_LAYOUT_V5
     .ledger_fixed ALIGN(LAYOUT_MEM_PAGE_SIZE) (NOLOAD) : {
         __ledger_fixed_start = .;
         . += LAYOUT_MEM_LEDGER_META_SIZE;
@@ -71,11 +66,6 @@ SECTIONS
         __bss_end = .;
     }
     . = ALIGN(LAYOUT_MEM_PAGE_SIZE);
-#else
-    __ledger_fixed_start = LAYOUT_MEM_LEDGER_META_BASE;
-    __ledger_fixed_end = LAYOUT_MEM_LEDGER_META_END;
-    . = 0x200000;
-#endif
 
     .sqlite_text : {
         __sqlite_start = .;
@@ -110,7 +100,6 @@ SECTIONS
     MEM_SQLITE_STACK_BASE = LAYOUT_MEM_SQLITE_STACK_BASE;
     MEM_SQLITE_STACK_TOP = LAYOUT_MEM_SQLITE_STACK_TOP;
     MEM_SQLITE_STACK_END = MEM_SQLITE_STACK_BASE + MEM_SQLITE_STACK_SIZE;
-#if LAYOUT_MEM_LAYOUT_V5
     MEM_SQLITE_STACK_GUARD = LAYOUT_MEM_SQLITE_STACK_GUARD;
     __kernel_resident_end = MEM_SQLITE_STACK_END;
     ASSERT(__ledger_fixed_start % LAYOUT_MEM_PAGE_SIZE == 0 &&
@@ -149,9 +138,6 @@ SECTIONS
            MEM_DMA_POOL_BASE >= (LAYOUT_MEM_BOOT_BUNDLE_BASE + LAYOUT_MEM_BOOT_BUNDLE_SIZE) &&
            MEM_DMA_POOL_END < LAYOUT_MEM_SYSTEM_SPACE_BASE,
            "DMA window must be outside boot bundle and system space")
-#else
-    __kernel_resident_end = ALIGN(__bss_end, LAYOUT_MEM_PAGE_SIZE);
-#endif
     ASSERT(((__bss_start | __bss_end | __sqlite_data_end | __sqlite_end) & 3) == 0 &&
            __bss_start <= __bss_end && __sqlite_data_end <= __sqlite_end,
            "BSS zero ranges must be ordered and DWORD aligned")
@@ -166,56 +152,11 @@ SECTIONS
     /*  居座り、あと 224 バイトで三重フォルトするところまで来ていた。         */
     /*  それを **ここで、リンク時に** 止める。                                */
     /* ==================================================================== */
-#if !LAYOUT_MEM_LAYOUT_V5
-    ASSERT(__bss_end <= KERNEL_LOAD_ADDR + MEM_KERNEL_IMAGE_MAX,
-        "kernel image exceeds MEM_KERNEL_IMAGE_MAX (include/memmap.h): the floating KHEAP_BASE/KAPI/SHM chain would run past the kernel band and silently unmap someone else's pages. Fix: shrink the kernel, or reduce MEM_SHM_SIZE in 16KB steps (keep SHM_BLOCK_COUNT in kernel/shm.h in sync), or reduce KHEAP_SIZE. Run 'python3 tools/gen_memmap.py --check' for the exact numbers; background is docs/archive/kernel_v21/TASK_KSTACK_USER.md")
-
-    /* ==================================================================== */
-    /*  SQLite の伸び代 (票 docs/tasks/v3/TASK_HAL_WIRING.md §1-3)            */
-    /*                                                                       */
-    /*  __sqlite_end の後ろには代替スタック 128KB が続き、その後ろの予約域    */
-    /*  (NOT PRESENT) の中に DMA プールを 0x2E8000 固定で開ける。+0x1000 は   */
-    /*  代替スタックの 4KB 切り上げぶん (MEM_SQLITE_STACK_BASE の式)。        */
-    /*  ここが赤くなったら、プールを動かすか SQLite を削るかの判断が要る —    */
-    /*  **黙って重ねてはいけない** (プールは割り込み文脈から DMA に渡す       */
-    /*  メモリで、重なれば SQLite の .bss が装置に書き潰される)。             */
-    /* ==================================================================== */
-    ASSERT(__sqlite_end + MEM_SQLITE_STACK_SIZE + 0x1000 <= MEM_DMA_POOL_BASE,
-        "SQLite band overruns DMA pool")
-
-    ASSERT(((MEM_FIXED_PAGING_BASE | MEM_FIXED_PD_BASE | MEM_FIXED_BOOT_PT_BASE |
-             MEM_FIXED_APERTURE_PT_BASE | MEM_FIXED_MMIO_TOP_PT_BASE | MEM_FIXED_PAGING_END | MEM_SHELL_HEAP_BASE |
-             MEM_SHELL_HEAP_END | MEM_SHELL_STACK_TOP | (MEM_SHELL_BAND_END + 1)) & 0xFFF) == 0,
-        "fixed paging/shell boundaries unaligned")
-    ASSERT(MEM_FIXED_BOOT_PT_COUNT == 8 && MEM_FIXED_PD_BASE == MEM_FIXED_PAGING_BASE &&
-           MEM_FIXED_BOOT_PT_BASE == MEM_FIXED_PD_BASE + 0x1000 &&
-           MEM_FIXED_APERTURE_PT_BASE == MEM_FIXED_BOOT_PT_BASE + MEM_FIXED_BOOT_PT_COUNT * 0x1000 &&
-           MEM_FIXED_MMIO_TOP_PT_BASE == MEM_FIXED_APERTURE_PT_BASE + 0x1000 &&
-           MEM_FIXED_PAGING_END == MEM_FIXED_MMIO_TOP_PT_BASE + 0x1000 &&
-           MEM_FIXED_PAGING_END - MEM_FIXED_PAGING_BASE == 11 * 0x1000,
-        "fixed paging must be contiguous 1/8/1/1 pages")
-    ASSERT(MEM_SHELL_STACK_TOP <= MEM_SHELL_HEAP_BASE &&
-           MEM_SHELL_HEAP_BASE < MEM_SHELL_HEAP_END &&
-           MEM_SHELL_HEAP_BASE + MEM_SHELL_HEAP_SIZE == MEM_SHELL_HEAP_END &&
-           MEM_SHELL_HEAP_END == MEM_FIXED_PAGING_BASE,
-        "shell heap overlaps fixed paging")
-    ASSERT(MEM_FIXED_PAGING_END <= MEM_SHELL_BAND_END + 1 &&
-           MEM_SHELL_BAND_END + 1 == MEM_POOL_BASE &&
-           MEM_POOL_BASE - MEM_FIXED_PAGING_END == 4 * 0x1000,
-        "fixed paging tail must reserve four pages")
-    ASSERT(MEM_KERNEL_BAND_END < MEM_SHELL_LOAD_ADDR &&
-           __sqlite_end + MEM_SQLITE_STACK_SIZE + 0x1000 <= MEM_DMA_POOL_BASE &&
-           MEM_DMA_POOL_END < MEM_SHELL_LOAD_ADDR &&
-           MEM_LEDGER_META_END <= MEM_STACK_GUARD && MEM_KSTACK_TOP < MEM_SHELL_LOAD_ADDR &&
-           MEM_SHELL_LOAD_ADDR <= MEM_SHELL_HEAP_BASE,
-        "fixed paging overlaps kernel/SQLite/DMA/metadata/stack")
-
-#endif
 
     .os32_generations 0 (INFO) : { KEEP(*(.os32_generations)) }
     .os32_generation_ref 0 (INFO) : { KEEP(*(.os32_generation_ref)) }
     /* GENERATED GENERATION REF BEGIN */
-__os32_abi_1_mem_3_fmt_4 = 0;
+__os32_abi_1_mem_4_fmt_4 = 0;
 /* GENERATED GENERATION REF END */
 
     /DISCARD/ : {

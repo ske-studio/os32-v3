@@ -22,13 +22,8 @@
 static int failed;
 
 /* 期待値は**数で書く** ([C4] の写しではなく、設計の数そのもの)。 */
-#if MEM_LAYOUT_V5
 #define POOL_BASE   0x7F0000UL
 #define POOL_END    0x7FFFFFUL
-#else
-#define POOL_BASE   0x2E8000UL
-#define POOL_END    0x2F7FFFUL
-#endif
 #define POOL_HALF   (POOL_BASE + 0x8000UL)
 #define POOL_BANK   ((POOL_BASE & ~0xFFFFUL) + 0x10000UL)
 #define KB(n)       ((u32)(n) * 1024UL)
@@ -71,14 +66,8 @@ static void layout(void)
     CHECK((u32)MEM_DMA_POOL_SIZE == KB(64));
     CHECK((u32)MEM_DMA_POOL_END == POOL_END);
     CHECK(DMA_POOL_PAGES == 16);
-#if MEM_LAYOUT_V5
     CHECK((POOL_BASE & 0xFFFFUL) == 0);
     CHECK(!dma_crosses_64k(POOL_BASE, KB(64)));
-#else
-    CHECK(POOL_BASE < POOL_BANK && POOL_BANK <= POOL_END);
-    CHECK(POOL_END < 0x2FB000UL);
-    CHECK(POOL_BANK - POOL_BASE == KB(32));
-#endif
     CHECK(DMA_POOL_MAX_BYTES == KB(32));
 }
 

@@ -42,7 +42,7 @@ from os32_generations import *
 OS32X_HDR_SIZE = 60
 # Address mirrors checked against include/memmap.h by gen_memmap.py.
 OS32X_APP_LOAD_ADDR = 0x80100000
-OS32X_SHELL_LOAD_ADDR = 0x300000
+OS32X_SHELL_LOAD_ADDR = 0x400000
 # v3 のバイナリが要求する最低 KAPI 版 (OS32X_HDR_V3_MIN_API)。
 OS32X_HDR_V3_MIN_API = 63
 

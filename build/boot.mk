@@ -3,7 +3,7 @@
 # ============================================================================
 
 # === スタンドアロン ASM (flat binary) ===
-BOOT_OUT = $(if $(filter-out build/out,$(BUILD_OUT)),$(BUILD_OUT)/boot/layout$(MEM_LAYOUT_V5),boot)
+BOOT_OUT = $(if $(filter-out build/out,$(BUILD_OUT)),$(BUILD_OUT)/boot,boot)
 
 ASM_STANDALONE = boot/boot_fat.asm boot/loader_fat.asm boot/loader_fat_new.asm boot/boot_hdd.asm boot/loader_hdd.asm
 BIN_STANDALONE = $(patsubst boot/%.asm,$(BOOT_OUT)/%.bin,$(ASM_STANDALONE))
@@ -16,7 +16,7 @@ $(BOOT_OUT)/loader_fat_new.bin $(BOOT_OUT)/loader_fat144.bin $(BOOT_OUT)/loader_
 # === 新HDDローダー (ASM + C リンク) ===
 CFLAGS_BOOT = $(C_STD) $(C_DIALECT_ERRORS) -m32 -march=i386 -ffreestanding -fno-pie \
               -fno-stack-protector -nostdlib -mno-red-zone -Os -Wall -fcommon \
-              -Iboot -I$(BUILD_OUT) -include $(LAYOUT_HEADER) $(LAYOUT_FLAGS)
+              -Iboot -I$(BUILD_OUT) -include $(LAYOUT_HEADER)
 
 BOOT_C_SRC = boot/boot_main.c boot/ext2_mini.c boot/lz4_mini.c boot/vk32_boot.c
 # 区画表の共有部 (drivers/pc98pt.c) を**写さずに**ローダにも組む

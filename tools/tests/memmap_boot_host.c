@@ -25,18 +25,12 @@ static void host_enable_check(void);
 
 #define QUOTE_(x) #x
 #define QUOTE(x) QUOTE_(x)
-#if MEM_LAYOUT_V5
 __asm__(".globl __sqlite_start\n.set __sqlite_start, 0x181000\n"
         ".globl __sqlite_end\n.set __sqlite_end, 0x240000\n"
         ".globl __kernel_resident_end\n.set __kernel_resident_end, " QUOTE(HOST_RESIDENT_END) "\n"
         ".globl __ledger_fixed_start\n.set __ledger_fixed_start, 0x17E000\n"
         ".globl __ledger_fixed_end\n.set __ledger_fixed_end, 0x180000\n"
         ".globl __bss_end\n.set __bss_end, " QUOTE(HOST_BSS_END) "\n");
-#else
-__asm__(".globl __sqlite_start\n.set __sqlite_start, 0x200000\n"
-        ".globl __sqlite_end\n.set __sqlite_end, 0x2BC060\n"
-        ".globl __bss_end\n.set __bss_end, " QUOTE(HOST_BSS_END) "\n");
-#endif
 
 static void die(int code)
 {
@@ -61,18 +55,14 @@ static void host_load_check(u32 root)
     CHECK(!_irq_enabled());
     CHECK(root == MEM_FIXED_PD_BASE && fixed_paging_valid());
     CHECK(!pg_enabled);
-#if MEM_LAYOUT_V5
     CHECK(boot_layout_valid());
-#endif
     host_loads++;
 }
 static void host_enable_check(void)
 {
     CHECK(!_irq_enabled() && host_cr3 == MEM_FIXED_PD_BASE);
     CHECK(fixed_paging_valid() && !pg_enabled);
-#if MEM_LAYOUT_V5
     CHECK(boot_layout_valid());
-#endif
     host_enables++;
 }
 
@@ -88,7 +78,7 @@ static void shell_heap_test(void)
 {
     void *parent, *child;
     u32 used, hash = fixed_hash();
-    CHECK(MEM_SHELL_HEAP_SIZE == (MEM_LAYOUT_V5 ? 256UL : 452UL) * 1024);
+    CHECK(MEM_SHELL_HEAP_SIZE == 256UL * 1024);
     exec_heap_init_at(MEM_SHELL_HEAP_BASE, MEM_SHELL_HEAP_SIZE);
     parent = exec_heap_alloc(MEM_SHELL_HEAP_SIZE - 8);
     CHECK(parent && (u32)parent + MEM_SHELL_HEAP_SIZE - 8 == MEM_SHELL_HEAP_END);
@@ -181,10 +171,8 @@ void _start(void)
 
     /* ---- カーネルの起動順そのもの (kernel/kernel.c) ---- */
     host_map_fixed_paging();
-#if MEM_LAYOUT_V5
     for (i = MEM_FIXED_PAGING_USED_END; i < MEM_FIXED_PAGING_FRAME_END; i += sizeof(u32))
         *(u32 *)i = 0xA55A1234;
-#endif
     host_arch_if = HOST_INITIAL_IF;
     paging_init(HOST_RAM_KB);
     CHECK(host_arch_if == HOST_INITIAL_IF);
@@ -197,15 +185,11 @@ void _start(void)
     CHECK(host_loads == 1 && host_enables == 1 && pg_enabled);
     CHECK(fixed_paging_valid() && host_cr3 == MEM_FIXED_PD_BASE);
     CHECK(MEM_FIXED_PAGING_END - MEM_FIXED_PAGING_BASE == 11 * PAGE_SIZE);
-#if MEM_LAYOUT_V5
     CHECK(MEM_FIXED_PAGING_FRAME_END - MEM_FIXED_PAGING_USED_END == 15 * PAGE_SIZE);
     CHECK(boot_layout_valid());
     layout_pte(MEM_FIXED_PAGING_BASE, MEM_FIXED_PAGING_FRAME_END, 1);
     layout_pte(MEM_LEDGER_META_BASE, MEM_LEDGER_META_END, 1);
     layout_pte(MEM_SHM_RESV_START, MEM_FIXED_PAGING_GUARD_BASE, 1);
-#else
-    CHECK(MEM_POOL_BASE - MEM_FIXED_PAGING_END == 4 * PAGE_SIZE);
-#endif
     CHECK(memmap_want_at(MEM_FIXED_MMIO_TOP_PT_BASE, 0) == MM_RW);
     for (u32 i = 0; i < PTE_COUNT; i++)
         CHECK(page_tables[PAGING_MMIO_TOP_PDI][i] == PAGE_NOT_PRESENT);
@@ -213,10 +197,6 @@ void _start(void)
         u32 i, hash = fixed_hash();
         for (i = MEM_FIXED_PAGING_BASE / PAGE_SIZE; i < MEM_FIXED_PAGING_END / PAGE_SIZE; i++)
             CHECK((page_tables[0][i] & (PTE_USER | PTE_PCD | PTE_PWT)) == 0);
-#if !MEM_LAYOUT_V5
-        for (i = MEM_FIXED_PAGING_END / PAGE_SIZE; i < MEM_POOL_BASE / PAGE_SIZE; i++)
-            CHECK(!(page_tables[0][i] & PTE_PRESENT));
-#endif
         /* live AS + 非master CR3 の再呼出しは全状態を保つ。 */
         live_addrspaces = 1;
         host_cr3 = 0x123000;
@@ -248,7 +228,6 @@ void _start(void)
               page_directory[PAGING_MMIO_TOP_PDI]);
         for (a = MEM_FIXED_PAGING_BASE; a < MEM_FIXED_PAGING_END; a += PAGE_SIZE)
             CHECK(as_va_to_pa(as.pd_phys, a, &pa) != 0);
-#if MEM_LAYOUT_V5
         for (a = MEM_FIXED_PAGING_USED_END; a < MEM_FIXED_PAGING_FRAME_END; a += sizeof(u32))
             CHECK(*(u32 *)a == 0xA55A1234);
         CHECK(paging_master_audit(tramp) == 0);
@@ -282,7 +261,6 @@ void _start(void)
                 CHECK(paging_as_audit(&as, 0) == 0);
             }
         }
-#endif
         paging_addrspace_destroy(&as);
         CHECK(!live_addrspaces && fixed_hash() == hash && fixed_paging_valid());
     }
@@ -369,25 +347,14 @@ void _start(void)
     /* 台帳の backing (FIXED 型、TASK_T1_LEDGER §3-3 / T1-U1): 張る前は予約域
      * (NP) を期待し、張った後は present / supervisor / RW を期待する。USER が
      * 立てば MM 検査が 1 本の食い違いとして拾う。下の 0x2F8000 は NP のまま。 */
-#if MEM_LAYOUT_V5
     CHECK(paging_is_present(MEM_LEDGER_META_BASE));
     /* ARENA_TOP leaves these two core pages mapped, even without the FIXED call. */
     if (HOST_RAM_KB <= 12292) CHECK(paging_map_ledger_backing());
-#else
-    CHECK(!paging_is_present(MEM_LEDGER_META_BASE));
-    CHECK(paging_map_ledger_backing());
-    CHECK(paging_is_present(MEM_LEDGER_META_BASE));
-    CHECK(paging_is_present(MEM_LEDGER_META_END - PAGE_SIZE));
-    CHECK(!paging_is_present(MEM_LEDGER_META_BASE - PAGE_SIZE));
-    CHECK(!paging_is_present(MEM_LEDGER_META_END));
-#endif
     CHECK(paging_memmap_selftest(tramp) == bad);
     CHECK(paging_poke_user_bit(MEM_LEDGER_META_BASE, 1) == 0);
     CHECK(paging_memmap_selftest(tramp) == bad + 1);
-#if MEM_LAYOUT_V5
     CHECK(!paging_map_ledger_backing());
     CHECK(page_tables[0][MEM_LEDGER_META_BASE / PAGE_SIZE] & PTE_USER);
-#endif
     (void)paging_poke_user_bit(MEM_LEDGER_META_BASE, 0);
     CHECK(paging_memmap_selftest(tramp) == bad);
 

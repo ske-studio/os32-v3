@@ -418,7 +418,7 @@ def run(source=None, irq=None):
         if r.returncode:
             return 'compile', r.stderr
         inc = ['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'include', 'kernel', 'exec', 'fs', 'lib', 'sdk/include/os32', 'arch/x86', 'platform/pc98')]
-        r = subprocess.run(['gcc', '-DMEM_LAYOUT_V5='+os.environ.get('MEM_LAYOUT_V5', '0'), '-m32', '-std=gnu11', '-O0', '-Wall', '-Werror',
+        r = subprocess.run(['gcc', '-m32', '-std=gnu11', '-O0', '-Wall', '-Werror',
                             '-Wno-unused-function', '-ffreestanding', '-fno-pie',
                             '-fno-stack-protector', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections', '-nostdlib', '-static', '-no-pie',
                             *inc, str(tmp / 't.c'), str(tmp / 's.o'), str(ROOT / 'kernel/irq_math.c'), str(ROOT / 'exec/exec_heap.c'), str(ROOT / 'kernel/kmalloc.c'), '-o', str(tmp / 't')],

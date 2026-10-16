@@ -31,7 +31,6 @@ CASES = ["port_table", "split_addr", "crosses", "count_bytes",
 
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-D__cdecl="]
-FLAGS += ["-DMEM_LAYOUT_V5=" + os.environ.get("MEM_LAYOUT_V5", "0")]
 INCLUDES = ["-I" + str(ROOT / p)
             for p in ("include", "drivers", "sdk/include/os32")]
 

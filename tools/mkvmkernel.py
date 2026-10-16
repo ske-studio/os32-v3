@@ -160,8 +160,7 @@ def elf_layout(path):
             if a < b and c < d and a < d and c < b:
                 raise ValueError('ELF: file/BSS overlap: {} / {}'.format(p, q))
     layout_root = os.path.dirname(os.path.dirname(os.path.abspath(gen_memmap.__file__)))
-    macros = Macros(read_defines(os.path.join(layout_root, 'include', 'memmap.h'),
-                                 symbols.get('MEM_LAYOUT_V5', 0)), symbols)
+    macros = Macros(read_defines(os.path.join(layout_root, 'include', 'memmap.h')), symbols)
     load_addr = macros.get('KERNEL_LOAD_ADDR')
     if load_addr is None:
         raise ValueError('ELF: unresolved KERNEL_LOAD_ADDR')
@@ -198,15 +197,14 @@ def main():
     parser.add_argument('--limit-header', default=DEFAULT_LIMIT_HEADER,
                         help='MAX_IMAGE_SIZE を読むヘッダ (既定: boot/boot_defs.h)')
     parser.add_argument('--layout-header', help='selected common generated layout header')
-    parser.add_argument('--layout', type=int, choices=(0, 1), help='expected layout selection')
     args = parser.parse_args()
 
     try:
-        if args.layout_header is not None or args.layout is not None:
-            if args.layout_header is None or args.layout is None or not args.elf:
-                raise ValueError('--layout-header and --layout require each other and --elf')
+        if args.layout_header is not None:
+            if not args.elf:
+                raise ValueError('--layout-header requires --elf')
             from gen_memmap import selected_layout_defects
-            errors = selected_layout_defects(ROOT, args.elf, args.layout_header, args.layout)
+            errors = selected_layout_defects(ROOT, args.elf, args.layout_header)
             if errors:
                 raise ValueError('; '.join(errors))
         max_image_size = read_max_image_size(args.limit_header)

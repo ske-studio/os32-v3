@@ -49,10 +49,9 @@ REAL_VMK = ROOT / "build/out/vmkernel.lz4"
 FD_IMAGES = {"2hd": ROOT / "images/os32_boot.img", "144": ROOT / "images/os32_boot144.img"}
 
 LOAD_MIN = 0x100000
-LAYOUT = int(os.environ.get("MEM_LAYOUT_V5", "0"))
 sys.path.insert(0, str(ROOT / "tools"))
 import gen_memmap as gen
-LOAD_END = gen.Macros(gen.read_defines(ROOT / "include/memmap.h", LAYOUT), {}).get("MEM_LAYOUT_LOAD_END")
+LOAD_END = gen.Macros(gen.read_defines(ROOT / "include/memmap.h"), {}).get("MEM_LAYOUT_LOAD_END")
 WINDOW = LOAD_END - LOAD_MIN
 MAX_IMAGE = 508 * 1024
 
@@ -161,7 +160,7 @@ def build(work, srcs, target, geom):
         common = common + ["-fno-pic"]
     # ローダと同じ -Os (build/boot.mk CFLAGS_BOOT)。-I boot で
     # "../lib/crc32_core.inc" が実物を指す。
-    gen.write_layout_header(ROOT, str(work / "memmap_layout.h"), LAYOUT)
+    gen.write_layout_header(ROOT, str(work / "memmap_layout.h"))
     inc = ["-I" + str(work), "-I" + str(ROOT / "boot"),
            "-include", str(work / "memmap_layout.h")]
     for key, obj in (("vk32", "vk32.o"), ("mini", "mini.o")):
@@ -170,7 +169,7 @@ def build(work, srcs, target, geom):
         sh([cc] + common + ["-Os"] + inc + ["-c", str(src), "-o", str(work / obj)])
 
     text = pathlib.Path(srcs["asm"]).read_text(encoding="utf-8")
-    (work / "vk32.asm").write_text(gen.preprocess_layout(ROOT, asm_vk32(text), LAYOUT, True), encoding="utf-8")
+    (work / "vk32.asm").write_text(gen.preprocess_layout(ROOT, asm_vk32(text), True), encoding="utf-8")
     sh(["nasm", "-f", "elf32", str(work / "vk32.asm"), "-o", str(work / "asm.o")])
     (work / "fat.asm").write_text(asm_fat(text, geom), encoding="utf-8")
     sh(["nasm", "-f", "elf32", str(work / "fat.asm"), "-o", str(work / "fat.o")])
@@ -621,7 +620,7 @@ def check_real(exe_by_geom, script, work):
 def c_values(header, names, extra_inc=()):
     """ヘッダを host gcc で読んで名前ごとの値を得る。"""
     with tempfile.TemporaryDirectory(prefix="vk32_vals_") as d:
-        gen.write_layout_header(ROOT, str(pathlib.Path(d) / "memmap_layout.h"), LAYOUT)
+        gen.write_layout_header(ROOT, str(pathlib.Path(d) / "memmap_layout.h"))
         src = pathlib.Path(d) / "v.c"
         body = "".join('printf("{0}=%lu\\n", (unsigned long)({0}));\n'.format(n) for n in names)
         src.write_text('#include <stdio.h>\n#include "{}"\nint main(void){{\n{}return 0;}}\n'.format(
@@ -660,7 +659,7 @@ MIRROR_BI = ["BI_OFF_IMG_CRC", "BI_OFF_IMG_SIZE", "BI_OFF_IMG_CHECK", "BOOTINFO_
 def check_mirror(asm_text):
     defs = c_values(str(DEFS), MIRROR_ASM + MIRROR_BI + ["BOOTINFO_BASE"])
     bad = []
-    equ = asm_equs(gen.preprocess_layout(ROOT, asm_text, LAYOUT, True))
+    equ = asm_equs(gen.preprocess_layout(ROOT, asm_text, True))
     for n in MIRROR_ASM:
         if n not in equ:
             bad.append("ASM に {} が無い".format(n))
@@ -699,7 +698,7 @@ def run_all(srcs, script, target, real):
         for g in GEOMS:
             lines += check_fat(exes[g], g)
         import test_stack_entry
-        lines.append(test_stack_entry.run_case(work, LAYOUT))
+        lines.append(test_stack_entry.run_case(work))
         import test_vmkernel_layout
         try:
             lines += test_vmkernel_layout.run_cases(sys.modules[__name__], exes, script, work, real)

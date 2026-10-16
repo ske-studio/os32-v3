@@ -10,6 +10,7 @@
 /*    (c) TC 後の FFFFh / 再ロードをまたいだ合成の不採用                    */
 /*    (d) バンクレジスタが **等差数列ではない** こと (ch0 だけ 0027h)       */
 /* ======================================================================== */
+#include "memmap.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -79,9 +80,9 @@ static void split_addr(void)
     CHECK(a == 0xABCD);
     CHECK(b == 0x12);
 
-    dma_split_addr(0x002E8000UL, &a, &b);   /* DMA プールの先頭 */
-    CHECK(a == 0x8000);
-    CHECK(b == 0x2E);
+    dma_split_addr(MEM_DMA_POOL_BASE, &a, &b);   /* DMA プールの先頭 */
+    CHECK(a == 0);
+    CHECK(b == 0x7F);
 
     dma_split_addr(0x00FFFFFFUL, &a, &b);   /* 16MB - 1 */
     CHECK(a == 0xFFFF);
@@ -159,16 +160,15 @@ static void accept_pair(void)
 /* ------------------------------------------------------------------ */
 static void check_args(void)
 {
-    u32 ok_phys = 0x002E8000UL;
+    u32 ok_phys = MEM_DMA_POOL_BASE;
 
     CHECK(dma_check_args(2, ok_phys, 512, DMA_DIR_TO_MEM, DMA_MODE_SINGLE) == 0);
     CHECK(dma_check_args(0, ok_phys, 512, DMA_DIR_FROM_MEM, DMA_MODE_CYCLIC) == 0);
-    /* 64KB ちょうどはバンクの先頭からなら通る (プールの 0x2E8000 からは
-     * またぐので通らない — それは下の「またぎ」で見る)。 */
+    /* 64KB ちょうどはバンク先頭と案5の池先頭から通る。 */
     CHECK(dma_check_args(3, 0x002E0000UL, 0x10000UL, DMA_DIR_TO_MEM,
                          DMA_MODE_SINGLE) == 0);
     CHECK(dma_check_args(3, ok_phys, 0x10000UL, DMA_DIR_TO_MEM,
-                         DMA_MODE_SINGLE) < 0);
+                         DMA_MODE_SINGLE) == 0);
 
     /* ch は 0〜3 */
     CHECK(dma_check_args(4, ok_phys, 512, DMA_DIR_TO_MEM, DMA_MODE_SINGLE) < 0);
