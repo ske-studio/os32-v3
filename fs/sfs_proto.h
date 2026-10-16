@@ -36,6 +36,10 @@
  * (SFS_MAX_FRAME) だけを持ち、長さ欄はこれと照合してから読む。 */
 #define SFS_MAX_PAYLOAD    512
 #define SFS_MAX_FRAME      (SFS_HDR_LEN + SFS_MAX_PAYLOAD + SFS_CRC_LEN)
+/* Storage capacity; the serial wire limit above remains unchanged. */
+#define SFS_LAN_MAX_PAYLOAD (SFS_MAX_PAYLOAD * 2)
+#define SFS_BUFFER_FRAME   (SFS_HDR_LEN + SFS_LAN_MAX_PAYLOAD + SFS_CRC_LEN)
+#define SFS_READ_ALIGN     512
 
 /* ---- 種別 ---- */
 #define SFS_T_HELLO        0x01    /* ver u16, max u16, nonce u32 → 応答で ID */
@@ -104,6 +108,11 @@ u32  sfs_crc32(const u8 *p, u32 n);
 u16  sfs_encode(u8 *out, u8 type, u32 sid, u16 seq,
                 const u8 *payload, u16 len);
 
+/* Explicit limit variant: out holds HDR + limit + CRC; limit <= LAN max. */
+u16 sfs_encode_limit(u8 *out, u8 type, u32 sid, u16 seq,
+                     const u8 *payload, u16 len, u16 limit);
+u32 sfs_trial_ticks_limit(u32 baud, u16 limit);
+
 /* ---- 受信器 ---- */
 typedef struct {
     u8  type;
@@ -118,7 +127,8 @@ typedef struct {
     u16 need;              /* このフレームの全長 (ヘッダを読むまでは 0) */
     u32 bad_crc;           /* CRC が合わず捨てたフレーム */
     u32 bad_len;           /* 長さ欄が上限を越えて捨てたヘッダ */
-    u8  buf[SFS_MAX_FRAME];
+    u16 max_payload;       /* reset defaults to the serial limit */
+    u8  buf[SFS_BUFFER_FRAME];
 } SfsDec;
 
 void sfs_dec_reset(SfsDec *d);

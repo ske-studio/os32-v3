@@ -1389,15 +1389,17 @@ def integration(exe, h):
 # ============================================================================
 IDENTITY = "IDENTITY"
 C_MUTATIONS = [
+    ("fs/sfs_client.c", r"    c->max_payload = SFS_MAX_PAYLOAD;\n    sfs_dec_reset",
+     "    c->max_payload = SFS_LAN_MAX_PAYLOAD;\n    sfs_dec_reset", "LAN limit applied to serial"),
     ("fs/sfs_proto.c", r"(    /\* CRC は種別 \(off 3\) からペイロードの末尾まで)",
      r"\1", IDENTITY),
     ("fs/sfs_proto.c", r"crc = sfs_crc32\(out \+ 3, \(u32\)\(SFS_HDR_LEN - 3 \+ len\)\);",
      "crc = sfs_crc32(out + 4, (u32)(SFS_HDR_LEN - 4 + len));",
      "CRC の範囲から種別を外す (Python と食い違う)"),
-    ("fs/sfs_proto.c", r"        if \(len > SFS_MAX_PAYLOAD\) \{\n            d->bad_len\+\+;",
+    ("fs/sfs_proto.c", r"        if \(len > d->max_payload \|\| len > SFS_LAN_MAX_PAYLOAD\) \{\n            d->bad_len\+\+;",
      "        if (len > 0xFFFF) {\n            d->bad_len++;",
      "受信器が長さ欄を上限と照合しない"),
-    ("fs/sfs_proto.c", r"    if \(len > SFS_MAX_PAYLOAD\) return 0;\n    out\[0\]",
+    ("fs/sfs_proto.c", r"    if \(limit > SFS_LAN_MAX_PAYLOAD \|\| len > limit\) return 0;\n    out\[0\]",
      "    out[0]", "組み立てが上限を越えるペイロードを断らない"),
     ("fs/sfs_proto.c", r"if \(\*seq >= SFS_SEQ_LAST\) return -1;",
      "if (*seq >= 0xFFFFu) *seq = 0;", "番号を周回させる"),

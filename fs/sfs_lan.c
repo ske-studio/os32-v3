@@ -64,6 +64,7 @@ static int lan_prepare(SfsLan *lan)
 
     if (lan->prepared) return 1;
     sfs_dec_reset(&dec);
+    dec.max_payload = SFS_LAN_MAX_PAYLOAD;
     for (i = SFS_LAN_HDR_LEN; i < lan->rx_end; i++) {
         r = sfs_dec_feed(&dec, lan->rx[i], &frame);
         if (r < 0) break;
@@ -105,7 +106,7 @@ static int lan_put(void *ctx, const u8 *buf, u32 n)
     int r;
 
     if (!lan_can_wait(ctx)) return -1;
-    if (n < SFS_HDR_LEN + SFS_CRC_LEN || n > SFS_MAX_FRAME) return -1;
+    if (n < SFS_HDR_LEN + SFS_CRC_LEN || n > SFS_BUFFER_FRAME) return -1;
     if (buf[3] == SFS_T_HELLO && n >= SFS_HDR_LEN + 8 + SFS_CRC_LEN) {
         lan->nonce = sfs_get32(buf + SFS_HDR_LEN + 4);
         lan->hello = 1;

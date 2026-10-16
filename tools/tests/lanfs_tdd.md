@@ -45,3 +45,12 @@ BYE 詰まり、受信状態の破棄、設定の再読、既定シリアル、�
 `test_rshell_serial.py` は echo/開始行/exit/EOT、CRLF、排他オプション、実 run_line を検査。
 `sh_status_host.c` は設定の保存・他キー保持・MAC 拒否・書込み失敗・子からの拒否を検査。
 追加変異: SFS_LAN 無視、end の受信破棄除去、サーバの peer 照合除去。
+
+## lanspeed
+
+実 serialfs VFS もリンクする。HELLO 1024/旧ホスト512/serial提示512、LAN の
+1024 B 読みを512+512、serial上限の512 B読みを508+4、最大応答1024/512、
+1024 B書込みのpayload上限と内容を検査。µs時計は下位32bit境界をまたぐ400µs、
+取得失敗時の標本除外。縮退を外す変異はRED。serial既定上限を1024にする変異は
+check-serialfs-hostでRED。check-e82557-drv-hostはsendのC/非C/!OKとCX/CNAの
+完了をtickなしで検査し、send/IRQの完了取得除去を別々にREDにする。

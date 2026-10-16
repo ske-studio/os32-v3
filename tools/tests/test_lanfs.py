@@ -21,7 +21,7 @@ from unittest.mock import patch
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/lanfs_host.c"
 C_SRCS = ["fs/sfs_lan.c", "fs/sfs_lan.h", "fs/sfs_client.c",
-          "fs/sfs_client.h", "fs/sfs_proto.c", "fs/sfs_proto.h"]
+          "fs/sfs_client.h", "fs/sfs_proto.c", "fs/sfs_proto.h", "fs/serialfs.c"]
 PY_SRC = ROOT / "tools/lanfs_host.py"
 sys.path.insert(0, str(ROOT / "tools"))
 import serialfs_host as sfs
@@ -48,7 +48,7 @@ def packet(raw, dst=HOST, src=GUEST, eth=0x88B5):
 
 
 def parse(packet):
-    fr = sfs.try_frame(packet, 14)
+    fr = sfs.try_frame(packet, 14, sfs.LAN_MAX_PAYLOAD)
     assert fr[0] == "frame", fr
     return fr[2]
 
@@ -56,7 +56,7 @@ def parse(packet):
 class Rig:
     def __init__(self, lib, host, root):
         self.lib = lib
-        self.server = sfs.Server(sfs.HostFS(root))
+        self.server = sfs.Server(sfs.HostFS(root, allow_write=["out"]), max_payload=sfs.LAN_MAX_PAYLOAD)
         self.host = host.LanServer(HOST, self.server)
         self.queue = []
         self.sent = []
@@ -74,7 +74,7 @@ class Rig:
     def send(self, ptr, size):
         try:
             wire = C.string_at(ptr, size)
-            assert 60 <= size <= 542
+            assert 60 <= size <= 1054
             assert wire[6:12] == GUEST and wire[12:14] == b"\x88\xb5"
             fr = parse(wire)
             end = 14 + 16 + len(fr.payload)
@@ -160,6 +160,43 @@ def run_suite(lib_path, py_path, root):
     for name in ("test_len", "test_ticks", "test_resends", "test_gates", "test_pending"):
         getattr(lib, name).restype = C.c_ulong
     host = load_host(py_path)
+    for cap in (1024, 512):
+        rig = Rig(lib, host, root)
+        rig.server.payload_cap = cap
+        rig.hello()
+        assert lib.test_limit() == cap
+        (pathlib.Path(root) / "data").write_bytes(bytes(i % 251 for i in range(2048)))
+        lib.test_clock(0)
+        size = 1024 if cap == 1024 else 512
+        assert lib.test_stream(size) == size
+        assert C.string_at(lib.test_data(), size) == bytes(i % 251 for i in range(size))
+        counts = [struct.unpack_from("<H", parse(w).payload, 4)[0]
+                  for w in rig.requests if parse(w).type == sfs.T_READ]
+        assert counts == ([512, 512] if cap == 1024 else [508, 4]), counts
+        assert lib.test_samples() == 2 and lib.test_avg() == 400 and lib.test_max() == 400
+        assert lib.test_read_max() == cap - 4
+        assert lib.test_len() == cap - 4
+        assert C.string_at(lib.test_data(), cap - 4) == bytes(i % 251 for i in range(cap - 4))
+        lib.test_clock(1)
+        assert lib.test_stream(1) == 1 and lib.test_samples() == 3
+        assert lib.test_write() == 1024
+        assert (pathlib.Path(root) / "out").read_bytes() == bytes(i % 251 for i in range(1024))
+        writes = [len(parse(w).payload) for w in rig.requests if parse(w).type == sfs.T_WRITE]
+        assert writes[0] == cap and len(writes) == (2 if cap == 1024 else 3), writes
+        rig.check()
+        (pathlib.Path(root) / "data").write_bytes(DATA)
+    # An intermediate peer limit also falls back to a usable serial size.
+    rig = Rig(lib, host, root)
+    rig.server.payload_cap = 513
+    rig.hello()
+    assert lib.test_limit() == 512
+    # Default serial offer stays 512 even with a 1024-capable host.
+    rig = Rig(lib, host, root)
+    lib.test_offer(512)
+    rig.hello()
+    assert lib.test_limit() == 512
+    print("GREEN payload negotiation, sector reads, writes, old host, microsecond timing")
+
     for mode in (None, "drop_request", "drop_response", "duplicate", "crc",
                  "wrong_seq", "ethertype"):
         rig = Rig(lib, host, root)
@@ -426,12 +463,13 @@ def build(work, changes=None, target=False):
     py_path = work / "lanfs_host.py"
     py_path.write_text(changes.get("tools/lanfs_host.py", PY_SRC.read_text()))
     inc = ["-I" + str(work), "-I" + str(ROOT / "include"),
-           "-I" + str(ROOT / "lib"), "-I" + str(ROOT / "sdk/include/os32")]
+           "-I" + str(ROOT / "lib"), "-I" + str(ROOT / "fs"), "-I" + str(ROOT / "sdk/include/os32")]
     flags = ["-std=gnu11", "-Wall", "-Wextra", "-D__cdecl="]
     if not changes:
         flags.append("-Werror")
     sources = [str(HARNESS), str(work / "sfs_lan.c"),
                str(work / "sfs_client.c"), str(work / "sfs_proto.c"),
+               str(work / "serialfs.c"),
                str(ROOT / "lib/crc32.c")]
     output = work / "lanfs.so"
     subprocess.run(["gcc", *flags, *inc, "-shared", "-fPIC", *sources,
@@ -453,6 +491,8 @@ def trial(exe, py_path, root, timeout=10):
 
 def run_mutations(tmp, root):
     mutations = [
+        ("hello_limit", "fs/sfs_client.c",
+         "        c->max_payload = SFS_MAX_PAYLOAD;", "        c->max_payload = SFS_LAN_MAX_PAYLOAD;"),
         ("seq", "fs/sfs_client.c", "f->sid != c->sid || f->seq != seq",
          "f->sid != c->sid"),
         ("old_seq", "tools/lanfs_host.py", "elif fr.seq <= self.high_seq:",

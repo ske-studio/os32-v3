@@ -61,6 +61,9 @@ void ring3_abort_check(void) { fprintf(stderr, "internal serial abort\n"); abort
 #include "e82557.h"
 #include "sysconfig.h"
 
+int sys_time_now(u32 *lo, u32 *hi)
+{ *lo = tick_count * 10000; *hi = 0; return 0; }
+
 static int g_cfg_lan, g_cfg_reads, g_nic_state = E82557_RUNNING;
 static int g_ru_ready = 1, g_ru_stuck, g_stale, g_rx_flood, g_drained;
 static int g_hello_ready, g_hello_stale, g_hello_drained;
@@ -576,12 +579,14 @@ static void lan_session(void)
     CHECK(g_lan.rx_pos == 0 && g_lan.rx_end == 0 && !g_lan.linked && !g_lan.prepared);
     CHECK(g_nic_rx_n == 0 && !g_active && !g_cli.sid && g_umount_calls == 2);
     CHECK(raw_has("sfs: exit=7") && raw_has("requests="));
+    CHECK(raw_has("rxfull=0 avg_us=0 max_us=0"));
     CHECK(!serial_gate_active() && g_nic_bad_uart == 0);
 
     reset(); g_cfg_lan = 1; g_nic_state = E82557_RX_WAIT;
     g_cfg_peer = "02:00:00:00:00:01";
     CHECK(serialfs_session_begin() == 0);
     CHECK(serialfs_session_end(0) == 0 && g_nic_bye == 1);
+    CHECK(raw_has("rxfull=1 avg_us=0 max_us=0"));
     for (state = E82557_OFF; state <= E82557_QUARANTINED; state++) {
         if (state == E82557_RUNNING || state == E82557_RX_WAIT) continue;
         reset(); g_cfg_lan = 1; g_nic_state = state;
@@ -623,12 +628,12 @@ static void lan_start(void)
     CHECK(g_lan.peer_fixed && g_cli.resends == 0 && g_cli.timeouts == 0);
     g_rnr += 3;
     CHECK(serialfs_session_end(0) == 0);
-    CHECK(strstr(g_kout, "bad_len=0 rnr=3\n") != NULL);
+    CHECK(strstr(g_kout, "bad_len=0 rxfull=1 avg_us=0 max_us=0\n") != NULL);
     g_rnr += 9;
     g_nonce_ctr = 0; /* LP64 host: keep nonce within the wire's 32 bits. */
     CHECK(serialfs_session_begin() == 0);
     CHECK(serialfs_session_end(0) == 0);
-    CHECK(strstr(g_kout, "bad_len=0 rnr=0\n") != NULL);
+    CHECK(strstr(g_kout, "bad_len=0 rxfull=0 avg_us=0 max_us=0\n") != NULL);
 
     reset(); g_cfg_lan = 1; g_ru_ready = 0;
     CHECK(serialfs_session_begin() == 0);

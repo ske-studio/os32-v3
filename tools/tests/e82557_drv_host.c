@@ -622,6 +622,23 @@ static void runtime_tests(const char *c)
         }
         if(!strcmp(c,"tx_generation")) { CHECK(rc==OS32_ERR_AGAIN && starts==initial); return; }
         CHECK(rc==0 && nic.tx==TX_ISSUED && starts==initial+1);
+        if(!strncmp(c,"tx_send_",8) || !strncmp(c,"tx_irq_",7)) {
+            cb_fail=starts;
+            put16(64,0);
+            CHECK(e82557_send(rx_frame,60)==OS32_ERR_AGAIN && nic.tx==TX_ISSUED);
+            int bad=strstr(c,"bad")!=NULL;
+            put16(64,bad?0x8000:0xa000);
+            if(!strncmp(c,"tx_irq_",7)) {
+                status=strstr(c,"cna")?0x2000:0x8000;
+                irq_depth++; (void)e82557_irq(0,NULL); irq_depth--;
+                CHECK(nic.tx==TX_IDLE);
+                CHECK(nic.stats[5]==!bad && nic.stats[6]==(u32)bad);
+            }
+            CHECK(e82557_send(rx_frame,60)==0 && nic.tx==TX_ISSUED);
+            CHECK(starts==initial+2 && !nic.stats[9]);
+            CHECK(nic.stats[5]==!bad && nic.stats[6]==(u32)bad);
+            return;
+        }
         if(!strcmp(c,"tx_done") || !strcmp(c,"tx_bad") || !strcmp(c,"tx_reserved")) {
             put16(64,!strcmp(c,"tx_bad")?0x8000:0xa000); service_tick();
             CHECK(nic.tx==TX_IDLE && nic.state==E82557_RUNNING);

@@ -1,4 +1,5 @@
 check-lanfs-host:
+- fs/serialfs.c
 - fs/sfs_lan.c
 - fs/sfs_lan.h
 - fs/sfs_client.c

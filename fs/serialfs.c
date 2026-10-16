@@ -176,7 +176,7 @@ static int sfs_list_dir(void *ctx, const char *path, vfs_dir_cb cb,
 {
     SfsClient *c = (SfsClient *)ctx;
     u8 pl[SFS_MAX_PAYLOAD];
-    u8 page[SFS_MAX_PAYLOAD];
+    u8 page[SFS_LAN_MAX_PAYLOAD];
     VfsDirEntry e;
     const u8 *body;
     u16 blen, pos;
@@ -251,9 +251,13 @@ static int sfs_read_stream(void *ctx, const char *path, void *buf,
     u32 done = 0;
     int n, rc;
 
+    /* LAN data chunks keep sector boundaries; serial preserves its 508 B. */
+    u32 read_max = c->max_payload - SFS_STATUS_LEN;
+    if (c->max_payload > SFS_MAX_PAYLOAD)
+        read_max = (read_max / SFS_READ_ALIGN) * SFS_READ_ALIGN;
     while (done < size) {
-        want = (u16)((size - done > (u32)SFS_READ_MAX)
-                     ? (u32)SFS_READ_MAX : (size - done));
+        want = (u16)((size - done > read_max)
+                     ? read_max : (size - done));
         sfs_put32(pl, offset + done);
         sfs_put16(pl + 4, want);
         n = sfs_put_path(pl + 6, (u16)(sizeof(pl) - 6), path);
@@ -278,7 +282,7 @@ static int sfs_read_file(void *ctx, const char *path, void *buf, u32 max)
 static int sfs_write_at(SfsClient *c, const char *path, const u8 *src,
                         u32 size, u32 offset, int first_trunc)
 {
-    u8 pl[SFS_MAX_PAYLOAD];
+    u8 pl[SFS_LAN_MAX_PAYLOAD];
     const u8 *body;
     u16 blen, room, chunk, k;
     u32 done = 0;
@@ -289,7 +293,7 @@ static int sfs_write_at(SfsClient *c, const char *path, const u8 *src,
     if (size == 0 && !first_trunc) return 0;
     n = sfs_put_path(pl + 5, (u16)(sizeof(pl) - 5), path);
     if (n < 0) return OS32_ERR_NAMETOOLONG;
-    room = (u16)(SFS_MAX_PAYLOAD - 5 - n);
+    room = (u16)(c->max_payload - 5 - n);
     if (room == 0) return OS32_ERR_NAMETOOLONG;
 
     while (first || done < size) {
