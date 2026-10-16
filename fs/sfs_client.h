@@ -44,7 +44,7 @@ typedef struct {
     const SfsIo *io;
     void *ctx;
     u32 baud;
-    u16 max_payload;       /* default 512; LAN offers 1024 before HELLO */
+    u16 max_payload;       /* default 512; LAN offers 1028 before HELLO */
     int (*time_us)(u32 *lo, u32 *hi); /* optional sys_time_now-compatible clock */
     unsigned long long rtt_total_us;
     u32 rtt_samples, rtt_max_us;

@@ -37,7 +37,7 @@
 #define SFS_MAX_PAYLOAD    512
 #define SFS_MAX_FRAME      (SFS_HDR_LEN + SFS_MAX_PAYLOAD + SFS_CRC_LEN)
 /* Storage capacity; the serial wire limit above remains unchanged. */
-#define SFS_LAN_MAX_PAYLOAD (SFS_MAX_PAYLOAD * 2)
+#define SFS_LAN_MAX_PAYLOAD (SFS_READ_ALIGN * 2 + SFS_STATUS_LEN)
 #define SFS_BUFFER_FRAME   (SFS_HDR_LEN + SFS_LAN_MAX_PAYLOAD + SFS_CRC_LEN)
 #define SFS_READ_ALIGN     512
 

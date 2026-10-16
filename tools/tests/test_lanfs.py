@@ -74,7 +74,7 @@ class Rig:
     def send(self, ptr, size):
         try:
             wire = C.string_at(ptr, size)
-            assert 60 <= size <= 1054
+            assert 60 <= size <= 1058
             assert wire[6:12] == GUEST and wire[12:14] == b"\x88\xb5"
             fr = parse(wire)
             end = 14 + 16 + len(fr.payload)
@@ -160,29 +160,35 @@ def run_suite(lib_path, py_path, root):
     for name in ("test_len", "test_ticks", "test_resends", "test_gates", "test_pending"):
         getattr(lib, name).restype = C.c_ulong
     host = load_host(py_path)
-    for cap in (1024, 512):
+    for cap in (1028, 512):
         rig = Rig(lib, host, root)
         rig.server.payload_cap = cap
         rig.hello()
         assert lib.test_limit() == cap
-        (pathlib.Path(root) / "data").write_bytes(bytes(i % 251 for i in range(2048)))
+        (pathlib.Path(root) / "data").write_bytes(bytes(i % 251 for i in range(10 * 1024)))
         lib.test_clock(0)
-        size = 1024 if cap == 1024 else 512
+        size = 10 * 1024 if cap == 1028 else 512
         assert lib.test_stream(size) == size
         assert C.string_at(lib.test_data(), size) == bytes(i % 251 for i in range(size))
         counts = [struct.unpack_from("<H", parse(w).payload, 4)[0]
                   for w in rig.requests if parse(w).type == sfs.T_READ]
-        assert counts == ([512, 512] if cap == 1024 else [508, 4]), counts
-        assert lib.test_samples() == 2 and lib.test_avg() == 400 and lib.test_max() == 400
+        assert counts == ([1024] * 10 if cap == 1028 else [508, 4]), counts
+        samples = len(counts)
+        assert lib.test_trial(115200) == (270 if cap == 1028 else 261)
+        assert lib.test_trial(9600) == (469 if cap == 1028 else 362)
+        assert lib.test_samples() == samples and lib.test_avg() == 400 and lib.test_max() == 400
         assert lib.test_read_max() == cap - 4
         assert lib.test_len() == cap - 4
+        assert len(rig.host.handle(rig.requests[-1])) == 14 + 12 + cap + 4
         assert C.string_at(lib.test_data(), cap - 4) == bytes(i % 251 for i in range(cap - 4))
         lib.test_clock(1)
-        assert lib.test_stream(1) == 1 and lib.test_samples() == 3
+        assert lib.test_stream(1) == 1 and lib.test_samples() == samples + 1
         assert lib.test_write() == 1024
         assert (pathlib.Path(root) / "out").read_bytes() == bytes(i % 251 for i in range(1024))
         writes = [len(parse(w).payload) for w in rig.requests if parse(w).type == sfs.T_WRITE]
-        assert writes[0] == cap and len(writes) == (2 if cap == 1024 else 3), writes
+        assert writes == ([1028, 16] if cap == 1028 else [512, 512, 30]), writes
+        # WRITE includes offset, flags and length-prefixed path: /out costs 10 B.
+        assert [n - 10 for n in writes] == ([1018, 6] if cap == 1028 else [502, 502, 20])
         rig.check()
         (pathlib.Path(root) / "data").write_bytes(DATA)
     # An intermediate peer limit also falls back to a usable serial size.
@@ -190,11 +196,13 @@ def run_suite(lib_path, py_path, root):
     rig.server.payload_cap = 513
     rig.hello()
     assert lib.test_limit() == 512
-    # Default serial offer stays 512 even with a 1024-capable host.
+    # Default serial offer stays 512 even with a 1028-capable host.
     rig = Rig(lib, host, root)
     lib.test_offer(512)
     rig.hello()
     assert lib.test_limit() == 512
+    assert lib.test_read_max() == 508
+    rig.check()
     print("GREEN payload negotiation, sector reads, writes, old host, microsecond timing")
 
     for mode in (None, "drop_request", "drop_response", "duplicate", "crc",

@@ -139,7 +139,7 @@ int sfs_client_hello(SfsClient *c, u32 nonce)
     if (sfs_get16(f.payload + 4) != SFS_VERSION ||
         sfs_get16(f.payload + 6) < SFS_MAX_PAYLOAD) return OS32_ERR_IO;
     if (sfs_get16(f.payload + 6) < c->max_payload)
-        /* Supported wire sizes are 512 and 1024, preserving read sectors. */
+        /* A smaller peer falls back to the serial wire limit. */
         c->max_payload = SFS_MAX_PAYLOAD;
     c->dec.max_payload = c->max_payload;
     c->sid = f.sid;
