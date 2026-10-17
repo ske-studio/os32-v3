@@ -73,7 +73,7 @@ def guest_observer(tmp):
                     '-Wl,--gc-sections', str(ROOT / 'tools/tests/layout_cycle_host.c'), '-o', str(exe)],
                    check=True)
     host32.run([str(exe)], check=True, timeout=60)
-    print('PASS guest observer: 6 modes x20, nested --once, sentinel corruption, 8 resource leaks, wrong result; dbg guards')
+    print('PASS guest observer: 6 modes x20, nested --once, sentinel corruption, 8 resource leaks, wrong result; fd1 summaries, leaf allocation failures, invalid mode, short write; dbg guards')
 
 
 def old_admission(tmp):

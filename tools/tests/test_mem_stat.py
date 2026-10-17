@@ -207,6 +207,12 @@ static u32 ht(void) { return KHEAP_SIZE; }
 static u32 hu(void) { return 8192; }
 static u32 hf(void) { return KHEAP_SIZE - 8192; }
 static int enabled(void) { return 1; }
+#ifndef SHELL_AS_APP
+/* cmd_mem is extracted without cmd_sys.c's private CRT declaration. */
+void os32_resident_sbrk_stats(u32 out[3]) {
+    out[0] = 1024; out[1] = 2048; out[2] = 131072;
+}
+#endif
 static void emit(char c) {
     __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(&c), "d"(1) : "memory");
 }
@@ -333,7 +339,11 @@ def shell_output(output, app):
     assert first.count('実測: app=') == (1 if app else 2), 'FAIL: live count'
     if app:
         assert '実測: Shell band' not in output, 'FAIL: CPL3 resident limit'
+        assert 'sbrk_used=' not in output, 'FAIL: CPL3 resident diagnostic'
     else:
+        diagnostic = '  diag: sbrk_used=1024 sbrk_peak=2048 sbrk_capacity=131072 exec_peak=0 exec_capacity=262144\n'
+        assert diagnostic in first and diagnostic in screens[1], 'FAIL: resident diagnostic'
+        assert 'sbrk_used=' not in screens[2], 'FAIL: failed system diagnostic'
         check(r'実測: Shell band sbrk上限=004B5000', first, 'resident limit')
         check(r'実測: app=4 ', first, 'all live IDs')
         for id in (3, 5):

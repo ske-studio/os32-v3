@@ -10,18 +10,20 @@
 #define CYCLE_COUNT 20
 #define SELF "/usr/bin/layout_cycle_test.bin"
 static volatile u8 bss_probe[PROBE_BYTES];
-static int run_cycles(KernelAPI *api, const char *mode, int rounds, int nested);
+static int run_cycles(KernelAPI *api, const char *mode, int rounds, int nested, int *total_out);
 
 int main(int argc, char **argv, KernelAPI *api)
 {
     const char *mode = argc > 1 ? argv[1] : "exit";
     int rounds = CYCLE_COUNT, nested = 0;
+    int passed, total;
     if (!strcmp(mode, "--leaf")) {
         u8 *a = malloc(PROBE_BYTES), *b = api->mem_alloc(PROBE_BYTES);
-        if (!a || !b) return 1;
+        if (!a || !b) return os32_test_summary(api, "layout_cycle_test", 0, 1);
         memset(a, 0x5a, PROBE_BYTES);
         memset(b, 0x69, PROBE_BYTES);
-        return 0; /* both heaps are deliberately reclaimed by exit */
+        /* Both heaps are deliberately reclaimed by exit. */
+        return os32_test_summary(api, "layout_cycle_test", 1, 1);
     }
     if (!strcmp(mode, "--once") && argc == 3) {
         rounds = 1;
@@ -30,9 +32,10 @@ int main(int argc, char **argv, KernelAPI *api)
     if (!strncmp(mode, "nested-", 7)) { nested = 1; mode += 7; }
     if (strcmp(mode, "exit") && strcmp(mode, "fault") && strcmp(mode, "stop")) {
         api->kprintf(0x07, "layout_cycle_test: FAIL usage: exit|fault|stop|nested-exit|nested-fault|nested-stop\n");
-        return 1;
+        return os32_test_summary_skip(api, "layout_cycle_test", "invalid mode");
     }
-    return run_cycles(api, mode, rounds, nested);
+    passed = run_cycles(api, mode, rounds, nested, &total);
+    return os32_test_summary(api, "layout_cycle_test", passed, total);
 }
 
 static int same_usage(const MemStat *a, const MemStat *b)
@@ -44,7 +47,7 @@ static int same_usage(const MemStat *a, const MemStat *b)
         a->leftover_pages == b->leftover_pages && a->lease_active == b->lease_active;
 }
 
-static int run_cycles(KernelAPI *api, const char *mode, int rounds, int nested)
+static int run_cycles(KernelAPI *api, const char *mode, int rounds, int nested, int *total_out)
 {
     volatile u8 stack_probe[PROBE_BYTES];
     u8 *libc_probe = malloc(PROBE_BYTES), *exec_probe = api->mem_alloc(PROBE_BYTES);
@@ -90,6 +93,7 @@ static int run_cycles(KernelAPI *api, const char *mode, int rounds, int nested)
 done:
     if (libc_probe) free(libc_probe);
     if (exec_probe) api->mem_free(exec_probe);
-    return os32_test_summary(api, "layout_cycle_test", passed, total);
+    *total_out = total;
+    return passed;
 #undef CHECK
 }

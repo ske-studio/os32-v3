@@ -778,8 +778,11 @@ def run_errno(tmp, syscalls=SYSCALLS_SRC, quiet=False):
              "-O1", "-Wall", "-Werror", "-Wno-unused-parameter",
              "-Wno-unused-but-set-variable"]
     exe = tmp / "errno"
+    # No resident heap is exercised here. Supply app_sys.ld's private boundary
+    # at the host image end so the real resident adapter can still be linked.
     res = subprocess.run(["gcc", *flags, "-nostdlib", "-static", "-no-pie",
                           str(ERRNO_SRC), str(syscalls), str(ROOT / "sdk/allocator/nano_adapter.c"),
+                          "-Wl,--defsym=__os32_shell_sbrk_limit=_end",
                           "-DOS32_CRT_RESIDENT", "-o", str(exe)],
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     if res.returncode != 0:
