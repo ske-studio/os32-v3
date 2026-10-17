@@ -175,6 +175,9 @@ def cases(script):
         check(w.returncode == 0, "--write が失敗した: " + w.stderr)
         original = (root / "docs/02_memory.md").read_text(encoding="utf-8")
         doc = (root / "build/out/MEMMAP.md").read_text(encoding="utf-8")
+        check("シェル常駐帯域 (MEM_SHELL_LOAD_ADDR〜MEM_SHELL_BAND_END)" in doc,
+              "shell heading must follow memmap constants")
+        check("0x400000-0x4FFFFF" not in doc, "stale shell heading")
         check("0xFFF00000" in doc and "0xFFF7FFFF" in doc and
               "PEGC リニア窓の別名" in doc, "PEGC alt window missing")
         check("0x3EB000" in doc and "固定 MMIO top PT" in doc, "top PT missing")

@@ -1,4 +1,5 @@
 check-sbrk-crt-host:
+- sdk/link/app_sys.ld
 - sdk/crt/syscalls.c
 - sdk/allocator/**
 - tools/tests/test_sbrk_crt.py

@@ -18,6 +18,22 @@ extern char _end[];
 static struct os32_nano_arena primary_arena;
 /* -1 permanently rejects a malformed initial handoff, including sbrk(0). */
 static int primary_initialized;
+#ifdef OS32_CRT_RESIDENT
+static uint32_t resident_sbrk_peak;
+extern char __os32_shell_sbrk_limit[]; /* app_sys.ld, fixed resident boundary */
+
+/* Private resident diagnostic, bytes since aligned _end, reset on shell load.
+ * Use the link symbol before lazy initialization: the shared KAPI limit may
+ * describe a USER child while the WM runs. Reading must not initialize CRT. */
+void os32_resident_sbrk_stats(uint32_t out[3])
+{
+    uintptr_t initial = ((uintptr_t)&_end + CRT_CHUNK_ALIGN - 1u) & ~(uintptr_t)(CRT_CHUNK_ALIGN - 1u);
+    out[0] = primary_initialized == 1 ? primary_arena.brk - primary_arena.initial : 0;
+    out[1] = resident_sbrk_peak;
+    out[2] = primary_initialized == 1 ? primary_arena.limit - primary_arena.initial :
+        (uintptr_t)__os32_shell_sbrk_limit - initial;
+}
+#endif
 #ifndef OS32_CRT_RESIDENT
 static int crt_grow_exact(void *opaque, uintptr_t base, size_t bytes)
 {
@@ -156,7 +172,10 @@ void *os32_nano_crt_sbrk(struct _reent *r, ptrdiff_t incr)
     busy = 0;
     return p;
 #else
-    return os32_nano_morecore(&primary_arena, r, incr);
+    void *p = os32_nano_morecore(&primary_arena, r, incr);
+    uint32_t used = primary_arena.brk - primary_arena.initial;
+    if (used > resident_sbrk_peak) resident_sbrk_peak = used;
+    return p;
 #endif
 }
 #endif

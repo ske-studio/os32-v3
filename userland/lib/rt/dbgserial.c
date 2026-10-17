@@ -16,6 +16,7 @@
 #include "dbgserial.h"
 
 #include <stdarg.h>
+#include "memmap.h"
 
 /* ======== 内部状態 ======== */
 static KernelAPI *dbg_api = (void *)0;
@@ -275,20 +276,12 @@ void dbg_serial_hexdump(const void *addr, int len)
 /* 静的ブラックリスト: 既知のNOT PRESENTページ */
 static int _dbg_is_blacklisted(u32 addr)
 {
-    /* カーネルスタックガード (0x1FB000。低位から移設済み) */
-    if (addr >= 0x1FB000UL && addr <= 0x1FBFFFUL) return 1;
-    /* カーネル予約域 */
-    if (addr >= 0x200000UL && addr <= 0x2FFFFFUL) return 1;
-    /* シェルスタックガード */
-    if (addr >= 0x370000UL && addr <= 0x370FFFUL) return 1;
-    /* シェル帯域後の予約 */
-    if (addr >= 0x380000UL && addr <= 0x3FFFFFUL) return 1;
-    /* Resident keeps its fixed guard. USER initial mapped_end can grow.
-     * NOTE: the PRESENT check below reads the master page tables, not the
-     * caller's AS, so it does not prove a USER address is mapped (no
-     * in-tree USER caller of dbg_memdump today). */
-    if (dbg_api && !dbg_api->mem_map && addr >= dbg_api->sbrk_heap_limit &&
-        addr - dbg_api->sbrk_heap_limit < 4096UL) return 1;
+    if (addr >= MEM_STACK_GUARD && addr <= MEM_STACK_GUARD_END) return 1;
+    if (addr >= MEM_FIXED_PAGING_GUARD_BASE && addr < MEM_FIXED_PAGING_BASE) return 1;
+    if (addr >= MEM_SHELL_GUARD && addr - MEM_SHELL_GUARD < MEM_GUARD_SIZE) return 1;
+    /* sbrk_heap_limit is the live exec_heap boundary, not a guard.
+     * The PRESENT check below reads master PTs, not the caller's AS;
+     * there is no in-tree USER caller of dbg_memdump today. */
     return 0;
 }
 

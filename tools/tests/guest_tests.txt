@@ -49,6 +49,7 @@ shm_reuse_test          # PASS 4/4: lock→free/exit→別 AS の同一 SHM 全�
 mem_stat_test          # mem_stat sizes / self / system / other IDs
 mem_stat_compat_test    # v72: 200B prefix compatibility
 kdebug_probe            # v75: module state and owner pages
+layout_cycle_test       # T3c2: 20 normal children; fault/STOP/nesting/GUI: tools/accept/t3c2.md
 
 # --- 入れなかったもの (前段 §8 の分類。理由を必ず書く) ---
 #

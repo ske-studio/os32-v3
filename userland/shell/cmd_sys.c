@@ -2,6 +2,9 @@
 #include "memmap.h"
 #include "config.h"   /* SYS_GSHELL_BIN, SYS_SYSTEM_CFG (K4: os32gui) */
 #include "kbd_watch.h" /* kbdstat -w の行 (票 TASK_KBD_NAV §3) */
+#ifndef SHELL_AS_APP
+extern void os32_resident_sbrk_stats(u32 out[3]); /* private resident CRT */
+#endif
 
 /* ======================================================================== */
 /*  システム操作モジュール (cmd_sys.c)                                      */
@@ -54,6 +57,12 @@ static int cmd_mem(int argc, char **argv)
         stat.phys_total_pages, stat.phys_free_pages,
         stat.resident_heap_total, stat.resident_heap_used);
     if (rc >= (int)sizeof(stat)) {
+#ifndef SHELL_AS_APP
+        u32 sbrk[3];
+        os32_resident_sbrk_stats(sbrk);
+        g_api->kprintf(ATTR_WHITE, "  diag: sbrk_used=%u sbrk_peak=%u sbrk_capacity=%u exec_peak=%u exec_capacity=%u\n",
+            sbrk[0], sbrk[1], sbrk[2], stat.resident_heap_peak, stat.resident_heap_total);
+#endif
         g_api->kprintf(ATTR_WHITE,
             "  diag: kstack=%u shell_stack=%u kheap_peak=%u resident_peak=%u resident_fail=%u\n",
             stat.kstack_high_water & 0xffffU, stat.kstack_high_water >> 16, stat.kheap_peak, stat.resident_heap_peak, stat.resident_heap_fail);
