@@ -10,3 +10,5 @@ check-hsync-h2-host:
 - tools/tests/mutpar.py
 - tools/check_map.d/check-hsync-h2-host.yaml
 - build/checks.d/check-hsync-h2-host.mk
+- tools/tests/hsync_shell_fixture.h
+- sdk/include/os32/os32_generations.h

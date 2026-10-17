@@ -351,6 +351,10 @@ def case_build_id(tmp):
 # --------------------------------------------------------------------------
 
 MUTATIONS = [
+    ("os32x_header_truncated_to_v3",
+     "f.read(os32x_hdr.OS32X_HDR_SIZE)",
+     "f.read(os32x_hdr.OS32X_HDR_V3_SIZE)"),
+
     # 変異 1: 失敗しても古い名札を消さない版 (§2-2 の否定側)。
     ("stale_manifest_kept",
      "def sync_failed():",
@@ -424,6 +428,25 @@ def case_kapi(tmp):
         check(ok is True, "K1 現行形式・一致なら配備は成功する")
         kv, _lines = parse(b.man_text()) if b.man().is_file() else ({}, None)
         check(kv.get("kapi") == str(off), "K1 kapi=%d" % off)
+
+    # v4 の後半 12B (世代・protocol) まで reader に渡すことを観測する。
+    with Bench(tmp / "k60") as b:
+        src = b.proj / b.files[0]["host"]
+        src.write_bytes(os32x_blob(hd.os32x_hdr.OS32X_HDR_VERSION, off))
+        original = hd.os32x_hdr.parse_header
+        lengths = []
+
+        def observe(blob):
+            lengths.append(len(blob))
+            return original(blob)
+
+        hd.os32x_hdr.parse_header = observe
+        try:
+            actual, error = hd.deployed_kapi_layout([("/bin/a.bin", str(src))])
+        finally:
+            hd.os32x_hdr.parse_header = original
+        check(actual == off and error is None and lengths == [hd.os32x_hdr.OS32X_HDR_SIZE],
+              "K60 OS32X v4 の 60B 全体を parse_header に渡す")
 
     # K2: v2 の成果物が混ざる -> 名札を書かない (配備失敗)
     with Bench(tmp / "k2") as b:

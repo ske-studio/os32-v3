@@ -20,3 +20,5 @@ check-hsync-h3-host:
 - tools/check_map.d/check-hsync-h3-host.yaml
 - build/checks.d/check-hsync-h3-host.mk
 - sdk/kapi.json
+- tools/tests/hsync_shell_fixture.h
+- sdk/include/os32/os32_generations.h

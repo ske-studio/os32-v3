@@ -83,6 +83,7 @@
 /* ======================================================================== */
 
 #include "os32api.h"
+#include "os32_generations.h"
 
 /* コピー先が /etc/settings.db* かを字句で見る純関数 (票 S0-D / D0)。
  * HostDrv に古い settings.db が残っていても NHD の本体を切り詰めない。
@@ -247,6 +248,8 @@ static int g_no_backup;              /* --no-backup (vmkernel.old を作らな�
  * 常に `g_root + ルートからの相対` で組むので、既定では今までと同じ文字列になる。 */
 static char g_root[OS32_MAX_PATH];
 static int  g_root_len;
+static int g_other_root;             /* ext2 マウント根、稼働ルートと別デバイス */
+static int g_recovery;               /* 別根への範囲指定なし全体復旧 */
 
 /* ======== 文字列ユーティリティ ======== */
 
@@ -469,7 +472,7 @@ static void ls_cb(const DirEntry_Ext *entry, void *ctx)
 typedef struct {
     char path[HS_MAN_PATH_CAP];   /* ルートからの相対 (先頭に '/' を付けない) */
     u32  size;
-    u32  crc;                     /* 表示・検査用。**判定には使わない** */
+    u32  crc;                     /* コピー中の流し CRC と照合する */
     u32  mtime;
 } ManEntry;
 
@@ -726,7 +729,7 @@ static int man_parse(char *text)
                 return 0;
             }
         } else {
-            /* format=1 が形式を固定しているので、知らない鍵は「別の形式」。
+            /* format=2 が形式を固定しているので、知らない鍵は「別の形式」。
              * 読めるふりをしない。 */
             g_man_bad = "unknown key";
             return 0;
@@ -1100,6 +1103,20 @@ static int copy_body(const char *src, int fd, u32 *out_crc, u32 *out_total,
     if (failed) return -1;
     *out_crc = crc;
     *out_total = total;
+    /* FDRECOV-1: コピーで既に読んだ流し CRC だけを照合する。
+     * .old の複製 (宛先からのコピー) と名札に無い余剰は対象外。 */
+    if (g_man_valid && str_has_prefix(src, "/host/")) {
+        int i;
+        for (i = 0; i < g_man_count; i++) {
+            if (str_cmp(g_man[i].path, src + sizeof("/host/") - 1) == 0) {
+                if (crc32_core_final(crc) != g_man[i].crc) {
+                    *reason = "manifest_crc_mismatch";
+                    return -1;
+                }
+                break;
+            }
+        }
+    }
     return 0;
 }
 
@@ -2319,7 +2336,7 @@ static void sync_directory(const char *src_dir, const char *dst_dir, int depth)
          * ルート直下の sys は既定で飛ばす (稼働中のシェル・共有ライブラリ)。
          * **全体同期のときだけ**。`hsync usr` の usr/sys は対象に含める。
          * 入れ替えたいときは `hsync sys` と明示する。-f でも解除しない。 */
-        if (depth == 0 && g_root_sync && str_cmp(fl.names[i], "sys") == 0) {
+        if (depth == 0 && g_root_sync && !g_recovery && str_cmp(fl.names[i], "sys") == 0) {
             g_excluded++;
             if (g_verbose)
                 api->kprintf(ATTR_YELLOW, "  EXCLUDE %s reason=%s\n",
@@ -2424,9 +2441,77 @@ static int dst_on_floppy(const char *dst, const char **devout)
  *   - 根の stat がディレクトリ + inode 2 でない     → root_not_ext2
  *     (/cd0 = ISO9660、FAT の区画、SerialFS など。HS_EXT2_ROOT_INO の注)
  * 戻り値 0 = 受け入れる / 1 = 断った (表示は済み)。 */
-static int root_guard(const char *root)
+/* FDRECOV-1: 稼働ルートへは、boot だけでも一式の世代を先に確かめる。
+ * min_api_ver は比較しない。同じ世代でカーネルだけ先行する経路を残す。 */
+#define HS_SOURCE_SHELL "/host/sys/shell.bin"
+#define HS_SOURCE_KERNEL "/host/boot/vmkernel.lz4"
+
+static int running_generation_gate(void)
+{
+    OS32Header hdr;
+    const char *why = "shell_header_unconfirmed";
+    u32 host = 0, running = 0;
+    u32 known = OS32X_FLAG_GFX | OS32X_FLAG_RING3 | OS32X_FLAG_SHLIB |
+                OS32X_FLAG_CUI_ONLY | OS32X_FLAG_LAUNCHER;
+    int fd = api->sys_open(HS_SOURCE_SHELL, KAPI_O_RDONLY);
+    int n = -1;
+    if (fd >= 0) {
+        n = read_fill(fd, (u8 *)&hdr, (int)sizeof(hdr));
+        api->sys_close(fd);
+    }
+    if (n == (int)sizeof(hdr) && hdr.magic == OS32X_MAGIC &&
+        hdr.header_size == OS32X_HDR_SIZE && hdr.version == OS32X_HDR_VERSION &&
+        !(hdr.flags & ~known)) {
+        if (hdr.memory_layout_generation != OS32_MEMORY_LAYOUT_GENERATION) {
+            why = "memory_layout_mismatch";
+            host = hdr.memory_layout_generation;
+            running = OS32_MEMORY_LAYOUT_GENERATION;
+        } else if (hdr.kapi_abi_generation != OS32_KAPI_ABI_GENERATION) {
+            why = "kapi_abi_mismatch";
+            host = hdr.kapi_abi_generation;
+            running = OS32_KAPI_ABI_GENERATION;
+        } else if ((hdr.shlib_protocol && hdr.shlib_protocol != OS32_SHLIB_PROTOCOL) ||
+                   ((hdr.flags & OS32X_FLAG_SHLIB) &&
+                    hdr.shlib_protocol != OS32_SHLIB_PROTOCOL)) {
+            why = "shlib_protocol_mismatch";
+            host = hdr.shlib_protocol;
+            running = OS32_SHLIB_PROTOCOL;
+        } else if (hdr.kapi_data_off != KAPI_DATA_FIELDS_OFF) {
+            why = HR_KAPI_LAYOUT;
+            host = hdr.kapi_data_off;
+            running = KAPI_DATA_FIELDS_OFF;
+        } else return 0;
+    }
+    api->kprintf(ATTR_RED, "Error: reason=%s host=%u running=%u; 0 files written\n",
+                 why, host, running);
+    api->kprintf(ATTR_RED,
+                 "  配備元と稼働 OS の世代の一致を確かめられない。\n"
+                 "  FD 起動 → sfs lan on → sfs run hsync --root /hd0 --verify --no-backup\n"
+                 "  終了成功かつ errors=0 の後だけ HDD から再起動する。\n");
+    return 1;
+}
+
+/* 別根全体は形式を解釈しない。名札と起動に必要な 2 ファイルの存在だけ見る。 */
+static int recovery_source_gate(void)
 {
     OS32_Stat st;
+    const char *missing = 0;
+    if (!g_man_valid) {
+        api->kprintf(ATTR_RED, "Error: reason=%s; 0 files written\n",
+                     g_man_present ? HR_MANIFEST_INVALID : HR_MANIFEST_ABSENT);
+        return 1;
+    }
+    if (api->sys_stat(HS_SOURCE_KERNEL, &st) != 0) missing = HS_SOURCE_KERNEL;
+    else if (api->sys_stat(HS_SOURCE_SHELL, &st) != 0) missing = HS_SOURCE_SHELL;
+    if (!missing) return 0;
+    api->kprintf(ATTR_RED, "Error: reason=recovery_source_missing %s; 0 files written\n",
+                 missing);
+    return 1;
+}
+
+static int root_guard(const char *root)
+{
+    OS32_Stat st, running;
     const char *dev;
     const char *why = 0;
     int rc = 0;
@@ -2448,6 +2533,11 @@ static int root_guard(const char *root)
             else if ((st.st_mode & OS_S_IFMT) != OS_S_IFDIR ||
                      st.st_ino != HS_EXT2_ROOT_INO)
                 why = HR_ROOT_NOT_EXT2;
+            else {
+                rc = api->sys_stat("/", &running);
+                if (rc != 0) why = HR_ROOT_STAT_FAIL;
+                else g_other_root = (st.st_dev != running.st_dev);
+            }
         }
     }
     if (!why) return 0;
@@ -2489,7 +2579,7 @@ static void usage(void)
     api->kprintf(ATTR_WHITE, "  既定: サイズか日時が違うものだけ内容を比較し、違えばコピーする\n");
     api->kprintf(ATTR_WHITE, "        日時が不明 (0) なら必ず内容を比較する\n");
     api->kprintf(ATTR_WHITE, "        見逃すのは「サイズも日時も同じで中身が違う」場合だけ\n");
-    api->kprintf(ATTR_WHITE, "  全体同期ではルート直下の sys を除外する (-f でも解除しない)\n");
+    api->kprintf(ATTR_WHITE, "  稼働ルートの全体同期は sys を除外。別デバイスの --root 全体復旧は sys も含む\n");
     api->kprintf(ATTR_WHITE, "  置き換えは一時ファイル `%s<名前>` 経由。この接頭辞は hsync の予約\n",
                  HS_TEMP_PREFIX);
 }
@@ -2510,6 +2600,8 @@ int __cdecl main(int argc, char **argv, KernelAPI *_api)
     root_arg = NULL;
     g_root[0] = '\0';
     g_root_len = 0;
+    g_other_root = 0;
+    g_recovery = 0;
     g_copied = 0;
     g_unchanged = 0;
     g_excluded = 0;
@@ -2699,6 +2791,14 @@ int __cdecl main(int argc, char **argv, KernelAPI *_api)
         }
     }
 
+    g_recovery = g_other_root && g_root_sync;
+    if (g_recovery && g_direct) {
+        api->kprintf(ATTR_RED, "Error: reason=%s; 0 files written\n"
+                     "  全体復旧には一時ファイル方式に対応した FD が必要\n",
+                     HR_KERNEL_TOO_OLD);
+        return 1;
+    }
+
     /* 同期先がフロッピーなら 1 件も触らずに断る (dry-run でも同じ判定)。
      * 見るのは**根を前置した**宛先 (--root /hd0 bin なら /hd0/bin のマウント) */
     {
@@ -2750,7 +2850,9 @@ int __cdecl main(int argc, char **argv, KernelAPI *_api)
         return 1;
     }
     /* 票 TASK_KAPI_DATA_FIELDS: 配備物の KAPI 配置と版 (1 件も書く前) */
-    if (man_kapi_gate(subdir ? norm : 0) != 0) {
+    if ((!g_other_root && running_generation_gate() != 0) ||
+        (g_recovery ? recovery_source_gate()
+                    : man_kapi_gate(subdir ? norm : 0)) != 0) {
         api->mem_free(file_buf);
         return 1;
     }
@@ -2815,8 +2917,8 @@ int __cdecl main(int argc, char **argv, KernelAPI *_api)
             return 1;
         }
         api->kprintf(ATTR_CYAN, "hsync: /host -> %s\n", g_root_len ? g_root : "/");
-        /* 既定の除外を**先頭で明示する** (設計書 §7.2) */
-        api->kprintf(ATTR_YELLOW,
+        /* 稼働ルートの全体同期だけ sys を除外する。 */
+        if (!g_recovery) api->kprintf(ATTR_YELLOW,
                      "  note: ルート直下の sys は既定で除外 "
                      "(入れ替えるなら `hsync sys`)。-f でも解除しない\n");
     }
