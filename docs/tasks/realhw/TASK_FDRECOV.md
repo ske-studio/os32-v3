@@ -1,6 +1,6 @@
 # FDRECOV-1 — FD 起動から LAN で HDD 一式を復旧する
 
-> 状態: **設計中 (2026-10-17、設計は確定し実装待ち)** — astra 起草 (r1〜r3)、Opus 5.5 の独立レビュー 2 往復 (r1「直してから」P1×2、r2「R2-1・R2-2 を直せば確定してよい」、r3 で反映)。実装は未着手。往復の記録は `~/os32-tmp/run/fdrecov/` (`opus_r1.md`・`astra_r2_response.md`・`opus_r2.md`・`astra_r3_response.md`)。台帳 [FDRECOV-1](../DEFERRED_TESTS.md)。
+> 状態: **実装中 (2026-10-17)** — main 3dd05eb で着地し NP21/W の受入 7 項に合格 (`~/os32-tmp/evidence/2026-10-17/fdrecov_np21w/RESULT.md`)。残りは実機の LAN の部分 (台帳 FDRECOV-1)。それまでの状態: 設計は astra 起草 (r1〜r3)、Opus 5.5 の独立レビュー 2 往復 (r1「直してから」P1×2、r2「R2-1・R2-2 を直せば確定してよい」、r3 で反映)。実装は未着手。往復の記録は `~/os32-tmp/run/fdrecov/` (`opus_r1.md`・`astra_r2_response.md`・`opus_r2.md`・`astra_r3_response.md`)。台帳 [FDRECOV-1](../DEFERRED_TESTS.md)。
 >
 > 設計案 r3 / 2026-10-17。参照ソース: `0c71845781d66a40968b04c932f96e6b31c304cc`。配置世代の違うカーネルだけを `hsync boot` で更新し、旧 shell が起動不能になる事故を防ぐ。PM 決定として F1〜F8・Q1〜Q4・R2-1〜R2-6 を採用する。
 
