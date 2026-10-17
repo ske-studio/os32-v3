@@ -561,3 +561,9 @@ X-2 の前半 (e8a の RO 日本語) は `accept_e11/RESULT.md` の GUI 日本�
 | ID | 何を残したか | 理由 | 次の関門 |
 |---|---|---|---|
 | T3AB-4 | T3 票 §4 T3ab の受入 ④「SLACK の全ページを一度だけ配って返す」のゲストでの観測: ゲストに専用の自己診断が無い。ホストの模型 (段 D、`tools/tests/memory_boot_host.c`) では確認済み、ゲストでは空きページ数の不変と leftover 0 が傍証 | 未判定 (専用の観測口が無い) | T3b1 (kdebug・監査の段) で、ゲストの自己診断に SLACK の一巡を足すかを決める |
+
+閉鎖 (2026-10-17、ユーザー決定「エミュレータで成功していれば良い」— FDRECOV-1 は NP21/W の受入 7 項の合格で完了とし、実機の LAN の部分は行わない。証拠 `~/os32-tmp/evidence/2026-10-17/fdrecov_np21w/RESULT.md`)
+
+| ID | 何を残したか | 理由 | 次の関門 |
+|---|---|---|---|
+| FDRECOV-1 | FD 起動から LAN で HDD を直す経路 ([TASK_FDRECOV](../../tasks/realhw/TASK_FDRECOV.md)) の**実機の部分**: 82557 の初期化 → シリアル操作 → auto peer の LAN 転送 → 最小インストールなしで HDD 再起動、必要時の明示 peer、wrong peer / ケーブル抜けからの再試行 | 実装 1611c76・39ee7dd (main 3dd05eb) は NP21/W で受入済み (2026-10-17、7 項合格: 新旧 FD の復旧・世代の門・FD 無書込み・書込み禁止の文言、`~/os32-tmp/evidence/2026-10-17/fdrecov_np21w/RESULT.md`)。NP21/W は 82557 を再現しない | 次にノートで実機を回すとき (立会い不要) |
