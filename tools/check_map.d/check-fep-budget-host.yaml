@@ -1,0 +1,20 @@
+check-fep-budget-host:
+- tools/fep_budget_capture.py
+- tools/tests/test_fep_budget.py
+- tools/tests/fep_budget_host.c
+- tools/tests/fep_budget_linux.c
+- tools/tests/ime_dict_host.c
+- tools/tests/sqlite_groups_backend.h
+- tools/tests/vfs_fd_sqlite_host.c
+- tools/tests/host32.py
+- tools/fep_to_sqlite.py
+- assets/joyo_kanji.txt
+- assets/ipadic/**
+- kernel/ime_dict.c
+- kernel/ime.h
+- fs/vfs_fd.c
+- fs/vfs.h
+- lib/sqlite3/**
+- build/checks.d/check-fep-budget-host.mk
+- tools/check_map.d/check-fep-budget-host.yaml
+- tools/accept/t4a4.md

@@ -1,9 +1,13 @@
 /* Isolated RAM filesystem boundary for the REAL bundled SQLite integration.
  * Not a copy of VFS/FD ownership. No host filesystem paths are accessed. */
+#ifndef FIXTURE_FILES
 #define FIXTURE_FILES 16
+#endif
 /* 8192 件の settings.db (票 S3-C の件数上限) と、その DELETE journal が
  * 収まる大きさ。128KiB では 8192 件の実 transaction を通せなかった。 */
+#ifndef FIXTURE_BYTES
 #define FIXTURE_BYTES (1024 * 1024)
+#endif
 typedef struct {
     int exists;
     char path[VFS_MAX_PATH];
