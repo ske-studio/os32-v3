@@ -104,8 +104,8 @@ void _start(void) {
     unchanged_failure(MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE - PAGE_SIZE - MEM_EXEC_HEAP_BASE + 1, 0);
     unchanged_failure(12 * 1024 * 1024, 0);
     unchanged_failure(0, 1);
-    const u32 resident[] = {0, 1, 256 * 1024};
-    const u32 limit = 0x4B5000;
+    const u32 resident[] = {0, 1, MEM_SHELL_EXEC_HEAP_SIZE};
+    const u32 limit = MEM_SHELL_HEAP_BASE;
     CHECK(MEM_SHELL_LOAD_ADDR == 0x400000 && MEM_SHELL_HEAP_END == 0x4F5000);
     for (u32 i = 0; i < sizeof(resident) / sizeof(resident[0]); i++) {
         CHECK(budget_launch(1, PAGE_SIZE, resident[i], 0) == 1);
@@ -113,10 +113,23 @@ void _start(void) {
         CHECK(slots[1].exec_heap_base == MEM_SHELL_HEAP_BASE);
         CHECK(slots[1].exec_heap_size == (resident[i] && resident[i] < MEM_SHELL_HEAP_SIZE ? resident[i] : MEM_SHELL_HEAP_SIZE));
     }
-    CHECK(budget_launch(1, MEM_SHELL_MAX_SIZE, 0, 0) == 1);
+    /* All unaligned ends in the last alignment unit retain the full headroom.
+     * The next byte must be refused before any slot/KAPI publication. */
+    const u32 max_image = limit - MEM_SHELL_IMAGE_HEADROOM - MEM_SHELL_LOAD_ADDR;
+    for (u32 tail = 0; tail < MEM_SHELL_HEAP_ALIGN; tail++) {
+        u32 sbrk_limit, base, size;
+        CHECK(exec_shell_layout(PAGE_SIZE + 1, max_image - PAGE_SIZE - 1 - tail,
+                                0, &sbrk_limit, &base, &size) == 0);
+        CHECK(sbrk_limit == limit && base == limit && size == MEM_SHELL_EXEC_HEAP_SIZE);
+        CHECK(budget_launch(1, max_image - tail, 0, 0) == 1);
+    }
     AppSlot saved = slots[1];
-    CHECK(budget_launch(1, MEM_SHELL_MAX_SIZE + 1, 0, 0) == EXEC_ERR_NOMEM);
-    CHECK(budget_launch(1, PAGE_SIZE, 256 * 1024 + 1, 0) == EXEC_ERR_NOMEM);
+    for (u32 extra = 1; extra <= MEM_SHELL_HEAP_ALIGN; extra++) {
+        CHECK(budget_launch(1, max_image + extra, 0, 0) == EXEC_ERR_NOMEM);
+        CHECK(digest(&saved, sizeof(saved)) == digest(&slots[1], sizeof(saved)));
+        CHECK(api.sbrk_heap_limit == limit);
+    }
+    CHECK(budget_launch(1, PAGE_SIZE, MEM_SHELL_EXEC_HEAP_SIZE + 1, 0) == EXEC_ERR_NOMEM);
     CHECK(budget_launch(1, PAGE_SIZE, 1024 * 1024, 0) == EXEC_ERR_NOMEM);
     CHECK(digest(&saved, sizeof(saved)) == digest(&slots[1], sizeof(saved)));
     CHECK(api.sbrk_heap_limit == limit);

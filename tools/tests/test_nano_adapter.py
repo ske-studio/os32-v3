@@ -58,12 +58,46 @@ def build_host(prefix, work):
             '-o', work / 'host.o')
 
 
-def resident_heap(prefix, work):
+RESIDENT_MUTATIONS = [
+    ('exec', '*sbrk_limit = base;', '*sbrk_limit = exec_end;',
+     'resident handoff limit'),
+    ('adapter', 'if (next > a->limit) goto fail;',
+     'if (next > a->limit) { a->brk = next; goto fail; }',
+     'upper failure unchanged'),
+    ('exec', '*sbrk_limit = base;',
+     '*sbrk_limit = base + (heap ? MEM_SHELL_EXEC_HEAP_SIZE - heap : 0);',
+     'tiny heap tail reserved'),
+    ('exec', 'ctx->exec_heap_size = exec_heap_size;\n        kapi->sbrk_heap_limit = sbrk_end;',
+     'ctx->exec_heap_size = exec_heap_size;\n        kapi->sbrk_heap_limit = sbrk_end + exec_heap_size;',
+     'resident handoff limit'),
+]
+
+
+def resident_heap(prefix, work, mutant=None):
     source = (ROOT / 'exec/exec.c').read_text()
+    adapter = SOURCE.read_text()
+    if mutant:
+        target, old, new, _ = mutant
+        text = source if target == 'exec' else adapter
+        assert text.count(old) == 1, mutant
+        text = text.replace(old, new)
+        if target == 'exec':
+            source = text
+        else:
+            adapter = text
+    (work / 'nano_adapter.c').write_text(adapter)
     parts = []
     for signature in ('static int exec_shell_layout(', 'static void exec_restore_context('):
         start = source.index(signature)
         parts.append(source[start:source.index('\n}', start) + 2])
+    # Exercise the product launch handoff, not a fixture assignment to KAPI.
+    start = source.index('    /* ヒープ・ガードページ設定 */')
+    end = source.index('    {\n        u32 launch_argv', start)
+    parts.append('''
+static void resident_handoff(AppSlot *ctx, u32 sbrk_end, u32 exec_heap_base,
+                             u32 exec_heap_size) {
+    int is_shell = 1;
+''' + source[start:end] + '\n}')
     (work / 'resident_exec.inc').write_text('\n'.join(parts))
     inc = ['-I'+str(ROOT / p) for p in ('tools/tests/host_arch', 'include', 'kernel',
            'exec', 'lib', 'sdk/allocator', 'sdk/include/os32', 'arch/x86', 'platform/pc98')]
@@ -72,15 +106,19 @@ def resident_heap(prefix, work):
         obj = work / (Path(rel).stem + '.o')
         command(prefix, 'gcc', '-std=gnu11', '-O2', '-ffreestanding', '-fno-builtin',
                 '-ffunction-sections', '-fdata-sections', '-Wall', '-Wextra', '-Werror',
-                *inc, '-I'+str(work), '-c', ROOT / rel, '-o', obj)
+                '-I'+str(work), *inc, '-c', ROOT / rel, '-o', obj)
         objects.append(obj)
     exe = work / 'resident'
     command(prefix, 'ld', '-m', 'elf_i386', '--gc-sections',
             '--defsym=resident_image_end='+hex(0x400000+4099),
             '-o', exe, *objects)
     result = host32.run([str(exe)], capture_output=True, text=True, timeout=30)
-    assert result.returncode == 0, ('resident', result.returncode, result.stdout, result.stderr)
-    print('PASS resident CRT/split/restore: bounds, overflow, unchanged heaps, tiny heap')
+    if mutant:
+        assert result.returncode == 1 and result.stdout == 'FAIL: ' + mutant[3] + '\n', result
+        print('RED resident runtime: ' + mutant[3])
+    else:
+        assert result.returncode == 0, ('resident', result.returncode, result.stdout, result.stderr)
+        print(result.stdout.strip())
 
 
 def rejection(prefix, work, archive, text, checker=gate, after=False):
@@ -362,6 +400,10 @@ def main():
                         raise AssertionError('original newlib unconnected entry accepted')
                 print(f'nano link gate: {negative_links} negative links rejected (allow-multiple-definition)')
         if args.mutate:
+            for index, mutant in enumerate(RESIDENT_MUTATIONS):
+                resident_work = work / ('resident-mutant-' + str(index))
+                resident_work.mkdir()
+                resident_heap(prefix, resident_work, mutant)
             source = SOURCE.read_text()
             def one(entry):
                 (old, new, hits, label), expected = entry

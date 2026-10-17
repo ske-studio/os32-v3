@@ -64,6 +64,12 @@ static int run(void)
 #ifdef OS32_CRT_RESIDENT
     CHECK(sbrk(1) == (void *)-1 && errno == ENOMEM && calls == 0 && primary_arena.brk == mapped,
           "resident no map");
+    /* A later KAPI handoff cannot repartition a published resident arena. */
+    api.sbrk_heap_limit = mapped + OS32_NANO_PAGE;
+    CHECK(sbrk(1) == (void *)-1 && errno == ENOMEM && calls == 0 &&
+          primary_arena.brk == mapped && primary_arena.limit == mapped,
+          "resident fixed after publication");
+    api.sbrk_heap_limit = mapped;
     reset(initial, mapped, UINTPTR_MAX);
     CHECK(sbrk(1 + (int)(mapped - initial)) == (void *)-1 && calls == 0 && primary_arena.brk == initial,
           "resident no map beyond backing");
