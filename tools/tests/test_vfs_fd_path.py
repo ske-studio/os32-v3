@@ -320,9 +320,14 @@ IME_MUTANTS = [
 SQLITE_MUTANTS = [
     ("SQLite の入出力が失効を見ない", "lib/sqlite3/os32_sqlite_vfs.c",
      "    return p->fd >= 0 && !vfs_fd_is_stale(p->fd);", "    return p->fd >= 0;"),
-    ("xTruncate が失効を見ない", "lib/sqlite3/os32_sqlite_vfs.c",
-     "    if (!file_live(pFile)) return SQLITE_IOERR_TRUNCATE;",
-     "    if (!file_valid(pFile)) return SQLITE_IOERR_TRUNCATE;"),
+    # T4b-4: file_live を外すだけでは vfs_resize_fd の STALE が伝わるため
+    # 正常と同じ結果になる。失効を成功扱いする欠陥を xTruncate に注入する。
+    ("xTruncate が失効を成功扱いする", "lib/sqlite3/os32_sqlite_vfs.c",
+     "static int os32Truncate(sqlite3_file *pFile, sqlite3_int64 size)\n"
+     "{\n    Os32File *p = (Os32File *)pFile;\n",
+     "static int os32Truncate(sqlite3_file *pFile, sqlite3_int64 size)\n"
+     "{\n    Os32File *p = (Os32File *)pFile;\n"
+     "    if (vfs_fd_is_stale(p->fd)) return SQLITE_OK;\n"),
     ("xFileSize が失効を見ない", "lib/sqlite3/os32_sqlite_vfs.c",
      "    if (!file_live(pFile)) return SQLITE_IOERR_FSTAT;",
      "    if (!file_valid(pFile)) return SQLITE_IOERR_FSTAT;"),
