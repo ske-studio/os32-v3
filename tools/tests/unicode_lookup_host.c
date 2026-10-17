@@ -21,7 +21,10 @@ static void say(const char *s)
 {
     u32 n = 0;
     while (s[n]) n++;
-    __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(s), "d"(n) : "memory");
+    u32 ret;
+    /* The syscall returns in eax; declare it so the next call reloads 4. */
+    __asm__ volatile("int $0x80" : "=a"(ret) : "0"(4), "b"(1), "c"(s), "d"(n) : "memory");
+    (void)ret;
 }
 static void die(int rc) __attribute__((noreturn));
 static void die(int rc)
