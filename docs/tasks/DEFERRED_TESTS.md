@@ -27,6 +27,7 @@
 | ID | 何を残したか | 理由 | 渡し先 |
 |---|---|---|---|
 | T3AB-R1 | T3ab の R1 像の一式のゲスト受入 | 実機の回帰 T3bR は 2026-10-17 に全項目 PASS (閉鎖台帳)。R1 像だけ未実施 | 次の R1 の回 |
+| EXECNEST-1 | CPL3 のアプリが KAPI exec_run で子を繰り返し起動すると、子が終わるたびに親のカーネルの入口 (TSS esp0) が戻らず約 1,756 B ずつ深くなり、14 回目に 40KiB の shell stack を溢れさせて triple fault (#DF、cr2=004f5fd0 = shell stack の guard)。子の終わり方 (正常・fault・STOP) によらない。T3c2 の fixture で初めて踏んだ (NP21/W 64MB、`~/os32-tmp/evidence/2026-10-17/t3c2_np21w/RESULT.md`) | カーネル層の不具合 (POLICY_DEV §1、ほかの段より先に直す)。filer など子を繰り返し起動するアプリも同じ形を踏む見込み [推] | 原因の調査と直し → T3c2 の受入をやり直す |
 | T4T7-RH | T4〜T7 の実機 (Ra266) での確認: T5c-4 の 82557 の回帰、T6b-2 の Ra266 の欄、T7a-2c の 9821 の再描画と CG 窓 (H-5・H-6b)、T7a-2e2 の `v86 -g`/boot2/DOS、T7 の Ra266 の計測 | ユーザー決定 2026-10-17: ソフトウェアの変更は NP21/W で合否を決め、ハードウェアに触るカーネルの変更は実機のテストをまとめて行う | ハードウェアに触る段がたまった所でまとめて行う実機の回 (時期は PM が提案)。新しい段で実機の項目が出たらこの行に足す |
 | LGY98-L12 | LGY-98 の L1 (131/200 フレーム) と L2 (66,132/131,072 B) が FAIL — main 9aaaf39 でも同じ数値で FAIL (T3ab の後退ではない)。台本 `tools/net_l0..l3_test.py` は urllib で 127.0.0.1:8025 を直接叩くので、WSL の NAT では届かない (受入では手元の shim で `np21w_client` の curl 経路へ回した) | 既存の失敗、原因は台本か host_agent v2 の側 [推] | 次に LGY-98 / net の台本を触る段: 台本を np21w_client に寄せ、L1/L2 の欠落の原因を調べる |
 | E9-1 | CPL3 sh 経由の tvdump (CUI 対照つき) | v3 の sh.bin はシリアル系コマンドを持たず (D2(a))、sh の中の tvdump は「external programs need the GUI terminal」で $?=126 — 台本の前提が v3 で成り立たない。代わりに CPL3 の CUI 前景で `audit_test tvram` が PASS (2026-10-16、`~/os32-tmp/evidence/2026-10-16/guest8/E9-1/`) | H-7 (端末アプリの再開) の再開時ゲートで |
