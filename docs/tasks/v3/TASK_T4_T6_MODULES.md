@@ -68,7 +68,7 @@ kdebug 固有の現行契約は [TASK_DBGREF §3-2](TASK_DBGREF.md#3-2-部品の
 little-endianの明示的decodeを使い、C構造体のcast/sizeofでファイルを読まない。**KMOD v1・144Bヘッダの項目順は既に確定** (`kernel/module_image.h:7,23`、`docs/tasks/v3/TASK_DBGREF.md:131`)。下表は意味の表であり再配置案ではない。C/ASM/Pythonはこの順序から生成・照合し、別スキーマを作らない。
 
 ヘッダword 0〜35は `magic,format,header_size,image_size,kapi,layout,module_abi,id,phase,flags,mem_size,payload_off,payload_size,text_off/size,ro_off/size,data_off/size,bss_off/size,reloc_off/count,import_off/count,export_off/count,names_off/size,init,stop,pair_crc,image_crc,ops_version,reserved0,reserved1`。表offsetはcontainer基点、節・入口・reloc書込先・slotはbody基点。relocは4B、importは `{u32 hash; u16 type_ver,kind; u32 slot_off}`、exportは `{u32 hash; u16 slot,ver; u32 entry_off}` の12B。名前は順序付きNUL列、63B上限、hashと実名を照合し衝突は生成失敗。CRCはimage_crc欄 (byte128〜131) を0にした容器全体 (`docs/tasks/v3/TASK_DBGREF.md:132,158,164`)。
-現KDEBUG policyはID=1/POST_ROOT/PAIR必須/stop=0/ops=2・18口/画像とbody各256KiB/reloc≤16,384/import≤1,024/export≤64 (`kernel/module_image.c:49,103`)。T4a-1でID・phase・stop・ops・サイズ上限を生成policyへ移し、KDEBUGの現契約とOFF/RUNNING/拒否診断を保持する。SQLITEの初期画像/body上限案は各512KiB [推]、load_span上限・表件数はT4a-2の実画像で確定し、超過を握り潰さない。**374,968Bの現SQLiteファイルは現256KiB上限に入らない**。
+現KDEBUG policyはID=1/POST_ROOT/PAIR必須/stop=0/ops=2・18口/画像とbody各256KiB/reloc≤16,384/import≤1,024/export≤64 (`kernel/module_image.c:49,103`)。T4a-1でID・phase・stop・ops・サイズ上限を生成policyへ移し、KDEBUGの現契約とOFF/RUNNING/拒否診断を保持する。SQLITEの画像/body上限は各512KiB、load_span≤544,768B、reloc≤4,096/import≤32/export≤1とする (T4a-2試作測定、下記)。超過を握り潰さない。**374,968Bの現SQLiteファイルは現256KiB上限に入らない**。
 wire名 `kapi_abi_gen` は現KMODではKAPI機能版76を入れる欄であり、D35のKAPI ABI世代1とは別 (`docs/tasks/v3/TASK_DBGREF.md:141`、`sdk/kapi.json:2`)。意味を黙って入れ替えず、4世代は生成物の印と配備一式で照合する。`module_abi_gen` はmodule別import定義のFNV-1a、`ops_version` はexport契約。KDEBUGのpair CRCは維持。EARLYには自己を含むVK32 CRCを埋める循環を作らずPAIR無しをID別policyで許し、VK32全体/entry CRC・世代・配布一式で照合する (T5b-1の生成試験)。
 
 | 項目 | 意味と検査 |
@@ -114,6 +114,12 @@ T5c-2b/T5c-3の依頼前に、kdebugのPCM/V86 importをcore facade経由で残�
 登録状態はmodule recordの固定容量配列に記録する `{owner, generation, state, backing, dependencies, irq_refs, tick_refs, callback_refs, dma_refs}`。配列満杯は副作用前に失敗。STARTING中のIRQ handlerは登録時点で有効なデータを持つ。brokerはRUNNING以外を全部無視する設計にはしない (initでIRQ完了を待つ装置がある)。IRQ・tick登録はownerとhandlerのtext所属を検証し、外部callbackもownerに結び付ける。
 
 失敗手順は新規呼出しをstubへ戻す → 装置の新規転送を止める → callback/IRQ/tickを解除・進行中呼出しゼロ確認 → DMA停止確認 → RAM回収。IRQ unregisterだけで停止成功とはしない。永久DEVICE予約と必要な復帰コード/写像は回収対象から除く。停止不能なら関連コード・データ・DMAを全て隔離し、省略stubへ進んだだけで「回収済み」と記録しない。boot-only依存を逆順に畳み、RUNNINGの依存先を先に解放しない。
+
+T4a-5 の核は `kernel/module_runtime.c/.h`。POST_ROOT の `module_load` は record を先に予約し、直接読込・検証・再配置・import 解決まで行う。`module_start` は resident adapter へ非公開 candidate を渡し、成功・export 一致を確認して prefix を返してから RUNNING にする。
+record は export の解決済み値・依存 handle `{slot, generation}`・lifecycle adapter を値で保持する。`module_exports` は RUNNING の同世代だけを返し、一般 KAPI の stub/services_public は利用側で管理する。
+`module_abort_reverse` は load 順の handle 列を逆順に戻す。abort は公開を閉じて quiesce→detach/drain→stop_dma を呼び、残存参照・停止失敗・生きた依存利用側があれば QUARANTINED を保持する。回収できた owner だけ reclaim/retire し、ABSENT と隔離への二重 abort は再解放しない。
+broker 接続用の `module_ref_acquire/release` は STARTING の owner/text 所属を照合する核であり、既存 IRQ/tick/DMA broker の部品対応は後続の接続で行う。EARLY owner 移譲・services_public transaction・kaudit_boot の勘定も後続段で接続する。
+host の受入・PM 用変異は `tools/tests/module_runtime_tdd.md`、既存 kdebug の実像・pair・OFF/RUNNING 回帰は `tools/tests/kdebug_init_tdd.md` を参照する。
 
 ## 3. T4 SQLite と FEP 案 A
 
@@ -291,6 +297,14 @@ T6bは最後に集積を上位票の `[0x500000,0x600000)` へ移し上限1MiB�
 | T6b-1 (1日) | HDD/FD集積移動・全区間検査 | ①508KiB超〜1MiB成功/1MiB+1拒否 ②loader/stack/source/core/bundle/bootinfo重複で展開write0 ③FD64KiB分割/segment wrap境界が一致 ④C/ASM同fixture同理由。最終entry検査前展開変異を検出。hsync読取・boot_image_info利用者も新像に追随 (§5-4)。 |
 | T6b-2 (0.5日) | 生存区間/ピーク計測・最終構成台本 | ①展開・root・SQLite/FEP公開・splash各時点でowner/PFN和一致 ②集積返却後にBB/SQLite、別staging0 ③64MB通常/故障対照 ④8MB planar/PEGC・17MB・Ra266は最終段の未実施欄へ引継ぐ。返却漏れは計数不一致になる。案5配置・USER別勘定 (§0/3-3)、bundle/prefix/隔離を含む監査diff0 (§7-2)。実機分はT4T7-RHへ送り受入を止めない。 |
 
+T4a-2 試作測定 (製品分離・ゲスト受入は後続段): `make sqlite-module-proto`、SQLite 3.53.0 全amalgamation/GNU89/`-Os`、製品設定、local kstring/kmath、libgcc 6 memberを保持。VFSコピーだけ外部pool/`ktime_ticks()`へ変更。
+| 容器 / body | prefix (表実長 / ページ確保) | payload / BSS | reloc / import / export |
+|---|---|---|---|
+| 394,104B / 380,928B | 12,889B / 16,384B | 377,720B / 2,356B | 3,040 / 23 / 1 |
+load_span=397,312B。SQLite専用生成policyは上記§2-1、reloc/import上限から表最大19,036B→prefix20,480B、body512KiBとの和544,768Bを上限にする。KDEBUG policyは維持。
+body+将来pool512KiB+stack128KiBは定常1,036,288B、prefix込みpeak1,052,672B (タグ/record等は後続実測)。旧static384KiB poolは試作bodyに無い。
+実測台帳は `build/out/sqlite-proto/measurements.json` (節/使用archive member/構成/ELF SHA-256)。再生成と境界試験は `check-sqlite-module-proto-host`、S4対照は `check-kdebug-init-host`。
+
 ### 7-2. 像・実行時RAMの見積もりと止める条件
 
 現 `kaudit_boot_pages` はkdebugだけを特別控除する (`kernel/kaudit_boot.c:14`、`kernel/memory_boot.c:391`)。SQLiteをFIXED鎖からowner割当へ移すT4cで、固定鎖減少とpool/SLACK供給増を更新する。module使用頁はその内数として観測し、独立欄に出すなら元分類から控除する。bundleのother勘定・prefix返却・隔離残頁まで重複なし、総和diff0を要求する。既存起動監査の回数を変えず、公開/rollback/集積返却は別観測点とする。
@@ -298,6 +312,7 @@ T6bは最後に集積を上位票の `[0x500000,0x600000)` へ移し上限1MiB�
 | 範囲 | core像の増減見積もり (未実装、[推]) | core外・測定ゲート |
 |---|---:|---|
 | T4a 共通核/生成policy | +4〜8KiB (DBGREF分を二重計上しない) | prototypeでprefix/body/record容量を確定。kdebug ONは既存body48KiB・peak60KiB、OFFは0 |
+| T4a-4 再測定 (host ILP32、製品未結線) | core増分0 | 512KiB内に固定管理状態80B、HEAP 524,208B、実容量516,096B。予約196,608B、APP+SYSTEM上限319,488B。合成S/M/L最大FEP 99,328B、実IPADIC 101,376B、各27切替成功 (ログ `~/os32-tmp/run/t4a/fix1_budget*.log`) |
 | T4b facade/F2/F3/X群 | +4〜10KiB | group/identity/出力stagingを含むmap差分。X-1の棚卸しで上限が変わるなら着手前に再見積もり |
 | T4c SQLite分離 | +1〜3KiBのcore接続、連結SQLite占有は別計上 | 現連結SQLite全占有770,560B (`build/out/kernel.map:4477,8033`)、うちstatic MEMSYS5 393,216Bを除く377,344Bがbody基準。ページ切上げ380,928B＋512KiB＋128KiB＝**1,036,288B定常 [推]**、peakはこれに実測prefixを加える |
 | T5a FEP分離 | 旧FEP約18.5KiBを外へ、B2 staging等+5〜7KiB [推] | module本体/状態・ページ丸めを新mapで計上。旧群値は `docs/tasks/v3/TASK_MEMMAP_V3.md:322`、現実測の節約量ではない |

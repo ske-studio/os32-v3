@@ -1,4 +1,5 @@
 check-kdebug-ctx-host:
+- tools/module_schema.py
 - sdk/kapi.json
 - build/checks.d/check-kdebug-ctx-host.mk
 - kdebug/v86_gcap.c

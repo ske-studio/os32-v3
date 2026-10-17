@@ -1,0 +1,20 @@
+check-module-runtime-host:
+- kernel/module_runtime.c
+- kernel/module_runtime.h
+- kernel/module_image.c
+- kernel/module_image.h
+- kernel/module_schema.h
+- kernel/pgalloc.h
+- include/types.h
+- include/memmap.h
+- fs/vfs.h
+- lib/kstring.h
+- lib/crc32_core.inc
+- tools/tests/module_runtime_host.c
+- tools/tests/test_module_runtime.py
+- tools/tests/module_runtime_tdd.md
+- tools/tests/test_module_image.py
+- tools/tests/module_image_host.c
+- tools/tests/host32.py
+- build/checks.d/check-module-runtime-host.mk
+- tools/check_map.d/check-module-runtime-host.yaml

@@ -48,7 +48,7 @@
 | `snd_engine.c` | FM/SSG シーケンサ (タイマ IRQ 駆動) | [05 §5-3](05_drivers.md) |
 | `v86*.c` | V86 モニタ、仮想 PIC、キー所有権、脱出キー | [archive/v21/v86v2/](archive/v21/v86v2/README.md) |
 | `kselftest.c` | ブート時セルフテスト (kstring / kmalloc / kprintf)。プリミティブを触ったら項目を足す | [POLICY_DEBUG §2](POLICY_DEBUG.md) |
-| `module.c` / `module_image.c` | デバッグ部品 `/boot/kdebug.bin` の読み込み・検証・拒否と回収 (KDEBUG=1 のときだけ、root マウント後)。部品の中身は `kdebug/` | [tasks/v3/TASK_DBGREF](tasks/v3/TASK_DBGREF.md) |
+| `module.c` / `module_image.c` / `module_runtime.c` | 部品の検証・固定 record・load/start/abort と隔離の核、および `/boot/kdebug.bin` の接続 (KDEBUG=1 のときだけ、root マウント後)。部品の中身は `kdebug/` | [tasks/v3/TASK_T4_T6_MODULES §2-2](tasks/v3/TASK_T4_T6_MODULES.md#2-2-状態と公開)、[TASK_DBGREF](tasks/v3/TASK_DBGREF.md) |
 | `irq.c` `irq_math.c` | 割り込みの動的登録 (`irq_register`、共有 IRQ、storm の検出) — v2.1 | [tasks/v3/TASK_HAL_WIRING](tasks/v3/TASK_HAL_WIRING.md) §1-1 |
 | `dma_pool.c` `dma_pool_math.c` | DMA プール (0x7F0000 の 64KB 整列の固定区間。64KB 境界をまたがない配り方、[HW2]) — v2.1 | [tasks/v3/TASK_HAL_WIRING](tasks/v3/TASK_HAL_WIRING.md) §1-3、[02 §2-1](02_memory.md) |
 | `ktime.c` `time_math.c` | µs 時計 (`ktime_*`、2.4576MHz 系のクランプ) — v2.1 | [tasks/v3/TASK_HAL_WIRING](tasks/v3/TASK_HAL_WIRING.md) §1-5 |

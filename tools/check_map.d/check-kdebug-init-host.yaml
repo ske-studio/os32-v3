@@ -1,4 +1,7 @@
 check-kdebug-init-host:
+- kernel/module_schema.h
+- tools/module_schema.py
+- tools/gen_module_schema.py
 - build/checks.d/check-kdebug-init-host.mk
 - build/kdebug.mk
 - build/module.ld
@@ -8,6 +11,8 @@ check-kdebug-init-host:
 - include/kprintf.h
 - include/memmap.h
 - kernel/module.c
+- kernel/module_runtime.c
+- kernel/module_runtime.h
 - kernel/module.h
 - kernel/module_image.c
 - kernel/module_image.h

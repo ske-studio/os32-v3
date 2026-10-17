@@ -27,9 +27,10 @@ def build_validator(directory, source=None):
 
 
 def validate(exe, image, *, kapi=75, layout=3, abi=0x12345678, pair=0xabcdef01,
-             ops=2, img_valid=1, imports=(), exports=(), runner=None):
-    contract = bytearray(struct.pack("<8I", kapi, layout, abi, pair, ops, img_valid,
-                                     len(imports), len(image)))
+             ops=2, img_valid=1, imports=(), exports=(), module_id=1, runner=None, relocate_base=None):
+    contract = bytearray(struct.pack("<11I", kapi, layout, abi, pair, ops, img_valid,
+                                     len(imports), len(image), module_id,
+                                     int(relocate_base is not None), relocate_base or 0))
     for entry in imports:
         contract.extend(struct.pack("<IHH", *entry))
     slots = [(0, 0, 0)] * 18
@@ -91,6 +92,15 @@ def cases():
         result.append((group, name, image, expected, dict(POLICY, **(policy or {}))))
 
     add("future-version", "future", lambda b: word(b, 1, 2))
+    add("id-policy", "known-image-wrong-policy", lambda b: None, policy={"module_id": 2})
+    add("id-policy", "unknown-policy", lambda b: None, policy={"module_id": 0})
+    add("id-policy", "wrong-image-id", lambda b: word(b, 7, 2))
+    add("id-policy", "unknown-matching-id", lambda b: word(b, 7, 99),
+        policy={"module_id": 99})
+    add("id-policy", "wrong-phase", lambda b: word(b, 8, 1))
+    add("id-policy", "missing-pair-flag", lambda b: word(b, 9, 0))
+    add("id-policy", "unknown-flag", lambda b: word(b, 9, 3))
+    add("id-policy", "stop-not-allowed", lambda b: word(b, 30, 10))
     add("header-size", "short-header-field", lambda b: word(b, 2, 140))
     add("image-size", "truncated", lambda b: b[:-1])
     add("image-size", "declared-size", lambda b: word(b, 3, 4159))
@@ -141,6 +151,8 @@ def cases():
     for i in (4, 5, 6, 33):
         add("abi-ops", f"abi-{i}", lambda b, i=i: word(b, i, 0), 6)
     add("abi-ops", "old-ops-v1", lambda b: word(b, 33, 1), 6)
+    add("abi-ops", "caller-ops-mismatch", lambda b: None, 6, {"ops": 1})
+    add("abi-ops", "old-ops-matching-caller", lambda b: word(b, 33, 1), 6, {"ops": 1})
     add("abi-ops", "import-count", lambda b: None, 6, {"imports": []})
     # Additional boundary and metadata variants, beyond the 14 required groups.
     for i in (0, 7, 8, 9, 30, 34, 35):
@@ -174,6 +186,12 @@ def cases():
         {"imports": [], "exports": []})
     add("names-extra", "missing-nul", lambda b: word(b, 28, 23))
     add("names-extra", "extra-nul", lambda b: word(b, 28, 26))
+    def oversized_image(b):
+        b.extend(bytes(262145 - len(b)))
+        for index, value in ((3, len(b)), (10, 262144), (12, len(b) - 4096),
+                             (19, len(b) - 4096), (20, 0)):
+            word(b, index, value)
+    add("image-limit", "image-one-byte-over-limit", oversized_image)
     for size in (0, 1, 127, 143):
         add("header-extra", f"short-{size}", lambda b, size=size: b[:size], checksum=False)
     return result
@@ -234,6 +252,10 @@ MUTATIONS = [
     ("pair", "h[MI_PAIR_CRC] != policy->pair_image_crc", "0"),
     ("img-valid", "!policy->img_valid", "0"),
     ("abi-ops", "h[MI_OPS_VERSION] != policy->ops_version", "0"),
+    ("policy-ops", "h[MI_OPS_VERSION] != component->ops_version", "0"),
+    ("policy-id", "h[MI_ID] != component->module_id", "0"),
+    ("image-limit", "file_size > component->image_max", "0"),
+    ("body-limit", "h[MI_MEM_SIZE] > component->mem_max", "0"),
 ]
 
 

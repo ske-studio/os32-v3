@@ -3,7 +3,7 @@
 
 The product build packages kdebug separately from the resident kernel. Metadata
 comes from gen_kdebug_imports.py; exports come from the linked kdebug_ops
-initializer (version followed by the sixteen function pointers).
+initializer (version followed by the eighteen function pointers).
 """
 import argparse
 import json
@@ -12,16 +12,11 @@ import struct
 import sys
 import zlib
 
-HEADER_SIZE = 144
-PAGE_SIZE = 4096
-MAX_SIZE = 262144
-MAX_RELOCS = 16384
-MAX_IMPORTS = 1024
-OPS_NAMES = ('selftest_run', 'selftest_post_exec', 'selftest_post_unicode',
-             'selftest_post_probe', 'crt_diag_bootlog', 'gcap_capture',
-             'gcap_active', 'gcap_keep_if', 'gcap_insn_abort', 'gcap_port_passed',
-             'gcap_pass_in', 'gcap_pass_out', 'gcap_note_in', 'gcap_note_out',
-             'gcap_detach', 'gcap_release', 'nic_selftest', 'nic_trace')
+from module_schema import CONSTANTS, HEADER_FIELDS, KDEBUG_OPS_NAMES, POLICIES
+
+HEADER_SIZE = CONSTANTS['HEADER_SIZE']
+PAGE_SIZE = CONSTANTS['PAGE_SIZE']
+OPS_NAMES = KDEBUG_OPS_NAMES  # Also consumed by gen_kdebug_imports.py.
 SECTION_NAMES = ('.text', '.rodata', '.data', '.bss')
 
 
@@ -113,7 +108,7 @@ class Elf:
         require(name in self.symbols, 'missing ELF symbol: ' + name)
         return self.symbols[name]
 
-    def body(self):
+    def body(self, policy):
         alloc = [s for s in self.sections if s['flags'] & 2 and s['size']]
         require(all(s['name'] in SECTION_NAMES for s in alloc),
                 'unexpected allocated ELF section')
@@ -128,8 +123,8 @@ class Elf:
         for section in alloc:
             require(section['type'] == (8 if section['name'] == '.bss' else 1),
                     'incorrect allocated section type')
-            require(section['addr'] <= MAX_SIZE and
-                    section['size'] <= MAX_SIZE - section['addr'], 'body too large')
+            require(section['addr'] <= policy['mem_max'] and
+                    section['size'] <= policy['mem_max'] - section['addr'], 'body too large')
         ordered = sorted(alloc, key=lambda s: s['addr'])
         for left, right in zip(ordered, ordered[1:]):
             require(left['addr'] + left['size'] <= right['addr'],
@@ -146,7 +141,7 @@ class Elf:
                   for name, s in zip(SECTION_NAMES, result)]
         return payload, mem_size, ranges
 
-    def relocations(self, payload, mem_size):
+    def relocations(self, payload, mem_size, policy):
         relocs = []
         for section in self.sections:
             if section['type'] not in (4, 9):
@@ -175,13 +170,19 @@ class Elf:
                 require(symbol['shndx'] < len(self.sections) and
                         self.sections[symbol['shndx']]['flags'] & 2,
                         'relocation must reference an allocated body symbol')
+                require(symbol['value'] < mem_size or (symbol['value'] == mem_size and
+                        symbol['name'] == '__module_end'), 'relocation symbol outside body')
                 if kind == 2:
+                    displacement = struct.unpack_from('<i', payload, where)[0]
+                    require(0 <= where + 4 + displacement <= mem_size,
+                            'PC32 target outside body')
                     continue
                 value = struct.unpack_from('<I', payload, where)[0]
-                require(value <= mem_size, 'relocation value outside body')
+                require(value < mem_size or (value == mem_size and
+                        symbol['name'] == '__module_end'), 'relocation value outside body')
                 relocs.append(where)
         relocs.sort()
-        require(len(relocs) <= MAX_RELOCS, 'too many relocations')
+        require(len(relocs) <= policy['reloc_max'], 'too many relocations')
         require(all(b >= a + 4 for a, b in zip(relocs, relocs[1:])),
                 'overlapping relocation writes')
         return relocs
@@ -204,24 +205,27 @@ def pair_crc(image):
 def name_bytes(name):
     require(isinstance(name, str), 'name must be a string')
     data = name.encode('ascii')
-    require(0 < len(data) <= 63 and b'\0' not in data, 'invalid module name')
+    require(0 < len(data) <= CONSTANTS['NAME_MAX'] and b'\0' not in data, 'invalid module name')
     return data
 
 
-def build(elf_data, metadata, vmkernel, kapi_abi_gen=75, layout_gen=3):
+def build(elf_data, metadata, vmkernel, kapi_abi_gen, layout_gen, *,
+          module_id=CONSTANTS['ID_KDEBUG']):
+    require(module_id in POLICIES, 'unknown module ID')
+    policy = POLICIES[module_id]
     elf = Elf(elf_data)
-    payload, mem_size, ranges = elf.body()
-    relocs = elf.relocations(payload, mem_size)
+    payload, mem_size, ranges = elf.body(policy)
+    relocs = elf.relocations(payload, mem_size, policy)
     text_off, text_size = ranges[0]
     data_off, data_size = ranges[2]
-    init = elf.symbol('kdebug_init')['value']
+    init = elf.symbol(policy['init_symbol'])['value']
     require(text_off <= init < text_off + text_size, 'init outside text')
     imports = metadata['imports']
-    require(len(imports) <= MAX_IMPORTS, 'too many imports')
+    require(len(imports) <= policy['import_max'], 'too many imports')
     import_table, export_table, names = bytearray(), bytearray(), bytearray()
-    seen_names = set()
+    seen_names, seen_hashes = set(), set()
     if imports:
-        slots = elf.symbol('kdebug_import_slots')
+        slots = elf.symbol(policy['imports_symbol'])
         require(slots['value'] == data_off and slots['size'] == len(imports) * 4 and
                 slots['size'] <= data_size and data_off % 4 == 0,
                 'import slots must be the exact array at data start')
@@ -232,6 +236,8 @@ def build(elf_data, metadata, vmkernel, kapi_abi_gen=75, layout_gen=3):
                 'invalid import metadata')
         require(name not in seen_names, 'duplicate import name')
         seen_names.add(name)
+        require(fnv1a(name) not in seen_hashes, 'module name hash collision')
+        seen_hashes.add(fnv1a(name))
         slot_off = data_off + 4 * index
         require(not any(r < slot_off + 4 and slot_off < r + 4 for r in relocs),
                 'relocation overlaps import slot')
@@ -239,16 +245,17 @@ def build(elf_data, metadata, vmkernel, kapi_abi_gen=75, layout_gen=3):
                 'import slot must be initially zero')
         import_table += struct.pack('<IHHI', fnv1a(name), ver, kind, slot_off)
         names += name + b'\0'
-    ops_version = 2
-    if 'kdebug_ops' in elf.symbols:
-        ops = elf.symbol('kdebug_ops')
-        require(ops['size'] == 4 * (len(OPS_NAMES) + 1), 'invalid kdebug_ops size')
+    ops_version = policy['ops_version']
+    ops_names = policy['ops_names']
+    if policy['ops_symbol'] in elf.symbols:
+        ops = elf.symbol(policy['ops_symbol'])
+        require(ops['size'] == 4 * (policy['ops_slots'] + 1), 'invalid module ops size')
         require(any(off <= ops['value'] and ops['value'] - off <= size and
                     ops['size'] <= size - (ops['value'] - off) for off, size in ranges[:3]),
                 'kdebug_ops outside payload sections')
-        values = struct.unpack_from('<' + 'I' * (len(OPS_NAMES) + 1), payload, ops['value'])
+        values = struct.unpack_from('<' + 'I' * (policy['ops_slots'] + 1), payload, ops['value'])
         require(values[0] == ops_version, 'unsupported kdebug_ops version')
-        for slot, (name, entry) in enumerate(zip(OPS_NAMES, values[1:]), 1):
+        for slot, (name, entry) in enumerate(zip(ops_names, values[1:]), 1):
             pointer_off = ops['value'] + slot * 4
             # A function at text VA zero is non-null in the relocated image.
             if pointer_off not in relocs:
@@ -256,6 +263,10 @@ def build(elf_data, metadata, vmkernel, kapi_abi_gen=75, layout_gen=3):
                 continue
             require(text_off <= entry < text_off + text_size, 'export outside text')
             encoded = name_bytes(name)
+            require(encoded not in seen_names, 'duplicate export name')
+            require(fnv1a(encoded) not in seen_hashes, 'module name hash collision')
+            seen_names.add(encoded)
+            seen_hashes.add(fnv1a(encoded))
             export_table += struct.pack('<IHHI', fnv1a(encoded), slot, 1, entry)
             names += encoded + b'\0'
     reloc_table = b''.join(struct.pack('<I', r) for r in relocs)
@@ -268,24 +279,36 @@ def build(elf_data, metadata, vmkernel, kapi_abi_gen=75, layout_gen=3):
     prefix_size = offset
     payload_offset = align(prefix_size)
     image_size = payload_offset + len(payload)
-    require(image_size <= MAX_SIZE and mem_size <= MAX_SIZE, 'module exceeds size limit')
+    require(image_size <= policy['image_max'] and mem_size <= policy['mem_max'],
+            'module exceeds size limit')
+    require(payload_offset + mem_size <= policy['load_span_max'], 'load span too large')
+    require(len(export_table) // CONSTANTS['RECORD_SIZE'] <= policy['export_max'],
+            'too many exports')
     abi = metadata['module_abi_gen']
     require(all(isinstance(v, int) and 0 <= v <= 0xffffffff
                 for v in (abi, kapi_abi_gen, layout_gen)), 'invalid ABI generation')
-    pair = pair_crc(vmkernel)
-    header = [int.from_bytes(b'KMOD', 'little'), 1, HEADER_SIZE, image_size,
-              kapi_abi_gen, layout_gen, abi, 1, 2, 1, mem_size,
-              payload_offset, len(payload), *[n for r in ranges for n in r],
-              offsets[0], len(relocs), offsets[1], len(imports),
-              offsets[2], len(export_table) // 12, offsets[3], len(names),
-              init, 0, pair, 0, ops_version, 0, 0]
-    image = bytearray(struct.pack('<36I', *header) + b''.join(tables))
+    pair = pair_crc(vmkernel) if policy['required_flags'] & CONSTANTS['FLAG_PAIR'] else 0
+    header = dict(MAGIC=CONSTANTS['MAGIC'], FORMAT=CONSTANTS['FORMAT_VERSION'],
+                  HEADER_SIZE=HEADER_SIZE, IMAGE_SIZE=image_size,
+                  KAPI=kapi_abi_gen, LAYOUT=layout_gen, ABI=abi, ID=module_id,
+                  PHASE=policy['phase'], FLAGS=policy['required_flags'], MEM_SIZE=mem_size,
+                  PAYLOAD_OFF=payload_offset, PAYLOAD_SIZE=len(payload),
+                  RELOC_OFF=offsets[0], RELOC_COUNT=len(relocs),
+                  IMPORT_OFF=offsets[1], IMPORT_COUNT=len(imports),
+                  EXPORT_OFF=offsets[2], EXPORT_COUNT=len(export_table) // CONSTANTS['RECORD_SIZE'],
+                  NAMES_OFF=offsets[3], NAMES_SIZE=len(names), INIT=init, STOP=0,
+                  PAIR_CRC=pair, IMAGE_CRC=0, OPS_VERSION=ops_version, RESERVED0=0, RESERVED1=0)
+    for section, (offset, size) in zip(('TEXT', 'RO', 'DATA', 'BSS'), ranges):
+        header[section + '_OFF'], header[section + '_SIZE'] = offset, size
+    image = bytearray(struct.pack('<' + 'I' * len(HEADER_FIELDS),
+                                  *[header[field] for field in HEADER_FIELDS]) + b''.join(tables))
     image += bytes(payload_offset - len(image)) + payload
-    struct.pack_into('<I', image, 128, zlib.crc32(image))
+    struct.pack_into('<I', image, HEADER_FIELDS.index('IMAGE_CRC') * 4, zlib.crc32(image))
     stats = dict(prefix_size=prefix_size, prefix_alloc=payload_offset,
                  reloc_count=len(relocs), import_count=len(imports),
                  export_count=len(export_table) // 12, names_size=len(names),
-                 pair_image_crc=pair, payload_size=len(payload), mem_size=mem_size)
+                 pair_image_crc=pair, payload_size=len(payload), mem_size=mem_size,
+                 image_size=image_size, load_span=payload_offset + mem_size)
     return bytes(image), stats
 
 
@@ -293,14 +316,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--elf', type=Path, required=True)
     parser.add_argument('--metadata', type=Path, required=True)
-    parser.add_argument('--vmkernel', type=Path, required=True)
-    parser.add_argument('--kapi-abi-gen', type=lambda s: int(s, 0), default=75)
-    parser.add_argument('--layout-gen', type=lambda s: int(s, 0), default=3)
+    parser.add_argument('--vmkernel', type=Path)
+    parser.add_argument('--module-id', type=int, default=CONSTANTS['ID_KDEBUG'])
+    parser.add_argument('--kapi-abi-gen', type=lambda s: int(s, 0), required=True)
+    parser.add_argument('--layout-gen', type=lambda s: int(s, 0), required=True)
     parser.add_argument('-o', '--output', type=Path, required=True)
     args = parser.parse_args()
     try:
         image, stats = build(args.elf.read_bytes(), json.loads(args.metadata.read_text()),
-                             args.vmkernel.read_bytes(), args.kapi_abi_gen, args.layout_gen)
+                             args.vmkernel.read_bytes() if args.vmkernel else b'',
+                             args.kapi_abi_gen, args.layout_gen, module_id=args.module_id)
         temporary = args.output.with_name(args.output.name + '.tmp')
         temporary.write_bytes(image)
         temporary.replace(args.output)

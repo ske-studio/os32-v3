@@ -107,9 +107,18 @@ u32 pgalloc_alloc_phys(u32 owner, int n)
 int pgalloc_free_n_owner(u32 owner, u32 pfn, int n)
 {
     CHECK(owner == (LEDGER_OWNER_FIXED_LAST + 1) && pfn == (u32)pool / PAGE_SIZE && n > 0 && (u32)n <= pages);
+    if (input[1] == 8) return 0;
     pages -= n;
     /* Reclaim really destroys prefix: published pointers must target the body. */
     kmemset(pool, 0xdd, n * PAGE_SIZE);
+    return 1;
+}
+int ledger_reclaim_owner(u32 owner, u32 *reclaimed)
+{
+    CHECK(owner == (LEDGER_OWNER_FIXED_LAST + 1));
+    *reclaimed = pages;
+    pages = 0;
+    kmemset(pool, 0xdd, CAP);
     return 1;
 }
 void kprintf(unsigned char color, const char *format, ...)
@@ -151,7 +160,8 @@ static void check_boot_dispatch(void)
     static const char *const names[] = {
         "OFF", "RUNNING", "NOT_FOUND", "BAD_HEADER", "PAIR_MISMATCH",
         "NO_IMAGE_CRC", "ABI_MISMATCH", "NO_PAGES", "SHORT_READ",
-        "BAD_CRC", "INIT_FAILED", "RELOC_INVALID", "IMPORT_INVALID"
+        "BAD_CRC", "INIT_FAILED", "RELOC_INVALID", "IMPORT_INVALID",
+        "RECORD_FULL", "BAD_DEPENDENCY", "BUSY", "QUARANTINED"
     };
     kdebug.ops.selftest_run = dispatch_run;
     kdebug.ops.selftest_post_exec = dispatch_exec;

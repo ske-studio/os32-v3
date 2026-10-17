@@ -367,7 +367,10 @@ static void journal_name_len(void)
     printf("PASS journal_name_len\n");
 }
 
-int main(void)
+#ifndef IME_DICT_HOST_MAIN
+#define IME_DICT_HOST_MAIN main
+#endif
+int IME_DICT_HOST_MAIN(void)
 {
     static IME_Dict d;
     int n, fd;

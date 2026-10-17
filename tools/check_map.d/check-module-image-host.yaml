@@ -1,4 +1,7 @@
 check-module-image-host:
+- kernel/module_schema.h
+- tools/module_schema.py
+- tools/gen_module_schema.py
 - build/checks.d/check-module-image-host.mk
 - include/types.h
 - kernel/module_image.c

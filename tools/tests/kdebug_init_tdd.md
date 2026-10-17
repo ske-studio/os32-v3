@@ -17,3 +17,15 @@ import 呼出しゼロを検査する。`--mutate` は kprintf 呼出し・候�
 - 18 slots, slot 17 NULL, slot 18 relocated into the retained body; version 1 rejects with ABI_MISMATCH before init. S4 imports = 223.
 - Trace harness includes actual nic_trace.c: seq/crc, append then sync, fresh TRY, malformed/overflow/stale marker, write/sync/short-write failure and sticky trace=off (12 scenarios plus fresh TRY).
 - Mutants: omitted sync, failure latch, image CRC comparison, and fresh TRY reset must each fail.
+
+## T4a-1
+
+The real S4 image (235 imports, ops v2 / 18 slots) still reaches RUNNING and the
+post-exec selftest, with zero imports during init. KDEBUG=0 performs no open or
+owner allocation. Added loader cases reject future format, a different module
+ID, wrong phase, missing PAIR, duplicate import slots, duplicate relocations,
+duplicate exports and overlapping tables before init/publication. Rejected cases
+retain zero public ops and reclaim pages/FD/owner through the existing harness.
+For OFF/rejected images, init starts with a UD2 probe (outside relocations) so any
+early call fails the test even though the real init has no side effects.
+Guest operation and deployment remain assigned to later integration gates.

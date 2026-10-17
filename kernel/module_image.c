@@ -5,6 +5,15 @@
 STATIC_ASSERT(sizeof(u32) == 4, module_u32_is_four_bytes);
 STATIC_ASSERT(MI_WORDS * 4 == MODULE_HEADER_SIZE, module_header_words);
 
+static const struct module_component_policy components[] = MODULE_COMPONENT_POLICIES;
+
+static const struct module_component_policy *component_policy(u32 id)
+{
+    for (u32 i = 0; i < sizeof(components) / sizeof(components[0]); i++)
+        if (components[i].module_id == id) return &components[i];
+    return 0;
+}
+
 static u32 get32(const u8 *p)
 {
     return (u32)p[0] | ((u32)p[1] << 8) | ((u32)p[2] << 16) | ((u32)p[3] << 24);
@@ -39,28 +48,34 @@ int module_image_header(const u8 *header, u32 header_bytes, u32 file_size,
     struct module_image_plan plan;
     u32 *h = plan.word;
     u32 table_off[4], table_len[4];
-    static const u32 count_max[3] = {
-        MODULE_RELOC_MAX, MODULE_IMPORT_MAX, MODULE_EXPORT_MAX
-    };
     static const u32 record_size[3] = {4, MODULE_RECORD_SIZE, MODULE_RECORD_SIZE};
     if (!header || !policy || header_bytes < MODULE_HEADER_SIZE)
         return MODULE_BAD_HEADER;
+    const struct module_component_policy *component = component_policy(policy->module_id);
+    if (!component) return MODULE_BAD_HEADER;
+    const u32 count_max[3] = {
+        component->reloc_max, component->import_max, component->export_max
+    };
     for (u32 i = 0; i < MI_WORDS; i++) h[i] = get32(header + 4 * i);
     if (h[MI_MAGIC] != MODULE_MAGIC || h[MI_FORMAT] != MODULE_FORMAT_VERSION ||
         h[MI_HEADER_SIZE] != MODULE_HEADER_SIZE || h[MI_IMAGE_SIZE] != file_size ||
-        file_size > MODULE_IMAGE_MAX || h[MI_ID] != MODULE_ID_KDEBUG ||
-        h[MI_PHASE] != MODULE_PHASE_POST_ROOT || h[MI_FLAGS] != MODULE_FLAG_PAIR ||
-        h[MI_STOP] != 0 || h[MI_RESERVED0] != 0 || h[MI_RESERVED1] != 0)
+        file_size > component->image_max || h[MI_ID] != component->module_id ||
+        h[MI_PHASE] != component->phase ||
+        (h[MI_FLAGS] & component->required_flags) != component->required_flags ||
+        (h[MI_FLAGS] & ~component->allowed_flags) ||
+        (!component->stop_allowed && h[MI_STOP]) ||
+        h[MI_RESERVED0] != 0 || h[MI_RESERVED1] != 0)
         return MODULE_BAD_HEADER;
     if (h[MI_PAYLOAD_OFF] < MODULE_PAGE_SIZE ||
         h[MI_PAYLOAD_OFF] % MODULE_PAGE_SIZE ||
         h[MI_PAYLOAD_OFF] > file_size ||
         h[MI_PAYLOAD_SIZE] != file_size - h[MI_PAYLOAD_OFF] ||
-        h[MI_MEM_SIZE] % MODULE_PAGE_SIZE || h[MI_MEM_SIZE] > MODULE_IMAGE_MAX ||
+        h[MI_MEM_SIZE] % MODULE_PAGE_SIZE || h[MI_MEM_SIZE] > component->mem_max ||
         h[MI_PAYLOAD_SIZE] > h[MI_MEM_SIZE] ||
         h[MI_MEM_SIZE] > 0xffffffffUL - h[MI_PAYLOAD_OFF])
         return MODULE_BAD_HEADER;
     plan.load_span = h[MI_PAYLOAD_OFF] + h[MI_MEM_SIZE];
+    if (plan.load_span > component->load_span_max) return MODULE_BAD_HEADER;
     for (u32 i = 0; i < 4; i++) {
         u32 off = h[MI_TEXT_OFF + 2 * i], len = h[MI_TEXT_SIZE + 2 * i];
         if (!within(off, len, h[MI_MEM_SIZE]) ||
@@ -72,6 +87,7 @@ int module_image_header(const u8 *header, u32 header_bytes, u32 file_size,
                 return MODULE_BAD_HEADER;
     }
     if (!in_text(h[MI_INIT], h)) return MODULE_BAD_HEADER;
+    if (h[MI_STOP] && !in_text(h[MI_STOP], h)) return MODULE_BAD_HEADER;
     for (u32 i = 0; i < 4; i++) {
         u32 off = h[MI_RELOC_OFF + 2 * i], count = h[MI_RELOC_COUNT + 2 * i];
         if (off < MODULE_HEADER_SIZE || off > h[MI_PAYLOAD_OFF])
@@ -102,10 +118,13 @@ int module_image_header(const u8 *header, u32 header_bytes, u32 file_size,
     }
     if (h[MI_KAPI] != policy->kapi_abi_gen || h[MI_LAYOUT] != policy->layout_gen ||
         h[MI_ABI] != policy->module_abi_gen || h[MI_OPS_VERSION] != policy->ops_version ||
+        h[MI_OPS_VERSION] != component->ops_version ||
         h[MI_IMPORT_COUNT] != policy->import_count)
         return MODULE_ABI_MISMATCH;
-    if (!policy->img_valid) return MODULE_NO_IMAGE_CRC;
-    if (h[MI_PAIR_CRC] != policy->pair_image_crc) return MODULE_PAIR_MISMATCH;
+    if (h[MI_FLAGS] & MODULE_FLAG_PAIR) {
+        if (!policy->img_valid) return MODULE_NO_IMAGE_CRC;
+        if (h[MI_PAIR_CRC] != policy->pair_image_crc) return MODULE_PAIR_MISMATCH;
+    }
     if (out) *out = plan;
     return MODULE_IMAGE_OK;
 }
@@ -129,6 +148,7 @@ int module_image_validate(const u8 *image, u32 size,
     struct module_image_plan plan;
     int rc = module_image_header(image, size, size, policy, &plan);
     if (rc) return rc;
+    const struct module_component_policy *component = component_policy(policy->module_id);
     const u32 *h = plan.word;
     const u8 zero[4] = {0, 0, 0, 0};
     u32 crc_off = MI_IMAGE_CRC * 4;
@@ -159,7 +179,7 @@ int module_image_validate(const u8 *image, u32 size,
     for (u32 i = 0; i < h[MI_EXPORT_COUNT]; i++) {
         const u8 *rec = image + h[MI_EXPORT_OFF] + i * MODULE_RECORD_SIZE;
         u32 slot = get16(rec + 4), hash = get32(rec);
-        if (slot < 1 || slot > MODULE_OPS_SLOTS || (seen & (1U << slot)) ||
+        if (slot < 1 || slot > component->ops_slots || (seen & (1U << slot)) ||
             !in_text(get32(rec + 8), h) || !policy->exports)
             return MODULE_BAD_HEADER;
         const struct module_symbol_contract *want = &policy->exports[slot - 1];
@@ -190,6 +210,28 @@ int module_image_validate(const u8 *image, u32 size,
             u32 slot = get32(image + h[MI_IMPORT_OFF] + j * MODULE_RECORD_SIZE + 8);
             if (overlap(off, 4, slot, 4)) return MODULE_RELOC_INVALID;
         }
+    }
+    if (out) *out = plan;
+    return MODULE_IMAGE_OK;
+}
+
+/* Validate every write and base addition before changing even BSS. The owned
+ * image is stable in OS32's cooperative loader; no prefix pointers escape. */
+int module_image_relocate(u8 *image, u32 size,
+                          const struct module_image_policy *policy, u32 base,
+                          struct module_image_plan *out)
+{
+    struct module_image_plan plan;
+    int rc = module_image_validate(image, size, policy, &plan);
+    if (rc) return rc;
+    const u32 *h = plan.word;
+    if (base > 0xffffffffUL - h[MI_MEM_SIZE]) return MODULE_RELOC_INVALID;
+    u8 *body = image + h[MI_PAYLOAD_OFF];
+    for (u32 i = h[MI_PAYLOAD_SIZE]; i < h[MI_MEM_SIZE]; i++) body[i] = 0;
+    for (u32 i = 0; i < h[MI_RELOC_COUNT]; i++) {
+        u32 off = get32(image + h[MI_RELOC_OFF] + 4 * i);
+        u32 value = base + get32(body + off);
+        for (u32 j = 0; j < 4; j++) body[off + j] = (u8)(value >> (8 * j));
     }
     if (out) *out = plan;
     return MODULE_IMAGE_OK;
