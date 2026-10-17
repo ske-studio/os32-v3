@@ -640,6 +640,8 @@ int ime_is_active(void)
 
 void ime_set_mode(int mode)
 {
+    if (mode < IME_MODE_OFF || mode > IME_MODE_KATAKANA) return;
+
     /* FEP ON 時は辞書を遅延オープンする (ime_toggle と同じ)。
      * これを欠くと dict->db が NULL のまま ime_dict_search が常に
      * 0 件を返し、変換がかな確定にフォールバックする。 */
@@ -673,6 +675,9 @@ static int ime_getchar_wait(int interruptible)
 {
     int keydata;
     int result;
+
+    /* WM already passed GUI text through FEP before terminal injection. */
+    if (con_sink_is_enabled()) return kbd_getkey_wait(interruptible);
 
     /* バッファに確定済みがあれば返す */
     if (g_ime.commit_pos < g_ime.commit_len) {
@@ -712,17 +717,29 @@ static int ime_getchar_wait(int interruptible)
     }
 }
 
+/* Only an actual CUI read takes custody of the shared composition. An empty
+ * child poll must not make its exit cancel its parent's preedit. */
+static void ime_note_cui_reader(void)
+{
+    if (ring3_call_from_user())
+        g_ime_reader_owner = res_owner_get(); /* nonblocking CUI input */
+}
+
 int ime_trygetchar(void)
 {
     int keydata;
     int result;
 
+    if (con_sink_is_enabled()) return kbd_trygetchar();
+
     if (g_ime.commit_pos < g_ime.commit_len) {
+        ime_note_cui_reader();
         return (int)(u8)g_ime.commit_buf[g_ime.commit_pos++];
     }
 
     keydata = kbd_trygetkey();
     if (keydata < 0) return -1;
+    ime_note_cui_reader();
 
     if (((keydata >> 8) & 0x7F) == KEY_SPACE &&
         (kbd_shift_state & SHIFT_SHIFT)) {
@@ -811,6 +828,8 @@ static int ime_getkey_wait(int interruptible)
     int keydata;
     int result;
 
+    if (con_sink_is_enabled()) return kbd_getkey_wait(interruptible);
+
     /* バッファに確定済みがあれば 1バイトずつ返す (scancode=0) */
     if (g_ime.commit_pos < g_ime.commit_len) {
         return (int)(u8)g_ime.commit_buf[g_ime.commit_pos++];
@@ -852,13 +871,17 @@ int ime_trygetkey(void)
     int keydata;
     int result;
 
+    if (con_sink_is_enabled()) return kbd_trygetkey();
+
     /* バッファに確定済みがあれば 1バイトずつ返す (scancode=0) */
     if (g_ime.commit_pos < g_ime.commit_len) {
+        ime_note_cui_reader();
         return (int)(u8)g_ime.commit_buf[g_ime.commit_pos++];
     }
 
     keydata = kbd_trygetkey();
     if (keydata < 0) return -1;
+    ime_note_cui_reader();
 
     /* Shift+Space: ON/OFF問わず常に検出 */
     if (((keydata >> 8) & 0x7F) == KEY_SPACE &&

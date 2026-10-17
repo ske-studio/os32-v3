@@ -6,6 +6,96 @@
 //! 中身は 2026-09-10 の独立レビュー第 2・3 回で足した挙動試験で、
 //! T5b (常駐表示パネル) 撤去のときに `host/terminal_tests.rs` から移した。
 
+/// X-11: X4 deferral followed by X3 must deliver the FEP's UTF-8 once, to
+/// the foreground owner only; a consumed make must not also become a Key.
+#[test]
+fn x11_fep_pump_wait_delivers_text_once_to_foreground() {
+    use crate::{fep, input, mocks, slot};
+    use os32api::gui::proto::{GuiEvent, GUI_EV_KEY, GUI_EV_TEXT, GUI_RING_CAPACITY};
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = four_app_state(&shm); // front owner 5; other owners 2/3/4
+    mocks::fep_script(&[0xe4, 0xba, 0x9c, -1]); // 亜 (same fixture as C)
+    fep::install();
+    mocks::push_rawkeys(&[0x1c | 0x100, 0x1c]); // commit Enter make/break
+    input::capture(&mut st, input::Ctx::Pump);
+    assert_eq!(st.pending_raw_n, 2);
+    assert_eq!(mocks::IME_SCRIPT.lock().unwrap().len(), 4, "X4 must not call FEP");
+    input::capture(&mut st, input::Ctx::Wait);
+    assert_eq!(st.pending_raw_n, 0);
+    assert!(mocks::IME_SCRIPT.lock().unwrap().is_empty());
+    for si in 0..4 {
+        let h = slot::read_header(&st, si);
+        let base = slot::ring_ptr(&st, si);
+        let mut text = Vec::new();
+        let mut text_events = 0;
+        for pos in h.ring_head..h.ring_tail {
+            let ev: GuiEvent = unsafe { core::ptr::read_unaligned(
+                base.add(pos as usize % GUI_RING_CAPACITY * 16) as *const GuiEvent) };
+            if ev.kind == GUI_EV_TEXT {
+                text_events += 1;
+                text.extend_from_slice(&ev.payload[..(ev.sub & 0x7f) as usize]);
+            }
+            assert!(ev.kind != GUI_EV_KEY || ev.sub & 1 == 0,
+                    "consumed Enter was also delivered as a Key make");
+        }
+        if st.slots[si].owner == 5 {
+            assert_eq!(text, "亜".as_bytes());
+            assert_eq!(text_events, 1);
+        } else {
+            assert!(text.is_empty(), "another owner received foreground text");
+        }
+    }
+    let tails: Vec<_> = (0..4).map(|si| slot::read_header(&st, si).ring_tail).collect();
+    input::capture(&mut st, input::Ctx::Wait);
+    for si in 0..4 { assert_eq!(slot::read_header(&st, si).ring_tail, tails[si]); }
+}
+
+/// X-11: OFF confirms kana in the kernel. Drain it and deliver to the old
+/// foreground now, before another key/focus/ON can claim those bytes.
+#[test]
+fn x11_fep_toggle_off_delivers_before_focus_changes() {
+    use crate::{fep, mocks, slot};
+    use os32api::gui::proto::{GuiEvent, GUI_EV_TEXT, GUI_RING_CAPACITY};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static ON: AtomicBool = AtomicBool::new(true);
+    unsafe extern "C" fn active() -> i32 { ON.load(Ordering::SeqCst) as i32 }
+    unsafe extern "C" fn toggle() { ON.fetch_xor(true, Ordering::SeqCst); }
+    mocks::init(); ON.store(true, Ordering::SeqCst);
+    let shm = mocks::Shm::new();
+    let mut st = four_app_state(&shm);
+    mocks::fep_script(&[0xe3, 0x81, 0x82, -1]); // あ, actual C toggle control
+    unsafe {
+        (*os32api::api_ptr()).ime_is_active = active;
+        (*os32api::api_ptr()).ime_toggle = toggle;
+    }
+    fep::install();
+    let before: Vec<_> = (0..4).map(|si| slot::read_header(&st, si).ring_tail).collect();
+    fep::toggle(&mut st);
+    assert!(!fep::is_on());
+    assert!(mocks::IME_SCRIPT.lock().unwrap().is_empty(),
+            "OFF must drain kernel commit before changing focus");
+    for si in 0..4 {
+        let h = slot::read_header(&st, si);
+        if st.slots[si].owner == 5 {
+            assert_eq!(h.ring_tail, before[si] + 1, "OFF delivers before a focus change");
+            let ev: GuiEvent = unsafe { core::ptr::read_unaligned(slot::ring_ptr(&st, si)
+                .add(before[si] as usize % GUI_RING_CAPACITY * 16) as *const GuiEvent) };
+            assert_eq!(ev.kind, GUI_EV_TEXT);
+            assert_eq!(ev.sub & 0x7f, 3);
+            assert_eq!(&ev.payload[..3], "あ".as_bytes());
+        } else {
+            assert_eq!(h.ring_tail, before[si]);
+        }
+    }
+    let tails: Vec<_> = (0..4).map(|si| slot::read_header(&st, si).ring_tail).collect();
+    st.zorder.swap(0, st.z_count - 1); // next foreground
+    fep::toggle(&mut st); // ON again must not carry the old foreground's text
+    fep::flush_text(&mut st);
+    assert!(fep::is_on());
+    for si in 0..4 { assert_eq!(slot::read_header(&st, si).ring_tail, tails[si]); }
+}
+
 /// Enter 連打で、FEP が確定した文字が Input dialog の結果から抜けないこと。
 ///
 /// 確定 Enter と決定 Enter が**同じ吸い出し周期**に入ると、`fep::flush_text`

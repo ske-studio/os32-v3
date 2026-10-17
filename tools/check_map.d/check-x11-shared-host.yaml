@@ -1,0 +1,24 @@
+check-x11-shared-host:
+- kernel/ime.c
+- kernel/ime.h
+- kernel/ime_romkana.c
+- kernel/ime_render.h
+- kernel/gui.c
+- kernel/gui.h
+- kernel/con_sink.c
+- kernel/kbd_inject.c
+- include/con_sink.h
+- include/kbd_inject.h
+- drivers/kbd.c
+- drivers/kbd.h
+- exec/exec.c
+- exec/exec_kapi_init.inc
+- lib/kstring.c
+- lib/kstring_c.c
+- lib/utf8.c
+- tools/tests/test_x11_shared.py
+- tools/tests/x11_shared_host.c
+- tools/tests/host32.py
+- tools/tests/host_arch/arch_io.h
+- tools/check_map.d/check-x11-shared-host.yaml
+- build/checks.d/check-x11-shared-host.mk
