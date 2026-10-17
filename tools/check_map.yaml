@@ -90,7 +90,6 @@ notest:
 - userland/lib/math/vec2.c
 - userland/lib/mgx/mgx_blit.c
 - userland/lib/mgx/mgx_decode.c
-- userland/lib/rt/dbgserial.c
 - userland/lib/save/save_core.c
 - userland/lib/save/save_meta.c
 - userland/lib/snd/libos32snd.c

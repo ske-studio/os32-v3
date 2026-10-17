@@ -1,6 +1,6 @@
 //! gshell — OS32 GUI シェル / ウィンドウマネージャ本体 (票 W1)。
 //!
-//! シェル帯 (0x300000, CPL=0, owner 1) に常駐する WM。`shell.bin` と排他で、
+//! シェル帯 (MEM_SHELL_LOAD_ADDR, CPL=0, owner 1) に常駐する WM。`shell.bin` と排他で、
 //! 切替はカーネルのシェル起動ループ (`sys_switch_shell`、契約 T9) が行う。
 //!
 //! ```text
@@ -210,7 +210,7 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
     unsafe {
         let a = os32api::api();
         /* FEP の描画先を TVRAM 版へ戻す (レビュー #4 ①)。gshell が抜けると同じ
-         * 0x300000 帯に shell.bin が載るので、GFX 版の関数表を残すとカーネル FEP が
+         * 同じシェル帯に shell.bin が載るので、GFX 版の関数表を残すとカーネル FEP が
          * 上書き済みコードへ間接 call する。gfx_shutdown より前に行う。 */
         (a.ime_set_render)(core::ptr::null_mut());
         (a.gfx_shutdown)();

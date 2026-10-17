@@ -117,8 +117,8 @@
   "sdk_build": {
     "status": "f11 USER tail trim; f8 TOPDOWN large blocks; resident fixed morecore with libc nano",
     "sources": {
-      "sdk/allocator/nano_adapter.c": "c03c307eb188dc2bc490d5da514e4fdfd445d77f7a425b176fe5779334aef3e6",
-      "sdk/allocator/nano_adapter.h": "5c67fca061feb7246c6f9fbd93354c952b4a4447eee54e0c374c84f6fd2d617b",
+      "sdk/allocator/nano_adapter.c": "e6d664bf58b1bf2486eecffd5c0aa3d8e60864806dc379f1b9cbef7e364ba856",
+      "sdk/allocator/nano_adapter.h": "fe7d202c48a0056c656629b06810f46568efbaa53778eaab3ada14f52e2258e3",
       "sdk/allocator/build_nano.py": "5ee17bf0d3d550c01f5abb083f3202ab580c158ceb41f7c85266ec0b980d3dde",
       "sdk/allocator/check_link.py": "12a6826d36eb95912e1d2739b3ee36d17d3bf5de2edd8457289761e5ef541302"
     },

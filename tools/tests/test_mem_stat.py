@@ -207,6 +207,12 @@ static u32 ht(void) { return KHEAP_SIZE; }
 static u32 hu(void) { return 8192; }
 static u32 hf(void) { return KHEAP_SIZE - 8192; }
 static int enabled(void) { return 1; }
+#ifndef SHELL_AS_APP
+/* cmd_mem is extracted without cmd_sys.c's private CRT declaration. */
+void os32_resident_sbrk_stats(u32 out[3]) {
+    out[0] = 1024; out[1] = 2048; out[2] = 131072;
+}
+#endif
 static void emit(char c) {
     __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(&c), "d"(1) : "memory");
 }
@@ -333,7 +339,11 @@ def shell_output(output, app):
     assert first.count('実測: app=') == (1 if app else 2), 'FAIL: live count'
     if app:
         assert '実測: Shell band' not in output, 'FAIL: CPL3 resident limit'
+        assert 'sbrk_used=' not in output, 'FAIL: CPL3 resident diagnostic'
     else:
+        diagnostic = '  diag: sbrk_used=1024 sbrk_peak=2048 sbrk_capacity=131072 exec_peak=0 exec_capacity=262144\n'
+        assert diagnostic in first and diagnostic in screens[1], 'FAIL: resident diagnostic'
+        assert 'sbrk_used=' not in screens[2], 'FAIL: failed system diagnostic'
         check(r'実測: Shell band sbrk上限=004B5000', first, 'resident limit')
         check(r'実測: app=4 ', first, 'all live IDs')
         for id in (3, 5):
@@ -436,7 +446,12 @@ def run_shell(runner, mutate):
             ('literal map', '(u32)MEM_EXEC_HEAP_BASE', '0x88000000U', 'literal map'),
             ('reservation line', 'exec_heap 予約起点=', 'exec_heap 起点=', 'map output'),
             ('CPL0 self only', 'int first = 2, last = 5;', 'int first = -1, last = -1;', 'caller queries'),
-            ('CPL3 resident limit', '#ifndef SHELL_AS_APP', '#if 1', 'CPL3 resident limit'),
+            # Mutate only the limit display. Enabling every resident branch also
+            # calls the private resident CRT diagnostic, absent from sh_app.
+            ('CPL3 resident limit',
+             '#ifndef SHELL_AS_APP\n    g_api->kprintf(ATTR_WHITE, "  実測: Shell band',
+             '#if 1\n    g_api->kprintf(ATTR_WHITE, "  実測: Shell band',
+             'CPL3 resident limit'),
         ]
         for name, old, new, label in variants:
             assert old in source
