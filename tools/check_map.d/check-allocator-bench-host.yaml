@@ -1,0 +1,17 @@
+check-allocator-bench-host:
+- userland/tests/allocator_bench.c
+- tools/tests/allocator_bench_host.c
+- tools/tests/test_allocator_bench.py
+- sdk/allocator/**
+- tools/check_nano_inputs.py
+- tools/tests/host32.py
+- exec/appmem.c
+- exec/appmem.h
+- include/appmem_types.h
+- include/memmap.h
+- sdk/include/os32/os32_kapi_shared.h
+- build/app.conf
+- userland/deploy.yaml
+- build/checks.d/check-allocator-bench-host.mk
+- tools/check_map.d/check-allocator-bench-host.yaml
+- tools/accept/t3c3.md
