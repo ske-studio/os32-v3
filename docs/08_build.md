@@ -315,7 +315,7 @@ python3 tools/gen_memmap.py --manifest --check
 |---|---|---|---|
 | `make check-fast` | 全検査を変異なし | 作業中 | 304.24秒 (2026-10-04、-j4/qemu、build変更によるmake変種9回込み) |
 | `make check-changed` | 当たった検査だけ変異込み、残りは変異なし。docs だけなら文書系のみ | 作業中の差分検査 | 選択集合に依存 |
-| `make check` | 全検査を変異込み | 取り込み前に1回 | 967.50秒 (16分7.5秒、2026-10-04、-j4/qemu、レビュー修正後)。改修前の当日ログは12〜48分で条件差あり |
+| `make check` | 全検査を変異込み | 取り込み前に1回 (PM は `make -k check` で最後まで回す、ROLES §0) | 967.50秒 (16分7.5秒、2026-10-04、-j4/qemu、レビュー修正後)。改修前の当日ログは12〜48分で条件差あり |
 
 今回の条件・実測・RED/GREEN は [検査整理の記録](archive/v3/TASK_T2D_T2H_RECORDS.md#検査の仕組みの整理-ci-select) を参照。
 `MUTATE=1` / `0` / `sel` と `MUTATE_TARGETS` で変異を切り替える。
