@@ -277,8 +277,8 @@ MUTATIONS = [
     # ---- 票 TASK_KAPI_DATA_FIELDS (KAPI の門、case_kapi) ----
     # 変異 K1: KAPI の門を main に繋いでいない版。
     ("kapi_gate_not_wired",
-     "    if (man_kapi_gate(subdir ? norm : 0) != 0) {",
-     "    if (0 && man_kapi_gate(subdir ? norm : 0) != 0) {"),
+     "                    : man_kapi_gate(subdir ? norm : 0)) != 0) {",
+     "                    : (0 && man_kapi_gate(subdir ? norm : 0))) != 0) {"),
     # 変異 K2: 配置違いを見逃す版 (この票の中心)。
     ("kapi_layout_ignored",
      "    if (g_man_kapi != kernel_off) { *why = HR_KAPI_LAYOUT; return 1; }",
