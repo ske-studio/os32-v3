@@ -198,6 +198,7 @@ T3 の前のデバッグ環境の整理 (起動時に読むデバッグ部品 `/
 | [tasks/realhw/PLAN.md](tasks/realhw/PLAN.md) | 実機で動かす計画 **実装中** — v2.1 の到達点は [RELEASE_v2.1.md](RELEASE_v2.1.md) §1。現在地・残件は [現行引き継ぎ §1](tasks/agents/HANDOVER_2026-10-09.md) |
 | [tasks/realhw/TASK_PEGC480_REALHW.md](tasks/realhw/TASK_PEGC480_REALHW.md) | **Ra266 の PEGC 640x480 の正典** — **受入完了 (2026-09-30、実機目視合格)**。実機 ROM (INT 18h AH=30h) の OUT 列 (`v86 -g`) に値と順序を合わせた。状態・残件は同票の状態行を参照 |
 | [tasks/realhw/TASK_TRIDENT_DRIVER.md](tasks/realhw/TASK_TRIDENT_DRIVER.md) | 内蔵 Trident (1023:9660) ドライバ **設計中** — 設計票 v5 が Codex 5 回目で Approve (2026-09-29)、実装は未着手。ユーザー決定「Cirrus はエミュレータ用、実機は Trident」 |
+| [tasks/realhw/TASK_FDRECOV.md](tasks/realhw/TASK_FDRECOV.md) | FD で起動して LAN で HDD 一式を復旧する経路と、hsync の配置の世代の門 **設計中** (2026-10-17 に設計は確定、実装は未着手) |
 | [tasks/realhw/TASK_LAN_82557.md](tasks/realhw/TASK_LAN_82557.md) | 内蔵 LAN (Intel 82557) で Host Services — **実装中**。LAN 経由の hsync は達成。現在地・残件は同票の冒頭と [現行引き継ぎ §1](tasks/agents/HANDOVER_2026-10-09.md) |
 | [tasks/realhw/TASK_FD144.md](tasks/realhw/TASK_FD144.md) | 1.44MB FD からの起動 — **受入完了・実機確認待ち** (エミュレータで F1〜F13 合格) |
 | [archive/realhw_v21/TASK_FDC_REALHW.md](archive/realhw_v21/TASK_FDC_REALHW.md) / [TASK_SERIAL_VFAST.md](archive/realhw_v21/TASK_SERIAL_VFAST.md) | 実機の FD 起動 (2026-09-22) / シリアル 115200 (2026-09-22〜23) — 受入完了 |
