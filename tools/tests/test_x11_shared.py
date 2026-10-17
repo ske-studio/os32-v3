@@ -6,6 +6,7 @@ function-extraction tool with test_exec_r1. IME state is the real resident state
 Mutations must compile and fail at their named runtime assertion.
 """
 import argparse
+import os
 import pathlib
 import re
 import subprocess
@@ -84,6 +85,16 @@ def run(mutation=None):
 
 
 MUTATIONS = [
+    ('IMECAND-CUI-mode-invisible', 'ime_source.inc',
+     '    g_ime_cui_redraw = table == NULL;', '',
+     'FAIL IMECAND CUI mode visible after reload clear'),
+    ('IMECAND-no-STOP-cancel', 'ime_source.inc',
+     '        ime_cancel_input();\n        return -1;',
+     '        return -1;', 'FAIL IMECAND input lifetime cancels all transient state'),
+    ('IMECAND-no-renderer-cancel', 'ime_source.inc',
+     '        ime_cancel_input(); /* GUI/CUI input lifetime ends with its renderer. */',
+     '', 'FAIL IMECAND input lifetime cancels all transient state'),
+
     ('park-clears-candidates', 'exec_source.inc',
      '    appslot_park_commit();      /* PARKED + 印 + owner 1 へ */',
      '    ime_init();\n    appslot_park_commit();',
@@ -127,6 +138,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
     run()
     if args.mutate:
-        for mutation in MUTATIONS:
+        selected = [m for m in MUTATIONS if not os.environ.get("MUTATION_FILTER")
+                    or os.environ["MUTATION_FILTER"] in m[0]]
+        assert selected, "no mutations selected"
+        for mutation in selected:
             run(mutation)
-        print(f'PASS {len(MUTATIONS)} mutations: runtime RED; compile failures 0')
+        print(f'PASS {len(selected)} mutations: runtime RED; compile failures 0')

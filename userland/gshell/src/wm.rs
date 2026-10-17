@@ -768,6 +768,7 @@ impl GuiState {
                 if self.lease_applied == self.windows[i].id(i) {
                     self.lease_dirty = true;
                 }
+                fep::forget_window(self, self.windows[i].id(i));
                 self.windows[i].lease_mask = 0;
                 let vac = self.windows[i].outer();
                 self.z_remove(i);
@@ -1445,6 +1446,7 @@ pub fn destroy_window(st: &mut GuiState, owner: i32, id: u32) -> i32 {
         Ok(i) => i,
         Err(e) => return e,
     };
+    fep::forget_window(st, id);
     lease::release_window(st, index);
     let vac = st.windows[index].outer();
     st.z_remove(index);
@@ -1516,6 +1518,9 @@ pub fn show_window(st: &mut GuiState, owner: i32, id: u32, show: bool) -> i32 {
     let outer = st.windows[index].outer();
     if show && !st.windows[index].visible {
         focus_leaving(st, false); /* X1 (票 KBD_NAV §1-6) */
+    }
+    if !show {
+        fep::forget_window(st, id);
     }
     let old_front = st.front_id();
     /* アプリの show / hide は WM の最小化を解く (hide ならタスクバーからも消える)。 */

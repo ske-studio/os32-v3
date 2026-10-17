@@ -539,8 +539,9 @@ pub fn commit_to(st: &mut GuiState, win_id: u32) {
         return; /* 予約は残す */
     }
     state().commit_for = 0;
-    /* 前の打鍵の確定文字が残っていれば、それは今のフォーカス窓のもの。 */
-    flush_text(st);
+    /* 前の打鍵の確定列も予約した元の窓のもの (現在の前景には渡さない)。 */
+    let original = input::target_of(st, win_id);
+    flush_text_to(st, original);
     /* RETURN 1 打では確定し切らないことがある: 候補の確定は最長一致で、
      * 残りのかなを未確定へ戻す (kernel/ime.c の commit_candidate)。素通り
      * (= 未確定が無い) になるまで上限つきで繰り返す (代行レビュー P3-1)。 */
@@ -556,6 +557,27 @@ pub fn commit_to(st: &mut GuiState, win_id: u32) {
     }
     let t = input::target_of(st, win_id);
     flush_text_to(st, t);
+}
+
+/// 入力先の寿命終了。STOP と同じ取消で、確定も辞書アクセスもしない (X1 可)。
+/// 既に WM が集めた確定列・予約も次の入力先へ渡さない。
+pub fn cancel_input() {
+    const SC_STOP: i32 = 0x60; // drivers/kbd.h KEY_STOP
+    grid_clear_all(state());
+    let _ = feed_kernel(SC_STOP << 8);
+    let f = state();
+    f.commit_len = 0;
+    f.commit_for = 0;
+    refresh_indicator(f);
+}
+
+/// 消える窓が未確定入力の宛先のときだけ取り消す。
+/// モーダルの入力は別の寿命。予約があれば現在の前景より元の宛先を優先する。
+pub fn forget_window(st: &GuiState, win_id: u32) {
+    let pending = state().commit_for;
+    if pending == win_id || (pending == 0 && !modal::is_input() && st.front_id() == win_id) {
+        cancel_input();
+    }
 }
 
 /// X1 でフォーカスが移る前に、確定の宛先だけ控える (最初の 1 件を保つ)。

@@ -202,8 +202,8 @@ SHM ブロック (`sys_shm_lock` / `sys_shm_free`)、パイプ (`sys_pipe_free` 
 | 分類 / 入口 | 主体・入力 | 返値 | 共有状態への変化・失敗時副作用 | 出力寿命・取消 |
 |---|---|---|---|---|
 | IME 入力 `ime_trygetchar()` | CUI 前景読取り。GUI 中は端末等の注入済み入力読取り | 確定 UTF-8 の1バイト / ASCII、なしは −1 (スキャンコードのみのキーも −1) | CUI は共有確定列を先に読み、なければ cooked 1件を変換。GUI は kbd の注入列だけを読み FEP に再投入しない | 値のコピー。CUI で実際にキー/確定列を消費した主体が終了すると未確定・候補・未読確定列を取消。空ポーリングは主体を奪わない |
-| IME 入力 `ime_trygetkey()` | CUI 前景 / GUI 注入入力の読取り | 確定1バイト (scan=0)、透過キーは `(scan<<8)\|ascii`、なしは −1 | CUI のキューと確定列は trygetchar と共用、同じ入力を二度返さない。GUI は注入バイトをそのまま返す | trygetchar と同じ取消。GUI 読取り・アプリ終了は WM の候補/未読確定列を消費・取消しない |
-| IME 入力 `ime_feed_key(keydata)` | WM が raw make から作った `(scan<<8)\|ascii`。負値は確定列の続きだけ取得 | 負値=消費、`>=0x100` または ESC=透過、`1..255` (ESC以外)=確定1バイト | cooked は読まない。未読確定列を優先するので WM は負値呼出しで引き切ってから次のキーを渡す。消費した make を Key として再配送しない | 値のコピー。確定列は1回だけ Text/端末注入へ配送。WM の候補は親子・park/resumeで共有され、通常の ESC/BS 操作で取消 |
+| IME 入力 `ime_trygetkey()` | CUI 前景 / GUI 注入入力の読取り | 確定1バイト (scan=0)、透過キーは `(scan<<8)\|ascii`、なしは −1 | CUI のキューと確定列は trygetchar と共用、同じ入力を二度返さない。GUI は注入バイトをそのまま返す | trygetchar と同じ取消。GUI 読取りは WM の候補/未読確定列を消費しない。入力先の窓破棄/非表示・owner終了時は WM がその宛先の未確定・候補・未読確定列を取消す (別の窓/モーダルの入力は保つ) |
+| IME 入力 `ime_feed_key(keydata)` | WM が raw make から作った `(scan<<8)\|ascii`。負値は確定列の続きだけ取得、STOP (`scan=0x60`) は入力先終了の取消 | 負値=消費、`>=0x100` または ESC=透過、`1..255` (ESC以外)=確定1バイト | cooked は読まない。STOP は未読確定列より先に全入力状態を取消し −1 (確定/学習/辞書アクセスなし、モード/辞書保持、X1可)。それ以外は未読確定列を優先するので WM は負値呼出しで引き切ってから次のキーを渡す。消費した make を Key として再配送しない | 値のコピー。確定列は1回だけ Text/端末注入へ配送。親子・park/resume単独では共有状態を保つ。通常の前景切替は元の窓へ確定して配送 (X1は宛先を予約)。窓破棄/非表示・owner終了・入力ダイアログ出入り・GUI/CUI切替では次の宛先へ持ち越さず取消 |
 | IME モード `ime_toggle()` | CUI の Shift+Space / WM の切替操作 | void | OFF→HIRAGANA (初回辞書open、失敗ならOFFのまま)。ON→OFF は未確定かなを確定列へ加え、候補表示を閉じる | モード/辞書は共有。OFF の確定列は WM が直後に引き切り、フォーカス変更前に現在の宛先へ1回配送。本人別へ保存・復元しない |
 | IME モード `ime_set_mode(mode)` | 共有モード設定。OFF=0 / HIRAGANA=1 / KATAKANA=2 | void | 範囲外は辞書open・表示・全状態の変更なし。有効ONは初回open後に入力状態へ戻す。OFFは表示を閉じる。toggle と違い、かなを確定しない | かな/未読確定列は保持。モード変更は全利用者に即時反映、owner 切替では戻さない |
 | IME 辞書 `ime_switch_dict(variant)` | 共有辞書の管理。S=0 / M=1 / L=2 | 0=成功、−1=無効値/open失敗、−2/−3=検索stmtのprepare失敗 | 範囲外は状態/接続不変。有効値は常駐接続を開き直す。現行は旧接続closeが先で、有効値のI/O失敗に旧接続保持保証はない | 候補/確定列は IME 内のコピーで、切替・親子・parkで有効。以後の検索/学習は共有辞書へ。予約超過時の切替規則は T4c 統合で接続 |
@@ -637,8 +637,8 @@ V86 ゲストを起動する。MS-DOS 5.00A の起動確認に使う。
 同じく `kernel.map` の番地を `emu_read_mem` で読む。
 
 - `kbd_trygetrawkey`: 戻り値 `keycode | down<<8 | mods<<9` (mods = そのイベント時点の `SHIFT_*`、GUI モード中のみ記録)、無ければ -1。WM (gshell) が Key down/up を作る。
-- `ime_feed_key(keydata)`: WM が打鍵 `(scancode<<8)|ascii` を FEP に通す (GUI 中はカーネルが cooked に積まないため)。負 = 確定文字列の続きだけ。戻り値: <0 消費 / >=0x100 素通り / 0x1B ESC 素通り / 1..0xFF 確定 UTF-8 の 1 バイト (W2)。
-- `ime_set_render(table)`: FEP の描画バックエンド (`IME_Render` 関数表) を差し替える。NULL で TVRAM 版へ戻す。gshell が GFX 版を渡す (W2)。**常駐側だけ** (2026-09-26): 実体は `kernel/gui.c` の `gui_ime_set_render` で、shell 帯 (owner 1) の CPL=0 の直呼びだけを通し、アプリ (CPL=3 の syscall 由来、`ring3_call_from_user()` が真) の呼び出しは NULL も含めて黙って無視する (戻りは void のまま、`gui_ime_render_rejected` が数える)。カーネルは表の関数を以後 CPL=0 で呼ぶため。gshell が終わると `gui_owner_exit(1)` が TVRAM 版へ戻す。
+- `ime_feed_key(keydata)`: WM が打鍵 `(scancode<<8)|ascii` を FEP に通す (GUI 中はカーネルが cooked に積まないため)。負 = 確定文字列の続きだけ。STOP (`scan=0x60`) は未確定/候補/未読確定列を取消し −1 (モード/辞書保持、X1可)。戻り値: <0 消費 / >=0x100 素通り / 0x1B ESC 素通り / 1..0xFF 確定 UTF-8 の 1 バイト (W2)。
+- `ime_set_render(table)`: FEP の描画バックエンド (`IME_Render` 関数表) を差し替える。NULL で TVRAM 版へ戻す。gshell が GFX 版を渡す (W2)。**常駐側だけ** (2026-09-26): 実体は `kernel/gui.c` の `gui_ime_set_render` で、shell 帯 (owner 1) の CPL=0 の直呼びだけを通し、アプリ (CPL=3 の syscall 由来、`ring3_call_from_user()` が真) の呼び出しは NULL も含めて黙って無視する (戻りは void のまま、`gui_ime_render_rejected` が数える)。カーネルは表の関数を以後 CPL=0 で呼ぶため。gshell が終わると `gui_owner_exit(1)` が TVRAM 版へ戻す。描画先が変わると未確定/候補/未読確定列を確定せず取消す (GUI/CUI の入力寿命境界)。モード/辞書は保持し、同じ表の再設定では入力を消さず有効モードの表示を復元する。
 
 `gfx_screen_info` の `out` は `GFX_ScreenInfo` (`os32_kapi_shared.h`): 画面サイズ・bpp・
 画素形式 (`GFX_FMT_*`)・能力ビット (`GFX_CAP_*`)・パレットリース範囲。GUI とアプリは

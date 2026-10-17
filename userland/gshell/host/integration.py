@@ -48,6 +48,23 @@ def build(gshell: Path, name: str, quiet: bool = False) -> Path:
 # 票 KBD_NAV (docs/tasks/gui/TASK_KBD_NAV.md) の受け入れ K1 の変異。
 # (名前, ファイル, 置き換え前 (ちょうど 1 か所), 置き換え後, RED になるべき試験の絞り込み)
 MUTATIONS = [
+    ('IMECAND collected commit goes to new focus', 'src/fep.rs',
+     '    flush_text_to(st, original);', '    flush_text(st);',
+     'imecand_collected_commit'),
+    ('IMECAND window destroy keeps candidate', 'src/wm.rs',
+     '    fep::forget_window(st, id);\n    lease::release_window(st, index);',
+     '    lease::release_window(st, index);', 'imecand_window_destroy'),
+    ('IMECAND owner exit keeps candidate', 'src/wm.rs',
+     '                fep::forget_window(self, self.windows[i].id(i));\n',
+     '', 'imecand_owner_exit'),
+    ('IMECAND pending target is forgotten', 'src/fep.rs',
+     '    if pending == win_id || (pending == 0 && !modal::is_input() && st.front_id() == win_id) {',
+     '    if !modal::is_input() && st.front_id() == win_id {',
+     'imecand_deferred_target_destroy'),
+    ('IMECAND input modal close keeps candidate', 'src/modal.rs',
+     '    if buttons == GUI_MODAL_INPUT {\n        fep::cancel_input();\n    }\n    state().used = false;',
+     '    state().used = false;', 'imecand_input_dialog_lifetime'),
+
     ('X11 toggle leaves kernel commit', 'src/fep.rs',
      '    collect_kernel_commit(); // toggle OFF can confirm pending kana\n', '',
      'x11_fep_toggle_off_delivers_before_focus_changes'),
@@ -362,14 +379,18 @@ def mutate() -> int:
     import concurrent.futures
     import os
     jobs = max(1, min(8, os.cpu_count() or 1))
+    indices = [i for i, m in enumerate(MUTATIONS)
+               if not os.environ.get("MUTATION_FILTER") or os.environ["MUTATION_FILTER"] in m[0]]
+    if not indices:
+        raise SystemExit("no mutations selected")
     with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as ex:
-        results = list(ex.map(one_mutation, range(len(MUTATIONS))))
+        results = list(ex.map(one_mutation, indices))
     bad = 0
     for ok, line in results:
         print(line)
         if not ok:
             bad += 1
-    print(f'kbdnav mutations: {len(MUTATIONS) - bad}/{len(MUTATIONS)} killed')
+    print(f'kbdnav mutations: {len(indices) - bad}/{len(indices)} killed')
     return bad
 
 

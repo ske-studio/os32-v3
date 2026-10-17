@@ -215,6 +215,9 @@ pub fn palette_sets() -> Vec<(i32, u8, u8, u8)> {
     lk(&PALETTE_SETS).clone()
 }
 unsafe extern "C" fn render(_: *mut u8) {}
+unsafe extern "C" fn ime_idle(key: i32) -> i32 {
+    if key < 0 || key == (0x60 << 8) { -1 } else { key }
+}
 /// テストが積む生キー (`kbd_trygetrawkey` が 1 件ずつ返す)。空なら -1。
 pub static RAWKEYS: Mutex<Vec<i32>> = Mutex::new(Vec::new());
 /// テストが積むカーネル FEP (`ime_feed_key`) の返り値。空なら 0x100 (Pass)。
@@ -227,7 +230,8 @@ unsafe extern "C" fn raw_key() -> i32 {
         q.remove(0)
     }
 }
-unsafe extern "C" fn ime_feed(_keydata: i32) -> i32 {
+unsafe extern "C" fn ime_feed(keydata: i32) -> i32 {
+    if keydata == (0x60 << 8) { return -1; } // lifetime cancel has no scripted output
     let mut q = lk(&IME_SCRIPT);
     if q.is_empty() {
         0x100
@@ -913,6 +917,7 @@ pub fn init() {
     a.gfx_get_palette = get_palette;
     a.ime_set_render = render;
     a.ime_is_active = zero_i32;
+    a.ime_feed_key = ime_idle;
     a.kcg_read_ank = ank;
     a.kcg_read_kanji = kanji;
     a.mem_alloc = alloc;
