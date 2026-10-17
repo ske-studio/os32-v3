@@ -28,3 +28,15 @@ No test-first sequence is claimed. The measured prefix is a fixture result with
 The full body relocation count and its final prefix remain unmeasured in S0.
 Final GREEN/RED execution results belong in the task completion report.
 No emulator/hardware acceptance, deployment or product integration is exercised.
+
+## T4a-1
+
+The current fixture uses all 235 generated S4 imports and two exports against
+the unchanged ops v2 / 18-slot contract. It checks the checked-in C schema against
+`gen_module_schema.render()` and passes current explicit KAPI/layout generations
+from `sdk/kapi.json` to both producer and validator. Omitting either generation
+from the CLI rejects without changing the existing output; omitting API
+generations raises TypeError. Unknown module IDs, old ELF ops, duplicate names
+and a fixed FNV collision (`costarring` / `liquid`) reject during generation.
+S4 contract regeneration remains byte-for-byte identical in the loader test.
+The implementation run uses `MUTATE=0`; PM runs the maintained mutants later.

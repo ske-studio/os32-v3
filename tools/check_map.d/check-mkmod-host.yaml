@@ -1,4 +1,7 @@
 check-mkmod-host:
+- kernel/module_schema.h
+- tools/module_schema.py
+- tools/gen_module_schema.py
 - sdk/kapi.json
 - drivers/e82557.h
 - fs/vfs.h

@@ -144,6 +144,8 @@ def main():
         for label, word, value, state in (
             ('header', 0, 0, 3), ('old-pair', 31, pair ^ 1, 4),
             ('abi', 6, meta['module_abi_gen'] ^ 1, 6), ('old-ops-v1', 33, 1, 6),
+            ('future-format', 1, 2, 3), ('wrong-id', 7, 2, 3),
+            ('wrong-phase', 8, 1, 3), ('missing-pair', 9, 0, 3),
             ('crc', 32, 0, 9)):
             bad = bytearray(image)
             struct.pack_into('<I', bad, word * 4, value)
@@ -154,16 +156,37 @@ def main():
         for label, off, value, state in (
             ('reloc-range', words[21], words[12], 11),
             ('import-hash', words[23], 0, 12),
+            ('duplicate-import-slot', words[23] + 12 + 8,
+             struct.unpack_from('<I', image, words[23] + 8)[0], 12),
+            ('duplicate-reloc', words[21] + 4,
+             struct.unpack_from('<I', image, words[21])[0], 11),
             ('export-slot', words[25] + 4, 0x10000, 3)):
             bad = bytearray(image)
             struct.pack_into('<I', bad, off, value)
             cases.append((label, 1, 0, state, seal(bad)))
+        bad = bytearray(image)
+        bad[words[25] + 12:words[25] + 24] = bad[words[25]:words[25] + 12]
+        cases.append(('duplicate-export', 1, 0, 3, seal(bad)))
+        bad = bytearray(image)
+        struct.pack_into('<I', bad, 23 * 4, words[21])
+        cases.append(('table-overlap', 1, 0, 3, seal(bad)))
         # The actual loader calls this deliberately failing, side-effect-free init.
         bad = bytearray(image)
         init = words[11] + words[29]
         bad[init:init + 6] = b'\xb8\x01\x00\x00\x00\xc3'
         cases.append(('init-failed', 1, 0, 10, seal(bad)))
         for label, config, fail, state, data in cases:
+            if state not in (1, 10):
+                # A rejected/OFF image must never execute init. A CPU trap
+                # probe makes early init observable even though real init is
+                # side-effect-free and calls no imports.
+                probe = bytearray(data)
+                trap = b'\x0f\x0b'  # UD2: any execution fails the host run.
+                assert init + len(trap) <= words[11] + words[13] + words[14]
+                relocs = struct.unpack_from('<' + 'I' * words[22], image, words[21])
+                assert all(r + 4 <= words[29] or r >= words[29] + len(trap) for r in relocs)
+                probe[init:init + len(trap)] = trap
+                data = seal(probe) if state != 9 else probe
             payload = struct.pack('<5I', config, fail, state, len(data), pair) + data
             for runner in os.environ.get('HOST32_RUNNERS', 'native qemu').split():
                 result = host32.run([str(exe)], input=payload, runner=runner)

@@ -21,3 +21,19 @@ No claim of a test-first implementation sequence is made. These are regression
 and mutation checks. Final run results belong in the task completion report.
 Native execution is not used in the Codex sandbox; qemu runs the ILP32 harness.
 Emulator, real hardware, loader integration and product linkage are outside S0.
+
+## T4a-1 common schema / ID policy
+
+`tools/module_schema.py` is consumed by mkmod and generates
+`kernel/module_schema.h` through `tools/gen_module_schema.py`. The independent
+wire fixture above keeps its explicit byte offsets. Caller-selected IDs must
+match the image and an admitted policy row; SQLite has no admitted row yet.
+KDEBUG still requires POST_ROOT, PAIR, no stop, ops v2 / 18 slots, and the existing
+image/body and table limits. Old ops also reject when the caller claims v1.
+
+The harness checks both header-only and whole-image validation, including NULL
+outputs: input bytes stay unchanged, failed outputs retain their sentinel, and
+successful plans match independently decoded words and load_span. Added source
+mutants remove ID, component ops, image-size and body-size predicates; the
+normal suite includes counterexamples for each. Implementation-stage execution
+uses `MUTATE=0`; mutation execution belongs to the PM after review.

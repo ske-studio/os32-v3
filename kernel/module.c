@@ -56,7 +56,7 @@ void kdebug_load(void)
     const struct module_image_policy policy = {
         KAPI_VERSION, OS32_MEMORY_LAYOUT_GENERATION, KDEBUG_ABI_GEN,
         bi->img_crc, KDEBUG_OPS_VERSION, bi->img_valid, KDEBUG_IMPORT_COUNT,
-        kdebug_import_contracts, kdebug_export_contracts
+        kdebug_import_contracts, kdebug_export_contracts, MODULE_ID_KDEBUG
     };
     rc = module_image_header(header, sizeof(header), st.st_size, &policy, &plan);
     if (rc) goto rejected;

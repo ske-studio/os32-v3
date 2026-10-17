@@ -15,6 +15,11 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools'))
 import gen_kdebug_imports as imports_gen
 import mkmod
+import gen_module_schema
+
+SPEC = json.loads((ROOT / 'sdk/kapi.json').read_text())
+KAPI = SPEC['version']
+LAYOUT = SPEC['generations']['memory_layout']
 
 
 def command(args):
@@ -94,9 +99,11 @@ scratch: .zero 8
 
 def verify(module, elf, metadata, kernel, pair, validator):
     from test_module_image import validate
-    image, stats = module.build(elf, metadata, kernel)
+    image, stats = module.build(elf, metadata, kernel, KAPI, LAYOUT)
     words = struct.unpack_from('<36I', image)
     assert words[:3] == (int.from_bytes(b'KMOD', 'little'), 1, 144)
+    assert words[4:6] == (KAPI, LAYOUT) and words[7:10] == (1, 2, 1)
+    assert words[33] == 2 and len(module.OPS_NAMES) == 18
     assert words[31] == pair
     checked = bytearray(image)
     struct.pack_into('<I', checked, 128, 0)
@@ -113,15 +120,17 @@ def verify(module, elf, metadata, kernel, pair, validator):
                         for e in metadata['imports']]
     expected_exports = [(1, mkmod.fnv1a(b'selftest_run'), 1),
                         (5, mkmod.fnv1a(b'crt_diag_bootlog'), 1)]
-    result = validate(validator, image, abi=metadata['module_abi_gen'], pair=pair,
+    result = validate(validator, image, kapi=KAPI, layout=LAYOUT,
+                      abi=metadata['module_abi_gen'], pair=pair,
                       imports=expected_imports, exports=expected_exports)
     assert result.returncode == 0, result.stdout + result.stderr
     return image, stats
 
 
 def negative_cases(elf, metadata, kernel):
-    def build(data=elf, meta=metadata, vk=kernel):
-        return mkmod.build(data, meta, vk)
+    def build(data=elf, meta=metadata, vk=kernel, module_id=1):
+        return mkmod.build(data, meta, vk, KAPI, LAYOUT, module_id=module_id)
+    rejected(lambda: build(module_id=2), 'unknown module ID')
     rejected(lambda: build(data=elf[:40]), 'range')
     bad = bytearray(elf); bad[4] = 2
     rejected(lambda: build(data=bad), 'ELF32')
@@ -152,6 +161,18 @@ def negative_cases(elf, metadata, kernel):
     rejected(lambda: build(data=bad), 'write outside payload')
     badmeta = json.loads(json.dumps(metadata)); badmeta['imports'][0]['index'] = 1
     rejected(lambda: build(meta=badmeta), 'metadata')
+    badmeta = json.loads(json.dumps(metadata))
+    badmeta['imports'][1]['name'] = badmeta['imports'][0]['name']
+    rejected(lambda: build(meta=badmeta), 'duplicate import name')
+    # Distinct ASCII names with the same FNV-1a hash, fixed rather than random.
+    assert mkmod.fnv1a(b'costarring') == mkmod.fnv1a(b'liquid')
+    badmeta['imports'][0]['name'], badmeta['imports'][1]['name'] = 'costarring', 'liquid'
+    rejected(lambda: build(meta=badmeta), 'hash collision')
+    ops = parsed.symbol('kdebug_ops')
+    ro = next(s for s in parsed.sections if s['name'] == '.rodata')
+    bad = bytearray(elf)
+    struct.pack_into('<I', bad, ro['offset'] + ops['value'] - ro['addr'], 1)
+    rejected(lambda: build(data=bad), 'ops version')
     bad = bytearray(kernel); bad[-1] ^= 1
     rejected(lambda: build(vk=bad), 'CRC mismatch')
     print('mkmod rejects malformed ELF, unsupported relocation, unresolved symbol, '
@@ -161,7 +182,7 @@ def negative_cases(elf, metadata, kernel):
 MUTATIONS = (
     ('drop-absolute', 'relocs.append(where)', 'pass'),
     ('keep-pc32', 'if kind == 2:', 'if False:'),
-    ('pair-zero', 'pair = pair_crc(vmkernel)', 'pair = 0'),
+    ('pair-zero', "pair_crc(vmkernel) if policy['required_flags'] & CONSTANTS['FLAG_PAIR'] else 0", '0'),
     ('bad-export-slot', 'fnv1a(encoded), slot, 1, entry', 'fnv1a(encoded), slot - 1, 1, entry'),
 )
 
@@ -170,6 +191,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
+    assert gen_module_schema.OUTPUT.read_text() == gen_module_schema.render(), 'stale KMOD schema'
     from test_module_image import build_validator
     with tempfile.TemporaryDirectory(prefix='mkmod-') as temp:
         directory = Path(temp)
@@ -181,10 +203,23 @@ def main():
         negative_cases(elf, metadata, kernel)
         imports_gen.check_nm(imports_gen.load_def())
         (directory / 'vmkernel.lz4').write_bytes(kernel)
-        output = command([sys.executable, ROOT / 'tools/mkmod.py', '--elf', elf_path,
-                          '--metadata', directory / 'kdebug_imports.json',
-                          '--vmkernel', directory / 'vmkernel.lz4', '-o', directory / 'module.bin'])
+        cli = [sys.executable, ROOT / 'tools/mkmod.py', '--elf', elf_path,
+               '--metadata', directory / 'kdebug_imports.json',
+               '--vmkernel', directory / 'vmkernel.lz4', '-o', directory / 'module.bin']
+        generations = ['--kapi-abi-gen', str(KAPI), '--layout-gen', str(LAYOUT)]
+        output = command([*cli, *generations])
         assert (directory / 'module.bin').read_bytes() == image
+        for given in ([], generations[:2], generations[2:]):
+            result = subprocess.run([str(a) for a in [*cli, *given]], capture_output=True)
+            assert result.returncode == 2 and b'required' in result.stderr
+            assert (directory / 'module.bin').read_bytes() == image
+        try:
+            mkmod.build(elf, metadata, kernel)
+        except TypeError:
+            pass
+        else:
+            raise AssertionError('build() silently supplied generations')
+        print('PASS shared schema; CLI/API require explicit KAPI and layout generations')
         assert 'prefix=' + str(stats['prefix_size']) + ' B' in output
         print(output.strip())
         print('prefix fixture (235 real generated imports, 2 exports): '
