@@ -14,6 +14,10 @@ check-db-caller-host:
 - exec/exec.c
 - exec/ring3_str.c
 - kapi/kapi_db.c
+- kapi/kapi_strings.c
+- include/kapi_strings.h
+- include/kapi_print.h
+- drivers/dev.h
 - tools/tests/db_caller_host.c
 - tools/tests/test_db_caller.py
 - kapi/kapi_generated.c

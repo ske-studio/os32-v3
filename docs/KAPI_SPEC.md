@@ -352,6 +352,27 @@ hash・リンク入力を記録する。空の apps/game は除外と明記し�
 | 0x00 | magic | 0x4B415049 ("KAPI") |
 | 0x04 | version | APIバージョン (現在値は [`sdk/kapi.json`](../sdk/kapi.json) の `version`) |
 
+### kprintf の CPL3 入力境界 (T4b-8)
+
+公開スロット・宣言・64B の引数窓は従来どおり。CPL3 の int80 入口で B1 の保存 caller を使い、固定 2 語、format、書式が消費する引数語、非 NULL の `%s` をカーネル staging へコピーし、全成功後に出力する。未使用の引数語や NUL の次ページは読まない。format は NUL 込み 1024B、各 `%s` は NUL 込み 4096B、可変引数は 14 語まで (`include/kapi_print.h`、既存 64B 窓から固定 8B を引いた値とビルド時照合)。上限ちょうどの NUL は成功、上限内未終端・欠落ページ・範囲外・引数窓超過・staging 確保失敗は出力せず、確保済み staging を返してから caller を fault-kill する。
+
+`%s` の NULL は従来どおり `(null)`。`%%` と末尾 `%` は引数を消費せず、未知指定子は従来どおり 1 語消費する。フラグ・幅・単一 `l` の解釈を renderer と共有し、通常の文字・UTF-8・属性変換を維持する。不完全な修飾子 (`%0` 等) は format の NUL で停止する。CPL0 の内部ログは直接 `kprintf` を呼び、USER コピーと割当を行わない。コピーした `%s` は出力完了後に全て解放する。全公開 NUL 入口の担当は [T4〜T6 §1-3](tasks/v3/TASK_T4_T6_MODULES.md#1-3-x-1-公開-nul-入力可変引数の担当表)。
+
+### 残る公開文字列の CPL3 入力境界 (T4b-8b)
+
+[T4〜T6 §1-3](tasks/v3/TASK_T4_T6_MODULES.md#1-3-x-1-公開-nul-入力可変引数の担当表) のパス・マウント・装置パス・起動コマンド・文字列出力/MML の 31 入口は、int80 → `kapi/kapi_strings.c` で保存 USER caller の `copy_caller_bytes` / `copy_caller_cstr` を使う。固定引数の必要な語だけをコピーし、全 NUL 入力の staging が成功してから既存 wrapper を呼ぶ。複数入力の後方での失敗も、VFS の問い合わせ・validator・cwd/redirect/マウント表の更新・装置操作・起動・表示・音源操作より前に拒否する。CPL0 の内部呼出しは従来の直接 wrapper を使う。スロット・宣言・公開 ABI/配置世代は不変。
+
+| 入力 | NUL 込みの上限 |
+|---|---:|
+| パス・装置名・マウントの prefix/dev/fs・`path_*` | `VFS_MAX_PATH` (256B) |
+| `exec_run` / `exec_start` のコマンド | `KAPI_STRING_CAP` (4096B) |
+| `launch_req` のコマンド | `LAUNCH_CMDLINE_MAX` (256B) |
+| `serial_puts` / `shell_print_utf8` / `fm_play_mml` / `snd_bgm_play` | `KAPI_STRING_CAP` (4096B) |
+
+ページの最後または上限の最後の NUL は成功し、その次を読まない。欠落ページ・範囲外・上限内未終端・確保失敗は全 staging を返してから fault-kill する。`sys_ls_window` と旧 ls shim のパスも 256B 内の NUL を必須にし、上限で NUL を補わない。旧 `sys_ls` の USER callback 入口は引き続き拒否する。FEP は T5a-1、ページ 0 の NP 化は T7。
+
+VFS パスの NULL=cwd、`sys_redirect_fd` の NULL 拒否の戻り値、`sys_mount` の prefix/dev/fs と `sys_umount_checked` の prefix の NULL=`VFS_ERR_INVAL`、`dev_blk_write` の書込権限なしの `-1`、`loop_attach` / `sys_switch_shell` / `exec_start` / `launch_req` の NULL 拒否、V86 の NULL=ディスク無しと `v86_boot2` の second=NULL は、NULL をそのまま target に渡して保つ。NULL と非 NULL が混ざる場合も、非 NULL の全入力を写してから target を呼ぶ。通常の UTF-8・属性・MML・引数語は変更せず渡す。文字列のポインタを保持する target は既存の所有バッファへコピーする。staging は呼出し中だけ有効で、正常復帰・拒否で解放する。STOP/fault 等の非局所脱出では `exec_reclaim_resources` の先頭でその app ID の staging を回収する。親子の `exec_run` は別 ID の staging を使うため、子の回収で親のコマンドを返さない。1 呼出し最大 3 本、最大 4096B + allocator overhead (マウントは 3×256B)。
+
 ### API関数 (自動生成 — os32_kapi_generated.h 準拠)
 
 > **`sys_getcwd` (0x7C) が返すポインタの寿命** (票 T9 §12 R1、2026-09-13):

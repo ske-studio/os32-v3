@@ -1,0 +1,26 @@
+check-kapi-strings-host:
+- kapi/kapi_strings.c
+- include/kapi_strings.h
+- exec/exec.c
+- exec/exec_kapi_init.inc
+- exec/ring3_ls.c
+- exec/redir_access.c
+- exec/access_walk.c
+- kernel/paging.c
+- kernel/pgalloc.c
+- kernel/physmem.c
+- kernel/shlib.c
+- kdebug/kselftest.c
+- sdk/kapi.json
+- userland/tests/kstr_boundary.c
+- tools/tests/test_kapi_strings.py
+- tools/tests/kapi_strings_host.c
+- tools/tests/test_access_walk.py
+- tools/tests/access_walk_host.c
+- tools/tests/pgalloc_host_fixture.h
+- tools/tests/kernel_layout.py
+- tools/tests/host32.py
+- tools/tests/mutpar.py
+- build/checks.d/check-kapi-strings-host.mk
+- tools/check_map.d/check-kapi-strings-host.yaml
+artifact_reader: true

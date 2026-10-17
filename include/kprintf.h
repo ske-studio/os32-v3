@@ -8,6 +8,10 @@
 #include "types.h"
 
 void __cdecl kprintf(u8 attr, const char *fmt, ...);
+/* Internal i386 word-vector entry; public KAPI remains variadic. */
+void kvprintf(u8 attr, const char *fmt, const u32 *args);
+char kprintf_spec(const char **cursor, int *width, int *left_align,
+                  char *pad_char);
 
 /* kprintf の属性 1 バイトを PC-98 のテキスト属性へ直す (純粋関数)。
  * 実体は lib/kprintf_attr.c、試験は tools/tests/test_kprintf_attr.py。

@@ -34,18 +34,11 @@ struct ls_collect {
 
 static int ls_copy_path(const struct caller_access *caller, u32 va, char *path)
 {
-    /* vfs_resolve_path accepts NULL as cwd and examines at most MAX_PATH
-     * bytes. Preserve that contract without probing past an early NUL or
-     * turning a readable overlong path into an application kill. */
+    /* NULL still means cwd. All other inputs require NUL inside the bound;
+     * no synthesized terminator before entering the filesystem. */
     if (!va) { path[0] = 0; return 1; }
-    for (u32 i = 0; i < VFS_MAX_PATH; i++) {
-        if (i > ~(u32)0 - va ||
-            !copy_caller_bytes(caller, (const void *)(uptr)(va + i), path + i, 1))
-            return 0;
-        if (!path[i]) return 1;
-    }
-    path[VFS_MAX_PATH] = 0;
-    return 1;
+    return copy_caller_cstr(caller, (const char *)(uptr)va,
+                            path, VFS_MAX_PATH);
 }
 
 static void ls_collect_entry(const VfsDirEntry *entry, void *opaque)

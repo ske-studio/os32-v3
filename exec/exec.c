@@ -23,6 +23,8 @@
 #include "ime.h"
 #include "kmalloc.h"
 #include "kprintf.h"
+#include "kapi_print.h"
+#include "kapi_strings.h"
 #include "paging.h"
 #include "pgalloc.h"
 #include "shlib.h"
@@ -1163,6 +1165,7 @@ static void exec_restore_context(int id)
 /* ======================================================================== */
 static void exec_reclaim_resources(int id)
 {
+    kapi_strings_cleanup_owned(id);
     /* (1) SQLite DB リソース (P5: cleanup_all → cleanup_owned)。
      * **FD 回収より先** (票 S0-K §1c / F2 の順序修正)。close は未 commit の
      * rollback で journal を読み書きするので、そのときまだ main / journal の
@@ -1458,6 +1461,7 @@ void __cdecl kapi_sys_exit(int status)
 
 /* 可変長引数 (kprintf) を拾うためのコピー窓 (固定分より広めに取る)。 */
 #define RING3_ARG_WINDOW  64u
+STATIC_ASSERT(KAPI_PRINT_ARG_LIMIT == (RING3_ARG_WINDOW - 8u) / 4u, print_arg_window);
 
 /* Fifth park origin: only after the entire KAPI/callback has returned.
  * No cleanup here; the existing WM top-level selects the owner to kill. */
@@ -1542,6 +1546,19 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
 
     /* --- (核) フォールトガードを立てる (v2 M2e) --- */
     ring3_in_syscall = 1;
+
+    /* Variadic input is copied by B1 on demand. Never read/copy an unused
+     * word past the caller's mapped argument tail, or emit a partial line. */
+    if (slot == KAPI_SLOT_KPRINTF) {
+        if (!kapi_print_call(args_src)) ring3_fault_kill();
+        frame[7] = 0;
+        goto syscall_complete;
+    }
+
+    int strings = kapi_strings_call(slot, (void *)wrapptr, args_src,
+                                    nbytes, kapi_argptr[slot], &frame[7]);
+    if (strings < 0) ring3_fault_kill();
+    if (strings) goto syscall_complete;
 
     /* --- (補助) 明示ポインタ引数の早期範囲検証 (v2 M2e) --- */
     {

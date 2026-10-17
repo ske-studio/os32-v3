@@ -10,6 +10,9 @@ check-caller-access-host:
 - tools/check_map.d/check-caller-access-host.yaml
 - build/checks.d/check-caller-access-host.mk
 - include/redir_access.h
+- include/kapi_strings.h
+- include/kapi_print.h
+- sdk/include/os32/os32_kapi_slots.h
 - tools/h3_park_resume.py
 - tools/h3_layout.c
 - tools/np21w_mcp/gui.py

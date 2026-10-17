@@ -296,6 +296,9 @@ static void test_heap(void)
 /* ------------------------------------------------------------------------ */
 static void test_kprintf(void)
 {
+    kprintf(0x07, "%0");
+    kprintf(0x07, "%-04l");
+    check(1, "kprintf incomplete modifiers return at NUL");
     kprintf(0x07, "");
     kprintf(0x07, "%");             /* 末尾 % — 旧実装はここで無限ループ */
     kprintf(0x07, "%%");

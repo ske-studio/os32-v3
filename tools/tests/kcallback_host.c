@@ -30,6 +30,7 @@ int caller_access_get_user(struct caller_access *c) { assert(user_call); kmemset
 /* The enumeration side models caller_access_get (same meaning as exec/redir_access.c); the real WM semantics are checked on the identity side (public_surface_host). */
 int caller_access_get(struct caller_access *c) { if (ring3_wm_depth || !user_call) { kmemset(c, 0, sizeof(*c)); c->origin = CALLER_TRUSTED; return 1; } return caller_access_get_user(c); }
 int copy_caller_bytes(const struct caller_access *c, const void *s, void *d, u32 n) { (void)c; assert(!fs_active); if (reject_input) return 0; if (read_end) assert((const u8 *)s + n <= read_end); kmemcpy(d, s, n); return 1; }
+int copy_caller_cstr(const struct caller_access *c, const char *s, char *d, u32 cap) { for (u32 i = 0; i < cap; i++) { if (!copy_caller_bytes(c, s + i, d + i, 1)) return 0; if (!d[i]) return 1; } return 0; }
 int check_caller_write_range(const struct caller_access *c, void *d, u32 n) { (void)c; output_checks++; if (!d || (u32)d > ~(u32)0 - n) return 0; assert(!fs_active && n == sizeof(struct ring3_ls_packet)); return !reject_output; }
 int copy_to_caller(const struct caller_access *c, void *d, const void *s, u32 n) { (void)c; assert(!fs_active); if (reject_copy) return 0; kmemcpy(d, s, n); return 1; }
 
@@ -255,12 +256,16 @@ int main(void)
     char long_path[VFS_MAX_PATH];
     kmemset(long_path, 'x', sizeof(long_path));
     request[1] = (u32)long_path;
-    assert(ring3_ls_dispatch((u32)request) == 0 && !out.count &&
-           out.result == OS32_ERR_NAMETOOLONG);
+    int before_long = fs_calls;
+    if (!__builtin_setjmp(killed)) {
+        ring3_ls_dispatch((u32)request);
+        assert(0);
+    }
+    assert(fs_calls == before_long);
     struct caller_access access;
     char staged[VFS_MAX_PATH + 1];
     read_end = (const u8 *)long_path + sizeof(long_path);
-    assert(ls_copy_path(&access, (u32)long_path, staged));
+    assert(!ls_copy_path(&access, (u32)long_path, staged));
     long_path[0] = 0;
     read_end = (const u8 *)long_path + 1;
     assert(ls_copy_path(&access, (u32)long_path, staged));

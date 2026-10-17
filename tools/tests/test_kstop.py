@@ -69,6 +69,13 @@ const u16 kapi_argsize[KAPI_FUNC_COUNT]={0}, kapi_argptr[KAPI_FUNC_COUNT]={0};
 int ring3_ptr_ok(u32 p) { (void)p; return 1; }
 static int request_inside;
 void ring3_abort_request(void);
+#include "os32_kapi_slots.h"
+#include "kapi_strings.h"
+int kapi_print_call(const void *args) { (void)args; CHECK(0); return 0; }
+int kapi_strings_call(u32 slot, void *target, const void *args, u32 nbytes, u16 ptrmask, u32 *result) {
+    CHECK(slot == 0); (void)target; (void)args; (void)nbytes; (void)ptrmask; (void)result;
+    return 0;
+}
 static u32 kapi_invoke(void *fn, const void *args, u32 n) {
     (void)fn; (void)args; (void)n;
     CHECK(caller && ring3_in_syscall && owner==2 && cr3==2 && !jumped);
