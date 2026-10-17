@@ -1399,7 +1399,7 @@ LBA28、無ければ word 53 bit0 の現在の CHS、それも無ければ既定
   持たないので、判定は SQLite と 1 対 1 になる)。**step しない**ので、SELECT の先頭行も
   DML も進まない。同じ handle の旧 stmt は **入力を受け付けたときだけ** finalize して
   置換し、入力拒否時は stmt・slot・transaction・SHM 結果を変えない
-  ([T4〜T6 票 §9 の決定](tasks/v3/TASK_T4_T6_MODULES.md#9-未決の争点))。
+  ([T4〜T6 票 §9 の決定](tasks/v3/TASK_T4_T6_MODULES.md#9-決定済みの争点))。
   拒否の戻り値を見ずに step すると前の文の続きが返る。
   この契約への実装追従は T4b-1 の対象で、現行 `kapi/kapi_db.c` はまだ入口で finalize する。
 - `db_bind_*`: prepare_only の後・**最初の step の前**だけ。`index` は 1-based。
