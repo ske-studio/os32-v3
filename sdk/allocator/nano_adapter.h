@@ -31,6 +31,9 @@ int os32_nano_configure(struct os32_nano_arena *primary,
                         void *(*map)(void *, size_t, unsigned),
                         int (*unmap)(void *, uintptr_t, size_t), void *opaque);
 void *os32_nano_crt_sbrk(struct _reent *r, ptrdiff_t incr);
+#ifdef OS32_CRT_RESIDENT
+void os32_resident_sbrk_stats(uint32_t out[3]); /* used, peak, capacity in bytes */
+#endif
 void *os32_nano_morecore(struct os32_nano_arena *arena, struct _reent *r, ptrdiff_t incr);
 void *os32_nano_sbrk(struct _reent *r, ptrdiff_t incr);
 struct mallinfo os32_nano_info(struct _reent *r);

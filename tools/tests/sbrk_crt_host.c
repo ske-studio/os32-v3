@@ -9,7 +9,8 @@ static struct _reent host_reent;
 struct _reent *_impure_ptr = &host_reent;
 int *__errno(void) { return &host_reent._errno; }
 KernelAPI *kapi;
-char _end[4] __attribute__((aligned(4)));
+char _end[4] __attribute__((aligned(OS32_NANO_PAGE)));
+__asm__(".globl __os32_shell_sbrk_limit\n.set __os32_shell_sbrk_limit, crt_fixture_end + 8192\n");
 static KernelAPI api;
 static unsigned calls, map_bytes;
 static uintptr_t map_base;
@@ -53,7 +54,20 @@ static int run(void)
     api.sbrk_heap_limit = mapped;
     api.mem_map = fake_map; /* Even if populated, resident must never use it. */
     kapi = &api;
+#ifdef OS32_CRT_RESIDENT
+    uint32_t stats[3];
+    api.sbrk_heap_limit = mapped + OS32_NANO_PAGE; /* WM can see a child's handoff. */
+    os32_resident_sbrk_stats(stats);
+    CHECK(primary_initialized == 0 && calls == 0 && stats[0] == 0 && stats[1] == 0 &&
+          stats[2] == mapped - initial, "resident stats before first sbrk ignore child handoff");
+    api.sbrk_heap_limit = mapped;
+#endif
     CHECK((uintptr_t)sbrk(0) == initial, "aligned initial");
+#ifdef OS32_CRT_RESIDENT
+    os32_resident_sbrk_stats(stats);
+    CHECK(stats[0] == 0 && stats[1] == 0 && stats[2] == mapped - initial,
+          "resident stats initial capacity");
+#endif
     CHECK(primary_arena.mapped_end == mapped, "initial mapped end");
     CHECK(sbrk(-1) == (void *)-1 && errno == ENOMEM && (uintptr_t)sbrk(0) == initial,
           "negative lower bound");
@@ -62,8 +76,19 @@ static int run(void)
     CHECK((uintptr_t)sbrk((int)(mapped - initial)) == initial && calls == 0 && primary_arena.brk == mapped,
           "inclusive mapped boundary");
 #ifdef OS32_CRT_RESIDENT
+    os32_resident_sbrk_stats(stats);
+    CHECK(stats[0] == mapped - initial && stats[1] == mapped - initial,
+          "resident peak at boundary");
     CHECK(sbrk(1) == (void *)-1 && errno == ENOMEM && calls == 0 && primary_arena.brk == mapped,
           "resident no map");
+    CHECK(sbrk(-1) == (void *)mapped, "resident shrink for peak");
+    os32_resident_sbrk_stats(stats);
+    CHECK(stats[0] == mapped - initial - 1 && stats[1] == mapped - initial,
+          "resident shrink retains peak");
+    CHECK(sbrk(1) == (void *)(mapped - 1), "resident restore after peak probe");
+    CHECK(sbrk(1) == (void *)-1, "resident failed growth for peak");
+    os32_resident_sbrk_stats(stats);
+    CHECK(stats[1] == mapped - initial, "resident failed growth retains peak");
     /* A later KAPI handoff cannot repartition a published resident arena. */
     api.sbrk_heap_limit = mapped + OS32_NANO_PAGE;
     CHECK(sbrk(1) == (void *)-1 && errno == ENOMEM && calls == 0 &&

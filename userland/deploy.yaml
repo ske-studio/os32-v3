@@ -209,6 +209,9 @@ filesystem:
       guest: /usr/bin/
       tags: [test]
     # --- f9 exec heap parent and --child use the same registered binary ---
+    - host: userland/tests/layout_cycle_test.bin
+      guest: /usr/bin/
+      tags: [test]
     - host: userland/tests/exec_heap_test.bin
       guest: /usr/bin/
       tags: [test]

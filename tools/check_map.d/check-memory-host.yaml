@@ -1,4 +1,27 @@
 check-memory-host:
+- tools/tests/test_t3c2.py
+- tools/tests/layout_cycle_host.c
+- tools/tests/os32x_layout_host.c
+- exec/os32x_hdr.c
+- tools/memmap_audit_live.py
+- tools/gen_memmap.py
+- userland/lib/rt/dbgserial.c
+- userland/lib/rt/dbgserial.h
+- userland/tests/layout_cycle_test.c
+- userland/gshell/**
+- boot/bootinfo.inc
+- boot/loader_fat_new.asm
+- build/os32.ld
+- fs/fd_redirect.c
+- fs/pipe_buffer.c
+- kernel/kentry.asm
+- kernel/shm.c
+- sdk/link/shlib.ld
+- tools/check_artifacts.py
+- tools/mkshlib.py
+- tools/tests/owner_reclaim_host.c
+- tools/tests/test_owner_reclaim.py
+- userland/rust/libos32gui/src/shlib.rs
 - tools/tests/host32.py
 - exec/redir_access.c
 - kernel/kmalloc.c

@@ -236,7 +236,7 @@ class Macros(object):
 CONV = "コンベンショナルメモリ (0x00000-0xFFFFF)"
 KERN = "カーネル常駐鎖・固定PT枠"
 SQL = "SQLite 連結帯域"
-SHELL = "シェル常駐帯域 (0x400000-0x4FFFFF)"
+SHELL = "シェル常駐帯域 (MEM_SHELL_LOAD_ADDR〜MEM_SHELL_BAND_END)"
 APP = "仮想アプリ帯 (0x80000000-)"
 DEV = "物理 RAM とデバイス窓"
 
@@ -317,7 +317,7 @@ def bands(m, sym):
     add(KERN, "固定 paging ガード", v("MEM_FIXED_PAGING_GUARD_BASE"),
         v("MEM_FIXED_PAGING_BASE") - 1, "NP")
     add(SQL, "カーネルスタックガード", v("MEM_STACK_GUARD"),
-        v("MEM_STACK_GUARD_END"), "NP", "2026-09-17 に 0x1FB000 から移設 (決裁 D1)")
+        v("MEM_STACK_GUARD_END"), "NP", "MEM_STACK_GUARD〜MEM_STACK_GUARD_END")
     add(SQL, "カーネルスタック", v("MEM_KSTACK_BASE"),
         (v("MEM_SHELL_LOAD_ADDR") or 0) - 1, "RW",
         "ESP 初期値 = MEM_KSTACK_TOP (kentry.asm / TSS.ESP0)")

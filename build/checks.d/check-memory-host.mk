@@ -12,6 +12,7 @@ check-memory-host:
 	python3 -B tools/tests/test_ledger.py $(MUT)
 	python3 -B tools/tests/test_lease.py $(MUT)
 	python3 -B tools/tests/test_exec_r1.py $(MUT)
+	python3 -B tools/tests/test_t3c2.py
 	python3 -B tools/tests/test_kstop.py $(MUT)
 	python3 -B tools/tests/test_device_reservation.py $(MUT)
 	python3 -B tools/tests/test_exec_budget.py $(MUT)
