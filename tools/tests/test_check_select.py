@@ -141,7 +141,8 @@ def case_sh_pipe(cs):
 def case_bare_extract(cs):
     rules, _ = cs.read_makefiles()
     assert "README.md" in cs.extract(rules, "check-kapi-version")
-    assert "CLAUDE.md" in cs.extract(rules, "check-manifests")
+    # CLAUDE.md の件数の照合は 2026-10-17 に外した (POLICY_DEV §9)。今も読む文書で確かめる。
+    assert "docs/07_shell.md" in cs.extract(rules, "check-manifests")
 
 
 def case_readme(cs):
