@@ -15,6 +15,10 @@ def run(runner, mutant=None):
         engine = (ROOT / TARGET_SRC[0]).read_text()
         if mutant == 'guard bypass':
             engine = engine.replace('sqlite_engine_active || kctx_irq_depth', '0 || kctx_irq_depth')
+        if mutant == 'early STOP':
+            old = '    sqlite_call_on_alt_stack(call, sqlite_engine_stack_top, frame);'
+            assert engine.count(old) == 1
+            engine = engine.replace(old, old + '\n    extern void ring3_abort_check(void);\n    ring3_abort_check();')
         (tmp / 'engine.c').write_text(engine)
         (tmp / 'io.h').write_text('extern unsigned long host_flags;\nvoid host_stop(void);\n'
             'static inline unsigned int irq_save(void) { unsigned int f=host_flags; host_flags &= ~512u; return f; }\n'

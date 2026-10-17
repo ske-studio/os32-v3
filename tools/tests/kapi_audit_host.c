@@ -79,7 +79,11 @@ int exec_park_kbd(void) {
     return 0;
 }
 int exec_park_poll(u32 tick) { (void)tick; return 0; }
-int kbd_inject_take(u8 *b) { (void)b; return 0; }
+static int injected_byte = -1;
+int kbd_inject_take(u8 *b) {
+    if (injected_byte < 0) return 0;
+    *b = (u8)injected_byte; injected_byte = -1; return 1;
+}
 int v86_is_active(void) { return 0; }
 int con_sink_is_enabled(void) { return sink; }
 void con_sink_push_print(const char *s, u32 n, u8 c) { (void)s; (void)n; (void)c; }
@@ -169,7 +173,8 @@ static int test_ime_exit_display(void)
 static void input_wait(void)
 {
     if (input_wake && waits == 1) {
-        kbd_head=0; kbd_count=1; kbd_buf[0]=('A' | (KEY_RETURN << 8));
+        if (kbd_gui_mode) injected_byte='A';
+        else { kbd_head=0; kbd_count=1; kbd_buf[0]=('A' | (KEY_RETURN << 8)); }
     }
 }
 static int input_call(void)
@@ -215,6 +220,18 @@ static int test_input(void)
         input_wake=0; wait_hook=0; stop_on_wait=abort_requested=stop_requested=0;
         user=1; kbd_head=0; kbd_count=1; kbd_buf[0]='B'; waits=0;
         CHECK(input_call()=='B' && !waits, "input ready");
+        /* Actual empty wait followed by delayed input, for every public entry
+         * in CUI and the GUI fallback. A successful normal GUI park is above. */
+        for (int gui=0; gui<2; gui++) {
+            kbd_gui_mode=sink=gui; kbd_count=0; injected_byte=-1;
+            waits=abort_checks=0; escaped=abort_requested=stop_requested=stop_on_wait=0;
+            input_wake=1; wait_hook=input_wait;
+            value=input_call();
+            CHECK(value==(gui || input_kind==0 || input_kind==2 ? 'A' : ('A' | (KEY_RETURN << 8))) &&
+                  waits==2 && !abort_checks && !escaped && !kbd_count && injected_byte<0,
+                  "raw delayed CUI/GUI input completes once");
+        }
+        input_wake=0; wait_hook=0; kbd_gui_mode=sink=0;
     }
     for (input_kind=0; input_kind<4; input_kind++) {
         int value=-2;
@@ -361,6 +378,12 @@ static int test(void)
         if (!__builtin_setjmp(jump)) wrap_fm_play_mml("CDEFG");
         CHECK(escaped==1 && waits==10 && last_key==0,"CUI sustained abort key off");
         request_wait=3; stop_requested=stop_on_wait=0;
+        /* No request: a full note completes and still sends final Key-OFF. */
+        request_wait=400; escaped=abort_requested=0; waits=abort_checks=0;
+        wrap_fm_play_mml("C");
+        CHECK(waits==22 && !abort_checks && !escaped && last_key==0,
+              "raw normal MML completes with Key-OFF");
+        request_wait=3;
     }
     if (AUDIT_CASE == 0 || AUDIT_CASE == 5) {
         user=1; waits=abort_checks=0; escaped=abort_requested=0;
@@ -372,6 +395,11 @@ static int test(void)
         stop_requested=stop_on_wait=0;
         abort_requested=0; waits=0; ser_head=0; ser_count=1; ser_buf[0]='Q';
         CHECK(wrap_serial_getchar()=='Q' && !waits && !ser_count,"serial ready");
+        user=1; request_wait=400; waits=abort_checks=0; escaped=0;
+        wait_hook=serial_wake;
+        CHECK(wrap_serial_getchar()=='Z' && waits==3 && !abort_checks && !ser_count,
+              "raw delayed serial completes once");
+        wait_hook=0; request_wait=3;
         s_gate=1; CHECK(wrap_serial_getchar()==-1,"serial gate");
         s_gate=0; user=0; abort_requested=1; escaped=0;
         waits=abort_checks=0; ser_count=0; wait_hook=serial_wake;

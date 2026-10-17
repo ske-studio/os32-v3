@@ -48,7 +48,7 @@ for fn in ('serial_putchar', 'serial_puts', 'serial_getchar', 'kbd_getchar',
            'kbd_getkey', 'ime_getchar', 'ime_getkey', 'fm_play_mml'):
     MUTATIONS.append((fn + ' public target', 3, fn + '_kapi(', fn + '('))
 
-def run(runner, mutation=None, case=0):
+def run(runner, mutation=None, case=0, expected=None):
     sources = [(ROOT / p).read_text() for p in SOURCES]
     names = ('rshell_set_active', 'serial_putchar', 'serial_puts', 'serial_getchar',
              'kbd_getchar', 'kbd_getkey', 'ime_getchar', 'ime_getkey', 'fm_play_mml')
@@ -106,6 +106,8 @@ def run(runner, mutation=None, case=0):
             # pointer before a CHECK. Count the runtime fault, never a build failure.
             tone_fault = mutation and mutation[0] in ('tone low', 'tone high') and p.returncode in (-11, 139)
             assert tone_fault or (p.returncode == 1 and 'FAIL ' in p.stdout), (p.returncode, p.stdout, p.stderr)
+            if expected:
+                assert expected in p.stdout, (mutation[0], expected, p.stdout, p.stderr)
             print('RED', mutation[0] if mutation else 'item ' + str(case),
                   'runtime SIGSEGV' if tone_fault else p.stdout.strip())
         else:
