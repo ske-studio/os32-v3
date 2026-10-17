@@ -71,7 +71,6 @@ int main(int argc, char **argv, KernelAPI *api)
     else if (!strcmp(mode, "mount")) api->sys_mount("/__t4b8b__", "__missing__", bad);
     else if (!strcmp(mode, "mount-dev")) api->sys_mount("/__t4b8b__", bad, "fat12");
     else if (!strcmp(mode, "device")) api->dev_blk_read(bad, 0, 0, 0);
-    else if (!strcmp(mode, "boot2")) api->v86_boot2("/__t4b8b_missing__", bad);
     else if (!strcmp(mode, "command")) api->exec_run(bad);
     else if (!strcmp(mode, "launch")) api->launch_req(bad);
     else if (!strcmp(mode, "output")) api->shell_print_utf8(bad, 7);

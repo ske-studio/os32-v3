@@ -88,6 +88,78 @@ static void invoke(const struct input_case *c, u32 words, int accepted)
     CHECK(host_cr3 == root && host_arch_if == flags);
     for (u32 i = 0; i < KAPI_STRING_ARGS; i++) CHECK(!allocated[i]);
 }
+
+#define main guest_main
+#define memcpy kmemcpy
+#define memset kmemset
+#define strcmp(a, b) (!equal(a, b))
+#include "guest_host_source.c"
+#undef strcmp
+#undef memset
+#undef memcpy
+#undef main
+
+static int guest_mapped, guest_unmapped, guest_armed, guest_calls;
+static void *guest_fault[5];
+static void *guest_map(u32 bytes, void *hint, u32 flags)
+{
+    CHECK(bytes == PAGE_SIZE * 2 && !hint && !flags && !guest_mapped);
+    guest_mapped++;
+    return (void *)MEM_EXEC_LOAD_ADDR;
+}
+static int guest_unmap(void *base, u32 bytes)
+{
+    CHECK(base == (void *)(MEM_EXEC_LOAD_ADDR + PAGE_SIZE) && bytes == PAGE_SIZE);
+    CHECK(guest_mapped == 1 && !guest_unmapped);
+    guest_unmapped++;
+    return 0;
+}
+static void guest_print(u8 attr, const char *format, ...)
+{
+    CHECK(attr == 7 && guest_unmapped == 1 && !guest_armed);
+    CHECK(equal(format, "KSTR armed %s; expect FAULT before target\n"));
+    __builtin_va_list ap;
+    __builtin_va_start(ap, format);
+    CHECK(equal(__builtin_va_arg(ap, const char *), "boot2"));
+    __builtin_va_end(ap);
+    guest_armed++;
+}
+static int guest_boot2(const char *path, const char *second)
+{
+    u32 va = MEM_EXEC_LOAD_ADDR, tail = va + PAGE_SIZE;
+    u8 *data = P2V(payload);
+    u32 *words = (u32 *)data;
+    const struct input_case c = {KAPI_SLOT_V86_BOOT2, 8, 3, 3, VFS_MAX_PATH, 3};
+    CHECK(guest_mapped == 1 && guest_unmapped == 1 && guest_armed == 1);
+    CHECK(equal(path, "/__t4b8b_missing__"));
+    CHECK(second == (const char *)(uptr)(tail - 16));
+    for (u32 i = 0; i < 16; i++) CHECK(second[i]);
+    /* Synchronize the guest writes into the distinct B1 physical backing.
+     * The real walker sees the second page missing, and the real dispatch
+     * must fault before kapi_invoke (the V86 wrapper entry) is reached. */
+    u32 *pt = P2V(space.app_pt_phys[0]);
+    CHECK(!pt[((tail >> PAGE_SHIFT) % PTE_COUNT)]);
+    kmemcpy(data + 512, path, sizeof("/__t4b8b_missing__"));
+    kmemcpy(data + PAGE_SIZE - 16, second, 16);
+    words[0] = va + 512; words[1] = tail - 16;
+    invoke(&c, va, 0);
+    guest_calls++;
+    __builtin_longjmp(guest_fault, 1);
+    return 0;
+}
+static void guest_boot2_test(void)
+{
+    KernelAPI api = {.mem_map = guest_map, .mem_unmap = guest_unmap,
+                     .kprintf = guest_print, .v86_boot2 = guest_boot2};
+    char *argv[] = {"kstr_v86", "boot2"};
+    CHECK(guest_main(1, argv, &api) == 1 && !guest_mapped);
+    if (!__builtin_setjmp(guest_fault)) {
+        guest_main(2, argv, &api);
+        CHECK(0); /* A surviving or missing boot2 call is never a pass. */
+    }
+    CHECK(guest_calls == 1 && !effects);
+    SAY("PASS kstr_v86 boot2: bad second input faults before V86, no effects");
+}
 static void caller_copy_tests(void)
 {
     CallerAccessFrame previous;
@@ -185,6 +257,7 @@ static void caller_copy_tests(void)
             invoke(c, va, 1);
         }
     }
+    guest_boot2_test();
     char path[VFS_MAX_PATH];
     struct caller_access saved;
     CHECK(caller_access_get(&saved));

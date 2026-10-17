@@ -13,6 +13,8 @@ check-kapi-strings-host:
 - kdebug/kselftest.c
 - sdk/kapi.json
 - userland/tests/kstr_boundary.c
+- userland/tests/kstr_v86.c
+- build/app.conf
 - tools/tests/test_kapi_strings.py
 - tools/tests/kapi_strings_host.c
 - tools/tests/test_access_walk.py
