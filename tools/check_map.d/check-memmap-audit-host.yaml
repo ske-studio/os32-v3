@@ -23,6 +23,7 @@ check-memmap-audit-host:
 - kernel/module.h
 - kdebug/kselftest.c
 - kernel/paging.c
+- kernel/paging.h
 - kernel/pgalloc.c
 - kernel/physmem.c
 - kernel/ring3_entry.asm

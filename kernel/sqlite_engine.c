@@ -3,6 +3,7 @@
 #include "io.h"
 #include "irq.h"
 #include "pgalloc.h"
+#include "paging.h"
 #include "memmap.h"
 #include "module_runtime.h"
 #include "memory_boot.h"
@@ -87,9 +88,13 @@ static int sqlite_start(struct module_record *r, u32 entry, u32 *exports)
     (void)exports;
     pool_phys = pgalloc_alloc_phys(r->owner, SQLITE_MODULE_POOL_SIZE / PAGE_SIZE);
     if (!pool_phys) return MODULE_NO_PAGES;
-    u32 stack = pgalloc_alloc_phys(r->owner, SQLITE_ENGINE_STACK_SIZE / PAGE_SIZE);
+    u32 stack = pgalloc_alloc_phys(r->owner, SQLITE_ENGINE_STACK_SIZE / PAGE_SIZE + 1);
     if (!stack) return MODULE_NO_PAGES;
-    sqlite_engine_stack_top = (u32)(uptr)P2V(stack) + SQLITE_ENGINE_STACK_SIZE;
+    paging_sqlite_stack_guard = (u32)(uptr)P2V(stack);
+    if (paging_set_not_present(paging_sqlite_stack_guard,
+                              paging_sqlite_stack_guard + PAGE_SIZE - 1) ||
+        paging_is_present(paging_sqlite_stack_guard)) return MODULE_NO_PAGES;
+    sqlite_engine_stack_top = paging_sqlite_stack_guard + PAGE_SIZE + SQLITE_ENGINE_STACK_SIZE;
     struct sqlite_init_call call = {entry, SQLITE_MISUSE};
     sqlite_engine_run(call_module_init, &call, 0);
     candidate_valid = valid_api(r);
@@ -110,6 +115,11 @@ static int sqlite_quiesce(struct module_record *r)
         if (!candidate_valid || !sqlite_engine_run(call_shutdown, &rc, 0) ||
             rc != SQLITE_OK) return 0;
     }
+    /* The owner reclaimer writes freed pages; restore the guard before it runs. */
+    if (paging_sqlite_stack_guard &&
+        paging_set_page(paging_sqlite_stack_guard,
+                        V2P((void *)(uptr)paging_sqlite_stack_guard), PAGE_RW)) return 0;
+    paging_sqlite_stack_guard = 0;
     sqlite_engine_stack_top = pool_phys = 0;
     init_called = candidate_valid = 0;
     return 1;
@@ -147,5 +157,7 @@ int os32_sqlite_start(void)
             record && record->owner ? ledger_owner_pages(record->owner) : 0,
             record ? record->pages : 0, record ? record->prefix_pages : 0,
             counts.diff);
+    kprintf(0x07, "[sqlite] stack_guard=%08x p=%u\n", paging_sqlite_stack_guard,
+            paging_sqlite_stack_guard ? paging_is_present(paging_sqlite_stack_guard) : 0);
     return rc;
 }

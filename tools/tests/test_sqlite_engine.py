@@ -29,6 +29,7 @@ def run(runner, mutant=None):
             'static inline void _stop(void) { host_stop(); }\n')
         (tmp / 'pgalloc.h').write_text('extern volatile u32 kctx_irq_depth, kctx_exc_depth;\n')
         (tmp / 'memmap.h').write_text('')
+        (tmp / 'paging.h').write_text('')
         src = (ROOT / 'exec/exec.c').read_text()
         a = src.index('void ring3_abort_check(void)\n{')
         (tmp / 'stop_source.c').write_text(src[a:src.index('\n}', a)+2])
@@ -48,7 +49,7 @@ def run(runner, mutant=None):
             gates.append('static void '+name+'(void) {\nu32 vector=13, fault_eip=test_eip, fault_addr=test_cr2;\n'+gate+' kills++; }\n')
         (tmp / 'fault_source.c').write_text('#include "io.h"\n'+'\n'.join(gates))
         rows = json.loads((ROOT / 'tools/prototypes/sqlite_imports.def').read_text())['facade']
-        mocks, calls, stub_calls, bindings = [], [], [], []
+        mocks, calls, stub_calls, bindings, refused_calls, io_refused_calls = [], [], [], [], [], []
         for row in rows:
             ret, name, args, target, wrapper = [row[k] for k in ('result','name','args','target','wrapper')]
             value = '(void *)0x1234' if '*' in ret else '73'
@@ -65,12 +66,20 @@ def run(runner, mutant=None):
             elif '*' in ret and row['stub'] != '0':
                 stub_calls.append(f'CHECK({call} != 0);')
             else: stub_calls.append(f'CHECK({call} == ({ret})({row["stub"]}));')
+            refused = ('SQLITE_MISUSE' if row['stub'] == 'OS32_ERR_NOSYS' else row['stub'])
+            check = (call+';' if ret == 'void' else
+                     f'CHECK({call} != 0);' if '*' in ret and refused != '0' else
+                     f'CHECK({call} == ({ret})({refused}));')
+            refused_calls.append(check)
+            if row['io']: io_refused_calls.append(check)
         mocks += ['static const SqliteModuleApi exports = {'+' '.join(bindings)+'};',
                   'const SqliteModuleApi *sqlite_module_api = &sqlite_stub_api;',
                   'int sqlite_module_ready(void) { return sqlite_module_api != &sqlite_stub_api; }']
         (tmp / 'sqlite_mocks.c').write_text('\n'.join(mocks))
         (tmp / 'outer_calls.c').write_text('\n'.join(calls))
         (tmp / 'stub_calls.c').write_text('\n'.join(stub_calls))
+        (tmp / 'refused_calls.c').write_text('\n'.join(refused_calls))
+        (tmp / 'io_refused_calls.c').write_text('\n'.join(io_refused_calls))
         outer = (ROOT / 'kernel/sqlite_outer.c').read_text()
         outer = outer.replace('../lib/sqlite3/generated/', str(ROOT / 'lib/sqlite3/generated')+'/')
         generated = (ROOT / 'lib/sqlite3/generated/sqlite_outer_calls.inc').read_text()

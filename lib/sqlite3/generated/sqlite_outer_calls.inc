@@ -84,7 +84,7 @@ static void call_close(void *arg) {
 }
 int os32_sqlite_close(sqlite3 *db)
 {
-    Call_close f = {db, OS32_ERR_NOSYS};
+    Call_close f = {db, SQLITE_MISUSE};
     if (!sqlite_module_ready()) return sqlite_module_api->close(db);
     sqlite_engine_run(call_close, &f, 1);
     return f.result;
@@ -97,7 +97,7 @@ static void call_prepare_v2(void *arg) {
 }
 int os32_sqlite_prepare_v2(sqlite3 *db, const char *sql, int size, sqlite3_stmt **out, const char **tail)
 {
-    Call_prepare_v2 f = {db, sql, size, out, tail, OS32_ERR_NOSYS};
+    Call_prepare_v2 f = {db, sql, size, out, tail, SQLITE_MISUSE};
     if (!sqlite_module_ready()) return sqlite_module_api->prepare_v2(db, sql, size, out, tail);
     sqlite_engine_run(call_prepare_v2, &f, 1);
     return f.result;
@@ -110,7 +110,7 @@ static void call_exec(void *arg) {
 }
 int os32_sqlite_exec(sqlite3 *db, const char *sql, SqliteExecCallback callback, void *arg, char **error)
 {
-    Call_exec f = {db, sql, callback, arg, error, OS32_ERR_NOSYS};
+    Call_exec f = {db, sql, callback, arg, error, SQLITE_MISUSE};
     if (!sqlite_module_ready()) return sqlite_module_api->exec(db, sql, callback, arg, error);
     sqlite_engine_run(call_exec, &f, 1);
     return f.result;
@@ -123,7 +123,7 @@ static void call_step(void *arg) {
 }
 int os32_sqlite_step(sqlite3_stmt *stmt)
 {
-    Call_step f = {stmt, OS32_ERR_NOSYS};
+    Call_step f = {stmt, SQLITE_MISUSE};
     if (!sqlite_module_ready()) return sqlite_module_api->step(stmt);
     sqlite_engine_run(call_step, &f, 1);
     return f.result;
@@ -136,7 +136,7 @@ static void call_finalize(void *arg) {
 }
 int os32_sqlite_finalize(sqlite3_stmt *stmt)
 {
-    Call_finalize f = {stmt, OS32_ERR_NOSYS};
+    Call_finalize f = {stmt, SQLITE_MISUSE};
     if (!sqlite_module_ready()) return sqlite_module_api->finalize(stmt);
     sqlite_engine_run(call_finalize, &f, 1);
     return f.result;
@@ -149,7 +149,7 @@ static void call_reset(void *arg) {
 }
 int os32_sqlite_reset(sqlite3_stmt *stmt)
 {
-    Call_reset f = {stmt, OS32_ERR_NOSYS};
+    Call_reset f = {stmt, SQLITE_MISUSE};
     if (!sqlite_module_ready()) return sqlite_module_api->reset(stmt);
     sqlite_engine_run(call_reset, &f, 1);
     return f.result;
@@ -162,7 +162,7 @@ static void call_bind_int(void *arg) {
 }
 int os32_sqlite_bind_int(sqlite3_stmt *stmt, int index, int value)
 {
-    Call_bind_int f = {stmt, index, value, OS32_ERR_NOSYS};
+    Call_bind_int f = {stmt, index, value, SQLITE_MISUSE};
     if (!sqlite_module_ready()) return sqlite_module_api->bind_int(stmt, index, value);
     sqlite_engine_run(call_bind_int, &f, 0);
     return f.result;
@@ -175,7 +175,7 @@ static void call_bind_null(void *arg) {
 }
 int os32_sqlite_bind_null(sqlite3_stmt *stmt, int index)
 {
-    Call_bind_null f = {stmt, index, OS32_ERR_NOSYS};
+    Call_bind_null f = {stmt, index, SQLITE_MISUSE};
     if (!sqlite_module_ready()) return sqlite_module_api->bind_null(stmt, index);
     sqlite_engine_run(call_bind_null, &f, 0);
     return f.result;
@@ -188,7 +188,7 @@ static void call_bind_text(void *arg) {
 }
 int os32_sqlite_bind_text(sqlite3_stmt *stmt, int index, const char *value, int length, SqliteDestructor destroy)
 {
-    Call_bind_text f = {stmt, index, value, length, destroy, OS32_ERR_NOSYS};
+    Call_bind_text f = {stmt, index, value, length, destroy, SQLITE_MISUSE};
     if (!sqlite_module_ready()) return sqlite_module_api->bind_text(stmt, index, value, length, destroy);
     sqlite_engine_run(call_bind_text, &f, 0);
     return f.result;
@@ -201,7 +201,7 @@ static void call_bind_blob(void *arg) {
 }
 int os32_sqlite_bind_blob(sqlite3_stmt *stmt, int index, const void *value, int length, SqliteDestructor destroy)
 {
-    Call_bind_blob f = {stmt, index, value, length, destroy, OS32_ERR_NOSYS};
+    Call_bind_blob f = {stmt, index, value, length, destroy, SQLITE_MISUSE};
     if (!sqlite_module_ready()) return sqlite_module_api->bind_blob(stmt, index, value, length, destroy);
     sqlite_engine_run(call_bind_blob, &f, 0);
     return f.result;
@@ -331,7 +331,7 @@ static void call_errcode(void *arg) {
 }
 int os32_sqlite_errcode(sqlite3 *db)
 {
-    Call_errcode f = {db, OS32_ERR_NOSYS};
+    Call_errcode f = {db, SQLITE_MISUSE};
     if (!sqlite_module_ready()) return sqlite_module_api->errcode(db);
     sqlite_engine_run(call_errcode, &f, 0);
     return f.result;
@@ -344,7 +344,7 @@ static void call_extended_errcode(void *arg) {
 }
 int os32_sqlite_extended_errcode(sqlite3 *db)
 {
-    Call_extended_errcode f = {db, OS32_ERR_NOSYS};
+    Call_extended_errcode f = {db, SQLITE_MISUSE};
     if (!sqlite_module_ready()) return sqlite_module_api->extended_errcode(db);
     sqlite_engine_run(call_extended_errcode, &f, 0);
     return f.result;
@@ -396,7 +396,7 @@ static void call_group_open(void *arg) {
 }
 int os32_sqlite_outer_group_open(const Os32SqliteGroup *group, const char *path, int flags, sqlite3 **out)
 {
-    Call_group_open f = {group, path, flags, out, OS32_ERR_NOSYS};
+    Call_group_open f = {group, path, flags, out, SQLITE_MISUSE};
     if (!sqlite_module_ready()) return sqlite_module_api->group_open(group, path, flags, out);
     sqlite_engine_run(call_group_open, &f, 1);
     return f.result;
@@ -422,7 +422,7 @@ static void call_group_acquire(void *arg) {
 }
 int os32_sqlite_outer_group_acquire(int kind, int owner, Os32SqliteGroup *out)
 {
-    Call_group_acquire f = {kind, owner, out, OS32_ERR_NOSYS};
+    Call_group_acquire f = {kind, owner, out, SQLITE_MISUSE};
     if (!sqlite_module_ready()) return sqlite_module_api->group_acquire(kind, owner, out);
     sqlite_engine_run(call_group_acquire, &f, 0);
     return f.result;
@@ -448,7 +448,7 @@ static void call_group_opened(void *arg) {
 }
 int os32_sqlite_outer_group_opened(const Os32SqliteGroup *group, void *db)
 {
-    Call_group_opened f = {group, db, OS32_ERR_NOSYS};
+    Call_group_opened f = {group, db, SQLITE_MISUSE};
     if (!sqlite_module_ready()) return sqlite_module_api->group_opened(group, db);
     sqlite_engine_run(call_group_opened, &f, 0);
     return f.result;
@@ -461,7 +461,7 @@ static void call_group_begin_close(void *arg) {
 }
 int os32_sqlite_outer_group_begin_close(const Os32SqliteGroup *group)
 {
-    Call_group_begin_close f = {group, OS32_ERR_NOSYS};
+    Call_group_begin_close f = {group, SQLITE_MISUSE};
     if (!sqlite_module_ready()) return sqlite_module_api->group_begin_close(group);
     sqlite_engine_run(call_group_begin_close, &f, 0);
     return f.result;
@@ -474,7 +474,7 @@ static void call_group_finish(void *arg) {
 }
 int os32_sqlite_outer_group_finish(const Os32SqliteGroup *group, int close_rc)
 {
-    Call_group_finish f = {group, close_rc, OS32_ERR_NOSYS};
+    Call_group_finish f = {group, close_rc, SQLITE_MISUSE};
     if (!sqlite_module_ready()) return sqlite_module_api->group_finish(group, close_rc);
     sqlite_engine_run(call_group_finish, &f, 0);
     return f.result;
@@ -487,7 +487,7 @@ static void call_group_quarantine(void *arg) {
 }
 int os32_sqlite_outer_group_quarantine(const Os32SqliteGroup *group, int stage, int rc)
 {
-    Call_group_quarantine f = {group, stage, rc, OS32_ERR_NOSYS};
+    Call_group_quarantine f = {group, stage, rc, SQLITE_MISUSE};
     if (!sqlite_module_ready()) return sqlite_module_api->group_quarantine(group, stage, rc);
     sqlite_engine_run(call_group_quarantine, &f, 0);
     return f.result;
@@ -500,7 +500,7 @@ static void call_group_snapshot(void *arg) {
 }
 int os32_sqlite_outer_group_snapshot(const Os32SqliteGroup *group, Os32SqliteGroupInfo *out)
 {
-    Call_group_snapshot f = {group, out, OS32_ERR_NOSYS};
+    Call_group_snapshot f = {group, out, SQLITE_MISUSE};
     if (!sqlite_module_ready()) return sqlite_module_api->group_snapshot(group, out);
     sqlite_engine_run(call_group_snapshot, &f, 0);
     return f.result;
@@ -513,7 +513,7 @@ static void call_group_for_db(void *arg) {
 }
 int os32_sqlite_outer_group_for_db(void *db, Os32SqliteGroupInfo *out)
 {
-    Call_group_for_db f = {db, out, OS32_ERR_NOSYS};
+    Call_group_for_db f = {db, out, SQLITE_MISUSE};
     if (!sqlite_module_ready()) return sqlite_module_api->group_for_db(db, out);
     sqlite_engine_run(call_group_for_db, &f, 0);
     return f.result;
@@ -565,7 +565,7 @@ static void call_shutdown(void *arg) {
 }
 int os32_sqlite_outer_shutdown(void)
 {
-    Call_shutdown f = {OS32_ERR_NOSYS};
+    Call_shutdown f = {SQLITE_MISUSE};
     if (!sqlite_module_ready()) return sqlite_module_api->shutdown();
     sqlite_engine_run(call_shutdown, &f, 0);
     return f.result;

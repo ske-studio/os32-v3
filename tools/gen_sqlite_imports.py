@@ -116,7 +116,10 @@ def generate_facade(out, rows, entries):
                      f'static void call_{name}(void *arg) {{', f'    Call_{name} *f = arg;', '    (void)f;']
         invocation = f'sqlite_module_api->{name}(' + ', '.join('f->'+a for a in names) + ')'
         wrappers += [('    f->result = ' if ret != 'void' else '    ') + invocation + ';', '}', decl, '{']
-        init = callargs + (', ' if names else '') + (r['stub'] if ret != 'void' else '0')
+        # Missing component uses its typed stub. A present but unavailable
+        # engine retains the pre-module SQLITE_MISUSE result for status calls.
+        refused = 'SQLITE_MISUSE' if r['stub'] == 'OS32_ERR_NOSYS' else r['stub']
+        init = callargs + (', ' if names else '') + (refused if ret != 'void' else '0')
         wrappers += [f'    Call_{name} f = {{{init}}};',
                      f'    if (!sqlite_module_ready()) ' +
                      (f'return sqlite_module_api->{name}({callargs});' if ret != 'void' else f'{{ sqlite_module_api->{name}({callargs}); return; }}'),

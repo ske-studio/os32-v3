@@ -27,6 +27,8 @@ check-sqlite-module-proto-host:
 - kernel/module_runtime.h
 - kernel/sqlite_engine.c
 - kernel/sqlite_engine.h
+- kernel/paging.h
+- kernel/isr_handlers.c
 - kernel/sqlite_outer.c
 - kernel/memory_boot.h
 - kernel/module.h

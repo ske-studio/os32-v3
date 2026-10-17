@@ -55,7 +55,10 @@
 
 T4c-1 では `__kernel_resident_end` は core BSS 末尾のページ境界。
 SQLite は `/boot/sqlite.mod` の body と512KiB pool・128KiB stackを同じ module owner で
-連続割当し、prefixだけ起動成功時に返す。SQLite の全頁（隔離時も含む）は
+連続割当し、prefixだけ起動成功時に返す。stack 直下に追加の1頁を NP guard として
+保持し、owner 回収前に supervisor/RW に戻す。動的な kernel VA は
+`paging_sqlite_stack_guard` と `[sqlite] stack_guard=... p=...` で観測し、boot/live audit で NP を照合する。
+SQLite の全頁（隔離時も含む）は
 SLACK/pool の内数であり、別枠として再加算しない。`[sqlite] owner=... state=... pages=...`
 は起動後の独立観測で、既存の boot audit 回数を増やさず総和の diff を表示する。
 memory_layout は4を維持する。変更はリンク時に浮く core 内部の常駐鎖と owner 割当であり、

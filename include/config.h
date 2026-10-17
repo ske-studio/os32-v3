@@ -26,7 +26,6 @@
 #define SYS_SYSTEM_CFG        "/etc/system.cfg"    /* 起動設定 (GUI=0/1、K4) */
 #define SYS_PROFILE_SYS       "/etc/profile"       /* システムプロファイル */
 #define SYS_UNICODE_BIN       "/sys/unicode.bin"   /* Unicodeテーブル */
-#define SYS_SQLITE_BIN        "/sys/sqlite.bin"    /* SQLite拡張域バイナリ */
 /* 既定の 16px フォント (KCG)。HDD / CD は長い名前。FD (FAT、FatFs は LFN なし)
  * に置くなら 8.3 の短い名前 — 2026-09-25 からフォントは NORMAL で、起動 FD
  * (= MINIMAL) には載せていない (build/packages.yaml)。カーネルは長い名前が

@@ -21,8 +21,8 @@
 /*    0xF0000 - 0xFFFFF : R/O  (BIOS ROM)                                   */
 /*                                                                          */
 /*  [拡張メモリ] 番地の正典は include/memmap.h、実値は build/out/MEMMAP.md   */
-/*    0x100000 -          : R/W  (カーネル code+data+BSS → SQLite → guard NP */
-/*                                → 代替スタック → heap+KAPI+SHM → SLACK。   */
+/*    0x100000 -          : R/W  (カーネル code+data+BSS → heap+KAPI+SHM → SLACK */
+/*                                SQLite owner の stack 直下は動的 NP guard。 */
 /*                                __bss_end 由来で浮く)                      */
 /*    0x3E0000 - 0x3E0FFF : NP   (固定 PD/PT 枠の guard)                     */
 /*    0x3E1000 - 0x3FAFFF : R/W  (固定 PD/PT 26 枚: 使用 11 + 予備 15)       */
@@ -46,6 +46,8 @@
 #include "memmap.h"
 #include "pgalloc.h"
 #include "pc98.h"
+
+u32 paging_sqlite_stack_guard;
 
 /* カーネルスタック帯のレイアウト不変条件。
  * ガードページはスタック直下に隣接する。ずれると paging_init の R/W 強制や
@@ -1259,6 +1261,7 @@ int paging_app_band_selftest(void)
  * しまい、この自己診断そのものが穴を隠す。 */
 static u8 memmap_want_at(u32 a, u32 tramp)
 {
+    if (paging_sqlite_stack_guard && a == paging_sqlite_stack_guard) return MM_NP;
     if (tramp && a == tramp) return MM_ROU;     /* exec.c の KAPI 踏み台 */
 
     /* コンベンショナルメモリ */
@@ -1587,6 +1590,7 @@ int paging_master_audit(u32 tramp)
                         want = PAGE_RW | PTE_PCD;
                 }
             }
+            if (paging_sqlite_stack_guard && a == paging_sqlite_stack_guard) want = 0;
             if (!(want & PTE_PRESENT)) { if (e & PTE_PRESENT) bad++; continue; }
             if ((e & (~(u32)(PAGE_SIZE - 1) | PAGE_RW | PTE_USER | PTE_PCD | PTE_PWT)) !=
                 (a | want)) bad++;

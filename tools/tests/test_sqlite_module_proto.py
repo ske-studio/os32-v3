@@ -208,7 +208,7 @@ def pair_runtime_suite(folder, mutate=False):
         print('MUTATE sqlite-mixed-pair RED (compiled, runtime acceptance assertion)')
 
 
-def real_runtime_suite(folder, directory, vmkernel):
+def real_runtime_suite(folder, directory, vmkernel, mutate=False):
     """Execute the product module with the full adapter and real stack switch."""
     generated = ROOT / 'lib/sqlite3/generated'
     for name in ('sqlite_engine', 'sqlite_outer'):
@@ -217,9 +217,16 @@ def real_runtime_suite(folder, directory, vmkernel):
             '../lib/sqlite3/generated/', str(generated) + '/'))
     (folder / 'io.h').write_text(
         'extern unsigned long host_flags;\n'
+        'void host_stop(void);\n'
+        'static inline void _disable(void) { host_flags &= ~512UL; }\n'
+        'static inline void _stop(void) { host_stop(); }\n'
         'static inline unsigned long irq_save(void) { unsigned long f=host_flags; '
         'host_flags &= ~512UL; return f; }\n'
         'static inline void irq_restore(unsigned long f) { host_flags=f; }\n')
+    handlers = (ROOT / 'kernel/isr_handlers.c').read_text()
+    start = handlers.index('void sqlite_engine_fault(')
+    (folder / 'sqlite_fault.inc').write_text(
+        '#include "io.h"\n' + handlers[start:handlers.index('\n}', start) + 2])
     # Real contracts, with unneeded disk/heap imports bound to a failing probe.
     # :memory: still executes the actual module's VFS registry and MEMSYS5.
     exports = (generated / 'sqlite_kexports.c').read_text()
@@ -235,18 +242,20 @@ def real_runtime_suite(folder, directory, vmkernel):
     obj = folder / 'sqlite_stack.o'
     subprocess.run(['nasm', '-f', 'elf32', ROOT / 'lib/sqlite3/sqlite_stack.asm', '-o', obj], check=True)
     exe = folder / 'sqlite-module'
-    subprocess.run(['gcc', *RUNTIME_FLAGS, '-Werror=vla', *RUNTIME_INCLUDES,
+    command = ['gcc', *RUNTIME_FLAGS, '-Werror=vla', '-I' + str(folder), *RUNTIME_INCLUDES,
                     '-I' + str(ROOT / 'lib/sqlite3'), '-I' + str(generated),
                     '-nostdlib', '-static', '-no-pie',
                     ROOT / 'tools/tests/sqlite_module_host.c',
                     folder / 'sqlite_engine.c', folder / 'sqlite_outer.c',
                     folder / 'sqlite_kexports.c', ROOT / 'kernel/module_runtime.c',
-                    ROOT / 'kernel/module_image.c', obj, '-o', exe], check=True)
+                    ROOT / 'kernel/module_image.c', obj, '-o', exe]
+    subprocess.run(command, check=True)
     pair = mkmod.pair_crc(vmkernel.read_bytes())
     image = (directory / 'sqlite.bin').read_bytes()
     for label, mode, expected in (('running', 0, 0), ('missing', 1, 2),
                                   ('mixed-pair', 2, 4), ('prefix-failure', 3, 10),
-                                  ('pool-failure', 4, 10), ('stack-failure', 5, 10)):
+                                  ('pool-failure', 4, 10), ('stack-failure', 5, 10),
+                                  ('stack-overflow', 6, 0)):
         data = bytearray(image)
         if mode == 2:
             word(data, 31, pair ^ 1)
@@ -254,8 +263,27 @@ def real_runtime_suite(folder, directory, vmkernel):
         payload = struct.pack('<4I', mode, len(data), pair, expected) + data
         for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
             result = host32.run([str(exe)], input=payload, runner=runner, capture_output=True)
-            assert result.returncode == 0, (label, runner, result)
+            assert result.returncode == (77 if mode == 6 else 0), (label, runner, result)
+            output = result.stdout.decode()
+            if mode == 0:
+                print(output, end='')
+            if mode == 6:
+                assert 'PASS guard overflow fault -> engine fail-stop' in output, result
+                print(output, end='')
         print('PASS real SQLite adapter ' + label, flush=True)
+    if mutate:
+        path = folder / 'sqlite_engine.c'
+        source = path.read_text()
+        start = source.index('    if (paging_set_not_present(')
+        end = source.index('\n    sqlite_engine_stack_top =', start)
+        path.write_text(source[:start] + source[end:])
+        subprocess.run(command, check=True)
+        payload = struct.pack('<4I', 0, len(image), pair, 0) + image
+        for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
+            result = host32.run([str(exe)], input=payload, runner=runner, capture_output=True)
+            assert result.returncode == 1 and b'FAIL guard_np &&' in result.stdout, result
+        print('MUTATE stack-guard-removed RED (compiled, runtime guard assertion)')
+        path.write_text(source)
 
 
 def main():
@@ -270,6 +298,8 @@ def main():
         generated = gen_sqlite_imports.generate(folder)
         for name in ('sqlite_imports.json', 'sqlite_imports.h', 'sqlite_import_stubs.S'):
             assert (folder / name).read_bytes() == (args.directory / name).read_bytes()
+        for name in ('sqlite_outer_calls.inc', 'sqlite_facade.h'):
+            assert (folder / name).read_bytes() == (ROOT / 'lib/sqlite3/generated' / name).read_bytes()
         assert generated['module_abi_gen'] != json.loads(
             (ROOT / 'kdebug/generated/kdebug_imports.json').read_text())['module_abi_gen']
         exe = build_validator(folder)
@@ -278,7 +308,7 @@ def main():
             stats = real_suite(exe, args.directory, args.vmkernel, runner)
             print(f'PASS {runner}: unaligned/last-word reloc; tail-2/BSS/duplicate/import/overflow write=0')
         pair_runtime_suite(folder, mutate=args.mutate)
-        real_runtime_suite(folder, args.directory, args.vmkernel)
+        real_runtime_suite(folder, args.directory, args.vmkernel, mutate=args.mutate)
         print(json.dumps(stats, sort_keys=True))
         if args.mutate:
             source = (ROOT / 'kernel/module_image.c').read_text()

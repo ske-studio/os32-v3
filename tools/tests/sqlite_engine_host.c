@@ -46,6 +46,7 @@ static void callback(void *arg)
     CHECK(!sqlite_engine_run(nested, 0, 0));
     CHECK(!sqlite_engine_available(0));
     CHECK(sqlite_engine_active == 1);
+    #include "refused_calls.c"
 }
 #include "sqlite_mocks.c"
 extern int check_registers(void (*fn)(void *), u32 top, void *arg);
@@ -65,10 +66,13 @@ void _start(void)
     pending = 0;
     int before = calls;
     kctx_irq_depth = 1;
+    #include "refused_calls.c"
     CHECK(!sqlite_engine_run(callback, (void *)123, 0));
     kctx_irq_depth = 0; kctx_exc_depth = 1;
+    #include "refused_calls.c"
     CHECK(!sqlite_engine_run(callback, (void *)123, 0));
     kctx_exc_depth = 0; host_flags = 2;
+    #include "io_refused_calls.c"
     CHECK(!sqlite_engine_run(callback, (void *)123, 1));
     CHECK(calls == before && host_flags == 2);
     CHECK(sqlite_engine_run(callback, (void *)123, 0));

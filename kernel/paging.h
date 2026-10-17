@@ -138,6 +138,10 @@ int paging_set_readonly(u32 start, u32 end);
  * 戻り値: 0=成功, -1=逆順 (全範囲を未変更) */
 int paging_set_not_present(u32 start, u32 end);
 
+/* SQLite owner stack's kernel VA; zero before allocation/after guard restore.
+ * The boot adapter publishes it for boot/live mapping audits, including quarantine. */
+extern u32 paging_sqlite_stack_guard;
+
 /* ブート後のコンベンショナルメモリ再利用 (ページ0: NP, 0x1000-0x9FFFF: R/W) */
 void paging_reclaim_conventional(void);
 

@@ -25,7 +25,7 @@ def audit_cases(tmp):
                'ring3_tramp_raw': 0x135123}
     macros = Macros(read_defines(ROOT / 'include/memmap.h'), symbols)
     k = {name: macros.get(name) for name in macros.defines}
-    checks = live.checks(k, symbols)
+    checks = live.checks(k, symbols, 0)
     assert ('KAPI trampoline', 0x136000, 0x136fff, 1, 1) in checks
     shell = [c for c in checks if c[0].startswith('shell')]
     assert shell[-1][2] == k['MEM_SHELL_BAND_END']
@@ -55,6 +55,19 @@ def audit_cases(tmp):
     assert loaded[address] == ptes[address]
     assert subprocess.run([sys.executable, str(ROOT / 'tools/memmap_audit_live.py'), '--help'],
                           capture_output=True).returncode == 0
+    for guard in (0, k['MEM_SHM_RESV_START'], k['MEM_PHYS_EXEC_FLOOR']):
+        ranges = live.checks(k, symbols, guard)
+        targets = [r for r in ranges if r[0] == 'SQLite stack guard']
+        assert len(targets) == bool(guard)
+        if not guard:
+            continue
+        assert targets == [('SQLite stack guard', guard, guard + live.PAGE - 1, 0, None)]
+        assert not any(lo <= guard <= hi and present for _, lo, hi, present, _ in ranges)
+        with contextlib.redirect_stdout(io.StringIO()):
+            assert live.show({guard: guard | 2}, guard, guard + live.PAGE - 1, 0, None) == 0
+            assert live.show({guard: guard | 3}, guard, guard + live.PAGE - 1, 0, None) == 1
+            assert live.show({}, guard, guard + live.PAGE - 1, 0, None) == 1
+    print('PASS live SQLite guard: absent/SLACK/high pool/NP/present/missing capture')
     print('PASS live audit: current constants, whole shell band, guards, missing PT, explicit directory')
 
 

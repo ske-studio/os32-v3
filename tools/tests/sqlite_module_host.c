@@ -5,6 +5,7 @@
 #include "module.h"
 #include "memory_boot.h"
 #include "pgalloc.h"
+#include "paging.h"
 #include "memmap.h"
 #include "bootinfo.h"
 #include "config.h"
@@ -22,6 +23,9 @@ static u8 live[POOL_PAGES];
 static u32 input[4]; /* mode, image size, pair, expected result */
 static u32 pos, opens, closes, owned, retired, allocated, alloc_calls;
 static u32 stack_base, heap_base, prefix_failed, init_calls, stack_probes;
+u32 paging_sqlite_stack_guard;
+static int guard_np, guard_restored;
+static void stack_usage(void);
 static struct bootinfo bi;
 u32 host_flags = 0x202;
 volatile u32 kctx_irq_depth, kctx_exc_depth;
@@ -37,9 +41,90 @@ static void say(const char *s)
 {
     u32 n = 0;
     while (s[n]) n++;
-    __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(s), "d"(n) : "memory");
+    u32 result;
+    __asm__ volatile("int $0x80" : "=a"(result) : "0"(4), "b"(1), "c"(s), "d"(n) : "memory");
 }
 #define CHECK(x) do { if (!(x)) { say("FAIL " #x "\n"); finish(1); } } while (0)
+static void protect(u32 start, int prot)
+{
+    int rc;
+    __asm__ volatile("int $0x80" : "=a"(rc) : "0"(125), "b"(start),
+                     "c"(PAGE_SIZE), "d"(prot) : "memory");
+    CHECK(!rc);
+}
+int paging_set_not_present(u32 start, u32 end)
+{
+    CHECK(start == stack_base - PAGE_SIZE && end == stack_base - 1 && !guard_np);
+    protect(start, 0);
+    guard_np = 1;
+    return 0;
+}
+int paging_is_present(u32 va)
+{
+    CHECK(va == paging_sqlite_stack_guard);
+    return !guard_np;
+}
+int paging_set_page(u32 va, u32 pa, u32 flags)
+{
+    CHECK(va == stack_base - PAGE_SIZE && pa == va && flags == PAGE_RW);
+    if (input[0] == 0) stack_usage(); /* Includes the final engine shutdown. */
+    protect(va, 7);
+    guard_np = 0; guard_restored++;
+    return 0;
+}
+/* An overflowing ESP faults onto a host signal stack, then takes the actual
+ * kernel fail-stop diagnostic. It cannot return to the overflowing engine. */
+static u8 signal_stack[16384];
+void host_stop(void) { CHECK(sqlite_engine_active); finish(77); }
+static void sputs(const char *s) { (void)s; }
+static void sput_hex32(u32 value) { (void)value; }
+static void tvram_puts_at(int r, int c, const char *s, u8 a)
+{ (void)r; (void)c; (void)s; (void)a; }
+static void tvram_put_hex32(int r, int c, u32 value, u8 a)
+{ (void)r; (void)c; (void)value; (void)a; }
+#include "sqlite_fault.inc"
+static void stack_fault(int signal)
+{
+    CHECK(signal == 11 && sqlite_engine_active);
+    say("PASS guard overflow fault -> engine fail-stop\n");
+    sqlite_engine_fault(14, 0, stack_base - sizeof(u32));
+    CHECK(0);
+}
+static void overflow(void *arg)
+{
+    (void)arg;
+    u32 saved;
+    __asm__ volatile("mov %%esp, %0; mov %1, %%esp; pushl $0; mov %0, %%esp"
+                     : "=&r"(saved) : "r"(stack_base) : "memory");
+    CHECK(0);
+}
+static void overflow_test(void)
+{
+    struct { void *sp; int flags; u32 size; } alt = {signal_stack, 0, sizeof(signal_stack)};
+    struct { void (*handler)(int); u32 flags; void *restorer; u32 mask[2]; }
+        action = {stack_fault, 0x08000000u, 0, {0, 0}}; /* SA_ONSTACK */
+    int rc;
+    __asm__ volatile("int $0x80" : "=a"(rc) : "0"(186), "b"(&alt), "c"(0) : "memory");
+    CHECK(!rc);
+    __asm__ volatile("int $0x80" : "=a"(rc) : "0"(174), "b"(11), "c"(&action),
+                     "d"(0), "S"(8) : "memory");
+    CHECK(!rc);
+    sqlite_engine_run(overflow, 0, 0);
+    CHECK(0);
+}
+static void stack_usage(void)
+{
+    u8 *base = (u8 *)(uptr)stack_base;
+    u32 untouched = 0;
+    while (untouched < SQLITE_ENGINE_STACK_SIZE && base[untouched] == 0xcc) untouched++;
+    u32 used = SQLITE_ENGINE_STACK_SIZE - untouched;
+    char digits[11];
+    u32 n = 0;
+    do { digits[n++] = '0' + used % 10; used /= 10; } while (used);
+    say("STACK high-water init/CRUD/diagnostics/shutdown: ");
+    while (n) { char text[2] = {digits[--n], 0}; say(text); }
+    say(" / 131072 bytes\n");
+}
 void *kmemcpy(void *d, const void *s, u32 n)
 {
     for (u32 i = 0; i < n; i++) ((u8 *)d)[i] = ((const u8 *)s)[i];
@@ -131,8 +216,8 @@ u32 pgalloc_alloc_phys(u32 owner, int n)
     allocated += n;
     kmemset((void *)(uptr)address, 0xcc, n * PAGE_SIZE);
     if (alloc_calls == 3) {
-        CHECK(n * PAGE_SIZE == SQLITE_ENGINE_STACK_SIZE);
-        stack_base = address;
+        CHECK(n * PAGE_SIZE == SQLITE_ENGINE_STACK_SIZE + PAGE_SIZE);
+        stack_base = address + PAGE_SIZE;
     }
     if (alloc_calls == 2) {
         CHECK(n * PAGE_SIZE == SQLITE_MODULE_POOL_SIZE);
@@ -145,6 +230,9 @@ int pgalloc_free_n_owner(u32 owner, u32 pfn, int n)
     CHECK(owner == OWNER && n > 0);
     u32 first = pfn - (u32)(uptr)pool / PAGE_SIZE;
     CHECK(first + n <= allocated);
+    if (stack_base && first <= (stack_base - PAGE_SIZE - (u32)(uptr)pool) / PAGE_SIZE &&
+        first + n > (stack_base - PAGE_SIZE - (u32)(uptr)pool) / PAGE_SIZE)
+        CHECK(!guard_np && guard_restored == 1 && !paging_sqlite_stack_guard);
     if (input[0] == 3 && !prefix_failed) { prefix_failed = 1; return 0; }
     for (int i = 0; i < n; i++) { CHECK(live[first + i]); live[first + i] = 0; }
     kmemset(pool + first * PAGE_SIZE, 0xdd, n * PAGE_SIZE);
@@ -215,6 +303,8 @@ void _start(void)
         stubs(); finish(0);
     }
     CHECK(sqlite_module_ready() && init_calls == 1 && stack_probes >= 3);
+    CHECK(guard_np && paging_sqlite_stack_guard == stack_base - PAGE_SIZE);
+    if (input[0] == 6) overflow_test();
     CHECK(owned && !retired && alloc_calls == 3 && module_exports(handle));
     struct module_record *r = module_record_get(handle);
     CHECK(r->state == MODULE_RUNNING && r->prefix_pages == 0);
