@@ -58,6 +58,11 @@ check-mem-stat-host:
 - userland/shell/cmd_base.c
 - userland/shell/shell.h
 - kernel/module.h
+- kernel/kaudit_boot.c
+- kernel/kselftest.h
+- kernel/memory_boot.c
+- kernel/memory_boot.h
+- include/kprintf.h
 - kernel/sysconfig.c
 - tools/check_map.d/check-mem-stat-host.yaml
 - build/checks.d/check-mem-stat-host.mk

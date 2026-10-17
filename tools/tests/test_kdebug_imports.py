@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools'))
@@ -27,6 +28,19 @@ class ImportsTests(unittest.TestCase):
         altered[1]['symbol'] = 'invented_import'
         with self.assertRaisesRegex(ValueError, 'nm mismatch'):
             gen.check_nm(altered)
+
+    def test_selftest_boot_references_are_not_excluded(self):
+        original = gen.symbols
+        for symbol in ('memory_boot_page_counts', 'kdebug'):
+            with self.subTest(symbol=symbol):
+                def with_reference(nm, paths, undefined):
+                    refs = original(nm, paths, undefined)
+                    if undefined and ROOT / 'build/out/kdebug/kselftest.o' in paths:
+                        refs.add(symbol)
+                    return refs
+                with patch.object(gen, 'symbols', side_effect=with_reference):
+                    with self.assertRaisesRegex(ValueError, 'unexpected=.*' + symbol):
+                        gen.check_nm(self.entries)
 
     def test_exact_order_kinds_context_and_hash(self):
         self.assertEqual(len(self.entries), 223)

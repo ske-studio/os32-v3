@@ -139,6 +139,7 @@ static void check_page_accounting(void)
           (memory_boot_dma_available() ? MEM_DMA_POOL_SIZE / PAGE_SIZE : 0));
     kaudit_boot_pages();
     CHECK(audit_runs == 1 && !audit_fail && page_logs == 1);
+    CHECK(boot_pages_audit_runs == 1 && !boot_pages_audit_fail);
     /* Change a fixed region, not the independent allocator/physical total. */
     while (ledger_regions[fixed].type != LEDGER_R_FIXED || ledger_regions[fixed].first) fixed++;
     ledger_regions[fixed].end--;
@@ -146,6 +147,7 @@ static void check_page_accounting(void)
     CHECK(c.diff == -1 && c.total + 1 == before.total);
     kaudit_boot_pages();
     CHECK(audit_runs == 2 && audit_fail == 1 && page_logs == 2);
+    CHECK(boot_pages_audit_runs == 2 && boot_pages_audit_fail == 1);
     CHECK(audit_first_fail_tag[0] == 'b');
     ledger_regions[fixed].end += 2;
     memory_boot_page_counts(0, 0, &c);

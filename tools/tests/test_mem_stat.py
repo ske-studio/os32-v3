@@ -19,7 +19,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 TARGET_SRCS = base.TARGET_SRCS + [
     'kapi/kapi_sys.c', 'userland/shell/cmd_sys.c', 'userland/shell/cmd_base.c', 'kernel/module.h',
     'tools/tests/mem_stat_host.c', 'tools/tests/kdebug_cli_host.c', 'tools/tests/test_mem_stat.py',
-    'kernel/sysconfig.c',
+    'kernel/sysconfig.c', 'kernel/kaudit_boot.c', 'kernel/memory_boot.c',
+    'kernel/memory_boot.h', 'kernel/kselftest.h', 'include/kprintf.h',
 ]
 
 
@@ -137,6 +138,9 @@ def run_body(runner, mutate):
     with tempfile.TemporaryDirectory(prefix='memstat-') as directory:
         tmp = pathlib.Path(directory)
         cc = build_fixture(tmp)
+        memory = (ROOT / 'kernel/memory_boot.c').read_text()
+        (tmp / 'page_count_source.c').write_text('\n'.join(function(memory, sig) for sig in
+            ('static u32 memory_page_overlap(', 'void memory_boot_count_pages(')))
         objs = []
         for i, path in enumerate(['exec/appmem.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c',
                                   'kernel/paging_app.c', 'kernel/physmem.c']):

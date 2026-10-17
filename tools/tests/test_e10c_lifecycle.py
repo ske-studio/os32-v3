@@ -41,7 +41,7 @@ def run(runner, mutant=None):
         assert 'if (kdi_kaudit_skipped(KAUDIT_POST_EXEC)) return 0;' in body, 'FAIL post-exec skipped'
         assert k.count('kaudit_post_exec();') == 1 and k.count('kaudit_post_probe();') == 1, 'FAIL boot audit count'
         for op in ('selftest_run', 'selftest_post_exec', 'selftest_post_unicode', 'selftest_post_probe'):
-            assert f'if (kdebug.ops.{op}) kdebug.ops.{op}();' in k, 'FAIL optional selftest'
+            assert f'if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.{op}();' in k, 'FAIL optional selftest'
         assert 'check(kdi_kaudit_last_rc(KAUDIT_POST_EXEC) == 0,' in body, 'FAIL post-exec body audit'
         assert 'kselftest_run_audit("AS-resume")' not in texts[PATHS[1]], 'FAIL resume audit'
         for name in ('exec_exit','exec_pending_transfer','exec_pending_finish'):

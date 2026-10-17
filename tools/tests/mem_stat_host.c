@@ -89,11 +89,58 @@ static u32 snapshot_kheap_free(void)
 #define kmalloc_free snapshot_kheap_free
 #include "module.h"
 struct kdebug kdebug;
+extern u32 boot_pages_audit_runs, boot_pages_audit_fail;
 #include "mem_stat_source.c"
 #undef pgalloc_free_pages
 #undef kmalloc_total
 #undef kmalloc_used
 #undef kmalloc_free
+
+/* Feed physical-page inputs through the real counter and boot audit to MemStat. */
+#include "memory_boot.h"
+#include "page_count_source.c"
+static struct memory_page_input boot_page_input;
+u32 audit_runs, audit_fail;
+char audit_first_fail_tag[32];
+char *kstrncpy(char *dst, const char *src, u32 n)
+{
+    char *result = dst;
+    if (!n) return result;
+    while (--n && *src) *dst++ = *src++;
+    *dst = 0;
+    return result;
+}
+void memory_boot_page_counts(u32 first, u32 pages, struct memory_page_counts *out)
+{
+    boot_page_input.kdebug_first = first;
+    boot_page_input.kdebug_pages = pages;
+    memory_boot_count_pages(&boot_page_input, out);
+}
+#include "kernel/kaudit_boot.c"
+
+static void boot_page_status(void)
+{
+    MemStat st;
+    memmap_audit_runs = as_audit_runs = v86_return_audit_runs = 0;
+    memmap_audit_fail = as_audit_fail = v86_return_audit_fail = 0;
+    /* No reserved regions: all physical pages are supplied by the allocator. */
+    boot_page_input.allocator_pages = MEM_POOL_BASE / PAGE_SIZE;
+    boot_page_input.phys_pages = boot_page_input.allocator_pages;
+    kaudit_boot_pages();
+    CHECK("boot pages snapshot", kapi_mem_stat(0, &st, sizeof(st)) == sizeof(st));
+    CHECK("boot pages normal", st.audit_runs == 1 && st.audit_fail == 0);
+    boot_page_input.phys_pages++;
+    kaudit_boot_pages();
+    CHECK("boot pages snapshot", kapi_mem_stat(0, &st, sizeof(st)) == sizeof(st));
+    CHECK("boot pages mismatch", st.audit_runs == 2 && st.audit_fail == 1);
+    CHECK("boot pages first failure", equal(audit_first_fail_tag, "boot-pages", 11));
+    boot_page_input.phys_pages--;
+    kaudit_boot_pages();
+    CHECK("boot pages snapshot", kapi_mem_stat(0, &st, sizeof(st)) == sizeof(st));
+    CHECK("boot pages retained", st.audit_runs == 3 && st.audit_fail == 1);
+    memmap_audit_runs = 14; as_audit_runs = 15; v86_return_audit_runs = 16;
+    memmap_audit_fail = 17; as_audit_fail = 18; v86_return_audit_fail = 19;
+}
 
 /* Model a shell-launched USER's syscall on the caller's TSS.ESP0 stack. */
 static void __attribute__((noinline)) shell_syscall(void) {
@@ -124,8 +171,8 @@ static void query(int id, int expected, int target)
             output.stat.resident_heap_fail == resident_heap_fail && output.stat.leftover_pages == exec_as_leftover_pages &&
             output.stat.ledger_irq_ops == ledger_irq_ops && output.stat.ledger_exc_ops == ledger_exc_ops &&
             output.stat.ledger_bad_free == ledger_bad_free && output.stat.fault_kill_count == 11 &&
-            output.stat.reclaim_count == 12 && output.stat.stop_park_count == 13 && output.stat.audit_runs == 45 &&
-            output.stat.audit_fail == 54 && output.stat.kselftest_pass == 295 && !output.stat.kselftest_fail);
+            output.stat.reclaim_count == 12 && output.stat.stop_park_count == 13 && output.stat.audit_runs == 48 &&
+            output.stat.audit_fail == 55 && output.stat.kselftest_pass == 295 && !output.stat.kselftest_fail);
         CHECK("active leases", output.stat.lease_active == 2);
         CHECK("owner pages", output.stat.owner_pages == (target ? ledger_owner_pages(g_slot[target].as->owner) : 0));
         CHECK("pressure epoch", output.stat.pressure_epoch == appslot_trim_epoch);
@@ -340,6 +387,7 @@ void _start(void)
     on_stack(shell_syscall, MEM_SHELL_STACK_TOP);
     /* Include the copyout/return path after the syscall snapshot was taken. */
     expected_stack_water = actual_kstack_high_water();
+    boot_page_status();
     module_status();
     matrix(); sizes(); values();
     u32 anon[2];

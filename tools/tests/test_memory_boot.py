@@ -124,8 +124,8 @@ def run_case(case='default', kb=16384, defines=(), mutation=None):
         start = selftest.index('static void test_slack_cycle(void)')
         end = selftest.index('\nint kselftest_run_post_exec(void)', start)
         (d / 'slack_cycle_host_source.c').write_text(selftest[start:end])
-        audit = (ROOT / 'kernel/kaudit.c').read_text()
-        (d / 'boot_pages_host_source.c').write_text(audit[audit.index('void kaudit_boot_pages(void)'):])
+        audit = (ROOT / 'kernel/kaudit_boot.c').read_text()
+        (d / 'boot_pages_host_source.c').write_text(audit[audit.index('u32 boot_pages_audit_runs,'):])
         cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie', '-ffunction-sections', '-Wl,--gc-sections', f'-DTEST_{case.upper()}', f'-DTEST_KB={kb}UL'] + list(defines)
         # arch/x86 + platform/pc98: include/io.h / include/cpu.h は契約
         # だけで、実装は固定名 arch_io.h / arch_cpu.h / platform_io.h を

@@ -147,8 +147,6 @@ def check_nm(entries, nm=None, root=ROOT):
         if stage == 'S2':
             refs.discard('__bss_end')
             refs.discard('__kernel_resident_end')
-            # Boot page accounting remains resident and is never an import.
-            refs -= {'memory_boot_page_counts', 'kdebug'}
             # The module now uses accessors; the retained audit accounts for
             # the original audit-only references. Keep the S0 inventory fixed.
             module_refs = symbols(nm, paths[:1], True)

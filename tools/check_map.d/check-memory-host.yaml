@@ -135,5 +135,5 @@ check-memory-host:
 - sdk/link/app_sys.ld
 - tools/gen_memmap.py
 - kernel/memory_boot.h
-- kernel/kaudit.c
+- kernel/kaudit_boot.c
 artifact_reader: true

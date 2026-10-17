@@ -63,7 +63,9 @@ BB と kdebug を除いたもの、`meta` は metadata と workspace (ARENA_TOP 
 `bb` は固定/RAM の BB、`kdebug` は採用した部品の本体、`other` は Unicode backing・DMA 等。
 VRAM/MMIO の表示面は BB に加えない。領域台帳と allocator の供給量から求めた総和を
 `memory_boot_ram_kb()` のページ数と照合する。後者は従来どおり低位640KiB〜1MiBを含み、
-15〜16MiBを除く。不一致は `ng diff=総和−物理頁数` と `MemStat.audit_fail` に記録し、起動は続ける。
+15〜16MiBを除く。実行回数と不一致の回数は専用の `boot_pages_audit_runs` /
+`boot_pages_audit_fail` に数え、それぞれ `MemStat.audit_runs` / `MemStat.audit_fail` に加算する。
+不一致は `ng diff=総和−物理頁数` と表示し、起動は続ける。
 KDEBUG=1 の自己試験は部品が RUNNING の場合だけ呼び、post_exec の `slack_cycle` は
 空き頁を1頁ずつ確保して再割当拒否・使用中 owner の保持・返却後の空き頁数を確かめる。
 ゲストでの T3b1 受入は [T3配置票](tasks/v3/TASK_T3_LAYOUT.md) §4 に従う。

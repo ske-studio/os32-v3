@@ -6,6 +6,10 @@ unsigned int host_arch_if = 0x202U;
 #include "gfx_kernel_fb_host.c"
 #undef run
 #include "../../kernel/kselftest_report.c"
+/* This lifecycle fixture exercises the KDEBUG=0 reset path only. */
+struct kdebug kdebug;
+const char *kdebug_state_name(int state)
+{ (void)state; return "OFF"; }
 #define ksel_pass kselftest_pass
 #define ksel_fail kselftest_fail
 static void check(int ok, const char *why) { (void)why; kdi_kselftest_count(ok); }

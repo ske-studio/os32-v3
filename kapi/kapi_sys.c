@@ -21,6 +21,7 @@ extern u32 exec_as_leftover_pages;
 extern volatile u32 fault_kill_count;
 extern u32 memmap_audit_runs, as_audit_runs, v86_return_audit_runs;
 extern u32 memmap_audit_fail, as_audit_fail, v86_return_audit_fail;
+extern u32 boot_pages_audit_runs, boot_pages_audit_fail;
 extern int kselftest_pass, kselftest_fail;
 
 extern volatile int ring3_in_syscall;
@@ -118,8 +119,10 @@ i32 kapi_mem_stat(i32 app_id, void *out, u32 size)
     snap.fault_kill_count = fault_kill_count;
     snap.reclaim_count = appslot_reclaim_count;
     snap.stop_park_count = ring3_stop_park_count;
-    snap.audit_runs = memmap_audit_runs + as_audit_runs + v86_return_audit_runs;
-    snap.audit_fail = memmap_audit_fail + as_audit_fail + v86_return_audit_fail;
+    snap.audit_runs = memmap_audit_runs + as_audit_runs + v86_return_audit_runs +
+                      boot_pages_audit_runs;
+    snap.audit_fail = memmap_audit_fail + as_audit_fail + v86_return_audit_fail +
+                      boot_pages_audit_fail;
     snap.kselftest_pass = kselftest_pass;
     snap.kselftest_fail = kselftest_fail;
     snap.kdebug_state = kdebug.state;

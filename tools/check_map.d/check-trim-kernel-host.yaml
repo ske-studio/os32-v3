@@ -74,4 +74,6 @@ check-trim-kernel-host:
 - userland/shell/cmd_base.c
 - kernel/sysconfig.c
 - tools/tests/kernel_layout.py
+- kernel/kaudit_boot.c
+- kernel/memory_boot.c
 artifact_reader: true
