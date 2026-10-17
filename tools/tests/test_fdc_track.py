@@ -37,7 +37,7 @@ CASES = ["split_2hd", "split_144", "readahead_count1", "cross_boundary",
          "seek_edge_foreign", "drain_before_skip", "readychange_invalidates",
          "multi_nr_quiet", "diskio_rw", "buf_layout", "font_replay",
          "recal_settle", "idle_rule", "track_nr_stop", "single_nr_no_recover",
-         "sis_edge_limit", "write_nr_no_recover"]
+         "sis_edge_limit", "write_nr_no_recover", "write_protection"]
 
 # font_replay の材料 (実物の FD イメージ)。make all が作る。
 # 読むファイル: もとは既定フォント /sys/font/default.kcg (188KB) だったが、
@@ -384,9 +384,9 @@ MUTATIONS = [
      r"(        /\* NR \(媒体無し\) は\*\*回復 \(リセット・RECALIBRATE\) より前に\*\*打ち切る\n[^\n]*\n[^\n]*\n)        if \(\(results\[0\] & FDC_ST0_NR\) != 0\) \{\n            dma_chan_mask\(FDC_DMA_CHANNEL\);\n            dma_armed = 0;\n            phase = \"nr\";\n            break;\n        \}",
      r"\1",
      "単発の READ の NR で回復とリトライを踏む"),
-    # 書き込みの NR は read 側と同じ形。2 つ目の一致 (WRITE 側) だけを消す。
+    # 書き込み側に固有の注釈で NR の分岐を選ぶ。
     ("drivers/fdc.c",
-     r"(            return 0;\n        \}\n\n        /\* NR \(媒体無し\) は回復より前に打ち切る \(read 側と同じ\)。[^\n]*\n[^\n]*\n)        if \(\(results\[0\] & FDC_ST0_NR\) != 0\) \{\n            dma_chan_mask\(FDC_DMA_CHANNEL\);\n            dma_armed = 0;\n            phase = \"nr\";\n            break;\n        \}",
+     r"(        /\* NR \(媒体無し\) は回復より前に打ち切る \(read 側と同じ\)。[^\n]*\n[^\n]*\n)        if \(\(results\[0\] & FDC_ST0_NR\) != 0\) \{\n            dma_chan_mask\(FDC_DMA_CHANNEL\);\n            dma_armed = 0;\n            phase = \"nr\";\n            break;\n        \}",
      r"\1",
      "単発の WRITE の NR で回復とリトライを踏む"),
     ("drivers/fdc.c",

@@ -176,6 +176,7 @@ static struct {
     int mt_used, dma_len_mismatch, dma_cross, cmd_while_masked;
     u8 last_rw[9];
     /* 失敗の差し込み */
+    int write_protected;
     int fail_multi;                 /* EOT > R の READ を DE で落とす */
     int bad_c, bad_h, bad_r;        /* 読めないセクタ (bad_r = 0 で無し) */
     int drop_irq_reads;             /* READ の完了 IRQ を出さない回数 */
@@ -271,6 +272,7 @@ static void model_rw(int is_write)
     else if (!M.present[drv]) { err = 1; nr = 1; }
     else if (M.pcn[drv] != C) { err = 1; st1 = 0x04; st2 = 0x10; } /* ND / WC */
     else if (!is_write && M.fail_multi && nsec > 1) { err = 1; st1 = 0x20; }
+    else if (is_write && M.write_protected) { err = 1; st1 = 0x02; }
     else if (M.force_err) { err = 1; st1 = 0x20; }
     else if (!is_write && M.bad_r && M.bad_c == C && M.bad_h == H
              && M.bad_r >= R && M.bad_r <= EOT) { err = 1; st1 = 0x20; st2 = 0x20; }
@@ -1376,6 +1378,54 @@ static void write_nr_no_recover(void)
     M.present[0] = 1;
 }
 
+static void write_protection(void)
+{
+    static u8 buf[1024];
+    int writes;
+
+    model_boot(1);
+    diskio_set_fdd_drive(0);
+    CHECK(disk_initialize(0) == 0);
+    M.write_protected = 1;
+    CHECK(disk_write(0, buf, 16, 1) == RES_WRPRT);
+    CHECK(disk_status(0) & STA_PROTECT);
+    CHECK(D.masked == 1);
+    writes = M.writes;
+    CHECK(disk_write(0, buf, 17, 1) == RES_WRPRT);
+    CHECK(M.writes == writes);
+    CHECK(disk_read(0, buf, 32, 1) == RES_OK);
+    CHECK(disk_status(0) & STA_PROTECT);
+
+    /* Ready 変化を回収したら、新しい媒体として NW を捨てる。 */
+    M.write_protected = 0;
+    model_pend(0xC0, 0);
+    model_line();
+    CHECK(fdc_read_sector_geom(0, 3, 0, 1, &fdc_geom_2hd, buf) == 0);
+    CHECK(!(disk_status(0) & STA_PROTECT));
+    CHECK(disk_write(0, buf, 16, 1) == RES_OK);
+
+    M.write_protected = 1;
+    CHECK(disk_write(0, buf, 16, 1) == RES_WRPRT);
+    CHECK(disk_initialize(0) == 0);
+    CHECK(!(disk_status(0) & STA_PROTECT));
+    M.write_protected = 0;
+    CHECK(disk_write(0, buf, 16, 1) == RES_OK);
+    M.write_protected = 1;
+    CHECK(disk_write(0, buf, 16, 1) == RES_WRPRT);
+    diskio_set_fdd_drive(1);
+    CHECK(disk_status(0) == STA_NOINIT);
+    CHECK(disk_initialize(0) == 0);
+    M.write_protected = 0;
+    CHECK(disk_write(0, buf, 16, 1) == RES_OK);
+
+    /* CRC などの通常の書込み失敗からは NW を推測しない。 */
+    diskio_set_fdd_drive(0);
+    CHECK(disk_initialize(0) == 0);
+    M.force_err = 1;
+    CHECK(fdc_write_sector_geom(0, 4, 0, 1, &fdc_geom_2hd, buf) == 0);
+    CHECK(!(disk_status(0) & STA_PROTECT));
+}
+
 /* 1 本のエッジで件数の上限 (4) ちょうどの別の通知が先に積まれていても、
  * エッジを待たずに読み続けて期限切れにならない。 */
 static void sis_edge_limit(void)
@@ -1542,6 +1592,7 @@ int main(int argc, char **argv)
         { "track_nr_stop", track_nr_stop },
         { "single_nr_no_recover", single_nr_no_recover },
         { "write_nr_no_recover", write_nr_no_recover },
+        { "write_protection", write_protection },
         { "sis_edge_limit", sis_edge_limit },
     };
     if (argc != 2) { fprintf(stderr, "usage: %s CASE\n", argv[0]); return 2; }

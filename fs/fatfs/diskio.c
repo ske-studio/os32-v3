@@ -32,6 +32,7 @@
 
 /* ドライブ状態 */
 static DSTATUS fdd_status = STA_NOINIT;
+static u32 fdd_protect_gen;
 static DSTATUS hdd_status = STA_NOINIT;
 
 /* FDDドライブ番号 (OS32側: 通常0) */
@@ -131,6 +132,12 @@ static const struct fdc_track_ops fdd_track_ops = {
     fdd_ops_now, 0
 };
 
+void diskio_set_fdd_protect(void)
+{
+    fdd_status |= STA_PROTECT;
+    fdd_protect_gen = fdc_media_gen(fdd_drive);
+}
+
 /* ドライブ番号設定 API (fatfs_vfs.c から呼ばれる)
  * ドライブ変更時はstatusとオフセットをリセットし、f_mountでの再初期化を促す */
 /* 先読みはここでは捨てない: STA_NOINIT にするので、次の読みの前に必ず
@@ -158,6 +165,11 @@ DSTATUS disk_status(BYTE pdrv)
 {
     switch (pdrv) {
     case DRV_FDD:
+        /* Ready 変化・媒体選択の世代が変わったら、前の媒体の NW は捨てる。 */
+        if ((fdd_status & STA_PROTECT) &&
+            fdd_protect_gen != fdc_media_gen(fdd_drive)) {
+            fdd_status &= (DSTATUS)~STA_PROTECT;
+        }
         return fdd_status;
     case DRV_HDD:
         return hdd_status;
@@ -258,7 +270,8 @@ DRESULT disk_write(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count)
 
     switch (pdrv) {
     case DRV_FDD:
-        if (fdd_status & STA_NOINIT) return RES_NOTRDY;
+        if (disk_status(pdrv) & STA_NOINIT) return RES_NOTRDY;
+        if (fdd_status & STA_PROTECT) return RES_WRPRT;
         /* FDD: fdc_write_sector (CHS ネイティブ) を直接使用。
          * 読み側と同じくジオメトリはドライブから聞く。
          * 先読みの古い中身は fdc_write_sector_geom が世代を進めて外す
@@ -273,6 +286,10 @@ DRESULT disk_write(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count)
                 int cyl  = lba / ((int)g->spt * (int)g->heads);
                 rc = fdc_write_sector(fdd_drive, cyl, head, sect,
                                       buff + i * g->bps);
+                if (rc == FDC_RC_WRITE_PROTECTED) {
+                    diskio_set_fdd_protect();
+                    return RES_WRPRT;
+                }
                 if (rc != 0) return RES_ERROR;
             }
         }

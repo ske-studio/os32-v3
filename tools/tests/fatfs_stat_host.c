@@ -17,6 +17,7 @@
 #include <string.h>
 
 #include "fatfs/ff.h"
+#include "fatfs/diskio.h"
 #include "vfs.h"
 #include "ide.h"
 #include "dev.h"
@@ -144,7 +145,9 @@ FRESULT f_getfree(const TCHAR *path, DWORD *nclst, FATFS **fatfs)
 FRESULT f_mount(FATFS *fs, const TCHAR *path, BYTE opt)
 { (void)fs; (void)path; (void)opt; return FR_NOT_READY; }
 
-/* ---- diskio / Device / IDE の境界 (mount 経路だけが使う) ---- */
+/* ---- diskio / Device / IDE の境界 (mount / 書込み失敗後の回復) ---- */
+DSTATUS disk_status(BYTE pdrv) { (void)pdrv; return 0; }
+void diskio_set_fdd_protect(void) {}
 void diskio_set_fdd_drive(int drv) { (void)drv; }
 void diskio_set_hdd_drive(int drv) { (void)drv; }
 void diskio_set_hdd_partition(u32 offset) { (void)offset; }

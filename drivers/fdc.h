@@ -389,7 +389,11 @@ int fdc_write_sector(int drv, int cyl, int head, int sect, const void *buf);
 int fdc_read_sector_geom(int drv, int cyl, int head, int sect,
                          const struct fdc_geom *g, void *buf);
 
-/* セクタ書き込み (ジオメトリ指定版) */
+/* NW (ST1 bit1) を受けた書込み。通常の I/O エラー (-1) と区別する。 */
+#define FDC_RC_WRITE_PROTECTED (-4)
+#define FDC_ST1_NW 0x02
+
+/* セクタ書き込み (ジオメトリ指定版)。NW は FDC_RC_WRITE_PROTECTED。 */
 int fdc_write_sector_geom(int drv, int cyl, int head, int sect,
                           const struct fdc_geom *g, const void *buf);
 
