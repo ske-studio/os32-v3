@@ -814,9 +814,7 @@ int __cdecl kapi_db_finalize(int handle)
     }
     slot->bindable = 0;
     if (rc != SQLITE_OK) {
-        slot_save_error(slot, rc);
         slot_note_teardown(slot, rc);
-        return -1;
     }
     return 0;
 }

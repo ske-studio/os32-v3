@@ -260,8 +260,9 @@ void exception_handler(u32 error_code, u32 vector, u32 fault_eip,
 
     _disable();
     if (sqlite_engine_active) {
-        u32 cr2;
-        __asm__ volatile("mov %%cr2, %0" : "=r"(cr2));
+        u32 cr2 = 0;
+        if (vector == 14)
+            __asm__ volatile("mov %%cr2, %0" : "=r"(cr2));
         sqlite_engine_fault(vector, fault_eip, cr2);
     }
 #ifdef OS32_R1_FIXTURE

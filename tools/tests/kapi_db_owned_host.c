@@ -186,10 +186,14 @@ static void test_replace_finalize_failure(void)
         int rc = entry == 0 ? kapi_db_exec(h, "SELECT 2") :
                  entry == 1 ? kapi_db_prepare(h, "SELECT 2") :
                               kapi_db_prepare_only(h, "SELECT 2");
-        assert(rc == -1 && !db_slots[h].isolated && db_slots[h].in_use);
-        assert(connections[0].finalizes == 1 && connections[0].steps == 0);
+        assert(rc == (entry == 1 ? DB_STATUS_ROW : 0));
+        assert(!db_slots[h].isolated && db_slots[h].in_use);
+        assert(db_slots[h].cleanup_error == SQLITE_OK);
+        assert(db_slots[h].last_error == SQLITE_OK);
+        assert(connections[0].finalizes == (entry == 0 ? 2 : 1));
+        assert(connections[0].steps == (entry == 2 ? 0 : 1));
         db_cleanup_owned(owner);
-        assert(connections[0].closes == 1 && connections[0].finalizes == 1);
+        assert(connections[0].closes == 1 && connections[0].finalizes == 2);
         assert(kapi_db_open("replacement") == h);
     }
 }

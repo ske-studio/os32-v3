@@ -89,7 +89,8 @@ void _start(void)
         CHECK(sqlite_engine_active == 1 && kills == 1);
         CHECK(hex_count == 3 && screen_count == 3 && line_count == 1);
         CHECK(fault_values[0] == (kind ? 14u : 13u));
-        CHECK(fault_values[1] == test_eip && fault_values[2] == test_cr2);
+        CHECK(fault_values[1] == test_eip);
+        CHECK(fault_values[2] == (kind ? test_cr2 : 0));
     }
     CHECK(faults == 2);
     sqlite_engine_active = 0; host_flags = 0x202;
