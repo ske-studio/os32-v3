@@ -573,3 +573,9 @@ X-2 の前半 (e8a の RO 日本語) は `accept_e11/RESULT.md` の GUI 日本�
 | ID | 何を残したか | 理由 | 次の関門 |
 |---|---|---|---|
 | FDWP-1 | 書込み禁止の FD から起動すると、起動ログ (/var/log/boot.new・mkdir /var) の書込み失敗のあと `FATAL: shell.bin load failed` で止まる (NP21/W の --readonly で再現、6b4e37e の FD でも同じ) | FDRECOV-1 の受入で見つけた既存の不具合 (FS の層)。復旧用の FD を書込み禁止にする使い方で起動できない | 原因の調査と直し (カーネル層の不具合なので次の段より先、POLICY_DEV §1) |
+
+閉鎖 (2026-10-17、EXECNEST-1 を main 6d580fd で直した: Ring3CallContext に esp0 を足し着地で復元。NP21/W で T3c2 の 6 命令が 20 回・ネストまで通り、esp0 は毎回同じ値に戻る (ネストの段ごとに一定の 0x6DC)。証拠 `~/os32-tmp/evidence/2026-10-17/t3c2_t3d1_np21w/RESULT.md`。行の「filer も踏む見込み」は誤りだった — filer は常駐 shell の内蔵 (CPL0) で、この形を踏まない)
+
+| ID | 何を残したか | 理由 | 次の関門 |
+|---|---|---|---|
+| EXECNEST-1 | CPL3 のアプリが KAPI exec_run で子を繰り返し起動すると、子が終わるたびに親のカーネルの入口 (TSS esp0) が戻らず約 1,756 B ずつ深くなり、14 回目に 40KiB の shell stack を溢れさせて triple fault (#DF、cr2=004f5fd0 = shell stack の guard)。子の終わり方 (正常・fault・STOP) によらない。T3c2 の fixture で初めて踏んだ (NP21/W 64MB、`~/os32-tmp/evidence/2026-10-17/t3c2_np21w/RESULT.md`) | カーネル層の不具合 (POLICY_DEV §1、ほかの段より先に直す)。filer など子を繰り返し起動するアプリも同じ形を踏む見込み [推] | 原因の調査と直し → T3c2 の受入をやり直す |
