@@ -52,7 +52,7 @@
 | `language` / `charset` | 文字列 (`ja` / `UTF-8`) | 将来の多言語・別の符号化の辞書を今の FEP が誤って開かないため | `meta` |
 | `variant` | `S` / `M` / `L` | `ime_switch_dict` の表示と、`mem_reserve_kb` の既定の見積もりの根拠 | `meta` |
 | `source` / `source_version` | 文字列 (`IPADIC` / `2.7.0`) | 出典。`04_DICT_QUALITY` の頻度データを重ねたときはここに列挙 | `meta` |
-| **`license` / `attribution`** | 文字列 (条項の要旨と著作権表示の全文、または同梱ファイルへの参照) | **必須**。辞書はパブリックの `os32-v3` で配るので、元データの配布条件 (IPADIC は著作権表示と条項の同梱を求める) をファイル自身が運ぶ。`ime` コマンドで表示できる形にする。**配布条件の原文の取り寄せと同梱 (`assets/ipadic/` に置き、`fep_to_sqlite.py` が `meta` に写す) はこの票の実装項目** | `meta` |
+| **`license` / `attribution`** | 文字列 (条項の要旨と著作権表示の全文、または同梱ファイルへの参照) | **必須**。辞書はパブリックの `os32-v3` で配るので、元データの配布条件 (IPADIC は著作権表示と条項の同梱を求める) をファイル自身が運ぶ。`ime` コマンドで表示できる形にする。原文は同梱済み ([THIRD_PARTY.md の IPADIC 行](../../../THIRD_PARTY.md))。`fep_to_sqlite.py` による `meta` への取り込みが残件 | `meta` |
 | `build_tool` / `build_date` | 文字列 | 生成した道具と日付 (`fep_to_sqlite.py` の版、ISO 8601)。再現性の確認 | `meta` |
 | `entry_count` | 整数 | `SELECT count(*)` を起動時に流さずに語数を表示・検査する (97,514 のような数を `ime` コマンドで出す) | `meta` |
 | `pos_table_version` | 整数 | `pos_id` の意味 (品詞表) の版。**学習データ側にも記録して不整合を検出** (§3)。品詞表を変えた辞書に古い学習を混ぜない | `meta` |
@@ -94,8 +94,8 @@
 
 | 場所 | 変更 |
 |---|---|
-| `tools/fep_to_sqlite.py` | `meta` 表の書き込み (§2 の全項目)、`user_version` の設定、配布条件の原文の同梱 (`license` / `attribution`)、`checksum` の計算、`cache_pages` × page_size ≤ `mem_reserve_kb` の検査 |
-| `assets/ipadic/` | 配布条件の原文を取り寄せて置く (今は無い、§1) |
+| `tools/fep_to_sqlite.py` | `meta` 表の書き込み (§2 の全項目)、`user_version` の設定、同梱済み原文からの `license` / `attribution` 取り込み、`checksum` の計算、`cache_pages` × page_size ≤ `mem_reserve_kb` の検査 |
+| `assets/ipadic/` | `COPYING` は同梱済み ([THIRD_PARTY.md の IPADIC 行](../../../THIRD_PARTY.md))。meta への取り込み元 |
 | `kernel/ime_dict.c` | 開くとき: 形式の版の検査 (ヘッダ直読みか PRAGMA、§2)、`meta` の読み取り、辞書を RO で開く、学習 DB を別に開く (`dict_user` の作成をそちらへ)、`dict_id` / `pos_table_version` の照合。`SQL_LEARN` と `ime_user_*` の宛先を学習 DB へ |
 | `kernel/ime.c` | `ime_switch_dict`: 切り替え先の `mem_reserve_kb` が起動時の確保量を超えるときは再起動を促す (D27) |
 | `lib/sqlite3/os32_sqlite_config.h` | `SQLITE_OMIT_SCHEMA_VERSION_PRAGMAS` を外すか、ヘッダ直読みで済ませるか (T4 で決める) |
@@ -104,7 +104,7 @@
 | `userland/system/hsync_protect.inc` | **`fep_user.db*` (本体・journal・回復用) を保護名に足す** (M6。今は `settings.db*` だけ) |
 | 移行の手段 (`ime` コマンドの下位コマンドか、学習 DB が無いときの初回起動の自動移行 — 設計票で決める) | 旧 `dict_user` (S/M/L の 3 ファイル) → `fep_user.db`。件数・内容の照合、重複規則、`dict_id` の対応、移行済みの印、途中失敗の復旧 (M6、§3) |
 | settings (`settings.db`) | `fep.mem_reserve_kb`、`fep.user_dict_path` (上書き用) |
-| 文書 | [`FEP_STATUS.md`](FEP_STATUS.md) の辞書スキーマの節を更新、[`00_INDEX.md`](00_INDEX.md) の表に状態を反映 |
+| 文書 | 本票の §2・§3 に現行辞書仕様を反映 (実装前は計画として区別)。`FEP_STATUS.md` は快照のまま保持し、[`00_INDEX.md`](00_INDEX.md) の表に状態を反映 |
 
 ---
 

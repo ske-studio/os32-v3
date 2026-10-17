@@ -9,26 +9,9 @@
 
 ## 1. 変換キー (XFER) 対応
 
-`KEY_XFER` (0x35) を変換操作に割り当てる。[`01_UI_CANDIDATE.md` §3](01_UI_CANDIDATE.md) のキーバインド表で定義済み:
-- 通常入力中の XFER = Space と同等 (変換開始)。
-- 候補選択中の XFER = リスト展開 / 次ページ。
-
-`ime_process_key()` で `scancode == KEY_XFER` を `KEY_SPACE` と同じ分岐へ
-合流させる (`KEY_NFER` 0x51 は「無変換確定」= かな直接確定に割当も検討)。
-
-```c
-/* 変換開始判定を XFER にも拡張 */
-if ((scancode == KEY_SPACE || scancode == KEY_XFER) && g_ime.kana_len > 0) {
-    ... /* 既存の最長一致検索 */
-}
-```
-
-| キー | scancode | 割り当て |
-|------|----------|---------|
-| `KEY_XFER` (変換) | 0x35 | 変換開始 / 候補送り (Space 相当) |
-| `KEY_NFER` (無変換) | 0x51 | かな直接確定 (Enter 相当, 任意) |
-
-> P1 着手時にキーバインド表へ織り込むのが効率的だが、本項目自体は独立して後付け可能。
+XFER の候補操作は実装済み。インライン候補中はリスト展開、リスト中は次候補となる
+(`kernel/ime.c:367`)。入力中の変換開始は Space のみ (`kernel/ime.c:484`) で、XFER 対応は残件。操作の表は [P1 §3](01_UI_CANDIDATE.md#3-キーバインド設計) を参照。
+`KEY_NFER` のかな直接確定への割当は将来の検討事項として残す。
 
 ---
 
@@ -56,9 +39,30 @@ if ((scancode == KEY_SPACE || scancode == KEY_XFER) && g_ime.kana_len > 0) {
 | `kernel/ime.c` | `ime_process_key` に XFER/NFER 分岐 |
 | `kernel/ime_dict.c` | (調査次第) `kprintf` → `kputs` 置換 |
 
-**テスト:** XFER キーで変換が起動すること。辞書ロード失敗時のエラー出力で
+**テスト:** 変換候補中の XFER でリストが開き、リスト中は次候補へ進むこと。
+入力中の XFER による変換開始は、対応を実装した後に検証する。辞書ロード失敗時のエラー出力で
 Page Fault が発生しないこと。
 
 ---
 
 *前: [`05_GFX_MODE.md`](05_GFX_MODE.md) ／ 次: [`07_BUNSETSU.md`](07_BUNSETSU.md) ／ 索引: [`00_INDEX.md`](00_INDEX.md)*
+
+## 4. 候補ゼロ障害の記録 (2026-08-07)
+
+**解決済み (2026-08-07):** 「漢字変換が候補ゼロになり SPACE がかな確定に
+フォールバックする」不具合は、複合原因を特定して修正した。
+1. `ime_set_mode()` (`ime` コマンドの `ime on` 経路) が辞書を開いて
+   いなかった — `dict->db == NULL` のまま `ime_dict_search` が即 0 を
+   返していた。→ `ime_toggle()` と同じ遅延オープンを追加。
+2. 辞書を開けても、外部プログラム終了時の `exec_exit()` が FD 3 以上を
+   一括クローズするため、FEP 辞書の SQLite fd が回収され以後の検索が
+   全て `SQLITE_IOERR_READ` になっていた。→ VFS に FD 保護フラグ
+   (`vfs_fd_set_protect`) を追加し、FEP 常駐接続の fd を保護。
+MEMSYS5 プール枯渇説は 400KB 拡張テストで棄却 (200KB で動作確認済み)。
+`ime_dict_search` には step エラー時のみ出る診断ログを追加した。
+変換・候補送り・確定・学習 (`dict_user` への UPSERT と 5.7MB DB 末尾=
+二重間接ブロック領域への永続化) を NP21/W 実機で検証済み。
+
+
+これは当時の検証記録である。現行も `kernel/ime.c` の `ime_set_mode()` に遅延オープン、
+`kernel/ime_dict.c:25` に辞書 FD の保護処理がある。

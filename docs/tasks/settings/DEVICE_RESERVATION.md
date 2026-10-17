@@ -85,12 +85,12 @@ GUI 初回の挿入点は `kernel/kernel.c` の `is_gui` 判定後、`exec_run(c
 
 ## 7. 実装範囲と受入ゲート
 
-次回コード範囲: `kernel/pgalloc.[ch]`, `kernel/sys.c`, `include/sys.h`（台帳/transaction/固定配置）、`exec/exec.[ch]`, `kernel/kernel.c`（idle 境界/公開順）、`gfx/gfx_core.c`, `include/gfx_hal.h`, 両 backend、`drivers/wab_glue*.{c,h}`, `drivers/wab_cirrus.c`（副作用分離）。必要時のみ `kernel/paging.[ch]` の cache/mapping 準備処理、既存定数ヘッダ。共有ファイルはこの順に直列統合。C89 [C1]、kernel 文字列 [C2]、KAPI 変更なし [ABI1–3]。
+次回コード範囲: `kernel/pgalloc.[ch]`, `kernel/sys.c`, `include/sys.h`（台帳/transaction/固定配置）、`exec/exec.[ch]`, `kernel/kernel.c`（idle 境界/公開順）、`gfx/gfx_core.c`, `include/gfx_hal.h`, 両 backend、`drivers/wab_glue*.{c,h}`, `drivers/wab_cirrus.c`（副作用分離）。必要時のみ `kernel/paging.[ch]` の cache/mapping 準備処理、既存定数ヘッダ。共有ファイルはこの順に直列統合。C の規約は [CONSTRAINTS.md C1](../../CONSTRAINTS.md#c1-c11-gnu11-を内部実装の基準とする)、kernel 文字列 [C2]、KAPI 変更なし [ABI1–3]。
 
 | ゲート | 合格条件（全て次回実装時。今回未実行） |
 |---|---|
-| T1 transaction | ILP32/GNU89 の実 pgalloc/sys 核で、2範囲目の live allocation、台帳満杯、model 容量不足、BB 不足を注入。全 state/output/IF 不変、I/O/map=0。重複範囲は union 集計。同 owner exact retry は統計不変、他 owner/部分一致拒否。 |
-| T2 範囲/所有 | PEGC全512KiB、Xe10銀行+全2MiBの末尾まで除外。legacy limit 外 UNKNOWN の窓も台帳登録できる。疎な RAM、最終PFN、overflow/逆順拒否。metadata/PT workspace/hotdeploy/shlib/BB、exec A/B **と動的穴** に個別衝突。free/mark/再 init/終了で永久予約が復活しない。 |
+| T1 transaction | ILP32/現行 [C1] の実 pgalloc/sys 核で、2範囲目の live allocation、台帳満杯、model 容量不足、BB 不足を注入。全 state/output/IF 不変、I/O/map=0。重複範囲は union 集計。同 owner exact retry は統計不変、他 owner/部分一致拒否。 |
+| T2 範囲/所有 | [§3 の候補の全予約範囲](#3-候補が要求する範囲)を末尾まで除外 (描画面だけでは不可)。legacy limit 外 UNKNOWN の窓も台帳登録できる。疎な RAM、最終PFN、overflow/逆順拒否。metadata/PT workspace/hotdeploy/shlib/BB、exec A/B **と動的穴** に個別衝突。free/mark/再 init/終了で永久予約が復活しない。 |
 | T3 順序 | mock I/O/mapping traceで `commit→全map成功→probe→enable→BB公開→AS作成` を検証。PEGC map/BB失敗、Cirrus map/setup失敗で副作用境界・保持予約・PC98復帰を確認。準備前の直接 backend 呼出しも拒否。 |
 | T4 起動/再利用 | GUI=0 と全 GFX 希望値で splash はPC98のみ、任意予約0・任意probe0・旧sys上端不変。GUI=1/CUI→GUIは同じgate。非idle初回拒否。再 init/shutdown/reentryでBB baseとclient USER/PCD維持、表示面は非USER。 |
 | T5 回帰/限界 | 既存 `test_physmem.py`, `test_pgalloc_range.py`, `test_pgalloc_model.py`, `test_highram_stage.py`, `test_paging_bounds.py`, `test_boot_splash_native.py` と新規broker host試験、`make kernel`/`make check`。モデルstageはfail-stopのまま、CUIで高位providerを捏造しない。PEGC低RAM拒否は未対応として明記。 |

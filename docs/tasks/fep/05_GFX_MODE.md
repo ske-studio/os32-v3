@@ -147,11 +147,11 @@ static void ovl_draw_glyph(int px, int py, const u8 *pat, int wb, int h, u8 colo
 | 方式 | 長所 | 短所 |
 |------|------|------|
 | A: GVRAM 直描き (§3-4) | 確実・GDC 設定に非依存 | 退避/復元コスト、漢字 ROM 描画実装 |
-| B: テキスト/グラフィック混在表示 | 既存 TVRAM 描画を流用できる | GDC モード制御が機種/エミュ依存、ハードウェアアクセラレータ禁止規定との整合確認要 |
+| B: テキスト/グラフィック混在表示 | 既存 TVRAM 描画を流用できる | GDC モード制御の機種/エミュ互換性が未検証 |
 
-→ **採用は方式 A**。方式 B は GDC のテキスト表示 ON 制御が
-「ハードウェアアクセラレータ使用禁止」(CLAUDE.md) の精神に照らしてリスクがあり、
-NP21/W 互換も未検証のため将来検討に留める。`tvram_set_visible()` の新設は方式 B 採用時のみ。
+→ **計画上の採用は方式 A**。[CONSTRAINTS.md HW1](../../CONSTRAINTS.md#hw1-egc--grcg--gdc-描画コマンドを使わない) が禁止するのは描画コマンドで、テキスト表示 ON 制御ではない。
+[未] 方式 B の機種・NP21/W 互換性は未検証のため将来検討に留める。`tvram_set_visible()` の新設は方式 B 採用時のみ。
+方式 A も、実装時には HW1 の HAL 描画経路に合わせて直接 VRAM 書込み案を見直す。
 
 ---
 
@@ -182,11 +182,11 @@ void ime_select_render(void)
 | `ime_render_gfx.c` (新規) | GFX 実装 (退避/復元/グリフ描画) |
 | `ime.c` | `render` ポインタ経由描画化、`ime_select_render` |
 | `gfx_core.c` / `gfx.h` | `int gfx_is_active(void);` 公開 |
-| `build.sh` | 新規 .c を `C_KERNEL` に追加 |
+| `build/kernel.mk` | 新規 .c を `C_KERNEL` に追加 |
 
 **テスト:** `gfx_demo` 起動中に Shift+Space で FEP ON → 画面最下部 16 ラインに
 `[あ]` と入力かな・変換候補が表示され、FEP OFF で元のグラフィックが復元されること。
-`build.sh` エラー 0。
+[ビルド・検証手順](../../08_build.md#ビルドターゲット) (§8-4) に従って確認する。
 
 ---
 

@@ -4,7 +4,7 @@
 > 優先度: **中** ／ 依存: KAPI 公開済 (`ime_*`)
 
 [`FEP_FUTURE.md`](FEP_FUTURE.md)「ユーザー辞書管理コマンド」「辞書バリアント動的切り替え」をまとめた
-外部プログラム `programs/ime.c` (シェルコマンド) を新設する。
+外部プログラム `userland/cmds/ime.c` (シェルコマンド) の実装済み設計記録。
 
 ---
 
@@ -65,35 +65,15 @@ int  ime_switch_dict(int variant);   /* 0=S,1=M,2=L → reopen */
 
 ## 4. 追加 KAPI (`kapi.json`)
 
-`kapi/` に `__cdecl` ラッパーを作り、`kapi.json` に登録 → `kapi_generated.*` 再生成。
-
-```jsonc
-{ "name": "ime_switch_dict", "ret": "int", "args": ["int variant"] },
-{ "name": "ime_user_list",   "ret": "int",
-  "args": ["const char *yomi_prefix", "IME_UserEntry *out", "int max"] },
-{ "name": "ime_user_delete", "ret": "int",
-  "args": ["const char *yomi", "const char *kanji"] },
-{ "name": "ime_user_export", "ret": "int", "args": ["const char *path"] },
-{ "name": "ime_user_clear",  "ret": "int", "args": [] }
-```
-
-> `IME_Result` を外部プログラムへ公開するには `programs/os32api.h` にも構造体定義
-> (yomi/kanji/pos_id/cost) を複製する必要がある。
-> 列挙専用には軽量構造体 `IME_UserEntry { char yomi[32]; char kanji[32]; int freq; }`
-> を新設する方がクリーン (**推奨**)。これを `ime_user_list` の出力型とする。
+定義元は `sdk/kapi.json`。公開済みの関数一覧は
+[KAPI_SPEC.md の FEP 辞書管理](../../KAPI_SPEC.md#fep-辞書管理--ノンブロッキング入力-v35) を参照。
+列挙の出力型 `IME_UserEntry` は `sdk/include/os32/os32_kapi_shared.h` で共有する。
 
 ---
 
-## 5. KAPI 拡張手順 (CLAUDE.md 準拠)
+## 5. KAPI 拡張手順
 
-1. `exec/exec.h` の `KernelAPI` 構造体**末尾**に関数ポインタ追加 (バイナリ互換)。
-2. `kapi/kapi_ime.c` (新規 or 既存) に `__cdecl` ラッパー実装。
-3. `exec/exec.c::exec_init()` にテーブル登録。
-4. `programs/os32api.h` に宣言追加 (+ `IME_UserEntry` 定義)。
-5. `KAPI_VERSION` インクリメント + `KAPI_SPEC.md` 更新。
-6. `tools/kapi.json` 追記 → `kapi_generated.c` / `os32_kapi_generated.h` / `kapi_generated.rs` 再生成。
-
-KAPI 追加分の全体一覧は [`00_INDEX.md` §9](00_INDEX.md#9-kapi-追加一覧-全フェーズ集約)。
+[KAPI_SPEC.md §3-1](../../KAPI_SPEC.md#3-1-kernelapi-関数の追加手順) に従う。生成物は手編集しない。
 
 ---
 
@@ -103,11 +83,11 @@ KAPI 追加分の全体一覧は [`00_INDEX.md` §9](00_INDEX.md#9-kapi-追加�
 |------|------|
 | `kernel/ime_dict.c` | `ime_dict_reopen` / `ime_user_*` 実装 |
 | `kernel/ime.c` / `ime.h` | `ime_switch_dict` ファサード、`IME_UserEntry` |
-| `kapi/kapi_ime.c` (新規) | `__cdecl` ラッパー |
-| `exec/exec.h` / `exec.c` | KAPI 登録 |
-| `tools/kapi.json` | KAPI 定義追記 |
-| `programs/os32api.h` | 宣言複製 + `IME_UserEntry` |
-| `programs/ime.c` (新規) | シェルコマンド本体 |
+| `kapi/kapi_generated.c` (生成物) | `__cdecl` ラッパー |
+| `exec/exec_kapi_init.inc` (生成物) | KAPI 登録 (手編集しない) |
+| `sdk/kapi.json` | KAPI 定義追記 |
+| `sdk/include/os32/os32_kapi_shared.h` | 共有型定義 + `IME_UserEntry` |
+| `userland/cmds/ime.c` | シェルコマンド本体 |
 
 **テスト:**
 1. `ime user list` で学習済みエントリが頻度順に表示される。
@@ -115,7 +95,7 @@ KAPI 追加分の全体一覧は [`00_INDEX.md` §9](00_INDEX.md#9-kapi-追加�
 3. `ime dict s` 後に変換候補数/順序が変わる (S 辞書は語彙少)。
 4. `ime user export` で CSV が `/tmp` に生成され、`cat` で内容確認。
 5. `ime user delete` 後に該当エントリが消える。
-6. `build.sh` / `build_programs.sh` エラー 0。
+6. [ビルド・検証手順](../../08_build.md#ビルドターゲット) (§8-4) に従って確認する。
 
 ---
 

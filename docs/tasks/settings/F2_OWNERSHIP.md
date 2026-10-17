@@ -103,6 +103,19 @@ journal を作っても、xOpen は **A の pVfs->pAppData** から A の cookie
 B の owner は一度も変更しない。FEP が B 実行中に初めて学習しても同様に RESIDENT group へ入る。
 全 SQLite entry の push/pop context 追加や、IRQ/longjmp に残り得る「現在の SQLite 接続」global は採用しない。
 
+### 3.1a scoped 実装の契約差分
+
+§3.1 の pointer 型 API は旧案。現行の宣言は `lib/sqlite3/os32_sqlite_vfs.h:23` を参照。
+
+- 専用 descriptor は DB_MAX_CONNECTIONS=8 + RESIDENT=1、非 default 一度登録。
+  再 acquire では cookie/世代などの可変状態だけを更新し、登録済み pNext を触らない。
+- §3.1 の pointer 型 API 案に対し、実装の `Os32SqliteGroup` は **cookie の値コピー**。
+  再利用された slot pointer で古い呼出しを新世代へ認証してしまう窓を避ける。
+  接続 open は専用 helper で一回だけ行い、URI flags/`file:` による VFS 差替えを拒否する。
+- xClose/lease の失敗は callback 戻り前に固定表へ sticky 保存。sqlite3_file の pointer は
+  保存しない。finish は close OK + 0FD + sticky-clear を必要とし、成功 close 後は
+  caller の db=NULL を診断より先に行う契約を内部 header と harness に明記した。
+
 ### 3.2 OS32 FD 表の内部 lease
 
 `fs/vfs_fd.c` の VfsFile に `lifetime = GENERIC / SQLITE`、cookie、FD generation、
@@ -286,30 +299,13 @@ callsite の静的検査も組み合わせる。新規 guest binary の必要性
 
 ## 7.1 F2b scoped 内部基盤の進捗（F2 全体の受入ではない）
 
-今回の明示依頼では §7 表の F2b をさらに限定し、**接続専用 VFS/group の内部基盤だけ**を
-`lib/sqlite3/os32_sqlite_vfs.c/.h` と専用 `tools/tests/sqlite_groups_*` /
-`test_sqlite_groups.py` に実装した。F2a の §3.3 API を使用。KAPI/FEP/exec 呼出し側は
-未移行で、default `os32` の legacy file open は維持する。境界 prerequisite 前の
-呼出し側移行・default fail-closed 化・配備の承認ではない。
-
-- 専用 descriptor は DB_MAX_CONNECTIONS=8 + RESIDENT=1、非 default 一度登録。
-  再 acquire では cookie/世代などの可変状態だけを更新し、登録済み pNext を触らない。
-- §3.1 の pointer 型 API 案に対し、実装の `Os32SqliteGroup` は **cookie の値コピー**。
-  再利用された slot pointer で古い呼出しを新世代へ認証してしまう窓を避ける。
-  接続 open は専用 helper で一回だけ行い、URI flags/`file:` による VFS 差替えを拒否する。
-- xClose/lease の失敗は callback 戻り前に固定表へ sticky 保存。sqlite3_file の pointer は
-  保存しない。finish は close OK + 0FD + sticky-clear を必要とし、成功 close 後は
-  caller の db=NULL を診断より先に行う契約を内部 header と harness に明記した。
-- HOST + ASan 32/32、i386-elf GNU89 VFS object compile 合格。F2a 回帰 15/15 と
-  既存 F1 host 回帰も合格。同梱 SQLite + 実 OS32 VFS/FD + RAM backend で
-  `/real.db-journal` が group=0/1、open_owner=1、current_owner=2 を保つこと、
-  TEMP_STORE=3 の temp SQL 80 行/追加 FD=0、SQLite close OK + stale lease + 0FD が
-  group finish では隔離となることを検証した。証跡・警告・試験の限界は
-  `tools/tests/sqlite_groups_tdd.md`。
-
-**未完了**: F2b の F1 caller 接続、F2c/F2d、境界 prerequisite、独立実装レビュー R1、
-kernel link、make check、guest/FEP の実走。full F2 は未受入。以下 §8 は引き続き
-統合全体の期待値であり、今回の scoped host 結果で全項目を合格扱いしない。
+接続専用 VFS/group の内部基盤のみ実装済み。KAPI/FEP/exec 呼出し側は未移行で、
+default `os32` の legacy file open を維持する。呼出し側移行・配備の承認ではない。
+合格: scoped host・ASan・target object と F2a/F1 回帰。証拠と限界は
+[sqlite_groups_tdd.md](../../../tools/tests/sqlite_groups_tdd.md#最終実行結果) を参照。実装の契約差分は §3.1a。
+未完了: F2b の F1 caller 接続、F2c/F2d、境界 prerequisite、独立レビュー R1、
+kernel link、make check、guest/FEP の実走。full F2 は未受入。
+§8 は統合全体の期待値であり、scoped host 結果で全項目を合格扱いしない。
 
 ## 8. 必須テスト表（期待値。まだ実行していない）
 
