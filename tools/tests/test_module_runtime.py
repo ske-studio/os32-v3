@@ -9,7 +9,7 @@ import sys
 import tempfile
 
 import host32
-from test_module_image import fixture, crc, word
+from test_module_image import fixture, crc, word, cases as image_cases
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
          '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-D__KERNEL_BUILD__']
 
@@ -36,6 +36,10 @@ CASES += [(f'cleanup-stage-{i}', 4, i) for i in range(1, 4)]
 CASES += [('record-full', 5, 0), ('dependency-reverse', 6, 0),
           ('dependency-live', 7, 0)]
 CASES += [(f'unstopped-ref-{i}', 8, i) for i in range(5)]
+CASES += [('prefix-return-reclaimed', 10, 0), ('prefix-return-isolated', 10, 1)]
+REJECTIONS = [(name, 9, rc) for _, name, _, rc, _ in image_cases()
+              if name in ('export-slot-19', 'export-duplicate', 'crc')]
+CASES += REJECTIONS
 
 
 def main():
@@ -51,7 +55,10 @@ def main():
 
         def run(cases, expected=0):
             for label, mode, arg in cases:
-                payload = struct.pack('<2I', mode, arg) + image()
+                data = image()
+                if mode == 9:
+                    data = next(data for _, name, data, _, _ in image_cases() if name == label)
+                payload = struct.pack('<2I', mode, arg) + data
                 for runner in os.environ.get('HOST32_RUNNERS', 'native qemu').split():
                     result = host32.run([str(exe)], input=payload, runner=runner,
                                         capture_output=True)
@@ -74,12 +81,20 @@ def main():
                  '(void)stopped;', [case for case in CASES if case[1] in (4, 8)]),
                 ('dependency-free', 'if (has_dependents(h)) goto quarantined;',
                  'if (0 && has_dependents(h)) goto quarantined;',
-                 [('dependency-live', 7, 0)])):
+                 [('dependency-live', 7, 0)]),
+                ('load-validation-bypass',
+                 '    if (rc) goto rejected;\n    r->state = MODULE_VALIDATED;',
+                 '    if (0 && rc) goto rejected;\n    r->state = MODULE_VALIDATED;',
+                 REJECTIONS),
+                ('export-copy-count',
+                 'i < h[MI_EXPORT_COUNT]; i++', 'i + 1 < h[MI_EXPORT_COUNT]; i++', [CASES[0]]),
+                ('export-copy-slot', 'r->exports[slot] =', 'r->exports[slot - 1] =', [CASES[0]])):
                 assert source.count(old) == 1, label
                 mutant = folder / (label + '.c')
                 mutant.write_text(source.replace(old, new))
                 build(mutant)
                 run(cases, expected=1)
+                print(f'MUTATE {label} RED (runtime assertions)', flush=True)
     return 0
 
 

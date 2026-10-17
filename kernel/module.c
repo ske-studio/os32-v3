@@ -60,12 +60,15 @@ void kdebug_load(void)
         kdebug.pair_crc = record->pair_crc;
     }
     if (!rc) rc = module_start(handle);
+    const u32 *exports = module_exports(handle);
+    /* A failed prefix return can finish rollback successfully (ABSENT). */
+    if (!rc && !exports) rc = MODULE_INIT_FAILED;
     if (rc) {
         kdebug.state = rc;
         kprintf(0x07, "[kdebug] rejected: %s\n", kdebug_state_name(rc));
         return;
     }
-    kmemcpy(&kdebug.ops, module_exports(handle), sizeof(kdebug.ops));
+    kmemcpy(&kdebug.ops, exports, sizeof(kdebug.ops));
     kdebug.base = record->base;
     kdebug.base_pa = record->backing;
     kdebug.pages = record->pages;

@@ -45,8 +45,7 @@ int module_load(const struct module_request *q, struct module_handle *out)
     if (!q->lifecycle.start || (q->policy.import_count && !q->imports))
         return MODULE_BAD_HEADER;
     for (u32 i = 0; i < MODULE_RECORD_CAP; i++) {
-        if (module_records[i].state != MODULE_ABSENT ||
-            module_records[i].generation == 0xffffffffU) continue;
+        if (module_records[i].state != MODULE_ABSENT) continue;
         r = &module_records[i];
         handle.slot = i;
         handle.generation = r->generation + 1;
@@ -72,11 +71,6 @@ int module_load(const struct module_request *q, struct module_handle *out)
     if (rc) goto rejected;
     r->state = MODULE_HEADER_CHECKED;
     const u32 *h = plan.word;
-    /* Every retained table has fixed storage; refuse before owner/init. */
-    if (h[MI_EXPORT_COUNT] > MODULE_RUNTIME_SLOTS) {
-        rc = MODULE_RECORD_FULL;
-        goto rejected;
-    }
     rc = MODULE_NO_PAGES;
     if (!ledger_owner_new(LEDGER_KIND_MODULE, r->module_id, q->name, &r->owner))
         goto rejected;
@@ -91,13 +85,12 @@ int module_load(const struct module_request *q, struct module_handle *out)
         (int)(st.st_size - sizeof(header))) goto rejected;
     vfs_close(fd);
     fd = -1;
-    rc = module_image_validate(image, st.st_size, &q->policy, &plan);
-    if (rc) goto rejected;
-    r->state = MODULE_VALIDATED;
     u8 *body = image + h[MI_PAYLOAD_OFF];
     r->base = (u32)(uptr)body; /* kernel VA from P2V */
     rc = module_image_relocate(image, st.st_size, &q->policy, r->base, &plan);
     if (rc) goto rejected;
+    r->state = MODULE_VALIDATED;
+    /* relocate validates export count/unique slots against generated policy. */
     for (u32 i = 0; i < h[MI_IMPORT_COUNT]; i++) {
         u32 off = read_word(image + h[MI_IMPORT_OFF] + i * MODULE_RECORD_SIZE + 8);
         kmemcpy(body + off, &q->imports[i], sizeof(u32));
@@ -106,10 +99,6 @@ int module_load(const struct module_request *q, struct module_handle *out)
     for (u32 i = 0; i < h[MI_EXPORT_COUNT]; i++) {
         const u8 *rec = image + h[MI_EXPORT_OFF] + i * MODULE_RECORD_SIZE;
         u32 slot = (u32)rec[4] | ((u32)rec[5] << 8);
-        if (slot > MODULE_RUNTIME_SLOTS) {
-            rc = MODULE_RECORD_FULL;
-            goto rejected;
-        }
         r->exports[slot] = r->base + read_word(rec + 8);
     }
     r->prefix_pages = h[MI_PAYLOAD_OFF] / PAGE_SIZE;
@@ -141,10 +130,8 @@ int module_start(struct module_handle h)
         module_abort(h);
         return MODULE_INIT_FAILED;
     }
-    if (!pgalloc_free_n_owner(r->owner, r->backing / PAGE_SIZE, r->prefix_pages)) {
-        module_abort(h);
-        return MODULE_ISOLATED;
-    }
+    if (!pgalloc_free_n_owner(r->owner, r->backing / PAGE_SIZE, r->prefix_pages))
+        return module_abort(h);
     r->backing += r->prefix_pages * PAGE_SIZE;
     r->pages -= r->prefix_pages;
     r->prefix_pages = 0;
@@ -227,7 +214,7 @@ int module_ref_acquire(struct module_handle h, u32 owner,
     if (kind <= MODULE_REF_CALLBACK &&
         (handler < r->text || handler - r->text >= r->text_size)) return 0;
     u32 *count = ref_count(r, kind);
-    if (!count || *count == 0xffffffffU) return 0;
+    if (!count) return 0;
     ++*count;
     return 1;
 }

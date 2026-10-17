@@ -115,6 +115,10 @@ def validate(output):
     assert summary, output
     values = dict(re.findall(r'(\w+)=(\d+)', summary.group()))
     assert int(values['bytes']) == 512 * 1024
+    assert int(values['heap']) + int(values['state']) == int(values['bytes'])
+    assert int(values['state']) > 0 and int(values['state']) % 8 == 0
+    assert int(values['capacity']) == int(values['heap']) // 65 * 64
+    assert int(values['app_limit']) == int(values['capacity']) - RESERVE
     assert int(values['reserve']) == RESERVE
     assert int(values['denied']) > 0
     assert int(values['common_measured']) <= RESERVE

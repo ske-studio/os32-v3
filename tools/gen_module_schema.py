@@ -14,6 +14,8 @@ def render():
              '#ifndef MODULE_SCHEMA_H', '#define MODULE_SCHEMA_H', '']
     for name, value in CONSTANTS.items():
         lines.append(f'#define MODULE_{name} {value}U')
+    max_slots = max(policy['ops_slots'] for policy in POLICIES.values())
+    lines += [f'#define MODULE_RUNTIME_SLOTS {max_slots}U']
     lines += ['', '/* Compatibility names for the existing KDEBUG contracts. */']
     kdebug = POLICIES[CONSTANTS['ID_KDEBUG']]
     for name, field in (('IMAGE_MAX', 'image_max'), ('RELOC_MAX', 'reloc_max'),

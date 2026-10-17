@@ -46,7 +46,7 @@ void _start(void)
     for (u32 i = input[7]; i < sizeof(image); i++) image[i] = 0xa5;
     /* A boundary mutant must reach the explicit write/range observation rather
      * than being accidentally rejected by the value read across payload end. */
-    if (input[9] && input[7] <= sizeof(image) - 4)
+    if (input[7] <= sizeof(image) - 4)
         for (u32 i = 0; i < 4; i++) image[input[7] + i] = 0;
     for (u32 i = 0; i < sizeof(image); i++) before[i] = image[i];
     struct module_image_plan plan, header_plan;

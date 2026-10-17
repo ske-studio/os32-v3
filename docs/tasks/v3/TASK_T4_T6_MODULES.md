@@ -312,6 +312,7 @@ body+将来pool512KiB+stack128KiBは定常1,036,288B、prefix込みpeak1,052,672
 | 範囲 | core像の増減見積もり (未実装、[推]) | core外・測定ゲート |
 |---|---:|---|
 | T4a 共通核/生成policy | +4〜8KiB (DBGREF分を二重計上しない) | prototypeでprefix/body/record容量を確定。kdebug ONは既存body48KiB・peak60KiB、OFFは0 |
+| T4a-4 再測定 (host ILP32、製品未結線) | core増分0 | 512KiB内に固定管理状態80B、HEAP 524,208B、実容量516,096B。予約196,608B、APP+SYSTEM上限319,488B。合成S/M/L最大FEP 99,328B、実IPADIC 101,376B、各27切替成功 (ログ `~/os32-tmp/run/t4a/fix1_budget*.log`) |
 | T4b facade/F2/F3/X群 | +4〜10KiB | group/identity/出力stagingを含むmap差分。X-1の棚卸しで上限が変わるなら着手前に再見積もり |
 | T4c SQLite分離 | +1〜3KiBのcore接続、連結SQLite占有は別計上 | 現連結SQLite全占有770,560B (`build/out/kernel.map:4477,8033`)、うちstatic MEMSYS5 393,216Bを除く377,344Bがbody基準。ページ切上げ380,928B＋512KiB＋128KiB＝**1,036,288B定常 [推]**、peakはこれに実測prefixを加える |
 | T5a FEP分離 | 旧FEP約18.5KiBを外へ、B2 staging等+5〜7KiB [推] | module本体/状態・ページ丸めを新mapで計上。旧群値は `docs/tasks/v3/TASK_MEMMAP_V3.md:322`、現実測の節約量ではない |

@@ -65,6 +65,8 @@ R1_OBJECTS += $(KDEBUG_KEXPORT_OBJ)
 
 all kernel: $(BUILD_OUT)/kdebug.bin
 kernel-r1: $(R1_OUT)/kdebug.bin
-kernel/module_image.o $(R1_OBJ)/kernel/module.o $(R1_OBJ)/kernel/module_image.o \
-    $(KERNEL_OBJ_PREFIX)kernel/module.o $(KERNEL_OBJ_PREFIX)kernel/module_image.o: $(MODULE_SCHEMA)
+kernel/module_image.o kernel/module_runtime.o $(R1_OBJ)/kernel/module.o \
+    $(R1_OBJ)/kernel/module_image.o $(R1_OBJ)/kernel/module_runtime.o \
+    $(KERNEL_OBJ_PREFIX)kernel/module.o $(KERNEL_OBJ_PREFIX)kernel/module_image.o \
+    $(KERNEL_OBJ_PREFIX)kernel/module_runtime.o: $(MODULE_SCHEMA)
 -include $(KDEBUG_OBJS:.o=.d) $(KDEBUG_KEXPORT_OBJ:.o=.d)

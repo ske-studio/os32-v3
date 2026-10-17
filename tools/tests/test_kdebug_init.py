@@ -139,7 +139,7 @@ def main():
         build_loader(ROOT / 'kernel/module.c')
         cases = [('off', 0, 0, 0, image), ('other-config', 2, 0, 0, image),
                  ('running', 1, 0, 1, image)]
-        for fail, state in ((1, 2), (2, 8), (3, 8), (4, 7), (5, 7), (6, 8), (7, 5)):
+        for fail, state in ((1, 2), (2, 8), (3, 8), (4, 7), (5, 7), (6, 8), (7, 5), (8, 10)):
             cases.append((f'failure-{fail}', 1, fail, state, image))
         for label, word, value, state in (
             ('header', 0, 0, 3), ('old-pair', 31, pair ^ 1, 4),

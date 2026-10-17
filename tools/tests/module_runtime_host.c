@@ -102,6 +102,7 @@ int pgalloc_free_n_owner(u32 owner, u32 pfn, int n)
     CHECK(pfn >= first && n > 0 && pfn - first + n <= OWNER_PAGES);
     u32 bits = ((1U << n) - 1) << (pfn - first);
     CHECK((mask[i] & bits) == bits);
+    if (input[0] == 10 && !returned) { returned = 1; return 0; }
     mask[i] &= ~bits;
     kmemset(pool[i] + (pfn - first) * PAGE_SIZE, 0xdd, n * PAGE_SIZE);
     returned += n;
@@ -110,6 +111,11 @@ int pgalloc_free_n_owner(u32 owner, u32 pfn, int n)
 int ledger_reclaim_owner(u32 owner, u32 *pages)
 {
     u32 i = index_of(owner);
+    if (input[0] == 9) {
+        /* Rejection must precede relocation, BSS zeroing and import writes. */
+        CHECK(!memcmp(pool[i], file, IMAGE_SIZE));
+        for (u32 j = IMAGE_SIZE; j < 2 * PAGE_SIZE; j++) CHECK(pool[i][j] == 0xcc);
+    }
     *pages = 0;
     for (u32 p = 0; p < OWNER_PAGES; p++) if (mask[i] & (1U << p)) {
         CHECK(pgalloc_free_n_owner(owner, (u32)(uptr)pool[i] / PAGE_SIZE + p, 1));
@@ -215,7 +221,13 @@ void _start(void)
     struct module_request q = request();
     struct module_handle h = {0, 0};
     fail_at = input[0] == 1 ? input[1] : 0;
+    if (input[0] == 10) fail_cleanup = input[1];
     rc = module_load(&q, &h);
+    if (input[0] == 9) {
+        CHECK(rc == (int)input[1] && !starts && !module_exports(h));
+        CHECK(module_record_get(h)->state == MODULE_ABSENT);
+        empty(); finish(0);
+    }
     if (!rc) {
         CHECK(!module_exports(h) && !starts);
         rc = module_start(h);
@@ -224,6 +236,13 @@ void _start(void)
         CHECK(rc == (fail_at && fail_at <= 2 ? MODULE_NO_PAGES : MODULE_INIT_FAILED));
         CHECK(module_record_get(h)->state == MODULE_ABSENT);
         abort_one(h); empty(); finish(0);
+    }
+    if (input[0] == 10) {
+        CHECK(rc == (input[1] ? MODULE_ISOLATED : 0));
+        CHECK(!module_exports(h));
+        if (input[1]) CHECK(module_record_get(h)->state == MODULE_QUARANTINED);
+        else { CHECK(module_record_get(h)->state == MODULE_ABSENT); empty(); }
+        finish(0);
     }
     CHECK(!rc && module_exports(h));
     struct module_record *r = module_record_get(h);

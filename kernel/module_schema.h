@@ -12,6 +12,7 @@
 #define MODULE_ID_SQLITE 2U
 #define MODULE_PHASE_POST_ROOT 2U
 #define MODULE_FLAG_PAIR 1U
+#define MODULE_RUNTIME_SLOTS 18U
 
 /* Compatibility names for the existing KDEBUG contracts. */
 #define MODULE_IMAGE_MAX 262144U
