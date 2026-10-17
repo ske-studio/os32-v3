@@ -40,6 +40,7 @@
 #include <stdarg.h>
 
 #include "os32api.h"      /* KernelAPI / OS32_Stat / OS32_ERR_* / u8,u32 */
+#include "hsync_shell_fixture.h"
 
 static int failures;
 static int checks;
@@ -138,6 +139,7 @@ static u32   fk_version = 53;
 
 static void fs_reset(void)
 {
+    fixture_shell_enabled = 1;
     int i;
     for (i = 0; i < FS_MAX_NODES; i++) {
         if (fs_nodes[i].data) free(fs_nodes[i].data);
@@ -349,6 +351,13 @@ static int fk_sys_ls(const char *path, void *cb, void *ctx)
 
 static int fk_sys_stat(const char *path, OS32_Stat *buf)
 {
+    if (strcmp(path, "/") == 0) {
+        memset(buf, 0, sizeof(*buf));
+        buf->st_mode = OS_S_IFDIR | 0755;
+        buf->st_ino = 2;
+        buf->st_dev = strcmp(fk_root_dev, "fd0") == 0 ? 2 : 1;
+        return 0;
+    }
     int n = fs_find(path);
 
     memset(buf, 0, sizeof(OS32_Stat));
@@ -370,6 +379,12 @@ static int fk_sys_stat(const char *path, OS32_Stat *buf)
  *   - 名前が在れば種別を問わず OS32_ERR_EXIST (ディレクトリでも) */
 static int fk_sys_open(const char *path, int mode)
 {
+    if (fixture_shell_enabled && strcmp(path, "/host/sys/shell.bin") == 0 &&
+        mode == KAPI_O_RDONLY) {
+        fixture_shell_pos = 0;
+        return FIXTURE_SHELL_FD;
+    }
+
     int n = fs_find(path);
     int f;
 
@@ -409,6 +424,8 @@ static void fk_sys_close(int fd)
 
 static int fk_sys_read(int fd, void *buf, u32 size)
 {
+    if (fd == FIXTURE_SHELL_FD) return fixture_shell_read(buf, size);
+
     FFd *h;
     FNode *nd;
     u32 avail;
@@ -1786,12 +1803,25 @@ static void setup_root_fd(void)
     u8 *b;
 
     setup_pair(3000, 1, 111, 3000, 2, 222);
+    fixture_shell_enabled = 0;
     fk_root_dev = "fd0";
     fk_sub_prefix = "/hd0";
     fk_sub_dev = "hd0";
     fk_sub2_prefix = 0;
     fk_sub2_dev = 0;
 
+    fs_add_dir("/host/boot");
+    fs_add_file("/host/boot/vmkernel.lz4", (const u8 *)"kernel", 6);
+    fs_add_dir("/host/sys");
+    fs_add_file("/host/sys/shell.bin", (const u8 *)"shell", 5);
+    fs_add_dir("/host/.deploy");
+    {
+        char man[256];
+        snprintf(man, sizeof(man), "format=2\nbuild=fdrecov\ngenerated=test\n"
+                 "kapi=%u\nkapi_version=%u\ncount=0\n---\n",
+                 (unsigned)KAPI_DATA_FIELDS_OFF, (unsigned)KAPI_VERSION);
+        fs_add_file("/host/.deploy/manifest.txt", (const u8 *)man, (u32)strlen(man));
+    }
     if (g_root_src) free(g_root_src);
     g_root_src = make_blob(3000, 1);           /* SRC_PATH と同じ中身 */
 
@@ -1940,11 +1970,16 @@ static void case_root(void)
         char man[512];
         sprintf(man,
                 "format=2\nbuild=test\ngenerated=now\nkapi=%lu\nkapi_version=1\n"
-                "count=2\n---\nbin/a.bin 3000 00000000 111\n"
-                "newdir/n.bin 50 00000000 444\n",
-                (unsigned long)KAPI_DATA_FIELDS_OFF);
-        fs_add_dir("/host/.deploy");
-        fs_add_file("/host/.deploy/manifest.txt", (const u8 *)man, (u32)strlen(man));
+                "count=4\n---\nbin/a.bin 3000 %08lx 111\n"
+                "newdir/n.bin 50 %08lx 444\n"
+                "boot/vmkernel.lz4 6 %08lx 0\nsys/shell.bin 5 %08lx 0\n",
+                (unsigned long)KAPI_DATA_FIELDS_OFF,
+                (unsigned long)crc32_core_final(crc32_core_update(CRC32_INIT, g_root_src, 3000)),
+                (unsigned long)crc32_core_final(crc32_core_update(CRC32_INIT,
+                    fs_nodes[node_of("/host/newdir/n.bin")].data, 50)),
+                (unsigned long)crc32_core_final(crc32_core_update(CRC32_INIT, (const u8 *)"kernel", 6)),
+                (unsigned long)crc32_core_final(crc32_core_update(CRC32_INIT, (const u8 *)"shell", 5)));
+        fs_set_data(node_of("/host/.deploy/manifest.txt"), (const u8 *)man, (u32)strlen(man));
         check(run_args(a) == 0 && log_has("DEPLOY build=test"), "名札つき --root /hd0: 成功");
         check(log_has("manifest_extra=0"),
               "名札の照合は根からの相対 (/hd0/bin/a.bin は bin/a.bin) = manifest_extra=0");
@@ -2108,8 +2143,7 @@ static void case_root(void)
         fk_version = 65;
         crc = make_vk32(oldk, sizeof(oldk), 0x11);
         (void)make_vk32(newk, sizeof(newk), 0x22);
-        fs_add_dir("/host/boot");
-        fs_add_file("/host/boot/vmkernel.lz4", newk, sizeof(newk));
+        fs_set_data(node_of("/host/boot/vmkernel.lz4"), newk, sizeof(newk));
         fs_add_dir("/hd0/boot");
         fs_add_file("/hd0/boot/vmkernel.lz4", oldk, sizeof(oldk));
 

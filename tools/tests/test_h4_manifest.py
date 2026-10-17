@@ -136,7 +136,46 @@ def build_host(tmp, name, src="tools/tests/h4_manifest_host.c"):
     return exe
 
 
+def legacy_manifest_compat(tmp):
+    """現行 writer の名札を git show で取り出した旧 reader に渡す。"""
+    from test_hostdrv_manifest import Bench, parse, os32x_blob
+    import hostdrv_deploy as hd
+
+    legacy = subprocess.check_output(
+        ["git", "show", "0c71845:userland/system/hsync.c"], cwd=ROOT, text=True)
+    with Bench(tmp / "legacy-deploy") as b:
+        off, _ver = hd.kapi_json_layout()
+        (b.proj / b.files[0]["host"]).write_bytes(
+            os32x_blob(hd.os32x_hdr.OS32X_HDR_VERSION, off))
+        if not hd.do_sync():
+            raise SystemExit("legacy compatibility: writer failed")
+        keys, _ = parse(b.man_text())
+        if set(keys) != {"format", "build", "generated", "kapi", "kapi_version", "count"}:
+            raise SystemExit("legacy compatibility: manifest keys changed")
+        exe = tmp / "h4-legacy"
+        tree = mutpar.build_in_tree(
+            ROOT, tmp / "legacy-reader", {MUT_TARGET: legacy}, [host_cmd(exe)])
+        result = subprocess.run([str(exe), "--manifest", str(b.man())], cwd=tree,
+                                timeout=300, check=False)
+        if result.returncode:
+            raise SystemExit("legacy compatibility: manifest_invalid")
+    print("LEGACY 0c71845 reader accepts current format=2 writer: PASS", flush=True)
+
+
 MUTATIONS = [
+    ("fdrecov_running_gate_removed",
+     "!g_other_root && running_generation_gate() != 0",
+     "g_other_root && running_generation_gate() != 0"),
+    ("fdrecov_kernel_stat_removed",
+     "if (api->sys_stat(HS_SOURCE_KERNEL, &st) != 0)",
+     "if (0 && api->sys_stat(HS_SOURCE_KERNEL, &st) != 0)"),
+    ("fdrecov_shell_stat_removed",
+     "else if (api->sys_stat(HS_SOURCE_SHELL, &st) != 0)",
+     "else if (0 && api->sys_stat(HS_SOURCE_SHELL, &st) != 0)"),
+    ("fdrecov_crc_removed",
+     "if (crc32_core_final(crc) != g_man[i].crc)",
+     "if (0 && crc32_core_final(crc) != g_man[i].crc)"),
+
     # 変異 1: --expect-build の門を素通りさせる版 (§2-3 の否定側)。
     ("expect_build_ignored",
      "    if (!g_expect_build) return 0;      /* 既定は表示だけして同期を続ける */",
@@ -342,6 +381,7 @@ if __name__ == "__main__":
         failed = 0
 
         check_manifest()
+        legacy_manifest_compat(tmp)
 
         exe = build_host(tmp, "h4-manifest")
         rc = subprocess.run([str(exe)], cwd=ROOT, timeout=300).returncode

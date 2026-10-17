@@ -39,6 +39,7 @@
 #include <stdarg.h>
 
 #include "os32api.h"      /* KernelAPI / OS32_Stat / OS32_ERR_* / u8,u32 */
+#include "hsync_shell_fixture.h"
 
 static int failures;
 static int checks;
@@ -86,6 +87,10 @@ static int fk_write_calls;
 static int fk_read_calls;
 static int fk_rename_calls;
 static int fk_mkdir_calls;
+static int fk_sync_calls;
+static int fk_mtime_calls;
+static int fk_header_reads;
+static int fk_other_mount;       /* 0: 無し、1: 別デバイス、2: 稼働ルートの別名 */
 
 static char  fk_log[262144];
 static u32   fk_log_len;
@@ -103,6 +108,9 @@ static void fs_reset(void)
     fk_read_calls = 0;
     fk_rename_calls = 0;
     fk_mkdir_calls = 0;
+    fk_sync_calls = 0;
+    fk_mtime_calls = 0;
+    fk_header_reads = 0;
     fk_log_len = 0;
     fk_log[0] = '\0';
 }
@@ -210,10 +218,13 @@ static int fk_sys_is_mounted(const char *prefix)
 /* vfs_devname: 同期先は HDD (ルート hd0)。FD の判定は hsync_h2_host.c が見る */
 static const char *fk_vfs_devname(const char *prefix)
 {
-    return strcmp(prefix, "/") == 0 ? "hd0" : "";
+    if (strcmp(prefix, "/") == 0) return "hd0";
+    if (fk_other_mount && strcmp(prefix, "/hd0") == 0)
+        return fk_other_mount == 1 ? "hd1" : "hd0";
+    return "";
 }
 
-static int fk_vfs_sync(void) { return 0; }
+static int fk_vfs_sync(void) { fk_sync_calls++; return 0; }
 
 static int fk_sys_mkdir(const char *path)
 {
@@ -274,6 +285,12 @@ static int fk_sys_stat(const char *path, OS32_Stat *buf)
 
 static int fk_sys_open(const char *path, int mode)
 {
+    if (fixture_shell_enabled && strcmp(path, "/host/sys/shell.bin") == 0 &&
+        mode == KAPI_O_RDONLY) {
+        fixture_shell_pos = 0;
+        return FIXTURE_SHELL_FD;
+    }
+
     int n = fs_find(path);
     int f;
 
@@ -307,10 +324,13 @@ static void fk_sys_close(int fd)
 
 static int fk_sys_read(int fd, void *buf, u32 size)
 {
+    if (fd == FIXTURE_SHELL_FD) return fixture_shell_read(buf, size);
+
     FFd *h;
     FNode *nd;
     u32 avail;
 
+    if (size == sizeof(OS32Header)) fk_header_reads++;
     fk_read_calls++;
     if (fd < 3 || fd - 3 >= FS_MAX_FDS || !fs_fds[fd - 3].used)
         return OS32_ERR_IO;
@@ -352,6 +372,7 @@ static int fk_sys_write(int fd, const void *buf, u32 size)
 static int fk_sys_set_mtime(const char *path, u32 mtime)
 {
     int n;
+    fk_mtime_calls++;
     if (mtime == 0) return OS32_ERR_INVAL;
     n = fs_find(path);
     if (n < 0) return OS32_ERR_NOTFOUND;
@@ -433,6 +454,9 @@ static int run_hsync(int argc, char **argv)
     fk_read_calls = 0;
     fk_rename_calls = 0;
     fk_mkdir_calls = 0;
+    fk_sync_calls = 0;
+    fk_mtime_calls = 0;
+    fk_header_reads = 0;
     for (i = 0; i < argc && i < 14; i++) av[i] = argv[i];
     if (g_inject_force_kapi) av[i++] = (char *)"--force-kapi";
     av[i] = 0;
@@ -503,7 +527,8 @@ static u32 blob_crc(const u8 *p, u32 n)
 /* **1 件も書いていない**ことを文言ではなく呼び出し回数で見る (観測窓) */
 static int wrote_nothing(void)
 {
-    return fk_write_calls == 0 && fk_rename_calls == 0 && fk_mkdir_calls == 0;
+    return fk_write_calls == 0 && fk_rename_calls == 0 && fk_mkdir_calls == 0 &&
+           fk_sync_calls == 0 && fk_mtime_calls == 0;
 }
 
 /* ---- 足場: /host に 2 ファイル、/ 側は空 (= 全部 new_file) ---- */
@@ -1250,11 +1275,26 @@ static void case_kapi(void)
     g_inject_force_kapi = 1;
 }
 
-int main(void)
+#include "fdrecov_cases.inc"
+
+int main(int argc, char **argv)
 {
     printf("=== 票 H4: 配備マニフェストと世代の確認 (読む側) ===\n");
     fake_api_init();
 
+    if (argc == 3 && strcmp(argv[1], "--manifest") == 0) {
+        char text[65536];
+        FILE *f = fopen(argv[2], "rb");
+        size_t n;
+        if (!f) return 2;
+        n = fread(text, 1, sizeof(text) - 1, f);
+        fclose(f);
+        text[n] = 0;
+        setup_tree();
+        put_manifest(text);
+        (void)run2("-n", "bin");
+        return !g_man_valid || log_has("manifest_invalid");
+    }
     case_m5();
     case_m6();
     case_m7_m8();
@@ -1263,6 +1303,7 @@ int main(void)
     case_regression();
     case_limits();
     case_kapi();
+    case_fdrecov();
 
     printf("\n%d checks, %d failures\n", checks, failures);
     return failures ? 1 : 0;

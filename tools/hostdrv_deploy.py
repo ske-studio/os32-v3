@@ -235,14 +235,14 @@ def deployed_kapi_layout(deployed):
 
     戻り値 (kapi_data_off, None) か (None, 理由)。OS32X でないファイル
     (データ・スクリプト) は見ない。OS32X が 1 本も無ければ sdk/kapi.json の値。
-    v3 でないもの・値が食い違うものがあれば理由を返す (名札を書かない)。
+    v4 でないもの・値が食い違うものがあれば理由を返す (名札を書かない)。
     """
     want, _ver = kapi_json_layout()
     seen = {}
     for guest_path, dest in deployed:
         try:
             with open(dest, 'rb') as f:
-                blob = f.read(os32x_hdr.OS32X_HDR_V3_SIZE)
+                blob = f.read(os32x_hdr.OS32X_HDR_SIZE)
         except OSError as exc:
             return None, "{} を読めない: {}".format(guest_path, exc)
         if len(blob) < 4 or int.from_bytes(blob[:4], 'little') != os32x_hdr.OS32X_MAGIC:

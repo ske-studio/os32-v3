@@ -1,4 +1,5 @@
 check-h4-manifest-host:
+- assets/profile_fdd
 - build/core.yaml
 - docs/manpages/hsync.1
 - tools/deploy_manifests.py
@@ -16,4 +17,7 @@ check-h4-manifest-host:
 - tools/check_map.d/check-h4-manifest-host.yaml
 - build/checks.d/check-h4-manifest-host.mk
 # Conservative artifact-path audit (including indirect helpers/fixtures).
+- tools/tests/hsync_shell_fixture.h
+- sdk/include/os32/os32_generations.h
+- tools/tests/fdrecov_cases.inc
 artifact_reader: true

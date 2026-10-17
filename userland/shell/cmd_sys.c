@@ -364,7 +364,10 @@ int shell_sfs_lan(int argc, char **argv)
         g_api->kprintf(ATTR_YELLOW, "%s", "sfs lan on|off|peer MAC|peer auto\n");
         return SH_STATUS_USAGE;
     }
-    if (cfg_set_key(key, value) != 0) return SH_STATUS_ERROR;
+    if (cfg_set_key(key, value) != 0) {
+        g_api->kprintf(ATTR_RED, "sfs: /etc/system.cfg に書けない (書込み禁止?)\n");
+        return SH_STATUS_ERROR;
+    }
     g_api->kprintf(ATTR_CYAN, "sfs: %s=%s (next session)\n", key, value);
     return SH_STATUS_OK;
 }

@@ -12,3 +12,5 @@ check-hsync-h1-host:
 - userland/system/hsync_bootold.inc
 - tools/check_map.d/check-hsync-h1-host.yaml
 - build/checks.d/check-hsync-h1-host.mk
+- tools/tests/hsync_shell_fixture.h
+- sdk/include/os32/os32_generations.h

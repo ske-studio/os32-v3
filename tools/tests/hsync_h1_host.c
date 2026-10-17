@@ -26,6 +26,7 @@
 #include <stdarg.h>
 
 #include "os32api.h"      /* KernelAPI / OS32_Stat / OS32_ERR_* / u8,u32 */
+#include "hsync_shell_fixture.h"
 #include "crc32.h"        /* 既存の一括版 crc32_calc (A07 の照合相手) */
 
 /* HostDrv の stat 判定 (票 H1 の是正点)。純関数なのでそのまま呼べる。
@@ -314,6 +315,12 @@ static int fk_sys_stat(const char *path, OS32_Stat *buf)
 
 static int fk_sys_open(const char *path, int mode)
 {
+    if (fixture_shell_enabled && strcmp(path, "/host/sys/shell.bin") == 0 &&
+        mode == KAPI_O_RDONLY) {
+        fixture_shell_pos = 0;
+        return FIXTURE_SHELL_FD;
+    }
+
     int n = fs_find(path);
     int f;
 
@@ -351,6 +358,8 @@ static void fk_sys_close(int fd)
 
 static int fk_sys_read(int fd, void *buf, u32 size)
 {
+    if (fd == FIXTURE_SHELL_FD) return fixture_shell_read(buf, size);
+
     FFd *h;
     FNode *nd;
     u32 avail, limit;

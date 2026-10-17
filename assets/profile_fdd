@@ -2,3 +2,7 @@ set PATH=/bin:/sbin
 set PROMPT=$P> 
 set HOME=/
 echo OS32 v1.0 (FDD Boot)
+echo LAN recovery: sfs lan on (saved to FD; unlock write protection on failure)
+echo Peer: auto by default; sfs lan peer MAC only with other LAN hosts
+echo From rshell: sfs run hsync --root /hd0 --verify --no-backup
+echo Reboot from HDD only after success and errors=0

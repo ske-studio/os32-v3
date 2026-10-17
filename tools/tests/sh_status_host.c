@@ -2251,7 +2251,13 @@ static void case_sfs_lan_cfg(void)
     check(shell_sfs_lan(4, bad) == SH_STATUS_USAGE && !g_data_writes,
           "sfs lan rejects invalid MAC without writes");
     g_cfg_write_fail = 1;
-    check(shell_sfs_lan(3, on) == SH_STATUS_ERROR, "sfs lan reports config write error");
+    check(shell_sfs_lan(3, on) == SH_STATUS_ERROR &&
+          out_has("sfs: /etc/system.cfg に書けない (書込み禁止?)\n"),
+          "sfs lan reports config write error and write protection hint");
+    fresh(); g_cfg_write_fail = 1;
+    check(shell_sfs_lan(4, peer) == SH_STATUS_ERROR &&
+          out_has("sfs: /etc/system.cfg に書けない (書込み禁止?)\n"),
+          "sfs lan peer reports config write error and hint");
 #ifndef SHELL_AS_APP
     fresh();
     check(cmd_sfs(3, on) == 0, "sfs lan routes through resident command");
