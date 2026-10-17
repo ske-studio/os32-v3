@@ -109,6 +109,10 @@ CONTROL_SKIP_ALLOW = {
         'Selects how to edit one mutant source; main runs run(runner) first.',
     ('tools/tests/' + 'test_kapi_ranges.py', 'mutant', 1):
         'Checks one fixture result; entry invokes run(args.runner) before mutant runs.',
+    ('tools/tests/' + 'test_kapi_print.py', 'mutant', 1):
+        'Checks one fixture result; main runs inventory() and run(runner) before all mutant runs.',
+    ('tools/tests/' + 'test_kapi_strings.py', 'mutant', 1):
+        'Checks one fixture result; main runs guest_declarations() and run(args) before all mutant runs.',
     ('tools/tests/' + 'test_kcallback.py', 'mutant', 1):
         'Checks fixture result; main runs run(args) before mutant runs.',
     ('tools/tests/' + 'test_kcallback.py', 'mutant is None', 1):
