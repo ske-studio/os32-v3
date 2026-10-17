@@ -34,6 +34,8 @@ userland/lib/rt/pkg.c を取り込み、RAM 上の 8MB の ext2 で
           "d\\img.dat"、"db." …) を入口で INVAL で断る (ラリー 2 の blocker)。
           fatname は実物の fs/fatfs_vfs.c + fs/fatfs/ff.c を RAM の FAT12 で回す
           (FAT を "/" にマウントした 253/254/255 バイトと rmdir の種別 — ラリー 3)
+  fatwp … 実物の diskio + FatFs + fatfs_vfs で NW の後も既存ファイルが読める。
+          後続の書込みは FDC を呼ばず断り、再初期化後の作成・追記・削除は通る。
   utf8  … Win32 の名前の規則と lib/kutf16.c の変換が同じ集合を通し 1 対 1 (ラリー 3 B2)
   hostwire … fs/hostdrvfs.c の入口検査の配線 (本文の検査。ホストで組めないため)
 
@@ -83,8 +85,18 @@ TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-Isdk/include/os32", "-Ikernel", "-Idrivers", "-Inet",
                 "-Ifs", "-Iexec", "-Igfx", "-Ilib", "-Ikapi"]
 
-# 変異: (名前, 写しの中のファイル, 置き換え前, 置き換え後)。どれも**落ちなければならない**。
+# 変異: (名前, 写しの中のファイル, 置き換え前, 置き換え後)。
+# 置き換え前後が同じものは正常対照 (通ること)。それ以外は落ちること。
+# FDWP の (a) の読み失敗は「窓を捨てない」変異で再現する。
+# STA_PROTECT の変異は再マウントで読みが戻るため、FDC への再試行の数で殺す。
 MUTANTS = [
+    ("FDWP: 正常対照 (何も変えない)", "fs/fatfs/diskio.c",
+     "    fdd_status |= STA_PROTECT;", "    fdd_status |= STA_PROTECT;"),
+    ("FDWP: NW で STA_PROTECT を立てない", "fs/fatfs/diskio.c",
+     "    fdd_status |= STA_PROTECT;", "    /* NW を忘れる */"),
+    ("FDWP: 書込み失敗で汚れた窓を捨てない", "fs/fatfs_vfs.c",
+     "    if (fr == FR_DISK_ERR || fr == FR_WRITE_PROTECTED) {",
+     "    if (0) {"),
     ("write が失効の印を見ない", "fs/vfs_fd.c",
      "    if (f->stale) return VFS_ERR_STALE;   /* 書かない。fs_ctx より先に見る */\n",
      ""),
@@ -806,6 +818,7 @@ REBUILD = {
     "fs/vfs_name_rules.inc": ("harness",),
     "fs/ext2_file.c": ("harness",),
     "fs/fatfs_vfs.c": ("harness",),
+    "fs/fatfs/diskio.c": ("harness",),
     "lib/kutf16.c": ("harness",),
     "lib/rt/pkg.c": ("harness",),
     "system/cdinst.c": ("harness",),
@@ -844,8 +857,10 @@ def _mutant_one(item):
                             first_fail=True)
         except subprocess.TimeoutExpired:
             ok = mutpar.timeout_red(False)
-        return (name if ok else None), \
-            f"MUTANT {i} ({name}): {'SURVIVED' if ok else 'killed'}"
+        control = before == after
+        passed = ok if control else not ok
+        status = "control PASS" if control and ok else ("SURVIVED" if ok else "killed")
+        return (None if passed else name), f"MUTANT {i} ({name}): {status}"
     finally:
         shutil.rmtree(mdir, ignore_errors=True)
         shutil.rmtree(tmp / f"img_m{i}", ignore_errors=True)

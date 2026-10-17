@@ -8,6 +8,7 @@
 /* ======================================================================== */
 
 #include "fatfs/ff.h"
+#include "fatfs/diskio.h"
 #include "vfs.h"
 #include "kmalloc.h"
 #include "kstring.h"
@@ -52,6 +53,19 @@ static int ff_to_vfs(FRESULT fr)
     case FR_NO_FILESYSTEM:  return VFS_ERR_IO;
     default:                return VFS_ERR_IO;
     }
+}
+
+
+/* 書込みが失敗した窓 (FF_FS_TINY) を捨て、後続の読みを回復する。
+ * 他の開いた FIL は再マウントで失効する。元のエラーは呼び手へ返す。
+ * f_mount の disk_initialize で NW も解除する。次の書込みで改めて検出する。 */
+static int ff_write_result(FatFsCtx *fc, FRESULT fr)
+{
+    if (fr == FR_DISK_ERR || fr == FR_WRITE_PROTECTED) {
+        f_mount(0, fc->vol, 0);
+        (void)f_mount(&fc->fatfs, fc->vol, 1);
+    }
+    return ff_to_vfs(fr);
 }
 
 
@@ -215,7 +229,7 @@ static int fatfs_vfs_write(void *ctx, const char *path, const void *data, u32 si
     if (rc_path != VFS_OK) return rc_path;
 
     fr = f_open(&fil, fpath, FA_WRITE | FA_CREATE_ALWAYS);
-    if (fr != FR_OK) return ff_to_vfs(fr);
+    if (fr != FR_OK) return ff_write_result(fc, fr);
 
     fr = f_write(&fil, data, size, &bw);
     /* f_close は最後のセクタとディレクトリエントリ (サイズ・クラスタ鎖) を
@@ -226,8 +240,8 @@ static int fatfs_vfs_write(void *ctx, const char *path, const void *data, u32 si
      * 拾わないと呼び手には見えない。 */
     fr_close = f_close(&fil);
 
-    if (fr != FR_OK) return ff_to_vfs(fr);
-    if (fr_close != FR_OK) return ff_to_vfs(fr_close);
+    if (fr != FR_OK) return ff_write_result(fc, fr);
+    if (fr_close != FR_OK) return ff_write_result(fc, fr_close);
     return (int)bw;
 }
 
@@ -241,7 +255,7 @@ static int fatfs_vfs_unlink(void *ctx, const char *path)
 
     rc_path = ff_make_path(fc, path, fpath, sizeof(fpath));
     if (rc_path != VFS_OK) return rc_path;
-    return ff_to_vfs(f_unlink(fpath));
+    return ff_write_result(fc, f_unlink(fpath));
 }
 
 
@@ -254,7 +268,7 @@ static int fatfs_vfs_mkdir(void *ctx, const char *path)
 
     rc_path = ff_make_path(fc, path, fpath, sizeof(fpath));
     if (rc_path != VFS_OK) return rc_path;
-    return ff_to_vfs(f_mkdir(fpath));
+    return ff_write_result(fc, f_mkdir(fpath));
 }
 
 
@@ -276,7 +290,7 @@ static int fatfs_vfs_rmdir(void *ctx, const char *path)
     fr = f_stat(fpath, &fno);
     if (fr != FR_OK) return ff_stat_to_vfs(fr);
     if (!(fno.fattrib & AM_DIR)) return VFS_ERR_NOTDIR;
-    return ff_to_vfs(f_unlink(fpath));
+    return ff_write_result(fc, f_unlink(fpath));
 }
 
 
@@ -292,7 +306,7 @@ static int fatfs_vfs_rename(void *ctx, const char *old_path, const char *new_pat
     if (rc_path != VFS_OK) return rc_path;
     rc_path = ff_make_path(fc, new_path, fpath_new, sizeof(fpath_new));
     if (rc_path != VFS_OK) return rc_path;
-    return ff_to_vfs(f_rename(fpath_old, fpath_new));
+    return ff_write_result(fc, f_rename(fpath_old, fpath_new));
 }
 
 
@@ -348,22 +362,23 @@ static int fatfs_vfs_write_stream(void *ctx, const char *path, const void *data,
     int rc_path;
     char fpath[VFS_MAX_PATH];
     FIL fil;
-    FRESULT fr;
+    FRESULT fr, fr_close;
     UINT bw;
 
     rc_path = ff_make_path(fc, path, fpath, sizeof(fpath));
     if (rc_path != VFS_OK) return rc_path;
 
     fr = f_open(&fil, fpath, FA_WRITE | FA_OPEN_ALWAYS);
-    if (fr != FR_OK) return ff_to_vfs(fr);
+    if (fr != FR_OK) return ff_write_result(fc, fr);
 
     fr = f_lseek(&fil, (FSIZE_t)offset);
-    if (fr != FR_OK) { f_close(&fil); return ff_to_vfs(fr); }
+    if (fr != FR_OK) { f_close(&fil); return ff_write_result(fc, fr); }
 
     fr = f_write(&fil, data, size, &bw);
-    f_close(&fil);
+    fr_close = f_close(&fil);
 
-    if (fr != FR_OK) return ff_to_vfs(fr);
+    if (fr != FR_OK) return ff_write_result(fc, fr);
+    if (fr_close != FR_OK) return ff_write_result(fc, fr_close);
     return (int)bw;
 }
 

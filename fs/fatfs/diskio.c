@@ -175,7 +175,8 @@ DSTATUS disk_initialize(BYTE pdrv)
     switch (pdrv) {
     case DRV_FDD:
         /* FDCはカーネル起動時に fdc_init() で初期化済み。
-         * 持っているトラックは捨てる (マウントし直し = 媒体が替わったかも)。 */
+         * 持っているトラックと検出済みの NW は捨てる
+         * (マウントし直し = 媒体が替わったかも)。 */
         fdd_track_setup();
         fdc_track_invalidate(&fdd_track);
         fdd_status = 0;
@@ -258,7 +259,8 @@ DRESULT disk_write(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count)
 
     switch (pdrv) {
     case DRV_FDD:
-        if (fdd_status & STA_NOINIT) return RES_NOTRDY;
+        if (disk_status(pdrv) & STA_NOINIT) return RES_NOTRDY;
+        if (fdd_status & STA_PROTECT) return RES_WRPRT;
         /* FDD: fdc_write_sector (CHS ネイティブ) を直接使用。
          * 読み側と同じくジオメトリはドライブから聞く。
          * 先読みの古い中身は fdc_write_sector_geom が世代を進めて外す
@@ -273,6 +275,10 @@ DRESULT disk_write(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count)
                 int cyl  = lba / ((int)g->spt * (int)g->heads);
                 rc = fdc_write_sector(fdd_drive, cyl, head, sect,
                                       buff + i * g->bps);
+                if (rc == FDC_RC_WRITE_PROTECTED) {
+                    fdd_status |= STA_PROTECT;
+                    return RES_WRPRT;
+                }
                 if (rc != 0) return RES_ERROR;
             }
         }

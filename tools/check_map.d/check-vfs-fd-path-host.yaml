@@ -6,6 +6,12 @@ check-vfs-fd-path-host:
 - fs/ext2_file.c
 - fs/ext2_vfs.c
 - fs/fatfs/ff.c
+- fs/fatfs/diskio.c
+- fs/fatfs/diskio_os32.h
+- drivers/fdc.h
+- drivers/fdc_track.c
+- drivers/fdc_track.h
+- drivers/rtc.h
 - fs/fatfs_vfs.c
 - fs/hostdrvfs.c
 - fs/iso9660.c

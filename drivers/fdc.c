@@ -866,6 +866,7 @@ int fdc_write_sector_geom(int drv, int cyl, int head, int sect,
     u16 bps = g->bps;
     const char *phase = "seek";
     int have_results = 0;   /* results[] が埋まったか (診断の出し分け) */
+    int write_protected = 0;
     int dma_armed = 0;      /* DMA ch2 をアンマスクしたまま抜けていないか */
 
     kmemset(results, 0, sizeof(results));
@@ -931,6 +932,14 @@ int fdc_write_sector_geom(int drv, int cyl, int head, int sect,
             return 0;
         }
 
+        if (results[1] & FDC_ST1_NW) {
+            /* リザルトは読み終えた。NR と同じく DMA を閉じて抜ける。 */
+            dma_chan_mask(FDC_DMA_CHANNEL);
+            dma_armed = 0;
+            write_protected = 1;
+            break;
+        }
+
         /* NR (媒体無し) は回復より前に打ち切る (read 側と同じ)。リザルトを
          * 読み終えているので DMA を閉じるだけでよい (リセットは要らない)。 */
         if ((results[0] & FDC_ST0_NR) != 0) {
@@ -945,7 +954,7 @@ int fdc_write_sector_geom(int drv, int cyl, int head, int sect,
     fdc_forget_cyl(drv);
 
     fdc_report_fail("write", drv, cyl, head, sect, phase, have_results, results);
-    return -1;
+    return write_protected ? FDC_RC_WRITE_PROTECTED : -1;
 }
 
 /* ======================================================================== */

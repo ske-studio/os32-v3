@@ -1301,35 +1301,54 @@ static void case_cdinst(void)
 #define FAT_SECTORS 2880u                   /* 1.44MB */
 static u8 g_fatdisk[FAT_SECTORS * 512u];
 
-DSTATUS disk_initialize(BYTE pdrv) { return pdrv == 0 ? 0 : STA_NOINIT; }
-DSTATUS disk_status(BYTE pdrv) { return pdrv == 0 ? 0 : STA_NOINIT; }
-DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count)
+/* FDWP: FatFs と diskio は実物。FDC の媒体だけ RAM に置く。 */
+#include "fdc.h"
+#include "rtc.h"
+static int g_fat_nw, g_fat_writes, g_fat_disk_writes;
+static u32 g_fat_gen;
+static u8 g_fat_tracks[FDC_TRACK_SLOTS][FDC_TRACK_MAX_BYTES];
+static u8 g_fat_sectors[FDC_SECTOR_SLOTS][FDC_SECTOR_SLOT_BYTES];
+static const struct fdc_geom g_fat_geom = {80, 2, 18, 2, 512, 0, 0};
+volatile u32 tick_count;
+const struct fdc_geom *fdc_get_geom(int drv) { (void)drv; return &g_fat_geom; }
+u32 fdc_media_gen(int drv) { (void)drv; return g_fat_gen; }
+u8 *fdc_track_slot(int i) { return g_fat_tracks[i]; }
+u8 *fdc_sector_slot(int i) { return g_fat_sectors[i]; }
+int fdc_read_sectors(int drv, int cyl, int head, int sect, int count,
+                     const struct fdc_geom *g, void *buf)
 {
-    if (pdrv != 0 || sector + count > FAT_SECTORS) return RES_PARERR;
-    kmemcpy(buff, g_fatdisk + sector * 512u, count * 512u);
-    return RES_OK;
+    u32 lba = (cyl * g->heads + head) * g->spt + sect - 1;
+    (void)drv;
+    if (lba + count > FAT_SECTORS) return -1;
+    kmemcpy(buf, g_fatdisk + lba * g->bps, count * g->bps);
+    return 0;
 }
+int fdc_read_sector_geom(int drv, int cyl, int head, int sect,
+                         const struct fdc_geom *g, void *buf)
+{ return fdc_read_sectors(drv, cyl, head, sect, 1, g, buf); }
+int fdc_write_sector(int drv, int cyl, int head, int sect, const void *buf)
+{
+    u32 lba = (cyl * 2 + head) * 18 + sect - 1;
+    (void)drv;
+    g_fat_writes++;
+    g_fat_gen++;
+    if (g_fat_nw == 1) return FDC_RC_WRITE_PROTECTED;
+    if (g_fat_nw == 2) return -1;
+    if (lba >= FAT_SECTORS) return -1;
+    kmemcpy(g_fatdisk + lba * 512u, buf, 512);
+    return 0;
+}
+void rtc_read(RTC_Time *t)
+{ kmemset(t, 0, sizeof(*t)); t->year = 26; t->month = 10; t->day = 17; }
+#include "drivers/fdc_track.c"
+#define disk_write fatwp_disk_write_impl
+#include "fatfs/diskio.c"
+#undef disk_write
 DRESULT disk_write(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count)
 {
-    if (pdrv != 0 || sector + count > FAT_SECTORS) return RES_PARERR;
-    kmemcpy(g_fatdisk + sector * 512u, buff, count * 512u);
-    return RES_OK;
+    g_fat_disk_writes++;
+    return fatwp_disk_write_impl(pdrv, buff, sector, count);
 }
-DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void *buff)
-{
-    if (pdrv != 0) return RES_PARERR;
-    if (cmd == CTRL_SYNC) return RES_OK;
-    if (cmd == GET_SECTOR_COUNT) { *(LBA_t *)buff = FAT_SECTORS; return RES_OK; }
-    if (cmd == GET_SECTOR_SIZE) { *(WORD *)buff = 512; return RES_OK; }
-    if (cmd == GET_BLOCK_SIZE) { *(DWORD *)buff = 1; return RES_OK; }
-    return RES_PARERR;
-}
-DWORD get_fattime(void) { return ((DWORD)(2026 - 1980) << 25) | (9u << 21) | (24u << 16); }
-void diskio_set_fdd_drive(int drv) { (void)drv; }
-void diskio_set_hdd_drive(int drv) { (void)drv; }
-void diskio_set_hdd_partition(u32 offset) { (void)offset; }
-void diskio_set_hdd_sector_size(u16 sz) { (void)sz; }
-void diskio_set_hdd_ide_phys_size(u16 sz) { (void)sz; }
 u32 dos_time_to_epoch(u16 fdate, u16 ftime) { (void)fdate; (void)ftime; return 0; }
 int memcmp(const void *a, const void *b, u32 n)
 {
@@ -1595,6 +1614,102 @@ static void case_utf8(void)
     CHECK(kutf8_to_utf16le("\xe6\x97\xa5", w, 1) == -1);
     CHECK(kutf8_to_utf16le("", w, 1) == 1 && w[0] == 0);
     CHECK(kutf8_to_utf16le((const char *)0, w, 4) == -1);
+}
+
+static int fatwp_write_at(const char *path, const char *data, u32 offset)
+{
+    int fd = vfs_open(path, O_RDWR);
+    int rc;
+    if (fd < 0) return fd;
+    rc = vfs_seek(fd, offset, SEEK_SET);
+    if (rc >= 0) rc = vfs_write_fd(fd, data, 1);
+    vfs_close(fd);
+    return rc;
+}
+
+/* 書込み失敗で窓が汚れても、別の既存ファイルは読み続けられる。
+ * (a) の shell 読み失敗を再現するのは「窓を捨てない」変異。
+ * STA_PROTECT を立てない変異は、再マウントだけで読みが戻るため、
+ * 再初期化までの FDC への書込み数 (2 回目を断ること) で捕まえる。 */
+static void case_fatwp(void)
+{
+    static BYTE work[FF_MAX_SS];
+    MKFS_PARM opt;
+    char buf[16];
+    static char large[1024];
+    int i, writes, disk_writes, rc;
+
+    report("case fatwp\n");
+    for (i = 0; i < 10; i++) {
+        disk_setup();
+        g_fat_nw = 0;
+        diskio_set_fdd_drive(0);
+        disk_initialize(0);
+        kmemset(g_fatdisk, 0, sizeof(g_fatdisk));
+        kmemset(&opt, 0, sizeof(opt));
+        opt.fmt = FM_FAT; opt.n_fat = 2;
+        CHECK(f_mkfs("0:", &opt, work, sizeof(work)) == FR_OK);
+        pdrv_busy[0] = pdrv_busy[1] = 0;
+        fatfs_init();
+        EQ(vfs_mount("/fd0", "fd0", "fat"), VFS_OK);
+        EQ(vfs_mkdir("/fd0/sys"), VFS_OK);
+        EQ(vfs_write("/fd0/sys/shell.bin", "SHELL", 5), 5);
+        EQ(vfs_write("/fd0/old", "OLD", 3), 3);
+        EQ(vfs_mkdir("/fd0/empty"), VFS_OK);
+        g_fat_nw = i == 9 ? 2 : 1;
+        if (i != 9) {
+            /* 1 回の操作内の再試行は保護で止める。再マウント前の寿命。 */
+            writes = g_fat_writes;
+            disk_writes = g_fat_disk_writes;
+            CHECK(disk_write(0, work, 16, 1) == RES_WRPRT);
+            CHECK(disk_status(0) & STA_PROTECT);
+            CHECK(disk_write(0, work, 16, 1) == RES_WRPRT);
+            CHECK(g_fat_disk_writes == disk_writes + 2);
+            CHECK(g_fat_writes == writes + 1);
+            CHECK(disk_initialize(0) == 0);
+        }
+        switch (i) {
+        case 0: rc = vfs_write("/fd0/boot.new", "LOG", 3); break;
+        case 1: rc = vfs_mkdir("/fd0/newdir"); break;
+        case 2: rc = vfs_rm("/fd0/old"); break;
+        case 3: rc = vfs_rename("/fd0/old", "/fd0/new"); break;
+        case 4: rc = vfs_rmdir("/fd0/empty"); break;
+        case 5: rc = fatwp_write_at("/fd0/old", "X", 3); break;
+        case 6: rc = vfs_write("/fd0/old", "REPLACE", 7); break;
+        case 7: rc = vfs_write("/fd0/boot.new", large, sizeof(large)); break;
+        case 8: rc = fatwp_write_at("/fd0/old", "X", 2048); break;
+        default: rc = vfs_mkdir("/fd0/newdir"); break;
+        }
+        EQ(rc, VFS_ERR_IO);
+        /* 修正前 RED: ここが IO になり shell が読めない。 */
+        EQ(vfs_read("/fd0/sys/shell.bin", buf, sizeof(buf)), 5);
+        CHECK(memcmp(buf, "SHELL", 5) == 0);
+        CHECK(!(disk_status(0) & STA_PROTECT));
+        /* 同じ書込み禁止媒体で、再マウント後の次の操作は再び FDC へ届く。 */
+        writes = g_fat_writes;
+        disk_writes = g_fat_disk_writes;
+        EQ(vfs_write("/fd0/again", "X", 1), VFS_ERR_IO);
+        CHECK(i == 9 ? g_fat_writes > writes : g_fat_writes == writes + 1);
+        CHECK(g_fat_disk_writes > disk_writes);
+        EQ(vfs_read("/fd0/sys/shell.bin", buf, sizeof(buf)), 5);
+        CHECK(memcmp(buf, "SHELL", 5) == 0);
+        CHECK(!(disk_status(0) & STA_PROTECT));
+        writes = g_fat_writes;
+        EQ(vfs_mkdir("/fd0/again"), VFS_ERR_IO);
+        CHECK(g_fat_writes == writes + 1);
+        EQ(vfs_read("/fd0/sys/shell.bin", buf, sizeof(buf)), 5);
+        CHECK(memcmp(buf, "SHELL", 5) == 0);
+        CHECK(!(disk_status(0) & STA_PROTECT));
+        /* 書込み可の媒体に交換し、初期化や読みを挟まず書込みから入る。
+         * 未回収の Ready 変化と実物 FDC の組合せは fdc_track_host.c で試す。 */
+        g_fat_nw = 0;
+        EQ(vfs_write("/fd0/ok", "A", 1), 1);
+        EQ(fatwp_write_at("/fd0/ok", "B", 1), 1);
+        EQ(vfs_read("/fd0/ok", buf, sizeof(buf)), 2);
+        CHECK(memcmp(buf, "AB", 2) == 0);
+        EQ(vfs_rm("/fd0/ok"), VFS_OK);
+        vfs_umount("/fd0");
+    }
 }
 
 static void case_fatname(void)
@@ -1864,6 +1979,7 @@ static void run(const char *sel)
     FDP_STEP("cdinst", case_cdinst)
     FDP_STEP("namerule", case_namerule)
     FDP_STEP("utf8", case_utf8)
+    FDP_STEP("fatwp", case_fatwp)
     FDP_STEP("fatname", case_fatname)
     FDP_STEP("hostname", case_hostname)
 #endif

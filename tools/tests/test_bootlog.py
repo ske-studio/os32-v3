@@ -233,7 +233,7 @@ def check_write_contract():
               flush=True)
         bad += 1
     if "fr_close = f_close(&fil);" not in fat or \
-       "if (fr_close != FR_OK) return ff_to_vfs(fr_close);" not in fat:
+       "if (fr_close != FR_OK) return ff_write_result(fc, fr_close);" not in fat:
         print("  FAIL FAT の write_file は f_close の失敗を返す (最後のフラッシュ)", flush=True)
         bad += 1
     return bad
