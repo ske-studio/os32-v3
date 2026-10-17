@@ -7,18 +7,18 @@ KernelAPIポインタを引数として実行する。
 
 | 項目 | 値 |
 |------|------|
-| バイナリ形式 | OS32X (40バイトヘッダ + フラットバイナリ)。`tools/mkos32x.py` が付与 |
+| バイナリ形式 | OS32X v4 (60バイトヘッダ + フラットバイナリ)。`sdk/mkos32x.py` が付与 |
 | ヘッダマジック | 0x4F533332 ('OS32') |
 | ソースファイル | `exec/exec.c` / `exec/exec.h` / `exec/exec_heap.c` |
 | KAPIラッパー | `kapi/kapi_*.c` (自動生成分 + 手動分)。版は [KAPI_SPEC.md](KAPI_SPEC.md) |
 | KAPIテーブルアドレス | 動的算出 (KHEAP_BASE + KHEAP_SIZE) |
 | ロードアドレス | USER は `MEM_EXEC_LOAD_ADDR` = 0x80100000。常駐 shell は低位配置。OS32X v4 のロード番地・4世代を完全一致検査し、不一致は `EXEC_ERR_INVALID` |
-| 特権レベル | **既定で CPL=3** (v2 M1〜M3, 2026-09-03)。例外は shell (CPL=0 常駐) と `OS32X_FLAG_FORCE_CPL0` (`mkos32x --cpl0`) |
+| 特権レベル | **既定で CPL=3** (v2 M1〜M3, 2026-09-03)。例外は常駐 shell (CPL=0)。受理するフラグは `exec/os32x_hdr.c:6` を参照 |
 | アドレス空間 | プログラムごとに PD。APP_BAND より下 (カーネル帯 0x100000〜・シェル帯 0x400000〜0x4FFFFF を含む) は全 PD 共有・非 USER。USER にするのは下の「Ring3 の USER 写像」の範囲だけ |
 | 共有ライブラリ | 0x80000000〜0x800FFFFF に `/sys/lib/libos32gui.shlib` が常駐 (`kernel/shlib.c`)。.text はアプリ間で共有 (RO+USER)、.data/.bss はアプリ PD ごとに複製 (`shlib_addrspace_attach`、失敗は `EXEC_ERR_NOMEM`)。アプリは stub (ジャンプ表への薄いスタブ) を静的リンクし、版は先頭 4KB の `OS32ShlibHeader` で照合 |
 | ヒープ | USER の libc 初期末尾は `page_up(img_end)+PAGE_SIZE` (BSS 端の端数 + 1 page)、その直後に guard_a。exec_heap は別予約 `MEM_EXEC_HEAP_BASE` (0x88000000)、未指定64KiB・明示値はページ丸め/最低64KiB。実行中は EXACT 伸長・副 arena・大塊を `mem_map` で確保する。resident shell/gshell は固定 sbrk 上限0x4B5000、exec_heap 256KiB (小さい明示値のみ縮小) |
-| ネスト実行 | 最大 4 段 (ID の池 `exec/appslot.h` の `APP_MAX_APPS`)。Level 0 = カーネル、1 = シェル、2+ = アプリ。**子が終了すると親に戻る** (親の exec_heap は `exec_heap_restore_state()` で復元) |
-| 資源の所有者 | FD / リダイレクト / パイプは `res_owner_get()` (= ネスト段) でタグ付け、終了段の分だけ回収 ([10 §10-9](10_notes.md)) |
+| ネスト実行 | 最大 4 段 (ID の池 `exec/appslot.h` の `APP_MAX_APPS`)。深さと資源所有者のアプリ ID は別に管理する。**子が終了すると親に戻る** (親の exec_heap は `exec_heap_restore_state()` で復元) |
+| 資源の所有者 | FD / リダイレクト / パイプ / SHM は `res_owner_get()` のアプリ ID (カーネル 0、常駐シェル 1、アプリ 2〜5) でタグ付けし、終了する ID の分だけ回収。切替時に `appslot` が所有者を更新する (`exec/appslot.c:261`)。保護されたカーネル常駐 FD は回収しない |
 | 不正ポインタ | ディスパッチャがアプリ帯 / SHM / VRAM の範囲で早期検証。検証しきれないものは「ring3 syscall 実行中フォールトガード」が捕捉し、**アプリだけ kill** (`fault_kill_count`)。設計: [archive/kernel_v2/](archive/kernel_v2/PLAN.md) |
 | プログラム専用スタック | CPL=3: `MEM_APP_STACK_TOP` (0x90000000) から可変量 (既定256KiB) を全 map、その直下に guard_b 1 page。常駐 shell/gshell は固定配置 |
 | 呼び出し規約 | カーネル側 GCC (System V) + `__cdecl` ラッパー、外部プログラム System V i386 ABI |
@@ -53,7 +53,7 @@ SHM の先頭 1 ブロック (16KB) は DB 結果・エラー文用、末尾 4 �
 `shm_alloc` が配るのは残り 9 ブロックで、解放・所有者回収・全回収でも固定予約を維持する。
 
 通常の AS map/unmap は私有 PT だけを操作し、共有 PT に掛かる要求は無変更で拒否する。
-旧低位 USER を前提とした成果物は memory_layout 世代 3 の完全一致検査で拒否する (KAPI v71 は不変)。
+旧低位 USER を前提とした成果物は memory_layout 世代の完全一致検査で拒否する。現行世代・KAPI 版は [sdk/kapi.json](../sdk/kapi.json)、照合契約は [KAPI_SPEC.md §4](KAPI_SPEC.md#4-kernelapi-構造体レイアウト) を参照。
 
 ### 起動失敗の巻き戻しと強制脱出
 

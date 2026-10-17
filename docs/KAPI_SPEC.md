@@ -71,6 +71,10 @@ make programs
 4. カーネル側に実体を実装する。
 5. 本仕様書のオフセット表を更新し、新APIに依存するプログラムの
    `build/app.conf` の要求バージョンを引き上げる。
+6. [ABI3] に従い `make clean` → `make all` を実行する。変更した API の試験と
+   `python3 tools/check_select.py --lint` を行い、担当別の検査は
+   [ROLES.md](tasks/agents/ROLES.md) §0「検査」に従う。外部 apps/game の再構築は
+   [H-7 の再開条件](tasks/v3/T2H_EXTERNAL_GATE.md)に従い、再開決定後に行う。
 
 値を持つフィールド (関数ポインタでないもの) は `data_fields` に追加する。
 ジェネレータは `kapi-><field> = 0;` を出力するだけなので、実際の値は
@@ -296,9 +300,8 @@ shlibプロトコルは完全一致、非依存アプリだけ0。min_api_verは
 `stack_size=0` は256KiB、明示値はページ切上げ・最低16KiB。signed overflow、
 帯の容量超過、argvフレームが収まらない要求を拒否する。
 
-`sdk/kapi.json` の `generations` が4世代の唯一の正典。
-T2g g2 の現在値は `os32x_format=4 / kapi_abi=1 / memory_layout=3 / shlib_protocol=2`、
-KAPI は 74、`GUI_PROTO_VERSION` は 1。shlib protocol は完全一致なので、
+4世代の現在値は [`sdk/kapi.json`](../sdk/kapi.json) の `generations`、
+KAPI の現在版は同ファイルの `version` を正典とする。shlib protocol は完全一致なので、
 protocol 1 の app と 2 の shlib、2 の app と 1 の shlib は両方向で入口前に拒否する。
 世代を変えるときも [ABI1] の生成と [ABI3] の `make clean` → `make all` を行う。
 `sdk/gen_kapi.py` は C (`os32_generations.h` / `os32_unit_stamp.h`)、
@@ -318,7 +321,7 @@ hash・リンク入力を記録する。空の apps/game は除外と明記し�
 | Offset | フィールド | 説明 |
 |--------|-----------|------|
 | 0x00 | magic | 0x4B415049 ("KAPI") |
-| 0x04 | version | APIバージョン (現在: 64) |
+| 0x04 | version | APIバージョン (現在値は [`sdk/kapi.json`](../sdk/kapi.json) の `version`) |
 
 ### API関数 (自動生成 — os32_kapi_generated.h 準拠)
 
@@ -742,15 +745,15 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
 - **返す**のは回収 (`exec_reclaim_owned`) だけ。正常終了 / `exec_kill` / fault / CTRL+STOP の
   どの経路で畳まれても、所有者がその ID なら 1 (WM) へ戻る。FD / SHM / DB / GUI 窓と同じ並び。
 - **宣言なしは断る (D1a)**: GUI 中に `OS32X_FLAG_GFX` (`mkos32x --gfx`) の立っていない CPL=3 が
-  `gfx_init` / `gfx_init_200` を呼んだら、**本体を呼ばずに何もしない**。`gfx_init` は `void` なので
-  戻り値では知らせられない — 断った回数はカーネルシンボル `gfx_init_reject_count` に積む
-  (KAPI にはしない)。CUI 中は従来どおり何でも通す。
-- **`--cpl0` は GUI から起動させない (D1)**: `OS32X_FLAG_FORCE_CPL0` のプログラム (v86 / VDM 系) は
-  VRAM を直接触るので、画面の所有者の外側で画面を壊す。`exec_start` (GUI 経路) は生存アプリの
-  有無に関わらず `OS32_ERR_INVAL` で断る。CUI の `exec_run` は従来どおり (生存アプリが 1 本でも
-  居れば `OS32_ERR_FULL`、居なければ通す)。
-- `gfx_init` を呼ばずに VRAM へ直接書く CPL=3 プログラムは「行儀の悪いプログラム」として扱い、
-  カーネルは守らない。WM の present を捨てる保険 (D2) は落とした (2026-09-12 ユーザー決裁)。
+  `gfx_init` / `gfx_init_200` を呼んだら、本体を呼ばずに拒否する。
+  `gfx_init_reject_count` に加算して `appslot_abort_request()` で中断を要求し、
+  syscall 出口の `ring3_abort_check()` でアプリを畳む (`exec/appslot.c:839`)。
+  `gfx_init` は `void` なので戻り値では知らせられない。CUI 中は宣言を要求しない。
+- 非シェルの外部プログラムは CPL=3 で動く。撤去済みの `OS32X_FLAG_FORCE_CPL0`
+  は既知フラグに含まれず、入口で拒否される (`exec/os32x_hdr.c:6`)。
+- 低位 VRAM は supervisor 写像で、CPL=3 からの直接書き込みは保護違反になる。
+  描画は KAPI または授権された lease 経由で行う
+  ([09_exec.md](09_exec.md)「Ring3 の USER 写像」)。
 
 
 ### 起動要求表 (v49)
@@ -831,6 +834,12 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
   (または `kbd_getkey` / `kbd_getchar`) を呼んだときだけ。「ESC かどうかだけ見て、ESC でなければ
   次の読み手に残す」という監視 (`source` 中の打ち切り) がこれで書ける。
 
+- 入力源は `kbd_trygetkey` と同じ。GUI 中は注入リングだけを見て、
+  CUI 中は rshell のシリアル → cooked リングの順に見る。
+- **`exec_park_poll` を呼ばない** (= WM へ譲らない)。park は成立すると戻らず、起こされるときに
+  `exec_resume` が注入リングの 1 バイトを取り出して EAX に入れてしまうため、「覗いただけ」に
+  ならない。譲りたい呼び手は従来どおり `kbd_trygetchar` / `kbd_trygetkey` を使う。
+
 ### 直前の同期起動の結果 (v55)
 
 | Offset | フィールド | プロトタイプ |
@@ -851,10 +860,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
   (= 呼び手が「次の候補へ進まない」と読める側)。
 - **GUI 経路 (`exec_start` / `exec_resume`) の子は記録しない** (`AppSlot.gui`)。
   読み口である `sh.bin` はカーネルの記録を読まないので、書くと同期起動の結果と紛れるだけ。
-- 源の見る順番は `kbd_trygetkey` と同じ — GUI の注入リング → rshell のシリアル → cooked リング。
-- **`exec_park_poll` を呼ばない** (= WM へ譲らない)。park は成立すると戻らず、起こされるときに
-  `exec_resume` が注入リングの 1 バイトを取り出して EAX に入れてしまうため、「覗いただけ」に
-  ならない。譲りたい呼び手は従来どおり `kbd_trygetchar` / `kbd_trygetkey` を使う。
+
 
 ### 実機のシリアルを 115200bps へ (v56)
 
@@ -863,7 +869,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
 | 0x368 | serial_init_vfast | `int(u32 baud)` |
 | 0x36C | serial_get_status | `int(u32 *mode, u32 *baud, u32 *fifo)` |
 
-- **既存の `serial_init` (0x0BC) は意味も引数も変えていない。** 従来どおり互換モード
+- **既存の `serial_init` (slot 33 = 0x08C) は意味も引数も変えていない。** 従来どおり互換モード
   (8251 + 8253 カウンタ#2) で初期化する。起動時の既定 9600 がこの経路を通る
   (票 TASK_SERIAL_VFAST の決裁「実機で通った経路を守る」)。
 - `serial_init_vfast` は **V･FAST モード (`013Ah` bit7)** で初期化する。入れるのは
@@ -919,7 +925,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
   ([archive/realhw_v21/TASK_SERIAL_VFAST.md](archive/realhw_v21/TASK_SERIAL_VFAST.md) 往復 3 ④)。
 - 同じ日に L-A (PCI 列挙) も版を取ったので、**着地時にそちらを v58 へ送った**。この節のスロット 0x370 はそのまま。
 
-**併せて `serial_putchar` (slot 38 = 0x98) の戻り値を `void` → `int` に広げた。**
+**併せて `serial_putchar` (slot 36 = 0x98) の戻り値を `void` → `int` に広げた。**
 
 | 値 | 意味 |
 |---|---|
@@ -1002,12 +1008,10 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
   **OS32 は CR0.WP = 0 で走る** (`kernel/shlib.c` がカーネルからの書き込みに依存)
   ので、読み取り専用の USER ページ = 共有ライブラリの `.text` へ CPL=0 から書いても
   #PF は起きない。帯の検証だけでは止まらない。
-- 表を歩くときは **master CR3 へ切り替えてからアプリ PD の物理を読む**。アプリ CR3 の
-  まま辿ると、PD もアプリ PT も `PGALLOC_BASE` (= アプリ帯) から取られているため
-  **表のつもりでアプリ自身のデータを読む** (2026-09-13、実機 K2 で 2 回失敗)。
-  `paging_pte_flags()` も使えない (master の PT を引くので、アプリでは RW + USER の
-  shlib `.data`/`.bss` が master では USER 無しに見え、正常な出力を誤って拒否する)。
-  2 本の出力は**1 回の往復でまとめて**見る (1 本ずつだと CR3 の書き込みが 4 回になる)。
+- `ring3_user_ranges_writable` は `caller_access_get_user` で syscall 入口の呼び手を
+  取得し、2 本の出力をそれぞれ `check_caller_write_range` で検査する
+  (`exec/exec.c:846`)。呼び手の AS と B1 台帳に基づくページ単位の検査で、
+  検査のための master CR3 への切替は行わない。caller の検証契約は §3-3 を参照。
 
 ### PCI 結線の診断 (v60)
 
@@ -1376,14 +1380,13 @@ LBA28、無ければ word 53 bit0 の現在の CHS、それも無ければ既定
   「journal の有無が分からない」ので `SQLITE_IOERR` で断る (不存在と同じ扱いにしない)。
   path は先に `vfs_resolve_path` で**絶対名へ解決**し、stat も open もその名前で行う
   (相対名を SQLite に渡さないので、transaction 中に cwd が動いても journal の削除先が
-  変わらない)。ただし `vfs_resolve_path` は作業領域で**切り詰めてから**正規化するので、
-  溢れた入力は「短い別の絶対名」として返る。だから解決の**前**に
-  `kstrlen(cwd) + 1 + kstrlen(path) + 1` (絶対名は cwd 抜き) が `VFS_MAX_PATH` に
-  収まることと、**成分数**が `VFS_MAX_PATH_DEPTH` (32) を超えないことを数え
-  (resolver は溢れた成分を黙って捨て、その後ろの `..` が保持済みの成分を消す)、
-  どちらかに反すれば `SQLITE_CANTOPEN` (path too long) で断る。`<絶対名>-journal` が下位層の path 容量 (`VFS_MAX_PATH` = 256B、SQLite の
-  `mxPathname` も 256) に収まらないときは、journal の stat が切り詰められて**本体に
-  当たる**ので open の前に `SQLITE_CANTOPEN` で断る。RW は `PRAGMA journal_mode` が `delete` で
+  変わらない)。`vfs_resolve_path` は長さ・成分数の超過を切り詰めず
+  `VFS_ERR_NAMETOOLONG` で拒否する (詳細は [06_filesystem.md](06_filesystem.md) §6-1)。
+  DB 側は解決前にも `db_resolve_fits` で長さと成分数を保守的に検査し、
+  超過や解決失敗は `SQLITE_CANTOPEN` で断る (`kapi/kapi_db.c:907`)。
+  また `<絶対名>-journal` が下位層の path 容量 (`VFS_MAX_PATH` = 256B、SQLite の
+  `mxPathname` も 256) に収まることを別に検査し、超過は open 前に
+  `SQLITE_CANTOPEN` で断る。RW は `PRAGMA journal_mode` が `delete` で
   あることを照会だけで確かめ、**照会の失敗** (`SQLITE_NOTADB` / `IOERR` / `NOMEM` 等 —
   拡張コードを finalize の前に控える) と **照会は通ったが DELETE でない**
   (`SQLITE_CANTOPEN`) を区別して close し失敗する。失敗コードは **owner 別**の
