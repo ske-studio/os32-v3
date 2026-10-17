@@ -79,6 +79,116 @@ static void report(const char *s, u32 n)
     __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(s), "d"(n) : "memory");
 }
 #define CHECK(x) do { if (!(x)) { report("FAIL " #x "\n", sizeof("FAIL " #x "\n") - 1); die(1); } } while (0)
+#ifdef TEST_ACCOUNT
+#include <stdarg.h>
+#include "kprintf.h"
+static u32 ksel_fail, audit_fail, audit_runs, page_logs, cycle_logs;
+static char audit_first_fail_tag[32];
+static struct { u32 base, pages; } kdebug;
+static void check(int cond, const char *name)
+{
+    (void)name;
+    ksel_fail += !cond;
+    CHECK(cond);
+}
+char *kstrncpy(char *dst, const char *src, unsigned long n)
+{
+    char *out = dst;
+    while (n--) { *dst++ = *src; if (*src) src++; }
+    return out;
+}
+void kprintf(unsigned char color, const char *format, ...)
+{
+    (void)color;
+    va_list ap;
+    va_start(ap, format);
+    if (format[1] == 'm') {
+        page_logs++;
+        u32 sum = 0;
+        for (u32 i = 0; i < 7; i++) sum += va_arg(ap, u32);
+        CHECK(va_arg(ap, u32) == sum);
+        u32 phys = va_arg(ap, u32);
+        const char *status = va_arg(ap, const char *);
+        i32 diff = va_arg(ap, i32);
+        CHECK(diff == (i32)sum - (i32)phys);
+        CHECK(status[0] == (diff ? 'n' : 'o'));
+    } else {
+        cycle_logs++;
+        u32 free = va_arg(ap, u32);
+        (void)va_arg(ap, u32); /* busy */
+        CHECK(va_arg(ap, u32) == free);
+        CHECK(!va_arg(ap, u32));
+    }
+    va_end(ap);
+}
+#include "slack_cycle_host_source.c"
+#include "boot_pages_host_source.c"
+static void check_page_accounting(void)
+{
+    struct memory_page_counts before, c;
+    u32 first = memory_boot_slack_first();
+    u32 end = MEM_FIXED_PAGING_GUARD_BASE / PAGE_SIZE;
+    u32 owner, p, bb, fixed = 0;
+    memory_boot_page_counts(0, 0, &before);
+    CHECK(before.total == memory_boot_ram_kb() / (PAGE_SIZE / 1024UL));
+    CHECK(!before.diff && before.total == before.phys);
+    CHECK(before.slack == end - first && !before.kdebug);
+    CHECK(before.meta == MEM_LEDGER_META_SIZE / PAGE_SIZE + boot_meta_end - boot_meta_first);
+    CHECK(before.bb == MEM_GFX_BB_SIZE / PAGE_SIZE);
+    CHECK(before.other == MEM_UNICODE_TABLE_SIZE / PAGE_SIZE +
+          (memory_boot_dma_available() ? MEM_DMA_POOL_SIZE / PAGE_SIZE : 0));
+    kaudit_boot_pages();
+    CHECK(audit_runs == 1 && !audit_fail && page_logs == 1);
+    CHECK(boot_pages_audit_runs == 1 && !boot_pages_audit_fail);
+    /* Change a fixed region, not the independent allocator/physical total. */
+    while (ledger_regions[fixed].type != LEDGER_R_FIXED || ledger_regions[fixed].first) fixed++;
+    ledger_regions[fixed].end--;
+    memory_boot_page_counts(0, 0, &c);
+    CHECK(c.diff == -1 && c.total + 1 == before.total);
+    kaudit_boot_pages();
+    CHECK(audit_runs == 2 && audit_fail == 1 && page_logs == 2);
+    CHECK(boot_pages_audit_runs == 2 && boot_pages_audit_fail == 1);
+    CHECK(audit_first_fail_tag[0] == 'b');
+    ledger_regions[fixed].end += 2;
+    memory_boot_page_counts(0, 0, &c);
+    CHECK(c.diff == 1 && c.total == before.total + 1);
+    ledger_regions[fixed].end--;
+    /* Real live allocations, including an occupied SLACK page standing in
+     * for the module body. The test must leave that owner and page intact. */
+    CHECK(ledger_owner_new(LEDGER_KIND_MODULE, 1, "live", &owner));
+    if (first < end) {
+        CHECK(pgalloc_alloc_n_owner(owner, 1, first, end, LEDGER_BOTTOM_UP, &p));
+        memory_boot_page_counts(p, 1, &c);
+        CHECK(!c.diff && c.kdebug == 1 && c.slack + 1 == before.slack);
+        CHECK(c.pool == before.pool);
+        test_slack_cycle();
+        CHECK(pgalloc_page_owned(p, owner) && ledger_owner_pages(owner) == 1);
+        CHECK(pgalloc_free_n_owner(owner, p, 1));
+    }
+    /* Also exercise OFF/rejected (no body), empty and entirely busy SLACK. */
+    test_slack_cycle();
+    CHECK(!ksel_fail && cycle_logs == (first < end ? 2U : 1U));
+    CHECK(pgalloc_alloc_n_owner(owner, 1, MEM_POOL_BASE / PAGE_SIZE,
+                                pgalloc_limit_pfn(), LEDGER_BOTTOM_UP, &p));
+    CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, 2, MEM_POOL_BASE / PAGE_SIZE,
+                                pgalloc_limit_pfn(), LEDGER_BOTTOM_UP, &bb));
+    ledger_surfaces[0].first = bb;
+    ledger_surfaces[0].npages = 2;
+    ledger_surfaces[0].backing = LEDGER_SB_RAM;
+    ledger_surfaces[0].role = LEDGER_ROLE_CLIENT;
+    memory_boot_page_counts(p, 1, &c);
+    CHECK(!c.diff && c.bb == before.bb + 2 && c.pool + 3 == before.pool);
+    CHECK(c.slack == before.slack && c.kdebug == 1);
+    ledger_surfaces[0].npages = 0;
+    CHECK(pgalloc_free_n_owner(LEDGER_OWNER_BOOT, bb, 2));
+    CHECK(pgalloc_free_n_owner(owner, p, 1) && ledger_owner_retire(owner));
+    memory_boot_page_counts(0, 0, &c);
+    CHECK(!c.diff && c.pool == before.pool && c.slack == before.slack);
+    CHECK(ledger_selfcheck("account"));
+    report("PASS boot pages +/-1, audit, BB/body split, live slack_cycle\n",
+           sizeof("PASS boot pages +/-1, audit, BB/body split, live slack_cycle\n") - 1);
+}
+#endif
 extern int memory_boot_init(u32) __attribute__((weak));
 static void host_failstop(void)
 {
@@ -359,7 +469,7 @@ void _start(void)
     host_kernel_boot(TEST_KB);
     CHECK(0);
 #endif
-#if defined(TEST_HIGH) || defined(TEST_RAMKB) || defined(TEST_CEILING) || defined(TEST_FIXED_PAGING) || defined(TEST_LEDGER)
+#if defined(TEST_HIGH) || defined(TEST_RAMKB) || defined(TEST_CEILING) || defined(TEST_FIXED_PAGING) || defined(TEST_LEDGER) || defined(TEST_ACCOUNT)
     /* The detector is the only source of a high attestation; the host cannot
      * touch the BIOS work area, so stand in for it with the same value. */
     if (TEST_KB > MEM_HIGH_RAM_BASE / 1024UL)
@@ -385,6 +495,10 @@ void _start(void)
 #endif
     CHECK(memory_boot_init(TEST_KB));
     check_v5_ledger();
+#ifdef TEST_ACCOUNT
+    check_page_accounting();
+    die(0);
+#endif
 #ifdef TEST_LEDGER
     die(0);
 #endif

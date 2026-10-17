@@ -34,6 +34,7 @@
 #include "kernel/kmalloc.h"
 #include "kernel/kstack_hw.h"
 #include "kernel/ktime.h"
+#include "kernel/memory_boot.h"
 #include "kernel/paging.h"
 #include "kernel/pgalloc.h"
 #include "kernel/sysclk.h"
@@ -114,8 +115,8 @@ struct v86_session_state *kdi_ptr_v86_session(void);
 u32 *kdi_ptr_v86_gcap_phase(void);
 u32 *kdi_ptr_v86_gcap_alloc_count(void);
 u32 *kdi_ptr_v86_gcap_free_count(void);
-#define KDEBUG_IMPORT_COUNT 218
-#define KDEBUG_ABI_GEN 0xd4c541f0u
+#define KDEBUG_IMPORT_COUNT 223
+#define KDEBUG_ABI_GEN 0x6c0252f0u
 #include "kernel/module_image.h"
 extern void (*const kdebug_kexports[])(void);
 extern const struct module_symbol_contract kdebug_import_contracts[];

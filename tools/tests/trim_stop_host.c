@@ -19,6 +19,7 @@ u32 kstack_high_water(void) { return 1024; }
 volatile u32 fault_kill_count;
 u32 memmap_audit_runs, as_audit_runs, v86_return_audit_runs;
 u32 memmap_audit_fail, as_audit_fail, v86_return_audit_fail;
+u32 boot_pages_audit_runs, boot_pages_audit_fail;
 int kselftest_pass, kselftest_fail;
 #include "module.h"
 struct kdebug kdebug;

@@ -37,4 +37,27 @@ u32 memory_boot_ram_kb(void);
  * 何も変えずに拒否する。集積域は展開済みなので池のまま。1 = 成功。
  * memory_boot_init が区間の表の最後に呼ぶ (T1 の時点では常に申告なし)。 */
 int memory_boot_boot_areas(u32 first, u32 end);
+/* SLACK begins at a linker-derived address, owned by the kernel image. */
+u32 memory_boot_slack_first(void);
+
+struct ledger_region;
+struct memory_page_input {
+    const struct ledger_region *regions;
+    u32 region_count, allocator_pages;
+    u32 low_end, high_end;       /* admitted physical spans, PFNs */
+    u32 meta_first, meta_end;   /* ARENA_TOP metadata + workspace, or 0,0 */
+    u32 bb_pages;               /* pool-backed BB, excluding VRAM/MMIO */
+    u32 kdebug_first, kdebug_pages, phys_pages;
+};
+struct memory_page_counts {
+    u32 fixed, slack, pool, meta, bb, kdebug, other, total, phys;
+    i32 diff;                  /* total - phys; never filled from a remainder */
+};
+/* Pure accounting of one boot snapshot. SLACK/pool include ordinary live
+ * allocations; BB and kdebug are split out. Fixed backing stays reserved on
+ * ARENA_TOP too. The conventional VRAM/ROM window follows ram_kb semantics. */
+void memory_boot_count_pages(const struct memory_page_input *in,
+                             struct memory_page_counts *out);
+void memory_boot_page_counts(u32 kdebug_first, u32 kdebug_pages,
+                             struct memory_page_counts *out);
 #endif

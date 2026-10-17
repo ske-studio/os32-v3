@@ -21,6 +21,7 @@ check-memmap-audit-host:
 - kernel/kaudit.c
 - kernel/kselftest.h
 - kernel/kselftest_report.c
+- kernel/module.h
 - kdebug/kselftest.c
 - kernel/paging.c
 - kernel/pgalloc.c

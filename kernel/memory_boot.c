@@ -54,6 +54,7 @@ static u32 boot_high_end;
 /* 実 RAM の合計 (KB)。memory_boot_init が最後に確定させる。0 = 未初期化。
  * 上端 (sys_mem_kb) との差が「RAM にならない番地」= 15-16MB システム空間。 */
 static u32 boot_ram_kb;
+static u32 boot_meta_first, boot_meta_end;
 
 /* ======================================================================== */
 /*  memory_boot_detect — 16MB 超の物理 RAM を数える                          */
@@ -364,6 +365,8 @@ int memory_boot_init(u32 mem_kb)
         layout.workspace_first = MEMORY_BOOT_FIXED_WS_FIRST;
         layout.workspace_end = MEMORY_BOOT_FIXED_WS_END;
     }
+    boot_meta_first = layout.kind == PGALLOC_BACKING_ARENA_TOP ? layout.workspace_first : 0;
+    boot_meta_end = layout.kind == PGALLOC_BACKING_ARENA_TOP ? top : 0;
     /* These calls verify real PTEs before touching metadata/workspace/hot.
      * Once attempted, failure is fatal (the caller fail-stops). */
     if (!sys_memory_bootstrap_model(&boot_memory, &layout, paging_verify_identity))
@@ -371,4 +374,85 @@ int memory_boot_init(u32 mem_kb)
     if (!sys_memory_stage_online()) return 0;
     return memory_boot_regions(top, layout.kind == PGALLOC_BACKING_ARENA_TOP ?
                                     layout.workspace_first : 0);
+}
+
+u32 memory_boot_slack_first(void)
+{
+    return MEM_SHM_RESV_START / PAGE_SIZE;
+}
+
+static u32 memory_page_overlap(u32 first, u32 end, u32 lo, u32 hi)
+{
+    if (first < lo) first = lo;
+    if (end > hi) end = hi;
+    return end > first ? end - first : 0;
+}
+
+void memory_boot_count_pages(const struct memory_page_input *in,
+                             struct memory_page_counts *out)
+{
+    const u32 slack_first = MEM_SHM_RESV_START / PAGE_SIZE;
+    const u32 slack_end = MEM_FIXED_PAGING_GUARD_BASE / PAGE_SIZE;
+    struct memory_page_counts c = {0};
+    c.slack = slack_end - slack_first;
+    c.pool = in->allocator_pages - c.slack;
+    c.bb = in->bb_pages;
+    c.pool -= c.bb;
+    c.kdebug = in->kdebug_pages;
+    u32 debug_slack = memory_page_overlap(in->kdebug_first,
+        in->kdebug_first + in->kdebug_pages, slack_first, slack_end);
+    c.slack -= debug_slack;
+    c.pool -= c.kdebug - debug_slack;
+    for (u32 i = 0; i < in->region_count; i++) {
+        const struct ledger_region *r = &in->regions[i];
+        if (r->type == LEDGER_R_BACKGROUND) continue;
+        u32 n = memory_page_overlap(r->first, r->end, 0, in->low_end) +
+            memory_page_overlap(r->first, r->end,
+                                MEM_HIGH_RAM_BASE / PAGE_SIZE, in->high_end);
+        if (r->type == LEDGER_R_FIXED) {
+            u32 meta = memory_page_overlap(r->first, r->end,
+                MEM_LEDGER_META_BASE / PAGE_SIZE, MEM_LEDGER_META_END / PAGE_SIZE) +
+                memory_page_overlap(r->first, r->end, in->meta_first, in->meta_end);
+            c.meta += meta;
+            c.fixed += n - meta;
+        } else if (r->type == LEDGER_R_SURFACE_BACKING &&
+                   r->first == MEM_GFX_BB_BASE / PAGE_SIZE) {
+            c.bb += n;
+        } else {
+            c.other += n; /* Unicode backing, DMA, bundle, RAM device reservations. */
+        }
+        /* Non-permanent boot regions (e.g. bundle) still belong to L1's pool. */
+        if (!(r->flags & LEDGER_RF_PERMANENT)) {
+            u32 slack = memory_page_overlap(r->first, r->end, slack_first, slack_end);
+            c.slack -= slack;
+            c.pool -= n - slack;
+        }
+    }
+    c.total = c.fixed + c.slack + c.pool + c.meta + c.bb + c.kdebug + c.other;
+    c.phys = in->phys_pages;
+    c.diff = (i32)c.total - (i32)c.phys;
+    *out = c;
+}
+
+void memory_boot_page_counts(u32 kdebug_first, u32 kdebug_pages,
+                             struct memory_page_counts *out)
+{
+    struct memory_page_input in = {0};
+    in.regions = ledger_regions;
+    in.region_count = ledger_region_count;
+    in.allocator_pages = pgalloc_total_pages();
+    in.phys_pages = memory_boot_ram_kb() / (PAGE_SIZE / 1024UL);
+    in.low_end = in.phys_pages;
+    if (in.low_end > MEMORY_BOOT_LEGACY_END / PAGE_SIZE)
+        in.low_end = MEMORY_BOOT_LEGACY_END / PAGE_SIZE;
+    in.high_end = MEM_HIGH_RAM_BASE / PAGE_SIZE + in.phys_pages - in.low_end;
+    in.meta_first = boot_meta_first;
+    in.meta_end = boot_meta_end;
+    for (u32 i = 0; i < LEDGER_MAX_SURFACES; i++)
+        if (ledger_surfaces[i].backing == LEDGER_SB_RAM &&
+            ledger_surfaces[i].role == LEDGER_ROLE_CLIENT)
+            in.bb_pages += ledger_surfaces[i].npages;
+    in.kdebug_first = kdebug_first;
+    in.kdebug_pages = kdebug_pages;
+    memory_boot_count_pages(&in, out);
 }

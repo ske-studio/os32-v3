@@ -93,4 +93,6 @@ check-trim-flow-host:
 - kernel/sysconfig.c
 # Conservative artifact-path audit (including indirect helpers/fixtures).
 - tools/tests/kernel_layout.py
+- kernel/kaudit_boot.c
+- kernel/memory_boot.c
 artifact_reader: true

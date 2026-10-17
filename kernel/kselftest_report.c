@@ -1,5 +1,6 @@
 #include "kselftest.h"
 #include "kprintf.h"
+#include "module.h"
 
 /* Stable kernel.map symbols, including when no debug module is loaded. */
 int kselftest_pass;
@@ -19,5 +20,9 @@ u32 kdi_get_kselftest_fail(void) { return kselftest_fail; }
 void kselftest_skipped(void)
 {
     kdi_kselftest_reset();
-    kprintf(0xA1, "[selftest] skipped (KDEBUG=0)\n");
+    if (kdebug.state == KDEBUG_OFF)
+        kprintf(0xA1, "[selftest] skipped (KDEBUG=0)\n");
+    else
+        kprintf(0xA1, "[selftest] not run (kdebug rejected: %s) — ON の受入は未成立\n",
+                kdebug_state_name(kdebug.state));
 }

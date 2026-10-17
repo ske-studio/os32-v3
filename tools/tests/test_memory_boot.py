@@ -120,6 +120,12 @@ def run_case(case='default', kb=16384, defines=(), mutation=None):
                 raise AssertionError('P2V_BOOT probe sites changed')
             mb = mb.replace('P2V_BOOT(', 'host_boot_ptr(')
         (d / 'memory_boot_host_source.c').write_text(mb)
+        selftest = (ROOT / 'kdebug/kselftest.c').read_text()
+        start = selftest.index('static void test_slack_cycle(void)')
+        end = selftest.index('\nint kselftest_run_post_exec(void)', start)
+        (d / 'slack_cycle_host_source.c').write_text(selftest[start:end])
+        audit = (ROOT / 'kernel/kaudit_boot.c').read_text()
+        (d / 'boot_pages_host_source.c').write_text(audit[audit.index('u32 boot_pages_audit_runs,'):])
         cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie', '-ffunction-sections', '-Wl,--gc-sections', f'-DTEST_{case.upper()}', f'-DTEST_KB={kb}UL'] + list(defines)
         # arch/x86 + platform/pc98: include/io.h / include/cpu.h は契約
         # だけで、実装は固定名 arch_io.h / arch_cpu.h / platform_io.h を
@@ -145,6 +151,21 @@ def run_case(case='default', kb=16384, defines=(), mutation=None):
 
 
 class MemoryBoot(unittest.TestCase):
+    def test_page_accounting_and_live_slack_cycle(self):
+        kernel = (ROOT / 'kernel/kernel.c').read_text()
+        self.assertEqual(kernel.count('    kaudit_boot_pages();'), 1)
+        self.assertLess(kernel.index('    kdebug_load();'), kernel.index('    kaudit_boot_pages();'))
+        self.assertLess(kernel.index('    gfx_boot_reserve();'), kernel.index('    kaudit_boot_pages();'))
+        self.assertLess(kernel.index('    kaudit_boot_pages();'), kernel.index('    exec_init();'))
+        selftest = (ROOT / 'kdebug/kselftest.c').read_text().split('int kselftest_run_post_exec(void)', 1)[1]
+        self.assertIn('    test_slack_cycle();', selftest.split('\n}', 1)[0])
+        for kb in (8192, 12296, 65536):
+            with self.subTest(kb=kb):
+                self.run_case('account', kb)
+        for end in ('0x375000', '0x374000'):
+            self.run_case('account', 8192, ('-DHOST_RESIDENT_END=' + end,))
+
+
     def test_v5_ledger_supply_and_dma(self):
         for kb in (8088, 8188, 8192, 12292, 12296, 65536):
             with self.subTest(kb=kb):
