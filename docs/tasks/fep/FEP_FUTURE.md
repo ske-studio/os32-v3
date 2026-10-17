@@ -19,8 +19,8 @@ FEP の残存タスクと将来拡張の計画。
   - 候補ウィンドウに番号を表示
   - 対応する数字キーで即座に確定
 - [x] **候補ページング**
-  - `IME_MAX_RESULTS` (32) を超える候補がある場合のページ送り
-  - Tab / Shift+Tab でページ切り替え
+  - 最大 `IME_MAX_RESULTS` (32、`kernel/ime.h:28`) 件の候補をページ分割
+  - RollDown/Right・RollUp/Left でページ切替 (`kernel/ime.c:407`)。操作は [P1 §3](01_UI_CANDIDATE.md#3-キーバインド設計) を参照
 
 ### GFX モード対応
 
@@ -41,15 +41,13 @@ FEP の残存タスクと将来拡張の計画。
 ### TVRAM スクロール保護 — 実装済 (P2、`tvram_set_scroll_reserve`)
 
 - [x] **`tvram_scroll` を 24 行制限に変更**
-  - 現在の `console.c` は `TVRAM_ROWS` (25行) をスクロール対象としており、FEP 表示領域 (25行目) を巻き込む
-  - FEP ON 時はスクロール範囲を行 0〜23 に制限
+  - FEP ON 時は最下行を保護し、候補リスト中は予約を拡大する ([P2 §4](02_SCROLL_GUARD.md#4-fep-からの制御))
 
 ---
 
 ## 中優先度: KAPI 公開
 
-現在の IME API はカーネル内部関数のみ。
-外部プログラムから IME を制御するための KAPI 公開:
+外部プログラムから IME を制御する KAPI は公開済み。定義元は `sdk/kapi.json`。
 
 - [x] **`ime_enable` / `ime_disable`** — FEP の有効/無効切り替え (ime_set_mode等で代替完了)
 - [x] **`ime_get_mode`** — 現在のモード取得 (OFF/HIRAGANA/KATAKANA)
@@ -97,9 +95,9 @@ FEP の残存タスクと将来拡張の計画。
   - `ime user list` — 学習辞書の閲覧
   - `ime user delete <yomi>` — エントリ削除
   - `ime user export` — CSV エクスポート
-- [x] **変換キー (XFER) 対応** (P6)
+- [ ] **変換キー (XFER) 対応** (P6、候補操作のみ実装済み)
   - PC-98 専用キー `KEY_XFER` (0x35) への機能割り当て
-  - 現在の Shift+Space と同等のトグルまたは別機能
+  - 候補リスト展開・候補送りは実装済み (`kernel/ime.c:367`)。入力中の変換開始は Space のみ (`kernel/ime.c:484`) で、XFER は残件。[P1 §3](01_UI_CANDIDATE.md#3-キーバインド設計) を参照
 - [ ] **kprintf va_args 問題の調査**
   - `.sqlite_text` セクションからの `kprintf` 呼び出しで Page Fault
   - FEP 辞書のエラー出力に影響する可能性
