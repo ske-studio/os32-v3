@@ -352,6 +352,12 @@ hash・リンク入力を記録する。空の apps/game は除外と明記し�
 | 0x00 | magic | 0x4B415049 ("KAPI") |
 | 0x04 | version | APIバージョン (現在値は [`sdk/kapi.json`](../sdk/kapi.json) の `version`) |
 
+### kprintf の CPL3 入力境界 (T4b-8)
+
+公開スロット・宣言・64B の引数窓は従来どおり。CPL3 の int80 入口で B1 の保存 caller を使い、固定 2 語、format、書式が消費する引数語、非 NULL の `%s` をカーネル staging へコピーし、全成功後に出力する。未使用の引数語や NUL の次ページは読まない。format は NUL 込み 1024B、各 `%s` は NUL 込み 4096B、可変引数は 14 語まで (`include/kapi_print.h`、既存 64B 窓から固定 8B を引いた値とビルド時照合)。上限ちょうどの NUL は成功、上限内未終端・欠落ページ・範囲外・引数窓超過・staging 確保失敗は出力せず、確保済み staging を返してから caller を fault-kill する。
+
+`%s` の NULL は従来どおり `(null)`。`%%` と末尾 `%` は引数を消費せず、未知指定子は従来どおり 1 語消費する。フラグ・幅・単一 `l` の解釈を renderer と共有し、通常の文字・UTF-8・属性変換を維持する。不完全な修飾子 (`%0` 等) は format の NUL で停止する。CPL0 の内部ログは直接 `kprintf` を呼び、USER コピーと割当を行わない。コピーした `%s` は出力完了後に全て解放する。全公開 NUL 入口の担当は [T4〜T6 §1-3](tasks/v3/TASK_T4_T6_MODULES.md#1-3-x-1-公開-nul-入力可変引数の担当表)。
+
 ### API関数 (自動生成 — os32_kapi_generated.h 準拠)
 
 > **`sys_getcwd` (0x7C) が返すポインタの寿命** (票 T9 §12 R1、2026-09-13):

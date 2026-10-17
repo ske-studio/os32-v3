@@ -1,1 +1,2 @@
 # file:function 理由 (非リテラル書式は関数ごとに実引数と書式の供給元を確認し、関数の呼び手が渡す書式も確認する)
+userland/tests/kprint_boundary.c:main T4b-8 guest fixture: mapped-page-end format and deliberately unterminated format; raw window overflow uses int80, ordinary SDK calls stay within 14 words.

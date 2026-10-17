@@ -124,9 +124,30 @@ static void emit_padded(const char *str, int len, int width,
 
 /* ======== 公開API ======== */
 
-void __cdecl kprintf(u8 attr, const char *fmt, ...)
+/* Shared parser: leave *cursor at the conversion (or NUL). Unknown
+ * conversions consume one slot, %% consumes none, exactly as the renderer. */
+char kprintf_spec(const char **cursor, int *width, int *left_align,
+                  char *pad_char)
 {
-    u32 *args = (u32 *)(&fmt) + 1;
+    const char *p = *cursor;
+    *width = 0;
+    *left_align = 0;
+    *pad_char = ' ';
+    if (*p == '-') { *left_align = 1; p++; }
+    if (*p == '0') { *pad_char = '0'; p++; }
+    while (*p >= '0' && *p <= '9') {
+        /* Keep malformed widths from overflowing signed arithmetic. */
+        if (*width <= (0x7fffffff - 9) / 10)
+            *width = *width * 10 + (*p - '0');
+        p++;
+    }
+    if (*p == 'l') p++;
+    *cursor = p;
+    return *p;
+}
+
+void kvprintf(u8 attr, const char *fmt, const u32 *args)
+{
     int ai = 0;
     const char *p = fmt;
 
@@ -148,26 +169,9 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...)
 
             p++;  /* '%' をスキップ */
 
-            /* フラグ解析 */
-            if (*p == '-') {
-                left_align = 1;
-                p++;
-            }
-            if (*p == '0') {
-                pad_char = '0';
-                p++;
-            }
-
-            /* 幅解析 */
-            while (*p >= '0' && *p <= '9') {
-                width = width * 10 + (*p - '0');
-                p++;
-            }
-
-            /* 長さ修飾子 (l を無視、32bit環境で同義) */
-            if (*p == 'l') {
-                p++;
-            }
+            kprintf_spec(&p, &width, &left_align, &pad_char);
+            /* A suffix such as "%0" has no conversion or argument. */
+            if (!*p) break;
 
             /* 変換指定子 */
             switch (*p) {
@@ -282,4 +286,9 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...)
         }
         p++;
     }
+}
+
+void __cdecl kprintf(u8 attr, const char *fmt, ...)
+{
+    kvprintf(attr, fmt, (const u32 *)(&fmt) + 1);
 }
