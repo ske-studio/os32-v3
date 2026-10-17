@@ -13,7 +13,7 @@ ARP/IP/ICMP/UDP/TCP、DHCP、DNS、ソケット、アプリケーションは別
 (独自リンクプロトコルと Host Services は [LINK_PLAN.md](LINK_PLAN.md))。
 ドライバの完成は raw Ethernet の対向試験で判定でき、IP スタックを前提にしない。
 
-推奨構成は **転送と IRQ 入口を NASM、初期化・リング管理・復旧を GNU89 C** とする。
+推奨構成は **転送と IRQ 入口を NASM、初期化・リング管理・復旧を GNU11 C** とする ([C1](../../CONSTRAINTS.md#c1-c11-gnu11-を内部実装の基準とする))。
 ベアメタルであることと、全処理をアセンブラで書くことは別の判断である。
 既存の `include/io.h` でも `in/out` と `rep insw` は直接生成される。
 全面 NASM 化で速度やサイズが必ず改善するとは現時点では断定できない。
@@ -244,9 +244,9 @@ NHD/エミュレータ設定変更は実施時に該当する承認・停止手�
   `kernel/cpu_calibrate.h`、`build/kernel.mk`、`build/os32.ld`。
 - 制約: [CONSTRAINTS.md](../../CONSTRAINTS.md)、[POLICY_DEV.md](../../POLICY_DEV.md)。
 
-現時点は資料・ソース調査と計画書作成のみ。M0〜M5 は未完了。
-NIC コード、KAPI、エミュレータ設定、ディスクイメージは変更していない。
-ドライバのビルド・エミュレータ送受信・実機試験・性能測定は未実施。
+M0 はエミュレータ基準で凍結、M1〜M4 は実装・エミュレータ受入済み ([§9](#9-進捗と確定事項-2026-09-05-着手ブランチ-featlgy98))。
+M5 の実機試験・性能測定は未実施。実カード条件とエミュレータで再現できない項目は
+[実機項目](#エミュレータでは確認できないこと-m4m5-の実機項目) に残す。
 
 ## 8. エミュレータ側の確認 (2026-09-05 追記、ローカル ai-debug fork のソースで照合)
 
@@ -358,10 +358,10 @@ LAN の語があるだけ)。PC-98 固有部分の一次資料は §7 の simk98
 - **診断は初期化時のフラグ** (`LGY98_FLAG_DIAG` → RAM 全域パターン試験 + Remote DMA 往復試験
   1/2/3/59/60/61/255/256/257/1513/1514 バイトと読み側余白の検査) で行い、結果は統計
   (`diag_ram_errors` / `diag_dma_errors` / `rdc_timeout`) と起動ログに出す。
-- **有効化はビルド時** `make kernel-lgy98` (スタンプ `build/out/lgy98.enabled` を置くので、以後の
-  `make kernel` / `deploy-nhd` も有効のまま。`make kernel-nolgy98` で戻す。emu_agent の許可リストに追加)。
-  `CONFIG_LGY98_BASE=0` (既定) では `lgy98_init()` は何もしない。`make kernel LGY98=1` だけだと
-  deploy がカーネルを作り直した時に無効へ戻る (2026-09-05 に実際に踏んだ)。
+- **ビルド設定の正典は [build/config.mk](../../../build/config.mk)** (`LGY98_STAMP`〜`KERNEL_CFLAGS`)。
+  `build/out/lgy98.flags` が無いときは `LGY98=1`・`LGY98_FLAGS=0`、BASE は `0x10D0`。
+  `make kernel-lgy98` / `kernel-lgy98-link` は試験用フラグをスタンプに保持する。
+  `make kernel-nolgy98` は `off` を保持して無効化し、以後のビルド・配備もその選択に従う。
 - IRQ 入口 (`isr_stub.asm` のスタブ、`idt.c` の登録、IMR の有効化) は M3 で入れる。
   `ne2k_irq()` の busy/pending の枠だけ先に置いた。
 - **M2 の試験経路は反射モード**: `LGY98_FLAG_REFLECT` で `timer_handler` (100Hz) から `lgy98_tick()`

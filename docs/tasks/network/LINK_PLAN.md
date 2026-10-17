@@ -2,13 +2,10 @@
 
 > 発行: PM (2026-09-05) / 状態: **受入完了 (2026-09-14)**
 
-> **L0〜L3 の機構はエミュレータ実装・合格済み (2026-09-05、ブランチ→main)。残るは L3 の
-> KAPI 公開のみ。** 版番号は v50 まで進んだので v43 は欠番、KAPI 公開と印刷などの追加サービスは
-> [HOST_SERVICES_PLAN.md](HOST_SERVICES_PLAN.md) (2026-09-13、v51 で公開する詳細計画) に移した。 対象は LGY-98 ドライバの上に載る 2 層 ―
-> OS32 独自リンクプロトコル (フロー制御つき raw Ethernet) と Host Services
-> (HTTP / File / RPC の要求応答)。この文書を設計・進捗の正典とする。
-> NIC ドライバそのものは [PLAN.md](PLAN.md) (別計画)。実装完了後の現行仕様は
-> `docs/05_drivers.md` (リンク層) と `docs/KAPI_SPEC.md` (Host Services API) に移す。
+> **L0〜L3 は実装・エミュレータ合格済み。KAPI v51 で公開し、N1 のコア受入も完了 (2026-09-14)。**
+> 対象は LGY-98 の上のリンクプロトコルと Host Services。本書はリンク層の設計・進捗の正典。
+> サービスの受入・実機残件は [HOST_SERVICES_PLAN §7](HOST_SERVICES_PLAN.md#7-票-実装単位順序)、
+> NIC の受入・残件は [PLAN §9](PLAN.md#9-進捗と確定事項-2026-09-05-着手ブランチ-featlgy98) を参照。
 
 ## 1. 方針
 
@@ -136,7 +133,7 @@ EOF stream_id  // ストリーム終端
 
 **正典は `docs/archive/network/TASK_N0.md` §1b (ワイヤ v2、2026-09-14)**。ここは要約で、
 食い違ったら N0 が勝つ。v1 (12B ヘッダ、`stream_id` 無し、L0〜L3 で合格) は N1 で v2 に
-置き換え、合格実績は v2 で取り直す。
+置き換えた。v2 の受入範囲と未確認事項は [§5-1](#5-1-進捗と証拠) を参照。
 
 - P2P なので ARP は不要。OS32 の MAC と Host Agent の MAC は HELLO で交換して
   以後固定する。EtherType は 0x88B5 (experimental 帯)。
@@ -183,75 +180,13 @@ Host Services    HTTP / File / RPC を KAPI 末尾追加。Host Agent を実装
 | L2 Streaming | **エミュレータ合格 (2026-09-05)**。大容量応答を seq 連続で受け、OS32 側の再結合バッファ無しで順次消費。欠落は再送で埋まる |
 | L3 Host Services | **機構はエミュレータ合格 (2026-09-05)**。外部プログラムから HTTP_GET → host_read が動く。回線速度に依らず OS32 側のメモリ上限が一定 |
 
-## 5-1. 進捗 (ブランチ `feat/net-link`)
+## 5-1. 進捗と証拠
 
-> **履歴**: この節の v43 予約・KAPI 4 本案・呼び手側で `link_poll` を回す記述は v1 時点のもの。現行は KAPI v51 の 5 本と `link_tick` 駆動 (TASK_N0 §1a / §2a)。
-
-- **L0 実装・エミュレータ合格 (2026-09-05)**: `net/link.{c,h}` (独自 EtherType 0x88B5、
-  16B リンクヘッダ op/epoch/seq/ack/length、EtherType はワイヤ big-endian・以降は LE)。
-  `drivers/lgy98.c` は `LGY98_FLAG_LINKTEST` で attach 後に `link_selftest(10)` を実行。
-  `tools/host_agent.py` (HELLO 応答 + REQUEST→RESPONSE echo) を対向に、
-  `make check-net-l0` で HELLO 確立・10/10 往復・再送 0・取りこぼし 0 を確認。
-  ビルドは `make kernel-lgy98-link` (LGY98_FLAGS=9 = DIAG+LINKTEST、反射なし)。
-- **L1 実装・エミュレータ合格 (2026-09-05)**: 絶対値 WINDOW (ack=順序どおり受けた最終 seq、
-  payload に credit_pages)。credit = min(`ne2k_rx_ring_free_pages`, `ne2k_rx_queue_free`×6)
-  − 安全マージン 12 ページ。`link_l1_bulk` がホストに DATA を流させ、`make check-net-l1` で
-  200/200 を順序どおり・EOF・NIC drop 0・credit 有界 (36 ページ) を確認。ホストは credit を
-  絶対値として守り (host_agent.py の in-flight 計上)、リングを溢れさせない。
-- **ページ消費の実測 (§2-3) 完了**: ドライバの `rx_pages_total` を CURR の進みから積算し、
-  512B ペイロードで **2.99 ページ/フレーム** を計測 (理論値 ceil((4+14+16+512)/256)=3 と一致)。
-  credit cost は当面この実測値を使い、host_agent は保守的に 6 ページ/フレームで見積もる。
-- **途中の修正**: 連続転送中に Remote DMA の RDC が 1 回タイムアウトし reinit が走って
-  リング全体 (in-flight DATA) が消え、L1 が gap でデッドロックしていた。dma_read/write を
-  1 回だけ再発行するようにして解消 (commit)。
-- **L2 実装・エミュレータ合格 (2026-09-05)**: 8KB のリングバッファに順序どおりの DATA を
-  溜め `link_stream_read` で順次消費 (再結合バッファなし)。バッファ空きを credit に反映して
-  消費が遅ければホストへ背圧。欠落 (seq>期待) は捨てて ack を止め、ホストの Go-Back-N 再送で
-  埋める。`make check-net-l2`: 128KB を 8KB バッファで全消費・内容一致・EOF・誘発した欠落を
-  回復 (gaps>0 かつ read==total)・overflow 0・NIC drop 0。
-- **L3 実装・エミュレータ合格 (2026-09-05)**: `link_service_get` が「GET <資源>」を出し、
-  ホストの RESPONSE (status u16 + len u32) を受けて本文を L2 ストリームで消費する。`make
-  check-net-l3`: GET /pattern/65536 を検証、/notfound で 404、TIME RPC、そして **GET
-  http://example.com/ でホストが実 HTTP を取得し 559B をストリーム配送** (オンライン時)。
-  OS32 は TCP/IP も HTTP も持たず、要求を出して結果だけ受け取る (方針どおり)。
-  `link_stream_read` がアプリ側の消費入口。Host Agent (`tools/host_agent.py`) は /pattern を
-  生成配送、http(s):// を urllib で実取得、/file/ をホストファイル読み、TIME を時刻応答。
-- **N1 実装完了 (2026-09-14、コーダー worktree。ホスト TDD のみ — ゲスト受入は PM)**:
-  ワイヤ v2 (20B ヘッダ・3 way HELLO・rid 台帳・RELEASE/STATUS) と
-  `net/link.c` の非ブロッキング化、**KAPI v51** (`host_open` / `host_status` /
-  `host_read` / `host_write` / `host_close`、slot 208〜212 = 0x348〜0x358)、
-  `tools/host_agent.py` v2 を実装。プロトコルを進めるのは 100Hz の `link_tick()`
-  だけ (`kernel/isr_handlers.c` の `ne2k_timer_tick()` の直後。反射モードでは
-  `link_init` を呼ばないので起動しない)。同期版 `link_hello` / `link_request` /
-  `link_service_get` / `link_stream_read` / `link_poll` は**廃止**し、自己試験
-  (L0〜L3) を非同期 API + IF=1 の hlt 待ちの上に書き直した。
-  ホスト TDD 2 本が GREEN: `make check-host-agent` (25/25、Agent 側の反例) と
-  `make check-net-link-host` (29/29、実 `net/link.c` + 実 `kapi/kapi_host.c` +
-  実 Agent をサブプロセス)。ケース名と TASK_N0 §3 の指摘番号の対応表・決めたこと・
-  既存 `check-net-l0`〜`l3` が読むシンボルの v2 での意味は
-  [`tools/tests/n1_tdd.md`](../../../tools/tests/n1_tdd.md)。
-  移植性調査は [`docs/archive/portability/SURVEY_N1.md`](../../archive/portability/SURVEY_N1.md)。
-  **未実施** (PM / テスターの受入): `make clean` → `make all` → `make check`、
-  `kernel-lgy98-link` の配備、`userland/tests/host_test.c` の実機実行、
-  `check-net-l0`〜`l3` と `check-net-m2` の回帰。
-- **(履歴) 残りは KAPI 公開だけ (KAPI v43 案)**: 以下は v1 時点の案で、確定した ABI は
-  **KAPI v51** (TASK_N0 §1a、上の N1 の行)。当時の記録として残す。Host Services を外部プログラムへ
-  出す。版番号は [KAPI_SPEC §3-2 の予約表](../../KAPI_SPEC.md) で **v43** に調停済み
-  (GUI が v42、その次。2026-09-06 に v41/v42 → v42/v43 へ改訂)。追加する KAPI (案、末尾追記):
-
-  | 関数 | 内容 |
-  |---|---|
-  | `i32 host_open(const char *req, u32 len)` | サービス要求 (`GET <資源>` 等) を送りハンドルを返す。RESPONSE の status/length は `host_status` で取る。負値は `LINK_ERR*` を `OS32_ERR_*` に写像 |
-  | `i32 host_read(i32 h, void *buf, u32 cap)` | ストリームから最大 cap バイト読む (`link_stream_read` の口)。0 = EOF、負値 = エラー。回線速度に依らず OS32 のメモリ上限は buf 分だけ (§3 の思想) |
-  | `i32 host_status(i32 h, u32 *status, u32 *length)` | RESPONSE の status (200/404 等) と本文長 |
-  | `void host_close(i32 h)` | ハンドルを閉じ、未読ストリームを捨てる |
-
-  エラー番号は既存の `OS32_ERR_*` (-1〜-10) に写像する: 送信失敗 → `IO` (-1)、引数不正 →
-  `INVAL` (-9)、未対応 → `NOSYS` (-10)。**GUI が取る -11〜-13 は使わず**、固有番号が要るときは
-  -14 以降 (KAPI_SPEC §3-2 の予約)。
-  現状の `link_service_get` は同期版 (自己試験用)。KAPI 化では `host_open` / `host_read` を
-  逐次・非ブロッキングに分け、アプリの `sys_halt` / GUI の `OP_WAIT` と協調して `link_poll` を
-  回す (計算ループでカーソルを止めないのと同じ設計)。**GUI 実装 (v42) の後に着手する。**
+- L0〜L3 は実装・エミュレータ合格 (2026-09-05)。各段の条件は §5、試験出力・ページ消費実測・修正経緯は [完了記録](../../archive/network/LINK_IMPLEMENTATION_RECORDS.md)。
+- N1 はワイヤ v2・KAPI v51 の 5 本を公開し、コア受入完了 (2026-09-14)。契約は [Host Services §3](HOST_SERVICES_PLAN.md#3-kapi-v51末尾追記abi13)、駆動は `link_tick()`。同期版 API は廃止済み。
+- N1 のホスト試験・ケース対応は [n1_tdd.md](../../../tools/tests/n1_tdd.md)、ゲスト判定と制限は [TASK_N1](../../archive/network/TASK_N1.md#2-受入-pm)。64KB 超の F6 は N3 の `wget` で再確認済み ([Host Services §9-3](HOST_SERVICES_PLAN.md#9-ユーザー判断が要る点))。
+- 実 LAN での受入は未実施。[N5](HOST_SERVICES_PLAN.md#7-票-実装単位順序) と [NIC の実機項目](PLAN.md#エミュレータでは確認できないこと-m4m5-の実機項目) に残す。
+- N1 の Agent 再起動後の STALE と `gui_busy` 同時実行は、既存のゲスト記録では未確認 (ホスト試験との区別を維持)。個別手順と当時の代替証拠は [N1 ゲスト記録](../../archive/network/TASK_N1.md#pm-ゲスト受入-2026-09-14kernel-lgy98-link-を-nhd-配備agent-v2-を-wsl2-で待受)。
 
 ## 6. Host Agent
 
@@ -272,4 +207,4 @@ Host Services    HTTP / File / RPC を KAPI 末尾追加。Host Agent を実装
 - 受信リング / 受信ヘッダ / ページ: DP8390 Overview
   (https://www.osdever.net/documents/DP8390Overview.pdf)、DP8390D データシート §7。
 - 制約: [CONSTRAINTS.md](../../CONSTRAINTS.md) ([D2] ini 変更、[D3] 秘密の非出力)。
-- 現時点は設計のみ。L0〜L3 は未着手。リンク層コード・KAPI・Host Agent は未実装。
+- 実装・公開・受入と未確認事項: [§5-1](#5-1-進捗と証拠)。

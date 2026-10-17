@@ -134,25 +134,15 @@ GUI の設計判断はすべてこの上限の内側で行い、下限は 386 �
   256 色モードのときは PEGC が優先される。OS32 の物理メモリ上限計算は
   0xF00000〜0xFFFFFF を RAM として扱ってはならない (16MB 以上積んだ 9821 の
   システム空間)。
-- **ai-debug の `/api/screenshot` は 98 側 VRAM からしか描かない**
-  (`src/vram/scrnsave.c` は WAB を参照しない)。アクセラレータ出力は
-  `np2wabwnd.hBmpBuf` (GDI バッファ) にあるので、WAB 検証を始める前に
-  screenshot API をそちらも拾えるよう拡張する必要がある。
+- **ai-debug の `/api/screenshot` は WAB 出力に対応済み**。
+  出力元とリレーを含む検証結果は [TASKS の G5](TASKS.md#gui-g5) を参照する。
 
-## 5. 未確認事項
+## 5. 表示の確認状況と残件
 
-- PEGC 256 色モードでのテキスト VRAM 合成: 資料は間接的に肯定 (§3.1) だが明文は無い。
-  NP21/W の 256 色モードで TVRAM に文字を置いて確認する (R4 の適用範囲に影響)。
-  **確認手順 (H2、2026-09-06、未実施)**: 9821 設定の ini で起動 → `hal_test` で PACKED8 を確認 →
-  `/api/cmd` で `ver` 等を出してテキストを置いた状態で **`/api/screenshot`** を撮る。256 色の絵の上に
-  TVRAM の文字が重なって見えれば合成あり → `gfx/backend_pegc.c` の `pegc_query` で
-  `GFX_CAP_TEXT_OVERLAY` を立てる。`/api/tvram` は TVRAM の中身を読むだけで合成の証拠に
-  ならない。**確認済み (2026-09-06)**: gui_busy の kprintf (TVRAM) が 256 色の絵の上に見えた →
-  合成あり、`pegc_query` で `GFX_CAP_TEXT_OVERLAY` を立てた (R4 の TVRAM クロームは PEGC でも使える)。
-- H2 の要検証事項 (エミュレータ待ち): 480 ラインのラスタが出るか (資料ミラーに 480 ライン用の
-  GDC SYNC 表が無く、v1 は 09A8h (31kHz) + 6Ah の指定だけ。400 ラインしか出なければ SYNC 再設定が
-  次の一手)、`pegc_shutdown` の 24kHz 復帰後にテキスト画面が乱れないか。資料の訂正 2 点は
-  `include/pegc.h` に注記 (6Ah 62h/63h は PC-H98 専用で 9821 は E0100h、09A8h は水平走査周波数)。
+- PEGC の TVRAM 合成は NP21/W で確認済み (2026-09-06)。
+  `pegc_query` は `GFX_CAP_TEXT_OVERLAY` を返す ([`backend_pegc.c:973–979`](../../../gfx/backend_pegc.c))。
+- 480 ライン表示と 24kHz 復帰は [実機票の受入](../realhw/TASK_PEGC480_REALHW.md#5-受け入れ)
+  と同票末尾の実機記録を参照する。エミュレータ待ちという旧状態は解消済み。
 - 実機のアクセラレータでの表示リレー: 資料上は 0FA3h/0FABh レジスタ 03h bit1 または
   0FACh bit1 (§3.2)。NP21/W は内蔵 (0FABh 03h) と C バスボード (40E1h bit0) のリレー状態を
   OR で合成する「暫定やっつけ」実装だが、Xe10 モードで OS32 が触るのは 0FABh 側だけなので
@@ -207,7 +197,7 @@ libos32gui ──► HAL (バックエンド表 + 能力ビット)
 6. **検証は同じテストで**: HAL 越しに同じ描画列を流し、screenshot (NP21/W) または実機の
    目視で全バックエンドが同じ絵になることを確認する。NP21/W で検証するときは
    `GD5430TYPE` を AUTO ではなく機種 ID に固定する (§3.2)。ai-debug の screenshot は
-   アクセラレータ出力を拾わないので、Cirrus 検証の前に拡張が要る (§4)。
+   WAB 対応済み。出力元の確認は [G5 の記録](TASKS.md#gui-g5) に従う。
 7. **[V1]〜[V4] は通常どおり**: HostDrv 配備だけを検証と呼ばない、配備 yaml に載せる、
    失敗はそのまま報告する。
 

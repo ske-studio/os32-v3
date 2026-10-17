@@ -4,7 +4,7 @@
 
 N1〜N4 すべて受入完了 (2026-09-15)。LGY-98 は既定ビルド。CUI (wget/lpr/hclip/hdate) と GUI (ファイラ印刷・端末コピペ) の両方で実証済み。残: N5 (実機)。
 上位: [LINK_PLAN.md](LINK_PLAN.md) (リンク層 L0〜L3 の正典、機構はエミュレータ合格済み)、[PLAN.md](PLAN.md) (LGY-98 ドライバ、M1〜M4 合格、M5 = 実カード)。
-本書は LINK_PLAN §5-1 の「残りは KAPI 公開だけ」を、**外部プログラムから使える形**まで分解し、印刷などネットワーク以外のサービスを同じ仕組みに載せる計画。契約の正典は LINK_PLAN のまま (フレーム形式・フロー制御は変えない)。
+本書はリンク層を**外部プログラムから使える形**まで公開し、印刷などネットワーク以外のサービスを同じ仕組みに載せる計画。契約の正典は LINK_PLAN のまま (フレーム形式・フロー制御は変えない)。
 
 ## 0. 方針 (LINK_PLAN §1 の再確認)
 
@@ -15,14 +15,14 @@ OS32 に TCP/IP・DNS・HTTP・TLS・プリンタドライバを載せない。*
 OS32 アプリ ── KAPI host_* ── net/link.c (L0〜L3) ── LGY-98 ── [NP21/W socket | 実 LAN] ── host_agent.py ── Windows (HTTP / プリンタ / 時計 / クリップボード / ファイル)
 ```
 
-## 1. 現状 (2026-09-13、コードで確認)
+## 1. 実装・受入済みの構成
 
 | 層 | 状態 |
 |---|---|
-| ドライバ `drivers/lgy98.c` `ne2000*.c` | M1〜M4 エミュレータ合格 (検出、送受信、IRQ5、リング溢れの安全網、100Hz 受信ウォッチドッグ)。**既定は無効** (`make kernel LGY98=1` / `kernel-lgy98`、スタンプ `build/out/lgy98.flags`)。M5 (実カード: 受信 count の FCS、16KB RAM、8bit 転送) 未 |
-| リンク層 `net/link.{c,h}` | L0 HELLO/REQUEST/RESPONSE/ACK、L1 絶対値 WINDOW (credit = min(ring 空き, queue 空き×6, ストリーム空き) − 12 ページ)、L2 8KB リングの順次消費 + Go-Back-N、L3 `link_service_get()` (同期版)。EtherType 0x88B5、ヘッダ 16B |
+| ドライバ `drivers/lgy98.c` `ne2000*.c` | M1〜M4 エミュレータ合格 (検出、送受信、IRQ5、リング溢れの安全網、100Hz 受信ウォッチドッグ)。**既定で有効** (設定は [PLAN §9](PLAN.md#実装上の決定-計画からの差分))。M5 (実カード: 受信 count の FCS、16KB RAM、8bit 転送) 未 |
+| リンク層 `net/link.{c,h}` | ワイヤ v2、絶対値 WINDOW、リングの順次消費と Go-Back-N。フレームは [LINK_PLAN §4](LINK_PLAN.md#4-フレーム形式-raw-ethernet-独自-ethertype)、非ブロッキング API と `link_tick` 駆動は [§3](#3-kapi-v51末尾追記abi13) |
 | Host Agent `tools/host_agent.py` | HELLO 応答、`GET /pattern/N`、`GET http(s)://…` (urllib)、`GET /file/<path>` (ホストのファイル読み)、`TIME`、L1/L2 の bulk / stream 配送 |
-| KAPI | **未公開**。v43 を予約していたが版は v50 まで進んだので **v43 の番号は使えない** (単調増加)。次の空きは **v51** → KAPI_SPEC §3-2 の予約表を「v43 据え置き → v51 に移す」と改訂する |
+| KAPI | **v51 で公開・受入済み**。5 本の非ブロッキング API は [§3](#3-kapi-v51末尾追記abi13) を参照 |
 | 試験 | `make check-net-l0/l1/l2/l3`、`net_m2/m4_test.py` (NP21/W の inject/capture)。ini の 5 キー (`USELGY98` 等) は設定済み ([D2]、変更しない) |
 
 ## 2. サービス一覧 (Host Agent が受ける要求)
@@ -38,7 +38,7 @@ Agent は宣言長ぶん受け切ったら RESPONSE を返す。要求ごとに 
 |---|---|---|---|
 | `GET <url> [--as text\|mgx[:W,C]]` | `http://` `https://` | status = HTTP ステータス、本文 | 既存。リダイレクトはホストが追う。ヘッダは返さない (v1)。**HTML の既定表現は `text`** (ホストで `w3m -dump` 相当に落とし、リンクは番号付き一覧、図の位置に印) — 5〜20KB で端末 / `edit` にそのまま出せる。`mgx:640,16` を指定すると headless ブラウザで描画して MGX (`tools/img2mgx.py` と同じ形式、`mgxview` で表示) を返す — 1 画面 3〜10 万 B、忠実な見た目が要るときだけ (PM 所見 2026-09-13、決裁 §9-6) |
 | `GET /file/<path>` | ホスト側パス | 200 / 404、本文 | 既存。**許可リスト** (§6) の下だけ |
-| `TIME` | — | 200、本文 = `YYYY-MM-DD HH:MM:SS` (19B) | 既存 (v2 では標準ヘッダ + 本文ストリーム)。時刻同期 (`date -sync` を足す) |
+| `TIME` | — | 200、本文 = `YYYY-MM-DD HH:MM:SS` (19B) | 既存 (v2 では標準ヘッダ + 本文ストリーム)。`hdate` によるホスト時刻表示 ([§5](#5-os32-側の利用者)) |
 | `PING` / `ECHO <len>` | — / 宣言長 | 200 / 200 + 本文 = 受けた WDATA | N1 の受入用 (ECHO は WDATA → DATA の折り返し) |
 | `PRINT OPEN <name> <kind>` | kind = `text` / `raw` | status、本文 = `job <id>` | **新規**。ジョブを開く。`text` は UTF-8 テキスト (ホストが CP932 / フォント処理を担う)、`raw` はプリンタにそのまま (ESC/P 等、v2) |
 | `PRINT DATA <id> <len>` + WDATA | len ≤ 宣言長 (1 要求 ≤ 64KB) | 200 / 409 (ジョブ無し・閉じ済み) | ジョブ本文。ホストはスプールに追記。大きい本文は要求を繰り返す |
@@ -104,11 +104,11 @@ Agent は宣言長ぶん受け切ったら RESPONSE を返す。要求ごとに 
 | **N0** | KAPI_SPEC §3-2 の予約を v43 → **v51** に改訂 (v43 は欠番のまま「使わない」と明記)、本書 §3 の ABI 表を §1a 形式で確定、Codex 設計レビュー | — | 表の照合 |
 | **N1 (K)** ✅ | v51 の 5 本、`net/link.c` の非ブロッキング化 (`link_request` の分割送信、状態機械)、`host_owner_exit`、ホスト TDD (`tools/tests/net_link_host.c` を L0〜L3 の試験から起こす)、`userland/tests/host_test.c` | N0、`kernel-lgy98-link` ビルド | `make check-net-l3` 相当を KAPI 経由で: GET /pattern/65536 の内容一致、404、TIME、AGAIN ループで WM が止まらない (GUI 配下で `gui_busy` と同時) |
 | **N2 (ホスト)** ✅ | `host_agent.py` に `PRINT OPEN/DATA/CLOSE/STATUS`、`CLIP GET/PUT` (WSL2 は clip.exe/powershell、無ければ 503)、`--spool-dir`/`--print-dir`/`--printer`/`--clip`、win32print/win32clipboard は任意依存。**`PUT /file/` は 501 で先送り (v1.4)** | — | Python 単体試験 (スプール、宣言長と WDATA の照合、閉じたジョブへの DATA 409、許可リスト外 403) |
-| **N3 (C)** ✅ | `libos32host` + `wget` / `lpr` / `hclip` / `date -sync` | N1、N2 | 端末 (GUI) と CUI の両方で `wget http://example.com/ /tmp/x` が 559B、`lpr /etc/profile` がホストの `spool/` に落ちる (to-file)、`hclip` の往復 |
+| **N3 (C)** ✅ | `libos32host` + `wget` / `lpr` / `hclip` / `hdate` | N1、N2 | 端末 (GUI) と CUI の両方で `wget http://example.com/ /tmp/x` が 559B、`lpr /etc/profile` がホストの `spool/` に落ちる (to-file)、`hclip` の往復 |
 | **N4 (W/apps)** ✅ | libos32gui 末尾追記、ファイラ「印刷」、端末のコピー / 貼り付け | N3 | GUI 受入 |
 | **N5** | 実カード (M5) — FCS の有無、16KB RAM、8bit 転送、IRQ。実機の Windows 側は **Npcap + scapy** (raw Ethernet) で `host_agent.py` を動かす | 実機 | 実 LAN で N3 の受入 |
 
-各票は T9 / S0 と同じ流儀 (設計 → Codex 網羅レビュー → worktree 実装 + ホスト TDD → Codex 実装レビュー → 配備 → 受入)。**LGY-98 有効カーネルは既定ビルドではない**ので、N1 以降の配備は `kernel-lgy98-link` を配備し、受入後に既定 (`LGY98=1` を常時) にするか決裁 §9-3。
+各票は T9 / S0 と同じ流儀 (設計 → Codex 網羅レビュー → worktree 実装 + ホスト TDD → Codex 実装レビュー → 配備 → 受入)。**LGY-98 は既定で有効** (決裁 §9-3、設定は [PLAN §9](PLAN.md#実装上の決定-計画からの差分))。通常の配備は [配備 3 経路](../../08_build.md#配備3経路) に従う。`kernel-lgy98-link` は起動時リンク自己試験用。
 
 ## 8. メモリ・性能の見積り
 

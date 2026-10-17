@@ -15,8 +15,7 @@
 
 ## 0. 到達点
 
-実機 PC-9821Ra266 のオンボード 82557 で、**既存のリンク層 (raw Ethernet、EtherType 0x88B5) と Host Services
-(クリップボード・印刷・HTTP・時刻) がそのまま動く**こと。エミュレータ側の LGY-98 経路は残す (回帰用)。
+実機 PC-9821Ra266 のオンボード 82557 で **LAN 越しの `hsync` を優先して動かす** (2026-10-15 のユーザー決定)。既存リンク層を使い、印刷・クリップボード・HTTP・時刻などの Host Services 全体の受入は後続段とする。エミュレータ側の LGY-98 経路は回帰用に残す。
 
 ## 1. 分かっていること
 
@@ -24,7 +23,7 @@
 |---|---|
 | NP21/W は PCI を再現しない (`0CF8h` の実装が無い)。**PCI も 82557 も実機でしか動かせない** | PLAN §5/§6 |
 | 実機との会話はシリアル 115200 で 3.2 KB/s、`tools/rshell_serial.py` (2026-09-22) | TASK_SERIAL_VFAST |
-| PC-98 の PCI: コンフィギュレーションメカニズム #1 (`0CF8h` DWORD でアドレス、`0CFCh` でデータ)。マーキュリー (82434LX) だけ #2 が要る。PCMC = デバイス 0、PCI-C バスブリッヂ = デバイス 1、スロット #0〜2 = デバイス 8〜10 | `io_pci.md` 40〜75 行 |
+| PC-98 の PCI: コンフィギュレーションメカニズム #1 (`0CF8h` DWORD でアドレス、`0CFCh` でデータ)。マーキュリー (82434LX) だけ #2 が要る。PCMC = デバイス 0、PCI-C バスブリッヂ = デバイス 1 (資料の例。Ra266 の実測は 0:6.0)、スロット #0〜2 = デバイス 8〜10 | `io_pci.md` 40〜75 行 |
 | PIRQ0〜3 → 8259 の割り当ては C バスブリッヂの PCI コンフィギュレーションレジスタで、通常 PnP BIOS が起動時に設定 → **デバイスの Interrupt Line レジスタを読めば IRQ が分かる** | 同 315〜320 行 |
 | ハードは規格どおりの PCI (PC/AT 用ボードが挿さる) | 同 |
 | リンク層は NIC の上に載る。`drivers/lgy98.c` が `link_init(mac)` を呼び、IRQ スタブは `irq_stub_nic_3/5/6` | `drivers/lgy98.c` 122〜137 行 |
@@ -38,7 +37,7 @@
 | 段 | やること | 大きさ (見積) | 検証 |
 |---|---|---|---|
 | **L-A** | **PCI の列挙**: `drivers/pci.c` (メカニズム #1 の config r/w、bus 0 の全デバイスを走査、vendor/device/class/BAR/Interrupt Line)、シェル `lspci`、`pci_find(vendor, device)`。判定は純粋関数に切り出してホスト試験 | 2〜3KB | **実機**: `lspci` で 8086:1229 (82557) と BAR (I/O 窓)、IRQ が出る |
-| **L-B** | **82557 ドライバ (最小)**: PCI から I/O BAR と IRQ、SCB 経由で reset / EEPROM から MAC / Configure / IA setup / CU (TX: 1 コマンドずつ) / RU (RX: RFD 連結、簡略モード)、割り込みは RU の Frame Received + CU 完了。参照は Intel の SDM (§6 SCB、§7 RFD) と Linux e100 の作法 | 10〜15KB | **実機**: MAC が読める → 自己送信 (ループバック) → ホストへ HELLO |
+| **L-B** | **82557 ドライバ (最小)**: PCI から I/O BAR と IRQ、SCB 経由で reset / EEPROM から MAC / Configure / IA setup / CU (TX: 1 コマンドずつ) / RU (RX: RFD 連結、簡略モード)、割り込みは RU の Frame Received + CU 完了。参照は Intel の SDM と BSD 実装 ([HW3]、§5-3) | 10〜15KB | **実機**: MAC が読める → 自己送信 (ループバック) → ホストへ HELLO |
 | **L-C** | **NIC 境界の一般化**: `lgy98.c` ↔ `net/link.c` の結びつきを関数表 (`net/nic.h`: tx / mac / irq / poll) にして 82557 を 2 つ目の NIC に。起動時は PCI に 82557 が居ればそれ、無ければ LGY-98 (設定は手動でよい、v3 §3) | 1〜2KB | NP21/W (LGY-98 の回帰 L0〜L3) + 実機 |
 | **L-D** | **ホストの橋** `tools/lan_bridge.py` (**Ubuntu 側 Python、標準ライブラリのみ** — AF_PACKET。scapy も Npcap も要らない): NIC で EtherType 0x88B5 を拾い、`host_agent.py --listen` の FrameStream へ流し、逆も返す。**実装済み** (ホスト試験 `make check-lan-bridge-host`、記録 [`tools/tests/lan_bridge_tdd.md`](../../../tools/tests/lan_bridge_tdd.md)) | ホストのみ | 実機 ↔ ホスト |
 | **L-D2** | **Ubuntu 向けのホスト側バックエンド**: `host_agent.py` のクリップボード (`clip.exe`/PowerShell) と印刷 (win32print) は Windows 前提。Linux では `xclip`/`wl-copy` と `lp` (CUPS) に差し替える (無ければ 503、既存の方針どおり) | ホストのみ | Ubuntu 機で `hclip` / `lpr` |
@@ -130,7 +129,7 @@ AF_PACKET の bind と `sendto` は実機の回で確かめる (§5-2)。
 |---|---|---|
 | R1 | `lspci` の全行 (bus 0〜、vendor:device、class、Header Type、BAR0〜5 の生値、Interrupt Line/Pin) | 82557 が **8086:1229** で見えるか、デバイス番号 (オンボードなので 8〜10 のスロット外の番号のはず)、**I/O BAR に BIOS が番地を割り当て済みか (0 なら自分で割り当てが要る)**、メモリ BAR の位置 |
 | R2 | 82557 の config 256 バイトの生ダンプ (`pcidump b d f`) | Command レジスタ (I/O Enable / Bus Master が立っているか)、Latency Timer、Subsystem ID (機種固有の実装)、Cap ポインタ |
-| R3 | PCI-C バスブリッヂ (デバイス 1) の config ダンプ | **PIRQ0〜3 → 8259 IRQ の割り当て** (`io_pci.md` は「PnP BIOS が設定する」としか言わない。レジスタ位置は資料に無いので Interrupt Line の値と突き合わせる) |
+| R3 | PCI-C バスブリッヂ (**Ra266 は 0:6.0**、R3 実測) の config ダンプ | **PIRQ0〜3 → 8259 IRQ の割り当て** (`io_pci.md` は「PnP BIOS が設定する」としか言わない。レジスタ位置は資料に無いので Interrupt Line の値と突き合わせる) |
 | R4 | PCMC (デバイス 0) の vendor:device | チップセット世代 (メカニズム #1 が使えるかの裏取り。マーキュリー 82434LX なら #2) |
 | R5 | 82557 の EEPROM 先頭 (MAC 6 バイト + サイズ語) を I/O BAR 経由で読む (L-B の最小片) | MAC が取れる = I/O 窓と EEPROM 制御が正しい。**L-B の残りはこれが通ってから** |
 | R6 | 割り込みが本当に来るか (Interrupt Line の IRQ に対して CU 完了 1 回) | PC-98 の PIRQ 配線は資料どおりでも、Interrupt Line の値が正しく設定されていない機種があり得る。来なければポーリングで進める |
@@ -141,7 +140,7 @@ AF_PACKET の bind と `sendto` は実機の回で確かめる (§5-2)。
 
 ### 5-3. 手元で作っておくが実機で答え合わせするもの
 
-- Configure コマンドの 22 バイト (Linux e100 の既定値を写す) — **リンクが上がるかは実機の PHY 次第** (82557 は外付け PHY、MII 経由。PHY の ID も R2 相当で読む)。
+- Configure コマンドは Intel SDM の Configure 節と BSD 実装に基づいて設計する ([HW3] の正典は [CONSTRAINTS](../../CONSTRAINTS.md#hw3-新しいハードウェアの実装はライセンス上参照しやすい既存の実装資料を参照してから設計する)、現行実装は `drivers/e82557.c`・`drivers/e82557_desc.c`) — **リンクが上がるかは実機の PHY 次第** (82557 は外付け PHY、MII 経由。PHY の ID も R2 相当で読む)。
 - 10/100 の自動判別 — 82557 自体は PHY 任せ。スイッチとのネゴシエーションは実機。
 - 実効速度 — L-E で `link_l2_stream` 相当を実機で測る。
 
@@ -152,6 +151,6 @@ AF_PACKET の bind と `sendto` は実機の回で確かめる (§5-2)。
 | 2026-09-22 | L-A | `drivers/pci.c` / `pci_decode.c` (メカニズム #1、bus 0 + ブリッジ配下、32 件の静的表)、`lspci` / `pcidump` (KAPI **v58**: `pci_count` / `pci_get` / `pci_cfg_read32`)、`inpd/outpd` は `platform/pc98/platform_io.h`。判定は 2 値 (`0x80000000` と `0x80FFFFFC` の読み戻し) — 実機で `absent` なら 1 値に緩める。ホスト試験 `check-pci-decode-host` (9 ケース、変異 7 本)。**カーネル 446.9KB / 468KB (残り 21.1KB)**。NP21/W: `[pci] 0 devices`、`lspci: no PCI (mechanism #1 not present)`、kselftest 104/104 |
 | 2026-09-22 | L-D | `tools/lan_bridge.py` (AF_PACKET ↔ FrameStream、標準ライブラリのみ、MAC は透過、`--agent-mac` 照合)。ホスト試験 `check-lan-bridge-host` (9 ケース、変異 5 本、実物の host_agent と L0 往復)。実 NIC は未確認 |
 | 2026-09-22 | 検証 | `make clean` → `make all` → `make external` → `make check` exit 0 (98a0785) |
-| 2026-09-23 | **R1〜R4 (実機)** | Ra266、Build Sep 23 10:20 (API v61)、Ubuntu ノートのシリアル越し (`tools/rshell_serial.py`)。**`lspci` (R1)**: `0:0.0 8086:1237` Host bridge (**82441FX PMC → R4: メカニズム #1 で正しい**) / `0:6.0 1033:002c` NEC bridge class 06.80 (**C バスブリッヂ = デバイス 6**、資料の「デバイス 1」ではない) / `0:7.0 1033:0009` NEC display class 03.80 (PEGC 側) / `0:8.0 1023:9660` Trident (irq 255 = 未割当、bar0〜2 mem 0x20000000/0x20400000/0x20800000) / **`0:11.0 8086:1229` Intel 82557 class 02.00 irq 3 pin A bar0 mem 0x20410000 bar1 io 0x6000 bar2 mem 0x20500000** / `0:12.0 1102:0007` Creative CA0106 (SB Live! 24-bit、PCI スロットの増設カード) class 04.01 irq 6 pin A bar0 io 0x6020。**R2 (82557 の config)**: `00: 86 80 29 12 47 01 80 02 02 00 00 02 00 60 00 00` → Command 0x0147 (IO+MEM+BusMaster、PERR 応答)、Status 0x0280、rev 02、Latency 0x60 / `10: 08 00 41 20 01 60 00 00 00 00 50 20` → BAR0 mem prefetchable 0x20410000、BAR1 io 0x6001、BAR2 mem 0x20500000 / `2c: 33 10 00 80` → Subsystem **1033:8000 (NEC)** / `34: 00` Cap 無し / `3c: 03 01 08 38` → **Line 3、Pin A**、MinGnt 8、MaxLat 0x38。**R3 (C バスブリッヂ 0:6.0)**: `40: 10 00 f6 00 fa 00 fb 00 fe 00 fe 00 00 01 ff 03` / `50: 00 01 02 0f 04 05 86 07 88 09 8a 0b 8c 0d 0e 8f` (0x50〜0x5f は IRQ 0〜15 の表に見える: 値 = IRQ 番号、bit7 が 6/8/10/12/15 に立つ。PIRQ→IRQ の対応はここから読めるかを L-B で解読) / `60: 06 80 80 03 50 3e 07 18 00 00 00 0c` / `70: 0c c0 00 00 00 00 00 00 b2 d9 0f 00`。**PCMC (R4)** `50: 30 82 00 8f 80 dd ff 01 1a 10 00 00 00 01 00 11` / `60: 04 04 08 08 08 08 08 08 80` (DRB) / `70: 08 1f 0a`。**L-B への帰結**: I/O 窓は BIOS が 0x6000 に割り当て済みで自前の割当は不要、IRQ は master 3 (動的 IRQ の対象、`irq_register(3)`)、共有相手は無い (IRQ 3 は他に無い)。Trident と PCM (CS4231 は C バス側、PCI には出ない) は無関係 |
+| 2026-09-23 | **R1〜R4 (実機)** | **取得済み**。Ra266 の C バスブリッジは 0:6.0、82557 は 0:11.0 (8086:1229)、BAR1 I/O 0x6000、IRQ 3 / pin A。BIOS による窓割当済み、PCI メカニズム #1 が動作。[生ダンプ・判定の証拠](../../archive/realhw/LAN_PCI_EVIDENCE_2026-09-23.md)。PIRQ 対応の解読と R5〜R7 は別途確認 |
 
 **R1〜R4 は 2026-09-23 に取得済み (上の表)**。2 値判定はそのまま通った (6 装置)。次の実機の回は **R5 (EEPROM から MAC)** — L-B の最小片が要る。
