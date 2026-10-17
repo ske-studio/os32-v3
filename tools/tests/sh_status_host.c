@@ -1160,6 +1160,14 @@ u32 save_crc32(const void *data, u32 len)
 
 /* ---- 実物のシェル ------------------------------------------------------ */
 
+#ifndef SHELL_AS_APP
+/* cmd_mem's private resident CRT diagnostic; allocator tests cover sampling. */
+void os32_resident_sbrk_stats(u32 out[3])
+{
+    out[0] = out[1] = out[2] = 0;
+}
+#endif
+
 #include "../../userland/shell/main.c"
 #include "../../userland/shell/cmd_base.c"
 #include "../../userland/shell/cmd_dir.c"
