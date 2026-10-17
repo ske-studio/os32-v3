@@ -38,4 +38,5 @@ T2f f1b の単体接続は、上記 newlib nano の検証済み member 6 個を�
 インストール済み libc.a は変更しない。変換入力と全 rename は
 [`nano_inputs.json`](sdk/allocator/nano_inputs.json) の `sdk_build`、ライセンス原文は
 [`nano.LICENSE`](sdk/allocator/nano.LICENSE) (変更なし)。
-SDK adapter 自体は OS32 の MIT。公開アプリへの結線は後段。
+SDK adapter 自体は OS32 の MIT。公開 SDK のアプリへのリンク経路には結線済み
+(`sdk/example/hello/Makefile:53` の `-los32nano -lc -lgcc`)。

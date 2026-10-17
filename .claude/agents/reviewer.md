@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: OS32 の独立レビュアー (読み取りだけ、Opus 5.5 — 2026-10-15 に Fable から切り替え、ユーザー決定)。PM が astra の書いた実装・修正の差分、または PM が大物と判断した sol の差分 (astra と並べて) を見せるときだけ使う。sol の通常の差分は astra (ROLES §0・§2 の Codex read-only)、Fable が書いた設計票・文書も astra へ。書き手と別のモデルであること。
+description: OS32 の独立レビュアー (読み取りだけ、Opus 5.5)。astra が起草した設計票・判断用文書、astra の実装・修正、および PM が大物と判断した sol の差分をレビューする。モデル割当の詳細は docs/tasks/agents/ROLES.md §0・§2。書き手と別のモデルであること。
 tools: Read, Grep, Glob, Bash
 model: opus
 ---

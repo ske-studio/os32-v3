@@ -28,8 +28,7 @@ SUMMARY 表と全体の `RESULT:` を出す。
   `wait` (最大 60 秒) / `screenshot` (`logs/<session>/shots/stepNN.bmp` に保存) /
   `selftest` (kernel.map で `kselftest_pass/fail` を引いて `/api/mem` を読む)。
 - ホスト側の行動は **許可リスト方式** (自由なシェルは渡さない):
-  `make` (target は kernel/programs/sdk/all/check/clean のみ) /
-  `hotdeploy` (`make hotdeploy FILE=<repo 相対 .bin>`) /
+  `make` (許可対象は `tools/emu_agent/agent.py:64` の `MAKE_TARGETS`) /
   `deploy` (`os32-cycle deploy` = 停止→NHD 配備→起動→ver。[D1] を機構で守る)。
   ログは RESULT 行・error 行・末尾 15 行に絞って渡し、モデルには
   「解釈せず exit= と RESULT: を引用せよ」と指示している。
