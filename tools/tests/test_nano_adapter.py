@@ -350,7 +350,8 @@ MUTATIONS += [
      1, 'preferred mapping boundary truncated'),
 ]
 EXPECTED_CHECKS += [
-    'attempts == before+1 && last_map_bytes == 65536u && last_flags == 0',
+    # 64KiB の優先を外すと、先に走る trim の試験 (副 arena の余り頁) で最初に落ちる。
+    'os32_nano_trim() == (end-keep)/OS32_NANO_PAGE && trim_unmaps == 1',
     'p && a.next && attempts == before+2',
     'p && a.next && attempts == before+2',
     'attempts == before+1 && last_map_bytes == rounded[i]',
