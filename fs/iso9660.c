@@ -685,6 +685,21 @@ static u32 iso9660_block_size_fn(void *c)
     return ctx ? (u32)ctx->block_size : ISO_SECTOR_SIZE;
 }
 
+/* Use the existing ATAPI readiness/generation contract, including cached reads.
+ * Never bless a new medium using an old mount's directory metadata. */
+static int iso_sqlite_media_generation(void *raw, u32 *out)
+{
+    Iso9660Ctx *ctx = (Iso9660Ctx *)raw;
+    if (!ctx || atapi_test_unit_ready() != ATAPI_OK) return VFS_ERR_IO;
+    if (atapi_media_gen() != ctx->media_gen) return VFS_ERR_IO;
+    *out = ctx->media_gen;
+    return VFS_OK;
+}
+
+static const VfsSqliteOps iso_sqlite_ops = {
+    VFS_SQLITE_IMMUTABLE_CD, 0, 0, iso_sqlite_media_generation
+};
+
 /* ======================================================================== */
 /*  VfsOps テーブル                                                          */
 /* ======================================================================== */
@@ -711,5 +726,6 @@ VfsOps iso9660_ops = {
     /* inode で動く口も持たない (票 TASK_VFS_FD_PATH)。FD はパスで動く */
     0,
     /* iso_strcasecmp と同じ規則 (英字だけ区別しない) (BUSY / pinned の名前比較用) */
-    iso_name_fold
+    iso_name_fold,
+    &iso_sqlite_ops /* Requires a separate boot-policy permit in VFS. */
 };

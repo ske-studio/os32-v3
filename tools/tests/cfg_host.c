@@ -1074,7 +1074,9 @@ static void c_shm_copy(void)
     CHECK(cfg_get_text(db, "gshell", "t", buf, 64) == 7);
     CHECK(!strcmp(buf, "private"));
     /* 別接続が SHM を丸ごと上書きしても、取り出した値は壊れない */
-    other = kapi_db_open_existing(CFG_DB_PATH, 0);
+    /* T4b-4 forbids a second mutable MAIN_DB identity. SHM lifetime does
+     * not depend on sharing that database: use a separate private database. */
+    other = kapi_db_open(":memory:");
     CHECK(other >= 0);
     CHECK(kapi_db_prepare_only(other, "SELECT 'AAAAAAAAAAAAAAAA'") == 0);
     CHECK(kapi_db_step(other) == DB_STATUS_ROW);

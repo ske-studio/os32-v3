@@ -56,7 +56,7 @@ def real_suite(exe, directory, runner, packer=mkmod):
     parsed = mkmod.Elf(elf)
     assert parsed.symbol('sqlite_module_pool')['size'] == 4
     assert 'sqlite_mem_pool' not in parsed.symbols and 'tick_count' not in parsed.symbols
-    assert len(metadata['imports']) == 23 and len(metadata['imports']) <= 32
+    assert len(metadata['imports']) == 29 and len(metadata['imports']) <= 32
     assert all(e['context'] == 'normal' and not e['irq'] for e in metadata['imports'])
     assert not {'memcpy', 'memset', 'tick_count'} & {e['name'] for e in metadata['imports']}
     assert stats['mem_size'] < 384 * 1024, 'static pool was retained'

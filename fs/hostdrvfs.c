@@ -980,7 +980,8 @@ static VfsOps g_hostdrvfs_ops = {
     /* inode で動く口も持たない (票 TASK_VFS_FD_PATH)。FD はパスで動く */
     0,
     /* ホスト (Windows) の名前は大文字小文字を区別しない (BUSY / pinned の名前比較用) */
-    hdrv_name_fold
+    hdrv_name_fold,
+    0 /* SQLite capability is not implied by filesystem permissions. */
 };
 
 VfsOps *hostdrvfs_get_ops(void)

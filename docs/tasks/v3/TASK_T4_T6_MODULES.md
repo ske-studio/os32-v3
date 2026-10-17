@@ -151,6 +151,8 @@ F3a/c: xTruncate/xSyncのI/O rcを `SQLITE_IOERR_TRUNCATE` / `SQLITE_IOERR_FSYNC
 
 これは排他openの汎用サービスの前倒しではなく、T4のSQLite入口で危険な重複を断る暫定制約。必要なVFS identityが現行で不足する場合はT4bで内部APIとして足す。既存ユーザーの同一DB複数open依存を調査し、必要なら接続共有へ移す。F2 T01は親/子/同ownerに**別のDBファイル**を使って所有回収を試験し、同じファイルのケースは2本目拒否の別試験へ。T12はFEP初回openをbootで済ませ、子実行中に初めて学習journalを開くケースへ読み替える。意味変更を隠してpath比較だけで合格にしない。
 
+内部接続口は `VfsOps.sqlite` の明示的能力と `vfs_sqlite_allow_immutable(prefix)` を使う。後者はboot coordinatorが配布CDと判断したマウントにだけ一度設定し、同じマウントで媒体世代を取り直さない (T4c/T5bで接続)。通常のRO指定だけでは許可しない。ext2のresizeは現状0/同一サイズだけを扱い、それ以外は内容を変えずNOSYS→`SQLITE_IOERR_TRUNCATE`。未実装の縮小を成功にしない。接続のidentityはxClose後もgroup finish成功まで保持し、既定VFSの旧接続もFDのMAIN_DB印で重複対象に含める。T4b-3の既定VFS閉鎖とは独立に適用する。
+
 FDWP-1のFatFs修正は読込起動の回帰基準であり、SQLite RO契約の受入ではない。dirty時だけ書込み、flush成功後だけ窓を更新する (`fs/fatfs/ff.c:1062,1085`、`fs/fatfs_vfs.c:207`)。FAT切出し後も書込み禁止FDからroot/Unicode/shellを読む。F3のrc伝播とCD不変媒体条件は本節で実装する。
 
 ### 3-3. FEP予算と設定の循環

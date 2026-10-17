@@ -94,6 +94,25 @@ typedef struct {
     int (*truncate)(void *ctx, u32 ino);
 } VfsInoOps;
 
+/* Internal SQLite capabilities, explicitly supplied by the backend. A name,
+ * transport or read-only permission alone never grants this capability. */
+#define VFS_SQLITE_UNSUPPORTED 0
+#define VFS_SQLITE_EXT2 1
+#define VFS_SQLITE_IMMUTABLE_CD 2
+typedef struct {
+    int kind;
+    int (*resize)(void *ctx, u32 ino, u32 size);
+    int (*writable)(void *ctx);
+    int (*media_generation)(void *ctx, u32 *out);
+} VfsSqliteOps;
+typedef struct {
+    u32 mount_generation;
+    u32 file_id;
+    u32 media_generation;
+    int kind;
+    int readonly;
+} VfsSqliteIdentity;
+
 /* FS操作テーブル (各FSドライバが実装)
  *
  * マルチインスタンス対応:
@@ -169,6 +188,7 @@ typedef struct {
      * loop イメージ (pinned) の名前比較をこれに従わせる — バイト比較のままだと
      * FAT で `DB` と `db` が別名に見え、同じ実体の付け替え・削除をすり抜ける。 */
     u8 (*name_fold)(u8 c);
+    const VfsSqliteOps *sqlite; /* optional; kernel internal, not KAPI */
 } VfsOps;
 
 /* ---- VFS API ---- */
@@ -216,6 +236,18 @@ int  vfs_rm(const char *path);
 int  vfs_rename(const char *oldpath, const char *newpath);
 
 /* ストリーム操作 (ファイルディスクリプタ・シーク対応) */
+/* Boot policy only: opt in a distribution CD mount, never inferred from RO.
+ * The permit is pinned to its initial generation until unmount, with no rearm.
+ * T4c/T5b boot coordinator calls this before opening distribution databases. */
+int vfs_sqlite_allow_immutable(const char *prefix);
+int vfs_sqlite_immutable_generation(void *ctx, u32 mount_generation, u32 *out);
+u32 vfs_path_mount_generation(const char *path);
+int vfs_sqlite_backend(const char *path);
+int vfs_sqlite_writable(const char *path);
+int vfs_sqlite_fd_identity(int fd, VfsSqliteIdentity *out);
+int vfs_sqlite_claim_main(int fd);
+int vfs_resize_fd(int fd, u32 size);
+int vfs_sync_fd(int fd);
 int  vfs_open(const char *path, int mode);
 void vfs_close(int fd);
 /* 指定所有者 (res_owner_get() の値で open 時にタグ付け) の FD を一括クローズ。

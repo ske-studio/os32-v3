@@ -40,14 +40,24 @@ static int host_register(sqlite3_vfs *vfs, int make_default)
     return rc;
 }
 #include "sqlite_groups_backend.h"
+static int fixture_stat_rc, fixture_rm_rc;
 volatile u32 tick_count;
 u32 sys_time(void) { return 0; }
 void kprintf(u8 color, const char *fmt, ...) { }
-int vfs_sync(void) { probes++; return 0; }
+int vfs_sync(void) { probes++; return fixture_sync_rc; }
 int vfs_rm(const char *path)
-{ probes++; return fixture_active ? fixture_rm(path) : 0; }
+{ probes++; return fixture_rm_rc ? fixture_rm_rc : (fixture_active ? fixture_rm(path) : 0); }
 int vfs_stat(const char *path, OS32_Stat *st)
-{ probes++; return fixture_active && fixture_find(path, 0) ? 0 : -1; }
+{
+    FixtureFile *f = fixture_find(path, 0);
+    probes++;
+    if (fixture_stat_rc) return fixture_stat_rc;
+    if (!fixture_active || !f) return VFS_ERR_NOTFOUND;
+    memset(st, 0, sizeof(*st));
+    st->st_mode = OS_S_IFREG | OS_S_IRUSR | OS_S_IWUSR;
+    st->st_size = f->size;
+    return VFS_OK;
+}
 
 
 static void capacity(void)
@@ -348,9 +358,9 @@ static void edge_opens(void)
     CHECK(f.base.pMethods == NULL && f.fd == -1 && out == 99 && vfs_count_sqlite(&a) == 1);
     size_rc = 0;
     for (i = 4; i < VFS_MAX_OPEN_FILES; i++) CHECK(vfs_open("/generic", O_RDWR) == i);
-    before = probes;
+    before = mock_fs_calls;
     CHECK(v->xOpen(v, "/full", &f.base, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, &out) == SQLITE_CANTOPEN);
-    CHECK(probes == before && f.base.pMethods == NULL && out == 99);
+    CHECK(mock_fs_calls == before && f.base.pMethods == NULL && out == 99);
     CHECK(os32_sqlite_group_begin_close(&a) == SQLITE_OK);
     CHECK(os32Close(&main_file.base) == SQLITE_OK);
     CHECK(os32_sqlite_group_finish(&a, SQLITE_OK) == SQLITE_OK);
@@ -483,7 +493,10 @@ static void real_sqlite(const char *mode)
     CHECK(memsys5_check_canary() == 0);
     printf("REAL close SQLite=OK finish=%d temp_rows=80 temp_FD=0\n", rc);
 }
-int main(int argc, char **argv)
+#ifndef GROUPS_TEST_MAIN
+#define GROUPS_TEST_MAIN main
+#endif
+int GROUPS_TEST_MAIN(int argc, char **argv)
 {
     int i;
     CHECK(argc == 2);
@@ -495,6 +508,7 @@ int main(int argc, char **argv)
         return 0;
     }
     CHECK(os32_sqlite_init() == SQLITE_OK);
+    fixture_capability();
     mock_ops.get_file_size = mock_size;
     mock_ops.write_file = mock_write;
     mock_ops.read_stream = mock_read_stream;

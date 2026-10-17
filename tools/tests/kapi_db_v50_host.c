@@ -60,7 +60,7 @@ int vfs_stat(const char *path, OS32_Stat *st)
     if (stat_fail_on && strstr(path, stat_fail_on)) return stat_fail_rc;
     f = fixture_find(host_resolve(path), 0);
     if (!f) return OS32_ERR_NOTFOUND;
-    if (st) { memset(st, 0, sizeof(*st)); st->st_size = f->size; }
+    if (st) { memset(st, 0, sizeof(*st)); st->st_size = f->size; st->st_mode = OS_S_IFREG | OS_S_IRUSR | OS_S_IWUSR; }
     return 0;
 }
 

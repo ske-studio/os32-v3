@@ -451,6 +451,27 @@ static void case_fd(void)
     report("case fd\n");
     disk_setup();
 
+    /* T4b-4: real ext2 FD identity survives spelling changes; resizing must
+     * propagate errors and never claim a nonzero unsupported shrink worked. */
+    {
+        VfsSqliteIdentity a, b;
+        CHECK(wfile("/hd0/identity", "keep") >= 0);
+        fd = vfs_open("/hd0/identity", O_RDWR);
+        fd2 = vfs_open("/hd0/./identity", O_RDONLY);
+        EQ(vfs_sqlite_fd_identity(fd, &a), VFS_OK);
+        EQ(vfs_sqlite_fd_identity(fd2, &b), VFS_OK);
+        CHECK(a.mount_generation != 0 && a.mount_generation == b.mount_generation);
+        CHECK(a.file_id == b.file_id && a.kind == VFS_SQLITE_EXT2);
+        CHECK(!a.readonly && b.readonly);
+        EQ(vfs_resize_fd(fd2, 0), VFS_ERR_ROFS);
+        EQ(vfs_resize_fd(fd, 2), VFS_ERR_NOSYS);
+        EQ(vfs_resize_fd(fd, 4), VFS_OK);
+        EQ(vfs_resize_fd(fd, 0), VFS_OK);
+        EQ(vfs_fstat(fd, &st), VFS_OK); EQ(st.st_size, 0);
+        EQ(vfs_sync_fd(fd), VFS_OK);
+        vfs_close(fd); vfs_close(fd2);
+    }
+
     /* ---- 欠陥 1 (Codex): open → unlink → mkdir → 元の FD へ write ---- */
     fd = vfs_open("/hd0/f", O_CREAT | O_WRONLY);
     CHECK(fd >= 3);
@@ -575,6 +596,18 @@ static void case_fd(void)
         ext2_ns_touch(g_ec);
         fd = vfs_open("/hd0/h1", O_RDONLY);
         CHECK(fd >= 3);
+        {
+            VfsSqliteIdentity a, b;
+            fd2 = vfs_open("/hd0/h2", O_RDONLY);
+            EQ(vfs_sqlite_fd_identity(fd, &a), VFS_OK);
+            EQ(vfs_sqlite_fd_identity(fd2, &b), VFS_OK);
+            CHECK(a.mount_generation == b.mount_generation && a.file_id == b.file_id);
+            EQ(vfs_sqlite_claim_main(fd), VFS_OK);
+            EQ(vfs_sqlite_claim_main(fd2), VFS_ERR_BUSY);
+            vfs_close(fd2);
+            /* This case tests rename below as a generic FD, not SQLite. */
+            open_files[fd].sqlite_main = 0;
+        }
         /* 同じ inode の名前間の rename は宛先の実体を解放しない — 印を付けない */
         (void)vfs_rename("/hd0/h2", "/hd0/h1");
         CHECK(vfs_fd_is_stale(fd) == 0);
