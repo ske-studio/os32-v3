@@ -68,8 +68,8 @@ MUTATIONS = (
      'base < MEM_SHM_BASE || end > MEM_SHM_BASE + MEM_SHM_SIZE ||', '', 'FAIL SHM foreign USER range'),
     ('shm-user-missing', 'kernel/paging.c', 'if (!(entry & PTE_USER))', 'if (0)', 'FAIL missing USER atomic reject'),
     ('v86-restore', 'kernel/paging.c', '    page_directory[0] = s->master_pde;', '    page_directory[0] &= ~PTE_USER;', 'FAIL V86 restores PDE0 USER'),
-    ('boot-order', 'kernel/kernel.c', '    if (kdebug.ops.selftest_run) kdebug.ops.selftest_run();',
-     '    if (kdebug.ops.selftest_run) kdebug.ops.selftest_run();', 'FAIL boot before AS'),
+    ('boot-order', 'kernel/kernel.c', '    if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_run();',
+     '    if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_run();', 'FAIL boot before AS'),
     ('launch-TVRAM', 'exec/exec.c', '        /* --- K3:',
      '        paging_addrspace_map_user_range(ctx->as, TVRAM_CHAR_BASE, GVRAM_BRG_END, PAGE_RW | PTE_USER);\n        /* --- K3:',
      'FAIL launch TVRAM removed'),
@@ -110,7 +110,7 @@ def run(runner, mutation=None):
         name, path, old, new, expected = mutation
         assert old in sources[path], name + ': mutation target'
         if name == 'boot-order':
-            sources[path] = sources[path].replace('    shm_init();', '    shm_init();\n    if (kdebug.ops.selftest_run) kdebug.ops.selftest_run();', 1)
+            sources[path] = sources[path].replace('    shm_init();', '    shm_init();\n' + new, 1)
         elif name in ('owned-user', 'db-unreserved', 'db-shifted', 'kill-no-end'):
             sources[path] = sources[path].replace(old, new, 1)
         else:
