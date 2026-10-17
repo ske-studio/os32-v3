@@ -62,6 +62,10 @@ check-check-select-host:
 - tools/check_p2v_allow.txt
 - tools/pack_name_tables.txt
 - tools/pack_notes.txt
+# case_bare_extract は check-kapi-version・check-manifests の道具が読む文書を見る (2026-10-17 に対応表の漏れで CI が赤)。
+- tools/check_kapi_version.py
+- tools/check_manifests.py
+- docs/07_shell.md
 # Conservative artifact-path audit (including indirect helpers/fixtures).
 - boot/bootinfo.inc
 - boot/loader_fat_new.asm
