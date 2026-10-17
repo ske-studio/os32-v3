@@ -26,6 +26,7 @@ void kselftest_audit_v86_return(void);
 
 /* These diagnostics remain in the kernel in both KDEBUG modes. */
 enum kaudit_tag { KAUDIT_POST_EXEC, KAUDIT_POST_PROBE, KAUDIT_POST_EXEC_SHM, KAUDIT_TAG_COUNT };
+void kaudit_boot_pages(void);
 void kaudit_post_exec(void);
 void kaudit_post_probe(void);
 int kdi_kaudit_last_rc(int tag);

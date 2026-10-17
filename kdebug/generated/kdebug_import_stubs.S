@@ -1091,4 +1091,29 @@ vfs_sync:
 boot_image_info:
     jmp *kdebug_import_slots+868
 .size boot_image_info, .-boot_image_info
+.globl pgalloc_alloc_n_owner
+.type pgalloc_alloc_n_owner, @function
+pgalloc_alloc_n_owner:
+    jmp *kdebug_import_slots+872
+.size pgalloc_alloc_n_owner, .-pgalloc_alloc_n_owner
+.globl pgalloc_free_n_owner
+.type pgalloc_free_n_owner, @function
+pgalloc_free_n_owner:
+    jmp *kdebug_import_slots+876
+.size pgalloc_free_n_owner, .-pgalloc_free_n_owner
+.globl pgalloc_free_pages
+.type pgalloc_free_pages, @function
+pgalloc_free_pages:
+    jmp *kdebug_import_slots+880
+.size pgalloc_free_pages, .-pgalloc_free_pages
+.globl pgalloc_page_owned
+.type pgalloc_page_owned, @function
+pgalloc_page_owned:
+    jmp *kdebug_import_slots+884
+.size pgalloc_page_owned, .-pgalloc_page_owned
+.globl memory_boot_slack_first
+.type memory_boot_slack_first, @function
+memory_boot_slack_first:
+    jmp *kdebug_import_slots+888
+.size memory_boot_slack_first, .-memory_boot_slack_first
 .section .note.GNU-stack,"",@progbits

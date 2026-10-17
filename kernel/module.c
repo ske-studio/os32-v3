@@ -24,7 +24,7 @@ static u32 read_word(const void *ptr)
     return (u32)p[0] | ((u32)p[1] << 8) | ((u32)p[2] << 16) | ((u32)p[3] << 24);
 }
 
-static const char *reject_name(int state)
+const char *kdebug_state_name(int state)
 {
     static const char *const names[] = {
         "OFF", "RUNNING", "NOT_FOUND", "BAD_HEADER", "PAIR_MISMATCH",
@@ -111,6 +111,7 @@ void kdebug_load(void)
     kdebug.base = base;
     kdebug.pages = h[MI_MEM_SIZE] / PAGE_SIZE;
     kdebug.state = KDEBUG_RUNNING;
+    kprintf(0x07, "[kdebug] running pair %08x\n", kdebug.pair_crc);
     return;
 
 rejected:
@@ -119,5 +120,5 @@ rejected:
     if (kdebug.owner) ledger_owner_retire(kdebug.owner);
     /* Keep the retired owner number for diagnosis; ops/base/pages remain zero. */
     kdebug.state = rc;
-    kprintf(0x07, "[kdebug] rejected: %s\n", reject_name(rc));
+    kprintf(0x07, "[kdebug] rejected: %s\n", kdebug_state_name(rc));
 }

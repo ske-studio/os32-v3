@@ -37,6 +37,7 @@ extern struct kdebug kdebug;
 
 /* Boot only, after dma_pool_init; cooperative, normal kernel context. */
 void kdebug_load(void);
+const char *kdebug_state_name(int state);
 int kdebug_init(struct kdebug_ops *candidate);
 
 enum kdebug_state {

@@ -29,7 +29,7 @@ class ImportsTests(unittest.TestCase):
             gen.check_nm(altered)
 
     def test_exact_order_kinds_context_and_hash(self):
-        self.assertEqual(len(self.entries), 218)
+        self.assertEqual(len(self.entries), 223)
         self.assertEqual(self.entries[0]['name'], 'kprintf')
         self.assertEqual(self.entries[210]['name'], 'kdi_ptr_v86_session')
         self.assertEqual({e['name'] for e in self.entries if e['context_safe']}, {

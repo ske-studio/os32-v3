@@ -1744,6 +1744,46 @@
       "source": "include/bootinfo.h",
       "context_safe": false,
       "index": 217
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "pgalloc_alloc_n_owner",
+      "source": "kernel/pgalloc.h",
+      "context_safe": false,
+      "index": 218
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "pgalloc_free_n_owner",
+      "source": "kernel/pgalloc.h",
+      "context_safe": false,
+      "index": 219
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "pgalloc_free_pages",
+      "source": "kernel/pgalloc.h",
+      "context_safe": false,
+      "index": 220
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "pgalloc_page_owned",
+      "source": "kernel/pgalloc.h",
+      "context_safe": false,
+      "index": 221
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "memory_boot_slack_first",
+      "source": "kernel/memory_boot.h",
+      "context_safe": false,
+      "index": 222
     }
   ]
 }

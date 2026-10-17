@@ -592,7 +592,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
         kprintf(0x07, "[dma] RAM short; pool/PCI/PCM skipped\n");
     }
     kdebug_load();
-    if (kdebug.ops.selftest_run) kdebug.ops.selftest_run();
+    if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_run();
     else kselftest_skipped();
 
     /* ⑥-0 (TASK_T1_LEDGER §3-3、B4): pci_init は台帳より前に走るので、g_pci の
@@ -656,6 +656,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * 上端の凍結 → ledger_selfcheck("gfx") (TASK_T1_LEDGER §3-3・§3-8)。
      * live AS 0 の起動文脈で、exec_init より前。probe は ⑦ のまま。 */
     gfx_boot_reserve();
+    kaudit_boot_pages();
 
     /* プログラムローダー初期化 (KernelAPIテーブル構築) */
     tvram_print(48, 2, "EXEC...", TATTR_GREEN);
@@ -663,7 +664,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     /* トランポリンページができてからでないと踏めない自己診断 (票 T9 §12 R1)。
      * kselftest_run() はここより前に走っている。 */
     kaudit_post_exec();
-    if (kdebug.ops.selftest_post_exec) kdebug.ops.selftest_post_exec();
+    if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_post_exec();
     tvram_print(56, 2, "OK", TATTR_WHITE);
 
     /* Unicodeテーブルロード */
@@ -686,7 +687,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     }
 
     (void)system_unicode_register();
-    if (kdebug.ops.selftest_post_unicode) kdebug.ops.selftest_post_unicode();
+    if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_post_unicode();
 
     /* IME (FEP) 初期化 — 辞書は初回使用時に遅延ロード */
     tvram_print(0, 4, "IME..", TATTR_GREEN);
@@ -753,7 +754,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     if (kdebug.ops.crt_diag_bootlog) kdebug.ops.crt_diag_bootlog();
     gfx_prepare_backend();
     kaudit_post_probe();
-    if (kdebug.ops.selftest_post_probe) kdebug.ops.selftest_post_probe();
+    if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_post_probe();
 
     /* 共有ライブラリ (0x80000000 帯、常駐シェルの 0x400000 帯とは別) を常駐させる — シェルを載せる **前** に
      * 1 回だけ (票 K3)。ここより後だと pgalloc が帯域のページを配ってしまう。

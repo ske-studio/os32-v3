@@ -3,6 +3,7 @@
 """
 import json
 import os
+import re
 from pathlib import Path
 import struct
 import subprocess
@@ -33,6 +34,19 @@ def seal(image):
     struct.pack_into('<I', image, 128, 0)
     struct.pack_into('<I', image, 128, zlib.crc32(image))
     return image
+
+
+def boot_dispatch(kernel):
+    """Compile the actual four kernel call sites, including the skipped path."""
+    lines = []
+    for op in ('selftest_run', 'selftest_post_exec', 'selftest_post_unicode', 'selftest_post_probe'):
+        found = re.findall(r'^    if \(.*\) kdebug\.ops\.' + op + r'\(\);$', kernel, re.M)
+        assert len(found) == 1, op
+        lines += found
+        if op == 'selftest_run':
+            assert found[0] + '\n    else kselftest_skipped();' in kernel
+            lines.append('    else kselftest_skipped();')
+    return 'static void host_boot_dispatch(void) {\n' + '\n'.join(lines) + '\n}\n'
 
 
 def main():
@@ -116,9 +130,13 @@ def main():
                    ''.join('    (void (*)(void))' + targets.get(e['name'], 'kdebug_forbidden_import') + ',\n'
                            for e in meta['imports']) + '};\n' + exports[end:])
         (folder / 'loader_exports.c').write_text(exports)
-        command([*host, ROOT / 'tools/tests/kdebug_loader_host.c',
-                 ROOT / 'kernel/module.c', ROOT / 'kernel/module_image.c',
-                 folder / 'loader_exports.c', '-o', exe])
+        kernel_source = (ROOT / 'kernel/kernel.c').read_text()
+        (folder / 'kernel_selftest_dispatch.h').write_text(boot_dispatch(kernel_source))
+        def build_loader(module_source):
+            command([*host, ROOT / 'tools/tests/kdebug_loader_host.c',
+                     module_source, ROOT / 'kernel/module_image.c',
+                     ROOT / 'kernel/kselftest_report.c', folder / 'loader_exports.c', '-o', exe])
+        build_loader(ROOT / 'kernel/module.c')
         cases = [('off', 0, 0, 0, image), ('other-config', 2, 0, 0, image),
                  ('running', 1, 0, 1, image)]
         for fail, state in ((1, 2), (2, 8), (3, 8), (4, 7), (5, 7), (6, 8), (7, 5)):
@@ -151,6 +169,27 @@ def main():
                 result = host32.run([str(exe)], input=payload, runner=runner)
                 assert result.returncode == 0, (label, result.returncode)
             print('PASS loader', label, flush=True)
+        if '--mutate' in sys.argv or '--mutate-running' in sys.argv:
+            module_source = (ROOT / 'kernel/module.c').read_text()
+            assignment = '    kdebug.state = KDEBUG_RUNNING;'
+            assert module_source.count(assignment) == 1
+            without_gate = kernel_source
+            for op in ('selftest_run', 'selftest_post_exec', 'selftest_post_unicode', 'selftest_post_probe'):
+                old = 'if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.' + op
+                assert old in without_gate
+                without_gate = without_gate.replace(old, 'if (kdebug.ops.' + op + ') kdebug.ops.' + op)
+            for label, module_text, kernel_text in (
+                ('loader-running-state', module_source.replace(assignment, ''), kernel_source),
+                ('kernel-running-gate', module_source, without_gate)):
+                mutant = folder / (label + '.c')
+                mutant.write_text(module_text)
+                (folder / 'kernel_selftest_dispatch.h').write_text(boot_dispatch(kernel_text))
+                build_loader(mutant)
+                payload = struct.pack('<5I', 1, 0, 1, len(image), pair) + image
+                for runner in os.environ.get('HOST32_RUNNERS', 'native qemu').split():
+                    result = host32.run([str(exe)], input=payload, runner=runner, capture_output=True)
+                    assert result.returncode == 1 and b'FAIL ' in result.stdout, (label, result)
+                print('MUTATE', label, 'RED (runtime assertion)', flush=True)
         print('PASS init: candidate only, imports=0; loader cases=' + str(len(cases)))
     return 0
 

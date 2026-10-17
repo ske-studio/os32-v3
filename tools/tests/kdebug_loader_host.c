@@ -11,6 +11,8 @@
 #include "kprintf.h"
 #include "memmap.h"
 #include "kdebug_imports.h"
+#include <stdarg.h>
+#include "kernel_selftest_dispatch.h"
 
 #define CAP (MODULE_IMAGE_MAX + MODULE_PAGE_SIZE)
 static u8 file[CAP];
@@ -18,13 +20,18 @@ static u8 pool[CAP] __attribute__((aligned(MODULE_PAGE_SIZE)));
 static u32 input[5]; /* config, failure injection, expected state, image size, pair */
 static unsigned pos, opens, closes, owners, retires, pages, reads, logs, imports;
 static struct bootinfo bi;
+static u32 running_logs, skipped_logs, not_run_logs, dispatch;
 static void finish(int code) __attribute__((noreturn));
 static void finish(int code)
 {
     __asm__ volatile("int $0x80" : : "a"(1), "b"(code) : "memory");
     for (;;) { }
 }
-#define CHECK(x) do { if (!(x)) finish(__LINE__ % 200 + 20); } while (0)
+#define CHECK(x) do { if (!(x)) { \
+    const char msg[] = "FAIL " #x "\n"; \
+    __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(msg), "d"(sizeof(msg) - 1) : "memory"); \
+    finish(1); \
+} } while (0)
 static void read_input(void *ptr, unsigned size)
 {
     while (size) {
@@ -108,8 +115,24 @@ int pgalloc_free_n_owner(u32 owner, u32 pfn, int n)
 void kprintf(unsigned char color, const char *format, ...)
 {
     (void)color;
-    if (!memcmp(format, "[kdebug] rejected: %s\n", sizeof("[kdebug] rejected: %s\n"))) logs++;
-    else imports++;
+    va_list ap;
+    va_start(ap, format);
+    if (!memcmp(format, "[kdebug] rejected: %s\n", sizeof("[kdebug] rejected: %s\n"))) {
+        logs++;
+        CHECK(va_arg(ap, const char *) == kdebug_state_name(input[2]));
+    } else if (!memcmp(format, "[kdebug] running pair %08x\n", sizeof("[kdebug] running pair %08x\n"))) {
+        running_logs++;
+        CHECK(va_arg(ap, u32) == input[4]);
+    } else if (!memcmp(format, "[selftest] skipped (KDEBUG=0)\n", sizeof("[selftest] skipped (KDEBUG=0)\n"))) {
+        skipped_logs++;
+        CHECK(kdebug.state == KDEBUG_OFF);
+    } else if (!memcmp(format, "[selftest] not run (kdebug rejected: %s) — ON の受入は未成立\n",
+                       sizeof("[selftest] not run (kdebug rejected: %s) — ON の受入は未成立\n"))) {
+        not_run_logs++;
+        CHECK(kdebug.state >= KDEBUG_NOT_FOUND);
+        CHECK(va_arg(ap, const char *) == kdebug_state_name(kdebug.state));
+    } else imports++;
+    va_end(ap);
 }
 void kdebug_forbidden_import(void) { imports++; finish(199); }
 u32 kdebug_test_fail(void) { imports++; return 0; }
@@ -118,6 +141,34 @@ int kdebug_test_skipped(int tag)
     CHECK(tag == KAUDIT_POST_EXEC);
     imports++;
     return 1;
+}
+static void dispatch_run(void) { dispatch |= 1; }
+static void dispatch_exec(void) { dispatch |= 2; }
+static void dispatch_unicode(void) { dispatch |= 4; }
+static void dispatch_probe(void) { dispatch |= 8; }
+static void check_boot_dispatch(void)
+{
+    static const char *const names[] = {
+        "OFF", "RUNNING", "NOT_FOUND", "BAD_HEADER", "PAIR_MISMATCH",
+        "NO_IMAGE_CRC", "ABI_MISMATCH", "NO_PAGES", "SHORT_READ",
+        "BAD_CRC", "INIT_FAILED", "RELOC_INVALID", "IMPORT_INVALID"
+    };
+    kdebug.ops.selftest_run = dispatch_run;
+    kdebug.ops.selftest_post_exec = dispatch_exec;
+    kdebug.ops.selftest_post_unicode = dispatch_unicode;
+    kdebug.ops.selftest_post_probe = dispatch_probe;
+    for (u32 state = 0; state < sizeof(names) / sizeof(names[0]); state++) {
+        kdebug.state = state;
+        dispatch = skipped_logs = not_run_logs = 0;
+        const char *got = kdebug_state_name(state), *want = names[state];
+        while (*want) CHECK(*want++ == *got++);
+        CHECK(!*got);
+        /* All ops deliberately remain non-NULL even in OFF/rejected states. */
+        host_boot_dispatch();
+        CHECK(dispatch == (state == KDEBUG_RUNNING ? 15U : 0));
+        CHECK(skipped_logs == (state == KDEBUG_OFF));
+        CHECK(not_run_logs == (state >= KDEBUG_NOT_FOUND));
+    }
 }
 void _start(void)
 {
@@ -129,6 +180,7 @@ void _start(void)
     CHECK(!rc);
     kdebug_load();
     CHECK(kdebug.state == input[2] && imports == 0);
+    CHECK(running_logs == (input[2] == KDEBUG_RUNNING));
     CHECK(opens == (input[0] == 1) && kdebug.open_count == opens);
     CHECK(closes == (opens && input[1] != 1));
     if (input[2] == KDEBUG_RUNNING) {
@@ -152,5 +204,6 @@ void _start(void)
         for (u32 i = 0; i < sizeof(kdebug.ops); i++) CHECK(!((u8 *)&kdebug.ops)[i]);
         if (!input[0]) CHECK(!owners && !kdebug.owner);
     }
+    check_boot_dispatch();
     finish(0);
 }

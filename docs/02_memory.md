@@ -57,6 +57,17 @@
 低位連続上端を返す（起動時の `ledger_arena_freeze()` で確定）。検出 RAM の最高番地ではない。
 DMA の恒久予約もここで止めるため、BB がさらに上に置かれても、この上端は DMA 開始番地になる。
 
+起動時は kdebug 読込と BB 予約の後に `[mem] pages ...` を1行出す (T3b1)。
+`fixed` は固定占有、`slack` / `pool` は通常の使用中ページも含む供給量から
+BB と kdebug を除いたもの、`meta` は metadata と workspace (ARENA_TOP 時も残す固定2頁を含む)、
+`bb` は固定/RAM の BB、`kdebug` は採用した部品の本体、`other` は Unicode backing・DMA 等。
+VRAM/MMIO の表示面は BB に加えない。領域台帳と allocator の供給量から求めた総和を
+`memory_boot_ram_kb()` のページ数と照合する。後者は従来どおり低位640KiB〜1MiBを含み、
+15〜16MiBを除く。不一致は `ng diff=総和−物理頁数` と `MemStat.audit_fail` に記録し、起動は続ける。
+KDEBUG=1 の自己試験は部品が RUNNING の場合だけ呼び、post_exec の `slack_cycle` は
+空き頁を1頁ずつ確保して再割当拒否・使用中 owner の保持・返却後の空き頁数を確かめる。
+ゲストでの T3b1 受入は [T3配置票](tasks/v3/TASK_T3_LAYOUT.md) §4 に従う。
+
 #### 動的レイアウト (番地が実行時に決まるので生成できない部分)
 
 生成される地図に出るのは `include/memmap.h` と `kernel.map` で決まる固定の番地だけ。

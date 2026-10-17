@@ -22,7 +22,7 @@ STAGE_KINDS = {
     'S2': ('FUNC',) * 134 + ('GETTER',) * 22 +
           ('GETTER', 'SETTER') * 12 + ('PTR',) * 7 + ('OP',) * 6,
     'S3': ('FUNC',) * 14 + ('GETTER',) * 2 + ('PTR',) * 4,
-    'S4': ('FUNC',) * 4,
+    'S4': ('FUNC',) * 9,
 }
 STAGES = {}
 for _stage, _kinds in STAGE_KINDS.items():
@@ -147,6 +147,8 @@ def check_nm(entries, nm=None, root=ROOT):
         if stage == 'S2':
             refs.discard('__bss_end')
             refs.discard('__kernel_resident_end')
+            # Boot page accounting remains resident and is never an import.
+            refs -= {'memory_boot_page_counts', 'kdebug'}
             # The module now uses accessors; the retained audit accounts for
             # the original audit-only references. Keep the S0 inventory fixed.
             module_refs = symbols(nm, paths[:1], True)
@@ -157,7 +159,10 @@ def check_nm(entries, nm=None, root=ROOT):
                     for name in refs - operations}
         if stage == 'S3':
             refs = {next((e['symbol'] for e in entries if e['name'] == name), name) for name in refs}
-        cumulative |= refs
+        # Append-only extensions can be used by older units in the current
+        # module without renumbering the original S1..S3 slots.
+        later = {e['symbol'] for e in entries[STAGES[stage]:]}
+        cumulative |= refs - later
         expected = {e['symbol'] for e in entries[:STAGES[stage]] if e['kind_name'] != 'OP'}
         if cumulative != expected:
             raise ValueError(f'{stage} nm mismatch: missing={sorted(expected-cumulative)}, unexpected={sorted(cumulative-expected)}')
