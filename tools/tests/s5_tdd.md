@@ -24,7 +24,7 @@ python3 -B tools/tests/test_cfg.py --sanitize s5_pure s5_bench s5_pool cmd
 
 | | |
 |---|---|
-| 対象 (1) | `userland/tests/cfg_bench.c` — CPL=3 の OS32X。`main` が最初の関数、`libos32cfg` を静的リンク |
+| 対象 (1) | `userland/tests/cfg_bench.c` — CPL=3 の OS32X。[CRT が `main` を名前で呼ぶ (関数順序は自由)](../../sdk/README.md#アプリを書くときの約束)、`libos32cfg` を静的リンク |
 | 対象 (2) | `userland/cmds/cfg.c` — `cfg status` の末尾に ` pool <db_mem_used> B` |
 | ハーネス | 既存の `tools/tests/cfg_host.c` を流用。実 SQLite + 実 `os32_sqlite_vfs.c` + 実 `kapi_db.c` + 実 `libos32cfg` + 実 `cfg.c` の上に **実 `cfg_bench.c` をそのまま載せる** (`#define main bench_main`) |
 | 贋物 | `host_api.db_mem_used = kapi_db_mem_used` — 実 `sqlite3_memory_used()` なので**実値**。`host_api.version = 50`。`host_gettick` に `host_tick_step` を足し、S5 の試験だけが tick を進める (既定 0 なので S2 までの見え方は不変) |

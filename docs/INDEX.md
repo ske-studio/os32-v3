@@ -257,7 +257,7 @@ T3 の前のデバッグ環境の整理 (起動時に読むデバッグ部品 `/
 | [archive/shell/TASK_SH_TRUNCATION.md](archive/shell/TASK_SH_TRUNCATION.md) | シェルの入力切り詰め **受入完了 (2026-09-16)** — 切り詰めたまま実行を続ける 26 経路。`if` の比較が 255 文字で切れて条件が逆転し破壊的なコマンドが走る欠陥を含む |
 | [archive/shell/TASK_EXIT_STATUS.md](archive/shell/TASK_EXIT_STATUS.md) | 終了コードの配線と `$?` **受入完了 (2026-09-16)** — ゲスト試験ランナーの 1 段目 (KAPI v55、`exec_last_result`)。決裁 E1 / E2 |
 | [tasks/shell/INHERITED_BUGS.md](tasks/shell/INHERITED_BUGS.md) | 継承バグ台帳 (T9 で起こした、常駐シェルと sh.bin の共通) |
-| [tasks/hotdeploy/DESIGN.md](tasks/hotdeploy/DESIGN.md) | ホットデプロイ (再起動なしの配備) の設計 |
+| [archive/hotdeploy/DESIGN.md](archive/hotdeploy/DESIGN.md) | ホットデプロイ (再起動なしの配備) の設計 |
 
 ### 試験と道具
 

@@ -115,8 +115,7 @@ KernelAPI・共有ライブラリの読み込みを指す。アプリ 1 本の�
 
 ## §3. ハードウェア制約
 
-**規則と理由の正典は [CONSTRAINTS.md](CONSTRAINTS.md)** — [HW1] (EGC / GRCG / GDC
-使用禁止)、[HW2] (DMA 64KB 境界)、[HW3] (新しいハードウェアは BSD 系など参照しやすい既存の実装と資料を先に見る) を参照。ここには実装上の補足だけを置く。
+**規則と理由の正典は [CONSTRAINTS.md](CONSTRAINTS.md)** — [HW1] (EGC / GRCG / GDC の描画コマンドを使わず、HAL 経由で描画)、[HW2] (DMA 64KB 境界)、[HW3] (新しいハードウェアは BSD 系など参照しやすい既存の実装と資料を先に見る) を参照。ここには実装上の補足だけを置く。
 
 - `disk.c` の DMA バッファは BSS 配置により 64KB 境界またぎを回避している ([HW2])。
 - [HW3] の参照先の例: FreeBSD の `sys/dev/<装置>/` (BSD-2-Clause)、NetBSD の `sys/dev/ic/`・`sys/dev/pci/`。メーカーの資料は `docs/hw/` のミラー (著作権物、コミットしない)。取ってきたソースは `~/os32-tmp/ref/<OS>-<版>/` に置き、リポジトリには入れない。
@@ -271,7 +270,7 @@ VFSの仕様に基づき、固定のバッファサイズ(0x4000など)を利用
 [POLICY_DEBUG.md §2](POLICY_DEBUG.md) に従う。反映を確かめてから変更対象の機能を試験し、
 期待した動作と既存機能への影響を確認する。未実行の試験は合格に含めず、報告で明示する ([V4])。
 実機での更新・検証手順は [08_build.md §8-6](08_build.md) を参照する。
-配備と検証の自動化は `os32-cycle`、ホットデプロイの設計と制限は [hotdeploy/DESIGN.md](tasks/hotdeploy/DESIGN.md) を参照する。
+配備と検証の自動化は `os32-cycle`、ホットデプロイの設計と制限は [hotdeploy/DESIGN.md](archive/hotdeploy/DESIGN.md) を参照する。
 
 ### シリアルコンソール経由のリモートテスト
 

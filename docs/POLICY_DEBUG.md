@@ -136,6 +136,7 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
 2026-10-06 に `CLAUDE.md` の「Known Gotchas」から移した — 入口の文書には置かず、ここが 1 か所の早見。
 
 **検証・配備**
+- HDD 起動では hd0 がルートなので `cdinst` は拒否される。FD 起動で行う。→ `userland/system/cdinst.c`、`userland/system/inst_hdd.c`
 - 配備の成否は文言で判断しない — ゲストの `ls -l /boot/vmkernel.lz4` と手元のサイズ、kselftest (`kselftest_pass` / `_fail`) は**新しい** `kernel.map` の番地で読む。NHD の作業イメージは `build/nhd/os32.nhd`。→ §2、§4-17、§4-29
 - `deploy.yaml` に無いバイナリは NHD で古いまま残り rshell を止める ([V2])。`hsync` は HostDrv の内容で上書きするので NHD 配備の後は先に `make deploy`、`/sys` は `hsync sys` + リセット (GUI の窓が例外 0 件で出ない = shlib が古い)。→ §4-12、§4-33、§4-36、§4-42
 - 保存の試験はバイト列で突き合わせ、冪等も繰り返して見る。通知のある API は入力経由と API 経由の両方を見る。→ §4-46、§4-44
@@ -152,6 +153,7 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
 - 実機の再起動はシリアルの `reboot`、起動待ちは 1 回の待ち受けで (`ver` の連打は起動を邪魔する)。→ [08_build §8-6](08_build.md) の R7 の更新準備
 
 **カーネル・FS**
+- CPL3 の `kprintf` は可変引数 14 個まで (属性と書式を含め `RING3_ARG_WINDOW` 64B)。超えると黙ってごみが出る。→ `userland/shell/cmd_pci.c:288`、`exec/exec.c` の `RING3_ARG_WINDOW`
 - 外部プログラムは CPL=3・自前のページディレクトリで走り、不正ポインタはそのアプリだけを kill する (`fault_kill_count`)。常駐シェルだけが例外。→ [`09_exec.md`](09_exec.md)
 - kstring / kmalloc / kprintf の基本部品を触ったら kselftest のケースを足す。→ §2
 - ext2: `ext2_g_aux` を free/alloc をまたいで持たない、`ext2_read_file` は端数ブロックを `to_copy` だけ写す、メタデータの I/O エラー後は書き込みを全部断る (-15 → ホストの e2fsck)、OS32 で読めることは正しい ext2 の証拠でない。→ §4-24、§4-32、§4-35、§4-58
@@ -165,6 +167,7 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
 - ブートローダ: PM 遷移は `loader_fat.asm` に内蔵、`boot_fat.asm` は `.8086`、HDD IPL の INT 1Bh は 16 回 (上限の理由は未確認)。→ [`docs/10_notes.md`](10_notes.md) §10-2、§10-3
 
 **GUI・入力・道具**
+- filer の起動時のフォーカスは右の一覧。木の枝を開くには TAB → →。→ `userland/rust/filer/src/lib.rs:250`
 - GUI の内部: `libos32gfx_attach()` (`gfx_init` ではない)、Cirrus の窓は 1 回だけ写像、テキストカーソルは CSRFORM の DC ビットだけ。→ §4-18、§4-20〜§4-22
 - `mui_pump_input()` はキーキューを食う (自前でキーを読むアプリは `mui_pump_input_ch()`)。→ §4-14
 - GUI を NP21/W で叩く: rshell を ESC で抜けてから、`SHIFT+SPACE` は `--data-urlencode`、`/api/mouse` は `ax/ay`、Start メニューの行は `start_row()`、配備は `system.cfg` を書き換える。「遅い」はまず `gfx_counters` と `/api/status` の `eip`。→ §4-23、§4-25、§4-31
@@ -301,7 +304,7 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
   共有ライブラリ内の `gfx_draw_font` (漢字経路) が 4 プレーン経路に落ちていた。ANK は libos32gui が自前で
   画素を置くので気付かなかった。
 - **対策**: 判定を C 側の `libos32gfx_attach()` に集約し、`libos32gfx_init` と attach の両方から呼ぶ。
-  SDK ライブラリを変えたので `make external` も必要 (§4-12 と同じ罠)。
+  SDK ライブラリ変更後は、[H-7 の条件を満たして再開が承認されたとき](tasks/v3/T2H_EXTERNAL_GATE.md#再開前に揃える-8-項目) に `make external` で再ビルドする (§4-12 と同じ罠)。
 - **検証**: PEGC / Cirrus で「日本語abc」が textbox とラベルに出る。9801 (`gfxmode pc98`) は元から正常。
 
 ### 4-21. Cirrus: 窓を shutdown で畳むと単独アプリが #PF、再 init でリレーが倒れたまま

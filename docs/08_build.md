@@ -210,7 +210,7 @@ Makefile ターゲットとの対応 (`build/deploy.mk`)。**このリポジト�
 | `make prune-source-extra` / `make prune-source-extra-delete` | HostDrv 配備元の名札外ファイルを一覧 (dry-run) / 削除。拡張子を限定せず、設定保護・allow-list は除外。正典は [T2H_EXTERNAL_GATE](tasks/v3/T2H_EXTERNAL_GATE.md) |
 | `make prune-stale` / `make prune-stale-delete` | 配備先 (HostDrv + NHD) に残ったマニフェストに無い *.bin を一覧 / 削除。deploy 系は既定で削除まで行う (`NO_PRUNE=1` で一覧のみ) |
 | `make apps` / `make game` | 外部リポジトリ (git submodule `apps/` = os32-apps、`game/` = os32-game) を SDK 経由でビルド。空なら `git submodule update --init` を促す |
-| `make external` | 上記 2 つをまとめて。KAPI / SDK ライブラリ変更後に再ビルドする。ポインタ更新条件は下記参照 |
+| `make external` | [H-7 の再開条件](tasks/v3/T2H_EXTERNAL_GATE.md#再開前に揃える-8-項目) を満たし承認後に、上記 2 つをまとめてビルド。再開後は KAPI / SDK ライブラリ変更時にも再ビルドする。ポインタ更新条件は下記参照 |
 | `make clean-external` | 外部リポジトリの生成物を削除 |
 | `make deploy` → ゲストで `hsync` | HostDrv 経由の配送 — 再起動不要。`hsync` は既定で `/sys` を外す (稼働中のシェル・共有ライブラリ)。入れ替えるときは `hsync sys` |
 | `make nhd-pull` | Windows 側 NHD を作業イメージ `build/nhd/os32.nhd` に取り込む (フォーマットしない)。deploy 系は無ければ自動で pull する |
@@ -536,7 +536,7 @@ git submodule update --init     # 初回 / clone 直後
 make external                  # apps + game (make apps / make game で個別)
 ```
 
-再開後は KAPI または SDK のライブラリ (libos32gfx 等) を変えたときも両方を再ビルドする。
+[H-7 の条件を満たして再開が承認された後](tasks/v3/T2H_EXTERNAL_GATE.md#再開前に揃える-8-項目) は KAPI または SDK のライブラリ (libos32gfx 等) を変えたときも両方を再ビルドする。
 アプリは静的リンクなので、旧 `.bin` に新ライブラリの変更は反映されない。
 再ビルドだけでは submodule のコミットもポインタも変わらない。submodule 側のソース変更で
 参照先が変わった場合にだけ、検証した組み合わせのポインタを親リポジトリで更新する。

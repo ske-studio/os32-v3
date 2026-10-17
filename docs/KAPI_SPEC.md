@@ -1396,9 +1396,11 @@ LBA28、無ければ word 53 bit0 の現在の CHS、それも無ければ既定
   次の statement があるかは `sqlite3_prepare_v2` の `pzTail` を**もう一度 prepare** して
   見る — stmt が返らなければ末尾は空白 / コメントだけ。空白やコメントの規則を自前で
   持たないので、判定は SQLite と 1 対 1 になる)。**step しない**ので、SELECT の先頭行も
-  DML も進まない。同じ handle の旧 stmt は **拒否理由に依らず入口で** finalize して
-  置換する (引数不正で断ったときに前の statement が残ると、次の `db_step` がそれを
-  実行してしまう)。
+  DML も進まない。同じ handle の旧 stmt は **入力を受け付けたときだけ** finalize して
+  置換し、入力拒否時は stmt・slot・transaction・SHM 結果を変えない
+  ([T4〜T6 票 §9 の決定](tasks/v3/TASK_T4_T6_MODULES.md#9-未決の争点))。
+  拒否の戻り値を見ずに step すると前の文の続きが返る。
+  この契約への実装追従は T4b-1 の対象で、現行 `kapi/kapi_db.c` はまだ入口で finalize する。
 - `db_bind_*`: prepare_only の後・**最初の step の前**だけ。`index` は 1-based。
   `text` は 0〜`DB_BIND_TEXT_MAX` (255) B、`blob` は 0〜`DB_BIND_BLOB_MAX` (4096) B。
   負・超過・NULL ポインタは拒否 (NULL 値は `db_bind_null`)。0B でも非 NULL の空値。

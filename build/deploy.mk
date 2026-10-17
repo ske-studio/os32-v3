@@ -70,7 +70,7 @@ hotdeploy:
 	@echo "make hotdeploy は廃止 (2026-09-09)。"
 	@echo "  1) make deploy      # ホスト → C:\\os32"
 	@echo "  2) ゲストで hsync   # /host -> / (sys は 'hsync sys' で明示)"
-	@echo "経緯: docs/tasks/hotdeploy/DESIGN.md"
+	@echo "経緯: docs/archive/hotdeploy/DESIGN.md"
 	@exit 1
 
 # nhd-mount: NHDのext2パーティションをマウント

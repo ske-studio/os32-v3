@@ -100,5 +100,3 @@ unsafeは静的保存領域のclaim後初期化、Sessionの外部領域再借�
 実行入口は `make check-t5a-host`。RED/GREEN と提出時点の結果は [TDD_LOG](TDD_LOG.md) にある。
 ホスト試験だけでは guest.rs の実行、CPL3 KAPI、実字形、WM のイベント配送、
 clip の寿命、再露出、終了後の復元、性能を保証しない。
-旧 README の最終 ELF/BSS/stack 配置・再起動・構成別表示の確認待ちは、この文書修正では
-解消を確認していない。PM は受入証拠と照合し、未実施分を持越し台帳へ登録する。

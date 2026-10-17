@@ -17,7 +17,7 @@ static u8 xfer_buf[4096];
 /*  ホストは NP21/W の aidebug API (POST /api/mem?space=linear) でこの配列へ */
 /*  直接バイト列を書き込み、そのあと hotdeploy コマンドでファイル化させる。  */
 /*  シリアルを通さないので hex 2 倍化もエミュレート速度も効かない。          */
-/*  設計: docs/tasks/hotdeploy/DESIGN.md (案 A)                              */
+/*  設計: docs/archive/hotdeploy/DESIGN.md (案 A)                              */
 /*                                                                          */
 /*  シェル帯域は 0x300000 から 468KB (MEM_SHELL_MAX_SIZE)。text 約 58KB +    */
 /*  既存 bss 約 59KB に 256KB を足しても収まる。                            */

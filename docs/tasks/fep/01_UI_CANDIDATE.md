@@ -215,7 +215,7 @@ static void candlist_draw(void)
 
 TVRAM ではリスト展開前に `candlist_save()` が候補領域の文字と属性を退避し、
 畳む / 確定する際に `candlist_clear()` → `candlist_restore()` で復元する
-(`kernel/ime.c:76`、`kernel/ime.c:99`、`kernel/ime.c:121`)。退避済みフラグで二重退避を防ぐ。
+(`kernel/ime.c:76`、`kernel/ime.c:98`、`kernel/ime.c:120`)。退避済みフラグで二重退避を防ぐ。
 退避バッファが無い場合は保存しないため、その場合の復元は保証されない。
 スクロールの予約行制御は [P2 §4](02_SCROLL_GUARD.md#4-fep-からの制御)、
 未実装の GVRAM 退避・復元案は [P5 §3](05_GFX_MODE.md#3-gfx-vram-退避復元) を参照。
