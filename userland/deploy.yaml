@@ -215,6 +215,10 @@ filesystem:
     - host: userland/tests/exec_heap_test.bin
       guest: /usr/bin/
       tags: [test]
+    # --- T3c3 F-9 allocator measurement ---
+    - host: userland/tests/allocator_bench.bin
+      guest: /usr/bin/
+      tags: [test]
     # --- f7 USER nano secondary arena ---
     - host: userland/tests/malloc_arena_test.bin
       guest: /usr/bin/
