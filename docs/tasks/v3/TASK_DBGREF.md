@@ -1,12 +1,12 @@
 # DBGREF — デバッグ環境の整理「対象を絞った 1 段目」: 起動時に読み込むデバッグ部品 (`/boot/kdebug.bin`) 設計票 r4a (確定版)
 
-> 状態: **受入完了 (2026-10-16)** — **S0〜S3 着地、G1〜G3 合格、実機の受入 (4) も合格** (86ba40c、KDEBUG=1 で [crt]/[crt2]/[pegc] の欄が 10/14 と同じ・実機 ROM の `v86 -g` OK・KDEBUG=0 で NOSYS、`~/os32-tmp/evidence/2026-10-16/dbgref_s3_realhw/`)。受入 (3) の採取途中の CTRL+STOP は台帳 E10-4 (T7)。S3 は 58f874e (`__bss_end` 純減 6,848 B、kdebug.bin body 11 ページ、F3 の未使用 import 8 本も削除)。 S0〜S2 は着地 (S2 は 6cd9d1b)。G1・G2 は NP21/W 64MB で合格 (`~/os32-tmp/evidence/2026-10-15/dbgref_g1/`・`dbgref_g2/RESULT.md`)。実測は S1a +2,688、S1b +96、S2 −27,264 B (`__bss_end` 0x191a20)、kdebug.bin 43,660 B。像の残りは 30,176 B (R7FIX2 などを含む実測) で、§6-3 の L-B 着手条件 (≥ 19,456 B) は成立。次は LAN L-B、そのあと S3。確定版 r4a (Fable 起草、astra 3 往復 + 確認 1 回、ユーザー決定 Q1〜Q3「推奨どおり」)。S0 (ホスト側) は着地。往復の記録は `~/os32-tmp/run/dbgref/`。§3-6 の添字 1〜134 の内訳の数字は `kernel/kdebug_imports.def` (生成器が `nm -u` との一致を検査) が正 (S0 レビュー S0-5)。
+> 状態: **受入完了 (2026-10-16)** — S0〜S3・G1〜G3 と実機受入 (4) は合格。証拠: `~/os32-tmp/evidence/2026-10-15/dbgref_g1/`、`dbgref_g2/RESULT.md`、`~/os32-tmp/evidence/2026-10-16/dbgref_s3_realhw/` (86ba40c)。採取途中の CTRL+STOP は [持越し台帳 E10-4](../DEFERRED_TESTS.md) の T7 残件。設計・レビュー記録は `~/os32-tmp/run/dbgref/`。
 
 書き手: Fable 5.1 (`claude-fable-5-1`)、2026-10-14。基点: main `78207df`。数字は `build/out/kernel.map`・`.o` (`nm -S` / `nm -u` / `readelf -S`)・`ls -l`・ヘッダの `extern` 宣言から取った。
 r4a = r4 + astra r4 の確認 (判定「依頼パックで直せば実装に出してよい」、P1 なし、P2 ①〜⑥) の反映 (`fable_r4_response.md`)。ユーザーの決定 (2026-10-14、推奨どおり): Q1 製品の既定は `KDEBUG=0`、受入と採取は「対の部品が RUNNING」を前提、1 段目は「対象を絞った 1 段目」と記録し全面達成とは書かない / Q2 L-B は S1+S2 後の実測で残り ≥ 19,456 B なら着手、SHM 削りは予備 / Q3 部品の形式は今回 T4 と同じ形式に確定。**この版は本文を全部持つ。前の版を参照しない。これ以上の往復はしない。**
 前提: OS32 はシングルタスク・協調切替。凡例: [確] 現物で確認、[推] 推測、[未] 実機かビルドで確かめる。
 
-> 入口の要約: ユーザーの要望「デバッグモードで起動しなければ、デバッグ用コードがメモリに乗らない」に対する**対象を絞った 1 段目**。カーネルは 1 種類、**kselftest の自己試験 (本体のファイルにある分)・`v86 -g` の記録器・crt_diag** を部品 `/boot/kdebug.bin` に移し、`/etc/system.cfg` の `KDEBUG=1` のときだけ root マウント後に読み込む。対は `vmkernel.lz4` の Image CRC で照合、状態は MemStat の末尾拡張 (slot を増やさない) で `ver` から読める。OFF でも lifecycle の監査は同じ回数走る。像の予算 (残り 7,424 B) から消える計画値 **約 −35.0 KB** (段の閾値の合成 **−29,900 B**)、OFF で常駐から消えるのは移した 3 対象の **38,067 B**。本体に残る診断関連 (loader・監査・他ファイルの試験本体・bootlog・計装・例外ダンプ) は**約 43 KB** あり、後の段の対象 (§0-3・§6-4)。
+> 入口の要約: ユーザーの要望「デバッグモードで起動しなければ、デバッグ用コードがメモリに乗らない」に対する**対象を絞った 1 段目**。カーネルは 1 種類、**kselftest の自己試験 (本体のファイルにある分)・`v86 -g` の記録器・crt_diag** を部品 `/boot/kdebug.bin` に移し、`/etc/system.cfg` の `KDEBUG=1` のときだけ root マウント後に読み込む。対は `vmkernel.lz4` の Image CRC で照合、状態は MemStat の末尾拡張 (slot を増やさない) で `ver` から読める。OFF でも lifecycle の監査は同じ回数走る。像の予算 (残り 7,424 B) から消える計画値 **約 −35.0 KB** (段の閾値は [§6](#6-2-段ごとの計画値と受入の閾値-b) を参照)、OFF で常駐から消えるのは移した 3 対象の **38,067 B**。本体に残る診断関連 (loader・監査・他ファイルの試験本体・bootlog・計装・例外ダンプ) は**約 43 KB** あり、後の段の対象 (§0-3・§6-4)。
 
 ---
 
@@ -217,7 +217,7 @@ T4 どおりデータの import は禁止し、データ記号 44 本 (kselftest
 | **構造体実体 1** | `v86_session` (struct v86_session_state、`.aborting` 等のメンバ読み) | `struct v86_session_state *kdi_ptr_v86_session(void)` × 1 | 無し (**`#define v86_session (*kdi_ptr_v86_session())`** — 配列とは別の展開) |
 | **新しい口 6** (本体の `kaudit.c` / `kselftest_report.c` の関数) | `ksel_pass/fail` の `++` (`check()` 2 行)、`= 0` (`kselftest_run` 2 行)、読み 20 か所 (:962,969,974,992-996,1560,1670,2085-2091,2126,2129)、監査の結果 | `void kdi_kselftest_count(int pass)`、`void kdi_kselftest_reset(void)`、`u32 kdi_get_kselftest_pass(void)`、`u32 kdi_get_kselftest_fail(void)`、`int kdi_kaudit_last_rc(int tag)`、`int kdi_kaudit_skipped(int tag)` | `check()` 2 行と `kselftest_run` 先頭 2 行、`post_exec` / `post_probe` の監査呼出し 2 行 = **6 行** (読みは `#define ksel_pass (kdi_get_kselftest_pass())`) |
 
-**`.def` の段ごとの一覧 (順序 = 列の添字、型は各ヘッダの宣言から生成器が取る)**:
+**設計時の段別一覧 (2026-10-14 の記録。現在の本数・添字ではない)**。現行は `kernel/kdebug_imports.def` と生成 `kdebug/generated/kdebug_imports.h:117` の `KDEBUG_IMPORT_COUNT` が正。
 
 | 段 | 添字 | kind | 内容 | 本数 |
 |---|---:|---|---|---:|
@@ -235,9 +235,9 @@ T4 どおりデータの import は禁止し、データ記号 44 本 (kselftest
 
 LB-1 の生成段は S4、export は既存 1〜5 と 18。gcap の移動はこの段では行わず、6〜17 は NULL。未実装の NIC import は NOSYS/DOWN/0 のスタブを持つ。
 
-- 本体側の費用 (実数で): `kdebug_kexports[]` 4 B × 本数、getter 約 8 B、setter 約 10 B、ポインタ getter 約 6 B、新しい口 約 12 B。段別: S1 = 4 B。S2 = 193 × 4 = 772 + getter 34 × 8 = 272 + setter 12 × 10 = 120 + ptr 7 × 6 = 42 + 口 6 × 12 = 72 → **1,278 B**。S3 = 17 × 4 = 68 + getter 2 × 8 = 16 + ptr 6 → **90 B**。
-- 部品側: import slot `kdebug_import_slots[211]` (`.data`、844 B) とスタブ `jmp *slot` (約 7 B × 211 ≈ 1.5 KB、text) — 部品の中 (像の予算の外)。
-- 解決: `module_abi_gen == kdebug_abi_gen && import_count == 211` を確かめ、**位置で**結ぶ (i 番目の slot に `kdebug_kexports[i]`)。名前表は道具用で、`name_hash` の不一致も拒否する。IRQ/例外文脈で呼べる import (`serial_puts_polled`、`kctx_*` の getter、`v86_gp_*` の getter、`v86_session` のポインタ) に `.def` で印を付け、例外文脈の口 (slot 7〜15) から呼べるのは印つきだけ、を `check-kdebug-ctx-host` で固定する。
+- 設計時の本体側費用の見積り: `kdebug_kexports[]` 4 B × 本数、getter 約 8 B、setter 約 10 B、ポインタ getter 約 6 B、新しい口 約 12 B。段別: S1 = 4 B。S2 = 193 × 4 = 772 + getter 34 × 8 = 272 + setter 12 × 10 = 120 + ptr 7 × 6 = 42 + 口 6 × 12 = 72 → **1,278 B**。S3 = 17 × 4 = 68 + getter 2 × 8 = 16 + ptr 6 → **90 B**。
+- 部品側: import slot は `kdebug_import_slots[KDEBUG_IMPORT_COUNT]`。slot とスタブは部品の中 (像の予算の外)。
+- 解決: `module_abi_gen == kdebug_abi_gen && import_count == KDEBUG_IMPORT_COUNT` を確かめ、**位置で**結ぶ (i 番目の slot に `kdebug_kexports[i]`)。名前表は道具用で、`name_hash` の不一致も拒否する。IRQ/例外文脈で呼べる import (`serial_puts_polled`、`kctx_*` の getter、`v86_gp_*` の getter、`v86_session` のポインタ) に `.def` で印を付け、例外文脈の口 (slot 7〜15) から呼べるのは印つきだけ、を `check-kdebug-ctx-host` で固定する。
 
 ### 3-7. 本体が常に返す状態 — MemStat 200 → **220 B** (版 75、slot 追加なし)
 

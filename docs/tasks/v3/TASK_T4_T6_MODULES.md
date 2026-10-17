@@ -1,9 +1,9 @@
 # TASK_T4_T6_MODULES — SQLite・FEP・起動モジュールの詳細設計
 
-> 状態: **設計中 (2026-10-15、再照合 r2、ユーザー確認待ち)** — 本票の実装・受入は未実施。元設計の独立レビュー往復3 Approve は §8 の履歴であり、この再照合版の承認ではない。
-> **レビューの経過 (PM、2026-10-16)**: astra が起草 (r2・r3) → Opus 5.5 が独立レビュー 2 往復 (r1「直してから」、r2「確定してよい (未決の争点はユーザーへ)」)。往復の記録は `~/os32-tmp/run/t3design/T4_T6_MODULES/` (`opus_r1.md`・`astra_r2_response.md`・`opus_r2.md`)。**ユーザーに決めていただく争点**: SQL の 3 入口の拒否時の扱い、/persist の媒体 (T5b-6 の前) — 末尾の「未決の争点」。実装の前にユーザーが確認する。
+> 状態: **設計中 (2026-10-16、再照合 r3、§9 の方針決定済み)** — 本票の実装・受入は未実施。元設計の独立レビュー往復3 Approve は §8 の履歴であり、この再照合版の承認ではない。
+> **レビューの経過 (PM、2026-10-16)**: astra が起草 (r2・r3) → Opus 5.5 が独立レビュー 2 往復 (r1「直してから」、r2「確定してよい (未決の争点はユーザーへ)」)。往復の記録は `~/os32-tmp/run/t3design/T4_T6_MODULES/` (`opus_r1.md`・`astra_r2_response.md`・`opus_r2.md`)。SQL 3入口は拒否時に何も変えず、HostDrv は root にしない (§9、2026-10-16 決定)。実装・測定ゲートは未完了。
 > 再照合: Codex、main `c81b27bed7c1b0d05e5e7d9de9763c4eded844e5` (2026-10-15)。元設計: Codex gpt-6-astra、調査基点 `3c4171a784cc47720392ab55b3c4a24aee17e6f3`、レビュー基点 `59c4285`。D1〜D36・契約・順序は維持し、実装済みの部分と今回の実装案を分ける。
-> 改訂: **r3 (2026-10-16)**。Opus 5.5 の再照合版レビュー r1 (P1なし、P2 1件・P3 5件) を反映。状態行は共通依頼の指定を維持し、上記mainが現在の先頭であることを再確認。採否は `astra_r2_response.md`、未決は§9。実装・受入済みとはしない。
+> 改訂: **r3 (2026-10-16)**。Opus 5.5 の再照合版レビュー r1 (P1なし、P2 1件・P3 5件) を反映。状態行は共通依頼の指定を維持し、上記mainが現在の先頭であることを再確認。採否は `astra_r2_response.md`、その後の方針決定は§9。実装・受入済みとはしない。
 > 上位契約: [TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) §3-5・§4・§6・§7。前提: [T2](TASK_T2_APPBAND.md) 完了 → [T3](TASK_T3_LAYOUT.md)。この票は形式、状態、移行と失敗処理の実装契約を補う。D番号の決定を変更しない。
 
 ## 0. 再照合
@@ -22,7 +22,7 @@
 | FEP予約量・S/M/L最大負荷・断片化保証 | 未測定 | 元票 §3-3 を維持しT4a-3/4で数値化。過去の常駐38KBだけを予約量にしない |
 | LAN/82557は将来の未実装driver | 要改訂 (移設対象に) | `docs/tasks/realhw/TASK_LAN_82557.md:3` はLB-2c送信まで、LB-3受信/IRQは未受入。T5cで完成済み範囲を確認して移す。L-B完了を推定しない |
 | gfx資源識別・予約をcoreに残す | 維持 | R7FIX2後はPEGCのFFF00000h窓 (`include/memmap.h:376,395`)。旧F00000h固定期待へ戻さず、永久予約とmodule回収を分ける |
-| HostDrv rootの管理ext2 DB配置 | 維持 (配置は判断待ち) | 元票 §3-5、`docs/tasks/v3/DOCS_REORG_T3.md:104`。LAN版/hostの段1 (`fs/sfs_lan.c:30,100`) はroot起動やDB整合性を提供しない |
+| HostDrv rootの管理ext2 DB配置 | 不採用 (2026-10-16 決定) | §3-5・§9。HostDrv は補助マウント、管理 DB は通常 NHD ext2 root に置く |
 | 8MB/17MB/実機の構成別受入 | 要改訂 (実施時期のみ) | `docs/tasks/DEFERRED_TESTS.md:19` の10-14決定で最終段へ。途中は64MB、D9/D21の最低条件・必須サービスは維持 |
 | 像の余裕はT2終了後に再計算 | 吸収済み (今回の既存像測定) | `build/out/kernel.map:4452` は `__bss_end=0x1940C0`。下記計算。T3後/本票各段の量は未測定 |
 
@@ -118,7 +118,7 @@ SQLite module initは module code → owner付きMEMSYS5 512KiB → 代替stack1
 
 **B4:** core側の `engine_enter/leave` を全outer呼出しへ置く。active owner/groupと呼出し深さはFD所有権とは別。正規VFS callbackはactiveを維持し二重enterしない。再入は失敗、例外時は `isr_handlers.c` のapp-kill判定より先にactiveを検査しfail-stopする。STOPは要求だけ保存し、leave後の安全点で処理する。診断API (`db_mem_used`/last_error) も例外ではない。
 
-**B3:** T2 bounded copyでpath/SQLをkernelへ完了してから旧stmt finalize。SQLは既存1024Bバッファ (payload1023B) にNULまで入らなければ失敗し、切捨てない。不正入力時はSQLite進入0、既存stmt・transaction・slot・SHM結果を維持する基準契約 (`docs/tasks/settings/FEP_BOUNDARY.md:140,141,213`) を変えない。copyoutはengineを出てから行う。対象は旧 `db_exec/db_prepare` を含む全outer入力。ただし旧stmt維持には「拒否のrcを見落としてstepすると旧SQLを実行する」反例がある (`kapi/kapi_db.c:651,704`)。`db_prepare_only` の入口finalize契約 (`docs/KAPI_SPEC.md:1396`) との調整も含め、3入口の公開接続は§9の判断前に行わない。T4b-1はcopy核・反例fixtureだけ先行でき、旧入口なら争点を回避できるとはしない。
+**B3:** T2 bounded copyでpath/SQLをkernelへ完了してから旧stmt finalize。SQLは既存1024Bバッファ (payload1023B) にNULまで入らなければ失敗し、切捨てない。不正入力時はSQLite進入0、既存stmt・transaction・slot・SHM結果を維持する基準契約 (`docs/tasks/settings/FEP_BOUNDARY.md:140,141,213`) を変えない。copyoutはengineを出てから行う。対象は旧 `db_exec/db_prepare` を含む全outer入力。§9 の決定に従い、3入口とも拒否時は何も変えない。拒否の rc を見落として step すると旧文の続きが返るのはアプリ側の問題として扱う。prepare_only も入力を受け付けた場合だけ finalize する設計に揃える。KAPI_SPEC の契約説明の同期は T4b-1 の前に行う (本票の決定を実装済みとはしない)。
 
 ### 3-2. F2/F3 と重複接続の移行規則
 
@@ -150,15 +150,14 @@ D27の「512KiBの単一MEMSYS5」は維持する。`cache_size`やsoft limitだ
 
 FEP画像CRC不一致・辞書なし・予約不足等は利用者へ未公開の失敗として、FEPの部分stmt/groupをclose/finalize → settingsを含むRESIDENT groupゼロを確認 → sqlite3_shutdown → 内部exportをstubへ → RUNNING/STARTINGからROLLING_BACK → FEP/SQLite ownerの回収、の順。init自身で失敗した場合も同じ段階印で一度だけ処理する。正常rollback後はSQLite/FEPの占有ゼロ、全dbはNOSYSのMINIMALへ入る。close/shutdown/装置停止の証明が失敗したらcode/heap/stack/groupを依存閉包ごとQUARANTINEDに残す。一般KAPIはstubだが **MINIMAL_QUARANTINED** と別状態で診断し、隔離byte数を空きから差し引く。これを標準MINIMALや8MB標準合格に数えない。安全な入力/回復継続を証明できなければ起動停止する。
 
-### 3-5. CD/HostDrvルートでもFEPを必須に保つ
+### 3-5. CD と通常 root の FEP
 
 これは新しい実装契約案で、現行 `ime_dict_open` がREADWRITE固定であることを変更する。D21のFEP必須とD26の実失敗rollbackは維持し、rootのFS種別だけでMINIMALを選ばない。
 
-- **CD標準構成:** 不変配布CDの既存combined `fep.db` をROで開いて変換を提供する。`ime_dict_open(mode)` にROを加え、CREATE TABLE/INDEXと学習stmtのprepareを行わず、`dict`と存在する場合の`dict_user`を読む検索stmtだけ作る。`dict_user`欠落なら辞書本体だけを検索する。学習は無操作、明示的な削除/clear等の更新APIはROFS、list/exportは読取として維持する。状態診断で「変換可・学習不可」を示す。これはFEP省略ではなく、DICT_METAの学習別file化も前倒ししない。settingsも不変CDをROで読み、更新はROFS。ext2へ学習を保存したい利用者は下の管理DB構成を選ぶ。
-- **HostDrvルートの標準構成:** /sys等をHostDrvから読む一方、**管理下のext2データvolumeを別mountし、FEP/設定の既定DBはそちらを使うことを必須**にする。mount先案は `/persist`、辞書はその `db/fep.db`、設定は `etc/settings.db`。実際の名前はパス定数の正典へ登録し、HostDrv用配布profileでkernel FEP・boot settings・libos32cfg/installerの既定pathを一組に生成する。複数alias mountを作らず、同じvolumeは一つのmount identityで管理する。kernel boot coordinatorはroot成立後・SQLite内部openより前にext2 mountと期待volume/DBの存在を確認する。FEPはこのext2上のcombined DBをRWで開き、既存学習を保持する。
-- **配備/不在時:** HostDrv上のlive DBをそのまま読むfallbackはない。初回のext2へのDB準備はユーザーデータを保った配布手順で行い、通常bootが既存学習を上書きしない。初回コピーでは元DBをclean closeし、コピー完了までホスト側の更新を止める。必要なら一時ファイルへコピーし、完了後に元DBの確定時に採った長さ・CRCと照合してから採用する。不一致なら採用せず再コピーする。通常bootで継続的なdigest検証は追加しない。管理volume/辞書が無い場合は設定不備という実失敗としてD26のrollbackを行い、その起動をHostDrv標準受入の合格に数えない。
+- **CD標準構成:** 不変配布CDの既存combined `fep.db` をROで開いて変換を提供する。`ime_dict_open(mode)` にROを加え、CREATE TABLE/INDEXと学習stmtのprepareを行わず、`dict`と存在する場合の`dict_user`を読む検索stmtだけ作る。`dict_user`欠落なら辞書本体だけを検索する。学習は無操作、明示的な削除/clear等の更新APIはROFS、list/exportは読取として維持する。状態診断で「変換可・学習不可」を示す。これはFEP省略ではなく、DICT_METAの学習別file化も前倒ししない。settingsも不変CDをROで読み、更新はROFS。学習を保存する通常構成は NHD ext2 root を使う。
+- **通常構成:** 管理 DB は通常 root (NHD ext2) の既定配置を使う。HostDrv は root にしない (§9 の決定)。HostDrv root 用の `/persist` 配置と DB 移行は不要。
 
-CDのRO FEPはT4c-3、HostDrv root+ext2管理DBはT5b-6の受入に分ける。現行rootはFD/FATまたはHDD/ext2 (`kernel/kernel.c:444,449`) なので、T4c-3では不変CDをrootとするhost fixtureで1語変換・学習journal生成ゼロ・更新ROFSを確認し、CD実起動はT5b-5で受ける。T5b-6では変換→学習→再起動後保持、HostDrv源の外部変更が開いた管理DBへ影響しないこと、管理volume不在の明示的失敗を確認する。HostDrvの配布profile/mount接続・媒体配置の判断は **T5b-6実装前** のゲートで、T4cやT5b全体の入口へ前倒ししない (`docs/tasks/v3/DOCS_REORG_T3.md:104`)。実装済みともユーザー承認済みの新データ配置とも記録せず、実際の媒体を変更する際は既存配備の [D1]〜[D3] に従う。
+CD の RO FEP は T4c-3 の host fixture で1語変換・学習journal生成ゼロ・更新ROFSを確認し、CD 実起動は T5b-5 で受ける。T5b-6 は HostDrv の補助マウントと通常 root の管理 DB が共存することを確認する。媒体変更は [D1]〜[D3] に従う。
 
 ## 4. T5a FEP 案 B
 
@@ -190,7 +189,7 @@ U19の移動可否はT5b入口でcore初期化の全依存を確認するゲー�
 | HDD/ext2 | coreのIDE/ext2でroot、core1エントリ・同梱不要 | root未成立なら回復媒体へ。通常モジュール探索で循環させない |
 | FD | core FDC + FAT EARLY、合計2エントリ | FAT失敗なら起動停止。SQLite/FEPなしMINIMALはroot成立後の回復構成 |
 | CD | core + ATAPI EARLY + iso9660 EARLY =3、HostDrv併用でも追加1で計4。iso9660側のdiskio等を依存画像へ静的に含める | ATAPI未起動でiso9660登録しない |
-| HostDrv | core + HostDrv EARLY =2。必要なnp2sys transportは同画像に含める。ext2管理DBの接続は§3-5 | 実機で専用I/Oへ触れない。rootとして使う構成ではEARLY依存を同梱 |
+| HostDrv (補助マウント) | CD併用時は HostDrv EARLY を追加して計4エントリ。np2sys transport は同画像に含める | root には使わない。実機で専用I/Oへ触れない |
 
 同梱域は1MiBの予約をまずboot ownerで保持し、各エントリを **VK32 entry.mem_size = load_span (prefix+body)** で配置する。BSS・整列を含め重複なし、同じページを2ownerに分けない。検証→再配置→initの順にmodule ownerへ占有ページを移譲し、**全エントリの処理と参照終了後に、余白ページだけ**返す。EARLYでも§2-1の継続情報コピーが済んだprefixページだけは余白として返せる。成功module/隔離moduleのbodyページは返さない。圧縮集積域は全展開・CRCとbootinfoへの結果コピーが終わった後に返す。
 
@@ -212,7 +211,7 @@ MINIMALでSQLiteを使う `install --recover-settings` は動作しない (D21)�
 | 2 | FM+snd、PCM | IRQ/tick/DMA broker。登録直後失敗・停止不能を必ず注入 |
 | 3 | V86 | entry/exit facade。低位PTE切替と例外の復帰コードの寿命を証明、稼働中回収なし |
 | 4 | LAN/82557 | core PCI識別/永久resource、driver bindのSTARTING/RUNNING/QUARANTINEとmodule状態を対応。LB-3/4受入後の実装を移す (現在は送信まで)。LAN版/hostのNIC参照・session寿命も確認 |
-| 5 | HostDrv / np2sysp+シームレスmouse / Cirrus+WAB | 検出前の専用I/Oを禁止。HostDrvはroot用EARLYなら同IDをPOST_ROOTで再ロードしない。Cirrusの識別glueだけcoreに残す |
+| 5 | HostDrv / np2sysp+シームレスmouse / Cirrus+WAB | 検出前の専用I/Oを禁止。HostDrvを補助マウント用EARLYで同梱した場合は同IDをPOST_ROOTで再ロードしない。Cirrusの識別glueだけcoreに残す |
 | 6 | スプラッシュ | CPL=3アプリ、BB lease借用→終了解除。表示失敗で常駐shellを止めない |
 
 gfxの副作用のない識別・resource記録はcoreに残す案とする。R7FIX2のPEGC別名窓FFF00000hの予約/写像 (`include/memmap.h:395`、`gfx/gfx_core.c:381`) はmodule失敗でも消さない。LANの装置手順は `docs/tasks/realhw/TASK_LAN_82557.md:51` のIntel/National資料とFreeBSD BSD実装を引継ぎ、新手順は[HW3]の根拠を添えてから実装する。同票:40の旧Linux参照を写し元にはしない。Trident enable/probe、合成器、追加NICはP4/P5の票でこのloaderへ載せる。USBをここで追加しない。起動一覧はmodule ID/phase/必須性/依存/許可パスを持つ配布manifestと照合し、任意ユーザーパスからのCPL=0ロード口を公開しない。必須集合と許可ID/phaseはcoreの生成policyで固定し、配布manifestはそのpolicyの任意モジュールの選択/期待hashを指定するだけ。root FSの閉包はboot媒体種別から決まり、manifestで省略不可。SQLite/FEPはMINIMALを除き必須で、manifestからの削除で省略扱いにしない。manifest欠落/破損/循環/重複/未知IDはユーザー未公開のboot失敗とし、root成立後は§3-4のrollbackを経てMINIMALへ、root閉包自体の失敗は停止する。
@@ -234,7 +233,7 @@ T6bは最後に集積を上位票の `[0x500000,0x600000)` へ移し上限1MiB�
 | T4a-3 (1日) | MEMSYS5 hook/タグ方式のhost prototype | ①HEAP→GETMALLOC→MALLOCの実allocatorを通る ②realloc失敗で旧block内容/勘定不変 ③別文脈freeと表満杯で漏れ0 ④heap+タグ総量≤512KiB。タグ/丸め勘定削除変異を検出 |
 | T4a-4 (1日) | 最大負荷S/M/Lの取り分測定fixture | ①app sort/prepareで上限到達後も各辞書1語変換/学習が通る ②全辞書切替で最大一時量を記録 ③予約超えは旧辞書保持＋再起動要求 ④共通予約・APP上限・最大連続要求を数値化。APP割当門削除で対照が崩れる |
 | T4a-5 (1日) | module record・load/start/abort共通核 | ①全確保点失敗でowner/page/FDが開始前へ ②init完了前はexport未公開 ③prefix返却後もexport/dependencyが有効 ④満杯/二重abortで二重freeなし ⑤未停止参照は隔離。先行公開/無条件free変異を検出 |
-| T4b-1 (0.5日) | B3のcopy核・3入口の反例fixture (公開接続は§9判断後) | ①1023B+NUL成功、1024B+NUL/未終端/guard跨ぎ失敗 ②copy拒否でengine進入0・ファイル不変 ③出力はleave後。finalize先行/切捨て変異を検出。stmt/slot/SHMの期待値は§9で選んだ契約に固定し、3入口の拒否→stepと資源回収を対照試験する。核だけの合格を公開接続の受入にしない |
+| T4b-1 (0.5日) | B3のcopy核・3入口の拒否時不変契約 (§9 決定済み) | ①1023B+NUL成功、1024B+NUL/未終端/guard跨ぎ失敗 ②copy拒否でengine進入0・ファイル不変 ③出力はleave後。finalize先行/切捨て変異を検出。stmt/slot/SHMは拒否時不変に固定し、3入口の拒否→stepと資源回収を対照試験する。核だけの合格を公開接続の受入にしない |
 | T4b-2 (1日) | engine guard・sqlite_stack.asm・例外/STOP接続 | ①全outerのESPが128KiB stack内で戻りregister/IF一致 ②再入/IRQ/IF=0 I/Oは副作用前拒否 ③engine中faultはfail-stop、app-kill/cleanup0 ④STOPはleave後に1回 ⑤通常VFS callbackのactive連続。guard迂回/早期STOP変異を検出 |
 | T4b-3 (1日) | F2 group/lease・KAPI/IME/boot利用者 | ①RESIDENT2slotをsettings返却→FEPで再利用 ②所属無しopen拒否 ③遅延journalは同group ④別DB親子/同ownerのT01/T02/T07/T12で子だけ回収 ⑤close失敗は隔離・再利用なし。現ownerへの誤帰属変異を検出 |
 | T4b-4 (1日) | VFS FD identity・MAIN_DB重複門・F3a/c | ①相対/絶対/別名の同一ext2 inodeを拒否 ②parked/親子/同owner/隔離済みも拒否 ③CREATEは新FDのみcloseし既存内容不変 ④別DB/:memory:成功 ⑤truncate/sync/delete/access失敗を各SQLite rcへ伝播 ⑥pOutFlagsは実open結果 ⑦RO write/truncate拒否 ⑧FAT/HostDrv/LAN版host MAIN_DBは作成前拒否。path比較置換/登録早期解除/成功固定/RO門削除変異を検出 |
@@ -252,7 +251,7 @@ T6bは最後に集積を上位票の `[0x500000,0x600000)` へ移し上限1MiB�
 | T5b-3 (1日) | EARLY所有移譲・余白返却 | ①container非整列/BSS reloc/隣接破損をinit0で拒否 ②未マウントVFS/POST_ROOT import禁止 ③bootinfo capture後だけ旧領域返却 ④同一ページ二重owner/二重移譲0 ⑤全entry参照終了後に余白だけ返す。早期返却変異を検出 |
 | T5b-4 (1日) | FAT切出し・FD起動 | ①core+FATの2entryでroot/shell成功 ②FAT失敗は停止 ③MINIMAL全db NOSYS・英数編集成功 ④install --recover-settingsは復旧済みと誤表示しない。閉包欠落/偽成功変異を検出 |
 | T5b-5 (1日) | ATAPI/iso9660切出し・CD起動 | ①3entry (HostDrv併用4) でroot成立 ②ATAPI失敗でiso登録0 ③BSS込み占有とDMA停止/返却一致 ④CDのRO FEP回帰。依存順逆転/停止未確認free変異を検出 |
-| T5b-6 (1日) | HostDrv EARLY・管理ext2配布profile | ①配置判断後にroot+管理DBで変換→学習→再起動保持 ②外部HostDrv源変更は開いたDBへ影響0 ③管理volume不在は明示rollback ④実機専用I/O0・同ID二重load0 ⑤初回コピーの長さ/CRC不一致で不採用。管理DBfallback/照合省略変異を検出 |
+| T5b-6 (1日) | HostDrv EARLY・補助マウント | ①通常 NHD ext2 root の DB で変換→学習→再起動保持 ②HostDrv を root にせず既定 DB 配置を維持 ③実機専用I/O0・同ID二重load0。既存 DB を変更する移行処理は追加しない |
 | T5c-0 (1日) | IRQ/tick/callback/DMA owner broker | ①登録直後失敗でも参照0を証明して回収 ②STARTINGの必要なIRQは有効 ③tick残存/DMA停止不能は依存閉包隔離 ④DEVICE予約不変。unregisterだけでfreeする変異を検出 |
 | T5c-1 (0.5日) | KCG ROM移設 | ①typed facadeで同じ文字 ②欠落stub診断 ③旧font経路と排他 ④キャッシュ/owner予算一致。誤export/二重初期化変異を検出 |
 | T5c-2a (1日) | FM+snd移設 | ①通常再生/STOP成功 ②tick登録後失敗で呼出先残存0 ③Key-OFF確認後回収、不能時隔離。tick解除欠落変異を検出 |
@@ -282,7 +281,7 @@ SQLiteのpool/stackはbodyから外してowner付き連続割当とし、BSSの�
 
 > 2026-10-14 ユーザー決定: 搭載メモリ量ごとの確認は v3 の最終段にまとめる (DEFERRED_TESTS の関門「v3 の最終段」)。それまでのゲスト受入は 64MB の 1 構成。以下の構成一覧は最終段用として残す。
 
-各段は `make check-changed` と必要なbuildを通し、ABI段は [ABI1]〜[ABI3] に従う。形式/loaderは既存 `check-module-image-host`・`check-kdebug-init-host`、wire/展開は `check-bootinfo-host`・`check-vk32-crc-host`、LANは `check-lanfs-host` を拡張する (各 `build/checks.d/` の同名mk)。正常対照がPASSしてから対応変異が観測でFAILすることを記録し、意図した生成拒否/ASSERT拒否の試験を除き、コンパイル失敗/timeoutを検出成功に数えない。DBGREF自己試験の受入はKDEBUG=1・pair CRC一致・RUNNINGが前提、OFFはopen0/owner0とkaudit継続を別に確認 (`docs/tasks/v3/TASK_DBGREF.md:104,110,112`)。外部apps/gameは現行の対象外決定を維持し、再開時の全再ビルドを引継ぎゲートへ残す。故障注入は別の使い捨て媒体で行い、本番辞書へ書かない。通常ゲスト8MB planar/PEGC・17MB・Ra266とFDの受入を上位票§7へ紐付け、MINIMAL落ちは標準成功とは別結果で記録する。ログは上記の共通項目と該当段の観測値に絞り、失敗・未実施構成を省略しない [V4]。r2の実測は§0の既存成果物の値を引き継ぎ、今回のr3ではmain基点・レビュー根拠・段参照・行数を文書照合した。製品build/host試験/ゲスト受入は実行していない。
+各段の検査分担は [ROLES §0](../agents/ROLES.md#0-現行の体制) に従い、ABI段は [ABI1]〜[ABI3] に従う。形式/loaderは既存 `check-module-image-host`・`check-kdebug-init-host`、wire/展開は `check-bootinfo-host`・`check-vk32-crc-host`、LANは `check-lanfs-host` を拡張する (各 `build/checks.d/` の同名mk)。正常対照がPASSしてから対応変異が観測でFAILすることを記録し、意図した生成拒否/ASSERT拒否の試験を除き、コンパイル失敗/timeoutを検出成功に数えない。DBGREF自己試験の受入はKDEBUG=1・pair CRC一致・RUNNINGが前提、OFFはopen0/owner0とkaudit継続を別に確認 (`docs/tasks/v3/TASK_DBGREF.md:104,110,112`)。外部apps/gameは現行の対象外決定を維持し、再開時の全再ビルドを引継ぎゲートへ残す。故障注入は別の使い捨て媒体で行い、本番辞書へ書かない。通常ゲスト8MB planar/PEGC・17MB・Ra266とFDの受入を上位票§7へ紐付け、MINIMAL落ちは標準成功とは別結果で記録する。ログは上記の共通項目と該当段の観測値に絞り、失敗・未実施構成を省略しない [V4]。r2の実測は§0の既存成果物の値を引き継ぎ、今回のr3ではmain基点・レビュー根拠・段参照・行数を文書照合した。製品build/host試験/ゲスト受入は実行していない。
 
 ## 8. 独立レビュー対応 (往復1)
 
@@ -310,7 +309,7 @@ SQLiteのpool/stackはbodyから外してowner付き連続割当とし、BSSの�
 | N3 wire容量 | 現4本を維持、64+20+32×4=212B、最大5本以内。媒体別閉包を2〜4本へ固定 |
 | N4 reloc/BSS | runtimeでも4B全体をpayload内へ限定、EARLY prefixのみの返却を明示 |
 
-往復3: 同じ `claude-opus-5-5` が **Approve**。N1〜N4は全てclosed、blockerなし。最終非blockerはCDのFEP/アプリRO重複許可、SHARED lockの条件付きno-op、xAccessの実有無/エラーとhot journal拒否を§3-2とT4b試験へ追記して対応。PM方針に従い文言追記の追加レビューは行わない。/persist配布profileの承認・測定ゲート・実装/ゲスト検証は未了のまま。
+往復3: 同じ `claude-opus-5-5` が **Approve**。N1〜N4は全てclosed、blockerなし。最終非blockerはCDのFEP/アプリRO重複許可、SHARED lockの条件付きno-op、xAccessの実有無/エラーとhot journal拒否を§3-2とT4b試験へ追記して対応。PM方針に従い文言追記の追加レビューは行わない。これは当時の記録。/persist 案は §9 で不採用となった。測定ゲート・実装/ゲスト検証は未了。
 
 再照合版への独立レビュー r1 (2026-10-16、Opus 5.5) は「直してから確定」、P1なし。F1/F2は反例と第三案を受けて§9の契約判断へ、F3〜F6は受入段・観測条件・粒度・照合/ログ範囲へ反映した。古いApproveを今回の承認に流用せず、採否の詳細は `astra_r2_response.md` に記録する。
 
@@ -318,11 +317,10 @@ SQLiteのpool/stackはbodyから外してowner付き連続割当とし、BSSの�
 
 | 論点 | 両方の言い分・根拠 | 決着が必要な段 |
 |---|---|---|
-| **決定 (ユーザー 2026-10-16)**: 3 SQL入口の拒否時のstmt/slotとfinalize時期 (F1/F2) | 古い行が返るのは、戻り値を見ずに `db_step` を呼んだアプリ自身の文だけで、シングルタスクでは他のアプリや OS のデータに及ばない — **アプリ側の書き方の問題**として扱う (ユーザー)。第三案 (保留 stmt) は採らない。拒否時は「何も変えない」(`docs/tasks/settings/FEP_BOUNDARY.md:140,141,213`) にそろえ、`docs/KAPI_SPEC.md:1396` の prepare_only の入口 finalize は「受け付けた入力のときだけ」と書き直す。KAPI_SPEC に「拒否の戻り値を見ずに step すると前の文の続きが返る」と注記 | T4b-1 の前に KAPI_SPEC と本票の該当行を直す |
+| **決定 (ユーザー 2026-10-16)**: 3 SQL入口の拒否時のstmt/slotとfinalize時期 (F1/F2) | 古い行が返るのは、戻り値を見ずに `db_step` を呼んだアプリ自身の文だけで、シングルタスクでは他のアプリや OS のデータに及ばない — **アプリ側の書き方の問題**として扱う (ユーザー)。第三案 (保留 stmt) は採らない。拒否時は「何も変えない」(`docs/tasks/settings/FEP_BOUNDARY.md:140,141,213`) にそろえ、`docs/KAPI_SPEC.md:1396` の prepare_only の入口 finalize は「受け付けた入力のときだけ」と書き直す。KAPI_SPEC に「拒否の戻り値を見ずに step すると前の文の続きが返る」と注記 | 本票は反映済み。KAPI_SPEC の説明同期は T4b-1 の前に行う |
 | **決定 (ユーザー 2026-10-16)**: X-11の共有サービスの呼出し主体 | 端末ごと・本人ごとの**新しい権限の分離は足さない** (単一利用者)。T4b-5 で通常の親子・park/resume の順を観測し、二重消費・別 owner への副作用・寿命の不具合が出たら、そこだけ直す。攻撃者を置かないことを理由に未観測の不具合を閉じない | T4b-5 の契約表と通常順の反例で照合 |
-| **決定 (ユーザー 2026-10-16)**: HostDrv rootの管理DB配置 | **HostDrv を root にしない**。管理 DB は通常の root (NHD の ext2) に置く。§3-5 の `/persist` ext2 案と、HostDrv root のための移行手順は不要 | T5b-6 で §3-5 の該当記述を外す |
+| **決定 (ユーザー 2026-10-16)**: HostDrv rootの管理DB配置 | **HostDrv を root にしない**。管理 DB は通常の root (NHD の ext2) に置く。§3-5 の `/persist` ext2 案と、HostDrv root のための移行手順は不要 | §3-5 と T5b-6 に反映済み。実装受入は未実施 |
 
-F1/F2の第三案 (契約判断前の実装案、未採用): 有効handle/通常文脈を確認後、SQL copy前にactive_stmtを同じslot/owner/groupの固定1本分pendingへ移し、active=NULL・bind不可・次step=DONEとする。拒否時はengine/finalize/VFS呼出し0、固定診断だけを返し、ファイル/transactionを変えない。column/bindからもpendingへ触れず、反復拒否でpendingを増やさない。次のcopy成功済みexec/prepare/prepare_onlyではB4/代替stack上でpendingを一度finalizeしてから新stmtを作る。db_finalize/close・owner終了もpendingを回収対象とし、正常回収前にslot/groupを再利用しない。finalizeの非OKでも同stmtを二度呼ばず、診断とclose失敗時の隔離は `docs/tasks/settings/F2_OWNERSHIP.md:188,194,199` に従う。pendingの資源は生存分として勘定し、最大1本/接続とメタデータ増分をT4bの予算へ含める。
-この案を選ぶ場合の追加観測: 3入口それぞれで旧SELECT残行/未実行DML→拒否→step=DONE・旧SQL実行0、拒否反復でpending本数/使用量一定、次の正常入力・finalize・close・子終了で回収1回、cleanup失敗の診断/隔離を確認する。拒否時のslot/SHM期待値と解放時期の正典整合を先に判断し、無効化欠落・先行finalize・pending漏れ/二重finalizeの変異を検出する。現状のB3とprepare_onlyの双方を満たしたものとして、この案を無断で公開接続しない。
+F1/F2 の保留 stmt 案は不採用。拒否時不変で十分とのユーザー判断による。検討経緯は `~/os32-tmp/run/t3design/T4_T6_MODULES/opus_r1.md` と `astra_r2_response.md`。
 
 FEP予約量・module別サイズ上限・U19可否・8MBピークは、対立した決定ではなく§7の測定ゲート。未測定の数字を埋めて承認済みにしない。今回、上位D番号の追加・上位本文の変更は行わない。契約変更を要する案はこの節の未決として残す。
