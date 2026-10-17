@@ -358,6 +358,14 @@ EXPECTED_CHECKS += [
     'mapped[i] == bytes',
 ]
 
+MUTATIONS += [
+    ('if (a->map_base && (!tail || (uintptr_t)tail + tail->size != a->brk))',
+     'if (0)', 1, 'secondary unused mapped tail retained'),
+]
+EXPECTED_CHECKS += [
+    'os32_nano_trim() == (end-keep)/OS32_NANO_PAGE && trim_unmaps == 1',
+]
+
 assert len(EXPECTED_CHECKS) == len(MUTATIONS)
 
 

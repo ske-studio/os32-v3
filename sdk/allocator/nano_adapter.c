@@ -359,6 +359,18 @@ size_t os32_nano_trim(void)
                     }
                 }
             }
+            /* Secondary mappings reserve spare pages beyond nano's break.
+             * A live tail (or an interior free hole) does not use that slack. */
+            if (a->map_base && (!tail || (uintptr_t)tail + tail->size != a->brk)) {
+                keep = (a->brk + OS32_NANO_PAGE - 1u) & ~(OS32_NANO_PAGE - 1u);
+                if (keep < a->mapped_end) {
+                    bytes = a->mapped_end - keep;
+                    if (0 == unmap_arena(map_opaque, keep, bytes)) {
+                        a->mapped_end = keep;
+                        pages += bytes / OS32_NANO_PAGE;
+                    }
+                }
+            }
         }
         link = &a->next;
     }
