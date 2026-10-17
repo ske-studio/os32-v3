@@ -257,16 +257,26 @@ void *os32_nano_sbrk(struct _reent *r, ptrdiff_t incr)
 void os32_nano_lock(struct _reent *r) { (void)r; }
 void os32_nano_unlock(struct _reent *r) { (void)r; }
 
+/* Total mapping, including the management page. Independent of the large
+ * allocation threshold: this only amortizes secondary arena creation. */
+#define NANO_SECONDARY_MIN (64u * 1024u)
 static struct os32_nano_arena *new_arena(size_t size)
 {
     uintptr_t base;
-    size_t bytes;
+    size_t bytes, required;
     struct os32_nano_arena *a;
     /* Management page + nano chunk header/padding + page rounding. */
     const size_t overhead = 2u * OS32_NANO_PAGE - 1u + 16u;
     if (!arenas || !map_arena || !unmap_arena || size > PTRDIFF_MAX - overhead) return NULL;
-    bytes = (size + overhead) & ~(OS32_NANO_PAGE - 1u);
+    required = (size + overhead) & ~(OS32_NANO_PAGE - 1u);
+    bytes = required < NANO_SECONDARY_MIN ? NANO_SECONDARY_MIN : required;
     base = (uintptr_t)map_arena(map_opaque, bytes, 0);
+    /* Under pressure, preserve allocations that fit the former mapping size.
+     * Publish no arena until one of the two requests has succeeded. */
+    if (!base && bytes > required) {
+        bytes = required;
+        base = (uintptr_t)map_arena(map_opaque, bytes, 0);
+    }
     if (!base) return NULL;
     a = (struct os32_nano_arena *)base;
     memset(a, 0, sizeof(*a));
@@ -346,6 +356,18 @@ size_t os32_nano_trim(void)
                             a->brk = a->mapped_end = keep;
                             pages += bytes / OS32_NANO_PAGE;
                         }
+                    }
+                }
+            }
+            /* Secondary mappings reserve spare pages beyond nano's break.
+             * A live tail (or an interior free hole) does not use that slack. */
+            if (a->map_base && (!tail || (uintptr_t)tail + tail->size != a->brk)) {
+                keep = (a->brk + OS32_NANO_PAGE - 1u) & ~(OS32_NANO_PAGE - 1u);
+                if (keep < a->mapped_end) {
+                    bytes = a->mapped_end - keep;
+                    if (0 == unmap_arena(map_opaque, keep, bytes)) {
+                        a->mapped_end = keep;
+                        pages += bytes / OS32_NANO_PAGE;
                     }
                 }
             }

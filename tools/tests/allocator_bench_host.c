@@ -8,6 +8,7 @@
 #include "../../userland/tests/allocator_bench.c"
 #undef main
 #include <stdarg.h>
+#include "appslot.h"
 
 static KernelAPI backend;
 KernelAPI *kapi = &backend;
@@ -17,6 +18,11 @@ static struct os32_nano_arena primary;
 static struct appmem_table table;
 static struct appmem_layout layout;
 static unsigned backend_maps, backend_unmaps, backend_exact_fail;
+/* Host backing/owner model, independent of both extent and observer lists.
+ * The real exec teardown walker runs against this model; guest PFNs/MMU and
+ * ledger reclamation still require the NP21/W parent-mode acceptance run. */
+static unsigned char owned[(MEM_APP_BAND_MAX_TOP - MEM_APP_BAND_BASE) / PAGE];
+static u32 owner_pages, first_full_base, full_checks;
 static uint64_t host_time = 0xffffff80ULL;
 static int no_clock;
 static int parent_mode, parent_step;
@@ -74,6 +80,31 @@ static void backing(uintptr_t base, unsigned bytes)
     unsigned result;
     __asm__ volatile("int $0x80" : "=a"(result) : "0"(90), "b"(args) : "memory");
     CHECK(result == base);
+    for (uintptr_t va = base; va < base + bytes; va += PAGE) {
+        unsigned i = (va - MEM_APP_BAND_BASE) / PAGE;
+        CHECK(i < sizeof(owned) && !owned[i]);
+        owned[i] = 1; owner_pages++;
+    }
+}
+static unsigned release_backing(uintptr_t base, unsigned bytes)
+{
+    unsigned pages = 0;
+    int result;
+    if (!bytes) return 0;
+    __asm__ volatile("int $0x80" : "=a"(result) : "0"(91), "b"(base), "c"(bytes) : "memory");
+    CHECK(!result);
+    for (uintptr_t va = base; va < base + bytes; va += PAGE) {
+        unsigned i = (va - MEM_APP_BAND_BASE) / PAGE;
+        CHECK(i < sizeof(owned));
+        if (owned[i]) { owned[i] = 0; owner_pages--; pages++; }
+    }
+    return pages;
+}
+static int equal(const void *a, const void *b, unsigned bytes)
+{
+    const unsigned char *x = a, *y = b;
+    while (bytes--) if (*x++ != *y++) return 0;
+    return 1;
 }
 static void *map_pages(u32 bytes, void *hint, u32 flags)
 {
@@ -92,12 +123,21 @@ static void *map_pages(u32 bytes, void *hint, u32 flags)
 static int unmap_pages(void *base, u32 bytes)
 {
     struct appmem_unmap_plan p;
-    int result, rc;
+    int rc;
+    struct appmem_table before = table;
+    u32 owned_before = owner_pages;
     backend_unmaps++;
     rc = appmem_unmap_prepare(&table, (u32)base, (u32)base + bytes, APPMEM_PUBLIC_UNMAP_MASK, &p);
-    if (rc) return rc == APPMEM_EFULL ? OS32_ERR_FULL : OS32_ERR_INVAL;
-    __asm__ volatile("int $0x80" : "=a"(result) : "0"(91), "b"(base), "c"(bytes) : "memory");
-    CHECK(!result);
+    if (rc) {
+        CHECK(equal(&table, &before, sizeof(table)));
+        CHECK(owner_pages == owned_before);
+        if (rc == APPMEM_EFULL) {
+            if (!first_full_base) first_full_base = (u32)base;
+            full_checks++;
+        }
+        return rc == APPMEM_EFULL ? OS32_ERR_FULL : OS32_ERR_INVAL;
+    }
+    CHECK(release_backing((uintptr_t)base, bytes) == bytes / PAGE);
     appmem_unmap_publish(&table, &p);
     return 0;
 }
@@ -129,6 +169,7 @@ static i32 stat_pages(i32 id, void *out, u32 bytes)
         s.owner_pages += (table.e[i].end - table.e[i].base) / PAGE;
     }
     s.extents_free = APPMEM_EXTENT_MAX - s.extents_total;
+    CHECK(s.owner_pages == owner_pages);
     memcpy(out, &s, sizeof(s));
     return sizeof(s);
 }
@@ -166,6 +207,71 @@ static int last_result(int *kind, int *code)
     *code = !strcmp(parent_case, "parent-failure") ? 1 : 0;
     return 0;
 }
+
+/* Only the exit dependencies are modeled; exec_teardown_app is extracted
+ * verbatim from exec.c by the runner. No allocator-list-driven cleanup. */
+static u32 exec_as_leftover_pages, exit_diagnostics, exit_before;
+static int retired, destroyed;
+static u32 ledger_owner_pages(u32 owner) { CHECK(owner == 2); return owner_pages; }
+static int lease_revoke_all(struct addrspace *as) { (void)as; return 0; }
+static void shlib_addrspace_detach(struct addrspace *as) { (void)as; }
+u32 paging_addrspace_free_user_range(struct addrspace *as, u32 base, u32 end)
+{
+    CHECK(as->owner == 2 && end >= base);
+    return release_backing(base, end - base);
+}
+void paging_addrspace_destroy(struct addrspace *as) { as->pd_phys = 0; destroyed++; }
+void paging_addrspace_poison(struct addrspace *as) { as->appmem_poisoned = 1; }
+static int ledger_reclaim_owner(u32 owner, u32 *left)
+{
+    CHECK(owner == 2); *left = owner_pages; return 1;
+}
+static int ledger_owner_retire(u32 owner) { CHECK(owner == 2); retired++; return 1; }
+static void exec_owner_diag(AppSlot *a, int exiting, u32 pages, u32 leftover)
+{
+    CHECK(a->as && exiting && !leftover);
+    exit_before = pages; exit_diagnostics++;
+}
+static void kfree(void *p) { CHECK(p != NULL); }
+static void serial_puts_polled(const char *s) { (void)s; CHECK(0); }
+#define kprintf print
+#include "allocator_teardown.inc"
+#undef kprintf
+
+static void retained_and_exit(void)
+{
+    if (first_full_base) {
+        void *retained = NULL;
+        for (unsigned i = 0; i < LARGE_COUNT; i++)
+            if (blocks[i] && (uintptr_t)blocks[i] / PAGE == first_full_base / PAGE)
+                retained = blocks[i];
+        CHECK(retained != NULL);
+        unsigned before = backend_unmaps, failures = full_checks;
+        u32 pages_before = owner_pages;
+        errno = 0;
+        free(retained);
+        CHECK(backend_unmaps == before + 1 && full_checks == failures + 1);
+        CHECK(errno == ENOMEM);
+        CHECK(owner_pages == pages_before);
+    }
+    struct addrspace as = {0};
+    AppSlot app = {0};
+    as.owner = 2; as.pd_phys = PAGE; as.appmem = table;
+    app.cpl3 = 1; app.as = &as;
+    app.load_addr = MEM_EXEC_LOAD_ADDR + PAGE;
+    app.sbrk_heap_limit = MEM_EXEC_LOAD_ADDR + 2 * PAGE;
+    app.exec_heap_base = MEM_EXEC_HEAP_BASE;
+    app.exec_heap_size = MEM_EXEC_HEAP_MIN;
+    u32 pages_before = owner_pages;
+    CHECK(pages_before > 0);
+    exec_teardown_app(&app);
+    CHECK(!app.as && !app.cpl3 && destroyed == 1 && retired == 1);
+    CHECK(exit_diagnostics == 1 && exit_before == pages_before);
+    CHECK(!exec_as_leftover_pages && !owner_pages);
+    for (unsigned i = 0; i < sizeof(owned); i++) CHECK(!owned[i]);
+    say("HOST F9 retained-list/owner/exec-teardown PASS\n",
+        sizeof("HOST F9 retained-list/owner/exec-teardown PASS\n") - 1);
+}
 void host_start(unsigned *stack)
 {
     int argc = stack[0];
@@ -187,6 +293,7 @@ void host_start(unsigned *stack)
     table.e[0] = (struct appmem_extent){MEM_EXEC_LOAD_ADDR + PAGE, MEM_EXEC_LOAD_ADDR + 2 * PAGE, APPMEM_LIBC_INITIAL, 0};
     table.e[1] = (struct appmem_extent){MEM_EXEC_HEAP_BASE, layout.exec_heap_cur_end, APPMEM_EXEC_INITIAL, 0};
     backing(table.e[0].base, PAGE);
+    backing(table.e[1].base, table.e[1].end - table.e[1].base);
     primary.initial = primary.brk = table.e[0].base;
     primary.mapped_end = table.e[0].end;
     primary.limit = UINTPTR_MAX;
@@ -203,6 +310,7 @@ void host_start(unsigned *stack)
     CHECK(backend_maps == map_calls + setup);
     CHECK(backend_unmaps == unmap_calls && backend_exact_fail == exact_fail);
     CHECK(!observer_bad);
+    if (!rc) retained_and_exit();
     die(rc);
 }
 __asm__(".global _start\n_start:\n mov %esp,%eax\n push %eax\n call host_start\n");
