@@ -13,7 +13,7 @@ OS のソースツリーを持たなくても、この SDK だけでアプリを
 | `lib/` | 静的アーカイブ (`libos32gfx.a` など 25 本) |
 | `crt/` | スタートアップ (`crt0.o`, `crt0_c.o`, `syscalls.o`, `help.o`) |
 | `link/` | リンカスクリプト (`app.ld`) |
-| `bin/mkos32x.py` | OS32X 実行ファイルヘッダ (v3) の付加。`bin/os32x_hdr.py` を同じ場所に置いて使う |
+| `bin/mkos32x.py` | OS32X 実行ファイルヘッダ (v4、60B) の付加。`bin/os32x_hdr.py` を同じ場所に置いて使う |
 | `rust/` | Rust ターゲット定義と `os32api` クレート |
 | `example/hello/` | 動く最小例 |
 | `KAPI_VERSION` | この SDK が対応する KernelAPI バージョン |
@@ -38,11 +38,11 @@ make OS32_SDK=../..
 
 ## アプリを書くときの約束
 
-**`main()` はソース中の最初の関数**にすること。crt0 がファイル先頭へ
-ジャンプするため、補助関数は `main()` の後ろに前方宣言付きで置く。
+CRT の `_start` → `_start_c` が `main` を名前で呼び、戻り値を終了コードにします
+(`sdk/crt/crt0.asm:38`、`sdk/crt/crt0_c.c:47`)。ソース内の関数の順序に制約はありません。
 
 ```c
-void main(int argc, char **argv, KernelAPI *api);
+int main(int argc, char **argv, KernelAPI *api);
 ```
 
 第3引数で `KernelAPI` テーブルを受け取る。OS の機能はすべてここを
@@ -50,14 +50,12 @@ void main(int argc, char **argv, KernelAPI *api);
 
 **OS32X ヘッダが要る。** リンクしただけの生バイナリは OS がロードしない。
 `mkos32x.py` で最低 API バージョンと要求ヒープサイズを埋め込む。
-最低 API バージョンは `KAPI_VERSION` 以下にすること (63 未満を渡しても 63 に上がる)。
+最低 API バージョンは `KAPI_VERSION` 以下にします。生成定義
+`include/os32/os32_generations.h` の `OS32X_MIN_API` が下限 (現在 75) で、これより小さい指定は下限に上がります。
 
-**ヘッダは v3 (KAPI v63〜)。** `mkos32x.py` は `--elf <app.elf>` が必須で、ELF の
-`.os32_kapi_layout` (crt0 が置く KernelAPI のデータ欄の配置の刻印) をヘッダの
-`kapi_data_off` に写す。刻印が無い ELF (crt0 を付けずにリンクした等) は断る。
-OS はこの値が自分の配置と違うバイナリを `rebuild required (KAPI data layout)` で
-起動しない。v62 以前の SDK で作ったオブジェクトは crt の `kapi` の実名
-(`os32_kapi_v63`) が違うのでリンクで落ちる — SDK を差し替えたら全部作り直すこと。
+**ヘッダは v4・60B。** `mkos32x.py` は `--elf <app.elf>` と ELF の刻印を照合します。
+形式・KAPI 配置・世代の条件は [KAPI_SPEC の世代契約](../docs/KAPI_SPEC.md#t2c-os32x-v4-と生成する世代-kapi-v69) を参照してください。
+SDK を差し替えたら旧オブジェクトを混ぜず、全て作り直してください。
 
 ### グラフィックスの注意
 
@@ -95,10 +93,10 @@ OS 側の `docs/KAPI_SPEC.md` の「API関数」の注記。)
 
 ## 互換性
 
-`KAPI_VERSION` は KernelAPI のテーブルレイアウトの版数。カーネルが
-新しい API を追加するたびに上がる。古い SDK でビルドしたアプリは
-新しいカーネルでも動くが、逆は動かない (exec がヘッダの最低 API
-バージョンを見て弾く)。
+`KAPI_VERSION` は機能版です。同じ世代で、アプリの最低 API 版を満たすカーネルなら利用できます。
+古い SDK のアプリが新しいカーネルで無条件に動くわけではありません。形式・KAPI 配置・ABI 世代・
+メモリ世代、および依存する共有ライブラリのプロトコルが一致する必要があります。
+世代が違う場合は現行 SDK で再構築します ([世代契約](../docs/KAPI_SPEC.md#t2c-os32x-v4-と生成する世代-kapi-v69))。
 
 ## T2c の世代契約
 
@@ -110,7 +108,7 @@ asm には `-p $(OS32_SDK)/crt/generations.inc` を付ける。
 `RUSTC_WRAPPER=$(OS32_SDK)/bin/rustc_stamp.py` を使う。
 生成器が記録した `.inputs.json` / `.generations.json` もビルド成果物として保つ。
 `example/hello/Makefile` が C の最小例。4世代の正典と形式は
-OS ソースツリーの `docs/KAPI_SPEC.md` §4-0。
+[KAPI_SPEC の世代契約](../docs/KAPI_SPEC.md#t2c-os32x-v4-と生成する世代-kapi-v69)。
 
 USER の newlib 利用プログラムは `lib/libos32nano.a` を `-lc` より前にリンクする
 (付属 example を参照)。`libos32nano.json` は CRT と adapter の hash 照合用で、

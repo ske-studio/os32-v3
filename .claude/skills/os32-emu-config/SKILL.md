@@ -10,7 +10,7 @@ description: NP21/W ini の限定変更。変更権限は PM (Claude Code) だ�
 
 | 役 | ini |
 |---|---|
-| **PM** (Claude Code) | **変更してよい唯一の役**。ユーザーが権限を付与済み (2026-10-01、`ROLES.md` §0 の「決裁」) — 個別の承認は要らないが、原本を残す経路を既定にし、終わったら戻す。NHD・イメージ原本の上書きは [D2] のまま |
+| **PM** (Claude Code) | **変更してよい唯一の役**。役の権限と操作の承認は別。[CONSTRAINTS の D2](../../../docs/CONSTRAINTS.md#d2-不可逆な操作は事前に承認を得る) と [ROLES §0「決裁」](../../../docs/tasks/agents/ROLES.md#0-現行の体制) に従って当該操作の個別承認を得る。既存承認が当該操作を含めば取り直さない。原本を残し、終わったら戻す |
 | コーダー (サブエージェント) | 不可。ini はスコープ外。必要になったら PM に戻す |
 | ローカル AI (`tools/emu_agent/`) | 不可。`tools/emu_agent/` の `ACTIONS` に ini 操作は存在しない |
 | レビュアー | 不可 (読み取りのみの役) |
@@ -161,21 +161,12 @@ taskkill は ini を書き戻さないので使わない)。使い捨て NHD は
   ローカル NTFS、reparse/hardlink 拒否、専有を前提とする。非協調プロセスの競合を
   完全には排除しない。既存承認が当該通常終了と trial 差分を含むなら再承認は不要 [D2]。
 
-## Transport cleanup の限定回帰試験
+## Transport cleanup の診断
 
-- stdout の BufferedReader は読み取りスレッドだけが閉じる。他スレッドの
-  `close()` は read lock を待って停止し得るため、終了側は bounded join に留める。
-  EOF 未到達時は失敗を返し、最終的な stream close は reader が EOF 後に行う。
-- wait timeout を成功に変換しない。trial は kill/retry なし、共有 live は元の
-  transport kill fallback だけを維持する。cleanup で既存の wait 例外を隠さない。
-- `python3 -B tools/tests/test_np21w_transport.py -v` で実ローカル pipe と偽 process の
-  timeout・通常 EOF・遅延 EOF・CLI failure JSON の stage/process 保持を検査する。
-  live の CLI は、`start` で孫を起動する無害なホスト子プロセスで「孫が stdout を継承すると
-  receipt / PID を出さず cleanup timeout、継承しなければ receipt と PID を出して rc=0」を検査する
-  (孫は 1.5 秒で自然に終わる。kill しない)。EOF 未到達を失敗とする不変条件は変えず、
-  直すのは起動側 (PS の `start` を ShellExecute に) である。
-  実エミュレータ、CIM、実 ini を使わない。Windows parser 試験は PS 本文をデータとして
-  ParseInput に渡すだけであり、実ライフサイクルの合格とは区別する。
+cleanup timeout は成功として扱わない。起動済みプロセス・stage・レシートの有無を確認し、
+下記の復元条件に従う。実装回帰と 2026-10-01 の修正経緯は
+[TDD 記録](../../../tools/tests/np21w_ini_live_tdd.md#置換後の失敗でレシートが残らない-2026-10-01) を参照。
+ホストの pipe・偽 process 試験は実エミュレータのライフサイクルの合格を意味しない。
 
 ## 従来のライブ変更・オフライン変換
 
@@ -306,9 +297,7 @@ ini.cppのinitload/initsave。bare起動時の既定ini導出と現在の選択�
    volume / file ID が候補 (一時ファイル) のものと同じ** (`ReplaceFile` は候補の ID を残す) なら、
    **同じ `replace` 要求の中でただちにレシートを保存** (`applied` = その読み戻し)、それから不在を再確認する。
    ID が違えば (同じバイト列の別ファイル) レシートを書かずに失敗する
-   (`readback identity differs from the candidate`、`original.bin` は残る)。PS は失敗した要求で
-   セッションを閉じるので、置換後に別の要求で書く形だと、置換後のどの失敗でもレシートが残らない
-   (2026-10-01 の実害: `snapshot` 段の失敗で `receipt.json` が無く `restore` 不能)。
+   (`readback identity differs from the candidate`、`original.bin` は残る)。
    reparse point は親要素を含め拒否し、読み込むファイルの hardlink も拒否する。
    ファイルを開くときの共有違反・ロック違反 (Win32 32/33) だけは、1 回の open につき再試行の待ちの予算 4 秒まで (期限の直前に始めた検査と open そのものは越えうる)
    250ms 間隔で再試行する (強制終了や `File.Replace` の直後に走査ソフトなどが一時的に掴む。§4-60 と同種、
@@ -318,10 +307,8 @@ ini.cppのinitload/initsave。bare起動時の既定ini導出と現在の選択�
    (位置引数 / `/i`、FD 引数) で起動し、
    起動した PID が 1 秒後に終了していないこと (`Start-Sleep` + `HasExited`) と、CIM による同一対象の
    2 回の確認を行う。作業ディレクトリは exe の親。対応ソースも起動時に `file_setcd(modulefile)` を実行する。
-   起動は **`UseShellExecute=$true`・リダイレクト無し** (trial の F3 と同じ)。`$false` だと .NET は
-   `CreateProcess(bInheritHandles=TRUE)` で起動し、NP21/W が PS の stdout パイプを持ち続けるので
-   reader が EOF に届かず、ini の置換・レシート・再起動が済んでいても最後が必ず
-   `Windows executor cleanup timeout` になっていた (2026-10-01、PM の実プロセス)。
+   起動は **`UseShellExecute=$true`・リダイレクト無し**。stdout 継承による cleanup timeout の
+   原因と回帰試験は [TDD 記録](../../../tools/tests/np21w_ini_live_tdd.md#実適用restore-が成功しても最後に-cleanup-timeout-2026-10-01) にある。
 
 失敗時は自動巻き戻し・追加の起動をしない。置換後の失敗にはバックアップ ID を付ける。
 `replace` が成功した後の失敗は `receipt ID for restore: <ID>` — レシートがあり、停止状態のまま

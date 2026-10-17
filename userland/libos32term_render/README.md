@@ -92,14 +92,7 @@ rootから実行するコマンドは作業票の3本。過去の証跡はTDD_LO
 実ROMから取得したglyphではない。独立oracleは本体のclip/run/bitmapデコードを使わず
 全体画素を生成して切抜きと比較し、番兵・全runのwrite内拘束も検査する。
 
-過去01〜06の13テストにはassertion RED→実装→GREENの実行証跡がある。
-07〜08の追加8テストは初回GREENであり、そのうち実質6件は未RED本体経路の唯一の証拠だった。
-過去ログの「追加回帰」という分類だけでは手順不足を説明できない。
-ユーザーの差し戻し決定を受け、render/draw/供給dispatchを実際に除去し、
-今回のテスト先行で座標受理・保存行選択・halo・引数受渡し・部分clipを再構築した。
-新規17試験は今回assertion RED→最小再実装→GREEN、新規1試験は幅検査範囲の初回GREEN回帰。
-過去の未履行を解消した証跡とは主張しない。TDD_LOG.mdは書き換えていない。
-型による不変性・固定行上限なし・依存Model検査等は回帰として区別する。
-
-共有make check登録、PM再実行と独立レビューは未実施。共有ファイルは編集しない。
+差し戻しと再実装の経緯・RED/GREEN の区別は [REWORK_LOG.md](REWORK_LOG.md) を参照。
+`make check-term-render` は `build/checks.d/check-term-render.mk:1` で共有検査に登録済み。
+提出時点の実行範囲は [TDD_LOG.md](TDD_LOG.md) と REWORK_LOG に記録している。
 配備・エミュレータ・ゲスト表示・性能・クロスリンク確認は本作業で実施していない。

@@ -18,7 +18,7 @@ fork の段取りは [docs/archive/v3/FORK_PLAN.md](docs/archive/v3/FORK_PLAN.md
 
 **submodule `apps/` `game/` は private です**。標準アプリと盤上ゲーム RPG は別リポジトリ (`ske-studio/os32-apps`、`ske-studio/os32-game`) で、
 公開していません。clone は `--recurse-submodules` を**付けずに**行ってください — apps / game が無くてもカーネル・シェル・コマンド・SDK・ディスクイメージ
-(core) はすべて組めます (`make all`)。アクセス権のあるトークンがあれば `git submodule update --init` の後に `make external` で apps / game も組めます。
+(core) はすべて組めます (`make all`)。apps / game のビルドは H-7 で持越し中です。取得権限に加え、[再開条件](docs/tasks/v3/T2H_EXTERNAL_GATE.md#再開前に揃える-8-項目) を満たして再開を決定してから組みます。
 
 NP21/W エミュレータと実機で動作します (実機は PC-9821Ra266 で FD 起動・CD からの HDD インストール・HDD 起動を確認 —
 [v2.1 のリリースノート](docs/RELEASE_v2.1.md))。以下の機能一覧と数字は fork 時点 (v2.1) のもので、v3 の作業で順に更新します。
@@ -40,7 +40,7 @@ v3 の最低条件は **8MB 機で GUI + 私有 2MB のアプリ** (目標、[V3
 - **IDT/PIC** 完全制御 (IRQ再マッピング, ISR ハンドラ)
 - **ページング** + ガードページ による安全なメモリ管理
 - **kmalloc** カーネルメモリアロケータ
-- **KernelAPI v75** — 関数表 (容量 300、うち 249 実装) + 固定オフセットのデータ欄による外部プログラムインタフェース
+- **KernelAPI v75 (現行値、fork 時点の値ではない)** — 関数表 (容量 300、うち 249 実装) + 固定オフセットのデータ欄による外部プログラムインタフェース
 - プログラム終了時の**リソース自動回収** (FD, リダイレクト, パイプ, 共有メモリ)
 
 ### ファイルシステム
@@ -156,7 +156,7 @@ os32-v3/
 
 ```bash
 make all           # カーネル + 全プログラム + SDK + D88イメージ + ISO (apps/game が無くても組める)
-make external      # apps/ + game/ (submodule を取得できた場合だけ)
+make external      # apps/ + game/ — H-7 の再開決定後だけ (下記参照)
 make check-fast    # ホスト試験と文書・生成物の検査 (変異なし)
 make clean         # クリーン
 make deploy        # HostDrv (C:\os32) へのデプロイ (再起動不要)
@@ -167,7 +167,7 @@ make deploy-kernel # NHDイメージへのデプロイ (要NP21/W再起動)
 (構築手順は [docs/08_build.md](docs/08_build.md) §8-5、CI 用のスクリプトは `tools/ci/build_cross.sh`)。
 日本語フォント (IPAex) はリポジトリに無く、初回の `make all` (または `make fonts`) が IPA の公式配布から取得します —
 IPA Font License v1.0 への同意を聞きます (非対話は `OS32_ACCEPT_IPA_LICENSE=1`、[docs/08_build.md](docs/08_build.md) §8-1)。
-CI (GitHub Actions) は os32 のものを持ってこず、このリポジトリで作り直します ([docs/archive/v3/FORK_PLAN.md §3 d](docs/archive/v3/FORK_PLAN.md))。
+CI (GitHub Actions) は実装済みです。[現行の CI 運用](docs/08_build.md#8-6-github-actions-での本体ビルド) を参照してください。fork 当時の計画は [FORK_PLAN §3](docs/archive/v3/FORK_PLAN.md#3-手順-順に) に残しています。
 
 ## ライセンス
 

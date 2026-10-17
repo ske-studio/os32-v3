@@ -79,10 +79,9 @@ Guest (NP21/W): drive it through skill **`run-os32`** and `tools/np21w_mcp/`; st
 | エミュレータ上の障害 / ini の変更 | スキル **`os32-emu-debug`** / **`os32-emu-config`** (ini は PM だけ) |
 | 実行モデル (CPL=3、資源回収) / 描画 | [`docs/09_exec.md`](docs/09_exec.md) / [`docs/05_drivers.md`](docs/05_drivers.md) §5-5 |
 
-**External programs** — OS32X flat ELF binaries (`sdk/link/app.ld`, `sdk/crt/crt0.asm`); `main()` must be the
-**first function** in the source file. In-tree sources live under `userland/` (`cmds/` (25 commands), `shell/`,
-`system/`, `tests/`, `rust/`, `lib/`); `apps/` and `game/` are submodules built by `make external` — **not built in v3** (H-7);
-when reopened, rebuild them after any KAPI **or SDK library** change ([`T2H_EXTERNAL_GATE.md`](docs/tasks/v3/T2H_EXTERNAL_GATE.md)).
+**External programs** — The CRT calls `main` by name; see the [SDK application contract](sdk/README.md#アプリを書くときの約束).
+In-tree programs live under `userland/`. The `apps/` and `game/` submodules are deferred under
+[H-7](docs/tasks/v3/T2H_EXTERNAL_GATE.md#再開前に揃える-8-項目); rebuild after KAPI or SDK library changes once reopening is approved.
 
 ## Documentation
 

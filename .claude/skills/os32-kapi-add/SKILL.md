@@ -5,7 +5,7 @@ description: OS32 の KernelAPI (KAPI) を追加・変更するときに使う�
 
 # KernelAPI の追加・変更
 
-手順の正典は `docs/KAPI_SPEC.md` §3-1、規則は `docs/CONSTRAINTS.md` の [ABI1]〜[ABI3]。
+手順の正典は [KAPI_SPEC §3-1](../../../docs/KAPI_SPEC.md#3-1-kernelapi-関数の追加手順)、規則は `docs/CONSTRAINTS.md` の [ABI1]〜[ABI3]。
 ここには手順本文を複製しない — **迷ったら正典を読む**。このスキルは
 「どこで落ちやすいか」と「終わったと言える条件」だけを持つ。
 
@@ -26,22 +26,17 @@ description: OS32 の KernelAPI (KAPI) を追加・変更するときに使う�
   生成物を手で触ったか、kapi.json の既存部分を動かしている。
 - **差分ビルドは無言で壊れる** ([ABI3])。構造体が変わるので `make clean` → `make all`。
   古い `syscalls.o` が残ると `malloc` が全部 ENOMEM になる類の症状が出る (POLICY_DEBUG §4-1)。
-- **`make external` を忘れない。** `apps/` `game/` のアプリは静的リンクなので、
-  古い `.bin` を残さない。再ビルドだけでは submodule のポインタは変わらない。
-  ポインタ更新条件は `docs/08_build.md` §8-4 を参照し、コミット・push は明示的な指示がある場合のみ行う。
+- **外部 apps/game は H-7 で持越し中**。[再開条件](../../../docs/tasks/v3/T2H_EXTERNAL_GATE.md#再開前に揃える-8-項目) を満たし、
+  再開を決定した後だけ `make external` で再構築する。
 - 関数ポインタでない値は `api` ではなく `data_fields`。ジェネレータは `= 0;` を出すだけなので、
   実際の代入を `exec/exec.c` の `exec_init()` に書く。書き忘れると呼び出し側で NULL を踏む。
 - 新 API に依存するプログラムは `build/app.conf` の要求バージョンを上げる。上げ忘れると
   古いカーネルで動かして原因不明の失敗になる。
 
-## 終わったと言える条件
+## 完了条件と報告
 
-1. `python3 sdk/gen_kapi.py && python3 sdk/kapi_rust_gen.py` の後、`git diff --stat` が意図した差分だけ。
-2. `make clean` → `make all` が通り、`make external` も通る。
-3. `make check` が通る (`check-kapi-version` が kapi.json / 生成物 / README / docs の版数を照合する)。
-4. `docs/KAPI_SPEC.md` §4 の関数表に新しいエントリがある (`check-kapi-version` が照合する)。
-5. **実機で新しい API を呼ぶまでは合格ではない** ([V1])。NHD へ配備して呼ぶ。
-   配備と反映確認の進め方はスキル `os32-build-verify`。
-
-報告には、追加したエントリ名とスロット、上げた版数、`make check` の結果、
-実機で何を呼んで何が返ったかを含める。未実施の手順は未実施と書く ([V4])。
+生成・版更新・ビルド・関数表更新は [KAPI_SPEC §3-1](../../../docs/KAPI_SPEC.md#3-1-kernelapi-関数の追加手順)、
+役別の検査条件は [ROLES §0「検査」](../../../docs/tasks/agents/ROLES.md#0-現行の体制) を参照する。
+配備と呼出し確認は [os32-build-verify](../os32-build-verify/SKILL.md#起動したバイナリを確認する) に従う ([V1])。
+報告には追加したエントリとスロット、版数、担当した検査の結果、ゲストでの呼出し結果を含める。
+未実施は未実施と書く ([V4])。

@@ -34,11 +34,9 @@ HostDrv                  OK   /mnt/c/os32
 NP21/W                   OK   phase=p2 protected_mode=1 eip=0x0010d130
 ```
 
-`NP21/W NG` なら Windows 側で `np21x64w.exe` が動いていないか
-(`python3 tools/np21w_ctl.py status` で見る。起動は `start --ini np21x64w.ini --wait-ready`、
-`docs/POLICY_DEBUG.md` §5)、`np21x64w.ini` の
-`aidebug=true` / `aidbport=8025` が落ちている。**`np21w.ini` ではない** —
-使われているのは `np21x64w.ini` のほう。
+`NP21/W NG` なら `python3 tools/np21w_ctl.py status` でプロセスを確認する。
+使用中 ini は固定名と決めつけず、[os32-emu-config §2](../os32-emu-config/SKILL.md#2-構成切替の-3-経路--開始停止復帰) の管理された起動情報で確認し、
+その ini の `aidebug` / `aidbport` を照合する。コマンド行だけでは起動後の設定切替を証明できない。
 
 `.env` (gitignore 済み) に `CROSS_DIR` `NP21W_DIR` `HOSTDRV_DIR` の 3 つが要る。
 **中身を出力に出さないこと** ([D3])。`doctor` は鍵の有無しか言わない。
@@ -75,8 +73,8 @@ python3 .claude/skills/run-os32/driver.py cmd 'ls -l /usr/bin/kstr_bench.bin'
 python3 .claude/skills/run-os32/driver.py cmd --wait 'kstr_bench > /tmp/k.txt'
 ```
 
-ゲストのシェルは 1 行を実行し終えるまで応答を返さないので、長い処理は HTTP が
-**必ず時間切れになる。それは失敗ではない** — ゲストは走り続けている。
+長い処理では HTTP が時間切れになることがある。timeout だけでは実行継続・通信不整合・停止を区別できない。
+[実行制御と通信](../os32-emu-debug/SKILL.md#実行制御と通信) に従い、画面・状態・完了印を照合する。
 `--wait` は完了印が出るまで待つ (仕組みは Gotchas)。
 
 ### ゲストのファイルをホストへ
@@ -179,8 +177,8 @@ Windows 側で `np21x64w.exe` を起動すると窓が開く。WSL からは見�
 
 | 症状 | 原因と対処 |
 |---|---|
-| `... に届かない` | NP21/W が動いていない、または `np21x64w.ini` の `aidebug` が落ちている |
-| `[aidebug: timeout waiting for EOT]` | 失敗ではない。ゲストがまだ走っている。`cmd --wait` を使う |
+| `... に届かない` | NP21/W が動いていない、または確認した使用中 ini の `aidebug` が落ちている |
+| `[aidebug: timeout waiting for EOT]` | [実行制御と通信](../os32-emu-debug/SKILL.md#実行制御と通信) に従い、画面・状態・完了印で判定する |
 | `cannot find -lc` / `-lgcc` | `.env` の無い worktree で `make` した。`CROSS_DIR=~/opt/cross` を渡す |
 | `pull` が「現れなかった」 | ゲストの `/host` が繋がっていない (実機構成)、または `cp` が失敗した |
 | 画面が真っ黒 | 起動していないか落ちている。`status` の `protected_mode` と `fault_generation` を見る |

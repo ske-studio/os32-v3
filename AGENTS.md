@@ -11,7 +11,7 @@ Use the WSL toolchain described in [INSTALL.md](INSTALL.md): i386-elf GCC, NASM,
 - `make all`: build the OS, programs, SDK, and images.
 - `make kernel`: build the kernel and SQLite.
 - `make programs`: build userland programs.
-- `git submodule update --init` then `make external`: initialize and build apps and game.
+- apps/game builds are deferred under H-7. Run `git submodule update --init` and `make external` only after the [reopening gate](docs/tasks/v3/T2H_EXTERNAL_GATE.md#再開前に揃える-8-項目) is satisfied and reopening is approved.
 - `make check-fast` / `make check-changed` / `make check`: host tests and repository checks (KAPI versions, manifests, constraint IDs, privileged instructions, docs links / orphans / status-line vocabulary) — without mutants / with mutants only for what you changed / with all mutants (before merging). Stages and times: [docs/08_build.md](docs/08_build.md) §8-4.
 - `make math_test`: build an individual guest test.
 
