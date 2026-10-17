@@ -341,6 +341,7 @@ void ring3_wm_leave(void)
 typedef struct {
     CallerAccessFrame caller;
     u32 *frame;
+    u32 esp0;
     int in_syscall, wm_depth;
 } Ring3CallContext;
 
@@ -352,6 +353,7 @@ static void ring3_context_save(volatile Ring3CallContext *out)
 {
     caller_access_save(&out->caller);
     out->frame = g_cur_frame;
+    out->esp0 = tss_get_esp0();
     out->in_syscall = ring3_in_syscall;
     out->wm_depth = ring3_wm_depth;
 }
@@ -366,10 +368,15 @@ static void ring3_context_clear(void)
 
 static void ring3_context_restore(const volatile Ring3CallContext *saved)
 {
+    /* Cleanup may enable IRQs. Restore the parent's entry stack together with
+     * its syscall context before returning to CPL3 (or the resident shell). */
+    unsigned int flags = irq_save();
     caller_access_leave(&saved->caller);
     g_cur_frame = saved->frame;
+    tss_set_esp0(saved->esp0);
     ring3_in_syscall = saved->in_syscall;
     ring3_wm_depth = saved->wm_depth;
+    irq_restore(flags);
 }
 
 volatile u32 ring3_caller_reject_count = 0;
