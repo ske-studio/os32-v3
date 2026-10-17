@@ -600,6 +600,15 @@ void ime_init(void)
     }
 }
 
+/* Called at boot, before any application owns an address space. */
+int ime_dict_boot(void)
+{
+    if (g_ime.dict_loaded) return 0;
+    if (ime_dict_open(&g_ime.dict, IME_DICT_PATH) != 0) return -1;
+    g_ime.dict_loaded = 1;
+    return 0;
+}
+
 void ime_toggle(void)
 {
     if (g_ime.mode == IME_MODE_OFF) {

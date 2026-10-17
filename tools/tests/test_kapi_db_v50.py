@@ -6,6 +6,7 @@
 
   python3 -B tools/tests/test_kapi_db_v50.py [--target] [--sanitize] [case ...]
 """
+import os
 import pathlib
 import re
 import subprocess
@@ -13,7 +14,7 @@ import sys
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-CASES = ["open_existing", "prepare_only", "binds", "error_code",
+CASES = ["group_callers", "open_existing", "prepare_only", "binds", "error_code",
          # N2 (c): ブート自己診断 db_v50_selftest() を make check で踏む (F1 回帰)
          "v50_selftest",
          # 票 H3 の是正 (2026-09-15): slot 配置の検査が **末尾追記で落ちない**
@@ -81,7 +82,7 @@ if __name__ == "__main__":
                        check=True)
         subprocess.run(["gcc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
                         "-Wno-unused-parameter",
-                        "-Wno-sign-compare", "-Wno-pointer-to-int-cast",
+                        "-Wno-sign-compare", "-Wno-pointer-to-int-cast", "-Wno-type-limits",
                         "-Wno-missing-field-initializers", "-D__cdecl=",
                         *san, "-I" + str(tmp), *INC,
                         str(ROOT / "tools/tests/kapi_db_v50_host.c"), obj,
@@ -121,5 +122,31 @@ if __name__ == "__main__":
             rc = subprocess.run([exe, case], cwd=ROOT).returncode
             print(f"EXIT {case}={rc}", flush=True)
             failed += rc != 0
+        if os.environ.get("MUTATE") == "1":
+            original = (ROOT / "kapi/kapi_db.c").read_text()
+            guard = ("    if (!db_copy_input(sql, sql_copy_buf, SQL_COPY_BUF_SIZE, 1) ||\n"
+                     "        !sql_copy_buf[0]) return -1;")
+            assert original.count(guard) == 3
+            vfs_original = (ROOT / "lib/sqlite3/os32_sqlite_vfs.c").read_text()
+            mutations = [
+                ("finalize before copy refusal", "kapi/kapi_db.c", original.replace(guard, "    if (slot->active_stmt) { sqlite3_finalize(slot->active_stmt); slot->active_stmt = 0; }\n" + guard), "prepare_replaces"),
+                ("SQL truncation", "kapi/kapi_db.c", original.replace(guard, "    if (!sql) return -1;\n    kstrncpy(sql_copy_buf, sql, SQL_COPY_BUF_SIZE);\n    if (!sql_copy_buf[0]) return -1;"), "prepare_replaces"),
+                ("late journal current owner", "lib/sqlite3/os32_sqlite_vfs.c", vfs_original.replace("vfs_open_sqlite(zName, oflags, g->owner,", "vfs_open_sqlite(zName, oflags, res_owner_get(),"), "group_callers"),
+            ]
+            for name, path, changed, case in mutations:
+                mutant = tmp / pathlib.Path(path).name
+                mutant.write_text(changed)
+                fixture = (ROOT / "tools/tests/kapi_db_v50_host.c").read_text()
+                fixture = fixture.replace('../../' + path, str(mutant))
+                fixture = fixture.replace('"../../', '"' + str(ROOT) + '/')
+                host = tmp / "mutant.c"
+                host.write_text(fixture)
+                subprocess.run(["gcc", "-std=gnu11", "-D__cdecl=",
+                                "-Wno-pointer-to-int-cast", "-I" + str(tmp), *INC,
+                                "-I" + str(ROOT / "tools/tests"), "-I" + str(ROOT / "kapi"),
+                                str(host), obj, "-o", exe], check=True)
+                result = subprocess.run([exe, case], capture_output=True, text=True)
+                assert result.returncode != 0 and "FAIL" in result.stdout + result.stderr, result
+                print("RED (runtime): " + name, flush=True)
         print(f"SUMMARY {len(cases)-failed}/{len(cases)} PASS", flush=True)
         sys.exit(bool(failed))

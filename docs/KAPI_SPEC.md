@@ -1429,7 +1429,8 @@ LBA28、無ければ word 53 bit0 の現在の CHS、それも無ければ既定
   置換し、入力拒否時は stmt・slot・transaction・SHM 結果を変えない
   ([T4〜T6 票 §9 の決定](tasks/v3/TASK_T4_T6_MODULES.md#9-決定済みの争点))。
   拒否の戻り値を見ずに step すると前の文の続きが返る。
-  この契約への実装追従は T4b-1 の対象で、現行 `kapi/kapi_db.c` はまだ入口で finalize する。
+  `db_exec` / `db_prepare` も同じコピー拒否時不変契約を持つ。
+  コピー拒否では診断欄も変更せず、戻り値 -1 で拒否を通知する。
 - `db_bind_*`: prepare_only の後・**最初の step の前**だけ。`index` は 1-based。
   `text` は 0〜`DB_BIND_TEXT_MAX` (255) B、`blob` は 0〜`DB_BIND_BLOB_MAX` (4096) B。
   負・超過・NULL ポインタは拒否 (NULL 値は `db_bind_null`)。0B でも非 NULL の空値。
@@ -1441,6 +1442,8 @@ LBA28、無ければ word 53 bit0 の現在の CHS、それも無ければ既定
   ときだけ**更新する (後片付けが原因診断を消さない)。close 後も slot が再利用される
   までは同じ値を返す (**再利用後は新しい接続の値** — handle に世代が無いので旧利用者を
   区別しない)。範囲外 handle / 一度も開かれていない slot は `SQLITE_MISUSE`。
+  close/finalize の後片付けに失敗した接続は group と残存 FD ごと隔離し、
+  同じ handle/group を再利用しない。終了時の回収もその接続へ再試行しない。
   `handle = -1` は呼び手 owner の直前 open 失敗。取得しても消えない。
 - CPL=3 の呼び手が渡すポインタは、ディスパッチャの早期検証 (先頭番地だけ) に加えて
   wrap 側が**範囲まで**検査する: `[p, p+len)` の各ページが許可帯にあること

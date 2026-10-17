@@ -22,4 +22,5 @@ check-db-caller-host:
 - exec/exec_kapi_init.inc
 - tools/check_map.d/check-db-caller-host.yaml
 - build/checks.d/check-db-caller-host.mk
+- tools/tests/db_group_shim.h
 artifact_reader: true

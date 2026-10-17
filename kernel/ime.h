@@ -11,6 +11,7 @@
 #include "types.h"
 #include "os32_kapi_shared.h"
 #include "ime_render.h"
+#include "vfs.h"
 
 /* ======================================================================== */
 /*  IME 状態                                                                */
@@ -39,8 +40,11 @@ typedef struct {
 /*  辞書コンテキスト (SQLite ベース)                                         */
 /* ======================================================================== */
 
+/* Zero-initialize once; a quarantined instance must never be reset/reused. */
 typedef struct {
     void *db;            /* sqlite3* (前方宣言回避のため void*) */
+    VfsSqliteCookie group;
+    int isolated;
     void *exact_stmt;    /* sqlite3_stmt* (完全一致検索) */
     void *prefix_stmt;   /* sqlite3_stmt* (前方一致検索) */
     void *learn_stmt;    /* sqlite3_stmt* (学習UPSERT) */
@@ -94,6 +98,7 @@ typedef struct {
 
 /* 初期化 (ブート時に1回) */
 void ime_init(void);
+int ime_dict_boot(void);
 
 /* FEP ON/OFF トグル (初回呼び出し時に辞書ロード) */
 void ime_toggle(void);

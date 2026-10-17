@@ -12,3 +12,5 @@ check-db-v50-host:
 - exec/exec_kapi_init.inc
 - tools/check_map.d/check-db-v50-host.yaml
 - build/checks.d/check-db-v50-host.mk
+- kernel/ime_dict.c
+- kernel/ime.h

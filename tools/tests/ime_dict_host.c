@@ -1,3 +1,4 @@
+#define OS32_SQLITE_DIRECT_TEST 1
 /* ========================================================================= */
 /*  IME_DICT_HOST.C — 辞書の常駐接続の開き直し (票 TASK_VFS_FD_PATH v3 の 6)  */
 /*                                                                           */
@@ -83,18 +84,33 @@ static int inj_read(void *ctx, const char *path, void *buf, u32 size, u32 offset
 
 #include "../../kernel/ime_dict.c"
 
+/* Fixture setup uses a separate EXEC group; default file opens are forbidden. */
+static Os32SqliteGroup setup_group;
+static int setup_open(const char *path, sqlite3 **db, int flags, const char *vfs)
+{
+    (void)vfs;
+    CHECK(os32_sqlite_group_acquire(OS32_SQLITE_EXEC, 1, &setup_group) == SQLITE_OK);
+    return os32_sqlite_group_open(&setup_group, path, flags, db);
+}
+static int setup_close(sqlite3 *db)
+{
+    CHECK(os32_sqlite_group_begin_close(&setup_group) == SQLITE_OK);
+    int rc = sqlite3_close(db);
+    return os32_sqlite_group_finish(&setup_group, rc);
+}
+
 /* ---- 足場 ---- */
 static void make_dict(const char *path, const char *kanji)
 {
     sqlite3 *db = 0;
     char sql[256];
-    CHECK(sqlite3_open_v2(path, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
+    CHECK(setup_open(path, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
                           (const char *)0) == SQLITE_OK);
     snprintf(sql, sizeof(sql),
              "CREATE TABLE dict(yomi TEXT, kanji TEXT, pos_id INT, cost INT);"
              "INSERT INTO dict VALUES('か','%s',1,10);", kanji);
     CHECK(sqlite3_exec(db, sql, 0, 0, 0) == SQLITE_OK);
-    CHECK(sqlite3_close(db) == SQLITE_OK);
+    CHECK(setup_close(db) == SQLITE_OK);
 }
 
 /* 実体の差し替え (`rm` → 同じ名前に作り直し と同じ結果。hsync の置き換え
@@ -189,6 +205,9 @@ static void admin_apis(IME_Dict *d)
     fail_from = 1024;
     fail_reads = 1000000;
     CHECK(ime_user_export(d, "/db/out2.csv") < 0);
+    reopened = n_reopened;
+    CHECK(ime_user_export(d, "/db/out2.csv") < 0);
+    CHECK(n_reopened == reopened); /* persistent I/O does not retry forever */
     fail_reads = 0;
     fail_from = 0;
     printf("PASS admin_export_step_error\n");
@@ -308,7 +327,7 @@ static void sqlite_methods_stale(void)
 
     /* 旧来の経路 (既定の VFS、IME 辞書と同じ) */
     make_dict("/db/m.db", "木");
-    CHECK(sqlite3_open_v2("/db/m.db", &db, SQLITE_OPEN_READWRITE, 0) == SQLITE_OK);
+    CHECK(setup_open("/db/m.db", &db, SQLITE_OPEN_READWRITE, 0) == SQLITE_OK);
     CHECK(sqlite3_exec(db, "SELECT count(*) FROM dict", 0, 0, 0) == SQLITE_OK);
     pf = main_file(db);
     fd = os32_sqlite_db_fd(db);
@@ -316,7 +335,7 @@ static void sqlite_methods_stale(void)
     expect_methods_ok(pf);
     open_files[fd].stale = 1;
     expect_methods_fail(pf);
-    CHECK(sqlite3_close(db) == SQLITE_OK);
+    CHECK(setup_close(db) == SQLITE_OK);
     CHECK(!open_files[fd].in_use);                    /* 失効後も解放できる */
     printf("PASS sqlite_stale_legacy\n");
 
@@ -353,26 +372,26 @@ static void journal_name_len(void)
     memset(name, 'n', sizeof(name));
     memcpy(name, "/db/", 4);
     name[room + 1] = '\0';                             /* 248: 1 バイト超過 */
-    CHECK(sqlite3_open_v2(name, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
+    CHECK(setup_open(name, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
                           0) == SQLITE_CANTOPEN);
-    if (db) sqlite3_close(db);
+    if (db) setup_close(db);
     db = 0;
     CHECK(fixture_find(name, 0) == NULL);              /* 作ってもいない */
     name[room] = '\0';                                 /* 247: 収まる */
-    CHECK(sqlite3_open_v2(name, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
+    CHECK(setup_open(name, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
                           0) == SQLITE_OK);
     CHECK(sqlite3_exec(db, "CREATE TABLE t(x); INSERT INTO t VALUES(1);",
                        0, 0, 0) == SQLITE_OK);        /* ジャーナルも開ける */
-    CHECK(sqlite3_close(db) == SQLITE_OK);
+    CHECK(setup_close(db) == SQLITE_OK);
     printf("PASS journal_name_len\n");
 }
 
 #ifndef IME_DICT_HOST_MAIN
 #define IME_DICT_HOST_MAIN main
 #endif
-int IME_DICT_HOST_MAIN(void)
+int IME_DICT_HOST_MAIN(int argc, char **argv)
 {
-    static IME_Dict d;
+    static IME_Dict d = {0};
     int n, fd;
 
     CHECK(os32_sqlite_init() == SQLITE_OK);
@@ -380,11 +399,29 @@ int IME_DICT_HOST_MAIN(void)
     mock_ops.read_stream = inj_read;
     make_dict("/db/fep.db", "蚊");
     CHECK(ime_dict_open(&d, "/db/fep.db") == 0);
+    if (argc > 1 && !strcmp(argv[1], "io_quarantine")) {
+        Os32SqliteGroupInfo info;
+        sqlite3_stmt *unowned = 0;
+        CHECK(sqlite3_prepare_v2(d.db, "SELECT 1", -1, &unowned, 0) == SQLITE_OK);
+        CHECK(ime_dict_reopen(&d, "/db/fep.db") == -1);
+        CHECK(d.isolated && d.db && n_reopened == 0);
+        CHECK(!d.exact_stmt && !d.prefix_stmt && !d.learn_stmt);
+        CHECK(os32_sqlite_group_snapshot(&d.group, &info) == SQLITE_OK);
+        CHECK(info.state == OS32_SQLITE_QUARANTINED && info.fd_count > 0);
+        CHECK(info.first_rc == SQLITE_BUSY);
+        CHECK(ime_dict_open(&d, "/db/fep.db") == -1);
+        CHECK(ime_dict_reopen(&d, "/db/fep.db") == -1);
+        CHECK(first_kanji(&d, &n)[0] == '\0' && n == 0);
+        vfs_close_owned(0);
+        CHECK(vfs_count_sqlite(&d.group) == info.fd_count);
+        puts("PASS io_quarantine: close BUSY retains group and FD");
+        return 0;
+    }
     CHECK(!strcmp(first_kanji(&d, &n), "蚊") && n == 1);
     fd = dict_fd(&d);
     CHECK(fd >= 3);
     CHECK(open_files[fd].sqlite_db == 1);     /* rename は BUSY で断られる印 */
-    CHECK(open_files[fd].protect == 1);       /* exec_exit の回収から外す印 */
+    CHECK(open_files[fd].lifetime == VFS_FD_SQLITE); /* group lease */
     printf("PASS open\n");
 
     /* (1) 実体の差し替え → 失効 → 接続ごと開き直して新しい中身で答える */
@@ -394,7 +431,7 @@ int IME_DICT_HOST_MAIN(void)
     CHECK(n_reopened == 1);
     CHECK(!open_files[fd].in_use || !open_files[fd].stale ||
           dict_fd(&d) != fd);                 /* 古い FD は閉じた */
-    CHECK(open_files[dict_fd(&d)].protect == 1);
+    CHECK(open_files[dict_fd(&d)].lifetime == VFS_FD_SQLITE);
     CHECK(open_files[dict_fd(&d)].sqlite_db == 1);
     printf("PASS stale_reopen\n");
 

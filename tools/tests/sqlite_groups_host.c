@@ -1,3 +1,4 @@
+#define OS32_SQLITE_DIRECT_TEST 1
 /* F2b: actual VFS + F2a FD table + bundled SQLite, host boundaries only. */
 #define main f2a_main
 #include "vfs_fd_sqlite_host.c"
@@ -9,7 +10,8 @@ char *kstrncpy(char *dst, const char *src, u32 size)
 void *kmemset(void *dst, int val, u32 size) { return memset(dst, val, size); }
 int kstrncmp(const char *a, const char *b, u32 n) { return strncmp(a, b, n); }
 #include "../../lib/sqlite3/sqlite3.h"
-static int register_fail, register_success[10];
+#include "../../lib/sqlite3/os32_sqlite_vfs.h"
+static int register_fail, register_success[OS32_SQLITE_GROUPS + 1];
 static int managed_opens;
 static int traced_open(const char *path, int mode, int owner,
                        const VfsSqliteCookie *cookie, int flags, VfsSqliteLease *out);
@@ -34,8 +36,8 @@ static int host_register(sqlite3_vfs *vfs, int make_default)
     }
     rc = sqlite3_vfs_register(vfs, make_default);
     if (rc == SQLITE_OK) {
-        i = vfs == &os32_vfs ? 9 : (int)(vfs - group_vfs);
-        CHECK(i >= 0 && i < 10); register_success[i]++;
+        i = vfs == &os32_vfs ? OS32_SQLITE_GROUPS : (int)(vfs - group_vfs);
+        CHECK(i >= 0 && i < OS32_SQLITE_GROUPS + 1); register_success[i]++;
     }
     return rc;
 }
@@ -62,7 +64,7 @@ int vfs_stat(const char *path, OS32_Stat *st)
 
 static void capacity(void)
 {
-    Os32SqliteGroup g[9], sentinel, extra;
+    Os32SqliteGroup g[OS32_SQLITE_GROUPS], sentinel, extra;
     int i, before;
     memset(&sentinel, 0x5a, sizeof(sentinel)); extra = sentinel;
     before = probes;
@@ -74,6 +76,7 @@ static void capacity(void)
     CHECK(!memcmp(&extra, &sentinel, sizeof(extra)));
     CHECK(os32_sqlite_group_acquire(OS32_SQLITE_RESIDENT, 2, &g[8]) == SQLITE_OK);
     CHECK(g[8].group_index == 8);
+    CHECK(os32_sqlite_group_acquire(OS32_SQLITE_RESIDENT, 0, &g[9]) == SQLITE_OK);
     CHECK(os32_sqlite_group_acquire(OS32_SQLITE_RESIDENT, 0, &extra) == SQLITE_FULL);
     CHECK(os32_sqlite_group_acquire(99, 0, &extra) == SQLITE_MISUSE);
     CHECK(os32_sqlite_group_acquire(OS32_SQLITE_EXEC, -1, &extra) == SQLITE_MISUSE);
@@ -365,9 +368,9 @@ static void edge_opens(void)
     CHECK(os32Close(&main_file.base) == SQLITE_OK);
     CHECK(os32_sqlite_group_finish(&a, SQLITE_OK) == SQLITE_OK);
     v = sqlite3_vfs_find("os32");
-    CHECK(v->xOpen(v, "/legacy", &f.base, SQLITE_OPEN_READWRITE, NULL) == SQLITE_OK);
-    CHECK(!f.managed && open_files[f.fd].lifetime == VFS_FD_GENERIC);
-    CHECK(os32Close(&f.base) == SQLITE_OK);
+    before = probes;
+    CHECK(v->xOpen(v, "/legacy", &f.base, SQLITE_OPEN_READWRITE, NULL) == SQLITE_CANTOPEN);
+    CHECK(f.base.pMethods == NULL && probes == before);
 }
 
 static void stale_group(void)
@@ -425,7 +428,7 @@ static void repeated_lifetimes(void)
         for (i = 0; i < OS32_SQLITE_GROUPS + 2; i++) {
             CHECK(v == links[i]); v = v->pNext;
         }
-        for (i = 0; i < 10; i++) CHECK(register_success[i] == 1);
+        for (i = 0; i < OS32_SQLITE_GROUPS + 1; i++) CHECK(register_success[i] == 1);
         CHECK(v == NULL);
     }
     for (i = 0; i < OS32_SQLITE_EXEC_GROUPS; i++)
@@ -504,7 +507,7 @@ int GROUPS_TEST_MAIN(int argc, char **argv)
         register_fail = 1;
         CHECK(sqlite3_os_init() == SQLITE_BUSY);
         CHECK(sqlite3_os_init() == SQLITE_OK);
-        for (i = 0; i < 10; i++) CHECK(register_success[i] == 1);
+        for (i = 0; i < OS32_SQLITE_GROUPS + 1; i++) CHECK(register_success[i] == 1);
         return 0;
     }
     CHECK(os32_sqlite_init() == SQLITE_OK);

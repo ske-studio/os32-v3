@@ -5,6 +5,7 @@
 
 #include "os32_sqlite_config.h"
 #include "sqlite3.h"
+#include "os32_sqlite_outer.h"
 #include "types.h"
 
 #define TVRAM_CHAR ((volatile u16 *)0xA0000UL)
@@ -20,14 +21,17 @@ static void tv_put(int row, int col, char c, u8 attr)
 int os32_sqlite_test(void)
 {
     sqlite3 *db;
-    int rc;
+    int rc, close_rc;
+    Os32SqliteGroup group;
 
     tv_put(20, 0, 'A', 0x0E);
 
     db = 0;
-    rc = sqlite3_open(":memory:", &db);
+    rc = os32_sqlite_group_acquire(OS32_SQLITE_RESIDENT, 0, &group);
+    if (rc != SQLITE_OK) return -1;
+    rc = os32_sqlite_group_open(&group, ":memory:", SQLITE_OPEN_READWRITE, &db);
     tv_put(20, 1, (rc == 0) ? 'O' : 'X', (rc == 0) ? 0x0A : 0x02);
-    if (rc != 0) return -1;
+    if (rc != 0) goto close;
 
     /* PRAGMA */
     sqlite3_exec(db, "PRAGMA journal_mode=OFF", 0, 0, 0);
@@ -43,7 +47,12 @@ int os32_sqlite_test(void)
 
     /* close */
     tv_put(20, 5, 'D', 0x0E);
-    sqlite3_close(db);
+close:
+    os32_sqlite_group_begin_close(&group);
+    close_rc = db ? sqlite3_close(db) : SQLITE_OK;
+    if (close_rc == SQLITE_OK) db = 0;
+    close_rc = os32_sqlite_group_finish(&group, close_rc);
+    if (close_rc != SQLITE_OK) return -1;
     tv_put(20, 6, 'K', 0x0A);
 
     return rc;

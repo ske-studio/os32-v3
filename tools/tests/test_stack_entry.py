@@ -53,9 +53,11 @@ entry_bp: dd 0
     command(['nasm', '-f', 'elf32', ROOT / 'kernel/setjmp.asm', '-o', work / 'setjmp.o'])
     boot = (ROOT / 'kernel/kernel.c').read_text()
     tss = re.search(r'tss_init\([^;]+;', boot).group()
-    sqlite = re.search(r'int trc = sqlite_call_on_alt_stack\([^;]+;', boot).group()
-    calls = ('\nstatic void boot_tss(void) { ' + tss + ' }\nstatic int boot_sqlite(void) { ' +
-             sqlite.replace('os32_sqlite_test', 'sqlite_body') + ' return trc; }\n')
+    engine = (ROOT / 'kernel/sqlite_engine.c').read_text()
+    top = re.search(r'sqlite_engine_stack_top = ([^;]+);', engine).group(1)
+    assert 'sq_rc = os32_sqlite_start();' in boot
+    calls = ('\nstatic void boot_tss(void) { ' + tss + ' }\nstatic int boot_sqlite(void) { '
+             'int result=0; sqlite_call_on_alt_stack(sqlite_body, ' + top + ', &result); return result; }\n')
     # Execute each product diagnostic classification block with boundary EIPs.
     isr = (ROOT / 'kernel/isr_handlers.c').read_text()
     classify = '''
@@ -77,14 +79,14 @@ static void exec_fault_recover(void) { exec_longjmp(jumpbuf); }
         classify += 'static void classify%d(u32 fault_eip) { int row = 0;\n%s\n}\n' % (i, isr[start:end])
         start = isr.index('    if (exec_nest_level > 0)', end)
         end = isr.index('\n    }', start) + len('\n    }')
-        classify += 'static int recover%d(void) { kctx_exc_depth = 1;\n%s\nreturn 0; }\n' % (i, isr[start:end])
+        classify += 'static void recover%d(void *arg) { (void)arg; kctx_exc_depth = 1;\n%s\n}\n' % (i, isr[start:end])
     classify += '''
 static void check_fault_return(void)
 {
     volatile u32 marker = 0x12345678;
     for (volatile int i = 0; i < 2; i++) {
         if (!exec_setjmp(jumpbuf)) {
-            sqlite_call_on_alt_stack(i ? recover1 : recover0, MEM_SQLITE_STACK_TOP);
+            sqlite_call_on_alt_stack(i ? recover1 : recover0, MEM_SQLITE_STACK_TOP, 0);
             finish(32);
         }
         CHECK(marker == 0x12345678 && (u32)&marker >= MEM_KSTACK_BASE &&
