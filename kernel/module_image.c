@@ -75,6 +75,7 @@ int module_image_header(const u8 *header, u32 header_bytes, u32 file_size,
         h[MI_MEM_SIZE] > 0xffffffffUL - h[MI_PAYLOAD_OFF])
         return MODULE_BAD_HEADER;
     plan.load_span = h[MI_PAYLOAD_OFF] + h[MI_MEM_SIZE];
+    if (plan.load_span > component->load_span_max) return MODULE_BAD_HEADER;
     for (u32 i = 0; i < 4; i++) {
         u32 off = h[MI_TEXT_OFF + 2 * i], len = h[MI_TEXT_SIZE + 2 * i];
         if (!within(off, len, h[MI_MEM_SIZE]) ||
@@ -209,6 +210,28 @@ int module_image_validate(const u8 *image, u32 size,
             u32 slot = get32(image + h[MI_IMPORT_OFF] + j * MODULE_RECORD_SIZE + 8);
             if (overlap(off, 4, slot, 4)) return MODULE_RELOC_INVALID;
         }
+    }
+    if (out) *out = plan;
+    return MODULE_IMAGE_OK;
+}
+
+/* Validate every write and base addition before changing even BSS. The owned
+ * image is stable in OS32's cooperative loader; no prefix pointers escape. */
+int module_image_relocate(u8 *image, u32 size,
+                          const struct module_image_policy *policy, u32 base,
+                          struct module_image_plan *out)
+{
+    struct module_image_plan plan;
+    int rc = module_image_validate(image, size, policy, &plan);
+    if (rc) return rc;
+    const u32 *h = plan.word;
+    if (base > 0xffffffffUL - h[MI_MEM_SIZE]) return MODULE_RELOC_INVALID;
+    u8 *body = image + h[MI_PAYLOAD_OFF];
+    for (u32 i = h[MI_PAYLOAD_SIZE]; i < h[MI_MEM_SIZE]; i++) body[i] = 0;
+    for (u32 i = 0; i < h[MI_RELOC_COUNT]; i++) {
+        u32 off = get32(image + h[MI_RELOC_OFF] + 4 * i);
+        u32 value = base + get32(body + off);
+        for (u32 j = 0; j < 4; j++) body[off + j] = (u8)(value >> (8 * j));
     }
     if (out) *out = plan;
     return MODULE_IMAGE_OK;

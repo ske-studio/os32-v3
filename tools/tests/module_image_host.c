@@ -1,8 +1,8 @@
 /* ILP32 stdin fixture, no libc; protocol is private to test_module_image.py. */
 #include "module_image.h"
 
-static u8 image[MODULE_IMAGE_MAX + 1];
-static u8 before[MODULE_IMAGE_MAX + 1];
+static u8 image[1024 * 1024];
+static u8 before[1024 * 1024];
 static struct module_symbol_contract imports[MODULE_IMPORT_MAX];
 static struct module_symbol_contract exports[MODULE_OPS_SLOTS];
 
@@ -34,7 +34,7 @@ static void check_unchanged(const void *bytes, u32 size, u8 value)
 
 void _start(void)
 {
-    u32 input[9];
+    u32 input[11];
     if (!read_exact(input, sizeof(input)) || input[6] > MODULE_IMPORT_MAX ||
         input[7] > sizeof(image)) finish(2);
     struct module_image_policy policy = {
@@ -43,7 +43,12 @@ void _start(void)
     };
     if (!read_exact(imports, input[6] * sizeof(imports[0])) ||
         !read_exact(exports, sizeof(exports)) || !read_exact(image, input[7])) finish(2);
-    for (u32 i = 0; i < input[7]; i++) before[i] = image[i];
+    for (u32 i = input[7]; i < sizeof(image); i++) image[i] = 0xa5;
+    /* A boundary mutant must reach the explicit write/range observation rather
+     * than being accidentally rejected by the value read across payload end. */
+    if (input[9] && input[7] <= sizeof(image) - 4)
+        for (u32 i = 0; i < 4; i++) image[input[7] + i] = 0;
+    for (u32 i = 0; i < sizeof(image); i++) before[i] = image[i];
     struct module_image_plan plan, header_plan;
     u8 *plan_bytes = (u8 *)&plan;
     for (u32 i = 0; i < sizeof(plan); i++) plan_bytes[i] = 0xa5;
@@ -73,6 +78,27 @@ void _start(void)
         }
         u32 want = header_plan.word[MI_PAYLOAD_OFF] + header_plan.word[MI_MEM_SIZE];
         if (header_plan.load_span != want || (!rc && plan.load_span != want)) finish(2);
+    }
+    if (input[9]) {
+        for (u32 i = 0; i < sizeof(plan); i++) plan_bytes[i] = 0xa5;
+        rc = module_image_relocate(image, input[7], &policy, input[10], &plan);
+        if (rc) {
+            check_unchanged(&plan, sizeof(plan), 0xa5);
+        } else {
+            const u32 *h = plan.word;
+            u8 *body = before + h[MI_PAYLOAD_OFF];
+            for (u32 i = h[MI_PAYLOAD_SIZE]; i < h[MI_MEM_SIZE]; i++) body[i] = 0;
+            for (u32 i = 0; i < h[MI_RELOC_COUNT]; i++) {
+                const u8 *p = before + h[MI_RELOC_OFF] + 4 * i;
+                u32 off = p[0] | (u32)p[1] << 8 | (u32)p[2] << 16 | (u32)p[3] << 24;
+                p = body + off;
+                u32 value = (p[0] | (u32)p[1] << 8 | (u32)p[2] << 16 | (u32)p[3] << 24) + input[10];
+                for (u32 j = 0; j < 4; j++) body[off + j] = (u8)(value >> (8 * j));
+            }
+        }
+        /* Includes prefix, non-target payload, BSS, padding and tail guards.
+         * Any rejected image must have produced literally zero writes. */
+        for (u32 i = 0; i < sizeof(image); i++) if (before[i] != image[i]) finish(2);
     }
     char msg[] = "RED 00\n";
     const char *output = rc ? msg : "GREEN\n";

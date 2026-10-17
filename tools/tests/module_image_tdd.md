@@ -37,3 +37,7 @@ successful plans match independently decoded words and load_span. Added source
 mutants remove ID, component ops, image-size and body-size predicates; the
 normal suite includes counterexamples for each. Implementation-stage execution
 uses `MUTATE=0`; mutation execution belongs to the PM after review.
+
+T4a-2: 共通 `module_image_relocate` の検証後書込は
+`check-sqlite-module-proto-host` で非整列/末尾/書込0/base overflowを確認する。
+ILP32 harness の末尾 guard と out の不変確認は両試験で共用する。

@@ -130,7 +130,7 @@ def verify(module, elf, metadata, kernel, pair, validator):
 def negative_cases(elf, metadata, kernel):
     def build(data=elf, meta=metadata, vk=kernel, module_id=1):
         return mkmod.build(data, meta, vk, KAPI, LAYOUT, module_id=module_id)
-    rejected(lambda: build(module_id=2), 'unknown module ID')
+    rejected(lambda: build(module_id=99), 'unknown module ID')
     rejected(lambda: build(data=elf[:40]), 'range')
     bad = bytearray(elf); bad[4] = 2
     rejected(lambda: build(data=bad), 'ELF32')

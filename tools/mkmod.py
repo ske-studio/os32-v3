@@ -170,10 +170,16 @@ class Elf:
                 require(symbol['shndx'] < len(self.sections) and
                         self.sections[symbol['shndx']]['flags'] & 2,
                         'relocation must reference an allocated body symbol')
+                require(symbol['value'] < mem_size or (symbol['value'] == mem_size and
+                        symbol['name'] == '__module_end'), 'relocation symbol outside body')
                 if kind == 2:
+                    displacement = struct.unpack_from('<i', payload, where)[0]
+                    require(0 <= where + 4 + displacement <= mem_size,
+                            'PC32 target outside body')
                     continue
                 value = struct.unpack_from('<I', payload, where)[0]
-                require(value <= mem_size, 'relocation value outside body')
+                require(value < mem_size or (value == mem_size and
+                        symbol['name'] == '__module_end'), 'relocation value outside body')
                 relocs.append(where)
         relocs.sort()
         require(len(relocs) <= policy['reloc_max'], 'too many relocations')
@@ -275,6 +281,7 @@ def build(elf_data, metadata, vmkernel, kapi_abi_gen, layout_gen, *,
     image_size = payload_offset + len(payload)
     require(image_size <= policy['image_max'] and mem_size <= policy['mem_max'],
             'module exceeds size limit')
+    require(payload_offset + mem_size <= policy['load_span_max'], 'load span too large')
     require(len(export_table) // CONSTANTS['RECORD_SIZE'] <= policy['export_max'],
             'too many exports')
     abi = metadata['module_abi_gen']
@@ -300,7 +307,8 @@ def build(elf_data, metadata, vmkernel, kapi_abi_gen, layout_gen, *,
     stats = dict(prefix_size=prefix_size, prefix_alloc=payload_offset,
                  reloc_count=len(relocs), import_count=len(imports),
                  export_count=len(export_table) // 12, names_size=len(names),
-                 pair_image_crc=pair, payload_size=len(payload), mem_size=mem_size)
+                 pair_image_crc=pair, payload_size=len(payload), mem_size=mem_size,
+                 image_size=image_size, load_span=payload_offset + mem_size)
     return bytes(image), stats
 
 
@@ -308,14 +316,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--elf', type=Path, required=True)
     parser.add_argument('--metadata', type=Path, required=True)
-    parser.add_argument('--vmkernel', type=Path, required=True)
+    parser.add_argument('--vmkernel', type=Path)
+    parser.add_argument('--module-id', type=int, default=CONSTANTS['ID_KDEBUG'])
     parser.add_argument('--kapi-abi-gen', type=lambda s: int(s, 0), required=True)
     parser.add_argument('--layout-gen', type=lambda s: int(s, 0), required=True)
     parser.add_argument('-o', '--output', type=Path, required=True)
     args = parser.parse_args()
     try:
         image, stats = build(args.elf.read_bytes(), json.loads(args.metadata.read_text()),
-                             args.vmkernel.read_bytes(), args.kapi_abi_gen, args.layout_gen)
+                             args.vmkernel.read_bytes() if args.vmkernel else b'',
+                             args.kapi_abi_gen, args.layout_gen, module_id=args.module_id)
         temporary = args.output.with_name(args.output.name + '.tmp')
         temporary.write_bytes(image)
         temporary.replace(args.output)

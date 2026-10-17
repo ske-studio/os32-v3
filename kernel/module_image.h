@@ -28,7 +28,7 @@ struct module_symbol_contract {
 struct module_component_policy {
     u32 module_id, phase, required_flags, allowed_flags, stop_allowed;
     u32 ops_version, ops_slots, image_max, mem_max;
-    u32 reloc_max, import_max, export_max;
+    u32 reloc_max, import_max, export_max, load_span_max;
 };
 struct module_image_policy {
     u32 kapi_abi_gen, layout_gen, module_abi_gen, pair_image_crc;
@@ -50,6 +50,13 @@ int module_image_header(const u8 *header, u32 header_bytes, u32 file_size,
                         struct module_image_plan *out);
 int module_image_validate(const u8 *image, u32 size,
                           const struct module_image_policy *policy,
+                          struct module_image_plan *out);
+
+/* Caller owns load_span writable bytes (including BSS/rounding), at an aligned
+ * container address. On rejection image and out are unchanged. On success only
+ * body relocation words and [payload_size, mem_size) are written. */
+int module_image_relocate(u8 *image, u32 size,
+                          const struct module_image_policy *policy, u32 base,
                           struct module_image_plan *out);
 
 #endif

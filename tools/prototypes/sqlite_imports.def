@@ -1,0 +1,143 @@
+{
+  "schema": 1,
+  "imports": [
+    {
+      "symbol": "vfs_close",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "vfs_close_sqlite",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "vfs_count_sqlite",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "vfs_fd_is_stale",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "vfs_fd_set_sqlite_db",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "vfs_get_size",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "vfs_open",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "vfs_open_sqlite",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "vfs_quarantine_sqlite",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "vfs_read_fd",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "vfs_resolve_path",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "vfs_rm",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "vfs_seek",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "vfs_stat",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "vfs_sync",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "vfs_validate_sqlite",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "vfs_write_fd",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "kprintf",
+      "source": "include/kprintf.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "sys_time",
+      "source": "include/sys.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "malloc",
+      "source": "kernel/kmalloc.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "free",
+      "source": "kernel/kmalloc.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "realloc",
+      "source": "kernel/kmalloc.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "ktime_ticks",
+      "declaration": "u32 ktime_ticks(void);",
+      "context": "normal",
+      "irq": false
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 """KMOD v1 wire order and component policies (TASK_T4_T6_MODULES §2-1).
 
 gen_module_schema.py emits the C view; mkmod consumes this source directly.
-SQLite gets its own row after T4a-2 measures its image and table limits.
+SQLite prototype limits are measured by tools/sqlite_module_proto.py.
 """
 
 HEADER_FIELDS = (
@@ -17,7 +17,7 @@ HEADER_FIELDS = (
 )
 CONSTANTS = dict(
     HEADER_SIZE=144, PAGE_SIZE=4096, NAME_MAX=63, RECORD_SIZE=12,
-    MAGIC=0x444f4d4b, FORMAT_VERSION=1, ID_KDEBUG=1,
+    MAGIC=0x444f4d4b, FORMAT_VERSION=1, ID_KDEBUG=1, ID_SQLITE=2,
     PHASE_POST_ROOT=2, FLAG_PAIR=1,
 )
 KDEBUG_OPS_NAMES = (
@@ -31,7 +31,7 @@ KDEBUG_OPS_NAMES = (
 POLICY_FIELDS = (
     'module_id', 'phase', 'required_flags', 'allowed_flags', 'stop_allowed',
     'ops_version', 'ops_slots', 'image_max', 'mem_max',
-    'reloc_max', 'import_max', 'export_max',
+    'reloc_max', 'import_max', 'export_max', 'load_span_max',
 )
 POLICIES = {
     CONSTANTS['ID_KDEBUG']: dict(
@@ -39,8 +39,18 @@ POLICIES = {
         required_flags=CONSTANTS['FLAG_PAIR'], allowed_flags=CONSTANTS['FLAG_PAIR'],
         stop_allowed=0, ops_version=2, ops_slots=len(KDEBUG_OPS_NAMES),
         image_max=262144, mem_max=262144,
-        reloc_max=16384, import_max=1024, export_max=64,
+        reloc_max=16384, import_max=1024, export_max=64, load_span_max=524288,
         init_symbol='kdebug_init', imports_symbol='kdebug_import_slots',
         ops_symbol='kdebug_ops', ops_names=KDEBUG_OPS_NAMES,
     ),
 }
+
+# T4a-2 VA0 measurement gate; no product SQLite loading until T4c.
+POLICIES[CONSTANTS['ID_SQLITE']] = dict(
+    module_id=CONSTANTS['ID_SQLITE'], phase=CONSTANTS['PHASE_POST_ROOT'],
+    required_flags=0, allowed_flags=0, stop_allowed=0,
+    ops_version=1, ops_slots=1, image_max=524288, mem_max=524288,
+    reloc_max=4096, import_max=32, export_max=1, load_span_max=544768,
+    init_symbol='sqlite_module_init', imports_symbol='sqlite_import_slots',
+    ops_symbol='sqlite_module_ops', ops_names=('initialize',),
+)

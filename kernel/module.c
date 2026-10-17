@@ -73,22 +73,11 @@ void kdebug_load(void)
         (int)(st.st_size - sizeof(header))) goto rejected;
     vfs_close(fd);
     fd = -1;
-    rc = module_image_validate(image, st.st_size, &policy, &plan);
-    if (rc) goto rejected;
     const u32 *h = plan.word;
     u8 *body = image + h[MI_PAYLOAD_OFF];
     u32 base = (u32)(uptr)body;   /* VA of the body (P2V above) [C5] */
-    kmemset(body + h[MI_PAYLOAD_SIZE], 0, h[MI_MEM_SIZE] - h[MI_PAYLOAD_SIZE]);
-    for (u32 i = 0; i < h[MI_RELOC_COUNT]; i++) {
-        u32 off = read_word(image + h[MI_RELOC_OFF] + i * 4);
-        rc = MODULE_RELOC_INVALID;
-        if (off > h[MI_PAYLOAD_SIZE] || 4 > h[MI_PAYLOAD_SIZE] - off)
-            goto rejected;
-        u32 value = read_word(body + off);
-        if (value > h[MI_MEM_SIZE]) goto rejected;
-        value += base;
-        kmemcpy(body + off, &value, sizeof(value));
-    }
+    rc = module_image_relocate(image, st.st_size, &policy, base, &plan);
+    if (rc) goto rejected;
     for (u32 i = 0; i < h[MI_IMPORT_COUNT]; i++) {
         u32 off = read_word(image + h[MI_IMPORT_OFF] + i * MODULE_RECORD_SIZE + 8);
         kmemcpy(body + off, &kdebug_kexports[i], sizeof(u32));

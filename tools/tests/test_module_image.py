@@ -27,9 +27,10 @@ def build_validator(directory, source=None):
 
 
 def validate(exe, image, *, kapi=75, layout=3, abi=0x12345678, pair=0xabcdef01,
-             ops=2, img_valid=1, imports=(), exports=(), module_id=1, runner=None):
-    contract = bytearray(struct.pack("<9I", kapi, layout, abi, pair, ops, img_valid,
-                                     len(imports), len(image), module_id))
+             ops=2, img_valid=1, imports=(), exports=(), module_id=1, runner=None, relocate_base=None):
+    contract = bytearray(struct.pack("<11I", kapi, layout, abi, pair, ops, img_valid,
+                                     len(imports), len(image), module_id,
+                                     int(relocate_base is not None), relocate_base or 0))
     for entry in imports:
         contract.extend(struct.pack("<IHH", *entry))
     slots = [(0, 0, 0)] * 18
@@ -94,8 +95,8 @@ def cases():
     add("id-policy", "known-image-wrong-policy", lambda b: None, policy={"module_id": 2})
     add("id-policy", "unknown-policy", lambda b: None, policy={"module_id": 0})
     add("id-policy", "wrong-image-id", lambda b: word(b, 7, 2))
-    add("id-policy", "unknown-matching-id", lambda b: word(b, 7, 2),
-        policy={"module_id": 2})
+    add("id-policy", "unknown-matching-id", lambda b: word(b, 7, 99),
+        policy={"module_id": 99})
     add("id-policy", "wrong-phase", lambda b: word(b, 8, 1))
     add("id-policy", "missing-pair-flag", lambda b: word(b, 9, 0))
     add("id-policy", "unknown-flag", lambda b: word(b, 9, 3))

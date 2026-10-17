@@ -68,7 +68,7 @@ kdebug 固有の現行契約は [TASK_DBGREF §3-2](TASK_DBGREF.md#3-2-部品の
 little-endianの明示的decodeを使い、C構造体のcast/sizeofでファイルを読まない。**KMOD v1・144Bヘッダの項目順は既に確定** (`kernel/module_image.h:7,23`、`docs/tasks/v3/TASK_DBGREF.md:131`)。下表は意味の表であり再配置案ではない。C/ASM/Pythonはこの順序から生成・照合し、別スキーマを作らない。
 
 ヘッダword 0〜35は `magic,format,header_size,image_size,kapi,layout,module_abi,id,phase,flags,mem_size,payload_off,payload_size,text_off/size,ro_off/size,data_off/size,bss_off/size,reloc_off/count,import_off/count,export_off/count,names_off/size,init,stop,pair_crc,image_crc,ops_version,reserved0,reserved1`。表offsetはcontainer基点、節・入口・reloc書込先・slotはbody基点。relocは4B、importは `{u32 hash; u16 type_ver,kind; u32 slot_off}`、exportは `{u32 hash; u16 slot,ver; u32 entry_off}` の12B。名前は順序付きNUL列、63B上限、hashと実名を照合し衝突は生成失敗。CRCはimage_crc欄 (byte128〜131) を0にした容器全体 (`docs/tasks/v3/TASK_DBGREF.md:132,158,164`)。
-現KDEBUG policyはID=1/POST_ROOT/PAIR必須/stop=0/ops=2・18口/画像とbody各256KiB/reloc≤16,384/import≤1,024/export≤64 (`kernel/module_image.c:49,103`)。T4a-1でID・phase・stop・ops・サイズ上限を生成policyへ移し、KDEBUGの現契約とOFF/RUNNING/拒否診断を保持する。SQLITEの初期画像/body上限案は各512KiB [推]、load_span上限・表件数はT4a-2の実画像で確定し、超過を握り潰さない。**374,968Bの現SQLiteファイルは現256KiB上限に入らない**。
+現KDEBUG policyはID=1/POST_ROOT/PAIR必須/stop=0/ops=2・18口/画像とbody各256KiB/reloc≤16,384/import≤1,024/export≤64 (`kernel/module_image.c:49,103`)。T4a-1でID・phase・stop・ops・サイズ上限を生成policyへ移し、KDEBUGの現契約とOFF/RUNNING/拒否診断を保持する。SQLITEの画像/body上限は各512KiB、load_span≤544,768B、reloc≤4,096/import≤32/export≤1とする (T4a-2試作測定、下記)。超過を握り潰さない。**374,968Bの現SQLiteファイルは現256KiB上限に入らない**。
 wire名 `kapi_abi_gen` は現KMODではKAPI機能版76を入れる欄であり、D35のKAPI ABI世代1とは別 (`docs/tasks/v3/TASK_DBGREF.md:141`、`sdk/kapi.json:2`)。意味を黙って入れ替えず、4世代は生成物の印と配備一式で照合する。`module_abi_gen` はmodule別import定義のFNV-1a、`ops_version` はexport契約。KDEBUGのpair CRCは維持。EARLYには自己を含むVK32 CRCを埋める循環を作らずPAIR無しをID別policyで許し、VK32全体/entry CRC・世代・配布一式で照合する (T5b-1の生成試験)。
 
 | 項目 | 意味と検査 |
@@ -290,6 +290,14 @@ T6bは最後に集積を上位票の `[0x500000,0x600000)` へ移し上限1MiB�
 | T5c-6 (1日) | 起動policy/manifest・splashアプリ | ①欠落/循環/重複/未知IDは公開前失敗 ②必須削除でもSQLite/FEPを省略扱いにしない ③splash lease返却→rshell/SerialFS→shellの順 ④表示失敗でもshellへ。必須判定/lease返却欠落変異を検出。splash後のcaller/esp0保持 (§3-1)、font close→BB/mailbox→USER順と低位FIXED非回収 (§6) を確認。 |
 | T6b-1 (1日) | HDD/FD集積移動・全区間検査 | ①508KiB超〜1MiB成功/1MiB+1拒否 ②loader/stack/source/core/bundle/bootinfo重複で展開write0 ③FD64KiB分割/segment wrap境界が一致 ④C/ASM同fixture同理由。最終entry検査前展開変異を検出。hsync読取・boot_image_info利用者も新像に追随 (§5-4)。 |
 | T6b-2 (0.5日) | 生存区間/ピーク計測・最終構成台本 | ①展開・root・SQLite/FEP公開・splash各時点でowner/PFN和一致 ②集積返却後にBB/SQLite、別staging0 ③64MB通常/故障対照 ④8MB planar/PEGC・17MB・Ra266は最終段の未実施欄へ引継ぐ。返却漏れは計数不一致になる。案5配置・USER別勘定 (§0/3-3)、bundle/prefix/隔離を含む監査diff0 (§7-2)。実機分はT4T7-RHへ送り受入を止めない。 |
+
+T4a-2 試作測定 (製品分離・ゲスト受入は後続段): `make sqlite-module-proto`、SQLite 3.53.0 全amalgamation/GNU89/`-Os`、製品設定、local kstring/kmath、libgcc 6 memberを保持。VFSコピーだけ外部pool/`ktime_ticks()`へ変更。
+| 容器 / body | prefix (表実長 / ページ確保) | payload / BSS | reloc / import / export |
+|---|---|---|---|
+| 394,104B / 380,928B | 12,889B / 16,384B | 377,720B / 2,356B | 3,040 / 23 / 1 |
+load_span=397,312B。SQLite専用生成policyは上記§2-1、reloc/import上限から表最大19,036B→prefix20,480B、body512KiBとの和544,768Bを上限にする。KDEBUG policyは維持。
+body+将来pool512KiB+stack128KiBは定常1,036,288B、prefix込みpeak1,052,672B (タグ/record等は後続実測)。旧static384KiB poolは試作bodyに無い。
+実測台帳は `build/out/sqlite-proto/measurements.json` (節/使用archive member/構成/ELF SHA-256)。再生成と境界試験は `check-sqlite-module-proto-host`、S4対照は `check-kdebug-init-host`。
 
 ### 7-2. 像・実行時RAMの見積もりと止める条件
 
