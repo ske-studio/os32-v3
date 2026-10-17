@@ -20,7 +20,7 @@ MUTANTS = [
      'va > H4_PHYS_BOUNDARY'),
     ('32MiB accepted as strictly above', 'pfns[i] > H4_PHYS_BOUNDARY / PAGE_SIZE',
      'pfns[i] >= H4_PHYS_BOUNDARY / PAGE_SIZE'),
-    ('owner reclaim omitted', 'ledger_reclaim_owner(owner, &left)', '(left = 0, 1)'),
+    ('owner reclaim omitted', 'ledger_reclaim_owner(owner, &left)', '(left = 0, (void)left, 1)'),
 ]
 
 
