@@ -30,7 +30,7 @@ struct kdebug_ops {
 };
 
 struct kdebug {
-    u32 state, pair_crc, base, pages, owner, open_count;
+    u32 state, pair_crc, base, base_pa, pages, owner, open_count;
     struct kdebug_ops ops;
 };
 extern struct kdebug kdebug;

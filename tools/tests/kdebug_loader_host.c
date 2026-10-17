@@ -187,6 +187,7 @@ void _start(void)
         CHECK(pages == kdebug.pages && pages > 0 && retires == 0 && logs == 0);
         u32 prefix = ((const u32 *)file)[11];
         CHECK(kdebug.pair_crc == bi.img_crc && kdebug.base == (u32)pool + prefix);
+        CHECK(kdebug.base_pa == V2P(pool + prefix));
         CHECK(kdebug.ops.version == KDEBUG_OPS_VERSION && kdebug.ops.crt_diag_bootlog);
         const u32 *ops = (const u32 *)&kdebug.ops;
         for (u32 slot = 1; slot <= 5; slot++)
@@ -200,7 +201,7 @@ void _start(void)
         for (u32 i = 0; i < prefix; i++) CHECK(pool[i] == 0xdd);
     } else {
         CHECK(!pages && retires == owners && logs == (input[2] != 0));
-        CHECK(!kdebug.base && !kdebug.pages);
+        CHECK(!kdebug.base && !kdebug.base_pa && !kdebug.pages);
         for (u32 i = 0; i < sizeof(kdebug.ops); i++) CHECK(!((u8 *)&kdebug.ops)[i]);
         if (!input[0]) CHECK(!owners && !kdebug.owner);
     }

@@ -14,7 +14,7 @@ u32 boot_pages_audit_runs, boot_pages_audit_fail;
 void kaudit_boot_pages(void)
 {
     struct memory_page_counts c;
-    memory_boot_page_counts(kdebug.pages ? V2P((void *)(uptr)kdebug.base) / PAGE_SIZE : 0,
+    memory_boot_page_counts(kdebug.pages ? kdebug.base_pa / PAGE_SIZE : 0,
                             kdebug.pages, &c);
     boot_pages_audit_runs++;
     boot_pages_audit_fail += c.diff != 0;
