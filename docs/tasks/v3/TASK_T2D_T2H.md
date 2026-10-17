@@ -331,7 +331,7 @@ front SDKのmalloc/map失敗時はallocator lock/busyを解き、GUIクライア
 | 小段 (各45〜75分) | 成果 / 閉じる試験 |
 |---|---|
 | g1 (取り込み単位 L1) | カーネル: 固定bit/epoch/理由分類、`mem_stat` 末尾追記 (KAPI 73)、TRIM_DONEの横取りと `exec_heap_user_trim` の結線 (F-12)。slot再利用、保留中の再要求で不変、飽和、pool0無確保。受入済み、証拠: `~/os32-tmp/evidence/2026-10-09/g1_gk1/RESULT.md` |
-| g2 (取り込み単位 L2、WM側とSDK側の2パックでも取り込みは1回) | WMのX3配送 (PARKED・非前景・未配送に1件、満杯は後送、完了で `sent` 解除)、shlibのTRIM消費/hook/TRIM_DONE、C/Rust allocatorの1回再試行 (入口拒否・in_trim・size0・raw mapは除外)、`shlib_protocol` +1 と全consumer再生成。受入済み、証拠: `~/os32-tmp/run/g/g2w/`・`g2s/` |
+| g2 (取り込み単位 L2、WM側とSDK側の2パックでも取り込みは1回) | WMのX3配送 (PARKED・非前景・未配送に1件、満杯は後送、完了で `sent` 解除)、shlibのTRIM消費/hook/TRIM_DONE、C/Rust allocatorの1回再試行 (入口拒否・in_trim・size0・raw mapは除外)、`shlib_protocol` +1 と全consumer再生成。GK-2 実施済み、証拠: `~/os32-tmp/evidence/2026-10-09/g23_gk/RESULT.md`。そこで未合格だった G-3/G-7 は後続 GK-3/GK-4 で閉鎖 ([閉鎖台帳 X-21](../../archive/v3/DEFERRED_CLOSED.md#x-21-部分閉)) |
 | g3 | C fixture (back×2・front、CUI子) とhost trace: A map開始→巻戻し→KAPI復帰→解錠→yield→X3配送→B resume→B trim→TRIM_DONE→B park→A resume→A再試行1回。未応答・raw map・CUI・旧内容保持。受入済み、証拠: `~/os32-tmp/evidence/2026-10-09/g_x21/` |
 | g4 | Rust fixture (shlib経由)、STOPとの統合trace、受入台本の確定。受入済み、証拠: `~/os32-tmp/evidence/2026-10-10/gk4/` |
 | g5 | 変異対応表/小さなkselftest/予算とPM台帳。受入済み、証拠: [T2G_MUTANTS](../../archive/v3/T2G_MUTANTS.md)・`~/os32-tmp/run/g/g_sizes.json` |

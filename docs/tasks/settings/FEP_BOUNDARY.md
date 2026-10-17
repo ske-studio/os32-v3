@@ -18,7 +18,8 @@ F2 の「SQLite 内部 fault は通常 cleanup で回復できない」という
 - FD group/lease、owner cleanup の順序は F2 の担当。本票で上書きしない。
   設定 DB、全 KAPI の uaccess 化、一般例外再設計、SQLite amalgamation 改造、WAL 導入は対象外。
 - ABI 変更は許容されるが必須ではない。必要なら [ABI1–3] に従い `sdk/kapi.json` を正典として
-  末尾追加・版更新・再生成、`make clean`→`make all`、SDK 利用側と `make external` まで全 rebuild。
+  末尾追加・版更新・再生成、`make clean`→`make all`、SDK 利用側まで全 rebuild。外部 apps/game の `make external` は
+  [H-7 の条件を満たし再開が承認されたとき](../v3/T2H_EXTERNAL_GATE.md#再開前に揃える-8-項目) の手順。
   生成物の手編集や旧新 binary の混在は禁止。GNU89 [C1]、kstring [C2]、定数集約 [C4] を守る。
 - **R0 独立レビューと PM の明示承認前に実装しない**。この文書の自己点検は独立レビューではない。
 

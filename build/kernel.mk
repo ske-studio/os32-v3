@@ -235,7 +235,7 @@ clean-kernel:
 
 # LAN (LGY-98) 有効カーネル。emu_agent の許可リストから呼べる 1 語ターゲット。
 # スタンプ (build/config.mk LGY98_STAMP) を置いてからビルドするので、以後の
-# make kernel / deploy-nhd も LAN 有効のまま。kernel-nolgy98 で既定 (無効) に戻す。
+# make kernel / deploy-nhd も LAN 有効のまま。kernel-nolgy98 で無効化する (stamp 無しの既定は有効)。
 kernel-lgy98:
 	@mkdir -p $(BUILD_OUT)
 	@echo 5 > $(LGY98_STAMP)

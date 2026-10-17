@@ -15,16 +15,16 @@
 | 項目 | いま有るもの (v2.1) | 移植に足りないもの / v3 で決めること | 落とし先 |
 |---|---|---|---|
 | **C コンパイラ・libc** | `i386-elf-gcc` 13.2 + newlib 4.4 **nano 構成** (`-lc -lgcc`、`libm.a` あり)。syscalls は `read/write/open/close/lseek/stat/fstat/unlink/isatty/gettimeofday/times/sbrk` の 18 本 (`sdk/crt/syscalls.c`)。ユーザーランドは `-std=gnu89 -march=i386` | **無い**: `opendir/readdir` (KAPI `sys_ls` はある)、`mkdir/rename` の libc 側 (KAPI `sys_mkdir/sys_rename` はある)、`signal`、`select/poll`、`mmap` (v3 の `mem_map` に対応させる)、環境変数、`clock_gettime`。nano の `printf` は **`%f` を既定で出さない** (`-u _printf_float` が要る、未確認 U1)。`sbrk` は OS32X ヘッダの `--heap` で上限が決まる (v3 では `mem_map` で伸長、D23) | P9 の「libc の穴」票 (最初の移植で埋める) |
-| **C++ ランタイム** | **無い** — クロス環境は C だけ (`i386-elf-g++` も `libstdc++` も未ビルド、`ls ~/opt/cross/bin` 2026-09-30)。カーネルの規約は C89 → v3 で C11 | ScummVM / DOSBox / Snes9x / NXEngine は C++ が必須。`libstdc++` (または `libsupc++` だけ) をクロス環境に足すか、C++ を捨てるかは**別の決裁**。例外・RTTI・静的コンストラクタの起動順 (crt0 が `main` の先頭へ飛ぶ約束) も影響する | 決裁 (P9 の前)。候補の表では「C++」を依存に書いた |
-| **浮動小数点 (x87)** | ハード x87 を使う (`kernel/kentry.asm:31`、`kernel/kernel.c:571`) | アプリ別の保存・復元は未実装。協調切替でも初期化・保存・復元が必要 ([TASK_MEMMAP_V3 §3-5-3 第3項](TASK_MEMMAP_V3.md#3-5-3-p6-実行モデル-を見直すときに壊れるもの))。整数のみのライブラリを優先すれば影響を小さくできる | P6 / P9 |
+| **C++ ランタイム** | **無い** — クロス環境は C だけ (`i386-elf-g++` も `libstdc++` も未ビルド、`ls ~/opt/cross/bin` 2026-09-30)。カーネルの規約は C89 → v3 で C11 | ScummVM / DOSBox / Snes9x / NXEngine は C++ が必須。`libstdc++` (または `libsupc++` だけ) をクロス環境に足すか、C++ を捨てるかは**別の決裁**。例外・RTTI・静的コンストラクタの起動順 (CRT が `main` を名前で呼ぶ契約) も影響する | 決裁 (P9 の前)。候補の表では「C++」を依存に書いた |
+| **浮動小数点 (x87)** | ハード x87 を使う (`kernel/kentry.asm:31`、`kernel/kernel.c:571`) | アプリ別の保存・復元は未実装。協調切替でも初期化・保存・復元が必要 ([TASK_MEMMAP_V3 §3-5-3「P6 の票に載せる要件」3](TASK_MEMMAP_V3.md#3-5-3-p6-実行モデル-を見直すときに壊れるもの))。整数のみのライブラリを優先すれば影響を小さくできる | P6 / P9 |
 | **画面 (Video HAL)** | `gfx_get_framebuffer` / `gfx_present_dirty` / `gfx_hw_blit` / `gfx_set_palette`。GUI 1.x は **8bpp PACKED8** (PEGC 640×480×256、9801 は planar 16 色)。Cirrus (NP21/W) / Trident (実機) の窓の帯 `0xFE000000` は実装済み、**16bpp 面は無い** | Video HAL の共通化 (framebuffer / pitch / VSync / flip / optional BitBLT)、**640×480×16bit** (DESIGN_APP_FIRST §5 の境界)、全画面 lease (D19)、VESA2 的な「LFB の番地 + pitch + モード一覧」だけの互換層。8bpp で足りる移植 (Doom / Wolf3D / テキスト系) は 16bpp を待たない | P9 (Video HAL の票、TASK_TRIDENT_DRIVER 段 3〜5) |
 | **音 (PCM / FM)** | `pcm_open/pcm_write/pcm_status/pcm_close` (CS4231、[TASK_PCM_CS4231.md](TASK_PCM_CS4231.md) 受入待ち)、`fm_note_on` / `ssg_*` / `snd_bgm_play` (OPNA、MML)、`snd_se_play_raw` | **SDL 1.2 の音はコールバック (別スレッド) 前提** → OS32 では (a) メインループから PCM リングを埋める、(b) PCM の DMA 割り込み (カーネル文脈) からアプリのコールバックを呼ぶ (CPL=3 へ上がる経路が要る) のどちらか。**(a) を既定**にし、ゲームのフレームごとに `pcm_write` する (遅延 = リング長)。ミキサ (複数音の合成、`SDL_mixer` 相当) はユーザーランドのライブラリで | P8 (音の層) |
 | **入力** | `kbd_trygetkey` / `kbd_is_pressed` / `kbd_trygetrawkey` / `kbd_get_modifiers`、`mouse_poll` / `mouse_set_bounds`、`libos32input` (割り当て表) | **押し離しのイベント** (SDL の `KEYDOWN/KEYUP`) を `kbd_trygetrawkey` から組む。**ジョイスティック KAPI は無い** (PC-98 のジョイポートは OPNA 経由 — 要るなら P8)。マウスの相対移動 (FPS 用) | P8 (入力の層) |
 | **ファイル** | VFS (ext2 / FAT / iso9660 / HostDrv / SerialFS)、`OS32_ERR_*`、パスは `/`。`stdio` は newlib 経由で動く | ディレクトリ列挙の libc 側、`fopen` の `"rb"`/`"wb"` は動く。大きなファイル (ROM 4MB、WAD 12MB、ScummVM のデータ数十 MB) の**読みの速さ** — IDE は PIO (P5 の追加項目)。`mmap` 相当は無い (`mem_map` + 読み込みで代える) | P5 (IDE DMA)、P9 |
 | **時間** | `get_tick` (10ms)、`sys_time_now` (µs、KAPI v59)、`rtc_read`、`sys_time` | `SDL_GetTicks` (ms) と `SDL_Delay` は `sys_time_now` + `sys_yield` で組める。**1kHz tick** は P3 の候補。VSync 待ちは Video HAL に | P9 (SDL 層) |
-| **スレッド** | **無い**。協調型 (`OP_WAIT` / `sys_yield`)、前景 1 本 | `SDL_CreateThread` / mutex / semaphore は**提供しない** (協調型なので `SDL_INIT_NOTHREADS` 相当で組み、スレッドを使う移植元は書き換える)。ZSNES は SDL 版でも音をコールバックに頼る → 上の (a) | P9 (SDL 層の「しないこと」) |
+| **スレッド** | **無い**。協調型 (待ち・譲りの条件は [GUI 契約](../gui/API_CONTRACTS.md#t2a-複数アプリ時のスロット割当と譲り合い--確定-2026-09-04) を参照)、前景 1 本 | `SDL_CreateThread` / mutex / semaphore は**提供しない** (協調型なので `SDL_INIT_NOTHREADS` 相当で組み、スレッドを使う移植元は書き換える)。ZSNES は SDL 版でも音をコールバックに頼る → 上の (a) | P9 (SDL 層の「しないこと」) |
 | **メモリ** | アプリ帯は `0x80000000〜` の私有 VA (image は MEM_EXEC_LOAD_ADDR)、`mem_map` で伸長 | v3: 私有写像 0x80000000〜、**8MB 機は私有 2MB が受入条件** (D9)、32MB / 64MB 機はそれ以上を池から借りる (R2)。ROM 4MB + エミュレート RAM + BB を持つ ZSNES は **32MB 機以上**が前提 | P1 (決定済み) |
-| **ビルド** | `sdk/` (静的アーカイブ 25 本)、`mkos32x.py`、`main()` が最初の関数、OS32X ヘッダ | 移植元の `configure` / CMake は使わず、**OS32 側に Makefile を書く** (`apps/` の流儀)。`-march=pentium` / `-mmmx` は移植ごとに許す (カーネルは i386 のまま)。NASM は有る (ZSNES に要る) | 各移植の票 |
+| **ビルド** | `sdk/` (静的アーカイブ 25 本)、`mkos32x.py`、[CRT が `main` を名前で呼ぶ (関数順序は自由)](../../../sdk/README.md#アプリを書くときの約束)、OS32X ヘッダ | 移植元の `configure` / CMake は使わず、**OS32 側に Makefile を書く** (`apps/` の流儀)。`-march=pentium` / `-mmmx` は移植ごとに許す (カーネルは i386 のまま)。NASM は有る (ZSNES に要る) | 各移植の票 |
 
 ### 1-1. ライセンスと同梱の扱い (提案、ユーザー決裁待ち)
 
@@ -157,7 +157,7 @@ os32 は **MIT** (`LICENSE`)。os32-v3 はパブリック (ROADMAP §0-1)。移�
 | U4 | ライセンスの細部: sc-im (BSD 4 条項と記した、要原典)、OpenTyrian のデータ (Tyrian 2000 のフリーウェア化の再配布条件)、libjpeg-turbo (IJG + BSD + zlib の 3 本)、Angband の二重ライセンスの選び方 | 各票の着手時に `LICENSE` を読む。**§2 の表のライセンス列は Web 検索の要約 (§5) であって原典の確認ではない** |
 | U5 | 実機性能はすべて推測: P100 での Tremor / minimp3 の実時間デコード、Doom の fps、Quake 320×200、**ZSNES のフレームスキップ**。NP21/W は速度を模擬しないので**実機でしか測れない** | Ra266 で実測 (P100 相当は Ra266 のクロックを落とせないので推定のまま) |
 | U6 | CS4231 を 32kHz に設定できるか (ZSNES の内部レート)。できなければ 44.1kHz へのリサンプル | TASK_PCM_CS4231 のレジスタ表 |
-| U7 | アプリ別 x87 の初期化・保存・復元の実装。必要性は決定済み ([TASK_MEMMAP_V3 §3-5-3 第3項](TASK_MEMMAP_V3.md#3-5-3-p6-実行モデル-を見直すときに壊れるもの))、実装は未完了 | P6 の票 |
+| U7 | アプリ別 x87 の初期化・保存・復元の実装。必要性は決定済み ([TASK_MEMMAP_V3 §3-5-3「P6 の票に載せる要件」3](TASK_MEMMAP_V3.md#3-5-3-p6-実行モデル-を見直すときに壊れるもの))、実装は未完了 | P6 の票 |
 | U8 | doomgeneric の `CMAP256` (8bpp 出力) が現行の master に残っているか | fork 時に確認 |
 | U9 | 8MB 機 (私有 2MB) で動く候補の見積り (Doom の WAD 逐次読み、OpenTyrian のデータ 5MB) はすべて推測 | 各票の受入 |
 

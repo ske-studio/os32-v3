@@ -248,7 +248,7 @@ API は Win16 の再現ではなく、その欠点を 386 で払える範囲の�
 
 | 作業 | カテゴリ | 担当 (ROLES §0) | 備考 |
 |------|---------|------|------|
-| Host Services N1〜N4 (**受入完了 2026-09-15**) | kernel / host / command / shlib | Claude Code PM + Opus 5 コーダー | ワイヤ v2、KAPI v51、`host_agent.py` v2、`wget` / `lpr` / `hclip` / `date -sync`、`host_*` ラッパー |
+| Host Services N1〜N4 (**受入完了 2026-09-15**) | kernel / host / command / shlib | Claude Code PM + Opus 5 コーダー | ワイヤ v2、KAPI v51、`host_agent.py` v2、`wget` / `lpr` / `hclip` / `hdate`、`host_*` ラッパー |
 | PEGC / Cirrus の 8bpp バックエンド (R2) (**受入完了 2026-09-29**) | GUI | 基盤 | S5 から先送り。PEGC 640x480・NP21/W の Cirrus 640x480 で gui_gate v11/v12g1/v12g4 が通る ([RELEASE_v2.1.md](RELEASE_v2.1.md) §2) |
 | N4 のアプリ側 (ファイラの印刷、端末のコピー / 貼り付け) (**受入完了 2026-09-15**) | app | Claude Code PM + Opus 5 コーダー (別エージェント案は 2026-09-14 に撤回) | libos32gui の `host_*` ラッパー経由 |
 | About dialog (**受入完了 2026-09-29**) | app | アプリ層 | OS32 About (`about.bin`、`ver` と同じ内容) |
