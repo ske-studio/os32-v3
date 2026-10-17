@@ -478,7 +478,7 @@ MUTATIONS = (
      '    out->in_syscall = 0;'),
     ('snapshot-WM', '    out->wm_depth = ring3_wm_depth;', '    out->wm_depth = 0;'),
     ('snapshot-frame', '    out->frame = g_cur_frame;', '    out->frame = 0;'),
-    ('snapshot-esp0', '    out->esp0 = tss_get_esp0();', ''),
+    ('snapshot-esp0', '    out->esp0 = tss_get_esp0();', '    out->esp0 = 0;'),
     ('restore-esp0', '    tss_set_esp0(saved->esp0);', ''),
     ('wm-notify-before-as',
      '    exec_reclaim_resources(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);\n    exec_notify_owned(id, EXEC_KIND_ABORTED);',
