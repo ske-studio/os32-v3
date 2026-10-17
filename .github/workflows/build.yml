@@ -36,8 +36,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 150
     steps:
-      # fetch-depth 1 で足りる: カーネルに埋める commit id (tools/gen_build_id.py) は
-      # `git rev-parse --short HEAD` だけで、履歴は要らない。
+      # カーネルに埋める commit id (tools/gen_build_id.py) は `git rev-parse --short HEAD` だけでよいが、
+      # 下の旧版を取り出す試験のために履歴を全部取る。
       - uses: actions/checkout@v4
         with:
           # test_h4_manifest の旧 hsync との互換の試験が `git show 0c71845:...` で旧版を取り出す (FDRECOV-1)。浅い clone では見つからない。
