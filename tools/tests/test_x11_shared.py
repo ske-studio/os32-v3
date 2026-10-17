@@ -1,8 +1,8 @@
 """T4b-5/X-11: real C services/keyboard queues, deterministic ILP32 controls.
 
-Dictionary storage, display and scheduler boundaries are explicit in the C
-fixture. test_exec_r1 covers real normal/fault/STOP/park landings and caller,
-ESP0 and separate heap restoration; the getter here covers optional outputs.
+Dictionary storage, display and CPU boundaries are explicit in the C fixture.
+Park/resume uses production exec/AppSlot functions and setjmp.asm, sharing the
+function-extraction tool with test_exec_r1. IME state is the real resident state.
 Mutations must compile and fail at their named runtime assertion.
 """
 import argparse
@@ -12,6 +12,7 @@ import subprocess
 import tempfile
 
 import host32
+from test_exec_r1 import function
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SOURCES = {
@@ -20,7 +21,24 @@ SOURCES = {
     'gui_source.inc': 'kernel/gui.c',
     'sink_source.inc': 'kernel/con_sink.c',
     'inject_source.inc': 'kernel/kbd_inject.c',
+    'exec_source.inc': 'exec/exec.c',
+    'slot_source.inc': 'exec/appslot.c',
 }
+
+
+def exec_sources(sources):
+    source = sources['exec_source.inc']
+    context = source[source.index('typedef struct {\n    CallerAccessFrame caller;'):
+                     source.index('} Ring3CallContext;') + len('} Ring3CallContext;')]
+    constants = '\n'.join(line for line in source.splitlines() if
+                          line.startswith(('#define EXEC_LJ_', 'static volatile int g_longjmp_')))
+    sources['exec_source.inc'] = constants + '\n' + context + '\n' + '\n'.join(
+        function(source, name) for name in (
+            'ring3_context_save', 'ring3_context_clear', 'ring3_context_restore',
+            'exec_restore_context', 'exec_park', 'exec_resume'))
+    sources['slot_source.inc'] = '\n'.join(function(sources['slot_source.inc'], name)
+        for name in ('appslot_park_check', 'appslot_park_commit', 'appslot_resume_check',
+                     'appslot_resume_source', 'appslot_resume_commit', 'appslot_mark_scheduled'))
 
 
 def run(mutation=None):
@@ -29,6 +47,7 @@ def run(mutation=None):
         name, source, old, new, expected = mutation
         assert sources[source].count(old) == 1, (name, sources[source].count(old))
         sources[source] = sources[source].replace(old, new)
+    exec_sources(sources)
     with tempfile.TemporaryDirectory(prefix='x11-shared-') as directory:
         work = pathlib.Path(directory)
         for include_name, source in sources.items():
@@ -42,12 +61,15 @@ def run(mutation=None):
             'tools/tests/host_arch', 'include', 'arch/x86', 'platform/pc98',
             'kernel', 'drivers', 'lib', 'sdk/include/os32', 'exec', 'fs')]
         exe = work / 'test'
+        subprocess.run(['nasm', '-f', 'elf32', str(ROOT / 'kernel/setjmp.asm'),
+                        '-o', str(work / 'setjmp.o')], check=True)
         subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2',
                         '-Wall', '-Wextra', '-Werror', '-Wno-unused-variable',
                         '-ffreestanding', '-fno-pie', '-fno-stack-protector',
                         '-ffunction-sections', '-fdata-sections', '-nostdlib',
                         '-static', '-no-pie', '-Wl,--gc-sections',
                         *includes, str(ROOT / 'tools/tests/x11_shared_host.c'),
+                        str(work / 'setjmp.o'),
                         *[str(ROOT / p) for p in ('lib/kstring.c', 'lib/kstring_c.c',
                            'lib/utf8.c', 'kernel/ime_romkana.c')],
                         '-o', str(exe)], check=True)
@@ -62,6 +84,15 @@ def run(mutation=None):
 
 
 MUTATIONS = [
+    ('park-clears-candidates', 'exec_source.inc',
+     '    appslot_park_commit();      /* PARKED + 印 + owner 1 へ */',
+     '    ime_init();\n    appslot_park_commit();',
+     'FAIL real park preserves candidate and dictionary'),
+    ('resume-clears-output', 'exec_source.inc',
+     '    appslot_resume_commit((int)app_id);',
+     '    appslot_resume_commit((int)app_id);\n'
+     '    while (ime_feed_key(-1) >= 0) {} /* discard pending output */',
+     'FAIL real resume preserves unread commit and dictionary'),
     ('invalid-mode-write', 'ime_source.inc',
      '    if (mode < IME_MODE_OFF || mode > IME_MODE_KATAKANA) return;', '',
      'FAIL invalid mode preserves complete state'),

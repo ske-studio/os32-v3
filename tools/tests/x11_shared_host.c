@@ -1,5 +1,5 @@
 /* X-11: real shared services and keyboard queues, ILP32. Device rendering,
- * dictionary storage and the scheduler are fixture boundaries. No per-owner
+ * dictionary storage and CPU transitions are fixture boundaries. No per-owner
  * IME state: switching owners alone must never manufacture a private copy. */
 #include "types.h"
 #include "io.h"
@@ -12,7 +12,7 @@
 
 static int owner = 1, user, wm_depth, wait_depth, calls, seen_owner;
 static int opens, reopens, searches, learns, management, storage_rc;
-static int scroll_rows;
+static int scroll_rows, candidate_draws;
 static AppSlot slots[APP_SLOT_COUNT];
 volatile u32 tick_count;
 volatile int exec_nest_level, ring3_wm_depth;
@@ -60,7 +60,7 @@ void tvram_writechar_at(int x, int y, u16 ch, u8 attr)
 static void draw_char(int x, int y, char ch, u8 attr)
 { (void)x; (void)y; (void)ch; (void)attr; }
 static int draw_wide(int x, int y, u32 ch, u8 attr)
-{ (void)x; (void)y; (void)ch; (void)attr; return 2; }
+{ (void)x; (void)ch; (void)attr; if (y < 24) candidate_draws++; return 2; }
 static void clear_row(int y, u8 attr) { (void)y; (void)attr; }
 const IME_Render g_ime_render_tvram = {draw_char, draw_wide, clear_row, 0, 0};
 void *kmalloc(u32 n) { (void)n; return 0; }
@@ -203,8 +203,6 @@ static int lifetime(void)
         CHECK(ime_trygetkey() == -1 && ime_trygetchar() == -1, "child empty polls");
         ime_owner_exit(3);
         CHECK(equal_state(&saved), "nonreader child exit preserves parent candidate/dictionary");
-        owner = 1; owner = 2; /* park/resume does not invoke owner_exit */
-        CHECK(equal_state(&saved), "park resume preserves candidate and dictionary");
         CHECK(ime_switch_dict(2) == 0 && !kstrcmp(g_ime.dict.path, "/db/fep_l.db"),
               "dictionary switch globally visible");
         CHECK(g_ime.result_count == saved.result_count && g_ime.converting == saved.converting &&
@@ -221,9 +219,6 @@ static int lifetime(void)
         key(KEY_RETURN);
         int first = read_kind ? ime_trygetkey() : ime_trygetchar();
         CHECK(first == 0xe4, "parent commit");
-        saved = g_ime;
-        owner = 1; owner = 2;
-        CHECK(equal_state(&saved), "park resume preserves unread commit");
         ime_owner_exit(2);
         CHECK(!g_ime.commit_len && !g_ime.kana_len && !g_ime.result_count && !g_ime.converting &&
               g_ime.mode == IME_MODE_HIRAGANA && g_ime.dict.db &&
@@ -240,8 +235,10 @@ static int lifetime(void)
         CHECK(!g_ime.result_count && !g_ime.kana_len && g_ime.dict.db,
               "child reader exit cancels shared input and keeps resident dictionary");
     }
-    say("PASS X11 parent child park output lifetime\n"); return 0;
+    say("PASS X11 parent child output lifetime\n"); return 0;
 }
+
+#include "x11_park_host.c"
 
 static i32 handler(u32 op, u32 arg, int id)
 { (void)op; calls++; seen_owner = id; return wm_depth == 1 && wait_depth ? (i32)arg : -99; }
@@ -313,7 +310,8 @@ static int results(void)
 }
 void _start(void)
 {
-    int rc = modes() || delivery() || lifetime() || gui_dispatch() || sink_readers() || results();
+    int rc = modes() || delivery() || lifetime() || park_lifetime() ||
+             gui_dispatch() || sink_readers() || results();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     for (;;) {}
 }
