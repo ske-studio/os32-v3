@@ -1,0 +1,16 @@
+check-unicode-lookup-host:
+- lib/unicode_jis_table.h
+- lib/utf8.c
+- lib/utf8.h
+- lib/utf8_internal.h
+- include/types.h
+- include/endian_le.h
+- tools/gen_unicode.c
+- tools/tests/host32.py
+- tools/tests/test_unicode_lookup.py
+- tools/tests/unicode_lookup_candidate.c
+- tools/tests/unicode_lookup_mock.h
+- tools/tests/unicode_lookup_sdk.c
+- tools/tests/unicode_lookup_host.c
+- build/checks.d/check-unicode-lookup-host.mk
+- tools/check_map.d/check-unicode-lookup-host.yaml
