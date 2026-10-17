@@ -285,6 +285,15 @@ void (*const kdebug_kexports[])(void) = {
     (void (*)(void))unicode_file_debug_phys,
     (void (*)(void))unicode_file_lookup,
     (void (*)(void))pgalloc_limit_pfn,
+    (void (*)(void))vfs_fstype,
+    (void (*)(void))vfs_stat,
+    (void (*)(void))vfs_open,
+    (void (*)(void))vfs_close,
+    (void (*)(void))vfs_read_fd,
+    (void (*)(void))vfs_write_fd,
+    (void (*)(void))vfs_get_size,
+    (void (*)(void))vfs_rm,
+    (void (*)(void))dma_range_ok,
 };
 const unsigned long kdebug_abi_gen = KDEBUG_ABI_GEN;
 const unsigned long kdebug_kexport_count = KDEBUG_IMPORT_COUNT;
@@ -515,6 +524,15 @@ const struct module_symbol_contract kdebug_import_contracts[] = {
     {0xc4253a5cu, 1, 1},
     {0xcc40e142u, 1, 1},
     {0x01e898deu, 1, 1},
+    {0x2a756ac0u, 1, 1},
+    {0x0b3765c5u, 1, 1},
+    {0xf43c9df3u, 1, 1},
+    {0x9a1b52f5u, 1, 1},
+    {0x9180a426u, 1, 1},
+    {0x5c2f8085u, 1, 1},
+    {0xbec91a0bu, 1, 1},
+    {0xf5a9fd5eu, 1, 1},
+    {0x71da51aau, 1, 1},
 };
 const struct module_symbol_contract kdebug_export_contracts[MODULE_OPS_SLOTS] = {
     [0] = {0xbcb84611u, 1, 0},

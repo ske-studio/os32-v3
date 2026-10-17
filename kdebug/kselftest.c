@@ -45,6 +45,7 @@
 #include "idt.h"          /* pit_get_setup / PIT_MODE_TIMER0 */
 #include "sysclk.h"       /* sysclk_hz / sysclk_detected */
 #include "memmap.h"       /* PIT_HZ / MEM_DMA_POOL_* */
+#include "vfs.h"
 #include "dma_pool.h"     /* DMA プール (票 TASK_HAL_WIRING §1-3) */
 #include "pcm_cs4231.h"
 #include "dma8237.h"      /* 8237 の共通部 (同 §1-2) */
@@ -995,7 +996,7 @@ int kselftest_run_post_unicode(void)
 
 /* T3b2: H-4(a) backing fixture. Keep the 32MiB acceptance boundary independent
  * of the boot identity-map size. Both cases deliberately use the SAME high VA.
- * No I/O here: T3b3 can consume the live AS/buffer at h4_buffer_entry(). */
+ * T3b3 performs I/O inside each case, before destroying its AS/backing. */
 #define H4_PHYS_BOUNDARY (32UL * MEM_1MB)
 #define H4_BUFFER_PAGES 3U
 #define H4_BUFFER_OFFSET (PAGE_SIZE - 17U)
@@ -1051,6 +1052,131 @@ static int h4_buffer_entry(struct addrspace *as, u32 buffer, u32 bytes)
     return 1;
 }
 
+/* Walk each USER page to its identity alias. VFS receives the actual backing,
+ * including >32MiB pages, never a low bounce buffer owned by this fixture.
+ * mode: 0=restore pattern, 1=write, 2=poison then read into the same pages. */
+static int h4_io_buffer(struct addrspace *as, u32 buffer, u32 bytes,
+                        int fd, int mode)
+{
+    for (u32 done = 0; done < bytes;) {
+        u32 va = buffer + done, pa = 0, offset = va % PAGE_SIZE;
+        u32 page = (va - MEM_EXEC_LOAD_ADDR) / PAGE_SIZE;
+        u32 n = PAGE_SIZE - offset;
+        if (n > bytes - done) n = bytes - done;
+        unsigned int flags = irq_save();
+        int mapped = as_access_page(as, va, 1, &pa);
+        irq_restore(flags);
+        if (!mapped) return 0;
+        u8 *p = P2V(pa);
+        if (mode != 1)
+            for (u32 j = 0; j < n; j++)
+                p[j] = h4_pattern(page, offset + j) ^ (mode == 2 ? 0xff : 0);
+        if (mode == 1 && vfs_write_fd(fd, p, n) != (int)n) return 0;
+        if (mode == 2 && vfs_read_fd(fd, p, n) != (int)n) return 0;
+        done += n;
+    }
+    return 1;
+}
+
+#define H4_ROOT_FILE "/h4-io.tmp"
+#define H4_HOST_FILE "/host/h4-io.tmp"
+
+/* Return 1=passed, 0=backend unavailable, -1=failed. */
+static int h4_io_roundtrip(struct addrspace *as, int high, int host)
+{
+    const char *path = host ? H4_HOST_FILE : H4_ROOT_FILE;
+    const char *backend = host ? "hostdrv" : "ext2";
+    const u32 buffer = MEM_EXEC_LOAD_ADDR + H4_BUFFER_OFFSET;
+    OS32_Stat st;
+    int fd = -1, attempted = 0, opened = 0, ok = 0, removed = 0;
+    const char *stage = "mount";
+    int available = !kstrcmp(vfs_fstype(host ? "/host" : "/"), backend);
+    if (!available) goto out;
+    /* Boot is single-task. Remove this fixture's leftover from an interrupted
+     * boot before starting a fresh roundtrip (HostDrv has no O_EXCL). */
+    stage = "absent";
+    int status = vfs_stat(path, &st);
+    if (status == VFS_OK) {
+        stage = "remove-stale";
+        if (vfs_rm(path) != VFS_OK) goto out;
+    } else if (status != VFS_ERR_NOTFOUND) goto out;
+    stage = "prepare";
+    if (!h4_io_buffer(as, buffer, H4_BUFFER_BYTES, -1, 0)) goto out;
+    stage = "open-write";
+    attempted = 1;
+    fd = vfs_open(path, O_WRONLY | O_CREAT | O_TRUNC);
+    if (fd < 0) goto out;
+    opened = 1;
+    stage = "write";
+    if (!h4_io_buffer(as, buffer, H4_BUFFER_BYTES, fd, 1)) goto out;
+    vfs_close(fd);
+    fd = -1;
+    stage = "sync";
+    if (vfs_sync() != VFS_OK) goto out;
+    stage = "open-read";
+    fd = vfs_open(path, O_RDONLY);
+    if (fd < 0) goto out;
+    stage = "size";
+    if (vfs_get_size(fd) != H4_BUFFER_BYTES) goto out;
+    stage = "read";
+    if (!h4_io_buffer(as, buffer, H4_BUFFER_BYTES, fd, 2)) goto out;
+    stage = "compare";
+    ok = h4_buffer_entry(as, buffer, H4_BUFFER_BYTES);
+out:
+    if (fd >= 0) vfs_close(fd);
+    if (attempted) {
+        int rc = vfs_rm(path);
+        removed = rc == VFS_OK || (!opened && rc == VFS_ERR_NOTFOUND);
+        if (!removed) { ok = 0; stage = "remove"; }
+    }
+    if (available) check(ok, "h4: I/O roundtrip and cleanup");
+    kprintf(0x07, "[h4] io %s backend=%s result=%s stage=%s bytes=%u removed=%u\n",
+            high ? "high" : "low", backend,
+            !available ? "SKIP" : ok ? "PASS" : "FAIL",
+            stage, H4_BUFFER_BYTES, removed);
+    return !available ? 0 : ok ? 1 : -1;
+}
+
+/* Allocate only presently free pool pages; never reinitialize a live pool
+ * after PCI/PCM binding. These buffers are not submitted to any device. */
+static void h4_dma_pool(void)
+{
+    struct dma_buf buffers[DMA_POOL_PAGES];
+    u32 before = dma_pool_free_pages(), count = 0;
+    int ok = 1;
+    while (count < before) {
+        struct dma_buf *b = &buffers[count];
+        if (dma_alloc(DMA_POOL_PAGE_SIZE, 0, DMA_PHYS_LIMIT, b) != 0) break;
+        int valid = b->pa >= MEM_DMA_POOL_BASE &&
+                    b->pa < MEM_DMA_POOL_BASE + MEM_DMA_POOL_SIZE &&
+                    b->size == DMA_POOL_PAGE_SIZE &&
+                    b->size <= MEM_DMA_POOL_BASE + MEM_DMA_POOL_SIZE - b->pa &&
+                    b->va == P2V(b->pa) &&
+                    dma_range_ok(b->pa, b->size, DMA_PHYS_LIMIT);
+        check(valid, "h4: DMA allocation range/bank");
+        ok &= valid;
+        kprintf(0x07, "[h4] io dma pool pa=%08X bytes=%u range_bank=%u\n",
+                b->pa, b->size, valid);
+        count++;
+    }
+    if (count) {
+        int complete = count == before;
+        check(complete, "h4: DMA allocation count matches free pages");
+        ok &= complete;
+    }
+    for (u32 i = 0; i < count; i++) {
+        int freed = dma_free(&buffers[i]) == 0;
+        check(freed, "h4: DMA free");
+        ok &= freed;
+    }
+    int restored = dma_pool_free_pages() == before;
+    check(restored, "h4: DMA free pages restored");
+    ok &= restored;
+    kprintf(0x07, "[h4] io dma pool result=%s allocated=%u free_restored=%u transfer=none\n",
+            !ok ? "FAIL" : !count ? "SKIP" : "PASS",
+            count, restored);
+}
+
 /* Return 1=completed, 0=not run (resources), -1=failed. All exits after
  * owner creation converge on destroy/reclaim/retire, including partial maps. */
 static int h4_backing_case(int high)
@@ -1093,9 +1219,13 @@ static int h4_backing_case(int high)
     kprintf(0x07, "[h4] %s entry va=%08X bytes=%u pages=%u pattern=%s\n",
             kind, MEM_EXEC_LOAD_ADDR + H4_BUFFER_OFFSET,
             H4_BUFFER_BYTES, H4_BUFFER_PAGES, pattern ? "ok" : "FAIL");
-    if (pattern) result = 1;
+    if (pattern) {
+        int root_io = h4_io_roundtrip(&as, high, 0);
+        int host_io = h4_io_roundtrip(&as, high, 1);
+        if (root_io >= 0 && host_io >= 0) result = root_io > 0 || host_io > 0;
+    }
 out:
-    if (!result)
+    if (!result && !entered)
         kprintf(0x07, "[h4] %s SKIP (not run): %s allocation failed\n", kind, stage);
     if (created) paging_addrspace_destroy(&as);
     if (owner) {
@@ -1119,6 +1249,7 @@ static void test_h4_backing(void)
 {
     (void)h4_backing_case(0);
     (void)h4_backing_case(1);
+    h4_dma_pool();
 }
 /* T3b2 end */
 

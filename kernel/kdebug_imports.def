@@ -1808,6 +1808,78 @@
       "source": "kernel/pgalloc.h",
       "context_safe": false,
       "index": 225
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "vfs_fstype",
+      "source": "fs/vfs.h",
+      "context_safe": false,
+      "index": 226
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "vfs_stat",
+      "source": "fs/vfs.h",
+      "context_safe": false,
+      "index": 227
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "vfs_open",
+      "source": "fs/vfs.h",
+      "context_safe": false,
+      "index": 228
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "vfs_close",
+      "source": "fs/vfs.h",
+      "context_safe": false,
+      "index": 229
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "vfs_read_fd",
+      "source": "fs/vfs.h",
+      "context_safe": false,
+      "index": 230
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "vfs_write_fd",
+      "source": "fs/vfs.h",
+      "context_safe": false,
+      "index": 231
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "vfs_get_size",
+      "source": "fs/vfs.h",
+      "context_safe": false,
+      "index": 232
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "vfs_rm",
+      "source": "fs/vfs.h",
+      "context_safe": false,
+      "index": 233
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "dma_range_ok",
+      "source": "drivers/dma8237.h",
+      "context_safe": false,
+      "index": 234
     }
   ]
 }

@@ -1131,4 +1131,49 @@ unicode_file_lookup:
 pgalloc_limit_pfn:
     jmp *kdebug_import_slots+900
 .size pgalloc_limit_pfn, .-pgalloc_limit_pfn
+.globl vfs_fstype
+.type vfs_fstype, @function
+vfs_fstype:
+    jmp *kdebug_import_slots+904
+.size vfs_fstype, .-vfs_fstype
+.globl vfs_stat
+.type vfs_stat, @function
+vfs_stat:
+    jmp *kdebug_import_slots+908
+.size vfs_stat, .-vfs_stat
+.globl vfs_open
+.type vfs_open, @function
+vfs_open:
+    jmp *kdebug_import_slots+912
+.size vfs_open, .-vfs_open
+.globl vfs_close
+.type vfs_close, @function
+vfs_close:
+    jmp *kdebug_import_slots+916
+.size vfs_close, .-vfs_close
+.globl vfs_read_fd
+.type vfs_read_fd, @function
+vfs_read_fd:
+    jmp *kdebug_import_slots+920
+.size vfs_read_fd, .-vfs_read_fd
+.globl vfs_write_fd
+.type vfs_write_fd, @function
+vfs_write_fd:
+    jmp *kdebug_import_slots+924
+.size vfs_write_fd, .-vfs_write_fd
+.globl vfs_get_size
+.type vfs_get_size, @function
+vfs_get_size:
+    jmp *kdebug_import_slots+928
+.size vfs_get_size, .-vfs_get_size
+.globl vfs_rm
+.type vfs_rm, @function
+vfs_rm:
+    jmp *kdebug_import_slots+932
+.size vfs_rm, .-vfs_rm
+.globl dma_range_ok
+.type dma_range_ok, @function
+dma_range_ok:
+    jmp *kdebug_import_slots+936
+.size dma_range_ok, .-dma_range_ok
 .section .note.GNU-stack,"",@progbits
