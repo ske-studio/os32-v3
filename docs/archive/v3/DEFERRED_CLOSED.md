@@ -555,3 +555,9 @@ X-2 の前半 (e8a の RO 日本語) は `accept_e11/RESULT.md` の GUI 日本�
 | ID | 何を残したか | 理由 | 次の関門 |
 |---|---|---|---|
 | T3AB-R | T3ab (6b4e37e) の実機 Ra266 の回帰 T3bR: PEGC の最上位の窓 (`win=fff00000`・`alias=ok`)、82557 (LB3・LAN の sfs)、監査・自己診断、`diag:`。R1 像の一式のゲスト受入も未実施 | NP21/W 64MB の受入 (7 項) は 2026-10-16 に済み (`~/os32-tmp/evidence/2026-10-16/t3ab_np21w/`) | ノートで実施中 (立会い不要)。R1 像は次の R1 の回で |
+
+閉鎖 (2026-10-17、T3b1 cbdf9b8 の NP21/W 64MB 受入: `[selftest] slack_cycle free=245 busy=11 taken=245 fail=0`、`[mem] pages ... ok diff=0`。証拠 `~/os32-tmp/evidence/2026-10-17/t3b1_np21w/RESULT.md`)
+
+| ID | 何を残したか | 理由 | 次の関門 |
+|---|---|---|---|
+| T3AB-4 | T3 票 §4 T3ab の受入 ④「SLACK の全ページを一度だけ配って返す」のゲストでの観測: ゲストに専用の自己診断が無い。ホストの模型 (段 D、`tools/tests/memory_boot_host.c`) では確認済み、ゲストでは空きページ数の不変と leftover 0 が傍証 | 未判定 (専用の観測口が無い) | T3b1 (kdebug・監査の段) で、ゲストの自己診断に SLACK の一巡を足すかを決める |
