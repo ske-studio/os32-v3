@@ -119,21 +119,21 @@ spt=18 は 2 の冪ではないので、従来のシフト演算 (`and al,07h` /
 
 ## 5. 受入 (エミュレータ実測、2026-09-18)
 
-| ID | 見たもの | 結果 |
+| ID | 条件 | 判定・証拠 |
 |---|---|---|
-| F1 | IPL が 512B セクタ・18 セクタ/トラックで読める | **合格** |
-| F2 | `boot_fat144.bin` が 512 バイトに収まる | **合格**。実コード 381 バイト、**余裕 129 バイト** |
-| F3 | LOADER.BIN の探索とロード | **合格** (ルートDir 12 セクタ / FAT 9 セクタ) |
-| F4 | カーネル起動 | **合格**。`PIC/PIT/KBD/DEV OK`、`HEAP...320K` |
-| F5 | `boot_drive` が 0x30 として渡る | **合格**。カーネルが `BOOT_DRIVE_FDD_144` として `fd0`+`fat` を選ぶ |
-| F6 | ルートマウント | **合格** (対応前は `root panic`) |
-| F7 | kselftest | **合格**。**85/85 passed** |
-| F8 | シェル起動 | **合格**。`OS32 v1.0 (FDD Boot)` |
-| F9 | 読み出しがバイト単位で正しい | **合格**。`/bin/cfg.bin` 38,272 バイト (**75 クラスタ**) がホストの原本と **md5 一致** |
-| F10 | `04BEh` が効く | **合格**。画面に `144M` (読み戻しで bit0=1 を確認)。この状態でも F9 が md5 一致 |
-| F11 | **ホスト機能が無くても起動する** | **合格**。`host_agent.py` を停止し `/api/net` が `connected=false` の状態でリセット → 起動・シェル応答とも変化なし |
-| F12 | `make check` | **合格** (EXIT=0) |
-| **F13** | **2HD (1232KB) の回帰** | **合格**。`os32_boot.d88` から起動 → `root OK` / シェル応答 / `/bin/cfg.bin` が **md5 一致**。`144M` の印は**出ない** (`boot_drive` が 0x90 なので 04BEh に触らない — 意図どおり)。**`FONT..NG` も 2HD で出る**ので §5-2 のとおり退行ではない |
+| F1 | IPL が 512B セクタ・18 セクタ/トラックで読める | **合格** ([証拠](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md)) |
+| F2 | `boot_fat144.bin` が 512 バイトに収まる | **合格** ([証拠](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md)) |
+| F3 | LOADER.BIN の探索とロード | **合格** ([証拠](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md)) |
+| F4 | カーネル起動 | **合格** ([証拠](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md)) |
+| F5 | `boot_drive` が 0x30 として渡る | **合格** ([証拠](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md)) |
+| F6 | ルートマウント | **合格** ([証拠](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md)) |
+| F7 | kselftest | **合格** ([証拠](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md)) |
+| F8 | シェル起動 | **合格** ([証拠](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md)) |
+| F9 | 読み出しがバイト単位で正しい | **合格** ([証拠](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md)) |
+| F10 | `04BEh` が効く | **合格** ([証拠](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md)) |
+| F11 | **ホスト機能が無くても起動する** | **合格** ([証拠](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md)) |
+| F12 | `make check` | **合格** ([証拠](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md)) |
+| **F13** | **2HD (1232KB) の回帰** | **合格** ([証拠](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md)) |
 
 ### 5-1. ホスト機能への依存 (F11 の内訳)
 
@@ -149,20 +149,10 @@ spt=18 は 2 の冪ではないので、従来のシフト演算 (`and al,07h` /
 
 **HostDrv を実際に外した試験は未実施** — ini の `HOSTDRV0` を消す必要があり [D2] の承認対象。
 
-### 5-2. `FONT..NG` は退行ではない
+### 5-2. FD のフォント構成
 
-`/sys/font/default.kcgfont` が最小 FDD イメージに入っていないだけ
-(`build/image.mk` の一覧に無い)。**2HD 版でも同じ。** 空きは 427KB あるので
-入れたければ足せる。
-
-> **2026-09-24 追記**: FD の中身を CD の MINIMAL と同じ集合にし、既定フォントを
-> 8.3 の `/sys/font/default.kcg` として入れた (カーネルは長い名前が無ければそれを読む)。
-> 入れた後の空きは 2HD 55KB / 1.44MB 267KB。[08_build.md の「起動 FD と MINIMAL」](../../08_build.md#起動-fd-と-minimal)
->
-> **2026-09-25 追記**: カーネルが約 4KB 増えて 2HD の FD が作れなくなったので、MINIMAL を
-> 「レスキュー兼インストーラ」に絞り、既定フォントと一般コマンドを NORMAL へ移した。
-> **FD 起動ではまた `FONT..NG` が出る** (退行ではない。文字は本体のフォント ROM)。空きは
-> 2HD 359KB / 1.44MB 568KB。
+現在の FD / MINIMAL の構成は [08_build.md「起動 FD と MINIMAL」](../../08_build.md#起動-fd-と-minimal) を参照。
+フォントの追加・除外と `FONT..NG` の記録は [受入記録](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md) に保存した。
 
 ## 6. 残件
 
@@ -172,4 +162,3 @@ spt=18 は 2 の冪ではないので、従来のシフト演算 (`and al,07h` /
 | **D88 形式の 1.44MB** | `fd_type=0x21` + 全セクタ `rpm_flg=1` が必要。`tools/mkd88.py` は 2HD (0x20 / `rpm_flg=0`) しか書かない。**実機へ D88 で渡すなら要る** |
 | `docs/D88_FORMAT_SPEC.md` の更新 | `0x20=2HD / 0x30=1D` と書いてあり、**1.44MB (0x21) と `rpm_flg` に触れていない**。NP21/W の実装と食い違う |
 | 書き込みの試験 | 読みは F9 で押さえたが、**1.44MB への書き込みは試していない** (`fdc_write_sector` はジオメトリ駆動にしたが未実測) |
-| ~~`/sys/font` を FDD イメージに入れるか~~ | 2026-09-24 に入れた (§5-2 の追記) |

@@ -168,7 +168,7 @@ WM の共通経路 (`wm::set_focus` とその同類) に入れるので、**マ�
 
 ## 3. 実機で確かめること (次の実機の回)
 
-準備 (**実装済み 2026-09-26、wt/kbd-diaglog、KAPI v67、手元ビルドとホスト試験のみ — NP21/W・実機は未確認**。
+準備 (**実装済み 2026-09-26、wt/kbd-diaglog、KAPI v67、NP21/W の確認範囲は §3-1、実機は未確認**。
 使い方は [POLICY_DEBUG.md](../../POLICY_DEBUG.md) §4-57 の `kbdstat -w`、試験は `make check-kbd-dlog-host`
 ([記録](../../../tools/tests/kbd_dlog_tdd.md))): **受信のたびに記録する診断リング**をドライバに足す (`drivers/kbd.c` の IRQ1 で、受け取った 1 バイトごとに
 `seq / code / make・break / 更新後の修飾` を 32 件の循環リングへ)。読むのは KAPI `kbd_diag_log` (追記、診断専用) と
@@ -188,18 +188,9 @@ WM の共通経路 (`wm::set_focus` とその同類) に入れるので、**マ�
 
 ### 3-1. NP21/W での観測 (2026-09-26、5992fd5、`kbdstat -w`)
 
-`/api/key` で KANA・KANA・CAPS・a・ESC の順に送った:
-
-```
-seq=1 code=72 make  key=72 KANA mods=KANA
-seq=2 code=F2 break key=72 KANA mods=KANA
-seq=3 code=71 make  key=71 CAPS mods=CAPS|KANA
-```
-
-- **NP21/W のカナ・CAPS は機械式ロックの模擬**: 1 回目の押下で make (ロック)、2 回目で break (解除)。
-- 今のドライバ (方式 A、make で反転・break を無視) では 2 回目の後も `mods=KANA` のまま = **ロックを外しても OS32 はカナ ON と思う**。
-  NP21/W の上では**方式 B (make で ON、break で OFF) が要る**。実機が同じかは下の手順で確かめる (NP21/W の模擬が実機に倣っている可能性は高い)。
-- `kbdstat -w` の出力は `/api/cmd` の EOT 待ちが先に切れて返らない (画面には出る)。NP21/W では本体の画面 (`/api/tvram`) で読む。
+NP21/W のカナ・CAPS は機械式ロックを模擬し、初回 make / 解除 break を診断リングで観測した。
+この観測を根拠に §2 の方式 B を採用済み。実機の送り方と起動時状態は §3 の残件。
+生出力は [診断リングの観測記録](../../archive/gui/GUI_KBD_NAV_LOG.md#診断リングの観測)。
 
 ## 4. 受入
 
@@ -211,13 +202,11 @@ seq=3 code=71 make  key=71 CAPS mods=CAPS|KANA
 
 ### 4-1. K2 の結果 (NP21/W、2026-09-26、カーネル 0d2acad = feat/gui 5f44cef + WM の門の修正)
 
-`/api/key` だけで: CTRL+ESC → DOWN → RETURN で **File Manager が開く** / GRPH+SPACE で窓メニュー (Restore が灰色、初期カーソルは Move) /
-Minimize で窓が消えタスクバーにボタンが残る / GRPH+TAB で戻る / 窓メニューの Move → 矢印 + RETURN で窓が動く / カナで `[M]`、テンキー 3 の連打でポインタが右下へ /
-GRPH+f･4 で閉じる / 窓が無い状態の GRPH+f･4 で Shut Down の確認 → ESC で戻る / Start → CUI mode の確認ダイアログ。**合格**。
-マウスキーでボタンを押す (5 / - / +) は NP21/W では未確認 (ホスト試験 K1 ④ のみ)。
-
-注意 (試験の手順): `/api/mouse` の `ax/ay` を使った後は **`abs=off`** に戻す。絶対座標の上書きが残っていると、gshell はそれを実マウスとして扱い、マウスキーの位置を毎周巻き戻す (ポインタが動かないように見える)。
-途中で見つけた不具合: 2026-09-23 以降 **GUI アプリが起動直後に kill されていた** (WM の中の mouse_poll が KAPI の出力の門で弾かれる) — docs/POLICY_DEBUG.md §4-61、wt/pump-guard で修正。
+**一部合格、K2 は未完了**。起動・窓メニュー・最小化/復元・移動・マウスキーの移動・終了を確認。
+マウスキーのボタン操作 (5 / - / +) は未確認 (ホスト K1 ④ のみ)。
+§4 の必須手順を通したゲスト証拠が揃うまで、K2 全体を合格とはしない。
+操作と証拠は [K2 実行記録](../../archive/gui/GUI_KBD_NAV_LOG.md#k2-実行記録)。
+`/api/mouse` の絶対座標操作後は `abs=off` に戻す (残るとマウスキーの位置が毎周戻る)。
 
 ## 5. しないこと
 

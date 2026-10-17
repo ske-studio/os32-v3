@@ -10,6 +10,10 @@
 
 ---
 
+本書は **v1.2 当時の追加契約**。単一アプリ方式や版・関数数は当時の記録である。
+現在の利用には [GUI 契約](../API_CONTRACTS.md#park-origins) と
+[shlib ABI 世代](../../../KAPI_SPEC.md#t2c-os32x-v4-と生成する世代-kapi-v69) を参照する。
+
 ## 0. v1.2 の範囲
 
 v1.2 は HAL 拡張版ではなく、v1.1 で完成した GUI 基盤を**デスクトップ環境として完成させる版**とする。
@@ -307,8 +311,9 @@ KAPI v42 / `GUI_PROTO_VERSION=1` / AppVTable 既存 layout を維持する。
 `SHLIB_NFUNC = 101`。`OS32ShlibHeader.version` は **1 のまま** (末尾追記なので版は上げない。
 新アプリ → 旧 shlib は `nfunc` 不足で bind 拒否する)。
 
-`modal_result` は **event 到着後だけ呼ぶ API** とする。`OS32_ERR_AGAIN` は存在しないので、
-未完成状態を問い合わせる口は公開しない (C4)。
+`modal_result` は **event 到着後だけ呼ぶ API** とする。未完成状態をポーリングする口は公開しない。
+この呼出制約はエラー名の有無とは独立であり、現行の `OS32_ERR_AGAIN` は
+[`os32_kapi_shared.h:647`](../../../../sdk/include/os32/os32_kapi_shared.h) に定義されている。
 
 互換条件:
 
