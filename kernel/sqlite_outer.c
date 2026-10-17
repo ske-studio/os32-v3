@@ -2,24 +2,10 @@
 #include "os32_sqlite_outer.h"
 #include "sqlite_engine.h"
 
-static void call_group_context(const Os32SqliteGroupInfo *info)
-{
-    sqlite_engine_owner = info->owner;
-    sqlite_engine_group = info->cookie.group_index;
-    sqlite_engine_generation = info->cookie.generation;
-}
-static void call_context(sqlite3 *db)
-{
-    Os32SqliteGroupInfo info;
-    if (os32_sqlite_group_for_db(db, &info) == SQLITE_OK)
-        call_group_context(&info);
-}
-
 typedef struct { sqlite3 *db; int result; } Call_close;
 static void call_close(void *arg)
 {
     Call_close *f = arg;
-    call_context(f->db);
     f->result = sqlite3_close(f->db);
 }
 int os32_sqlite_close(sqlite3 *db)
@@ -33,7 +19,6 @@ typedef struct { sqlite3 *db; const char *sql; int size; sqlite3_stmt **out; con
 static void call_prepare_v2(void *arg)
 {
     Call_prepare_v2 *f = arg;
-    call_context(f->db);
     f->result = sqlite3_prepare_v2(f->db, f->sql, f->size, f->out, f->tail);
 }
 int os32_sqlite_prepare_v2(sqlite3 *db, const char *sql, int size, sqlite3_stmt **out, const char **tail)
@@ -47,7 +32,6 @@ typedef struct { sqlite3 *db; const char *sql; SqliteExecCallback callback; void
 static void call_exec(void *arg)
 {
     Call_exec *f = arg;
-    call_context(f->db);
     f->result = sqlite3_exec(f->db, f->sql, f->callback, f->arg, f->error);
 }
 int os32_sqlite_exec(sqlite3 *db, const char *sql, SqliteExecCallback callback, void *arg, char **error)
@@ -61,7 +45,6 @@ typedef struct { sqlite3_stmt *stmt; int result; } Call_step;
 static void call_step(void *arg)
 {
     Call_step *f = arg;
-    call_context(sqlite3_db_handle(f->stmt));
     f->result = sqlite3_step(f->stmt);
 }
 int os32_sqlite_step(sqlite3_stmt *stmt)
@@ -75,7 +58,6 @@ typedef struct { sqlite3_stmt *stmt; int result; } Call_finalize;
 static void call_finalize(void *arg)
 {
     Call_finalize *f = arg;
-    call_context(sqlite3_db_handle(f->stmt));
     f->result = sqlite3_finalize(f->stmt);
 }
 int os32_sqlite_finalize(sqlite3_stmt *stmt)
@@ -89,7 +71,6 @@ typedef struct { sqlite3_stmt *stmt; int result; } Call_reset;
 static void call_reset(void *arg)
 {
     Call_reset *f = arg;
-    call_context(sqlite3_db_handle(f->stmt));
     f->result = sqlite3_reset(f->stmt);
 }
 int os32_sqlite_reset(sqlite3_stmt *stmt)
@@ -103,7 +84,6 @@ typedef struct { sqlite3_stmt *stmt; int index; int value; int result; } Call_bi
 static void call_bind_int(void *arg)
 {
     Call_bind_int *f = arg;
-    call_context(sqlite3_db_handle(f->stmt));
     f->result = sqlite3_bind_int(f->stmt, f->index, f->value);
 }
 int os32_sqlite_bind_int(sqlite3_stmt *stmt, int index, int value)
@@ -117,7 +97,6 @@ typedef struct { sqlite3_stmt *stmt; int index; int result; } Call_bind_null;
 static void call_bind_null(void *arg)
 {
     Call_bind_null *f = arg;
-    call_context(sqlite3_db_handle(f->stmt));
     f->result = sqlite3_bind_null(f->stmt, f->index);
 }
 int os32_sqlite_bind_null(sqlite3_stmt *stmt, int index)
@@ -131,7 +110,6 @@ typedef struct { sqlite3_stmt *stmt; int index; const char *value; int length; S
 static void call_bind_text(void *arg)
 {
     Call_bind_text *f = arg;
-    call_context(sqlite3_db_handle(f->stmt));
     f->result = sqlite3_bind_text(f->stmt, f->index, f->value, f->length, f->destroy);
 }
 int os32_sqlite_bind_text(sqlite3_stmt *stmt, int index, const char *value, int length, SqliteDestructor destroy)
@@ -145,7 +123,6 @@ typedef struct { sqlite3_stmt *stmt; int index; const void *value; int length; S
 static void call_bind_blob(void *arg)
 {
     Call_bind_blob *f = arg;
-    call_context(sqlite3_db_handle(f->stmt));
     f->result = sqlite3_bind_blob(f->stmt, f->index, f->value, f->length, f->destroy);
 }
 int os32_sqlite_bind_blob(sqlite3_stmt *stmt, int index, const void *value, int length, SqliteDestructor destroy)
@@ -159,7 +136,6 @@ typedef struct { sqlite3_stmt *stmt; int result; } Call_bind_parameter_count;
 static void call_bind_parameter_count(void *arg)
 {
     Call_bind_parameter_count *f = arg;
-    call_context(sqlite3_db_handle(f->stmt));
     f->result = sqlite3_bind_parameter_count(f->stmt);
 }
 int os32_sqlite_bind_parameter_count(sqlite3_stmt *stmt)
@@ -173,7 +149,6 @@ typedef struct { sqlite3_stmt *stmt; int result; } Call_column_count;
 static void call_column_count(void *arg)
 {
     Call_column_count *f = arg;
-    call_context(sqlite3_db_handle(f->stmt));
     f->result = sqlite3_column_count(f->stmt);
 }
 int os32_sqlite_column_count(sqlite3_stmt *stmt)
@@ -187,7 +162,6 @@ typedef struct { sqlite3_stmt *stmt; int column; int result; } Call_column_int;
 static void call_column_int(void *arg)
 {
     Call_column_int *f = arg;
-    call_context(sqlite3_db_handle(f->stmt));
     f->result = sqlite3_column_int(f->stmt, f->column);
 }
 int os32_sqlite_column_int(sqlite3_stmt *stmt, int column)
@@ -201,7 +175,6 @@ typedef struct { sqlite3_stmt *stmt; int column; double result; } Call_column_do
 static void call_column_double(void *arg)
 {
     Call_column_double *f = arg;
-    call_context(sqlite3_db_handle(f->stmt));
     f->result = sqlite3_column_double(f->stmt, f->column);
 }
 double os32_sqlite_column_double(sqlite3_stmt *stmt, int column)
@@ -215,7 +188,6 @@ typedef struct { sqlite3_stmt *stmt; int column; const unsigned char * result; }
 static void call_column_text(void *arg)
 {
     Call_column_text *f = arg;
-    call_context(sqlite3_db_handle(f->stmt));
     f->result = sqlite3_column_text(f->stmt, f->column);
 }
 const unsigned char * os32_sqlite_column_text(sqlite3_stmt *stmt, int column)
@@ -229,7 +201,6 @@ typedef struct { sqlite3_stmt *stmt; int column; const void * result; } Call_col
 static void call_column_blob(void *arg)
 {
     Call_column_blob *f = arg;
-    call_context(sqlite3_db_handle(f->stmt));
     f->result = sqlite3_column_blob(f->stmt, f->column);
 }
 const void * os32_sqlite_column_blob(sqlite3_stmt *stmt, int column)
@@ -243,7 +214,6 @@ typedef struct { sqlite3_stmt *stmt; int column; int result; } Call_column_bytes
 static void call_column_bytes(void *arg)
 {
     Call_column_bytes *f = arg;
-    call_context(sqlite3_db_handle(f->stmt));
     f->result = sqlite3_column_bytes(f->stmt, f->column);
 }
 int os32_sqlite_column_bytes(sqlite3_stmt *stmt, int column)
@@ -257,7 +227,6 @@ typedef struct { sqlite3_stmt *stmt; int column; int result; } Call_column_type;
 static void call_column_type(void *arg)
 {
     Call_column_type *f = arg;
-    call_context(sqlite3_db_handle(f->stmt));
     f->result = sqlite3_column_type(f->stmt, f->column);
 }
 int os32_sqlite_column_type(sqlite3_stmt *stmt, int column)
@@ -271,7 +240,6 @@ typedef struct { sqlite3 *db; int result; } Call_get_autocommit;
 static void call_get_autocommit(void *arg)
 {
     Call_get_autocommit *f = arg;
-    call_context(f->db);
     f->result = sqlite3_get_autocommit(f->db);
 }
 int os32_sqlite_get_autocommit(sqlite3 *db)
@@ -285,7 +253,6 @@ typedef struct { sqlite3 *db; int result; } Call_errcode;
 static void call_errcode(void *arg)
 {
     Call_errcode *f = arg;
-    call_context(f->db);
     f->result = sqlite3_errcode(f->db);
 }
 int os32_sqlite_errcode(sqlite3 *db)
@@ -299,7 +266,6 @@ typedef struct { sqlite3 *db; int result; } Call_extended_errcode;
 static void call_extended_errcode(void *arg)
 {
     Call_extended_errcode *f = arg;
-    call_context(f->db);
     f->result = sqlite3_extended_errcode(f->db);
 }
 int os32_sqlite_extended_errcode(sqlite3 *db)
@@ -313,7 +279,6 @@ typedef struct { sqlite3 *db; const char * result; } Call_errmsg;
 static void call_errmsg(void *arg)
 {
     Call_errmsg *f = arg;
-    call_context(f->db);
     f->result = sqlite3_errmsg(f->db);
 }
 const char * os32_sqlite_errmsg(sqlite3 *db)
@@ -362,7 +327,6 @@ typedef struct { void *db; int result; } Call_fd;
 static void call_fd(void *arg)
 {
     Call_fd *f = arg;
-    call_context((sqlite3 *)f->db);
     f->result = os32_sqlite_db_fd(f->db);
 }
 int os32_sqlite_outer_db_fd(void *db)
@@ -398,9 +362,6 @@ typedef struct {
 static void call_group_open(void *arg)
 {
     Call_group_open *f = arg;
-    Os32SqliteGroupInfo info;
-    if (os32_sqlite_group_snapshot(f->group, &info) == SQLITE_OK)
-        call_group_context(&info);
     f->result = os32_sqlite_group_open(f->group, f->path, f->flags, f->out);
 }
 int os32_sqlite_outer_group_open(const Os32SqliteGroup *group, const char *path,

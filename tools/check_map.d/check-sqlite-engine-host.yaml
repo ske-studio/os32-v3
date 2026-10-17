@@ -10,7 +10,6 @@ check-sqlite-engine-host:
 - kernel/kernel.c
 - kapi/kapi_db.c
 - kernel/ime_dict.c
-- build/kernel.mk
 - tools/tests/test_sqlite_engine.py
 - tools/tests/sqlite_engine_host.c
 - tools/tests/sqlite_engine_regs.asm

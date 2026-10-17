@@ -350,7 +350,7 @@ void ime_dict_learn(IME_Dict *dict, const char *yomi, const char *kanji)
     }
 }
 
-/* Finalize/close failure is terminal for this lifetime, including reopen. */
+/* Finalize always destroys the statement; its rc reports the last evaluation. */
 static int ime_dict_close(IME_Dict *dict)
 {
     int rc = SQLITE_OK, next;
@@ -360,22 +360,14 @@ static int ime_dict_close(IME_Dict *dict)
         dict->isolated = 1;
         return -1;
     }
-    if (dict->exact_stmt) {
-        rc = sqlite3_finalize((sqlite3_stmt *)dict->exact_stmt);
-        dict->exact_stmt = 0;
-    }
-    if (rc == SQLITE_OK && dict->prefix_stmt) {
-        rc = sqlite3_finalize((sqlite3_stmt *)dict->prefix_stmt);
-        dict->prefix_stmt = 0;
-    }
-    if (rc == SQLITE_OK && dict->learn_stmt) {
-        rc = sqlite3_finalize((sqlite3_stmt *)dict->learn_stmt);
-        dict->learn_stmt = 0;
-    }
-    if (rc != SQLITE_OK) {
-        os32_sqlite_group_quarantine(&dict->group, OS32_SQLITE_STAGE_CLOSE, rc);
-        dict->isolated = 1;
-        return -1;
+    void **statements[] = { &dict->exact_stmt, &dict->prefix_stmt, &dict->learn_stmt };
+    for (unsigned int i = 0; i < sizeof(statements) / sizeof(statements[0]); i++) {
+        if (*statements[i]) {
+            next = sqlite3_finalize((sqlite3_stmt *)*statements[i]);
+            *statements[i] = 0;
+            if (next != SQLITE_OK)
+                kprintf(ATTR_RED, "IME: finalize evaluation rc=%d\r\n", next);
+        }
     }
     if (dict->db) rc = sqlite3_close((sqlite3 *)dict->db);
     if (rc == SQLITE_OK) dict->db = 0;

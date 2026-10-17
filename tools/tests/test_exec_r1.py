@@ -200,8 +200,6 @@ static u32 host_kapi_table[KAPI_FUNC_COUNT + 2];
 const u16 kapi_argsize[KAPI_FUNC_COUNT] = {0};
 const u16 kapi_argptr[KAPI_FUNC_COUNT] = {0};
 static void ring3_abort_check(void) {}
-static volatile u32 sqlite_engine_active;
-static void sqlite_engine_fault(void) { __builtin_trap(); }
 static int stop_pending;
 int appslot_stop_pending(void) { return stop_pending; }
 static void exec_park_stop(u32 *f);

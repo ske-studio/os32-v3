@@ -9,9 +9,7 @@ static unsigned char stack[128 * 1024] __attribute__((aligned(16)));
 u32 host_flags = 0x202;
 volatile u32 kctx_irq_depth, kctx_exc_depth;
 static int calls, kills, faults, pending;
-static int expected_owner = 3;
 static void *fault_env[5];
-int res_owner_get(void) { return 3; }
 void host_stop(void) { faults++; __builtin_longjmp(fault_env, 1); }
 typedef struct { int abort_req; } AppSlot;
 static AppSlot app;
@@ -21,15 +19,23 @@ static int appslot_cur(void) { return 3; }
 static AppSlot *appslot_get(int id) { (void)id; return &app; }
 static void ring3_abort_kill(void) { kills++; }
 #include "stop_source.c"
+static const u32 test_eip = 0x12345678, test_cr2 = 0x87654321;
+static u32 fault_values[3];
+static int hex_count, screen_count, line_count;
+static void sputs(const char *s) { if (s[0] == '\n' && !s[1]) line_count++; }
+static void sput_hex32(u32 value) { CHECK(hex_count < 3); fault_values[hex_count++] = value; }
+static void tvram_puts_at(int row, int col, const char *s, u8 attr)
+{ (void)row; (void)col; (void)s; (void)attr; }
+static void tvram_put_hex32(int row, int col, u32 value, u8 attr)
+{ (void)row; (void)col; (void)attr; CHECK(value == fault_values[screen_count++]); }
 #include "fault_source.c"
 static void probe(void)
 {
     char local;
     CHECK((u32)&local >= (u32)stack && (u32)&local < (u32)(stack + sizeof(stack)));
-    CHECK(sqlite_engine_active == 1 && sqlite_engine_owner == expected_owner);
-    if (expected_owner == 1) CHECK(sqlite_engine_group == 2 && sqlite_engine_generation == 9);
+    CHECK(sqlite_engine_active == 1);
     calls++;
-    if (pending) { app.abort_req = 1; ring3_abort_check(); CHECK(!kills && app.abort_req); }
+    if (pending) app.abort_req = 1;
 }
 static void nested(void *arg) { (void)arg; CHECK(0); }
 static void callback(void *arg)
@@ -64,24 +70,26 @@ void _start(void)
     CHECK(host_flags == 2);
     host_flags = 0x202;
     /* Real assembly, all four callee-saved registers and exact ESP. */
-    sqlite_engine_active = 1; sqlite_engine_owner = 3;
+    sqlite_engine_active = 1;
     CHECK(check_registers(callback, sqlite_engine_stack_top, (void *)123));
     sqlite_engine_active = 0;
     #include "outer_calls.c"
     CHECK(!sqlite_engine_active && host_flags == 0x202);
-    expected_owner = 1;
     CHECK(os32_sqlite_get_autocommit((sqlite3 *)7) == 73);
     CHECK(os32_sqlite_outer_db_fd((void *)7) == 12);
-    CHECK(!sqlite_engine_active && sqlite_engine_group == -1 && !sqlite_engine_generation);
-    expected_owner = 3;
+    CHECK(!sqlite_engine_active);
     /* The actual handler gates must stop before the app-kill branch. */
     for (int kind = 0; kind < 2; kind++) {
         sqlite_engine_active = 1;
+        hex_count = screen_count = line_count = 0;
         if (!__builtin_setjmp(fault_env)) {
             if (kind) test_page_fault(); else test_exception();
             CHECK(0);
         }
         CHECK(sqlite_engine_active == 1 && kills == 1);
+        CHECK(hex_count == 3 && screen_count == 3 && line_count == 1);
+        CHECK(fault_values[0] == (kind ? 14u : 13u));
+        CHECK(fault_values[1] == test_eip && fault_values[2] == test_cr2);
     }
     CHECK(faults == 2);
     sqlite_engine_active = 0; host_flags = 0x202;

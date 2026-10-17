@@ -15,8 +15,6 @@ def run(runner, mutant=None):
         engine = (ROOT / TARGET_SRC[0]).read_text()
         if mutant == 'guard bypass':
             engine = engine.replace('sqlite_engine_active || kctx_irq_depth', '0 || kctx_irq_depth')
-        if mutant == 'early STOP':
-            engine = engine.replace('return sqlite_engine_active != 0;', 'return 0;')
         (tmp / 'engine.c').write_text(engine)
         (tmp / 'io.h').write_text('extern unsigned long host_flags;\nvoid host_stop(void);\n'
             'static inline unsigned int irq_save(void) { unsigned int f=host_flags; host_flags &= ~512u; return f; }\n'
@@ -29,15 +27,19 @@ def run(runner, mutant=None):
         a = src.index('void ring3_abort_check(void)\n{')
         (tmp / 'stop_source.c').write_text(src[a:src.index('\n}', a)+2])
         src = (ROOT / 'kernel/isr_handlers.c').read_text()
-        gates = []
+        a = src.index('void sqlite_engine_fault(')
+        fault = src[a:src.index('\n}', a)+2]
+        gates = [fault]
         for original, name in [('exception_handler', 'test_exception'), ('page_fault_handler','test_page_fault')]:
             a = src.index('void '+original+'(')
             a = src.index('    _disable();', a)
             b = src.index('    /* ---- CPL=3', a)
             gate = src[a:b]
             if mutant == 'fault app kill':
-                gate = gate.replace('if (sqlite_engine_active) sqlite_engine_fault();', '')
-            gates.append('static void '+name+'(void) {\n'+gate+' kills++; }\n')
+                gate = re.sub(r'    if \(sqlite_engine_active\) \{.*?\n    \}', '', gate, flags=re.S)
+                gate = re.sub(r'    if \(sqlite_engine_active\) sqlite_engine_fault\([^;]+;', '', gate)
+            gate = gate.replace('__asm__ volatile("mov %%cr2, %0" : "=r"(cr2));', 'cr2 = test_cr2;')
+            gates.append('static void '+name+'(void) {\nu32 vector=13, fault_eip=test_eip, fault_addr=test_cr2;\n'+gate+' kills++; }\n')
         (tmp / 'fault_source.c').write_text('#include "io.h"\n'+'\n'.join(gates))
         hdr = (ROOT / 'lib/sqlite3/os32_sqlite_outer.h').read_text()
         mocks, calls = [], []
@@ -47,7 +49,7 @@ def run(runner, mutant=None):
             mocks.append(f'{ret} sqlite3_{name}({args}) {{ probe(); return {value}; }}')
             argv = ', '.join('0' for _ in args.split(',')) if args != 'void' else ''
             calls.append(f'{{ int before=calls; CHECK(os32_sqlite_{name}({argv}) == ({ret})({value})); CHECK(calls > before); }}')
-        mocks += ['int os32_sqlite_group_for_db(void *db, Os32SqliteGroupInfo *out) { if (db != (void *)7) return SQLITE_MISUSE; out->owner=1; out->cookie.group_index=2; out->cookie.generation=9; return SQLITE_OK; }', 'int os32_sqlite_group_snapshot(const Os32SqliteGroup *g, Os32SqliteGroupInfo *out) { (void)g; (void)out; return SQLITE_MISUSE; }', 'sqlite3 *sqlite3_db_handle(sqlite3_stmt *s) { (void)s; probe(); return 0; }', 'int os32_sqlite_group_open(const Os32SqliteGroup *g, const char *p, int f, sqlite3 **o) { (void)g; (void)p; (void)f; (void)o; probe(); return 0; }', 'int os32_sqlite_init(void) { probe(); return 0; }',
+        mocks += ['int os32_sqlite_group_open(const Os32SqliteGroup *g, const char *p, int f, sqlite3 **o) { (void)g; (void)p; (void)f; (void)o; probe(); return 0; }', 'int os32_sqlite_init(void) { probe(); return 0; }',
                   'int os32_sqlite_db_fd(void *db) { (void)db; probe(); return 12; }',
                   'char *sqlite3_vsnprintf(int n, char *out, const char *fmt, __builtin_va_list ap) { (void)n; (void)fmt; (void)ap; probe(); out[0]=0; return out; }']
         calls += ['CHECK(os32_sqlite_outer_group_open(0,0,0,0) == 0);', 'CHECK(os32_sqlite_start() == 0);', 'CHECK(os32_sqlite_outer_db_fd(0) == 12);',
@@ -82,7 +84,7 @@ def main():
             print(r.stdout+r.stderr,end='')
             assert r.returncode == 0, r.returncode
     if args.mutate:
-        for name in ['guard bypass','early STOP','fault app kill']:
+        for name in ['guard bypass','fault app kill']:
             r=run(args.runner,name)
             assert r.returncode != 0 and 'FAIL:' in r.stdout, (name,r.returncode,r.stdout,r.stderr)
             print('RED (runtime): '+name)

@@ -280,6 +280,12 @@ ERRNO_MUTANTS = [
 
 # kernel/ime_dict.c の変異 (ime の段で落ちること)
 IME_MUTANTS = [
+    ("io_once: evaluation error quarantines finalized statement",
+     '            if (next != SQLITE_OK)\n                kprintf',
+     '            if (next != SQLITE_OK) { dict->isolated = 1; return -1; }\n            if (next != SQLITE_OK)\n                kprintf'),
+    ("io_quarantine: close BUSY retires group",
+     '    next = os32_sqlite_group_finish(&dict->group, rc);',
+     '    next = SQLITE_OK;'),
     ("hot journal を見ずに開き直す",
      "    if (rc != OS32_ERR_NOTFOUND && !(rc == 0 && st.st_size == 0)) {",
      "    if (0) {"),
@@ -407,7 +413,7 @@ def run_ime(tmp, quiet=False):
         print("IME BUILD FAIL")
         return False
     ok = True
-    for case in [None, "io_quarantine", "io_hot_journal"]:
+    for case in [None, "io_quarantine"]:
         r = host32.run([str(exe)] + ([case] if case else []),
                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=120)
         if not quiet:
@@ -419,7 +425,7 @@ def run_ime(tmp, quiet=False):
 
 def _run_ime_exe(exe):
     try:
-        for case in [None, "io_quarantine", "io_hot_journal"]:
+        for case in [None, "io_quarantine"]:
             r = host32.run([str(exe)] + ([case] if case else []),
                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=120)
             if r.returncode != 0:

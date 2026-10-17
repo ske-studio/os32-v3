@@ -92,6 +92,20 @@ static void tvram_put_hex32(int row, int col, u32 val, u8 attr)
     tvram_puts_at(row, col, buf, attr);
 }
 
+/* SQLite faults cannot unwind or enter app resource cleanup. */
+void sqlite_engine_fault(u32 vector, u32 eip, u32 cr2)
+{
+    _disable();
+    sputs("\n[SQLite] fault vector="); sput_hex32(vector);
+    sputs(" EIP="); sput_hex32(eip);
+    sputs(" CR2="); sput_hex32(cr2); sputs("\n");
+    tvram_puts_at(0, 0, "SQLite fault vector=         EIP=         CR2=", 0x41);
+    tvram_put_hex32(0, 20, vector, 0x41);
+    tvram_put_hex32(0, 33, eip, 0x41);
+    tvram_put_hex32(0, 46, cr2, 0x41);
+    for (;;) _stop();
+}
+
 /* ====================================================================== */
 /*  例外ダンプ共通ヘルパー (exception_handler / page_fault_handler 共用) */
 /* ====================================================================== */
@@ -245,7 +259,11 @@ void exception_handler(u32 error_code, u32 vector, u32 fault_eip,
     int row = 0;
 
     _disable();
-    if (sqlite_engine_active) sqlite_engine_fault();
+    if (sqlite_engine_active) {
+        u32 cr2;
+        __asm__ volatile("mov %%cr2, %0" : "=r"(cr2));
+        sqlite_engine_fault(vector, fault_eip, cr2);
+    }
 #ifdef OS32_R1_FIXTURE
     r1_fixture_exception(vector);
 #endif
@@ -343,7 +361,7 @@ void page_fault_handler(u32 error_code, u32 fault_addr, u32 fault_eip, u32 *regs
     int row = 0;  /* 画面最上部から表示 (最大限の情報量) */
 
     _disable();
-    if (sqlite_engine_active) sqlite_engine_fault();
+    if (sqlite_engine_active) sqlite_engine_fault(14, fault_eip, fault_addr);
 
     /* ---- CPL=3 (リング3) 由来の #PF はアプリだけ kill (v2 M1e/V4) ----
      * #PF フレーム (isr_stub_14 .not_v86): regs[8]=error_code,

@@ -38,7 +38,6 @@ static int g_longjmp_reason, g_longjmp_id;
 volatile u32 ring3_caller_reject_count, ring3_abort_count;
 static int aborted;
 /* This fixture has no SQLite execution; sqlite-engine tests the active case. */
-static int sqlite_engine_stop_deferred(void) { return 0; }
 void res_owner_set(int id) { owner=id; }
 int res_owner_get(void) { return owner; }
 void fd_redirect_save(FdRedirectState *p) { (void)p; }

@@ -65,7 +65,7 @@ def build_fixture(tmp):
     dispatch = function(exe, 'void __cdecl ring3_syscall_dispatch(')
     tail = dispatch[dispatch.index('syscall_complete:') + len('syscall_complete:'):dispatch.rfind('}')]
     parts.append('static void host_syscall_tail(u32 *frame) { int prev_caller=0, prev_in_syscall=0; u32 *prev_frame=0;\n' + tail + '\n}')
-    (tmp / 'exec_source.c').write_text('#include "owner_diag.h"\nstatic int sqlite_engine_stop_deferred(void) { return 0; }\n' + '\n'.join(parts))
+    (tmp / 'exec_source.c').write_text('#include "owner_diag.h"\n' + '\n'.join(parts))
     (tmp / 'abort_clear_source.c').write_text(function(slot, 'int appslot_abort_clear('))
     lease = read('exec/lease.c')
     (tmp / 'lease_revoke_source.c').write_text(

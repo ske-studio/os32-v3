@@ -587,6 +587,10 @@ int __cdecl kapi_db_close(int handle)
     if (slot->active_stmt) {
         rc = sqlite3_finalize(slot->active_stmt);
         slot->active_stmt = (sqlite3_stmt *)0;
+        /* The statement is gone even when its last evaluation failed. */
+        slot_save_error(slot, rc);
+        if (rc != SQLITE_OK) slot_note_teardown(slot, rc);
+        rc = SQLITE_OK;
     }
     slot->bindable = 0;
     if (rc == SQLITE_OK && !sqlite3_get_autocommit(slot->db))
@@ -812,8 +816,6 @@ int __cdecl kapi_db_finalize(int handle)
     if (rc != SQLITE_OK) {
         slot_save_error(slot, rc);
         slot_note_teardown(slot, rc);
-        os32_sqlite_group_quarantine(&slot->group, OS32_SQLITE_STAGE_CLOSE, rc);
-        slot->isolated = 1;
         return -1;
     }
     return 0;

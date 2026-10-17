@@ -111,8 +111,7 @@ void shlib_addrspace_detach(struct addrspace *as) { (void)as; }
 #include "owner_diag.h"
 /* R1 recovery runs outside SQLite; the engine fixture tests active faults. */
 static volatile u32 sqlite_engine_active;
-static int sqlite_engine_stop_deferred(void) { return 0; }
-static void sqlite_engine_fault(void) { CHECK(0); }
+static void sqlite_engine_fault(u32 vector, u32 eip, u32 cr2) { (void)vector; (void)eip; (void)cr2; CHECK(0); }
 #include "exec_source.c"
 static void caller_access_leave(int *p) { (void)p; }
 static u32 *g_cur_frame;

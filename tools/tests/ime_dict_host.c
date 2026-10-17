@@ -399,28 +399,22 @@ int IME_DICT_HOST_MAIN(int argc, char **argv)
     mock_ops.read_stream = inj_read;
     make_dict("/db/fep.db", "蚊");
     CHECK(ime_dict_open(&d, "/db/fep.db") == 0);
-    if (argc > 1) {
+    if (argc > 1 && !strcmp(argv[1], "io_quarantine")) {
         Os32SqliteGroupInfo info;
-        int hot = !strcmp(argv[1], "io_hot_journal");
-        fail_from = 1024;
-        fail_reads = hot ? 1000000 : 1;
-        plant_journal = hot;
-        CHECK(first_kanji(&d, &n)[0] == '\0' && n == 0);
-        /* T4b supersedes retry-after-failed-finalize: retain this lifetime. */
+        sqlite3_stmt *unowned = 0;
+        CHECK(sqlite3_prepare_v2(d.db, "SELECT 1", -1, &unowned, 0) == SQLITE_OK);
+        CHECK(ime_dict_reopen(&d, "/db/fep.db") == -1);
         CHECK(d.isolated && d.db && n_reopened == 0);
+        CHECK(!d.exact_stmt && !d.prefix_stmt && !d.learn_stmt);
         CHECK(os32_sqlite_group_snapshot(&d.group, &info) == SQLITE_OK);
         CHECK(info.state == OS32_SQLITE_QUARANTINED && info.fd_count > 0);
-        if (hot) {
-            FixtureFile *j = fixture_find("/db/fep.db-journal", 0);
-            CHECK(!plant_journal && j && j->size == 4 && !memcmp(j->data,"JJJJ",4));
-        }
-        fail_reads = 0;
-        CHECK(ime_dict_open(&d,"/db/fep.db") == -1);
-        CHECK(ime_dict_reopen(&d,"/db/fep.db") == -1);
-        CHECK(first_kanji(&d,&n)[0] == '\0' && n == 0);
+        CHECK(info.first_rc == SQLITE_BUSY);
+        CHECK(ime_dict_open(&d, "/db/fep.db") == -1);
+        CHECK(ime_dict_reopen(&d, "/db/fep.db") == -1);
+        CHECK(first_kanji(&d, &n)[0] == '\0' && n == 0);
         vfs_close_owned(0);
         CHECK(vfs_count_sqlite(&d.group) == info.fd_count);
-        puts("PASS finalize IO failure quarantined; no reopen or generic reclaim");
+        puts("PASS io_quarantine: close BUSY retains group and FD");
         return 0;
     }
     CHECK(!strcmp(first_kanji(&d, &n), "蚊") && n == 1);
@@ -448,6 +442,33 @@ int IME_DICT_HOST_MAIN(int argc, char **argv)
     CHECK(n_reopened == 2);
     printf("PASS stale_each_event\n");
 
+    /* (3) 失効を伴わない I/O エラーは 1 回だけ開き直す (成功で戻す) */
+    fail_reads = 1;
+    CHECK(!strcmp(first_kanji(&d, &n), "可"));
+    CHECK(n_reopened == 3);
+    CHECK(d.io_retried == 0);                 /* やり直しが成功したので戻した */
+    fail_reads = 1000000;                     /* 読めないまま */
+    CHECK(first_kanji(&d, &n)[0] == '\0' && n == 0);
+    CHECK(n_reopened == 3);                   /* 開き直しても読めない = 開けない */
+    CHECK(d.db == 0);                         /* 辞書無しで動く */
+    fail_reads = 0;
+    CHECK(first_kanji(&d, &n)[0] == '\0' && n == 0);
+    /* 開き直せるが中身の頁だけ読めない: 1 回開き直したら、以後の検索では
+     * 開き直さない (読めないまま開き直しを繰り返さない) */
+    CHECK(ime_dict_open(&d, "/db/fep.db") == 0);
+    fail_from = 1024;                          /* 1 頁目 (schema) は読める */
+    fail_reads = 1000000;
+    CHECK(first_kanji(&d, &n)[0] == '\0');
+    CHECK(n_reopened == 4 && d.db != 0 && d.io_retried == 1);
+    CHECK(first_kanji(&d, &n)[0] == '\0');
+    CHECK(first_kanji(&d, &n)[0] == '\0');
+    CHECK(n_reopened == 4);
+    fail_reads = 0;
+    fail_from = 0;
+    CHECK(!strcmp(first_kanji(&d, &n), "可"));
+    CHECK(d.io_retried == 0);                  /* 成功で戻す */
+    printf("PASS io_once\n");
+
     /* (4a) 失効 + hot journal が**旧接続が SQL を流す前から**残っている
      * (Codex 実装レビュー ラリー 1 の B1)。旧接続で sqlite3_step をすると
      * SQLite は本体を読む前に hot journal を判定し、ジャーナルを再生・削除
@@ -468,6 +489,23 @@ int IME_DICT_HOST_MAIN(int argc, char **argv)
         CHECK(j != NULL && j->size == 4 && !memcmp(j->data, "JJJJ", 4));
     }
     printf("PASS hot_journal_before_sql\n");
+
+    /* (4b) 失効を伴わない I/O エラーの後に journal が残っている (古い接続の
+     * 失敗した書き込みが残した形): 開き直しの判断で見つけて開かない */
+    fixture_rm("/db/fep.db-journal");
+    CHECK(ime_dict_open(&d, "/db/fep.db") == 0);   /* 頁キャッシュは空 */
+    fail_reads = 1000000;
+    fail_from = 1024;
+    n_kprintf = 0;
+    plant_journal = 1;
+    CHECK(first_kanji(&d, &n)[0] == '\0' && n == 0);
+    CHECK(plant_journal == 0);
+    CHECK(d.db == 0);
+    CHECK(n_kprintf >= 1 && strstr(last_kprintf, "remains"));
+    CHECK(fixture_find("/db/fep.db-journal", 0) != NULL);   /* 触らない */
+    fail_reads = 0;
+    fail_from = 0;
+    printf("PASS hot_journal\n");
 
     /* (5) 長さ 0 の journal は hot ではない — 開き直す */
     fixture_rm("/db/fep.db-journal");

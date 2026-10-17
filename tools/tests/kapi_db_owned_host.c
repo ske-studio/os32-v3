@@ -186,11 +186,11 @@ static void test_replace_finalize_failure(void)
         int rc = entry == 0 ? kapi_db_exec(h, "SELECT 2") :
                  entry == 1 ? kapi_db_prepare(h, "SELECT 2") :
                               kapi_db_prepare_only(h, "SELECT 2");
-        assert(rc == -1 && db_slots[h].isolated && db_slots[h].in_use);
+        assert(rc == -1 && !db_slots[h].isolated && db_slots[h].in_use);
         assert(connections[0].finalizes == 1 && connections[0].steps == 0);
         db_cleanup_owned(owner);
-        assert(connections[0].closes == 0 && connections[0].finalizes == 1);
-        assert(kapi_db_open("replacement") != h);
+        assert(connections[0].closes == 1 && connections[0].finalizes == 1);
+        assert(kapi_db_open("replacement") == h);
     }
 }
 
@@ -201,11 +201,11 @@ static void test_finalize_failure(void)
     assert(kapi_db_prepare(h, "SELECT") == DB_STATUS_ROW);
     connections[0].finalize_rc = SQLITE_IOERR;
     connections[0].transaction = 1;
-    assert(kapi_db_close(h) == -1);
-    assert(!strcmp(connections[0].trace, "F"));
+    assert(kapi_db_close(h) == 0);
+    assert(!strcmp(connections[0].trace, "FRC"));
     assert(!strcmp(kapi_db_last_error(h), "finalize failure"));
-    assert(!connections[0].closed);
-    assert(kapi_db_open("quarantine-not-reused") != h);
+    assert(connections[0].closed && !db_slots[h].isolated);
+    assert(kapi_db_open("reused") == h);
 }
 static void test_rollback_failure(void)
 {
@@ -237,7 +237,7 @@ static void test_busy_isolation(void)
             else if (mode == 1) db_cleanup_owned(2);
             else db_cleanup_all();
             assert(!strcmp(kapi_db_last_error(h), message));
-            assert(!strcmp(connections[0].trace, stage == 2 ? "F" : stage == 1 ? "FR" : "FRC"));
+            assert(!strcmp(connections[0].trace, stage > 0 ? "FR" : "FRC"));
             assert(!connections[0].closed);
             /* Simulate returning to parent then recycling the same nest. */
             owner = 1; db_cleanup_owned(2);
@@ -250,7 +250,7 @@ static void test_busy_isolation(void)
             assert(kapi_db_finalize(h) == -1);
             db_cleanup_owned(2); db_cleanup_all();
             assert(connections[1].closed);
-            assert(!strcmp(connections[0].trace, stage == 2 ? "F" : stage == 1 ? "FR" : "FRC"));
+            assert(!strcmp(connections[0].trace, stage > 0 ? "FR" : "FRC"));
             assert(!strcmp(kapi_db_last_error(h), message));
             for (i = 0; i < DB_MAX_CONNECTIONS - 1; i++)
                 assert(kapi_db_open("capacity") >= 0);

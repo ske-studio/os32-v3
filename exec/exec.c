@@ -32,7 +32,6 @@
 #include "shm.h"
 #include "gui.h"
 #include "snd_engine.h"
-#include "sqlite_engine.h"
 #include "pcm_cs4231.h"   /* pcm_reclaim (票 TASK_PCM_CS4231 §2-1) */
 #include "con_sink.h"
 #include "kbd_inject.h"   /* K7: GUI 中の kbd 待ちを満たす注入リング */
@@ -727,7 +726,6 @@ int ring3_wait_pending(void)
 /* ======================================================================== */
 void ring3_abort_check(void)
 {
-    if (sqlite_engine_stop_deferred()) return;
     AppSlot *a = appslot_get(appslot_cur());
     if (!a || !a->abort_req) return;
     a->abort_req = 0;
@@ -1165,7 +1163,6 @@ static void exec_restore_context(int id)
 /* ======================================================================== */
 static void exec_reclaim_resources(int id)
 {
-    if (sqlite_engine_active) sqlite_engine_fault();
     /* (1) SQLite DB リソース (P5: cleanup_all → cleanup_owned)。
      * **FD 回収より先** (票 S0-K §1c / F2 の順序修正)。close は未 commit の
      * rollback で journal を読み書きするので、そのときまだ main / journal の
