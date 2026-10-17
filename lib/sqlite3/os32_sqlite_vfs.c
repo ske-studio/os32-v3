@@ -5,8 +5,8 @@
 /*  MEMSYS5 固定プールによるメモリ管理もここで初期化する。                    */
 /*                                                                          */
 /*  制約:                                                                   */
-/*    - シングルタスク: ロック / ミューテックス は全て no-op                  */
-/*    - xTruncate: ext2 truncate 未実装のため no-op                          */
+/*    - single task: SHARED locks are no-op; immutable CD cannot promote    */
+/*    - mutable MAIN_DB: one connection per ext2 inode                      */
 /*    - ジャーナルモード: DELETE (デフォルト)                                 */
 /* ======================================================================== */
 
@@ -71,6 +71,8 @@ typedef struct {
     int first_stage, first_rc;
     int sticky_rc;
     int open_attempted;
+    int has_main;
+    VfsSqliteIdentity main_identity;
 } Os32GroupSlot;
 static Os32GroupSlot groups[OS32_SQLITE_GROUPS];
 
@@ -159,6 +161,7 @@ int os32_sqlite_group_finish(const Os32SqliteGroup *cookie, int close_rc)
         os32_sqlite_group_quarantine(cookie, OS32_SQLITE_STAGE_CLOSE, close_rc);
         return close_rc;
     }
+    g->has_main = 0;
     g->state = OS32_SQLITE_FREE;
     return SQLITE_OK;
 }
@@ -168,6 +171,8 @@ typedef struct Os32File {
     sqlite3_file base;   /* SQLite 基底 (先頭に置く) */
     int fd;              /* OS32 VFS ファイルディスクリプタ */
     int managed;
+    int readonly;
+    int immutable;
     VfsSqliteLease lease;
 } Os32File;
 
@@ -194,6 +199,10 @@ static int file_live(sqlite3_file *file)
 {
     Os32File *p = (Os32File *)file;
     if (!file_valid(file)) return 0;
+    if (p->immutable) {
+        VfsSqliteIdentity id;
+        if (vfs_sqlite_fd_identity(p->fd, &id) != VFS_OK) return 0;
+    }
     return p->fd >= 0 && !vfs_fd_is_stale(p->fd);
 }
 
@@ -232,6 +241,7 @@ static int os32Read(sqlite3_file *pFile, void *buf, int iAmt,
     if (!file_live(pFile)) return SQLITE_IOERR_READ;
     vfs_seek(p->fd, (int)iOfst, 0);  /* SEEK_SET */
     n = vfs_read_fd(p->fd, buf, (u32)iAmt);
+    if (p->immutable && !file_live(pFile)) return SQLITE_IOERR_READ;
     if (n < 0) return SQLITE_IOERR_READ;
     if (n < iAmt) {
         /* 不足分をゼロ埋め (SQLite 仕様) */
@@ -248,6 +258,7 @@ static int os32Write(sqlite3_file *pFile, const void *buf, int iAmt,
     int n;
 
     if (!file_live(pFile)) return SQLITE_IOERR_WRITE;
+    if (p->readonly) return SQLITE_READONLY;
     vfs_seek(p->fd, (int)iOfst, 0);  /* SEEK_SET */
     n = vfs_write_fd(p->fd, buf, (u32)iAmt);
     if (n < iAmt) return SQLITE_IOERR_WRITE;
@@ -256,23 +267,21 @@ static int os32Write(sqlite3_file *pFile, const void *buf, int iAmt,
 
 static int os32Truncate(sqlite3_file *pFile, sqlite3_int64 size)
 {
-    (void)size;
+    Os32File *p = (Os32File *)pFile;
     if (!file_live(pFile)) return SQLITE_IOERR_TRUNCATE;
-    /* ext2 truncate 未実装 — no-op */
-    /* 影響: VACUUM はファイルサイズを縮小できない。 */
-    /*       journal_mode=DELETE ではジャーナル truncate が発生するが、 */
-    /*       no-op でも DELETE モードのコミットフローに実害なし。 */
-    return SQLITE_OK;
+    if (p->readonly) return SQLITE_READONLY;
+    if (size < 0 || (sqlite3_uint64)size > 0xffffffffUL)
+        return SQLITE_IOERR_TRUNCATE;
+    return vfs_resize_fd(p->fd, (u32)size) == VFS_OK
+        ? SQLITE_OK : SQLITE_IOERR_TRUNCATE;
 }
 
 static int os32Sync(sqlite3_file *pFile, int flags)
 {
     Os32File *p = (Os32File *)pFile;
     (void)flags;
-    (void)p;
     if (!file_live(pFile)) return SQLITE_IOERR_FSYNC;
-    vfs_sync();
-    return SQLITE_OK;
+    return vfs_sync_fd(p->fd) == VFS_OK ? SQLITE_OK : SQLITE_IOERR_FSYNC;
 }
 
 static int os32FileSize(sqlite3_file *pFile, sqlite3_int64 *pSize)
@@ -285,9 +294,17 @@ static int os32FileSize(sqlite3_file *pFile, sqlite3_int64 *pSize)
 
 /* ロック系: シングルタスクのため全て no-op */
 static int os32Lock(sqlite3_file *f, int l)
-    { (void)l; return file_live(f) ? SQLITE_OK : SQLITE_IOERR_LOCK; }
+{
+    if (!file_live(f)) return SQLITE_IOERR_LOCK;
+    if (((Os32File *)f)->immutable && l > SQLITE_LOCK_SHARED) return SQLITE_READONLY;
+    return SQLITE_OK;
+}
 static int os32Unlock(sqlite3_file *f, int l)
-    { (void)l; return file_live(f) ? SQLITE_OK : SQLITE_IOERR_UNLOCK; }
+{
+    if (!file_live(f)) return SQLITE_IOERR_UNLOCK;
+    if (((Os32File *)f)->immutable && l > SQLITE_LOCK_SHARED) return SQLITE_READONLY;
+    return SQLITE_OK;
+}
 static int os32CheckReservedLock(sqlite3_file *f, int *pOut)
 {
     if (!file_live(f)) return SQLITE_IOERR_CHECKRESERVEDLOCK;
@@ -305,7 +322,8 @@ static int os32FileControl(sqlite3_file *f, int op, void *pArg)
 static int os32SectorSize(sqlite3_file *f)
     { return file_live(f) ? 512 : 0; }
 static int os32DeviceCharacteristics(sqlite3_file *f)
-    { (void)file_live(f); return 0; }
+    { (void)file_live(f); return 0; } /* Keep SQLite's lock/access callbacks:
+                                      * they check media even with cached pages. */
 
 /* ファイルメソッドテーブル */
 static const sqlite3_io_methods os32_io_methods = {
@@ -368,28 +386,71 @@ static int journal_name_fits(const char *name)
     return name_len(abs_name) + sfx + 1u <= (u32)VFS_MAX_PATH;
 }
 
+/* Immutable distribution databases must already be clean. Probe both sidecars
+ * before SQLite can attempt recovery; NOTFOUND alone means absent. */
+static int immutable_clean(const char *name)
+{
+    const char *suffixes[2] = {"-journal", "-wal"};
+    char side[VFS_MAX_PATH];
+    OS32_Stat st;
+    int i, rc;
+    u32 n = name_len(name), j;
+    for (i = 0; i < 2; i++) {
+        kstrncpy(side, name, sizeof(side));
+        for (j = 0; suffixes[i][j]; j++) side[n + j] = suffixes[i][j];
+        side[n + j] = 0;
+        rc = vfs_stat(side, &st);
+        if (rc == VFS_OK) return SQLITE_CANTOPEN;
+        if (rc != VFS_ERR_NOTFOUND) return SQLITE_IOERR;
+    }
+    return vfs_sqlite_backend(name) == VFS_SQLITE_IMMUTABLE_CD ? SQLITE_OK : SQLITE_IOERR;
+}
+
 static int os32VfsOpen(sqlite3_vfs *pVfs, const char *zName,
                        sqlite3_file *pFile, int flags, int *pOutFlags)
 {
     Os32File *p = (Os32File *)pFile;
     int oflags = 0;
+    int rc, i, backend;
+    VfsSqliteIdentity id;
     Os32GroupSlot *g = (Os32GroupSlot *)pVfs->pAppData;
 
     p->base.pMethods = (sqlite3_io_methods *)0;
     p->fd = -1;
     p->managed = g != 0;
+    p->immutable = 0;
 
     /* 一時ファイル (zName==NULL) はメモリストアで処理されるはず */
     if (zName == (const char *)0) return SQLITE_CANTOPEN;
+    if (g && (!group_active(g) || (flags & SQLITE_OPEN_URI))) return SQLITE_CANTOPEN;
     if ((flags & SQLITE_OPEN_MAIN_DB) && !journal_name_fits(zName))
         return SQLITE_CANTOPEN;             /* 名前が長すぎる (NAMETOOLONG) */
+
+    backend = vfs_sqlite_backend(zName);
+    if (backend == VFS_SQLITE_IMMUTABLE_CD) {
+        if (!(flags & SQLITE_OPEN_MAIN_DB) || !(flags & SQLITE_OPEN_READONLY) ||
+            (flags & (SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE))) return SQLITE_READONLY;
+        rc = immutable_clean(zName);
+        if (rc != SQLITE_OK) return rc;
+        p->immutable = 1;
+    }
+    if (backend == VFS_ERR_IO) return SQLITE_IOERR;
+    if (flags & SQLITE_OPEN_MAIN_DB) {
+        if (backend != VFS_SQLITE_EXT2 && backend != VFS_SQLITE_IMMUTABLE_CD)
+            return SQLITE_CANTOPEN;
+        if (flags & SQLITE_OPEN_READWRITE) {
+            rc = vfs_sqlite_writable(zName);
+            if (rc == VFS_ERR_ROFS && !(flags & SQLITE_OPEN_CREATE))
+                flags = (flags & ~SQLITE_OPEN_READWRITE) | SQLITE_OPEN_READONLY;
+            else if (rc != VFS_OK) return SQLITE_CANTOPEN;
+        }
+    }
 
     if (flags & SQLITE_OPEN_CREATE)   oflags |= 0x0100; /* KAPI_O_CREAT */
     if (flags & SQLITE_OPEN_READWRITE) oflags |= 0x0002; /* KAPI_O_RDWR */
     else                               oflags |= 0x0000; /* KAPI_O_RDONLY */
 
     if (g) {
-        if (!group_active(g) || (flags & SQLITE_OPEN_URI)) return SQLITE_CANTOPEN;
         if (vfs_open_sqlite(zName, oflags, g->owner, &g->cookie,
                             flags, &p->lease) != VFS_OK) return SQLITE_CANTOPEN;
         p->fd = p->lease.fd;
@@ -403,6 +464,34 @@ static int os32VfsOpen(sqlite3_vfs *pVfs, const char *zName,
     }
     if (p->fd < 0) return SQLITE_CANTOPEN;
 
+    p->readonly = !(oflags & O_RDWR);
+    if (flags & SQLITE_OPEN_MAIN_DB) {
+        rc = vfs_sqlite_fd_identity(p->fd, &id);
+        if (rc == VFS_OK) {
+            for (i = 0; i < OS32_SQLITE_GROUPS; i++) {
+                Os32GroupSlot *other = &groups[i];
+                if (other->has_main &&
+                    other->main_identity.mount_generation == id.mount_generation &&
+                    other->main_identity.file_id == id.file_id) {
+                    if (id.kind == VFS_SQLITE_IMMUTABLE_CD && id.readonly &&
+                        other->main_identity.kind == VFS_SQLITE_IMMUTABLE_CD &&
+                        other->main_identity.readonly &&
+                        other->main_identity.media_generation == id.media_generation) continue;
+                    rc = VFS_ERR_BUSY;
+                    break;
+                }
+            }
+        }
+        if (rc == VFS_OK) rc = vfs_sqlite_claim_main(p->fd);
+        if (rc != VFS_OK) {
+            /* pMethods is still NULL: close only this newly opened FD. */
+            if (os32Close(pFile) != SQLITE_OK && g)
+                os32_sqlite_group_quarantine(&g->cookie,
+                    OS32_SQLITE_STAGE_XCLOSE, SQLITE_IOERR_CLOSE);
+            return rc == VFS_ERR_IO ? SQLITE_IOERR : SQLITE_CANTOPEN;
+        }
+        if (g) { g->main_identity = id; g->has_main = 1; }
+    }
     p->base.pMethods = &os32_io_methods;
     if (pOutFlags) *pOutFlags = flags;
     return SQLITE_OK;
@@ -411,16 +500,16 @@ static int os32VfsOpen(sqlite3_vfs *pVfs, const char *zName,
 static int os32VfsDelete(sqlite3_vfs *pVfs, const char *zPath, int dirSync)
 {
     int rc;
-    (void)pVfs; (void)dirSync;
+    (void)pVfs;
     if (pVfs->pAppData && !group_active((Os32GroupSlot *)pVfs->pAppData))
         return SQLITE_IOERR_DELETE;
+    rc = vfs_sqlite_backend(zPath);
+    if (rc < 0) return SQLITE_IOERR_DELETE;
+    if (rc == VFS_SQLITE_IMMUTABLE_CD) return SQLITE_READONLY;
     rc = vfs_rm(zPath);
-    /* SQLite 仕様: ファイルが存在しない場合も SQLITE_OK を返す */
-    /* (ジャーナル削除時にファイルが既にないケースがある) */
-    if (rc < 0) {
-        /* 注意: .sqlite_text からの kprintf は PAGE FAULT を引き起こす */
-        /* (既知の制約: 06_PHASES.md §1.6 参照) */
-    }
+    if (rc == VFS_ERR_NOTFOUND) return SQLITE_IOERR_DELETE_NOENT;
+    if (rc != VFS_OK) return SQLITE_IOERR_DELETE;
+    if (dirSync && vfs_sync() != VFS_OK) return SQLITE_IOERR_DIR_FSYNC;
     return SQLITE_OK;
 }
 
@@ -433,12 +522,20 @@ static int os32VfsAccess(sqlite3_vfs *pVfs, const char *zPath,
 
     if (pVfs->pAppData && !group_active((Os32GroupSlot *)pVfs->pAppData))
         return SQLITE_IOERR_ACCESS;
+    rc = vfs_sqlite_backend(zPath);
+    if (rc < 0) return SQLITE_IOERR_ACCESS;
     rc = vfs_stat(zPath, &st);
-    if (flags == SQLITE_ACCESS_EXISTS) {
-        *pResOut = (rc == 0) ? 1 : 0;
-    } else {
-        *pResOut = (rc == 0) ? 1 : 0;
-    }
+    if (vfs_sqlite_backend(zPath) < 0) return SQLITE_IOERR_ACCESS;
+    if (rc == VFS_ERR_NOTFOUND) { *pResOut = 0; return SQLITE_OK; }
+    if (rc != VFS_OK) return SQLITE_IOERR_ACCESS;
+    if (flags == SQLITE_ACCESS_EXISTS) *pResOut = 1;
+    else if (flags == SQLITE_ACCESS_READ) *pResOut = !!(st.st_mode & OS_S_IRUSR);
+    else if (flags == SQLITE_ACCESS_READWRITE) {
+        rc = vfs_sqlite_writable(zPath);
+        if (rc != VFS_OK && rc != VFS_ERR_ROFS) return SQLITE_IOERR_ACCESS;
+        *pResOut = rc == VFS_OK && (st.st_mode & OS_S_IRUSR) &&
+                   (st.st_mode & OS_S_IWUSR);
+    } else return SQLITE_IOERR_ACCESS;
     return SQLITE_OK;
 }
 
@@ -448,8 +545,8 @@ static int os32VfsFullPathname(sqlite3_vfs *pVfs, const char *zName,
     (void)pVfs;
     if (pVfs->pAppData && !group_active((Os32GroupSlot *)pVfs->pAppData))
         return SQLITE_CANTOPEN;
-    kstrncpy(zOut, zName, (u32)nOut);
-    return SQLITE_OK;
+    return vfs_resolve_path(zName, zOut, nOut) == VFS_OK
+        ? SQLITE_OK : SQLITE_CANTOPEN;
 }
 
 static int os32VfsRandomness(sqlite3_vfs *pVfs, int nByte, char *zOut)
@@ -551,6 +648,7 @@ int os32_sqlite_group_acquire(int kind, int owner, Os32SqliteGroup *out)
         g->first_rc = 0;
         g->sticky_rc = 0;
         g->open_attempted = 0;
+        g->has_main = 0;
         *out = g->cookie;
         return SQLITE_OK;
     }

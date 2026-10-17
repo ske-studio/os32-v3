@@ -28,6 +28,7 @@
 |---|---|---|---|
 | T3AB-R1 | T3ab の R1 像の一式のゲスト受入 | 実機の回帰 T3bR は 2026-10-17 に全項目 PASS (閉鎖台帳)。R1 像だけ未実施 | 次の R1 の回 |
 | T3C2-GUI | T3c2 の 6 命令を GUI の端末から回す (sentinel・20 回・ネスト) と、H-5 の Ra266 64MB での同条件比較 | v3 に GUI の端末アプリが無い (H-7)、H-5 は実機の条件。CUI の 6 命令・CUI/GUI の往復・PT の監査は NP21/W で合格 (2026-10-17、`~/os32-tmp/evidence/2026-10-17/t3c2_t3d1_np21w/RESULT.md`) | GUI の端末は H-7 の再開時、H-5 はハードウェアの実機の回 (T4T7-RH と同じ回) |
+| T4B-CD | 不変CDのboot permit接続、CD FEP/settingsのRO開始、および実ゲストの同一DB排他・媒体交換 | T4b-4/4cはhostでVFS/ISO/ATAPIを通す段。配備・ゲスト操作は依頼対象外。`vfs_sqlite_allow_immutable(prefix)` はboot policyが明示する口で、自動RO判定はしない | T4c-3のRO FEP/settings接続とhost受入、T5b-5のCD実起動。ext2/同一DBのゲスト受入はPMのT4b統合時 |
 | T3D2-D15 | D15 (前景 1 本で起動 2 秒・入力→描画 100ms、P100/32MB) の判定。T3d2 の時間は NP21/W の参考値だけ (`~/os32-tmp/evidence/2026-10-18/t3d2_np21w/RESULT.md`) | エミュレータの時間は実機の時間ではない。票 T3d2 の取り決めで「未測定として台帳へ」 | 実機の回 (T4T7-RH と同じ回)、T7b の日本語の描画の計測と合わせて |
 | T4T7-RH | T4〜T7 の実機 (Ra266) での確認: T5c-4 の 82557 の回帰、T6b-2 の Ra266 の欄、T7a-2c の 9821 の再描画と CG 窓 (H-5・H-6b)、T7a-2e2 の `v86 -g`/boot2/DOS、T7 の Ra266 の計測 | ユーザー決定 2026-10-17: ソフトウェアの変更は NP21/W で合否を決め、ハードウェアに触るカーネルの変更は実機のテストをまとめて行う | ハードウェアに触る段がたまった所でまとめて行う実機の回 (時期は PM が提案)。新しい段で実機の項目が出たらこの行に足す |
 | LGY98-L12 | LGY-98 の L1 (131/200 フレーム) と L2 (66,132/131,072 B) が FAIL — main 9aaaf39 でも同じ数値で FAIL (T3ab の後退ではない)。台本 `tools/net_l0..l3_test.py` は urllib で 127.0.0.1:8025 を直接叩くので、WSL の NAT では届かない (受入では手元の shim で `np21w_client` の curl 経路へ回した) | 既存の失敗、原因は台本か host_agent v2 の側 [推] | 次に LGY-98 / net の台本を触る段: 台本を np21w_client に寄せ、L1/L2 の欠落の原因を調べる |

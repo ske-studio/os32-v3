@@ -8,6 +8,7 @@
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); exit(1); \
 } } while (0)
 static int current_owner = 2, owner_sets, probes, size_rc, write_rc;
+static int mock_fs_calls;
 /* vfs_resolve_path が呼ばれたときに立っているべき owner。F2a/F2b は 2 のまま
  * (vfs_open_sqlite が広域 owner を動かさないことの確認)。S0-K の
  * kapi_db_v50_host.c だけが owner を渡り歩くのでここも一緒に動かす。 */
@@ -18,6 +19,15 @@ static int resolve_owner = 2;
  * どちらも作れる。F2a/F2b は "" のまま (絶対名しか渡さない)。 */
 static const char *resolve_cwd = "";
 static VfsOps mock_ops;
+static int immutable_permit, media_error;
+static u32 mock_media_generation = 1;
+int vfs_sqlite_immutable_generation(void *ctx, u32 generation, u32 *out)
+{
+    if (!immutable_permit) return VFS_ERR_ROFS;
+    if (media_error || mock_media_generation != 1) return VFS_ERR_IO;
+    *out = mock_media_generation;
+    return VFS_OK;
+}
 int res_owner_get(void) { return current_owner; }
 void res_owner_set(int owner) { owner_sets++; current_owner = owner; }
 /* fs/vfs.c の vfs_resolve_path の移植 (票 TASK_VFS_FD_PATH 以降の形)。
@@ -102,16 +112,17 @@ VfsOps *vfs_route(const char *path, char *out, int size, void **ctx)
 int vfs_path_kind(const char *path) { probes++; return VFS_KIND_FILE; }
 /* fs/vfs.c 側の実装 (マウント単位の st_dev)。ここでは固定値で足りる */
 u32 vfs_path_dev(const char *path) { return 1; }
+u32 vfs_path_mount_generation(const char *path) { return 1; }
 static int mock_size(void *ctx, const char *path, u32 *size)
-{ probes++; *size = 8; return size_rc; }
+{ probes++; mock_fs_calls++; *size = 8; return size_rc; }
 static int mock_write(void *ctx, const char *path, const void *buf, u32 size)
-{ probes++; return write_rc; }
+{ probes++; mock_fs_calls++; return write_rc; }
 static int mock_read_stream(void *ctx, const char *path, void *buf,
                             u32 size, u32 offset)
-{ probes++; memset(buf, 'R', size); return (int)size; }
+{ probes++; mock_fs_calls++; memset(buf, 'R', size); return (int)size; }
 static int mock_write_stream(void *ctx, const char *path, const void *buf,
                              u32 size, u32 offset)
-{ probes++; return (int)size; }
+{ probes++; mock_fs_calls++; return (int)size; }
 int fd_is_redirected(int fd) { return 0; }
 u16 fd_redirect_ifmt(int fd, int *out_file_fd)
 { (void)fd; if (out_file_fd) *out_file_fd = -1; return OS_S_IFCHR; }

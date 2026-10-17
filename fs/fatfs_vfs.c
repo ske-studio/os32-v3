@@ -779,7 +779,8 @@ static VfsOps fatfs_ops = {
     /* inode で動く口も持たない (票 TASK_VFS_FD_PATH)。FD はパスで動く */
     0,
     /* 大文字小文字を区別しない (FatFs の短い名前の規則) */
-    fat_name_fold
+    fat_name_fold,
+    0 /* SQLite capability is not implied by filesystem permissions. */
 };
 
 

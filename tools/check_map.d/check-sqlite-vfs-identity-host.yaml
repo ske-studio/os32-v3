@@ -1,0 +1,22 @@
+check-sqlite-vfs-identity-host:
+- build/checks.d/check-sqlite-vfs-identity-host.mk
+- tools/check_map.d/check-sqlite-vfs-identity-host.yaml
+- tools/tests/test_sqlite_vfs_identity.py
+- tools/tests/sqlite_vfs_identity_host.c
+- tools/tests/sqlite_groups_host.c
+- tools/tests/sqlite_groups_backend.h
+- tools/tests/vfs_fd_sqlite_host.c
+- lib/sqlite3/os32_sqlite_vfs.c
+- lib/sqlite3/os32_sqlite_vfs.h
+- lib/sqlite3/sqlite3.c
+- lib/sqlite3/os32_sqlite_config.h
+- fs/vfs_fd.c
+- fs/vfs.c
+- fs/vfs.h
+- fs/ext2_vfs.c
+- tools/tests/sqlite_cd_host.c
+- tools/tests/cd_read_host.c
+- fs/iso9660.c
+- drivers/atapi.c
+- drivers/atapi.h
+- tools/tests/atapi_hostshim/io.h

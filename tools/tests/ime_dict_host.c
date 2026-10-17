@@ -43,7 +43,7 @@ int vfs_stat(const char *path, OS32_Stat *st)
 {
     FixtureFile *f = fixture_find(path, 0);
     if (!f) return OS32_ERR_NOTFOUND;
-    if (st) { memset(st, 0, sizeof(*st)); st->st_size = f->size; }
+    if (st) { memset(st, 0, sizeof(*st)); st->st_size = f->size; st->st_mode = OS_S_IFREG | OS_S_IRUSR | OS_S_IWUSR; }
     return 0;
 }
 
@@ -293,9 +293,9 @@ static void expect_methods_ok(sqlite3_file *pf)
     const sqlite3_io_methods *m = pf->pMethods;
     sqlite3_int64 sz = -1;
     int res = 1;
-    CHECK(m->xTruncate(pf, 1024) == SQLITE_OK);
-    CHECK(m->xSync(pf, 0) == SQLITE_OK);
     CHECK(m->xFileSize(pf, &sz) == SQLITE_OK && sz > 0);
+    CHECK(m->xTruncate(pf, sz) == SQLITE_OK);
+    CHECK(m->xSync(pf, 0) == SQLITE_OK);
     CHECK(m->xCheckReservedLock(pf, &res) == SQLITE_OK && res == 0);
 }
 

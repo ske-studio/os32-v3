@@ -481,6 +481,27 @@ static u32 ext2_vfs_block_size(void *ctx) {
     return ec ? ec->sb_info.block_size : 0;
 }
 
+/* Preserve data for unsupported nonzero resize, rather than report success.
+ * SQLite DELETE journals use zero; equal-size requests need no change. */
+static int ext2_sqlite_resize(void *ctx, u32 ino, u32 size)
+{
+    OS32_Stat st;
+    int rc = ext2_vfs_stat_ino(ctx, ino, &st);
+    if (rc != VFS_OK) return rc;
+    if (size == st.st_size) return VFS_OK;
+    if (size != 0) return VFS_ERR_NOSYS;
+    return ext2_vfs_truncate_ino(ctx, ino);
+}
+
+static int ext2_sqlite_writable(void *ctx)
+{
+    return ext2_to_vfs_err(ext2_check_writable((Ext2Ctx *)ctx));
+}
+
+static const VfsSqliteOps ext2_sqlite_ops = {
+    VFS_SQLITE_EXT2, ext2_sqlite_resize, ext2_sqlite_writable, 0
+};
+
 /* ext2操作テーブル */
 static VfsOps ext2_ops = {
     "ext2",
@@ -495,7 +516,8 @@ static VfsOps ext2_ops = {
     ext2_vfs_set_mtime,         /* 票 H3。他の FS は埋めない = NOSYS */
     ext2_vfs_create_excl,       /* 票 H2。他の FS は埋めない = NOSYS */
     &ext2_ino_ops,              /* 票 TASK_VFS_FD_PATH。FD は inode で動く */
-    0                           /* name_fold なし = 名前はバイトで区別する */
+    0,                          /* name_fold なし = 名前はバイトで区別する */
+    &ext2_sqlite_ops
 };
 
 

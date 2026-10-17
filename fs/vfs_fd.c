@@ -57,6 +57,8 @@ typedef struct {
     u32 ino;
     int stale;          /* 1 = 失効 (unlink / 置き換え rename / umount の後) */
     int pinned;         /* 1 = 使用中の loop イメージ (unlink・置き換えは BUSY) */
+    u32 mount_generation;
+    int sqlite_main;
     int sqlite_db;      /* 1 = SQLite の DB / ジャーナル (rename は BUSY) */
 } VfsFile;
 
@@ -222,6 +224,8 @@ static int vfs_open_internal(const char *path, int mode, int owner,
     open_files[fd].ops = ops;
     open_files[fd].fs_ctx = fs_ctx;
     open_files[fd].dev = vfs_path_dev(resolved);
+    open_files[fd].mount_generation = vfs_path_mount_generation(resolved);
+    open_files[fd].sqlite_main = 0;
     open_files[fd].protect = 0;
     open_files[fd].owner = owner;
     open_files[fd].lifetime = cookie ? VFS_FD_SQLITE : VFS_FD_GENERIC;
@@ -705,4 +709,114 @@ void vfs_sys_compat_shell_print(const char *s, u8 attr)
     /* 互換機能として常に FD=1(標準出力) へ流し込む。色指定は無視される */
     if (!s) return;
     vfs_write_fd(1, s, str_len(s));
+}
+
+/* SQLite uses these only in the existing non-reentrant normal context. */
+int vfs_sqlite_backend(const char *path)
+{
+    char rel[VFS_MAX_PATH], resolved[VFS_MAX_PATH];
+    void *ctx;
+    VfsOps *ops;
+    int rc = vfs_resolve_path(path, resolved, sizeof(resolved));
+    if (rc != VFS_OK) return rc;
+    ops = vfs_route(resolved, rel, sizeof(rel), &ctx);
+    if (!ops) return VFS_ERR_NOMOUNT;
+    if (ops->sqlite && ops->sqlite->kind == VFS_SQLITE_IMMUTABLE_CD) {
+        u32 media;
+        rc = vfs_sqlite_immutable_generation(ctx, vfs_path_mount_generation(resolved), &media);
+        if (rc != VFS_OK) return rc;
+    }
+    return ops->sqlite ? ops->sqlite->kind : VFS_SQLITE_UNSUPPORTED;
+}
+
+int vfs_sqlite_writable(const char *path)
+{
+    char rel[VFS_MAX_PATH], resolved[VFS_MAX_PATH];
+    void *ctx;
+    VfsOps *ops;
+    int rc = vfs_resolve_path(path, resolved, sizeof(resolved));
+    if (rc != VFS_OK) return rc;
+    ops = vfs_route(resolved, rel, sizeof(rel), &ctx);
+    if (!ops) return VFS_ERR_NOMOUNT;
+    if (!ops->sqlite || !ops->sqlite->writable) return VFS_ERR_ROFS;
+    return ops->sqlite->writable(ctx);
+}
+
+int vfs_sqlite_fd_identity(int fd, VfsSqliteIdentity *out)
+{
+    VfsFile *f;
+    if (!out || fd < 3 || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
+    f = &open_files[fd];
+    if (!f->in_use || f->stale) return VFS_ERR_STALE;
+    if (!f->ops->sqlite || !f->mount_generation) return VFS_ERR_NOSYS;
+    out->mount_generation = f->mount_generation;
+    out->kind = f->ops->sqlite->kind;
+    out->readonly = !(f->mode & (O_RDWR | O_WRONLY));
+    out->media_generation = 0;
+    if (out->kind == VFS_SQLITE_IMMUTABLE_CD) {
+        OS32_Stat st;
+        u32 media;
+        int rc = vfs_sqlite_immutable_generation(f->fs_ctx, f->mount_generation, &media);
+        if (rc != VFS_OK) return rc;
+        if (f->sqlite_main) {
+            out->file_id = f->ino;
+            out->media_generation = media;
+            return VFS_OK;
+        }
+        if (!f->ops->stat) return VFS_ERR_NOSYS;
+        rc = f->ops->stat(f->fs_ctx, f->path, &st);
+        if (rc != VFS_OK) return rc;
+        rc = vfs_sqlite_immutable_generation(f->fs_ctx, f->mount_generation, &media);
+        if (rc != VFS_OK) return rc;
+        out->file_id = st.st_ino;
+        out->media_generation = media;
+    } else {
+        if (!f->has_ino) return VFS_ERR_NOSYS;
+        out->file_id = f->ino;
+    }
+    return VFS_OK;
+}
+
+int vfs_sqlite_claim_main(int fd)
+{
+    VfsSqliteIdentity id;
+    int i, rc = vfs_sqlite_fd_identity(fd, &id);
+    if (rc != VFS_OK) return rc;
+    for (i = 3; i < VFS_MAX_OPEN_FILES; i++) {
+        VfsFile *f = &open_files[i];
+        /* Include stale/quarantined/parked FDs until close completes. */
+        if (i != fd && f->in_use && f->sqlite_main &&
+            f->mount_generation == id.mount_generation && f->ino == id.file_id) {
+            if (id.kind == VFS_SQLITE_IMMUTABLE_CD && id.readonly &&
+                !(f->mode & (O_RDWR | O_WRONLY))) continue;
+            return VFS_ERR_BUSY;
+        }
+    }
+    open_files[fd].ino = id.file_id;
+    open_files[fd].sqlite_main = 1;
+    return VFS_OK;
+}
+
+int vfs_resize_fd(int fd, u32 size)
+{
+    VfsFile *f;
+    int rc;
+    if (fd < 3 || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
+    f = &open_files[fd];
+    if (!f->in_use || f->stale) return VFS_ERR_STALE;
+    if (!(f->mode & (O_RDWR | O_WRONLY))) return VFS_ERR_ROFS;
+    if (!f->has_ino || !f->ops->sqlite || !f->ops->sqlite->resize)
+        return VFS_ERR_NOSYS;
+    rc = f->ops->sqlite->resize(f->fs_ctx, f->ino, size);
+    if (rc == VFS_OK) f->size = size;
+    return rc;
+}
+
+int vfs_sync_fd(int fd)
+{
+    VfsFile *f;
+    if (fd < 3 || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
+    f = &open_files[fd];
+    if (!f->in_use || f->stale) return VFS_ERR_STALE;
+    return f->ops->sync ? f->ops->sync(f->fs_ctx) : VFS_ERR_NOSYS;
 }

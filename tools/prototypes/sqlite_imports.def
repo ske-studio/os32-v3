@@ -138,6 +138,42 @@
       "declaration": "u32 ktime_ticks(void);",
       "context": "normal",
       "irq": false
+    },
+    {
+      "symbol": "vfs_sqlite_backend",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "vfs_sqlite_writable",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "vfs_sqlite_fd_identity",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "vfs_sqlite_claim_main",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "vfs_resize_fd",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "vfs_sync_fd",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
     }
   ]
 }
