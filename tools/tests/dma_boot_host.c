@@ -17,7 +17,7 @@ u32 ledger_region_count;
 #define CHECK(x) do { if (!(x)) { fprintf(stderr, "FAIL %d: %s\n", __LINE__, #x); exit(1); } } while (0)
 static int available, conflict, reserved, tested, bound, pcm, diag, loaded;
 static int debug_enabled = 1;
-static int dma_tested, dma_skipped;
+static int dma_tested, dma_skipped, unicode_loads;
 static void kprintf(int attr, const char *fmt, ...);
 static void test_dma_pool(void) { dma_tested++; }
 #include "selftest_dma_gate.c"
@@ -64,6 +64,11 @@ void kdebug_load(void)
     kdebug.ops.selftest_run = debug_enabled ? selftest : 0;
 }
 static void kselftest_skipped(void) { CHECK(!debug_enabled); tested++; }
+static void unicode_file_load(void)
+{
+    CHECK(reserved && tested == 1 && loaded == 1 && !bound && !pcm);
+    unicode_loads++;
+}
 u32 ledger_resource_import_pci(void) { CHECK(reserved); return 0; }
 u32 ledger_res_overflow;
 static void kernel_pci_line_bits(void) { }
@@ -104,11 +109,11 @@ int main(int argc, char **argv)
     CHECK(b.pa == 123 && b.va == (void *)456 && b.size == 789);
     if (!setjmp(halt)) {
         host_kernel_dma(available ? 8192 : 8088);
-        CHECK(!conflict && loaded == 1);
+        CHECK(!conflict && loaded == 1 && unicode_loads == 1);
         if (available) CHECK(tested == 1 && bound == 1 && pcm == 1 && !diag);
         else { CHECK(!s_pool.ready && !bound && !pcm && tested == 1 && diag == 1); }
     } else {
-        CHECK(conflict && !loaded && !diag);
+        CHECK(conflict && !loaded && !diag && !unicode_loads);
         untouched();
     }
     return 0;

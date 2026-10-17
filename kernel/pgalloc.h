@@ -14,7 +14,7 @@
 #include "sys.h"
 #include "paging.h"
 
-/* 管理対象の開始アドレスは include/memmap.h の MEM_POOL_BASE (物理側の定数)。 */
+/* 一般割当域は linker 由来の SLACK と MEM_POOL_BASE 以降の物理 pool。 */
 
 /* ======== API ======== */
 #include "physmem.h"
@@ -216,8 +216,8 @@ u32 ledger_owner_pages(u32 owner);
  * ONLINE のときだけ。DEVICE owner は拒否。成功は戻り値、PFN は *pfn。 */
 int pgalloc_alloc_n_owner(u32 owner, int n, u32 first, u32 end, u32 flags,
                           u32 *pfn);
-/* 汎用の池 [MEM_POOL_BASE, 上端) の最初適合 (下から)。物理番地を返す (池は
- * MEM_POOL_BASE 以上なので 0 = 失敗)。 */
+/* SLACK を含む一般割当域の最初適合 (下から)。物理番地を返す。
+ * 物理0頁は固定予約なので 0 = 失敗。 */
 u32 pgalloc_alloc_phys(u32 owner, int n);
 /* **全ページが owner のものであるときだけ**解放。他 owner・未確保・永久予約が
  * 混じれば全件不変で拒否し ledger_bad_free を数える。 */
@@ -277,7 +277,7 @@ int ledger_reserve_set(u32 owner, const struct ledger_span *spans, u32 n);
 #define LEDGER_ROLE_CLIENT   1   /* アプリへ USER で貸す面 */
 #define LEDGER_ROLE_DISPLAY  2   /* 表示面 (supervisor のまま) */
 #define LEDGER_ROLE_TVRAM    3   /* テキスト VRAM 面 (supervisor のまま) */
-#define LEDGER_ROLE_UNICODE  4   /* Unicode テーブル面 (読み取り専用) */
+#define LEDGER_ROLE_UNICODE  4   /* 予約済み公開番号。Unicode は非公開、query は INVAL。 */
 #define LEDGER_PERM_NONE     0
 #define LEDGER_PERM_RO       2
 #define LEDGER_PERM_RW       1

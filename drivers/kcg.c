@@ -25,8 +25,6 @@
 #include "kcg.h"
 /* #include "gfx.h" removed */
 #include "io.h"
-#include "utf8.h"
-#include "utf8_internal.h"
 #include "pc98.h"
 #include "kstring.h"
 #include "os32_kapi_shared.h"
@@ -209,16 +207,16 @@ void kcg_read_kanji(u16 jis_code, u8 *buf)
                           ANK_CACHE_SIZE + 256)
 
 /*
- * LZ4圧縮データの一時バッファとして、Unicode変換テーブル領域
- * (0x4A000) を流用する。0x4A000〜0x9FFFF = 344KB が利用可能。
+ * LZ4圧縮データの boot 専用 scratch。
+ * MEM_KCG_LZ4_TEMP_BASE〜END の 344KB が利用可能。
  * 圧縮フォントデータは ~180KB なので十分。
  *
- * boot 内部読込だけに限定し、閉鎖後は表・BB・mailbox を上書きしない。
+ * boot 内部読込だけに限定し、閉鎖後は BB・mailbox を上書きしない。
  * 上限は VRAM の直前 (MEM_CONV_END)。カーネルスタックを 0x1FC000 へ
  * 退避する前は 0x8F000 (スタックガード) で頭打ちだった。
  */
-#define LZ4_TEMP_BUF     ((u8 *)P2V_CONST(MEM_UNICODE_TABLE_BASE))
-#define LZ4_TEMP_MAX     (MEM_CONV_END - MEM_UNICODE_TABLE_BASE)  /* 344KB */
+#define LZ4_TEMP_BUF     ((u8 *)P2V_CONST(MEM_KCG_LZ4_TEMP_BASE))
+#define LZ4_TEMP_MAX     (MEM_KCG_LZ4_TEMP_END - MEM_KCG_LZ4_TEMP_BASE)  /* 344KB */
 
 /*
  * チャンク分割読み込みヘルパー。
@@ -248,7 +246,6 @@ void kcg_boot_phase_close(void)
 {
     if (!kcg_boot_phase_open) return;
     kcg_boot_phase_open = 0;  /* 先に scratch を失効、TRUSTED も NOSYS */
-    if (!utf8_validate_jis_table()) utf8_set_jis_table_ready(0);
     kmemset(P2V(MEM_GFX_BB_BASE), 0, MEM_GFX_BB_SIZE);
     kmemset(P2V(MEM_AUTOPLAY_MAILBOX_BASE), 0, MEM_AUTOPLAY_MAILBOX_SIZE);
 }
@@ -302,7 +299,7 @@ int kcg_load_font(const char *path)
         }
         kprintf(0x07, "[KCG] LZ4: %d bytes\n", compressed_size);
 
-        /* 圧縮データをチャンク分割でUnicode領域に読み込み */
+        /* 圧縮データをチャンク分割で boot scratch に読み込み */
         n = kcg_read_chunked(fd, LZ4_TEMP_BUF, compressed_size);
         vfs_close(fd);
 

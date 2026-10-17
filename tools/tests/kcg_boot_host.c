@@ -1,10 +1,9 @@
-/* T2e e8b: entire real kcg.c + utf8.c; VFS is a byte-stream stub.
+/* T2e e8b: entire real kcg.c; VFS is a byte-stream stub.
  * Physical RAM is redirected only in this fixture. No guest mailbox access.
  */
 #include "memmap.h"
 #include "kstring.h"
 #include "os32_kapi_shared.h"
-#include "utf8.h"
 static u8 ram[MEM_CONV_END];
 static u8 before[MEM_CONV_END];
 #undef P2V_CONST
@@ -15,9 +14,7 @@ static u8 before[MEM_CONV_END];
 static inline void outp(unsigned port, unsigned value) { (void)port; (void)value; }
 static inline unsigned inp(unsigned port) { (void)port; return 0; }
 static inline void io_wait(void) { }
-static int host_validate_jis_table(void);
 #include "kcg_source.inc"
-#include "utf8_source.inc"
 
 static unsigned checks;
 static void output(const char *s, unsigned n)
@@ -40,25 +37,19 @@ void *kmemset(void *dst, int value, u32 n)
 {
     if (watch) {
         if (dst == P2V(MEM_GFX_BB_BASE)) {
-            CHECK(stage == 1, "BB follows validation");
+            CHECK(!kcg_boot_phase_open, "scratch invalidated before BB");
+            CHECK(stage == 0, "BB before mailbox");
             CHECK(n == MEM_GFX_BB_SIZE && value == 0, "BB entire range");
-            stage = 2;
+            stage = 1;
         } else if (dst == P2V(MEM_AUTOPLAY_MAILBOX_BASE)) {
-            CHECK(stage == 2, "mailbox follows BB");
+            CHECK(stage == 1, "mailbox follows BB");
             CHECK(n == MEM_AUTOPLAY_MAILBOX_SIZE && value == 0, "mailbox exact range");
-            stage = 3;
+            stage = 2;
         } else CHECK(0, "unexpected close write");
     }
     u8 *p = dst;
     while (n--) *p++ = (u8)value;
     return dst;
-}
-static int host_validate_jis_table(void)
-{
-    CHECK(!kcg_boot_phase_open, "scratch invalidated before validation");
-    CHECK(stage == 0, "validation before clearing");
-    stage = 1;
-    return utf8_validate_jis_table();
 }
 void kprintf(u8 attr, const char *fmt, ...)
 {
@@ -96,17 +87,6 @@ static void font_image(int compressed)
     for (unsigned i = 0; i < KCG_PAYLOAD_SIZE; ++i)
         image[image_size++] = (u8)(i * 37 + 11);
 }
-static const u32 cp[4] = {0x4E9C, 0x4E00, 0x5BFE, 0x9078};
-static const u16 jis[4] = {0x3021, 0x306C, 0x4250, 0x412A};
-static void table(void)
-{
-    kmemset(P2V(MEM_UNICODE_TABLE_BASE), 0, MEM_UNICODE_TABLE_SIZE);
-    for (int i = 0; i < 4; ++i) {
-        u8 *p = ram + MEM_UNICODE_TABLE_BASE + cp[i]*2;
-        p[0] = (u8)jis[i]; p[1] = jis[i] >> 8;
-    }
-    utf8_set_jis_table_ready(1);
-}
 static void snapshot(void)
 {
     for (unsigned i = 0; i < sizeof(ram); ++i) before[i] = ram[i];
@@ -132,16 +112,15 @@ static void tests(void)
             CHECK(kanji_cache[i] == (u8)(i*37+11), "boot cache payload");
     }
     CHECK(opens == 2 && closes == 2 && reads > 2 && sizes == 1, "boot VFS exercised");
-    table(); snapshot(); stage = 0; watch = 1;
+    snapshot(); stage = 0; watch = 1;
     kcg_boot_phase_close();
     watch = 0;
-    CHECK(stage == 3, "close completes order");
+    CHECK(stage == 2, "close completes order");
     for (unsigned i = 0; i < sizeof(ram); ++i) {
         int cleared = (i >= MEM_GFX_BB_BASE && i < MEM_GFX_BB_BASE+MEM_GFX_BB_SIZE) ||
                       (i >= MEM_AUTOPLAY_MAILBOX_BASE && i < MEM_AUTOPLAY_MAILBOX_BASE+MEM_AUTOPLAY_MAILBOX_SIZE);
         CHECK(ram[i] == (cleared ? 0 : before[i]), "close exact memory ranges");
     }
-    CHECK(unicode_to_jis(cp[0]) == jis[0], "valid table ready");
     closed_call("font"); closed_call((const char *)0);
     /* A repeated close must not clear live BB/mailbox. init cannot reopen it. */
     ram[MEM_GFX_BB_BASE] = 0x7a; ram[MEM_AUTOPLAY_MAILBOX_BASE] = 0x7b;
@@ -154,23 +133,20 @@ static void tests(void)
     for (unsigned i=0; i<sizeof(ram); ++i)
         CHECK(ram[i] == before[i], "closed init preserves font");
     closed_call("font");
-    /* Private state reset is fixture-only: four independent boot failures. */
-    for (int bad=0; bad<4; ++bad) {
-        table(); ram[MEM_UNICODE_TABLE_BASE + cp[bad]*2] ^= 1;
-        kcg_boot_phase_open = 1; stage = 0; watch = 1;
-        kcg_boot_phase_close(); watch = 0;
-        CHECK(stage == 3, "failed probe still initializes");
-        CHECK(unicode_to_jis(cp[(bad+1)%4]) == 0, "invalid table ready zero");
-    }
-    /* A complete-looking table cannot revive a failed/short boot read. */
-    table(); utf8_set_jis_table_ready(0);
-    kcg_boot_phase_open = 1; stage = 0; watch = 1;
-    kcg_boot_phase_close(); watch = 0;
-    CHECK(unicode_to_jis(cp[0]) == 0, "failed read remains not ready");
+    /* The next text draw still obtains the glyphs loaded before scratch closed. */
+    u8 glyph[32];
+    unsigned kanji_offset = ((0x30 - 0x21) * 94) * 32;
+    unsigned ank_offset = KANJI_CACHE_SIZE + KANJI_FETCHED_SIZE + 'A' * 16;
+    kcg_read_kanji(0x3021, glyph);
+    for (unsigned i = 0; i < 32; ++i)
+        CHECK(glyph[i] == (u8)((kanji_offset + i) * 37 + 11), "closed next kanji glyph");
+    kcg_read_ank('A', glyph);
+    for (unsigned i = 0; i < 16; ++i)
+        CHECK(glyph[i] == (u8)((ank_offset + i) * 37 + 11), "closed next ANK glyph");
 }
 void _start(void)
 {
     tests();
-    output("PASS kcg boot (12 scenarios)\n", sizeof("PASS kcg boot (12 scenarios)\n")-1);
+    output("PASS kcg boot (boot raw/LZ4, close, repeat, NOSYS)\n", sizeof("PASS kcg boot (boot raw/LZ4, close, repeat, NOSYS)\n")-1);
     stop(0);
 }

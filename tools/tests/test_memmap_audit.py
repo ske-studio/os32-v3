@@ -36,8 +36,8 @@ MUTANTS = [
     '            if (!(want & PTE_PRESENT)) { if (e & PTE_PRESENT) bad++; continue; }',
     'FAIL paging_master_audit(exec_tramp_page_addr()) > 0')
    for name, condition in (
-       ('font', 'a >= MEM_FONT_CACHE_BASE && a < MEM_UNICODE_TABLE_BASE'),
-       ('unicode', 'a >= MEM_UNICODE_TABLE_BASE && a < MEM_GFX_BB_BASE'),
+       ('font', 'a >= MEM_FONT_CACHE_BASE && a < MEM_KCG_LZ4_TEMP_BASE'),
+       ('scratch', 'a >= MEM_KCG_LZ4_TEMP_BASE && a < MEM_GFX_BB_BASE'),
        ('bb', 'a >= MEM_GFX_BB_BASE && a < MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE'),
        ('tvram', 'a >= TVRAM_CHAR_BASE && a < GVRAM_BRG_END'))],
 

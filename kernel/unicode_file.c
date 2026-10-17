@@ -80,3 +80,9 @@ u16 unicode_file_lookup(u32 cp)
     }
     return 0;
 }
+
+/* Private kdebug import: inspect ownership without publishing a user view. */
+u32 unicode_file_debug_phys(void)
+{
+    return unicode_pairs ? V2P(unicode_pairs) : 0;
+}

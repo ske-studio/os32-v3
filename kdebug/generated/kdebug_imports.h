@@ -39,6 +39,7 @@
 #include "kernel/pgalloc.h"
 #include "kernel/sysclk.h"
 #include "kernel/time_math.h"
+#include "kernel/unicode_file.h"
 #include "kernel/v86.h"
 #include "kernel/v86_gcap.h"
 #include "kernel/v86_io.h"
@@ -115,8 +116,8 @@ struct v86_session_state *kdi_ptr_v86_session(void);
 u32 *kdi_ptr_v86_gcap_phase(void);
 u32 *kdi_ptr_v86_gcap_alloc_count(void);
 u32 *kdi_ptr_v86_gcap_free_count(void);
-#define KDEBUG_IMPORT_COUNT 223
-#define KDEBUG_ABI_GEN 0x6c0252f0u
+#define KDEBUG_IMPORT_COUNT 225
+#define KDEBUG_ABI_GEN 0x4709b14du
 #include "kernel/module_image.h"
 extern void (*const kdebug_kexports[])(void);
 extern const struct module_symbol_contract kdebug_import_contracts[];

@@ -74,7 +74,7 @@ MUTATIONS = (
      '        paging_addrspace_map_user_range(ctx->as, TVRAM_CHAR_BASE, GVRAM_BRG_END, PAGE_RW | PTE_USER);\n        /* --- K3:',
      'FAIL launch TVRAM removed'),
     ('launch-font', 'exec/exec.c', '        /* --- K3:',
-     '        paging_addrspace_map_user_range(ctx->as, MEM_FONT_CACHE_BASE, MEM_UNICODE_TABLE_BASE, PAGE_RW | PTE_USER);\n        /* --- K3:',
+     '        paging_addrspace_map_user_range(ctx->as, MEM_FONT_CACHE_BASE, MEM_KCG_LZ4_TEMP_BASE, PAGE_RW | PTE_USER);\n        /* --- K3:',
      'FAIL launch font removed'),
     ('launch-shm', 'exec/exec.c', '        /* --- K3:',
      '        paging_addrspace_map_user_range(ctx->as, MEM_SHM_BASE, MEM_SHM_BASE + MEM_SHM_SIZE, PAGE_RW | PTE_USER);\n        /* --- K3:',

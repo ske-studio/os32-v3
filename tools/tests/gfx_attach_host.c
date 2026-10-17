@@ -46,12 +46,11 @@ static int port_lease(const struct gfx_attach_ref *ref, struct gfx_attach_view *
 static int port_unlease(u32 token) { releases++;return lease_release(&space,token); }
 static const struct gfx_attach_port port={port_query,port_lease,port_unlease};
 /* Generated-slot-shaped host boundary: private port performs real B1 calls. */
-static const struct gfx_attach_port *public_unicode;
 static u32 public_queries, public_leases, public_count=1;
 static int __cdecl public_query(u32 role, OS32_SurfaceQueryResult *out)
 {
     struct gfx_attach_desc d;
-    const struct gfx_attach_port *p=role==OS32_SURFACE_CLIENT ? &port : public_unicode;
+    const struct gfx_attach_port *p=role==OS32_SURFACE_CLIENT ? &port : 0;
     public_queries++;
     if (!p) return OS32_ERR_INVAL;
     int rc=p->query(&d);
@@ -68,7 +67,7 @@ static int __cdecl public_lease(u32 role, const OS32_SurfaceRef *ref, u32 access
 {
     struct gfx_attach_ref r={ref->sid,ref->generation};
     struct gfx_attach_view v;
-    const struct gfx_attach_port *p=role==OS32_SURFACE_CLIENT ? &port : public_unicode;
+    const struct gfx_attach_port *p=role==OS32_SURFACE_CLIENT ? &port : 0;
     CHECK(access==(role==OS32_SURFACE_CLIENT ? OS32_SURFACE_RW : OS32_SURFACE_RO));
     if(!p) return OS32_ERR_INVAL;
     int rc=p->lease(&r,&v);
@@ -262,15 +261,15 @@ static void run(void)
     caller_access_leave(&prev);
     /* v69 never reads appended slots; v70 binds without host port injection. */
     CHECK(caller_access_enter(&prev,CALLER_USER));
-    gfx_attach_port=0;gfx_unicode_port=0;api.version=69;
+    gfx_attach_port=0;api.version=69;
     libos32gfx_attach(&api);
-    CHECK(!gfx_attach_port && !gfx_unicode_port && public_queries==0);
+    CHECK(!gfx_attach_port && public_queries==0);
     CHECK(!lease_revoke_all(&space));libos32gfx_detach();
     api.version=70;api.surface_query=public_query;api.surface_lease=public_lease;
     api.surface_unlease=public_unlease;api.kbd_getchar=waited_key;
     api.kbd_trygetchar=waited_key;api.sys_yield=waited_yield;api.sys_halt=waited_halt;
     libos32gfx_attach(&api);
-    CHECK(gfx_attach_port && gfx_unicode_port && public_queries==2 && public_leases==1);
+    CHECK(gfx_attach_port && public_queries==1 && public_leases==1);
     CHECK(gfx_ready && live()==1);
     u32 fresh=space.leases[0].token;
     gfx_init_200();sdk_gfx_present();

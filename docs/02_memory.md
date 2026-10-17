@@ -60,7 +60,7 @@ DMA の恒久予約もここで止めるため、BB がさらに上に置かれ�
 起動時は kdebug 読込と BB 予約の後に `[mem] pages ...` を1行出す (T3b1)。
 `fixed` は固定占有、`slack` / `pool` は通常の使用中ページも含む供給量から
 BB と kdebug を除いたもの、`meta` は metadata と workspace (ARENA_TOP 時も残す固定2頁を含む)、
-`bb` は固定/RAM の BB、`kdebug` は採用した部品の本体、`other` は Unicode backing・DMA 等。
+`bb` は固定/RAM の BB、`kdebug` は採用した部品の本体、`other` は DMA 等。
 VRAM/MMIO の表示面は BB に加えない。領域台帳と allocator の供給量から求めた総和を
 `memory_boot_ram_kb()` のページ数と照合する。後者は従来どおり低位640KiB〜1MiBを含み、
 15〜16MiBを除く。実行回数と不一致の回数は専用の `boot_pages_audit_runs` /
@@ -69,6 +69,20 @@ VRAM/MMIO の表示面は BB に加えない。領域台帳と allocator の供�
 KDEBUG=1 の自己試験は部品が RUNNING の場合だけ呼び、post_exec の `slack_cycle` は
 空き頁を1頁ずつ確保して再割当拒否・使用中 owner の保持・返却後の空き頁数を確かめる。
 ゲストでの T3b1 受入は [T3配置票](tasks/v3/TASK_T3_LAYOUT.md) §4 に従う。
+
+
+Unicode-JIS は `/sys/unicode.bin` の昇順 7,063 組 (28,252 B) を起動時に一度読み、
+検証成功時だけ kernel owner の連続7頁 (28,672 B) に保持する。一般割当域の
+SLACK または pool の内数で、表ありは owner 使用頁 +7・空き頁 −7、KHEAP 常駐消費0。
+頁末の420 Bは探索しない。失敗時は確保頁を返し、かな算術だけで起動を続ける。
+表・表ポインタはユーザーへ公開せず、変換は KAPI `unicode_to_jis` を呼ぶ。
+
+旧低位128KiB (0x4A000〜0x69FFF) は T7a まで kernel FIXED として保持し、
+会計は `other` −32頁、`fixed` +32頁、総数不変。boot の KCG LZ4 scratch は
+`MEM_KCG_LZ4_TEMP_BASE`〜`MEM_KCG_LZ4_TEMP_END` (0x4A000〜0xA0000、終端を含まない)
+の344KiBで、BB・mailbox と共用する。close は scratch 失効後に BB・mailbox を初期化し、
+その後のフォント読込は NOSYS。Unicode の7頁はこの低位 scratch から独立し、
+旧低位予約を一般池へ返すまでは RAM 消費が28KiB増える。
 
 #### 動的レイアウト (番地が実行時に決まるので生成できない部分)
 
@@ -134,8 +148,8 @@ PEGC 候補は F00000h と FFF00000h の両窓 (各512KB) を supervisor + PCD �
 > (実機 Ra266 のアクセラレータは PCI の Trident)。経緯は `docs/POLICY_DEBUG.md` §4-34。
 
 > **デバイス窓の貸し出し規則 (e11b2)**
-> master のデバイス窓は **supervisor + PCD**、Unicode/主記憶 BB は supervisor + WB を維持する。
-> CPL=3 の描画は CLIENT lease の私有 VA、Unicode は RO lease だけを使う。
+> master のデバイス窓は **supervisor + PCD**、主記憶 BB は supervisor + WB を維持する。
+> CPL=3 の描画は CLIENT lease の私有 VA を使い、Unicode 変換は KAPI を呼ぶ。
 > Cirrus DISPLAY の RW は授権された lease に限定し、旧 alias の PTE/PDE に USER を立てない。
 > 通常の AS map/unmap は共有 PT に掛かる要求を全範囲無変更で拒否する。
 > kselftest (`paging_map_user_keep_selftest`) は拒否と PFN/属性/PDE の不変を検査する。

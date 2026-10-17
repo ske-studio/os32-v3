@@ -136,8 +136,7 @@ static void check_page_accounting(void)
     CHECK(before.slack == end - first && !before.kdebug);
     CHECK(before.meta == MEM_LEDGER_META_SIZE / PAGE_SIZE + boot_meta_end - boot_meta_first);
     CHECK(before.bb == MEM_GFX_BB_SIZE / PAGE_SIZE);
-    CHECK(before.other == MEM_UNICODE_TABLE_SIZE / PAGE_SIZE +
-          (memory_boot_dma_available() ? MEM_DMA_POOL_SIZE / PAGE_SIZE : 0));
+    CHECK(before.other == (memory_boot_dma_available() ? MEM_DMA_POOL_SIZE / PAGE_SIZE : 0));
     kaudit_boot_pages();
     CHECK(audit_runs == 1 && !audit_fail && page_logs == 1);
     CHECK(boot_pages_audit_runs == 1 && !boot_pages_audit_fail);
@@ -531,12 +530,8 @@ die(0);
             }
             if (r->type == LEDGER_R_SURFACE_BACKING) {
                 backing++;
-                CHECK((r->owner == LEDGER_OWNER_BOOT &&
-                       r->first == MEM_GFX_BB_BASE / PAGE_SIZE) ||
-                      (r->owner == LEDGER_OWNER_KERNEL &&
-                       r->first == MEM_UNICODE_TABLE_BASE / PAGE_SIZE &&
-                       r->end == (MEM_UNICODE_TABLE_BASE + MEM_UNICODE_TABLE_SIZE) / PAGE_SIZE &&
-                       r->cache == LEDGER_CACHE_WB));
+                CHECK(r->owner == LEDGER_OWNER_BOOT &&
+                      r->first == MEM_GFX_BB_BASE / PAGE_SIZE);
             }
             if (r->type == LEDGER_R_FIXED) fixed++;
             if (r->type == LEDGER_R_DMA)
@@ -547,7 +542,7 @@ die(0);
                 CHECK(!ledger_backing_mapped && r->first == workspace_first);
         }
         CHECK(bg == 2);
-        CHECK(backing == 2 && fixed == 11U + (ledger_backing_mapped ? 0U : 1U));
+        CHECK(backing == 1 && fixed == 12U + (ledger_backing_mapped ? 0U : 1U));
         /* 同梱の申告は無い (bootinfo に欄が無い): 同梱域も集積域も池のまま */
         CHECK(!ledger_owner_pages(LEDGER_OWNER_BUNDLE));
     }

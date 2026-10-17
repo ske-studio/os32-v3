@@ -1476,7 +1476,7 @@ static void sis_edge_limit(void)
 /*  作って FDC_TRACK_IMAGE で渡す)。期待する中身は Python が FAT をたどって  */
 /*  取り出したファイル (FDC_TRACK_FONT)、その FatFs のパスは FDC_TRACK_PATH。*/
 /*  2026-09-25 に既定フォントが MINIMAL から外れて FD に載らなくなったので、*/
-/*  同じ読み方を FD に残る大きいファイル (/sys/unicode.bin) で回す。         */
+/*  同じ読み方を FD に残る大きいファイル (/vmkrnl.lz4) で回す。         */
 /*  読み方: kernel/boot_font.c → drivers/kcg.c の kcg_load_font と           */
 /*  fs/vfs_fd.c / fs/fatfs_vfs.c のとおり:                                  */
 /*    vfs_open        = stat + get_file_size (どちらも f_stat)               */

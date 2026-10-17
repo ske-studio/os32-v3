@@ -40,13 +40,10 @@ CASES = ["split_2hd", "split_144", "readahead_count1", "cross_boundary",
          "sis_edge_limit", "write_nr_no_recover", "write_protection"]
 
 # font_replay の材料 (実物の FD イメージ)。make all が作る。
-# 読むファイル: もとは既定フォント /sys/font/default.kcg (188KB) だったが、
-# 2026-09-25 にフォントを MINIMAL から NORMAL へ移して FD に載らなくなった
-# (build/packages.yaml)。読み方 (kcg_load_font と同じ 16B → 1KB ずつ) はそのまま、
-# FD に残る大きいファイルで起動時にカーネルが FatFs で読む /sys/unicode.bin
-# (128KB、トラック 16 本分) に替えた。
+# MINIMAL のカーネル像を使う。28,252 B の Unicode 組表では多トラック試験が
+# 弱くなるため、64 KiB 以上を必須にし、従来の 16 B → 1 KiB 読込を保つ。
 D88 = ROOT / "images/os32_boot.d88"
-FONT_GUEST = ("SYS", "UNICODE.BIN")
+FONT_GUEST = ("VMKRNL.LZ4",)
 _ENV = {}
 
 
@@ -215,6 +212,7 @@ def prepare_font(tmp):
         return None
     raw = d88_to_raw(D88.read_bytes())
     font = fat12_extract(raw, FONT_GUEST)
+    assert len(font) >= 65536, "font_replay requires a MINIMAL file >=64 KiB"
     img = pathlib.Path(tmp) / "fd.raw"
     fnt = pathlib.Path(tmp) / "font.kcg"
     img.write_bytes(raw)

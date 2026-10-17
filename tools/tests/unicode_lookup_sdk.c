@@ -1,6 +1,3 @@
-/* Separate SDK translation unit: its only external reference is the API. */
-#include "unicode_lookup_mock.h"
-u16 sdk_unicode_to_jis(u32 cp)
-{
-    return unicode_mock_api->unicode_to_jis(cp);
-}
+/* Compile the actual SDK UTF-8 implementation against the generated KAPI. */
+#define unicode_to_jis sdk_unicode_to_jis
+#include "utf8_source.inc"

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""T2e e8b real kcg/utf8 + C LZ4, VFS stub. --mutate uses copies only.
+"""T2e e8b real kcg + C LZ4, VFS stub. --mutate uses copies only.
 Record: tools/tests/kcg_boot_tdd.md. Kernel uses Rust LZ4; decoder parity is
 covered elsewhere. This suite verifies font loader boundaries and closure.
 """
@@ -30,14 +30,12 @@ MUTATIONS = (
     ('mailbox-clear', 'drivers/kcg.c',
      'kmemset(P2V(MEM_AUTOPLAY_MAILBOX_BASE), 0, MEM_AUTOPLAY_MAILBOX_SIZE);', '',
      'FAIL close completes order'),
-    ('four-point', 'lib/utf8.c',
-     'return jis_table_probe();', 'return 1;',
-     'FAIL invalid table ready zero'),
+
 )
 
 
 def run(runner, mutation=None):
-    sources = {p: (ROOT / p).read_text() for p in ('drivers/kcg.c', 'lib/utf8.c')}
+    sources = {p: (ROOT / p).read_text() for p in ('drivers/kcg.c',)}
     if mutation:
         name, path, old, new, expected = mutation
         assert sources[path].count(old) == 1, name + ': mutation target'
@@ -45,10 +43,8 @@ def run(runner, mutation=None):
     with tempfile.TemporaryDirectory(prefix='e8b-kcg-') as directory:
         work = Path(directory)
         source = sources['drivers/kcg.c'].replace('"../fs/vfs.h"', '"vfs.h"').replace(
-            '"../lib/lz4.h"', '"lz4.h"').replace(
-            'if (!utf8_validate_jis_table())', 'if (!host_validate_jis_table())')
+            '"../lib/lz4.h"', '"lz4.h"')
         (work / 'kcg_source.inc').write_text(source)
-        (work / 'utf8_source.inc').write_text(sources['lib/utf8.c'])
         cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O0', '-Wall', '-Wextra',
                '-Werror', '-Wno-unused-variable', '-Werror=vla', '-ffreestanding', '-fno-builtin', '-fno-pie',
                '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
@@ -75,13 +71,13 @@ def run(runner, mutation=None):
 
 def boot_order():
     source = (ROOT/'kernel/kernel.c').read_text()
-    ordered = ['boot_font_load();', 'utf8_validate_jis_table()', 'shlib_init();',
+    ordered = ['boot_font_load();', 'unicode_file_load();', 'shlib_init();',
                'bootlog_save();', 'kcg_boot_phase_close();', 'exec_run(cur_shell']
     positions = [source.index(s) for s in ordered]
     assert positions == sorted(positions), 'boot closure before normal AS'
     assert source.count('kcg_boot_phase_close();') == 1, 'one closure'
-    assert 'bytes == (int)MEM_UNICODE_TABLE_SIZE &&\n            utf8_validate_jis_table()' in source
-    print('PASS boot order and complete Unicode read gate')
+    assert source.count('unicode_file_load();') == 1, 'one Unicode load'
+    print('PASS boot order and single private Unicode load')
 
 
 @host32.control_session

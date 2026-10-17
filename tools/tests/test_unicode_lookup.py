@@ -1,4 +1,4 @@
-"""T3d1a: generated pair file + product loader/lookup against current utf8.c.
+"""T3d1b: generated pair file + product loader/lookup through actual SDK/KAPI.
 
 The generator's --pairs output is read into the fake VFS input. The independent
 flat oracle still comes from the original header. Product sources contain no
@@ -51,7 +51,7 @@ MUTANTS = [
      'if (cp > 0xFFFF) return 0x2121;', 'FAIL fallback-absent'),
     ('kana-arithmetic', PRODUCT, '0x2421 + (cp - 0x3041)',
      '0x2422 + (cp - 0x3041)', 'FAIL fallback-kana'),
-    ('sdk-bypass', SDK, 'return unicode_mock_api->unicode_to_jis(cp);',
+    ('sdk-bypass', 'lib/utf8.c', 'return kapi->unicode_to_jis(cp);',
      'extern u16 unicode_file_lookup(u32); return unicode_file_lookup(cp);',
      'FAIL sdk-kapi'),
 ]
@@ -66,9 +66,43 @@ def byte_array(name, data):
     return 'static const u8 ' + name + '[] = {' + ','.join(map(str, data)) + '};\n'
 
 
+def product_build_rules():
+    """Execute the product rules with an existing old artifact and newer inputs."""
+    text = (ROOT / 'build/programs.mk').read_text()
+    rules = text[text.index('unicode_bin:'):text.index('\nfep_dic:')]
+    dependencies = re.search(r'^tools/gen_unicode: (.+)$', rules, re.M).group(1).split()
+    with tempfile.TemporaryDirectory(prefix='os32-unicode-build-') as folder:
+        work = pathlib.Path(folder)
+        for path in dependencies:
+            dest = work / path
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes((ROOT / path).read_bytes())
+        out = work / 'out/unicode.bin'
+        out.parent.mkdir()
+        out.write_bytes(bytes(131072))
+        (work / 'Makefile').write_text('BUILD_OUT := out\n' + rules)
+        def make(*args):
+            return subprocess.run(['make', *args, 'unicode_bin'], cwd=work,
+                                  capture_output=True, text=True, check=True)
+        make()
+        expected = out.read_bytes()
+        assert len(expected) == 28252, 'existing old product artifact must regenerate'
+        make('-q')  # Up to date: do not recreate it on every build.
+        for dependency in ('tools/gen_unicode.c', 'lib/unicode_jis_table.h',
+                           'kernel/unicode_file.h'):
+            out.write_bytes(bytes(131072))
+            result = make('-W', dependency)
+            assert './tools/gen_unicode --pairs out/unicode.bin' in result.stdout
+            assert out.read_bytes() == expected, dependency + ' did not regenerate'
+    deploy = (ROOT / 'build/deploy.mk').read_text()
+    prereqs = re.search(r'^deploy-kernel: (.+)$', deploy, re.M).group(1).split()
+    assert 'unicode_bin' in prereqs, 'kernel deployment must build the pair file'
+    print('PASS product regeneration (existing/source/table/format) and deploy dependency')
+
+
 def run_case(runner, mutation=None):
     paths = [PRODUCT, 'kernel/unicode_file.h', SDK,
-             'tools/tests/unicode_lookup_mock.h', 'tools/tests/unicode_lookup_host.c']
+             'lib/utf8.c', 'lib/utf8.h', 'tools/tests/unicode_lookup_host.c']
     texts = {p: (ROOT / p).read_text() for p in paths}
     pairs = entries((ROOT / TABLE).read_text())
     assert len(pairs) == 7063
@@ -96,18 +130,34 @@ def run_case(runner, mutation=None):
         expected = b''.join(cp.to_bytes(2, 'little') + jis.to_bytes(2, 'little')
                             for cp, jis in pairs)
         assert data == expected, 'generator LE pair format'
-        # d1a must preserve the no-argument product generation format.
+        # The no-argument product generator uses the same pair format.
         subprocess.run([str(generator)], cwd=tmp, check=True, capture_output=True)
-        assert (tmp / 'unicode.bin').read_bytes() == flat, 'legacy product format'
+        assert (tmp / 'unicode.bin').read_bytes() == data, 'product pair format'
         (tmp / 'unicode_lookup_oracle.h').write_text(
             byte_array('oracle_flat', flat) + byte_array('generated_pairs', data) +
             'static const u16 oracle_cp[] = {' + ','.join(str(cp) for cp, _ in pairs) + '};\n')
         includes = ['-I' + str(p) for p in
                     (tmp, ROOT / 'include', ROOT / 'lib', ROOT / 'kernel',
                      ROOT / 'fs', ROOT / 'sdk/include/os32')]
+        (tmp / 'utf8_source.inc').write_text(texts['lib/utf8.c'])
+        kernel_utf8 = re.sub(r'\b(utf8_\w+|unicode_to_\w+)(?=\s*\()',
+                             lambda match: 'kernel_' + match[0], texts['lib/utf8.c'])
+        (tmp / 'kernel_utf8.h').write_text(re.sub(
+            r'\b(utf8_\w+|unicode_to_\w+)(?=\s*\()',
+            lambda match: 'kernel_' + match[0], texts['lib/utf8.h']))
+        kernel_utf8 = kernel_utf8.replace('#include "utf8.h"', '#include "kernel_utf8.h"')
+        kernel_utf8 = kernel_utf8.replace('#include "../kernel/unicode_file.h"',
+                                          '#include "unicode_file.h"')
+        (tmp / 'unicode_kernel.c').write_text('#define __KERNEL_BUILD__ 1\n' + kernel_utf8)
+        generated = (ROOT / 'kapi/kapi_generated.c').read_text()
+        wrapper = re.search(r'u16 __cdecl wrap_unicode_to_jis\(u32 cp\)\n\{.*?\n\}',
+                            generated, re.S).group(0)
+        (tmp / 'unicode_kapi.c').write_text(
+            '#include "unicode_file.h"\nextern u32 kapi_calls;\n'
+            '#define KAPI_HIT(slot) (++kapi_calls)\n' + wrapper)
         objects = []
-        for name in ('unicode_file', 'unicode_lookup_sdk', 'unicode_lookup_host', 'utf8'):
-            source = ROOT / 'lib/utf8.c' if name == 'utf8' else tmp / (name + '.c')
+        for name in ('unicode_file', 'unicode_lookup_sdk', 'unicode_lookup_host', 'unicode_kapi', 'unicode_kernel'):
+            source = tmp / (name + '.c')
             obj = tmp / (name + '.o')
             subprocess.run(['gcc', *FLAGS, *includes, '-c', str(source), '-o', str(obj)], check=True)
             objects.append(str(obj))
@@ -118,7 +168,7 @@ def run_case(runner, mutation=None):
         assert len(pointers) == 1 and pointers[0][2] == 'b' and int(pointers[0][1], 16) == 4, nm
         sdk_nm = subprocess.check_output(['nm', '-u', objects[1]], text=True)
         if not mutation or mutation[0] != 'sdk-bypass':
-            assert sdk_nm.split() == ['U', 'unicode_mock_api'], sdk_nm
+            assert sdk_nm.split() == ['U', 'os32_kapi_v63'], sdk_nm
         exe = tmp / 'fixture'
         subprocess.run(['gcc', '-m32', '-nostdlib', '-static', '-no-pie',
                         '-Wl,-z,noexecstack', *objects, '-o', str(exe)], check=True)
@@ -132,6 +182,7 @@ def main():
     p.add_argument('--mutate', action='store_true')
     a = p.parse_args()
     host32.begin_control(a.mutate, a.runner, ROOT)
+    product_build_rules()
     with host32.control(a.mutate, a.runner, ROOT):
         result = run_case(a.runner)
         print(result.stdout + result.stderr, end='')

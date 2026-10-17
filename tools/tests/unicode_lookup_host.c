@@ -1,4 +1,4 @@
-/* ILP32 fixture: current utf8.c oracle + product file loader + mock SDK.
+/* ILP32 fixture: legacy flat oracle + product file loader + real SDK/KAPI.
  * VFS input bytes are read from the generated file by the Python driver. */
 #include <stdarg.h>
 #include "unicode_file.h"
@@ -8,20 +8,23 @@
 #include "pgalloc.h"
 #include "vfs.h"
 #include "kprintf.h"
-#include "unicode_lookup_mock.h"
+#include "os32_kapi_shared.h"
 #include "unicode_lookup_oracle.h"
 
-u16 unicode_to_jis(u32 cp);
-void utf8_set_jis_table(const u8 *table);
+u16 sdk_unicode_to_jis(u32 cp);
+u16 kernel_unicode_to_jis(u32 cp);
+u16 __cdecl wrap_unicode_to_jis(u32 cp);
+u32 kapi_calls;
+static KernelAPI api = {.version = KAPI_VERSION, .unicode_to_jis = wrap_unicode_to_jis};
+KernelAPI *kapi = &api;
 
-static u32 kapi_calls;
-static u16 __attribute__((cdecl)) wrap_unicode_to_jis(u32 cp)
+/* Independent legacy arithmetic/flat-index oracle, never linked into product. */
+static u16 oracle_lookup(u32 cp)
 {
-    kapi_calls++;
-    return unicode_file_lookup(cp);
+    if (cp >= 0x3041 && cp <= 0x3093) return (u16)(0x2421 + cp - 0x3041);
+    if (cp >= 0x30A1 && cp <= 0x30F6) return (u16)(0x2521 + cp - 0x30A1);
+    return cp <= 0xffff ? le16_rd(oracle_flat + cp * 2) : 0;
 }
-static const struct unicode_mock_api api = { wrap_unicode_to_jis };
-const struct unicode_mock_api *unicode_mock_api = &api;
 
 static void say(const char *s)
 {
@@ -197,9 +200,9 @@ static void load_failures(void)
 
 static void compare(u32 cp, const char *label)
 {
-    u16 old = unicode_to_jis(cp);
+    u16 old = oracle_lookup(cp);
     u32 calls = kapi_calls;
-    if (unicode_file_lookup(cp) != old) {
+    if (kernel_unicode_to_jis(cp) != old) {
         say("FAIL "); say(label); say(" direct\n"); die(1);
     }
     CHECK(kapi_calls == calls, "kernel-direct");
@@ -221,8 +224,7 @@ void harness_main(void)
           read_calls == 1 && stat_calls == 1 && log_calls == 1, "success-calls");
     for (u32 i = 0; i < sizeof(generated_pairs); i++)
         CHECK(pages[i] == generated_pairs[i], "loaded-bytes");
-    utf8_set_jis_table(oracle_flat);
-    CHECK(unicode_to_jis(0x4E9C) == 0x3021, "oracle-ready");
+    CHECK(oracle_lookup(0x4E9C) == 0x3021, "oracle-ready");
     compare(0x00A7, "first");
     compare(0xFFE5, "last");
     compare(0, "missing");
@@ -234,8 +236,8 @@ void harness_main(void)
                         0x30A0, 0x30A1, 0x30F6, 0x30F7};
     for (u32 i = 0; i < sizeof(kana) / sizeof(kana[0]); i++)
         compare(kana[i], "kana");
-    CHECK(unicode_to_jis(0x3041) == 0x2421 && unicode_to_jis(0x3093) == 0x2473 &&
-          unicode_to_jis(0x30A1) == 0x2521 && unicode_to_jis(0x30F6) == 0x2576,
+    CHECK(oracle_lookup(0x3041) == 0x2421 && oracle_lookup(0x3093) == 0x2473 &&
+          oracle_lookup(0x30A1) == 0x2521 && oracle_lookup(0x30F6) == 0x2576,
           "kana-arithmetic");
     for (u32 i = 0; i < 7063; i++) compare(oracle_cp[i], "pair");
     for (u32 cp = 0; cp <= 0xFFFF; cp++) compare(cp, "bmp");

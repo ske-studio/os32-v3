@@ -2,7 +2,6 @@ check-unicode-lookup-host:
 - lib/unicode_jis_table.h
 - lib/utf8.c
 - lib/utf8.h
-- lib/utf8_internal.h
 - include/types.h
 - include/endian_le.h
 - tools/gen_unicode.c
@@ -17,8 +16,11 @@ check-unicode-lookup-host:
 - include/kprintf.h
 - sdk/include/os32/os32_kapi_shared.h
 - build/kernel.mk
-- tools/tests/unicode_lookup_mock.h
 - tools/tests/unicode_lookup_sdk.c
 - tools/tests/unicode_lookup_host.c
 - build/checks.d/check-unicode-lookup-host.mk
 - tools/check_map.d/check-unicode-lookup-host.yaml
+- kapi/kapi_generated.c
+- sdk/include/os32/os32_kapi_generated.h
+- build/programs.mk
+- build/deploy.mk

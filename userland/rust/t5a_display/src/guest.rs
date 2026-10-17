@@ -975,8 +975,8 @@ impl App for DisplayApp<'_> {
 
 extern "C" {
     // lib/utf8.h: u16 unicode_to_jis(u32 codepoint).
-    // The static gfx instance supplies its Unicode lease after the storage claim.
-    // The port validates four known entries; never mark an absent table ready.
+    // The SDK stub calls the kernel-owned Unicode lookup through KAPI.
+    // A missing root table retains kana arithmetic and returns zero for kanji.
     fn unicode_to_jis(codepoint: u32) -> u16;
 }
 struct GuestGlyphs;

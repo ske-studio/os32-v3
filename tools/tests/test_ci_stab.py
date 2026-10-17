@@ -113,6 +113,8 @@ CONTROL_SKIP_ALLOW = {
         'Checks fixture result; main runs run(args) before mutant runs.',
     ('tools/tests/' + 'test_kcallback.py', 'mutant is None', 1):
         'Reports guest fixture result; main runs run_guest_result(args) first.',
+    ('tools/tests/' + 'test_nano_adapter.py', 'mutant', 1):
+        'Checks one resident fixture result; main runs resident_heap(prefix, work) before all mutant runs.',
     ('tools/tests/' + 'test_sbrk_crt.py', 'mutant', 1):
         'Checks one fixture result; main runs USER and resident normal controls before all mutant runs.',
 

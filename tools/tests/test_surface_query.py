@@ -45,7 +45,6 @@ MUTANTS = [
     ('s->backend == LEDGER_SF_PC98 ? SURFACE_QUERY_MAX : 1', 's->backend != 0 ? SURFACE_QUERY_MAX : 1', 'PEGC DISPLAY count'),
     ('refs[i].generation != snap.desc[i].ref.generation', '0', 'old refs'),
     ('access == LEDGER_PERM_RW && snap.desc[i].access_max != LEDGER_PERM_RW', '0', 'RO escalation'),
-    ('s->role == LEDGER_ROLE_UNICODE && sf->perm_max != LEDGER_PERM_RO', '0', 'Unicode RO'),
     ('refs[i].generation != snap.desc[i].ref.generation', 'refs[0].generation != snap.desc[0].ref.generation', 'last ref generation'),
     ('d->plane_offset[j] = sf->plane_offset[j];', 'd->plane_offset[j] = 0;', 'geometry'),
     ('!copy_to_caller(&c, user_out, &snap, sizeof(snap))', '0', 'copyout'),

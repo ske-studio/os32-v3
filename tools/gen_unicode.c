@@ -1,13 +1,11 @@
 #include <stdio.h>
 #include "lib/unicode_jis_table.h"
 
-#include <stdlib.h>
 #include <string.h>
 #include "endian_le.h"
 #include "kernel/unicode_file.h"
 
-/* T3d1a opt-in output, kept separate from the deployed flat unicode.bin.
- * d1b will switch the product rule to this format. */
+/* Product file: headerless, strictly ordered LE pairs. */
 static int write_pairs(const char *path)
 {
     STATIC_ASSERT(UNICODE_JIS_TABLE_SIZE == UNICODE_FILE_PAIRS, unicode_pair_count);
@@ -32,19 +30,5 @@ int main(int argc, char **argv) {
         fprintf(stderr, "usage: %s [--pairs output]\n", argv[0]);
         return 1;
     }
-    FILE *f = fopen("unicode.bin", "wb");
-    if (!f) return 1;
-    
-    unsigned short *table = calloc(65536, sizeof(unsigned short));
-    int i;
-    for (i = 0; i < UNICODE_JIS_TABLE_SIZE; i++) {
-        table[unicode_jis_table[i].unicode] = unicode_jis_table[i].jis;
-    }
-    
-    size_t w = fwrite(table, sizeof(unsigned short), 65536, f);
-    fclose(f);
-    free(table);
-    
-    printf("Successfully wrote unicode.bin (%zu elements, %zu bytes)\n", w, w * sizeof(unsigned short));
-    return 0;
+    return write_pairs("unicode.bin");
 }

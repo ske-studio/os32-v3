@@ -15,7 +15,7 @@
 /*                                                                          */
 /*  [コンベンショナルメモリ]                                                */
 /*    0x00000 - 0x00FFF : NP   (NULLポインタ検出, paging_reclaim後)          */
-/*    0x01000 - 0x9FFFF : R/W  (フォント/Unicode/GFX, ブート後に再利用)      */
+/*    0x01000 - 0x9FFFF : R/W  (フォント/KCG scratch/GFX, ブート後に再利用)      */
 /*    0xA0000 - 0xEFFFF : R/W。TVRAM / B,R,G / E は PCD (UC)。             */
 /*    CG 窓と ROM は WB (PCD なし)。ROM の書込み保護は下記。                 */
 /*    0xF0000 - 0xFFFFF : R/O  (BIOS ROM)                                   */
@@ -407,7 +407,7 @@ void paging_reclaim_conventional(void)
      * 問題を調査中。元は paging_set_not_present(0x0, MEM_NULL_GUARD_END); */
     paging_set_readonly(0x0, MEM_NULL_GUARD_END);
 
-    /* 0x1000-0x9FFFF: R/W (フォント/Unicode/GFX用) */
+    /* 0x1000-0x9FFFF: R/W (フォント/KCG scratch/GFX用) */
     paging_map_range(MEM_CONV_RECLAIM_START, MEM_CONV_RECLAIM_END + 1,
                      MEM_CONV_RECLAIM_START, PAGE_RW);
 }
@@ -1256,8 +1256,8 @@ int paging_app_band_selftest(void)
 /*  期待値は全て memmap.h から引く ([C4])。番地は 1 つも直書きしない。        */
 /*                                                                          */
 /*  ブート直後 (kselftest_run_post_exec) に呼ぶ。旧 VRAM / フォント /        */
-/*  Unicode / GFX BB の恒等 alias は CPL=3 起動後も supervisor のまま。      */
-/*  CLIENT と Unicode は私有 lease VA に写し、共有 PT は昇格させない。      */
+/*  KCG scratch / GFX BB の恒等 alias は CPL=3 起動後も supervisor のまま。      */
+/*  CLIENT は私有 lease VA に写し、共有 PT は昇格させない。      */
 /* ======================================================================== */
 
 #define MM_NP   0   /* not-present */

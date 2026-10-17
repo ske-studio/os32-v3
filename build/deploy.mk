@@ -14,7 +14,7 @@ deploy deploy-u3: $(BUILD_OUT)/vmkernel.lz4 $(BUILD_OUT)/kdebug.bin programs uni
 #   (NP21/W再起動が必要)。HostDrv を先に同期するので、HostDrv 側が古いまま
 #   ext2 を上書きして中身を失う事故を防げる。
 #   ブートローダー自体を変更した場合は deploy-boot を別途実行すること。
-deploy-kernel: $(BUILD_OUT)/vmkernel.lz4 $(BUILD_OUT)/kdebug.bin
+deploy-kernel: $(BUILD_OUT)/vmkernel.lz4 $(BUILD_OUT)/kdebug.bin unicode_bin
 	python3 tools/gen_deploy_set.py
 	@echo "=== Sync to HostDrv before NHD deploy ==="
 	$(HOSTDRV_DEPLOY) sync

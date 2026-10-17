@@ -1035,7 +1035,7 @@ static int app_store(AppSlot *a, u32 va, const void *src, u32 len)
 /*  返すものが無い。共有帯 (SHM / トランポリン) に掛かる解放要求は          */
 /*  paging_addrspace_free_user_range が全範囲無変更で拒否する。              */
 /*  band_top は私有領域の上端 (ring3_band_set)。BB の旧恒等 alias は         */
-/*  supervisor のままで私有 PT に重ねない。CLIENT / Unicode の lease は     */
+/*  supervisor のままで私有 PT に重ねない。CLIENT の lease は     */
 /*  専用の解放口で回収し、ここで backing の物理ページを返さない (e11b2)。    */
 /* ======================================================================== */
 /* 取り残し (3 領域の外に張られたまま返らなかったページ) の累計。R5 (a) の

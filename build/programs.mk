@@ -185,7 +185,7 @@ clean-gshell:
 # そのオブジェクトを外部プログラムにリンクすると 1 つの .o が 2 つの
 # リンクドメインに跨ることになる。ユーザー空間用は _prog.o として
 # PROGRAM_FLAGS で別途ビルドする。
-lib/utf8_prog.o: lib/utf8.c lib/utf8.h lib/utf8_internal.h include/memmap.h include/endian_le.h
+lib/utf8_prog.o: lib/utf8.c lib/utf8.h $(SDK_KAPI_HDR)
 	$(CC) $(PROGRAM_FLAGS) -Ilib -c $< -o $@
 
 # === LZ4 Command ===
@@ -575,9 +575,14 @@ userland/%.bin: userland/%.raw userland/%.elf
 	python3 sdk/mkos32x.py $< $@ --elf userland/$*.elf --api $$_api $$_opts
 
 # === ヘルパーツール ===
-unicode_bin:
-	@if [ ! -f tools/gen_unicode ]; then gcc tools/gen_unicode.c -I. -Iinclude -O2 -o tools/gen_unicode; fi
-	@if [ ! -f $(BUILD_OUT)/unicode.bin ]; then ./tools/gen_unicode && mv unicode.bin $(BUILD_OUT)/unicode.bin; fi
+unicode_bin: $(BUILD_OUT)/unicode.bin
+
+tools/gen_unicode: tools/gen_unicode.c lib/unicode_jis_table.h kernel/unicode_file.h include/endian_le.h include/types.h
+	gcc -std=gnu11 -O2 -I. -Iinclude $< -o $@
+
+$(BUILD_OUT)/unicode.bin: tools/gen_unicode
+	@mkdir -p $(BUILD_OUT)
+	./tools/gen_unicode --pairs $@
 
 fep_dic:
 	@if [ ! -f assets/fep.db ]; then python3 tools/fep_to_sqlite.py; fi
@@ -629,7 +634,7 @@ $(eval $(call DEFINE_RUST_PROGRAM,font_test,userland/tests,$$(GFX_OBJ)))
 $(eval $(call DEFINE_RUST_PROGRAM,gui_demo,userland/tests,))
 # v1.2 の client API 試験 (C4): MessageBox/File/Input の modal_result、session_launch、icon16。stub のみ
 $(eval $(call DEFINE_RUST_PROGRAM,v12_api_test,userland/tests,))
-# T5a: 静的 Unicode consumer も gfx の v70 port から RO lease を初期化。
+# T5a: 静的 Unicode consumer も gfx の v76 KAPI stub を使う。
 $(eval $(call DEFINE_RUST_PROGRAM,t5a_display,userland/tests,$$(GFX_OBJ)))
 programs: t5a_display_rust
 # v1.2 File Manager (C5): Win3.1 風 2 ペイン、SESSION_REQUEST で起動依頼。stub のみ

@@ -14,7 +14,7 @@ T2h で確かめる。外部集合の移行・動作を PASS とした記録で�
 | # | caller の追随・再開条件 | 確かめる証拠 |
 |---|---|---|
 | 1 | 面は query / lease / bundle から取得する。旧 token の VA を保存して再利用しない。RO 面へ書かず、部分取得失敗では全返却する | caller の監査、取得失敗・古い token の拒否、終了後 lease / owner の回収 |
-| 2 | TVRAM / GVRAM / font / Unicode の低位直読を撤去する。描画・文字・フォントは授権された入口を使い、Unicode は CRT / shlib の RO lease 経由にする | 低位ポインタの検索・caller ごとの監査、日本語表示、未取得時の代替表示 |
+| 2 | TVRAM / GVRAM / font / Unicode の低位直読を撤去する。描画・文字・フォントは授権された入口を使い、Unicode は SDK / shlib の `unicode_to_jis` KAPI 経由にする | 低位ポインタの検索・caller ごとの監査、日本語表示、未取得時の代替表示 |
 | 3 | 高位アドレスを符号付き整数で比較・加算しない。範囲・overflow・整列を検査する | 高位ポインタの境界負例と caller 監査 |
 | 4 | OS32X ヘッダ v4 の 4 世代 (`os32x_format` / `kapi_abi` / `memory_layout` / `shlib_protocol`) を現行 SDK と一致させる。memory_layout 3 に追随する前の旧成果物は世代不一致で拒否される | 正典 `sdk/kapi.json` とヘッダ刻印、旧形式・世代不一致の入口前拒否 |
 | 5 | 私有 heap / map / unmap と C / Rust allocator、整列、可変 stack に追随する。SDK CRT の `libos32nano.a` は `-lc` より前にリンクする | 65535 / 65536 / 65537B と整列の対照、枯渇時失敗、解放後 owner 回収 |
@@ -28,6 +28,8 @@ L-h で **KAPI 74 / MemStat 200B** となる SDK で `make clean-external` →
 4 世代の正典・リンク規則は [KAPI_SPEC](../../KAPI_SPEC.md) §3-1 と
 [SDK README](../../../sdk/README.md)。現行で `make external` がリンク刻印未追随のため
 失敗すること、c2 より古い libos32gfx の caller が面変更に追随しないことは H-7 の既知事項。
+T3d1 の Unicode 切替に伴う `game/app/main.c:183-207` の旧 setter 撤去と
+KAPI 経由への移行も再開時に行う。現在の apps / game は変更・ビルドしない。
 
 ## T2h の配備集合と配備元の照合
 

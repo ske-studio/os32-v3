@@ -58,6 +58,7 @@
 #include "gui.h"          /* gui_ime_set_render (ime_set_render の門) */
 #include "memory_boot.h"
 #include "pgalloc.h"      /* pgalloc_model_state (T1a: legacy 経路の撤去) */
+#include "unicode_file.h" /* private boot-table diagnostics; never a KAPI */
 
 /* Data imports use accessors; include macros only after declarations. */
 extern volatile int ring3_in_syscall;
@@ -971,12 +972,24 @@ static void test_kapi_layout(void)
 int kselftest_run_post_unicode(void)
 {
     u32 before = ksel_fail;
-    const struct ledger_surface *sf = ledger_surface_find(0, LEDGER_ROLE_UNICODE);
-    check(sf && sf->owner == LEDGER_OWNER_KERNEL && !sf->backend &&
-          sf->perm_max == LEDGER_PERM_RO && sf->backing == LEDGER_SB_FIXED_RAM &&
-          sf->first == MEM_UNICODE_TABLE_BASE / PAGE_SIZE &&
-          sf->npages == MEM_UNICODE_TABLE_SIZE / PAGE_SIZE &&
-          ledger_surface_validate(sf), "unicode:registered RO backend0");
+    u32 phys = unicode_file_debug_phys();
+    int owned = (phys & (PAGE_SIZE - 1)) == 0;
+    /* Reserved role 4 must never expose the table, with or without the file. */
+    check(!ledger_surface_find(0, LEDGER_ROLE_UNICODE), "unicode:nonpublic");
+    if (phys) {
+        for (u32 i = 0; i < UNICODE_FILE_PAGES; i++)
+            if (!pgalloc_page_owned(phys / PAGE_SIZE + i, LEDGER_OWNER_KERNEL))
+                owned = 0;
+        check(owned, "unicode:kernel owns 7 pages");
+    }
+    check(unicode_file_lookup(0x3041) == 0x2421 &&
+          unicode_file_lookup(0x3093) == 0x2473 &&
+          unicode_file_lookup(0x30A1) == 0x2521 &&
+          unicode_file_lookup(0x30F6) == 0x2576, "unicode:kana endpoints");
+    check(unicode_file_lookup(0x4E00) == (phys ? 0x306C : 0),
+          "unicode:table or kana-only");
+    check(unicode_file_lookup(0xFFFF) == 0 &&
+          unicode_file_lookup(0x10000) == 0, "unicode:unmapped/BMP limit");
     return ksel_fail - before;
 }
 

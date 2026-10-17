@@ -30,4 +30,14 @@ check-unicode-surface-host:
 - tools/tests/unicode_surface_host.c
 - tools/check_map.d/check-unicode-surface-host.yaml
 - build/checks.d/check-unicode-surface-host.mk
+- kernel/unicode_file.c
+- kernel/unicode_file.h
+- tools/gen_unicode.c
+- lib/unicode_jis_table.h
+- tools/tests/test_unicode_lookup.py
+- build/programs.mk
+- build/deploy.mk
+- kapi/kapi_generated.c
+- tools/tests/unicode_lookup_host.c
+- tools/tests/unicode_lookup_sdk.c
 artifact_reader: true
