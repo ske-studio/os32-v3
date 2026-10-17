@@ -39,6 +39,9 @@ jobs:
       # fetch-depth 1 で足りる: カーネルに埋める commit id (tools/gen_build_id.py) は
       # `git rev-parse --short HEAD` だけで、履歴は要らない。
       - uses: actions/checkout@v4
+        with:
+          # test_h4_manifest の旧 hsync との互換の試験が `git show 0c71845:...` で旧版を取り出す (FDRECOV-1)。浅い clone では見つからない。
+          fetch-depth: 0
 
       # Ubuntu の apt 依存 (Makefile / tools を grep して列挙、2026-09-30):
       #   nasm (boot/、カーネルの .asm)、genisoimage (build/image.mk の ISO)、
