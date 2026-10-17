@@ -52,7 +52,7 @@ Guest (NP21/W): drive it through skill **`run-os32`** and `tools/np21w_mcp/`; st
 - **[C3]** Functions exposed to external programs need `__cdecl` wrappers in `kapi/`.
 - **[C4]** No hardcoded constants — follow the three-layer constant scheme.
 - **[C5]** Physical addresses become pointers through `P2V` / `P2V_IO` (`P2V_CONST` / `P2V_IO_CONST` only for constant initializers); pointers passed to device/PTE/CR3 use `V2P`. App/lease virtual addresses use AS/SURFACE translation. Exceptions are recorded in `tools/check_p2v_allow.txt`.
-- **[HW1]** Never use EGC / GRCG / GDC drawing commands. The CPU writes straight to VRAM at `0xA8000`.
+- **[HW1]** Never use EGC / GRCG / GDC drawing commands. Draw through the HAL (`gfx_present` path): the CPU writes VRAM directly on 98 planar (`0xA8000`) and PEGC; the Cirrus backend may use its own accelerator inside the HAL.
 - **[HW2]** DMA buffers must not straddle a 64KB boundary.
 - **[HW3]** New hardware drivers: before designing, consult the vendor manual **and** a license-compatible existing implementation (FreeBSD/NetBSD/OpenBSD or other BSD/MIT code) and cite it in the design ticket. Never copy code or structure from GPL implementations (e.g. Linux); use them only for behavior not found in BSD code or manuals, and say so.
 - **[ABI1]** `sdk/kapi.json` is the single source of truth. Never hand-edit the generated files.
