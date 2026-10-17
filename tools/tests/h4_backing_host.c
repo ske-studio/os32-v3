@@ -1,10 +1,15 @@
-/* T3b2: actual fixture + allocator + paging + USER walk. Only machine
- * boundaries and allocation/map failures are supplied by this harness. */
+/* T3b2/b3: actual fixture + allocator + paging + USER walk + DMA math.
+ * Machine boundaries and VFS are mocked; VFS asserts live physical pointers
+ * and supplies deterministic I/O failures, short counts and corruption. */
 #include <stdarg.h>
 #include "types.h"
 #include "paging.h"
 #include "pgalloc.h"
 #include "kprintf.h"
+#include "vfs.h"
+#include "kstring.h"
+#include "dma_pool.h"
+#include "fdc.h"
 static u32 host_cr3;
 static void die(int code)
 {
@@ -64,6 +69,101 @@ int shlib_read_page(u32 va, u32 pa) { (void)va; (void)pa; return 0; }
 u32 exec_tramp_page_addr(void) { return 0; }
 void exec_addrspace_abort(struct addrspace *as) { (void)as; CHECK(0); }
 static u32 ksel_fail, entries, skips, page_logs, cleanups, results, last_entered;
+static u32 io_operation, io_fail_at, io_logs, io_passes, io_removes;
+static u32 observed_pfns[3], io_corrupt;
+static u32 dma_logs, dma_passes, dma_skips, dma_fails;
+static int io_short, io_no_copy, io_wrong_mount, io_existing;
+static u8 file_data[PAGE_SIZE + 34];
+static u32 file_size, file_offset;
+static int files_present[2], file_backend, file_fd, file_mode;
+#define file_exists files_present[file_backend]
+static int io_fails(void) { return ++io_operation == io_fail_at; }
+static void io_pointer(const void *p, u32 n)
+{
+    u32 logical = PAGE_SIZE - 17 + file_offset;
+    CHECK(p == P2V(observed_pfns[logical / PAGE_SIZE] * PAGE_SIZE + logical % PAGE_SIZE));
+    CHECK(n == (file_offset == 17 ? PAGE_SIZE : 17));
+    int owned = 0;
+    for (u32 o = LEDGER_OWNER_FIXED_LAST + 1; o < LEDGER_MAX_OWNERS; o++)
+        owned |= pgalloc_page_owned(observed_pfns[logical / PAGE_SIZE], o);
+    CHECK(owned);
+}
+const char *vfs_fstype(const char *prefix)
+{
+    CHECK(same(prefix, "/") || same(prefix, "/host"));
+    return io_wrong_mount ? "fat" : same(prefix, "/") ? "ext2" : "hostdrv";
+}
+int vfs_stat(const char *path, OS32_Stat *st)
+{
+    file_backend = same(path, "/host/h4-io.tmp");
+    (void)st;
+    if (io_fails()) return VFS_ERR_IO;
+    return io_existing || file_exists ? VFS_OK : VFS_ERR_NOTFOUND;
+}
+int vfs_open(const char *path, int mode)
+{
+    CHECK(same(path, "/h4-io.tmp") || same(path, "/host/h4-io.tmp"));
+    CHECK(!file_fd);
+    if (io_fails()) return VFS_ERR_IO;
+    if (mode != O_RDONLY) {
+        CHECK(mode == (O_WRONLY | O_CREAT | O_TRUNC));
+        CHECK(!file_exists);
+        file_exists = 1;
+        file_size = 0;
+    } else CHECK(file_exists);
+    file_fd = 3;
+    file_mode = mode;
+    file_offset = 0;
+    return file_fd;
+}
+void vfs_close(int fd)
+{
+    CHECK(fd == 3 && file_fd == 3);
+    file_fd = 0;
+}
+int vfs_write_fd(int fd, const void *buf, u32 n)
+{
+    CHECK(fd == 3 && file_fd == 3 && file_mode != O_RDONLY);
+    io_pointer(buf, n);
+    if (io_fails()) return io_short ? (int)n - 1 : VFS_ERR_IO;
+    CHECK(file_offset + n <= sizeof(file_data));
+    for (u32 i = 0; i < n; i++) file_data[file_offset + i] = ((const u8 *)buf)[i];
+    file_size = file_offset += n;
+    return n;
+}
+int vfs_read_fd(int fd, void *buf, u32 n)
+{
+    CHECK(fd == 3 && file_fd == 3 && file_mode == O_RDONLY);
+    io_pointer(buf, n);
+    for (u32 i = 0; i < n; i++)
+        CHECK(((u8 *)buf)[i] == (u8)(file_data[file_offset + i] ^ 0xff));
+    if (io_fails()) return io_short ? (int)n - 1 : VFS_ERR_IO;
+    CHECK(file_offset + n <= file_size);
+    for (u32 i = 0; i < n; i++) {
+        if (!io_no_copy) ((u8 *)buf)[i] = file_data[file_offset + i];
+        if (io_corrupt == file_offset + i + 1) ((u8 *)buf)[i] ^= 1;
+    }
+    file_offset += n;
+    return n;
+}
+u32 vfs_get_size(int fd)
+{
+    CHECK(fd == 3 && file_fd == 3);
+    return io_fails() ? file_size + 1 : file_size;
+}
+int vfs_sync(void) { return io_fails() ? VFS_ERR_IO : VFS_OK; }
+int vfs_rm(const char *path)
+{
+    (void)path;
+    CHECK(!file_fd && !io_existing);
+    io_removes++;
+    if (io_fails()) return VFS_ERR_IO;
+    if (!file_exists) return VFS_ERR_NOTFOUND;
+    file_exists = 0;
+    return VFS_OK;
+}
+int kstrcmp(const char *a, const char *b) { return !same(a, b); }
+
 static void check(int cond, const char *name)
 {
     (void)name;
@@ -92,6 +192,7 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...)
         int range = va_arg(ap, int);
         CHECK(range == (high ? pfn > 32 * MEM_1MB / PAGE_SIZE :
                               pfn < 32 * MEM_1MB / PAGE_SIZE));
+        observed_pfns[page] = pfn;
         page_logs++;
     } else if (same(fmt, "[h4] %s cleanup owner=%u pages=%u retired=%u\n")) {
         (void)va_arg(ap, const char *);
@@ -103,12 +204,36 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...)
         (void)va_arg(ap, const char *);
         const char *result = va_arg(ap, const char *);
         last_entered = va_arg(ap, int);
-        CHECK(last_entered == (same(result, "PASS") || bad_pattern));
+        CHECK(last_entered == (same(result, "PASS") || bad_pattern || io_fail_at ||
+                              io_corrupt || io_no_copy || io_wrong_mount || io_existing));
         CHECK(va_arg(ap, int) == 1);
         results++;
+    } else if (same(fmt, "[h4] io %s backend=%s result=%s stage=%s bytes=%u removed=%u\n")) {
+        (void)va_arg(ap, const char *);
+        const char *backend = va_arg(ap, const char *);
+        CHECK(same(backend, "ext2") || same(backend, "hostdrv"));
+        io_passes += same(va_arg(ap, const char *), "PASS");
+        (void)va_arg(ap, const char *);
+        CHECK(va_arg(ap, u32) == PAGE_SIZE + 34);
+        (void)va_arg(ap, int);
+        io_logs++;
+    } else if (same(fmt, "[h4] io dma pool pa=%08X bytes=%u range_bank=%u\n")) {
+        u32 pa = va_arg(ap, u32), size = va_arg(ap, u32);
+        int valid = va_arg(ap, int);
+        CHECK(valid == (pa >= 0x7f0000 && pa + size <= 0x800000 &&
+                        size == PAGE_SIZE && pa / 0x10000 == (pa + size - 1) / 0x10000));
+        dma_logs++;
+    } else if (same(fmt, "[h4] io dma pool result=%s allocated=%u free_restored=%u transfer=none\n")) {
+        const char *result = va_arg(ap, const char *);
+        dma_passes += same(result, "PASS");
+        dma_skips += same(result, "SKIP");
+        dma_fails += same(result, "FAIL");
+        CHECK(va_arg(ap, u32) == dma_logs);
+        CHECK(va_arg(ap, int) == 1);
     }
     va_end(ap);
 }
+#include "dma_pool_host_source.c"
 #include "h4_backing_source.c"
 
 #define HOST_RAM_END (64UL * MEM_1MB)
@@ -137,10 +262,16 @@ static void reset_observation(u32 failure)
 {
     operation = ksel_fail = entries = skips = page_logs = cleanups = results = 0;
     last_entered = 0;
+    dma_logs = dma_passes = dma_skips = dma_fails = 0;
+    io_operation = io_fail_at = io_logs = io_passes = io_removes = io_corrupt = 0;
+    io_short = io_no_copy = io_wrong_mount = io_existing = 0;
+    CHECK(!file_fd);
+    files_present[0] = files_present[1] = 0;
     fail_at = failure;
 }
 static void recovered(u32 before, u32 root, u32 flags)
 {
+    CHECK(!file_fd);
     CHECK(pgalloc_free_pages() == before && host_cr3 == root && host_arch_if == flags);
     for (u32 o = LEDGER_OWNER_FIXED_LAST + 1; o < LEDGER_MAX_OWNERS; o++)
         CHECK(!ledger_owner_pages(o) && !ledger_owners[o].kind);
@@ -171,6 +302,8 @@ static void classification_and_patterns(void)
     CHECK(h4_collect_pfns(&as, 1, pfns));
     for (u32 i = 0; i < H4_BUFFER_PAGES; i++) CHECK(pfns[i] == high[i]);
     CHECK(h4_buffer_entry(&as, MEM_EXEC_LOAD_ADDR + H4_BUFFER_OFFSET, H4_BUFFER_BYTES));
+    CHECK(h4_io_roundtrip(&as, 1, 0) && h4_io_roundtrip(&as, 1, 1));
+    CHECK(io_logs == 2 && io_passes == 2 && io_removes == 2 && !file_exists);
     /* Corrupt each of the three covered portions, including the final byte. */
     for (u32 i = 0; i < H4_BUFFER_PAGES; i++) {
         u32 offset = i == 0 ? H4_BUFFER_OFFSET : i == 1 ? PAGE_SIZE / 2 : 16;
@@ -207,20 +340,104 @@ static void classification_and_patterns(void)
     CHECK(ledger_reclaim_owner(owner, &freed) && !ledger_owner_pages(owner));
     CHECK(ledger_owner_retire(owner));
 }
+static void dma_controls(void)
+{
+    CHECK(MEM_DMA_POOL_BASE == 0x7f0000 && MEM_DMA_POOL_SIZE == 0x10000);
+    CHECK(dma_pool_free_pages() == DMA_POOL_PAGES);
+    struct dma_buf held;
+    CHECK(!dma_alloc(DMA_POOL_MAX_BYTES, 0, DMA_PHYS_LIMIT, &held));
+    u32 free = dma_pool_free_pages();
+    reset_observation(0);
+    h4_dma_pool();
+    CHECK(!ksel_fail && dma_logs == free && dma_passes == 1);
+    CHECK(dma_pool_free_pages() == free && !dma_free(&held));
+    /* An old pool address must be rejected even though it is ISA-addressable.
+     * The real allocator is used; only its configured base is perturbed. */
+    s_pool.base = 0x3e0000;
+    reset_observation(0);
+    h4_dma_pool();
+    CHECK(ksel_fail == DMA_POOL_PAGES && dma_fails == 1);
+    CHECK(dma_pool_free_pages() == DMA_POOL_PAGES);
+    dma_pool_init();
+    struct dma_buf full[2];
+    CHECK(!dma_alloc(DMA_POOL_MAX_BYTES, 0, DMA_PHYS_LIMIT, &full[0]));
+    CHECK(!dma_alloc(DMA_POOL_MAX_BYTES, 0, DMA_PHYS_LIMIT, &full[1]));
+    reset_observation(0);
+    h4_dma_pool();
+    CHECK(!ksel_fail && !dma_logs && dma_skips == 1);
+    CHECK(!dma_free(&full[0]) && !dma_free(&full[1]));
+    CHECK(dma_pool_free_pages() == DMA_POOL_PAGES && !dma_pool_bad_free());
+}
+
+/* Compile the actual FDC setup, without any device operations. Its BSS
+ * address comes from this build's kernel ELF; synthetic cases also cover
+ * both choices made by fdc_buf_layout. No driver/export change is needed. */
+extern char __bss_end[];
+static u32 host_fdc_base;
+#include "fdc_setup_source.c"
+static void fdc_window(void)
+{
+    CHECK(HOST_FDC_BSS >= HOST_BSS_START);
+    CHECK(HOST_FDC_BSS + FDC_BUF_BYTES <= (u32)__bss_end);
+    CHECK(HOST_FDC_BSS + FDC_BUF_BYTES <= MEM_DMA_POOL_BASE);
+    const u32 bases[] = {HOST_FDC_BSS, 0x200000, 0x20fff0};
+    for (u32 i = 0; i < sizeof(bases) / sizeof(bases[0]); i++) {
+        host_fdc_base = bases[i];
+        s_dma = 0;
+        fdc_buf_setup();
+        CHECK(s_dma_pa == V2P(s_dma));
+        CHECK(s_dma_pa >= host_fdc_base);
+        CHECK(s_dma_pa + FDC_DMA_BUF_SIZE <= host_fdc_base + FDC_BUF_BYTES);
+        CHECK(dma_range_ok(s_dma_pa, FDC_DMA_BUF_SIZE, DMA_PHYS_LIMIT));
+        CHECK(s_slots >= (u8 *)P2V(host_fdc_base));
+        CHECK(s_slots + FDC_CACHE_BYTES <= (u8 *)P2V(host_fdc_base + FDC_BUF_BYTES));
+        CHECK(s_dma + FDC_DMA_BUF_SIZE <= s_slots || s_slots + FDC_CACHE_BYTES <= s_dma);
+    }
+    say("[h4] io fdc BSS window: PASS (ELF address + actual setup; no transfer)\n");
+}
+
 void _start(void)
 {
     boot_pool();
+    dma_pool_init();
+    fdc_window();
     u32 before = pgalloc_free_pages(), root = host_cr3;
     for (u32 f = 0; f < 2; f++) {
         host_arch_if = f ? 0x202 : 2;
         reset_observation(0);
         test_h4_backing();
         CHECK(!ksel_fail && entries == 2 && !skips && page_logs == 6 && cleanups == 2 && results == 2);
+        CHECK(io_logs == 4 && io_passes == 4 && io_removes == 4 && !file_exists);
         recovered(before, root, f ? 0x202 : 2);
         for (int high = 0; high < 2; high++) {
             reset_observation(0);
             CHECK(h4_backing_case(high) == 1 && !ksel_fail);
-            u32 operations = operation;
+            u32 operations = operation, io_operations = io_operation;
+            /* Every I/O failure, on both backends, must fail (never SKIP).
+             * This includes open, each page, sync, size and remove. */
+            for (u32 fail = 1; fail <= io_operations; fail++) {
+                for (int short_io = 0; short_io < 2; short_io++) {
+                    reset_observation(0);
+                    io_fail_at = fail;
+                    io_short = short_io;
+                    CHECK(h4_backing_case(high) == -1 && ksel_fail == 1);
+                    CHECK(!skips && io_logs == 2 && io_passes == 1);
+                    CHECK(io_removes >= 1);
+                    recovered(before, root, f ? 0x202 : 2);
+                }
+            }
+            for (u32 corrupt = 0; corrupt < 6; corrupt++) {
+                reset_observation(0);
+                if (corrupt < 3)
+                    io_corrupt = corrupt == 0 ? 1 : corrupt == 1 ? 18 : sizeof(file_data);
+                else if (corrupt == 3) io_no_copy = 1;
+                else if (corrupt == 4) io_wrong_mount = 1;
+                else io_existing = 1;
+                CHECK(h4_backing_case(high) == -1 && ksel_fail == 2);
+                CHECK(!skips && io_logs == 2 && !io_passes);
+                CHECK(io_removes == (corrupt < 4 ? 2U : 0U));
+                recovered(before, root, f ? 0x202 : 2);
+            }
             for (u32 fail = 1; fail <= operations; fail++) {
                 reset_observation(fail);
                 CHECK(h4_backing_case(high) == 0 && !ksel_fail);
@@ -240,6 +457,7 @@ void _start(void)
             }
         }
     }
+    dma_controls();
     classification_and_patterns();
     recovered(before, root, host_arch_if);
     /* A real empty high interval, without injection: retain all high RAM
@@ -252,6 +470,6 @@ void _start(void)
     CHECK(h4_backing_case(1) == 0 && skips == 1 && !entries && !ksel_fail);
     CHECK(ledger_reclaim_owner(holder, &freed) && ledger_owner_retire(holder));
     recovered(before, root, host_arch_if);
-    say("PASS: h4 real high/low USER PFNs, strict boundary, mixed pages, patterns, all allocation/map failures, owner recovery\n");
+    say("PASS: h4 real high/low USER PFNs, strict boundary, mixed pages, patterns, all allocation/map failures, owner recovery, I/O errors/short counts/corruption/cleanup, DMA pool and FDC window\n");
     die(0);
 }

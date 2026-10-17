@@ -1,7 +1,8 @@
-"""T3b2: execute the kdebug fixture with real ILP32 allocator/page walks.
+"""T3b2/b3: execute the kdebug fixture with real ILP32 allocator/page walks.
 
 Normal controls cover all PFNs, strict >32MiB, the ordinary low allocation,
-partial allocation/map failure and reclaim. --mutate is for PM verification;
+partial allocation/map failure and reclaim, I/O fault/cleanup controls, the
+actual DMA allocator and FDC setup at this kernel ELF's BSS address. --mutate is for PM verification;
 compilation errors never count as RED.
 """
 import argparse
@@ -14,12 +15,24 @@ from kernel_layout import linker_flags
 
 ROOT = Path(__file__).resolve().parents[2]
 TARGET_SRC = ['kdebug/kselftest.c', 'kernel/paging.c', 'kernel/pgalloc.c',
-              'exec/access_walk.c', 'kernel/physmem.c']
+              'exec/access_walk.c', 'kernel/physmem.c', 'kernel/dma_pool.c',
+              'kernel/dma_pool_math.c', 'drivers/dma8237_math.c',
+              'drivers/fdc.c', 'drivers/fdc_decide.c']
 MUTANTS = [
     ('VA-only high classification', 'pfns[i] > H4_PHYS_BOUNDARY / PAGE_SIZE',
      'va > H4_PHYS_BOUNDARY'),
     ('32MiB accepted as strictly above', 'pfns[i] > H4_PHYS_BOUNDARY / PAGE_SIZE',
      'pfns[i] >= H4_PHYS_BOUNDARY / PAGE_SIZE'),
+    ('write omitted', 'vfs_write_fd(fd, p, n)', '(int)n'),
+    ('read omitted', 'vfs_read_fd(fd, p, n)', '(int)n'),
+    ('comparison omitted', 'ok = h4_buffer_entry(as, buffer, H4_BUFFER_BYTES);', 'ok = 1;'),
+    ('poison omitted', 'mode == 2 ? 0xff : 0', '0'),
+    ('remove omitted', 'int rc = vfs_rm(path);', 'int rc = VFS_OK;'),
+    ('I/O failure ignored', 'if (root_io && host_io) result = 1;',
+     '(void)root_io; (void)host_io; result = 1;'),
+    ('DMA range ignored', 'check(valid, "h4: DMA allocation range/bank");',
+     'check(1, "h4: DMA allocation range/bank");'),
+    ('DMA free omitted', 'dma_free(&buffers[i]) == 0', '1'),
     ('owner reclaim omitted', 'ledger_reclaim_owner(owner, &left)', '(left = 0, (void)left, 1)'),
 ]
 
@@ -38,10 +51,25 @@ def run(body, runner):
         (tmp / 'h4_backing_source.c').write_text(body)
         for name, path in (('paging', 'kernel/paging.c'),
                            ('pgalloc', 'kernel/pgalloc.c'),
+                           ('dma_pool', 'kernel/dma_pool.c'),
                            ('access_walk', 'exec/access_walk.c')):
             (tmp / (name + '_host_source.c')).write_text((ROOT / path).read_text())
+        fdc = (ROOT / 'drivers/fdc.c').read_text()
+        fdc = fdc[fdc.index('static u8 s_fdbuf['):fdc.index('static u8 *fdc_dma_buf(void)')]
+        fdc = fdc.replace('static u8 s_fdbuf[FDC_BUF_BYTES];',
+                          '#define s_fdbuf ((u8 *)P2V(host_fdc_base))')
+        (tmp / 'fdc_setup_source.c').write_text(fdc)
+        symbols = {}
+        for line in subprocess.check_output(
+                ['nm', '--defined-only', str(ROOT / 'build/out/kernel.elf')], text=True).splitlines():
+            fields = line.split()
+            if len(fields) == 3:
+                symbols[fields[2]] = int(fields[0], 16)
+        fdc_flags = [f'-DHOST_FDC_BSS={symbols["s_fdbuf"]}',
+                     f'-DHOST_BSS_START={symbols["__bss_start"]}']
+        print(f'[h4] io fdc linked BSS base={symbols["s_fdbuf"]:08X}')
         exe = tmp / 'h4'
-        command = ['gcc', *linker_flags(), '-m32', '-march=i386', '-std=gnu11',
+        command = ['gcc', *linker_flags(), *fdc_flags, '-m32', '-march=i386', '-std=gnu11',
                    '-O2', '-Wall', '-Wextra', '-Werror', '-ffreestanding',
                    '-fno-pie', '-fno-stack-protector', '-ffunction-sections',
                    '-fdata-sections', '-DPHYSMEM_HOST_TEST=1', '-nostdlib',
@@ -50,7 +78,10 @@ def run(body, runner):
                      ('tools/tests/host_arch', 'include', 'arch/x86', 'platform/pc98',
                       'kernel', 'exec', 'fs', 'lib', 'drivers', 'sdk/include/os32')],
                    str(ROOT / 'tools/tests/h4_backing_host.c'),
-                   str(ROOT / 'kernel/physmem.c'), '-o', str(exe)]
+                   *[str(ROOT / path) for path in ('kernel/physmem.c',
+                       'kernel/dma_pool_math.c',
+                       'drivers/dma8237_math.c', 'drivers/fdc_decide.c')],
+                   '-o', str(exe)]
         host32.build(command, check=True, capture_output=True, text=True)
         return host32.run([str(exe)], runner=runner, capture_output=True,
                           text=True, timeout=120)
