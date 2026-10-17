@@ -67,7 +67,7 @@ static u32 host_esp0 = MEM_SHELL_STACK_TOP;
 u32 tss_get_esp0(void) { return host_esp0; }
 void tss_set_esp0(u32 esp0) { CHECK(!host_if); host_esp0 = esp0; }
 static int cleanup, teardown, notices, transfers, scheduled_kind, phase;
-static int host_wm_kill, nested_parent, dispatch_action;
+static int host_wm_kill, nested_parent, dispatch_action, parent_probe;
 static u32 *g_cur_frame, parent_frame[13], child_frame[13];
 static struct addrspace spaces[APP_SLOT_COUNT];
 volatile u32 ring3_transition_count;
@@ -208,6 +208,11 @@ int ring3_ptr_ok(u32 p) { (void)p; return 1; }
 static u32 kapi_invoke(void *fn, const void *args, u32 n) {
     struct caller_access a;
     (void)fn; (void)args; (void)n;
+    if (parent_probe) {
+        CHECK(caller_access_get_user(&a) && a.app_id == 3 && owner == 3 && cr3 == 3);
+        CHECK(ring3_in_syscall && !ring3_wm_depth);
+        return 91;
+    }
     CHECK(caller_access_get_user(&a) && a.app_id == 2);
     CHECK(ring3_in_syscall && !ring3_wm_depth);
     if (dispatch_action) simulate_action();
@@ -293,6 +298,7 @@ static void setup(int gui, int kind) {
     slots[2].state = APP_STATE_RUNNING; slots[2].parent = 3;
     slots[2].cpl3 = 1; slots[2].gui = gui; g_cur_app = &slots[2];
     scheduled_kind = kind;
+    g_last_kind = EXEC_KIND_EXITED; g_last_code = 314;
 }
 '''
 
@@ -342,6 +348,10 @@ static int test(void) {
         CHECK(!ring3_in_syscall && !ring3_wm_depth && fault_kill_count == 1);
         CHECK(ring3_wm_fault_count == (kind == EXEC_KIND_FAULT));
         if (!gui) CHECK(g_last_kind == kind && g_last_code == EXEC_ERR_FAULT);
+        else {
+            int k, c;
+            CHECK(exec_last_result(&k, &c) == 0 && k == EXEC_KIND_EXITED && c == 314);
+        }
         exec_pending_finish(); /* 一度消費した pending を二重回収しない */
         CHECK(cleanup == 7 && teardown == 1 && notices == 1);
     }
@@ -385,7 +395,19 @@ static int test(void) {
         struct caller_access out;
         CHECK(caller_access_get(&out) && out.origin == CALLER_TRUSTED);
         ring3_wm_leave(); ring3_wm_leave();
-        if (action > 0 && action < 5) CHECK(caller_access_get_user(&out) && out.app_id == 3);
+        if (action > 0 && action < 5) {
+            CHECK(caller_access_get_user(&out) && out.app_id == 3);
+            int k, c;
+            CHECK(exec_last_result(&k, &c) == 0);
+            CHECK(k == (action == 3 ? EXEC_KIND_EXITED : action == 4 ? EXEC_KIND_ABORTED : EXEC_KIND_FAULT));
+            CHECK(c == (action == 3 ? 17 : EXEC_ERR_FAULT));
+            /* Next actual syscall after normal/fault/STOP child return. */
+            parent_probe = 1; parent_frame[7] = 0; parent_frame[11] = MEM_APP_BAND_BASE;
+            ring3_syscall_dispatch(parent_frame);
+            CHECK(parent_frame[7] == 91 && tss_get_esp0() == MEM_SHELL_STACK_TOP);
+            CHECK(exec_heap_used() == resident_used && *resident_sentinel == 0xABCDEF12);
+            parent_probe = 0;
+        }
         else CHECK(!caller_access_get_user(&out)); /* park returned to shell */
     }
     setup(1, EXEC_KIND_ABORTED);
@@ -414,7 +436,7 @@ def run(source=None, irq=None):
              'ring3_context_save', 'ring3_context_clear', 'ring3_context_restore',
              'ring3_wm_enter', 'ring3_wm_leave', 'ring3_syscall_dispatch',
              'exec_park', 'exec_park_kbd', 'exec_park_poll', 'exec_sys_yield', 'exec_park_stop',
-             'exec_finish', 'exec_exit', 'kapi_sys_exit', 'exec_pending_transfer', 'exec_pending_finish',
+             'exec_finish', 'exec_exit', 'kapi_sys_exit', 'exec_last_result', 'exec_pending_transfer', 'exec_pending_finish',
              'exec_kill_one', 'exec_fault_recover', 'ring3_kill_kind', 'ring3_fault_kill', 'ring3_abort_kill')
     context = source[source.index('typedef struct {\n    CallerAccessFrame caller;'):source.index('} Ring3CallContext;') + len('} Ring3CallContext;')]
     access = (ROOT / 'exec/redir_access.c').read_text()

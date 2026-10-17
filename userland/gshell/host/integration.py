@@ -48,6 +48,12 @@ def build(gshell: Path, name: str, quiet: bool = False) -> Path:
 # 票 KBD_NAV (docs/tasks/gui/TASK_KBD_NAV.md) の受け入れ K1 の変異。
 # (名前, ファイル, 置き換え前 (ちょうど 1 か所), 置き換え後, RED になるべき試験の絞り込み)
 MUTATIONS = [
+    ('X11 toggle leaves kernel commit', 'src/fep.rs',
+     '    collect_kernel_commit(); // toggle OFF can confirm pending kana\n', '',
+     'x11_fep_toggle_off_delivers_before_focus_changes'),
+    ('X11 toggle delays delivery until after focus', 'src/fep.rs',
+     '    flush_text(st); // deliver before another key can change the focus\n', '',
+     'x11_fep_toggle_off_delivers_before_focus_changes'),
     ('gserial deadline reversed', 'src/gserial.rs', '(st.now.wrapping_sub(st.gserial.deadline) as i32) >= 0', '(st.now.wrapping_sub(st.gserial.deadline) as i32) < 0', 'gserial_watchdog'),
     ('gserial break omitted', 'src/gserial.rs', 'out[n] = raw(scan, false, mods); n += 1;', 'out[n] = 0; n += 1;', 'gserial_queue_atomic'),
     ('gserial length unchecked', 'src/gserial.rs', 'if q.len == LINE_MAX { q.long = true; }', 'if q.len == LINE_MAX { q.long = false; }', 'gserial_framing'),
@@ -342,7 +348,9 @@ def one_mutation(k: int) -> tuple:
                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         exe.unlink(missing_ok=True)
         ran = re.search(r'test result: \w+\. (\d+) passed; (\d+) failed', r.stdout)
-        expected = {'e7 CUI rollback screen info': 'e7 CUI rollback geometry stale',
+        expected = {'X11 toggle leaves kernel commit': 'OFF must drain kernel commit before changing focus',
+                    'X11 toggle delays delivery until after focus': 'OFF delivers before a focus change',
+                    'e7 CUI rollback screen info': 'e7 CUI rollback geometry stale',
                     'e7 restore screen info': 'e7 restore geometry stale',
                     'e7 restore framebuffer': 'e7 restore framebuffer stale'}.get(name)
         if r.returncode != 0 and ran and int(ran[2]) > 0 and (expected is None or expected in r.stdout):

@@ -193,6 +193,34 @@ SHM ブロック (`sys_shm_lock` / `sys_shm_free`)、パイプ (`sys_pipe_free` 
 (int の口は -1、`get_buf` は NULL、`column_int` は 0、`column_text` は `""`、void の口は何もしない) を返し、状態は変わらない。
 常駐シェル・WM・終了時の回収 (信頼側の文脈) は今どおり操作できる。v70 では `pipe_get_buf` は CPL3 なら自分の資源でも NULL。`pipe_get_len` は CPL3 の別 owner なら 0、自分なら長さを返す。TRUSTED は従来どおり。台帳 E11-8 の意味変更。
 
+### 共有サービス12口の契約 (X-11 / T4b-5)
+
+単一利用者・単一タスク・協調切替の共有サービスであり、本人別の FEP 状態・exec 結果や新しい権限表は作らない。
+根拠は [T4〜T6 §1-2・§9](tasks/v3/TASK_T4_T6_MODULES.md#1-2-台帳から受けるidと関門)。
+下表の「呼び手」は現在の実行主体。WM はアプリの syscall 中にも動くので、その区間の FEP 呼出しは WM の配送として扱う。
+
+| 分類 / 入口 | 主体・入力 | 返値 | 共有状態への変化・失敗時副作用 | 出力寿命・取消 |
+|---|---|---|---|---|
+| IME 入力 `ime_trygetchar()` | CUI 前景読取り。GUI 中は端末等の注入済み入力読取り | 確定 UTF-8 の1バイト / ASCII、なしは −1 (スキャンコードのみのキーも −1) | CUI は共有確定列を先に読み、なければ cooked 1件を変換。GUI は kbd の注入列だけを読み FEP に再投入しない | 値のコピー。CUI で実際にキー/確定列を消費した主体が終了すると未確定・候補・未読確定列を取消。空ポーリングは主体を奪わない |
+| IME 入力 `ime_trygetkey()` | CUI 前景 / GUI 注入入力の読取り | 確定1バイト (scan=0)、透過キーは `(scan<<8)\|ascii`、なしは −1 | CUI のキューと確定列は trygetchar と共用、同じ入力を二度返さない。GUI は注入バイトをそのまま返す | trygetchar と同じ取消。GUI 読取り・アプリ終了は WM の候補/未読確定列を消費・取消しない |
+| IME 入力 `ime_feed_key(keydata)` | WM が raw make から作った `(scan<<8)\|ascii`。負値は確定列の続きだけ取得 | 負値=消費、`>=0x100` または ESC=透過、`1..255` (ESC以外)=確定1バイト | cooked は読まない。未読確定列を優先するので WM は負値呼出しで引き切ってから次のキーを渡す。消費した make を Key として再配送しない | 値のコピー。確定列は1回だけ Text/端末注入へ配送。WM の候補は親子・park/resumeで共有され、通常の ESC/BS 操作で取消 |
+| IME モード `ime_toggle()` | CUI の Shift+Space / WM の切替操作 | void | OFF→HIRAGANA (初回辞書open、失敗ならOFFのまま)。ON→OFF は未確定かなを確定列へ加え、候補表示を閉じる | モード/辞書は共有。OFF の確定列は WM が直後に引き切り、フォーカス変更前に現在の宛先へ1回配送。本人別へ保存・復元しない |
+| IME モード `ime_set_mode(mode)` | 共有モード設定。OFF=0 / HIRAGANA=1 / KATAKANA=2 | void | 範囲外は辞書open・表示・全状態の変更なし。有効ONは初回open後に入力状態へ戻す。OFFは表示を閉じる。toggle と違い、かなを確定しない | かな/未読確定列は保持。モード変更は全利用者に即時反映、owner 切替では戻さない |
+| IME 辞書 `ime_switch_dict(variant)` | 共有辞書の管理。S=0 / M=1 / L=2 | 0=成功、−1=無効値/open失敗、−2/−3=検索stmtのprepare失敗 | 範囲外は状態/接続不変。有効値は常駐接続を開き直す。現行は旧接続closeが先で、有効値のI/O失敗に旧接続保持保証はない | 候補/確定列は IME 内のコピーで、切替・親子・parkで有効。以後の検索/学習は共有辞書へ。予約超過時の切替規則は T4c 統合で接続 |
+| IME 辞書 `ime_user_delete(yomi, kanji)` | 共通学習辞書を操作。非空 yomi、kanji は NULL/空なら同じ読みにある全語 | 0 / −1=入力・接続なし / −2=prepare失敗 / −3=実行失敗 | 削除は全利用者に反映、表示中の候補コピーは変更しない。I/O回復で接続を開き直すことがある | 文字列は呼出し中有効に保つ。呼出し後に保持しない。取消/owner終了で削除を巻き戻さない |
+| IME 辞書 `ime_user_export(path)` | 共通学習辞書の CSV 出力。非空 path | 0 / −1=入力・接続なし / −2=open / −3=prepare / −4=読取 / −5=書込失敗 | 成功は全件出力。出力先を create/truncate した後の失敗は空/途中のファイルを残し得る。学習辞書と候補コピーを変更しない | path は呼出し中有効。出力ファイルは owner終了で削除しない。B2 の入力 staging/副作用前拒否は T5a-1 で接続 |
+| IME 辞書 `ime_user_clear()` | 共通学習辞書を全消去 | 0 / −1=接続なし / −2=実行失敗 | 以後の検索へ全体に反映。表示済み候補/未読確定列はコピーとして残る。I/O回復による再openあり | owner終了やparkで消去を巻き戻さない。FEP常駐辞書はアプリのUSER勘定・回収対象と別 |
+| 実行 `exec_last_result(kind, code)` | 全呼び手。出力は各々 NULL 可、有効な書込先 | 0=記録あり、INVAL=なし (kind=NONE/code=0) | 全体の直前の同期 exec の1件。読みは非消費。次の exec_run 入口でNONEにし、完了/起動失敗で更新。exec_start/resume の GUI 子は更新しない | 呼び手へのコピーは次のexec後も有効。親子間で本人別に保存しない。fault/STOPも種別を保持し、park/resume単独では更新しない |
+| GUI `gui_call(op, arg)` | 現在の実ownerを WM に渡す。arg の形式/寿命は各opの契約 | WM の返値 / 未登録NOSYS / 内部 OWNER_EXIT はINVAL | 公開OWNER_EXITをWMへ転送しない。TRIM_DONE はcoreのepoch/owner検査へ。その他は実ownerのまま正規WMへ配送、WM文脈/WAIT印を対で管理 | 同期opのargは呼出し中有効。parkしたWAITは保存フレームの復帰値として戻る。owner終了時の内部通知が窓等を取消 ([GUI契約](tasks/gui/API_CONTRACTS.md)) |
+| console `con_sink_read(buf, cap)` | 最初の有効な読取り主体が単一reader。非NULL buf、cap≥CON_SINK_REC_MAX | 完全レコードのコピーbyte数 / 空=0 / 入力INVAL / 別reader=EXIST | 空でもreaderを獲得。INVAL/EXISTは出力/リング/reader不変。park・子終了・enable/disableでは所有を返さず、reader本人の終了時だけ返す | コピーは呼び手所有。所有返却時にリングを捨てない。enable/disableはリング内容を捨てる。あふれは古いレコード単位で破棄 |
+
+CUI の候補/かな/未読確定列は1組であり、子が実際に読めば同じ列を進め、最後の読取り主体の終了で取消す。
+子が読まなければ親の候補と辞書を保つ。ブロッキング IME 口は待機開始時に読取り主体を記録し、STOP/終了で取消す。
+GUI の物理入力は raw→WM/FEP→Text または端末注入の1経路であり、cookedへ重ねて積まない。
+GUI 中の IME ブロッキング口も注入済みバイトを直接返す。CUI/WM の通常操作、無効値、親子・parkの対照は
+`check-x11-shared-host` / `check-gshell-host`、子正常/fault/STOP後の ESP0/caller・次KAPI・USER別heap勘定は
+`check-memory-host` 内の `test_exec_r1.py` で検査する。NP21/W の実配送受入は PM が別に実施する。
+
 ### §3-3 出力ポインタの宣言 `out` (票 TASK_KAPI_OUTPUT_GUARD)
 
 OS32 は **CR0.WP = 0** で走る (`kernel/shlib.c` がカーネルからの書き込みで共有ライブラリを

@@ -355,7 +355,9 @@ pub fn toggle(st: &mut GuiState) {
     unsafe {
         (os32api::api().ime_toggle)();
     }
+    collect_kernel_commit(); // toggle OFF can confirm pending kana
     sync_mode(st);
+    flush_text(st); // deliver before another key can change the focus
 }
 
 /// X4 で見た SHIFT+SPACE を次の X3 へ持ち越す (打鍵を落とさないため)。
@@ -394,6 +396,12 @@ pub fn feed(st: &mut GuiState, scan: u8, ch: u8, _mods: u32) -> Fed {
     }
     /* 確定文字列の 1 バイト目。続きを引き切る。 */
     push_commit(v as u8);
+    collect_kernel_commit();
+    sync_mode(st);
+    Fed::Consumed
+}
+
+fn collect_kernel_commit() {
     let mut guard = 0;
     loop {
         guard += 1;
@@ -405,8 +413,6 @@ pub fn feed(st: &mut GuiState, scan: u8, ch: u8, _mods: u32) -> Fed {
             _ => break,
         }
     }
-    sync_mode(st);
-    Fed::Consumed
 }
 
 fn push_commit(b: u8) {
