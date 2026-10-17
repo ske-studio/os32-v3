@@ -95,7 +95,7 @@ prefixを処理後に返す場合、exportの解決済み関数表・dependency/
 
 S4の型・slot・生成ABI・pair CRC・ops2/18口を正常対照として維持する (`kdebug/generated/kdebug_imports.h:119`、`tools/gen_kdebug_imports.py:25,75,170`)。SQLite用import定義は別に作り、現235本へ一律追加しない。生成済みファイルは手編集しない。`tools/mkmod.py:211,297` の旧既定値75/3はT4a-1で必須引数化または `sdk/kapi.json` 読込へ変更する。
 
-起動時に読むSQLite・FEP・後続部品はkdebugと同じ **`/boot`** に置き、`hsync boot` で対として運ぶ (PM決定)。機能版完全一致 (`kernel/module_image.c:103`) を維持し、同じ公開ABI世代でも旧部品を残さない。配布の接続は§5-4。
+`make kernel` は「カーネルの像と、それと対になって起動時に読む部品の一式」を組む (部品は像の CRC を埋めるので像と一緒に組み直す。Tx の段ごとの `make kernel` で部品の誤りを拾うため、ユーザー決定 2026-10-18)。起動時に読むSQLite・FEP・後続部品はkdebugと同じ **`/boot`** に置き、`hsync boot` で対として運ぶ (PM決定)。機能版完全一致 (`kernel/module_image.c:103`) を維持し、同じ公開ABI世代でも旧部品を残さない。配布の接続は§5-4。
 
 T5c-2b/T5c-3の依頼前に、kdebugのPCM/V86 importをcore facade経由で残すか、該当自己試験を部品側へ移すかを決める。対象はpcm_open・pcm_state・v86_* 13本・paging_v86_session_open (`kernel/kdebug_imports.def:895,903,911,1615`)、S4の本数・ABI印も再生成する。現形式に部品間importを追加したものとは扱わない。
 
@@ -268,7 +268,7 @@ T6bは最後に集積を上位票の `[0x500000,0x600000)` へ移し上限1MiB�
 | T4b-5 (1日) | X-11全12口の契約表・共有サービス回帰 | ①12口の主体・入力・返値・状態変化・出力寿命・取消を表に明記 (IME9口は入力/モード/辞書管理に分類) ②CUI/WM通常配送で入力1回消費 ③parent/child/park-resumeで候補・辞書・出力の寿命が表と一致 ④無効mode/variantで状態不変 ⑤exec結果の「全体の直前1件」を親子切替で観測 ⑥gui_callの実owner/内部op拒否・正規WM配送を観測 ⑦con_sinkの先着/別reader EXIST/終了時返却を観測。二重配送/無効値書込/owner差替/reader早期解放変異を検出。子正常/fault/STOP→親→次KAPIのesp0/callerとUSER別勘定も確認 (§3-1/3-3)。 |
 | T4b-7 (1日) | E11-A2b raw KAPIゲストfixture | ①kbd/IME/serial無入力待ち・FM長音の各CUI/GUIでSTOP→shell/WM復帰 ②通常完了も成功 ③内部ログ/SQLite中は中断0 ④owner回収1回・Key-OFF・候補取消・池復帰。取消削除/内部ログに取消混入の変異を検出。親復帰後のesp0/caller・次KAPIとUSER別勘定を確認 (§3-1/3-3)。 |
 | T4b-8 (1日) | X-1残る文字列・kprintfの棚卸し/接続 | ①全公開NUL入力/可変引数の担当が確定 ②format/%s/引数窓の端をB1で処理 ③ページ末尾NUL成功、次ページ欠落/未終端は副作用前失敗 ④通常表示同一。生ポインタ読取へ戻す変異を検出。量が多ければAPI群別に分割 |
-| T4c-1 (1日) | SQLite module build・typed facade・全stub | ①旧連結sqlite section/addr参照と固定stack依存が消える ②全db API/診断がstubかtyped exportへ ③通常db_test/db_mem_used成功 ④旧新混在はinit0で拒否。直呼び残存/NULL stub変異を検出。/bootへ配布しhsync bootで対更新 (§5-4)。resident終端・stack・KHEAP算出と監査を切替 (§7-2)。依頼に `rg -l "__sqlite_\|SQLITE_STACK\|__kernel_resident_end"` の全参照一覧 (paging/kentry/isr・監査・tools/testsも含む) を添える。VK32をcore1本へ変更、Unicode順序・配布世代門も同期 (§3-4/5-4)。 |
+| T4c-1 (1日) | SQLite module build・typed facade・全stub | ①旧連結sqlite section/addr参照と固定stack依存が消える ②全db API/診断がstubかtyped exportへ ③通常db_test/db_mem_used成功 ④旧新混在はinit0で拒否。直呼び残存/NULL stub変異を検出。/bootへ配布しhsync bootで対更新 (§5-4)。resident終端・stack・KHEAP算出と監査を切替 (§7-2)。依頼に `rg -l "__sqlite_\|SQLITE_STACK\|__kernel_resident_end"` の全参照一覧 (paging/kentry/isr・監査・tools/testsも含む) を添える。VK32をcore1本へ変更、Unicode順序・配布世代門も同期 (§3-4/5-4)。 加えて `make kernel` がカーネルの像と対の部品 (kdebug.bin・SQLite の部品、T5 以降は起動時に読む部品) を全部組むこと (部品の一覧は `build/kernel.mk` の 1 つの変数、ユーザー決定 2026-10-18)。 |
 | T4c-2 (1日) | services_public・settings→FEP transaction | ①公開前db/imeはstub、全成功で同時公開 ②各init確保/設定close/FEP CRC/辞書欠落/予約不足を注入 ③戻せた失敗はSQLite owner占有0・MINIMAL ④close/shutdown失敗は隔離byteとMINIMAL_QUARANTINEDを診断。早期公開/隔離free変異を検出。Unicode7頁を保持し欠落等はかなのみ継続 (§3-4)、配布世代門を回帰 (§5-4)。監査diff0 (§7-2)。起動tickを前後比較 (NP21/W参考値、現591〜595 / 544〜558、合否に使わない)。 |
 | T4c-3 (1日) | CD RO FEP・標準構成の回帰 | ①CD rootのhost fixtureで1語変換 (実起動はT5b-5) ②dict_user有無とも読取成功 ③学習journal0/更新ROFS/list・export読取維持 ④app圧迫下FEP成功 ⑤ext2標準RW学習も保持。ROでCREATE/学習prepareする変異を検出 |
 | T5a-1 (1日) | FEP B2・staging/出力境界 | ①各256B/64件境界・NULL契約一致 ②不正入力engine進入0/output不変 ③finalize/reset/binding終了→leave→copyout順 ④late出力拒否後もbusy解除 ⑤export不正pathでcreate/truncate0。寿命逆転/失敗kanjiをNULL化する変異を検出 |
