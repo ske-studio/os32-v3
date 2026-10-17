@@ -120,6 +120,10 @@ static void resource(int id, int step) {
     check_invalid_caller();
     cleanup++;
 }
+void kapi_strings_cleanup_owned(int id) {
+    CHECK(id == 2 && cleanup == 0 && !teardown && host_if && cr3 == 1);
+    CHECK(!kctx_irq_depth && !kctx_exc_depth);
+}
 static void db_cleanup_owned(int id) { resource(id, 0); }
 static void fd_redirect_reset_owned(int id) { resource(id, 1); }
 static void vfs_close_owned(int id) { resource(id, 2); }
@@ -205,6 +209,13 @@ int appslot_stop_pending(void) { return stop_pending; }
 static void exec_park_stop(u32 *f);
 static void ring3_gui_pump(void) {}
 int ring3_ptr_ok(u32 p) { (void)p; return 1; }
+#include "os32_kapi_slots.h"
+#include "kapi_strings.h"
+int kapi_print_call(const void *args) { (void)args; CHECK(0); return 0; }
+int kapi_strings_call(u32 slot, void *target, const void *args, u32 nbytes, u16 ptrmask, u32 *result) {
+    CHECK(slot == 0); (void)target; (void)args; (void)nbytes; (void)ptrmask; (void)result;
+    return 0;
+}
 static u32 kapi_invoke(void *fn, const void *args, u32 n) {
     struct caller_access a;
     (void)fn; (void)args; (void)n;

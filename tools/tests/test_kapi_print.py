@@ -44,7 +44,7 @@ def run(runner, mutant=None):
         sources[key] = (ROOT / path).read_text()
     dispatch = (ROOT / 'exec/exec.c').read_text()
     start = dispatch.index('    if (slot == KAPI_SLOT_KPRINTF) {')
-    end = dispatch.index('    /* --- (補助)', start)
+    end = dispatch.index('    int strings = ', start)
     sources['dispatch'] = dispatch[start:end]
     if mutant:
         name, key, old, new = mutant

@@ -68,19 +68,19 @@ X-11の出発点は `~/os32-tmp/evidence/2026-10-07/audit-classification.md:33,4
 | 公開入口 (括弧内は複数の NUL 引数) | 担当・接続先 | 本差分での扱い |
 |---|---|---|
 | `kprintf` (fmt / `%s` / `...`) | T4b-8 表示群、`kapi/kapi_print.c` → `kvprintf` | 今回 B1 接続。契約は [KAPI_SPEC](../../KAPI_SPEC.md#kprintf-の-cpl3-入力境界-t4b-8) |
-| `sys_unlink`, `sys_rename` (oldpath/newpath), `sys_mkdir`, `sys_rmdir`, `sys_chdir`, `sys_open`, `sys_stat`, `sys_redirect_fd` | T4b-8 パス群、生成 wrapper → VFS/redirect | 継続。先頭の早期検査だけでは NUL 全域の受入にならない |
-| `sys_mount` (prefix/dev/fs), `sys_umount`, `sys_umount_checked`, `sys_is_mounted`, `vfs_devname` | T4b-8 マウント群、生成 wrapper → VFS | 継続。複数入力は全入力を写してから副作用へ |
-| `path_set_drive`, `path_set_cwd`, `path_parse` | T4b-8 パス群、`lib/path.c` | 継続。validator/共有 cwd 更新より前にコピー |
-| `kcg_load_font`, `loop_attach`, `dev_blk_read`, `dev_blk_write`, `v86_disktest`, `v86_boot`, `v86_boot2` (path/second), `sys_switch_shell` | T4b-8 装置・起動パス群、各 target | 継続。`v86_boot2` の second=NULL の意味も維持 |
-| `exec_run`, `exec_start`, `launch_req` | T4b-8 コマンド群、`exec/exec.c`, `exec/launch.c` | 継続。親 PD 参照/長さ検査を B1 全結線と数えない |
-| `serial_puts`, `shell_print_utf8`, `fm_play_mml`, `snd_bgm_play` | T4b-8 文字列出力・MML 群、各 target | 継続。出力/音源操作前の全入力コピーと STOP 時の staging 寿命を確認 |
-| `sys_ls`, `sys_ls_window` | T2e の私的 ls shim / `exec/ring3_ls.c` | USER の旧 callback 入口は拒否。window は checked copy 済みだが、上限で NUL を補う現契約の整理は T4b-8 パス群へ |
+| `sys_unlink`, `sys_rename` (oldpath/newpath), `sys_mkdir`, `sys_rmdir`, `sys_chdir`, `sys_open`, `sys_stat`, `sys_redirect_fd` | T4b-8 パス群、生成 wrapper → VFS/redirect | B1 接続済み。保存 USER caller で全入力を写してから wrapper へ |
+| `sys_mount` (prefix/dev/fs), `sys_umount`, `sys_umount_checked`, `sys_is_mounted`, `vfs_devname` | T4b-8 マウント群、生成 wrapper → VFS | B1 接続済み。prefix/dev/fs の全入力を写してから副作用へ |
+| `path_set_drive`, `path_set_cwd`, `path_parse` | T4b-8 パス群、`lib/path.c` | B1 接続済み。validator/共有 cwd 更新より前にコピー |
+| `kcg_load_font`, `loop_attach`, `dev_blk_read`, `dev_blk_write`, `v86_disktest`, `v86_boot`, `v86_boot2` (path/second), `sys_switch_shell` | T4b-8 装置・起動パス群、各 target | B1 接続済み。`v86_boot2` の second=NULL の意味も維持 |
+| `exec_run`, `exec_start`, `launch_req` | T4b-8 コマンド群、`exec/exec.c`, `exec/launch.c` | B1 接続済み。コマンド全体を写してから起動/要求登録へ |
+| `serial_puts`, `shell_print_utf8`, `fm_play_mml`, `snd_bgm_play` | T4b-8 文字列出力・MML 群、各 target | B1 接続済み。出力/音源操作前にコピー、STOP/fault の所有者回収で staging を返す |
+| `sys_ls`, `sys_ls_window` | T2e の私的 ls shim / `exec/ring3_ls.c` | USER の旧 callback 入口は拒否。window/旧 shim は B1 コピーで 256B 内の NUL を必須とし、上限で補わない |
 | `sys_set_mtime` | `kapi/kapi_sys.c` | B1 range＋1B コピー済み。256B 上限、拒否時 VFS 呼出しなし。今回変更なし |
 | `db_open`, `db_open_existing`, `db_exec`, `db_prepare`, `db_prepare_only` | T4b-1 / `kapi/kapi_db.c` | B1 コピー済み。DB path/SQL の既定上限・拒否時不変を維持 |
 | `ime_user_list`, `ime_user_delete` (yomi/kanji), `ime_user_export` | T5a-1 / `kernel/ime.c` → `kernel/ime_dict.c` | 他票。T4b-5 の共有サービス契約をコピー完了とは扱わない |
 | `db_bind_text`, `host_open` | 長さ付き入力 (NUL 不要)、既存 DB/host facade | X-1 の NUL 群から除外。各 target の B1 range/copy 契約を維持 |
 
-この表は担当境界であり、継続群の受入や X-1 全体の閉鎖を意味しない。
+T4b-8 の上記各群は host の境界・副作用前拒否・生ポインタ変異を検査する。ゲスト受入は PM が行う。入力上限と staging 寿命は [KAPI_SPEC](../../KAPI_SPEC.md#残る公開文字列の-cpl3-入力境界-t4b-8b)。FEP / ページ 0 を含む X-1 全体の閉鎖を意味しない。
 
 ## 2. モジュール形式と呼出し契約
 

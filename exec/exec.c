@@ -24,6 +24,7 @@
 #include "kmalloc.h"
 #include "kprintf.h"
 #include "kapi_print.h"
+#include "kapi_strings.h"
 #include "paging.h"
 #include "pgalloc.h"
 #include "shlib.h"
@@ -1164,6 +1165,7 @@ static void exec_restore_context(int id)
 /* ======================================================================== */
 static void exec_reclaim_resources(int id)
 {
+    kapi_strings_cleanup_owned(id);
     /* (1) SQLite DB リソース (P5: cleanup_all → cleanup_owned)。
      * **FD 回収より先** (票 S0-K §1c / F2 の順序修正)。close は未 commit の
      * rollback で journal を読み書きするので、そのときまだ main / journal の
@@ -1552,6 +1554,11 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
         frame[7] = 0;
         goto syscall_complete;
     }
+
+    int strings = kapi_strings_call(slot, (void *)wrapptr, args_src,
+                                    nbytes, kapi_argptr[slot], &frame[7]);
+    if (strings < 0) ring3_fault_kill();
+    if (strings) goto syscall_complete;
 
     /* --- (補助) 明示ポインタ引数の早期範囲検証 (v2 M2e) --- */
     {

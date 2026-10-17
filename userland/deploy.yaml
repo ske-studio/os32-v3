@@ -289,6 +289,10 @@ filesystem:
     - host: userland/tests/kprint_boundary.bin
       guest: /usr/bin/
       tags: [test]
+    # T4b-8b: remaining B1 input groups, faults and FM STOP.
+    - host: userland/tests/kstr_boundary.bin
+      guest: /usr/bin/
+      tags: [test]
     # --- kstr_bench (票 TASK_KSTRING_BENCH: kstring の asm 版と C 版を実機で測る。
     #     出力は `KSTR ...` の固定書式で、集計は tools/kstr_bench_report.py) ---
     - host: userland/tests/kstr_bench.bin
