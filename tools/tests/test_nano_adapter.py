@@ -337,6 +337,27 @@ MUTATIONS += [
 ]
 EXPECTED_CHECKS += ['yields <= 1', 'yields <= 1', 'malloc(8) == NULL && yields == 0', 'malloc(65536) == NULL && yields == before', 'malloc(65536) == NULL && yields == 0', 'calloc(0,8) == NULL && yields == 0', '((const unsigned char *)p)[i] == byte', 'unmaps == old_unmaps+1 && mapped[0] == 0', 'done_calls == 0 && serve_probe == 2']
 
+# T3c4: compile-valid policy mutations, checked at their runtime assertion.
+MUTATIONS += [
+    ('required < NANO_SECONDARY_MIN ? NANO_SECONDARY_MIN : required',
+     'required', 1, 'secondary preference removed'),
+    ('if (!base && bytes > required)', 'if (0)', 1, 'secondary fallback removed'),
+    ('bytes = required;\n        base =', 'bytes = NANO_SECONDARY_MIN;\n        base =',
+     1, 'fallback repeats preferred size'),
+    ('if (!base && bytes > required)', 'if (!base && bytes >= required)',
+     1, 'fallback duplicates unchanged size'),
+    ('a->mapped_end = base + bytes;', 'a->mapped_end = base + required;',
+     1, 'preferred mapping boundary truncated'),
+]
+EXPECTED_CHECKS += [
+    'attempts == before+1 && last_map_bytes == 65536u && last_flags == 0',
+    'p && a.next && attempts == before+2',
+    'p && a.next && attempts == before+2',
+    'attempts == before+1 && last_map_bytes == rounded[i]',
+    # The earlier full unmap must cover the actual preferred mapping.
+    'mapped[i] == bytes',
+]
+
 assert len(EXPECTED_CHECKS) == len(MUTATIONS)
 
 

@@ -7,6 +7,11 @@ check-allocator-bench-host:
 - tools/tests/host32.py
 - exec/appmem.c
 - exec/appmem.h
+- exec/exec.c
+- exec/exec_kapi_init.inc
+- exec/appslot.h
+- kernel/paging.h
+- include/ksetjmp.h
 - include/appmem_types.h
 - include/memmap.h
 - sdk/include/os32/os32_kapi_shared.h

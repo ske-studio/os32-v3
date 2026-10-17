@@ -186,6 +186,7 @@ static unsigned char secondary[MAP_SLOTS][MAP_CAPACITY] __attribute__((aligned(O
 static size_t mapped[MAP_SLOTS];
 static unsigned maps, unmaps, last_flags, attempts;
 static int reject_map, reject_unmap;
+static size_t map_limit = MAP_CAPACITY, previous_map_bytes, last_map_bytes;
 static int trim_fixture;
 static uintptr_t primary_end, trim_fail_base, trim_unmap_base;
 static size_t trim_unmap_bytes, grow_ceiling;
@@ -217,8 +218,9 @@ static void *map_secondary(void *opaque, size_t bytes, unsigned flags)
     CHECK(opaque == &maps);
     callback_checks();
     attempts++; last_flags=flags;
+    previous_map_bytes=last_map_bytes; last_map_bytes=bytes;
     CHECK(flags == 0 || flags == OS32_NANO_TOPDOWN);
-    if (reject_map || bytes > MAP_CAPACITY) return NULL;
+    if (reject_map || bytes > map_limit) return NULL;
     for (unsigned i=0; i<MAP_SLOTS; i++) if (!mapped[i]) {
         mapped[i]=bytes; maps++;
         memset(secondary[i],0,bytes);
@@ -311,9 +313,9 @@ static void automatic_tests(void)
     other=a.next;
     memset(p,0x39,2*OS32_NANO_PAGE);
     reject_map=1;
-    CHECK(realloc(p,8*OS32_NANO_PAGE)==NULL && ((unsigned char*)p)[8191]==0x39 && other->live==1);
+    CHECK(realloc(p,14*OS32_NANO_PAGE)==NULL && ((unsigned char*)p)[8191]==0x39 && other->live==1);
     reject_map=0;
-    q=realloc(p,8*OS32_NANO_PAGE);
+    q=realloc(p,14*OS32_NANO_PAGE);
     CHECK(q && ((unsigned char*)q)[8191]==0x39 && unmaps==2 && a.next!=other);
     other=a.next;
     /* Foreign pointers leave all arenas and live contents intact. */
@@ -334,7 +336,7 @@ static void automatic_tests(void)
     free(r);
     CHECK(a.next==NULL && unmaps==3);
     /* Two live arenas: freeing one must not touch its neighbor's state. */
-    p=calloc(1,2*OS32_NANO_PAGE); q=malloc(8*OS32_NANO_PAGE);
+    p=calloc(1,2*OS32_NANO_PAGE); q=malloc(14*OS32_NANO_PAGE);
     CHECK(p && q && ((unsigned char*)p)[8191]==0);
     memset(q,0x58,8*OS32_NANO_PAGE);
     CHECK(os32_nano_select(&a));
@@ -428,9 +430,11 @@ static void same_bytes(const void *p, unsigned byte, size_t n)
 static void same_state(const struct os32_nano_arena *arena,
                        const struct os32_nano_arena *saved)
 {
-    CHECK(arena->free_list == saved->free_list && arena->brk == saved->brk &&
-          arena->mapped_end == saved->mapped_end && arena->sbrk_start == saved->sbrk_start &&
-          arena->initial == saved->initial && arena->next == saved->next && arena->live == saved->live);
+    CHECK(arena->free_list == saved->free_list);
+    CHECK(arena->brk == saved->brk);
+    CHECK(arena->mapped_end == saved->mapped_end);
+    CHECK(arena->sbrk_start == saved->sbrk_start);
+    CHECK(arena->initial == saved->initial && arena->next == saved->next && arena->live == saved->live);
     for (size_t i=0;i<sizeof(arena->info);i++)
         CHECK(((const unsigned char *)&arena->info)[i] == ((const unsigned char *)&saved->info)[i]);
 }
@@ -601,6 +605,78 @@ static void trim_tests(void)
     same_bytes(q,0x66,64); free(p); free(q); free(hole);
 }
 
+/* T3c4: preference/fallback are separate from the retained EFULL behavior. */
+static void secondary_policy_tests(void)
+{
+    void *p, *q, *keep;
+    struct os32_nano_arena saved, saved_other, *other;
+    unsigned before;
+
+    trim_reset(0);
+    keep=malloc(32); CHECK(keep); memset(keep,0x81,32);
+    a.limit=a.brk; /* Every further allocation must use secondary backing. */
+    before=attempts;
+    p=calloc(1,OS32_NANO_PAGE); CHECK(p && a.next);
+    other=a.next;
+    CHECK(attempts == before+1 && last_map_bytes == 65536u && last_flags == 0);
+    CHECK(other->mapped_end-other->map_base == 65536u);
+    same_bytes(p,0,OS32_NANO_PAGE);
+    q=malloc(OS32_NANO_PAGE); CHECK(q && other->live == 2);
+    CHECK(attempts == before+1 && a.next == other && !other->next);
+    memset(p,0x82,OS32_NANO_PAGE);
+    free(q);
+    uintptr_t keep_end=page_up((uintptr_t)other->free_list+12u);
+    CHECK(os32_nano_trim() == (65536u-(keep_end-other->map_base))/OS32_NANO_PAGE);
+    CHECK(other->mapped_end == keep_end && mapped[0] == keep_end-other->map_base);
+    same_bytes(p,0x82,OS32_NANO_PAGE); same_bytes(keep,0x81,32);
+    free(p); CHECK(!a.next && !mapped[0]); free(keep);
+
+    trim_reset(0); a.limit=a.brk;
+    map_limit=3u*OS32_NANO_PAGE; before=attempts;
+    p=calloc(1,OS32_NANO_PAGE);
+    CHECK(p && a.next && attempts == before+2);
+    CHECK(previous_map_bytes == 65536u && last_map_bytes == 3u*OS32_NANO_PAGE && last_flags == 0);
+    other=a.next;
+    CHECK(other->mapped_end-other->map_base == 3u*OS32_NANO_PAGE && mapped[0] == 3u*OS32_NANO_PAGE);
+    same_bytes(p,0,OS32_NANO_PAGE);
+    reject_unmap=OS32_ERR_FULL;
+    free(p); CHECK(a.next == other && !other->live);
+    saved=a; saved_other=*other;
+    CHECK(os32_nano_trim() == 0);
+    same_state(&a,&saved); same_state(other,&saved_other);
+    reject_unmap=0;
+    CHECK(os32_nano_trim() == 3 && !a.next && !mapped[0]);
+    map_limit=MAP_CAPACITY;
+
+    /* Both maps fail with a live neighboring arena: nothing is published. */
+    trim_reset(0);
+    keep=malloc(32); CHECK(keep); memset(keep,0x83,32); a.limit=a.brk;
+    p=malloc(14u*OS32_NANO_PAGE); CHECK(p && a.next);
+    memset(p,0x84,14u*OS32_NANO_PAGE);
+    other=a.next; other->grow_exact=blocked_grow;
+    saved=a; saved_other=*other; before=attempts; map_limit=0; reent._errno=0;
+    CHECK(malloc(2u*OS32_NANO_PAGE) == NULL && reent._errno == ENOMEM);
+    CHECK(attempts == before+2 && previous_map_bytes == 65536u && last_map_bytes == 4u*OS32_NANO_PAGE);
+    same_state(&a,&saved); same_state(other,&saved_other);
+    same_bytes(keep,0x83,32); same_bytes(p,0x84,14u*OS32_NANO_PAGE);
+    map_limit=MAP_CAPACITY; free(p); free(keep); CHECK(!a.next);
+
+    /* Rounding to/above the preference must not retry the identical request. */
+    const size_t requests[]={60000u,65535u};
+    const size_t rounded[]={65536u,18u*OS32_NANO_PAGE};
+    for (unsigned i=0;i<2;i++) {
+        trim_reset(0); keep=malloc(32); CHECK(keep); a.limit=a.brk;
+        map_limit=0; before=attempts; saved=a;
+        CHECK(malloc(requests[i]) == NULL && reent._errno == ENOMEM);
+        CHECK(attempts == before+1 && last_map_bytes == rounded[i]);
+        same_state(&a,&saved);
+        map_limit=MAP_CAPACITY;
+        p=malloc(requests[i]); CHECK(p && a.next && last_flags == 0);
+        CHECK(a.next->mapped_end-a.next->map_base == rounded[i]);
+        free(p); CHECK(!a.next && !mapped[0]); free(keep);
+    }
+}
+
 static int recover_on_yield;
 static void *retry_old;
 static i32 retry_yield(void)
@@ -697,5 +773,5 @@ static void retry_tests(void)
 
 void _start(void)
 {
-    tests(); trim_tests(); retry_tests(); write_text("nano adapter: ",14); number(checks); write_text(" checks GREEN\n",14); stop(0);
+    tests(); trim_tests(); secondary_policy_tests(); retry_tests(); write_text("nano adapter: ",14); number(checks); write_text(" checks GREEN\n",14); stop(0);
 }

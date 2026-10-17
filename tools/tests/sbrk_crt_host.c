@@ -15,6 +15,17 @@ static KernelAPI api;
 static unsigned calls, map_bytes;
 static uintptr_t map_base;
 static int mode;
+#ifndef OS32_CRT_RESIDENT
+static unsigned char secondary[65536] __attribute__((aligned(OS32_NANO_PAGE)));
+static unsigned secondary_cap, secondary_calls, secondary_bytes;
+static int secondary_used;
+static int __cdecl fake_unmap(void *base, u32 bytes)
+{
+    if (base != secondary || bytes != secondary_bytes || !secondary_used) return -1;
+    secondary_used = 0;
+    return 0;
+}
+#endif
 
 static void report(const char *s)
 {
@@ -29,6 +40,14 @@ static void *__cdecl fake_map(u32 bytes, void *hint, u32 flags)
     calls++;
     map_bytes = bytes;
     map_base = (uintptr_t)hint;
+#ifndef OS32_CRT_RESIDENT
+    if (!flags && !hint) {
+        secondary_calls++;
+        if (bytes > secondary_cap || secondary_used) return NULL;
+        secondary_used = 1; secondary_bytes = bytes;
+        return secondary;
+    }
+#endif
     if (flags != OS32_MEM_MAP_EXACT) return NULL;
     if (mode == 1) return NULL;
     if (mode == 2) return (void *)(map_base + OS32_NANO_PAGE);
@@ -122,6 +141,21 @@ static int run(void)
     api.sbrk_heap_limit = mapped;
     CHECK((uintptr_t)sbrk(0) == mapped + 2u * OS32_NANO_PAGE + 1u && calls == 4,
           "parent arena retained");
+    /* Actual CRT map/unmap wrappers, including the preferred-size retry. */
+    api.mem_unmap = fake_unmap;
+    primary_arena.limit = primary_arena.brk;
+    const unsigned caps[] = {sizeof(secondary), 3u * OS32_NANO_PAGE};
+    for (unsigned i = 0; i < 2; i++) {
+        secondary_cap = caps[i]; secondary_calls = 0;
+        void *p = malloc(OS32_NANO_PAGE);
+        CHECK(p && secondary_calls == i + 1 && secondary_bytes == caps[i],
+              "CRT secondary preference and fallback");
+        CHECK(primary_arena.next && primary_arena.next->mapped_end ==
+              (uintptr_t)secondary + caps[i], "CRT secondary actual boundary");
+        memset(p, 0x59, OS32_NANO_PAGE);
+        free(p);
+        CHECK(!primary_arena.next && !secondary_used, "CRT secondary full release");
+    }
 #endif
     reset(0xfffffff0u, UINTPTR_MAX, UINTPTR_MAX);
     CHECK(sbrk(32) == (void *)-1 && errno == ENOMEM && primary_arena.brk == 0xfffffff0u && calls == 0,
