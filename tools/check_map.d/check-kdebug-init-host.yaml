@@ -11,6 +11,8 @@ check-kdebug-init-host:
 - include/kprintf.h
 - include/memmap.h
 - kernel/module.c
+- kernel/module_runtime.c
+- kernel/module_runtime.h
 - kernel/module.h
 - kernel/module_image.c
 - kernel/module_image.h

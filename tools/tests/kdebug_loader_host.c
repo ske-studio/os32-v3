@@ -112,6 +112,14 @@ int pgalloc_free_n_owner(u32 owner, u32 pfn, int n)
     kmemset(pool, 0xdd, n * PAGE_SIZE);
     return 1;
 }
+int ledger_reclaim_owner(u32 owner, u32 *reclaimed)
+{
+    CHECK(owner == (LEDGER_OWNER_FIXED_LAST + 1));
+    *reclaimed = pages;
+    pages = 0;
+    kmemset(pool, 0xdd, CAP);
+    return 1;
+}
 void kprintf(unsigned char color, const char *format, ...)
 {
     (void)color;

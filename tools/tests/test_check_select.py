@@ -836,8 +836,9 @@ def case_mk_real_tree(cs):
         shutil.rmtree(os.path.join(fx.d, "tools"))
         os.symlink(os.path.join(cs.ROOT, "tools"), os.path.join(fx.d, "tools"))
         r = fx.plan(files=["build/sdk.mk", "Makefile"], map_=m)
-        # Layout artifact readers now track build/** even with no recipe delta.
-        _only(r, "check-memmap-host")
+        # Layout/SQLite prototype artifact readers select SDK build changes even
+        # with no recipe delta (the prototype was added in T4a-2).
+        _only(r, "check-memmap-host", "check-sqlite-module-proto-host")
         assert any("新しい検査 0 本" in l and "追加選択なし" in l for l in r[3]), r[3]
         rel = "build/checks.d/check-time-math-host.mk"
         text = pathlib.Path(fx.d, rel).read_text()

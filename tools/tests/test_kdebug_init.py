@@ -134,7 +134,7 @@ def main():
         (folder / 'kernel_selftest_dispatch.h').write_text(boot_dispatch(kernel_source))
         def build_loader(module_source):
             command([*host, ROOT / 'tools/tests/kdebug_loader_host.c',
-                     module_source, ROOT / 'kernel/module_image.c',
+                     module_source, ROOT / 'kernel/module_image.c', ROOT / 'kernel/module_runtime.c',
                      ROOT / 'kernel/kselftest_report.c', folder / 'loader_exports.c', '-o', exe])
         build_loader(ROOT / 'kernel/module.c')
         cases = [('off', 0, 0, 0, image), ('other-config', 2, 0, 0, image),

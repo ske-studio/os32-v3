@@ -1,0 +1,293 @@
+/* Actual transaction core + validator, with destructive VFS/page fixtures. */
+#include "module_runtime.h"
+#include "pgalloc.h"
+#include "memmap.h"
+#include "vfs.h"
+#include "kstring.h"
+
+#define IMAGE_SIZE 4160U
+#define OWNER_PAGES 4U
+static u8 file[IMAGE_SIZE];
+static u8 pool[MODULE_RECORD_CAP][OWNER_PAGES * PAGE_SIZE]
+    __attribute__((aligned(PAGE_SIZE)));
+static u32 live[MODULE_RECORD_CAP], mask[MODULE_RECORD_CAP];
+static u32 input[2], pos, fd_live, opens, closes, allocations, fail_at;
+static u32 starts, cleans, clean_order, returned, retired, fail_cleanup;
+static struct module_handle current;
+static void finish(int code) __attribute__((noreturn));
+static void finish(int code)
+{
+    __asm__ volatile("int $0x80" : : "a"(1), "b"(code) : "memory");
+    for (;;) { }
+}
+#define CHECK(x) do { if (!(x)) { \
+    const char msg[] = "FAIL " #x "\n"; \
+    __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(msg), "d"(sizeof(msg)-1) : "memory"); \
+    finish(1); \
+} } while (0)
+void *kmemcpy(void *d, const void *s, u32 n)
+{
+    for (u32 i = 0; i < n; i++) ((u8 *)d)[i] = ((const u8 *)s)[i];
+    return d;
+}
+void *kmemset(void *d, int c, u32 n)
+{
+    for (u32 i = 0; i < n; i++) ((u8 *)d)[i] = c;
+    return d;
+}
+int memcmp(const void *a, const void *b, u32 n)
+{
+    for (u32 i = 0; i < n; i++)
+        if (((const u8 *)a)[i] != ((const u8 *)b)[i]) return 1;
+    return 0;
+}
+static void read_input(void *p, u32 size)
+{
+    while (size) {
+        int rc;
+        __asm__ volatile("int $0x80" : "=a"(rc) : "0"(3), "b"(0), "c"(p), "d"(size) : "memory");
+        CHECK(rc > 0);
+        size -= rc; p = (u8 *)p + rc;
+    }
+}
+int vfs_open(const char *path, int mode)
+{
+    CHECK(path[0] == '/' && mode == O_RDONLY && !fd_live);
+    opens++; fd_live = 1; pos = 0;
+    return 3;
+}
+void vfs_close(int fd) { CHECK(fd == 3 && fd_live); fd_live = 0; closes++; }
+int vfs_fstat(int fd, OS32_Stat *st)
+{
+    CHECK(fd == 3 && fd_live); st->st_size = IMAGE_SIZE; return 0;
+}
+int vfs_read_fd(int fd, void *dst, u32 n)
+{
+    CHECK(fd == 3 && fd_live && n <= IMAGE_SIZE - pos);
+    kmemcpy(dst, file + pos, n); pos += n; return n;
+}
+static u32 index_of(u32 owner)
+{
+    CHECK(owner > LEDGER_OWNER_FIXED_LAST);
+    u32 i = owner - LEDGER_OWNER_FIXED_LAST - 1;
+    CHECK(i < MODULE_RECORD_CAP && live[i]);
+    return i;
+}
+int ledger_owner_new(u32 kind, u32 id, const char *name, u32 *owner)
+{
+    CHECK(kind == LEDGER_KIND_MODULE && id == MODULE_ID_KDEBUG && name[0]);
+    if (++allocations == fail_at) return 0;
+    for (u32 i = 0; i < MODULE_RECORD_CAP; i++) if (!live[i]) {
+        live[i] = 1; *owner = LEDGER_OWNER_FIXED_LAST + 1 + i; return 1;
+    }
+    finish(2);
+}
+u32 pgalloc_alloc_phys(u32 owner, int n)
+{
+    u32 i = index_of(owner);
+    if (++allocations == fail_at) return 0;
+    CHECK(n > 0 && (u32)n <= OWNER_PAGES);
+    u32 bits = (1U << n) - 1;
+    for (u32 p = 0; p + n <= OWNER_PAGES; p++) if (!(mask[i] & (bits << p))) {
+        mask[i] |= bits << p;
+        kmemset(pool[i] + p * PAGE_SIZE, 0xcc, n * PAGE_SIZE);
+        return (u32)(uptr)(pool[i] + p * PAGE_SIZE);
+    }
+    finish(2);
+}
+int pgalloc_free_n_owner(u32 owner, u32 pfn, int n)
+{
+    u32 i = index_of(owner);
+    u32 first = (u32)(uptr)pool[i] / PAGE_SIZE;
+    CHECK(pfn >= first && n > 0 && pfn - first + n <= OWNER_PAGES);
+    u32 bits = ((1U << n) - 1) << (pfn - first);
+    CHECK((mask[i] & bits) == bits);
+    mask[i] &= ~bits;
+    kmemset(pool[i] + (pfn - first) * PAGE_SIZE, 0xdd, n * PAGE_SIZE);
+    returned += n;
+    return 1;
+}
+int ledger_reclaim_owner(u32 owner, u32 *pages)
+{
+    u32 i = index_of(owner);
+    *pages = 0;
+    for (u32 p = 0; p < OWNER_PAGES; p++) if (mask[i] & (1U << p)) {
+        CHECK(pgalloc_free_n_owner(owner, (u32)(uptr)pool[i] / PAGE_SIZE + p, 1));
+        ++*pages;
+    }
+    return 1;
+}
+int ledger_owner_retire(u32 owner)
+{
+    u32 i = index_of(owner);
+    CHECK(!mask[i]); live[i] = 0; retired++; return 1;
+}
+static void empty(void)
+{
+    CHECK(!fd_live && opens == closes);
+    for (u32 i = 0; i < MODULE_RECORD_CAP; i++) CHECK(!live[i] && !mask[i]);
+}
+static int quiesce(struct module_record *r)
+{
+    current.slot = (u32)(r - module_records); current.generation = r->generation;
+    CHECK(r->state == MODULE_ROLLING_BACK && !module_exports(current));
+    CHECK(clean_order == 0); clean_order = 1; cleans++;
+    /* The previous module must remain available while a consumer cleans up. */
+    for (u32 i = 0; i < r->dependency_count; i++)
+        CHECK(module_exports(r->dependencies[i]));
+    return fail_cleanup != 1;
+}
+static int detach(struct module_record *r)
+{
+    CHECK(clean_order == 1); clean_order = 2;
+    if (fail_cleanup != 2) {
+        if (input[0] != 8 || input[1] != MODULE_REF_IRQ)
+            while (r->irq_refs) CHECK(module_ref_release(current, MODULE_REF_IRQ));
+        if (input[0] != 8 || input[1] != MODULE_REF_TICK)
+            while (r->tick_refs) CHECK(module_ref_release(current, MODULE_REF_TICK));
+        if (input[0] != 8 || input[1] != MODULE_REF_CALLBACK)
+            while (r->callback_refs) CHECK(module_ref_release(current, MODULE_REF_CALLBACK));
+        if (input[0] != 8 || input[1] != MODULE_REF_ACTIVE)
+            while (r->active_refs) CHECK(module_ref_release(current, MODULE_REF_ACTIVE));
+    }
+    return fail_cleanup != 2;
+}
+static int stop_dma(struct module_record *r)
+{
+    CHECK(clean_order == 2); clean_order = 0;
+    if (fail_cleanup != 3 && (input[0] != 8 || input[1] != MODULE_REF_DMA))
+        while (r->dma_refs) CHECK(module_ref_release(current, MODULE_REF_DMA));
+    return fail_cleanup != 3;
+}
+static int start(struct module_record *r, u32 entry, u32 *ops)
+{
+    starts++;
+    current.slot = (u32)(r - module_records); current.generation = r->generation;
+    CHECK(r->state == MODULE_STARTING && !module_exports(current));
+    CHECK(entry == r->init && ops[0] == 2 && ops[5] == r->base + 10);
+    CHECK(!fd_live);
+    /* Real BSS zeroing/import resolution, and actual body code execution. */
+    CHECK(*(u32 *)(uptr)(r->base + 32) == 0x12345678U);
+    for (u32 i = 64; i < PAGE_SIZE; i++) CHECK(!((u8 *)(uptr)r->base)[i]);
+    CHECK(((int (*)(void))(uptr)entry)() == 0);
+    CHECK(!module_ref_acquire(current, r->owner + 1, MODULE_REF_IRQ, r->text));
+    CHECK(!module_ref_acquire(current, r->owner, MODULE_REF_TICK, r->text + r->text_size));
+    for (u32 kind = MODULE_REF_IRQ; kind <= MODULE_REF_ACTIVE; kind++)
+        CHECK(module_ref_acquire(current, r->owner, kind,
+                                 kind <= MODULE_REF_CALLBACK ? r->text : 0));
+    if (!pgalloc_alloc_phys(r->owner, 1)) return 1;
+    if (!pgalloc_alloc_phys(r->owner, 1)) return 1;
+    if (input[0] == 3) ops[5]++;
+    return input[0] == 2;
+}
+static struct module_symbol_contract imports[] = {{0xd8ef36fcU, 1, 1}};
+static struct module_symbol_contract exports[MODULE_OPS_SLOTS];
+static u32 addresses[] = {0x12345678U};
+static struct module_request request(void)
+{
+    /* Hashes are supplied from the independent Python fixture's contracts. */
+    struct module_request q = {
+        .path = "/boot/test.mod", .name = "fixture",
+        .policy = {75, 3, 0x12345678, 0xabcdef01, 2, 1, 1,
+                   imports, exports, MODULE_ID_KDEBUG},
+        .imports = addresses,
+        .lifecycle = {start, quiesce, detach, stop_dma}
+    };
+    return q;
+}
+static void abort_one(struct module_handle h)
+{
+    current = h;
+    CHECK(!module_abort(h));
+    u32 before = returned;
+    CHECK(!module_abort(h) && returned == before);
+}
+void _start(void)
+{
+    read_input(input, sizeof(input)); read_input(file, sizeof(file));
+    /* Decode contract hashes independently from the file's known records. */
+    kmemcpy(&imports[0].name_hash, file + 152, 4);
+    kmemcpy(&exports[4].name_hash, file + 164, 4);
+    exports[4].version = 1;
+    int rc;
+    __asm__ volatile("int $0x80" : "=a"(rc) : "0"(125), "b"(pool), "c"(sizeof(pool)), "d"(7) : "memory");
+    CHECK(!rc);
+    struct module_request q = request();
+    struct module_handle h = {0, 0};
+    fail_at = input[0] == 1 ? input[1] : 0;
+    rc = module_load(&q, &h);
+    if (!rc) {
+        CHECK(!module_exports(h) && !starts);
+        rc = module_start(h);
+    }
+    if (input[0] >= 1 && input[0] <= 3) {
+        CHECK(rc == (fail_at && fail_at <= 2 ? MODULE_NO_PAGES : MODULE_INIT_FAILED));
+        CHECK(module_record_get(h)->state == MODULE_ABSENT);
+        abort_one(h); empty(); finish(0);
+    }
+    CHECK(!rc && module_exports(h));
+    struct module_record *r = module_record_get(h);
+    CHECK(r->pages == 1 && !r->prefix_pages);
+    CHECK(((int (*)(void))(uptr)module_exports(h)[5])() == 42);
+    for (u32 i = 0; i < PAGE_SIZE; i++) CHECK(pool[0][i] == 0xdd);
+    CHECK(module_start(h) == MODULE_BUSY);
+    if (input[0] == 4 || input[0] == 8) {
+        /* Each incomplete stop stage must retain body and all owner pages. */
+        fail_cleanup = input[0] == 4 ? input[1] : 0; current = h;
+        u32 before = returned;
+        CHECK(module_abort(h) == MODULE_ISOLATED);
+        CHECK(r->state == MODULE_QUARANTINED && !module_exports(h));
+        CHECK(live[0] && mask[0] == 14 && returned == before && !retired);
+        CHECK(module_abort(h) == MODULE_ISOLATED && returned == before && cleans == 1);
+        finish(0);
+    }
+    if (input[0] == 5) {
+        /* Record saturation must not open a file or allocate an owner/page. */
+        struct module_handle all[MODULE_RECORD_CAP]; all[0] = h;
+        for (u32 i = 1; i < MODULE_RECORD_CAP; i++) {
+            CHECK(!module_load(&q, &all[i]));
+            CHECK(!module_start(all[i]));
+        }
+        u32 old_opens = opens, old_alloc = allocations;
+        struct module_handle unchanged = h;
+        CHECK(module_load(&q, &unchanged) == MODULE_RECORD_FULL);
+        CHECK(unchanged.slot == h.slot && unchanged.generation == h.generation);
+        CHECK(opens == old_opens && allocations == old_alloc);
+        for (u32 i = MODULE_RECORD_CAP; i; i--) abort_one(all[i - 1]);
+        empty(); finish(0);
+    }
+    if (input[0] == 6 || input[0] == 7) {
+        struct module_handle chain[2] = {h, {0, 0}};
+        q.dependencies = &h; q.dependency_count = 1;
+        CHECK(!module_load(&q, &chain[1]));
+        /* The request dependency table is temporary; record must own its copy. */
+        h.generation++; q.dependencies = 0;
+        CHECK(!module_start(chain[1]));
+        CHECK(module_exports(module_record_get(chain[1])->dependencies[0]));
+        if (input[0] == 7) {
+            current = chain[0]; u32 before = returned;
+            CHECK(module_abort(chain[0]) == MODULE_ISOLATED && returned == before);
+            CHECK(live[0] && live[1]); finish(0);
+        }
+        /* Exercise actual reverse helper (cleanup derives current from record). */
+        CHECK(!module_abort_reverse(chain, 2));
+        empty(); finish(0);
+    }
+    abort_one(h); empty();
+    /* Slot reuse invalidates old handles, including release and abort. */
+    struct module_handle next;
+    CHECK(!module_load(&q, &next));
+    CHECK(next.slot == h.slot && next.generation == h.generation + 1);
+    CHECK(!module_record_get(h) && !module_exports(h));
+    CHECK(!module_ref_release(h, MODULE_REF_IRQ));
+    CHECK(!module_abort(h));
+    abort_one(next); empty();
+    /* Refuse dependency storage overflow and stale dependencies before open. */
+    u32 old_opens = opens, old_alloc = allocations;
+    q.dependencies = &h; q.dependency_count = MODULE_DEPENDENCY_CAP + 1;
+    CHECK(module_load(&q, &next) == MODULE_BAD_DEPENDENCY);
+    q.dependency_count = 1;
+    CHECK(module_load(&q, &next) == MODULE_BAD_DEPENDENCY);
+    CHECK(opens == old_opens && allocations == old_alloc);
+    finish(0);
+}
