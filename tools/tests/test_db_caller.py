@@ -1,5 +1,5 @@
 """T2d d5: real wrappers/copy/walk, SQLite entry-only, small source closure."""
-TARGET_SRC = ['kapi/kapi_db.c', 'exec/exec.c', 'exec/redir_access.c', 'exec/access_walk.c', 'fs/vfs.c', 'kapi/kapi_generated.c', 'kdebug/kselftest.c']
+TARGET_SRC = ['kapi/kapi_db.c', 'kapi/kapi_strings.c', 'include/kapi_strings.h', 'exec/exec.c', 'exec/redir_access.c', 'exec/access_walk.c', 'fs/vfs.c', 'kapi/kapi_generated.c', 'kdebug/kselftest.c']
 
 import host32
 import argparse
@@ -21,11 +21,14 @@ def sources():
     trim_end = result['guards'].index('\n}', trim_start) + 2
     result['guards'] = result['guards'][:trim_start] + result['guards'][trim_end:]
     result['db'] = (walk.ROOT / 'kapi/kapi_db.c').read_text()
+    result['strings'] = (walk.ROOT / 'kapi/kapi_strings.c').read_text()
+    start = src.index('int exec_disk_write_allowed(void)')
+    result['disk_policy'] = src[start:src.index('\n}', start) + 2]
     result['str'] = (walk.ROOT / 'exec/ring3_str.c').read_text()
     result['vfs'] = (walk.ROOT / 'fs/vfs.c').read_text()
     generated = (walk.ROOT / 'kapi/kapi_generated.c').read_text()
     result['out_wrapper'] = generated[generated.index('#define KAPI_OUT_LEN('):generated.index('static u32 kapi_out_mul')]
-    for name in ('wrap_sys_stat', 'wrap_db_bind_text'):
+    for name in ('wrap_sys_stat', 'wrap_db_bind_text', 'wrap_sys_mount', 'wrap_sys_umount_checked', 'wrap_dev_blk_write'):
         start = generated.index('int __cdecl ' + name + '(')
         result['out_wrapper'] += generated[start:generated.index('\n}', start) + 2] + '\n'
     start = src.index('void __cdecl ring3_syscall_dispatch(')
@@ -43,6 +46,17 @@ def sources():
     return result
 
 MUTANTS = [
+    ('strings', 'args[i] = (u32)(uptr)p;', '(void)p;', 'public stat raw input'),
+    ('strings', '[KAPI_SLOT_SYS_MOUNT] = {7, 7, VFS_MAX_PATH}',
+     '[KAPI_SLOT_SYS_MOUNT] = {7, 0, VFS_MAX_PATH}', 'mount NULL killed before VFS'),
+    ('strings', '[KAPI_SLOT_SYS_UMOUNT_CHECKED] = {1, 1, VFS_MAX_PATH}',
+     '[KAPI_SLOT_SYS_UMOUNT_CHECKED] = {1, 0, VFS_MAX_PATH}', 'umount NULL killed before VFS'),
+    ('strings', '[KAPI_SLOT_DEV_BLK_WRITE] = {1, 1, VFS_MAX_PATH}',
+     '[KAPI_SLOT_DEV_BLK_WRITE] = {1, 0, VFS_MAX_PATH}', 'write NULL killed before authorization'),
+    ('vfs', 'if (!prefix || !dev_name || !fstype) return VFS_ERR_INVAL;',
+     'if (!prefix || !dev_name || !fstype) return VFS_ERR_IO;', 'mount NULL wrong target result'),
+    ('vfs', 'int i, rc;\n\n    if (!prefix) return VFS_ERR_INVAL;',
+     'int i, rc;\n\n    if (!prefix) return VFS_ERR_IO;', 'umount NULL wrong target result'),
     ('guest_probe', 'api->sbrk_heap_limit - 1u', '((void)api, 0x800000UL - 1u)', 'guest old low app boundary'),
     ('db', 'rc = vfs_stat(abs_path_buf, &st);', 'rc = wrap_sys_stat(abs_path_buf, &st);', 'internal stat routed through public guard'),
     ('out_wrapper', 'KAPI_OUT_LEN(buf, sizeof(OS32_Stat))', '0u', 'public stat output unchecked'),
@@ -71,7 +85,7 @@ def main():
     args = parser.parse_args()
     host32.begin_control(args.mutate, args.runner, walk.ROOT)
     paths = [walk.ROOT / p for p in list(walk.FILES.values()) +
-             ['exec/exec.c', 'exec/ring3_str.c', 'kapi/kapi_db.c', 'fs/vfs.c',
+             ['exec/exec.c', 'exec/ring3_str.c', 'kapi/kapi_db.c', 'kapi/kapi_strings.c', 'fs/vfs.c',
               'kapi/kapi_generated.c', 'userland/tests/db_v50_test.c', 'tools/tests/db_caller_host.c']]
     hashes = {p: hashlib.sha256(p.read_bytes()).digest() for p in paths}
     src = sources()

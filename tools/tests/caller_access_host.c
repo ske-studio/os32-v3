@@ -7,6 +7,9 @@
 #include <string.h>
 #include "appslot.h"
 #include "v86.h"
+#include "os32_kapi_slots.h"
+#include "kapi_print.h"
+#include "kapi_strings.h"
 #define __KSTRING_H
 void *kmemcpy(void *d, const void *s, u32 n) { return memcpy(d, s, n); }
 #define IO_H
@@ -45,6 +48,16 @@ static void exec_park_stop(u32 *frame) { (void)frame; stop_park_calls++; }
 static int ring3_ptr_ok(u32 p) { (void)p; return 1; }
 static void ring3_fault_kill(void) { longjmp(killed, 1); }
 static u32 kapi_invoke(void *fn, const void *args, u32 n);
+/* This fixture uses a non-string slot to test caller identity and nesting.
+ * String staging/output boundaries are exercised by db_caller/kapi_strings. */
+int kapi_print_call(const void *args) { (void)args; assert(0); return 0; }
+int kapi_strings_call(u32 slot, void *target, const void *args,
+                      u32 nbytes, u16 ptrmask, u32 *result)
+{
+    assert(slot == 0);
+    (void)target; (void)args; (void)nbytes; (void)ptrmask; (void)result;
+    return 0;
+}
 #include "ring3_ls.h"
 static int ls_calls;
 int ring3_ls_dispatch(u32 user_esp)

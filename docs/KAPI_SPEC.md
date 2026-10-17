@@ -371,7 +371,7 @@ hash・リンク入力を記録する。空の apps/game は除外と明記し�
 
 ページの最後または上限の最後の NUL は成功し、その次を読まない。欠落ページ・範囲外・上限内未終端・確保失敗は全 staging を返してから fault-kill する。`sys_ls_window` と旧 ls shim のパスも 256B 内の NUL を必須にし、上限で NUL を補わない。旧 `sys_ls` の USER callback 入口は引き続き拒否する。FEP は T5a-1、ページ 0 の NP 化は T7。
 
-VFS パスの NULL=cwd、`sys_redirect_fd` の NULL 拒否の戻り値、`loop_attach` / `sys_switch_shell` / `exec_start` / `launch_req` の NULL 拒否、V86 の NULL=ディスク無しと `v86_boot2` の second=NULL は、NULL をそのまま target に渡して保つ。通常の UTF-8・属性・MML・引数語は変更せず渡す。文字列のポインタを保持する target は既存の所有バッファへコピーする。staging は呼出し中だけ有効で、正常復帰・拒否で解放する。STOP/fault 等の非局所脱出では `exec_reclaim_resources` の先頭でその app ID の staging を回収する。親子の `exec_run` は別 ID の staging を使うため、子の回収で親のコマンドを返さない。1 呼出し最大 3 本、最大 4096B + allocator overhead (マウントは 3×256B)。
+VFS パスの NULL=cwd、`sys_redirect_fd` の NULL 拒否の戻り値、`sys_mount` の prefix/dev/fs と `sys_umount_checked` の prefix の NULL=`VFS_ERR_INVAL`、`dev_blk_write` の書込権限なしの `-1`、`loop_attach` / `sys_switch_shell` / `exec_start` / `launch_req` の NULL 拒否、V86 の NULL=ディスク無しと `v86_boot2` の second=NULL は、NULL をそのまま target に渡して保つ。NULL と非 NULL が混ざる場合も、非 NULL の全入力を写してから target を呼ぶ。通常の UTF-8・属性・MML・引数語は変更せず渡す。文字列のポインタを保持する target は既存の所有バッファへコピーする。staging は呼出し中だけ有効で、正常復帰・拒否で解放する。STOP/fault 等の非局所脱出では `exec_reclaim_resources` の先頭でその app ID の staging を回収する。親子の `exec_run` は別 ID の staging を使うため、子の回収で親のコマンドを返さない。1 呼出し最大 3 本、最大 4096B + allocator overhead (マウントは 3×256B)。
 
 ### API関数 (自動生成 — os32_kapi_generated.h 準拠)
 

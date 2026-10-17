@@ -4,6 +4,7 @@
 #define HOST_DB_CALLER_TEST
 #define HOST_CALLER_COPY_TEST
 #include "access_walk_host.c"
+#undef used
 void *memcpy(void *d, const void *s, u32 n) { return kmemcpy(d, s, n); }
 #include "ring3_str.h"
 #include "ring3_ls.h"
@@ -21,10 +22,22 @@ void ring3_fault_kill(void) {
 }
 #define KAPI_HIT(n) ((void)(n))
 #include "kapi_db.h"
+#include "kapi_print.h"
+#include "kapi_strings.h"
+#include "../../drivers/dev.h"
+int con_sink_is_enabled(void) { return 0; }
+#include "disk_policy_host_source.c"
+/* The denied write must return before device lookup or IO. */
+Device *dev_find(const char *name) { (void)name; CHECK(0); return 0; }
+int dev_blk_write_lba(Device *d, u32 lba, int count, const void *buf) {
+    (void)d; (void)lba; (void)count; (void)buf; CHECK(0); return -1;
+}
 #include "out_wrapper_host_source.c"
 #include "db_host_source.c"
 #include "db_group_shim.h"
 #include "vfs_host_source.c"
+/* NULL validation must return before any mount resource changes. */
+void vfs_fd_invalidate_mount(void *ctx) { (void)ctx; CHECK(0); }
 #include "guest_probe_host_source.c"
 #include "arg_tables_host_source.c"
 static u32 *g_cur_frame;
@@ -34,12 +47,32 @@ static void ring3_abort_check(void) {}
 static void ring3_gui_pump(void) {}
 static int stop_park_calls;
 static void exec_park_stop(u32 *frame) { (void)frame; stop_park_calls++; }
-static u32 kapi_invoke(void *fn, const void *args, u32 n) {
+/* kprintf is outside this fixture; sys_stat uses the real string staging. */
+int kapi_print_call(const void *args) { (void)args; CHECK(0); return 0; }
+static char string_heap[KAPI_STRING_ARGS][KAPI_STRING_CAP];
+static int string_used[KAPI_STRING_ARGS];
+void *kmalloc(u32 size) {
+    CHECK(size <= KAPI_STRING_CAP);
+    for (u32 i = 0; i < KAPI_STRING_ARGS; i++)
+        if (!string_used[i]) { string_used[i] = 1; return string_heap[i]; }
+    CHECK(0); return 0;
+}
+void kfree(void *p) {
+    for (u32 i = 0; i < KAPI_STRING_ARGS; i++)
+        if (p == string_heap[i]) { CHECK(string_used[i]); string_used[i] = 0; return; }
+    CHECK(0);
+}
+u32 kapi_invoke(void *fn, const void *args, u32 n) {
     const u32 *a = args;
     (void)n;
     invoke_calls++;
+    if (fn == wrap_sys_stat) {
+        CHECK(a[0] != MEM_EXEC_LOAD_ADDR + 128);
+        CHECK(!kstrcmp((const char *)a[0], "/abc"));
+    }
     return ((u32 (*)(u32, u32, u32, u32, u32, u32))fn)(a[0], a[1], a[2], a[3], a[4], a[5]);
 }
+#include "strings_host_source.c"
 static u32 host_kapi_table[KAPI_FUNC_COUNT + 2];
 #define KAPI_ADDR host_kapi_table
 #define RING3_ARG_WINDOW 64u
@@ -50,16 +83,20 @@ static int dispatch_probe(u32 slot_id, u32 a, u32 b, u32 c, u32 d, int kill) {
     u32 frame[13] = {0};
     u32 *args = (u32 *)MEM_EXEC_LOAD_ADDR;
     args[1] = a; args[2] = b; args[3] = c; args[4] = d;
+    kmemcpy((u8 *)P2V(payload) + sizeof(u32), args + 1, 4 * sizeof(u32));
     frame[7] = slot_id; frame[11] = (u32)args;
     int parks_before = stop_park_calls;
     expect_kill = kill;
     if (__builtin_setjmp(kill_env)) {
         CHECK(stop_park_calls == parks_before);
+        /* Match the owner's nonlocal teardown after a public output fault. */
+        kapi_strings_cleanup_owned(current);
         expect_kill = 0;
         return -999;
     }
     ring3_syscall_dispatch(frame);
     CHECK(!kill && stop_park_calls == parks_before + 1);
+    for (u32 i = 0; i < KAPI_STRING_ARGS; i++) CHECK(!string_used[i]);
     return (int)frame[7];
 }
 
@@ -151,6 +188,9 @@ static void caller_copy_tests(void)
     mounts[0].ops = &host_ops;
     ((u32 *)KAPI_ADDR)[2 + KAPI_SLOT_DB_BIND_TEXT] = (u32)wrap_db_bind_text;
     ((u32 *)KAPI_ADDR)[2 + KAPI_SLOT_SYS_STAT] = (u32)wrap_sys_stat;
+    ((u32 *)KAPI_ADDR)[2 + KAPI_SLOT_SYS_MOUNT] = (u32)wrap_sys_mount;
+    ((u32 *)KAPI_ADDR)[2 + KAPI_SLOT_SYS_UMOUNT_CHECKED] = (u32)wrap_sys_umount_checked;
+    ((u32 *)KAPI_ADDR)[2 + KAPI_SLOT_DEV_BLK_WRITE] = (u32)wrap_dev_blk_write;
     g_cur_app = &slot;
     slot.stack_base = MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE;
     slot.stack_top = MEM_APP_STACK_TOP;
@@ -184,11 +224,16 @@ static void caller_copy_tests(void)
               (u32)guard_crossing_text(&api), 2, 0) == -1);
         CHECK(invoke_calls == invoked + 3 && ring3_range_reject_count == before);
         /* Public sys_stat still checks the app output before driver writes. */
-        kmemcpy((void *)(MEM_EXEC_LOAD_ADDR + 128), "/abc", 5);
+        kmemcpy(p + 128, "/abc", 5);
+        kmemcpy((void *)(MEM_EXEC_LOAD_ADDR + 128), "/raw", 5);
         u32 out = MEM_EXEC_LOAD_ADDR + 256;
         CHECK(dispatch_probe(KAPI_SLOT_SYS_STAT, MEM_EXEC_LOAD_ADDR + 128,
               out, 0, 0, 0) == 0);
         CHECK(((OS32_Stat *)out)->st_size == PAGE_SIZE);
+        u32 stat_input_before = vfs_calls;
+        kmemcpy(p + PAGE_SIZE - 4, "bad!", 4);
+        CHECK(dispatch_probe(KAPI_SLOT_SYS_STAT, va, out, 0, 0, 1) == -999);
+        CHECK(vfs_calls == stat_input_before);
         pt[index] &= ~PTE_RW;
         u32 stat_before = vfs_calls;
         ((OS32_Stat *)out)->st_size = 123;
@@ -197,6 +242,30 @@ static void caller_copy_tests(void)
         CHECK(vfs_calls == stat_before && ((OS32_Stat *)out)->st_size == 123);
         CHECK(ring3_range_reject_addr == out);
         pt[index] |= PTE_RW;
+        /* Real generated wrappers -> real VFS NULL validation, for every
+         * combination. Non-NULL inputs must still all copy before the call. */
+        kmemcpy(p + 512, "/mnt", 5);
+        kmemcpy(p + 528, "hd0", 4);
+        kmemcpy(p + 544, "fat", 4);
+        for (u32 nulls = 1; nulls < 8; nulls++) {
+            int calls_before = invoke_calls;
+            CHECK(dispatch_probe(KAPI_SLOT_SYS_MOUNT,
+                  nulls & 1 ? 0 : MEM_EXEC_LOAD_ADDR + 512,
+                  nulls & 2 ? 0 : MEM_EXEC_LOAD_ADDR + 528,
+                  nulls & 4 ? 0 : MEM_EXEC_LOAD_ADDR + 544, 0, 0) == VFS_ERR_INVAL);
+            CHECK(invoke_calls == calls_before + 1);
+        }
+        CHECK(dispatch_probe(KAPI_SLOT_SYS_UMOUNT_CHECKED, 0, 0, 0, 0, 0) == VFS_ERR_INVAL);
+        CHECK(!slot.disk_write_authorized);
+        CHECK(dispatch_probe(KAPI_SLOT_DEV_BLK_WRITE, 0, 0, 0, 0, 0) == -1);
+        for (u32 bad = 0; bad < 3; bad++) {
+            u32 mount_args[3] = {0, 0, 0};
+            mount_args[bad] = MEM_EXEC_LOAD_ADDR + PAGE_SIZE;
+            int calls_before = invoke_calls;
+            CHECK(dispatch_probe(KAPI_SLOT_SYS_MOUNT, mount_args[0],
+                  mount_args[1], mount_args[2], 0, 1) == -999);
+            CHECK(invoke_calls == calls_before);
+        }
         for (int entry = 0; entry < 5; entry++) {
             reset_db(); kmemcpy(p + PAGE_SIZE - 4, "abcd", 4);
             CHECK(ring3_ptr_ok(va));
@@ -302,7 +371,7 @@ static void caller_copy_tests(void)
     live->gen++;
     CHECK(!ring3_ptr_ok(MEM_LEASE_BASE));
     CHECK(!ring3_user_range_ok(MEM_LEASE_BASE, 4));
-    SAY("PASS: d5 real DB/copy/walk, guest dispatch boundary, internal VFS/public stat, RO/scratch/output/WM/IF/CR3");
+    SAY("PASS: d5 real DB/copy/walk, staged public stat/output, mount NULL=VFS_ERR_INVAL, denied write NULL=-1, RO/scratch/WM/IF/CR3");
     die(0);
 }
 

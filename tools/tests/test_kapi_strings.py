@@ -15,8 +15,9 @@ GROUPS = {
 NULLABLE = {name: 1 for name in (
     'sys_unlink sys_mkdir sys_rmdir sys_chdir sys_open sys_stat '
     'kcg_load_font loop_attach v86_disktest v86_boot sys_switch_shell '
-    'exec_start launch_req').split()}
-NULLABLE.update(sys_rename=3, sys_redirect_fd=2, v86_boot2=3)
+    'exec_start launch_req dev_blk_write').split()}
+NULLABLE.update(sys_rename=3, sys_redirect_fd=2, v86_boot2=3,
+                sys_mount=7, sys_umount_checked=1)
 TARGET_SRC = [*walk.FILES.values(), 'kapi/kapi_strings.c', 'include/kapi_strings.h',
               'exec/exec.c', 'sdk/kapi.json', 'exec/ring3_ls.c']
 
@@ -62,6 +63,15 @@ def run(args, mutant=None):
 
 def mutants(args):
     names = GROUPS if args.group == 'all' else [args.group]
+    if args.group in ('all', 'mount'):
+        for slot, mask in (('SYS_MOUNT', 7), ('SYS_UMOUNT_CHECKED', 1)):
+            yield ('strings', f'[KAPI_SLOT_{slot}] = {{{mask}, {mask}, VFS_MAX_PATH}}',
+                   f'[KAPI_SLOT_{slot}] = {{{mask}, 0, VFS_MAX_PATH}}',
+                   slot.lower() + ' NULL killed')
+    if args.group in ('all', 'device'):
+        yield ('strings', '[KAPI_SLOT_DEV_BLK_WRITE] = {1, 1, VFS_MAX_PATH}',
+               '[KAPI_SLOT_DEV_BLK_WRITE] = {1, 0, VFS_MAX_PATH}',
+               'dev_blk_write NULL killed')
     for group in names:
         slot = 'KAPI_SLOT_' + GROUPS[group].split()[0].upper()
         yield ('strings', 'args[i] = (u32)(uptr)p;',
