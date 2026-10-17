@@ -347,6 +347,13 @@ static void edge_opens(void)
 {
     Os32SqliteGroup a;
     Os32File f, main_file;
+    VfsFile saved_fds[VFS_MAX_OPEN_FILES];
+    const int unowned_flags[] = {
+        SQLITE_OPEN_READWRITE,
+        SQLITE_OPEN_MAIN_DB | SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
+        SQLITE_OPEN_MAIN_DB | SQLITE_OPEN_READONLY,
+        SQLITE_OPEN_MAIN_JOURNAL | SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE
+    };
     sqlite3_vfs *v = sqlite3_vfs_find("os32-g0");
     int i, before, out = 99;
     before = probes;
@@ -369,8 +376,12 @@ static void edge_opens(void)
     CHECK(os32_sqlite_group_finish(&a, SQLITE_OK) == SQLITE_OK);
     v = sqlite3_vfs_find("os32");
     before = probes;
-    CHECK(v->xOpen(v, "/legacy", &f.base, SQLITE_OPEN_READWRITE, NULL) == SQLITE_CANTOPEN);
-    CHECK(f.base.pMethods == NULL && probes == before);
+    memcpy(saved_fds, open_files, sizeof(saved_fds));
+    for (i = 0; i < (int)(sizeof(unowned_flags) / sizeof(unowned_flags[0])); i++) {
+        CHECK(v->xOpen(v, "/legacy", &f.base, unowned_flags[i], &out) == SQLITE_CANTOPEN);
+        CHECK(f.base.pMethods == NULL && f.fd == -1 && out == 99 && probes == before);
+        CHECK(!memcmp(saved_fds, open_files, sizeof(saved_fds)));
+    }
 }
 
 static void stale_group(void)

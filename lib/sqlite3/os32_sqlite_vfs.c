@@ -432,7 +432,8 @@ static int os32VfsOpen(sqlite3_vfs *pVfs, const char *zName,
 
     /* 一時ファイル (zName==NULL) はメモリストアで処理されるはず */
     if (zName == (const char *)0) return SQLITE_CANTOPEN;
-    if (g && (!group_active(g) || (flags & SQLITE_OPEN_URI))) return SQLITE_CANTOPEN;
+    /* Reject unowned opens before even backend/path probes. */
+    if (!g || !group_active(g) || (flags & SQLITE_OPEN_URI)) return SQLITE_CANTOPEN;
     if ((flags & SQLITE_OPEN_MAIN_DB) && !journal_name_fits(zName))
         return SQLITE_CANTOPEN;             /* 名前が長すぎる (NAMETOOLONG) */
 
@@ -460,13 +461,9 @@ static int os32VfsOpen(sqlite3_vfs *pVfs, const char *zName,
     if (flags & SQLITE_OPEN_READWRITE) oflags |= 0x0002; /* KAPI_O_RDWR */
     else                               oflags |= 0x0000; /* KAPI_O_RDONLY */
 
-    if (g) {
-        if (vfs_open_sqlite(zName, oflags, g->owner, &g->cookie,
-                            flags, &p->lease) != VFS_OK) return SQLITE_CANTOPEN;
-        p->fd = p->lease.fd;
-    } else {
-        return SQLITE_CANTOPEN; /* Every file belongs to a connection group. */
-    }
+    if (vfs_open_sqlite(zName, oflags, g->owner, &g->cookie,
+                        flags, &p->lease) != VFS_OK) return SQLITE_CANTOPEN;
+    p->fd = p->lease.fd;
     if (p->fd < 0) return SQLITE_CANTOPEN;
 
     p->readonly = !(oflags & O_RDWR);
