@@ -8,7 +8,9 @@
 #define RAW_MML_NOTES 128
 #define RAW_CHILD "/usr/bin/raw_wait_test.bin "
 #define RAW_COMMAND_BYTES 128
-#define RAW_DB_SQL "CREATE TABLE probe(x); INSERT INTO probe VALUES(73)"
+#define RAW_DB_CREATE "CREATE TABLE probe(x)"
+#define RAW_DB_INSERT "INSERT INTO probe VALUES(73)"
+#define RAW_IME_WARM_LIMIT 4
 #define RAW_SLOW_SQL \
     "WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<1000000) " \
     "SELECT sum(x) FROM n"
@@ -47,7 +49,8 @@ static int probe(KernelAPI *api, const char *entry, const char *end)
     if (!bytes) return 1;
     bytes[0] = 0x5a; bytes[RAW_USER_BYTES - 1] = 0xa5;
     int db = api->db_open(":memory:");
-    if (db < 0 || api->db_exec(db, RAW_DB_SQL) < 0) return 1;
+    if (db < 0 || api->db_exec(db, RAW_DB_CREATE) < 0 ||
+        api->db_exec(db, RAW_DB_INSERT) < 0) return 1;
     MemStat self;
     if (api->mem_stat(-1, &self, sizeof(self)) != sizeof(self)) return 1;
     api->kprintf(ATTR_WHITE,
@@ -92,10 +95,29 @@ static int parent_run(KernelAPI *api, const char *entry, const char *end)
      * mistaken for a child leak. This group stays alive across child exit. */
     u8 *sentinel = api->mem_alloc(RAW_USER_BYTES);
     int db = api->db_open(":memory:");
-    if (!sentinel || db < 0 || api->db_exec(db, RAW_DB_SQL) < 0) return 1;
+    if (!sentinel || db < 0 || api->db_exec(db, RAW_DB_CREATE) < 0 ||
+        api->db_exec(db, RAW_DB_INSERT) < 0) return 1;
     sentinel[0] = 0x39; sentinel[RAW_USER_BYTES - 1] = 0x93;
     if (strlen(RAW_CHILD) + strlen(entry) + strlen(end) + 2 > sizeof(command)) return 1;
     strcpy(command, RAW_CHILD); strcat(command, entry); strcat(command, " "); strcat(command, end);
+    /* db_mem_used includes the resident FEP's page cache and statements.
+     * PM uses only yomi "a" (あ), SPACE, ESC twice, FEP OFF, Q here and
+     * the same yomi for the child's STOP. Require two settled observations
+     * before accounting; never absorb growth observed after child exit. */
+    if ((!strcmp(entry, "imechar") || !strcmp(entry, "imekey")) && !strcmp(end, "stop")) {
+        u32 previous = api->db_mem_used();
+        int settled = 0;
+        for (int i = 0; i < RAW_IME_WARM_LIMIT; i++) {
+            api->kprintf(ATTR_WHITE,
+                "raw_wait WARMUP IME: ON hiragana, a, SPACE, ESC twice, OFF, Q\n");
+            int key = !strcmp(entry, "imechar") ? api->ime_getchar() : api->ime_getkey();
+            if ((key & 0xff) != 'Q') return 1;
+            u32 current = api->db_mem_used();
+            if (i > 0 && current == previous) { settled = 1; break; }
+            previous = current;
+        }
+        if (!settled) return 1;
+    }
     u32 sqlite_before = api->db_mem_used();
     if (api->mem_stat(-1, &before, sizeof(before)) != sizeof(before)) return 1;
     (void)api->exec_run(command);

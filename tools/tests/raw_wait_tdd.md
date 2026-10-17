@@ -11,11 +11,14 @@ SQLite guard と実代替 stack、実 exec の launch/resume 着地を ILP32/qem
 物理 I/O・入力 IRQ・CR3/iret・辞書 storage の代替部分はそれぞれの足場冒頭を参照。
 通常の GUI park と、park 不成立時の STOP 解除は別々に検査する。
 
-`MUTATE=1` は次の 11 件だけを写しに適用し、コンパイル成功と指定アサートでの RED を要求する。
+`MUTATE=1` は次の 14 件だけを写しに適用し、コンパイル成功と指定アサートでの RED を要求する。
 コンパイル失敗・タイムアウト・別アサートの失敗は変異検出の成功に数えない。
 
 | 変異 | 期待する実行時失敗 |
 |---|---|
+| fixture の FEP 事前検索を省略 | IME 親の正常対照 |
+| fixture の CREATE/INSERT を結合 | 単一文 SQL 代替による正常対照の拒否 |
+| fixture の INSERT エラーを無視 | INSERT 失敗対照 |
 | kbd getchar / getkey の取消削除 (2) | `input CUI abort` |
 | GUI fallback の取消削除 | `input GUI fallback STOP` |
 | IME getchar / getkey の候補取消削除 (2) | `IME char/key STOP cancels composition` |
@@ -41,8 +44,13 @@ fixture は通常 CPL3、`userland/deploy.yaml` に登録済み。公開 KAPI・
 先行入力を空にし、CUI はローカル shell を使う。rshell の kbd_getchar は既存のタイムアウトで
 空白を返すので、無入力 STOP の対照にはしない。serial は SerialFS のセッションを閉じて
 `s_gate=0`、接続相手から自動送信しない状態にする。ゲスト serial への入力は物理打鍵と区別する。
-IME の通常完了は OFF にして大文字 `Q` を送る。変換取消は ON にして「あ」等を作り SPACE で
-候補を開いた後に STOP。辞書切替で学習内容を削除しない。
+IME の通常完了は OFF にして大文字 `Q` を送る。変換取消の読みは「あ」に固定する。
+CUI の `parent imechar stop` / `parent imekey stop` は、基準採取前に `WARMUP` を表示する。
+表示のたびに、ひらがな ON → `a` → SPACE (候補表示) → ESC 2 回 (変換取消・読み消去)
+→ OFF → 大文字 `Q` を入力する。候補リストを Down で展開しない。
+同じ検索・取消後の SQLite 使用量が連続一致するまで最低 2 回、最大 4 回繰り返す。
+子の `READY` が出てから再びひらがな ON → `a` → SPACE で同じ「あ」の候補を表示し、CTRL+STOP。
+GUI でも読みは「あ」に固定する。辞書切替で学習内容を削除しない。
 
 | 口 (`entry`) | CUI 正常・STOP | GUI 正常・STOP |
 |---|---|---|
@@ -67,7 +75,7 @@ GUI の STOP park を採る回は syscall 入口から `APP_RUNAWAY_TICKS` 未�
 fixture の READY は app ID・USER owner pages/heap・SQLite bytes を別々に表示する。
 USER 96KiB と live `:memory:` DB は意図的に app に残す。CUI 親は子の正常/fault/STOP すべてで
 reclaim 差=1、phys_free_pages/親 owner_pages/heap 不変、leftover/bad_free 増加=0、SQLite 使用量の
-基準復帰、親 sentinel と次の mem_stat/DB 呼出しを照合する。
+事前検索後の基準復帰、親 sentinel と次の mem_stat/DB 呼出しを照合する。
 `raw_wait_test parent fault done` も実行し、#UD 後の親復帰を対照にする。
 `log` の初回辞書 load による常駐増分を子リークと混同しないため、既定辞書を事前に開き、
 同じ辞書への切替を一度成功させてから採取する。
@@ -81,6 +89,9 @@ reclaim 差=1、phys_free_pages/親 owner_pages/heap 不変、leftover/bad_free 
   free pages と `lib/sqlite3/os32_sqlite_vfs.c` の `groups` の接続勘定を前後で採取する。
   CUI の自動照合に加え、GUI kill 後は子 owner=0、reclaim 増分=1、slot FREE、
   SQLite pool 基準復帰、親/RESIDENT group が生存していることを確認する。
+  `db_mem_used()` は全 SQLite の量なので、それだけで子の group の消滅を判定しない。
+  IME の事前検索後を基準とし、子 group の回収と常駐 FEP の接続・保持 statement/cache の
+  生存を別々に採取する。
 - FM は STOP 直前に `fm_note_on` 到達を確認し、最後の `fm_note_off(0)` の実 OPN
   KEY_ONOFF 書込を I/O trace で確認する。無音だけを Key-OFF の証拠にしない。
 - IME は `g_ime` の kana/result/commit/rk と候補表示を確認する。CUI 読み手の終了で取消、

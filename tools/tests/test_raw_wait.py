@@ -29,11 +29,21 @@ CASES = {
 }
 
 
-def guest_fixture():
+def guest_fixture(mutation=None):
     root = pathlib.Path(__file__).resolve().parents[2]
     with tempfile.TemporaryDirectory(prefix='raw-wait-guest-') as directory:
         tmp = pathlib.Path(directory)
         source = (root / 'userland/tests/raw_wait_test.c').read_text()
+        if mutation == 'skip FEP warmup':
+            source = source.replace(
+                'if ((!strcmp(entry, "imechar") || !strcmp(entry, "imekey")) && !strcmp(end, "stop"))',
+                'if (0)')
+        elif mutation == 'combined SQL':
+            source = source.replace('"CREATE TABLE probe(x)"',
+                                    '"CREATE TABLE probe(x); INSERT INTO probe VALUES(73)"')
+        elif mutation == 'ignore INSERT error':
+            source = source.replace('api->db_exec(db, RAW_DB_INSERT) < 0',
+                                    '(api->db_exec(db, RAW_DB_INSERT), 0)')
         (tmp / 'guest_source.inc').write_text(source.replace('#include <string.h>', ''))
         exe = tmp / 'test'
         subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2',
@@ -46,7 +56,17 @@ def guest_fixture():
                         '-o', str(exe)], check=True)
         result = host32.run([str(exe)], runner='qemu', capture_output=True, text=True, timeout=30)
         print(result.stdout + result.stderr, end='', flush=True)
-        assert result.returncode == 0, result.returncode
+        if mutation:
+            expected = {
+                'skip FEP warmup': 'FAIL guest fixture: raw_guest_main(4,argv,&table)==(leak ? 1 : 0)',
+                'combined SQL': 'FAIL guest fixture: raw_guest_main(3,argv,&table)==0 && saw_pass==1 && !bad',
+                'ignore INSERT error': 'FAIL guest fixture: raw_guest_main(3,argv,&table)==1 && !reads && sql_calls==failure',
+            }[mutation]
+            assert result.returncode == 1 and expected in result.stdout, (
+                mutation, result.returncode, result.stdout, result.stderr)
+            print(f'RED runtime: guest {mutation}', flush=True)
+        else:
+            assert result.returncode == 0, result.returncode
 
 
 def main():
@@ -62,6 +82,8 @@ def main():
     assert status == 'pass', (status, log)
     print('PASS raw waits: real exec cleanup once / parent esp0+caller / next KAPI / USER heap')
     if args.mutate:
+        for mutation in ('skip FEP warmup', 'combined SQL', 'ignore INSERT error'):
+            guest_fixture(mutation)
         for name, expected in CASES.items():
             mutation = next(m for m in audit.MUTATIONS if m[0] == name)
             audit.run('qemu', mutation, expected=expected)
@@ -69,7 +91,7 @@ def main():
         assert result.returncode == 1 and 'FAIL: !sqlite_engine_active && !kills' in result.stdout, (
             result.returncode, result.stdout, result.stderr)
         print('RED runtime: SQLite STOP before leave')
-        print(f'PASS {len(CASES) + 1} raw-wait mutations: named runtime RED, compile failures 0')
+        print(f'PASS {len(CASES) + 4} raw-wait mutations: named runtime RED, compile failures 0')
 
 
 if __name__ == '__main__':
