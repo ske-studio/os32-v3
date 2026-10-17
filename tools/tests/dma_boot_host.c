@@ -7,6 +7,7 @@
 #include <setjmp.h>
 #include "dma_pool.h"
 #include "pgalloc.h"
+#include "module.h"
 struct ledger_region ledger_regions[LEDGER_MAX_REGIONS];
 u32 ledger_region_count;
 #include "dma_pool_source.c"
@@ -39,14 +40,14 @@ static int memory_boot_dma_available(void) { CHECK(reserved); return available; 
 static void shm_init(void) { CHECK(reserved); untouched(); }
 int paging_boot_user_shared(u32 addr) { (void)addr; return 0; }
 static u32 exec_tramp_page_addr(void) { return 0; }
-static int selftest(void)
+static void selftest(void)
 {
     struct dma_buf b;
     CHECK(reserved && !bound && !pcm);
     host_selftest_dma();
     CHECK(dma_tested == available && dma_skipped == !available);
     tested++; /* Non-DMA selftests must run even on short RAM. */
-    if (!available) { CHECK(!s_pool.ready); return 0; }
+    if (!available) { CHECK(!s_pool.ready); return; }
     CHECK(s_pool.ready);
     CHECK(dma_pool_free_pages() == DMA_POOL_PAGES);
     CHECK(dma_alloc(16384, 0, DMA_PHYS_LIMIT, &b) == 0);
@@ -54,10 +55,14 @@ static int selftest(void)
     CHECK(dma_mark_leaked(&b) == 0);
     dma_pool_init(); /* real selftest discards its spans before probe */
     CHECK(dma_pool_free_pages() == DMA_POOL_PAGES && !dma_pool_leaked());
-    return 0;
 }
-static struct { struct { int (*selftest_run)(void); } ops; } kdebug;
-static void kdebug_load(void) { loaded++; kdebug.ops.selftest_run = debug_enabled ? selftest : 0; }
+struct kdebug kdebug;
+void kdebug_load(void)
+{
+    loaded++;
+    kdebug.state = debug_enabled ? KDEBUG_RUNNING : KDEBUG_OFF;
+    kdebug.ops.selftest_run = debug_enabled ? selftest : 0;
+}
 static void kselftest_skipped(void) { CHECK(!debug_enabled); tested++; }
 u32 ledger_resource_import_pci(void) { CHECK(reserved); return 0; }
 u32 ledger_res_overflow;

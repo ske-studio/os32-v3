@@ -84,7 +84,8 @@ static void report(const char *s, u32 n)
 #include "kprintf.h"
 static u32 ksel_fail, audit_fail, audit_runs, page_logs, cycle_logs;
 static char audit_first_fail_tag[32];
-static struct { u32 base, pages; } kdebug;
+#include "module.h"
+struct kdebug kdebug;
 static void check(int cond, const char *name)
 {
     (void)name;

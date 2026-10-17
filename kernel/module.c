@@ -109,6 +109,7 @@ void kdebug_load(void)
     kdebug.ops = candidate;
     pgalloc_free_n_owner(kdebug.owner, phys / PAGE_SIZE, h[MI_PAYLOAD_OFF] / PAGE_SIZE);
     kdebug.base = base;
+    kdebug.base_pa = V2P(body);
     kdebug.pages = h[MI_MEM_SIZE] / PAGE_SIZE;
     kdebug.state = KDEBUG_RUNNING;
     kprintf(0x07, "[kdebug] running pair %08x\n", kdebug.pair_crc);
@@ -118,7 +119,7 @@ rejected:
     if (fd >= 0) vfs_close(fd);
     if (phys) pgalloc_free_n_owner(kdebug.owner, phys / PAGE_SIZE, npages);
     if (kdebug.owner) ledger_owner_retire(kdebug.owner);
-    /* Keep the retired owner number for diagnosis; ops/base/pages remain zero. */
+    /* Keep the retired owner number for diagnosis; ops/base/base_pa/pages remain zero. */
     kdebug.state = rc;
     kprintf(0x07, "[kdebug] rejected: %s\n", kdebug_state_name(rc));
 }

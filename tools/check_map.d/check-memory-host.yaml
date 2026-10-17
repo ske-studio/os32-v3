@@ -136,4 +136,5 @@ check-memory-host:
 - tools/gen_memmap.py
 - kernel/memory_boot.h
 - kernel/kaudit_boot.c
+- kernel/module.h
 artifact_reader: true
