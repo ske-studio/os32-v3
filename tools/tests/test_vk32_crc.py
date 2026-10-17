@@ -213,15 +213,29 @@ def make_image(script, work, kernel, sqlite, label, sqlite_addr=0x200000):
     work = pathlib.Path(work)
     kp, sp, op = work / (label + "_k.bin"), work / (label + "_s.bin"), work / (label + ".lz4")
     kp.write_bytes(kernel)
-    sp.write_bytes(sqlite)
+    if sqlite is not None:
+        sp.write_bytes(sqlite)
     r = subprocess.run([sys.executable, "-B", str(script),
                         "--kernel", str(kp), "--kernel-addr", "0x100000",
-                        "--sqlite", str(sp), "--sqlite-addr", hex(sqlite_addr),
                         "--limit-header", str(DEFS), "-o", str(op)],
                        capture_output=True)
     if r.returncode != 0:
         raise Fail("[{}] mkvmkernel が失敗\n{}".format(label, r.stderr.decode(errors="replace")))
-    return op.read_bytes()
+    image = op.read_bytes()
+    check_format(image, kernel, None, label + '-core')
+    if sqlite is None:
+        return image
+    # Additional wire entries are synthetic loader fixtures, never product SQLite.
+    parts = [(0x100000, kernel), (sqlite_addr, sqlite)]
+    hsz = 16 + 20 * len(parts) + 8
+    header = struct.pack('<4I', 0x32334B56, hsz, 2, len(parts))
+    payload, crcs = b'', b''
+    for addr, raw in parts:
+        compressed = lz4.block.compress(raw, store_size=False)
+        header += struct.pack('<4I', addr, len(raw), hsz + len(payload), len(compressed))
+        payload += compressed
+        crcs += struct.pack('<I', zlib.crc32(raw) & 0xffffffff)
+    return reseal(header + crcs + struct.pack('<II', hsz + len(payload), 0) + payload)
 
 
 def parse(img):
@@ -257,16 +271,17 @@ def check_format(img, kernel, sqlite, label):
     """生成物を zlib と突き合わせる。"""
     h = parse(img)
     out = []
-    if h["magic"] != 0x32334B56 or h["ver"] != 2 or h["n"] != 2:
+    raws = (kernel,) if sqlite is None else (kernel, sqlite)
+    if h["magic"] != 0x32334B56 or h["ver"] != 2 or h["n"] != len(raws):
         raise Fail("[{}] 共通部 {}".format(label, h))
-    if h["hsz"] != 16 + 20 * 2 + 8:
+    if h["hsz"] != 16 + 20 * len(raws) + 8:
         raise Fail("[{}] header_size {} != 64".format(label, h["hsz"]))
     if h["isize"] != len(img):
         raise Fail("[{}] image_size {} != 長さ {}".format(label, h["isize"], len(img)))
-    want = file_crc(img, 2)
+    want = file_crc(img, len(raws))
     if h["icrc"] != want:
         raise Fail("[{}] image_crc {:08x} != zlib {:08x}".format(label, h["icrc"], want))
-    for i, raw in enumerate((kernel, sqlite)):
+    for i, raw in enumerate(raws):
         if h["crcs"][i] != zlib.crc32(raw) & 0xFFFFFFFF:
             raise Fail("[{}] entry_crc[{}] {:08x} != zlib {:08x}".format(
                 label, i, h["crcs"][i], zlib.crc32(raw) & 0xFFFFFFFF))
@@ -275,8 +290,8 @@ def check_format(img, kernel, sqlite, label):
             raise Fail("[{}] entry[{}] の中身が元と違う".format(label, i))
     if h["ents"][0][2] != h["hsz"]:
         raise Fail("[{}] データが header_size の直後から始まらない".format(label))
-    out.append("[{}] format: v2 hsz=64 image_size={} image_crc={:08x} entry_crc={} "
-               "(zlib と一致)".format(label, len(img), h["icrc"],
+    out.append("[{}] format: v2 hsz={} image_size={} image_crc={:08x} entry_crc={} "
+               "(zlib と一致)".format(label, h["hsz"], len(img), h["icrc"],
                                      " ".join("{:08x}".format(c) for c in h["crcs"])))
     return out
 
@@ -324,9 +339,9 @@ def corrupt_cases(img):
     n = h["n"]
     hsz = h["hsz"]
     k_addr, k_raw, k_off, k_csz = h["ents"][0]
-    s_addr, s_raw, s_off, s_csz = h["ents"][1]
+    s_addr, s_raw, s_off, s_csz = h["ents"][-1]
     L = len(img)
-    e1 = 16 + 16  # entry[1] の位置
+    e1 = 16 + 16 * (n - 1)  # last entry (core-only or synthetic multi-entry)
     cases = []
 
     def c(name, data, code, pre=True):
@@ -368,7 +383,8 @@ def corrupt_cases(img):
     c("load_addr = 帯の上端", reseal(put(img, e1, "<I", LOAD_END)), "DST")
     c("末尾が帯の上端を 1 バイト越える", reseal(put(img, e1, "<I", LOAD_END - s_raw + 1)), "DST")
     c("load_addr + raw_size が桁あふれ", reseal(put(img, e1, "<I", 0xFFFFFF00)), "DST")
-    c("sqlite が kernel に重なる", reseal(put(img, e1, "<I", k_addr + k_raw - 1)), "DST")
+    if n > 1:
+        c("last entry overlaps core", reseal(put(img, e1, "<I", k_addr + k_raw - 1)), "DST")
     c("raw_size = 0", reseal(put(img, e1 + 4, "<I", 0)), "DST")
     # 末尾がちょうど上端 (通る側の境界) は展開して RAW でなく成功する
     # ---- 展開 (decoded == raw_size)
@@ -388,8 +404,8 @@ def corrupt_cases(img):
         struct.pack_into("<I", b, 16 + 20 * n, len(b))
         c("LZ4: " + name, reseal(bytes(b)), "DECODE", False)
     # ---- 展開後の CRC
-    c("entry_crc[1] (ファイル CRC は付け直す)", reseal(put(img, 16 + 16 * n + 4, "<I",
-                                                   h["crcs"][1] ^ 1)), "ENTRY_CRC", False)
+    c("entry_crc[1] (ファイル CRC は付け直す)", reseal(put(img, 16 + 16 * n + 4 * (n - 1), "<I",
+                                                   h["crcs"][-1] ^ 1)), "ENTRY_CRC", False)
     c("entry_crc[0] = 0", reseal(put(img, 16 + 16 * n, "<I", 0)), "ENTRY_CRC", False)
     return cases
 
@@ -442,8 +458,8 @@ def check_corrupt(exe, img, label):
                    label, len(corrupt_cases(img)), post))
     # 通る側の境界: 末尾がちょうど帯の上端
     h = parse(img)
-    s_raw = h["ents"][1][1]
-    edge = reseal(put(img, 16 + 16, "<I", LOAD_END - s_raw))
+    s_raw = h["ents"][-1][1]
+    edge = reseal(put(img, 16 + 16 * (h["n"] - 1), "<I", LOAD_END - s_raw))
     for mode in (0, 1):
         rc, _, win = run(exe, mode, edge)
         if rc != 0:
@@ -574,14 +590,15 @@ def check_real(exe_by_geom, script, work):
     out = []
     if not REAL_VMK.is_file():
         raise Fail("[real] build/out/vmkernel.lz4 が無い (make kernel が先)")
-    # kernel.bin / sqlite.bin とは突き合わせない: kapi_sys.o は毎回組み直される
+    # kernel.bin とは突き合わせない: kapi_sys.o は毎回組み直される
     # (__DATE__ __TIME__) ので、make check の並列の中で別の目標が kernel を組み直すと
     # kernel.bin と vmkernel.lz4 が一瞬食い違う。中身は python-lz4 で展開した
     # ものを正とし、CRC はそれを zlib で計算して突き合わせる (ローダとは独立)。
     img = REAL_VMK.read_bytes()
     h = parse(img)
-    k, s = (lz4.block.decompress(img[o:o + c], uncompressed_size=r)
-            for (a, r, o, c) in h["ents"])
+    assert h["n"] == 1, "product must contain one core entry"
+    a, r, o, c = h["ents"][0]
+    k, s = lz4.block.decompress(img[o:o + c], uncompressed_size=r), None
     out += check_format(img, k, s, "real")
     out += check_good(exe_by_geom["2hd"], img, k, s, "real")
     out += check_corrupt(exe_by_geom["2hd"], img, "real")
@@ -714,7 +731,7 @@ def run_all(srcs, script, target, real):
 MUTATIONS = [
     # (対象キー, パターン, 置換, 何回目 (0 始まり、-1 = すべて), 説明)
     ("none", "", "", 0, "対照: 何も変えない (GREEN であること)"),
-    ("script", "addr = spans[purpose][0]", "addr = 0x200000 if purpose == 'sqlite' else spans[purpose][0]",
+    ("script", "addr = spans[purpose][0]", "addr = spans[purpose][0] + 4096",
      0, "T3a1: SQLite の宛先を旧 0x200000 に強制"),
     ("script", "and not r['noload']", "", 0, "T3a1: NOLOAD をファイル長として扱う"),
     ("vk32", "    if (rd32(file + VK32_OFF_IMAGE_SIZE(n)) != file_size) return VK32_ERR_LENGTH;\n",

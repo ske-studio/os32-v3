@@ -1,4 +1,5 @@
 check-kapi-ranges-host:
+- lib/sqlite3/generated/*
 - exec/access_walk.c
 - exec/exec.c
 - exec/appslot.h

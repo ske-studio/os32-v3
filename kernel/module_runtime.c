@@ -130,8 +130,10 @@ int module_start(struct module_handle h)
         module_abort(h);
         return MODULE_INIT_FAILED;
     }
-    if (!pgalloc_free_n_owner(r->owner, r->backing / PAGE_SIZE, r->prefix_pages))
-        return module_abort(h);
+    if (!pgalloc_free_n_owner(r->owner, r->backing / PAGE_SIZE, r->prefix_pages)) {
+        int rc = module_abort(h);
+        return rc ? rc : MODULE_INIT_FAILED;
+    }
     r->backing += r->prefix_pages * PAGE_SIZE;
     r->pages -= r->prefix_pages;
     r->prefix_pages = 0;

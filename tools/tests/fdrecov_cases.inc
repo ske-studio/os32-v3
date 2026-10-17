@@ -13,7 +13,10 @@ static void fdrecov_setup(int header_case, int other)
     fs_nodes[n].ino = HS_EXT2_ROOT_INO;
     fs_add_dir("/host/boot");
     fs_add_file("/host/boot/vmkernel.lz4", (const u8 *)"new kernel", 10);
+    fs_add_file("/host/boot/kdebug.bin", (const u8 *)"paired debug", 12);
+    fs_add_file("/host/boot/sqlite.mod", (const u8 *)"paired sqlite", 13);
     fs_add_dir("/host/sys");
+    fs_add_file("/host/sys/unicode.bin", (const u8 *)"unicode table", 13);
     switch (header_case) {
     case 1: h.memory_layout_generation++; break;
     case 2: h.kapi_abi_generation++; break;
@@ -91,8 +94,9 @@ static void case_fdrecov(void)
     /* min_api_ver のみ上昇 / protocol=0・現行値は boot 先行が通る。 */
     fdrecov_setup(12, 0);
     fdrecov_manifest_version(KAPI_DATA_FIELDS_OFF, KAPI_VERSION + 1);
-    check(run1("boot") == 0 && fs_find("/boot/vmkernel.lz4") >= 0,
-          "同世代で KAPI 版のみ上昇した boot は通る");
+    check(run1("boot") == 0 && fs_find("/boot/vmkernel.lz4") >= 0 &&
+          fs_find("/boot/kdebug.bin") >= 0 && fs_find("/boot/sqlite.mod") >= 0,
+          "同世代で KAPI 版のみ上昇した boot はカーネルと対部品を運ぶ");
     fdrecov_setup(0, 0);
     check(run1("boot") == 0, "shlib protocol=0 は依存なし");
     fdrecov_setup(11, 0);
@@ -103,9 +107,12 @@ static void case_fdrecov(void)
         fdrecov_setup(h, 1);
         fdrecov_manifest_version(KAPI_DATA_FIELDS_OFF + 4, KAPI_VERSION + 1);
         check(run3("--root", "//hd0/./", "--verify") == 0 &&
-              fs_find("/hd0/sys/shell.bin") >= 0 && fk_header_reads == 0,
+              fs_find("/hd0/sys/shell.bin") >= 0 &&
+              fs_find("/hd0/boot/kdebug.bin") >= 0 &&
+              fs_find("/hd0/boot/sqlite.mod") >= 0 &&
+              fs_find("/hd0/sys/unicode.bin") >= 0 && fk_header_reads == 0,
               "別デバイス全体は異世代・不正ヘッダも解釈せず sys までコピー");
-        check(log_has("manifest_extra=2"), "余剰 boot/sys は集計だけで拒否しない");
+        check(log_has("manifest_extra=5"), "余剰 boot/sys は集計だけで拒否しない");
     }
     fdrecov_setup(9, 1);
     check(run3("--root", "/hd0", "-n") == 0 && wrote_nothing() && fk_header_reads == 0,

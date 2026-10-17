@@ -20,8 +20,7 @@ from gen_memmap import Macros, read_defines
 
 def audit_cases(tmp):
     # Independent symbols; addresses in the observer must follow this layout.
-    symbols = {'__bss_end': 0x140000, '__sqlite_start': 0x140000,
-               '__sqlite_end': 0x250000, '__kernel_resident_end': 0x271000,
+    symbols = {'__bss_end': 0x140000, '__kernel_resident_end': 0x140000,
                '__ledger_fixed_start': 0x13e000, '__ledger_fixed_end': 0x140000,
                'ring3_tramp_raw': 0x135123}
     macros = Macros(read_defines(ROOT / 'include/memmap.h'), symbols)
@@ -38,7 +37,7 @@ def audit_cases(tmp):
             ptes[address] = address | present | 2 | ((user or 0) << 2)
     with contextlib.redirect_stdout(io.StringIO()):
         assert sum(live.show(ptes, lo, hi, p, u) for _, lo, hi, p, u in checks) == 0
-        for guard in ('MEM_STACK_GUARD', 'MEM_SHELL_GUARD', 'MEM_SQLITE_STACK_GUARD'):
+        for guard in ('MEM_STACK_GUARD', 'MEM_SHELL_GUARD'):
             address = k[guard]
             saved = ptes[address]
             ptes[address] |= 1

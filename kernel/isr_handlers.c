@@ -1,4 +1,5 @@
 #include "sqlite_engine.h"
+#include "module_runtime.h"
 #ifdef OS32_R1_FIXTURE
 #include "r1_fixture.h"
 #endif
@@ -14,6 +15,18 @@
 #include "paging.h"
 #include "memmap.h"
 #include "kprintf.h"
+
+/* Runtime records remain resident even when a failed module is quarantined. */
+static int sqlite_fault_address(u32 eip)
+{
+    for (u32 i = 0; i < MODULE_RECORD_CAP; i++) {
+        const struct module_record *r = &module_records[i];
+        if (r->module_id == MODULE_ID_SQLITE && r->state != MODULE_ABSENT &&
+            eip >= r->text && eip - r->text < r->text_size)
+            return 1;
+    }
+    return 0;
+}
 
 /* exec フォルト復帰用 (exec.c で定義) */
 extern volatile int exec_nest_level;
@@ -314,12 +327,10 @@ void exception_handler(u32 error_code, u32 vector, u32 fault_eip,
 
     /* EIPの領域判定 */
     {
-        extern u32 __sqlite_start, __sqlite_end;
-        u32 sq_s = (u32)&__sqlite_start;
-        u32 sq_e = (u32)&__sqlite_end;
-        if (fault_eip >= sq_s && fault_eip < sq_e) {
+        if (sqlite_fault_address(fault_eip)) {
             tvram_puts_at(row+3, 17, "[sqlite]", 0xA1);
-        } else if (fault_eip >= KERNEL_LOAD_ADDR && fault_eip < sq_s) {
+        } else if (fault_eip >= KERNEL_LOAD_ADDR &&
+            fault_eip < (u32)&__kernel_resident_end) {
             tvram_puts_at(row+3, 17, "[.text]", 0xA1);
         } else {
             tvram_puts_at(row+3, 17, "[OUT OF CODE!]", 0xC1);
@@ -414,13 +425,11 @@ void page_fault_handler(u32 error_code, u32 fault_addr, u32 fault_eip, u32 *regs
 
     /* EIPがコードセクション内かチェック */
     {
-        extern u32 __sqlite_start, __sqlite_end;
-        u32 sq_s = (u32)&__sqlite_start;
-        u32 sq_e = (u32)&__sqlite_end;
-        if (fault_eip >= sq_s && fault_eip < sq_e) {
-            tvram_puts_at(row+2, 18, "[.sqlite_text]", 0xA1);
-            sputs(" [.sqlite_text]\n");
-        } else if (fault_eip >= KERNEL_LOAD_ADDR && fault_eip < sq_s) {
+        if (sqlite_fault_address(fault_eip)) {
+            tvram_puts_at(row+2, 18, "[sqlite]", 0xA1);
+            sputs(" [sqlite]\n");
+        } else if (fault_eip >= KERNEL_LOAD_ADDR &&
+            fault_eip < (u32)&__kernel_resident_end) {
             tvram_puts_at(row+2, 18, "[.text]", 0xA1);
             sputs(" [.text]\n");
         } else {

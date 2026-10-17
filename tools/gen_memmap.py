@@ -13,7 +13,7 @@ gen_memmap.py — メモリ地図の生成と、重なり・逆転の検出
 そこでこの生成器を置く。
 
   情報源   include/memmap.h の #define (番地の正典) と
-           build/out/kernel.map の __bss_end / __sqlite_start / __sqlite_end
+           build/out/kernel.map の __bss_end
   出力先   build/out/MEMMAP.md (コミットしない)。表は全て **絶対番地**。
   検査     帯どうしの重なりと、start > end の逆転。今回の穴は両方ともこれで捕まる。
 
@@ -57,7 +57,7 @@ BEGIN = "<!-- 生成: tools/gen_memmap.py --write (この印の中は手で書�
 END = "<!-- /生成: tools/gen_memmap.py -->"
 
 # kernel.map から取るリンカシンボル。ここに無いものは #define から解く。
-SYMBOLS = ("__bss_end", "__sqlite_start", "__sqlite_end",
+SYMBOLS = ("__bss_end",
            "__kernel_resident_end", "__ledger_fixed_start", "__ledger_fixed_end")
 
 PAGE = 0x1000
@@ -235,7 +235,6 @@ class Macros(object):
 
 CONV = "コンベンショナルメモリ (0x00000-0xFFFFF)"
 KERN = "カーネル常駐鎖・固定PT枠"
-SQL = "SQLite 連結帯域"
 SHELL = "シェル常駐帯域 (MEM_SHELL_LOAD_ADDR〜MEM_SHELL_BAND_END)"
 APP = "仮想アプリ帯 (0x80000000-)"
 DEV = "物理 RAM とデバイス窓"
@@ -303,12 +302,7 @@ def bands(m, sym):
     add(KERN, "SLACK", v("MEM_SHM_RESV_START"), v("MEM_SHM_RESV_END"),
         "RW", "カーネルが予算いっぱいなら空になる (それは正しい)")
 
-    add(SQL, "SQLite code+BSS", sym["__sqlite_start"], sym["__sqlite_end"] - 1,
-        "RW", "kernel.map の __sqlite_start / __sqlite_end")
-    add(SQL, "SQLite 代替スタック", v("MEM_SQLITE_STACK_BASE"),
-        plus("MEM_SQLITE_STACK_BASE", "MEM_SQLITE_STACK_SIZE", -1), "RW")
-    add(SQL, "SQLite スタックガード", v("MEM_SQLITE_STACK_GUARD"),
-        v("MEM_SQLITE_STACK_BASE") - 1, "NP")
+
     add(KERN, "台帳 backing (FIXED 型)", v("MEM_LEDGER_META_BASE"),
         v("MEM_LEDGER_META_END") - 1, "RW", "全構成で恒久保持、supervisor/WB",
         parent="カーネル .text/.data/.bss")
@@ -316,9 +310,9 @@ def bands(m, sym):
         "64KiB 整列、RAM が全域にあるときだけ先行予約、supervisor/WB")
     add(KERN, "固定 paging ガード", v("MEM_FIXED_PAGING_GUARD_BASE"),
         v("MEM_FIXED_PAGING_BASE") - 1, "NP")
-    add(SQL, "カーネルスタックガード", v("MEM_STACK_GUARD"),
+    add(KERN, "カーネルスタックガード", v("MEM_STACK_GUARD"),
         v("MEM_STACK_GUARD_END"), "NP", "MEM_STACK_GUARD〜MEM_STACK_GUARD_END")
-    add(SQL, "カーネルスタック", v("MEM_KSTACK_BASE"),
+    add(KERN, "カーネルスタック", v("MEM_KSTACK_BASE"),
         (v("MEM_SHELL_LOAD_ADDR") or 0) - 1, "RW",
         "ESP 初期値 = MEM_KSTACK_TOP (kentry.asm / TSS.ESP0)")
 
@@ -483,10 +477,8 @@ MIRRORS = (
      "MEM_KSTACK_TOP"),
     ("build/os32.ld", r"^\s*MEM_KERNEL_IMAGE_MAX\s*=\s*(0x[0-9A-Fa-f]+)\s*;",
      "MEM_KERNEL_IMAGE_MAX"),
-    # SQLite の代替スタックと DMA プール (票 TASK_HAL_WIRING §1-3)。ld の
+    # DMA プール (票 TASK_HAL_WIRING §1-3)。ld の
     # ASSERT が鎖と池の位置を見るので、C 側とずれると重なりを見逃す。
-    ("build/os32.ld", r"^\s*MEM_SQLITE_STACK_SIZE\s*=\s*(0x[0-9A-Fa-f]+)\s*;",
-     "MEM_SQLITE_STACK_SIZE"),
     ("build/os32.ld", r"^\s*MEM_DMA_POOL_BASE\s*=\s*(0x[0-9A-Fa-f]+)\s*;",
      "MEM_DMA_POOL_BASE"),
     ("sdk/include/os32/os32_gui_shared.h",
@@ -696,7 +688,7 @@ def table(rows, defect_pairs):
         bad.add(r["name"])
 
     out = []
-    order = [CONV, KERN, SQL, SHELL, APP, DEV]
+    order = [CONV, KERN, SHELL, APP, DEV]
     for section in order:
         mine = [r for r in rows if r["section"] == section]
         if not mine:
@@ -753,10 +745,7 @@ def render(m, sym, rows, map_path, root):
     parts.append("__bss_end      = 0x%06X   (カーネル本体 %s)"
                  % (sym["__bss_end"],
                     human(sym["__bss_end"] - (m.get("KERNEL_LOAD_ADDR") or 0))))
-    parts.append("__sqlite_start = 0x%06X" % sym["__sqlite_start"])
-    parts.append("__sqlite_end   = 0x%06X   (SQLite 本体 %s)"
-                 % (sym["__sqlite_end"],
-                    human(sym["__sqlite_end"] - sym["__sqlite_start"])))
+
     parts.append("")
     parts.append(table(rows, d))
     parts.append("")
@@ -846,7 +835,7 @@ def read_elf(path):
                 name, value, _, _, _, index = struct.unpack_from("<IIIBBH", table, off)
                 if name and index:
                     symbols[string(strings, name)] = value
-    for name in SYMBOLS + ("__bss_start", "__sqlite_data_end"):
+    for name in SYMBOLS + ("__bss_start",):
         if name not in symbols:
             raise ValueError("ELF: missing symbol " + name)
     return allocated, symbols
@@ -877,7 +866,7 @@ def layout_defects(manifest, sections, symbols):
         r = emitted.get(s["name"])
         if r is None or any(r[k] != s[k] for k in ("start", "end", "kind", "noload")):
             out.append("ELF区間の欠落/不一致: " + s["name"])
-    for lo, hi in (("__bss_start", "__bss_end"), ("__sqlite_data_end", "__sqlite_end")):
+    for lo, hi in (("__bss_start", "__bss_end"),):
         cursor = symbols[lo]
         for r in sorted((r for r in rows if r.get("noload") and
                          r["end"] > symbols[lo] and r["start"] < symbols[hi]),
@@ -929,11 +918,11 @@ def layout_manifest(root, map_path, elf_path, limit_name=None):
 
     limit_name = limit_name or "MEM_FIXED_PAGING_GUARD_BASE"
     rows = [layout_range(s["name"], s["start"], s["end"],
-                         "sqlite" if s["name"].startswith(".sqlite") else "core",
+                         "core",
                          source="elf", kind=s["kind"], noload=s["noload"])
             for s in sections]
-    # Include alignment gaps inside each image, not the current core/SQLite gap.
-    for purpose in ("core", "sqlite"):
+    # Include alignment gaps inside the core image.
+    for purpose in ("core",):
         group = sorted((r for r in rows if r["purpose"] == purpose), key=lambda r: r["start"])
         for a, b in zip(group, group[1:]):
             if a["end"] < b["start"]:
@@ -947,7 +936,7 @@ def layout_manifest(root, map_path, elf_path, limit_name=None):
         v("MEM_GFX_BB_BASE"), "kcg_scratch", reservation="FIXED",
         lifetime="boot-only", scratch_end=v("MEM_KCG_LZ4_TEMP_END"))
     resident = symbols.get("__kernel_resident_end", symbols["__bss_end"])
-    core_pad_end = symbols["__sqlite_start"]
+    core_pad_end = resident
     add("core tail padding", symbols["__bss_end"], core_pad_end, "core", noload=True)
     add("resident tail padding", resident, v("KHEAP_BASE"), "core", noload=True)
     add("KHEAP", v("KHEAP_BASE"), v("KHEAP_BASE") + v("KHEAP_SIZE"), "heap")
@@ -956,11 +945,6 @@ def layout_manifest(root, map_path, elf_path, limit_name=None):
     add("SHM", v("MEM_SHM_BASE"), v("MEM_SHM_END") + 1, "shared_memory")
     shm_end = v("MEM_SHM_GUARD_HI") + v("MEM_GUARD_SIZE")
     add("SHM guard hi", v("MEM_SHM_GUARD_HI"), shm_end, "guard")
-    stack_padding_end = v("MEM_SQLITE_STACK_GUARD")
-    add("sqlite tail padding", symbols["__sqlite_end"], stack_padding_end, "sqlite", noload=True)
-    add("SQLite stack guard", stack_padding_end, v("MEM_SQLITE_STACK_BASE"), "guard")
-    add("SQLite stack", v("MEM_SQLITE_STACK_BASE"),
-        v("MEM_SQLITE_STACK_BASE") + v("MEM_SQLITE_STACK_SIZE"), "sqlite_stack", noload=True)
     chain_end = max([r["end"] for r in rows] + [symbols.get("__kernel_resident_end", 0)])
     slack = chain_slack(chain_end, v(limit_name))
     slack["state"] = "present"
@@ -993,7 +977,7 @@ def layout_manifest(root, map_path, elf_path, limit_name=None):
         raise ValueError("generations-manifest: generation mismatch")
     artifacts = [artifact(p) for p in (elf_path, map_path, os.path.join(root, HDR_REL), generation_path)]
     recorded = {entry["path"]: entry for entry in generation["files"]}
-    for name in ("kernel.bin", "sqlite.bin", "vmkernel.lz4"):
+    for name in ("kernel.bin", "vmkernel.lz4"):
         rel = os.path.relpath(os.path.join(output_dir, name), root)
         actual = artifact(os.path.join(root, rel))
         if actual != recorded.get(rel):

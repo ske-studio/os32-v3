@@ -25,9 +25,7 @@ static void host_enable_check(void);
 
 #define QUOTE_(x) #x
 #define QUOTE(x) QUOTE_(x)
-__asm__(".globl __sqlite_start\n.set __sqlite_start, 0x181000\n"
-        ".globl __sqlite_end\n.set __sqlite_end, 0x240000\n"
-        ".globl __kernel_resident_end\n.set __kernel_resident_end, " QUOTE(HOST_RESIDENT_END) "\n"
+__asm__(".globl __kernel_resident_end\n.set __kernel_resident_end, " QUOTE(HOST_RESIDENT_END) "\n"
         ".globl __ledger_fixed_start\n.set __ledger_fixed_start, 0x17E000\n"
         ".globl __ledger_fixed_end\n.set __ledger_fixed_end, 0x180000\n"
         ".globl __bss_end\n.set __bss_end, " QUOTE(HOST_BSS_END) "\n");

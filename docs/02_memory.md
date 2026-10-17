@@ -48,10 +48,19 @@
 
 実ビルドの地図は `build/out/MEMMAP.md` に生成する
 ([生成文書の見方](INDEX.md#生成文書の見方))。定義は `include/memmap.h`、
-実ビルドの数値は `build/out/kernel.map` の `__bss_end` / SQLite の境界から求める。
+実ビルドの数値は `build/out/kernel.map` の `__bss_end` / `__kernel_resident_end`から求める。
 表は全て絶対番地とし、カーネル本体の使用量・残り予算・成長時に動く帯も表示する。
 `__bss_end` が伸びると `KHEAP_BASE` 以降の KAPI / SHM / ガードも動くため、
 数値の地図はコミットせず、説明をこの節に残す。
+
+T4c-1 では `__kernel_resident_end` は core BSS 末尾のページ境界。
+SQLite は `/boot/sqlite.mod` の body と512KiB pool・128KiB stackを同じ module owner で
+連続割当し、prefixだけ起動成功時に返す。SQLite の全頁（隔離時も含む）は
+SLACK/pool の内数であり、別枠として再加算しない。`[sqlite] owner=... state=... pages=...`
+は起動後の独立観測で、既存の boot audit 回数を増やさず総和の diff を表示する。
+memory_layout は4を維持する。変更はリンク時に浮く core 内部の常駐鎖と owner 割当であり、
+USER/shlib VA、固定 paging/stack/shell、公開 KAPI slot とデータ配置は変わらない。
+部品の新旧は独立した ops版2・import/facade ABI印・VK32の対CRCで拒否する。
 
 `sys_usable_mem_end()` は `MEM_PHYS_EXEC_FLOOR` から最初の PERSIST 所有頁までの
 低位連続上端を返す（起動時の `ledger_arena_freeze()` で確定）。検出 RAM の最高番地ではない。

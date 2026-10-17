@@ -24,13 +24,13 @@
 
 extern int ring3_call_from_user(void);
 
-/* kapi_db.c はリンカスクリプトで EXCLUDE_FILE に含まれていないため、
- * 通常の .text に配置される。sqlite3_exec 等は .sqlite_text にあるが、
- * カーネルの .text から .sqlite_text を呼ぶのは問題ない。
- * ただし、SQL文字列は外部プログラム空間 (0x400000+) から渡される。
- * sqlite3_exec が SQL を読み取る際にページフォールトが発生する場合、
- * カーネル側にコピーする必要がある。
- */
+/* SQLite calls go through the typed outer facade. Stage caller strings in
+ * core memory before the module is entered; the module never retains them. */
+#ifdef OS32_SQLITE_DIRECT_TEST
+#define DB_MODULE_READY() 1
+#else
+#define DB_MODULE_READY() sqlite_module_ready()
+#endif
 #define SQL_COPY_BUF_SIZE DB_SQL_MAX_BYTES
 static char sql_copy_buf[SQL_COPY_BUF_SIZE];
 
@@ -93,7 +93,7 @@ STATIC_ASSERT(MEM_SHM_DB_OFFSET == 0, db_shm_at_band_start);
 /*  ヘルパー: CPL=3 から読める文字列 (票 TASK_DB_ERRSTR §4)                  */
 /*                                                                          */
 /*  共有メモリはアプリの PD に RW+USER で見えているが、カーネルの            */
-/*  .rodata / .data と SQLite (カーネル常駐鎖の中) は見えない。              */
+/*  .rodata / .data と SQLite module は見えない。              */
 /*  だから `const char *` を返す KAPI は、返す前に共有メモリの**診断領域**   */
 /*  (ブロック 0 の末尾、os32_kapi_shared.h の DB_SHM_DIAG_* が唯一の管理元)  */
 /*  へ写す。結果データ側の上限は DB_SHM_RESULT_LIMIT なので、両者は重ならない。*/
@@ -302,7 +302,7 @@ static int shm_row_fits_n(int ncol, u32 payload)
 
 /* 行を書く前の 1 巡目 (Codex 往復 2 の B3)。ここで **列値を実体化** し、
  *   - 16KB に収まるか
- *   - 実体化そのものが失敗していないか (MEMSYS5 プールは 384KB しかない。
+ *   - 実体化そのものが失敗していないか (MEMSYS5 の空きが足りないと、
  *     `sqlite3_column_blob/text` が NULL を返す・`sqlite3_errcode` が NOMEM に
  *     なる = 値が取れていない。長さだけ見て書くと data_offset = 0 の
  *     **欠落 ROW を成功として**返してしまう)
@@ -489,6 +489,7 @@ static int db_ieq(const char *a, const char *b);
 
 int __cdecl kapi_db_open(const char *path)
 {
+    if (!DB_MODULE_READY()) return OS32_ERR_NOSYS;
     if (!SQLITE_OUTER_READY(1)) return -1;
     int i;
     int rc;
@@ -576,6 +577,7 @@ static void slot_save_error(DbSlot *slot, int rc)
 
 int __cdecl kapi_db_close(int handle)
 {
+    if (!DB_MODULE_READY()) return OS32_ERR_NOSYS;
     if (!SQLITE_OUTER_READY(1)) return -1;
     DbSlot *slot = slot_get(handle);
     int rc = SQLITE_OK;
@@ -621,6 +623,7 @@ int __cdecl kapi_db_close(int handle)
 
 int __cdecl kapi_db_exec(int handle, const char *sql)
 {
+    if (!DB_MODULE_READY()) return OS32_ERR_NOSYS;
     if (!SQLITE_OUTER_READY(1)) return -1;
     DbSlot *slot = slot_get(handle);
     DB_ResultHeader *hdr = (DB_ResultHeader *)DB_SHM_PTR;
@@ -671,6 +674,7 @@ int __cdecl kapi_db_exec(int handle, const char *sql)
 
 int __cdecl kapi_db_prepare(int handle, const char *sql)
 {
+    if (!DB_MODULE_READY()) return OS32_ERR_NOSYS;
     if (!SQLITE_OUTER_READY(1)) return -1;
     DbSlot *slot = slot_get(handle);
     int rc;
@@ -724,6 +728,7 @@ int __cdecl kapi_db_prepare(int handle, const char *sql)
 
 int __cdecl kapi_db_step(int handle)
 {
+    if (!DB_MODULE_READY()) return OS32_ERR_NOSYS;
     if (!SQLITE_OUTER_READY(1)) return -1;
     DbSlot *slot = slot_get(handle);
     int rc;
@@ -770,7 +775,7 @@ int __cdecl kapi_db_step(int handle)
 
 int __cdecl kapi_db_column_int(int handle, int col)
 {
-    if (!SQLITE_OUTER_READY(0)) return 0;
+    if (!DB_MODULE_READY() || !SQLITE_OUTER_READY(0)) return 0;
     DbSlot *slot = slot_get(handle);
     if (!slot || !slot->active_stmt) return 0;
     return sqlite3_column_int(slot->active_stmt, col);
@@ -778,7 +783,7 @@ int __cdecl kapi_db_column_int(int handle, int col)
 
 const char * __cdecl kapi_db_column_text(int handle, int col)
 {
-    if (!SQLITE_OUTER_READY(0)) return 0;
+    if (!DB_MODULE_READY() || !SQLITE_OUTER_READY(0)) return db_shm_empty();
     DbSlot *slot = slot_get(handle);
     DB_ResultHeader *hdr = (DB_ResultHeader *)DB_SHM_PTR;
     DB_ColumnInfo *info;
@@ -804,6 +809,7 @@ const char * __cdecl kapi_db_column_text(int handle, int col)
 /* 戻り値: 0=成功, -1=失敗 */
 int __cdecl kapi_db_finalize(int handle)
 {
+    if (!DB_MODULE_READY()) return OS32_ERR_NOSYS;
     if (!SQLITE_OUTER_READY(1)) return -1;
     DbSlot *slot = slot_get(handle);
     int rc = SQLITE_OK;
@@ -825,7 +831,8 @@ int __cdecl kapi_db_finalize(int handle)
  * 1 回の db_exec の結果に結びついた別の欄で、こちらは動かさない。 */
 const char * __cdecl kapi_db_last_error(int handle)
 {
-    if (!SQLITE_OUTER_READY(0)) return 0;
+    if (!DB_MODULE_READY()) return db_shm_diag("SQLite module unavailable");
+    if (!SQLITE_OUTER_READY(0)) return db_shm_diag("SQLite engine unavailable");
     DbSlot *slot;
     if (handle < 0 || handle >= DB_MAX_CONNECTIONS)
         return db_shm_diag("invalid handle");
@@ -840,6 +847,7 @@ const char * __cdecl kapi_db_last_error(int handle)
 
 u32 __cdecl kapi_db_mem_used(void)
 {
+    if (!DB_MODULE_READY() || !SQLITE_OUTER_READY(0)) return 0;
     return (u32)sqlite3_memory_used();
 }
 
@@ -982,6 +990,7 @@ static int db_journal_fits(const char *path)
 
 int __cdecl kapi_db_open_existing(const char *path, int writable)
 {
+    if (!DB_MODULE_READY()) return OS32_ERR_NOSYS;
     if (!SQLITE_OUTER_READY(1)) return -1;
     int i, rc, flags;
     OS32_Stat st;
@@ -1128,6 +1137,7 @@ int __cdecl kapi_db_open_existing(const char *path, int writable)
 
 int __cdecl kapi_db_prepare_only(int handle, const char *sql)
 {
+    if (!DB_MODULE_READY()) return OS32_ERR_NOSYS;
     if (!SQLITE_OUTER_READY(1)) return -1;
     DbSlot *slot = slot_get(handle);
     sqlite3_stmt *stmt = (sqlite3_stmt *)0;
@@ -1193,6 +1203,7 @@ static int bind_done(DbSlot *slot, int rc)
 
 int __cdecl kapi_db_bind_int(int handle, int index, int value)
 {
+    if (!DB_MODULE_READY()) return OS32_ERR_NOSYS;
     if (!SQLITE_OUTER_READY(0)) return -1;
     DbSlot *slot = bind_slot(handle, index);
     if (!slot) return -1;
@@ -1201,6 +1212,7 @@ int __cdecl kapi_db_bind_int(int handle, int index, int value)
 
 int __cdecl kapi_db_bind_text(int handle, int index, const char *text, int length)
 {
+    if (!DB_MODULE_READY()) return OS32_ERR_NOSYS;
     if (!SQLITE_OUTER_READY(0)) return -1;
     DbSlot *slot = bind_slot(handle, index);
     if (!slot) return -1;
@@ -1218,6 +1230,7 @@ int __cdecl kapi_db_bind_text(int handle, int index, const char *text, int lengt
 
 int __cdecl kapi_db_bind_blob(int handle, int index, const void *data, int length)
 {
+    if (!DB_MODULE_READY()) return OS32_ERR_NOSYS;
     if (!SQLITE_OUTER_READY(0)) return -1;
     DbSlot *slot = bind_slot(handle, index);
     if (!slot) return -1;
@@ -1233,6 +1246,7 @@ int __cdecl kapi_db_bind_blob(int handle, int index, const void *data, int lengt
 
 int __cdecl kapi_db_bind_null(int handle, int index)
 {
+    if (!DB_MODULE_READY()) return OS32_ERR_NOSYS;
     if (!SQLITE_OUTER_READY(0)) return -1;
     DbSlot *slot = bind_slot(handle, index);
     if (!slot) return -1;
@@ -1241,6 +1255,7 @@ int __cdecl kapi_db_bind_null(int handle, int index)
 
 int __cdecl kapi_db_error_code(int handle)
 {
+    if (!DB_MODULE_READY()) return OS32_ERR_NOSYS;
     if (!SQLITE_OUTER_READY(0)) return -1;
     DbSlot *slot;
     int owner;

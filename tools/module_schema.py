@@ -45,11 +45,11 @@ POLICIES = {
     ),
 }
 
-# T4a-2 VA0 measurement gate; no product SQLite loading until T4c.
+# T4c-1 paired POST_ROOT SQLite; initialize returns the typed facade.
 POLICIES[CONSTANTS['ID_SQLITE']] = dict(
     module_id=CONSTANTS['ID_SQLITE'], phase=CONSTANTS['PHASE_POST_ROOT'],
-    required_flags=0, allowed_flags=0, stop_allowed=0,
-    ops_version=1, ops_slots=1, image_max=524288, mem_max=524288,
+    required_flags=CONSTANTS["FLAG_PAIR"], allowed_flags=CONSTANTS["FLAG_PAIR"], stop_allowed=0,
+    ops_version=2, ops_slots=1, image_max=524288, mem_max=524288,
     reloc_max=4096, import_max=32, export_max=1, load_span_max=544768,
     init_symbol='sqlite_module_init', imports_symbol='sqlite_import_slots',
     ops_symbol='sqlite_module_ops', ops_names=('initialize',),

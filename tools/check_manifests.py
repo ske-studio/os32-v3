@@ -511,7 +511,7 @@ def main():
         print("ビルド成果物が見つからない。先に make all を実行すること。",
               file=sys.stderr)
         return 2
-    require_fresh('.', ['build/out/kernel.bin', 'build/out/sqlite.bin',
+    require_fresh('.', ['build/out/kernel.bin', 'build/out/kdebug.bin', 'build/out/sqlite.mod',
                         *sorted(bins)])
 
     rc = 0

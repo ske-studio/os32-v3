@@ -1,3 +1,4 @@
+import importlib.util
 import os, pathlib, re, shlex, shutil, subprocess, tempfile
 MAKE_TARGETS = ["all"]
 # Compile commands outlive dry_run; keep their generated inputs until exit.
@@ -127,6 +128,16 @@ def dry_run(root):
     os.makedirs(out_dir)
     from gen_memmap import write_layout_header
     write_layout_header(root, os.path.join(out_dir, "memmap_layout.h"))
+    # make -n does not run the paired SQLite module's C/header generator.
+    # Keep these derived inputs beside the layout header for later AST reads.
+    generator = pathlib.Path(root, "tools/gen_sqlite_imports.py")
+    if generator.is_file():
+        spec = importlib.util.spec_from_file_location("sqlite_dry_run", generator)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        module.ROOT = pathlib.Path(root)
+        module.generate(pathlib.Path(out_dir, "sqlite-proto"),
+                        pathlib.Path(root, "tools/prototypes/sqlite_imports.def"))
     for name in SAVED_SETTINGS:
         src = pathlib.Path(root, REAL_BUILD_OUT, name)
         if src.is_file():

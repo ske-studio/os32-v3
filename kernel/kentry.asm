@@ -9,8 +9,6 @@ bits 32
 extern kernel_main
 extern __bss_start
 extern __bss_end
-extern __sqlite_data_end
-extern __sqlite_end
 ;; LAYOUT_* は $(BUILD_OUT)/memmap_layout.h (LAYOUT_CPP で展開) から。
 
 section .text
@@ -34,14 +32,6 @@ kentry:
         mov     ecx, __bss_end
         sub     ecx, edi
         shr     ecx, 2            ;; DWORD数に変換
-        xor     eax, eax
-        rep     stosd
-
-        ;; SQLite BSS領域ゼロクリア (ブートローダーが.sqlite_bssをロードしないため)
-        mov     edi, __sqlite_data_end
-        mov     ecx, __sqlite_end
-        sub     ecx, edi
-        shr     ecx, 2
         xor     eax, eax
         rep     stosd
 

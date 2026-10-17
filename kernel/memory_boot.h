@@ -54,7 +54,8 @@ struct memory_page_counts {
     i32 diff;                  /* total - phys; never filled from a remainder */
 };
 /* Pure accounting of one boot snapshot. SLACK/pool include ordinary live
- * allocations; BB and kdebug are split out. Fixed backing stays reserved on
+ * allocations, including SQLite body/pool/stack and quarantined pages;
+ * BB and kdebug are split out. Fixed backing stays reserved on
  * ARENA_TOP too. The conventional VRAM/ROM window follows ram_kb semantics. */
 void memory_boot_count_pages(const struct memory_page_input *in,
                              struct memory_page_counts *out);

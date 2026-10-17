@@ -63,12 +63,10 @@ static void *host_boot_ptr(u32 addr)
 #ifndef HOST_RESIDENT_END
 #define HOST_RESIDENT_END 0x261000
 #endif
-__asm__(".globl __sqlite_start\n.set __sqlite_start, 0x180000\n"
-        ".globl __kernel_resident_end\n.set __kernel_resident_end, " HOST_QUOTE(HOST_RESIDENT_END) "\n"
+__asm__(".globl __kernel_resident_end\n.set __kernel_resident_end, " HOST_QUOTE(HOST_RESIDENT_END) "\n"
         ".globl __ledger_fixed_start\n.set __ledger_fixed_start, 0x17E000\n"
         ".globl __ledger_fixed_end\n.set __ledger_fixed_end, 0x180000\n");
-__asm__(".globl __sqlite_end\n.set __sqlite_end, 0x240000\n"
-        ".globl __bss_end\n.set __bss_end, 0x180000\n");
+__asm__(".globl __bss_end\n.set __bss_end, 0x180000\n");
 static void die(int code)
 {
     __asm__ volatile("int $0x80" : : "a"(1), "b"(code));

@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""Generate SQLite's separate typed cdecl import ABI and T4a-2 VFS copy.
+"""Generate SQLite typed imports, facade/stubs and the owner-pool VFS body.
 
-Product sources are read only. The copy changes tick reads into function imports
-and replaces the BSS pool with a caller supplied pointer; allocator hooks and
-facade/stack switching belong to later steps.
+The same input drives both sides of the paired module contract.
 """
 import argparse
 import json
@@ -16,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFINITION = ROOT / 'tools/prototypes/sqlite_imports.def'
 
 
-def generate(out, definition=DEFINITION):
+def generate(out, definition=DEFINITION, contracts_only=False):
     doc = json.loads(Path(definition).read_text())
     if doc['schema'] != 1:
         raise ValueError('unknown SQLite import schema')
@@ -38,6 +36,7 @@ def generate(out, definition=DEFINITION):
                             kind=1, type_ver=1))
         names.add(name)
         hashes.add(hashed)
+    module_abi = fnv1a((str(abi_hash(entries)) + json.dumps(doc['facade'], sort_keys=True)).encode())
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     includes = sorted({e['source'] for e in entries if 'source' in e})
@@ -47,48 +46,102 @@ def generate(out, definition=DEFINITION):
     header += [f'#include "{p}"' for p in includes]
     header += [e['signature'] for e in entries]
     header += [f'#define SQLITE_IMPORT_COUNT {len(entries)}',
-               f'#define SQLITE_MODULE_ABI_GEN 0x{abi_hash(entries):08x}u',
+               f'#define SQLITE_MODULE_ABI_GEN 0x{module_abi:08x}u',
                'extern unsigned long sqlite_import_slots[SQLITE_IMPORT_COUNT];', '#endif']
     (out / 'sqlite_imports.h').write_text('\n'.join(header) + '\n')
-    (out / 'sqlite_import_slots.c').write_text(
-        '#include "sqlite_imports.h"\nunsigned long sqlite_import_slots[SQLITE_IMPORT_COUNT]\n'
-        '__attribute__((section(".data.sqlite_import_slots"), aligned(4))) = {0};\n')
-    asm = ['/* Generated i386 cdecl tail jumps, including variadic kprintf. */',
-           '.section .text.sqlite_imports,"ax",@progbits', '.code32']
-    for e in entries:
-        n = e['name']
-        asm += [f'.globl {n}', f'.type {n}, @function', f'{n}:',
-                f'    jmp *sqlite_import_slots+{4*e["index"]}', f'.size {n}, .-{n}']
-    asm += ['.section .note.GNU-stack,"",@progbits']
-    (out / 'sqlite_import_stubs.S').write_text('\n'.join(asm) + '\n')
-    # Compile-only provider type check; deliberately not a resident kernel input.
-    core = ['#include "sqlite_imports.h"', 'extern volatile u32 tick_count;',
-            'u32 ktime_ticks(void) { return tick_count; }']
-    for e in entries:
-        signature = e['signature'].replace('__cdecl ', '')
-        pointer = signature.replace(e['name'], '(*sqlite_type_' + e['name'] + ')', 1)
-        core.append(pointer[:-1] + ' = ' + e['name'] + ';')
-    (out / 'sqlite_provider_types.c').write_text('\n'.join(core) + '\n')
-    source = (ROOT / 'lib/sqlite3/os32_sqlite_vfs.c').read_text()
-    replacements = {
-        '#define SQLITE_MEMSYS5_SIZE  (384 * 1024)': '#define SQLITE_MEMSYS5_SIZE (512 * 1024)',
-        'static char sqlite_mem_pool[SQLITE_MEMSYS5_SIZE];': 'char *sqlite_module_pool;',
-    }
-    for old, new in replacements.items():
-        if source.count(old) != 1:
-            raise ValueError('prototype VFS input changed: ' + old)
-        source = source.replace(old, new)
-    if source.count('extern volatile u32 tick_count;') != 2 or source.count('tick_count') != 5:
-        raise ValueError('prototype tick input changed')
-    source = source.replace('extern volatile u32 tick_count;', '')
-    source = source.replace('tick_count', 'ktime_ticks()').replace('sqlite_mem_pool', 'sqlite_module_pool')
-    (out / 'os32_sqlite_vfs.c').write_text('#include "sqlite_imports.h"\n' + source)
-    metadata = dict(module_abi_gen=abi_hash(entries), imports=entries)
-    (out / 'sqlite_imports.json').write_text(json.dumps(metadata, indent=2) + '\n')
+    if not contracts_only:
+        (out / 'sqlite_import_slots.c').write_text(
+            '#include "sqlite_imports.h"\nunsigned long sqlite_import_slots[SQLITE_IMPORT_COUNT]\n'
+            '__attribute__((section(".data.sqlite_import_slots"), aligned(4))) = {0};\n')
+        asm = ['/* Generated i386 cdecl tail jumps, including variadic kprintf. */',
+               '.section .text.sqlite_imports,"ax",@progbits', '.code32']
+        for e in entries:
+            n = e['name']
+            asm += [f'.globl {n}', f'.type {n}, @function', f'{n}:',
+                    f'    jmp *sqlite_import_slots+{4*e["index"]}', f'.size {n}, .-{n}']
+        asm += ['.section .note.GNU-stack,"",@progbits']
+        (out / 'sqlite_import_stubs.S').write_text('\n'.join(asm) + '\n')
+        # Compile-only provider type check; deliberately not a resident kernel input.
+        core = ['#include "sqlite_imports.h"', 'extern volatile u32 tick_count;',
+                'u32 ktime_ticks(void) { return tick_count; }']
+        for e in entries:
+            signature = e['signature'].replace('__cdecl ', '')
+            pointer = signature.replace(e['name'], '(*sqlite_type_' + e['name'] + ')', 1)
+            core.append(pointer[:-1] + ' = ' + e['name'] + ';')
+        (out / 'sqlite_provider_types.c').write_text('\n'.join(core) + '\n')
+    generate_facade(out, doc["facade"], entries)
+    if not contracts_only:
+        source = (ROOT / 'lib/sqlite3/os32_sqlite_vfs.c').read_text()
+        source = source.replace('static char sqlite_mem_pool[SQLITE_MEMSYS5_SIZE];',
+                                'char *sqlite_module_pool;\n#define sqlite_mem_pool sqlite_module_pool')
+        source = source.replace('extern volatile u32 tick_count;', '')
+        source = source.replace('tick_count', 'ktime_ticks()')
+        (out / 'os32_sqlite_vfs.c').write_text('#include "sqlite_imports.h"\n' + source)
+    metadata = dict(module_abi_gen=module_abi, imports=entries)
+    if not contracts_only:
+        (out / 'sqlite_imports.json').write_text(json.dumps(metadata, indent=2) + '\n')
     return metadata
+
+
+def generate_facade(out, rows, entries):
+    """One typed API/stub list for module and resident outer calls."""
+    h = ['/* Generated by gen_sqlite_imports.py; do not edit. */',
+         '#ifndef SQLITE_FACADE_GENERATED_H', '#define SQLITE_FACADE_GENERATED_H',
+         '#include "os32_sqlite_config.h"', '#include "os32_sqlite_outer.h"', '#include <stdarg.h>',
+         '#define SQLITE_MODULE_OPS_VERSION 2u',
+         '#define SQLITE_MODULE_POOL_SIZE SQLITE_MEMSYS5_SIZE',
+         'typedef struct {']
+    for r in rows:
+        h.append(f'    {r["result"]} (*{r["name"]})({r["args"]});')
+    h += ['} SqliteModuleApi;', f'#define SQLITE_MODULE_API_SLOTS {len(rows)}u',
+          'extern const SqliteModuleApi sqlite_stub_api;',
+          'extern const SqliteModuleApi *sqlite_module_api;',
+          'int sqlite_module_ready(void);']
+    stubs, wrappers, bind = [], [], []
+    for r in rows:
+        name, ret, args, target, wrapper = (r[x] for x in ('name','result','args','target','wrapper'))
+        arglist = [] if args == 'void' else args.split(', ')
+        names = [re.search(r'(\w+)$', arg)[1] for arg in arglist]
+        callargs = ', '.join(names)
+        decl = f'{ret} {wrapper}({args})'
+        h.append(decl + ';')
+        stub = 'return;' if ret == 'void' else f'return {r["stub"]};'
+        stubs += [f'static {ret} stub_{name}({args}) {{ ' +
+                  ' '.join(f'(void){a};' for a in names) + ' ' + stub + ' }']
+        fields = '; '.join(arglist) if arglist else ''
+        if fields: fields += '; '
+        if ret != 'void': fields += ret + ' result;'
+        else: fields += 'int unused;'
+        wrappers += [f'typedef struct {{ {fields} }} Call_{name};',
+                     f'static void call_{name}(void *arg) {{', f'    Call_{name} *f = arg;', '    (void)f;']
+        invocation = f'sqlite_module_api->{name}(' + ', '.join('f->'+a for a in names) + ')'
+        wrappers += [('    f->result = ' if ret != 'void' else '    ') + invocation + ';', '}', decl, '{']
+        init = callargs + (', ' if names else '') + (r['stub'] if ret != 'void' else '0')
+        wrappers += [f'    Call_{name} f = {{{init}}};',
+                     f'    if (!sqlite_module_ready()) ' +
+                     (f'return sqlite_module_api->{name}({callargs});' if ret != 'void' else f'{{ sqlite_module_api->{name}({callargs}); return; }}'),
+                     f'    sqlite_engine_run(call_{name}, &f, {r["io"]});',
+                     ('    return f.result;' if ret != 'void' else '    return;'), '}']
+        bind.append(f'    .{name} = {target},')
+    stubs += ['const SqliteModuleApi sqlite_stub_api = {'] + [f'    .{r["name"]} = stub_{r["name"]},' for r in rows] + ['};']
+    h += ['#endif']
+    (out / 'sqlite_facade.h').write_text('\n'.join(h)+'\n')
+    (out / 'sqlite_outer_calls.inc').write_text('\n'.join(stubs+wrappers)+'\n')
+    (out / 'sqlite_facade_bind.inc').write_text('\n'.join(bind)+'\n')
+    core = ['#include "sqlite_imports.h"', '#include "module_image.h"',
+            'extern volatile u32 tick_count;', 'u32 ktime_ticks(void) { return tick_count; }',
+            'const u32 sqlite_kexports[] = {']
+    core += [f'    (u32)(uptr){e["name"]},' for e in entries]
+    core += ['};', 'const struct module_symbol_contract sqlite_import_contracts[] = {']
+    core += [f'    {{0x{fnv1a(e["name"].encode()):08x}u, 1, 1}},' for e in entries]
+    core += ['};', 'const struct module_symbol_contract sqlite_export_contracts[] = {',
+             f'    {{0x{fnv1a(b"initialize"):08x}u, 1, 0}},', '};']
+    (out / 'sqlite_kexports.c').write_text('\n'.join(core)+'\n')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out-dir', type=Path, required=True)
-    generate(parser.parse_args().out_dir)
+    parser.add_argument('--contracts-only', action='store_true')
+    args = parser.parse_args()
+    generate(args.out_dir, contracts_only=args.contracts_only)

@@ -9,17 +9,16 @@ import gen_memmap as gen
 
 def run_case(work):
     work = pathlib.Path(work) / 'stack-entry'
-    elf = fixture(work, core_bss=35, sqlite_bss=39)
+    elf = fixture(work, core_bss=35)
     _, syms = gen.read_elf(elf)
     m = gen.Macros(gen.read_defines(ROOT / 'include/memmap.h'), syms)
     guards = ['MEM_STACK_GUARD', 'MEM_SHELL_GUARD', 'MEM_SHM_GUARD_LO', 'MEM_SHM_GUARD_HI']
-    guards += ['MEM_SQLITE_STACK_GUARD', 'MEM_FIXED_PAGING_GUARD_BASE']
+    guards += ['MEM_FIXED_PAGING_GUARD_BASE']
     header = ['static const unsigned long guard_ranges[][2] = {']
     header += ['{%d, %d},' % (m.get(n), m.get(n) + m.get('MEM_GUARD_SIZE')) for n in guards]
     header += ['};', 'static void boot_tss(void);', 'static int boot_sqlite(void);',
                'static void check_classification(void);', 'static void check_fault_return(void);']
-    for name, symbol in [('ZERO_CORE_START', '__bss_start'), ('ZERO_CORE_END', '__bss_end'),
-                         ('ZERO_SQLITE_START', '__sqlite_data_end'), ('ZERO_SQLITE_END', '__sqlite_end')]:
+    for name, symbol in [('ZERO_CORE_START', '__bss_start'), ('ZERO_CORE_END', '__bss_end')]:
         header += ['#define %s %d' % (name, syms[symbol])]
     (work / 'fixture_values.h').write_text('\n'.join(header))
     (work / 'x86_desc.h').write_text('static void x86_load_tr(unsigned int sel) {(void)sel;}\n')
@@ -53,11 +52,8 @@ entry_bp: dd 0
     command(['nasm', '-f', 'elf32', ROOT / 'kernel/setjmp.asm', '-o', work / 'setjmp.o'])
     boot = (ROOT / 'kernel/kernel.c').read_text()
     tss = re.search(r'tss_init\([^;]+;', boot).group()
-    engine = (ROOT / 'kernel/sqlite_engine.c').read_text()
-    top = re.search(r'sqlite_engine_stack_top = ([^;]+);', engine).group(1)
-    assert 'sq_rc = os32_sqlite_start();' in boot
     calls = ('\nstatic void boot_tss(void) { ' + tss + ' }\nstatic int boot_sqlite(void) { '
-             'int result=0; sqlite_call_on_alt_stack(sqlite_body, ' + top + ', &result); return result; }\n')
+             'int result=0; sqlite_call_on_alt_stack(sqlite_body, test_stack_top, &result); return result; }\n')
     # Execute each product diagnostic classification block with boundary EIPs.
     isr = (ROOT / 'kernel/isr_handlers.c').read_text()
     classify = '''
@@ -66,6 +62,9 @@ static void tvram_puts_at(int row, int col, const char *s, int attr)
 { (void)row; (void)col; (void)attr; label = s; }
 static void sputs(const char *s) { (void)s; }
 '''
+    begin = isr.index('static int sqlite_fault_address(')
+    end = isr.index('\n/* exec フォルト復帰用', begin)
+    classify += isr[begin:end]
     classify += '''
 static u32 jumpbuf[KSETJMP_BUF_LEN];
 u32 kctx_irq_depth, kctx_exc_depth;
@@ -74,7 +73,7 @@ static int exec_nest_level = 1;
 static void exec_fault_recover(void) { exec_longjmp(jumpbuf); }
 '''
     for i, name in enumerate(('exception_handler', 'page_fault_handler')):
-        start = isr.index('        extern u32 __sqlite_start, __sqlite_end;', isr.index('void ' + name))
+        start = isr.index('        if (sqlite_fault_address(fault_eip))', isr.index('void ' + name))
         end = isr.index('\n    }', start)
         classify += 'static void classify%d(u32 fault_eip) { int row = 0;\n%s\n}\n' % (i, isr[start:end])
         start = isr.index('    if (exec_nest_level > 0)', end)
@@ -86,7 +85,7 @@ static void check_fault_return(void)
     volatile u32 marker = 0x12345678;
     for (volatile int i = 0; i < 2; i++) {
         if (!exec_setjmp(jumpbuf)) {
-            sqlite_call_on_alt_stack(i ? recover1 : recover0, MEM_SQLITE_STACK_TOP, 0);
+            sqlite_call_on_alt_stack(i ? recover1 : recover0, test_stack_top, 0);
             finish(32);
         }
         CHECK(marker == 0x12345678 && (u32)&marker >= MEM_KSTACK_BASE &&
@@ -95,12 +94,13 @@ static void check_fault_return(void)
 }
 '''
     classify += 'static void check_classification(void) {\n'
+    classify += 'module_records[0].module_id = MODULE_ID_SQLITE; module_records[0].state = MODULE_RUNNING; module_records[0].text = 0x200000; module_records[0].text_size = 4096;\n'
     for i in range(2):
         for addr, expected in [(m.get('KERNEL_LOAD_ADDR') - 1, 'O'),
                                (m.get('KERNEL_LOAD_ADDR'), '.'),
-                               (syms['__sqlite_start'] - 1, '.'),
-                               (syms['__sqlite_start'], 's' if i == 0 else '.'),
-                               (syms['__sqlite_end'], 'O'), (0x200000, 'O')]:
+                               (syms['__kernel_resident_end'] - 1, '.'),
+                               (syms['__kernel_resident_end'], 'O'),
+                               (0x200000, 's'), (0x201000, 'O')]:
             classify += "classify%d(%d); CHECK(label[1] == '%s', 30);\n" % (i, addr, expected)
     classify += '}\n'
     source = (ROOT / 'tools/tests/stack_entry_host.c').read_text()
@@ -111,7 +111,7 @@ static void check_fault_return(void)
            '-Wall', '-Wextra', '-Werror',
            *['-I' + str(p) for p in (work, ROOT, ROOT / 'include', ROOT / 'kernel', ROOT / 'lib')],
            work / 'host.c', work / 'entry.o', work / 'sqlite_stack.o', work / 'setjmp.o', '-o', work / 'host']
-    for name in ('__bss_start', '__bss_end', '__sqlite_start', '__sqlite_data_end', '__sqlite_end'):
+    for name in ('__bss_start', '__bss_end', '__kernel_resident_end'):
         host_name = 'fixture_bss_start' if name == '__bss_start' else name
         cmd += ['-Wl,--defsym,%s=%d' % (host_name, syms[name])]
     command(cmd)

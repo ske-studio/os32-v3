@@ -1565,6 +1565,20 @@ static u32 make_vk32(u8 *b, u32 len, u8 fill)
     return crc;
 }
 
+/* 旧 core + SQLite の 2 entry も v2 のまま保存・復旧できる。 */
+static u32 make_vk32_legacy_pair(u8 *b, u32 len)
+{
+    u32 i, crc;
+    (void)make_vk32(b, len, 0x11);
+    memset(b + 36, 0, 28);
+    b[4] = 64;
+    b[12] = 2;
+    b[56] = (u8)len;
+    crc = crc32_core_final(crc32_core_update(CRC32_INIT, b, len));
+    for (i = 0; i < 4; i++) b[60 + i] = (u8)(crc >> (8 * i));
+    return crc;
+}
+
 static void boot_pair(u32 *old_crc)
 {
     static u8 oldk[200], newk[240];
@@ -1585,6 +1599,21 @@ static void case_boot_old(void)
 
     printf("== TASK_SERIAL_HOSTFS: /boot/vmkernel.old は起動した版のときだけ ==\n");
     g_fake.boot_image_info = fk_boot_image_info;
+
+    /* T4c-1: 旧 2 entry の起動像を .old に残し、新 1 entry を受理する。 */
+    boot_pair(&crc);
+    {
+        u8 legacy[200];
+        crc = make_vk32_legacy_pair(legacy, sizeof(legacy));
+        fs_drop(node_of("/boot/vmkernel.lz4"));
+        fs_add_file("/boot/vmkernel.lz4", legacy, sizeof(legacy));
+        fk_boot_valid = 1;
+        fk_boot_crc = crc;
+        check(run1("boot") == 0 &&
+              node_equal_bytes("/boot/vmkernel.old", legacy, sizeof(legacy)) &&
+              node_size("/boot/vmkernel.lz4") == 240,
+              "旧 core+SQLite の 2 entry から core 1 entry を正常更新");
+    }
 
     /* 一致 → .old を作ってから置き換える */
     boot_pair(&crc);

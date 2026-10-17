@@ -1,4 +1,6 @@
 check-raw-wait-host:
+- lib/sqlite3/generated/*
+- tools/prototypes/sqlite_imports.def
 - build/checks.d/check-raw-wait-host.mk
 - drivers/fm.c
 - drivers/fm.h

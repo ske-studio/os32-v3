@@ -175,5 +175,349 @@
       "context": "normal",
       "irq": false
     }
+  ],
+  "facade": [
+    {
+      "name": "close",
+      "result": "int",
+      "args": "sqlite3 *db",
+      "target": "sqlite3_close",
+      "wrapper": "os32_sqlite_close",
+      "io": 1,
+      "stub": "OS32_ERR_NOSYS"
+    },
+    {
+      "name": "prepare_v2",
+      "result": "int",
+      "args": "sqlite3 *db, const char *sql, int size, sqlite3_stmt **out, const char **tail",
+      "target": "sqlite3_prepare_v2",
+      "wrapper": "os32_sqlite_prepare_v2",
+      "io": 1,
+      "stub": "OS32_ERR_NOSYS"
+    },
+    {
+      "name": "exec",
+      "result": "int",
+      "args": "sqlite3 *db, const char *sql, SqliteExecCallback callback, void *arg, char **error",
+      "target": "sqlite3_exec",
+      "wrapper": "os32_sqlite_exec",
+      "io": 1,
+      "stub": "OS32_ERR_NOSYS"
+    },
+    {
+      "name": "step",
+      "result": "int",
+      "args": "sqlite3_stmt *stmt",
+      "target": "sqlite3_step",
+      "wrapper": "os32_sqlite_step",
+      "io": 1,
+      "stub": "OS32_ERR_NOSYS"
+    },
+    {
+      "name": "finalize",
+      "result": "int",
+      "args": "sqlite3_stmt *stmt",
+      "target": "sqlite3_finalize",
+      "wrapper": "os32_sqlite_finalize",
+      "io": 1,
+      "stub": "OS32_ERR_NOSYS"
+    },
+    {
+      "name": "reset",
+      "result": "int",
+      "args": "sqlite3_stmt *stmt",
+      "target": "sqlite3_reset",
+      "wrapper": "os32_sqlite_reset",
+      "io": 1,
+      "stub": "OS32_ERR_NOSYS"
+    },
+    {
+      "name": "bind_int",
+      "result": "int",
+      "args": "sqlite3_stmt *stmt, int index, int value",
+      "target": "sqlite3_bind_int",
+      "wrapper": "os32_sqlite_bind_int",
+      "io": 0,
+      "stub": "OS32_ERR_NOSYS"
+    },
+    {
+      "name": "bind_null",
+      "result": "int",
+      "args": "sqlite3_stmt *stmt, int index",
+      "target": "sqlite3_bind_null",
+      "wrapper": "os32_sqlite_bind_null",
+      "io": 0,
+      "stub": "OS32_ERR_NOSYS"
+    },
+    {
+      "name": "bind_text",
+      "result": "int",
+      "args": "sqlite3_stmt *stmt, int index, const char *value, int length, SqliteDestructor destroy",
+      "target": "sqlite3_bind_text",
+      "wrapper": "os32_sqlite_bind_text",
+      "io": 0,
+      "stub": "OS32_ERR_NOSYS"
+    },
+    {
+      "name": "bind_blob",
+      "result": "int",
+      "args": "sqlite3_stmt *stmt, int index, const void *value, int length, SqliteDestructor destroy",
+      "target": "sqlite3_bind_blob",
+      "wrapper": "os32_sqlite_bind_blob",
+      "io": 0,
+      "stub": "OS32_ERR_NOSYS"
+    },
+    {
+      "name": "bind_parameter_count",
+      "result": "int",
+      "args": "sqlite3_stmt *stmt",
+      "target": "sqlite3_bind_parameter_count",
+      "wrapper": "os32_sqlite_bind_parameter_count",
+      "io": 0,
+      "stub": "0"
+    },
+    {
+      "name": "column_count",
+      "result": "int",
+      "args": "sqlite3_stmt *stmt",
+      "target": "sqlite3_column_count",
+      "wrapper": "os32_sqlite_column_count",
+      "io": 0,
+      "stub": "0"
+    },
+    {
+      "name": "column_int",
+      "result": "int",
+      "args": "sqlite3_stmt *stmt, int column",
+      "target": "sqlite3_column_int",
+      "wrapper": "os32_sqlite_column_int",
+      "io": 0,
+      "stub": "0"
+    },
+    {
+      "name": "column_double",
+      "result": "double",
+      "args": "sqlite3_stmt *stmt, int column",
+      "target": "sqlite3_column_double",
+      "wrapper": "os32_sqlite_column_double",
+      "io": 0,
+      "stub": "0"
+    },
+    {
+      "name": "column_text",
+      "result": "const unsigned char *",
+      "args": "sqlite3_stmt *stmt, int column",
+      "target": "sqlite3_column_text",
+      "wrapper": "os32_sqlite_column_text",
+      "io": 0,
+      "stub": "0"
+    },
+    {
+      "name": "column_blob",
+      "result": "const void *",
+      "args": "sqlite3_stmt *stmt, int column",
+      "target": "sqlite3_column_blob",
+      "wrapper": "os32_sqlite_column_blob",
+      "io": 0,
+      "stub": "0"
+    },
+    {
+      "name": "column_bytes",
+      "result": "int",
+      "args": "sqlite3_stmt *stmt, int column",
+      "target": "sqlite3_column_bytes",
+      "wrapper": "os32_sqlite_column_bytes",
+      "io": 0,
+      "stub": "0"
+    },
+    {
+      "name": "column_type",
+      "result": "int",
+      "args": "sqlite3_stmt *stmt, int column",
+      "target": "sqlite3_column_type",
+      "wrapper": "os32_sqlite_column_type",
+      "io": 0,
+      "stub": "0"
+    },
+    {
+      "name": "get_autocommit",
+      "result": "int",
+      "args": "sqlite3 *db",
+      "target": "sqlite3_get_autocommit",
+      "wrapper": "os32_sqlite_get_autocommit",
+      "io": 0,
+      "stub": "1"
+    },
+    {
+      "name": "errcode",
+      "result": "int",
+      "args": "sqlite3 *db",
+      "target": "sqlite3_errcode",
+      "wrapper": "os32_sqlite_errcode",
+      "io": 0,
+      "stub": "OS32_ERR_NOSYS"
+    },
+    {
+      "name": "extended_errcode",
+      "result": "int",
+      "args": "sqlite3 *db",
+      "target": "sqlite3_extended_errcode",
+      "wrapper": "os32_sqlite_extended_errcode",
+      "io": 0,
+      "stub": "OS32_ERR_NOSYS"
+    },
+    {
+      "name": "errmsg",
+      "result": "const char *",
+      "args": "sqlite3 *db",
+      "target": "sqlite3_errmsg",
+      "wrapper": "os32_sqlite_errmsg",
+      "io": 0,
+      "stub": "\"SQLite engine unavailable\""
+    },
+    {
+      "name": "errstr",
+      "result": "const char *",
+      "args": "int rc",
+      "target": "sqlite3_errstr",
+      "wrapper": "os32_sqlite_errstr",
+      "io": 0,
+      "stub": "\"SQLite engine unavailable\""
+    },
+    {
+      "name": "memory_used",
+      "result": "sqlite3_int64",
+      "args": "void",
+      "target": "sqlite3_memory_used",
+      "wrapper": "os32_sqlite_memory_used",
+      "io": 0,
+      "stub": "0"
+    },
+    {
+      "name": "group_open",
+      "result": "int",
+      "args": "const Os32SqliteGroup *group, const char *path, int flags, sqlite3 **out",
+      "target": "os32_sqlite_group_open",
+      "wrapper": "os32_sqlite_outer_group_open",
+      "io": 1,
+      "stub": "OS32_ERR_NOSYS"
+    },
+    {
+      "name": "db_fd",
+      "result": "int",
+      "args": "void *db",
+      "target": "os32_sqlite_db_fd",
+      "wrapper": "os32_sqlite_outer_db_fd",
+      "io": 0,
+      "stub": "-1"
+    },
+    {
+      "name": "group_acquire",
+      "result": "int",
+      "args": "int kind, int owner, Os32SqliteGroup *out",
+      "target": "os32_sqlite_group_acquire",
+      "wrapper": "os32_sqlite_outer_group_acquire",
+      "io": 0,
+      "stub": "OS32_ERR_NOSYS"
+    },
+    {
+      "name": "group_vfs_name",
+      "result": "const char *",
+      "args": "const Os32SqliteGroup *group",
+      "target": "os32_sqlite_group_vfs_name",
+      "wrapper": "os32_sqlite_outer_group_vfs_name",
+      "io": 0,
+      "stub": "0"
+    },
+    {
+      "name": "group_opened",
+      "result": "int",
+      "args": "const Os32SqliteGroup *group, void *db",
+      "target": "os32_sqlite_group_opened",
+      "wrapper": "os32_sqlite_outer_group_opened",
+      "io": 0,
+      "stub": "OS32_ERR_NOSYS"
+    },
+    {
+      "name": "group_begin_close",
+      "result": "int",
+      "args": "const Os32SqliteGroup *group",
+      "target": "os32_sqlite_group_begin_close",
+      "wrapper": "os32_sqlite_outer_group_begin_close",
+      "io": 0,
+      "stub": "OS32_ERR_NOSYS"
+    },
+    {
+      "name": "group_finish",
+      "result": "int",
+      "args": "const Os32SqliteGroup *group, int close_rc",
+      "target": "os32_sqlite_group_finish",
+      "wrapper": "os32_sqlite_outer_group_finish",
+      "io": 0,
+      "stub": "OS32_ERR_NOSYS"
+    },
+    {
+      "name": "group_quarantine",
+      "result": "int",
+      "args": "const Os32SqliteGroup *group, int stage, int rc",
+      "target": "os32_sqlite_group_quarantine",
+      "wrapper": "os32_sqlite_outer_group_quarantine",
+      "io": 0,
+      "stub": "OS32_ERR_NOSYS"
+    },
+    {
+      "name": "group_snapshot",
+      "result": "int",
+      "args": "const Os32SqliteGroup *group, Os32SqliteGroupInfo *out",
+      "target": "os32_sqlite_group_snapshot",
+      "wrapper": "os32_sqlite_outer_group_snapshot",
+      "io": 0,
+      "stub": "OS32_ERR_NOSYS"
+    },
+    {
+      "name": "group_for_db",
+      "result": "int",
+      "args": "void *db, Os32SqliteGroupInfo *out",
+      "target": "os32_sqlite_group_for_db",
+      "wrapper": "os32_sqlite_outer_group_for_db",
+      "io": 0,
+      "stub": "OS32_ERR_NOSYS"
+    },
+    {
+      "name": "canary",
+      "result": "int",
+      "args": "void",
+      "target": "memsys5_check_canary",
+      "wrapper": "os32_sqlite_outer_canary",
+      "io": 0,
+      "stub": "-1"
+    },
+    {
+      "name": "dump_vfs",
+      "result": "void",
+      "args": "void",
+      "target": "os32_sqlite_dump_vfs",
+      "wrapper": "os32_sqlite_outer_dump_vfs",
+      "io": 0,
+      "stub": null
+    },
+    {
+      "name": "vsnprintf",
+      "result": "char *",
+      "args": "int size, char *out, const char *format, va_list args",
+      "target": "sqlite3_vsnprintf",
+      "wrapper": "os32_sqlite_outer_vsnprintf",
+      "io": 0,
+      "stub": "0"
+    },
+    {
+      "name": "shutdown",
+      "result": "int",
+      "args": "void",
+      "target": "sqlite3_shutdown",
+      "wrapper": "os32_sqlite_outer_shutdown",
+      "io": 0,
+      "stub": "OS32_ERR_NOSYS"
+    }
   ]
 }

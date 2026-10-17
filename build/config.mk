@@ -2,7 +2,7 @@
 #  config.mk — ツールチェーン、フラグ、パス定義
 # ============================================================================
 
-# ビルド成果物出力ディレクトリ (kernel.bin / sqlite.bin / vmkernel.lz4 /
+# ビルド成果物出力ディレクトリ (kernel.bin / sqlite.mod / kdebug.bin / vmkernel.lz4 /
 # unicode.bin / kernel.elf / kernel.map をリポジトリルートから分離する)
 BUILD_OUT ?= build/out
 LAYOUT_HEADER = $(BUILD_OUT)/memmap_layout.h

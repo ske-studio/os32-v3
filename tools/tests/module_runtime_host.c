@@ -238,10 +238,15 @@ void _start(void)
         abort_one(h); empty(); finish(0);
     }
     if (input[0] == 10) {
-        CHECK(rc == (input[1] ? MODULE_ISOLATED : 0));
-        CHECK(!module_exports(h));
-        if (input[1]) CHECK(module_record_get(h)->state == MODULE_QUARANTINED);
-        else { CHECK(module_record_get(h)->state == MODULE_ABSENT); empty(); }
+        CHECK(rc == (input[1] ? MODULE_ISOLATED : MODULE_INIT_FAILED));
+        CHECK(!module_exports(h) && starts == 1 && cleans == 1);
+        if (input[1]) {
+            CHECK(module_record_get(h)->state == MODULE_QUARANTINED);
+            CHECK(live[0] && mask[0] == 15 && returned == 1 && !retired);
+        } else {
+            CHECK(module_record_get(h)->state == MODULE_ABSENT && retired == 1);
+            abort_one(h); empty();
+        }
         finish(0);
     }
     CHECK(!rc && module_exports(h));

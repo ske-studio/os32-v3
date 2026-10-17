@@ -1,6 +1,7 @@
 #ifndef SQLITE_ENGINE_H
 #define SQLITE_ENGINE_H
 #include "types.h"
+#define SQLITE_ENGINE_STACK_SIZE (128u * 1024u)
 /* Core state: never infer engine activity from ESP or FD ownership. */
 extern volatile u32 sqlite_engine_active;
 extern u32 sqlite_engine_stack_top;

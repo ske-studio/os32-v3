@@ -7,7 +7,7 @@ tools/mkvmkernel.py (実物) で VK32 イメージを作り、各エントリを
   mode 0  boot/lz4_mini.c        (HDD ローダ loader_hdd.bin が使う)
   mode 1  lib/lz4.c              (lz4 コマンド。境界チェックを lz4_mini と揃えている)
   mode 2  boot/loader_fat_new.asm の pm_lz4_decode (FD ローダ。**ASM をそのまま** 32bit で)
-で展開して元の kernel.bin / sqlite.bin とバイト一致するかを見る。ハーネス
+で展開して元の kernel.bin とバイト一致するかを見る。ハーネス
 tools/tests/vmkernel_lz4_host.c は libc なしの 32bit 静的 ELF で、ASM を
 ファイルから切り出して nasm -f elf32 で組んでリンクする。
 
@@ -41,7 +41,6 @@ LZ4C_SRC = ROOT / "lib/lz4.c"
 ASM_SRC = ROOT / "boot/loader_fat_new.asm"
 LIMIT_HEADER = ROOT / "boot/boot_defs.h"
 REAL_KERNEL = ROOT / "build/out/kernel.bin"
-REAL_SQLITE = ROOT / "build/out/sqlite.bin"
 
 MODES = [(0, "lz4_mini.c"), (1, "lib/lz4.c"), (2, "pm_lz4_decode (asm)")]
 
@@ -207,7 +206,6 @@ def run_mk(script, kernel_path, sqlite_path, out_path):
     return subprocess.run(
         [sys.executable, "-B", str(script),
          "--kernel", str(kernel_path), "--kernel-addr", "0x100000",
-         "--sqlite", str(sqlite_path), "--sqlite-addr", "0x200000",
          "--limit-header", str(LIMIT_HEADER), "-o", str(out_path)],
         capture_output=True)
 
@@ -246,9 +244,9 @@ def check_image(exe, script, work, kernel, sqlite, label, need_features):
         raise Fail("[{}] mkvmkernel が失敗\n{}".format(label, r.stderr.decode(errors="replace")))
     img = op.read_bytes()
     ents = parse_vk32(img)
-    if [e[0] for e in ents] != [0x100000, 0x200000]:
+    if [e[0] for e in ents] != [0x100000]:
         raise Fail("[{}] load_addr がずれた".format(label))
-    fast_total = 64 + sum(len(lz4.block.compress(x, store_size=False)) for x in (kernel, sqlite))
+    fast_total = 44 + len(lz4.block.compress(kernel, store_size=False))
     if not len(img) < fast_total:
         raise Fail("[{}] 高圧縮になっていない ({} >= 既定 {})".format(label, len(img), fast_total))
     lines = ["[{}] image {} B (既定の圧縮なら {} B)".format(label, len(img), fast_total)]
@@ -301,11 +299,9 @@ def case_boundary(script, work):
     rnd = random.Random(7)
     pool = bytes(rnd.getrandbits(8) for _ in range(limit + 4096))
     sq = b"\0" * 64
-    sq_c = len(lz4.block.compress(sq, store_size=False, mode="high_compression",
-                                  compression=12))
 
     def total(n):
-        return 64 + sq_c + len(lz4.block.compress(pool[:n], store_size=False,
+        return 44 + len(lz4.block.compress(pool[:n], store_size=False,
                                                   mode="high_compression", compression=12))
 
     found = {}
@@ -348,10 +344,10 @@ def run_all(srcs, script, target, real):
         k, s = synthetic()
         lines += check_image(exe, script, work, k, s, "synthetic", True)[1]
         if real:
-            if not (REAL_KERNEL.is_file() and REAL_SQLITE.is_file()):
-                raise Fail("[real] build/out/kernel.bin / sqlite.bin が無い (make kernel が先)")
+            if not REAL_KERNEL.is_file():
+                raise Fail("[real] build/out/kernel.bin が無い (make kernel が先)")
             size, ln = check_image(exe, script, work, REAL_KERNEL.read_bytes(),
-                                   REAL_SQLITE.read_bytes(), "real", False)
+                                   b"", "real", False)
             lines += ln
             lines.append("[real] 上限 {} まで残り {} B".format(max_image_size(),
                                                            max_image_size() - size))
@@ -425,7 +421,7 @@ def main(args):
     if real:
         sys.path.insert(0, str(ROOT / 'tools'))
         from check_artifacts import require_fresh
-        require_fresh(ROOT, ['build/out/kernel.bin', 'build/out/sqlite.bin'])
+        require_fresh(ROOT, ['build/out/kernel.bin'])
     srcs = {"mini": MINI_SRC, "lz4c": LZ4C_SRC, "asm": ASM_SRC}
     try:
         for ln in run_all(srcs, SCRIPT, target, real):

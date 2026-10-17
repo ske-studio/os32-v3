@@ -259,7 +259,6 @@ static int boot_layout_valid(void)
         boot_range_valid(MEM_FIXED_PAGING_GUARD_BASE, MEM_FIXED_PAGING_BASE, 0) &&
         boot_range_valid(MEM_STACK_GUARD, MEM_KSTACK_BASE, 0) &&
         boot_range_valid(MEM_KSTACK_BASE, MEM_KSTACK_TOP + 4, 1) &&
-        boot_range_valid(MEM_SQLITE_STACK_GUARD, MEM_SQLITE_STACK_BASE, 0) &&
         boot_range_valid(MEM_SHELL_LOAD_ADDR, MEM_SHELL_GUARD, 1) &&
         boot_range_valid(MEM_SHELL_GUARD, MEM_SHELL_GUARD + PAGE_SIZE, 0) &&
         boot_range_valid(MEM_SHELL_GUARD + PAGE_SIZE, MEM_SHELL_BAND_END + 1, 1);
@@ -270,7 +269,6 @@ static int boot_layout_valid(void)
 /* ======================================================================== */
 void paging_init(u32 mem_kb)
 {
-    extern u32 __sqlite_start;
     int i, j;
     u32 phys;
     u32 pd_phys;
@@ -360,17 +358,6 @@ void paging_init(u32 mem_kb)
     /* シェルスタックガード: Not-Present */
     paging_set_not_present(MEM_SHELL_GUARD, MEM_SHELL_GUARD + PAGE_SIZE - 1);
 
-    /* SQLite + 代替スタック (__sqlite_start〜): 強制R/W
-     * ブートローダーが sqlite.bin を __sqlite_start にロード済み。
-     * 代替スタックも含めメモリプローブ結果に関係なく R/W を保証する。 */
-    {
-        u32 sq_start = PAGE_ALIGN_DOWN((u32)&__sqlite_start);
-        u32 sq_end   = PAGE_ALIGN_DOWN(MEM_SQLITE_STACK_TOP + PAGE_SIZE);
-        paging_map_range(sq_start, sq_end, sq_start, PAGE_RW);
-    }
-
-    paging_set_not_present(MEM_SQLITE_STACK_GUARD, MEM_SQLITE_STACK_BASE - 1);
-
     /* BIOS ROM: Read-Only */
     paging_set_readonly(MEM_BIOS_ROM_START, MEM_BIOS_ROM_END);
 
@@ -380,10 +367,7 @@ void paging_init(u32 mem_kb)
     if (paging_map_range(MEM_FIXED_PAGING_BASE, MEM_FIXED_PAGING_FRAME_END,
                          MEM_FIXED_PAGING_BASE, PAGE_RW) != 0 ||
         !fixed_paging_valid() ||
-        !boot_layout_valid() ||
-        !boot_range_valid(PAGE_ALIGN_DOWN((u32)&__sqlite_start), MEM_SQLITE_STACK_GUARD, 1) ||
-        !boot_range_valid(MEM_SQLITE_STACK_BASE,
-                          PAGE_ALIGN_DOWN(MEM_SQLITE_STACK_TOP + PAGE_SIZE), 1)) {
+        !boot_layout_valid()) {
         irq_restore(flags);
         return; /* PG は立てない。後段の memory_boot_init が fail-stop。 */
     }
@@ -1283,7 +1267,6 @@ static u8 memmap_want_at(u32 a, u32 tramp)
     if (a < MEM_BIOS_ROM_START) return MM_RW;   /* VRAM */
     if (a <= MEM_BIOS_ROM_END) return MM_RO;
 
-    if (a >= MEM_SQLITE_STACK_GUARD && a < MEM_SQLITE_STACK_BASE) return MM_NP;
     if (a >= MEM_FIXED_PAGING_GUARD_BASE && a < MEM_FIXED_PAGING_BASE) return MM_NP;
     if (a >= MEM_FIXED_PAGING_BASE && a < MEM_FIXED_PAGING_FRAME_END) return MM_RW;
 

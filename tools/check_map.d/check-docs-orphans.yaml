@@ -58,4 +58,10 @@ check-docs-orphans:
 - tools/tests/owner_reclaim_host.c
 - tools/tests/test_owner_reclaim.py
 - userland/rust/libos32gui/src/shlib.rs
+- kernel/kdebug_imports.def
+- tools/gen_kdebug_imports.py
+- tools/gen_sqlite_imports.py
+- tools/mkmod.py
+- tools/module_schema.py
+- tools/prototypes/sqlite_imports.def
 artifact_reader: true

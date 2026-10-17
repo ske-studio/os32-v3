@@ -48,12 +48,11 @@ boot/*.asm      →  nasm (-f bin / -f elf32)  →  boot/*.bin / boot/*.o
 kernel/*.asm    →  nasm (-f elf32)           →  kernel/*.o
 */*.c           →  gcc (-m32 -ffreestanding) →  */*.o
                                                ↓
-*.o + kernel/*.o → ld (-T os32.ld)           → build/out/kernel.elf (0x100000〜、SQLite は core BSS の直後)
+*.o + kernel/*.o → ld (-T os32.ld)           → build/out/kernel.elf (0x100000〜、SQLite を含まない core)
                                                (+ build/out/kernel.map)
 kernel.elf      →  objcopy (-O binary)       → build/out/kernel.bin (カーネル本体)
-                →  objcopy (--only-section)  → build/out/sqlite.bin (SQLite拡張域)
                                                ↓
-kernel.bin + sqlite.bin → mkvmkernel.py      → build/out/vmkernel.lz4 (LZ4圧縮カーネルイメージ)
+kernel.bin             → mkvmkernel.py      → build/out/vmkernel.lz4 (LZ4圧縮カーネルイメージ)
                                                LZ4 高圧縮 (HC level 12、展開側は同じ形式で無変更)。
                                                合計が MAX_IMAGE_SIZE (boot/boot_defs.h、508KiB) を
                                                超えたら出力を消して失敗 (HDD ローダが読めない)。
@@ -135,6 +134,12 @@ ne2000 リングと gcc + python3 だけで回るホスト試験 17 本。どの
 
 インクルードパスは `Makefile` で細かく制御されており、基本的にソースファイルから他のヘッダディレクトリは `-I` によって自動解決できるため `#include "file.h"` で問題なく参照可能。
 
+`make kernel` は `build/kernel.mk` の `KERNEL_PAIRED_MODULES` にある
+`kdebug.bin` と `sqlite.mod` も組み、VK32 の CRC と対にする。
+SQLite は既存 VA0/module 生成器で GNU89 の engine/VFS を組み、typed facade を
+初期化 export から受け取る。`/boot` の部品・Unicode 表を含む一式を `hsync boot`
+で更新する。`vmkernel.old` への巻戻しでは、同じ像と対の部品も一緒に復元する。
+
 ### §8-3 ディレクトリ構造
 
 ```
@@ -157,7 +162,7 @@ os32/
 ├── docs/hw/        PC-98 資料のローカルミラー (git 管理外、tools/sync_hwdocs.sh)
 ├── sdk/            配布 SDK (allocator/ (nano入力台帳・表示), include/, crt/, link/ (app.ld / app_sys.ld / shlib.ld), rust/, example/)、kapi.json と生成器
 ├── build/          モジュール化 Makefile 群 (config.mk, kernel.mk, programs.mk, libs.mk, deploy.mk, image.mk, sdk.mk 等) + リンカスクリプト
-│   └── out/        ビルド成果物 (kernel.bin, sqlite.bin, vmkernel.lz4, unicode.bin, kernel.elf/.map)
+│   └── out/        ビルド成果物 (kernel.bin, sqlite.mod, kdebug.bin, vmkernel.lz4, unicode.bin, kernel.elf/.map)
 ├── assets/         データアセット (DB, 辞書, profile 等)
 ├── tests/          テストスクリプト
 ├── tools/          ホスト上でのイメージ生成・デプロイ・検査ツール (nhd_deploy, mkshlib, check_*, emu_agent/ (ローカル AI の実機操作), np21w_mcp/, np21w_ctl (NP21/W の停止・起動))

@@ -81,10 +81,10 @@ enum module_field {
     { \
         .module_id = 2U, \
         .phase = 2U, \
-        .required_flags = 0U, \
-        .allowed_flags = 0U, \
+        .required_flags = 1U, \
+        .allowed_flags = 1U, \
         .stop_allowed = 0U, \
-        .ops_version = 1U, \
+        .ops_version = 2U, \
         .ops_slots = 1U, \
         .image_max = 524288U, \
         .mem_max = 524288U, \
