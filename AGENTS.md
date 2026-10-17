@@ -25,6 +25,7 @@ Worktrees have no `.env`. Before anything else, export
 `tools/preflight.sh --base <SHA from the request> --fix-fonts` and fix every NG. Run only `make all` and the tests you added or touched, with `MUTATE=0`; also run
 `python3 tools/check_select.py --lint` (seconds; register new test inputs in `tools/check_map.d/`). Do not run
 mutation passes, the full `--select` candidate set or the static checks (the PM runs them once after review).
+For a request that is one step of a multi-step task (Tx, from T4): run `make kernel` (plus any userland image your step touches) instead of `make all`; after the last step, before review, run `make all`, the `check_select.py --select --files <whole Tx diff>` candidates with `MUTATE=0`, and the five static checks once (ROLES §0).
 Run checks in the foreground and wait for them to finish instead of re-reading partial logs; never abort and restart a run. Only logs produced after your last source change count as passing.
 Never commit (the sandbox keeps `.git` read-only; the PM commits).
 
