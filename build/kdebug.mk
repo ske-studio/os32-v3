@@ -59,6 +59,5 @@ $(R1_OBJ)/kernel/module.o: kernel/module.c build/config.mk build/kdebug.mk $(KDE
 $(R1_OUT)/kernel.elf: $(KDEBUG_KEXPORT_OBJ)
 R1_OBJECTS += $(KDEBUG_KEXPORT_OBJ)
 
-all kernel: $(BUILD_OUT)/kdebug.bin
-kernel-r1: $(R1_OUT)/kdebug.bin
+all: $(BUILD_OUT)/kdebug.bin
 -include $(KDEBUG_OBJS:.o=.d) $(KDEBUG_KEXPORT_OBJ:.o=.d)

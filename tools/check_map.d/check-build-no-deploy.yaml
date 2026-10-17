@@ -1,6 +1,8 @@
 check-build-no-deploy:
 # Makefile / build/*.mk は full と make の型照合に任せる。
 # build/kernel.mk / libs.mk / programs.mk の変更は broad の走査器として選ぶ。
+# kernel / kernel-r1 の対の部品と像への依存も test_build_no_deploy.py で照合する。
 - build/checks.d/check-build-no-deploy.mk
 - tools/tests/test_build_no_deploy.py
 - tools/check_map.d/check-build-no-deploy.yaml
+artifact_reader: true
