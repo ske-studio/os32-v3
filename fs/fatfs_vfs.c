@@ -58,14 +58,12 @@ static int ff_to_vfs(FRESULT fr)
 
 /* 書込みが失敗した窓 (FF_FS_TINY) を捨て、後続の読みを回復する。
  * 他の開いた FIL は再マウントで失効する。元のエラーは呼び手へ返す。
- * f_mount は disk_initialize を呼ぶため、同じ媒体で見た NW は引き継ぐ。 */
+ * f_mount の disk_initialize で NW も解除する。次の書込みで改めて検出する。 */
 static int ff_write_result(FatFsCtx *fc, FRESULT fr)
 {
     if (fr == FR_DISK_ERR || fr == FR_WRITE_PROTECTED) {
-        int protect = fc->pdrv == 0 && (disk_status(fc->pdrv) & STA_PROTECT);
         f_mount(0, fc->vol, 0);
         (void)f_mount(&fc->fatfs, fc->vol, 1);
-        if (protect) diskio_set_fdd_protect();
     }
     return ff_to_vfs(fr);
 }

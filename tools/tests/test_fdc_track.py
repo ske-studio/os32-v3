@@ -384,6 +384,10 @@ MUTATIONS = [
      r"(        /\* NR \(媒体無し\) は\*\*回復 \(リセット・RECALIBRATE\) より前に\*\*打ち切る\n[^\n]*\n[^\n]*\n)        if \(\(results\[0\] & FDC_ST0_NR\) != 0\) \{\n            dma_chan_mask\(FDC_DMA_CHANNEL\);\n            dma_armed = 0;\n            phase = \"nr\";\n            break;\n        \}",
      r"\1",
      "単発の READ の NR で回復とリトライを踏む"),
+    ("drivers/fdc.c",
+     r"        if \(results\[1\] & FDC_ST1_NW\) \{\n(?:[^\n]*\n)*?        \}\n",
+     "",
+     "WRITE の NW を通常エラーにして回復とリトライを踏む"),
     # 書き込み側に固有の注釈で NR の分岐を選ぶ。
     ("drivers/fdc.c",
      r"(        /\* NR \(媒体無し\) は回復より前に打ち切る \(read 側と同じ\)。[^\n]*\n[^\n]*\n)        if \(\(results\[0\] & FDC_ST0_NR\) != 0\) \{\n            dma_chan_mask\(FDC_DMA_CHANNEL\);\n            dma_armed = 0;\n            phase = \"nr\";\n            break;\n        \}",

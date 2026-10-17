@@ -12,8 +12,6 @@
 #include "types.h"
 
 void diskio_set_fdd_drive(int drv);
-/* 回復の f_mount が再初期化しても、検出済みの NW を引き継ぐ。 */
-void diskio_set_fdd_protect(void);
 void diskio_set_hdd_drive(int drv);
 void diskio_set_hdd_partition(u32 offset);
 void diskio_set_hdd_sector_size(u16 sz);

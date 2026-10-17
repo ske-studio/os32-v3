@@ -87,6 +87,8 @@ TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
 
 # 変異: (名前, 写しの中のファイル, 置き換え前, 置き換え後)。
 # 置き換え前後が同じものは正常対照 (通ること)。それ以外は落ちること。
+# FDWP の (a) の読み失敗は「窓を捨てない」変異で再現する。
+# STA_PROTECT の変異は再マウントで読みが戻るため、FDC への再試行の数で殺す。
 MUTANTS = [
     ("FDWP: 正常対照 (何も変えない)", "fs/fatfs/diskio.c",
      "    fdd_status |= STA_PROTECT;", "    fdd_status |= STA_PROTECT;"),

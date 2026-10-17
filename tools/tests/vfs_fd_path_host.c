@@ -1627,7 +1627,10 @@ static int fatwp_write_at(const char *path, const char *data, u32 offset)
     return rc;
 }
 
-/* 書込み失敗で窓が汚れても、別の既存ファイルは読み続けられる。 */
+/* 書込み失敗で窓が汚れても、別の既存ファイルは読み続けられる。
+ * (a) の shell 読み失敗を再現するのは「窓を捨てない」変異。
+ * STA_PROTECT を立てない変異は、再マウントだけで読みが戻るため、
+ * 再初期化までの FDC への書込み数 (2 回目を断ること) で捕まえる。 */
 static void case_fatwp(void)
 {
     static BYTE work[FF_MAX_SS];
@@ -1654,6 +1657,17 @@ static void case_fatwp(void)
         EQ(vfs_write("/fd0/old", "OLD", 3), 3);
         EQ(vfs_mkdir("/fd0/empty"), VFS_OK);
         g_fat_nw = i == 9 ? 2 : 1;
+        if (i != 9) {
+            /* 1 回の操作内の再試行は保護で止める。再マウント前の寿命。 */
+            writes = g_fat_writes;
+            disk_writes = g_fat_disk_writes;
+            CHECK(disk_write(0, work, 16, 1) == RES_WRPRT);
+            CHECK(disk_status(0) & STA_PROTECT);
+            CHECK(disk_write(0, work, 16, 1) == RES_WRPRT);
+            CHECK(g_fat_disk_writes == disk_writes + 2);
+            CHECK(g_fat_writes == writes + 1);
+            CHECK(disk_initialize(0) == 0);
+        }
         switch (i) {
         case 0: rc = vfs_write("/fd0/boot.new", "LOG", 3); break;
         case 1: rc = vfs_mkdir("/fd0/newdir"); break;
@@ -1670,17 +1684,25 @@ static void case_fatwp(void)
         /* 修正前 RED: ここが IO になり shell が読めない。 */
         EQ(vfs_read("/fd0/sys/shell.bin", buf, sizeof(buf)), 5);
         CHECK(memcmp(buf, "SHELL", 5) == 0);
-        CHECK(!!(disk_status(0) & STA_PROTECT) == (i != 9));
+        CHECK(!(disk_status(0) & STA_PROTECT));
+        /* 同じ書込み禁止媒体で、再マウント後の次の操作は再び FDC へ届く。 */
         writes = g_fat_writes;
         disk_writes = g_fat_disk_writes;
         EQ(vfs_write("/fd0/again", "X", 1), VFS_ERR_IO);
-        EQ(vfs_mkdir("/fd0/again"), VFS_ERR_IO);
-        CHECK(i == 9 ? g_fat_writes > writes : g_fat_writes == writes);
-        CHECK(i == 9 ? g_fat_disk_writes > disk_writes : g_fat_disk_writes == disk_writes);
-        /* 明示的な再初期化で媒体交換。作成・追記・削除も通常通り。 */
-        g_fat_nw = 0;
-        CHECK(disk_initialize(0) == 0);
+        CHECK(i == 9 ? g_fat_writes > writes : g_fat_writes == writes + 1);
+        CHECK(g_fat_disk_writes > disk_writes);
+        EQ(vfs_read("/fd0/sys/shell.bin", buf, sizeof(buf)), 5);
+        CHECK(memcmp(buf, "SHELL", 5) == 0);
         CHECK(!(disk_status(0) & STA_PROTECT));
+        writes = g_fat_writes;
+        EQ(vfs_mkdir("/fd0/again"), VFS_ERR_IO);
+        CHECK(g_fat_writes == writes + 1);
+        EQ(vfs_read("/fd0/sys/shell.bin", buf, sizeof(buf)), 5);
+        CHECK(memcmp(buf, "SHELL", 5) == 0);
+        CHECK(!(disk_status(0) & STA_PROTECT));
+        /* 書込み可の媒体に交換し、初期化や読みを挟まず書込みから入る。
+         * 未回収の Ready 変化と実物 FDC の組合せは fdc_track_host.c で試す。 */
+        g_fat_nw = 0;
         EQ(vfs_write("/fd0/ok", "A", 1), 1);
         EQ(fatwp_write_at("/fd0/ok", "B", 1), 1);
         EQ(vfs_read("/fd0/ok", buf, sizeof(buf)), 2);

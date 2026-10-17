@@ -195,6 +195,7 @@ static struct {
     int unsettled;
     int foreign_on_seek;            /* SEEK 完了の前に別の通知を積む: 1=drv1 SE, 2=自 Ready 変化, 3=4 件 */
     int fail_reads;                 /* 次の READ を n 回 DE で落とす */
+    int fail_writes;                /* 次の WRITE を n 回 DE で落とす */
     int force_err;
 } M;
 
@@ -261,6 +262,7 @@ static void model_rw(int is_write)
         M.move_pending = 0;
     }
     if (M.fail_reads > 0 && !is_write) { M.fail_reads--; M.force_err = 1; }
+    if (M.fail_writes > 0 && is_write) { M.fail_writes--; M.force_err = 1; }
     if (!is_write && nsec > 1) M.multi_reads++;
     if (M.cmd[0] & 0x80) M.mt_used++;
     if (D.masked) M.cmd_while_masked++;
@@ -1381,13 +1383,16 @@ static void write_nr_no_recover(void)
 static void write_protection(void)
 {
     static u8 buf[1024];
-    int writes;
+    int writes, resets, recals;
 
     model_boot(1);
     diskio_set_fdd_drive(0);
     CHECK(disk_initialize(0) == 0);
     M.write_protected = 1;
+    writes = M.writes; resets = M.resets; recals = M.recals;
     CHECK(disk_write(0, buf, 16, 1) == RES_WRPRT);
+    CHECK(M.writes == writes + 1);
+    CHECK(M.resets == resets && M.recals == recals);
     CHECK(disk_status(0) & STA_PROTECT);
     CHECK(D.masked == 1);
     writes = M.writes;
@@ -1396,19 +1401,33 @@ static void write_protection(void)
     CHECK(disk_read(0, buf, 32, 1) == RES_OK);
     CHECK(disk_status(0) & STA_PROTECT);
 
-    /* Ready 変化を回収したら、新しい媒体として NW を捨てる。 */
+    /* キャッシュの世代が進んでも保護の寿命は変わらない。
+     * FatFs 以外からの失敗した書込みも世代を進める。 */
+    CHECK(fdc_write_sector_geom(0, 2, 0, 1, &fdc_geom_2hd, buf)
+          == FDC_RC_WRITE_PROTECTED);
+    CHECK(disk_status(0) & STA_PROTECT);
     M.write_protected = 0;
     model_pend(0xC0, 0);
     model_line();
     CHECK(fdc_read_sector_geom(0, 3, 0, 1, &fdc_geom_2hd, buf) == 0);
-    CHECK(!(disk_status(0) & STA_PROTECT));
-    CHECK(disk_write(0, buf, 16, 1) == RES_OK);
+    CHECK(disk_status(0) & STA_PROTECT);
 
+    /* 同じ書込み禁止媒体でも再マウントで解除し、次は FDC に 1 回届く。 */
     M.write_protected = 1;
-    CHECK(disk_write(0, buf, 16, 1) == RES_WRPRT);
     CHECK(disk_initialize(0) == 0);
     CHECK(!(disk_status(0) & STA_PROTECT));
+    writes = M.writes;
+    CHECK(disk_write(0, buf, 16, 1) == RES_WRPRT);
+    CHECK(M.writes == writes + 1);
+    CHECK(disk_read(0, buf, 32, 1) == RES_OK);
+    CHECK(disk_status(0) & STA_PROTECT);
+
+    /* 書込み可の媒体へ交換。Ready 変化を回収せず、再マウント後は書込みから。 */
     M.write_protected = 0;
+    model_pend(0xC0, 0);
+    model_line();
+    CHECK(disk_initialize(0) == 0);
+    CHECK(!(disk_status(0) & STA_PROTECT));
     CHECK(disk_write(0, buf, 16, 1) == RES_OK);
     M.write_protected = 1;
     CHECK(disk_write(0, buf, 16, 1) == RES_WRPRT);
@@ -1418,12 +1437,21 @@ static void write_protection(void)
     M.write_protected = 0;
     CHECK(disk_write(0, buf, 16, 1) == RES_OK);
 
-    /* CRC などの通常の書込み失敗からは NW を推測しない。 */
+    /* 一時的な CRC エラーはリトライで成功する (正常の対照)。 */
     diskio_set_fdd_drive(0);
     CHECK(disk_initialize(0) == 0);
     M.force_err = 1;
     CHECK(fdc_write_sector_geom(0, 4, 0, 1, &fdc_geom_2hd, buf) == 0);
     CHECK(!(disk_status(0) & STA_PROTECT));
+
+    /* 全リトライで CRC エラー。実物の disk_write が通常エラーを保護にしない。 */
+    M.fail_writes = FDC_RW_RETRIES;
+    writes = M.writes;
+    CHECK(disk_write(0, buf, 64, 1) == RES_ERROR);
+    CHECK(M.writes == writes + FDC_RW_RETRIES);
+    CHECK(M.fail_writes == 0);
+    CHECK(!(disk_status(0) & STA_PROTECT));
+    CHECK(disk_write(0, buf, 64, 1) == RES_OK);
 }
 
 /* 1 本のエッジで件数の上限 (4) ちょうどの別の通知が先に積まれていても、

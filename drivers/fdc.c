@@ -933,6 +933,9 @@ int fdc_write_sector_geom(int drv, int cyl, int head, int sect,
         }
 
         if (results[1] & FDC_ST1_NW) {
+            /* リザルトは読み終えた。NR と同じく DMA を閉じて抜ける。 */
+            dma_chan_mask(FDC_DMA_CHANNEL);
+            dma_armed = 0;
             write_protected = 1;
             break;
         }
