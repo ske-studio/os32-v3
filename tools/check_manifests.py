@@ -109,10 +109,9 @@ def check_doc_counts():
         return len(glob.glob(pattern))
 
     checks = [
-        ("CLAUDE.md", r"\((\d+) commands\)",
-         count("userland/cmds/*.c"), "userland/cmds/*.c"),
-        # docs/INDEX.md のソースツリー複製は 2026-09-05 に削除 (件数を持つ文書は
-        # CLAUDE.md の 1 か所だけにする)。
+        # docs/INDEX.md のソースツリー複製は 2026-09-05 に、CLAUDE.md の
+        # 「(N commands)」は 2026-10-17 に削除 (POLICY_DEV §9: 件数を写さない)。
+        # 件数を文書に書くときはここに照合を足す。
     ]
 
     bad = []
