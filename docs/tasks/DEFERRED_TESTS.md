@@ -27,6 +27,7 @@
 | ID | 何を残したか | 理由 | 渡し先 |
 |---|---|---|---|
 | T3AB-R | T3ab (6b4e37e) の実機 Ra266 の回帰 T3bR: PEGC の最上位の窓 (`win=fff00000`・`alias=ok`)、82557 (LB3・LAN の sfs)、監査・自己診断、`diag:`。R1 像の一式のゲスト受入も未実施 | NP21/W 64MB の受入 (7 項) は 2026-10-16 に済み (`~/os32-tmp/evidence/2026-10-16/t3ab_np21w/`) | ノートで実施中 (立会い不要)。R1 像は次の R1 の回で |
+| FDRECOV-1 | FD で起動した OS32 から LAN で HDD を直す経路: FD の `/etc/system.cfg` に SFS_LAN、hsync `--root /hd0` を LAN で、KAPI の門は FD のカーネルでなく対象の root と比べる、配備マニフェストの形式は後方互換に保つ、hsync.1 に復旧の手順を数行。これで道具の入った版 (LAN sfs を持つ L-F2 32b07e4 以降) の FD ならどれでも復旧に使える | 2026-10-16 の T3bR で実機が止まり、戻すのに FD からの最小インストールが要った。代理の人の操作を減らす (ユーザー承認 2026-10-17) | T3bR の後に小さな票にする |
 | T3AB-4 | T3 票 §4 T3ab の受入 ④「SLACK の全ページを一度だけ配って返す」のゲストでの観測: ゲストに専用の自己診断が無い。ホストの模型 (段 D、`tools/tests/memory_boot_host.c`) では確認済み、ゲストでは空きページ数の不変と leftover 0 が傍証 | 未判定 (専用の観測口が無い) | T3b1 (kdebug・監査の段) で、ゲストの自己診断に SLACK の一巡を足すかを決める |
 | LGY98-L12 | LGY-98 の L1 (131/200 フレーム) と L2 (66,132/131,072 B) が FAIL — main 9aaaf39 でも同じ数値で FAIL (T3ab の後退ではない)。台本 `tools/net_l0..l3_test.py` は urllib で 127.0.0.1:8025 を直接叩くので、WSL の NAT では届かない (受入では手元の shim で `np21w_client` の curl 経路へ回した) | 既存の失敗、原因は台本か host_agent v2 の側 [推] | 次に LGY-98 / net の台本を触る段: 台本を np21w_client に寄せ、L1/L2 の欠落の原因を調べる |
 | E9-1 | CPL3 sh 経由の tvdump (CUI 対照つき) | v3 の sh.bin はシリアル系コマンドを持たず (D2(a))、sh の中の tvdump は「external programs need the GUI terminal」で $?=126 — 台本の前提が v3 で成り立たない。代わりに CPL3 の CUI 前景で `audit_test tvram` が PASS (2026-10-16、`~/os32-tmp/evidence/2026-10-16/guest8/E9-1/`) | H-7 (端末アプリの再開) の再開時ゲートで |
