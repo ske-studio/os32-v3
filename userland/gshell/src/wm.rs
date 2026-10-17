@@ -761,6 +761,7 @@ impl GuiState {
 
     /* ---- 所有者回収 (契約 T4 / U8。GUI_OP_OWNER_EXIT) ---- */
     pub fn reclaim_owner(&mut self, owner: i32) {
+        fep::forget_owner(self, owner);
         /* ウィンドウ */
         let mut i = 0;
         while i < GUI_MAX_WINDOWS {
@@ -768,7 +769,6 @@ impl GuiState {
                 if self.lease_applied == self.windows[i].id(i) {
                     self.lease_dirty = true;
                 }
-                fep::forget_window(self, self.windows[i].id(i));
                 self.windows[i].lease_mask = 0;
                 let vac = self.windows[i].outer();
                 self.z_remove(i);

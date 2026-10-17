@@ -312,17 +312,15 @@ fn grid_clear_all(f: &mut Fep) {
 
 /// GFX 版の関数表をカーネル FEP へ差し込む。
 ///
-/// **現状は何もしない**: `ime_set_render()` に相当する KAPI がまだ無い
-/// (モジュール先頭の申し送りを参照)。KAPI が生えたらここで
-/// `(a.ime_set_render)(&GSHELL_IME_RENDER_GFX as *const _ as *mut u8)` を呼ぶ。
-/// 差し込めていない間は [`kernel_drives`](Fep::kernel_drives) が false のままで、
-/// WM 側がモード表示だけを格子へ書く。
+/// IME ON なら差し込み中にモード表示が描かれるので、格子は先に初期化する。
 pub fn install() {
     let f = state();
     f.render_table = &GSHELL_IME_RENDER_GFX as *const ImeRender as u32;
-    /* カーネル FEP の描画先を GFX 版の関数表へ (K 依頼 2 = ime_set_render)。 */
-    unsafe { (os32api::api().ime_set_render)(f.render_table as *mut u8) };
     grid_clear_all(f);
+    let table = f.render_table;
+    /* カーネル FEP の描画先を GFX 版の関数表へ (K 依頼 2 = ime_set_render)。 */
+    unsafe { (os32api::api().ime_set_render)(table as *mut u8) };
+    let f = state();
     f.on = unsafe { (os32api::api().ime_is_active)() } != 0;
     refresh_indicator(f);
 }
@@ -574,14 +572,33 @@ pub fn cancel_input() {
 /// 消える窓が未確定入力の宛先のときだけ取り消す。
 /// モーダルの入力は別の寿命。予約があれば現在の前景より元の宛先を優先する。
 pub fn forget_window(st: &GuiState, win_id: u32) {
-    let pending = state().commit_for;
-    if pending == win_id || (pending == 0 && !modal::is_input() && st.front_id() == win_id) {
+    if input_window(st) == win_id {
         cancel_input();
     }
 }
 
+/// 回収で前景が変わる前に、owner の入力先を一度だけ判定する。
+pub fn forget_owner(st: &GuiState, owner: i32) {
+    if let Some(i) = st.win_by_id(input_window(st)) {
+        if st.windows[i].owner == owner {
+            cancel_input();
+        }
+    }
+}
+
+fn input_window(st: &GuiState) -> u32 {
+    if modal::is_input() {
+        return 0;
+    }
+    let pending = state().commit_for;
+    if pending != 0 { pending } else { st.front_id() }
+}
+
 /// X1 でフォーカスが移る前に、確定の宛先だけ控える (最初の 1 件を保つ)。
 pub fn defer_commit(win_id: u32) {
+    if modal::is_input() {
+        return;
+    }
     let f = state();
     if !f.on || f.commit_for != 0 {
         return;

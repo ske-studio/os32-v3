@@ -1685,9 +1685,11 @@ fn fep_over_taskbar_keeps_its_order_across_frame_and_fep_cycles() {
  * a candidate until STOP and exposes a UTF-8 tail at the next input, so missing
  * WM lifetime notifications fail at runtime rather than at a source check. */
 static IMECAND_PENDING: std::sync::Mutex<Vec<u8>> = std::sync::Mutex::new(Vec::new());
+static IMECAND_STOPS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 unsafe extern "C" fn imecand_feed(key: i32) -> i32 {
     let mut pending = IMECAND_PENDING.lock().unwrap();
     if key == (0x60 << 8) {
+        IMECAND_STOPS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         pending.clear();
         return -1;
     }
@@ -1815,4 +1817,123 @@ fn imecand_input_modal_survives_unrelated_window_exit() {
     modal::on_key(&mut st, 0, 0x1b, 0);
     assert!(IMECAND_PENDING.lock().unwrap().is_empty());
     fep_off();
+}
+
+#[test]
+fn imecand_run_focus_change_neither_reserves_nor_cancels_window_input() {
+    for reclaim in [false, true] {
+        mocks::init(); fep_off();
+        let shm = mocks::Shm::new();
+        let mut st = windows(&shm, &[(20, 20, 180, 120), (300, 20, 180, 120)]);
+        imecand_setup();
+        let a = st.front_id();
+        let b = id(&st, 0);
+        modal::open_wm_input(&mut st, b"Run\0", modal::WM_PURPOSE_RUN);
+        imecand_seed();
+        IMECAND_STOPS.store(0, std::sync::atomic::Ordering::SeqCst);
+        assert_eq!(wm::set_focus(&mut st, 2, b), 0);
+        if reclaim { st.reclaim_owner(3); }
+        else { assert_eq!(wm::destroy_window(&mut st, 3, a), 0); }
+        assert_eq!(*IMECAND_PENDING.lock().unwrap(), "幹事".as_bytes(),
+                   "IMECAND Run candidate cancelled with background A");
+        assert_eq!(IMECAND_STOPS.load(std::sync::atomic::Ordering::SeqCst), 0);
+        // Nor may destroying the current background window B cancel Run input.
+        assert_eq!(wm::destroy_window(&mut st, 2, b), 0);
+        assert_eq!(*IMECAND_PENDING.lock().unwrap(), "幹事".as_bytes());
+        assert_eq!(IMECAND_STOPS.load(std::sync::atomic::Ordering::SeqCst), 0);
+        // A reservation made during Run must not survive until a later modal closes.
+        // Reset only the modal here, preserving FEP state to expose that reservation.
+        modal::reset();
+        fep::apply_pending_commit(&mut st);
+        assert_eq!(*IMECAND_PENDING.lock().unwrap(), "幹事".as_bytes(),
+                   "IMECAND Run input reserved for a background window");
+        fep::cancel_input(); fep_off();
+    }
+}
+
+#[test]
+fn imecand_owner_exit_cancels_once_before_reclaiming_modal_and_windows() {
+    use std::sync::atomic::Ordering::SeqCst;
+    use os32api::gui::proto::{GUI_MODAL_INPUT, GUI_OP_OWNER_EXIT};
+    for count in [1, 3] {
+        for input_modal in [false, true] {
+            for kind in [0, 2, 3] { // normal, fault, CTRL+STOP
+                mocks::init(); fep_off();
+                let shm = mocks::Shm::new();
+                let rects = [(20, 20, 120, 100), (180, 20, 120, 100), (340, 20, 120, 100)];
+                let st = wm::g();
+                *st = windows(&shm, &rects[..count]);
+                st.inited = true;
+                for i in 0..count { st.windows[i].owner = 3; }
+                st.bring_to_front(0); // removing index 0 exposes another owned window
+                imecand_setup();
+                if input_modal {
+                    let s = st.alloc_slot(3).unwrap();
+                    slot::init_header(st, s);
+                    let parent = st.front_id();
+                    assert!(modal::open(st, s, 3, parent, GUI_MODAL_INPUT, b"Input", 5) > 0);
+                    imecand_seed();
+                }
+                IMECAND_STOPS.store(0, SeqCst);
+                assert_eq!(crate::handler::gshell_gui_handler(GUI_OP_OWNER_EXIT, kind, 3), 0);
+                assert_eq!(IMECAND_STOPS.load(SeqCst), 1,
+                           "IMECAND owner exit must cancel exactly once: windows={count}, modal={input_modal}");
+                assert!(IMECAND_PENDING.lock().unwrap().is_empty());
+                assert!(!modal::is_open());
+                assert!(st.windows.iter().all(|w| !w.used));
+                fep_off();
+            }
+        }
+    }
+}
+
+// Model the synchronous preedit_draw callback from ime_set_render/STOP while
+// keeping the production GFX callbacks, grid, layout and drawing path intact.
+fn imecand_draw_on() {
+    let r = &fep::GSHELL_IME_RENDER_GFX;
+    (r.begin)();
+    (r.clear_row)(fep::PREEDIT_ROW as i32, 0);
+    (r.putc)(0, fep::PREEDIT_ROW as i32, b'[', 0xA1);
+    (r.putw)(1, fep::PREEDIT_ROW as i32, 0x3042, 0xA1);
+    (r.putc)(3, fep::PREEDIT_ROW as i32, b']', 0xA1);
+    (r.end)();
+}
+unsafe extern "C" fn imecand_install_on(table: *mut u8) {
+    // The guest ABI carries 32-bit addresses; use the host's actual static.
+    assert_eq!(table as usize as u32, &fep::GSHELL_IME_RENDER_GFX as *const _ as usize as u32);
+    imecand_draw_on();
+}
+unsafe extern "C" fn imecand_on_feed(key: i32) -> i32 {
+    if key == (0x60 << 8) || key == ((SC_A << 8) | b'a' as i32) {
+        imecand_draw_on();
+        -1
+    } else if key < 0 { -1 } else { key }
+}
+#[test]
+fn imecand_gui_on_visible_after_install_and_cancel_while_typing_enters_fep() {
+    mocks::init(); fep_off();
+    *fep::state() = fep::Fep::NEW;
+    let shm = mocks::Shm::new();
+    let mut st = windows(&shm, &[(20, 20, 180, 120)]);
+    mocks::fep_script(&[]);
+    unsafe {
+        (*os32api::api_ptr()).ime_set_render = imecand_install_on;
+        (*os32api::api_ptr()).ime_feed_key = imecand_on_feed;
+    }
+    fep::install();
+    assert!(fep::state().kernel_drives);
+    for cancel in [false, true] {
+        if cancel { fep::cancel_input(); }
+        fep::pre_cycle(&mut st);
+        fep::post_cycle(&mut st);
+        assert!(fep::is_on() && !fep::rect().is_empty(),
+                "IMECAND GUI ON indicator missing after install/cancel");
+        clear_rings(&st);
+        run(&mut st, &tap(SC_A, 0));
+        assert!(text(&st, 0).is_empty(), "IMECAND ON typing must enter FEP");
+        assert!(!keys(&st, 0).iter().any(|&(down, scan, _, _)| down && scan == SC_A as u8));
+        assert!(!fep::rect().is_empty(), "IMECAND GUI ON typing lost indicator");
+    }
+    *fep::state() = fep::Fep::NEW;
+    mocks::init(); fep_off();
 }

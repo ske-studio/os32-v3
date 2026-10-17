@@ -85,6 +85,13 @@ def run(mutation=None):
 
 
 MUTATIONS = [
+    ('IMECAND-no-immediate-ON-redraw', 'ime_source.inc',
+     '    /* Restore now and again at the first read after the shell reload clear. */\n'
+     '    if (ime_is_active()) preedit_draw();', '',
+     'FAIL IMECAND GUI entry ON indicator drawn synchronously'),
+    ('IMECAND-no-cancel-ON-redraw', 'ime_source.inc',
+     '    if (g_ime.mode != IME_MODE_OFF) preedit_draw();', '',
+     'FAIL IMECAND cancellation keeps visible ON indicator'),
     ('IMECAND-CUI-mode-invisible', 'ime_source.inc',
      '    g_ime_cui_redraw = table == NULL;', '',
      'FAIL IMECAND CUI mode visible after reload clear'),
