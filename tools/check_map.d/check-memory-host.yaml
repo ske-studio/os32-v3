@@ -43,6 +43,7 @@ check-memory-host:
 - kernel/physmem.c
 - kernel/sys.c
 - kernel/setjmp.asm
+- kernel/tss.h
 - kernel/isr_stub.asm
 - kernel/irq.c
 - kernel/irq_math.c

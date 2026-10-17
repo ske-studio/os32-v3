@@ -26,17 +26,23 @@ def landing(s, start, buf, name):
     a = s.index('    volatile Ring3CallContext caller_context;', s.index(start))
     jump = s.index('    if (exec_setjmp(' + buf + ') != 0)', a)
     b = s.index('\n    }', jump) + len('\n    }')
-    return ('static int ' + name + '(void) {\n'
+    return ('static int ' + name + '_body(void) {\n'
             '    AppSlot *a = &slots[2], *ctx = a; int gui = host_gui;\n'
             '    (void)ctx; (void)gui;\n'
             + s[a:b] + '\n'
-            '    simulate(); return 99;\n}\n')
+            '    simulate(); return 99;\n}\n'
+            'static int ' + name + '(void) {\n'
+            '    u32 before = tss_get_esp0();\n'
+            '    int rc = ' + name + '_body();\n'
+            '    CHECK(tss_get_esp0() == before);\n'
+            '    return rc;\n}\n')
 
 
 PRE = r'''
 #include "appslot.h"
 #include "exec.h"
 #include "exec_heap.h"
+#include "tss.h"
 #include "ring3_ls.h"
 int ring3_ls_dispatch(u32 user_esp) { (void)user_esp; __builtin_trap(); }
 #include "v86.h"
@@ -57,6 +63,9 @@ static void exec_stop_mark(void) {}
 static AppSlot slots[APP_SLOT_COUNT];
 static AppSlot *g_cur_app;
 static int cur = 2, owner = 2, cr3 = 2, host_if = 1, host_gui;
+static u32 host_esp0 = MEM_SHELL_STACK_TOP;
+u32 tss_get_esp0(void) { return host_esp0; }
+void tss_set_esp0(u32 esp0) { CHECK(!host_if); host_esp0 = esp0; }
 static int cleanup, teardown, notices, transfers, scheduled_kind, phase;
 static int host_wm_kill, nested_parent, dispatch_action;
 static u32 *g_cur_frame, parent_frame[13], child_frame[13];
@@ -217,6 +226,9 @@ void appslot_park_stop_commit(void) { stop_pending = 0; appslot_park_commit(); }
 
 POST = r'''
 static void simulate(void) {
+    /* arch_enter_user / ring3_resume install a deeper kernel entry stack.
+     * Do not reset this in setup: repeated children must not consume it. */
+    host_esp0 -= 1756; /* EXECNEST-1: observed per-child stack consumption */
     cur = owner = cr3 = 2; g_cur_app = &slots[2];
     slots[2].state = APP_STATE_RUNNING;
     dispatch_action = 0;
@@ -304,7 +316,7 @@ static int test(void) {
     CHECK(sizeof(AppSlot) == 204 + sizeof(int) + sizeof(u32));
     CHECK(sizeof(RedirAccess) == 24 && sizeof(CallerAccessFrame) == 28);
     CHECK(sizeof(FdRedirect) == 52 && sizeof(FdRedirectState) == 156);
-    CHECK(sizeof(Ring3CallContext) == 40);
+    CHECK(sizeof(Ring3CallContext) == 44);
     CHECK(irq_register(5, host_handler, 0, 0) == 0);
     kctx_irq_depth = 1; /* IRQ1/0 等固定スタブの上も同じ真実 */
     CHECK(irq_register(6, host_handler, 0, 0) == IRQ_ERR_CTX);
@@ -355,8 +367,10 @@ static int test(void) {
     CHECK(cleanup == 7 && notices == 1 && transfers == 1);
     /* Both real landing blocks restore a surviving parent's exact values. */
     for (resumed = 0; resumed <= 1; resumed++)
-    for (int action = 0; action <= 7; action++) {
-        setup(0, action == 4 ? EXEC_KIND_ABORTED : EXEC_KIND_FAULT);
+    for (int action = 0; action <= 8; action++)
+    for (int repeat = 0; repeat < 20; repeat++) {
+        CHECK(tss_get_esp0() == MEM_SHELL_STACK_TOP);
+        setup(action == 8, action == 4 || action == 8 ? EXEC_KIND_ABORTED : EXEC_KIND_FAULT);
         phase = action;
         nested_parent = 1; cur = owner = cr3 = 3;
         CallerAccessFrame prev;
@@ -364,6 +378,7 @@ static int test(void) {
         ring3_in_syscall = 1; g_cur_frame = parent_frame;
         ring3_wm_enter(); ring3_wm_enter();
         int rc = resumed ? resume_landing() : launch_landing();
+        CHECK(tss_get_esp0() == MEM_SHELL_STACK_TOP);
         CHECK(rc == (action == 0 || action >= 5 ? 2 : resumed ? 0 : action == 3 ? 17 : EXEC_ERR_FAULT));
         CHECK(caller_frame.valid && caller_frame.access.app_id == 3);
         CHECK(ring3_in_syscall == 1 && ring3_wm_depth == 2 && g_cur_frame == parent_frame);
@@ -463,6 +478,8 @@ MUTATIONS = (
      '    out->in_syscall = 0;'),
     ('snapshot-WM', '    out->wm_depth = ring3_wm_depth;', '    out->wm_depth = 0;'),
     ('snapshot-frame', '    out->frame = g_cur_frame;', '    out->frame = 0;'),
+    ('snapshot-esp0', '    out->esp0 = tss_get_esp0();', '    out->esp0 = 0;'),
+    ('restore-esp0', '    tss_set_esp0(saved->esp0);', ''),
     ('wm-notify-before-as',
      '    exec_reclaim_resources(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);\n    exec_notify_owned(id, EXEC_KIND_ABORTED);',
      '    exec_reclaim_owned(id, EXEC_KIND_ABORTED);\n    exec_teardown_app(a);\n    appslot_reclaim(id);'),
