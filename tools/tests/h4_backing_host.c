@@ -70,9 +70,11 @@ u32 exec_tramp_page_addr(void) { return 0; }
 void exec_addrspace_abort(struct addrspace *as) { (void)as; CHECK(0); }
 static u32 ksel_fail, entries, skips, page_logs, cleanups, results, last_entered;
 static u32 io_operation, io_fail_at, io_logs, io_passes, io_removes;
+static u32 io_skips, io_checks;
 static u32 observed_pfns[3], io_corrupt;
 static u32 dma_logs, dma_passes, dma_skips, dma_fails;
-static int io_short, io_no_copy, io_wrong_mount, io_existing;
+static u32 dma_operation, dma_fail_at;
+static int io_short, io_no_copy, io_wrong_mount;
 static u8 file_data[PAGE_SIZE + 34];
 static u32 file_size, file_offset;
 static int files_present[2], file_backend, file_fd, file_mode;
@@ -91,14 +93,15 @@ static void io_pointer(const void *p, u32 n)
 const char *vfs_fstype(const char *prefix)
 {
     CHECK(same(prefix, "/") || same(prefix, "/host"));
-    return io_wrong_mount ? "fat" : same(prefix, "/") ? "ext2" : "hostdrv";
+    if (same(prefix, "/")) return (io_wrong_mount & 1) ? "fat" : "ext2";
+    return (io_wrong_mount & 2) ? "" : "hostdrv";
 }
 int vfs_stat(const char *path, OS32_Stat *st)
 {
     file_backend = same(path, "/host/h4-io.tmp");
     (void)st;
     if (io_fails()) return VFS_ERR_IO;
-    return io_existing || file_exists ? VFS_OK : VFS_ERR_NOTFOUND;
+    return file_exists ? VFS_OK : VFS_ERR_NOTFOUND;
 }
 int vfs_open(const char *path, int mode)
 {
@@ -154,8 +157,8 @@ u32 vfs_get_size(int fd)
 int vfs_sync(void) { return io_fails() ? VFS_ERR_IO : VFS_OK; }
 int vfs_rm(const char *path)
 {
-    (void)path;
-    CHECK(!file_fd && !io_existing);
+    CHECK(same(path, file_backend ? "/host/h4-io.tmp" : "/h4-io.tmp"));
+    CHECK(!file_fd);
     io_removes++;
     if (io_fails()) return VFS_ERR_IO;
     if (!file_exists) return VFS_ERR_NOTFOUND;
@@ -166,7 +169,7 @@ int kstrcmp(const char *a, const char *b) { return !same(a, b); }
 
 static void check(int cond, const char *name)
 {
-    (void)name;
+    if (same(name, "h4: I/O roundtrip and cleanup")) io_checks++;
     ksel_fail += !cond;
 }
 void __cdecl kprintf(u8 attr, const char *fmt, ...)
@@ -205,15 +208,18 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...)
         const char *result = va_arg(ap, const char *);
         last_entered = va_arg(ap, int);
         CHECK(last_entered == (same(result, "PASS") || bad_pattern || io_fail_at ||
-                              io_corrupt || io_no_copy || io_wrong_mount || io_existing));
+                              io_corrupt || io_no_copy || io_wrong_mount));
         CHECK(va_arg(ap, int) == 1);
         results++;
     } else if (same(fmt, "[h4] io %s backend=%s result=%s stage=%s bytes=%u removed=%u\n")) {
         (void)va_arg(ap, const char *);
         const char *backend = va_arg(ap, const char *);
         CHECK(same(backend, "ext2") || same(backend, "hostdrv"));
-        io_passes += same(va_arg(ap, const char *), "PASS");
-        (void)va_arg(ap, const char *);
+        const char *result = va_arg(ap, const char *);
+        const char *stage = va_arg(ap, const char *);
+        io_passes += same(result, "PASS");
+        io_skips += same(result, "SKIP");
+        CHECK(same(result, "SKIP") == same(stage, "mount"));
         CHECK(va_arg(ap, u32) == PAGE_SIZE + 34);
         (void)va_arg(ap, int);
         io_logs++;
@@ -233,7 +239,14 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...)
     }
     va_end(ap);
 }
+#define dma_alloc actual_dma_alloc
 #include "dma_pool_host_source.c"
+#undef dma_alloc
+int dma_alloc(u32 size, u32 align, u32 limit, struct dma_buf *out)
+{
+    if (++dma_operation == dma_fail_at) return DMA_POOL_ERR_NOSPC;
+    return actual_dma_alloc(size, align, limit, out);
+}
 #include "h4_backing_source.c"
 
 #define HOST_RAM_END (64UL * MEM_1MB)
@@ -263,8 +276,10 @@ static void reset_observation(u32 failure)
     operation = ksel_fail = entries = skips = page_logs = cleanups = results = 0;
     last_entered = 0;
     dma_logs = dma_passes = dma_skips = dma_fails = 0;
+    dma_operation = dma_fail_at = 0;
     io_operation = io_fail_at = io_logs = io_passes = io_removes = io_corrupt = 0;
-    io_short = io_no_copy = io_wrong_mount = io_existing = 0;
+    io_skips = io_checks = 0;
+    io_short = io_no_copy = io_wrong_mount = 0;
     CHECK(!file_fd);
     files_present[0] = files_present[1] = 0;
     fail_at = failure;
@@ -302,7 +317,7 @@ static void classification_and_patterns(void)
     CHECK(h4_collect_pfns(&as, 1, pfns));
     for (u32 i = 0; i < H4_BUFFER_PAGES; i++) CHECK(pfns[i] == high[i]);
     CHECK(h4_buffer_entry(&as, MEM_EXEC_LOAD_ADDR + H4_BUFFER_OFFSET, H4_BUFFER_BYTES));
-    CHECK(h4_io_roundtrip(&as, 1, 0) && h4_io_roundtrip(&as, 1, 1));
+    CHECK(h4_io_roundtrip(&as, 1, 0) == 1 && h4_io_roundtrip(&as, 1, 1) == 1);
     CHECK(io_logs == 2 && io_passes == 2 && io_removes == 2 && !file_exists);
     /* Corrupt each of the three covered portions, including the final byte. */
     for (u32 i = 0; i < H4_BUFFER_PAGES; i++) {
@@ -351,6 +366,18 @@ static void dma_controls(void)
     h4_dma_pool();
     CHECK(!ksel_fail && dma_logs == free && dma_passes == 1);
     CHECK(dma_pool_free_pages() == free && !dma_free(&held));
+    /* No allocation is SKIP; any partially allocated free pool is FAIL.
+     * Each injected failure must still return every acquired page. */
+    for (u32 fail = 1; fail <= DMA_POOL_PAGES; fail++) {
+        reset_observation(0);
+        dma_fail_at = fail;
+        h4_dma_pool();
+        CHECK(dma_logs == fail - 1 && !dma_passes);
+        CHECK(ksel_fail == (fail > 1) && dma_fails == (fail > 1));
+        CHECK(dma_skips == (fail == 1));
+        CHECK(dma_pool_free_pages() == DMA_POOL_PAGES && !dma_pool_bad_free());
+    }
+    reset_observation(0);
     /* An old pool address must be rejected even though it is ISA-addressable.
      * The real allocator is used; only its configured base is perturbed. */
     s_pool.base = 0x3e0000;
@@ -426,16 +453,56 @@ void _start(void)
                     recovered(before, root, f ? 0x202 : 2);
                 }
             }
-            for (u32 corrupt = 0; corrupt < 6; corrupt++) {
+            for (u32 corrupt = 0; corrupt < 4; corrupt++) {
                 reset_observation(0);
                 if (corrupt < 3)
                     io_corrupt = corrupt == 0 ? 1 : corrupt == 1 ? 18 : sizeof(file_data);
-                else if (corrupt == 3) io_no_copy = 1;
-                else if (corrupt == 4) io_wrong_mount = 1;
-                else io_existing = 1;
+                else io_no_copy = 1;
                 CHECK(h4_backing_case(high) == -1 && ksel_fail == 2);
                 CHECK(!skips && io_logs == 2 && !io_passes);
-                CHECK(io_removes == (corrupt < 4 ? 2U : 0U));
+                CHECK(io_removes == 2);
+                recovered(before, root, f ? 0x202 : 2);
+            }
+            /* FD root, absent HostDrv, and neither backend: unavailable
+             * backends log SKIP without contributing a check or failure. */
+            for (int missing = 1; missing <= 3; missing++) {
+                reset_observation(0);
+                io_wrong_mount = missing;
+                CHECK(h4_backing_case(high) == (missing != 3) && !ksel_fail);
+                CHECK(!skips && io_logs == 2 && io_skips == (missing == 3 ? 2U : 1U));
+                CHECK(io_passes == 2 - io_skips && io_checks == io_passes);
+                CHECK(io_removes == io_passes);
+                CHECK(!files_present[0] && !files_present[1]);
+                recovered(before, root, f ? 0x202 : 2);
+                if (missing != 3) {
+                    reset_observation(0);
+                    io_wrong_mount = missing;
+                    io_fail_at = 1;
+                    CHECK(h4_backing_case(high) == -1 && ksel_fail == 1);
+                    CHECK(io_skips == 1 && io_checks == 1 && !io_passes);
+                    recovered(before, root, f ? 0x202 : 2);
+                }
+            }
+            /* Simulate interruption after write, including a failed stale
+             * removal. A later attempt must recover without manual cleanup. */
+            reset_observation(0);
+            files_present[0] = files_present[1] = 1;
+            CHECK(h4_backing_case(high) == 1 && !ksel_fail);
+            CHECK(io_passes == 2 && io_removes == 4);
+            CHECK(!files_present[0] && !files_present[1]);
+            recovered(before, root, f ? 0x202 : 2);
+            for (int backend = 0; backend < 2; backend++) {
+                reset_observation(0);
+                files_present[backend] = 1;
+                io_fail_at = backend ? io_operations / 2 + 2 : 2;
+                CHECK(h4_backing_case(high) == -1 && ksel_fail == 1);
+                CHECK(io_passes == 1 && files_present[backend]);
+                CHECK(!files_present[!backend] && io_removes == 2);
+                recovered(before, root, f ? 0x202 : 2);
+                io_fail_at = 0;
+                CHECK(h4_backing_case(high) == 1 && ksel_fail == 1);
+                CHECK(io_passes == 3 && io_removes == 5);
+                CHECK(!files_present[0] && !files_present[1]);
                 recovered(before, root, f ? 0x202 : 2);
             }
             for (u32 fail = 1; fail <= operations; fail++) {

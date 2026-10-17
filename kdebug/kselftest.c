@@ -1081,6 +1081,7 @@ static int h4_io_buffer(struct addrspace *as, u32 buffer, u32 bytes,
 #define H4_ROOT_FILE "/h4-io.tmp"
 #define H4_HOST_FILE "/host/h4-io.tmp"
 
+/* Return 1=passed, 0=backend unavailable, -1=failed. */
 static int h4_io_roundtrip(struct addrspace *as, int high, int host)
 {
     const char *path = host ? H4_HOST_FILE : H4_ROOT_FILE;
@@ -1089,11 +1090,16 @@ static int h4_io_roundtrip(struct addrspace *as, int high, int host)
     OS32_Stat st;
     int fd = -1, attempted = 0, opened = 0, ok = 0, removed = 0;
     const char *stage = "mount";
-    if (kstrcmp(vfs_fstype(host ? "/host" : "/"), backend)) goto out;
-    /* HostDrv has no O_EXCL. Boot is single-task: preserve an existing file
-     * and fail the test, including when absence cannot be established. */
+    int available = !kstrcmp(vfs_fstype(host ? "/host" : "/"), backend);
+    if (!available) goto out;
+    /* Boot is single-task. Remove this fixture's leftover from an interrupted
+     * boot before starting a fresh roundtrip (HostDrv has no O_EXCL). */
     stage = "absent";
-    if (vfs_stat(path, &st) != VFS_ERR_NOTFOUND) goto out;
+    int status = vfs_stat(path, &st);
+    if (status == VFS_OK) {
+        stage = "remove-stale";
+        if (vfs_rm(path) != VFS_OK) goto out;
+    } else if (status != VFS_ERR_NOTFOUND) goto out;
     stage = "prepare";
     if (!h4_io_buffer(as, buffer, H4_BUFFER_BYTES, -1, 0)) goto out;
     stage = "open-write";
@@ -1123,11 +1129,12 @@ out:
         removed = rc == VFS_OK || (!opened && rc == VFS_ERR_NOTFOUND);
         if (!removed) { ok = 0; stage = "remove"; }
     }
-    check(ok, "h4: I/O roundtrip and cleanup");
+    if (available) check(ok, "h4: I/O roundtrip and cleanup");
     kprintf(0x07, "[h4] io %s backend=%s result=%s stage=%s bytes=%u removed=%u\n",
-            high ? "high" : "low", backend, ok ? "PASS" : "FAIL",
+            high ? "high" : "low", backend,
+            !available ? "SKIP" : ok ? "PASS" : "FAIL",
             stage, H4_BUFFER_BYTES, removed);
-    return ok;
+    return !available ? 0 : ok ? 1 : -1;
 }
 
 /* Allocate only presently free pool pages; never reinitialize a live pool
@@ -1152,6 +1159,11 @@ static void h4_dma_pool(void)
                 b->pa, b->size, valid);
         count++;
     }
+    if (count) {
+        int complete = count == before;
+        check(complete, "h4: DMA allocation count matches free pages");
+        ok &= complete;
+    }
     for (u32 i = 0; i < count; i++) {
         int freed = dma_free(&buffers[i]) == 0;
         check(freed, "h4: DMA free");
@@ -1161,7 +1173,7 @@ static void h4_dma_pool(void)
     check(restored, "h4: DMA free pages restored");
     ok &= restored;
     kprintf(0x07, "[h4] io dma pool result=%s allocated=%u free_restored=%u transfer=none\n",
-            !ok ? "FAIL" : !count || count != before ? "SKIP" : "PASS",
+            !ok ? "FAIL" : !count ? "SKIP" : "PASS",
             count, restored);
 }
 
@@ -1210,10 +1222,10 @@ static int h4_backing_case(int high)
     if (pattern) {
         int root_io = h4_io_roundtrip(&as, high, 0);
         int host_io = h4_io_roundtrip(&as, high, 1);
-        if (root_io && host_io) result = 1;
+        if (root_io >= 0 && host_io >= 0) result = root_io > 0 || host_io > 0;
     }
 out:
-    if (!result)
+    if (!result && !entered)
         kprintf(0x07, "[h4] %s SKIP (not run): %s allocation failed\n", kind, stage);
     if (created) paging_addrspace_destroy(&as);
     if (owner) {
