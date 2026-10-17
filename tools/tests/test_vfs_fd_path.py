@@ -406,19 +406,25 @@ def run_ime(tmp, quiet=False):
         print(err)
         print("IME BUILD FAIL")
         return False
-    r = host32.run([str(exe)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                       timeout=120)
-    if not quiet:
-        print("case ime (real kernel/ime_dict.c + SQLite + vfs_fd.c)")
-        print(r.stdout.decode("utf-8", "replace").rstrip())
-    return r.returncode == 0
+    ok = True
+    for case in [None, "io_quarantine", "io_hot_journal"]:
+        r = host32.run([str(exe)] + ([case] if case else []),
+                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=120)
+        if not quiet:
+            print("case ime", case or "normal", "(real SQLite/VFS)")
+            print(r.stdout.decode("utf-8", "replace").rstrip())
+        ok = ok and r.returncode == 0
+    return ok
 
 
 def _run_ime_exe(exe):
     try:
-        r = host32.run([str(exe)], stdout=subprocess.PIPE,
-                           stderr=subprocess.STDOUT, timeout=120)
-        return r.returncode == 0
+        for case in [None, "io_quarantine", "io_hot_journal"]:
+            r = host32.run([str(exe)] + ([case] if case else []),
+                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=120)
+            if r.returncode != 0:
+                return False
+        return True
     except subprocess.TimeoutExpired:
         return mutpar.timeout_red(False)
 

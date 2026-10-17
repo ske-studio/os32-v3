@@ -4,3 +4,4 @@ check-db-owned-host:
 - tools/tests/test_kapi_db_owned.py
 - tools/check_map.d/check-db-owned-host.yaml
 - build/checks.d/check-db-owned-host.mk
+- tools/tests/db_group_shim.h

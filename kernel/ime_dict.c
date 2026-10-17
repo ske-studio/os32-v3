@@ -11,6 +11,7 @@
 
 #include "ime.h"
 #include "sqlite3.h"
+#include "os32_sqlite_outer.h"
 #include "vfs.h"
 #include "utf8.h"
 #include "kprintf.h"
@@ -18,17 +19,6 @@
 #include "kstring.h"
 #include "os32_kapi_shared.h"
 #include "os32_sqlite_vfs.h"
-
-/* FEP辞書はカーネル常駐の接続なので、基底の VFS fd を exec_exit の
- * FD一括クローズから保護する。これを欠くと外部プログラム (ime.bin 等)
- * の終了時に fd が回収され、以後の検索が全て SQLITE_IOERR になる。 */
-static void dict_fd_protect(IME_Dict *dict, int on)
-{
-    int fd;
-    if (!dict || !dict->db) return;
-    fd = os32_sqlite_db_fd(dict->db);
-    if (fd >= 0) vfs_fd_set_protect(fd, on);
-}
 
 /* プリペアドステートメントのSQL */
 static const char SQL_EXACT[] =
@@ -58,26 +48,31 @@ static const char SQL_LEARN[] =
 /*  公開API                                                                  */
 /* ======================================================================== */
 
-static void ime_dict_close(IME_Dict *dict);
+static int ime_dict_close(IME_Dict *dict);
 
 int ime_dict_open(IME_Dict *dict, const char *path)
 {
-    sqlite3 *db;
+    if (!SQLITE_OUTER_READY(1)) return -1;
+    sqlite3 *db = 0;
     sqlite3_stmt *stmt;
     int rc;
 
+    if (dict->isolated || dict->db) return -1;
     kmemset(dict, 0, sizeof(IME_Dict));
+    if (os32_sqlite_group_acquire(OS32_SQLITE_RESIDENT, 0, &dict->group)
+            != SQLITE_OK) return -1;
     /* 開き直しに使う名前。収まらなければ覚えない (= 開き直さない)。
      * 切り詰めた名前で別の DB を開き直さない */
     if (path && kstrlen(path) < sizeof(dict->path))
         kstrncpy(dict->path, path, sizeof(dict->path));
 
     /* DBファイルを読み書き可能で開く (ユーザー辞書のため) */
-    rc = sqlite3_open_v2(path, &db, SQLITE_OPEN_READWRITE, (const char *)0);
+    rc = os32_sqlite_group_open(&dict->group, path, SQLITE_OPEN_READWRITE, &db);
+    dict->db = db;
     if (rc != SQLITE_OK) {
         kprintf(ATTR_RED, "IME: sqlite3_open failed: %s (rc=%d)\r\n",
                 path, rc);
-        if (db) sqlite3_close(db);
+        (void)ime_dict_close(dict);
         return -1;
     }
     dict->db = (void *)db;
@@ -102,8 +97,7 @@ int ime_dict_open(IME_Dict *dict, const char *path)
     rc = sqlite3_prepare_v2(db, SQL_EXACT, -1, &stmt, (const char **)0);
     if (rc != SQLITE_OK) {
         kprintf(ATTR_RED, "IME: prepare exact failed (rc=%d)\r\n", rc);
-        sqlite3_close(db);
-        dict->db = (void *)0;
+        (void)ime_dict_close(dict);
         return -2;
     }
     dict->exact_stmt = (void *)stmt;
@@ -112,10 +106,7 @@ int ime_dict_open(IME_Dict *dict, const char *path)
     rc = sqlite3_prepare_v2(db, SQL_PREFIX, -1, &stmt, (const char **)0);
     if (rc != SQLITE_OK) {
         kprintf(ATTR_RED, "IME: prepare prefix failed (rc=%d)\r\n", rc);
-        sqlite3_finalize((sqlite3_stmt *)dict->exact_stmt);
-        sqlite3_close(db);
-        dict->db = (void *)0;
-        dict->exact_stmt = (void *)0;
+        (void)ime_dict_close(dict);
         return -3;
     }
     dict->prefix_stmt = (void *)stmt;
@@ -129,8 +120,7 @@ int ime_dict_open(IME_Dict *dict, const char *path)
         dict->learn_stmt = (void *)0;
     }
 
-    /* 常駐接続の fd を exec クリーンアップから保護 */
-    dict_fd_protect(dict, 1);
+    /* Main and late journals retain the RESIDENT group lease. */
 
     /* 成功の知らせはシリアルだけに出す。GUI (gshell) 中に SHIFT+SPACE で
      * 初めて辞書を開くと、この行が TVRAM に残って GFX 画面に透けるため
@@ -148,7 +138,7 @@ int ime_dict_open(IME_Dict *dict, const char *path)
 /*  rename、umount) と、VFS は開いていた FD に失効の印を付け、以後の読みは    */
 /*  OS32_ERR_STALE になる (SQLite には SQLITE_IOERR として届く)。そのときは   */
 /*  **SQLite 接続ごと**開き直す — ステートメント 3 本の finalize →          */
-/*  sqlite3_close → open → prepare → dict_fd_protect                       */
+/*  sqlite3_close → group_finish → acquire/open → prepare                       */
 /*  (ime_dict_close + ime_dict_open)。                                      */
 /*                                                                          */
 /*  hsync の差し替え (置き換え rename) は**ここへ来ない**: 辞書を開いている   */
@@ -179,7 +169,7 @@ static int dict_recover(IME_Dict *dict)
     int fd, stale, rc;
     u32 n;
 
-    if (!dict || !dict->db || !dict->path[0]) return 0;
+    if (!dict || !dict->db || dict->isolated || !dict->path[0]) return 0;
     fd = os32_sqlite_db_fd(dict->db);
     stale = (fd >= 0) ? vfs_fd_is_stale(fd) : 0;
     if (!stale && dict->io_retried) return 0;
@@ -189,7 +179,7 @@ static int dict_recover(IME_Dict *dict)
     kstrncpy(name, dict->path, sizeof(name));
     kstrncat(name, "-journal", sizeof(name));
 
-    ime_dict_close(dict);
+    if (ime_dict_close(dict) != 0) return 0;
     rc = vfs_stat(name, &st);
     if (rc != OS32_ERR_NOTFOUND && !(rc == 0 && st.st_size == 0)) {
         /* hot journal (か、有無を判定できない)。開かない */
@@ -213,11 +203,12 @@ static int dict_recover(IME_Dict *dict)
  * 戻り値: 1 = 使える接続がある / 0 = 辞書無し */
 static int dict_ready(IME_Dict *dict)
 {
+    if (!SQLITE_OUTER_READY(1)) return 0;
     int fd;
-    if (!dict || !dict->db) return 0;
+    if (!dict || !dict->db || dict->isolated) return 0;
     fd = os32_sqlite_db_fd(dict->db);
     if (fd >= 0 && vfs_fd_is_stale(fd)) (void)dict_recover(dict);
-    return dict->db != (void *)0;
+    return dict->db != (void *)0 && !dict->isolated;
 }
 
 static int is_ioerr(int rc) { return (rc & 0xFF) == SQLITE_IOERR; }
@@ -359,32 +350,46 @@ void ime_dict_learn(IME_Dict *dict, const char *yomi, const char *kanji)
     }
 }
 
-/* 辞書クローズ内部関数 */
-static void ime_dict_close(IME_Dict *dict)
+/* Finalize/close failure is terminal for this lifetime, including reopen. */
+static int ime_dict_close(IME_Dict *dict)
 {
-    if (!dict || !dict->db) return;
-    /* 保護を解除してから閉じる (fd スロット再利用に備える) */
-    dict_fd_protect(dict, 0);
+    int rc = SQLITE_OK, next;
+    if (!dict || dict->isolated) return -1;
+    if (!dict->group.generation) return 0;
+    if (os32_sqlite_group_begin_close(&dict->group) != SQLITE_OK) {
+        dict->isolated = 1;
+        return -1;
+    }
     if (dict->exact_stmt) {
-        sqlite3_finalize((sqlite3_stmt *)dict->exact_stmt);
-        dict->exact_stmt = NULL;
+        rc = sqlite3_finalize((sqlite3_stmt *)dict->exact_stmt);
+        dict->exact_stmt = 0;
     }
-    if (dict->prefix_stmt) {
-        sqlite3_finalize((sqlite3_stmt *)dict->prefix_stmt);
-        dict->prefix_stmt = NULL;
+    if (rc == SQLITE_OK && dict->prefix_stmt) {
+        rc = sqlite3_finalize((sqlite3_stmt *)dict->prefix_stmt);
+        dict->prefix_stmt = 0;
     }
-    if (dict->learn_stmt) {
-        sqlite3_finalize((sqlite3_stmt *)dict->learn_stmt);
-        dict->learn_stmt = NULL;
+    if (rc == SQLITE_OK && dict->learn_stmt) {
+        rc = sqlite3_finalize((sqlite3_stmt *)dict->learn_stmt);
+        dict->learn_stmt = 0;
     }
-    sqlite3_close((sqlite3 *)dict->db);
-    dict->db = NULL;
+    if (rc != SQLITE_OK) {
+        os32_sqlite_group_quarantine(&dict->group, OS32_SQLITE_STAGE_CLOSE, rc);
+        dict->isolated = 1;
+        return -1;
+    }
+    if (dict->db) rc = sqlite3_close((sqlite3 *)dict->db);
+    if (rc == SQLITE_OK) dict->db = 0;
+    next = os32_sqlite_group_finish(&dict->group, rc);
+    if (next != SQLITE_OK) { dict->isolated = 1; return -1; }
+    dict->group.generation = 0;
+    return 0;
 }
 
 /* 辞書再オープン */
 int ime_dict_reopen(IME_Dict *dict, const char *path)
 {
-    ime_dict_close(dict);
+    if (!SQLITE_OUTER_READY(1)) return -1;
+    if (ime_dict_close(dict) != 0) return -1;
     return ime_dict_open(dict, path);
 }
 

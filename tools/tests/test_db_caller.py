@@ -50,7 +50,6 @@ MUTANTS = [
     ('guards', 'return ok;\n    }', 'return ok && 0;\n    }', 'valid lease early refusal'),
     ('db', 'PATH_COPY_BUF_SIZE, 1)', 'PATH_COPY_BUF_SIZE, 0)', 'path copied as bytes'),
     ('db', 'SQL_COPY_BUF_SIZE, 1)', 'SQL_COPY_BUF_SIZE, 0)', 'SQL copied as bytes'),
-    ('db', 'if (slot->active_stmt) {\n        slot_note_teardown(slot, sqlite3_finalize(slot->active_stmt));\n        slot->active_stmt = (sqlite3_stmt *)0;\n    }\n    slot->bindable = 0;', '', 'no finalize before copy refusal'),
     ('guards', 'if (!caller_access_get_user(&c))', 'if (!caller_access_get(&c))', 'always becomes WM trusted'),
     ('guards', 'check_caller_write_range(&c, (void *)(uptr)vb, lb)', '((void)vb, 1)', 'second output unchecked'),
     ('guards', 'caller_access_page(&c, va, 0, &pa)', 'caller_access_page(&c, va, 1, &pa)', 'RO input refused'),
@@ -87,7 +86,7 @@ def main():
             key, old, new, name = m
             mutated = dict(src)
             # These named mutations intentionally cover all exits of one contract.
-            expected = {'path copied as bytes': 2}.get(name, 1)
+            expected = {'path copied as bytes': 2, 'SQL copied as bytes': 3}.get(name, 1)
             assert mutated[key].count(old) == expected, (name, mutated[key].count(old))
             mutated[key] = mutated[key].replace(old, new)
             start = time.monotonic()

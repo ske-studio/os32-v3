@@ -48,4 +48,5 @@ check-vk32-crc-host:
 - build/out/sqlite.bin
 - build/out/*
 # T3a1: build/out の kernel.elf を丸ごと読む (成果物の読み手)。
+- kernel/sqlite_engine.c
 artifact_reader: true

@@ -1,3 +1,4 @@
+#define OS32_SQLITE_DIRECT_TEST 1
 /* ========================================================================= */
 /*  IME_DICT_HOST.C — 辞書の常駐接続の開き直し (票 TASK_VFS_FD_PATH v3 の 6)  */
 /*                                                                           */
@@ -83,18 +84,33 @@ static int inj_read(void *ctx, const char *path, void *buf, u32 size, u32 offset
 
 #include "../../kernel/ime_dict.c"
 
+/* Fixture setup uses a separate EXEC group; default file opens are forbidden. */
+static Os32SqliteGroup setup_group;
+static int setup_open(const char *path, sqlite3 **db, int flags, const char *vfs)
+{
+    (void)vfs;
+    CHECK(os32_sqlite_group_acquire(OS32_SQLITE_EXEC, 1, &setup_group) == SQLITE_OK);
+    return os32_sqlite_group_open(&setup_group, path, flags, db);
+}
+static int setup_close(sqlite3 *db)
+{
+    CHECK(os32_sqlite_group_begin_close(&setup_group) == SQLITE_OK);
+    int rc = sqlite3_close(db);
+    return os32_sqlite_group_finish(&setup_group, rc);
+}
+
 /* ---- 足場 ---- */
 static void make_dict(const char *path, const char *kanji)
 {
     sqlite3 *db = 0;
     char sql[256];
-    CHECK(sqlite3_open_v2(path, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
+    CHECK(setup_open(path, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
                           (const char *)0) == SQLITE_OK);
     snprintf(sql, sizeof(sql),
              "CREATE TABLE dict(yomi TEXT, kanji TEXT, pos_id INT, cost INT);"
              "INSERT INTO dict VALUES('か','%s',1,10);", kanji);
     CHECK(sqlite3_exec(db, sql, 0, 0, 0) == SQLITE_OK);
-    CHECK(sqlite3_close(db) == SQLITE_OK);
+    CHECK(setup_close(db) == SQLITE_OK);
 }
 
 /* 実体の差し替え (`rm` → 同じ名前に作り直し と同じ結果。hsync の置き換え
@@ -189,6 +205,9 @@ static void admin_apis(IME_Dict *d)
     fail_from = 1024;
     fail_reads = 1000000;
     CHECK(ime_user_export(d, "/db/out2.csv") < 0);
+    reopened = n_reopened;
+    CHECK(ime_user_export(d, "/db/out2.csv") < 0);
+    CHECK(n_reopened == reopened); /* persistent I/O does not retry forever */
     fail_reads = 0;
     fail_from = 0;
     printf("PASS admin_export_step_error\n");
@@ -308,7 +327,7 @@ static void sqlite_methods_stale(void)
 
     /* 旧来の経路 (既定の VFS、IME 辞書と同じ) */
     make_dict("/db/m.db", "木");
-    CHECK(sqlite3_open_v2("/db/m.db", &db, SQLITE_OPEN_READWRITE, 0) == SQLITE_OK);
+    CHECK(setup_open("/db/m.db", &db, SQLITE_OPEN_READWRITE, 0) == SQLITE_OK);
     CHECK(sqlite3_exec(db, "SELECT count(*) FROM dict", 0, 0, 0) == SQLITE_OK);
     pf = main_file(db);
     fd = os32_sqlite_db_fd(db);
@@ -316,7 +335,7 @@ static void sqlite_methods_stale(void)
     expect_methods_ok(pf);
     open_files[fd].stale = 1;
     expect_methods_fail(pf);
-    CHECK(sqlite3_close(db) == SQLITE_OK);
+    CHECK(setup_close(db) == SQLITE_OK);
     CHECK(!open_files[fd].in_use);                    /* 失効後も解放できる */
     printf("PASS sqlite_stale_legacy\n");
 
@@ -353,26 +372,26 @@ static void journal_name_len(void)
     memset(name, 'n', sizeof(name));
     memcpy(name, "/db/", 4);
     name[room + 1] = '\0';                             /* 248: 1 バイト超過 */
-    CHECK(sqlite3_open_v2(name, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
+    CHECK(setup_open(name, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
                           0) == SQLITE_CANTOPEN);
-    if (db) sqlite3_close(db);
+    if (db) setup_close(db);
     db = 0;
     CHECK(fixture_find(name, 0) == NULL);              /* 作ってもいない */
     name[room] = '\0';                                 /* 247: 収まる */
-    CHECK(sqlite3_open_v2(name, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
+    CHECK(setup_open(name, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
                           0) == SQLITE_OK);
     CHECK(sqlite3_exec(db, "CREATE TABLE t(x); INSERT INTO t VALUES(1);",
                        0, 0, 0) == SQLITE_OK);        /* ジャーナルも開ける */
-    CHECK(sqlite3_close(db) == SQLITE_OK);
+    CHECK(setup_close(db) == SQLITE_OK);
     printf("PASS journal_name_len\n");
 }
 
 #ifndef IME_DICT_HOST_MAIN
 #define IME_DICT_HOST_MAIN main
 #endif
-int IME_DICT_HOST_MAIN(void)
+int IME_DICT_HOST_MAIN(int argc, char **argv)
 {
-    static IME_Dict d;
+    static IME_Dict d = {0};
     int n, fd;
 
     CHECK(os32_sqlite_init() == SQLITE_OK);
@@ -380,11 +399,35 @@ int IME_DICT_HOST_MAIN(void)
     mock_ops.read_stream = inj_read;
     make_dict("/db/fep.db", "蚊");
     CHECK(ime_dict_open(&d, "/db/fep.db") == 0);
+    if (argc > 1) {
+        Os32SqliteGroupInfo info;
+        int hot = !strcmp(argv[1], "io_hot_journal");
+        fail_from = 1024;
+        fail_reads = hot ? 1000000 : 1;
+        plant_journal = hot;
+        CHECK(first_kanji(&d, &n)[0] == '\0' && n == 0);
+        /* T4b supersedes retry-after-failed-finalize: retain this lifetime. */
+        CHECK(d.isolated && d.db && n_reopened == 0);
+        CHECK(os32_sqlite_group_snapshot(&d.group, &info) == SQLITE_OK);
+        CHECK(info.state == OS32_SQLITE_QUARANTINED && info.fd_count > 0);
+        if (hot) {
+            FixtureFile *j = fixture_find("/db/fep.db-journal", 0);
+            CHECK(!plant_journal && j && j->size == 4 && !memcmp(j->data,"JJJJ",4));
+        }
+        fail_reads = 0;
+        CHECK(ime_dict_open(&d,"/db/fep.db") == -1);
+        CHECK(ime_dict_reopen(&d,"/db/fep.db") == -1);
+        CHECK(first_kanji(&d,&n)[0] == '\0' && n == 0);
+        vfs_close_owned(0);
+        CHECK(vfs_count_sqlite(&d.group) == info.fd_count);
+        puts("PASS finalize IO failure quarantined; no reopen or generic reclaim");
+        return 0;
+    }
     CHECK(!strcmp(first_kanji(&d, &n), "蚊") && n == 1);
     fd = dict_fd(&d);
     CHECK(fd >= 3);
     CHECK(open_files[fd].sqlite_db == 1);     /* rename は BUSY で断られる印 */
-    CHECK(open_files[fd].protect == 1);       /* exec_exit の回収から外す印 */
+    CHECK(open_files[fd].lifetime == VFS_FD_SQLITE); /* group lease */
     printf("PASS open\n");
 
     /* (1) 実体の差し替え → 失効 → 接続ごと開き直して新しい中身で答える */
@@ -394,7 +437,7 @@ int IME_DICT_HOST_MAIN(void)
     CHECK(n_reopened == 1);
     CHECK(!open_files[fd].in_use || !open_files[fd].stale ||
           dict_fd(&d) != fd);                 /* 古い FD は閉じた */
-    CHECK(open_files[dict_fd(&d)].protect == 1);
+    CHECK(open_files[dict_fd(&d)].lifetime == VFS_FD_SQLITE);
     CHECK(open_files[dict_fd(&d)].sqlite_db == 1);
     printf("PASS stale_reopen\n");
 
@@ -404,33 +447,6 @@ int IME_DICT_HOST_MAIN(void)
     CHECK(!strcmp(first_kanji(&d, &n), "可"));
     CHECK(n_reopened == 2);
     printf("PASS stale_each_event\n");
-
-    /* (3) 失効を伴わない I/O エラーは 1 回だけ開き直す (成功で戻す) */
-    fail_reads = 1;
-    CHECK(!strcmp(first_kanji(&d, &n), "可"));
-    CHECK(n_reopened == 3);
-    CHECK(d.io_retried == 0);                 /* やり直しが成功したので戻した */
-    fail_reads = 1000000;                     /* 読めないまま */
-    CHECK(first_kanji(&d, &n)[0] == '\0' && n == 0);
-    CHECK(n_reopened == 3);                   /* 開き直しても読めない = 開けない */
-    CHECK(d.db == 0);                         /* 辞書無しで動く */
-    fail_reads = 0;
-    CHECK(first_kanji(&d, &n)[0] == '\0' && n == 0);
-    /* 開き直せるが中身の頁だけ読めない: 1 回開き直したら、以後の検索では
-     * 開き直さない (読めないまま開き直しを繰り返さない) */
-    CHECK(ime_dict_open(&d, "/db/fep.db") == 0);
-    fail_from = 1024;                          /* 1 頁目 (schema) は読める */
-    fail_reads = 1000000;
-    CHECK(first_kanji(&d, &n)[0] == '\0');
-    CHECK(n_reopened == 4 && d.db != 0 && d.io_retried == 1);
-    CHECK(first_kanji(&d, &n)[0] == '\0');
-    CHECK(first_kanji(&d, &n)[0] == '\0');
-    CHECK(n_reopened == 4);
-    fail_reads = 0;
-    fail_from = 0;
-    CHECK(!strcmp(first_kanji(&d, &n), "可"));
-    CHECK(d.io_retried == 0);                  /* 成功で戻す */
-    printf("PASS io_once\n");
 
     /* (4a) 失効 + hot journal が**旧接続が SQL を流す前から**残っている
      * (Codex 実装レビュー ラリー 1 の B1)。旧接続で sqlite3_step をすると
@@ -452,23 +468,6 @@ int IME_DICT_HOST_MAIN(void)
         CHECK(j != NULL && j->size == 4 && !memcmp(j->data, "JJJJ", 4));
     }
     printf("PASS hot_journal_before_sql\n");
-
-    /* (4b) 失効を伴わない I/O エラーの後に journal が残っている (古い接続の
-     * 失敗した書き込みが残した形): 開き直しの判断で見つけて開かない */
-    fixture_rm("/db/fep.db-journal");
-    CHECK(ime_dict_open(&d, "/db/fep.db") == 0);   /* 頁キャッシュは空 */
-    fail_reads = 1000000;
-    fail_from = 1024;
-    n_kprintf = 0;
-    plant_journal = 1;
-    CHECK(first_kanji(&d, &n)[0] == '\0' && n == 0);
-    CHECK(plant_journal == 0);
-    CHECK(d.db == 0);
-    CHECK(n_kprintf >= 1 && strstr(last_kprintf, "remains"));
-    CHECK(fixture_find("/db/fep.db-journal", 0) != NULL);   /* 触らない */
-    fail_reads = 0;
-    fail_from = 0;
-    printf("PASS hot_journal\n");
 
     /* (5) 長さ 0 の journal は hot ではない — 開き直す */
     fixture_rm("/db/fep.db-journal");

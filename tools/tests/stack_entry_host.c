@@ -39,20 +39,20 @@ static void __attribute__((noinline)) deep_stack(void)
     volatile u8 data[8192];
     for (u32 i = 0; i < sizeof(data); i++) data[i] = 0;
 }
-extern int sqlite_call_on_alt_stack(int (*func)(void), u32 top);
-static int sqlite_body(void)
+extern void sqlite_call_on_alt_stack(void (*func)(void *), u32 top, void *arg);
+static void sqlite_body(void *arg)
 {
     volatile u32 local;
     CHECK((u32)&local >= MEM_SQLITE_STACK_BASE &&
           (u32)&local < MEM_SQLITE_STACK_TOP, 12);
-    return 73;
+    *(int *)arg = 73;
 }
-static int shell_body(void)
+static void shell_body(void *arg)
 {
     volatile u32 local;
     CHECK((u32)&local >= SHELL_STACK_BASE && (u32)&local < MEM_SHELL_STACK_TOP, 13);
     deep_stack();
-    return 81;
+    *(int *)arg = 81;
 }
 extern u32 entry_sp, entry_bp;
 void kernel_main(u32 mem_kb, u32 boot_drive)
@@ -77,7 +77,10 @@ void kernel_main(u32 mem_kb, u32 boot_drive)
     CHECK(after > before && after >= 8192 && after <= MEM_KSTACK_TOP - MEM_KSTACK_BASE, 23);
     CHECK(kstack_high_water() == after, 24);
     CHECK(boot_sqlite() == 73, 25);
-    CHECK(sqlite_call_on_alt_stack(shell_body, MEM_SHELL_STACK_TOP) == 81, 26);
+    int result=0;
+    sqlite_call_on_alt_stack(shell_body, MEM_SHELL_STACK_TOP, &result);
+    CHECK(result == 81, 26);
+    CHECK(tss_get_esp0() == entry_sp + 12, 34);
     u32 shell = kstack_high_water() >> 16;
     CHECK(shell >= 8192 && shell <= MEM_SHELL_STACK_SIZE, 27);
     guards();

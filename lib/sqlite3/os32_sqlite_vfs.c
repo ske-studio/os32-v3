@@ -116,6 +116,16 @@ int os32_sqlite_group_snapshot(const Os32SqliteGroup *cookie,
     return SQLITE_OK;
 }
 
+int os32_sqlite_group_for_db(void *db, Os32SqliteGroupInfo *out)
+{
+    int i;
+    if (!db) return SQLITE_MISUSE;
+    for (i = 0; i < OS32_SQLITE_GROUPS; i++)
+        if (groups[i].state != OS32_SQLITE_FREE && groups[i].db == db)
+            return os32_sqlite_group_snapshot(&groups[i].cookie, out);
+    return SQLITE_MISUSE;
+}
+
 int os32_sqlite_group_begin_close(const Os32SqliteGroup *cookie)
 {
     Os32GroupSlot *g = group_lookup(cookie);
@@ -394,12 +404,7 @@ static int os32VfsOpen(sqlite3_vfs *pVfs, const char *zName,
                             flags, &p->lease) != VFS_OK) return SQLITE_CANTOPEN;
         p->fd = p->lease.fd;
     } else {
-        /* Legacy default retained until all connection boundaries migrate. */
-        p->fd = vfs_open(zName, oflags);
-        /* 開いている DB / ジャーナルの rename は BUSY で断る (票
-         * TASK_VFS_FD_PATH のユーザー決裁 ①)。group の FD (vfs_open_sqlite)
-         * には最初から付いている。旧来の経路 (IME 辞書の常駐接続など) にも付ける */
-        if (p->fd >= 0) (void)vfs_fd_set_sqlite_db(p->fd);
+        return SQLITE_CANTOPEN; /* Every file belongs to a connection group. */
     }
     if (p->fd < 0) return SQLITE_CANTOPEN;
 
@@ -537,6 +542,11 @@ int os32_sqlite_group_acquire(int kind, int owner, Os32SqliteGroup *out)
         return SQLITE_MISUSE;
     first = kind == OS32_SQLITE_EXEC ? 0 : OS32_SQLITE_EXEC_GROUPS;
     end = kind == OS32_SQLITE_EXEC ? OS32_SQLITE_EXEC_GROUPS : OS32_SQLITE_GROUPS;
+    /* A failed boot/settings/FEP close must not borrow the other resident slot. */
+    if (kind == OS32_SQLITE_RESIDENT) {
+        for (i = first; i < end; i++)
+            if (groups[i].state == OS32_SQLITE_QUARANTINED) return SQLITE_BUSY;
+    }
     for (i = first; i < end; i++) {
         g = &groups[i];
         if (g->state != OS32_SQLITE_FREE ||
@@ -561,7 +571,7 @@ int os32_sqlite_group_acquire(int kind, int owner, Os32SqliteGroup *out)
 static sqlite3_vfs group_vfs[OS32_SQLITE_GROUPS];
 static const char *const group_names[OS32_SQLITE_GROUPS] = {
     "os32-g0", "os32-g1", "os32-g2", "os32-g3", "os32-g4",
-    "os32-g5", "os32-g6", "os32-g7", "os32-resident"
+    "os32-g5", "os32-g6", "os32-g7", "os32-resident", "os32-resident1"
 };
 typedef char Os32GroupCapacityCheck[(DB_MAX_CONNECTIONS == 8) ? 1 : -1];
 static int vfs_registered;

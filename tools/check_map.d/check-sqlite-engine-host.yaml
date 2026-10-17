@@ -1,0 +1,20 @@
+check-sqlite-engine-host:
+- kernel/sqlite_engine.c
+- kernel/sqlite_engine.h
+- kernel/sqlite_outer.c
+- lib/sqlite3/os32_sqlite_outer.h
+- lib/sqlite3/sqlite_stack.asm
+- lib/sqlite3/os32_sqlite_test.c
+- exec/exec.c
+- kernel/isr_handlers.c
+- kernel/kernel.c
+- kapi/kapi_db.c
+- kernel/ime_dict.c
+- build/kernel.mk
+- tools/tests/test_sqlite_engine.py
+- tools/tests/sqlite_engine_host.c
+- tools/tests/sqlite_engine_regs.asm
+- tools/tests/host32.py
+- tools/check_map.d/check-sqlite-engine-host.yaml
+- build/checks.d/check-sqlite-engine-host.mk
+- exec/exec_kapi_init.inc

@@ -12,7 +12,7 @@
 #define OS32_SQLITE_EXEC 1
 #define OS32_SQLITE_RESIDENT 2
 #define OS32_SQLITE_EXEC_GROUPS DB_MAX_CONNECTIONS
-#define OS32_SQLITE_RESIDENT_GROUPS 1
+#define OS32_SQLITE_RESIDENT_GROUPS 2
 #define OS32_SQLITE_GROUPS (OS32_SQLITE_EXEC_GROUPS + OS32_SQLITE_RESIDENT_GROUPS)
 #define OS32_SQLITE_GROUP_GENERATION_MAX 0xffffffffUL
 #define OS32_SQLITE_FREE 0
@@ -45,6 +45,8 @@ typedef struct {
  * A FREE lifetime's snapshot remains readable until the next acquire. */
 int os32_sqlite_group_snapshot(const Os32SqliteGroup *group,
                                Os32SqliteGroupInfo *out);
+
+int os32_sqlite_group_for_db(void *db, Os32SqliteGroupInfo *out);
 
 struct sqlite3;
 /* Sole supported connection-open entry for dedicated groups. URI and VFS

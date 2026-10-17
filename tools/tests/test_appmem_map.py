@@ -225,7 +225,7 @@ def main():
                                   'void * __cdecl wrap_mem_map(', 'int __cdecl wrap_mem_unmap('))
 
             (tmp / 'public_wrap_source.c').write_text(public_parts(bodies[7]))
-            (tmp / 'exec_source.c').write_text(exec_parts(bodies[5]))
+            (tmp / 'exec_source.c').write_text('static int sqlite_engine_stop_deferred(void) { return 0; }\n' + exec_parts(bodies[5]))
             (tmp / 'heap_context_source.c').write_text(heap_context_parts(bodies[5]))
             (tmp / 'abort_clear_source.c').write_text(function(bodies[6], 'int appslot_abort_clear('))
             lease_source = (ROOT / 'exec/lease.c').read_text()
@@ -265,7 +265,7 @@ def main():
                     (tmp / 'heap_source.c').write_text(bodies[8])
                     (tmp / 'heap_context_source.c').write_text(heap_context_parts(bodies[5]))
                     (tmp / 'paging_source.c').write_text(bodies[4])
-                    (tmp / 'exec_source.c').write_text(exec_parts(bodies[5]))
+                    (tmp / 'exec_source.c').write_text('static int sqlite_engine_stop_deferred(void) { return 0; }\n' + exec_parts(bodies[5]))
                     (tmp / 'abort_clear_source.c').write_text(function(bodies[6], 'int appslot_abort_clear('))
                     return obj
                 if index in (2, 3): source = source.replace('irq_save()', 'publish_save()')

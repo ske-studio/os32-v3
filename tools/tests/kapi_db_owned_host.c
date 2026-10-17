@@ -1,3 +1,4 @@
+#define OS32_SQLITE_DIRECT_TEST 1
 /* Real wrapper, deterministic SQLite boundary faults; no copied DB logic. */
 #include <assert.h>
 #include <stdio.h>
@@ -5,6 +6,7 @@
 #include "sqlite3.h"
 #include "db_copy_shim.h"
 #include "../../kapi/kapi_db.c"
+#include "db_group_shim.h"
 
 unsigned char test_shm[DB_SHM_BLOCK_SIZE];
 struct sqlite3 {
@@ -174,6 +176,24 @@ static void test_teardown_order(void)
         assert(!strcmp(connections[1].trace, "C"));
     }
 }
+static void test_replace_finalize_failure(void)
+{
+    for (int entry = 0; entry < 3; entry++) {
+        reset();
+        int h = kapi_db_open("replace-fault");
+        assert(kapi_db_prepare_only(h, "SELECT 1") == 0);
+        connections[0].finalize_rc = SQLITE_IOERR;
+        int rc = entry == 0 ? kapi_db_exec(h, "SELECT 2") :
+                 entry == 1 ? kapi_db_prepare(h, "SELECT 2") :
+                              kapi_db_prepare_only(h, "SELECT 2");
+        assert(rc == -1 && db_slots[h].isolated && db_slots[h].in_use);
+        assert(connections[0].finalizes == 1 && connections[0].steps == 0);
+        db_cleanup_owned(owner);
+        assert(connections[0].closes == 0 && connections[0].finalizes == 1);
+        assert(kapi_db_open("replacement") != h);
+    }
+}
+
 static void test_finalize_failure(void)
 {
     int h;
@@ -182,11 +202,10 @@ static void test_finalize_failure(void)
     connections[0].finalize_rc = SQLITE_IOERR;
     connections[0].transaction = 1;
     assert(kapi_db_close(h) == -1);
-    assert(!strcmp(connections[0].trace, "FRC"));
+    assert(!strcmp(connections[0].trace, "F"));
     assert(!strcmp(kapi_db_last_error(h), "finalize failure"));
-    assert(connections[0].closed);
-    assert(kapi_db_open("reuse-after-close-success") == h);
-    assert(strcmp(kapi_db_last_error(h), "finalize failure"));
+    assert(!connections[0].closed);
+    assert(kapi_db_open("quarantine-not-reused") != h);
 }
 static void test_rollback_failure(void)
 {
@@ -195,10 +214,10 @@ static void test_rollback_failure(void)
     connections[0].transaction = 1;
     connections[0].rollback_rc = SQLITE_IOERR;
     assert(kapi_db_close(h) == -1);
-    assert(!strcmp(connections[0].trace, "RC"));
+    assert(!strcmp(connections[0].trace, "R"));
     assert(!strcmp(kapi_db_last_error(h), "rollback failure"));
-    assert(connections[0].closed);
-    assert(kapi_db_open("close-success-reuse") == h);
+    assert(!connections[0].closed);
+    assert(kapi_db_open("quarantine-not-reused") != h);
 }
 static void test_busy_isolation(void)
 {
@@ -218,7 +237,7 @@ static void test_busy_isolation(void)
             else if (mode == 1) db_cleanup_owned(2);
             else db_cleanup_all();
             assert(!strcmp(kapi_db_last_error(h), message));
-            assert(!strcmp(connections[0].trace, "FRC"));
+            assert(!strcmp(connections[0].trace, stage == 2 ? "F" : stage == 1 ? "FR" : "FRC"));
             assert(!connections[0].closed);
             /* Simulate returning to parent then recycling the same nest. */
             owner = 1; db_cleanup_owned(2);
@@ -231,7 +250,7 @@ static void test_busy_isolation(void)
             assert(kapi_db_finalize(h) == -1);
             db_cleanup_owned(2); db_cleanup_all();
             assert(connections[1].closed);
-            assert(!strcmp(connections[0].trace, "FRC"));
+            assert(!strcmp(connections[0].trace, stage == 2 ? "F" : stage == 1 ? "FR" : "FRC"));
             assert(!strcmp(kapi_db_last_error(h), message));
             for (i = 0; i < DB_MAX_CONNECTIONS - 1; i++)
                 assert(kapi_db_open("capacity") >= 0);
@@ -252,14 +271,14 @@ static void test_open_failure(void)
         hdr = (DB_ResultHeader *)test_shm;
         assert(hdr->status == DB_STATUS_ERROR);
         assert(!strcmp((char *)test_shm + hdr->error_offset, "open first"));
-        assert(!strcmp(connections[0].trace, "RC"));
+        assert(!strcmp(connections[0].trace, "R"));
         assert(!strcmp(kapi_db_last_error(0), "open first"));
         open_rc = SQLITE_OK;
         owner = 1; db_cleanup_owned(2);
         owner = 2; h = kapi_db_open("recycled-owner");
-        assert(h == (busy ? 1 : 0));
+        assert(h == 1);
         db_cleanup_owned(2); db_cleanup_all();
-        assert(!strcmp(connections[0].trace, "RC"));
+        assert(!strcmp(connections[0].trace, "R"));
         if (busy) assert(!strcmp(kapi_db_last_error(0), "open first"));
     }
     reset(); open_rc = SQLITE_NOMEM; open_null = 1;
@@ -326,6 +345,7 @@ int main(void)
     test_rollback_failure();
     test_owned();
     test_teardown_order();
+    test_replace_finalize_failure();
     test_finalize_failure();
     puts("PASS owned, teardown order, finalize/rollback faults, BUSY isolation, open faults");
     return 0;

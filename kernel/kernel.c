@@ -74,6 +74,7 @@ extern void fatfs_init(void);
 #include "lgy98.h"
 #include "pcm_cs4231.h"
 #include "os32_sqlite_vfs.h"
+#include "os32_sqlite_outer.h"
 #include "kapi_db.h"
 #include "bootlog.h"
 #include "module.h"
@@ -190,6 +191,7 @@ static u8 kernel_pci_line_bits(unsigned int irq)
 
 void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
 {
+    int sqlite_ready = 0;
     char tmp[16];
     int mb;
 
@@ -671,7 +673,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
 
     if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_post_unicode();
 
-    /* IME (FEP) 初期化 — 辞書は初回使用時に遅延ロード */
+    /* IME (FEP) 初期化 — 辞書は IRQ 有効化後、アプリ起動前に開く */
     tvram_print(0, 4, "IME..", TATTR_GREEN);
     kprintf(0x07, "[BOOT] ime_init...\n");
     ime_init();
@@ -697,19 +699,11 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     tvram_print(0, 4, "SQLite...", TATTR_GREEN);
     {
         int sq_rc;
-        sq_rc = os32_sqlite_init();
+        sq_rc = os32_sqlite_start();
+        sqlite_ready = sq_rc == 0;
         kprintf(0x07, "[SQ] init rc=%d\n", sq_rc);
         if (sq_rc == 0) {
             tvram_print(9, 4, "OK", TATTR_WHITE);
-            /* 代替スタック(128KB)でSQLiteテスト実行 */
-            {
-                extern int os32_sqlite_test(void);
-                extern int sqlite_call_on_alt_stack(
-                    int (*func)(void), u32 stack_top);
-                int trc = sqlite_call_on_alt_stack(
-                    os32_sqlite_test, MEM_SQLITE_STACK_TOP);
-                kprintf(0x07, "[SQ] kernel test rc=%d\n", trc);
-            }
         } else {
             tvram_print(9, 4, "ER", TATTR_RED);
         }
@@ -718,6 +712,11 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     /* 割り込み有効化 */
     tvram_print(71, 2, "IRQ_EN", TATTR_YELLOW);
     _enable();
+    if (sqlite_ready) {
+        int rc = os32_sqlite_test();
+        kprintf(0x07, "[SQ] kernel test rc=%d\n", rc);
+        if (!rc) kprintf(0x07, "[IME] boot dictionary rc=%d\n", ime_dict_boot());
+    }
 
     /* autoexec: シェルスクリプト(/etc/autoexec.bat)に移行済み。
      * シェル起動後に ui.c から script_source_file() で実行される。 */

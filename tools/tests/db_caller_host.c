@@ -1,8 +1,10 @@
+#define OS32_SQLITE_DIRECT_TEST 1
 /* Actual dispatcher, DB/output wrappers, VFS and caller copy/walk.
  * Only SQLite and the filesystem driver are entry-recording boundaries. */
 #define HOST_DB_CALLER_TEST
 #define HOST_CALLER_COPY_TEST
 #include "access_walk_host.c"
+void *memcpy(void *d, const void *s, u32 n) { return kmemcpy(d, s, n); }
 #include "ring3_str.h"
 #include "ring3_ls.h"
 int ring3_ls_dispatch(u32 user_esp) { (void)user_esp; __builtin_trap(); }
@@ -21,6 +23,7 @@ void ring3_fault_kill(void) {
 #include "kapi_db.h"
 #include "out_wrapper_host_source.c"
 #include "db_host_source.c"
+#include "db_group_shim.h"
 #include "vfs_host_source.c"
 #include "guest_probe_host_source.c"
 #include "arg_tables_host_source.c"
@@ -100,6 +103,13 @@ int sqlite3_step(sqlite3_stmt *s) { (void)s; sql_entry(); return SQLITE_DONE; }
 const unsigned char *sqlite3_column_text(sqlite3_stmt *s, int c) {
     (void)s; (void)c; sql_entry(); return (const unsigned char *)"delete";
 }
+int sqlite3_column_count(sqlite3_stmt *s) { (void)s; sql_entry(); return 0; }
+int sqlite3_column_type(sqlite3_stmt *s, int c) { (void)s; (void)c; sql_entry(); return SQLITE_NULL; }
+int sqlite3_column_int(sqlite3_stmt *s, int c) { (void)s; (void)c; sql_entry(); return 0; }
+double sqlite3_column_double(sqlite3_stmt *s, int c) { (void)s; (void)c; sql_entry(); return 0; }
+const void *sqlite3_column_blob(sqlite3_stmt *s, int c) { (void)s; (void)c; sql_entry(); return 0; }
+int sqlite3_column_bytes(sqlite3_stmt *s, int c) { (void)s; (void)c; sql_entry(); return 0; }
+int sqlite3_errcode(sqlite3 *db) { (void)db; sql_entry(); return SQLITE_OK; }
 int sqlite3_bind_parameter_count(sqlite3_stmt *s) { (void)s; sql_entry(); return 1; }
 int sqlite3_bind_text(sqlite3_stmt *s, int i, const char *t, int n, void (*d)(void *)) {
     (void)s; (void)i; (void)d; sql_entry();
@@ -187,14 +197,15 @@ static void caller_copy_tests(void)
         CHECK(vfs_calls == stat_before && ((OS32_Stat *)out)->st_size == 123);
         CHECK(ring3_range_reject_addr == out);
         pt[index] |= PTE_RW;
-        for (int entry = 0; entry < 3; entry++) {
+        for (int entry = 0; entry < 5; entry++) {
             reset_db(); kmemcpy(p + PAGE_SIZE - 4, "abcd", 4);
             CHECK(ring3_ptr_ok(va));
             int rc = entry == 0 ? kapi_db_open((void *)va) : entry == 1 ?
-                kapi_db_open_existing((void *)va, 0) : kapi_db_prepare_only(0, (void *)va);
-            CHECK(rc == -1 && sqlite_calls == (entry == 2 ? 1u : 0u) && !vfs_calls);
+                kapi_db_open_existing((void *)va, 0) : entry == 2 ? kapi_db_prepare_only(0, (void *)va) :
+                entry == 3 ? kapi_db_exec(0, (void *)va) : kapi_db_prepare(0, (void *)va);
+            CHECK(rc == -1 && sqlite_calls == 0 && !vfs_calls);
             if (entry == 2) {
-                CHECK(!db_slots[0].active_stmt && !db_slots[0].bindable);
+                CHECK(db_slots[0].active_stmt == (sqlite3_stmt *)3 && db_slots[0].bindable);
             } else {
                 CHECK(db_slots[0].active_stmt == (sqlite3_stmt *)3 && db_slots[0].bindable);
             }
@@ -202,7 +213,8 @@ static void caller_copy_tests(void)
             p[PAGE_SIZE - 1] = 0; expected_input = "abc";
             u32 rejects = ring3_range_reject_count;
             rc = entry == 0 ? kapi_db_open((void *)va) : entry == 1 ?
-                kapi_db_open_existing((void *)va, 0) : kapi_db_prepare_only(0, (void *)va);
+                kapi_db_open_existing((void *)va, 0) : entry == 2 ? kapi_db_prepare_only(0, (void *)va) :
+                entry == 3 ? kapi_db_exec(0, (void *)va) : kapi_db_prepare(0, (void *)va);
             CHECK(rc >= 0 && sqlite_calls);
             CHECK(ring3_range_reject_count == rejects);
             if (entry == 1) CHECK(vfs_calls == 2); /* real VFS -> kernel local st */
@@ -265,7 +277,7 @@ static void caller_copy_tests(void)
         for (int mode = 0; mode < 2; mode++) {
             reset_db();
             CHECK(kapi_db_prepare_only(0, mode ? (void *)va : 0) == -1);
-            CHECK(sqlite_calls == 1 && !db_slots[0].active_stmt && !db_slots[0].bindable);
+            CHECK(sqlite_calls == 0 && db_slots[0].active_stmt == (sqlite3_stmt *)3 && db_slots[0].bindable);
         }
         CHECK(caller_access_enter(&prev, CALLER_USER));
         CHECK(host_arch_if == expected_if && host_cr3 == root);

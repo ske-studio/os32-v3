@@ -13,6 +13,7 @@
 #include "os32_kapi_slots.h"   /* v50: 自己診断が slot 番号を名前で見る */
 #include "os32_sqlite_config.h"
 #include "sqlite3.h"
+#include "os32_sqlite_outer.h"
 #include "kstring.h"
 #include "kprintf.h"
 #include "os32_sqlite_vfs.h"
@@ -64,6 +65,7 @@ static char journal_buf[VFS_MAX_PATH];
 typedef struct {
     int in_use;               /* 1=使用中, 0=空き */
     int owner;                /* open 時の res_owner_get() */
+    Os32SqliteGroup group;
     int isolated;             /* close failed: never touch this connection again */
     int cleanup_error;        /* first teardown failure, retained until reuse */
     char cleanup_message[DB_ERROR_SIZE];
@@ -487,6 +489,7 @@ static int db_ieq(const char *a, const char *b);
 
 int __cdecl kapi_db_open(const char *path)
 {
+    if (!SQLITE_OUTER_READY(1)) return -1;
     int i;
     int rc;
 
@@ -518,6 +521,12 @@ int __cdecl kapi_db_open(const char *path)
         return -1;
     }
 
+    if (os32_sqlite_group_acquire(OS32_SQLITE_EXEC, res_owner_get(),
+                                  &db_slots[i].group) != SQLITE_OK) {
+        open_fail_set(SQLITE_FULL);
+        return -1;
+    }
+    db_slots[i].db = (sqlite3 *)0;
     db_slots[i].cleanup_error = SQLITE_OK;
     db_slots[i].cleanup_message[0] = '\0';
     /* v50: slot を配り直したので診断欄も初期化する (前の持ち主の「最後の
@@ -526,7 +535,8 @@ int __cdecl kapi_db_open(const char *path)
     db_slots[i].used_once = 1;
     db_slots[i].bindable = 0;
     db_slots[i].owner = res_owner_get();
-    rc = sqlite3_open(path_copy_buf, &db_slots[i].db);
+    rc = os32_sqlite_group_open(&db_slots[i].group, path_copy_buf,
+        SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, &db_slots[i].db);
     if (rc != SQLITE_OK) {
         /* Open can fail with a live connection. Save before teardown. */
         slot_save_error(&db_slots[i], rc);
@@ -536,6 +546,10 @@ int __cdecl kapi_db_open(const char *path)
         if (db_slots[i].db) {
             db_slots[i].in_use = 1;
             kapi_db_close(i);
+        } else {
+            os32_sqlite_group_begin_close(&db_slots[i].group);
+            if (os32_sqlite_group_finish(&db_slots[i].group, SQLITE_OK) != SQLITE_OK)
+                db_slots[i].in_use = db_slots[i].isolated = 1;
         }
         return -1;
     }
@@ -562,41 +576,48 @@ static void slot_save_error(DbSlot *slot, int rc)
 
 int __cdecl kapi_db_close(int handle)
 {
+    if (!SQLITE_OUTER_READY(1)) return -1;
     DbSlot *slot = slot_get(handle);
-    int rc;
+    int rc = SQLITE_OK;
     if (!slot) return -1;
-
-    /* 実行中ステートメントの finalize */
-    if (slot->active_stmt) {
-        int frc = sqlite3_finalize(slot->active_stmt);
-        slot_save_error(slot, frc);
-        slot_note_teardown(slot, frc);   /* v50: 失敗したときだけ診断へ */
-        slot->active_stmt = (sqlite3_stmt *)0;
-    }
-    slot->bindable = 0;
-
-    if (!sqlite3_get_autocommit(slot->db)) {
-        int rrc = sqlite3_exec(slot->db, "ROLLBACK", 0, 0, 0);
-        slot_save_error(slot, rrc);
-        slot_note_teardown(slot, rrc);
-    }
-    rc = sqlite3_close(slot->db);
-    if (rc != SQLITE_OK) {
-        slot_save_error(slot, rc);
-        slot_note_teardown(slot, rc);
-        /* Never retry, even after this nest/owner is recycled. This does NOT
-         * protect main/journal/temp FDs against generic FD cleanup: F2 must
-         * establish complete VFS tracking/quarantine before integration. */
+    if (os32_sqlite_group_begin_close(&slot->group) != SQLITE_OK) {
         slot->isolated = 1;
         return -1;
     }
-    slot->db = (sqlite3 *)0;
+    if (slot->active_stmt) {
+        rc = sqlite3_finalize(slot->active_stmt);
+        slot->active_stmt = (sqlite3_stmt *)0;
+    }
+    slot->bindable = 0;
+    if (rc == SQLITE_OK && !sqlite3_get_autocommit(slot->db))
+        rc = sqlite3_exec(slot->db, "ROLLBACK", 0, 0, 0);
+    if (rc != SQLITE_OK) {
+        slot_save_error(slot, rc);
+        slot_note_teardown(slot, rc);
+        os32_sqlite_group_quarantine(&slot->group, OS32_SQLITE_STAGE_CLOSE, rc);
+        slot->isolated = 1;
+        return -1;
+    }
+    rc = sqlite3_close(slot->db);
+    if (rc == SQLITE_OK) slot->db = (sqlite3 *)0;
+    else {
+        slot_save_error(slot, rc);
+        slot_note_teardown(slot, rc);
+    }
+    rc = os32_sqlite_group_finish(&slot->group, rc);
+    if (rc != SQLITE_OK) {
+        slot_save_error(slot, rc);
+        slot_note_teardown(slot, rc);
+        slot->isolated = 1;
+        return -1;
+    }
     slot->in_use = 0;
-    return slot->cleanup_error == SQLITE_OK ? 0 : -1;
+    return 0;
 }
 
 int __cdecl kapi_db_exec(int handle, const char *sql)
 {
+    if (!SQLITE_OUTER_READY(1)) return -1;
     DbSlot *slot = slot_get(handle);
     DB_ResultHeader *hdr = (DB_ResultHeader *)DB_SHM_PTR;
     sqlite3_stmt *stmt = (sqlite3_stmt *)0;
@@ -607,20 +628,16 @@ int __cdecl kapi_db_exec(int handle, const char *sql)
         return -1;
     }
 
+    /* B3: copy fully before finalizing or changing the slot/SHM. */
+    if (!db_copy_input(sql, sql_copy_buf, SQL_COPY_BUF_SIZE, 1) ||
+        !sql_copy_buf[0]) return -1;
+
     /* 前のステートメントがあれば解放 */
-    if (slot->active_stmt) {
-        sqlite3_finalize(slot->active_stmt);
-        slot->active_stmt = (sqlite3_stmt *)0;
+    if (kapi_db_finalize(handle) != 0) {
+        shm_write_error(slot);
+        return -1;
     }
-    slot->bindable = 0;
 
-    /* SQL文字列をカーネルバッファにコピー (外部プログラム空間からの読み取り問題回避) */
-    kstrncpy(sql_copy_buf, sql, SQL_COPY_BUF_SIZE - 1);
-    sql_copy_buf[SQL_COPY_BUF_SIZE - 1] = '\0';
-
-
-
-    /* prepare */
     rc = sqlite3_prepare_v2(slot->db, sql_copy_buf, -1, &stmt, 0);
     if (rc != SQLITE_OK || !stmt) {
         kprintf(0x04, "[DB] prepare fail rc=%d\n", rc);
@@ -650,6 +667,7 @@ int __cdecl kapi_db_exec(int handle, const char *sql)
 
 int __cdecl kapi_db_prepare(int handle, const char *sql)
 {
+    if (!SQLITE_OUTER_READY(1)) return -1;
     DbSlot *slot = slot_get(handle);
     int rc;
     int step_rc;
@@ -659,16 +677,15 @@ int __cdecl kapi_db_prepare(int handle, const char *sql)
         return -1;
     }
 
-    /* 前のステートメントがあれば解放 */
-    if (slot->active_stmt) {
-        sqlite3_finalize(slot->active_stmt);
-        slot->active_stmt = (sqlite3_stmt *)0;
-    }
-    slot->bindable = 0;
+    /* B3: copy fully before finalizing or changing the slot/SHM. */
+    if (!db_copy_input(sql, sql_copy_buf, SQL_COPY_BUF_SIZE, 1) ||
+        !sql_copy_buf[0]) return -1;
 
-    /* SQL文字列をカーネルバッファにコピー */
-    kstrncpy(sql_copy_buf, sql, SQL_COPY_BUF_SIZE - 1);
-    sql_copy_buf[SQL_COPY_BUF_SIZE - 1] = '\0';
+    /* 前のステートメントがあれば解放 */
+    if (kapi_db_finalize(handle) != 0) {
+        shm_write_error(slot);
+        return -1;
+    }
 
     rc = sqlite3_prepare_v2(slot->db, sql_copy_buf, -1, &slot->active_stmt, 0);
     if (rc != SQLITE_OK) {
@@ -703,6 +720,7 @@ int __cdecl kapi_db_prepare(int handle, const char *sql)
 
 int __cdecl kapi_db_step(int handle)
 {
+    if (!SQLITE_OUTER_READY(1)) return -1;
     DbSlot *slot = slot_get(handle);
     int rc;
 
@@ -748,6 +766,7 @@ int __cdecl kapi_db_step(int handle)
 
 int __cdecl kapi_db_column_int(int handle, int col)
 {
+    if (!SQLITE_OUTER_READY(0)) return 0;
     DbSlot *slot = slot_get(handle);
     if (!slot || !slot->active_stmt) return 0;
     return sqlite3_column_int(slot->active_stmt, col);
@@ -755,6 +774,7 @@ int __cdecl kapi_db_column_int(int handle, int col)
 
 const char * __cdecl kapi_db_column_text(int handle, int col)
 {
+    if (!SQLITE_OUTER_READY(0)) return 0;
     DbSlot *slot = slot_get(handle);
     DB_ResultHeader *hdr = (DB_ResultHeader *)DB_SHM_PTR;
     DB_ColumnInfo *info;
@@ -780,15 +800,22 @@ const char * __cdecl kapi_db_column_text(int handle, int col)
 /* 戻り値: 0=成功, -1=失敗 */
 int __cdecl kapi_db_finalize(int handle)
 {
+    if (!SQLITE_OUTER_READY(1)) return -1;
     DbSlot *slot = slot_get(handle);
+    int rc = SQLITE_OK;
     if (!slot) return -1;
     if (slot->active_stmt) {
-        /* v50: 戻り値は従来どおり 0 のまま (既存 10 本の挙動は不変)。
-         * 失敗したときだけ診断欄を更新する。 */
-        slot_note_teardown(slot, sqlite3_finalize(slot->active_stmt));
+        rc = sqlite3_finalize(slot->active_stmt);
         slot->active_stmt = (sqlite3_stmt *)0;
     }
     slot->bindable = 0;
+    if (rc != SQLITE_OK) {
+        slot_save_error(slot, rc);
+        slot_note_teardown(slot, rc);
+        os32_sqlite_group_quarantine(&slot->group, OS32_SQLITE_STAGE_CLOSE, rc);
+        slot->isolated = 1;
+        return -1;
+    }
     return 0;
 }
 
@@ -798,6 +825,7 @@ int __cdecl kapi_db_finalize(int handle)
  * 1 回の db_exec の結果に結びついた別の欄で、こちらは動かさない。 */
 const char * __cdecl kapi_db_last_error(int handle)
 {
+    if (!SQLITE_OUTER_READY(0)) return 0;
     DbSlot *slot;
     if (handle < 0 || handle >= DB_MAX_CONNECTIONS)
         return db_shm_diag("invalid handle");
@@ -954,6 +982,7 @@ static int db_journal_fits(const char *path)
 
 int __cdecl kapi_db_open_existing(const char *path, int writable)
 {
+    if (!SQLITE_OUTER_READY(1)) return -1;
     int i, rc, flags;
     OS32_Stat st;
     sqlite3 *db = (sqlite3 *)0;
@@ -1042,6 +1071,12 @@ int __cdecl kapi_db_open_existing(const char *path, int writable)
         return -1;
     }
 
+    if (os32_sqlite_group_acquire(OS32_SQLITE_EXEC, res_owner_get(),
+                                  &db_slots[i].group) != SQLITE_OK) {
+        open_fail_set(SQLITE_FULL);
+        return -1;
+    }
+    db_slots[i].db = (sqlite3 *)0;
     db_slots[i].cleanup_error = SQLITE_OK;
     db_slots[i].cleanup_message[0] = '\0';
     db_slots[i].last_error = SQLITE_OK;
@@ -1050,9 +1085,9 @@ int __cdecl kapi_db_open_existing(const char *path, int writable)
     db_slots[i].active_stmt = (sqlite3_stmt *)0;
     db_slots[i].owner = res_owner_get();
 
-    /* CREATE も URI も付けない。vfs は既定の "os32"。 */
+    /* CREATE/URI は付けず、この接続専用 group の VFS を使う。 */
     flags = writable ? SQLITE_OPEN_READWRITE : SQLITE_OPEN_READONLY;
-    rc = sqlite3_open_v2(abs_path_buf, &db, flags, (const char *)0);
+    rc = os32_sqlite_group_open(&db_slots[i].group, abs_path_buf, flags, &db);
     db_slots[i].db = db;
     if (rc != SQLITE_OK) {
         slot_save_error(&db_slots[i], rc);
@@ -1062,6 +1097,10 @@ int __cdecl kapi_db_open_existing(const char *path, int writable)
         if (db) {
             db_slots[i].in_use = 1;
             kapi_db_close(i);
+        } else {
+            os32_sqlite_group_begin_close(&db_slots[i].group);
+            if (os32_sqlite_group_finish(&db_slots[i].group, SQLITE_OK) != SQLITE_OK)
+                db_slots[i].in_use = db_slots[i].isolated = 1;
         }
         return -1;
     }
@@ -1089,6 +1128,7 @@ int __cdecl kapi_db_open_existing(const char *path, int writable)
 
 int __cdecl kapi_db_prepare_only(int handle, const char *sql)
 {
+    if (!SQLITE_OUTER_READY(1)) return -1;
     DbSlot *slot = slot_get(handle);
     sqlite3_stmt *stmt = (sqlite3_stmt *)0;
     const char *tail = (const char *)0;
@@ -1099,21 +1139,11 @@ int __cdecl kapi_db_prepare_only(int handle, const char *sql)
         return -1;
     }
 
-    /* Public prepare_only contract: discard the old stmt even on copy refusal. */
-    if (slot->active_stmt) {
-        slot_note_teardown(slot, sqlite3_finalize(slot->active_stmt));
-        slot->active_stmt = (sqlite3_stmt *)0;
-    }
-    slot->bindable = 0;
-
-    if (!db_copy_input(sql, sql_copy_buf, SQL_COPY_BUF_SIZE, 1)) {
-        slot_note(slot, SQLITE_MISUSE);
-        shm_write_error_text("sql pointer rejected by the range check");
-        return -1;
-    }
-    if (sql_copy_buf[0] == '\0') {
-        slot_note(slot, SQLITE_MISUSE);
-        shm_write_error_text("sql is empty");
+    /* B3: rejected input leaves the old statement and result untouched. */
+    if (!db_copy_input(sql, sql_copy_buf, SQL_COPY_BUF_SIZE, 1) ||
+        !sql_copy_buf[0]) return -1;
+    if (kapi_db_finalize(handle) != 0) {
+        shm_write_error(slot);
         return -1;
     }
 
@@ -1163,6 +1193,7 @@ static int bind_done(DbSlot *slot, int rc)
 
 int __cdecl kapi_db_bind_int(int handle, int index, int value)
 {
+    if (!SQLITE_OUTER_READY(0)) return -1;
     DbSlot *slot = bind_slot(handle, index);
     if (!slot) return -1;
     return bind_done(slot, sqlite3_bind_int(slot->active_stmt, index, value));
@@ -1170,6 +1201,7 @@ int __cdecl kapi_db_bind_int(int handle, int index, int value)
 
 int __cdecl kapi_db_bind_text(int handle, int index, const char *text, int length)
 {
+    if (!SQLITE_OUTER_READY(0)) return -1;
     DbSlot *slot = bind_slot(handle, index);
     if (!slot) return -1;
     if (length < 0 || length > DB_BIND_TEXT_MAX ||
@@ -1186,6 +1218,7 @@ int __cdecl kapi_db_bind_text(int handle, int index, const char *text, int lengt
 
 int __cdecl kapi_db_bind_blob(int handle, int index, const void *data, int length)
 {
+    if (!SQLITE_OUTER_READY(0)) return -1;
     DbSlot *slot = bind_slot(handle, index);
     if (!slot) return -1;
     if (length < 0 || length > DB_BIND_BLOB_MAX ||
@@ -1200,6 +1233,7 @@ int __cdecl kapi_db_bind_blob(int handle, int index, const void *data, int lengt
 
 int __cdecl kapi_db_bind_null(int handle, int index)
 {
+    if (!SQLITE_OUTER_READY(0)) return -1;
     DbSlot *slot = bind_slot(handle, index);
     if (!slot) return -1;
     return bind_done(slot, sqlite3_bind_null(slot->active_stmt, index));
@@ -1207,6 +1241,7 @@ int __cdecl kapi_db_bind_null(int handle, int index)
 
 int __cdecl kapi_db_error_code(int handle)
 {
+    if (!SQLITE_OUTER_READY(0)) return -1;
     DbSlot *slot;
     int owner;
 

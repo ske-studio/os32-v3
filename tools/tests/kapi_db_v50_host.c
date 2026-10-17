@@ -1,3 +1,4 @@
+#define OS32_SQLITE_DIRECT_TEST 1
 /* ========================================================================= */
 /*  KAPI_DB_V50_HOST.C — 票 S0-K §1d のホスト TDD                            */
 /*                                                                           */
@@ -294,7 +295,7 @@ static void prepare_only(void)
     big[DB_SQL_MAX_BYTES - 1] = ' ';
     big[DB_SQL_MAX_BYTES] = '\0';
     CHECK(kapi_db_prepare_only(h, big) == -1);
-    CHECK(kapi_db_error_code(h) == SQLITE_MISUSE);
+    CHECK(kapi_db_error_code(h) == SQLITE_OK);
 
     CHECK(kapi_db_close(h) == 0);
 }
@@ -534,10 +535,7 @@ static void user_range(void)
 }
 
 /* ---- 7. 回収順序 (票 §1c) ---------------------------------------------- */
-/*  DB 接続の main / journal FD は汎用 FD (kapi_db.c は既定 VFS を使う) なので、
- *  vfs_close_owned が先に走ると SQLite は死んだ FD 越しに rollback / close を
- *  投げることになる。新しい並び (DB → FD) と古い並び (FD → DB) を両方走らせ、
- *  観測できる差を assert する。                                             */
+/* Managed main/journal FDs survive generic cleanup in either order. */
 static void reclaim_order(const char *mode)
 {
     static unsigned char before[FIXTURE_BYTES];
@@ -573,7 +571,7 @@ static void reclaim_order(const char *mode)
         vfs_close_owned(4);             /* 旧: FD が先 */
         live = 0;
         for (i = 3; i < VFS_MAX_OPEN_FILES; i++) if (open_files[i].in_use) live++;
-        CHECK(live == 0);               /* 後始末の前に FD が消えている */
+        CHECK(live >= 2);               /* SQLite lease survives generic cleanup. */
         db_probes = probes;
         db_cleanup_owned(4);
         db_probes = probes - db_probes;
@@ -593,22 +591,10 @@ static void reclaim_order(const char *mode)
     for (i = 3; i < VFS_MAX_OPEN_FILES; i++) if (open_files[i].in_use) live++;
     printf("ORDER %s: fds left=%d\n", mode, live);
 
-    if (!strcmp(mode, "new")) {
-        /* DB が先なら rollback も close も **生きた FD の上**で終わる。
-         * 観測点は「後始末がバックエンドに届いた回数」— journal の読み戻しは
-         * FD 越しにしか起きない。 */
-        CHECK(!db_slots[h].in_use && !db_slots[h].isolated);
-        CHECK(fixture_find("/r.db-journal", 0) == NULL);
-        CHECK(live == 0);
-        CHECK(db_probes >= 10);
-    } else {
-        /* 旧い並びでは FD が先に消えるので、rollback の I/O は
-         * バックエンドに 1 度も届かない (path で引く journal の削除だけ)。
-         * **戻り値は成功のまま**なのがこの並びの怖さ — os32 SQLite VFS は
-         * まだ I/O 失敗を握り潰す (票 F3a は未実施)。だから「成功したか」では
-         * なく「後始末が届いたか」で見る。 */
-        CHECK(db_probes <= 3);
-    }
+    CHECK(!db_slots[h].in_use && !db_slots[h].isolated);
+    CHECK(fixture_find("/r.db-journal", 0) == NULL);
+    CHECK(live == 0);
+    CHECK(db_probes >= 10);
     resolve_owner = current_owner = 2;
 }
 
@@ -891,55 +877,46 @@ static void sql_tail_sqlite(void)
     CHECK(kapi_db_close(h) == 0);
 }
 
-/* ---- 17. 拒否した prepare が旧 stmt を残さない (往復 2 の B2) ----------- */
+/* B3: all public SQL entries preserve the connection on copy refusal. */
 static void prepare_replaces(void)
 {
-    static char big[DB_SQL_MAX_BYTES + 64];
-    int h, mode;
-
+    static char big[DB_SQL_MAX_BYTES + 1];
+    static unsigned char saved[sizeof(test_shm)];
+    int (*entries[])(int, const char *) = {
+        kapi_db_exec, kapi_db_prepare, kapi_db_prepare_only
+    };
     make_db("/pr.db", "CREATE TABLE t(x)");
-    memset(big, ' ', sizeof(big));
-    memcpy(big, "SELECT 1", 8);
-    big[DB_SQL_MAX_BYTES] = '\0';        /* NUL 込み 1025B = 上限超過 */
-
-    for (mode = 0; mode < 3; mode++) {
-        h = kapi_db_open_existing("/pr.db", 1);
-        CHECK(h >= 0);
-        CHECK(kapi_db_exec(h, "DELETE FROM t") == 0);
-
-        /* 積んで bind まで済ませた INSERT がある状態で… */
-        CHECK(kapi_db_prepare_only(h, "INSERT INTO t VALUES(?)") == 0);
-        CHECK(kapi_db_bind_int(h, 1, 42) == 0);
-
-        /* …引数検証で弾かれる prepare を出す (空 / 上限超過 / NULL)。 */
-        if (mode == 0) CHECK(kapi_db_prepare_only(h, "") == -1);
-        else if (mode == 1) CHECK(kapi_db_prepare_only(h, big) == -1);
-        else CHECK(kapi_db_prepare_only(h, (const char *)0) == -1);
-        CHECK(kapi_db_error_code(h) == SQLITE_MISUSE);
-
-        /* Every refusal discards the previous stmt, including copy refusal. */
-        CHECK(kapi_db_step(h) == DB_STATUS_DONE);
-        CHECK(kapi_db_bind_int(h, 1, 1) == -1);
-
-        CHECK(kapi_db_prepare_only(h, "SELECT count(*) FROM t") == 0);
-        CHECK(kapi_db_step(h) == DB_STATUS_ROW);
-        CHECK(kapi_db_column_int(h, 0) == 0);        /* INSERT は走っていない */
-        CHECK(kapi_db_finalize(h) == 0);
-        CHECK(kapi_db_close(h) == 0);
+    for (int entry = 0; entry < 3; entry++) {
+        for (int mode = 0; mode < 4; mode++) {
+            int h = kapi_db_open_existing("/pr.db", 1);
+            CHECK(h >= 0);
+            CHECK(kapi_db_exec(h, "DELETE FROM t") == 0);
+            CHECK(kapi_db_exec(h, "BEGIN") == 0);
+            CHECK(kapi_db_prepare_only(h, "INSERT INTO t VALUES(?)") == 0);
+            CHECK(kapi_db_bind_int(h, 1, 42) == 0);
+            DbSlot before = db_slots[h];
+            memcpy(saved, test_shm, sizeof(saved));
+            memset(big, ' ', sizeof(big));
+            memcpy(big, "SELECT 1", 8);
+            if (mode != 3) big[DB_SQL_MAX_BYTES] = 0;
+            const char *input = mode == 0 ? "" : mode == 1 ? 0 : big;
+            int probes_before = probes;
+            CHECK(entries[entry](h, input) == -1);
+            CHECK(probes == probes_before);
+            CHECK(!memcmp(&before, &db_slots[h], sizeof(before)));
+            CHECK(!memcmp(saved, test_shm, sizeof(saved)));
+            CHECK(!sqlite3_get_autocommit(db_slots[h].db));
+            CHECK(kapi_db_step(h) == DB_STATUS_DONE);
+            CHECK(kapi_db_prepare_only(h, "SELECT x FROM t") == 0);
+            CHECK(kapi_db_step(h) == DB_STATUS_ROW);
+            CHECK(kapi_db_column_int(h, 0) == 42);
+            CHECK(kapi_db_finalize(h) == 0);
+            big[DB_SQL_MAX_BYTES - 1] = 0;
+            CHECK(entries[entry](h, big) >= 0);
+            CHECK(kapi_db_close(h) == 0); /* rollback and reclaim */
+            CHECK(!db_slots[h].in_use);
+        }
     }
-
-    /* 単一 statement の拒否 (tail あり) でも同じ */
-    h = kapi_db_open_existing("/pr.db", 1);
-    CHECK(h >= 0);
-    CHECK(kapi_db_prepare_only(h, "INSERT INTO t VALUES(?)") == 0);
-    CHECK(kapi_db_bind_int(h, 1, 7) == 0);
-    CHECK(kapi_db_prepare_only(h, "SELECT 1; SELECT 2") == -1);
-    CHECK(kapi_db_step(h) == DB_STATUS_DONE);
-    CHECK(kapi_db_prepare_only(h, "SELECT count(*) FROM t") == 0);
-    CHECK(kapi_db_step(h) == DB_STATUS_ROW);
-    CHECK(kapi_db_column_int(h, 0) == 0);
-    CHECK(kapi_db_finalize(h) == 0);
-    CHECK(kapi_db_close(h) == 0);
 }
 
 /* ---- 18. 実体化の失敗を ROW にしない (往復 2 の B3) --------------------- */
@@ -1300,6 +1277,104 @@ static void cpl3_paths(void)
     host_user_hi = NULL;
 }
 
+/* T01/T02/T07/T12: real public DB and IME callers, real SQLite/VFS/FDs. */
+void serial_puts(const char *s) { (void)s; }
+int utf8_strlen(const u8 *s)
+{ int n=0; while (*s) { if ((*s & 0xc0) != 0x80) n++; s++; } return n; }
+#include "../../kernel/ime_dict.c"
+static void group_callers(void)
+{
+    Os32SqliteGroup boot, boot2;
+    Os32SqliteGroupInfo info;
+    sqlite3 *db = 0;
+    IME_Dict dict = {0};
+    sqlite3_stmt *untracked = 0;
+    int parent, child, sibling, fresh;
+    int fd_count, journals = 0;
+    /* A short settings/selftest lifetime returns both RESIDENT slots. */
+    CHECK(os32_sqlite_group_acquire(OS32_SQLITE_RESIDENT, 0, &boot) == SQLITE_OK);
+    CHECK(os32_sqlite_group_acquire(OS32_SQLITE_RESIDENT, 0, &boot2) == SQLITE_OK);
+    CHECK(os32_sqlite_group_open(&boot, ":memory:", SQLITE_OPEN_READWRITE, &db) == SQLITE_OK);
+    CHECK(os32_sqlite_group_begin_close(&boot) == SQLITE_OK);
+    CHECK(sqlite3_close(db) == SQLITE_OK); db=0;
+    CHECK(os32_sqlite_group_finish(&boot, SQLITE_OK) == SQLITE_OK);
+    CHECK(os32_sqlite_group_begin_close(&boot2) == SQLITE_OK);
+    CHECK(os32_sqlite_group_finish(&boot2, SQLITE_OK) == SQLITE_OK);
+    CHECK(sqlite3_open_v2("/unowned.db", &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, 0) == SQLITE_CANTOPEN);
+    CHECK(!fixture_find("/unowned.db", 0));
+    if (db) CHECK(sqlite3_close(db) == SQLITE_OK);
+    make_db("/fep.db", "CREATE TABLE dict(yomi TEXT,kanji TEXT,pos_id INT,cost INT)");
+    { int h=kapi_db_open("/fep.db"); CHECK(h >= 0);
+      CHECK(kapi_db_exec(h,"INSERT INTO dict VALUES('か','蚊',1,1)") == 0);
+      CHECK(kapi_db_close(h) == 0); }
+    resolve_owner=current_owner=0;
+    CHECK(ime_dict_open(&dict, "/fep.db") == 0);
+    CHECK(dict.group.group_index == boot.group_index && dict.group.generation > boot.generation);
+    resolve_owner=current_owner=1;
+    parent=kapi_db_open("/parent.db"); CHECK(parent >= 0);
+    CHECK(kapi_db_exec(parent,"CREATE TABLE t(x); ") == 0);
+    CHECK(kapi_db_exec(parent,"INSERT INTO t VALUES(1),(2)") == 0);
+    CHECK(kapi_db_prepare_only(parent,"SELECT x FROM t ORDER BY x") == 0);
+    CHECK(kapi_db_step(parent) == DB_STATUS_ROW);
+    resolve_owner=current_owner=2;
+    child=kapi_db_open("/child.db"); sibling=kapi_db_open("/sibling.db");
+    CHECK(child >= 0 && sibling >= 0 && child != sibling);
+    /* Child executes against the parent's connection as a trusted CPL0 caller. */
+    CHECK(kapi_db_exec(parent,"PRAGMA cache_size=1") == 0);
+    CHECK(kapi_db_exec(parent,"BEGIN") == 0);
+    for (int i=0;i<80;i++) CHECK(kapi_db_exec(parent,"INSERT INTO t VALUES(zeroblob(512))") == 0);
+    CHECK(vfs_count_sqlite(&db_slots[parent].group) == 2);
+    CHECK(sqlite3_exec(dict.db,"PRAGMA cache_size=1; BEGIN",0,0,0) == SQLITE_OK);
+    for (int i=0;i<80;i++) {
+        char yomi[32]; snprintf(yomi,sizeof(yomi),"か%03d",i);
+        ime_dict_learn(&dict,yomi,"蚊");
+    }
+    for (int i=3;i<VFS_MAX_OPEN_FILES;i++) {
+        if (!open_files[i].in_use) continue;
+        if (open_files[i].cookie.group_index == dict.group.group_index) {
+            CHECK(open_files[i].owner == 0);
+            if (open_files[i].sqlite_flags & SQLITE_OPEN_MAIN_JOURNAL) journals++;
+        }
+        if (open_files[i].cookie.group_index == db_slots[parent].group.group_index)
+            CHECK(open_files[i].owner == 1);
+    }
+    CHECK(journals == 1 && current_owner == 2 && owner_sets == 0);
+    CHECK(kapi_db_prepare(parent,"SELECT x FROM t WHERE typeof(x)='integer' ORDER BY x") == DB_STATUS_ROW);
+    CHECK(kapi_db_column_int(parent,0) == 1);
+    db_cleanup_owned(2); vfs_close_owned(2);
+    CHECK(kapi_db_step(parent) == DB_STATUS_ROW && kapi_db_column_int(parent,0) == 2);
+    CHECK(!db_slots[child].in_use && !db_slots[sibling].in_use);
+    CHECK(vfs_count_sqlite(&db_slots[parent].group) == 2);
+    CHECK(vfs_count_sqlite(&dict.group) == 2);
+    CHECK(kapi_db_exec(parent,"ROLLBACK") == 0);
+    CHECK(kapi_db_prepare(parent,"SELECT x FROM t ORDER BY x") == DB_STATUS_ROW);
+    CHECK(kapi_db_column_int(parent,0) == 1);
+    CHECK(kapi_db_step(parent) == DB_STATUS_ROW && kapi_db_column_int(parent,0) == 2);
+    CHECK(sqlite3_exec(dict.db,"COMMIT",0,0,0) == SQLITE_OK);
+    { IME_Result result[4]; CHECK(ime_dict_search(&dict,"か",result,4) > 0); }
+    CHECK(ime_dict_close(&dict) == 0);
+    CHECK(ime_dict_open(&dict, "/fep.db") == 0);
+    CHECK(sqlite3_prepare_v2(dict.db,"SELECT 1",-1,&untracked,0) == SQLITE_OK);
+    CHECK(ime_dict_reopen(&dict,"/fep.db") == -1 && dict.isolated && dict.db);
+    CHECK(os32_sqlite_group_snapshot(&dict.group,&info) == SQLITE_OK);
+    CHECK(info.state == OS32_SQLITE_QUARANTINED);
+    CHECK(ime_dict_open(&dict,"/fep.db") == -1);
+    CHECK(os32_sqlite_group_acquire(OS32_SQLITE_RESIDENT,0,&boot2) == SQLITE_BUSY);
+    CHECK(kapi_db_close(parent) == 0);
+    child=kapi_db_open("/busy.db"); CHECK(child >= 0);
+    CHECK(sqlite3_prepare_v2(db_slots[child].db,"SELECT 1",-1,&untracked,0) == SQLITE_OK);
+    fd_count=vfs_count_sqlite(&db_slots[child].group);
+    CHECK(fd_count == 1 && kapi_db_close(child) == -1);
+    CHECK(os32_sqlite_group_snapshot(&db_slots[child].group,&info) == SQLITE_OK);
+    CHECK(info.state == OS32_SQLITE_QUARANTINED && info.has_db);
+    db_cleanup_owned(2); db_cleanup_all(); vfs_close_owned(2);
+    CHECK(vfs_count_sqlite(&db_slots[child].group) == fd_count);
+    fresh=kapi_db_open("/new.db"); CHECK(fresh >= 0 && fresh != child);
+    CHECK(kapi_db_close(fresh) == 0);
+    CHECK(kapi_db_close(child) == -1);
+    CHECK(vfs_count_sqlite(&db_slots[child].group) == fd_count);
+}
+
 int main(int argc, char **argv)
 {
     CHECK(argc == 2);
@@ -1307,7 +1382,8 @@ int main(int argc, char **argv)
     reset_all();
     cases_run++;
 
-    if (!strcmp(argv[1], "open_existing")) open_existing();
+    if (!strcmp(argv[1], "group_callers")) group_callers();
+    else if (!strcmp(argv[1], "open_existing")) open_existing();
     else if (!strcmp(argv[1], "prepare_only")) prepare_only();
     else if (!strcmp(argv[1], "binds")) binds();
     else if (!strcmp(argv[1], "error_code")) error_code();

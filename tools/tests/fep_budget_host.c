@@ -205,7 +205,7 @@ static void switch_dict(IME_Dict *d, int target, unsigned need, int *pending)
 }
 int main(int argc, char **argv)
 {
-    IME_Dict d;
+    IME_Dict d = {0};
     unsigned demands[3], common = 0;
     CHECK(argc == 11 && sizeof(void *) == 4);
     state.reserve = (unsigned)strtoul(argv[1], NULL, 10);

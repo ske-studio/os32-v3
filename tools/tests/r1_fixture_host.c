@@ -44,6 +44,9 @@ volatile int ring3_in_syscall = 1;
 static int ring3_wm_depth;
 static void sputs(const char *s) { (void)s; }
 static void sput_hex32(u32 v) { (void)v; }
+/* This fixture exercises non-engine faults; engine faults have a separate test. */
+static volatile u32 sqlite_engine_active;
+static void sqlite_engine_fault(void) { fail(__LINE__); }
 #include "entry_source.c"
 static void __attribute__((unused)) host_raise_ud(void) {
     u32 regs[13] = {0};

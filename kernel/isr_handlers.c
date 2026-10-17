@@ -1,3 +1,4 @@
+#include "sqlite_engine.h"
 #ifdef OS32_R1_FIXTURE
 #include "r1_fixture.h"
 #endif
@@ -244,6 +245,7 @@ void exception_handler(u32 error_code, u32 vector, u32 fault_eip,
     int row = 0;
 
     _disable();
+    if (sqlite_engine_active) sqlite_engine_fault();
 #ifdef OS32_R1_FIXTURE
     r1_fixture_exception(vector);
 #endif
@@ -341,6 +343,7 @@ void page_fault_handler(u32 error_code, u32 fault_addr, u32 fault_eip, u32 *regs
     int row = 0;  /* 画面最上部から表示 (最大限の情報量) */
 
     _disable();
+    if (sqlite_engine_active) sqlite_engine_fault();
 
     /* ---- CPL=3 (リング3) 由来の #PF はアプリだけ kill (v2 M1e/V4) ----
      * #PF フレーム (isr_stub_14 .not_v86): regs[8]=error_code,

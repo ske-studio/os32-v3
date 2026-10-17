@@ -1,3 +1,4 @@
+#define OS32_SQLITE_DIRECT_TEST 1
 /* ========================================================================= */
 /*  DB_ERRSTR_HOST.C — 票 TASK_DB_ERRSTR §5 (E5 / E6 / E7) のホスト TDD      */
 /*                                                                           */
