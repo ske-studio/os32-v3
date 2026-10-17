@@ -16,7 +16,7 @@ static OS32Header fixture_shell_header(void)
     h.kapi_data_off = KAPI_DATA_FIELDS_OFF;
     h.kapi_abi_generation = OS32_KAPI_ABI_GENERATION;
     h.memory_layout_generation = OS32_MEMORY_LAYOUT_GENERATION;
-    h.shlib_protocol = OS32_SHLIB_PROTOCOL;
+    h.shlib_protocol = 0;  /* 常駐 shell は shlib に依存しない。 */
     return h;
 }
 

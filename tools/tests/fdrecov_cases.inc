@@ -17,14 +17,14 @@ static void fdrecov_setup(int header_case, int other)
     switch (header_case) {
     case 1: h.memory_layout_generation++; break;
     case 2: h.kapi_abi_generation++; break;
-    case 3: h.shlib_protocol++; break;
+    case 3: h.shlib_protocol = OS32_SHLIB_PROTOCOL + 1; break;
     case 4: h.kapi_data_off += 4; break;
     case 5: h.magic = 0; break;
     case 6: h.header_size = OS32X_HDR_V3_SIZE; break;
     case 7: h.version++; break;
     case 8: h.flags = 0x80000000U; break;
     case 9: len--; break;
-    case 11: h.shlib_protocol = 0; break;
+    case 11: h.shlib_protocol = OS32_SHLIB_PROTOCOL; break;
     case 12: h.min_api_ver = KAPI_VERSION + 1; break;
     default: break;
     }
@@ -74,6 +74,9 @@ static void case_fdrecov(void)
                 if (h == 1)
                     check(log_has("reason=memory_layout_mismatch") && log_has("host=") && log_has("running="),
                           "配置世代の両値を表示する");
+                if (h == 3)
+                    check(log_has("reason=shlib_protocol_mismatch"),
+                          "現行と異なる shlib protocol は拒否する");
             }
         }
     }
@@ -85,13 +88,15 @@ static void case_fdrecov(void)
     check(run2("--root", "/hd0") == 0 && fs_find("/hd0/sys/shell.bin") < 0,
           "同一デバイス別名の全体も通常の sys 除外");
 
-    /* min_api_ver のみ上昇 / protocol=0 は稼働ルートの boot 先行が通る。 */
+    /* min_api_ver のみ上昇 / protocol=0・現行値は boot 先行が通る。 */
     fdrecov_setup(12, 0);
     fdrecov_manifest_version(KAPI_DATA_FIELDS_OFF, KAPI_VERSION + 1);
     check(run1("boot") == 0 && fs_find("/boot/vmkernel.lz4") >= 0,
           "同世代で KAPI 版のみ上昇した boot は通る");
-    fdrecov_setup(11, 0);
+    fdrecov_setup(0, 0);
     check(run1("boot") == 0, "shlib protocol=0 は依存なし");
+    fdrecov_setup(11, 0);
+    check(run1("boot") == 0, "現行 shlib protocol は受理する");
 
     for (h = 0; h <= 12; h++) {
         if (h == 10) continue;  /* 欠落は後で拒否を確認 */
