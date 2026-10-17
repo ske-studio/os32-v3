@@ -2,7 +2,7 @@
 
 The flat LE oracle uses the same expansion as tools/gen_unicode.c. It is
 constructed from the original header, never from a mutated candidate table.
-Image measurements are separate: tools/measure_unicode_lookup.py.
+Image measurements (T3d0) are recorded in ~/os32-tmp/evidence/2026-10-17/t3d0_measure/.
 """
 import argparse
 import pathlib

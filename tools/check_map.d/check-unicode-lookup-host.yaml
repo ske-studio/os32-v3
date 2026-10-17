@@ -12,6 +12,5 @@ check-unicode-lookup-host:
 - tools/tests/unicode_lookup_mock.h
 - tools/tests/unicode_lookup_sdk.c
 - tools/tests/unicode_lookup_host.c
-- tools/measure_unicode_lookup.py
 - build/checks.d/check-unicode-lookup-host.mk
 - tools/check_map.d/check-unicode-lookup-host.yaml
