@@ -1,7 +1,7 @@
 # TASK_T7_AND_FOLLOWUPS — 低位解放・OpenType と v3 後半への接続
 
-> 状態: **設計中 (2026-10-15、再照合 r2、ユーザー確認待ち)** — 本文を全部持つ実装用設計案。本版は **r3 (2026-10-16、独立レビュー r1 反映)**。共通依頼の状態行は維持し、旧版の Opus 5.5 第3回 Approve は本版の承認・実装・受入とは区別する。
-> **レビューの経過 (PM、2026-10-16)**: astra が起草 (r2・r3) → Opus 5.5 が独立レビュー 2 往復 (r1「直してから」、r2「確定してよい (未決の争点はユーザーへ)」)。往復の記録は `~/os32-tmp/run/t3design/T7_AND_FOLLOWUPS/` (`opus_r1.md`・`astra_r2_response.md`・`opus_r2.md`)。**ユーザーに決めていただく争点**: F5 shell 入口の return PC 検査、F7 x87 と [HW3] — 末尾の「未決の争点」。実装の前にユーザーが確認する。
+> 状態: **設計中 (2026-10-16、再照合 r3、F5/F7 決定済み)** — 本文を全部持つ実装用設計案。本版は **r3 (2026-10-16、独立レビュー r1 反映)**。共通依頼の状態行は維持し、旧版の Opus 5.5 第3回 Approve は本版の承認・実装・受入とは区別する。
+> **レビューの経過 (PM、2026-10-16)**: astra が起草 (r2・r3) → Opus 5.5 が独立レビュー 2 往復 (r1「直してから」、r2「確定してよい (未決の争点はユーザーへ)」)。往復の記録は `~/os32-tmp/run/t3design/T7_AND_FOLLOWUPS/` (`opus_r1.md`・`astra_r2_response.md`・`opus_r2.md`)。F5 は return PC 検査を維持、F7 は CPU 命令だけならメーカー資料必須・既存実装任意に決定済み (§7)。本文へ反映済み、実装と未測定ゲートは残る。
 > 設計: Codex。再照合基点 `c81b27bed7c1b0d05e5e7d9de9763c4eded844e5` (2026-10-15、main、作業木差分なし)。旧調査基点 `3c4171a`、元の設計レビュー基点 `59c4285`。D1〜D36・契約・順序は変更しない。file:line はこの再照合基点、相対リンクは正典の `docs/tasks/v3/` 配置を基準とする。
 > 決定本文は [TASK_MEMMAP_V3](TASK_MEMMAP_V3.md)、柱/範囲/順序は [V3_PLAN](V3_PLAN.md)。前提は [T3](TASK_T3_LAYOUT.md) と [T4〜T6b](TASK_T4_T6_MODULES.md)。後半の既存票を置換せず、接続契約と未起票項目の着手ゲートを定める。
 
@@ -140,7 +140,7 @@ font/fileの状態は `CLOSED → VALIDATING → READY → CLOSED`。検証中�
 
 FD generationは番号の再利用を検出する値で、ファイル内容の世代ではない。font read leaseはmount世代+inode identity+u32内容epochをkernel内に保持し、font用lease/face世代もu32とする。ext2の置換rename/unlink/umountによる既存staleに加え、同inodeへのwrite/truncateの**変更前**に関連font leaseを失効し内容epochを進める。対象はFD write、O_TRUNC、path write/stream、inode write/truncateを通るext2更新で、`fs/vfs_fd.c:207,420-457`、`fs/vfs.c:527`、`fs/ext2_vfs.c:143,288,407-429` を共通の変更通知へ結ぶ。失敗したwriteでも失効は戻さず再open時に再検証し、epoch満了はwrapせず当該leaseを閉じる。この非wrap契約と世代満了時のretireは維持し、u32満了の強制注入はT7の試験・変異から外す (型/境界処理はレビュー対象)。各read_at内部と全入力取得後/cache commit前、cache-hit描画前にも検証する。更新中のfaceを継続せずsafe pointで再openして全索引を検証し直す。hsync置換・同サイズ上書き・truncateを別々に試験する。外部変更を観測できないHostDrv/SerialFS/LAN版 `/host` などinode/変更通知のないsourceは最初の製品font sourceとして拒否しKCGへ落とす (事前に管理下ext2へ配備する)。mtime/sizeやヘッダだけの比較を内容一致の保証にしない。このVFS追加はT7b-bの前提であり、現行generic FDで実装済みとはしない。
 
-x87 guardの実装開始前に [HW3] のCPUメーカー資料とBSD/MITの全状態save/restore実装の版・行を固定し、未収集のまま命令列を決めない。採用ラスタライザがf32を使う場合、P6全体を待たず **T7b-aにx87隔離guardを先行実装する**。gshellのfont描画/寸法の最外周でcallerのx87全状態 (register stack、status/tag、CW) を専用の低位外領域へ保存、例外をmaskした既知CWで初期化し、成功/失敗とも復元する。CWだけの保存では不足。guard中のpark/アプリ切替/STOP処理/再入を禁止し、要求は終了後の安全点で処理する。IRQでFPを使わない。アプリ私有側も同じguardで呼出元のFP計算を壊さない。x87非搭載CPUは検出してこの経路を実行せずKCGへ落とす。386対応は最終命令列検査を行う。x87保存領域は4KiBの管理予算に、追加codeは画像増分へ算入する。
+x87 guard の実装開始前に [CONSTRAINTS [HW3]](../../CONSTRAINTS.md#hw3-新しいハードウェアの実装はライセンス上参照しやすい既存の実装資料を参照してから設計する) に従い、Intel 資料の版・節を固定する。CPU 命令だけの扱いでは BSD/MIT の既存実装参照は任意で、参照した場合に版・ファイル・行を記す。採用ラスタライザがf32を使う場合、P6全体を待たず **T7b-aにx87隔離guardを先行実装する**。gshellのfont描画/寸法の最外周でcallerのx87全状態 (register stack、status/tag、CW) を専用の低位外領域へ保存、例外をmaskした既知CWで初期化し、成功/失敗とも復元する。CWだけの保存では不足。guard中のpark/アプリ切替/STOP処理/再入を禁止し、要求は終了後の安全点で処理する。IRQでFPを使わない。アプリ私有側も同じguardで呼出元のFP計算を壊さない。x87非搭載CPUは検出してこの経路を実行せずKCGへ落とす。386対応は最終命令列検査を行う。x87保存領域は4KiBの管理予算に、追加codeは画像増分へ算入する。
 
 parser/rasterは境界検査済み入力と上限付き領域だけを使い、allocation failureはResult、unchecked index/unwrap/panicを製品経路に残さない。host fuzz/破損font・全上限±1を通し、panic不在はテストだけで証明せず全呼出経路のレビュー条件とする。gshell側の予期しないfault/panicはfont active印でapp-killより先に検出しfail-stopする (WM faultを無関係なアプリだけの失敗へ畳まない)。STOPは正常leave後に配送する。T7b-bでアプリがCW/rounding/例外maskを変更しx87 stackに値を残した状態からWM描画し、状態の完全復帰とfault帰属を検査する。
 
@@ -216,7 +216,7 @@ FD/MINIMAL起動はフォントfileを載せない構成としてKCGのcold/warm
 | P5 82557/PCM/Trident/FD/KBD | DMA物理記述子、module lifetime、gfxのsurface/lease | 各既存票の実機段。Tridentのdecode幅実測を済ませるまで未検証BARを承認済みにしない。ドライバ設計はOpus/Codex突合。PCM合成器はまずIRQ整数演算 (D36) |
 | P5 IDE DMA/cache/先読み | 永久device資源、DMA停止証明、VFS I/Oエラーとowner | 新票でPIO実測baseline、DMA mask/境界/descriptor所有、timeout→停止→fallback、dirty/writeback/flush順序を設計。cache所有はkernel、アプリ終了でdirtyを消さない。使い捨てext2で失敗/再起動後e2fsckと内容比較 |
 | P6 実行モデル | T2のSTOP要求/通常回収、trim安全点、T4のengine active | 新票で自動番犬と明示STOPの条件を分離。KAPI中はAS切替なし、長いKAPIの期限/取消点、VFS/SQLite副作用の中断規則、x87をAS毎に保存復元。純loop/長いKAPI/WM再入/SQLite active/PCM/park-resumeを列挙して停止応答を測る。IRQからfreeしない |
-| P7 ABI整理 | T2の形式/KAPI/layout/shlibの4識別とcompile-unit stamp (T2cで基盤吸収済み、現行KAPI75・形式4/ABI1/layout3/shlib2 (`sdk/include/os32/os32_generations.h:4-8`)) | 未実施の一度限りのスロット整理について、世代正典と整理一覧を1回の変更セットに固定する。未知型のRust生成失敗、旧shell含む混在拒否、旧.oのlink拒否、NHD/HostDrv一組を検査。[ABI1]〜[ABI3] の通常append-onlyとD35の一度限り整理を混同しない |
+| P7 ABI整理 | T2の形式/KAPI/layout/shlibの4識別とcompile-unit stamp (T2cで基盤吸収済み、現行値は `sdk/kapi.json` の `version` / `generations` を参照) | 未実施の一度限りのスロット整理について、世代正典と整理一覧を1回の変更セットに固定する。未知型のRust生成失敗、旧shell含む混在拒否、旧.oのlink拒否、NHD/HostDrv一組を検査。[ABI1]〜[ABI3] の通常append-onlyとD35の一度限り整理を混同しない |
 | P8 GUI音・入力 | DMA ring/lease、T2通常文脈、gshell owner | 新票でproducer/consumer cursor、underrun/overrun、close/fault時停止、event所有/容量/drop、入力focusとWM再入を定める。microUIマウスキーも対象に含め、既存WMマウスキーと二重配送せずfocus/移動/クリック/リピートを試験。8bppを維持 |
 | P9 Video HAL/SDL/移植 | SURFACE記述子とlease VA分離、能力bit、全画面専有 | 新票でformat/pitch/plane/clip/present/flip/mode-change revoke、SW fallback、私有面(c)の費用を定義。(b)を勝手に(c)へ変えない。PEGC直描きは全画面だけ。SDL shimはcapabilityで断り、固定VRAM番地を公開しない。[PORT_CANDIDATES](PORT_CANDIDATES.md) の低難度移植から着手しZSNESもv3候補として依存API/CPU/メモリ/音性能を個別票で測る。移植完了をこのHAL票だけで認定しない |
 | U21 共有グリフ最適化 | T7b私有版のcold/warm/実peak、gshell所有・RO leaseのT2契約 | 私有80KiB×owner数との実節減を測ってから別票。補充GUI opの再入、cache evictionと借用寿命、世代/revoke、gshell終了・app faultを設計。測定で価値が出る前に共有化しない |
@@ -269,7 +269,7 @@ Opus 5.5 (`claude-opus-5-5`) は **Approve**。第2回R1〜R4は全てclosed、�
 
 ## 7. 未決の争点
 
-独立レビュー r1 の未決は次の2件。新しいD番号は提案せず、判断が出るまで該当本文を維持する。parser/欧文選定、性能/像/FD/実機の未測定は引き続き各段のゲートであり、合格済みにはしない。
+独立レビュー r1 の2件は下表のとおり決定済みで、本文へ反映した。parser/欧文選定、性能/像/FD/実機の未測定は引き続き各段のゲートであり、合格済みにはしない。
 
 | 所見 / 論点 | 削減・緩和する側の言い分 | 維持する側の言い分 / 決着に必要な判断 |
 |---|---|---|

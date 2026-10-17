@@ -1,12 +1,14 @@
 # TASK_T3_LAYOUT — T3 カーネル帯・常駐シェルの詳細設計
 
-> 状態: **実装中 (2026-10-16)** — T3a0・T3a1・T3b0・**T3ab** (6b4e37e、7 段の票は [t3ab/](t3ab/README.md)) が着地、T3ab は NP21/W 64MB の受入済み (7 項、台帳 T3AB-4・LGY98-L12)。実機の回帰 T3bR (台帳 T3AB-R) を実施中。次は T3b1 / T3c1 / T3d0。 — 共通依頼の状態行を維持。本文は **r3 (2026-10-16、Opus r1対応)**。実装・受入は未実施。旧版の承認と今回のレビューは §5 で区別する。
+> 状態: **実装中 (2026-10-16)** — T3a0・T3a1・T3b0・**T3ab** (6b4e37e、7 段の票は [t3ab/](t3ab/README.md)) が着地、T3ab は NP21/W 64MB の受入済み (7 項、台帳 T3AB-4・LGY98-L12)。実機の回帰 T3bR (台帳 T3AB-R) を実施中。次は T3b1 / T3c1 / T3d0。 本文は r3 と案5決定を反映。未完了は T3b1 以後の段・測定ゲートであり、T3ab の受入とは区別する。
 > **レビューの経過 (PM、2026-10-16)**: astra が起草 (r2・r3) → Opus 5.5 が独立レビュー 2 往復 (r1「直してから」、r2「確定してよい (未決の争点はユーザーへ)」)。往復の記録は `~/os32-tmp/run/t3design/T3_LAYOUT/` (`opus_r1.md`・`astra_r2_response.md`・`opus_r2.md`)。0x3FB000 の衝突はユーザー承認の**案 5** (DMA の池を 0x7F0000 へ移し、0x3E0000〜0x3FFFFF を見張り・PT の枠 26・見張り・スタック 16KiB に) で決着 (2026-10-16、astra 改訂 2 回 → Opus 2 往復で「確定してよい」、記録 `~/os32-tmp/run/t3design/opt5/`)。
 > 設計: Codex。再照合基点 main `c81b27bed7c1b0d05e5e7d9de9763c4eded844e5` (2026-10-15)。旧基点 `3c4171a784cc47720392ab55b3c4a24aee17e6f3`、元の設計レビュー基点 `59c4285`。根拠の file:line は今回の木。実測は既存成果物の読取で、新規ビルド・ゲスト実行はしていない。
 > 決定の正典は [TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) D1〜D36、定義は `include/memmap.h`、実装済み地図は [02_memory](../../02_memory.md)。D・契約・順序は変えない。リンクは `docs/tasks/v3/` 配置時の相対パス。本票は本文を全部持つ。
 > OS32 は PC-98・MIT・単一利用者・単一タスク・協調切替。攻撃者を想定せず、バグ/装置誤動作から戻せることと像の予算を守る。認証・暗号・権限分離強化は足さず、性能は P100/32MB の D15 まで。[CONSTRAINTS](../../CONSTRAINTS.md):16-205 ([C1]〜[D3])、装置の扱いを追加するなら [HW3]:92-98 のメーカー資料と BSD/MIT 実装を先に示し、GPL から写さない。
 
 ## 0. 再照合
+
+以下は 2026-10-15 基点の調査記録。配置の未実装という記述は当時の状態で、T3ab 受入後の状態は冒頭と §2 の案5を参照する。
 
 | 元票の前提・着手条件 | 分類 | 今回の照合と扱い (根拠) |
 |---|---|---|
@@ -46,6 +48,8 @@ T3 は T2c〜h の統合・受入後に実装する。旧「e5は別worktree」�
 | 起動診断 | 固定占有・SLACK・一般池・metadata・BB・kdebugを別勘定。KDEBUG=1は対の部品がRUNNINGで実試験が走ったこと、KDEBUG=0は監査継続を記録 |
 
 ### 1-1. 基点の実物と引渡し待ち
+
+2026-10-15 時点の記録 (T3ab 実装前)。未完了の段は冒頭の状態行を参照。
 
 | 実物 (今回の file:line / シンボル) | 確認した境界と残作業 |
 |---|---|
@@ -97,7 +101,7 @@ SHM後方guardと固定PT手前guardまでのSLACKは区別し、旧「後方予
 
 T2fのCPL=3用 `_sbrk` (EXACT mem_map) と **常駐shell/gshell用CRTのビルド分離は既にある** (`build/programs.mk:39-49`)。resident版は `nano_adapter.c:127-190` の固定 `sbrk_heap_limit` と範囲/符号/overflow検査を継承し、exec側が共通計算した `exec_base` を限界に渡す。ユーザー入力フラグでresident経路を選ばせない。exec_heapは固定256KiB内で現行allocatorを初期化する。shellヘッダheap_szは0なら256KiB、0超256KiB以下ならexec_baseから下詰めでその長さを使い、余りをsbrkへ渡さない。256KiB超は入口前に拒否。公開後の移動・再分割はせず、子終了は `exec_heap_restore_state()`、shell heapの再初期化は禁止。
 
-この256KiBはT3用の暫定設計値としてT3cでshell/gshellと子ネストのpeakを実測し、T7bでfont込みの再ゲートを通す。全体のSLACK再計測にはT7のpage0 snapshot増分 (+2,560Bの設計値とELFページ丸め、[T7詳細](TASK_T7_AND_FOLLOWUPS.md)) も含め、現時点の実測値とはしない。T7bの未来の実測をT3完了の前提にはしない。足りなければ同じ1MiB内の固定分割定数を変更・全再ビルドして再受入し、実行中の境界移動で救済しない。
+この256KiBはT3用の暫定設計値としてT3cでshell/gshellと子ネストのpeakを実測し、T7bでfont込みの再ゲートを通す。全体の SLACK 再計測では、T7 の page0 snapshot は既存4096Bの転用として追加0Bとする ([T7 §1-1](TASK_T7_AND_FOLLOWUPS.md#1-1-v86-状態遷移))。既存占有を二重計上しない。T7bの未来の実測をT3完了の前提にはしない。足りなければ同じ1MiB内の固定分割定数を変更・全再ビルドして再受入し、実行中の境界移動で救済しない。
 
 **T3 の予算式 [推、未リンク]**: `C=align_up(現行__bss_end,4096)+8192`、`R=align_up(C+770560,4096)+4096+131072`、`chain_end=R+196608+4096+2×4096+229376` とするとT3abは `0x2E0000`、SLACKは1,048,576 B (256頁)。FIXEDの2頁は全機種常駐で、ARENA_TOPの動的metadataは別勘定。SQLiteの128KiBは既存占有の移動、guard4KiBとKHEAP復元16KiBは増分として数える。
 Unicodeの7,063組×4 B=28,252 B (`lib/unicode_jis_table.h:2-8`)、FIXED8,192 B、実装code/data/BSS増分の仮枠16,384 B [推] を現行像に足し、各境界を丸めると `chain_end≈0x2EA000`、SLACK≈1,007,616 B (246頁)。仮枠はT3ab8KiB・c2KiB・d2KiB・予備4KiB、SDK/試験部品は別測定。案5でもSLACK終端は0x3E0000で不変、低位の一般池はDMA予約で64KiB減り、固定PT枠は予備込みで保持する。圧縮増分はT3d0の試作像とd1の完成像の実長で確認し、shellは1MiB内、kdebugは池の実ページで別ゲートにする。H-4(a)の試験本体はkdebugへ置くが、範囲指定割当のimport追加はexport表は少なくとも1枠4 B＋整列差を常駐仮枠に計上する [推] (`kernel/pgalloc.h:215-218`、`build/kdebug.mk:10-13`、`kdebug/generated/kdebug_kexports.c:58`)。製品像増分0とは断定しない。
@@ -109,7 +113,7 @@ T2の暫定Unicode RO leaseは全同梱callerのKAPI移行と同一切替で撤�
 boot後の旧 `kcg_load_font` NOSYS化とfont_load_testの期待変更はT2e8bで吸収済み (`drivers/kcg.c:263`、`TASK_T2D_T2H.md:154-157,221`)。T3では継承を確認し、同じ意味変更を版更新へ二重計上しない。Unicode KAPI追加の版は現在75を起点に実装時に予約し、`sdk/kapi.json`と`KAPI_VERSION`を揃え、生成物は手編集しない ([ABI1]〜[ABI3]、`KAPI_SPEC.md:49-83`)。
 `kcg.c:220-221` のLZ4 scratchはT7aまで旧低位FIXEDに保持し、専用定数 `MEM_KCG_LZ4_TEMP_BASE/END` (従来0x4A000〜MEM_CONV_END、344KiB)へ名前を分離する。poolの連続確保や常駐増はしない。Unicode用途を外しても低位128KiBを一般池へ返さず、kernelのFIXED用途としてT7aまで保持する。scratchがplanar BB/mailboxと重なるため、boot読込→scratch失効→BB全消去/初期化・mailbox初期化→host操作/V86/通常AS・USER leaseの開始を守る。現在のclose順は `kernel/kernel.c:773-776`、消去は `drivers/kcg.c:247-253`。公開後のBB leaseは禁止せず、kcgからの上書きを禁止する。
 T7aまではV86の636KiB backingを維持し、低位を直接渡さない。T7aで旧scratch/BB用途を撤去してV86へ専有を引き渡す (一般池へ返さない)。font_load_testは期待NOSYSのPASS試験を維持し、BB/mailbox不変はhost読取かkdebug自己試験で照合する。未貸与mailboxをCPL3試験が直読せず、SKIPで回帰を隠さない。`tools/tests/guest_tests.txt`・`test_result_conv_host.c`・`test_unicode_surface.py:15-35,60-65` の旧期待も新しい不成立/変換口へ置換する。
-D35の4世代を再定義しない。配置切替時は現行memory_layout=3 (`generations-manifest.json:8`) を更新し、Unicodeは機能版の末尾追加とする。旧shell・旧shlib・新SDK+旧.o・NHD/HostDrv混在は入口前拒否。kernelのImage CRCが変わるたびに対の `/boot/kdebug.bin` を再生成し、古い部品による「自己試験0件」を合格にしない (`TASK_DBGREF.md:6-9`)。
+D35の4世代を再定義しない。配置切替時は `sdk/kapi.json` の `generations.memory_layout` を更新し、Unicodeは機能版の末尾追加とする。旧shell・旧shlib・新SDK+旧.o・NHD/HostDrv混在は入口前拒否。kernelのImage CRCが変わるたびに対の `/boot/kdebug.bin` を再生成し、古い部品による「自己試験0件」を合格にしない (`TASK_DBGREF.md:6-9`)。
 
 ## 4. 実装分割と受入
 
@@ -117,7 +121,7 @@ D35の4世代を再定義しない。配置切替時は現行memory_layout=3 (`g
 
 | 段 (依存) | 変更範囲・独立して閉じるもの | 観測可能な受入条件 / 代表変異 |
 |---|---|---|
-| T3a0 (関門照合後、0.5日) | ELF配置manifest・予算/写し検査の準備。`tools/gen_memmap.py`、`test_memmap_gen.py`。現配置も検査可能にする | ①現ELFと既存manifestの値一致 ②code/data/BSS/NOLOADを半開区間で出力 ③鎖終端DMA−1頁/一致は通り+1頁は失敗 ④BSS省略・区間重複・C/ASM写し不一致の変異を検出。製品像増分0 |
+| T3a0 (関門照合後、0.5日) | ELF配置manifest・予算/写し検査の準備。`tools/gen_memmap.py`、`test_memmap_gen.py`。現配置も検査可能にする | ①現ELFと既存manifestの値一致 ②code/data/BSS/NOLOADを半開区間で出力 ③SLACK鎖終端は `MEM_FIXED_PAGING_GUARD_BASE` (0x3E0000) −1頁/一致で通り+1頁は失敗。DMA境界はb3で別検査 ④BSS省略・区間重複・C/ASM写し不一致の変異を検出。製品像増分0 |
 | T3a1 (a0、0.5〜1日) | `mkvmkernel.py`・`build/kernel.mk` の通常/R1像のSQLite宛先をELFから導出、C/ASM loader fixture | ①現配置の展開先/CRC不変 ②連結配置fixtureも同じ生成器で通る ③ロード先+長さのoverflow/重複/BSS食込みを拒否 ④BSSゼロ化区間の両端4byte整列・全BSS包含・guard非交差をELF/link ASSERTで確認 ⑤圧縮像≤508KiB。旧0x200000強制・NOLOADをファイル長扱いの変異を検出 |
 | T3b0 (a0、0.5〜1日) | 台帳runtime区間とpagingのhost fixtureを先行。`test_memory_boot.py`、`memory_boot_host.c`、`memmap_boot_host.c` | ①新旧地図を同じ入力で検証 ②FIXED/ARENA_TOP両方でmetadata二重登録0 ③SLACK空/逆転/境界を区別 ④PT/stack/guardの重なりを拒否。旧NP期待・SLACK二重供給の変異で失敗 |
 | **T3ab (a1,b0、1日)** | `memmap.h`・linker/kentry・paging/memory_boot/physmem/pgalloc/dma・shellリンク/exec限界を一体切替。既検証の式/fixtureを結線し世代を更新。0x2E8000・0x3F1000・0x3FB000を直書きする `tools/tests/dma_pool_host.c`・`tools/tests/pcm_cs4231_host.c`・`tools/tests/dma8237_host.c`・`tools/tests/test_mem_stat.py`・`tools/tests/test_memmap_gen.py`・`tools/tests/paging_bounds_host.c` (0x3FB000 の CHECK、新しい MMIO PT は 0x3EB000)・`tools/tests/test_dma_pool.py` (0x2F0000 をまたぐ前提、新しい池は 64KiB 整列)・`tools/tests/vk32_host.c` と `tools/tests/test_vk32_crc.py` (展開の上限 0x2E8000) と `drivers/fdc.h` の注記も追随。`kernel/pgalloc.c:1044-1048` の `ledger_arena_freeze` は 0x500000 から上へ最初の PERSIST で止まるので、DMA の予約 (0x7F0000) でも止まる — `sys_usable_mem_end` の意味 (低位の連続の上端) をこの段で書き直す | ①同世代一式と対kdebugの配備予行が通り、ONでRUNNINGと実試験実行を確認 ②link ASSERT/manifest/予算一致、固定PTは承認配置 ③PG直後とAS生成後のSLACK/shell/metadataは恒等sup/RW/WB、guardはNP ④SLACK全頁を一度だけ割当/返却、固定頁混入0 ⑤SQLite正常DB/FEP・BSS全域/stack guard成立 ⑥NP21/W 64MBの起動/地図監査0fail、PEGC通常経路とLGY-98 L0〜L3回帰が通る (FFF00000hと82557はbRへ) ⑦圧縮≤508KiB・KHEAP192KiB。NP化/旧pool下限/metadata重複の変異を検出 |
@@ -134,14 +138,14 @@ D35の4世代を再定義しない。配置切替時は現行memory_layout=3 (`g
 | T3d2 (b3,bR,c4,d1、0.5〜1日) | 統合と引渡し。予算・世代・日本語時間の最終計測 | ①同世代manifestと対kdebugを照合 ②64MBで地図監査/自己試験0fail、CPL3 fault/STOP→次起動 ③2MB試験3種・GUI終了後CUI・DB/FEPが通る ④日本語の起動/入力→描画時間を同じ文面・環境で記録 (D15判定は未測定として台帳へ) ⑤全占有/SLACK/shell/KHEAP/kstackの実測と未測定を区別し後続へ渡す |
 
 T3abに必要なshellの最小境界結線はc1待ちにしない (新帯を旧sbrk限界で起動しない)。a0/a1/b0は現配置を保ったhost受入、abで実配置を切替え、d0はその受入済み配置の試作像をhostで測る。危険度の高いheap/exec/paging変更は64MBゲスト受入を終えてから次を積み、実機bRは統合d2の必須依存とする。H-4(a)はkdebugから範囲指定割当→試験ASのUSER VAへ写像→全頁PFNを記録→既存caller試験経路でI/O往復→AS/ownerを回収する (`kselftest.c:750-838`、`kernel/kdebug_imports.def:183-199,815`)。低位対照と頁を跨ぐ高位bufferのbyte一致を取り、専用の途中I/O失敗注入・境界長の総当たりは追加しない。各段が1日または10項を越えるなら準備fixture・台本をさらに分け、不可分な切替自体は分断しない (`ROLES.md:19`)。
-変異は一度に一欠陥を入れ、正常対照PASSと対応するassert/観測FAILを対に残す。コンパイル失敗を検出成功と数えない。対象host検査を途中はMUTATE=0、最後の変更後は選択候補をMUTATE=1、新規/変更試験のMUTATE=0・静的5本・lintで確認する (`ROLES.md:17`)。取り込みの全体検査はPMが節目の実木で一度。ABI変更後は [ABI3] のclean→all、386命令/生成物/世代/配備manifest検査も通す。試験は `check_slot.sh` を通し同時2本まで (`ROLES.md:18-20`)。文書段階で合格ログを作らない。
+変異は一度に一欠陥を入れ、正常対照PASSと対応するassert/観測FAILを対に残す。コンパイル失敗を検出成功と数えない。実装者と PM の検査分担は [ROLES §0](../agents/ROLES.md#0-現行の体制) に従う。ABI変更後は [ABI3] のclean→all、386命令/生成物/世代/配備manifest検査も通す。試験は `check_slot.sh` を通し同時2本まで (`ROLES.md:18-20`)。文書段階で合格ログを作らない。
 `vmkernel.lz4≤508KiB` はa1/ab/d0/d1で必須。現余裕19,762 Bに表が入るかは未測定で、d0の試作測定をd1開始条件とし、以後基点/コードが変われば再測定する。超過時は§6へ「表の一括移行を維持して像を削る側」と「508KiBを守るため段取り再検討を求める側」の根拠・不足量を残し、T6b/SQLite分離の前倒しや上限変更を本票で決めない。F-9/Unicodeの時間は同条件の記録だけとし、D15のP100/32MBで起動2秒・入力→描画100msという目標を維持し、達成判定は未測定として台帳へ渡す (c4でF-9の正しさを別判定し、性能を合格扱いにしない)。
 > 2026-10-14ユーザー決定: 今のゲスト受入はNP21/W 64MB一構成。8MB planar/PEGC、17MB (Cirrus/fallback含む)、Ra266 64MBの構成一覧と最低条件はv3最終段へ残す (`DEFERRED_TESTS.md:19,59`)。構成別の全通しとは別に、今回の配置変更に対するRa266のPEGC最上位窓/82557回帰はT3bRで省略しない。
-失敗時は旧新を混ぜず直前の一式へ戻す。NHD/HostDrv/実機の配備予行とhash確認、停止→配備→起動は [V1]・[D1]〜[D3] と既存手順に従いテスターが行う。既存データを新masterで上書きしない。T3のSLACKは未分離SQLiteを含み最終余裕とは区別する。T7のpage0 snapshot +2,560 BとELF丸め、T7b font込みshell peakは将来再ゲートで、T3の測定や完了条件に先取りしない。
+失敗時は旧新を混ぜず直前の一式へ戻す。NHD/HostDrv/実機の配備予行とhash確認、停止→配備→起動は [V1]・[D1]〜[D3] と既存手順に従いテスターが行う。既存データを新masterで上書きしない。T3のSLACKは未分離SQLiteを含み最終余裕とは区別する。T7 の page0 snapshot は既存4096Bを転用し追加0B。T7b font込み shell peak は将来の再ゲートで、T3の完了条件に先取りしない。
 
 ## 5. 独立レビュー対応 (往復1)
 
-以下の往復1〜3は旧版の履歴。再照合r2は Opus 5.5 が2026-10-16に独立レビューし「直してから」(P1なし、P2×3/P3×5、`opus_r1.md`)。本r3でA1〜A5/A8を採用、A6/A7を一部採用し、各根拠は `astra_r2_response.md` に記録。r3の独立再レビュー・ユーザー確認は未実施。
+以下の往復1〜3は旧版の履歴。再照合r2は Opus 5.5 が2026-10-16に独立レビューし「直してから」(P1なし、P2×3/P3×5、`opus_r1.md`)。本r3でA1〜A5/A8を採用、A6/A7を一部採用し、各根拠は `astra_r2_response.md` に記録。その後の独立レビュー r2 と案5のユーザー決定は冒頭の記録を参照。
 
 レビュアー `claude-opus-5-5` (Opus 5.5)、2026-10-01、判定Request changes。実装検証ではなく文書/コード照合。この行は当時の記録で、修正後の確認結果は下の往復2/3。
 

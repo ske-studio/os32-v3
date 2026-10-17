@@ -9,11 +9,11 @@
 
 ## 0. 入口と作業の単位
 
-T2a / T2a′ / T2b / T2c の実装結果、レビュー対応、PM受入は親票§5-1の各 **-R** 節を読む。T2cの「未実装」「停止」は履歴で、末尾のPM受入が現在地。NP21/W 8/17MBの受入済みを、Ra266や未実施ケースの合格に読み替えない。
+T2a / T2a′ / T2b / T2c の実装結果・レビュー・PM受入は [TASK_T2ABC_RESULTS](../../archive/v3/TASK_T2ABC_RESULTS.md) を参照。NP21/W 8/17MB の合格を Ra266 や未実施ケースの合格に読み替えない。
 
 本票の承認後に d0 (既存不具合候補の再現確認→修正) → d → e → f → g → h の順で進む。ext2調査をdと並行に先行着手し、hの受入前に調査ゲートを閉じる。既知のカーネル層不具合と確定した場合は [POLICY_DEV §1](../../POLICY_DEV.md) に従い新機能より修正を優先する。各小段は**実装・対象ホスト試験・報告を含め45〜75分を目安、最大120分**。75分で残作業を見積もり、90分で実装を止め、差分・失敗ログ・次の1ケースを記録する。120分に検査を押し込まない。表の小段でも超えるなら「失敗注入の半分」等へ分ける。着地単位と一回のコーダー依頼は別で、未使用helperの準備は個別レビュー可能、公開切替は依存小段を揃えて一組で受け入れる。
 
-各段のチェック結線・全再ビルド・独立レビュー・PMゲスト受入も別の依頼単位にする。将来の実装完了検査は親票/ROLESどおり `make check-changed`、PM着地時 `make all` と `make check`。**今回の文書作業では§9の5検査だけ**。一時物とTMPDIRは `/home/hight/os32-tmp/` 以下。コード、配備、NP21/W、NHD、ini、commit/pushは今回の対象外。
+各段のチェック結線・全再ビルド・独立レビュー・PMゲスト受入は別の依頼単位にする。検査の役割分担は [ROLES §0](../agents/ROLES.md#0-現行の体制) を参照。実装者は `make all`・直接の追加/変更試験を `MUTATE=0`・`check_select.py --lint`、取り込みの検査はレビュー後に PM が行う。一時物と TMPDIR は `/home/hight/os32-tmp/` 以下。
 
 | 作業 | 依存 / 並行できる準備 |
 |---|---|
@@ -187,13 +187,8 @@ guest台本/host成功経路期待も同時更新。表/BB/mailbox不変はkself
 | E11-14 | — | c | SHM・ページ長の公開定数 | SDK共有ヘッダ・caller | 私有PAGE_BYTES等の重複 | SDK/markerビルド | 公開値とkernel一致、生成・版は一括 |
 | 補4 | 4 | a/b | V86全出口と通常地図の結線 | session end → CR3 reload → 3段検査 | 旧出口の復元漏れ | V86正常/失敗/STOP/kill/K1・VM INT80h | 内容/属性・PCD・PDE USER復元、通常AS禁止、DISPLAY/TVRAM再lease |
 
-**e11 統合受入 (PM、2026-10-07、main `1d222ac`、17MB・今の ini・PEGC)**:
-受入合格: kselftest 283/0、guest_tests PASS 15、低位 USER 撤去・E kill/F 生存と revoke kill・SHM RO/再利用・PT0/V86 監査・世代拒否。
-値返し列挙、CUI 描画、GUI/日本語、Run 全画面のキー終了を受入。今回の変更による退行なし。
-既存問題は X-12 (PEGC の blit_test/bench_scale2x)・X-13 (font_test のフォント未配備) に登録。
-持越しの所在: E9-1、E10-1/4/5/6、E11-5/8/9/12/A2/A3/BUD/PERF、PRIO-1/3、H-4/5/7/9、S-5/6。
-予算 E11-2 は b2_sizes.json の実測で確定。閉じた行と証拠は [閉鎖台帳](../../archive/v3/DEFERRED_CLOSED.md)。
-証拠: `~/os32-tmp/evidence/2026-10-07/accept_e11/RESULT.md` と同ディレクトリのログ・画面・PT0/marker。
+**e11 統合受入 (2026-10-07)**: 合格。証拠: `~/os32-tmp/evidence/2026-10-07/accept_e11/RESULT.md`。
+未完了項目は [持越し台帳](../DEFERRED_TESTS.md)、閉じた項目と予算の証拠は [閉鎖台帳](../../archive/v3/DEFERRED_CLOSED.md) を参照。
 > 記録は archive へ移した (2026-10-07): [優先段・KAPI-AUDIT-FIX・e11c1/c3](../../archive/v3/TASK_T2D_T2H_RECORDS.md#land-r217)、[e11b1/c2](../../archive/v3/TASK_T2D_T2H_RECORDS.md#land-r678)。
 
 ### e11 の分担と切替順
@@ -285,6 +280,8 @@ nanoのtail trimは実free list上で末尾のfree chunkを確認し、header/�
 
 ### 3-5. 分割・試験・受入
 
+段別の実装契約・制限は以下に残す。実行結果は各行の証拠パス、f1a〜f4 の詳細は [実行記録](../../archive/v3/TASK_T2D_T2H_RECORDS.md#r1951)。台帳 ID は段の実施当時の対応であり、現在の未完了は [持越し台帳](../DEFERRED_TESTS.md) を参照する。
+
 | 小段 (各45〜75分) | 成果 / 閉じる試験 |
 |---|---|
 | f1a | toolchainの実nano入力/hash・リンク対象と由来/ライセンス/パッチのビルド台帳。実装・対象host検証済み (2026-10-02)、全体検査は下記記録 |
@@ -292,15 +289,15 @@ nanoのtail trimは実free list上で末尾のfree chunkを確認し、header/�
 | f2 | extent/穴探索/flags。両端/overflow/EXACT/hint衝突、固定32本 |
 | f3 | map準備/公開。data各枚・PT各枚不足の全rollback |
 | f4 | unmap/部分分割/併合。FULL不変、NP→TLB→free、別owner拒否 |
-| f5a | 内部結線 (KAPI 70 不変): AS extent/layout、初期 heap 登録、ANON teardown、毒 AS 隔離、owner 往復 +5。AS 1,224B (表 512 + layout 16 + poison 4)、1,376B/16KiB ASSERT 内。F-2/F-3 の負例はホスト試験へ。fix1: 毒化時に対象の中断要求、resume 前に検査、live 数から隔離。4 TU は -Os。証拠 `/home/hight/os32-tmp/run/f5/fix1_report.md` と `f5a_fix1_sizes.json` (初回は `report.md` / `f5a_sizes.json`)。実 kill・high-water は台帳 F-6。 |
+| f5a | 内部結線 (KAPI 70 不変): AS extent/layout、初期 heap 登録、ANON teardown、毒 AS 隔離、owner 往復 +5。F-2/F-3 の負例はホスト試験へ。fix1: 毒化時に対象の中断要求、resume 前に検査、live 数から隔離。証拠 `/home/hight/os32-tmp/run/f5/fix1_report.md` と `f5a_fix1_sizes.json` (初回は `report.md` / `f5a_sizes.json`)。実 kill・high-water は台帳 F-6。 |
 | f5b | USER 専用 mem_map/mem_unmap (slot 246/247)、KAPI 71・memory 2。内部の検査とエラー翻訳に接続、公開 flags を静的照合。F-1 閉鎖。map/write/unmap の対照と同じ VA の PF 試験を登録、ゲスト受入は F-6。P3 の poison 経路検査と master 文脈注記を追加。証拠 `/home/hight/os32-tmp/run/f5/f5b_report.md`・`f5b_sizes.json`。 |
 | f6 | USER/resident CRT を分離。primary adapter morecore に委譲し、USER は初期 mapped_end から EXACT 伸長、resident は固定上限。負増分/INT_MIN/overflow・失敗時不変を検査。KAPI 71・memory 2 据置、malloc 結線は f7。host 対照/指定5変異とゲスト `sbrk_grow_test` を登録、実ゲストは台帳 F-7。証拠 `/home/hight/os32-tmp/run/f6/f6_report.md`。 |
 | f7 | USER の malloc 8入口を私有 nano archive + adapter へ結線。arena 別状態・pointer routing・跨ぎ realloc・空副 arena の unmap rollback、CRT と primary 所有を単一化。resident は libc nano / 固定 sbrk。hash による link_guard 検査、SDK 配布と `malloc_arena_test` を追加。KAPI 71・memory 2・kernel 不変。64KiB 以上の直接map は f8、最小初期量は f12。host/変異・サイズの証拠 `/home/hight/os32-tmp/run/f7/f7_report.md`、実ゲスト受入は台帳 F-8。 |
 | f8 | USER C の要求≥65536をTOPDOWN直接map、一覧照合後のprefix検証・即unmap/失敗復元、callocの積/prefix/page丸め検査、realloc移行時の旧内容保持。Rust共通GlobalAllocはmem_alloc上で4/8/16/64/4096整列・元base解放・明示zeroing。KAPI 71・memory 2・kernel不変。host/変異と5成果物サイズの証拠 `/home/hight/os32-tmp/run/f8/f8_report.md`・`f8_sizes.json`。ゲスト65535/65536/65537・EXACT再map・alloc_demo整列は台帳F-8、kernel実byte分類はf10。 |
-| f9 | USER は検証済み EXEC extent の一時 KHeap、WM/TRUSTED/get 失敗は resident。小要求の EXACT/TOPDOWN 伸長、公開 EXEC 拒否と内部全 extent 返却、ARENA teardown。AS 集計 4B (1,228B)、static resident は CPL3 復元で変更しない。KAPI 71・memory 2 据置。実測 +1,504B、f 残 4,096B。host/変異とゲスト親子試験の証拠 `/home/hight/os32-tmp/run/f9/f9_fix1_report.md`・`f9_fix1_sizes.json`、実ゲストは台帳 F-10。64KiB 以上は収まれば暫定で既存 arena、TOPDOWN 分類は f10。double free / ブロック頭でない pointer の free は当該 AS の heap を以後無効にする。 |
-| f10 | 要求≥64KiB は TOPDOWN の EXEC_LARGE、作れないときは理由を問わず伸長なしで既存 arena (§3-4 の補足、PM 決定)。識別は extent/base のみ、非併合・即返却・teardown 回収。trim は全 USER arena 検証後に ARENA 末尾/空 arena だけ返し、INITIAL は内部返却も拒否。失敗時は header/used 不変、free 段失敗は毒 AS として隔離。LARGE double free は未使用 VA なら無視、ANON 内なら無効化、再確保済みなら新割当を free。AS 1,228B・KAPI 71・memory 2 据置、基点 160342d 比 +480B (予算1,500B内)。F-4 の host 分を閉鎖、ゲストと trim 配送後の観測は台帳 F-11/F-12。証拠 `/home/hight/os32-tmp/run/f10/f10_report.md`・`f10_sizes.json`。 |
+| f9 | USER は検証済み EXEC extent の一時 KHeap、WM/TRUSTED/get 失敗は resident。小要求の EXACT/TOPDOWN 伸長、公開 EXEC 拒否と内部全 extent 返却、ARENA teardown。static resident は CPL3 復元で変更しない。host/変異とゲスト親子試験の証拠 `/home/hight/os32-tmp/run/f9/f9_fix1_report.md`・`f9_fix1_sizes.json`、実ゲストは台帳 F-10。64KiB 以上は収まれば暫定で既存 arena、TOPDOWN 分類は f10。double free / ブロック頭でない pointer の free は当該 AS の heap を以後無効にする。 |
+| f10 | 要求≥64KiB は TOPDOWN の EXEC_LARGE、作れないときは理由を問わず伸長なしで既存 arena (§3-4 の補足、PM 決定)。識別は extent/base のみ、非併合・即返却・teardown 回収。trim は全 USER arena 検証後に ARENA 末尾/空 arena だけ返し、INITIAL は内部返却も拒否。失敗時は header/used 不変、free 段失敗は毒 AS として隔離。LARGE double free は未使用 VA なら無視、ANON 内なら無効化、再確保済みなら新割当を free。F-4 の host 分を閉鎖、ゲストと trim 配送後の観測は台帳 F-11/F-12。証拠 `/home/hight/os32-tmp/run/f10/f10_report.md`・`f10_sizes.json`。 |
 | f11 | SDK 内部 `os32_nano_trim` (USER のみ)。実 free list の末尾を page_up(chunk+12) まで残し、primary は image 端 page も保持。arena ごとに unmap 成功後だけ size/brk/mapped_end 確定、失敗後も走査継続して成功ページ数を合算。空副 arena は既存 release_empty で再返却、busy 中は 0。実 nano の接続/末尾併合・失敗全状態・生存全バイト・再入と 6 変異を追加。KAPI 71・memory 2・kernel 不変。証拠 `/home/hight/os32-tmp/run/f11/f11_report.md`・`f11_sizes.json`・`f11_check_scope.json`。ゲスト/native と通知配送は台帳 F-13、性能は F-9 (f12)。 |
-| f12 | f12a: USER 起動を exec_heap 最低64KiB・libc BSS端のpage_up+1pageへ切替、可変stack全map。旧折半/tier/物理0xC00000天井を撤去。memory 3・KAPI 71据置、resident/親子回収は維持。PDE集合の実消費・不足/overflow/KHEAP失敗とresident 3条件をhostで検査。boot最小域は共通 `MEM_EXEC_BOOT_MIN`: 0x590000→0x551000 (bootstrap/init/selftest/host境界、8MB不変)。基点0a929e1比 kernel -352B、f残3,968B。K7形は空き768page中94page。証拠 `/home/hight/os32-tmp/run/f12/f12a_report.md`・`f12_sizes.json`。台本/文書固定値・F-5/F-9・性能・8MB延期登録はf12b、ゲスト受入はPM。 |
+| f12 | f12a: USER 起動を exec_heap 最低64KiB・libc BSS端のpage_up+1pageへ切替、可変stack全map。旧折半/tier/物理0xC00000天井を撤去。memory 3・KAPI 71据置、resident/親子回収は維持。PDE集合の実消費・不足/overflow/KHEAP失敗とresident 3条件をhostで検査。boot最小域は共通 `MEM_EXEC_BOOT_MIN`: 0x590000→0x551000 (bootstrap/init/selftest/host境界、8MB不変)。証拠 `/home/hight/os32-tmp/run/f12/f12a_report.md`・`f12_sizes.json`。台本/文書固定値・F-5/F-9・性能・8MB延期登録はf12b、ゲスト受入はPM。 |
 | f13 | f13a: `mem_stat(app_id,out,size)` slot 248・**KAPI 72** (WM/CPL0 常駐は任意 ID、USER は自己と ID 0、MemStat 120B・MIN 44B、USER 使用量は AS 側)、`mem` を作り直し (CPL0 は 2..5 を 3 行ずつ、NOTFOUND 非表示、CPL3 は自己だけ・resident sbrk 実測は CPL0 だけ)。kselftest +1 (289)。kernel `__bss_end` +1,184B (上限は PM が +800→+1,400B に改訂)。f13b: 変異の対応表の洗い、台本の版 72 追従と f13/F-14 項目、teardown の extent 採取ツール `tools/accept/as_extents_at_teardown.py` (入口 EAX=AppSlot*、offset 生成)。ゲスト受入 2026-10-09 で CPL3 sh の mem が kprintf の引数の窓 (14 個) を超えて壊れる不具合 → 1 行 1 回に分割 (6a393ac)。証拠 `/home/hight/os32-tmp/run/f13/`・`~/os32-tmp/evidence/2026-10-09/f13_acc/RESULT.md`。f13c (2026-10-09): mem.1・07_shell・02_memory・KAPI_SPEC の文言を実物に揃え、§3-2 を昇順・v71/v72 を受入済みに。F-14 の generation-shlib と installer-cancel もゲストで合格。F-14 の残り (filer の数百件) は台帳。 |
 
 > **記録は archive へ移した (2026-10-06)**: T2f — f1a〜f4 の実装記録 — [TASK_T2D_T2H_RECORDS.md の「元の行 1951–2370」](../../archive/v3/TASK_T2D_T2H_RECORDS.md#r1951)。
@@ -329,13 +326,17 @@ front SDKのmalloc/map失敗時はallocator lock/busyを解き、GUIクライア
 
 ### 4-3. 分割・試験・受入
 
+受入済みの段を以下に要約する。配送・未読入力による先行起床・再試行の制限は §4-2、後続の未完了は [持越し台帳](../DEFERRED_TESTS.md) を参照する。
+
 | 小段 (各45〜75分) | 成果 / 閉じる試験 |
 |---|---|
-| g1 (取り込み単位 L1) | カーネル: 固定bit/epoch/理由分類、`mem_stat` 末尾追記 (KAPI 73)、TRIM_DONEの横取りと `exec_heap_user_trim` の結線 (F-12)。slot再利用、保留中の再要求で不変、飽和、pool0無確保 **着地・GK-1 合格 (2026-10-09、1d4b3ea)**: kernel +1,432B (g1 上限は見積り誤りで 700→1,500B に改訂、g 枠 3,072B の残り 1,640B)、AppSlot 212B、MemStat 132B、kselftest 293/0、新 `check-trim-kernel-host` (変異 15)。証拠 `~/os32-tmp/evidence/2026-10-09/g1_gk1/RESULT.md`、`~/os32-tmp/run/g/g1/`。trim 経路の実動作は GK-3 |
-| g2 (取り込み単位 L2、WM側とSDK側の2パックでも取り込みは1回) | WMのX3配送 (PARKED・非前景・未配送に1件、満杯は後送、完了で `sent` 解除)、shlibのTRIM消費/hook/TRIM_DONE、C/Rust allocatorの1回再試行 (入口拒否・in_trim・size0・raw mapは除外)、`shlib_protocol` +1 と全consumer再生成 **着地 (2026-10-09、L2 = 077eae9、GK-2 は未実施)**: g2w (gshell の trim.rs、+1,576B — 見積り +600B 超)・g2s (shlib・Rust/C allocator の 1 回再試行、`shlib_protocol` 2、resident CRT は世代刻印のみ変化)。C の size 0 は基点どおり nano (パックの誤りをレビュー R1 で修正)、C の retry/trim_serve は in-tree の SDK 内部口 (公開しない)。WM の MemStat offset は gshell 側の手写し (os32api に Rust 定義が無い、g2w レビュー R2)。証拠 `~/os32-tmp/run/g/g2w/`・`g2s/` |
-| g3 | C fixture (back×2・front、CUI子) とhost trace: A map開始→巻戻し→KAPI復帰→解錠→yield→X3配送→B resume→B trim→TRIM_DONE→B park→A resume→A再試行1回。未応答・raw map・CUI・旧内容保持 **着地 (2026-10-09、44b5c5a、GK-3 は未実施)**: `trim_back`/`trim_front` (14,364B / 10,622B、deploy は test) と `check-trim-flow-host` (正常 6 ケース・変異 6 RED、native/qemu)。G-4 の後に障害物 1 ページを別計上で unmap し EXACT regrow (案 1)。製品差分 0。レビューの限界: 受入 4 (raw map の yield 0) は C では構造で必ず成り立ち、本当の検出は Rust 側 (g4) — 受入 1 の「区間内 WM 0」はハーネス入口での観測で syscall 入口のポンプは対象外 — A の成功は DONE で枯渇注入を切る形 (B の返却ページの再利用そのものは GK-3)。証拠 `~/os32-tmp/run/g/g3/`。**GK-3 (2026-10-09、b469f8f)**: G-1/G-4/G-5/G-8/G-9 合格 (F-12 の末尾・全返却・INITIAL 不変・EXACT regrow を観測)、G-6 は端末の代わりに Run で合格、G-2 条件付き、G-3/G-7 未合格 → **g3fix (cf53cc7)**: G-3 は前景の未読入力 (t の break) で yield した A が先に起きる — §4-2 の応答性優先の仕様どおり (案 A、製品不変)。fixture は対象前にリングを空にし、入力が残る場合の ENOMEM を期待として固定。**C 模型が WAIT_POLL+未読を入力群から外していた食い違いを製品に合わせた** (8 条件を C と Rust で照合)。G-7 は STOP が確定した前景に当たる仕様で、`--stop-focus` を追加。G-2 は `p` 再準備。G-2/G-3/G-7 の再受入は次の GK で。証拠 `~/os32-tmp/evidence/2026-10-09/g23_gk/`・`~/os32-tmp/run/g/g3fix/`。**GK-3 再受入 (2026-10-09、063c515)**: G-2/G-3/G-4/G-7 合格 (G-3 は t の長押し、G-7 は slow-hook 1000)。証拠 `~/os32-tmp/evidence/2026-10-09/g_x21/` |
-| g4 | Rust fixture (shlib経由)、STOPとの統合trace、受入台本の確定 **着地 (2026-10-09、1cd65a1、GK-4 は未実施)**: `trim_back_rs` (Box を個別 mem_alloc、ARENA 2 本・LARGE 0、hook→DONE で末尾と空 ARENA の返却、`--stop-focus`) と `check-trim-back-rs-host`・STOP trace (DONE 直後と hook 中、回収 1・2 欄 0・mask 0・sent 0)、変異 4。`guest_acceptance.yaml` に GK-2〜GK-4 の 15 entry。`--no-answer` は Rust の SDK の上では作れない (run_vt が hook 後に必ず DONE) ので G-5 は C 版。Rust の raw map は KAPI 表の直接呼出しで、再試行しないことは構造で成り立つ (静的に固定)。証拠 `~/os32-tmp/run/g/g4/`。**GK-4 (2026-10-09) 不合格**: R-1 で `PREP FAIL` (LARGE=1 が先在) → **g4fix 着地 (2026-10-09)**: 先在は libos32gui の `gfx_surface_init` のサーフェスプール 131,648B (64KiB 以上で LARGE)。LARGE は「0」ではなく prepare 前の本数から不変で判定 (prepare・DONE 観測・regrow)、PREP 行は実値。ホスト試験に先在ケース 4 本、変異 4→7。**GK-4 合格 (2026-10-10、0ecaf98)**: R-1 `PREP OK ... LARGE=1` (プール分)、R-2 retry ok・Rust DATA OK・hook_calls=1、R-3 ARENA 2→1・EXACT regrow、R-4 hook 中の STOP で回収 +1・stop_park +1・slot 全 0 (DONE 直後の STOP は park を通らず stop_park +0、設計どおり)。証拠 `~/os32-tmp/evidence/2026-10-10/gk4/`。同時に gtool3 (`emu_gui_launch` の成立に RUNNING+in_op_wait、送信前の consink head、`emu_type` の hold、台本の G-3 長押し・G-7/R-4 の slow-hook 1000) も着地。証拠 `~/os32-tmp/run/g/g4fix/`・`~/os32-tmp/run/tool/s3/` |
-| g5 | 変異対応表/小さなkselftest/予算とPM台帳 **着地 (2026-10-09、53da294)**: [T2G_MUTANTS](../../archive/v3/T2G_MUTANTS.md) — 票の 13 種類とレビュー由来 9 種類を合成した 16 種類すべてに runtime RED (変異 205: RED 204・compile error 1・timeout 0・生き残り 0、追加 9 本)。設計票の「18 種類」は合成前の数。MemStat 末尾 3 欄 (120/124/128) を STATIC_ASSERT で固定し、gshell・Rust fixture の手写し定数をヘッダと照合 (レビュー P2-1)。kselftest は 293 のまま。予算: kernel `__bss_end` +1,432B (g 枠 3,072B の残り 1,640B)、gshell +1,704B、shlib +24B、表は `~/os32-tmp/run/g/g_sizes.json`。F-12 は GK-3 の G-4 で閉じた。ゲスト受入の残りは X-21・X-19 |
+| g1 (取り込み単位 L1) | カーネル: 固定bit/epoch/理由分類、`mem_stat` 末尾追記 (KAPI 73)、TRIM_DONEの横取りと `exec_heap_user_trim` の結線 (F-12)。slot再利用、保留中の再要求で不変、飽和、pool0無確保。受入済み、証拠: `~/os32-tmp/evidence/2026-10-09/g1_gk1/RESULT.md` |
+| g2 (取り込み単位 L2、WM側とSDK側の2パックでも取り込みは1回) | WMのX3配送 (PARKED・非前景・未配送に1件、満杯は後送、完了で `sent` 解除)、shlibのTRIM消費/hook/TRIM_DONE、C/Rust allocatorの1回再試行 (入口拒否・in_trim・size0・raw mapは除外)、`shlib_protocol` +1 と全consumer再生成。受入済み、証拠: `~/os32-tmp/run/g/g2w/`・`g2s/` |
+| g3 | C fixture (back×2・front、CUI子) とhost trace: A map開始→巻戻し→KAPI復帰→解錠→yield→X3配送→B resume→B trim→TRIM_DONE→B park→A resume→A再試行1回。未応答・raw map・CUI・旧内容保持。受入済み、証拠: `~/os32-tmp/evidence/2026-10-09/g_x21/` |
+| g4 | Rust fixture (shlib経由)、STOPとの統合trace、受入台本の確定。受入済み、証拠: `~/os32-tmp/evidence/2026-10-10/gk4/` |
+| g5 | 変異対応表/小さなkselftest/予算とPM台帳。受入済み、証拠: [T2G_MUTANTS](../../archive/v3/T2G_MUTANTS.md)・`~/os32-tmp/run/g/g_sizes.json` |
+
+受入の限界: g3 の host trace は syscall 入口のポンプを観測せず、DONE 後の枯渇注入解除も返却ページの再利用そのものの証拠ではない (実返却は GK-3)。未読入力で A が先に起き ENOMEM になるのは §4-2 の仕様。Rust の無応答は SDK が必ず DONE を返すため C fixture で確認し、raw map の再試行なしは構造でも固定する。Rust の LARGE は準備前から存在する GUI surface pool 分を基準に不変と判定する。STOP は対象の前景を確定させ、hook 中と DONE 直後の park の差を区別する。
 
 実appmem/exec/allocatorのtraceとWMの配送を組み、A map開始→巻戻し→KAPI復帰→allocator解錠→yield→X3配送→B trim→TRIM_DONE→A retryの順をassertする。変異はmap途中pump、VA不足通知、CUI自身への配送、前景への配送、busy/入口拒否での再試行、slot再利用で古いbit維持、無制限retry、queue満杯でbit消失、保留中の再要求でepoch変化、未応答への再配送、hookの二重呼出し、realloc再試行のcopy欠落、世代据置。epochの単なる値だけで試験を成立させない。
 
@@ -576,7 +577,7 @@ d6 は正味 4,260B、未消費 1,628B。旧「全枠消費後の余白 5,520B�
 
 ### 6-2. 試験実装の規約
 
-各小段に正常対照と1つの目的別負例を先に用意し、実ソースの失敗→修正→成功を記録。MMU/IRQ/I/Oだけをホスト足場にし、kernelの判定やallocatorを模型に複製しない。実CR3/TLB・デバイス・描画の合格はguestで補う。新試験は `tools/check_map.yaml`、該当build検査、生成 [TESTS](../../TESTS.md)へ実装時に登録する。今回は実在しない試験へのリンクや生成一覧を作らない。
+各小段に正常対照と1つの目的別負例を先に用意し、実ソースの失敗→修正→成功を記録。MMU/IRQ/I/Oだけをホスト足場にし、kernelの判定やallocatorを模型に複製しない。実CR3/TLB・デバイス・描画の合格はguestで補う。新試験は `tools/check_map.d/*.yaml` と該当 build 検査へ登録する。生成一覧は `build/out/TESTS.md`、読み方は [TESTS](../../TESTS.md) を参照する。今回は実在しない試験へのリンクや生成一覧を作らない。
 
 変異は写しの対象ソース/fixtureだけを1回読み込んだcacheから作る。1 mutantごとにリポジトリ全木コピー、rg全走査、make check、全manifest再生成をしない。依存closureを固定し、正常objectは再利用、変異TUだけ再コンパイル/再リンク。入力hashは一組の開始/終了で確認する。`mutpar.py`の固定並列度を使い、別の全体検査と重ねない。
 

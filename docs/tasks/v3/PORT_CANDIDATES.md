@@ -16,7 +16,7 @@
 |---|---|---|---|
 | **C コンパイラ・libc** | `i386-elf-gcc` 13.2 + newlib 4.4 **nano 構成** (`-lc -lgcc`、`libm.a` あり)。syscalls は `read/write/open/close/lseek/stat/fstat/unlink/isatty/gettimeofday/times/sbrk` の 18 本 (`sdk/crt/syscalls.c`)。ユーザーランドは `-std=gnu89 -march=i386` | **無い**: `opendir/readdir` (KAPI `sys_ls` はある)、`mkdir/rename` の libc 側 (KAPI `sys_mkdir/sys_rename` はある)、`signal`、`select/poll`、`mmap` (v3 の `mem_map` に対応させる)、環境変数、`clock_gettime`。nano の `printf` は **`%f` を既定で出さない** (`-u _printf_float` が要る、未確認 U1)。`sbrk` は OS32X ヘッダの `--heap` で上限が決まる (v3 では `mem_map` で伸長、D23) | P9 の「libc の穴」票 (最初の移植で埋める) |
 | **C++ ランタイム** | **無い** — クロス環境は C だけ (`i386-elf-g++` も `libstdc++` も未ビルド、`ls ~/opt/cross/bin` 2026-09-30)。カーネルの規約は C89 → v3 で C11 | ScummVM / DOSBox / Snes9x / NXEngine は C++ が必須。`libstdc++` (または `libsupc++` だけ) をクロス環境に足すか、C++ を捨てるかは**別の決裁**。例外・RTTI・静的コンストラクタの起動順 (crt0 が `main` の先頭へ飛ぶ約束) も影響する | 決裁 (P9 の前)。候補の表では「C++」を依存に書いた |
-| **浮動小数点 (x87)** | CR0.EM=0 で **ハード x87 を直接使う** (`kernel/kentry.asm`、`kernel/kernel.c:545`)。`-march=i386` でも x87 命令は出る。実機 (P100 / Ra266) は x87 内蔵、NP21/W も再現 | **アプリ切替時の x87 文脈の退避が無い** (`fnsave/frstor` はカーネルに無い、2026-09-30 grep)。協調型で切替が `OP_WAIT` の中だけなら壊れないが、v3 の「固まったアプリからカーネルが制御を取り戻す」(P6) が入ると要る。整数のみのライブラリ (Tremor / libmad / minimp3 既定) を優先すれば影響を小さくできる | P6 / P9 (x87 の退避を T2 の受入に足すか) |
+| **浮動小数点 (x87)** | ハード x87 を使う (`kernel/kentry.asm:31`、`kernel/kernel.c:571`) | アプリ別の保存・復元は未実装。協調切替でも初期化・保存・復元が必要 ([TASK_MEMMAP_V3 §3-5-3 第3項](TASK_MEMMAP_V3.md#3-5-3-p6-実行モデル-を見直すときに壊れるもの))。整数のみのライブラリを優先すれば影響を小さくできる | P6 / P9 |
 | **画面 (Video HAL)** | `gfx_get_framebuffer` / `gfx_present_dirty` / `gfx_hw_blit` / `gfx_set_palette`。GUI 1.x は **8bpp PACKED8** (PEGC 640×480×256、9801 は planar 16 色)。Cirrus (NP21/W) / Trident (実機) の窓の帯 `0xFE000000` は実装済み、**16bpp 面は無い** | Video HAL の共通化 (framebuffer / pitch / VSync / flip / optional BitBLT)、**640×480×16bit** (DESIGN_APP_FIRST §5 の境界)、全画面 lease (D19)、VESA2 的な「LFB の番地 + pitch + モード一覧」だけの互換層。8bpp で足りる移植 (Doom / Wolf3D / テキスト系) は 16bpp を待たない | P9 (Video HAL の票、TASK_TRIDENT_DRIVER 段 3〜5) |
 | **音 (PCM / FM)** | `pcm_open/pcm_write/pcm_status/pcm_close` (CS4231、[TASK_PCM_CS4231.md](TASK_PCM_CS4231.md) 受入待ち)、`fm_note_on` / `ssg_*` / `snd_bgm_play` (OPNA、MML)、`snd_se_play_raw` | **SDL 1.2 の音はコールバック (別スレッド) 前提** → OS32 では (a) メインループから PCM リングを埋める、(b) PCM の DMA 割り込み (カーネル文脈) からアプリのコールバックを呼ぶ (CPL=3 へ上がる経路が要る) のどちらか。**(a) を既定**にし、ゲームのフレームごとに `pcm_write` する (遅延 = リング長)。ミキサ (複数音の合成、`SDL_mixer` 相当) はユーザーランドのライブラリで | P8 (音の層) |
 | **入力** | `kbd_trygetkey` / `kbd_is_pressed` / `kbd_trygetrawkey` / `kbd_get_modifiers`、`mouse_poll` / `mouse_set_bounds`、`libos32input` (割り当て表) | **押し離しのイベント** (SDL の `KEYDOWN/KEYUP`) を `kbd_trygetrawkey` から組む。**ジョイスティック KAPI は無い** (PC-98 のジョイポートは OPNA 経由 — 要るなら P8)。マウスの相対移動 (FPS 用) | P8 (入力の層) |
@@ -131,7 +131,7 @@ os32 は **MIT** (`LICENSE`)。os32-v3 はパブリック (ROADMAP §0-1)。移�
 | 順 | 候補 | 待つ基盤 | 何を確かめるか (合格の目安) |
 |---|---|---|---|
 | 1 | **zlib** → **libpng / stb_image** | 無し (v2.1 の SDK で今日からできる) | 「他人の `*.c` を OS32 の Makefile で通す」手順、newlib nano の穴の洗い出し (U1)。`gzip -d` 相当の CUI と PNG → MGX 変換 |
-| 2 | **Lua 5.4** | x87 (退避の要否だけ P6 で決める) | `double` と `%f`、`setjmp/longjmp`、`libm`。対話環境が動く。**WordGrinder の前提** |
+| 2 | **Lua 5.4** | x87 (P6 でアプリ別の退避を実装する) | `double` と `%f`、`setjmp/longjmp`、`libm`。対話環境が動く。**WordGrinder の前提** |
 | 3 | **Frotz (dfrotz)** | 無し | `stdio` だけの GPL アプリの**別配布の形** (§1-1 U2) を最初に決める |
 | 4 | **Tremor / minimp3** → 音楽再生器 | PCM (E4〜E6 の受入) | `pcm_write` の実運用、P100 の実時間デコード (U5) |
 | 5 | **Angband** (TVRAM 前端) | 無し | `term` 前端の書き方 = **後の curses 系 (sc-im / WordGrinder / nano) の共通部品** (`libos32curses` 的な薄い層を切り出すかはここで判断) |
@@ -157,7 +157,7 @@ os32 は **MIT** (`LICENSE`)。os32-v3 はパブリック (ROADMAP §0-1)。移�
 | U4 | ライセンスの細部: sc-im (BSD 4 条項と記した、要原典)、OpenTyrian のデータ (Tyrian 2000 のフリーウェア化の再配布条件)、libjpeg-turbo (IJG + BSD + zlib の 3 本)、Angband の二重ライセンスの選び方 | 各票の着手時に `LICENSE` を読む。**§2 の表のライセンス列は Web 検索の要約 (§5) であって原典の確認ではない** |
 | U5 | 実機性能はすべて推測: P100 での Tremor / minimp3 の実時間デコード、Doom の fps、Quake 320×200、**ZSNES のフレームスキップ**。NP21/W は速度を模擬しないので**実機でしか測れない** | Ra266 で実測 (P100 相当は Ra266 のクロックを落とせないので推定のまま) |
 | U6 | CS4231 を 32kHz に設定できるか (ZSNES の内部レート)。できなければ 44.1kHz へのリサンプル | TASK_PCM_CS4231 のレジスタ表 |
-| U7 | x87 文脈の退避 (fnsave 108 バイト) を P6 の「制御を取り戻す」経路に足す必要 — 前景 1 本なら不要、裏のアプリが x87 を使っていれば要る | P6 の票 |
+| U7 | アプリ別 x87 の初期化・保存・復元の実装。必要性は決定済み ([TASK_MEMMAP_V3 §3-5-3 第3項](TASK_MEMMAP_V3.md#3-5-3-p6-実行モデル-を見直すときに壊れるもの))、実装は未完了 | P6 の票 |
 | U8 | doomgeneric の `CMAP256` (8bpp 出力) が現行の master に残っているか | fork 時に確認 |
 | U9 | 8MB 機 (私有 2MB) で動く候補の見積り (Doom の WAD 逐次読み、OpenTyrian のデータ 5MB) はすべて推測 | 各票の受入 |
 

@@ -59,16 +59,16 @@ RESYNC との競合を `gen` の検査では消せない (既に鳴ったデー�
 |---|---|---|---|
 | CLOSED | 何もしない | 拒否 | open → OPENING |
 | OPENING | 何もしない (IEN=0) | 拒否 | 検出 + 初期化列 (foreground、期限つき) → OPEN / 失敗 → 巻き戻し → CLOSED |
-| OPEN | 何もしない (PEN=0) | ステージングへ | **ステージングが 4096 frame (両半分ぶん) 以上**、または close で未転送あり → `pcm_start` → RUNNING (close なら続けて DRAINING)。半分 1 つで始めると次の write が間に合っても最初の切り替えで 2048 frame の無音が入る (往復 5 B3) ので両半分がそろうまで待つ (開始遅延 93ms @44.1k)。短いストリームは close で開始する。**close で未転送なし、または reclaim → 再生せず `irq_unregister` → `dma_pool_free` × 2 → CLOSED** (往復 4 R7) |
+| OPEN | 何もしない (PEN=0) | ステージングへ | **ステージングが 4096 frame (両半分ぶん) 以上**、または close で未転送あり → `pcm_start` → RUNNING (close なら続けて DRAINING)。半分 1 つで始めると次の write が間に合っても最初の切り替えで 2048 frame の無音が入る (往復 5 B3) ので両半分がそろうまで待つ (開始遅延 93ms @44.1k)。短いストリームは close で開始する。**close で未転送なし、または reclaim → 再生せず `irq_unregister` → `kfree` (ステージング) → `dma_free` (リング) → CLOSED** (往復 4 R7) |
 | RUNNING | 観測・連続性の判定・補充・番犬 (`advance_run`) | ステージングへ | close → DRAINING / 番犬・連続性喪失 → RS_STOP / reclaim → 即時 abort (下) |
 | DRAINING | 同上 (`advance_run`、新規の write は拒否) | 拒否 | **drain の 3 段階** (`last_data_half` に入るのを待つ → 読んでいる → 無音の半分を読んでいる) を切り替えの観測で進め、無音の半分から出る切り替えで完了 → STOP_REQ (往復 5 B2)。番犬・連続性喪失 → **drain 失敗を記録して STOP_REQ** (往復 3 B4) / reclaim → 即時 abort |
 | RS_STOP | 入口 (1 回): IEN=0 → PEN=0 → ack、`deadline` = 今 + 3 tick を**入口でだけ**設定。以後の tick (`advance_stop`): R0 != 0x80 を確かめてから **I11 の DRS (D4、DRQ 動作中) = 0** を待つ → RS_RESTART。期限切れ → STOP_REQ (失敗)。**通常の補充はしない** (PI は ack だけ) | ステージングへ | close → `close_pending` を立てて RS_RESTART の後に DRAINING / reclaim → 即時 abort |
 | RS_RESTART | `dma_chan_mask` → リング 0 化 → `filled[] = 0` → `dma_chan_setup` → I15/I14 → ステージングから半分 0 (と 1) へ写す → half = 0、gen +1、番犬と連続性の基準時刻を今に → unmask → PEN=1 → IEN=1 → RUNNING (`close_pending` なら DRAINING)、`resyncs` +1。setup が失敗したら STOP_REQ (失敗) | ステージングへ | |
 | STOP_REQ | 入口 (1 回): IEN=0 → PEN=0 → R2 に書いて INT を消し、I24 に 0、`deadline` = 今 + 3 tick。以後の tick (`advance_stop`): R0 != 0x80 を確かめてから DRS=0 を待つ → `dma_chan_mask` → **証拠**: I9 の PEN=0、I24 の PI=0、R0 != 0x80 → STOP_DONE。期限内に証拠が読めない → FAULTED | 拒否 | reclaim → 残りを引き継ぐ (下) |
-| STOP_DONE | PI だけ ack | 拒否 | foreground (close / reclaim) が **`irq_unregister` → `dma_pool_free` (リングとステージング)** → CLOSED |
-| FAULTED | 何もしない (装置に触らない、Index 書きも 0 回) | 拒否 | foreground が `irq_unregister` → `dma_pool_mark_leaked` (両方)。再 open は `OS32_ERR_IO` (再起動まで) |
+| STOP_DONE | PI だけ ack | 拒否 | foreground (close / reclaim) が **`irq_unregister` → `kfree` (ステージング) → `dma_free` (リング)** → CLOSED |
+| FAULTED | 何もしない (装置に触らない、Index 書きも 0 回) | 拒否 | foreground が `irq_unregister` → `kfree` (ステージング) → `dma_mark_leaked` (リングだけ)。再 open は `OS32_ERR_IO` (再起動まで) |
 
-`irq_unregister` と `dma_pool_free` は **foreground だけ** (ISR 文脈からの解除は 1-1 で `IRQ_ERR_CTX`)。**advance の構造** (往復 4 R1、往復 9): **まず CLOSED / OPENING / FAULTED / `s_mce_busy` 中なら装置に触らず `IRQ_NONE`** (Index 書きを
+`irq_unregister` と `kfree` / `dma_free` は **foreground だけ** (ISR 文脈からの解除は 1-1 で `IRQ_ERR_CTX`)。**advance の構造** (往復 4 R1、往復 9): **まず CLOSED / OPENING / FAULTED / `s_mce_busy` 中なら装置に触らず `IRQ_NONE`** (Index 書きを
 含めてアクセス 0 回。E1 で数える) → 共通の PI の ack → 状態で分岐: RUNNING / DRAINING → `advance_run` (観測・連続性・補充・番犬)、RS_STOP / STOP_REQ → `advance_stop`
 (入口の 1 回の処理と、後続 tick の確認を分ける。期限は入口でだけ設定)、RS_RESTART → 再構成、それ以外 (OPEN / OPENING /
 STOP_DONE / FAULTED / CLOSED) → 何もしない。**新規の write を受けるのは OPEN と RUNNING と RS_* だけ**。
@@ -77,11 +77,11 @@ STOP_DONE / FAULTED / CLOSED) → 何もしない。**新規の write を受け�
 (先に新しい経路を結ぶ。DMA #1 はマスク済み、IRQ10 は未登録だが装置は IEN=0。NP21/W は `0F40h = 0` で detach して
 `dmach = 0xff` になり、その状態で I8 を書くと `cs4231_control` が配列外 (`dmac.dmach[255]`) を触るので、**detach 状態で装置
 レジスタを書かない**。E0 で NP21/W 側にも未 attach の防御を足す) → (4) R2 に書いて INT を消し、I9 の PEN=0 と I10 の IEN=0 を書く
-(BIOS の旧設定の要因を止める) → (5) 検出 (1 の表、MODE2 まで) → (6) `dma_pool_alloc` × 2 → (7) `irq_register(10, pcm_irq, 0,
+(BIOS の旧設定の要因を止める) → (5) 検出 (1 の表、MODE2 まで) → (6) `dma_alloc` (リング) と `kmalloc` (ステージング) → (7) `irq_register(10, pcm_irq, 0,
 IRQ_F_SHARED)` → (8) 初期化列 (下) → (9) `dma_chan_setup(1, …, CYCLIC)` (マスクのまま) → (10) I15 = 0xFF、I14 = 0x07 → (11) owner を
-公開、状態 OPEN。**失敗は逆順**: (8)〜(10) の失敗は `irq_unregister` → `dma_pool_free` × 2 (DMA 未開始・マスク中なので安全) →
-PEN=0/IEN=0 のまま `0F40h` は **0x1A のまま残す** (detach しない) → CLOSED。戻り値: `OS32_ERR_NOSYS` 検出なし / `OS32_ERR_NOMEM`
-プール / `OS32_ERR_BUSY` IRQ 登録 / `OS32_ERR_IO` 初期化の期限。
+公開、状態 OPEN。**失敗は逆順**: (8)〜(10) の失敗は `irq_unregister` → `kfree` (ステージング) → `dma_free` (リング) (DMA 未開始・マスク中なので安全) →
+PEN=0/IEN=0 のまま `0F40h` は **0x1A のまま残す** (detach しない) → CLOSED。戻り値: `OS32_ERR_NOSYS` 検出なし / `OS32_ERR_NOSPC` (−4、内部名 `PCM_ERR_NOMEM`)
+メモリ確保 / `OS32_ERR_FULL` (−13、内部名 `PCM_ERR_BUSY`) IRQ 登録 / `OS32_ERR_IO` 初期化の期限。
 
 **初期化列** (§1 の典拠どおり。各 poll は IF=1・期限 5 tick、超えたら `OS32_ERR_IO` で巻き戻し。往復 3 B1: §1 と一致させた):
 R0 が 0x80 でなくなるまで poll (INIT) → I12 に MODE2=1 を書き、読み戻して MODE2 を確認 → **`cs_write_mce(8, 0x5B)`** (44.1k。
@@ -151,8 +151,8 @@ write が開始しないと次の write は 0 のまま OPEN に留まる)。空
 通過したら STOP_REQ に入る。foreground は **STOP_DONE か FAULTED になるまで IF=1 で待つ**。期限は**半分単位**で導く (往復 4 R5): 残りのステージングを
 写し切る半分の数 `ceil(staged / 2048)` + 現在の半分の残り 1 + データの半分の通過 1 + 0 の半分の通過 1 + 停止確認の 3 tick →
 `(ceil(staged / 2048) + 3) × H + 3 tick` を tick に切り上げ (H = 2048 × 1000 / rate ms)。staged = 0 で 44.1k は 17 tick、22.05k は 31 tick。期限切れは番犬と同じく drain 失敗 → STOP_REQ
-を待つ。STOP_DONE なら `irq_unregister` → `dma_pool_free` × 2 → CLOSED、戻り 0 (drain 失敗が記録されていれば `OS32_ERR_IO`)。
-FAULTED なら leaked、`OS32_ERR_IO`。**「PI が来ない」は証拠にしない**。末尾の 0 埋めは underrun に数えない。
+を待つ。STOP_DONE なら `irq_unregister` → `kfree` (ステージング) → `dma_free` (リング) → CLOSED、戻り 0 (drain 失敗が記録されていれば `OS32_ERR_IO`)。
+FAULTED ならステージングを `kfree`、リングだけ leaked とし、`OS32_ERR_IO`。**「PI が来ない」は証拠にしない**。末尾の 0 埋めは underrun に数えない。
 
 **RESYNC と停止のサンプル境界** (往復 3 B6): PEN=0 は発行済みの DMA 要求の最後のサンプル転送が終わってから効く (DS139PP2
 p.16/19)。だから **PEN=0 の後、I11 の DRS (D4: PDRQ/CDRQ が動作中) が 0 になるのを tick で待ってから** `dma_chan_mask` する
@@ -164,10 +164,10 @@ p.16/19)。だから **PEN=0 の後、I11 の DRS (D4: PDRQ/CDRQ が動作中) �
 一致を要求 (不一致は `OS32_ERR_INVAL`)。回収は `exec_reclaim_owned(id)` に `pcm_reclaim(id)` を足す (呼ばれる時点では `g_cur_app`
 は親に戻っているので、**保存した owner と引数 id だけを照合**): **待たない abort** — 状態が RUNNING / DRAINING / RS_* なら
 IEN=0 → PEN=0 → ack → `dma_chan_mask` (DRS は待たない。捨てるストリームなので境界は問わない) → 証拠の読み戻し 1 回 →
-`irq_unregister` → 証拠があれば `dma_pool_free` × 2、無ければ leaked/FAULTED。STOP_REQ / STOP_DONE の途中なら**残りの手順を
+`irq_unregister` → ステージングは常に `kfree` → 証拠があればリングを `dma_free`、無ければリングだけ leaked/FAULTED。STOP_REQ / STOP_DONE の途中なら**残りの手順を
 引き継いで 1 度だけ**解放する (`finalized` フラグ。close 側の待ちは longjmp で戻らないので二重解放は起きないが、契約として
 1 度に固定する)。**reclaim は IF=0 (fault の回収) からも来る**ので tick 待ちを再開せず、その場で待たない abort と 1 度だけの後始末を行う。**全状態の表** (往復 4 R7): OPENING (foreground の途中なので reclaim は来ない) / OPEN → 再生せず解放 /
-RUNNING・DRAINING・RS_STOP・RS_RESTART → 即時 abort / STOP_REQ → 残りを引き継ぐ / STOP_DONE → 解放 / FAULTED → unregister + leaked /
+RUNNING・DRAINING・RS_STOP・RS_RESTART → 即時 abort / STOP_REQ → 残りを引き継ぐ / STOP_DONE → 解放 / FAULTED → unregister + ステージングの kfree + リングだけ leaked /
 CLOSED → 何もしない。正常終了・fault・CTRL+STOP・park 中の kill で同じ経路。
 
 **レート**: 44100 / 22050 だけ。**音量**: I6/I7 の LDA/RDA (6 ビット、1.5dB 刻み、減衰値に線形) を `percent` (1〜100、100 = 0dB)
@@ -249,13 +249,16 @@ close / reclaim が各状態から 1 度だけ解放すること)。
 
 | ID | 結果 |
 |---|---|
-| E0 | 合格: NP21/W フォーク `wt/pcm-api` → main (2dca70f)、配備。`/api/sound` に `cs4231` (PEN/IEN/MODE2/I8/Base/経路/PI 累積/TC) と `?pcm=1` (DMA 直後の生 frame 1 秒、base64)。未 attach の防御も入った。`pu_count` は NP21/W に PUR/PU を立てる箇所が無いので無し |
-| E1 | 合格: ホスト試験 21 ケース、変異 24 本 RED、`make check` 通過 |
-| E2 | 合格: 新 trial ini (`np21w-trial-pcm-sndboard64.ini`、原本は無変更) で起動 → `[pcm] CS4231 v=100 irq 10 dma 1 fmt 0x5B`、kselftest 197/197。現行の trial (CS4231 無し) では `[pcm] none` と `pcm_test nodev` → NOSYS |
-| E3 | 合格: `pcm_test` 5 秒 (左 1kHz / 右 frame 番号) → underruns 0、repeats 0、resyncs 0、close → 0、PI 累積 109 (= 5 × 44100 / 2048)、生 frame の照合: 右は 41,368 frame で欠落 0、左は 1,000Hz、末尾の 0 埋め 2,732 frame。`pcm_test short` (1 frame → close) → 0。停止後 PEN=0/IEN=0。**切り分けた欠陥 2 件**: (1) close の待ちループが ISR の書く `state` を素の読みで回していて、コンパイラが読みをループの外へ持ち上げ、期限まで回って毎回 IO/FAULTED になった → `volatile` 経由に (POLICY_DEBUG §4-56)。(2) 試験側の位相刻み `(1024 × 1000) << 16` が 32 ビットを溢れて左が 40Hz になっていた → 12 ビット先に上げて割る。**未実施**: 書き込みを 200ms 止めて underrun を数える経路 (試験に無い)、開始直後 / close 直前の採取区間、ミュートの別確認、8KB コピーの実時間 |
-| E4 | 未 (共有 IRQ の偽装置 hook は未実装) |
-| E5 | 未 (`/api/cmd` が返るまで `/api/key` を送れないので CTRL+STOP を注入できない。kselftest から `pcm_reclaim` を直接呼ぶ形に置き換える案) |
-| E6 | **部分 (2026-09-23)**: 実機 Ra266 の起動画面に `[pcm] CS4231 v=101 irq 10 dma 1 fmt 0x5B` — 検出・ルート設定・I25 の版 (0x65 = 101、NP21/W の 0x80 と違う実チップ値)・初期化まで通った。再生 (音・XTAL2・DMA) は未 — FD に `pcmtest` (8.3 名) を足したので次の実機回で `pcmtest short` |
+| E0 | 合格: NP21/W フォーク `wt/pcm-api`、main `2dca70f` (`/api/sound` の採取口)。PUR/PU は未模擬のため計数なし |
+| E1 | 合格: [実装・ホスト記録](../../archive/v3/TASK_PCM_CS4231_RESULTS.md) |
+| E2 | 合格: `np21w-trial-pcm-sndboard64.ini`、`pcm_test nodev` の対照 (§3 の受入条件) |
+| E3 | 合格 (採取できた範囲): `pcm_test` / `pcm_test short`、当時の観測は下記。**未実施**: 200ms 書込み停止、開始直後/close直前の採取、ミュートの別確認、8KBコピー時間 |
+| E4 | 未: 共有 IRQ の偽装置 hook は未実装 |
+| E5 | 未: 当時は再生中の CTRL+STOP 注入を実施できなかった。後続の回収試験を当時の合格にはしない |
+| E6 | 部分: Ra266 の検出・初期化。後続の音切れは [持越し台帳 R7-2、H-4(b)(c)](../DEFERRED_TESTS.md) を参照 |
+
+E3 の当時の観測 (2026-09-23): 5秒再生で underruns/repeats/resyncs=0、close=0、PI累積109。生frameは右41,368 frameで欠落0、左1,000Hz、末尾無音2,732 frame。停止後PEN/IEN=0。
+この採取の独立した証拠パスは本票に残っていないため、数値を削除して追跡不能にしない。切り分けた close 状態の読みの問題は [POLICY_DEBUG §4-56](../../POLICY_DEBUG.md#4-56-isr-が書く状態を-foreground-で待つループは-volatile-で読む-pcm-の-close-が毎回-io-になった2026-09-23) を参照。
 
 残件 (実装レビュー往復 2 の非 blocker): 生成 wrapper 経由の `pcm_write` 契約試験 (範囲・あふれ・端数の順序)、交互試験の補強 (2 段目の期限境界で STOP_DONE、release → 再 open の claim 引き継ぎ、親 owner に戻った状態の reclaim)。
 
