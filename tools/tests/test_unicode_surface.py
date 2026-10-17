@@ -1,4 +1,4 @@
-"""T2e e8a: two real SDK utf8 copies over kernel system query/lease/ledger.
+"""T3d1b: private product table, two SDK KAPI callers, real query/lease/ledger.
 
 The host maps separate lease VAs; no hardware or emulator is accessed.
 Mutants must fail at the named runtime assertion (compile failures are errors).
@@ -8,8 +8,10 @@ import argparse
 import pathlib
 import re
 import tempfile
+import subprocess
+from test_unicode_lookup import byte_array
 from test_gfx_attach import TARGET_SRCS as ATTACH_SRCS, SDK_SRCS, HEADERS, CORE
-from test_gfx_kernel_fb import ROOT, run_case, TARGET_SRCS as KERNEL_SRCS
+from test_gfx_kernel_fb import ROOT, run_case
 from mutpar import run_ordered
 
 FIXTURE = 'tools/tests/unicode_surface_host.c'
@@ -48,7 +50,8 @@ TARGET_SRCS = [
     'userland/lib/math/libos32math.h',
     'lib/utf8.c',
     'lib/utf8.h',
-    'lib/utf8_internal.h',
+    'kernel/unicode_file.c',
+    'kernel/unicode_file.h',
     'exec/system_surface.c',
     'exec/system_surface.h',
     'tools/tests/unicode_surface_host.c',
@@ -57,12 +60,8 @@ TARGET_SRCS = [
 ]
 assert set(ATTACH_SRCS) <= set(TARGET_SRCS)
 MUTANTS = [
-    ('user-initial-alias', UTF8, 'static const u8 *unicode_jis_table = 0;', 'static const u8 *unicode_jis_table = (const u8 *)P2V_CONST(MEM_UNICODE_TABLE_BASE);', 'FAIL !utf8_host_pointer() && !shl_utf8_host_pointer()'),
-    ('unicode-rw', SYSTEM, '.perm_max = LEDGER_PERM_RO', '.perm_max = LEDGER_PERM_RW', 'FAIL unicode_ro'),
-    ('fallback-low', CORE, '    utf8_set_jis_table(0);', '    utf8_set_jis_table((const u8 *)P2V_CONST(MEM_UNICODE_TABLE_BASE));', 'FAIL uninitialized_null'),
-    ('ready-retained', UTF8, '    jis_table_ready = 0;\n    unicode_jis_table = table;', '    if (jis_table_ready != 1) jis_table_ready = 0;\n    unicode_jis_table = table;', 'FAIL failure_unready'),
+    ('sdk-no-kapi', UTF8, 'return kapi->unicode_to_jis(cp);', '(void)cp; return 0;', 'FAIL unicode_to_jis(0x3041)==0x2421'),
     ('tvram-gui', 'exec/surface_query.c', '        if (gui) return OS32_ERR_INVAL;', '        if (0) return OS32_ERR_INVAL;', 'FAIL tvram_gui_denied'),
-    ('static-no-acquire', CORE, '    libos32gfx_unicode_init();', '    /* missing static acquisition */', 'FAIL two_instances'),
     ('slot-unready', 'kernel/pgalloc.c', '    gfx_surface_unready &= ~(1U << i);', '', 'FAIL slot_ready'),
 ]
 
@@ -78,10 +77,9 @@ def main():
     names = set(re.findall(r'\b(gfx_\w+)\s*\(', '\n'.join(originals[x] for x in SDK_SRCS+HEADERS)))
     names.discard('gfx_cpl')
     first = re.compile(r'(?<!->)(?<!\.)\b('+'|'.join(sorted(names))+r')\b')
-    globals_ = ['gfx_api', 'gfx_fb', 'gfx_ready', 'gfx_packed', 'gfx_dirty_suppress', 'gfx_attach_port', 'gfx_unicode_port']
+    globals_ = ['gfx_api', 'gfx_fb', 'gfx_ready', 'gfx_packed', 'gfx_dirty_suppress', 'gfx_attach_port']
     second = re.compile(r'(?<!->)(?<!\.)(?<!struct )\b('+'|'.join(sorted(names | set(globals_)))+
                         r'|libos32gfx_\w+|utf8_\w+(?=\s*\()|unicode_to_\w+(?=\s*\())\b')
-    kernel_names = re.compile(r'\b(utf8_\w+|unicode_to_\w+)(?=\s*\()')
     with tempfile.TemporaryDirectory(prefix='os32-e8a-objects-') as cache:
         def run(m=None):
             texts = dict(originals)
@@ -96,23 +94,24 @@ def main():
                         body = texts[path]
                         if path == CORE:
                             body = body.replace('return cs & 3U;', 'extern unsigned int host_sdk_cpl; return host_sdk_cpl;')
-                        if path == UTF8:
-                            body += '\nconst u8 *utf8_host_pointer(void) { return unicode_jis_table; }\nint utf8_host_ready(void) { return jis_table_ready; }\n'
                         if path.endswith('gfx_dump.c'):
                             body = '#pragma GCC diagnostic ignored "-Wsign-compare"\n'+body
                         body = (second.sub(lambda x: 'shl_'+x[0], body) if shlib else
                                 first.sub(lambda x: 'sdk_'+x[0], body))
+                        if shlib and path == UTF8:
+                            body = '#include "os32_kapi_shared.h"\n#undef kapi\n#define kapi shl_kapi\n' + body
                         dest = destdir/pathlib.Path(path).name
                         dest.write_text(body)
                         if path in SDK_SRCS: sources.append(dest)
-                (tmp/'kernel_utf8.h').write_text(kernel_names.sub(lambda x:'k_'+x[0],originals['lib/utf8.h']))
-                # Independent production kernel utf8 and publisher.
-                for path in (UTF8, SYSTEM):
-                    body = kernel_names.sub(lambda x:'k_'+x[0], originals[path] if path==UTF8 else texts[path])
-                    body = '#define __KERNEL_BUILD__ 1\n'+body.replace('#include "utf8.h"', '#include "kernel_utf8.h"')
-                    # Private kernel declarations must match its renamed symbols.
-                    body = body.replace('#include "utf8_internal.h"', 'int k_utf8_jis_table_ready(void);')
-                    dest=tmp/('kernel_'+pathlib.Path(path).name);dest.write_text(body);sources.append(dest)
+                for path in (SYSTEM, 'kernel/unicode_file.c'):
+                    dest=tmp/('kernel_'+pathlib.Path(path).name)
+                    dest.write_text(texts[path]);sources.append(dest)
+                generator=tmp/'gen_unicode'
+                subprocess.run(['gcc','-std=gnu11','-I'+str(ROOT),'-I'+str(ROOT/'include'),
+                                str(ROOT/'tools/gen_unicode.c'),'-o',str(generator)],check=True)
+                pair_file=tmp/'pairs.bin'
+                subprocess.run([str(generator),'--pairs',str(pair_file)],check=True)
+                (tmp/'unicode_pairs.inc').write_text(byte_array('generated_pairs',pair_file.read_bytes()))
                 footing = texts['tools/tests/gfx_kernel_fb_host.c'].replace('int con_sink_is_enabled(void) { return 0; }',
                             'static int host_gui;\nint con_sink_is_enabled(void) { return host_gui; }')
                 (tmp/'gfx_kernel_fb_host.c').write_text(footing)

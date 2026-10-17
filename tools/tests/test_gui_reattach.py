@@ -18,7 +18,6 @@ MUTANTS=[
  ('input-no-check','sdk/rust/os32api/src/lib.rs','    input_return();','    // no return check', 'input return check missing'),
  ('wait-result-overwrite',GUI+'client.rs','    let _ = check_gfx(); // Drawing failure must not replace the OP_WAIT result.','    check_gfx()?;', 'wait result survives attach failure'),
  ('offscreen-gated',GUI+'draw.rs','if !t.offscreen && unsafe','if unsafe','offscreen remains drawable'),
- ('shlib-double-unicode',GUI+'shlib.rs','    client::attach_gfx();','    unsafe { crate::ffi::libos32gfx_unicode_init(); }\n    client::attach_gfx();', 'shlib Unicode acquisition missing'),
  ('gdi-shlib-no-rollback',GDI,'        os32api::gui::stub::detach_gfx();','', 'gdi shlib rollback missing'),
  ('surface-size-stale',GUI+'surface.rs','pub fn surface_size(id: SurfaceId) -> (i32, i32) {\n    crate::gstate::screen_info_cached();','pub fn surface_size(id: SurfaceId) -> (i32, i32) {','first surface_size is stale'),
  ('base-clip-stale',GUI+'clip.rs','pub fn set_base_clip(surface: SurfaceId, rect: Rect) -> i32 {\n    crate::gstate::screen_info_cached();','pub fn set_base_clip(surface: SurfaceId, rect: Rect) -> i32 {','base clip keeps old geometry'),

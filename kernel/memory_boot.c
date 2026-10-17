@@ -207,11 +207,11 @@ static const struct {
 } memory_boot_fixed[] = {
     { 0, MB_PFN(MEM_NULL_GUARD_END + 1),
       LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
-    { MB_PFN(MEM_FONT_CACHE_BASE), MB_PFN(MEM_UNICODE_TABLE_BASE),
+    { MB_PFN(MEM_FONT_CACHE_BASE), MB_PFN(MEM_KCG_LZ4_TEMP_BASE),
       LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
-    { MB_PFN(MEM_UNICODE_TABLE_BASE),
-      MB_PFN(MEM_UNICODE_TABLE_BASE + MEM_UNICODE_TABLE_SIZE),
-      LEDGER_R_SURFACE_BACKING, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
+    /* 旧 Unicode 32頁は T7a まで KCG scratch の FIXED として保持。 */
+    { MB_PFN(MEM_KCG_LZ4_TEMP_BASE), MB_PFN(MEM_GFX_BB_BASE),
+      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
     /* planar BB: 固定の SURFACE の backing (owner boot → gshell は T1e) */
     { MB_PFN(MEM_GFX_BB_BASE), MB_PFN(MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE),
       LEDGER_R_SURFACE_BACKING, LEDGER_OWNER_BOOT, LEDGER_CACHE_WB, 0 },
@@ -419,7 +419,7 @@ void memory_boot_count_pages(const struct memory_page_input *in,
                    r->first == MEM_GFX_BB_BASE / PAGE_SIZE) {
             c.bb += n;
         } else {
-            c.other += n; /* Unicode backing, DMA, bundle, RAM device reservations. */
+            c.other += n; /* DMA, bundle, RAM device reservations. */
         }
         /* Non-permanent boot regions (e.g. bundle) still belong to L1's pool. */
         if (!(r->flags & LEDGER_RF_PERMANENT)) {

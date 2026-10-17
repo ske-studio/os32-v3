@@ -20,9 +20,9 @@
 #include "kbd_inject.h"
 
 /* V86 セッション中の画面描画抑止 (kernel/v86.c)。
- * セッション中は低位 640KB がゲスト用バッキング RAM に差し替わっており、
- * Unicode-JIS 表 (0x4A000) を読むとゲストのメモリをテーブルとして解釈して
- * 文字化けする。TVRAM/KCG への書き込みもゲストの画面と CG 状態を汚す。
+ * セッション中は低位 640KB がゲスト用バッキング RAM に差し替わる。
+ * Unicode-JIS 表は独立した kernel 所有頁にあるが、TVRAM/KCG への書き込みは
+ * ゲストの画面と CG 状態を汚す。
  * 描画だけを抑止し、シリアル出力 (rshell ログ) は通す。 */
 extern int v86_is_active(void);
 

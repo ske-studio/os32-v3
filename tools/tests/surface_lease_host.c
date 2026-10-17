@@ -161,7 +161,7 @@ static void caller_copy_tests(void)
     source.role = LEDGER_ROLE_UNICODE; source.backend = 0;
     ledger_surfaces[sid].role = LEDGER_ROLE_UNICODE; ledger_surfaces[sid].backend = 0;
     ledger_surfaces[sid].perm_max = LEDGER_PERM_RO;
-    tokens[0] = GET(0); CHECK(!lease_release(&space, tokens[0]));
+    GET(OS32_ERR_INVAL); /* Reserved Unicode role has no lease. */
     requested_access = LEDGER_PERM_RW; GET(OS32_ERR_INVAL);
     requested_access = LEDGER_PERM_RO;
     source.role = LEDGER_ROLE_TVRAM; ledger_surfaces[sid].role = LEDGER_ROLE_TVRAM;

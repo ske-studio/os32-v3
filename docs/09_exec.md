@@ -44,7 +44,7 @@ KernelAPIポインタを引数として実行する。
 | 0xA0000〜0xBFFFF | supervisor (e11b1〜) | テキスト / グラフィック VRAM。CPL=3 は KAPI (`tvram_*`) か lease 経由だけ |
 | フォントキャッシュ 0x01000〜 | supervisor (e11b1〜) | `kcg_read_*` の KAPI 越し |
 | SHM | RW+USER (共有 PT、lock 中は RO) | boot 専用口で初期化し、SHM 専用口で RW だけ切替 |
-| Unicode 表 0x4A000〜 | supervisor (e11b2〜) | CPL=3 は RO の Unicode lease 経由 |
+| Unicode の組表 (kernel 所有の 7 頁、T3d1〜) | supervisor | CPL=3 は KAPI `unicode_to_jis` だけ (表は公開しない、[T3D1_UNICODE_FILE](tasks/v3/T3D1_UNICODE_FILE.md)) |
 | 0x6A000〜0x89FFF (9801 BB)、バックエンド固有 BB | supervisor (e11b2〜) | CLIENT lease の私有 VA で描画。Cirrus DISPLAY は授権された lease だけ RW |
 | KAPI トランポリン 1 ページ | RO+USER | `int 0x80` スタブ列 |
 | 0x80000000〜 shlib .text | RO+USER (共有) / .data は per-app | 共有ライブラリ |

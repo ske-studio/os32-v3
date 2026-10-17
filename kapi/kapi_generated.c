@@ -46,6 +46,7 @@
 #include "ring3_ls.h"
 #include "redir_access.h"
 #include "appmem.h"
+#include "unicode_file.h"
 
 extern volatile u32 tick_count;
 extern void kapi_sys_exit(int status);
@@ -61,7 +62,7 @@ extern i32 kapi_mem_stat(i32 app_id, void *out, u32 size);
 #include "kapi_profile.h"
 
 #ifdef KAPI_PROFILE
-volatile u32 kapi_hits[249];
+volatile u32 kapi_hits[250];
 #endif
 
 /* 各スロットの cdecl 引数バイト数 (固定分)。int 0x80 ディスパッチャが
@@ -316,6 +317,7 @@ const u16 kapi_argsize[KAPI_FUNC_COUNT] = {
     12,  /* mem_map */
     8,  /* mem_unmap */
     12,  /* mem_stat */
+    4,  /* unicode_to_jis */
 };
 
 /* 各スロットの固定引数のうち早期検査するポインタのビットマスク (bit k = 引数 k)。
@@ -570,6 +572,7 @@ const u16 kapi_argptr[KAPI_FUNC_COUNT] = {
     0x0000,  /* mem_map */
     0x0000,  /* mem_unmap */
     0x0000,  /* mem_stat */
+    0x0000,  /* unicode_to_jis */
 };
 
 /* ---- 出力ポインタの書き込み可検査 (票 TASK_KAPI_OUTPUT_GUARD) --------
@@ -2404,5 +2407,11 @@ i32 __cdecl wrap_mem_stat(i32 app_id, void *out, u32 size)
         ring3_fault_kill();   /* 戻らない */
     }
     return kapi_mem_stat(app_id, out, size);
+}
+
+u16 __cdecl wrap_unicode_to_jis(u32 cp)
+{
+    KAPI_HIT(249);
+    return unicode_file_lookup(cp);
 }
 

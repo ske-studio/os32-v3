@@ -130,7 +130,7 @@ LEASE_MUTANTS = [
     ('lease-one-shot', 'kernel/r1_fixture.c', '    r1_fixture_arm[slot] = 0;',
      '    /* leave armed */', 'FAIL !r1_fixture_arm[R1_FIXTURE_LEASE_FAIL]'),
     ('lease-role', 'kernel/r1_fixture.c', 'role == LEDGER_ROLE_CLIENT',
-     '(role || 1)', 'FAIL !r1_fixture_lease(&space,LEDGER_ROLE_UNICODE)'),
+     '(role || 1)', 'FAIL !r1_fixture_lease(&space,LEDGER_ROLE_TVRAM)'),
     ('wait-no-retry', 'userland/lib/gfx/libos32gfx_core.c',
      '    gfx_api->sys_halt();\n    (void)libos32gfx_check();', '    gfx_api->sys_halt();',
      'FAIL waits==1'),

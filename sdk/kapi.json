@@ -1,6 +1,6 @@
 {
   "generations": {"os32x_format": 4, "kapi_abi": 1, "memory_layout": 4, "shlib_protocol": 2},
-  "version": 75,
+  "version": 76,
   "func_capacity": 300,
   "crt_kapi_symbol": "os32_kapi_v63",
   "data_fields": [
@@ -53,7 +53,7 @@
     "memory_boot.h",
     "launch.h",
     "kapi_host.h",
-    "pci.h", "pcm_cs4231.h", "bootinfo.h", "serialfs.h", "v86_gcap.h", "surface_query.h", "ring3_ls.h", "redir_access.h", "appmem.h"
+    "pci.h", "pcm_cs4231.h", "bootinfo.h", "serialfs.h", "v86_gcap.h", "surface_query.h", "ring3_ls.h", "redir_access.h", "appmem.h", "unicode_file.h"
   ],
   "externs": [
     "extern volatile u32 tick_count;",
@@ -1876,6 +1876,12 @@
       "args": ["i32 app_id", "void *out", "u32 size"],
       "target": "kapi_mem_stat",
       "out": [{"arg": "out", "len": "size"}]
+    },
+    {
+      "name": "unicode_to_jis",
+      "ret": "u16",
+      "args": ["u32 cp"],
+      "target": "unicode_file_lookup"
     }
   ]
 }

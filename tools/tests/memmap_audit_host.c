@@ -24,7 +24,6 @@ char *kstrncpy(char *d, const char *s, u32 n)
 #include "audit_slice.inc"
 #include "post_probe_slice.inc"
 #include "system_surface.h"
-int utf8_jis_table_ready(void) { return 1; }
 int host_map_fail;
 static u32 scan_total[2], scan_interval[2], scan_max[2];
 void host_scan(int kind)
@@ -162,7 +161,7 @@ static void run(void)
     reset_scans();
     CHECK(ledger_selfcheck("bounded"));
     CHECK(scan_max[1] == pgalloc_limit_pfn() && scan_max[1] <= PHYSMEM_MAX_PFN);
-    CHECK(paging_addrspace_map_user_range(&space, MEM_UNICODE_TABLE_BASE,
+    CHECK(paging_addrspace_map_user_range(&space, MEM_KCG_LZ4_TEMP_BASE,
           MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE, PAGE_RW | PTE_USER) == -1);
     CHECK(!paging_master_audit(exec_tramp_page_addr()));
     CHECK(!paging_shm_set_rw(MEM_SHM_BASE, MEM_SHM_BASE + PAGE_SIZE, 0));

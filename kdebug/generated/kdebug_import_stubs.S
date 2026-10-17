@@ -1116,4 +1116,14 @@ pgalloc_page_owned:
 memory_boot_slack_first:
     jmp *kdebug_import_slots+888
 .size memory_boot_slack_first, .-memory_boot_slack_first
+.globl unicode_file_debug_phys
+.type unicode_file_debug_phys, @function
+unicode_file_debug_phys:
+    jmp *kdebug_import_slots+892
+.size unicode_file_debug_phys, .-unicode_file_debug_phys
+.globl unicode_file_lookup
+.type unicode_file_lookup, @function
+unicode_file_lookup:
+    jmp *kdebug_import_slots+896
+.size unicode_file_lookup, .-unicode_file_lookup
 .section .note.GNU-stack,"",@progbits

@@ -1,7 +1,5 @@
 #include "libos32gfx.h"
 #include "libgfx_attach_internal.h"
-#include "utf8_internal.h"
-#include "memmap.h"
 
 KernelAPI *gfx_api;
 GFX_Framebuffer gfx_fb;
@@ -9,9 +7,6 @@ int gfx_dirty_suppress;
 int gfx_packed;
 int gfx_ready;
 const struct gfx_attach_port *gfx_attach_port;
-const struct gfx_attach_port *gfx_unicode_port;
-static struct gfx_attach_ref unicode_ref;
-static struct gfx_attach_view unicode_view;
 static int gfx_pools_initialized;
 static int gfx_stopped;
 static struct gfx_attach_ref gfx_ref;
@@ -49,22 +44,16 @@ static int kapi_lease(u32 role, u32 access, const struct gfx_attach_ref *ref,
 
 static int client_query(struct gfx_attach_desc *out)
 { return kapi_query(OS32_SURFACE_CLIENT, out); }
-static int unicode_query(struct gfx_attach_desc *out)
-{ return kapi_query(OS32_SURFACE_UNICODE, out); }
 static int client_lease(const struct gfx_attach_ref *ref, struct gfx_attach_view *out)
 { return kapi_lease(OS32_SURFACE_CLIENT, OS32_SURFACE_RW, ref, out); }
-static int unicode_lease(const struct gfx_attach_ref *ref, struct gfx_attach_view *out)
-{ return kapi_lease(OS32_SURFACE_UNICODE, OS32_SURFACE_RO, ref, out); }
 static int kapi_unlease(u32 token)
 { return gfx_api->surface_unlease(token); }
 static const struct gfx_attach_port gfx_kapi_port = {client_query, client_lease, kapi_unlease};
-static const struct gfx_attach_port unicode_kapi_port = {unicode_query, unicode_lease, kapi_unlease};
 
 static void bind_ports(void)
 {
     if (gfx_api && gfx_api->version >= 70) {
         gfx_attach_port = &gfx_kapi_port;
-        gfx_unicode_port = &unicode_kapi_port;
     }
 }
 
@@ -73,42 +62,6 @@ static unsigned int gfx_cpl(void)
     unsigned short cs;
     __asm__ volatile("mov %%cs,%0" : "=r"(cs));
     return cs & 3U;
-}
-
-void libos32gfx_unicode_init(void)
-{
-    struct gfx_attach_desc desc = {0};
-    struct gfx_attach_view view = {0};
-    bind_ports();
-    /* CPL0 keeps its internal path; user failure never probes the low alias. */
-    if (gfx_cpl() == 0) {
-        utf8_set_jis_table((const u8 *)P2V_CONST(MEM_UNICODE_TABLE_BASE));
-        return;
-    }
-    if (!gfx_unicode_port) return;
-    utf8_set_jis_table(0);
-    if (gfx_unicode_port->query(&desc)) goto fail;
-    if (unicode_view.token && unicode_ref.sid == desc.ref.sid &&
-        unicode_ref.generation == desc.ref.generation) {
-        utf8_set_jis_table((const u8 *)unicode_view.base);
-        return;
-    }
-    if (unicode_view.token) (void)gfx_unicode_port->unlease(unicode_view.token);
-    unicode_view = (struct gfx_attach_view){0};
-    if (!desc.ref.generation || desc.bytes != MEM_UNICODE_TABLE_SIZE ||
-        desc.planes != 1 || desc.plane_offset[0]) goto fail;
-    if (gfx_unicode_port->lease(&desc.ref, &view)) goto fail;
-    unicode_view = view;
-    if (!view.token || !view.base || view.bytes != desc.bytes ||
-        view.bytes > ~view.base || view.planes[0] != view.base ||
-        view.planes[1] || view.planes[2] || view.planes[3]) goto fail;
-    unicode_ref = desc.ref;
-    utf8_set_jis_table((const u8 *)view.base);
-    return;
-fail:
-    if (unicode_view.token) (void)gfx_unicode_port->unlease(unicode_view.token);
-    unicode_view = (struct gfx_attach_view){0};
-    unicode_ref = (struct gfx_attach_ref){0};
 }
 
 void libos32gfx_detach(void)
@@ -195,7 +148,7 @@ int libos32gfx_attach_checked(void)
 {
     int rc;
     gfx_stopped = 0;
-    libos32gfx_unicode_init();
+    bind_ports();
     rc = gfx_refresh();
     /* Pools do not depend on a framebuffer. Initialize even after FULL so
      * check/present can recover, but never reset live objects on reattach. */

@@ -1,4 +1,4 @@
-# KernelAPI v75 仕様書
+# KernelAPI v76 仕様書
 
 外部プログラム (OS32X) がカーネル機能を利用するためのAPIテーブル仕様。
 
@@ -16,8 +16,8 @@
 | 最大プログラムサイズ | image と暫定 heap 予算を起動時に検査 ([TASK_T2_APPBAND](tasks/v3/TASK_T2_APPBAND.md) §4) |
 | プログラム専用ヒープ | 動的配置 (sbrk_heap_limit, exec_heap 管理下) |
 | プログラム専用スタック | 動的配置 (メモリ終端付近、下向き展開) |
-| 現在のバージョン | **75** |
-| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 249・予約 51) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
+| 現在のバージョン | **76** |
+| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 250・予約 50) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
 
 ---
 
@@ -120,6 +120,7 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v70 | **実装 (2026-10-07、e11c1・統合ゲスト受入前)** | surface query/lease/bundle/unlease・値返し ls・本人識別の 6 本 (slot 240〜245)。公開値型・ページ/SHM 定数、pipe の CPL3 制限。e11b2 で memory_layout 世代 2 (版70は不変、旧世代1は拒否) | §4-10、[TASK_T2D_T2H](tasks/v3/TASK_T2D_T2H.md) e11 |
 | v71 | **受入済み (2026-10-08、f12 ゲスト受入)** | USER 専用 `mem_map` / `mem_unmap` (slot 246・247)。f12 で memory_layout 世代 3 (KAPI 71・slot・データ欄は不変)。USER の最小初期量と mem_map による伸長へ切替。旧世代は拒否。 |
 | v72 | **受入済み (2026-10-09、f13 ゲスト受入)** | `mem_stat` (slot 248)、サイズ引数つき MemStat。4 世代・データ欄は不変。 | 本書 §4-12 |
+| v76 | **実装 (T3d1b、ゲスト受入は未実施)** | `unicode_to_jis` (slot 249)、kernel 所有の組表を探索。4 世代・データ欄は不変。 | 本書 §4-13 |
 | v75 | **受入済み (2026-10-15、DBGREF G1)** | MemStat 末尾に kdebug の 5 欄を追記 (220B)。slot・4 世代は据置 (OS32X_MIN_API は 75)。 | 本書 §4-12 |
 | v74 | **実装 (T2h h4a、ゲスト受入は R1)** | MemStat 診断 17 欄を末尾追記 (200B)。slot・4 世代は据置。 | 本書 §4-12 |
 | v73 | **実装 (T2g g1、ゲストは GK-1)** | MemStat 末尾に圧力 epoch・保留 mask・app epoch を追記 (132B)。slot・4 世代は据置。 | 本書 §4-12 |
@@ -1838,3 +1839,16 @@ kheap_peak / resident_heap_peak は B、resident_heap_fail は常駐確保の失
 固定シリアル診断は通常文脈のみ。commit で `OS32: owner-start id=<n> owner=<o> gen=<g>`、teardown の前後差で `OS32: owner-exit id=<n> owner=<o> gen=<g> pages=<p> leftover=<l> irq=<d> exc=<d>` を出す。pages は回収前、leftover は回収後の増分、深さは出力時の観測値。起動中止は start 無しで exit を出す。
 
 gshell の CTRL+GRPH+f･10 は全 app slot (2〜5) の id/state/owner_pages/exec_heap_used/trim_pending をシリアルへ出す。X4 では入力を退避し X3 で採取する。
+
+
+### §4-13 unicode_to_jis (v76)
+
+| オフセット | 名前 | 型 |
+|---|---|---|
+| 0x3EC | unicode_to_jis | `u16(u32 cp)` |
+
+slot 249。ひらがな U+3041..3093 とカタカナ U+30A1..30F6 は算術変換し、
+他は起動時に `/sys/unicode.bin` から kernel 所有の7頁へ読んだ7,063組を二分探索する。
+未収録・BMP外・表が無い場合は0（かな算術は表が無くても有効）。表ポインタは公開しない。
+予約済み surface role 4 の query は `OS32_ERR_INVAL`。媒体・失敗時の契約は
+[T3d1 補遺](tasks/v3/T3D1_UNICODE_FILE.md) §1〜§3 に従う。

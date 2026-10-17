@@ -58,10 +58,6 @@ utf8_decode_t utf8_decode(const u8 *src);
 /* Unicode → JIS変換 (0=変換不可) */
 u16 unicode_to_jis(u32 codepoint);
 
-/* Unicode→JIS 変換表 (/sys/unicode.bin) のロード成否を通知する。
- * 未ロードのまま unicode_to_jis を呼ぶと 0 (変換不可) が返る。 */
-void utf8_set_jis_table_ready(int ready);
-
 /* Unicode → ANKコード (0=非ANK) */
 u8 unicode_to_ank(u32 codepoint);
 

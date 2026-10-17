@@ -34,7 +34,7 @@
 #include "shlib.h"
 #include "shm.h"
 #include "utf8.h"
-#include "utf8_internal.h"
+#include "unicode_file.h"
 #include "system_surface.h"
 #include "kselftest.h"
 #include "kstack_hw.h"
@@ -535,8 +535,8 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
 
     /* boot 内の正規のフォント読込 (e8b: kcg_load_font は boot フェーズの
      * 間だけ通り、boot_phase_close() の後は NOSYS)。
-     * Unicode テーブル (0x4A000) はまだロードされていないので、
-     * LZ4 一時バッファとして安全に使える。 */
+     * BB/mailbox の公開前なので、低位 KCG scratch を
+     * LZ4 一時バッファとして使える。 */
     tvram_print(0, 3, "FONT..", TATTR_GREEN);
     {
         int fret;
@@ -594,6 +594,8 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     kdebug_load();
     if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_run();
     else kselftest_skipped();
+
+    unicode_file_load();
 
     /* ⑥-0 (TASK_T1_LEDGER §3-3、B4): pci_init は台帳より前に走るので、g_pci の
      * メモリ BAR をここで資源表へ RAW (採取値、予約権限なし) として取り込む。
@@ -667,26 +669,6 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_post_exec();
     tvram_print(56, 2, "OK", TATTR_WHITE);
 
-    /* Unicodeテーブルロード */
-    tvram_print(60, 2, "UNI...", TATTR_GREEN);
-    kprintf(0x07, "[BOOT] UNI load: dst=%x size=%x\n",
-            (unsigned)MEM_UNICODE_TABLE_BASE, (unsigned)MEM_UNICODE_TABLE_SIZE);
-    {
-        int bytes = vfs_read(SYS_UNICODE_BIN, (void *)P2V(MEM_UNICODE_TABLE_BASE), MEM_UNICODE_TABLE_SIZE);
-        kprintf(0x07, "[BOOT] UNI load: bytes=%d\n", bytes);
-        if (bytes == (int)MEM_UNICODE_TABLE_SIZE &&
-            utf8_validate_jis_table()) {
-            utf8_set_jis_table_ready(1);
-            tvram_print(67, 2, "OK", TATTR_WHITE);
-        } else {
-            /* 表を有効化しない。ロード失敗のまま引くと、0x4A000 に
-             * 残っていた別のデータを変換表として読んでしまう。 */
-            utf8_set_jis_table_ready(0);
-            tvram_print(67, 2, "ER", TATTR_RED);
-        }
-    }
-
-    (void)system_unicode_register();
     if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_post_unicode();
 
     /* IME (FEP) 初期化 — 辞書は初回使用時に遅延ロード */
@@ -767,7 +749,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * ext2 / FAT でなければ書かない。どこで失敗しても起動は続ける。 */
     bootlog_save();
 
-    /* scratch失効→Unicode再検証→planar BB全域/mailbox初期化。
+    /* scratch失効→planar BB全域/mailbox初期化。
      * 台帳の予約と公開は別。gfx_started後のSURFACE publisher/USER lease、
      * 最初の通常AS開始より前に完了する。 */
     kcg_boot_phase_close();

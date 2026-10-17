@@ -43,7 +43,6 @@ TARGET_SRCS = [
     'userland/lib/math/libos32math.h',
     'lib/utf8.c',
     'lib/utf8.h',
-    'lib/utf8_internal.h',
 ]
 assert set(KERNEL_SRCS) <= set(TARGET_SRCS)
 SDK_SRCS = [p for p in TARGET_SRCS if (p.startswith("userland/") or p == "lib/utf8.c") and p.endswith(".c")]
@@ -55,7 +54,7 @@ MUTANTS = [
  ('halt-no-check', [(CORE,'    gfx_api->sys_halt();\n    (void)libos32gfx_check();','    gfx_api->sys_halt();')],
    'FAIL gfx_ready && live()==1 && space.leases[0].token!=fresh'),
  ('production-port-absent', [(CORE,'gfx_api->version >= 70','gfx_api->version > 70')],
-   'FAIL gfx_attach_port && gfx_unicode_port && public_queries==2 && public_leases==1'),
+   'FAIL gfx_attach_port && public_queries==1 && public_leases==1'),
  ('getchar-no-check', [(CORE,'    int key = gfx_api->kbd_getchar();\n    (void)libos32gfx_check();','    int key = gfx_api->kbd_getchar();')],
    'FAIL gfx_ready && live()==1 && space.leases[0].token!=fresh'),
  ('trygetchar-no-check', [(CORE,'    if (key >= 0) (void)libos32gfx_check();','    (void)key;')],

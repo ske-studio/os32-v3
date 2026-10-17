@@ -56,10 +56,10 @@ static void caller_copy_tests(void)
                         source.backend = role <= LEDGER_ROLE_DISPLAY ? LEDGER_SF_PEGC : 0;
                         ledger_surfaces[sid[0]].role = role;
                         ledger_surfaces[sid[0]].backend = source.backend;
-                        ledger_surfaces[sid[0]].perm_max = role == LEDGER_ROLE_UNICODE ? LEDGER_PERM_RO : LEDGER_PERM_RW;
+                        ledger_surfaces[sid[0]].perm_max = LEDGER_PERM_RW;
                         int allowed = role == LEDGER_ROLE_CLIENT ? (!mode || !g || f) :
                             role == LEDGER_ROLE_DISPLAY ? (g && (!mode || f)) :
-                            role == LEDGER_ROLE_TVRAM ? !mode : 1;
+                            role == LEDGER_ROLE_TVRAM ? !mode : 0;
                         query_expect(allowed ? 0 : OS32_ERR_INVAL);
                         CHECK(surface_query_refs(&source, refs, 1, LEDGER_PERM_RO) ==
                               (allowed ? 0 : OS32_ERR_INVAL));
@@ -124,8 +124,8 @@ static void caller_copy_tests(void)
     BAD(kctx_exc_depth = 1, kctx_exc_depth = 0);
     source.role = LEDGER_ROLE_UNICODE; source.backend = 0;
     ledger_surfaces[sid[0]].role = LEDGER_ROLE_UNICODE; ledger_surfaces[sid[0]].backend = 0;
-    query_expect(OS32_ERR_INVAL); /* Unicode publisher must offer RO only. */
-    ledger_surfaces[sid[0]].perm_max = LEDGER_PERM_RO; query_expect(0);
+    query_expect(OS32_ERR_INVAL); /* Reserved Unicode role is never public. */
+    ledger_surfaces[sid[0]].perm_max = LEDGER_PERM_RO; query_expect(OS32_ERR_INVAL);
     source.role = LEDGER_ROLE_CLIENT; source.backend = LEDGER_SF_PC98;
     ledger_surfaces[sid[0]].role = LEDGER_ROLE_CLIENT; ledger_surfaces[sid[0]].backend = LEDGER_SF_PC98;
     ledger_surfaces[sid[0]].perm_max = LEDGER_PERM_RW;

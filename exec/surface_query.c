@@ -59,7 +59,6 @@ STATIC_ASSERT(OS32_SURFACE_MAX == SURFACE_QUERY_MAX, abi_surface_max);
 STATIC_ASSERT(OS32_SURFACE_CLIENT == LEDGER_ROLE_CLIENT, abi_surface_client);
 STATIC_ASSERT(OS32_SURFACE_DISPLAY == LEDGER_ROLE_DISPLAY, abi_surface_display);
 STATIC_ASSERT(OS32_SURFACE_TVRAM == LEDGER_ROLE_TVRAM, abi_surface_tvram);
-STATIC_ASSERT(OS32_SURFACE_UNICODE == LEDGER_ROLE_UNICODE, abi_surface_unicode);
 STATIC_ASSERT(OS32_SURFACE_RO == LEDGER_PERM_RO, abi_surface_ro);
 STATIC_ASSERT(OS32_SURFACE_RW == LEDGER_PERM_RW, abi_surface_rw);
 STATIC_ASSERT(OS32_SURFACE_PC98 == LEDGER_SF_PC98, abi_surface_pc98);
@@ -102,8 +101,6 @@ int surface_query_authorize(const struct surface_query_source *s,
     case LEDGER_ROLE_TVRAM:
         if (gui) return OS32_ERR_INVAL;
         break;
-    case LEDGER_ROLE_UNICODE:
-        break;
     default:
         return OS32_ERR_INVAL;
     }
@@ -137,8 +134,7 @@ static int surface_snapshot(const struct surface_query_source *s,
             !sf->planes || sf->planes > SURFACE_QUERY_MAX ||
             !sf->width || !sf->height || !sf->pitch ||
             sf->npages > ~(u32)0 / PAGE_SIZE ||
-            (sf->perm_max != LEDGER_PERM_RO && sf->perm_max != LEDGER_PERM_RW) ||
-            (s->role == LEDGER_ROLE_UNICODE && sf->perm_max != LEDGER_PERM_RO))
+            (sf->perm_max != LEDGER_PERM_RO && sf->perm_max != LEDGER_PERM_RW))
             return OS32_ERR_INVAL;
         d->ref = *r;
         d->role = sf->role; d->backend = sf->backend; d->format = sf->format;
@@ -235,7 +231,6 @@ static int surface_api_source(u32 role, struct surface_query_source *source)
     case LEDGER_ROLE_DISPLAY:
         return gfx_surface_source(role, source);
     case LEDGER_ROLE_TVRAM:
-    case LEDGER_ROLE_UNICODE:
         return system_surface_source(role, source);
     default:
         return OS32_ERR_INVAL;

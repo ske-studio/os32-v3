@@ -163,7 +163,7 @@ void _start(void) {
         CHECK(!app_map_region(a.as, a.exec_heap_base, a.exec_heap_base + a.exec_heap_size));
         CHECK(!app_map_region(a.as, a.stack_base, a.stack_top));
         launch_shared_maps(&a); CHECK(!launch_map_attempts);
-        for (i = MEM_UNICODE_TABLE_BASE; i < MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE; i += PAGE_SIZE)
+        for (i = MEM_KCG_LZ4_TEMP_BASE; i < MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE; i += PAGE_SIZE)
             CHECK(!(page_tables[0][i / PAGE_SIZE] & PTE_USER));
         for (i = 0; i < t_bb_size; i += PAGE_SIZE)
             CHECK(page_tables[(t_bb_base + i) >> 22][((t_bb_base + i) >> 12) & 1023] == ((t_bb_base + i) | PAGE_RW));

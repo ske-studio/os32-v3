@@ -1784,6 +1784,22 @@
       "source": "kernel/memory_boot.h",
       "context_safe": false,
       "index": 222
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "unicode_file_debug_phys",
+      "source": "kernel/unicode_file.h",
+      "context_safe": false,
+      "index": 223
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "unicode_file_lookup",
+      "source": "kernel/unicode_file.h",
+      "context_safe": false,
+      "index": 224
     }
   ]
 }

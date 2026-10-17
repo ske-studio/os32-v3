@@ -261,15 +261,15 @@ def bands(m, sym):
     add(CONV, "NULL ポインタ検出ガード", 0, v("MEM_NULL_GUARD_END"), "NP",
         "ブート後は R/O (BDA 参照のため。paging.c の [DEBUG] 注記)")
     add(CONV, "フォントキャッシュ", v("MEM_FONT_CACHE_BASE"),
-        (v("MEM_UNICODE_TABLE_BASE") or 0) - 1, "RW", "kcg.c がブート後に配置")
+        (v("MEM_KCG_LZ4_TEMP_BASE") or 0) - 1, "RW", "kcg.c がブート後に配置")
     add(CONV, "ブート情報域 (ローダ → kernel_main)", v("MEM_BOOTINFO_BASE"),
         v("MEM_BOOTINFO_END"), "RW",
         "INT 1Bh AH=84h の結果 (include/bootinfo.h)。kernel_main の最初で写した"
         "後はフォントキャッシュが上書きしてよい",
         parent="フォントキャッシュ")
-    add(CONV, "Unicode-JIS 変換表", v("MEM_UNICODE_TABLE_BASE"),
-        plus("MEM_UNICODE_TABLE_BASE", "MEM_UNICODE_TABLE_SIZE", -1), "RW",
-        "SURFACE_BACKING/KERNEL/WB、RO lease。旧 USER RW は e11 で撤去、T3 V86_LOW 統合時に再検討")
+    add(CONV, "KCG scratch 固定予約", v("MEM_KCG_LZ4_TEMP_BASE"),
+        (v("MEM_GFX_BB_BASE") or 0) - 1, "RW",
+        "FIXED/KERNEL/WB。boot 限定 scratch は MEM_KCG_LZ4_TEMP_END まで BB/mailbox と共用、close 後は再使用しない")
     add(CONV, "GFX バックバッファ (4 プレーン)", v("MEM_GFX_BB_BASE"),
         plus("MEM_GFX_BB_BASE", "MEM_GFX_BB_SIZE", -1), "RW",
         "CPL=3 からは常に USER (レビュー #6)")
@@ -943,6 +943,9 @@ def layout_manifest(root, map_path, elf_path, limit_name=None):
     def add(name, start, end, purpose, **extra):
         rows.append(layout_range(name, start, end, purpose, source="memmap.h", **extra))
 
+    add("KCG scratch fixed reservation", v("MEM_KCG_LZ4_TEMP_BASE"),
+        v("MEM_GFX_BB_BASE"), "kcg_scratch", reservation="FIXED",
+        lifetime="boot-only", scratch_end=v("MEM_KCG_LZ4_TEMP_END"))
     resident = symbols.get("__kernel_resident_end", symbols["__bss_end"])
     core_pad_end = symbols["__sqlite_start"]
     add("core tail padding", symbols["__bss_end"], core_pad_end, "core", noload=True)

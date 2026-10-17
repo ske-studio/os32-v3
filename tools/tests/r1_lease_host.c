@@ -39,7 +39,7 @@ static void run(void)
         if(bad<4) {
             CHECK(!libos32gfx_attach_checked() && gfx_ready && live()==1);
             libos32gfx_detach(); CHECK(!live());
-        } else if(bad==4) CHECK(!r1_fixture_lease(&space,LEDGER_ROLE_UNICODE));
+        } else if(bad==4) CHECK(!r1_fixture_lease(&space,LEDGER_ROLE_TVRAM));
         else CHECK(!r1_fixture_lease(&(struct addrspace){0},LEDGER_ROLE_CLIENT));
         if(bad>=2) CHECK(r1_fixture_arm[R1_FIXTURE_LEASE_FAIL]==R1_FIXTURE_ARM);
         r1_fixture_id[R1_FIXTURE_LEASE_FAIL]=2;

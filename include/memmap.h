@@ -113,9 +113,10 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 #define MEM_BOOTINFO_SIZE       0x00100UL
 #define MEM_BOOTINFO_END        0x07EFFUL
 
-/* Unicode-JIS変換テーブル (コンベンショナル, 128KB) */
-#define MEM_UNICODE_TABLE_BASE  0x4A000UL
-#define MEM_UNICODE_TABLE_SIZE  0x20000UL  /* 128KB */
+/* KCG LZ4 scratch (boot 限定、BB/mailbox 初期化前の 344KB)。
+ * [BASE, MEM_GFX_BB_BASE) の旧128KBは kernel FIXED のまま保持する。 */
+#define MEM_KCG_LZ4_TEMP_BASE   0x4A000UL
+#define MEM_KCG_LZ4_TEMP_END    MEM_CONV_END
 
 /* GFXバックバッファ (コンベンショナル, 128KB = 32000B × 4プレーン) */
 #define MEM_GFX_BB_BASE         0x6A000UL

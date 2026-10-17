@@ -58,7 +58,6 @@ check-r1-fixture-host:
 - userland/lib/math/libos32math.h
 - lib/utf8.c
 - lib/utf8.h
-- lib/utf8_internal.h
 - exec/appslot.c
 - exec/appslot.h
 - exec/owner_diag.h

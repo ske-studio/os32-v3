@@ -9,8 +9,7 @@
 /*  変換の計算量:                                                            */
 /*    - UTF-8デコード: O(1) ビット演算のみ                                   */
 /*    - ひらがな/カタカナ: O(1) オフセット計算                                */
-/*    - 漢字テーブル検索: O(log2(3160)) ≈ 12回比較                           */
-/*    - テーブル検索はKCG I/Oアクセス(500μs)の2.6%以下                       */
+/*    - 漢字テーブル検索: カーネル所有の7,063組を二分探索                    */
 /*                                                                          */
 /*  u32最適化:                                                               */
 /*    - マルチバイト文字の読み出しを le32_rd(src) 一括読み出しに最適化        */
@@ -21,89 +20,13 @@
 /* ======================================================================== */
 
 #include "utf8.h"
-#include "utf8_internal.h"
-#include "memmap.h"
 #include "endian_le.h"
-
-/* Unicode→JIS 変換表 (/sys/unicode.bin) は **媒体の上の外部形式** —
- * u16 (LE) が 0x10000 語並んだものを、0x4A000 へ生のまま読み込んでいる
- * (kernel/kernel.c の vfs_read)。表の番地は 2 バイト整列なのでアラインの
- * 心配は無いが、`u16 *` で引くと BE の CPU で値が入れ替わる。だから
- * バイト列として持ち、引くときに le16_rd() でバイト順を当てる。 */
 #ifdef __KERNEL_BUILD__
-static const u8 *unicode_jis_table = (const u8 *)P2V_CONST(MEM_UNICODE_TABLE_BASE);
+#include "../kernel/unicode_file.h"
 #else
-static const u8 *unicode_jis_table = 0;
+/* The CRT and shlib each supply their initialized KAPI pointer. */
+extern KernelAPI *kapi;
 #endif
-
-static u16 jis_table_lookup(u32 cp)
-{
-    return le16_rd(unicode_jis_table + cp * 2);
-}
-
-/* Unicode→JIS 変換表 (/sys/unicode.bin) が使える状態か。
- *   -1 未判定 (初回参照時に自己診断する)
- *    0 使えない
- *    1 使える
- *
- * 表は BSS ではなく生の物理アドレス (0x4A000) に置かれるので、ロードに
- * 失敗しても「ゼロ埋め」にはならず、前に居たデータがそのまま表として
- * 読まれる — 画面が意味不明な漢字で埋まり、原因が表のロード失敗だと
- * 気づけない。だから「読めるかどうか」ではなく「正しい表かどうか」を
- * 確かめる必要がある。
- *
- * カーネルと外部プログラムは別の実体を持つ。kernel はロード後に ready を
- * 設定し、ユーザー版は NULL で始めて SDK Unicode port が渡す RO lease の
- * 内容を検証する。初回の NULL probe が失敗しても setter で回復できる。 */
-static int jis_table_ready = -1;
-
-void utf8_set_jis_table_ready(int ready)
-{
-    jis_table_ready = ready && unicode_jis_table ? 1 : 0;
-}
-
-/* 既知の (Unicode, JIS X 0208) 対応を数点照合して、0x4A000 に載っている
- * のが本当に変換表かを確かめる。1 点だけだと残骸が偶然一致しうるので
- * 離れた位置から複数取る。 */
-static int jis_table_probe(void)
-{
-    static const u32 probe_cp[4]  = { 0x4E9C, 0x4E00, 0x5BFE, 0x9078 };
-    static const u16 probe_jis[4] = { 0x3021, 0x306C, 0x4250, 0x412A };
-    int i;
-
-    if (!unicode_jis_table) return 0;
-    for (i = 0; i < 4; i++) {
-        if (jis_table_lookup(probe_cp[i]) != probe_jis[i]) return 0;
-    }
-    return 1;
-}
-
-#ifdef __KERNEL_BUILD__
-/* boot の読込と scratch 失効時もユーザー版と同じ4点を照合する。 */
-int utf8_validate_jis_table(void)
-{
-    return jis_table_probe();
-}
-int utf8_jis_table_ready(void)
-{
-    return jis_table_ready == 1;
-}
-#else
-void utf8_set_jis_table(const u8 *table)
-{
-    jis_table_ready = 0;
-    unicode_jis_table = table;
-    if (table) jis_table_ready = jis_table_probe();
-}
-#endif
-
-static int jis_table_usable(void)
-{
-    if (jis_table_ready < 0) {
-        jis_table_ready = jis_table_probe();
-    }
-    return jis_table_ready;
-}
 
 /* ======================================================================== */
 /*  u32 最適化プリミティブ                                                   */
@@ -283,29 +206,15 @@ u8 unicode_to_ank(u32 cp)
 }
 
 /* ======================================================================== */
-/*  Unicode → JIS変換 (O(1) テーブル参照)                                   */
+/*  Unicode → JIS変換 (カーネル所有の組表)                                  */
 /* ======================================================================== */
 u16 unicode_to_jis(u32 cp)
 {
-    /* ひらがな: U+3041-U+3093 → JIS 0x2421-0x2473 */
-    if (cp >= 0x3041 && cp <= 0x3093) {
-        return (u16)(0x2421 + (cp - 0x3041));
-    }
-
-    /* カタカナ: U+30A1-U+30F6 → JIS 0x2521-0x2576 */
-    if (cp >= 0x30A1 && cp <= 0x30F6) {
-        return (u16)(0x2521 + (cp - 0x30A1));
-    }
-
-    /* BMP範囲外 → 変換不可 */
-    if (cp > 0xFFFF) return 0;
-
-    /* 表が無いなら引かない (未ロードのゴミを漢字として表示しない)。
-       未判定なら内容を検証して自動的に決める。 */
-    if (!jis_table_usable()) return 0;
-
-    /* O(1) でテーブルから直接引く */
-    return jis_table_lookup(cp);
+#ifdef __KERNEL_BUILD__
+    return unicode_file_lookup(cp);
+#else
+    return kapi->unicode_to_jis(cp);
+#endif
 }
 
 /* ======================================================================== */

@@ -165,7 +165,7 @@ DMA ch2 は閉じている) と変異「単発の WRITE の NR で回復とリ�
 | `single_nr_no_recover` | 単発の READ の NR で回復もリトライもしない |
 | `write_nr_no_recover` | 単発の WRITE の NR でも回復もリトライもしない (READ と同じ) |
 | `sis_edge_limit` | 上限ちょうどの別の通知の後ろの完了を期限切れにしない |
-| `font_replay` | 実物の FD イメージと実物の `ff.c` で、フォントの読み込みを VFS の読み方のまま再現する (2026-09-25〜 フォントが FD から外れたので同じ読み方で `/sys/unicode.bin` を読む)。multi / seek は配置から出した上限以下 (`font_bounds`)、single 0、期限切れ 0、中身がファイルと一致 |
+| `font_replay` | 実物の FD イメージと実物の `ff.c` で、フォントの読み込みを VFS の読み方のまま再現する (フォントが FD から外れたため同じ読み方で MINIMAL の `/vmkrnl.lz4` を読む。T3d1 で Unicode が小さくなったので、64 KiB 以上のこの像へ変更)。multi / seek は配置から出した上限以下 (`font_bounds`)、single 0、期限切れ 0、中身がファイルと一致 |
 | `seek_edge_foreign` | SEEK の完了の前に別ドライブの通知 / 自ドライブの Ready 変化が積まれていても、1 本のエッジで全部読んで期限切れを待たない。Ready 変化で世代が進む |
 | `drain_before_skip` | 取り残しの通知で INT 線が上がったままでも、省略の前の排水で下ろし、READ の完了のエッジが来る |
 | `readychange_invalidates` | SIS で Ready 変化を見たら、持っている先読みを入れ替え後の媒体に当てない |

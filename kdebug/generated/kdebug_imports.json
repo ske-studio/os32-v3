@@ -1,7 +1,7 @@
 {
-  "module_abi_gen": 1812091632,
+  "module_abi_gen": 1191817549,
   "stage": "S4",
-  "count": 223,
+  "count": 225,
   "imports": [
     {
       "stage": "S1",
@@ -3345,6 +3345,36 @@
       "type_ver": 1,
       "signature": "u32 memory_boot_slack_first(void);",
       "source_declaration": "u32 memory_boot_slack_first(void);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "stage": "S4",
+      "kind": 1,
+      "symbol": "unicode_file_debug_phys",
+      "source": "kernel/unicode_file.h",
+      "context_safe": false,
+      "index": 223,
+      "name": "unicode_file_debug_phys",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "u32 unicode_file_debug_phys(void);",
+      "source_declaration": "u32 unicode_file_debug_phys(void);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "stage": "S4",
+      "kind": 1,
+      "symbol": "unicode_file_lookup",
+      "source": "kernel/unicode_file.h",
+      "context_safe": false,
+      "index": 224,
+      "name": "unicode_file_lookup",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "u16 unicode_file_lookup(u32 cp);",
+      "source_declaration": "u16 unicode_file_lookup(u32 cp);",
       "dtype": null,
       "array": false
     }

@@ -1,5 +1,5 @@
 CHECK_PAR_ORDER += 126:check-unicode-lookup-host
-# T3d0: disposable candidate only; no product source or API changes.
+# T3d1: generated pair file + product loader/lookup, with a mock SDK path.
 check-unicode-lookup-host:
 	$(call host32_check,test_unicode_lookup.py)
 
