@@ -571,6 +571,9 @@ pub fn open(
     if buttons > GUI_MODAL_INPUT {
         return OS32_ERR_INVAL;
     }
+    if buttons == GUI_MODAL_INPUT {
+        fep::cancel_input();
+    }
     let next_id = next_dialog_id();
     {
         let m = state();
@@ -680,6 +683,9 @@ fn open_wm(st: &mut GuiState, buttons: u16, msg: &[u8], purpose: u8) -> bool {
     if state().used {
         return false;
     }
+    if buttons == GUI_MODAL_INPUT {
+        fep::cancel_input();
+    }
     let next_id = next_dialog_id();
     {
         let m = state();
@@ -737,6 +743,9 @@ fn finish(st: &mut GuiState, result: i16) {
 
     /* **後始末より先に閉じる**: 用途によってはここから次のダイアログ
      * (エラー通知) を開くので、`used` を落としておかないと開けない (W3)。 */
+    if buttons == GUI_MODAL_INPUT {
+        fep::cancel_input();
+    }
     state().used = false;
 
     if wm_owned {
@@ -843,6 +852,9 @@ pub fn reclaim_owner(st: &mut GuiState, owner: i32) {
     };
     if !hit {
         return;
+    }
+    if was_input {
+        fep::cancel_input();
     }
     {
         let m = state();

@@ -312,17 +312,15 @@ fn grid_clear_all(f: &mut Fep) {
 
 /// GFX 版の関数表をカーネル FEP へ差し込む。
 ///
-/// **現状は何もしない**: `ime_set_render()` に相当する KAPI がまだ無い
-/// (モジュール先頭の申し送りを参照)。KAPI が生えたらここで
-/// `(a.ime_set_render)(&GSHELL_IME_RENDER_GFX as *const _ as *mut u8)` を呼ぶ。
-/// 差し込めていない間は [`kernel_drives`](Fep::kernel_drives) が false のままで、
-/// WM 側がモード表示だけを格子へ書く。
+/// IME ON なら差し込み中にモード表示が描かれるので、格子は先に初期化する。
 pub fn install() {
     let f = state();
     f.render_table = &GSHELL_IME_RENDER_GFX as *const ImeRender as u32;
-    /* カーネル FEP の描画先を GFX 版の関数表へ (K 依頼 2 = ime_set_render)。 */
-    unsafe { (os32api::api().ime_set_render)(f.render_table as *mut u8) };
     grid_clear_all(f);
+    let table = f.render_table;
+    /* カーネル FEP の描画先を GFX 版の関数表へ (K 依頼 2 = ime_set_render)。 */
+    unsafe { (os32api::api().ime_set_render)(table as *mut u8) };
+    let f = state();
     f.on = unsafe { (os32api::api().ime_is_active)() } != 0;
     refresh_indicator(f);
 }
@@ -539,8 +537,9 @@ pub fn commit_to(st: &mut GuiState, win_id: u32) {
         return; /* 予約は残す */
     }
     state().commit_for = 0;
-    /* 前の打鍵の確定文字が残っていれば、それは今のフォーカス窓のもの。 */
-    flush_text(st);
+    /* 前の打鍵の確定列も予約した元の窓のもの (現在の前景には渡さない)。 */
+    let original = input::target_of(st, win_id);
+    flush_text_to(st, original);
     /* RETURN 1 打では確定し切らないことがある: 候補の確定は最長一致で、
      * 残りのかなを未確定へ戻す (kernel/ime.c の commit_candidate)。素通り
      * (= 未確定が無い) になるまで上限つきで繰り返す (代行レビュー P3-1)。 */
@@ -558,8 +557,48 @@ pub fn commit_to(st: &mut GuiState, win_id: u32) {
     flush_text_to(st, t);
 }
 
+/// 入力先の寿命終了。STOP と同じ取消で、確定も辞書アクセスもしない (X1 可)。
+/// 既に WM が集めた確定列・予約も次の入力先へ渡さない。
+pub fn cancel_input() {
+    const SC_STOP: i32 = 0x60; // drivers/kbd.h KEY_STOP
+    grid_clear_all(state());
+    let _ = feed_kernel(SC_STOP << 8);
+    let f = state();
+    f.commit_len = 0;
+    f.commit_for = 0;
+    refresh_indicator(f);
+}
+
+/// 消える窓が未確定入力の宛先のときだけ取り消す。
+/// モーダルの入力は別の寿命。予約があれば現在の前景より元の宛先を優先する。
+pub fn forget_window(st: &GuiState, win_id: u32) {
+    if input_window(st) == win_id {
+        cancel_input();
+    }
+}
+
+/// 回収で前景が変わる前に、owner の入力先を一度だけ判定する。
+pub fn forget_owner(st: &GuiState, owner: i32) {
+    if let Some(i) = st.win_by_id(input_window(st)) {
+        if st.windows[i].owner == owner {
+            cancel_input();
+        }
+    }
+}
+
+fn input_window(st: &GuiState) -> u32 {
+    if modal::is_input() {
+        return 0;
+    }
+    let pending = state().commit_for;
+    if pending != 0 { pending } else { st.front_id() }
+}
+
 /// X1 でフォーカスが移る前に、確定の宛先だけ控える (最初の 1 件を保つ)。
 pub fn defer_commit(win_id: u32) {
+    if modal::is_input() {
+        return;
+    }
     let f = state();
     if !f.on || f.commit_for != 0 {
         return;

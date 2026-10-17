@@ -27,6 +27,8 @@ extern void ring3_abort_check(void);
 
 static IME_State g_ime;
 static int g_ime_reader_owner;
+static int g_ime_cui_redraw;
+static void ime_cancel_input(void);
 
 /* 辞書ファイルのパス */
 #define IME_DICT_PATH  "/db/fep.db"
@@ -680,6 +682,15 @@ int ime_get_mode(void)
     return g_ime.mode;
 }
 
+/* Shell reload clears TVRAM after gui_owner_exit. Restore the shared mode
+ * when CUI starts waiting, before consuming its first key. */
+static void ime_prepare_cui_input(void)
+{
+    if (!g_ime_cui_redraw) return;
+    g_ime_cui_redraw = 0;
+    if (ime_is_active()) preedit_draw();
+}
+
 static int ime_getchar_wait(int interruptible)
 {
     int keydata;
@@ -687,6 +698,7 @@ static int ime_getchar_wait(int interruptible)
 
     /* WM already passed GUI text through FEP before terminal injection. */
     if (con_sink_is_enabled()) return kbd_getkey_wait(interruptible);
+    ime_prepare_cui_input();
 
     /* バッファに確定済みがあれば返す */
     if (g_ime.commit_pos < g_ime.commit_len) {
@@ -740,6 +752,7 @@ int ime_trygetchar(void)
     int result;
 
     if (con_sink_is_enabled()) return kbd_trygetchar();
+    ime_prepare_cui_input();
 
     if (g_ime.commit_pos < g_ime.commit_len) {
         ime_note_cui_reader();
@@ -794,6 +807,13 @@ int ime_feed_key(int keydata)
 {
     int result;
 
+    /* WM input-target lifetime boundary: STOP cancels even an unread tail.
+     * No dictionary access/learning, so this is also safe in X1. */
+    if (keydata >= 0 && ((keydata >> 8) & 0x7F) == KEY_STOP) {
+        ime_cancel_input();
+        return -1;
+    }
+
     /* 確定済みの続きがあれば先にそれを返す */
     if (g_ime.commit_pos < g_ime.commit_len) {
         return (int)(u8)g_ime.commit_buf[g_ime.commit_pos++];
@@ -829,7 +849,15 @@ int ime_feed_key(int keydata)
 /* ======================================================================== */
 void ime_set_render(void *table)
 {
-    g_ime.render = table ? (const IME_Render *)table : &g_ime_render_tvram;
+    const IME_Render *next = table ? (const IME_Render *)table : &g_ime_render_tvram;
+    if (next != g_ime.render) {
+        ime_cancel_input(); /* GUI/CUI input lifetime ends with its renderer. */
+        g_ime_reader_owner = 0;
+        g_ime.render = next;
+    }
+    g_ime_cui_redraw = table == NULL;
+    /* Restore now and again at the first read after the shell reload clear. */
+    if (ime_is_active()) preedit_draw();
 }
 
 static int ime_getkey_wait(int interruptible)
@@ -838,6 +866,7 @@ static int ime_getkey_wait(int interruptible)
     int result;
 
     if (con_sink_is_enabled()) return kbd_getkey_wait(interruptible);
+    ime_prepare_cui_input();
 
     /* バッファに確定済みがあれば 1バイトずつ返す (scancode=0) */
     if (g_ime.commit_pos < g_ime.commit_len) {
@@ -881,6 +910,7 @@ int ime_trygetkey(void)
     int result;
 
     if (con_sink_is_enabled()) return kbd_trygetkey();
+    ime_prepare_cui_input();
 
     /* バッファに確定済みがあれば 1バイトずつ返す (scancode=0) */
     if (g_ime.commit_pos < g_ime.commit_len) {
@@ -956,7 +986,7 @@ int ime_user_clear_facade(void)
     return ime_user_clear(&g_ime.dict);
 }
 
-/* Cancel the dying CUI reader's composition, without committing candidates.
+/* Cancel an input target's composition, without committing candidates.
  * Dictionary/mode stay available for the next reader. */
 static void ime_cancel_input(void)
 {
@@ -966,8 +996,10 @@ static void ime_cancel_input(void)
     g_ime.kana_buf[0] = '\0';
     g_ime.converting = 0;
     g_ime.result_count = g_ime.candidate_idx = g_ime.page = 0;
+    g_ime.convert_len = 0;
     g_ime.commit_len = g_ime.commit_pos = 0;
     ime_rk_init(&g_ime.rk);
+    tvram_set_scroll_reserve(g_ime.mode != IME_MODE_OFF ? 1 : 0);
     /* OFF leaves the last console row to the app; ON keeps the mode visible. */
     if (g_ime.mode != IME_MODE_OFF) preedit_draw();
 }

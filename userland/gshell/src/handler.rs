@@ -56,11 +56,12 @@ pub extern "C" fn gshell_gui_handler(op: u32, arg: u32, owner: i32) -> i32 {
         }
         /* カーネルの exec_exit から。owner のウィンドウ / タイマ / スロットを回収。
          * 描かない (X1) — 空いた領域は screen_dirty に積まれ、次の X3 で埋まる。 */
+        /* 入力モーダルがある間に窓の入力先を判定する。モーダル自身の取消は後。 */
+        st.reclaim_owner(owner);
         modal::reclaim_owner(st, owner);
         /* sticky な Quit は宛先ごと消える。**SessionAction は残す** (契約 S2:
          * 正常 exit / CTRL+STOP / fault kill のいずれでも失わない)。 */
         session::reclaim_owner(owner);
-        st.reclaim_owner(owner);
         /* K5b-W: 譲り合いの表からもこの ID の 1 本分だけ落とす (T4 / U8)。
          * 4 つの畳み方 (exit / fault / CTRL+STOP / exec_kill) はすべて
          * カーネルの `gui_owner_exit` を通るので、回収はここ 1 か所で足りる。 */

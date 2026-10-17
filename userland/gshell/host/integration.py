@@ -48,6 +48,51 @@ def build(gshell: Path, name: str, quiet: bool = False) -> Path:
 # 票 KBD_NAV (docs/tasks/gui/TASK_KBD_NAV.md) の受け入れ K1 の変異。
 # (名前, ファイル, 置き換え前 (ちょうど 1 か所), 置き換え後, RED になるべき試験の絞り込み)
 MUTATIONS = [
+    ('IMECAND collected commit goes to new focus', 'src/fep.rs',
+     '    flush_text_to(st, original);', '    flush_text(st);',
+     'imecand_collected_commit'),
+    ('IMECAND window destroy keeps candidate', 'src/wm.rs',
+     '    fep::forget_window(st, id);\n    lease::release_window(st, index);',
+     '    lease::release_window(st, index);', 'imecand_window_destroy'),
+    ('IMECAND owner exit keeps candidate', 'src/wm.rs',
+     '        fep::forget_owner(self, owner);\n',
+     '', 'imecand_owner_exit'),
+    ('IMECAND pending target is forgotten', 'src/fep.rs',
+     '    if pending != 0 { pending } else { st.front_id() }',
+     '    st.front_id()',
+     'imecand_deferred_target_destroy'),
+    ('IMECAND input modal close keeps candidate', 'src/modal.rs',
+     '    if buttons == GUI_MODAL_INPUT {\n        fep::cancel_input();\n    }\n    state().used = false;',
+     '    state().used = false;', 'imecand_input_dialog_lifetime'),
+    ('IMECAND-fix1 modal focus reserves window', 'src/fep.rs',
+     'pub fn defer_commit(win_id: u32) {\n    if modal::is_input() {\n        return;\n    }',
+     'pub fn defer_commit(win_id: u32) {',
+     'imecand_run_focus_change'),
+    ('IMECAND-fix1 window cancellation bypasses modal', 'src/fep.rs',
+     'fn input_window(st: &GuiState) -> u32 {\n    if modal::is_input() {\n        return 0;\n    }',
+     'fn input_window(st: &GuiState) -> u32 {',
+     'imecand_run_focus_change'),
+    ('IMECAND-fix1 grid cleared after render callback', 'src/fep.rs',
+     '    grid_clear_all(f);\n    let table = f.render_table;\n'
+     '    /* カーネル FEP の描画先を GFX 版の関数表へ (K 依頼 2 = ime_set_render)。 */\n'
+     '    unsafe { (os32api::api().ime_set_render)(table as *mut u8) };\n    let f = state();',
+     '    let table = f.render_table;\n'
+     '    unsafe { (os32api::api().ime_set_render)(table as *mut u8) };\n'
+     '    let f = state();\n    grid_clear_all(f);',
+     'imecand_gui_on_visible'),
+    ('IMECAND-fix1 modal reclaimed before window target decision', 'src/handler.rs',
+     '        st.reclaim_owner(owner);\n        modal::reclaim_owner(st, owner);',
+     '        modal::reclaim_owner(st, owner);\n        st.reclaim_owner(owner);',
+     'imecand_owner_exit_cancels_once'),
+    ('IMECAND-fix1 cancellation per reclaimed window', 'src/wm.rs',
+     '        fep::forget_owner(self, owner);\n        /* ウィンドウ */\n'
+     '        let mut i = 0;\n        while i < GUI_MAX_WINDOWS {\n'
+     '            if self.windows[i].used && self.windows[i].owner == owner {',
+     '        let mut i = 0;\n        while i < GUI_MAX_WINDOWS {\n'
+     '            if self.windows[i].used && self.windows[i].owner == owner {\n'
+     '                fep::forget_window(self, self.windows[i].id(i));',
+     'imecand_owner_exit_cancels_once'),
+
     ('X11 toggle leaves kernel commit', 'src/fep.rs',
      '    collect_kernel_commit(); // toggle OFF can confirm pending kana\n', '',
      'x11_fep_toggle_off_delivers_before_focus_changes'),
@@ -362,14 +407,18 @@ def mutate() -> int:
     import concurrent.futures
     import os
     jobs = max(1, min(8, os.cpu_count() or 1))
+    indices = [i for i, m in enumerate(MUTATIONS)
+               if not os.environ.get("MUTATION_FILTER") or os.environ["MUTATION_FILTER"] in m[0]]
+    if not indices:
+        raise SystemExit("no mutations selected")
     with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as ex:
-        results = list(ex.map(one_mutation, range(len(MUTATIONS))))
+        results = list(ex.map(one_mutation, indices))
     bad = 0
     for ok, line in results:
         print(line)
         if not ok:
             bad += 1
-    print(f'kbdnav mutations: {len(MUTATIONS) - bad}/{len(MUTATIONS)} killed')
+    print(f'kbdnav mutations: {len(indices) - bad}/{len(indices)} killed')
     return bad
 
 

@@ -12,7 +12,9 @@
 
 static int owner = 1, user, wm_depth, wait_depth, calls, seen_owner;
 static int opens, reopens, searches, learns, management, storage_rc;
-static int scroll_rows, candidate_draws;
+static int scroll_rows, candidate_draws, mode_draws;
+static u32 ime_cells[25][80];
+static u32 gui_ime_cells[25][80];
 static AppSlot slots[APP_SLOT_COUNT];
 volatile u32 tick_count;
 volatile int exec_nest_level, ring3_wm_depth;
@@ -58,11 +60,17 @@ void tvram_putchar_at(int x, int y, char ch, u8 attr)
 void tvram_writechar_at(int x, int y, u16 ch, u8 attr)
 { (void)x; (void)y; (void)ch; (void)attr; }
 static void draw_char(int x, int y, char ch, u8 attr)
-{ (void)x; (void)y; (void)ch; (void)attr; }
+{ (void)attr; ime_cells[y][x] = (u8)ch; if (ch == '[') mode_draws++; }
 static int draw_wide(int x, int y, u32 ch, u8 attr)
-{ (void)x; (void)ch; (void)attr; if (y < 24) candidate_draws++; return 2; }
-static void clear_row(int y, u8 attr) { (void)y; (void)attr; }
+{ (void)attr; ime_cells[y][x] = ch; if (y < 24) candidate_draws++; return 2; }
+static void clear_row(int y, u8 attr) { (void)attr; kmemset(ime_cells[y], 0, sizeof(ime_cells[y])); }
 const IME_Render g_ime_render_tvram = {draw_char, draw_wide, clear_row, 0, 0};
+static void gui_draw_char(int x, int y, char ch, u8 attr)
+{ (void)attr; gui_ime_cells[y][x] = (u8)ch; }
+static int gui_draw_wide(int x, int y, u32 ch, u8 attr)
+{ (void)attr; gui_ime_cells[y][x] = ch; return 2; }
+static void gui_clear_row(int y, u8 attr)
+{ (void)attr; kmemset(gui_ime_cells[y], 0, sizeof(gui_ime_cells[y])); }
 void *kmalloc(u32 n) { (void)n; return 0; }
 
 /* The same dictionary instance is shared through all nine IME entries.
@@ -111,6 +119,9 @@ static void reset(void)
     g_ime.render = &g_ime_render_tvram;
     g_ime_reader_owner = opens = reopens = searches = learns = management = 0;
     g_gui_handler = 0;
+    g_ime_cui_redraw = mode_draws = 0;
+    kmemset(ime_cells, 0, sizeof(ime_cells));
+    kmemset(gui_ime_cells, 0, sizeof(gui_ime_cells));
     shared_dict = 0;
 }
 static void key(u8 code) { kbd_deliver(code); kbd_deliver(code | 0x80); }
@@ -238,6 +249,92 @@ static int lifetime(void)
     say("PASS X11 parent child output lifetime\n"); return 0;
 }
 
+/* IMECAND-1: actual FEP, keyboard queues and GUI teardown boundary. The Rust
+ * suite checks window/owner dispatch to STOP; here STOP is not mocked. */
+static int gui_input_lifetime(void)
+{
+    static const IME_Render gfx_render = {gui_draw_char, gui_draw_wide, gui_clear_row, 0, 0};
+    for (int boundary = 0; boundary < 2; boundary++) {
+        for (int phase = 0; phase < 4; phase++) {
+            reset();
+            ime_toggle();
+            ime_set_render((void *)&gfx_render);
+            CHECK(gui_ime_cells[24][0] == '[' && gui_ime_cells[24][1] == 0x3042,
+                  "IMECAND GUI entry ON indicator drawn synchronously");
+            (void)ime_feed_key((0x1d << 8) | 'a');
+            if (phase >= 1) (void)ime_feed_key((KEY_SPACE << 8) | ' ');
+            if (phase == 2) (void)ime_feed_key(KEY_DOWN << 8);
+            if (phase == 3) (void)ime_feed_key((KEY_RETURN << 8) | 13);
+            IME_State saved = g_ime;
+            ime_set_render((void *)&gfx_render);
+            CHECK(equal_state(&saved), "IMECAND same renderer preserves current input");
+            int learned = learns;
+            if (!boundary) {
+                /* WM cancel_input clears its GFX grid before sending STOP. */
+                kmemset(gui_ime_cells, 0, sizeof(gui_ime_cells));
+                (void)ime_feed_key(KEY_STOP << 8);
+            } else {
+                /* Normal gshell detach, then defensive owner-exit reset. */
+                ime_set_render(0);
+                gui_owner_exit(GUI_SHELL_OWNER, 0);
+            }
+            CHECK(!g_ime.kana_len && !g_ime.rk.preedit[0] && !g_ime.rk.n_wait &&
+                  !g_ime.result_count && !g_ime.converting && !g_ime.convert_len &&
+                  g_ime.state == IME_ST_INPUT && !g_ime.commit_len && !g_ime.commit_pos,
+                  "IMECAND input lifetime cancels all transient state");
+            CHECK(learns == learned && g_ime.dict.db && ime_is_active() && scroll_rows == 1,
+                  "IMECAND cancellation keeps mode dictionary without learning");
+            u32 (*cells)[80] = boundary ? ime_cells : gui_ime_cells;
+            CHECK(cells[24][0] == '[' && cells[24][1] == 0x3042,
+                  "IMECAND cancellation keeps visible ON indicator");
+            CHECK(ime_feed_key(-1) == -1 && ime_feed_key((KEY_RETURN << 8) | 13) ==
+                  ((KEY_RETURN << 8) | 13), "IMECAND no candidate or swallowed RETURN");
+            if (boundary) {
+                mode_draws = 0; /* model the shell reload loop's TVRAM clear */
+                kmemset(ime_cells, 0, sizeof(ime_cells));
+                CHECK(ime_trygetkey() == -1 && mode_draws == 1,
+                      "IMECAND CUI mode visible after reload clear");
+            }
+            /* Cancellation keeps IME ON: new typing belongs to FEP, with a
+             * visible mode indicator in both GUI and CUI. */
+            if (boundary) {
+                key(0x1d);
+                CHECK(ime_trygetkey() == -1 && g_ime.kana_len > 0,
+                      "IMECAND CUI ON typing enters FEP after cancellation");
+            } else {
+                CHECK(ime_feed_key((0x1d << 8) | 'a') == -1 && g_ime.kana_len > 0,
+                      "IMECAND GUI ON typing enters FEP after cancellation");
+            }
+            CHECK(cells[24][0] == '[' && cells[24][1] == 0x3042,
+                  "IMECAND ON typing keeps visible mode indicator");
+            (void)ime_feed_key(KEY_STOP << 8);
+            /* Shared mode remains ON. OFF now has nothing to confirm. */
+            ime_toggle();
+            CHECK(ime_feed_key(-1) == -1, "IMECAND OFF cannot confirm old kana");
+            if (!boundary) {
+                CHECK(ime_feed_key((0x2b << 8) | 'c') == ((0x2b << 8) | 'c') &&
+                      ime_feed_key((0x25 << 8) | 'l') == ((0x25 << 8) | 'l') &&
+                      ime_feed_key((0x1e << 8) | 's') == ((0x1e << 8) | 's') &&
+                      ime_feed_key((KEY_RETURN << 8) | 13) == ((KEY_RETURN << 8) | 13),
+                      "IMECAND GUI subsequent cls RETURN intact");
+            } else {
+                key(0x2b); key(0x25); key(0x1e); key(KEY_RETURN);
+                CHECK((ime_getkey() & 255) == 'c' && (ime_getkey() & 255) == 'l' &&
+                      (ime_getkey() & 255) == 's' && (ime_getkey() & 255) == 13,
+                      "IMECAND CUI subsequent cls RETURN intact");
+            }
+        }
+    }
+    /* Emergency gshell exit without a normal detach also cancels. */
+    reset(); ime_set_render((void *)&gfx_render); ime_toggle();
+    (void)ime_feed_key((0x1d << 8) | 'a');
+    (void)ime_feed_key((KEY_SPACE << 8) | ' ');
+    gui_owner_exit(GUI_SHELL_OWNER, 0);
+    CHECK(!g_ime.result_count && !g_ime.kana_len && ime_feed_key(-1) == -1,
+          "IMECAND emergency GUI exit cancels candidate");
+    say("PASS IMECAND real STOP and GUI CUI lifetime\n"); return 0;
+}
+
 #include "x11_park_host.c"
 
 static i32 handler(u32 op, u32 arg, int id)
@@ -310,7 +407,7 @@ static int results(void)
 }
 void _start(void)
 {
-    int rc = modes() || delivery() || lifetime() || park_lifetime() ||
+    int rc = modes() || delivery() || lifetime() || gui_input_lifetime() || park_lifetime() ||
              gui_dispatch() || sink_readers() || results();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     for (;;) {}
