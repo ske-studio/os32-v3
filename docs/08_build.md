@@ -219,7 +219,7 @@ Makefile ターゲットとの対応 (`build/deploy.mk`)。**このリポジト�
 
 配備元が欠けると `make all` が `deploy-set.json` の生成で止まる。
 
-ビルド側のターゲットは `make all` / `kernel` / `libs` / `programs` / `sdk` /
+`make kernel` はカーネルの像と対の部品 (現在は `kdebug.bin`、像の CRC を埋めるため一緒に組み直す) を組む。ビルド側のターゲットは `make all` / `kernel` / `libs` / `programs` / `sdk` /
 `apps` / `game` / `clean` / `clean-kernel` / `clean-libs` / `clean-programs`。
 KernelAPI の構造体を変えたときは `make clean` → `make all` が必須
 (古い `.o` が残ると ABI 不整合で静かに壊れる)。

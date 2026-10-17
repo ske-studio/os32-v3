@@ -224,7 +224,9 @@ $(BUILD_OUT)/layout-manifest.json: $(BUILD_OUT)/generations-manifest.json tools/
 # 生成規則と一緒に結線し、deploy.mk 単独の利用者には生成済み成果物を渡せる。
 deploy deploy-u3 deploy-kernel deploy-nhd nhd-migrate-pt deploy-fd: $(BUILD_OUT)/layout-manifest.json
 
-kernel: $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/sqlite.bin $(BUILD_OUT)/vmkernel.lz4 $(BUILD_OUT)/layout-manifest.json
+# 像の CRC (pair) を埋める部品の一覧。T4c-1 で SQLite、T5 で起動時の部品を足す。
+KERNEL_PAIRED_MODULES := $(BUILD_OUT)/kdebug.bin
+kernel: $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/sqlite.bin $(BUILD_OUT)/vmkernel.lz4 $(BUILD_OUT)/layout-manifest.json $(KERNEL_PAIRED_MODULES)
 
 # === カーネルクリーン ===
 clean-kernel:
@@ -345,7 +347,8 @@ $(R1_OUT)/sqlite.bin: $(R1_OUT)/kernel.elf
 $(R1_OUT)/vmkernel.lz4: $(R1_OUT)/kernel.bin $(R1_OUT)/sqlite.bin $(R1_OUT)/kernel.elf tools/mkvmkernel.py tools/gen_memmap.py include/memmap.h boot/boot_defs.h
 	python3 tools/mkvmkernel.py --layout-header $(LAYOUT_HEADER) --elf $(R1_OUT)/kernel.elf --kernel $(R1_OUT)/kernel.bin --sqlite $(R1_OUT)/sqlite.bin -o $@
 
-kernel-r1: $(R1_OUT)/vmkernel.lz4
+R1_PAIRED_MODULES := $(R1_OUT)/kdebug.bin
+kernel-r1: $(R1_OUT)/vmkernel.lz4 $(R1_PAIRED_MODULES)
 	python3 tools/r1_manifest.py $(R1_OUT)
 
 -include $(R1_OBJECTS:.o=.d)
