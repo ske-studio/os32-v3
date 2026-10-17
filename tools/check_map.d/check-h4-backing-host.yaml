@@ -1,0 +1,14 @@
+check-h4-backing-host:
+- build/checks.d/check-h4-backing-host.mk
+- tools/check_map.d/check-h4-backing-host.yaml
+- tools/tests/test_h4_backing.py
+- tools/tests/h4_backing_host.c
+- tools/tests/host32.py
+- tools/tests/kernel_layout.py
+- tools/tests/host_arch/**
+- kdebug/kselftest.c
+- kernel/paging.c
+- kernel/pgalloc.c
+- kernel/physmem.c
+- exec/access_walk.c
+artifact_reader: true
