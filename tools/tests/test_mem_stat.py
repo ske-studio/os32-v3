@@ -446,7 +446,12 @@ def run_shell(runner, mutate):
             ('literal map', '(u32)MEM_EXEC_HEAP_BASE', '0x88000000U', 'literal map'),
             ('reservation line', 'exec_heap 予約起点=', 'exec_heap 起点=', 'map output'),
             ('CPL0 self only', 'int first = 2, last = 5;', 'int first = -1, last = -1;', 'caller queries'),
-            ('CPL3 resident limit', '#ifndef SHELL_AS_APP', '#if 1', 'CPL3 resident limit'),
+            # Mutate only the limit display. Enabling every resident branch also
+            # calls the private resident CRT diagnostic, absent from sh_app.
+            ('CPL3 resident limit',
+             '#ifndef SHELL_AS_APP\n    g_api->kprintf(ATTR_WHITE, "  実測: Shell band',
+             '#if 1\n    g_api->kprintf(ATTR_WHITE, "  実測: Shell band',
+             'CPL3 resident limit'),
         ]
         for name, old, new, label in variants:
             assert old in source
