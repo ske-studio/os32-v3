@@ -1,7 +1,7 @@
 {
-  "module_abi_gen": 1191817549,
+  "module_abi_gen": 2646485688,
   "stage": "S4",
-  "count": 225,
+  "count": 226,
   "imports": [
     {
       "stage": "S1",
@@ -3375,6 +3375,21 @@
       "type_ver": 1,
       "signature": "u16 unicode_file_lookup(u32 cp);",
       "source_declaration": "u16 unicode_file_lookup(u32 cp);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "stage": "S4",
+      "kind": 1,
+      "symbol": "pgalloc_limit_pfn",
+      "source": "kernel/pgalloc.h",
+      "context_safe": false,
+      "index": 225,
+      "name": "pgalloc_limit_pfn",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "u32 pgalloc_limit_pfn(void);",
+      "source_declaration": "u32 pgalloc_limit_pfn(void);",
       "dtype": null,
       "array": false
     }

@@ -1800,6 +1800,14 @@
       "source": "kernel/unicode_file.h",
       "context_safe": false,
       "index": 224
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "pgalloc_limit_pfn",
+      "source": "kernel/pgalloc.h",
+      "context_safe": false,
+      "index": 225
     }
   ]
 }

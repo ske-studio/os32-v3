@@ -1126,4 +1126,9 @@ unicode_file_debug_phys:
 unicode_file_lookup:
     jmp *kdebug_import_slots+896
 .size unicode_file_lookup, .-unicode_file_lookup
+.globl pgalloc_limit_pfn
+.type pgalloc_limit_pfn, @function
+pgalloc_limit_pfn:
+    jmp *kdebug_import_slots+900
+.size pgalloc_limit_pfn, .-pgalloc_limit_pfn
 .section .note.GNU-stack,"",@progbits

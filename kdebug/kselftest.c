@@ -993,6 +993,135 @@ int kselftest_run_post_unicode(void)
     return ksel_fail - before;
 }
 
+/* T3b2: H-4(a) backing fixture. Keep the 32MiB acceptance boundary independent
+ * of the boot identity-map size. Both cases deliberately use the SAME high VA.
+ * No I/O here: T3b3 can consume the live AS/buffer at h4_buffer_entry(). */
+#define H4_PHYS_BOUNDARY (32UL * MEM_1MB)
+#define H4_BUFFER_PAGES 3U
+#define H4_BUFFER_OFFSET (PAGE_SIZE - 17U)
+#define H4_BUFFER_BYTES (PAGE_SIZE + 34U)
+
+static u8 h4_pattern(u32 page, u32 offset)
+{
+    return (u8)(0x31U + page * 0x29U + offset % 251U);
+}
+
+/* Record every buffer page, including the partial first/last pages. A high
+ * virtual address is never evidence about the physical backing. */
+static int h4_collect_pfns(struct addrspace *as, int high, u32 *pfns)
+{
+    int valid = 1;
+    const char *kind = high ? "high" : "low";
+    for (u32 i = 0; i < H4_BUFFER_PAGES; i++) {
+        u32 va = MEM_EXEC_LOAD_ADDR + i * PAGE_SIZE, pa = 0;
+        unsigned int flags = irq_save();
+        int mapped = as_access_page(as, va, 1, &pa);
+        irq_restore(flags);
+        pfns[i] = pa / PAGE_SIZE;
+        int range = high ? pfns[i] > H4_PHYS_BOUNDARY / PAGE_SIZE :
+                           pfns[i] < H4_PHYS_BOUNDARY / PAGE_SIZE;
+        valid &= mapped && range;
+        kprintf(0x07, "[h4] %s page=%u va=%08X pfn=%08X user_rw=%u range=%u\n",
+                kind, i, va, pfns[i], mapped, range);
+    }
+    return valid;
+}
+
+/* This entry is reached only after allocation, USER mapping and ALL PFNs
+ * have passed. Walk the live AS again to read the page-crossing buffer;
+ * do not treat a direct read of the original allocation as USER evidence. */
+static int h4_buffer_entry(struct addrspace *as, u32 buffer, u32 bytes)
+{
+    u32 done = 0;
+    while (done < bytes) {
+        u32 va = buffer + done, pa = 0;
+        u32 offset = va % PAGE_SIZE;
+        u32 page = (va - MEM_EXEC_LOAD_ADDR) / PAGE_SIZE;
+        u32 n = PAGE_SIZE - offset;
+        if (n > bytes - done) n = bytes - done;
+        unsigned int flags = irq_save();
+        int mapped = as_access_page(as, va, 0, &pa);
+        irq_restore(flags);
+        if (!mapped) return 0;
+        const u8 *p = P2V(pa);
+        for (u32 j = 0; j < n; j++)
+            if (p[j] != h4_pattern(page, offset + j)) return 0;
+        done += n;
+    }
+    return 1;
+}
+
+/* Return 1=completed, 0=not run (resources), -1=failed. All exits after
+ * owner creation converge on destroy/reclaim/retire, including partial maps. */
+static int h4_backing_case(int high)
+{
+    struct addrspace as;
+    u32 owner = 0, pfns[H4_BUFFER_PAGES], left = 0;
+    u32 before = pgalloc_free_pages();
+    int created = 0, entered = 0, result = 0;
+    const char *kind = high ? "high" : "low", *stage = "owner";
+    if (!ledger_owner_new(LEDGER_KIND_AS, 0, "h4", &owner)) goto out;
+    stage = "AS";
+    if (paging_addrspace_create(&as, owner) != 0) goto out;
+    created = 1;
+    for (u32 i = 0; i < H4_BUFFER_PAGES; i++) {
+        u32 pa, pfn;
+        stage = "backing";
+        if (high) {
+            if (!pgalloc_alloc_n_owner(owner, 1,
+                    H4_PHYS_BOUNDARY / PAGE_SIZE + 1, pgalloc_limit_pfn(),
+                    LEDGER_BOTTOM_UP, &pfn)) goto out;
+            pa = pfn * PAGE_SIZE;
+        } else {
+            pa = pgalloc_alloc_phys(owner, 1);
+            if (!pa) goto out;
+        }
+        u8 *p = P2V(pa);
+        for (u32 j = 0; j < PAGE_SIZE; j++) p[j] = h4_pattern(i, j);
+        stage = "USER map";
+        if (paging_addrspace_map_user(&as, MEM_EXEC_LOAD_ADDR + i * PAGE_SIZE,
+                                     pa, PAGE_RW | PTE_USER) != 0) goto out;
+    }
+    result = -1;
+    int valid = h4_collect_pfns(&as, high, pfns);
+    check(valid, "h4: all USER PFNs in physical range");
+    if (!valid) goto out;
+    entered = 1;
+    int pattern = h4_buffer_entry(&as, MEM_EXEC_LOAD_ADDR + H4_BUFFER_OFFSET,
+                                 H4_BUFFER_BYTES);
+    check(pattern, "h4: page-crossing pattern");
+    kprintf(0x07, "[h4] %s entry va=%08X bytes=%u pages=%u pattern=%s\n",
+            kind, MEM_EXEC_LOAD_ADDR + H4_BUFFER_OFFSET,
+            H4_BUFFER_BYTES, H4_BUFFER_PAGES, pattern ? "ok" : "FAIL");
+    if (pattern) result = 1;
+out:
+    if (!result)
+        kprintf(0x07, "[h4] %s SKIP (not run): %s allocation failed\n", kind, stage);
+    if (created) paging_addrspace_destroy(&as);
+    if (owner) {
+        int reclaimed = ledger_reclaim_owner(owner, &left);
+        u32 pages = ledger_owner_pages(owner);
+        int retired = ledger_owner_retire(owner);
+        check(reclaimed && !pages && retired, "h4: owner pages 0 and retired");
+        if (!reclaimed || pages || !retired) result = -1;
+        kprintf(0x07, "[h4] %s cleanup owner=%u pages=%u retired=%u\n",
+                kind, owner, pages, retired);
+    }
+    int restored = pgalloc_free_pages() == before;
+    check(restored, "h4: free pages restored");
+    if (!restored) result = -1;
+    kprintf(0x07, "[h4] %s result=%s entered=%u free_restored=%u\n", kind,
+            result > 0 ? "PASS" : result < 0 ? "FAIL" : "SKIP", entered, restored);
+    return result;
+}
+
+static void test_h4_backing(void)
+{
+    (void)h4_backing_case(0);
+    (void)h4_backing_case(1);
+}
+/* T3b2 end */
+
 /* Exhaust only free SLACK, keeping a snapshot of every live owner. The
  * snapshot lives on the test stack, never in the resident kernel BSS. */
 static void test_slack_cycle(void)
@@ -1060,6 +1189,7 @@ int kselftest_run_post_exec(void)
     test_pool_model();
     test_slack_cycle();
     test_ledger();
+    test_h4_backing();
     test_appmem();
     test_gfx_ledger();
     test_pcm();
