@@ -100,14 +100,14 @@ PEGC 候補は F00000h と FFF00000h の両窓 (各512KB) を supervisor + PCD �
 2026-09-29) に置く。RAM の量に関係なく RAM と重ならないよう物理地図で MMIO にし (RAM として登録できる上端 =
 `MEM_PHYS_RAM_CEILING` = 2GB、D11 — `[2GB, 4GB)` は窓の帯も含めて RAM にしない、T1a)、帯の先頭 4MB の PT を paging_init が**静的に 1 枚** (画像外の固定域) 持つ —
 新しい PDE は live AS が 0 の間しか足せないが、gfx の init は exec の後にも走るため。
-最上位4MB (FFC00000h〜FFFFFFFFh、PDE 0x3FF) にも静的 PT (003FB000h) を持ち、全アプリ PD に共有する。固定 PD/PT は 1/8/1/1 の11ページ、003FC000h〜003FFFFFh の4ページは NP。最上位 PT は初期には全 NP、PEGC 候補の写像成功後だけ FFF00000h〜FFF7FFFFh の128ページを公開する。
+最上位4MB (FFC00000h〜FFFFFFFFh、PDE 0x3FF) にも静的 PT (003EB000h) を持ち、全アプリ PD に共有する。固定 PD/PT は 1/8/1/1 の11ページ。003FB000h はスタックガード (NP)、003FC000h〜003FFFFFh の4ページはカーネルスタック (RW)。定義は [include/memmap.h](../include/memmap.h)、保護属性の適用は `kernel/paging.c:349` を参照。最上位 PT は初期には全 NP、PEGC 候補の写像成功後だけ FFF00000h〜FFF7FFFFh の128ページを公開する。
 監査は候補の有無でなく台帳の公開済み map 範囲に一致させる。正常時は両窓 RW|PCD、F00 成功後の FFF 失敗時は F00 の予約・写像・公開を残して FFF は NP、候補なしなら最上位 PT の全 PTE は NP。
 帯を物理地図で MMIO に登録するのは 16MB 超の RAM を登録する経路 (`memory_boot_add_high`) だけで、高位 RAM の無い
 構成 (8MB〜15MB、台帳の置き場は FIXED / ARENA_TOP — TASK_T1_LEDGER §3-3) では帯は明示の MMIO 登録でなく UNKNOWN のまま — RAM にはならないので現状の RAM 判定・窓のマップには
 支障は無く、明示の登録は v3 の資源割当で引き継ぐ:
 
 ```
-0x00F00000 - 0x00F4AFFF          PEGC のリニア窓 (H2、043Bh bit2=0 のとき)  supervisor + PCD
+0x00F00000 - 0x00F7FFFF          PEGC のリニア窓 (H2、043Bh bit2=0 のとき)  supervisor + PCD
 0x00F60000 - 0x00F67FFF          WAB (Cirrus Xe10) のバンク窓 (ITF の既定。backend は使わない)
 0xFE000000 - 0xFE1FFFFF          WAB (Cirrus Xe10) の 2MB リニア窓 (NP21/W は 4MB を窓として出す) supervisor + PCD
   +000000h 表示面 / +04B000h クライアント面 (300KB) / +096000h 塗りパターン

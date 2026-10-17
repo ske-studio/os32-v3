@@ -20,7 +20,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | エージェント運用体制 (役割・起動・規約) | [tasks/agents/ROLES.md](tasks/agents/ROLES.md) (§0 が現行の 1 表。経緯は持たない) | CLAUDE.md (体制 1 段落 + リンク)。経緯は [archive/agents/ROLES_HISTORY_2026-10-06.md](archive/agents/ROLES_HISTORY_2026-10-06.md)、見直しの根拠は [tasks/agents/REVIEW_2026-10-06.md](tasks/agents/REVIEW_2026-10-06.md) |
 | 延ばした試験・SKIP・ホストだけの合格・未結線 (持越し) | [tasks/DEFERRED_TESTS.md](tasks/DEFERRED_TESTS.md) (未完了だけを持つ。終わった行は消す) | 各票・引き継ぎは参照のみ。同じ延期を票や memory に写さない |
 | 番地・帯域 | `include/memmap.h` (定義)、[02_memory.md §2-1](02_memory.md) (説明)、`build/out/MEMMAP.md` (実ビルドの生成地図、`make docs-gen`) | CLAUDE.md は入口のみ |
-| KAPI の一覧・オフセット・版 | `sdk/kapi.json` → [KAPI_SPEC.md §4](KAPI_SPEC.md) | README.md / このファイル / KAPI_SPEC.md の版番号 (`tools/check_kapi_version.py` が照合。CLAUDE.md は版数を持たない) |
+| KAPI の一覧・オフセット・版 | `sdk/kapi.json` → [KAPI_SPEC.md §4](KAPI_SPEC.md#4-kernelapi-構造体レイアウト) | README.md / このファイル / KAPI_SPEC.md の版番号 (`tools/check_kapi_version.py` が照合。CLAUDE.md は版数を持たない) |
 | KAPI 追加手順 | [KAPI_SPEC.md §3-1](KAPI_SPEC.md) | スキル `.claude/skills/os32-kapi-add` と CLAUDE.md (どちらもポインタのみ) |
 | KAPI 版番号・エラー番号の予約 (未実装の先取り調停) | [KAPI_SPEC.md §3-2](KAPI_SPEC.md) | 各計画 (GUI TASK_K1、network LINK_PLAN) は参照 |
 | エラーコード | `os32_kapi_shared.h` の `OS32_ERR_*` | 各 FS は境界で翻訳 |
@@ -177,7 +177,7 @@ T3 の前のデバッグ環境の整理 (起動時に読むデバッグ部品 `/
 
 | ドキュメント | 内容 |
 |-------------|------|
-| [tasks/agents/HANDOVER_2026-10-09.md](tasks/agents/HANDOVER_2026-10-09.md) | **引き継ぎ 2026-10-09 (現行)** — T2h R0〜R7 一巡後の現在地 (次は h9 の締め・反省会)、次の一手、段をまたぐ道具と罠。入口だけ (50 行以内) |
+| [tasks/agents/HANDOVER_2026-10-09.md](tasks/agents/HANDOVER_2026-10-09.md) | **引き継ぎ 2026-10-09 (現行)** — 現在地は §1、次の一手は §2、段をまたぐ道具と罠は §4。入口だけ (50 行以内) |
 | [tasks/agents/REVIEW_2026-10-14.md](tasks/agents/REVIEW_2026-10-14.md) | **T3 前の反省会 2026-10-14 — 完了記録** — 判断 7 点の決定、議題 10 件の結論、残りの作業 |
 | [tasks/agents/REVIEW_2026-10-06.md](tasks/agents/REVIEW_2026-10-06.md) | **開発体制の見直し 2026-10-06 — 完了記録** — 遅さの原因 (根拠つき)、決めたこと、残りの作業 a〜e |
 | [tasks/DEFERRED_TESTS.md](tasks/DEFERRED_TESTS.md) | **持越し台帳** — 延ばした試験・SKIP・ホストだけの合格・未結線を 1 か所に |
@@ -195,10 +195,10 @@ T3 の前のデバッグ環境の整理 (起動時に読むデバッグ部品 `/
 
 | ドキュメント | 内容 |
 |-------------|------|
-| [tasks/realhw/PLAN.md](tasks/realhw/PLAN.md) | 実機で動かす計画 **実装中** — 到達点は [RELEASE_v2.1.md](RELEASE_v2.1.md) §1。残: 82557 の L-B、PCM の E6、Trident、PEGC の目視 |
-| [tasks/realhw/TASK_PEGC480_REALHW.md](tasks/realhw/TASK_PEGC480_REALHW.md) | **Ra266 の PEGC 640x480 の正典** — **受入完了・実機確認待ち (2026-09-29)**。実機 ROM (INT 18h AH=30h) の OUT 列 (`v86 -g`) に値と順序を合わせ、画面を見ない条件で受け入れ。残るのは GUI の目視だけ |
+| [tasks/realhw/PLAN.md](tasks/realhw/PLAN.md) | 実機で動かす計画 **実装中** — v2.1 の到達点は [RELEASE_v2.1.md](RELEASE_v2.1.md) §1。現在地・残件は [現行引き継ぎ §1](tasks/agents/HANDOVER_2026-10-09.md) |
+| [tasks/realhw/TASK_PEGC480_REALHW.md](tasks/realhw/TASK_PEGC480_REALHW.md) | **Ra266 の PEGC 640x480 の正典** — **受入完了 (2026-09-30、実機目視合格)**。実機 ROM (INT 18h AH=30h) の OUT 列 (`v86 -g`) に値と順序を合わせた。状態・残件は同票の状態行を参照 |
 | [tasks/realhw/TASK_TRIDENT_DRIVER.md](tasks/realhw/TASK_TRIDENT_DRIVER.md) | 内蔵 Trident (1023:9660) ドライバ **設計中** — 設計票 v5 が Codex 5 回目で Approve (2026-09-29)、実装は未着手。ユーザー決定「Cirrus はエミュレータ用、実機は Trident」 |
-| [tasks/realhw/TASK_LAN_82557.md](tasks/realhw/TASK_LAN_82557.md) | 内蔵 LAN (Intel 82557) で Host Services — **実装中** (L-A PCI 列挙・L-D Linux の橋は着地、次は L-B) |
+| [tasks/realhw/TASK_LAN_82557.md](tasks/realhw/TASK_LAN_82557.md) | 内蔵 LAN (Intel 82557) で Host Services — **実装中**。LAN 経由の hsync は達成。現在地・残件は同票の冒頭と [現行引き継ぎ §1](tasks/agents/HANDOVER_2026-10-09.md) |
 | [tasks/realhw/TASK_FD144.md](tasks/realhw/TASK_FD144.md) | 1.44MB FD からの起動 — **受入完了・実機確認待ち** (エミュレータで F1〜F13 合格) |
 | [archive/realhw_v21/TASK_FDC_REALHW.md](archive/realhw_v21/TASK_FDC_REALHW.md) / [TASK_SERIAL_VFAST.md](archive/realhw_v21/TASK_SERIAL_VFAST.md) | 実機の FD 起動 (2026-09-22) / シリアル 115200 (2026-09-22〜23) — 受入完了 |
 | [archive/realhw_v21/TASK_HDD_INSTALL.md](archive/realhw_v21/TASK_HDD_INSTALL.md) / [TASK_SERIAL_HOSTFS.md](archive/realhw_v21/TASK_SERIAL_HOSTFS.md) / [TASK_ATAPI_TIMEOUT.md](archive/realhw_v21/TASK_ATAPI_TIMEOUT.md) | CD から HDD へのインストールと HDD 起動 (2026-09-25) / SerialFS と `hsync --root` による実機の更新 (2026-09-29) / ATAPI の待ち上限を秒単位に (2026-09-26) — 受入完了 |
@@ -224,15 +224,15 @@ T3 の前のデバッグ環境の整理 (起動時に読むデバッグ部品 `/
 | ドキュメント | 内容 |
 |-------------|------|
 | [archive/v3/V3_PLAN_DRAFT.md](archive/v3/V3_PLAN_DRAFT.md) | **v3 本案の草案 — 草案群のまとめ (2026-09-30、完了記録: 本案 V3_PLAN.md に昇格)** — 草案の一覧と振り分け (§1)、目的と範囲・**目標の 2 段** (§2、§2-1)、柱と順序の案 (§3)、**メモリマップの柱は決定済み** (§3-1 は要点と決着先、正典は TASK_MEMMAP_V3)、食い違いの一覧 (§4)、v2.x との互換 (§5)、fork の段取り (§6)、ユーザー判断と Codex の論点 (§7)。**§7-2 X1〜X8 は 2026-09-30 に Codex が回答しユーザーが承認 (結論と反映先は表)**。本案への昇格はユーザー判断と Codex の突き合わせの後 |
-| [archive/v3/FORK_PLAN.md](archive/v3/FORK_PLAN.md) | **os32-v3 への fork の段取り — 計画 (2026-09-30、ユーザー承認「準備を承認」)** — 持っていくものの一覧 (`git ls-files` 1,551 ファイルをディレクトリ単位で 持つ / 持たない / 要判断、§1)、経緯の要約とケーススタディの候補 (HISTORY / CASE_STUDIES / THIRD_PARTY、§1-4)、**公開前の監査 (秘密・著作権物・第三者ライセンス・実パス・ホスト名、コマンドと合格条件、2026-09-30 の結果、§2)**、手順 a〜g と [D2] の地点 (§3)、判断が要る点 J1〜J8 (§4)。リポジトリの作成・push は未実施 |
+| [archive/v3/FORK_PLAN.md](archive/v3/FORK_PLAN.md) | **os32-v3 への fork の段取り — 完了記録 (2026-10-16、票の状態行)** — 持っていくものの一覧 (`git ls-files` 1,551 ファイルをディレクトリ単位で 持つ / 持たない / 要判断、§1)、経緯の要約とケーススタディの候補 (HISTORY / CASE_STUDIES / THIRD_PARTY、§1-4)、**公開前の監査 (秘密・著作権物・第三者ライセンス・実パス・ホスト名、コマンドと合格条件、2026-09-30 の結果、§2)**、手順 a〜g と [D2] の地点 (§3)、判断が要る点 J1〜J8 (§4)。版と fork の扱いは [ROADMAP.md §0-1](ROADMAP.md) |
 | [archive/v3/PLAN.md](archive/v3/PLAN.md) | **v3 の計画 (2026-09-17)** — 機能を足す前に入れ物を作り直す (C11 → メモリマップ再配置 → ドライバの動的読み込み → PCI → 82557)。カーネル本体の大きさと残りは `build/out/MEMMAP.md` ([生成手順](#生成文書の見方))。アプリへの払い出し §4、アイデア §5。**完了記録 (2026-09-30): 策定時の計画。本案は V3_PLAN.md** |
-| [tasks/v3/TASK_MEMMAP_V3.md](tasks/v3/TASK_MEMMAP_V3.md) | **v3 のメモリマップ — 設計中 (方針確定 2026-09-30、3 者討論で決定、Codex Approve)**。決定 D1〜D35 (D29〜D34 = 保留 5 件 U6 の拾い方、**D35 = D7 の改訂: fork 時の KAPI 整理でスロット順を変えてよい、世代の識別と旧新混在試験が条件**、2026-09-30; システムは恒等のまま、アプリだけ 0x80000000〜、物理台帳、SQLite のモジュール化、低位 640KB を V86 へ、OpenType)、帯の表、票 T0〜T7、受入条件、**Codex X1〜X8 の補足の対応表 (§8-4)**、経緯。実装は未着手 |
+| [tasks/v3/TASK_MEMMAP_V3.md](tasks/v3/TASK_MEMMAP_V3.md) | **v3 のメモリマップ** (方針確定 2026-09-30、3 者討論で決定、Codex Approve)。決定 D1〜D35 (D29〜D34 = 保留 5 件 U6 の拾い方、**D35 = D7 の改訂: fork 時の KAPI 整理でスロット順を変えてよい、世代の識別と旧新混在試験が条件**、2026-09-30; システムは恒等のまま、アプリだけ 0x80000000〜、物理台帳、SQLite のモジュール化、低位 640KB を V86 へ、OpenType)、帯の表、票 T0〜T7、受入条件、**Codex X1〜X8 の補足の対応表 (§8-4)**、経緯。実装の状態は同票の状態行と [現行引き継ぎ](tasks/agents/HANDOVER_2026-10-09.md) を参照 |
 | [archive/v3/U6_PENDING_REVIEW.md](archive/v3/U6_PENDING_REVIEW.md) | **U6 の仕分け表 — 決裁済み (2026-09-30、ユーザーが 6 点すべて推奨どおりに決定 → TASK_MEMMAP_V3 D29〜D34)**: 保留 5 件 (F3a〜c / F2c / FEP_BOUNDARY / MEMORY_RAM_INTEGRATION / DEVICE_RESERVATION) の現状 (コードで確認)、TASK_MEMMAP_V3 の決定で置き換わった部分と残る部分、拾う先 (T2 / T4 / T5a の要件、P4、撤回)、判断点 6 つとその決定 |
 | [archive/v3/TASK_T1_LEDGER.md](archive/v3/TASK_T1_LEDGER.md) | **T1: 物理地図と所有権台帳 — 受入完了 (2026-10-01、T1a〜T1f 着地、残件は状態行)** — TASK_MEMMAP_V3 §6 T1 の範囲と T2 以降との境界 (§1)、物理メモリの確保・予約・写像の現状一覧と P2V / V2P の監査見積り 161 件 (§2)、台帳の 4 層 (地図・割当可否・owner・区間の表)、owner の種別 (AS / 永続 / モジュール / device)、検証済み資源レコード (X4、span ごとの資源と `res_mask`)、SURFACE の型 (Cirrus の CLIENT / DISPLAY を含む)、API、起動順 (8MB 型の backing と exec 上端、PCI 採取値の取り込み)、P2V / V2P / `P2V_CONST` と `check_p2v.py`、R1 の計数 (観測用の深さと broker の判定を分ける、jmpbuf の 3 保存先)、`dma_alloc`、gfx の識別 → 予約 → 写像 (候補群 1 owner) (§3)、段 T1a (モデル経路) 〜 T1f と受入・8MB / 17MB / 64MB の確かめ方・段の境目の owner 表 (§4)、リスクと未確認 (§5)、Codex の論点 X9〜X16 と 1 回目 B1〜B7 / 2 回目 B8〜B11 の対応表 (§6) |
 | [archive/v3/TASK_T2D_RESULTS.md](archive/v3/TASK_T2D_RESULTS.md) | **T2d (B1 checked copy) d0a〜d6 の実装結果と受入 — 完了記録 (2026-10-02)** — [TASK_T2D_T2H](tasks/v3/TASK_T2D_T2H.md) の §10-2〜§10-16 をそのまま移したもの (節番号は元のまま)。各段のコーダーの実装結果・レビュー対応・PM のゲスト受入、d6 の変異の仕分けと size 確定 |
 | [archive/v3/TASK_T2D_T2H_RECORDS.md](archive/v3/TASK_T2D_T2H_RECORDS.md) | **T2e〜T2h の実行記録 — 完了記録 (2026-10-06)** — [TASK_T2D_T2H](tasks/v3/TASK_T2D_T2H.md) から切り離した e1〜e10a・kapinull・f1a〜f4・h2・h3・STOP 修正・検査の整理 (ci-stab / ci-select) の実装結果と受入。見出しは元の行番号。未実施は [DEFERRED_TESTS](tasks/DEFERRED_TESTS.md) が正 |
 | [archive/v3/TASK_T2ABC_RESULTS.md](archive/v3/TASK_T2ABC_RESULTS.md) | 完了記録 — T2 親票 §5-1 の T2a〜T2c 実装・受入結果 (未実施・残件を含む)。設計・受入条件は TASK_T2_APPBAND に残す |
-| [tasks/v3/TASK_T2_APPBAND.md](tasks/v3/TASK_T2_APPBAND.md) | **T2: アプリ帯 + lease 窓 — 設計中 (2026-10-01)**。SURFACE lease 契約、現状調査、高位 AS・可変スタック・R1/R2/R3-e・B1・D35、T2a〜T2h の受入、サイズ予算と独立レビュー論点 |
+| [tasks/v3/TASK_T2_APPBAND.md](tasks/v3/TASK_T2_APPBAND.md) | **T2: アプリ帯 + lease 窓** (設計・受入の契約。状態は同票の状態行と [現行引き継ぎ](tasks/agents/HANDOVER_2026-10-09.md) を参照)。SURFACE lease 契約、現状調査、高位 AS・可変スタック・R1/R2/R3-e・B1・D35、T2a〜T2h の受入、サイズ予算と独立レビュー論点 |
 | [archive/v3/TASK_CLANG_CHECKS.md](archive/v3/TASK_CLANG_CHECKS.md) | C ソースの静的検査 5 本 (check-p2v・check-c-dialect・check-le-access・check-arch-asm・audit_cast_align) を clang の構文木で作り直した。旧版 (`tools/legacy_checks/`) は撤去 (ユーザー決定 2026-10-01、リポジトリ外にバックアップ) **着地 (2026-10-01、`8612b06`)** |
 | [tasks/v3/PORT_CANDIDATES.md](tasks/v3/PORT_CANDIDATES.md) | **既存ソフトウェアの移植候補 — 計画 (2026-09-30、v3 後半・P9)** — 移植の前提となる基盤 (libc の穴・C++ 無し・x87・Video HAL・PCM・協調型・ライセンスの置き場)、候補 23 本の表 (ライブラリ / テキスト系 / 8bpp ゲーム / メディア / ワープロ・表計算)、**ZSNES の難度と障害**、推奨の挑戦順 (zlib → Lua → … → doomgeneric → Wolf4SDL → ZSNES)、未確認事項 |
 | [tasks/v3/RUST_VS_C11.md](tasks/v3/RUST_VS_C11.md) | **Rust にする部品と C11 に揃える部品 — 設計中・方針確定 (2026-09-30、U5 の調査票、決定は TASK_MEMMAP_V3 D36)** — C11 化 (T0) の範囲とコスト (小)、Rust の今の使われ方と道具 (nightly + build-std、`i686-os32-none.json` の既定 CPU は `generic`、os32api、`os32_lz4` のカーネルリンク実績、ビルド時間)、IRQ 文脈の制約、候補 24 件の比較表 (新規 / 既存 / 既に Rust)、推奨 (合成器と OpenType は Rust、カーネル核・FS・FEP・SDK・デコーダは C11)、混在の約束 (FFI・所有権・panic・x87・target JSON)、相対コスト、ユーザー決定 7 点 + (a)、**386 下限の守り方 (§7: `cpu=i386` でも LLVM は `bswap` / `cmpxchg` / `xadd` を出す — 回避実装 + 最終成果物の検査を必須に)**、Codex 事実確認の対応表 (§8) |
@@ -242,7 +242,7 @@ T3 の前のデバッグ環境の整理 (起動時に読むデバッグ部品 `/
 | [tasks/settings/DEVICE_RESERVATION.md](tasks/settings/DEVICE_RESERVATION.md) / [FEP_BOUNDARY.md](tasks/settings/FEP_BOUNDARY.md) / [F2_OWNERSHIP.md](tasks/settings/F2_OWNERSHIP.md) | v3 の入力になる設計提案 (計画 / 設計中 / 設計中)。**U6 決定 (2026-09-30) を状態行に注記**: DEVICE_RESERVATION は改訂して P4 (核は T1 の台帳)、FEP_BOUNDARY と F2 の残りは P1 の T2 / T4 / T5a の要件。MEMORY_RAM_INTEGRATION は撤回して [archive/settings/](archive/settings/MEMORY_RAM_INTEGRATION.md) へ |
 | [DESIGN_APP_FIRST.md](DESIGN_APP_FIRST.md) | **アプリケーション優先設計の草案** — 前景 1 アプリへ資源を集中する設計思想。640×480×16bit を高機能グラフィックスの境界とし、Video HAL / VESA2 的互換層 / SDL 等の判断基準を整理。ロードマップではない |
 | [AUXILIARY_CORE_SERVICE.md](AUXILIARY_CORE_SERVICE.md) / [LEGACY_LIVING_PRESERVATION.md](LEGACY_LIVING_PRESERVATION.md) | 草案 (2026-09-28) — 余剰コアを固定機能アクセラレータに / レガシー実機の動態保存と OS32・OS64・Host Service の役割分離。ACS は v3 の範囲外。**OS64 は OS32 とは別の 64 ビット OS の構想** (v3 / v4 の範囲外、版数表に載せない。定義は LEGACY の冒頭、2026-09-30) |
-| [tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md) | **v3 本案 — 実装中 (2026-09-30)** — 目的の一文 (§1)、範囲と v3 / v4 の外 (§2-1)、**目標の 2 段の正典** (§2-2)、柱 P0〜P10 と正典 (§3)、順序 (§4)、v3 後半の票 (§5)、持ち越した宿題 (§6)、決定と経緯の在りか (§7)。T0 受入完了、次は T1 |
+| [tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md) | **v3 本案 — 実装中 (2026-09-30)** — 目的の一文 (§1)、範囲と v3 / v4 の外 (§2-1)、**目標の 2 段の正典** (§2-2)、柱 P0〜P10 と正典 (§3)、順序 (§4)、v3 後半の票 (§5)、持ち越した宿題 (§6)、決定と経緯の在りか (§7)。進捗は同票の状態行と [現行引き継ぎ](tasks/agents/HANDOVER_2026-10-09.md) を参照 |
 
 ### シェル・配備 (hsync)
 

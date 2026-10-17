@@ -33,8 +33,8 @@
 **KernelAPI の版と関数表の容量**: 本数・残り・オフセットの正典は [KAPI_SPEC.md](KAPI_SPEC.md) (v63 からデータ欄は 0x4B8 に固定、
 関数表の容量 R = 300、票 [TASK_KAPI_DATA_FIELDS](archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md))。ここに置く規則は 1 つ:
 **残りが 16 本を切ったら次の R を決める票を起こす** — R を変えるとデータ欄が動き、全バイナリの作り直し (v63 と同じ移行) になる。
-トランポリン 1 ページの上限は R ≤ 318。配備順 (v64 以降は「カーネルを先、ユーザーランドを後」) の手順の正典は
-[08_build.md](08_build.md#kapi-v63-移行)。
+トランポリン 1 ページの上限は R ≤ 318。配備順は
+[08_build.md §8-4](08_build.md#kapi-v63-移行) を参照する。
 
 *v1.0 到達までの開発履歴は [archive/ROADMAP_v1.0.md](archive/ROADMAP_v1.0.md) を参照*
 
@@ -78,12 +78,14 @@ API は Win16 の再現ではなく、その欠点を 386 で払える範囲の�
 
 ### CUI / GUI 切替フロー
 
+シェル帯の配置は [`include/memmap.h`](../include/memmap.h) の `MEM_SHELL_LOAD_ADDR`、実行モデルは [09_exec.md](09_exec.md) を参照。
+
 ```text
 [CUI -> GUI: 即時]
 1. CUI shell で `os32gui`
 2. shell: sys_switch_shell("/bin/gshell.bin")
 3. shell exit
-4. kernel shell loop が gshell を 0x300000 へロード
+4. kernel shell loop が gshell をシェル帯へロード
 
 [次回 boot の既定値]
 - `os32gui on`  -> system.cfg GUI=1
@@ -292,7 +294,7 @@ v3 では timer interrupt を利用したプリエンプティブ寄りの multi
 計画は [tasks/realhw/PLAN.md](tasks/realhw/PLAN.md) (実装中)。策定時 (2026-09-17) は「v1.x のあいだは着手しない」としたが、
 **v2.1 で FD 起動・CD からの HDD インストール・HDD 起動・シリアル 115200・SerialFS (シリアル越しの `/host`)・PCI 列挙まで到達した**
 ([RELEASE_v2.1.md](RELEASE_v2.1.md) §1)。実機は**エミュレータが嘘をついている箇所を暴くため**に使う (役割が違うので両方を取る)。
-残り (v3 の線): 82557 の L-B、PCM の E6、Trident (PEGC の目視は 2026-09-30 に合格)。当時の鍵だった「ホスト側のシリアル実装」は
+現在地と残件は [現行引き継ぎ §1](tasks/agents/HANDOVER_2026-10-09.md)、LAN の詳細は [82557 票](tasks/realhw/TASK_LAN_82557.md) を参照。当時の鍵だった「ホスト側のシリアル実装」は
 `tools/rshell_serial.py` と SerialFS で埋まった。
 
 **実機 LAN はオンボードの Intel 82557 を狙う** (ユーザー決裁 2026-09-17)。
@@ -324,29 +326,14 @@ v2.1 に入った — 本案 §4 で順序を引き直した)。カーネル本�
 **再配置の中身は 2026-09-30 の 3 者討論 (ユーザー・Fable・Codex) で決定した** — 正典は
 [tasks/v3/TASK_MEMMAP_V3.md](tasks/v3/TASK_MEMMAP_V3.md) (決定 D1〜D22、帯の表、票 T0〜T7)。要点: カーネル・シェル・通常 RAM は
 恒等写像のまま、アプリだけ 0x80000000〜 の私有写像。物理地図と所有権台帳を先に作り、固定帯はカーネル 3MB + シェル 1MB だけ。
-SQLite は同一リンクをやめてモジュール、低位 640KB は V86 へ。下の「着手の前に決めること」のうち**本体の上限**はその討論で決まった
+SQLite は同一リンクをやめてモジュール、低位 640KB は V86 へ。策定時に未決だった**本体の上限**はその討論で決まった
 (鎖の終端 ≤ 0x3E0000 をリンカ ASSERT で、本体の予算 2,516KB、余りは KERNEL_SLACK として池へ)。ARM との順序と `u32` / `<stdint.h>` は
 [archive/v3/V3_PLAN_DRAFT.md](archive/v3/V3_PLAN_DRAFT.md) §3 P0 / §1-5 (ARM は v3 の後、固定長は維持) のまま。
 
-v3 で行う。**この 2 つは同時に動かさない** — どちらも全ファイルに触れるので、
-壊れたときにどちらが原因か切り分けられなくなる。C11 が先 (T0)、再配置は T1〜T7。
-
-| 順 | やること | なぜその順か |
-|---|---|---|
-| 1 | **規約を C11 へ** (変数は**固定長を維持**) | `_Static_assert` は定数式でなければ**コンパイルエラー**になる。今の自作 `STATIC_ASSERT` は定数式でないと**黙って無効化される** (`kernel/shm.c` の 2 本が毎ビルド警告を出しながら何も検査していなかった)。**再配置を検査なしでやらないため、C11 が先** |
-| 2 | **メモリマップの全体再配置** | カーネル帯域 1MB に 1041KB を詰めていたのが 2026-09-17 の穴の根 ([archive/kernel_v21/TASK_KSTACK_USER.md](archive/kernel_v21/TASK_KSTACK_USER.md))。帯の中で削るのは延命でしかない |
-
-**着手の前に決めること**:
-
-- **カーネル本体をどこまで大きくしてよいか。** 番地の正典は `include/memmap.h`、生成した地図は `build/out/MEMMAP.md` (`make docs-gen`) (v2.1 時点で 583.0KB / 596KB、
-  残り 13.0KB。2026-09-17 は 433KB / 余裕 34KB)。上限を決めないと、削ってもまた同じ場所に戻る。
-- **ARM 実装との順序。** KAPI 生成器の arch 対応が v3 まで保留なので、再配置してから
-  ARM に手を付けると**配置の前提が 2 回動く**。
-- **`u32` を続けるか `<stdint.h>` に寄せるか。** 固定長の維持は 32 ビット限定の前提
-  ([tasks/portability/ARM_GAUGE.md](tasks/portability/ARM_GAUGE.md) §10) と噛み合う。
-  どちらでもよいが**混在が最悪**。
-
-詳しい懸念は [archive/kernel_v21/TASK_KSTACK_USER.md](archive/kernel_v21/TASK_KSTACK_USER.md) §7-5。
+策定時 (2026-09-17) は、配置超過と表明の検査不足を背景に、原因を切り分けられるよう C11 化を先に、再配置を後にする順序を選んだ。
+T0 の C11 移行は受入完了。現在の順序・決定は [V3_PLAN.md](tasks/v3/V3_PLAN.md)、
+型と C11 機能の採用範囲は [POLICY_DEV.md §2](POLICY_DEV.md) を参照。
+策定時の懸念は [TASK_KSTACK_USER.md §7-5](archive/kernel_v21/TASK_KSTACK_USER.md) に残す。
 
 ### 他アーキテクチャへの移植に備えた調査 (継続)
 

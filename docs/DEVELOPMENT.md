@@ -38,7 +38,7 @@
 | `shlib.c` | 共有ライブラリ帯 0x80000000〜 (高位 VA、AS ごと) のロード (`OS32ShlibHeader`) と、アプリ PD ごとの .data/.bss 複製 (`shlib_addrspace_attach`) | [02 §2-1](02_memory.md)、[09](09_exec.md)、[archive/gui_v11/TASK_K3](archive/gui_v11/TASK_K3_shared_lib_band.md) |
 | `paging.c` `pgalloc.c` | ページテーブル (現行実装: 静的な恒等写像 32MB、それより上の RAM は検出量だけ動的に写像、RAM の登録上端 2GB。設計上限ではない — 02_memory.md §2-1)、ガードページ、物理ページ確保。PD はプログラムごと (v2 M1)。デバイス窓は `paging_map_phys` (supervisor+PCD)、CLIENT は lease の私有 VA、共有 PT の通常 map/unmap は拒否 | [02](02_memory.md)、[archive/kernel_v2/M1_RING3.md](archive/kernel_v2/M1_RING3.md) |
 | `kmalloc.c` | カーネルヒープ (320KB) | [02 §2-1](02_memory.md) |
-| `shm.c` | 共有メモリ 16 ブロック × 16KB。ブロック 0 = DB 結果、12〜15 = GUI (K1 票) | [02](02_memory.md)、[tasks/gui/API_CONTRACTS.md T2](tasks/gui/API_CONTRACTS.md) |
+| `shm.c` | 共有メモリの割当と DB / GUI の予約。帯とブロック数は `include/memmap.h`、配置の説明は [02 §2-1](02_memory.md) | [02](02_memory.md)、[tasks/gui/API_CONTRACTS.md T2](tasks/gui/API_CONTRACTS.md) |
 | `idt.c` `isr_*.c` | 割り込み、`int 0x80` KAPI トランポリン着地点 | [04](04_interrupts.md)、[archive/kernel_v2/M2](archive/kernel_v2/M2_KAPI_TRAMPOLINE.md) |
 | `ime.c` `ime_romkana.c` `ime_dict.c` `ime_render*.c` | FEP。描画は関数表 (`ime_render.h`) 越し。GUI は `ime_feed_key` / `ime_set_render` (KAPI v42) で WM が FEP を持つ | [tasks/fep/](tasks/fep/00_INDEX.md)、[archive/gui_v11/TASK_W2](archive/gui_v11/TASK_W2_fep_lease_modal.md) |
 | `ring3_entry.asm` | `int 0x80` の入口 (`int80_stub`: セグメント復元後 `sti`、出口 `cli`)、`kapi_invoke` | [09](09_exec.md)、[POLICY_DEBUG §4-19](POLICY_DEBUG.md) |
@@ -61,11 +61,11 @@
 
 | ファイル | 役割 | 仕様 |
 |---|---|---|
-| `exec/exec.c` `exec_heap.c` | OS32X ローダ (ヘッダ v2 `load_addr`)、子プロセス帯の動的レイアウト、Ring3 AS の USER 写像 (プログラム帯 / スタック / VRAM / SHM / フォント / バックバッファ / shlib)、`exec_launch_abort` (起動失敗の巻き戻し)、所有者別の資源回収、CTRL+STOP (`ring3_abort_*`)、syscall 境界ポンプ (`ring3_gui_pump`)、`exec_run` の setjmp 分割壁 | [09](09_exec.md) |
+| `exec/exec.c` `exec_heap.c` | OS32X ローダ (ヘッダ v4・60B)、子プロセス帯の動的レイアウト、Ring3 AS の USER 写像 (プログラム帯 / スタック / SHM / shlib / lease 窓。低位 VRAM・フォントは supervisor、KAPI / lease 経由)、`exec_launch_abort` (起動失敗の巻き戻し)、所有者別の資源回収、CTRL+STOP (`ring3_abort_*`)、syscall 境界ポンプ (`ring3_gui_pump`)、`exec_run` の setjmp 分割壁 | [09](09_exec.md) |
 | `exec/exec_kapi_init.inc` | KAPI 表の初期化 (生成物) | [KAPI_SPEC §3-1](KAPI_SPEC.md) |
 | `kapi/kapi_generated.c` `kapi_sys.c` `kapi_db.c` | `__cdecl` ラッパー (生成 + 手書き) | 同上 |
 | `sdk/kapi.json` | **KAPI の正典** | 同上 |
-| `sdk/include/os32/os32_kapi_shared.h` | 構造体・`KAPI_VERSION`・`OS32_ERR_*` (エラーコードの正典)・OS32X ヘッダ v2・`OS32ShlibHeader` | 同上 |
+| `sdk/include/os32/os32_kapi_shared.h` | 構造体・`KAPI_VERSION`・`OS32_ERR_*` (エラーコードの正典)・OS32X ヘッダ v4・60B・`OS32ShlibHeader` | 同上 |
 | `sdk/include/os32/os32_kapi_slots.h` | `KAPI_SLOT_*` = `int 0x80` のスロット番号 (生成物、型非依存) | [KAPI_SPEC §3-1](KAPI_SPEC.md) |
 | `sdk/include/os32/os32_gui_shared.h` `sdk/rust/os32api/src/gui/` | GUI の op / イベント / SHM レイアウト (C と Rust に同じ値) | [tasks/gui/API_CONTRACTS.md](tasks/gui/API_CONTRACTS.md)、[tasks/gui/PROTO_LAYOUT.md](tasks/gui/PROTO_LAYOUT.md) |
 | `sdk/link/app.ld` `app_sys.ld` `shlib.ld` `sdk/crt/crt0.asm` | アプリ (私有 VA 0x80100000) / シェル帯 (0x400000、gshell) / 共有ライブラリ (私有 VA 0x80000000) のリンク | [09](09_exec.md)、[02 §2-1](02_memory.md) |
@@ -84,7 +84,7 @@
 | `fm.c` | OPN/OPM | [05 §5-3](05_drivers.md) |
 | `kcg.c` | 漢字 ROM / ビットマップフォント | [05 §5-9](05_drivers.md) |
 | `np2sysp.c` | NP21/W ハイパーコール | [05 §5-10](05_drivers.md) |
-| `lgy98.c` `ne2000.c` `ne2000_ring.c` `ne2000_io.asm` `ne2000_regs.h` | LGY-98 (NE2000 互換 C バス LAN)。カード固有 / 8390 本体 / リング計算 (ホスト試験可) / 16bit PIO / レジスタ定数の正典。既定は無効 (`CONFIG_LGY98_BASE=0`) | [tasks/network/PLAN.md](tasks/network/PLAN.md) |
+| `lgy98.c` `ne2000.c` `ne2000_ring.c` `ne2000_io.asm` `ne2000_regs.h` | LGY-98 (NE2000 互換 C バス LAN)。カード固有 / 8390 本体 / リング計算 (ホスト試験可) / 16bit PIO / レジスタ定数の正典。既定は有効 (カード未装着時は起動継続)。無効化は `make kernel-nolgy98` (`build/config.mk`) | [tasks/network/PLAN.md](tasks/network/PLAN.md) |
 | `pci.c` `pci_decode.c` `pci_bind.c` `pci_bind_match.c` | PCI の列挙 (メカニズム #1)・構成空間のデコード・結線表 (ドライバとの結び付け)、`lspci -v` — v2.1 | [tasks/realhw/TASK_LAN_82557](tasks/realhw/TASK_LAN_82557.md) (L-A)、[tasks/v3/TASK_HAL_WIRING](tasks/v3/TASK_HAL_WIRING.md) §1-4 |
 | `dma8237.c` `dma8237_math.c` | 8237 DMA の共通部 (`dma_chan_setup`、auto-init) — v2.1 | [tasks/v3/TASK_HAL_WIRING](tasks/v3/TASK_HAL_WIRING.md) §1-2 |
 | `pcm_cs4231.c` `pcm_cs4231_math.c` | CS4231 (MATE-X PCM) の PCM 再生 (リングは DMA プール、IRQ は動的登録) — v2.1 | [tasks/v3/TASK_PCM_CS4231](tasks/v3/TASK_PCM_CS4231.md) |

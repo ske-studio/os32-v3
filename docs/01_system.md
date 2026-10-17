@@ -100,12 +100,12 @@ loader_fat_new.asm (16bit → 32bit) — 第2段階
 
 ### §1-3 レイヤー構造と垂直依存性
 
-上位レイヤーは下位レイヤーの機能を利用するが、下位レイヤーが上位レイヤーの具体的な実装に依存すること（逆参照）は原則として禁止する。
+上位レイヤーは下位レイヤーの機能を利用するが、下位レイヤーが上位レイヤーの具体的な実装に依存すること（逆参照）は原則として禁止する。番地の定義は [include/memmap.h](../include/memmap.h)、配置の説明は [§2-1](02_memory.md) を参照。
 
 ```text
 [ アプリケーション層 ] (userland/, apps/, game/)   CPL=3、PD 分離
         |                 |
-        |        [ 共有ライブラリ ] (libos32gui.shlib @0x400000)
+        |        [ 共有ライブラリ ] (libos32gui.shlib @0x80000000)
         |                 |
         v                 v
 [ シェル層 ] CUI shell.bin / GUI gshell.bin (WM) — シェル帯 0x400000、CPL=0、gui_call の受け手

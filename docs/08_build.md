@@ -72,7 +72,7 @@ kernel.elf のリンクに build/out/build_id.c   → tools/gen_build_id.py (コ
 === HDD デプロイ ===
 boot_hdd.asm    →  nasm (-f bin)             →  boot_hdd.bin (512B IPL, LBA 0)
 loader_hdd.asm + boot_main.c + ext2_mini.c + lz4_mini.c
-                →  nasm + gcc + ld (-T loader.ld) → loader_hdd.bin (LBA 2-5)
+                →  nasm + gcc + ld (-T loader.ld) → loader_hdd.bin (LBA 2-17、最大 8KB)
 build/out/vmkernel.lz4 → ext2 FS 内 /boot/vmkernel.lz4 に配置 (nhd_deploy.py)
 build/out/kdebug.bin   → ext2 FS 内 /boot/kdebug.bin (デバッグ部品、vmkernel.lz4 の Image CRC と対。
                          対で配る — nhd_deploy の copy --dest /boot、hsync boot、FD インストール。票 TASK_DBGREF §3-9)
@@ -105,8 +105,7 @@ userland/rust/libos32gui       → ld -T sdk/link/shlib.ld     → userland/libo
 GUI アプリ      → libos32gui_stub (ジャンプ表への薄いスタブ) を静的リンク、libos32gfx は入れない
 ```
 
-日常のターゲット (`make all` に含まれる): `kernel` `programs` `libs` `gshell` `shlib` `external`
-(`apps` + `game`)。検査: `make check-fast` / `make check-changed` / `make check` の 3 通り
+日常のターゲット (`make all` に含まれる): `kernel` `programs` `libs` `gshell` `shlib`。検査: `make check-fast` / `make check-changed` / `make check` の 3 通り
 ([§8-4 検査の 3 段](#検査の3段))。`emu_agent` (ローカル AI) の `make` は
 許可リスト (`tools/emu_agent/agent.py` の `MAKE_TARGETS`) に載ったターゲットしか実行しない。
 `make all` の最後、および各配備 (`deploy` / `deploy-kernel` / `deploy-nhd` / `nhd_deploy.py sync`) の書込み前に、使う成果物から `build/out/deploy-set.json` を生成する。生成に失敗した場合は配備先へ書き込まない。配備時の期待表は最後に HostDrv/NHD へ配ったものの表で、FD の中身は含まない。`deploy-fd` と部分同期 `sync --tag` は期待表を再生成しない。期待集合・allow-list・名札照合と外部対象外の扱いは [T2H_EXTERNAL_GATE](tasks/v3/T2H_EXTERNAL_GATE.md)。
@@ -324,10 +323,7 @@ recipe には `$(MUT)` / `$(MUTS)` を使う。HOST32 は `$(call host32_check,t
 `check-c-dialect-host` のmake変種9回は、変異ありの場合、または Makefile・build の規則・
 言語検査器が変わった場合だけ回す。実物の lint は各本体検査に集約し、ホスト試験はfixtureを使う。
 
-**誰がいつ回すか** ([ROLES §0](tasks/agents/ROLES.md)): 実装者は依頼パックに列挙された `make check-<名前>` と新しい試験だけ。
-`check-changed` / `check_select.py` は PM が列挙を作る・変更が広がったときに候補を出し直すための道具。
-全体 (`make check`) は PM が取り込みのまとまりごとに統合状態で 1 回 — 修正のやり直しの中では回さない。
-取り込みの検査は 3 段 (文書だけ / 小さい取り込み / 節目の全体、[ROLES §0「検査」](tasks/agents/ROLES.md)) で、rc=0 なら push (`make check` は各試験の正常の対照も回すので `check-fast` を兼ねる)。
+**誰がいつ回すか**: 実装者・PM の担当、`MUTATE=0`・lint の条件、取り込みの検査の 3 段は、正典 [ROLES §0「検査」](tasks/agents/ROLES.md) に従う。
 
 **`check-changed` は作業中の近道で、取りこぼしの保証はしない。保証は取り込み後の `make check` が担う。**
 変更は基点からHEADまでと、未コミット (staged/unstaged)・未追跡の和。
@@ -386,7 +382,7 @@ lint は「手書きの一覧 + 自動ヘッダ依存」とrecipeからの入力
 #### KAPI v63 への移行 (データ欄の固定配置、票 [TASK_KAPI_DATA_FIELDS](archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md))
 
 v63 で KernelAPI のデータ欄を 0x4B8 に固定し、OS32X ヘッダを v3 にした
-([KAPI_SPEC.md](KAPI_SPEC.md) §4-0)。**v62 以前のバイナリ (アプリ・常駐シェル・
+([KAPI_SPEC.md §4-0](KAPI_SPEC.md#4-0-データ欄の固定配置とヘッダ-v3-v63票-task_kapi_data_fields))。**v62 以前のバイナリ (アプリ・常駐シェル・
 `libos32gui.shlib`) は一度だけ全部断られる**ので、初回は次の順で入れ替える:
 
 1. `make clean && make clean-external` — 古い `.o` は crt の `kapi` の改名
@@ -398,8 +394,8 @@ v63 で KernelAPI のデータ欄を 0x4B8 に固定し、OS32X ヘッダを v3 
    `/sys` (常駐シェル) が旧いまま新カーネルに載ると起動時に止まる
    (`FATAL: shell.bin: rebuild required (KAPI data layout)`、FDD の shell があればそちら)
 
-**v64 以降は「カーネルを先、ユーザーランドを後」** (ユーザー決裁 2026-09-24)。
-データ欄が固定になったので、新しいカーネルは古いユーザーランドをそのまま動かせる。
+**同一の形式・ABI・配置・shlib 世代内の機能版更新では「カーネルを先、ユーザーランドを後」** (v64 以降、ユーザー決裁 2026-09-24)。
+データ欄が固定なので、この条件内で新しいカーネルは古いユーザーランドを動かせる。OS32X v4 の世代照合契約は [KAPI_SPEC.md §4](KAPI_SPEC.md#4-kernelapi-構造体レイアウト)、現行値は [sdk/kapi.json](../sdk/kapi.json) を参照。
 逆 (新しいユーザーランド + 古いカーネル) は、`min_api_ver` (exec と shlib ローダ) と
 `hsync` の「配備物の版 > カーネルの版」の拒否 (`reason=kapi_newer_than_kernel`) が止める。
 shlib ローダが要求版で断ったときは、GUI を選んでいても CUI shell で起動し
@@ -531,18 +527,20 @@ U3 の予行・実機更新の準備は `make deploy-u3 HOSTDRV_DIR=<配備元�
 標準アプリとゲームは別リポジトリ (`ske-studio/os32-apps` / `ske-studio/os32-game`) で、
 `apps/` `game/` に git submodule として置き、`make sdk` が作る `build/sdk/` を指してビルドする。
 
+**現在は v3 のビルド対象外 (H-7)**。再開の条件・監査・受入は正典 [T2H_EXTERNAL_GATE.md](tasks/v3/T2H_EXTERNAL_GATE.md) に従う。
+
+再開が決まった後の初期化・ビルド:
+
 ```bash
 git submodule update --init     # 初回 / clone 直後
-make external                   # apps + game (make apps / make game で個別)
+make external                  # apps + game (make apps / make game で個別)
 ```
 
-- **KAPI を動かしたら `make external` で両方を再ビルドする。**
-  再ビルドだけでは submodule のコミットもポインタも変わらない。submodule 側のソース変更を
-  コミットして参照先が変わった場合にだけ、検証した組み合わせのポインタを親リポジトリで更新する。
-  コミット・push はユーザーの明示的な指示がある場合のみ行う。
-- **SDK のライブラリ (libos32gfx 等) を変えたときも同じ。** アプリは静的リンクなので、
-  古い `.bin` は新しいバックエンド (PEGC の PACKED8 等) で #PF する
-  (2026-09-06 に hello32 で実測)。
+再開後は KAPI または SDK のライブラリ (libos32gfx 等) を変えたときも両方を再ビルドする。
+アプリは静的リンクなので、旧 `.bin` に新ライブラリの変更は反映されない。
+再ビルドだけでは submodule のコミットもポインタも変わらない。submodule 側のソース変更で
+参照先が変わった場合にだけ、検証した組み合わせのポインタを親リポジトリで更新する。
+コミット・push はユーザーの明示的な指示がある場合のみ行う。
 
 #### `tools/hostdrv_deploy.py`
 HostDrv デプロイ先 (`HOSTDRV_DIR`, 既定 `C:\os32`) への差分同期。sudo 不要で高速。`make deploy` から呼ばれる。
@@ -587,7 +585,7 @@ FD が作れなくなった (`mkfat12.py` の「ディスク容量不足」)。
 |---|---|
 | カーネル、unicode.bin、shell.bin (組み込みコマンド)、filetypes、settings.tsv / settings.db (FD は profile も) | 起動と設定 |
 | install / cdinst | HDD へ入れる |
-| hsync | 残り (NORMAL 以降) を `/host` から取ってくる。**同期元は HostDrv なので今は NP21/W の上だけ** (実機は SerialFS 待ち) |
+| hsync | 残り (NORMAL 以降) を `/host` から取ってくる。NP21/W は HostDrv、実機は SerialFS 経由で利用できる ([KAPI_SPEC.md v66](KAPI_SPEC.md#シリアル越しの-host-v66)、§8-6 の実機更新手順) |
 | less / grep / hexdump | 壊れたファイルを見る |
 | cfg | 設定を直す |
 

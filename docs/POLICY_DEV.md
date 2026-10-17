@@ -191,11 +191,9 @@ make clean     # KernelAPI 構造体を変えたら clean → all が必須
 
 不一致はサイレントに古いバイナリが使われ続ける致命的な問題を引き起こす。
 
-> **`make deploy` (HostDrv) だけでは検証にならない。** HostDrv はゲストの `/host` に
-> しか配置せず、PATH 解決では NHD 側の `/usr/bin` が優先される。プログラム名で
-> 起動すると **NHD 上の古い .bin が黙って実行され、変更が反映されていないのに
-> 「合格」に見える**。ライブラリやテストを変更したときの検証は必ず NHD フルデプロイ
-> (NP21/W 停止 → `make deploy-kernel` → 起動) で行うこと。
+> **配備後は実行バイナリへの反映を確かめること ([V1])。** PATH は NHD の `/usr/bin` を優先するため、
+> HostDrv だけ更新しても古いバイナリで合格に見える。配備経路は
+> [08_build.md §8-4](08_build.md#配備3経路)、反映確認は [POLICY_DEBUG.md §2](POLICY_DEBUG.md) に従う。
 
 ### コマンド実行ルール (WSL環境)
 
@@ -269,17 +267,11 @@ VFSの仕様に基づき、固定のバッファサイズ(0x4000など)を利用
 
 ### 基本的な検証フロー
 
-1. `make all` でビルドエラーがないことを確認
-2. HostDrv にデプロイ (`hostdrv_deploy.py sync`)
-3. カーネル変更時は NP21/W を停止してから `make deploy-kernel` (HostDrv同期 →
-   HostDrv→ext2同期 → NHDコピー) を実行し、再起動する。
-   ブートローダー自体を変更した場合のみ `make deploy-boot` も実行する
-4. ゲスト側で `hsync` を実行 (HostDrv → ext2 同期)
-5. `ver` コマンドでビルドタイムスタンプと API バージョンを確認
-6. 変更対象の機能を手動テスト
-
-ビルドから実機検証までは `os32-cycle` (build / push / deploy / run / tvram / shot) に
-畳んである。詳細は `docs/tasks/hotdeploy/DESIGN.md`。
+ビルドと配備は [08_build.md §8-4](08_build.md#配備3経路)、バイナリの反映確認は
+[POLICY_DEBUG.md §2](POLICY_DEBUG.md) に従う。反映を確かめてから変更対象の機能を試験し、
+期待した動作と既存機能への影響を確認する。未実行の試験は合格に含めず、報告で明示する ([V4])。
+実機での更新・検証手順は [08_build.md §8-6](08_build.md) を参照する。
+配備と検証の自動化は `os32-cycle`、ホットデプロイの設計と制限は [hotdeploy/DESIGN.md](tasks/hotdeploy/DESIGN.md) を参照する。
 
 ### シリアルコンソール経由のリモートテスト
 

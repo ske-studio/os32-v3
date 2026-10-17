@@ -200,21 +200,21 @@ IDE HDD上のLinux ext2ファイルシステムを読み書きする。パーテ
 | ルートinode | 2 (`EXT2_ROOT_INO`) |
 | ブロックグループ | マルチグループ対応。1 グループ最大 8192 ブロック (`EXT2_BLOCKS_PER_GROUP_MAX`)、グループ数上限 32 (`EXT2_MAX_GROUPS`) |
 
-**API**:
+**API** (引数名の要約): `ctx` はマウントごとの `Ext2Ctx *`。正確な宣言は [fs/ext2.h](../fs/ext2.h) と [fs/ext2_priv.h](../fs/ext2_priv.h) を参照。`ext2_format` は内部で一時コンテキストを使う。
 
 | 関数 | 説明 |
 |------|------|
-| `ext2_mount(drive)` | マウント |
+| `ext2_mount(ctx, drive)` | マウント |
 | `ext2_format(drive, total_sectors)` | ext2フォーマット (mkfs相当) |
-| `ext2_read_file(ino, buf, max)` | ファイル読込 |
-| `ext2_write(ino, data, sz)` | ファイル上書き |
-| `ext2_create(dir, name, data, sz)` | ファイル新規作成 |
-| `ext2_unlink(dir, name)` | ファイル削除 |
-| `ext2_mkdir(dir, name)` | ディレクトリ作成 |
-| `ext2_rmdir(dir, name)` | ディレクトリ削除 |
-| `ext2_list_dir(ino, cb, ctx)` | ディレクトリ一覧 |
-| `ext2_lookup(path, out_ino)` | パス→inode解決 |
-| `ext2_sync()` | メタデータ書き戻し |
+| `ext2_read_file(ctx, ino, buf, max)` | ファイル読込 |
+| `ext2_write(ctx, ino, data, sz)` | ファイル上書き |
+| `ext2_create(ctx, dir, name, data, sz)` | ファイル新規作成 |
+| `ext2_unlink(ctx, dir, name)` | ファイル削除 |
+| `ext2_mkdir(ctx, dir, name)` | ディレクトリ作成 |
+| `ext2_rmdir(ctx, dir, name)` | ディレクトリ削除 |
+| `ext2_list_dir(ctx, ino, cb, user_ctx)` | ディレクトリ一覧 |
+| `ext2_lookup(ctx, path, out_ino)` | パス→inode解決 |
+| `ext2_sync(ctx)` | メタデータ書き戻し |
 
 ### §6-3 IDE ドライバ (ide.c / ide.h)
 

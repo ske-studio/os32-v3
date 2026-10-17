@@ -158,7 +158,7 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
 - VFS: エラーは `OS32_ERR_*` (FS の境界で翻訳)、`mount(dev_id)` は `(dev_type << 8) | unit`、`sys_ls` のコールバックから専用バッファ無しで FS を触らない。→ [`docs/06_filesystem.md`](06_filesystem.md) §6-1、§4-30、§4-26
 - デバイス窓は物理地図 (`pgalloc_range_has_ram`) で判定する (RAM の上端 `sys_get_mem_kb` ではない)。→ §4-34
 - CPL=3 の KAPI は IF=1 で走る (`int80_stub` の出口は IF=0)。KAPI の検査は `ring3_guard_active(ring3_in_syscall, ring3_wm_depth)` で (WM はアプリの syscall の中で走る)。→ §4-19、§4-61
-- シェルは 2 ヒープ (`kernel/paging.c` はシェル帯 0x400000–0x4FFFFF を present に保ち、shell heap は 0x4B5000–0x4F4FFF、0x4F5000 だけ NP のガード — 番地の正典は `include/memmap.h`、生成した地図は `build/out/MEMMAP.md` (`make docs-gen`))。exit の資源回収は所有者タグ (exec のネスト段) — カーネル常駐の FD は `vfs_fd_set_protect(fd, 1)`、親へ戻るときは `exec_heap_restore_state()` (`exec_heap_init_at()` ではない)。→ §4-15、§4-16、[`09_exec.md`](09_exec.md)
+- シェルは 2 ヒープ (`kernel/paging.c` はシェル帯 0x400000–0x4FFFFF を present に保ち、shell heap は 0x4B5000–0x4F4FFF、0x4F5000 だけ NP のガード — 番地の正典は `include/memmap.h`、生成した地図は `build/out/MEMMAP.md` (`make docs-gen`))。exit の資源回収は所有者タグ (アプリ ID、仕様は末尾の `09_exec.md`) — カーネル常駐の FD は `vfs_fd_set_protect(fd, 1)`、親へ戻るときは `exec_heap_restore_state()` (`exec_heap_init_at()` ではない)。→ §4-15、§4-16、[`09_exec.md`](09_exec.md)
 - SQLite はカーネル内 (core BSS の直後) の固定 384KB MEMSYS5 プールを全接続 (FEP 辞書を含む) で共有する — `*_init()` の末尾で接続を閉じる。枯渇は `db_query` の `-2`、`db_last_error()` を必ず出す。→ §4-13
 - 日本語は 1 文字 3 バイト・2 桁、切り詰めは UTF-8 の境界で。外部プログラムの漢字は既知の対で JIS 表を確かめてから `utf8_set_jis_table_ready(1)`。フォントは `tools/gen_font16.py`。→ §4-27、§4-11、§4-10
 - 物理 0x90000 は自動プレイのメールボックス — 配置を変えたら `game/tools/autoplay/driver.py` も同じコミットで。→ [`docs/02_memory.md`](02_memory.md) §2-1
@@ -398,9 +398,11 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
   `OP_WAIT` が眠らず 33 回/秒の空 commit をしていた (`gfx_counters` の idle 増分で発覚)。
   起床判定と配送判定が別実装で乖離し得たので `damage::deliverable_cand` に統合。
 - **手順 (30 秒で決まる)**: ① `gfx_counters` を打鍵前後で読み present の有無を見る → 無ければ
-  「アプリが描いていない or 起きていない」。② `/api/status` の `eip` を連続サンプルし、0x5xxxxx (アプリ) /
-  0x4xxxxx (shlib) / 0x3xxxxx (gshell) / 0x1xxxxx (カーネル idle) のどこに居るかを数える。
-  ③ shlib / アプリなら `i386-elf-nm -n` でシンボルに落とす。起床経路のカウンタはそのあと。
+  「アプリが描いていない or 起きていない」。② `/api/status` の `eip` を連続サンプルし、
+  [`include/memmap.h`](../include/memmap.h) と対象ビルドの map で所属する帯域・シンボルを調べる。
+  現行の先頭はアプリ `0x80100000`、shlib `0x80000000`、シェル `0x400000`。
+  ③ shlib / アプリなら対象ビルドの ELF に `i386-elf-nm -n` を使ってシンボルに落とす。
+  カーネル内にいる場合も map で実行箇所を確かめ、番地だけで idle と決めない。起床経路のカウンタはそのあと。
 
 ### 4-26. `sys_ls` のコールバックから FS を触ると一覧が崩れる
 
@@ -895,7 +897,7 @@ curl -s http://127.0.0.1:8025/api/screenshot > screenshot.png
 
 ### `emu_read_mem` で読むカーネルシンボル
 
-KAPI ではない**カーネルの大域変数** (カウンタ・印)。番地は毎回その版の `build/kernel.map` から引き、
+KAPI ではない**カーネルの大域変数** (カウンタ・印)。番地は毎回その版の `build/out/kernel.map` から引き、
 `emu_read_mem` (または `/api/mem`) で読む。どれも起動時 0。
 
 | シンボル | 定義 | 意味 |
@@ -921,19 +923,10 @@ KAPI ではない**カーネルの大域変数** (カウンタ・印)。番地�
 
 ### ビルド→デプロイ→テストの標準サイクル
 
-| 変更対象 | 手順 | NP21/W再起動 |
-|----------|------|:---:|
-| プログラムのみ (HostDrv実行) | `make all` → `make deploy` | 不要 |
-| プログラムのみ (ホット) | `make hotdeploy FILE=<path>` | 不要 |
-| カーネル / ブートFS | `np21w_ctl.py stop` → `make all` → `make deploy && make deploy-kernel` → `np21w_ctl.py start` | **必要** |
-
-```bash
-# カーネル変更時のフルサイクル例
-python3 tools/np21w_ctl.py stop
-make all && make deploy && make deploy-kernel
-python3 tools/np21w_ctl.py start --ini np21x64w.ini --wait-ready
-curl -X POST http://127.0.0.1:8025/api/cmd --data-binary "ver"   # Build タイムスタンプ確認
-```
+配備方式と実行手順は [08_build.md §8-4](08_build.md#配備3経路) に従う。
+配備後は §2 のチェックリストで、実行するバイナリに変更が届いたことを確認する。
+`ver` の Build 表示、ゲストのファイルサイズ、対象ビルドの map に基づく kselftest の値を
+照合してから変更機能を試験する。
 
 ---
 
