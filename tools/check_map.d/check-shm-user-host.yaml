@@ -1,4 +1,6 @@
 check-shm-user-host:
+- kernel/v86_snapshot.c
+- kernel/v86_module.h
 - kernel/paging.*
 - kernel/shm.*
 - kernel/v86_mem.*

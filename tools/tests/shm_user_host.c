@@ -43,8 +43,6 @@ void *kmemcpy(void *dest, const void *src, u32 n) {
     while (n--) *d++ = *s++;
     return dest;
 }
-#define real_saved v86_session.real_saved
-#define real_lowmem v86_session.real_lowmem
 #include "v86_bios_slice.inc"
 void v86_bios_setup(void) {}
 void v86_io_apply_policy(void) {}
@@ -313,6 +311,7 @@ void _start(void)
     check_reserved();
     test_int80();
     for (u32 i = 0; i < PAGE_SIZE; i++) host_page0[i] = (u8)(i ^ (i >> 8));
+    v86_bios_save_real();
     old = entry(0);
     CHECK(paging_v86_map_range(0, PAGE_SIZE, 0, PAGE_RW | PTE_USER) == -1 &&
           entry(0) == old, "V86 outside session unchanged");
@@ -325,6 +324,7 @@ void _start(void)
     CHECK((entry(0) & PTE_USER) && (entry(V86_REMAP_START + PAGE_SIZE) & PTE_USER),
           "V86 dedicated USER");
     for (u32 i = 0; i < PAGE_SIZE; i++) host_page0[i] = 0;
+    v86_bios_save_real(); /* Repeated capture must not replace the original. */
     flushes = host_flushes;
     v86_mem_teardown();
     for (u32 i = 0; i < PAGE_SIZE; i++)
@@ -412,3 +412,7 @@ void _start(void)
 
 /* Paging-only fixture has no exec slots; abort delivery is appmem_map_host. */
 void exec_addrspace_abort(struct addrspace *as) { (void)as; }
+
+/* Module lifetime is exercised with the real runtime in v86_module_host.c. */
+int v86_module_session_acquire(void) { return 1; }
+void v86_module_session_release(void) {}

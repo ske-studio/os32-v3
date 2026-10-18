@@ -13,7 +13,7 @@
 #include "palette.h"    /* palette_init() — セッション終了時の復帰 */
 #include "console.h"    /* console_hw_cursor_enable() — DOS が変えた CSRFORM を戻す */
 #include "snd_engine.h" /* snd_set_master() — FM をゲストに明け渡す */
-#include "module.h"     /* kdebug.ops.gcap_* — `v86 -g` の採取 (票 TASK_PEGC480_REALHW §3 段 1) */
+#include "module.h"     /* v86_debug_ops()->gcap_* — `v86 -g` の採取 (票 TASK_PEGC480_REALHW §3 段 1) */
 
 /* GDC はコマンドとパラメータの間に I/O ウェイトが要る (gfx_internal.h と同じ) */
 static void io_out(unsigned int port, unsigned int val)
@@ -52,13 +52,13 @@ u32 v86_iolog[V86_IOLOG_N * 4];
  *  [3] 同じ内容が連続した回数 */
 
 /* #GP ハンドラが記録しているゲストの CS:IP (kernel/v86.c) */
-extern u32 v86_gp_cs;
-extern u32 v86_gp_ip;
+#include "v86.h"
+#include "v86_module.h"
 
 static void iolog(u16 port, int size, int dir, u32 value)
 {
     u32 key = ((u32)dir << 24) | ((u32)size << 16) | port;
-    u32 loc = ((v86_gp_cs & 0xFFFFU) << 16) | (v86_gp_ip & 0xFFFFU);
+    u32 loc = ((v86_last_gp_cs() & 0xFFFFU) << 16) | (v86_last_gp_ip() & 0xFFFFU);
     u32 *e;
 
     {
@@ -236,14 +236,7 @@ static void gfx_state_for_guest(void)
 
 /* UNDOCUMENTED io_disp.md: I/O 00A2h / モードF/F1 DISP ENABLE。
  * CUI の表示順序を通常の V86 と ROM 採取の出口で共有する。 */
-void v86_cui_display_restore(void)
-{
-    gfx_current_height = GFX_HEIGHT;
-    gfx_flip_enabled = 0;
-    io_out(GDC_GFX_CMD, GDC_CMD_STOP);
-    io_out(MODE_FF1_PORT, MFF1_DISP_ON);
-    io_out(GDC_TEXT_CMD, GDC_CMD_START);
-}
+
 
 /* OS32 の CUI に戻す。ゲストの VRAM 内容は保持するが表示は止める。 */
 static void gfx_state_for_os32(void)
@@ -353,7 +346,7 @@ static int io_is_observed(u16 port)
 void v86_io_apply_policy(void)
 {
     u32 i;
-    int capture = (kdebug.ops.gcap_active ? kdebug.ops.gcap_active() : 0);
+    int capture = (v86_debug_ops()->gcap_active ? v86_debug_ops()->gcap_active() : 0);
 
     io_trap_n = 0;
     io_last_port = 0;
@@ -383,7 +376,7 @@ void v86_io_apply_policy(void)
     if (capture) {
         u32 p;
         for (p = 0; p < 0x0A00U; p++) {
-            if (kdebug.ops.gcap_port_passed(p)) {
+            if (v86_debug_ops()->gcap_port_passed(p)) {
                 tss_iomap_deny((u16)p);
             }
         }
@@ -410,7 +403,7 @@ void v86_io_reset_policy(void)
      * gfx_state_for_os32 は 400 ライン・16 色へ決め打ちで戻すだけで、
      * 同期 (SYNC / 09A8h) を戻さない — ここで走らせると ROM の戻しを
      * 上書きする。音源は明け渡していないので戻すものが無い。 */
-    if (kdebug.ops.gcap_active && kdebug.ops.gcap_active()) {
+    if (v86_debug_ops()->gcap_active && v86_debug_ops()->gcap_active()) {
         return;
     }
     gfx_state_for_os32();
@@ -428,7 +421,7 @@ u32 v86_io_in(u16 port, int size)
 {
     u32 v;
 
-    if (kdebug.ops.gcap_pass_in && kdebug.ops.gcap_pass_in(port, size, &v)) {
+    if (v86_debug_ops()->gcap_pass_in && v86_debug_ops()->gcap_pass_in(port, size, &v)) {
         /* `v86 -g`: 実機から幅どおりに読んで数えた */
     } else if (io_is_observed(port)) {
         v = inp(port);                  /* 観測: 実ポートを読んで中継 */
@@ -440,7 +433,7 @@ u32 v86_io_in(u16 port, int size)
         v = (size == 1) ? 0xFFU : 0xFFFFU;
     }
     /* 採取中だけ・通さなかったポートだけ数える (通したものは上で数えた) */
-    if (kdebug.ops.gcap_note_in) kdebug.ops.gcap_note_in(port, size, v);
+    if (v86_debug_ops()->gcap_note_in) v86_debug_ops()->gcap_note_in(port, size, v);
 
     io_trap_n++;
     io_last_port = port;
@@ -450,7 +443,7 @@ u32 v86_io_in(u16 port, int size)
 
 void v86_io_out(u16 port, int size, u32 value)
 {
-    if (kdebug.ops.gcap_pass_out && kdebug.ops.gcap_pass_out(port, size, value)) {
+    if (v86_debug_ops()->gcap_pass_out && v86_debug_ops()->gcap_pass_out(port, size, value)) {
         /* `v86 -g`: 記録してから実機へ幅どおりに書いた */
     } else if (io_is_observed(port)) {
         outp(port, value);              /* 観測: ログを取ってから実ポートへ */
@@ -460,7 +453,7 @@ void v86_io_out(u16 port, int size, u32 value)
         v86_kbd_out(port, value);
     }
     /* 採取中だけ・通さなかったポートだけ積む (通したものは上で積んだ) */
-    if (kdebug.ops.gcap_note_out) kdebug.ops.gcap_note_out(port, size, value);
+    if (v86_debug_ops()->gcap_note_out) v86_debug_ops()->gcap_note_out(port, size, value);
 
     io_trap_n++;
     io_last_port = port;

@@ -1,4 +1,5 @@
 check-r1-fixture-host:
+- kernel/v86_module.h
 - kernel/r1_fixture.c
 - kernel/r1_fixture.h
 - kernel/isr_handlers.c

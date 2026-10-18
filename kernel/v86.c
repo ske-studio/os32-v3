@@ -19,6 +19,7 @@
 #include "idt.h"
 #include "kprintf.h"
 #include "io.h"
+#include "gfx_internal.h"
 
 /* setjmp/longjmp (kernel/setjmp.asm) — セッションからの脱出に使う */
 #include "ksetjmp.h"
@@ -948,4 +949,17 @@ int v86_boot2(const char *path, const char *second)
 int v86_boot(const char *path)
 {
     return v86_boot2(path, (const char *)0);
+}
+
+/* Core display return path also serves kdebug with v86.mod absent. */
+void v86_cui_display_restore(void)
+{
+    gfx_current_height = GFX_HEIGHT;
+    gfx_flip_enabled = 0;
+    outp(GDC_GFX_CMD, GDC_CMD_STOP);
+    io_wait();
+    outp(MODE_FF1_PORT, MFF1_DISP_ON);
+    io_wait();
+    outp(GDC_TEXT_CMD, GDC_CMD_START);
+    io_wait();
 }

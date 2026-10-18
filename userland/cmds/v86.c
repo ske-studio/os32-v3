@@ -197,8 +197,8 @@ int main(int argc, char **argv, KernelAPI *kapi)
         printf("    emu_read_mem addr=v86_boot_gpip   len=4  (last #GP IP)\n");
         printf("    emu_read_mem addr=v86_boot_gpop   len=4  (opcode there)\n");
         printf("    emu_read_mem addr=v86_flt_vec     len=24 (non-#GP fault)\n");
-        printf("    emu_read_mem addr=v86_disk_ident_n len=32 (disk counters)\n");
-        printf("    emu_read_mem addr=v86_kbd_n_push  len=12 (kbd push/read/drop)\n");
+        printf("    v86.mod: v86_disk_ident_n (32 bytes), v86_kbd_n_push (12 bytes)\n");
+        printf("    address = module base + offset in build/out/v86/v86.map\n");
         printf("  Exit the guest with CTRL+STOP.\n");
         return 0;
     }

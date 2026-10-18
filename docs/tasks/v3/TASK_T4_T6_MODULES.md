@@ -323,6 +323,10 @@ load_span=397,312B。SQLite専用生成policyは上記§2-1、reloc/import上限
 body+将来pool512KiB+stack128KiBは定常1,036,288B、prefix込みpeak1,052,672B (タグ/record等は後続実測)。旧static384KiB poolは試作bodyに無い。
 実測台帳は `build/out/sqlite-proto/measurements.json` (節/使用archive member/構成/ELF SHA-256)。再生成と境界試験は `check-sqlite-module-proto-host`、S4対照は `check-kdebug-init-host`。
 
+T5c-3 接続契約: `v86.mod` (ID 8、POST_ROOT/PAIR 必須、ops 1・initialize 1 口) は BIOS/I/O・仮想 PIC/keyboard を保持し、core の typed facade 20 口へ接続する。import は関数 28 本、ABI 印は `build/out/v86/v86_imports.h` の生成値。kdebug は既存 core facade を引き続き import し、S4 の定義・総数235本・ABI印 `0xf8381b03` は変更しない。V86 は kdebug 自己試験より前に load、欠落時は session begin を低位変更前に拒否する。
+セッションの ACTIVE 参照は PTE snapshot 前から、例外後の trusted landing で disk detach・backing 返却・復帰監査を終えるまで保持する。途中の abort は隔離し、参照中の body は復帰用に呼出し可能。entry/longjmp、runtime_end の ESP0/IF、PTE snapshot/restore と例外の一次処理は core のまま、caller は切り替えない。
+`bootinfo_capture` の保存域と `v86_session.real_lowmem[4096]` は core に置く。page0 は起動時・paging 前の一度だけ保存し、以後は read-only 原本として使用、session reset/部品回収では消さない (T7a-1c 引渡し)。低位 FIXED は従来どおり非回収。#DF 専用 TSS/task gate/stack/CR3 と V86 の kernel_tss/ESP0 は別系統を維持する。
+
 ### 7-2. 像・実行時RAMの見積もりと止める条件
 
 T4でSQLiteはFIXED鎖からowner割当へ移行済み。T5入口で実mapを基準化し、module頁はSLACK/poolの内数、NP guardも所有頁として1回数える。AUDITGUARD-1のAS作成/boot監査を維持し、通常/rollback/隔離でdiff0。prefix返却を含め二重計上せず、起動監査の回数は変えない。

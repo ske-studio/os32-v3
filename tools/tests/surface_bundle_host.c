@@ -299,3 +299,7 @@ static void caller_copy_tests(void)
     SAY("surface bundle + native exec/V86 cache PASS");
     die(0);
 }
+
+/* Module lifetime is covered by v86_module_host.c. */
+int v86_module_session_acquire(void) { return 1; }
+void v86_module_session_release(void) {}

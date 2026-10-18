@@ -11,15 +11,6 @@
 #include "paging.h"
 #include "vfs.h"
 
-/* 実機の page0 全体 (IVT/BDA とゲストが触れる残部) の退避先。
- *
- * バッキング RAM を張るとゲストから見た低位メモリは真っさらになるので、
- * 実機の値をそのまま渡してやらないとゲストは何も判断できない。
- * ROM を指す割り込みベクタもここから引き継ぐ。 */
-#define REAL_SNAPSHOT_SIZE PAGE_SIZE
-#define real_lowmem v86_session.real_lowmem
-#define real_saved v86_session.real_saved
-
 static u32 bios_calls = 0;
 static u32 bios_last_vec = 0;
 static int disk_attached = 0;
@@ -250,28 +241,6 @@ static const u8 hle_vectors[] = {
     0x1B        /* ディスク BIOS */
 };
 
-void v86_bios_save_real(void)
-{
-    /* begin already captured the old PTE, including NP/RO/USER. Temporarily
-     * expose physical page zero for the full snapshot; end restores the PTE. */
-    paging_set_page(0, 0, PAGE_RO);
-    kmemcpy(real_lowmem, P2V(0), REAL_SNAPSHOT_SIZE);
-    real_saved = 1;
-}
-
-/* セッション終了時に実機の IVT/BDA を書き戻す。
- * ページ 0 は実物理のままゲストに渡している (v86_mem.c 参照) ので、
- * ゲストが書き換えた分をここで巻き戻さないと OS32 側に残ってしまう。 */
-void v86_bios_restore_real(void)
-{
-    if (!real_saved) {
-        return;
-    }
-    paging_set_page(0, 0, PAGE_RW);
-    kmemcpy(P2V(0), real_lowmem, REAL_SNAPSHOT_SIZE);
-    real_saved = 0;
-}
-
 void v86_bios_setup(void)
 {
     u8 *guest = (u8 *)0;        /* リマップ済みのゲスト低位メモリ */
@@ -279,9 +248,7 @@ void v86_bios_setup(void)
     /* 実機の IVT / BDA をゲストへ引き継ぐ。
      * ROM を指す割り込みベクタもここから受け継ぐので、HLE しないコールは
      * そのまま実 BIOS ROM が処理する。 */
-    if (real_saved) {
-        kmemcpy(guest, real_lowmem, REAL_SNAPSHOT_SIZE);
-    }
+    kmemcpy(guest, v86_bios_real_lowmem(), PAGE_SIZE);
 
     /* ゲストに見せるマシン構成を作る。
      *

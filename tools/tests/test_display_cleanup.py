@@ -11,7 +11,7 @@ import tempfile
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
-TARGET_SRCS = ('kernel/v86_io.c', 'kdebug/v86_gcap.c', 'kernel/boot_splash.c', 'gfx/gfx_core.c')
+TARGET_SRCS = ('kernel/v86_io.c', 'kdebug/v86_gcap.c', 'kernel/boot_splash.c', 'gfx/gfx_core.c', 'kernel/v86.c')
 
 
 def function(text, name):
@@ -34,12 +34,12 @@ def build_run(tree, kind, cases):
             io = (tree / TARGET_SRCS[0]).read_text()
             gcap = (tree / TARGET_SRCS[1]).read_text()
             names = ['io_out']
-            if 'void v86_cui_display_restore(' in io:
-                names.append('v86_cui_display_restore')
-            body = ''.join(function(io, name) for name in names + ['gfx_state_for_os32', 'v86_io_reset_policy'])
+            core = (tree / TARGET_SRCS[4]).read_text()
+            body = function(core, 'v86_cui_display_restore') + ''.join(function(io, name) for name in names + ['gfx_state_for_os32', 'v86_io_reset_policy'])
             if 'static void gcap_out(' in gcap:
                 body += function(gcap, 'gcap_out')
             body += function(gcap, 'gcap_cui_rebuild')
+            body = body.replace('v86_debug_ops()->', 'kdebug.ops.')
             (tmp / 'display_cleanup_slice.inc').write_text(body)
             src = tree / 'tools/tests/display_cleanup_host.c'
         else:
@@ -57,16 +57,16 @@ def build_run(tree, kind, cases):
 
 # Each anchor's exact hit count is fixed; compile failures never count as RED.
 MUTATIONS = [
-    ('v86-height', TARGET_SRCS[0], '    gfx_current_height = GFX_HEIGHT;', '', 1, 'v86', 'FAIL: CUI height flip'),
-    ('v86-flip', TARGET_SRCS[0], '    gfx_flip_enabled = 0;', '', 1, 'v86', 'FAIL: CUI height flip'),
+    ('v86-height', TARGET_SRCS[4], '    gfx_current_height = GFX_HEIGHT;', '', 1, 'v86', 'FAIL: CUI height flip'),
+    ('v86-flip', TARGET_SRCS[4], '    gfx_flip_enabled = 0;', '', 1, 'v86', 'FAIL: CUI height flip'),
     ('v86-start', TARGET_SRCS[0], '    v86_cui_display_restore();',
      '    io_out(GDC_GFX_CMD, GDC_CMD_START);', 1, 'v86', 'FAIL: graphics must stay stopped'),
     ('v86-access-one', TARGET_SRCS[0], 'io_out(GDC_ACCESS_PAGE, GDC_PAGE_0);\n\n    /* 16 色',
      'io_out(GDC_ACCESS_PAGE, GDC_PAGE_1);\n\n    /* 16 色', 1, 'v86', 'FAIL: access page must be zero'),
     ('v86-display-one', TARGET_SRCS[0], 'v86_cui_display_restore();\n    io_out(GDC_DISP_PAGE, GDC_PAGE_0);',
      'v86_cui_display_restore();\n    io_out(GDC_DISP_PAGE, GDC_PAGE_1);', 1, 'v86', 'FAIL: display page must be zero'),
-    ('no-display-enable', TARGET_SRCS[0], '    io_out(MODE_FF1_PORT, MFF1_DISP_ON);', '', 1, 'v86', 'FAIL: display output must be enabled'),
-    ('no-text-start', TARGET_SRCS[0], '    io_out(GDC_TEXT_CMD, GDC_CMD_START);', '', 1, 'v86', 'FAIL: text must be started'),
+    ('no-display-enable', TARGET_SRCS[4], '    outp(MODE_FF1_PORT, MFF1_DISP_ON);', '', 1, 'v86', 'FAIL: display output must be enabled'),
+    ('no-text-start', TARGET_SRCS[4], '    outp(GDC_TEXT_CMD, GDC_CMD_START);', '', 1, 'v86', 'FAIL: text must be started'),
     ('gcap-no-restore', TARGET_SRCS[1], '    v86_cui_display_restore();', '', 1, 'v86', 'FAIL: capture rebuild'),
     ('old-splash-cleanup', TARGET_SRCS[2], '    gfx_clear_planar_pages(GFX_PLANE_SZ);',
      '    bb_clear(0);\n    gfx_add_dirty_rect(0, 0, GFX_WIDTH, GFX_HEIGHT);\n    gfx_present();', 1, 'splash', 'FAIL: residual logo page=0'),

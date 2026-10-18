@@ -138,7 +138,7 @@ def dry_run(root):
         module.ROOT = pathlib.Path(root)
         module.generate(pathlib.Path(out_dir, "sqlite-proto"),
                         pathlib.Path(root, "tools/prototypes/sqlite_imports.def"))
-        for component in ("fep", "cd", "kcg", "fm"):
+        for component in ("fep", "cd", "kcg", "fm", "v86"):
             definition = pathlib.Path(root, "tools/prototypes/" + component + "_imports.def")
             if definition.is_file():
                 module.generate(pathlib.Path(out_dir, component), definition, module=component)

@@ -1,0 +1,177 @@
+{
+  "schema": 1,
+  "contracts": [
+    "kernel/v86_module.h",
+    "kernel/module.h"
+  ],
+  "imports": [
+    {
+      "symbol": "console_hw_cursor_enable",
+      "source": "include/console.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "palette_init",
+      "source": "gfx/palette.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "snd_set_master",
+      "source": "kernel/snd_engine.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "tss_iomap_allow",
+      "source": "kernel/tss.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "tss_iomap_deny",
+      "source": "kernel/tss.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "tss_iomap_deny_all",
+      "source": "kernel/tss.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "v86_last_gp_cs",
+      "source": "kernel/v86.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "v86_last_gp_ip",
+      "source": "kernel/v86.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "v86_debug_ops",
+      "source": "kernel/v86_module.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "v86_cui_display_restore",
+      "source": "kernel/v86_io.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "v86_bios_real_lowmem",
+      "source": "kernel/v86_bios.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "kmemcpy",
+      "source": "lib/kstring.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "loop_dev_attach",
+      "source": "drivers/loop_dev.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "loop_dev_detach",
+      "source": "drivers/loop_dev.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "loop_dev_get_fd",
+      "source": "drivers/loop_dev.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "loop_dev_get_format",
+      "source": "drivers/loop_dev.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "loop_dev_get_geometry",
+      "source": "drivers/loop_dev.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "loop_dev_get_sec_n",
+      "source": "drivers/loop_dev.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "loop_dev_is_hdd",
+      "source": "drivers/loop_dev.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "loop_dev_is_writable",
+      "source": "drivers/loop_dev.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "loop_dev_read_chs",
+      "source": "drivers/loop_dev.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "loop_dev_read_lba",
+      "source": "drivers/loop_dev.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "loop_dev_seek_d88",
+      "source": "drivers/loop_dev.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "loop_dev_track_id_d88",
+      "source": "drivers/loop_dev.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "loop_dev_write_chs",
+      "source": "drivers/loop_dev.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "loop_dev_write_lba",
+      "source": "drivers/loop_dev.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "vfs_read_fd",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "vfs_seek",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": true
+    }
+  ]
+}
