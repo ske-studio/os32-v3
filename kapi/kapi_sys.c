@@ -156,6 +156,7 @@ void kapi_sys_get_build_info(char *buf, int size)
     if (!buf || size <= 0) return;
     kstrncpy(buf, __DATE__ " " __TIME__, (u32)size);
     sqlite_engine_stack_report();
+    services_report();
 }
 
 /* ======================================================================== */

@@ -404,6 +404,20 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
             assert result.returncode == 1 and b'FAIL guard_np &&' in result.stdout, result
         print('MUTATE stack-guard-removed RED (compiled, runtime guard assertion)')
         path.write_text(source)
+        # Revert the ABSENT filters separately; the final-check failure reuses
+        # both reclaimed IDs before calling the real ver report path.
+        for name in ('sqlite_engine.c', 'fep_module.c'):
+            target = folder / name
+            original = target.read_text()
+            old = 'r && r->state != MODULE_ABSENT && r->owner ?'
+            assert old in original, name
+            target.write_text(original.replace(old, 'r && r->owner ?'))
+            subprocess.run(command, check=True)
+            result = boot_run(54)
+            assert result.returncode == 1 and b'FAIL ' in result.stdout, (name, result)
+            print('MUTATE absent-owner-reuse ' + name + ' RED (compiled runtime): '
+                  + result.stdout.decode().strip(), flush=True)
+            target.write_text(original)
         runtime_path = folder / 'module_runtime_boot.c'
         runtime_source = (ROOT / 'kernel/module_runtime.c').read_text()
         runtime_path.write_text(runtime_source)
@@ -577,7 +591,7 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
             assert original.count(old) == 1, label
             path.write_text(original.replace(old, new))
             subprocess.run(command, check=True)
-            result = boot_run(50)
+            result = boot_run(54)
             assert result.returncode == 1 and failure in result.stdout, (label, result)
             print('MUTATE ' + label + ' RED (compiled runtime): ' + result.stdout.decode().strip(), flush=True)
             path.write_text(original)

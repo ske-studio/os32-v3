@@ -60,6 +60,8 @@ check-mem-stat-host:
 - userland/shell/cmd_base.c
 - userland/shell/shell.h
 - kernel/module.h
+- kernel/module_runtime.h
+- kernel/module_image.h
 - kernel/kaudit_boot.c
 - kernel/kselftest.h
 - kernel/memory_boot.c

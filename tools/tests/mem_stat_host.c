@@ -92,10 +92,31 @@ struct kdebug kdebug;
 extern u32 boot_pages_audit_runs, boot_pages_audit_fail;
 /* Use the product reporter so restoring its call emits real diagnostic text. */
 static const char *services_state_name(void) { return "SQLITE_ONLY"; }
-static u32 services_public;
+#include "module_runtime.h"
+#include "sqlite_engine.h"
+int services_public;
+enum services_stage services_stage = SERVICES_SQLITE_ONLY;
+static int services_reserve;
+static struct module_handle sqlite_handle;
+static struct module_record *module_record_get_stub(struct module_handle handle) { (void)handle; return 0; }
+#define module_record_get module_record_get_stub
 static u32 fep_module_pages(void) { return 0; }
 static u32 ime_boot_bytes(void) { return 0; }
 #include "services_report_source.c"
+#undef module_record_get
+static void sqlite_stack_report_stub(void) {}
+#define sqlite_engine_stack_report sqlite_stack_report_stub
+#include "build_info_source.c"
+#undef sqlite_engine_stack_report
+static void ver_diagnostics(void)
+{
+    char buf[64];
+    diagnostic_bytes = diagnostic_lines = 0;
+    capture_diagnostics = 1;
+    kapi_sys_get_build_info(buf, sizeof(buf));
+    capture_diagnostics = 0;
+    CHECK("ver services once", diagnostic_bytes > 0 && diagnostic_lines == 1);
+}
 #include "mem_stat_source.c"
 #undef pgalloc_free_pages
 #undef kmalloc_total
@@ -369,6 +390,7 @@ static void owner_diagnostics(void)
 
 void _start(void)
 {
+    ver_diagnostics();
     owner_diagnostics();
     heap_ram();
     /* The fixed-map fixture covers the new stack bands; map before marking. */

@@ -21,6 +21,7 @@ TARGET_SRCS = base.TARGET_SRCS + [
     'tools/tests/mem_stat_host.c', 'tools/tests/kdebug_cli_host.c', 'tools/tests/test_mem_stat.py',
     'kernel/sqlite_engine.c', 'kernel/sysconfig.c', 'kernel/kaudit_boot.c', 'kernel/memory_boot.c',
     'kernel/memory_boot.h', 'kernel/kselftest.h', 'include/kprintf.h',
+    'kernel/module_runtime.h', 'kernel/module_image.h', 'kernel/sqlite_engine.h',
 ]
 
 
@@ -62,6 +63,8 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...) {
 """)
     (tmp / 'services_report_source.c').write_text(
         function(read('kernel/sqlite_engine.c'), 'void services_report('))
+    (tmp / 'build_info_source.c').write_text(
+        function(read('kapi/kapi_sys.c'), 'void kapi_sys_get_build_info('))
     (tmp / 'mem_fixture.c').write_text(fixture)
     heap = read('tools/tests/exec_heap_host.h')
     heap = heap.replace(function(heap, 'AppSlot *appslot_at('), function(slot, 'AppSlot *appslot_at('))
