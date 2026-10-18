@@ -73,7 +73,7 @@ extern int fatfs_init(void);
 #include "fm_module.h"
 #include "mouse.h"
 #include "lgy98.h"
-#include "pcm_cs4231.h"
+#include "pcm_module.h"
 #include "os32_sqlite_vfs.h"
 #include "os32_sqlite_outer.h"
 #include "sqlite_engine.h"
@@ -622,7 +622,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     /* CS4231 (MATE-X PCM) の検出だけ (票 TASK_PCM_CS4231 §2-1)。
      * 無い機械では `[pcm] none` を出して静かに戻る — 以降の起動は変わらない。 */
     if (memory_boot_dma_available()) {
-        pcm_init();
+        pcm_module_load();
     }
 
     /* FDリダイレクト初期化 (プログラムローダーより前に) */

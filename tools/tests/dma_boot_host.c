@@ -114,11 +114,12 @@ static void pci_bind_all(int drivers, int count)
     CHECK(dma_alloc(16384, 0, DMA_PHYS_LIMIT, &b) == 0);
     bound++;
 }
-static void pcm_init(void)
+static int pcm_module_load(void)
 {
     CHECK(reserved && available && tested == 1 && bound == 1);
     CHECK(dma_pool_free_pages() == DMA_POOL_PAGES - 4);
     pcm++;
+    return 0;
 }
 static void kprintf(int attr, const char *fmt, ...)
 {

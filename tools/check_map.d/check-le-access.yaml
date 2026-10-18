@@ -2,6 +2,7 @@ check-le-access:
 - tools/clang_ast/**
 - tools/gen_sqlite_imports.py
 - tools/prototypes/cd_imports.def
+- tools/prototypes/pcm_imports.def
 - tools/tests/test_clang_ast.py
 - drivers/**/*.[ch]
 - fs/**/*.[ch]

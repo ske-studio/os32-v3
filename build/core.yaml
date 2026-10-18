@@ -59,9 +59,14 @@ filesystem:
     # --- Paired ROM glyph reader (also on FD) ---
     - host: build/out/kcg.mod
       guest: /boot/kcg.mod
+      tags: [core]
     # --- Paired FM/snd (also on FD) ---
     - host: build/out/fm.mod
       guest: /boot/fm.mod
+      tags: [core]
+    # --- Paired PCM (also on FD) ---
+    - host: build/out/pcm.mod
+      guest: /boot/pcm.mod
       tags: [core]
     # --- カーネルデータ ---
     - host: build/out/unicode.bin

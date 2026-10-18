@@ -121,7 +121,7 @@ S4の型・slot・生成ABI・pair CRC・ops2/18口を正常対照として維�
 
 `make kernel` は「カーネルの像と、それと対になって起動時に読む部品の一式」を組む (部品は像の CRC を埋めるので像と一緒に組み直す。Tx の段ごとの `make kernel` で部品の誤りを拾うため、ユーザー決定 2026-10-18)。起動時に読むSQLite・FEP・後続部品はkdebugと同じ **`/boot`** に置き、`hsync boot` で対として運ぶ (PM決定)。機能版完全一致 (`kernel/module_image.c:103`) を維持し、同じ公開ABI世代でも旧部品を残さない。配布の接続は§5-4。
 
-T5c-2b/T5c-3の依頼前に、kdebugのPCM/V86 importをcore facade経由で残すか、該当自己試験を部品側へ移すかを決める。対象はpcm_open・pcm_state・v86_* 13本・paging_v86_session_open (`kernel/kdebug_imports.def:895,903,911,1615`)、S4の本数・ABI印も再生成する。現形式に部品間importを追加したものとは扱わない。
+T5c-2bはPCM importをcore facadeに残す (公開KAPI・tick・owner回収にも必要な同じ入口を使い、自己試験の移設と別の接続を省く方が小さい)。S4は235本・生成ABI印 `0xf8381b03` を維持し、PCMの私有ABIは型付き表とimport定義から生成する。T5c-3の依頼前にV86 importのcore facade維持か自己試験移設を決める。対象はpcm_open・pcm_state・v86_* 13本・paging_v86_session_open (`kernel/kdebug_imports.def:895,903,911,1615`)、S4の本数・ABI印も再生成する。現形式に部品間importを追加したものとは扱わない。
 
 ### 2-2. 状態と公開
 
