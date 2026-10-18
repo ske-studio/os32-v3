@@ -251,12 +251,26 @@ static int boot_range_valid(u32 first, u32 end, int present)
     return 1;
 }
 
+/* SLACK は module owner の頁も含む。SQLite owner が登録した stack guard
+ * だけ NP を要求し、残りは未割当・body/pool/stack とも恒等 sup/RW/WB。
+ * 帯を常駐末尾まで縮めると、想定外の NP / 写像漏れを見逃す。 */
+static int boot_slack_valid(void)
+{
+    u32 guard = paging_sqlite_stack_guard;
+    if (guard < MEM_SHM_RESV_START || guard >= MEM_FIXED_PAGING_GUARD_BASE)
+        return boot_range_valid(MEM_SHM_RESV_START, MEM_FIXED_PAGING_GUARD_BASE, 1);
+    return !(guard % PAGE_SIZE) &&
+        boot_range_valid(MEM_SHM_RESV_START, guard, 1) &&
+        boot_range_valid(guard, guard + PAGE_SIZE, 0) &&
+        boot_range_valid(guard + PAGE_SIZE, MEM_FIXED_PAGING_GUARD_BASE, 1);
+}
+
 /* 台帳の backing の型によらない supervisor 範囲。
  * SHM の属性は後で shm_init / boot_user_shared が張る。 */
 static int boot_layout_valid(void)
 {
     return MEM_SHM_RESV_START <= MEM_FIXED_PAGING_GUARD_BASE &&
-        boot_range_valid(MEM_SHM_RESV_START, MEM_FIXED_PAGING_GUARD_BASE, 1) &&
+        boot_slack_valid() &&
         boot_range_valid(MEM_LEDGER_META_BASE, MEM_LEDGER_META_END, 1) &&
         boot_range_valid(MEM_FIXED_PAGING_GUARD_BASE, MEM_FIXED_PAGING_BASE, 0) &&
         boot_range_valid(MEM_STACK_GUARD, MEM_KSTACK_BASE, 0) &&

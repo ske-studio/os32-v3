@@ -24,6 +24,7 @@ char *kstrncpy(char *d, const char *s, u32 n)
 #include "audit_slice.inc"
 #include "post_probe_slice.inc"
 #include "system_surface.h"
+#include "shlib.h"
 int host_map_fail;
 static u32 scan_total[2], scan_interval[2], scan_max[2];
 void host_scan(int kind)
@@ -144,8 +145,65 @@ static void run(void)
     gfx_surface_unready &= ~(1U << (selected - ledger_surfaces));
     u32 owner;
     CHECK(ledger_owner_new(LEDGER_KIND_AS, 2, "audit", &owner));
+    /* AUDITGUARD-1: the real AS-launch route must accept a module-owned NP
+     * guard in SLACK, while still rejecting every other missing mapping.
+     * This exercises PTE audits, not the #PF/stack-overflow delivery path. */
+    u32 module_owner;
+    CHECK(ledger_owner_new(LEDGER_KIND_MODULE, 1, "sqlite-guard", &module_owner));
+    const u32 as_guards[] = {
+        MEM_SHM_RESV_START, MEM_SHM_RESV_START + PAGE_SIZE,
+        MEM_FIXED_PAGING_GUARD_BASE - PAGE_SIZE, MEM_PHYS_EXEC_FLOOR
+    };
+    /* Reserve before the AS allocator can consume the first SLACK pages. */
+    for (u32 i = 0; i < sizeof(as_guards) / sizeof(as_guards[0]); i++) {
+        u32 pfn = as_guards[i] / PAGE_SIZE, allocated;
+        CHECK(pgalloc_alloc_n_owner(module_owner, 1, pfn, pfn + 1,
+                                   LEDGER_BOTTOM_UP, &allocated));
+        CHECK(allocated == pfn);
+    }
     CHECK(!paging_addrspace_create_lease(&space, owner));
     slot.as = &space;
+    for (u32 i = 0; i < sizeof(as_guards) / sizeof(as_guards[0]); i++) {
+        u32 va = as_guards[i], pfn = va / PAGE_SIZE;
+        CHECK(pgalloc_page_owned(pfn, module_owner));
+        paging_sqlite_stack_guard = va;
+        CHECK(!paging_set_not_present(va, va + PAGE_SIZE - 1));
+        CHECK(!paging_as_audit(&space, shlib_read_page));
+        CHECK(!lease_audit_all());
+        CHECK(!paging_master_audit(exec_tramp_page_addr()));
+        CHECK(!kselftest_run_audit("AS-launch") && !audit_fail && !as_audit_fail);
+        /* Both sides of the registered page remain strictly present/RW/WB. */
+        const u32 unexpected[] = {
+            MEM_SHM_RESV_START, MEM_SHM_RESV_START + PAGE_SIZE,
+            MEM_FIXED_PAGING_GUARD_BASE - PAGE_SIZE,
+            MEM_LEDGER_META_BASE, MEM_KSTACK_BASE, MEM_SHELL_LOAD_ADDR
+        };
+        for (u32 j = 0; j < sizeof(unexpected) / sizeof(unexpected[0]); j++) {
+            u32 a = unexpected[j];
+            if (a == va) continue;
+            u32 *entry = &page_tables[a >> 22][(a / PAGE_SIZE) % PTE_COUNT];
+            u32 saved_entry = *entry;
+            const u32 corrupt[] = {PTE_PRESENT, PTE_RW, PTE_USER, PTE_PCD, PAGE_SIZE};
+            for (u32 k = 0; k < sizeof(corrupt) / sizeof(corrupt[0]); k++) {
+                *entry = saved_entry ^ corrupt[k];
+                CHECK(paging_as_audit(&space, shlib_read_page) > 0);
+                CHECK(lease_audit_all() > 0);
+                *entry = saved_entry;
+            }
+        }
+        CHECK(!paging_set_page(va, va, PAGE_RW));
+        /* boot_layout covers SLACK; the master also covers a high pool guard. */
+        if (va < MEM_FIXED_PAGING_GUARD_BASE) {
+            CHECK(paging_as_audit(&space, shlib_read_page) > 0);
+            CHECK(lease_audit_all() > 0);
+        }
+        CHECK(paging_master_audit(exec_tramp_page_addr()) > 0);
+        paging_sqlite_stack_guard = 0;
+        CHECK(!lease_audit_all());
+        CHECK(pgalloc_free_n_owner(module_owner, pfn, 1));
+    }
+    CHECK(ledger_owner_retire(module_owner));
+    SAY("PASS AS-launch SQLite guard: SLACK boundaries/interior/high pool; unexpected NP/attributes/frame rejected");
     reset_scans();
     CHECK(!lease_audit_all());
     CHECK(scan_max[0] == PTE_COUNT); /* empty AS has only the mandatory lease PT */
