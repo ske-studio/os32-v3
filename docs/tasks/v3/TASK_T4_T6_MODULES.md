@@ -1,6 +1,6 @@
 # TASK_T4_T6_MODULES — SQLite・FEP・起動モジュールの詳細設計
 
-> 状態: **実装中 (2026-10-18)** — T4 受入完了。**T5-0a 受入** (1514b83、`~/os32-tmp/evidence/2026-10-18/t5-0a_np21w/RESULT.md`): 基準 = 像 253,256 B・sqlite.mod 398,424 B・常駐の終わり 0x19d000・stack_guard 0x300000・SERVICES_READY、FD 空き 2HD 155,648 B / 1.44MB 372,736 B。db fixture は 132 秒 (stop は leave 後に 1 回)。engine stack の high-water は全負荷で 4,668 B (深い式は未測定)。IMEDUP-1 は CUI/GUI で重複なし・学習語が先頭。次は T5-0b (KSTK-DF、stack は host で SQLITE_MAX_EXPR_DEPTH=100 の式を実測して 16KB 以下なら 32KiB・32KB 以下なら 64KiB・それ以上は 128KiB のまま — PM 判断)。
+> 状態: **実装中 (2026-10-18)** — T4 受入完了。**T5-0a 受入** (1514b83、`~/os32-tmp/evidence/2026-10-18/t5-0a_np21w/RESULT.md`): 基準 = 像 253,256 B・sqlite.mod 398,424 B・常駐の終わり 0x19d000・stack_guard 0x300000・SERVICES_READY、FD 空き 2HD 155,648 B / 1.44MB 372,736 B。db fixture は 132 秒 (stop は leave 後に 1 回)。engine stack の high-water は全負荷で 4,668 B (深い式は未測定)。IMEDUP-1 は CUI/GUI で重複なし・学習語が先頭。次は T5-0b (KSTK-DF、stack は **32KiB に縮め、SQLITE_MAX_EXPR_DEPTH を host の実測で 32KiB に収まる値まで下げる** — ユーザー承認 2026-10-18: アプリは自作で深い式を書く場面が無く、実測 4,668 B、あふれは KSTK-DF で診断つきの停止になるので 2 段の判定は要らない)。
 >
 > **T5 着手前の再照合 r5 (2026-10-18)** — EARLY は作らず FAT/HostDrv は core、CD は POST_ROOT、不変 CD の RO SQLite は凍結。T5 の段・受入・予算を更新 (決定は §9)。
 > それまでの状態: **設計中 (2026-10-18、再照合 r4)** — main `952f16b`、T3受入完了 (2026-10-18)、KAPI v76・memory_layout 4。圧縮余裕18,165 B。本票の実装・受入は未実施。
