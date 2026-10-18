@@ -264,7 +264,20 @@ VFSのファイルディスクリプタ (FD 0=stdin, 1=stdout) に対して、�
 
 ### §6-6 ISO 9660 ファイルシステム (iso9660.c / iso9660.h)
 
-CD-ROM上のISO 9660 Level 1ファイルシステムを読み取り専用でVFS経由で提供する。ATAPIドライバ (§5-6) を介してセクタ読み出しを行う。
+ISO 9660 Level 1 を読み取り専用で VFS 経由で提供する。ATAPI と ISO9660 は
+`/boot/cd.mod` の 1 部品 (ID `ATAPI_ISO`、POST_ROOT、カーネルとの PAIR 必須) にまとめる。
+FD/HDD の root・ページ台帳の成立後、サービス設定に依存せず読み込むので、MINIMAL と
+SQLITE_ONLY でも cdinst のパッケージ読取・照合に使える。CD はインストール元であり起動媒体ではない。
+
+ISO の登録後に `/cd0` の自動 mount と他装置への ISO 試行を行う。`cd0` は ATAPI、
+`hd0`〜`hd3` と `lo0`〜`lo3` は共有の Device 読取口を使い、装置のセクタサイズから
+2048 バイト単位に換算する (ISO は装置先頭から)。IDE・FDC・FatFs の diskio は core に残る。
+無媒体・容量読取失敗では `cd0` を公開せず、ISO の登録は loop/hd 用に残す。
+PVD の短読・破損では mount を公開せず診断し、成立済みの root を続ける。
+
+FS/Device の登録は core アダプタが参照を計上する。rollback は FS 登録を解除してから
+装置を解除し、ISO mount が残って FS 解除が拒否された場合は body と両登録を保持する。
+PIO は同期呼出しのため IRQ・tick・DMA の停止口は追加しない。
 
 | 項目 | 値 |
 |------|-----|

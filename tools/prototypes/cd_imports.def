@@ -1,0 +1,82 @@
+{
+  "schema": 1,
+  "contracts": [
+    "kernel/cd_module.h",
+    "drivers/dev.h",
+    "fs/vfs.h"
+  ],
+  "imports": [
+    {
+      "symbol": "cpu_delay_us",
+      "context": "normal",
+      "irq": false,
+      "source": "kernel/cpu_calibrate.h"
+    },
+    {
+      "symbol": "dev_find",
+      "context": "normal",
+      "irq": false,
+      "source": "drivers/dev.h"
+    },
+    {
+      "symbol": "dev_blk_read_lba",
+      "context": "normal",
+      "irq": false,
+      "source": "drivers/dev.h"
+    },
+    {
+      "symbol": "kfree",
+      "context": "normal",
+      "irq": false,
+      "source": "kernel/kmalloc.h"
+    },
+    {
+      "symbol": "kmalloc",
+      "context": "normal",
+      "irq": false,
+      "source": "kernel/kmalloc.h"
+    },
+    {
+      "symbol": "kzalloc",
+      "context": "normal",
+      "irq": false,
+      "source": "kernel/kmalloc.h"
+    },
+    {
+      "symbol": "kprintf",
+      "context": "normal",
+      "irq": false,
+      "source": "include/kprintf.h"
+    },
+    {
+      "symbol": "kstrncpy",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/kstring.h"
+    },
+    {
+      "symbol": "ktime_ticks",
+      "context": "normal",
+      "irq": false,
+      "declaration": "u32 ktime_ticks(void);"
+    },
+    {
+      "symbol": "kstrcmp",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/kstring.h"
+    },
+    {
+      "symbol": "kstrlen",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/kstring.h"
+    },
+    {
+      "symbol": "kmemcpy",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/kstring.h"
+    }
+  ]
+}

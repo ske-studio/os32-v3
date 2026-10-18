@@ -38,7 +38,7 @@ def generate(out, definition=DEFINITION, contracts_only=False, module="sqlite"):
         names.add(name)
         hashes.add(hashed)
     facade = json.dumps(doc.get('facade', []), sort_keys=True)
-    if module == 'fep':
+    if module != 'sqlite':
         # Paired facade includes callback and public record layout contracts.
         facade += ''.join((ROOT / p).read_text() for p in doc['contracts'])
     module_abi = fnv1a((str(abi_hash(entries)) + facade).encode())
@@ -80,7 +80,7 @@ def generate(out, definition=DEFINITION, contracts_only=False, module="sqlite"):
     if module == "sqlite":
         generate_facade(out, doc["facade"], entries)
     else:
-        generate_fep_exports(out, entries)
+        generate_component_exports(out, entries, module)
     if module == "sqlite" and not contracts_only:
         source = (ROOT / 'lib/sqlite3/os32_sqlite_vfs.c').read_text()
         source = source.replace('static char sqlite_mem_pool[SQLITE_MEMSYS5_SIZE];',
@@ -159,23 +159,23 @@ def generate_facade(out, rows, entries):
     (out / 'sqlite_kexports.c').write_text('\n'.join(core)+'\n')
 
 
-def generate_fep_exports(out, entries):
-    """FEP uses its hand-written typed facade and the same function-only slots."""
-    core = ['#include "fep_imports.h"', '#include "module_image.h"',
-            'const u32 fep_kexports[] = {']
+def generate_component_exports(out, entries, module):
+    """Paired components use typed facades and the same function-only slots."""
+    core = [f'#include "{module}_imports.h"', '#include "module_image.h"',
+            f'const u32 {module}_kexports[] = {{']
     core += [f'    (u32)(uptr){e["name"]},' for e in entries]
-    core += ['};', 'const struct module_symbol_contract fep_import_contracts[] = {']
+    core += ['};', f'const struct module_symbol_contract {module}_import_contracts[] = {{']
     core += [f'    {{0x{fnv1a(e["name"].encode()):08x}u, 1, 1}},' for e in entries]
-    core += ['};', 'const struct module_symbol_contract fep_export_contracts[] = {',
+    core += ['};', f'const struct module_symbol_contract {module}_export_contracts[] = {{',
              f'    {{0x{fnv1a(b"initialize"):08x}u, 1, 0}},', '};']
-    (out / 'fep_kexports.c').write_text('\n'.join(core) + '\n')
+    (out / f'{module}_kexports.c').write_text('\n'.join(core) + '\n')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out-dir', type=Path, required=True)
     parser.add_argument('--contracts-only', action='store_true')
-    parser.add_argument('--module', choices=('sqlite', 'fep'), default='sqlite')
+    parser.add_argument('--module', choices=('sqlite', 'fep', 'cd'), default='sqlite')
     args = parser.parse_args()
     definition = ROOT / f'tools/prototypes/{args.module}_imports.def'
     generate(args.out_dir, definition, contracts_only=args.contracts_only, module=args.module)

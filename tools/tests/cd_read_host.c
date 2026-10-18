@@ -73,6 +73,7 @@ void kprintf(u8 attr, const char *fmt, ...)
 /* ---- 実物 ---- */
 #include "../../drivers/atapi.c"
 #include "../../fs/iso9660.c"
+#include "../../kernel/cd_body.c"
 
 #define CHECK(x) do { if (!(x)) { \
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); exit(1); \
@@ -234,6 +235,7 @@ static struct {
     u32 drq_max;       /* 1 回の DRQ の上限 (0 = bcl どおり) */
     int fail_multi;    /* count > 1 の READ(10) を MEDIUM ERROR で断る */
     long fail_lba;     /* この LBA を含む READ(10) を断る (-1 = なし) */
+    int short_single;  /* T5b-5: truncated PVD transfer */
     int short_multi;   /* count > 1 の READ(10) で 1 セクタ少なく渡す */
     int ua_next;       /* 次のこの数のコマンドで UNIT ATTENTION を返し、媒体を B へ */
     int stale;         /* 境目の後の古い状態の回数 */
@@ -320,6 +322,7 @@ static void model_exec(void)
         M.data = M.m->img + lba * SEC;
         M.data_len = cnt * SEC;
         if (M.short_multi && cnt > 1) M.data_len -= SEC;
+        if (M.short_single && cnt == 1) M.data_len -= 2;
         M.n_sectors += M.data_len / SEC;
         M.pos = 0;
         model_start_block();
@@ -892,16 +895,24 @@ void atapi_shim_outpw(unsigned int port, unsigned int value)
 /*  dev 層の贋物 (cd0 だけ)                                                 */
 /* ======================================================================== */
 
-static Device g_cd0;
+static Device g_cd0 = {.type = DEV_BLOCK, .bus_type = DEV_BUS_ATAPI,
+                       .sect_size = SEC};
 static u32 g_dev_calls;
+static Device g_image;
 
 Device *dev_find(const char *name)
 {
+    if (g_image.name && !strcmp(name, g_image.name)) return &g_image;
     return (strcmp(name, "cd0") == 0) ? &g_cd0 : (Device *)0;
 }
 
 int dev_blk_read_lba(Device *dev, u32 lba, int count, void *buf)
 {
+    if (dev == &g_image) {
+        CHECK((lba + (u32)count) * dev->sect_size <= g_media_a.secs * SEC);
+        memcpy(buf, g_media_a.img + lba * dev->sect_size, count * dev->sect_size);
+        return 0;
+    }
     CHECK(dev == &g_cd0);
     g_dev_calls++;
     return atapi_read_sectors(lba, (u32)count, buf);
@@ -920,6 +931,7 @@ static void setup(void)
     build_media(&g_media_a, BIG_LBA_A, SUB_LBA, DEEP_SIZE, 1);
     build_media(&g_media_b, BIG_LBA_B, SUB_LBA_B, DEEP_SIZE_B, 2);
     M.m = &g_media_a;
+    g_cd0.total_sects = g_media_a.secs;
     CHECK(atapi_init() == 1);
 }
 
@@ -938,6 +950,7 @@ static void setup_np2_layout(int layout)
     build_media(&g_media_a, BIG_LBA_A, SUB_LBA, DEEP_SIZE, 1);
     build_media(&g_media_b, BIG_LBA_B, SUB_LBA_B, DEEP_SIZE_B, 2);
     M.m = &g_media_a;
+    g_cd0.total_sects = g_media_a.secs;
     g_np2 = 1;
     g_delay_us = 0;
     N.strict = g_np2cfg.strict;
@@ -2236,11 +2249,79 @@ static void t_np2_start_unit(void)
     np2_check_protocol();
 }
 
+/* T5b-5: actual body init against the existing NP21/W PIO model. */
+static void t_cd_body(void)
+{
+    CdModuleApi api;
+    setup_np2();
+    CHECK(!cd_module_init(&api));
+    CHECK(api.fs == &iso9660_ops && api.device);
+    CHECK(!strcmp(api.device->name, "cd0") && api.device->total_sects);
+    /* Keep READ CAPACITY's existing spin-up / START UNIT retry path. */
+    N.d[0].need_start = 1;
+    N.d[0].ready_after = 2;
+    CHECK(!cd_module_init(&api));
+    CHECK(api.device && N.d[0].n_startunit == 1);
+    N.d[0].loaded = 0;
+    CHECK(!cd_module_init(&api));
+    CHECK(api.fs == &iso9660_ops && !api.device);
+    CHECK(strstr(g_klog, "medium unavailable"));
+}
+
+static void t_iso_devices(void)
+{
+    setup();
+    const int types[] = {VFS_DEV_HD, VFS_DEV_LOOP};
+    const char *names[] = {"hd1", "lo1"};
+    for (unsigned i = 0; i < 2; i++) {
+        g_image = (Device){.name = names[i], .type = DEV_BLOCK,
+                           .bus_type = DEV_BUS_LOOP, .sect_size = 512,
+                           .total_sects = g_media_a.secs * (SEC / 512)};
+        void *ctx = iso9660_ops.mount(VFS_MOUNT_DEV_ENCODE(types[i], 1));
+        CHECK(ctx);
+        u8 buf[3000];
+        CHECK(iso9660_ops.read_stream(ctx, "/BIG.PKG", buf, sizeof(buf), 31) == sizeof(buf));
+        for (u32 j = 0; j < sizeof(buf); j++)
+            CHECK(buf[j] == file_byte(&g_media_a, BIG_LBA_A, j + 31));
+        iso9660_ops.umount(ctx);
+    }
+    CHECK(!iso9660_ops.mount(VFS_MOUNT_DEV_ENCODE(VFS_DEV_FD, 0)));
+}
+
+static void t_iso_bad_pvd(void)
+{
+    setup();
+    u8 original[SEC];
+    u8 *pvd = g_media_a.img + ISO_PVD_LBA * SEC;
+    memcpy(original, pvd, SEC);
+    for (unsigned i = 0; i < 6; i++) {
+        memcpy(pvd, original, SEC);
+        if (i == 0) pvd[1] = 'X';
+        if (i == 1) pvd[6] = 0;
+        if (i == 2) pvd[129] = 0;
+        if (i == 3) pvd[156] = 0;
+        if (i == 4) put_both32(pvd + 158, g_media_a.secs);
+        if (i == 5) put_both32(pvd + 166, 0xffffffffU);
+        CHECK(!iso9660_ops.mount(VFS_MOUNT_DEV_ENCODE(VFS_DEV_CD, 0)));
+    }
+    CHECK(strstr(g_klog, "invalid PVD; mount unpublished"));
+    memcpy(pvd, original, SEC);
+    M.short_single = 1;
+    CHECK(!iso9660_ops.mount(VFS_MOUNT_DEV_ENCODE(VFS_DEV_CD, 0)));
+    CHECK(strstr(g_klog, "PVD read failed; mount unpublished"));
+    M.short_single = 0;
+    void *ctx = do_mount();
+    iso9660_ops.umount(ctx);
+}
+
 int main(int argc, char **argv)
 {
     const char *cs = (argc > 1) ? argv[1] : "";
     const char *bs = getenv("CD_READ_BIGSIZE");
     if (bs) g_big_size = (u32)strtoul(bs, NULL, 10);
+    if (!strcmp(cs, "cd_body")) { t_cd_body(); return 0; }
+    if (!strcmp(cs, "iso_devices")) { t_iso_devices(); return 0; }
+    if (!strcmp(cs, "iso_bad_pvd")) { t_iso_bad_pvd(); return 0; }
     if (!strcmp(cs, "stream_4k"))            t_stream_4k();
     else if (!strcmp(cs, "stream_odd"))      t_stream_odd();
     else if (!strcmp(cs, "stream_32k"))      t_stream_32k();

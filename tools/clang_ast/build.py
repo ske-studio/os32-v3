@@ -138,9 +138,10 @@ def dry_run(root):
         module.ROOT = pathlib.Path(root)
         module.generate(pathlib.Path(out_dir, "sqlite-proto"),
                         pathlib.Path(root, "tools/prototypes/sqlite_imports.def"))
-        fep_definition = pathlib.Path(root, "tools/prototypes/fep_imports.def")
-        if fep_definition.is_file():
-            module.generate(pathlib.Path(out_dir, "fep"), fep_definition, module="fep")
+        for component in ("fep", "cd"):
+            definition = pathlib.Path(root, "tools/prototypes/" + component + "_imports.def")
+            if definition.is_file():
+                module.generate(pathlib.Path(out_dir, component), definition, module=component)
     for name in SAVED_SETTINGS:
         src = pathlib.Path(root, REAL_BUILD_OUT, name)
         if src.is_file():

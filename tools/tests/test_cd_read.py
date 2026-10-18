@@ -37,11 +37,11 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 READ_HARNESS = "tools/tests/cd_read_host.c"
 PKG_HARNESS = "tools/tests/cd_pkg_host.c"
 SHIM = "tools/tests/atapi_hostshim"
-TREE_FILES = ["drivers/atapi.c", "drivers/atapi.h", "fs/iso9660.c", "fs/iso9660.h",
+TREE_FILES = ["kernel/cd_body.c", "kernel/cd_module.h", "drivers/atapi.c", "drivers/atapi.h", "fs/iso9660.c", "fs/iso9660.h",
               "userland/lib/rt/pkg.c", "userland/lib/rt/pkg.h",
               READ_HARNESS, PKG_HARNESS, SHIM + "/io.h"]
 
-READ_CASES = ["stream_4k", "stream_odd", "stream_32k", "read_file", "multi_fallback",
+READ_CASES = ["cd_body", "iso_devices", "iso_bad_pvd", "stream_4k", "stream_odd", "stream_32k", "read_file", "multi_fallback",
               "short_transfer", "bad_outside", "bad_inside", "lru_order", "ua_mount", "multi_drq",
               "path_cache", "dir_lru", "list_reentrant", "unit_attention",
               "idle_rule", "no_window", "stat_swap", "list_swap",
@@ -80,6 +80,7 @@ EXE_KEYS = ("read", "wide", "pkg")
 # ほかは実物で組んだもの (main の 1 回目、全部通ったもの) を使う。表に無いファイル
 # (ヘッダなど) は 3 本とも組む。表が gcc -MM の依存より狭ければ mutate() が落ちる。
 REBUILD = {
+    "kernel/cd_body.c": ("read", "wide"),
     "drivers/atapi.c": ("read", "wide"),
     "fs/iso9660.c": ("read", "wide"),
     "userland/lib/rt/pkg.c": ("pkg",),
@@ -226,6 +227,14 @@ MUTATIONS = [
      r"cdb\[7\] = \(u8\)\(n >> 8\);\n        cdb\[8\] = \(u8\)\(n & 0xFF\);",
      "cdb[7] = 0;\n        cdb[8] = 1;",
      "CDB の転送長を 1 のまま (旧 CDB)"),
+    ("kernel/cd_body.c",
+     r"if \(rc\)",
+     "if (0)", "T5b5: 無媒体の装置を公開"),
+    ("fs/iso9660.c",
+     r"dev_blk_read_lba\(dev, lba \* ratio, \(int\)\(count \* ratio\), buf\)",
+     "dev_blk_read_lba(dev, lba, (int)count, buf)", "T5b5: ISO セクタ換算なし"),
+    ("fs/iso9660.c",
+     r"pvd\[6\] != 1", "0", "T5b5: 壊れた PVD を公開"),
     # --- fs/iso9660.c: 覚えたパス
     ("fs/iso9660.c",
      r"if \(ctx->pc_valid && kstrcmp\(ctx->pc_path, path\) == 0\) \{",

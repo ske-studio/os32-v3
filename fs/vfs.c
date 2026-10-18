@@ -338,6 +338,12 @@ int vfs_dev_parse(const char *name, int *dev_type, int *dev_id)
         *dev_id = name[2] - '0';
         return VFS_OK;
     }
+    /* Loop image unit, distinct from the compacting Device registry index. */
+    if (name[0] == 'l' && name[1] == 'o' && name[2] >= '0' && name[2] <= '3') {
+        *dev_type = VFS_DEV_LOOP;
+        *dev_id = name[2] - '0';
+        return VFS_OK;
+    }
     /* "COM1" etc */
     if (name[0] == 'C' && name[1] == 'O' && name[2] == 'M') {
         *dev_type = VFS_DEV_SERIAL;

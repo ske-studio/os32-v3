@@ -91,9 +91,6 @@ void dev_register_hdd(int drive);
 /* SCSIデバイスの登録 (将来用スタブ — WD33C93ドライバ完成後に実装) */
 void dev_register_scsi(int scsi_id);
 
-/* CD-ROMデバイスの登録 (ATAPIドライバ検出済みの場合) */
-void dev_register_cdrom(void);
-
 /* デバイス検索 (名前で) */
 Device *dev_find(const char *name);
 

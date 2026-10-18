@@ -8,3 +8,10 @@ check-cd-read-host:
 - userland/lib/rt/pkg.c
 - tools/check_map.d/check-cd-read-host.yaml
 - build/checks.d/check-cd-read-host.mk
+- kernel/cd_body.c
+- kernel/cd_module.h
+- kernel/module_runtime.h
+- kernel/module_image.h
+- kernel/module_schema.h
+- fs/vfs.h
+- drivers/dev.h
