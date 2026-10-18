@@ -127,8 +127,8 @@ static int parent_run(KernelAPI *api, const char *entry, const char *end)
         int settled = 0;
         for (int i = 0; i < RAW_IME_WARM_LIMIT; i++) {
             api->kprintf(ATTR_WHITE,
-                "raw_wait WARMUP IME: ON hiragana, " RAW_IME_ROMAJI " (" RAW_IME_YOMI
-                "), SPACE, ESC twice, OFF, Q\n");
+                "raw_wait WARMUP IME: ON hiragana, %s (%s), SPACE, ESC twice, OFF, Q\n",
+                RAW_IME_ROMAJI, RAW_IME_YOMI);
             int key = !strcmp(entry, "imechar") ? api->ime_getchar() : api->ime_getkey();
             if ((key & 0xff) != 'Q') return 1;
             u32 current = api->db_mem_used();
