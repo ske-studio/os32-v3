@@ -33,6 +33,18 @@ int os32_sqlite_outer_group_open(const Os32SqliteGroup *group, const char *path,
 int os32_sqlite_start(void);
 int os32_sqlite_outer_db_fd(void *db);
 char *os32_sqlite_snprintf(int size, char *out, const char *format, ...);
+int os32_sqlite_outer_group_acquire(int kind, int owner, Os32SqliteGroup *out);
+const char * os32_sqlite_outer_group_vfs_name(const Os32SqliteGroup *group);
+int os32_sqlite_outer_group_opened(const Os32SqliteGroup *group, void *db);
+int os32_sqlite_outer_group_begin_close(const Os32SqliteGroup *group);
+int os32_sqlite_outer_group_finish(const Os32SqliteGroup *group, int close_rc);
+int os32_sqlite_outer_group_quarantine(const Os32SqliteGroup *group, int stage, int rc);
+int os32_sqlite_outer_group_snapshot(const Os32SqliteGroup *group, Os32SqliteGroupInfo *out);
+int os32_sqlite_outer_group_for_db(void *db, Os32SqliteGroupInfo *out);
+int os32_sqlite_outer_canary(void);
+void os32_sqlite_outer_dump_vfs(void);
+int os32_sqlite_outer_shutdown(void);
+int sqlite_module_ready(void);
 int sqlite_engine_available(int io);
 #ifdef OS32_SQLITE_DIRECT_TEST
 #define SQLITE_OUTER_READY(io) 1
@@ -43,6 +55,16 @@ int sqlite_engine_available(int io);
  * fixture links these actual thunks and the actual i386 trampoline. */
 #if !defined(OS32_SQLITE_DIRECT_TEST) && !defined(OS32_SQLITE_OUTER_IMPL)
 #define os32_sqlite_group_open os32_sqlite_outer_group_open
+#define os32_sqlite_group_acquire os32_sqlite_outer_group_acquire
+#define os32_sqlite_group_vfs_name os32_sqlite_outer_group_vfs_name
+#define os32_sqlite_group_opened os32_sqlite_outer_group_opened
+#define os32_sqlite_group_begin_close os32_sqlite_outer_group_begin_close
+#define os32_sqlite_group_finish os32_sqlite_outer_group_finish
+#define os32_sqlite_group_quarantine os32_sqlite_outer_group_quarantine
+#define os32_sqlite_group_snapshot os32_sqlite_outer_group_snapshot
+#define os32_sqlite_group_for_db os32_sqlite_outer_group_for_db
+#define memsys5_check_canary os32_sqlite_outer_canary
+#define os32_sqlite_dump_vfs os32_sqlite_outer_dump_vfs
 #define sqlite3_snprintf os32_sqlite_snprintf
 #define os32_sqlite_db_fd os32_sqlite_outer_db_fd
 #define sqlite3_close os32_sqlite_close

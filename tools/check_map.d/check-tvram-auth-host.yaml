@@ -1,4 +1,5 @@
 check-tvram-auth-host:
+- lib/sqlite3/generated/*
 - exec/exec.c
 - exec/exec.h
 - sdk/kapi.json

@@ -1,9 +1,7 @@
 #include "types.h"
 static u32 host_cr3;
 #include "paging_host_source.c"
-__asm__(".globl __sqlite_start\n.set __sqlite_start, 0x200000\n"
-        ".globl __sqlite_end\n.set __sqlite_end, 0x240000\n"
-        ".globl __bss_end\n.set __bss_end, 0x180000\n");
+__asm__(".globl __bss_end\n.set __bss_end, 0x180000\n");
 __asm__(".globl __kernel_resident_end\n.set __kernel_resident_end, 0x261000\n"
         ".globl __ledger_fixed_start\n.set __ledger_fixed_start, 0x17E000\n"
         ".globl __ledger_fixed_end\n.set __ledger_fixed_end, 0x180000\n");

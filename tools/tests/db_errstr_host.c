@@ -77,6 +77,12 @@ int ring3_user_range_ok(u32 p, u32 len)
 #define SHM_CANARY 256
 static unsigned char test_shm[DB_SHM_BLOCK_SIZE + SHM_CANARY];
 #include "db_copy_shim.h"
+/* Keep direct SQLite calls in this legacy harness, but exercise the actual
+ * module availability gate in the KAPI facade. */
+#include "../../lib/sqlite3/os32_sqlite_outer.h"
+#undef OS32_SQLITE_DIRECT_TEST
+static int test_module_ready = 1;
+int sqlite_module_ready(void) { return test_module_ready; }
 #include "../../kapi/kapi_db.c"
 
 /* ========================================================================= */
@@ -457,13 +463,58 @@ static void diag_layout(void)
     }
 }
 
+static void module_absent(void)
+{
+    DbSlot saved;
+    unsigned char result[DB_SHM_RESULT_LIMIT];
+    const char *text;
+    int old_probes, h = kapi_db_open(":memory:");
+    CHECK(h >= 0);
+    CHECK(kapi_db_prepare_only(h, "SELECT ?1") == 0);
+    CHECK(kapi_db_bind_int(h, 1, 42) == 0);
+    saved = db_slots[h];
+    memcpy(result, test_shm, sizeof(result));
+    old_probes = probes;
+    test_module_ready = 0;
+    CHECK(kapi_db_open((const char *)1) == OS32_ERR_NOSYS);
+    CHECK(kapi_db_open_existing((const char *)1, 1) == OS32_ERR_NOSYS);
+    CHECK(kapi_db_close(h) == OS32_ERR_NOSYS);
+    CHECK(kapi_db_exec(h, (const char *)1) == OS32_ERR_NOSYS);
+    CHECK(kapi_db_prepare(h, (const char *)1) == OS32_ERR_NOSYS);
+    CHECK(kapi_db_prepare_only(h, (const char *)1) == OS32_ERR_NOSYS);
+    CHECK(kapi_db_step(h) == OS32_ERR_NOSYS);
+    CHECK(kapi_db_finalize(h) == OS32_ERR_NOSYS);
+    CHECK(kapi_db_bind_int(h, 1, 7) == OS32_ERR_NOSYS);
+    CHECK(kapi_db_bind_text(h, 1, (const char *)1, 1) == OS32_ERR_NOSYS);
+    CHECK(kapi_db_bind_blob(h, 1, (const void *)1, 1) == OS32_ERR_NOSYS);
+    CHECK(kapi_db_bind_null(h, 1) == OS32_ERR_NOSYS);
+    CHECK(kapi_db_error_code(h) == OS32_ERR_NOSYS);
+    CHECK(kapi_db_error_code(-1) == OS32_ERR_NOSYS);
+    CHECK(kapi_db_column_int(h, 0) == 0);
+    CHECK(kapi_db_mem_used() == 0);
+    text = kapi_db_column_text(h, 0);
+    CHECK(IN_SHM(text) && text[0] == '\0');
+    text = kapi_db_last_error(h);
+    CHECK(IN_SHM(text) && strstr(text, "module unavailable") != 0);
+    db_cleanup_owned(current_owner);
+    db_cleanup_all();
+    CHECK(memcmp(&saved, &db_slots[h], sizeof(saved)) == 0);
+    CHECK(memcmp(result, test_shm, sizeof(result)) == 0);
+    CHECK(probes == old_probes);
+    test_module_ready = 1;
+    CHECK(kapi_db_step(h) == DB_STATUS_ROW);
+    CHECK(kapi_db_column_int(h, 0) == 42);
+    CHECK(kapi_db_close(h) == 0);
+}
+
 int main(int argc, char **argv)
 {
     CHECK(argc == 2);
     CHECK(os32_sqlite_init() == SQLITE_OK);
     reset_all();
 
-    if (!strcmp(argv[1], "errstr_range")) errstr_range();
+    if (!strcmp(argv[1], "module_absent")) module_absent();
+    else if (!strcmp(argv[1], "errstr_range")) errstr_range();
     else if (!strcmp(argv[1], "coltext_range")) coltext_range();
     else if (!strcmp(argv[1], "errstr_truncate")) errstr_truncate();
     else if (!strcmp(argv[1], "result_bound")) result_bound();

@@ -5,6 +5,10 @@
 #include "memmap.h"
 #include "fixture_values.h"
 #include "ksetjmp.h"
+#include "module_runtime.h"
+struct module_record module_records[MODULE_RECORD_CAP];
+static u8 test_stack[128 * 1024] __attribute__((aligned(4096)));
+#define test_stack_top ((u32)test_stack + sizeof(test_stack) - 16)
 #include "kernel/kstack_hw.c"
 #include "kernel/tss.c"
 
@@ -43,8 +47,8 @@ extern void sqlite_call_on_alt_stack(void (*func)(void *), u32 top, void *arg);
 static void sqlite_body(void *arg)
 {
     volatile u32 local;
-    CHECK((u32)&local >= MEM_SQLITE_STACK_BASE &&
-          (u32)&local < MEM_SQLITE_STACK_TOP, 12);
+    CHECK((u32)&local >= (u32)test_stack &&
+          (u32)&local < test_stack_top, 12);
     *(int *)arg = 73;
 }
 static void shell_body(void *arg)
@@ -60,11 +64,8 @@ void kernel_main(u32 mem_kb, u32 boot_drive)
     CHECK(entry_sp == MEM_KSTACK_TOP - 12 && entry_bp == 0, 14);
     CHECK(mem_kb == 65536 && boot_drive == 0x80, 15);
     bytes(ZERO_CORE_START, ZERO_CORE_END, 0, 16);
-    bytes(ZERO_SQLITE_START, ZERO_SQLITE_END, 0, 17);
     bytes(ZERO_CORE_START - 4, ZERO_CORE_START, 0xCC, 18);
     bytes(ZERO_CORE_END, ZERO_CORE_END + 4, 0xCC, 31);
-    bytes(ZERO_SQLITE_START - 4, ZERO_SQLITE_START, 0xCC, 19);
-    bytes(ZERO_SQLITE_END, ZERO_SQLITE_END + 4, 0xCC, 20);
     guards();
     /* Calls extracted verbatim from kernel_main, so a stale argument is visible. */
     boot_tss();

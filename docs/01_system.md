@@ -38,7 +38,7 @@ loader_hdd.asm (16bit → 32bit) — 第2段階ローダー (ELF + C)
 boot_main.c (32bit プロテクトモード) — Cメインロジック
   ├── PC-98パーティションテーブル (LBA 1) からext2パーティション特定
   ├── ext2 ミニドライバで /boot/vmkernel.lz4 を 0x10000 に読み込み
-  ├── VK32 v2 の検査 + LZ4展開 (kernel.bin→0x100000, sqlite.bin→__sqlite_start) — boot/vk32_boot.c
+  ├── VK32 v2 の検査 + LZ4展開 (kernel.bin→0x100000、core 1 本) — boot/vk32_boot.c
   │   完全長・entry_count・入力と展開先の範囲・decoded == raw_size・展開後とファイル全体の
   │   CRC32 を見て、外れたら 5 行目に理由を出して止まる
   ├── 起動したイメージの CRC をブート情報域 (0x7E00) のイメージ欄へ
@@ -63,7 +63,7 @@ kernel.c :: kernel_main(u32 mem_kb, u32 boot_drive)
   ├── fd_redirect_init() / pipe_buffer_init()
   ├── exec_init() (KernelAPIテーブル構築)
   ├── Unicodeテーブルロード / ime_init()
-  ├── snd_init() / os32_sqlite_init()
+  ├── snd_init() / os32_sqlite_start() (/boot/sqlite.mod の対 CRC 検査・owner 割当)
   ├── /etc/system.cfg 読み取り (sysconfig.c: GUI=0/1、GFX=pc98|pegc|cirrus|auto → gfx_set_backend_pref)
   ├── boot_splash() (ブートスプラッシュ。ここで最初の gfx_init → HAL バックエンドの probe/init)
   └── シェル起動ループ: exec_run("/sys/shell.bin" または GUI=1 なら "/bin/gshell.bin")
@@ -90,7 +90,7 @@ loader_fat_new.asm (16bit → 32bit) — 第2段階
   ├── FAT12から /VMKRNL.LZ4 を検索、読む前に FAT チェーン全体を検査
   │   (長さ・早期終端・範囲外・循環 = fat_chain_check) してから読み込み (DMA境界対応)
   ├── A20ゲート有効化 / GDT設定 / PM遷移
-  ├── VK32 v2 の検査 + LZ4展開 (kernel.bin→0x100000, sqlite.bin→__sqlite_start) — pm_vk32_boot
+  ├── VK32 v2 の検査 + LZ4展開 (kernel.bin→0x100000、core 1 本) — pm_vk32_boot
   │   (HDD ローダと同じ検査・同じ VK32_ERR_*)。起動したイメージの CRC を 0x7E00 へ
   ├── メモリプロービング
   └── far jmp 0x08:0x100000 (kernel_main へジャンプ)

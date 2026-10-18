@@ -213,13 +213,17 @@ def main():
             result = subprocess.run([str(a) for a in [*cli, *given]], capture_output=True)
             assert result.returncode == 2 and b'required' in result.stderr
             assert (directory / 'module.bin').read_bytes() == image
+        without_pair = cli[:cli.index('--vmkernel')] + cli[cli.index('--vmkernel') + 2:]
+        result = subprocess.run([str(a) for a in [*without_pair, *generations]], capture_output=True)
+        assert result.returncode == 2 and b'--vmkernel' in result.stderr and b'required' in result.stderr
+        assert (directory / 'module.bin').read_bytes() == image
         try:
             mkmod.build(elf, metadata, kernel)
         except TypeError:
             pass
         else:
             raise AssertionError('build() silently supplied generations')
-        print('PASS shared schema; CLI/API require explicit KAPI and layout generations')
+        print('PASS shared schema; CLI requires paired VK32; CLI/API require explicit KAPI and layout generations')
         assert 'prefix=' + str(stats['prefix_size']) + ' B' in output
         print(output.strip())
         print('prefix fixture (235 real generated imports, 2 exports): '

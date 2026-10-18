@@ -275,7 +275,7 @@ R1〜R4 はプリエンプティブでない前提をそのまま約束にした
 | 外部データ | **禁止**。`tick_count` は `ktime_ticks()` のアクセサに置き換える (`os32_sqlite_vfs.c` の 3 か所)。`mkmod.py` は外部データへの `R_386_32` を見つけたら**生成を拒否** |
 | 再配置表 | `R_386_32` の位置一覧 (4B × 件数。SQLite は数千件 = 十数 KB、推測)。ローダはベースを加算。**表に無い種別が残っていたら拒否** |
 | エクスポート表 | カーネルが呼ぶ入口 (`sqlite3_open_v2` … `db_mem_used` が使う `sqlite3_memory_used`)。`kapi_db.c` / `ime_dict.c` は `os32_sqlite_vfs.h` のマクロ層で表を引く |
-| 置き場・メモリ | 池 (第一候補 KERNEL_SLACK)、CPL=0、supervisor。**MEMSYS5 512KB** (D27、全機種同じ。今の 384KB (`os32_sqlite_vfs.c:34`) と、8MB 機だけ 256KB に絞る案 (旧 U3) は不採用) と代替スタック 128KB は**モジュール init が池から取り** `SQLITE_CONFIG_HEAP` へ。`MEM_SQLITE_STACK_TOP` は変数に。**FEP の取り分は読み込み時に優先確保、アプリの接続は「プール − FEP 分」で上限** (§4-6) |
+| 置き場・メモリ | 池 (第一候補 KERNEL_SLACK)、CPL=0、supervisor。**MEMSYS5 512KB** (D27、全機種同じ。T4c-1 前の 384KB (`os32_sqlite_vfs.c`) と、8MB 機だけ 256KB に絞る案 (旧 U3) は不採用) と代替スタック 128KB は**モジュール init が池から取り** `SQLITE_CONFIG_HEAP` へ。stack 上端は `sqlite_engine_stack_top` 変数。**FEP の取り分は読み込み時に優先確保、アプリの接続は「プール − FEP 分」で上限** (§4-6) |
 | 未読み込み時 (MINIMAL だけ、D21) | `db_open` は `OS32_ERR_NOSYS` 系の 1 値。FEP は §5-6 の**API 別 stub** |
 | 池からの予算 | code 375 + MEMSYS5 512 + 代替スタック 128 + 再配置表 ≈ 16 = **≈ 1,031KB** (D27 の前は 775〜903KB) |
 

@@ -61,7 +61,7 @@ void kdebug_load(void)
     }
     if (!rc) rc = module_start(handle);
     const u32 *exports = module_exports(handle);
-    /* A failed prefix return can finish rollback successfully (ABSENT). */
+    /* Publish only an available RUNNING export table. */
     if (!rc && !exports) rc = MODULE_INIT_FAILED;
     if (rc) {
         kdebug.state = rc;

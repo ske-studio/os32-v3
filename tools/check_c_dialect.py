@@ -25,11 +25,11 @@ STD_SQLITE = "gnu89"
 SQLITE_SRCS = (
     "lib/sqlite3/sqlite3.c",
     "lib/sqlite3/os32_sqlite_vfs.c",
-    "lib/sqlite3/os32_sqlite_test.c",
 )
 SQLITE_DIRS = ("userland/tests/sqlite_standalone/",)
 # make -n に必ず現れるはずの翻訳単位 (消えたら検査が空振りしている)
 REQUIRED_SRCS = SQLITE_SRCS + (
+    "lib/sqlite3/os32_sqlite_test.c",
     "userland/tests/sqlite_standalone/sqlite_standalone.c",
     "userland/tests/sqlite_standalone/sqlite_user_vfs.c",
     "kernel/kernel.c",
@@ -106,8 +106,16 @@ def _clang_compile(cc, flags, body, root, tmp, name, incs=()):
     return r.returncode,r.stderr
 
 
-def expected_std(src):
+def source_identity(src):
     s = os.path.normpath(src).replace(os.sep, "/")
+    # The paired module compiles a generated copy of this VFS into BUILD_OUT.
+    if pathlib.Path(s).name == "os32_sqlite_vfs.c":
+        return "lib/sqlite3/os32_sqlite_vfs.c"
+    return s
+
+
+def expected_std(src):
+    s = source_identity(src)
     if s in SQLITE_SRCS or any(s.startswith(d) for d in SQLITE_DIRS):
         return STD_SQLITE
     return STD_MAIN
@@ -344,7 +352,7 @@ def check_internal_units(units, root, jobs=None):
     count = 0
     seen = set()
     for u in units:
-        vendor = _is_vendor(u['src'])
+        vendor = _is_vendor(source_identity(u['src']))
         src = u['src']
         if not pathlib.Path(root,src).is_file() and src.endswith('/build_id.c'):
             src = 'build/out/build_id.c'
@@ -378,7 +386,7 @@ def check_build_flags(root):
     probs = []
     if not units:
         return (["make -n -B の出力に i386-elf-gcc のコンパイル行が無い"], {})
-    seen = {u["src"] for u in units}
+    seen = {source_identity(u["src"]) for u in units}
     for s in REQUIRED_SRCS:
         if s not in seen:
             probs.append("%s: コンパイル行に無い (検査が空振りしている)" % s)

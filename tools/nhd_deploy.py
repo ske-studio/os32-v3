@@ -669,7 +669,7 @@ def do_deploy(force=False):
 def do_write_boot(loader_bin):
     """NHDのブート領域にローダーのみを書き込む (新方式)
 
-    カーネル/SQLiteはext2のvmkernel.lz4として配置されるため、
+    カーネルと対の部品はext2の /boot に配置されるため、
     rawセクタ書き込みはローダー (LBA 2-17) のみ。
     """
     NHD_HEADER = 512

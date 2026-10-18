@@ -10,7 +10,8 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     canon = json.loads((ROOT / 'sdk/kapi.json').read_text())
     paths = set()
-    for pattern in ('build/out/kernel.bin', 'build/out/sqlite.bin', 'build/out/vmkernel.lz4',
+    for pattern in ('build/out/kernel.bin', 'build/out/vmkernel.lz4',
+                    'build/out/kdebug.bin', 'build/out/*.mod',
                     'boot/*.bin', 'userland/**/*.bin', 'userland/*.shlib',
                     'build/sdk/**/*.a', 'build/sdk/**/*.o', 'build/sdk/**/*.h',
                     'build/sdk/**/*.ld', 'build/sdk/**/*.py', 'build/sdk/**/*.rs'):

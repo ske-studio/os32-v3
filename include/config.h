@@ -21,11 +21,11 @@
 #define SYS_SHELL_BIN         "/sys/shell.bin"     /* システムシェル (HDD/FDD共通) */
 #define SYS_SHELL_BIN_FDD     "/sys/shell.bin"     /* FDDフォールバック (統一パス) */
 #define SYS_GSHELL_BIN        "/bin/gshell.bin"    /* GUI シェル (WM 常駐、W1 が実体を作る、契約 T9) */
+#define SYS_SQLITE_MOD        "/boot/sqlite.mod"
 #define SYS_KDEBUG_BIN        "/boot/kdebug.bin"
 #define SYS_SYSTEM_CFG        "/etc/system.cfg"    /* 起動設定 (GUI=0/1、K4) */
 #define SYS_PROFILE_SYS       "/etc/profile"       /* システムプロファイル */
 #define SYS_UNICODE_BIN       "/sys/unicode.bin"   /* Unicodeテーブル */
-#define SYS_SQLITE_BIN        "/sys/sqlite.bin"    /* SQLite拡張域バイナリ */
 /* 既定の 16px フォント (KCG)。HDD / CD は長い名前。FD (FAT、FatFs は LFN なし)
  * に置くなら 8.3 の短い名前 — 2026-09-25 からフォントは NORMAL で、起動 FD
  * (= MINIMAL) には載せていない (build/packages.yaml)。カーネルは長い名前が

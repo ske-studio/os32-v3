@@ -869,7 +869,8 @@ static int man_gate(void)
  *     **ただし `/boot` だけに絞った同期 (`hsync boot`) はこの 1 条件から外す**:
  *     カーネルを先に運ぶ唯一の HostDrv 経路で、ここで断ると v64 の
  *     カーネルがいつまでも入らない (Codex 実装レビュー R1 blocker 2)。
- *     /boot にはユーザーランドが無いので、版の前後はこの同期に関係しない。
+ *     /boot のカーネルと対の kdebug.bin / sqlite.mod を一緒に運ぶ。
+ *     ユーザーランドが無いので、版の前後はこの同期に関係しない。
  *     配置違い・名札の欠落/不正は /boot でも断る (配備元の一式が
  *     このカーネル系列のものか確かめられない)。
  *   - 名札が無い / 壊れている / kapi が無い (format=1) → 確かめられない。
@@ -3029,7 +3030,7 @@ int __cdecl main(int argc, char **argv, KernelAPI *_api)
         else if (g_touched_boot)
             api->kprintf(ATTR_YELLOW,
                          "NOTE: /boot を更新した -> 再起動が必要 "
-                         "(カーネルはブート時ロード)\n");
+                         "(カーネルと対の部品はブート時ロード)\n");
     }
 
     api->mem_free(file_buf);

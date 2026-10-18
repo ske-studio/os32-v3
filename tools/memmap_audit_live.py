@@ -5,6 +5,9 @@
 Usage: python3 tools/memmap_audit_live.py SNAPSHOT_DIR [--root DEPLOYED_TREE]
 Each JSON is an emu_read_mem response with a 4096-byte `hex` member.
 Use the ELF/header from the deployed build, not another worktree's artifacts.
+Also capture the 4 bytes at paging_sqlite_stack_guard as sqlite_stack_guard.json,
+or pass --sqlite-guard with the address printed by the same boot's [sqlite] log
+(0 when no stack was allocated).
 """
 import argparse
 import json
@@ -26,24 +29,20 @@ def pte_all(directory, count):
     return out
 
 
-def checks(k, symbols):
+def checks(k, symbols, sqlite_guard):
     """Inclusive intervals; every changing address comes from this build."""
     page_end = PAGE - 1
     # exec_tramp_page_addr(): the one USER/RO page inside kernel BSS.
     tramp = (symbols['ring3_tramp_raw'] + page_end) & ~page_end
-    return [
+    ranges = [
         ("カーネル (trampoline 前)", k['KERNEL_LOAD_ADDR'], tramp - 1, 1, 0),
         ("KAPI trampoline", tramp, tramp + page_end, 1, 1),
         ("カーネル (trampoline 後)", tramp + PAGE, symbols['__bss_end'] - 1, 1, 0),
-        ("SQLite 帯", symbols['__sqlite_start'], symbols['__sqlite_end'] - 1, 1, 0),
-        ("SQLite stack guard", k['MEM_SQLITE_STACK_GUARD'], k['MEM_SQLITE_STACK_BASE'] - 1, 0, None),
-        ("SQLite stack", k['MEM_SQLITE_STACK_BASE'], k['MEM_SQLITE_STACK_BASE'] + k['MEM_SQLITE_STACK_SIZE'] - 1, 1, 0),
         ("カーネルヒープ", k['KHEAP_BASE'], k['KHEAP_BASE'] + k['KHEAP_SIZE'] - 1, 1, 0),
         ("KAPI テーブル", k['KHEAP_BASE'] + k['KHEAP_SIZE'], k['MEM_SHM_GUARD_LO'] - 1, 1, 0),
         ("SHM 前方 guard", k['MEM_SHM_GUARD_LO'], k['MEM_SHM_GUARD_LO'] + page_end, 0, None),
         ("SHM", k['MEM_SHM_BASE'], k['MEM_SHM_END'], 1, 1),
         ("SHM 後方 guard", k['MEM_SHM_GUARD_HI'], k['MEM_SHM_GUARD_HI'] + page_end, 0, None),
-        ("SLACK", k['MEM_SHM_RESV_START'], k['MEM_SHM_RESV_END'], 1, 0),
         ("固定 paging guard", k['MEM_FIXED_PAGING_GUARD_BASE'], k['MEM_FIXED_PAGING_BASE'] - 1, 0, None),
         ("固定 paging 枠", k['MEM_FIXED_PAGING_BASE'], k['MEM_FIXED_PAGING_FRAME_END'] - 1, 1, 0),
         ("kernel stack guard", k['MEM_STACK_GUARD'], k['MEM_STACK_GUARD_END'], 0, None),
@@ -52,6 +51,17 @@ def checks(k, symbols):
         ("shell stack guard", k['MEM_SHELL_GUARD'], k['MEM_SHELL_GUARD'] + page_end, 0, None),
         ("shell stack", k['MEM_SHELL_STACK_TOP'] - k['MEM_SHELL_STACK_SIZE'], k['MEM_SHELL_BAND_END'], 1, 0),
     ]
+    lo, hi = k['MEM_SHM_RESV_START'], k['MEM_SHM_RESV_END']
+    if sqlite_guard and lo <= sqlite_guard <= hi:
+        if lo < sqlite_guard:
+            ranges.append(("SLACK (guard 前)", lo, sqlite_guard - 1, 1, 0))
+        if sqlite_guard + PAGE <= hi:
+            ranges.append(("SLACK (guard 後)", sqlite_guard + PAGE, hi, 1, 0))
+    else:
+        ranges.append(("SLACK", lo, hi, 1, 0))
+    if sqlite_guard:
+        ranges.append(("SQLite stack guard", sqlite_guard, sqlite_guard + page_end, 0, None))
+    return ranges
 
 
 def show(ptes, lo, hi, want_p, want_us):
@@ -77,7 +87,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('snapshot_dir', type=Path)
     parser.add_argument('--root', type=Path, default=ROOT)
+    parser.add_argument('--sqlite-guard', type=lambda value: int(value, 0))
     args = parser.parse_args()
+    guard = args.sqlite_guard
+    if guard is None:
+        capture = args.snapshot_dir / 'sqlite_stack_guard.json'
+        if not capture.exists():
+            parser.error('capture paging_sqlite_stack_guard or pass --sqlite-guard')
+        guard, = struct.unpack('<I', bytes.fromhex(json.loads(capture.read_text())['hex']))
+    if guard % PAGE:
+        parser.error('SQLite guard must be page aligned')
     elf = args.root / 'build/out/kernel.elf'
     header = args.root / 'build/out/memmap_layout.h'
     defects = layout_header_defects(args.root, elf, header)
@@ -88,7 +107,7 @@ def main():
     k = {name: macros.get(name) for name in macros.defines}
     ptes = pte_all(args.snapshot_dir, k['MEM_FIXED_BOOT_PT_COUNT'])
     total = 0
-    for label, lo, hi, wp, wu in checks(k, symbols):
+    for label, lo, hi, wp, wu in checks(k, symbols, guard):
         print(f'--- {label} ({lo:08x}-{hi:08x})')
         total += show(ptes, lo, hi, wp, wu)
     print(f'食い違いのある区間: {total} 件')

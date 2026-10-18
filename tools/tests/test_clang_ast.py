@@ -71,8 +71,10 @@ class ClangTest(unittest.TestCase):
                             u['src'].endswith('/build_id.c') else arg for arg in args]
                     args = [re.sub(r'[^ ]*/c_dialect_out_[^/]+/out', '<out>', arg)
                             for arg in args]
-                    result.append((u['src'] if not u['src'].endswith('/build_id.c')
-                                   else '<build_id>', tuple(args)))
+                    src = (u['src'] if not u['src'].endswith('/build_id.c')
+                           else '<build_id>')
+                    src = re.sub(r'[^ ]*/c_dialect_out_[^/]+/out', '<out>', src)
+                    result.append((src, tuple(args)))
                 return sorted(result)
             self.assertEqual(commands(out), commands(full_out))
 

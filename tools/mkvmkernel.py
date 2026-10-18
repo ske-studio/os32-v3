@@ -2,12 +2,12 @@
 # ========================================================================
 #  mkvmkernel.py -- VK32圧縮カーネルイメージ生成ツール
 #
-#  kernel.bin と sqlite.bin を LZ4ブロック圧縮し、VK32ヘッダ付き
+#  kernel.bin を LZ4ブロック圧縮し、VK32ヘッダ付き
 #  イメージファイル (vmkernel.lz4) を生成する。
 #
 #  使用法:
 #    python3 tools/mkvmkernel.py \
-#        --elf kernel.elf --kernel kernel.bin --sqlite sqlite.bin \
+#        --elf kernel.elf --kernel kernel.bin \
 #        -o vmkernel.lz4
 #
 #  必要パッケージ: pip install lz4
@@ -17,7 +17,7 @@
 #  生成したイメージが HDD ローダの上限 MAX_IMAGE_SIZE (boot/boot_defs.h) を
 #  超えたら**出力を書かずに失敗**する (TASK_HDD_INSTALL N8 の生成側)。
 #  ホスト試験: tools/tests/test_vmkernel_lz4.py / test_vk32_crc.py
-#  明示 --kernel-addr / --sqlite-addr は旧CLI/合成fixture用。ELFとの併用時は
+#  明示 --kernel-addr は旧CLI/合成fixture用。ELFとの併用時は
 #  一致を要求する。製品の通常/R1ビルドは --elf を使う。
 #
 #  VK32ヘッダ仕様 (v2、票 TASK_SERIAL_HOSTFS 部品 A-4。正典の説明は
@@ -28,7 +28,7 @@
 #    0x08       4     version: 2
 #    0x0C       4     entry_count: エントリ数 (1〜4)
 #    0x10+16i   16    entry[i]: load_addr / raw_size / data_offset / compressed_size
-#    0x10+16n   4n    entry_crc[i]: 展開後 (元の kernel.bin / sqlite.bin) の CRC32
+#    0x10+16n   4n    entry_crc[i]: 展開後 (元の kernel.bin) の CRC32
 #    0x10+20n   4     image_size: ファイル全体の長さ (完全長)
 #    0x14+20n   4     image_crc: ファイル全体の CRC32 (**この欄を 0 として**計算)
 #  CRC32 は IEEE 802.3 (zlib.crc32)。ローダ (HDD: boot/vk32_boot.c、FD:
@@ -125,25 +125,22 @@ def elf_layout(path):
     """Use T3a0's ELF manifest intervals, without its post-build artifact hashes.
 
     The complete manifest depends on vmkernel itself, so cannot be a build input.
-    NOBITS occupies memory but never contributes bytes to either flat binary.
+    NOBITS occupies memory but never contributes bytes to the core flat binary.
     """
     import gen_memmap
     from gen_memmap import read_elf, layout_range, Macros, read_defines
     sections, symbols = read_elf(path)
     entry = elf_load_addresses(path, sections)
     rows = [layout_range(s['name'], s['start'], s['end'],
-                         'sqlite' if s['name'].startswith('.sqlite') else 'core',
+                         'core',
                          noload=s['noload']) for s in sections if s['end'] > s['start']]
     spans = {}
-    for purpose in ('core', 'sqlite'):
+    for purpose in ('core',):
         stored = [r for r in rows if r['purpose'] == purpose and not r['noload']]
         if not stored:
             raise ValueError('ELF: missing file sections: ' + purpose)
         spans[purpose] = (min(r['start'] for r in stored), max(r['end'] for r in stored))
-    if spans['sqlite'][0] != symbols['__sqlite_start']:
-        raise ValueError('ELF: SQLite file start != __sqlite_start')
-    zeros = [('core', symbols['__bss_start'], symbols['__bss_end']),
-             ('sqlite', symbols['__sqlite_data_end'], symbols['__sqlite_end'])]
+    zeros = [('core', symbols['__bss_start'], symbols['__bss_end'])]
     for purpose, start, end in zeros:
         if start > end or (start | end) & 3:
             raise ValueError('ELF: unaligned/reversed BSS zero range: ' + purpose)
@@ -169,7 +166,7 @@ def elf_layout(path):
             raise ValueError('ELF: {} 0x{:x} != loader KERNEL_LOAD_ADDR 0x{:x}'.format(
                 label, addr, load_addr))
     for name in ('MEM_SHM_GUARD_LO', 'MEM_SHM_GUARD_HI', 'MEM_STACK_GUARD',
-                 'MEM_SHELL_GUARD', 'MEM_SQLITE_STACK_GUARD', 'MEM_FIXED_PAGING_GUARD_BASE'):
+                 'MEM_SHELL_GUARD', 'MEM_FIXED_PAGING_GUARD_BASE'):
         if name not in macros.defines:
             continue
         guard, size = macros.get(name), macros.get('MEM_GUARD_SIZE')
@@ -185,13 +182,9 @@ def main():
         description='VK32圧縮カーネルイメージ (vmkernel.lz4) 生成ツール')
     parser.add_argument('--kernel', required=True,
                         help='カーネルバイナリ (kernel.bin)')
-    parser.add_argument('--elf', help='linked kernel ELF (derive and validate both destinations)')
+    parser.add_argument('--elf', help='linked kernel ELF (derive and validate core destination)')
     parser.add_argument('--kernel-addr', type=parse_addr,
                         help='カーネル展開先アドレス (例: 0x100000)')
-    parser.add_argument('--sqlite', required=True,
-                        help='SQLiteバイナリ (sqlite.bin)')
-    parser.add_argument('--sqlite-addr', type=parse_addr,
-                        help='SQLite展開先アドレス (例: 0x300000)')
     parser.add_argument('-o', '--output', required=True,
                         help='出力ファイル名 (vmkernel.lz4)')
     parser.add_argument('--limit-header', default=DEFAULT_LIMIT_HEADER,
@@ -209,7 +202,7 @@ def main():
                 raise ValueError('; '.join(errors))
         max_image_size = read_max_image_size(args.limit_header)
         spans = elf_layout(args.elf) if args.elf else None
-        for label, purpose in (('kernel', 'core'), ('sqlite', 'sqlite')):
+        for label, purpose in (('kernel', 'core'),):
             explicit = getattr(args, label + '_addr')
             if spans:
                 addr = spans[purpose][0]
@@ -227,7 +220,6 @@ def main():
     # エントリ定義: (ファイルパス, 展開先アドレス, ラベル)
     entries = [
         (args.kernel, args.kernel_addr, 'kernel'),
-        (args.sqlite, args.sqlite_addr, 'sqlite'),
     ]
 
     entry_count = len(entries)

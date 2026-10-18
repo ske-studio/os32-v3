@@ -6,7 +6,7 @@ from pathlib import Path
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
-SYMBOLS = ('__bss_end', '__sqlite_start', '__sqlite_end',
+SYMBOLS = ('__bss_end',
            '__kernel_resident_end', '__ledger_fixed_start', '__ledger_fixed_end')
 
 

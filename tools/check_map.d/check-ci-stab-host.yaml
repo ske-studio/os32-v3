@@ -123,7 +123,6 @@ check-ci-stab-host:
 - sdk/gen_kapi.py
 - build/kernel.mk
 - build/out/kernel.bin
-- build/out/sqlite.bin
 - build/out/*
 - kernel/sqlite_engine.c
 artifact_reader: true

@@ -114,7 +114,7 @@ def case_real_plan():
               f"{mkpkg.PKG_MAX_ENTRIES}")
     # Minimal =「CUI のシェル + 基本コマンド」(cdinst の選択肢 1 の文言)
     minimal = {g for n, _, _, fs in resolved if n == 'minimal' for g, _ in fs}
-    need = ['/sys/shell.bin', '/boot/vmkernel.lz4', '/boot/kdebug.bin', '/sys/unicode.bin',
+    need = ['/sys/shell.bin', '/boot/vmkernel.lz4', '/boot/kdebug.bin', '/boot/sqlite.mod', '/sys/unicode.bin',
             '/etc/filetypes', '/etc/settings.tsv', '/etc/settings.db'] + \
         ['/bin/%s.bin' % c for c in MINIMAL_BASE_CMDS] + \
         ['/sbin/%s.bin' % c for c in MINIMAL_SBIN]

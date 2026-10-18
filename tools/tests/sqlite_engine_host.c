@@ -2,6 +2,7 @@
 #include "types.h"
 #include "sqlite_engine.h"
 #include "os32_sqlite_outer.h"
+#include "lib/sqlite3/generated/sqlite_facade.h"
 static void die(int code) { __asm__ volatile("int $0x80" : : "a"(1), "b"(code)); for (;;) {} }
 static void say(const char *s) { u32 n=0; while(s[n]) n++; __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(s), "d"(n)); }
 #define CHECK(x) do { if (!(x)) { say("FAIL: " #x "\n"); die(1); } } while (0)
@@ -45,12 +46,17 @@ static void callback(void *arg)
     CHECK(!sqlite_engine_run(nested, 0, 0));
     CHECK(!sqlite_engine_available(0));
     CHECK(sqlite_engine_active == 1);
+    #include "refused_calls.c"
 }
 #include "sqlite_mocks.c"
 extern int check_registers(void (*fn)(void *), u32 top, void *arg);
 void _start(void)
 {
+    CHECK(!sqlite_engine_available(1));
+    #include "stub_calls.c"
+    CHECK(!calls);
     sqlite_engine_stack_top = (u32)(stack + sizeof(stack));
+    sqlite_module_api = &exports;
     CHECK(sqlite_engine_available(1));
     pending = 1;
     CHECK(sqlite_engine_run(callback, (void *)123, 1));
@@ -60,10 +66,13 @@ void _start(void)
     pending = 0;
     int before = calls;
     kctx_irq_depth = 1;
+    #include "refused_calls.c"
     CHECK(!sqlite_engine_run(callback, (void *)123, 0));
     kctx_irq_depth = 0; kctx_exc_depth = 1;
+    #include "refused_calls.c"
     CHECK(!sqlite_engine_run(callback, (void *)123, 0));
     kctx_exc_depth = 0; host_flags = 2;
+    #include "io_refused_calls.c"
     CHECK(!sqlite_engine_run(callback, (void *)123, 1));
     CHECK(calls == before && host_flags == 2);
     CHECK(sqlite_engine_run(callback, (void *)123, 0));
@@ -76,8 +85,10 @@ void _start(void)
     #include "outer_calls.c"
     CHECK(!sqlite_engine_active && host_flags == 0x202);
     CHECK(os32_sqlite_get_autocommit((sqlite3 *)7) == 73);
-    CHECK(os32_sqlite_outer_db_fd((void *)7) == 12);
+    CHECK(os32_sqlite_outer_db_fd((void *)7) == 73);
     CHECK(!sqlite_engine_active);
+    sqlite_module_api = &sqlite_stub_api;
+    #include "stub_calls.c"
     /* The actual handler gates must stop before the app-kill branch. */
     for (int kind = 0; kind < 2; kind++) {
         sqlite_engine_active = 1;

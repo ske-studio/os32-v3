@@ -7,7 +7,7 @@
 /*  ビルドオプション:                                                        */
 /*    - 最適化: -Os (サイズ最適化必須。-O2比で30%削減)                        */
 /*    - amalgamation: OMITマクロ付きでソースから再生成したもの                */
-/*    - 配置先: カーネル core BSS の直後 (__sqlite_start、build/os32.ld)     */
+/*    - 配置先: /boot/sqlite.mod (owner 付き body/pool/stack)     */
 /* ======================================================================== */
 #ifndef OS32_SQLITE_CONFIG_H
 #define OS32_SQLITE_CONFIG_H
@@ -60,6 +60,7 @@
  * 代わりに -msoft-float でソフトウェア浮動小数点を使用する */
 
 /* ======== メモリ管理 ======== */
+#define SQLITE_MEMSYS5_SIZE        (512u * 1024u) /* owner allocation, canaries included */
 #define SQLITE_ENABLE_MEMSYS5      1     /* 固定プールメモリアロケータ */
 
 /* ======== リソース制限 ======== */

@@ -9,7 +9,7 @@
 # ここに一覧を書かないこと — 2026-09-24 まで FDD_MIN_CMDS を手で持っていて
 # CD の MINIMAL とずれていた。make check-packages-host が実物で等しいかを見る。
 # 2hd と 1.44MB で 1 つを使う。$(1) = LOADER.BIN のもと。
-FDD_IMAGE_DEPS = boot $(BUILD_OUT)/vmkernel.lz4 $(BUILD_OUT)/kdebug.bin programs unicode_bin \
+FDD_IMAGE_DEPS = boot $(BUILD_OUT)/vmkernel.lz4 $(KERNEL_PAIRED_MODULES) programs unicode_bin \
                  $(BUILD_OUT)/settings.db assets-deployed build/packages.yaml \
                  userland/deploy.yaml build/core.yaml tools/mkpkg.py
 define FDD_IMAGE_ARGS
@@ -47,7 +47,7 @@ fd144: images/os32_boot144.img
 # `make iso` や `make -j` でも欠損で落ちないように)。settings.db は媒体だけ、
 # settings.v2.fixture は DEBUG が持つ。出力先の古い *.PKG は mkpkg が消す
 # (ISO は packages/ を丸ごと焼くので、名前の変わった PKG が残らないように)。
-packages: programs boot $(BUILD_OUT)/vmkernel.lz4 $(BUILD_OUT)/kdebug.bin unicode_bin \
+packages: programs boot $(BUILD_OUT)/vmkernel.lz4 $(KERNEL_PAIRED_MODULES) unicode_bin \
           $(BUILD_OUT)/settings.db $(BUILD_OUT)/settings.v2.fixture \
           assets-deployed assets/fep.db
 	python3 tools/mkpkg.py --plan build/packages.yaml --output packages/ --base .

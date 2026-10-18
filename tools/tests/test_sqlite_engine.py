@@ -1,5 +1,6 @@
 """T4b-2: actual core guard, typed thunks and NASM trampoline on ILP32."""
 import argparse
+import json
 import pathlib
 import re
 import tempfile
@@ -12,7 +13,8 @@ TARGET_SRC = ['kernel/sqlite_engine.c', 'kernel/sqlite_outer.c', 'exec/exec.c',
 def run(runner, mutant=None):
     with tempfile.TemporaryDirectory(prefix='sqlite-engine-') as directory:
         tmp = pathlib.Path(directory)
-        engine = (ROOT / TARGET_SRC[0]).read_text()
+        engine = (ROOT / TARGET_SRC[0]).read_text().split('/* Boot-only adapter:')[0]
+        engine = engine.replace('#include "../lib/sqlite3/generated/', '#include "'+str(ROOT / 'lib/sqlite3/generated')+'/')
         if mutant == 'guard bypass':
             engine = engine.replace('sqlite_engine_active || kctx_irq_depth', '0 || kctx_irq_depth')
         if mutant == 'early STOP':
@@ -26,7 +28,8 @@ def run(runner, mutant=None):
             'static inline void _disable(void) { host_flags &= ~512u; }\n'
             'static inline void _stop(void) { host_stop(); }\n')
         (tmp / 'pgalloc.h').write_text('extern volatile u32 kctx_irq_depth, kctx_exc_depth;\n')
-        (tmp / 'memmap.h').write_text('#define MEM_SQLITE_STACK_TOP 0u\n')
+        (tmp / 'memmap.h').write_text('')
+        (tmp / 'paging.h').write_text('')
         src = (ROOT / 'exec/exec.c').read_text()
         a = src.index('void ring3_abort_check(void)\n{')
         (tmp / 'stop_source.c').write_text(src[a:src.index('\n}', a)+2])
@@ -45,21 +48,48 @@ def run(runner, mutant=None):
             gate = gate.replace('__asm__ volatile("mov %%cr2, %0" : "=r"(cr2));', 'cr2 = test_cr2;')
             gates.append('static void '+name+'(void) {\nu32 vector=13, fault_eip=test_eip, fault_addr=test_cr2;\n'+gate+' kills++; }\n')
         (tmp / 'fault_source.c').write_text('#include "io.h"\n'+'\n'.join(gates))
-        hdr = (ROOT / 'lib/sqlite3/os32_sqlite_outer.h').read_text()
-        mocks, calls = [], []
-        for ret, name, args in re.findall(r'^(.+?) os32_sqlite_(\w+)\(([^;]*)\);', hdr, re.M):
-            if name in ('start', 'outer_db_fd', 'outer_group_open', 'snprintf'): continue
+        rows = json.loads((ROOT / 'tools/prototypes/sqlite_imports.def').read_text())['facade']
+        mocks, calls, stub_calls, bindings, refused_calls, io_refused_calls = [], [], [], [], [], []
+        for row in rows:
+            ret, name, args, target, wrapper = [row[k] for k in ('result','name','args','target','wrapper')]
             value = '(void *)0x1234' if '*' in ret else '73'
-            mocks.append(f'{ret} sqlite3_{name}({args}) {{ probe(); return {value}; }}')
+            result = 'return;' if ret == 'void' else f'return {value};'
+            mocks.append(f'{ret} {target}({args}) {{ CHECK(0); {result} }}')
+            mocks.append(f'static {ret} exported_{name}({args}) {{ probe(); {result} }}')
+            bindings.append(f'.{name} = exported_{name},')
             argv = ', '.join('0' for _ in args.split(',')) if args != 'void' else ''
-            calls.append(f'{{ int before=calls; CHECK(os32_sqlite_{name}({argv}) == ({ret})({value})); CHECK(calls > before); }}')
-        mocks += ['int os32_sqlite_group_open(const Os32SqliteGroup *g, const char *p, int f, sqlite3 **o) { (void)g; (void)p; (void)f; (void)o; probe(); return 0; }', 'int os32_sqlite_init(void) { probe(); return 0; }',
-                  'int os32_sqlite_db_fd(void *db) { (void)db; probe(); return 12; }',
-                  'char *sqlite3_vsnprintf(int n, char *out, const char *fmt, __builtin_va_list ap) { (void)n; (void)fmt; (void)ap; probe(); out[0]=0; return out; }']
-        calls += ['CHECK(os32_sqlite_outer_group_open(0,0,0,0) == 0);', 'CHECK(os32_sqlite_start() == 0);', 'CHECK(os32_sqlite_outer_db_fd(0) == 12);',
-                  '{ char out[8]; CHECK(os32_sqlite_snprintf(8,out,"%d",1) == out && !out[0]); }']
+            call = f'{wrapper}({argv})'
+            check = call+';' if ret == 'void' else f'CHECK({call} == ({ret})({value}));'
+            calls.append(f'{{ int before=calls; {check} CHECK(calls > before); }}')
+            stub_calls.append(f'CHECK(sqlite_stub_api.{name} != 0);')
+            if ret == 'void': stub_calls.append(call+';')
+            elif '*' in ret and row['stub'] != '0':
+                stub_calls.append(f'CHECK({call} != 0);')
+            else: stub_calls.append(f'CHECK({call} == ({ret})({row["stub"]}));')
+            refused = ('SQLITE_MISUSE' if row['stub'] == 'OS32_ERR_NOSYS' else row['stub'])
+            check = (call+';' if ret == 'void' else
+                     f'CHECK({call} != 0);' if '*' in ret and refused != '0' else
+                     f'CHECK({call} == ({ret})({refused}));')
+            refused_calls.append(check)
+            if row['io']: io_refused_calls.append(check)
+        mocks += ['static const SqliteModuleApi exports = {'+' '.join(bindings)+'};',
+                  'const SqliteModuleApi *sqlite_module_api = &sqlite_stub_api;',
+                  'int sqlite_module_ready(void) { return sqlite_module_api != &sqlite_stub_api; }']
         (tmp / 'sqlite_mocks.c').write_text('\n'.join(mocks))
         (tmp / 'outer_calls.c').write_text('\n'.join(calls))
+        (tmp / 'stub_calls.c').write_text('\n'.join(stub_calls))
+        (tmp / 'refused_calls.c').write_text('\n'.join(refused_calls))
+        (tmp / 'io_refused_calls.c').write_text('\n'.join(io_refused_calls))
+        outer = (ROOT / 'kernel/sqlite_outer.c').read_text()
+        outer = outer.replace('../lib/sqlite3/generated/', str(ROOT / 'lib/sqlite3/generated')+'/')
+        generated = (ROOT / 'lib/sqlite3/generated/sqlite_outer_calls.inc').read_text()
+        if mutant == 'direct call':
+            generated = generated.replace('sqlite_module_api->close(f->db)', 'sqlite3_close(f->db)')
+        if mutant == 'NULL stub':
+            generated = generated.replace('.close = stub_close,', '.close = 0,')
+        (tmp / 'outer_calls.inc').write_text(generated)
+        outer = outer.replace(str(ROOT / 'lib/sqlite3/generated/sqlite_outer_calls.inc'), str(tmp / 'outer_calls.inc'))
+        (tmp / 'outer.c').write_text(outer)
         objects = []
         for rel in ['lib/sqlite3/sqlite_stack.asm','tools/tests/sqlite_engine_regs.asm']:
             obj = tmp / (pathlib.Path(rel).stem+'.o')
@@ -68,10 +98,10 @@ def run(runner, mutant=None):
         exe = tmp/'test'
         cmd = ['gcc','-m32','-march=i386','-std=gnu11','-Os','-ffreestanding','-fno-pie',
                '-fno-stack-protector','-ffunction-sections','-fdata-sections','-nostdlib',
-               '-static','-no-pie','-Wl,--gc-sections','-I'+str(tmp)]
-        cmd += ['-I'+str(ROOT/p) for p in ['include','kernel','fs','lib/sqlite3','sdk/include/os32']]
+               '-static','-no-pie','-Wl,--gc-sections','-I'+str(tmp), '-I'+str(ROOT)]
+        cmd += ['-I'+str(ROOT/p) for p in ['include','kernel','fs','lib','lib/sqlite3','sdk/include/os32']]
         cmd += [str(ROOT/'tools/tests/sqlite_engine_host.c'),str(tmp/'engine.c'),
-                str(ROOT/'kernel/sqlite_outer.c'), *objects, '-o',str(exe)]
+                str(tmp/'outer.c'), *objects, '-o',str(exe)]
         host32.build(cmd, check=True, capture_output=True, text=True)
         return host32.run([str(exe)], runner=runner, capture_output=True, text=True, timeout=host32.RUN_TIMEOUT)
 
@@ -88,7 +118,7 @@ def main():
             print(r.stdout+r.stderr,end='')
             assert r.returncode == 0, r.returncode
     if args.mutate:
-        for name in ['guard bypass','fault app kill']:
+        for name in ['guard bypass','fault app kill','direct call','NULL stub']:
             r=run(args.runner,name)
             assert r.returncode != 0 and 'FAIL:' in r.stdout, (name,r.returncode,r.stdout,r.stderr)
             print('RED (runtime): '+name)

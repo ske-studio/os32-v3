@@ -2,7 +2,7 @@
 /*  IME_DICT.C - FEP辞書検索エンジン (SQLite ベース)                         */
 /*                                                                          */
 /*  カーネルVFS上のSQLite DBファイルを辞書バックエンドとして使用する。        */
-/*  sqlite3_*関数をカーネル空間から直接呼び出す (KAPI不使用)。               */
+/*  SQLite は resident outer facade 経由で typed module export を呼ぶ。               */
 /*                                                                          */
 /*  検索モード:                                                              */
 /*    - 2文字以下: 完全一致 (変換キー押下時のみ呼ばれる前提)                 */

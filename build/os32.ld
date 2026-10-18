@@ -5,7 +5,6 @@ ENTRY(kentry)
 KERNEL_LOAD_ADDR = LAYOUT_KERNEL_LOAD_ADDR;
 MEM_KSTACK_TOP = LAYOUT_MEM_KSTACK_TOP;
 MEM_KERNEL_IMAGE_MAX = LAYOUT_MEM_KERNEL_IMAGE_MAX;
-MEM_SQLITE_STACK_SIZE = LAYOUT_MEM_SQLITE_STACK_SIZE;
 MEM_DMA_POOL_BASE = LAYOUT_MEM_DMA_POOL_BASE;
 MEM_FIXED_PAGING_BASE = LAYOUT_MEM_FIXED_PAGING_BASE;
 MEM_FIXED_PD_BASE = LAYOUT_MEM_FIXED_PD_BASE;
@@ -37,23 +36,22 @@ SECTIONS
     .text : {
         /* kernel/kentry.o が確実に関数の先頭になるようにする */
         kernel/kentry.o(.text)
-        /* SQLite関連ファイルを除外して残りを配置 */
-        *(EXCLUDE_FILE(lib/sqlite3/sqlite3.o lib/sqlite3/os32_sqlite_vfs.o lib/sqlite3/os32_sqlite_test.o) .text)
-        *(EXCLUDE_FILE(lib/sqlite3/sqlite3.o lib/sqlite3/os32_sqlite_vfs.o lib/sqlite3/os32_sqlite_test.o) .text.*)
+        *(.text)
+        *(.text.*)
     }
 
     .data : {
-        *(EXCLUDE_FILE(lib/sqlite3/sqlite3.o lib/sqlite3/os32_sqlite_vfs.o lib/sqlite3/os32_sqlite_test.o) .data)
-        *(EXCLUDE_FILE(lib/sqlite3/sqlite3.o lib/sqlite3/os32_sqlite_vfs.o lib/sqlite3/os32_sqlite_test.o) .data.*)
-        *(EXCLUDE_FILE(lib/sqlite3/sqlite3.o lib/sqlite3/os32_sqlite_vfs.o lib/sqlite3/os32_sqlite_test.o) .rodata)
-        *(EXCLUDE_FILE(lib/sqlite3/sqlite3.o lib/sqlite3/os32_sqlite_vfs.o lib/sqlite3/os32_sqlite_test.o) .rodata.*)
+        *(.data)
+        *(.data.*)
+        *(.rodata)
+        *(.rodata.*)
     }
 
     .bss ALIGN(4) : {
         __bss_start = .;
-        *(EXCLUDE_FILE(lib/sqlite3/sqlite3.o lib/sqlite3/os32_sqlite_vfs.o lib/sqlite3/os32_sqlite_test.o) .bss)
-        *(EXCLUDE_FILE(lib/sqlite3/sqlite3.o lib/sqlite3/os32_sqlite_vfs.o lib/sqlite3/os32_sqlite_test.o) .bss.*)
-        *(EXCLUDE_FILE(lib/sqlite3/sqlite3.o lib/sqlite3/os32_sqlite_vfs.o lib/sqlite3/os32_sqlite_test.o) COMMON)
+        *(.bss)
+        *(.bss.*)
+        *(COMMON)
         . = ALIGN(4);
     }
 
@@ -66,50 +64,12 @@ SECTIONS
     }
     . = ALIGN(LAYOUT_MEM_PAGE_SIZE);
 
-    /* ================================================================ */
-    /*  SQLite (core BSS 直後、ページ整列)                              */
-    /* ================================================================ */
-    .sqlite_text : {
-        __sqlite_start = .;
-        KEEP(lib/sqlite3/sqlite3.o(.text .text.*))
-        KEEP(lib/sqlite3/os32_sqlite_vfs.o(.text .text.*))
-        KEEP(lib/sqlite3/os32_sqlite_test.o(.text .text.*))
-    }
-
-    .sqlite_rodata : {
-        KEEP(lib/sqlite3/sqlite3.o(.rodata .rodata.*))
-        KEEP(lib/sqlite3/os32_sqlite_vfs.o(.rodata .rodata.*))
-        KEEP(lib/sqlite3/os32_sqlite_test.o(.rodata .rodata.*))
-    }
-
-    .sqlite_data : {
-        KEEP(lib/sqlite3/sqlite3.o(.data .data.*))
-        KEEP(lib/sqlite3/os32_sqlite_vfs.o(.data .data.*))
-        KEEP(lib/sqlite3/os32_sqlite_test.o(.data .data.*))
-        . = ALIGN(4);
-        __sqlite_data_end = .;
-    }
-
-    .sqlite_bss (NOLOAD) : {
-        lib/sqlite3/sqlite3.o(.bss .bss.* COMMON)
-        lib/sqlite3/os32_sqlite_vfs.o(.bss .bss.* COMMON)
-        lib/sqlite3/os32_sqlite_test.o(.bss .bss.* COMMON)
-        . = ALIGN(4);
-        __sqlite_end = .;
-    }
-
-    MEM_SQLITE_STACK_BASE = LAYOUT_MEM_SQLITE_STACK_BASE;
-    MEM_SQLITE_STACK_TOP = LAYOUT_MEM_SQLITE_STACK_TOP;
-    MEM_SQLITE_STACK_END = MEM_SQLITE_STACK_BASE + MEM_SQLITE_STACK_SIZE;
-    MEM_SQLITE_STACK_GUARD = LAYOUT_MEM_SQLITE_STACK_GUARD;
-    __kernel_resident_end = MEM_SQLITE_STACK_END;
+    /* SQLite image, heap and stack belong to its runtime owner. */
+    __kernel_resident_end = .;
     ASSERT(__ledger_fixed_start % LAYOUT_MEM_PAGE_SIZE == 0 &&
            __ledger_fixed_end - __ledger_fixed_start == LAYOUT_MEM_LEDGER_META_SIZE &&
            __bss_start <= __ledger_fixed_start && __ledger_fixed_end == __bss_end,
            "ledger backing must be two pages inside core BSS")
-    ASSERT(__bss_end <= __sqlite_start && __sqlite_end <= MEM_SQLITE_STACK_GUARD &&
-           MEM_SQLITE_STACK_BASE == MEM_SQLITE_STACK_GUARD + LAYOUT_MEM_GUARD_SIZE,
-           "SQLite chain overlaps BSS/guard")
     /* ==================================================================== */
     /*  カーネル本体の予算 (2026-09-17 決裁 D2、票                            */
     /*  docs/archive/kernel_v21/TASK_KSTACK_USER.md)                          */
@@ -148,8 +108,8 @@ SECTIONS
            MEM_DMA_POOL_BASE >= (LAYOUT_MEM_BOOT_BUNDLE_BASE + LAYOUT_MEM_BOOT_BUNDLE_SIZE) &&
            MEM_DMA_POOL_END < LAYOUT_MEM_SYSTEM_SPACE_BASE,
            "DMA window must be outside boot bundle and system space")
-    ASSERT(((__bss_start | __bss_end | __sqlite_data_end | __sqlite_end) & 3) == 0 &&
-           __bss_start <= __bss_end && __sqlite_data_end <= __sqlite_end,
+    ASSERT(((__bss_start | __bss_end) & 3) == 0 &&
+           __bss_start <= __bss_end,
            "BSS zero ranges must be ordered and DWORD aligned")
 
     .os32_generations 0 (INFO) : { KEEP(*(.os32_generations)) }

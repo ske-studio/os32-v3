@@ -1,4 +1,7 @@
 check-sqlite-engine-host:
+- tools/gen_sqlite_imports.py
+- tools/prototypes/sqlite_imports.def
+- lib/sqlite3/generated/*
 - kernel/sqlite_engine.c
 - kernel/sqlite_engine.h
 - kernel/sqlite_outer.c

@@ -5,6 +5,8 @@ check-packages-host:
 - docs/manpages/**
 - assets/**
 - build/core.yaml
+- build/deploy.mk
+- build/image.mk
 - build/packages.yaml
 - drivers/pc98pt.c
 - fs/ext2_layout.c

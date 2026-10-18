@@ -30,43 +30,31 @@ def command(cmd, cwd=None, ok=True):
     return r
 
 
-def fixture(work, core_bss=32, sqlite_data=4, sqlite_bss=32,
-            link_edit=None):
+def fixture(work, core_bss=32, core_data=4, link_edit=None):
     work.mkdir()
-    objects = []
-    for rel, data in (
-        ('kernel/kentry', f'global kentry\nsection .text\nkentry: nop\n'
-         f'section .data align=4\ndd 0x12345678\nsection .bss align=4\nresb {core_bss}\n'),
-        ('lib/sqlite3/sqlite3', f'section .text\nnop\nsection .rodata align=32\ndd 42\n'
-         f'section .data align=4\ntimes {sqlite_data} db 7\n'
-         f'section .bss align=4\nresb {sqlite_bss}\n'),
-        ('lib/sqlite3/os32_sqlite_vfs', 'section .text\n'),
-        ('lib/sqlite3/os32_sqlite_test', 'section .text\n')):
-        p = work / rel
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.with_suffix('.asm').write_text(data)
-        command(['nasm', '-f', 'elf32', p.with_suffix('.asm'), '-o', p.with_suffix('.o')])
-        objects.append(p.with_suffix('.o').relative_to(work))
+    p = work / 'kernel/kentry'
+    p.parent.mkdir()
+    p.with_suffix('.asm').write_text(
+        f'global kentry\nsection .text\nkentry: nop\n'
+        f'section .data align=4\ntimes {core_data} db 7\n'
+        f'section .bss align=4\nresb {core_bss}\n')
+    command(['nasm', '-f', 'elf32', p.with_suffix('.asm'), '-o', p.with_suffix('.o')])
     script = gen.preprocess_layout(ROOT, (ROOT / 'build/os32.ld').read_text())
     if link_edit:
         before, after = link_edit
         assert before in script
         script = script.replace(before, after)
-        # Isolate a rodata LMA shift; keep the flat binary's end unchanged.
-        script = script.replace('.sqlite_data : {',
-                                '.sqlite_data : AT(ADDR(.sqlite_data)) {')
     (work / 'layout.ld').write_text(script)
     elf = work / 'kernel.elf'
-    command(['ld', '-m', 'elf_i386', '-T', 'layout.ld', '-Map=kernel.map', '-o', elf, *objects], cwd=work)
-    for name, flags in (('kernel', ['--remove-section=.sqlite_' + s for s in ('text', 'rodata', 'data', 'bss')]),
-                        ('sqlite', ['--only-section=.sqlite_' + s for s in ('text', 'rodata', 'data')])):
-        command(['objcopy', '-O', 'binary', *flags, elf, work / (name + '.bin')])
+    command(['ld', '-m', 'elf_i386', '-T', 'layout.ld', '-Map=kernel.map',
+             '-o', elf, 'kernel/kentry.o'], cwd=work)
+    command(['objcopy', '-O', 'binary', elf, work / 'kernel.bin'])
     return elf
 
 
 def generate(script, work, elf, *extra):
     return command([sys.executable, '-B', script, '--elf', elf,
-                    '--kernel', work / 'kernel.bin', '--sqlite', work / 'sqlite.bin',
+                    '--kernel', work / 'kernel.bin',
                     '--limit-header', ROOT / 'boot/boot_defs.h', '-o', work / 'image.lz4',
                     *extra], ok=False)
 
@@ -77,8 +65,7 @@ def link_asserts(work, elf):
     m = gen.Macros(gen.read_defines(ROOT / 'include/memmap.h'), syms)
     assertions = []
     for lo, hi, section in (('__bss_start', '__bss_end', '.bss'),
-                            ('__bss_start', '__bss_end', '.ledger_fixed'),
-                            ('__sqlite_data_end', '__sqlite_end', '.sqlite_bss')):
+                            ('__bss_start', '__bss_end', '.ledger_fixed')):
         assertions += [f'ASSERT((({lo} | {hi}) & 3) == 0, "BSS alignment")',
                        f'ASSERT({lo} <= ADDR({section}) && '
                        f'ADDR({section}) + SIZEOF({section}) <= {hi}, "BSS coverage")',
@@ -88,9 +75,7 @@ def link_asserts(work, elf):
             assertions.append(f'ASSERT({hi} <= {a} || {lo} >= {a+n}, "BSS guard")')
     (work / 'assert.ld').write_text('\n'.join(assertions))
     return command(['ld', '-m', 'elf_i386', '-T', 'layout.ld', '-T', 'assert.ld',
-                    '-o', work / 'assert.elf', 'kernel/kentry.o',
-                    'lib/sqlite3/sqlite3.o', 'lib/sqlite3/os32_sqlite_vfs.o',
-                    'lib/sqlite3/os32_sqlite_test.o'], cwd=work, ok=False)
+                    '-o', work / 'assert.elf', 'kernel/kentry.o'], cwd=work, ok=False)
 
 
 def edit_elf(elf, output, symbol=None, value=None, bss_end=None):
@@ -119,8 +104,7 @@ def check_real_bss(elf):
     # The executable entry must lead directly into the product BSS/stack path.
     _, linked = gen.read_elf(elf)
     assert linked['kentry'] == linked['KERNEL_LOAD_ADDR'], 'entry != core start'
-    zeros = [(syms[a], syms[b]) for a, b in (('__bss_start', '__bss_end'),
-                                            ('__sqlite_data_end', '__sqlite_end'))]
+    zeros = [(syms[a], syms[b]) for a, b in (('__bss_start', '__bss_end'),)]
     assert all(a <= b and not ((a | b) & 3) for a, b in zeros)
     for row in manifest['ranges']:
         if row.get('source') == 'elf' and row.get('noload'):
@@ -162,8 +146,7 @@ def run_cases(vk, exes, script, work, real=False):
     work = pathlib.Path(work)
     lines = []
     for name, edit, diagnostic in (
-            ('lma-shift', ('.sqlite_rodata : {',
-                           '.sqlite_rodata : AT(ADDR(.sqlite_rodata) - 4) {'), b'VMA/LMA'),
+            ('lma-shift', ('.data : {', '.data : AT(ADDR(.data) + 4) {'), b'VMA/LMA'),
             ('core-shift', ('. = KERNEL_LOAD_ADDR;', '. = 0x101000;'), b'core start'),
             ('entry-shift', ('ENTRY(kentry)',
                              'ENTRY(shifted_entry)\nshifted_entry = kentry + 4;'), b'ELF entry')):
@@ -183,15 +166,14 @@ def run_cases(vk, exes, script, work, real=False):
         real = ROOT/'build/out'
         d = work/'real-layout'
         d.mkdir()
-        for name in ('kernel.bin', 'sqlite.bin'):
+        for name in ('kernel.bin',):
             shutil.copy(real/name, d/name)
         r = generate(script, d, real/'kernel.elf')
         assert r.returncode == 0, r.stderr.decode()
         img = (d/'image.lz4').read_bytes()
         _, syms = gen.read_elf(real/'kernel.elf')
         legacy = vk.make_image(script, work, (d/'kernel.bin').read_bytes(),
-                               (d/'sqlite.bin').read_bytes(), 'legacy-layout',
-                               sqlite_addr=syms['__sqlite_start'])
+                               None, 'legacy-layout')
         assert img == legacy == (real/'vmkernel.lz4').read_bytes(), 'current image/CRC changed'
         assert len(img) <= vk.MAX_IMAGE, 'compressed budget'
         assert check_real_bss(real/'kernel.elf'), 'real ELF BSS/guard constraints'
@@ -203,24 +185,21 @@ def run_cases(vk, exes, script, work, real=False):
     assert r.returncode == 0, r.stderr.decode()
     img = (d / 'image.lz4').read_bytes()
     _, syms = gen.read_elf(elf)
-    assert vk.parse(img)['ents'][1][0] == syms['__sqlite_start'], 'SQLite destination != ELF'
+    assert vk.parse(img)['n'] == 1 and vk.parse(img)['ents'][0][0] == syms['KERNEL_LOAD_ADDR'], 'core-only destination != ELF'
     assert link_asserts(d, elf).returncode == 0, 'link ASSERT control'
     for exe in exes.values():
         lines += vk.check_good(exe, img, (d/'kernel.bin').read_bytes(),
-                               (d/'sqlite.bin').read_bytes(), d.name)
-    # NOLOAD must never contribute file bytes. Include both ends and padding.
-    assert vk.parse(img)['ents'][1][1] == syms['__sqlite_data_end'] - syms['__sqlite_start']
+                               None, d.name)
+    # BSS reservations exercise the unchanged multi-entry wire independently.
     loader_reservation_cases(vk, exes, (d/'kernel.bin').read_bytes(),
-                             (d/'sqlite.bin').read_bytes(), syms['__bss_start'],
-                             syms['__bss_end'], syms['__sqlite_start'])
-    r = generate(script, d, elf, '--sqlite-addr', hex(syms['__sqlite_start'] + 4))
+                             b'extra fixture', syms['__bss_start'],
+                             syms['__bss_end'], syms['__kernel_resident_end'])
+    r = generate(script, d, elf, '--kernel-addr', hex(syms['KERNEL_LOAD_ADDR'] + 4))
     assert r.returncode != 0 and b'conflicting' in r.stderr, 'explicit address conflict accepted'
-    # A destination inside the other image's BSS must fail at generation time.
-    bad = edit_elf(elf, d/'overlap.elf', bss_end=syms['__sqlite_start'] + 4)
-    bad = edit_elf(bad, bad, '__bss_end', syms['__sqlite_start'] + 4)
+    bad = edit_elf(elf, d/'overlap.elf', '__bss_start', syms['KERNEL_LOAD_ADDR'])
     r = generate(script, d, bad)
     assert r.returncode != 0 and b'overlap' in r.stderr, 'BSS collision accepted'
-    for name, opts in (('unaligned-start', dict(sqlite_data=3)),
+    for name, opts in (('unaligned-start', dict(core_data=3)),
                        ('unaligned-end', dict(core_bss=33))):
         d = work / name
         elf = fixture(d, **opts)
@@ -234,7 +213,7 @@ def run_cases(vk, exes, script, work, real=False):
     d = work / 'chain'
     elf = d/'kernel.elf'
     _, syms = gen.read_elf(elf)
-    for name in ('__bss_start', '__bss_end', '__sqlite_data_end', '__sqlite_end'):
+    for name in ('__bss_start', '__bss_end'):
         bad = edit_elf(elf, d/'unaligned.elf', name, syms[name] + 1)
         r = generate(script, d, bad)
         assert r.returncode != 0 and b'BSS zero range' in r.stderr, name + ' alignment'
@@ -244,7 +223,7 @@ def run_cases(vk, exes, script, work, real=False):
     # Shift zeroing (not file bytes) across the existing stack guard.
     m = gen.Macros(gen.read_defines(ROOT / 'include/memmap.h'), syms)
     guard_end = m.get('MEM_STACK_GUARD') + m.get('MEM_GUARD_SIZE')
-    bad = edit_elf(elf, d/'guard.elf', '__sqlite_end', guard_end)
+    bad = edit_elf(elf, d/'guard.elf', '__bss_end', guard_end)
     r = generate(script, d, bad)
     assert r.returncode != 0 and b'guard' in r.stderr, 'BSS guard intersection accepted'
     # Relink with the same bad symbol definitions: require the specific ASSERT,
@@ -252,7 +231,7 @@ def run_cases(vk, exes, script, work, real=False):
     ld_script = (d/'layout.ld').read_text()
     for before, after, diagnostic in (
             ('__bss_end = .;', '__bss_end = . - 4;', b'BSS coverage'),
-            ('__sqlite_end = .;', f'__sqlite_end = {guard_end};', b'BSS guard')):
+            ('__bss_end = .;', f'__bss_end = {guard_end};', b'BSS guard')):
         (d/'layout.ld').write_text(ld_script.replace(before, after))
         r = link_asserts(d, elf)
         assert r.returncode != 0 and diagnostic in r.stderr, diagnostic.decode()
@@ -261,7 +240,7 @@ def run_cases(vk, exes, script, work, real=False):
     r = generate(script, d, bad)
     assert r.returncode != 0 and b'overflow' in r.stderr, 'ELF section overflow accepted'
     # A file padded to include NOLOAD is rejected, rather than compressed as data.
-    with (d/'sqlite.bin').open('ab') as f:
+    with (d/'kernel.bin').open('ab') as f:
         f.write(bytes(32))
     r = generate(script, d, elf)
     assert r.returncode != 0 and b'file size mismatch' in r.stderr, 'NOLOAD bytes accepted'

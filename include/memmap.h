@@ -35,7 +35,7 @@
 
 /* ====================================================================== */
 /*  カーネルヒープ (kmalloc)                                                */
-/*  __kernel_resident_end (SQLite 代替スタックの末尾) から動的算出 (4KB)    */
+/*  __kernel_resident_end (ページ整列した core BSS の末尾) から動的算出 (4KB)    */
 /* ====================================================================== */
 extern u32 __kernel_resident_end;
 extern u32 __ledger_fixed_start, __ledger_fixed_end;
@@ -239,11 +239,8 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 #define MEM_SHM_RESV_START_MAX (MEM_SHM_GUARD_HI_MAX + MEM_GUARD_SIZE)
 
 /* ====================================================================== */
-/*  SQLite帯域 (core BSS直後の連結配置)                                     */
-/*  SQLite code+BSS + 代替スタック (128KB)                                  */
+/*  固定 paging / stack 枠と core 内 ledger backing                         */
 /* ====================================================================== */
-extern u32 __sqlite_end;
-#define MEM_SQLITE_STACK_GUARD ((((u32)&__sqlite_end) + 0xFFF) & ~0xFFFUL)
 #define MEM_FIXED_PAGING_GUARD_BASE 0x3E0000UL
 #define MEM_FIXED_PAGING_FRAME_END 0x3FB000UL
 #define MEM_FIXED_PAGING_FRAME_PAGES 26UL
@@ -256,9 +253,6 @@ extern u32 __sqlite_end;
 #define MEM_FIXED_PAGING_USED_PAGES 11UL
 #define MEM_LEDGER_META_SIZE 0x2000UL
 #define MEM_KSTACK_SIZE 0x4000UL
-#define MEM_SQLITE_STACK_BASE (MEM_SQLITE_STACK_GUARD + MEM_GUARD_SIZE)
-#define MEM_SQLITE_STACK_SIZE  0x020000UL  /* 128KB */
-#define MEM_SQLITE_STACK_TOP   (MEM_SQLITE_STACK_BASE + MEM_SQLITE_STACK_SIZE - 16)
 
 
 /* ---------------------------------------------------------------------- */

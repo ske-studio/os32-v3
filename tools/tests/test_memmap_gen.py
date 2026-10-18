@@ -46,14 +46,13 @@ BROKEN = 0x380000        # 予算超過。SHM がカーネル帯域を突き抜�
 CLEAN = 0x280000         # 予算内。重なりも逆転も無い
 
 def map_symbols(resident):
-    return {'__bss_end': 0x140000, '__sqlite_start': 0x140000,
-            '__sqlite_end': resident - 0x21000, '__kernel_resident_end': resident,
-            '__ledger_fixed_start': 0x13e000, '__ledger_fixed_end': 0x140000}
+    return {'__bss_end': resident, '__kernel_resident_end': resident,
+            '__ledger_fixed_start': resident - 8192, '__ledger_fixed_end': resident}
 
 
 MUTATIONS = {
     "no-layout-bss-coverage": (
-        '    for lo, hi in (("__bss_start", "__bss_end"), ("__sqlite_data_end", "__sqlite_end")):',
+        '    for lo, hi in (("__bss_start", "__bss_end"),):',
         '    for lo, hi in ():'),
     "no-layout-overlap": (
         '            out.append("半開区間の重複: %s / %s" % (a["name"], b["name"]))',
@@ -76,8 +75,7 @@ def _unused_mirrors(root, m):"""),
     "guess-map": ("""    if not os.path.isfile(map_path):
         raise MissingMap(""",
                   """    if not os.path.isfile(map_path):
-        return {"__bss_end": 0x140000, "__sqlite_start": 0x200000,
-                "__sqlite_end": 0x2BC060}
+        return {"__bss_end": 0x140000, "__kernel_resident_end": 0x140000}
     if False:
         raise MissingMap("""),
 }
@@ -181,7 +179,7 @@ def cases(script):
         check("0xFFF00000" in doc and "0xFFF7FFFF" in doc and
               "PEGC リニア窓の別名" in doc, "PEGC alt window missing")
         check("0x3EB000" in doc and "固定 MMIO top PT" in doc, "top PT missing")
-        check("0x140000" in doc, "生成ブロックに __bss_end が入っていない")
+        check("0x%06X" % CLEAN in doc, "生成ブロックに __bss_end が入っていない")
         # 表の行は必ず絶対番地で始まる (「+4KB - +260KB」のような相対表記を禁じる)
         block = doc.split("<!-- 生成")[1].split("<!-- /生成")[0]
         fenced = block.split("```")[1]
@@ -296,11 +294,11 @@ def fixed_paging_cases(script):
     with tempfile.TemporaryDirectory(prefix='os32-fixed-link-') as tmp:
         root = make_tree(tmp, CLEAN)
         check(link_fixture(root).returncode == 0, 'baseline linker failed')
-        # SQLite 末尾が旧PD案0x2DD000への上限を越えても、既存DMA予算内は許可。
-        check(link_fixture(root, sqlite_end=0x2c0000).returncode == 0, 'SQLite growth restricted')
-        out = link_fixture(root, sqlite_end=0x460000)
+        # core BSS が増えても、常駐鎖の予算内なら許可。
+        check(link_fixture(root, core_end=0x2c0000).returncode == 0, 'core growth restricted')
+        out = link_fixture(root, core_end=0x460000)
         check(out.returncode != 0 and 'resident chain exceeds SLACK ceiling' in out.stderr,
-              'SQLite exceeded resident budget without rejection')
+              'core exceeded resident budget without rejection')
         ld = root / 'build/os32.ld'
         ld.write_text(ld.read_text().replace('MEM_FIXED_PD_BASE = LAYOUT_MEM_FIXED_PD_BASE;',
                                              'MEM_FIXED_PD_BASE = 0x3F2000;'))
@@ -308,17 +306,14 @@ def fixed_paging_cases(script):
         out = run(script, root, '--check')
         check(out.returncode != 0 and '写しのずれ' in out.stdout, 'fixed paging mirror mismatch escaped')
     return ['FIXED   map/link rejected 512KiB heap / unaligned / overlap / count; mirror rejected',
-            'SQLITE  growth past old PT limit accepted; resident chain budget excess rejected']
+            'CORE    growth inside budget accepted; resident chain budget excess rejected']
 
 
-def link_fixture(root, sqlite_end=0x2bc060):
+def link_fixture(root, core_end=0x2bc060):
     """本物のos32.ldに最小入力を与え、ASSERTを実際に評価する。"""
     cc = 'i386-elf-gcc'
     ld = 'i386-elf-ld'
-    for rel, asm in (('kernel/kentry', '.text\n.globl kentry\nkentry: nop\n.bss\n.space 16\n'),
-                     ('lib/sqlite3/sqlite3', f'.bss\n.space {sqlite_end - 0x200000}\n'),
-                     ('lib/sqlite3/os32_sqlite_vfs', '.text\n'),
-                     ('lib/sqlite3/os32_sqlite_test', '.text\n')):
+    for rel, asm in (('kernel/kentry', f'.text\n.globl kentry\nkentry: nop\n.bss\n.space {core_end - 0x100000}\n'),):
         src = root / (rel + '.s')
         src.parent.mkdir(parents=True, exist_ok=True)
         src.write_text(asm)
@@ -328,8 +323,7 @@ def link_fixture(root, sqlite_end=0x2bc060):
     import gen_memmap
     source = (root / 'build/os32.ld').read_text()
     (root / 'build/out/fixture.ld').write_text(gen_memmap.preprocess_layout(root, source))
-    return subprocess.run([str(ld), '-T', 'build/out/fixture.ld' , 'kernel/kentry.o',
-                           'lib/sqlite3/sqlite3.o', '-o', 'build/out/fixture.elf'],
+    return subprocess.run([str(ld), '-T', 'build/out/fixture.ld' , 'kernel/kentry.o', '-o', 'build/out/fixture.elf'],
                           cwd=root, capture_output=True, text=True)
 
 
@@ -374,7 +368,7 @@ def layout_cases(script):
               'ELF section not emitted as half-open interval')
     check({'code', 'data', 'bss'} <= {r.get('kind') for r in manifest['ranges']}, 'section kinds missing')
     check(all(next(r for r in manifest['ranges'] if r['name'] == name)['noload']
-              for name in ('.bss', '.sqlite_bss')), 'BSS must be NOLOAD')
+              for name in ('.bss', '.ledger_fixed')), 'BSS must be NOLOAD')
     log = ['LAYOUT real ELF/map/manifest + objdump PASS; code/data/BSS/NOLOAD half-open PASS']
 
     defines = gen.read_defines(ROOT / 'include/memmap.h')
@@ -393,7 +387,7 @@ def layout_cases(script):
             raise AssertionError('chain +1 page escaped budget assertion: ' + name)
         log.append('BOUNDARY ' + name + ': -1/0 page PASS; +1 page budget FAIL')
 
-    for name in ('.bss', '.sqlite_bss'):
+    for name in ('.bss', '.ledger_fixed'):
         check(not gen.layout_defects(manifest, sections, symbols), 'BSS control failed')
         broken = copy.deepcopy(manifest)
         broken['ranges'] = [r for r in broken['ranges'] if r['name'] != name]
@@ -413,7 +407,7 @@ def layout_cases(script):
     with tempfile.TemporaryDirectory(prefix='os32-layout-') as tmp:
         root = make_tree(tmp, CLEAN)
         for rel in ('build/out/kernel.elf', 'build/out/kernel.map',
-                    'build/out/kernel.bin', 'build/out/sqlite.bin', 'build/out/vmkernel.lz4',
+                    'build/out/kernel.bin', 'build/out/vmkernel.lz4',
                     'build/out/generations-manifest.json', 'build/out/memmap_layout.h', 'sdk/kapi.json'):
             dst = root / rel
             dst.parent.mkdir(parents=True, exist_ok=True)

@@ -18,38 +18,26 @@
 #include "kstring.h"
 #include "kprintf.h"
 
-/* ======== MEMSYS5 固定プール (200KB) + canary ========
- * 一時的に 400KB へ拡張していたが、エンジンlib (board/battle/econ/inv) が
- * 起動時のRAMキャッシュ読込後もDB接続を握りっぱなしにしていたのが原因で、
- * 各libが init 完了時に db_close するよう修正して同時接続を1本に戻した。
- * よって拡張前の 200KB に復帰する。
- * 注: FEP候補ゼロ問題 (2026-08-07解決) はプール枯渇ではなく、exec_exit の
- * FD一括クローズが FEP辞書の fd を回収していたのが原因 (vfs_fd_set_protect
- * で保護)。FEP常駐接続 + 一時接続1本は 200KB で動作確認済み。 */
-/* MEMSYS5 固定プール。
-   200KB では game (econ 常時接続 + battle/rpg/items/events の順次ロード) が
-   最後の battle.db 二回目 open の prepare で out of memory になった
-   (使用中 188KB で枯渇) ので 384KB に広げた。置き場は SQLite の .bss で、
-   常駐鎖の予算 (build/os32.ld の ASSERT) に含まれる。 */
-#define SQLITE_MEMSYS5_SIZE  (384 * 1024)
+/* Product module receives its owner-backed pool. The source-local array is
+ * retained only for isolated VFS host fixtures; product generation replaces it
+ * with a pointer before compilation. */
 #define CANARY_VALUE 0xDEADBEEFUL
-static u32 canary_before[4] = {
-    CANARY_VALUE, CANARY_VALUE, CANARY_VALUE, CANARY_VALUE
-};
+#define CANARY_WORDS 4
+#define CANARY_BYTES (CANARY_WORDS * sizeof(u32))
 static char sqlite_mem_pool[SQLITE_MEMSYS5_SIZE];
-static u32 canary_after[4] = {
-    CANARY_VALUE, CANARY_VALUE, CANARY_VALUE, CANARY_VALUE
-};
+/* The sentinels travel with the owner allocation, not the module's data. */
+#define canary_before ((u32 *)sqlite_mem_pool)
+#define canary_after ((u32 *)(sqlite_mem_pool + SQLITE_MEMSYS5_SIZE - CANARY_BYTES))
 
 /* MEMSYS5 プールの canary 検証
  * 戻り値: 0=正常, -1=前方破壊, -2=後方破壊 */
 int memsys5_check_canary(void)
 {
     int i;
-    for (i = 0; i < 4; i++) {
+    for (i = 0; i < CANARY_WORDS; i++) {
         if (canary_before[i] != CANARY_VALUE) return -1;
     }
-    for (i = 0; i < 4; i++) {
+    for (i = 0; i < CANARY_WORDS; i++) {
         if (canary_after[i] != CANARY_VALUE) return -2;
     }
     return 0;
@@ -729,15 +717,19 @@ int sqlite3_os_end(void)
 /* ======================================================================== */
 int os32_sqlite_init(void)
 {
-    int rc;
+    int rc, i;
+    for (i = 0; i < CANARY_WORDS; i++) {
+        canary_before[i] = CANARY_VALUE;
+        canary_after[i] = CANARY_VALUE;
+    }
 
     kprintf(0x07, "[SQT] init: pool=%x size=%x\n",
             (unsigned)sqlite_mem_pool, SQLITE_MEMSYS5_SIZE);
 
     /* MEMSYS5 固定プール設定 */
     rc = sqlite3_config(SQLITE_CONFIG_HEAP,
-                        sqlite_mem_pool,
-                        SQLITE_MEMSYS5_SIZE,
+                        sqlite_mem_pool + CANARY_BYTES,
+                        SQLITE_MEMSYS5_SIZE - 2 * CANARY_BYTES,
                         64);  /* 最小アロケーション粒度 */
 
     kprintf(0x07, "[SQT] sqlite3_config rc=%d\n", rc);

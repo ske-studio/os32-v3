@@ -299,7 +299,7 @@ class CheckInfra(unittest.TestCase):
                 return 0 if exe == 'control' else 1
             with mock.patch.object(db, 'build', build), mock.patch.object(db, 'run_cases', cases), contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(db.run_mutations(work, 'unused', []), 0)
-            self.assertEqual(len(calls), 9)
+            self.assertEqual(len(calls), 1 + len(db.MUTATIONS))
             self.assertEqual((root/'kapi/kapi_db.c').read_text(), original)
 
     def test_mutate_switches(self):

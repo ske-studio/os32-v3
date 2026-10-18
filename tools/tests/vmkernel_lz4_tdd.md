@@ -41,7 +41,7 @@ sqlite は 38,628 系列・offset 最大 65,529・延長 255 を跨ぐリテラ�
 | ケース | 内容 |
 |---|---|
 | synthetic | 合成データで VK32 を作り、3 実装とも raw ちょうどを返してバイト一致。延長 255 を跨ぐリテラル長・マッチ長、offset >= 32768、重なるマッチを**含むことを数えて確かめる**。既定の圧縮より小さい (HC になっている) |
-| real (`--real`) | build/out の kernel.bin / sqlite.bin で同じ一致。無ければ FAIL |
+| real (`--real`) | build/out の kernel.bin (core 1 本) で同じ一致。無ければ FAIL |
 | oversize | 上限を超えると mkvmkernel が非 0 で終わり、古い出力も消す |
 | boundary | 合計がちょうど 520,192 は通り、520,193 は落ちる |
 

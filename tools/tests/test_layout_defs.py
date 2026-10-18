@@ -39,22 +39,22 @@ def run(cmd):
 
 def check_fixture(work):
     directory = work / 'layout'
-    elf = fixture(directory, core_bss=33, sqlite_bss=35)
+    elf = fixture(directory, core_bss=33)
     header = directory / 'memmap_layout.h'
     gen.write_layout_header(ROOT, header)
     assert not gen.layout_header_defects(ROOT, elf, header)
     sections, syms = gen.read_elf(elf)
     m = gen.Macros(gen.read_defines(ROOT / 'include/memmap.h'), syms)
-    for lo, hi in (('__bss_start', '__bss_end'), ('__sqlite_data_end', '__sqlite_end')):
+    for lo, hi in (('__bss_start', '__bss_end'),):
         assert syms[lo] <= syms[hi] and (syms[lo] | syms[hi]) & 3 == 0
     for s in sections:
         if s['noload']:
-            lo, hi = ('__sqlite_data_end', '__sqlite_end') if s['name'].startswith('.sqlite') else ('__bss_start', '__bss_end')
+            lo, hi = ('__bss_start', '__bss_end')
             assert syms[lo] <= s['start'] <= s['end'] <= syms[hi]
     assert syms['__bss_end'] == syms['__ledger_fixed_end']
     assert syms['__ledger_fixed_end'] - syms['__ledger_fixed_start'] == 8192
-    assert syms['__sqlite_start'] == syms['__bss_end']
-    assert syms['__kernel_resident_end'] == m.get('MEM_SQLITE_STACK_BASE') + 131072
+    assert syms['__kernel_resident_end'] == syms['__bss_end']
+    assert syms['__kernel_resident_end'] % 4096 == 0
     assert m.get('KHEAP_BASE') == syms['__kernel_resident_end']
     assert all(m.get(k) == v for k, v in EXPECTED.items())
     result = generate(ROOT / 'tools/mkvmkernel.py', directory, elf)
@@ -62,7 +62,7 @@ def check_fixture(work):
     (directory / 'vmkernel.lz4').write_bytes((directory / 'image.lz4').read_bytes())
     canon = json.loads((ROOT / 'sdk/kapi.json').read_text())
     files = []
-    for name in ('kernel.bin', 'sqlite.bin', 'vmkernel.lz4'):
+    for name in ('kernel.bin', 'vmkernel.lz4'):
         path = directory / name
         data = path.read_bytes()
         files.append(dict(path=os.path.relpath(path, ROOT), size=len(data),
@@ -72,7 +72,7 @@ def check_fixture(work):
     (directory / 'generations-manifest.json').write_text(json.dumps(generation))
     manifest_root = make_tree(directory / 'manifest-root', CLEAN)
     manifest_out = manifest_root / 'build/out'
-    for name in ('kernel.elf', 'kernel.map', 'kernel.bin', 'sqlite.bin',
+    for name in ('kernel.elf', 'kernel.map', 'kernel.bin',
                  'vmkernel.lz4', 'memmap_layout.h'):
         shutil.copy(directory / name, manifest_out / name)
     (manifest_root / 'sdk/kapi.json').write_text(json.dumps(canon))
@@ -143,7 +143,7 @@ def check_product(outputs):
         m = gen.Macros(gen.read_defines(ROOT / 'include/memmap.h'), symbols)
         assert all(m.get(k) == v for k, v in EXPECTED.items()), rel
         assert m.get('MEM_SHM_RESV_START') <= m.get('MEM_FIXED_PAGING_GUARD_BASE')
-        assert symbols['__ledger_fixed_end'] == symbols['__bss_end'] == symbols['__sqlite_start']
+        assert symbols['__ledger_fixed_end'] == symbols['__bss_end'] == symbols['__kernel_resident_end']
         assert (out / 'vmkernel.lz4').stat().st_size <= 508 * 1024
     print('product ELF matches fixture fixed values, resident/SLACK and compressed budget PASS:', ', '.join(outputs))
 

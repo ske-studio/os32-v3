@@ -1,5 +1,4 @@
-/* T4a-2 VA0 prototype: retain the complete configured amalgamation, so later
- * facade exports cannot silently add unmeasured code. No product link change. */
+/* VA0 SQLite body, shared by the product and T4a size/relocation checks. */
 OUTPUT_FORMAT(elf32-i386)
 OUTPUT_ARCH(i386)
 ENTRY(sqlite_module_init)

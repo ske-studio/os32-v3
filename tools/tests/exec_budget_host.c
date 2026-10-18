@@ -102,7 +102,11 @@ void _start(void) {
     launch_case(PAGE_SIZE, 7 * 1024 * 1024, 0, 0, 7 * 1024 * 1024);
     unchanged_failure(0xfffff000U, 0);
     unchanged_failure(MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE - PAGE_SIZE - MEM_EXEC_HEAP_BASE + 1, 0);
-    unchanged_failure(12 * 1024 * 1024, 0);
+    /* Include the current core's released SLACK in the exhaustion boundary.
+     * The request still fits VA; admission must reject its physical budget. */
+    u32 available = pgalloc_free_pages(), before_admits = admits;
+    unchanged_failure((available + 1) * PAGE_SIZE, 0);
+    CHECK(admits == before_admits + 1 && need_seen > available);
     unchanged_failure(0, 1);
     const u32 resident[] = {0, 1, MEM_SHELL_EXEC_HEAP_SIZE};
     const u32 limit = MEM_SHELL_HEAP_BASE;

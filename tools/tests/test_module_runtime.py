@@ -72,6 +72,8 @@ def main():
         if '--mutate' in sys.argv:
             source = SOURCE.read_text()
             for label, old, new, cases in (
+                ('prefix-failure-success', 'return rc ? rc : MODULE_INIT_FAILED;',
+                 'return rc;', [('prefix-return-reclaimed', 10, 0)]),
                 ('early-publication', 'r->state == MODULE_RUNNING ? r->exports : 0',
                  '(r->state == MODULE_RUNNING || r->state == MODULE_STARTING) ? r->exports : 0',
                  [CASES[0]]),

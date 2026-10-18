@@ -316,7 +316,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--elf', type=Path, required=True)
     parser.add_argument('--metadata', type=Path, required=True)
-    parser.add_argument('--vmkernel', type=Path)
+    parser.add_argument('--vmkernel', type=Path, required=True)
     parser.add_argument('--module-id', type=int, default=CONSTANTS['ID_KDEBUG'])
     parser.add_argument('--kapi-abi-gen', type=lambda s: int(s, 0), required=True)
     parser.add_argument('--layout-gen', type=lambda s: int(s, 0), required=True)

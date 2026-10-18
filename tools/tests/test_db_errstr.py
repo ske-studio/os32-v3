@@ -35,7 +35,7 @@ import mutpar
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CASES = ["errstr_range", "coltext_range", "errstr_truncate", "result_bound",
-         "diag_layout"]
+         "diag_layout", "module_absent"]
 INC = ["-I" + str(ROOT / p) for p in
        ("include", "fs", "drivers", "sdk/include/os32", "lib", "lib/sqlite3")]
 CONFIG = str(ROOT / "lib/sqlite3/os32_sqlite_config.h")
@@ -104,6 +104,11 @@ def run_cases(exe, cases, root=ROOT):
 #   "run"    実行時に落ちる (ケースが RED)
 #   "source" 静的な番人が捕まえる (事前検査が先に断つので実行時には見えない)
 MUTATIONS = [
+    # T4c-1: an unavailable module must return a readable SHM diagnostic.
+    ("kapi/kapi_db.c",
+     '    if (!DB_MODULE_READY()) return db_shm_diag("SQLite module unavailable");',
+     '    if (!DB_MODULE_READY()) return 0;',
+     "run"),
     # 1. 上限の引き算を 1 か所だけ元に戻す (事前検査の payload 側)。
     #    → 上限を超える行が ROW として通り、診断領域を勘定に入れなくなる。
     ("kapi/kapi_db.c",

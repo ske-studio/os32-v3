@@ -111,7 +111,11 @@ def case_parse(cd):
     check("-include" in s and "lib/sqlite3/os32_sqlite_config.h" in s, "-include とその引数は残す")
     check(cd.expected_std("lib/sqlite3/sqlite3.c") == "gnu89", "SQLite 本体は gnu89")
     check(cd.expected_std("lib/sqlite3/os32_sqlite_vfs.c") == "gnu89", "SQLite の VFS は gnu89")
-    check(cd.expected_std("lib/sqlite3/os32_sqlite_test.c") == "gnu89", "SQLite の試験は gnu89")
+    check(cd.expected_std("lib/sqlite3/os32_sqlite_test.c") == "gnu11", "core の SQLite 自己試験は gnu11")
+    check(cd.expected_std("/tmp/out/sqlite-proto/os32_sqlite_vfs.c") == "gnu89",
+          "生成した module VFS も gnu89")
+    check(cd.source_identity("/tmp/out/sqlite-proto/os32_sqlite_vfs.c") ==
+          "lib/sqlite3/os32_sqlite_vfs.c", "生成した VFS を必須翻訳単位として数える")
     check(cd.expected_std("userland/tests/sqlite_standalone/sqlite_user_vfs.c") == "gnu89",
           "userland の SQLite 単体は gnu89")
     check(cd.expected_std("kernel/kernel.c") == "gnu11", "本体は gnu11")
@@ -443,11 +447,12 @@ MUTANTS = [
     ("SQLite の旗が本体の共通旗を継ぐ (§2 F2 の形に戻す)", "RED",
      lambda: rep(CFG, "CFLAGS_SQLITE = $(C_STD_SQLITE) $(CFLAGS_MACHINE) -Os",
                  "CFLAGS_SQLITE = $(CFLAGS_COMMON) -Os")),
-    ("os32_sqlite_test.o を本体の言語指定で組む", "RED",
-     # dry_run uses an alternate BUILD_OUT, hence the prefixed object rule.
+    ("core の os32_sqlite_test.o を gnu89 に戻す", "RED",
      lambda: rep("build/kernel.mk",
-                 "$(if $(filter %/os32_sqlite_test.c,$<),-O0) -include",
-                 "$(if $(filter %/os32_sqlite_test.c,$<),-O0 $(C_STD)) -include")),
+                 "$(KERNEL_OBJ_PREFIX)lib/sqlite3/os32_sqlite_test.o: lib/sqlite3/os32_sqlite_test.c\n"
+                 "\t@mkdir -p $(@D)\n\t$(CC) $(CFLAGS_BASE) $(INC_KERNEL) -c $< -o $@",
+                 "$(KERNEL_OBJ_PREFIX)lib/sqlite3/os32_sqlite_test.o: lib/sqlite3/os32_sqlite_test.c\n"
+                 "\t@mkdir -p $(@D)\n\t$(CC) $(CFLAGS_BASE) $(C_STD_SQLITE) $(INC_KERNEL) -c $< -o $@")),
     ("userland の SQLite 単体を gnu11 で組む", "RED",
      lambda: rep("build/programs.mk", "SQLITE_SA_CFLAGS = $(C_STD_SQLITE)",
                  "SQLITE_SA_CFLAGS = $(C_STD)")),
@@ -571,7 +576,7 @@ def case_sqlite_rule(cd):
         check(rc == 0, "SQLite recipe dry-run succeeds: " + err)
         units = [u for u in cd.parse_compile_lines(out)
                  if u['src'] == 'lib/sqlite3/os32_sqlite_test.c']
-        check(bool(units) and all(cd.effective_std(u['sig'], tree, u['cc']) == 'gnu11'
+        check(bool(units) and all(cd.effective_std(u['sig'], tree, u['cc']) == 'gnu89'
                                   for u in units),
               "SQLite test mode edit reaches the actual compile command")
 

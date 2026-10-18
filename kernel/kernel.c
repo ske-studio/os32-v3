@@ -694,8 +694,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     tvram_print(18, 4, "SQ..", TATTR_GREEN);
     kprintf(0x07, "[BOOT] sqlite_init...\n");
 
-    /* SQLite エンジン初期化 (ブートローダーが __sqlite_start にロード済み、
-     * kentry.asm が .sqlite_bss をゼロクリア済み) */
+    /* Unicode is already resident; load the paired /boot SQLite module. */
     tvram_print(0, 4, "SQLite...", TATTR_GREEN);
     {
         int sq_rc;

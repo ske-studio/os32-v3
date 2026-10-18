@@ -12,12 +12,12 @@ from module_schema import CONSTANTS, POLICIES
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def measure(directory):
+def measure(directory, vmkernel):
     directory = Path(directory)
     elf = (directory / 'sqlite.elf').read_bytes()
     metadata = json.loads((directory / 'sqlite_imports.json').read_text())
     spec = json.loads((ROOT / 'sdk/kapi.json').read_text())
-    image, stats = mkmod.build(elf, metadata, b'', spec['version'],
+    image, stats = mkmod.build(elf, metadata, Path(vmkernel).read_bytes(), spec['version'],
                               spec['generations']['memory_layout'], module_id=CONSTANTS['ID_SQLITE'])
     (directory / 'sqlite.bin').write_bytes(image)
     stats['policy'] = {k: v for k, v in POLICIES[CONSTANTS['ID_SQLITE']].items()
@@ -42,4 +42,6 @@ def measure(directory):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--directory', type=Path, required=True)
-    measure(parser.parse_args().directory)
+    parser.add_argument('--vmkernel', type=Path, required=True)
+    args = parser.parse_args()
+    measure(args.directory, args.vmkernel)

@@ -21,8 +21,8 @@
 /*    0xF0000 - 0xFFFFF : R/O  (BIOS ROM)                                   */
 /*                                                                          */
 /*  [拡張メモリ] 番地の正典は include/memmap.h、実値は build/out/MEMMAP.md   */
-/*    0x100000 -          : R/W  (カーネル code+data+BSS → SQLite → guard NP */
-/*                                → 代替スタック → heap+KAPI+SHM → SLACK。   */
+/*    0x100000 -          : R/W  (カーネル code+data+BSS → heap+KAPI+SHM → SLACK */
+/*                                SQLite owner の stack 直下は動的 NP guard。 */
 /*                                __bss_end 由来で浮く)                      */
 /*    0x3E0000 - 0x3E0FFF : NP   (固定 PD/PT 枠の guard)                     */
 /*    0x3E1000 - 0x3FAFFF : R/W  (固定 PD/PT 26 枚: 使用 11 + 予備 15)       */
@@ -46,6 +46,8 @@
 #include "memmap.h"
 #include "pgalloc.h"
 #include "pc98.h"
+
+u32 paging_sqlite_stack_guard;
 
 /* カーネルスタック帯のレイアウト不変条件。
  * ガードページはスタック直下に隣接する。ずれると paging_init の R/W 強制や
@@ -259,7 +261,6 @@ static int boot_layout_valid(void)
         boot_range_valid(MEM_FIXED_PAGING_GUARD_BASE, MEM_FIXED_PAGING_BASE, 0) &&
         boot_range_valid(MEM_STACK_GUARD, MEM_KSTACK_BASE, 0) &&
         boot_range_valid(MEM_KSTACK_BASE, MEM_KSTACK_TOP + 4, 1) &&
-        boot_range_valid(MEM_SQLITE_STACK_GUARD, MEM_SQLITE_STACK_BASE, 0) &&
         boot_range_valid(MEM_SHELL_LOAD_ADDR, MEM_SHELL_GUARD, 1) &&
         boot_range_valid(MEM_SHELL_GUARD, MEM_SHELL_GUARD + PAGE_SIZE, 0) &&
         boot_range_valid(MEM_SHELL_GUARD + PAGE_SIZE, MEM_SHELL_BAND_END + 1, 1);
@@ -270,7 +271,6 @@ static int boot_layout_valid(void)
 /* ======================================================================== */
 void paging_init(u32 mem_kb)
 {
-    extern u32 __sqlite_start;
     int i, j;
     u32 phys;
     u32 pd_phys;
@@ -360,17 +360,6 @@ void paging_init(u32 mem_kb)
     /* シェルスタックガード: Not-Present */
     paging_set_not_present(MEM_SHELL_GUARD, MEM_SHELL_GUARD + PAGE_SIZE - 1);
 
-    /* SQLite + 代替スタック (__sqlite_start〜): 強制R/W
-     * ブートローダーが sqlite.bin を __sqlite_start にロード済み。
-     * 代替スタックも含めメモリプローブ結果に関係なく R/W を保証する。 */
-    {
-        u32 sq_start = PAGE_ALIGN_DOWN((u32)&__sqlite_start);
-        u32 sq_end   = PAGE_ALIGN_DOWN(MEM_SQLITE_STACK_TOP + PAGE_SIZE);
-        paging_map_range(sq_start, sq_end, sq_start, PAGE_RW);
-    }
-
-    paging_set_not_present(MEM_SQLITE_STACK_GUARD, MEM_SQLITE_STACK_BASE - 1);
-
     /* BIOS ROM: Read-Only */
     paging_set_readonly(MEM_BIOS_ROM_START, MEM_BIOS_ROM_END);
 
@@ -380,10 +369,7 @@ void paging_init(u32 mem_kb)
     if (paging_map_range(MEM_FIXED_PAGING_BASE, MEM_FIXED_PAGING_FRAME_END,
                          MEM_FIXED_PAGING_BASE, PAGE_RW) != 0 ||
         !fixed_paging_valid() ||
-        !boot_layout_valid() ||
-        !boot_range_valid(PAGE_ALIGN_DOWN((u32)&__sqlite_start), MEM_SQLITE_STACK_GUARD, 1) ||
-        !boot_range_valid(MEM_SQLITE_STACK_BASE,
-                          PAGE_ALIGN_DOWN(MEM_SQLITE_STACK_TOP + PAGE_SIZE), 1)) {
+        !boot_layout_valid()) {
         irq_restore(flags);
         return; /* PG は立てない。後段の memory_boot_init が fail-stop。 */
     }
@@ -1275,6 +1261,7 @@ int paging_app_band_selftest(void)
  * しまい、この自己診断そのものが穴を隠す。 */
 static u8 memmap_want_at(u32 a, u32 tramp)
 {
+    if (paging_sqlite_stack_guard && a == paging_sqlite_stack_guard) return MM_NP;
     if (tramp && a == tramp) return MM_ROU;     /* exec.c の KAPI 踏み台 */
 
     /* コンベンショナルメモリ */
@@ -1283,7 +1270,6 @@ static u8 memmap_want_at(u32 a, u32 tramp)
     if (a < MEM_BIOS_ROM_START) return MM_RW;   /* VRAM */
     if (a <= MEM_BIOS_ROM_END) return MM_RO;
 
-    if (a >= MEM_SQLITE_STACK_GUARD && a < MEM_SQLITE_STACK_BASE) return MM_NP;
     if (a >= MEM_FIXED_PAGING_GUARD_BASE && a < MEM_FIXED_PAGING_BASE) return MM_NP;
     if (a >= MEM_FIXED_PAGING_BASE && a < MEM_FIXED_PAGING_FRAME_END) return MM_RW;
 
@@ -1604,6 +1590,7 @@ int paging_master_audit(u32 tramp)
                         want = PAGE_RW | PTE_PCD;
                 }
             }
+            if (paging_sqlite_stack_guard && a == paging_sqlite_stack_guard) want = 0;
             if (!(want & PTE_PRESENT)) { if (e & PTE_PRESENT) bad++; continue; }
             if ((e & (~(u32)(PAGE_SIZE - 1) | PAGE_RW | PTE_USER | PTE_PCD | PTE_PWT)) !=
                 (a | want)) bad++;

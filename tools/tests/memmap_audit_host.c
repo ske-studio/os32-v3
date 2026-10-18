@@ -77,6 +77,21 @@ static void run(void)
     CHECK(!paging_boot_user_shared(exec_tramp_page_addr()));
     CHECK(!paging_master_audit(exec_tramp_page_addr()));
     u32 *pt = page_tables[TVRAM_CHAR_BASE >> 22];
+    /* SQLite may land in low SLACK or in the high physical pool. Both boot
+     * audits must expect NP and detect a guard silently made present. */
+    const u32 stack_guards[] = {MEM_SHM_RESV_START, MEM_PHYS_EXEC_FLOOR};
+    for (u32 i = 0; i < sizeof(stack_guards) / sizeof(stack_guards[0]); i++) {
+        u32 va = stack_guards[i];
+        CHECK(paging_is_present(va));
+        paging_sqlite_stack_guard = va;
+        CHECK(!paging_set_not_present(va, va + PAGE_SIZE - 1));
+        CHECK(!paging_memmap_selftest(exec_tramp_page_addr()));
+        CHECK(!paging_master_audit(exec_tramp_page_addr()));
+        CHECK(!paging_set_page(va, va, PAGE_RW));
+        CHECK(paging_memmap_selftest(exec_tramp_page_addr()) > 0);
+        CHECK(paging_master_audit(exec_tramp_page_addr()) > 0);
+        paging_sqlite_stack_guard = 0;
+    }
     u32 idx = TVRAM_CHAR_BASE / PAGE_SIZE, saved = pt[idx];
     /* Every font/Unicode/BB/native VRAM page must reject legacy USER. */
     for (u32 a = MEM_FONT_CACHE_BASE; a < MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE; a += PAGE_SIZE) {

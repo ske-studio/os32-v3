@@ -44,6 +44,10 @@ filesystem:
     - host: build/out/kdebug.bin
       guest: /boot/kdebug.bin
       tags: [core]
+    # --- Paired SQLite module (also copied by hsync boot) ---
+    - host: build/out/sqlite.mod
+      guest: /boot/sqlite.mod
+      tags: [core]
     # --- カーネルデータ ---
     - host: build/out/unicode.bin
       guest: /sys/unicode.bin

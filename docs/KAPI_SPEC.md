@@ -545,6 +545,8 @@ VFS パスの NULL=cwd、`sys_redirect_fd` の NULL 拒否の戻り値、`sys_mo
 
 ### DB API (v29-v31)
 
+SQLite 部品が無いとき、`db_*` は `OS32_ERR_NOSYS` を返し、`db_last_error` は診断文字列を返す。
+
 | Offset | フィールド | プロトタイプ |
 |--------|-----------|------|
 | 0x238 | db_open | `int(const char *path)` |

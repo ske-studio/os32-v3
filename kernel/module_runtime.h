@@ -59,7 +59,7 @@ extern struct module_record module_records[MODULE_RECORD_CAP];
 int module_load(const struct module_request *request, struct module_handle *out);
 struct module_record *module_record_get(struct module_handle handle);
 const u32 *module_exports(struct module_handle handle);
-/* Prefix-return failure returns abort status; consult exports for RUNNING. */
+/* Success means RUNNING; prefix-return failure is always nonzero. */
 int module_start(struct module_handle handle);
 int module_abort(struct module_handle handle);
 /* Boot transaction caller supplies successful loads in load order. */

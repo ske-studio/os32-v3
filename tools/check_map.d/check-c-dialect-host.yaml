@@ -5,6 +5,10 @@ check-c-dialect-host:
 - '**/*.inc'
 - sdk/example/hello/**
 - tools/check_c_dialect.py
+- tools/gen_sqlite_imports.py
+- tools/gen_kdebug_imports.py
+- tools/prototypes/sqlite_imports.def
+- build/sqlite-proto.mk
 - tools/tests/test_c_dialect.py
 - tools/tests/mutpar.py
 - tools/check_map.d/check-c-dialect-host.yaml
@@ -38,4 +42,7 @@ check-c-dialect-host:
 - tools/mkshlib.py
 - tools/tests/test_owner_reclaim.py
 - userland/rust/libos32gui/src/shlib.rs
+- kernel/kdebug_imports.def
+- tools/mkmod.py
+- tools/module_schema.py
 artifact_reader: true
