@@ -143,6 +143,8 @@ T4a-5 の核は `kernel/module_runtime.c/.h`。POST_ROOT の `module_load` は r
 record は export の解決済み値・依存 handle `{slot, generation}`・lifecycle adapter を値で保持する。`module_exports` は RUNNING の同世代だけを返し、一般 KAPI の stub/services_public は利用側で管理する。
 `module_abort_reverse` は load 順の handle 列を逆順に戻す。abort は公開を閉じて quiesce→detach/drain→stop_dma を呼び、残存参照・停止失敗・生きた依存利用側があれば QUARANTINED を保持する。回収できた owner だけ reclaim/retire し、ABSENT と隔離への二重 abort は再解放しない。
 broker 接続用の `module_ref_acquire/release` は STARTING の owner/text 所属を照合する核であり、既存 IRQ/tick/DMA broker の部品対応は後続の接続で行う。services_public transaction・kaudit_boot の勘定はT4で接続済み、EARLY owner移譲は作らない。
+T5c-0 の登録契約: FS/Device は init の最後に公開し、登録前に `MODULE_REF_REGISTRATION` (handler=0) を取得する。登録失敗ならその参照だけを戻す。rollback の detach はマウント/利用者を先に断ち、`vfs_unregister_fs` / `dev_unregister` 成功後に参照を戻す。FS はマウントが残れば BUSY・表不変、Device の解除は検索表だけで、保持された `Device *` は adapter が断つまで参照を戻さない。未解除参照または停止失敗は既存の QUARANTINED と逆順 rollback に渡し、依存閉包の body/所有RAMを保持する (MINIMAL_QUARANTINED と同じ回収不可の扱い)。一般公開/boot transaction の診断は各部品の接続段で既存経路へ渡す。全 broker の owner 化や自動 unload 表より小さく、既存 lifecycle と参照計数を再利用できるためこの方式を採る。永久 DEVICE 予約は触らない。
+`tools/module_schema.py` の許可 ID 一覧は kdebug/sqlite/fep/ATAPI+iso9660/kcg/fm/pcm/v86/lan/cirrus の10件 (FAT・HostDrv は core)。生成 `MODULE_RECORD_CAP=10` はこの件数で決まり、満杯は open/owner確保前に拒否する。未切出し ID の画像 policy はまだ無く、loader は従来どおり拒否する。STARTING IRQ の有効化・tick/callback/DMA の停止は各 adapter が参照核を使って行い、`module_exports` の RUNNING 門で IRQ を抑止しない。
 host の受入・PM 用変異は `tools/tests/module_runtime_tdd.md`、既存 kdebug の実像・pair・OFF/RUNNING 回帰は `tools/tests/kdebug_init_tdd.md` を参照する。
 
 ## 3. T4 SQLite と FEP 案 A

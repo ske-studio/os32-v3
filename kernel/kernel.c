@@ -54,7 +54,7 @@
 #include "loop_dev.h"
 
 /* FatFs VFSドライバ (fs/fatfs_vfs.c) */
-extern void fatfs_init(void);
+extern int fatfs_init(void);
 
 #include "hostdrvfs.h"
 #include "serialfs.h"
@@ -372,14 +372,15 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     dev_init();
     loop_dev_init();  /* lo0..lo3 ループバックデバイス登録 */
     path_init();
-    ext2_init();
-    fatfs_init();
-    vfs_register_fs(&iso9660_ops);
-
-    hostdrvfs_init();
-    serialfs_init();   /* /host をシリアル越しに (sfs run の中だけ、票 TASK_SERIAL_HOSTFS B) */
+    int fs_registration_failed = ext2_init() != VFS_OK;
+    fs_registration_failed |= fatfs_init() != VFS_OK;
+    fs_registration_failed |= vfs_register_fs(&iso9660_ops) != VFS_OK;
+    fs_registration_failed |= hostdrvfs_init() != VFS_OK;
+    fs_registration_failed |= serialfs_init() != VFS_OK;
     path_set_device_validator(dev_find_validator);
-    tvram_print(64, 1, "OK", TATTR_WHITE);
+    tvram_print(64, 1, fs_registration_failed ? "NG" : "OK", TATTR_WHITE);
+    if (fs_registration_failed)
+        kprintf(TATTR_WHITE, "VFS: filesystem registration failed\n");
 
     /* パレット初期化 */
     palette_init();

@@ -22,7 +22,7 @@
 
 /* VfsOps (vfs_register_fs に渡す) */
 VfsOps *serialfs_get_ops(void);
-void    serialfs_init(void);
+int     serialfs_init(void);
 
 /* セッションが mount の口を開け閉めする。c = このセッションの受け手。
  * 開いているあいだだけ ops->mount が c を返す (それ以外は NULL)。 */

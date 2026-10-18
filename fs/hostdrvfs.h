@@ -11,7 +11,7 @@
 #include "vfs.h"
 
 /* HostDrvFS初期化: VfsOps登録を行う */
-void hostdrvfs_init(void);
+int hostdrvfs_init(void);
 
 /* HostDrv存在確認: エミュレータが対応していれば1を返す */
 int hostdrvfs_detect(void);

@@ -17,9 +17,15 @@ HEADER_FIELDS = (
 )
 CONSTANTS = dict(
     HEADER_SIZE=144, PAGE_SIZE=4096, NAME_MAX=63, RECORD_SIZE=12,
-    MAGIC=0x444f4d4b, FORMAT_VERSION=1, ID_KDEBUG=1, ID_SQLITE=2, ID_FEP=3,
+    MAGIC=0x444f4d4b, FORMAT_VERSION=1,
     PHASE_POST_ROOT=2, FLAG_PAIR=1,
 )
+# T5 permitted component IDs, including the cuts still to come. FAT and
+# HostDrv stay core. Reserve capacity now without inventing image policies for
+# components whose imports/limits have not yet been defined.
+ALLOWED_MODULE_IDS = dict(KDEBUG=1, SQLITE=2, FEP=3, ATAPI_ISO=4, KCG=5,
+                          FM=6, PCM=7, V86=8, LAN=9, CIRRUS=10)
+CONSTANTS.update(('ID_' + name, value) for name, value in ALLOWED_MODULE_IDS.items())
 KDEBUG_OPS_NAMES = (
     'selftest_run', 'selftest_post_exec', 'selftest_post_unicode',
     'selftest_post_probe', 'crt_diag_bootlog', 'gcap_capture',

@@ -171,7 +171,7 @@ int module_abort(struct module_handle h)
         if (r->lifecycle.stop_dma && !r->lifecycle.stop_dma(r)) stopped = 0;
     }
     if (!stopped || r->irq_refs || r->tick_refs || r->callback_refs ||
-        r->dma_refs || r->active_refs) goto quarantined;
+        r->dma_refs || r->active_refs || r->registration_refs) goto quarantined;
     if (r->owner) {
         u32 reclaimed;
         if (!ledger_reclaim_owner(r->owner, &reclaimed)) goto quarantined;
@@ -203,6 +203,7 @@ static u32 *ref_count(struct module_record *r, enum module_ref_kind kind)
     case MODULE_REF_CALLBACK: return &r->callback_refs;
     case MODULE_REF_DMA: return &r->dma_refs;
     case MODULE_REF_ACTIVE: return &r->active_refs;
+    case MODULE_REF_REGISTRATION: return &r->registration_refs;
     }
     return 0;
 }

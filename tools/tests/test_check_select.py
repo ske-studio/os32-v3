@@ -167,10 +167,11 @@ def case_docs_always(cs):
 
 
 def case_broad_only(cs):
-    # drivers/dev.c は走査型 (arch-asm / le-access) の ** にしか当たらない。
+    # 未登録の仮想ドライバは走査型 (arch-asm / le-access) の ** だけに当たる。
+    # dev.c は T5c-0 の登録試験が直接見るので、この役には使わない。
     # 文字列を割ってあるのは、check-map の抽出がこの試験の入力と数えないため
     # (数えるとこの試験自身の glob に当たって筋書きが崩れる)。
-    mode, st, mu = run_plan(cs, ["drivers/" + "dev.c"])
+    mode, st, mu = run_plan(cs, ["drivers/" + "unmapped_fixture.c"])
     assert mode == "full", mode
 
 

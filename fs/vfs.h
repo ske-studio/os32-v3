@@ -193,8 +193,12 @@ typedef struct {
 
 /* ---- VFS API ---- */
 
-/* ファイルシステム実装の登録 */
-void vfs_register_fs(VfsOps *ops);
+/* Register last in init; FULL/EXIST leave the table unchanged.
+ * Boot rollback: unmount/drain users before unregister. BUSY retains the
+ * registration and its module reference; only OK permits releasing it.
+ * Core FS registrations live for the whole boot. */
+int vfs_register_fs(VfsOps *ops);
+int vfs_unregister_fs(VfsOps *ops);
 
 /* デバイス名 → デバイスID変換 ("hd0"→0, "fd0"→0等) */
 int vfs_dev_parse(const char *name, int *dev_type, int *dev_id);

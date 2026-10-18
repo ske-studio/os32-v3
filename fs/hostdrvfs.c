@@ -989,7 +989,7 @@ VfsOps *hostdrvfs_get_ops(void)
     return &g_hostdrvfs_ops;
 }
 
-void hostdrvfs_init(void)
+int hostdrvfs_init(void)
 {
-    vfs_register_fs(&g_hostdrvfs_ops);
+    return vfs_register_fs(&g_hostdrvfs_ops);
 }

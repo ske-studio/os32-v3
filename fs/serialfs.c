@@ -396,7 +396,7 @@ VfsOps *serialfs_get_ops(void)
     return &g_serialfs_ops;
 }
 
-void serialfs_init(void)
+int serialfs_init(void)
 {
-    vfs_register_fs(&g_serialfs_ops);
+    return vfs_register_fs(&g_serialfs_ops);
 }

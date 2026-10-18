@@ -4,7 +4,6 @@
 
 #include "module_image.h"
 
-#define MODULE_RECORD_CAP 8U
 #define MODULE_DEPENDENCY_CAP 8U
 
 enum module_state {
@@ -19,7 +18,7 @@ enum module_result {
 };
 enum module_ref_kind {
     MODULE_REF_IRQ, MODULE_REF_TICK, MODULE_REF_CALLBACK, MODULE_REF_DMA,
-    MODULE_REF_ACTIVE
+    MODULE_REF_ACTIVE, MODULE_REF_REGISTRATION
 };
 struct module_handle { u32 slot, generation; };
 struct module_record;
@@ -48,6 +47,7 @@ struct module_record {
     struct module_handle dependencies[MODULE_DEPENDENCY_CAP];
     u32 dependency_count;
     u32 irq_refs, tick_refs, callback_refs, dma_refs, active_refs;
+    u32 registration_refs;
     struct module_lifecycle lifecycle;
 };
 extern struct module_record module_records[MODULE_RECORD_CAP];
@@ -66,7 +66,12 @@ int module_abort(struct module_handle handle);
 int module_abort_reverse(const struct module_handle *handles, u32 count);
 /* Broker adapters use these before registration and after confirmed removal.
  * STARTING registrations work; handler must belong to this owner's text.
- * DMA/active counts use handler=0. They do not replace hardware stop checks. */
+ * DMA/active/registration counts use handler=0. They do not replace hardware
+ * stop checks. For FS/Device: acquire before the final init registration,
+ * release on registration failure or after detach removes all its users.
+ * A failed detach must retain the reference; abort then isolates the owner.
+ * IRQ adapters may dispatch STARTING handlers after acquire, before init
+ * completes; module_exports is deliberately not their dispatch gate. */
 int module_ref_acquire(struct module_handle handle, u32 owner,
                        enum module_ref_kind kind, u32 handler);
 int module_ref_release(struct module_handle handle, enum module_ref_kind kind);
