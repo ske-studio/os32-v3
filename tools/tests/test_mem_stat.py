@@ -19,7 +19,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 TARGET_SRCS = base.TARGET_SRCS + [
     'kapi/kapi_sys.c', 'userland/shell/cmd_sys.c', 'userland/shell/cmd_base.c', 'kernel/module.h',
     'tools/tests/mem_stat_host.c', 'tools/tests/kdebug_cli_host.c', 'tools/tests/test_mem_stat.py',
-    'kernel/sysconfig.c', 'kernel/kaudit_boot.c', 'kernel/memory_boot.c',
+    'kernel/sqlite_engine.c', 'kernel/sysconfig.c', 'kernel/kaudit_boot.c', 'kernel/memory_boot.c',
     'kernel/memory_boot.h', 'kernel/kselftest.h', 'include/kprintf.h',
 ]
 
@@ -46,6 +46,22 @@ def build_fixture(tmp):
     fixture = fixture.replace(function(fixture, 'AppSlot *appslot_get('), function(slot, 'AppSlot *appslot_get('))
     fixture = fixture.replace('int appslot_cur(void) { return current_slot; }',
                               '#define g_cur current_slot\n' + function(slot, 'int appslot_cur(') + '\n#undef g_cur')
+    # Count emitted text, including partial lines, rather than reporter calls.
+    fixture = fixture.replace(function(fixture, 'void __cdecl kprintf('), r"""
+static u32 diagnostic_bytes, diagnostic_lines;
+static int capture_diagnostics;
+void __cdecl kprintf(u8 attr, const char *fmt, ...) {
+    (void)attr;
+    if (!capture_diagnostics) return;
+    while (*fmt) {
+        diagnostic_bytes++;
+        diagnostic_lines += *fmt == '\n';
+        say(fmt++, 1);
+    }
+}
+""")
+    (tmp / 'services_report_source.c').write_text(
+        function(read('kernel/sqlite_engine.c'), 'void services_report('))
     (tmp / 'mem_fixture.c').write_text(fixture)
     heap = read('tools/tests/exec_heap_host.h')
     heap = heap.replace(function(heap, 'AppSlot *appslot_at('), function(slot, 'AppSlot *appslot_at('))
@@ -93,6 +109,8 @@ def build_fixture(tmp):
 
 
 MUTANTS = [
+    ('mem_stat prints services', 'kmemcpy(out, &snap, snap.size);',
+     'kmemcpy(out, &snap, snap.size); if (!app_id) services_report();', 'mem_stat output zero'),
     ('module state absent', 'snap.kdebug_state = kdebug.state;', '', 'module state'),
     ('module pair absent', 'snap.kdebug_pair_crc = kdebug.pair_crc;', '', 'module pair'),
     ('module body absent', 'snap.kdebug_pages = kdebug.pages;', '', 'module body'),

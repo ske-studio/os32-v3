@@ -15,7 +15,7 @@ extern int services_public;
 enum services_stage {
     SERVICES_ROOT_READY, SERVICES_UNICODE, SERVICES_SQLITE_INTERNAL_READY,
     SERVICES_SETTINGS_CLOSED, SERVICES_FEP_INTERNAL_READY, SERVICES_READY,
-    SERVICES_MINIMAL, SERVICES_MINIMAL_QUARANTINED
+    SERVICES_MINIMAL, SERVICES_MINIMAL_QUARANTINED, SERVICES_SQLITE_ONLY
 };
 extern enum services_stage services_stage;
 enum services_fault {
@@ -28,4 +28,5 @@ enum services_fault {
 /* Debugger injection before services_boot; zero in normal images. */
 extern volatile u32 services_boot_fault;
 void services_boot(void);
+void services_report(void);
 #endif

@@ -107,8 +107,10 @@ int vfs_resolve_path(const char *in, char *out, int size)
     out[o] = '\0';
     return VFS_OK;
 }
+#ifndef VFS_FD_CUSTOM_ROUTE
 VfsOps *vfs_route(const char *path, char *out, int size, void **ctx)
 { probes++; str_cpy(out, path, size); *ctx = &mock_ops; return &mock_ops; }
+#endif
 int vfs_path_kind(const char *path) { probes++; return VFS_KIND_FILE; }
 /* fs/vfs.c 側の実装 (マウント単位の st_dev)。ここでは固定値で足りる */
 u32 vfs_path_dev(const char *path) { return 1; }

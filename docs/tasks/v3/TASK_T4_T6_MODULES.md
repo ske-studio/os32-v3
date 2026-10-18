@@ -193,9 +193,15 @@ D27の「512KiBの単一MEMSYS5」は維持する。`cache_size`やsoft limitだ
 
 ### 3-4. 必須サービスを一括公開するboot transaction
 
-`ROOT_READY → Unicode読込 → SQLITE_INTERNAL_READY → SETTINGS_CLOSED → FEP_INTERNAL_READY → SERVICES_READY`。Unicode表はkernel ownerの7頁でSLACK/poolの内数 (`kernel/unicode_file.c:15`)。SQLite/FEP失敗で回収しない。欠落・旧128KiB形式・I/O失敗はかなのみで継続し、FEP省略・起動停止の条件にしない。途中は一般のdb/ime KAPIがstubのまま、信頼するboot coordinatorとFEPだけが内部SQLite exportを使う。settingsはengine_enter経由、予約評価もこの段で行う。FEP正常起動とgroup/予約確認が揃って初めてservices_publicを一度に開く。最初のユーザーASはこの後なので、半公開をアプリが見ることはない。T4の案AではFEP固定コードはcoreに残り、回収量0の対象はその動的資源とSQLite module。T5aの案B以後はFEP bodyも同じrollback対象に加わる (上位票 `docs/tasks/v3/TASK_MEMMAP_V3.md:442`)。
+**ユーザー決定 2026-10-19: FD 起動は FEP なし (SQLite だけ)、recover-settings のため**。`services_boot` は既定辞書 `/db/fep.db` を `stat` 1 回だけで確認し、NOTFOUND の場合も SQLite 初期化 → settings close・RESIDENT group ゼロの確認まで進める。その後 FEP を読み込まず `SQLITE_ONLY` で `db_*` を公開し、IME は T5a-2 の FEP 不在時と同じ stub (英数・編集の生キーを透過) にする。診断は `[services] SQLITE_ONLY: no FEP dictionary`、`mem` の system 診断にも状態名を出す。辞書を存在確認のために open しない。辞書あり・有無不明の stat エラー・辞書欠落の注入は従来の初期化/rollback 経路を保つ。
 
-FEP画像CRC不一致・辞書なし・予約不足等は利用者へ未公開の失敗として、FEPの部分stmt/groupをclose/finalize → settingsを含むRESIDENT groupゼロを確認 → sqlite3_shutdown → 内部exportをstubへ → RUNNING/STARTINGからROLLING_BACK → FEP/SQLite ownerの回収、の順。init自身で失敗した場合も同じ段階印で一度だけ処理する。正常rollback後はSQLite/FEPの占有ゼロ、全dbはNOSYSのMINIMALへ入る。close/shutdown/装置停止の証明が失敗したらcode/heap/stack/groupを依存閉包ごとQUARANTINEDに残す。一般KAPIはstubだが **MINIMAL_QUARANTINED** と別状態で診断し、隔離byte数を空きから差し引く。これを標準MINIMALや8MB標準合格に数えない。安全な入力/回復継続を証明できなければ起動停止する。
+SQLITE_ONLY の FEP 予約は 0。settings の接続を閉じ、RESIDENT group ゼロを検査した `boot_check(0, 0)` で予約を外す小さい変更とする。協調切替・起動は一度だけで後から FEP を載せる口もないため、空予約を残す利用者はなく APP 上限を広げられる。live 辞書がある `boot_check(1, 0)` は従来どおり予約を保つ。通常起動は settings の値・下限・予約失敗の扱いを保つ。
+
+FD 復旧は T4b-4 の ext2 限定を維持する (PM 決定 2026-10-19)。install は FAT の `/etc/settings.db` を `/hd0/etc/settings.db.master.new` にコピーし、長さ・バイト一致を確認してから写しを SQLite で照合する。以後はその写しから既存の `.new` を作り、退避・最終切替の手順を保つ。既存の写しとその journal は消さず停止し、今回の写しだけを成功・取消し・失敗の出口で回収する。close 失敗時は既存の `.new` と同様に隔離 inode を保持し、再起動後の削除を案内する。RAM 試験は FD 側を SQLite 非対応、対象を ext2 対応として正常系と途中失敗を確認する。FDC と実 FD 起動の受入は NP21/W で別途確認する。
+
+`ROOT_READY → Unicode読込 → SQLITE_INTERNAL_READY → SETTINGS_CLOSED → FEP_INTERNAL_READY → SERVICES_READY`。Unicode表はkernel ownerの7頁でSLACK/poolの内数 (`kernel/unicode_file.c:15`)。SQLite/FEP失敗で回収しない。欠落・旧128KiB形式・I/O失敗はかなのみで継続し、FEP省略・起動停止の条件にしない。辞書なしは `SETTINGS_CLOSED → SQLITE_ONLY` へ分岐する。途中は一般のdb/ime KAPIがstubのまま、信頼するboot coordinatorとFEPだけが内部SQLite exportを使う。settingsはengine_enter経由、予約評価もこの段で行う。FEP正常起動とgroup/予約確認が揃って初めてservices_publicを一度に開く。最初のユーザーASはこの後なので、半公開をアプリが見ることはない。T4の案AではFEP固定コードはcoreに残り、回収量0の対象はその動的資源とSQLite module。T5aの案B以後はFEP bodyも同じrollback対象に加わる (上位票 `docs/tasks/v3/TASK_MEMMAP_V3.md:442`)。
+
+SQLite失敗・fep.mod欠落・FEP画像CRC不一致・辞書ありでの辞書open/init失敗・予約不足等は利用者へ未公開の失敗として、FEPの部分stmt/groupをclose/finalize → settingsを含むRESIDENT groupゼロを確認 → sqlite3_shutdown → 内部exportをstubへ → RUNNING/STARTINGからROLLING_BACK → FEP/SQLite ownerの回収、の順。init自身で失敗した場合も同じ段階印で一度だけ処理する。正常rollback後はSQLite/FEPの占有ゼロ、全dbはNOSYSのMINIMALへ入る。close/shutdown/装置停止の証明が失敗したらcode/heap/stack/groupを依存閉包ごとQUARANTINEDに残す。一般KAPIはstubだが **MINIMAL_QUARANTINED** と別状態で診断し、隔離byte数を空きから差し引く。これを標準MINIMALや8MB標準合格に数えない。安全な入力/回復継続を証明できなければ起動停止する。
 
 ### 3-5. CD と通常 root の FEP
 
@@ -238,7 +244,7 @@ ATAPI/ISOとcoreのIDE/FDC/FAT/loop/diskioの依存を現コードで列挙し�
 
 ### 5-3. MINIMAL 回復の境界
 
-T5b-4はcoreのFATによるFD回復の回帰だけに縮める。書込み禁止FDのroot/Unicode/shell、HDD起動後のFD利用、MINIMALの英数編集を維持する。SQLiteを使う `install --recover-settings` は動かず (D21)、NOSYSをDB破損/復旧済みと誤表示しない。DB修復はSQLite/FEPが正常な標準構成またはホストの既存手順で行う。
+T5b-4はcoreのFATによるFD回復の回帰だけに縮める。書込み禁止FDのroot/Unicode/shell、HDD起動後のFD利用、MINIMALの英数編集を維持する。SQLiteを使う `install --recover-settings` は MINIMAL では動かず (D21)、NOSYS は SQLite が使えないため復旧できず、`/boot/sqlite.mod` があるインストール用 FD から再実行する旨を 1 行表示する (rc は非 0)。DB破損の `master unreadable` と区別する。SQLITE_ONLY での FD 復旧は §3-4 の ext2 の写しを使う。
 
 ### 5-4. 配布・更新と容量ゲート
 
@@ -351,6 +357,7 @@ r4材料は `RECHECK_r4.md` と `opus_r1.md` (Approve、PMはF1〜F6採用)。�
 
 | 論点 | 決定・根拠 | 反映・確認する段 |
 |---|---|---|
+| **ユーザー決定 2026-10-19: FD 起動は FEP なし (SQLite だけ)、recover-settings のため** | D21 を改訂。辞書 NOTFOUND は SQLite → settings close → SQLITE_ONLY (`db_*` 公開・IME stub・FEP予約0)。SQLite/FEP の実失敗は従来どおり MINIMAL。recover-settings の NOSYS 案内はインストール用 FD と `/boot/sqlite.mod` を確認する手順 | §3-4・MEMMAP_V3 D21/§3-5 (必須/省略)。host は実部品起動と install の RAM backend、FD 実起動は PM が NP21/W で確認 |
 | **ユーザー承認 2026-10-18: 根拠のあいまいな基準の見直し** | FINDINGS.mdの推奨を採用。stack固定、集積拡張凍結、増減記録、policyのID数でrecord容量を決定、KCG hit率記録、FEP予約の下方上書き | §0・§3-1・§5-2/5-4・§6・§7。#7のコード変更は別依頼 |
 | **決定 (ユーザー 2026-10-16)**: 3 SQL入口の拒否時のstmt/slotとfinalize時期 (F1/F2) | 古い行が返るのは、戻り値を見ずに `db_step` を呼んだアプリ自身の文だけで、シングルタスクでは他のアプリや OS のデータに及ばない — **アプリ側の書き方の問題**として扱う (ユーザー)。第三案 (保留 stmt) は採らない。拒否時は「何も変えない」(`docs/tasks/settings/FEP_BOUNDARY.md:140,141,213`) にそろえ、`docs/KAPI_SPEC.md:1396` の prepare_only の入口 finalize は「受け付けた入力のときだけ」と書き直す。KAPI_SPEC に「拒否の戻り値を見ずに step すると前の文の続きが返る」と注記 | 本票は反映済み。KAPI_SPEC の説明同期は T4b-1 の前に行う |
 | **決定 (ユーザー 2026-10-16)**: X-11の共有サービスの呼出し主体 | 端末ごと・本人ごとの**新しい権限の分離は足さない** (単一利用者)。T4b-5 で通常の親子・park/resume の順を観測し、二重消費・別 owner への副作用・寿命の不具合が出たら、そこだけ直す。攻撃者を置かないことを理由に未観測の不具合を閉じない | T4b-5の契約を維持し、GUIRUNKEY-1・IMECAND/IMEIND・終了中STOPをT5a-3で回帰。IMEDUP-1の最初のゲスト確認はT5-0a |

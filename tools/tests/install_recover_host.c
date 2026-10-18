@@ -14,7 +14,9 @@
 /* ========================================================================= */
 
 #define main f2a_main
+#define VFS_FD_CUSTOM_ROUTE 1
 #include "vfs_fd_sqlite_host.c"
+#undef VFS_FD_CUSTOM_ROUTE
 #undef main
 
 #include <stdarg.h>
@@ -38,6 +40,20 @@ void *kmemset(void *dst, int val, u32 n) { return memset(dst, val, n); }
 #include "../../lib/sqlite3/sqlite3.h"
 #include "../../lib/sqlite3/os32_sqlite_vfs.c"
 #include "sqlite_groups_backend.h"
+
+/* Fixture construction uses the ext2-capable RAM store; recovery routes the
+ * FD root through FAT-like ops (stream I/O, no SQLite/ino capability). The
+ * target keeps ext2 ops. The real SQLite VFS enforces T4b-4 on both routes. */
+static VfsOps fat_ops;
+static int host_root_fat;
+VfsOps *vfs_route(const char *path, char *out, int size, void **ctx)
+{
+    VfsOps *ops = host_root_fat && strncmp(path, "/hd0/", 5) ? &fat_ops : &mock_ops;
+    probes++;
+    str_cpy(out, path, size);
+    *ctx = ops;
+    return ops;
+}
 
 volatile u32 tick_count;
 u32 sys_time(void) { return 0; }
@@ -117,7 +133,17 @@ int ring3_user_range_ok(u32 p, u32 len)
 #define SHM_CANARY 256
 static unsigned char test_shm[DB_SHM_BLOCK_SIZE + SHM_CANARY];
 #include "db_copy_shim.h"
-#include "../../kapi/kapi_db.c"
+/* Keep direct SQLite/VFS calls, but exercise the product KAPI public gate.
+ * Boot itself is covered by sqlite_module_host with both paired images. */
+#include "../../lib/sqlite3/os32_sqlite_outer.h"
+#include "../../kernel/sqlite_engine.h"
+#undef OS32_SQLITE_DIRECT_TEST
+int services_public = 1;
+enum services_stage services_stage = SERVICES_READY;
+#ifndef INSTALL_KAPI_DB_SOURCE
+#define INSTALL_KAPI_DB_SOURCE "../../kapi/kapi_db.c"
+#endif
+#include INSTALL_KAPI_DB_SOURCE
 
 /* ========================================================================= */
 /*  RecoverOps の贋物 (障害注入)                                             */
@@ -170,6 +196,7 @@ static int host_mount_calls;
 static int host_mount_rc;
 static const char *key_script = "Y";
 static int key_pos;
+static int host_db_open_calls;
 
 /* fd -> path (注入の対象を決めるため) */
 #define HOST_FDS 32
@@ -298,6 +325,7 @@ static int db_close_should_fail(int h)
 static int rop_db_open_existing(const char *p, int w)
 {
     int h;
+    host_db_open_calls++;
     rop_db_close_want = 0;
     if (inj_db_open_fail && hit(inj_db_open_fail, p)) {
         /* 実在しない名前を引かせて本物の CANTOPEN を作る */
@@ -337,7 +365,10 @@ static int rop_getkey(void)
     return 0x1B;
 }
 
-#include "../../userland/system/install_recover.inc"
+#ifndef INSTALL_RECOVER_SOURCE
+#define INSTALL_RECOVER_SOURCE "../../userland/system/install_recover.inc"
+#endif
+#include INSTALL_RECOVER_SOURCE
 
 static const RecoverOps host_ops = {
     rop_stat, rop_open, rop_read, rop_write, rop_close, rop_unlink,
@@ -473,6 +504,8 @@ static void reset_all(void)
     inj_db_close_fail = 0;
     inj_db_close_path = NULL;
     inj_db_open_fail = NULL;
+    services_public = 1;
+    services_stage = SERVICES_READY;
     inj_db_prepare_fail = NULL;
     inj_ino_share_a = NULL;
     inj_ino_share_b = NULL;
@@ -485,10 +518,15 @@ static void reset_all(void)
     host_mount_rc = 0;
     key_script = "Y";
     key_pos = 0;
+    host_db_open_calls = 0;
     resolve_owner = current_owner = 2;
     resolve_cwd = "";
     fixture_init();
+    host_root_fat = 0;
     make_settings_db(RC_MASTER, MASTER_KEYS, 1);
+    fat_ops = mock_ops;
+    fat_ops.ino = NULL;
+    fat_ops.sqlite = NULL;
 }
 
 /* 現行の HDD 側 DB を「壊れた 1406B のファイル」として置く (受入 I2 と同じ形) */
@@ -503,8 +541,17 @@ static void clear_output(void) { cap_buf[0] = '\0'; cap_len = 0; }
 
 static int run_recover(void)
 {
+    int result;
+    int had_master = fx_exists(rc_path[RC_N_MASTER]);
     key_pos = 0;
-    return recover_settings_main(&host_ops, "hd0", 0);
+    host_root_fat = 1;
+    result = recover_settings_main(&host_ops, "hd0", 0);
+    /* Every ordinary exit, including later backup/switch failures, cleans its
+     * master copy. Preserve foreign leftovers and the documented close case. */
+    if (!had_master && !strstr(cap_buf, "master close failed") &&
+        !hit(inj_unlink_fail, rc_path[RC_N_MASTER]))
+        CHECK(!fx_exists(rc_path[RC_N_MASTER]));
+    return result;
 }
 static int run_revert(void)
 {
@@ -799,9 +846,58 @@ static void case_gate(void)
 /*  1c — マスタの検査                                                        */
 /* ========================================================================= */
 
+/* SQLITE_ONLY is the boot fixture's output fed into the real KAPI gate.
+ * This RAM backend models FD root/master and the mounted ext2 target; it does
+ * not claim to exercise FDC I/O or boot/module loading. */
+static void case_sqlite_only(void)
+{
+    reset_all();
+    make_settings_db(rc_path[RC_N_DB], MASTER_KEYS, 1);
+    services_stage = SERVICES_SQLITE_ONLY;
+    services_public = 1;
+    CHECK(host_root_dev == HOST_DEV(VFS_DEV_FD, 0));
+    CHECK(!fx_exists("/db/fep.db"));
+    key_script = "N";
+    CHECK(run_recover() == 0);
+    CHECK_STR("[Y/N]");
+    CHECK_NOSTR("SQLite unavailable");
+    CHECK_NOSTR("master unreadable");
+    CHECK(!fx_exists(rc_path[RC_N_BAK]));
+    /* FAT MAIN_DB is rejected; recovery checks its ext2 copy instead. */
+    RcDbInfo target;
+    CHECK(kapi_db_open_existing(RC_MASTER, 0) < 0);
+    CHECK(kapi_db_error_code(-1) == SQLITE_CANTOPEN);
+    CHECK(rc_db_check(&host_ops, rc_path[RC_N_DB], &target) == 0);
+    CHECK(target.rows == MASTER_KEYS);
+    CHECK(!fx_exists(rc_path[RC_N_MASTER]));
+    key_script = "Y";
+    CHECK(run_recover() == 0);
+    CHECK(fx_exists(rc_path[RC_N_BAK]));
+    CHECK(rc_db_check(&host_ops, rc_path[RC_N_DB], &target) == 0);
+    CHECK(target.rows == MASTER_KEYS);
+    CHECK(!fx_exists(rc_path[RC_N_MASTER]));
+}
+
 static void case_master(void)
 {
     Snap s;
+
+    /* Real MINIMAL gate: a prior CANTOPEN must not hide NOSYS. Both the
+     * open result and error-code entry now pass through the product gate. */
+    reset_all();
+    put_broken_db();
+    snap_take(rc_path[RC_N_DB], &s);
+    CHECK(kapi_db_open_existing("/no/such/file.db", 0) < 0);
+    services_public = 0;
+    services_stage = SERVICES_MINIMAL;
+    CHECK(run_recover() == 1);
+    CHECK_STR("SQLite unavailable (MINIMAL): cannot recover settings; boot from the installation FD with /boot/sqlite.mod present and run again\n");
+    CHECK_NOSTR("master unreadable");
+    CHECK_NOSTR("[Y/N]");
+    CHECK_SNAP(rc_path[RC_N_DB], s);
+    CHECK(!fx_exists(rc_path[RC_N_BAK]));
+    CHECK(!fx_exists(rc_path[RC_N_NEW]));
+    CHECK(!fx_exists(rc_path[RC_N_STATE]));
 
     /* マスタが無い */
     reset_all();
@@ -810,6 +906,7 @@ static void case_master(void)
     CHECK(vfs_rm(RC_MASTER) == VFS_OK);
     CHECK(run_recover() == 1);
     CHECK_STR("master unreadable");
+    CHECK_NOSTR("cannot remove settings.db.master.new");
     CHECK_SNAP(rc_path[RC_N_DB], s);
     CHECK(!fx_exists(rc_path[RC_N_BAK]));
 
@@ -819,6 +916,7 @@ static void case_master(void)
     fx_put(RC_MASTER, "not a database", 14);
     CHECK(run_recover() == 1);
     CHECK_STR("master unreadable");
+    CHECK_NOSTR("MINIMAL");
 
     /* meta が無い (schema 検査で落ちる) */
     reset_all();
@@ -850,10 +948,12 @@ static void case_master(void)
     put_broken_db();
     snap_take(rc_path[RC_N_DB], &s);
     inj_db_close_fail = 1;
-    inj_db_close_path = RC_MASTER;
+    inj_db_close_path = rc_path[RC_N_MASTER];
     CHECK(run_recover() == 1);
     CHECK_STR("master close failed");
     CHECK_SNAP(rc_path[RC_N_DB], s);
+    CHECK_STR("REBOOT from the floppy, then: rm /hd0/etc/settings.db.master.new, install --recover-settings hd0");
+    CHECK(fx_exists(rc_path[RC_N_MASTER]));
 
     /* 保証の上限を表示に書く (integrity_check は OMIT) */
     reset_all();
@@ -861,6 +961,121 @@ static void case_master(void)
     key_script = "N";
     CHECK(run_recover() == 0);
     CHECK_STR("integrity_check is not available");
+}
+
+/* FAT source -> byte-verified ext2 copy -> real SQLite -> existing recovery.
+ * Only media capabilities/I/O errors are modeled; no FDC/boot claims. */
+static void case_master_copy(void)
+{
+    int fault;
+    for (fault = 0; fault < 6; fault++) {
+        reset_all();
+        /* More than one copy-buffer, so short write is genuinely mid-copy. */
+        CHECK(vfs_rm(RC_MASTER) == 0);
+        make_settings_db(RC_MASTER, 500, 1);
+        CHECK(fx_size(RC_MASTER) > RC_BUF);
+        put_broken_db();
+        fx_puts(rc_path[RC_N_JOURNAL], "original hot journal");
+        fx_puts(rc_path[RC_N_BAK], "previous backup");
+        fx_puts(rc_path[RC_N_BAKJ], "previous backup journal");
+        snap_all();
+        if (fault == 1) inj_write_garble = rc_path[RC_N_MASTER];
+        if (fault == 2) inj_db_prepare_fail = rc_path[RC_N_MASTER];
+        if (fault == 3) {
+            inj_write_short = rc_path[RC_N_MASTER];
+            inj_write_short_after = 1;
+        }
+        if (fault == 4) inj_read_fail = RC_MASTER;
+        if (fault == 5) inj_open_fail = rc_path[RC_N_MASTER];
+        services_stage = SERVICES_SQLITE_ONLY;
+        CHECK(run_recover() == (fault != 0));
+        CHECK_SNAP(RC_MASTER, snap_master);
+        CHECK(!fx_exists(rc_path[RC_N_MASTER]));
+        CHECK(!fx_exists(rc_path[RC_N_MASTERJ]));
+        if (!fault) {
+            CHECK_STR("recovered: schema_version 1, 500 keys, sync=0, reopen=ok, close=ok");
+            CHECK(host_db_open_calls == 3);
+            CHECK(fx_same(rc_path[RC_N_DB], RC_MASTER));
+            CHECK_SNAP(rc_path[RC_N_BAK], snap_db);
+            CHECK_SNAP(rc_path[RC_N_BAKJ], snap_journal);
+        } else {
+            CHECK_STR("master unreadable");
+            CHECK_NOSTR("cannot remove settings.db.master.new");
+            CHECK_NOSTR("[Y/N]");
+            CHECK(host_db_open_calls == (fault == 2));
+            CHECK_SNAP(rc_path[RC_N_DB], snap_db);
+            CHECK_SNAP(rc_path[RC_N_JOURNAL], snap_journal);
+            CHECK_SNAP(rc_path[RC_N_BAK], snap_bak);
+            CHECK_SNAP(rc_path[RC_N_BAKJ], snap_bakj);
+            CHECK(!fx_exists(rc_path[RC_N_STATE]));
+            CHECK(!fx_exists(rc_path[RC_N_NEW]));
+        }
+    }
+
+    /* Never truncate/delete an existing copy or its journal, including ESC. */
+    for (fault = RC_N_MASTER; fault <= RC_N_MASTERJ; fault++) {
+        Snap stale;
+        reset_all();
+        put_broken_db();
+        fx_puts(rc_path[RC_N_JOURNAL], "hot");
+        fx_puts(rc_path[fault], "foreign file");
+        snap_all();
+        snap_take(rc_path[fault], &stale);
+        CHECK(run_recover() == 1);
+        CHECK_STR("stale settings.db.master.new");
+        CHECK(host_db_open_calls == 0);
+        CHECK_SNAP(rc_path[fault], stale);
+        CHECK_SNAP(rc_path[RC_N_DB], snap_db);
+        CHECK_SNAP(rc_path[RC_N_JOURNAL], snap_journal);
+    }
+
+    /* UNKNOWN is not ABSENT; a shared inode must not become our copy. */
+    for (fault = RC_N_MASTER; fault <= RC_N_MASTERJ; fault++) {
+        reset_all();
+        put_broken_db();
+        snap_all();
+        inj_stat_unknown = rc_path[fault];
+        CHECK(run_recover() == 1);
+        CHECK_STR("stat failed");
+        CHECK_SNAP(rc_path[RC_N_DB], snap_db);
+        CHECK(host_db_open_calls == 0);
+    }
+    reset_all();
+    put_broken_db();
+    fx_puts(rc_path[RC_N_MASTER], "foreign file");
+    snap_all();
+    inj_ino_share_a = rc_path[RC_N_DB];
+    inj_ino_share_b = rc_path[RC_N_MASTER];
+    CHECK(run_recover() == 1);
+    CHECK_STR("share an inode");
+    CHECK_SNAP(rc_path[RC_N_DB], snap_db);
+    CHECK(fx_exists(rc_path[RC_N_MASTER]));
+
+    /* N and ESC leave the original pair and the previous backup intact. */
+    for (fault = 0; fault < 2; fault++) {
+        reset_all();
+        put_broken_db();
+        fx_puts(rc_path[RC_N_JOURNAL], "hot");
+        fx_puts(rc_path[RC_N_BAK], "old backup");
+        snap_all();
+        key_script = fault ? "" : "N";
+        CHECK(run_recover() == 0);
+        CHECK(host_db_open_calls == 1);
+        CHECK_SNAP(rc_path[RC_N_DB], snap_db);
+        CHECK_SNAP(rc_path[RC_N_JOURNAL], snap_journal);
+        CHECK_SNAP(rc_path[RC_N_BAK], snap_bak);
+        CHECK(!fx_exists(rc_path[RC_N_MASTER]));
+    }
+
+    reset_all();
+    put_broken_db();
+    snap_all();
+    key_script = "N";
+    inj_unlink_fail = rc_path[RC_N_MASTER];
+    CHECK(run_recover() == 1);
+    CHECK_STR("cannot remove settings.db.master.new");
+    CHECK_SNAP(rc_path[RC_N_DB], snap_db);
+    CHECK(fx_exists(rc_path[RC_N_MASTER]));
 }
 
 /* ========================================================================= */
@@ -1161,8 +1376,8 @@ static void case_newfail(void)
     reset_all();
     put_broken_db();
     snap_all();
-    inj_read_fail = RC_MASTER;
-    inj_read_fail_after = 2;      /* コピーの read 2 回 (本体 + EOF) は通す */
+    inj_read_fail = rc_path[RC_N_MASTER];
+    inj_read_fail_after = 4;      /* 初回比較 + .new コピー (各 本体 + EOF) */
     CHECK(run_recover() == 1);
     CHECK_STR("verify failed (settings.db.new)");
     CHECK_SNAP(rc_path[RC_N_DB], snap_db);
@@ -1757,10 +1972,12 @@ int main(int argc, char **argv)
     mock_ops.write_stream = mock_write_stream;
     CHECK(os32_sqlite_init() == SQLITE_OK);
     if (argc != 2) return 2;
-    if (!strcmp(argv[1], "media")) case_media();
+    if (!strcmp(argv[1], "sqlite_only")) case_sqlite_only();
+    else if (!strcmp(argv[1], "media")) case_media();
     else if (!strcmp(argv[1], "scan")) case_scan();
     else if (!strcmp(argv[1], "gate")) case_gate();
     else if (!strcmp(argv[1], "master")) case_master();
+    else if (!strcmp(argv[1], "master_copy")) case_master_copy();
     else if (!strcmp(argv[1], "approve")) case_approve();
     else if (!strcmp(argv[1], "happy")) case_happy();
     else if (!strcmp(argv[1], "backup_fail")) case_backup_fail();

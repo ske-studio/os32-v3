@@ -90,6 +90,12 @@ static u32 snapshot_kheap_free(void)
 #include "module.h"
 struct kdebug kdebug;
 extern u32 boot_pages_audit_runs, boot_pages_audit_fail;
+/* Use the product reporter so restoring its call emits real diagnostic text. */
+static const char *services_state_name(void) { return "SQLITE_ONLY"; }
+static u32 services_public;
+static u32 fep_module_pages(void) { return 0; }
+static u32 ime_boot_bytes(void) { return 0; }
+#include "services_report_source.c"
 #include "mem_stat_source.c"
 #undef pgalloc_free_pages
 #undef kmalloc_total
@@ -127,6 +133,12 @@ static void boot_page_status(void)
     boot_page_input.allocator_pages = MEM_POOL_BASE / PAGE_SIZE;
     boot_page_input.phys_pages = boot_page_input.allocator_pages;
     kaudit_boot_pages();
+    diagnostic_bytes = diagnostic_lines = 0;
+    capture_diagnostics = 1;
+    for (u32 i = 0; i < 64; i++)
+        CHECK("repeated system snapshot", kapi_mem_stat(0, &st, sizeof(st)) == sizeof(st));
+    capture_diagnostics = 0;
+    CHECK("mem_stat output zero", diagnostic_bytes == 0 && diagnostic_lines == 0);
     CHECK("boot pages snapshot", kapi_mem_stat(0, &st, sizeof(st)) == sizeof(st));
     CHECK("boot pages normal", st.audit_runs == 1 && st.audit_fail == 0);
     boot_page_input.phys_pages++;

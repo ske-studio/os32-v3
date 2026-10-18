@@ -266,6 +266,9 @@ int os32_sqlite_boot_check(int live, int reserve)
         count++;
     }
     if (count != live) return SQLITE_BUSY;
+    /* With no resident group there is no FEP to reserve for. A zero request
+     * with a live dictionary remains an observation and preserves its budget. */
+    if (!live && !reserve) budget->reserve = 0;
     if (reserve) {
         if (reserve > 0 && reserve < OS32_SQLITE_FEP_RESERVE_MIN) {
             kprintf(0x07, "[SQT] FEP reserve below minimum; using %d bytes\n",

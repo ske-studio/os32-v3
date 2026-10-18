@@ -15,10 +15,12 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 CASES = [
+    "sqlite_only",  # FD root + actual public db_* gate + master/target SQL
     "media",        # 1a 起動媒体 / 対象デバイス (受入 I1)
     "scan",         # 1b 三値 / UNKNOWN / inode 共有 / .new 残骸
     "gate",         # 1b 印の phase による門と印の往復
     "master",       # 1c マスタの検査と close 失敗
+    "master_copy",  # FAT -> ext2 copy/byte check/SQL + failure/cancel cleanup
     "approve",      # 1d 承認しない (受入 I5)
     "happy",        # 1e/1f 正常系 (受入 I2 / I3 / I4)
     "backup_fail",  # 1e 退避の各失敗 (元の対は不変)
@@ -32,7 +34,7 @@ CASES = [
 ]
 
 INC = ["-I" + str(ROOT / p) for p in
-       ("include", "fs", "drivers", "sdk/include", "sdk/include/os32",
+       ("include", "fs", "drivers", "kapi", "sdk/include", "sdk/include/os32",
         "lib", "lib/sqlite3", "userland/lib")]
 CONFIG = str(ROOT / "lib/sqlite3/os32_sqlite_config.h")
 
@@ -42,7 +44,7 @@ SHIMS = {
 }
 
 
-def build(tmp, sanitize):
+def build(tmp, sanitize, recovery_source=None, kapi_source=None):
     for name, text in SHIMS.items():
         (tmp / name).write_text(text)
     obj = str(tmp / "sqlite.o")
@@ -57,6 +59,10 @@ def build(tmp, sanitize):
                     "-Wno-sign-compare", "-Wno-pointer-to-int-cast",
                     "-Wno-missing-field-initializers", "-D__cdecl=",
                     "-D__OS32_USERLAND__",
+                    *(['-DINSTALL_RECOVER_SOURCE="' + str(recovery_source) + '"']
+                      if recovery_source else []),
+                    *(['-DINSTALL_KAPI_DB_SOURCE="' + str(kapi_source) + '"']
+                      if kapi_source else []),
                     *san, "-I" + str(tmp), *INC,
                     str(ROOT / "tools/tests/install_recover_host.c"), obj,
                     "-o", exe], check=True)
@@ -64,6 +70,54 @@ def build(tmp, sanitize):
           "(real install_recover.inc + real kapi_db.c + bundled SQLite)",
           flush=True)
     return exe
+
+
+def mutations(tmp, sanitize):
+    source = (ROOT / "userland/system/install_recover.inc").read_text()
+    for label, old, new in (
+            ("nosys-open-result", "out->err = h;", "out->err = 0;"),
+            ("nosys-master-diagnostic", "if (master.err == OS32_ERR_NOSYS)", "if (0)")):
+        assert source.count(old) == 1, label
+        path = tmp / "install_recover_mutant.inc"
+        path.write_text(source.replace(old, new))
+        exe = build(tmp, sanitize, recovery_source=path)
+        result = subprocess.run([exe, "master"], cwd=ROOT, capture_output=True)
+        assert result.returncode == 1 and b"message missing: SQLite unavailable (MINIMAL)" in result.stderr, (label, result)
+        print("MUTATE " + label + " RED (compiled runtime): " +
+              result.stderr.decode().splitlines()[0], flush=True)
+
+    for label, old, new, case, failure in (
+            ("master-fat-sql", "rc_db_check(ops, rc_path[RC_N_MASTER], &master)",
+             "rc_db_check(ops, RC_MASTER, &master)", "sqlite_only", b"run_recover() == 0"),
+            ("master-byte-compare", "rc_clone(ops, RC_MASTER, rc_path[RC_N_MASTER])",
+             "rc_copy_file(ops, RC_MASTER, rc_path[RC_N_MASTER])", "master_copy",
+             b"host_db_open_calls == (fault == 2)"),
+            ("master-sql-check", "if (rc_db_check(ops, rc_path[RC_N_MASTER], &master) != 0)",
+             "if (rc_db_check(ops, rc_path[RC_N_MASTER], &master) == 12345)",
+             "master_copy", b"message missing: master unreadable"),
+            ("master-copy-cleanup", "drop_rc = ops->unlink(rc_path[RC_N_MASTER]);",
+             "drop_rc = 0;", "master_copy", b"!fx_exists(rc_path[RC_N_MASTER])"),
+            ("master-stale-copy", "rc_state[RC_N_MASTER] == RC_PRESENT ||",
+             "0 ||", "master_copy", b"run_recover() == 1")):
+        assert source.count(old) == 1, label
+        path = tmp / "install_recover_mutant.inc"
+        path.write_text(source.replace(old, new))
+        exe = build(tmp, sanitize, recovery_source=path)
+        result = subprocess.run([exe, case], cwd=ROOT, capture_output=True)
+        assert result.returncode == 1 and failure in result.stderr, (label, result)
+        print("MUTATE " + label + " RED (compiled runtime): " +
+              result.stderr.decode().splitlines()[0], flush=True)
+
+    source = (ROOT / "kapi/kapi_db.c").read_text()
+    old = "#define DB_MODULE_READY() services_public"
+    assert source.count(old) == 1
+    path = tmp / "kapi_db_mutant.c"
+    path.write_text(source.replace(old, "#define DB_MODULE_READY() (services_public && services_stage == SERVICES_READY)"))
+    exe = build(tmp, sanitize, kapi_source=path)
+    result = subprocess.run([exe, "sqlite_only"], cwd=ROOT, capture_output=True)
+    assert result.returncode == 1 and b"run_recover() == 0" in result.stderr, result
+    print("MUTATE sqlite-only-db-gate RED (compiled runtime): " +
+          result.stderr.decode().splitlines()[0], flush=True)
 
 
 def target_compile(tmp):
@@ -98,4 +152,6 @@ if __name__ == "__main__":
             print(f"EXIT {case}={rc}", flush=True)
             failed += rc != 0
         print(f"SUMMARY {len(cases)-failed}/{len(cases)} PASS", flush=True)
+        if "--mutate" in sys.argv and not failed:
+            mutations(tmp, "--sanitize" in sys.argv)
         sys.exit(bool(failed))
