@@ -94,7 +94,7 @@ class McpTests(unittest.TestCase):
         sequence=[state,dict(state,kernel=[{'owner':i,'state':2 if i==4 else 0} for i in range(2,6)])]
         g.wm_state=lambda: sequence.pop(0) if sequence else state
         g.screen_text=lambda **kw: {'lines':['PASS', 'Run: absolute path'],'unknown_count':0,'path':kw.get('path')}
-        g.ime_active=lambda: False
+        g.ime_mode=lambda: 0
         g.consink=lambda **kw: {'text':'PASS','lines':['PASS'],'since':10}
         g.symbols=lambda: ({'probe':(0x1234,4)}, {})
         g.word=lambda a: self.assertEqual(a,0x1234) or 7
@@ -153,7 +153,7 @@ def init(self, *args, **kwargs):
     sequence = [state,ready]
     self.wm_state = lambda: sequence.pop(0) if sequence else ready
     self.screen_text = lambda **kw: {'lines': ['Run: absolute path']}
-    self.ime_active = lambda: False
+    self.ime_mode = lambda: 0
     self.consink = lambda **kw: {'since': 44}
     self.mouse_posts = lambda: sum(p=='/api/mouse' for p,d in self.posts)
 gui.Gui.__init__ = init

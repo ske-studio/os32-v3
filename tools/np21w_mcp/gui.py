@@ -284,7 +284,7 @@ class ElfSymbols:
 
 
 def c_constants(path, extra=None):
-    """Evaluate the numeric #define subset used by the memory/slot headers.
+    """Evaluate numeric #defines and scalar enums used by observation headers.
 
     No execution of C or arbitrary Python: only integer arithmetic AST nodes.
     Dynamic linker symbols are supplied from the current kernel ELF.
@@ -293,6 +293,17 @@ def c_constants(path, extra=None):
     source = re.sub(r'/\*.*?\*/', '', Path(path).read_text(), flags=re.S)
     source = source.replace('\\\n', '')
     definitions = dict(re.findall(r'^\s*#define\s+(\w+)\s+([^\n]+)', source, re.M))
+    for body in re.findall(r'\benum\s+\w+\s*\{([^{}]*)\}', source):
+        previous = '0'
+        for entry in body.split(','):
+            if not entry.strip():
+                continue
+            name, sep, value = entry.partition('=')
+            name = name.strip()
+            if not re.fullmatch(r'\w+', name):
+                raise ValueError('unsupported C enum: ' + entry)
+            definitions[name] = value.strip() if sep else previous
+            previous = name + ' + 1'
     cache = dict(extra or {})
     ops = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul,
            ast.BitAnd: operator.and_, ast.BitOr: operator.or_, ast.LShift: operator.lshift,
@@ -323,31 +334,37 @@ def c_word_offsets(path, name, through):
 
     Like c_constants, accept only the subset needed here and fail closed if
     the source layout changes to a type/declarator this reader cannot handle.
-    AppSlot's prefix is int/u32 on the target i386 ABI, both four bytes.
+    Scalar prefixes are int/u32 on the target i386 ABI, both four bytes.
     """
     source = re.sub(r'/\*.*?\*/|//[^\n]*', '', Path(path).read_text(), flags=re.S)
     match = re.search(r'\btypedef\s+struct\s*\{([^{}]*)\}\s*' + re.escape(name) + r'\s*;', source)
     if match is None:
+        match = re.search(r'\bstruct\s+' + re.escape(name) + r'\s*\{([^{}]*)\}', source)
+    if match is None:
         raise ValueError('unsupported C struct layout: ' + name)
     offsets = {}
     for declaration in match[1].split(';'):
-        field = re.fullmatch(r'\s*(?:int|u32)\s+(\w+)\s*', declaration)
-        if field is None:
+        fields = re.fullmatch(r'\s*(?:int|u32)\s+(\w+(?:\s*,\s*\w+)*)\s*', declaration)
+        if fields is None:
             raise ValueError('unsupported C field layout: ' + declaration.strip())
-        offsets[field[1]] = len(offsets) * struct.calcsize('<I')
-        if field[1] == through:
-            return offsets
+        for field in fields[1].split(','):
+            field = field.strip()
+            offsets[field] = len(offsets) * struct.calcsize('<I')
+            if field == through:
+                return offsets
     raise ValueError('missing C field layout: ' + through)
 
 
 class Gui:
     def __init__(self, transport=None, kernel_elf=None, gshell_elf=None,
-                 symbol_factory=ElfSymbols, descriptor=None):
+                 symbol_factory=ElfSymbols, descriptor=None, fep_elf=None):
         self.transport = transport or default_transport
         self.kernel_elf = kernel_elf or os.environ.get(
             'OS32_KERNEL_ELF', '/home/hight/os32-v3/build/out/kernel.elf')
         self.gshell_elf = gshell_elf or os.environ.get(
             'OS32_GSHELL_ELF', '/home/hight/os32-v3/userland/gshell.elf')
+        self.fep_elf = fep_elf or os.environ.get(
+            'OS32_FEP_ELF', str(Path(self.kernel_elf).parent / 'fep/fep.elf'))
         self.symbol_factory = symbol_factory
         self.descriptor = descriptor
 
@@ -475,7 +492,7 @@ class Gui:
 
     def dismiss_settings_warning(self):
         """Dismiss only the known first-entry warning, never arbitrary dialogs."""
-        pattern = re.compile(r"Settings:\s+MISSING\s+-\s+defaults\s+in\s+use\.\s+Run\s+'?cfg\s+init'?\s+in\s+CUI\.")
+        pattern = re.compile(r"Settings:\s+MISSING\s+-\s+defaults\s+in\s+use\.?\s+Run\s+'?cfg\s+init'?\s+in\s+CUI")
         last = self.screen_text()
         if screen_matches(pattern, last):
             key(seq='RETURN', transport=self.transport)
@@ -485,10 +502,51 @@ class Gui:
                 return {'ok': False, 'reason': 'Settings warning did not close', 'last': last}
         return {'ok': True, 'last': last}
 
+    def ime_mode(self):
+        """Read VA0 FEP state at its runtime base; MINIMAL has no FEP.
+
+        build/fep-module.ld links at zero, and module_runtime.c relocates the
+        payload to record.base. The resident fep_module.c facade holds function
+        pointers only, so g_ime must come from build/out/fep/fep.elf.
+        """
+        kernel = self.symbol_factory(self.kernel_elf).read()
+        header = ROOT / 'kernel/module_runtime.h'
+        constants = c_constants(header)
+        offsets = c_word_offsets(header, 'module_record', 'base')
+        count = constants('MODULE_RECORD_CAP')
+        address, size = kernel['module_records']
+        if not size or size % count or size // count < offsets['base'] + 4:
+            raise ValueError('invalid module_records stride')
+        module_id = c_constants(ROOT / 'kernel/module_schema.h')('MODULE_ID_FEP')
+        for slot in range(count):
+            prefix = self.mem(address + slot * (size // count), offsets['base'] + 4)
+            values = {name: struct.unpack_from('<I', prefix, offsets[name])[0]
+                      for name in ('state', 'module_id', 'base')}
+            if values['module_id'] == module_id and values['state'] == constants('MODULE_RUNNING'):
+                fep = self.symbol_factory(self.fep_elf).read()
+                # IME_State starts with int mode (kernel/ime.h); OFF is zero.
+                return self.word(values['base'] + fep['g_ime'][0])
+        return 0
+
     def ime_active(self):
-        kernel, _ = self.symbols()
-        # IME_State starts with int mode (kernel/ime.h); OFF is zero.
-        return self.word(kernel['g_ime'][0]) != 0
+        return self.ime_mode() != 0
+
+    def _restore_ime(self, mode):
+        # SHIFT+SPACE always reopens in hiragana (kernel/ime.c:ime_toggle).
+        # No GUI key selects katakana; report the observed mismatch explicitly.
+        result = {'before': mode, 'ok': False}
+        try:
+            current = self.ime_mode()
+            if mode and not current:
+                key(seq='SHIFT+SPACE', transport=self.transport)
+                self.transport.clock.sleep(0.35)
+                current = self.ime_mode()
+            result.update(after=current, ok=current == mode)
+            if not result['ok']:
+                result['reason'] = 'IME mode could not be restored'
+        except Exception as exc:
+            result['reason'] = 'IME restore failed: %s: %s' % (type(exc).__name__, exc)
+        return result
 
     def launch(self, path, timeout=60, fallback=False):
         if not path.startswith('/') or any(c.isspace() for c in path):
@@ -528,23 +586,28 @@ class Gui:
         key(seq='RETURN', transport=self.transport) if not fallback else None
         self.transport.clock.sleep(0.5)
         dialog = self.screen_text()
-        if not screen_matches(re.compile(r'Run: absolute path'), dialog):
+        # Only the input prompt is a complete line. The notification starts
+        # "Run: absolute path required ..." and must never receive path input.
+        if not screen_matches(re.compile(r'(?m)^\s*Run: absolute path\s*$'), dialog):
             return {'ok': False, 'reason': 'Run dialog did not open; path was not typed',
                     'last': dialog, 'since': since}
-        restore_ime = self.ime_active()
+        restore_ime = self.ime_mode()
+        input_failure = None
         try:
             if restore_ime:
                 key(seq='SHIFT+SPACE', transport=self.transport)
                 self.transport.clock.sleep(0.35)
-                if self.ime_active():
-                    return {'ok': False, 'reason': 'IME did not turn off; path was not typed',
-                            'last': dialog, 'since': since}
-            key(text=path, escapes=False, transport=self.transport)
-            key(seq='RETURN', transport=self.transport)
+                if self.ime_mode():
+                    input_failure = {'ok': False, 'reason': 'IME did not turn off; path was not typed',
+                                     'last': dialog, 'since': since}
+            if input_failure is None:
+                key(text=path, escapes=False, transport=self.transport)
+                key(seq='RETURN', transport=self.transport)
         finally:
-            if restore_ime and not self.ime_active():
-                key(seq='SHIFT+SPACE', transport=self.transport)
-                self.transport.clock.sleep(0.35)
+            ime_restore = self._restore_ime(restore_ime)
+        if input_failure is not None:
+            input_failure['ime_restore'] = ime_restore
+            return input_failure
         seen = set()
         exited = set()
 
@@ -566,12 +629,14 @@ class Gui:
 
         waited = self._wait(self.wm_state, ready, timeout)
         waited['since'] = since
+        waited['ime_restore'] = ime_restore
         if not waited['ok']:
             waited['reason'] = 'owner did not remain alive and enter OP_WAIT (PARKED or RUNNING in_op_wait=1)'
             return waited
         owner = next(iter(seen))
         last = waited['last']
-        result = {'ok': True, 'owner': owner, 'slot': None, 'last': last, 'since': since}
+        result = {'ok': True, 'owner': owner, 'slot': None, 'last': last, 'since': since,
+                  'ime_restore': ime_restore}
         if last['version'] == 2:
             matches = [s for s in last['wm_slots'] if s.get('owner') == owner and s.get('used')]
             if len(matches) == 1:

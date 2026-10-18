@@ -19,6 +19,12 @@ check-np21w-gui-host:
 - include/memmap.h
 - include/con_sink.h
 - exec/appslot.h
+- kernel/module_runtime.h
+- kernel/module_schema.h
+- kernel/ime.h
+- kernel/ime.c
+- kernel/fep_module.c
+- build/fep-module.ld
 - userland/gshell/src/startmenu.rs
 - .claude/skills/os32-gui-drive/SKILL.md
 - tools/np21w_mcp/np21w_client.py

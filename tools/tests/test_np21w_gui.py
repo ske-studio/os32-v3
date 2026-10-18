@@ -225,16 +225,24 @@ KERNEL_NM = '''00160001 B __bss_end
 00152008 00000004 b g_count
 0015200c 00000004 B appslot_trim_epoch
 00152010 00000004 T appslot_trim_done
+00180000 00000720 B module_records
 '''
 SHELL_NM = '''00600000 00000004 B gshell_trim_delivered
 00600004 00000004 B gshell_trim_skipped_full
 '''
+FEP_NM = '''00003540 00001800 b g_ime
+'''
+MODULE_RECORD_ADDRESS = 0x180000
+MODULE_RECORD_STRIDE = 0xe4
+FEP_BASE = 0x2a1000
+IME_ADDRESS = FEP_BASE + 0x3540
 
 
 def symbols(path):
     def nm(args, **kwargs):
         assert args[1:3] == ['-S', '--defined-only']
-        return types.SimpleNamespace(stdout=SHELL_NM if path == 'shell' else KERNEL_NM)
+        return types.SimpleNamespace(stdout=SHELL_NM if path == 'shell' else
+                                     FEP_NM if Path(path).name == 'fep.elf' else KERNEL_NM)
     return gui.ElfSymbols(path, runner=nm)
 
 
@@ -279,7 +287,12 @@ class GuiTests(unittest.TestCase):
         self.g = gui.Gui(self.http.transport(), 'kernel', 'shell', symbols,
                          descriptor=gui.NO_DESCRIPTOR)
         self.g.screen_text = Mock(return_value={'lines': ['Run: absolute path'], 'ambiguous': []})
-        self.g.ime_active = Mock(return_value=False)
+        # Core has no g_ime. Model VA0 fep.elf plus a relocated RUNNING FEP
+        # record, after other modules, using the actual module_record prefix.
+        self.http.put(MODULE_RECORD_ADDRESS, bytes(MODULE_RECORD_STRIDE * 8))
+        self.http.put(MODULE_RECORD_ADDRESS + MODULE_RECORD_STRIDE * 2,
+                      struct.pack('<9I', 12, 1, 6, 3, 0x1234, FEP_BASE, 8, 0, FEP_BASE))
+        self.http.put(IME_ADDRESS, struct.pack('<I', 0))
         self.http.put(0x150000, bytes(8192))
         for addr in (0x152000, 0x152004, 0x152008):
             self.http.put(addr, struct.pack('<I', 0))
@@ -523,7 +536,8 @@ class GuiTests(unittest.TestCase):
     def test_launch_settings_warning(self):
         self.states([0, 2])
         self.g.screen_text.side_effect = [
-            {'lines': ["Settings: MISSING - defaults in use.", "Run 'cfg init' in CUI."]},
+            # Automatic screen reading drops trailing punctuation.
+            {'lines': ["Settings: MISSING - defaults in use", "Run 'cfg init' in CUI"]},
             {'lines': []}, {'lines': ['Run: absolute path']}]
         self.assertTrue(self.g.launch('/x', timeout=15)['ok'])
         seqs = [data['seq'] for _, data in self.http.posts if 'seq' in data]
@@ -531,14 +545,84 @@ class GuiTests(unittest.TestCase):
 
     def test_launch_ime_on(self):
         self.states([0, 2])
-        self.g.ime_active.side_effect = [True, False, False]
-        self.assertTrue(self.g.launch('/x', timeout=15)['ok'])
+        self.ime_keys(1)
+        result = self.g.launch('/x', timeout=15)
+        self.assertTrue(result['ok'])
+        self.assertEqual(result['ime_restore'], {'before': 1, 'after': 1, 'ok': True})
         inputs = [data for _, data in self.http.posts]
         toggles = [i for i, data in enumerate(inputs) if data.get('seq') == 'SHIFT+SPACE']
         typed = next(i for i, data in enumerate(inputs) if 'text' in data)
         self.assertEqual(len(toggles), 2)
         self.assertLess(toggles[0], typed)
         self.assertGreater(toggles[1], typed)
+
+    def ime_keys(self, mode, stuck=False, restore_error=False):
+        self.http.put(IME_ADDRESS, struct.pack('<I', mode))
+        post = self.http.post
+        def inject(path, data):
+            post(path, data)
+            current = struct.unpack('<I', bytes(self.http.memory[IME_ADDRESS+i] for i in range(4)))[0]
+            if data == {'seq': 'SHIFT+SPACE'}:
+                if restore_error and not current:
+                    raise OSError('restore key rejected')
+                # kernel/ime.c:ime_toggle: OFF -> HIRAGANA, any ON -> OFF.
+                if not stuck:
+                    self.http.put(IME_ADDRESS, struct.pack('<I', 0 if current else 1))
+            if 'text' in data:
+                self.assertEqual(current, 0, 'path typed while IME was ON')
+        self.g.transport.post = inject
+
+    def test_ime_mode_relocated_fep_and_minimal(self):
+        for mode in (0, 1, 2):
+            self.http.put(IME_ADDRESS, struct.pack('<I', mode))
+            self.assertEqual(self.g.ime_mode(), mode)
+            self.assertEqual(self.g.ime_active(), mode != 0)
+        # MINIMAL can retain a failed FEP record; ABSENT/private/quarantined
+        # records must not dereference the unloaded body or require its ELF.
+        original_factory = self.g.symbol_factory
+        def core_only(path):
+            self.assertEqual(path, 'kernel')
+            return original_factory(path)
+        self.g.symbol_factory = core_only
+        for state in (0, 1, 5, 8):
+            self.http.put(MODULE_RECORD_ADDRESS + MODULE_RECORD_STRIDE * 2 + 8,
+                          struct.pack('<I', state))
+            self.assertEqual(self.g.ime_mode(), 0)
+        self.states([0, 2])
+        self.assertTrue(self.g.launch('/x', timeout=15)['ok'])
+        self.assertNotIn({'seq': 'SHIFT+SPACE'}, [data for _, data in self.http.posts])
+
+    def test_launch_ime_katakana_reports_incomplete_restore(self):
+        for sequence in ([0, 2], [0, 0]):
+            self.states(sequence)
+            self.ime_keys(2)
+            result = self.g.launch('/x', timeout=15)
+            self.assertEqual(result['ime_restore'], {
+                'before': 2, 'after': 1, 'ok': False, 'reason': 'IME mode could not be restored'})
+
+    def test_launch_ime_failed_disable_and_restore(self):
+        self.states([0, 2])
+        self.ime_keys(2, stuck=True)
+        result = self.g.launch('/x', timeout=15)
+        self.assertFalse(result['ok'])
+        self.assertIn('IME did not turn off', result['reason'])
+        self.assertFalse(any('text' in data for _, data in self.http.posts))
+        self.assertEqual(result['ime_restore'], {'before': 2, 'after': 2, 'ok': True})
+        self.states([0, 2])
+        self.ime_keys(1, restore_error=True)
+        result = self.g.launch('/x', timeout=15)
+        self.assertTrue(result['ok'])  # Launch succeeded, but restoration failed.
+        self.assertFalse(result['ime_restore']['ok'])
+        self.assertIn('restore key rejected', result['ime_restore']['reason'])
+
+    def test_launch_rejects_run_error_notification(self):
+        self.states([0, 2])
+        self.g.screen_text.return_value = {'lines': [
+            'Run: absolute path required (e.g. /usr/bin/filer.bin)', 'OK']}
+        result = self.g.launch('/x', timeout=15)
+        self.assertFalse(result['ok'])
+        self.assertIn('Run dialog did not open', result['reason'])
+        self.assertFalse(any('text' in data for _, data in self.http.posts))
 
     def test_launch_run_not_open(self):
         self.states([0, 2])
@@ -837,6 +921,11 @@ def mutate():
         ("states[owner] == app('APP_STATE_RUNNING')", "False", 'test_launch_running_op_wait_and_non_wait_running'),
         ("since = self.consink()['since']  # Before", "since = None  # Before", 'test_launch_cursor_precedes_input_and_preserves_early_marker'),
         ("data['hold'] = hold", "data['hold'] = 0", 'test_type_hold_single_chord_and_validation'),
+        ("values['base'] + fep['g_ime'][0]", "kernel['g_ime'][0]", 'test_ime_mode_relocated_fep_and_minimal'),
+        ("values['base'] + fep['g_ime'][0]", "fep['g_ime'][0]", 'test_ime_mode_relocated_fep_and_minimal'),
+        (r'in\s+CUI"', r'in\s+CUI\."', 'test_launch_settings_warning'),
+        (r"(?m)^\s*Run: absolute path\s*$", r"Run: absolute path", 'test_launch_rejects_run_error_notification'),
+        ("ok=current == mode", "ok=bool(current) == bool(mode)", 'test_launch_ime_katakana_reports_incomplete_restore'),
         ("offsets['in_op_wait']", "offsets['state']", 'test_state_symbols_stride_and_separate_tables'),
         ("'slot': None, 'last': last", "'slot': owner - 2, 'last': last", 'test_launch_success_owner_not_shm'),
         ("'ok': False, 'last': last", "'ok': True, 'last': last", 'test_wait_mem_timeout_last_and_success'),
