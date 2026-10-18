@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "sqlite3.h"
+#include "os32_kapi_shared.h"
 #include "guest_inputs.inc"
 
 #define CHECK(c) do { if (!(c)) { puts("FAIL guest inputs: " #c); return 1; } } while (0)
@@ -52,6 +53,7 @@ int main(void)
     sqlite3 *db = NULL;
     sqlite3_stmt *stmt = NULL;
     const char *tail = NULL;
+    CHECK(sizeof(RAW_SLOW_SQL) <= DB_SQL_MAX_BYTES);
     CHECK(RAW_DICT_CANDIDATES > 0);
     CHECK(sqlite3_config(SQLITE_CONFIG_HEAP, pool.bytes, sizeof(pool.bytes), 32) == SQLITE_OK);
     CHECK(sqlite3_initialize() == SQLITE_OK);

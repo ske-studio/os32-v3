@@ -63,6 +63,7 @@ def guest_inputs(tmp):
                       '-nostartfiles', '-fno-pie', '-static',
                       '-include', str(root / 'lib/sqlite3/os32_sqlite_config.h'),
                       '-I' + str(tmp), '-I' + str(root / 'lib/sqlite3'),
+                      '-I' + str(root / 'sdk/include/os32'),
                       str(root / 'tools/tests/raw_wait_sql_host.c'),
                       str(root / 'tools/tests/fep_budget_linux.c'), str(obj), '-lm',
                       '-o', str(exe)], check=True)
@@ -131,6 +132,8 @@ def main():
         original, run = guest_inputs(pathlib.Path(directory))
         if args.mutate:
             variants = [
+                ('oversized SQL', re.sub(r'([a-k]), ', r'\1 CROSS JOIN ', original),
+                 'FAIL guest inputs: sizeof(RAW_SLOW_SQL) <= DB_SQL_MAX_BYTES'),
                 ('CTE SQL', original.replace('"SELECT sum(a.x+b.x+c.x+d.x+e.x+f.x+g.x+h.x+i.x+j.x+k.x+l.x) FROM "',
                                             '"WITH n AS (SELECT 1) SELECT * FROM n, "'),
                  'FAIL guest inputs: sqlite3_prepare_v2(db, RAW_SLOW_SQL, -1, &stmt, &tail) == SQLITE_OK'),
@@ -165,7 +168,7 @@ def main():
         assert result.returncode == 1 and 'FAIL: !sqlite_engine_active && !kills' in result.stdout, (
             result.returncode, result.stdout, result.stderr)
         print('RED runtime: SQLite STOP before leave')
-        print(f'PASS {len(CASES) + 9} raw-wait mutations: named runtime RED, compile failures 0')
+        print(f'PASS {len(CASES) + 10} raw-wait mutations: named runtime RED, compile failures 0')
 
 
 if __name__ == '__main__':

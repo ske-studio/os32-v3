@@ -41,6 +41,7 @@ check-raw-wait-host:
 - lib/sqlite3/sqlite3.h
 - lib/sqlite3/sqlite_stack.asm
 - lib/utf8.c
+- sdk/include/os32/os32_kapi_shared.h
 - sdk/gen_kapi.py
 - sdk/kapi.json
 - tools/check_map.d/check-raw-wait-host.yaml
