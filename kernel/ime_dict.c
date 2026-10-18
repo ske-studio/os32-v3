@@ -85,6 +85,31 @@ static const char SQL_LEARN[] =
     "ON CONFLICT(yomi, kanji) DO UPDATE SET "
     "freq = freq + 1, last_ts = ?3";
 
+/* Large learning ranges must not materialize every spelling in an in-memory
+ * GROUP BY / IN tree. Pick one best spelling at a time, excluding only the
+ * (at most IME_MAX_RESULTS) rows already selected. Rowids keep full spelling
+ * identity in SQLite even when the public result truncates it to 31 bytes. */
+static const char SQL_PREFIX_PICK[] =
+    "SELECT kanji, 0, -10000 - freq as cost, rowid,"
+    " (-10000 - freq) >> 32, (-10000 - freq) & 4294967295 FROM dict_user"
+    " WHERE yomi >= ?1 AND yomi < ?1 || X'EFBFBF'"
+    " AND kanji NOT IN (SELECT kanji FROM dict_user WHERE rowid IN ("
+    "?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,"
+    "?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33))"
+    " ORDER BY cost LIMIT 1";
+static const char SQL_PREFIX_DICT_BOUNDED[] =
+    "SELECT kanji, pos_id, rank, 0, rank >> 32, rank & 4294967295 FROM ("
+    "SELECT kanji, pos_id, CASE WHEN yomi = ?1 THEN cost - 500 ELSE cost END as rank"
+    " FROM dict d WHERE yomi >= ?1 AND yomi < ?1 || X'EFBFBF'"
+    /* Test rank first: with 32 learned words ordinary dictionary rows cannot
+     * enter the output, so they need no correlated learning-range scan. */
+    " AND (?2 IS NULL OR CASE WHEN yomi = ?1 THEN cost - 500 ELSE cost END < (?2 + 0))"
+    " AND NOT EXISTS (SELECT 1 FROM dict_user u WHERE u.kanji = d.kanji"
+    " AND u.yomi >= ?1 AND u.yomi < ?1 || X'EFBFBF')"
+    " ORDER BY rank LIMIT 32)";
+STATIC_ASSERT(sizeof(SQL_PREFIX_PICK) <= DB_SQL_MAX_BYTES, ime_prefix_pick_sql_size);
+STATIC_ASSERT(sizeof(SQL_PREFIX_DICT_BOUNDED) <= DB_SQL_MAX_BYTES, ime_prefix_bounded_sql_size);
+
 /* ======================================================================== */
 /*  公開API                                                                  */
 /* ======================================================================== */
@@ -255,6 +280,112 @@ static int dict_ready(IME_Dict *dict)
 
 static int is_ioerr(int rc) { return (rc & 0xFF) == SQLITE_IOERR; }
 
+static void dict_result(sqlite3_stmt *stmt, const char *yomi, int yomi_len,
+                        IME_Result *r)
+{
+    const char *text = (const char *)sqlite3_column_text(stmt, 0);
+    int copy_len = (int)kstrlen(text);
+    if (copy_len > 31) copy_len = 31;
+    kmemcpy(r->kanji, text, copy_len);
+    r->kanji[copy_len] = '\0';
+    copy_len = yomi_len < 31 ? yomi_len : 31;
+    kmemcpy(r->yomi, yomi, copy_len);
+    r->yomi[copy_len] = '\0';
+    r->pos_id = (u16)sqlite3_column_int(stmt, 1);
+    r->cost = sqlite3_column_int(stmt, 2);
+    if (r->cost >= 0 && kstrlen(r->kanji) >= (u32)yomi_len)
+        r->cost += 300;
+}
+
+/* The module facade exposes 32-bit integer columns/bindings. Split SQL ranks
+ * and bind decimal rowids/ranks to retain their full width without ABI changes. */
+static sqlite3_int64 dict_rank(sqlite3_stmt *stmt)
+{
+    return (sqlite3_int64)(((sqlite3_uint64)(u32)sqlite3_column_int(stmt, 4) << 32) |
+                          (u32)sqlite3_column_int(stmt, 5));
+}
+
+/* -1 selects the existing fast query for a small learning range. All other
+ * returns are final results; temporary statements are finalized on every exit.
+ * Neither the pick sorter nor the dictionary sorter retains more than 32 rows.
+ * The OS is single-task/cooperative: learning cannot change during this scan. */
+static int dict_prefix_bounded(IME_Dict *dict, const char *yomi, int yomi_len,
+                               IME_Result *results, int max_results, int *io_error)
+{
+    sqlite3 *db = dict->db;
+    sqlite3_stmt *stmt = 0;
+    sqlite3_int64 costs[IME_MAX_RESULTS];
+    int rc, rows = 0, count = 0;
+
+    rc = sqlite3_prepare_v2(db,
+        "SELECT 1 FROM dict_user WHERE yomi >= ?1 AND yomi < ?1 || X'EFBFBF'",
+        -1, &stmt, 0);
+    if (rc != SQLITE_OK) goto done;
+    rc = sqlite3_bind_text(stmt, 1, yomi, yomi_len, SQLITE_STATIC);
+    if (rc != SQLITE_OK) goto done;
+    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW && ++rows <= IME_MAX_RESULTS) {}
+    if (rc == SQLITE_DONE) {
+        sqlite3_finalize(stmt);
+        return -1;
+    }
+    if (rc != SQLITE_ROW) goto done;
+    sqlite3_finalize(stmt);
+    stmt = 0;
+
+    rc = sqlite3_prepare_v2(db, SQL_PREFIX_PICK, -1, &stmt, 0);
+    if (rc != SQLITE_OK) goto done;
+    rc = sqlite3_bind_text(stmt, 1, yomi, yomi_len, SQLITE_STATIC);
+    if (rc != SQLITE_OK) goto done;
+    while (count < max_results && (rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+        char rowid[32];
+        kstrncpy(rowid, (const char *)sqlite3_column_text(stmt, 3), sizeof(rowid));
+        costs[count] = dict_rank(stmt);
+        dict_result(stmt, yomi, yomi_len, &results[count]);
+        rc = sqlite3_reset(stmt);
+        if (rc != SQLITE_OK) goto done;
+        rc = sqlite3_bind_text(stmt, count + 2, rowid, -1, SQLITE_TRANSIENT);
+        if (rc != SQLITE_OK) goto done;
+        count++;
+    }
+    if (rc != SQLITE_OK && rc != SQLITE_DONE) goto done;
+    sqlite3_finalize(stmt);
+    stmt = 0;
+
+    rc = sqlite3_prepare_v2(db, SQL_PREFIX_DICT_BOUNDED, -1, &stmt, 0);
+    if (rc != SQLITE_OK) goto done;
+    rc = sqlite3_bind_text(stmt, 1, yomi, yomi_len, SQLITE_STATIC);
+    if (rc != SQLITE_OK) goto done;
+    if (count == max_results) {
+        char rank[32];
+        sqlite3_snprintf(sizeof(rank), rank, "%lld", costs[count - 1]);
+        rc = sqlite3_bind_text(stmt, 2, rank, -1, SQLITE_TRANSIENT);
+        if (rc != SQLITE_OK) goto done;
+    }
+    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+        sqlite3_int64 cost = dict_rank(stmt);
+        int slot = 0;
+        if (!sqlite3_column_text(stmt, 0)) continue;
+        while (slot < count && costs[slot] <= cost) slot++;
+        if (slot == max_results) continue;
+        if (count < max_results) count++;
+        for (int i = count - 1; i > slot; i--) {
+            results[i] = results[i - 1];
+            costs[i] = costs[i - 1];
+        }
+        costs[slot] = cost;
+        dict_result(stmt, yomi, yomi_len, &results[slot]);
+    }
+done:
+    if (rc != SQLITE_OK && rc != SQLITE_DONE) {
+        *io_error = is_ioerr(rc);
+        count = 0;
+        kprintf(ATTR_RED, "IME: bounded prefix failed (rc=%d) %s\r\n", rc,
+                sqlite3_errmsg(db));
+    }
+    if (stmt) sqlite3_finalize(stmt);
+    return count;
+}
+
 static int ime_dict_search_once(IME_Dict *dict, const char *yomi,
                                 IME_Result *results, int max_results,
                                 int *io_error);
@@ -282,7 +413,6 @@ static int ime_dict_search_once(IME_Dict *dict, const char *yomi,
     int count;
     int yomi_len;
     const char *kanji_text;
-    int copy_len;
 
     *io_error = 0;
     if (!dict || !dict->db || !yomi || !results || max_results <= 0)
@@ -303,6 +433,9 @@ static int ime_dict_search_once(IME_Dict *dict, const char *yomi,
     } else {
         /* 3文字以上: 前方一致 */
         stmt = (sqlite3_stmt *)dict->prefix_stmt;
+        sqlite3_reset(stmt);
+        count = dict_prefix_bounded(dict, yomi, yomi_len, results, max_results, io_error);
+        if (count >= 0) return count;
     }
 
     sqlite3_reset(stmt);
@@ -314,31 +447,10 @@ static int ime_dict_search_once(IME_Dict *dict, const char *yomi,
         int step_rc;
         while (count < max_results &&
                (step_rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-        IME_Result *r = &results[count];
-
         /* 漢字 (カラム0) */
         kanji_text = (const char *)sqlite3_column_text(stmt, 0);
         if (!kanji_text) continue;
-        copy_len = (int)kstrlen(kanji_text);
-        if (copy_len > 31) copy_len = 31;
-        kmemcpy(r->kanji, kanji_text, copy_len);
-        r->kanji[copy_len] = '\0';
-
-        /* 読みをコピー */
-        copy_len = yomi_len < 31 ? yomi_len : 31;
-        kmemcpy(r->yomi, yomi, copy_len);
-        r->yomi[copy_len] = '\0';
-
-        /* 品詞ID (カラム1) */
-        r->pos_id = (u16)sqlite3_column_int(stmt, 1);
-
-        /* コスト (カラム2) */
-        r->cost = sqlite3_column_int(stmt, 2);
-
-        /* ひらがな/カタカナそのまま表記に対する動的ペナルティ */
-        if (r->cost >= 0 && kstrlen(r->kanji) >= (u32)yomi_len) {
-            r->cost += 300;
-        }
+        dict_result(stmt, yomi, yomi_len, &results[count]);
 
         count++;
         }

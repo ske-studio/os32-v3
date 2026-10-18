@@ -4,6 +4,7 @@
  * allocation context calls are explicit here; service startup is T4c-2.
  */
 #include <stdio.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include "types.h"
@@ -38,7 +39,13 @@ char *kstrncat(char *d, const char *s, u32 n)
 
 void *kzalloc(u32 n) { return calloc(1, n); }
 void kfree(void *p) { free(p); }
-void kprintf(u8 attr, const char *fmt, ...) { }
+void kprintf(u8 attr, const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    vfprintf(stderr, fmt, args);
+    va_end(args);
+}
 void serial_puts(const char *s) { }
 int utf8_strlen(const u8 *s)
 {
@@ -361,6 +368,66 @@ static void learning(IME_Dict *dict)
     prefix_candidates(dict, 1);
     puts("PASS ext2 RW learning insert/update remount freq=2 ranking journal_deleted exact/prefix unique");
 }
+
+static void bounded_reference(IME_Dict *dict)
+{
+    const int limits[] = {1, 2, IME_MAX_RESULTS, IME_MAX_RESULTS + 1};
+    for (unsigned k = 0; k < sizeof(limits) / sizeof(limits[0]); k++) {
+        IME_Result results[IME_MAX_RESULTS];
+        sqlite3_stmt *reference = NULL;
+        int n = ime_dict_search(dict, "よさん", results, limits[k]);
+        CHECK(sqlite3_prepare_v2(dict->db, SQL_PREFIX, -1, &reference, NULL) == SQLITE_OK);
+        CHECK(sqlite3_bind_text(reference, 1, "よさん", -1, SQLITE_STATIC) == SQLITE_OK);
+        int expected = 0, rc;
+        while ((rc = sqlite3_step(reference)) == SQLITE_ROW && expected < limits[k]) {
+            CHECK(expected < n);
+            CHECK(!strcmp(results[expected].kanji,
+                          (const char *)sqlite3_column_text(reference, 0)));
+            CHECK(results[expected].pos_id == sqlite3_column_int(reference, 1));
+            CHECK(results[expected].cost == (u16)sqlite3_column_int(reference, 2));
+            CHECK(!strcmp(results[expected].yomi, "よさん"));
+            expected++;
+        }
+        CHECK(n == expected);
+        CHECK(sqlite3_finalize(reference) == SQLITE_OK);
+    }
+}
+static void bounded_learning(IME_Dict *dict)
+{
+    os32_sqlite_allocation_context(dict->db, &dict->group);
+    CHECK(sqlite3_exec(dict->db,
+        "INSERT INTO dict VALUES('よさん','word38',7,-20000),"
+        "('よさん','plain',5,-10115),('よさん','tail',6,100);",
+        NULL, NULL, NULL) == SQLITE_OK);
+    /* More than 32 rows, repeated spellings at different readings/frequencies.
+     * Picking only the first 32 raw rows would lose distinct candidates. */
+    for (int i = 0; i < 120; i++) {
+        char sql[160];
+        snprintf(sql, sizeof(sql),
+                 "INSERT INTO dict_user VALUES('よさん%03d','word%02d',%d,0)",
+                 i, i / 3, i + 1);
+        CHECK(sqlite3_exec(dict->db, sql, NULL, NULL, NULL) == SQLITE_OK);
+    }
+    CHECK(sqlite3_exec(dict->db,
+        "INSERT INTO dict_user(rowid,yomi,kanji,freq)"
+        " VALUES(4294967297,'よさんhigh','word00',1000)",
+        NULL, NULL, NULL) == SQLITE_OK);
+    bounded_reference(dict);
+    CHECK(sqlite3_exec(dict->db,
+        "DELETE FROM dict_user WHERE kanji NOT IN ('word00','word01')",
+        NULL, NULL, NULL) == SQLITE_OK);
+    for (int i = 0; i < 40; i++) {
+        char sql[160];
+        snprintf(sql, sizeof(sql),
+                 "INSERT INTO dict_user VALUES('よさんextra%03d','word%02d',%d,0)",
+                 i, i & 1, 200 + i);
+        CHECK(sqlite3_exec(dict->db, sql, NULL, NULL, NULL) == SQLITE_OK);
+    }
+    /* Many rows but only two learned spellings: merge ordinary dictionary
+     * words too, including a cheaper dictionary word, and exhaust the input. */
+    bounded_reference(dict);
+    puts("PASS bounded prefix matches SQL rank/POS/identity/cap with repeated learning and 64-bit rowid");
+}
 int main(int argc, char **argv)
 {
     IME_Dict dict = {0};
@@ -370,6 +437,7 @@ int main(int argc, char **argv)
     open_dict(&dict);
     if (!strcmp(argv[1], "pressure")) pressure(&dict);
     else if (!strcmp(argv[1], "learning")) learning(&dict);
+    else if (!strcmp(argv[1], "bounded")) bounded_learning(&dict);
     else { CHECK(!strcmp(argv[1], "prefix") && argc == 3); prefix_work(&dict); }
     os32_sqlite_allocation_context(dict.db, &dict.group);
     CHECK(ime_dict_close(&dict) == 0);
