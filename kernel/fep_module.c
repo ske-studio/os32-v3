@@ -163,7 +163,7 @@ int fep_module_abort(void) { return module_abort(fep_handle); }
 u32 fep_module_pages(void)
 {
     struct module_record *r = module_record_get(fep_handle);
-    return r && r->owner ? ledger_owner_pages(r->owner) : 0;
+    return r && r->state != MODULE_ABSENT && r->owner ? ledger_owner_pages(r->owner) : 0;
 }
 u32 ime_boot_bytes(void)
 {

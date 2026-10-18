@@ -36,6 +36,7 @@ u32 paging_sqlite_stack_guard;
 static int guard_np, guard_restored;
 static u32 stack_reports;
 static u32 dictionary_stats, dictionary_missing_messages, services_reports;
+static u32 reused_owner_pages;
 static void stack_usage(void);
 /* Copyout seam for the real ver diagnostic entry. */
 char *kstrncpy(char *d, const char *s, u32 n)
@@ -427,6 +428,10 @@ void kprintf(u8 attr, const char *fmt, ...)
                       services_stage == SERVICES_MINIMAL_QUARANTINED ? "MINIMAL_QUARANTINED" : "STARTING",
                       kstrlen(state) + 1));
         CHECK(va_arg(args, unsigned) == (unsigned)services_public);
+        CHECK(va_arg(args, unsigned) == (module_records[0].state == MODULE_ABSENT ?
+              0 : ledger_owner_pages(OWNER)));
+        CHECK(va_arg(args, unsigned) == (module_records[1].state == MODULE_ABSENT ?
+              0 : ledger_owner_pages(OWNER + 1)));
         va_end(args);
         services_reports++;
     }
@@ -564,7 +569,7 @@ u32 ledger_owner_pages(u32 owner)
     CHECK(owner == OWNER || owner == OWNER + 1);
     u32 count = 0;
     for (u32 i = 0; i < allocated; i++) count += live[i] && page_owner[i] == owner;
-    return count;
+    return count + reused_owner_pages;
 }
 int ledger_owner_retire(u32 owner)
 {
@@ -763,6 +768,17 @@ static void boot_transaction(void)
     say(" fep_bytes="); number(ime_boot_bytes());
     say(" quarantine_bytes="); number(isolated ? (pages + fep_pages) * PAGE_SIZE + ime_boot_bytes() : 0);
     say(" unicode_pages="); number(unicode_pages); say(" guard_included=1 audit_diff=0\n");
+    if (services_stage == SERVICES_MINIMAL) {
+        /* Reclaimed owner IDs now belong to later applications (e.g. sh).
+         * Records retain those IDs, but ver must not attribute their pages. */
+        reused_owner_pages = 7;
+        CHECK(ledger_owner_pages(OWNER) == 7 && ledger_owner_pages(OWNER + 1) == 7);
+        CHECK(!fep_module_pages());
+        services_report();
+        CHECK(services_reports == 2);
+        reused_owner_pages = 0;
+        say("PASS MINIMAL reused owner IDs: ver sqlite_pages=0 fep_pages=0\n");
+    }
     u32 before = alloc_calls;
     services_boot();
     CHECK(alloc_calls == before); /* boot transaction is single-shot */

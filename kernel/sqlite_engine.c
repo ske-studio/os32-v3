@@ -300,7 +300,7 @@ rollback:;
 report:;
     services_reserve = reserve;
     struct module_record *r = module_record_get(sqlite_handle);
-    u32 pages = r && r->owner ? ledger_owner_pages(r->owner) : 0;
+    u32 pages = r && r->state != MODULE_ABSENT && r->owner ? ledger_owner_pages(r->owner) : 0;
     u32 fep = ime_boot_bytes();
     u32 fep_pages = fep_module_pages();
     struct memory_page_counts counts;
@@ -332,7 +332,7 @@ static const char *services_state_name(void)
 void services_report(void)
 {
     struct module_record *r = module_record_get(sqlite_handle);
-    u32 pages = r && r->owner ? ledger_owner_pages(r->owner) : 0;
+    u32 pages = r && r->state != MODULE_ABSENT && r->owner ? ledger_owner_pages(r->owner) : 0;
     u32 fep_pages = fep_module_pages();
     u32 fep = ime_boot_bytes();
     kprintf(0x07, "  services: %s public=%u sqlite_pages=%u fep_pages=%u quarantine_bytes=%u reserve=%d\n",
