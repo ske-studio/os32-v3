@@ -67,8 +67,13 @@ static const char SQL_PREFIX[] =
     "  SELECT kanji, pos_id,"
     "    CASE WHEN yomi = ?1 THEN cost - 500 ELSE cost END as cost"
     "    FROM dict d WHERE yomi >= ?1 AND yomi < ?1 || X'EFBFBF'"
-    "    AND NOT EXISTS (SELECT 1 FROM dict_user u WHERE u.kanji = d.kanji"
-    "      AND u.yomi >= ?1 AND u.yomi < ?1 || X'EFBFBF')"
+    /* Build the learned spelling set once, rather than scanning the reading
+     * range for every dictionary row. IS NOT TRUE also accepts NULL, matching
+     * NOT EXISTS semantics without IN's per-row NULL-resolution scan.
+     * Ordering this small set avoids the bundled SQLite's extra Bloom-filter
+     * probe per dictionary row (covered by the real-dictionary VM-step test). */
+    "    AND (d.kanji IN (SELECT kanji FROM dict_user"
+    "      WHERE yomi >= ?1 AND yomi < ?1 || X'EFBFBF' ORDER BY kanji)) IS NOT TRUE"
     ") ORDER BY cost LIMIT 32";
 
 STATIC_ASSERT(sizeof(SQL_EXACT) <= DB_SQL_MAX_BYTES, ime_exact_sql_size);

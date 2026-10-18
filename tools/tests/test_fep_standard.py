@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """T4c-3: app pressure at the product ILP32 cap and standard ext2 RW learning."""
 import argparse
+import importlib.util
 import os
 from pathlib import Path
 import shutil
+import sqlite3
 import tempfile
 
 import host32
@@ -11,7 +13,7 @@ import host32
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = 'tools/tests/fep_standard_host.c'
 # Only changed implementation sources need overlay copies; other includes
-# fall back to ROOT. Both regressions run normally before any mutant.
+# fall back to ROOT. All regressions run normally before any mutant.
 FILES = [SOURCE, 'lib/sqlite3/os32_sqlite_vfs.c', 'kernel/ime_dict.c']
 MUTANTS = [
     ('fep_uses_app_cap', 'pressure', 'lib/sqlite3/os32_sqlite_vfs.c',
@@ -27,8 +29,8 @@ MUTANTS = [
      '    "      WHERE u.yomi = ?1 AND u.kanji = d.kanji)"\n',
      '', 'count == expected'),
     ('prefix_dictionary_duplicate', 'learning', 'kernel/ime_dict.c',
-     '    "    AND NOT EXISTS (SELECT 1 FROM dict_user u WHERE u.kanji = d.kanji"\n'
-     '    "      AND u.yomi >= ?1 AND u.yomi < ?1 || X\'EFBFBF\')"\n',
+     '    "    AND (d.kanji IN (SELECT kanji FROM dict_user"\n'
+     '    "      WHERE yomi >= ?1 AND yomi < ?1 || X\'EFBFBF\' ORDER BY kanji)) IS NOT TRUE"\n',
      '', 'count == expected'),
     ('prefix_user_duplicate', 'learning', 'kernel/ime_dict.c',
      '    "  SELECT kanji, 0 as pos_id, MIN(-10000 - freq) as cost"\n'
@@ -37,7 +39,43 @@ MUTANTS = [
      '    "  SELECT kanji, 0 as pos_id, (-10000 - freq) as cost"\n'
      '    "    FROM dict_user WHERE yomi >= ?1 AND yomi < ?1 || X\'EFBFBF\'"\n',
      'count == expected'),
+    ('prefix_limit_two', 'learning', 'kernel/ime_dict.c',
+     '") ORDER BY cost LIMIT 32";\n\nSTATIC_ASSERT(sizeof(SQL_EXACT)',
+     '") ORDER BY cost LIMIT 2";\n\nSTATIC_ASSERT(sizeof(SQL_EXACT)',
+     'count == IME_MAX_RESULTS'),
+    ('prefix_range_scan', 'prefix', 'kernel/ime_dict.c',
+     '    "    AND (d.kanji IN (SELECT kanji FROM dict_user"\n'
+     '    "      WHERE yomi >= ?1 AND yomi < ?1 || X\'EFBFBF\' ORDER BY kanji)) IS NOT TRUE"\n',
+     '    "    AND NOT EXISTS (SELECT 1 FROM dict_user u WHERE u.kanji = d.kanji"\n'
+     '    "      AND u.yomi >= ?1 AND u.yomi < ?1 || X\'EFBFBF\')"\n',
+     'fixed_steps * 2 <= baseline_steps * 3'),
 ]
+
+
+def dictionary(tmp):
+    # Build the shipped M dictionary from bundled IPADIC, using the real tool.
+    # Seed the old schema (no spelling-first index) with 32 distinct learned
+    # spellings at the input prefix, as produced by ime_dict_learn.
+    spec = importlib.util.spec_from_file_location('fep_builder', ROOT / 'tools/fep_to_sqlite.py')
+    builder = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(builder)
+    entries = builder.normalize_costs(builder.load_ipadic(str(ROOT / 'assets/ipadic')))
+    path = tmp / 'fep.db'
+    builder.create_db(entries, str(path), builder.SIZE_DEFS['M']['cost_limit'])
+    with sqlite3.connect(path) as db:
+        rows = db.execute("SELECT kanji FROM dict WHERE yomi >= ? AND yomi < ?",
+                          ('しょう', 'しょう\uffff')).fetchall()
+        assert len(rows) >= 700, len(rows)
+        words = sorted({row[0] for row in rows})[:32]
+        assert len(words) == 32
+        db.executescript('CREATE TABLE dict_user(yomi TEXT NOT NULL,kanji TEXT NOT NULL,'
+                         'freq INTEGER DEFAULT 1,last_ts INTEGER DEFAULT 0,PRIMARY KEY(yomi,kanji));'
+                         'CREATE INDEX idx_user_yomi ON dict_user(yomi);')
+        db.executemany('INSERT INTO dict_user VALUES(?,?,?,?)',
+                       [('しょう', word, i + 1, i) for i, word in enumerate(words)])
+    print(f'INPUT real bundled IPADIC M shou_candidates={len(rows)} learned=32 legacy_schema',
+          flush=True)
+    return path
 
 
 def build(root, obj, exe):
@@ -54,8 +92,11 @@ def build(root, obj, exe):
                   str(obj), '-lm', '-o', str(exe)], check=True)
 
 
-def run(exe, case, runner):
-    result = host32.run([str(exe), case], runner=runner,
+def run(exe, case, runner, data):
+    command = [str(exe), case]
+    if case == 'prefix':
+        command.append(str(data))
+    result = host32.run(command, runner=runner,
                         capture_output=True, text=True, timeout=120)
     print(result.stdout + result.stderr, end='', flush=True)
     return result
@@ -68,6 +109,7 @@ def main():
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='fep-standard-') as directory:
         tmp = Path(directory)
+        data = dictionary(tmp)
         obj = tmp / 'sqlite.o'
         cc = str(Path(os.environ['CROSS_DIR']) / 'bin/i386-elf-gcc')
         host32.build([cc, '-m32', '-march=i386', '-std=gnu89', '-Os', '-DNDEBUG',
@@ -77,10 +119,11 @@ def main():
                       str(ROOT / 'lib/sqlite3/sqlite3.c'), '-o', str(obj)], check=True)
         normal = tmp / 'normal'
         build(ROOT, obj, normal)
-        for case in ('pressure', 'learning'):
-            result = run(normal, case, args.runner)
+        for case in ('pressure', 'learning', 'prefix'):
+            result = run(normal, case, args.runner, data)
             assert result.returncode == 0, result.returncode
-        print('GREEN FEP APP+SYSTEM=319488 conversion; ext2 RW learning', flush=True)
+        print('GREEN FEP APP+SYSTEM=319488 conversion; ext2 RW learning; prefix cap/order/VM steps',
+              flush=True)
         if args.mutate:
             for name, case, file, old, new, marker in MUTANTS:
                 tree = tmp / name
@@ -94,7 +137,7 @@ def main():
                 source.write_text(text.replace(old, new))
                 exe = tree / 'mutant'
                 build(tree, obj, exe)  # Compile errors never count as RED.
-                result = run(exe, case, args.runner)
+                result = run(exe, case, args.runner, data)
                 assert result.returncode == 1 and marker in result.stderr, (name, result)
                 print(f'RED runtime {name}: {marker}', flush=True)
 
