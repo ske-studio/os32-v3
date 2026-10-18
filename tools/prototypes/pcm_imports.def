@@ -1,0 +1,119 @@
+{
+  "schema": 1,
+  "contracts": [
+    "kernel/pcm_module.h",
+    "drivers/pcm_cs4231.h",
+    "kernel/irq.h",
+    "kernel/dma_pool.h"
+  ],
+  "imports": [
+    {
+      "symbol": "pcm_module_irq_register",
+      "source": "kernel/pcm_module.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "pcm_module_irq_unregister",
+      "source": "kernel/pcm_module.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "pcm_module_dma_alloc",
+      "source": "kernel/pcm_module.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "pcm_module_dma_free",
+      "source": "kernel/pcm_module.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "dma_mark_leaked",
+      "source": "kernel/dma_pool.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "dma_chan_mask",
+      "source": "drivers/dma8237.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "dma_chan_unmask",
+      "source": "drivers/dma8237.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "dma_chan_setup",
+      "source": "drivers/dma8237.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "dma_chan_remaining",
+      "source": "drivers/dma8237.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "dma_chan_ack_tc",
+      "source": "drivers/dma8237.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "kmalloc",
+      "source": "kernel/kmalloc.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "kfree",
+      "source": "kernel/kmalloc.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "kmemcpy",
+      "source": "lib/kstring.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "kmemset",
+      "source": "lib/kstring.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "kprintf",
+      "source": "include/kprintf.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "sys_time_now",
+      "source": "include/sys.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "ktime_ticks",
+      "context": "normal",
+      "irq": true,
+      "declaration": "u32 ktime_ticks(void);"
+    },
+    {
+      "symbol": "res_owner_get",
+      "context": "normal",
+      "irq": false,
+      "declaration": "int res_owner_get(void);"
+    }
+  ]
+}

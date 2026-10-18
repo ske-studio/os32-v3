@@ -64,6 +64,10 @@ filesystem:
     - host: build/out/fm.mod
       guest: /boot/fm.mod
       tags: [core]
+    # --- Paired PCM (also on FD) ---
+    - host: build/out/pcm.mod
+      guest: /boot/pcm.mod
+      tags: [core]
     # --- カーネルデータ ---
     - host: build/out/unicode.bin
       guest: /sys/unicode.bin

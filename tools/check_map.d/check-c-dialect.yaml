@@ -10,6 +10,7 @@ check-c-dialect:
 - tools/prototypes/sqlite_imports.def
 - tools/prototypes/fep_imports.def
 - tools/prototypes/cd_imports.def
+- tools/prototypes/pcm_imports.def
 - build/sqlite-proto.mk
 - tools/check_map.d/check-c-dialect.yaml
 - build/checks.d/check-c-dialect.mk

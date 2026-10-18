@@ -1,0 +1,133 @@
+/* Real runtime + resident PCM brokers. Relocated body calls are a host seam;
+ * the CS4231 fixture separately exercises the real device stop evidence. */
+#define _start unused_runtime_start
+#include "module_runtime_host.c"
+#undef _start
+#include "io.h"
+#define irq_save() 0U
+#define irq_restore(f) ((void)(f))
+#ifndef PCM_ADAPTER
+#define PCM_ADAPTER "../../kernel/pcm_module.c"
+#endif
+#include PCM_ADAPTER
+
+static u32 ticks, mode, public_calls, dma_live, dma_freed, irq_live;
+static struct dma_buf ring;
+int dma_alloc(u32 size, u32 align, u32 limit, struct dma_buf *out)
+{
+    CHECK(size == PCM_RING_BYTES && align == PCM_POOL_ALIGN && limit == DMA_PHYS_LIMIT);
+    CHECK(!dma_live);
+    dma_live = 1;
+    *out = (struct dma_buf){.pa = MEM_DMA_POOL_BASE, .va = &ring, .size = size};
+    CHECK((out->pa & 0xffffU) + size <= 0x10000U);
+    return 0;
+}
+int dma_free(const struct dma_buf *buf)
+{
+    CHECK(buf->pa == MEM_DMA_POOL_BASE && dma_live);
+    dma_live = 0; dma_freed++;
+    return 0;
+}
+int irq_register(unsigned int irq, irq_handler_fn fn, void *arg, unsigned int flags)
+{
+    CHECK(irq == PCM_IRQ && fn && !arg && flags == IRQ_F_SHARED && !irq_live);
+    irq_live = 1;
+    return 0;
+}
+int irq_unregister(unsigned int irq, irq_handler_fn fn, void *arg)
+{
+    CHECK(irq == PCM_IRQ && fn && !arg && irq_live);
+    irq_live = 0;
+    return 0;
+}
+static int body_irq(unsigned int irq, void *arg) { (void)irq; (void)arg; return IRQ_HANDLED; }
+static void body_tick(void) { ticks++; }
+static int body_open(u32 rate)
+{
+    if (dma_live) return PCM_ERR_BUSY;
+    CHECK(rate == PCM_RATE_44100);
+    public_calls++;
+    CHECK(!pcm_module_dma_alloc(PCM_RING_BYTES, PCM_POOL_ALIGN, DMA_PHYS_LIMIT, &ring));
+    CHECK(!pcm_module_irq_register(PCM_IRQ, body_irq, 0, IRQ_F_SHARED));
+    return 0;
+}
+static int body_quiet(void)
+{
+    if (irq_target) CHECK(!pcm_module_irq_unregister(PCM_IRQ, body_irq, 0));
+    if (mode == 2) return 0; /* real driver leaves leaked ring and DMA ref */
+    if (dma_live) CHECK(!pcm_module_dma_free(&ring));
+    return 1;
+}
+static int init_pcm(PcmModuleApi *out)
+{
+    CHECK(!module_exports(pcm_handle));
+    u32 entries[PCM_MODULE_API_SLOTS];
+    for (u32 i = 0; i < PCM_MODULE_API_SLOTS; i++) entries[i] = (u32)(uptr)body_tick;
+    kmemcpy(out, entries, sizeof(entries));
+    out->tick = body_tick;
+    out->quiet = body_quiet;
+    out->open = body_open;
+    return 0;
+}
+static int start_then_fail(struct module_record *r, u32 entry, u32 *ops)
+{
+    int rc = pcm_start_module(r, entry, ops);
+    if (!rc && mode == 1) {
+        body_open(PCM_RATE_44100);
+        CHECK(r->irq_refs == 1 && r->dma_refs == 1 && !module_exports(pcm_handle));
+        pcm_tick();
+        CHECK(pcm_open(PCM_RATE_44100) == OS32_ERR_NOSYS);
+        CHECK(ticks == 1 && public_calls == 1);
+        return MODULE_INIT_FAILED;
+    }
+    return rc;
+}
+void _start(void)
+{
+    read_input(input, sizeof(input)); read_input(file, sizeof(file));
+    mode = input[1];
+    kmemcpy(&imports[0].name_hash, file + 152, 4);
+    kmemcpy(&exports[4].name_hash, file + 164, 4);
+    exports[4].version = 1;
+    struct module_request q = request();
+    q.lifecycle = (struct module_lifecycle){.start = start_then_fail, .quiesce = pcm_quiesce,
+                                           .detach = pcm_detach, .stop_dma = pcm_stop_dma};
+    /* S4 invalid rate and missing-module stubs preserve their contract. */
+    CHECK(pcm_open(PCM_RATE_44100 + 1) == OS32_ERR_INVAL);
+    CHECK(pcm_open(PCM_RATE_44100) == OS32_ERR_NOSYS);
+    CHECK(pcm_state() == PCM_ST_CLOSED && !pcm_present());
+    CHECK(pcm_write(0, 0) == OS32_ERR_INVAL && pcm_close() == OS32_ERR_INVAL);
+    pcm_tick(); CHECK(!ticks);
+    CHECK(!module_load(&q, &pcm_handle));
+    struct module_record *r = module_record_get(pcm_handle);
+    r->init = (u32)(uptr)init_pcm;
+    r->text = (u32)(uptr)body_irq & ~(PAGE_SIZE - 1);
+    r->text_size = 16 * PAGE_SIZE;
+    int rc = module_start(pcm_handle);
+    if (mode == 1 || mode == 3) {
+        CHECK(rc == MODULE_INIT_FAILED);
+        CHECK(!tick_target && !r->tick_refs && !irq_target && !r->irq_refs && !r->dma_refs);
+        CHECK(!dma_live && !irq_live && r->state == MODULE_ABSENT);
+        CHECK(dma_freed == (mode == 1 ? 1U : 0U));
+        empty(); finish(0);
+    }
+    CHECK(!rc && r->tick_refs == 1 && tick_target);
+    CHECK(!pcm_open(PCM_RATE_44100)); pcm_tick();
+    CHECK(pcm_open(PCM_RATE_44100 + 1) == PCM_ERR_BUSY);
+    CHECK(ticks == 1 && public_calls == 1 && r->dma_refs == 1 && r->irq_refs == 1);
+    u32 before = returned;
+    rc = pcm_module_abort();
+    CHECK(!tick_target && !r->tick_refs && !irq_target && !r->irq_refs && !irq_live);
+    pcm_tick(); CHECK(ticks == 1);
+    CHECK(pcm_open(PCM_RATE_44100) == OS32_ERR_NOSYS);
+    if (mode == 2) {
+        CHECK(rc == MODULE_ISOLATED && r->state == MODULE_QUARANTINED);
+        CHECK(returned == before && mask[0] == 2 && live[0] && !retired);
+        CHECK(dma_live && !dma_freed && r->dma_refs == 1);
+        CHECK(pcm_module_abort() == MODULE_ISOLATED);
+    } else {
+        CHECK(!rc && r->state == MODULE_ABSENT && !dma_live && dma_freed == 1 && !r->dma_refs);
+        CHECK(!pcm_module_abort()); empty();
+    }
+    finish(0);
+}

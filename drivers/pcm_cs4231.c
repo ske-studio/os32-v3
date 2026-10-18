@@ -17,7 +17,17 @@
 #include "dma_pool.h"
 #include "kmalloc.h"     /* ステージングは DMA しないので KHEAP から */
 #include "irq.h"
+#ifdef OS32_PCM_MODULE
+#include "pcm_module.h"
+extern u32 ktime_ticks(void);
+#define tick_count ktime_ticks()
+#define irq_register pcm_module_irq_register
+#define irq_unregister pcm_module_irq_unregister
+#define dma_alloc pcm_module_dma_alloc
+#define dma_free pcm_module_dma_free
+#else
 #include "idt.h"        /* tick_count */
+#endif
 #include "io.h"
 #include "kprintf.h"
 #include "kstring.h"
@@ -766,4 +776,12 @@ void pcm_reclaim(int owner)
     else pcm_enter_faulted(PCM_DIAG_FAULT_RECLAIM);
     irq_restore(f);
     pcm_release(evid ? 0 : 1);
+}
+
+/* Module rollback uses the same bounded abort and evidence as owner STOP.
+ * OPENING failures already unwind synchronously in pcm_open_fail. */
+int pcm_module_quiet(void)
+{
+    pcm_reclaim(s_owner);
+    return !s_fault_sticky && g_pcm.state == PCM_ST_CLOSED;
 }
