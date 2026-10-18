@@ -19,7 +19,7 @@ from test_module_image import build_validator, validate, fnv, crc, word
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'kernel/cd_module.c'
 CASES = ['register-unmount-release', 'fs-full', 'device-full', 'init-failed',
-         'no-medium-iso-available', 'prefix-return-failed', 'mounted-body-retained']
+         'no-drive-iso-available', 'prefix-return-failed', 'mounted-body-retained']
 
 
 def product_image(folder):

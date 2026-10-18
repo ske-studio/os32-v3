@@ -27,8 +27,7 @@
 extern volatile u32 tick_count;
 #endif
 
-/* ISO addresses are always 2048 bytes, while hd/loop devices may use 512.
- * diskio/FatFs and IDE/FDC stay core; all reads use the shared Device read API. */
+/* CD reads use the shared Device API; diskio/FatFs and IDE/FDC stay core. */
 static int iso_read_device(Device *dev, u32 lba, u32 count, void *buf)
 {
     if (dev->sect_size <= 0 || dev->sect_size > ISO_SECTOR_SIZE ||
@@ -407,13 +406,9 @@ static void *iso9660_mount(int dev_id)
     char devname[8];
 
     int type = VFS_MOUNT_DEV_TYPE(dev_id);
-    const char *prefix;
-    if (type == VFS_DEV_CD) prefix = "cd";
-    else if (type == VFS_DEV_HD) prefix = "hd";
-    else if (type == VFS_DEV_LOOP) prefix = "lo";
-    else return (void *)0;
-    devname[0] = prefix[0];
-    devname[1] = prefix[1];
+    if (type != VFS_DEV_CD) return (void *)0;
+    devname[0] = 'c';
+    devname[1] = 'd';
     devname[2] = '0' + (char)VFS_MOUNT_DEV_ID(dev_id);
     devname[3] = '\0';
     dev = dev_find(devname);

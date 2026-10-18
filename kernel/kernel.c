@@ -558,6 +558,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
             Device *d = dev_find(dname);
 
             if (!d || d->type != DEV_BLOCK) continue;
+            if (!d->sect_size || !d->total_sects) continue;
 
             /* ルートと一致する場合はスキップ */
             {

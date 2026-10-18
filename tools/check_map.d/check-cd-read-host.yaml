@@ -15,3 +15,16 @@ check-cd-read-host:
 - kernel/module_schema.h
 - fs/vfs.h
 - drivers/dev.h
+- kernel/kernel.c
+- fs/vfs.c
+- drivers/dev.c
+- drivers/disk.h
+- drivers/ide.h
+- drivers/fdc.h
+- drivers/fdc_decide.h
+- include/console.h
+- include/kbd.h
+- include/pc98.h
+- include/types.h
+- lib/kstring.h
+- tools/tests/atapi_hostshim/io.h

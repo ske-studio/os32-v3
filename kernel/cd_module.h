@@ -8,7 +8,7 @@
 #define CD_MODULE_OPS_VERSION 1u
 typedef struct {
     VfsOps *fs;
-    Device *device;              /* NULL when no readable medium was found */
+    Device *device;              /* NULL only when no ATAPI drive was found */
 } CdModuleApi;
 
 int cd_module_load(void);

@@ -8,11 +8,11 @@
  *  atapi.c のポートは tools/tests/atapi_hostshim/io.h がここの ATAPI デバイスの
  *  模型へ回す。模型は PACKET (0xA0) → 12 バイトの CDB → DRQ ごとのデータ、を
  *  レジスタの粒度で写し、READ(10) の回数・セクタ数・(LBA, 数) の列を数える。
- *  iso9660.c の下の dev 層 (dev_find / dev_blk_read_lba) は cd0 だけの贋物で、
- *  そのまま atapi_read_sectors へ渡す (drivers/dev.c の cd0_read と同じ)。
+ *  dev.c / vfs.c も実物。媒体の後挿入は sys_mount の委譲先 vfs_mount まで通す。
+ *  KAPI の呼出し規約・ポインタ検証と PC-98 の実起動はこの模型の対象外。
  *  媒体は試験が組む ISO 9660 のイメージ (PVD・根・SUB・ファイル)。
  *
- *  [C1] C89 / GNU89。
+ *  [C1] GNU11。
  * ======================================================================== */
 
 #include <stdio.h>
@@ -25,6 +25,7 @@
 #include "kmalloc.h"
 #include "lib/kstring.h"
 #include "cpu_calibrate.h"
+#include "pc98.h"
 
 /* ---- 境界の贋物 (kstring / kmalloc / tick) ---- */
 volatile u32 tick_count;
@@ -892,31 +893,35 @@ void atapi_shim_outpw(unsigned int port, unsigned int value)
 { if (g_np2) np2_outpw(port, value); else m_outpw(port, value); }
 
 /* ======================================================================== */
-/*  dev 層の贋物 (cd0 だけ)                                                 */
+/*  実物 dev 層への fixture 装置・未使用境界                                                 */
 /* ======================================================================== */
 
-static Device g_cd0 = {.type = DEV_BLOCK, .bus_type = DEV_BUS_ATAPI,
-                       .sect_size = SEC};
-static u32 g_dev_calls;
-static Device g_image;
-
-Device *dev_find(const char *name)
+static int fixture_cd_read(Device *dev, int lba, int count, void *buf)
 {
-    if (g_image.name && !strcmp(name, g_image.name)) return &g_image;
-    return (strcmp(name, "cd0") == 0) ? &g_cd0 : (Device *)0;
+    (void)dev;
+    return atapi_read_sectors((u32)lba, (u32)count, buf);
+}
+static Device g_cd0 = {.name = "cd0", .type = DEV_BLOCK, .bus_type = DEV_BUS_ATAPI,
+                       .sect_size = SEC, .blk_read = fixture_cd_read};
+
+/* No open FDs in this fixture. Device and VFS registries are real. */
+void vfs_fd_invalidate_mount(void *ctx) { (void)ctx; }
+/* ASan retains the core device descriptors; no IDE/FDC I/O is expected. */
+int fdc_read_sector(int d, int c, int h, int s, void *buf)
+{ (void)d; (void)c; (void)h; (void)s; (void)buf; CHECK(0); return -1; }
+int fdc_write_sector(int d, int c, int h, int s, const void *buf)
+{ (void)d; (void)c; (void)h; (void)s; (void)buf; CHECK(0); return -1; }
+int ide_read_sectors(int d, u32 lba, u32 n, void *buf)
+{ (void)d; (void)lba; (void)n; (void)buf; CHECK(0); return -1; }
+int ide_write_sectors(int d, u32 lba, u32 n, const void *buf)
+{ (void)d; (void)lba; (void)n; (void)buf; CHECK(0); return -1; }
+static void reset_devices(void)
+{
+    while (dev_count()) CHECK(!dev_unregister(dev_get(0)));
+    CHECK(!dev_register(&g_cd0));
 }
 
-int dev_blk_read_lba(Device *dev, u32 lba, int count, void *buf)
-{
-    if (dev == &g_image) {
-        CHECK((lba + (u32)count) * dev->sect_size <= g_media_a.secs * SEC);
-        memcpy(buf, g_media_a.img + lba * dev->sect_size, count * dev->sect_size);
-        return 0;
-    }
-    CHECK(dev == &g_cd0);
-    g_dev_calls++;
-    return atapi_read_sectors(lba, (u32)count, buf);
-}
+#include "boot_submount.c"
 
 /* ======================================================================== */
 /*  共通                                                                     */
@@ -932,6 +937,7 @@ static void setup(void)
     build_media(&g_media_b, BIG_LBA_B, SUB_LBA_B, DEEP_SIZE_B, 2);
     M.m = &g_media_a;
     g_cd0.total_sects = g_media_a.secs;
+    reset_devices();
     CHECK(atapi_init() == 1);
 }
 
@@ -951,6 +957,7 @@ static void setup_np2_layout(int layout)
     build_media(&g_media_b, BIG_LBA_B, SUB_LBA_B, DEEP_SIZE_B, 2);
     M.m = &g_media_a;
     g_cd0.total_sects = g_media_a.secs;
+    reset_devices();
     g_np2 = 1;
     g_delay_us = 0;
     N.strict = g_np2cfg.strict;
@@ -2264,28 +2271,86 @@ static void t_cd_body(void)
     CHECK(api.device && N.d[0].n_startunit == 1);
     N.d[0].loaded = 0;
     CHECK(!cd_module_init(&api));
-    CHECK(api.fs == &iso9660_ops && !api.device);
+    CHECK(api.fs == &iso9660_ops && api.device && !api.device->total_sects);
     CHECK(strstr(g_klog, "medium unavailable"));
+    N.d[0].present = 0;
+    CHECK(!cd_module_init(&api));
+    CHECK(api.fs == &iso9660_ops && !api.device);
+}
+
+/* Empty tray at boot: NP21/W reports one sector, real drives may fail
+ * READ CAPACITY. Registration follows cd_start, with the actual body result.
+ * No re-init/re-registration/capacity refresh is allowed after insertion. */
+static void t_empty_insert(void)
+{
+    for (unsigned failed_capacity = 0; failed_capacity < 2; failed_capacity++) {
+        CdModuleApi api;
+        setup_np2();
+        CHECK(!dev_unregister(&g_cd0));
+        N.d[0].loaded = 0;
+        N.d[0].need_start = failed_capacity;
+        N.d[0].start_ignored = failed_capacity;
+        CHECK(!cd_module_init(&api));
+        CHECK(api.fs == &iso9660_ops);
+        CHECK(!vfs_register_fs(api.fs));
+        if (api.device) CHECK(!dev_register(api.device));
+        if (api.device) CHECK(api.device->total_sects == 0);
+        u32 reads = M.n_read10;
+        boot_submount(0); /* HDD boot; empty cd0 must not be auto-mounted. */
+        CHECK(M.n_read10 == reads);
+        char rel[VFS_MAX_PATH];
+        void *ctx;
+        CHECK(!vfs_route("/cd0", rel, sizeof(rel), &ctx));
+        N.d[0].loaded = 1;
+        N.d[0].need_start = N.d[0].start_ignored = 0;
+        /* sys_mount delegates directly here (kapi_generated.c). */
+        int (*sys_mount)(const char *, const char *, const char *) = vfs_mount;
+        CHECK(sys_mount("/cd0", "cd0", "iso9660") == VFS_OK);
+        CHECK(vfs_route("/cd0", rel, sizeof(rel), &ctx) == &iso9660_ops);
+        u8 buf[TINY_SIZE];
+        CHECK(vfs_read("/cd0/TINY.TXT", buf, sizeof(buf)) == sizeof(buf));
+        CHECK(!memcmp(buf, g_media_a.img + TINY_LBA * SEC, sizeof(buf)));
+        CHECK(dev_find("cd0") == api.device && api.device);
+        CHECK(!api.device->total_sects);
+        vfs_umount("/cd0");
+        CHECK(!vfs_unregister_fs(api.fs));
+        CHECK(!dev_unregister(api.device));
+    }
+    printf("empty_insert: empty boot (one sector/capacity failure), insert, sys_mount, read PASS\n");
 }
 
 static void t_iso_devices(void)
 {
     setup();
-    const int types[] = {VFS_DEV_HD, VFS_DEV_LOOP};
+    CHECK(!vfs_register_fs(&iso9660_ops));
     const char *names[] = {"hd1", "lo1"};
     for (unsigned i = 0; i < 2; i++) {
-        g_image = (Device){.name = names[i], .type = DEV_BLOCK,
-                           .bus_type = DEV_BUS_LOOP, .sect_size = 512,
-                           .total_sects = g_media_a.secs * (SEC / 512)};
-        void *ctx = iso9660_ops.mount(VFS_MOUNT_DEV_ENCODE(types[i], 1));
-        CHECK(ctx);
-        u8 buf[3000];
-        CHECK(iso9660_ops.read_stream(ctx, "/BIG.PKG", buf, sizeof(buf), 31) == sizeof(buf));
-        for (u32 j = 0; j < sizeof(buf); j++)
-            CHECK(buf[j] == file_byte(&g_media_a, BIG_LBA_A, j + 31));
-        iso9660_ops.umount(ctx);
+        /* Even a readable ISO image is outside the CD-only contract. */
+        Device image = {.name = names[i], .type = DEV_BLOCK,
+                        .bus_type = DEV_BUS_LOOP, .sect_size = SEC,
+                        .total_sects = g_media_a.secs, .blk_read = fixture_cd_read};
+        CHECK(!dev_register(&image));
+        g_klog_n = 0; g_klog[0] = '\0';
+        u32 reads = M.n_read10;
+        CHECK(vfs_mount("/image", names[i], "iso9660") != VFS_OK);
+        CHECK(M.n_read10 == reads && !g_klog_n);
+        CHECK(!dev_unregister(&image));
     }
     CHECK(!iso9660_ops.mount(VFS_MOUNT_DEV_ENCODE(VFS_DEV_FD, 0)));
+    /* Unattached loop units, plus each independently missing geometry field. */
+    Device empty[] = {
+        {.name = "lo0", .type = DEV_BLOCK}, {.name = "lo1", .type = DEV_BLOCK},
+        {.name = "lo2", .type = DEV_BLOCK}, {.name = "lo3", .type = DEV_BLOCK},
+        {.name = "cd1", .type = DEV_BLOCK, .total_sects = 100},
+        {.name = "cd2", .type = DEV_BLOCK, .sect_size = SEC}
+    };
+    CHECK(!dev_unregister(&g_cd0));
+    for (unsigned i = 0; i < sizeof(empty) / sizeof(empty[0]); i++)
+        CHECK(!dev_register(&empty[i]));
+    g_klog_n = 0; g_klog[0] = '\0';
+    boot_submount(0);
+    CHECK(!g_klog_n);
+    CHECK(!vfs_unregister_fs(&iso9660_ops));
 }
 
 static void t_iso_bad_pvd(void)
@@ -2319,6 +2384,7 @@ int main(int argc, char **argv)
     const char *cs = (argc > 1) ? argv[1] : "";
     const char *bs = getenv("CD_READ_BIGSIZE");
     if (bs) g_big_size = (u32)strtoul(bs, NULL, 10);
+    if (!strcmp(cs, "empty_insert")) { t_empty_insert(); return 0; }
     if (!strcmp(cs, "cd_body")) { t_cd_body(); return 0; }
     if (!strcmp(cs, "iso_devices")) { t_iso_devices(); return 0; }
     if (!strcmp(cs, "iso_bad_pvd")) { t_iso_bad_pvd(); return 0; }

@@ -36,7 +36,6 @@
 #define VFS_DEV_SERIAL  2
 #define VFS_DEV_CD      3
 #define VFS_DEV_HOSTDRV 4
-#define VFS_DEV_LOOP    5
 
 #define VFS_MOUNT_DEV_ENCODE(t, i) ((((t) & 0xFF) << 8) | ((i) & 0xFF))
 #define VFS_MOUNT_DEV_TYPE(x)      (((x) >> 8) & 0xFF)

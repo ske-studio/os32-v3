@@ -20,7 +20,7 @@ int cd_module_init(CdModuleApi *out)
     AtapiCapacity cap;
     out->fs = &iso9660_ops;
     out->device = 0;
-    if (!atapi_init()) {
+    if (atapi_init() <= 0) {
         kprintf(0x07, "[cd] no ATAPI drive; root retained\n");
         return 0;
     }
@@ -31,9 +31,10 @@ int cd_module_init(CdModuleApi *out)
         rc = ATAPI_ERR_NO_MEDIA;
     if (rc) {
         kprintf(0x07, "[cd] medium unavailable rc=%d; root retained\n", rc);
-        return 0;
     }
-    cd_device.total_sects = cap.total_sectors;
+    /* The drive survives an empty tray. ATAPI reads do not use this bound;
+     * zero only suppresses the boot-time automatic mount. */
+    cd_device.total_sects = rc ? 0 : cap.total_sectors;
     cd_device.bus_id = (u8)atapi_drive_index();
     out->device = &cd_device;
     return 0;
