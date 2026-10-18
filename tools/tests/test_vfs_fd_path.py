@@ -14,6 +14,7 @@ userland/lib/rt/pkg.c を取り込み、RAM 上の 8MB の ext2 で
   nocase … 大文字小文字を区別しない FS (name_fold) の BUSY / pinned (B4)
   cdinst … 実物の userland/system/cdinst.c の install_packages が、どの
           パッケージの失敗でも止まり完了を出さない
+  filedir … EXT2DIR-1: ext2/FAT で通常ファイルを親にした全操作の拒否・無書込み
   dot   … 最終要素の "." / ".."
   path  … 255/256 バイト、32/33 要素、相対パス + 長い cwd、mount prefix
   pkg   … pkg_parse / pkg_first_overflow / pkg_extract (PKG はここで作る)
@@ -41,6 +42,7 @@ userland/lib/rt/pkg.c を取り込み、RAM 上の 8MB の ext2 で
 
   python3 -B tools/tests/test_vfs_fd_path.py [--target] [--mutants] [case]
 
+--mutants=filedir  EXT2DIR-1 の追加変異だけを回す (正常対照を先に回す)。
 --target  触った fs/*.c を i386-elf-gcc で -Werror 単体コンパイル ([C1])。
 --mutants fs/ と userland/lib/rt/ の**写し**に変異を 1 つずつ当てて組み直し、
           どれも落ちることを見る。実物のソースは書き換えない。
@@ -262,6 +264,35 @@ MUTANTS = [
      "            if (wfd < 0) {\n                api->mem_free(data_buf);\n                return PKG_ERR_IO;\n            }",
      "            if (wfd < 0) continue;"),
 ]
+
+# EXT2DIR-1: each removed guard must compile and fail in the real runtime.
+FILEDIR_MUTANTS = [
+    ("EXT2DIR-1: " + fn, "fs/ext2_dir.c",
+     "    if ((" + var + ".mode & EXT2_S_IFMT) != EXT2_S_IFDIR) return EXT2_ERR_NOTDIR; /* " + fn + " */",
+     "    /* removed directory guard */")
+    for fn, var in (("ext2_find_entry_loc", "inode"),
+                    ("ext2_add_entry", "dir_inode"),
+                    ("ext2_delete_entry", "dir_inode"),
+                    ("ext2_is_dir_empty", "inode"),
+                    ("ext2_parent_of", "inode"),
+                    ("ext2_set_dotdot", "inode"),
+                    ("lookup", "inode"))
+] + [
+    ("EXT2DIR-1: list", "fs/ext2_dir.c",
+     "    if ((inode.mode & EXT2_S_IFMT) != EXT2_S_IFDIR) return EXT2_ERR_NOTDIR;\n",
+     "    /* removed directory guard */\n"),
+    ("EXT2DIR-1: propagate dot prefix stat errors", "fs/vfs.c",
+     "    if (rc != VFS_OK) return VFS_OK;",
+     "    if (rc == VFS_ERR_NOTFOUND) return VFS_OK;\n    if (rc != VFS_OK) return rc;"),
+    ("EXT2DIR-1: VFS dot prefix", "fs/vfs.c",
+     "int rc = vfs_check_dot_prefix(parts, part_len, num_parts);",
+     "int rc = VFS_OK; (void)vfs_check_dot_prefix;"),
+    ("EXT2DIR-1: FatFs follow_path", "fs/fatfs/ff.c",
+     "if (!(dp->obj.attr & AM_DIR)) {\t/* It is not a sub-directory and cannot follow */",
+     "if (0) { /* removed directory guard */"),
+]
+MUTANTS += FILEDIR_MUTANTS
+
 
 
 # sdk/crt/syscalls.c の変異 (errno の段で落ちること)
@@ -884,6 +915,14 @@ def _mutant_one(item):
             return name, f"MUTANT {i} ({name}): build failed\n{err}"
         imgdir = tmp / f"img_m{i}"
         imgdir.mkdir()
+        if name.startswith("EXT2DIR-1:"):
+            result = host32.run([str(exe), str(imgdir), str(pkgdir), "filedir"],
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                timeout=120)
+            red = result.returncode == 1 and b"FAIL line" in result.stdout
+            if not red:
+                return name, f"MUTANT {i} ({name}): expected assertion RED, rc={result.returncode}\n{result.stdout.decode('utf-8', 'replace')}"
+            return None, f"MUTANT {i} ({name}): COMPILE PASS, runtime RED (rc=1)"
         try:
             ok, _ = run_exe(exe, imgdir, pkgdir, quiet=True, e2fsck=e2fsck,
                             first_fail=True)
@@ -898,19 +937,20 @@ def _mutant_one(item):
         shutil.rmtree(tmp / f"img_m{i}", ignore_errors=True)
 
 
-def mutants(tmp, pkgdir, e2fsck):
+def mutants(tmp, pkgdir, e2fsck, selected=None):
     """並列に回し (mutpar、OS32_MUT_JOBS)、結果は変異の番号順に出す。"""
+    selected = MUTANTS if selected is None else selected
     survivors = []
     ffo = tmp / "mut_base_ff.o"
     cmd = _ff_cmd(ROOT / "fs", ffo)
     stale = mutpar.check_rebuild_table(
         {f: k for f, k in REBUILD.items()},
-        {"ff": mutpar.gcc_deps(cmd, ROOT)}, [m[1] for m in MUTANTS])
+        {"ff": mutpar.gcc_deps(cmd, ROOT)}, [m[1] for m in selected])
     for s in stale:
         print("REBUILD TABLE STALE: " + s)
         survivors.append("REBUILD TABLE STALE")
     subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    items = [(tmp, pkgdir, e2fsck, ffo, i, m) for i, m in enumerate(MUTANTS)]
+    items = [(tmp, pkgdir, e2fsck, ffo, i, m) for i, m in enumerate(selected)]
     for surv, line in mutpar.run_ordered(_mutant_one, items):
         print(line, flush=True)
         if surv:
@@ -994,6 +1034,12 @@ def main():
             return 1
         if "--target" in sys.argv:
             target_compile(tmp)
+        if "--mutants=filedir" in sys.argv:
+            surv = mutants(tmp, pkgdir, e2fsck, FILEDIR_MUTANTS)
+            if surv:
+                print("FILEDIR MUTANTS SURVIVED: " + "; ".join(surv))
+                return 1
+            print(f"FILEDIR MUTANTS all {len(FILEDIR_MUTANTS)} runtime RED")
         if "--mutants" in sys.argv:
             surv = mutants(tmp, pkgdir, e2fsck)
             if surv:

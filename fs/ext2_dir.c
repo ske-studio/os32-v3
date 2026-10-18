@@ -20,7 +20,7 @@ int ext2_list_dir(Ext2Ctx *ctx, u32 dir_ino, ext2_dir_callback cb, void *user_ct
 
     ret = ext2_read_inode(ctx, dir_ino, &inode);
     if (ret != 0) return ret;
-    if (!(inode.mode & EXT2_S_IFDIR)) return EXT2_ERR_NOTDIR;
+    if ((inode.mode & EXT2_S_IFMT) != EXT2_S_IFDIR) return EXT2_ERR_NOTDIR;
 
     for (bi = 0; ; bi++) {
         /* 「読めなかった」を「ここで終わり」と読み替えない (票 B8) */
@@ -103,6 +103,7 @@ int ext2_find_entry_loc(Ext2Ctx *ctx, u32 dir_ino, const char *name,
 
     ret = ext2_read_inode(ctx, dir_ino, &inode);
     if (ret != 0) return ret;
+    if ((inode.mode & EXT2_S_IFMT) != EXT2_S_IFDIR) return EXT2_ERR_NOTDIR; /* ext2_find_entry_loc */
 
     for (bi = 0; ; bi++) {
         /* **ここが B8 の入口**。間接ブロックが読めなかったのを「未割当 =
@@ -188,6 +189,7 @@ int ext2_add_entry(Ext2Ctx *ctx, u32 dir_ino, const char *name, u32 ino, u8 file
 
     ret = ext2_read_inode(ctx, dir_ino, &dir_inode);
     if (ret != 0) return ret;
+    if ((dir_inode.mode & EXT2_S_IFMT) != EXT2_S_IFDIR) return EXT2_ERR_NOTDIR; /* ext2_add_entry */
 
     for (bi = 0; ; bi++) {
         /* 読めなかったまま抜けると下の「新ブロック割り当て」へ落ちて、
@@ -345,6 +347,7 @@ int ext2_delete_entry(Ext2Ctx *ctx, u32 dir_ino, const char *name)
 
     ret = ext2_read_inode(ctx, dir_ino, &dir_inode);
     if (ret != 0) return ret;
+    if ((dir_inode.mode & EXT2_S_IFMT) != EXT2_S_IFDIR) return EXT2_ERR_NOTDIR; /* ext2_delete_entry */
 
     for (bi = 0; ; bi++) {
         ret = ext2_bmap(ctx, &dir_inode, bi, &phys);
@@ -536,6 +539,7 @@ static int ext2_is_dir_empty(Ext2Ctx *ctx, u32 dir_ino)
 
     ret = ext2_read_inode(ctx, dir_ino, &inode);
     if (ret != 0) return ret;
+    if ((inode.mode & EXT2_S_IFMT) != EXT2_S_IFDIR) return EXT2_ERR_NOTDIR; /* ext2_is_dir_empty */
 
     for (bi = 0; ; bi++) {
         ret = ext2_bmap(ctx, &inode, bi, &phys);
@@ -676,6 +680,7 @@ static int ext2_parent_of(Ext2Ctx *ctx, u32 dir_ino, u32 *out)
     *out = 0;
     ret = ext2_read_inode(ctx, dir_ino, &inode);
     if (ret != 0) return ret;
+    if ((inode.mode & EXT2_S_IFMT) != EXT2_S_IFDIR) return EXT2_ERR_NOTDIR; /* ext2_parent_of */
     ret = ext2_bmap(ctx, &inode, 0, &phys);
     if (ret != 0) return EXT2_ERR_IO;
     if (phys == 0) return EXT2_ERR_IO;   /* ディレクトリに先頭ブロックが無い */
@@ -708,6 +713,7 @@ static int ext2_set_dotdot(Ext2Ctx *ctx, u32 dir_ino, u32 new_parent)
 
     ret = ext2_read_inode(ctx, dir_ino, &inode);
     if (ret != 0) return ret;
+    if ((inode.mode & EXT2_S_IFMT) != EXT2_S_IFDIR) return EXT2_ERR_NOTDIR; /* ext2_set_dotdot */
     ret = ext2_bmap(ctx, &inode, 0, &phys);
     if (ret != 0) return EXT2_ERR_IO;
     if (phys == 0) return EXT2_ERR_IO;
@@ -1204,7 +1210,15 @@ int ext2_lookup(Ext2Ctx *ctx, const char *path, u32 *out_ino)
         ret = ext2_find_entry(ctx, current_ino, component, &found_ino, &found_type);
         if (ret != 0) return ret;
         current_ino = found_ino;
-        if (path[i] == '/') i++;
+        if (path[i] == '/') {
+            Ext2Inode inode;
+            /* A separator requires a directory, including a trailing slash.
+             * Use the inode mode; the directory entry type may be UNKNOWN. */
+            ret = ext2_read_inode(ctx, current_ino, &inode);
+            if (ret != 0) return ret;
+            if ((inode.mode & EXT2_S_IFMT) != EXT2_S_IFDIR) return EXT2_ERR_NOTDIR; /* lookup */
+            i++;
+        }
     }
 
     *out_ino = current_ino;
