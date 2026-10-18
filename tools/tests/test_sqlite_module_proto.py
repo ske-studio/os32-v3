@@ -235,7 +235,9 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
         # Disk settings I/O belongs to the VFS fixture; use a private RAM DB here.
         source = source.replace('SYS_SETTINGS_DB, SQLITE_OPEN_READONLY', '":memory:", SQLITE_OPEN_READWRITE')
         if name == 'sqlite_engine':
-            source = 'struct sqlite3; extern void host_seed_settings(struct sqlite3 *db);\n' + source.replace(
+            source = ('struct sqlite3; extern void host_seed_settings(struct sqlite3 *db);\n'
+                      'extern int host_final_boot_check(int, int);\n') + source.replace(
+                'os32_sqlite_outer_boot_check(1, reserve)', 'host_final_boot_check(1, reserve)').replace(
                 '    if (!rc && !os32_sqlite_prepare_v2(db,',
                 '    if (!rc) host_seed_settings(db);\n    if (!rc && !os32_sqlite_prepare_v2(db,')
         (folder / (name + '.c')).write_text(source.replace(
@@ -364,7 +366,7 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
                   ('learn-prepare-failure', 32), ('close-fault-after-ready', 33),
                   ('settings-below-minimum', 34), ('settings-minimum', 35),
                   ('settings-minimum-minus-one', 36), ('missing-FEP', 50),
-                  ('mixed-FEP', 51), ('FEP-allocation', 52), ('FEP-PAIR-required', 53)]
+                  ('final-ready-check-failure', 54), ('mixed-FEP', 51), ('FEP-allocation', 52), ('FEP-PAIR-required', 53)]
     boot_cases += [(name, 20 + fault) for fault, name in enumerate((
         'pool', 'stack', 'sqlite-init', 'settings-close', 'fep-text', 'fep-attr',
         'fep-crc', 'dictionary', 'reserve', 'fep-close', 'shutdown'), 1)]
@@ -499,9 +501,30 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
         assert result.returncode == 1 and b'FAIL ' in result.stdout, result
         print('MUTATE fep-dependency-first-free RED (compiled runtime): ' + result.stdout.decode().strip(), flush=True)
         path.write_text(original)
-        # The old early-module_abort mutation is now harmless: runtime's
-        # has_dependents isolates SQLite while FEP still holds it. The direct
-        # early reclaim mutation above retains the original free-order oracle.
+        old = '    cleanup_blocked = fep_module_abort() != 0;'
+        abort = '    int isolated = module_abort(sqlite_handle);'
+        assert original.count(old) == original.count(abort) == 1
+        path.write_text(original.replace(old, abort + '\n' + old).replace(
+            abort + '\n    sqlite_module_api', '    sqlite_module_api'))
+        subprocess.run(command, check=True)
+        result = boot_run(54)
+        assert result.returncode == 1 and b'FAIL services_stage == SERVICES_MINIMAL' in result.stdout, result
+        print('MUTATE sqlite-abort-before-fep RED (compiled runtime): ' + result.stdout.decode().strip(), flush=True)
+        path.write_text(original)
+        path = folder / 'fep_module.c'
+        original = path.read_text()
+        for label, old, new, failure in (
+                ('stub-scan-only-poll', 'c < 0 || !(c & 0xff) ? -1', 'c < 0 ? -1',
+                 b'FAIL ime_trygetchar() == -1'),
+                ('stub-wait-once', 'while (!(c & 0xff));', 'while (0);',
+                 b"FAIL ime_getchar() == 'a'")):
+            assert original.count(old) == 1, label
+            path.write_text(original.replace(old, new))
+            subprocess.run(command, check=True)
+            result = boot_run(50)
+            assert result.returncode == 1 and failure in result.stdout, (label, result)
+            print('MUTATE ' + label + ' RED (compiled runtime): ' + result.stdout.decode().strip(), flush=True)
+            path.write_text(original)
 
 
 

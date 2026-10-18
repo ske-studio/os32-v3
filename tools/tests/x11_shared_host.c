@@ -472,6 +472,7 @@ static int results(void)
     }
     say("PASS X11 global result\n"); return 0;
 }
+/* Tests the module-internal publication gate; resident MINIMAL stubs are covered by sqlite_module_host. */
 static int unpublished(void)
 {
     reset();

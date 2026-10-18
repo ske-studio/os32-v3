@@ -125,9 +125,10 @@ int host_fep_prepare(sqlite3 *db, const char *sql, int n, sqlite3_stmt **out, co
     return os32_sqlite_prepare_v2(db, sql, n, out, tail);
 }
 static int host_key = -1, host_sink, host_user, host_stop_pending, abort_checks;
+static int host_next_key = -1, ready_check_failed;
 void ring3_abort_check(void);
 volatile u8 kbd_shift_state;
-int kbd_trygetkey(void) { int key = host_key; host_key = -1; return key; }
+int kbd_trygetkey(void) { int key = host_key; host_key = host_next_key; host_next_key = -1; return key; }
 int kbd_trygetchar(void) { int key = kbd_trygetkey(); return key < 0 ? -1 : key & 255; }
 int kbd_getkey_wait(int interruptible) { if (interruptible && host_stop_pending) return -1; return kbd_trygetkey(); }
 int kbd_getchar(void) { return kbd_trygetchar(); }
@@ -170,6 +171,14 @@ static void input_paths(void)
         host_stop_pending = 0;
     }
     host_sink = 0;
+    if (services_stage == SERVICES_MINIMAL) {
+        host_key = KEY_F1 << 8;
+        CHECK(ime_trygetchar() == -1);
+        host_key = KEY_F1 << 8; host_next_key = 0x1e61;
+        CHECK(ime_getchar() == 'a');
+        host_key = KEY_F1 << 8; host_next_key = 0x1e61;
+        CHECK(ime_getchar_kapi() == 'a');
+    }
 }
 int vfs_stat(const char *path, OS32_Stat *st)
 {
@@ -573,6 +582,19 @@ void host_seed_settings(sqlite3 *db)
         input[0] == 35 ? "INSERT INTO settings VALUES('system','fep_mem_reserve_kb',0,99)" :
                         "INSERT INTO settings VALUES('system','fep_mem_reserve_kb',0,98)", 0, 0, 0));
 }
+/* Inject only after the real final check sees the unpublished, ready FEP. */
+int host_final_boot_check(int ready, int reserve)
+{
+    int rc = os32_sqlite_outer_boot_check(ready, reserve);
+    if (input[0] == 54) {
+        CHECK(!rc && ready == 1 && !services_public);
+        CHECK(services_stage == SERVICES_FEP_INTERNAL_READY);
+        CHECK(g_ime.dict_loaded && g_ime.dict.exact_stmt && fep_module_pages());
+        ready_check_failed++;
+        return SQLITE_ERROR;
+    }
+    return rc;
+}
 static void boot_transaction(void)
 {
     services_stage = SERVICES_ROOT_READY;
@@ -589,6 +611,7 @@ static void boot_transaction(void)
     int isolated = services_boot_fault == SERVICES_FAULT_SETTINGS_CLOSE ||
                    services_boot_fault == SERVICES_FAULT_FEP_CLOSE ||
                    services_boot_fault == SERVICES_FAULT_SHUTDOWN;
+    CHECK(ready_check_failed == (input[0] == 54));
     CHECK(services_public == ok);
     if (ok) {
         CHECK(services_stage == SERVICES_READY && sqlite_module_ready());
@@ -699,7 +722,7 @@ void _start(void)
     __asm__ volatile("int $0x80" : "=a"(rc) : "0"(125), "b"(pool), "c"(sizeof(pool)), "d"(7) : "memory");
     CHECK(!rc);
     stubs();
-    if ((input[0] >= 10 && input[0] <= 36) || (input[0] >= 50 && input[0] <= 53)) boot_transaction();
+    if ((input[0] >= 10 && input[0] <= 36) || (input[0] >= 50 && input[0] <= 54)) boot_transaction();
     rc = os32_sqlite_start();
     CHECK(rc == (int)input[3] && opens == 1 && closes == (input[0] != 1));
     CHECK(!sqlite_engine_active && host_flags == 0x202);
