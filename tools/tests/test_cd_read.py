@@ -555,12 +555,17 @@ def make_tree(tmp, rel=None, text=None):
         dst.write_text((ROOT / f).read_text(encoding="utf-8"), encoding="utf-8")
     if rel is not None:
         (tree / rel).write_text(text, encoding="utf-8")
+    write_boot_submount(tree, tree / "tools/tests/boot_submount.c")
+    return tree
+
+
+def write_boot_submount(tree, dest):
+    """Share the real boot fragment with consumers of cd_read_host.c."""
     kernel = (tree / "kernel/kernel.c").read_text()
     start = kernel.index('    {', kernel.index('    cd_module_load();'))
     end = kernel.index('    services_stage = SERVICES_ROOT_READY;', start)
-    (tree / "tools/tests/boot_submount.c").write_text(
+    dest.write_text(
         'static void boot_submount(int boot_drive) {\n' + kernel[start:end] + '}\n')
-    return tree
 
 
 def _mutate_one(item):

@@ -904,8 +904,10 @@ static int fixture_cd_read(Device *dev, int lba, int count, void *buf)
 static Device g_cd0 = {.name = "cd0", .type = DEV_BLOCK, .bus_type = DEV_BUS_ATAPI,
                        .sect_size = SEC, .blk_read = fixture_cd_read};
 
-/* No open FDs in this fixture. Device and VFS registries are real. */
+/* Standalone CD tests have no open FDs; SQLite uses real vfs_fd.c. */
+#ifndef CD_HOST_REAL_FDS
 void vfs_fd_invalidate_mount(void *ctx) { (void)ctx; }
+#endif
 /* ASan retains the core device descriptors; no IDE/FDC I/O is expected. */
 int fdc_read_sector(int d, int c, int h, int s, void *buf)
 { (void)d; (void)c; (void)h; (void)s; (void)buf; CHECK(0); return -1; }

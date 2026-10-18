@@ -5,6 +5,8 @@ import shutil
 import subprocess
 import tempfile
 
+from test_cd_read import write_boot_submount
+
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CASES = ['absolute', 'relative', 'alias', 'parent_child', 'same_owner', 'parked', 'quarantine',
          'close_gap', 'separate', 'errors', 'readonly', 'unsupported', 'fullpath']
@@ -13,7 +15,8 @@ FILES = ['fs/vfs.h', 'fs/vfs_fd.c', 'lib/sqlite3/os32_sqlite_vfs.c',
          'tools/tests/sqlite_groups_host.c', 'tools/tests/sqlite_groups_backend.h',
          'tools/tests/vfs_fd_sqlite_host.c', 'tools/tests/sqlite_cd_host.c',
          'tools/tests/cd_read_host.c', 'kernel/cd_body.c', 'kernel/cd_module.h', 'fs/vfs.c', 'fs/iso9660.c',
-         'drivers/atapi.c', 'tools/tests/atapi_hostshim/io.h']
+         'drivers/atapi.c', 'tools/tests/atapi_hostshim/io.h',
+         'drivers/dev.c', 'kernel/kernel.c']
 INC = ['-I' + str(ROOT / p) for p in
        ('include', 'fs', 'drivers', 'sdk/include/os32', 'lib', 'lib/sqlite3')]
 VFS = 'lib/sqlite3/os32_sqlite_vfs.c'
@@ -72,6 +75,11 @@ MUTANTS = [
 
 
 def compile_host(root, obj, exe, cd=False):
+    extra = []
+    if cd:
+        write_boot_submount(root, exe.parent / 'boot_submount.c')
+        extra = ['-I' + str(exe.parent), '-ffunction-sections', '-fdata-sections',
+                 '-Wl,--gc-sections', str(root / 'drivers/dev.c')]
     subprocess.run(['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                     '-Wno-unused-parameter', '-Wno-sign-compare',
                     '-Wno-pointer-to-int-cast', '-Wno-missing-field-initializers',
@@ -80,7 +88,7 @@ def compile_host(root, obj, exe, cd=False):
                     '-I' + str(root), '-I' + str(ROOT), '-I' + str(ROOT / 'kernel'), *INC,
                     str(root / ('tools/tests/sqlite_cd_host.c' if cd else
                                 'tools/tests/sqlite_vfs_identity_host.c')), str(obj),
-                    '-o', str(exe)], check=True)
+                    *extra, '-o', str(exe)], check=True)
 
 
 def main():

@@ -1,6 +1,7 @@
 /* T4b-4c: bundled SQLite -> real VFS/FD -> real ISO -> real ATAPI.
  * Only ATA ports, owner and TTY are mocked. Media is built before mounting. */
 #define main cd_baseline_main
+#define CD_HOST_REAL_FDS
 #include "cd_read_host.c"
 #undef main
 #include "../../fs/vfs.c"
