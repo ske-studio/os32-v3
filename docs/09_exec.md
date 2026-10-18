@@ -73,6 +73,8 @@ SHM の先頭 1 ブロック (16KB) は DB 結果・エラー文用、末尾 4 �
   片方だけ直すと必ず食い違うので、変更時は両方を見る (レビュー #5 ④、2026-09-06)。
 - **CTRL+STOP** は CPL=3 アプリを畳む (`ring3_abort_request` を IRQ1 で立て、IRQ1 スタブ (割り込まれた
   文脈が CPL=3 のとき) と syscall 入口の `ring3_abort_check` が `ring3_fault_kill` で回収)。GUI 中も CUI 中も効く。
+  CUI の子が既に戻り、終了処理中に届いた STOP はその子の slot とともに捨て、親には引き継がない。
+  その `abort_req` は同じ slot を次に使うアプリにも残さない。
 - **syscall 境界ポンプ** (`ring3_gui_pump`): アプリが KAPI を呼ぶたび (1 tick に 1 回まで) に WM の
   ポンプ (X4) を回し、計算ループ中でもカーソルとクリックを取りこぼさない (契約 T6)。WM 自身 (owner 1) は除外。
 - CPL=3 の KAPI 呼び出しは **IF=1** で走る (`int80_stub` の `sti` / 出口 `cli`。[POLICY_DEBUG §4-19](POLICY_DEBUG.md))。

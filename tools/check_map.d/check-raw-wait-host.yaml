@@ -9,6 +9,7 @@ check-raw-wait-host:
 - drivers/serial.c
 - drivers/serial.h
 - exec/appslot.h
+- exec/appslot.c
 - exec/exec.c
 - exec/exec.h
 - exec/exec_heap.c
@@ -36,8 +37,12 @@ check-raw-wait-host:
 - lib/kstring_c.c
 - lib/sqlite3/os32_sqlite_outer.h
 - lib/sqlite3/os32_sqlite_test.c
+- lib/sqlite3/os32_sqlite_config.h
+- lib/sqlite3/sqlite3.c
+- lib/sqlite3/sqlite3.h
 - lib/sqlite3/sqlite_stack.asm
 - lib/utf8.c
+- sdk/include/os32/os32_kapi_shared.h
 - sdk/gen_kapi.py
 - sdk/kapi.json
 - tools/check_map.d/check-raw-wait-host.yaml
@@ -52,3 +57,9 @@ check-raw-wait-host:
 - tools/tests/test_sqlite_engine.py
 - userland/tests/raw_wait_test.c
 - tools/tests/raw_wait_guest_host.c
+- tools/tests/raw_wait_late_stop_host.c
+- tools/tests/raw_wait_sql_host.c
+- tools/tests/fep_budget_linux.c
+- tools/fep_to_sqlite.py
+- assets/ipadic/**
+- assets/joyo_kanji.txt

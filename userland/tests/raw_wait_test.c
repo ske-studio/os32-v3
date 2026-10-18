@@ -11,9 +11,22 @@
 #define RAW_DB_CREATE "CREATE TABLE probe(x)"
 #define RAW_DB_INSERT "INSERT INTO probe VALUES(73)"
 #define RAW_IME_WARM_LIMIT 4
+#define RAW_IME_YOMI "か"
+#define RAW_IME_ROMAJI "ka"
+#define RAW_DICT_VARIANT 1
+/* Four rows in each of twelve factors: 4^12 VM iterations, without CTEs
+ * (SQLITE_OMIT_CTE) or more than SQLITE_MAX_COMPOUND_SELECT=5 terms.
+ * Comma joins keep the SQL within DB_SQL_MAX_BYTES, including NUL. */
+#define RAW_SQL_FOUR \
+    "(SELECT 1 AS x UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4)"
 #define RAW_SLOW_SQL \
-    "WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<1000000) " \
-    "SELECT sum(x) FROM n"
+    "SELECT sum(a.x+b.x+c.x+d.x+e.x+f.x+g.x+h.x+i.x+j.x+k.x+l.x) FROM " \
+    RAW_SQL_FOUR " a, " RAW_SQL_FOUR " b, " \
+    RAW_SQL_FOUR " c, " RAW_SQL_FOUR " d, " \
+    RAW_SQL_FOUR " e, " RAW_SQL_FOUR " f, " \
+    RAW_SQL_FOUR " g, " RAW_SQL_FOUR " h, " \
+    RAW_SQL_FOUR " i, " RAW_SQL_FOUR " j, " \
+    RAW_SQL_FOUR " k, " RAW_SQL_FOUR " l"
 
 static int parent_run(KernelAPI *api, const char *entry, const char *end);
 static int probe(KernelAPI *api, const char *entry, const char *end);
@@ -69,9 +82,10 @@ static int probe(KernelAPI *api, const char *entry, const char *end)
         api->fm_play_mml(mml);
     } else if (dbmode) rc = api->db_exec(db, RAW_SLOW_SQL);
     else if (logmode) {
-        /* The success diagnostic uses internal serial_puts, inside a USER
-         * syscall. PM injects STOP at that diagnostic, not at this banner. */
-        rc = api->ime_switch_dict(1);
+        /* Build the kernel with OS32_RAW_WAIT_LOG_TICKS (see raw_wait_tdd.md).
+         * Its LOG BEGIN/END enclose repeated internal serial_puts in this
+         * single syscall. Send STOP after the child's BEGIN without a BP. */
+        rc = api->ime_switch_dict(RAW_DICT_VARIANT);
     } else if (fault) __asm__ volatile("ud2" : : : "memory");
     if (stop || rc < 0 || (value & 0xff) != 'Q' ||
         bytes[0] != 0x5a || bytes[RAW_USER_BYTES - 1] != 0xa5) {
@@ -100,8 +114,12 @@ static int parent_run(KernelAPI *api, const char *entry, const char *end)
     sentinel[0] = 0x39; sentinel[RAW_USER_BYTES - 1] = 0x93;
     if (strlen(RAW_CHILD) + strlen(entry) + strlen(end) + 2 > sizeof(command)) return 1;
     strcpy(command, RAW_CHILD); strcat(command, entry); strcat(command, " "); strcat(command, end);
+    /* The first dictionary reopen retains resident SQLite state. Perform the
+     * same successful switch as the child before taking either baseline. */
+    if (!strcmp(entry, "log") && api->ime_switch_dict(RAW_DICT_VARIANT) < 0)
+        return 1;
     /* db_mem_used includes the resident FEP's page cache and statements.
-     * PM uses only yomi "a" (あ), SPACE, ESC twice, FEP OFF, Q here and
+     * PM uses only yomi "ka" (か), SPACE, ESC twice, FEP OFF, Q here and
      * the same yomi for the child's STOP. Require two settled observations
      * before accounting; never absorb growth observed after child exit. */
     if ((!strcmp(entry, "imechar") || !strcmp(entry, "imekey")) && !strcmp(end, "stop")) {
@@ -109,7 +127,8 @@ static int parent_run(KernelAPI *api, const char *entry, const char *end)
         int settled = 0;
         for (int i = 0; i < RAW_IME_WARM_LIMIT; i++) {
             api->kprintf(ATTR_WHITE,
-                "raw_wait WARMUP IME: ON hiragana, a, SPACE, ESC twice, OFF, Q\n");
+                "raw_wait WARMUP IME: ON hiragana, " RAW_IME_ROMAJI " (" RAW_IME_YOMI
+                "), SPACE, ESC twice, OFF, Q\n");
             int key = !strcmp(entry, "imechar") ? api->ime_getchar() : api->ime_getkey();
             if ((key & 0xff) != 'Q') return 1;
             u32 current = api->db_mem_used();

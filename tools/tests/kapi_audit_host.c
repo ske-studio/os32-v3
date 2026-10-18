@@ -6,6 +6,9 @@
 #include "os32_kapi_shared.h"
 static unsigned ports, waits, abort_checks, request_wait=3, opn_reg, last_key;
 static volatile int user, escaped;
+static char log_tx[256];
+static unsigned log_tx_count;
+static int log_capture;
 #include "appslot.h"
 static AppSlot wait_slot;
 #define abort_requested wait_slot.abort_req
@@ -43,6 +46,10 @@ void ring3_abort_check(void)
 static void host_out(unsigned p, unsigned v)
 {
     ports++;
+    if (log_capture && log_tx_count + 1 < sizeof(log_tx)) {
+        log_tx[log_tx_count++] = (char)v;
+        log_tx[log_tx_count] = 0;
+    }
     if (p == OPN_ADDR) opn_reg=v;
     if (p == OPN_DATA && opn_reg == OPN_REG_KEY_ONOFF) last_key=v;
 }
@@ -57,6 +64,7 @@ void cpu_delay_us(u32 us) { (void)us; host_wait(); }
 #include "console_source.inc"
 #include "fm_source.inc"
 #include "serial_source.inc"
+#include "ime_log_source.inc"
 #define KAPI_HIT(n) ((void)(n))
 #include "kbd_source.inc"
 #include "ime_source.inc"
@@ -457,6 +465,29 @@ static int test(void)
         }
         CHECK(!escaped && !abort_checks && ports==22, "USER internal logs and frames never abort");
         tx_ready=0; user=stop_on_wait=abort_requested=stop_requested=0;
+        /* Real extended log body and serial driver: inject halfway through
+         * its live interval, finish logging, then consume at a safe point. */
+        user=tx_ready=1; abort_requested=stop_requested=0;
+        waits=abort_checks=0; escaped=0; request_wait=1000;
+        u32 normal_start=tick_count;
+        if (!__builtin_setjmp(jump)) ime_dict_log_probe();
+        CHECK(!escaped && !abort_checks && !abort_requested &&
+              tick_count-normal_start>=OS32_RAW_WAIT_LOG_TICKS,
+              "extended internal log normal completion");
+        waits=abort_checks=ports=log_tx_count=0; escaped=0; request_wait=16;
+        log_capture=1;
+        static const char log_end[]="\r\nraw_wait LOG END\r\n";
+        u32 log_start=tick_count;
+        if (!__builtin_setjmp(jump)) ime_dict_log_probe();
+        log_capture=0;
+        CHECK(!escaped && !abort_checks && abort_requested &&
+              tick_count-log_start>=OS32_RAW_WAIT_LOG_TICKS && ports>32 &&
+              log_tx_count>=sizeof(log_end)-1 &&
+              !kstrcmp(log_tx+log_tx_count-(sizeof(log_end)-1), log_end),
+              "extended internal log retains STOP until end");
+        if (!__builtin_setjmp(jump)) ring3_abort_check();
+        CHECK(escaped==1 && abort_checks==1, "extended internal log STOP at safe point");
+        abort_requested=escaped=0; request_wait=3; tx_ready=user=0;
     }
     if (AUDIT_CASE == 0 || AUDIT_CASE == 6) CHECK(test_input()==0, "input tests");
     if (AUDIT_CASE == 0 || AUDIT_CASE == 6)
