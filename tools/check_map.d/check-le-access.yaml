@@ -3,6 +3,7 @@ check-le-access:
 - tools/gen_sqlite_imports.py
 - tools/prototypes/cd_imports.def
 - tools/prototypes/pcm_imports.def
+- tools/prototypes/cirrus_imports.def
 - tools/tests/test_clang_ast.py
 - drivers/**/*.[ch]
 - fs/**/*.[ch]

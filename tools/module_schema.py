@@ -126,3 +126,14 @@ POLICIES[CONSTANTS['ID_V86']] = dict(
     init_symbol='v86_module_init', imports_symbol='v86_import_slots',
     ops_symbol='v86_module_ops', ops_names=('initialize',),
 )
+
+# T5c-5b: HAL/board/chip body; permanent windows and identify stay core.
+POLICIES[CONSTANTS['ID_CIRRUS']] = dict(
+    module_id=CONSTANTS['ID_CIRRUS'], phase=CONSTANTS['PHASE_POST_ROOT'],
+    required_flags=CONSTANTS['FLAG_PAIR'], allowed_flags=CONSTANTS['FLAG_PAIR'],
+    stop_allowed=0, ops_version=1, ops_slots=1,
+    image_max=65536, mem_max=65536,
+    reloc_max=2048, import_max=16, export_max=1, load_span_max=81920,
+    init_symbol='cirrus_module_init', imports_symbol='cirrus_import_slots',
+    ops_symbol='cirrus_module_ops', ops_names=('initialize',),
+)

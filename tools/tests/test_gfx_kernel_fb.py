@@ -13,7 +13,7 @@ import host32
 from mutpar import run_ordered
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 TARGET_SRCS = ['gfx/gfx_core.c', 'gfx/backend_pc98.c', 'gfx/backend_pegc.c',
-               'gfx/backend_cirrus.c', 'gfx/gfx_vram.c', 'gfx/gfx_scroll.c',
+               'gfx/backend_cirrus.c', 'gfx/cirrus_identify.c', 'gfx/gfx_vram.c', 'gfx/gfx_scroll.c',
                'exec/surface_query.c', 'exec/lease.c', 'exec/access_walk.c',
                'exec/redir_access.c', 'kernel/shlib.c', 'kernel/paging.c',
                'kernel/pgalloc.c', 'kernel/sys.c', 'kernel/physmem.c']
@@ -115,8 +115,9 @@ static inline void io_wait_n(int n) {(void)n;}
         if (sf) s_bb_phys=sf->first*PAGE_SIZE;
     }
     return s_probe_ok && host_pegc_available;''')
-            if path == 'gfx/backend_cirrus.c':
+            if path == 'gfx/cirrus_identify.c':
                 body = replace_function(body,'int cirrus_identify(void)','    return 1;')
+            if path == 'gfx/backend_cirrus.c':
                 body = replace_function(body,'static int cirrus_probe(void)', '''
     extern int host_cirrus_available;
     if (!s_probed) {

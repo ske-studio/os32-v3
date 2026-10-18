@@ -72,6 +72,10 @@ filesystem:
     - host: build/out/v86.mod
       guest: /boot/v86.mod
       tags: [core]
+    # --- Paired Cirrus/WAB (also on FD) ---
+    - host: build/out/cirrus.mod
+      guest: /boot/cirrus.mod
+      tags: [core]
     # --- カーネルデータ ---
     - host: build/out/unicode.bin
       guest: /sys/unicode.bin

@@ -119,15 +119,10 @@ extern GfxBackend gfx_backend_pegc __attribute__((weak));
  * 止める。backend_pegc.c を入れないビルドでは 0 (weak) — 呼ぶ側が確かめる。 */
 void pegc_restore_text_sync(int hsync31) __attribute__((weak));
 
-/* Cirrus GD54xx アクセラレータバックエンド (gfx/backend_cirrus.c, H3)。
- * PEGC と同じく **const ではない / weak 宣言**:
- *   - const でない: bb_base / bb_size を init() が実行時に埋める。
- *   - weak: gfx/backend_cirrus.c を build/kernel.mk に入れていないビルドでは
- *     0 になり、バックエンド表の要素が NULL になって probe から外れる。
- * **bb_base はカード VRAM の中を指す** (票 H3b, 2026-09-06)。クライアント面は
- * 主記憶ではなくカード VRAM の非表示領域にあり (契約 G4 / DESIGN §8)、
- * 0FABh レジスタ 02h の 2MB リニア窓 (物理 01000000h) 越しに CPU から線形に
- * 見える。H3 の時点では 32KB のバンク窓しか無く bb_base = NULL だった。 */
+/* Cirrus GD54xx: core の表へ cirrus.mod が HAL callbacks を登録する。
+ * 欠落時は probe=0。識別と永久窓の予約は core、probe/enable は graphics
+ * 境界。bb_base は FE000000h のリニア窓内の CLIENT 面 (表示面は含まない)。
+ * weak は backend を持たない host fixture のため維持する。 */
 extern GfxBackend gfx_backend_cirrus __attribute__((weak));
 
 /* ------------------------------------------------------------------------ */

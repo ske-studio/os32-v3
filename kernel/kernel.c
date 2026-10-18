@@ -75,6 +75,7 @@ extern int fatfs_init(void);
 #include "mouse.h"
 #include "lgy98.h"
 #include "pcm_module.h"
+#include "cirrus_module.h"
 #include "os32_sqlite_vfs.h"
 #include "os32_sqlite_outer.h"
 #include "sqlite_engine.h"
@@ -721,6 +722,8 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * 戻る。 */
     if (kdebug.ops.crt_diag_bootlog) kdebug.ops.crt_diag_bootlog();
     gfx_prepare_backend();
+    /* Register after boot preparation: GUI=0 must never probe/enable Cirrus. */
+    cirrus_module_load();
     kaudit_post_probe();
     if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_post_probe();
 
@@ -806,6 +809,8 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
 
             /* GUI は全画面 GFX を握るのでテキストカーソルを消す。CUI は出す。 */
             if (is_gui) {
+                /* Graphics boundary, master PD; all windows were mapped by ⑥. */
+                gfx_prepare_backend();
                 /* ⑨ 選択中 backend の CLIENT を boot → gshell へ (2 回目以降は
                  * 無操作) → ledger_selfcheck("gui")。TASK_T1_LEDGER §3-3 ⑨。 */
                 gfx_client_to_gshell();
