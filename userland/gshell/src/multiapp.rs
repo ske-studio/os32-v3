@@ -192,6 +192,8 @@ pub struct Multi {
     /// Successful WM injections, indexed by their original fullscreen owner.
     /// Scheduling hints only; the kernel alone decides who can consume bytes.
     injected_keys: [bool; MAX_APPS],
+    key_wait_notice: bool,
+    key_wait_checks: [bool; MAX_APPS],
 }
 
 impl Multi {
@@ -206,6 +208,8 @@ impl Multi {
         poll_last: 0,
         poll_choice: 0,
         injected_keys: [false; MAX_APPS],
+        key_wait_notice: false,
+        key_wait_checks: [false; MAX_APPS],
     };
 }
 
@@ -270,6 +274,7 @@ pub fn reset() {
 pub fn on_start(id: i32) {
     adopt_running(id);
     m().running = 0; /* もう park 済み (exec_start が戻ったのがその証拠) */
+    if let Some(i) = idx(id) { m().key_wait_checks[i] = true; }
 }
 
 /// 起動したてのアプリを表に載せる (まだ `exec_start` は戻っていない = 走っている)。
@@ -315,6 +320,7 @@ pub fn end_start(rc: i32) {
             on_start(rc);
         }
         m().running = 0; /* park 済み = 走っていない */
+        if let Some(i) = idx(rc) { m().key_wait_checks[i] = true; }
     } else {
         /* 0 = 終了済み (回収は `gui_owner_exit` 経由で済んでいる)、
          * 負 = 何も立っていない。adopt の残骸があれば落とす。 */
@@ -332,6 +338,7 @@ pub fn on_owner_exit(id: i32) {
     };
     let mm = m();
     mm.injected_keys[i] = false;
+    mm.key_wait_checks[i] = false;
     mm.apps[i] = App::NEW;
     if mm.running == id {
         mm.running = 0;
@@ -607,7 +614,8 @@ fn injected_key_empty(id: i32) {
 /// 通らないのでスロットも窓も持たない — [`input_ready`] / [`derived_ready`]
 /// の材料が 1 つも無く、注入リングの未読だけが唯一の起床の理由になる。
 ///
-/// **`kbd_inject_pending` を先に見る**。端末由来が空で、成功したWM注入の
+/// **`kbd_inject_pending` を先に見る**。WMの件数は起床候補のヒントであり、
+/// 無関係なWAIT_KEYに取得権を与えない。端末由来が空で、成功したWM注入の
 /// 候補も無ければKAPI 1本で終わる。候補は未読の保証ではなく、実際の宛先
 /// 照合はexec_resume先のカーネルが行う。AGAINで候補を降ろす。
 pub fn key_ready(id: i32) -> bool {
@@ -618,6 +626,50 @@ pub fn key_ready(id: i32) -> bool {
         return false;
     }
     app_state(id) == APP_STATE_WAIT_KEY
+}
+
+/// A raw key wait needs a window in its launch ancestry or a fullscreen
+/// input owner. Run applications without either have no route for keys/STOP.
+fn key_input_connected(st: &GuiState, id: i32) -> bool {
+    for win in &st.windows {
+        if win.used && chain_contains(win.owner, id) {
+            return true;
+        }
+    }
+    let owner = crate::fullscreen::owner();
+    owner != 0 && chain_contains(owner, id)
+}
+
+fn chain_contains(head: i32, id: i32) -> bool {
+    let mut cur = head;
+    for _ in 0..MAX_APPS {
+        if cur == id { return true; }
+        if idx(cur).is_none() { break; }
+        cur = unsafe { (os32api::api().launch_child)(cur) };
+    }
+    false
+}
+
+/// Check only after start/resume returned a parked app, not on every idle
+/// round. launch_report has installed the child's ancestry before this runs.
+/// Top-level only: reject an unreachable wait even when no key is pending.
+fn end_unconnected_key_wait(st: &mut GuiState) -> bool {
+    for i in 0..MAX_APPS {
+        let id = APP_ID_MIN + i as i32;
+        if !m().key_wait_checks[i] { continue; }
+        m().key_wait_checks[i] = false;
+        if m().apps[i].alive && app_state(id) == APP_STATE_WAIT_KEY
+            && !key_input_connected(st, id)
+        {
+            let rc = kill_for_request(id);
+            if rc >= 0 {
+                forget(id);
+                m().key_wait_notice = true;
+            }
+            return true;
+        }
+    }
+    false
 }
 
 /// 入力群: 未読の待ち行列型がリングにある、sticky Quit が積めずに残って
@@ -978,6 +1030,7 @@ pub fn should_park(st: &GuiState, cur: i32) -> bool {
     if session::ready_to_run(st)
         || st.launch_pending
         || has_top_level_work(mm)
+        || mm.key_wait_notice
         || fullscreen_restore_pending()
         || launch_work_pending()
         || crate::settings::pending()
@@ -1088,6 +1141,17 @@ pub fn resume_one(st: &mut GuiState) -> bool {
         }
         return true;
     }
+    let ended = end_unconnected_key_wait(st);
+    if m().key_wait_notice && crate::modal::open_wm_message(
+        st, os32api::gui::proto::GUI_MODAL_OK,
+        b"No keyboard input. Run from a terminal.\0", crate::modal::WM_PURPOSE_NOTIFY)
+    {
+        m().key_wait_notice = false;
+    }
+    if ended {
+        crate::after_exec(st);
+        return true;
+    }
     let k = pick(st);
     if k == 0 {
         return false;
@@ -1119,6 +1183,7 @@ pub fn resume_one(st: &mut GuiState) -> bool {
     mark_resumed(k);
     let rc = unsafe { (os32api::api().exec_resume)(k, wait_ret) };
     m().running = 0;
+    if let Some(i) = idx(rc) { m().key_wait_checks[i] = true; }
     /* 所有者の問い合わせ (票 T8 D3/D4)。全画面 GFX プログラムが `gfx_init` を
      * 呼んだ / 抜けたのは `exec_resume` から戻った直後にしか分からない。
      * 戻っていれば `after_exec` が復帰 (`gfx_init` → パレット → 全面再合成) まで

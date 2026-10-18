@@ -2455,6 +2455,7 @@ fn a_slotless_app_waiting_for_a_key_is_never_forgotten() {
     multiapp::on_start(3); /* 端末から起動した CUI (スロット無し) */
     mocks::set_app_state(2, ST_PARKED);
     mocks::set_app_state(3, ST_WAIT_KEY);
+    mocks::set_launch_child(2, 3);
 
     /* 注入リングが空 = 起床の理由が無い (指摘 C)。 */
     mocks::set_kbd_pending(0);
@@ -2482,6 +2483,7 @@ fn a_slotless_app_waiting_for_a_key_is_resumed_when_a_byte_is_injected() {
     multiapp::on_start(3);
     mocks::set_app_state(2, ST_PARKED);
     mocks::set_app_state(3, ST_WAIT_KEY);
+    mocks::set_launch_child(2, 3);
     mocks::set_kbd_pending(1);
 
     assert!(multiapp::input_ready(&st, 3), "注入があるのに入力群でない");
@@ -2507,6 +2509,7 @@ fn an_again_from_exec_resume_yields_the_round_without_folding_the_app() {
     multiapp::on_start(3);
     mocks::set_app_state(2, ST_PARKED);
     mocks::set_app_state(3, ST_WAIT_KEY);
+    mocks::set_launch_child(2, 3);
     mocks::set_kbd_pending(1);
     *mocks::RESUME_SCRIPT.lock().unwrap() = vec![OS32_ERR_AGAIN];
     let last_before = multiapp::last_run();
@@ -2584,6 +2587,7 @@ fn switch_cui_kills_a_slotless_key_waiting_app_that_cannot_be_sent_a_quit() {
     multiapp::on_start(3); /* 端末から起動した CUI: スロットも窓も無い */
     mocks::set_app_state(2, ST_PARKED);
     mocks::set_app_state(3, ST_WAIT_KEY);
+    mocks::set_launch_child(2, 3);
     mocks::set_kbd_pending(0); /* 打鍵待ちのまま (起こす理由が無い) */
 
     /* Start → CUI mode → Yes。 */
@@ -4248,4 +4252,114 @@ fn h2stop_mouse_press_rearms_but_hold_and_release_do_not() {
             assert_eq!(st.abort_seen, expected, "buttons={buttons}");
         }
     }
+}
+
+// GUIRUNKEY-1: disconnected Run wait is killed independently of pending keys.
+#[test]
+fn guirunkey_run_wait_ends_with_reason_and_reclaims_app() {
+    use crate::{mocks, modal, multiapp};
+    for pending in [0, 1] {
+        mocks::init();
+        let shm = mocks::Shm::new();
+        let mut st = one_gui_app_state(&shm);
+        multiapp::on_start(2);
+        multiapp::begin_start();
+        multiapp::end_start(3); // exec_start returned from raw kbd/ime WAIT_KEY
+        mocks::set_app_state(2, ST_PARKED);
+        mocks::set_app_state(3, ST_WAIT_KEY);
+        mocks::set_kill_frees(&[3]);
+        mocks::set_kbd_pending(pending);
+        assert!(multiapp::resume_one(&mut st));
+        assert_eq!(mocks::kill_calls(), vec![3], "Run wait must be reclaimed");
+        assert!(mocks::resume_calls().is_empty(), "Run must not consume terminal Q");
+        assert!(!multiapp::is_tracked(3));
+        assert!(multiapp::is_tracked(2));
+        assert!(modal::is_open());
+        assert_eq!(modal::msg_bytes(), b"No keyboard input. Run from a terminal.");
+    }
+}
+
+#[test]
+fn guirunkey_terminal_sh_child_wait_keeps_input_and_stop_target() {
+    use crate::{mocks, multiapp};
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let st = terminal_sh_child_chain(&shm);
+    mocks::set_kbd_pending(1);
+    assert!(multiapp::resume_one(st));
+    assert_eq!(mocks::resume_calls(), vec![(4, 0)]);
+    assert!(mocks::kill_calls().is_empty());
+    assert_eq!(multiapp::abort_target(st), 4);
+}
+
+#[test]
+fn guirunkey_reason_waits_for_modal_but_reclaim_does_not() {
+    use crate::{mocks, modal, multiapp};
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = one_gui_app_state(&shm);
+    multiapp::on_start(2);
+    multiapp::on_start(3);
+    mocks::set_app_state(2, ST_PARKED);
+    mocks::set_app_state(3, ST_WAIT_KEY);
+    mocks::set_kill_frees(&[3]);
+    assert!(modal::open_wm_message(&mut st, os32api::gui::proto::GUI_MODAL_OK, b"Existing\0", modal::WM_PURPOSE_NOTIFY));
+    assert!(multiapp::resume_one(&mut st));
+    assert_eq!(mocks::kill_calls(), vec![3]);
+    assert!(!multiapp::is_tracked(3));
+    assert_eq!(modal::msg_bytes(), b"Existing");
+    // The surviving GUI app resumes while the existing modal owns the UI.
+    *mocks::RESUME_SCRIPT.lock().unwrap() = vec![2];
+    assert!(multiapp::resume_one(&mut st));
+    assert_eq!(mocks::resume_calls(), vec![(2, 0)]);
+    modal::on_key(&mut st, 0x1c, 13, 0);
+    assert!(!modal::is_open());
+    // Its next cooperative yield must reach top-level to deliver the notice.
+    assert!(multiapp::should_park(&st, 2), "pending reason must yield to top-level");
+    multiapp::resume_one(&mut st);
+    assert!(modal::is_open());
+    assert_eq!(modal::msg_bytes(), b"No keyboard input. Run from a terminal.");
+    assert_eq!(mocks::kill_calls(), vec![3]);
+    modal::on_key(&mut st, 0x1c, 13, 0);
+    assert!(!multiapp::should_park(&st, 2), "delivered reason must clear pending work");
+}
+
+#[test]
+fn guirunkey_window_and_fullscreen_waits_keep_their_existing_paths() {
+    use crate::{fullscreen, mocks, multiapp};
+    for screen in [false, true] {
+        mocks::init();
+        let shm = mocks::Shm::new();
+        let mut st = one_gui_app_state(&shm);
+        multiapp::on_start(2);
+        mocks::set_app_state(2, ST_WAIT_KEY);
+        if screen {
+            for win in &mut st.windows { win.used = false; }
+            fullscreen::arm(&[0;48]); mocks::set_screen_owner(2); fullscreen::observe();
+            multiapp::note_injected_key(2);
+        } else {
+            mocks::set_kbd_pending(1);
+        }
+        assert!(multiapp::resume_one(&mut st));
+        assert_eq!(mocks::resume_calls(), vec![(2, 0)]);
+        assert!(mocks::kill_calls().is_empty());
+    }
+}
+
+#[test]
+fn guirunkey_run_wait_after_poll_is_also_reclaimed() {
+    use crate::{mocks, multiapp};
+    mocks::init();
+    let mut st = crate::wm::GuiState::NEW;
+    multiapp::on_start(3);
+    mocks::set_app_state(3, ST_WAIT_POLL);
+    *mocks::RESUME_SCRIPT.lock().unwrap() = vec![3];
+    assert!(multiapp::resume_one(&mut st));
+    assert!(mocks::kill_calls().is_empty());
+    mocks::set_app_state(3, ST_WAIT_KEY);
+    mocks::set_kill_frees(&[3]);
+    assert!(multiapp::resume_one(&mut st));
+    assert_eq!(mocks::kill_calls(), vec![3]);
+    assert!(!multiapp::is_tracked(3));
+    assert_eq!(crate::modal::msg_bytes(), b"No keyboard input. Run from a terminal.");
 }

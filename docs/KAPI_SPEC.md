@@ -716,7 +716,10 @@ syscall の中なので `exec_park` も起きず、協調型の全体が止ま�
   e11a の内部例外: 全画面 owner がアプリで、呼び手が WM 本人 (slot 1 または明示的な WM pump)、
   全画面 owner が読み手本人・その子孫でない場合は、読み手未確立でも注入できる。
   WM例外の各バイトには注入時のownerを保持し、そのownerとslot/launch連鎖の子孫だけが
-  take/peekできる。別宛先のバイトは飛ばし、宛先ごとのFIFOを維持する (従来の端末由来は不変)。
+  take/peekできる。端末由来 (`dest=0`) は現在のcon_sink読み手とそのslot/launch連鎖の
+  子孫だけが取得でき、無関係なWAIT_KEYとは共有しない。別宛先のバイトは飛ばし、
+  宛先ごとのFIFOを維持する。旧K7で承認した複数WAIT_KEYの共有はv3で改めた
+  (GUIRUNKEY-1、ユーザー決定 2026-10-18)。
   この例外にも通常権限にも該当しなければ `OS32_ERR_EXIST`、`utf8 == NULL` は `OS32_ERR_INVAL`。
   gshell は全画面 owner につながる起動元の窓だけに配送し、該当窓が無いときだけ直接注入する。
   端末の子への直接注入はカーネルでも拒否する。`WAIT_POLL` は従来の poll 起床後に 1 byte を取る。
@@ -724,17 +727,20 @@ syscall の中なので `exec_park` も起きず、協調型の全体が止ま�
   規約 (票 §5 R2)。あふれは con_sink と逆で **新しい方を捨てる** — 打鍵は順序が意味を持ち、
   古い方を捨てると打った文字列の頭が欠ける。捨てた分は戻り値 (< `len`) で分かり、累計は
   カーネルシンボル `kbd_inject_drop_count` にも積む (KAPI にはしない)。
-- `kbd_inject_pending()`: 現在のアプリが取得可能な未読バイト数。WM自身には端末由来だけが
-  見え、全画面宛てを隠れた端末のWAIT_KEYの起床理由にしない。公開シグネチャは不変。
+- `kbd_inject_pending()`: 現在のアプリが取得可能な未読バイト数。例外としてWM自身には
+  端末由来の件数を起床候補のヒントとして見せるが、WMのtake/peekは許可しない。
+  全画面宛てを隠れた端末のWAIT_KEYの起床理由にしない。公開シグネチャは不変。
   WMは直接注入の成功時にownerの起床候補を控え、owner/launch連鎖末尾のWAIT_KEYを
   再開候補にする。取得可否はカーネルが決め、AGAINで候補を消す (空振りを繰り返さない)。
   WAIT_POLLは従来のpoll起床を使い、owner退場時は候補も消す。
 - GUI 中の `kbd_getchar` / `kbd_getkey` / `kbd_trygetchar` は**この注入リングだけ**を見る。
   `kbd_getchar` / `kbd_getkey` は空のとき **第 2 の park 点**として止まり
   (`APP_STATE_WAIT_KEY` + 印 `parked_from_kbd`)、`exec_resume` が注入リングの 1 バイトを
-  保存フレームの EAX に入れて起こす (WM の `wait_ret` は使わない)。リングが空のままの
+  保存フレームの EAX に入れて起こす (WM の `wait_ret` は使わない)。再開先が取得可能なバイトの無い
   `exec_resume` は `OS32_ERR_AGAIN` で、印も状態も残る。
   `kbd_getkey` の GUI 中の戻り値は下位 8bit だけが意味を持つ (スキャンコードは 0)。
+  Run直起動で窓も入力先への接続も無いアプリのWAIT_KEYは、WMが理由を表示して
+  終了・回収する ([09_exec.md](09_exec.md#実行方式))。
 - **CUI モード (`kbd_gui_mode == 0`) は 1 行も変わらない** — rshell のタイムアウト経路を
   含めて従来どおり cooked リング + `hlt`。
 - CUI復帰 (`console_text_gdc_start`) は注入リング全体を捨てる。退場時
