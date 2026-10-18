@@ -18,6 +18,7 @@
 | 次に `check_select.py` / ci-stab を触る保守の段 (遅くとも T3 の最初の取り込みの全体検査) | X-4 (残り) | 記録の分はその全体検査で残す |
 | T4 | X-11、E11-A2b、X-1 の一部 | 設計票で扱う |
 | T5-0a / T5-0b | T4C1-GUEST、T4B-EXT2、T4C1-CORE、KSTK-DF、IMEDUP-1 | T4証拠照合・fixture短縮/計測・実guard受入。engine stack 32KiB + NP 1頁 (深さ100のhost実測24,388Bが収まる、SQLITE_MAX_EXPR_DEPTH=100のまま、ユーザー決定2026-10-18) |
+| T5a-2のゲスト受入 | T5A2-GUEST | FEP部品・正常/MINIMAL入力・依存隔離・guard込み監査 |
 | T5a-3 | T4B7-GUI | GUI端末と入力・IME・STOPの観測 |
 | T5の各部品追加 / 次のVFS・ISO境界変更 | T4C1-FD / T4B-CD | FD容量でT6b-M挿入 / 凍結コードの削除要否判断 |
 | T5a / T7 | X-1 の一部、E10-4、H-6b、H-5 (CG 窓 WB・68h) | — |
@@ -42,6 +43,7 @@
 | T4C1-CORE | engine stack 32KiB + NP 1頁 (深さ100のhost実測24,388Bが収まる、SQLITE_MAX_EXPR_DEPTH=100のまま、ユーザー決定2026-10-18)。core増分+4,072Bは実測として保持 | stack採否の二段判定・縮小時だけの再確認は不要。既存受入の証拠照合だけ残す | NP21/W で 32KiB の全負荷 high-water 4,668 B を確認 (2026-10-18、dcfe5b1)。深さ 100 のゲスト計測は道具が無く host の 24,388 B が根拠。閉じてよい — 次の台帳整理で閉鎖台帳へ |
 | KSTK-DF | カーネル・SQLite engine のスタックがガード頁に当たると、#PF の例外フレームも NP 頁に書くので #DF → トリプルフォルト (リセット) になり、診断の 1 行が出ない。#DF を専用 TSS の task gate で受ければ止まる前に診断を出せる (T4c-1 の直しの astra レビュー P1) | T4c-1 以前の固定ガード・カーネルのスタックと同じ振る舞い (`kernel/isr_stub.asm:28`)。黙った破壊ではなく停止なので T4c-1 の範囲外 | NP21/W で受入 (2026-10-18、dcfe5b1: kernel/engine とも診断の 1 行を出して停止)。残りは実機 (T4T7-RH の T5-0b の項目) だけ |
 | FEPLEARN-1 | 学習した語は `fep.db` の `dict_user` にあり、配備 (nhd_deploy sync) や FEP が閉じている間の hsync で `fep.db` を入れ替えると配布の状態に戻る (T5-0a の受入で観測) | T4 以前からの作り。FEP が開いている間の hsync は BUSY で置き換えを断る (`userland/system/hsync.c:1622`) ので普段の更新では起きない | 学習を別ファイルに分ける DICT_META の段で解消。実機で FD 復旧 (FDRECOV) をすると学習が消えることを手順書に書くのはその段まで保留 |
+| T5A2-GUEST | fep.mod 分離後のNP21/W: 正常/MINIMALのGUI textbox・CUI英数編集、IMECAND/IMEIND/IMEDUPとGUIRUNKEY-1、RESIDENT学習の子終了後保持、Unicode7頁・guard込み実監査diff0、#DF回帰 | 実装worktreeのhost試験のみ。実機/エミュレータ配備はPMが実施。手順とhost証拠は `~/os32-tmp/run/t5a2/report.md` | T5a-2のゲスト受入で確認し、T5a-3を積む前に閉じる。hostの監査fixtureを実ゲストの合格に数えない |
 | T4B7-GUI | T4b-7 の GUI 端末からの db done/stop と、区間中の log stop (試験ビルド) | db の fixture (4^12 行の集計) が 1 回 12〜19 分かかり、GUI 端末の回は未実行。通常の像の log stop は子が先に終わる。CUI では両方合格 (`~/os32-tmp/evidence/2026-10-18/t4c_fix3_np21w/RESULT.md`) | T5-0aで製品SQL設定のままfixtureを数分へ縮め期待結果/試験を同期 (文の形を保ち、行数でstack深さは変わらない)。T5a-3でGUI端末のdone/stop・区間内log stopと入力/IME/STOPを観測。端末実体/世代/起動経路を固定しH-7/T5A-ACCとは分ける |
 | IMEDUP-1 | 学習後に同一候補が重複しないことのゲスト確認 | コードは着地、C側の重複排除で候補32件未満を許す。ゲスト未確認 | 最初のゲスト受入T5-0aで変換→学習→再変換を観測 |
 | LGY98-L12 | LGY-98 の L1 (131/200 フレーム) と L2 (66,132/131,072 B) が FAIL — main 9aaaf39 でも同じ数値で FAIL (T3ab の後退ではない)。台本 `tools/net_l0..l3_test.py` は urllib で 127.0.0.1:8025 を直接叩くので、WSL の NAT では届かない (受入では手元の shim で `np21w_client` の curl 経路へ回した) | 既存の失敗、原因は台本か host_agent v2 の側 [推] | 次に LGY-98 / net の台本を触る段: 台本を np21w_client に寄せ、L1/L2 の欠落の原因を調べる |

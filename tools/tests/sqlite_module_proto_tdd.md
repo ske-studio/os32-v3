@@ -34,11 +34,14 @@ SQLITE の生成 policy 行から required PAIR を外す変異と pair 照合�
 
 ## T4c-2 一括公開と rollback
 
-同じ実像/adapter の試験で `services_boot` を実行する。実際の FEP buffer 確保・
-abort・辞書 close と Unicode loader を使い、SQLite の group・MEMSYS5・shutdown は
-再配置した製品本文で実行する。画面出力とディスクを置換し、settings は種を入れるため
-RW の一時 RAM DB、辞書 open は RAM DB の実 stmt で代える。ディスク上の実 IME SQL は
-既存 `check-vfs-fd-path-host` / `check-fep-budget-host`、ゲスト全体は PM の確認範囲。
+同じ実像/adapter の試験で `services_boot` を実行する。T5a-2 からは実 `fep.mod` も
+`module_runtime` で読み、再配置・prefix 返却後の製品 `ime.c` / `ime_dict.c` と typed facade を
+実行する。FEP boot/abort/close のソース抽出はしない。SQLite の group・MEMSYS5・shutdown と
+Unicode loader も実経路を通す。画面出力とディスクを置換し、settings は種を入れるため
+RW の一時 RAM DB、FEP の group_open import は実製品 SQL を prepare できる RAM 辞書へ向ける。
+partial/learn prepare 失敗は import の seam で実 SQLite 構文エラーを返す。
+ディスク上の RESIDENT / 遅延 journal と子終了は既存 `check-vfs-fd-path-host` /
+`check-fep-budget-host` の実 VFS 試験、NP21/W 全体は PM の確認範囲。
 
 正常対照は公開を最後まで閉じ、設定 224 / 128 / 99 KiB と既定 192 KiB、64 / 98 KiB の
 99 KiB への丸めと診断、128 KiB 時の APP 上限増加、APP の割当拒否後も
@@ -53,8 +56,23 @@ Unicode の欠落/旧形式/I/O/確保失敗でも SERVICES_READY、かなの算
 いずれもコンパイル後の assertion failure だけを RED と数える。通常対照を先に実行する。
 `check-db-errstr-host` は内部 SQLite を ready にしたまま public を閉じ、全 DB 口の stub と
 副作用 0 を確認する。`check-x11-shared-host` は未公開 IME 管理口と CUI/GUI 生入力を確認する。
-ページ監査はこの fixture の合成 count を合格根拠にせず、既存の memory/memmap 監査検査と
-NP21/W の diff=0 を使う。SA_ONSTACK の既存 overflow 検査は実 IDT の再現ではない。
+T5a-2 の正常/MINIMAL 入力対照は GUI の英数/矢印/BS raw key と無入力、CUI/terminal の
+blocking/nonblocking・KAPI 入力を通す。STOP は keyboard wait が -1 を返す seam で、
+KAPI の abort safe point に届くことを照合する (実 IRQ/STOP 配送の試験ではない)。
+CUI read で owner を取得した後の終了は composition だけを消し、実 RESIDENT DB/group を保持する。
+FEP 欠落/対違い/PAIR外し/確保失敗も MINIMAL に戻す。FEP close 失敗ではその6頁と
+buffer 736B、および依存 SQLite231頁を隔離する。
+
+`--fep-mutate` は正常対照の後、stub が常時 -1 を返す変異と依存先の先 free を検出する。
+既存の学習 prepare 必須化・公開後の close fault 誤適用は、変更した実 FEP object だけを
+製品フラグで組み直して他の製品 object とリンクし、mkmod で再 pack して runtime RED を確認する。
+旧「FEP より先の SQLite abort」変異は依存 guard により隔離となり先 free に至らなくなったため、
+直接依存 owner を先 reclaim する変異へ統合した (新変異は runtime RED)。
+`--mutate` にもこれらの検査を残す。
+
+`memory_boot_page_counts` は0を返す shimで、実監査の根拠にしない。ログの `audit_diff=0` は
+fixture の live bitmap と SQLite/FEP owner 頁合計の個別照合 (NP guard含む) を表す。
+製品監査の受入には既存 memory/memmap 監査検査と NP21/W の diff=0 を使う。SA_ONSTACK の既存 overflow 検査は実 IDT の再現ではない。
 
 ## T5-0b stack 採否と fault の試験境界
 

@@ -869,7 +869,7 @@ static int man_gate(void)
  *     **ただし `/boot` だけに絞った同期 (`hsync boot`) はこの 1 条件から外す**:
  *     カーネルを先に運ぶ唯一の HostDrv 経路で、ここで断ると v64 の
  *     カーネルがいつまでも入らない (Codex 実装レビュー R1 blocker 2)。
- *     /boot のカーネルと対の kdebug.bin / sqlite.mod を一緒に運ぶ。
+ *     /boot のカーネルと対の kdebug.bin / sqlite.mod / fep.mod を一緒に運ぶ。
  *     ユーザーランドが無いので、版の前後はこの同期に関係しない。
  *     配置違い・名札の欠落/不正は /boot でも断る (配備元の一式が
  *     このカーネル系列のものか確かめられない)。

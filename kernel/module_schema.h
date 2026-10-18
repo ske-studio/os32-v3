@@ -10,6 +10,7 @@
 #define MODULE_FORMAT_VERSION 1U
 #define MODULE_ID_KDEBUG 1U
 #define MODULE_ID_SQLITE 2U
+#define MODULE_ID_FEP 3U
 #define MODULE_PHASE_POST_ROOT 2U
 #define MODULE_FLAG_PAIR 1U
 #define MODULE_RUNTIME_SLOTS 18U
@@ -92,6 +93,21 @@ enum module_field {
         .import_max = 32U, \
         .export_max = 1U, \
         .load_span_max = 544768U, \
+    }, \
+    { \
+        .module_id = 3U, \
+        .phase = 2U, \
+        .required_flags = 1U, \
+        .allowed_flags = 1U, \
+        .stop_allowed = 0U, \
+        .ops_version = 1U, \
+        .ops_slots = 1U, \
+        .image_max = 65536U, \
+        .mem_max = 65536U, \
+        .reloc_max = 2048U, \
+        .import_max = 96U, \
+        .export_max = 1U, \
+        .load_span_max = 81920U, \
     }, \
 }
 

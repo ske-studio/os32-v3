@@ -1,0 +1,400 @@
+{
+  "schema": 1,
+  "contracts": [
+    "kernel/fep_module.h",
+    "kernel/ime_render.h",
+    "sdk/include/os32/os32_kapi_shared.h"
+  ],
+  "imports": [
+    {
+      "symbol": "caller_access_get",
+      "context": "normal",
+      "irq": false,
+      "source": "include/redir_access.h"
+    },
+    {
+      "symbol": "check_caller_write_range",
+      "context": "normal",
+      "irq": false,
+      "source": "include/redir_access.h"
+    },
+    {
+      "symbol": "con_sink_is_enabled",
+      "context": "normal",
+      "irq": false,
+      "source": "include/con_sink.h"
+    },
+    {
+      "symbol": "copy_caller_cstr",
+      "context": "normal",
+      "irq": false,
+      "source": "include/redir_access.h"
+    },
+    {
+      "symbol": "copy_to_caller",
+      "context": "normal",
+      "irq": false,
+      "source": "include/redir_access.h"
+    },
+    {
+      "symbol": "fep_kbd_shift_state",
+      "context": "normal",
+      "irq": false,
+      "declaration": "u8 fep_kbd_shift_state(void);"
+    },
+    {
+      "symbol": "fep_services_boot_fault",
+      "context": "normal",
+      "irq": false,
+      "declaration": "u32 fep_services_boot_fault(void);"
+    },
+    {
+      "symbol": "fep_services_public",
+      "context": "normal",
+      "irq": false,
+      "declaration": "int fep_services_public(void);"
+    },
+    {
+      "symbol": "fep_services_stage",
+      "context": "normal",
+      "irq": false,
+      "declaration": "int fep_services_stage(void);"
+    },
+    {
+      "symbol": "kbd_getkey_wait",
+      "context": "normal",
+      "irq": false,
+      "source": "drivers/kbd.h"
+    },
+    {
+      "symbol": "kbd_trygetchar",
+      "context": "normal",
+      "irq": false,
+      "source": "drivers/kbd.h"
+    },
+    {
+      "symbol": "kbd_trygetkey",
+      "context": "normal",
+      "irq": false,
+      "source": "drivers/kbd.h"
+    },
+    {
+      "symbol": "kfree",
+      "context": "normal",
+      "irq": false,
+      "source": "kernel/kmalloc.h"
+    },
+    {
+      "symbol": "kmalloc",
+      "context": "normal",
+      "irq": false,
+      "source": "kernel/kmalloc.h"
+    },
+    {
+      "symbol": "kmalloc_block_size",
+      "context": "normal",
+      "irq": false,
+      "source": "kernel/kmalloc.h"
+    },
+    {
+      "symbol": "kmemcpy",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/kstring.h"
+    },
+    {
+      "symbol": "kmemset",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/kstring.h"
+    },
+    {
+      "symbol": "kprintf",
+      "context": "normal",
+      "irq": false,
+      "source": "include/kprintf.h"
+    },
+    {
+      "symbol": "kstrcmp",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/kstring.h"
+    },
+    {
+      "symbol": "kstrcpy",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/kstring.h"
+    },
+    {
+      "symbol": "kstrlen",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/kstring.h"
+    },
+    {
+      "symbol": "kstrncat",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/kstring.h"
+    },
+    {
+      "symbol": "kstrncpy",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/kstring.h"
+    },
+    {
+      "symbol": "ktime_ticks",
+      "context": "normal",
+      "irq": false,
+      "declaration": "u32 ktime_ticks(void);"
+    },
+    {
+      "symbol": "kzalloc",
+      "context": "normal",
+      "irq": false,
+      "source": "kernel/kmalloc.h"
+    },
+    {
+      "symbol": "os32_sqlite_bind_int",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/sqlite3/os32_sqlite_outer.h"
+    },
+    {
+      "symbol": "os32_sqlite_bind_null",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/sqlite3/os32_sqlite_outer.h"
+    },
+    {
+      "symbol": "os32_sqlite_bind_text",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/sqlite3/os32_sqlite_outer.h"
+    },
+    {
+      "symbol": "os32_sqlite_close",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/sqlite3/os32_sqlite_outer.h"
+    },
+    {
+      "symbol": "os32_sqlite_column_int",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/sqlite3/os32_sqlite_outer.h"
+    },
+    {
+      "symbol": "os32_sqlite_column_text",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/sqlite3/os32_sqlite_outer.h"
+    },
+    {
+      "symbol": "os32_sqlite_errcode",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/sqlite3/os32_sqlite_outer.h"
+    },
+    {
+      "symbol": "os32_sqlite_errmsg",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/sqlite3/os32_sqlite_outer.h"
+    },
+    {
+      "symbol": "os32_sqlite_exec",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/sqlite3/os32_sqlite_outer.h"
+    },
+    {
+      "symbol": "os32_sqlite_extended_errcode",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/sqlite3/os32_sqlite_outer.h"
+    },
+    {
+      "symbol": "os32_sqlite_finalize",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/sqlite3/os32_sqlite_outer.h"
+    },
+    {
+      "symbol": "os32_sqlite_outer_db_fd",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/sqlite3/os32_sqlite_outer.h"
+    },
+    {
+      "symbol": "os32_sqlite_outer_group_acquire",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/sqlite3/os32_sqlite_outer.h"
+    },
+    {
+      "symbol": "os32_sqlite_outer_group_begin_close",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/sqlite3/os32_sqlite_outer.h"
+    },
+    {
+      "symbol": "os32_sqlite_outer_group_finish",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/sqlite3/os32_sqlite_outer.h"
+    },
+    {
+      "symbol": "os32_sqlite_outer_group_open",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/sqlite3/os32_sqlite_outer.h"
+    },
+    {
+      "symbol": "os32_sqlite_prepare_v2",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/sqlite3/os32_sqlite_outer.h"
+    },
+    {
+      "symbol": "os32_sqlite_reset",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/sqlite3/os32_sqlite_outer.h"
+    },
+    {
+      "symbol": "os32_sqlite_snprintf",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/sqlite3/os32_sqlite_outer.h"
+    },
+    {
+      "symbol": "os32_sqlite_step",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/sqlite3/os32_sqlite_outer.h"
+    },
+    {
+      "symbol": "res_owner_get",
+      "context": "normal",
+      "irq": false,
+      "source": "fs/fd_redirect.h"
+    },
+    {
+      "symbol": "ring3_abort_check",
+      "context": "normal",
+      "irq": false,
+      "declaration": "void ring3_abort_check(void);"
+    },
+    {
+      "symbol": "ring3_call_from_user",
+      "context": "normal",
+      "irq": false,
+      "source": "exec/exec.h"
+    },
+    {
+      "symbol": "ring3_fault_kill",
+      "context": "normal",
+      "irq": false,
+      "source": "exec/exec.h"
+    },
+    {
+      "symbol": "serial_puts",
+      "context": "normal",
+      "irq": false,
+      "source": "drivers/serial.h"
+    },
+    {
+      "symbol": "sqlite_engine_available",
+      "context": "normal",
+      "irq": false,
+      "source": "kernel/sqlite_engine.h"
+    },
+    {
+      "symbol": "tvram_putchar_at",
+      "context": "normal",
+      "irq": false,
+      "source": "include/tvram.h"
+    },
+    {
+      "symbol": "tvram_putkanji_at",
+      "context": "normal",
+      "irq": false,
+      "source": "include/tvram.h"
+    },
+    {
+      "symbol": "tvram_readchar_at",
+      "context": "normal",
+      "irq": false,
+      "source": "include/tvram.h"
+    },
+    {
+      "symbol": "tvram_set_scroll_reserve",
+      "context": "normal",
+      "irq": false,
+      "source": "include/tvram.h"
+    },
+    {
+      "symbol": "unicode_to_ank",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/utf8.h"
+    },
+    {
+      "symbol": "unicode_to_jis",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/utf8.h"
+    },
+    {
+      "symbol": "utf8_decode",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/utf8.h"
+    },
+    {
+      "symbol": "utf8_delete_last",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/utf8.h"
+    },
+    {
+      "symbol": "utf8_strlen",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/utf8.h"
+    },
+    {
+      "symbol": "vfs_close",
+      "context": "normal",
+      "irq": false,
+      "source": "fs/vfs.h"
+    },
+    {
+      "symbol": "vfs_fd_is_stale",
+      "context": "normal",
+      "irq": false,
+      "source": "fs/vfs.h"
+    },
+    {
+      "symbol": "vfs_open",
+      "context": "normal",
+      "irq": false,
+      "source": "fs/vfs.h"
+    },
+    {
+      "symbol": "vfs_stat",
+      "context": "normal",
+      "irq": false,
+      "source": "fs/vfs.h"
+    },
+    {
+      "symbol": "vfs_write_fd",
+      "context": "normal",
+      "irq": false,
+      "source": "fs/vfs.h"
+    }
+  ]
+}

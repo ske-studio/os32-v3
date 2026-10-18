@@ -128,7 +128,7 @@ def dry_run(root):
     os.makedirs(out_dir)
     from gen_memmap import write_layout_header
     write_layout_header(root, os.path.join(out_dir, "memmap_layout.h"))
-    # make -n does not run the paired SQLite module's C/header generator.
+    # make -n does not run the paired modules' C/header generator.
     # Keep these derived inputs beside the layout header for later AST reads.
     generator = pathlib.Path(root, "tools/gen_sqlite_imports.py")
     if generator.is_file():
@@ -138,6 +138,9 @@ def dry_run(root):
         module.ROOT = pathlib.Path(root)
         module.generate(pathlib.Path(out_dir, "sqlite-proto"),
                         pathlib.Path(root, "tools/prototypes/sqlite_imports.def"))
+        fep_definition = pathlib.Path(root, "tools/prototypes/fep_imports.def")
+        if fep_definition.is_file():
+            module.generate(pathlib.Path(out_dir, "fep"), fep_definition, module="fep")
     for name in SAVED_SETTINGS:
         src = pathlib.Path(root, REAL_BUILD_OUT, name)
         if src.is_file():

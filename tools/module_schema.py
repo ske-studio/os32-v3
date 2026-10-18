@@ -17,7 +17,7 @@ HEADER_FIELDS = (
 )
 CONSTANTS = dict(
     HEADER_SIZE=144, PAGE_SIZE=4096, NAME_MAX=63, RECORD_SIZE=12,
-    MAGIC=0x444f4d4b, FORMAT_VERSION=1, ID_KDEBUG=1, ID_SQLITE=2,
+    MAGIC=0x444f4d4b, FORMAT_VERSION=1, ID_KDEBUG=1, ID_SQLITE=2, ID_FEP=3,
     PHASE_POST_ROOT=2, FLAG_PAIR=1,
 )
 KDEBUG_OPS_NAMES = (
@@ -53,4 +53,15 @@ POLICIES[CONSTANTS['ID_SQLITE']] = dict(
     reloc_max=4096, import_max=32, export_max=1, load_span_max=544768,
     init_symbol='sqlite_module_init', imports_symbol='sqlite_import_slots',
     ops_symbol='sqlite_module_ops', ops_names=('initialize',),
+)
+
+# T5a-2 paired FEP depends on the private SQLite engine at POST_ROOT.
+POLICIES[CONSTANTS['ID_FEP']] = dict(
+    module_id=CONSTANTS['ID_FEP'], phase=CONSTANTS['PHASE_POST_ROOT'],
+    required_flags=CONSTANTS['FLAG_PAIR'], allowed_flags=CONSTANTS['FLAG_PAIR'],
+    stop_allowed=0, ops_version=1, ops_slots=1,
+    image_max=65536, mem_max=65536,
+    reloc_max=2048, import_max=96, export_max=1, load_span_max=81920,
+    init_symbol='fep_module_init', imports_symbol='fep_import_slots',
+    ops_symbol='fep_module_ops', ops_names=('initialize',),
 )

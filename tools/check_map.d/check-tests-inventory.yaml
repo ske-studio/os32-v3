@@ -59,4 +59,5 @@ check-tests-inventory:
 - tools/mkmod.py
 - tools/module_schema.py
 - tools/prototypes/sqlite_imports.def
+- tools/prototypes/fep_imports.def
 artifact_reader: true

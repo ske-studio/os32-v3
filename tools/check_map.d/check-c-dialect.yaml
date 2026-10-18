@@ -8,6 +8,7 @@ check-c-dialect:
 - tools/gen_sqlite_imports.py
 - tools/gen_kdebug_imports.py
 - tools/prototypes/sqlite_imports.def
+- tools/prototypes/fep_imports.def
 - build/sqlite-proto.mk
 - tools/check_map.d/check-c-dialect.yaml
 - build/checks.d/check-c-dialect.mk

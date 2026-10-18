@@ -11,6 +11,7 @@
 #include "bootinfo.h"
 #include "config.h"
 #include "ime.h"
+#include "fep_module.h"
 #include "unicode_file.h"
 #include "kstring.h"
 #include "kprintf.h"
@@ -251,7 +252,7 @@ void services_boot(void)
     if (services_boot_fault == SERVICES_FAULT_RESERVE) reserve = SQLITE_MODULE_POOL_SIZE;
     rc = os32_sqlite_outer_boot_check(0, reserve);
     if (rc) goto rollback;
-    rc = ime_dict_boot();
+    rc = fep_module_load(sqlite_handle);
     kprintf(0x07, "[IME] boot dictionary rc=%d\n", rc);
     if (rc) goto rollback;
     services_stage = SERVICES_FEP_INTERNAL_READY;
@@ -271,7 +272,7 @@ rollback:;
     enum services_stage failed_stage = services_stage;
     services_public = 0;
     /* FEP statements/groups must disappear while internal exports still work. */
-    cleanup_blocked = ime_boot_abort() != 0;
+    cleanup_blocked = fep_module_abort() != 0;
     if (sqlite_module_ready() && os32_sqlite_outer_boot_check(0, 0))
         cleanup_blocked = 1;
     int isolated = module_abort(sqlite_handle);
@@ -284,16 +285,17 @@ report:;
     struct module_record *r = module_record_get(sqlite_handle);
     u32 pages = r && r->owner ? ledger_owner_pages(r->owner) : 0;
     u32 fep = ime_boot_bytes();
+    u32 fep_pages = fep_module_pages();
     struct memory_page_counts counts;
     memory_boot_page_counts(kdebug.pages ? kdebug.base_pa / PAGE_SIZE : 0,
                             kdebug.pages, &counts);
     /* Observation only: preserve kaudit's existing run count and classifications.
-     * SQLite remains in SLACK/pool; FEP buffers remain inside KHEAP. */
-    kprintf(0x07, "[services] %s public=%u sqlite_pages=%u fep_bytes=%u quarantine_bytes=%u diff=%d\n",
+     * Both module bodies remain in SLACK/pool; FEP buffers are in KHEAP. */
+    kprintf(0x07, "[services] %s public=%u sqlite_pages=%u fep_pages=%u fep_bytes=%u quarantine_bytes=%u diff=%d\n",
             services_public ? "SERVICES_READY" :
             services_stage == SERVICES_MINIMAL ? "MINIMAL" : "MINIMAL_QUARANTINED",
-            (u32)services_public, pages, fep,
-            services_stage == SERVICES_MINIMAL_QUARANTINED ? pages * PAGE_SIZE + fep : 0,
+            (u32)services_public, pages, fep_pages, fep,
+            services_stage == SERVICES_MINIMAL_QUARANTINED ? (pages + fep_pages) * PAGE_SIZE + fep : 0,
             counts.diff);
     kprintf(0x07, "[services] tick=%u..%u reserve=%d unicode=%08x\n",
             start_tick, tick_count, reserve, unicode_file_debug_phys());

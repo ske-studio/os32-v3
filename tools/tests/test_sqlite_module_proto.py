@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 from pathlib import Path
 import struct
 import subprocess
@@ -201,9 +202,10 @@ def pair_runtime_suite(folder, mutate=False):
         # Change the actual SQLITE row, preserving KDEBUG and allowed flags.
         marker = '.module_id = 2U,'
         assert schema.count(marker) == 1
-        head, row = schema.split(marker)
+        head, tail = schema.split(marker)
+        row, following = tail.split('.module_id = 3U,', 1)
         assert row.count('.required_flags = 1U,') == 1
-        policy = head + marker + row.replace('.required_flags = 1U,', '.required_flags = 0U,')
+        policy = head + marker + row.replace('.required_flags = 1U,', '.required_flags = 0U,') + '.module_id = 3U,' + following
         build(policy=policy)
         run(9, 0, 3, expected=1)
         print('MUTATE sqlite-pair-policy RED (compiled, runtime acceptance assertion)')
@@ -214,19 +216,16 @@ def pair_runtime_suite(folder, mutate=False):
         print('MUTATE sqlite-mixed-pair RED (compiled, runtime acceptance assertion)')
 
 
-def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=False):
+def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=False, fep_mutate=False):
     """Execute the product module with the full adapter and real stack switch."""
     generated = ROOT / 'lib/sqlite3/generated'
     (folder / 'sys_build_info.inc').write_text(function(
         (ROOT / 'kapi/kapi_sys.c').read_text(), 'kapi_sys_get_build_info'))
-    ime = (ROOT / 'kernel/ime.c').read_text()
-    close = function((ROOT / 'kernel/ime_dict.c').read_text(), 'ime_dict_close')
-    close = close.replace('sqlite3_finalize(', 'os32_sqlite_finalize(').replace('sqlite3_close(', 'os32_sqlite_close(')
-    close = close.replace('os32_sqlite_group_', 'os32_sqlite_outer_group_')
-    (folder / 'services_fep.inc').write_text('\n'.join(
-        line for line in ime.splitlines() if line.startswith(('#define CANDLIST_SAVE_', '#define IME_DICT_PATH')))
-        + '\n' + '\n'.join(function(ime, name) for name in ('ime_boot_bytes', 'ime_dict_boot', 'ime_boot_abort'))
-        + '\n' + close)
+    fep_directory = ROOT / 'build/out/fep'
+    fep_elf = mkmod.Elf((fep_directory / 'fep.elf').read_bytes())
+    (folder / 'fep_host_offsets.h').write_text(
+        '#define HOST_FEP_STATE ' + str(next(sym['value'] for table in fep_elf.symtabs.values() for sym in table if sym['name'] == 'g_ime')) + 'u\n')
+    (folder / 'fep_module.c').write_bytes((ROOT / 'kernel/fep_module.c').read_bytes())
     smoke = (ROOT / 'lib/sqlite3/os32_sqlite_test.c').read_text()
     smoke = smoke.replace(function(smoke, 'tv_put'),
         'static void tv_put(int r, int c, char v, u8 a) { (void)r; (void)c; (void)v; (void)a; }')
@@ -265,20 +264,46 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
         'const u32 sqlite_kexports[] = {\n' + ''.join(
             '    (u32)(uptr)' + (row['name'] if row['name'] in used else 'sqlite_forbidden_import') + ',\n'
             for row in metadata['imports']) + '};\n' + exports[end:])
+    fep_metadata = json.loads((fep_directory / 'fep_imports.json').read_text())
+    fep_exports = (fep_directory / 'fep_kexports.c').read_text()
+    end = fep_exports.index('};', fep_exports.index('const u32 fep_kexports[]')) + 2
+    used = {'kmemcpy', 'kmemset', 'kstrncpy', 'kstrlen', 'kprintf', 'kmalloc',
+            'kfree', 'kmalloc_block_size', 'serial_puts', 'sqlite_engine_available',
+            'con_sink_is_enabled', 'kbd_trygetkey', 'kbd_trygetchar', 'kbd_getkey_wait',
+            'ring3_call_from_user', 'res_owner_get', 'ring3_abort_check',
+            'tvram_set_scroll_reserve'}
+    wrappers = {'os32_sqlite_outer_group_open': 'host_fep_group_open',
+                'os32_sqlite_outer_group_acquire': 'host_fep_group_acquire',
+                'os32_sqlite_prepare_v2': 'host_fep_prepare'}
+    (folder / 'fep_kexports.c').write_text(
+        '#include "fep_imports.h"\n#include "module_image.h"\n'
+        'extern void sqlite_forbidden_import(void);\n'
+        'extern int host_fep_group_open(const Os32SqliteGroup *, const char *, int, sqlite3 **);\n'
+        'extern int host_fep_group_acquire(int, int, Os32SqliteGroup *);\n'
+        'extern int host_fep_prepare(sqlite3 *, const char *, int, sqlite3_stmt **, const char **);\n'
+        'const u32 fep_kexports[] = {\n' + ''.join(
+            '    (u32)(uptr)' + wrappers.get(row['name'], row['name'] if
+                row['name'] in used or row['name'].startswith(('os32_sqlite_', 'fep_'))
+                else 'sqlite_forbidden_import') + ',\n' for row in fep_metadata['imports'])
+        + '};\n' + fep_exports[end:])
     obj = folder / 'sqlite_stack.o'
     subprocess.run(['nasm', '-f', 'elf32', ROOT / 'lib/sqlite3/sqlite_stack.asm', '-o', obj], check=True)
     exe = folder / 'sqlite-module'
     command = ['gcc', *RUNTIME_FLAGS, '-Werror=vla', '-I' + str(folder), *RUNTIME_INCLUDES,
                     '-I' + str(ROOT / 'lib/sqlite3'), '-I' + str(generated),
+                    '-I' + str(fep_directory), '-I' + str(ROOT / 'drivers'),
                     '-nostdlib', '-static', '-no-pie',
                     ROOT / 'tools/tests/sqlite_module_host.c',
                     folder / 'sqlite_engine.c', folder / 'sqlite_outer.c',
-                    folder / 'sqlite_kexports.c', ROOT / 'kernel/module_runtime.c',
+                    folder / 'sqlite_kexports.c', folder / 'fep_kexports.c', folder / 'fep_module.c',
+                    ROOT / 'kernel/module_runtime.c',
                     ROOT / 'kernel/module_image.c', ROOT / 'kernel/unicode_file.c',
                     folder / 'sqlite_smoke.c', obj, '-o', exe]
     subprocess.run(command, check=True)
     pair = mkmod.pair_crc(vmkernel.read_bytes())
     image = (directory / 'sqlite.bin').read_bytes()
+    fep_image = (ROOT / 'build/out/fep.mod').read_bytes()
+    fep_payload = struct.pack('<I', len(fep_image)) + fep_image
     for label, mode, expected in (('running', 0, 0), ('missing', 1, 2),
                                   ('mixed-pair', 2, 4), ('prefix-failure', 3, 10),
                                   ('pool-failure', 4, 10), ('stack-failure', 5, 10),
@@ -287,7 +312,7 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
         if mode == 2:
             word(data, 31, pair ^ 1)
             crc(data)
-        payload = struct.pack('<4I', mode, len(data), pair, expected) + data
+        payload = struct.pack('<4I', mode, len(data), pair, expected) + data + fep_payload
         for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
             result = host32.run([str(exe)], input=payload, runner=runner, capture_output=True)
             assert result.returncode == (77 if mode == 6 else 0), (label, runner, result)
@@ -301,7 +326,7 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
     # Keep stack modes separate from boot/settings modes 10..36 in the harness.
     for label, mode in (('expr-depth-100', 40), ('compound-5', 41),
                         ('sort-1024', 42), ('index-1024', 43), ('trigger-omitted', 44)):
-        payload = struct.pack('<4I', mode, len(image), pair, 0) + image
+        payload = struct.pack('<4I', mode, len(image), pair, 0) + image + fep_payload
         result = host32.run([str(exe)], input=payload, runner='qemu', capture_output=True)
         print(result.stdout.decode(), end='', flush=True)
         assert result.returncode == 0 and f'STACK workload={mode} '.encode() in result.stdout, (label, result)
@@ -312,7 +337,7 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
         assert header.count(old) == 1
         (folder / 'sqlite_engine.h').write_text(header.replace(old, '(16u * 1024u)'))
         subprocess.run(command, check=True)
-        payload = struct.pack('<4I', 40, len(image), pair, 0) + image
+        payload = struct.pack('<4I', 40, len(image), pair, 0) + image + fep_payload
         result = host32.run([str(exe)], input=payload, runner='qemu', capture_output=True)
         assert result.returncode == 77 and b'PASS host signal seam -> engine fail-stop (NOT IDT/#DF)' in result.stdout, result
         print('MUTATE undersized-stack RED (compiled runtime): ' + result.stdout.decode().strip(), flush=True)
@@ -326,7 +351,7 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
         assert source.count(fill) == 1
         path.write_text(source.replace(fill, '    /* mutation: omit initial stack fill */'))
         subprocess.run(command, check=True)
-        payload = struct.pack('<4I', 0, len(image), pair, 0) + image
+        payload = struct.pack('<4I', 0, len(image), pair, 0) + image + fep_payload
         result = host32.run([str(exe)], input=payload, runner='qemu', capture_output=True)
         assert result.returncode == 1 and b'FAIL deep_water > 0 && deep_water < SQLITE_ENGINE_STACK_SIZE' in result.stdout, result
         print('MUTATE stack-fill RED (compiled runtime): ' + result.stdout.decode().strip(), flush=True)
@@ -338,16 +363,22 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
                   ('settings-reserve', 19), ('settings-lower-reserve', 20),
                   ('learn-prepare-failure', 32), ('close-fault-after-ready', 33),
                   ('settings-below-minimum', 34), ('settings-minimum', 35),
-                  ('settings-minimum-minus-one', 36)]
+                  ('settings-minimum-minus-one', 36), ('missing-FEP', 50),
+                  ('mixed-FEP', 51), ('FEP-allocation', 52), ('FEP-PAIR-required', 53)]
     boot_cases += [(name, 20 + fault) for fault, name in enumerate((
         'pool', 'stack', 'sqlite-init', 'settings-close', 'fep-text', 'fep-attr',
         'fep-crc', 'dictionary', 'reserve', 'fep-close', 'shutdown'), 1)]
-    def boot_run(mode):
+    def boot_run(mode, fep_body=None):
         data = bytearray(image)
         if mode == 12:
             word(data, 31, pair ^ 1)
             crc(data)
-        return host32.run([str(exe)], input=struct.pack('<4I', mode, len(data), pair, 0) + data,
+        fep_data = bytearray(fep_image if fep_body is None else fep_body)
+        if mode in (51, 53):
+            word(fep_data, 31 if mode == 51 else 9, pair ^ 1 if mode == 51 else 0)
+            crc(fep_data)
+        return host32.run([str(exe)], input=struct.pack('<4I', mode, len(data), pair, 0) + data
+                          + struct.pack('<I', len(fep_data)) + fep_data,
                           runner='qemu', capture_output=True)
     for label, mode in boot_cases:
         result = boot_run(mode)
@@ -360,22 +391,17 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
         end = source.index('\n    sqlite_engine_stack_top =', start)
         path.write_text(source[:start] + source[end:])
         subprocess.run(command, check=True)
-        payload = struct.pack('<4I', 0, len(image), pair, 0) + image
+        payload = struct.pack('<4I', 0, len(image), pair, 0) + image + fep_payload
         for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
             result = host32.run([str(exe)], input=payload, runner=runner, capture_output=True)
             assert result.returncode == 1 and b'FAIL guard_np &&' in result.stdout, result
         print('MUTATE stack-guard-removed RED (compiled, runtime guard assertion)')
         path.write_text(source)
-        fep_path = folder / 'services_fep.inc'
-        fep_source = fep_path.read_text()
         runtime_path = folder / 'module_runtime_boot.c'
         runtime_source = (ROOT / 'kernel/module_runtime.c').read_text()
         runtime_path.write_text(runtime_source)
         boot_command = [runtime_path if item == ROOT / 'kernel/module_runtime.c' else item for item in command]
         mutations = [
-            ('learn-required-MINIMAL', fep_path, fep_source,
-             '    g_ime.dict_loaded = 1;',
-             '    if (!g_ime.dict.learn_stmt) return -1;\n    g_ime.dict_loaded = 1;', 32),
             ('reserve-lower-MINIMAL', path, source,
              '*reserve = OS32_SQLITE_FEP_RESERVE_MIN;', '*reserve = -1;', 34),
             ('reserve-reject-lower', path, source,
@@ -384,20 +410,15 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
                                                           'OS32_SQLITE_FEP_RESERVE'), 20),
             ('reserve-no-minimum', path, source,
              'if (kb < OS32_SQLITE_FEP_RESERVE_MIN / 1024)', 'if (0)', 34),
-            ('close-fault-after-ready', fep_path, fep_source,
-             'services_stage < SERVICES_READY &&\n        ', '', 33),
             ('early-public', path, source,
              '    services_stage = SERVICES_SQLITE_INTERNAL_READY;',
              '    services_stage = SERVICES_SQLITE_INTERNAL_READY; services_public = 1;', 10),
             ('isolated-free', runtime_path, runtime_source,
              '    if (!stopped || r->irq_refs || r->tick_refs || r->callback_refs ||\n        r->dma_refs || r->active_refs) goto quarantined;',
              '    if (0 && (!stopped || r->irq_refs || r->tick_refs || r->callback_refs ||\n        r->dma_refs || r->active_refs)) goto quarantined;', 31),
-            ('rollback-order', path, source,
-             '    cleanup_blocked = ime_boot_abort() != 0;',
-             '    module_abort(sqlite_handle);\n    cleanup_blocked = ime_boot_abort() != 0;', 18),
             ('unicode-reclaim', path, source,
-             '    cleanup_blocked = ime_boot_abort() != 0;',
-             '    u32 lost; ledger_reclaim_owner(LEDGER_OWNER_KERNEL, &lost);\n    cleanup_blocked = ime_boot_abort() != 0;', 28),
+             '    cleanup_blocked = fep_module_abort() != 0;',
+             '    u32 lost; ledger_reclaim_owner(LEDGER_OWNER_KERNEL, &lost);\n    cleanup_blocked = fep_module_abort() != 0;', 28),
         ]
         for label, target, original, old, new, mode in mutations:
             assert original.count(old) == 1, label
@@ -407,6 +428,81 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
             assert result.returncode == 1 and b'FAIL ' in result.stdout, (label, result)
             print('MUTATE ' + label + ' RED (compiled runtime): ' + result.stdout.decode().strip(), flush=True)
             target.write_text(original)
+    if mutate or fep_mutate:
+        # Retain the two T4c-2 mutations after moving the actual FEP code into
+        # its paired image. Build only the changed production object in a temp
+        # directory, link with the other product objects, then repack normally.
+        flags = shlex.split(subprocess.check_output([
+            'make', '--no-print-directory', '-s', '-f', 'build/config.mk',
+            '--eval=host-fep-flags: ; @echo $(CFLAGS_BASE) -Os -DOS32_FEP_MODULE $(INC_KERNEL)',
+            'host-fep-flags'], cwd=ROOT, text=True))
+        compiler = Path(os.environ['CROSS_DIR']) / 'bin/i386-elf-gcc'
+        linker = compiler.with_name('i386-elf-ld')
+        libgcc = subprocess.check_output([compiler, '-print-libgcc-file-name'], text=True).strip()
+        mutated_dir = folder / 'fep-body'
+        mutated_dir.mkdir()
+        body_objects = ('fep_body', 'ime', 'ime_dict', 'ime_romkana',
+                        'ime_render_tvram', 'fep_import_slots', 'fep_import_stubs')
+        spec = json.loads((ROOT / 'sdk/kapi.json').read_text())
+        original_offsets = (folder / 'fep_host_offsets.h').read_text()
+        for label, name, old, new, mode in (
+            ('learn-required-MINIMAL', 'ime', '    g_ime.dict_loaded = 1;',
+             '    if (!g_ime.dict.learn_stmt) return -1;\n    g_ime.dict_loaded = 1;', 32),
+            ('close-fault-after-ready', 'ime_dict',
+             'services_stage < SERVICES_READY &&\n        ', '', 33)):
+            source = (ROOT / 'kernel' / (name + '.c')).read_text()
+            scope = function(source, 'ime_dict_boot' if name == 'ime' else 'ime_dict_close')
+            assert scope.count(old) == 1, label
+            source_path = mutated_dir / (name + '.c')
+            source_path.write_text(source.replace(scope, scope.replace(old, new)))
+            obj_path = source_path.with_suffix('.o')
+            subprocess.run([compiler, *flags, '-I' + str(fep_directory),
+                            '-c', source_path, '-o', obj_path], cwd=ROOT, check=True)
+            elf_path = mutated_dir / 'fep.elf'
+            objects = [obj_path if stem == name else fep_directory / (stem + '.o')
+                       for stem in body_objects]
+            subprocess.run([linker, '-m', 'elf_i386', '--emit-relocs', '-T',
+                            ROOT / 'build/fep-module.ld', *objects, libgcc,
+                            '-o', elf_path], cwd=ROOT, check=True)
+            elf_data = elf_path.read_bytes()
+            parsed = mkmod.Elf(elf_data)
+            state_offset = next(sym['value'] for table in parsed.symtabs.values()
+                                for sym in table if sym['name'] == 'g_ime')
+            (folder / 'fep_host_offsets.h').write_text('#define HOST_FEP_STATE ' + str(state_offset) + 'u\n')
+            body, _ = mkmod.build(elf_data, fep_metadata, vmkernel.read_bytes(),
+                                 spec['version'], spec['generations']['memory_layout'], module_id=3)
+            subprocess.run(command, check=True)
+            result = boot_run(mode, body)
+            assert result.returncode == 1 and b'FAIL ' in result.stdout, (label, result)
+            print('MUTATE ' + label + ' RED (repacked product runtime): ' + result.stdout.decode().strip(), flush=True)
+        (folder / 'fep_host_offsets.h').write_text(original_offsets)
+    if mutate or fep_mutate:
+        path = folder / 'fep_module.c'
+        original = path.read_text()
+        old = 'static int stub_feed_key(int keydata) { return keydata; }'
+        assert original.count(old) == 1
+        path.write_text(original.replace(old,
+            'static int stub_feed_key(int keydata) { (void)keydata; return -1; }'))
+        subprocess.run(command, check=True)
+        result = boot_run(50)
+        assert result.returncode == 1 and b'FAIL ime_feed_key(0x1e61) == 0x1e61' in result.stdout, result
+        print('MUTATE fep-stub-always-minus-one RED (compiled runtime): ' + result.stdout.decode().strip(), flush=True)
+        path.write_text(original)
+        path = folder / 'sqlite_engine.c'
+        original = path.read_text()
+        old = '    cleanup_blocked = fep_module_abort() != 0;'
+        assert original.count(old) == 1
+        path.write_text(original.replace(old,
+            '    u32 lost; ledger_reclaim_owner(module_records[sqlite_handle.slot].owner, &lost);\n' + old))
+        subprocess.run(command, check=True)
+        result = boot_run(30)
+        assert result.returncode == 1 and b'FAIL ' in result.stdout, result
+        print('MUTATE fep-dependency-first-free RED (compiled runtime): ' + result.stdout.decode().strip(), flush=True)
+        path.write_text(original)
+        # The old early-module_abort mutation is now harmless: runtime's
+        # has_dependents isolates SQLite while FEP still holds it. The direct
+        # early reclaim mutation above retains the original free-order oracle.
+
 
 
 def main():
@@ -414,6 +510,7 @@ def main():
     parser.add_argument('--directory', type=Path, default=ROOT / 'build/out/sqlite-proto')
     parser.add_argument('--vmkernel', type=Path, default=ROOT / 'build/out/vmkernel.lz4')
     parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--fep-mutate', action='store_true', help='only T5a-2 stub and rollback mutants')
     parser.add_argument('--stack-mutate', action='store_true', help='only T5-0b stack capacity mutant')
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='sqlite-module-') as td:
@@ -433,7 +530,7 @@ def main():
             print(f'PASS {runner}: unaligned/last-word reloc; tail-2/BSS/duplicate/import/overflow write=0')
         pair_runtime_suite(folder, mutate=args.mutate)
         real_runtime_suite(folder, args.directory, args.vmkernel, mutate=args.mutate,
-                           stack_mutate=args.stack_mutate)
+                           stack_mutate=args.stack_mutate, fep_mutate=args.fep_mutate)
         print(json.dumps(stats, sort_keys=True))
         if args.mutate:
             source = (ROOT / 'kernel/module_image.c').read_text()

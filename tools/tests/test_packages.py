@@ -114,7 +114,8 @@ def case_real_plan():
               f"{mkpkg.PKG_MAX_ENTRIES}")
     # Minimal =「CUI のシェル + 基本コマンド」(cdinst の選択肢 1 の文言)
     minimal = {g for n, _, _, fs in resolved if n == 'minimal' for g, _ in fs}
-    need = ['/sys/shell.bin', '/boot/vmkernel.lz4', '/boot/kdebug.bin', '/boot/sqlite.mod', '/sys/unicode.bin',
+    need = ['/sys/shell.bin', '/boot/vmkernel.lz4', '/boot/kdebug.bin',
+            '/boot/sqlite.mod', '/boot/fep.mod', '/sys/unicode.bin',
             '/etc/filetypes', '/etc/settings.tsv', '/etc/settings.db'] + \
         ['/bin/%s.bin' % c for c in MINIMAL_BASE_CMDS] + \
         ['/sbin/%s.bin' % c for c in MINIMAL_SBIN]
@@ -563,7 +564,7 @@ def case_fd(plan, resolved):
         check(not missing and not extra and not bad,
               f"FD {label} の実物 = 構成 ({len(got)} ファイル、欠け {len(missing)}、"
               f"余分 {len(extra)}、違い {len(bad)})")
-        print(f"  info FD {label}: 空き {free // 1024}KB / {total // 1024}KB")
+        print(f"  info FD {label}: 空き {free} B / {total} B ({free // 1024}KB / {total // 1024}KB)")
         p = fd_free_problem(label, free)
         check(p is None, p or f"FD {label}: 空き {free // 1024}KB >= {FD_MIN_FREE_KB}KB")
     # 否定側: 見張りが閾値の 1KB 下を落とし、ちょうどは通す

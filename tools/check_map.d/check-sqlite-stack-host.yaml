@@ -74,4 +74,12 @@ check-sqlite-stack-host:
 - lib/sqlite3/os32_sqlite_test.c
 - include/endian_le.h
 - kapi/kapi_sys.c
+- kernel/fep_module.c
+- kernel/fep_module.h
+- kernel/fep_body.c
+- kernel/ime_romkana.c
+- kernel/ime_render_tvram.c
+- tools/prototypes/fep_imports.def
+- build/fep-module.ld
+- build/out/fep/*.o
 artifact_reader: true

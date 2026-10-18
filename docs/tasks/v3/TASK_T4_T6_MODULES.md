@@ -206,9 +206,13 @@ ATAPI/iso9660はT5b-5でFD/HDD rootの `/boot` からPOST_ROOTとして読み、
 
 ## 4. T5a FEP 案 B
 
-T4でfacade化したFEPを `/boot/fep.mod` へ移す。SQLite RUNNINGの依存を必須とし、未公開init中に辞書group/stmt/入力状態を全て準備してからexportを一括公開する。core側stubの意味は上位票 §5-6 (`docs/tasks/v3/TASK_MEMMAP_V3.md:444`) のAPI別表をそのままテストoracleとする。is_active/get_modeは0、set_mode/toggle/set_render/switch_dictは無操作、feed_key(k)はk≥0でk・負なら0、getkey/getcharは生のblocking入力、trygetkeyはkbd_trygetkeyの生キー (無入力だけ−1)、trygetcharはその文字、ime_user_*はNOSYS。MINIMALの英数編集を非ブロッキング/ブロッキング両経路で確認する。
+T4でfacade化したFEPを `/boot/fep.mod` へ移す。SQLite RUNNINGの依存を必須とし、未公開init中に辞書group/stmt/入力状態を全て準備してからexportを一括公開する。core側stubの意味は上位票 §5-6 (`docs/tasks/v3/TASK_MEMMAP_V3.md:444`) のAPI別表をそのままテストoracleとする。is_active/get_modeは0、set_mode/toggle/set_renderは無操作、switch_dictはNOSYS、feed_key(k)は無入力の負値も含めkをそのまま返す (T4c-2の実装とWMの消費判定を保持)、getkey/getcharは生のblocking入力、trygetkeyはkbd_trygetkeyの生キー (無入力だけ−1)、trygetcharはその文字、ime_user_*はNOSYS。MINIMALの英数編集を非ブロッキング/ブロッキング両経路で確認する。
 
 B2 facadeは `ime_user_list/delete/export` の全入力を先にbounded copy → kernel staging → bind/step → stmt finalize/resetとbinding寿命終了 → engine_leave → copyout、の順。listは上限件数/文字列長で打ち切り状態を返す。deleteの不正kanjiをNULL条件に変換しない。exportはpath検証完了前にcreate/truncateしない。上限は [FEP_BOUNDARY §3](../settings/FEP_BOUNDARY.md) を引継ぎ、失敗時に返却バッファを部分公開しない。具体値はprefix/yomi/kanji/path各256B (NUL込み)、list max=1〜64、staging=64×68=4,352Bを専用領域に置く。NULL prefixは全件、NULL/正常な空kanjiは同一yomi全候補削除、不正kanjiは失敗。上限±1とページ末尾NUL、失敗後busy解除を試す (`docs/tasks/settings/FEP_BOUNDARY.md:45`)。
+
+T5a-2では `kernel/fep_module.h` の20口をtyped facadeとし、`fep_module_init` の1 exportで内部表を写す。全入口をFEP text内と照合し、prefix返却後もcoreの写しを使用する。ID=3・POST_ROOT・PAIR必須、SQLite RUNNINGへの依存をmodule recordへ登録する。FEP close不能時はFEP body/状態とSQLite code/pool/stack/guardを保持し、公開口はstubへ戻す。Unicodeのkernel owner 7頁はこの回収対象に含めない。
+
+描画は既存の `IME_Render` 5 callbackとgshellの静的状態 (`fep.rs` の `state()`) を使う。独立したctx引数は無い。`gui_ime_set_render` の登録門を保ち、`gui_owner_exit` がシェル帯再利用前にNULLへ戻す。FEP側は旧表が有効な間に候補を取消し、TVRAM表へ切り替える。boot rollbackも表を戻してから辞書を閉じる。MINIMALは表を保存しない。
 
 `dict_fd_protect` はT4で撤去済み。RESIDENT group (DICT_META前は1接続) を維持する。close失敗は記録してreopenを拒否する。SQLite→FEPの依存順を守り、FEP init失敗で標準起動を成功扱いにしない。MINIMALへ落とす際も停止確認済みのgroupだけ解放する。
 

@@ -445,7 +445,7 @@ T4前の事実 (履歴): カーネル静的 (`kernel.mk:31`、`kernel.c:624`)、
 |---|---|
 | モジュール化 | **A**: core固定＋SQLite typed facade (T4で接続済み)。**B**: `/boot/fep.mod` (SQLite に依存、T5a)。A → B の順 |
 | 依存 | FEP → SQLite (辞書)、→ 描画 (TVRAM は JIS 表、GUI は gshell の表)、→ キーボード (KAPI 経由、ISR 境界なし、推測) |
-| **未搭載時の stub (API 別)** — MINIMAL でだけ効く | `ime_is_active` = 0、`ime_get_mode` = 0、`ime_set_mode` / `ime_toggle` / `ime_set_render` / `ime_switch_dict` = 無操作 (0)、`ime_feed_key(k)` = **素通し (k ≥ 0 はそのまま返す、k < 0 は 0)**、`ime_getkey` / `ime_getchar` = 生のキー入力に落とす (ブロッキング)、**`ime_trygetkey` = `kbd_trygetkey()` の生キー (非ブロッキング、無ければ −1)、`ime_trygetchar` = その文字** (CUI エディタの `vz_kbhit` が `ime_trygetkey` を回している `apps/edit/sys_keyboard.c:27`、`ime.c:851`)、`ime_user_*` = `OS32_ERR_NOSYS`。スロット順は維持 |
+| **未搭載時の stub (API 別)** — MINIMAL でだけ効く | `ime_is_active` = 0、`ime_get_mode` = 0、`ime_set_mode` / `ime_toggle` / `ime_set_render` = 無操作、`ime_switch_dict` = `OS32_ERR_NOSYS`、`ime_feed_key(k)` = **素通し (無入力の負値もそのまま返す、T4c-2の実装契約を保持)**、`ime_getkey` / `ime_getchar` = 生のキー入力に落とす (ブロッキング)、**`ime_trygetkey` = `kbd_trygetkey()` の生キー (非ブロッキング、無ければ −1)、`ime_trygetchar` = その文字** (CUI エディタの `vz_kbhit` が `ime_trygetkey` を回している `apps/edit/sys_keyboard.c:27`、`ime.c:851`)、`ime_user_*` = `OS32_ERR_NOSYS`。スロット順は維持 |
 | 読み込まない構成 | **決定 (D21)**: SQLite と FEP は常に読み込む。例外は **MINIMAL (FD 起動の回復用構成) だけ**。標準 8MB の受入は FEP 込み。**受入に「MINIMAL で英数の入力・編集 (gshell のテキストボックスと CUI エディタ)」を追加**。読み込み失敗は MINIMAL へ (D26) |
 | SQLite の取り分 | **起動時に優先確保、アプリの接続は「プール − FEP 分」で上限、超える辞書への入れ替えは再起動で再確保** (D27、§4-6)。量は辞書のメタ情報 `mem_reserve_kb` + settings |
 | 辞書のメタ情報・学習データ | **辞書のメタ情報 (形式の版・dict_id・license 等) と、学習データの別ファイル化は採用 (D28)。着手は v3 の後の方** — 票 [`../fep/TASK_DICT_META.md`](../fep/TASK_DICT_META.md)。それまで FEP は今の `fep.db` (メタ無し、学習表 `dict_user` 同居) のまま |

@@ -22,12 +22,23 @@
 #include "os32_kapi_shared.h"
 #include "os32_sqlite_vfs.h"
 
+#ifdef OS32_FEP_MODULE
+#include "fep_imports.h"
+#define services_stage fep_services_stage()
+#define services_boot_fault fep_services_boot_fault()
+#endif
+
+
 /* Opt-in T4b-7 guest probe. No KAPI argument or normal-build behavior change.
  * 100Hz ticks let keyboard IRQs arrive while internal logging is still active.
  * Force this object to rebuild when toggling KERNEL_CFLAGS_EXTRA (see TDD). */
 #if defined(OS32_RAW_WAIT_LOG_TICKS) && OS32_RAW_WAIT_LOG_TICKS > 0
 #include "io.h"
+#ifdef OS32_FEP_MODULE
+#define tick_count ktime_ticks()
+#else
 extern volatile u32 tick_count;
+#endif
 extern int ring3_call_from_user(void);
 static void ime_dict_log_probe(void)
 {

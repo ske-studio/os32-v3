@@ -15,6 +15,7 @@ static void fdrecov_setup(int header_case, int other)
     fs_add_file("/host/boot/vmkernel.lz4", (const u8 *)"new kernel", 10);
     fs_add_file("/host/boot/kdebug.bin", (const u8 *)"paired debug", 12);
     fs_add_file("/host/boot/sqlite.mod", (const u8 *)"paired sqlite", 13);
+    fs_add_file("/host/boot/fep.mod", (const u8 *)"paired fep", 10);
     fs_add_dir("/host/sys");
     fs_add_file("/host/sys/unicode.bin", (const u8 *)"unicode table", 13);
     switch (header_case) {
@@ -95,10 +96,15 @@ static void case_fdrecov(void)
     fdrecov_setup(12, 0);
     fdrecov_manifest_version(KAPI_DATA_FIELDS_OFF, KAPI_VERSION + 1);
     check(run1("boot") == 0 && fs_find("/boot/vmkernel.lz4") >= 0 &&
-          fs_find("/boot/kdebug.bin") >= 0 && fs_find("/boot/sqlite.mod") >= 0,
+          fs_find("/boot/kdebug.bin") >= 0 && fs_find("/boot/sqlite.mod") >= 0 &&
+          fs_find("/boot/fep.mod") >= 0,
           "同世代で KAPI 版のみ上昇した boot はカーネルと対部品を運ぶ");
     fdrecov_setup(0, 0);
     check(run1("boot") == 0, "shlib protocol=0 は依存なし");
+    check(fs_find("/boot/fep.mod") >= 0 &&
+          fs_nodes[fs_find("/boot/fep.mod")].size == 10 &&
+          memcmp(fs_nodes[fs_find("/boot/fep.mod")].data, "paired fep", 10) == 0,
+          "同世代 boot は FEP のバイト列を保存する");
     fdrecov_setup(11, 0);
     check(run1("boot") == 0, "現行 shlib protocol は受理する");
 
@@ -110,9 +116,14 @@ static void case_fdrecov(void)
               fs_find("/hd0/sys/shell.bin") >= 0 &&
               fs_find("/hd0/boot/kdebug.bin") >= 0 &&
               fs_find("/hd0/boot/sqlite.mod") >= 0 &&
+              fs_find("/hd0/boot/fep.mod") >= 0 &&
               fs_find("/hd0/sys/unicode.bin") >= 0 && fk_header_reads == 0,
               "別デバイス全体は異世代・不正ヘッダも解釈せず sys までコピー");
-        check(log_has("manifest_extra=5"), "余剰 boot/sys は集計だけで拒否しない");
+        check(log_has("manifest_extra=6"), "余剰 boot/sys は集計だけで拒否しない");
+        check(fs_find("/hd0/boot/fep.mod") >= 0 &&
+              fs_nodes[fs_find("/hd0/boot/fep.mod")].size == 10 &&
+              memcmp(fs_nodes[fs_find("/hd0/boot/fep.mod")].data, "paired fep", 10) == 0,
+              "別 root 全体復旧は FEP のバイト列を保存する");
     }
     fdrecov_setup(9, 1);
     check(run3("--root", "/hd0", "-n") == 0 && wrote_nothing() && fk_header_reads == 0,

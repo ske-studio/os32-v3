@@ -24,6 +24,14 @@
 extern int ring3_call_from_user(void);
 extern void ring3_abort_check(void);
 
+#ifdef OS32_FEP_MODULE
+#include "fep_imports.h"
+#define services_public fep_services_public()
+#define services_boot_fault fep_services_boot_fault()
+#define kbd_shift_state fep_kbd_shift_state()
+#endif
+
+
 /* ======================================================================== */
 /*  グローバル IME 状態                                                      */
 /* ======================================================================== */

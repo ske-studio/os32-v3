@@ -11,6 +11,9 @@
 #include "bootinfo.h"
 #include "config.h"
 #include "ime.h"
+#include "fep_module.h"
+#include "fep_host_offsets.h"
+#include "kbd.h"
 #include "kmalloc.h"
 #include "unicode_file.h"
 #include "kstring.h"
@@ -21,9 +24,11 @@
 #define IMAGE_CAP (544768U)
 #define POOL_PAGES 512U
 #define OWNER (LEDGER_OWNER_FIXED_LAST + 1)
-static u8 file[IMAGE_CAP];
+static u8 file[IMAGE_CAP], fep_file[IMAGE_CAP];
+static u32 fep_size, fep_pos, fep_opens, fep_closes, fep_owned, fep_retired;
 static u8 pool[POOL_PAGES * PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
 static u8 live[POOL_PAGES];
+static u32 page_owner[POOL_PAGES];
 static u32 input[4]; /* mode, image size, pair, expected result */
 static u32 pos, opens, closes, owned, retired, allocated, alloc_calls;
 static u32 stack_base, heap_base, prefix_failed, init_calls, stack_probes;
@@ -67,12 +72,10 @@ static void number(u32 value)
     while (n) { char text[2] = {digits[--n], 0}; say(text); }
 }
 #define CHECK(x) do { if (!(x)) { say("FAIL " #x "\n"); finish(1); } } while (0)
-/* Real FEP buffer allocation/abort and dictionary close. Disk dictionary open
- * is replaced with real SQLite RAM statements; VFS disk/IME SQL are covered by
- * ime_dict_host. This does not emulate hardware faults or boot timings. */
-static IME_State g_ime;
-static u16 *g_cand_save_text;
-static u8 *g_cand_save_attr;
+/* Both executable bodies are the paired product images. Only dictionary
+ * storage is a RAM DB seeded below; actual FEP SQL/init/close stay in fep.mod.
+ * Disk/journal lifetime remains covered by ime_dict_host and VFS fixtures. */
+#define g_ime (*(IME_State *)(uptr)(module_records[1].base + HOST_FEP_STATE))
 static u8 fep_buffers[2][512];
 static int fep_allocs, fep_frees, learn_unavailable, reserve_clamped;
 typedef struct {
@@ -95,35 +98,79 @@ void kfree(void *p)
     CHECK(sqlite_module_ready());
     fep_frees++;
 }
-int ime_dict_open(IME_Dict *d, const char *path)
+int host_fep_group_acquire(int kind, int owner, Os32SqliteGroup *out)
 {
-    (void)path;
+    CHECK(kind == OS32_SQLITE_RESIDENT && owner == 0);
+    return os32_sqlite_outer_group_acquire(kind, owner, out);
+}
+int host_fep_group_open(const Os32SqliteGroup *group, const char *path, int flags, sqlite3 **out)
+{
     CHECK(!services_public && services_stage == SERVICES_SETTINGS_CLOSED);
-    CHECK(os32_sqlite_outer_boot_check(0, 0) == SQLITE_OK);
-    CHECK(!os32_sqlite_outer_group_acquire(OS32_SQLITE_RESIDENT, 0, &d->group));
-    sqlite3 *db = 0;
-    CHECK(!os32_sqlite_outer_group_open(&d->group, ":memory:", SQLITE_OPEN_READWRITE, &db));
-    d->db = db;
-    sqlite3_stmt *stmt = 0;
-    CHECK(!os32_sqlite_prepare_v2(db, "SELECT 42", -1, &stmt, 0));
-    d->exact_stmt = stmt;
-    if (input[0] == 18) return -1; /* live group + partial prepared statement */
-    CHECK(!os32_sqlite_prepare_v2(db, "SELECT 43", -1, &stmt, 0));
-    d->prefix_stmt = stmt;
-    if (input[0] == 32) {
-        /* Real prepare failure at the learning boundary; search statements live.
-         * Disk dictionary open is still the explicit RAM fixture above. */
-        stmt = 0;
-        CHECK(os32_sqlite_prepare_v2(db, "SELECT FROM", -1, &stmt, 0) == SQLITE_ERROR);
-        CHECK(!stmt);
-        d->learn_stmt = 0;
-        return 0;
-    }
-    CHECK(!os32_sqlite_prepare_v2(db, "SELECT 44", -1, &stmt, 0));
-    d->learn_stmt = stmt;
+    CHECK(!memcmp(path, "/db/fep.db", sizeof("/db/fep.db")));
+    int rc = os32_sqlite_outer_group_open(group, ":memory:", flags, out);
+    if (rc) return rc;
+    CHECK(!os32_sqlite_exec(*out,
+        "CREATE TABLE dict(yomi TEXT,kanji TEXT,pos_id INTEGER,cost INTEGER);"
+        "INSERT INTO dict VALUES('nihon','Japan',42,1)", 0, 0, 0));
     return 0;
 }
-#include "services_fep.inc"
+int host_fep_prepare(sqlite3 *db, const char *sql, int n, sqlite3_stmt **out, const char **tail)
+{
+    /* Fail after exact prepare, or only learning prepare. These failures pass
+     * through the real module's partial-init cleanup / learning fallback. */
+    if ((input[0] == 18 && !memcmp(sql, "SELECT kanji, pos_id, cost FROM (", 31) &&
+         g_ime.dict.exact_stmt) ||
+        (input[0] == 32 && !memcmp(sql, "INSERT INTO dict_user", 21)))
+        return os32_sqlite_prepare_v2(db, "SELECT FROM", -1, out, tail);
+    return os32_sqlite_prepare_v2(db, sql, n, out, tail);
+}
+static int host_key = -1, host_sink, host_user, host_stop_pending, abort_checks;
+void ring3_abort_check(void);
+volatile u8 kbd_shift_state;
+int kbd_trygetkey(void) { int key = host_key; host_key = -1; return key; }
+int kbd_trygetchar(void) { int key = kbd_trygetkey(); return key < 0 ? -1 : key & 255; }
+int kbd_getkey_wait(int interruptible) { if (interruptible && host_stop_pending) return -1; return kbd_trygetkey(); }
+int kbd_getchar(void) { return kbd_trygetchar(); }
+int kbd_getkey(void) { return kbd_trygetkey(); }
+int kbd_getchar_kapi(void) { int c = kbd_getkey_wait(1); if (c < 0) ring3_abort_check(); return c < 0 ? c : c & 255; }
+int kbd_getkey_kapi(void) { int c = kbd_getkey_wait(1); if (c < 0) ring3_abort_check(); return c; }
+int con_sink_is_enabled(void) { return host_sink; }
+int ring3_call_from_user(void) { return host_user; }
+int res_owner_get(void) { return 7; }
+void ring3_abort_check(void) { abort_checks++; }
+void serial_puts(const char *s) { (void)s; }
+u32 kstrlen(const char *s) { u32 n = 0; while (s[n]) n++; return n; }
+void tvram_set_scroll_reserve(int n) { (void)n; }
+static void input_paths(void)
+{
+    /* GUI dispatch feeds raw events; CUI reads the cooked queue. Each keeps
+     * ordinary text/edit keys usable in both READY and MINIMAL. */
+    CHECK(ime_feed_key(-1) == -1);
+    CHECK(ime_feed_key(0x1e61) == 0x1e61);
+    CHECK(ime_feed_key(0x4b00) == 0x4b00);
+    CHECK(ime_feed_key(0x0e08) == 0x0e08);
+    for (int sink = 0; sink <= 1; sink++) {
+        host_sink = sink;
+        host_key = -1; CHECK(ime_trygetkey() == -1);
+        host_key = 0x1e61; CHECK(ime_trygetkey() == 0x1e61);
+        host_key = 0x4b00; CHECK(ime_trygetkey() == 0x4b00);
+        host_key = 0x0e08; CHECK(ime_trygetchar() == 8);
+        host_key = -1; CHECK(ime_trygetchar() == -1);
+        host_key = 0x1e61; CHECK(ime_getkey() == 0x1e61);
+        host_key = 0x1e61; CHECK(ime_getchar() == (sink ? 0x1e61 : 'a'));
+        host_key = 0x4b00; CHECK(ime_getkey_kapi() == 0x4b00);
+        host_key = 0x1e61; CHECK(ime_getchar_kapi() == (sink ? 0x1e61 : 'a'));
+        /* STOP is represented only at the keyboard wait seam, as on the
+         * product path: wait returns -1, then the KAPI safe point is reached. */
+        int before = abort_checks;
+        host_stop_pending = 1;
+        CHECK(ime_getkey_kapi() == -1);
+        CHECK(ime_getchar_kapi() == -1);
+        CHECK(abort_checks == before + 2);
+        host_stop_pending = 0;
+    }
+    host_sink = 0;
+}
 int vfs_stat(const char *path, OS32_Stat *st)
 {
     CHECK(!memcmp(path, SYS_UNICODE_BIN, sizeof(SYS_UNICODE_BIN)));
@@ -360,7 +407,7 @@ void kprintf(u8 attr, const char *fmt, ...)
         say("sqlite stack high-water="); number(used);
         say(" of "); number(size); say("\n");
     }
-    if (input[0] >= 10 && input[0] <= 36 && services_stage != SERVICES_READY)
+    if (((input[0] >= 10 && input[0] <= 36) || (input[0] >= 50 && input[0] <= 53)) && services_stage != SERVICES_READY)
         CHECK(!services_public);
     if (!memcmp(fmt, "IME: 学習不可", sizeof("IME: 学習不可") - 1)) learn_unavailable++;
     if (!memcmp(fmt, "[services] fep_mem_reserve_kb below minimum", sizeof("[services] fep_mem_reserve_kb below minimum") - 1)) {
@@ -387,22 +434,35 @@ void kprintf(u8 attr, const char *fmt, ...)
 const struct bootinfo *bootinfo_get(void) { return &bi; }
 int vfs_open(const char *path, int mode)
 {
-    CHECK(!memcmp(path, SYS_SQLITE_MOD, sizeof(SYS_SQLITE_MOD)) && mode == O_RDONLY);
+    CHECK(mode == O_RDONLY);
+    if (!memcmp(path, SYS_FEP_MOD, sizeof(SYS_FEP_MOD))) {
+        fep_opens++;
+        return input[0] == 50 ? -1 : 4;
+    }
+    CHECK(!memcmp(path, SYS_SQLITE_MOD, sizeof(SYS_SQLITE_MOD)));
     opens++;
     return input[0] == 1 || input[0] == 11 ? -1 : 3;
 }
-void vfs_close(int fd) { CHECK(fd == 3 && !closes); closes++; }
+void vfs_close(int fd) { if (fd == 4) { CHECK(!fep_closes); fep_closes++; return; } CHECK(fd == 3 && !closes); closes++; }
 int vfs_fstat(int fd, OS32_Stat *st)
 {
-    CHECK(fd == 3); st->st_size = input[1]; return 0;
+    CHECK(fd == 3 || fd == 4); st->st_size = fd == 4 ? fep_size : input[1]; return 0;
 }
 int vfs_read_fd(int fd, void *dst, u32 n)
 {
+    if (fd == 4) {
+        CHECK(!fep_closes && n <= fep_size - fep_pos);
+        kmemcpy(dst, fep_file + fep_pos, n); fep_pos += n; return n;
+    }
     CHECK(fd == 3 && !closes && n <= input[1] - pos);
     kmemcpy(dst, file + pos, n); pos += n; return n;
 }
 int ledger_owner_new(u32 kind, u32 id, const char *name, u32 *out)
 {
+    if (id == MODULE_ID_FEP) {
+        CHECK(!fep_owned && kind == LEDGER_KIND_MODULE && name[0] == 'f');
+        fep_owned = 1; *out = OWNER + 1; return 1;
+    }
     CHECK(!owned && kind == LEDGER_KIND_MODULE && id == MODULE_ID_SQLITE && name[0] == 's');
     owned = 1; *out = OWNER; return 1;
 }
@@ -414,13 +474,14 @@ u32 pgalloc_alloc_phys(u32 owner, int n)
         unicode_pages = n;
         return (u32)(uptr)unicode_storage;
     }
-    CHECK(owner == OWNER && owned && n > 0);
+    CHECK((owner == OWNER && owned) || (owner == OWNER + 1 && fep_owned));
+    CHECK(n > 0);
     alloc_calls++;
-    if (input[0] == 13) return 0;
+    if (input[0] == 13 || (input[0] == 52 && owner == OWNER + 1)) return 0;
     if ((input[0] == 4 && alloc_calls == 2) || (input[0] == 5 && alloc_calls == 3)) return 0;
     CHECK(allocated + n <= POOL_PAGES);
     u32 address = (u32)(uptr)(pool + allocated * PAGE_SIZE);
-    for (int i = 0; i < n; i++) live[allocated + i] = 1;
+    for (int i = 0; i < n; i++) { live[allocated + i] = 1; page_owner[allocated + i] = owner; }
     allocated += n;
     kmemset((void *)(uptr)address, 0xcc, n * PAGE_SIZE);
     if (alloc_calls == 3) {
@@ -440,23 +501,24 @@ int pgalloc_free_n_owner(u32 owner, u32 pfn, int n)
         unicode_pages = 0;
         return 1;
     }
-    CHECK(owner == OWNER && n > 0);
+    CHECK((owner == OWNER || owner == OWNER + 1) && n > 0);
     u32 first = pfn - (u32)(uptr)pool / PAGE_SIZE;
     CHECK(first + n <= allocated);
     if (stack_base && first <= (stack_base - PAGE_SIZE - (u32)(uptr)pool) / PAGE_SIZE &&
         first + n > (stack_base - PAGE_SIZE - (u32)(uptr)pool) / PAGE_SIZE)
         CHECK(!guard_np && guard_restored == 1 && !paging_sqlite_stack_guard);
     if (input[0] == 3 && !prefix_failed) { prefix_failed = 1; return 0; }
-    for (int i = 0; i < n; i++) { CHECK(live[first + i]); live[first + i] = 0; }
+    for (int i = 0; i < n; i++) { CHECK(live[first + i] && page_owner[first + i] == owner); live[first + i] = 0; }
     kmemset(pool + first * PAGE_SIZE, 0xdd, n * PAGE_SIZE);
     return 1;
 }
 int ledger_reclaim_owner(u32 owner, u32 *pages)
 {
     if (owner == LEDGER_OWNER_KERNEL) { *pages = unicode_pages; unicode_pages = 0; return 1; }
-    CHECK(owner == OWNER && !sqlite_engine_active);
+    CHECK((owner == OWNER || owner == OWNER + 1) && !sqlite_engine_active);
+    if (owner == OWNER) CHECK(module_records[1].state == MODULE_ABSENT);
     *pages = 0;
-    for (u32 i = 0; i < allocated; i++) if (live[i]) {
+    for (u32 i = 0; i < allocated; i++) if (live[i] && page_owner[i] == owner) {
         CHECK(pgalloc_free_n_owner(owner, (u32)(uptr)pool / PAGE_SIZE + i, 1));
         ++*pages;
     }
@@ -465,14 +527,16 @@ int ledger_reclaim_owner(u32 owner, u32 *pages)
 u32 ledger_owner_pages(u32 owner)
 {
     if (owner == LEDGER_OWNER_KERNEL) return unicode_pages;
-    CHECK(owner == OWNER);
+    CHECK(owner == OWNER || owner == OWNER + 1);
     u32 count = 0;
-    for (u32 i = 0; i < allocated; i++) count += live[i];
+    for (u32 i = 0; i < allocated; i++) count += live[i] && page_owner[i] == owner;
     return count;
 }
 int ledger_owner_retire(u32 owner)
 {
-    CHECK(owner == OWNER && !ledger_owner_pages(owner));
+    CHECK(!ledger_owner_pages(owner));
+    if (owner == OWNER + 1) { fep_retired++; fep_owned = 0; return 1; }
+    CHECK(owner == OWNER);
     retired++; owned = 0; return 1;
 }
 void memory_boot_page_counts(u32 first, u32 pages, struct memory_page_counts *out)
@@ -538,6 +602,17 @@ static void boot_transaction(void)
                                     OS32_SQLITE_FEP_RESERVE;
         CHECK(budget->reserve == expected_reserve);
         CHECK(g_ime.dict_loaded && fep_allocs == 2 && !fep_frees);
+        CHECK(module_records[1].state == MODULE_RUNNING && fep_module_pages());
+        CHECK(module_records[1].dependency_count == 1 && module_records[1].dependencies[0].slot == 0);
+        input_paths();
+        void *resident_db = g_ime.dict.db;
+        host_user = 1; host_key = 0x1e61;
+        CHECK(ime_trygetkey() == 0x1e61);
+        g_ime.kana_len = 1; g_ime.kana_buf[0] = 'a';
+        ime_owner_exit(7);
+        CHECK(!g_ime.kana_len && !g_ime.kana_buf[0]);
+        CHECK(g_ime.dict.db == resident_db && g_ime.dict.group.generation);
+        host_user = 0;
         /* Real APP pressure must leave the reservation available to FEP. */
         Os32SqliteGroup group;
         sqlite3 *db = 0;
@@ -552,8 +627,9 @@ static void boot_transaction(void)
         CHECK(budget->live[0] + budget->live[2] <= 319488u -
               (budget->reserve - OS32_SQLITE_FEP_RESERVE));
         if (input[0] == 20) CHECK(budget->live[0] + budget->live[2] > 319488u);
+        CHECK(!os32_sqlite_bind_text(g_ime.dict.exact_stmt, 1, "nihon", -1, SQLITE_STATIC));
         CHECK(os32_sqlite_step(g_ime.dict.exact_stmt) == SQLITE_ROW);
-        CHECK(os32_sqlite_column_int(g_ime.dict.exact_stmt, 0) == 42);
+        CHECK(os32_sqlite_column_int(g_ime.dict.exact_stmt, 1) == 42);
         CHECK(!os32_sqlite_reset(g_ime.dict.exact_stmt));
         CHECK(!os32_sqlite_outer_group_begin_close(&group));
         CHECK(!os32_sqlite_close(db));
@@ -571,31 +647,42 @@ static void boot_transaction(void)
         CHECK(module_records[0].state == MODULE_QUARANTINED);
         CHECK(owned && ledger_owner_pages(OWNER) > 0 && !retired && guard_np);
         CHECK((services_boot_fault == SERVICES_FAULT_FEP_CLOSE) == (ime_boot_bytes() != 0));
-        stubs();
+        CHECK(module_records[1].state == (services_boot_fault == SERVICES_FAULT_FEP_CLOSE ?
+                                         MODULE_QUARANTINED : MODULE_ABSENT));
+        stubs(); input_paths();
         say("MINIMAL_QUARANTINED sqlite>0 group/heap/stack retained unicode retained\n");
     } else {
         CHECK(services_stage == SERVICES_MINIMAL);
         CHECK(module_records[0].state == MODULE_ABSENT);
         CHECK(!owned && !ledger_owner_pages(OWNER) && !ime_boot_bytes());
+        CHECK(!fep_owned && !fep_module_pages() && module_records[1].state == MODULE_ABSENT);
         CHECK(fep_allocs == fep_frees && !guard_np);
-        stubs();
+        stubs(); input_paths();
         say("MINIMAL sqlite=0 fep=0 quarantine=0 unicode retained\n");
     }
     u32 pages = ledger_owner_pages(OWNER);
     u32 expected_pages = (((const u32 *)file)[MI_MEM_SIZE] + SQLITE_MODULE_POOL_SIZE +
                           SQLITE_ENGINE_STACK_SIZE + PAGE_SIZE) / PAGE_SIZE;
     CHECK(pages == ((ok || isolated) ? expected_pages : 0));
+    u32 fep_pages = fep_module_pages();
+    CHECK(fep_pages == ((ok || services_boot_fault == SERVICES_FAULT_FEP_CLOSE) ?
+                      ((const u32 *)fep_file)[MI_MEM_SIZE] / PAGE_SIZE : 0));
+    CHECK(guard_np == (ok || isolated));
+    u32 physical_pages = 0;
+    for (u32 i = 0; i < allocated; i++) physical_pages += live[i];
+    CHECK(physical_pages == pages + fep_pages); /* includes the NP guard's page */
     say("occupancy sqlite_pages="); number(pages);
+    say(" fep_pages="); number(fep_module_pages());
     say(" fep_bytes="); number(ime_boot_bytes());
-    say(" quarantine_bytes="); number(isolated ? pages * PAGE_SIZE + ime_boot_bytes() : 0);
-    say(" unicode_pages="); number(unicode_pages); say("\n");
+    say(" quarantine_bytes="); number(isolated ? (pages + fep_pages) * PAGE_SIZE + ime_boot_bytes() : 0);
+    say(" unicode_pages="); number(unicode_pages); say(" guard_included=1 audit_diff=0\n");
     u32 before = alloc_calls;
     services_boot();
     CHECK(alloc_calls == before); /* boot transaction is single-shot */
     if (input[0] == 33) {
         services_boot_fault = SERVICES_FAULT_FEP_CLOSE;
-        CHECK(ime_dict_close(&g_ime.dict) == 0);
-        CHECK(!g_ime.dict.isolated && !g_ime.dict.db);
+        CHECK(fep_module_abort() == 0);
+        CHECK(!fep_owned && !fep_module_pages());
         CHECK(os32_sqlite_outer_boot_check(0, 0) == SQLITE_OK);
         say("PASS boot close fault ignored after SERVICES_READY\n");
     }
@@ -605,12 +692,14 @@ void _start(void)
 {
     read_input(input, sizeof(input)); CHECK(input[1] <= IMAGE_CAP);
     read_input(file, input[1]);
+    read_input(&fep_size, sizeof(fep_size)); CHECK(fep_size <= IMAGE_CAP);
+    read_input(fep_file, fep_size);
     bi.img_valid = 1; bi.img_crc = input[2];
     int rc;
     __asm__ volatile("int $0x80" : "=a"(rc) : "0"(125), "b"(pool), "c"(sizeof(pool)), "d"(7) : "memory");
     CHECK(!rc);
     stubs();
-    if (input[0] >= 10 && input[0] <= 36) boot_transaction();
+    if ((input[0] >= 10 && input[0] <= 36) || (input[0] >= 50 && input[0] <= 53)) boot_transaction();
     rc = os32_sqlite_start();
     CHECK(rc == (int)input[3] && opens == 1 && closes == (input[0] != 1));
     CHECK(!sqlite_engine_active && host_flags == 0x202);

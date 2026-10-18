@@ -33,7 +33,7 @@ exec/ring3_ls.o exec/exec.o: exec/ring3_ls.h
 C_KERNEL = \
     kernel/kernel.c kernel/kstack_hw.c kernel/boot_font.c kernel/gdt.c kernel/double_fault.c kernel/tss.c kernel/v86.c kernel/v86_mem.c kernel/v86_io.c kernel/v86_pic.c kernel/v86_kbd.c kernel/v86_bios.c kernel/v86_gcap.c kernel/boot_splash.c kernel/idt.c kernel/isr_handlers.c kernel/cpu_calibrate.c kernel/cpu_calibrate_math.c kernel/sysclk.c kernel/pit_math.c kernel/bootinfo.c kernel/bootinfo_check.c \
     kernel/paging.c kernel/paging_app.c kernel/dma_pool.c kernel/dma_pool_math.c kernel/physmem.c kernel/pgalloc.c kernel/ledger_pci.c kernel/memory_boot.c kernel/shlib.c kernel/shm.c kernel/gui.c kernel/kmalloc.c kernel/console.c kernel/con_sink.c kernel/bootlog.c kernel/bootlog_save.c kernel/kbd_inject.c kernel/sys.c kernel/sysconfig.c kernel/kaudit.c kernel/kaudit_boot.c kernel/kselftest_report.c kernel/irq.c kernel/irq_math.c kernel/ktime.c kernel/time_math.c \
-    kernel/sqlite_engine.c kernel/sqlite_outer.c lib/sqlite3/os32_sqlite_test.c kernel/module.c kernel/module_image.c kernel/module_runtime.c kernel/unicode_file.c kernel/ime.c kernel/ime_romkana.c kernel/ime_dict.c kernel/ime_render_tvram.c kernel/snd_engine.c \
+    kernel/sqlite_engine.c kernel/sqlite_outer.c lib/sqlite3/os32_sqlite_test.c kernel/module.c kernel/module_image.c kernel/module_runtime.c kernel/unicode_file.c kernel/fep_module.c kernel/snd_engine.c \
     drivers/kbd.c drivers/kbd_status.c drivers/kbd_dlog.c drivers/serial.c drivers/serial_plan.c drivers/fm.c \
     drivers/fdc.c drivers/fdc_decide.c drivers/fdc_track.c drivers/disk.c drivers/dma8237.c drivers/dma8237_math.c drivers/pci.c drivers/pci_decode.c drivers/pci_bind.c drivers/pci_bind_match.c drivers/e82557.c drivers/e82557_eeprom.c drivers/e82557_desc.c drivers/ide.c drivers/ide_addr.c drivers/pc98pt.c drivers/atapi.c drivers/rtc.c drivers/dev.c drivers/kcg.c drivers/np2sysp.c drivers/loop_dev.c \
     drivers/mouse.c drivers/mouse_bus.c drivers/mouse_seamless.c \
@@ -201,7 +201,7 @@ $(BUILD_OUT)/layout-manifest.json: $(BUILD_OUT)/generations-manifest.json tools/
 deploy deploy-u3 deploy-kernel deploy-nhd nhd-migrate-pt deploy-fd: $(BUILD_OUT)/layout-manifest.json
 
 # 像の CRC (pair) を埋める部品の一覧。T4c-1 で SQLite、T5 で起動時の部品を足す。
-KERNEL_PAIRED_MODULES := $(BUILD_OUT)/kdebug.bin $(BUILD_OUT)/sqlite.mod
+KERNEL_PAIRED_MODULES := $(BUILD_OUT)/kdebug.bin $(BUILD_OUT)/sqlite.mod $(BUILD_OUT)/fep.mod
 kernel: $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/vmkernel.lz4 $(BUILD_OUT)/layout-manifest.json $(KERNEL_PAIRED_MODULES)
 
 # === カーネルクリーン ===
