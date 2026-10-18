@@ -201,6 +201,52 @@ static int delivery(void)
     say("PASS X11 CUI/WM delivery\n"); return 0;
 }
 
+/* IMEIND-1: real CUI keyboard/FEP path; renderer cells model the visible row.
+ * No dictionary lookup is needed for discarding an incomplete consonant. */
+static int cui_return_indicator(void)
+{
+    for (int mode = IME_MODE_HIRAGANA; mode <= IME_MODE_KATAKANA; mode++) {
+        for (int read_kind = 0; read_kind < 2; read_kind++) {
+            reset(); ime_set_mode(mode);
+            int (*read_key)(void) = read_kind ? ime_trygetkey : ime_trygetchar;
+            u32 indicator = mode == IME_MODE_HIRAGANA ? 0x3042 : 0x30a2;
+            key(0x24); /* k */
+            CHECK(read_key() == -1 && !g_ime.kana_len &&
+                  !kstrcmp(g_ime.rk.preedit, "k") && ime_cells[24][4] == 'k',
+                  "IMEIND CUI incomplete consonant displayed");
+            key(KEY_RETURN);
+            CHECK(read_key() == -1 && g_ime.commit_pos == g_ime.commit_len,
+                  "IMEIND discarded RETURN produces no output");
+            CHECK(ime_cells[24][0] == '[' && ime_cells[24][1] == indicator &&
+                  ime_cells[24][3] == ']',
+                  "IMEIND discarded RETURN keeps visible ON indicator");
+            for (int x = 4; x < TVRAM_COLS; x++) {
+                CHECK(!ime_cells[24][x], "IMEIND discarded reading is no longer visible");
+            }
+            CHECK(ime_get_mode() == mode && scroll_rows == 1 &&
+                  !g_ime.rk.preedit[0] && !g_ime.rk.n_wait,
+                  "IMEIND discarded RETURN clears romaji and keeps mode");
+            key(KEY_RETURN);
+            CHECK((read_key() & 255) == 13, "IMEIND empty RETURN passes through");
+            key(0x1d); /* a must not combine with the discarded k */
+            CHECK(read_key() == -1 && !kstrcmp(g_ime.kana_buf, "あ"),
+                  "IMEIND next typing starts a fresh reading");
+            key(KEY_RETURN);
+            CHECK(read_key() == 0xe3 && read_key() == (mode == IME_MODE_HIRAGANA ? 0x81 : 0x82) &&
+                  read_key() == (mode == IME_MODE_HIRAGANA ? 0x82 : 0xa2) && read_key() == -1 &&
+                  ime_cells[24][0] == '[' && ime_cells[24][1] == indicator,
+                  "IMEIND kana RETURN commits once and keeps ON indicator");
+            key(0x2e); /* n still flushes to kana before the romaji reset. */
+            CHECK(read_key() == -1, "IMEIND pending n consumed");
+            key(KEY_RETURN);
+            CHECK(read_key() == 0xe3 && read_key() == (mode == IME_MODE_HIRAGANA ? 0x82 : 0x83) &&
+                  read_key() == (mode == IME_MODE_HIRAGANA ? 0x93 : 0xb3) && read_key() == -1,
+                  "IMEIND RETURN still flushes n exactly once");
+        }
+    }
+    say("PASS IMEIND CUI RETURN indicator\n"); return 0;
+}
+
 static int lifetime(void)
 {
     for (int read_kind = 0; read_kind < 2; read_kind++) {
@@ -407,7 +453,7 @@ static int results(void)
 }
 void _start(void)
 {
-    int rc = modes() || delivery() || lifetime() || gui_input_lifetime() || park_lifetime() ||
+    int rc = modes() || delivery() || cui_return_indicator() || lifetime() || gui_input_lifetime() || park_lifetime() ||
              gui_dispatch() || sink_readers() || results();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     for (;;) {}
