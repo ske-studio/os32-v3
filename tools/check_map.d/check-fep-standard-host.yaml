@@ -4,6 +4,9 @@ check-fep-standard-host:
 - tools/tests/fep_budget_linux.c
 - tools/tests/hdd_pt_fake.h
 - tools/tests/host32.py
+- tools/fep_to_sqlite.py
+- assets/joyo_kanji.txt
+- assets/ipadic/**
 - kernel/ime_dict.c
 - kernel/ime.h
 - fs/vfs.c
