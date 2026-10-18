@@ -19,19 +19,19 @@
 #endif
 
 enum { SYSTEM, FEP, APP, CLASSES };
-typedef struct { unsigned owner, charge; } BudgetTag;
-_Static_assert(sizeof(BudgetTag) == 8, "ILP32 prefix layout");
+typedef struct { unsigned owner, charge; } ProbeBudgetTag;
+_Static_assert(sizeof(ProbeBudgetTag) == 8, "ILP32 prefix layout");
 typedef struct {
     sqlite3_mem_methods backing;
     unsigned context, live[CLASSES], peak, fep_peak, max_request;
     unsigned reserve, denied, physical_fail, app_peak;
-} BudgetState;
-static BudgetState state;
-#define STATE_BYTES ((sizeof(BudgetState) + 7u) & ~7u)
+} ProbeBudgetState;
+static ProbeBudgetState state;
+#define STATE_BYTES ((sizeof(ProbeBudgetState) + 7u) & ~7u)
 #define HEAP_BYTES (BUDGET_BYTES - STATE_BYTES)
 #define CAPACITY ((HEAP_BYTES / (ATOM_BYTES + 1u)) * ATOM_BYTES)
-static union { double align; unsigned char bytes[HEAP_BYTES]; } budget;
-_Static_assert(sizeof(state) + sizeof(budget) <= BUDGET_BYTES, "fixed state inside budget");
+static union { double align; unsigned char bytes[HEAP_BYTES]; } probe_storage;
+_Static_assert(sizeof(state) + sizeof(probe_storage) <= BUDGET_BYTES, "fixed state inside probe_storage");
 static const char *paths[] = {"/db/fep_s.db", "/db/fep.db", "/db/fep_l.db"};
 static const char *labels[] = {"S", "M", "L"};
 static char keys[3][2][32];
@@ -40,10 +40,10 @@ static unsigned held_count, learns[3];
 static sqlite3 *app;
 
 static unsigned total(void) { return state.live[SYSTEM] + state.live[FEP] + state.live[APP]; }
-static void *budget_malloc(int bytes)
+static void *probe_budget_malloc(int bytes)
 {
-    unsigned charge = (unsigned)state.backing.xRoundup(bytes + sizeof(BudgetTag));
-    BudgetTag *tag;
+    unsigned charge = (unsigned)state.backing.xRoundup(bytes + sizeof(ProbeBudgetTag));
+    ProbeBudgetTag *tag;
     if (charge > state.max_request) state.max_request = charge;
     if (!OMIT_APP_GATE && state.context == APP &&
         state.live[APP] + state.live[SYSTEM] + charge > CAPACITY - state.reserve) {
@@ -60,39 +60,39 @@ static void *budget_malloc(int bytes)
     if (state.live[APP] > state.app_peak) state.app_peak = state.live[APP];
     return tag + 1;
 }
-static void budget_free(void *p)
+static void probe_budget_free(void *p)
 {
-    BudgetTag *tag;
+    ProbeBudgetTag *tag;
     if (!p) return;
-    tag = (BudgetTag *)p - 1;
+    tag = (ProbeBudgetTag *)p - 1;
     CHECK(tag->owner < CLASSES && state.live[tag->owner] >= tag->charge);
     state.live[tag->owner] -= tag->charge;
     state.backing.xFree(tag);
 }
-static int budget_size(void *p)
-{ return state.backing.xSize((BudgetTag *)p - 1) - (int)sizeof(BudgetTag); }
-static int budget_roundup(int bytes)
-{ return state.backing.xRoundup(bytes + sizeof(BudgetTag)) - (int)sizeof(BudgetTag); }
-static void *budget_realloc(void *p, int bytes)
+static int probe_budget_size(void *p)
+{ return state.backing.xSize((ProbeBudgetTag *)p - 1) - (int)sizeof(ProbeBudgetTag); }
+static int probe_budget_roundup(int bytes)
+{ return state.backing.xRoundup(bytes + sizeof(ProbeBudgetTag)) - (int)sizeof(ProbeBudgetTag); }
+static void *probe_budget_realloc(void *p, int bytes)
 {
     void *next;
     unsigned saved = state.context, size;
-    if (!p) return budget_malloc(bytes);
-    size = (unsigned)budget_size(p);
+    if (!p) return probe_budget_malloc(bytes);
+    size = (unsigned)probe_budget_size(p);
     if ((unsigned)bytes <= size) return p;
-    state.context = ((BudgetTag *)p - 1)->owner;
-    next = budget_malloc(bytes);
+    state.context = ((ProbeBudgetTag *)p - 1)->owner;
+    next = probe_budget_malloc(bytes);
     state.context = saved;
-    if (next) { memcpy(next, p, size); budget_free(p); }
+    if (next) { memcpy(next, p, size); probe_budget_free(p); }
     return next;
 }
-static int budget_init(void *p) { (void)p; return state.backing.xInit(state.backing.pAppData); }
-static void budget_end(void *p) { (void)p; state.backing.xShutdown(state.backing.pAppData); }
+static int probe_budget_init(void *p) { (void)p; return state.backing.xInit(state.backing.pAppData); }
+static void probe_budget_end(void *p) { (void)p; state.backing.xShutdown(state.backing.pAppData); }
 static void start_budget(void)
 {
-    sqlite3_mem_methods methods = {budget_malloc, budget_free, budget_realloc,
-        budget_size, budget_roundup, budget_init, budget_end, NULL};
-    CHECK(sqlite3_config(SQLITE_CONFIG_HEAP, budget.bytes, HEAP_BYTES, ATOM_BYTES) == SQLITE_OK);
+    sqlite3_mem_methods methods = {probe_budget_malloc, probe_budget_free, probe_budget_realloc,
+        probe_budget_size, probe_budget_roundup, probe_budget_init, probe_budget_end, NULL};
+    CHECK(sqlite3_config(SQLITE_CONFIG_HEAP, probe_storage.bytes, HEAP_BYTES, ATOM_BYTES) == SQLITE_OK);
     CHECK(sqlite3_config(SQLITE_CONFIG_GETMALLOC, &state.backing) == SQLITE_OK);
     CHECK(sqlite3_config(SQLITE_CONFIG_MALLOC, &methods) == SQLITE_OK);
     state.context = SYSTEM;
@@ -272,7 +272,7 @@ int main(int argc, char **argv)
     CHECK(!total());
     printf("BUDGET bytes=%u heap=%u state=%u capacity=%u prefix=%u reserve=%u app_limit=%u app_peak=%u denied=%u physical_fail=%u common_measured=%u result=PASS\n",
         BUDGET_BYTES, (unsigned)HEAP_BYTES, (unsigned)STATE_BYTES,
-        (unsigned)CAPACITY, (unsigned)sizeof(BudgetTag), state.reserve,
+        (unsigned)CAPACITY, (unsigned)sizeof(ProbeBudgetTag), state.reserve,
         (unsigned)CAPACITY - state.reserve, state.app_peak, state.denied, state.physical_fail, common);
     return 0;
 }

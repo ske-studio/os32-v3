@@ -514,8 +514,17 @@
       "name": "shutdown",
       "result": "int",
       "args": "void",
-      "target": "sqlite3_shutdown",
+      "target": "os32_sqlite_shutdown",
       "wrapper": "os32_sqlite_outer_shutdown",
+      "io": 0,
+      "stub": "OS32_ERR_NOSYS"
+    },
+    {
+      "name": "boot_check",
+      "result": "int",
+      "args": "int live, int reserve",
+      "target": "os32_sqlite_boot_check",
+      "wrapper": "os32_sqlite_outer_boot_check",
       "io": 0,
       "stub": "OS32_ERR_NOSYS"
     }

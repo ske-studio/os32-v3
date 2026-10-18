@@ -44,7 +44,9 @@ int os32_sqlite_outer_group_for_db(void *db, Os32SqliteGroupInfo *out);
 int os32_sqlite_outer_canary(void);
 void os32_sqlite_outer_dump_vfs(void);
 int os32_sqlite_outer_shutdown(void);
+int os32_sqlite_outer_boot_check(int live, int reserve);
 int sqlite_module_ready(void);
+extern int services_public;
 int sqlite_engine_available(int io);
 #ifdef OS32_SQLITE_DIRECT_TEST
 #define SQLITE_OUTER_READY(io) 1

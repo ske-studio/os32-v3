@@ -8,6 +8,9 @@
 #include "dma_pool.h"
 #include "pgalloc.h"
 #include "module.h"
+#include "sqlite_engine.h"
+enum services_stage services_stage;
+volatile u32 tick_count;
 struct ledger_region ledger_regions[LEDGER_MAX_REGIONS];
 u32 ledger_region_count;
 #include "dma_pool_source.c"

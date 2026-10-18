@@ -29,7 +29,7 @@ extern int ring3_call_from_user(void);
 #ifdef OS32_SQLITE_DIRECT_TEST
 #define DB_MODULE_READY() 1
 #else
-#define DB_MODULE_READY() sqlite_module_ready()
+#define DB_MODULE_READY() services_public
 #endif
 #define SQL_COPY_BUF_SIZE DB_SQL_MAX_BYTES
 static char sql_copy_buf[SQL_COPY_BUF_SIZE];

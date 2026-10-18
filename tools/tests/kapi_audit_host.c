@@ -4,6 +4,8 @@
 #include "io.h"
 #include "fm.h"
 #include "os32_kapi_shared.h"
+int services_public = 1;
+volatile u32 services_boot_fault;
 static unsigned ports, waits, abort_checks, request_wait=3, opn_reg, last_key;
 static volatile int user, escaped;
 static char log_tx[256];

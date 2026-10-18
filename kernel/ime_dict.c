@@ -10,6 +10,7 @@
 /* ======================================================================== */
 
 #include "ime.h"
+#include "sqlite_engine.h"
 #include "sqlite3.h"
 #include "os32_sqlite_outer.h"
 #include "vfs.h"
@@ -68,8 +69,6 @@ static const char SQL_LEARN[] =
 /* ======================================================================== */
 /*  公開API                                                                  */
 /* ======================================================================== */
-
-static int ime_dict_close(IME_Dict *dict);
 
 int ime_dict_open(IME_Dict *dict, const char *path)
 {
@@ -375,7 +374,7 @@ void ime_dict_learn(IME_Dict *dict, const char *yomi, const char *kanji)
 }
 
 /* Finalize always destroys the statement; its rc reports the last evaluation. */
-static int ime_dict_close(IME_Dict *dict)
+int ime_dict_close(IME_Dict *dict)
 {
     int rc = SQLITE_OK, next;
     if (!dict || dict->isolated) return -1;
@@ -393,6 +392,10 @@ static int ime_dict_close(IME_Dict *dict)
                 kprintf(ATTR_RED, "IME: finalize evaluation rc=%d\r\n", next);
         }
     }
+#ifndef OS32_SQLITE_DIRECT_TEST
+    if (services_boot_fault == SERVICES_FAULT_FEP_CLOSE) rc = SQLITE_BUSY;
+    else
+#endif
     if (dict->db) rc = sqlite3_close((sqlite3 *)dict->db);
     if (rc == SQLITE_OK) dict->db = 0;
     next = os32_sqlite_group_finish(&dict->group, rc);

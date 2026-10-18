@@ -29,6 +29,82 @@ static char sqlite_mem_pool[SQLITE_MEMSYS5_SIZE];
 #define canary_before ((u32 *)sqlite_mem_pool)
 #define canary_after ((u32 *)(sqlite_mem_pool + SQLITE_MEMSYS5_SIZE - CANARY_BYTES))
 
+/* T4a-4's measured prefix allocator, inside the same 512KiB owner pool.
+ * The two canaries and fixed accounting state are deducted before MEMSYS5.
+ * Allocation tags preserve class when another caller frees/reallocates them. */
+enum { BUDGET_SYSTEM, BUDGET_FEP, BUDGET_APP, BUDGET_CLASSES };
+typedef struct { unsigned owner, charge; } BudgetTag;
+typedef struct {
+    sqlite3_mem_methods backing;
+    unsigned context, live[BUDGET_CLASSES], reserve;
+} BudgetState;
+#define BUDGET_STATE_BYTES ((sizeof(BudgetState) + 7u) & ~7u)
+#define BUDGET_HEAP_BYTES (SQLITE_MEMSYS5_SIZE - 2 * CANARY_BYTES - BUDGET_STATE_BYTES)
+#define BUDGET_ATOM_BYTES 64u
+#define BUDGET_CAPACITY ((BUDGET_HEAP_BYTES / (BUDGET_ATOM_BYTES + 1u)) * BUDGET_ATOM_BYTES)
+#define budget ((BudgetState *)(sqlite_mem_pool + CANARY_BYTES))
+
+static int budget_roundup(int n)
+{
+    int raw;
+    if (n <= 0 || n > 0x40000000 - (int)sizeof(BudgetTag)) return 0;
+    raw = budget->backing.xRoundup(n + sizeof(BudgetTag));
+    return raw ? raw - (int)sizeof(BudgetTag) : 0;
+}
+static void *budget_malloc(int n)
+{
+    BudgetTag *tag;
+    unsigned charge;
+    int rounded = budget_roundup(n);
+    if (!rounded) return 0;
+    charge = rounded + sizeof(BudgetTag);
+    if (budget->context == BUDGET_APP &&
+        budget->live[BUDGET_APP] + budget->live[BUDGET_SYSTEM] + charge >
+        BUDGET_CAPACITY - budget->reserve) return 0;
+    tag = budget->backing.xMalloc(charge);
+    if (!tag) return 0;
+    tag->owner = budget->context;
+    tag->charge = budget->backing.xSize(tag);
+    budget->live[tag->owner] += tag->charge;
+    return tag + 1;
+}
+static void budget_free(void *p)
+{
+    BudgetTag *tag;
+    if (!p) return;
+    tag = (BudgetTag *)p - 1;
+    budget->live[tag->owner] -= tag->charge;
+    budget->backing.xFree(tag);
+}
+static int budget_size(void *p)
+{
+    return budget->backing.xSize((BudgetTag *)p - 1) - sizeof(BudgetTag);
+}
+static void *budget_realloc(void *p, int n)
+{
+    void *next;
+    unsigned saved, size;
+    if (!p) return budget_malloc(n);
+    size = budget_size(p);
+    if (n > 0 && (unsigned)n <= size) return p;
+    saved = budget->context;
+    budget->context = ((BudgetTag *)p - 1)->owner;
+    next = budget_malloc(n);
+    budget->context = saved;
+    if (next) { kmemcpy(next, p, size); budget_free(p); }
+    return next;
+}
+static int budget_init(void *p)
+{
+    (void)p;
+    return budget->backing.xInit(budget->backing.pAppData);
+}
+static void budget_end(void *p)
+{
+    (void)p;
+    budget->backing.xShutdown(budget->backing.pAppData);
+}
+
 /* MEMSYS5 プールの canary 検証
  * 戻り値: 0=正常, -1=前方破壊, -2=後方破壊 */
 int memsys5_check_canary(void)
@@ -162,6 +238,47 @@ int os32_sqlite_group_finish(const Os32SqliteGroup *cookie, int close_rc)
     g->has_main = 0;
     g->state = OS32_SQLITE_FREE;
     return SQLITE_OK;
+}
+
+/* Called only by generated module adapters, on the active engine stack. */
+void os32_sqlite_allocation_context(void *db, const Os32SqliteGroup *cookie)
+{
+    Os32GroupSlot *g = group_lookup(cookie);
+    int i;
+    if (!g && db) {
+        for (i = 0; i < OS32_SQLITE_GROUPS; i++)
+            if (groups[i].db == db && groups[i].state != OS32_SQLITE_FREE) {
+                g = &groups[i];
+                break;
+            }
+    }
+    budget->context = g ? (g->kind == OS32_SQLITE_RESIDENT ? BUDGET_FEP : BUDGET_APP)
+                        : BUDGET_SYSTEM;
+}
+
+int os32_sqlite_boot_check(int live, int reserve)
+{
+    int i, count = 0;
+    for (i = 0; i < OS32_SQLITE_GROUPS; i++) {
+        if (groups[i].state == OS32_SQLITE_FREE) continue;
+        if (groups[i].state != OS32_SQLITE_LIVE ||
+            groups[i].kind != OS32_SQLITE_RESIDENT) return SQLITE_BUSY;
+        count++;
+    }
+    if (count != live) return SQLITE_BUSY;
+    if (reserve) {
+        if (reserve < OS32_SQLITE_FEP_RESERVE ||
+            (unsigned)reserve > BUDGET_CAPACITY - budget->live[BUDGET_SYSTEM] ||
+            budget->live[BUDGET_FEP] > (unsigned)reserve) return SQLITE_NOMEM;
+        budget->reserve = reserve;
+    }
+    return SQLITE_OK;
+}
+
+int os32_sqlite_shutdown(void)
+{
+    if (os32_sqlite_boot_check(0, 0) != SQLITE_OK) return SQLITE_BUSY;
+    return sqlite3_shutdown();
 }
 
 /* ======== ファイルハンドル構造体 ======== */
@@ -718,6 +835,10 @@ int sqlite3_os_end(void)
 int os32_sqlite_init(void)
 {
     int rc, i;
+    sqlite3_mem_methods methods = {budget_malloc, budget_free, budget_realloc,
+        budget_size, budget_roundup, budget_init, budget_end, 0};
+    kmemset(budget, 0, sizeof(*budget));
+    budget->reserve = OS32_SQLITE_FEP_RESERVE;
     for (i = 0; i < CANARY_WORDS; i++) {
         canary_before[i] = CANARY_VALUE;
         canary_after[i] = CANARY_VALUE;
@@ -728,11 +849,16 @@ int os32_sqlite_init(void)
 
     /* MEMSYS5 固定プール設定 */
     rc = sqlite3_config(SQLITE_CONFIG_HEAP,
-                        sqlite_mem_pool + CANARY_BYTES,
-                        SQLITE_MEMSYS5_SIZE - 2 * CANARY_BYTES,
-                        64);  /* 最小アロケーション粒度 */
+                        sqlite_mem_pool + CANARY_BYTES + BUDGET_STATE_BYTES,
+                        BUDGET_HEAP_BYTES,
+                        BUDGET_ATOM_BYTES);  /* 最小アロケーション粒度 */
 
     kprintf(0x07, "[SQT] sqlite3_config rc=%d\n", rc);
+    if (rc != SQLITE_OK) return rc;
+
+    rc = sqlite3_config(SQLITE_CONFIG_GETMALLOC, &budget->backing);
+    if (rc != SQLITE_OK) return rc;
+    rc = sqlite3_config(SQLITE_CONFIG_MALLOC, &methods);
     if (rc != SQLITE_OK) return rc;
 
     /* SQLite 初期化 (内部で sqlite3_os_init が呼ばれる) */

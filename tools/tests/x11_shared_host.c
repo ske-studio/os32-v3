@@ -10,6 +10,8 @@
 #include "kbd_inject.h"
 #include "kstring.h"
 
+int services_public = 1;
+volatile u32 services_boot_fault;
 static int owner = 1, user, wm_depth, wait_depth, calls, seen_owner;
 static int opens, reopens, searches, learns, management, storage_rc;
 static int scroll_rows, candidate_draws, mode_draws;
@@ -91,6 +93,8 @@ int ime_dict_search(IME_Dict *d, const char *y, IME_Result *r, int max)
 }
 void ime_dict_learn(IME_Dict *d, const char *y, const char *k)
 { (void)y; (void)k; if (d == shared_dict) learns++; }
+int ime_user_list(IME_Dict *d, const char *prefix, IME_UserEntry *out, int max)
+{ (void)d; (void)prefix; (void)out; (void)max; management++; return storage_rc; }
 int ime_user_delete(IME_Dict *d, const char *y, const char *k)
 { (void)y; (void)k; management++; return d == shared_dict ? storage_rc : -99; }
 int ime_user_export(IME_Dict *d, const char *p)
@@ -451,9 +455,30 @@ static int results(void)
     }
     say("PASS X11 global result\n"); return 0;
 }
+static int unpublished(void)
+{
+    reset();
+    services_public = 0;
+    ime_toggle(); ime_set_mode(IME_MODE_HIRAGANA);
+    CHECK(!ime_is_active() && ime_get_mode() == IME_MODE_OFF && !opens, "unpublished IME stays disabled");
+    CHECK(ime_switch_dict(1) == OS32_ERR_NOSYS &&
+          ime_user_list_facade(0, 0, 0) == OS32_ERR_NOSYS &&
+          ime_user_delete_facade(0, 0) == OS32_ERR_NOSYS &&
+          ime_user_export_facade(0) == OS32_ERR_NOSYS &&
+          ime_user_clear_facade() == OS32_ERR_NOSYS && !management,
+          "unpublished management stubs");
+    CHECK(ime_feed_key(0x1e61) == 0x1e61 && ime_feed_key(-1) == -1,
+          "MINIMAL GUI raw key and empty input");
+    CHECK(ime_trygetkey() == -1 && ime_trygetchar() == -1, "MINIMAL empty CUI polls");
+    key(0x1d);
+    CHECK(ime_trygetchar() == 'a', "MINIMAL CUI raw char");
+    services_public = 1;
+    say("PASS unpublished DB-independent IME stubs and MINIMAL input\n");
+    return 0;
+}
 void _start(void)
 {
-    int rc = modes() || delivery() || cui_return_indicator() || lifetime() || gui_input_lifetime() || park_lifetime() ||
+    int rc = unpublished() || modes() || delivery() || cui_return_indicator() || lifetime() || gui_input_lifetime() || park_lifetime() ||
              gui_dispatch() || sink_readers() || results();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     for (;;) {}

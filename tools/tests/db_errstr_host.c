@@ -81,8 +81,9 @@ static unsigned char test_shm[DB_SHM_BLOCK_SIZE + SHM_CANARY];
  * module availability gate in the KAPI facade. */
 #include "../../lib/sqlite3/os32_sqlite_outer.h"
 #undef OS32_SQLITE_DIRECT_TEST
-static int test_module_ready = 1;
-int sqlite_module_ready(void) { return test_module_ready; }
+int services_public = 1;
+/* Internally running even while all public entries are stubs. */
+int sqlite_module_ready(void) { return 1; }
 #include "../../kapi/kapi_db.c"
 
 /* ========================================================================= */
@@ -475,7 +476,7 @@ static void module_absent(void)
     saved = db_slots[h];
     memcpy(result, test_shm, sizeof(result));
     old_probes = probes;
-    test_module_ready = 0;
+    services_public = 0;
     CHECK(kapi_db_open((const char *)1) == OS32_ERR_NOSYS);
     CHECK(kapi_db_open_existing((const char *)1, 1) == OS32_ERR_NOSYS);
     CHECK(kapi_db_close(h) == OS32_ERR_NOSYS);
@@ -501,7 +502,7 @@ static void module_absent(void)
     CHECK(memcmp(&saved, &db_slots[h], sizeof(saved)) == 0);
     CHECK(memcmp(result, test_shm, sizeof(result)) == 0);
     CHECK(probes == old_probes);
-    test_module_ready = 1;
+    services_public = 1;
     CHECK(kapi_db_step(h) == DB_STATUS_ROW);
     CHECK(kapi_db_column_int(h, 0) == 42);
     CHECK(kapi_db_close(h) == 0);

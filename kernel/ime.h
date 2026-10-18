@@ -99,6 +99,9 @@ typedef struct {
 /* 初期化 (ブート時に1回) */
 void ime_init(void);
 int ime_dict_boot(void);
+int ime_boot_abort(void);
+u32 ime_boot_bytes(void);
+int ime_dict_close(IME_Dict *dict);
 
 /* FEP ON/OFF トグル (初回呼び出し時に辞書ロード) */
 void ime_toggle(void);

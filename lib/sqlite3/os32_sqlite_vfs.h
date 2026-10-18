@@ -58,6 +58,11 @@ int os32_sqlite_group_open(const Os32SqliteGroup *group, const char *path,
 /* SQLite エンジン初期化 (MEMSYS5 + VFS登録 + sqlite3_initialize) */
 /* 戻り値: 0=成功, 非0=失敗 */
 int os32_sqlite_init(void);
+/* T4a-4 measured common S/M/L reservation, no dictionary metadata yet. */
+#define OS32_SQLITE_FEP_RESERVE (192 * 1024)
+int os32_sqlite_boot_check(int live, int reserve);
+int os32_sqlite_shutdown(void);
+void os32_sqlite_allocation_context(void *db, const Os32SqliteGroup *group);
 
 /* カーネル内 SQLite 動作テスト (メモリDB で CRUD 検証) */
 /* 戻り値: 0=全テスト成功, -1=失敗あり */

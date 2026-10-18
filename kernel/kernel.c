@@ -75,6 +75,7 @@ extern void fatfs_init(void);
 #include "pcm_cs4231.h"
 #include "os32_sqlite_vfs.h"
 #include "os32_sqlite_outer.h"
+#include "sqlite_engine.h"
 #include "kapi_db.h"
 #include "bootlog.h"
 #include "module.h"
@@ -191,7 +192,6 @@ static u8 kernel_pci_line_bits(unsigned int irq)
 
 void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
 {
-    int sqlite_ready = 0;
     char tmp[16];
     int mb;
 
@@ -597,7 +597,10 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_run();
     else kselftest_skipped();
 
+    services_stage = SERVICES_ROOT_READY;
+    kprintf(0x07, "[services] ROOT_READY tick=%u\n", tick_count);
     unicode_file_load();
+    services_stage = SERVICES_UNICODE;
 
     /* ⑥-0 (TASK_T1_LEDGER §3-3、B4): pci_init は台帳より前に走るので、g_pci の
      * メモリ BAR をここで資源表へ RAW (採取値、予約権限なし) として取り込む。
@@ -691,31 +694,10 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * カード未装着・応答不良でも NIC だけ無効にして起動を続ける。 */
     lgy98_init();
 
-    tvram_print(18, 4, "SQ..", TATTR_GREEN);
-    kprintf(0x07, "[BOOT] sqlite_init...\n");
-
-    /* Unicode is already resident; load the paired /boot SQLite module. */
-    tvram_print(0, 4, "SQLite...", TATTR_GREEN);
-    {
-        int sq_rc;
-        sq_rc = os32_sqlite_start();
-        sqlite_ready = sq_rc == 0;
-        kprintf(0x07, "[SQ] init rc=%d\n", sq_rc);
-        if (sq_rc == 0) {
-            tvram_print(9, 4, "OK", TATTR_WHITE);
-        } else {
-            tvram_print(9, 4, "ER", TATTR_RED);
-        }
-    }
-
-    /* 割り込み有効化 */
+    /* File-backed settings/FEP I/O needs IRQs; no application exists yet. */
     tvram_print(71, 2, "IRQ_EN", TATTR_YELLOW);
     _enable();
-    if (sqlite_ready) {
-        int rc = os32_sqlite_test();
-        kprintf(0x07, "[SQ] kernel test rc=%d\n", rc);
-        if (!rc) kprintf(0x07, "[IME] boot dictionary rc=%d\n", ime_dict_boot());
-    }
+    services_boot();
 
     /* autoexec: シェルスクリプト(/etc/autoexec.bat)に移行済み。
      * シェル起動後に ui.c から script_source_file() で実行される。 */

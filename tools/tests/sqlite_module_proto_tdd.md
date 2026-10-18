@@ -31,3 +31,25 @@ SQLITE の生成 policy 行から required PAIR を外す変異と pair 照合�
 コンパイル失敗・signal・timeoutは検出成功に数えない。T4c-1 の依頼に従い実装時も
 この検査の変異を実行する。ホストの VFS は部品の読込とメモリ DB 用の限定置換で、
 ディスク上の DB・NP21/W 起動は PM のゲスト受入に残す。
+
+## T4c-2 一括公開と rollback
+
+同じ実像/adapter の試験で `services_boot` を実行する。実際の FEP buffer 確保・
+abort・辞書 close と Unicode loader を使い、SQLite の group・MEMSYS5・shutdown は
+再配置した製品本文で実行する。画面出力とディスクを置換し、settings は種を入れるため
+RW の一時 RAM DB、辞書 open は RAM DB の実 stmt で代える。ディスク上の実 IME SQL は
+既存 `check-vfs-fd-path-host` / `check-fep-budget-host`、ゲスト全体は PM の確認範囲。
+
+正常対照は公開を最後まで閉じ、設定 224 KiB と既定 192 KiB、APP の割当拒否後も
+FEP stmt の実行を確認する。module 欠落/対不一致/画像・pool・stack の確保失敗/
+SQLite init/FEP の二つの buffer/部分 stmt/CRC 注入/辞書欠落/予約不足は占有 0 の MINIMAL。
+settings close・FEP close・shutdown 失敗は MINIMAL_QUARANTINED、owner/guard を保持。
+Unicode の欠落/旧形式/I/O/確保失敗でも SERVICES_READY、かなの算術変換は生存する。
+ロード済み 7 頁は全 rollback で保持する。再呼出しは副作用 0。
+
+追加変異は早期公開、隔離 owner の free、FEP close より先の module abort、Unicode の誤回収。
+いずれもコンパイル後の assertion failure だけを RED と数える。通常対照を先に実行する。
+`check-db-errstr-host` は内部 SQLite を ready にしたまま public を閉じ、全 DB 口の stub と
+副作用 0 を確認する。`check-x11-shared-host` は未公開 IME 管理口と CUI/GUI 生入力を確認する。
+ページ監査はこの fixture の合成 count を合格根拠にせず、既存の memory/memmap 監査検査と
+NP21/W の diff=0 を使う。SA_ONSTACK の既存 overflow 検査は実 IDT の再現ではない。

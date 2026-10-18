@@ -67,4 +67,12 @@ check-sqlite-module-proto-host:
 - kdebug/generated/kdebug_imports.json
 - build/module.ld
 - kernel/kdebug_imports.def
+- kernel/ime.c
+- kernel/ime.h
+- kernel/ime_dict.c
+- kernel/ime_render.h
+- kernel/unicode_file.c
+- kernel/unicode_file.h
+- lib/sqlite3/os32_sqlite_test.c
+- include/endian_le.h
 artifact_reader: true

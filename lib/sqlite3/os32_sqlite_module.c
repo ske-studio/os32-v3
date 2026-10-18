@@ -2,9 +2,7 @@
 #define OS32_SQLITE_OUTER_IMPL
 #include "generated/sqlite_facade.h"
 extern char *sqlite_module_pool;
-static const SqliteModuleApi api = {
 #include "generated/sqlite_facade_bind.inc"
-};
 int sqlite_module_init(void *pool, SqliteModuleApi *out)
 {
     sqlite_module_pool = pool;

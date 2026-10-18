@@ -32,3 +32,4 @@ check-x11-shared-host:
 - tools/tests/host_arch/arch_io.h
 - tools/check_map.d/check-x11-shared-host.yaml
 - build/checks.d/check-x11-shared-host.mk
+- kernel/sqlite_engine.h

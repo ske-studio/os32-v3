@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 import struct
 import subprocess
@@ -17,6 +18,11 @@ from test_module_image import build_validator, validate, fixture, crc, word, POL
 from test_mkmod import rejected
 from test_module_runtime import FLAGS as RUNTIME_FLAGS, INCLUDES as RUNTIME_INCLUDES
 import host32
+
+def function(source, name):
+    match = re.search(r'^(?:static )?(?:int|u32|void) ' + name + r'\([^)]*\)\n\{', source, re.M)
+    assert match, name
+    return source[match.start():source.index('\n}', match.end()) + 2]
 
 
 def check(run, rc, name):
@@ -211,8 +217,26 @@ def pair_runtime_suite(folder, mutate=False):
 def real_runtime_suite(folder, directory, vmkernel, mutate=False):
     """Execute the product module with the full adapter and real stack switch."""
     generated = ROOT / 'lib/sqlite3/generated'
+    ime = (ROOT / 'kernel/ime.c').read_text()
+    close = function((ROOT / 'kernel/ime_dict.c').read_text(), 'ime_dict_close')
+    close = close.replace('sqlite3_finalize(', 'os32_sqlite_finalize(').replace('sqlite3_close(', 'os32_sqlite_close(')
+    close = close.replace('os32_sqlite_group_', 'os32_sqlite_outer_group_')
+    (folder / 'services_fep.inc').write_text('\n'.join(
+        line for line in ime.splitlines() if line.startswith(('#define CANDLIST_SAVE_', '#define IME_DICT_PATH')))
+        + '\n' + '\n'.join(function(ime, name) for name in ('ime_boot_bytes', 'ime_dict_boot', 'ime_boot_abort'))
+        + '\n' + close)
+    smoke = (ROOT / 'lib/sqlite3/os32_sqlite_test.c').read_text()
+    smoke = smoke.replace(function(smoke, 'tv_put'),
+        'static void tv_put(int r, int c, char v, u8 a) { (void)r; (void)c; (void)v; (void)a; }')
+    (folder / 'sqlite_smoke.c').write_text(smoke)
     for name in ('sqlite_engine', 'sqlite_outer'):
         source = (ROOT / 'kernel' / (name + '.c')).read_text()
+        # Disk settings I/O belongs to the VFS fixture; use a private RAM DB here.
+        source = source.replace('SYS_SETTINGS_DB, SQLITE_OPEN_READONLY', '":memory:", SQLITE_OPEN_READWRITE')
+        if name == 'sqlite_engine':
+            source = 'struct sqlite3; extern void host_seed_settings(struct sqlite3 *db);\n' + source.replace(
+                '    if (!rc && !os32_sqlite_prepare_v2(db,',
+                '    if (!rc) host_seed_settings(db);\n    if (!rc && !os32_sqlite_prepare_v2(db,')
         (folder / (name + '.c')).write_text(source.replace(
             '../lib/sqlite3/generated/', str(generated) + '/'))
     (folder / 'io.h').write_text(
@@ -232,7 +256,7 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False):
     exports = (generated / 'sqlite_kexports.c').read_text()
     end = exports.index('};', exports.index('const u32 sqlite_kexports[]')) + 2
     metadata = json.loads((directory / 'sqlite_imports.json').read_text())
-    used = {'kprintf', 'sys_time', 'ktime_ticks', 'vfs_count_sqlite'}
+    used = {'kprintf', 'sys_time', 'ktime_ticks', 'vfs_count_sqlite', 'vfs_quarantine_sqlite'}
     (folder / 'sqlite_kexports.c').write_text(
         '#include "sqlite_imports.h"\n#include "module_image.h"\n'
         'extern void sqlite_forbidden_import(void);\n'
@@ -248,7 +272,8 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False):
                     ROOT / 'tools/tests/sqlite_module_host.c',
                     folder / 'sqlite_engine.c', folder / 'sqlite_outer.c',
                     folder / 'sqlite_kexports.c', ROOT / 'kernel/module_runtime.c',
-                    ROOT / 'kernel/module_image.c', obj, '-o', exe]
+                    ROOT / 'kernel/module_image.c', ROOT / 'kernel/unicode_file.c',
+                    folder / 'sqlite_smoke.c', obj, '-o', exe]
     subprocess.run(command, check=True)
     pair = mkmod.pair_crc(vmkernel.read_bytes())
     image = (directory / 'sqlite.bin').read_bytes()
@@ -271,6 +296,24 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False):
                 assert 'PASS guard overflow fault -> engine fail-stop' in output, result
                 print(output, end='')
         print('PASS real SQLite adapter ' + label, flush=True)
+    boot_cases = [('services-ready', 10), ('missing-sqlite', 11), ('mixed-sqlite', 12),
+                  ('image-allocation', 13), ('unicode-missing', 14), ('unicode-old', 15),
+                  ('unicode-io', 16), ('unicode-allocation', 17), ('partial-FEP', 18),
+                  ('settings-reserve', 19), ('settings-under-reserve', 20)]
+    boot_cases += [(name, 20 + fault) for fault, name in enumerate((
+        'pool', 'stack', 'sqlite-init', 'settings-close', 'fep-text', 'fep-attr',
+        'fep-crc', 'dictionary', 'reserve', 'fep-close', 'shutdown'), 1)]
+    def boot_run(mode):
+        data = bytearray(image)
+        if mode == 12:
+            word(data, 31, pair ^ 1)
+            crc(data)
+        return host32.run([str(exe)], input=struct.pack('<4I', mode, len(data), pair, 0) + data,
+                          runner='qemu', capture_output=True)
+    for label, mode in boot_cases:
+        result = boot_run(mode)
+        assert result.returncode == 0, (label, result)
+        print('PASS boot ' + label + ': ' + result.stdout.decode().strip(), flush=True)
     if mutate:
         path = folder / 'sqlite_engine.c'
         source = path.read_text()
@@ -284,6 +327,32 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False):
             assert result.returncode == 1 and b'FAIL guard_np &&' in result.stdout, result
         print('MUTATE stack-guard-removed RED (compiled, runtime guard assertion)')
         path.write_text(source)
+        runtime_path = folder / 'module_runtime_boot.c'
+        runtime_source = (ROOT / 'kernel/module_runtime.c').read_text()
+        runtime_path.write_text(runtime_source)
+        boot_command = [runtime_path if item == ROOT / 'kernel/module_runtime.c' else item for item in command]
+        mutations = [
+            ('early-public', path, source,
+             '    services_stage = SERVICES_SQLITE_INTERNAL_READY;',
+             '    services_stage = SERVICES_SQLITE_INTERNAL_READY; services_public = 1;', 10),
+            ('isolated-free', runtime_path, runtime_source,
+             '    if (!stopped || r->irq_refs || r->tick_refs || r->callback_refs ||\n        r->dma_refs || r->active_refs) goto quarantined;',
+             '    if (0 && (!stopped || r->irq_refs || r->tick_refs || r->callback_refs ||\n        r->dma_refs || r->active_refs)) goto quarantined;', 31),
+            ('rollback-order', path, source,
+             '    cleanup_blocked = ime_boot_abort() != 0;',
+             '    module_abort(sqlite_handle);\n    cleanup_blocked = ime_boot_abort() != 0;', 18),
+            ('unicode-reclaim', path, source,
+             '    cleanup_blocked = ime_boot_abort() != 0;',
+             '    u32 lost; ledger_reclaim_owner(LEDGER_OWNER_KERNEL, &lost);\n    cleanup_blocked = ime_boot_abort() != 0;', 28),
+        ]
+        for label, target, original, old, new, mode in mutations:
+            assert original.count(old) == 1, label
+            target.write_text(original.replace(old, new))
+            subprocess.run(boot_command, check=True)
+            result = boot_run(mode)
+            assert result.returncode == 1 and b'FAIL ' in result.stdout, (label, result)
+            print('MUTATE ' + label + ' RED (compiled runtime): ' + result.stdout.decode().strip(), flush=True)
+            target.write_text(original)
 
 
 def main():

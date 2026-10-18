@@ -7,6 +7,7 @@
 #define __KSTRING_H
 char *kstrncpy(char *dst, const char *src, u32 size)
 { str_cpy(dst, src, (int)size); return dst; }
+void *kmemcpy(void *dst, const void *src, u32 size) { return memcpy(dst, src, size); }
 void *kmemset(void *dst, int val, u32 size) { return memset(dst, val, size); }
 int kstrncmp(const char *a, const char *b, u32 n) { return strncmp(a, b, n); }
 #include "../../lib/sqlite3/sqlite3.h"

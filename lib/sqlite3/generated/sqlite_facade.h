@@ -45,8 +45,9 @@ typedef struct {
     void (*dump_vfs)(void);
     char * (*vsnprintf)(int size, char *out, const char *format, va_list args);
     int (*shutdown)(void);
+    int (*boot_check)(int live, int reserve);
 } SqliteModuleApi;
-#define SQLITE_MODULE_API_SLOTS 38u
+#define SQLITE_MODULE_API_SLOTS 39u
 extern const SqliteModuleApi sqlite_stub_api;
 extern const SqliteModuleApi *sqlite_module_api;
 int sqlite_module_ready(void);
@@ -88,4 +89,5 @@ int os32_sqlite_outer_canary(void);
 void os32_sqlite_outer_dump_vfs(void);
 char * os32_sqlite_outer_vsnprintf(int size, char *out, const char *format, va_list args);
 int os32_sqlite_outer_shutdown(void);
+int os32_sqlite_outer_boot_check(int live, int reserve);
 #endif

@@ -10,6 +10,8 @@
 #include "module.h"
 #include "bootinfo.h"
 #include "config.h"
+#include "ime.h"
+#include "unicode_file.h"
 #include "kstring.h"
 #include "kprintf.h"
 #include "os32_generations.h"
@@ -52,7 +54,11 @@ int sqlite_engine_run(void (*call)(void *), void *frame, int io)
 const SqliteModuleApi *sqlite_module_api = &sqlite_stub_api;
 static SqliteModuleApi candidate_api;
 static struct module_handle sqlite_handle;
-static int init_called, candidate_valid;
+static int init_called, candidate_valid, cleanup_blocked;
+int services_public;
+enum services_stage services_stage;
+volatile u32 services_boot_fault;
+extern volatile u32 tick_count;
 static u32 pool_phys;
 extern const u32 sqlite_kexports[];
 extern const struct module_symbol_contract sqlite_import_contracts[];
@@ -86,8 +92,10 @@ static void call_module_init(void *arg)
 static int sqlite_start(struct module_record *r, u32 entry, u32 *exports)
 {
     (void)exports;
+    if (services_boot_fault == SERVICES_FAULT_POOL) return MODULE_NO_PAGES;
     pool_phys = pgalloc_alloc_phys(r->owner, SQLITE_MODULE_POOL_SIZE / PAGE_SIZE);
     if (!pool_phys) return MODULE_NO_PAGES;
+    if (services_boot_fault == SERVICES_FAULT_STACK) return MODULE_NO_PAGES;
     u32 stack = pgalloc_alloc_phys(r->owner, SQLITE_ENGINE_STACK_SIZE / PAGE_SIZE + 1);
     if (!stack) return MODULE_NO_PAGES;
     paging_sqlite_stack_guard = (u32)(uptr)P2V(stack);
@@ -98,18 +106,20 @@ static int sqlite_start(struct module_record *r, u32 entry, u32 *exports)
     struct sqlite_init_call call = {entry, SQLITE_MISUSE};
     sqlite_engine_run(call_module_init, &call, 0);
     candidate_valid = valid_api(r);
-    return !candidate_valid || call.rc != SQLITE_OK;
+    return !candidate_valid || call.rc != SQLITE_OK ||
+           services_boot_fault == SERVICES_FAULT_SQLITE_INIT;
 }
 
 static void call_shutdown(void *arg)
 {
-    *(int *)arg = candidate_api.shutdown();
+    *(int *)arg = services_boot_fault == SERVICES_FAULT_SHUTDOWN
+               ? SQLITE_BUSY : candidate_api.shutdown();
 }
 static int sqlite_quiesce(struct module_record *r)
 {
     (void)r;
     sqlite_module_api = &sqlite_stub_api;
-    if (sqlite_engine_active) return 0;
+    if (sqlite_engine_active || cleanup_blocked) return 0;
     if (init_called) {
         int rc = SQLITE_MISUSE;
         if (!candidate_valid || !sqlite_engine_run(call_shutdown, &rc, 0) ||
@@ -160,4 +170,100 @@ int os32_sqlite_start(void)
     kprintf(0x07, "[sqlite] stack_guard=%08x p=%u\n", paging_sqlite_stack_guard,
             paging_sqlite_stack_guard ? paging_is_present(paging_sqlite_stack_guard) : 0);
     return rc;
+}
+
+/* Missing/unreadable settings use the measured default. A failed close is
+ * different: preserve the group and its SQLite dependency until reboot. */
+static int services_settings(int *reserve)
+{
+    Os32SqliteGroup group;
+    sqlite3 *db = 0;
+    sqlite3_stmt *stmt = 0;
+    int rc = os32_sqlite_outer_group_acquire(OS32_SQLITE_RESIDENT, 0, &group);
+    if (rc) return rc;
+    rc = os32_sqlite_outer_group_open(&group, SYS_SETTINGS_DB, SQLITE_OPEN_READONLY, &db);
+    if (!rc && !os32_sqlite_prepare_v2(db,
+            "SELECT ival FROM settings WHERE scope='fep' AND key='mem_reserve_kb' AND type=0",
+            -1, &stmt, 0) && os32_sqlite_step(stmt) == SQLITE_ROW) {
+        int kb = os32_sqlite_column_int(stmt, 0);
+        /* Invalid configured values fail reservation, rather than wrap. */
+        *reserve = kb > 0 && kb <= (int)(SQLITE_MODULE_POOL_SIZE / 1024)
+                 ? kb * 1024 : -1;
+    }
+    if (stmt) os32_sqlite_finalize(stmt);
+    rc = os32_sqlite_outer_group_begin_close(&group);
+    if (rc) return rc;
+    rc = services_boot_fault == SERVICES_FAULT_SETTINGS_CLOSE ? SQLITE_BUSY
+         : db ? os32_sqlite_close(db) : SQLITE_OK;
+    return os32_sqlite_outer_group_finish(&group, rc);
+}
+
+void services_boot(void)
+{
+    /* Boot only, including failure: never retry an isolated lifetime. */
+    if (services_stage != SERVICES_UNICODE) return;
+    u32 start_tick = tick_count;
+    int reserve = OS32_SQLITE_FEP_RESERVE;
+    int rc = os32_sqlite_start();
+    if (rc) goto rollback;
+    services_stage = SERVICES_SQLITE_INTERNAL_READY;
+    kprintf(0x07, "[services] SQLITE_INTERNAL_READY tick=%u\n", tick_count);
+    rc = os32_sqlite_test();
+    kprintf(0x07, "[SQ] kernel test rc=%d\n", rc);
+    if (rc) goto rollback;
+    rc = services_settings(&reserve);
+    if (rc) goto rollback;
+    rc = os32_sqlite_outer_boot_check(0, 0);
+    if (rc) goto rollback;
+    services_stage = SERVICES_SETTINGS_CLOSED;
+    kprintf(0x07, "[services] SETTINGS_CLOSED tick=%u\n", tick_count);
+    if (services_boot_fault == SERVICES_FAULT_RESERVE) reserve = 1;
+    rc = os32_sqlite_outer_boot_check(0, reserve);
+    if (rc) goto rollback;
+    rc = ime_dict_boot();
+    kprintf(0x07, "[IME] boot dictionary rc=%d\n", rc);
+    if (rc) goto rollback;
+    services_stage = SERVICES_FEP_INTERNAL_READY;
+    kprintf(0x07, "[services] FEP_INTERNAL_READY tick=%u\n", tick_count);
+    rc = os32_sqlite_outer_boot_check(1, reserve);
+    if (rc) goto rollback;
+    if (services_boot_fault == SERVICES_FAULT_FEP_CLOSE ||
+        services_boot_fault == SERVICES_FAULT_SHUTDOWN) {
+        rc = MODULE_INIT_FAILED;
+        goto rollback;
+    }
+    services_stage = SERVICES_READY;
+    services_public = 1;
+    goto report;
+
+rollback:;
+    enum services_stage failed_stage = services_stage;
+    services_public = 0;
+    /* FEP statements/groups must disappear while internal exports still work. */
+    cleanup_blocked = ime_boot_abort() != 0;
+    if (sqlite_module_ready() && os32_sqlite_outer_boot_check(0, 0))
+        cleanup_blocked = 1;
+    int isolated = module_abort(sqlite_handle);
+    sqlite_module_api = &sqlite_stub_api;
+    services_stage = isolated || cleanup_blocked ? SERVICES_MINIMAL_QUARANTINED
+                                               : SERVICES_MINIMAL;
+    kprintf(0x07, "[services] rollback stage=%u rc=%d fault=%u cleanup=%u\n",
+            failed_stage, rc, services_boot_fault, (u32)cleanup_blocked);
+report:;
+    struct module_record *r = module_record_get(sqlite_handle);
+    u32 pages = r && r->owner ? ledger_owner_pages(r->owner) : 0;
+    u32 fep = ime_boot_bytes();
+    struct memory_page_counts counts;
+    memory_boot_page_counts(kdebug.pages ? kdebug.base_pa / PAGE_SIZE : 0,
+                            kdebug.pages, &counts);
+    /* Observation only: preserve kaudit's existing run count and classifications.
+     * SQLite remains in SLACK/pool; FEP buffers remain inside KHEAP. */
+    kprintf(0x07, "[services] %s public=%u sqlite_pages=%u fep_bytes=%u quarantine_bytes=%u diff=%d\n",
+            services_public ? "SERVICES_READY" :
+            services_stage == SERVICES_MINIMAL ? "MINIMAL" : "MINIMAL_QUARANTINED",
+            (u32)services_public, pages, fep,
+            services_stage == SERVICES_MINIMAL_QUARANTINED ? pages * PAGE_SIZE + fep : 0,
+            counts.diff);
+    kprintf(0x07, "[services] tick=%u..%u reserve=%d unicode=%08x\n",
+            start_tick, tick_count, reserve, unicode_file_debug_phys());
 }

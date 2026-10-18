@@ -36,6 +36,7 @@ static int stub_canary(void) {  return -1; }
 static void stub_dump_vfs(void) {  return; }
 static char * stub_vsnprintf(int size, char *out, const char *format, va_list args) { (void)size; (void)out; (void)format; (void)args; return 0; }
 static int stub_shutdown(void) {  return OS32_ERR_NOSYS; }
+static int stub_boot_check(int live, int reserve) { (void)live; (void)reserve; return OS32_ERR_NOSYS; }
 const SqliteModuleApi sqlite_stub_api = {
     .close = stub_close,
     .prepare_v2 = stub_prepare_v2,
@@ -75,6 +76,7 @@ const SqliteModuleApi sqlite_stub_api = {
     .dump_vfs = stub_dump_vfs,
     .vsnprintf = stub_vsnprintf,
     .shutdown = stub_shutdown,
+    .boot_check = stub_boot_check,
 };
 typedef struct { sqlite3 *db; int result; } Call_close;
 static void call_close(void *arg) {
@@ -568,5 +570,18 @@ int os32_sqlite_outer_shutdown(void)
     Call_shutdown f = {SQLITE_MISUSE};
     if (!sqlite_module_ready()) return sqlite_module_api->shutdown();
     sqlite_engine_run(call_shutdown, &f, 0);
+    return f.result;
+}
+typedef struct { int live; int reserve; int result; } Call_boot_check;
+static void call_boot_check(void *arg) {
+    Call_boot_check *f = arg;
+    (void)f;
+    f->result = sqlite_module_api->boot_check(f->live, f->reserve);
+}
+int os32_sqlite_outer_boot_check(int live, int reserve)
+{
+    Call_boot_check f = {live, reserve, SQLITE_MISUSE};
+    if (!sqlite_module_ready()) return sqlite_module_api->boot_check(live, reserve);
+    sqlite_engine_run(call_boot_check, &f, 0);
     return f.result;
 }

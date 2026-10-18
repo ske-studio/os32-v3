@@ -97,7 +97,7 @@ def generate_facade(out, rows, entries):
           'extern const SqliteModuleApi sqlite_stub_api;',
           'extern const SqliteModuleApi *sqlite_module_api;',
           'int sqlite_module_ready(void);']
-    stubs, wrappers, bind = [], [], []
+    stubs, wrappers, bind, adapters = [], [], [], []
     for r in rows:
         name, ret, args, target, wrapper = (r[x] for x in ('name','result','args','target','wrapper'))
         arglist = [] if args == 'void' else args.split(', ')
@@ -125,12 +125,18 @@ def generate_facade(out, rows, entries):
                      (f'return sqlite_module_api->{name}({callargs});' if ret != 'void' else f'{{ sqlite_module_api->{name}({callargs}); return; }}'),
                      f'    sqlite_engine_run(call_{name}, &f, {r["io"]});',
                      ('    return f.result;' if ret != 'void' else '    return;'), '}']
-        bind.append(f'    .{name} = {target},')
+        # Allocation class follows the connection/group, never the current app.
+        db = 'db' if 'db' in names else '(stmt ? sqlite3_db_handle(stmt) : 0)' if 'stmt' in names else '0'
+        group = 'group' if 'group' in names else '0'
+        adapters += [f'static {ret} module_{name}({args}) {{',
+                     f'    os32_sqlite_allocation_context({db}, {group});',
+                     ('    return ' if ret != 'void' else '    ') + f'{target}({callargs});', '}']
+        bind.append(f'    .{name} = module_{name},')
     stubs += ['const SqliteModuleApi sqlite_stub_api = {'] + [f'    .{r["name"]} = stub_{r["name"]},' for r in rows] + ['};']
     h += ['#endif']
     (out / 'sqlite_facade.h').write_text('\n'.join(h)+'\n')
     (out / 'sqlite_outer_calls.inc').write_text('\n'.join(stubs+wrappers)+'\n')
-    (out / 'sqlite_facade_bind.inc').write_text('\n'.join(bind)+'\n')
+    (out / 'sqlite_facade_bind.inc').write_text('\n'.join(adapters + ['static const SqliteModuleApi api = {'] + bind + ['};'])+'\n')
     core = ['#include "sqlite_imports.h"', '#include "module_image.h"',
             'extern volatile u32 tick_count;', 'u32 ktime_ticks(void) { return tick_count; }',
             'const u32 sqlite_kexports[] = {']

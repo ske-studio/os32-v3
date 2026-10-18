@@ -7,6 +7,7 @@
 
 #include "memmap.h"
 #include "ime.h"
+#include "sqlite_engine.h"
 #include "kbd.h"
 #include "tvram.h"
 #include "console.h"
@@ -595,25 +596,47 @@ void ime_init(void)
     g_ime.render = &g_ime_render_tvram;
     ime_rk_init(&g_ime.rk);
 
-    if (!g_cand_save_text) {
-        g_cand_save_text = (u16 *)kmalloc(CANDLIST_SAVE_ROWS * CANDLIST_SAVE_COLS * sizeof(u16));
-    }
-    if (!g_cand_save_attr) {
-        g_cand_save_attr = (u8 *)kmalloc(CANDLIST_SAVE_ROWS * CANDLIST_SAVE_COLS * sizeof(u8));
-    }
 }
 
-/* Called at boot, before any application owns an address space. */
+/* Dynamic FEP resources remain private until the shared service gate opens. */
+u32 ime_boot_bytes(void)
+{
+    return (g_cand_save_text ? kmalloc_block_size(g_cand_save_text) + BLK_HDR_SIZE : 0) +
+           (g_cand_save_attr ? kmalloc_block_size(g_cand_save_attr) + BLK_HDR_SIZE : 0);
+}
+
 int ime_dict_boot(void)
 {
     if (g_ime.dict_loaded) return 0;
-    if (ime_dict_open(&g_ime.dict, IME_DICT_PATH) != 0) return -1;
+    if (services_boot_fault != SERVICES_FAULT_FEP_TEXT)
+        g_cand_save_text = kmalloc(CANDLIST_SAVE_ROWS * CANDLIST_SAVE_COLS * sizeof(u16));
+    if (!g_cand_save_text) return -1;
+    if (services_boot_fault != SERVICES_FAULT_FEP_ATTR)
+        g_cand_save_attr = kmalloc(CANDLIST_SAVE_ROWS * CANDLIST_SAVE_COLS * sizeof(u8));
+    if (!g_cand_save_attr) return -1;
+    if (services_boot_fault == SERVICES_FAULT_FEP_CRC ||
+        services_boot_fault == SERVICES_FAULT_DICTIONARY) return -1;
+    if (ime_dict_open(&g_ime.dict, IME_DICT_PATH) != 0 ||
+        !g_ime.dict.learn_stmt) return -1;
     g_ime.dict_loaded = 1;
+    return 0;
+}
+
+int ime_boot_abort(void)
+{
+    g_ime.mode = IME_MODE_OFF;
+    if (ime_dict_close(&g_ime.dict)) return -1;
+    g_ime.dict_loaded = 0;
+    if (g_cand_save_attr) kfree(g_cand_save_attr);
+    if (g_cand_save_text) kfree(g_cand_save_text);
+    g_cand_save_attr = 0;
+    g_cand_save_text = 0;
     return 0;
 }
 
 void ime_toggle(void)
 {
+    if (!services_public) return;
     if (g_ime.mode == IME_MODE_OFF) {
         if (!g_ime.dict_loaded) {
             if (ime_dict_open(&g_ime.dict, IME_DICT_PATH) == 0) {
@@ -647,11 +670,13 @@ void ime_toggle(void)
 
 int ime_is_active(void)
 {
+    if (!services_public) return 0;
     return g_ime.mode != IME_MODE_OFF;
 }
 
 void ime_set_mode(int mode)
 {
+    if (!services_public) return;
     if (mode < IME_MODE_OFF || mode > IME_MODE_KATAKANA) return;
 
     /* FEP ON 時は辞書を遅延オープンする (ime_toggle と同じ)。
@@ -680,6 +705,7 @@ void ime_set_mode(int mode)
 
 int ime_get_mode(void)
 {
+    if (!services_public) return IME_MODE_OFF;
     return g_ime.mode;
 }
 
@@ -694,6 +720,7 @@ static void ime_prepare_cui_input(void)
 
 static int ime_getchar_wait(int interruptible)
 {
+    if (!services_public) return interruptible ? kbd_getchar_kapi() : kbd_getchar();
     int keydata;
     int result;
 
@@ -749,6 +776,7 @@ static void ime_note_cui_reader(void)
 
 int ime_trygetchar(void)
 {
+    if (!services_public) return kbd_trygetchar();
     int keydata;
     int result;
 
@@ -806,6 +834,7 @@ int ime_trygetchar(void)
 /* ======================================================================== */
 int ime_feed_key(int keydata)
 {
+    if (!services_public) return keydata;
     int result;
 
     /* WM input-target lifetime boundary: STOP cancels even an unread tail.
@@ -863,6 +892,7 @@ void ime_set_render(void *table)
 
 static int ime_getkey_wait(int interruptible)
 {
+    if (!services_public) return kbd_getkey_wait(interruptible);
     int keydata;
     int result;
 
@@ -907,6 +937,7 @@ static int ime_getkey_wait(int interruptible)
 
 int ime_trygetkey(void)
 {
+    if (!services_public) return kbd_trygetkey();
     int keydata;
     int result;
 
@@ -953,6 +984,7 @@ int ime_trygetkey(void)
 /* 辞書バリアント切り替え */
 int ime_switch_dict(int variant)
 {
+    if (!services_public) return OS32_ERR_NOSYS;
     const char *path;
     if (variant == 0) {
         path = "/db/fep_s.db";
@@ -969,21 +1001,25 @@ int ime_switch_dict(int variant)
 /* ユーザー学習辞書操作のカーネル内ファサード */
 int ime_user_list_facade(const char *yomi_prefix, void *out, int max)
 {
+    if (!services_public) return OS32_ERR_NOSYS;
     return ime_user_list(&g_ime.dict, yomi_prefix, (IME_UserEntry *)out, max);
 }
 
 int ime_user_delete_facade(const char *yomi, const char *kanji)
 {
+    if (!services_public) return OS32_ERR_NOSYS;
     return ime_user_delete(&g_ime.dict, yomi, kanji);
 }
 
 int ime_user_export_facade(const char *path)
 {
+    if (!services_public) return OS32_ERR_NOSYS;
     return ime_user_export(&g_ime.dict, path);
 }
 
 int ime_user_clear_facade(void)
 {
+    if (!services_public) return OS32_ERR_NOSYS;
     return ime_user_clear(&g_ime.dict);
 }
 

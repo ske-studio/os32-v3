@@ -20,3 +20,6 @@ check-sqlite-engine-host:
 - tools/check_map.d/check-sqlite-engine-host.yaml
 - build/checks.d/check-sqlite-engine-host.mk
 - exec/exec_kapi_init.inc
+- kernel/ime.h
+- kernel/ime_render.h
+- kernel/unicode_file.h
