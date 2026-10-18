@@ -216,6 +216,7 @@ def wire(mod, guest, tmp):
         if guest.now > 3600:
             raise Runaway()
 
+    mod._gui.Gui.screen_text = lambda self: {'lines': []}
     mod.post = post
     mod.get = get
     mod._cmd_raw = lambda line, timeout: guest.cmd(line)

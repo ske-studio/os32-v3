@@ -18,7 +18,7 @@ import sys
 import tempfile
 import types
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 import urllib.parse
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -278,6 +278,8 @@ class GuiTests(unittest.TestCase):
         self.http = Http()
         self.g = gui.Gui(self.http.transport(), 'kernel', 'shell', symbols,
                          descriptor=gui.NO_DESCRIPTOR)
+        self.g.screen_text = Mock(return_value={'lines': ['Run: absolute path'], 'ambiguous': []})
+        self.g.ime_active = Mock(return_value=False)
         self.http.put(0x150000, bytes(8192))
         for addr in (0x152000, 0x152004, 0x152008):
             self.http.put(addr, struct.pack('<I', 0))
@@ -517,6 +519,35 @@ class GuiTests(unittest.TestCase):
                     'windows': [{'id':91, 'owner':4, 'title':'demo'}] if version == 2 and state != 0 else [],
                     'front':4 if version == 2 and state != 0 else 0}
         self.g.wm_state = observe
+
+    def test_launch_settings_warning(self):
+        self.states([0, 2])
+        self.g.screen_text.side_effect = [
+            {'lines': ["Settings: MISSING - defaults in use.", "Run 'cfg init' in CUI."]},
+            {'lines': []}, {'lines': ['Run: absolute path']}]
+        self.assertTrue(self.g.launch('/x', timeout=15)['ok'])
+        seqs = [data['seq'] for _, data in self.http.posts if 'seq' in data]
+        self.assertEqual(seqs[:2], ['RETURN', 'CTRL+ESC'])
+
+    def test_launch_ime_on(self):
+        self.states([0, 2])
+        self.g.ime_active.side_effect = [True, False, False]
+        self.assertTrue(self.g.launch('/x', timeout=15)['ok'])
+        inputs = [data for _, data in self.http.posts]
+        toggles = [i for i, data in enumerate(inputs) if data.get('seq') == 'SHIFT+SPACE']
+        typed = next(i for i, data in enumerate(inputs) if 'text' in data)
+        self.assertEqual(len(toggles), 2)
+        self.assertLess(toggles[0], typed)
+        self.assertGreater(toggles[1], typed)
+
+    def test_launch_run_not_open(self):
+        self.states([0, 2])
+        self.g.screen_text.return_value = {'lines': []}
+        result = self.g.launch('/x', timeout=15)
+        self.assertFalse(result['ok'])
+        self.assertIn('Run dialog did not open', result['reason'])
+        self.assertFalse(any('text' in data for _, data in self.http.posts))
+        self.assertEqual(sum(data.get('seq') == 'CTRL+ESC' for _, data in self.http.posts), 1)
 
     def test_launch_success_owner_not_shm(self):
         self.states([0, 1, 2])

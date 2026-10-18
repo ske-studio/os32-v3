@@ -102,6 +102,7 @@ CUI で `os32gui on` を実行して `GUI=1` を永続化する (既存の設定
 |---|---|
 | クリックが効かない | status から H を取り直す。Cirrus は wab_height。最後に off |
 | 文字が全部 `?` | セル原点、二色の fg/bg 推定、24bpp の RGB 展開、ゲストの ANK キャッシュを確認。region と PNG を保存 |
+| Settings 警告や IME ON で launch が失敗 | launch は Settings: MISSING を閉じ、Run 表示を確認して IME を一時 OFF・復元する。Run が開かなければ理由付きで停止し、自動再試行しない。画面と last を確認する |
 | launch が時間切れ | Start の項目順変更、rshell が text を吸った可能性、owner が消えた/OP_WAIT に入らない可能性。last と consink を読む |
 | `[aidebug: timeout]` | CUI の長いコマンドがまだ動いているだけのことがある。これだけでは失敗ではない。fixture の完了印を待つ |
 | 待ちが `ok:false` | GUI の条件待ちは時間切れで失敗。last を証拠にし、fixture の期待を弱めない |

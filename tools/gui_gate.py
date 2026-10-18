@@ -175,7 +175,10 @@ def begin_gui(h, settle=10.0, poll=1.0):
         st = status()
         if gui_entered(st, h):
             print("  status %s (GUI ok)" % st)
-            return True
+            warning = _gui.Gui(transport=_transport()).dismiss_settings_warning()
+            if not warning['ok']:
+                print("  NG: %s" % warning['reason'])
+            return warning['ok']
         if time.time() - t0 >= settle:
             break
         time.sleep(poll)

@@ -473,6 +473,23 @@ class Gui:
         result['version'] = 2
         return result
 
+    def dismiss_settings_warning(self):
+        """Dismiss only the known first-entry warning, never arbitrary dialogs."""
+        pattern = re.compile(r"Settings:\s+MISSING\s+-\s+defaults\s+in\s+use\.\s+Run\s+'?cfg\s+init'?\s+in\s+CUI\.")
+        last = self.screen_text()
+        if screen_matches(pattern, last):
+            key(seq='RETURN', transport=self.transport)
+            self.transport.clock.sleep(0.5)
+            last = self.screen_text()
+            if screen_matches(pattern, last):
+                return {'ok': False, 'reason': 'Settings warning did not close', 'last': last}
+        return {'ok': True, 'last': last}
+
+    def ime_active(self):
+        kernel, _ = self.symbols()
+        # IME_State starts with int mode (kernel/ime.h); OFF is zero.
+        return self.word(kernel['g_ime'][0]) != 0
+
     def launch(self, path, timeout=60, fallback=False):
         if not path.startswith('/') or any(c.isspace() for c in path):
             raise ValueError('Run requires an absolute path without whitespace')
@@ -484,6 +501,9 @@ class Gui:
             raise ValueError('Run path must be at most 255 ASCII bytes')
         self._timeout(timeout)
         height = self.require_gui()
+        warning = self.dismiss_settings_warning()
+        if not warning['ok']:
+            return warning
         before = self.wm_state()
         before_windows = {w['id'] for w in before.get('windows', [])}
         app = c_constants(ROOT / 'exec/appslot.h')
@@ -507,8 +527,24 @@ class Gui:
                 self.transport.clock.sleep(0.35)
         key(seq='RETURN', transport=self.transport) if not fallback else None
         self.transport.clock.sleep(0.5)
-        key(text=path, escapes=False, transport=self.transport)
-        key(seq='RETURN', transport=self.transport)
+        dialog = self.screen_text()
+        if not screen_matches(re.compile(r'Run: absolute path'), dialog):
+            return {'ok': False, 'reason': 'Run dialog did not open; path was not typed',
+                    'last': dialog, 'since': since}
+        restore_ime = self.ime_active()
+        try:
+            if restore_ime:
+                key(seq='SHIFT+SPACE', transport=self.transport)
+                self.transport.clock.sleep(0.35)
+                if self.ime_active():
+                    return {'ok': False, 'reason': 'IME did not turn off; path was not typed',
+                            'last': dialog, 'since': since}
+            key(text=path, escapes=False, transport=self.transport)
+            key(seq='RETURN', transport=self.transport)
+        finally:
+            if restore_ime and not self.ime_active():
+                key(seq='SHIFT+SPACE', transport=self.transport)
+                self.transport.clock.sleep(0.35)
         seen = set()
         exited = set()
 
