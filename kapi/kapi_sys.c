@@ -145,7 +145,6 @@ done:
     irq_restore(irq);
     if (result > 0) {
         kmemcpy(out, &snap, snap.size);
-        if (!app_id) services_report();
     }
     return result;
 }

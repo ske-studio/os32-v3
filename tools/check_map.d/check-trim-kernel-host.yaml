@@ -30,6 +30,7 @@ check-trim-kernel-host:
 - include/types.h
 - kapi/kapi_generated.c
 - kapi/kapi_sys.c
+- kernel/sqlite_engine.c
 - kernel/gdt.h
 - kernel/gui.c
 - kernel/gui.h
