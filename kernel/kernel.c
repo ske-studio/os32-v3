@@ -24,6 +24,7 @@
 #include "gfx.h"
 #include "gfx_hal.h"   /* H2b: GFX_PREF_* / gfx_set_backend_pref (GFX= の反映先) */
 #include "kcg.h"
+#include "kcg_module.h"
 #include "boot_font.h"
 #include "boot_splash.h"
 #include "cpu_calibrate.h"
@@ -545,6 +546,8 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     /* POST_ROOT: the loader needs root, paging and the page ledger. CD is
      * independent of services_boot, so MINIMAL/SQLITE_ONLY can read packages. */
     cd_module_load();
+    /* Old font and ROM cache are exclusive; page owners exist only now. */
+    if (!kcg_font_loaded()) kcg_module_load();
     {
         const char *names[MAX_DEVICES];
         int num = dev_get_names(names, MAX_DEVICES);

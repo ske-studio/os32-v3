@@ -78,6 +78,9 @@ static int cd_module_load(void)
     cd_loaded++;
     return 0;
 }
+/* KCG is synchronous and independent of this DMA gate. */
+static int kcg_font_loaded(void) { return 0; }
+static int kcg_module_load(void) { CHECK(reserved && cd_loaded == 1); return 0; }
 int dev_get_names(const char **names, int max)
 {
     (void)names; (void)max;

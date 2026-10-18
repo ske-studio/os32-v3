@@ -16,6 +16,12 @@ static inline unsigned inp(unsigned port) { (void)port; return 0; }
 static inline void io_wait(void) { }
 #include "kcg_source.inc"
 
+/* This suite exercises the retained file path. ROM ports live in the separate
+ * body fixture; an absent ROM facade deterministically clears the glyph. */
+static int module_attempted;
+int kcg_module_attempted(void) { return module_attempted; }
+void kcg_rom_read_ank(u8 ch, u8 *buf) { (void)ch; kmemset(buf, 0, 16); }
+void kcg_rom_read_kanji(u16 jis, u8 *buf) { (void)jis; kmemset(buf, 0, 32); }
 static unsigned checks;
 static void output(const char *s, unsigned n)
 {
@@ -112,6 +118,10 @@ static void tests(void)
             CHECK(kanji_cache[i] == (u8)(i*37+11), "boot cache payload");
     }
     CHECK(opens == 2 && closes == 2 && reads > 2 && sizes == 1, "boot VFS exercised");
+    CHECK(kcg_font_loaded(), "legacy selected");
+    module_attempted = 1;
+    closed_call("font"); /* A ROM attempt also excludes late legacy loading. */
+    module_attempted = 0;
     snapshot(); stage = 0; watch = 1;
     kcg_boot_phase_close();
     watch = 0;

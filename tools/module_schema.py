@@ -82,3 +82,14 @@ POLICIES[CONSTANTS['ID_ATAPI_ISO']] = dict(
     init_symbol='cd_module_init', imports_symbol='cd_import_slots',
     ops_symbol='cd_module_ops', ops_names=('initialize',),
 )
+
+# T5c-1: typed ROM glyph reader; Unicode and old font path stay core.
+POLICIES[CONSTANTS['ID_KCG']] = dict(
+    module_id=CONSTANTS['ID_KCG'], phase=CONSTANTS['PHASE_POST_ROOT'],
+    required_flags=CONSTANTS['FLAG_PAIR'], allowed_flags=CONSTANTS['FLAG_PAIR'],
+    stop_allowed=0, ops_version=1, ops_slots=1,
+    image_max=16384, mem_max=81920,
+    reloc_max=256, import_max=2, export_max=1, load_span_max=86016,
+    init_symbol='kcg_module_init', imports_symbol='kcg_import_slots',
+    ops_symbol='kcg_module_ops', ops_names=('initialize',),
+)

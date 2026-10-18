@@ -56,6 +56,10 @@ filesystem:
     - host: build/out/cd.mod
       guest: /boot/cd.mod
       tags: [core]
+    # --- Paired ROM glyph reader (also on FD) ---
+    - host: build/out/kcg.mod
+      guest: /boot/kcg.mod
+      tags: [core]
     # --- カーネルデータ ---
     - host: build/out/unicode.bin
       guest: /sys/unicode.bin

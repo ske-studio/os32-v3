@@ -22,3 +22,5 @@ check-sqlite-vfs-identity-host:
 - tools/tests/atapi_hostshim/io.h
 - kernel/cd_body.c
 - kernel/cd_module.h
+- kernel/kernel.c
+- drivers/dev.c

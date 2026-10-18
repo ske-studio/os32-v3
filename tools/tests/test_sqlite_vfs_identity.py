@@ -13,7 +13,7 @@ FILES = ['fs/vfs.h', 'fs/vfs_fd.c', 'lib/sqlite3/os32_sqlite_vfs.c',
          'tools/tests/sqlite_groups_host.c', 'tools/tests/sqlite_groups_backend.h',
          'tools/tests/vfs_fd_sqlite_host.c', 'tools/tests/sqlite_cd_host.c',
          'tools/tests/cd_read_host.c', 'kernel/cd_body.c', 'kernel/cd_module.h', 'fs/vfs.c', 'fs/iso9660.c',
-         'drivers/atapi.c', 'tools/tests/atapi_hostshim/io.h']
+         'drivers/atapi.c', 'drivers/dev.c', 'tools/tests/atapi_hostshim/io.h']
 INC = ['-I' + str(ROOT / p) for p in
        ('include', 'fs', 'drivers', 'sdk/include/os32', 'lib', 'lib/sqlite3')]
 VFS = 'lib/sqlite3/os32_sqlite_vfs.c'
@@ -72,6 +72,17 @@ MUTANTS = [
 
 
 def compile_host(root, obj, exe, cd=False):
+    extra = []
+    if cd:
+        # Same real boot fragment as test_cd_read; its shared fixture now uses
+        # the real Device registry. Keep unused core IDE/FDC providers out.
+        kernel = (ROOT / 'kernel/kernel.c').read_text()
+        start = kernel.index('    {', kernel.index('    cd_module_load();'))
+        end = kernel.index('    services_stage = SERVICES_ROOT_READY;', start)
+        (exe.parent / 'boot_submount.c').write_text(
+            'static void boot_submount(int boot_drive) {\n' + kernel[start:end] + '}\n')
+        extra = ['-I' + str(exe.parent), '-ffunction-sections', '-fdata-sections',
+                 '-Wl,--gc-sections', str(root / 'drivers/dev.c')]
     subprocess.run(['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                     '-Wno-unused-parameter', '-Wno-sign-compare',
                     '-Wno-pointer-to-int-cast', '-Wno-missing-field-initializers',
@@ -79,7 +90,7 @@ def compile_host(root, obj, exe, cd=False):
                     '-I' + str(root / 'tools/tests/atapi_hostshim'),
                     '-I' + str(root), '-I' + str(ROOT), '-I' + str(ROOT / 'kernel'), *INC,
                     str(root / ('tools/tests/sqlite_cd_host.c' if cd else
-                                'tools/tests/sqlite_vfs_identity_host.c')), str(obj),
+                                'tools/tests/sqlite_vfs_identity_host.c')), str(obj), *extra,
                     '-o', str(exe)], check=True)
 
 
