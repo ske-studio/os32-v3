@@ -484,6 +484,7 @@ int vfs_umount_checked(const char *prefix)
         mounts[i].ops->umount(mounts[i].fs_ctx);
         mounts[i].in_use = 0;
         mounts[i].fs_ctx = (void *)0;
+        mounts[i].ops = 0;
         return VFS_OK;
     }
     return VFS_ERR_NOTFOUND;
