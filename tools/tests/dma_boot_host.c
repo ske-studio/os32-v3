@@ -119,6 +119,7 @@ static int lan_module_load(void)
     bound++;
     return 0;
 }
+static void lan_module_pci_bind_fallback(void) { CHECK(reserved && tested == 1); }
 static int pcm_module_load(void)
 {
     CHECK(reserved && available && tested == 1 && bound == 1);

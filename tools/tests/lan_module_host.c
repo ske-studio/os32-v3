@@ -11,12 +11,13 @@
 #endif
 #include LAN_ADAPTER
 
-enum { NORMAL, DECLINE, QUARANTINE, ACTIVE, PREFIX_FAIL, START_FAIL, CLEAN_DECLINE };
+enum { NORMAL, DECLINE, QUARANTINE, ACTIVE, PREFIX_FAIL, START_FAIL, CLEAN_DECLINE, MISSING, INIT_FAIL };
 static u32 mode, ticks, probes, sends, gets, quiet_calls, release_calls;
 static u32 dma_live, dma_freed, irq_live, irq_calls, cleanup_order;
 static int probe_result;
 static struct dma_buf ring;
-static struct pci_dev nic = {.vendor = E82557_VENDOR, .device = E82557_DEVICE, .irq_line = 5};
+static struct pci_dev nic = {.vendor = E82557_VENDOR, .device = E82557_DEVICE,
+    .class = PCI_CLASS_NETWORK, .subclass = PCI_SUB_NET_ETHERNET, .irq_line = 5};
 int dma_alloc(u32 size, u32 align, u32 limit, struct dma_buf *out)
 {
     CHECK(size == PAGE_SIZE && align == PAGE_SIZE && limit == DMA_PHYS_LIMIT && !dma_live);
@@ -54,7 +55,7 @@ static int body_get(void *ctx) { CHECK(ctx == &nic); gets++; return 42; }
 static int body_probe(const struct pci_dev *dev)
 {
     struct module_record *r = module_record_get(lan_handle);
-    CHECK(dev == &nic && !module_exports(lan_handle));
+    CHECK(dev->vendor == nic.vendor && !module_exports(lan_handle));
     CHECK(r->tick_refs == 1 && r->registration_refs == 1 && tick_target);
     probes++;
     if (mode == DECLINE) return PCI_PROBE_DECLINE;
@@ -93,15 +94,54 @@ static int init_lan(LanModuleApi *out)
     out->probe = body_probe; out->tick = body_tick; out->state = body_state;
     out->quiet = body_quiet; out->release = body_release;
     out->send = body_send; out->io.get = body_get;
+    return mode == INIT_FAIL ? MODULE_INIT_FAILED : 0;
+}
+int pci_count(void) { return 2; }
+int pci_get(u32 idx, void *buf)
+{
+    struct pci_dev *out = buf;
+    if (idx >= 2) return -1;
+    *out = nic;
+    if (idx) { out->vendor = 0x1234; out->dev = 1; out->irq_line = 7; }
     return 0;
+}
+#define pci_bind_all real_pci_bind_all
+#include "../../drivers/pci_bind.c"
+#undef pci_bind_all
+#include "../../drivers/pci_bind_match.c"
+static u32 bind_calls, bind_reports;
+void __cdecl kprintf(u8 attr, const char *fmt, ...)
+{
+    (void)attr;
+    if (!kstrcmp(fmt, "[pci] bind: %d bound, %d quarantined of %d\n")) bind_reports++;
 }
 int pci_bind_all(const struct pci_driver *const *table, int n)
 {
-    CHECK(n == 1 && table[0] == &e82557_driver);
-    probe_result = table[0]->probe(&nic);
-    return probe_result == PCI_PROBE_OK;
+    bind_calls++;
+    int rc = real_pci_bind_all(table, n);
+    struct pci_bind_info info;
+    CHECK(!pci_bind_info_get(0, &info));
+    probe_result = info.result == PCI_BIND_BOUND ? PCI_PROBE_OK :
+        info.result == PCI_BIND_QUARANTINED ? PCI_PROBE_QUARANTINE : PCI_PROBE_DECLINE;
+    return rc;
 }
-int pci_quarantined(void) { return probe_result == PCI_PROBE_QUARANTINE; }
+static u8 line_bits(unsigned int irq)
+{ return irq == 5 ? PCI_LINE_BIT_QUARANTINED : PCI_LINE_BIT_STORM; }
+static void check_fallback(void)
+{
+    struct pci_bind_info info;
+    lan_module_pci_bind_fallback();
+    lan_module_pci_bind_fallback();
+    CHECK(bind_calls == 1 && bind_reports == 1);
+    pci_bind_set_line_state_hook(line_bits);
+    for (int i = 0; i < 2; i++) {
+        CHECK(!pci_bind_info_get(i, &info));
+        CHECK(info.result == PCI_BIND_NONE && info.reason == PCI_BIND_NO_DRIVER);
+        CHECK(info.irq == (i ? 7 : 5));
+        CHECK(info.line_state == (i ? PCI_LINE_STORM_MASKED : PCI_LINE_QUARANTINED));
+    }
+    CHECK(pci_bind_info_get(2, &info) == -1);
+}
 static int start_then_fail(struct module_record *r, u32 entry, u32 *ops)
 {
     int rc = lan_start_module(r, entry, ops);
@@ -127,12 +167,19 @@ void _start(void)
     CHECK(e82557_recv(mac, sizeof(mac), &n) == OS32_ERR_NOSYS && !n);
     CHECK(e82557_state() == E82557_OFF && sfs_lan_io.get(&nic) == -1);
     e82557_tick(); CHECK(!ticks);
+    if (mode == MISSING) { check_fallback(); finish(0); }
     CHECK(!module_load(&q, &lan_handle));
     struct module_record *r = module_record_get(lan_handle);
     r->init = (u32)(uptr)init_lan;
     r->text = (u32)(uptr)body_irq & ~(PAGE_SIZE - 1);
     r->text_size = 16 * PAGE_SIZE;
     int rc = module_start(lan_handle);
+    if (mode == INIT_FAIL) {
+        CHECK(rc == MODULE_INIT_FAILED && !probes);
+        check_fallback(); empty(); finish(0);
+    }
+    lan_module_pci_bind_fallback();
+    CHECK(bind_calls == 1 && bind_reports == 1);
     CHECK(probes == 1);
     if (mode == QUARANTINE) {
         CHECK(rc == MODULE_INIT_FAILED && r->state == MODULE_QUARANTINED);

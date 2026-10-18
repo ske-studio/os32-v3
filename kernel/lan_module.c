@@ -16,6 +16,7 @@ extern const struct module_symbol_contract lan_export_contracts[];
 static struct module_handle lan_handle;
 static LanModuleApi candidate;
 static int candidate_valid, quiet_done;
+static int pci_bound;
 static void (*tick_target)(void);
 static irq_handler_fn irq_target;
 static unsigned int irq_line;
@@ -177,6 +178,7 @@ static int lan_start_module(struct module_record *r, u32 entry, u32 *exports)
     candidate_valid = 1;
     if (rc) return rc;
     const struct pci_driver *const drivers[] = {&e82557_driver};
+    pci_bound = 1;
     pci_bind_all(drivers, sizeof(drivers) / sizeof(drivers[0]));
     return pci_quarantined() ? MODULE_INIT_FAILED : 0;
 }
@@ -219,5 +221,13 @@ int lan_module_load(void)
     if (!rc && !module_exports(lan_handle)) rc = MODULE_INIT_FAILED;
     kprintf(0x07, "[lan] module rc=%d pair=%08x tick=%d\n", rc, bi->img_crc, tick_target != 0);
     return rc;
+}
+/* Preserve a completed bind, including quarantine, when start failed later. */
+void lan_module_pci_bind_fallback(void)
+{
+    if (!pci_bound) {
+        pci_bound = 1;
+        pci_bind_all(NULL, 0);
+    }
 }
 int lan_module_abort(void) { return module_abort(lan_handle); }

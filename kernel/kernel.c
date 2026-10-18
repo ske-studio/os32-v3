@@ -609,6 +609,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     if (memory_boot_dma_available()) {
         lan_module_load();
     }
+    lan_module_pci_bind_fallback();
 
     /* CS4231 (MATE-X PCM) の検出だけ (票 TASK_PCM_CS4231 §2-1)。
      * 無い機械では `[pcm] none` を出して静かに戻る — 以降の起動は変わらない。 */

@@ -698,6 +698,7 @@ static void lan_lifetime(void)
 
     reset(); g_cfg_lan = 1; g_module_available = 0;
     CHECK(serialfs_session_begin() == OS32_ERR_IO);
+    CHECK(strstr(g_kout, "sfs: lan.mod unavailable (sfs lan off for serial)\n") != NULL);
     CHECK(g_module_acquires == 1 && !g_module_refs && !g_module_releases);
     CHECK(!g_nic_calls && !g_mount_calls && !g_active);
     CHECK(!g_module_errors && tick_count == 1000);

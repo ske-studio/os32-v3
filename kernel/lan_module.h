@@ -27,6 +27,7 @@ typedef struct {
 } LanModuleApi;
 #define LAN_MODULE_API_SLOTS 20u
 int lan_module_load(void);
+void lan_module_pci_bind_fallback(void);
 int lan_module_abort(void);
 int lan_module_session_acquire(void);
 void lan_module_session_release(void);

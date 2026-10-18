@@ -1529,6 +1529,9 @@ GATE_MUTATIONS = [
      "            break;", "ゲートの上げ下げで UART / FIFO の残りを読み捨てない"),
 ]
 SESSION_MUTATIONS = [
+    ("fs/serialfs_session.c",
+     r'            kprintf\(SFS_ATTR_ERR, "sfs: lan.mod unavailable \(sfs lan off for serial\)\\n"\);\n',
+     "", "lan.mod 不在の診断を消す"),
     ("fs/serialfs_session.c", r"            sfs_lan_reset\(&g_lan\);",
      "            ;", "LAN start の読み捨てを外す"),
     ("fs/serialfs_session.c", r"        while \(!e82557_rx_ready\(\)\) \{",

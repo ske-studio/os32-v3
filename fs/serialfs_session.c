@@ -231,6 +231,7 @@ int serialfs_session_begin(void)
     g_use_lan = sysconfig_get_int(SYS_SYSTEM_CFG, "SFS_LAN", 0) == 1;
     if (g_use_lan) {
         if (!lan_module_session_acquire()) {
+            kprintf(SFS_ATTR_ERR, "sfs: lan.mod unavailable (sfs lan off for serial)\n");
             g_use_lan = 0;
             return OS32_ERR_IO;
         }

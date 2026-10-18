@@ -48,6 +48,8 @@ check-lan-module-host:
 - drivers/e82557_regs.h
 - drivers/pci.h
 - drivers/pci_decode.h
+- drivers/pci_bind.c
+- drivers/pci_bind_match.c
 - drivers/pci_bind.h
 - kernel/irq.h
 - kernel/irq_math.h

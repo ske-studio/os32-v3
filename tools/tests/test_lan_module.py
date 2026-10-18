@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'kernel/lan_module.c'
 CASES = ['normal-detach', 'decline-zero-refs', 'quarantine-no-rebind-free',
          'active-session-retained', 'prefix-failure', 'failure-after-bind',
-         'decline-after-irq-dma-cleanup']
+         'decline-after-irq-dma-cleanup', 'missing-module-pci-info', 'init-failure-pci-info']
 
 
 def product_image(folder):
@@ -88,6 +88,7 @@ def boot_distribution():
     boot = kernel[begin:end]
     assert kernel.count('lan_module_load();') == 1
     assert re.search(r'if \(memory_boot_dma_available\(\)\)\s*\{\s*lan_module_load\(\);\s*\}', boot)
+    assert boot.index('lan_module_pci_bind_fallback();') > boot.index('lan_module_load();')
     assert 'services_boot_mode' not in boot and 'SYS_LAN_MOD' in (ROOT / 'include/config.h').read_text()
     plan = mkpkg.load_plan(ROOT / 'build/packages.yaml')
     for loader in ('boot/loader_fat_new.bin', 'boot/loader_fat144.bin'):
@@ -124,6 +125,8 @@ def runtime_checks(folder, mutations=False):
     if mutations:
         source = SOURCE.read_text()
         for label, old, new in (
+            ('pci-fallback', '        pci_bind_all(NULL, 0);', '        /* omit fallback */'),
+            ('pci-rebind', '    if (!pci_bound) {', '    if (1) {'),
             ('tick-detach',
              'if (!quiet_done || r->active_refs) return 0;\n    lan_detach_tick();',
              'if (!quiet_done || r->active_refs) return 0;\n    /* omit tick detach */'),
@@ -135,7 +138,7 @@ def runtime_checks(folder, mutations=False):
             mutant = folder / (label + '.c')
             mutant.write_text(source.replace(old, new))
             build(mutant)
-            run([0, 5], expected=1)
+            run([7, 8] if label == 'pci-fallback' else [0, 5], expected=1)
             print('MUTATE ' + label + ' RED (compiled, runtime assertions)', flush=True)
 
 
