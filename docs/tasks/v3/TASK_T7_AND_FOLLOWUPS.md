@@ -2,7 +2,7 @@
 
 > 状態: **設計中 (2026-10-16、再照合 r3、F5/F7 決定済み)** — 本文を全部持つ実装用設計案。本版は **r3 (2026-10-16、独立レビュー r1 反映)**。共通依頼の状態行は維持し、旧版の Opus 5.5 第3回 Approve は本版の承認・実装・受入とは区別する。
 > **T5 着手前の再照合 r5 (2026-10-18)** — EARLY取消後の順序とT5c-3からのcore原本/復帰口を同期。T4後の実測をT7の入口基準にする。
-> **ユーザー決定 (2026-10-17)**: 「T4 から T7 までは実機でテストを行わず、エミュレーター上だけで確認を取れれば大丈夫」。真意は「ソフトウェアのコード変更はエミュレータでの確認で十分。ハードウェアに触るカーネルの変更は実機のテストをまとめて行う」— 各段の合否は NP21/W (64MB) で決める。本文で実機の観測を求めている項目 (T7a-2c の 9821 実機の再描画と H-5 の CG 窓、T7a-2e2 の Ra266 `-g`/boot2/DOS、T7 §3-2 の Ra266 の計測) は、ハードウェアに触る変更がある程度たまった所でまとめて行う実機の回 (台帳 T4T7-RH) へ送り、段の受入を止めない。本文の「実機未確認を NP21/W だけで閉じない」系の記述は、この行が上書きする。
+> **ユーザー決定 (2026-10-17)**: 「T4 から T7 までは実機でテストを行わず、エミュレーター上だけで確認を取れれば大丈夫」。真意は「ソフトウェアのコード変更はエミュレータでの確認で十分。ハードウェアに触るカーネルの変更は実機のテストをまとめて行う」— 各段の合否は NP21/W (64MB) で決める。本文で実機の観測を求めている項目 (T7a-2c の 9821 実機の再描画と H-5 の CG 窓、T7a-2e の Ra266 `-g`/boot2/DOS、T7 §3-2 の Ra266 の計測) は、ハードウェアに触る変更がある程度たまった所でまとめて行う実機の回 (台帳 T4T7-RH) へ送り、段の受入を止めない。本文の「実機未確認を NP21/W だけで閉じない」系の記述は、この行が上書きする。
 > **レビューの経過 (PM、2026-10-16)**: astra が起草 (r2・r3) → Opus 5.5 が独立レビュー 2 往復 (r1「直してから」、r2「確定してよい (未決の争点はユーザーへ)」)。往復の記録は `~/os32-tmp/run/t3design/T7_AND_FOLLOWUPS/` (`opus_r1.md`・`astra_r2_response.md`・`opus_r2.md`)。F5 は return PC 検査を維持、F7 は CPU 命令だけならメーカー資料必須・既存実装任意に決定済み (§7)。本文へ反映済み、実装と未測定ゲートは残る。
 > 設計: Codex。再照合基点 `c81b27bed7c1b0d05e5e7d9de9763c4eded844e5` (2026-10-15、main、作業木差分なし)。旧調査基点 `3c4171a`、元の設計レビュー基点 `59c4285`。D1〜D36・契約・順序は変更しない。file:line はこの再照合基点、相対リンクは正典の `docs/tasks/v3/` 配置を基準とする。
 > 決定本文は [TASK_MEMMAP_V3](TASK_MEMMAP_V3.md)、柱/範囲/順序は [V3_PLAN](V3_PLAN.md)。前提は [T3](TASK_T3_LAYOUT.md) と [T4〜T6b](TASK_T4_T6_MODULES.md)。後半の既存票を置換せず、接続契約と未起票項目の着手ゲートを定める。
@@ -16,10 +16,10 @@
 | T2 の e5〜e12 の再init/revoke/再attach・200行・Unicode橋は引渡し待ち | 吸収済み | T2e 受入済み (`docs/tasks/agents/HANDOVER_2026-10-09.md:11`、`TASK_T2D_T2H.md:190-227`)。公開leaseを基盤として引継ぐ |
 | f2〜f13/g の map・allocator・trim は引渡し待ち | 吸収済み | 同 HANDOVER:12-13。通常文脈の安全点を再利用し、font独自の借用guardは追加する |
 | h の V86/STOP 復元が未確定 | 要改訂 | 既存session/正確なPTE復元・通常文脈回収は `kernel/v86_mem.c:50-207`、`kernel/paging.c:657-689`。未観測は台帳に残し §1 で受ける |
-| T3→T4→T5-0→T5a→T5b→T5c→T6b→T7a→T7b | r5で更新 | T5-0はstack計測→KSTK-DF→32KiB採否。T5bはcore FAT回帰とPOST_ROOT CD、登録核T5c-0をCDより前へ。FD容量不足時だけT6b-Mを先行。EARLY/HostDrv分離段は削除。T7はT5c-1/3の原本・復帰口とT6b最終一式を受ける |
+| T3→T4→T5-0→T5a→T5b→T5c→T7a→T7b | r5で更新 | T5-0はstack計測・KSTK-DF。engine stack 32KiB + NP 1頁で決定済み (深さ100のhost実測24,388Bが収まる、SQLITE_MAX_EXPR_DEPTH=100のまま、ユーザー決定2026-10-18)。T5bはcore FAT回帰とPOST_ROOT CD、登録核T5c-0をCDより前へ。FD容量不足時だけT6b-Mを先行。EARLY/HostDrv分離段は削除。集積拡張T6b-1/2は凍結し、圧縮像が508KiBの8割 (約416KiB) に近づいたら起票。T7はT5c-1/3の原本・復帰口とT5最終一式を受ける |
 | planar BB の旧低位 backing をpoolへ移す | 維持 | `include/memmap.h:148-150`、`kernel/memory_boot.c:219-224`。CLIENT/SURFACE契約は維持してbackingを替える |
 | Unicode の暫定RO leaseをT7まで残す可能性 | 要改訂 | 撤去はT3の組表/KAPI化と同時 (`DOCS_REORG_T3.md:60`)。T7aは撤去済みを照合する |
-| `.kcgfont` 廃止とKCGのpool cache 64KiB | 維持 | 旧低位cache/boot読込は `drivers/kcg.c:48-57,245-267` に存続。T5c module化とT7a caller撤去の境界を照合 |
+| `.kcgfont` 廃止とKCGのpool cache (64KiBは計上値) | 維持 | 旧低位cache/boot読込は `drivers/kcg.c:48-57,245-267` に存続。T5c module化とT7a caller撤去の境界を照合 |
 | 旧font KAPIをNOSYSにする | 吸収済み | boot終了後のNOSYSは `drivers/kcg.c:247-263`。T7aはboot読込も撤去し旧slotのNOSYSを保つ |
 | CUI表示復帰と両ページ消去 | 吸収済み | `kernel/v86_io.c:240-247,249-283`、`gfx/gfx_core.c:894-906` とT2受入。KCG CODE/cache、6Ah標準/拡張、CG窓WBの残件とは別 |
 | page0 snapshot は0x600、全ページ化に+2560B | 吸収済み | `kernel/v86_bios.c:19,253-283`、`kernel/v86_mem.h:108-121` は既に4096B。+2560Bは再計上しない |
@@ -28,15 +28,15 @@
 | KCG cold 1字34 I/O | 要改訂 | `drivers/kcg.c:152-169` はOUT34+IN32=66回、さらに `kcg_wait` 34回 (:39-42)。時間は未測定 |
 | 診断・gcapの所在は旧kernel一体 | 要改訂 | DBGREF S0〜S2/KAPI75着地 (`TASK_DBGREF.md:3-9`、`sdk/kapi.json:3`)。gcap移設S3は未完、現物は `kernel/v86_gcap.c`。S3後の結線契約も §3 で引継ぐ |
 | PEGCの低位直読撤去で既存port probeを残す | 維持 | R7FIX2後の窓はFFF00000h (`include/memmap.h:381`、台帳R7-1)。F00000hへ戻さず、保存BIOS値との比較だけ差し替える |
-| font read lease/内容epochを新設する | 維持 | `fs/vfs_fd.c:292-301,420-457,584-607` はSQLite世代・既存staleのみ。font専用契約は未実装 |
-| parser公開API・欧文選定・54KiB・1MiB/2MiB・FD peak・x87 | 未測定 | `userland/rust/font_test/Cargo.toml:10-12` と `userland/rust/font_test/src/lib.rs:274-282` は全ファイルread/Face::parseの試作。製品streamingの証拠ではない |
+| font read leaseと使用中の更新拒否 | 更新 | FD/owner世代は検証する。FEP辞書と同様に使用中のhsyncはBUSY、新フォントは次の起動で読む (§2-4) |
+| parser公開API・欧文選定・corpus実測上限・1MiB/2MiB・FD peak・x87 | 未測定 | `userland/rust/font_test/Cargo.toml:10-12` と `userland/rust/font_test/src/lib.rs:274-282` は全ファイルread/Face::parseの試作。製品streamingの証拠ではない |
 | P3/P5 NIC とnetwork /hostは後続のみ | 要改訂 | LAN LB-2c送信実機確認、LB-3以降は未完 (`docs/tasks/realhw/TASK_LAN_82557.md:3,8`)。LANFS段1は模型のみ (`tools/tests/lanfs_tdd.md:5-37`)、§4に接続 |
 | 8MB/17MBを各段で受入 | 要改訂 | `V3_PLAN.md:39-46`、台帳:19。途中はNP21/W 64MB、容量別はv3最終段。Ra266固有の観測とD15目標は免除しない |
 
 **2026-10-15時点の実測 (履歴、T7の現予算ではない)**: `build/out/kernel.map:1576-1578,4452,8011` は load=0x100000、max=0x99000=626,688B、`__bss_end=0x1940C0`。像=text/data/BSS/整列込み **606,400B**、残り **20,288B** (=0x199000−0x1940C0)、ページ切上げ後の余白は16,384B。DBGREF後の30,176B (`TASK_T2D_T2H.md:547`) から正味 **9,888B増**。LANだけの増分とは断定しない。map更新日時2026-10-15 23:47:40 JST、SHA256=`b83f79dff899041aba6070037e620f14bdae5baf4e5cec06deb1e6e03d9c4a23`。
-同時に存在する `build/out/vmkernel.lz4` は500,430B、`boot/boot_defs.h:93` の508KiB上限まで19,762B、`build/out/kdebug.bin` は44,840B (file長、常駐量ではない)。再ビルドはせず読取計測のみで、配備像・同一設定の再現性は未確認。T7着手時はT3〜T6b後の同一一式で再計測し、core・module・私有領域・圧縮像を別勘定にする。予定の撤去益を先取りしない。
+同時に存在する `build/out/vmkernel.lz4` は500,430B、`boot/boot_defs.h:93` の508KiB上限まで19,762B、`build/out/kdebug.bin` は44,840B (file長、常駐量ではない)。再ビルドはせず読取計測のみで、配備像・同一設定の再現性は未確認。T7着手時はT5後 (T6b-M実施時はその後) の同一一式で再計測し、core・module・私有領域・圧縮像を別勘定にする。予定の撤去益を先取りしない。
 
-T7への引渡しはT5c-1のKCG facade/cache≤64KiB・未搭載時core復帰口と、T5c-3のbootinfo/page0原本・V86必須PTE/例外復帰口。page0通常NP・低位FIXED統合・旧font撤去はT7で行い、T5aのB2受入だけでX-1全体を閉じない。
+T7への引渡しはT5c-1のKCG facade/cache (64KiBは計上値)・未搭載時core復帰口と、T5c-3のbootinfo/page0原本・V86必須PTE/例外復帰口。page0通常NP・低位FIXED統合・旧font撤去はT7で行い、T5aのB2受入だけでX-1全体を閉じない。
 
 ## 1. T7a 低位の所有権切替
 
@@ -55,7 +55,7 @@ T7aの到達点は「低位を一般poolへ追加」ではなく、bootinfoの�
 |---|---|
 | planar BB | boot時pool連続確保→gshell所有、T2のSURFACE経由。全planeポインタを更新し旧0x6A000参照をゼロにする |
 | Unicode展開表 | T3のkernel組表+KAPI。T2暫定RO leaseが残っていれば先に撤去 |
-| `.kcgfont` 展開/読込scratch | 廃止。T5c-1のtyped KCG facade・pool上の上限64KiBキャッシュへ。未搭載時のcore復帰口も引き継ぐ |
+| `.kcgfont` 展開/読込scratch | 廃止。T5c-1のtyped KCG facade・pool上のキャッシュ (64KiBは計上値、受入ではhit率を記録)へ。未搭載時のcore復帰口も引き継ぐ |
 | bootinfo/BDA | IVT/BDAの起動時原本とbootinfoをcoreへコピー。以後の低位直読を§1-1の順で撤去 |
 | `V86_TEST_MAGIC_ADDR` (現0x8C000) | 低位V86領域内の試験語。開始ごとにゼロ化し当該試験だけが設定。通常kernel stateの置場にしない |
 | mailbox | 0x90000の内容をセッション前後で退避/復元。host側排他はツールの契約。kernelがhost接続を検出して拒否できるとはしない |
@@ -98,7 +98,7 @@ D36どおり依存はMITソースをvendor化し、版・license・差分・最�
 
 既存libos32guiのG2 (`text`/`measure_text` の半角8・全角16・高さ16) は維持する。GUI adapterはUnicode幅判定を共通にして固定cellへ配置し、筆位置はcell幅だけ進める。glyphはraster前のbboxで幅を測り、cellを超える欧文 (W/M/m等) は横方向をcell幅へ縮小して中央配置する。横縮小はadvanceを変えず、縦は共通baselineを維持する。cell clipは最終安全境界に限定し、縮小後の字形が欠けた結果を受け入れない。欧文の比例advanceはfont APIから取得できるが既存widgetへ直結しない。baselineはface metricsから同じ丸めで求め、KCG fallbackも同じcellへ置く。T7b-aで欧文fontの横縮小後の1x可読性・上下の欠けなし (W/M/m、アクセント、descenderを含む) を確認し、読めなければ等幅候補の再選定をゲートとする。T7b-aでG2維持の承認とcaller一覧 (text/measure_text、edit/caret、clip、FEP候補窓) を照合し、T7b-bで画像と測定を一致させる。比例幅GUIへ変更したい場合はG2改訂の別判断が必要。
 
-sourceは `read_at(offset, dst, len)`、file_size、**owner・FD generation・内容epoch**を持つ。seek/readの短読は成功扱いせず、他ownerのFDを借りない。gshellのopen/reopenはshell自身の通常文脈だけで行い、`vfs_fd_set_protect` を設定する。GUI op中は設定変更要求だけ記録し、そのopからopenしない。描画時の遅延openもしない。shell shutdownでは明示closeする。アプリのfont FDはそのownerでopenして通常終了回収に任せる。
+sourceは `read_at(offset, dst, len)`、file_size、**owner・FD generation**を持つ。seek/readの短読は成功扱いせず、他ownerのFDを借りない。gshellのopen/reopenはshell自身の通常文脈だけで行い、`vfs_fd_set_protect` を設定する。GUI op中は設定変更要求だけ記録し、そのopからopenしない。描画時の遅延openもしない。shell shutdownでは明示closeする。アプリのfont FDはそのownerでopenして通常終了回収に任せる。
 
 read_atは `offset <= file_size && len <= file_size-offset` を先に判定し、要求長を返した場合だけ完全成功とする。len=0は有効な範囲で0、短読/媒体エラーでは当該glyphを捨てる。font_closeは借用終了後にだけFDを閉じ、STALEなleaseも登録世代一致なら解放可能とする (誤った世代で再利用後のFDを閉じない)。自動再openは次の通常安全点に1回だけ試し、失敗した設定世代は明示変更までKCGに固定する。
 
@@ -120,78 +120,75 @@ ttf-parserのprivate `glyf`内部へ当然にアクセスできるとはしな�
 
 上位票の「表≈100KiB」は廃止したサブセットの見込みで、IPA原本のcmap/loca/hmtx合計だけで343,649B (約336KiB)になる。再照合時の `assets/fonts/ipaexg.ttf` / `ipaexm.ttf` のSFNT directory (offset12から20entry) を読取計測し、両方で245,775+48,960+48,914B。原本hash/取得経路は `assets/fonts/README.OS32:4-16` と一致した。**全表常駐を前提にせず、表ディレクトリと選択subtableの索引だけ常駐させる設計案**とする。
 
-| データ | 読み方 / 上限の案 |
+| データ | 読み方 / 実測から決める上限 |
 |---|---|
-| head/hhea/maxpとtable directory | 範囲検査後に必要scalarだけ保持。索引/scalar/face管理合計4KiBまで、table数64まで。全font常駐なし |
+| head/hhea/maxpとtable directory | 範囲検査後に必要scalarだけ保持。table数・索引/scalar/face管理量はa1③のcorpus実測最大以上で決める。全font常駐なし |
 | cmap | 対応format4/12のheader・検索用indexを保持、segment/group本体はread_at。検索回数は要素数の対数に制限 |
 | loca/hmtx | glyph IDから必要entryだけ読む。長短loca、末尾advance共有を区別 |
-| table read cache | 4KiB×4slotの私有LRU。上限16KiB。file/generation/offsetでkey化 |
-| glyph scratch | 入力合計2KiB、展開点512・contour64・component32・深さ8まで。点/edge/再帰フレームの専用領域を別に16KiB以内、曲線分割後edge1024までとし、超過は代替字形。製品fontで欠ける字を一覧にする |
-| raster scratch | 初期上限16/32px。bbox各辺を最大32pxへ制限し外側余白各4pxを含む最大40×40、f32累積面6400B + 出力/行scratch等を含め合計16KiBまで。巨大bearing/幅/高さはfallback。pitch×heightと座標をoverflow検査し不足で途中描画しない |
+| table read cache | 私有LRU、file/generation/offsetでkey化。slot数・各slot量はa1③の読込単位・同時保持量の実測最大以上で決め、a6でhit率とcold性能を記録 |
+| glyph scratch | 入力byte数・点・contour・component・再帰深さ・曲線分割後edge・専用領域はa1③のcorpus実測最大以上で上限を決め、超過は代替字形。製品fontで欠ける字を一覧にする |
+| raster scratch | 16/32pxでbbox・余白・pitch×height・f32累積面/出力/行scratchをa1③で測り、実測最大以上の上限を決める。超過は代替字形、座標とサイズのoverflowを検査し不足で途中描画しない |
 | bitmap cache | 8MB構成は上位票の64〜80KiB/owner内。glyph+font_generation+px+render_modeをkey、LRUで返却 |
 
-これは予算案で、16KiBのread cacheでOpenType sourceのcold性能が目標を満たすかは未測定。font作業域は4+16+2+16+16=54KiB/owner (bitmap別) の設計上限。複数faceでも作業域は直列に共有し再入を拒否する。shell画像/BSS+heap+40KiB stack+guard+font peakが1MiB内、アプリのfont領域は私有総量2MiB内であることをT7b-aのmap/peakで確認する。16MB以上の256KiB bitmap cacheも私有勘定。gshellはT3の起動時固定分割 (exec_heap256KiB、sbrk最低128KiB) とresident CRTを使う。共有glyph cache/GUI補充opはこの票に追加しない (U21)。T3は現在のmapで初期分割を確定し、未測定T7bに依存させない。T7b-aでcrate導入前後のgshell画像とshlib text/data/reloc/paddingを比較し、shell/shlib帯と2MiB私有枠への課金を確認する。不足時は固定分割定数/リンクASSERT変更を独立差分として再レビュー・全再ビルド・再受入してから製品接続する。実行中に境界を動かしたり帯そのものを無断拡大したりしない。
+a1③で配布fontの字形corpusとhashを固定し、上表の最大値を測って上限を決める。a3〜a5はその実測最大以上の上限を使い、超過時は代替字形とする。作業域総量 (bitmap別) はa6で実peakを記録し、cold性能も計測する。複数faceでも作業域は直列に共有し再入を拒否する。shell画像/BSS+heap+40KiB stack+guard+font peakが1MiB内、アプリのfont領域は私有総量2MiB内であることをT7b-aのmap/peakで確認する。16MB以上の256KiB bitmap cacheも私有勘定。gshellはT3の起動時固定分割 (exec_heap256KiB、sbrk最低128KiB) とresident CRTを使う。共有glyph cache/GUI補充opはこの票に追加しない (U21)。T3は現在のmapで初期分割を確定し、未測定T7bに依存させない。T7b-aでcrate導入前後のgshell画像とshlib text/data/reloc/paddingを比較し、shell/shlib帯と2MiB私有枠への課金を確認する。不足時は固定分割定数/リンクASSERT変更を独立差分として再レビュー・全再ビルド・再受入してから製品接続する。実行中に境界を動かしたり帯そのものを無断拡大したりしない。
 
-FD表は全16本、通常open対象は3〜15の13本。初期案は各ownerのactive face用FDを最大1本、gshell+4 appで最大5本とし、欧文/日本語切替時はcloseして開き直す。T7b-aではFEP/SQLite (DB/journal含む)、標準redirect、pipe、loaderを含む実peakを計測し残数を記録する。FD不足はKCG fallback、再openを毎字繰り返さない。FD増設を予算不足の暗黙の解決にしない。
+FD表は全16本、通常open対象は3〜15の13本。active faceのFD上限はT7b-a6でgshellとapp、FEP/SQLite (DB/journal含む)、標準redirect、pipe、loaderを含むFD peakと残数を実測して決める。FD不足はKCG fallback、再openを毎字繰り返さない。FD増設を予算不足の暗黙の解決にしない。
 
 ### 2-3. 解析・描画・エラー
 
 font/fileの状態は `CLOSED → VALIDATING → READY → CLOSED`。検証中のfaceを公開しない。table offset/length、glyph ID、glyph span、contour/point命令のrun長を検査する。locaは全走査せず要求glyphの隣接2entryを読み `0 <= start <= end <= glyf_length` を検査する。cmapは対応する (platform,encoding)=(3,10) format12を優先、次に(3,1) format4とし、未対応ならfallback。検索に使うsegment/groupのソート・非重複はopen時にストリーム走査で検証し保持しない。そのcold I/Oも計測する。format4のidRangeOffsetは当該wordを基点としてglyphIdArrayの範囲内か検査し、delta加算前後のglyph IDを検査する。複合glyphは循環・再帰深さ・総component/点数・総読込byte数を上限付きで処理し、最初に選定fontで非対応にするなら検出して代替へ落とす。fontの実測最大字形をOpenType一般の保証にしない。
 
-1字の処理はlook up→全入力取得/検証→scratchへ完全raster→cache commit→描画。短読/破損/確保失敗で部分bitmapをcacheへ入れない。cacheから描画する場合も先にsource lease/content epochを確認する。設定変更時は借用中の描画終了を待つ通常安全点で旧face/token/cacheを失効 → 旧FD close → 新face検証 → 公開とする。旧faceを残す二重openはしない。意図的にpeak FDを1本へ抑える選択で、再open失敗時はKCGで継続する。trimはT2の通常文脈・非再入安全点でbitmap/read cacheを返し、描画中に借用中のentryを解放しない。
+1字の処理はlook up→全入力取得/検証→scratchへ完全raster→cache commit→描画。短読/破損/確保失敗で部分bitmapをcacheへ入れない。cacheから描画する場合も先にsource lease/FD generationを確認する。設定変更時は借用中の描画終了を待つ通常安全点で旧face/token/cacheを失効 → 旧FD close → 新face検証 → 公開とする。旧faceを残す二重openはしない。設定切替でFD peakを増やさず、再open失敗時はKCGで継続する。trimはT2の通常文脈・非再入安全点でbitmap/read cacheを返し、描画中に借用中のentryを解放しない。
 
 ### 2-4. 内容の更新とx87境界
 
-FD generationは番号の再利用を検出する値で、ファイル内容の世代ではない。font read leaseはmount世代+inode identity+u32内容epochをkernel内に保持し、font用lease/face世代もu32とする。ext2の置換rename/unlink/umountによる既存staleに加え、同inodeへのwrite/truncateの**変更前**に関連font leaseを失効し内容epochを進める。対象はFD write、O_TRUNC、path write/stream、inode write/truncateを通るext2更新で、`fs/vfs_fd.c:207,420-457`、`fs/vfs.c:527`、`fs/ext2_vfs.c:143,288,407-429` を共通の変更通知へ結ぶ。失敗したwriteでも失効は戻さず再open時に再検証し、epoch満了はwrapせず当該leaseを閉じる。この非wrap契約と世代満了時のretireは維持し、u32満了の強制注入はT7の試験・変異から外す (型/境界処理はレビュー対象)。各read_at内部と全入力取得後/cache commit前、cache-hit描画前にも検証する。更新中のfaceを継続せずsafe pointで再openして全索引を検証し直す。hsync置換・同サイズ上書き・truncateを別々に試験する。外部変更を観測できないHostDrv/SerialFS/LAN版 `/host` などinode/変更通知のないsourceは最初の製品font sourceとして拒否しKCGへ落とす (事前に管理下ext2へ配備する)。mtime/sizeやヘッダだけの比較を内容一致の保証にしない。このVFS追加はT7b-bの前提であり、現行generic FDで実装済みとはしない。
+FD generationは番号の再利用を検出する値で、ファイル内容の世代ではない。fontはFEPの辞書と同じく、使用中はhsyncがBUSYで置き換えを断る。新しいフォントは使用していないときに配備し、次の起動で読む。T7b-b1でfont sourceの使用中保護を接続し、製品結線でBUSY時の元ファイル不変と次回起動の新font読込を確認する。全更新口への変更前失効通知と内容epochは作らない。read leaseのowner/FD generation・既存stale検証とclose後の旧token拒否は維持する。HostDrv/SerialFS/LAN版 `/host` など管理外で内容が変わるsourceは最初の製品font sourceにはせず、管理下ext2へ配備する。
 
-x87 guard の実装開始前に [CONSTRAINTS [HW3]](../../CONSTRAINTS.md#hw3-新しいハードウェアの実装はライセンス上参照しやすい既存の実装資料を参照してから設計する) に従い、Intel 資料の版・節を固定する。CPU 命令だけの扱いでは BSD/MIT の既存実装参照は任意で、参照した場合に版・ファイル・行を記す。採用ラスタライザがf32を使う場合、P6全体を待たず **T7b-aにx87隔離guardを先行実装する**。gshellのfont描画/寸法の最外周でcallerのx87全状態 (register stack、status/tag、CW) を専用の低位外領域へ保存、例外をmaskした既知CWで初期化し、成功/失敗とも復元する。CWだけの保存では不足。guard中のpark/アプリ切替/STOP処理/再入を禁止し、要求は終了後の安全点で処理する。IRQでFPを使わない。アプリ私有側も同じguardで呼出元のFP計算を壊さない。x87非搭載CPUは検出してこの経路を実行せずKCGへ落とす。386対応は最終命令列検査を行う。x87保存領域は4KiBの管理予算に、追加codeは画像増分へ算入する。
+x87 guard の実装開始前に [CONSTRAINTS [HW3]](../../CONSTRAINTS.md#hw3-新しいハードウェアの実装はライセンス上参照しやすい既存の実装資料を参照してから設計する) に従い、Intel 資料の版・節を固定する。CPU 命令だけの扱いでは BSD/MIT の既存実装参照は任意で、参照した場合に版・ファイル・行を記す。採用ラスタライザがf32を使う場合、P6全体を待たず **T7b-aにx87隔離guardを先行実装する**。gshellのfont描画/寸法の最外周でcallerのx87全状態 (register stack、status/tag、CW) を専用の低位外領域へ保存、例外をmaskした既知CWで初期化し、成功/失敗とも復元する。CWだけの保存では不足。guard中のpark/アプリ切替/STOP処理/再入を禁止し、要求は終了後の安全点で処理する。IRQでFPを使わない。アプリ私有側も同じguardで呼出元のFP計算を壊さない。x87非搭載CPUは検出してこの経路を実行せずKCGへ落とす。386対応は最終命令列検査を行う。x87保存領域は実測するface管理量に、追加codeは画像増分へ算入する。
 
 parser/rasterは境界検査済み入力と上限付き領域だけを使い、allocation failureはResult、unchecked index/unwrap/panicを製品経路に残さない。host fuzz/破損font・全上限±1を通し、panic不在はテストだけで証明せず全呼出経路のレビュー条件とする。gshell側の予期しないfault/panicはfont active印でapp-killより先に検出しfail-stopする (WM faultを無関係なアプリだけの失敗へ畳まない)。STOPは正常leave後に配送する。T7b-bでアプリがCW/rounding/例外maskを変更しx87 stackに値を残した状態からWM描画し、状態の完全復帰とfault帰属を検査する。
 
 ## 3. T7 の実装分割と受入
 
-各行は半日〜1日の独立受入単位。番号付き条件は各段7項以下、同じ判定の機種/入口違いは試験行列で展開する。各段で対象像の増減・BSS・pool peakを記録し、10項超または1日を超える依頼は契約の境界で再分割する。原則は表の順、b-aの試作は実装sourceを差し替えられるfixtureとし、b-bのlease/epoch完成前にgshellへ製品接続しない。T7b-a1の着手条件はG2維持とcaller一覧の承認 (§2-1)、a5のレビュー条件は全呼出経路のpanic/unchecked不在 (§2-4) とし、観測による受入とは分ける。
+各行は半日〜1日の独立受入単位。番号付き条件が10項を超えたら分け、同じ判定の機種/入口違いは試験行列で展開する。各段で対象像の増減・BSS・pool peakを記録し、10項超または1日を超える依頼は契約の境界で再分割する。原則は表の順、b-aの試作は実装sourceを差し替えられるfixtureとし、b-bのlease/使用中保護完成前にgshellへ製品接続しない。T7b-a1の着手条件はG2維持とcaller一覧の承認 (§2-1)、a5のレビュー条件は全呼出経路のpanic/unchecked不在 (§2-4) とし、観測による受入とは分ける。
 
 | 段 (旧4段の細分) / 主な対象 | 観測で閉じる条件 | 故障注入・変異 (正常対照も必須) |
 |---|---|---|
 | T7a-1a BB / `gfx/gfx_core.c`・planar backend | ①boot連続pool確保 ②全planeが新backing ③boot→gshell所有移譲1回 ④lease/present/再attachで同じ絵 ⑤失敗時ページ漏れ0 | 最後のplane旧番地残し、pool確保失敗 |
-| T7a-1b KCG / `drivers/kcg.c`・`kernel/boot_font.c`・deploy | ①配備予行で旧font無し ②KCGのみのGUI日本語/CUI英数編集 ③cache≤64KiB ④module欠落/init失敗はCUI維持 ⑤旧slot NOSYSと低位font参照0 ⑥cold/warm1000字・I/O記録 | cache満杯/確保失敗、旧font fallback再導入。D36の `os32_lz4` は呼出し0を確認して撤去 |
+| T7a-1b KCG / `drivers/kcg.c`・`kernel/boot_font.c`・deploy | ①配備予行で旧font無し ②KCGのみのGUI日本語/CUI英数編集 ③cache hit率記録 (64KiBは計上値) ④module欠落/init失敗はCUI維持 ⑤旧slot NOSYSと低位font参照0 ⑥cold/warm1000字・I/O記録 | cache満杯/確保失敗、旧font fallback再導入。D36の `os32_lz4` は呼出し0を確認して撤去 |
 | T7a-1c boot原本 / T5c-3のcore保存口・BIOS consumer | ①書換え前に4096B保存 ②原本不変 ③4経路の直読0 ④Unicode橋撤去済み ⑤bootinfo/boot stack退去 ⑥各セッション前後の物理page0全4096Bが原本と一致 ⑦boot2/DOS起動成功 | snapshot末尾欠落、終了時原本フラグ消去、consumer1本直読へ戻す (NP化は次段) |
 | T7a-2a 入場 / exec・uaccess・session | ①単独CPL3呼出し成功 ②GUI/親/他AS/parked/再入を変更前拒否 ③不正path/outputでPTE不変 ④caller pin/CR3退避 ⑤master中caller VA参照0 ⑥成功/失敗ともpin解除 | 終端欠落、2本目pathのcopy失敗、mailbox起動時確保失敗、pin解除漏れ |
 | T7a-2b 低位切替 / paging・v86_mem/bios | ①fixtureの直接低位640KiB実行 ②通常page0 NP ③page0/mailbox原内容一致 ④全出口CR3/PTE/PDE/TLB一致 ⑤前回データ/0x8C000ゼロ | 各準備境界失敗、末尾PTE復元/TLB反映/mailbox復元を1つずつ除去 |
 | T7a-2c 表示復元 / v86_io・KCG facade・固定診断 | ①[HW3]根拠対を固定 ②6Ah標準/拡張復元 ③68h=0Bh注入後CODE+cache失効 ④CG窓WB/VRAM UCの前後一致 ⑤9801 gui_gate・9821実機再描画 ⑥R7FIX2のFFF窓とCUI復帰維持 | mode復帰/失効省略、古いF00000h窓へ戻す。A9h値は実測記録 |
 | T7a-2d 採取中断 / gcap・STOP・DBGREF境界 | ①active印を見てSTOP注入 ②kills増分1 ③g/tv alloc−free差0 ④gcap_ops/active解除 ⑤TVRAM30行/CR3/出力規則復元 ⑥次のv86実行成功 | detach/release片方除去、準備失敗/#PF/#GP/STOPを各入口で注入 |
-| T7a-2e1 予約統合 / memory_boot・memmap・gen_memmap・02_memory | ①低位全160PFNが単一FIXED/kernel/WB ②session前後で型/owner/PFN数不変 ③一般pool供給0 ④BBは別SURFACE_BACKING ⑤docs-genと台帳/定数/説明一致 | 旧低位予約1行残し、owner/端PFN違い。旧backing製品経路は維持 |
-| T7a-2e2 backing撤去 / v86_mem・製品結線 | ①通常経路を直接低位へ ②159ページ確保0 (旧経路との差636KiB) ③低位予約とpool不変 ④GUI→CUI→V86→GUI20回漏れ0 ⑤Ra266 -g/boot2/DOS回帰 | 連続pool枯渇でもV86可 (他stagingは確保済み)、旧低位backing別名残し |
-| T7b-a1 採用ゲート / font crate・assets | ①公開API/必要reader範囲固定 ②IPA/欧文原本のhash/license/fetch確認 ③最大点/輪郭/component/span表 ④上限超過字一覧 ⑤W/M/m/アクセント/descenderの1x可読性 | CFF/可変font/未対応cmapはKCG。読めなければ欧文再選定 |
+| T7a-2e 予約統合・backing撤去 / memory_boot・memmap・gen_memmap・02_memory・v86_mem | ①低位全160PFNが単一FIXED/kernel/WB ②session前後で型/owner/PFN数不変 ③一般pool供給0 ④BBは別SURFACE_BACKING ⑤docs-genと台帳/定数/説明一致 ⑥通常経路を直接低位へ ⑦159ページ確保0 (旧経路との差636KiB) ⑧低位予約とpool不変 ⑨GUI→CUI→V86→GUI20回漏れ0 ⑩Ra266 -g/boot2/DOS回帰 | 旧低位予約1行残し、owner/端PFN違い、連続pool枯渇でもV86可 (他stagingは確保済み)、旧低位backing別名残し |
+| T7b-a1 採用ゲート / font crate・assets | ①公開API/必要reader範囲固定 ②IPA/欧文原本のhash/license/fetch確認 ③corpus全字形 (16/32px) の点/輪郭/component/深さ/span/edge・table/索引・read cache/作業域・bboxの実測最大表と上限決定 ④上限超過字一覧 ⑤W/M/m/アクセント/descenderの1x可読性 | CFF/可変font/未対応cmapはKCG。読めなければ欧文再選定 |
 | T7b-a2 x87 / 共通guard・exec安全点 | ①全状態一致 (save領域の予約byteは除外) ②既知CW内で実行 ③再入拒否 ④STOP/parkはleave後 ⑤非搭載はKCG ⑥faultの帰属が一致 | 値8本/CW丸め/例外mask変更、失敗出口のrestore除去。f32前に完成 |
-| T7b-a3 table reader / directory・cmap・loca/hmtx | ①全file常駐0 ②索引≤4KiB/read cache≤16KiB ③format4/12対照一致 ④隣接locaとadvance一致 ⑤短読で公開0 | offset/length overflow、順序逆転、idRangeOffset境界±1 |
-| T7b-a4 glyph / 単純・複合輪郭 | ①製品corpusの輪郭対照一致 ②入力≤2KiB/点512/contour64 ③component32/深さ8 ④edge≤1024/専用領域≤16KiB ⑤不対応字は一覧と一致 | 循環、run長、各上限±1、途中読込失敗で部分commit拒否 |
-| T7b-a5 raster / 16・32px・font_test | ①26.6寸法とbaseline対照一致 ②bbox最大40×40/作業域≤16KiB ③完全bitmapだけcommit ④最終386命令列検査 | bbox/pitch/座標overflow、allocation failure、途中raster失敗 |
-| T7b-a6 試作計測 / map・FD・ext2 | ①shell1MiB/8MB私有2MiBの内訳表 ②作業域54KiB/bitmap別枠 ③FD peakと残数 ④cold/warm1000字 ⑤起動/入力→描画計測 ⑥上限・採用法を実測で確定 | corpus cache thrash、font FD不足、memory上限ちょうど/超過。試作全file readを製品へ戻さない |
-| T7b-b1 app read lease / VFS・public KAPI | ①open/read_at/closeのowner/世代検証 ②短読失敗 ③1face/owner ④STALE closeで別FD保持 ⑤通常終了でFD/owner漏れ0 ⑥[ABI1]〜[ABI3]と一式再ビルド | 異owner/旧token/生FD混用、FD再利用 |
+| T7b-a3 table reader / directory・cmap・loca/hmtx | ①全file常駐0 ②table数/索引/read cache上限はa1③の実測最大以上、超過は代替 ③format4/12対照一致 ④隣接locaとadvance一致 ⑤短読で公開0 | offset/length overflow、順序逆転、idRangeOffset境界±1 |
+| T7b-a4 glyph / 単純・複合輪郭 | ①製品corpusの輪郭対照一致 ②入力/点/contour上限はa1③の実測最大以上 ③component/深さも同基準 ④edge/専用領域も同基準、各上限超過は代替 ⑤不対応字は一覧と一致 | 循環、run長、各上限±1、途中読込失敗で部分commit拒否 |
+| T7b-a5 raster / 16・32px・font_test | ①26.6寸法とbaseline対照一致 ②bbox/作業域上限はa1③の実測最大以上、超過は代替 ③完全bitmapだけcommit ④最終386命令列検査 | bbox/pitch/座標overflow、allocation failure、途中raster失敗 |
+| T7b-a6 試作計測 / map・FD・ext2 | ①shell1MiB/8MB私有2MiBの内訳表 ②作業域実peak/bitmap別枠 ③FD peakと残数からactive faceのFD上限を決定 ④cold/warm1000字 ⑤起動/入力→描画計測 ⑥上限・採用法を実測で確定 | corpus cache thrash、font FD不足、memory上限ちょうど/超過。試作全file readを製品へ戻さない |
+| T7b-b1 app read lease / VFS・public KAPI | ①open/read_at/closeのowner/世代検証 ②短読失敗 ③a6で決めたactive faceのFD上限 ④STALE closeで別FD保持 ⑤通常終了でFD/owner漏れ0 ⑥[ABI1]〜[ABI3]と一式再ビルド ⑦使用中のhsync置換はBUSYで元ファイル不変 | 異owner/旧token/生FD混用、FD再利用、使用中保護欠落 |
 | T7b-b2 shell入口 / loader・WM・service表 | ①shell世代/text/文脈検査 ②appから到達不可 ③WM中shell read成功 ④app ownerのFD不使用 ⑤park/fault/dispatch後の印0 ⑥reloadで旧lease無効 | wrapper検査/印消去を除去、WM後app再利用。新しい権限モデルは足さない |
-| T7b-b3a 内容epoch基盤 / VFS FD write・O_TRUNC | ①FD同サイズwriteの変更前失効 ②O_TRUNC変更前失効 ③失敗writeでも失効維持 ④各read_atとcommit/cache-hit前検証 ⑤再openは安全点だけ ⑥host source拒否 | FD write/O_TRUNCの通知を各1つ除去、読込途中に更新。fixture限定で製品へは未接続 |
-| T7b-b3b 全更新口 / ext2 path・stream・inode・rename等 | ①path write/streamの変更前失効 ②inode write/truncateの変更前失効 ③rename/unlink/umount失効 ④hsync置換/同inode再利用で旧face拒否 ⑤更新口一覧と実呼出traceの対応漏れ0 ⑥b3aのFD経路回帰 | 通知を経路ごとに1つ抜く、同サイズ上書き/短縮/失敗後再open。全経路完了後だけb4へ |
-| T7b-b4 製品結線 / gshell・shlib・trim | ①配備予行で新一式一致 ②旧face失効→close→新検証公開 ③設定変更/パネル終了/別app open後再描画 ④trim後再描画 ⑤借用中解放0 ⑥fault/終了でFD/owner漏れ0 | 借用中trim/STOP、close後open失敗、partial bitmap投入 |
-| T7b-b5 G2表示 / text・measure・edit・FEP | ①1x日本語/欧文画像可読 ②W/M/m等の欠け0 ③text/measure/caret位置一致 ④clip/baseline一致 ⑤FEP候補窓一致 ⑥旧tokenで寸法/描画STALE | cell幅とadvance混同、縮小せずclip、fallback baselineずれ |
-| T7b-b6 統合 / 製品計測・回帰 | ①cold/warm1000字とpeak記録 ②D15の計測判定 (容量別は最終段) ③FD/MINIMALでKCG ④破損/短読/上限超過で操作継続 ⑤x87完全復帰 ⑥20回trim/設定変更/終了で増加0 | 内容epoch確認/guard復元を抜き実経路で検出、枯渇後の次起動 |
+| T7b-b3 製品結線 / gshell・shlib・trim | ①配備予行で新一式一致 ②旧face失効→close→新検証公開 ③設定変更/パネル終了/別app open後再描画 ④trim後再描画 ⑤借用中解放0 ⑥fault/終了でFD/owner漏れ0 ⑦使用中hsyncはBUSY、新fontは次の起動で読込 | 借用中trim/STOP、close後open失敗、partial bitmap投入 |
+| T7b-b4 G2表示 / text・measure・edit・FEP | ①1x日本語/欧文画像可読 ②W/M/m等の欠け0 ③text/measure/caret位置一致 ④clip/baseline一致 ⑤FEP候補窓一致 ⑥旧tokenで寸法/描画STALE | cell幅とadvance混同、縮小せずclip、fallback baselineずれ |
+| T7b-b5 統合 / 製品計測・回帰 | ①cold/warm1000字とpeak記録 ②D15の計測判定 (容量別は最終段) ③FD/MINIMALでKCG ④破損/短読/上限超過で操作継続 ⑤x87完全復帰 ⑥20回trim/設定変更/終了で増加0 | 使用中保護/guard復元を抜き実経路で検出、枯渇後の次起動 |
 
-T7a-2bはCR3/PTEと直接低位のfixture内でU7を実証する。-2c/-2dの確認後、-2e1で予約統合とdocs-genを独立受入し、-2e2で旧backingの製品経路を撤去する。page0通常NPは4consumer退去後だけ有効にし、復元失敗注入はfail-stopを期待値とする。-1cの比較時点はPREPARINGの低位変更前とRESTORINGの復元後・NP化前で、0x600〜0xFFFも含む。guest実行中のpage0書換えは禁止せず、DOS起動成功はbyte一致とは別に観測する。b3aはFD write/O_TRUNC、b3bはpath/stream・inode直接更新と名前/寿命の変更を受け持ち、共通通知の結線を照合する。準備段だけの合格で製品の成功を宣言しない。
+T7a-2bはCR3/PTEと直接低位のfixture内でU7を実証する。-2c/-2dの確認後、-2eで予約統合・docs-gen・旧backingの製品経路撤去を一緒に受け入れる。page0通常NPは4consumer退去後だけ有効にし、復元失敗注入はfail-stopを期待値とする。-1cの比較時点はPREPARINGの低位変更前とRESTORINGの復元後・NP化前で、0x600〜0xFFFも含む。guest実行中のpage0書換えは禁止せず、DOS起動成功はbyte一致とは別に観測する。fontの使用中保護はb1、hsyncのBUSYと次の起動での新font読込はb3の製品結線で受ける。準備段だけの合格で製品の成功を宣言しない。
 
-### 3-1. 像と実行時占有の見積もり
+### 3-1. 像と実行時占有の記録
 
-以下は着手パック用の増分枠 **[推]** (計測値ではない)。T7a入口/T7b入口のmapを基準に各段で内訳を埋める。上限超過時は依存/作業域を再検討し、帯・D契約・目標を無断で変えない。
+T7a/T7bの入口と出口で同じ構成のmapを記録し、core・module・私有領域・圧縮像の増減を分ける。推測のcore追加8〜16KiBを関門にせず、像・容量の停止条件はMAX_IMAGE_SIZE・MEM_KERNEL_IMAGE_MAXのASSERT・FD実測だけとする。
 
-| 対象 / 担当段 | 見積もりと勘定 |
+| 対象 / 担当段 | 記録する勘定 |
 |---|---|
-| T7a core (1a〜2e2) | code/管理 +4〜8KiB [推] (mailbox pointer等を含む)、不変page0追加0B (既存real_lowmemをT5c-3で転用、T7も同じ原本)、mailbox配列追加0B (KHEAPへ)。既存4096Bは再計上しない。減る旧font読込/codeは実測まで控除0 |
-| T7a pool / KHEAP | planar BB128KiB (32頁)、KCG cache≤64KiB + moduleのmem_size。mailbox868Bは起動時確保で保持し、allocator管理/整列込みの実占有をKHEAPへ別計上。path2本とV86Gcap stagingは現在のAPI上限/sizeofで事前確保しpeakを別記、stagingはmaster切替後に確保しない。backing撤去の636KiBはpool peak差で像の減少にはしない |
-| T7b core (b1〜b3b、guard結線) | code/registry +4〜8KiB [推]、最大5 active source、epoch/世代表はtarget sizeofで算定。VFS/execをfont crateと一緒にcoreへリンクしない |
-| T7b shell/shlib (a2〜a6、b4〜b6) | parser/raster text等は各32〜64KiB増の仮枠 [推]。gshell静的リンクとshlib共有textを別計上、reloc/data/整列込み。作業域54KiB + bitmap64〜80KiB (8MB) / 256KiB (16MB以上) はowner私有。shell40KiB stack+guard/heapも1MiB内 |
+| T7a core (1a〜2e) | code/管理のmap差分 (mailbox pointer等を含む)。不変page0はT5c-3で転用したreal_lowmemを共有し追加0B、mailbox配列はKHEAPへ置き追加BSS 0B。旧font読込/codeの撤去量も実測で記録 |
+| T7a pool / KHEAP | planar BB128KiB (32頁)、KCG cache (64KiBは計上値) + moduleのmem_size。mailbox868Bは起動時確保で保持し、allocator管理/整列込みの実占有をKHEAPへ別計上。path2本とV86Gcap stagingは現在のAPI上限/sizeofで事前確保しpeakを別記、stagingはmaster切替後に確保しない。backing撤去の636KiBはpool peak差で像の減少にはしない |
+| T7b core (b1〜b2、guard結線) | code/registryのmap差分、a6のFD上限に対応するsource/世代表のtarget sizeofと整列。VFS/execをfont crateと一緒にcoreへリンクしない |
+| T7b shell/shlib (a2〜a6、b3〜b5) | parser/rasterのgshell静的リンクとshlib共有textを別計上し、reloc/data/整列も記録。a1③で定めた作業域の実peak + bitmap64〜80KiB (8MB) / 256KiB (16MB以上) はowner私有。shell40KiB stack+guard/heapも1MiB内 |
 | DEBUG部品と製品 | 新診断/fixtureは対のkdebugまたは試験専用像に置き、core必須復元コードは部品OFFでも残す。部品file長とページ切上げmem_sizeを区別し、KDEBUG=0/1のpool peakを別測定 |
 
-core追加の合計は **8,192〜16,384B [推]** (=T7a 4〜8KiB + T7b 4〜8KiB、両端ともpage0追加0B・mailbox配列追加0B)。F1の原本転用だけなら9,060〜17,252B、F4のmailbox868BをKHEAPへ移してこの値となる。KHEAPは既存固定帯内の実占有が増えるため、868Bとallocator費用を含むpeakを確認し、core像減と空きheap増を取り違えない。旧20,288Bからの差引きは現予算に使わない。T5/T6b最終一式のcore・module・heap/stack/NP guard・圧縮像・FD残量を入口基準とし、管理表sizeof・整列と各段実増分が確定するまで予算成立を宣言しない。撤去益は先取りせず、圧縮像は別にMAX_IMAGE_SIZEへ照合する。
+T5最終一式 (T6b-M実施時はその後) のcore・module・heap/stack/NP guard・圧縮像・FD残量を入口に記録し、T7出口との差を残す。KHEAPのmailbox868Bとallocator費用を含むpeakは別計上する。旧20,288Bや撤去予定量の差引きを予算にせず、圧縮像はMAX_IMAGE_SIZEへ照合する。
 
 ### 3-2. 試験の実行と判定
 
@@ -269,7 +266,7 @@ FD/MINIMAL起動はフォントfileを載せない構成としてKCGのcold/warm
 
 Opus 5.5 (`claude-opus-5-5`) は **Approve**。第2回R1〜R4は全てclosed、残るblockerなし。文書設計の承認であり、実装・実機の受入完了ではない。WM呼出区間の印は既存 `ring3_wm_enter/leave` とlongjmp/dispatchでの解除機構の再利用を優先し、T7b-bの実装レビューで確認する。
 
-未測定ゲートはD15の速度、ext2 sourceのcold性能、54KiB作業域、shell 1MiB/私有2MiB予算、FD peak本数、Ra266の `v86 -g`、68h=0Bh時のA9hの値、page0全体の保存・復元へ変更した後のboot2/DOS回帰。これらは本レビューのApproveで合格に置き換えない。
+現在の未測定ゲートはD15の速度、ext2 sourceのcold性能、corpusに基づく作業域実測、shell 1MiB/私有2MiB予算、FD peak本数、Ra266の `v86 -g`、68h=0Bh時のA9hの値、page0全体の保存・復元へ変更した後のboot2/DOS回帰。これらは本レビューのApproveで合格に置き換えない。
 
 ## 7. 未決の争点
 
@@ -277,5 +274,6 @@ Opus 5.5 (`claude-opus-5-5`) は **Approve**。第2回R1〜R4は全てclosed、�
 
 | 所見 / 論点 | 削減・緩和する側の言い分 | 維持する側の言い分 / 決着に必要な判断 |
 |---|---|---|
+| **ユーザー承認 2026-10-18: 根拠のあいまいな基準の見直し** | corpus実測で上限、a6実測でFD本数、KCG hit率と入口/出口mapを記録。各段は10項超で分割 | §2-2・§2-4・§3へ反映。予約統合/backing撤去はT7a-2eへ統合、内容epochの2段は削除し使用中hsync BUSY・新fontは次回起動へ変更 |
 | **決定 (ユーザー 2026-10-16)**: F5: shell wrapperのreturn PC検査 | **残す**。目的はなりすまし対策ではなく、偶発的な入口の誤用 (バグ) の検出。WM 経由で caller 判定が 0 になる経路 (`exec/exec.c:309-336,377-379`) でも shell 由来を確かめられる | 既承認 R1 と本文・b2 受入はそのまま。T7 の実装で検査の費用が目立てば、そのとき比較して削る |
 | **決定 (ユーザー 2026-10-16)**: F7: x87 guardへの[HW3]適用 | CPU の命令だけの扱いは、**メーカーの資料 (Intel のマニュアル) を必須、BSD/MIT の実装は任意** (`docs/CONSTRAINTS.md` の [HW3] に 1 行足した) | §2-4 の根拠は Intel の資料の版・節を必須とし、BSD の実装は参照したときだけ書く |

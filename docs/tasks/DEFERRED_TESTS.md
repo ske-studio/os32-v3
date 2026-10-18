@@ -17,12 +17,13 @@
 | **v3 の最終段 (搭載メモリ量ごとの動作確認)** | H-4 の構成別の残り (8MB・17MB・Cirrus など、メモリ量・構成ごとの M の全通し) | ユーザー決定 2026-10-14: 搭載メモリ量ごとの確認は v3 の最終段まで後回し。それまでのゲスト受入は NP21/W 64MB (`np21x64w.ini` の ExMemory=64、実機 Ra266 と同じ) の 1 構成で回す。8MB の最低条件 (V3_PLAN §2-2) は目標のまま、その判定を最終段で行う |
 | 次に `check_select.py` / ci-stab を触る保守の段 (遅くとも T3 の最初の取り込みの全体検査) | X-4 (残り) | 記録の分はその全体検査で残す |
 | T4 | X-11、E11-A2b、X-1 の一部 | 設計票で扱う |
-| T5-0a / T5-0b | T4C1-GUEST、T4B-EXT2、T4C1-CORE、KSTK-DF、IMEDUP-1 | T4証拠照合・fixture短縮/計測→実guard受入→stack採否 |
+| T5-0a / T5-0b | T4C1-GUEST、T4B-EXT2、T4C1-CORE、KSTK-DF、IMEDUP-1 | T4証拠照合・fixture短縮/計測・実guard受入。engine stack 32KiB + NP 1頁 (深さ100のhost実測24,388Bが収まる、SQLITE_MAX_EXPR_DEPTH=100のまま、ユーザー決定2026-10-18) |
 | T5a-3 | T4B7-GUI | GUI端末と入力・IME・STOPの観測 |
 | T5の各部品追加 / 次のVFS・ISO境界変更 | T4C1-FD / T4B-CD | FD容量でT6b-M挿入 / 凍結コードの削除要否判断 |
 | T5a / T7 | X-1 の一部、E10-4、H-6b、H-5 (CG 窓 WB・68h) | — |
 | [TASK_PCM_CS4231](v3/TASK_PCM_CS4231.md) | R7-2、H-4 (b)(c) | — |
 | 保守 (道具・媒体) | LZSS-1、PRIO-1、S-1、X-20、PRE-1 | 次にその道具・媒体を触る段 |
+| **ユーザー承認 2026-10-18: 根拠のあいまいな基準の見直し** | T4C1-CORE・KSTK-DF・T4C1-FD・T4T7-RH | stack決定・集積拡張凍結・T7a-2e統合に合わせて関門を同期 |
 | 決定による持越し | H-7、S-4、E11-A3 | 再開時ゲート (H-7) / U6 で足さない (E11-A3) |
 | 記録 | R7-3、R7-4 | — |
 
@@ -36,9 +37,9 @@
 | T4B-CD | 不変CD専用RO SQLiteのコード/host試験を凍結保持。削除費用と像の差の判断だけ残す | ユーザー決定2026-10-18: vfs_sqlite_allow_immutableのT4c/T5b製品接続予定を取消。CD root/FEP/settings/permit/媒体交換の製品試験は方針変更で対象外 (合格ではない) | 次にVFS/ISO境界を触る段で削除要否を判断。通常CD読取/cdinstはT5b-5。ext2排他は別行 |
 | T4B-EXT2 | 実ゲストの同一DB排他 (親子/park/RESIDENT/別名) の証拠照合 | T4b-4/4cのhost成功やCD接続取消でゲスト完了にはしない | T5-0aでT4受入証拠と照合し、未証拠分を明記して実施済みだけ閉鎖 |
 | T3D2-D15 | D15 (前景 1 本で起動 2 秒・入力→描画 100ms、P100/32MB) の判定。T3d2 の時間は NP21/W の参考値だけ (`~/os32-tmp/evidence/2026-10-18/t3d2_np21w/RESULT.md`) | エミュレータの時間は実機の時間ではない。票 T3d2 の取り決めで「未測定として台帳へ」 | 実機の回 (T4T7-RH と同じ回)、T7b の日本語の描画の計測と合わせて |
-| T4T7-RH | T4〜T7 の実機 (Ra266) での確認: T5c-4 の 82557 の回帰、T6b-2 の Ra266 の欄、T7a-2c の 9821 の再描画と CG 窓 (H-5・H-6b)、T7a-2e2 の `v86 -g`/boot2/DOS、T7 の Ra266 の計測、T5-0b の kernel/engine 実guard→#DF task gate→シリアル/画面診断→停止 (resetなし)、通常例外/ESP0/V86と32KiB stack負荷回帰 | ユーザー決定 2026-10-17: ソフトウェアの変更は NP21/W で合否を決め、ハードウェアに触るカーネルの変更は実機のテストをまとめて行う | ハードウェアに触る段がたまった所でまとめて行う実機の回 (時期は PM が提案)。新しい段で実機の項目が出たらこの行に足す |
-| T4C1-FD | T4c-1時点のFD残量: 2HD 157KB・1.44MB 369KB、SQLite分離で約136KB減 | 過去の値。VK32圧縮減と非圧縮部品/prefix/cluster丸めの差を再計測する必要がある | T5-0aと各追加前後に両FD実残量を測る。ATAPI/iso9660・lan.modも計上。不足する追加段の前へT6b-Mを挿入。T6b-1/2の集積拡張だけでは解消しない |
-| T4C1-CORE | engine stack 128KiB の見直し: host の最大使用量は 4,604 / 131,072 B (init/CRUD/診断だけ)。core 増分 +4,072 B は削らず見積を実測に直した (ユーザー承認 2026-10-18) | ゲストの大きい文 (db_v50_test) での最大使用量が未測定 | T5-0aで128KiBのままdb_v50_test等のhigh-water/残余を計測。T5-0bは深さ100のhost実測24,388 Bにより32KiBへ縮小、深さ上限100を維持 (ユーザー決定2026-10-18)。KSTK-DF受入時に同じ負荷/rollback/監査を再確認 |
+| T4T7-RH | T4〜T7 の実機 (Ra266) での確認: T5c-4 の 82557 の回帰、T7a-2c の 9821 の再描画と CG 窓 (H-5・H-6b)、T7a-2e の `v86 -g`/boot2/DOS、T7 の Ra266 の計測、T5-0b の kernel/engine 実guard→#DF task gate→シリアル/画面診断→停止 (resetなし)、通常例外/ESP0/V86と32KiB stack負荷回帰 | ユーザー決定 2026-10-17: ソフトウェアの変更は NP21/W で合否を決め、ハードウェアに触るカーネルの変更は実機のテストをまとめて行う | ハードウェアに触る段がたまった所でまとめて行う実機の回 (時期は PM が提案)。新しい段で実機の項目が出たらこの行に足す |
+| T4C1-FD | T4c-1時点のFD残量: 2HD 157KB・1.44MB 369KB、SQLite分離で約136KB減 | 過去の値。VK32圧縮減と非圧縮部品/prefix/cluster丸めの差を再計測する必要がある | T5-0aと各追加前後に両FD実残量を測る。ATAPI/iso9660・lan.modも計上。不足する追加段の前へT6b-Mを挿入。T6b-1/2は凍結し、圧縮像が508KiBの8割 (約416KiB) に近づいたら起票する。FD容量対策とは別 |
+| T4C1-CORE | engine stack 32KiB + NP 1頁 (深さ100のhost実測24,388Bが収まる、SQLITE_MAX_EXPR_DEPTH=100のまま、ユーザー決定2026-10-18)。core増分+4,072Bは実測として保持 | stack採否の二段判定・縮小時だけの再確認は不要。既存受入の証拠照合だけ残す | T5-0a/0bの観測範囲と実guard診断→停止の証拠を照合し、未証拠分だけ残す |
 | KSTK-DF | カーネル・SQLite engine のスタックがガード頁に当たると、#PF の例外フレームも NP 頁に書くので #DF → トリプルフォルト (リセット) になり、診断の 1 行が出ない。#DF を専用 TSS の task gate で受ければ止まる前に診断を出せる (T4c-1 の直しの astra レビュー P1) | T4c-1 以前の固定ガード・カーネルのスタックと同じ振る舞い (`kernel/isr_stub.asm:28`)。黙った破壊ではなく停止なので T4c-1 の範囲外 | T5-0b 実装・host記述子/診断試験済、NP21/W受入は未実行。DF_GUARD_TEST=1/2の専用像で実guard→診断→停止 (reset/cleanup0)、通常像32KiBで同負荷/rollback/監査を確認。手順: ~/os32-tmp/run/t5-0b/report.md |
 | FEPLEARN-1 | 学習した語は `fep.db` の `dict_user` にあり、配備 (nhd_deploy sync) や FEP が閉じている間の hsync で `fep.db` を入れ替えると配布の状態に戻る (T5-0a の受入で観測) | T4 以前からの作り。FEP が開いている間の hsync は BUSY で置き換えを断る (`userland/system/hsync.c:1622`) ので普段の更新では起きない | 学習を別ファイルに分ける DICT_META の段で解消。実機で FD 復旧 (FDRECOV) をすると学習が消えることを手順書に書くのはその段まで保留 |
 | T4B7-GUI | T4b-7 の GUI 端末からの db done/stop と、区間中の log stop (試験ビルド) | db の fixture (4^12 行の集計) が 1 回 12〜19 分かかり、GUI 端末の回は未実行。通常の像の log stop は子が先に終わる。CUI では両方合格 (`~/os32-tmp/evidence/2026-10-18/t4c_fix3_np21w/RESULT.md`) | T5-0aで製品SQL設定のままfixtureを数分へ縮め期待結果/試験を同期 (文の形を保ち、行数でstack深さは変わらない)。T5a-3でGUI端末のdone/stop・区間内log stopと入力/IME/STOPを観測。端末実体/世代/起動経路を固定しH-7/T5A-ACCとは分ける |

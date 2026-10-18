@@ -4,7 +4,7 @@
 >
 > **T5 着手前の再照合 r5 (2026-10-18)** — EARLY は作らず FAT/HostDrv は core、CD は POST_ROOT、不変 CD の RO SQLite は凍結。T5 の段・受入・予算を更新 (決定は §9)。
 > それまでの状態: **設計中 (2026-10-18、再照合 r4)** — main `952f16b`、T3受入完了 (2026-10-18)、KAPI v76・memory_layout 4。圧縮余裕18,165 B。本票の実装・受入は未実施。
-> **ユーザー決定 (2026-10-17)**: 「T4 から T7 までは実機でテストを行わず、エミュレーター上だけで確認を取れれば大丈夫」。真意は「ソフトウェアのコード変更はエミュレータでの確認で十分。ハードウェアに触るカーネルの変更は実機のテストをまとめて行う」— 各段の合否は NP21/W (64MB) で決める。本文で実機の観測を求めている項目 (T5c-4 の 82557 の回帰 — NP21/W は 82557 を再現しないのでホスト試験と LGY-98 の経路で代える、T6b-2 の Ra266 の欄) は、ハードウェアに触る変更がある程度たまった所でまとめて行う実機の回 (台帳 T4T7-RH) へ送り、段の受入を止めない。本文の「実機未確認を NP21/W だけで閉じない」系の記述は、この行が上書きする。
+> **ユーザー決定 (2026-10-17)**: 「T4 から T7 までは実機でテストを行わず、エミュレーター上だけで確認を取れれば大丈夫」。真意は「ソフトウェアのコード変更はエミュレータでの確認で十分。ハードウェアに触るカーネルの変更は実機のテストをまとめて行う」— 各段の合否は NP21/W (64MB) で決める。本文で実機の観測を求めている項目 (T5c-4 の 82557 の回帰 — NP21/W は 82557 を再現しないのでホスト試験と LGY-98 の経路で代える) は、ハードウェアに触る変更がある程度たまった所でまとめて行う実機の回 (台帳 T4T7-RH) へ送り、段の受入を止めない。本文の「実機未確認を NP21/W だけで閉じない」系の記述は、この行が上書きする。
 > 改訂: **r4 (2026-10-18)** — RECHECK_r4とOpusレビュー・PM判断F1〜F6を反映。T4a-1着手可、T4全体の受入を意味しない。r3までのレビュー経過は§8。
 > 上位契約: [TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) §3-5・§4・§6・§7。前提: [T2](TASK_T2_APPBAND.md)・[T3](TASK_T3_LAYOUT.md) 受入完了。この票は形式、状態、移行と失敗処理の実装契約を補う。D番号の決定を変更しない。
 
@@ -15,12 +15,12 @@ r5 は main `4bb31fe` の再照合 (`~/os32-tmp/run/t5recheck/RECHECK.md`・`TIC
 | 元票の前提・着手条件 | 判定 | 今の根拠と本票での扱い |
 |---|---|---|
 | T2c〜h の map/allocator・trim・owner/STOP 待ち | 吸収済み (T2) | `docs/tasks/v3/TASK_T2D_T2H.md:304,337,349`、`docs/tasks/agents/HANDOVER_2026-10-09.md:11`。受入済み機構を使い、台帳の未採取を完了扱いにしない |
-| T2 → T3 → T4 → T5-0 → T5a/b/c → T6b | r5で更新 | 上位§6と本票§7-1。T3配置は受入済み。本票各段で差分を再計測する。既存S4とLAN受入範囲を後続の正常対照にする (§2・§6) |
+| T2 → T3 → T4 → T5-0 → T5a/b/c → T7 (FD容量不足時だけT6b-M) | r5で更新 | 上位§6と本票§7-1。T3配置は受入済み。本票各段で差分を再計測する。既存S4とLAN受入範囲を後続の正常対照にする (§2・§6) |
 | e11 公開版・4世代を後で照合 | 吸収済み (T2/DBGREF) | `sdk/kapi.json:2`、`:3`: format=4、KAPI ABI=1、memory=4、shlib=2、機能版76。更新時は生成値で照合する |
 | 専用module核・生成器・リンカ | T4で実装済み | `kernel/module_runtime.c`・単一schema・mkmod・PAIR必須のPOST_ROOT SQLiteを拡張する。核の再新設はしない (§2) |
 | SQLite分離とroot順 | T4実績へ更新 | SQLiteはowner割当の部品へ移行済み。root → PG/台帳の順は維持、U19の前倒しは作らない (§5) |
 | B1 checked copy と B3/B4・F2/F3 は別 | 維持 | `docs/tasks/v3/TASK_T2D_T2H.md:94,587`。`db_exec` の切捨て・finalize先行は `kapi/kapi_db.c:610`。旧SQL入口も含む拒否時不変契約は§3-1・§9 |
-| 512KiB単一MEMSYS5・FEP優先取り分 | T4で接続済み | 既定FEP予約192KiB、APP+SYSTEM上限319,488B。全outerの代替stackとRESIDENT groupを維持 |
+| 512KiB単一MEMSYS5・FEP優先取り分 | T4実績・予約方針更新 | FEP予約は既定192KiB、下げる向きの上書きも可、下限は実測の最大。APP+SYSTEM上限319,488Bは既定時の値。全outerの代替stackとRESIDENT groupを維持 |
 | FEP予約量・S/M/L最大負荷 | T4実績を継承 | §7-2のhost値と受入一式を区別。T5-0aでゲストstackを測定し、未測定経路を記録 |
 | LAN/82557の移設範囲 | 更新 | TX/RX/IRQ・BOUNDとLB-3・LAN版/host実機受入済み (`drivers/e82557.c:377,700,729,793`、`docs/tasks/realhw/TASK_LAN_82557.md:3`)。T5c-4で移設回帰。LB-4まで完了とはしない |
 | gfx資源識別・予約をcoreに残す | 維持 | R7FIX2後はPEGCのFFF00000h窓 (`include/memmap.h:337,357`)。旧F00000h固定期待へ戻さず、永久予約とmodule回収を分ける |
@@ -149,13 +149,13 @@ host の受入・PM 用変異は `tools/tests/module_runtime_tdd.md`、既存 kd
 
 `kapi_db.c` / `ime_dict.c` / boot selftest / VFS初期化の全outer SQLite呼出しを型つきexport facadeへ移す。stubは `db_open` 等の失敗可能APIではNOSYS、bool/使用量等は各既存APIの無効値を返し、last_errorに未搭載理由を保持する。成功ハンドルを作らない。関数ごとのstub表をコード生成入力に置き、NULL関数ポインタへ飛ばさない。
 
-SQLite module initは module code → owner付きMEMSYS5 512KiB → 代替stack128KiB → SQLite/VFS登録 → 内部export公開、で終える。settings読込/FEP予約評価とFEP initはその後のboot transactionで行う。stack pointerはCPL=0内部の可変値。**boot selftest・kapi_db・ime_dict・WM/gshellのFEP呼出しを含む全outer SQLite facadeを代替stackへ切替える**。引数はkernel staging/固定call frameへ揃え、元ESPとcallee-saved registerを保存・復帰する。engine_enterを先に行い再入はstack切替前に拒否、正規VFS callbackはそのstackを継続使用する。I/Oを伴うfacadeは入口IF=0なら副作用前に失敗し、勝手にstiしない。IRQ handlerは呼べない。例外判定はstack番地に依存せずcoreのengine_activeを見るので代替stack上でもfail-stop、元stackへ通常return/cleanupを行わない。終了時は進入深さゼロを要求する。init失敗では逆順に戻す。エンジン状態を破壊した例外からはcleanupを試みない。
+SQLite module initは module code → owner付きMEMSYS5 512KiB → 代替stack32KiB + NP 1頁 → SQLite/VFS登録 → 内部export公開、で終える。settings読込/FEP予約評価とFEP initはその後のboot transactionで行う。stack pointerはCPL=0内部の可変値。**boot selftest・kapi_db・ime_dict・WM/gshellのFEP呼出しを含む全outer SQLite facadeを代替stackへ切替える**。引数はkernel staging/固定call frameへ揃え、元ESPとcallee-saved registerを保存・復帰する。engine_enterを先に行い再入はstack切替前に拒否、正規VFS callbackはそのstackを継続使用する。I/Oを伴うfacadeは入口IF=0なら副作用前に失敗し、勝手にstiしない。IRQ handlerは呼べない。例外判定はstack番地に依存せずcoreのengine_activeを見るので代替stack上でもfail-stop、元stackへ通常return/cleanupを行わない。終了時は進入深さゼロを要求する。init失敗では逆順に戻す。エンジン状態を破壊した例外からはcleanupを試みない。
 
 **B4:** core側の `engine_enter/leave` を全outer呼出しへ置く。active owner/groupと呼出し深さはFD所有権とは別。正規VFS callbackはactiveを維持し二重enterしない。再入は失敗、例外時は `isr_handlers.c` のapp-kill判定より先にactiveを検査しfail-stopする。STOPは要求だけ保存し、leave後の安全点で処理する。診断API (`db_mem_used`/last_error) も例外ではない。
 
 **B3:** T2 bounded copyでpath/SQLをkernelへ完了してから旧stmt finalize。SQLは既存1024Bバッファ (payload1023B) にNULまで入らなければ失敗し、切捨てない。不正入力時はSQLite進入0、既存stmt・transaction・slot・SHM結果を維持する基準契約 (`docs/tasks/settings/FEP_BOUNDARY.md:140,141,213`) を変えない。copyoutはengineを出てから行う。対象は旧 `db_exec/db_prepare` を含む全outer入力。§9 の決定に従い、3入口とも拒否時は何も変えない。拒否の rc を見落として step すると旧文の続きが返るのはアプリ側の問題として扱う。prepare_only も入力を受け付けた場合だけ finalize する設計に揃える。KAPI_SPEC の契約説明の同期は T4b-1 の前に行う (本票の決定を実装済みとはしない)。
 
-EXECNESTのcaller/frameとTSS.ESP0の保存・IRQ保護下復元 (`exec/exec.c:338`) はSQLiteのESP切替と別契約。通常CPL0呼出しではTSSを変更しない。子の正常/fault/STOP→親復帰→次KAPIとsplash終了で元のesp0/callerを確認する。T4後は全outerがowner付き128KiB stackとNP guard 1頁を使う。T5-0aのゲスト計測 → T5-0bのKSTK-DF → 32KiB採否の順とし、host最大4,604Bをゲスト最大とは扱わない。
+EXECNESTのcaller/frameとTSS.ESP0の保存・IRQ保護下復元 (`exec/exec.c:338`) はSQLiteのESP切替と別契約。通常CPL0呼出しではTSSを変更しない。子の正常/fault/STOP→親復帰→次KAPIとsplash終了で元のesp0/callerを確認する。全outerはowner付きengine stack 32KiB + NP 1頁 (深さ100のhost実測24,388Bが収まる、SQLITE_MAX_EXPR_DEPTH=100のまま、ユーザー決定2026-10-18)を使う。T5-0aの計測とT5-0bのKSTK-DF受入は採否の二段判定にしない。
 
 ### 3-2. F2/F3 と重複接続の移行規則
 
@@ -226,7 +226,7 @@ T5c-0をT5b-5より前へ置く。`VfsOps*`/Device操作表は部品codeへの�
 
 ATAPI/ISOとcoreのIDE/FDC/FAT/loop/diskioの依存を現コードで列挙し、core facadeか同一部品への包含で閉じる。一般の部品間linkは増やさない。登録後に `/cd0` の自動mountに加えloop・hd上のISOをiso9660で試す既存処理も行う。部品失敗で未成立のCD装置/mountを公開せず、成立済みrootを維持する。
 
-`MODULE_RECORD_CAP=8` は T5c-0 で暫定の上限と満杯拒否を固定し、T5b-5 で ATAPI/ISO を 1 部品にするか 2 部品にするかが決まった後に確定値を記録する。候補はkdebug/sqlite/fep/atapi/iso/kcg/fm/pcm/v86/lan/cirrusの11 (ATAPI/ISOを一体にする場合10)、FAT/HostDrvは数えない。FD/HDD・任意部品・隔離保持を含む実際の最大同時数を数え直し、必要容量の見込みは T5c-0 で受ける。候補数をそのまま新定数にしない。
+`MODULE_RECORD_CAP` はT5c-0で生成policyの許可ID数から一度に決め、満杯拒否を試験する。ATAPI/ISOの部品境界もその生成policyへ反映し、T5b-5での再判定は置かない。
 
 ### 5-3. MINIMAL 回復の境界
 
@@ -236,7 +236,7 @@ T5b-4はcoreのFATによるFD回復の回帰だけに縮める。書込み禁止
 
 T4c-1でVK32はcore 1本へ変更済み。全媒体で同一の像を保つ。起動部品はPAIR必須で `/boot` に置き、`KERNEL_PAIRED_MODULES`・配布manifest・hsync bootの対更新へ追加する。ID/phase/依存/許可パスの最小policyを各追加段で定め、T5c-6は一覧の統合とする。同世代更新・異世代0件書込・別root復旧とFDRECOV-1の稼働root世代門/名札format=2を維持する。部品・対kdebug・28,252B Unicode表を一式で配り、HostDrvから自動代替読込しない。EARLY用のhsync_bootold新対応は不要。
 
-T5-0aと各部品追加前後に2HD/1.44MBの実残量を測る。FDにはインストール用ATAPI/iso9660と、T5c-4以後のFDRECOV-1用 `lan.mod` も含める。VK32の圧縮後差分＋部品の非圧縮長/prefix/FAT cluster丸め＋他ファイル差分を計上し、FD内のsqlite.mod配布とMINIMALでの未ロードを区別する。不足する追加段の直前にT6b-M (§7-1) を挿入する。508KiB集積拡張 (T6b-1/2) とは別の容量ゲートとする。
+T5-0aと各部品追加前後に2HD/1.44MBの実残量を測る。FDにはインストール用ATAPI/iso9660と、T5c-4以後のFDRECOV-1用 `lan.mod` も含める。VK32の圧縮後差分＋部品の非圧縮長/prefix/FAT cluster丸め＋他ファイル差分を計上し、FD内のsqlite.mod配布とMINIMALでの未ロードを区別する。不足する追加段の直前にT6b-M (§7-1) を挿入する。集積拡張の凍結とは別の容量ゲートとする。
 
 ## 6. T5c 外へ出す順序と T6b
 
@@ -255,17 +255,15 @@ KCG移設でもUnicode探索はcoreに残す。撤去済みleaseや表ポイン�
 
 h4は既存の低位/物理32MiB超USER bufferでext2/HostDrv往復とowner回収を行う (`kdebug/kselftest.c:1012,1182`)。移設後もS4 VFS/DMA importはcore facade経由で保ち (:1717,1845)、依存が使える時点で同fixtureを回す。HostDrvはcoreの現行順を保ち、h4のSKIPを成功に数えない。DMA境界検査のtransfer=none (:1175) はPCM/FDC実転送の証拠ではない。
 
-T6bは最後に集積を上位票の `[0x500000,0x600000)` へ移し上限1MiBにする。loader自身、stack、圧縮源、core展開先、bootinfoを区間表へ載せ、**全宛先を検証するまで1バイトも展開しない**。source/destinationの重複も検査する。FDのreal-mode読込からPMコピーへの境界でsegment wrap/64KiB分割を監査する。単なるMAX_IMAGE_SIZE置換では閉じない。
-
-8MBのピークは各段の同時生存区間の和で証明する。圧縮画像1MiBが生存する間にBB/SQLiteを先取りしない。展開完了後に集積を返し、POST_ROOTを開始する。同梱域の予約・移譲は無い。終了時の空きだけを測ってピーク合格にしない。
+T6b-1/2は凍結。圧縮像が508KiBの8割 (約416KiB) に近づいたら起票する。T6b-MのFD容量対策は継続する。
 
 ## 7. 実装単位と試験台帳
 
 ### 7-1. 半日〜1日の受入単位
 
-T4行は実装時の契約履歴として残し、追加作業はT5-0aから。各行は独立に差分を検査・受入できる0.5〜1日 [推] の単位で、丸数字が観測する条件 (最大8項、10項以下)。T4b-4a/4bはT4b-4へ、T4b-5/6はT4b-5へ統合し、残る番号は引継ぎ参照のため維持する。同一段内でも先行行の成果物を使う。未接続の核はhost試験で単独受入し、公開切替はT4c/T5aの統合ゲートを通す。工数超過/10項超なら依頼前にさらに割る。§9は決定済み。測定ゲートは各担当行で確認する。
+T4行は実装時の契約履歴として残し、追加作業はT5-0aから。各行は独立に差分を検査・受入できる0.5〜1日 [推] の単位で、丸数字が観測する条件 (10項を超えたら分割)。T4b-4a/4bはT4b-4へ、T4b-5/6はT4b-5へ統合し、残る番号は引継ぎ参照のため維持する。同一段内でも先行行の成果物を使う。未接続の核はhost試験で単独受入し、公開切替はT4c/T5aの統合ゲートを通す。工数超過/10項超なら依頼前にさらに割る。§9は決定済み。測定ゲートは各担当行で確認する。
 
-T5の順は **T5-0a → T5-0b → T5a-1/2/3 → T5b-4 (縮小) → T5c-0 (前倒し) → T5b-5 → T5c-1/2a/2b/3/4/5b/6**。容量不足時だけT6b-Mを該当追加段の前へ入れ、T6b-1/2 → T7へ進む。T5b-1〜3・T5b-6・T5c-5aは削除し、残る番号は参照のため維持する。FM/PCMのSTOPはT5a-3の契約を引き継ぐ。
+T5の順は **T5-0a → T5-0b → T5a-1/2/3 → T5b-4 (縮小) → T5c-0 (前倒し) → T5b-5 → T5c-1/2a/2b/3/4/5b/6**。容量不足時だけT6b-Mを該当追加段の前へ入れ、T5cの後はT7へ進む。T6b-1/2は凍結。圧縮像が508KiBの8割 (約416KiB) に近づいたら起票する。T5b-1〜3・T5b-6・T5c-5aは削除し、残る番号は参照のため維持する。FM/PCMのSTOPはT5a-3の契約を引き継ぐ。
 
 | 小段 (順) | 変更するもの・独立成果 | 観測できる受入条件 / 対応する変異 |
 |---|---|---|
@@ -285,24 +283,23 @@ T5の順は **T5-0a → T5-0b → T5a-1/2/3 → T5b-4 (縮小) → T5c-0 (前倒
 | T4c-1 (1日) | SQLite module build・typed facade・全stub | ①旧連結sqlite section/addr参照と固定stack依存が消える ②全db API/診断がstubかtyped exportへ ③通常db_test/db_mem_used成功 ④旧新混在はinit0で拒否。直呼び残存/NULL stub変異を検出。/bootへ配布しhsync bootで対更新 (§5-4)。resident終端・stack・KHEAP算出と監査を切替 (§7-2)。依頼に `rg -l "__sqlite_\|SQLITE_STACK\|__kernel_resident_end"` の全参照一覧 (paging/kentry/isr・監査・tools/testsも含む) を添える。VK32をcore1本へ変更、Unicode順序・配布世代門も同期 (§3-4/5-4)。 加えて `make kernel` がカーネルの像と対の部品 (kdebug.bin・SQLite の部品、T5 以降は起動時に読む部品) を全部組むこと (部品の一覧は `build/kernel.mk` の 1 つの変数、ユーザー決定 2026-10-18)。 SQLITE の policy (`tools/module_schema.py`) を PAIR 必須にし、mkmod に `--vmkernel` を必須で渡す (T4a の時点では PAIR を禁じていて、同じ版の古い部品を受け入れうる — T4a のレビュー R5)。 `module_start` は prefix の返却に失敗して回収まで済んだときに 0 を返す (`kernel/module_runtime.c:133-134`) — 呼び手は戻り値だけで成功と判断せず状態を見るか、0 以外を返す形に直す (T4a のレビュー Q1)。 |
 | T4c-2 (1日) | services_public・settings→FEP transaction | ①公開前db/imeはstub、全成功で同時公開 ②各init確保/設定close/FEP CRC/辞書欠落/予約不足を注入 ③戻せた失敗はSQLite owner占有0・MINIMAL ④close/shutdown失敗は隔離byteとMINIMAL_QUARANTINEDを診断。早期公開/隔離free変異を検出。Unicode7頁を保持し欠落等はかなのみ継続 (§3-4)、配布世代門を回帰 (§5-4)。監査diff0 (§7-2)。起動tickを前後比較 (NP21/W参考値、現591〜595 / 544〜558、合否に使わない)。 |
 | T4c-3 (1日) | FEP の標準構成の回帰 (app 圧迫下の変換・ext2 学習) | ④アプリが MEMSYS5 の app+system 上限 319,488 B まで使っても FEP の変換が成功 ⑤ext2 標準 RW の学習を保持。FEP 予約を app と同じ上限で拒否する変異・学習を省く変異を検出 |
-| T5-0a (1日) | T4基準化・engine stack計測・最初のゲスト受入 | ①受入SHA/設定・core/module/guard/FD残量を記録 ②製品SQL設定のdb fixtureを同じ文の形のまま数分へ縮め期待結果/試験を同期 (行数はstack深さを変えない) ③128KiBのままinit/settings・db_test/db_v50_test・大きいSQL・FEP変換/学習/切替・CUI/GUIとSTOP後処理のhigh-water/残余/未測定範囲を提示 ④IMEDUP-1をゲストで確認 (学習後同一候補の重複なし、32件未満可) ⑤32KiB採否案。host 4,604Bをゲスト最大と扱わない |
-| T5-0b (1日) | KSTK-DF・stack採否 | ①Intel資料に基づく専用TSS/task gate/stack/有効CR3をcoreに置き全使用PDから到達可 ②kernel/engineの実guard到達をゲスト注入し最小診断→停止、reset/cleanup0 ③通常例外/ESP0/監査回帰 ④深度100のhost実測24,388Bにより32KiB+NP1頁を選択 (ユーザー決定2026-10-18)し同じ負荷/rollbackを再確認。host SA_ONSTACKは代用不可 |
+| T5-0a (1日) | T4基準化・engine stack計測・最初のゲスト受入 | ①受入SHA/設定・core/module/guard/FD残量を記録 ②製品SQL設定のdb fixtureを同じ文の形のまま数分へ縮め期待結果/試験を同期 (行数はstack深さを変えない) ③128KiBのままinit/settings・db_test/db_v50_test・大きいSQL・FEP変換/学習/切替・CUI/GUIとSTOP後処理のhigh-water/残余/未測定範囲を提示 ④IMEDUP-1をゲストで確認 (学習後同一候補の重複なし、32件未満可) ⑤観測済み負荷と未測定範囲を記録。stackの決定は§3-1 |
+| T5-0b (1日) | KSTK-DF・32KiB stack | ①Intel資料に基づく専用TSS/task gate/stack/有効CR3をcoreに置き全使用PDから到達可 ②kernel/engineの実guard到達をゲスト注入し最小診断→停止、reset/cleanup0 ③通常例外/ESP0/監査回帰 ④engine stack 32KiB + NP 1頁 (深さ100のhost実測24,388Bが収まる、SQLITE_MAX_EXPR_DEPTH=100のまま、ユーザー決定2026-10-18)。host SA_ONSTACKは実guard注入の代用不可 |
 | T5a-1 (1日) | FEP B2・staging/出力境界 | ①各256B/64件境界・戻り値/NULL契約を入口ごとに対照 ②不正入力engine進入0/output不変 ③finalize/reset/binding終了→leave→copyout順 ④late出力拒否後もbusy解除 ⑤export不正pathでcreate/truncate0。寿命逆転/失敗kanjiをNULL化する変異を検出。X-1担当表を更新するがpage0 NPは閉じない |
 | T5a-2 (1日) | fep.modへの分離・依存・stub | ①core直リンクをなくしtyped facadeと描画callback/ctx寿命を照合 ②SQLite→FEP非公開init、逆順rollback、close失敗の依存隔離 ③RESIDENT/遅延journalを子終了で失わない ④PAIR必須・KERNEL_PAIRED_MODULES・/boot配布・hsync同/異世代/別root復旧 ⑤正常/MINIMALのGUI textbox/CUI英数編集 (生キー/無入力) ⑥Unicode7頁保持・guard込み監査diff0。stub常時−1/依存先先free変異を検出 |
 | T5a-3 (1日) | GUI端末の観測 (T4B7-GUI) と入力・IME・STOP | ①T5-0aの短縮fixtureでGUI端末db done/stop・区間内log stop (試験ビルド)、engine/内部ログ中断0・安全点以後回収1回 ②端末/起動連鎖だけへ一度配送、無関係なRunの窓なしWAIT_KEYは理由表示して終了 ③前景切替の元窓への確定と入力先消滅/GUI↔CUIの取消を区別、mode/辞書/ON表示保持 ④終了中の子STOPを親/再利用slotへ残さず新STOPは有効 ⑤通常/MINIMALのGUI textbox/CUI編集。端末の実体・世代・起動経路を依頼で固定しH-7/T5A-ACCと分ける |
 | T5b-4 (0.5日、縮小) | core FAT・FD回復の回帰 | ①書込み禁止FDでroot/Unicode/shell ②HDD起動後もFD利用 ③MINIMAL全db NOSYS・英数編集 ④install --recover-settingsの制限を正しく表示 ⑤全媒体同一像・FD残量・配布世代門とhsync途中停止後の/host維持。FAT分離はしない |
-| T5c-0 (前倒し、1日) | FS/Device登録寿命・必要なbroker・record容量 | ①VFS_MAX_FS=8の満杯を明示失敗、解除口無しの現状から公開/rollback方式を固定 ②登録後失敗で参照を断って回収、不能なら隔離 ③STARTINGの必要IRQ有効・tick/callback/DMA停止不能は依存閉包保持 ④永久DEVICE予約不変 ⑤§5-2の縮小後構成と隔離保持から MODULE_RECORD_CAP の暫定の上限と満杯拒否を固定 (確定値は T5b-5 の後に記録)。FS/Device核はCDより前、残るbrokerは各切出し前に必要分だけ受ける (10項超なら分割) |
+| T5c-0 (前倒し、1日) | FS/Device登録寿命・必要なbroker・record容量 | ①VFS_MAX_FS=8の満杯を明示失敗、解除口無しの現状から公開/rollback方式を固定 ②登録後失敗で参照を断って回収、不能なら隔離 ③STARTINGの必要IRQ有効・tick/callback/DMA停止不能は依存閉包保持 ④永久DEVICE予約不変 ⑤生成policyの許可ID数から MODULE_RECORD_CAP を一度に決定し、満杯拒否を確認。FS/Device核はCDより前、残るbrokerは各切出し前に必要分だけ受ける (10項超なら分割) |
 | T5b-5 (1日) | POST_ROOTのATAPI/iso9660・CDインストール元読取 | ①FD/HDDの/bootから読みcdinst前に登録、MINIMALでもパッケージ読取/照合 ②共有diskio等の依存と登録順、/cd0自動mountとloop/hd上ISO試行 ③無媒体/短読/破損は診断し成立済みrootを継続、未成立装置/mount公開0 ④登録参照を断つまでbody保持、core IDE/HDD/FD利用を回帰 ⑤使い捨て先への既存インストール手順で配布一式・FD容量を照合。CD起動/FEP/settings/immutable permitは対象外 |
-| T5c-1 (0.5日) | KCG ROM移設 | ①typed facadeで同じ文字 ②欠落stub診断 ③旧font経路と排他 ④キャッシュ/owner予算一致。誤export/二重初期化変異を検出。Unicode探索はcore、cache≤64KiBと未搭載時のcore復帰口をT7へ渡す。低位scratchはT7aまでFIXED。font close→BB/mailbox→USER順 (§6)。 |
+| T5c-1 (0.5日) | KCG ROM移設 | ①typed facadeで同じ文字 ②欠落stub診断 ③旧font経路と排他 ④cache hit率を記録。誤export/二重初期化変異を検出。Unicode探索はcore、cacheの計上値64KiBと未搭載時のcore復帰口をT7へ渡す。低位scratchはT7aまでFIXED。font close→BB/mailbox→USER順 (§6)。 |
 | T5c-2a (1日) | FM+snd移設 | ①通常再生/STOP成功 ②tick登録後失敗で呼出先残存0 ③Key-OFF確認後回収、不能時隔離。tick解除欠落変異を検出 |
 | T5c-2b (1日) | PCM移設 | ①再生/停止成功 ②IRQ登録後失敗とDMA停止不能を区別 ③64KiB境界内・停止不能リング保持 ④永久予約不変。DMA証拠省略変異を検出。依頼前にPCM importのcore facade維持か自己試験移設を決め、S4本数/ABI印を更新 (§2-1)。案5 DMA期待 (§0) とh4接続を確認し、transfer=noneを実転送証拠にしない (§6)。 |
 | T5c-3 (1日) | V86移設 | ①CUIのentry/exit往復 ②低位PTE復帰 ③例外復帰コードが回収対象にならない ④セッション中free0。復帰前owner retire変異を検出。依頼前にV86 importの接続とS4本数/ABI印を決定 (§2-1)。caller/esp0保持 (§3-1)、低位FIXEDの非回収 (§6) を確認。bootinfo保存とpage0原本4096B (既存real_lowmemを転用) はcoreの唯一の不変写しとし、session reset/部品回収から除外してT7a-1cへ渡す。必須PTE/例外復帰口もcore保持。 |
 | T5c-4 (1日) | LAN/82557移設・SFS接続 | ①LB受入済みTX/RX/IRQ回帰 ②PCI DECLINEなら参照0、QUARANTINEなら再bind/free0 ③LAN版/host通信中の取消/断線で有限復帰 ④session/NIC callbackを断つまで保持。IRQ/tick片方のみ解除変異を検出。現TX/RX/IRQ・LAN同期の移設回帰。h4/core facadeを維持 (§6)。⑤FD起動 (MINIMALを含む) でlan.modを読み [FDRECOV-1](../realhw/TASK_FDRECOV.md) の回帰を1本。FD容量にlan.modとATAPI/iso9660を計上。82557はhost試験＋LGY-98経路、実機分はT4T7-RHへ。LGY98-L12の既知FAILを移設の合格へ読み替えない。 |
 | T5c-5b (1日) | Cirrus+WAB移設・core識別glue | ①GUI=0識別/予約、enable0 ②GUI境界でだけprobe/enable ③失敗でもPEGC等の永久予約維持 ④全共通PDEが最初のAS前に準備済み。識別/enable混合変異を検出。案5のPT枠 (§0) とPEGC最上位窓予約を維持。 |
 | T5c-6 (1日) | 起動policy/manifestの一覧統合・splashアプリ | ①先行段からのID/phase/依存/policyを統合、欠落/循環/重複/未知IDは公開前失敗 ②必須削除でもSQLite/FEPを省略扱いにしない ③splash lease返却→rshell/SerialFS→shellの順 ④表示失敗でもshellへ。必須判定/lease返却欠落変異を検出。splash後のcaller/esp0保持 (§3-1)、font close→BB/mailbox→USER順と低位FIXED非回収 (§6) を確認。 |
-| T6b-M (容量不足なら該当T5段の前へ) | POST_ROOT部品の圧縮 (まずSQLite) | ①外枠の形式/圧縮長/展開長上限 ②元KMODの世代/PAIR/CRCとinit前検証を維持 ③固定小bufferから最終load_spanへ展開、全画像scratch追加0 ④短読/破損/展開超過はinit0・回収 ⑤FD純節減・読込/展開時間・peak実測。集積移動T6b-1/2とは別段 |
-| T6b-1 (1日) | HDD/FD集積移動・全区間検査 | ①508KiB超〜1MiB成功/1MiB+1拒否 ②loader/stack/source/core/bootinfo重複で展開write0 ③FD64KiB分割/segment wrap境界が一致 ④C/ASM同fixture同理由。最終entry検査前展開変異を検出。hsync読取・boot_image_info利用者の1MiB上限への追随を確認。EARLY用形式変更は含めない (§5-4)。 |
-| T6b-2 (0.5日) | 生存区間/ピーク計測・最終構成台本 | ①展開・root・SQLite/FEP公開・splash各時点でowner/PFN和一致 ②集積返却後にBB/SQLite、別staging0 ③64MB通常/故障対照 ④8MB planar/PEGC・17MB・Ra266は最終段の未実施欄へ引継ぐ。返却漏れは計数不一致になる。案5配置・USER別勘定 (§0/3-3)、prefix/guard/隔離を含む監査diff0 (§7-2)。実機分はT4T7-RHへ送り受入を止めない。 |
+| T6b-M (容量不足なら該当T5段の前へ) | POST_ROOT部品の圧縮 (まずSQLite) | ①外枠の形式/圧縮長/展開長上限 ②元KMODの世代/PAIR/CRCとinit前検証を維持 ③固定小bufferから最終load_spanへ展開、全画像scratch追加0 ④短読/破損/展開超過はinit0・回収 ⑤FD純節減・読込/展開時間・peak実測。凍結中の集積移動T6b-1/2とは別段 |
+| T6b-1/2 (凍結) | 集積移動・上限拡張 | 圧縮像が508KiBの8割 (約416KiB) に近づいたら起票 |
 
 T4a-2 試作測定 (履歴、T5の製品予算には使わない): `make sqlite-module-proto`、SQLite 3.53.0 全amalgamation/GNU89/`-Os`、製品設定、local kstring/kmath、libgcc 6 memberを保持。VFSコピーだけ外部pool/`ktime_ticks()`へ変更。
 | 容器 / body | prefix (表実長 / ページ確保) | payload / BSS | reloc / import / export |
@@ -319,15 +316,15 @@ T4でSQLiteはFIXED鎖からowner割当へ移行済み。T5入口で実mapを基
 | 範囲 | core像の実績 / 増減見積もり | core外・測定ゲート |
 |---|---:|---|
 | T4a 共通核/生成policy | +4〜8KiB (DBGREF分を二重計上しない) | prototypeでprefix/body/record容量を確定。kdebug ONは既存body48KiB・peak60KiB、OFFは0 |
-| T4a-4 再測定 (当時のhost ILP32実績、製品はT4で結線済み) | core増分0 | 512KiB内に固定管理状態80B、HEAP 524,208B、実容量516,096B。予約196,608B、APP+SYSTEM上限319,488B。settings の system/fep_mem_reserve_kb で増やす向きだけ上書き可、下限は既定192KiB。合成S/M/L最大FEP 99,328B、実IPADIC 101,376B、各27切替成功 (ログ `~/os32-tmp/run/t4a/fix1_budget*.log`) |
+| T4a-4 再測定 (当時のhost ILP32実績、製品はT4で結線済み) | core増分0 | 512KiB内に固定管理状態80B、HEAP 524,208B、実容量516,096B。予約196,608B、APP+SYSTEM上限319,488B。settings の system/fep_mem_reserve_kb は既定192KiB、下げる向きの上書きも可、下限は実測の最大 (T4a-4の実IPADIC 101,376Bを切り上げた100KiB程度)。コードの直しは別依頼 (wt/fepres)。合成S/M/L最大FEP 99,328B、実IPADIC 101,376B、各27切替成功 (ログ `~/os32-tmp/run/t4a/fix1_budget*.log`) |
 | T4b facade/F2/F3/X群 | +4〜10KiB | group/identity/出力stagingを含むmap差分。X-1の棚卸しで上限が変わるなら着手前に再見積もり |
 | T4c SQLite分離 | core接続増分+4,072B、T4c-2で+1,174B [実績]。受入像約252KB・常駐終端0x19c000 | 別観測のbuild ID 562ff32 (受入一式の再ビルド値ではない) は常駐終端0x19d000・sqlite.mod=398,424B、body385,024B、prefix16,384B。heap512KiB+stack128KiB+guard4KiB込み定常1,044,480B、prefix込み1,060,864B (record等別)。T5-0aで受入一式を再測定 |
-| T5a FEP分離 | 旧FEP約18.5KiBを外へ、B2 staging等+5〜7KiB [推] | module本体/状態・ページ丸めを新mapで計上。旧群値は `docs/tasks/v3/TASK_MEMMAP_V3.md:322`、現実測の節約量ではない |
+| T5a FEP分離 | FEP撤去とB2 staging等のcore増減を記録 | module本体/状態・ページ丸めを新mapで計上。旧群値は `docs/tasks/v3/TASK_MEMMAP_V3.md:322`、現実測の節約量ではない |
 | T5b CD POST_ROOT | ATAPI/iso9660のcore減分とfacade/登録核の増分を実測 | FAT/HostDrvはcore。同梱域/212B wireの増分なし。FD上部品とprefix/常駐量を別に計上 |
-| T5c 各driver/manifest | broker/一覧+3〜6KiBから実際に除いた群を差引く | NIC・PCMのDMAは固定DMA pool、module RAMと二重計上しない。群別の新mapとprefix/常駐/隔離を各段で採る |
-| T6b | kernel追加の計数/glue≤1KiB [推]、loaderと圧縮対応増分は別枠 | 圧縮源≤1MiBの寿命・展開peak、T6b-MのFD純節減を実測。8MBの旧概算を合格値に転用しない |
+| T5c 各driver/manifest | broker/一覧追加と各群撤去のcore増減を記録 | NIC・PCMのDMAは固定DMA pool、module RAMと二重計上しない。群別の新mapとprefix/常駐/隔離を各段で採る |
+| T6b-M | 圧縮対応によるcore/loaderの増減を記録 | FD純節減・読込/展開時間・peakを実測 |
 
-T3値は履歴とし、案5の配置契約を維持したT4後の同一SHA・設定一式でT5-0a時に成果物の `__bss_end`、実定数、core text/data/bss、圧縮長、SLACK、free/max連続pagesを基準化する。各段は増減を同じ構成・同じフラグで比較し、既存像の残りを越す/SLACKの返却量を侵す/必要連続量を確保できない場合は後続へ進めず段を縮めて再計測する。coreの増分は§7-2各行の上端も暫定見積ゲートとし、超過時は理由・新mapを提示して枠を見直す。KHEAP/SHMを削る、FEPを省略する、MEMSYS5を増減することで帳尻を合わせない。上の見積もりは承認済み予算ではなく、正負の未実測値を相殺して合格にも使わない。
+T3値は履歴とし、案5の配置契約を維持したT4後の同一SHA・設定一式でT5-0a時に成果物の `__bss_end`、実定数、core text/data/bss、圧縮長、SLACK、free/max連続pagesを基準化する。各段は増減を同じ構成・同じフラグで記録する。像・容量について止める条件は硬い上限 (MAX_IMAGE_SIZE・MEM_KERNEL_IMAGE_MAXのASSERT・FD実測) だけとし、各行の見積もり上端は関門にしない。KHEAP/SHMを削る、FEPを省略する、MEMSYS5を増減することで帳尻を合わせない。上の見積もりは承認済み予算ではなく、正負の未実測値を相殺して合格にも使わない。
 SQLiteのpool/stackはbodyから外してowner付き連続割当とし、BSSの旧384KiBを残して512KiBを追加する二重確保をmapで検出する。FEPの4,352B stagingとタグ表はそれぞれ置いた領域で1回だけ計上する。KDEBUG=1受入ではそのowner/bodyもピーク・定常へ加え、隔離は空きに含めない。共通ログはbuild ID (SHA)・構成・小段・成否/未実施を持ち、詳細はその段の判定に必要なものだけ採る。形式/ロード段は世代・画像CRC・phase/状態、メモリ段はowner/PFN・prefix/body/heap/stack・最大連続空き、engine段はIF/深さ・例外分類、driver段はcallback/DMA参照を記録する。失敗時は初回理由・残存/隔離量を該当範囲で残す。
 
 > 2026-10-14 ユーザー決定: 搭載メモリ量ごとの確認は v3 の最終段にまとめる (DEFERRED_TESTS の関門「v3 の最終段」)。それまでのゲスト受入は 64MB の 1 構成。以下の構成一覧は最終段用として残す。
@@ -346,6 +343,7 @@ r4材料は `RECHECK_r4.md` と `opus_r1.md` (Approve、PMはF1〜F6採用)。�
 
 | 論点 | 決定・根拠 | 反映・確認する段 |
 |---|---|---|
+| **ユーザー承認 2026-10-18: 根拠のあいまいな基準の見直し** | FINDINGS.mdの推奨を採用。stack固定、集積拡張凍結、増減記録、policyのID数でrecord容量を決定、KCG hit率記録、FEP予約の下方上書き | §0・§3-1・§5-2/5-4・§6・§7。#7のコード変更は別依頼 |
 | **決定 (ユーザー 2026-10-16)**: 3 SQL入口の拒否時のstmt/slotとfinalize時期 (F1/F2) | 古い行が返るのは、戻り値を見ずに `db_step` を呼んだアプリ自身の文だけで、シングルタスクでは他のアプリや OS のデータに及ばない — **アプリ側の書き方の問題**として扱う (ユーザー)。第三案 (保留 stmt) は採らない。拒否時は「何も変えない」(`docs/tasks/settings/FEP_BOUNDARY.md:140,141,213`) にそろえ、`docs/KAPI_SPEC.md:1396` の prepare_only の入口 finalize は「受け付けた入力のときだけ」と書き直す。KAPI_SPEC に「拒否の戻り値を見ずに step すると前の文の続きが返る」と注記 | 本票は反映済み。KAPI_SPEC の説明同期は T4b-1 の前に行う |
 | **決定 (ユーザー 2026-10-16)**: X-11の共有サービスの呼出し主体 | 端末ごと・本人ごとの**新しい権限の分離は足さない** (単一利用者)。T4b-5 で通常の親子・park/resume の順を観測し、二重消費・別 owner への副作用・寿命の不具合が出たら、そこだけ直す。攻撃者を置かないことを理由に未観測の不具合を閉じない | T4b-5の契約を維持し、GUIRUNKEY-1・IMECAND/IMEIND・終了中STOPをT5a-3で回帰。IMEDUP-1の最初のゲスト確認はT5-0a |
 | **決定 (ユーザー 2026-10-16)**: HostDrv rootの管理DB配置 | **HostDrv を root にしない**。管理 DB は通常の root (NHD の ext2) に置く。§3-5 の `/persist` ext2 案と、HostDrv root のための移行手順は不要 | §3-5・§5。HostDrvはcoreの現行挙動を維持 |
@@ -353,4 +351,4 @@ r4材料は `RECHECK_r4.md` と `opus_r1.md` (Approve、PMはF1〜F6採用)。�
 | **ユーザー決定2026-10-18: EARLYを作らない** | FAT/HostDrvはcore。VK32複数entry製品利用・bootinfo新形式・U19前倒し・同梱1MiB/所有移譲・対応ASM/hsync_bootoldは作らない。全媒体同一像、形式上限4は不変。ATAPI/iso9660はPOST_ROOTでMINIMALでもcdinst前に読む | §5、T5b-1〜3/6・T5c-5a削除、T5b-4縮小、T5c-0前倒し、T5b-5置換。上位§3-5/4-5/6を同期 |
 | **ユーザー決定2026-10-18: 不変CDのRO SQLiteを凍結** | コードとhost試験を残しT4c/T5bの製品接続予定は取消。次にVFS/ISO境界を触るときに削除費用と像の差で判断 | §3-2・T4b-4cの履歴、台帳T4B-CD。通常CD読取はT5b-5 |
 
-残る技術ゲートは32KiB採否・FD容量とT6b-Mの挿入時期・ATAPI/ISOの部品境界と登録rollback・縮小後のrecord容量・PCM/V86のkdebug接続。FEP既定予約192KiBはT4実績を維持する。8MB/17MBは最終段、実機はT4T7-RHへ。D番号とP100/32MBの目標は変えず、未測定の数字を承認済みにしない。
+残る技術ゲートはFD容量とT6b-Mの挿入時期・ATAPI/ISOの部品境界と登録rollback・PCM/V86のkdebug接続。stackは§3-1の32KiB + NP 1頁で決定済み。FEP予約は既定192KiB、下げる向きの上書きも可、下限は実測の最大 (コードの直しは別依頼)。8MB/17MBは最終段、実機はT4T7-RHへ。D番号とP100/32MBの目標は変えず、未測定の数字を承認済みにしない。
