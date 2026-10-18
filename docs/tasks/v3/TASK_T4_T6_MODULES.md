@@ -1,6 +1,6 @@
 # TASK_T4_T6_MODULES — SQLite・FEP・起動モジュールの詳細設計
 
-> 状態: **実装中 (2026-10-18)** — **T4 (T4a・T4b・T4c-1〜3) は受入完了**。T4c-2 の受入 (eeb4633、`~/os32-tmp/evidence/2026-10-18/t4c2_np21w/RESULT.md`): 段 ROOT_READY → SQLITE_INTERNAL_READY → SETTINGS_CLOSED → FEP_INTERNAL_READY → SERVICES_READY (public=1、quarantine 0、diff=0)、db 9/9・42/42 と T4b-7 の db done/stop が MEMSYS5 のアプリ+システム上限 319,488 B の中で合格、部品なしは MINIMAL で落ちない、予約の上書き 224 は採用・128 は既定 192KiB に丸め。T4c-3 は CD の RO FEP を作らず (ユーザー決定 2026-10-18、CD はインストールの元だけ)、FEP の標準構成の回帰 (app 圧迫下の変換・ext2 学習) を host で。未実行: 注入と QUARANTINED の経路はゲストでは回していない (host の 22 通り)。IMEDUP-1 (学習後に候補が重複) は着地 (SQL は元のまま、重複は C の側で除き候補が 32 件より少なくなるのは許す)、ゲストでの確認は次の受入で。次は T4 の終わりの評価と T5 着手前の再照合 (CD の前提の変更を含む)。
+> 状態: **実装中 (2026-10-18)** — T4 受入完了。**T5-0a 受入** (1514b83、`~/os32-tmp/evidence/2026-10-18/t5-0a_np21w/RESULT.md`): 基準 = 像 253,256 B・sqlite.mod 398,424 B・常駐の終わり 0x19d000・stack_guard 0x300000・SERVICES_READY、FD 空き 2HD 155,648 B / 1.44MB 372,736 B。db fixture は 132 秒 (stop は leave 後に 1 回)。engine stack の high-water は全負荷で 4,668 B (深い式は未測定)。IMEDUP-1 は CUI/GUI で重複なし・学習語が先頭。次は T5-0b (KSTK-DF、stack は host で SQLITE_MAX_EXPR_DEPTH=100 の式を実測して 16KB 以下なら 32KiB・32KB 以下なら 64KiB・それ以上は 128KiB のまま — PM 判断)。
 >
 > **T5 着手前の再照合 r5 (2026-10-18)** — EARLY は作らず FAT/HostDrv は core、CD は POST_ROOT、不変 CD の RO SQLite は凍結。T5 の段・受入・予算を更新 (決定は §9)。
 > それまでの状態: **設計中 (2026-10-18、再照合 r4)** — main `952f16b`、T3受入完了 (2026-10-18)、KAPI v76・memory_layout 4。圧縮余裕18,165 B。本票の実装・受入は未実施。
