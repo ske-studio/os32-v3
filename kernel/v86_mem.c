@@ -7,6 +7,7 @@
 
 #include "v86_mem.h"
 #include "v86.h"
+#include "v86_module.h"
 #include "paging.h"
 #include "pgalloc.h"
 #include "io.h"
@@ -54,10 +55,13 @@ int v86_session_begin(u32 owner)
 
     /* リマップすると実機の IVT/BDA が見えなくなるので先に退避する。
      * ゲストはこれを引き継いで初めてまともに動ける。 */
-    if (paging_v86_snapshot(&v86_session) != 0) return -1;
+    if (!v86_module_session_acquire()) return -1;
+    if (paging_v86_snapshot(&v86_session) != 0) {
+        v86_module_session_release();
+        return -1;
+    }
     v86_session.open = 1;
     v86_session.aborting = 0;
-    v86_bios_save_real();
 
     backing_phys = pgalloc_alloc_phys(owner, V86_BACKING_PAGES);
     backing_owner = owner;
@@ -204,6 +208,7 @@ release:
     if (v86_session.aborting && kdebug.ops.gcap_release) kdebug.ops.gcap_release();
     gfx_v86_return();
     kselftest_audit_v86_return();
+    v86_module_session_release();
 done:
     v86_session.closing = 0;
 }

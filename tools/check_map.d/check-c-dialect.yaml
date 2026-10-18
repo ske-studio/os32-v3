@@ -1,4 +1,5 @@
 check-c-dialect:
+- tools/prototypes/v86_imports.def
 - tools/clang_ast/**
 - tools/tests/test_clang_ast.py
 - '**/*.[ch]'

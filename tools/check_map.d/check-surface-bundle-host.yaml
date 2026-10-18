@@ -1,4 +1,5 @@
 check-surface-bundle-host:
+- kernel/v86_module.h
 - userland/lib/rt/ls.c
 - sdk/include/os32/ls.h
 - exec/access_walk.c

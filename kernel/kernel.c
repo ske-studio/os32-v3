@@ -71,6 +71,7 @@ extern int fatfs_init(void);
 #include "pipe_buffer.h"
 #include "snd_engine.h"
 #include "fm_module.h"
+#include "v86_module.h"
 #include "mouse.h"
 #include "lgy98.h"
 #include "pcm_module.h"
@@ -205,6 +206,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * memory_boot_detect も低位 (0594h) を読むだけだが、順序を固定する
      * ためここに置く。以後は写しだけを使う (bootinfo_get / _hdd_geom)。 */
     bootinfo_capture();
+    v86_bios_save_real();
 
     /* ローダの 512KB プローブは 16MB 手前までしか見ない (その先は PC-98 の
      * 16MB システム空間で、書き込みプローブが VRAM を壊す)。16MB 超は BIOS
@@ -540,6 +542,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     } else {
         kprintf(0x07, "[dma] RAM short; pool/PCI/PCM skipped\n");
     }
+    v86_module_load(); /* Core facades are ready before kdebug selftests. */
     kdebug_load();
     if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_run();
     else kselftest_skipped();

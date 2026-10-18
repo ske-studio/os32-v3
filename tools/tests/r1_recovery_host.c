@@ -278,3 +278,7 @@ void _start(void) {
     say("r1 recovery: K1, parent syscall exit, PARKED pre-commit, quarantine/owner-exit PASS\n");
     die(0);
 }
+
+/* Module lifetime is covered by v86_module_host.c. */
+int v86_module_session_acquire(void) { return 1; }
+void v86_module_session_release(void) {}

@@ -106,8 +106,9 @@ void v86_bios_setup(void);
 /* セッション終了時に実機の IVT/BDA を書き戻す */
 void v86_bios_restore_real(void);
 
-/* リマップ前の実機 IVT / BDA を退避する。v86_mem_setup() の先頭で呼ぶ。 */
+/* Boot-only capture before paging; session reset never changes this copy. */
 void v86_bios_save_real(void);
+const u8 *v86_bios_real_lowmem(void);
 
 /* このベクタを HLE するか (しないならゲストの IVT へ流す) */
 int  v86_bios_is_hle(u32 vector);

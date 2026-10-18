@@ -31,7 +31,7 @@ exec/ring3_ls.o exec/exec.o: exec/ring3_ls.h
 
 # === カーネル C ソース ===
 C_KERNEL = \
-    kernel/kernel.c kernel/kstack_hw.c kernel/boot_font.c kernel/gdt.c kernel/double_fault.c kernel/tss.c kernel/v86.c kernel/v86_mem.c kernel/v86_io.c kernel/v86_pic.c kernel/v86_kbd.c kernel/v86_bios.c kernel/v86_gcap.c kernel/boot_splash.c kernel/idt.c kernel/isr_handlers.c kernel/cpu_calibrate.c kernel/cpu_calibrate_math.c kernel/sysclk.c kernel/pit_math.c kernel/bootinfo.c kernel/bootinfo_check.c \
+    kernel/kernel.c kernel/kstack_hw.c kernel/boot_font.c kernel/gdt.c kernel/double_fault.c kernel/tss.c kernel/v86.c kernel/v86_mem.c kernel/v86_snapshot.c kernel/v86_module.c kernel/v86_gcap.c kernel/boot_splash.c kernel/idt.c kernel/isr_handlers.c kernel/cpu_calibrate.c kernel/cpu_calibrate_math.c kernel/sysclk.c kernel/pit_math.c kernel/bootinfo.c kernel/bootinfo_check.c \
     kernel/paging.c kernel/paging_app.c kernel/dma_pool.c kernel/dma_pool_math.c kernel/physmem.c kernel/pgalloc.c kernel/ledger_pci.c kernel/memory_boot.c kernel/shlib.c kernel/shm.c kernel/gui.c kernel/kmalloc.c kernel/console.c kernel/con_sink.c kernel/bootlog.c kernel/bootlog_save.c kernel/kbd_inject.c kernel/sys.c kernel/sysconfig.c kernel/kaudit.c kernel/kaudit_boot.c kernel/kselftest_report.c kernel/irq.c kernel/irq_math.c kernel/ktime.c kernel/time_math.c \
     kernel/sqlite_engine.c kernel/sqlite_outer.c lib/sqlite3/os32_sqlite_test.c kernel/module.c kernel/module_image.c kernel/module_runtime.c kernel/unicode_file.c kernel/fep_module.c kernel/cd_module.c kernel/kcg_module.c kernel/fm_module.c \
     drivers/kbd.c drivers/kbd_status.c drivers/kbd_dlog.c drivers/serial.c drivers/serial_plan.c \
@@ -189,7 +189,7 @@ $(BUILD_OUT)/layout-manifest.json: $(BUILD_OUT)/generations-manifest.json tools/
 deploy deploy-u3 deploy-kernel deploy-nhd nhd-migrate-pt deploy-fd: $(BUILD_OUT)/layout-manifest.json
 
 # 像の CRC (pair) を埋める部品の一覧。T4c-1 で SQLite、T5 で起動時の部品を足す。
-KERNEL_PAIRED_MODULES := $(BUILD_OUT)/kdebug.bin $(BUILD_OUT)/sqlite.mod $(BUILD_OUT)/fep.mod $(BUILD_OUT)/cd.mod $(BUILD_OUT)/kcg.mod $(BUILD_OUT)/fm.mod $(BUILD_OUT)/pcm.mod
+KERNEL_PAIRED_MODULES := $(BUILD_OUT)/kdebug.bin $(BUILD_OUT)/sqlite.mod $(BUILD_OUT)/fep.mod $(BUILD_OUT)/cd.mod $(BUILD_OUT)/kcg.mod $(BUILD_OUT)/fm.mod $(BUILD_OUT)/pcm.mod $(BUILD_OUT)/v86.mod
 kernel: $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/vmkernel.lz4 $(BUILD_OUT)/layout-manifest.json $(KERNEL_PAIRED_MODULES)
 
 # === カーネルクリーン ===

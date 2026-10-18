@@ -22,6 +22,7 @@
 #define SYS_SHELL_BIN_FDD     "/sys/shell.bin"     /* FDDフォールバック (統一パス) */
 #define SYS_GSHELL_BIN        "/bin/gshell.bin"    /* GUI シェル (WM 常駐、W1 が実体を作る、契約 T9) */
 #define SYS_SQLITE_MOD        "/boot/sqlite.mod"
+#define SYS_V86_MOD           "/boot/v86.mod"
 #define SYS_FM_MOD            "/boot/fm.mod"
 #define SYS_PCM_MOD           "/boot/pcm.mod"
 #define SYS_CD_MOD            "/boot/cd.mod"

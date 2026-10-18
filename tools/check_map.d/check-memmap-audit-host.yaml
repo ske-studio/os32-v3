@@ -1,4 +1,5 @@
 check-memmap-audit-host:
+- kernel/v86_snapshot.c
 - arch/x86/**
 - build/checks.d/check-gfx-reinit-host.mk
 - build/checks.d/check-memmap-audit-host.mk

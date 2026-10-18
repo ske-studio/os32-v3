@@ -24,7 +24,7 @@ u32 ledger_region_count;
 static int available, conflict, reserved, tested, bound, pcm, diag, loaded;
 static int debug_enabled = 1;
 static int dma_tested, dma_skipped, unicode_loads;
-static int cd_loaded;
+static int cd_loaded, v86_loaded;
 static u32 boot_drive = BOOT_DRIVE_FDD;
 static void kprintf(int attr, const char *fmt, ...);
 static void test_dma_pool(void) { dma_tested++; }
@@ -65,8 +65,15 @@ static void selftest(void)
     CHECK(dma_pool_free_pages() == DMA_POOL_PAGES && !dma_pool_leaked());
 }
 struct kdebug kdebug;
+static int v86_module_load(void)
+{
+    CHECK(reserved && !loaded && !tested);
+    v86_loaded++;
+    return 0;
+}
 void kdebug_load(void)
 {
+    CHECK(v86_loaded == 1);
     loaded++;
     kdebug.state = debug_enabled ? KDEBUG_RUNNING : KDEBUG_OFF;
     kdebug.ops.selftest_run = debug_enabled ? selftest : 0;

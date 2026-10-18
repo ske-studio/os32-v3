@@ -112,13 +112,13 @@ struct v86_session_state {
     int running;
     int aborting;
     int release_pending;
-    int real_saved;
+    int real_saved; /* Boot capture latch: never clear on session reset. */
     u32 backing_phys, backing_owner;
     u32 jmpbuf[KSETJMP_BUF_LEN];
     u32 saved_esp0, saved_eflags;
     u32 low_pte[V86_GUEST_MAP_END / PAGE_SIZE];
     u32 master_pde, active_pde, active_cr3;
-    u8 real_lowmem[PAGE_SIZE];
+    u8 real_lowmem[PAGE_SIZE]; /* Immutable core boot page0; T7a-1c. */
 };
 extern struct v86_session_state v86_session;
 extern u32 v86_restore_mismatch;
