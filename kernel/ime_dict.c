@@ -393,7 +393,8 @@ int ime_dict_close(IME_Dict *dict)
         }
     }
 #ifndef OS32_SQLITE_DIRECT_TEST
-    if (services_boot_fault == SERVICES_FAULT_FEP_CLOSE) rc = SQLITE_BUSY;
+    if (services_stage < SERVICES_READY &&
+        services_boot_fault == SERVICES_FAULT_FEP_CLOSE) rc = SQLITE_BUSY;
     else
 #endif
     if (dict->db) rc = sqlite3_close((sqlite3 *)dict->db);

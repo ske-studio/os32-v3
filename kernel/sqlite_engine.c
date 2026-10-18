@@ -183,12 +183,17 @@ static int services_settings(int *reserve)
     if (rc) return rc;
     rc = os32_sqlite_outer_group_open(&group, SYS_SETTINGS_DB, SQLITE_OPEN_READONLY, &db);
     if (!rc && !os32_sqlite_prepare_v2(db,
-            "SELECT ival FROM settings WHERE scope='fep' AND key='mem_reserve_kb' AND type=0",
+            "SELECT ival FROM settings WHERE scope='system' AND key='fep_mem_reserve_kb' AND type=0",
             -1, &stmt, 0) && os32_sqlite_step(stmt) == SQLITE_ROW) {
         int kb = os32_sqlite_column_int(stmt, 0);
-        /* Invalid configured values fail reservation, rather than wrap. */
-        *reserve = kb > 0 && kb <= (int)(SQLITE_MODULE_POOL_SIZE / 1024)
-                 ? kb * 1024 : -1;
+        if (kb < OS32_SQLITE_FEP_RESERVE / 1024) {
+            kprintf(0x07, "[services] fep_mem_reserve_kb below default: %d; using %d KiB\n",
+                    kb, OS32_SQLITE_FEP_RESERVE / 1024);
+            *reserve = OS32_SQLITE_FEP_RESERVE;
+        } else {
+            /* Oversized values fail reservation without overflowing bytes. */
+            *reserve = kb <= (int)(SQLITE_MODULE_POOL_SIZE / 1024) ? kb * 1024 : -1;
+        }
     }
     if (stmt) os32_sqlite_finalize(stmt);
     rc = os32_sqlite_outer_group_begin_close(&group);
@@ -217,7 +222,7 @@ void services_boot(void)
     if (rc) goto rollback;
     services_stage = SERVICES_SETTINGS_CLOSED;
     kprintf(0x07, "[services] SETTINGS_CLOSED tick=%u\n", tick_count);
-    if (services_boot_fault == SERVICES_FAULT_RESERVE) reserve = 1;
+    if (services_boot_fault == SERVICES_FAULT_RESERVE) reserve = SQLITE_MODULE_POOL_SIZE;
     rc = os32_sqlite_outer_boot_check(0, reserve);
     if (rc) goto rollback;
     rc = ime_dict_boot();

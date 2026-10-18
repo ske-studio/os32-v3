@@ -85,6 +85,15 @@ def run(mutation=None):
 
 
 MUTATIONS = [
+    ('MINIMAL-scan-only-poll', 'ime_source.inc',
+     'int ime_trygetchar(void)\n{',
+     'int ime_trygetchar(void)\n{\n    if (!services_public) return kbd_trygetchar();',
+     'FAIL MINIMAL scan-only poll returns no character'),
+    ('MINIMAL-scan-only-wait', 'ime_source.inc',
+     'static int ime_getchar_wait(int interruptible)\n{',
+     'static int ime_getchar_wait(int interruptible)\n{\n'
+     '    if (!services_public) return interruptible ? kbd_getchar_kapi() : kbd_getchar();',
+     'FAIL MINIMAL wait skips scan-only key'),
     ('IMEIND-RETURN-clear-only', 'ime_source.inc',
      '            preedit_draw(); /* Keep the ON indicator even when nothing was committed. */',
      '            preedit_clear();',

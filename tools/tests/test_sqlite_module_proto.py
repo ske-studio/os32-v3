@@ -299,7 +299,8 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False):
     boot_cases = [('services-ready', 10), ('missing-sqlite', 11), ('mixed-sqlite', 12),
                   ('image-allocation', 13), ('unicode-missing', 14), ('unicode-old', 15),
                   ('unicode-io', 16), ('unicode-allocation', 17), ('partial-FEP', 18),
-                  ('settings-reserve', 19), ('settings-under-reserve', 20)]
+                  ('settings-reserve', 19), ('settings-under-reserve', 20),
+                  ('learn-prepare-failure', 32), ('close-fault-after-ready', 33)]
     boot_cases += [(name, 20 + fault) for fault, name in enumerate((
         'pool', 'stack', 'sqlite-init', 'settings-close', 'fep-text', 'fep-attr',
         'fep-crc', 'dictionary', 'reserve', 'fep-close', 'shutdown'), 1)]
@@ -327,11 +328,20 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False):
             assert result.returncode == 1 and b'FAIL guard_np &&' in result.stdout, result
         print('MUTATE stack-guard-removed RED (compiled, runtime guard assertion)')
         path.write_text(source)
+        fep_path = folder / 'services_fep.inc'
+        fep_source = fep_path.read_text()
         runtime_path = folder / 'module_runtime_boot.c'
         runtime_source = (ROOT / 'kernel/module_runtime.c').read_text()
         runtime_path.write_text(runtime_source)
         boot_command = [runtime_path if item == ROOT / 'kernel/module_runtime.c' else item for item in command]
         mutations = [
+            ('learn-required-MINIMAL', fep_path, fep_source,
+             '    g_ime.dict_loaded = 1;',
+             '    if (!g_ime.dict.learn_stmt) return -1;\n    g_ime.dict_loaded = 1;', 32),
+            ('reserve-lower-MINIMAL', path, source,
+             '*reserve = OS32_SQLITE_FEP_RESERVE;', '*reserve = -1;', 20),
+            ('close-fault-after-ready', fep_path, fep_source,
+             'services_stage < SERVICES_READY &&\n        ', '', 33),
             ('early-public', path, source,
              '    services_stage = SERVICES_SQLITE_INTERNAL_READY;',
              '    services_stage = SERVICES_SQLITE_INTERNAL_READY; services_public = 1;', 10),

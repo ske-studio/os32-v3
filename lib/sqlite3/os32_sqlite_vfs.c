@@ -25,8 +25,8 @@
 #define CANARY_WORDS 4
 #define CANARY_BYTES (CANARY_WORDS * sizeof(u32))
 static char sqlite_mem_pool[SQLITE_MEMSYS5_SIZE];
-/* The sentinels travel with the owner allocation, not the module's data. */
-#define canary_before ((u32 *)sqlite_mem_pool)
+/* Owner pool layout: BudgetState | canary | MEMSYS5 heap | canary. */
+#define canary_before ((u32 *)(sqlite_mem_pool + BUDGET_STATE_BYTES))
 #define canary_after ((u32 *)(sqlite_mem_pool + SQLITE_MEMSYS5_SIZE - CANARY_BYTES))
 
 /* T4a-4's measured prefix allocator, inside the same 512KiB owner pool.
@@ -42,7 +42,7 @@ typedef struct {
 #define BUDGET_HEAP_BYTES (SQLITE_MEMSYS5_SIZE - 2 * CANARY_BYTES - BUDGET_STATE_BYTES)
 #define BUDGET_ATOM_BYTES 64u
 #define BUDGET_CAPACITY ((BUDGET_HEAP_BYTES / (BUDGET_ATOM_BYTES + 1u)) * BUDGET_ATOM_BYTES)
-#define budget ((BudgetState *)(sqlite_mem_pool + CANARY_BYTES))
+#define budget ((BudgetState *)sqlite_mem_pool)
 
 static int budget_roundup(int n)
 {
@@ -267,6 +267,11 @@ int os32_sqlite_boot_check(int live, int reserve)
     }
     if (count != live) return SQLITE_BUSY;
     if (reserve) {
+        if (reserve > 0 && reserve < OS32_SQLITE_FEP_RESERVE) {
+            kprintf(0x07, "[SQT] FEP reserve below default; using %d bytes\n",
+                    OS32_SQLITE_FEP_RESERVE);
+            reserve = OS32_SQLITE_FEP_RESERVE;
+        }
         if (reserve < OS32_SQLITE_FEP_RESERVE ||
             (unsigned)reserve > BUDGET_CAPACITY - budget->live[BUDGET_SYSTEM] ||
             budget->live[BUDGET_FEP] > (unsigned)reserve) return SQLITE_NOMEM;

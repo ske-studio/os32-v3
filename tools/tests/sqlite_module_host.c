@@ -62,7 +62,11 @@ static IME_State g_ime;
 static u16 *g_cand_save_text;
 static u8 *g_cand_save_attr;
 static u8 fep_buffers[2][512];
-static int fep_allocs, fep_frees;
+static int fep_allocs, fep_frees, learn_unavailable, reserve_clamped;
+typedef struct {
+    sqlite3_mem_methods backing;
+    unsigned context, live[3], reserve;
+} HostBudgetState;
 static u8 unicode_storage[UNICODE_FILE_PAGES * PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
 static u32 unicode_pages;
 volatile u32 tick_count;
@@ -94,6 +98,15 @@ int ime_dict_open(IME_Dict *d, const char *path)
     if (input[0] == 18) return -1; /* live group + partial prepared statement */
     CHECK(!os32_sqlite_prepare_v2(db, "SELECT 43", -1, &stmt, 0));
     d->prefix_stmt = stmt;
+    if (input[0] == 32) {
+        /* Real prepare failure at the learning boundary; search statements live.
+         * Disk dictionary open is still the explicit RAM fixture above. */
+        stmt = 0;
+        CHECK(os32_sqlite_prepare_v2(db, "SELECT FROM", -1, &stmt, 0) == SQLITE_ERROR);
+        CHECK(!stmt);
+        d->learn_stmt = 0;
+        return 0;
+    }
     CHECK(!os32_sqlite_prepare_v2(db, "SELECT 44", -1, &stmt, 0));
     d->learn_stmt = stmt;
     return 0;
@@ -252,6 +265,8 @@ void kprintf(u8 attr, const char *fmt, ...)
     (void)attr;
     if (input[0] >= 10 && services_stage != SERVICES_READY)
         CHECK(!services_public);
+    if (!memcmp(fmt, "IME: 学習不可", sizeof("IME: 学習不可") - 1)) learn_unavailable++;
+    if (!memcmp(fmt, "[services] fep_mem_reserve_kb below default", sizeof("[services] fep_mem_reserve_kb below default") - 1)) reserve_clamped++;
     if (!sqlite_engine_active) return;
     stack_probe();
     if (!memcmp(fmt, "[SQT] init:", 11)) {
@@ -384,29 +399,33 @@ void host_seed_settings(sqlite3 *db)
     if (input[0] != 19 && input[0] != 20) return;
     CHECK(!os32_sqlite_exec(db, "CREATE TABLE settings(scope TEXT,key TEXT,type INTEGER,ival INTEGER)", 0, 0, 0));
     CHECK(!os32_sqlite_exec(db, input[0] == 19 ?
-        "INSERT INTO settings VALUES('fep','mem_reserve_kb',0,224)" :
-        "INSERT INTO settings VALUES('fep','mem_reserve_kb',0,128)", 0, 0, 0));
+        "INSERT INTO settings VALUES('system','fep_mem_reserve_kb',0,224)" :
+        "INSERT INTO settings VALUES('system','fep_mem_reserve_kb',0,128)", 0, 0, 0));
 }
 static void boot_transaction(void)
 {
     services_stage = SERVICES_ROOT_READY;
     unicode_file_load();
     services_stage = SERVICES_UNICODE;
-    if (input[0] > 20) services_boot_fault = input[0] - 20;
+    if (input[0] > 20 && input[0] <= 31) services_boot_fault = input[0] - 20;
     u32 unicode_before = unicode_pages;
     services_boot();
     CHECK(unicode_pages == unicode_before);
     CHECK(unicode_before == ((input[0] >= 14 && input[0] <= 17) ? 0 : UNICODE_FILE_PAGES));
     CHECK(unicode_file_lookup(0x3041) == 0x2421);
     CHECK(!sqlite_engine_active && host_flags == 0x202);
-    int ok = input[0] == 10 || input[0] == 19 || (input[0] >= 14 && input[0] <= 17);
+    int ok = input[0] == 10 || input[0] == 19 || input[0] == 20 || input[0] == 32 || input[0] == 33 || (input[0] >= 14 && input[0] <= 17);
     int isolated = services_boot_fault == SERVICES_FAULT_SETTINGS_CLOSE ||
                    services_boot_fault == SERVICES_FAULT_FEP_CLOSE ||
                    services_boot_fault == SERVICES_FAULT_SHUTDOWN;
     CHECK(services_public == ok);
     if (ok) {
         CHECK(services_stage == SERVICES_READY && sqlite_module_ready());
-        CHECK(os32_sqlite_outer_boot_check(1, OS32_SQLITE_FEP_RESERVE) == SQLITE_OK);
+        CHECK(learn_unavailable == (input[0] == 32));
+        CHECK((g_ime.dict.learn_stmt == 0) == (input[0] == 32));
+        CHECK(reserve_clamped == (input[0] == 20));
+        HostBudgetState *budget = (HostBudgetState *)(uptr)heap_base;
+        CHECK(budget->reserve == (input[0] == 19 ? 224 * 1024 : OS32_SQLITE_FEP_RESERVE));
         CHECK(g_ime.dict_loaded && fep_allocs == 2 && !fep_frees);
         /* Real APP pressure must leave the reservation available to FEP. */
         Os32SqliteGroup group;
@@ -419,12 +438,18 @@ static void boot_transaction(void)
             CHECK(++inserts < 200);
         }
         CHECK(inserts > 0);
+        CHECK(budget->live[0] + budget->live[2] <= 319488u -
+              (budget->reserve - OS32_SQLITE_FEP_RESERVE));
         CHECK(os32_sqlite_step(g_ime.dict.exact_stmt) == SQLITE_ROW);
         CHECK(os32_sqlite_column_int(g_ime.dict.exact_stmt, 0) == 42);
         CHECK(!os32_sqlite_reset(g_ime.dict.exact_stmt));
         CHECK(!os32_sqlite_outer_group_begin_close(&group));
         CHECK(!os32_sqlite_close(db));
         CHECK(!os32_sqlite_outer_group_finish(&group, SQLITE_OK));
+        if (input[0] == 20) {
+            CHECK(os32_sqlite_outer_boot_check(1, 128 * 1024) == SQLITE_OK);
+            CHECK(budget->reserve == OS32_SQLITE_FEP_RESERVE);
+        }
         say("SERVICES_READY sqlite>0 fep=736 quarantine=0 unicode retained\n");
     } else if (isolated) {
         CHECK(services_stage == SERVICES_MINIMAL_QUARANTINED);
@@ -452,6 +477,13 @@ static void boot_transaction(void)
     u32 before = alloc_calls;
     services_boot();
     CHECK(alloc_calls == before); /* boot transaction is single-shot */
+    if (input[0] == 33) {
+        services_boot_fault = SERVICES_FAULT_FEP_CLOSE;
+        CHECK(ime_dict_close(&g_ime.dict) == 0);
+        CHECK(!g_ime.dict.isolated && !g_ime.dict.db);
+        CHECK(os32_sqlite_outer_boot_check(0, 0) == SQLITE_OK);
+        say("PASS boot close fault ignored after SERVICES_READY\n");
+    }
     finish(0);
 }
 void _start(void)
@@ -502,8 +534,10 @@ void _start(void)
     CHECK(os32_sqlite_finalize(stmt) == SQLITE_OK);
     CHECK(os32_sqlite_exec(db, "DELETE FROM t", 0, 0, 0) == SQLITE_OK);
     CHECK(os32_sqlite_outer_canary() == 0);
-    /* Sentinels must surround the actual owner pool, not module data. */
-    u32 *first = (u32 *)(uptr)heap_base;
+    /* Corrupt the word immediately before the MEMSYS5 heap: accounting
+     * state must precede the canary, never separate it from the heap. */
+    u32 state_bytes = (sizeof(HostBudgetState) + 7u) & ~7u;
+    u32 *first = (u32 *)(uptr)(heap_base + state_bytes + 4 * sizeof(u32) - sizeof(u32));
     u32 *last = (u32 *)(uptr)(heap_base + SQLITE_MODULE_POOL_SIZE - sizeof(u32));
     u32 saved = *first;
     *first ^= 1;

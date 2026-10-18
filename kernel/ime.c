@@ -616,8 +616,9 @@ int ime_dict_boot(void)
     if (!g_cand_save_attr) return -1;
     if (services_boot_fault == SERVICES_FAULT_FEP_CRC ||
         services_boot_fault == SERVICES_FAULT_DICTIONARY) return -1;
-    if (ime_dict_open(&g_ime.dict, IME_DICT_PATH) != 0 ||
-        !g_ime.dict.learn_stmt) return -1;
+    if (ime_dict_open(&g_ime.dict, IME_DICT_PATH) != 0) return -1;
+    if (!g_ime.dict.learn_stmt)
+        kprintf(ATTR_RED, "IME: 学習不可 (learning unavailable), conversion enabled\r\n");
     g_ime.dict_loaded = 1;
     return 0;
 }
@@ -720,7 +721,6 @@ static void ime_prepare_cui_input(void)
 
 static int ime_getchar_wait(int interruptible)
 {
-    if (!services_public) return interruptible ? kbd_getchar_kapi() : kbd_getchar();
     int keydata;
     int result;
 
@@ -776,7 +776,6 @@ static void ime_note_cui_reader(void)
 
 int ime_trygetchar(void)
 {
-    if (!services_public) return kbd_trygetchar();
     int keydata;
     int result;
 

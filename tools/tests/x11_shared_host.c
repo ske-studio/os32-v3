@@ -472,6 +472,13 @@ static int unpublished(void)
     CHECK(ime_trygetkey() == -1 && ime_trygetchar() == -1, "MINIMAL empty CUI polls");
     key(0x1d);
     CHECK(ime_trygetchar() == 'a', "MINIMAL CUI raw char");
+    /* PC-98 arrows carry control bytes; F1/F2 are actual ASCII-zero keys. */
+    key(KEY_F1);
+    CHECK(ime_trygetchar() == -1, "MINIMAL scan-only poll returns no character");
+    key(KEY_F1); key(0x1d);
+    CHECK(ime_getchar() == 'a', "MINIMAL wait skips scan-only key");
+    key(KEY_F2); key(0x1d);
+    CHECK(ime_getchar_kapi() == 'a', "MINIMAL interruptible wait skips scan-only key");
     services_public = 1;
     say("PASS unpublished DB-independent IME stubs and MINIMAL input\n");
     return 0;
