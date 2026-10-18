@@ -1,0 +1,30 @@
+check-module-policy-host:
+- tools/module_schema.py
+- tools/gen_module_schema.py
+- kernel/module_schema.h
+- tools/tests/test_module_policy.py
+- include/config.h
+- build/core.yaml
+- kernel/kernel.c
+- kernel/sqlite_engine.c
+- userland/system/hsync.c
+- userland/shell/ui.c
+- build/checks.d/check-module-policy-host.mk
+- tools/check_map.d/check-module-policy-host.yaml
+- kernel/module.c
+- kernel/fep_module.c
+- kernel/cd_module.c
+- kernel/kcg_module.c
+- kernel/fm_module.c
+- kernel/pcm_module.c
+- kernel/v86_module.c
+- kernel/lan_module.c
+- kernel/cirrus_module.c
+- userland/system/hsync_bootold.inc
+- userland/system/hsync_protect.inc
+- userland/shell/sh_redraw.inc
+# Build lists and distribution names are audited as a broad consumer.
+- build/kernel.*
+- build/out/*
+- lib/crc32_core.inc
+artifact_reader: true
