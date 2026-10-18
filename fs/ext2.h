@@ -192,6 +192,6 @@ int ext2_format(int ide_drive, u32 total_sectors);
 int ext2_format_at(int ide_drive, u32 start_lba, u32 length);
 
 /* ---- VFS登録 ---- */
-void ext2_init(void);
+int ext2_init(void);
 
 #endif /* EXT2_H */

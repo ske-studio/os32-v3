@@ -161,7 +161,7 @@ int dev_blk_read_lba(Device *dev, u32 lba, int count, void *buf)
 os_time_t dos_time_to_epoch(u16 dos_date, u16 dos_time)
 { return (os_time_t)dos_date * 65536 + dos_time; }
 
-void vfs_register_fs(VfsOps *ops) { (void)ops; }
+int vfs_register_fs(VfsOps *ops) { (void)ops; return VFS_OK; }
 
 /* ---- kernel の境界 ---- */
 void *kzalloc(u32 size) { return calloc(1, size); }

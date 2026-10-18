@@ -1,4 +1,6 @@
 check-sqlite-stack-host:
+- drivers/dev.c
+- fs/vfs.c
 - build/sqlite-module.ld
 - build/checks.d/check-sqlite-stack-host.mk
 - tools/check_map.d/check-sqlite-module-proto-host.yaml

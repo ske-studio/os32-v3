@@ -129,7 +129,7 @@ void kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 
 void *kzalloc(u32 size) { (void)size; return (void *)0; }
 void kfree(void *p) { (void)p; }
-void vfs_register_fs(VfsOps *ops) { (void)ops; }
+int vfs_register_fs(VfsOps *ops) { (void)ops; return VFS_OK; }
 
 /* ======================================================================== */
 /*  RAM ディスク (64 シリンダ × 16/63 = 64,512 セクタ = 31.5MiB)             */

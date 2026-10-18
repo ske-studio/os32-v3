@@ -659,6 +659,7 @@ static void case_fd(void)
     dump_image("fd.img");
     vfs_umount("/hd0");
     CHECK(open_files[fd].fs_ctx == (void *)0);
+    CHECK(!open_files[fd].ops && !open_files[fd3].ops);
     expect_stale(fd);
     expect_stale(fd3);
     vfs_close(fd); vfs_close(fd3);

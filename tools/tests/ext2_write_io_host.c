@@ -192,7 +192,7 @@ void kfree(void *p)
 
 /* ---- VFS 登録の境界 (ext2_init から呼ばれるだけ) ---- */
 int vfs_dir_needs_metadata(vfs_dir_cb cb, void *ctx) { (void)cb; (void)ctx; return 1; }
-void vfs_register_fs(VfsOps *ops) { (void)ops; }
+int vfs_register_fs(VfsOps *ops) { (void)ops; return VFS_OK; }
 
 /* ======================================================================== */
 /*  RAM ディスク + セクタ I/O 計数                                          */

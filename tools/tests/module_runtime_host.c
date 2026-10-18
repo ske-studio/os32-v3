@@ -3,6 +3,7 @@
 #include "pgalloc.h"
 #include "memmap.h"
 #include "vfs.h"
+#include "dev.h"
 #include "kstring.h"
 
 #define IMAGE_SIZE 4160U
@@ -14,6 +15,9 @@ static u32 live[MODULE_RECORD_CAP], mask[MODULE_RECORD_CAP];
 static u32 input[2], pos, fd_live, opens, closes, allocations, fail_at;
 static u32 starts, cleans, clean_order, returned, retired, fail_cleanup;
 static struct module_handle current;
+static Device device = {.name = "cd0", .type = DEV_BLOCK};
+static Device *cached_device;
+static int fs_context;
 static void finish(int code) __attribute__((noreturn));
 static void finish(int code)
 {
@@ -25,6 +29,33 @@ static void finish(int code)
     __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(msg), "d"(sizeof(msg)-1) : "memory"); \
     finish(1); \
 } } while (0)
+static void *mount_fs(int dev)
+{
+    CHECK(VFS_MOUNT_DEV_TYPE(dev) == VFS_DEV_CD);
+    return &fs_context;
+}
+static void unmount_fs(void *ctx) { CHECK(ctx == &fs_context); }
+void vfs_fd_invalidate_mount(void *ctx) { CHECK(ctx == &fs_context); }
+static VfsOps fs_ops = {.name = "fixture", .mount = mount_fs, .umount = unmount_fs};
+int kstrcmp(const char *a, const char *b)
+{
+    while (*a && *a == *b) { a++; b++; }
+    return (u8)*a - (u8)*b;
+}
+u32 kstrlen(const char *s)
+{
+    u32 n = 0;
+    while (s[n]) n++;
+    return n;
+}
+char *kstrncpy(char *d, const char *s, u32 n)
+{
+    if (!n) return d;
+    u32 i = 0;
+    while (i + 1 < n && s[i]) { d[i] = s[i]; i++; }
+    d[i] = 0;
+    return d;
+}
 void *kmemcpy(void *d, const void *s, u32 n)
 {
     for (u32 i = 0; i < n; i++) ((u8 *)d)[i] = ((const u8 *)s)[i];
@@ -111,6 +142,10 @@ int pgalloc_free_n_owner(u32 owner, u32 pfn, int n)
 int ledger_reclaim_owner(u32 owner, u32 *pages)
 {
     u32 i = index_of(owner);
+    if (input[0] == 11) {
+        CHECK(!dev_find("cd0") && !cached_device);
+        CHECK(vfs_mount("/fixture", "cd0", "fixture") == VFS_ERR_INVAL);
+    }
     if (input[0] == 9) {
         /* Rejection must precede relocation, BSS zeroing and import writes. */
         CHECK(!memcmp(pool[i], file, IMAGE_SIZE));
@@ -155,6 +190,18 @@ static int detach(struct module_record *r)
             while (r->callback_refs) CHECK(module_ref_release(current, MODULE_REF_CALLBACK));
         if (input[0] != 8 || input[1] != MODULE_REF_ACTIVE)
             while (r->active_refs) CHECK(module_ref_release(current, MODULE_REF_ACTIVE));
+        if (input[0] != 8 || input[1] != MODULE_REF_REGISTRATION)
+            while (input[0] != 11 && r->registration_refs)
+                CHECK(module_ref_release(current, MODULE_REF_REGISTRATION));
+    }
+    if (input[0] == 11 && r->registration_refs) {
+        if (input[1] != 1) vfs_umount("/fixture");
+        if (vfs_unregister_fs(&fs_ops) != VFS_OK) return 0;
+        CHECK(module_ref_release(current, MODULE_REF_REGISTRATION));
+        CHECK(!dev_unregister(&device));
+        if (input[1] == 2) return 0; /* A cached Device user could not detach. */
+        cached_device = 0;
+        CHECK(module_ref_release(current, MODULE_REF_REGISTRATION));
     }
     return fail_cleanup != 2;
 }
@@ -181,8 +228,27 @@ static int start(struct module_record *r, u32 entry, u32 *ops)
     for (u32 kind = MODULE_REF_IRQ; kind <= MODULE_REF_ACTIVE; kind++)
         CHECK(module_ref_acquire(current, r->owner, kind,
                                  kind <= MODULE_REF_CALLBACK ? r->text : 0));
+    /* A STARTING IRQ consumer dispatches independently of module_exports. */
+    CHECK(((int (*)(void))(uptr)(r->base + 10))() == 42);
+    if (input[0] != 11)
+        CHECK(module_ref_acquire(current, r->owner, MODULE_REF_REGISTRATION, 0));
     if (!pgalloc_alloc_phys(r->owner, 1)) return 1;
     if (!pgalloc_alloc_phys(r->owner, 1)) return 1;
+    if (input[0] == 11 && starts == 3) {
+        CHECK(module_ref_acquire(current, r->owner, MODULE_REF_REGISTRATION, 0));
+        CHECK(!dev_register(&device));
+        cached_device = dev_find("cd0");
+        CHECK(cached_device == &device);
+        CHECK(module_ref_acquire(current, r->owner, MODULE_REF_REGISTRATION, 0));
+        CHECK(vfs_register_fs(&fs_ops) == VFS_OK);
+        CHECK(module_ref_acquire(current, r->owner, MODULE_REF_REGISTRATION, 0));
+        CHECK(vfs_register_fs(&fs_ops) == VFS_ERR_EXIST);
+        CHECK(module_ref_release(current, MODULE_REF_REGISTRATION));
+        CHECK(r->registration_refs == 2); /* Failed publication owns no ref. */
+        CHECK(vfs_mount("/fixture", "cd0", "fixture") == VFS_OK);
+        if (input[1] >= 3) fail_cleanup = input[1] - 2;
+        return 1; /* Fail after publication, while still STARTING. */
+    }
     if (input[0] == 3) ops[5]++;
     return input[0] == 2;
 }
@@ -208,9 +274,51 @@ static void abort_one(struct module_handle h)
     u32 before = returned;
     CHECK(!module_abort(h) && returned == before);
 }
+static void registry_limits(void)
+{
+    VfsOps ops[VFS_MAX_FS + 1];
+    Device devices[MAX_DEVICES + 1];
+    char names[MAX_DEVICES + 1][2];
+    kmemset(ops, 0, sizeof(ops));
+    kmemset(devices, 0, sizeof(devices));
+    for (u32 i = 0; i <= MAX_DEVICES; i++) {
+        names[i][0] = 'A' + i; names[i][1] = 0;
+        devices[i].name = names[i];
+        CHECK(dev_register(&devices[i]) == (i < MAX_DEVICES ? 0 : -1));
+    }
+    CHECK(dev_count() == MAX_DEVICES && !dev_find(names[MAX_DEVICES]));
+    CHECK(dev_register(&devices[0]) == -1);
+    CHECK(dev_unregister(&devices[MAX_DEVICES]) == -1);
+    CHECK(!dev_unregister(&devices[1]));
+    CHECK(!dev_find(names[1]) && dev_get(1) == &devices[2]);
+    CHECK(!dev_register(&devices[MAX_DEVICES]));
+    for (u32 i = 0; i <= MAX_DEVICES; i++)
+        if (i != 1) CHECK(!dev_unregister(&devices[i]));
+    CHECK(!dev_count() && !dev_get(0));
+    for (u32 i = 0; i <= VFS_MAX_FS; i++) {
+        ops[i] = fs_ops; ops[i].name = names[i];
+        CHECK(vfs_register_fs(&ops[i]) == (i < VFS_MAX_FS ? VFS_OK : VFS_ERR_FULL));
+    }
+    CHECK(vfs_register_fs(&ops[0]) == VFS_ERR_EXIST);
+    CHECK(vfs_unregister_fs(&ops[VFS_MAX_FS]) == VFS_ERR_NOTFOUND);
+    CHECK(vfs_mount("/fixture", "cd0", names[VFS_MAX_FS]) == VFS_ERR_INVAL);
+    CHECK(vfs_mount("/fixture", "cd0", names[1]) == VFS_OK);
+    CHECK(vfs_unregister_fs(&ops[1]) == VFS_ERR_BUSY);
+    vfs_umount("/fixture");
+    CHECK(vfs_unregister_fs(&ops[1]) == VFS_OK);
+    CHECK(vfs_mount("/fixture", "cd0", names[1]) == VFS_ERR_INVAL);
+    CHECK(vfs_register_fs(&ops[VFS_MAX_FS]) == VFS_OK);
+    for (u32 i = 0; i <= VFS_MAX_FS; i++) if (i != 1) {
+        CHECK(vfs_mount("/fixture", "cd0", names[i]) == VFS_OK);
+        vfs_umount("/fixture");
+        CHECK(vfs_unregister_fs(&ops[i]) == VFS_OK);
+    }
+}
 void _start(void)
 {
+    CHECK(MODULE_RECORD_CAP == 10);
     read_input(input, sizeof(input)); read_input(file, sizeof(file));
+    if (input[0] == 12) { registry_limits(); finish(0); }
     /* Decode contract hashes independently from the file's known records. */
     kmemcpy(&imports[0].name_hash, file + 152, 4);
     kmemcpy(&exports[4].name_hash, file + 164, 4);
@@ -255,6 +363,26 @@ void _start(void)
     CHECK(((int (*)(void))(uptr)module_exports(h)[5])() == 42);
     for (u32 i = 0; i < PAGE_SIZE; i++) CHECK(pool[0][i] == 0xdd);
     CHECK(module_start(h) == MODULE_BUSY);
+    if (input[0] == 11) {
+        struct module_handle chain[3] = {h, {0, 0}, {0, 0}};
+        q.dependencies = &chain[0]; q.dependency_count = 1;
+        CHECK(!module_load(&q, &chain[1]) && !module_start(chain[1]));
+        q.dependencies = &chain[1];
+        CHECK(!module_load(&q, &chain[2]));
+        CHECK(module_start(chain[2]) == MODULE_INIT_FAILED);
+        CHECK(!module_exports(chain[2]));
+        u32 before = returned;
+        fail_cleanup = 0;
+        CHECK(module_abort_reverse(chain, 3) == (input[1] ? MODULE_ISOLATED : 0));
+        if (input[1]) {
+            CHECK(returned == before && returned == 2 && !retired);
+            for (u32 i = 0; i < 3; i++) {
+                CHECK(module_record_get(chain[i])->state == MODULE_QUARANTINED);
+                CHECK(live[i] && mask[i] == (i == 2 ? 15U : 14U));
+            }
+        } else empty();
+        finish(0);
+    }
     if (input[0] == 4 || input[0] == 8) {
         /* Each incomplete stop stage must retain body and all owner pages. */
         fail_cleanup = input[0] == 4 ? input[1] : 0; current = h;

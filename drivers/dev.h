@@ -75,8 +75,15 @@ struct _Device {
 /* デバイスシステム初期化 (全ドライバ登録) */
 void dev_init(void);
 
-/* デバイス登録 (戻り値: 0=成功, -1=満杯) */
+/* Register last in init: 0=success, -1=full/duplicate/invalid. */
 int dev_register(Device *dev);
+/* Boot rollback: removes discovery only (0=removed, -1=not registered).
+ * Before releasing MODULE_REF_REGISTRATION the adapter must also detach
+ * every cached Device pointer (including mounted FS). IRQ/tick/callback and
+ * DMA have separate references/stop hooks; all must stop before reclamation.
+ * Failure retains the module/dependencies. This never releases
+ * permanent ledger DEVICE reservations. Indices are enumeration only. */
+int dev_unregister(Device *dev);
 
 /* HDDデバイスの登録 (ユーティリティ) */
 void dev_register_hdd(int drive);

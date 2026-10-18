@@ -172,7 +172,7 @@ unsigned long long __umoddi3(unsigned long long num, unsigned long long den)
 }
 
 /* VFS 登録の境界 (hostdrvfs_init から呼ばれるだけ) */
-void vfs_register_fs(VfsOps *ops) { (void)ops; }
+int vfs_register_fs(VfsOps *ops) { (void)ops; return VFS_OK; }
 
 /* ======================================================================== */
 /*  実物の UTF-16 変換 と 実物の HostDrv ドライバ                           */

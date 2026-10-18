@@ -171,9 +171,11 @@ def pair_runtime_suite(folder, mutate=False):
     def build(source=image_source, policy=schema):
         source_path.write_text(source)
         schema_path.write_text(policy)
-        subprocess.run(['gcc', *RUNTIME_FLAGS, '-Werror=vla', *RUNTIME_INCLUDES,
-                        '-nostdlib', '-static', '-no-pie', harness_path,
-                        ROOT / 'kernel/module_runtime.c', source_path, '-o', exe], check=True)
+        subprocess.run(['gcc', *RUNTIME_FLAGS, '-Werror=vla', '-Wno-unused-parameter',
+                        *RUNTIME_INCLUDES, '-nostdlib', '-static', '-no-pie',
+                        '-Wl,--gc-sections', harness_path, ROOT / 'kernel/module_runtime.c',
+                        ROOT / 'fs/vfs.c', ROOT / 'drivers/dev.c', source_path,
+                        '-o', exe], check=True)
 
     def run(field, value, rc, expected=0):
         data = fixture()

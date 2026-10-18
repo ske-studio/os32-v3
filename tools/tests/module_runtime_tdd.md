@@ -3,7 +3,7 @@
 契約: [TASK_T4_T6_MODULES §2-2 / T4a-5](../../docs/tasks/v3/TASK_T4_T6_MODULES.md#2-2-状態と公開)。
 `make check-module-runtime-host MUTATE=0 HOST32_RUNNERS=qemu` は実際の
 `module_runtime.c` と `module_image.c` を GNU11 ILP32 でリンクする。
-VFS/owner/page のみを置換し、確保内容を破棄する free と executable body を使う。
+画像読込用 VFS FD/owner/page を置換し、FS/Device 登録と mount は実 `vfs.c` / `dev.c` をリンクする。確保内容を破棄する free と executable body を使う。
 
 - owner 作成・load_span・init 内 2 回の割当をそれぞれ失敗させ、FD、owner、全ページが開始前へ戻る。
 - CRC・export slot/重複の拒否で、回収直前の像全体と未使用 BSS が読込直後から不変。
@@ -19,3 +19,7 @@ PM 用の `--mutate` は正常対照の後に、STARTING の先行公開・参�
 無条件 free・依存先の先行 free・relocate の拒否結果無視・export 件数/slot の転記誤り・prefix 返却失敗後の偽の成功を実行時 assertion で検出する。T4c-1 は依頼に従いこの検査の変異も実行する。
 既存 `check-kdebug-init-host` は実 kdebug 像・pair/拒否理由・OFF の open/owner 0・
 RUNNING から実自己試験の dispatch を継続して確認する。ゲスト起動はこの fixture の合格に含めない。
+
+T5c-0: FS の8枠/Device の16枠を埋め、拒否時不変・重複・未登録解除・中央の削除と詰め直し・再利用を実行する。FS は mount 中の BUSY と unmount 後の解除を対照にする。10 record の満杯でファイル/owner確保0を確認する。
+3段の依存を load/start し、末端の STARTING が Device/FS を登録・mount した後で失敗する。解除成功なら検索/登録/キャッシュ参照0を **reclaim の直前** に検査し全ownerを回収する。mount/Device キャッシュ/各停止段の失敗なら末端と依存2段を逆順 abort して全owner保持、export非公開、再回収0を確認する。永久 DEVICE 予約のコードは変更しない。
+STARTING 中に実 body を IRQ consumer 相当から呼ぶ試験は、CPU の IRQ/PIC/DMA を模擬しない。各装置の実 IRQ 有効化/停止の観測は切出し段で行う。新しい変異は登録残存無視・STARTING拒否・満杯の偽成功・mount中解除・Device解除欠落を runtime assertion で RED にする。

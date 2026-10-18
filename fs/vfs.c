@@ -210,11 +210,14 @@ static int vfs_last_is_dot(const char *path)
 static VfsOps *fs_registry[VFS_MAX_FS];
 static int num_fs = 0;
 
-void vfs_register_fs(VfsOps *ops)
+int vfs_register_fs(VfsOps *ops)
 {
-    if (num_fs < VFS_MAX_FS) {
-        fs_registry[num_fs++] = ops;
-    }
+    if (!ops || !ops->name) return VFS_ERR_INVAL;
+    for (int i = 0; i < num_fs; i++)
+        if (kstrcmp(fs_registry[i]->name, ops->name) == 0) return VFS_ERR_EXIST;
+    if (num_fs == VFS_MAX_FS) return VFS_ERR_FULL;
+    fs_registry[num_fs++] = ops;
+    return VFS_OK;
 }
 
 /* ======== VFSグローバル状態 ======== */
@@ -236,6 +239,21 @@ typedef struct {
 
 static MountPoint mounts[VFS_MAX_FS];
 static u32 mount_generation;
+
+int vfs_unregister_fs(VfsOps *ops)
+{
+    /* Boot rollback only: the adapter must unmount its instances first.
+     * Refuse without changing the registry while a mount can still call ops. */
+    for (int i = 0; i < VFS_MAX_FS; i++)
+        if (mounts[i].in_use && mounts[i].ops == ops) return VFS_ERR_BUSY;
+    for (int i = 0; i < num_fs; i++) {
+        if (fs_registry[i] != ops) continue;
+        while (++i < num_fs) fs_registry[i - 1] = fs_registry[i];
+        fs_registry[--num_fs] = 0;
+        return VFS_OK;
+    }
+    return VFS_ERR_NOTFOUND;
+}
 
 /* ======== マウントの検索とパスの分離 ======== */
 
@@ -438,6 +456,7 @@ void vfs_umount(const char *prefix)
             mounts[i].ops->umount(mounts[i].fs_ctx);
             mounts[i].in_use = 0;
             mounts[i].fs_ctx = (void *)0;
+            mounts[i].ops = 0;
             break;
         }
     }

@@ -318,10 +318,22 @@ void dev_init(void)
 
 int dev_register(Device *dev)
 {
+    if (!dev || !dev->name || dev_find(dev->name)) return -1;
     if (dev_num >= MAX_DEVICES) return -1;
     dev_table[dev_num] = dev;
     dev_num++;
     return 0;
+}
+
+int dev_unregister(Device *dev)
+{
+    for (int i = 0; i < dev_num; i++) {
+        if (dev_table[i] != dev) continue;
+        while (++i < dev_num) dev_table[i - 1] = dev_table[i];
+        dev_table[--dev_num] = 0;
+        return 0;
+    }
+    return -1;
 }
 
 Device *dev_find(const char *name)

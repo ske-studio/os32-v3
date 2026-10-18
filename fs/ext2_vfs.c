@@ -522,7 +522,7 @@ static VfsOps ext2_ops = {
 
 
 /* ======== 初期化・登録 ======== */
-void ext2_init(void)
+int ext2_init(void)
 {
-    vfs_register_fs(&ext2_ops);
+    return vfs_register_fs(&ext2_ops);
 }

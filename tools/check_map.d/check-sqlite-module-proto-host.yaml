@@ -1,4 +1,6 @@
 check-sqlite-module-proto-host:
+- drivers/dev.c
+- fs/vfs.c
 - Makefile
 - build/config.mk
 - build/sqlite-proto.mk

@@ -607,6 +607,7 @@ void vfs_fd_invalidate_mount(void *fs_ctx)
             /* 解放される fs_ctx を持ち続けない (同じ番地に次のマウントが
              * 来ても取り違えない) */
             f->fs_ctx = (void *)0;
+            f->ops = 0; /* No module table pointer survives unmount. */
         }
     }
 }

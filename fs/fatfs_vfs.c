@@ -785,7 +785,7 @@ static VfsOps fatfs_ops = {
 
 
 /* ======== 初期化・登録 ======== */
-void fatfs_init(void)
+int fatfs_init(void)
 {
-    vfs_register_fs(&fatfs_ops);
+    return vfs_register_fs(&fatfs_ops);
 }

@@ -45,7 +45,7 @@
 
 /* serialfs_init が呼ぶ */
 static VfsOps *g_registered;
-void vfs_register_fs(VfsOps *ops) { g_registered = ops; }
+int vfs_register_fs(VfsOps *ops) { g_registered = ops; return VFS_OK; }
 
 static int failed;
 #define CHECK(x) do { if (!(x)) { \
