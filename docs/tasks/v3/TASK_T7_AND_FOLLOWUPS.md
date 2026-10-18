@@ -155,7 +155,7 @@ parser/rasterは境界検査済み入力と上限付き領域だけを使い、a
 | 段 (旧4段の細分) / 主な対象 | 観測で閉じる条件 | 故障注入・変異 (正常対照も必須) |
 |---|---|---|
 | T7a-1a BB / `gfx/gfx_core.c`・planar backend | ①boot連続pool確保 ②全planeが新backing ③boot→gshell所有移譲1回 ④lease/present/再attachで同じ絵 ⑤失敗時ページ漏れ0 | 最後のplane旧番地残し、pool確保失敗 |
-| T7a-1b KCG / `drivers/kcg.c`・`kernel/boot_font.c`・deploy | ①配備予行で旧font無し ②KCGのみのGUI日本語/CUI英数編集 ③cache hit率記録 (64KiBは計上値) ④module欠落/init失敗はCUI維持 ⑤旧slot NOSYSと低位font参照0 ⑥cold/warm1000字・I/O記録 | cache満杯/確保失敗、旧font fallback再導入。D36の `os32_lz4` は呼出し0を確認して撤去 |
+| T7a-1b KCG / `drivers/kcg.c`・`kernel/boot_font.c`・deploy | ①配備予行で旧font無し ②KCGのみのGUI日本語/CUI英数編集 ③cache hit率記録 (64KiBは計上値) ④module欠落/init失敗はCUI維持 (`kcg_module_ready()`・`kcg_module_load()` の結果でcoreが判断、T5c-1のstubは字形0/診断・TVRAM経路保持) ⑤旧slot NOSYSと低位font参照0 ⑥cold/warm1000字・I/O記録 | cache満杯/確保失敗、旧font fallback再導入。D36の `os32_lz4` は呼出し0を確認して撤去 |
 | T7a-1c boot原本 / T5c-3のcore保存口・BIOS consumer | ①書換え前に4096B保存 ②原本不変 ③4経路の直読0 ④Unicode橋撤去済み ⑤bootinfo/boot stack退去 ⑥各セッション前後の物理page0全4096Bが原本と一致 ⑦boot2/DOS起動成功 | snapshot末尾欠落、終了時原本フラグ消去、consumer1本直読へ戻す (NP化は次段) |
 | T7a-2a 入場 / exec・uaccess・session | ①単独CPL3呼出し成功 ②GUI/親/他AS/parked/再入を変更前拒否 ③不正path/outputでPTE不変 ④caller pin/CR3退避 ⑤master中caller VA参照0 ⑥成功/失敗ともpin解除 | 終端欠落、2本目pathのcopy失敗、mailbox起動時確保失敗、pin解除漏れ |
 | T7a-2b 低位切替 / paging・v86_mem/bios | ①fixtureの直接低位640KiB実行 ②通常page0 NP ③page0/mailbox原内容一致 ④全出口CR3/PTE/PDE/TLB一致 ⑤前回データ/0x8C000ゼロ | 各準備境界失敗、末尾PTE復元/TLB反映/mailbox復元を1つずつ除去 |

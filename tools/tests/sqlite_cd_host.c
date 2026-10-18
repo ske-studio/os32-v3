@@ -1,9 +1,13 @@
 /* T4b-4c: bundled SQLite -> real VFS/FD -> real ISO -> real ATAPI.
  * Only ATA ports, owner and TTY are mocked. Media is built before mounting. */
+#define vfs_fd_invalidate_mount cd_read_unused_invalidate_mount
 #define main cd_baseline_main
 #define CD_HOST_REAL_FDS
 #include "cd_read_host.c"
 #undef main
+#undef vfs_fd_invalidate_mount
+/* The included CD fixture has no FDs; this suite uses the real FD table. */
+void vfs_fd_invalidate_mount(void *ctx);
 #include "../../fs/vfs.c"
 #include "../../fs/vfs_fd.c"
 #include "../../lib/sqlite3/sqlite3.h"

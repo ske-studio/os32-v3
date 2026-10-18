@@ -29,8 +29,10 @@
 
 /* ======== API ======== */
 
-/* KCG初期化 (コードアクセスモード設定) */
+/* 旧fontキャッシュの初期化。ROMのモード設定は部品が行う。 */
 void kcg_init(void);
+/* Successfully loaded legacy font excludes the ROM module until T7a. */
+int kcg_font_loaded(void);
 
 /* 描画スケール設定 (1=等倍, 2=2倍, 3=3倍, 4=4倍) */
 void kcg_set_scale(int scale);

@@ -24,24 +24,13 @@
 
 #include "kcg.h"
 /* #include "gfx.h" removed */
-#include "io.h"
-#include "pc98.h"
+#include "../kernel/kcg_module.h"
 #include "kstring.h"
 #include "os32_kapi_shared.h"
 #include "endian_le.h"   /* フォント書庫ヘッダは LE の外部形式 */
 
 /* スケール係数 (デフォルト=1, 最大4) */
 int kcg_scale = 1;
-
-/* ======== I/Oウェイト ======== */
-static void kcg_wait(void)
-{
-    io_wait();
-}
-
-/* ======================================================================== */
-/*  KCG初期化                                                               */
-/* ======================================================================== */
 
 /* キャッシュ用のポインタ定義 (memmap.h: MEM_FONT_CACHE_BASE = 0x01000) */
 #include "memmap.h"
@@ -55,16 +44,17 @@ static u8 *ank_cache     = (u8 *)P2V_CONST((MEM_FONT_CACHE_BASE + KANJI_CACHE_SI
 static u8 *ank_fetched   = (u8 *)P2V_CONST((MEM_FONT_CACHE_BASE + KANJI_CACHE_SIZE + KANJI_FETCHED_SIZE + ANK_CACHE_SIZE));
 
 static int kcg_boot_phase_open = 1;
+static int font_loaded, cache_initialized;
+
+int kcg_font_loaded(void) { return font_loaded; }
 
 void kcg_init(void)
 {
     kcg_scale = 1;
     /* Loaded glyphs are immutable after boot; void ABI cannot return NOSYS. */
     if (!kcg_boot_phase_open) return;
-    /* コードアクセスモードに設定 (モードFF1 = KCGコードアクセス) */
-    outp(MODE_FF1_PORT, MFF1_KCG_CODE);
-    kcg_wait();
-
+    if (cache_initialized) return;
+    cache_initialized = 1;
     /* キャッシュフラグの初期化 — kmemset (rep stosd) で高速化 */
     kmemset(kanji_fetched, 0, KANJI_FETCHED_SIZE);
     kmemset(ank_fetched, 0, 256);
@@ -93,33 +83,13 @@ void kcg_read_ank(u8 ch, u8 *buf)
     int line;
     u8 *cache_ptr;
 
-    if (ank_fetched[ch]) {
+    if (font_loaded && ank_fetched[ch]) {
         cache_ptr = ank_cache + (ch * 16);
         for (line = 0; line < 16; line++) buf[line] = cache_ptr[line];
         return;
     }
 
-    /*
-     * NP2kaiソースコード (cgrom.c) より判明:
-     *   oa1: cr->code = (dat << 8) | (cr->code & 0xff)  → A1hは上位バイト
-     *   oa3: cr->code = (cr->code & 0xff00) | dat        → A3hは下位バイト
-     *   ANK条件: !(cr->code & 0xff00) → A1h = 0x00
-     *   フォント: fontrom + 0x80000 + (cr->code << 4)
-     *   ライン: ptr[cr->line]  (line = dat & 0x1f)
-     */
-    outp(KCG_CODE_LO, 0x00);        /* A1h ← 0x00 (上位=0でANK) */
-    kcg_wait();
-    outp(KCG_CODE_HI, ch);          /* A3h ← ANK文字コード (下位) */
-    kcg_wait();
-
-    cache_ptr = ank_cache + (ch * 16);
-    for (line = 0; line < 16; line++) {
-        outp(KCG_LINE_SEL, (u8)line);  /* A5h ← ライン (bit4=0でANK) */
-        kcg_wait();
-        buf[line] = (u8)inp(KCG_DATA); /* A9h → パターン */
-        cache_ptr[line] = buf[line];
-    }
-    ank_fetched[ch] = 1;
+    kcg_rom_read_ank(ch, buf);
 }
 
 /* ======================================================================== */
@@ -138,41 +108,14 @@ void kcg_read_kanji(u16 jis_code, u8 *buf)
     /* JISコードのバリデーション (0x2121 - 0x7E7E) */
     if (hi >= 0x21 && hi <= 0x7E && lo >= 0x21 && lo <= 0x7E) {
         idx = (hi - 0x21) * 94 + (lo - 0x21);
-        if (kanji_fetched[idx]) {
+        if (font_loaded && kanji_fetched[idx]) {
             cache_ptr = kanji_cache + (idx * 32);
             for (line = 0; line < 32; line++) buf[line] = cache_ptr[line];
             return;
         }
-    } else {
-        idx = -1; /* invalid jis code range for cache */
     }
 
-    /* 文字コード設定 */
-    outp(KCG_CODE_LO, lo);          /* A1h ← JIS下位 */
-    kcg_wait();
-    outp(KCG_CODE_HI, hi - 0x20);   /* A3h ← JIS上位 - 0x20 */
-    kcg_wait();
-
-    /* 左半分 (8ドット×16ライン) — bit5=1 */
-    for (line = 0; line < 16; line++) {
-        outp(KCG_LINE_SEL, (u8)(line | 0x20));  /* bit5=1: 左 */
-        kcg_wait();
-        buf[line * 2] = (u8)inp(KCG_DATA);
-    }
-
-    /* 右半分 (8ドット×16ライン) — bit5=0 */
-    for (line = 0; line < 16; line++) {
-        outp(KCG_LINE_SEL, (u8)(line | 0x00));  /* bit5=0: 右 */
-        kcg_wait();
-        buf[line * 2 + 1] = (u8)inp(KCG_DATA);
-    }
-
-    /* キャッシュへの書き込み */
-    if (idx >= 0) {
-        cache_ptr = kanji_cache + (idx * 32);
-        for (line = 0; line < 32; line++) cache_ptr[line] = buf[line];
-        kanji_fetched[idx] = 1;
-    }
+    kcg_rom_read_kanji(jis_code, buf);
 }
 
 /* ======================================================================== */
@@ -257,7 +200,7 @@ int kcg_load_font(const char *path)
     u32 magic, payload_size, flags;
     int n, compressed_size, ret;
 
-    if (!kcg_boot_phase_open) return OS32_ERR_NOSYS;
+    if (!kcg_boot_phase_open || kcg_module_attempted()) return OS32_ERR_NOSYS;
 
     kprintf(0x07, "[KCG] loading: %s\n", path);
 
@@ -334,6 +277,7 @@ int kcg_load_font(const char *path)
         kprintf(0x07, "[KCG] loaded: %u bytes\n", payload_size);
     }
 
+    font_loaded = 1;
     return 0;
 }
 

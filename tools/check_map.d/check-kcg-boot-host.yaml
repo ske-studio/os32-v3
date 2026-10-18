@@ -1,5 +1,7 @@
 check-kcg-boot-host:
 - drivers/kcg.c
+- drivers/kcg.h
+- kernel/kcg_module.h
 - kernel/kernel.c
 - lib/lz4.c
 - lib/utf8.c

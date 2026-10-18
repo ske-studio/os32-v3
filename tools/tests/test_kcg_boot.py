@@ -16,12 +16,12 @@ MUTATIONS = (
      '    kcg_scale = 1;\n    /* Loaded glyphs', '    /* Loaded glyphs',
      'FAIL closed init resets scale'),
     ('init-clears-font', 'drivers/kcg.c',
-     '    if (!kcg_boot_phase_open) return;\n    /* コードアクセス', '    /* コードアクセス', 'FAIL closed init preserves font'),
+     '    if (!kcg_boot_phase_open) return;', '', 'FAIL closed init preserves font'),
     ('guard', 'drivers/kcg.c',
-     'if (!kcg_boot_phase_open) return OS32_ERR_NOSYS;', '',
+     'if (!kcg_boot_phase_open || kcg_module_attempted()) return OS32_ERR_NOSYS;', '',
      'FAIL closed VFS untouched'),
     ('closed-open', 'drivers/kcg.c',
-     'if (!kcg_boot_phase_open) return OS32_ERR_NOSYS;',
+     'if (!kcg_boot_phase_open || kcg_module_attempted()) return OS32_ERR_NOSYS;',
      'if (!kcg_boot_phase_open) { vfs_open(path, 0); return OS32_ERR_NOSYS; }',
      'FAIL closed VFS untouched'),
     ('BB-clear', 'drivers/kcg.c',
@@ -52,7 +52,7 @@ def run(runner, mutation=None):
                '-D__KERNEL_BUILD__=1']
         cmd += ['-I'+str(work)]
         cmd += ['-I'+str(ROOT/p) for p in ('tools/tests/host_arch', 'include',
-                'arch/x86', 'platform/pc98', 'drivers', 'lib', 'fs', 'sdk/include/os32')]
+                'arch/x86', 'platform/pc98', 'kernel', 'drivers', 'lib', 'fs', 'sdk/include/os32')]
         exe = work / 'fixture'
         result = host32.build(cmd + [str(ROOT/'tools/tests/kcg_boot_host.c'),
                 str(ROOT/'lib/lz4.c'), '-o', str(exe)], capture_output=True, text=True)
