@@ -89,14 +89,14 @@ def main():
         build(source)
         run(range(len(CASES)))
         if '--mutate' in sys.argv:
-            # Compile the genuine session end with its release moved ahead of
+            # Compile the genuine session end with an extra release before
             # PTE restoration. Actual module_abort then reclaims/retires early.
             anchor = '    v86_module_session_release();'
             assert source.count(anchor) == 2
-            mutant = source.replace(anchor + '\n}', '}')
             edge = '    v86_restore_mismatch += paging_v86_restore(&v86_session);'
-            assert edge in mutant
-            mutant = mutant.replace(edge, anchor + '\n' + edge)
+            assert source.count(edge) == 1
+            mutant = source.replace(edge, anchor + '\n' + edge)
+            assert mutant.count(anchor) == source.count(anchor) + 1
             build(mutant)
             run([1], expected=1)
             print('MUTATE owner-retire-before-return RED (runtime assertion; compiled)', flush=True)

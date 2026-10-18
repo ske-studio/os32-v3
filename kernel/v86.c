@@ -951,6 +951,8 @@ int v86_boot(const char *path)
     return v86_boot2(path, (const char *)0);
 }
 
+/* UNDOCUMENTED io_disp.md: I/O 00A2h / モードF/F1 DISP ENABLE。
+ * CUI の表示順序を通常の V86 と ROM 採取の出口で共有する。 */
 /* Core display return path also serves kdebug with v86.mod absent. */
 void v86_cui_display_restore(void)
 {

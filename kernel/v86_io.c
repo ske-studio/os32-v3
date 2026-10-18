@@ -234,10 +234,6 @@ static void gfx_state_for_guest(void)
     io_out(GDC_ACCESS_PAGE, GDC_PAGE_0);
 }
 
-/* UNDOCUMENTED io_disp.md: I/O 00A2h / モードF/F1 DISP ENABLE。
- * CUI の表示順序を通常の V86 と ROM 採取の出口で共有する。 */
-
-
 /* OS32 の CUI に戻す。ゲストの VRAM 内容は保持するが表示は止める。 */
 static void gfx_state_for_os32(void)
 {
