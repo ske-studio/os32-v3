@@ -82,3 +82,14 @@ POLICIES[CONSTANTS['ID_ATAPI_ISO']] = dict(
     init_symbol='cd_module_init', imports_symbol='cd_import_slots',
     ops_symbol='cd_module_ops', ops_names=('initialize',),
 )
+
+# T5c-2a: FM driver and snd share a tick and Key-OFF lifetime.
+POLICIES[CONSTANTS['ID_FM']] = dict(
+    module_id=CONSTANTS['ID_FM'], phase=CONSTANTS['PHASE_POST_ROOT'],
+    required_flags=CONSTANTS['FLAG_PAIR'], allowed_flags=CONSTANTS['FLAG_PAIR'],
+    stop_allowed=0, ops_version=1, ops_slots=1,
+    image_max=65536, mem_max=65536,
+    reloc_max=2048, import_max=16, export_max=1, load_span_max=81920,
+    init_symbol='fm_module_init', imports_symbol='fm_import_slots',
+    ops_symbol='fm_module_ops', ops_names=('initialize',),
+)

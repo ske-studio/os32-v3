@@ -56,6 +56,9 @@ filesystem:
     - host: build/out/cd.mod
       guest: /boot/cd.mod
       tags: [core]
+    - host: build/out/fm.mod
+      guest: /boot/fm.mod
+      tags: [core]
     # --- カーネルデータ ---
     - host: build/out/unicode.bin
       guest: /sys/unicode.bin

@@ -15,7 +15,12 @@
 /*  外部参照                                                                */
 /* ======================================================================== */
 
+#ifdef OS32_FM_MODULE
+extern u32 ktime_ticks(void);
+#define tick_count ktime_ticks()
+#else
 extern volatile u32 tick_count;
+#endif
 
 /* res_owner_get() は fs/fd_redirect.c。kernel/ は -Ifs を持たないので
  * kernel/gui.c と同じ流儀で extern 宣言する (票 K5 の D9-4)。 */

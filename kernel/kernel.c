@@ -69,6 +69,7 @@ extern int fatfs_init(void);
 #include "fd_redirect.h"
 #include "pipe_buffer.h"
 #include "snd_engine.h"
+#include "fm_module.h"
 #include "mouse.h"
 #include "lgy98.h"
 #include "pcm_cs4231.h"
@@ -684,9 +685,9 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     /* サウンドエンジン初期化 */
     tvram_print(9, 4, "SND..", TATTR_GREEN);
     kprintf(0x07, "[BOOT] snd_init...\n");
-    snd_init();
-    tvram_print(14, 4, "OK ", TATTR_WHITE);
-    kprintf(0x07, "[BOOT] snd_init OK\n");
+    int snd_rc = fm_module_load();
+    tvram_print(14, 4, snd_rc ? "-- " : "OK ", TATTR_WHITE);
+    kprintf(0x07, "[BOOT] snd module rc=%d\n", snd_rc);
 
     /* LAN (LGY-98)。CONFIG_LGY98_BASE=0 (既定) なら何もしない。
      * カード未装着・応答不良でも NIC だけ無効にして起動を続ける。 */

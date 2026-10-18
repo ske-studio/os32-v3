@@ -32,7 +32,7 @@ extern int ring3_wait_pending(void);
  * アドレスラッチ→データ送信の 2 段階なので、途中で割り込まれて別の
  * opn_write が走るとレジスタ番号が化ける。通常コンテキストと ISR
  * (snd_tick) の両方から呼ばれるため、全体を irq_save で保護する。 */
-void opn_write(uchar reg, uchar val)
+static int opn_write_checked(uchar reg, uchar val)
 {
     unsigned int flags;
     u32 guard;
@@ -45,7 +45,7 @@ void opn_write(uchar reg, uchar val)
     if (guard == 0) {
         /* 音源が応答しない。書いても捨てられるだけなので諦める */
         irq_restore(flags);
-        return;
+        return 0;
     }
 
     /* アドレス送信 */
@@ -61,6 +61,26 @@ void opn_write(uchar reg, uchar val)
     io_wait_n(20);
 
     irq_restore(flags);
+    return 1;
+}
+
+void opn_write(uchar reg, uchar val) { (void)opn_write_checked(reg, val); }
+
+/* YM2203 Key-ON/OFF has no readback. Confirm every silence write passed
+ * BUSY and the final write completed; timeout cannot certify quiescence. */
+int fm_quiet(void)
+{
+    unsigned int flags = irq_save();
+    int ok = 1;
+    for (int ch = 0; ch < OPN_CHANNEL_COUNT; ch++) {
+        ok &= opn_write_checked(OPN_REG_KEY_ONOFF, (uchar)ch);
+        ok &= opn_write_checked((uchar)(SSG_REG_VOL_A + ch), 0);
+    }
+    ok &= opn_write_checked(SSG_REG_MIXER, SSG_MIXER_ALL_OFF | SSG_MIXER_IO_FLAG);
+    u32 guard = OPN_BUSY_TIMEOUT;
+    while ((inp(OPN_STATUS) & OPN_BUSY) && --guard != 0);
+    irq_restore(flags);
+    return ok && guard != 0;
 }
 
 /* OPN初期化 — snddrv/src/opn.c opn_init() 移植 */
@@ -296,7 +316,12 @@ void ssg_all_off(void)
 
 /* ウェイト (tickカウンタ使用)。GUI STOP は完了した syscall の出口で
  * WM へ譲るので、途中で park せず 0 を返して MML の Key-OFF へ進む。 */
+#ifdef OS32_FM_MODULE
+extern u32 ktime_ticks(void);
+#define tick_count ktime_ticks()
+#else
 extern volatile u32 tick_count;
+#endif
 static int wait_ms(u32 ms, int interruptible)
 {
     u32 ticks = ms / 10;   /* 100Hz → 10ms/tick */

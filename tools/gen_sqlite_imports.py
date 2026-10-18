@@ -28,8 +28,8 @@ def generate(out, definition=DEFINITION, contracts_only=False, module="sqlite"):
         hashed = fnv1a(name.encode())
         if hashed in hashes:
             raise ValueError('paired import hash collision')
-        if row['context'] != 'normal' or row['irq'] is not False:
-            raise ValueError('paired imports require normal context')
+        if row['context'] != 'normal' or type(row['irq']) is not bool:
+            raise ValueError('paired imports require normal context and an IRQ permission')
         signature = row.get('declaration') or declaration(dict(row, kind='FUNC'), ROOT)
         if not re.search(r'\b' + name + r'\s*\([^;{}]*\);$', signature):
             raise ValueError('function import required')
@@ -175,7 +175,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out-dir', type=Path, required=True)
     parser.add_argument('--contracts-only', action='store_true')
-    parser.add_argument('--module', choices=('sqlite', 'fep', 'cd'), default='sqlite')
+    parser.add_argument('--module', choices=('sqlite', 'fep', 'cd', 'fm'), default='sqlite')
     args = parser.parse_args()
     definition = ROOT / f'tools/prototypes/{args.module}_imports.def'
     generate(args.out_dir, definition, contracts_only=args.contracts_only, module=args.module)
