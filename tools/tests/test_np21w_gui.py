@@ -225,7 +225,7 @@ KERNEL_NM = '''00160001 B __bss_end
 00152008 00000004 b g_count
 0015200c 00000004 B appslot_trim_epoch
 00152010 00000004 T appslot_trim_done
-00180000 00000720 B module_records
+00180000 00000910 B module_records
 '''
 SHELL_NM = '''00600000 00000004 B gshell_trim_delivered
 00600004 00000004 B gshell_trim_skipped_full
@@ -233,7 +233,9 @@ SHELL_NM = '''00600000 00000004 B gshell_trim_delivered
 FEP_NM = '''00003540 00001800 b g_ime
 '''
 MODULE_RECORD_ADDRESS = 0x180000
-MODULE_RECORD_STRIDE = 0xe4
+# i386 module_record: 12 words, 19 exports, 8 two-word dependencies,
+# dependency_count, 6 ref counters (including registration_refs), 4 hooks.
+MODULE_RECORD_STRIDE = (12 + 19 + 8 * 2 + 1 + 6 + 4) * 4
 FEP_BASE = 0x2a1000
 IME_ADDRESS = FEP_BASE + 0x3540
 
@@ -289,7 +291,7 @@ class GuiTests(unittest.TestCase):
         self.g.screen_text = Mock(return_value={'lines': ['Run: absolute path'], 'ambiguous': []})
         # Core has no g_ime. Model VA0 fep.elf plus a relocated RUNNING FEP
         # record, after other modules, using the actual module_record prefix.
-        self.http.put(MODULE_RECORD_ADDRESS, bytes(MODULE_RECORD_STRIDE * 8))
+        self.http.put(MODULE_RECORD_ADDRESS, bytes(MODULE_RECORD_STRIDE * 10))
         self.http.put(MODULE_RECORD_ADDRESS + MODULE_RECORD_STRIDE * 2,
                       struct.pack('<9I', 12, 1, 6, 3, 0x1234, FEP_BASE, 8, 0, FEP_BASE))
         self.http.put(IME_ADDRESS, struct.pack('<I', 0))

@@ -512,12 +512,13 @@ class Gui:
         kernel = self.symbol_factory(self.kernel_elf).read()
         header = ROOT / 'kernel/module_runtime.h'
         constants = c_constants(header)
+        schema = c_constants(ROOT / 'kernel/module_schema.h')
         offsets = c_word_offsets(header, 'module_record', 'base')
-        count = constants('MODULE_RECORD_CAP')
+        count = schema('MODULE_RECORD_CAP')
         address, size = kernel['module_records']
         if not size or size % count or size // count < offsets['base'] + 4:
             raise ValueError('invalid module_records stride')
-        module_id = c_constants(ROOT / 'kernel/module_schema.h')('MODULE_ID_FEP')
+        module_id = schema('MODULE_ID_FEP')
         for slot in range(count):
             prefix = self.mem(address + slot * (size // count), offsets['base'] + 4)
             values = {name: struct.unpack_from('<I', prefix, offsets[name])[0]
