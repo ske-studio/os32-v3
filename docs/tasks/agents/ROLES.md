@@ -99,7 +99,7 @@ PM は着地の前に worktree の `git log -1` を確かめる。参照先が�
 - ゲストの試験プログラムは `int main` で PASS 0 / FAIL 1 を返す。
 - 同じ箇所を 2 本が別の形で直したときは、マージの後にその箇所を読む。
 - **T4 で踏んだもの (2026-10-18)** — 依頼パックに書き、差分で確かめる:
-  - ゲストの試験プログラムを足したら、`build/app.conf` の宣言ビット (`v86_*` を呼ぶなら `cui`) と `deploy.yaml` を揃え、`check-manifests` を実装者の試験に入れる。GUI から起動する手順と `cui` が両立しないなら、V86 の部分を別のプログラムに分ける (T4b-8 の `kstr_v86`)。
+  - ゲストの試験プログラムを足したら、`build/app.conf` の宣言ビット (`v86_*` を呼ぶなら `cui`) と `deploy.yaml` を揃え、`check-manifests` と `check-kprintf-window` (書式はリテラルで書く、マクロの連結は非リテラル扱い) を実装者の試験に入れる。GUI から起動する手順と `cui` が両立しないなら、V86 の部分を別のプログラムに分ける (T4b-8 の `kstr_v86`)。
   - `--mutate` の分岐を持つ試験を足したら `check-ci-stab-host` も回させる。正常の段を main で先に走らせる形なら、`tools/tests/test_ci_stab.py` の許可に理由つきで足す。
   - ゲストの fixture は実ゲストの構成で成り立つ入力だけにする。SQLite の省いた機能 (`lib/sqlite3/os32_sqlite_config.h` の `SQLITE_OMIT_*`、例: CTE なし)、配布の辞書に無い読み (`fep.db` に「あ」は無い)、初回だけの増分 (辞書の切替) で、host では通るのにゲストで動かなかった (T4b-7)。同じ SQL を host で同じ設定で prepare するか、ゲストで 1 回回してから受入に出す。
   - 呼出しを包む変更 (写しを挟む・入口をまとめる) では、今の戻り値の約束 (NULL でエラー値を返す入口など) を担当表で 1 行ずつ照合する。T4b-8 では `sys_mount(NULL, …)` がエラー値から kill に変わりかけた。
