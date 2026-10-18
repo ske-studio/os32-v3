@@ -60,6 +60,9 @@ int os32_sqlite_group_open(const Os32SqliteGroup *group, const char *path,
 int os32_sqlite_init(void);
 /* T4a-4 measured common S/M/L reservation, no dictionary metadata yet. */
 #define OS32_SQLITE_FEP_RESERVE (192 * 1024)
+/* ceil(max(real IPADIC 101376 B, synthetic 99328 B) / KiB) = 99 KiB;
+ * tools/tests/fep_budget_host.c, ~/os32-tmp/run/t4a/fix1_budget*.log. */
+#define OS32_SQLITE_FEP_RESERVE_MIN (99 * 1024)
 int os32_sqlite_boot_check(int live, int reserve);
 int os32_sqlite_shutdown(void);
 void os32_sqlite_allocation_context(void *db, const Os32SqliteGroup *group);

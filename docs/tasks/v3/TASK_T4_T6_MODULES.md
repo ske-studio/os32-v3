@@ -316,7 +316,7 @@ T4でSQLiteはFIXED鎖からowner割当へ移行済み。T5入口で実mapを基
 | 範囲 | core像の実績 / 増減見積もり | core外・測定ゲート |
 |---|---:|---|
 | T4a 共通核/生成policy | +4〜8KiB (DBGREF分を二重計上しない) | prototypeでprefix/body/record容量を確定。kdebug ONは既存body48KiB・peak60KiB、OFFは0 |
-| T4a-4 再測定 (当時のhost ILP32実績、製品はT4で結線済み) | core増分0 | 512KiB内に固定管理状態80B、HEAP 524,208B、実容量516,096B。予約196,608B、APP+SYSTEM上限319,488B。settings の system/fep_mem_reserve_kb は既定192KiB、下げる向きの上書きも可、下限は実測の最大 (T4a-4の実IPADIC 101,376Bを切り上げた100KiB程度)。コードの直しは別依頼 (wt/fepres)。合成S/M/L最大FEP 99,328B、実IPADIC 101,376B、各27切替成功 (ログ `~/os32-tmp/run/t4a/fix1_budget*.log`) |
+| T4a-4 再測定 (当時のhost ILP32実績、製品はT4で結線済み) | core増分0 | 512KiB内に固定管理状態80B、HEAP 524,208B、実容量516,096B。予約196,608B、APP+SYSTEM上限319,488B。現在の settings による上書きと下限は [KAPI_SPEC](../../KAPI_SPEC.md#db-api-v29-v31) を参照。合成S/M/L最大FEP 99,328B、実IPADIC 101,376B、各27切替成功 (ログ `~/os32-tmp/run/t4a/fix1_budget*.log`) |
 | T4b facade/F2/F3/X群 | +4〜10KiB | group/identity/出力stagingを含むmap差分。X-1の棚卸しで上限が変わるなら着手前に再見積もり |
 | T4c SQLite分離 | core接続増分+4,072B、T4c-2で+1,174B [実績]。受入像約252KB・常駐終端0x19c000 | 別観測のbuild ID 562ff32 (受入一式の再ビルド値ではない) は常駐終端0x19d000・sqlite.mod=398,424B、body385,024B、prefix16,384B。heap512KiB+stack128KiB+guard4KiB込み定常1,044,480B、prefix込み1,060,864B (record等別)。T5-0aで受入一式を再測定 |
 | T5a FEP分離 | FEP撤去とB2 staging等のcore増減を記録 | module本体/状態・ページ丸めを新mapで計上。旧群値は `docs/tasks/v3/TASK_MEMMAP_V3.md:322`、現実測の節約量ではない |

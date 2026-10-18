@@ -362,7 +362,14 @@ void kprintf(u8 attr, const char *fmt, ...)
     if (input[0] >= 10 && input[0] <= 33 && services_stage != SERVICES_READY)
         CHECK(!services_public);
     if (!memcmp(fmt, "IME: 学習不可", sizeof("IME: 学習不可") - 1)) learn_unavailable++;
-    if (!memcmp(fmt, "[services] fep_mem_reserve_kb below default", sizeof("[services] fep_mem_reserve_kb below default") - 1)) reserve_clamped++;
+    if (!memcmp(fmt, "[services] fep_mem_reserve_kb below minimum", sizeof("[services] fep_mem_reserve_kb below minimum") - 1)) {
+        va_list args;
+        va_start(args, fmt);
+        CHECK(va_arg(args, int) == (input[0] == 34 ? 64 : 98));
+        CHECK(va_arg(args, int) == OS32_SQLITE_FEP_RESERVE_MIN / 1024);
+        va_end(args);
+        reserve_clamped++;
+    }
     if (!sqlite_engine_active) return;
     stack_probe();
     if (!memcmp(fmt, "[SQT] init:", 11)) {
@@ -492,11 +499,14 @@ static int selected(void *arg, int n, char **values, char **names)
 }
 void host_seed_settings(sqlite3 *db)
 {
-    if (input[0] != 19 && input[0] != 20) return;
+    if (input[0] != 19 && input[0] != 20 && (input[0] < 34 || input[0] > 36)) return;
     CHECK(!os32_sqlite_exec(db, "CREATE TABLE settings(scope TEXT,key TEXT,type INTEGER,ival INTEGER)", 0, 0, 0));
     CHECK(!os32_sqlite_exec(db, input[0] == 19 ?
         "INSERT INTO settings VALUES('system','fep_mem_reserve_kb',0,224)" :
-        "INSERT INTO settings VALUES('system','fep_mem_reserve_kb',0,128)", 0, 0, 0));
+        input[0] == 20 ? "INSERT INTO settings VALUES('system','fep_mem_reserve_kb',0,128)" :
+        input[0] == 34 ? "INSERT INTO settings VALUES('system','fep_mem_reserve_kb',0,64)" :
+        input[0] == 35 ? "INSERT INTO settings VALUES('system','fep_mem_reserve_kb',0,99)" :
+                        "INSERT INTO settings VALUES('system','fep_mem_reserve_kb',0,98)", 0, 0, 0));
 }
 static void boot_transaction(void)
 {
@@ -510,7 +520,7 @@ static void boot_transaction(void)
     CHECK(unicode_before == ((input[0] >= 14 && input[0] <= 17) ? 0 : UNICODE_FILE_PAGES));
     CHECK(unicode_file_lookup(0x3041) == 0x2421);
     CHECK(!sqlite_engine_active && host_flags == 0x202);
-    int ok = input[0] == 10 || input[0] == 19 || input[0] == 20 || input[0] == 32 || input[0] == 33 || (input[0] >= 14 && input[0] <= 17);
+    int ok = input[0] == 10 || input[0] == 19 || input[0] == 20 || (input[0] >= 32 && input[0] <= 36) || (input[0] >= 14 && input[0] <= 17);
     int isolated = services_boot_fault == SERVICES_FAULT_SETTINGS_CLOSE ||
                    services_boot_fault == SERVICES_FAULT_FEP_CLOSE ||
                    services_boot_fault == SERVICES_FAULT_SHUTDOWN;
@@ -519,9 +529,13 @@ static void boot_transaction(void)
         CHECK(services_stage == SERVICES_READY && sqlite_module_ready());
         CHECK(learn_unavailable == (input[0] == 32));
         CHECK((g_ime.dict.learn_stmt == 0) == (input[0] == 32));
-        CHECK(reserve_clamped == (input[0] == 20));
+        CHECK(reserve_clamped == (input[0] == 34 || input[0] == 36));
         HostBudgetState *budget = (HostBudgetState *)(uptr)heap_base;
-        CHECK(budget->reserve == (input[0] == 19 ? 224 * 1024 : OS32_SQLITE_FEP_RESERVE));
+        unsigned expected_reserve = input[0] == 19 ? 224 * 1024 :
+                                    input[0] == 20 ? 128 * 1024 :
+                                    input[0] >= 34 ? OS32_SQLITE_FEP_RESERVE_MIN :
+                                    OS32_SQLITE_FEP_RESERVE;
+        CHECK(budget->reserve == expected_reserve);
         CHECK(g_ime.dict_loaded && fep_allocs == 2 && !fep_frees);
         /* Real APP pressure must leave the reservation available to FEP. */
         Os32SqliteGroup group;
@@ -536,6 +550,7 @@ static void boot_transaction(void)
         CHECK(inserts > 0);
         CHECK(budget->live[0] + budget->live[2] <= 319488u -
               (budget->reserve - OS32_SQLITE_FEP_RESERVE));
+        if (input[0] == 20) CHECK(budget->live[0] + budget->live[2] > 319488u);
         CHECK(os32_sqlite_step(g_ime.dict.exact_stmt) == SQLITE_ROW);
         CHECK(os32_sqlite_column_int(g_ime.dict.exact_stmt, 0) == 42);
         CHECK(!os32_sqlite_reset(g_ime.dict.exact_stmt));
@@ -544,8 +559,11 @@ static void boot_transaction(void)
         CHECK(!os32_sqlite_outer_group_finish(&group, SQLITE_OK));
         if (input[0] == 20) {
             CHECK(os32_sqlite_outer_boot_check(1, 128 * 1024) == SQLITE_OK);
-            CHECK(budget->reserve == OS32_SQLITE_FEP_RESERVE);
+            CHECK(budget->reserve == 128 * 1024);
         }
+        say("FEP reserve="); number(budget->reserve);
+        say(" app_limit="); number(319488u + OS32_SQLITE_FEP_RESERVE - budget->reserve);
+        say(" diagnostics="); number(reserve_clamped); say("\n");
         say("SERVICES_READY sqlite>0 fep=736 quarantine=0 unicode retained\n");
     } else if (isolated) {
         CHECK(services_stage == SERVICES_MINIMAL_QUARANTINED);

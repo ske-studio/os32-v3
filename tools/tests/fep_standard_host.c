@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "types.h"
+#include "os32_sqlite_vfs.h"
 #define __KSTRING_H
 void *kmemcpy(void *d, const void *s, u32 n) { return memcpy(d, s, n); }
 void *kmemset(void *d, int c, u32 n) { return memset(d, c, n); }
@@ -45,10 +46,17 @@ void *kzalloc(u32 n)
     return p;
 }
 void kfree(void *p) { if (p) heap_live--; free(p); }
+static unsigned reserve_diagnostics;
 void kprintf(u8 attr, const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
+    if (!strcmp(fmt, "[SQT] FEP reserve below minimum; using %d bytes\n")) {
+        CHECK(va_arg(args, int) == OS32_SQLITE_FEP_RESERVE_MIN);
+        reserve_diagnostics++;
+        va_end(args);
+        va_start(args, fmt);
+    }
     vfprintf(stderr, fmt, args);
     va_end(args);
 }
@@ -174,13 +182,12 @@ static void conversion(IME_Dict *dict)
 /* Keep app SQL allocations alive, then fill its rounded remainder exactly.
  * Do not warm the FEP statements before pressure: search must allocate while
  * APP+SYSTEM is already at the product cap, with no spare admission credit. */
-static void pressure(IME_Dict *dict)
+static void pressure(IME_Dict *dict, unsigned limit)
 {
     Os32SqliteGroup group;
     sqlite3 *app = NULL;
     static void *held[8192];
     unsigned count = 0, rows = 0;
-    const unsigned limit = 319488u;
     int rc;
     CHECK(BUDGET_CAPACITY - budget->reserve == limit);
     CHECK(os32_sqlite_group_acquire(OS32_SQLITE_EXEC, 2, &group) == SQLITE_OK);
@@ -207,6 +214,33 @@ static void pressure(IME_Dict *dict)
     while (count) sqlite3_free(held[--count]);
     close_db(&group, app);
     CHECK(budget->live[BUDGET_APP] == 0);
+}
+static void reservations(IME_Dict *dict)
+{
+    static const struct ReserveCase { int request; unsigned adopted, diagnostics; } cases[] = {
+        {128 * 1024, 128 * 1024, 0},
+        {64 * 1024, OS32_SQLITE_FEP_RESERVE_MIN, 1},
+        {OS32_SQLITE_FEP_RESERVE_MIN, OS32_SQLITE_FEP_RESERVE_MIN, 0},
+        {OS32_SQLITE_FEP_RESERVE_MIN - 1, OS32_SQLITE_FEP_RESERVE_MIN, 1},
+        {OS32_SQLITE_FEP_RESERVE, OS32_SQLITE_FEP_RESERVE, 0},
+        {224 * 1024, 224 * 1024, 0},
+    };
+    CHECK(OS32_SQLITE_FEP_RESERVE == 192 * 1024);
+    CHECK(OS32_SQLITE_FEP_RESERVE_MIN == 101376);
+    for (unsigned i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        unsigned before = reserve_diagnostics;
+        CHECK(os32_sqlite_boot_check(1, cases[i].request) == SQLITE_OK);
+        CHECK(budget->reserve == cases[i].adopted);
+        CHECK(reserve_diagnostics - before == cases[i].diagnostics);
+        pressure(dict, 516096u - cases[i].adopted);
+        CHECK(os32_sqlite_boot_check(1, 0) == SQLITE_OK);
+        CHECK(budget->reserve == cases[i].adopted);
+        CHECK(os32_sqlite_boot_check(1, -1) == SQLITE_NOMEM);
+        CHECK(os32_sqlite_boot_check(1, SQLITE_MEMSYS5_SIZE) == SQLITE_NOMEM);
+        CHECK(budget->reserve == cases[i].adopted);
+        CHECK(reserve_diagnostics - before == cases[i].diagnostics);
+    }
+    puts("PASS reserves default=192 lower=128 minimum=99 clamp=64KiB/minimum-1B upper=224; APP cap follows reserve");
 }
 static void learned(IME_Dict *dict, int freq)
 {
@@ -338,7 +372,8 @@ int main(int argc, char **argv)
     CHECK(argc == 2);
     setup();
     open_dict(&dict);
-    if (!strcmp(argv[1], "pressure")) pressure(&dict);
+    if (!strcmp(argv[1], "pressure")) pressure(&dict, 319488u);
+    else if (!strcmp(argv[1], "reserve")) reservations(&dict);
     else if (!strcmp(argv[1], "learning")) learning(&dict);
     else CHECK(0);
     os32_sqlite_allocation_context(dict.db, &dict.group);
