@@ -23,3 +23,17 @@ RUNNING から実自己試験の dispatch を継続して確認する。ゲス�
 T5c-0: FS の8枠/Device の16枠を埋め、拒否時不変・重複・未登録解除・中央の削除と詰め直し・再利用を実行する。FS は mount 中の BUSY と unmount 後の解除を対照にする。10 record の満杯でファイル/owner確保0を確認する。
 3段の依存を load/start し、末端の STARTING が Device/FS を登録・mount した後で失敗する。解除成功なら検索/登録/キャッシュ参照0を **reclaim の直前** に検査し全ownerを回収する。mount/Device キャッシュ/各停止段の失敗なら末端と依存2段を逆順 abort して全owner保持、export非公開、再回収0を確認する。永久 DEVICE 予約のコードは変更しない。
 STARTING 中に実 body を IRQ consumer 相当から呼ぶ試験は、CPU の IRQ/PIC/DMA を模擬しない。各装置の実 IRQ 有効化/停止の観測は切出し段で行う。新しい変異は登録残存無視・STARTING拒否・満杯の偽成功・mount中解除・Device解除欠落を runtime assertion で RED にする。
+
+## T5b-5: CD 登録アダプタ
+
+`make check-cd-module-host MUTATE=0` は実物の cd アダプタ・module runtime・FS/Device
+登録表を ILP32/qemu で組む。既存のページ fixture に init を注入し、RELOCATED 以降の
+登録・満杯・init 失敗・prefix 返却失敗・unmount 後解除・mount 中の body 隔離を確認する。
+実物の `cd.mod` は mkmod との一致、PAIR/phase/短読/CRC 拒否、relocate、core に残る
+IDE/FDC/diskio と部品へ移した ATAPI/ISO のシンボルも照合する。
+`MUTATE=1` の正常対照後、FS 拒否無視・装置解除削除・登録結果無視を runtime RED にする。
+
+PIO と部品 init は `check-cd-read-host` の既存 NP21/W 装置モデルで実行する。
+追加対照は無媒体の装置公開 0、512B の hd/loop 上の ISO、破損/短読 PVD の mount 0。
+無媒体の公開・セクタ換算省略・PVD 版確認省略の変異を runtime RED にする。
+これは PC-98 の実起動の代用ではない。FD/HDD からの起動と実 CD の利用は PM が確認する。

@@ -26,7 +26,6 @@ ATAPI_READ_MAX_SECTORS を 32 にした版 (1 回の転送が 64KB = byte count 
 import os
 import pathlib
 import re
-import mutpar
 import subprocess
 import sys
 import tempfile
@@ -37,11 +36,13 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 READ_HARNESS = "tools/tests/cd_read_host.c"
 PKG_HARNESS = "tools/tests/cd_pkg_host.c"
 SHIM = "tools/tests/atapi_hostshim"
-TREE_FILES = ["drivers/atapi.c", "drivers/atapi.h", "fs/iso9660.c", "fs/iso9660.h",
+TREE_FILES = ["kernel/kernel.c", "kernel/cd_body.c", "kernel/cd_module.h",
+              "fs/vfs.c", "fs/vfs.h", "drivers/dev.c", "drivers/dev.h",
+              "drivers/atapi.c", "drivers/atapi.h", "fs/iso9660.c", "fs/iso9660.h",
               "userland/lib/rt/pkg.c", "userland/lib/rt/pkg.h",
               READ_HARNESS, PKG_HARNESS, SHIM + "/io.h"]
 
-READ_CASES = ["stream_4k", "stream_odd", "stream_32k", "read_file", "multi_fallback",
+READ_CASES = ["empty_insert", "cd_body", "iso_devices", "iso_bad_pvd", "stream_4k", "stream_odd", "stream_32k", "read_file", "multi_fallback",
               "short_transfer", "bad_outside", "bad_inside", "lru_order", "ua_mount", "multi_drq",
               "path_cache", "dir_lru", "list_reentrant", "unit_attention",
               "idle_rule", "no_window", "stat_swap", "list_swap",
@@ -80,6 +81,10 @@ EXE_KEYS = ("read", "wide", "pkg")
 # ほかは実物で組んだもの (main の 1 回目、全部通ったもの) を使う。表に無いファイル
 # (ヘッダなど) は 3 本とも組む。表が gcc -MM の依存より狭ければ mutate() が落ちる。
 REBUILD = {
+    "kernel/cd_body.c": ("read", "wide"),
+    "kernel/kernel.c": ("read", "wide"),
+    "fs/vfs.c": ("read", "wide"),
+    "drivers/dev.c": ("read", "wide"),
     "drivers/atapi.c": ("read", "wide"),
     "fs/iso9660.c": ("read", "wide"),
     "userland/lib/rt/pkg.c": ("pkg",),
@@ -88,11 +93,13 @@ REBUILD = {
 
 def _commands(tmp, tree):
     tmp = pathlib.Path(tmp)
+    link = ["-ffunction-sections", "-fdata-sections", "-Wl,--gc-sections",
+            str(tree / "fs/vfs.c"), str(tree / "drivers/dev.c")]
     return {
         "read": ["gcc", *COMMON, *SAN, *read_includes(tree),
-                 str(tree / READ_HARNESS), "-o", str(tmp / "cd-read")],
+                 str(tree / READ_HARNESS), *link, "-o", str(tmp / "cd-read")],
         "wide": ["gcc", *COMMON, *SAN, "-DATAPI_READ_MAX_SECTORS=32",
-                 *read_includes(tree), str(tree / READ_HARNESS),
+                 *read_includes(tree), str(tree / READ_HARNESS), *link,
                  "-o", str(tmp / "cd-read-wide")],
         "pkg": ["gcc", *COMMON, *SAN, *pkg_includes(tree),
                 str(tree / PKG_HARNESS), "-o", str(tmp / "cd-pkg")],
@@ -226,6 +233,16 @@ MUTATIONS = [
      r"cdb\[7\] = \(u8\)\(n >> 8\);\n        cdb\[8\] = \(u8\)\(n & 0xFF\);",
      "cdb[7] = 0;\n        cdb[8] = 1;",
      "CDB の転送長を 1 のまま (旧 CDB)"),
+    ("kernel/cd_body.c",
+     r"cd_device.total_sects = rc \? 0 : cap.total_sectors;",
+     "cd_device.total_sects = cap.total_sectors;", "T5b5: 無媒体でも自動 mount する容量を残す"),
+    ("fs/iso9660.c",
+     r"if \(type != VFS_DEV_CD\) return \(void \*\)0;\n    devname\[0\] = 'c';\n    devname\[1\] = 'd';",
+     "if (type != VFS_DEV_CD && type != VFS_DEV_HD) return (void *)0;\n"
+     "    devname[0] = type == VFS_DEV_CD ? 'c' : 'h';\n"
+     "    devname[1] = 'd';", "T5b5: HD 上の ISO を受付"),
+    ("fs/iso9660.c",
+     r"pvd\[6\] != 1", "0", "T5b5: 壊れた PVD を公開"),
     # --- fs/iso9660.c: 覚えたパス
     ("fs/iso9660.c",
      r"if \(ctx->pc_valid && kstrcmp\(ctx->pc_path, path\) == 0\) \{",
@@ -517,6 +534,13 @@ MUTATIONS = [
      r"\"SRST: BSY did not clear, bus marked dead\", 0, 0, 0,\n                      ATAPI_SRST_TIMEOUT_US\);",
      "\"SRST: BSY did not clear, bus marked dead\", 0, 0, 0,\n                      s_wait_limit_us);",
      "SRST の行の limit= に PACKET の上限を出す (31 秒を待ったのに 10s と出る)"),
+    ("kernel/cd_body.c", r"    if \(rc\) \{", "    if (rc) { return 0;",
+     "R1: 空トレイで cd0 を登録せず後挿入 sys_mount が失敗"),
+    ("kernel/kernel.c", r"            if \(!d->sect_size \|\| !d->total_sects\) continue;",
+     "            if (0) continue;", "R2: 未 attach/容量なし装置も自動 mount"),
+    ("fs/vfs.c", r"    /\* \"COM1\" etc \*/",
+     "    if (name[0] == 'l' && name[1] == 'o') { *dev_type = VFS_DEV_CD; *dev_id = 0; return VFS_OK; }\n"
+     "    /* \"COM1\" etc */", "R3: loop を ISO mount の対象に戻す"),
     # 対照: 何も変えない。SURVIVED でなければ試験が不安定 (偽の RED)。
     ("fs/iso9660.c", r"(#include \"iso9660\.h\")", r"\1", "対照 (何も変えない)"),
 ]
@@ -531,6 +555,11 @@ def make_tree(tmp, rel=None, text=None):
         dst.write_text((ROOT / f).read_text(encoding="utf-8"), encoding="utf-8")
     if rel is not None:
         (tree / rel).write_text(text, encoding="utf-8")
+    kernel = (tree / "kernel/kernel.c").read_text()
+    start = kernel.index('    {', kernel.index('    cd_module_load();'))
+    end = kernel.index('    services_stage = SERVICES_ROOT_READY;', start)
+    (tree / "tools/tests/boot_submount.c").write_text(
+        'static void boot_submount(int boot_drive) {\n' + kernel[start:end] + '}\n')
     return tree
 
 
@@ -576,7 +605,11 @@ def mutate(base):
     control_ok = False
     only = {int(x) for x in os.environ.get("CD_MUT_ONLY", "").split(",") if x}
     with tempfile.TemporaryDirectory(prefix="os32-cddeps-") as tmp:
-        deps = {k: mutpar.gcc_deps(c, ROOT) for k, c in _commands(tmp, ROOT).items()}
+        # Dependency scanning uses real source paths plus the generated boot loop.
+        tree = make_tree(tmp)
+        generated = ["-I" + str(tree / "tools/tests")]
+        deps = {k: mutpar.gcc_deps(c + generated, ROOT)
+                for k, c in _commands(tmp, ROOT).items()}
     stale = mutpar.check_rebuild_table(REBUILD, deps, [m[0] for m in MUTATIONS])
     for s in stale:
         print("REBUILD TABLE STALE: " + s, flush=True)

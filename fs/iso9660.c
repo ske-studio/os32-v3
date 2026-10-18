@@ -13,13 +13,32 @@
 #include "atapi.h"
 #include "kmalloc.h"
 #include "lib/kstring.h"
+#include "kprintf.h"
 #include "endian_le.h"   /* LE アクセサの正典 (ここの 2 つはその別名) */
 
 /* ======================================================================== */
 /*  内部ヘルパー                                                             */
 /* ======================================================================== */
 
+#ifdef OS32_CD_MODULE
+#include "cd_imports.h"
+#define tick_count ktime_ticks()
+#else
 extern volatile u32 tick_count;
+#endif
+
+/* CD reads use the shared Device API; diskio/FatFs and IDE/FDC stay core. */
+static int iso_read_device(Device *dev, u32 lba, u32 count, void *buf)
+{
+    if (dev->sect_size <= 0 || dev->sect_size > ISO_SECTOR_SIZE ||
+        ISO_SECTOR_SIZE % dev->sect_size) return VFS_ERR_IO;
+    u32 ratio = ISO_SECTOR_SIZE / (u32)dev->sect_size;
+    if (lba > 0xffffffffU / ratio || count > 0x7fffffffU / ratio ||
+        (dev->bus_type != DEV_BUS_ATAPI &&
+         (lba > dev->total_sects / ratio || count > dev->total_sects / ratio - lba)))
+        return VFS_ERR_IO;
+    return dev_blk_read_lba(dev, lba * ratio, (int)(count * ratio), buf);
+}
 
 /* 媒体から count セクタ読む (キャッシュを通らない)。読めたら時刻を覚える */
 static int iso_dev_read(Iso9660Ctx *ctx, u32 lba, u32 count, void *buf)
@@ -29,7 +48,7 @@ static int iso_dev_read(Iso9660Ctx *ctx, u32 lba, u32 count, void *buf)
 
     dev = dev_find(ctx->devname);
     if (!dev) return VFS_ERR_IO;
-    rc = dev_blk_read_lba(dev, lba, (int)count, buf);
+    rc = iso_read_device(dev, lba, count, buf);
     ctx->touched = 1;
     ctx->last_tick = tick_count;
     return (rc != 0) ? VFS_ERR_IO : 0;
@@ -386,27 +405,34 @@ static void *iso9660_mount(int dev_id)
     Device *dev;
     char devname[8];
 
-    /* iso9660 は CD 専用。種別を確かめずに下位バイトだけで "cd%d" を
-     * 組み立てると、fd0/hd0 が cd0 として開かれる。 */
-    if (VFS_MOUNT_DEV_TYPE(dev_id) != VFS_DEV_CD) return (void *)0;
-
-    /* デバイス名を構築: "cd0", "cd1", ... */
+    int type = VFS_MOUNT_DEV_TYPE(dev_id);
+    if (type != VFS_DEV_CD) return (void *)0;
     devname[0] = 'c';
     devname[1] = 'd';
     devname[2] = '0' + (char)VFS_MOUNT_DEV_ID(dev_id);
     devname[3] = '\0';
-
     dev = dev_find(devname);
     if (!dev) return (void *)0;
 
-    /* PVD読み出し (LBA 16) */
-    if (dev_blk_read_lba(dev, ISO_PVD_LBA, 1, pvd) != 0)
+    if (iso_read_device(dev, ISO_PVD_LBA, 1, pvd) != 0) {
+        kprintf(0x07, "[iso9660] %s: PVD read failed; mount unpublished\n", devname);
         return (void *)0;
-
-    /* マジック確認: pvd[1..5] == "CD001" */
-    if (pvd[0] != 1 || pvd[1] != 'C' || pvd[2] != 'D'
-                     || pvd[3] != '0' || pvd[4] != '0' || pvd[5] != '1')
+    }
+    u32 volume = iso_read_le32(pvd + 80);
+    u32 root_lba = iso_read_le32(pvd + 158);
+    u32 root_size = iso_read_le32(pvd + 166);
+    u32 root_sectors = root_size / ISO_SECTOR_SIZE + (root_size % ISO_SECTOR_SIZE != 0);
+    if (pvd[0] != 1 || pvd[1] != 'C' || pvd[2] != 'D' || pvd[3] != '0' ||
+        pvd[4] != '0' || pvd[5] != '1' || pvd[6] != 1 ||
+        iso_read_le16(pvd + 128) != ISO_SECTOR_SIZE ||
+        volume <= ISO_PVD_LBA ||
+        (dev->bus_type != DEV_BUS_ATAPI &&
+         volume > dev->total_sects / (ISO_SECTOR_SIZE / dev->sect_size)) ||
+        pvd[156] < 34 || !(pvd[181] & ISO_FLAG_DIRECTORY) || !root_size ||
+        root_lba >= volume || root_sectors > volume - root_lba) {
+        kprintf(0x07, "[iso9660] %s: invalid PVD; mount unpublished\n", devname);
         return (void *)0;
+    }
 
     /* kzalloc: 未初期化フィールドが残らないようにする */
     ctx = (Iso9660Ctx *)kzalloc(sizeof(Iso9660Ctx));
@@ -423,7 +449,6 @@ static void *iso9660_mount(int dev_id)
 
     /* 論理ブロックサイズ (pvd[128..129] = LE u16) */
     ctx->block_size = iso_read_le16(pvd + 128);
-    if (ctx->block_size == 0) ctx->block_size = ISO_SECTOR_SIZE;
 
     /* ルートディレクトリレコード (pvd[156..189], 34バイト) */
     {

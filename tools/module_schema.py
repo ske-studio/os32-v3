@@ -71,3 +71,14 @@ POLICIES[CONSTANTS['ID_FEP']] = dict(
     init_symbol='fep_module_init', imports_symbol='fep_import_slots',
     ops_symbol='fep_module_ops', ops_names=('initialize',),
 )
+
+# T5b-5: ATAPI and ISO9660 share one POST_ROOT body and registration lifetime.
+POLICIES[CONSTANTS['ID_ATAPI_ISO']] = dict(
+    module_id=CONSTANTS['ID_ATAPI_ISO'], phase=CONSTANTS['PHASE_POST_ROOT'],
+    required_flags=CONSTANTS['FLAG_PAIR'], allowed_flags=CONSTANTS['FLAG_PAIR'],
+    stop_allowed=0, ops_version=1, ops_slots=1,
+    image_max=65536, mem_max=65536,
+    reloc_max=2048, import_max=32, export_max=1, load_span_max=81920,
+    init_symbol='cd_module_init', imports_symbol='cd_import_slots',
+    ops_symbol='cd_module_ops', ops_names=('initialize',),
+)

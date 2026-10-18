@@ -9,6 +9,9 @@
 #include "pgalloc.h"
 #include "module.h"
 #include "sqlite_engine.h"
+#include "dev.h"
+#include "../../fs/vfs.h"
+#include "pc98.h"
 enum services_stage services_stage;
 volatile u32 tick_count;
 struct ledger_region ledger_regions[LEDGER_MAX_REGIONS];
@@ -21,6 +24,8 @@ u32 ledger_region_count;
 static int available, conflict, reserved, tested, bound, pcm, diag, loaded;
 static int debug_enabled = 1;
 static int dma_tested, dma_skipped, unicode_loads;
+static int cd_loaded;
+static u32 boot_drive = BOOT_DRIVE_FDD;
 static void kprintf(int attr, const char *fmt, ...);
 static void test_dma_pool(void) { dma_tested++; }
 #include "selftest_dma_gate.c"
@@ -67,9 +72,28 @@ void kdebug_load(void)
     kdebug.ops.selftest_run = debug_enabled ? selftest : 0;
 }
 static void kselftest_skipped(void) { CHECK(!debug_enabled); tested++; }
+static int cd_module_load(void)
+{
+    CHECK(reserved && tested == 1 && loaded == 1);
+    cd_loaded++;
+    return 0;
+}
+int dev_get_names(const char **names, int max)
+{
+    (void)names; (void)max;
+    CHECK(cd_loaded == 1);
+    return 0;
+}
+Device *dev_find(const char *name) { (void)name; return NULL; }
+int vfs_mount(const char *prefix, const char *name, const char *fstype)
+{
+    (void)prefix; (void)name; (void)fstype;
+    CHECK(0); /* no block devices in this DMA fixture */
+    return VFS_ERR_IO;
+}
 static void unicode_file_load(void)
 {
-    CHECK(reserved && tested == 1 && loaded == 1 && !bound && !pcm);
+    CHECK(reserved && tested == 1 && loaded == 1 && cd_loaded == 1 && !bound && !pcm);
     unicode_loads++;
 }
 u32 ledger_resource_import_pci(void) { CHECK(reserved); return 0; }
@@ -78,7 +102,6 @@ static void kernel_pci_line_bits(void) { }
 static void pci_bind_set_line_state_hook(void (*hook)(void)) { (void)hook; }
 static int pci_drivers;
 #define PCI_DRIVER_COUNT 1
-#define TATTR_WHITE 0
 static void pci_bind_all(int drivers, int count)
 {
     struct dma_buf b;

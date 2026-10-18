@@ -16,3 +16,6 @@ check-dma-pool-host:
 - kernel/pgalloc.h
 - kernel/module.h
 - kernel/sqlite_engine.h
+- drivers/dev.h
+- fs/vfs.h
+- include/pc98.h

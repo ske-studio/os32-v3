@@ -512,7 +512,7 @@ def main():
               file=sys.stderr)
         return 2
     require_fresh('.', ['build/out/kernel.bin', 'build/out/kdebug.bin',
-                        'build/out/sqlite.mod', 'build/out/fep.mod',
+                        'build/out/sqlite.mod', 'build/out/fep.mod', 'build/out/cd.mod',
                         *sorted(bins)])
 
     rc = 0

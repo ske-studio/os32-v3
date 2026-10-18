@@ -22,6 +22,7 @@
 #define SYS_SHELL_BIN_FDD     "/sys/shell.bin"     /* FDDフォールバック (統一パス) */
 #define SYS_GSHELL_BIN        "/bin/gshell.bin"    /* GUI シェル (WM 常駐、W1 が実体を作る、契約 T9) */
 #define SYS_SQLITE_MOD        "/boot/sqlite.mod"
+#define SYS_CD_MOD            "/boot/cd.mod"
 #define SYS_FEP_MOD           "/boot/fep.mod"
 #define SYS_SETTINGS_DB "/etc/settings.db"
 #define SYS_KDEBUG_BIN        "/boot/kdebug.bin"

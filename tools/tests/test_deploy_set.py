@@ -47,6 +47,7 @@ class DeploySet(unittest.TestCase):
             {"host": "build/out/kdebug.bin", "guest": "/boot/kdebug.bin"},
             {"host": "build/out/sqlite.mod", "guest": "/boot/sqlite.mod"},
             {"host": "build/out/fep.mod", "guest": "/boot/fep.mod"},
+            {"host": "build/out/cd.mod", "guest": "/boot/cd.mod"},
             {"host": "build/out/unicode.bin", "guest": "/sys/unicode.bin"},
             {"host": "userland/shell.bin", "guest": "/sys/shell.bin"},
             {"host": "userland/libos32gui.shlib", "guest": "/sys/lib/"},
@@ -56,7 +57,7 @@ class DeploySet(unittest.TestCase):
             {"host": "assets/filetypes", "guest": "/etc/filetypes"},
         ]
         for name in ("build/out/vmkernel.lz4", "build/out/kdebug.bin", "build/out/unicode.bin",
-                     "build/out/sqlite.mod", "build/out/fep.mod",
+                     "build/out/sqlite.mod", "build/out/fep.mod", "build/out/cd.mod",
                      "userland/shell.bin", "userland/libos32gui.shlib",
                      "userland/tests/a.bin", "userland/tests/excluded.bin",
                      "assets/a.dat", "assets/filetypes", "build/out/kernel.bin",
@@ -90,13 +91,14 @@ class DeploySet(unittest.TestCase):
     def test_scope_hashes_and_determinism(self):
         result = self.generate()
         self.assertEqual(result, self.generate())
-        self.assertEqual(len(result["files"]), 10)
+        self.assertEqual(len(result["files"]), 11)
         hosts = {e["host"] for e in result["files"]}
         self.assertIn("build/out/unicode.bin", hosts)
         self.assertIn("build/out/vmkernel.lz4", hosts)
         self.assertIn("build/out/kdebug.bin", hosts)
         self.assertIn("build/out/sqlite.mod", hosts)
         self.assertIn("build/out/fep.mod", hosts)
+        self.assertIn("build/out/cd.mod", hosts)
         self.assertIn("userland/libos32gui.shlib", hosts)
         self.assertFalse(any(h.startswith(("boot/", "build/sdk/", "apps/", "game/"))
                              or h.endswith(("kernel.bin", "sqlite.bin", "excluded.bin"))
@@ -120,7 +122,7 @@ class DeploySet(unittest.TestCase):
         self.entries += [{"host": "not-built.db", "guest": "/etc/settings.db"},
                          {"host": "not-built.cfg", "guest": "/etc/system.cfg"},
                          {"host": "not-built.log", "guest": "/var/log/boot.log"}]
-        self.assertEqual(len(self.generate()["files"]), 10)
+        self.assertEqual(len(self.generate()["files"]), 11)
 
     def test_missing_and_duplicate_rejected(self):
         (self.root / "build/out/unicode.bin").unlink()

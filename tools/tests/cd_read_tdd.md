@@ -244,6 +244,12 @@ SURVIVED でなければ試験が不安定。変異の一覧と結果は `test_c
   を出さない) は全部 RED。既存の変異のうち待ち・回復の形が変わった 7 本はパターンを新しい形に合わせた。
   全 73 本 RED / 0 SURVIVED (対照は SURVIVED)
 
+## 3-7. T5b-5 レビュー R1〜R3 (2026-10-19)
+
+- `empty_insert`: 実物 cd_body の初期化結果を実物 dev/VFS に登録する。空トレイは NP21/W の容量 1 セクタと READ CAPACITY 失敗の 2 通り。実物 kernel.c から抜いたサブマウント段では読まず、媒体挿入後は再初期化・再登録・容量更新をせず `sys_mount` の直接の委譲先 `vfs_mount("/cd0", "cd0", "iso9660")` とファイル読取が成功する。KAPI の境界検証と実起動は対象外。
+- `iso_devices`: 読める ISO を持つ hd/loop の mount は読取・診断なしで失敗。未 attach lo0〜lo3 と sect_size / total_sects が片方ずつ 0 の装置を起動段に通し、診断が出ない。
+- R1 の旧早期 return、R2 の起動段のスキップ削除、R3 の loop 受付復活を変異に追加。既存の無媒体・hd ISO 受付の変異も CD 専用の契約へ更新する。実物 dev.c / vfs.c を結合し、IDE/FDC の未使用 I/O と FD 失効だけを境界の贋物にする。
+
 ## 4. 未検証
 
 - **実機・NP21/W での速さは測っていない** (PM が測る)。NP21/W は CD のシーク・回転を模擬しないので

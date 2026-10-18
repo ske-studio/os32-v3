@@ -47,10 +47,9 @@
 #include "dma_pool.h"   /* DMA プール (同 §1-3) */
 #include "ide.h"
 #include "bootinfo.h"   /* ブート情報域 0x7E00 (票 TASK_HDD_INSTALL 段 0) */
-#include "atapi.h"
+#include "cd_module.h"
 #include "vfs.h"
 #include "ext2.h"
-#include "iso9660.h"
 #include "loop_dev.h"
 
 /* FatFs VFSドライバ (fs/fatfs_vfs.c) */
@@ -374,7 +373,6 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     path_init();
     int fs_registration_failed = ext2_init() != VFS_OK;
     fs_registration_failed |= fatfs_init() != VFS_OK;
-    fs_registration_failed |= vfs_register_fs(&iso9660_ops) != VFS_OK;
     fs_registration_failed |= hostdrvfs_init() != VFS_OK;
     fs_registration_failed |= serialfs_init() != VFS_OK;
     path_set_device_validator(dev_find_validator);
@@ -415,15 +413,6 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * (票 TASK_SERIAL_HOSTFS A-4 — 更新の証拠は Build ではなくこの CRC)。 */
     bootinfo_report_image();
 
-    /* ATAPI CD-ROM 検出 */
-    {
-        int cd = atapi_init();
-        if (cd > 0) {
-            tvram_print(14, 3, "CD", TATTR_WHITE);
-            dev_register_cdrom();
-        }
-    }
-
     /* ヒープ初期化 (VFSマウントでkmalloc使用のため、マウント前に必要) */
     tvram_print(24, 2, "HEAP...", TATTR_GREEN);
     kmalloc_init((void *)KHEAP_BASE, KHEAP_SIZE);
@@ -435,14 +424,10 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
         tvram_print(31, 2, hb, TATTR_WHITE);
     }
 
-    /* 自動マウント処理 */
+    /* root と HostDrv の初期マウント (部品の読込より前) */
     tvram_print(14, 3, "MOUNT...", TATTR_GREEN);
     {
-        int i, rc;
-        /* MAX_DEVICES 分確保する。lo0-lo3 が hd0/cd0 より先に登録されるため、
-         * 固定8個だと後続デバイスが自動マウント対象から漏れる。 */
-        const char *names[MAX_DEVICES];
-        int num = dev_get_names(names, MAX_DEVICES);
+        int rc;
         const char *root_dev;
         const char *root_fs;
 
@@ -462,50 +447,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
         }
         tvram_print(23, 3, "root OK", TATTR_WHITE);
 
-        /* 2. サブマウント (ルート以外) */
-        for (i = 0; i < num; i++) {
-            const char *dname = names[i];
-            char mnt[VFS_MNTPATH_MAX];
-            int j;
-            Device *d = dev_find(dname);
-
-            if (!d || d->type != DEV_BLOCK) continue;
-
-            /* ルートと一致する場合はスキップ */
-            {
-                int match = 1;
-                for (j = 0; root_dev[j] || dname[j]; j++) {
-                    if (root_dev[j] != dname[j]) { match = 0; break; }
-                }
-                if (match) continue;
-            }
-
-            /* パス生成: "/dname/" */
-            mnt[0] = '/';
-            for (j = 0; dname[j] && j < VFS_MNTPATH_MAX - 4; j++) {
-                mnt[1 + j] = dname[j];
-            }
-            mnt[1 + j] = '\0';
-
-            /* フォールバックしながらマウント試行 */
-            {
-                int mounted = 0;
-                /* CDデバイスにはiso9660のみ試行 */
-                if (dname[0] == 'c' && dname[1] == 'd') {
-                    if (vfs_mount(mnt, dname, "iso9660") == VFS_OK) mounted = 1;
-                } else {
-                    if (vfs_mount(mnt, dname, "ext2") == VFS_OK) mounted = 1;
-                    if (!mounted) {
-                        if (vfs_mount(mnt, dname, "iso9660") == VFS_OK) mounted = 1;
-                    }
-                    if (!mounted) {
-                        vfs_mount(mnt, dname, "fat");
-                    }
-                }
-            }
-        }
-
-        /* 3. HostDrv(NT) 自動マウント (/host) */
+        /* HostDrv(NT) 自動マウント (/host) */
         if (hostdrvfs_detect()) {
             int hrc = vfs_mount("/host", "hostdrv", "hostdrv");
             if (hrc == VFS_OK) {
@@ -599,6 +541,59 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     kdebug_load();
     if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_run();
     else kselftest_skipped();
+
+    /* POST_ROOT: the loader needs root, paging and the page ledger. CD is
+     * independent of services_boot, so MINIMAL/SQLITE_ONLY can read packages. */
+    cd_module_load();
+    {
+        const char *names[MAX_DEVICES];
+        int num = dev_get_names(names, MAX_DEVICES);
+        const char *root_dev = (boot_drive == BOOT_DRIVE_FDD ||
+                                boot_drive == BOOT_DRIVE_FDD_144) ? "fd0" : "hd0";
+        /* 登録済みの部品を含めてサブマウント (ルート以外) */
+        for (int i = 0; i < num; i++) {
+            const char *dname = names[i];
+            char mnt[VFS_MNTPATH_MAX];
+            int j;
+            Device *d = dev_find(dname);
+
+            if (!d || d->type != DEV_BLOCK) continue;
+            if (!d->sect_size || !d->total_sects) continue;
+
+            /* ルートと一致する場合はスキップ */
+            {
+                int match = 1;
+                for (j = 0; root_dev[j] || dname[j]; j++) {
+                    if (root_dev[j] != dname[j]) { match = 0; break; }
+                }
+                if (match) continue;
+            }
+
+            /* パス生成: "/dname/" */
+            mnt[0] = '/';
+            for (j = 0; dname[j] && j < VFS_MNTPATH_MAX - 4; j++) {
+                mnt[1 + j] = dname[j];
+            }
+            mnt[1 + j] = '\0';
+
+            /* フォールバックしながらマウント試行 */
+            {
+                int mounted = 0;
+                /* CDデバイスにはiso9660のみ試行 */
+                if (dname[0] == 'c' && dname[1] == 'd') {
+                    if (vfs_mount(mnt, dname, "iso9660") == VFS_OK) mounted = 1;
+                } else {
+                    if (vfs_mount(mnt, dname, "ext2") == VFS_OK) mounted = 1;
+                    if (!mounted) {
+                        if (vfs_mount(mnt, dname, "iso9660") == VFS_OK) mounted = 1;
+                    }
+                    if (!mounted) {
+                        vfs_mount(mnt, dname, "fat");
+                    }
+                }
+            }
+        }
+    }
 
     services_stage = SERVICES_ROOT_READY;
     kprintf(0x07, "[services] ROOT_READY tick=%u\n", tick_count);

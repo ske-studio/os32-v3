@@ -4,6 +4,8 @@ check-arch-asm:
 - tools/check_p2v_allow.txt
 - tools/tests/mutpar.py
 - tools/clang_ast/**
+- tools/gen_sqlite_imports.py
+- tools/prototypes/cd_imports.def
 - tools/tests/test_clang_ast.py
 - boot/boot_main.c
 - sdk/allocator/nano_adapter.c

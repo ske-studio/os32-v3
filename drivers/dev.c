@@ -14,7 +14,6 @@
 #include "dev.h"
 #include "disk.h"
 #include "ide.h"
-#include "atapi.h"
 #include "fdc.h"   /* fdc_read_sector, fdc_write_sector */
 
 /* ======== デバイステーブル ======== */
@@ -166,38 +165,6 @@ void dev_register_hdd(int drive)
         hd_devs[drive]->spt   = info.sectors;
         dev_register(hd_devs[drive]);
     }
-}
-
-/* ======================================================================== */
-/*  CD-ROM ドライバ (ATAPI — LBA ネイティブ)                                */
-/* ======================================================================== */
-
-static int cd0_read(Device *self, int lba, int count, void *buf)
-{
-    (void)self;
-    return atapi_read_sectors((u32)lba, (u32)count, buf);
-}
-
-static Device cd0_dev = {
-    "cd0", DEV_BLOCK,
-    DEV_BUS_ATAPI, 0,       /* bus_type=ATAPI, bus_id=0 */
-    ATAPI_SECTOR_SIZE,      /* sect_size 2048 */
-    0,                      /* total_sects (初期化時に設定) */
-    cd0_read,               /* blk_read (LBA ネイティブ) */
-    0,                      /* blk_write = NULL (読み取り専用) */
-    0, 0, 0, 0,             /* chr_read, chr_write, ioctl, priv */
-    0, 0,                   /* blk_read_chs/write_chs = NULL (LBA デバイス) */
-    0, 0, 0                 /* cyls/heads/spt = 0 (CHS ジオメトリなし) */
-};
-
-/* CD-ROMを登録するユーティリティ */
-void dev_register_cdrom(void)
-{
-    AtapiCapacity cap;
-    if (atapi_read_capacity(&cap) == ATAPI_OK) {
-        cd0_dev.total_sects = cap.total_sectors;
-    }
-    dev_register(&cd0_dev);
 }
 
 /* SCSIデバイスの登録 (将来用スタブ — WD33C93ドライバ完成後に実装予定) */

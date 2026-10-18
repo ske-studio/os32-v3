@@ -9,6 +9,7 @@ check-c-dialect-host:
 - tools/gen_kdebug_imports.py
 - tools/prototypes/sqlite_imports.def
 - tools/prototypes/fep_imports.def
+- tools/prototypes/cd_imports.def
 - build/sqlite-proto.mk
 - tools/tests/test_c_dialect.py
 - tools/tests/mutpar.py

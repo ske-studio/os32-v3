@@ -63,4 +63,5 @@ check-map:
 - tools/module_schema.py
 - tools/prototypes/sqlite_imports.def
 - tools/prototypes/fep_imports.def
+- tools/prototypes/cd_imports.def
 artifact_reader: true

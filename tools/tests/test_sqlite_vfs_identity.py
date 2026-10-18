@@ -12,7 +12,7 @@ FILES = ['fs/vfs.h', 'fs/vfs_fd.c', 'lib/sqlite3/os32_sqlite_vfs.c',
          'lib/sqlite3/os32_sqlite_vfs.h', 'tools/tests/sqlite_vfs_identity_host.c',
          'tools/tests/sqlite_groups_host.c', 'tools/tests/sqlite_groups_backend.h',
          'tools/tests/vfs_fd_sqlite_host.c', 'tools/tests/sqlite_cd_host.c',
-         'tools/tests/cd_read_host.c', 'fs/vfs.c', 'fs/iso9660.c',
+         'tools/tests/cd_read_host.c', 'kernel/cd_body.c', 'kernel/cd_module.h', 'fs/vfs.c', 'fs/iso9660.c',
          'drivers/atapi.c', 'tools/tests/atapi_hostshim/io.h']
 INC = ['-I' + str(ROOT / p) for p in
        ('include', 'fs', 'drivers', 'sdk/include/os32', 'lib', 'lib/sqlite3')]
