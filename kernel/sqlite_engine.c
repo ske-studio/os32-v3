@@ -83,6 +83,7 @@ enum services_stage services_stage;
 volatile u32 services_boot_fault;
 extern volatile u32 tick_count;
 static u32 pool_phys;
+static int services_reserve;
 extern const u32 sqlite_kexports[];
 extern const struct module_symbol_contract sqlite_import_contracts[];
 extern const struct module_symbol_contract sqlite_export_contracts[];
@@ -297,6 +298,7 @@ rollback:;
     kprintf(0x07, "[services] rollback stage=%u rc=%d fault=%u cleanup=%u\n",
             failed_stage, rc, services_boot_fault, (u32)cleanup_blocked);
 report:;
+    services_reserve = reserve;
     struct module_record *r = module_record_get(sqlite_handle);
     u32 pages = r && r->owner ? ledger_owner_pages(r->owner) : 0;
     u32 fep = ime_boot_bytes();
@@ -329,7 +331,12 @@ static const char *services_state_name(void)
 
 void services_report(void)
 {
-    kprintf(0x07, "  services: %s db=%u fep_pages=%u fep_bytes=%u\n",
-            services_state_name(), (u32)services_public,
-            fep_module_pages(), ime_boot_bytes());
+    struct module_record *r = module_record_get(sqlite_handle);
+    u32 pages = r && r->owner ? ledger_owner_pages(r->owner) : 0;
+    u32 fep_pages = fep_module_pages();
+    u32 fep = ime_boot_bytes();
+    kprintf(0x07, "  services: %s public=%u sqlite_pages=%u fep_pages=%u quarantine_bytes=%u reserve=%d\n",
+            services_state_name(), (u32)services_public, pages, fep_pages,
+            services_stage == SERVICES_MINIMAL_QUARANTINED ? (pages + fep_pages) * PAGE_SIZE + fep : 0,
+            services_reserve);
 }

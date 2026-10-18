@@ -417,13 +417,14 @@ void kprintf(u8 attr, const char *fmt, ...)
     if (!memcmp(fmt, "[services] SQLITE_ONLY: no FEP dictionary\n",
                 sizeof("[services] SQLITE_ONLY: no FEP dictionary\n")))
         dictionary_missing_messages++;
-    if (!memcmp(fmt, "  services: %s db=%u", sizeof("  services: %s db=%u") - 1)) {
+    if (!memcmp(fmt, "  services: %s public=%u", sizeof("  services: %s public=%u") - 1)) {
         va_list args;
         va_start(args, fmt);
         const char *state = va_arg(args, const char *);
         CHECK(!memcmp(state, services_stage == SERVICES_SQLITE_ONLY ? "SQLITE_ONLY" :
                       services_stage == SERVICES_READY ? "SERVICES_READY" :
-                      services_stage == SERVICES_MINIMAL ? "MINIMAL" : "MINIMAL_QUARANTINED",
+                      services_stage == SERVICES_MINIMAL ? "MINIMAL" :
+                      services_stage == SERVICES_MINIMAL_QUARANTINED ? "MINIMAL_QUARANTINED" : "STARTING",
                       kstrlen(state) + 1));
         CHECK(va_arg(args, unsigned) == (unsigned)services_public);
         va_end(args);
@@ -835,7 +836,7 @@ void _start(void)
     CHECK(deep_water > 0 && deep_water < SQLITE_ENGINE_STACK_SIZE);
     char build_info[64];
     kapi_sys_get_build_info(build_info, sizeof(build_info));
-    CHECK(build_info[0] && stack_reports == 1);
+    CHECK(build_info[0] && stack_reports == 1 && services_reports == 1);
     CHECK(os32_sqlite_exec(db, "DELETE FROM t", 0, 0, 0) == SQLITE_OK);
     CHECK(sqlite_engine_stack_high_water() >= deep_water);
     CHECK(os32_sqlite_outer_canary() == 0);
