@@ -147,6 +147,21 @@ enum module_field {
         .export_max = 1U, \
         .load_span_max = 86016U, \
     }, \
+    { \
+        .module_id = 6U, \
+        .phase = 2U, \
+        .required_flags = 1U, \
+        .allowed_flags = 1U, \
+        .stop_allowed = 0U, \
+        .ops_version = 1U, \
+        .ops_slots = 1U, \
+        .image_max = 65536U, \
+        .mem_max = 65536U, \
+        .reloc_max = 2048U, \
+        .import_max = 16U, \
+        .export_max = 1U, \
+        .load_span_max = 81920U, \
+    }, \
 }
 
 #endif

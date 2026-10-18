@@ -48,6 +48,7 @@ include build/sqlite-proto.mk
 include build/fep-module.mk
 include build/cd-module.mk
 include build/kcg-module.mk
+include build/fm-module.mk
 include build/libs.mk
 include build/programs.mk
 include build/deploy.mk

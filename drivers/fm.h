@@ -101,6 +101,7 @@ void fm_set_tone_num(int ch, int tone_num);
 void fm_note_on(int ch, int note);
 void fm_note_off(int ch);
 void fm_all_off(void);
+int fm_quiet(void); /* confirmed silence for boot rollback */
 
 /* SSG音源 */
 void ssg_tone(int ch, u16 period);
