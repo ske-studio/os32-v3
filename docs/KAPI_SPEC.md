@@ -214,6 +214,8 @@ SHM ブロック (`sys_shm_lock` / `sys_shm_free`)、パイプ (`sys_pipe_free` 
 | GUI `gui_call(op, arg)` | 現在の実ownerを WM に渡す。arg の形式/寿命は各opの契約 | WM の返値 / 未登録NOSYS / 内部 OWNER_EXIT はINVAL | 公開OWNER_EXITをWMへ転送しない。TRIM_DONE はcoreのepoch/owner検査へ。その他は実ownerのまま正規WMへ配送、WM文脈/WAIT印を対で管理 | 同期opのargは呼出し中有効。parkしたWAITは保存フレームの復帰値として戻る。owner終了時の内部通知が窓等を取消 ([GUI契約](tasks/gui/API_CONTRACTS.md)) |
 | console `con_sink_read(buf, cap)` | 最初の有効な読取り主体が単一reader。非NULL buf、cap≥CON_SINK_REC_MAX | 完全レコードのコピーbyte数 / 空=0 / 入力INVAL / 別reader=EXIST | 空でもreaderを獲得。INVAL/EXISTは出力/リング/reader不変。park・子終了・enable/disableでは所有を返さず、reader本人の終了時だけ返す | コピーは呼び手所有。所有返却時にリングを捨てない。enable/disableはリング内容を捨てる。あふれは古いレコード単位で破棄 |
 
+IME の検索候補は SQL の最大32行から C 側で31 B に切る前の表記の重複を除き、学習語の先行順位を保つが、減った分は取り直さず32件未満を許す。
+
 CUI の候補/かな/未読確定列は1組であり、子が実際に読めば同じ列を進め、最後の読取り主体の終了で取消す。
 子が読まなければ親の候補と辞書を保つ。ブロッキング IME 口は待機開始時に読取り主体を記録し、STOP/終了で取消す。
 GUI の物理入力は raw→WM/FEP→Text または端末注入の1経路であり、cookedへ重ねて積まない。

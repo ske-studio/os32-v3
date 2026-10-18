@@ -24,47 +24,9 @@ MUTANTS = [
      'rc = sqlite3_step(stmt);\n    if (rc != SQLITE_DONE && is_ioerr(rc)',
      'rc = SQLITE_DONE;\n    if (rc != SQLITE_DONE && is_ioerr(rc)',
      'ime_user_list(dict, "か", entries, 4) == 1'),
-    ('exact_dictionary_duplicate', 'learning', 'kernel/ime_dict.c',
-     '    "    AND NOT EXISTS (SELECT 1 FROM dict_user u"\n'
-     '    "      WHERE u.yomi = ?1 AND u.kanji = d.kanji)"\n',
+    ('no_candidate_dedup', 'learning', 'kernel/ime_dict.c',
+     '        if (i < count) continue;\n',
      '', 'count == expected'),
-    ('prefix_dictionary_duplicate', 'learning', 'kernel/ime_dict.c',
-     '    "    AND (d.kanji IN (SELECT kanji FROM dict_user"\n'
-     '    "      WHERE yomi >= ?1 AND yomi < ?1 || X\'EFBFBF\' ORDER BY kanji)) IS NOT TRUE"\n',
-     '', 'count == expected'),
-    ('prefix_user_duplicate', 'learning', 'kernel/ime_dict.c',
-     '    "  SELECT kanji, 0 as pos_id, MIN(-10000 - freq) as cost"\n'
-     '    "    FROM dict_user WHERE yomi >= ?1 AND yomi < ?1 || X\'EFBFBF\'"\n'
-     '    "    GROUP BY kanji"\n',
-     '    "  SELECT kanji, 0 as pos_id, (-10000 - freq) as cost"\n'
-     '    "    FROM dict_user WHERE yomi >= ?1 AND yomi < ?1 || X\'EFBFBF\'"\n',
-     'count == expected'),
-    ('prefix_limit_two', 'learning', 'kernel/ime_dict.c',
-     '") ORDER BY cost LIMIT 32";\n\nSTATIC_ASSERT(sizeof(SQL_EXACT)',
-     '") ORDER BY cost LIMIT 2";\n\nSTATIC_ASSERT(sizeof(SQL_EXACT)',
-     'count == IME_MAX_RESULTS'),
-    ('prefix_range_scan', 'prefix', 'kernel/ime_dict.c',
-     '    "    AND (d.kanji IN (SELECT kanji FROM dict_user"\n'
-     '    "      WHERE yomi >= ?1 AND yomi < ?1 || X\'EFBFBF\' ORDER BY kanji)) IS NOT TRUE"\n',
-     '    "    AND NOT EXISTS (SELECT 1 FROM dict_user u WHERE u.kanji = d.kanji"\n'
-     '    "      AND u.yomi >= ?1 AND u.yomi < ?1 || X\'EFBFBF\')"\n',
-     'fixed_steps * 2 <= baseline_steps * 3'),
-    ('bounded_repeated_spelling', 'bounded', 'kernel/ime_dict.c',
-     '    " AND kanji NOT IN (SELECT kanji FROM dict_user WHERE rowid IN ("\n'
-     '    "?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,"\n'
-     '    "?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33))"\n',
-     '    " AND (kanji NOT IN (SELECT kanji FROM dict_user WHERE rowid IN ("\n'
-     '    "?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,"\n'
-     '    "?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33)) OR ?2 IS NOT NULL)"\n',
-     '!strcmp(results[expected].kanji,'),
-    ('bounded_dictionary_duplicate', 'bounded', 'kernel/ime_dict.c',
-     '    " AND NOT EXISTS (SELECT 1 FROM dict_user u WHERE u.kanji = d.kanji"\n'
-     '    " AND u.yomi >= ?1 AND u.yomi < ?1 || X\'EFBFBF\')"\n',
-     '', '!strcmp(results[expected].kanji,'),
-    ('bounded_rowid_truncated', 'bounded', 'kernel/ime_dict.c',
-     '    "SELECT kanji, 0, -10000 - freq as cost, rowid,"',
-     '    "SELECT kanji, 0, -10000 - freq as cost, rowid & 4294967295,"',
-     '!strcmp(results[expected].kanji,'),
 ]
 
 
@@ -135,7 +97,7 @@ def main():
                       str(ROOT / 'lib/sqlite3/sqlite3.c'), '-o', str(obj)], check=True)
         normal = tmp / 'normal'
         build(ROOT, obj, normal)
-        for case in ('pressure', 'learning', 'prefix', 'bounded'):
+        for case in ('pressure', 'learning', 'prefix'):
             result = run(normal, case, args.runner, data)
             assert result.returncode == 0, result.returncode
         print('GREEN FEP APP+SYSTEM=319488 conversion; ext2 RW learning; prefix cap/order/VM steps',
