@@ -9,6 +9,7 @@
 #include "con_sink.h"
 #include "kbd_inject.h"
 #include "kstring.h"
+#include "redir_access.h"
 
 int services_public = 1;
 volatile u32 services_boot_fault;
@@ -74,6 +75,22 @@ static int gui_draw_wide(int x, int y, u32 ch, u8 attr)
 static void gui_clear_row(int y, u8 attr)
 { (void)attr; kmemset(gui_ime_cells[y], 0, sizeof(gui_ime_cells[y])); }
 void *kmalloc(u32 n) { (void)n; return 0; }
+
+/* Storage is a stub in this shared-service fixture. B2's actual SQL/copy
+ * failure and lifetime checks live in fep_boundary_host.c. */
+int sqlite_engine_available(int io) { return !io || _irq_enabled(); }
+int caller_access_get(struct caller_access *c)
+{ kmemset(c, 0, sizeof(*c)); c->origin = user ? CALLER_USER : CALLER_TRUSTED; return 1; }
+int copy_caller_cstr(const struct caller_access *c, const char *s, char *d, u32 cap)
+{
+    (void)c;
+    if (!s || kstrlen(s) >= cap) return 0;
+    kmemcpy(d, s, kstrlen(s) + 1); return 1;
+}
+int check_caller_write_range(const struct caller_access *c, void *d, u32 n)
+{ (void)c; return !n || d != NULL; }
+int copy_to_caller(const struct caller_access *c, void *d, const void *s, u32 n)
+{ if (!check_caller_write_range(c, d, n)) return 0; kmemcpy(d, s, n); return 1; }
 
 /* The same dictionary instance is shared through all nine IME entries.
  * SQLite/VFS error propagation is covered separately by ime_dict_host.c. */

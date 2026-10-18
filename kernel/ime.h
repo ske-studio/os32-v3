@@ -28,6 +28,10 @@
 /* 検索結果の最大数 */
 #define IME_MAX_RESULTS     32
 
+/* B2 public dictionary input bounds, including NUL (not candidate width). */
+#define IME_USER_STRING_CAP 256u
+#define IME_USER_LIST_MAX   64
+
 /* 検索結果エントリ */
 typedef struct {
     char yomi[32];      /* 読み (UTF-8, ヌル終端) */

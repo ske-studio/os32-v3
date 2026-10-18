@@ -1239,7 +1239,7 @@
     },
     {
       "name": "ime_user_list",
-      "out": [{"arg": "out", "len": "max", "unit": "sizeof(IME_UserEntry)"}],
+      "out": "target",
       "ret": "int",
       "args": ["const char *yomi_prefix", "void *out", "int max"],
       "target": "ime_user_list_facade"

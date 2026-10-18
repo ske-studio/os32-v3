@@ -1709,12 +1709,6 @@ int __cdecl wrap_ime_switch_dict(int variant)
 int __cdecl wrap_ime_user_list(const char *yomi_prefix, void *out, int max)
 {
     KAPI_HIT(159);
-    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
-    if (!ring3_user_ranges_writable(
-            (u32)out, kapi_out_mul(KAPI_OUT_LEN_S(out, max), (u32)(sizeof(IME_UserEntry))),
-            (u32)0, 0u)) {
-        ring3_fault_kill();   /* 戻らない */
-    }
     return ime_user_list_facade(yomi_prefix, out, max);
 }
 

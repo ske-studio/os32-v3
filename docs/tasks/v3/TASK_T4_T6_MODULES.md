@@ -76,7 +76,9 @@ X-11の出発点は `~/os32-tmp/evidence/2026-10-07/audit-classification.md:33,4
 | `sys_ls`, `sys_ls_window` | T2e の私的 ls shim / `exec/ring3_ls.c` | USER の旧 callback 入口は拒否。window/旧 shim は B1 コピーで 256B 内の NUL を必須とし、上限で補わない |
 | `sys_set_mtime` | `kapi/kapi_sys.c` | B1 range＋1B コピー済み。256B 上限、拒否時 VFS 呼出しなし。今回変更なし |
 | `db_open`, `db_open_existing`, `db_exec`, `db_prepare`, `db_prepare_only` | T4b-1 / `kapi/kapi_db.c` | B1 コピー済み。DB path/SQL の既定上限・拒否時不変を維持 |
-| `ime_user_list`, `ime_user_delete` (yomi/kanji), `ime_user_export` | T5a-1 / `kernel/ime.c` → `kernel/ime_dict.c` | 他票。T4b-5 の共有サービス契約をコピー完了とは扱わない |
+| `ime_user_list` (prefix) | T5a-1 / `kernel/ime.c` → `kernel/ime_dict.c` | B2 接続。256B NUL、NULL/空 prefix は全件、1〜64件。無効引数/copy=-1、SQL=-4、正常のみ件数。kernel staging→finalize/leave→B1 copyout |
+| `ime_user_delete` (yomi/kanji) | T5a-1 / 同上 | B2 接続。各256Bを全コピー。yomi NULL/空=-1、kanji NULL/正常な空のみ同じ読みの全候補。copy失敗=-1、SQL=-2/-3、成功0 |
+| `ime_user_export` (path) | T5a-1 / 同上 | B2 接続。256B NUL、NULL/空/copy失敗=-1、拒否時create/truncate=0。SQL/I/O=-2〜-5、成功0 |
 | `db_bind_text`, `host_open` | 長さ付き入力 (NUL 不要)、既存 DB/host facade | X-1 の NUL 群から除外。各 target の B1 range/copy 契約を維持 |
 
 T4b-8 の上記各群は host の境界・副作用前拒否・生ポインタ変異を検査する。ゲスト受入は PM が行う。入力上限と staging 寿命は [KAPI_SPEC](../../KAPI_SPEC.md#残る公開文字列の-cpl3-入力境界-t4b-8b)。FEP / ページ 0 を含む X-1 全体の閉鎖を意味しない。

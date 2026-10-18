@@ -1,0 +1,21 @@
+check-fep-boundary-host:
+- tools/tests/test_fep_boundary.py
+- tools/tests/fep_boundary_host.c
+- tools/tests/ime_dict_host.c
+- tools/tests/vfs_fd_sqlite_host.c
+- tools/tests/sqlite_groups_backend.h
+- tools/tests/fep_budget_linux.c
+- tools/tests/test_vfs_fd_path.py
+- tools/tests/host32.py
+- tools/tests/host_arch/**
+- kernel/ime.c
+- kernel/ime.h
+- kernel/ime_dict.c
+- include/redir_access.h
+- include/io.h
+- fs/vfs_fd.c
+- fs/vfs.h
+- lib/sqlite3/**
+- sdk/kapi.json
+- build/checks.d/check-fep-boundary-host.mk
+- tools/check_map.d/check-fep-boundary-host.yaml

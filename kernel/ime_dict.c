@@ -289,13 +289,13 @@ static int ime_dict_search_once(IME_Dict *dict, const char *yomi,
     }
 
     sqlite3_reset(stmt);
-    sqlite3_bind_text(stmt, 1, yomi, yomi_len, SQLITE_STATIC);
+    int bind_rc = sqlite3_bind_text(stmt, 1, yomi, yomi_len, SQLITE_STATIC);
 
     /* 結果取得ループ */
     count = 0;
     {
-        int step_rc;
-        while (count < max_results &&
+        int step_rc = bind_rc;
+        while (bind_rc == SQLITE_OK && count < max_results &&
                (step_rc = sqlite3_step(stmt)) == SQLITE_ROW) {
         IME_Result *r = &results[count];
 
@@ -358,34 +358,41 @@ static int ime_dict_search_once(IME_Dict *dict, const char *yomi,
 
     for (int i = 0; i < count; i++)
         if (full_kanji[i]) kfree(full_kanji[i]);
+    /* End SQLITE_STATIC borrowing even on LIMIT, bind or step failure. */
+    int reset_rc = sqlite3_reset(stmt);
+    int clear_rc = sqlite3_bind_null(stmt, 1);
+    if (reset_rc != SQLITE_OK || clear_rc != SQLITE_OK) count = 0;
     return count;
+}
+
+static int dict_learn_once(sqlite3_stmt *stmt, const char *yomi, const char *kanji)
+{
+    int rc;
+    sqlite3_reset(stmt);
+    rc = sqlite3_bind_text(stmt, 1, yomi, -1, SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text(stmt, 2, kanji, -1, SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt, 3, 0);
+    if (rc == SQLITE_OK) rc = sqlite3_step(stmt);
+    int reset_rc = sqlite3_reset(stmt);
+    int y_rc = sqlite3_bind_null(stmt, 1);
+    int k_rc = sqlite3_bind_null(stmt, 2);
+    if (rc == SQLITE_DONE) {
+        if (reset_rc != SQLITE_OK) rc = reset_rc;
+        else if (y_rc != SQLITE_OK) rc = y_rc;
+        else if (k_rc != SQLITE_OK) rc = k_rc;
+    }
+    return rc;
 }
 
 void ime_dict_learn(IME_Dict *dict, const char *yomi, const char *kanji)
 {
-    sqlite3_stmt *stmt;
     int rc;
-
     if (!dict || !yomi || !kanji) return;
     if (!dict_ready(dict) || !dict->learn_stmt) return;
-
-    stmt = (sqlite3_stmt *)dict->learn_stmt;
-    sqlite3_reset(stmt);
-
-    sqlite3_bind_text(stmt, 1, yomi, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 2, kanji, -1, SQLITE_STATIC);
-    sqlite3_bind_int(stmt, 3, 0 /* sys_time() is not easily available here, use 0 for now */);
-
-    rc = sqlite3_step(stmt);
+    rc = dict_learn_once((sqlite3_stmt *)dict->learn_stmt, yomi, kanji);
     if (rc != SQLITE_DONE && is_ioerr(rc) && dict_recover(dict) &&
         dict->learn_stmt) {
-        /* 開き直した接続で 1 回だけやり直す */
-        stmt = (sqlite3_stmt *)dict->learn_stmt;
-        sqlite3_reset(stmt);
-        sqlite3_bind_text(stmt, 1, yomi, -1, SQLITE_STATIC);
-        sqlite3_bind_text(stmt, 2, kanji, -1, SQLITE_STATIC);
-        sqlite3_bind_int(stmt, 3, 0);
-        rc = sqlite3_step(stmt);
+        rc = dict_learn_once((sqlite3_stmt *)dict->learn_stmt, yomi, kanji);
     }
     if (rc != SQLITE_DONE) {
         kprintf(ATTR_RED, "IME: Learn failed (rc=%d)\r\n", rc);
@@ -443,6 +450,18 @@ int ime_dict_reopen(IME_Dict *dict, const char *path)
 /*  失敗した」(開き直して 1 回やり直す)。                                   */
 /* ======================================================================== */
 
+/* Public display fields stay 32 bytes; input keys are never truncated. */
+static void user_display_copy(char *out, const char *text, u32 cap)
+{
+    u32 n = text ? kstrlen(text) : 0;
+    if (n >= cap) {
+        n = cap - 1;
+        while (n && ((u8)text[n] & 0xc0) == 0x80) n--;
+    }
+    if (n) kmemcpy(out, text, n);
+    out[n] = '\0';
+}
+
 /* 一覧: 件数 / -4 = 読めなかった (部分的な一覧を成功にしない)。
  * prepare の失敗も -4 — 以前は 0 を返したので、ime コマンドが「学習なし」と
  * 区別できなかった (実装レビュー ラリー 2 の非 blocker) */
@@ -463,43 +482,33 @@ static int user_list_once(IME_Dict *dict, const char *yomi_prefix,
     }
 
     rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
-    if (rc != SQLITE_OK) {
-        *io_error = is_ioerr(sqlite3_extended_errcode(db));
-        kprintf(ATTR_RED, "IME: user_list prepare failed (rc=%d)\r\n", rc);
-        return -4;
-    }
-
+    if (rc != SQLITE_OK) goto finish;
     if (yomi_prefix && yomi_prefix[0] != '\0') {
-        sqlite3_bind_text(stmt, 1, yomi_prefix, -1, SQLITE_STATIC);
+        rc = sqlite3_bind_text(stmt, 1, yomi_prefix, (int)kstrlen(yomi_prefix), SQLITE_STATIC);
     }
-    sqlite3_bind_int(stmt, 2, max);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt, 2, max);
+    if (rc != SQLITE_OK) goto finish;
 
     while (count < max && (rc = sqlite3_step(stmt)) == SQLITE_ROW) {
         IME_UserEntry *e = &out[count];
         const char *y_text = (const char *)sqlite3_column_text(stmt, 0);
         const char *k_text = (const char *)sqlite3_column_text(stmt, 1);
         int freq = sqlite3_column_int(stmt, 2);
-
-        if (y_text) {
-            kstrncpy(e->yomi, y_text, sizeof(e->yomi));
-        } else {
-            e->yomi[0] = '\0';
-        }
-
-        if (k_text) {
-            kstrncpy(e->kanji, k_text, sizeof(e->kanji));
-        } else {
-            e->kanji[0] = '\0';
-        }
-
+        kmemset(e, 0, sizeof(*e)); /* Also clear tails after a recovered partial read. */
+        user_display_copy(e->yomi, y_text, sizeof(e->yomi));
+        user_display_copy(e->kanji, k_text, sizeof(e->kanji));
         e->freq = freq;
         count++;
     }
-
-    sqlite3_finalize(stmt);
-    if (count < max && rc != SQLITE_DONE) {
+    if (count == max && rc == SQLITE_ROW) rc = SQLITE_DONE;
+finish:
+    if (stmt) {
+        int final_rc = sqlite3_finalize(stmt);
+        if (rc == SQLITE_DONE && final_rc != SQLITE_OK) rc = final_rc;
+    }
+    if (rc != SQLITE_DONE) {
         *io_error = is_ioerr(rc);
-        kprintf(ATTR_RED, "IME: user_list step failed (rc=%d)\r\n", rc);
+        kprintf(ATTR_RED, "IME: user_list prepare failed / bind/step/finalize failed (rc=%d)\r\n", rc);
         return -4;
     }
     return count;
@@ -511,8 +520,8 @@ int ime_user_list(IME_Dict *dict, const char *yomi_prefix,
 {
     int io_error = 0, n;
 
-    if (!dict || !out || max <= 0) return 0;
-    if (!dict_ready(dict)) return 0;
+    if (!dict || !out || max <= 0 || max > IME_USER_LIST_MAX) return -1;
+    if (!dict_ready(dict)) return -1;
     n = user_list_once(dict, yomi_prefix, out, max, &io_error);
     if (io_error && dict_recover(dict))
         n = user_list_once(dict, yomi_prefix, out, max, &io_error);
@@ -542,13 +551,13 @@ static int user_delete_once(IME_Dict *dict, const char *yomi,
         return -2;
     }
 
-    sqlite3_bind_text(stmt, 1, yomi, -1, SQLITE_STATIC);
-    if (kanji && kanji[0] != '\0') {
-        sqlite3_bind_text(stmt, 2, kanji, -1, SQLITE_STATIC);
+    rc = sqlite3_bind_text(stmt, 1, yomi, (int)kstrlen(yomi), SQLITE_STATIC);
+    if (rc == SQLITE_OK && kanji && kanji[0] != '\0') {
+        rc = sqlite3_bind_text(stmt, 2, kanji, (int)kstrlen(kanji), SQLITE_STATIC);
     }
-
-    rc = sqlite3_step(stmt);
-    sqlite3_finalize(stmt);
+    if (rc == SQLITE_OK) rc = sqlite3_step(stmt);
+    int final_rc = sqlite3_finalize(stmt);
+    if (rc == SQLITE_DONE && final_rc != SQLITE_OK) rc = final_rc;
 
     if (rc != SQLITE_DONE) {
         *io_error = is_ioerr(rc);
@@ -597,7 +606,8 @@ static int user_export_once(IME_Dict *dict, const char *path, int *io_error)
     if (rc != SQLITE_OK) {
         *io_error = is_ioerr(sqlite3_extended_errcode(db));
         kprintf(ATTR_RED, "IME: export prepare failed (rc=%d)\r\n", rc);
-        vfs_close(fd);
+        if (stmt) sqlite3_finalize(stmt);
+        (void)vfs_close(fd);
         return -3;
     }
 
@@ -622,8 +632,12 @@ static int user_export_once(IME_Dict *dict, const char *path, int *io_error)
         result = -4;
     }
 
-    sqlite3_finalize(stmt);
-    vfs_close(fd);
+    int final_rc = sqlite3_finalize(stmt);
+    if (!result && final_rc != SQLITE_OK) {
+        *io_error = is_ioerr(final_rc);
+        result = -4;
+    }
+    vfs_close(fd); /* void API: no close status is exposed by VFS. */
     return result;
 }
 

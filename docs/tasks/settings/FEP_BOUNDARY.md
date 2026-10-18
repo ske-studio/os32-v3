@@ -71,6 +71,20 @@ F2 の「SQLite 内部 fault は通常 cleanup で回復できない」という
   入力の切捨てと区別する。長い DB キーの省略表示を完全な削除キーとは保証しない。
   完全キー返却が必要なら構造体/新 API を別途承認し全 rebuild。CSV 全仕様の改変はしない。
 
+### T5a-1 の B2 接続
+
+公開3入口は `ime.c` で保存 caller の B1 (`copy_caller_cstr` / write-range / copyout) を使う。
+trusted も容量を検査する。未公開サービスの NOSYS は先に返す。既存 dispatch の帯域外拒否は維持。
+list の生成 wrapper は `sdk/kapi.json` の `out: target` で検査を B2 に委譲し、無効 out/max を -1 にする
+（旧内部 list の NULL out/max<=0 と辞書無しの 0 は、§3 の「0は正常な空結果だけ」に合わせて -1）。
+NULL prefix、NULL/正常な空 kanji、delete/export の既存 SQL/I/O 分類は維持する。
+list は BSS 64件をゼロ化・busy 予約し、エラーと late copyout 拒否でも解放する。回復再試行時も行全体をゼロ化。
+検索/学習の常駐 stmt は reset と借用 text 引数への bind_null で借用を終了する（既存 typed export のみ）。
+VFS の `vfs_close` は void なので close の rc は観測できない。全正常エラーで一度だけ閉じる。
+実ソース＋製品設定 SQLite/VFS の試験は `tools/tests/test_fep_boundary.py`。
+この host 試験の copy/outer/IF は差し替え境界であり、実 PD/IRQ/NP21/W の証明にはしない。
+page 0 NP (T7)、fep.mod 分離 (T5a-2) はこの接続では閉じない。
+
 ## 4. checked copy の契約（新規内部 helper、公開 KAPI ではない）
 
 提案責務は `copy_caller_cstr`、`check_caller_write_range`、`copy_to_caller`。
