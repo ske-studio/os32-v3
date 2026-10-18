@@ -24,6 +24,13 @@ char *kstrncpy(char *d, const char *s, u32 n)
     return d;
 }
 #include "resolve_host_source.c"
+/* This fixture has no mounted filesystem; keep the real resolver's lexical
+ * fallback when a dot prefix has no backing stat operation. */
+VfsOps *vfs_route(const char *path, char *rel_out, int max_rel, void **ctx_out)
+{
+    (void)path; (void)rel_out; (void)max_rel; (void)ctx_out;
+    return 0;
+}
 #include "disk_host_source.c"
 #include "generated_host_source.c"
 
