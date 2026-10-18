@@ -59,7 +59,7 @@ def product_image(folder):
     print('PASS product Cirrus: paired POST_ROOT, relocate, truncated/corrupt rejection, core identification / module drivers', flush=True)
 
 
-def hal_context():
+def hal_context(unguarded=False, cui_first=False):
     """Real module context and HAL body with the existing three-backend fixture.
     Hardware probe/register I/O are the same seams as test_gfx_kernel_fb.
     """
@@ -67,6 +67,13 @@ def hal_context():
     fixture = (ROOT / 'tools/tests/gfx_kernel_fb_host.c').read_text()
     glue = '#include "' + str(ROOT / 'kernel/cirrus_body.c') + '"\n' + """
 GfxBackend gfx_backend_cirrus;
+static void (*boundary_real_init)(void);
+static int boundary_init_calls;
+static void boundary_count_init(void)
+{
+    boundary_init_calls++;
+    boundary_real_init();
+}
 static const CirrusModuleContext fixture_context = {
     &gfx_backend_cirrus, &gfx_counters,
     &gfx_current_height, &gfx_flip_enabled, &gfx_display_page
@@ -74,13 +81,47 @@ static const CirrusModuleContext fixture_context = {
 """
     fixture = fixture.replace('static void run(void)\n{', glue +
                               'static void run(void)\n{\n    cirrus_module_init(&gfx_backend_cirrus, &fixture_context);')
+    # Compile the actual kernel GUI boundary statement into the real HAL fixture.
+    boot = (ROOT / 'kernel/kernel.c').read_text()
+    start = boot.index('            if (is_gui) {\n                /* Graphics boundary')
+    boundary = boot[start:boot.index('gfx_client_to_gshell();', start)]
+    boundary = next(line.strip() for line in boundary.splitlines()
+                    if 'gfx_prepare_backend();' in line)
+    if unguarded:
+        assert boundary == 'if (!gfx_cirrus_probed()) gfx_prepare_backend();'
+        boundary = 'gfx_prepare_backend();'
+    marker = '    /* Run the real selection/lifecycle for every preference, plus AUTO. */'
+    assert fixture.count(marker) == 1
+    first_init = ('gfx_init(); diag_previous_gen = host_serial_value("[gfx] init gen="); '
+                  'gfx_shutdown(); host_serial_reset();') if cui_first else ''
+    fixture = fixture.replace(marker, """
+    /* GUI=0 boot preparation has no Cirrus body yet; no enable or real probe. */
+    GfxBackend registered = gfx_backend_cirrus;
+    gfx_backend_cirrus = (GfxBackend){0};
+    gfx_prepare_backend();
+    CHECK(!gfx_cirrus_probed());
+    gfx_backend_cirrus = registered;
+    boundary_real_init = gfx_backend_cirrus.init;
+    gfx_backend_cirrus.init = boundary_count_init;
+    CHECK(boundary_init_calls == 0);
+    """ + first_init + """
+    /* Two GUI entries, without the gshell init: only the boundary's work. */
+    """ + boundary + "\n    " + boundary + """
+    CHECK(gfx_cirrus_probed());
+    CHECK(boundary_init_calls == 1);
+    gfx_backend_cirrus.init = boundary_real_init;
+""" + marker)
     change = ('gfx/backend_cirrus.c', '#include "cirrus_module.h"',
               '#define OS32_CIRRUS_MODULE 1\n#include "cirrus_module.h"')
     for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
         result = run_case(None, runner, extra_changes=[change],
                           fixture_body='unsigned int host_arch_if = 0x202U;\n' + fixture)
-        assert result.returncode == 0, (result.returncode, result.stdout, result.stderr)
-        print('PASS module context: ' + result.stdout.strip(), flush=True)
+        if unguarded:
+            assert result.returncode == 1 and 'FAIL boundary_init_calls == 1' in result.stdout, result
+            print('MUTATE RED repeated GUI boundary init (compiled)', flush=True)
+        else:
+            assert result.returncode == 0, (result.returncode, result.stdout, result.stderr)
+            print('PASS module context / two GUI boundaries, one Cirrus init: ' + result.stdout.strip(), flush=True)
 
 
 def identify_enable_mutant(folder):
@@ -105,6 +146,7 @@ def main():
         folder = Path(td)
         product_image(folder)
         hal_context()
+        hal_context(cui_first=True)
         # Real boot call order: reserve/mapping before AS; no body at boot probe.
         boot = (ROOT / 'kernel/kernel.c').read_text()
         assert boot.index('    gfx_boot_reserve();') < boot.index('    exec_init();')
@@ -132,6 +174,7 @@ def main():
         build(SOURCE)
         run(range(len(CASES)))
         if '--mutate' in sys.argv:
+            hal_context(unguarded=True)
             identify_enable_mutant(folder)
             source = SOURCE.read_text()
             old = '    *out = cirrus_backend_ops;'

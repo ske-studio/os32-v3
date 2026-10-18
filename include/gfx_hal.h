@@ -145,15 +145,12 @@ void gfx_set_backend_pref(int pref);
 /* 現在の希望値 (GFX_PREF_*)。既定は GFX_PREF_AUTO。 */
 int  gfx_get_backend_pref(void);
 
-/* 希望値に従って実バックエンドを 1 回選択・初期化し、表示はテキストへ戻す。
- * probe の結果と描画面 (PEGC は主記憶の予約、Cirrus はリニア窓の写像) が
- * ここで確定する。**起動時のカーネル文脈から、アプリを 1 つも走らせる前に
- * 呼ぶこと**:
- *   - PEGC の probe は BIOS ワークエリアを読むが、アプリ PD には写像が無い
- *     (2026-09-09 の gdi_test #PF addr=0x045C)
- *   - PEGC のバックバッファは物理末尾側の予約なので、アプリが走っていると
- *     そのスタック/ヒープに阻まれて必ず失敗する
- *     (Cirrus はカード VRAM 内なので予約は不要。窓の写像は init で 1 回だけ) */
+/* Cirrus の実 probe が graphics 境界で試行済みか (成功・失敗とも記録)。 */
+int gfx_cirrus_probed(void);
+
+/* 起動時は Cirrus 登録前に master PD で PEGC を準備する。
+ * Cirrus 未 probe の最初の GUI 境界でも呼ぶ。CUI 描画アプリは gfx_init が境界。
+ * 窓・BB は gfx_boot_reserve が確保済み。表示はテキストへ戻す。 */
 void gfx_prepare_backend(void);
 
 /* 現在のバックエンドのバックバッファの物理範囲を返す (base は 4KB 境界)。

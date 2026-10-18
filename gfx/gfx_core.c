@@ -104,6 +104,21 @@ int gfx_get_backend_pref(void)
     return g_backend_pref;
 }
 
+/* Missing module stubs do not count as a Cirrus hardware probe. */
+static int cirrus_probed;
+
+int gfx_cirrus_probed(void)
+{
+    return cirrus_probed;
+}
+
+static int gfx_probe_backend(const GfxBackend *backend)
+{
+    if (!backend->probe) return 0;
+    if (backend == &gfx_backend_cirrus && backend->init) cirrus_probed = 1;
+    return backend->probe();
+}
+
 static void gfx_select_backend(void)
 {
     int i;
@@ -126,7 +141,7 @@ static void gfx_select_backend(void)
             /* weak 宣言なので未リンクなら要素が 0 (→ 9801 へ落ちる) */
             if (!g_backend_list[i]) continue;
             if (g_backend_list[i] != want) continue;
-            if (g_backend_list[i]->probe && g_backend_list[i]->probe()) {
+            if (gfx_probe_backend(g_backend_list[i])) {
                 g_backend = g_backend_list[i];
                 return;
             }
@@ -140,7 +155,7 @@ static void gfx_select_backend(void)
         /* weak 宣言のバックエンド (未リンクなら 0) を飛ばす。
          * → include/gfx_hal.h の gfx_backend_pegc の注記 */
         if (!g_backend_list[i]) continue;
-        if (g_backend_list[i]->probe && g_backend_list[i]->probe()) {
+        if (gfx_probe_backend(g_backend_list[i])) {
             g_backend = g_backend_list[i];
             return;
         }
@@ -833,26 +848,16 @@ static int gfx_select_and_init_backend(void)
 }
 
 /* ======================================================================== */
-/*  gfx_prepare_backend — 実バックエンドを「起動時に 1 回だけ」用意する      */
+/*  gfx_prepare_backend — 起動時の PEGC 準備と、初回 GUI 境界の準備          */
 /*                                                                          */
-/*  boot_splash は PC98 を強制するので、実バックエンドの probe も init も    */
-/*  走らない。それをアプリ (CPL=3) の初回 gfx_init まで繰り延べると 2 つ壊れる: */
-/*                                                                          */
-/*   1. PEGC の probe は BIOS ワークエリア (0x045C / 0x0597) を読むが、そこは */
-/*      master PD にしか写像が無く、アプリ PD では #PF でアプリが死ぬ。       */
-/*   2. (T1e まで) PEGC の BB の予約もここで行っていた。今は起動時の ⑥     */
-/*      (gfx_boot_reserve) が窓の予約・写像と BB の確保を probe より前に      */
-/*      済ませ、probe / init はそれを使うだけ (TASK_T1_LEDGER §3-8)。         */
-/*                                                                          */
-/*  どちらも「アプリが 1 つも走っていないカーネル文脈」でなければ成立しない。  */
-/*  バックエンドが prepare() を持てば (PEGC) それだけを呼ぶ — probe と        */
-/*  起動時の同期の記録だけで、表示のモードも同期も変えない。実機 Ra266 +      */
-/*  液晶の桁ずれは、CUI 起動でも 480 ライン化 → 24kHz 戻しを通していたこと  */
-/*  が原因だという **仮説** (未確認。候補は backend_pegc.c の pegc_prepare   */
-/*  の注記、TASK_FDC_REALHW §9-1)。持たなければ (Cirrus) 従来どおり           */
-/*  init まで済ませて shutdown で表示をテキストへ戻す。予約とリニア窓は        */
-/*  shutdown をまたいで保持されるので、以後のアプリの gfx_init は再利用する。  */
-/*  9801 (init == NULL) は予約も窓も要らないので何もしない。                 */
+/*  splash は PC98 を強制する。起動時は Cirrus 登録前にここを呼び、PEGC の   */
+/*  BIOS ワークを master PD で probe する。窓・BB は起動時の ⑥ が確保済み。 */
+/*  PEGC の prepare は表示のモードも同期も変えず、同期状態だけ記録する。     */
+/*  Cirrus は起動時には温めず、最初の GUI 境界で probe / init → shutdown。  */
+/*  CUI の描画アプリの gfx_init も graphics 境界で、直接 probe / init する。 */
+/*  probe 済みなら GUI 境界からは再度呼ばず、描画側の gfx_init に任せる。    */
+/*  予約と窓は shutdown をまたいで保持される (TASK_T1_LEDGER §3-8)。         */
+/*  9801 (init == NULL) は何もしない。                                      */
 /* ======================================================================== */
 void gfx_prepare_backend(void)
 {

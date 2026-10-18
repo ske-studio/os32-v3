@@ -712,14 +712,11 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     /* ブートスプラッシュ表示 (カーネル内蔵) */
     boot_splash();
 
-    /* splash は PC98 を強制するので probe を走らせない。バックエンドの選択と
-     * probe のキャッシュ温めはここで 1 回だけ、**カーネル文脈 (master PD)** で
-     * 行う。PEGC の probe は BIOS ワークエリア 0x045C / 0x0597 を読み、そこは
-     * アプリ PD に写像が無いので、初回 probe をアプリに繰り延べると CPL=3 で
-     * #PF が起きてアプリが死ぬ (2026-09-09 に gdi_test で実測)。窓の予約・
-     * 写像と PEGC の BB は ⑥ (gfx_boot_reserve) が済ませてあり、probe はそれを
-     * 使うだけ (⑦、TASK_T1_LEDGER §3-3)。init まで済ませたら表示はテキストへ
-     * 戻る。 */
+    /* splash は PC98 を強制する。ここでは Cirrus 登録前に PEGC の選択・
+     * probe と同期状態の記録を master PD で済ませる (BIOS ワークはアプリ PD
+     * に写像されない)。窓・BB は ⑥ (gfx_boot_reserve) が確保済み。
+     * Cirrus は温めず、最初の GUI 境界、または CUI 描画アプリの gfx_init で
+     * probe/enable する。GUI=0 の起動では識別・予約だけで enable しない。 */
     if (kdebug.ops.crt_diag_bootlog) kdebug.ops.crt_diag_bootlog();
     gfx_prepare_backend();
     /* Register after boot preparation: GUI=0 must never probe/enable Cirrus. */
@@ -810,7 +807,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
             /* GUI は全画面 GFX を握るのでテキストカーソルを消す。CUI は出す。 */
             if (is_gui) {
                 /* Graphics boundary, master PD; all windows were mapped by ⑥. */
-                gfx_prepare_backend();
+                if (!gfx_cirrus_probed()) gfx_prepare_backend();
                 /* ⑨ 選択中 backend の CLIENT を boot → gshell へ (2 回目以降は
                  * 無操作) → ledger_selfcheck("gui")。TASK_T1_LEDGER §3-3 ⑨。 */
                 gfx_client_to_gshell();
