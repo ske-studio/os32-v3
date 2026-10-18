@@ -216,12 +216,13 @@ static void overflow_test(void)
     sqlite_engine_run(overflow, 0, 0);
     CHECK(0);
 }
-/* Each workload runs in a fresh process/module so high-water is per workload
+/* Modes 10..36 are boot transactions; 40..44 are stack workloads.
+ * Each workload runs in a fresh process/module so high-water is per workload
  * including initialize and the common CRUD baseline. No mark reset while active. */
 static void stack_workload(sqlite3 *db, u32 mode)
 {
     sqlite3_stmt *stmt = 0;
-    if (mode == 34) {
+    if (mode == 40) {
         install_stack_fault();
         /* Left-deep tree avoids the parser's independent parentheses limit.
          * A leaf is depth 1: 100 terms reach exactly SQLITE_MAX_EXPR_DEPTH. */
@@ -242,7 +243,7 @@ static void stack_workload(sqlite3 *db, u32 mode)
             CHECK(os32_sqlite_finalize(stmt) == SQLITE_OK);
             if (depth == SQLITE_MAX_EXPR_DEPTH) { say("STACK expr-depth=100 prepare/step: "); number(sqlite_engine_stack_high_water()); say(" bytes\n"); }
         }
-    } else if (mode == 35) {
+    } else if (mode == 41) {
         CHECK(os32_sqlite_prepare_v2(db,
             "SELECT v FROM t UNION SELECT v+1 FROM t UNION SELECT v+2 FROM t "
             "UNION SELECT v+3 FROM t UNION SELECT v+4 FROM t ORDER BY 1 DESC",
@@ -251,7 +252,7 @@ static void stack_workload(sqlite3 *db, u32 mode)
             CHECK(os32_sqlite_step(stmt) == SQLITE_ROW && os32_sqlite_column_int(stmt, 0) == value);
         CHECK(os32_sqlite_step(stmt) == SQLITE_DONE);
         CHECK(os32_sqlite_finalize(stmt) == SQLITE_OK);
-    } else if (mode == 36 || mode == 37) {
+    } else if (mode == 42 || mode == 43) {
         CHECK(os32_sqlite_prepare_v2(db, "INSERT INTO t SELECT v+? FROM t", -1, &stmt, 0) == SQLITE_OK);
         for (int i = 1; i <= 512; i *= 2) {
             CHECK(os32_sqlite_bind_int(stmt, 1, i) == SQLITE_OK);
@@ -259,14 +260,14 @@ static void stack_workload(sqlite3 *db, u32 mode)
             CHECK(os32_sqlite_reset(stmt) == SQLITE_OK);
         }
         CHECK(os32_sqlite_finalize(stmt) == SQLITE_OK);
-        if (mode == 37) CHECK(os32_sqlite_exec(db, "CREATE INDEX ix ON t(v DESC)", 0, 0, 0) == SQLITE_OK);
-        CHECK(os32_sqlite_prepare_v2(db, mode == 36 ?
+        if (mode == 43) CHECK(os32_sqlite_exec(db, "CREATE INDEX ix ON t(v DESC)", 0, 0, 0) == SQLITE_OK);
+        CHECK(os32_sqlite_prepare_v2(db, mode == 42 ?
             "SELECT v FROM t ORDER BY (v*17)%103, v DESC" : "SELECT v FROM t ORDER BY v DESC",
             -1, &stmt, 0) == SQLITE_OK);
         int old_key = -1, old_value = 0;
         for (int i = 0; i < 1024; i++) {
             CHECK(os32_sqlite_step(stmt) == SQLITE_ROW);
-            int value = os32_sqlite_column_int(stmt, 0), key = mode == 36 ? (value*17)%103 : 0;
+            int value = os32_sqlite_column_int(stmt, 0), key = mode == 42 ? (value*17)%103 : 0;
             CHECK(key > old_key || (key == old_key && value < old_value));
             old_key = key; old_value = value;
         }
@@ -359,7 +360,7 @@ void kprintf(u8 attr, const char *fmt, ...)
         say("sqlite stack high-water="); number(used);
         say(" of "); number(size); say("\n");
     }
-    if (input[0] >= 10 && input[0] <= 33 && services_stage != SERVICES_READY)
+    if (input[0] >= 10 && input[0] <= 36 && services_stage != SERVICES_READY)
         CHECK(!services_public);
     if (!memcmp(fmt, "IME: 学習不可", sizeof("IME: 学習不可") - 1)) learn_unavailable++;
     if (!memcmp(fmt, "[services] fep_mem_reserve_kb below minimum", sizeof("[services] fep_mem_reserve_kb below minimum") - 1)) {
@@ -609,7 +610,7 @@ void _start(void)
     __asm__ volatile("int $0x80" : "=a"(rc) : "0"(125), "b"(pool), "c"(sizeof(pool)), "d"(7) : "memory");
     CHECK(!rc);
     stubs();
-    if (input[0] >= 10 && input[0] <= 33) boot_transaction();
+    if (input[0] >= 10 && input[0] <= 36) boot_transaction();
     rc = os32_sqlite_start();
     CHECK(rc == (int)input[3] && opens == 1 && closes == (input[0] != 1));
     CHECK(!sqlite_engine_active && host_flags == 0x202);
@@ -646,7 +647,7 @@ void _start(void)
     CHECK(os32_sqlite_step(stmt) == SQLITE_ROW && os32_sqlite_column_int(stmt, 0) == 42);
     CHECK(os32_sqlite_step(stmt) == SQLITE_DONE);
     CHECK(os32_sqlite_finalize(stmt) == SQLITE_OK);
-    if (input[0] >= 34 && input[0] <= 38) { stack_workload(db, input[0]); finish(0); }
+    if (input[0] >= 40 && input[0] <= 44) { stack_workload(db, input[0]); finish(0); }
     /* Recursive expression parsing on the real engine stack, product config. */
     CHECK(os32_sqlite_prepare_v2(db,
         "SELECT abs(abs(abs(abs(abs(abs(abs(abs(abs(abs(abs(abs("

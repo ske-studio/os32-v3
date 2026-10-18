@@ -298,12 +298,13 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
                 assert 'PASS host signal seam -> engine fail-stop (NOT IDT/#DF)' in output, result
                 print(output, end='')
         print('PASS real SQLite adapter ' + label, flush=True)
-    for label, mode in (('expr-depth-100', 34), ('compound-5', 35),
-                        ('sort-1024', 36), ('index-1024', 37), ('trigger-omitted', 38)):
+    # Keep stack modes separate from boot/settings modes 10..36 in the harness.
+    for label, mode in (('expr-depth-100', 40), ('compound-5', 41),
+                        ('sort-1024', 42), ('index-1024', 43), ('trigger-omitted', 44)):
         payload = struct.pack('<4I', mode, len(image), pair, 0) + image
         result = host32.run([str(exe)], input=payload, runner='qemu', capture_output=True)
         print(result.stdout.decode(), end='', flush=True)
-        assert result.returncode == 0, (label, result)
+        assert result.returncode == 0 and f'STACK workload={mode} '.encode() in result.stdout, (label, result)
     if stack_mutate:
         # Depth 100 exceeds 16 KiB: require an observed runtime guard fault.
         header = (ROOT / 'kernel/sqlite_engine.h').read_text()
@@ -311,7 +312,7 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
         assert header.count(old) == 1
         (folder / 'sqlite_engine.h').write_text(header.replace(old, '(16u * 1024u)'))
         subprocess.run(command, check=True)
-        payload = struct.pack('<4I', 34, len(image), pair, 0) + image
+        payload = struct.pack('<4I', 40, len(image), pair, 0) + image
         result = host32.run([str(exe)], input=payload, runner='qemu', capture_output=True)
         assert result.returncode == 77 and b'PASS host signal seam -> engine fail-stop (NOT IDT/#DF)' in result.stdout, result
         print('MUTATE undersized-stack RED (compiled runtime): ' + result.stdout.decode().strip(), flush=True)
@@ -350,7 +351,7 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
                           runner='qemu', capture_output=True)
     for label, mode in boot_cases:
         result = boot_run(mode)
-        assert result.returncode == 0, (label, result)
+        assert result.returncode == 0 and b'occupancy sqlite_pages=' in result.stdout, (label, result)
         print('PASS boot ' + label + ': ' + result.stdout.decode().strip(), flush=True)
     if mutate:
         path = folder / 'sqlite_engine.c'
