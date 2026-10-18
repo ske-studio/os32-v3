@@ -442,9 +442,9 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
              'vfs_stat(IME_DICT_PATH, &dictionary) == VFS_ERR_NOTFOUND',
              'vfs_stat(IME_DICT_PATH, &dictionary) == VFS_OK', 10),
             ('no-dictionary-MINIMAL', path, source,
-             '    int rc = os32_sqlite_start();',
+             '    rc = os32_sqlite_start();',
              '    if (no_dictionary) { services_stage = SERVICES_MINIMAL; return; }\n'
-             '    int rc = os32_sqlite_start();', 55),
+             '    rc = os32_sqlite_start();', 55),
             ('sqlite-only-not-public', path, source,
              '        services_public = 1;', '        services_public = 0;', 55),
             ('sqlite-only-called-ready', path, source,
