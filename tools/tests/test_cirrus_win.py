@@ -34,6 +34,7 @@ INCLUDES = ["-I" + str(ROOT / p)
                       "gfx", "drivers", "fs", "lib", "kernel")]
 SRC = ROOT / "tools/tests/cirrus_win_host.c"
 MUT_TARGET = "gfx/backend_cirrus.c"
+IDENTIFY = "gfx/cirrus_identify.c"
 
 
 def host_cmd(exe):
@@ -49,23 +50,23 @@ def target_cmd(obj):
 MUTATIONS = [
     # (名前, 対象ファイル, 元, 変異後)
     # 1 = 本件の欠陥そのもの: RAM の上端 (sys_get_mem_kb) で窓を決める旧判定。
-    ("top_of_ram", MUT_TARGET,
+    ("top_of_ram", IDENTIFY,
      "    return !pgalloc_range_has_ram(base / PAGE_SIZE, last / PAGE_SIZE + 1);",
      "    { extern u32 sys_get_mem_kb(void); (void)last;\n"
      "      return !(sys_get_mem_kb() > base / 1024UL); }"),
     # 2 = 物理地図を見ない (窓は常に空いている扱い)。
-    ("no_map", MUT_TARGET,
+    ("no_map", IDENTIFY,
      "    return !pgalloc_range_has_ram(base / PAGE_SIZE, last / PAGE_SIZE + 1);",
      "    (void)last; return 1;"),
     # 3 = 窓の末尾ページを問い合わせから落とす (部分一致の見落とし)。
-    ("end_short", MUT_TARGET,
+    ("end_short", IDENTIFY,
      "last / PAGE_SIZE + 1);", "last / PAGE_SIZE);"),
     # 4 = 窓の前のページまで問い合わせる (隣の RAM で窓を塞ぐ)。
-    ("first_early", MUT_TARGET,
+    ("first_early", IDENTIFY,
      "pgalloc_range_has_ram(base / PAGE_SIZE, last",
      "pgalloc_range_has_ram(base / PAGE_SIZE - 1, last"),
     # 5 = 32bit 空間の末尾越えを見ない (末尾番地が桁あふれして小さく見える)。
-    ("no_wrap_check", MUT_TARGET,
+    ("no_wrap_check", IDENTIFY,
      "    if (size - 1 > 0xFFFFFFFFUL - base) return 0;\n", ""),
     # 6 = auto でも NP21/W 判定をせずに ID を読む (実機でポートを叩く)。
     ("no_np2_gate", MUT_TARGET,
@@ -76,10 +77,11 @@ MUTATIONS = [
      "gfx_get_backend_pref() != GFX_PREF_CIRRUS && !np2_detect()",
      "!np2_detect()"),
     # 8 = 窓の判定より前に NP21/W 判定を読む (RAM に当たる構成でも I/O を出す)。
-    ("np2_before_window", MUT_TARGET,
-     "    if (!cirrus_win_usable(s_glue->win_base, s_glue->win_size)) return 0;\n",
+    ("np2_before_window", IDENTIFY,
+     "    if (!cirrus_win_usable(WAB_XE10_WIN_BASE, WAB_XE10_WIN_SIZE)) return 0;\n",
+     "    extern int np2_detect(void);\n"
      "    if (gfx_get_backend_pref() != GFX_PREF_CIRRUS && !np2_detect()) return 0;\n"
-     "    if (!cirrus_win_usable(s_glue->win_base, s_glue->win_size)) return 0;\n"),
+     "    if (!cirrus_win_usable(WAB_XE10_WIN_BASE, WAB_XE10_WIN_SIZE)) return 0;\n"),
     # 10 = probe が ⑥ の SURFACE (予約・写像済み) を確かめずに I/O へ進む
     #      (T1e、TASK_T1_LEDGER §3-8: probe は自分で予約も写像もしない)。
     ("no_surface_gate", MUT_TARGET,

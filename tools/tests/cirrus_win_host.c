@@ -24,6 +24,7 @@
 #include "types.h"
 #define NOINST __attribute__((no_instrument_function))
 
+#include "../../gfx/cirrus_identify.c"
 #include "../../gfx/backend_cirrus.c"
 #include "wab_xe10.h"     /* 実物の窓の番地 (贋グルーに入れる) */
 
@@ -97,7 +98,8 @@ struct ledger_surface *ledger_surface_find(u32 backend, u32 role)
 }
 
 /* ---- 贋のボードグルー ---- */
-static int glue_probe_calls;
+static int glue_probe_calls, enable_calls;
+static void fake_enable(void) { enable_calls++; }
 static int fake_glue_probe(void) { glue_probe_calls++; return 0; }
 static void fake_linear_enable(int on) { (void)on; }
 WabGlue wab_glue_xe10;
@@ -113,6 +115,8 @@ static void glue_reset(u32 win_base, u32 win_size, u32 lin_base, u32 lin_size)
     wab_glue_xe10.lin_base = lin_base;
     wab_glue_xe10.lin_size = lin_size;
     glue_probe_calls = 0;
+    enable_calls = 0;
+    gfx_backend_cirrus.init = fake_enable;
     s_probed = 0;
     s_probe_ok = 0;
 }
@@ -313,7 +317,8 @@ static void probe_stages(void)
     /* リニア窓が RAM に当たる番地 (旧番地 + 高位 RAM) → 同じく進まない。 */
     cfg_15m_high1();
     fake_pref = GFX_PREF_AUTO; fake_np2 = 1; np2_calls = 0;
-    glue_reset(BANK, BANK_N, OLD_LIN, LIN_N);
+    glue_reset(BANK, BANK_N, LIN, LIN_N);
+    map_add(LIN, LIN + LIN_N);
     CHECK(cirrus_probe() == 0);
     CHECK(glue_probe_calls == 0);
     fake_pref = GFX_PREF_AUTO;
@@ -326,12 +331,14 @@ static void probe_stages(void)
     CHECK(cirrus_identify());
     CHECK(cirrus_probe() == 0);
     CHECK(glue_probe_calls == 0 && np2_calls == 0);
+    CHECK(enable_calls == 0);
     fake_surface = 1;
     /* 識別はポートを叩かない (NP21/W 判定も ID も読まない)。 */
     glue_reset(BANK, BANK_N, LIN, LIN_N);
     np2_calls = 0;
     CHECK(cirrus_identify());
     CHECK(glue_probe_calls == 0 && np2_calls == 0);
+    CHECK(enable_calls == 0);
     fake_pref = GFX_PREF_AUTO;
 }
 

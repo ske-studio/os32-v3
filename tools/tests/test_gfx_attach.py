@@ -15,6 +15,7 @@ TARGET_SRCS = [
     'gfx/backend_pc98.c',
     'gfx/backend_pegc.c',
     'gfx/backend_cirrus.c',
+    'gfx/cirrus_identify.c',
     'gfx/gfx_vram.c',
     'gfx/gfx_scroll.c',
     'exec/surface_query.c',

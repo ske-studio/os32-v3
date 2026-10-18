@@ -67,6 +67,7 @@ check-memory-host:
 - gfx/gfx_core.c
 - gfx/backend_pegc.c
 - gfx/backend_cirrus.c
+- gfx/cirrus_identify.c
 - tools/tests/test_highram_stage.py
 - tools/tests/test_ledger.py
 - tools/tests/test_exec_r1.py

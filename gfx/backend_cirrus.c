@@ -13,8 +13,7 @@
 /*    drivers/wab_glue_xe10.c ボード (ポート翻訳、ID、リレー、VRAM 窓)       */
 /*  ここには VGA レジスタ番号も PC-98 のポート番号も書かない。               */
 /*                                                                          */
-/*  [HW1] は 98 標準グラフィック用の規則なのでここには適用されない           */
-/*  (DESIGN B3 / §7-5): 塗りと転送はチップの 2D エンジンで行う。             */
+/*  [HW1]: HAL 内の Cirrus バックエンドだけで自前の 2D エンジンを使う。     */
 /*                                                                          */
 /*  **bb_base はリニア窓の中の非表示面** (票 H3b, 2026-09-06)。               */
 /*  H3 の時点では Xe10 内蔵の CPU 窓が 32KB のバンク窓しかなく               */
@@ -47,6 +46,17 @@
 #include "wab_glue.h"       /* -Idrivers (INC_GFX) */
 #include "wab_glue_xe10.h"
 #include "wab_cirrus.h"
+#include "cirrus_module.h"
+#ifdef OS32_CIRRUS_MODULE
+#define gfx_backend_cirrus (*cirrus_context->backend)
+#define gfx_counters (*cirrus_context->counters)
+#define gfx_current_height (*cirrus_context->height)
+#define gfx_flip_enabled (*cirrus_context->flip)
+#define gfx_display_page (*cirrus_context->page)
+#define CIRRUS_BACKEND_TABLE cirrus_backend_ops
+#else
+#define CIRRUS_BACKEND_TABLE gfx_backend_cirrus
+#endif
 #include "np2sysp.h"       /* np2_detect: auto で Xe10 を試すのは NP21/W だけ */
 
 /* ------------------------------------------------------------------------ */
@@ -197,50 +207,9 @@ static void cirrus_linear_off(void)
 /*    4. チップの解錠キー往復 (SR6)。                                        */
 /*  1 だけ先に見るのは、窓が張れないなら ID が合っても使えないため。         */
 /* ------------------------------------------------------------------------ */
-static int cirrus_win_usable(u32 base, u32 size)
-{
-    u32 last;
-    if (size == 0) return 0;
-    /* 32bit の物理空間の末尾を越えないこと (4GB ちょうどで終わるのは可)。
-     * 末尾番地 (inclusive) で持つので base + size の桁あふれを作らない。 */
-    if (size - 1 > 0xFFFFFFFFUL - base) return 0;
-    last = base + (size - 1);
-    /* 窓に RAM が登録されていれば張ってはいけない (自分の RAM を隠す)。
-     * **RAM の上端 (sys_get_mem_kb) では決めない** — K6-RAM 以後、15MB 機
-     * + 高位 RAM (NP21/W ExMemory 16) の上端は 17,408KB で、15-16MB の穴の
-     * 中にあるバンク窓 F60000h まで「RAM が届いている」と誤判定して probe が
-     * ID 判定の前に落ちていた (PEGC で直した §4-34 と同じ形)。見るのはブート
-     * 時に凍結した物理地図で、窓 [base, last] にかかるページを 1 枚も
-     * 落とさずに問い合わせる。pgalloc 未初期化は RAM あり扱い (張らない)。
-     * リニア窓は v3 のデバイス窓の帯 (物理地図で MMIO) に置くので RAM とは
-     * 重ならない。ページテーブル側の置き場 (帯の静的 PT) に収まることは
-     * ボードの層 (drivers/wab_glue_xe10.c) の STATIC_ASSERT が見ている。 */
-    return !pgalloc_range_has_ram(base / PAGE_SIZE, last / PAGE_SIZE + 1);
-}
-
-/* 副作用のない識別 (TASK_T1_LEDGER §3-8)。物理地図とボードの表を見るだけで、
- * ポートは叩かない (ID の読み出しは index OUT なので識別に使えない —
- * **予約は存在の証明ではない**、DEVICE_RESERVATION §6)。機種が 9821 系で
- * あることは ⑥ の呼び手 (gfx_core.c) が BIOS ワークエリアで見る。
- * 1 = Cirrus (Xe10) の候補。 */
-int cirrus_identify(void)
-{
-    s_glue = &wab_glue_xe10;
-
-    if (!cirrus_win_usable(s_glue->win_base, s_glue->win_size)) return 0;
-    /* リニア窓が使えないと CPU 描画面 (bb_base) を出せない = gshell も
-     * gdi_test も描けないので、ここで諦めて PEGC / 9801 へ譲る (H3b)。 */
-    if (!cirrus_win_usable(s_glue->lin_base, s_glue->lin_size)) return 0;
-    if (!s_glue->linear_enable) return 0;
-    /* 窓の先頭がページ境界で、使う VRAM (表示面 + 非表示面 + パターン) が
-     * 窓に収まること。ボードごとの値なので実行時に見る。 */
-    if (s_glue->lin_base & (PAGE_SIZE - 1)) return 0;
-    if (s_glue->lin_size < (u32)CIRRUS_VRAM_MIN) return 0;
-    return 1;
-}
-
 static int cirrus_probe(void)
 {
+    s_glue = &wab_glue_xe10;
     if (s_probed) return s_probe_ok;
     s_probed = 1;
     s_probe_ok = 0;
@@ -596,7 +565,7 @@ static void cirrus_shutdown(void)
 /*  最初の init() で決まったら shutdown() を挟んでも持ち続ける (exec が      */
 /*  アプリ起動時に見るため)。NULL に戻るのは init 途中の失敗だけ。           */
 /* ------------------------------------------------------------------------ */
-GfxBackend gfx_backend_cirrus = {
+GfxBackend CIRRUS_BACKEND_TABLE = {
     "cirrus-gd54xx",
     cirrus_probe,
     cirrus_init,

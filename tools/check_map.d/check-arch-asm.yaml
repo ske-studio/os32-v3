@@ -9,6 +9,7 @@ check-arch-asm:
 - tools/prototypes/cd_imports.def
 - tools/prototypes/pcm_imports.def
 - tools/prototypes/lan_imports.def
+- tools/prototypes/cirrus_imports.def
 - tools/tests/test_clang_ast.py
 - boot/boot_main.c
 - sdk/allocator/nano_adapter.c

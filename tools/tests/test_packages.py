@@ -115,7 +115,7 @@ def case_real_plan():
     # Minimal =「CUI のシェル + 基本コマンド」(cdinst の選択肢 1 の文言)
     minimal = {g for n, _, _, fs in resolved if n == 'minimal' for g, _ in fs}
     need = ['/sys/shell.bin', '/boot/vmkernel.lz4', '/boot/kdebug.bin',
-            '/boot/sqlite.mod', '/boot/fep.mod', '/boot/cd.mod', '/boot/kcg.mod', '/boot/fm.mod', '/boot/pcm.mod', '/boot/v86.mod', '/boot/lan.mod', '/sys/unicode.bin',
+            '/boot/sqlite.mod', '/boot/fep.mod', '/boot/cd.mod', '/boot/kcg.mod', '/boot/fm.mod', '/boot/pcm.mod', '/boot/v86.mod', '/boot/lan.mod', '/boot/cirrus.mod', '/sys/unicode.bin',
             '/etc/filetypes', '/etc/settings.tsv', '/etc/settings.db'] + \
         ['/bin/%s.bin' % c for c in MINIMAL_BASE_CMDS] + \
         ['/sbin/%s.bin' % c for c in MINIMAL_SBIN]

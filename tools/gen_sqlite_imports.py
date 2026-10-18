@@ -175,7 +175,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out-dir', type=Path, required=True)
     parser.add_argument('--contracts-only', action='store_true')
-    parser.add_argument('--module', choices=('sqlite', 'fep', 'cd', 'kcg', 'fm', 'pcm', 'v86', 'lan'), default='sqlite')
+    parser.add_argument('--module', choices=('sqlite', 'fep', 'cd', 'kcg', 'fm', 'pcm', 'v86', 'lan', 'cirrus'), default='sqlite')
     args = parser.parse_args()
     definition = ROOT / f'tools/prototypes/{args.module}_imports.def'
     generate(args.out_dir, definition, contracts_only=args.contracts_only, module=args.module)

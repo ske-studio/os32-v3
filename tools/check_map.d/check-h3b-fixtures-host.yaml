@@ -7,6 +7,7 @@ check-h3b-fixtures-host:
 - exec/surface_query.c
 - fs/pipe_buffer.c
 - gfx/backend_cirrus.c
+- gfx/cirrus_identify.c
 - gfx/backend_pc98.c
 - gfx/backend_pegc.c
 - gfx/gfx_core.c

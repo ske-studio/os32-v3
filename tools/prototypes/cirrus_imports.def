@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "contracts": [
+    "kernel/cirrus_module.h",
+    "include/gfx_hal.h",
+    "drivers/wab_glue.h"
+  ],
+  "imports": [
+    {
+      "symbol": "cirrus_identify",
+      "source": "include/gfx_hal.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "gfx_get_backend_pref",
+      "source": "include/gfx_hal.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "ledger_surface_find",
+      "source": "kernel/pgalloc.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "np2_detect",
+      "source": "drivers/np2sysp.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "kmemset",
+      "source": "lib/kstring.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "kmemcpy",
+      "source": "lib/kstring.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "kprintf",
+      "source": "include/kprintf.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "palette_get_all",
+      "source": "gfx/palette.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "palette_shadow_set",
+      "source": "gfx/palette.h",
+      "context": "normal",
+      "irq": false
+    }
+  ]
+}

@@ -13,6 +13,7 @@ check-c-dialect:
 - tools/prototypes/cd_imports.def
 - tools/prototypes/pcm_imports.def
 - tools/prototypes/lan_imports.def
+- tools/prototypes/cirrus_imports.def
 - build/sqlite-proto.mk
 - tools/check_map.d/check-c-dialect.yaml
 - build/checks.d/check-c-dialect.mk

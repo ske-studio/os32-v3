@@ -5,6 +5,7 @@ check-p2v:
 - tools/prototypes/cd_imports.def
 - tools/prototypes/pcm_imports.def
 - tools/prototypes/lan_imports.def
+- tools/prototypes/cirrus_imports.def
 - tools/tests/test_clang_ast.py
 - tools/check_p2v.py
 - tools/check_p2v_allow.txt

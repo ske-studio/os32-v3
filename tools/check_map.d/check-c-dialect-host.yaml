@@ -13,6 +13,7 @@ check-c-dialect-host:
 - tools/prototypes/cd_imports.def
 - tools/prototypes/pcm_imports.def
 - tools/prototypes/lan_imports.def
+- tools/prototypes/cirrus_imports.def
 - build/sqlite-proto.mk
 - tools/tests/test_c_dialect.py
 - tools/tests/mutpar.py
