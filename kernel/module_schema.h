@@ -22,6 +22,7 @@
 #define MODULE_ID_CIRRUS 10U
 #define MODULE_RUNTIME_SLOTS 18U
 #define MODULE_RECORD_CAP 10U
+#define MODULE_REQUIRED_PATHS { "/boot/sqlite.mod", "/boot/fep.mod" }
 
 /* Compatibility names for the existing KDEBUG contracts. */
 #define MODULE_IMAGE_MAX 262144U

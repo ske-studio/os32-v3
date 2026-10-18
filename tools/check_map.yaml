@@ -17,6 +17,7 @@ docs_only:
 - docs/images/**
 - docs/logs/**
 broad:
+- check-module-policy-host
 - check-kcg-module-host
 - check-cd-module-host
 - check-double-fault-host

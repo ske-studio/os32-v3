@@ -187,11 +187,15 @@ int vfs_stat(const char *path, OS32_Stat *st)
     if (!memcmp(path, "/db/fep.db", sizeof("/db/fep.db"))) {
         CHECK(services_stage == SERVICES_UNICODE && !opens && !fep_opens && !alloc_calls);
         dictionary_stats++;
-        if (input[0] == 55 || (input[0] >= 57 && input[0] <= 59)) return VFS_ERR_NOTFOUND;
+        if (input[0] == 55 || (input[0] >= 57 && input[0] <= 60)) return VFS_ERR_NOTFOUND;
         if (input[0] == 56) return VFS_ERR_IO;
         st->st_size = 1;
         return 0;
     }
+    if (!memcmp(path, SYS_SQLITE_MOD, sizeof(SYS_SQLITE_MOD)))
+        return input[0] == 57 ? VFS_ERR_NOTFOUND : VFS_OK;
+    if (!memcmp(path, SYS_FEP_MOD, sizeof(SYS_FEP_MOD)))
+        return input[0] == 60 ? VFS_ERR_NOTFOUND : VFS_OK;
     CHECK(!memcmp(path, SYS_UNICODE_BIN, sizeof(SYS_UNICODE_BIN)));
     if (input[0] == 14) return VFS_ERR_NOTFOUND;
     st->st_size = input[0] == 15 ? 128 * 1024 : UNICODE_FILE_BYTES;
@@ -635,6 +639,7 @@ static void boot_transaction(void)
     if (input[0] == 59) services_boot_fault = SERVICES_FAULT_SETTINGS_CLOSE;
     u32 unicode_before = unicode_pages;
     services_boot();
+    if (input[0] == 60) CHECK(!services_public);
     CHECK(dictionary_stats == 1);
     CHECK(dictionary_missing_messages == (input[0] == 55));
     int sqlite_only = input[0] == 55;
@@ -803,7 +808,7 @@ void _start(void)
     __asm__ volatile("int $0x80" : "=a"(rc) : "0"(125), "b"(pool), "c"(sizeof(pool)), "d"(7) : "memory");
     CHECK(!rc);
     stubs();
-    if ((input[0] >= 10 && input[0] <= 36) || (input[0] >= 50 && input[0] <= 59)) boot_transaction();
+    if ((input[0] >= 10 && input[0] <= 36) || (input[0] >= 50 && input[0] <= 60)) boot_transaction();
     rc = os32_sqlite_start();
     CHECK(rc == (int)input[3] && opens == 1 && closes == (input[0] != 1));
     CHECK(!sqlite_engine_active && host_flags == 0x202);

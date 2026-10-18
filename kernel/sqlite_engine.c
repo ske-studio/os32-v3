@@ -243,7 +243,13 @@ void services_boot(void)
     /* Only definite absence selects recovery mode; other stat failures retain
      * the normal FEP initialization/rollback path. Never open the dictionary. */
     int no_dictionary = vfs_stat(IME_DICT_PATH, &dictionary) == VFS_ERR_NOTFOUND;
-    int rc = os32_sqlite_start();
+    /* Required bodies stay required even on the dictionary-free recovery FD.
+     * The policy table generates this list; absence never publishes services. */
+    static const char *const required_paths[] = MODULE_REQUIRED_PATHS;
+    int rc = MODULE_NOT_FOUND;
+    for (u32 i = 0; i < sizeof(required_paths) / sizeof(required_paths[0]); i++)
+        if (vfs_stat(required_paths[i], &dictionary) != VFS_OK) goto rollback;
+    rc = os32_sqlite_start();
     if (rc) goto rollback;
     services_stage = SERVICES_SQLITE_INTERNAL_READY;
     kprintf(0x07, "[services] SQLITE_INTERNAL_READY tick=%u\n", tick_count);

@@ -218,7 +218,7 @@ def pair_runtime_suite(folder, mutate=False):
         print('MUTATE sqlite-mixed-pair RED (compiled, runtime acceptance assertion)')
 
 
-def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=False, fep_mutate=False):
+def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=False, fep_mutate=False, policy_mutate=False):
     """Execute the product module with the full adapter and real stack switch."""
     generated = ROOT / 'lib/sqlite3/generated'
     (folder / 'sys_build_info.inc').write_text(function(
@@ -371,7 +371,7 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
                   ('final-ready-check-failure', 54), ('mixed-FEP', 51), ('FEP-allocation', 52), ('FEP-PAIR-required', 53),
                   ('no-dictionary-sqlite-only', 55), ('dictionary-stat-io', 56),
                   ('no-dictionary-missing-sqlite', 57), ('no-dictionary-sqlite-init', 58),
-                  ('no-dictionary-settings-close', 59)]
+                  ('no-dictionary-settings-close', 59), ('no-dictionary-missing-fep', 60)]
     boot_cases += [(name, 20 + fault) for fault, name in enumerate((
         'pool', 'stack', 'sqlite-init', 'settings-close', 'fep-text', 'fep-attr',
         'fep-crc', 'dictionary', 'reserve', 'fep-close', 'shutdown'), 1)]
@@ -391,6 +391,18 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
         result = boot_run(mode)
         assert result.returncode == 0 and b'occupancy sqlite_pages=' in result.stdout, (label, result)
         print('PASS boot ' + label + ': ' + result.stdout.decode().strip(), flush=True)
+    if policy_mutate:
+        path = folder / 'sqlite_engine.c'
+        source = path.read_text()
+        old = 'if (vfs_stat(required_paths[i], &dictionary) != VFS_OK) goto rollback;'
+        assert source.count(old) == 1
+        path.write_text(source.replace(old,
+            '(void)vfs_stat(required_paths[i], &dictionary);'))
+        subprocess.run(command, check=True)
+        result = boot_run(60)
+        assert result.returncode == 1 and b'FAIL !services_public' in result.stdout, result
+        print('MUTATE required-check-removed RED (compiled runtime): ' + result.stdout.decode().strip(), flush=True)
+        path.write_text(source)
     if mutate:
         path = folder / 'sqlite_engine.c'
         source = path.read_text()
@@ -602,6 +614,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--directory', type=Path, default=ROOT / 'build/out/sqlite-proto')
     parser.add_argument('--vmkernel', type=Path, default=ROOT / 'build/out/vmkernel.lz4')
+    parser.add_argument('--policy-mutate', action='store_true', help='only T5c-6 required-body mutant')
     parser.add_argument('--mutate', action='store_true')
     parser.add_argument('--fep-mutate', action='store_true', help='only T5a-2 stub and rollback mutants')
     parser.add_argument('--stack-mutate', action='store_true', help='only T5-0b stack capacity mutant')
@@ -623,7 +636,7 @@ def main():
             print(f'PASS {runner}: unaligned/last-word reloc; tail-2/BSS/duplicate/import/overflow write=0')
         pair_runtime_suite(folder, mutate=args.mutate)
         real_runtime_suite(folder, args.directory, args.vmkernel, mutate=args.mutate,
-                           stack_mutate=args.stack_mutate, fep_mutate=args.fep_mutate)
+                           stack_mutate=args.stack_mutate, fep_mutate=args.fep_mutate, policy_mutate=args.policy_mutate or args.mutate)
         print(json.dumps(stats, sort_keys=True))
         if args.mutate:
             source = (ROOT / 'kernel/module_image.c').read_text()
