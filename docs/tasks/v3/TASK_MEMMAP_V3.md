@@ -15,6 +15,7 @@
 
 | # | 決定 | 出所 |
 |---|---|---|
+| — | **ユーザー承認 2026-10-18: 根拠のあいまいな基準の見直し**。stack・集積・record容量・FEP予約と受入を同期 | §2-1・§4-2・§4-5・§4-6・§5-4/5-5・§6・§7、詳細は [T4〜T6b §9](TASK_T4_T6_MODULES.md#9-決定済みの争点) |
 | D1 | **カーネル・シェル・通常 RAM は恒等写像 (supervisor)**、**アプリだけ 0x80000000〜 の私有写像** | 両者合意、ユーザー承認 |
 | D2 | **物理地図と所有権台帳を先に** (RAM の存在 / 割当可否 / owner / 写像を別情報に、PFN 半開区間) | Codex P0、両者合意 |
 | D3 | `exec_child_claim` / `sys_reserve_top` / `EXEC_DYN_RESERVE` / `MEM_APP_BAND_DEVICE_FLOOR` は撤去。物理は全部池から owner 付き | 両者合意 |
@@ -87,7 +88,7 @@ v3 の答え: **システム側は恒等のまま (D1・D20)、物理地図と�
 | 0x3FB000–0x3FBFFF | 0 | NP | 4KB | ガード |
 | 0x3FC000–0x3FFFFF | 0 | 固定 | 16KB | カーネルスタック |
 | **0x400000–0x4FFFFF** | 1 | 固定 supervisor | 1MB | **常駐シェル帯 (1 箱)**: 画像 (gshell 219KB) → sbrk ↑ … exec_heap ↓ ← ガード ← スタック 40KB。全 PD 共有。gshell は CPL=0 なので池・VRAM 窓を直接触れる (D8) |
-| **0x500000–0xEFFFFF** | 1–3 | **池 (低位側)** | 10MB | `MEM_POOL_BASE = 0x500000`。T6b以後は **0x500000–0x5FFFFF = 圧縮画像の集積域** (§4-5、展開後に池へ)。同梱域の予約は2026-10-18決定で作らない。**0x7F0000–0x7FFFFF は DMA 専用64KBを固定予約** (一般池へ配らない) |
+| **0x500000–0xEFFFFF** | 1–3 | **池 (低位側)** | 10MB | `MEM_POOL_BASE = 0x500000`。集積移動は凍結し、圧縮像は現行の低位集積へ (§4-5)。同梱域の予約は2026-10-18決定で作らない。**0x7F0000–0x7FFFFF は DMA 専用64KBを固定予約** (一般池へ配らない) |
 | 0xF00000–0xFFFFFF | 3 | 固定 NP / sup+PCD | 1MB | システム空間 (PEGC リニア窓)。RAM として配らない (D6) |
 | 0x1000000–RAM 上端 | 4– | 池 (高位) | 検出量 | K6 の経路。`MEM_PHYS_RAM_CEILING = 0x80000000` |
 | 0x20000000 帯 | 128– | 固定 sup+PCD | BAR ごと | PCI の BAR (Ra266)。PT は列挙時 (`exec_init` より前) に作る |
@@ -96,7 +97,7 @@ v3 の答え: **システム側は恒等のまま (D1・D20)、物理地図と�
 | 0xFE000000–0xFEFFFFFF | 1016–1019 | 固定 sup+PCD | 16MB | デバイス窓の帯 (v2.1 のまま) |
 | 0xFF000000– | 1020–1023 | 固定 | 16MB | ROM ミラー / MMIO |
 
-**案5 (ユーザー承認 2026-10-16)**: DMA を低位の池へ移し、両ガードと16KiBスタックを維持する。番地は固定 `0x7F0000` を採る (8MB末尾の64KiBでRAM、T6bの集積域の外)。0x700000では8MB機の低位の池が3区間に割れるが、末尾なら集積域の後ろを連続して使える (旧同梱域の予約は2026-10-18に取消)。検出RAMが終端0x800000に届かない場合はDMAを使う装置 (PCM・82557) だけを無効にし、診断を1行出して起動を続ける。一般割当前に `LEDGER_R_DMA / LEDGER_OWNER_KERNEL / WB` で16ページを恒久予約し、物理=仮想・supervisor/RWを保つ。8237A＋バンクは24bit (`docs/hw/undocumented/io_dma.md:383-386`)、[HW2] により64KiB整列・境界非跨越、1MB以上禁止は解除済み (`drivers/dma8237.c:89-91`)。15〜16MBは全機種・全設定で除外する (`docs/hw/undocumented/io_mem.md:157-191`、`docs/hw/undocumented/pci_cbus.md:79-100` のシステム空間、386以上の機種が前提)。具体配置・利用側・初期化順は [T3 §2-2](TASK_T3_LAYOUT.md#2-2-固定領域とページング)。
+**案5 (ユーザー承認 2026-10-16)**: DMA を低位の池へ移し、両ガードと16KiBスタックを維持する。番地は固定 `0x7F0000` を採る (8MB末尾の64KiBでRAM)。末尾に置いて低位の池を連続して使う (集積拡張は凍結、旧同梱域の予約は2026-10-18に取消)。検出RAMが終端0x800000に届かない場合はDMAを使う装置 (PCM・82557) だけを無効にし、診断を1行出して起動を続ける。一般割当前に `LEDGER_R_DMA / LEDGER_OWNER_KERNEL / WB` で16ページを恒久予約し、物理=仮想・supervisor/RWを保つ。8237A＋バンクは24bit (`docs/hw/undocumented/io_dma.md:383-386`)、[HW2] により64KiB整列・境界非跨越、1MB以上禁止は解除済み (`drivers/dma8237.c:89-91`)。15〜16MBは全機種・全設定で除外する (`docs/hw/undocumented/io_mem.md:157-191`、`docs/hw/undocumented/pci_cbus.md:79-100` のシステム空間、386以上の機種が前提)。具体配置・利用側・初期化順は [T3 §2-2](TASK_T3_LAYOUT.md#2-2-固定領域とページング)。
 
 ### 2-2. lease の契約
 
@@ -267,7 +268,7 @@ R1〜R4 はプリエンプティブでない前提をそのまま約束にした
 - **再配置の実態** (`readelf -r`): 内部の `R_386_PC32` が大半 (sqlite3Vdbe* 1,123 件など) のほか、**外部関数への `R_386_PC32`** (`memset` 175、`memcpy` 171、`vfs_validate_sqlite` …) と **外部データへの `R_386_32`** (`tick_count` × 3、`os32_sqlite_vfs.o`) がある。絶対参照の一覧にベースを足すだけでは足りない (Codex P2-2)。
 - `sqlite3_config(SQLITE_CONFIG_HEAP, ptr, size)` は任意ポインタ可 (`:633-635`)。
 
-T4後はSQLiteをowner割当のPOST_ROOT部品に分離済み。FEPは案A (core固定＋typed facade)、MEMSYS5 512KiB・既定FEP予約192KiB・APP+SYSTEM上限319,488B。現行実績とT5入口の再測定は [T4〜T6b §0・§7-2](TASK_T4_T6_MODULES.md) を参照する。
+T4後はSQLiteをowner割当のPOST_ROOT部品に分離済み。FEPは案A (core固定＋typed facade)、MEMSYS5 512KiB・既定FEP予約192KiB・既定時APP+SYSTEM上限319,488B。予約上書きの方針は§4-6。現行実績とT5入口の再測定は [T4〜T6b §0・§7-2](TASK_T4_T6_MODULES.md) を参照する。
 
 ### 4-2. モジュール形式 (D12・D17)
 
@@ -278,9 +279,9 @@ T4後はSQLiteをowner割当のPOST_ROOT部品に分離済み。FEPは案A (core
 | 外部データ | **禁止**。`tick_count` は `ktime_ticks()` のアクセサに置き換える (`os32_sqlite_vfs.c` の 3 か所)。`mkmod.py` は外部データへの `R_386_32` を見つけたら**生成を拒否** |
 | 再配置表 | `R_386_32` の位置一覧 (4B × 件数。SQLite は数千件 = 十数 KB、推測)。ローダはベースを加算。**表に無い種別が残っていたら拒否** |
 | エクスポート表 | カーネルが呼ぶ入口 (`sqlite3_open_v2` … `db_mem_used` が使う `sqlite3_memory_used`)。`kapi_db.c` / `ime_dict.c` は `os32_sqlite_vfs.h` のマクロ層で表を引く |
-| 置き場・メモリ | 池 (第一候補 KERNEL_SLACK)、CPL=0、supervisor。**MEMSYS5 512KB** (D27、全機種同じ。T4c-1 前の 384KB (`os32_sqlite_vfs.c`) と、8MB 機だけ 256KB に絞る案 (旧 U3) は不採用) と代替スタック 128KB は**モジュール init が池から取り** `SQLITE_CONFIG_HEAP` へ。stack 上端は `sqlite_engine_stack_top` 変数。**FEP の取り分は読み込み時に優先確保、アプリの接続は「プール − FEP 分」で上限** (§4-6) |
+| 置き場・メモリ | 池 (第一候補 KERNEL_SLACK)、CPL=0、supervisor。**MEMSYS5 512KB** (D27、全機種同じ。T4c-1 前の 384KB (`os32_sqlite_vfs.c`) と、8MB 機だけ 256KB に絞る案 (旧 U3) は不採用) とengine stack 32KiB + NP 1頁 (深さ100のhost実測24,388B、SQLITE_MAX_EXPR_DEPTH=100のまま、ユーザー決定2026-10-18) は**モジュール init が池から取り** `SQLITE_CONFIG_HEAP` へ。stack 上端は `sqlite_engine_stack_top` 変数。**FEP の取り分は読み込み時に優先確保、アプリの接続は「プール − FEP 分」で上限** (§4-6) |
 | 未読み込み時 (MINIMAL だけ、D21) | `db_open` は `OS32_ERR_NOSYS` 系の 1 値。FEP は §5-6 の**API 別 stub** |
-| 池からの予算 | code 375 + MEMSYS5 512 + 代替スタック 128 + 再配置表 ≈ 16 = **≈ 1,031KB** (D27 の前は 775〜903KB) |
+| 池からの勘定 | module body + MEMSYS5 512KiB + engine stack 32KiB + NP 1頁、ロード時はprefixを加算。実占有は同一一式で記録 ([T4〜T6b §7-2](TASK_T4_T6_MODULES.md)) |
 
 ### 4-3. 8MB の勘定 (D9・D21)
 
@@ -337,37 +338,36 @@ T4前の `build/kernel.mk` の C オブジェクトを `size` で群に分けた
 
 **承認済みのEARLY計画はユーザー決定2026-10-18で作らない。** VK32の複数entryの製品利用、bootinfo 212B新形式、U19 (PG/台帳をroot前へ)、同梱域1MiB/所有移譲と対応するローダASM・hsync_bootold新対応を取り消す。VK32の形式上限4 entryは既存のまま。T4後のcore 1本の像を全媒体で共用し、FATとHostDrvはcoreに残す。
 
-1. ローダは現行の圧縮像を集積→CRC検査→coreへ展開する。集積の508KiB上限はT6b-1/2で1MiBへ移す計画を維持する。
+1. ローダは現行の圧縮像を集積→CRC検査→coreへ展開する。集積上限は508KiBを維持する。T6b-1/2は凍結。圧縮像が508KiBの8割 (約416KiB) に近づいたら起票する。
 2. coreのFAT/FDCまたはIDE/ext2でrootを成立させ、PG/台帳/DMAを準備する現行順を保つ。root後にUnicode → SQLite → settings close → FEP → SERVICES_READY。起動部品は `/boot` から読みPAIR必須でカーネルと対に配る。
 3. ATAPI/iso9660はFD/HDD root上からPOST_ROOTで読み、cdinst・USER_READYより前に登録する。MINIMALでもCD読取を残す。登録後に `/cd0` 自動mountとloop/hd上ISOのiso9660試行も実行する。CDはインストール元だけでrootにせず、FEP/settings/不変RO SQLite許可を接続しない。
 4. HostDrvはcoreの補助マウントを保ち、hsync bootが途中で止まっても `/host` は残る。gfxの識別glue/永久予約はcore、最初のAS前に共通PDEとBBを準備し、probe/enableはGUI境界。通常部品の登録 → splash実行/回収 → rshell/SerialFS → shellの順は維持する。
 
-T5c-0のFS/Device登録寿命・満杯時の明示失敗をCD切出し前へ置き、IRQ/tick/DMA brokerは必要な部品に限る。部品の同時数と隔離保持からMODULE_RECORD_CAP=8をT5bで再計算する。T5-0aと部品追加時にFD容量を実測し、ATAPI/iso9660とT5c-4以後のlan.modも含め、不足する追加段の前だけT6b-M (POST_ROOT圧縮) を挿入する。詳細は [T4〜T6b §5・§7](TASK_T4_T6_MODULES.md)。
+T5c-0のFS/Device登録寿命・満杯時の明示失敗をCD切出し前へ置き、IRQ/tick/DMA brokerは必要な部品に限る。MODULE_RECORD_CAPはT5c-0で生成policyの許可ID数から一度に決め、満杯拒否を試験する。T5-0aと部品追加時にFD容量を実測し、ATAPI/iso9660とT5c-4以後のlan.modも含め、不足する追加段の前だけT6b-M (POST_ROOT圧縮) を挿入する。詳細は [T4〜T6b §5・§7](TASK_T4_T6_MODULES.md)。
 
-**T6b の区間表 (案5の配置契約を維持)**:
+**現行の区間表 (集積拡張は凍結、案5の配置契約を維持)**:
 
 | 区間 | 用途 | 上限 | 寿命 |
 |---|---|---|---|
-| 0x010000–0x08EFFF | 現行ローダの集積 | 508KiB | T6bまで |
+| 0x010000–0x08EFFF | 現行ローダの集積 | 508KiB | 展開・CRC完了まで |
 | 0x0009FFFC 以下 | ローダのstack・FAT buffer・bootinfo | — | boot consumer退去まで |
 | 0x100000–0x3DFFFF | coreと常駐鎖の配置枠 | 2,944KiB | 実際の常駐終端/SLACKを同一mapで計測 |
-| 0x500000–0x5FFFFF | T6b以後の圧縮集積 | 1MiB | 全展開/CRC後、台帳初期化で池へ |
-| 0x600000–0x7EFFFF | 池 (旧同梱予約は作らない) | — | 通常のowner割当 |
+| 0x500000–0x7EFFFF | 池 (集積移動・旧同梱予約は作らない) | — | 通常のowner割当 |
 | [0x7F0000,0x800000) | DMA専用予約 | 64KiB | 常駐、一般池へ配らない |
 
-T6b-1はloader/stack/source/core/bootinfoの全区間とsource/destinationの非重複を検査してから展開する。T6b-2は集積・core・各ownerの同時生存peakを測り、BB/SQLiteの先取りや別の全画像stagingを足さない。旧同梱1MiBは予算から外し、T4後の受入一式で実測する。8MB/17MBは最終段、実機は台帳T4T7-RHへ。
+T6b-MではFD容量の純節減・読込/展開時間・peakをT4後の受入一式で実測する。8MB/17MBは最終段、実機は台帳T4T7-RHへ。
 
 ### 4-6. SQLite の予算と FEP の取り分 (D27、ユーザー決定 2026-09-30)
 
 **T4前の事実 (履歴)**: MEMSYS5 は `SQLITE_CONFIG_HEAP` で渡す**全接続共有の 1 ヒープ** (`os32_sqlite_vfs.c:34-39`、今 384KB。200KB のころ game の順次ロードで枯渇 `:21-33`)。接続の上限は `DB_MAX_CONNECTIONS` = 8 (`os32_kapi_shared.h:47`)、既定のページキャッシュは接続あたり 10 ページ (`SQLITE_DEFAULT_CACHE_SIZE`、`os32_sqlite_config.h:66`、page_size 1KB `:67`)。FEP 辞書が常駐した状態の使用量は実測 38,784B (`settings/DESIGN.md` §6、`cfg_bench`)。FEP は辞書の接続を SQLite 直呼びで 1 本持つ (`ime_dict.c`)。
 
-T4で以下の量と取り分保証を接続済み。DICT_META前はsettings (`system/fep_mem_reserve_kb`) と既定192KiB、APP+SYSTEM上限319,488B。辞書meta読取は後続。受入済みの計数ラッパを維持し、cache_sizeだけで保証しない。
+T4で以下の量と取り分保証を接続済み。DICT_META前はsettings (`system/fep_mem_reserve_kb`) と既定192KiB、APP+SYSTEM上限319,488Bは既定時の値。予約は下げる向きの上書きも可、下限は実測の最大 (T4a-4の実IPADIC 101,376Bを切り上げた100KiB程度)。このコードの直しは別依頼 (wt/fepres)、辞書meta読取は後続。受入済みの計数ラッパを維持し、cache_sizeだけで保証しない。
 
 | 項目 | 決定 |
 |---|---|
 | MEMSYS5 の量 | **512KB、全機種同じ** (§4-2、§4-3)。モジュール init が池から取る (R7、owner=sqlite) |
-| FEP の取り分 | 起動時SQLite → settings close → FEP、既定192KiBを優先予約。settingsで増やす向きだけ上書き可。DICT_META前は1接続、meta読取は同票の段 |
-| アプリの接続の上限 | T4の計数ラッパでAPP+SYSTEM上限319,488Bを守り、FEP取り分を侵す割当はNULL。合成S/M/L・実辞書の観測は [T4〜T6b §7-2](TASK_T4_T6_MODULES.md) |
+| FEP の取り分 | 起動時SQLite → settings close → FEP、既定192KiB、下げる向きの上書きも可、下限は実測の最大。settingsで指定し優先予約する。DICT_META前は1接続、meta読取は同票の段 |
+| アプリの接続の上限 | T4の計数ラッパで予約を差し引いたAPP+SYSTEM上限 (既定時319,488B) を守り、FEP取り分を侵す割当はNULL。合成S/M/L・実辞書の観測は [T4〜T6b §7-2](TASK_T4_T6_MODULES.md) |
 | 完全分離ではない | MEMSYS5 は 1 ヒープなので、**cache_size の制限は上限であって予約ではない** — アプリの接続の一時確保 (prepare・sort・一時表) で FEP の分が食われうる。SQLite はプロセスにヒープを 1 つしか持てないので FEP 専用の 2 つ目のヒープは作れない。**実装の段 (T4) で「アプリの接続が上限まで使った状態で FEP の 1 語変換が通る」を試験し**、足りなければ `sqlite3_soft_heap_limit64` か FEP 側の最小 cache の再確保で補う (§7 に受入を足した) |
 | 辞書の入れ替え | `ime_switch_dict` (S/M/L、`ime.c:882-895`) で切り替える先の `mem_reserve_kb` が起動時の確保量を超えるときは、**その場で再確保せず「再起動で再確保」** (設定に保存して再起動を促す)。超えないときはそのまま切り替える |
 | MINIMAL | SQLite を読まないので取り分も無い (D21・D26) |
@@ -419,7 +419,7 @@ P2 は「shlib ローダの流用」ではなく、**形式検査・表生成の
 
 | 項目 | 設計 |
 |---|---|
-| ストリーミング読み出し層 (**実装項目**) | **旧サブセット試作の見積**: 表 `cmap` `loca` `hmtx` `head` `hhea` `maxp` ≈ 100KB。原本にこの全表常駐見積を適用しない。`glyf` は字形ごとに `sys_lseek` + `read` (loca から offset/length)。ttf-parser には**字形 1 つ分のスライス**を `glyf` として渡す薄い層を書く (ttf-parser の `Face` 全体を使わず `glyf::Table` 相当を自前で組む、推測: 数百行)。作業域: 輪郭 ≤ 2KB (このファイルは 1,076B、**OpenType 一般の保証ではない** → 上限超えは字形を「□」に落とす)、累積面 16px 1KB / 32px 4KB |
+| ストリーミング読み出し層 (**実装項目**) | **旧サブセット試作の見積**: 表 `cmap` `loca` `hmtx` `head` `hhea` `maxp` ≈ 100KB。原本にこの全表常駐見積を適用しない。`glyf` は字形ごとに `sys_lseek` + `read` (loca から offset/length)。ttf-parser には**字形 1 つ分のスライス**を `glyf` として渡す薄い層を書く (ttf-parser の `Face` 全体を使わず `glyf::Table` 相当を自前で組む、推測: 数百行)。作業域の上限は [T7詳細 §2-2・§3](TASK_T7_AND_FOLLOWUPS.md) のa1③で字形corpusの最大値を実測して決め、a3〜a5は実測最大以上、超過は代替字形とする |
 | ラスタライザとキャッシュの所有者 | **v3 の最初は私有**: libos32gui (shlib、text 共有) にラスタライザを置き、**キャッシュはアプリの shlib data / ヒープに私有** (私有総量の内側、16px 1bpp 2,048 字 × 40B = 80KB)。**gshell は libos32gfx を静的リンクしている** (`gshell/Cargo.toml:12`) ので、WM も同じ Rust クレートを静的に持ち、**シェル帯の内側に**私有で持つ (表100KB+キャッシュ80KBは旧サブセット見積。原本の予算は [T7詳細 §2](TASK_T7_AND_FOLLOWUPS.md) の読込方式とT3固定分割で再検証、U15)。CPL=3 の shlib から supervisor の共有キャッシュには書けないので、**共有キャッシュ (gshell 所有、RO lease、欠けた字形は GUI op で WM に頼む) は後の最適化** (U21) |
 | 予算 | 8MB: 16px 1bpp 64〜80KB/プロセス。16MB 以上: 256KB (2 サイズ or 2bpp) |
 | 判定 | 1x の見た目 (罠 POLICY_DEBUG §4-10)、ラスタ時間 (U4: P100 で 1 字 0.2〜1ms、386 は 10 倍以上 — 推測)。cold の 1 画面 1,000 字 = 0.2〜1 秒 |
@@ -430,7 +430,7 @@ P2 は「shlib ローダの流用」ではなく、**形式検査・表生成の
 
 | 今 | v3 |
 |---|---|
-| フォントキャッシュ 292KB (0x1000) | 消滅 (OpenType は私有)。KCG ROM fallback の読み出しキャッシュは**モジュールが池から取る** (LRU 64KB を上限に、§4-3 に計上。別案 = キャッシュを持たず毎回 ROM から 32B 読む: I/O 34 本/字 (`kcg.c:147-165`) で遅いが 0KB、推測) |
+| フォントキャッシュ 292KB (0x1000) | 消滅 (OpenType は私有)。KCG ROM fallback の読み出しキャッシュは**モジュールが池から取る** (64KiBは§4-3の計上値、受入ではhit率を記録。別案 = キャッシュを持たず毎回 ROM から 32B 読む: I/O 34 本/字 (`kcg.c:147-165`) で遅いが 0KB、推測) |
 | Unicode 表 128KB (0x4A000) | カーネル `.rodata` 28KB |
 | GFX BB (9801、128KB、0x6A000) | 池へ (owner=boot → gshell、§2-2) |
 | 空き 88KB (0x90000 mailbox) | mailbox は残す |
@@ -480,17 +480,17 @@ T4前の事実 (履歴): カーネル静的 (`kernel.mk:31`、`kernel.c:624`)、
 | **[T2 アプリ帯 + lease 窓](TASK_T2_APPBAND.md)** | **設計段で lease 契約 (§2-2) を先に決める** → 0x80000000 へ、lease 窓 0xF0000000、定数分離、claim / DEVICE_FLOOR / `--cpl0` 撤去、`exec.c:1932-1959` の共有 USER 写像撤去 (SHM・トランポリン以外)、`paging.c:796` の共有 PT 経路撤去、shlib を池 + AS ごと写像、既定 heap、**スタックを可変 (OS32X ヘッダ)**、検査 3 段 (§2-3 ⑥)、app.ld / shlib.ld / mkshlib / stub.rs、全再ビルド・旧形式拒否、**BB を gshell 所有 + lease に (b)**、**§3-5 の exec 側: 強制脱出を移譲 / 回収の 2 段に (R1)、伸長の KAPI は `mem_map` / `mem_unmap` の 2 つだけ (libc の `_sbrk` をヒープ末尾に続けて map する形へ、閾値 64KB、池不足時の trim 通知、起動予約なし — R2、D23〜D25)、lease 窓の PT 1 枚の事前確保と失敗時の巻き戻し (R3-e)**、**FEP_BOUNDARY B1 (D31): `ring3_ptr_ok` の帯判定を新しい帯で書き直す差分に「NUL まで 1 バイトずつ検証する bounded copy」を含める (`db_user_str_copy` を `exec/` へ移して共通化、`[start, start+len)` の overflow 検査)**、**lease の API (Codex X3、§2-2)**: 記述子は SURFACE 台帳への参照、lease 結果の仮想番地は別に返す (`gfx_get_framebuffer` の返す番地を AS ごとに)、キャッシュ属性は台帳から、共有 PT を書く要求の拒否、ページ整列の占有と解除順、planar のカーネル側プレーンポインタの更新。全再ビルド・旧形式拒否の**世代の識別は D35** (旧新混在試験は P7 の受入と共有) | CPL=3 起動・終了・fault・複数 AS、旧バイナリ拒否、**未終端・ページ跨ぎの user 文字列を渡した KAPI は失敗 (SQLite 進入中の #PF にならない)**、**lease を 2 AS に貸して互いに見えない** (§2-2 の定義)、**lease の回帰 (X3、§2-3 ⑥ (d)): 3 バックエンドで描画・present、lease の物理対応と alias のキャッシュ属性の一致、無関係な AS の権限・物理不変、PT / 台帳不足の全体巻き戻し、片方だけの revoke、終了時回収、再 init**、通常 GUI アプリが VRAM を読み書きすると kill、**CUI の無限ループ中の CTRL+STOP と PCM 再生中の CTRL+STOP で池の空きが戻る (R1)**、伸長 → unmap → 終了で owner のページ 0 (R2・R5) |
 | **[T3 カーネル帯](TASK_T3_LAYOUT.md)** | 3MB + 固定の塊 + KERNEL_SLACK + シェル 0x400000 (1 箱) + DMA 整列 + 固定PT周辺の再検証 (画像外化はT2a′で済み、T2票§1-3) + Unicode 組表を `.rodata` へ (T7a から前倒し可)。SQLite は本体の直後に連結 | 地図検査、8MB の予算検査、`pgalloc_free_pages` の実測で §4-3 を更新 |
 | **[T4 SQLite 分離](TASK_T4_T6_MODULES.md)** | §4-2 (ベース 0 リンク + emit-relocs、インポートスタブ、外部データ禁止、未対応再配置の拒否)、**MEMSYS5 512KB** / 代替スタックを池へ、`kapi_db` / `ime_dict` を表経由 (FEP 案 A)、MINIMAL での `db_*`、**FEP の取り分の優先確保と `db_open` の上限 (§4-6、`mem_reserve_kb` は既定値 + settings だけ。辞書のメタ情報の読み取りは TASK_DICT_META)**、読み込み失敗で MINIMAL へ (D26)、**F2 の残り (D30): `kapi_db` / `ime_dict` の open を `os32_sqlite_group_open` 経由に (RESIDENT group 2 本)、F2d の隔離経路 (`exec_cleanup_owned_resources`、quarantine の到達)、default VFS の未所属 open の fail-closed**、**F3a + F3c の VFS 側 (D29): I/O の rc を捨てない、`SQLITE_IOERR_TRUNCATE` / `SQLITE_IOERR_FSYNC`、`pOutFlags`、RO 接続の write 拒否**、**FEP_BOUNDARY B3 / B4 (D31): 旧 `db_exec` / `db_prepare` の checked copy (1024B 超は失敗、旧 stmt の finalize より前に SQL を全コピー)、エクスポート表のラッパに `enter` / `leave` (= 全 outer 呼び出しの台帳)、SQLite 進入中の例外は app-kill でなく kernel 異常 (`isr_handlers.c` の判定順)**、**ローダの契約 (§4-7、Codex X2)**: ロード時検証 (範囲・重複再配置・世代)、信頼する配布物だけ、公開の境界 (init 成功後に export)、**排他 open (D29) の導入まで同一 DB の重複接続をどう禁止するかを明記 (§4-6、X7-4)** | `db_*` 全 KAPI、FEP 変換、`db_mem_used` の戻り、MINIMAL で起動、**アプリの接続が上限まで使った状態で FEP の 1 語変換が通る**、**F2 の T01 / T02 / T07 / T12 (親の接続の生存、後発 journal の所属、close 失敗の隔離、子の実行中の FEP 学習)、SQL 1025B の `db_exec` が失敗、truncate が `SQLITE_IOERR_TRUNCATE`、RO 接続の write が拒否**、**壊れたモジュール画像 (範囲外・重複の再配置、未知の形式版) の拒否と init の各段階の失敗注入で参照が残らない (X2)**、**parked アプリ同士が同じ DB を開く経路の扱い (X7-4)** |
-| **T5-0 着手前受入** | 0a: T4一式の基準化・db fixture短縮・128KiB engine stack計測・IMEDUP-1ゲスト確認。0b: KSTK-DF | 実guardで診断→停止を受けてから32KiB採否、縮小時は同じ負荷/rollbackを再確認、不足なら128KiB維持 |
+| **T5-0 着手前受入** | 0a: T4一式の基準化・db fixture短縮・128KiB engine stack計測・IMEDUP-1ゲスト確認。0b: KSTK-DF | 実guardで診断→停止を確認。engine stack 32KiB + NP 1頁 (深さ100のhost実測24,388Bが収まる、SQLITE_MAX_EXPR_DEPTH=100のまま、ユーザー決定2026-10-18) |
 | **T5a FEP** | 案 B (`/boot/fep.mod`、PAIR必須・カーネルと対で配布)、**API 別 stub**、**F2c (D30): FEP の接続 2 本 (辞書 RO + 学習 RW、[TASK_DICT_META](../fep/TASK_DICT_META.md) 前は辞書 1 本) を起動時 (live AS = 0) に RESIDENT group で開く、T4で撤去済みの `dict_fd_protect` を戻さず、close 失敗を隠さない reopen 拒否**、**FEP_BOUNDARY B2 (D31): `ime_user_list / delete / export` の facade を bounded copy + kernel staging → finalize → copyout に (不正 kanji で全候補削除に拡大しない、不正 path で truncate しない、上限表 §3)** | FEP 有り / MINIMAL の両方で英数入力・編集、FEP で 1 語変換、**子アプリの実行中に FEP が学習 (journal を開く) して子の終了で FEP の FD が閉じない**、**不正ポインタ・未終端の `ime_user_*` は失敗して SQLite に届かない**。T5a-3でT4B7-GUI・GUIRUNKEY・IMECAND/IMEIND・終了中STOPを回帰 |
 | **T5b POST_ROOTのCD・FD回復** | FAT/HostDrvはcore、EARLYは作らない。T5b-4のFD回帰 → T5c-0の登録核/record容量 → T5b-5のATAPI/iso9660 | 全媒体同一像、書込み禁止FDとHDD起動、MINIMALでもCD読取/cdinst。/cd0とloop/hd上ISOの試行を登録後に実行。CD rootと不変RO SQLite接続は対象外 |
 | **T5c その他のモジュール** | KCG → FM+snd → PCM → V86 → LAN → Cirrus/WAB → manifest一覧/splash。HostDrv/np2sysp/mouseの分離段は削除。必要なbrokerは各切出し前へ | IRQ/tick/callback/DMAの停止/隔離と永久予約を維持。FD (MINIMAL含む) でlan.modを読みFDRECOV-1回帰1本。KCG復帰口・V86必須復帰口/boot原本はcoreからT7へ。GUI=0識別/予約のみ、splash回収後shellへ |
-| **T6b ローダ集積拡張・部品圧縮** | T6b-1/2: 集積0x500000〜/上限1MiB・非重複/peak。T6b-M: POST_ROOT圧縮 (不足するT5追加段の直前へ) | FD純節減と読込/展開時間・peak。途中は64MB、容量別/実機は既決の最終段/台帳へ |
+| **T6b 部品圧縮 / 集積拡張は凍結** | T6b-M: POST_ROOT圧縮 (不足するT5追加段の直前へ)。T6b-1/2は凍結。圧縮像が508KiBの8割 (約416KiB) に近づいたら起票する | FD純節減と読込/展開時間・peak。途中は64MB、容量別/実機は既決の最終段/台帳へ |
 | **[T7a 低位解放](TASK_T7_AND_FOLLOWUPS.md)** | BB (planar) を池へ、V86 の低位直接使用、フォントキャッシュ (0x1000) の撤去、`.kcgfont` の撤去 | V86 起動 (CUI)、GUI と交互 |
 | **T7b OpenType** | ストリーミング読み出し層、libos32gui + gshell のラスタライザ、私有キャッシュ、KCG ROM fallback (予備) | 1x の見た目、cold/warm の描画時間 (D15) |
 
 T3以降の実装分割・失敗処理・測定ゲートは [T3詳細](TASK_T3_LAYOUT.md)、[T4〜T6b詳細](TASK_T4_T6_MODULES.md)、[T7と後半接続](TASK_T7_AND_FOLLOWUPS.md) (設計中) を参照。上の行は範囲、各詳細票は実装契約を持つ。
 
-旧本文 (§11-2) の B1〜B7・B9 は T2/T3 で閉じ、**B8の同梱は取消、残りはT6b (508KiB)**。順序: T0 → T1 → T2 → T3 → T4 → T5-0 → T5a → T5b (T5c-0前倒し) → T5c → T6b-1/2 → T7a → T7b。FD容量不足時だけT6b-Mを該当T5段の前へ (T7a の Unicode 組表だけ T3 へ前倒し可)。V3_PLAN_DRAFT §3 の P1 (この票) → P2 (モジュール = T4〜T5c) → P4 (デバイス窓の資源割当 = T1 の台帳の上) の順と一致する。
+旧本文 (§11-2) の B1〜B7・B9 は T2/T3 で閉じ、**B8の同梱は取消、集積拡張T6b-1/2は凍結 (508KiB維持)**。順序: T0 → T1 → T2 → T3 → T4 → T5-0 → T5a → T5b (T5c-0前倒し) → T5c → T7a → T7b。FD容量不足時だけT6b-Mを該当T5段の前へ (T7a の Unicode 組表だけ T3 へ前倒し可)。V3_PLAN_DRAFT §3 の P1 (この票) → P2 (モジュール = T4〜T5c) → P4 (デバイス窓の資源割当 = T1 の台帳の上) の順と一致する。
 
 ---
 
@@ -504,7 +504,7 @@ T3以降の実装分割・失敗処理・測定ゲートは [T3詳細](TASK_T3_L
 | NP21/W 17MB | 上と同じ + 15〜16MB が池に無い + 2 枚以上の PDE を使うアプリ |
 | 実機 Ra266 64MB | 上と同じ + PCI BAR の窓が sup+PCD + PCM 再生中の操作 + D15 の判定 (数字を票へ) |
 | FD 起動 (NP21/W と実機) | 全媒体共通の像のcore FATで `/` がマウントでき、シェルまで上がる。POST_ROOTのATAPI/iso9660でCDを読め、T5c-4以後はlan.modでFDRECOV-1を回帰する。MINIMAL で `db_*` が決まった誤りを返す |
-| 全構成 | 旧形式 (load_addr 0x500000 / `--cpl0` / 旧 shell.bin / 旧 shlib / 旧 `.kcgfont`) の拒否、**旧新混在 (D35 / Codex X6、P7 と共有): 旧アプリ・旧常駐シェル・旧 shlib・新 SDK + 旧 `.o`・v2 SDK でビルドした apps/game・HostDrv と NHD の食い違い、のそれぞれが入口へ飛ぶ前に拒否される (形式版・KAPI ABI 世代・メモリ配置世代・shlib プロトコルの不一致。未知の形式版も拒否)**、DMA 64KB 境界、圧縮画像の上限 (T6b 前 508KiB / 後 1MB) と非重複検査、変異 (境界を 1 ページずらす) をリンク ASSERT と地図検査が止める |
+| 全構成 | 旧形式 (load_addr 0x500000 / `--cpl0` / 旧 shell.bin / 旧 shlib / 旧 `.kcgfont`) の拒否、**旧新混在 (D35 / Codex X6、P7 と共有): 旧アプリ・旧常駐シェル・旧 shlib・新 SDK + 旧 `.o`・v2 SDK でビルドした apps/game・HostDrv と NHD の食い違い、のそれぞれが入口へ飛ぶ前に拒否される (形式版・KAPI ABI 世代・メモリ配置世代・shlib プロトコルの不一致。未知の形式版も拒否)**、DMA 64KB 境界、圧縮画像の上限508KiB (集積拡張は凍結) と非重複検査、変異 (境界を 1 ページずらす) をリンク ASSERT と地図検査が止める |
 | 保護 | ring3_guard: アプリから (a) シェル帯、(b) 池の他 owner、(c) 自分の PT、(d) 固定 PT、(e) **VRAM (テキスト・プレーン・バンク窓・リニア窓)**、(f) 他 AS に貸したサーフェス (自分には未貸与の面) を触ると kill されて OS が生きる。(g) SHM・トランポリン・自分の lease は読めて生き残る。**通常 GUI アプリは VRAM に触れない** |
 
 ---
@@ -518,7 +518,7 @@ T3以降の実装分割・失敗処理・測定ゲートは [T3詳細](TASK_T3_L
 | P1-1 | 共有 PT のままでは 1 PD だけへの lease が作れない (`paging.c:796`) | **反映**: lease 窓 0xF0000000〜 (PDE 960〜1015、AS ごとの私有 PT) に別名写像。低位の恒等は supervisor のまま。`addrspace_map_user_page` の共有 PT 経路を撤去。検査は「その AS の lease なら可」 | §2-1、§2-2、§2-3 ⑥ |
 | P1-2 | VRAM の常時 USER 写像 (`exec.c:1932`) が全画面 lease を迂回 (planar の A8000h、PEGC のバンク窓) | **反映**: 通常 GUI アプリへの VRAM 写像を撤去。VRAM は全画面 / CUI の TVRAM / V86 の用途別 lease。受入 (e) を「VRAM に触ると kill」に反転 | §2-1、§2-2、§7 |
 | P1-3 | ルート FS モジュールの起動順が逆、T5 → T6 の順序が逆 (`kernel.c:425`) | **当時は反映、2026-10-18に取消**。EARLY/U19/代替同梱予約は作らず、root前はcore、部品はPOST_ROOT | §4-5、§6 |
-| P2-1 | ローダの 8MB 以内の証明、区間と寿命 | **更新 (2026-10-18)**: 集積0x500000〜1MiBはT6bで維持、同梱1MiBは作らない。現行の区間表は§4-5 | §4-5 |
+| P2-1 | ローダの 8MB 以内の証明、区間と寿命 | **更新 (2026-10-18)**: 集積拡張T6b-1/2は凍結し508KiBを維持、同梱1MiBは作らない。現行の区間表は§4-5 | §4-5 |
 | P2-2 | SQLite モジュールは絶対参照だけでは未完成 (`R_386_PC32` 外部、`tick_count`) | **反映**: ベース 0 で最終リンク + `--emit-relocs`、インポートスタブ、外部データ禁止 (`tick_count` → アクセサ)、未対応再配置の拒否 | §4-1、§4-2 |
 | P2-3 | FEP 未搭載時の一律エラーは英数入力を壊す (`fep.rs:326,388`) | **反映**: API 別 stub、受入に英数の入力・編集 | §5-6、§7 |
 | P2-4 | OpenType は lseek 置換だけでは動かない、キャッシュの所有者、WM の到達経路 | **反映**: ストリーミング読み出し層を実装項目に、キャッシュは v3 の最初は私有 (アプリ = shlib data、gshell = 静的リンク)、共有キャッシュは後 (U21)。最大字形 1,076B を採用しつつ「一般の保証ではない」 | §5-4 |
