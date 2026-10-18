@@ -547,6 +547,9 @@ VFS パスの NULL=cwd、`sys_redirect_fd` の NULL 拒否の戻り値、`sys_mo
 
 ### DB API (v29-v31)
 
+FEP の SQLite 予約は既定 192 KiB、settings の system scope の `fep_mem_reserve_kb` で引下げも許可し、下限未満は診断して下限に丸める (MINIMAL にせず、上限の扱いは従来どおり)。
+下限 `OS32_SQLITE_FEP_RESERVE_MIN` は T4a-4 (`tools/tests/fep_budget_host.c`、ログ `~/os32-tmp/run/t4a/fix1_budget*.log`) の実 IPADIC 最大 101,376 B・合成最大 99,328 B の大きい方を KiB に切り上げた 99 KiB とする (ユーザー決定 2026-10-18)。
+
 SQLite 部品が無いとき、`db_*` は `OS32_ERR_NOSYS` を返し、`db_last_error` は診断文字列を返す。
 
 | Offset | フィールド | プロトタイプ |

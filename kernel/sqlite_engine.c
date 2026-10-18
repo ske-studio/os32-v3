@@ -212,10 +212,10 @@ static int services_settings(int *reserve)
             "SELECT ival FROM settings WHERE scope='system' AND key='fep_mem_reserve_kb' AND type=0",
             -1, &stmt, 0) && os32_sqlite_step(stmt) == SQLITE_ROW) {
         int kb = os32_sqlite_column_int(stmt, 0);
-        if (kb < OS32_SQLITE_FEP_RESERVE / 1024) {
-            kprintf(0x07, "[services] fep_mem_reserve_kb below default: %d; using %d KiB\n",
-                    kb, OS32_SQLITE_FEP_RESERVE / 1024);
-            *reserve = OS32_SQLITE_FEP_RESERVE;
+        if (kb < OS32_SQLITE_FEP_RESERVE_MIN / 1024) {
+            kprintf(0x07, "[services] fep_mem_reserve_kb below minimum: %d; using %d KiB\n",
+                    kb, OS32_SQLITE_FEP_RESERVE_MIN / 1024);
+            *reserve = OS32_SQLITE_FEP_RESERVE_MIN;
         } else {
             /* Oversized values fail reservation without overflowing bytes. */
             *reserve = kb <= (int)(SQLITE_MODULE_POOL_SIZE / 1024) ? kb * 1024 : -1;

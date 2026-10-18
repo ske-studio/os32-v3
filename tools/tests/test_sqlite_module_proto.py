@@ -315,8 +315,10 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False):
     boot_cases = [('services-ready', 10), ('missing-sqlite', 11), ('mixed-sqlite', 12),
                   ('image-allocation', 13), ('unicode-missing', 14), ('unicode-old', 15),
                   ('unicode-io', 16), ('unicode-allocation', 17), ('partial-FEP', 18),
-                  ('settings-reserve', 19), ('settings-under-reserve', 20),
-                  ('learn-prepare-failure', 32), ('close-fault-after-ready', 33)]
+                  ('settings-reserve', 19), ('settings-lower-reserve', 20),
+                  ('learn-prepare-failure', 32), ('close-fault-after-ready', 33),
+                  ('settings-below-minimum', 34), ('settings-minimum', 35),
+                  ('settings-minimum-minus-one', 36)]
     boot_cases += [(name, 20 + fault) for fault, name in enumerate((
         'pool', 'stack', 'sqlite-init', 'settings-close', 'fep-text', 'fep-attr',
         'fep-crc', 'dictionary', 'reserve', 'fep-close', 'shutdown'), 1)]
@@ -355,7 +357,13 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False):
              '    g_ime.dict_loaded = 1;',
              '    if (!g_ime.dict.learn_stmt) return -1;\n    g_ime.dict_loaded = 1;', 32),
             ('reserve-lower-MINIMAL', path, source,
-             '*reserve = OS32_SQLITE_FEP_RESERVE;', '*reserve = -1;', 20),
+             '*reserve = OS32_SQLITE_FEP_RESERVE_MIN;', '*reserve = -1;', 34),
+            ('reserve-reject-lower', path, source,
+             function(source, 'services_settings'),
+             function(source, 'services_settings').replace('OS32_SQLITE_FEP_RESERVE_MIN',
+                                                          'OS32_SQLITE_FEP_RESERVE'), 20),
+            ('reserve-no-minimum', path, source,
+             'if (kb < OS32_SQLITE_FEP_RESERVE_MIN / 1024)', 'if (0)', 34),
             ('close-fault-after-ready', fep_path, fep_source,
              'services_stage < SERVICES_READY &&\n        ', '', 33),
             ('early-public', path, source,

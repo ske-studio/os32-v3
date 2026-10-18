@@ -267,12 +267,12 @@ int os32_sqlite_boot_check(int live, int reserve)
     }
     if (count != live) return SQLITE_BUSY;
     if (reserve) {
-        if (reserve > 0 && reserve < OS32_SQLITE_FEP_RESERVE) {
-            kprintf(0x07, "[SQT] FEP reserve below default; using %d bytes\n",
-                    OS32_SQLITE_FEP_RESERVE);
-            reserve = OS32_SQLITE_FEP_RESERVE;
+        if (reserve > 0 && reserve < OS32_SQLITE_FEP_RESERVE_MIN) {
+            kprintf(0x07, "[SQT] FEP reserve below minimum; using %d bytes\n",
+                    OS32_SQLITE_FEP_RESERVE_MIN);
+            reserve = OS32_SQLITE_FEP_RESERVE_MIN;
         }
-        if (reserve < OS32_SQLITE_FEP_RESERVE ||
+        if (reserve < OS32_SQLITE_FEP_RESERVE_MIN ||
             (unsigned)reserve > BUDGET_CAPACITY - budget->live[BUDGET_SYSTEM] ||
             budget->live[BUDGET_FEP] > (unsigned)reserve) return SQLITE_NOMEM;
         budget->reserve = reserve;

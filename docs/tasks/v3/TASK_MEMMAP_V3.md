@@ -366,8 +366,8 @@ T4で以下の量と取り分保証を接続済み。DICT_META前はsettings (`s
 | 項目 | 決定 |
 |---|---|
 | MEMSYS5 の量 | **512KB、全機種同じ** (§4-2、§4-3)。モジュール init が池から取る (R7、owner=sqlite) |
-| FEP の取り分 | 起動時SQLite → settings close → FEP、既定192KiBを優先予約。settingsで増やす向きだけ上書き可。DICT_META前は1接続、meta読取は同票の段 |
-| アプリの接続の上限 | T4の計数ラッパでAPP+SYSTEM上限319,488Bを守り、FEP取り分を侵す割当はNULL。合成S/M/L・実辞書の観測は [T4〜T6b §7-2](TASK_T4_T6_MODULES.md) |
+| FEP の取り分 | 起動時SQLite → settings close → FEP、既定192KiBを優先予約。settingsで引下げも可、下限未満は診断して丸める ([下限と根拠](../../KAPI_SPEC.md#db-api-v29-v31))。DICT_META前は1接続、meta読取は同票の段 |
+| アプリの接続の上限 | T4の計数ラッパでAPP+SYSTEM上限 (既定319,488B、予約の増減に追従) を守り、FEP取り分を侵す割当はNULL。合成S/M/L・実辞書の観測は [T4〜T6b §7-2](TASK_T4_T6_MODULES.md) |
 | 完全分離ではない | MEMSYS5 は 1 ヒープなので、**cache_size の制限は上限であって予約ではない** — アプリの接続の一時確保 (prepare・sort・一時表) で FEP の分が食われうる。SQLite はプロセスにヒープを 1 つしか持てないので FEP 専用の 2 つ目のヒープは作れない。**実装の段 (T4) で「アプリの接続が上限まで使った状態で FEP の 1 語変換が通る」を試験し**、足りなければ `sqlite3_soft_heap_limit64` か FEP 側の最小 cache の再確保で補う (§7 に受入を足した) |
 | 辞書の入れ替え | `ime_switch_dict` (S/M/L、`ime.c:882-895`) で切り替える先の `mem_reserve_kb` が起動時の確保量を超えるときは、**その場で再確保せず「再起動で再確保」** (設定に保存して再起動を促す)。超えないときはそのまま切り替える |
 | MINIMAL | SQLite を読まないので取り分も無い (D21・D26) |

@@ -13,7 +13,19 @@ SOURCE = 'tools/tests/fep_standard_host.c'
 # Only changed implementation sources need overlay copies; other includes
 # fall back to ROOT. All regressions run normally before any mutant.
 FILES = [SOURCE, 'lib/sqlite3/os32_sqlite_vfs.c', 'kernel/ime_dict.c']
+RESERVE_FLOOR = r'''        if (reserve > 0 && reserve < OS32_SQLITE_FEP_RESERVE_MIN) {
+            kprintf(0x07, "[SQT] FEP reserve below minimum; using %d bytes\n",
+                    OS32_SQLITE_FEP_RESERVE_MIN);
+            reserve = OS32_SQLITE_FEP_RESERVE_MIN;
+        }
+        if (reserve < OS32_SQLITE_FEP_RESERVE_MIN ||'''
 MUTANTS = [
+    ('reserve_reject_lower', 'reserve', 'lib/sqlite3/os32_sqlite_vfs.c',
+     RESERVE_FLOOR, RESERVE_FLOOR.replace('OS32_SQLITE_FEP_RESERVE_MIN', 'OS32_SQLITE_FEP_RESERVE'),
+     'va_arg(args, int) == OS32_SQLITE_FEP_RESERVE_MIN'),
+    ('reserve_no_minimum', 'reserve', 'lib/sqlite3/os32_sqlite_vfs.c',
+     RESERVE_FLOOR, '        if (reserve < 0 ||',
+     'budget->reserve == cases[i].adopted'),
     ('fep_uses_app_cap', 'pressure', 'lib/sqlite3/os32_sqlite_vfs.c',
      'if (budget->context == BUDGET_APP &&',
      'if ((budget->context == BUDGET_APP || budget->context == BUDGET_FEP) &&',
@@ -74,10 +86,10 @@ def main():
                       str(ROOT / 'lib/sqlite3/sqlite3.c'), '-o', str(obj)], check=True)
         normal = tmp / 'normal'
         build(ROOT, obj, normal)
-        for case in ('pressure', 'learning'):
+        for case in ('pressure', 'reserve', 'learning'):
             result = run(normal, case, args.runner)
             assert result.returncode == 0, result.returncode
-        print('GREEN FEP APP+SYSTEM=319488 conversion; ext2 RW learning; prefix cap/order; full spelling boundary',
+        print('GREEN FEP APP+SYSTEM=319488 conversion; adjustable reserve/minimum; ext2 RW learning; prefix cap/order; full spelling boundary',
               flush=True)
         if args.mutate:
             for name, case, file, old, new, marker in MUTANTS:

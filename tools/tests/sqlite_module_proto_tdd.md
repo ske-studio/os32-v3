@@ -40,14 +40,16 @@ abort・辞書 close と Unicode loader を使い、SQLite の group・MEMSYS5�
 RW の一時 RAM DB、辞書 open は RAM DB の実 stmt で代える。ディスク上の実 IME SQL は
 既存 `check-vfs-fd-path-host` / `check-fep-budget-host`、ゲスト全体は PM の確認範囲。
 
-正常対照は公開を最後まで閉じ、設定 224 KiB と既定 192 KiB、APP の割当拒否後も
+正常対照は公開を最後まで閉じ、設定 224 / 128 / 99 KiB と既定 192 KiB、64 / 98 KiB の
+99 KiB への丸めと診断、128 KiB 時の APP 上限増加、APP の割当拒否後も
 FEP stmt の実行を確認する。module 欠落/対不一致/画像・pool・stack の確保失敗/
 SQLite init/FEP の二つの buffer/部分 stmt/CRC 注入/辞書欠落/予約不足は占有 0 の MINIMAL。
 settings close・FEP close・shutdown 失敗は MINIMAL_QUARANTINED、owner/guard を保持。
 Unicode の欠落/旧形式/I/O/確保失敗でも SERVICES_READY、かなの算術変換は生存する。
 ロード済み 7 頁は全 rollback で保持する。再呼出しは副作用 0。
 
-追加変異は早期公開、隔離 owner の free、FEP close より先の module abort、Unicode の誤回収。
+追加変異は早期公開、隔離 owner の free、FEP close より先の module abort、Unicode の誤回収、
+予約の引下げ拒否・下限処理なし・下限未満で MINIMAL。
 いずれもコンパイル後の assertion failure だけを RED と数える。通常対照を先に実行する。
 `check-db-errstr-host` は内部 SQLite を ready にしたまま public を閉じ、全 DB 口の stub と
 副作用 0 を確認する。`check-x11-shared-host` は未公開 IME 管理口と CUI/GUI 生入力を確認する。
