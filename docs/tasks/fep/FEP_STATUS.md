@@ -102,7 +102,8 @@ CREATE INDEX idx_user_yomi ON dict_user(yomi);
 | 読み ≥ 3文字 | 前方一致 | `WHERE yomi >= ?1 AND yomi < ?1 \|\| X'EFBFBF'` | 長い読みは部分入力で候補を出す |
 
 - 前方一致時、完全一致には **-500 コストボーナス** を付与
-- ユーザー辞書 (`dict_user`) は `UNION ALL` で結合、コスト `(-10000 - freq)` で常に最優先
+- ユーザー辞書 (`dict_user`) はコスト `(-10000 - freq)` で最優先。同じ表記の本辞書候補を検索範囲内で除き、学習語は1回だけ出す。前方一致では入力した接頭辞が学習の読みになるため、範囲内の学習語も表記でまとめ、最大頻度の順位を使う。重複排除は既存の32件上限を適用する前に行う。
+- 品詞違いを別候補にはしない。辞書生成も `(yomi, kanji)` で集約する (`tools/fep_to_sqlite.py`)。学習表の主キーも同じで品詞列はなく、[FEP_BOUNDARY §3](../settings/FEP_BOUNDARY.md) と [KAPI の IME 契約](../../KAPI_SPEC.md) の削除も `yomi, kanji` 単位。学習候補の `pos_id=0` を保持する。
 
 ### コスト計算 (fep_to_sqlite.py)
 

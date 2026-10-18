@@ -42,23 +42,37 @@ static void ime_dict_log_probe(void)
 }
 #endif
 
-/* プリペアドステートメントのSQL */
+/* Candidate identity excludes POS: tools/fep_to_sqlite.py collapses
+ * (yomi, kanji); dict_user / learning / deletion have no POS key (see
+ * docs/tasks/settings/FEP_BOUNDARY.md §3 and the IME service contracts in
+ * docs/KAPI_SPEC.md). Keep the learned row (pos_id=0) and its frequency rank.
+ * Prefix results carry the input yomi, so learning can store a shorter reading
+ * than dict.yomi. Collapse learned spellings across the searched range and
+ * exclude matching dict spellings across that same range, before LIMIT. */
 static const char SQL_EXACT[] =
     "SELECT kanji, pos_id, cost FROM ("
     "  SELECT kanji, 0 as pos_id, (-10000 - freq) as cost FROM dict_user WHERE yomi = ?1"
     "  UNION ALL "
-    "  SELECT kanji, pos_id, cost FROM dict WHERE yomi = ?1"
+    "  SELECT kanji, pos_id, cost FROM dict d WHERE yomi = ?1"
+    "    AND NOT EXISTS (SELECT 1 FROM dict_user u"
+    "      WHERE u.yomi = ?1 AND u.kanji = d.kanji)"
     ") ORDER BY cost LIMIT 32";
 
 static const char SQL_PREFIX[] =
     "SELECT kanji, pos_id, cost FROM ("
-    "  SELECT kanji, 0 as pos_id, (-10000 - freq) as cost"
+    "  SELECT kanji, 0 as pos_id, MIN(-10000 - freq) as cost"
     "    FROM dict_user WHERE yomi >= ?1 AND yomi < ?1 || X'EFBFBF'"
+    "    GROUP BY kanji"
     "  UNION ALL "
     "  SELECT kanji, pos_id,"
     "    CASE WHEN yomi = ?1 THEN cost - 500 ELSE cost END as cost"
-    "    FROM dict WHERE yomi >= ?1 AND yomi < ?1 || X'EFBFBF'"
+    "    FROM dict d WHERE yomi >= ?1 AND yomi < ?1 || X'EFBFBF'"
+    "    AND NOT EXISTS (SELECT 1 FROM dict_user u WHERE u.kanji = d.kanji"
+    "      AND u.yomi >= ?1 AND u.yomi < ?1 || X'EFBFBF')"
     ") ORDER BY cost LIMIT 32";
+
+STATIC_ASSERT(sizeof(SQL_EXACT) <= DB_SQL_MAX_BYTES, ime_exact_sql_size);
+STATIC_ASSERT(sizeof(SQL_PREFIX) <= DB_SQL_MAX_BYTES, ime_prefix_sql_size);
 
 static const char SQL_LEARN[] =
     "INSERT INTO dict_user (yomi, kanji, freq, last_ts) "

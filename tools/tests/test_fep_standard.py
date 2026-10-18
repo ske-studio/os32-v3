@@ -17,11 +17,26 @@ MUTANTS = [
     ('fep_uses_app_cap', 'pressure', 'lib/sqlite3/os32_sqlite_vfs.c',
      'if (budget->context == BUDGET_APP &&',
      'if ((budget->context == BUDGET_APP || budget->context == BUDGET_FEP) &&',
-     'ime_dict_search(dict, "か", result, IME_MAX_RESULTS) == 1'),
+     'ime_dict_search(dict, "か", result, IME_MAX_RESULTS) == 2'),
     ('skip_learning', 'learning', 'kernel/ime_dict.c',
      'rc = sqlite3_step(stmt);\n    if (rc != SQLITE_DONE && is_ioerr(rc)',
      'rc = SQLITE_DONE;\n    if (rc != SQLITE_DONE && is_ioerr(rc)',
      'ime_user_list(dict, "か", entries, 4) == 1'),
+    ('exact_dictionary_duplicate', 'learning', 'kernel/ime_dict.c',
+     '    "    AND NOT EXISTS (SELECT 1 FROM dict_user u"\n'
+     '    "      WHERE u.yomi = ?1 AND u.kanji = d.kanji)"\n',
+     '', 'count == expected'),
+    ('prefix_dictionary_duplicate', 'learning', 'kernel/ime_dict.c',
+     '    "    AND NOT EXISTS (SELECT 1 FROM dict_user u WHERE u.kanji = d.kanji"\n'
+     '    "      AND u.yomi >= ?1 AND u.yomi < ?1 || X\'EFBFBF\')"\n',
+     '', 'count == expected'),
+    ('prefix_user_duplicate', 'learning', 'kernel/ime_dict.c',
+     '    "  SELECT kanji, 0 as pos_id, MIN(-10000 - freq) as cost"\n'
+     '    "    FROM dict_user WHERE yomi >= ?1 AND yomi < ?1 || X\'EFBFBF\'"\n'
+     '    "    GROUP BY kanji"\n',
+     '    "  SELECT kanji, 0 as pos_id, (-10000 - freq) as cost"\n'
+     '    "    FROM dict_user WHERE yomi >= ?1 AND yomi < ?1 || X\'EFBFBF\'"\n',
+     'count == expected'),
 ]
 
 

@@ -127,8 +127,17 @@ static void setup(void)
         "PRAGMA page_size=1024;"
         "CREATE TABLE dict(yomi TEXT,kanji TEXT,pos_id INT,cost INT);"
         "CREATE INDEX idx_dict_yomi ON dict(yomi);"
-        "INSERT INTO dict VALUES('か','科',1,10),('にほんご','日本語',2,20);",
+        "INSERT INTO dict VALUES('か','科',1,10),('か','蚊',3,20),"
+        "('にほんご','日本語',2,20),('にほん','日本',4,50);",
         NULL, NULL, NULL) == SQLITE_OK);
+    /* Fill a reading to the existing cap: dedup must happen before LIMIT,
+     * or a learned duplicate would displace one of these distinct words. */
+    for (int i = 0; i < IME_MAX_RESULTS; i++) {
+        char sql[128];
+        snprintf(sql, sizeof(sql),
+                 "INSERT INTO dict VALUES('げん','cap%02d',1,%d)", i, i);
+        CHECK(sqlite3_exec(db, sql, NULL, NULL, NULL) == SQLITE_OK);
+    }
     close_db(&group, db);
 }
 static void open_dict(IME_Dict *dict)
@@ -144,10 +153,10 @@ static void conversion(IME_Dict *dict)
 {
     IME_Result result[IME_MAX_RESULTS];
     os32_sqlite_allocation_context(dict->db, &dict->group);
-    CHECK(ime_dict_search(dict, "か", result, IME_MAX_RESULTS) == 1);
+    CHECK(ime_dict_search(dict, "か", result, IME_MAX_RESULTS) == 2);
     CHECK(!strcmp(result[0].kanji, "科"));
-    CHECK(ime_dict_search(dict, "にほん", result, IME_MAX_RESULTS) == 1);
-    CHECK(!strcmp(result[0].kanji, "日本語"));
+    CHECK(ime_dict_search(dict, "にほん", result, IME_MAX_RESULTS) == 2);
+    CHECK(!strcmp(result[0].kanji, "日本"));  /* exact-match bonus */
 }
 
 /* Keep app SQL allocations alive, then fill its rounded remainder exactly.
@@ -195,16 +204,41 @@ static void learned(IME_Dict *dict, int freq)
     CHECK(!strcmp(entries[0].yomi, "か") && !strcmp(entries[0].kanji, "蚊"));
     CHECK(entries[0].freq == freq);
 }
-static void learning(IME_Dict *dict)
+static void unique_candidates(IME_Dict *dict, const char *yomi,
+                              int expected, const char *first)
 {
     IME_Result results[IME_MAX_RESULTS];
+    int count = ime_dict_search(dict, yomi, results, IME_MAX_RESULTS);
+    CHECK(count == expected);
+    CHECK(!strcmp(results[0].kanji, first));
+    CHECK(results[0].pos_id == 0);  /* learned row, regardless of dictionary POS */
+    for (int i = 0; i < count; i++)
+        for (int j = 0; j < i; j++)
+            CHECK(strcmp(results[i].kanji, results[j].kanji) != 0);
+    CHECK(ime_dict_search(dict, yomi, results, 1) == 1);
+    CHECK(!strcmp(results[0].kanji, first));
+}
+static void learning(IME_Dict *dict)
+{
     OS32_Stat st;
     unsigned before = disk_writes;
     conversion(dict);
     ime_dict_learn(dict, "か", "蚊");
     learned(dict, 1);
+    unique_candidates(dict, "か", 2, "蚊");
     ime_dict_learn(dict, "か", "蚊");
     learned(dict, 2);
+    unique_candidates(dict, "か", 2, "蚊");
+    /* Search returns the input prefix as yomi, not the dictionary's full
+     * reading. Both ways of learning the same spelling must collapse. */
+    ime_dict_learn(dict, "にほん", "日本語");
+    unique_candidates(dict, "にほん", 2, "日本語");
+    ime_dict_learn(dict, "げん", "cap01");
+    unique_candidates(dict, "げん", IME_MAX_RESULTS, "cap01");
+    ime_dict_learn(dict, "にほん", "日本");
+    ime_dict_learn(dict, "にほんご", "日本語");
+    ime_dict_learn(dict, "にほんご", "日本語");
+    unique_candidates(dict, "にほん", 2, "日本語");
     CHECK(disk_writes > before);
     CHECK(ime_dict_close(dict) == 0);
     CHECK(vfs_sync() == VFS_OK);
@@ -212,10 +246,11 @@ static void learning(IME_Dict *dict)
     CHECK(vfs_mount("/", "hd0", "ext2") == VFS_OK);
     open_dict(dict);
     learned(dict, 2);
-    CHECK(ime_dict_search(dict, "か", results, IME_MAX_RESULTS) == 2);
-    CHECK(!strcmp(results[0].kanji, "蚊"));
+    unique_candidates(dict, "か", 2, "蚊");
+    unique_candidates(dict, "にほん", 2, "日本語");
     CHECK(vfs_stat("/db/fep.db-journal", &st) == VFS_ERR_NOTFOUND);
-    puts("PASS ext2 RW learning insert/update remount freq=2 ranking journal_deleted");
+    unique_candidates(dict, "げん", IME_MAX_RESULTS, "cap01");
+    puts("PASS ext2 RW learning insert/update remount freq=2 ranking journal_deleted exact/prefix unique");
 }
 int main(int argc, char **argv)
 {
