@@ -1281,6 +1281,8 @@ static void cpl3_paths(void)
 void serial_puts(const char *s) { (void)s; }
 int utf8_strlen(const u8 *s)
 { int n=0; while (*s) { if ((*s & 0xc0) != 0x80) n++; s++; } return n; }
+void *kzalloc(u32 n) { return calloc(1, n); }
+void kfree(void *p) { free(p); }
 #include "../../kernel/ime_dict.c"
 static void group_callers(void)
 {

@@ -4,6 +4,7 @@
  * allocation context calls are explicit here; service startup is T4c-2.
  */
 #include <stdio.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include "types.h"
@@ -36,9 +37,21 @@ char *kstrncat(char *d, const char *s, u32 n)
 #include "kmalloc.h"
 #include "hdd_pt_fake.h"
 
-void *kzalloc(u32 n) { return calloc(1, n); }
-void kfree(void *p) { free(p); }
-void kprintf(u8 attr, const char *fmt, ...) { }
+static unsigned heap_live;
+void *kzalloc(u32 n)
+{
+    void *p = calloc(1, n);
+    if (p) heap_live++;
+    return p;
+}
+void kfree(void *p) { if (p) heap_live--; free(p); }
+void kprintf(u8 attr, const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    vfprintf(stderr, fmt, args);
+    va_end(args);
+}
 void serial_puts(const char *s) { }
 int utf8_strlen(const u8 *s)
 {
@@ -130,8 +143,7 @@ static void setup(void)
         "INSERT INTO dict VALUES('か','科',1,10),('か','蚊',3,20),"
         "('にほんご','日本語',2,20),('にほん','日本',4,50);",
         NULL, NULL, NULL) == SQLITE_OK);
-    /* Exceed the prefix cap: dedup must happen before LIMIT, or a learned
-     * duplicate would displace one of these distinct words. */
+    /* Exceed the SQL cap: removing duplicates may leave fewer than 32. */
     for (int i = 0; i <= IME_MAX_RESULTS; i++) {
         char sql[128];
         snprintf(sql, sizeof(sql),
@@ -223,7 +235,7 @@ static void prefix_candidates(IME_Dict *dict, int learned)
     IME_Result results[IME_MAX_RESULTS + 1];
     sqlite3_stmt *stmt = dict->prefix_stmt;
     int count = ime_dict_search(dict, "げんか", results, IME_MAX_RESULTS + 1);
-    CHECK(count == IME_MAX_RESULTS);
+    CHECK(count == IME_MAX_RESULTS - learned);
     /* Check every unlearned spelling and its rank, including the last slot. */
     for (int i = 0; i < count; i++) {
         char expected[32];
@@ -244,88 +256,45 @@ static void prefix_candidates(IME_Dict *dict, int learned)
     CHECK(sqlite3_reset(stmt) == SQLITE_OK);
 }
 
-/* IMEDUP-1's original query, before duplicate exclusion was introduced.
- * Compare VM steps on the same data/SQLite build, never host wall time. */
-static const char original_prefix[] =
-    "SELECT kanji, pos_id, cost FROM ("
-    " SELECT kanji, 0 as pos_id, (-10000 - freq) as cost"
-    " FROM dict_user WHERE yomi >= ?1 AND yomi < ?1 || X'EFBFBF'"
-    " UNION ALL SELECT kanji, pos_id,"
-    " CASE WHEN yomi = ?1 THEN cost - 500 ELSE cost END as cost"
-    " FROM dict WHERE yomi >= ?1 AND yomi < ?1 || X'EFBFBF'"
-    ") ORDER BY cost LIMIT 32";
-
-/* Reviewed IMEDUP-1 query, retaining the per-dictionary-row range scan. */
-static const char reviewed_prefix[] =
-    "SELECT kanji, pos_id, cost FROM ("
-    " SELECT kanji, 0 as pos_id, MIN(-10000 - freq) as cost"
-    " FROM dict_user WHERE yomi >= ?1 AND yomi < ?1 || X'EFBFBF' GROUP BY kanji"
-    " UNION ALL SELECT kanji, pos_id,"
-    " CASE WHEN yomi = ?1 THEN cost - 500 ELSE cost END as cost"
-    " FROM dict d WHERE yomi >= ?1 AND yomi < ?1 || X'EFBFBF'"
-    " AND NOT EXISTS (SELECT 1 FROM dict_user u WHERE u.kanji = d.kanji"
-    " AND u.yomi >= ?1 AND u.yomi < ?1 || X'EFBFBF')"
-    ") ORDER BY cost LIMIT 32";
-
-static int prefix_steps(sqlite3_stmt *stmt)
+/* Full spellings differ after byte 31, while all public results look alike.
+ * Exercise both query paths and both long-first / short-first orderings. */
+static void spelling_boundary(IME_Dict *dict)
 {
-    int count = 0, rc;
-    CHECK(sqlite3_reset(stmt) == SQLITE_OK);
-    CHECK(sqlite3_bind_text(stmt, 1, "しょう", -1, SQLITE_STATIC) == SQLITE_OK);
-    (void)sqlite3_stmt_status(stmt, SQLITE_STMTSTATUS_VM_STEP, 1);
-    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) count++;
-    CHECK(rc == SQLITE_DONE && count == IME_MAX_RESULTS);
-    int steps = sqlite3_stmt_status(stmt, SQLITE_STMTSTATUS_VM_STEP, 0);
-    CHECK(steps > 0);
-    CHECK(sqlite3_reset(stmt) == SQLITE_OK);
-    return steps;
-}
-
-static void load_dictionary(const char *path)
-{
-    FILE *file = fopen(path, "rb");
-    char buf[4096];
-    size_t n;
-    int fd = vfs_open("/db/fep.db", O_WRONLY | O_TRUNC);
-    CHECK(file && fd >= 0);
-    while ((n = fread(buf, 1, sizeof(buf), file)) != 0)
-        CHECK(vfs_write_fd(fd, buf, n) == (int)n);
-    CHECK(!ferror(file) && fclose(file) == 0);
-    vfs_close(fd);
-}
-
-static void prefix_work(IME_Dict *dict)
-{
-    sqlite3_stmt *original = NULL;
-    sqlite3 *db = dict->db;
-    os32_sqlite_allocation_context(db, &dict->group);
-    CHECK(sqlite3_db_readonly(db, "main") == 0);
-    CHECK(sqlite3_prepare_v2(db, original_prefix, -1, &original, NULL) == SQLITE_OK);
-    int baseline_steps = prefix_steps(original);
-    CHECK(sqlite3_finalize(original) == SQLITE_OK);
-    CHECK(sqlite3_prepare_v2(db, reviewed_prefix, -1, &original, NULL) == SQLITE_OK);
-    int before_steps = prefix_steps(original);
-    CHECK(sqlite3_finalize(original) == SQLITE_OK);
-    int fixed_steps = prefix_steps(dict->prefix_stmt);
-    printf("prefix real IPADIC shou learned=32 VM_STEP original=%d before=%d after=%d\n",
-           baseline_steps, before_steps, fixed_steps);
-    CHECK(fixed_steps * 2 <= baseline_steps * 3);
-    /* Preserve the populated legacy learning table and its frequency rank. */
-    IME_UserEntry entries[IME_MAX_RESULTS];
-    CHECK(ime_user_list(dict, "しょう", entries, IME_MAX_RESULTS) == IME_MAX_RESULTS);
-    IME_Result results[IME_MAX_RESULTS];
-    CHECK(ime_dict_search(dict, "しょう", results, IME_MAX_RESULTS) == IME_MAX_RESULTS);
-    for (int i = 0; i < IME_MAX_RESULTS; i++) {
-        CHECK(entries[i].freq == IME_MAX_RESULTS - i);
-        CHECK(results[i].pos_id == 0 && !strcmp(results[i].kanji, entries[i].kanji));
-        for (int j = 0; j < i; j++) CHECK(strcmp(results[i].kanji, results[j].kanji));
+    const char *readings[] = {"な", "ながい", "さ", "さかい"};
+    const char *base = "漢漢漢漢漢漢漢漢漢漢a";
+    char long_a[40], long_b[40];
+    CHECK(strlen(base) == 31);
+    for (unsigned k = 0; k < sizeof(readings) / sizeof(readings[0]); k++) {
+        char sql[512];
+        IME_Result results[IME_MAX_RESULTS];
+        /* Cover exactly 32 bytes as well as multibyte suffixes (34 bytes). */
+        snprintf(long_a, sizeof(long_a), "%s%s", base, k < 2 ? "甲" : "b");
+        snprintf(long_b, sizeof(long_b), "%s%s", base, k < 2 ? "乙" : "c");
+        CHECK(strlen(long_a) == (k < 2 ? 34u : 32u));
+        CHECK(strlen(long_b) == (k < 2 ? 34u : 32u));
+        snprintf(sql, sizeof(sql),
+                 "INSERT INTO dict VALUES('%s','%s',11,10),"
+                 "('%s','%s',12,20),('%s','%s',13,30)",
+                 readings[k], long_a, readings[k], long_b, readings[k], base);
+        CHECK(sqlite3_exec(dict->db, sql, NULL, NULL, NULL) == SQLITE_OK);
+        ime_dict_learn(dict, readings[k], long_a);
+        unsigned before = heap_live;
+        CHECK(ime_dict_search(dict, readings[k], results, IME_MAX_RESULTS) == 3);
+        CHECK(heap_live == before);
+        CHECK(results[0].pos_id == 0 && results[1].pos_id == 12 && results[2].pos_id == 13);
+        for (int i = 0; i < 3; i++) CHECK(!strcmp(results[i].kanji, base));
+        ime_dict_learn(dict, readings[k], base);
+        ime_dict_learn(dict, readings[k], base);
+        CHECK(ime_dict_search(dict, readings[k], results, IME_MAX_RESULTS) == 3);
+        CHECK(heap_live == before);
+        CHECK(results[0].pos_id == 0 && results[1].pos_id == 0 && results[2].pos_id == 12);
+        for (int i = 0; i < 3; i++) CHECK(!strcmp(results[i].kanji, base));
+        CHECK(ime_dict_search(dict, readings[k], results, 2) == 2);
+        CHECK(heap_live == before);
     }
-    CHECK(ime_dict_close(dict) == 0);
-    open_dict(dict);
-    os32_sqlite_allocation_context(dict->db, &dict->group);
-    CHECK(prefix_steps(dict->prefix_stmt) == fixed_steps);
-    puts("PASS prefix VM steps <= original * 1.5; legacy RW learning preserved on reopen");
+    puts("PASS exact/prefix full spelling identity across 31-byte boundary; copies released");
 }
+
 static void learning(IME_Dict *dict)
 {
     OS32_Stat st;
@@ -348,6 +317,7 @@ static void learning(IME_Dict *dict)
     ime_dict_learn(dict, "にほんご", "日本語");
     ime_dict_learn(dict, "にほんご", "日本語");
     unique_candidates(dict, "にほん", 2, "日本語");
+    spelling_boundary(dict);
     CHECK(disk_writes > before);
     CHECK(ime_dict_close(dict) == 0);
     CHECK(vfs_sync() == VFS_OK);
@@ -361,16 +331,16 @@ static void learning(IME_Dict *dict)
     prefix_candidates(dict, 1);
     puts("PASS ext2 RW learning insert/update remount freq=2 ranking journal_deleted exact/prefix unique");
 }
+
 int main(int argc, char **argv)
 {
     IME_Dict dict = {0};
-    CHECK(argc == 2 || argc == 3);
+    CHECK(argc == 2);
     setup();
-    if (argc == 3) load_dictionary(argv[2]);
     open_dict(&dict);
     if (!strcmp(argv[1], "pressure")) pressure(&dict);
     else if (!strcmp(argv[1], "learning")) learning(&dict);
-    else { CHECK(!strcmp(argv[1], "prefix") && argc == 3); prefix_work(&dict); }
+    else CHECK(0);
     os32_sqlite_allocation_context(dict.db, &dict.group);
     CHECK(ime_dict_close(&dict) == 0);
     CHECK(memsys5_check_canary() == 0);

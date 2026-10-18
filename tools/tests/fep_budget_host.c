@@ -132,6 +132,15 @@ static void word(IME_Dict *dict, int variant)
     for (int k = 0; k < 2; k++) {
         n = ime_dict_search(dict, keys[variant][k], results, IME_MAX_RESULTS);
         CHECK(n > 0);
+        if (k == 1) {
+            /* All 8192 distinct learned spellings outrank dictionary rows. */
+            CHECK(n == IME_MAX_RESULTS);
+            for (int i = 0; i < n; i++) {
+                CHECK(results[i].pos_id == 0);
+                for (int j = 0; j < i; j++)
+                    CHECK(strcmp(results[i].kanji, results[j].kanji) != 0);
+            }
+        }
     }
     /* Max legal byte-length pair, new row then update, with a large learning
      * B-tree already present. Verify persisted freq, not the void API result. */

@@ -18,6 +18,7 @@
 #include "kprintf.h"
 #include "serial.h"
 #include "kstring.h"
+#include "kmalloc.h"
 #include "os32_kapi_shared.h"
 #include "os32_sqlite_vfs.h"
 
@@ -42,42 +43,23 @@ static void ime_dict_log_probe(void)
 }
 #endif
 
-/* Candidate identity excludes POS: tools/fep_to_sqlite.py collapses
- * (yomi, kanji); dict_user / learning / deletion have no POS key (see
- * docs/tasks/settings/FEP_BOUNDARY.md §3 and the IME service contracts in
- * docs/KAPI_SPEC.md). Keep the learned row (pos_id=0) and its frequency rank.
- * Prefix results carry the input yomi, so learning can store a shorter reading
- * than dict.yomi. Collapse learned spellings across the searched range and
- * exclude matching dict spellings across that same range, before LIMIT. */
+/* プリペアドステートメントのSQL */
 static const char SQL_EXACT[] =
     "SELECT kanji, pos_id, cost FROM ("
     "  SELECT kanji, 0 as pos_id, (-10000 - freq) as cost FROM dict_user WHERE yomi = ?1"
     "  UNION ALL "
-    "  SELECT kanji, pos_id, cost FROM dict d WHERE yomi = ?1"
-    "    AND NOT EXISTS (SELECT 1 FROM dict_user u"
-    "      WHERE u.yomi = ?1 AND u.kanji = d.kanji)"
+    "  SELECT kanji, pos_id, cost FROM dict WHERE yomi = ?1"
     ") ORDER BY cost LIMIT 32";
 
 static const char SQL_PREFIX[] =
     "SELECT kanji, pos_id, cost FROM ("
-    "  SELECT kanji, 0 as pos_id, MIN(-10000 - freq) as cost"
+    "  SELECT kanji, 0 as pos_id, (-10000 - freq) as cost"
     "    FROM dict_user WHERE yomi >= ?1 AND yomi < ?1 || X'EFBFBF'"
-    "    GROUP BY kanji"
     "  UNION ALL "
     "  SELECT kanji, pos_id,"
     "    CASE WHEN yomi = ?1 THEN cost - 500 ELSE cost END as cost"
-    "    FROM dict d WHERE yomi >= ?1 AND yomi < ?1 || X'EFBFBF'"
-    /* Build the learned spelling set once, rather than scanning the reading
-     * range for every dictionary row. IS NOT TRUE also accepts NULL, matching
-     * NOT EXISTS semantics without IN's per-row NULL-resolution scan.
-     * Ordering this small set avoids the bundled SQLite's extra Bloom-filter
-     * probe per dictionary row (covered by the real-dictionary VM-step test). */
-    "    AND (d.kanji IN (SELECT kanji FROM dict_user"
-    "      WHERE yomi >= ?1 AND yomi < ?1 || X'EFBFBF' ORDER BY kanji)) IS NOT TRUE"
+    "    FROM dict WHERE yomi >= ?1 AND yomi < ?1 || X'EFBFBF'"
     ") ORDER BY cost LIMIT 32";
-
-STATIC_ASSERT(sizeof(SQL_EXACT) <= DB_SQL_MAX_BYTES, ime_exact_sql_size);
-STATIC_ASSERT(sizeof(SQL_PREFIX) <= DB_SQL_MAX_BYTES, ime_prefix_sql_size);
 
 static const char SQL_LEARN[] =
     "INSERT INTO dict_user (yomi, kanji, freq, last_ts) "
@@ -282,6 +264,7 @@ static int ime_dict_search_once(IME_Dict *dict, const char *yomi,
     int count;
     int yomi_len;
     const char *kanji_text;
+    char *full_kanji[IME_MAX_RESULTS] = {0};
     int copy_len;
 
     *io_error = 0;
@@ -319,7 +302,24 @@ static int ime_dict_search_once(IME_Dict *dict, const char *yomi,
         /* 漢字 (カラム0) */
         kanji_text = (const char *)sqlite3_column_text(stmt, 0);
         if (!kanji_text) continue;
+        /* Compare full SQL spellings before the public 31-byte truncation.
+         * Short words already fit in results; retain only longer originals.
+         * The cost-ordered SQL puts learned words first. Do not refill LIMIT. */
+        int i;
+        for (i = 0; i < count; i++) {
+            const char *seen = full_kanji[i] ? full_kanji[i] : results[i].kanji;
+            if (kstrcmp(seen, kanji_text) == 0) break;
+        }
+        if (i < count) continue;
         copy_len = (int)kstrlen(kanji_text);
+        if (copy_len >= (int)sizeof(r->kanji)) {
+            full_kanji[count] = kzalloc(copy_len + 1);
+            if (!full_kanji[count]) {
+                step_rc = SQLITE_NOMEM;
+                break;
+            }
+            kmemcpy(full_kanji[count], kanji_text, copy_len + 1);
+        }
         if (copy_len > 31) copy_len = 31;
         kmemcpy(r->kanji, kanji_text, copy_len);
         r->kanji[copy_len] = '\0';
@@ -356,6 +356,8 @@ static int ime_dict_search_once(IME_Dict *dict, const char *yomi,
         }
     }
 
+    for (int i = 0; i < count; i++)
+        if (full_kanji[i]) kfree(full_kanji[i]);
     return count;
 }
 

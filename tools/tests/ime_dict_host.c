@@ -31,6 +31,8 @@ int kstrcmp(const char *a, const char *b) { return strcmp(a, b); }
 int kstrncmp(const char *a, const char *b, u32 n) { return strncmp(a, b, n); }
 void *kmemcpy(void *dst, const void *src, u32 n) { return memcpy(dst, src, n); }
 void *kmemset(void *dst, int val, u32 n) { return memset(dst, val, n); }
+void *kzalloc(u32 n) { return calloc(1, n); }
+void kfree(void *p) { free(p); }
 
 #include "../../lib/sqlite3/sqlite3.h"
 #include "../../lib/sqlite3/os32_sqlite_vfs.c"
