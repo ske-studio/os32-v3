@@ -131,10 +131,6 @@ static void word(IME_Dict *dict, int variant)
     /* Max fanout exact (<=2 chars) and prefix (3 chars) selected by builder. */
     for (int k = 0; k < 2; k++) {
         n = ime_dict_search(dict, keys[variant][k], results, IME_MAX_RESULTS);
-        if (n == 0)
-            fprintf(stderr, "SEARCH variant=%s key=%s err=%d %s peak=%u request=%u physical_fail=%u\n",
-                    labels[variant], keys[variant][k], sqlite3_errcode(dict->db),
-                    sqlite3_errmsg(dict->db), state.fep_peak, state.max_request, state.physical_fail);
         CHECK(n > 0);
         if (k == 1) {
             /* All 8192 distinct learned spellings outrank dictionary rows. */
