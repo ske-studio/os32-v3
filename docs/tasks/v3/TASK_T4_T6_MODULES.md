@@ -1,6 +1,6 @@
 # TASK_T4_T6_MODULES — SQLite・FEP・起動モジュールの詳細設計
 
-> 状態: **実装中 (2026-10-18)** — T4 受入完了。**T5-0a 受入** (1514b83、`~/os32-tmp/evidence/2026-10-18/t5-0a_np21w/RESULT.md`): 基準 = 像 253,256 B・sqlite.mod 398,424 B・常駐の終わり 0x19d000・stack_guard 0x300000・SERVICES_READY、FD 空き 2HD 155,648 B / 1.44MB 372,736 B。db fixture は 132 秒 (stop は leave 後に 1 回)。high-water は全負荷で 4,668 B。IMEDUP-1 は CUI/GUI で重複なし・学習語が先頭。**T5-0b 着地** (受入待ち): #DF を専用 TSS の task gate で受け 1 行の診断を出して止める、engine stack は 32KiB (深さ 100 の host 実測 24,388 B が収まるので SQLITE_MAX_EXPR_DEPTH=100 のまま — ユーザー決定 2026-10-18)。
+> 状態: **実装中 (2026-10-18)** — T4 受入完了。**T5-0a 受入** (1514b83、`~/os32-tmp/evidence/2026-10-18/t5-0a_np21w/RESULT.md`): 基準 = 像 253,256 B・sqlite.mod 398,424 B・常駐の終わり 0x19d000・stack_guard 0x300000・SERVICES_READY、FD 空き 2HD 155,648 B / 1.44MB 372,736 B。db fixture は 132 秒 (stop は leave 後に 1 回)。high-water は全負荷で 4,668 B。IMEDUP-1 は CUI/GUI で重複なし・学習語が先頭。**T5-0b 受入** (dcfe5b1、`~/os32-tmp/evidence/2026-10-18/t5-0b_np21w/RESULT.md`): #DF を専用 TSS の task gate で受け、kernel/engine のガード注入とも `DOUBLE FAULT: prev EIP/ESP/CR2/CR3 kernel|engine` の 1 行を画面とシリアルに出して hlt で停止 (リセットなし・回収なし)。engine stack 32KiB で同じ全負荷の high-water 4,668 B (残り 28,100 B)、通常の例外・V86 (`v86 -t`)・db の回帰と FEP 予約の上書き (128・64→99KiB・既定) も合格。実機は T4T7-RH。次は T5a-1。
 >
 > **T5 着手前の再照合 r5 (2026-10-18)** — EARLY は作らず FAT/HostDrv は core、CD は POST_ROOT、不変 CD の RO SQLite は凍結。T5 の段・受入・予算を更新 (決定は §9)。
 > それまでの状態: **設計中 (2026-10-18、再照合 r4)** — main `952f16b`、T3受入完了 (2026-10-18)、KAPI v76・memory_layout 4。圧縮余裕18,165 B。本票の実装・受入は未実施。
