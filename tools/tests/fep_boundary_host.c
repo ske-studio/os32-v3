@@ -1,6 +1,6 @@
 /* B2: production facade + dictionary + product SQLite/VFS/FD fixture.
  * B1 mapping/IF walks have their own real-PD tests. Here copy/CPU boundaries
- * model an inaccessible byte, a stale output at copyout and IF explicitly;
+ * model an inaccessible/read-only byte, a stale output at copyout and IF explicitly;
  * SQL wrappers model the existing outer run/leave and inject ordinary errors.
  * This does not model #PF/IDT/IRQ hardware. */
 #include <stdio.h>
@@ -17,6 +17,8 @@ static int fail_after, steps;
 static int origin, identity = 1;
 static const char *bad_byte, *caller_y, *caller_k;
 static IME_UserEntry *watched;
+static void *kill_escape[5];
+static int expect_kill;
 static struct { sqlite3_stmt *stmt; const char *borrow[2]; } bindings[16];
 static void require(int ok, const char *msg);
 static int binding_slot(sqlite3_stmt *s)
@@ -28,6 +30,12 @@ static int binding_slot(sqlite3_stmt *s)
 static unsigned char before[64 * sizeof(IME_UserEntry)];
 static void require(int ok, const char *msg)
 { if (!ok) { fprintf(stderr, "FAIL B2 %s\n", msg); exit(1); } }
+/* Model the nonlocal kill before SQL/staging acquisition, not #PF hardware. */
+void ring3_fault_kill(void)
+{
+    require(expect_kill, "unexpected output fault kill");
+    __builtin_longjmp(kill_escape, 1);
+}
 static void enter(void)
 {
     require(!engine && _irq_enabled(), "engine IF/reentry");
@@ -142,6 +150,19 @@ static void watch(void)
 }
 static void untouched(int rc)
 { require(rc < 0 && entries == 0 && writes == 0 && !memcmp(out, before, sizeof(out)), "invalid input engine0/output unchanged"); }
+static void bad_output(int max)
+{
+    expect_kill = 1;
+    int enabled = _irq_enabled();
+    if (!__builtin_setjmp(kill_escape)) {
+        (void)ime_user_list_facade(NULL, out, max);
+        require(0, "invalid output must kill");
+    }
+    expect_kill = 0;
+    require(_irq_enabled() == enabled && !engine && !entries && !copies && !writes &&
+            !ime_user_staging_busy && !memcmp(out, before, sizeof(out)),
+            "output fault before engine/staging/copy");
+}
 static void no_borrow(sqlite3_stmt *s)
 {
     require(!sqlite3_stmt_busy(s), "reset before input lifetime ends");
@@ -171,7 +192,12 @@ static void inputs(void)
     require(ime_user_list_facade(key, out, 1) == 0, "page end NUL accepted");
     bad_byte = NULL;
     watch(); bad_byte = (const char *)out + sizeof(out) - 1;
-    untouched(ime_user_list_facade(NULL, out, 64)); bad_byte = NULL;
+    bad_output(64);
+    /* A read-only USER output with max=1 used to escape as an ordinary -1. */
+    bad_byte = (const char *)out;
+    bad_output(1); bad_byte = NULL;
+    require(ime_user_list_facade(NULL, out, 1) == 0, "output fault leaves staging reusable");
+    watch();
     _disable(); untouched(ime_user_list_facade(NULL, out, 1));
     untouched(ime_user_delete_facade("か", NULL));
     untouched(ime_user_export_facade("/db/out.csv"));

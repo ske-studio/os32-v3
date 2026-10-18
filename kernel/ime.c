@@ -1019,8 +1019,11 @@ int ime_user_list_facade(const char *yomi_prefix, void *out, int max)
         if (!copy_caller_cstr(&caller, yomi_prefix, prefix, sizeof(prefix))) return -1;
         yomi_prefix = prefix;
     }
-    if (!check_caller_write_range(&caller, out, (u32)max * sizeof(IME_UserEntry)) ||
-        !sqlite_engine_available(1)) return -1;
+    if (!check_caller_write_range(&caller, out, (u32)max * sizeof(IME_UserEntry))) {
+        ring3_fault_kill();
+        return -1;
+    }
+    if (!sqlite_engine_available(1)) return -1;
     u32 flags = irq_save();
     if (ime_user_staging_busy) { irq_restore(flags); return -1; }
     ime_user_staging_busy = 1;

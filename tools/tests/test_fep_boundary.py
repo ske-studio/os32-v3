@@ -9,6 +9,10 @@ import host32
 
 ROOT = Path(__file__).resolve().parents[2]
 MUTANTS = [
+    ('invalid-output-returns-error', 'kernel/ime.c',
+     '        ring3_fault_kill();\n        return -1;',
+     '        return -1;',
+     'invalid output must kill'),
     ('failed-kanji-null', 'kernel/ime.c',
      'if (!copy_caller_cstr(&caller, kanji, k, sizeof(k))) return -1;\n        kanji = k;',
      'if (!copy_caller_cstr(&caller, kanji, k, sizeof(k))) kanji = NULL;\n        else kanji = k;',

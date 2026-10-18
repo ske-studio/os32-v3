@@ -419,6 +419,24 @@ int IME_DICT_HOST_MAIN(int argc, char **argv)
         puts("PASS io_quarantine: close BUSY retains group and FD");
         return 0;
     }
+    /* Leave a real evaluation error on an owned stmt without resetting it.
+     * Search/learn reset to end their SQLITE_STATIC borrowing, so their I/O
+     * failures no longer exercise finalize's evaluation-error return. */
+    fd = dict_fd(&d);
+    CHECK(fd >= 3);
+    CHECK(sqlite3_bind_text(d.exact_stmt, 1, "か", -1, SQLITE_STATIC) == SQLITE_OK);
+    fail_from = 1024;
+    fail_reads = 1;
+    CHECK((sqlite3_step(d.exact_stmt) & 0xff) == SQLITE_IOERR);
+    CHECK(fail_reads == 0);
+    fail_from = 0;
+    CHECK(ime_dict_close(&d) == 0);
+    CHECK(!d.isolated && !d.db && !d.group.generation);
+    CHECK(!d.exact_stmt && !d.prefix_stmt && !d.learn_stmt);
+    CHECK(!open_files[fd].in_use);
+    CHECK(strstr(last_kprintf, "finalize evaluation") != NULL);
+    CHECK(ime_dict_open(&d, "/db/fep.db") == 0);
+    puts("PASS finalize_evaluation_error: unreset failed stmt closes without isolation");
     CHECK(!strcmp(first_kanji(&d, &n), "蚊") && n == 1);
     fd = dict_fd(&d);
     CHECK(fd >= 3);

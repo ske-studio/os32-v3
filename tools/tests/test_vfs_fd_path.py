@@ -297,8 +297,20 @@ IME_MUTANTS = [
     ("旧接続に SQL を流す前に失効を見ない",
      "    if (fd >= 0 && vfs_fd_is_stale(fd)) (void)dict_recover(dict);",
      "    if (fd >= 0 && 0) (void)dict_recover(dict);"),
+    # finalize also reports the step error: drop both observations to model
+    # mistaking an evaluation failure for EOF, while retaining real cleanup.
     ("export が step の異常終了を EOF にする",
-     "    if (result == 0 && step_rc != SQLITE_DONE) {", "    if (0) {"),
+     '    if (result == 0 && step_rc != SQLITE_DONE) {\n'
+     '        *io_error = is_ioerr(step_rc);\n'
+     '        kprintf(ATTR_RED, "IME: export step failed (rc=%d)\\r\\n", step_rc);\n'
+     '        result = -4;\n'
+     '    }\n\n'
+     '    int final_rc = sqlite3_finalize(stmt);\n'
+     '    if (!result && final_rc != SQLITE_OK) {\n'
+     '        *io_error = is_ioerr(final_rc);\n'
+     '        result = -4;\n'
+     '    }',
+     '    sqlite3_finalize(stmt);'),
     ("clear が旧接続で先に SQL を流す",
      "    if (!dict_ready(dict)) return -1;\n    rc = sqlite3_exec",
      "    if (!dict->db) return -1;\n    rc = sqlite3_exec"),
