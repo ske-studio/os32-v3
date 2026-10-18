@@ -2504,6 +2504,8 @@ i32 exec_resume(i32 app_id, i32 wait_ret)
     } else if (src == APP_RESUME_SRC_KBD) {
         /* 票 §5 の指摘 B: 文字の取り出しはここで完結する (WM 側に取り出し用
          * の KAPI は作らない)。WM が渡した wait_ret は**使わない**。
+         * 端末由来も読み手とslot/launchの子孫だけが取得できる (GUIRUNKEY-1)。
+         * WMのpendingはヒントなので、別のRunのWAIT_KEYに端末入力を渡さない。
          * 空なら起こさず OS32_ERR_AGAIN — 印も状態も残るので、WM は次の周で
          * もう一度試せばよい (その周は譲る = streak に数えない)。 */
         ch = 0;

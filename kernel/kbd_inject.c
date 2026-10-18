@@ -88,8 +88,7 @@ static void inj_readable(int id, u8 allowed[APP_SLOT_COUNT])
 {
     int n, parent;
     for (n = 0; n < APP_SLOT_COUNT; n++) allowed[n] = 0;
-    allowed[0] = 1;                 /* legacy terminal stream */
-    if (id < APP_ID_MIN || id > APP_ID_MAX) return;
+    if (id < APP_ID_SHELL || id > APP_ID_MAX) return;
     allowed[id] = 1;
     for (n = 0; n < APP_MAX_APPS; n++) {
         for (parent = APP_ID_MIN; parent <= APP_ID_MAX; parent++) {
@@ -101,6 +100,11 @@ static void inj_readable(int id, u8 allowed[APP_SLOT_COUNT])
                 slot->parent <= APP_ID_MAX) allowed[slot->parent] = 1;
         }
     }
+    /* dest=0 belongs to the console reader and its synchronous/launch children.
+     * A different Run application must not consume terminal typeahead. */
+    int reader = con_sink_reader_get();
+    if (reader >= APP_ID_SHELL && reader <= APP_ID_MAX && allowed[reader])
+        allowed[0] = 1;
 }
 
 /* Remove a single entry, preserving FIFO order of every other destination.
@@ -223,7 +227,11 @@ u32 kbd_inject_pending(void)
         kbd_inject_unlock(f);
         return 0;
     }
-    inj_readable(inj_current_reader(), allowed);
+    int id = inj_current_reader();
+    inj_readable(id, allowed);
+    /* WM uses this count only as a scheduling hint. It cannot take/peek the
+     * terminal stream; exec_resume checks the actual destination again. */
+    if (id == APP_ID_SHELL) allowed[0] = 1;
     for (i = 0; i < g_inj_count; i++) {
         if (allowed[g_inj_dest[pos]]) n++;
         pos = (pos + 1) % KBD_INJECT_RING_SIZE;
@@ -330,7 +338,7 @@ u32 kbd_inject_selftest(void)
     if (kbd_inject_pending() != 0)                             bad |= 1u << 0;
 
     /* (1) 積んだ順に 1 バイトずつ出る (UTF-8 の並びは変えない) */
-    if (inj_push(utf8_a, 3, 0) != 3)    bad |= 1u << 1;
+    if (inj_push(utf8_a, 3, appslot_cur()) != 3)    bad |= 1u << 1;
     if (kbd_inject_pending() != 3)    bad |= 1u << 1;
     for (i = 0; i < 3; i++) {
         b = 0;
@@ -350,11 +358,11 @@ u32 kbd_inject_selftest(void)
         /* 受け皿の静的配列は置かない (256B に収めた意味が消える) */
         for (i = 0; i < (u32)KBD_INJECT_RING_SIZE; i++) {
             one = (u8)(i & 0xFF);
-            pushed += inj_push(&one, 1, 0);
+            pushed += inj_push(&one, 1, appslot_cur());
         }
         if (pushed != (u32)KBD_INJECT_RING_SIZE) bad |= 1u << 3;
         one = 'Z';
-        if (inj_push(&one, 1, 0) != 0) bad |= 1u << 3;
+        if (inj_push(&one, 1, appslot_cur()) != 0) bad |= 1u << 3;
         if (kbd_inject_pending() != (u32)KBD_INJECT_RING_SIZE) bad |= 1u << 3;
         b = 0xFF;
         if (!kbd_inject_take(&b) || b != 0) bad |= 1u << 3;   /* 最初の 1 本 */
@@ -363,7 +371,7 @@ u32 kbd_inject_selftest(void)
     /* (4) 破棄で空になり、環の巻き戻しも起きない */
     kbd_inject_discard();
     if (kbd_inject_pending() != 0) bad |= 1u << 4;
-    if (inj_push((const u8 *)"xy", 2, 0) != 2) bad |= 1u << 4;
+    if (inj_push((const u8 *)"xy", 2, appslot_cur()) != 2) bad |= 1u << 4;
     b = 0;
     if (!kbd_inject_take(&b) || b != 'x') bad |= 1u << 4;
     b = 0;
@@ -373,7 +381,7 @@ u32 kbd_inject_selftest(void)
     kbd_inject_discard();
     b = 0x5A;
     if (kbd_inject_peek(&b) != 0 || b != 0x5A) bad |= 1u << 5;   /* 空は 0 */
-    if (inj_push((const u8 *)"pq", 2, 0) != 2) bad |= 1u << 5;
+    if (inj_push((const u8 *)"pq", 2, appslot_cur()) != 2) bad |= 1u << 5;
     b = 0;
     if (!kbd_inject_peek(&b) || b != 'p') bad |= 1u << 5;
     b = 0;

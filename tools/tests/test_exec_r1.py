@@ -421,12 +421,19 @@ static int test(void) {
         }
         else CHECK(!caller_access_get_user(&out)); /* park returned to shell */
     }
-    setup(1, EXEC_KIND_ABORTED);
-    cur = owner = cr3 = 1; g_cur_app = 0; host_wm_kill = 1;
-    slots[2].state = APP_STATE_PARKED;
-    exec_kill_one(2);
-    CHECK(cleanup == 7 && teardown == 1 && notices == 1 && !transfers);
-    CHECK(cur == 1 && owner == 1 && cr3 == 1 && ring3_transition_count == 1);
+    /* GUIRUNKEY-1: WM's disconnected WAIT_KEY rejection uses this same real
+     * kill/reclaim path. Resources are recorded substitutes; the production
+     * reclaim order, notification and slot release execute unmodified. */
+    for (int state = APP_STATE_PARKED; state <= APP_STATE_WAIT_KEY; state++) {
+        setup(1, EXEC_KIND_ABORTED);
+        cur = owner = cr3 = 1; g_cur_app = 0; host_wm_kill = 1;
+        ring3_transition_count = 0;
+        slots[2].state = state;
+        exec_kill_one(2);
+        CHECK(cleanup == 7 && teardown == 1 && notices == 1 && !transfers);
+        CHECK(slots[2].state == APP_STATE_FREE && slots[3].state == APP_STATE_RUNNING);
+        CHECK(cur == 1 && owner == 1 && cr3 == 1 && ring3_transition_count == 1);
+    }
     return 0;
 }
 void _start(void) {

@@ -55,6 +55,10 @@ if __name__ == "__main__":
                        cwd=ROOT, check=True)
         if args.mutate:
             for old, new, expected in [
+                ('    int reader = con_sink_reader_get();\n'
+                 '    if (reader >= APP_ID_SHELL && reader <= APP_ID_MAX && allowed[reader])\n'
+                 '        allowed[0] = 1;',
+                 '    allowed[0] = 1;', 'FAIL GUIRUNKEY unrelated cannot steal Q'),
                 ('return ring3_wm_depth > 0 ? APP_ID_SHELL : appslot_cur();', 'return appslot_cur();',
                  'FAIL WM pump cannot borrow fullscreen reader identity'),
                 ('if (appslot_gfx_owner() >= APP_ID_MIN) bad |= 1u << 0;', '',

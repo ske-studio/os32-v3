@@ -95,6 +95,7 @@ static void reset_all(void)
 static int become_reader(int owner)
 {
     res_owner_set(owner);
+    host_cur = owner;
     return con_sink_read(sink_buf, (u32)CON_SINK_REC_MAX) >= 0;
 }
 
@@ -134,6 +135,7 @@ static void case_permission(void)
     check(take_one() == 'P', "pump delivery");
     ring3_wm_depth = 0; host_cur = APP_ID_SHELL;
     con_sink_enable(); check(become_reader(2), "terminal reader");
+    host_cur = APP_ID_SHELL; /* WM exception checks below, not terminal execution. */
     host_slots[3].parent = 4; host_slots[4].parent = 2; host_slots[2].parent = APP_ID_SHELL;
     res_owner_set(0);
     check(kbd_inject((const u8 *)"X", 1) == OS32_ERR_EXIST, "terminal descendant no duplicate");
@@ -236,8 +238,8 @@ static void case_pending(void)
     take_one();
     check(kbd_inject_pending() == 2, "3c 取り出しで減る");
 
-    res_owner_set(9);       /* 読み手でも WM でもない他人 */
-    check(kbd_inject_pending() == 2, "3d 誰でも覗ける (WM が見る)");
+    res_owner_set(9); host_cur = APP_ID_SHELL;
+    check(kbd_inject_pending() == 2, "3d WM sees terminal scheduling hint");
     check(kbd_inject((const u8 *)"x", 1) == (i32)OS32_ERR_EXIST,
           "3e 覗けても注げはしない");
 }
@@ -434,10 +436,43 @@ static void case_fullscreen_destination(void)
     reset_all();
 }
 
+/* GUIRUNKEY-1: observed owner2 terminal -> child4, unrelated Run owner3.
+ * The real console reader and injection ring run here; slot/launch identities
+ * are the observed fixture, not a simulation of WM execution order or IRQs. */
+static void case_guirunkey(void)
+{
+    u8 b = 0x5a;
+    reset_all();
+    con_sink_enable();
+    check(become_reader(2), "GUIRUNKEY terminal owner2");
+    host_children[2] = 4;
+    check(kbd_inject((const u8 *)"Q", 1) == 1, "GUIRUNKEY terminal inject Q");
+    host_cur = 3;
+    check(kbd_inject_pending() == 0, "GUIRUNKEY unrelated pending empty");
+    check(!kbd_inject_peek(&b) && b == 0x5a, "GUIRUNKEY unrelated cannot peek");
+    check(!kbd_inject_take_for(3, &b) && b == 0x5a,
+          "GUIRUNKEY unrelated cannot steal Q");
+    host_cur = APP_ID_SHELL;
+    check(kbd_inject_pending() == 1, "GUIRUNKEY WM scheduling hint");
+    check(!kbd_inject_take(&b) && !kbd_inject_peek(&b), "GUIRUNKEY WM cannot consume Q");
+    check(kbd_inject_take_for(4, &b) && b == 'Q', "GUIRUNKEY only terminal child takes Q");
+    check(!kbd_inject_take_for(4, &b), "GUIRUNKEY Q consumed once");
+
+    /* terminal -> sh -> async child -> synchronous child; no shared stream. */
+    host_cur = 2;
+    check(kbd_inject((const u8 *)"abc", 3) == 3, "GUIRUNKEY inject chain");
+    host_children[2] = 5; host_children[5] = 4; host_slots[3].parent = 4;
+    check(kbd_inject_take_for(3, &b) && b == 'a', "GUIRUNKEY mixed launch slot descendant");
+    check(kbd_inject_take_for(5, &b) && b == 'b', "GUIRUNKEY terminal sh");
+    check(kbd_inject_take_for(2, &b) && b == 'c', "GUIRUNKEY terminal reader");
+    reset_all();
+}
+
 int main(void)
 {
     failures = 0;
     report("kbd inject ring (K7-K)\n");
+    case_guirunkey();
     case_fullscreen_destination();
     case_permission();
     case_byte_order();

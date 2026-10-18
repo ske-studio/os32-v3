@@ -48,6 +48,10 @@ def build(gshell: Path, name: str, quiet: bool = False) -> Path:
 # 票 KBD_NAV (docs/tasks/gui/TASK_KBD_NAV.md) の受け入れ K1 の変異。
 # (名前, ファイル, 置き換え前 (ちょうど 1 か所), 置き換え後, RED になるべき試験の絞り込み)
 MUTATIONS = [
+    ('GUIRUNKEY disconnected wait retained', 'src/multiapp.rs',
+     '    let ended = end_unconnected_key_wait(st);', '    let ended = false;',
+     'guirunkey_run_wait_ends_with_reason_and_reclaims_app'),
+
     ('IMECAND collected commit goes to new focus', 'src/fep.rs',
      '    flush_text_to(st, original);', '    flush_text(st);',
      'imecand_collected_commit'),

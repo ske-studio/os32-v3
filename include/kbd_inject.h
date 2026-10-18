@@ -35,8 +35,9 @@
  *   OS32_ERR_EXIST (票 §5 の R2、e11aの例外)。 */
 i32 kbd_inject(const u8 *utf8, u32 len);
 /* kbd_inject_pending: 現在のアプリが取得可能な未読バイト数。
- * 端末由来は従来どおり。WM由来は注入時の全画面ownerとその子孫だけ。
- * WM自身からは端末由来だけが見える。 */
+ * 端末由来はcon_sinkの読み手とslot/launchの子孫だけ。WM由来は
+ * 注入時の全画面ownerとその子孫だけ。WM自身には端末由来の件数だけを
+ * 起床候補のヒントとして見せる (WMのtake/peekは不可)。 */
 u32 kbd_inject_pending(void);
 
 /* --- カーネル内から (drivers/kbd.c, exec/exec.c) ------------------------- */
