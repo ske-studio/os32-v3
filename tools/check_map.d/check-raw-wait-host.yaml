@@ -9,6 +9,7 @@ check-raw-wait-host:
 - drivers/serial.c
 - drivers/serial.h
 - exec/appslot.h
+- exec/appslot.c
 - exec/exec.c
 - exec/exec.h
 - exec/exec_heap.c
@@ -56,6 +57,7 @@ check-raw-wait-host:
 - tools/tests/test_sqlite_engine.py
 - userland/tests/raw_wait_test.c
 - tools/tests/raw_wait_guest_host.c
+- tools/tests/raw_wait_late_stop_host.c
 - tools/tests/raw_wait_sql_host.c
 - tools/tests/fep_budget_linux.c
 - tools/fep_to_sqlite.py

@@ -82,8 +82,9 @@ static int probe(KernelAPI *api, const char *entry, const char *end)
         api->fm_play_mml(mml);
     } else if (dbmode) rc = api->db_exec(db, RAW_SLOW_SQL);
     else if (logmode) {
-        /* The success diagnostic uses internal serial_puts, inside a USER
-         * syscall. PM injects STOP at that diagnostic, not at this banner. */
+        /* Build the kernel with OS32_RAW_WAIT_LOG_TICKS (see raw_wait_tdd.md).
+         * Its LOG BEGIN/END enclose repeated internal serial_puts in this
+         * single syscall. Send STOP after the child's BEGIN without a BP. */
         rc = api->ime_switch_dict(RAW_DICT_VARIANT);
     } else if (fault) __asm__ volatile("ud2" : : : "memory");
     if (stop || rc < 0 || (value & 0xff) != 'Q' ||

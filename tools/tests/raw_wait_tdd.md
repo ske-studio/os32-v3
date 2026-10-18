@@ -11,11 +11,12 @@ SQLite guard と実代替 stack、実 exec の launch/resume 着地を ILP32/qem
 物理 I/O・入力 IRQ・CR3/iret・辞書 storage の代替部分はそれぞれの足場冒頭を参照。
 通常の GUI park と、park 不成立時の STOP 解除は別々に検査する。
 
-`MUTATE=1` は次の 19 件だけを写しに適用し、コンパイル成功と指定アサートでの RED を要求する。
+`MUTATE=1` は次の 24 件だけを写しに適用し、コンパイル成功と指定アサートでの RED を要求する。
 コンパイル失敗・タイムアウト・別アサートの失敗は変異検出の成功に数えない。
 
 | 変異 | 期待する実行時失敗 |
 |---|---|
+| fixture の SQL を上限超過に戻す | `sizeof(RAW_SLOW_SQL) <= DB_SQL_MAX_BYTES` |
 | fixture の SQL に CTE を再導入 | OS32 設定の SQLite prepare 失敗 |
 | fixture の SQL を短縮 | 集計結果の対照 |
 | fixture の読みを「あ」に戻す | 配布 M 辞書の候補数 0 |
@@ -32,6 +33,9 @@ SQLite guard と実代替 stack、実 exec の launch/resume 着地を ILP32/qem
 | FM 最後の Key-OFF 削除 | `mml sustained stop key off` |
 | 内部 TX / puts に取消混入 (2) | `USER internal logs and frames never abort` |
 | SQLite leave 前に STOP を消費 | `!sqlite_engine_active && !kills ...` |
+| 終了処理中の要求を回収済み slot に残す | `reclaimed slot request cleared` |
+| 終了処理中の要求を親に渡す | `parent request stays clear` |
+| 延長ログの途中に中断を追加 / 要求をクリア (2) | `extended internal log retains STOP until end` |
 
 ゲスト fixture 自身も記録用 KernelAPI で実行し、8 口の選択、予期しない入力・STOP 後の
 return の拒否、親の二重回収・pool/USER/SQLite 漏れ・sentinel/result 不一致の検出を確認する。
@@ -43,6 +47,9 @@ IME の固定読みは IPADIC 全件を配布生成器で正規化した後、M 
 正常対照は各入力口の空待ち→遅延入力→1 回消費、GUI park、serial 通常受信、
 FM 1 音の全時間完了＋Key-OFF、内部ログの IF=0/1 両方、SQLite active 中の kill=0 と
 leave 後の kill=1、親の exact esp0/caller 復元→次の実 syscall→親 USER heap 不変。
+`raw_wait_late_stop_host.c` は実 `exec_finish` と実 AppSlot を使い、資源回収中・私有ページ回収中の
+要求を注入する (資源/CR3 操作と IRQ の時刻は代替)。通常終了の結果・回収1回・親の次の安全点・
+同じ slot の再利用・新しい STOP の1回消費まで照合する。
 
 ## PM のゲスト手順 (64MB、未実施)
 
@@ -117,17 +124,34 @@ GUI は親がないので、`raw_wait_test log done` を事前に一度完了さ
 ### 内部ログ / SQLite の中断禁止を観測する方法
 
 READY と処理入口の間に STOP を送ってもこの受入の証拠にはならない。
-`db stop` は `sqlite_engine_active=1` の SELECT 内、`log stop` は
-`ime_dict_reopen` の成功診断が呼ぶ **内部** `serial_puts` の入口で停止点を取り、
-そこにいることを確認して解除・CTRL+STOP を送る。停止した CPU に IRQ は配送されないので、
-`parent log stop` は最初の reopen/成功診断が親の事前切替なので注入しない。
-起動前に停止点を置く場合はその 1 回を見送り、子の READY と app ID を照合した
-2 回目の reopen の診断を対象にする (旧 `log_stop_bp.py` の最初のヒットはそのまま使わない)。
-解除後に IRQ1 が到達した位置も trace で確認する。STOP 要求が保持されている間は
-`ring3_abort_count` / reclaim が増えず、engine は active を保ち、ログは最後まで送られること。
-SQLite は leave 後、ログは caller の syscall 出口後だけ CUI abort または GUI park を許す。
-入口や出口にしか IRQ が届かなかった回は「未観測」とし、成功に数えず再採取する。
-`db done` / `log done` は同じ処理が通常完了する対照。
+`db stop` は `sqlite_engine_active=1` の SELECT 内への IRQ 到達を採る。
+`log stop` は以下の試験ビルドを使い、**ブレークせず**に注入する。通常ビルドの短いログと
+停止点でのキー注入の組合せは使わない (停止中はエミュレータの時刻が進まない)。
+
+1. `make -W kernel/ime_dict.c all KERNEL_CFLAGS_EXTRA=-DOS32_RAW_WAIT_LOG_TICKS=1000 MUTATE=0`。
+   試験フラグは USER 呼出しからの辞書成功ログだけを1000 tick (100Hzで約10秒) 延長する。
+   KAPI の引数・版・slot は変えない。フラグ切替は make の依存に含まれないため `-W` は必須。
+   PM がこのカーネルと対の kdebug/モジュール・fixture を停止→配備→起動し、hash/CRC を照合する。
+2. SerialFS/rshell を閉じ、`s_gate=0`、ローカル CUI、FEP OFF とする。
+   シリアル出力を非停止で採取し、全 BP を外して `trap_pause=false` を確認する。
+3. `raw_wait_test parent log done` を実行する。親の事前切替と子の本試行に各1組の
+   `raw_wait LOG BEGIN` → ドット列 → `raw_wait LOG END` が出て、正常 PASS となること。
+4. `raw_wait_test parent log stop` を実行する。最初の BEGIN/END (親の事前切替) は見送る。
+   子の READY/app ID を控え、**2回目の BEGIN の後、ドットが増えている間**に
+   キー API の `seq=CTRL+STOP` を1回だけ送る。BEGIN から END まで pause/BP/resume を使わない。
+   自動注入はシリアル受信側で2回目の BEGIN を検出して即送る。ログの採取遅延が10秒以上なら
+   tick 引数を増やして再ビルドする。hold の長さは配送区間の証拠にしない。
+5. CPUを止めないメモリ読取りで、END より前の子の `abort_req=1`、abort/reclaim 増分0を
+   採る (現 ELF の `g_cur` / `g_slot` と型の offset を使う)。時刻入りのシリアル記録と併せ、
+   区間中の受理を示す。必要なら非停止 trace の IRQ1 EIP を `ime_dict_open` 内へインライン化されたログ区間とその呼出し先に照合する。
+6. END 完送後にだけ abort が+1、回収が+1、`PASS parent log kind=3 code=-2` となり、
+   子の `FAIL returned` / `PASS normal` が出ず、親の次 KAPI が通ること。続けて done を実行し、
+   再利用 slot に STOP が残らないこと。GUI は END 後の STOP park と WM kill を区別する。
+
+BEGIN/END の間の受理を示せなかった回、終了処理中にだけ届いた回はこの項目の成功に数えない。
+後者は [09_exec.md](../../docs/09_exec.md#起動失敗の巻き戻しと強制脱出) の契約どおり子 slot とともに破棄する。
+SQLite は leave 後、ログは caller の syscall 出口だけ CUI abort または GUI park を許す。
+試験後に通常像へ戻す場合は同じ `-W` を使い、試験フラグ無しで `make all` し直して照合する。
 
 `g_ime`/`caller_frame` 等の static は kernel ELF のローカルシンボルから読む。
 観測だけのために KAPI・常駐の診断カウンタや固定アドレスは追加しない。

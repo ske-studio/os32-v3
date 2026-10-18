@@ -20,6 +20,27 @@
 #include "os32_kapi_shared.h"
 #include "os32_sqlite_vfs.h"
 
+/* Opt-in T4b-7 guest probe. No KAPI argument or normal-build behavior change.
+ * 100Hz ticks let keyboard IRQs arrive while internal logging is still active.
+ * Force this object to rebuild when toggling KERNEL_CFLAGS_EXTRA (see TDD). */
+#if defined(OS32_RAW_WAIT_LOG_TICKS) && OS32_RAW_WAIT_LOG_TICKS > 0
+#include "io.h"
+extern volatile u32 tick_count;
+extern int ring3_call_from_user(void);
+static void ime_dict_log_probe(void)
+{
+    if (!ring3_call_from_user()) return;
+    u32 start = tick_count;
+    serial_puts("raw_wait LOG BEGIN\r\n");
+    while ((u32)(tick_count - start) < OS32_RAW_WAIT_LOG_TICKS) {
+        u32 tick = tick_count;
+        serial_puts(".");
+        while (tick_count == tick) io_wait();
+    }
+    serial_puts("\r\nraw_wait LOG END\r\n");
+}
+#endif
+
 /* プリペアドステートメントのSQL */
 static const char SQL_EXACT[] =
     "SELECT kanji, pos_id, cost FROM ("
@@ -128,6 +149,9 @@ int ime_dict_open(IME_Dict *dict, const char *path)
     serial_puts("IME: Dict loaded (SQLite): ");
     serial_puts(path);
     serial_puts("\r\n");
+#if defined(OS32_RAW_WAIT_LOG_TICKS) && OS32_RAW_WAIT_LOG_TICKS > 0
+    ime_dict_log_probe();
+#endif
     return 0;
 }
 

@@ -5,9 +5,10 @@ import re
 import subprocess
 import tempfile
 import host32
+from test_exec_r1 import function
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SOURCES = ('kernel/console.c', 'drivers/fm.c', 'drivers/serial.c', 'kapi/kapi_generated.c', 'drivers/kbd.c', 'kernel/ime.c', 'exec/exec.c')
+SOURCES = ('kernel/console.c', 'drivers/fm.c', 'drivers/serial.c', 'kapi/kapi_generated.c', 'drivers/kbd.c', 'kernel/ime.c', 'exec/exec.c', 'kernel/ime_dict.c')
 MUTATIONS = [
     ('cursor x low', 0, 'if (x < 0) x = 0;', ''),
     ('cursor x high', 0, 'if (x >= TVRAM_COLS) x = TVRAM_COLS - 1;', ''),
@@ -28,6 +29,10 @@ MUTATIONS += [
     ('serial char probe', 2, 'serial_putchar_kapi', 'probe'),
     ('shared TX abort regression', 2, 'static int ser_tx_byte(char c)\n{', 'static int ser_tx_byte(char c)\n{\n    if (_irq_enabled() && ring3_wait_pending()) ring3_abort_check();'),
     ('shared puts abort regression', 2, 'void serial_puts(const char *str)\n{', 'void serial_puts(const char *str)\n{\n    if (_irq_enabled() && ring3_wait_pending()) ring3_abort_check();'),
+    ('extended log early abort', 7, '        serial_puts(".");',
+     '        if (ring3_wait_pending()) ring3_abort_check();\n        serial_puts(".");'),
+    ('extended log drops STOP', 7, '        serial_puts(".");',
+     '        appslot_get(appslot_cur())->abort_req = 0;\n        serial_puts(".");'),
     ('kbd char wait', 4, '            if (interruptible && ring3_wait_pending()) return -1;', ''),
     ('kbd key wait', 4, '    while (kbd_count == 0) {\n        if (interruptible && ring3_wait_pending()) return -1;', '    while (kbd_count == 0) {'),
     ('kbd gui wait', 4, '        if (interruptible && ring3_wait_pending()) return -1; /* GUI fallback */', ''),
@@ -89,13 +94,14 @@ def run(runner, mutation=None, case=0, expected=None):
             sources[idx] = sources[idx].replace(old, new, 1)
     with tempfile.TemporaryDirectory(prefix='kapi-audit-') as directory:
         work = pathlib.Path(directory)
-        for inc, source in zip(('console_source.inc', 'fm_source.inc', 'serial_source.inc', 'rshell_source.inc', 'kbd_source.inc', 'ime_source.inc', 'wait_source.inc'), sources):
+        sources[7] = function(sources[7], 'ime_dict_log_probe')
+        for inc, source in zip(('console_source.inc', 'fm_source.inc', 'serial_source.inc', 'rshell_source.inc', 'kbd_source.inc', 'ime_source.inc', 'wait_source.inc', 'ime_log_source.inc'), sources):
             (work / inc).write_text(source)
         exe = work / 'fixture'
         cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Werror', '-Wno-unused-variable', '-ffreestanding',
                '-fno-pie', '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
                '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections', '-D__KERNEL_BUILD__',
-               '-DAUDIT_CASE=' + str(case), '-I' + str(work)]
+               '-DOS32_RAW_WAIT_LOG_TICKS=32', '-DAUDIT_CASE=' + str(case), '-I' + str(work)]
         cmd += ['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'include',
             'arch/x86', 'platform/pc98', 'kernel', 'drivers', 'lib', 'sdk/include/os32', 'exec', 'fs')]
         p = subprocess.run(cmd + [str(ROOT / 'tools/tests/kapi_audit_host.c'), '-o', str(exe)], capture_output=True, text=True)

@@ -30,7 +30,55 @@ CASES = {
     'mml key off': 'FAIL mml sustained stop key off',
     'shared TX abort regression': 'FAIL USER internal logs and frames never abort',
     'shared puts abort regression': 'FAIL USER internal logs and frames never abort',
+    'extended log early abort': 'FAIL extended internal log retains STOP until end',
+    'extended log drops STOP': 'FAIL extended internal log retains STOP until end',
 }
+
+
+def late_stop(mutate=False):
+    root = pathlib.Path(__file__).resolve().parents[2]
+    ex = (root / 'exec/exec.c').read_text()
+    slots = (root / 'exec/appslot.c').read_text()
+    finish = lifecycle.function(ex, 'exec_finish')
+    variants = [('normal', finish, slots, None)]
+    if mutate:
+        start = slots.index('u32 appslot_reclaim(')
+        reclaim = slots[start:slots.index('\n}', start) + 2]
+        assert reclaim.count('    slot_zero(a);') == 1
+        assert finish.count('        appslot_reclaim(id);') == 1
+        variants += [
+            ('retain reclaimed request', finish,
+             slots.replace(reclaim, reclaim.replace('    slot_zero(a);',
+                 '    int request = a->abort_req;\n    slot_zero(a);\n    a->abort_req = request;')),
+             'FAIL late STOP: reclaimed slot request cleared'),
+            ('forward to parent', finish.replace('        appslot_reclaim(id);',
+                 '        appslot_get(parent)->abort_req |= a->abort_req;\n        appslot_reclaim(id);'),
+             slots, 'FAIL late STOP: parent request stays clear'),
+        ]
+    with tempfile.TemporaryDirectory(prefix='raw-wait-late-stop-') as directory:
+        tmp = pathlib.Path(directory)
+        for name, body, slot_source, expected in variants:
+            (tmp / 'late_stop_appslot.inc').write_text(slot_source)
+            (tmp / 'late_stop_exec.inc').write_text(body + '\n' + '\n'.join(
+                lifecycle.function(ex, n) for n in ('ring3_abort_request', 'ring3_abort_check')))
+            exe = tmp / 'test'
+            inc = ['-I' + str(root / p) for p in ('tools/tests/host_arch', 'include',
+                   'kernel', 'exec', 'fs', 'lib', 'sdk/include/os32')]
+            host32.build(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Werror',
+                          '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
+                          '-ffreestanding', '-fno-pie', '-fno-stack-protector',
+                          '-nostdlib', '-static', '-no-pie', '-I' + str(tmp), *inc,
+                          str(root / 'tools/tests/raw_wait_late_stop_host.c'),
+                          '-o', str(exe)], check=True)
+            result = host32.run([str(exe)], runner='qemu', capture_output=True,
+                                text=True, timeout=30)
+            print(result.stdout + result.stderr, end='', flush=True)
+            if expected:
+                assert result.returncode == 1 and expected in result.stdout, (
+                    name, result.returncode, result.stdout, result.stderr)
+                print(f'RED runtime: late STOP {name} (compiled)', flush=True)
+            else:
+                assert result.returncode == 0, (result.returncode, result.stdout, result.stderr)
 
 
 def guest_inputs(tmp):
@@ -128,6 +176,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
+    late_stop(args.mutate)
     with tempfile.TemporaryDirectory(prefix='raw-wait-inputs-') as directory:
         original, run = guest_inputs(pathlib.Path(directory))
         if args.mutate:
@@ -168,7 +217,7 @@ def main():
         assert result.returncode == 1 and 'FAIL: !sqlite_engine_active && !kills' in result.stdout, (
             result.returncode, result.stdout, result.stderr)
         print('RED runtime: SQLite STOP before leave')
-        print(f'PASS {len(CASES) + 10} raw-wait mutations: named runtime RED, compile failures 0')
+        print(f'PASS {len(CASES) + 12} raw-wait mutations: named runtime RED, compile failures 0')
 
 
 if __name__ == '__main__':
