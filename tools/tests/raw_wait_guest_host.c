@@ -14,6 +14,7 @@ static KernelAPI table;
 static u8 allocation[RAW_USER_BYTES];
 static int selected, reads, opens, closes, frees, returned, bad, parent_case;
 static int stats, sql_calls, saw_pass, saw_fail, sql_failure, ime_parent;
+static int log_parent, switches, switch_failure, children, child_stop;
 static u32 sqlite_bytes;
 static MemStat snapshot;
 
@@ -58,15 +59,28 @@ static int __cdecl read3(void) { selected=3; reads++; if (ime_parent) sqlite_byt
 static int __cdecl read4(void) { selected=4; reads++; return returned; }
 static void __cdecl mml(const char *s)
 { selected=5; reads++; if (kstrlen(s) != 1 && kstrlen(s) != RAW_MML_NOTES) bad++; }
-static int __cdecl variant(int v) { selected=7; reads++; if (v != 1) bad++; return 0; }
+static int __cdecl variant(int v)
+{
+    selected=7; reads++; switches++;
+    if (v != 1) bad++;
+    if (switch_failure) return -1;
+    if (log_parent) sqlite_bytes=16384;
+    return 0;
+}
 static int __cdecl child(const char *s)
 {
+    children++;
     if (ime_parent) {
         if (kstrcmp(s, ime_parent==1 ? RAW_CHILD "imechar stop" : RAW_CHILD "imekey stop")) bad++;
         if (reads < 2) bad++;
         /* The child repeats the same candidate search: its retained cache
          * grows only when the parent did not already warm it. */
         sqlite_bytes=12288;
+    } else if (log_parent) {
+        if (kstrcmp(s, child_stop ? RAW_CHILD "log stop" : RAW_CHILD "log done")) bad++;
+        /* First switch retains resident dictionary state; subsequent switches
+         * keep the same amount. A missing pre-switch must fail accounting. */
+        (void)variant(1);
     } else if (kstrcmp(s, RAW_CHILD "kbdkey done")) bad++;
     snapshot.reclaim_count++;
     /* Each independent corruption must turn the guest's PASS into FAIL. */
@@ -78,13 +92,14 @@ static int __cdecl child(const char *s)
     return 0;
 }
 static int __cdecl result(int *kind, int *code)
-{ *kind=ime_parent || parent_case==6 ? EXEC_KIND_ABORTED : EXEC_KIND_EXITED;
-  *code=ime_parent ? EXEC_ERR_FAULT : 0; return 0; }
+{ *kind=ime_parent || child_stop || parent_case==6 ? EXEC_KIND_ABORTED : EXEC_KIND_EXITED;
+  *code=ime_parent || child_stop ? EXEC_ERR_FAULT : 0; return 0; }
 
 static void reset(void)
 {
     selected=-1; reads=opens=closes=frees=bad=stats=sql_calls=saw_pass=saw_fail=0;
     returned='Q'; parent_case=sql_failure=ime_parent=0;
+    log_parent=switches=switch_failure=children=child_stop=0;
     kmemset(&snapshot,0,sizeof(snapshot));
     snapshot.app_id=3; snapshot.owner_pages=37; snapshot.phys_free_pages=1000;
     snapshot.exec_heap_used=RAW_USER_BYTES;
@@ -134,6 +149,18 @@ static int test(void)
         char *parent[]={"raw_wait_test","parent","kbdkey","done"};
         CHECK(raw_guest_main(4,parent,&table)==1 && stats==0 && sql_calls==failure);
     }
+    for (int stop=0; stop<=1; stop++) {
+        for (int leak=0; leak<=1; leak++) {
+            reset(); log_parent=1; child_stop=stop; parent_case=leak ? 4 : 0;
+            char *argv[]={"raw_wait_test","parent","log",stop ? "stop" : "done"};
+            CHECK(raw_guest_main(4,argv,&table)==(leak ? 1 : 0));
+            CHECK(!bad && switches==2 && stats==2 && children==1);
+        }
+    }
+    reset(); log_parent=switch_failure=1;
+    char *log[]={"raw_wait_test","parent","log","done"};
+    CHECK(raw_guest_main(4,log,&table)==1 && !stats && !children);
+    say("PASS guest fixture: log pre-switch before baseline, failure rejected, child leak still rejected\n");
     say("PASS guest fixture: settled resident FEP baseline, child SQLite leak rejected, separate CREATE/INSERT errors rejected\n");
     say("PASS guest fixture: eight raw entries, unexpected return/input rejected; parent rejects double reclaim/pool/USER/SQLite/sentinel/result mismatch\n");
     return 0;

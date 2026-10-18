@@ -11,11 +11,16 @@ SQLite guard と実代替 stack、実 exec の launch/resume 着地を ILP32/qem
 物理 I/O・入力 IRQ・CR3/iret・辞書 storage の代替部分はそれぞれの足場冒頭を参照。
 通常の GUI park と、park 不成立時の STOP 解除は別々に検査する。
 
-`MUTATE=1` は次の 14 件だけを写しに適用し、コンパイル成功と指定アサートでの RED を要求する。
+`MUTATE=1` は次の 19 件だけを写しに適用し、コンパイル成功と指定アサートでの RED を要求する。
 コンパイル失敗・タイムアウト・別アサートの失敗は変異検出の成功に数えない。
 
 | 変異 | 期待する実行時失敗 |
 |---|---|
+| fixture の SQL に CTE を再導入 | OS32 設定の SQLite prepare 失敗 |
+| fixture の SQL を短縮 | 集計結果の対照 |
+| fixture の読みを「あ」に戻す | 配布 M 辞書の候補数 0 |
+| fixture の log 事前切替を省略 | log 親の正常対照 |
+| fixture の log 事前切替エラーを無視 | 切替失敗時に子を起動しない対照 |
 | fixture の FEP 事前検索を省略 | IME 親の正常対照 |
 | fixture の CREATE/INSERT を結合 | 単一文 SQL 代替による正常対照の拒否 |
 | fixture の INSERT エラーを無視 | INSERT 失敗対照 |
@@ -30,6 +35,10 @@ SQLite guard と実代替 stack、実 exec の launch/resume 着地を ILP32/qem
 
 ゲスト fixture 自身も記録用 KernelAPI で実行し、8 口の選択、予期しない入力・STOP 後の
 return の拒否、親の二重回収・pool/USER/SQLite 漏れ・sentinel/result 不一致の検出を確認する。
+実際の `RAW_SLOW_SQL` を同梱 SQLite と `os32_sqlite_config.h` で prepare/step し、
+512KiB MEMSYS5 内で 4^12 行の集計結果と VM step 数を照合する (VFS のみメモリ用代替)。
+IME の固定読みは IPADIC 全件を配布生成器で正規化した後、M のコスト上限・重複排除を
+同じ生成器で適用し、候補があることを検査する。変更済み・学習済みのゲスト DB は根拠にしない。
 
 正常対照は各入力口の空待ち→遅延入力→1 回消費、GUI park、serial 通常受信、
 FM 1 音の全時間完了＋Key-OFF、内部ログの IF=0/1 両方、SQLite active 中の kill=0 と
@@ -44,26 +53,28 @@ fixture は通常 CPL3、`userland/deploy.yaml` に登録済み。公開 KAPI・
 先行入力を空にし、CUI はローカル shell を使う。rshell の kbd_getchar は既存のタイムアウトで
 空白を返すので、無入力 STOP の対照にはしない。serial は SerialFS のセッションを閉じて
 `s_gate=0`、接続相手から自動送信しない状態にする。ゲスト serial への入力は物理打鍵と区別する。
-IME の通常完了は OFF にして大文字 `Q` を送る。変換取消の読みは「あ」に固定する。
+IME の通常完了は OFF にして大文字 `Q` を送る。変換取消の読みは「か」に固定する。
 CUI の `parent imechar stop` / `parent imekey stop` は、基準採取前に `WARMUP` を表示する。
-表示のたびに、ひらがな ON → `a` → SPACE (候補表示) → ESC 2 回 (変換取消・読み消去)
+表示のたびに、ひらがな ON → `ka` → SPACE (候補表示) → ESC 2 回 (変換取消・読み消去)
 → OFF → 大文字 `Q` を入力する。候補リストを Down で展開しない。
 同じ検索・取消後の SQLite 使用量が連続一致するまで最低 2 回、最大 4 回繰り返す。
-子の `READY` が出てから再びひらがな ON → `a` → SPACE で同じ「あ」の候補を表示し、CTRL+STOP。
-GUI でも読みは「あ」に固定する。辞書切替で学習内容を削除しない。
+子の `READY` が出てから再びひらがな ON → `ka` → SPACE で同じ「か」の候補を表示し、CTRL+STOP。
+GUI でも読みは「か」に固定する。辞書切替で学習内容を削除しない。
 
 | 口 (`entry`) | CUI 正常・STOP | GUI 正常・STOP |
 |---|---|---|
-| `kbdchar`, `kbdkey` | `raw_wait_test parent <entry> done` / `stop` | WM の通常 launch で `raw_wait_test <entry> done` / `stop` |
+| `kbdchar`, `kbdkey` | `raw_wait_test parent <entry> done` / `stop` | GUI 端末内で `raw_wait_test <entry> done` / `stop` |
 | `imechar`, `imekey` | 同上。候補表示中の STOP も両口で行う | 同上。WM の FEP 配送と raw cooked 待ちを区別 |
 | `serial` | 同上。done は READY 後に受信線へ `Q` | 同上。done は受信線へ `Q` |
 | `fm` | 同上。done は 1 音、stop は約 28 秒の連音列中 | 同上。Key-ON 中に STOP |
-| `db` | 同上。長い再帰 SELECT 中に STOP | 同上 |
+| `db` | 同上。4^12 行の直積集計 SELECT 中に STOP | 同上 |
 | `log` | 同上。既定辞書への reopen 成功ログ中に STOP | 同上 |
 
 `done` は入力口では READY 後に `Q`、FM/DB/log は入力なしで完了を待つ。
 `stop` は READY の後に CTRL+STOP。CUI では親に `PASS parent` が出て、さらに shell に戻る。
-GUI は `parent` を使わない (GUI CPL3 の nested exec_run は禁止)。WAIT_KEY のアプリは
+GUI は端末内で起動し `parent` を使わない (GUI CPL3 の nested exec_run は禁止)。
+窓のない fixture を Run から直接起動すると入力先が成立しないため、この手順には使わない。
+WAIT_KEY のアプリは
 すでに WM に譲っているので、CTRL+STOP 後に WM の選択・終了操作で当該 app を kill する。
 serial/FM の実行中 STOP では安全点で WM に戻ることを確認してから同じ終了操作を行う。
 GUI の STOP park を採る回は syscall 入口から `APP_RUNAWAY_TICKS` 未満で送る。
@@ -77,8 +88,9 @@ USER 96KiB と live `:memory:` DB は意図的に app に残す。CUI 親は子�
 reclaim 差=1、phys_free_pages/親 owner_pages/heap 不変、leftover/bad_free 増加=0、SQLite 使用量の
 事前検索後の基準復帰、親 sentinel と次の mem_stat/DB 呼出しを照合する。
 `raw_wait_test parent fault done` も実行し、#UD 後の親復帰を対照にする。
-`log` の初回辞書 load による常駐増分を子リークと混同しないため、既定辞書を事前に開き、
-同じ辞書への切替を一度成功させてから採取する。
+`log` の CUI 親は既定 M 辞書への切替を一度成功させてから SQLite と MemStat の基準を採る。
+切替失敗なら子を起動せず FAIL (終了値 1)。初回常駐増分を子リークとして数えず、子の後の増分は許容しない。
+GUI は親がないので、`raw_wait_test log done` を事前に一度完了させてから基準を採る。
 
 ### カーネル側の観測 (各 entry の前後)
 
@@ -108,6 +120,9 @@ READY と処理入口の間に STOP を送ってもこの受入の証拠には�
 `db stop` は `sqlite_engine_active=1` の SELECT 内、`log stop` は
 `ime_dict_reopen` の成功診断が呼ぶ **内部** `serial_puts` の入口で停止点を取り、
 そこにいることを確認して解除・CTRL+STOP を送る。停止した CPU に IRQ は配送されないので、
+`parent log stop` は最初の reopen/成功診断が親の事前切替なので注入しない。
+起動前に停止点を置く場合はその 1 回を見送り、子の READY と app ID を照合した
+2 回目の reopen の診断を対象にする (旧 `log_stop_bp.py` の最初のヒットはそのまま使わない)。
 解除後に IRQ1 が到達した位置も trace で確認する。STOP 要求が保持されている間は
 `ring3_abort_count` / reclaim が増えず、engine は active を保ち、ログは最後まで送られること。
 SQLite は leave 後、ログは caller の syscall 出口後だけ CUI abort または GUI park を許す。
