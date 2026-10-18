@@ -72,6 +72,33 @@ int vfs_chdir(const char *path)
  * 非再入 (呼び手の約束) なので static に置き、カーネルスタックを使わない。 */
 static char resolve_tmp[VFS_MAX_PATH * 2 + 1];
 
+/* Before discarding a component via . or .., reject an existing non-directory.
+ * Otherwise /file/../other becomes /other before the FS can reject file.
+ * Keep lexical normalization of absent paths (used by install/hsync). Route
+ * directly: vfs_stat would recurse into this resolver and overwrite its tmp. */
+static int vfs_check_dot_prefix(const char **parts, const int *lengths, int count)
+{
+    char prefix[sizeof(resolve_tmp)], rel[sizeof(resolve_tmp)];
+    OS32_Stat st;
+    VfsOps *ops;
+    void *ctx;
+    int i, j, n = 0, rc;
+
+    if (count == 0) return VFS_OK;
+    for (i = 0; i < count; i++) {
+        prefix[n++] = '/';
+        for (j = 0; j < lengths[i]; j++) prefix[n++] = parts[i][j];
+    }
+    prefix[n] = '\0';
+    ops = vfs_route(prefix, rel, sizeof(rel), &ctx);
+    if (!ops || !ops->stat) return VFS_OK;
+    rc = ops->stat(ctx, rel, &st);
+    if (rc == VFS_ERR_NOTFOUND) return VFS_OK;
+    if (rc != VFS_OK) return rc;
+    if ((st.st_mode & OS_S_IFMT) != OS_S_IFDIR) return VFS_ERR_NOTDIR;
+    return VFS_OK;
+}
+
 int vfs_resolve_path(const char *input, char *output, int out_size)
 {
     char *tmp = resolve_tmp;
@@ -119,6 +146,11 @@ int vfs_resolve_path(const char *input, char *output, int out_size)
         c = tmp[p];
         tmp[p] = '\0';
 
+        if ((len == 1 && tmp[start] == '.') ||
+            (len == 2 && tmp[start] == '.' && tmp[start + 1] == '.')) {
+            int rc = vfs_check_dot_prefix(parts, part_len, num_parts);
+            if (rc != VFS_OK) return rc;
+        }
         if (len == 1 && tmp[start] == '.') {
             /* nop */
         } else if (len == 2 && tmp[start] == '.' && tmp[start+1] == '.') {

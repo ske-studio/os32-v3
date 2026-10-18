@@ -1989,6 +1989,137 @@ static void case_hostname(void)
 }
 #endif
 
+#ifndef FDP_RED
+/* EXT2DIR-1: real ext2/FatFs + VFS/FD, only the device is RAM.
+ * A regular file deliberately contains a valid ext2 entry named x. Its bytes
+ * must never be interpreted as a directory, even by the low-level helpers. */
+static u8 filedir_data[EXT2_BLOCK_SIZE];
+static char filedir_file[VFS_MAX_PATH], filedir_other[VFS_MAX_PATH];
+
+static void filedir_entry_cb(const Ext2DirEntry *entry, void *ctx)
+{ (void)entry; (void)ctx; }
+
+static void filedir_unchanged(void)
+{
+    u8 buf[EXT2_BLOCK_SIZE];
+    OS32_Stat st;
+    EQ(vfs_stat(filedir_file, &st), VFS_OK);
+    CHECK(st.st_size == sizeof(filedir_data));
+    EQ(vfs_read(filedir_file, buf, sizeof(buf)), sizeof(buf));
+    CHECK(memcmp(buf, filedir_data, sizeof(buf)) == 0);
+    EQ(vfs_stat(filedir_other, &st), VFS_OK);
+    CHECK(st.st_size == 4);
+    EQ(vfs_read(filedir_other, buf, sizeof(buf)), 4);
+    CHECK(memcmp(buf, "KEEP", 4) == 0);
+}
+
+#define FILEDIR_REFUSED(expr) do { \
+    u32 ew_ = g_wr_sect; int fw_ = g_fat_disk_writes; \
+    int rc_ = (expr); \
+    CHECK(rc_ < 0); \
+    CHECK(g_wr_sect == ew_ && g_fat_disk_writes == fw_); \
+    filedir_unchanged(); \
+} while (0)
+
+static void filedir_paths(const char *root)
+{
+    static const char *const suffix[] = {
+        "/file/x", "/file/y", "/file/./x", "/file/../other"
+    };
+    char bad[VFS_MAX_PATH], dir[VFS_MAX_PATH];
+    int i, fd;
+    kstrncpy(filedir_file, root, sizeof(filedir_file));
+    kstrncat(filedir_file, "/file", sizeof(filedir_file));
+    kstrncpy(filedir_other, root, sizeof(filedir_other));
+    kstrncat(filedir_other, "/other", sizeof(filedir_other));
+    CHECK(wfile(filedir_other, "KEEP") >= 0);
+    kmemset(filedir_data, 0, sizeof(filedir_data));
+    if (root[1] == 'h') {
+        u32 ino = 0;
+        EQ(ext2_lookup(g_ec, "/other", &ino), EXT2_OK);
+        le32_wr(filedir_data, ino);
+    } else {
+        le32_wr(filedir_data, 12);
+    }
+    le16_wr(filedir_data + 4, sizeof(filedir_data));
+    filedir_data[6] = 1;
+    filedir_data[7] = EXT2_FT_REG_FILE;
+    filedir_data[8] = 'x';
+    CHECK(vfs_write(filedir_file, filedir_data, sizeof(filedir_data)) >= 0);
+    for (i = 0; i < (int)(sizeof(suffix) / sizeof(suffix[0])); i++) {
+        kstrncpy(bad, root, sizeof(bad));
+        kstrncat(bad, suffix[i], sizeof(bad));
+        FILEDIR_REFUSED(vfs_open(bad, O_WRONLY | O_CREAT | O_TRUNC));
+        FILEDIR_REFUSED(vfs_open(bad, O_WRONLY | O_CREAT | O_EXCL));
+        FILEDIR_REFUSED(vfs_mkdir(bad));
+        FILEDIR_REFUSED(vfs_rm(bad));
+        FILEDIR_REFUSED(vfs_rmdir(bad));
+        FILEDIR_REFUSED(vfs_rename(bad, filedir_other));
+        FILEDIR_REFUSED(vfs_rename(filedir_other, bad));
+        FILEDIR_REFUSED(vfs_write(bad, "BAD", 3));
+    }
+    /* Normal create/read/rename/remove and directory moves still work. */
+    kstrncpy(dir, root, sizeof(dir));
+    kstrncat(dir, "/d", sizeof(dir));
+    EQ(vfs_mkdir(dir), VFS_OK);
+    kstrncpy(bad, dir, sizeof(bad));
+    kstrncat(bad, "/ok", sizeof(bad));
+    fd = vfs_open(bad, O_WRONLY | O_CREAT | O_TRUNC);
+    CHECK(fd >= 0);
+    if (fd >= 0) { EQ(vfs_write_fd(fd, "OK", 2), 2); vfs_close(fd); }
+    EQ(vfs_rm(bad), VFS_OK);
+    EQ(vfs_rename(filedir_other, bad), VFS_OK);
+    EQ(vfs_rename(bad, filedir_other), VFS_OK);
+    kstrncpy(bad, root, sizeof(bad));
+    kstrncat(bad, "/e", sizeof(bad));
+    EQ(vfs_rename(dir, bad), VFS_OK);
+    EQ(vfs_rmdir(bad), VFS_OK);
+    filedir_unchanged();
+}
+
+static void case_filedir(void)
+{
+    static BYTE work[FF_MAX_SS];
+    MKFS_PARM opt;
+    u32 ino = 0, out = 0;
+    report("case filedir ext2\n");
+    disk_setup();
+    filedir_paths("/hd0");
+    EQ(ext2_lookup(g_ec, "/file", &ino), EXT2_OK);
+    REFUSED_AS(ext2_lookup(g_ec, "/file/x", &out), EXT2_ERR_NOTDIR);
+    REFUSED_AS(ext2_lookup(g_ec, "/file/", &out), EXT2_ERR_NOTDIR);
+    REFUSED_AS(ext2_find_entry_loc(g_ec, ino, "x", &out, 0, 0, 0), EXT2_ERR_NOTDIR);
+    REFUSED_AS(ext2_list_dir(g_ec, ino, filedir_entry_cb, 0), EXT2_ERR_NOTDIR);
+    REFUSED_AS(ext2_add_entry(g_ec, ino, "y", ino, EXT2_FT_REG_FILE), EXT2_ERR_NOTDIR);
+    REFUSED_AS(ext2_delete_entry(g_ec, ino, "x"), EXT2_ERR_NOTDIR);
+    REFUSED_AS(ext2_create(g_ec, ino, "y", "BAD", 3), EXT2_ERR_NOTDIR);
+    REFUSED_AS(ext2_mkdir(g_ec, ino, "y"), EXT2_ERR_NOTDIR);
+    REFUSED_AS(ext2_unlink(g_ec, ino, "x"), EXT2_ERR_NOTDIR);
+    REFUSED_AS(ext2_rmdir(g_ec, ino, "x"), EXT2_ERR_NOTDIR);
+    REFUSED_AS(ext2_rename(g_ec, ino, "x", EXT2_ROOT_INO, "z"), EXT2_ERR_NOTDIR);
+    REFUSED_AS(ext2_rename(g_ec, EXT2_ROOT_INO, "other", ino, "y"), EXT2_ERR_NOTDIR);
+    REFUSED_AS(ext2_is_dir_empty(g_ec, ino), EXT2_ERR_NOTDIR);
+    REFUSED_AS(ext2_parent_of(g_ec, ino, &out), EXT2_ERR_NOTDIR);
+    REFUSED_AS(ext2_set_dotdot(g_ec, ino, EXT2_ROOT_INO), EXT2_ERR_NOTDIR);
+    filedir_unchanged();
+    dump_image("filedir.img");
+
+    report("case filedir FAT12\n");
+    disk_setup();
+    kmemset(g_fatdisk, 0, sizeof(g_fatdisk));
+    kmemset(&opt, 0, sizeof(opt));
+    opt.fmt = FM_FAT;
+    opt.n_fat = 2;
+    CHECK(f_mkfs("0:", &opt, work, sizeof(work)) == FR_OK);
+    pdrv_busy[0] = pdrv_busy[1] = 0;
+    fatfs_init();
+    EQ(vfs_mount("/fd0", "fd0", "fat"), VFS_OK);
+    filedir_paths("/fd0");
+    vfs_umount("/fd0");
+}
+#undef FILEDIR_REFUSED
+#endif
+
 /* sel が "+first-fail" なら全段を回し、どこかの段で落ちたらそこで打ち切る
  * (test_vfs_fd_path.py の変異。RED かどうかだけ分かればよい)。 */
 #define FDP_STEP(name, fn) \
@@ -2015,6 +2146,7 @@ static void run(const char *sel)
     FDP_STEP("fatwp", case_fatwp)
     FDP_STEP("fatname", case_fatname)
     FDP_STEP("hostname", case_hostname)
+    FDP_STEP("filedir", case_filedir)
 #endif
 done:
     report("checks "); report_i(g_checks);
