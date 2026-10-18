@@ -1,6 +1,7 @@
 # 持越し台帳 — 延ばした試験・SKIP・ホストだけの合格・未結線
 
 > 状態: **現行 (2026-10-14、反省会の決定と GSERIAL-1・GSERIAL-2 の閉鎖を反映。h9 で T2h の照合済み)** — R0〜R7 (NP21/W の 5 構成 + 実機 Ra266) の結果で閉じた行は [閉鎖台帳](../archive/v3/DEFERRED_CLOSED.md) の「T2h R0〜R7」へ移した (閉 21・部分閉 10)。残るのは **渡す 21** (次のゲスト受入 8、後続の段 12、実機 1)・**持越し 3** (決定)・**実機の所見 4**。分類の一覧は `~/os32-tmp/run/h/h9/H9_CLASSIFY.md`。
+> **T5 着手前の再照合 r5 (2026-10-18)** — T5-0a/0b・T5a-3の受け口、CD接続取消と凍結、FD容量ゲートを同期。状態行は過去の記録のまま。
 > 規則: **未完了だけを持つ**。終わった行は、証拠の所在を票に書いてから [閉鎖台帳](../archive/v3/DEFERRED_CLOSED.md) へ移す。実行ログを貼らない。同じ延期を票・引き継ぎ・memory に写さない。
 > ここに行が無い SKIP・未実行は合格に数えない ([ROLES §4](agents/ROLES.md))。FAIL・crash・timeout を延期に書き換えない。関門に着いたら、その関門の行を全部消すまで次へ進まない。
 
@@ -16,6 +17,9 @@
 | **v3 の最終段 (搭載メモリ量ごとの動作確認)** | H-4 の構成別の残り (8MB・17MB・Cirrus など、メモリ量・構成ごとの M の全通し) | ユーザー決定 2026-10-14: 搭載メモリ量ごとの確認は v3 の最終段まで後回し。それまでのゲスト受入は NP21/W 64MB (`np21x64w.ini` の ExMemory=64、実機 Ra266 と同じ) の 1 構成で回す。8MB の最低条件 (V3_PLAN §2-2) は目標のまま、その判定を最終段で行う |
 | 次に `check_select.py` / ci-stab を触る保守の段 (遅くとも T3 の最初の取り込みの全体検査) | X-4 (残り) | 記録の分はその全体検査で残す |
 | T4 | X-11、E11-A2b、X-1 の一部 | 設計票で扱う |
+| T5-0a / T5-0b | T4C1-GUEST、T4B-EXT2、T4C1-CORE、KSTK-DF、IMEDUP-1 | T4証拠照合・fixture短縮/計測→実guard受入→stack採否 |
+| T5a-3 | T4B7-GUI | GUI端末と入力・IME・STOPの観測 |
+| T5の各部品追加 / 次のVFS・ISO境界変更 | T4C1-FD / T4B-CD | FD容量でT6b-M挿入 / 凍結コードの削除要否判断 |
 | T5a / T7 | X-1 の一部、E10-4、H-6b、H-5 (CG 窓 WB・68h) | — |
 | [TASK_PCM_CS4231](v3/TASK_PCM_CS4231.md) | R7-2、H-4 (b)(c) | — |
 | 保守 (道具・媒体) | LZSS-1、PRIO-1、S-1、X-20、PRE-1 | 次にその道具・媒体を触る段 |
@@ -28,14 +32,16 @@
 |---|---|---|---|
 | T3AB-R1 | T3ab の R1 像の一式のゲスト受入 | 実機の回帰 T3bR は 2026-10-17 に全項目 PASS (閉鎖台帳)。R1 像だけ未実施 | 次の R1 の回 |
 | T3C2-GUI | T3c2 の 6 命令を GUI の端末から回す (sentinel・20 回・ネスト) と、H-5 の Ra266 64MB での同条件比較 | v3 に GUI の端末アプリが無い (H-7)、H-5 は実機の条件。CUI の 6 命令・CUI/GUI の往復・PT の監査は NP21/W で合格 (2026-10-17、`~/os32-tmp/evidence/2026-10-17/t3c2_t3d1_np21w/RESULT.md`) | GUI の端末は H-7 の再開時、H-5 はハードウェアの実機の回 (T4T7-RH と同じ回) |
-| T4C1-GUEST | SQLite 分離後の通常 DB/FEP、欠落・混在拒否、対更新と監査 diff=0 | T4c-1 は host 実装段、ユーザー指定でゲストを回さない。手順・サイズ・証拠は `~/os32-tmp/run/t4c/report_T4c-1.md` | PM の T4c-1 NP21/W 64MB 受入。db_test/db_v50_test・db_mem_used、CUI/GUI 変換、KDEBUG ON/OFF、hsync boot の同世代/異世代/別root復旧を確認 |
-| T4B-CD | 不変CDのboot permit接続、CD FEP/settingsのRO開始、および実ゲストの同一DB排他・媒体交換 | T4b-4/4cはhostでVFS/ISO/ATAPIを通す段。配備・ゲスト操作は依頼対象外。`vfs_sqlite_allow_immutable(prefix)` はboot policyが明示する口で、自動RO判定はしない | T4c-3のRO FEP/settings接続とhost受入、T5b-5のCD実起動。ext2/同一DBのゲスト受入はPMのT4b統合時 |
+| T4C1-GUEST | T4c-1のゲスト項目のうち未照合: 欠落/混在拒否・対更新・KDEBUG ON/OFF・監査、注入/QUARANTINED | 通常DB 9/9・42/42とservices順/diff0、部品なしMINIMALはT4c-2受入記録あり (`~/os32-tmp/evidence/2026-10-18/t4c2_np21w/RESULT.md`)。項目別に突合し、T4全体の状態行だけで一括閉鎖しない | T5-0aで証拠照合。未証拠の注入/隔離・同/異世代更新/別root復旧等は残す |
+| T4B-CD | 不変CD専用RO SQLiteのコード/host試験を凍結保持。削除費用と像の差の判断だけ残す | ユーザー決定2026-10-18: vfs_sqlite_allow_immutableのT4c/T5b製品接続予定を取消。CD root/FEP/settings/permit/媒体交換の製品試験は方針変更で対象外 (合格ではない) | 次にVFS/ISO境界を触る段で削除要否を判断。通常CD読取/cdinstはT5b-5。ext2排他は別行 |
+| T4B-EXT2 | 実ゲストの同一DB排他 (親子/park/RESIDENT/別名) の証拠照合 | T4b-4/4cのhost成功やCD接続取消でゲスト完了にはしない | T5-0aでT4受入証拠と照合し、未証拠分を明記して実施済みだけ閉鎖 |
 | T3D2-D15 | D15 (前景 1 本で起動 2 秒・入力→描画 100ms、P100/32MB) の判定。T3d2 の時間は NP21/W の参考値だけ (`~/os32-tmp/evidence/2026-10-18/t3d2_np21w/RESULT.md`) | エミュレータの時間は実機の時間ではない。票 T3d2 の取り決めで「未測定として台帳へ」 | 実機の回 (T4T7-RH と同じ回)、T7b の日本語の描画の計測と合わせて |
 | T4T7-RH | T4〜T7 の実機 (Ra266) での確認: T5c-4 の 82557 の回帰、T6b-2 の Ra266 の欄、T7a-2c の 9821 の再描画と CG 窓 (H-5・H-6b)、T7a-2e2 の `v86 -g`/boot2/DOS、T7 の Ra266 の計測 | ユーザー決定 2026-10-17: ソフトウェアの変更は NP21/W で合否を決め、ハードウェアに触るカーネルの変更は実機のテストをまとめて行う | ハードウェアに触る段がたまった所でまとめて行う実機の回 (時期は PM が提案)。新しい段で実機の項目が出たらこの行に足す |
-| T4C1-FD | T4c-1 で FD の空きが 136KB 減った (2HD 293→157KB、1.44MB 504→369KB)。SQLite は VK32 の中では LZ4 で約 257KB だったが、`sqlite.mod` は圧縮なしの 395,640 B。FD 起動で読む量も約 138KB 増 | 部品の圧縮は T6b の範囲。今は入る (T4c-1 のレビュー R2) | T5 で部品を足す前に FD の残量を測り、足りなければ部品の圧縮 (T6b) を前倒しの候補にする |
-| T4C1-CORE | engine stack 128KiB の見直し: host の最大使用量は 4,604 / 131,072 B (init/CRUD/診断だけ)。core 増分 +4,072 B は削らず見積を実測に直した (ユーザー承認 2026-10-18) | ゲストの大きい文 (db_v50_test) での最大使用量が未測定 | T5 の最初に NP21/W で db_v50_test を含む最大使用量を測り、32KiB に縮めるかを決める (ユーザー承認 2026-10-18) |
-| KSTK-DF | カーネル・SQLite engine のスタックがガード頁に当たると、#PF の例外フレームも NP 頁に書くので #DF → トリプルフォルト (リセット) になり、診断の 1 行が出ない。#DF を専用 TSS の task gate で受ければ止まる前に診断を出せる (T4c-1 の直しの astra レビュー P1) | T4c-1 以前の固定ガード・カーネルのスタックと同じ振る舞い (`kernel/isr_stub.asm:28`)。黙った破壊ではなく停止なので T4c-1 の範囲外 | T5 に小さい段として入れる (ユーザー承認 2026-10-18)。T5 着手前の再照合で段を置く |
-| T4B7-GUI | T4b-7 の GUI 端末からの db done/stop と、区間中の log stop (試験ビルド) | db の fixture (4^12 行の集計) が 1 回 12〜19 分かかり、GUI 端末の回は未実行。通常の像の log stop は子が先に終わる。CUI では両方合格 (`~/os32-tmp/evidence/2026-10-18/t4c_fix3_np21w/RESULT.md`) | db の fixture を数分に縮める直しと一緒に、次に GUI 端末を触る段 (T5a) の受入で回す |
+| T4C1-FD | T4c-1時点のFD残量: 2HD 157KB・1.44MB 369KB、SQLite分離で約136KB減 | 過去の値。VK32圧縮減と非圧縮部品/prefix/cluster丸めの差を再計測する必要がある | T5-0aと各追加前後に両FD実残量を測る。ATAPI/iso9660・lan.modも計上。不足する追加段の前へT6b-Mを挿入。T6b-1/2の集積拡張だけでは解消しない |
+| T4C1-CORE | engine stack 128KiB の見直し: host の最大使用量は 4,604 / 131,072 B (init/CRUD/診断だけ)。core 増分 +4,072 B は削らず見積を実測に直した (ユーザー承認 2026-10-18) | ゲストの大きい文 (db_v50_test) での最大使用量が未測定 | T5-0aで128KiBのままdb_v50_test等のhigh-water/残余を計測。T5-0bのKSTK-DF受入後に32KiB採否を記録し、縮小時は同じ負荷/rollback/監査を再確認、不足なら128KiB維持 |
+| KSTK-DF | カーネル・SQLite engine のスタックがガード頁に当たると、#PF の例外フレームも NP 頁に書くので #DF → トリプルフォルト (リセット) になり、診断の 1 行が出ない。#DF を専用 TSS の task gate で受ければ止まる前に診断を出せる (T4c-1 の直しの astra レビュー P1) | T4c-1 以前の固定ガード・カーネルのスタックと同じ振る舞い (`kernel/isr_stub.asm:28`)。黙った破壊ではなく停止なので T4c-1 の範囲外 | T5-0b。専用TSS/task gateでkernel/engineの実guard到達をゲスト注入し、診断→停止 (reset/cleanup0) を受けてからstack縮小へ |
+| T4B7-GUI | T4b-7 の GUI 端末からの db done/stop と、区間中の log stop (試験ビルド) | db の fixture (4^12 行の集計) が 1 回 12〜19 分かかり、GUI 端末の回は未実行。通常の像の log stop は子が先に終わる。CUI では両方合格 (`~/os32-tmp/evidence/2026-10-18/t4c_fix3_np21w/RESULT.md`) | T5-0aで製品SQL設定のままfixtureを数分へ縮め期待結果/試験を同期 (文の形を保ち、行数でstack深さは変わらない)。T5a-3でGUI端末のdone/stop・区間内log stopと入力/IME/STOPを観測。端末実体/世代/起動経路を固定しH-7/T5A-ACCとは分ける |
+| IMEDUP-1 | 学習後に同一候補が重複しないことのゲスト確認 | コードは着地、C側の重複排除で候補32件未満を許す。ゲスト未確認 | 最初のゲスト受入T5-0aで変換→学習→再変換を観測 |
 | LGY98-L12 | LGY-98 の L1 (131/200 フレーム) と L2 (66,132/131,072 B) が FAIL — main 9aaaf39 でも同じ数値で FAIL (T3ab の後退ではない)。台本 `tools/net_l0..l3_test.py` は urllib で 127.0.0.1:8025 を直接叩くので、WSL の NAT では届かない (受入では手元の shim で `np21w_client` の curl 経路へ回した) | 既存の失敗、原因は台本か host_agent v2 の側 [推] | 次に LGY-98 / net の台本を触る段: 台本を np21w_client に寄せ、L1/L2 の欠落の原因を調べる |
 | E9-1 | CPL3 sh 経由の tvdump (CUI 対照つき) | v3 の sh.bin はシリアル系コマンドを持たず (D2(a))、sh の中の tvdump は「external programs need the GUI terminal」で $?=126 — 台本の前提が v3 で成り立たない。代わりに CPL3 の CUI 前景で `audit_test tvram` が PASS (2026-10-16、`~/os32-tmp/evidence/2026-10-16/guest8/E9-1/`) | H-7 (端末アプリの再開) の再開時ゲートで |
 | E11-9 | WM の tvdump 0 埋めのゲスト確認 | v3 の GUI には rshell が無く gserial にも tvdump が無い。代わりに GUI の Run から `audit_test tvram` を回すと FAIL 12 (範囲外の読み 10 回の番兵が 0 で上書き + 'Q' 2 件) — GUI 中の TVRAM の読みは 0 埋めという設計と整合するが、試験の期待との関係は未確認 (`guest8/E11-9/`) | H-7 の再開時ゲートで。`audit_test tvram` の GUI での期待はその前に確かめる |
@@ -68,7 +74,7 @@
 |---|---|---|---|
 | H-7 | apps / game: v3 では組まない (ユーザー決定 2026-09-30)。T2h では再開時ゲート (caller 追随・再ビルド・受入の一覧) の引渡しを確かめた。v3 の完了条件ではない。再開時は **c2 以後の SDK で再ビルド必須** — 旧 libos32gfx.a の外部バイナリは v70 で互換 token の VA を得て取り直さず、200 ライン化後に kill され得る (e11c2 レビュー R6)。**memory_layout=2 (e11b2) 以後、再ビルド前の apps/game の成果物はロード時に世代不一致で必ず拒否される** (旧 shlib の拒否は R1c-2 で実証)。外部の Makefile は T2c 以後の `link_guard.py` 経由のリンクにも未追随 (2026-10-08 の `make external` で mkos32x が拒否)。f7 以後は SDK の CRT が `libos32nano.a` を要るので、外部 Makefile のリンクに `-los32nano` を `-lc` より前に足す (f7 レビュー P2-1)。**端末アプリに依る未実施をここに束ねる**: E11-5 の端末の子・隠れた sh、E11-9 の GUI 端末の tvdump 0 埋め (元の行 1113、1248、1810–1826、1868、3463) | 再開時ゲート | apps / game の再開時 |
 | S-4 | 外部 apps / game の再結線 | 適用外 → = H-7 | 同上 |
-| E11-A3 | 全画面 owner の同期の子 (slot.parent) は kernel が読ませるが WM の起床の手がかりに入らない。端末由来のバイト (宛先 0) は全員が読める。**PM 決定 (2026-10-07): 専用 KAPI `kbd_inject_to` は e11c に入れない**、**U6 (ユーザー決定 2026-10-10): 足さない** — 全画面への矢印・機能キーの配送は E11-5 の実測で判断 (残り 2 点は E11-5 行) | 改善 (決定による持越し) | 全画面の入力に不足が出たとき |
+| E11-A3 | 全画面 owner の同期の子 (slot.parent) は kernel が読ませるが WM の起床の手がかりに入らない。旧「端末由来は全員が読める」はGUIRUNKEY-1 (2026-10-18) で変更済み。読み手とslot/launchの起動連鎖だけが取得する。全画面の起床手がかりの残件は維持。**PM 決定 (2026-10-07): 専用 KAPI `kbd_inject_to` は e11c に入れない**、**U6 (ユーザー決定 2026-10-10): 足さない** — 全画面への矢印・機能キーの配送は E11-5 の実測で判断 (残り 2 点は E11-5 行) | 改善 (決定による持越し) | 全画面の入力に不足が出たとき |
 
 ## 4. 実機 Ra266 (R7、2026-10-12、9545e27)
 
