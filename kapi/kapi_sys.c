@@ -16,6 +16,7 @@
 #include "pgalloc.h"
 #include "io.h"
 #include "kstack_hw.h"
+#include "sqlite_engine.h"
 #include "module.h"
 extern u32 exec_as_leftover_pages;
 extern volatile u32 fault_kill_count;
@@ -152,6 +153,7 @@ void kapi_sys_get_build_info(char *buf, int size)
     /* int の size を無検証で u32 に渡すと負値が巨大長に化ける */
     if (!buf || size <= 0) return;
     kstrncpy(buf, __DATE__ " " __TIME__, (u32)size);
+    sqlite_engine_stack_report();
 }
 
 /* ======================================================================== */

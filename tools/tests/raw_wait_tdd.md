@@ -40,7 +40,9 @@ SQLite guard と実代替 stack、実 exec の launch/resume 着地を ILP32/qem
 ゲスト fixture 自身も記録用 KernelAPI で実行し、8 口の選択、予期しない入力・STOP 後の
 return の拒否、親の二重回収・pool/USER/SQLite 漏れ・sentinel/result 不一致の検出を確認する。
 実際の `RAW_SLOW_SQL` を同梱 SQLite と `os32_sqlite_config.h` で prepare/step し、
-512KiB MEMSYS5 内で 4^12 行の集計結果と VM step 数を照合する (VFS のみメモリ用代替)。
+512KiB MEMSYS5 内で 4^9 × 2^3 = 2,097,152 行の集計結果と VM step 数を照合する (VFS のみメモリ用代替)。
+SQL は NUL 込み 862B (上限 1024B)、期待集計値 56,623,104。VM steps は旧 436,207,865 → 54,527,842 (比 0.1250)。
+旧 NP21/W 実測 12〜19 分から約 90〜143 秒を見込む (短縮後のゲスト時間は PM が実測する)。
 IME の固定読みは IPADIC 全件を配布生成器で正規化した後、M のコスト上限・重複排除を
 同じ生成器で適用し、候補があることを検査する。変更済み・学習済みのゲスト DB は根拠にしない。
 
@@ -74,7 +76,7 @@ GUI でも読みは「か」に固定する。辞書切替で学習内容を削�
 | `imechar`, `imekey` | 同上。候補表示中の STOP も両口で行う | 同上。WM の FEP 配送と raw cooked 待ちを区別 |
 | `serial` | 同上。done は READY 後に受信線へ `Q` | 同上。done は受信線へ `Q` |
 | `fm` | 同上。done は 1 音、stop は約 28 秒の連音列中 | 同上。Key-ON 中に STOP |
-| `db` | 同上。4^12 行の直積集計 SELECT 中に STOP | 同上 |
+| `db` | 同上。4^9 × 2^3 = 2,097,152 行の直積集計 SELECT 中に STOP | 同上 |
 | `log` | 同上。既定辞書への reopen 成功ログ中に STOP | 同上 |
 
 `done` は入力口では READY 後に `Q`、FM/DB/log は入力なしで完了を待つ。

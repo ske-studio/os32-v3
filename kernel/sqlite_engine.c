@@ -20,6 +20,8 @@
 
 volatile u32 sqlite_engine_active;
 u32 sqlite_engine_stack_top;
+#define SQLITE_STACK_MARK 0xa5
+static u32 sqlite_stack_peak;
 extern void sqlite_call_on_alt_stack(void (*call)(void *), u32 top, void *frame);
 
 int sqlite_engine_available(int io)
@@ -47,6 +49,26 @@ int sqlite_engine_run(void (*call)(void *), void *frame, int io)
     irq_restore(flags);
     /* STOP belongs to the caller's safe point, after output and teardown. */
     return 1;
+}
+
+/* Downward stack: the untouched prefix excludes the NP guard page.
+ * Only diagnostics scan it; neither IRQ masking nor an engine call is needed. */
+u32 sqlite_engine_stack_high_water(void)
+{
+    if (!sqlite_engine_stack_top) return 0;
+    const volatile u8 *base = (const volatile u8 *)(uptr)
+        (sqlite_engine_stack_top - SQLITE_ENGINE_STACK_SIZE);
+    u32 untouched = 0;
+    while (untouched < SQLITE_ENGINE_STACK_SIZE - sqlite_stack_peak &&
+           base[untouched] == SQLITE_STACK_MARK) untouched++;
+    sqlite_stack_peak = SQLITE_ENGINE_STACK_SIZE - untouched;
+    return sqlite_stack_peak;
+}
+
+void sqlite_engine_stack_report(void)
+{
+    kprintf(0x07, "sqlite stack high-water=%u of %u\n",
+            sqlite_engine_stack_high_water(), SQLITE_ENGINE_STACK_SIZE);
 }
 
 /* Boot-only adapter: code, pool and alternate stack share one module owner.
@@ -103,6 +125,10 @@ static int sqlite_start(struct module_record *r, u32 entry, u32 *exports)
                               paging_sqlite_stack_guard + PAGE_SIZE - 1) ||
         paging_is_present(paging_sqlite_stack_guard)) return MODULE_NO_PAGES;
     sqlite_engine_stack_top = paging_sqlite_stack_guard + PAGE_SIZE + SQLITE_ENGINE_STACK_SIZE;
+    /* Fill once, before module init uses the stack. Never repaint on entry. */
+    kmemset((void *)(uptr)(sqlite_engine_stack_top - SQLITE_ENGINE_STACK_SIZE),
+            SQLITE_STACK_MARK, SQLITE_ENGINE_STACK_SIZE);
+    sqlite_stack_peak = 0;
     struct sqlite_init_call call = {entry, SQLITE_MISUSE};
     sqlite_engine_run(call_module_init, &call, 0);
     candidate_valid = valid_api(r);

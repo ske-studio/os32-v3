@@ -217,6 +217,8 @@ def pair_runtime_suite(folder, mutate=False):
 def real_runtime_suite(folder, directory, vmkernel, mutate=False):
     """Execute the product module with the full adapter and real stack switch."""
     generated = ROOT / 'lib/sqlite3/generated'
+    (folder / 'sys_build_info.inc').write_text(function(
+        (ROOT / 'kapi/kapi_sys.c').read_text(), 'kapi_sys_get_build_info'))
     ime = (ROOT / 'kernel/ime.c').read_text()
     close = function((ROOT / 'kernel/ime_dict.c').read_text(), 'ime_dict_close')
     close = close.replace('sqlite3_finalize(', 'os32_sqlite_finalize(').replace('sqlite3_close(', 'os32_sqlite_close(')
@@ -296,6 +298,20 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False):
                 assert 'PASS guard overflow fault -> engine fail-stop' in output, result
                 print(output, end='')
         print('PASS real SQLite adapter ' + label, flush=True)
+    if mutate:
+        path = folder / 'sqlite_engine.c'
+        source = path.read_text()
+        fill = ('    kmemset((void *)(uptr)(sqlite_engine_stack_top - SQLITE_ENGINE_STACK_SIZE),\n'
+                '            SQLITE_STACK_MARK, SQLITE_ENGINE_STACK_SIZE);')
+        assert source.count(fill) == 1
+        path.write_text(source.replace(fill, '    /* mutation: omit initial stack fill */'))
+        subprocess.run(command, check=True)
+        payload = struct.pack('<4I', 0, len(image), pair, 0) + image
+        result = host32.run([str(exe)], input=payload, runner='qemu', capture_output=True)
+        assert result.returncode == 1 and b'FAIL deep_water > 0 && deep_water < SQLITE_ENGINE_STACK_SIZE' in result.stdout, result
+        print('MUTATE stack-fill RED (compiled runtime): ' + result.stdout.decode().strip(), flush=True)
+        path.write_text(source)
+        subprocess.run(command, check=True)
     boot_cases = [('services-ready', 10), ('missing-sqlite', 11), ('mixed-sqlite', 12),
                   ('image-allocation', 13), ('unicode-missing', 14), ('unicode-old', 15),
                   ('unicode-io', 16), ('unicode-allocation', 17), ('partial-FEP', 18),

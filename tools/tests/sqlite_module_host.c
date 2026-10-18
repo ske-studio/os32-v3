@@ -28,7 +28,18 @@ static u32 pos, opens, closes, owned, retired, allocated, alloc_calls;
 static u32 stack_base, heap_base, prefix_failed, init_calls, stack_probes;
 u32 paging_sqlite_stack_guard;
 static int guard_np, guard_restored;
+static u32 stack_reports;
 static void stack_usage(void);
+/* Copyout seam for the real ver diagnostic entry. */
+char *kstrncpy(char *d, const char *s, u32 n)
+{
+    u32 i = 0;
+    if (!n) return d;
+    while (i + 1 < n && s[i]) { d[i] = s[i]; i++; }
+    d[i] = 0;
+    return d;
+}
+#include "sys_build_info.inc"
 static struct bootinfo bi;
 u32 host_flags = 0x202;
 volatile u32 kctx_irq_depth, kctx_exc_depth;
@@ -201,10 +212,8 @@ static void overflow_test(void)
 }
 static void stack_usage(void)
 {
-    u8 *base = (u8 *)(uptr)stack_base;
-    u32 untouched = 0;
-    while (untouched < SQLITE_ENGINE_STACK_SIZE && base[untouched] == 0xcc) untouched++;
-    u32 used = SQLITE_ENGINE_STACK_SIZE - untouched;
+    u32 used = sqlite_engine_stack_high_water();
+    CHECK(used > 0 && used < SQLITE_ENGINE_STACK_SIZE);
     char digits[11];
     u32 n = 0;
     do { digits[n++] = '0' + used % 10; used /= 10; } while (used);
@@ -263,6 +272,17 @@ int vfs_quarantine_sqlite(const VfsSqliteCookie *cookie)
 void kprintf(u8 attr, const char *fmt, ...)
 {
     (void)attr;
+    if (!memcmp(fmt, "sqlite stack high-water=", 23)) {
+        va_list args;
+        va_start(args, fmt);
+        u32 used = va_arg(args, unsigned), size = va_arg(args, unsigned);
+        va_end(args);
+        CHECK(!sqlite_engine_active && (host_flags & 0x200));
+        CHECK(used > 0 && used < size && size == SQLITE_ENGINE_STACK_SIZE);
+        stack_reports++;
+        say("sqlite stack high-water="); number(used);
+        say(" of "); number(size); say("\n");
+    }
     if (input[0] >= 10 && services_stage != SERVICES_READY)
         CHECK(!services_public);
     if (!memcmp(fmt, "IME: 学習不可", sizeof("IME: 学習不可") - 1)) learn_unavailable++;
@@ -532,7 +552,20 @@ void _start(void)
     CHECK(os32_sqlite_step(stmt) == SQLITE_ROW && os32_sqlite_column_int(stmt, 0) == 42);
     CHECK(os32_sqlite_step(stmt) == SQLITE_DONE);
     CHECK(os32_sqlite_finalize(stmt) == SQLITE_OK);
+    /* Recursive expression parsing on the real engine stack, product config. */
+    CHECK(os32_sqlite_prepare_v2(db,
+        "SELECT abs(abs(abs(abs(abs(abs(abs(abs(abs(abs(abs(abs("
+        "abs(abs(abs(abs(abs(abs(abs(abs(abs(abs(abs(abs(-42"
+        "))))))))))))))))))))))))", -1, &stmt, 0) == SQLITE_OK);
+    CHECK(os32_sqlite_step(stmt) == SQLITE_ROW && os32_sqlite_column_int(stmt, 0) == 42);
+    CHECK(os32_sqlite_finalize(stmt) == SQLITE_OK);
+    u32 deep_water = sqlite_engine_stack_high_water();
+    CHECK(deep_water > 0 && deep_water < SQLITE_ENGINE_STACK_SIZE);
+    char build_info[64];
+    kapi_sys_get_build_info(build_info, sizeof(build_info));
+    CHECK(build_info[0] && stack_reports == 1);
     CHECK(os32_sqlite_exec(db, "DELETE FROM t", 0, 0, 0) == SQLITE_OK);
+    CHECK(sqlite_engine_stack_high_water() >= deep_water);
     CHECK(os32_sqlite_outer_canary() == 0);
     /* Corrupt the word immediately before the MEMSYS5 heap: accounting
      * state must precede the canary, never separate it from the heap. */

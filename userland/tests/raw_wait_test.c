@@ -14,19 +14,20 @@
 #define RAW_IME_YOMI "か"
 #define RAW_IME_ROMAJI "ka"
 #define RAW_DICT_VARIANT 1
-/* Four rows in each of twelve factors: 4^12 VM iterations, without CTEs
+/* Nine four-row and three two-row factors: 4^9 * 2^3 rows, without CTEs
  * (SQLITE_OMIT_CTE) or more than SQLITE_MAX_COMPOUND_SELECT=5 terms.
  * Comma joins keep the SQL within DB_SQL_MAX_BYTES, including NUL. */
 #define RAW_SQL_FOUR \
     "(SELECT 1 AS x UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4)"
+#define RAW_SQL_TWO "(SELECT 1 AS x UNION ALL SELECT 2)"
 #define RAW_SLOW_SQL \
     "SELECT sum(a.x+b.x+c.x+d.x+e.x+f.x+g.x+h.x+i.x+j.x+k.x+l.x) FROM " \
     RAW_SQL_FOUR " a, " RAW_SQL_FOUR " b, " \
     RAW_SQL_FOUR " c, " RAW_SQL_FOUR " d, " \
     RAW_SQL_FOUR " e, " RAW_SQL_FOUR " f, " \
     RAW_SQL_FOUR " g, " RAW_SQL_FOUR " h, " \
-    RAW_SQL_FOUR " i, " RAW_SQL_FOUR " j, " \
-    RAW_SQL_FOUR " k, " RAW_SQL_FOUR " l"
+    RAW_SQL_FOUR " i, " RAW_SQL_TWO " j, " \
+    RAW_SQL_TWO " k, " RAW_SQL_TWO " l"
 
 static int parent_run(KernelAPI *api, const char *entry, const char *end);
 static int probe(KernelAPI *api, const char *entry, const char *end);

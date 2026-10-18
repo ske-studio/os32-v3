@@ -7,6 +7,8 @@ extern volatile u32 sqlite_engine_active;
 extern u32 sqlite_engine_stack_top;
 int sqlite_engine_available(int io);
 int sqlite_engine_run(void (*call)(void *), void *frame, int io);
+u32 sqlite_engine_stack_high_water(void);
+void sqlite_engine_stack_report(void);
 void sqlite_engine_fault(u32 vector, u32 eip, u32 cr2);
 /* Boot-only transaction. Internal SQLite exports are independent of this gate. */
 extern int services_public;

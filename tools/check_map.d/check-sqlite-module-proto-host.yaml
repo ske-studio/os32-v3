@@ -75,4 +75,5 @@ check-sqlite-module-proto-host:
 - kernel/unicode_file.h
 - lib/sqlite3/os32_sqlite_test.c
 - include/endian_le.h
+- kapi/kapi_sys.c
 artifact_reader: true

@@ -61,17 +61,17 @@ int main(void)
     CHECK(sqlite3_prepare_v2(db, RAW_SLOW_SQL, -1, &stmt, &tail) == SQLITE_OK);
     CHECK(stmt && tail && !*tail);
     CHECK(sqlite3_step(stmt) == SQLITE_ROW);
-    /* 4^12 rows, sum of twelve independent values 1..4. Require real VM
+    /* 4^9 * 2^3 rows, mean sum 9*2.5 + 3*1.5 = 27. Require real VM
      * work rather than relying on host timing or a trivially folded query. */
-    CHECK(sqlite3_column_int64(stmt, 0) == 503316480);
+    CHECK(sqlite3_column_int64(stmt, 0) == 56623104);
     int steps = sqlite3_stmt_status(stmt, SQLITE_STMTSTATUS_VM_STEP, 0);
-    CHECK(steps > 16777216);
+    CHECK(steps > 2097152);
     CHECK(sqlite3_step(stmt) == SQLITE_DONE);
     CHECK(sqlite3_finalize(stmt) == SQLITE_OK);
     CHECK(sqlite3_close(db) == SQLITE_OK);
     CHECK(sqlite3_shutdown() == SQLITE_OK);
     CHECK(!file_opens && sqlite3_memory_used() == 0);
-    printf("PASS guest inputs: OS32 SQLite prepare/step, VM steps=%d, M dictionary yomi=%s candidates=%d\n",
-           steps, RAW_IME_YOMI, RAW_DICT_CANDIDATES);
+    printf("PASS guest inputs: OS32 SQLite prepare/step, SQL bytes=%u, VM steps=%d, M dictionary yomi=%s candidates=%d\n",
+           (unsigned)sizeof(RAW_SLOW_SQL), steps, RAW_IME_YOMI, RAW_DICT_CANDIDATES);
     return 0;
 }

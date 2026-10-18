@@ -181,14 +181,14 @@ def main():
         original, run = guest_inputs(pathlib.Path(directory))
         if args.mutate:
             variants = [
-                ('oversized SQL', re.sub(r'([a-k]), ', r'\1 CROSS JOIN ', original),
+                ('oversized SQL', re.sub(r'([a-k]), ', r'\1 CROSS JOIN /* SQL length probe */ ', original),
                  'FAIL guest inputs: sizeof(RAW_SLOW_SQL) <= DB_SQL_MAX_BYTES'),
                 ('CTE SQL', original.replace('"SELECT sum(a.x+b.x+c.x+d.x+e.x+f.x+g.x+h.x+i.x+j.x+k.x+l.x) FROM "',
                                             '"WITH n AS (SELECT 1) SELECT * FROM n, "'),
                  'FAIL guest inputs: sqlite3_prepare_v2(db, RAW_SLOW_SQL, -1, &stmt, &tail) == SQLITE_OK'),
                 ('short SQL', original.replace('"(SELECT 1 AS x UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4)"',
                                               '"(SELECT 1 AS x)"'),
-                 'FAIL guest inputs: sqlite3_column_int64(stmt, 0) == 503316480'),
+                 'FAIL guest inputs: sqlite3_column_int64(stmt, 0) == 56623104'),
                 ('absent reading', original.replace('#define RAW_IME_YOMI "か"', '#define RAW_IME_YOMI "あ"'),
                  'FAIL guest inputs: RAW_DICT_CANDIDATES > 0'),
             ]
