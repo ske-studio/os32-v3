@@ -1,0 +1,18 @@
+check-fep-ro-host:
+- tools/tests/test_fep_ro.py
+- tools/tests/fep_ro_host.c
+- tools/tests/fep_budget_linux.c
+- tools/tests/sqlite_cd_host.c
+- tools/tests/cd_read_host.c
+- tools/tests/atapi_hostshim/io.h
+- tools/tests/host32.py
+- kernel/ime_dict.c
+- kernel/ime.h
+- fs/vfs.c
+- fs/vfs_fd.c
+- fs/vfs.h
+- fs/iso9660.c
+- drivers/atapi.c
+- lib/sqlite3/**
+- build/checks.d/check-fep-ro-host.mk
+- tools/check_map.d/check-fep-ro-host.yaml

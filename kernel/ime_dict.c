@@ -66,6 +66,15 @@ static const char SQL_LEARN[] =
     "ON CONFLICT(yomi, kanji) DO UPDATE SET "
     "freq = freq + 1, last_ts = ?3";
 
+/* Combined CD dictionaries may omit the learning table entirely. */
+static const char SQL_EXACT_BASE[] =
+    "SELECT kanji, pos_id, cost FROM dict WHERE yomi = ?1 ORDER BY cost LIMIT 32";
+static const char SQL_PREFIX_BASE[] =
+    "SELECT kanji, pos_id,"
+    " CASE WHEN yomi = ?1 THEN cost - 500 ELSE cost END as cost"
+    " FROM dict WHERE yomi >= ?1 AND yomi < ?1 || X'EFBFBF'"
+    " ORDER BY cost LIMIT 32";
+
 /* ======================================================================== */
 /*  公開API                                                                  */
 /* ======================================================================== */
@@ -79,6 +88,9 @@ int ime_dict_open(IME_Dict *dict, const char *path)
 
     if (dict->isolated || dict->db) return -1;
     kmemset(dict, 0, sizeof(IME_Dict));
+    /* This capability includes the boot policy permission and media generation;
+     * a generic RO mount alone never selects the immutable CD path. */
+    dict->readonly = vfs_sqlite_backend(path) == VFS_SQLITE_IMMUTABLE_CD;
     if (os32_sqlite_group_acquire(OS32_SQLITE_RESIDENT, 0, &dict->group)
             != SQLITE_OK) return -1;
     /* 開き直しに使う名前。収まらなければ覚えない (= 開き直さない)。
@@ -86,8 +98,8 @@ int ime_dict_open(IME_Dict *dict, const char *path)
     if (path && kstrlen(path) < sizeof(dict->path))
         kstrncpy(dict->path, path, sizeof(dict->path));
 
-    /* DBファイルを読み書き可能で開く (ユーザー辞書のため) */
-    rc = os32_sqlite_group_open(&dict->group, path, SQLITE_OPEN_READWRITE, &db);
+    rc = os32_sqlite_group_open(&dict->group, path,
+        dict->readonly ? SQLITE_OPEN_READONLY : SQLITE_OPEN_READWRITE, &db);
     dict->db = db;
     if (rc != SQLITE_OK) {
         kprintf(ATTR_RED, "IME: sqlite3_open failed: %s (rc=%d)\r\n",
@@ -97,24 +109,40 @@ int ime_dict_open(IME_Dict *dict, const char *path)
     }
     dict->db = (void *)db;
 
-    /* 学習用テーブルの作成 (存在しない場合) */
-    rc = sqlite3_exec(db,
-        "CREATE TABLE IF NOT EXISTS dict_user ("
-        "  yomi TEXT NOT NULL,"
-        "  kanji TEXT NOT NULL,"
-        "  freq INTEGER DEFAULT 1,"
-        "  last_ts INTEGER DEFAULT 0,"
-        "  PRIMARY KEY (yomi, kanji)"
-        ");"
-        "CREATE INDEX IF NOT EXISTS idx_user_yomi ON dict_user(yomi);",
-        0, 0, 0);
-    if (rc != SQLITE_OK) {
-        kprintf(ATTR_RED, "IME: create user dict failed (rc=%d)\r\n", rc);
-        /* 学習はできないが検索は続行するためエラーにはしない */
+    if (dict->readonly) {
+        rc = sqlite3_prepare_v2(db,
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='dict_user'",
+            -1, &stmt, 0);
+        if (rc == SQLITE_OK) {
+            rc = sqlite3_step(stmt);
+            dict->no_user_table = rc == SQLITE_DONE;
+            sqlite3_finalize(stmt);
+        }
+        if (rc != SQLITE_ROW && rc != SQLITE_DONE) {
+            (void)ime_dict_close(dict);
+            return -1;
+        }
+    } else {
+        /* 学習用テーブルの作成 (存在しない場合)。不変 CD では実行しない。 */
+        rc = sqlite3_exec(db,
+            "CREATE TABLE IF NOT EXISTS dict_user ("
+            "  yomi TEXT NOT NULL,"
+            "  kanji TEXT NOT NULL,"
+            "  freq INTEGER DEFAULT 1,"
+            "  last_ts INTEGER DEFAULT 0,"
+            "  PRIMARY KEY (yomi, kanji)"
+            ");"
+            "CREATE INDEX IF NOT EXISTS idx_user_yomi ON dict_user(yomi);",
+            0, 0, 0);
+        if (rc != SQLITE_OK) {
+            kprintf(ATTR_RED, "IME: create user dict failed (rc=%d)\r\n", rc);
+            /* 学習はできないが検索は続行するためエラーにはしない */
+        }
     }
 
     /* 完全一致検索用プリペアドステートメント */
-    rc = sqlite3_prepare_v2(db, SQL_EXACT, -1, &stmt, (const char **)0);
+    rc = sqlite3_prepare_v2(db, dict->no_user_table ? SQL_EXACT_BASE : SQL_EXACT,
+                          -1, &stmt, (const char **)0);
     if (rc != SQLITE_OK) {
         kprintf(ATTR_RED, "IME: prepare exact failed (rc=%d)\r\n", rc);
         (void)ime_dict_close(dict);
@@ -123,7 +151,8 @@ int ime_dict_open(IME_Dict *dict, const char *path)
     dict->exact_stmt = (void *)stmt;
 
     /* 前方一致検索用プリペアドステートメント */
-    rc = sqlite3_prepare_v2(db, SQL_PREFIX, -1, &stmt, (const char **)0);
+    rc = sqlite3_prepare_v2(db, dict->no_user_table ? SQL_PREFIX_BASE : SQL_PREFIX,
+                          -1, &stmt, (const char **)0);
     if (rc != SQLITE_OK) {
         kprintf(ATTR_RED, "IME: prepare prefix failed (rc=%d)\r\n", rc);
         (void)ime_dict_close(dict);
@@ -132,12 +161,14 @@ int ime_dict_open(IME_Dict *dict, const char *path)
     dict->prefix_stmt = (void *)stmt;
 
     /* 学習(UPSERT)用プリペアドステートメント */
-    rc = sqlite3_prepare_v2(db, SQL_LEARN, -1, &stmt, (const char **)0);
-    if (rc == SQLITE_OK) {
-        dict->learn_stmt = (void *)stmt;
-    } else {
-        kprintf(ATTR_RED, "IME: prepare learn failed (rc=%d)\r\n", rc);
-        dict->learn_stmt = (void *)0;
+    if (!dict->readonly) {
+        rc = sqlite3_prepare_v2(db, SQL_LEARN, -1, &stmt, (const char **)0);
+        if (rc == SQLITE_OK) {
+            dict->learn_stmt = (void *)stmt;
+        } else {
+            kprintf(ATTR_RED, "IME: prepare learn failed (rc=%d)\r\n", rc);
+            dict->learn_stmt = (void *)0;
+        }
     }
 
     /* Main and late journals retain the RESIDENT group lease. */
@@ -435,6 +466,7 @@ static int user_list_once(IME_Dict *dict, const char *yomi_prefix,
     const char *sql;
 
     *io_error = 0;
+    if (dict->no_user_table) return 0;
     if (yomi_prefix && yomi_prefix[0] != '\0') {
         sql = "SELECT yomi, kanji, freq FROM dict_user WHERE yomi >= ?1 AND yomi < ?1 || X'EFBFBF' ORDER BY freq DESC, yomi ASC LIMIT ?2";
     } else {
@@ -545,6 +577,7 @@ int ime_user_delete(IME_Dict *dict, const char *yomi, const char *kanji)
 
     if (!dict || !yomi || yomi[0] == '\0') return -1;
     if (!dict_ready(dict)) return -1;
+    if (dict->readonly) return OS32_ERR_ROFS;
     rc = user_delete_once(dict, yomi, kanji, &io_error);
     if (io_error && dict_recover(dict))
         rc = user_delete_once(dict, yomi, kanji, &io_error);
@@ -569,6 +602,10 @@ static int user_export_once(IME_Dict *dict, const char *path, int *io_error)
     if (fd < 0) {
         kprintf(ATTR_RED, "IME: export open failed: %s (fd=%d)\r\n", path, fd);
         return -2;
+    }
+    if (dict->no_user_table) {
+        vfs_close(fd);
+        return 0;
     }
 
     sql = "SELECT yomi, kanji, freq FROM dict_user ORDER BY freq DESC, yomi ASC";
@@ -627,6 +664,7 @@ int ime_user_clear(IME_Dict *dict)
 
     if (!dict) return -1;
     if (!dict_ready(dict)) return -1;
+    if (dict->readonly) return OS32_ERR_ROFS;
     rc = sqlite3_exec((sqlite3 *)dict->db, "DELETE FROM dict_user;", NULL, NULL, NULL);
     if (rc != SQLITE_OK &&
         is_ioerr(sqlite3_extended_errcode((sqlite3 *)dict->db)) &&
