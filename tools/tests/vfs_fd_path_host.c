@@ -2077,6 +2077,12 @@ static void filedir_paths(const char *root)
     filedir_unchanged();
 }
 
+static int filedir_media_stat(void *ctx, const char *path, OS32_Stat *st)
+{
+    (void)ctx; (void)path; (void)st;
+    return VFS_ERR_IO;
+}
+
 static void case_filedir(void)
 {
     static BYTE work[FF_MAX_SS];
@@ -2104,6 +2110,22 @@ static void case_filedir(void)
     filedir_unchanged();
     dump_image("filedir.img");
 
+    /* Leave an existing cwd after its medium becomes unreadable. */
+    EQ(vfs_mkdir("/hd0/present"), VFS_OK);
+    EQ(vfs_chdir("/hd0/present"), VFS_OK);
+    ext2_ops.stat = filedir_media_stat;
+    {
+        OS32_Stat st;
+        EQ(vfs_stat("/hd0/present", &st), VFS_ERR_IO);
+    }
+    {
+        char resolved[VFS_MAX_PATH];
+        EQ(RESOLVE("../..", resolved, sizeof(resolved)), VFS_OK);
+        CHECK(kstrcmp(resolved, "/") == 0);
+    }
+    kstrncpy(cwd, "/", VFS_MAX_PATH);
+    ext2_ops.stat = ext2_vfs_stat;
+
     report("case filedir FAT12\n");
     disk_setup();
     kmemset(g_fatdisk, 0, sizeof(g_fatdisk));
@@ -2114,6 +2136,13 @@ static void case_filedir(void)
     pdrv_busy[0] = pdrv_busy[1] = 0;
     fatfs_init();
     EQ(vfs_mount("/fd0", "fd0", "fat"), VFS_OK);
+    {
+        OS32_Stat st;
+        EQ(vfs_stat("/fd0/unused.", &st), VFS_ERR_INVAL);
+    }
+    EQ(vfs_chdir("/fd0/unused./.."), VFS_OK);
+    CHECK(kstrcmp(vfs_cwd(), "/fd0/") == 0);
+    kstrncpy(cwd, "/", VFS_MAX_PATH);
     filedir_paths("/fd0");
     vfs_umount("/fd0");
 }

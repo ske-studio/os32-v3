@@ -74,7 +74,8 @@ static char resolve_tmp[VFS_MAX_PATH * 2 + 1];
 
 /* Before discarding a component via . or .., reject an existing non-directory.
  * Otherwise /file/../other becomes /other before the FS can reject file.
- * Keep lexical normalization of absent paths (used by install/hsync). Route
+ * Keep lexical normalization on any stat failure (e.g. removed media or
+ * invalid names that disappear via ..). Route
  * directly: vfs_stat would recurse into this resolver and overwrite its tmp. */
 static int vfs_check_dot_prefix(const char **parts, const int *lengths, int count)
 {
@@ -93,8 +94,7 @@ static int vfs_check_dot_prefix(const char **parts, const int *lengths, int coun
     ops = vfs_route(prefix, rel, sizeof(rel), &ctx);
     if (!ops || !ops->stat) return VFS_OK;
     rc = ops->stat(ctx, rel, &st);
-    if (rc == VFS_ERR_NOTFOUND) return VFS_OK;
-    if (rc != VFS_OK) return rc;
+    if (rc != VFS_OK) return VFS_OK;
     if ((st.st_mode & OS_S_IFMT) != OS_S_IFDIR) return VFS_ERR_NOTDIR;
     return VFS_OK;
 }
