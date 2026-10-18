@@ -48,8 +48,6 @@ typedef struct {
     void *exact_stmt;    /* sqlite3_stmt* (完全一致検索) */
     void *prefix_stmt;   /* sqlite3_stmt* (前方一致検索) */
     void *learn_stmt;    /* sqlite3_stmt* (学習UPSERT) */
-    int readonly;       /* boot policy が許可した不変 CD */
-    int no_user_table;  /* RO 配布辞書に dict_user が無い */
     /* 常駐接続の開き直し (票 TASK_VFS_FD_PATH 方針 v3 の 6)。開いた名前と、
      * FD の失効を伴わない I/O エラーで開き直した印 (成功した検索で戻す) */
     char path[OS32_MAX_PATH];

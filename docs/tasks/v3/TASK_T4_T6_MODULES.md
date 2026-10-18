@@ -45,7 +45,7 @@
 | `boot/vk32_boot.c:43` (`vk32_boot`) | 既存 raw_size の検証。load_span/BSS 込み形式は本票で実装する |
 | `exec/redir_access.c:269` (`copy_caller_cstr`)、`kapi/kapi_db.c:205` (`db_copy_input`) | T2d の B1 は着地。全 DB facade の結線完了ではない |
 | `kapi/kapi_db.c:598` (`kapi_db_exec`) | 旧 stmt の finalize 後に SQL をコピーする経路が残る。§3-1 B3 の修正対象 |
-| `kernel/ime_dict.c:63` (`ime_dict_open`)、`fs/vfs_fd.c:292` (`vfs_validate_sqlite`) | 現行 FEP open と世代検査の入口。RO FEP・group/identity の追加契約と区別する |
+| `kernel/ime_dict.c:63` (`ime_dict_open`)、`fs/vfs_fd.c:292` (`vfs_validate_sqlite`) | 現行 FEP open と世代検査の入口。group/identity の追加契約と区別する |
 
 T2d の B1 と本票への引渡しは `docs/tasks/v3/TASK_T2D_T2H.md:94,582` が正。T2f/g/hの機構は使えるが、GUI KAPI-loopのSTOP修正をB4のengine_active/代替stack保証と読み替えない。実装は既存の `kernel/module.c/.h`、`kernel/module_image.c/.h`、`tools/mkmod.py`、`build/module.ld` を拡張し、importの生成入力をmoduleごとに分ける。内部ABIは公開KAPI表に混ぜない。
 
@@ -196,12 +196,12 @@ FEP画像CRC不一致・辞書なし・予約不足等は利用者へ未公開�
 
 ### 3-5. CD と通常 root の FEP
 
-これは新しい実装契約案で、現行 `ime_dict_open` がREADWRITE固定であることを変更する。D21のFEP必須とD26の実失敗rollbackは維持し、rootのFS種別だけでMINIMALを選ばない。
+通常 root では D21 の FEP 必須と D26 の実失敗 rollback を維持する。CD は下記のユーザー決定のとおりインストールの元だけで、起動の媒体ではない。
 
-- **CD標準構成:** 不変配布CDの既存combined `fep.db` をROで開いて変換を提供する。`ime_dict_open(mode)` にROを加え、CREATE TABLE/INDEXと学習stmtのprepareを行わず、`dict`と存在する場合の`dict_user`を読む検索stmtだけ作る。`dict_user`欠落なら辞書本体だけを検索する。学習は無操作、明示的な削除/clear等の更新APIはROFS、list/exportは読取として維持する。状態診断で「変換可・学習不可」を示す。これはFEP省略ではなく、DICT_METAの学習別file化も前倒ししない。settingsも不変CDをROで読み、更新はROFS。学習を保存する通常構成は NHD ext2 root を使う。
+- **CD:** インストールの元 (cdinst が FD/HDD 起動の後に読む) だけで、CD を root にする起動は無い (ユーザー 2026-10-18)。CD 上の辞書を FEP で開くこと、CD の settings を読むことは無い。
 - **通常構成:** 管理 DB は通常 root (NHD ext2) の既定配置を使う。HostDrv は root にしない (§9 の決定)。
 
-CD の RO FEP は T4c-3 の host fixture で1語変換・学習journal生成ゼロ・更新ROFSを確認し、CD 実起動は T5b-5 で受ける。T5b-6 は HostDrv の補助マウントと通常 root の管理 DB が共存することを確認する。媒体変更は [D1]〜[D3] に従う。
+CD は起動の媒体ではないので、CD 上の FEP・settings の経路は作らない。T5b-5 の『CD 起動』は T5 着手前の再照合で、インストール時に CD を読む段 (ATAPI/iso9660 を早期ロードから外せるか、T4b-4c の不変 CD の RO SQLite 経路の要否を含む) に直す。T4c-3 は app 圧迫下の変換と ext2 の標準 RW 学習を回帰する。T5b-6 は HostDrv の補助マウントと通常 root の管理 DB が共存することを確認する。媒体変更は [D1]〜[D3] に従う。
 
 ## 4. T5a FEP 案 B
 
@@ -301,14 +301,14 @@ T6bは最後に集積を上位票の `[0x500000,0x600000)` へ移し上限1MiB�
 | T4b-8 (1日) | X-1残る文字列・kprintfの棚卸し/接続 | ①全公開NUL入力/可変引数の担当が確定 ②format/%s/引数窓の端をB1で処理 ③ページ末尾NUL成功、次ページ欠落/未終端は副作用前失敗 ④通常表示同一。生ポインタ読取へ戻す変異を検出。量が多ければAPI群別に分割 |
 | T4c-1 (1日) | SQLite module build・typed facade・全stub | ①旧連結sqlite section/addr参照と固定stack依存が消える ②全db API/診断がstubかtyped exportへ ③通常db_test/db_mem_used成功 ④旧新混在はinit0で拒否。直呼び残存/NULL stub変異を検出。/bootへ配布しhsync bootで対更新 (§5-4)。resident終端・stack・KHEAP算出と監査を切替 (§7-2)。依頼に `rg -l "__sqlite_\|SQLITE_STACK\|__kernel_resident_end"` の全参照一覧 (paging/kentry/isr・監査・tools/testsも含む) を添える。VK32をcore1本へ変更、Unicode順序・配布世代門も同期 (§3-4/5-4)。 加えて `make kernel` がカーネルの像と対の部品 (kdebug.bin・SQLite の部品、T5 以降は起動時に読む部品) を全部組むこと (部品の一覧は `build/kernel.mk` の 1 つの変数、ユーザー決定 2026-10-18)。 SQLITE の policy (`tools/module_schema.py`) を PAIR 必須にし、mkmod に `--vmkernel` を必須で渡す (T4a の時点では PAIR を禁じていて、同じ版の古い部品を受け入れうる — T4a のレビュー R5)。 `module_start` は prefix の返却に失敗して回収まで済んだときに 0 を返す (`kernel/module_runtime.c:133-134`) — 呼び手は戻り値だけで成功と判断せず状態を見るか、0 以外を返す形に直す (T4a のレビュー Q1)。 |
 | T4c-2 (1日) | services_public・settings→FEP transaction | ①公開前db/imeはstub、全成功で同時公開 ②各init確保/設定close/FEP CRC/辞書欠落/予約不足を注入 ③戻せた失敗はSQLite owner占有0・MINIMAL ④close/shutdown失敗は隔離byteとMINIMAL_QUARANTINEDを診断。早期公開/隔離free変異を検出。Unicode7頁を保持し欠落等はかなのみ継続 (§3-4)、配布世代門を回帰 (§5-4)。監査diff0 (§7-2)。起動tickを前後比較 (NP21/W参考値、現591〜595 / 544〜558、合否に使わない)。 |
-| T4c-3 (1日) | CD RO FEP・標準構成の回帰 | ①CD rootのhost fixtureで1語変換 (実起動はT5b-5) ②dict_user有無とも読取成功 ③学習journal0/更新ROFS/list・export読取維持 ④app圧迫下FEP成功 ⑤ext2標準RW学習も保持。ROでCREATE/学習prepareする変異を検出 |
+| T4c-3 (1日) | FEP の標準構成の回帰 (app 圧迫下の変換・ext2 学習) | ④アプリが MEMSYS5 の app+system 上限 319,488 B まで使っても FEP の変換が成功 ⑤ext2 標準 RW の学習を保持。FEP 予約を app と同じ上限で拒否する変異・学習を省く変異を検出 |
 | T5a-1 (1日) | FEP B2・staging/出力境界 | ①各256B/64件境界・NULL契約一致 ②不正入力engine進入0/output不変 ③finalize/reset/binding終了→leave→copyout順 ④late出力拒否後もbusy解除 ⑤export不正pathでcreate/truncate0。寿命逆転/失敗kanjiをNULL化する変異を検出 |
 | T5a-2 (1日) | fep.modへの分離・依存・stub | ①FEPのcore直リンクなし ②SQLite→FEP init、逆順rollback ③RESIDENTと学習journalを子終了で失わない ④close失敗でreopen拒否 ⑤MINIMALのGUI textbox/CUI editで英数編集 (生キーあり/無入力の両方)。stub常時−1/依存先先free変異を検出。/boot/fep.modをhsync bootの対更新へ含め、上位票の/sys記述も同期 (§5-4)。Unicode順序/7頁保持・配布世代門を回帰。 |
 | T5b-1 (1日) | VK32/bootinfo生成・C/ASM共通wire | ①4entry/212Bを同じoffsetでdecode ②entry_count5/旧形式/不一致CRC拒否、最大定数6はASSERT失敗 ③同梱mem_size=load_spanでBSS/prefix不重複 ④EARLY生成にpair CRC自己参照なし。rawだけの占有検査へ戻す変異を検出。core1本から媒体閉包2〜4本へ。hsyncの旧/新像読取・boot_image_info利用者と配布世代門を同期 (§5-4)。 |
 | T5b-2 (1日) | U19初期化依存・PG/台帳/DMAを前へ | ①初回物理割当前にbundle全域予約 ②root driver前にDMA成立 ③HDD root成功 ④kdebug ON/OFFとkaudit回数維持 ⑤GUI=0で識別/予約まで、probe0。予約遅延/起動順逆転変異を検出。案5配置・監査diff0 (§0/7-2)、Unicode順序 (§3-4)、h4の依存と実行時期 (§6)、配布世代門 (§5-4) を依存表に含める。 |
 | T5b-3 (1日) | EARLY所有移譲・余白返却 | ①container非整列/BSS reloc/隣接破損をinit0で拒否 ②未マウントVFS/POST_ROOT import禁止 ③bootinfo capture後だけ旧領域返却 ④同一ページ二重owner/二重移譲0 ⑤全entry参照終了後に余白だけ返す。早期返却変異を検出。bundleのother勘定・prefix返却・隔離まで監査diff0 (§7-2)。 |
 | T5b-4 (1日) | FAT切出し・FD起動 | ①core+FATの2entryでroot/shell成功 ②FAT失敗は停止 ③MINIMAL全db NOSYS・英数編集成功 ④install --recover-settingsは復旧済みと誤表示しない。閉包欠落/偽成功変異を検出。書込み禁止FDのroot/Unicode/shellを回帰 (§3-2)。h4は依存成立後 (§6)、hsync新旧像・配布世代門も回帰 (§5-4)。 |
-| T5b-5 (1日) | ATAPI/iso9660切出し・CD起動 | ①3entry (HostDrv併用4) でroot成立 ②ATAPI失敗でiso登録0 ③BSS込み占有とDMA停止/返却一致 ④CDのRO FEP回帰。依存順逆転/停止未確認free変異を検出。部品・対kdebug・Unicode配布と同/異世代更新・別root復旧を確認 (§5-4)。 |
+| T5b-5 (1日) | ATAPI/iso9660切出し・CD起動 | ①3entry (HostDrv併用4) でroot成立 ②ATAPI失敗でiso登録0 ③BSS込み占有とDMA停止/返却一致 ④ (CD は起動の媒体ではない — ユーザー 2026-10-18。この行は T5 着手前の再照合で CD を読む段に直す)。依存順逆転/停止未確認free変異を検出。部品・対kdebug・Unicode配布と同/異世代更新・別root復旧を確認 (§5-4)。 |
 | T5b-6 (1日) | HostDrv EARLY・補助マウント | ①通常 NHD ext2 root の DB で変換→学習→再起動保持 ②HostDrv を root にせず既定 DB 配置を維持 ③実機専用I/O0・同ID二重load0。既存 DB を変更する移行処理は追加しない。h4往復/owner回収 (§6) と配布世代門 (§5-4) を回帰。 |
 | T5c-0 (1日) | IRQ/tick/callback/DMA owner broker | ①登録直後失敗でも参照0を証明して回収 ②STARTINGの必要なIRQは有効 ③tick残存/DMA停止不能は依存閉包隔離 ④DEVICE予約不変。unregisterだけでfreeする変異を検出 部品の record の数 (`kernel/module_runtime.h` の MODULE_RECORD_CAP 8) を T5c までに外へ出す部品 (kdebug・sqlite・fep・fat・atapi・iso・hostdrv・kcg・fm・pcm・v86・lan・cirrus) で数え直す (超えると RECORD_FULL で拒否 — T4a のレビュー R6)。 |
 | T5c-1 (0.5日) | KCG ROM移設 | ①typed facadeで同じ文字 ②欠落stub診断 ③旧font経路と排他 ④キャッシュ/owner予算一致。誤export/二重初期化変異を検出。Unicode探索はcore、低位scratchはT7aまでFIXED。font close→BB/mailbox→USER順 (§6)。 |
@@ -364,5 +364,6 @@ r4材料は `RECHECK_r4.md` と `opus_r1.md` (Approve、PMはF1〜F6採用)。�
 | **決定 (ユーザー 2026-10-16)**: 3 SQL入口の拒否時のstmt/slotとfinalize時期 (F1/F2) | 古い行が返るのは、戻り値を見ずに `db_step` を呼んだアプリ自身の文だけで、シングルタスクでは他のアプリや OS のデータに及ばない — **アプリ側の書き方の問題**として扱う (ユーザー)。第三案 (保留 stmt) は採らない。拒否時は「何も変えない」(`docs/tasks/settings/FEP_BOUNDARY.md:140,141,213`) にそろえ、`docs/KAPI_SPEC.md:1396` の prepare_only の入口 finalize は「受け付けた入力のときだけ」と書き直す。KAPI_SPEC に「拒否の戻り値を見ずに step すると前の文の続きが返る」と注記 | 本票は反映済み。KAPI_SPEC の説明同期は T4b-1 の前に行う |
 | **決定 (ユーザー 2026-10-16)**: X-11の共有サービスの呼出し主体 | 端末ごと・本人ごとの**新しい権限の分離は足さない** (単一利用者)。T4b-5 で通常の親子・park/resume の順を観測し、二重消費・別 owner への副作用・寿命の不具合が出たら、そこだけ直す。攻撃者を置かないことを理由に未観測の不具合を閉じない | T4b-5 の契約表と通常順の反例で照合 |
 | **決定 (ユーザー 2026-10-16)**: HostDrv rootの管理DB配置 | **HostDrv を root にしない**。管理 DB は通常の root (NHD の ext2) に置く。§3-5 の `/persist` ext2 案と、HostDrv root のための移行手順は不要 | §3-5 と T5b-6 に反映済み。実装受入は未実施 |
+| **ユーザー決定 2026-10-18: CD はインストールの元だけで起動の媒体ではない。CD の RO FEP は作らない** | インストールは FD/HDD から起動して cdinst で CD を読む。CD root の起動・CD 上の FEP・CD の settings の経路は作らない | §3-5・T4c-3 に反映。T5b-5・MEMMAP_V3 §4-5 の CD 起動・VK32 の entry 構成・T4b-4c の RO SQLite 経路は T5 着手前の再照合で直す |
 
 FEP予約量・module別サイズ上限・U19可否・8MBピークは、対立した決定ではなく§7の測定ゲート。未測定の数字を埋めて承認済みにしない。今回、上位D番号の追加・上位本文の変更は行わない。契約変更が必要になった場合だけ個別に判断する。

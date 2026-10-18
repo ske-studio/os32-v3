@@ -79,10 +79,7 @@ static void cd_access(sqlite3_vfs *v)
     CHECK(v->xAccess(v, "/fep.db", SQLITE_ACCESS_EXISTS, &out) == SQLITE_IOERR_ACCESS && out == 17);
     iso9660_ops.stat = iso9660_stat;
 }
-#ifndef SQLITE_CD_HOST_MAIN
-#define SQLITE_CD_HOST_MAIN main
-#endif
-int SQLITE_CD_HOST_MAIN(int argc, char **argv)
+int main(int argc, char **argv)
 {
     Os32SqliteGroup a, b;
     sqlite3 *fep = NULL, *app = NULL;

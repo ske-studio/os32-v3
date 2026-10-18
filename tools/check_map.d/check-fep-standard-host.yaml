@@ -1,0 +1,20 @@
+check-fep-standard-host:
+- tools/tests/test_fep_standard.py
+- tools/tests/fep_standard_host.c
+- tools/tests/fep_budget_linux.c
+- tools/tests/hdd_pt_fake.h
+- tools/tests/host32.py
+- kernel/ime_dict.c
+- kernel/ime.h
+- fs/vfs.c
+- fs/vfs_fd.c
+- fs/vfs.h
+- fs/ext2*.c
+- fs/ext2*.h
+- drivers/pc98pt.c
+- drivers/pc98pt.h
+- drivers/ide.h
+- drivers/dev.h
+- lib/sqlite3/**
+- build/checks.d/check-fep-standard-host.mk
+- tools/check_map.d/check-fep-standard-host.yaml
