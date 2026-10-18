@@ -214,7 +214,7 @@ def pair_runtime_suite(folder, mutate=False):
         print('MUTATE sqlite-mixed-pair RED (compiled, runtime acceptance assertion)')
 
 
-def real_runtime_suite(folder, directory, vmkernel, mutate=False):
+def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=False):
     """Execute the product module with the full adapter and real stack switch."""
     generated = ROOT / 'lib/sqlite3/generated'
     (folder / 'sys_build_info.inc').write_text(function(
@@ -295,9 +295,28 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False):
             if mode == 0:
                 print(output, end='')
             if mode == 6:
-                assert 'PASS guard overflow fault -> engine fail-stop' in output, result
+                assert 'PASS host signal seam -> engine fail-stop (NOT IDT/#DF)' in output, result
                 print(output, end='')
         print('PASS real SQLite adapter ' + label, flush=True)
+    for label, mode in (('expr-depth-100', 34), ('compound-5', 35),
+                        ('sort-1024', 36), ('index-1024', 37), ('trigger-omitted', 38)):
+        payload = struct.pack('<4I', mode, len(image), pair, 0) + image
+        result = host32.run([str(exe)], input=payload, runner='qemu', capture_output=True)
+        print(result.stdout.decode(), end='', flush=True)
+        assert result.returncode == 0, (label, result)
+    if stack_mutate:
+        # Depth 100 exceeds 16 KiB: require an observed runtime guard fault.
+        header = (ROOT / 'kernel/sqlite_engine.h').read_text()
+        old = '(32u * 1024u)'
+        assert header.count(old) == 1
+        (folder / 'sqlite_engine.h').write_text(header.replace(old, '(16u * 1024u)'))
+        subprocess.run(command, check=True)
+        payload = struct.pack('<4I', 34, len(image), pair, 0) + image
+        result = host32.run([str(exe)], input=payload, runner='qemu', capture_output=True)
+        assert result.returncode == 77 and b'PASS host signal seam -> engine fail-stop (NOT IDT/#DF)' in result.stdout, result
+        print('MUTATE undersized-stack RED (compiled runtime): ' + result.stdout.decode().strip(), flush=True)
+        (folder / 'sqlite_engine.h').unlink()
+        subprocess.run(command, check=True)
     if mutate:
         path = folder / 'sqlite_engine.c'
         source = path.read_text()
@@ -386,6 +405,7 @@ def main():
     parser.add_argument('--directory', type=Path, default=ROOT / 'build/out/sqlite-proto')
     parser.add_argument('--vmkernel', type=Path, default=ROOT / 'build/out/vmkernel.lz4')
     parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--stack-mutate', action='store_true', help='only T5-0b stack capacity mutant')
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='sqlite-module-') as td:
         folder = Path(td)
@@ -403,7 +423,8 @@ def main():
             stats = real_suite(exe, args.directory, args.vmkernel, runner)
             print(f'PASS {runner}: unaligned/last-word reloc; tail-2/BSS/duplicate/import/overflow write=0')
         pair_runtime_suite(folder, mutate=args.mutate)
-        real_runtime_suite(folder, args.directory, args.vmkernel, mutate=args.mutate)
+        real_runtime_suite(folder, args.directory, args.vmkernel, mutate=args.mutate,
+                           stack_mutate=args.stack_mutate)
         print(json.dumps(stats, sort_keys=True))
         if args.mutate:
             source = (ROOT / 'kernel/module_image.c').read_text()

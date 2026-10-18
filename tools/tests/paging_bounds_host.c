@@ -139,6 +139,19 @@ void _start(void)
         struct addrspace as;
         u32 before = used, before_calls;
         CHECK(paging_addrspace_create(&as, LEDGER_OWNER_KERNEL) == 0);
+        /* #DF's GDT/IDT, old/new TSS, emergency stack and text live in core.
+         * All bytes of core use these same PTs in master and a live app PD.
+         * This checks mappings, not CPU exception/task-switch delivery. */
+        u32 *app_pd = P2V(as.pd_phys);
+        for (u32 va = KERNEL_LOAD_ADDR; va < (u32)(uptr)__kernel_resident_end; va += PAGE_SIZE) {
+            CHECK(app_pd[va >> 22] == page_directory[va >> 22]);
+            u32 pte = page_tables[va >> 22][(va / PAGE_SIZE) % PTE_COUNT];
+            CHECK((pte & (PTE_PRESENT | PTE_USER)) == PTE_PRESENT);
+            CHECK((pte & ~(PAGE_SIZE - 1)) == va);
+        }
+        CHECK(!paging_is_present(MEM_STACK_GUARD));
+        CHECK(app_pd[TVRAM_CHAR_BASE >> 22] == page_directory[TVRAM_CHAR_BASE >> 22]);
+        CHECK(app_pd[MEM_FIXED_PD_BASE >> 22] == page_directory[MEM_FIXED_PD_BASE >> 22]);
         before_calls = calls;
         CHECK(paging_map_phys(0x2000000, 0, 1, PAGE_RW) == -1);
         CHECK(calls == before_calls);

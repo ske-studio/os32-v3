@@ -6,6 +6,7 @@
 /* ======================================================================== */
 
 #include "idt.h"
+#include "gdt.h"
 #include "io.h"
 #include "sysclk.h"   /* 0000:0501h から判定したシステムクロック */
 #include "memmap.h"   /* PIT_HZ */
@@ -128,6 +129,12 @@ void idt_init(void)
             idt_set_gate(i, exc_stubs[i], IDT_ATTR_INT_GATE32);
         }
     }
+
+    /* #DF must not push a frame on the faulting stack. Intel SDM Vol.3A
+     * 6.15 (#DF), 8.2.5/8.3: IDT task gate, dedicated available 32-bit TSS. */
+    idt[8].offset_low = idt[8].offset_high = 0;
+    idt[8].selector = GDT_DF_TSS_SEL;
+    idt[8].type_attr = IDT_ATTR_TASK_GATE;
 
     /* IRQハンドラ (PIC再マッピング後) */
     idt_set_gate(0x20, irq_stub_0, IDT_ATTR_INT_GATE32);  /* IRQ0: タイマ */

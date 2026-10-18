@@ -5,9 +5,10 @@
 /*  このファイルを直接 #include してはいけない — 常に "cpu.h" を引くこと。    */
 /*  ビルドは -Iarch/$(ARCH) で解決する (build/config.mk)。                   */
 /*                                                                          */
-/*  命令列は移設前 (kernel/paging.c・exec/exec.c のその場の asm) から         */
+/*  元の命令列は移設前 (kernel/paging.c・exec/exec.c のその場の asm) から         */
 /*  1 文字も変えていない。移設の前後でカーネルの .o が md5 で一致することを   */
 /*  確かめてある (docs/tasks/portability/ARM_GAUGE.md §9 順序 5)。           */
+/*  T5-0b: CR3変更時にTSSの静的CR3欄も更新し、#DF診断用に控える。          */
 /* ======================================================================== */
 
 #ifndef ARCH_CPU_H
@@ -33,7 +34,10 @@ static inline u32 arch_mmu_current_root(void)
 /* CR3 への書き込みは、同じ値でも TLB を全部捨てる (i386 に PCID は無い)。 */
 static inline void arch_mmu_load_root(u32 root_phys)
 {
-    __asm__ volatile("mov %0, %%cr3" : : "r"(root_phys) : "memory");
+    /* CR3 is a static TSS field: hardware task switch does not save it.
+     * Keep the outgoing task root for the #DF diagnostic. */
+    __asm__ volatile("mov %1, %0; mov %1, %%cr3"
+                     : "=m"(kernel_tss.cr3) : "r"(root_phys) : "memory");
 }
 
 /* i386 互換: CR3 リロード方式。invlpg は i486+ なので使えない。 */
@@ -69,6 +73,7 @@ do {                                                                    \
     __asm__ volatile(                                                   \
         "cli\n\t"                                                       \
         "movl %%esp, %[e0]\n\t"    /* TSS.ESP0 = 現在のカーネル ESP */  \
+        "movl %[pd], %[saved_pd]\n\t"                                  \
         "movl %[pd], %%cr3\n\t"    /* アプリ PD へ切替 */               \
         "movl %[uds], %%eax\n\t"                                        \
         "movw %%ax, %%ds\n\t"                                           \
@@ -81,7 +86,8 @@ do {                                                                    \
         "pushl %[ucs]\n\t"         /* CS = USER_CS */                   \
         "pushl %[eip]\n\t"         /* EIP = エントリポイント */         \
         "iret\n\t"                                                      \
-        : [e0] "=m"(kernel_tss.esp0)                                    \
+        : [e0] "=m"(kernel_tss.esp0),                                   \
+          [saved_pd] "=m"(kernel_tss.cr3)                               \
         : [pd]  "r"(root_phys),                                         \
           [uesp]"r"(user_sp),                                           \
           [eip] "r"(entry),                                             \

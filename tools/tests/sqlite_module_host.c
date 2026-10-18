@@ -1,6 +1,7 @@
 /* Actual relocated SQLite body, full resident adapter and NASM stack switch. */
 #define OS32_SQLITE_OUTER_IMPL
 #include "sqlite_engine.h"
+#include "lib/sqlite3/os32_sqlite_config.h"
 #include "module_runtime.h"
 #include "module.h"
 #include "memory_boot.h"
@@ -170,8 +171,9 @@ int paging_set_page(u32 va, u32 pa, u32 flags)
     guard_np = 0; guard_restored++;
     return 0;
 }
-/* An overflowing ESP faults onto a host signal stack, then takes the actual
- * kernel fail-stop diagnostic. It cannot return to the overflowing engine. */
+/* SA_ONSTACK tests only NP protection + the fail-stop function in isolation.
+ * It does NOT model IDT #PF delivery on an exhausted kernel stack or #DF.
+ * KSTK-DF requires the actual guest task-gate injections. */
 static u8 signal_stack[16384];
 void host_stop(void) { CHECK(sqlite_engine_active); finish(77); }
 static void sputs(const char *s) { (void)s; }
@@ -184,7 +186,7 @@ static void tvram_put_hex32(int r, int c, u32 value, u8 a)
 static void stack_fault(int signal)
 {
     CHECK(signal == 11 && sqlite_engine_active);
-    say("PASS guard overflow fault -> engine fail-stop\n");
+    say("PASS host signal seam -> engine fail-stop (NOT IDT/#DF)\n");
     sqlite_engine_fault(14, 0, stack_base - sizeof(u32));
     CHECK(0);
 }
@@ -196,7 +198,7 @@ static void overflow(void *arg)
                      : "=&r"(saved) : "r"(stack_base) : "memory");
     CHECK(0);
 }
-static void overflow_test(void)
+static void install_stack_fault(void)
 {
     struct { void *sp; int flags; u32 size; } alt = {signal_stack, 0, sizeof(signal_stack)};
     struct { void (*handler)(int); u32 flags; void *restorer; u32 mask[2]; }
@@ -207,9 +209,83 @@ static void overflow_test(void)
     __asm__ volatile("int $0x80" : "=a"(rc) : "0"(174), "b"(11), "c"(&action),
                      "d"(0), "S"(8) : "memory");
     CHECK(!rc);
+}
+static void overflow_test(void)
+{
+    install_stack_fault();
     sqlite_engine_run(overflow, 0, 0);
     CHECK(0);
 }
+/* Each workload runs in a fresh process/module so high-water is per workload
+ * including initialize and the common CRUD baseline. No mark reset while active. */
+static void stack_workload(sqlite3 *db, u32 mode)
+{
+    sqlite3_stmt *stmt = 0;
+    if (mode == 34) {
+        install_stack_fault();
+        /* Left-deep tree avoids the parser's independent parentheses limit.
+         * A leaf is depth 1: 100 terms reach exactly SQLITE_MAX_EXPR_DEPTH. */
+        char sql[2 * SQLITE_MAX_EXPR_DEPTH + 32];
+        for (int depth = 1; depth <= SQLITE_MAX_EXPR_DEPTH + 1; depth++) {
+            u32 n = 0;
+            const char *prefix = "SELECT ";
+            while (*prefix) sql[n++] = *prefix++;
+            for (int i = 0; i < depth; i++) { if (i) sql[n++] = '+'; sql[n++] = 'v'; }
+            const char *suffix = " FROM t";
+            while (*suffix) sql[n++] = *suffix++;
+            sql[n] = 0;
+            int rc = os32_sqlite_prepare_v2(db, sql, -1, &stmt, 0);
+            if (depth == SQLITE_MAX_EXPR_DEPTH + 1) { CHECK(rc == SQLITE_ERROR && !stmt); break; }
+            CHECK(rc == SQLITE_OK);
+            CHECK(os32_sqlite_step(stmt) == SQLITE_ROW && os32_sqlite_column_int(stmt, 0) == 42 * depth);
+            CHECK(os32_sqlite_step(stmt) == SQLITE_DONE);
+            CHECK(os32_sqlite_finalize(stmt) == SQLITE_OK);
+            if (depth == SQLITE_MAX_EXPR_DEPTH) { say("STACK expr-depth=100 prepare/step: "); number(sqlite_engine_stack_high_water()); say(" bytes\n"); }
+        }
+    } else if (mode == 35) {
+        CHECK(os32_sqlite_prepare_v2(db,
+            "SELECT v FROM t UNION SELECT v+1 FROM t UNION SELECT v+2 FROM t "
+            "UNION SELECT v+3 FROM t UNION SELECT v+4 FROM t ORDER BY 1 DESC",
+            -1, &stmt, 0) == SQLITE_OK);
+        for (int value = 46; value >= 42; value--)
+            CHECK(os32_sqlite_step(stmt) == SQLITE_ROW && os32_sqlite_column_int(stmt, 0) == value);
+        CHECK(os32_sqlite_step(stmt) == SQLITE_DONE);
+        CHECK(os32_sqlite_finalize(stmt) == SQLITE_OK);
+    } else if (mode == 36 || mode == 37) {
+        CHECK(os32_sqlite_prepare_v2(db, "INSERT INTO t SELECT v+? FROM t", -1, &stmt, 0) == SQLITE_OK);
+        for (int i = 1; i <= 512; i *= 2) {
+            CHECK(os32_sqlite_bind_int(stmt, 1, i) == SQLITE_OK);
+            CHECK(os32_sqlite_step(stmt) == SQLITE_DONE);
+            CHECK(os32_sqlite_reset(stmt) == SQLITE_OK);
+        }
+        CHECK(os32_sqlite_finalize(stmt) == SQLITE_OK);
+        if (mode == 37) CHECK(os32_sqlite_exec(db, "CREATE INDEX ix ON t(v DESC)", 0, 0, 0) == SQLITE_OK);
+        CHECK(os32_sqlite_prepare_v2(db, mode == 36 ?
+            "SELECT v FROM t ORDER BY (v*17)%103, v DESC" : "SELECT v FROM t ORDER BY v DESC",
+            -1, &stmt, 0) == SQLITE_OK);
+        int old_key = -1, old_value = 0;
+        for (int i = 0; i < 1024; i++) {
+            CHECK(os32_sqlite_step(stmt) == SQLITE_ROW);
+            int value = os32_sqlite_column_int(stmt, 0), key = mode == 36 ? (value*17)%103 : 0;
+            CHECK(key > old_key || (key == old_key && value < old_value));
+            old_key = key; old_value = value;
+        }
+        CHECK(os32_sqlite_step(stmt) == SQLITE_DONE);
+        CHECK(os32_sqlite_finalize(stmt) == SQLITE_OK);
+    } else {
+        /* Product SQLITE_OMIT_TRIGGER: there is no trigger execution stack. */
+        CHECK(os32_sqlite_prepare_v2(db,
+            "CREATE TRIGGER tr AFTER INSERT ON t BEGIN UPDATE t SET v=v+1; END",
+            -1, &stmt, 0) == SQLITE_ERROR && !stmt);
+    }
+    u32 peak = sqlite_engine_stack_high_water();
+    u32 required = 32 * 1024; /* depth 100 measured 24,388 B; user decision 2026-10-18 */
+    say("STACK workload="); number(mode); say(" high-water="); number(peak);
+    say(" required="); number(required); say(" configured="); number(SQLITE_ENGINE_STACK_SIZE); say("\n");
+    CHECK(SQLITE_ENGINE_STACK_SIZE >= required);
+    CHECK(os32_sqlite_outer_canary() == 0);
+}
+
 static void stack_usage(void)
 {
     u32 used = sqlite_engine_stack_high_water();
@@ -219,7 +295,7 @@ static void stack_usage(void)
     do { digits[n++] = '0' + used % 10; used /= 10; } while (used);
     say("STACK high-water init/CRUD/diagnostics/shutdown: ");
     while (n) { char text[2] = {digits[--n], 0}; say(text); }
-    say(" / 131072 bytes\n");
+    say(" / "); number(SQLITE_ENGINE_STACK_SIZE); say(" bytes\n");
 }
 void *kmemcpy(void *d, const void *s, u32 n)
 {
@@ -283,7 +359,7 @@ void kprintf(u8 attr, const char *fmt, ...)
         say("sqlite stack high-water="); number(used);
         say(" of "); number(size); say("\n");
     }
-    if (input[0] >= 10 && services_stage != SERVICES_READY)
+    if (input[0] >= 10 && input[0] <= 33 && services_stage != SERVICES_READY)
         CHECK(!services_public);
     if (!memcmp(fmt, "IME: 学習不可", sizeof("IME: 学習不可") - 1)) learn_unavailable++;
     if (!memcmp(fmt, "[services] fep_mem_reserve_kb below default", sizeof("[services] fep_mem_reserve_kb below default") - 1)) reserve_clamped++;
@@ -515,7 +591,7 @@ void _start(void)
     __asm__ volatile("int $0x80" : "=a"(rc) : "0"(125), "b"(pool), "c"(sizeof(pool)), "d"(7) : "memory");
     CHECK(!rc);
     stubs();
-    if (input[0] >= 10) boot_transaction();
+    if (input[0] >= 10 && input[0] <= 33) boot_transaction();
     rc = os32_sqlite_start();
     CHECK(rc == (int)input[3] && opens == 1 && closes == (input[0] != 1));
     CHECK(!sqlite_engine_active && host_flags == 0x202);
@@ -552,6 +628,7 @@ void _start(void)
     CHECK(os32_sqlite_step(stmt) == SQLITE_ROW && os32_sqlite_column_int(stmt, 0) == 42);
     CHECK(os32_sqlite_step(stmt) == SQLITE_DONE);
     CHECK(os32_sqlite_finalize(stmt) == SQLITE_OK);
+    if (input[0] >= 34 && input[0] <= 38) { stack_workload(db, input[0]); finish(0); }
     /* Recursive expression parsing on the real engine stack, product config. */
     CHECK(os32_sqlite_prepare_v2(db,
         "SELECT abs(abs(abs(abs(abs(abs(abs(abs(abs(abs(abs(abs("
@@ -588,6 +665,6 @@ void _start(void)
     CHECK(!sqlite_engine_active && host_flags == 0x202);
     CHECK(!module_abort(handle) && !owned && retired == 1 && !sqlite_engine_stack_top);
     stubs();
-    say("PASS real SQLite init/CRUD/typed diagnostics/prefix reuse/128KiB stack/reclaim\n");
+    say("PASS real SQLite init/CRUD/typed diagnostics/prefix reuse/engine stack/reclaim\n");
     finish(0);
 }

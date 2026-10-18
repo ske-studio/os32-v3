@@ -20,7 +20,7 @@ local memcpy/memset、libgcc member 台帳、世代・CRC・prefix/body を確�
 正常 KDEBUG S4 の対照は既存 `check-kdebug-init-host` と `test_mkmod.py`。
 ⑦ 実 `sqlite_engine.c` (boot adapter を含む)・typed outer・runtime・validator と
 NASM stack trampoline をリンクし、実製品像を relocate して init/CRUD を実行。
-所有者付き 128 KiB stack 上の init と callback、全 API の本文内番地、prefix 破棄後の
+所有者付き `SQLITE_ENGINE_STACK_SIZE` stack 上の init と callback、全 API の本文内番地、prefix 破棄後の
 `:memory:` CREATE/INSERT/UPDATE/SELECT/DELETE と prepare/step/close、診断・shutdown を確認する。
 owner pool の先頭/末尾 word を壊すと canary は -1/-2、復元後は 0 に戻る。
 missing・pair 混在・pool/stack 割当失敗・prefix 返却失敗では stub を保持し全 owner ページを回収。
@@ -53,3 +53,23 @@ Unicode の欠落/旧形式/I/O/確保失敗でも SERVICES_READY、かなの算
 副作用 0 を確認する。`check-x11-shared-host` は未公開 IME 管理口と CUI/GUI 生入力を確認する。
 ページ監査はこの fixture の合成 count を合格根拠にせず、既存の memory/memmap 監査検査と
 NP21/W の diff=0 を使う。SA_ONSTACK の既存 overflow 検査は実 IDT の再現ではない。
+
+## T5-0b stack 採否と fault の試験境界
+
+製品 `sqlite.mod` を各ケース別の新しいプロセスで実行する。初期化/共通CRUD込みの
+塗り/high-water は式深度100 (101はprepare拒否)、複合SELECT5項、1024行sort、
+1024行index作成、OMIT_TRIGGERのprepare拒否を観測する。深度100の実測24,388Bに
+基づき必要容量32KiBをruntimeで照合する (ユーザー決定2026-10-18)。
+`check-sqlite-stack-host MUTATE=1` は正常対照の後、16KiBへ縮める変異だけを実行する。
+深度100のSQL負荷がNPガードへ到達するhost signal seamを観測してruntime REDとする。
+これは実IDT/#DF配送の代用ではない。
+rollback/隔離の所有頁期待値は本体の定数から計算する。NPガードは追加1頁のまま。
+
+既存SA_ONSTACKケースはhostの保護違反と診断関数単体だけを試す。IDTの#PFは
+あふれたstackへフレームを積むので、このhost経路を#DF受入の代わりにしない。
+`check-double-fault-host` は製品GDT/IDT/TSSの初期化、CR3の控え、診断出力を
+privileged命令のseam付きで実行する。task gateを割込みgateへ戻す/誤CR3変異は
+runtimeの記述子照合でRED。CPUのtask switch自体はNP21/Wの実guard注入で受ける。
+`make kernel DF_GUARD_TEST=1` はbootのkernel guard、`=2` はservices起動後の
+engine guardへESPを寄せて実pushする。通常 `=0` は呼出し無し。各試験像はcoreと
+対のsqlite/kdebugをまとめて配備し、診断後は停止したままかを見る (詳細はT5-0b報告)。

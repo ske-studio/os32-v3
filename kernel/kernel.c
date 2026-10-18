@@ -76,6 +76,7 @@ extern void fatfs_init(void);
 #include "os32_sqlite_vfs.h"
 #include "os32_sqlite_outer.h"
 #include "sqlite_engine.h"
+#include "double_fault.h"
 #include "kapi_db.h"
 #include "bootlog.h"
 #include "module.h"
@@ -243,6 +244,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * GDT のエントリ3を使うので gdt_init の直後に呼ぶ。
      * ESP0 は V86 突入直前に v86_enter が実際の ESP へ差し替える。 */
     tss_init(MEM_KSTACK_TOP);
+    double_fault_init();
 
     /* IDT/PIC/PIT 初期化 */
     tvram_print(12, 1, "IDT...", TATTR_GREEN);
@@ -698,6 +700,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     tvram_print(71, 2, "IRQ_EN", TATTR_YELLOW);
     _enable();
     services_boot();
+    double_fault_test();
 
     /* autoexec: シェルスクリプト(/etc/autoexec.bat)に移行済み。
      * シェル起動後に ui.c から script_source_file() で実行される。 */

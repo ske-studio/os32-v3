@@ -31,7 +31,7 @@ exec/ring3_ls.o exec/exec.o: exec/ring3_ls.h
 
 # === カーネル C ソース ===
 C_KERNEL = \
-    kernel/kernel.c kernel/kstack_hw.c kernel/boot_font.c kernel/gdt.c kernel/tss.c kernel/v86.c kernel/v86_mem.c kernel/v86_io.c kernel/v86_pic.c kernel/v86_kbd.c kernel/v86_bios.c kernel/v86_gcap.c kernel/boot_splash.c kernel/idt.c kernel/isr_handlers.c kernel/cpu_calibrate.c kernel/cpu_calibrate_math.c kernel/sysclk.c kernel/pit_math.c kernel/bootinfo.c kernel/bootinfo_check.c \
+    kernel/kernel.c kernel/kstack_hw.c kernel/boot_font.c kernel/gdt.c kernel/double_fault.c kernel/tss.c kernel/v86.c kernel/v86_mem.c kernel/v86_io.c kernel/v86_pic.c kernel/v86_kbd.c kernel/v86_bios.c kernel/v86_gcap.c kernel/boot_splash.c kernel/idt.c kernel/isr_handlers.c kernel/cpu_calibrate.c kernel/cpu_calibrate_math.c kernel/sysclk.c kernel/pit_math.c kernel/bootinfo.c kernel/bootinfo_check.c \
     kernel/paging.c kernel/paging_app.c kernel/dma_pool.c kernel/dma_pool_math.c kernel/physmem.c kernel/pgalloc.c kernel/ledger_pci.c kernel/memory_boot.c kernel/shlib.c kernel/shm.c kernel/gui.c kernel/kmalloc.c kernel/console.c kernel/con_sink.c kernel/bootlog.c kernel/bootlog_save.c kernel/kbd_inject.c kernel/sys.c kernel/sysconfig.c kernel/kaudit.c kernel/kaudit_boot.c kernel/kselftest_report.c kernel/irq.c kernel/irq_math.c kernel/ktime.c kernel/time_math.c \
     kernel/sqlite_engine.c kernel/sqlite_outer.c lib/sqlite3/os32_sqlite_test.c kernel/module.c kernel/module_image.c kernel/module_runtime.c kernel/unicode_file.c kernel/ime.c kernel/ime_romkana.c kernel/ime_dict.c kernel/ime_render_tvram.c kernel/snd_engine.c \
     drivers/kbd.c drivers/kbd_status.c drivers/kbd_dlog.c drivers/serial.c drivers/serial_plan.c drivers/fm.c \
@@ -69,6 +69,11 @@ $(BUILD_ID_OBJ): $(BUILD_ID_SRC)
 # kernel/ モジュール
 kernel/%.o: kernel/%.c
 	$(CC) $(CFLAGS_BASE) $(INC_KERNEL) -c $< -o $@
+
+# Test-only real guard injection: 0=off, 1=kernel, 2=SQLite engine.
+DF_GUARD_TEST ?= 0
+kernel/double_fault.o: private KERNEL_CFLAGS += -Os -DOS32_DF_GUARD_TEST=$(DF_GUARD_TEST)
+kernel/double_fault.o: .FORCE
 
 # Resident debug loader and validator: keep their boot-only code compact.
 kernel/module.o kernel/module_image.o kernel/module_runtime.o: private KERNEL_CFLAGS += -Os

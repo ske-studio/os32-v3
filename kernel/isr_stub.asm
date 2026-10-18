@@ -25,7 +25,7 @@ USER_DS     equ 0x2B
 ;; C ハンドラは DS がカーネルデータセグメントであることを前提に動くので、
 ;; 復元しないまま呼ぶと即座に #GP を起こす。しかもその #GP ハンドラも
 ;; DS=0 のまま C を呼ぶため、例外が無限再帰してカーネルスタックを食い潰し、
-;; ガードページに当たって #DF → トリプルフォルトになる。
+;; ガードページに当たる。現在は専用 #DF task gate で診断して停止する。
 ;;
 ;; 実際 Phase 1 の初回検証でこれを踏んだ (#PF の一次原因が完全に隠れ、
 ;; 「原因不明のトリプルフォルト」に見えた)。全スタブで必ず復元すること。
@@ -756,3 +756,36 @@ irq_stub_13:
 ;; で結ぶので、専用の irq_stub_nic_3/5/6 も idt_register_irq() も要らない。
 ;; EOI は irq_finish() が 1 回だけ送る。
 ;; ============================================================
+
+;; #DF task switch has already loaded flat segments, IF=0 and a fresh ESP.
+;; CPU pushed the zero error code. No IRET: old task state is not resumable.
+section .text
+global double_fault_entry
+extern double_fault_halt
+double_fault_entry:
+        cli
+        cld
+        mov     eax, cr2
+        and     esp, -16
+        sub     esp, 12
+        push    eax
+        call    double_fault_halt
+.df_stop:
+        cli
+        hlt
+        jmp     .df_stop
+
+;; Test-only callers are compiled out of the normal image. The push really
+;; touches the NP guard; #PF delivery must fail on that same stack -> #DF.
+global double_fault_touch_guard
+double_fault_touch_guard:
+        cli
+        mov     eax, [esp + 4]
+        mov     esp, eax
+        push    dword 0
+        ud2
+        jmp     .df_stop_guard
+.df_stop_guard:
+        cli
+        hlt
+        jmp     .df_stop_guard
