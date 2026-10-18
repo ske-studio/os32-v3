@@ -39,7 +39,7 @@ typedef struct {
     int  (*getkey)(void);
 } RecoverOps;
 
-/* ---- 対象の 9 名 + マスタ ---------------------------------------------- */
+/* ---- 対象の名前 + FD 上のマスタ --------------------------------------- */
 #define RC_TARGET_MOUNT   "/hd0"
 #define RC_TARGET_ETC     "/hd0/etc"
 #define RC_TARGET_DEV     "hd0"
@@ -55,7 +55,9 @@ typedef struct {
 #define RC_N_FAILED       6
 #define RC_N_FAILEDJ      7
 #define RC_N_STATE        8
-#define RC_NAMES          9
+#define RC_N_MASTER       9
+#define RC_N_MASTERJ     10
+#define RC_NAMES         11
 
 static const char *const rc_path[RC_NAMES] = {
     "/hd0/etc/settings.db",
@@ -66,7 +68,9 @@ static const char *const rc_path[RC_NAMES] = {
     "/hd0/etc/settings.db.new-journal",
     "/hd0/etc/settings.db.failed",
     "/hd0/etc/settings.db.failed-journal",
-    "/hd0/etc/settings.db.recover-state"
+    "/hd0/etc/settings.db.recover-state",
+    "/hd0/etc/settings.db.master.new",
+    "/hd0/etc/settings.db.master.new-journal"
 };
 
 static const char *const rc_name[RC_NAMES] = {
@@ -78,7 +82,9 @@ static const char *const rc_name[RC_NAMES] = {
     "settings.db.new-journal",
     "settings.db.failed",
     "settings.db.failed-journal",
-    "settings.db.recover-state"
+    "settings.db.recover-state",
+    "settings.db.master.new",
+    "settings.db.master.new-journal"
 };
 
 /* 三値 */
@@ -448,6 +454,10 @@ static int rc_db_check(const RecoverOps *ops, const char *path, RcDbInfo *out)
 
     h = ops->db_open_existing(path, 0);
     if (h < 0) {
+        if (h == OS32_ERR_NOSYS) {
+            out->err = h;
+            return -1;
+        }
         rc = ops->db_error_code(-1);
         out->err = rc ? rc : -1;
         return -1;
@@ -578,7 +588,7 @@ static int rc_check_media(const RecoverOps *ops, const char *drive)
 }
 
 /* ======================================================================== */
-/*  1b — 9 名の走査と事前検査                                                */
+/*  1b — 対象名の走査と事前検査                                              */
 /* ======================================================================== */
 
 static int rc_scan(const RecoverOps *ops)
@@ -712,6 +722,7 @@ static void rc_drop_made(const RecoverOps *ops)
 {
     int i;
     for (i = 0; i < RC_NAMES; i++) {
+        if (i == RC_N_MASTER) continue; /* rc_recover の出口で回収 */
         if (rc_made[i]) {
             ops->unlink(rc_path[i]);
             rc_made[i] = 0;
@@ -723,7 +734,7 @@ static void rc_drop_made(const RecoverOps *ops)
 /*  recover 本体                                                             */
 /* ======================================================================== */
 
-static int rc_recover(const RecoverOps *ops, const char *drive)
+static int rc_recover_impl(const RecoverOps *ops, const char *drive)
 {
     RcDbInfo master, probe;
     OS32_Stat sa, sb;
@@ -752,16 +763,36 @@ static int rc_recover(const RecoverOps *ops, const char *drive)
         return 1;
     }
 
-    /* 1c — マスタの検査 */
-    if (rc_db_check(ops, RC_MASTER, &master) != 0) {
-        if (master.err != 0) {
-            ops->kprintf(ATTR_RED, "%s\n", "master unreadable");
-            if (master.close_err != 0)
-                ops->kprintf(ATTR_RED, "master close failed (%d)\n",
-                             master.close_err);
+    /* 1c — FAT 上の MAIN_DB は開かない。ext2 にコピー + バイト比較して検査。
+     * 既存の写し / journal は消さず停止 (単一タスク・協調切替)。 */
+    if (rc_state[RC_N_MASTER] == RC_PRESENT ||
+        rc_state[RC_N_MASTERJ] == RC_PRESENT) {
+        ops->kprintf(ATTR_RED, "%s\n",
+                     "stale settings.db.master.new(+journal) present - inspect and remove manually");
+        return 1;
+    }
+    rc_made[RC_N_MASTER] = 1;
+    if (rc_clone(ops, RC_MASTER, rc_path[RC_N_MASTER]) != 0) {
+        ops->kprintf(ATTR_RED, "%s\n", "master unreadable: copy/byte verification failed");
+        return 1;
+    }
+    if (rc_db_check(ops, rc_path[RC_N_MASTER], &master) != 0) {
+        if (master.close_err != 0) {
+            /* 隔離接続が掴む inode は消さない (.new の close 失敗と同じ)。 */
+            rc_made[RC_N_MASTER] = 0;
+            ops->kprintf(ATTR_RED,
+                         "master close failed (%d) - settings.db.master.new kept; original untouched.\n",
+                         master.close_err);
+            ops->kprintf(ATTR_RED, "%s\n",
+                         "REBOOT from the floppy, then: rm /hd0/etc/settings.db.master.new, install --recover-settings hd0");
             return 1;
         }
-        ops->kprintf(ATTR_RED, "master close failed (%d)\n", master.close_err);
+        if (master.err == OS32_ERR_NOSYS) {
+            ops->kprintf(ATTR_RED,
+                         "SQLite unavailable (MINIMAL): cannot recover settings; boot from the installation FD with /boot/sqlite.mod present and run again\n");
+            return 1;
+        }
+        ops->kprintf(ATTR_RED, "%s\n", "master unreadable");
         return 1;
     }
     ops->kprintf(ATTR_WHITE, "%s\n",
@@ -832,14 +863,14 @@ static int rc_recover(const RecoverOps *ops, const char *drive)
     rc_made[RC_N_STATE] = 0;
 
     /* ---- 1f. コピー・検証・切替 ---------------------------------------- */
-    if (rc_copy_file(ops, RC_MASTER, rc_path[RC_N_NEW]) != RC_CP_OK) {
+    if (rc_copy_file(ops, rc_path[RC_N_MASTER], rc_path[RC_N_NEW]) != RC_CP_OK) {
         ops->kprintf(ATTR_RED, "copy failed (%s)\n", rc_name[RC_N_NEW]);
         ops->unlink(rc_path[RC_N_NEW]);
         return 1;
     }
-    if (ops->stat(RC_MASTER, &sa) != 0 ||
+    if (ops->stat(rc_path[RC_N_MASTER], &sa) != 0 ||
         ops->stat(rc_path[RC_N_NEW], &sb) != 0 || sa.st_size != sb.st_size ||
-        rc_cmp_file(ops, RC_MASTER, rc_path[RC_N_NEW]) != 0) {
+        rc_cmp_file(ops, rc_path[RC_N_MASTER], rc_path[RC_N_NEW]) != 0) {
         ops->kprintf(ATTR_RED, "verify failed (%s)\n", rc_name[RC_N_NEW]);
         ops->unlink(rc_path[RC_N_NEW]);
         return 1;
@@ -960,6 +991,24 @@ static int rc_recover(const RecoverOps *ops, const char *drive)
         return 1;
     }
     return 0;
+}
+
+/* 事前検査の失敗・取消し・退避以後の失敗も、今回のマスタの写しを回収する。 */
+static int rc_recover(const RecoverOps *ops, const char *drive)
+{
+    int result, drop_rc;
+    rc_made[RC_N_MASTER] = 0;
+    result = rc_recover_impl(ops, drive);
+    if (rc_made[RC_N_MASTER]) {
+        drop_rc = ops->unlink(rc_path[RC_N_MASTER]);
+        if (drop_rc != 0 && drop_rc != OS32_ERR_NOTFOUND) {
+            ops->kprintf(ATTR_RED, "%s\n",
+                         "cannot remove settings.db.master.new - inspect and remove manually");
+            result = 1;
+        }
+        rc_made[RC_N_MASTER] = 0;
+    }
+    return result;
 }
 
 /* ======================================================================== */

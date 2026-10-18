@@ -230,12 +230,18 @@ static int services_settings(int *reserve)
     return os32_sqlite_outer_group_finish(&group, rc);
 }
 
+static const char *services_state_name(void);
+
 void services_boot(void)
 {
     /* Boot only, including failure: never retry an isolated lifetime. */
     if (services_stage != SERVICES_UNICODE) return;
     u32 start_tick = tick_count;
     int reserve = OS32_SQLITE_FEP_RESERVE;
+    OS32_Stat dictionary;
+    /* Only definite absence selects recovery mode; other stat failures retain
+     * the normal FEP initialization/rollback path. Never open the dictionary. */
+    int no_dictionary = vfs_stat(IME_DICT_PATH, &dictionary) == VFS_ERR_NOTFOUND;
     int rc = os32_sqlite_start();
     if (rc) goto rollback;
     services_stage = SERVICES_SQLITE_INTERNAL_READY;
@@ -249,6 +255,15 @@ void services_boot(void)
     if (rc) goto rollback;
     services_stage = SERVICES_SETTINGS_CLOSED;
     kprintf(0x07, "[services] SETTINGS_CLOSED tick=%u\n", tick_count);
+    if (no_dictionary) {
+        /* No live resident group and no later FEP load: boot_check(0, 0)
+         * has released the FEP reservation along with settings. */
+        reserve = 0;
+        services_stage = SERVICES_SQLITE_ONLY;
+        services_public = 1;
+        kprintf(0x07, "[services] SQLITE_ONLY: no FEP dictionary\n");
+        goto report;
+    }
     if (services_boot_fault == SERVICES_FAULT_RESERVE) reserve = SQLITE_MODULE_POOL_SIZE;
     rc = os32_sqlite_outer_boot_check(0, reserve);
     if (rc) goto rollback;
@@ -292,11 +307,29 @@ report:;
     /* Observation only: preserve kaudit's existing run count and classifications.
      * Both module bodies remain in SLACK/pool; FEP buffers are in KHEAP. */
     kprintf(0x07, "[services] %s public=%u sqlite_pages=%u fep_pages=%u fep_bytes=%u quarantine_bytes=%u diff=%d\n",
-            services_public ? "SERVICES_READY" :
-            services_stage == SERVICES_MINIMAL ? "MINIMAL" : "MINIMAL_QUARANTINED",
+            services_state_name(),
             (u32)services_public, pages, fep_pages, fep,
             services_stage == SERVICES_MINIMAL_QUARANTINED ? (pages + fep_pages) * PAGE_SIZE + fep : 0,
             counts.diff);
     kprintf(0x07, "[services] tick=%u..%u reserve=%d unicode=%08x\n",
             start_tick, tick_count, reserve, unicode_file_debug_phys());
+}
+
+/* Diagnostic only; no engine entry, allocation or ABI change. */
+static const char *services_state_name(void)
+{
+    switch (services_stage) {
+    case SERVICES_READY: return "SERVICES_READY";
+    case SERVICES_SQLITE_ONLY: return "SQLITE_ONLY";
+    case SERVICES_MINIMAL: return "MINIMAL";
+    case SERVICES_MINIMAL_QUARANTINED: return "MINIMAL_QUARANTINED";
+    default: return "STARTING";
+    }
+}
+
+void services_report(void)
+{
+    kprintf(0x07, "  services: %s db=%u fep_pages=%u fep_bytes=%u\n",
+            services_state_name(), (u32)services_public,
+            fep_module_pages(), ime_boot_bytes());
 }

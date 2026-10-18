@@ -90,6 +90,12 @@ static u32 snapshot_kheap_free(void)
 #include "module.h"
 struct kdebug kdebug;
 extern u32 boot_pages_audit_runs, boot_pages_audit_fail;
+static u32 services_report_calls;
+void services_report(void)
+{
+    CHECK("services report IRQ enabled", _irq_enabled());
+    services_report_calls++;
+}
 #include "mem_stat_source.c"
 #undef pgalloc_free_pages
 #undef kmalloc_total
@@ -127,7 +133,9 @@ static void boot_page_status(void)
     boot_page_input.allocator_pages = MEM_POOL_BASE / PAGE_SIZE;
     boot_page_input.phys_pages = boot_page_input.allocator_pages;
     kaudit_boot_pages();
+    u32 reports_before = services_report_calls;
     CHECK("boot pages snapshot", kapi_mem_stat(0, &st, sizeof(st)) == sizeof(st));
+    CHECK("services report on mem", services_report_calls == reports_before + 1);
     CHECK("boot pages normal", st.audit_runs == 1 && st.audit_fail == 0);
     boot_page_input.phys_pages++;
     kaudit_boot_pages();

@@ -143,7 +143,10 @@ i32 kapi_mem_stat(i32 app_id, void *out, u32 size)
     result = (int)snap.size;
 done:
     irq_restore(irq);
-    if (result > 0) kmemcpy(out, &snap, snap.size);
+    if (result > 0) {
+        kmemcpy(out, &snap, snap.size);
+        if (!app_id) services_report();
+    }
     return result;
 }
 

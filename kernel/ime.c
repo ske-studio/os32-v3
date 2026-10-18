@@ -41,9 +41,6 @@ static int g_ime_reader_owner;
 static int g_ime_cui_redraw;
 static void ime_cancel_input(void);
 
-/* 辞書ファイルのパス */
-#define IME_DICT_PATH  "/db/fep.db"
-
 /* ======================================================================== */
 /*  プリエディット表示 (TVRAM 25行目 = y=24)                                 */
 /* ======================================================================== */

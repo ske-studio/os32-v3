@@ -551,6 +551,7 @@ FEP の SQLite 予約は既定 192 KiB、settings の system scope の `fep_mem_
 下限 `OS32_SQLITE_FEP_RESERVE_MIN` は T4a-4 (`tools/tests/fep_budget_host.c`、ログ `~/os32-tmp/run/t4a/fix1_budget*.log`) の実 IPADIC 最大 101,376 B・合成最大 99,328 B の大きい方を KiB に切り上げた 99 KiB とする (ユーザー決定 2026-10-18)。
 
 SQLite 部品が無いとき、`db_*` は `OS32_ERR_NOSYS` を返し、`db_last_error` は診断文字列を返す。
+FD 起動の辞書なしは `SQLITE_ONLY` とし、recover-settings のため `db_*` は公開、IME は stub、FEP 予約は 0 とする (ユーザー決定 2026-10-19)。
 
 | Offset | フィールド | プロトタイプ |
 |--------|-----------|------|

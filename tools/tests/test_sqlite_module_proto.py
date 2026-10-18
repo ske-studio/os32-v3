@@ -366,12 +366,15 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
                   ('learn-prepare-failure', 32), ('close-fault-after-ready', 33),
                   ('settings-below-minimum', 34), ('settings-minimum', 35),
                   ('settings-minimum-minus-one', 36), ('missing-FEP', 50),
-                  ('final-ready-check-failure', 54), ('mixed-FEP', 51), ('FEP-allocation', 52), ('FEP-PAIR-required', 53)]
+                  ('final-ready-check-failure', 54), ('mixed-FEP', 51), ('FEP-allocation', 52), ('FEP-PAIR-required', 53),
+                  ('no-dictionary-sqlite-only', 55), ('dictionary-stat-io', 56),
+                  ('no-dictionary-missing-sqlite', 57), ('no-dictionary-sqlite-init', 58),
+                  ('no-dictionary-settings-close', 59)]
     boot_cases += [(name, 20 + fault) for fault, name in enumerate((
         'pool', 'stack', 'sqlite-init', 'settings-close', 'fep-text', 'fep-attr',
         'fep-crc', 'dictionary', 'reserve', 'fep-close', 'shutdown'), 1)]
-    def boot_run(mode, fep_body=None):
-        data = bytearray(image)
+    def boot_run(mode, fep_body=None, sqlite_body=None):
+        data = bytearray(image if sqlite_body is None else sqlite_body)
         if mode == 12:
             word(data, 31, pair ^ 1)
             crc(data)
@@ -404,6 +407,21 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
         runtime_path.write_text(runtime_source)
         boot_command = [runtime_path if item == ROOT / 'kernel/module_runtime.c' else item for item in command]
         mutations = [
+            ('no-dictionary-loads-FEP', path, source,
+             'vfs_stat(IME_DICT_PATH, &dictionary) == VFS_ERR_NOTFOUND',
+             '(vfs_stat(IME_DICT_PATH, &dictionary), 0)', 55),
+            ('dictionary-present-sqlite-only', path, source,
+             'vfs_stat(IME_DICT_PATH, &dictionary) == VFS_ERR_NOTFOUND',
+             'vfs_stat(IME_DICT_PATH, &dictionary) == VFS_OK', 10),
+            ('no-dictionary-MINIMAL', path, source,
+             '    int rc = os32_sqlite_start();',
+             '    if (no_dictionary) { services_stage = SERVICES_MINIMAL; return; }\n'
+             '    int rc = os32_sqlite_start();', 55),
+            ('sqlite-only-not-public', path, source,
+             '        services_public = 1;', '        services_public = 0;', 55),
+            ('sqlite-only-called-ready', path, source,
+             '        services_stage = SERVICES_SQLITE_ONLY;',
+             '        services_stage = SERVICES_READY;', 55),
             ('reserve-lower-MINIMAL', path, source,
              '*reserve = OS32_SQLITE_FEP_RESERVE_MIN;', '*reserve = -1;', 34),
             ('reserve-reject-lower', path, source,
@@ -430,6 +448,42 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
             assert result.returncode == 1 and b'FAIL ' in result.stdout, (label, result)
             print('MUTATE ' + label + ' RED (compiled runtime): ' + result.stdout.decode().strip(), flush=True)
             target.write_text(original)
+    if mutate:
+        # Remove the actual module's zero-resident reservation release, then
+        # repack the product body. The same runtime pressure assertion must fail.
+        flags = shlex.split(subprocess.check_output([
+            'make', '--no-print-directory', '-s', '-f', 'build/config.mk',
+            '--eval=host-sqlite-flags: ; @echo $(CFLAGS_SQLITE) $(INC_SQLITE)',
+            'host-sqlite-flags'], cwd=ROOT, text=True))
+        compiler = Path(os.environ['CROSS_DIR']) / 'bin/i386-elf-gcc'
+        source = (directory / 'os32_sqlite_vfs.c').read_text()
+        old = '    if (!live && !reserve) budget->reserve = 0;'
+        assert source.count(old) == 1
+        path = folder / 'os32_sqlite_vfs.c'
+        path.write_text(source.replace(old, '    /* mutation: keep unused FEP reservation */'))
+        obj_path = folder / 'os32_sqlite_vfs.o'
+        subprocess.run([compiler, *flags, '-I.', '-I' + str(directory),
+                        '-include', ROOT / 'lib/sqlite3/os32_sqlite_config.h',
+                        '-c', path, '-o', obj_path], cwd=ROOT, check=True)
+        elf_path = folder / 'sqlite-no-release.elf'
+        objects = [obj_path if name == 'os32_sqlite_vfs' else directory / (name + '.o')
+                   for name in ('sqlite3', 'os32_sqlite_vfs', 'sqlite_module',
+                                'sqlite_import_slots', 'sqlite_import_stubs',
+                                'kstring', 'kstring_c', 'kmath')]
+        libgcc = subprocess.check_output([compiler, '-print-libgcc-file-name'], text=True).strip()
+        subprocess.run([compiler.with_name('i386-elf-ld'), '-m', 'elf_i386', '--emit-relocs',
+                        '-T', ROOT / 'build/sqlite-module.ld', *objects, libgcc,
+                        '-o', elf_path], cwd=ROOT, check=True)
+        spec = json.loads((ROOT / 'sdk/kapi.json').read_text())
+        body, _ = mkmod.build(elf_path.read_bytes(), metadata, vmkernel.read_bytes(),
+                             spec['version'], spec['generations']['memory_layout'], module_id=2)
+        # Restore the host adapter after the preceding core mutations.
+        subprocess.run(command, check=True)
+        result = boot_run(55, sqlite_body=body)
+        assert result.returncode == 1 and b'FAIL budget->reserve == 0' in result.stdout, result
+        print('MUTATE sqlite-only-keeps-reserve RED (repacked product runtime): ' +
+              result.stdout.decode().strip(), flush=True)
+
     if mutate or fep_mutate:
         # Retain the two T4c-2 mutations after moving the actual FEP code into
         # its paired image. Build only the changed production object in a temp

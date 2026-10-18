@@ -35,6 +35,7 @@ static u32 stack_base, heap_base, prefix_failed, init_calls, stack_probes;
 u32 paging_sqlite_stack_guard;
 static int guard_np, guard_restored;
 static u32 stack_reports;
+static u32 dictionary_stats, dictionary_missing_messages, services_reports;
 static void stack_usage(void);
 /* Copyout seam for the real ver diagnostic entry. */
 char *kstrncpy(char *d, const char *s, u32 n)
@@ -171,7 +172,7 @@ static void input_paths(void)
         host_stop_pending = 0;
     }
     host_sink = 0;
-    if (services_stage == SERVICES_MINIMAL) {
+    if (services_stage == SERVICES_MINIMAL || services_stage == SERVICES_SQLITE_ONLY) {
         host_key = KEY_F1 << 8;
         CHECK(ime_trygetchar() == -1);
         host_key = KEY_F1 << 8; host_next_key = 0x1e61;
@@ -182,6 +183,14 @@ static void input_paths(void)
 }
 int vfs_stat(const char *path, OS32_Stat *st)
 {
+    if (!memcmp(path, "/db/fep.db", sizeof("/db/fep.db"))) {
+        CHECK(services_stage == SERVICES_UNICODE && !opens && !fep_opens && !alloc_calls);
+        dictionary_stats++;
+        if (input[0] == 55 || (input[0] >= 57 && input[0] <= 59)) return VFS_ERR_NOTFOUND;
+        if (input[0] == 56) return VFS_ERR_IO;
+        st->st_size = 1;
+        return 0;
+    }
     CHECK(!memcmp(path, SYS_UNICODE_BIN, sizeof(SYS_UNICODE_BIN)));
     if (input[0] == 14) return VFS_ERR_NOTFOUND;
     st->st_size = input[0] == 15 ? 128 * 1024 : UNICODE_FILE_BYTES;
@@ -405,6 +414,21 @@ int vfs_quarantine_sqlite(const VfsSqliteCookie *cookie)
 void kprintf(u8 attr, const char *fmt, ...)
 {
     (void)attr;
+    if (!memcmp(fmt, "[services] SQLITE_ONLY: no FEP dictionary\n",
+                sizeof("[services] SQLITE_ONLY: no FEP dictionary\n")))
+        dictionary_missing_messages++;
+    if (!memcmp(fmt, "  services: %s db=%u", sizeof("  services: %s db=%u") - 1)) {
+        va_list args;
+        va_start(args, fmt);
+        const char *state = va_arg(args, const char *);
+        CHECK(!memcmp(state, services_stage == SERVICES_SQLITE_ONLY ? "SQLITE_ONLY" :
+                      services_stage == SERVICES_READY ? "SERVICES_READY" :
+                      services_stage == SERVICES_MINIMAL ? "MINIMAL" : "MINIMAL_QUARANTINED",
+                      kstrlen(state) + 1));
+        CHECK(va_arg(args, unsigned) == (unsigned)services_public);
+        va_end(args);
+        services_reports++;
+    }
     if (!memcmp(fmt, "sqlite stack high-water=", 23)) {
         va_list args;
         va_start(args, fmt);
@@ -450,7 +474,7 @@ int vfs_open(const char *path, int mode)
     }
     CHECK(!memcmp(path, SYS_SQLITE_MOD, sizeof(SYS_SQLITE_MOD)));
     opens++;
-    return input[0] == 1 || input[0] == 11 ? -1 : 3;
+    return input[0] == 1 || (input[0] == 11 || input[0] == 57) ? -1 : 3;
 }
 void vfs_close(int fd) { if (fd == 4) { CHECK(!fep_closes); fep_closes++; return; } CHECK(fd == 3 && !closes); closes++; }
 int vfs_fstat(int fd, OS32_Stat *st)
@@ -573,9 +597,9 @@ static int selected(void *arg, int n, char **values, char **names)
 }
 void host_seed_settings(sqlite3 *db)
 {
-    if (input[0] != 19 && input[0] != 20 && (input[0] < 34 || input[0] > 36)) return;
+    if (input[0] != 55 && input[0] != 19 && input[0] != 20 && (input[0] < 34 || input[0] > 36)) return;
     CHECK(!os32_sqlite_exec(db, "CREATE TABLE settings(scope TEXT,key TEXT,type INTEGER,ival INTEGER)", 0, 0, 0));
-    CHECK(!os32_sqlite_exec(db, input[0] == 19 ?
+    CHECK(!os32_sqlite_exec(db, (input[0] == 19 || input[0] == 55) ?
         "INSERT INTO settings VALUES('system','fep_mem_reserve_kb',0,224)" :
         input[0] == 20 ? "INSERT INTO settings VALUES('system','fep_mem_reserve_kb',0,128)" :
         input[0] == 34 ? "INSERT INTO settings VALUES('system','fep_mem_reserve_kb',0,64)" :
@@ -601,18 +625,55 @@ static void boot_transaction(void)
     unicode_file_load();
     services_stage = SERVICES_UNICODE;
     if (input[0] > 20 && input[0] <= 31) services_boot_fault = input[0] - 20;
+    if (input[0] == 58) services_boot_fault = SERVICES_FAULT_SQLITE_INIT;
+    if (input[0] == 59) services_boot_fault = SERVICES_FAULT_SETTINGS_CLOSE;
     u32 unicode_before = unicode_pages;
     services_boot();
+    CHECK(dictionary_stats == 1);
+    CHECK(dictionary_missing_messages == (input[0] == 55));
+    int sqlite_only = input[0] == 55;
+    if (sqlite_only) {
+        CHECK(opens == 1 && init_calls == 1 && !fep_opens && !fep_allocs);
+        CHECK(services_stage == SERVICES_SQLITE_ONLY && sqlite_module_ready());
+        CHECK(!fep_owned && !fep_module_pages() && !ime_boot_bytes());
+        CHECK(module_records[1].state == MODULE_ABSENT);
+        HostBudgetState *budget = (HostBudgetState *)(uptr)heap_base;
+        CHECK(budget->reserve == 0);
+        /* The paired engine really executes SQL, with the entire APP budget
+         * available after settings closes (seeded reserve=224 KiB is ignored). */
+        Os32SqliteGroup group;
+        sqlite3 *db = 0;
+        int selected_rows = 0;
+        CHECK(!os32_sqlite_outer_group_acquire(OS32_SQLITE_EXEC, 1, &group));
+        CHECK(!os32_sqlite_outer_group_open(&group, ":memory:", SQLITE_OPEN_READWRITE, &db));
+        CHECK(!os32_sqlite_exec(db, "SELECT 42", selected, &selected_rows, 0));
+        CHECK(selected_rows == 1);
+        CHECK(!os32_sqlite_exec(db, "CREATE TABLE pressure(x)", 0, 0, 0));
+        int inserts = 0;
+        while (os32_sqlite_exec(db, "INSERT INTO pressure VALUES(zeroblob(4096))", 0, 0, 0) == SQLITE_OK)
+            CHECK(++inserts < 200);
+        CHECK(budget->live[0] + budget->live[2] > 319488u);
+        CHECK(!os32_sqlite_outer_group_begin_close(&group));
+        CHECK(!os32_sqlite_close(db));
+        CHECK(!os32_sqlite_outer_group_finish(&group, SQLITE_OK));
+        ime_set_mode(1); ime_toggle();
+        CHECK(!ime_is_active() && !ime_get_mode());
+        CHECK(ime_switch_dict(0) == OS32_ERR_NOSYS);
+        input_paths();
+        say("PASS SQLITE_ONLY stat=1 sqlite=running SQL=42 FEP=stub reserve=0 app>319488\n");
+    }
+    services_report();
+    CHECK(services_reports == 1);
     CHECK(unicode_pages == unicode_before);
     CHECK(unicode_before == ((input[0] >= 14 && input[0] <= 17) ? 0 : UNICODE_FILE_PAGES));
     CHECK(unicode_file_lookup(0x3041) == 0x2421);
     CHECK(!sqlite_engine_active && host_flags == 0x202);
-    int ok = input[0] == 10 || input[0] == 19 || input[0] == 20 || (input[0] >= 32 && input[0] <= 36) || (input[0] >= 14 && input[0] <= 17);
+    int ok = input[0] == 10 || input[0] == 19 || input[0] == 20 || (input[0] >= 32 && input[0] <= 36) || (input[0] >= 14 && input[0] <= 17) || input[0] == 56;
     int isolated = services_boot_fault == SERVICES_FAULT_SETTINGS_CLOSE ||
                    services_boot_fault == SERVICES_FAULT_FEP_CLOSE ||
                    services_boot_fault == SERVICES_FAULT_SHUTDOWN;
     CHECK(ready_check_failed == (input[0] == 54));
-    CHECK(services_public == ok);
+    CHECK(services_public == (ok || sqlite_only));
     if (ok) {
         CHECK(services_stage == SERVICES_READY && sqlite_module_ready());
         CHECK(learn_unavailable == (input[0] == 32));
@@ -621,7 +682,7 @@ static void boot_transaction(void)
         HostBudgetState *budget = (HostBudgetState *)(uptr)heap_base;
         unsigned expected_reserve = input[0] == 19 ? 224 * 1024 :
                                     input[0] == 20 ? 128 * 1024 :
-                                    input[0] >= 34 ? OS32_SQLITE_FEP_RESERVE_MIN :
+                                    (input[0] >= 34 && input[0] <= 36) ? OS32_SQLITE_FEP_RESERVE_MIN :
                                     OS32_SQLITE_FEP_RESERVE;
         CHECK(budget->reserve == expected_reserve);
         CHECK(g_ime.dict_loaded && fep_allocs == 2 && !fep_frees);
@@ -665,6 +726,8 @@ static void boot_transaction(void)
         say(" app_limit="); number(319488u + OS32_SQLITE_FEP_RESERVE - budget->reserve);
         say(" diagnostics="); number(reserve_clamped); say("\n");
         say("SERVICES_READY sqlite>0 fep=736 quarantine=0 unicode retained\n");
+    } else if (sqlite_only) {
+        CHECK(sqlite_module_ready());
     } else if (isolated) {
         CHECK(services_stage == SERVICES_MINIMAL_QUARANTINED);
         CHECK(module_records[0].state == MODULE_QUARANTINED);
@@ -686,11 +749,11 @@ static void boot_transaction(void)
     u32 pages = ledger_owner_pages(OWNER);
     u32 expected_pages = (((const u32 *)file)[MI_MEM_SIZE] + SQLITE_MODULE_POOL_SIZE +
                           SQLITE_ENGINE_STACK_SIZE + PAGE_SIZE) / PAGE_SIZE;
-    CHECK(pages == ((ok || isolated) ? expected_pages : 0));
+    CHECK(pages == ((ok || sqlite_only || isolated) ? expected_pages : 0));
     u32 fep_pages = fep_module_pages();
     CHECK(fep_pages == ((ok || services_boot_fault == SERVICES_FAULT_FEP_CLOSE) ?
                       ((const u32 *)fep_file)[MI_MEM_SIZE] / PAGE_SIZE : 0));
-    CHECK(guard_np == (ok || isolated));
+    CHECK(guard_np == (ok || sqlite_only || isolated));
     u32 physical_pages = 0;
     for (u32 i = 0; i < allocated; i++) physical_pages += live[i];
     CHECK(physical_pages == pages + fep_pages); /* includes the NP guard's page */
@@ -702,6 +765,7 @@ static void boot_transaction(void)
     u32 before = alloc_calls;
     services_boot();
     CHECK(alloc_calls == before); /* boot transaction is single-shot */
+    CHECK(dictionary_stats == 1);
     if (input[0] == 33) {
         services_boot_fault = SERVICES_FAULT_FEP_CLOSE;
         CHECK(fep_module_abort() == 0);
@@ -722,7 +786,7 @@ void _start(void)
     __asm__ volatile("int $0x80" : "=a"(rc) : "0"(125), "b"(pool), "c"(sizeof(pool)), "d"(7) : "memory");
     CHECK(!rc);
     stubs();
-    if ((input[0] >= 10 && input[0] <= 36) || (input[0] >= 50 && input[0] <= 54)) boot_transaction();
+    if ((input[0] >= 10 && input[0] <= 36) || (input[0] >= 50 && input[0] <= 59)) boot_transaction();
     rc = os32_sqlite_start();
     CHECK(rc == (int)input[3] && opens == 1 && closes == (input[0] != 1));
     CHECK(!sqlite_engine_active && host_flags == 0x202);
