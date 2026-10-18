@@ -28,6 +28,7 @@ check-memmap-audit-host:
 - kernel/physmem.c
 - kernel/ring3_entry.asm
 - kernel/shlib.c
+- kernel/shlib.h
 - kernel/sys.c
 - kernel/v86_gcap.*
 - kdebug/v86_gcap.*

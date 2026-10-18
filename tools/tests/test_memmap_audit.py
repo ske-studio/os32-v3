@@ -19,6 +19,11 @@ def function(text, name):
 from mutpar import run_ordered
 
 MUTANTS = [
+ ('boot-slack-all-present', 'kernel/paging.c', '        boot_slack_valid() &&',
+  '        boot_range_valid(MEM_SHM_RESV_START, MEM_FIXED_PAGING_GUARD_BASE, 1) &&',
+  'FAIL !paging_as_audit(&space, shlib_read_page)'),
+ ('boot-slack-unchecked', 'kernel/paging.c', '        boot_slack_valid() &&',
+  '        1 &&', 'FAIL paging_as_audit(&space, shlib_read_page) > 0'),
  ('low-audit-USER', 'kernel/paging.c', '        if (want == seen) { i++; continue; }',
   '        if (want == MM_RW && seen == MM_RWU) want = seen;\n        if (want == seen) { i++; continue; }',
   'FAIL paging_memmap_selftest(exec_tramp_page_addr()) > 0'),
