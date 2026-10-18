@@ -58,10 +58,11 @@ NP21/W の diff=0 を使う。SA_ONSTACK の既存 overflow 検査は実 IDT の
 
 製品 `sqlite.mod` を各ケース別の新しいプロセスで実行する。初期化/共通CRUD込みの
 塗り/high-water は式深度100 (101はprepare拒否)、複合SELECT5項、1024行sort、
-1024行index作成、OMIT_TRIGGERのprepare拒否を観測する。16KiB以下→32KiB、
-32KiB以下→64KiB、それ以上→128KiBの余裕をruntimeで照合する。
-`check-sqlite-stack-host MUTATE=1` は正常対照の後、32KiBへ縮める変異だけを実行する。
-実測24,388Bは32KiB内で完走するが、64KiBを要求するassertionでREDになる。
+1024行index作成、OMIT_TRIGGERのprepare拒否を観測する。深度100の実測24,388Bに
+基づき必要容量32KiBをruntimeで照合する (ユーザー決定2026-10-18)。
+`check-sqlite-stack-host MUTATE=1` は正常対照の後、16KiBへ縮める変異だけを実行する。
+深度100のSQL負荷がNPガードへ到達するhost signal seamを観測してruntime REDとする。
+これは実IDT/#DF配送の代用ではない。
 rollback/隔離の所有頁期待値は本体の定数から計算する。NPガードは追加1頁のまま。
 
 既存SA_ONSTACKケースはhostの保護違反と診断関数単体だけを試す。IDTの#PFは

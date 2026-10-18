@@ -305,16 +305,15 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
         print(result.stdout.decode(), end='', flush=True)
         assert result.returncode == 0, (label, result)
     if stack_mutate:
-        # Keep enough space to run the workload, but violate the measured
-        # headroom policy (24,388 B requires 64 KiB, not 32 KiB).
+        # Depth 100 exceeds 16 KiB: require an observed runtime guard fault.
         header = (ROOT / 'kernel/sqlite_engine.h').read_text()
-        old = '(64u * 1024u)'
+        old = '(32u * 1024u)'
         assert header.count(old) == 1
-        (folder / 'sqlite_engine.h').write_text(header.replace(old, '(32u * 1024u)'))
+        (folder / 'sqlite_engine.h').write_text(header.replace(old, '(16u * 1024u)'))
         subprocess.run(command, check=True)
         payload = struct.pack('<4I', 34, len(image), pair, 0) + image
         result = host32.run([str(exe)], input=payload, runner='qemu', capture_output=True)
-        assert result.returncode == 1 and b'FAIL SQLITE_ENGINE_STACK_SIZE >= required' in result.stdout, result
+        assert result.returncode == 77 and b'PASS host signal seam -> engine fail-stop (NOT IDT/#DF)' in result.stdout, result
         print('MUTATE undersized-stack RED (compiled runtime): ' + result.stdout.decode().strip(), flush=True)
         (folder / 'sqlite_engine.h').unlink()
         subprocess.run(command, check=True)

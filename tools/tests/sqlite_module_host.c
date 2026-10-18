@@ -198,7 +198,7 @@ static void overflow(void *arg)
                      : "=&r"(saved) : "r"(stack_base) : "memory");
     CHECK(0);
 }
-static void overflow_test(void)
+static void install_stack_fault(void)
 {
     struct { void *sp; int flags; u32 size; } alt = {signal_stack, 0, sizeof(signal_stack)};
     struct { void (*handler)(int); u32 flags; void *restorer; u32 mask[2]; }
@@ -209,6 +209,10 @@ static void overflow_test(void)
     __asm__ volatile("int $0x80" : "=a"(rc) : "0"(174), "b"(11), "c"(&action),
                      "d"(0), "S"(8) : "memory");
     CHECK(!rc);
+}
+static void overflow_test(void)
+{
+    install_stack_fault();
     sqlite_engine_run(overflow, 0, 0);
     CHECK(0);
 }
@@ -218,6 +222,7 @@ static void stack_workload(sqlite3 *db, u32 mode)
 {
     sqlite3_stmt *stmt = 0;
     if (mode == 34) {
+        install_stack_fault();
         /* Left-deep tree avoids the parser's independent parentheses limit.
          * A leaf is depth 1: 100 terms reach exactly SQLITE_MAX_EXPR_DEPTH. */
         char sql[2 * SQLITE_MAX_EXPR_DEPTH + 32];
@@ -274,7 +279,7 @@ static void stack_workload(sqlite3 *db, u32 mode)
             -1, &stmt, 0) == SQLITE_ERROR && !stmt);
     }
     u32 peak = sqlite_engine_stack_high_water();
-    u32 required = peak <= 16*1024 ? 32*1024 : peak <= 32*1024 ? 64*1024 : 128*1024;
+    u32 required = 32 * 1024; /* depth 100 measured 24,388 B; user decision 2026-10-18 */
     say("STACK workload="); number(mode); say(" high-water="); number(peak);
     say(" required="); number(required); say(" configured="); number(SQLITE_ENGINE_STACK_SIZE); say("\n");
     CHECK(SQLITE_ENGINE_STACK_SIZE >= required);
