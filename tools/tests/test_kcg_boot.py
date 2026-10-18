@@ -16,7 +16,9 @@ MUTATIONS = (
      '    kcg_scale = 1;\n    /* Loaded glyphs', '    /* Loaded glyphs',
      'FAIL closed init resets scale'),
     ('init-clears-font', 'drivers/kcg.c',
-     '    if (!kcg_boot_phase_open) return;', '', 'FAIL closed init preserves font'),
+     # Bypass both init guards so a closed re-init still clears loaded glyphs.
+     '    if (!kcg_boot_phase_open) return;\n    if (cache_initialized) return;',
+     '', 'FAIL closed init preserves font'),
     ('guard', 'drivers/kcg.c',
      'if (!kcg_boot_phase_open || kcg_module_attempted()) return OS32_ERR_NOSYS;', '',
      'FAIL closed VFS untouched'),
