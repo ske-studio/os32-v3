@@ -529,7 +529,8 @@ static int ime_process_key(int keydata)
     if (scancode == KEY_RETURN) {
         if (g_ime.kana_len > 0 || g_ime.rk.preedit[0] != '\0') {
             commit_kana_direct();
-            preedit_clear();
+            ime_rk_init(&g_ime.rk); /* Discard incomplete romaji after flushing n. */
+            preedit_draw(); /* Keep the ON indicator even when nothing was committed. */
             return 1;
         }
         return -1;

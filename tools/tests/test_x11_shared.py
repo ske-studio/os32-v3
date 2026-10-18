@@ -85,6 +85,13 @@ def run(mutation=None):
 
 
 MUTATIONS = [
+    ('IMEIND-RETURN-clear-only', 'ime_source.inc',
+     '            preedit_draw(); /* Keep the ON indicator even when nothing was committed. */',
+     '            preedit_clear();',
+     'FAIL IMEIND discarded RETURN keeps visible ON indicator'),
+    ('IMEIND-RETURN-stale-romaji', 'ime_source.inc',
+     '            ime_rk_init(&g_ime.rk); /* Discard incomplete romaji after flushing n. */',
+     '', 'FAIL IMEIND discarded reading is no longer visible'),
     ('IMECAND-no-immediate-ON-redraw', 'ime_source.inc',
      '    /* Restore now and again at the first read after the shell reload clear. */\n'
      '    if (ime_is_active()) preedit_draw();', '',
