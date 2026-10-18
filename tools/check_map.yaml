@@ -17,6 +17,8 @@ docs_only:
 - docs/images/**
 - docs/logs/**
 broad:
+- check-double-fault-host
+- check-sqlite-stack-host
 - check-sqlite-engine-host
 - check-memmap-host
 - check-deploy-set-host

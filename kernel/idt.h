@@ -31,6 +31,7 @@ struct idt_ptr {
 } __attribute__((packed));
 
 /* IDTタイプ/属性ビット */
+#define IDT_ATTR_TASK_GATE     0x85  /* P=1, DPL=0, type=5 */
 #define IDT_ATTR_INT_GATE32  0x8E   /* P=1, DPL=0, 32ビット割込みゲート */
 #define IDT_ATTR_TRAP_GATE32 0x8F   /* P=1, DPL=0, 32ビットトラップゲート */
 #define IDT_ATTR_INT_GATE32_DPL3 0xEE /* P=1, DPL=3, 32ビット割込みゲート

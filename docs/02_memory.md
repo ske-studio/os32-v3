@@ -54,7 +54,7 @@
 数値の地図はコミットせず、説明をこの節に残す。
 
 T4c-1 では `__kernel_resident_end` は core BSS 末尾のページ境界。
-SQLite は `/boot/sqlite.mod` の body と512KiB pool・128KiB stackを同じ module owner で
+SQLite は `/boot/sqlite.mod` の body と512KiB pool・64KiB stackを同じ module owner で
 連続割当し、prefixだけ起動成功時に返す。stack 直下に追加の1頁を NP guard として
 保持し、owner 回収前に supervisor/RW に戻す。動的な kernel VA は
 `paging_sqlite_stack_guard` と `[sqlite] stack_guard=... p=...` で観測し、boot/live audit で NP を照合する。
@@ -64,6 +64,15 @@ SLACK/pool の内数であり、別枠として再加算しない。`[sqlite] ow
 memory_layout は4を維持する。変更はリンク時に浮く core 内部の常駐鎖と owner 割当であり、
 USER/shlib VA、固定 paging/stack/shell、公開 KAPI slot とデータ配置は変わらない。
 部品の新旧は独立した ops版2・import/facade ABI印・VK32の対CRCで拒否する。
+
+T5-0b の #DF (vector 8) は専用 task gate (GDT末尾 idx6 / selector 0x30) で受ける。
+既存 idx3 の ring3/V86 TSS・idx4/5 の利用者セグメントは維持する。core BSS の
+104B TSS・4KiB stack と固定 master CR3 を使い、GDT/IDT/旧新TSS/入口は各PD共有の
+核の恒等写像に残す。前の EIP/ESP、CR2、ソフトウェアが控えた前の CR3 と
+kernel/engine/unknown をシリアル・TVRAM に1行出して停止し、復帰・回収しない。
+EIP は #DF の仕様上再開点ではなく、CR2 は例外フレーム書込み失敗の番地にもなる。
+engine stack は製品設定の深度100のhost実測24,388Bに対して64KiBを選択 (定義は
+`kernel/sqlite_engine.h`)、NP guard 1頁は変更しない。実guard配送の受入は台帳 KSTK-DF。
 
 `sys_usable_mem_end()` は `MEM_PHYS_EXEC_FLOOR` から最初の PERSIST 所有頁までの
 低位連続上端を返す（起動時の `ledger_arena_freeze()` で確定）。検出 RAM の最高番地ではない。

@@ -6,7 +6,7 @@
 static void die(int code) { __asm__ volatile("int $0x80" : : "a"(1), "b"(code)); for (;;) {} }
 static void say(const char *s) { u32 n=0; while(s[n]) n++; __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(s), "d"(n)); }
 #define CHECK(x) do { if (!(x)) { say("FAIL: " #x "\n"); die(1); } } while (0)
-static unsigned char stack[128 * 1024] __attribute__((aligned(16)));
+static unsigned char stack[SQLITE_ENGINE_STACK_SIZE] __attribute__((aligned(16)));
 u32 host_flags = 0x202;
 volatile u32 kctx_irq_depth, kctx_exc_depth;
 static int calls, kills, faults, pending;
@@ -105,6 +105,6 @@ void _start(void)
     }
     CHECK(faults == 2);
     sqlite_engine_active = 0; host_flags = 0x202;
-    say("PASS: all typed outer calls/128KiB ESP/registers/IF/reentry/IRQ/STOP/fault\n");
+    say("PASS: all typed outer calls/engine-stack ESP/registers/IF/reentry/IRQ/STOP/fault\n");
     die(0);
 }

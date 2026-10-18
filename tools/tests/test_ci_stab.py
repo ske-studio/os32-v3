@@ -105,6 +105,8 @@ def mutation_test_sources(root):
 # The following helpers accept mutant data, not the suite's mutation-mode flag;
 # their callers run a normal fixture before calling the helper with each mutant.
 CONTROL_SKIP_ALLOW = {
+    ('tools/tests/' + 'test_double_fault.py', 'mutant', 1):
+        'Checks one fixture result; main runs run(folder) before descriptor mutants.',
     ('tools/tests/' + 'test_e10c_lifecycle.py', "mutant[0] == 'gcap-ops'", 1):
         'Selects how to edit one mutant source; main runs run(runner) first.',
     ('tools/tests/' + 'test_kapi_ranges.py', 'mutant', 1):

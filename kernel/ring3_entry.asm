@@ -114,6 +114,7 @@ ring3_resume:
         ;; STATIC_ASSERT(tss_esp0_at_offset_4) が固定している
         ;; (v86_entry.asm と同じ書き方)。
         mov     [edx + 4], ecx
+        mov     [edx + 28], eax         ;; static TSS.CR3: #DF diagnostic
         mov     cr3, eax                ;; アプリ PD へ切替
         sub     esp, 13 * 4             ;; フレーム置き場
         mov     edi, esp

@@ -19,8 +19,8 @@ struct gdt_ptr {
     u32 base;
 } __attribute__((packed));
 
-/* GDT は6エントリ (NULL, カーネルコード, カーネルデータ, TSS,
- * ユーザコード, ユーザデータ)。
+/* GDT は7エントリ (NULL, カーネルコード, カーネルデータ, TSS,
+ * ユーザコード, ユーザデータ, #DF TSS)。
  *
  * V86 ゲストはリアルモード形式のセグメントを使うので ring3 用の
  * コード/データディスクリプタを必要としないが、v2 の CPL=3
@@ -55,6 +55,11 @@ static void gdt_set_gate(int num, u32 base, u32 limit, u8 access, u8 gran)
 void gdt_set_tss(u32 base, u32 limit)
 {
     gdt_set_gate(GDT_TSS_IDX, base, limit, 0x89, 0x00);
+}
+
+void gdt_set_df_tss(u32 base, u32 limit)
+{
+    gdt_set_gate(GDT_DF_TSS_IDX, base, limit, GDT_ACCESS_TSS, 0);
 }
 
 /* カーネルGDTの初期化 */

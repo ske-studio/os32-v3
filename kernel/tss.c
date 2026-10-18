@@ -17,6 +17,8 @@ STATIC_ASSERT(TSS_IOMAP_SIZE == 65536 / 8, tss_iomap_covers_all_ports);
  * 原因不明のトリプルフォルトになる。構造体を触ったらここで止まる。 */
 STATIC_ASSERT(offsetof(struct tss_entry, esp0) == 4, tss_esp0_at_offset_4);
 
+STATIC_ASSERT(offsetof(struct tss_entry, cr3) == 28, tss_cr3_at_offset_28);
+
 /* GDT 側で TSS ディスクリプタを作るため公開する */
 struct tss_entry kernel_tss;
 
