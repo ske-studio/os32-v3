@@ -75,7 +75,7 @@ C_CASES = ["crc_and_frames", "timing_and_seq", "vfs_contract", "mount_permit",
 GATE_CASES = ["gate_tx", "hold_overflow", "gate_rx", "gate_init_refused",
               "isr_counts"]
 SESSION_CASES = ["flow", "hello_fail_quiet", "hello_fail_flood", "end_late_hold",
-                 "end_not_quiet", "lan_session", "lan_start"]
+                 "end_not_quiet", "lan_session", "lan_start", "lan_lifetime"]
 
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-D_DEFAULT_SOURCE", "-D__cdecl=",

@@ -35,15 +35,15 @@ C_KERNEL = \
     kernel/paging.c kernel/paging_app.c kernel/dma_pool.c kernel/dma_pool_math.c kernel/physmem.c kernel/pgalloc.c kernel/ledger_pci.c kernel/memory_boot.c kernel/shlib.c kernel/shm.c kernel/gui.c kernel/kmalloc.c kernel/console.c kernel/con_sink.c kernel/bootlog.c kernel/bootlog_save.c kernel/kbd_inject.c kernel/sys.c kernel/sysconfig.c kernel/kaudit.c kernel/kaudit_boot.c kernel/kselftest_report.c kernel/irq.c kernel/irq_math.c kernel/ktime.c kernel/time_math.c \
     kernel/sqlite_engine.c kernel/sqlite_outer.c lib/sqlite3/os32_sqlite_test.c kernel/module.c kernel/module_image.c kernel/module_runtime.c kernel/unicode_file.c kernel/fep_module.c kernel/cd_module.c kernel/kcg_module.c kernel/fm_module.c \
     drivers/kbd.c drivers/kbd_status.c drivers/kbd_dlog.c drivers/serial.c drivers/serial_plan.c \
-    drivers/fdc.c drivers/fdc_decide.c drivers/fdc_track.c drivers/disk.c drivers/dma8237.c drivers/dma8237_math.c drivers/pci.c drivers/pci_decode.c drivers/pci_bind.c drivers/pci_bind_match.c drivers/e82557.c drivers/e82557_eeprom.c drivers/e82557_desc.c drivers/ide.c drivers/ide_addr.c drivers/pc98pt.c drivers/rtc.c drivers/dev.c drivers/kcg.c drivers/np2sysp.c drivers/loop_dev.c \
+    drivers/fdc.c drivers/fdc_decide.c drivers/fdc_track.c drivers/disk.c drivers/dma8237.c drivers/dma8237_math.c drivers/pci.c drivers/pci_decode.c drivers/pci_bind.c drivers/pci_bind_match.c drivers/ide.c drivers/ide_addr.c drivers/pc98pt.c drivers/rtc.c drivers/dev.c drivers/kcg.c drivers/np2sysp.c drivers/loop_dev.c \
     drivers/mouse.c drivers/mouse_bus.c drivers/mouse_seamless.c \
     drivers/lgy98.c drivers/ne2000.c drivers/ne2000_ring.c \
-    kernel/pcm_module.c \
+    kernel/pcm_module.c kernel/lan_module.c \
     drivers/wab_glue_xe10.c drivers/wab_cirrus.c \
     net/link.c \
     gfx/gfx_core.c gfx/gfx_vram.c gfx/gfx_scroll.c gfx/palette.c gfx/backend_pc98.c gfx/backend_pegc.c gfx/backend_cirrus.c \
     fs/fatfs/ff.c fs/fatfs/diskio.c fs/fatfs_vfs.c \
-    fs/ext2_super.c fs/ext2_inode.c fs/ext2_dir.c fs/ext2_file.c fs/ext2_fmt.c fs/ext2_layout.c fs/ext2_vfs.c fs/vfs.c fs/vfs_fd.c fs/fd_redirect.c fs/pipe_buffer.c fs/hostdrvfs.c fs/sfs_proto.c fs/sfs_client.c fs/sfs_lan.c fs/serialfs.c fs/serialfs_session.c \
+    fs/ext2_super.c fs/ext2_inode.c fs/ext2_dir.c fs/ext2_file.c fs/ext2_fmt.c fs/ext2_layout.c fs/ext2_vfs.c fs/vfs.c fs/vfs_fd.c fs/fd_redirect.c fs/pipe_buffer.c fs/hostdrvfs.c fs/sfs_proto.c fs/sfs_client.c fs/serialfs.c fs/serialfs_session.c \
     exec/exec.c exec/appmem.c exec/appmem_map.c exec/appmem_unmap.c exec/ring3_ls.c exec/redir_access.c exec/access_walk.c exec/surface_query.c exec/system_surface.c exec/lease.c exec/exec_heap.c exec/appslot.c exec/launch.c exec/ring3_str.c exec/os32x_hdr.c \
     kapi/kapi_print.c kapi/kapi_strings.c kapi/kapi_generated.c kapi/kapi_db.c kapi/kapi_sys.c kapi/kapi_host.c \
     lib/path.c lib/utf8.c lib/kprintf.c lib/kprintf_attr.c lib/os_time.c lib/kstring.c lib/kutf16.c lib/kmath.c lib/crc32.c \
@@ -108,10 +108,6 @@ kernel/paging_app.o: kernel/paging_app.c
 net/%.o: net/%.c
 	$(CC) $(CFLAGS_BASE) $(INC_KERNEL) -c $< -o $@
 
-# R5 EEPROM runs once at boot; keep diagnostic formatting within the image budget.
-drivers/e82557.o drivers/e82557_eeprom.o drivers/e82557_desc.o: drivers/%.o: drivers/%.c
-	$(CC) $(CFLAGS_BASE) -Os $(INC_DRIVERS) -c $< -o $@
-
 drivers/%.o: drivers/%.c
 	$(CC) $(CFLAGS_BASE) $(INC_DRIVERS) -c $< -o $@
 
@@ -120,7 +116,6 @@ gfx/%.o: gfx/%.c
 	$(CC) $(CFLAGS_BASE) $(INC_GFX) -c $< -o $@
 
 # fs/ モジュール
-fs/sfs_lan.o: fs/sfs_lan.h fs/sfs_client.h fs/sfs_proto.h
 # セッションは常駐シェルの判定 (exec/appslot.h の APP_ID_SHELL) を見るので -Iexec も要る
 fs/serialfs_session.o: fs/serialfs_session.c
 	$(CC) $(CFLAGS_BASE) $(INC_KERNEL) -c $< -o $@
@@ -189,7 +184,7 @@ $(BUILD_OUT)/layout-manifest.json: $(BUILD_OUT)/generations-manifest.json tools/
 deploy deploy-u3 deploy-kernel deploy-nhd nhd-migrate-pt deploy-fd: $(BUILD_OUT)/layout-manifest.json
 
 # 像の CRC (pair) を埋める部品の一覧。T4c-1 で SQLite、T5 で起動時の部品を足す。
-KERNEL_PAIRED_MODULES := $(BUILD_OUT)/kdebug.bin $(BUILD_OUT)/sqlite.mod $(BUILD_OUT)/fep.mod $(BUILD_OUT)/cd.mod $(BUILD_OUT)/kcg.mod $(BUILD_OUT)/fm.mod $(BUILD_OUT)/pcm.mod $(BUILD_OUT)/v86.mod
+KERNEL_PAIRED_MODULES := $(BUILD_OUT)/kdebug.bin $(BUILD_OUT)/sqlite.mod $(BUILD_OUT)/fep.mod $(BUILD_OUT)/cd.mod $(BUILD_OUT)/kcg.mod $(BUILD_OUT)/fm.mod $(BUILD_OUT)/pcm.mod $(BUILD_OUT)/v86.mod $(BUILD_OUT)/lan.mod
 kernel: $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/vmkernel.lz4 $(BUILD_OUT)/layout-manifest.json $(KERNEL_PAIRED_MODULES)
 
 # === カーネルクリーン ===
@@ -327,7 +322,7 @@ $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(BUILD_ID_OBJ) $(R1_OBJECTS): $(LAYOUT_HEADER
 # Keep the original source-adjacent legacy objects. All alternate output trees
 # use separate objects/dependencies, including SQLite and assembler inputs.
 ifneq ($(KERNEL_OBJ_PREFIX),)
-LAYOUT_SMALL = $(R1_SMALL) kernel/module.c kernel/module_image.c kernel/module_runtime.c drivers/e82557.c drivers/e82557_eeprom.c drivers/e82557_desc.c
+LAYOUT_SMALL = $(R1_SMALL) kernel/module.c kernel/module_image.c kernel/module_runtime.c
 $(KERNEL_OBJ_PREFIX)%.o: %.c
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS_BASE) $(if $(filter $<,$(LAYOUT_SMALL)),-Os) $(if $(filter kernel/module.c,$<),-Ikdebug/generated) $(if $(filter fs/fatfs/%,$<),$(INC_FATFS),$(INC_KERNEL)) -c $< -o $@

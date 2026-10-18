@@ -17,6 +17,16 @@
 #include "kstring.h"
 #endif
 
+#ifdef OS32_LAN_MODULE
+#include "lan_module.h"
+extern u32 ktime_ticks(void);
+#define tick_count (ktime_ticks())
+#define irq_register lan_module_irq_register
+#define irq_unregister lan_module_irq_unregister
+#define dma_alloc lan_module_dma_alloc
+#define dma_free lan_module_dma_free
+#endif
+
 #define E82557_VAR_DIR "/var"
 #define E82557_LOG_DIR "/var/log"
 #define E82557_CRC_DIGITS 8
@@ -132,7 +142,11 @@ static const char *try_begin(void)
 static void nic_trace(u32 stage)
 {
     /* Normal boot context only: the module performs VFS I/O. */
+#ifdef OS32_LAN_MODULE
+    lan_module_trace(stage);
+#else
     if (kdebug.ops.nic_trace) kdebug.ops.nic_trace(stage);
+#endif
 }
 
 static void scb_mask(u16 base, int on)
@@ -829,3 +843,35 @@ const struct pci_driver e82557_driver = {
     sizeof(struct pci_driver), E82557_VENDOR, E82557_DEVICE,
     PCI_CLASS_NETWORK, PCI_SUB_NET_ETHERNET, "e82557", e82557_probe
 };
+
+/* Boot rollback only. Reuse LB's selective-reset evidence before detaching
+ * IRQ/tick; free the pool buffer only after both callbacks are detached. */
+int lan_module_quiet(void)
+{
+    if (nic.state == E82557_OFF) return 1;
+    if (nic.state == E82557_QUARANTINED || nic.state == E82557_FAILED) return 0;
+    unsigned int flags = irq_save();
+    nic.state = E82557_STOPPING;
+    int stopped = stop_dma(nic.base, &nic.stop, E82557_STOP_ATTEMPTS);
+    if (stopped) {
+        u16 status = inpw(nic.base + E82557_SCB_STATUS);
+        outp(nic.base + E82557_SCB_ACK, (u8)(status >> 8));
+    }
+    irq_restore(flags);
+    if (!stopped) {
+        bm_restore(&nic.dev, 1);
+        (void)dma_mark_leaked(&nic.dma);
+        nic.state = E82557_QUARANTINED;
+    }
+    return stopped;
+}
+
+int lan_module_release(void)
+{
+    if (nic.state == E82557_OFF) return 1;
+    if (nic.state != E82557_STOPPING) return 0;
+    bm_restore(&nic.dev, !(nic.dev.command & E82557_COMMAND_BM));
+    if (dma_free(&nic.dma)) return 0;
+    nic.state = E82557_OFF;
+    return 1;
+}

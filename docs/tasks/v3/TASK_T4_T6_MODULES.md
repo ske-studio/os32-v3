@@ -327,6 +327,9 @@ T5c-3 接続契約: `v86.mod` (ID 8、POST_ROOT/PAIR 必須、ops 1・initialize
 セッションの ACTIVE 参照は PTE snapshot 前から、例外後の trusted landing で disk detach・backing 返却・復帰監査を終えるまで保持する。途中の abort は隔離し、参照中の body は復帰用に呼出し可能。entry/longjmp、runtime_end の ESP0/IF、PTE snapshot/restore と例外の一次処理は core のまま、caller は切り替えない。
 `bootinfo_capture` の保存域と `v86_session.real_lowmem[4096]` は core に置く。page0 は起動時・paging 前の一度だけ保存し、以後は read-only 原本として使用、session reset/部品回収では消さない (T7a-1c 引渡し)。低位 FIXED は従来どおり非回収。#DF 専用 TSS/task gate/stack/CR3 と V86 の kernel_tss/ESP0 は別系統を維持する。
 
+T5c-4 接続契約: `lan.mod` (ID 9、POST_ROOT/PAIR 必須、ops 1・initialize 1 口、関数 import 28 本) に 82557 本体・EEPROM/descriptor・SerialFS LAN transport を置く。PCI 列挙/識別、永久予約、VFS/DMA と既存 packet/SFS facade は core、S4 の235本・ABI印は維持する。ROOT_READY 後、SQLite/FEP の services 判定前に読み、FD の MINIMAL/SQLITE_ONLY でも同じ経路を使う。
+DECLINE は IRQ/tick/DMA/登録参照を返し、QUARANTINE は再 probe と body/DMA の free を止める。rollback は既存 LB の selective-reset 停止証拠→IRQ/tick 解除→DMA 返却の順。session の ACTIVE 参照は LAN 初期化前から BYE/umount/reset と callback/context 切断後まで保持し、途中 abort は既存 module runtime で隔離する。
+
 ### 7-2. 像・実行時RAMの見積もりと止める条件
 
 T4でSQLiteはFIXED鎖からowner割当へ移行済み。T5入口で実mapを基準化し、module頁はSLACK/poolの内数、NP guardも所有頁として1回数える。AUDITGUARD-1のAS作成/boot監査を維持し、通常/rollback/隔離でdiff0。prefix返却を含め二重計上せず、起動監査の回数は変えない。

@@ -12,6 +12,6 @@ check-e82557-desc-host:
 - drivers/e82557_eeprom.c
 - drivers/pci_bind_match.c
 - drivers/pci_decode.c
-- kernel/kernel.c
+- kernel/lan_module.c
 - tools/tests/e82557_drv_host.c
 - kernel/isr_handlers.c

@@ -65,6 +65,25 @@ int sys_time_now(u32 *lo, u32 *hi)
 { *lo = tick_count * 10000; *hi = 0; return 0; }
 
 static int g_cfg_lan, g_cfg_reads, g_nic_state = E82557_RUNNING;
+static int g_module_available = 1, g_module_refs;
+static int g_module_acquires, g_module_releases, g_module_errors;
+static int g_nic_calls;
+
+int lan_module_session_acquire(void)
+{
+    g_module_acquires++;
+    if (!g_module_available) return 0;
+    if (g_module_refs) g_module_errors++;
+    g_module_refs++;
+    return 1;
+}
+
+static void nic_callback(void)
+{
+    g_nic_calls++;
+    if (g_module_refs != 1) g_module_errors++;
+}
+
 static int g_ru_ready = 1, g_ru_stuck, g_stale, g_rx_flood, g_drained;
 static int g_hello_ready, g_hello_stale, g_hello_drained;
 static u32 g_rnr, g_hello_tick;
@@ -92,13 +111,14 @@ static u8 g_nic_rx[SFS_LAN_RX_CAP];
 static u32 g_nic_rx_n;
 static int g_nic_hello, g_nic_bye, g_nic_answer = 1, g_nic_bad_uart;
 static int g_nic_busy;
-void e82557_get_mac(u8 *mac) { memcpy(mac, g_guest_mac, 6); }
+void e82557_get_mac(u8 *mac) { nic_callback(); memcpy(mac, g_guest_mac, 6); }
 int e82557_send(const void *buf, u32 len)
 {
     const u8 *p = buf;
     SfsDec dec;
     SfsFrame frame;
     u32 i;
+    nic_callback();
     if (serial_gate_active()) g_nic_bad_uart++;
     if (g_nic_busy) return OS32_ERR_AGAIN;
     sfs_dec_reset(&dec);
@@ -124,13 +144,15 @@ int e82557_send(const void *buf, u32 len)
             g_nic_rx_n = 14 + sfs_encode(g_nic_rx + 14,
                 SFS_T_HELLO | SFS_T_RESP, 0x1234ABCDUL, 0, pl, 12);
         } else if (frame.type == SFS_T_BYE) g_nic_bye++;
-        else abort(); /* LOG/EXIT must never go to the LAN NIC. */
+        else if (frame.type != SFS_T_STAT)
+            abort(); /* LOG/EXIT must never go to the LAN NIC. */
         break;
     }
     return 0;
 }
 int e82557_recv(void *buf, u32 cap, u32 *len)
 {
+    nic_callback();
     if (cap != SFS_LAN_RX_CAP) abort();
     if (g_stale || g_rx_flood) {
         if (g_stale) g_stale--;
@@ -198,6 +220,18 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...)
 }
 
 #include "serialfs_session.c"
+
+void lan_module_session_release(void)
+{
+    /* The last module reference must outlive NIC draining and every stored
+     * session callback. These are the real session/transport structures. */
+    if (g_module_refs != 1 || g_cli.io || g_cli.ctx ||
+        g_lan.nic || g_lan.clock || g_lan.clock_ctx ||
+        g_lan.rx_pos || g_lan.rx_end || g_lan.linked || g_lan.prepared)
+        g_module_errors++;
+    g_module_refs--;
+    g_module_releases++;
+}
 
 /* ======================================================================== */
 /*  偽のホスト                                                              */
@@ -333,6 +367,9 @@ static void reset(void)
 {
     g_nonce_ctr = 0; /* native host u32 is unsigned long (64 bits here) */
     g_cfg_lan = g_cfg_reads = g_mount_fail = 0;
+    g_module_available = 1;
+    g_module_refs = g_module_acquires = g_module_releases = g_module_errors = 0;
+    g_nic_calls = 0;
     g_cfg_peer = "";
     g_nic_state = E82557_RUNNING;
     g_ru_ready = 1; g_ru_stuck = g_stale = g_rx_flood = g_drained = 0;
@@ -652,6 +689,59 @@ static void lan_start(void)
     CHECK(tick_count < 4000);
 }
 
+static void lan_lifetime(void)
+{
+    const u8 *resp;
+    u16 len;
+    u32 start;
+    int i;
+
+    reset(); g_cfg_lan = 1; g_module_available = 0;
+    CHECK(serialfs_session_begin() == OS32_ERR_IO);
+    CHECK(g_module_acquires == 1 && !g_module_refs && !g_module_releases);
+    CHECK(!g_nic_calls && !g_mount_calls && !g_active);
+    CHECK(!g_module_errors && tick_count == 1000);
+
+    /* Normal completion, failed HELLO, mount failure, and child cancellation
+     * all converge on finish while holding the module reference. */
+    for (i = 0; i < 4; i++) {
+        reset(); g_cfg_lan = 1;
+        if (i == 1) g_nic_answer = 0;
+        if (i == 2) g_mount_fail = 1;
+        start = tick_count;
+        CHECK(serialfs_session_begin() == ((i == 1 || i == 2) ? OS32_ERR_IO : 0));
+        if (i == 0 || i == 3) {
+            CHECK(g_module_refs == 1 && !g_module_releases);
+            if (i == 3) {
+                g_lan.rx_pos = 14; g_lan.rx_end = 30; g_lan.prepared = 1;
+                g_nic_rx_n = 60;
+                g_nic_busy = 1;
+            }
+            CHECK(serialfs_session_end(i == 3 ? -1 : 0) == 0);
+        }
+        CHECK(tick_count - start < 3000);
+        CHECK(g_module_acquires == 1 && g_module_releases == 1);
+        CHECK(!g_module_refs && !g_module_errors && !g_active && !g_nic_rx_n);
+    }
+
+    /* Cable loss after HELLO: requests receive no answer, the existing client
+     * deadline declares the line dead, and a subsequent end remains finite. */
+    reset(); g_cfg_lan = 1;
+    CHECK(serialfs_session_begin() == 0);
+    start = tick_count;
+    for (i = 0; i < SFS_DEAD_AFTER; i++) {
+        CHECK(sfs_client_call(&g_cli, SFS_T_STAT, (const u8 *)"/", 1,
+                              &resp, &len) == OS32_ERR_IO);
+        CHECK(g_module_refs == 1 && !g_module_releases);
+    }
+    CHECK(g_cli.dead == SFS_DEAD_FAILS && tick_count - start < 10000);
+    start = tick_count;
+    CHECK(serialfs_session_end(OS32_ERR_IO) == 0);
+    CHECK(tick_count - start <= sfs_ms_ticks(SFS_LAN_PUT_MS) + 1);
+    CHECK(g_module_acquires == 1 && g_module_releases == 1);
+    CHECK(!g_module_refs && !g_module_errors && !g_active);
+}
+
 int main(int argc, char **argv)
 {
     const char *c = argc > 1 ? argv[1] : "";
@@ -662,6 +752,7 @@ int main(int argc, char **argv)
     else if (!strcmp(c, "end_not_quiet")) end_not_quiet();
     else if (!strcmp(c, "lan_session")) lan_session();
     else if (!strcmp(c, "lan_start")) lan_start();
+    else if (!strcmp(c, "lan_lifetime")) lan_lifetime();
     else {
         fprintf(stderr, "usage: serialfs-session-host <case>\n");
         return 2;

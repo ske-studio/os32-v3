@@ -34,6 +34,7 @@
 #include "sfs_lan.h"
 #include "sys.h"
 #include "e82557.h"
+#include "lan_module.h"
 #include "sysconfig.h"
 #include "config.h"
 
@@ -145,6 +146,12 @@ static int sfs_finish(int code)
 
     if (g_use_lan) {
         sfs_lan_reset(&g_lan);
+        g_cli.io = 0;
+        g_cli.ctx = 0;
+        g_lan.nic = 0;
+        g_lan.clock = 0;
+        g_lan.clock_ctx = 0;
+        lan_module_session_release();
         if (g_cli.dead != SFS_DEAD_NONE)
             kprintf(SFS_ATTR_ERR, "sfs: line declared dead (%s)\n",
                     sfs_dead_name(g_cli.dead));
@@ -223,6 +230,10 @@ int serialfs_session_begin(void)
 
     g_use_lan = sysconfig_get_int(SYS_SYSTEM_CFG, "SFS_LAN", 0) == 1;
     if (g_use_lan) {
+        if (!lan_module_session_acquire()) {
+            g_use_lan = 0;
+            return OS32_ERR_IO;
+        }
         /* These driver entry points belong exclusively to the foreground. */
         int state = e82557_state();
         char peer[32]; /* room to detect a too-long configured MAC */

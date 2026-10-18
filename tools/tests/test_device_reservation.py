@@ -668,11 +668,11 @@ class DeviceReservation(unittest.TestCase):
                 self.assertFalse(name in text, '%s に %s が残っている' % (rel, name))
 
     def test_import_is_before_bind(self):
-        # ⑥-0 は pci_bind_all の直前 (B4)、台帳 (memory_boot_init) より後。
+        # ⑥-0 は PCI bind を行う LAN 部品の起動前 (B4)、台帳より後。
         k = (ROOT / 'kernel/kernel.c').read_text()
         imp = k.index('ledger_resource_import_pci()')
         self.assertLess(k.index('memory_boot_init(mem_kb)'), imp)
-        self.assertLess(imp, k.index('pci_bind_all(pci_drivers'))
+        self.assertLess(imp, k.index('lan_module_load()'))
 
 
 # 変異 (§4-4)。当て先は load() の写し (実物は書き換えない)。

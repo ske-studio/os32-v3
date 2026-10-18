@@ -54,6 +54,13 @@ static void fdrecov_manifest_version(u32 off, u32 ver)
     fs_set_data(fs_find(MAN_PATH), (const u8 *)text, (u32)strlen(text));
 }
 
+static const char *fdrecov_lan_devname(const char *prefix)
+{
+    if (strcmp(prefix, "/") == 0) return "fd0";
+    if (strcmp(prefix, "/hd0") == 0) return "hd0";
+    return "";
+}
+
 static void case_fdrecov(void)
 {
     static const char *const targets[] = {"boot", "sys", 0};
@@ -164,6 +171,35 @@ static void case_fdrecov(void)
           fs_find("/hd0/bin/b.bin") >= 0, "流し CRC 不一致はその 1 件の errors、公開しない");
     fdrecov_setup(0, 1);
     check(run2("--root", "/hd0") == 0 && g_errors == 0, "CRC 正常の対照");
+
+    /* T5c-4: FD MINIMAL / SQLITE_ONLY recovery must not need any db API.
+     * The fixture leaves those slots NULL, so an accidental call also fails.
+     * The LAN image is copied as part of the existing whole-root operation. */
+    fdrecov_setup(1, 1);
+    g_fake.vfs_devname = fdrecov_lan_devname;
+    fs_add_file("/host/boot/lan.mod", (const u8 *)"paired lan", 10);
+    fs_add_dir("/boot");
+    fs_add_file("/boot/lan.mod", (const u8 *)"FD lan", 6);
+    fs_add_dir("/hd0/boot");
+    fs_add_file("/hd0/boot/lan.mod", (const u8 *)"old lan", 7);
+    check(g_fake.db_open == 0 && g_fake.db_open_existing == 0,
+          "FD 全体復旧の対照は db API なし");
+    {
+        char *av[] = {"hsync", "--root", "/hd0", "--verify", "--no-backup", 0};
+        int n;
+        rc = run_hsync(5, av);
+        n = fs_find("/hd0/boot/lan.mod");
+        check(rc == 0 && g_errors == 0 && n >= 0 &&
+              fs_nodes[n].size == 10 && memcmp(fs_nodes[n].data, "paired lan", 10) == 0 &&
+              fs_find("/hd0/sys/shell.bin") >= 0 && fk_header_reads == 0,
+              "FDRECOV: db なしの別根全体復旧で lan.mod と shell をコピーする");
+        n = fs_find("/boot/lan.mod");
+        check(n >= 0 && fs_nodes[n].size == 6 &&
+              memcmp(fs_nodes[n].data, "FD lan", 6) == 0 &&
+              fs_find("/hd0/boot/lan.mod.old") < 0,
+              "FDRECOV: 稼働 FD と未確認の old 像を更新しない");
+    }
+    g_fake.vfs_devname = fk_vfs_devname;
 
     fixture_shell_enabled = 1;
     fk_other_mount = 0;

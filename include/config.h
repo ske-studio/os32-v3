@@ -25,6 +25,7 @@
 #define SYS_V86_MOD           "/boot/v86.mod"
 #define SYS_FM_MOD            "/boot/fm.mod"
 #define SYS_PCM_MOD           "/boot/pcm.mod"
+#define SYS_LAN_MOD           "/boot/lan.mod"
 #define SYS_CD_MOD            "/boot/cd.mod"
 #define SYS_KCG_MOD           "/boot/kcg.mod"
 #define SYS_FEP_MOD           "/boot/fep.mod"

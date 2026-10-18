@@ -75,6 +75,7 @@ extern int fatfs_init(void);
 #include "mouse.h"
 #include "lgy98.h"
 #include "pcm_module.h"
+#include "lan_module.h"
 #include "os32_sqlite_vfs.h"
 #include "os32_sqlite_outer.h"
 #include "sqlite_engine.h"
@@ -158,19 +159,6 @@ static char *tv_cat_dec(char *dst, int val)
     }
     return tv_cat(dst, tmp);
 }
-
-/* ======================================================================== */
-/*  PCI の結線表 (票 docs/tasks/v3/TASK_HAL_WIRING.md §1-4)                 */
-/*                                                                          */
-/*  82557 の R5 EEPROM 観測。未一致の装置は今までどおり候補なし。         */
-/*                                                                          */
-/*  1 件ずつのポインタ配列にしてあるのは、将来 §3 の動的読み込みが来た      */
-/*  ときに表を差し替えるのが 1 ポインタで済むから (`size` で版を確かめる)。 */
-/* ======================================================================== */
-static const struct pci_driver *const pci_drivers[] = {
-    &e82557_driver
-};
-#define PCI_DRIVER_COUNT  (sizeof(pci_drivers) / sizeof(pci_drivers[0]))
 
 /* dev_findをPathDeviceValidatorとして使用するラッパー */
 static int dev_find_validator(const char *name)
@@ -619,7 +607,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     }
     pci_bind_set_line_state_hook(kernel_pci_line_bits);
     if (memory_boot_dma_available()) {
-        pci_bind_all(pci_drivers, PCI_DRIVER_COUNT);
+        lan_module_load();
     }
 
     /* CS4231 (MATE-X PCM) の検出だけ (票 TASK_PCM_CS4231 §2-1)。

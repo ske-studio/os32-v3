@@ -72,6 +72,10 @@ filesystem:
     - host: build/out/v86.mod
       guest: /boot/v86.mod
       tags: [core]
+    # --- Paired LAN/82557 and SerialFS transport (also on FD) ---
+    - host: build/out/lan.mod
+      guest: /boot/lan.mod
+      tags: [core]
     # --- カーネルデータ ---
     - host: build/out/unicode.bin
       guest: /sys/unicode.bin

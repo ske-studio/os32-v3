@@ -688,6 +688,35 @@ static void runtime_tests(const char *c)
         CHECK(e82557_recv(NULL,60,&len)==OS32_ERR_INVAL && e82557_recv(buf,60,NULL)==OS32_ERR_INVAL);
     }
 }
+static void module_stop_test(const char *c)
+{
+    int fail_stop=!strcmp(c,"module_stopfail");
+    int before_resets=resets;
+    u32 before_time=now, before_seq=nic.stop.reset_seq;
+    CHECK(!lan_module_release() && !freed && registered);
+    if(fail_stop) stop_fail=2;
+    CHECK(lan_module_quiet()==!fail_stop && !irq_depth);
+    CHECK(now-before_time<=E82557_RESET_US*E82557_STOP_ATTEMPTS);
+    CHECK(resets>before_resets && nic.stop.reset_seq>before_seq && mask==1);
+    CHECK(registered && !unregistered && !freed);
+    if(fail_stop) {
+        CHECK(nic.state==E82557_QUARANTINED && leaked==1 && !(pci_command&4));
+        int before_io=io_count;
+        CHECK(!lan_module_quiet() && !lan_module_release());
+        CHECK(io_count==before_io && !freed && registered);
+        return;
+    }
+    CHECK(nic.state==E82557_STOPPING && !leaked && !(status&0xfffc));
+    int before_io=io_count;
+    service_tick();
+    CHECK(e82557_irq(3,NULL)==IRQ_NONE && io_count==before_io);
+    CHECK(irq_unregister(3,handler,NULL)==0);
+    CHECK(lan_module_release() && nic.state==E82557_OFF && freed==1 && unregistered==1);
+    before_io=io_count;
+    CHECK(lan_module_quiet() && lan_module_release());
+    service_tick();
+    CHECK(io_count==before_io && freed==1 && !leaked);
+}
 int main(int argc,char **argv)
 {
     const char *c=argc>1?argv[1]:"pass"; int rc,skip=0;
@@ -756,7 +785,9 @@ int main(int argc,char **argv)
 
     if(!strcmp(c,"dma_fail")) alloc_fail=1;
     if(!strcmp(c,"bm_fail")) bm_fail=1;
-    if(!strcmp(c,"bm_present") || !strcmp(c,"bm_present_ng")) pci_command=0x0147;
+    if(!strcmp(c,"bm_present") || !strcmp(c,"bm_present_ng") || !strcmp(c,"module_bm_present")) {
+        pci_command=0x0147; dev.command|=E82557_COMMAND_BM;
+    }
     if(!strcmp(c,"bm_present_ng")) cb_ng=1;
     if(!strcmp(c,"cb_edge")) cb_delay=20000;
     if(!strcmp(c,"cb_late")) cb_delay=21000;
@@ -846,6 +877,13 @@ int main(int argc,char **argv)
         else CHECK(!strcmp(files[1].data,"1\n"));
     }
     if(rc==PCI_PROBE_OK && !swi_lost) runtime_tests(c);
+    if(!strncmp(c,"module_",7)) module_stop_test(c);
+    if(rc!=PCI_PROBE_OK) {
+        int before_io=io_count, before_freed=freed, before_unregistered=unregistered;
+        CHECK(lan_module_quiet()==(rc==PCI_PROBE_DECLINE));
+        CHECK(lan_module_release()==(rc==PCI_PROBE_DECLINE));
+        CHECK(io_count==before_io && freed==before_freed && unregistered==before_unregistered);
+    }
     if(!strcmp(c,"pass")) fprintf(1,"%s",output);
     return !!failed;
 }

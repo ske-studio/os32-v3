@@ -1,0 +1,176 @@
+{
+  "schema": 1,
+  "contracts": [
+    "kernel/lan_module.h"
+  ],
+  "imports": [
+    {
+      "symbol": "lan_module_irq_register",
+      "source": "kernel/lan_module.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "lan_module_irq_unregister",
+      "source": "kernel/lan_module.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "lan_module_dma_alloc",
+      "source": "kernel/lan_module.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "lan_module_dma_free",
+      "source": "kernel/lan_module.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "lan_module_trace",
+      "source": "kernel/lan_module.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "dma_mark_leaked",
+      "source": "kernel/dma_pool.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "cpu_delay_us",
+      "source": "kernel/cpu_calibrate.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "pci_cfg_read32",
+      "source": "drivers/pci.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "pci_cfg_write16",
+      "source": "drivers/pci.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "pci_bar_base",
+      "source": "drivers/pci_decode.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "pci_bar_kind",
+      "source": "drivers/pci_decode.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "pci_bind_set_reason",
+      "source": "drivers/pci_bind.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "sysconfig_get_int",
+      "source": "kernel/sysconfig.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "vfs_mkdir",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "vfs_read",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "vfs_write",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "vfs_sync",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "vfs_rm",
+      "source": "fs/vfs.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "boot_image_info",
+      "source": "include/bootinfo.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "kstrncmp",
+      "source": "lib/kstring.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "kutoa_dec",
+      "source": "include/kprintf.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "kprintf",
+      "source": "include/kprintf.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "sfs_dec_reset",
+      "source": "fs/sfs_proto.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "sfs_dec_feed",
+      "source": "fs/sfs_proto.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "sfs_get32",
+      "source": "fs/sfs_proto.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "sfs_ms_ticks",
+      "source": "fs/sfs_proto.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "ktime_ticks",
+      "declaration": "u32 ktime_ticks(void);",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "kstrcmp",
+      "source": "lib/kstring.h",
+      "context": "normal",
+      "irq": false
+    }
+  ]
+}

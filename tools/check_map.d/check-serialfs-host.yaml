@@ -8,6 +8,7 @@ check-serialfs-host:
 - fs/sfs_lan.h
 - drivers/e82557.h
 - kernel/sysconfig.h
+- kernel/lan_module.h
 - fs/sfs_client.c
 - fs/sfs_proto.c
 - kernel/sys.c

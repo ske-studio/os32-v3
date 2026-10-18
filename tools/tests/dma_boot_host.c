@@ -110,16 +110,14 @@ u32 ledger_resource_import_pci(void) { CHECK(reserved); return 0; }
 u32 ledger_res_overflow;
 static void kernel_pci_line_bits(void) { }
 static void pci_bind_set_line_state_hook(void (*hook)(void)) { (void)hook; }
-static int pci_drivers;
-#define PCI_DRIVER_COUNT 1
-static void pci_bind_all(int drivers, int count)
+static int lan_module_load(void)
 {
     struct dma_buf b;
-    (void)drivers; (void)count;
     CHECK(reserved && available && tested == 1 && !pcm);
     CHECK(dma_pool_free_pages() == DMA_POOL_PAGES);
     CHECK(dma_alloc(16384, 0, DMA_PHYS_LIMIT, &b) == 0);
     bound++;
+    return 0;
 }
 static int pcm_module_load(void)
 {
