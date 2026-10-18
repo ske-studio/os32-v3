@@ -4298,7 +4298,9 @@ fn guirunkey_reason_waits_for_modal_but_reclaim_does_not() {
     mocks::init();
     let shm = mocks::Shm::new();
     let mut st = one_gui_app_state(&shm);
+    multiapp::on_start(2);
     multiapp::on_start(3);
+    mocks::set_app_state(2, ST_PARKED);
     mocks::set_app_state(3, ST_WAIT_KEY);
     mocks::set_kill_frees(&[3]);
     assert!(modal::open_wm_message(&mut st, os32api::gui::proto::GUI_MODAL_OK, b"Existing\0", modal::WM_PURPOSE_NOTIFY));
@@ -4306,12 +4308,20 @@ fn guirunkey_reason_waits_for_modal_but_reclaim_does_not() {
     assert_eq!(mocks::kill_calls(), vec![3]);
     assert!(!multiapp::is_tracked(3));
     assert_eq!(modal::msg_bytes(), b"Existing");
+    // The surviving GUI app resumes while the existing modal owns the UI.
+    *mocks::RESUME_SCRIPT.lock().unwrap() = vec![2];
+    assert!(multiapp::resume_one(&mut st));
+    assert_eq!(mocks::resume_calls(), vec![(2, 0)]);
     modal::on_key(&mut st, 0x1c, 13, 0);
     assert!(!modal::is_open());
+    // Its next cooperative yield must reach top-level to deliver the notice.
+    assert!(multiapp::should_park(&st, 2), "pending reason must yield to top-level");
     multiapp::resume_one(&mut st);
     assert!(modal::is_open());
     assert_eq!(modal::msg_bytes(), b"No keyboard input. Run from a terminal.");
     assert_eq!(mocks::kill_calls(), vec![3]);
+    modal::on_key(&mut st, 0x1c, 13, 0);
+    assert!(!multiapp::should_park(&st, 2), "delivered reason must clear pending work");
 }
 
 #[test]

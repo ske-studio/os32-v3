@@ -1030,6 +1030,7 @@ pub fn should_park(st: &GuiState, cur: i32) -> bool {
     if session::ready_to_run(st)
         || st.launch_pending
         || has_top_level_work(mm)
+        || mm.key_wait_notice
         || fullscreen_restore_pending()
         || launch_work_pending()
         || crate::settings::pending()
