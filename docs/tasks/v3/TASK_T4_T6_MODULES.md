@@ -339,7 +339,7 @@ body+将来pool512KiB+stack128KiBは定常1,036,288B、prefix込みpeak1,052,672
 | T4a 共通核/生成policy | +4〜8KiB (DBGREF分を二重計上しない) | prototypeでprefix/body/record容量を確定。kdebug ONは既存body48KiB・peak60KiB、OFFは0 |
 | T4a-4 再測定 (host ILP32、製品未結線) | core増分0 | 512KiB内に固定管理状態80B、HEAP 524,208B、実容量516,096B。予約196,608B、APP+SYSTEM上限319,488B。settings の system/fep_mem_reserve_kb で増やす向きだけ上書き可、下限は既定192KiB。合成S/M/L最大FEP 99,328B、実IPADIC 101,376B、各27切替成功 (ログ `~/os32-tmp/run/t4a/fix1_budget*.log`) |
 | T4b facade/F2/F3/X群 | +4〜10KiB | group/identity/出力stagingを含むmap差分。X-1の棚卸しで上限が変わるなら着手前に再見積もり |
-| T4c SQLite分離 | +1〜3KiBのcore接続、連結SQLite占有は別計上 | 現連結SQLite全占有770,560B (`build/out/kernel.map:4477,8033`)、うちstatic MEMSYS5 393,216Bを除く377,344Bがbody基準。ページ切上げ380,928B＋512KiB＋128KiB＝**1,036,288B定常 [推]**、peakはこれに実測prefixを加える |
+| T4c SQLite分離 | +1〜3KiBのcore接続 (**実測 +4,072 B、T4c-2 で +1,174 B — 見積を実測に直す、ユーザー承認 2026-10-18。像は約 252KB で 508KiB まで余裕が大きい**)、連結SQLite占有は別計上 | 現連結SQLite全占有770,560B (`build/out/kernel.map:4477,8033`)、うちstatic MEMSYS5 393,216Bを除く377,344Bがbody基準。ページ切上げ380,928B＋512KiB＋128KiB＝**1,036,288B定常 [推]**、peakはこれに実測prefixを加える |
 | T5a FEP分離 | 旧FEP約18.5KiBを外へ、B2 staging等+5〜7KiB [推] | module本体/状態・ページ丸めを新mapで計上。旧群値は `docs/tasks/v3/TASK_MEMMAP_V3.md:322`、現実測の節約量ではない |
 | T5b EARLY/bootinfo | 接続/検査+4〜8KiB、FS群を外へ移した差分を別記 | 同梱域1MiB内で全load_spanの和≤1MiB。212B wire＋保存配列もcore像へ。旧FS群38.1KiB (`docs/tasks/v3/TASK_MEMMAP_V3.md:324`) は参考 |
 | T5c 各driver/manifest | broker/一覧+3〜6KiBから実際に除いた群を差引く | NIC・PCMのDMAは固定DMA pool、module RAMと二重計上しない。群別の新mapとprefix/常駐/隔離を各段で採る |
