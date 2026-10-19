@@ -112,7 +112,7 @@ NP21/W の観測 (票 §3-1: カナ・CAPS は機械式ロック) を受けて�
 | `irq_skip` | IRQ1: EMPTY (0x00・NP21/W の空 0x85) と ERROR (FE、PE+OE) は積まない、DATA は積む、OVERRUN は `KBD_DLOG_F_OVERRUN` 付きで積む。捨てた分は `KbdDiag` の `empty_count` / `err_count` に数えられている |
 | `irq_mods` | 修飾は配った**後**の値: カナ make → KANA、カナ break → 解除 (方式 B)、2 度目の make → KANA。SHIFT / CAPS の組み合わせ、`kbd_get_modifiers()` と一致、続きの読み (ESC の make) |
 | `irq_locks` | 方式 B: カナ・CAPS とも make で ON、make の繰り返しでも ON、break で OFF (break の重複でも OFF)、互いに独立。cooked は CAPS を外すと小文字に戻る、raw (GUI 中) は修飾キー自身の行に更新後の状態。起動時は 053Ah のカナ・CAPS だけを引き継ぐ (SHIFT / GRPH / CTRL は捨てる) |
-| `irq_flags_api` | V86 中は `KBD_DLOG_F_V86` (カナ・CAPS のロックは追い、SHIFT 等と押下表は更新しない)、GUI 中は `KBD_DLOG_F_GUI`、`out` NULL・`max <= 0` は `OS32_ERR_INVAL`、40 バイト溜まったら先頭 seq 9、大きな `max` は CAP で頭打ち、`kbd_init` で seq が 1 から、禁止区間の釣り合い |
+| `irq_flags_api` | V86 中は `KBD_DLOG_F_V86` (修飾状態はすべて追い、押下表は更新しない)、GUI 中は `KBD_DLOG_F_GUI`、`out` NULL・`max <= 0` は `OS32_ERR_INVAL`、40 バイト溜まったら先頭 seq 9、大きな `max` は CAP で頭打ち、`kbd_init` で seq が 1 から、禁止区間の釣り合い |
 | `watch_fmt` | `seq=12 code=F2 break key=72 KANA mods=CAPS|KANA` の形、印 `[OE] [V86] [GUI]`、修飾の並び SHIFT / CAPS / KANA / GRPH / CTRL、無ければ `-`、切り詰めても NUL 終端 |
 | `watch_lost` | 取りこぼしの件数 (`first - prev - 1`)、`LOST seq=13..20 (8): cannot judge this span` の形、飛びが無ければ空 |
 

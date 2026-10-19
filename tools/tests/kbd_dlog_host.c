@@ -247,8 +247,8 @@ static void case_irq_flags_api(void)
 
     fresh();
     stub_v86 = 1;
-    irq(KBD_STAT_RXRDY, 0x72);   /* V86 へ回す: ロックの状態だけは OS32 側でも追う */
-    irq(KBD_STAT_RXRDY, 0x70);   /* SHIFT はゲストのもの: OS32 側で更新しない */
+    irq(KBD_STAT_RXRDY, 0x72);   /* V86 へ回す: 修飾状態は OS32 側でも追う */
+    irq(KBD_STAT_RXRDY, 0x70);   /* SHIFT も OS32 側で追う */
     stub_v86 = 0;
     kbd_set_gui_mode(1);
     irq(KBD_STAT_RXRDY, 0x1D);
@@ -256,10 +256,10 @@ static void case_irq_flags_api(void)
     n = kbd_diag_log(0, out, KBD_DLOG_CAP);
     CHECK(n == 3);
     CHECK(out[0].flags == KBD_DLOG_F_V86 && out[0].mods == KBD_DLOG_MOD_KANA);
-    CHECK(out[1].flags == KBD_DLOG_F_V86 && out[1].mods == KBD_DLOG_MOD_KANA);
+    CHECK(out[1].flags == KBD_DLOG_F_V86 && out[1].mods == (KBD_DLOG_MOD_KANA | KBD_DLOG_MOD_SHIFT));
     CHECK(stub_v86_pushed == 2);
     CHECK(kbd_is_pressed(0x72) == 0 && kbd_is_pressed(0x70) == 0);
-    CHECK(out[2].flags == KBD_DLOG_F_GUI && out[2].mods == KBD_DLOG_MOD_KANA);
+    CHECK(out[2].flags == KBD_DLOG_F_GUI && out[2].mods == (KBD_DLOG_MOD_KANA | KBD_DLOG_MOD_SHIFT));
 
     CHECK(kbd_diag_log(0, (KbdDiagLogEnt *)0, 4) == OS32_ERR_INVAL);
     CHECK(kbd_diag_log(0, out, 0) == OS32_ERR_INVAL);
@@ -280,6 +280,53 @@ static void case_irq_flags_api(void)
     irq(KBD_STAT_RXRDY, 0x1D);
     n = kbd_diag_log(0, out, KBD_DLOG_CAP);
     CHECK(n == 1 && out[0].seq == 1);
+}
+
+/* V86 の境界をまたぐ make/break でも OS32 の修飾状態を追う。 */
+static void case_irq_v86_mods(void)
+{
+    static const u8 keys[] = { KEY_SHIFT, KEY_CTRL, KEY_GRPH, KEY_CAPS, KEY_KANA };
+    static const u8 bits[] = { SHIFT_SHIFT, SHIFT_CTRL, SHIFT_GRPH, SHIFT_CAPS, SHIFT_KANA };
+    KbdDiagLogEnt out[KBD_DLOG_CAP];
+    unsigned int i;
+
+    for (i = 0; i < sizeof(keys) / sizeof(keys[0]); i++) {
+        fresh();
+        irq(KBD_STAT_RXRDY, keys[i]);
+        CHECK(kbd_get_modifiers() == bits[i]);
+        stub_v86 = 1;
+        irq(KBD_STAT_RXRDY, keys[i] | SCANCODE_BREAK);
+        CHECK(kbd_get_modifiers() == 0);
+        CHECK(stub_v86_pushed == 1);
+        CHECK(kbd_diag_log(0, out, KBD_DLOG_CAP) == 2);
+        CHECK(out[1].code == (keys[i] | SCANCODE_BREAK));
+        CHECK(out[1].flags == KBD_DLOG_F_V86 && out[1].mods == 0);
+        irq(KBD_STAT_RXRDY, keys[i]);
+        CHECK(kbd_get_modifiers() == bits[i]);
+        CHECK(stub_v86_pushed == 2);
+        stub_v86 = 0;
+        irq(KBD_STAT_RXRDY, keys[i] | SCANCODE_BREAK);
+        CHECK(kbd_get_modifiers() == 0);
+        /* CTRL が残ると、この小文字はコントロールコードになる。 */
+        irq(KBD_STAT_RXRDY, 0x1D);
+        CHECK(kbd_trygetkey() == ((0x1D << 8) | 'a'));
+        CHECK(kbd_trygetkey() == -1);
+    }
+
+    /* 通常キーは V86 だけへ渡り、cooked/raw/押下表へ混入しない。 */
+    for (i = 0; i < 2; i++) {
+        fresh();
+        kbd_set_gui_mode(i);
+        stub_v86 = 1;
+        irq(KBD_STAT_RXRDY, 0x1D);
+        CHECK(kbd_is_pressed(0x1D) == 0);
+        irq(KBD_STAT_RXRDY, 0x9D);
+        CHECK(stub_v86_pushed == 2);
+        stub_v86 = 0;
+        CHECK(kbd_trygetkey() == -1);
+        CHECK(kbd_trygetrawkey() == -1);
+        CHECK(kbd_get_modifiers() == 0);
+    }
 }
 
 /* (d') ロックキーの方式 B。raw リング (GUI 中) と cooked (CUI 中) の両方と、
@@ -493,6 +540,7 @@ static const struct { const char *name; void (*fn)(void); } cases[] = {
     { "irq_skip",       case_irq_skip },
     { "irq_mods",       case_irq_mods },
     { "irq_flags_api",  case_irq_flags_api },
+    { "irq_v86_mods",   case_irq_v86_mods },
     { "irq_locks",      case_irq_locks },
     { "watch_fmt",      case_watch_fmt },
     { "watch_lost",     case_watch_lost },
