@@ -116,7 +116,7 @@ def run_case(case='default', kb=16384, defines=(), mutation=None):
         mb = texts['kernel/memory_boot.c']
         if case == 'detect_cap':
             # BIOS ワークと書き込み検証をホストの配列で受ける (memory_boot_host.c)。
-            if mb.count('P2V_BOOT(') != 4:
+            if mb.count('P2V_BOOT(') != 3:
                 raise AssertionError('P2V_BOOT probe sites changed')
             mb = mb.replace('P2V_BOOT(', 'host_boot_ptr(')
         (d / 'memory_boot_host_source.c').write_text(mb)

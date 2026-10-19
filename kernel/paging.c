@@ -403,10 +403,8 @@ void paging_init(u32 mem_kb)
 /* ======================================================================== */
 void paging_reclaim_conventional(void)
 {
-    /* ページ0: Read-Only (BIOS DATA AREA アクセスを許可しつつ書き込み検出)
-     * [DEBUG] NOT PRESENT → R/O に変更: LZ4展開中にBDA参照でクラッシュする
-     * 問題を調査中。元は paging_set_not_present(0x0, MEM_NULL_GUARD_END); */
-    paging_set_readonly(0x0, MEM_NULL_GUARD_END);
+    /* Boot consumers now use the immutable real_lowmem copy. */
+    paging_set_not_present(0, MEM_NULL_GUARD_END);
 
     /* 0x1000-0x9FFFF: R/W (フォント/KCG scratch/GFX用) */
     paging_map_range(MEM_CONV_RECLAIM_START, MEM_CONV_RECLAIM_END + 1,
@@ -1280,7 +1278,7 @@ static u8 memmap_want_at(u32 a, u32 tramp)
     if (tramp && a == tramp) return MM_ROU;     /* exec.c の KAPI 踏み台 */
 
     /* コンベンショナルメモリ */
-    if (a <= MEM_NULL_GUARD_END) return MM_RO;  /* BDA 参照のため R/O */
+    if (a <= MEM_NULL_GUARD_END) return MM_NP;
     if (a < MEM_CONV_END) return MM_RW;
     if (a < MEM_BIOS_ROM_START) return MM_RW;   /* VRAM */
     if (a <= MEM_BIOS_ROM_END) return MM_RO;

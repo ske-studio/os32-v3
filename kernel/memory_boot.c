@@ -2,6 +2,7 @@
 #include "pgalloc.h"
 #include "memmap.h"
 #include "pc98.h"
+#include "v86_bios.h"
 
 /* The loader samples one dword per 512KiB, including F00000/F80000.
  * Writable device memory can pass that test: it does NOT establish RAM in
@@ -92,7 +93,9 @@ u32 memory_boot_detect(u32 mem_kb)
     volatile u32 *cell;
     volatile u32 *low;
 
-    reported = *(volatile u16 *)P2V_BOOT(BIOS_WORK_MEM_HIGH_MB);
+    const u8 *bios = v86_bios_real_lowmem();
+    reported = bios[BIOS_WORK_MEM_HIGH_MB] |
+               ((u32)bios[BIOS_WORK_MEM_HIGH_MB + 1] << 8);
     /* 最上位の ROM / PCI MMIO 帯は RAM にならないので、そこまでで頭打ち。
      * これは人為的な上限ではなく、デバイスが居る番地の除外である。 */
     if (reported > (MEM_PHYS_RAM_CEILING - MEM_HIGH_RAM_BASE) / MEM_1MB)

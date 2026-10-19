@@ -13,6 +13,8 @@ static void *fake_map(u32 pa, int io);
 #define P2V(pa) fake_map((pa), 0)
 #define P2V_IO(pa) fake_map((pa), 1)
 #include "../../kdebug/crt_diag.c"
+static struct v86_session_state boot_snapshot;
+struct v86_session_state *kdi_ptr_v86_session(void) { return &boot_snapshot; }
 
 static void output(const char *s)
 {
@@ -77,20 +79,19 @@ void crt_shim_out(unsigned int port, unsigned int value, int width)
 { event(port, value, width, 1); }
 static void *fake_map(u32 pa, int io)
 {
-    CHECK(pa < FAKE_SIZE && mem_n < EVENT_MAX);
+    CHECK(pa >= MEM_PAGE_SIZE && pa < FAKE_SIZE && mem_n < EVENT_MAX);
     mem_addr[mem_n] = pa; mem_io[mem_n++] = io;
     return &fake[pa];
 }
 static void reset_events(void) { ev_n = out_n = mem_n = 0; }
 static void check_events(void)
 {
-    CHECK(out_n == 0 && ev_n == 14 && mem_n == 21);
+    CHECK(out_n == 0 && ev_n == 14 && mem_n == 15);
     CHECK(ev_port[0] == 0x9A8 && ev_port[1] == 0x31);
     for (int i = 0; i < 14; i++) CHECK(ev_width[i] == 8 && !ev_out[i]);
     for (int i = 0; i < 12; i++) CHECK(ev_port[i + 2] == 0x841EU + 0x100U * i);
-    for (int i = 0; i < 6; i++) CHECK(mem_addr[i] == work[i] && mem_io[i] == 0);
     for (int i = 0; i < 15; i++)
-        CHECK(mem_addr[i + 6] == 0xA3FE2U + 2U * i && mem_io[i + 6] == 1);
+        CHECK(mem_addr[i] == 0xA3FE2U + 2U * i && mem_io[i] == 1);
 }
 
 unsigned int bootlog_lock(void) { return 0; }
@@ -124,7 +125,7 @@ void _start(void)
     char buf[CRT_DIAG_BUFSZ], again[CRT_DIAG_BUFSZ];
     int n = length(expected);
     for (int i = 0; i < FAKE_SIZE; i++) fake[i] = (u8)(i * 17 + i / 256 + 3);
-    for (int i = 0; i < 6; i++) fake[work[i]] = (u8)(0x10 + i);
+    for (int i = 0; i < 6; i++) boot_snapshot.real_lowmem[work[i]] = (u8)(0x10 + i);
     for (int i = 0; i < 15; i++) fake[0xA3FE2 + 2 * i] = (u8)(0x20 + i);
     protect_fake();
 
@@ -142,7 +143,7 @@ void _start(void)
     for (int i = 0; i < 6; i++) CHECK(raw.w[i] == 0x10 + i);
     for (int i = 0; i < 15; i++) CHECK(raw.msw[i] == 0x20 + i);
     for (int i = 0; i < 12; i++) CHECK(raw.sdip[i] == 0x30 + i);
-    output("PASS read: zero OUT, 14 IN, 21 mapped bytes, read-only memory\n");
+    output("PASS read: zero OUT, 14 IN, 15 mapped bytes + immutable BDA, read-only memory\n");
 
     saved = raw;
     reset_events();

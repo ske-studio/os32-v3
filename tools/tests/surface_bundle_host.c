@@ -47,7 +47,16 @@ void gfx_v86_return(void) {}
 void kselftest_audit_v86_return(void) {}
 /* Only the CPU write to V86 virtual RAM is redirected to its backing by the
  * harness. setup/teardown, map table and all PTE updates are real. */
+static u32 restore_jmp[5];
+static int expected_restore_stop;
+static void bundle_restore_stop(void)
+{
+    CHECK(expected_restore_stop && v86_restore_mismatch);
+    __builtin_longjmp(restore_jmp, 1);
+}
+#define _stop bundle_restore_stop
 #include "v86_host_source.c"
+#undef _stop
 int host_lease_copyin(const struct caller_access *c, const void *s, void *d, u32 n)
 {
     copyins++;
@@ -171,9 +180,20 @@ static void caller_copy_tests(void)
     /* A ledger cache mismatch must be observed independently of the table. */
     ledger_surfaces[source.refs[3].sid].cache = LEDGER_CACHE_WB;
     CHECK(!v86_mem_setup(space.owner));
-    v86_mem_teardown();
+    expected_restore_stop = 1;
+    if (!__builtin_setjmp(restore_jmp)) {
+        v86_mem_teardown();
+        CHECK(0); /* A rejected restore must not return to the caller. */
+    }
+    expected_restore_stop = 0;
     CHECK(v86_restore_mismatch != 0);
     ledger_surfaces[source.refs[3].sid].cache = LEDGER_CACHE_UC;
+    /* Test-only continuation after observing the product's fail-stop. */
+    v86_restore_mismatch = 0;
+    v86_session.closing = 0;
+    v86_map_session = &v86_session;
+    v86_mem_teardown();
+    _enable();
     /* Filler ends immediately before the fourth plane crosses a PDE. */
     u32 backing = pgalloc_alloc_phys(space.owner, PTE_COUNT - 24);
     sf = (struct ledger_surface){.first = backing / PAGE_SIZE, .npages = PTE_COUNT - 24,

@@ -45,9 +45,14 @@ static int observed_stage(void)
  * ホストの配列で受ける (run_case が P2V_BOOT の呼び手だけを差し替える)。
  * 16MB 以上は 1MB ごとに別の語 (別名なし)、24bit ラップの落ち先は 16 語。 */
 static u32 host_bda_word, host_cells[4096], host_low[16], host_max_probe;
+const u8 *v86_bios_real_lowmem(void) {
+    static u8 original[PAGE_SIZE];
+    original[BIOS_WORK_MEM_HIGH_MB] = host_bda_word;
+    original[BIOS_WORK_MEM_HIGH_MB + 1] = host_bda_word >> 8;
+    return original;
+}
 static void *host_boot_ptr(u32 addr)
 {
-    if (addr == BIOS_WORK_MEM_HIGH_MB) return &host_bda_word;
     if (addr >= MEM_HIGH_RAM_BASE) {
         if (addr > host_max_probe) host_max_probe = addr;
         return &host_cells[((addr - MEM_HIGH_RAM_BASE) / MEM_1MB) % 4096];

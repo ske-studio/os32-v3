@@ -2,6 +2,7 @@
 #include "v86_bios.h"
 #include "paging.h"
 #include "kstring.h"
+#include "io.h"
 
 /* The one immutable page0 copy, captured before paging/low-memory reuse.
  * Keep it in the existing core session storage for T7a-1c; never reset it. */
@@ -16,7 +17,7 @@ void v86_bios_save_real(void)
 void v86_bios_restore_real(void)
 {
     if (!v86_session.real_saved) return;
-    paging_set_page(0, 0, PAGE_RW);
+    if (paging_set_page(0, 0, PAGE_RW) != 0) for (;;) _stop();
     kmemcpy(P2V(0), v86_session.real_lowmem, REAL_SNAPSHOT_SIZE);
 }
 

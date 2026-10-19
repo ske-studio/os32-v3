@@ -67,8 +67,8 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
         for key, body in sources.items():
             if key in ('lease', 'surface_query'): continue
             if key == 'v86':
-                body = body.replace('(volatile u32 *)(V86_REMAP_START + PAGE_SIZE)',
-                                    '(volatile u32 *)P2V(backing_phys)')
+                body = body.replace('P2V(V86_REMAP_START + PAGE_SIZE)',
+                                    'P2V(backing_phys)')
             if key == 'boot':
                 body = body[body.index('static void test_caller_boot('):body.index('static void test_ledger(void)')]
             (tmp / (key + '_host_source.c')).write_text(body)
@@ -108,7 +108,7 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
                     # Only the TU containing real paging is rebuilt. A private
                     # include name keeps parallel mutants independent.
                     if unit == 'v86':
-                        body = body.replace('(volatile u32 *)(V86_REMAP_START + PAGE_SIZE)', '(volatile u32 *)P2V(backing_phys)')
+                        body = body.replace('P2V(V86_REMAP_START + PAGE_SIZE)', 'P2V(backing_phys)')
                     paging = tmp / (key + '_source.c'); paging.write_text(body)
                     access = (ROOT / 'tools/tests/access_walk_host.c').read_text().replace(
                         '#include "' + unit + '_host_source.c"', '#include "' + paging.name + '"')

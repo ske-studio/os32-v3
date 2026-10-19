@@ -68,6 +68,11 @@ static void check_clear(const char *reason, int plane_size)
     fprintf(stderr, "FAIL: %s (line %d)\n", msg, __LINE__); exit(1); \
 } } while (0)
 
+/* KCG is available in these splash cases; an exit would be unexpected. */
+void __cdecl kapi_sys_exit(int status) {
+    (void)status;
+    CHECK(0, "unexpected gfx KCG exit");
+}
 static int cirrus_probe_stub(void) { cirrus_probes++; return cirrus_ok; }
 static int pegc_probe_stub(void) { pegc_probes++; return pegc_ok; }
 u32 pegc_window_base(void) { return PEGC_LINEAR_BASE; }

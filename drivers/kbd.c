@@ -17,6 +17,7 @@
 /* ======================================================================== */
 
 #include "kbd.h"
+#include "../kernel/v86_bios.h"
 #include "io.h"
 #include "kprintf.h"
 #include "memmap.h"
@@ -259,17 +260,14 @@ static u8 kbd_lock_bits_from_bios(u8 bios_shift)
     return s;
 }
 
-/* 0000:053Ah を読む。kbd_init (paging_init より前、PG=0 で低位物理がそのまま
- * 見える) からだけ呼ぶ。番地を volatile 変数に通すのは kernel/sysclk.c と同じ
- * 理由 (GCC の -Warray-bounds の誤診断)。ホスト試験は模型の値に差し替える。 */
+/* Use the immutable boot BDA; page0 is NP outside V86 sessions. */
 #if defined(KBD_HOST_TEST) && !defined(__KERNEL_BUILD__)
 extern u8 kbd_host_bios_shift;   /* tools/tests/kbd_dlog_host.c */
 static u8 kbd_bios_shift_peek(void) { return kbd_host_bios_shift; }
 #else
 static u8 kbd_bios_shift_peek(void)
 {
-    volatile u32 a = BIOS_WORK_KB_SHIFT;
-    return *(volatile u8 *)P2V_IO(a);
+    return v86_bios_real_lowmem()[BIOS_WORK_KB_SHIFT];
 }
 #endif
 
