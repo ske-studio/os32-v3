@@ -181,6 +181,8 @@ T7a-2bはCR3/PTEと直接低位のfixture内でU7を実証する。-2c/-2dの確
 
 **T7b-b1・b2 の詳細設計 (2026-10-20、Fable 起草・Opus 2 往復で条件付き承認・PM が N1〜N6 を反映)**: `~/os32-tmp/run/t7bb12/DESIGN.final.md`。票の前提と実物の食い違い 9 件 (独立の shell loader は無く `exec_run` の is_shell、使用中の更新拒否の手本は loop の pinned、保存 caller は AS 世代、gshell へ KAPI 外で渡す経路は無い等) を §1 に記録。渡し方は entry frame の 4 語目 (`frame[5]`) + CRT0 `__os32_aux`、`main` 署名は不変。段は S1 (VFS、a6 の確定後) ∥ S3a → S2 → S3b (exec.c の結線を 1 段に集約)。FD の予約・上限の値は a6 の実測で入れる。
 
+**T7b-b3・b4 の詳細設計 (2026-10-20、Fable 起草・Opus 3 往復・PM の最終修正)**: `~/os32-tmp/run/t7bb34/DESIGN.final.md`。PM 決定 (推奨どおり): U1 欧文 baseline は face ごと (東雲 14・Inconsolata 13、超過は cell で clip — 下の b4 変異欄「縮小せず clip」はこの意味)、U2 IPAex はゲストに配備しない (kcgfont は触らない)、U3 公開 token API は作らない — 字形 cache 設計 final §2 の「公開 font_lookup/GlyphToken の世代検証」は「公開 font API を足す時に同時に入れる」と読み替え、b4⑥ は「設定世代の変更後、旧世代の cache entry を描かない (host 検出)」。
+
 ### 3-1. 像と実行時占有の記録
 
 T7a/T7bの入口と出口で同じ構成のmapを記録し、core・module・私有領域・圧縮像の増減を分ける。推測のcore追加8〜16KiBを関門にせず、像・容量の停止条件はMAX_IMAGE_SIZE・MEM_KERNEL_IMAGE_MAXのASSERT・FD実測だけとする。
