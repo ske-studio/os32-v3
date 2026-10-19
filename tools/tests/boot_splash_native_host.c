@@ -15,6 +15,13 @@ static void irq_restore(unsigned int flags) { (void)flags; }
 static void outp(unsigned int port, unsigned int value);
 #include "../../gfx/gfx_core.c"
 #include "../../gfx/backend_pc98.c"
+const u8 *v86_bios_real_lowmem(void)
+{
+    static const u8 bios[MEM_PAGE_SIZE] = {
+        [PEGC_BIOS_ARCH_FLAG] = PEGC_BIOS_ARCH_EXTGFX
+    };
+    return bios;
+}
 /* This fixture is LP64. Read the GUI wire layouts with their target widths;
  * keep their assertions active. gfx_vram only needs the shared coordinates. */
 #include <stdint.h>

@@ -19,6 +19,14 @@ def product_image(folder):
     """Real mkmod product: PAIR/phase and relocation, with write-free rejection."""
     spec = json.loads((ROOT / 'sdk/kapi.json').read_text())
     metadata = json.loads((ROOT / 'build/out/v86/v86_imports.json').read_text())
+    exceptional = {e['name'] for e in metadata['imports'] if e['context'] == 'normal,exception'}
+    assert exceptional == {e['name'] for e in metadata['imports']
+                           if (e['name'].startswith('loop_dev_') and e['name'] not in
+                               ('loop_dev_attach', 'loop_dev_detach')) or
+                           e['name'] in ('vfs_read_fd', 'vfs_seek', 'kmemcpy',
+                               'console_hw_cursor_enable', 'palette_init', 'snd_set_master',
+                               'tss_iomap_deny_all', 'v86_last_gp_cs', 'v86_last_gp_ip',
+                               'v86_debug_ops', 'v86_cui_display_restore')}
     data = (ROOT / 'build/out/v86.mod').read_bytes()
     kernel = (ROOT / 'build/out/vmkernel.lz4').read_bytes()
     # Use the existing packer for the boot loader's paired image CRC.

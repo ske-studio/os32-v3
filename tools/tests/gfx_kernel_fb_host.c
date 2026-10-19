@@ -601,3 +601,13 @@ static void run(void)
 
 /* Paging-only fixture has no exec slots; abort delivery is appmem_map_host. */
 void exec_addrspace_abort(struct addrspace *as) { (void)as; }
+
+/* Boot BIOS copy for the real PEGC boot-sync consumer. */
+const u8 *v86_bios_real_lowmem(void)
+{
+    static const u8 bios[MEM_PAGE_SIZE] = {
+        [PEGC_BIOS_ARCH_FLAG] = PEGC_BIOS_ARCH_EXTGFX,
+        [PEGC_BIOS_MODE_FLAG] = PEGC_BIOS_MODE_EXTGFX
+    };
+    return bios;
+}

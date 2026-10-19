@@ -9,7 +9,7 @@ import tempfile
 from mutpar import run_ordered
 import host32
 def function(text, name):
-    match = re.search(r'^(?:static )?(?:void|int) (?:__cdecl )?' + name + r'\([^)]*\)\n\{', text, re.M)
+    match = re.search(r'^(?:static )?(?:(?:void|int|u8|u32) |const u8 \*)(?:__cdecl )?' + name + r'\([^)]*\)\n\{', text, re.M)
     assert match, name
     pos, depth = match.end(), 1
     while depth:
@@ -36,7 +36,9 @@ MUTATIONS = (
     ('resume-gate', 'exec/exec.c', '    if (paging_v86_session_open()) return OS32_ERR_BUSY;', '', 'FAIL session exec gate'),
     ('kill-no-release', 'exec/exec.c', '    v86_session_end();\n    exec_finish(id, EXEC_ERR_FAULT, kind);', '    exec_finish(id, EXEC_ERR_FAULT, kind);', 'FAIL kill release before owner reclaim'),
     ('release-on-exception', 'kernel/v86_mem.c', ' || kctx_irq_depth || kctx_exc_depth', '', 'FAIL backing release trusted context'),
-    ('page0-short', 'kernel/v86_snapshot.c', '#define REAL_SNAPSHOT_SIZE PAGE_SIZE', '#define REAL_SNAPSHOT_SIZE 0x600', 'FAIL V86 page0 all bytes'),
+    ('page0-forget', 'kernel/v86_mem.c', '    v86_bios_restore_real();', '    v86_bios_restore_real();\n    v86_session.real_saved = 0;', 'FAIL V86 second original valid'),
+    ('consumer-direct', 'gfx/gfx_core.c', 'v86_bios_real_lowmem()[PEGC_BIOS_ARCH_FLAG]', '*(volatile u8 *)P2V_IO(PEGC_BIOS_ARCH_FLAG)', 'FAIL BIOS gfx candidate immutable'),
+    ('page0-short', 'kernel/v86_snapshot.c', '#define REAL_SNAPSHOT_SIZE PAGE_SIZE', '#define REAL_SNAPSHOT_SIZE 0x600', 'FAIL V86 original immutable'),
     ('kill-no-end', 'exec/exec.c', '    v86_session_end();\n    ring3_context_clear();\n    g_pending_id', '    ring3_context_clear();\n    g_pending_id', 'FAIL kill ends session before app jump'),
     ('fixed-restore', 'kernel/paging.c', '        page_tables[0][i] = saved;', '        page_tables[0][i] = i * PAGE_SIZE | PAGE_RW; (void)saved;', 'FAIL unmap before backing free'),
     ('active-pde', 'kernel/paging.c', '    ((u32 *)P2V(s->active_cr3))[0] = s->active_pde;', '', 'FAIL V86 active PDE exact'),
@@ -104,7 +106,7 @@ def wiring(sources):
 
 
 def run(runner, mutation=None):
-    paths = ('kernel/paging.c', 'kernel/shm.c', 'kernel/v86_mem.c', 'kernel/kernel.c', 'exec/exec.c', 'kernel/v86.c', 'kernel/v86_snapshot.c')
+    paths = ('kernel/paging.c', 'kernel/shm.c', 'kernel/v86_mem.c', 'kernel/kernel.c', 'exec/exec.c', 'kernel/v86.c', 'kernel/v86_snapshot.c', 'gfx/backend_pegc.c', 'gfx/gfx_core.c')
     sources = {p: (ROOT/p).read_text() for p in paths}
     if mutation:
         name, path, old, new, expected = mutation
@@ -124,7 +126,11 @@ def run(runner, mutation=None):
         raise
     with tempfile.TemporaryDirectory(prefix='e10a-shm-') as directory:
         work = Path(directory)
-        (work/'v86_bios_slice.inc').write_text(re.search(r'^#define REAL_SNAPSHOT_SIZE .*$', sources['kernel/v86_snapshot.c'], re.M)[0] + '\n' + (function(sources['kernel/v86_snapshot.c'], 'v86_bios_save_real') + function(sources['kernel/v86_snapshot.c'], 'v86_bios_restore_real')).replace('P2V(0)', 'host_page0').replace('P2V_BOOT(0)', 'host_page0'))
+        (work/'v86_bios_slice.inc').write_text(re.search(r'^#define REAL_SNAPSHOT_SIZE .*$', sources['kernel/v86_snapshot.c'], re.M)[0] + '\n' + (function(sources['kernel/v86_snapshot.c'], 'v86_bios_save_real') + function(sources['kernel/v86_snapshot.c'], 'v86_bios_restore_real') + function(sources['kernel/v86_snapshot.c'], 'v86_bios_real_lowmem')).replace('P2V(0)', 'host_page0').replace('P2V_BOOT(0)', 'host_page0'))
+        consumer = function(sources['gfx/backend_pegc.c'], 'bios_flag')
+        consumer += function(sources['gfx/backend_pegc.c'], 'pegc_identify')
+        consumer += function(sources['gfx/gfx_core.c'], 'gfx_identify_candidates')
+        (work/'bios_consumer_slice.inc').write_text(consumer.replace('P2V_IO(PEGC_BIOS_ARCH_FLAG)', '(host_page0 + PEGC_BIOS_ARCH_FLAG)'))
         (work/'v86_unwind_slice.inc').write_text(function(sources['kernel/v86.c'], 'v86_runtime_end') + function(sources['exec/exec.c'], 'exec_pending_transfer') + function(sources['exec/exec.c'], 'exec_pending_finish') + function(sources['exec/exec.c'], 'exec_exit') + function(sources['exec/exec.c'], 'ring3_kill_kind'))
         (work/'v86_int_slice.inc').write_text((function(sources['kernel/v86.c'], 'v86_do_int') + function(sources['kernel/v86.c'], 'v86_int80')).replace('(const u16 *)(vector * 4)', '(const u16 *)(host_page0 + vector * 4)'))
         arch = (ROOT/'tools/tests/host_arch/arch_cpu.h').read_text()
@@ -144,7 +150,7 @@ def run(runner, mutation=None):
                '-ffunction-sections', '-fdata-sections', '-nostdlib', '-static', '-no-pie',
                '-Wl,--gc-sections', '-DPHYSMEM_HOST_TEST=1']
         cmd += ['-I'+str(work)] + ['-I'+str(ROOT/p) for p in
-                  ('tools/tests/host_arch', 'tools/tests', 'include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec', 'sdk/include/os32')]
+                  ('tools/tests/host_arch', 'tools/tests', 'include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec', 'gfx', 'sdk/include/os32')]
         exe = work/'fixture'
         result = host32.build(cmd + [str(ROOT/'tools/tests/shm_user_host.c'), str(ROOT/'kernel/physmem.c'), '-o', str(exe)], capture_output=True, text=True)
         if result.returncode:
@@ -163,15 +169,16 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--runner', choices=('native', 'qemu'))
     parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--mutation', action='append', choices=[m[0] for m in MUTATIONS])
     args = parser.parse_args()
     host32.begin_control(args.mutate, args.runner, ROOT)
     with host32.control(args.mutate, args.runner, ROOT) as normal:
         if normal:
             run(args.runner)
     if args.mutate:
-        for _ in run_ordered(lambda mutation: run(args.runner, mutation), MUTATIONS):
+        for _ in run_ordered(lambda mutation: run(args.runner, mutation), [m for m in MUTATIONS if not args.mutation or m[0] in args.mutation]):
             pass
-        print(f'PASS {len(MUTATIONS)}/{len(MUTATIONS)} mutations')
+        print('PASS selected mutations')
 
 if __name__ == '__main__':
     main()

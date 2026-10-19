@@ -48,7 +48,7 @@ SLICE_BEGIN = '#define GFX_CAND_PEGC'
 SLICE_END = '/* ======================================================================== */\n/*  KAPI: 画面能力の問い合わせ'
 # 切り出しの中だけ、台帳・写像の呼び出しを記録係へ付け替える。
 HOOKS = (
-    ('*(volatile u8 *)P2V_IO(arch)', 'host_bda(arch)'),
+    ('v86_bios_real_lowmem()[PEGC_BIOS_ARCH_FLAG]', 'host_bda(PEGC_BIOS_ARCH_FLAG)'),
     ('ledger_resource_add(', 'host_resource('),
     ('ledger_reserve_set(', 'host_reserve('),
     ('paging_map_phys(', 'host_map('),
