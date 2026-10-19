@@ -6,6 +6,8 @@
 /* ======================================================================== */
 
 #include "v86_mem.h"
+#include "v86_call.h"
+#include "kstring.h"
 #include "v86.h"
 #include "v86_module.h"
 #include "paging.h"
@@ -15,6 +17,7 @@
 #include "v86_bios.h"
 #include "module.h"
 #include "kselftest.h"
+#include "tvram.h"
 #include "../gfx/gfx.h"
 
 struct v86_session_state v86_session;
@@ -53,8 +56,13 @@ int v86_session_begin(u32 owner)
         return -1;              /* 二重セットアップ */
     }
 
-    /* リマップすると実機の IVT/BDA が見えなくなるので先に退避する。
-     * ゲストはこれを引き継いで初めてまともに動ける。 */
+    /* T7a-2b proves direct low RAM in the fixture. The product retains its
+     * old backing until reservation consolidation in T7a-2e. */
+#ifdef OS32_V86_DIRECT_LOW_FIXTURE
+    if (!v86_call_mailbox() || !v86_session.real_saved) return -2;
+    kmemcpy(v86_call_mailbox(), P2V(MEM_AUTOPLAY_MAILBOX_BASE),
+            MEM_AUTOPLAY_MAILBOX_SIZE);
+#endif
     if (!v86_module_session_acquire()) return -1;
     if (paging_v86_snapshot(&v86_session) != 0) {
         v86_module_session_release();
@@ -63,6 +71,7 @@ int v86_session_begin(u32 owner)
     v86_session.open = 1;
     v86_session.aborting = 0;
 
+#ifndef OS32_V86_DIRECT_LOW_FIXTURE
     backing_phys = pgalloc_alloc_phys(owner, V86_BACKING_PAGES);
     backing_owner = owner;
     if (!backing_phys) {
@@ -70,50 +79,25 @@ int v86_session_begin(u32 owner)
         return -2;              /* 連続領域が取れない */
     }
 
-    /* ページ 0 (IVT + BDA) だけは**実物理のまま**ゲストに見せる。
-     *
-     * NP21/W はキーボード BIOS (INT 09h) をホスト側の C で実装していて
-     * (`src/bios/bios09.c`)、ROM の `FD80:0088` にある `NOP` を踏むと
-     * `bios0x09()` が走る仕掛けになっている。そのコードは
-     * **`mem[]` = 物理メモリを直接叩く**ので、ページングを通らない。
-     *
-     * ここをバッキング RAM に張り替えていたせいで、
-     *
-     *   物理 0x528 (キーバッファ個数) = 0x01   ← BIOS が書いた
-     *   ゲストが見る 0x528            = 0x00   ← 誰も書いていない
-     *
-     * という食い違いが起き、Ys はタイトル画面で
-     * `0000:052A` のキー入力状態テーブルを永久に舐め続けていた。
-     * 実機なら ROM のコードがゲストとして走るので、その書き込みは
-     * ページテーブルを通って正しい場所に落ちる。
-     *
-     * ページ 0 で OS32 が使っているのは IVT と BDA だけで、
-     * どちらもセッション前に退避しセッション後に戻す。
-     * フォントキャッシュ以降 (0x1000-) はバッキングのままなので、
-     * ゲストが OS32 のデータを壊す心配はない。
-     *
-     * ゲストは CPL=3 なので USER を付ける。V86 専用口が PDE 側にも
-     * USER を伝播させる (実効権限は PDE と PTE の論理積のため)。 */
+#else
+    (void)owner;
+#endif
+
+    /* Page zero is physical even on the legacy path: NP21/W BIOS writes
+     * physical BDA directly. Only this session may expose it to the guest. */
     if (paging_v86_map_range(0, PAGE_SIZE, 0, PAGE_RW | PTE_USER) != 0)
         goto fail;
 
-    /* ページ 1 以降をバッキング RAM へ。backing_phys の先頭がゲストの
-     * 0x1000 に対応する (ページ 0 はバッキングを持たない)。 */
+#ifdef OS32_V86_DIRECT_LOW_FIXTURE
+    if (paging_v86_map_range(PAGE_SIZE, V86_REMAP_END, PAGE_SIZE,
+                             PAGE_RW | PTE_USER) != 0) goto fail;
+    kmemset(P2V(V86_REMAP_START), 0, V86_REMAP_END);
+#else
     if (paging_v86_map_range(V86_REMAP_START + PAGE_SIZE, V86_REMAP_END,
-                         backing_phys, PAGE_RW | PTE_USER) != 0) {
-        goto fail;
-    }
-
-    /* ゲストに渡す前にゼロクリアする。ページ 0 は実機の IVT/BDA が
-     * そのまま入っているので触らない。 */
-    {
-        volatile u32 *p = (volatile u32 *)(V86_REMAP_START + PAGE_SIZE);
-        u32 n = (V86_REMAP_END - (V86_REMAP_START + PAGE_SIZE)) / 4;
-        u32 i;
-        for (i = 0; i < n; i++) {
-            p[i] = 0;
-        }
-    }
+                             backing_phys, PAGE_RW | PTE_USER) != 0) goto fail;
+    kmemset(P2V(V86_REMAP_START + PAGE_SIZE), 0,
+            V86_REMAP_END - PAGE_SIZE);
+#endif
 
     /* VRAM は実物理を直マップ。ここが #GP しないことが性能の前提。
      * ROM 帯は読み取り専用で見せる。BIOS ROM も含めて実行可能にしておく —
@@ -166,6 +150,10 @@ void v86_session_end(void)
         flags = (v86_session.saved_eflags & ~EFLAGS_IF) | (flags & EFLAGS_IF);
     v86_runtime_end();
     v86_bios_restore_real();
+#ifdef OS32_V86_DIRECT_LOW_FIXTURE
+    kmemcpy(P2V(MEM_AUTOPLAY_MAILBOX_BASE), v86_call_mailbox(),
+            MEM_AUTOPLAY_MAILBOX_SIZE);
+#endif
 
     /* Restore exact saved PTEs, including NP, USER and cache attributes.
      * The table remains the setup/teardown cache-policy contract. */
@@ -187,6 +175,24 @@ void v86_session_end(void)
         }
     }
     v86_restore_mismatch += paging_v86_restore(&v86_session);
+    if (v86_restore_mismatch) {
+        char line[] = "V86 RESTORE: bad=00000000 PTE=00000000 PDE=00000000 PCD=00000000";
+        u32 counts[] = { v86_restore_mismatch, v86_session.restore_pte_bad,
+            v86_session.restore_pde_bad, v86_restore_mismatch -
+            v86_session.restore_pte_bad - v86_session.restore_pde_bad };
+        const unsigned int offsets[] = { 17, 30, 43, 56 };
+        for (unsigned int n = 0; n < 4; n++)
+            for (int i = 7; i >= 0; i--) {
+                line[offsets[n] + i] = "0123456789ABCDEF"[counts[n] & 15];
+                counts[n] >>= 4;
+            }
+        volatile u16 *text = P2V_IO(TVRAM_BASE);
+        volatile u16 *attr = P2V_IO(TVRAM_ATTR);
+        unsigned int col = 0;
+        for (; line[col]; col++) { text[col] = (u8)line[col]; attr[col] = TATTR_RED; }
+        while (col < TVRAM_COLS) { text[col] = ' '; attr[col++] = TATTR_RED; }
+        for (;;) _stop();
+    }
     /* All backing aliases are gone before owner reclamation can run. */
     if (v86_session.aborting && kdebug.ops.gcap_detach) kdebug.ops.gcap_detach();
     v86_io_reset_policy();

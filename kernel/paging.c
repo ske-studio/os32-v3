@@ -403,10 +403,8 @@ void paging_init(u32 mem_kb)
 /* ======================================================================== */
 void paging_reclaim_conventional(void)
 {
-    /* ページ0: Read-Only (BIOS DATA AREA アクセスを許可しつつ書き込み検出)
-     * [DEBUG] NOT PRESENT → R/O に変更: LZ4展開中にBDA参照でクラッシュする
-     * 問題を調査中。元は paging_set_not_present(0x0, MEM_NULL_GUARD_END); */
-    paging_set_readonly(0x0, MEM_NULL_GUARD_END);
+    /* Boot consumers now use the immutable real_lowmem copy. */
+    paging_set_not_present(0, MEM_NULL_GUARD_END);
 
     /* 0x1000-0x9FFFF: R/W (フォント/KCG scratch/GFX用) */
     paging_map_range(MEM_CONV_RECLAIM_START, MEM_CONV_RECLAIM_END + 1,
@@ -657,6 +655,7 @@ int paging_v86_snapshot(struct v86_session_state *s)
 int paging_v86_restore(struct v86_session_state *s)
 {
     u32 bad = 0;
+    s->restore_pte_bad = s->restore_pde_bad = 0;
     for (u32 i = 0; i < V86_GUEST_MAP_END / PAGE_SIZE; i++) {
         u32 saved = s->low_pte[i];
         if (v86_map_session != s) bad++;
@@ -667,8 +666,12 @@ int paging_v86_restore(struct v86_session_state *s)
     arch_mmu_flush_tlb();
     for (u32 i = 0; i < V86_GUEST_MAP_END / PAGE_SIZE; i++)
         if (page_tables[0][i] != s->low_pte[i]) bad++;
+    s->restore_pte_bad = bad; /* Includes a rejected session/PTE restore. */
     if (page_directory[0] != s->master_pde ||
-        ((u32 *)P2V(s->active_cr3))[0] != s->active_pde) bad++;
+        ((u32 *)P2V(s->active_cr3))[0] != s->active_pde) {
+        s->restore_pde_bad++;
+        bad++;
+    }
     v86_map_session = 0;
     return (int)bad;
 }
@@ -1280,7 +1283,7 @@ static u8 memmap_want_at(u32 a, u32 tramp)
     if (tramp && a == tramp) return MM_ROU;     /* exec.c の KAPI 踏み台 */
 
     /* コンベンショナルメモリ */
-    if (a <= MEM_NULL_GUARD_END) return MM_RO;  /* BDA 参照のため R/O */
+    if (a <= MEM_NULL_GUARD_END) return MM_NP;
     if (a < MEM_CONV_END) return MM_RW;
     if (a < MEM_BIOS_ROM_START) return MM_RW;   /* VRAM */
     if (a <= MEM_BIOS_ROM_END) return MM_RO;

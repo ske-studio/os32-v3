@@ -191,7 +191,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     /* **最初に** ブート情報域 (0x7E00、ローダが INT 1Bh AH=84h の結果を
      * 書いた) を写す。0x7E00 はフォントキャッシュの内側で、フォント・
      * ヒープ・その他の低位の再利用より前でなければ上書きされる。
-     * memory_boot_detect も低位 (0594h) を読むだけだが、順序を固定する
+     * memory_boot_detect も保存した BDA (0594h) を読むので、順序を固定する
      * ためここに置く。以後は写しだけを使う (bootinfo_get / _hdd_geom)。 */
     bootinfo_capture();
     v86_bios_save_real();
@@ -288,9 +288,8 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
         tvram_print(6, 2, cpubuf, TATTR_WHITE);
     }
 
-    /* キーボード初期化。**paging_init より前** に呼ぶ — kbd_init は BIOS ワーク
-     * エリア 0000:053Ah (カナ・CAPS の初期値) を読み、ページング後はページ 0 が
-     * NOT PRESENT になる (include/pc98.h BIOS_WORK_KB_SHIFT、memmap.h)。 */
+    /* キーボード初期化。カナ・CAPS の初期値は保存済み BDA (053Ah) から取る。
+     * page0 は通常 NP (include/pc98.h BIOS_WORK_KB_SHIFT、memmap.h)。 */
     tvram_print(48, 1, "KBD...", TATTR_GREEN);
     kbd_init();
     tvram_print(54, 1, "OK", TATTR_WHITE);

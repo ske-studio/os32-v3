@@ -4,6 +4,7 @@
 /* Core admission/staging for the four public V86 calls. Low mappings remain
  * the session's responsibility. The caller is stopped until checked copyout. */
 int v86_call_init(void);
+void *v86_call_mailbox(void);
 int v86_call_admit(void);
 int v86_call_pinned(void);
 /* 0: other slot, 1: handled, -1: bad caller memory (cleaned before FAULT). */

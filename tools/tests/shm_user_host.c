@@ -25,7 +25,10 @@ static int checked_backing_free(u32 owner_id, u32 pfn, int n);
 static int checked_restore(struct v86_session_state *s);
 #define paging_v86_restore checked_restore
 #define pgalloc_free_n_owner checked_backing_free
+static void host_restore_stop(void);
+#define _stop host_restore_stop
 #include "v86_mem.c"
+#undef _stop
 #undef paging_v86_restore
 #undef pgalloc_free_n_owner
 #undef pgalloc_alloc_phys
@@ -72,7 +75,14 @@ static void say(const char *s, u32 n)
 }
 #define SAY(s) say(s "\n", sizeof(s "\n") - 1)
 static u32 checks;
+static int expected_stop;
+static u32 stop_jmp[KSETJMP_BUF_LEN];
 #define CHECK(x, s) do { checks++; if (!(x)) { SAY("FAIL " s); die(1); } } while (0)
+static void host_restore_stop(void) {
+    CHECK(expected_stop, "unexpected restore fail-stop");
+    CHECK(v86_restore_mismatch == V86_GUEST_MAP_END / PAGE_SIZE, "V86 rejected restore counted");
+    __builtin_longjmp(stop_jmp, 1);
+}
 #include "pegc.h"
 #include "gfx.h"
 #include "gfx_hal.h"
@@ -184,7 +194,7 @@ void exec_longjmp(u32 *buf) {
 }
 #define v86_active v86_session.active
 /* Entry staging is covered by v86_call_host; this harness owns low-PTE unwind. */
-static void v86_call_cleanup(void) {}
+void v86_call_cleanup(void) {}
 static void exec_finish(int id, int status, int kind) {
     (void)id; (void)status; (void)kind;
     CHECK(!backing_phys && !v86_session.release_pending, "kill release before owner reclaim");
@@ -266,6 +276,10 @@ void _start(void)
     struct addrspace a, b;
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
     CHECK(result == KERNEL_LOAD_ADDR, "host mapping");
+    /* The fail-stop path writes its diagnostic directly to TVRAM. */
+    args[0] = TVRAM_BASE; args[1] = TVRAM_ATTR + PAGE_SIZE - TVRAM_BASE;
+    __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
+    CHECK(result == TVRAM_BASE, "host TVRAM mapping");
     host_map_fixed_paging();
     paging_init(17408);
     host_pool_boot(17408);
@@ -432,9 +446,19 @@ void _start(void)
     CHECK(!v86_mem_setup(2), "V86 after CR3 switch begin");
     /* Inject a rejected map operation; direct restore still removes aliases. */
     v86_map_session = 0;
+    expected_stop = 1;
+    if (!__builtin_setjmp(stop_jmp)) {
+        v86_mem_teardown();
+        CHECK(0, "restore mismatch must fail-stop");
+    }
+    expected_stop = 0;
+    _enable();
+    /* The fixture resumes after observing fail-stop; product never resumes. */
+    v86_restore_mismatch = 0;
+    v86_session.closing = 0;
+    v86_map_session = &v86_session;
     v86_mem_teardown();
-    CHECK(v86_restore_mismatch == V86_GUEST_MAP_END / PAGE_SIZE,
-          "V86 rejected restore counted");
+    CHECK(!v86_restore_mismatch, "V86 rejected restore counted");
     CHECK(entry(0) == old && (entry(V86_TEST_BB) & PTE_USER),
           "V86 rejected restore safe");
     missing = v86_restore_mismatch;

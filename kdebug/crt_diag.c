@@ -3,6 +3,7 @@
 #include "memmap.h"
 #include "pegc.h"
 #include "kprintf.h"
+#include "generated/kdebug_imports.h"
 
 static const u32 crt_work_addr[CRT_DIAG_WORK_COUNT] = {
     CRT_DIAG_W0400, CRT_DIAG_W0402, CRT_DIAG_W0459,
@@ -14,7 +15,7 @@ void crt_diag_read(CrtDiagRaw *r)
     r->hsync = (u8)inp(PEGC_HSYNC_PORT);
     r->sysa = (u8)inp(CRT_DIAG_SYSPORT_A);
     for (int i = 0; i < CRT_DIAG_WORK_COUNT; i++)
-        r->w[i] = *(const volatile u8 *)P2V(crt_work_addr[i]);
+        r->w[i] = kdi_ptr_v86_session()->real_lowmem[crt_work_addr[i]];
     for (int i = 0; i < CRT_DIAG_MSW_COUNT; i++)
         r->msw[i] = *(const volatile u8 *)P2V_IO(
             CRT_DIAG_MSW_BASE + CRT_DIAG_MSW_STRIDE * i);

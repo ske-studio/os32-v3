@@ -155,7 +155,7 @@ def check_nm(entries, nm=None, root=ROOT):
                 raise ValueError('S2 missing operation references: ' + str(sorted(operations-module_refs)))
             refs = {next((e['symbol'] for e in entries if e['kind_name'] in ('GETTER', 'SETTER', 'PTR') and e['name'] == name), name)
                     for name in refs - operations}
-        if stage == 'S3':
+        if stage in ('S1', 'S3'):
             refs = {next((e['symbol'] for e in entries if e['name'] == name), name) for name in refs}
         # Append-only extensions can be used by older units in the current
         # module without renumbering the original S1..S3 slots.

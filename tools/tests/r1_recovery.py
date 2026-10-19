@@ -46,7 +46,7 @@ def recovery(tmp, function, runner, mutation=None):
           + tail + '}\nstatic void host_syscall_tail(u32 *frame) { int prev_caller=0, prev_in_syscall=0; u32 *prev_frame=0;\n' + end + '}\n')
     # Linux cannot map guest page zero. Only BIOS/CPU/device edges are substitutes.
     stage('v86_source.c', read('kernel/v86_mem.c').replace(
-        '(volatile u32 *)(V86_REMAP_START + PAGE_SIZE)', '(volatile u32 *)P2V(backing_phys)'))
+        'P2V(V86_REMAP_START + PAGE_SIZE)', 'P2V(backing_phys)'))
     entry = function(read('kernel/isr_handlers.c'), 'void exception_handler(')
     entry = entry[:entry.index('    /* 画面上部クリア */')] + '}\n'
     entry = entry.replace('    const char *name;\n    int row = 0;', '    (void)error_code;')

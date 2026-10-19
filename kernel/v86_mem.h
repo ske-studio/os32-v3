@@ -118,6 +118,7 @@ struct v86_session_state {
     u32 saved_esp0, saved_eflags;
     u32 low_pte[V86_GUEST_MAP_END / PAGE_SIZE];
     u32 master_pde, active_pde, active_cr3;
+    u32 restore_pte_bad, restore_pde_bad; /* Last restore diagnostic counts. */
     u8 real_lowmem[PAGE_SIZE]; /* Immutable core boot page0; T7a-1c. */
 };
 extern struct v86_session_state v86_session;

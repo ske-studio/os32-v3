@@ -1,4 +1,6 @@
 check-crt-diag-host:
+- kdebug/generated/**
+- kernel/v86_mem.h
 - kdebug/crt_diag.c
 - kernel/kernel.c
 - kernel/bootlog.c

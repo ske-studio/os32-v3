@@ -40,10 +40,10 @@ MUTATIONS = (
     ('consumer-direct', 'gfx/gfx_core.c', 'v86_bios_real_lowmem()[PEGC_BIOS_ARCH_FLAG]', '*(volatile u8 *)P2V_IO(PEGC_BIOS_ARCH_FLAG)', 'FAIL BIOS gfx candidate immutable'),
     ('page0-short', 'kernel/v86_snapshot.c', '#define REAL_SNAPSHOT_SIZE PAGE_SIZE', '#define REAL_SNAPSHOT_SIZE 0x600', 'FAIL V86 original immutable'),
     ('kill-no-end', 'exec/exec.c', '    v86_session_end();\n    ring3_context_clear();\n    g_pending_id', '    ring3_context_clear();\n    g_pending_id', 'FAIL kill ends session before app jump'),
-    ('fixed-restore', 'kernel/paging.c', '        page_tables[0][i] = saved;', '        page_tables[0][i] = i * PAGE_SIZE | PAGE_RW; (void)saved;', 'FAIL unmap before backing free'),
-    ('active-pde', 'kernel/paging.c', '    ((u32 *)P2V(s->active_cr3))[0] = s->active_pde;', '', 'FAIL V86 active PDE exact'),
+    ('fixed-restore', 'kernel/paging.c', '        page_tables[0][i] = saved;', '        page_tables[0][i] = i * PAGE_SIZE | PAGE_RW; (void)saved;', 'FAIL unexpected restore fail-stop'),
+    ('active-pde', 'kernel/paging.c', '    ((u32 *)P2V(s->active_cr3))[0] = s->active_pde;', '', 'FAIL unexpected restore fail-stop'),
     ('session-gate', 'kernel/paging.c', '!v86_map_session || base >= end', 'base >= end', 'FAIL V86 outside session unchanged'),
-    ('restore-count', 'kernel/paging.c', 'if (v86_map_session != s) bad++;', 'if (v86_map_session != s) (void)0;', 'FAIL V86 rejected restore counted'),
+    ('restore-count', 'kernel/paging.c', 'if (v86_map_session != s) bad++;', 'if (v86_map_session != s) (void)0;', 'FAIL restore mismatch must fail-stop'),
     ('db-unreserved', 'kernel/shm.c',
      '        shm_state[i] = SHM_RESERVED;',
      '', 'FAIL first allocation excludes DB'),
@@ -69,7 +69,7 @@ MUTATIONS = (
     ('shm-range', 'kernel/paging.c',
      'base < MEM_SHM_BASE || end > MEM_SHM_BASE + MEM_SHM_SIZE ||', '', 'FAIL SHM foreign USER range'),
     ('shm-user-missing', 'kernel/paging.c', 'if (!(entry & PTE_USER))', 'if (0)', 'FAIL missing USER atomic reject'),
-    ('v86-restore', 'kernel/paging.c', '    page_directory[0] = s->master_pde;', '    page_directory[0] &= ~PTE_USER;', 'FAIL V86 restores PDE0 USER'),
+    ('v86-restore', 'kernel/paging.c', '    page_directory[0] = s->master_pde;', '    page_directory[0] &= ~PTE_USER;', 'FAIL unexpected restore fail-stop'),
     ('boot-order', 'kernel/kernel.c', '    if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_run();',
      '    if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_run();', 'FAIL boot before AS'),
     ('launch-TVRAM', 'exec/exec.c', '        /* --- K3:',
@@ -141,7 +141,7 @@ def run(runner, mutation=None):
             source = sources[p]
             # Linux cannot dereference the V86 low alias; clear its backing instead.
             if p == 'kernel/v86_mem.c':
-                source = source.replace('(volatile u32 *)(V86_REMAP_START + PAGE_SIZE)', '(volatile u32 *)P2V(backing_phys)')
+                source = source.replace('P2V(V86_REMAP_START + PAGE_SIZE)', 'P2V(backing_phys)')
             (work/Path(p).name).write_text(source)
         alloc = (ROOT/'kernel/pgalloc.c').read_text().replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags')
         (work/'pgalloc_host_source.c').write_text(alloc)

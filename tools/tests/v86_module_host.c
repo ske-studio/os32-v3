@@ -79,6 +79,12 @@ void _start(void)
     }
     CHECK(!rc && v86_module_session_acquire());
     CHECK(!v86_module_session_acquire() && r->active_refs == 1);
+    /* This teardown-only fixture supplies the normal snapshot cache policy. */
+    for (int mi = 0; mi < V86_IDENT_MAP_N; mi++) {
+        const struct v86_ident_ent *e = &v86_ident_map[mi];
+        for (u32 a = e->start; a < e->end; a += PAGE_SIZE)
+            v86_session.low_pte[a / PAGE_SIZE] = a | e->teardown_flags;
+    }
     v86_session.open = v86_session.active = v86_session.running = 1;
     free_before = returned;
     v86_io_apply_policy(); CHECK(calls == 1);

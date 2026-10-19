@@ -14,8 +14,7 @@
 extern volatile int ring3_in_syscall, ring3_wm_depth;
 extern u32 kapi_invoke(void *target, const void *args, u32 bytes);
 
-/* Allocated once at boot, never placed in core BSS. T7a-2b uses this buffer
- * when the mailbox itself stops being protected by the old backing. */
+/* Allocated once at boot, retained by core outside the low guest area. */
 static void *mailbox;
 static struct {
     struct caller_access caller;
@@ -35,6 +34,8 @@ int v86_call_init(void)
     if (!mailbox) mailbox = kmalloc(MEM_AUTOPLAY_MAILBOX_SIZE);
     return mailbox != 0;
 }
+
+void *v86_call_mailbox(void) { return mailbox; }
 
 int v86_call_pinned(void) { return call.pinned; }
 
