@@ -4,7 +4,7 @@
   "license": "MIT",
   "source": "https://static.crates.io/crates/ttf-parser/ttf-parser-0.21.1.crate",
   "sha256": "2c591d83f69777866b9126b24c6dd9a18351f177e49d625920d19f989fd31cf8",
-  "changes": "None. Source and manifests unchanged; upstream examples/tests/dev tooling omitted.",
+  "changes": "OS32 D36 patch in src/parser.rs only (T7b-a5): 32-bit big-endian FromData reads avoid BSWAP for the 386 floor; \"patches\" lists each exact hunk (upstream text -> OS32 text) and reverting them reproduces upstream_sha256. Other sources and manifests unchanged; upstream examples/tests/dev tooling omitted.",
   "files": {
     "Cargo.toml": "0e489755bb3b66bfe3748cf53a1207ac84b9503cdaca882659bcb96cf8a3b700",
     "Cargo.toml.orig": "0fb4ad72f6c36589980ebd96a5c46bcbd33f8a84f01447944d48844fc48af7b1",
@@ -21,7 +21,7 @@
     "src/ggg/mod.rs": "2447e02327f94531342560a9d1236cabf5df5a0ca37399839222cc7eae41a833",
     "src/language.rs": "a60ae54702f016da956ae2302031610183df180c7dd726ca244948d7b1d0ab1c",
     "src/lib.rs": "b83d6074766e5fc4f38add7e451bb9585a41a0e1755112e47fe7345e562629b9",
-    "src/parser.rs": "c0b620074f542d390a9dd1bab235e7f4feea2cd9d7aeabefdfdfe82ceb1e2470",
+    "src/parser.rs": "633742008e73a922cde78442eae1a4ba2f2a28d31a3956683d43183f9772f123",
     "src/tables/ankr.rs": "b71784f3587d0c5893e848e29284f89793dc95451f059651dfb99268d642ca3d",
     "src/tables/avar.rs": "3a89d5e9548ad8b432a2aadbe6af49e71b247659b4b6f481271fce5b91775730",
     "src/tables/cbdt.rs": "3cae1371844cb027313ab00e672441130926f24af5505b24c855b76a49fa079a",
@@ -75,5 +75,37 @@
     "src/tables/vhea.rs": "c2a1b72659969772ecac3f5221ea5cd7502f03454c5e34516a8e0d23578ef34e",
     "src/tables/vorg.rs": "8b5872e30a796f7e06ec3e3ad874ad05326f578098bbb6277ba94d1e3418149a",
     "src/var_store.rs": "c2f678831e5fc5a49394dc2e5a3a42b3c54d8c8950984b1c3593b72be7e2578f"
-  }
+  },
+  "patches": [
+    {
+      "file": "src/parser.rs",
+      "upstream_sha256": "c0b620074f542d390a9dd1bab235e7f4feea2cd9d7aeabefdfdfe82ceb1e2470",
+      "upstream": "        data.try_into().ok().map(u32::from_be_bytes)\n",
+      "os32": "        data.try_into().ok().map(os32_be_u32)\n"
+    },
+    {
+      "file": "src/parser.rs",
+      "upstream_sha256": "c0b620074f542d390a9dd1bab235e7f4feea2cd9d7aeabefdfdfe82ceb1e2470",
+      "upstream": "        data.try_into().ok().map(i32::from_be_bytes)\n",
+      "os32": "        data.try_into().ok().map(|b| os32_be_u32(b) as i32)\n"
+    },
+    {
+      "file": "src/parser.rs",
+      "upstream_sha256": "c0b620074f542d390a9dd1bab235e7f4feea2cd9d7aeabefdfdfe82ceb1e2470",
+      "upstream": "        data.try_into().ok().map(u64::from_be_bytes)\n",
+      "os32": "        let b: [u8; 8] = data.try_into().ok()?;\n        let high = os32_be_u32([b[0], b[1], b[2], b[3]]);\n        Some(u64::from(core::hint::black_box(high)) << 32 | u64::from(os32_be_u32([b[4], b[5], b[6], b[7]])))\n"
+    },
+    {
+      "file": "src/parser.rs",
+      "upstream_sha256": "c0b620074f542d390a9dd1bab235e7f4feea2cd9d7aeabefdfdfe82ceb1e2470",
+      "upstream": "        Some(U24(u32::from_be_bytes([0, data[0], data[1], data[2]])))\n",
+      "os32": "        Some(U24(os32_be_u32([0, data[0], data[1], data[2]])))\n"
+    },
+    {
+      "file": "src/parser.rs",
+      "upstream_sha256": "c0b620074f542d390a9dd1bab235e7f4feea2cd9d7aeabefdfdfe82ceb1e2470",
+      "upstream": "impl FromData for u16 {\n",
+      "os32": "// OS32 patch (D36, docs/tasks/v3/RUST_VS_C11.md §7-2/7-3): 32-bit big-endian\n// reads combine two 16-bit halves through an optimisation barrier, so LLVM\n// cannot emit BSWAP (486+) for the 386 floor. Recorded in UPSTREAM.json.\n#[inline]\nfn os32_be_u32(b: [u8; 4]) -> u32 {\n    let high = u16::from_be_bytes([b[0], b[1]]);\n    let low = u16::from_be_bytes([b[2], b[3]]);\n    u32::from(core::hint::black_box(high)) << 16 | u32::from(low)\n}\n\nimpl FromData for u16 {\n"
+    }
+  ]
 }

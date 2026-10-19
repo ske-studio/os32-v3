@@ -1,0 +1,22 @@
+# T7b-a5 host-only fixture: the product raster compiled for i686-os32-none
+# (x87, no SSE) and run on the host under the a2 guard (test_font_raster.py).
+[package]
+name = "font_raster_x87"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[lib]
+crate-type = ["staticlib"]
+path = "src/lib.rs"
+
+[workspace]
+
+[dependencies]
+os32-font = { path = "../../../userland/lib/font" }
+
+[profile.release]
+opt-level = 2
+lto = true
+panic = "abort"
+codegen-units = 1

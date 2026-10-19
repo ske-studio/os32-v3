@@ -1,382 +1,281 @@
 /*
- * font_test — IPAフォント TrueType レンダリングテスト (Rust)
+ * font_test — T7b-a5 の 1bpp ラスタ試験アプリ (Rust)
  *
- * ttf-parser (zero-alloc) + ab_glyph_rasterizer でオンデマンドラスタライズ。
- * fontdue と違い、全グリフを一括パースしないためメモリ効率が良い。
+ * 製品と同じ os32-font (逐次読み reader + 1 字の輪郭 + 16ppem の 1bpp ラスタ、
+ * 32px は 16px の最近傍 2 倍) を CPL=3 のアプリから使う。ファイル全体は読まない
+ * (FD から read_at で必要な所だけ、LRU の read cache 経由)。
  *
- * フォントファイル: /data/ipaexg.ttf (ゲスト側パス、明朝は /data/ipaexm.ttf)。
- * 日本語 OpenType は配布物に同梱しない (ユーザー決定 2026-09-30) — 使う人が
- * assets/fonts/ipaexg.ttf (無改変の原本) を hsync などで /data に置く。
- * 無ければ open 失敗を報告して終了する (GFX モードには入らない)。
- * 以前の JIS X 0208 サブセット (ipaexg_subset.ttf) は廃止した。
+ * フォント (配布物には入っていない — 使う人が hsync などで /data に置く):
+ *   /data/JF-Dot-Shinonome16.ttf  標準の和文 (必須。無ければ SKIP で終了 2)
+ *   /data/Inconsolata-Regular.ttf 欧文 (任意)
+ *   /data/ipaexg.ttf              IPAex ゴシック (任意、比較用)
+ *
+ *   font_test -c   画面を使わない照合: 各フォントの決まった符号位置の集合を全部
+ *                  ラスタして FONTCHK 行 (字数・黒画素数・FNV-1a) を出す。値は
+ *                  tools/tests/test_font_raster.py の EXPECT 行と比べる。
+ *   font_test      見本の描画 (16px と 32px)。キーで戻る。
+ *
+ * x87: アプリの FPU 文脈で動く (CPL=3 の前景)。gshell/製品の呼出しは
+ * T7b-a2 の font_guard_run を通す (b3)。
  */
 #![no_std]
 #![no_main]
 
-extern crate alloc;
 extern crate os32api;
 
-use alloc::vec;
-use alloc::vec::Vec;
-use ab_glyph_rasterizer::{point, Rasterizer};
-use ttf_parser::Face;
+use os32_font::{
+    limits::MAX_BITMAP_BYTES,
+    raster::{PixelSize, Placement, RasterScratch},
+    reader::{Error, Face, Result, Source},
+};
 use os32api::gfx;
-use os32api::kprint;
 use os32api::KernelAPI;
 
-/* フォントファイルのゲスト側パス */
-const FONT_PATH: &[u8] = b"/data/ipaexg.ttf\0";
-const FONT_PATH_MINCHO: &[u8] = b"/data/ipaexm.ttf\0";
+const SHINONOME: &[u8] = b"/data/JF-Dot-Shinonome16.ttf\0";
+const INCONSOLATA: &[u8] = b"/data/Inconsolata-Regular.ttf\0";
+const IPAEXG: &[u8] = b"/data/ipaexg.ttf\0";
 
-/// フォントファイルが開けるか (中身は読まない)。無いときに GFX モードへ
-/// 入らず報告して終わるための前検査。
-fn font_available(path: &[u8]) -> bool {
-    unsafe {
-        let a = os32api::api();
-        let fd = (a.sys_open)(path.as_ptr(), os32api::fs::O_RDONLY);
-        if fd < 0 {
-            return false;
-        }
-        (a.sys_close)(fd);
-        true
-    }
-}
+/* 照合する符号位置の範囲 (cmap に字があるものだけ数える)。
+ * test_font_raster.py の GUEST_RANGES と同じ。 */
+const CHECK_RANGES: [(u32, u32); 4] = [(0x20, 0x7e), (0xa0, 0xff), (0x3000, 0x30ff), (0x4e00, 0x4fff)];
 
-/* PC-98 画面サイズ */
 const SCREEN_W: i32 = 640;
 const SCREEN_H: i32 = 400;
 
-/* ================================================================ */
-/*  OutlineBuilder → ab_glyph_rasterizer ブリッジ                   */
-/* ================================================================ */
-
-struct GlyphBuilder {
-    rasterizer: Rasterizer,
-    scale: f32,
-    off_x: f32,
-    off_y: f32,
-    first_x: f32,
-    first_y: f32,
-    last_x: f32,
-    last_y: f32,
+/// 開いた FD の位置指定読み (lseek + read)。短読はそのまま返す。
+struct FdSource {
+    fd: i32,
+    size: u64,
 }
-
-impl GlyphBuilder {
-    fn tx(&self, x: f32) -> f32 { x * self.scale + self.off_x }
-    fn ty(&self, y: f32) -> f32 { -y * self.scale + self.off_y }
-}
-
-impl ttf_parser::OutlineBuilder for GlyphBuilder {
-    fn move_to(&mut self, x: f32, y: f32) {
-        let px = self.tx(x);
-        let py = self.ty(y);
-        self.first_x = px;
-        self.first_y = py;
-        self.last_x = px;
-        self.last_y = py;
-    }
-
-    fn line_to(&mut self, x: f32, y: f32) {
-        let px = self.tx(x);
-        let py = self.ty(y);
-        self.rasterizer.draw_line(
-            point(self.last_x, self.last_y),
-            point(px, py),
-        );
-        self.last_x = px;
-        self.last_y = py;
-    }
-
-    fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
-        let (cx, cy) = (self.tx(x1), self.ty(y1));
-        let (px, py) = (self.tx(x), self.ty(y));
-        self.rasterizer.draw_quad(
-            point(self.last_x, self.last_y),
-            point(cx, cy),
-            point(px, py),
-        );
-        self.last_x = px;
-        self.last_y = py;
-    }
-
-    fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
-        let (c1x, c1y) = (self.tx(x1), self.ty(y1));
-        let (c2x, c2y) = (self.tx(x2), self.ty(y2));
-        let (px, py) = (self.tx(x), self.ty(y));
-        self.rasterizer.draw_cubic(
-            point(self.last_x, self.last_y),
-            point(c1x, c1y),
-            point(c2x, c2y),
-            point(px, py),
-        );
-        self.last_x = px;
-        self.last_y = py;
-    }
-
-    fn close(&mut self) {
-        if self.last_x != self.first_x || self.last_y != self.first_y {
-            self.rasterizer.draw_line(
-                point(self.last_x, self.last_y),
-                point(self.first_x, self.first_y),
-            );
+impl FdSource {
+    fn open(path: &[u8]) -> Option<Self> {
+        unsafe {
+            let a = os32api::api();
+            let fd = (a.sys_open)(path.as_ptr(), os32api::fs::O_RDONLY);
+            if fd < 0 {
+                return None;
+            }
+            let size = (a.sys_lseek)(fd, 0, os32api::fs::SEEK_END);
+            if size <= 0 {
+                (a.sys_close)(fd);
+                return None;
+            }
+            Some(Self { fd, size: size as u64 })
         }
-        self.last_x = self.first_x;
-        self.last_y = self.first_y;
     }
 }
-
-/* ================================================================ */
-/*  グリフラスタライズ                                              */
-/* ================================================================ */
-
-struct GlyphBitmap {
-    width: usize,
-    height: usize,
-    bearing_x: i32,
-    bearing_y: i32,
-    advance: i32,
-    bitmap: Vec<u8>,
+impl Drop for FdSource {
+    fn drop(&mut self) {
+        unsafe { (os32api::api().sys_close)(self.fd) };
+    }
 }
-
-/// 1文字をラスタライズして α ビットマップを返す
-fn rasterize_glyph(face: &Face, ch: char, size: f32) -> Option<GlyphBitmap> {
-    let glyph_id = face.glyph_index(ch)?;
-    let bbox = face.glyph_bounding_box(glyph_id)?;
-
-    let upem = face.units_per_em() as f32;
-    let scale = size / upem;
-
-    /* ピクセル寸法 — マージンを十分に取り、グリフ上端が切れるのを防止 */
-    let w = ((bbox.x_max - bbox.x_min) as f32 * scale) as usize + 4;
-    let h = ((bbox.y_max - bbox.y_min) as f32 * scale) as usize + 4;
-    if w < 2 || h < 2 { return None; }
-
-    /* ラスタライザ座標オフセット: TTF座標 → ピクセル座標 */
-    let off_x = -(bbox.x_min as f32) * scale + 1.0;
-    let off_y = (bbox.y_max as f32) * scale + 1.0;
-
-    let mut builder = GlyphBuilder {
-        rasterizer: Rasterizer::new(w, h),
-        scale, off_x, off_y,
-        first_x: 0.0, first_y: 0.0,
-        last_x: 0.0, last_y: 0.0,
-    };
-
-    face.outline_glyph(glyph_id, &mut builder)?;
-
-    /* α値ビットマップ取得 */
-    let mut bitmap = vec![0u8; w * h];
-    builder.rasterizer.for_each_pixel_2d(|x, y, alpha| {
-        let idx = y as usize * w + x as usize;
-        if idx < bitmap.len() {
-            let a = (alpha * 255.0) as u32;
-            bitmap[idx] = if a > 255 { 255 } else { a as u8 };
-        }
-    });
-
-    let advance = face.glyph_hor_advance(glyph_id)
-        .unwrap_or(upem as u16) as f32 * scale;
-
-    Some(GlyphBitmap {
-        width: w,
-        height: h,
-        bearing_x: (bbox.x_min as f32 * scale) as i32 - 1,
-        bearing_y: (bbox.y_max as f32 * scale) as i32 + 1,
-        advance: advance as i32,
-        bitmap,
-    })
-}
-
-/* ================================================================ */
-/*  ビットマップ描画                                                */
-/* ================================================================ */
-
-fn draw_bitmap(
-    x: i32, y: i32,
-    width: usize, height: usize,
-    bitmap: &[u8],
-    fg: u8, _dim: u8,
-) {
-    unsafe {
-        for row in 0..height {
-            for col in 0..width {
-                let px = x + col as i32;
-                let py = y + row as i32;
-                if px < 0 || px >= SCREEN_W || py < 0 || py >= SCREEN_H { continue; }
-
-                /* 1bit モノクロ: 閾値96 で ON/OFF */
-                let alpha = bitmap[row * width + col];
-                if alpha >= 96 {
-                    gfx::gfx_pixel(px, py, fg);
+impl Source for FdSource {
+    fn file_size(&self) -> u64 {
+        self.size
+    }
+    fn read_at(&mut self, offset: u64, dst: &mut [u8]) -> Result<usize> {
+        let offset = i32::try_from(offset).map_err(|_| Error::Bounds)?;
+        unsafe {
+            let a = os32api::api();
+            if (a.sys_lseek)(self.fd, offset, os32api::fs::SEEK_SET) != offset {
+                return Err(Error::Io);
+            }
+            let mut got = 0usize;
+            while got < dst.len() {
+                let n = (a.sys_read)(self.fd, dst.as_mut_ptr().add(got), (dst.len() - got) as u32);
+                if n < 0 {
+                    return Err(Error::Io);
                 }
+                if n == 0 {
+                    break;
+                }
+                got += n as usize;
+            }
+            Ok(got)
+        }
+    }
+}
+
+/* 作業域と 1 字の bitmap は BSS に置く (スタックを使わない)。 */
+static mut WORK: RasterScratch = RasterScratch::new();
+static mut BITS: [u8; MAX_BITMAP_BYTES] = [0; MAX_BITMAP_BYTES];
+
+fn work() -> &'static mut RasterScratch {
+    unsafe { &mut *core::ptr::addr_of_mut!(WORK) }
+}
+fn bits() -> &'static mut [u8; MAX_BITMAP_BYTES] {
+    unsafe { &mut *core::ptr::addr_of_mut!(BITS) }
+}
+
+fn render(face: &mut Face<FdSource>, cp: u32, size: PixelSize) -> Option<Placement> {
+    let gid = face.glyph_index(cp).ok()??;
+    if gid == 0 {
+        return None;
+    }
+    work().render(face, gid, size, bits()).ok()
+}
+
+/* ---------------- 照合 (-c) ---------------- */
+
+struct Check {
+    glyphs: u32,
+    black: u32,
+    fallback: u32,
+    fnv: u32,
+}
+impl Check {
+    fn bytes(&mut self, data: &[u8]) {
+        for &b in data {
+            self.fnv = (self.fnv ^ u32::from(b)).wrapping_mul(16_777_619);
+        }
+    }
+}
+
+fn check_face(path: &[u8], name: &[u8]) {
+    let Some(source) = FdSource::open(path) else {
+        os32api::kprint!(b"FONTCHK %s SKIP not deployed\r\n\0", name.as_ptr());
+        return;
+    };
+    let Ok(mut face) = Face::open(source) else {
+        os32api::kprint!(b"FONTCHK %s FAIL open\r\n\0", name.as_ptr());
+        return;
+    };
+    let mut c = Check { glyphs: 0, black: 0, fallback: 0, fnv: 0x811c_9dc5 };
+    for (first, last) in CHECK_RANGES {
+        for cp in first..=last {
+            let gid = match face.glyph_index(cp) {
+                Ok(Some(g)) if g != 0 => g,
+                _ => continue,
+            };
+            match work().render(&mut face, gid, PixelSize::Px16, bits()) {
+                Ok(p) => {
+                    c.glyphs += 1;
+                    c.bytes(&cp.to_le_bytes());
+                    c.bytes(&p.width.to_le_bytes());
+                    c.bytes(&p.height.to_le_bytes());
+                    c.bytes(&p.left.to_le_bytes());
+                    c.bytes(&p.top.to_le_bytes());
+                    c.bytes(&p.advance.to_le_bytes());
+                    let image = bits().get(..p.bytes()).unwrap_or(&[]);
+                    for &b in image {
+                        c.black += b.count_ones();
+                    }
+                    c.bytes(image);
+                }
+                Err(_) => c.fallback += 1,
+            }
+        }
+    }
+    os32api::kprint!(
+        b"FONTCHK %s glyphs=%d black=%d fallback=%d fnv=%x\r\n\0",
+        name.as_ptr(),
+        c.glyphs as i32,
+        c.black as i32,
+        c.fallback as i32,
+        c.fnv
+    );
+}
+
+/* ---------------- 見本の描画 ---------------- */
+
+fn draw(x: i32, baseline: i32, p: &Placement, color: u8) {
+    for row in 0..i32::from(p.height) {
+        for col in 0..i32::from(p.width) {
+            let at = row as usize * usize::from(p.pitch) + col as usize / 8;
+            if bits().get(at).copied().unwrap_or(0) & (0x80 >> (col % 8)) == 0 {
+                continue;
+            }
+            let px = x + i32::from(p.left) + col;
+            let py = baseline - i32::from(p.top) + row;
+            if (0..SCREEN_W).contains(&px) && (0..SCREEN_H).contains(&py) {
+                unsafe { gfx::gfx_pixel(px, py, color) };
             }
         }
     }
 }
 
-/* ================================================================ */
-/*  UTF-8 文字列描画                                                */
-/* ================================================================ */
-
-fn draw_string(
-    face: &Face,
-    x: i32, y: i32,
-    text: &str,
-    size: f32,
-    fg: u8, dim: u8,
-) -> i32 {
-    let upem = face.units_per_em() as f32;
-    let scale = size / upem;
-    let ascender = face.ascender() as f32 * scale;
-
-    let mut cx = x;
-    let mut cy = y;
-
+/// 欧文は Inconsolata (あれば)、それ以外と欠字は東雲。戻りは送り後の x。
+fn draw_text(ja: &mut Face<FdSource>, latin: &mut Option<Face<FdSource>>, x: i32, baseline: i32,
+             text: &str, size: PixelSize, color: u8) -> i32 {
+    let mut pen = x << 6;
     for ch in text.chars() {
-        if ch == '\n' {
-            cx = x;
-            cy += size as i32 + 2;
-            continue;
+        let cp = ch as u32;
+        let placed = match latin {
+            Some(face) if cp < 0x2000 => render(face, cp, size),
+            _ => None,
         }
-
-        /* スペースの場合はアドバンスだけ進める */
-        if ch == ' ' {
-            cx += (size * 0.3) as i32;
-            continue;
-        }
-
-        match rasterize_glyph(face, ch, size) {
-            Some(g) => {
-                let gx = cx + g.bearing_x;
-                let gy = cy + (ascender as i32 - g.bearing_y);
-                draw_bitmap(gx, gy, g.width, g.height, &g.bitmap, fg, dim);
-                cx += g.advance;
-            }
-            None => {
-                /* グリフが見つからない場合はスキップ */
-                cx += (size * 0.5) as i32;
-            }
+        .or_else(|| render(ja, cp, size));
+        if let Some(p) = placed {
+            draw((pen + 32) >> 6, baseline, &p, color);
+            pen += p.advance;
+        } else {
+            pen += (8 * size.factor() as i32) << 6;
         }
     }
-
-    cy + size as i32
+    (pen + 32) >> 6
 }
-/* ================================================================ */
-/*  フォント読み込み＆3サイズ描画ヘルパー                           */
-/* ================================================================ */
 
-fn load_and_render(
-    path: &[u8],
-    label: &[u8],
-    start_y: i32,
-    color: u8,
-) -> i32 {
-    let font_data = match os32api::fs::read_file(path) {
-        Some(d) => d,
-        None => {
-            kprint!(b"WARN: %s not found\r\n\0", path.as_ptr());
-            return start_y;
-        }
-    };
-
-    let face = match Face::parse(&font_data, 0) {
-        Ok(f) => f,
-        Err(_) => { return start_y; }
-    };
-
-    /* セクションラベル (KCGで描画) */
+fn show(ja: &mut Face<FdSource>, latin: &mut Option<Face<FdSource>>) {
     unsafe {
+        gfx::gfx_clear(0);
+        gfx::gfx_fill_rect(0, 0, SCREEN_W, 20, 1);
         gfx::kcg_set_scale(1);
-        gfx::kcg_draw_utf8(8, start_y, label.as_ptr(), color, 0);
+        gfx::kcg_draw_utf8(8, 4, b"T7b-a5 1bpp raster: JF Dot Shinonome16 / Inconsolata\0".as_ptr(), 7, 1);
     }
-
-    let mut y = start_y + 18;
-
-    /* 16px */
-    y = draw_string(&face, 16, y,
-        "16px: ABC \u{3042}\u{3044}\u{3046} \u{30A2}\u{30A4}\u{30A6} \u{6F22}\u{5B57}\u{30C6}\u{30B9}\u{30C8} \u{5927}\u{5B66} \u{60C5}\u{5831} \u{5DE5}\u{5B66}",
-        16.0, 7, 0);
-    y += 4;
-
-    /* 24px */
-    y = draw_string(&face, 16, y,
-        "24px: \u{65E5}\u{672C}\u{8A9E}\u{30D5}\u{30A9}\u{30F3}\u{30C8} ABC",
-        24.0, 7, 0);
-    y += 6;
-
-    /* 32px */
-    y = draw_string(&face, 16, y,
-        "32px: \u{6F22}\u{5B57} OS32",
-        32.0, 7, 0);
-
-    y + 8
+    let lines16 = [
+        "16px: \u{8B70} \u{9B31} \u{8594}\u{8587} \u{6A5F}\u{68B0} \u{8A2D}\u{5B9A}",
+        "16px: \u{3042}\u{3044}\u{3046} \u{30A2}\u{30A4}\u{30A6} \u{6F22}\u{5B57}",
+        "16px: Hello, OS32! \u{00C5} \u{00E7} W M m g j y {}[]",
+    ];
+    let mut y = 44;
+    for line in lines16 {
+        draw_text(ja, latin, 16, y, line, PixelSize::Px16, 15);
+        y += 20;
+    }
+    y += 24;
+    for line in ["32px: \u{8B70}\u{9B31}\u{8594}\u{8587}\u{6A5F}\u{68B0}", "32px: \u{8A2D}\u{5B9A} OS32 \u{00C5}\u{00E7}"] {
+        draw_text(ja, latin, 16, y, line, PixelSize::Px32, 15);
+        y += 40;
+    }
+    gfx::present();
 }
 
 /* ================================================================ */
 /*  メイン関数                                                       */
 /* ================================================================ */
 #[no_mangle]
-pub extern "C" fn main(
-    _argc: i32,
-    _argv: *const *const u8,
-    api: *mut KernelAPI,
-) -> i32 {
+pub extern "C" fn main(argc: i32, argv: *const *const u8, api: *mut KernelAPI) -> i32 {
     os32api::os32_init(api);
+    let check = argc > 1 && unsafe {
+        let arg = *argv.add(1);
+        !arg.is_null() && *arg == b'-' && *arg.add(1) == b'c' && *arg.add(2) == 0
+    };
 
-    os32api::print(b"TrueType Font Test - 1bit Monochrome\r\n\0");
-    os32api::print(b"Gothic + Mincho x 16/24/32px = 6 patterns\r\n\0");
-
-    /* フォントは同梱していない。無ければここで終わる (GFX モードに入らない) */
-    if !font_available(FONT_PATH) {
-        os32api::print(
-            b"font_test: SKIP font not deployed (/data/ipaexg.ttf)\r\n\0",
-        );
+    os32api::print(b"font_test: os32-font 16ppem 1bpp raster (32px = 2x nearest)\r\n\0");
+    let Some(source) = FdSource::open(SHINONOME) else {
+        os32api::print(b"font_test: SKIP font not deployed (/data/JF-Dot-Shinonome16.ttf)\r\n\0");
         return 2;
+    };
+    if check {
+        drop(source);
+        check_face(SHINONOME, b"shinonome\0");
+        check_face(INCONSOLATA, b"inconsolata\0");
+        check_face(IPAEXG, b"ipaexg\0");
+        return 0;
     }
+    let Ok(mut ja) = Face::open(source) else {
+        os32api::print(b"font_test: FAIL open /data/JF-Dot-Shinonome16.ttf\r\n\0");
+        return 1;
+    };
+    let mut latin = FdSource::open(INCONSOLATA).and_then(|s| Face::open(s).ok());
 
     os32api::print(b"Press any key to start...\r\n\0");
     os32api::wait_key();
-
-    /* GFX モード初期化 */
     unsafe {
         gfx::libos32gfx_init(api);
-        gfx::gfx_clear(0);
     }
-
-    /* --- ヘッダー --- */
-    unsafe {
-        gfx::gfx_fill_rect(0, 0, SCREEN_W, 20, 1);
-        gfx::kcg_set_scale(1);
-        gfx::kcg_draw_utf8(
-            8, 4,
-            b"[1bit Monochrome] TrueType Font Test - Gothic / Mincho\0".as_ptr(),
-            7, 1,
-        );
-    }
-
-    /* --- ゴシック体 (読み込み → 描画 → スコープ終了で解放) --- */
-    let y_mid = load_and_render(
-        FONT_PATH,
-        b"--- IPAex Gothic ---\0",
-        24,
-        15,
-    );
-
-    /* --- 明朝体 (ゴシックのデータは解放済み) --- */
-    load_and_render(
-        FONT_PATH_MINCHO,
-        b"--- IPAex Mincho ---\0",
-        y_mid,
-        15,
-    );
-
-    /* VRAM転送 */
-    gfx::present();
-
-    /* キー入力待ち → テキストモードに復帰 */
+    show(&mut ja, &mut latin);
     os32api::wait_key();
     gfx::shutdown();
-
     0
 }
-
