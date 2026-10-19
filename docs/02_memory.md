@@ -107,12 +107,7 @@ SLACK または pool の内数で、表ありは owner 使用頁 +7・空き頁 
 頁末の420 Bは探索しない。失敗時は確保頁を返し、かな算術だけで起動を続ける。
 表・表ポインタはユーザーへ公開せず、変換は KAPI `unicode_to_jis` を呼ぶ。
 
-旧低位128KiB (0x4A000〜0x69FFF) は T7a まで kernel FIXED として保持し、
-会計は `other` −32頁、`fixed` +32頁、総数不変。boot の KCG LZ4 scratch は
-`MEM_KCG_LZ4_TEMP_BASE`〜`MEM_KCG_LZ4_TEMP_END` (0x4A000〜0xA0000、終端を含まない)
-の344KiBで、BB・mailbox と共用する。close は scratch 失効後に BB・mailbox を初期化し、
-その後のフォント読込は NOSYS。Unicode の7頁はこの低位 scratch から独立し、
-旧低位予約を一般池へ返すまでは RAM 消費が28KiB増える。
+旧低位予約は T7a-2e で V86_LOW に統合。
 
 #### 動的レイアウト (番地が実行時に決まるので生成できない部分)
 

@@ -52,10 +52,10 @@ WAIT_KEY との共有承認は v3 で改めた (GUIRUNKEY-1、ユーザー決定
 | guard_a=sbrk_end、guard_b=stack_top-stack_size-PAGE_SIZE | 非 present | libc 初期末尾 / stack 境界 (`ring3_guard`) |
 | stack_top-stack_size〜stack_top | RW+USER | 可変ユーザスタック全量 |
 | 0xA0000〜0xBFFFF | supervisor (e11b1〜) | テキスト / グラフィック VRAM。CPL=3 は KAPI (`tvram_*`) か lease 経由だけ |
-| フォントキャッシュ 0x01000〜 | supervisor (e11b1〜) | `kcg_read_*` の KAPI 越し |
+| 低位 V86_LOW | supervisor | V86 session 中だけゲストの RAM として使用 |
 | SHM | RW+USER (共有 PT、lock 中は RO) | boot 専用口で初期化し、SHM 専用口で RW だけ切替 |
 | Unicode の組表 (kernel 所有の 7 頁、T3d1〜) | supervisor | CPL=3 は KAPI `unicode_to_jis` だけ (表は公開しない、[T3D1_UNICODE_FILE](tasks/v3/T3D1_UNICODE_FILE.md)) |
-| 0x6A000〜0x89FFF (9801 BB)、バックエンド固有 BB | supervisor (e11b2〜) | CLIENT lease の私有 VA で描画。Cirrus DISPLAY は授権された lease だけ RW |
+| pool から確保した 32 頁 (SURFACE、9801 BB)、バックエンド固有 BB | supervisor (e11b2〜) | CLIENT lease の私有 VA で描画。Cirrus DISPLAY は授権された lease だけ RW |
 | KAPI トランポリン 1 ページ | RO+USER | `int 0x80` スタブ列 |
 | 0x80000000〜 shlib .text | RO+USER (共有) / .data は per-app | 共有ライブラリ |
 
