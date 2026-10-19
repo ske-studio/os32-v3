@@ -87,19 +87,24 @@ jobs:
         if: steps.cross-cache.outputs.cache-hit != 'true'
         run: tools/ci/build_cross.sh --prefix "$CROSS_DIR" --work "$RUNNER_TEMP/cross-work" --jobs "$(nproc)"
 
-      # フォント。key = ipaex-<配布 zip の SHA-256 (fetch_fonts.py に固定)>。
+      # フォント。key = IPAex / Inconsolata の配布 zip の SHA-256 (fetch_fonts.py に固定)。
       #    ヒットすれば fetch_fonts.py は SHA-256 を照合するだけで何も取らない。
       - name: Font cache key
         id: fontkey
-        run: echo "key=ipaex-$(python3 tools/fetch_fonts.py --print-zip-sha256)" >> "$GITHUB_OUTPUT"
+        run: echo "key=fonts-$(python3 tools/fetch_fonts.py --print-zip-sha256)-$(python3 tools/fetch_fonts.py --family inconsolata --print-zip-sha256)" >> "$GITHUB_OUTPUT"
 
-      - name: Cache IPAex fonts
+      - name: Cache IPAex and Inconsolata fonts
         uses: actions/cache@v4
         with:
           path: |
             assets/fonts/ipaexg.ttf
             assets/fonts/ipaexm.ttf
+            assets/fonts/Inconsolata-Regular.ttf
+            assets/fonts/Inconsolata-OFL.txt
           key: ${{ steps.fontkey.outputs.key }}
+
+      - name: Fetch Inconsolata (verify cached font and OFL)
+        run: python3 tools/fetch_fonts.py --family inconsolata
 
       # ③ core のビルド。OS32_ACCEPT_IPA_LICENSE=1 は、リポジトリ所有者が IPA Font License v1.0 に
       #    同意している前提で CI では非対話に同意する (未取得のときだけ fetch_fonts.py が見る)。

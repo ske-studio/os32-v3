@@ -1,0 +1,24 @@
+os32-font — T7b shared crate (not connected to shell/shlib yet)
+
+src/limits.rs is the single definition of the T7b-a1 corpus limits for
+IPAex 004.01 and Inconsolata Regular 3.000. These are bounds for later
+readers, not a promise of arbitrary TrueType support. No allocations or
+resident tables are introduced in a1.
+
+vendor/ttf-parser-0.21.1 contains upstream src/, Cargo.toml, Cargo.toml.orig,
+README.md and both license originals, byte-for-byte from the crates.io
+archive. OS32 selects MIT (LICENSE-MIT). Examples, tests and dev tooling
+are omitted. UPSTREAM.json records the archive URL/hash and each retained
+file hash. No source patch. Both dependencies use default-features=false.
+
+API boundary (T7b-a1 investigation): Face::parse/from_raw_tables require
+borrowed slices and have no read_at callback. Later readers must handle
+SFNT directory/scalars, cmap 4/12, loca/hmtx and component collection/gid
+rewriting. Public loca::Table::parse + glyf::Table::parse/outline can read
+a bounded temporary glyf/loca for one glyph and its components; private
+simple-outline/composite iterators are not used. Do not connect the
+prototype's whole-file Face::parse to the product.
+
+Final linked 386 instruction validation remains the T7b-a5 gate (D36).
+This step preserves the prototype version/features and adds no runtime
+reader or rasterizer.

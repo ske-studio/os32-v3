@@ -8,5 +8,5 @@ crate-type = ["staticlib"]
 
 [dependencies]
 os32api = { path = "../../../sdk/rust/os32api" }
-ttf-parser = { version = "0.21", default-features = false }
+ttf-parser = { path = "../../lib/font/vendor/ttf-parser-0.21.1", default-features = false }
 ab_glyph_rasterizer = { version = "0.1", default-features = false, features = ["libm"] }
