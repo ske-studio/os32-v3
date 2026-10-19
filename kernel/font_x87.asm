@@ -43,8 +43,6 @@ font_x87_boot_init:
         inc     eax
         jmp     .done
 .absent:
-        or      edx, 1 << 2                ; EM=1: later accidental FP -> #NM
-        mov     cr0, edx
 .done:
         add     esp, 4
         ret

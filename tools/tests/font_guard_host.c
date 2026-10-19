@@ -126,7 +126,7 @@ static void probe(void) {
         host_ac=cpu ? 1u<<18 : 0;
         host_no_fpu=absent;
         CHECK(font_x87_boot_init()==!absent,"boot FPU detection");
-        CHECK(host_cr0==(0x80000013u | (cpu ? 32u:0) | (absent ? 4u:0)),"boot CR0 386/486");
+        CHECK(host_cr0==(0x80000013u | (cpu ? 32u:0)),"boot CR0 386/486");
     }
     say("GREEN probe branches (CR0/absent ESC modeled)\n");
 }

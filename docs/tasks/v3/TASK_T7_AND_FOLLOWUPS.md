@@ -169,7 +169,7 @@ parser/rasterは境界検査済み入力と上限付き領域だけを使い、a
 | T7b-a2 x87 / 共通guard・exec安全点 | ①全状態一致 (save領域の予約byteは除外) ②既知CW内で実行 ③再入拒否 ④STOP/parkはleave後 ⑤非搭載はKCG ⑥faultの帰属が一致 | 値8本/CW丸め/例外mask変更、失敗出口のrestore除去。f32前に完成 |
 | T7b-a3 table reader / directory・cmap・loca/hmtx | ①全file常駐0 ②table数/索引/read cache上限はa1③の実測最大以上、超過は代替 ③format4/12対照一致 ④隣接locaとadvance一致 ⑤短読で公開0 | offset/length overflow、順序逆転、idRangeOffset境界±1 |
 | T7b-a4 glyph / 単純・複合輪郭 | ①製品corpusの輪郭対照一致 ②入力/点/contour上限はa1③の実測最大以上 ③component/深さも同基準 ④edge/専用領域も同基準、各上限超過は代替 ⑤不対応字は一覧と一致 | 循環、run長、各上限±1、途中読込失敗で部分commit拒否 |
-| T7b-a5 raster / 16・32px・font_test | ①26.6寸法とbaseline対照一致 ②bbox/作業域上限はa1③の実測最大以上、超過は代替 ③完全bitmapだけcommit ④最終386命令列検査 | bbox/pitch/座標overflow、allocation failure、途中raster失敗 |
+| T7b-a5 raster / 16・32px・font_test | ①26.6寸法とbaseline対照一致 ②bbox/作業域上限はa1③の実測最大以上、超過は代替 ③完全bitmapだけcommit ④最終386命令列検査 ⑤x87 (CW=037F、精度64bit) の結果はhostのf32とビット一致しない (二重丸め) — 比較は許容差か被覆の段で取る | bbox/pitch/座標overflow、allocation failure、途中raster失敗 |
 | T7b-a6 試作計測 / map・FD・ext2 | ①shell1MiB/8MB私有2MiBの内訳表 ②作業域実peak/bitmap別枠 ③FD peakと残数からactive faceのFD上限を決定 ④cold/warm1000字 ⑤起動/入力→描画計測 ⑥上限・採用法を実測で確定 | corpus cache thrash、font FD不足、memory上限ちょうど/超過。試作全file readを製品へ戻さない |
 | T7b-b1 app read lease / VFS・public KAPI | ①open/read_at/closeのowner/世代検証 ②短読失敗 ③a6で決めたactive faceのFD上限 ④STALE closeで別FD保持 ⑤通常終了でFD/owner漏れ0 ⑥[ABI1]〜[ABI3]と一式再ビルド ⑦使用中のhsync置換はBUSYで元ファイル不変 | 異owner/旧token/生FD混用、FD再利用、使用中保護欠落 |
 | T7b-b2 shell入口 / loader・WM・service表 | ①shell世代/text/文脈検査 ②appから到達不可 ③WM中shell read成功 ④app ownerのFD不使用 ⑤park/fault/dispatch後の印0 ⑥reloadで旧lease無効 | wrapper検査/印消去を除去、WM後app再利用。新しい権限モデルは足さない |
