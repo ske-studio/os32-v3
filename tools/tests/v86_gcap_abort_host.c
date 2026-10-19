@@ -29,8 +29,9 @@ struct kdebug kdebug;
 struct ledger_surface ledger_surfaces[LEDGER_MAX_SURFACES];
 u32 v86_gcap_phase, v86_gcap_alloc_count, v86_gcap_free_count, v86_gp_cs, v86_gp_ip;
 static u32 step, inject_step, injection, failure_step, calls, killed[5], landed[5];
-static u32 refs, allocations, frees, policy_deny, display_reset, cursor, finishes, sync_restores;
-static u32 fault_kill_count, ring3_abort_count;
+static u32 refs, allocations, frees, policy_deny, display_reset, cursor, finishes, sync_restores, cui_restores;
+static u32 fault_kill_count, ring3_abort_count, hotkey_call, hotkeys;
+volatile int ring3_in_syscall = 1;
 volatile u32 ring3_wm_fault_count, tick_count;
 volatile int ring3_wm_depth;
 static int g_cur_app = 1;
@@ -63,18 +64,23 @@ void exec_longjmp(u32 *buf) {
 }
 #include "cleanup.inc"
 #include "kill.inc"
+/* Only kernel-context faults during the capture syscall reach these handlers.
+ * Guest VM faults go through the V86 decoder, not the app kill dispatcher. */
+static volatile u32 sqlite_engine_active;
+static void sqlite_engine_fault(u32 vector, u32 eip, u32 cr2) {
+    (void)vector; (void)eip; (void)cr2; CHECK(0, "unexpected SQLite fault");
+}
+static void sputs(const char *s) { (void)s; }
+static void sput_hex32(u32 n) { (void)n; }
+#include "fault.inc"
 static void boundary(void) {
     step++;
     if (step != inject_step) return;
     CHECK(v86_gcap_active() || (!v86_session.open && allocations > frees), "observe capture before injection");
-    if (injection == 3) {
-        kctx_irq_depth = 1;
-        ring3_abort_request();
-        ring3_abort_check();
-    } else {
-        kctx_exc_depth = 1; /* #PF / #GP decoder's existing kill edge. */
-        ring3_fault_kill();
-    }
+    u32 regs[13] = {0}; /* CS.RPL=0: kernel executing within capture's syscall. */
+    kctx_exc_depth = 1;
+    if (injection == 1) page_fault_handler(0, 0, 0, regs);
+    else exception_handler(0, 13, 0, regs);
     CHECK(0, "kill does not return");
 }
 void *kmemcpy(void *d, const void *s, u32 n) { u8 *x=d; const u8 *y=s; while(n--) *x++=*y++; return d; }
@@ -90,7 +96,7 @@ int v86_gui_refuse(void) { return 0; }
 int v86_is_active(void) { return v86_session.active; }
 int gfx_get_height(void) { return GFX_HEIGHT; }
 void console_hw_cursor_enable(void) { cursor++; }
-void v86_cui_display_restore(void) {}
+void v86_cui_display_restore(void) { cui_restores++; }
 void __attribute__((weak)) pegc_restore_text_sync(int freq) { CHECK(freq == 1, "saved ROM sync frequency"); sync_restores++; }
 int serial_gate_active(void) { return 1; }
 void serial_puts_polled(const char *s) { (void)s; }
@@ -155,11 +161,19 @@ int v86_run_limit(const struct v86_context *ctx, u32 ticks) {
         ((volatile u16 *)P2V_IO(TVRAM_CHAR_BASE))[i] = 0xdead;
         ((volatile u16 *)P2V_IO(TVRAM_ATTR_BASE))[i] = 0xbeef;
     }
+    /* IRQ/IRET and ROM are modeled: the real V86 keyboard branch returns
+     * HOTKEY here without ring3_abort_request/check (drivers/kbd.c). */
+    if (calls == hotkey_call) {
+        CHECK(v86_gcap_active(), "HOTKEY observed active");
+        gd_set(GD_DONE, 0);
+        hotkeys++;
+        return V86_EXIT_HOTKEY;
+    }
     return V86_EXIT_HLT;
 }
 static u16 original(u32 i) { return (u16)(i ^ 0x1234); }
 static void before(void) {
-    step = calls = policy_deny = display_reset = cursor = sync_restores = 0;
+    step = calls = policy_deny = display_reset = cursor = sync_restores = cui_restores = 0;
     call.pinned = 1; call.cr3 = 0x400000; host_cr3 = paging_kernel_pd_phys();
     v86_session.aborting = 0;
     for(u32 i=0; i<GCAP_TV_CELLS; i++) {
@@ -196,13 +210,13 @@ void _start(void) {
     for(int mode=V86G_MODE_ROM; mode<=V86G_MODE_SELFTEST; mode++) {
         before();
         CHECK(v86_gdc_capture(mode, &output) >= 0, "normal capture");
-        u32 total = step;
+        u32 total = step, runs = calls;
         v86_call_cleanup();
         if(mode == V86G_MODE_SELFTEST)
             CHECK(!cursor && !display_reset, "normal dry capture leaves display alone");
         after();
         for(u32 entry=1; entry<=total; entry++) {
-            for(injection=1; injection<=3; injection++) {
+            for(injection=1; injection<=2; injection++) {
                 before(); inject_step = entry;
                 u32 kills_before = fault_kill_count, aborts_before = ring3_abort_count;
                 if(!__builtin_setjmp(killed)) {
@@ -212,7 +226,7 @@ void _start(void) {
                 kctx_irq_depth = kctx_exc_depth = 0; /* trusted setjmp landing */
                 exec_pending_finish();
                 CHECK(fault_kill_count == kills_before+1, "kills delta one");
-                CHECK(ring3_abort_count == aborts_before+(injection==3), "STOP observed active");
+                CHECK(ring3_abort_count == aborts_before, "fault is not STOP");
                 CHECK(policy_deny && display_reset && cursor, "output policy and display restored");
                 if(mode == V86G_MODE_ROM && (entry == 17 || entry == 18))
                     CHECK(sync_restores == 1, "interrupted ROM mode restores sync");
@@ -221,6 +235,25 @@ void _start(void) {
                 CHECK(v86_gdc_capture(V86G_MODE_ROM, &output) >= 0 && calls == 3, "next V86 succeeds");
                 v86_call_cleanup(); after();
             }
+        }
+        /* CTRL+STOP during each modeled guest run returns normally via HOTKEY.
+         * It must not count as a kill; the recorder still releases everything. */
+        for (u32 run=1; run<=runs; run++) {
+            before(); hotkey_call = run;
+            u32 kills_before = fault_kill_count, aborts_before = ring3_abort_count;
+            u32 hotkeys_before = hotkeys;
+            v86_gdc_capture(mode, &output);
+            CHECK(hotkeys == hotkeys_before+1, "HOTKEY reached");
+            CHECK(fault_kill_count == kills_before && ring3_abort_count == aborts_before,
+                  "HOTKEY kills delta zero");
+            CHECK(policy_deny, "HOTKEY output policy restored");
+            if (mode == V86G_MODE_ROM)
+                CHECK(cursor && cui_restores, "HOTKEY display restored");
+            v86_call_cleanup(); after();
+            hotkey_call = 0;
+            before();
+            CHECK(v86_gdc_capture(V86G_MODE_ROM, &output) >= 0 && calls == 3, "next V86 after HOTKEY succeeds");
+            v86_call_cleanup(); after();
         }
         /* Recoverable preparation failures at module, snapshot, backing and
          * every mapping boundary (steps 2..13); all retain caller output. */
@@ -231,6 +264,6 @@ void _start(void) {
         failure_step = 0;
     }
     CHECK(finishes > 0, "kill landing exercised");
-    SAY("GREEN capture active STOP/#PF/#GP at every entry / prepare failure / release / TVRAM30 / CR3 / next V86 / KDEBUG OFF");
+    SAY("GREEN capture active HOTKEY kills+0 / syscall #PF/#GP kills+1 at every entry / prepare failure / release / TVRAM30 / CR3 / next V86 / KDEBUG OFF");
     die(0);
 }

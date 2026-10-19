@@ -1,4 +1,5 @@
 check-v86-gcap-abort-host:
+- kernel/isr_handlers.c
 - kernel/v86_mem.*
 - kernel/v86_gcap.*
 - kernel/v86_io.*

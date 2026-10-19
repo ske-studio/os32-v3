@@ -1,6 +1,7 @@
 """T7a-2d: real recorder/session/exec kill paths, modeled CPU and ROM.
-No signal stack emulation: #PF/#GP call the real kill dispatcher at explicit
-boundaries. Hardware IRQ delivery, IRET/CR3 and visible restoration need NP21/W.
+No signal stack emulation: kernel #PF/#GP enter the real syscall-fault
+handlers at explicit boundaries; modeled V86 runs return HOTKEY separately.
+Hardware IRQ delivery, IRET/CR3 and visible restoration need NP21/W.
 Normal controls always run before compiled runtime-RED omissions.
 """
 from pathlib import Path
@@ -34,7 +35,8 @@ MUTATIONS = (
 
 def main():
     paths = ('kernel/v86_mem.c', 'kdebug/v86_gcap.c', 'exec/exec.c',
-             'exec/v86_call.c', 'kernel/v86_gcap.c', 'kernel/v86_io.c')
+             'exec/v86_call.c', 'kernel/v86_gcap.c', 'kernel/v86_io.c',
+             'kernel/isr_handlers.c')
     sources = {p: (ROOT / p).read_text() for p in paths}
     with tempfile.TemporaryDirectory(prefix='v86-gcap-abort-') as td:
         work = Path(td)
@@ -51,6 +53,13 @@ def main():
                 'exec_exit', 'exec_pending_transfer', 'exec_pending_finish',
                 'ring3_kill_kind', 'ring3_fault_kill', 'ring3_abort_kill',
                 'ring3_abort_request', 'ring3_abort_check')))
+            handlers = ''.join(function(parts[paths[6]], n).split(marker)[0] + '}\n'
+                               for n, marker in (
+                                   ('exception_handler', '    /* 画面上部クリア */'),
+                                   ('page_fault_handler', '    /* 画面上部をクリア')))
+            handlers = handlers.replace('    const char *name;\n    int row = 0;', '    (void)error_code;')
+            handlers = handlers.replace('    int row = 0;  /* 画面最上部から表示 (最大限の情報量) */', '')
+            (work / 'fault.inc').write_text(handlers)
             (work / 'cleanup.inc').write_text(function(parts[paths[3]], 'v86_call_cleanup'))
             (work / 'policy.inc').write_text(function(parts[paths[5]], 'v86_io_reset_policy'))
             exe = work / 'fixture'
