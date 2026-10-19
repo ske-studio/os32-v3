@@ -147,6 +147,8 @@ FD generationは番号の再利用を検出する値で、ファイル内容の�
 
 x87 guard の実装開始前に [CONSTRAINTS [HW3]](../../CONSTRAINTS.md#hw3-新しいハードウェアの実装はライセンス上参照しやすい既存の実装資料を参照してから設計する) に従い、Intel 資料の版・節を固定する。CPU 命令だけの扱いでは BSD/MIT の既存実装参照は任意で、参照した場合に版・ファイル・行を記す。採用ラスタライザがf32を使う場合、P6全体を待たず **T7b-aにx87隔離guardを先行実装する**。gshellのfont描画/寸法の最外周でcallerのx87全状態 (register stack、status/tag、CW) を専用の低位外領域へ保存、例外をmaskした既知CWで初期化し、成功/失敗とも復元する。CWだけの保存では不足。guard中のpark/アプリ切替/STOP処理/再入を禁止し、要求は終了後の安全点で処理する。IRQでFPを使わない。アプリ私有側も同じguardで呼出元のFP計算を壊さない。x87非搭載CPUは検出してこの経路を実行せずKCGへ落とす。386対応は最終命令列検査を行う。x87保存領域は実測するface管理量に、追加codeは画像増分へ算入する。
 
+**T7b-a2 の [HW3] 根拠 (2026-10-19 固定)**: Intel SDM Vol.2A **253666-088US (June 2025)** [原本](https://cdrdv2-public.intel.com/858446/253666-088-sdm-vol-2a.pdf)、FINIT/FNINIT・FLDCW・FRSTOR・FSAVE/FNSAVE (特に 3-414 の 387/486 向け保存後 FWAIT)。Intel **80386 Programmer's Reference Manual (1986)** [§11.1](https://pdos.csail.mit.edu/6.828/2018/readings/i386/s11_01.htm) の ET/EM/MP/TS と 387 の #MF、Intel **i486 Programmer's Reference Manual (1992)** [原本](https://www.bitsavers.org/components/intel/80486/1992_Intel_486_Programmers_Reference_Manual.pdf) の Fig.3-23 CPU_ID/MCP_ID 検出例 (AC 判定、FNINIT/FNSTSW/FNSTCW、非搭載) を用いる。Pentium の no-wait 窓は SDM Vol.1 **253665-021 (September 2006)** [§D.2.1.3](https://www.intel.com/content/dam/support/us/en/documents/processors/pentium4/sb/25366521.pdf) に従い NE=1 で避ける。BSD/MIT 実装は参照していない。共通入口は `font_guard_run` (整数結果、NOSYS は KCG、再入は BUSY)、専用108Bは低位外の core BSS。製品 caller は b3、STOP は復元後の既存 exec 安全点へ戻す。
+
 parser/rasterは境界検査済み入力と上限付き領域だけを使い、allocation failureはResult、unchecked index/unwrap/panicを製品経路に残さない。host fuzz/破損font・全上限±1を通し、panic不在はテストだけで証明せず全呼出経路のレビュー条件とする。gshell側の予期しないfault/panicはfont active印でapp-killより先に検出しfail-stopする (WM faultを無関係なアプリだけの失敗へ畳まない)。STOPは正常leave後に配送する。T7b-bでアプリがCW/rounding/例外maskを変更しx87 stackに値を残した状態からWM描画し、状態の完全復帰とfault帰属を検査する。
 
 ## 3. T7 の実装分割と受入
@@ -167,7 +169,7 @@ parser/rasterは境界検査済み入力と上限付き領域だけを使い、a
 | T7b-a2 x87 / 共通guard・exec安全点 | ①全状態一致 (save領域の予約byteは除外) ②既知CW内で実行 ③再入拒否 ④STOP/parkはleave後 ⑤非搭載はKCG ⑥faultの帰属が一致 | 値8本/CW丸め/例外mask変更、失敗出口のrestore除去。f32前に完成 |
 | T7b-a3 table reader / directory・cmap・loca/hmtx | ①全file常駐0 ②table数/索引/read cache上限はa1③の実測最大以上、超過は代替 ③format4/12対照一致 ④隣接locaとadvance一致 ⑤短読で公開0 | offset/length overflow、順序逆転、idRangeOffset境界±1 |
 | T7b-a4 glyph / 単純・複合輪郭 | ①製品corpusの輪郭対照一致 ②入力/点/contour上限はa1③の実測最大以上 ③component/深さも同基準 ④edge/専用領域も同基準、各上限超過は代替 ⑤不対応字は一覧と一致 | 循環、run長、各上限±1、途中読込失敗で部分commit拒否 |
-| T7b-a5 raster / 16・32px・font_test | ①26.6寸法とbaseline対照一致 ②bbox/作業域上限はa1③の実測最大以上、超過は代替 ③完全bitmapだけcommit ④最終386命令列検査 | bbox/pitch/座標overflow、allocation failure、途中raster失敗 |
+| T7b-a5 raster / 16・32px・font_test | ①26.6寸法とbaseline対照一致 ②bbox/作業域上限はa1③の実測最大以上、超過は代替 ③完全bitmapだけcommit ④最終386命令列検査 ⑤x87 (CW=037F、精度64bit) の結果はhostのf32とビット一致しない (二重丸め) — 比較は許容差か被覆の段で取る | bbox/pitch/座標overflow、allocation failure、途中raster失敗 |
 | T7b-a6 試作計測 / map・FD・ext2 | ①shell1MiB/8MB私有2MiBの内訳表 ②作業域実peak/bitmap別枠 ③FD peakと残数からactive faceのFD上限を決定 ④cold/warm1000字 ⑤起動/入力→描画計測 ⑥上限・採用法を実測で確定 | corpus cache thrash、font FD不足、memory上限ちょうど/超過。試作全file readを製品へ戻さない |
 | T7b-b1 app read lease / VFS・public KAPI | ①open/read_at/closeのowner/世代検証 ②短読失敗 ③a6で決めたactive faceのFD上限 ④STALE closeで別FD保持 ⑤通常終了でFD/owner漏れ0 ⑥[ABI1]〜[ABI3]と一式再ビルド ⑦使用中のhsync置換はBUSYで元ファイル不変 | 異owner/旧token/生FD混用、FD再利用、使用中保護欠落 |
 | T7b-b2 shell入口 / loader・WM・service表 | ①shell世代/text/文脈検査 ②appから到達不可 ③WM中shell read成功 ④app ownerのFD不使用 ⑤park/fault/dispatch後の印0 ⑥reloadで旧lease無効 | wrapper検査/印消去を除去、WM後app再利用。新しい権限モデルは足さない |

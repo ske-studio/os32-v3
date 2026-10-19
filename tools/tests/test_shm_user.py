@@ -89,7 +89,9 @@ def wiring(sources):
     for name, guard in (('exec_launch', 'if (paging_v86_session_open()) return EXEC_ERR_INVALID;'),
                         ('exec_resume', 'if (paging_v86_session_open()) return OS32_ERR_BUSY;')):
         start = e.index('\n{', e.index(name + '('))
-        assert e[start:].split('\n', 3)[2].strip() == guard, 'FAIL session exec gate'
+        # Both refusals precede any state change; font was added in T7b-a2.
+        first = [line.strip() for line in e[start:].split('\n')[2:4]]
+        assert first == ['if (font_guard_active) return OS32_ERR_BUSY;', guard], 'FAIL session exec gate'
     k = sources['kernel/kernel.c']
     boot = 'paging_boot_user_shared(exec_tramp_page_addr())'
     assert boot in k and k.index('shm_init();') < k.index(boot) < k.index('kdebug.ops.selftest_run();'), 'FAIL boot before AS'

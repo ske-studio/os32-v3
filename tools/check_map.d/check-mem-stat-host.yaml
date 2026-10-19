@@ -1,4 +1,5 @@
 check-mem-stat-host:
+- tools/tests/font_guard_inactive.h
 - exec/exec_heap.c
 - exec/exec_heap.h
 - kernel/kmalloc.c

@@ -1,4 +1,5 @@
 check-kapi-audit-host:
+- tools/tests/font_guard_inactive.h
 - kernel/ime.c
 - drivers/kbd.c
 - kernel/ime_romkana.c

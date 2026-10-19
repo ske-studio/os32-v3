@@ -1,3 +1,4 @@
+#include "font_guard_inactive.h"
 /* Real paging/ledger/V86 and exec lifecycle slices; CPU and device edges only. */
 #include "types.h"
 #include "appslot.h"

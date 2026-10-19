@@ -1,0 +1,25 @@
+check-font-guard-host:
+- tools/tests/font_guard_inactive.h
+- kernel/font_guard*
+- kernel/r1_fixture.h
+- kernel/font_x87.asm
+- kernel/kentry.asm
+- kernel/isr_handlers.c
+- exec/exec_heap.c
+- exec/exec_kapi_init.inc
+- exec/redir_access.c
+- kernel/irq.c
+- kernel/irq_math.c
+- kernel/kmalloc.c
+- kernel/setjmp.asm
+- exec/exec.c
+- exec/appslot.h
+- include/**
+- arch/x86/**
+- tools/tests/host_arch/**
+- tools/tests/host32.py
+- tools/tests/test_exec_r1.py
+- tools/tests/font_guard_host.c
+- tools/tests/test_font_guard.py
+- build/checks.d/check-font-guard-host.mk
+- tools/check_map.d/check-font-guard-host.yaml

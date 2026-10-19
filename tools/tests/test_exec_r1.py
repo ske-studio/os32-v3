@@ -39,6 +39,7 @@ def landing(s, start, buf, name):
 
 
 PRE = r'''
+#include "font_guard_inactive.h"
 #include "appslot.h"
 #include "exec.h"
 #include "exec_heap.h"
@@ -479,7 +480,7 @@ def run(source=None, irq=None):
                            capture_output=True, text=True)
         if r.returncode:
             return 'compile', r.stderr
-        inc = ['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'include', 'kernel', 'exec', 'fs', 'lib', 'sdk/include/os32', 'arch/x86', 'platform/pc98')]
+        inc = ['-I' + str(ROOT / p) for p in ('tools/tests', 'tools/tests/host_arch', 'include', 'kernel', 'exec', 'fs', 'lib', 'sdk/include/os32', 'arch/x86', 'platform/pc98')]
         r = subprocess.run(['gcc', '-m32', '-std=gnu11', '-O0', '-Wall', '-Werror',
                             '-Wno-unused-function', '-ffreestanding', '-fno-pie',
                             '-fno-stack-protector', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections', '-nostdlib', '-static', '-no-pie',

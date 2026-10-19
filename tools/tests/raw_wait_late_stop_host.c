@@ -1,3 +1,4 @@
+#include "font_guard_inactive.h"
 /* Real exec_finish + AppSlot; inject IRQ1's request during resource/page
  * teardown. Device cleanup and CR3 changes are recording seams. */
 #include "appslot.h"

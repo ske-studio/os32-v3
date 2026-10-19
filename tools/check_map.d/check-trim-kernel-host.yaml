@@ -1,4 +1,5 @@
 check-trim-kernel-host:
+- tools/tests/font_guard_inactive.h
 - arch/x86/arch_cpu.h
 - arch/x86/arch_io.h
 - build/checks.d/check-trim-kernel-host.mk

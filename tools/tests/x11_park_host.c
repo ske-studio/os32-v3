@@ -1,3 +1,4 @@
+#include "font_guard_inactive.h"
 /* Included by x11_shared_host.c after the real IME and keyboard sources.
  * Production exec_park/exec_resume, context save/restore and AppSlot transitions
  * run unmodified, with the real setjmp.asm. Only CPU, heap, redirect and caller

@@ -10,6 +10,7 @@ from test_exec_r1 import function
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PRE = r'''
+#include "font_guard_inactive.h"
 #include "appslot.h"
 #include "exec.h"
 #include "ring3_ls.h"
@@ -275,7 +276,7 @@ def run(overrides=None):
         d=pathlib.Path(d); (d/'t.c').write_text(code)
         (d/'s.asm').write_text((ROOT/'kernel/setjmp.asm').read_text().replace('exec_longjmp','asm_longjmp'))
         subprocess.run(['nasm','-f','elf32',str(d/'s.asm'),'-o',str(d/'s.o')],check=True,capture_output=True)
-        inc=['-I'+str(ROOT/p) for p in ('include','kernel','exec','fs','lib','drivers','sdk/include/os32')]
+        inc=['-I'+str(ROOT/p) for p in ('tools/tests','include','kernel','exec','fs','lib','drivers','sdk/include/os32')]
         r=subprocess.run(['gcc','-m32','-std=gnu11','-O0','-Wall','-Werror','-Wno-unused-function',
           '-ffunction-sections','-fdata-sections','-Wl,--gc-sections','-ffreestanding','-fno-pie',
           '-fno-stack-protector','-nostdlib','-static','-no-pie',*inc,str(d/'t.c'),str(d/'s.o'),'-o',str(d/'t')],capture_output=True,text=True)

@@ -24,9 +24,11 @@ def run_case(work):
     (work / 'x86_desc.h').write_text('static void x86_load_tr(unsigned int sel) {(void)sel;}\n')
     entry = (ROOT / 'kernel/kentry.asm').read_text()
     # CR0 cannot execute in host user mode; retain the complete BSS/ESP/argument path.
-    start = entry.index('        mov     eax, cr0')
-    end = entry.index('        fninit', start)
-    entry = entry[:start] + entry[end:]
+    # The probe's privileged CR0 operations are outside this stack fixture.
+    entry = entry.replace('extern font_x87_boot_init', '')
+    entry = entry.replace('extern font_x87_present', '')
+    entry = entry.replace('        call    font_x87_boot_init', '')
+    entry = entry.replace('        mov     [font_x87_present], eax', '')
     entry = entry.replace('__bss_start', 'fixture_bss_start')
     entry = entry.replace('extern kernel_main', 'extern host_kernel_main\n%define kernel_main entry_probe')
     entry += '''
