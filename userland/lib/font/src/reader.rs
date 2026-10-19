@@ -21,6 +21,11 @@ pub trait Source {
     fn file_size(&self) -> u64;
     /// Return the actual byte count, including short reads; never retry here.
     fn read_at(&mut self, offset: u64, dst: &mut [u8]) -> Result<usize>;
+    /// T7b-b3: the lease check (owner, FD generation, stale) done once per text()
+    /// entry. Default: a zero-length read_at, which the app KAPI validates first.
+    fn validate(&mut self) -> Result<()> {
+        self.read_at(0, &mut []).map(|_| ())
+    }
 }
 
 /// Check subtraction before calling the source, including zero-length requests.
@@ -377,6 +382,11 @@ impl<S> Default for Face<S> {
 }
 
 impl<S: Source> Face<S> {
+    /// T7b-b3: validate the open face's source (Source::validate); Closed otherwise.
+    pub fn validate(&mut self) -> Result<()> {
+        self.ensure_open()?;
+        self.reader.source.as_mut().ok_or(Error::Closed)?.validate()
+    }
     /// Open `source` in place (closing any face held here first). The face is
     /// published only after directory, scalar and selected cmap validation; on
     /// failure it is left closed and `source` has been dropped.

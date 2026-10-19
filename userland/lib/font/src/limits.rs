@@ -48,3 +48,40 @@ pub const COVERAGE_THRESHOLD: f32 = 128.0 / 255.0;
 pub const MAX_COORD_UNITS: f32 = 1_048_576.0;
 // a1 quadratic flattening: n segments with n^4 >= this * |a - 2c + b|^2 (error <= 1/8 px).
 pub const QUAD_FLATNESS_SQ: f32 = 4.0;
+
+// T7b-b3 glyph cache (glyph cache design §3, b3/b4 design §2-1). One owner
+// arena of fixed slots per pixel class: a SLOT_HDR_BYTES header followed by the
+// 1bpp bitmap (byte-aligned rows). The slot rectangle is the standard face's
+// measured maximum plus margin (re-measure in a5 when the face changes; JF Dot
+// Shinonome 16 at 16px is 16x16). A glyph that does not fit is drawn uncached.
+pub const SLOT_HDR_BYTES: usize = 32;
+pub const SLOT16_W: usize = 20;
+pub const SLOT16_H: usize = 21;
+pub const SLOT32_W: usize = 36;
+pub const SLOT32_H: usize = 37;
+pub const fn slot_bytes(w: usize, h: usize) -> usize {
+    (SLOT_HDR_BYTES + w.div_ceil(8) * h).div_ceil(8) * 8
+}
+pub const SLOT16_BYTES: usize = slot_bytes(SLOT16_W, SLOT16_H);
+pub const SLOT32_BYTES: usize = slot_bytes(SLOT32_W, SLOT32_H);
+const _: () = assert!(SLOT16_BYTES == 96 && SLOT32_BYTES == 224);
+pub const ARENA_BYTES: usize = 65536;
+// Standard set is 16px only (32px draws the 16px bitmap doubled): the whole arena
+// is 16px slots. N16/N32 change only right after invalidate_all (cache design T2).
+pub const N16: usize = 682;
+pub const N32: usize = 0;
+const _: () = assert!(N16 * SLOT16_BYTES + N32 * SLOT32_BYTES <= ARENA_BYTES);
+// Hash buckets (power of two) holding u16 slot numbers.
+pub const BUCKETS: usize = 256;
+const _: () = assert!(BUCKETS.is_power_of_two());
+// Static context (buckets/state/stats) budget beside the arena (cache design §1).
+pub const CACHE_STATIC_BYTES: usize = 2 * 1024;
+// Value of the `font_set` setting.
+pub const FONT_SET_STD: u16 = 0;
+pub const FONT_SET_KCG_ONLY: u16 = 1;
+// Rows above the baseline in a 16-row cell (U1 (a): per-face baseline). 16ppem:
+// Shinonome ascent 13.75 (14 rows above, 2 below); Inconsolata ASCII yMax 11.76 '(',
+// yMin -2.78 'j' (12 above, 3 below). Asserted against the fonts by check-font-engine-host.
+pub const CELL_H_PX: usize = 16;
+pub const ASCENT_JA_PX: i16 = 14;
+pub const ASCENT_LATIN_PX: i16 = 13;
