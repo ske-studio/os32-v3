@@ -12,6 +12,8 @@ pub const MAX_TOTAL_INPUT_BYTES: usize = 4 * 1024;
 pub const MAX_EDGES: usize = 512;
 pub const MAX_BBOX_PX: usize = 40;
 pub const MAX_TABLES: usize = 32;
+// Encoding records (not segments/groups); supported originals have at most 4.
+pub const MAX_CMAP_SUBTABLES: usize = 32;
 pub const MAX_CMAP_SEGMENTS: usize = 8192;
 pub const MAX_CMAP_GROUPS: usize = 16384;
 pub const READ_CACHE_SLOTS: usize = 2;
