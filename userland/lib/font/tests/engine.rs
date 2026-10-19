@@ -233,8 +233,8 @@ fn search_order_half_latin_full_ja() {
     r.engine.invalidate_all().unwrap();
     let (_, g, _) = draw(&mut r.engine, 'A' as u32, Cell::Full);
     assert_eq!((g.entry.face, g.ascent), (FaceId::Ja, ASCENT_JA_PX), "full: ja first");
-    let (_, g, _) = draw(&mut r.engine, 'B' as u32, Cell::Full);
-    assert_eq!(g.entry.face, FaceId::Latin, "full: ja, then latin");
+    let (res, g, _) = draw(&mut r.engine, 'B' as u32, Cell::Full);
+    assert!(res != Resolved::Bitmap && g.entry.face != FaceId::Latin, "full: ja only, never latin");
     // 32px class: no slot in the standard layout -> complete, uncached.
     let mut g = Glyph::default();
     assert_eq!(r.engine.resolve(KANJI, Cell::Full, Px32, &mut g), Resolved::Bitmap);
@@ -246,11 +246,11 @@ fn search_order_half_latin_full_ja() {
 #[test]
 fn hits_read_nothing_and_match_cold_and_trimmed() {
     let mut r = rig(8);
-    let cold: Vec<_> = [KANJI, 'B' as u32].iter().map(|&cp| draw(&mut r.engine, cp, Cell::Full)).collect();
+    let cold: Vec<_> = [(KANJI, Cell::Full), ('B' as u32, Cell::Half)].iter().map(|&(cp, c)| draw(&mut r.engine, cp, c)).collect();
     let before = reads(&r);
     let raster = r.engine.stats().raster;
     for _ in 0..3 {
-        let warm: Vec<_> = [KANJI, 'B' as u32].iter().map(|&cp| draw(&mut r.engine, cp, Cell::Full)).collect();
+        let warm: Vec<_> = [(KANJI, Cell::Full), ('B' as u32, Cell::Half)].iter().map(|&(cp, c)| draw(&mut r.engine, cp, c)).collect();
         assert_eq!(warm, cold, "warm hit == cold miss");
     }
     assert_eq!(reads(&r), before, "hit: no cmap/read_at");
@@ -258,7 +258,7 @@ fn hits_read_nothing_and_match_cold_and_trimmed() {
     assert_eq!(r.engine.stats().hit_bitmap, 6);
     r.engine.trim().unwrap();
     assert_eq!(r.engine.cache().n_valid(), 0);
-    let again: Vec<_> = [KANJI, 'B' as u32].iter().map(|&cp| draw(&mut r.engine, cp, Cell::Full)).collect();
+    let again: Vec<_> = [(KANJI, Cell::Full), ('B' as u32, Cell::Half)].iter().map(|&(cp, c)| draw(&mut r.engine, cp, c)).collect();
     assert_eq!(again, cold, "regenerated after trim");
 }
 

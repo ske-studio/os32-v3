@@ -25,8 +25,8 @@ MUTATIONS = [
     ('close-keeps-entries', 'src/engine.rs', '        self.ja.close();\n        self.cache.invalidate_all();',
      '        self.ja.close();', 'reopen_closes_invalidates_then_opens'),
     ('stale-ignored', 'src/engine.rs', 'if latin.is_err() || ja.is_err() {', 'if false {', 'entry_check_once_and_stale'),
-    ('full-latin-first', 'src/engine.rs', 'Cell::Full => [FaceId::Ja, FaceId::Latin],',
-     'Cell::Full => [FaceId::Latin, FaceId::Ja],', 'search_order_half_latin_full_ja'),
+    ('full-falls-to-latin', 'src/engine.rs', 'Cell::Full => &[FaceId::Ja],',
+     'Cell::Full => &[FaceId::Ja, FaceId::Latin],', 'search_order_half_latin_full_ja'),
     ('fallback-not-committed', 'src/engine.rs', 'let cached = self.cache.commit(key, &entry, &[]).is_ok();',
      'let cached = false;', 'fallback_entries_are_committed_and_hit'),
     # b4④ baseline: ascent 14 for Inconsolata cuts g/j/p/q/y.

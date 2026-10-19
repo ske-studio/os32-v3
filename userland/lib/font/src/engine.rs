@@ -401,13 +401,15 @@ impl<S: Source> Engine<S> {
         }
         let s = self.cache.stats_mut();
         s.miss = s.miss.wrapping_add(1);
-        let order = match cell {
-            Cell::Half => [FaceId::Latin, FaceId::Ja],
-            Cell::Full => [FaceId::Ja, FaceId::Latin],
+        // Full cells never fall back to the latin face (box/block glyphs overflow
+        // the 16px slot); a miss there goes to KCG.
+        let order: &[FaceId] = match cell {
+            Cell::Half => &[FaceId::Latin, FaceId::Ja],
+            Cell::Full => &[FaceId::Ja],
         };
         let mut found = None;
         let mut failed = false;
-        for id in order {
+        for &id in order {
             let face = if id == FaceId::Latin { &mut self.latin } else { &mut self.ja };
             match face.glyph_index(cp) {
                 Ok(Some(gid)) => {
