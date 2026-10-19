@@ -1,4 +1,5 @@
 check-v86-low-host:
+- tools/tests/font_guard_inactive.h
 - kernel/sysclk.c
 - drivers/kbd.c
 - tools/tests/test_shm_user.py

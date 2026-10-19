@@ -1,4 +1,5 @@
 check-ci-stab-host:
+- tools/tests/font_guard_inactive.h
 - sdk/link/app_sys.ld
 - tools/tests/test_ci_stab.py
 - tools/tests/host32.py

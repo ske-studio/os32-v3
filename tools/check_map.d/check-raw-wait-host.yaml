@@ -1,4 +1,5 @@
 check-raw-wait-host:
+- tools/tests/font_guard_inactive.h
 - lib/sqlite3/generated/*
 - tools/prototypes/sqlite_imports.def
 - build/checks.d/check-raw-wait-host.mk

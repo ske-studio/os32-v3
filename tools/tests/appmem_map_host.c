@@ -1,3 +1,4 @@
+#include "font_guard_inactive.h"
 /* Real paging/pgalloc/physmem/appmem; Linux/MMU/IRQ are the only host boundary. */
 #include "types.h"
 #include "tvram.h"

@@ -1,3 +1,4 @@
+#include "font_guard_inactive.h"
 #include "types.h"
 #include "v86.h"
 #include "idt.h"

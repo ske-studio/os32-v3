@@ -1,4 +1,5 @@
 check-appmem-map-host:
+- tools/tests/font_guard_inactive.h
 - sdk/kapi.json
 - kapi/kapi_generated.c
 - exec/exec.c

@@ -1,3 +1,4 @@
+#include "font_guard_inactive.h"
 /* Real recorder + session begin/end + exec transfer/landing. CPU mappings,
  * ROM execution and IRQ arrival are substitutes, never a simulated IDT stack. */
 #include "types.h"

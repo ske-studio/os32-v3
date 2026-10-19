@@ -1,4 +1,5 @@
 check-memory-host:
+- tools/tests/font_guard_inactive.h
 - tools/tests/test_t3c2.py
 - tools/tests/layout_cycle_host.c
 - tools/tests/os32x_layout_host.c

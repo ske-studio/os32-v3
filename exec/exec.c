@@ -1,4 +1,5 @@
 #include "v86_call.h"
+#include "font_guard.h"
 #include "v86_mem.h"
 #ifdef OS32_R1_FIXTURE
 #include "r1_fixture.h"
@@ -729,6 +730,7 @@ int ring3_wait_pending(void)
 /* ======================================================================== */
 void ring3_abort_check(void)
 {
+    if (font_guard_active) return;
     AppSlot *a = appslot_get(appslot_cur());
     if (!a || !a->abort_req) return;
     a->abort_req = 0;
@@ -780,6 +782,9 @@ static void ring3_gui_pump(void)
     /* ここは ring3_in_syscall = 0 の区間だが、WM の文脈である印は同じ形で
      * 立てる (ポンプの位置が動いても 3 つの門の判定が変わらないように)。 */
     ring3_wm_enter();
+#ifdef OS32_R1_FIXTURE
+    font_guard_fixture();
+#endif
     pump();
     ring3_wm_leave();
     g_gui_pump_busy = 0;
@@ -1381,6 +1386,7 @@ static void exec_finish(int id, int status, int kind)
 
 void exec_exit(int status, int kind)
 {
+    if (font_guard_active) font_guard_fault(0, 0, 0);
     /* A fault during teardown must not jump over an unfinished unmap. */
     if (v86_session.closing) { exec_stop_mark(); for (;;) { _stop(); } }
     v86_session.aborting = 1;
@@ -1396,6 +1402,7 @@ void exec_exit(int status, int kind)
 /* IRQ/例外では資源に触れず、対象と種別を控えて trusted stack へ移譲。 */
 static void exec_pending_transfer(int kind)
 {
+    if (font_guard_active) font_guard_fault(0, 0, 0);
     int id = appslot_cur();
     AppSlot *a = appslot_get(id);
     if (!a || g_pending_id) { exec_stop_mark(); for (;;) { _stop(); } }
@@ -1471,6 +1478,7 @@ STATIC_ASSERT(KAPI_PRINT_ARG_LIMIT == (RING3_ARG_WINDOW - 8u) / 4u, print_arg_wi
  * No cleanup here; the existing WM top-level selects the owner to kill. */
 static void exec_park_stop(u32 *frame)
 {
+    if (font_guard_active) return;
     int id = appslot_cur();
     AppSlot *a = appslot_get(id);
     u32 k;
@@ -1619,6 +1627,7 @@ syscall_complete:
 static void ring3_kill_kind(int kind) __attribute__((noinline));
 static void ring3_kill_kind(int kind)
 {
+    if (font_guard_active) font_guard_fault(0, 0, 0);
     fault_kill_count++;
     if (kind == EXEC_KIND_FAULT && ring3_wm_depth > 0) {
         ring3_wm_fault_count++;     /* 深さを 0 に戻す前に数える */
@@ -1682,6 +1691,7 @@ static int exec_shell_layout(u32 text, u32 bss, u32 heap,
 /* ======================================================================== */
 static int exec_launch(const char *cmdline, int gui_arg)
 {
+    if (font_guard_active) return OS32_ERR_BUSY;
     if (paging_v86_session_open()) return EXEC_ERR_INVALID;
     if (v86_call_pinned()) return EXEC_ERR_INVALID;
     /* longjmp 復帰側で読む gui。caller_context は setjmp 前の値から不変。
@@ -2273,6 +2283,7 @@ i32 exec_start(const char *cmdline)
 /* ======================================================================== */
 i32 exec_park(void)
 {
+    if (font_guard_active) return OS32_ERR_BUSY;
     if (v86_call_pinned()) return OS32_ERR_BUSY;
     int id = appslot_cur();
     AppSlot *a;
@@ -2324,6 +2335,7 @@ i32 exec_park(void)
 /* ======================================================================== */
 int exec_park_kbd(void)
 {
+    if (font_guard_active) return 0;
     int id;
     AppSlot *a;
     u32 k;
@@ -2380,6 +2392,7 @@ int exec_park_kbd(void)
 /* ======================================================================== */
 int exec_park_poll(u32 now_tick)
 {
+    if (font_guard_active) return 0;
     int id;
     AppSlot *a;
     u32 k;
@@ -2434,6 +2447,7 @@ int exec_park_poll(u32 now_tick)
 /* ======================================================================== */
 i32 exec_sys_yield(void)
 {
+    if (font_guard_active) return OS32_ERR_BUSY;
     int id;
     AppSlot *a;
     u32 k;
@@ -2484,6 +2498,7 @@ i32 exec_sys_yield(void)
 /* ======================================================================== */
 i32 exec_resume(i32 app_id, i32 wait_ret)
 {
+    if (font_guard_active) return OS32_ERR_BUSY;
     if (paging_v86_session_open()) return OS32_ERR_BUSY;
     if (v86_call_pinned()) return OS32_ERR_BUSY;
     AppSlot *a;
@@ -2581,6 +2596,7 @@ static void exec_kill_one(int id)
 
 i32 exec_kill(i32 app_id)
 {
+    if (font_guard_active) return OS32_ERR_BUSY;
     int chain[APP_MAX_APPS];
     int n;
     int i;
@@ -2623,5 +2639,6 @@ i32 exec_app_state(i32 app_id)
 /* ======================================================================== */
 i32 exec_abort_clear(void)
 {
+    if (font_guard_active) return OS32_ERR_BUSY;
     return appslot_abort_clear();
 }

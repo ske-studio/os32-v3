@@ -1,3 +1,4 @@
+#include "font_guard_inactive.h"
 #define OS32_SQLITE_OUTER_IMPL
 #include "types.h"
 #include "sqlite_engine.h"

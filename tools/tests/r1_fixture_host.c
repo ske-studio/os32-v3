@@ -1,3 +1,4 @@
+#include "font_guard_inactive.h"
 /* Real ledger and stop paths; only CPU entry and stop are host substitutes. */
 #include "types.h"
 #include "v86_mem.h"

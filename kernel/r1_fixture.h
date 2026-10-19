@@ -22,6 +22,7 @@ extern volatile u32 r1_fixture_id[R1_FIXTURE_SLOTS];
 extern volatile u32 r1_fixture_generation[R1_FIXTURE_SLOTS];
 struct addrspace;
 void r1_fixture_timer(void);
+void font_guard_fixture(void);
 void r1_fixture_exception(u32 vector);
 void r1_fixture_v86_end(void);
 void r1_fixture_v86_ready(void);

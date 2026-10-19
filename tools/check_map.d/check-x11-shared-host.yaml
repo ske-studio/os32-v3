@@ -1,4 +1,5 @@
 check-x11-shared-host:
+- tools/tests/font_guard_inactive.h
 - kernel/ime.c
 - kernel/ime.h
 - kernel/ime_romkana.c

@@ -7,6 +7,8 @@ cpu 386
 bits 32
 
 extern kernel_main
+extern font_x87_boot_init
+extern font_x87_present
 extern __bss_start
 extern __bss_end
 ;; LAYOUT_* は $(BUILD_OUT)/memmap_layout.h (LAYOUT_CPP で展開) から。
@@ -15,18 +17,6 @@ section .text
 
 global kentry
 kentry:
-        ;; ============================================================
-        ;; FPU (x87) 初期化
-        ;; CR0.EM (bit2) = 0: FPU命令をソフトウェアエミュレーションしない
-        ;; CR0.MP (bit1) = 1: WAIT/FWAIT でタスクスイッチ確認
-        ;; CR0.NE (bit5) = 1: x87例外を内部(INT16)で処理 (外部IRQ13不使用)
-        ;; ============================================================
-        mov     eax, cr0
-        and     eax, ~(1 << 2)    ;; CR0.EM = 0 (FPU命令を直接実行)
-        or      eax, (1 << 1)     ;; CR0.MP = 1
-        or      eax, (1 << 5)     ;; CR0.NE = 1
-        mov     cr0, eax
-        fninit                     ;; FPU を既知の状態にリセット
         ;; BSS領域ゼロクリア (ベアメタルではCRT0がないため手動で行う)
         mov     edi, __bss_start
         mov     ecx, __bss_end
@@ -71,4 +61,6 @@ kentry:
         push    dword 0                 ;; ダミーリターンアドレス
         xor     ebp, ebp
 
+        call    font_x87_boot_init
+        mov     [font_x87_present], eax
         jmp     kernel_main
