@@ -147,6 +147,8 @@ static int gcap_keep_if = 0;    /* 1 = ゲストの INT n で IF を落とさな
 void v86_gcap_detach(void)
 {
     v86_gcap_rec = 0;
+    gcap_ops = 0;
+    gcap_keep_if = 0;
 }
 
 int v86_gcap_port_passed(u16 port)
@@ -356,6 +358,9 @@ static void gcap_rom(V86Gcap *g)
     g->set_ax = (u16)(0x3000U | al480);
     g->set_bx = (u16)(bh480 << 8);
     before = v86g_phase_counts(g);
+    /* STOP/fault can bypass the ROM restore below. Arm the existing fallback
+     * before the first mode write; a completed restore replaces this mark. */
+    g->restore = V86G_RST_FALLBACK;
     reason = gcap_run(g, GCAP_ENTRY_ROM, V86G_PH_SET480, g->set_ax, g->set_bx,
                       &ax, &bx, &done, 1, GCAP_TICK_LIMIT);
     v86g_phase_diag(g, before, V86G_PH_SET480, reason, done, ax);
@@ -605,6 +610,9 @@ void v86_gcap_release(void)
     v86_gcap_rec = 0;
     gcap_ops = 0;
     gcap_keep_if = 0;
+    /* Also covers a kill before session_begin or after its normal teardown.
+     * Use the same display/KCG restoration as every other V86 abort. */
+    if (v86_session.aborting) v86_io_reset_policy();
     if (g->mode == V86G_MODE_ROM &&
         g->restore == V86G_RST_FALLBACK && pegc_restore_text_sync)
         pegc_restore_text_sync(v86g_mode_is_31k((int)g->layout, g->r31_ax & 0xFFU));

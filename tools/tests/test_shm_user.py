@@ -35,7 +35,7 @@ MUTATIONS = (
     ('exec-gate', 'exec/exec.c', '    if (paging_v86_session_open()) return EXEC_ERR_INVALID;', '', 'FAIL session exec gate'),
     ('resume-gate', 'exec/exec.c', '    if (paging_v86_session_open()) return OS32_ERR_BUSY;', '', 'FAIL session exec gate'),
     ('kill-no-release', 'exec/exec.c', '    v86_session_end();\n    v86_call_cleanup();\n    exec_finish(id, EXEC_ERR_FAULT, kind);', '    exec_finish(id, EXEC_ERR_FAULT, kind);', 'FAIL kill release before owner reclaim'),
-    ('release-on-exception', 'kernel/v86_mem.c', ' || kctx_irq_depth || kctx_exc_depth', '', 'FAIL backing release trusted context'),
+    ('release-on-exception', 'kernel/v86_mem.c', 'if (kctx_irq_depth || kctx_exc_depth) goto done;', '', 'FAIL gcap release normal context'),
     ('page0-forget', 'kernel/v86_mem.c', '    v86_bios_restore_real();', '    v86_bios_restore_real();\n    v86_session.real_saved = 0;', 'FAIL V86 second original valid'),
     ('consumer-direct', 'gfx/gfx_core.c', 'v86_bios_real_lowmem()[PEGC_BIOS_ARCH_FLAG]', '*(volatile u8 *)P2V_IO(PEGC_BIOS_ARCH_FLAG)', 'FAIL BIOS gfx candidate immutable'),
     ('page0-short', 'kernel/v86_snapshot.c', '#define REAL_SNAPSHOT_SIZE PAGE_SIZE', '#define REAL_SNAPSHOT_SIZE 0x600', 'FAIL V86 original immutable'),

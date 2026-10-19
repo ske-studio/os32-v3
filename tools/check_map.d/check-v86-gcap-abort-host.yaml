@@ -1,0 +1,22 @@
+check-v86-gcap-abort-host:
+- kernel/v86_mem.*
+- kernel/v86_gcap.*
+- kernel/v86_io.*
+- kernel/module.h
+- exec/v86_call.c
+- exec/exec.c
+- exec/exec_kapi_init.inc
+- exec/appslot.h
+- kdebug/v86_gcap.c
+- kdebug/v86_gcap_math.c
+- kdebug/v86_gcap_diag.h
+- kernel/v86_gcap_math.h
+- include/**
+- arch/x86/**
+- platform/pc98/**
+- tools/tests/host_arch/**
+- tools/tests/host32.py
+- tools/tests/test_v86_gcap_abort.py
+- tools/tests/v86_gcap_abort_host.c
+- tools/check_map.d/check-v86-gcap-abort-host.yaml
+- build/checks.d/check-v86-gcap-abort-host.mk
