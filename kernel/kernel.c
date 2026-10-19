@@ -716,6 +716,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
         for (;;) {
             int rc;
             int is_gui;
+            int kcg_unavailable = 0;
 
             /* 切替要求を取り出して消す (consume 方式、レビュー #3 ④)。
              * 取り出した後は要求が空になるので、gshell のロード失敗や連続
@@ -727,7 +728,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
 
             is_gui = (kstrcmp(cur_shell, SYS_GSHELL_BIN) == 0);
             if (is_gui && !kcg_module_ready()) {
-                kprintf(0x07, "[boot] KCG unavailable -> CUI shell\n");
+                kcg_unavailable = 1;
                 cur_shell = SYS_SHELL_BIN;
                 is_gui = 0;
             }
@@ -784,7 +785,9 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
             }
 
             boot_diag_exec(cur_shell, 0, 0, 0);
-            rc = exec_run(cur_shell);
+            /* CUI の初期表示・profile の後、プロンプトの前に理由を出す。 */
+            rc = exec_run(kcg_unavailable
+                          ? SYS_SHELL_BIN " --kcg-unavailable" : cur_shell);
             boot_diag_exec(0, rc, is_gui, gui_fault_streak);
 
             /* gshell がロードできない (未存在、不正バイナリ等) → 警告して CUI に

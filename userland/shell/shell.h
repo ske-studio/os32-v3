@@ -166,7 +166,7 @@ void shell_print_help(const char *cmd_name);
 int shell_print_kdebug(int detail);
 
 /* メインループ・UI制御 (ui.c) */
-void shell_run(void);
+void shell_run(const char *startup_notice);
 void hist_save(void);
 void hist_load(void);
 

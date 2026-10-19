@@ -14,7 +14,7 @@ from test_module_image import build_validator, validate, fnv, crc, word
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def graphics_boundary(unguarded=False):
+def graphics_boundary(mutation=None):
     from test_gfx_kernel_fb import run_case
     fixture = (ROOT / 'tools/tests/gfx_kernel_fb_host.c').read_text()
     fixture = fixture.replace('void shell_print(const char *s,u8 c) {(void)s;(void)c;}',
@@ -35,7 +35,8 @@ static void run(void)
     for (int mode = 0; mode < 2; mode++) {
         slot.abort_req = 0;
         if (mode) gfx_kapi_init_200(); else gfx_kapi_init();
-        CHECK(slot.abort_req && gfx_init_gen == generation);
+        CHECK(!slot.abort_req && gfx_init_gen == generation);
+        CHECK(host_exit_count == mode + 1 && host_exit_status == 1);
         CHECK(messages == mode + 1);
     }
     host_kcg_ready = 1;
@@ -45,20 +46,85 @@ static void run(void)
     gfx_shutdown();
     gfx_kapi_init_200();
     CHECK(!slot.abort_req && gfx_init_gen == generation + 2);
-    CHECK(messages == 2);
+    CHECK(messages == 2 && host_exit_count == 2);
     die(0);
 }
 '''
-    changes = [('gfx/gfx_core.c', 'if (!kcg_module_ready()) {', 'if (0) {')] if unguarded else []
+    changes = []
+    if mutation:
+        old, new = mutation
+        changes = [('gfx/gfx_core.c', old, new)]
     for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
         result = run_case(None, runner, fixture_body='unsigned int host_arch_if = 0x202U;\n' + fixture,
                           extra_changes=changes)
-        if unguarded:
-            assert result.returncode == 1 and 'FAIL slot.abort_req && gfx_init_gen == generation' in result.stdout, result
-            print('RED KCG graphics boundary removed (compiled, runtime assertion)', flush=True)
+        if mutation:
+            assert result.returncode == 1 and 'FAIL ' in result.stdout, result
+            print('RED KCG graphics '+mutation[0]+' (compiled, runtime assertion)', flush=True)
         else:
             assert result.returncode == 0, (result.stdout, result.stderr)
             print('PASS KCG graphics boundary: CUI init/init200 refuse before drawing, ready succeeds', flush=True)
+
+
+def boot_notice(folder, remove_notice=False):
+    """Real app shell startup; profile may clear before the notice.
+
+    Kernel argv routing is checked below; console/serial hardware is stubbed
+    by the existing shell fixture. The actual kprintf KAPI is observed.
+    """
+    import re
+    from test_sh_truncation import HOST_SRC, build_host, write_shims
+    kernel = (ROOT / 'kernel/kernel.c').read_text()
+    assert 'kcg_unavailable = 1;' in kernel
+    assert '? SYS_SHELL_BIN " --kcg-unavailable" : cur_shell' in kernel
+    source = HOST_SRC.read_text()
+    ui = ROOT / 'userland/shell/ui.c'
+    startup = ui.read_text().split('    hist_load();', 1)[1].split('    for (;;) {', 1)[0]
+    assert startup.index('rshell_set_active(1)') < startup.index('kprintf')
+    assert startup.index('kprintf') < startup.index('execute_command("rshell")')
+    if remove_notice:
+        changed = ui.read_text().replace(
+            'if (startup_notice) g_api->kprintf(ATTR_WHITE, "%s", startup_notice);',
+            '(void)startup_notice;')
+        target = folder / 'ui_mutant.c'
+        target.write_text(changed)
+    def include(match):
+        path = (HOST_SRC.parent / match[1]).resolve()
+        if remove_notice and path == ui:
+            path = target
+        return '#include "' + str(path) + '"'
+    source = re.sub(r'#include "(\.\./[^"\n]+)"', include, source)
+    source = source.replace('void _start(void)', 'void original_start(void)')
+    source += r'''
+void _start(void)
+{
+    build_api();
+    for (int missing = 0; missing < 2; missing++) {
+        fresh();
+        ui_reset();
+        g_cmd_count = 0;
+        file_add("/etc/profile", "clear\necho PROFILE_DONE\n");
+        ui_exit();
+        char *argv[] = { "shell.bin", "--kcg-unavailable", 0 };
+        main(missing ? 2 : 1, argv, &g_fake);
+        check(out_count("[boot] KCG unavailable -> CUI shell\n") == missing,
+              "KCG notice once only on fallback");
+        if (missing) check(out_has("PROFILE_DONE\n[boot] KCG unavailable -> CUI shell\nsh> "),
+                           "KCG notice after profile before prompt");
+    }
+    die(failures ? 1 : 0);
+}
+'''
+    fixture = folder / 'boot_notice_host.c'
+    fixture.write_text(source)
+    exe = build_host(folder, write_shims(folder), 'boot_notice', fixture)
+    for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
+        result = host32.run([str(exe)], runner=runner, capture_output=True, text=True)
+        assert result.returncode == int(remove_notice), (result.stdout, result.stderr)
+        if remove_notice:
+            assert 'FAIL KCG notice' in result.stdout, result
+            print('RED KCG startup notice removed (compiled, runtime assertion)', flush=True)
+        else:
+            print('PASS KCG startup notice after profile, before prompt; ordinary shell quiet', flush=True)
 
 
 def product(folder):
@@ -127,8 +193,11 @@ def main():
         print('PASS adapter: missing stub/diagnostic, allocation failure, failed init/export/prefix, abort, duplicate', flush=True)
         run(body, 'body', [0])
         graphics_boundary()
+        boot_notice(folder)
         if '--mutate' in sys.argv:
-            graphics_boundary(unguarded=True)
+            graphics_boundary(('if (!kcg_module_ready()) {', 'if (0) {'))
+            graphics_boundary(('kapi_sys_exit(1);', 'appslot_abort_request();'))
+            boot_notice(folder, remove_notice=True)
             for label, source, old, new, kind, modes in (
                 ('wrong-export', adapter, 'return MODULE_INIT_FAILED;\n    return 0;',
                  'return 0;\n    return 0;', 'module', [1]),

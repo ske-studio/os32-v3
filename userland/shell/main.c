@@ -122,7 +122,8 @@ int main(int argc, char **argv, KernelAPI *api)
     shell_cmd_filer_init();
 
     /* メインループ開始 (ui.c) */
-    shell_run();
+    shell_run(argc > 1 && str_eq(argv[1], "--kcg-unavailable")
+              ? "[boot] KCG unavailable -> CUI shell\n" : 0);
     /* D2(d): `exit N` の N を端末へ返す (常駐では sh_exit_code は 0 のまま —
      * いちばん外側の execute_command が 1 行ごとに要求を下ろすので、
      * shell_run は `exit` では抜けない)。 */

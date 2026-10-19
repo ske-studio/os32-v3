@@ -16,6 +16,7 @@
 #include "kcg_module.h"
 #include "../exec/surface_query.h"
 #include "../exec/appslot.h"
+#include "../exec/exec.h"
 
 /* 画面の所有者の表は exec/appslot.c にある (判定材料が AppSlot にあり、
  * ホストで試験できるため)。gfx/ は -Iexec を持たないので、kernel/con_sink.c
@@ -1032,7 +1033,7 @@ static int gfx_kapi_claim(void)
 {
     if (!kcg_module_ready()) {
         shell_print("Error: KCG unavailable -> CUI\n", ATTR_RED);
-        appslot_abort_request();
+        kapi_sys_exit(1);
         return -1;
     }
     if (appslot_gfx_claim(con_sink_is_enabled()) >= 0) return 0;

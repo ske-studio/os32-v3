@@ -540,7 +540,7 @@ void hist_load(void)
     hist_dirty = 0;
 }
 
-void shell_run(void) {
+void shell_run(const char *startup_notice) {
     char cmd_buf[CMD_BUF_SIZE];
     int cmd_pos, cmd_len, key, last_tab = 0;
     /* T15: 行編集が打鍵を捨てたことを覚えておく印。以前は 4092 バイトで
@@ -606,6 +606,13 @@ void shell_run(void) {
      * D2(a): sh.bin では呼ばない。シリアルを初期化すると rshell_active の
      * タイムアウト (kbd_getchar が一定時間でスペースを返す) まで巻き込む。 */
     g_api->serial_init(SYS_SERIAL_BAUD);
+    /* 起動案内も rshell と同じ画面・シリアルの経路へ。 */
+    g_api->rshell_set_active(1);
+#endif
+
+    if (startup_notice) g_api->kprintf(ATTR_WHITE, "%s", startup_notice);
+
+#ifndef SHELL_AS_APP
     (void)execute_command("rshell");
 #endif
 
