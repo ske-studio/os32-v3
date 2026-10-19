@@ -135,8 +135,9 @@ static void host_start(void)
     paging_init(16384);
     host_pool_boot_ws(16384, HOST_WS_FIRST, HOST_WS_END);
     CHECK(!paging_boot_user_shared(exec_tramp_page_addr()));
+    /* Synthetic fixed RAM surface outside V86_LOW exercises the generic contract. */
     CHECK(ledger_register_region(LEDGER_R_SURFACE_BACKING, LEDGER_OWNER_KERNEL,
-          MEM_GFX_BB_BASE / PAGE_SIZE, MEM_GFX_BB_BASE / PAGE_SIZE + 1, LEDGER_CACHE_WB, 0));
+          MEM_LEDGER_META_BASE / PAGE_SIZE, MEM_LEDGER_META_BASE / PAGE_SIZE + 1, LEDGER_CACHE_WB, 0));
     CHECK(ledger_owner_new(LEDGER_KIND_AS, 2, "d3", &owner));
     CHECK(ledger_owner_new(LEDGER_KIND_AS, 3, "other", &other));
     CHECK(!paging_addrspace_create_lease(&space, owner));
@@ -329,12 +330,12 @@ static void host_start(void)
         }
         lp[0] = payload | PAGE_RW | PTE_USER; probe(MEM_LEASE_BASE, 0, 0, 0);
         live->backing = LEDGER_SB_FIXED_RAM; live->owner = LEDGER_OWNER_KERNEL;
-        live->first = MEM_GFX_BB_BASE / PAGE_SIZE;
-        lp[0] = MEM_GFX_BB_BASE | PAGE_RW | PTE_USER;
-        probe(MEM_LEASE_BASE, 0, 1, MEM_GFX_BB_BASE);
-        probe(MEM_LEASE_BASE, 1, 1, MEM_GFX_BB_BASE);
+        live->first = MEM_LEDGER_META_BASE / PAGE_SIZE;
+        lp[0] = MEM_LEDGER_META_BASE | PAGE_RW | PTE_USER;
+        probe(MEM_LEASE_BASE, 0, 1, MEM_LEDGER_META_BASE);
+        probe(MEM_LEASE_BASE, 1, 1, MEM_LEDGER_META_BASE);
         live->perm_max = LEDGER_PERM_RO; probe(MEM_LEASE_BASE, 1, 0, 0);
-        probe(MEM_LEASE_BASE, 0, 1, MEM_GFX_BB_BASE);
+        probe(MEM_LEASE_BASE, 0, 1, MEM_LEDGER_META_BASE);
         live->first++; lp[0] += PAGE_SIZE; probe(MEM_LEASE_BASE, 0, 0, 0);
     }
     /* Real boot helper: small trusted copies and separate RO AS walk. */

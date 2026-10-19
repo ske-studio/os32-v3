@@ -157,7 +157,7 @@ void gfx_prepare_backend(void);
  * exec が CPL=3 アプリへ USER マップする範囲。= 台帳の **選択中 backend の
  * CLIENT の SURFACE** (TASK_T1_LEDGER §3-8)。⑥ より前・面の無い backend
  * では *size に 0 が入る。
- *   9801  : (MEM_GFX_BB_BASE, MEM_GFX_BB_SIZE) の固定面 = 従来と同じ
+ *   9801  : poolから確保した MEM_GFX_BB_SIZE (128KiB) の面
  *   PEGC  : ⑥ が池の CPL=0 子のアリーナ内の上端から確保した 300KB (主記憶)
  *   Cirrus: リニア窓の中の非表示面 300KB (カード VRAM, H3b、MMIO) */
 void gfx_bb_phys_range(u32 *base, u32 *size);

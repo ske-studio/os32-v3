@@ -19,7 +19,7 @@ TARGET_SRCS = ['gfx/gfx_core.c', 'gfx/backend_pc98.c', 'gfx/backend_pegc.c',
                'kernel/pgalloc.c', 'kernel/sys.c', 'kernel/physmem.c']
 MUTANTS = [
  ('last-plane-old', 'bb_i = bb[3];',
-  'bb_i = P2V(MEM_GFX_BB_BASE + 3 * GFX_PLANE_SZ);',
+  'bb_i = P2V(0x6A000UL + 3 * GFX_PLANE_SZ);',
   'FAIL bb_r-bb_b == GFX_PLANE_SZ && bb_g-bb_b == 2*GFX_PLANE_SZ && bb_i-bb_b == 3*GFX_PLANE_SZ'),
 
  ('bridge-init-abort', 'if (bad_output && (valid ? caller.origin == CALLER_USER : user)',
@@ -35,7 +35,7 @@ MUTANTS = [
   '(valid && caller.origin == CALLER_USER && (user || !user))', 'FAIL slot.abort_req'),
 
  ('fixed-bb', 'u8 *bb_b, *bb_r, *bb_g, *bb_i;',
-  'u8 *bb_b = P2V_CONST(MEM_GFX_BB_BASE), *bb_r, *bb_g, *bb_i;',
+  'u8 *bb_b = P2V_CONST(0x6A000UL), *bb_r, *bb_g, *bb_i;',
   'FAIL !bb_b && !bb_r && !bb_g && !bb_i && !gfx_backend_pc98.bb_base'),
  ('rounded-stride', '.plane_offset = {0, GFX_BPL * GFX_HEIGHT, 2 * GFX_BPL * GFX_HEIGHT,\n                       3 * GFX_BPL * GFX_HEIGHT}',
   '.plane_offset = {0, GVRAM_PLANE_SIZE, 2 * GVRAM_PLANE_SIZE, 3 * GVRAM_PLANE_SIZE}',

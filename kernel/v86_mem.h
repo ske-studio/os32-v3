@@ -1,13 +1,9 @@
 /* ======================================================================== */
 /*  V86_MEM.H — V86 ゲスト用アドレス空間                                    */
 /*                                                                          */
-/*  ゲストには 16bit 実行環境らしい低位 1MB を見せる必要があるが、OS32 は    */
-/*  そこを既に使っている (フォントキャッシュ 292KB / KCG scratch 予約 /      */
-/*  GFX バックバッファ 128KB / mailbox 等)。                     */
-/*                                                                          */
-/*  そこで pgalloc から連続物理メモリを別途確保し、セッション中だけ         */
-/*  低位アドレスをそこへリマップする。OS32 のデータは物理的には無傷のまま   */
-/*  で、teardown で保存した PTE に戻せば元通りになる。         */
+/*  低位640KiBは単一 FIXED/kernel/WB (V86_LOW)、一般poolへ供給しない。      */
+/*  セッション中は実物理を直接使い、page0原本とmailboxを終了時に戻す。      */
+/*  通常のpage0はNP、残りはsupervisor。BBはpool上の別SURFACE。              */
 /*                                                                          */
 /*  VRAM (0xA0000-0xEFFFF) はリマップせず実物理をそのまま見せる。           */
 /*  実測で Ys は GVRAM へ CPU で直接書き込んで描画しており、GDC/GRCG/EGC の  */
@@ -40,12 +36,6 @@
 #define V86_REMAP_START     0x00000UL
 #define V86_REMAP_END       MEM_CONV_END             /* 0xA0000 (含まず) */
 
-/* バッキング RAM のページ数。
- * ページ 0 (IVT+BDA) は**実物理のまま**ゲストに見せるのでバッキングを
- * 持たない (理由は v86_mem.c の setup 内コメント)。160 ページ確保して
- * 先頭 1 ページを使わず捨てていたのを 159 ページに詰めてある。 */
-#define V86_BACKING_PAGES   ((V86_REMAP_END / PAGE_SIZE) - 1)   /* 159 ページ */
-
 /* VRAM / ROM 帯 (リマップせず実物理を見せる) */
 #define V86_VRAM_START      TVRAM_CHAR_BASE
 #define V86_VRAM_END        GVRAM_BRG_END   /* TVRAM/CG/GVRAM (含まず) */
@@ -57,7 +47,7 @@
 #define V86_SOUNDROM_END    0xF0000UL   /* サウンド BIOS ROM (含まず) */
 
 /* ------------------------------------------------------------------------ */
-/*  v86_guest_range_ok — ゲストのリニアアドレス範囲がバッキング RAM に      */
+/*  v86_guest_range_ok — ゲストのリニアアドレス範囲が直接低位 RAM に      */
 /*  収まっているか。                                                        */
 /*                                                                          */
 /*  seg:off は 16bit の掛け算なので理屈上 0x10FFEF (1MB+64KB 弱) まで       */
@@ -86,7 +76,7 @@ static inline int v86_guest_range_ok(u32 linear, u32 len)
 /*  実行する (実測: IPL は FD80:xxxx の ROM 内で I/O して #GP を出す)。      */
 /*  したがって命令デコードの検証は 1MB 全域を許可する。                     */
 /*  **書き込みの検証には使わないこと** — ゲストスタックへの書き込みは       */
-/*  v86_guest_range_ok() (バッキング RAM 内) で検証する。                    */
+/*  v86_guest_range_ok() (直接低位 RAM 内) で検証する。                    */
 /* ------------------------------------------------------------------------ */
 #define V86_GUEST_MAP_END   0x100000UL
 
@@ -113,7 +103,6 @@ struct v86_session_state {
     int aborting;
     int release_pending;
     int real_saved; /* Boot capture latch: never clear on session reset. */
-    u32 backing_phys, backing_owner;
     u32 jmpbuf[KSETJMP_BUF_LEN];
     u32 saved_esp0, saved_eflags;
     u32 low_pte[V86_GUEST_MAP_END / PAGE_SIZE];
@@ -132,15 +121,11 @@ int paging_v86_restore(struct v86_session_state *s);
 
 /* ======== API ======== */
 
-/* バッキング RAM を owner で確保して低位アドレスをリマップする
- * (owner: KAPI 経由なら呼び手の AS、カーネルからなら kernel —
- * exec_ledger_owner()、TASK_T1_LEDGER §4-8)。0 で成功、負でエラー。 */
+/* 低位を直接ゲストへ写像。ownerは既存callerとの入口互換のため保持し、
+ * 予約ownerはkernelのまま。0で成功、負でエラー。 */
 int  v86_mem_setup(u32 owner);
 
 /* 保存地図へ復元。例外中の解放は trusted 着地の再呼出しへ送る。 */
 void v86_mem_teardown(void);
-
-/* 確保済みバッキング RAM の物理先頭 (0 = 未確保)。デバッグ用。 */
-u32  v86_mem_backing_phys(void);
 
 #endif /* __V86_MEM_H */

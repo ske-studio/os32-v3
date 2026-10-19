@@ -1110,7 +1110,7 @@ static u32 sasi_rw(u32 *frame, int slot, int is_write,
         if (!guest_range_ok(addr, r)) {
             v86_disk_fail_n++; v86_disk_fail_why = 1;
             v86_disk_fail_dst = addr;
-            return 0x40;        /* バッキング RAM の外。書くと カーネルが壊れる */
+            return 0x40;        /* 直接低位 (V86_LOW) の外。書くと カーネルが壊れる */
         }
         if (is_write) {
             /* 端数はセクタを読んでから前半だけ差し替える (RMW)。 */

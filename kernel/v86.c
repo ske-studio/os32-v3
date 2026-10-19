@@ -11,7 +11,7 @@
 #include "tss.h"
 #include "paging.h"
 #include "v86_mem.h"
-#include "exec.h"       /* exec_ledger_owner: バッキングの台帳の owner */
+#include "exec.h"       /* exec_ledger_owner: 直接低位 (V86_LOW) の台帳の owner */
 #include "v86_io.h"
 #include "v86_pic.h"
 #include "v86_bios.h"
@@ -638,7 +638,7 @@ static const u8 v86_test_code[] = {
 };
 
 /* スモークテストの結果を外から観測できるように残す。
- * バッキング RAM はセッション終了で解放されてしまうので、
+ * 直接低位 (V86_LOW) はセッション終了で復元されるので、
  * 判定に使った値をカーネル側にコピーしておく (kernel.map 経由で読める)。 */
 u32 v86_smoke_result = 0xFFFFFFFFUL;
 u32 v86_smoke_magic  = 0;
@@ -669,7 +669,7 @@ int v86_smoke_test(void)
         return -1;
     }
 
-    /* 低位アドレスはバッキング RAM に張り替わっているので、ここへの
+    /* 直接低位 (V86_LOW) をゲストに開放しているので、ここへの
      * 書き込みはそのままゲストのメモリになる。 */
     for (i = 0; i < sizeof(v86_test_code); i++) {
         ((volatile u8 *)V86_TEST_CODE_ADDR)[i] = v86_test_code[i];
@@ -706,7 +706,7 @@ int v86_smoke_test(void)
 
     reason = v86_run(&ctx);
 
-    /* teardown でバッキング RAM が消えるので、判定材料を先に退避する */
+    /* teardown で直接低位 (V86_LOW) を復元するので、判定材料を先に退避する */
     v86_smoke_magic  = (u32)*magic;
     v86_smoke_magic2 = (u32)*(volatile u16 *)(V86_TEST_MAGIC_ADDR + 2);
     v86_smoke_reason = (u32)reason;
@@ -779,8 +779,8 @@ int v86_disk_test(const char *path)
     v86_disk_cmp    = 0;
 
     /* 先にカーネル側で「正解」を読んでおく。
-     * バッキング RAM を張る前に読むこと (張った後は VFS が使う低位メモリが
-     * ゲストのものに差し替わっている)。 */
+     * 直接低位 (V86_LOW) の session を始める前に読むこと
+     * (session 中は低位がゲストの RAM になる)。 */
     if (v86_bios_attach_disk(path) != 0) {
         v86_disk_result = 0x8001;
         return -1;
@@ -828,7 +828,7 @@ int v86_disk_test(const char *path)
 
     reason = v86_run(&ctx);
 
-    /* teardown でバッキング RAM が消える前に結果を回収する */
+    /* teardown で直接低位 (V86_LOW) を復元する前に結果を回収する */
     v86_disk_marker = (u32)*(volatile u16 *)(V86_TEST_MAGIC_ADDR + 8);
     got = (const u8 *)V86_TEST_BUF_ADDR;
     same = 0;

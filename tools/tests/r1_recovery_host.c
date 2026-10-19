@@ -84,7 +84,7 @@ static void ring3_context_clear(void) { ring3_in_syscall=0; }
 void exec_longjmp(u32 *buf) {
     if (buf != g_exit_jmpbuf) {
         CHECK(kctx_exc_depth == 1 && !kctx_irq_depth);
-        CHECK(v86_session.release_pending && v86_session.backing_phys);
+        CHECK(v86_session.release_pending);
         CHECK(!v86_session.open && g_pending_id == g_cur);
         CHECK(g_slot[g_cur].state == APP_STATE_FAULT_PENDING);
         transferred++;
@@ -137,8 +137,10 @@ void v86_bios_detach_disk(void) {
     CHECK(!kctx_exc_depth && !kctx_irq_depth && _irq_enabled()); releases++;
 }
 void v86_gcap_release(void) { CHECK(!kctx_exc_depth && !kctx_irq_depth); }
-void gfx_v86_return(void) { CHECK(!v86_session.backing_phys); }
+void gfx_v86_return(void) { CHECK(!v86_session.open); }
 void kselftest_audit_v86_return(void) { CHECK(!v86_restore_mismatch); }
+static u8 host_low[MEM_CONV_END], host_mailbox[MEM_AUTOPLAY_MAILBOX_SIZE];
+void *v86_call_mailbox(void) { return host_mailbox; }
 #include "v86_source.c"
 static void sputs(const char *s) { (void)s; }
 static void sput_hex32(u32 n) { (void)n; }
@@ -210,7 +212,7 @@ static void v86_case(void) {
     u32 pages=ledger_owner_pages(owner);
     if (!__builtin_setjmp(jump)) { v86_session_begin(owner); CHECK(0); }
     CHECK(transferred==1 && releases==release0 && !r1_fixture_arm[R1_FIXTURE_V86_FAULT]);
-    CHECK(ledger_owner_pages(owner)>pages && g_pending_kind==EXEC_KIND_FAULT);
+    CHECK(ledger_owner_pages(owner)==pages && g_pending_kind==EXEC_KIND_FAULT);
     exec_pending_finish();
     CHECK(releases==release0+1 && !ledger_owner_pages(owner) && !g_pending_id);
     CHECK(exec_as_leftover_pages==left && last_kind==EXEC_KIND_FAULT && !v86_restore_mismatch);
@@ -275,6 +277,7 @@ void _start(void) {
     CHECK(result==KERNEL_LOAD_ADDR);
     host_map_fixed_paging(); paging_init(17408); host_pool_boot(17408);
     g_slot[APP_ID_SHELL].state=APP_STATE_RUNNING;
+    v86_session.real_saved = 1;
     v86_case(); poison_case(0); poison_case(1);
     CHECK(!ledger_irq_ops && !ledger_exc_ops && !exec_stop_count);
     say("r1 recovery: K1, parent syscall exit, PARKED pre-commit, quarantine/owner-exit PASS\n");

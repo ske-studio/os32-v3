@@ -53,6 +53,15 @@
 `__bss_end` が伸びると `KHEAP_BASE` 以降の KAPI / SHM / ガードも動くため、
 数値の地図はコミットせず、説明をこの節に残す。
 
+T7a-2e の低位 `[0, MEM_CONV_END)` (640KiB、160 PFN) は、用途 V86_LOW の
+単一 `FIXED/kernel/WB` 永久予約。一般 pool への供給は0で、V86 session の前後も
+型・owner・PFN 数は変わらない。通常 page0 はNP、残りはsupervisor/RW。
+V86 は低位を直接 RW/USER 写像し、mailbox 868B を既存KHEAPへ退避してから
+640KiB をゼロ化する。終了時は不変のboot原本からpage0全4096Bとmailboxを戻し、
+保存したPTEを復元する。旧159頁のbacking確保は0 (sessionのpool peakは636KiB減)。
+planar BBはboot時pool確保の32頁・別SURFACE_BACKINGで、boot→gshellの既存移譲を使う。
+旧font/cache・KCG scratch・低位BBの予約と番地定数は撤去済み。bootinfoとboot stackは退去済み。
+
 T4c-1 では `__kernel_resident_end` は core BSS 末尾のページ境界。
 SQLite は `/boot/sqlite.mod` の body と512KiB pool・32KiB stackを同じ module owner で
 連続割当し、prefixだけ起動成功時に返す。stack 直下に追加の1頁を NP guard として
@@ -98,12 +107,7 @@ SLACK または pool の内数で、表ありは owner 使用頁 +7・空き頁 
 頁末の420 Bは探索しない。失敗時は確保頁を返し、かな算術だけで起動を続ける。
 表・表ポインタはユーザーへ公開せず、変換は KAPI `unicode_to_jis` を呼ぶ。
 
-旧低位128KiB (0x4A000〜0x69FFF) は T7a まで kernel FIXED として保持し、
-会計は `other` −32頁、`fixed` +32頁、総数不変。boot の KCG LZ4 scratch は
-`MEM_KCG_LZ4_TEMP_BASE`〜`MEM_KCG_LZ4_TEMP_END` (0x4A000〜0xA0000、終端を含まない)
-の344KiBで、BB・mailbox と共用する。close は scratch 失効後に BB・mailbox を初期化し、
-その後のフォント読込は NOSYS。Unicode の7頁はこの低位 scratch から独立し、
-旧低位予約を一般池へ返すまでは RAM 消費が28KiB増える。
+旧低位予約は T7a-2e で V86_LOW に統合。
 
 #### 動的レイアウト (番地が実行時に決まるので生成できない部分)
 
@@ -174,7 +178,7 @@ PEGC 候補は F00000h と FFF00000h の両窓 (各512KB) を supervisor + PCD �
 > Cirrus DISPLAY の RW は授権された lease に限定し、旧 alias の PTE/PDE に USER を立てない。
 > 通常の AS map/unmap は共有 PT に掛かる要求を全範囲無変更で拒否する。
 > kselftest (`paging_map_user_keep_selftest`) は拒否と PFN/属性/PDE の不変を検査する。
-> `ring3_guard bb` は低位 0x6A000 への書込みで PF error=7、kill を期待し、
+> `ring3_guard bb` は旧BB番地 (現在はV86_LOW) 0x6A000 への書込みで PF error=7、kill を期待し、
 > 正規 CLIENT lease の生存対照は `ring3_guard lease` が担う。
 
 > **CR0.WP = 0 で走る** (`arch/x86/arch_cpu.h` の MMU 有効化)。`kernel/shlib.c` が

@@ -16,7 +16,7 @@ MUTATIONS = (
      '    return vfs_open(path, 0);', 'FAIL legacy VFS untouched'),
     ('old-low-cache', 'drivers/kcg.c',
      '    kcg_rom_read_ank(ch, buf);',
-     '    (void)ch; buf[0] = *(u8 *)P2V(MEM_FONT_CACHE_BASE);', 'FAIL ROM ANK bytes'),
+     '    (void)ch; buf[0] = *(u8 *)P2V(0x01000UL);', 'FAIL ROM ANK bytes'),
 )
 
 

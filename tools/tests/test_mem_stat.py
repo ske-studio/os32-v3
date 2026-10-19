@@ -344,7 +344,7 @@ def shell_output(output, app):
     first = screens[0]
     check(r'Memory Info:\n  Physical : 17408 KB \(17 MB\)\n  RAM      : 16384 KB \(16 MB\).*\n  Paging   : ENABLED\n  Heap Tot : 196608 B, Used: 8192 B, Free: 188416 B', first, 'existing lines')
     for pattern in [r'実測: phys pages total=4096 free=3000; resident heap total=262144 used=48 B',
-                    r'定数: 00000000-00001000 NULL guard; 00001000-000A0000 V86 窓',
+                    r'定数: 00000000-00001000 NULL guard; 00000000-000A0000 V86 窓',
                     r'定数: 000A0000-000F0000 VRAM; 00100000-003E0000 Kernel band',
                     r'定数: 003E0000-003FB000 paging guard/PT; DMA pool 007F0000-00800000',
                     r'定数: 003FB000-003FC000 kstack guard; 003FC000-00400000 kstack',

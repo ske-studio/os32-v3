@@ -20,8 +20,8 @@ WANTED = ('int ring3_ptr_ok(', 'static const char *exec_image_reject_reason(', '
 MUTATIONS = [
  ('peak-common-update', '        h->used += blk->size + BLK_HDR_SIZE;',
   '        h->used += blk->size + BLK_HDR_SIZE;\n        if (h->used > kmalloc_peak_bytes) kmalloc_peak_bytes = h->used;'),
- ('scratch-user-restored', '        /* --- K3:', '        paging_addrspace_map_user_range(ctx->as, MEM_KCG_LZ4_TEMP_BASE, MEM_KCG_LZ4_TEMP_END, PAGE_RW | PTE_USER);\n        /* --- K3:'),
- ('bb-user-restored', '        /* --- K3:', '        paging_addrspace_map_user_range(ctx->as, MEM_GFX_BB_BASE, MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE, PAGE_RW | PTE_USER);\n        /* --- K3:'),
+ ('scratch-user-restored', '        /* --- K3:', '        paging_addrspace_map_user_range(ctx->as, 0x4A000UL, MEM_CONV_END, PAGE_RW | PTE_USER);\n        /* --- K3:'),
+ ('bb-user-restored', '        /* --- K3:', '        paging_addrspace_map_user_range(ctx->as, 0x6A000UL, 0x6A000UL + MEM_GFX_BB_SIZE, PAGE_RW | PTE_USER);\n        /* --- K3:'),
  ('guard-fixed-stack', '#define RING3_HEAP_TOP (RING3_STACK_BOTTOM - PAGE_SIZE)', '#define RING3_HEAP_TOP (MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE - PAGE_SIZE)'),
  ('shell-shlib-accepted', 'else if (is_shell && hdr->shlib_protocol)', 'else if (((void)is_shell, 0) && hdr->shlib_protocol)'),
  ('argv-RO-rejected', 'as_va_to_pa_read(pd, (u32)p, &pa)', 'as_va_to_pa(pd, (u32)p, &pa)'),

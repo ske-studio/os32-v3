@@ -111,7 +111,7 @@
 | ファイル | 役割 | 仕様 |
 |---|---|---|
 | `gfx/gfx_core.c` `gfx_vram.c` `palette.c` | HAL の入口: バックエンド選択 (probe 順 Cirrus → PEGC → 9801 (auto で Cirrus を試すのは NP21/W の上だけ、Cirrus のリニア窓はデバイス窓の帯 0xFE000000〜 — v2.1)、`GFX=` の強制)、present (ページフリップ)、パレット、カウンタ (`gfx_stats`)、`gfx_bb_phys_range` | [05 §5-5](05_drivers.md) |
-| `gfx/backend_pc98.c` `backend_pegc.c` `backend_cirrus.c` `include/gfx_hal.h` | バックエンド表 `GfxBackend` (probe / init / query / present_rect / fill / blit / enter / leave / shutdown) と 3 実装: 9801 4 プレーン (主記憶 BB 0x6A000)、PEGC 640×480×256 (F00000h/FFF00000h 窓 (043Bh bit2=1 は後者)、BB は arena 上端の 300KB (gfx_boot_reserve))、Cirrus GD5430 (0xFE000000 リニア窓、表示面 + クライアント面、エンジン BLT) | [05 §5-5](05_drivers.md)、[02 §2-1](02_memory.md)、[tasks/gui/DESIGN.md](tasks/gui/DESIGN.md) |
+| `gfx/backend_pc98.c` `backend_pegc.c` `backend_cirrus.c` `include/gfx_hal.h` | バックエンド表 `GfxBackend` (probe / init / query / present_rect / fill / blit / enter / leave / shutdown) と 3 実装: 9801 4 プレーン (BB は pool から確保した 32 頁 (SURFACE))、PEGC 640×480×256 (F00000h/FFF00000h 窓 (043Bh bit2=1 は後者)、BB は arena 上端の 300KB (gfx_boot_reserve))、Cirrus GD5430 (0xFE000000 リニア窓、表示面 + クライアント面、エンジン BLT) | [05 §5-5](05_drivers.md)、[02 §2-1](02_memory.md)、[tasks/gui/DESIGN.md](tasks/gui/DESIGN.md) |
 | `lib/sqlite3/os32_sqlite_vfs.c` `os32_sqlite_config.h` `sqlite_stack.asm` | カーネル内 SQLite (core BSS の直後、MEMSYS5 384KB、代替スタック) | [archive/v21/sqlite/](archive/v21/sqlite/00_INDEX.md) |
 | `boot/boot_*.asm` `loader_*.asm` `boot_main.c` `ext2_mini.c` `lz4_mini.c` | IPL、第 2 段ローダ (PM 遷移を含む、分割禁止)、LZ4 展開 | [01 §1-2](01_system.md)、[10 §10-2, §10-3](10_notes.md)、[archive/v21/boot_reform/](archive/v21/boot_reform/00_OVERVIEW.md) |
 

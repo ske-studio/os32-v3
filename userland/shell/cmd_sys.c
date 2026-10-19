@@ -76,7 +76,7 @@ static int cmd_mem(int argc, char **argv)
     }
     g_api->kprintf(ATTR_CYAN, "%s", "Memory Map (ranges: [base,end)):\n");
     g_api->kprintf(ATTR_WHITE, "  定数: %08X-%08X NULL guard; %08X-%08X V86 窓\n",
-        0U, (u32)(MEM_NULL_GUARD_END + 1), (u32)MEM_FONT_CACHE_BASE, (u32)MEM_CONV_END);
+        0U, (u32)(MEM_NULL_GUARD_END + 1), 0U, (u32)MEM_CONV_END);
     g_api->kprintf(ATTR_WHITE, "  定数: %08X-%08X VRAM; %08X-%08X Kernel band\n",
         (u32)MEM_CONV_END, (u32)MEM_BIOS_ROM_START,
         (u32)KERNEL_LOAD_ADDR, (u32)(MEM_KERNEL_BAND_END + 1));

@@ -30,8 +30,8 @@ int vfs_read(const char *path, void *out, u32 bytes)
 static void protect_scratch(int prot)
 {
     int rc;
-    __asm__ volatile("int $0x80" : "=a"(rc) : "a"(125), "b"(MEM_KCG_LZ4_TEMP_BASE),
-                     "c"(MEM_GFX_BB_BASE-MEM_KCG_LZ4_TEMP_BASE), "d"(prot) : "memory");
+    __asm__ volatile("int $0x80" : "=a"(rc) : "a"(125), "b"(0x4A000UL),
+                     "c"(0x6A000UL-0x4A000UL), "d"(prot) : "memory");
     CHECK(!rc);
 }
 static void run(void) __attribute__((used));

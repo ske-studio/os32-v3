@@ -15,6 +15,8 @@ void kcg_v86_restore(void) { kcg_restores++; }
 
 volatile u32 kctx_irq_depth, kctx_exc_depth;
 struct kdebug kdebug;
+static u8 mailbox[MEM_AUTOPLAY_MAILBOX_SIZE];
+void *v86_call_mailbox(void) { return mailbox; }
 struct ledger_surface ledger_surfaces[LEDGER_MAX_SURFACES];
 static u32 mode, restored, detached, audited, calls;
 static u32 free_before;
@@ -60,6 +62,11 @@ void kselftest_audit_v86_return(void) { CHECK(session_ref); audited++; }
 
 void _start(void)
 {
+    /* This fixture exercises teardown only; provide the saved host mailbox. */
+    u32 args[6] = {MEM_AUTOPLAY_MAILBOX_BASE, PAGE_SIZE, 3, 0x32, ~0U, 0}, mapped;
+    __asm__ volatile("int $0x80" : "=a"(mapped) : "a"(90), "b"(args) : "memory");
+    CHECK(mapped == MEM_AUTOPLAY_MAILBOX_BASE);
+    for (u32 i = 0; i < sizeof(mailbox); i++) mailbox[i] = (u8)i;
     read_input(input, sizeof(input)); read_input(file, sizeof(file));
     mode = input[1];
     kmemcpy(&imports[0].name_hash, file + 152, 4);
@@ -101,6 +108,8 @@ void _start(void)
         v86_session_end();
     }
     CHECK(restored == 1 && detached == 1 && audited == 1);
+    for (u32 i = 0; i < sizeof(mailbox); i++)
+        CHECK(((u8 *)P2V(MEM_AUTOPLAY_MAILBOX_BASE))[i] == mailbox[i]);
     CHECK(!session_ref && !r->active_refs && !v86_session.release_pending);
     CHECK(returned == free_before && !retired);
     v86_session_end(); CHECK(detached == 1);

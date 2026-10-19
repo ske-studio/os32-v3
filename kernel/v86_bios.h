@@ -100,7 +100,7 @@ int  v86_bios_has_disk(void);
 u32  v86_bios_boot_daua(void);
 
 /* ゲストの IVT / BDA を用意し、HLE 対象ベクタにスタブを仕込む。
- * v86_mem_setup() がバッキング RAM を張った後に呼ぶこと。 */
+ * v86_mem_setup() が直接低位 (V86_LOW) をゲストに開放した後に呼ぶこと。 */
 void v86_bios_setup(void);
 
 /* セッション終了時に実機の IVT/BDA を書き戻す */

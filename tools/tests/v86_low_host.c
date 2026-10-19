@@ -1,4 +1,4 @@
-/* T7a-2b: real paging/session/BIOS with a qemu-user low VA mapping.
+/* T7a-2e: real paging/session/BIOS with a qemu-user low VA mapping.
  * CPU CR3/TLB and exception delivery are explicit substitutes; no signal stack
  * is claimed to emulate #PF. The low fixture executes actual x86 instructions.
  */
@@ -10,6 +10,9 @@
 static u32 host_cr3;
 static void flush_low(void);
 #include "paging.c"
+#include "pgalloc.c"
+#include "pgalloc_host_fixture.h"
+#include "low_reservation.inc"
 #include "module.h"
 #include "kstring.h"
 
@@ -93,7 +96,13 @@ static void checked_bios(void) {
     v86_bios_setup();
     boundary(); /* BIOS complete, before I/O policy */
 }
-#define OS32_V86_DIRECT_LOW_FIXTURE 1
+static u32 allocation_calls;
+static u32 checked_alloc(u32 owner, int pages) __attribute__((unused));
+static u32 checked_alloc(u32 owner, int pages) {
+    allocation_calls++;
+    return pgalloc_alloc_phys(owner, pages);
+}
+#define pgalloc_alloc_phys checked_alloc
 #define paging_v86_snapshot checked_snapshot
 #define paging_v86_map_range checked_map
 #define v86_bios_setup checked_bios
@@ -103,8 +112,8 @@ static void checked_bios(void) {
 #undef v86_bios_setup
 #undef paging_v86_map_range
 #undef paging_v86_snapshot
+#undef pgalloc_alloc_phys
 struct kdebug kdebug;
-struct ledger_surface ledger_surfaces[LEDGER_MAX_SURFACES];
 volatile u32 kctx_irq_depth, kctx_exc_depth;
 static u32 releases;
 void v86_io_apply_policy(void) { boundary(); }
@@ -113,16 +122,34 @@ void v86_runtime_end(void) { v86_session.active = v86_session.running = 0; }
 void gfx_v86_return(void) { CHECK(!kctx_exc_depth && !v86_session.open, "normal release"); releases++; }
 void kselftest_audit_v86_return(void) {}
 void loop_dev_detach(int slot) { (void)slot; }
-u32 pgalloc_alloc_pt(void) { return 0; }
-void pgalloc_free_pt(u32 phys) { (void)phys; }
-int pgalloc_free_n_owner(u32 owner, u32 pfn, int n) {
-    (void)owner; (void)pfn; (void)n;
-    CHECK(0, "direct fixture has no backing allocation"); return 0;
-}
 static u32 saved_pt[MEM_1MB / PAGE_SIZE], saved_pde, caller_pd[PDE_COUNT] __attribute__((aligned(PAGE_SIZE)));
 static u8 original(u32 a) { return (u8)(a ^ (a >> 8) ^ 0x39); }
 static u8 mailbox_byte(u32 a) { return (u8)(a * 17 + 3); }
+static u32 low_region_count, pool_free;
+static struct ledger_region low_regions[LEDGER_MAX_REGIONS];
+static void reservation_unchanged(void) {
+    CHECK(ledger_region_count == low_region_count, "reservation count unchanged");
+    for (u32 i = 0; i < sizeof(low_regions); i++)
+        CHECK(((u8 *)ledger_regions)[i] == ((u8 *)low_regions)[i], "reservation bytes unchanged");
+    CHECK(pgalloc_free_pages() == pool_free, "session pool unchanged");
+    CHECK(!allocation_calls, "zero session backing allocations");
+    for (u32 p = 0; p < 160; p++) {
+        u32 hits = 0;
+        CHECK(!bit(eligible, p), "low pool supply zero");
+        for (u32 i = 0; i < ledger_region_count; i++) {
+            const struct ledger_region *r = &ledger_regions[i];
+            if (p >= r->first && p < r->end) {
+                CHECK(r->first == 0 && r->end == 160 && r->type == LEDGER_R_FIXED &&
+                      r->owner == LEDGER_OWNER_KERNEL && r->cache == LEDGER_CACHE_WB,
+                      "single FIXED kernel WB all 160 PFNs");
+                hits++;
+            }
+        }
+        CHECK(hits == 1, "one low reservation");
+    }
+}
 static void restored(void) {
+    reservation_unchanged();
     CHECK(!v86_session.open && !paging_v86_session_open(), "session closed");
     for (u32 i = 0; i < MEM_1MB / PAGE_SIZE; i++) {
         CHECK(page_tables[0][i] == saved_pt[i], "exact PTE including last ROM page");
@@ -152,6 +179,7 @@ static void before(void) {
         *(volatile u8 *)P2V(MEM_AUTOPLAY_MAILBOX_BASE + i) = mailbox_byte(i);
 }
 static void execute_low(void) {
+    reservation_unchanged();
     for (u32 a = 0; a < MEM_CONV_END; a += PAGE_SIZE) {
         CHECK((tlb[a / PAGE_SIZE] & ~(PAGE_SIZE - 1)) == a, "direct physical PFN");
         CHECK((tlb[a / PAGE_SIZE] & (PAGE_RW | PTE_USER)) == (PAGE_RW | PTE_USER), "direct guest RW USER");
@@ -181,6 +209,16 @@ void _start(void) {
     for (u32 i = 0; i < PAGE_SIZE; i++) *(volatile u8 *)P2V(i) = original(i);
     v86_bios_save_real();
     paging_init(16384);
+    host_pool_boot(16384);
+    for (u32 i = 0; i < sizeof(memory_boot_fixed) / sizeof(memory_boot_fixed[0]); i++) {
+        CHECK(ledger_register_region(memory_boot_fixed[i].type, memory_boot_fixed[i].owner,
+              memory_boot_fixed[i].first, memory_boot_fixed[i].end,
+              memory_boot_fixed[i].cache, LEDGER_RF_PERMANENT), "boot low reservation registration");
+    }
+    low_region_count = ledger_region_count;
+    kmemcpy(low_regions, ledger_regions, sizeof(low_regions));
+    pool_free = pgalloc_free_pages();
+    reservation_unchanged();
     paging_reclaim_conventional();
     CHECK(!(page_tables[0][0] & PTE_PRESENT) && memmap_want_at(0, 0) == MM_NP, "normal page0 NP");
     /* Shared SHM/trampoline PDE USER must survive all exits, including failure
@@ -233,6 +271,23 @@ void _start(void) {
         }
         CHECK(!module_refs && !v86_session.release_pending, "all exits release");
     }
+    /* Exhaust the real contiguous pool after module/staging preparation.
+     * The direct product path still runs, and repeated sessions leak no pages.
+     * Actual GUI transitions remain a guest acceptance (gfx is stubbed here). */
+    u32 held[4096], held_n = 0, p;
+    while ((p = pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, 1))) held[held_n++] = p;
+    CHECK(!pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, 159), "contiguous pool exhausted");
+    pool_free = pgalloc_free_pages();
+    CHECK(!pool_free, "pool completely exhausted");
+    for (u32 cycle = 0; cycle < 20; cycle++) {
+        before();
+        CHECK(!v86_session_begin(LEDGER_OWNER_KERNEL), "V86 available with exhausted pool");
+        execute_low(); v86_session_end(); restored();
+        CHECK(!module_refs && !v86_session.release_pending, "20 sessions no pin leak");
+    }
+    while (held_n) CHECK(pgalloc_free_n_owner(LEDGER_OWNER_KERNEL,
+                       held[--held_n] / PAGE_SIZE, 1), "release exhaustion fixture");
+    pool_free = pgalloc_free_pages();
     /* A failed restore must never reach caller copyout/unpin. */
     for (u32 kind = 1; kind <= 3; kind++) {
         before(); CHECK(!v86_session_begin(2), "fail-stop begin");
@@ -252,6 +307,6 @@ void _start(void) {
         v86_session_end();
         restored();
     }
-    SAY("GREEN direct 640KiB execution / page0 NP / mailbox / prepare failures / exits / TLB / fail-stop");
+    SAY("GREEN single FIXED/kernel/WB 160 PFNs / 20 exhausted-pool sessions / backing alloc=0 (-636KiB) / direct 640KiB execution / page0 NP / mailbox / prepare failures / exits / TLB / fail-stop");
     die(0);
 }

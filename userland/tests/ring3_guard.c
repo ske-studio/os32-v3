@@ -21,8 +21,8 @@ void _start(int argc, char **argv)
      * 01000000h)、PEGC は PEGC_LINEAR_BASE (F00000h)。直値なのは上と同じ理由。 */
     volatile unsigned int   *cirrus_vis = (volatile unsigned int *)0x01000000UL;
     volatile unsigned int   *pegc_vis   = (volatile unsigned int *)0x00F00000UL;
-    /* 9801 の主記憶バックバッファ (include/memmap.h MEM_GFX_BB_BASE)。 */
-    volatile unsigned int   *pc98_bb    = (volatile unsigned int *)MEM_GFX_BB_BASE;
+    /* 旧BB番地。現在はV86_LOW、CPL3からの直書きは引き続き拒否。 */
+    volatile unsigned int   *pc98_bb    = (volatile unsigned int *)0x6A000UL;
     char sel = (argc > 1 && argv[1]) ? argv[1][0] : 0;
 
     if (sel == 'l' || sel == 'f') {

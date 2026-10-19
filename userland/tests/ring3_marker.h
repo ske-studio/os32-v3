@@ -13,7 +13,7 @@
  * ring3_guard shlib (B) | SLB? | RG | MEM_SHLIB_BASE                          | 7 (*)    | kill +1
  * ring3_guard cirrus (C) | VIS? | RG | Cirrus linear window, offset 0         | 7 or 6   | kill +1
  * ring3_guard pegc (D) | PEG? | RG  | PEGC_LINEAR_BASE, display surface       | 7 or 6   | kill +1
- * ring3_guard bb (E) | BB?? | RG    | MEM_GFX_BB_BASE (0x6A000)                | 7        | kill +1
+ * ring3_guard bb (E) | BB?? | RG    | 旧BB / V86_LOW (0x6A000)                | 7        | kill +1
  * ring3_guard lease (F+) | LES? | RG | gfx_get_framebuffer planes[0] lease VA | none | SURV, kill +0
  * ring3_guard free (F-) | REV? | RG | same VA after gfx_shutdown | 6 | kill +1
  * shm_reuse_child lockwrite first/last | SLK? | SL | locked block + 0/0x3000 | 7 | kill +1

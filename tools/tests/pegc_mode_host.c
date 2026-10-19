@@ -1226,7 +1226,7 @@ static void case_serial_enter(void)
     world_reset();
     fake_09a8_raw=RA266_09A8;
     fake_09a0_clk=RA266_CLK;
-    s_bb_phys=MEM_GFX_BB_BASE;
+    s_bb_phys=0x6A000UL;
     pegc_init();
     CHECK(host_serial_count("[pegc] enter ") == 1);
     CHECK(host_serial_find("[pegc] enter 09a8=81 msk=0 dsp=0 lcd=0 clk=0 ext=0 800l=0 fifo_to=0 vs_to=0\r\n"));
@@ -1300,7 +1300,7 @@ static void case_window_selection(void)
         host_bios[PEGC_BIOS_MODE_FLAG] = PEGC_BIOS_MODE_EXTGFX;
         fake_sys16m = rows[i].sys16m; gfx_diag_altwin = rows[i].force;
         display_fail = rows[i].failure;
-        s_probed = 0; s_bb_phys = MEM_GFX_BB_BASE;
+        s_probed = 0; s_bb_phys = 0x6A000UL;
         ledger_surfaces[0].first = PEGC_LINEAR_BASE / PAGE_SIZE;
         ledger_surfaces[0].npages = PEGC_FB_SIZE_480 / PAGE_SIZE;
         volatile u8 *a = P2V_IO(PEGC_BANK_WIN0 + 16);
@@ -1361,7 +1361,7 @@ static void case_diag_stripes(void)
     static u16 ports[EV_MAX];
     static u8 values[EV_MAX];
     int count = 0;
-    world_reset(); s_bb_phys = MEM_GFX_BB_BASE;
+    world_reset(); s_bb_phys = 0x6A000UL;
     pegc_init();
     CHECK(!stripe_delays && !host_serial_count("[pegc] stripes "));
     for (int i = 0; i < ev_n; i++) if (ev_kind[i] == EV_OUT) {

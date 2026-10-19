@@ -224,7 +224,7 @@ RESERVE_THEN_MAP, MAP_THEN_RESERVE = _swap_reserve_and_map()
 MUTATIONS = [
     ('selftest-old-planar-address', 'kdebug/kselftest.c',
      'p->first >= MEM_POOL_BASE / PAGE_SIZE',
-     'p->first * PAGE_SIZE == MEM_GFX_BB_BASE'),
+     'p->first * PAGE_SIZE == 0x6A000UL'),
     ('selftest-fixed-planar-ram', 'kdebug/kselftest.c',
      'p->backing == LEDGER_SB_RAM &&',
      'p->backing == LEDGER_SB_FIXED_RAM &&'),

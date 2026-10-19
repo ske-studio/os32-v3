@@ -85,8 +85,8 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 #define MEM_BIOS_ROM_END      0xFFFFFUL
 
 /* ====================================================================== */
-/*  コンベンショナルメモリ再利用域 (ブート後に配置)                          */
-/*  Step 04 で最終アドレスに更新される。暫定的にカーネル帯域後方にも配置。   */
+/*  V86_LOW: [0, MEM_CONV_END) は単一 FIXED/kernel/WB、pool供給なし。       */
+/*  page0は通常NP、残りはsupervisor/RW。セッション中だけ直接ゲストへ写像。 */
 /* ====================================================================== */
 #define MEM_CONV_RECLAIM_START  0x01000UL
 #define MEM_CONV_RECLAIM_END    0x9FFFFUL
@@ -98,13 +98,10 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 /* NULLポインタ検出ガード */
 #define MEM_NULL_GUARD_END      0x00FFFUL
 
-/* フォントキャッシュ (コンベンショナル, ~292KB) */
-#define MEM_FONT_CACHE_BASE     0x01000UL
-
 /* ブート情報域 (ローダ → kernel_main、256B)。形式は include/bootinfo.h。
  * FD / HDD のローダが実モードで INT 1Bh AH=84h の結果をここへ書き、
  * kernel_main が**最初に** (フォント・ヒープより前に) 写す。
- * フォントキャッシュの内側なので、写した後は上書きされてよい。
+ * V86_LOW の内側なので、写した後はV86が上書きしてよい。
  * 置き場の根拠 (票 TASK_HDD_INSTALL §1-v3 N1): ローダの実モードスタックは
  * 0x7C00 から下へ、ローダ本体は 0x8000〜、loader_hdd の受け渡しは
  * 0x7F00〜0x7F11、FAT のバッファは 0x6000〜0x77FF、圧縮イメージは 0x10000〜。
@@ -113,14 +110,8 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 #define MEM_BOOTINFO_SIZE       0x00100UL
 #define MEM_BOOTINFO_END        0x07EFFUL
 
-/* KCG LZ4 scratch (boot 限定、BB/mailbox 初期化前の 344KB)。
- * [BASE, MEM_GFX_BB_BASE) の旧128KBは kernel FIXED のまま保持する。 */
-#define MEM_KCG_LZ4_TEMP_BASE   0x4A000UL
-#define MEM_KCG_LZ4_TEMP_END    MEM_CONV_END
-
-/* GFXバックバッファ (コンベンショナル, 128KB = 32000B × 4プレーン) */
-#define MEM_GFX_BB_BASE         0x6A000UL
-#define MEM_GFX_BB_SIZE         0x20000UL  /* 128KB (32000B×4プレーン, 0x6A000-0x89FFF) */
+/* planar BB: boot時にpoolから連続32頁を確保し、既存SURFACEで管理する。 */
+#define MEM_GFX_BB_SIZE         0x20000UL  /* 128KiB (32000B × 4プレーン) */
 
 /* 自動プレイ mailbox: game/app の実装と game/tools/autoplay/driver.py の対。
  * 配置や大きさを変えるときは game 側も同じコミットで直す (CLAUDE.md)。 */
@@ -130,9 +121,7 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 /* ====================================================================== */
 /*  8bpp パックドバックバッファ (PEGC 256 色, GUI v1.1 H2)                  */
 /*                                                                          */
-/*  640×480×1B = 307,200B = ちょうど 75 ページ。9801 の 4 プレーン用         */
-/*  128KB (MEM_GFX_BB_BASE) には収まらず、コンベンショナルの空き            */
-/*  (0x8A000-0x9FFFF, 88KB) にも入らない。                                  */
+/*  640×480×1B = 307,200B = ちょうど 75 ページ。planarの32頁と別に確保。    */
 /*                                                                          */
 /*  **置き場所は CPL=0 子のアリーナ (低位 RAM) の上端** — 起動時の ⑥       */
 /*  (gfx_boot_reserve) が池からアリーナ内の上端を TOP_DOWN で連続確保し      */

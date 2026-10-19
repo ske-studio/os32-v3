@@ -45,8 +45,9 @@ struct kdebug kdebug = { .ops = { .gcap_release = v86_gcap_release } };
 void v86_gcap_release(void) {}
 void gfx_v86_return(void) {}
 void kselftest_audit_v86_return(void) {}
-/* Only the CPU write to V86 virtual RAM is redirected to its backing by the
- * harness. setup/teardown, map table and all PTE updates are real. */
+/* Physical low bytes are modeled; session and PTE updates are real. */
+static u8 host_low[MEM_CONV_END], host_mailbox[MEM_AUTOPLAY_MAILBOX_SIZE];
+void *v86_call_mailbox(void) { return host_mailbox; }
 static u32 restore_jmp[5];
 static int expected_restore_stop;
 static void bundle_restore_stop(void)
@@ -156,6 +157,7 @@ static void caller_copy_tests(void)
     host_cr3 = paging_kernel_pd_phys();
     limit = 4096;
     native_cache();
+    v86_session.real_saved = 1;
     CHECK(!v86_mem_setup(space.owner)); native_cache();
     v86_mem_teardown(); native_cache();
     CHECK(!v86_restore_mismatch);

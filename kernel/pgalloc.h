@@ -268,7 +268,7 @@ int ledger_reserve_set(u32 owner, const struct ledger_span *spans, u32 n);
 /* ======== SURFACE と CPL=0 子のアリーナ (§3-1・§3-6・§3-8、T1e) ======== */
 /* SURFACE の backing / backend / role / perm_max。 */
 #define LEDGER_SB_RAM        1   /* 池から確保した PFN 区間 (PEGC の BB) */
-#define LEDGER_SB_FIXED_RAM  2   /* 固定の RAM (planar BB 0x6A000) */
+#define LEDGER_SB_FIXED_RAM  2   /* 固定予約された RAM */
 #define LEDGER_SB_VRAM       3
 #define LEDGER_SB_MMIO       4   /* 装置の窓の中 (Cirrus のクライアント面・表示面) */
 #define LEDGER_SF_PC98       1

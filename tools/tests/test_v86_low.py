@@ -1,4 +1,4 @@
-"""T7a-2b direct low fixture. CR3/TLB are modeled; memory at VA 0 is real.
+"""T7a-2e product direct low path and real reservation/allocator. CR3/TLB are modeled; memory at VA 0 is real.
 qemu -B reserves a host offset so Linux mmap_min_addr does not hide page zero.
 Normal control always precedes compiled, runtime-RED single omissions.
 """
@@ -34,7 +34,25 @@ MUTATIONS = (
     for index in range(7)
 )
 
+LOW_ROW = """    { 0, MB_PFN(MEM_CONV_END),
+      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },"""
+MUTATIONS += (
+    ('kernel/memory_boot.c', LOW_ROW, LOW_ROW + """
+    { 0x6A, 0x8A, LEDGER_R_SURFACE_BACKING, LEDGER_OWNER_BOOT, LEDGER_CACHE_WB, 0 },""", 'old-low-reservation'),
+    ('kernel/memory_boot.c', LOW_ROW, LOW_ROW.replace('LEDGER_OWNER_KERNEL', 'LEDGER_OWNER_BOOT'), 'low-owner'),
+    ('kernel/memory_boot.c', LOW_ROW, LOW_ROW.replace('MB_PFN(MEM_CONV_END)', 'MB_PFN(MEM_CONV_END) - 1'), 'low-end-PFN'),
+    ('kernel/v86_mem.c', 'paging_v86_map_range(PAGE_SIZE, V86_REMAP_END, PAGE_SIZE,',
+     'paging_v86_map_range(PAGE_SIZE, V86_REMAP_END, MEM_POOL_BASE,', 'old-backing-alias'),
+    ('kernel/v86_mem.c', '    (void)owner;',
+     '    if (!pgalloc_alloc_phys(owner, 159)) return -2;', 'old-backing-allocation'),
+)
+
 EXPECTED = {
+    'old-low-reservation': 'boot low reservation registration',
+    'low-owner': 'single FIXED kernel WB all 160 PFNs',
+    'low-end-PFN': 'single FIXED kernel WB all 160 PFNs',
+    'old-backing-alias': 'direct physical PFN',
+    'old-backing-allocation': 'session pool unchanged',
     'last-PTE': 'restore must complete before caller return',
     'restore-TLB': 'TLB restored before caller',
     'mailbox-restore': 'mailbox restored',
@@ -46,8 +64,25 @@ EXPECTED = {
 
 
 
+def check_generated_map():
+    sys.path.insert(0, str(ROOT / 'tools'))
+    import gen_memmap
+    m, _, rows = gen_memmap.load(str(ROOT), str(ROOT / 'build/out/kernel.map'))
+    low = [r for r in rows if r['section'] == gen_memmap.CONV and r['start'] < m.get('MEM_CONV_END') and r['parent'] is None]
+    assert len(low) == 1 and low[0]['name'] == 'V86_LOW'
+    assert low[0]['start'] == 0 and low[0]['end'] == 160 * 4096 - 1
+    assert low[0]['attr'] == 'FIXED/kernel/WB'
+    for obsolete in ('MEM_FONT_CACHE_BASE', 'MEM_KCG_LZ4_TEMP_BASE', 'MEM_GFX_BB_BASE'):
+        assert m.get(obsolete) is None, obsolete
+    assert m.get('MEM_GFX_BB_SIZE') == 32 * 4096
+    explanation = (ROOT / 'docs/02_memory.md').read_text()
+    assert 'V86_LOW' in explanation and 'FIXED/kernel/WB' in explanation
+    assert '160 PFN' in explanation and '636KiB' in explanation
+
+
 def main():
-    paths = ('kernel/paging.c', 'kernel/v86_mem.c', 'kernel/v86_bios.c', 'kernel/v86_snapshot.c', 'kernel/sysclk.c', 'drivers/kbd.c')
+    check_generated_map()
+    paths = ('kernel/paging.c', 'kernel/v86_mem.c', 'kernel/v86_bios.c', 'kernel/v86_snapshot.c', 'kernel/sysclk.c', 'drivers/kbd.c', 'kernel/memory_boot.c')
     sources = {p: (ROOT / p).read_text() for p in paths}
     with tempfile.TemporaryDirectory(prefix='v86-low-') as td:
         work = Path(td)
@@ -59,15 +94,17 @@ def main():
             for path, source in parts.items():
                 (work / Path(path).name).write_text(source)
             (work / 'bios_consumer_slice.inc').write_text(function(parts['drivers/kbd.c'], 'kbd_bios_shift_peek'))
+            memory = parts['kernel/memory_boot.c']
+            (work / 'low_reservation.inc').write_text(memory[memory.index('#define MB_PFN'):memory.index('STATIC_ASSERT(MEM_SHELL_BAND_END')])
             exe = work / 'fixture'
             cmd = ['gcc', *linker_flags(), '-m32', '-march=i386', '-std=gnu11', '-O2',
                    '-Wall', '-Wextra', '-Werror', '-Wno-array-bounds', '-Wno-discarded-qualifiers', '-Wno-stringop-overflow',
-                   '-ffreestanding', '-fno-builtin', '-fno-pie', '-fno-stack-protector',
+                   '-DPHYSMEM_HOST_TEST=1', '-ffreestanding', '-fno-builtin', '-fno-pie', '-fno-stack-protector',
                    '-fno-delete-null-pointer-checks', '-ffunction-sections', '-fdata-sections',
                    '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections', '-I' + str(work)]
-            cmd += ['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'include',
+            cmd += ['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'tools/tests', 'include',
                     'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec', 'gfx', 'fs', 'drivers', 'sdk/include/os32')]
-            subprocess.run(cmd + [str(ROOT / 'tools/tests/v86_low_host.c'), '-o', str(exe)], check=True)
+            subprocess.run(cmd + [str(ROOT / 'tools/tests/v86_low_host.c'), str(ROOT / 'kernel/physmem.c'), '-o', str(exe)], check=True)
             result = subprocess.run(['qemu-i386', '-B', '0x100000000', str(exe)],
                                     capture_output=True, text=True, timeout=host32.RUN_TIMEOUT)
             assert result.returncode == (1 if label else 0), (label, result)

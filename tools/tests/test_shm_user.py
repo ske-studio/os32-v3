@@ -76,7 +76,7 @@ MUTATIONS = (
      '        paging_addrspace_map_user_range(ctx->as, TVRAM_CHAR_BASE, GVRAM_BRG_END, PAGE_RW | PTE_USER);\n        /* --- K3:',
      'FAIL launch TVRAM removed'),
     ('launch-font', 'exec/exec.c', '        /* --- K3:',
-     '        paging_addrspace_map_user_range(ctx->as, MEM_FONT_CACHE_BASE, MEM_KCG_LZ4_TEMP_BASE, PAGE_RW | PTE_USER);\n        /* --- K3:',
+     '        paging_addrspace_map_user_range(ctx->as, 0x01000UL, 0x4A000UL, PAGE_RW | PTE_USER);\n        /* --- K3:',
      'FAIL launch font removed'),
     ('launch-shm', 'exec/exec.c', '        /* --- K3:',
      '        paging_addrspace_map_user_range(ctx->as, MEM_SHM_BASE, MEM_SHM_BASE + MEM_SHM_SIZE, PAGE_RW | PTE_USER);\n        /* --- K3:',
@@ -100,7 +100,7 @@ def wiring(sources):
     start = e.index('        if (app_map_region(ctx->as, load_base, sbrk_end)')
     launch = e[start:e.index('        if (shlib_addrspace_attach(ctx->as) < 0)', start)]
     assert 'TVRAM_CHAR_BASE' not in launch, 'FAIL launch TVRAM removed'
-    assert 'MEM_FONT_CACHE_BASE' not in launch, 'FAIL launch font removed'
+    assert '0x01000UL' not in launch, 'FAIL launch font removed'
     assert 'MEM_SHM_BASE' not in launch, 'FAIL launch SHM removed'
     assert 'ring3_tramp_page' not in launch, 'FAIL launch trampoline removed'
 
@@ -139,9 +139,9 @@ def run(runner, mutation=None):
         (work/'arch_cpu.h').write_text(arch)
         for p in paths[:3]:
             source = sources[p]
-            # Linux cannot dereference the V86 low alias; clear its backing instead.
+            # Linux low bytes are modeled here; v86_low_host executes real low RAM.
             if p == 'kernel/v86_mem.c':
-                source = source.replace('P2V(V86_REMAP_START + PAGE_SIZE)', 'P2V(backing_phys)')
+                source = source.replace('P2V(V86_REMAP_START)', 'host_low').replace('P2V(MEM_AUTOPLAY_MAILBOX_BASE)', '(host_low + MEM_AUTOPLAY_MAILBOX_BASE)')
             (work/Path(p).name).write_text(source)
         alloc = (ROOT/'kernel/pgalloc.c').read_text().replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags')
         (work/'pgalloc_host_source.c').write_text(alloc)
