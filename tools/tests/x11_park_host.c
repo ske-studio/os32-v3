@@ -36,6 +36,7 @@ static void ring3_band_set(u32 n) { (void)n; }
 u32 paging_kernel_pd_phys(void) { return 1; }
 void paging_load_cr3(u32 pd) { cr3 = pd; }
 int paging_v86_session_open(void) { return 0; }
+int v86_call_pinned(void) { return 0; }
 int paging_set_not_present(u32 start, u32 end) { (void)start; (void)end; return 0; }
 void exec_heap_save_state(u32 *used) { *used = 0; }
 void exec_heap_restore_state(u32 base, u32 size, u32 used)

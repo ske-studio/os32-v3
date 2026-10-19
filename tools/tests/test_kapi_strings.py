@@ -9,19 +9,19 @@ ROOT = walk.ROOT
 GROUPS = {
     'path': 'sys_unlink sys_rename sys_mkdir sys_rmdir sys_chdir sys_open sys_stat sys_redirect_fd path_set_drive path_set_cwd path_parse',
     'mount': 'sys_mount sys_umount sys_umount_checked sys_is_mounted vfs_devname',
-    'device': 'kcg_load_font loop_attach dev_blk_read dev_blk_write v86_disktest v86_boot v86_boot2 sys_switch_shell',
+    'device': 'kcg_load_font loop_attach dev_blk_read dev_blk_write sys_switch_shell',
     'command': 'exec_run exec_start launch_req',
     'output': 'serial_puts shell_print_utf8 fm_play_mml snd_bgm_play',
 }
 NULLABLE = {name: 1 for name in (
     'sys_unlink sys_mkdir sys_rmdir sys_chdir sys_open sys_stat '
-    'kcg_load_font loop_attach v86_disktest v86_boot sys_switch_shell '
+    'kcg_load_font loop_attach sys_switch_shell '
     'exec_start launch_req dev_blk_write').split()}
-NULLABLE.update(sys_rename=3, sys_redirect_fd=2, v86_boot2=3,
+NULLABLE.update(sys_rename=3, sys_redirect_fd=2,
                 sys_mount=7, sys_umount_checked=1)
 TARGET_SRC = [*walk.FILES.values(), 'kapi/kapi_strings.c', 'include/kapi_strings.h',
               'exec/exec.c', 'sdk/kapi.json', 'exec/ring3_ls.c',
-              'userland/tests/kstr_v86.c', 'userland/tests/kstr_boundary.c',
+              'userland/tests/kstr_boundary.c',
               'build/app.conf']
 
 
@@ -44,9 +44,6 @@ def run(args, mutant=None):
     setup = setup.replace('    caller_copy_tests();', '    caller_copy_tests();\n    die(0);')
     sources['setup'] = setup
     sources['strings'] = (ROOT / 'kapi/kapi_strings.c').read_text()
-    # Bind the real guest's libc calls to the freestanding fixture helpers.
-    sources['guest'] = (ROOT / 'userland/tests/kstr_v86.c').read_text().replace(
-        '#include <string.h>', '')
     dispatch = (ROOT / 'exec/exec.c').read_text()
     start = dispatch.index('    int strings = kapi_strings_call(')
     sources['dispatch'] = dispatch[start:dispatch.index('    /* --- (補助)', start)]
@@ -89,14 +86,6 @@ def mutants(args):
         yield ('strings', '[KAPI_SLOT_DEV_BLK_WRITE] = {1, 1, VFS_MAX_PATH}',
                '[KAPI_SLOT_DEV_BLK_WRITE] = {1, 0, VFS_MAX_PATH}',
                'dev_blk_write NULL killed')
-        yield ('strings', '[KAPI_SLOT_V86_BOOT2] = {3, 3, VFS_MAX_PATH}',
-               '[KAPI_SLOT_V86_BOOT2] = {1, 3, VFS_MAX_PATH}',
-               'boot2 second input unchecked')
-        yield ('guest', 'api->v86_boot2("/__t4b8b_missing__", bad);',
-               'api->v86_boot2("/__t4b8b_missing__", 0);',
-               'boot2 guest second input NULL')
-        yield ('guest', "memset(bad, '!', 16);", "memset(bad, 0, 16);",
-               'boot2 guest second input terminated')
     for group in names:
         slot = 'KAPI_SLOT_' + GROUPS[group].split()[0].upper()
         yield ('strings', 'args[i] = (u32)(uptr)p;',

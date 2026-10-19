@@ -51,6 +51,12 @@ static u32 kapi_invoke(void *fn, const void *args, u32 n);
 /* This fixture uses a non-string slot to test caller identity and nesting.
  * String staging/output boundaries are exercised by db_caller/kapi_strings. */
 int kapi_print_call(const void *args) { (void)args; assert(0); return 0; }
+int v86_call_dispatch(u32 slot, void *target, const void *args, u32 bytes,
+                      u32 *result)
+{
+    (void)slot; (void)target; (void)args; (void)bytes; (void)result;
+    return 0;
+}
 int kapi_strings_call(u32 slot, void *target, const void *args,
                       u32 nbytes, u16 ptrmask, u32 *result)
 {

@@ -185,6 +185,7 @@ static u32 *page_tables[PAGING_PT_COUNT];
 
 static int pg_enabled = 0;
 static u32 live_addrspaces;
+u32 paging_live_addrspaces(void) { return live_addrspaces; }
 static int boot_user_shared_done;
 /* Intended SHM permissions, recorded by the only post-boot RW-changing API.
  * Auditing must not infer the expected RW bit from the PTE being checked. */

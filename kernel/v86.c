@@ -1,3 +1,4 @@
+#include "v86_call.h"
 /* ======================================================================== */
 /*  V86.C — 仮想8086モード ランタイム (Phase 1 最小実装)                    */
 /*                                                                          */
@@ -51,7 +52,7 @@ volatile u32 v86_gui_reject_count = 0;
 /* ======================================================================== */
 int v86_gui_refuse(void)
 {
-    if (!con_sink_is_enabled()) return 0;
+    if (!con_sink_is_enabled()) return !v86_call_admit();
     v86_gui_reject_count++;
     shell_print("Error: v86 is cui only - run this from CUI mode\n", ATTR_RED);
     appslot_abort_request();
