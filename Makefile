@@ -60,6 +60,32 @@ include build/image.mk
 include build/sdk.mk
 include build/assets.mk
 
+# First-build ordering, before compiler-generated .d files exist.
+MODULE_PROVIDER_OBJS := $(SQLITE_PROTO_OUT)/sqlite_provider_types.o \
+    $(FEP_OUT)/fep_provider_types.o $(CD_OUT)/cd_provider_types.o \
+    $(KCG_OUT)/kcg_provider_types.o $(FM_OUT)/fm_provider_types.o \
+    $(PCM_OUT)/pcm_provider_types.o $(V86_OUT)/v86_provider_types.o \
+    $(LAN_OUT)/lan_provider_types.o $(CIRRUS_OUT)/cirrus_provider_types.o
+$(C_KERNEL_OBJ) $(ASM_KERNEL_OBJ) $(BUILD_ID_OBJ) $(R1_OBJECTS) \
+    $(KDEBUG_OBJS) $(SQLITE_PROTO_OBJS) $(FEP_OBJS) $(CD_OBJS) $(KCG_OBJS) \
+    $(FM_OBJS) $(PCM_OBJS) $(V86_OBJS) $(LAN_OBJS) $(CIRRUS_OBJS) \
+    $(ALL_LIB_OBJ) $(CRT0_USER_OBJ) $(CRT0_RESIDENT_OBJ) $(DBG_OBJ) \
+    $(SHELL_OBJ) $(SH_OBJ) $(PCI_DECODE_USER_OBJ) $(PC98PT_USER_OBJ) \
+    $(SH_PCI_DECODE_OBJ) $(SH_PC98PT_OBJ) $(INST_OBJ) $(BENCH_OBJ) \
+    $(BENCH_S2X_OBJ) $(FAULTPROBE_OBJ) $(SQLITE_SA_OBJ) \
+    $(patsubst %.c,%.o,$(wildcard userland/cmds/*.c userland/tests/*.c userland/system/*.c)) \
+    lib/utf8_prog.o lib/lz4_prog.o lib/microtar/microtar_prog.o userland/lib/rt/pkg.o \
+    userland/lib/gfx/ui.o $(MODULE_PROVIDER_OBJS) \
+    userland/tests/kstr_asm_a.o userland/tests/kstr_c_c.o \
+    $(RUST_LZ4_LIB) $(RUST_KAPI_RS) $(SDK_KAPI_HDR) sdk: | $(KAPI_GENERATED)
+
+$(GSHELL_LIB) sdk: | $(RUST_KAPI_RS)
+
+# module_image.h is also included transitively by core and component units.
+$(C_KERNEL_OBJ) $(R1_OBJECTS) $(KDEBUG_OBJS) $(FEP_OBJS) $(CD_OBJS) \
+    $(KCG_OBJS) $(FM_OBJS) $(PCM_OBJS) $(V86_OBJS) $(LAN_OBJS) $(CIRRUS_OBJS) \
+    $(MODULE_PROVIDER_OBJS): | $(MODULE_SCHEMA)
+
 # === ヘッダ依存の取り込み ===
 # 各 .c のコンパイル時に -MMD -MP (build/config.mk の DEPFLAGS) が生成する .d を読み込む。
 # これにより構造体定義などヘッダを変更したとき、依存する .o が必ず再ビルドされる。

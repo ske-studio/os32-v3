@@ -135,7 +135,13 @@ exec/%.o: exec/%.c kapi/kapi_generated.c
 	$(CC) $(CFLAGS_BASE) $(INC_EXEC) -c $< -o $@
 
 # kapi/ モジュール
-kapi/kapi_generated.c: sdk/kapi.json sdk/gen_kapi.py
+KAPI_GENERATED := kapi/kapi_generated.c exec/exec_kapi_init.inc \
+    sdk/include/os32/os32_kapi_generated.h sdk/include/os32/os32_kapi_slots.h \
+    sdk/include/os32/os32_generations.h sdk/include/os32/os32_unit_stamp.h \
+    sdk/os32_generations.py sdk/rust/os32api/src/generations.rs \
+    sdk/crt/generations.inc sdk/link/generations.ld \
+    sdk/link/app.ld sdk/link/app_sys.ld sdk/link/shlib.ld build/os32.ld
+$(KAPI_GENERATED) &: sdk/kapi.json sdk/gen_kapi.py
 	python3 sdk/gen_kapi.py
 
 # kapi_sys.o は __DATE__/__TIME__ を含むため毎回再コンパイル
