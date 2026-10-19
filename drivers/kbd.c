@@ -358,6 +358,25 @@ static void kbd_deliver(u8 scancode)
      * kbd_lock_apply の説明)。打鍵そのものは下の分岐どおりゲストへ回す。 */
     is_lock = kbd_lock_apply(keycode, is_break);
 
+    /* 修飾状態は渡し先によらず追い、V86 中の break も反映する。raw エントリに
+     * 「このイベント時点の修飾状態」を焼き込む (レビュー #3 ②: WM が取り込む
+     * ときの最新状態で変換すると Shift↓ A↓ A↑ Shift↑ が溜まった場合に
+     * a/A を取り違える)。修飾キー自身のイベントは更新後の状態を載せる。 */
+    is_mod = is_lock;   /* カナ・CAPS は kbd_lock_apply で更新済み */
+    if (keycode == KEY_SHIFT) {
+        if (is_break) kbd_shift_state &= ~SHIFT_SHIFT;
+        else          kbd_shift_state |=  SHIFT_SHIFT;
+        is_mod = 1;
+    } else if (keycode == KEY_CTRL) {
+        if (is_break) kbd_shift_state &= ~SHIFT_CTRL;
+        else          kbd_shift_state |=  SHIFT_CTRL;
+        is_mod = 1;
+    } else if (keycode == KEY_GRPH) {
+        if (is_break) kbd_shift_state &= ~SHIFT_GRPH;
+        else          kbd_shift_state |=  SHIFT_GRPH;
+        is_mod = 1;
+    }
+
     /* V86 セッション中はキーをまるごとゲストへ回す。
      * 8251A のデータレジスタは読んだら消えるので、ここで OS32 側の
      * リングバッファにも入れると「シェルに打った覚えのない文字が
@@ -378,25 +397,6 @@ static void kbd_deliver(u8 scancode)
         kbd_key_pressed[keycode >> 3] &= ~(1 << (keycode & 7));
     } else {
         kbd_key_pressed[keycode >> 3] |=  (1 << (keycode & 7));
-    }
-
-    /* シフトキー状態の更新。raw リングへ積む前に行い、raw エントリに
-     * 「このイベント時点の修飾状態」を焼き込む (レビュー #3 ②: WM が取り込む
-     * ときの最新状態で変換すると Shift↓ A↓ A↑ Shift↑ が溜まった場合に
-     * a/A を取り違える)。修飾キー自身のイベントは更新後の状態を載せる。 */
-    is_mod = is_lock;   /* カナ・CAPS は kbd_lock_apply で更新済み */
-    if (keycode == KEY_SHIFT) {
-        if (is_break) kbd_shift_state &= ~SHIFT_SHIFT;
-        else          kbd_shift_state |=  SHIFT_SHIFT;
-        is_mod = 1;
-    } else if (keycode == KEY_CTRL) {
-        if (is_break) kbd_shift_state &= ~SHIFT_CTRL;
-        else          kbd_shift_state |=  SHIFT_CTRL;
-        is_mod = 1;
-    } else if (keycode == KEY_GRPH) {
-        if (is_break) kbd_shift_state &= ~SHIFT_GRPH;
-        else          kbd_shift_state |=  SHIFT_GRPH;
-        is_mod = 1;
     }
 
     /* 生イベントを raw リングへ (make も break も、全キー。IRQ 内なので保護不要)。

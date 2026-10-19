@@ -39,8 +39,7 @@ u32 v86_kbd_n_read;
 u32 v86_kbd_n_drop;
 
 /* 脱出ホットキー (CTRL + GRPH + DEL) 判定用の修飾キー状態。
- * OS32 側の kbd_shift_state はセッション中、カナ・CAPS (ロック) しか更新しない
- * (drivers/kbd.c kbd_lock_apply) ので、CTRL / GRPH は自前で持つ。 */
+ * OS32 側とは別に、セッション中に届いた CTRL / GRPH を自前で持つ。 */
 static int mod_ctrl;
 static int mod_grph;
 

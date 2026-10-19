@@ -34,7 +34,7 @@ SOURCES = {
 }
 
 CASES = ["stop_timeout", "stop_mouse", "stop_burst", "ring_basic", "ring_wrap", "irq_skip", "irq_mods", "irq_flags_api",
-         "irq_locks", "watch_fmt", "watch_lost"]
+         "irq_locks", "irq_v86_mods", "watch_fmt", "watch_lost"]
 
 # -Wno-attributes: __cdecl は x86-64 のホストでは無視される (警告だけ)。
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror", "-Wno-attributes",
@@ -79,6 +79,12 @@ MUTATIONS = [
     ("k", r"    if \(out == NULL \|\| max <= 0\) \{\n        return OS32_ERR_INVAL;\n    \}\n",
      "",
      "引数を検査しない (NULL へ書く / 0 件を成功と答える)"),
+    ("k", r"(    is_mod = is_lock;.*?\n    }\n)(.*?)(?=    /\* 生イベント)",
+     r"\2\1",
+     "修飾更新を V86 分岐の後へ戻す (V86 中の CTRL break が OS32 に反映されない)"),
+    ("k", r"(        if \(v86_kbd_push\(scancode\)\) {.*?\n        }\n)        return;",
+     r"\1",
+     "V86 へ渡した後も OS32 へ配る (通常キーが cooked/raw に混入する)"),
     # ロックキーの方式 B (票 TASK_KBD_NAV §2)
     ("k", r"    if \(is_break\) kbd_shift_state &= \(u8\)~bit;\n    else          kbd_shift_state \|= bit;\n",
      "    if (!is_break) kbd_shift_state ^= bit;\n",
