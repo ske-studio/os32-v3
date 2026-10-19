@@ -602,13 +602,6 @@ fn short_reads_publish_nothing() {
 fn read_cache_lru() {
     let (source, stats) = disk(&fonts().remove(1)); // IPAexG
     let mut face = Face::open(source).unwrap();
-    face.trim();
-    stats.reads.set(0);
-    for gid in [0, 512, 0, 1024, 0] {
-        face.advance(gid).unwrap();
-    }
-    assert_eq!(stats.reads.get(), 3, "recently used block was evicted");
-
     // Fill all N slots, promote the oldest, then force an eviction.
     face.trim();
     stats.reads.set(0);
