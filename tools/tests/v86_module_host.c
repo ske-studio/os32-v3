@@ -6,6 +6,8 @@
 #include "io.h"
 #define irq_save() 0U
 #define irq_restore(f) ((void)(f))
+static u32 kcg_restores;
+void kcg_v86_restore(void) { kcg_restores++; }
 #include "v86_module.c"
 #include "v86.h"
 #include "paging.h"
@@ -67,6 +69,7 @@ void _start(void)
     q.lifecycle = (struct module_lifecycle){.start = v86_start, .quiesce = v86_quiesce};
     CHECK(!v86_module_session_acquire());
     v86_io_apply_policy(); CHECK(!calls);
+    v86_io_reset_policy(); CHECK(kcg_restores == 1);
     CHECK(!module_load(&q, &v86_handle));
     struct module_record *r = module_record_get(v86_handle);
     r->init = (u32)(uptr)init_v86;
@@ -90,6 +93,7 @@ void _start(void)
     v86_io_apply_policy(); CHECK(calls == 1);
     if (mode == 2) kctx_exc_depth = 1;
     v86_session_end();
+    CHECK(kcg_restores == 2);
     if (mode == 2) {
         CHECK(!detached && !audited && session_ref && r->active_refs == 1);
         CHECK(v86_session.release_pending && returned == free_before && !retired);

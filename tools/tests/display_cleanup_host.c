@@ -6,6 +6,9 @@
 #define __cdecl
 #include "module.h"
 #include "pc98.h"
+#include "pegc.h"
+static u8 boot_bios[4096];
+static const u8 *v86_bios_real_lowmem(void) { return boot_bios; }
 #include "gfx.h"
 int gfx_current_height = 200, gfx_flip_enabled = 1;
 #define CHECK(c, msg) do { if (!(c)) { fprintf(stderr, "FAIL: %s\n", msg); exit(1); } } while (0)
@@ -16,6 +19,7 @@ static void outp(unsigned int p, unsigned int v)
     CHECK(n < 64, "bounded OUT trace");
     ports[n] = p; values[n++] = v;
 }
+static void outpw(unsigned p, unsigned v) { outp(p, v); }
 static void io_wait(void) { waits++; }
 static void palette_init(void) { palette++; }
 static void console_hw_cursor_enable(void) { cursor++; }
@@ -39,7 +43,12 @@ int main(int argc, char **argv)
     u16 tv = 123;
     CHECK(argc == 2, "case argument");
     int mode = atoi(argv[1]);
-    if (mode == 0) {
+    if (mode == 3 || mode == 4) {
+        boot_bios[BIOS_CRT_FLAGS] = BIOS_CRT_GRCG;
+        boot_bios[BIOS_GRAPH_FLAGS] = BIOS_GRAPH_EGC;
+        if (mode == 4) boot_bios[PEGC_BIOS_ARCH_FLAG] = PEGC_BIOS_ARCH_EXTGFX;
+    }
+    if (mode == 0 || mode == 3 || mode == 4) {
         v86_io_reset_policy();
         for (unsigned int i = 0; i < n; i++) {
             CHECK(ports[i] != GDC_GFX_CMD || values[i] != GDC_CMD_START,
@@ -56,9 +65,18 @@ int main(int argc, char **argv)
         }
         CHECK(display_enabled, "display output must be enabled");
         CHECK(text_started, "text must be started");
-        CHECK(n == sizeof(want_ports) / sizeof(*want_ports), "normal OUT count");
-        for (unsigned int i = 0; i < n; i++)
-            CHECK(ports[i] == want_ports[i] && values[i] == want_values[i], "CUI OUT order/value");
+        /* Independent expected values for EGC-capable 9801 and 9821.
+         * Old 9801 gets no EGC/9821-only writes; captured exits stay separate. */
+        unsigned extra = mode == 4 ? 9 : mode == 3 ? 5 : 0;
+        static const unsigned ep[] = {0x4a0,0x6a,0x6a,0x6a,0x7c,0x6a,0x6a,0x6a,0x6a};
+        static const unsigned ev[] = {0xfff0,7,4,6,0,7,0x20,0x68,6};
+        for (unsigned i = 0; i < extra; i++)
+            CHECK(ports[i+1] == ep[i] && values[i+1] == ev[i], "standard/extended restore");
+        CHECK(n - extra == sizeof(want_ports) / sizeof(*want_ports), "normal OUT count");
+        for (unsigned int i = 0; i < n - extra; i++) {
+            unsigned j = i ? i + extra : 0;
+            CHECK(ports[j] == want_ports[i] && values[j] == want_values[i], "CUI OUT order/value");
+        }
         CHECK(palette == 1 && cursor == 1 && deny == 1 && sound == 1, "normal restoration retained");
     } else if (mode == 1) {
         active = 1;

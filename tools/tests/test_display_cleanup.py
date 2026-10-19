@@ -57,6 +57,15 @@ def build_run(tree, kind, cases):
 
 # Each anchor's exact hit count is fixed; compile failures never count as RED.
 MUTATIONS = [
+    ('standard-mode-omitted', TARGET_SRCS[0], '        io_out(MODE_FF2_PORT, PEGC_FF2_STD_GFX);',
+     '', 1, 'v86', 'FAIL: standard/extended restore'),
+    ('400-line-mode-omitted', TARGET_SRCS[0], '        io_out(MODE_FF2_PORT, PEGC_FF2_VRAM_400L);',
+     '', 1, 'v86', 'FAIL: standard/extended restore'),
+    ('egc-reset-omitted', TARGET_SRCS[0], '        outpw(EGC_ACCESS_PORT, EGC_ACCESS_RESET);',
+     '', 1, 'v86', 'FAIL: standard/extended restore'),
+    ('grcg-off-omitted', TARGET_SRCS[0], '        io_out(GRCG_MODE_PORT, GRCG_MODE_OFF);',
+     '        (void)bios;', 1, 'v86', 'FAIL: standard/extended restore'),
+
     ('v86-height', TARGET_SRCS[4], '    gfx_current_height = GFX_HEIGHT;', '', 1, 'v86', 'FAIL: CUI height flip'),
     ('v86-flip', TARGET_SRCS[4], '    gfx_flip_enabled = 0;', '', 1, 'v86', 'FAIL: CUI height flip'),
     ('v86-start', TARGET_SRCS[0], '    v86_cui_display_restore();',
@@ -90,7 +99,7 @@ for plane in 'BRGI':
 
 
 def main():
-    cases = {'v86': [[str(i)] for i in range(3)],
+    cases = {'v86': [[str(i)] for i in range(5)],
              'splash': [[str(i), *fault] for fault in ([], ['fault']) for i in range(4)] + [['1', 'init400'], ['1', 'init200']]}
     for kind in cases:
         results = build_run(ROOT, kind, cases[kind])

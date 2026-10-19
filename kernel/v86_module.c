@@ -8,6 +8,7 @@
 #include "os32_kapi_shared.h"
 #include "kstring.h"
 #include "kprintf.h"
+#include "kcg_module.h"
 
 extern const u32 v86_kexports[];
 extern const struct module_symbol_contract v86_import_contracts[];
@@ -89,6 +90,7 @@ void v86_io_apply_policy(void)
 
 void v86_io_reset_policy(void)
 {
+    kcg_v86_restore();
     if (body_callable()) candidate.v86_io_reset_policy();
 }
 

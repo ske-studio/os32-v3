@@ -227,6 +227,16 @@
 #define MFF2_16COLOR         0x01   /* 16色グラフィックモード */
 #define MFF2_GRCG_MODE       0x04   /* GRCG互換モード */
 #define MFF2_EGC_MODE        0x05   /* EGC拡張モード */
+#define MFF2_UNLOCK          0x07   /* EGC/拡張F/F変更許可 */
+#define MFF2_LOCK            0x06   /* EGC/拡張F/F変更禁止 */
+#define GRCG_MODE_PORT       0x7C
+#define GRCG_MODE_OFF        0x00
+#define EGC_ACCESS_PORT      0x4A0
+#define EGC_ACCESS_RESET     0xFFF0 /* EGC→GRCG 前に全プレーン有効へ */
+#define BIOS_CRT_FLAGS       0x054C
+#define BIOS_CRT_GRCG        0x02
+#define BIOS_GRAPH_FLAGS     0x054D
+#define BIOS_GRAPH_EGC       0x40
 
 /* ボーダーカラー (6CH) */
 #define BORDER_COLOR_PORT    0x6C

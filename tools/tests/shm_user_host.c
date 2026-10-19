@@ -232,6 +232,16 @@ static void test_int80(void)
 }
 #define TRAMP (KERNEL_LOAD_ADDR + PAGE_SIZE)
 static u32 entry(u32 a) { return page_tables[a >> 22][(a >> PAGE_SHIFT) % PTE_COUNT]; }
+static void display_cache_policy(void)
+{
+    for (u32 a = TVRAM_CG_WINDOW; a < GVRAM_PLANE_B; a += PAGE_SIZE)
+        CHECK((entry(a) & (PTE_PCD | PTE_PWT)) == 0, "CG window WB");
+    static const u32 planes[] = {GVRAM_PLANE_B, GVRAM_PLANE_R,
+                                GVRAM_PLANE_G, GVRAM_PLANE_I};
+    for (u32 i = 0; i < 4; i++)
+        for (u32 a = planes[i]; a < planes[i] + GVRAM_PLANE_SIZE; a += PAGE_SIZE)
+            CHECK((entry(a) & (PTE_PCD | PTE_PWT)) == PTE_PCD, "VRAM UC");
+}
 static int perm(u32 a, int rw)
 {
     return (entry(a) & (PAGE_RW | PTE_USER | PTE_PCD | PTE_PWT)) ==
@@ -379,7 +389,9 @@ void _start(void)
           entry(0) == old, "V86 outside session unchanged");
     page_tables[0][TVRAM_CHAR_BASE / PAGE_SIZE] |= PTE_USER;
     page_tables[0][V86_TEST_BB / PAGE_SIZE] |= PTE_USER;
+    display_cache_policy();
     CHECK(v86_mem_setup(2) == 0, "V86 setup");
+    display_cache_policy();
     page0_equal();
     CHECK(paging_addrspace_create(&(struct addrspace){0}, 9) == -1,
           "V86 blocks normal AS");
@@ -391,6 +403,7 @@ void _start(void)
     v86_bios_save_real(); /* Repeated capture must not replace the original. */
     flushes = host_flushes;
     v86_mem_teardown();
+    display_cache_policy();
     for (u32 i = 0; i < PAGE_SIZE; i++)
         CHECK(host_page0[i] == (u8)(i ^ (i >> 8) ^ 0x04), "V86 page0 all bytes");
     CHECK(host_flushes == flushes + 2 && host_flushed_cr3 == a.pd_phys, "V86 active TLB");

@@ -154,7 +154,8 @@ def product(folder):
             assert result.returncode == bool(rc), result
             assert result.stdout == (b'GREEN\n' if not rc else f'RED {rc:02}\n'.encode()), result
         check(data, 0)
-        for field, value, rc in ((9, 0, 3), (31, mkmod.pair_crc(kernel)^1, 4)):
+        for field, value, rc in ((9, 0, 3), (31, mkmod.pair_crc(kernel)^1, 4),
+                                 (6, 0x97c0653b, 6)):
             bad = bytearray(data); word(bad, field, value); check(crc(bad), rc)
         check(data[:-1], 3)
     print('PASS KCG product: core Unicode, PAIR/phase/relocation/short read', flush=True)
@@ -170,10 +171,12 @@ def main():
         def run(source, kind, modes, expected=0):
             path = folder / ('kcg_body_source.inc' if kind == 'body' else 'adapter.c')
             path.write_text(source)
+            if kind == 'body':
+                (folder / 'adapter.c').write_text(adapter)
             exe = folder / kind
             extra = ([f'-DKCG_ADAPTER="{path}"', ROOT / 'kernel/module_runtime.c',
                       ROOT / 'kernel/module_image.c', ROOT / 'fs/vfs.c', ROOT / 'drivers/dev.c']
-                     if kind == 'module' else [])
+                     if kind == 'module' else [f'-DKCG_ADAPTER="{folder / "adapter.c"}"'])
             result = subprocess.run(['gcc', *FLAGS, '-Wno-unused-parameter', *INCLUDES,
                                      '-I'+str(ROOT/'build/out/kcg'), '-I'+str(folder),
                                      '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
@@ -198,6 +201,13 @@ def main():
             graphics_boundary(('if (!kcg_module_ready()) {', 'if (0) {'))
             graphics_boundary(('kapi_sys_exit(1);', 'appslot_abort_request();'))
             boot_notice(folder, remove_notice=True)
+            saved_adapter = adapter
+            for old in ('outp(MODE_FF1_PORT, MFF1_KCG_CODE);', 'public_api()->invalidate();'):
+                assert adapter.count(old) == 1
+                adapter = saved_adapter.replace(old, '')
+                run(body, 'body', [0], expected=1)
+                print('RED restore '+old+' (compiled, runtime assertion)', flush=True)
+                adapter = saved_adapter
             for label, source, old, new, kind, modes in (
                 ('wrong-export', adapter, 'return MODULE_INIT_FAILED;\n    return 0;',
                  'return 0;\n    return 0;', 'module', [1]),
@@ -209,6 +219,8 @@ def main():
                 ('allocation-failure-publishes', adapter,
                  'kmemset(buf, 0, KCG_KANJI_H * 2);',
                  'kmemset(buf, 1, KCG_KANJI_H * 2);', 'module', [4]),
+                ('cache-invalidate-omitted', body, 'cache[i].tag = 0;',
+                 '(void)i;', 'body', [0]),
                 ('body-double-init', body, 'if (initialized) return MODULE_BUSY;',
                  'if (0) return MODULE_BUSY;', 'body', [0]),
             ):

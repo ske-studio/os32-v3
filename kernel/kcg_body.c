@@ -94,13 +94,17 @@ static void read_kanji(u16 jis, u8 *buf)
     read_glyph(jis, buf, KCG_KANJI_H * 2);
 }
 static void stats(KcgCacheStats *out) { *out = counters; }
+static void invalidate(void)
+{
+    for (u32 i = 0; i < KCG_CACHE_SLOTS; i++) cache[i].tag = 0;
+}
 int kcg_module_init(KcgModuleApi *out)
 {
     if (initialized) return MODULE_BUSY;
     initialized = 1;
     outp(MODE_FF1_PORT, MFF1_KCG_CODE);
     kcg_wait();
-    *out = (KcgModuleApi){read_ank, read_kanji, stats};
+    *out = (KcgModuleApi){read_ank, read_kanji, stats, invalidate};
     return 0;
 }
 const struct {

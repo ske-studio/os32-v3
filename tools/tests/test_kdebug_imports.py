@@ -43,10 +43,11 @@ class ImportsTests(unittest.TestCase):
                         gen.check_nm(self.entries)
 
     def test_exact_order_kinds_context_and_hash(self):
-        self.assertEqual(len(self.entries), 235)
+        self.assertEqual(len(self.entries), 239)
         self.assertEqual([e['name'] for e in self.entries[226:]], [
             'vfs_fstype', 'vfs_stat', 'vfs_open', 'vfs_close', 'vfs_read_fd',
-            'vfs_write_fd', 'vfs_get_size', 'vfs_rm', 'dma_range_ok'])
+            'vfs_write_fd', 'vfs_get_size', 'vfs_rm', 'dma_range_ok',
+            'kcg_rom_read_ank', 'kcg_cache_stats', 'v86_io_reset_policy', 'paging_pte_flags'])
         self.assertEqual(self.entries[0]['name'], 'kprintf')
         self.assertEqual(self.entries[210]['name'], 'kdi_ptr_v86_session')
         self.assertEqual({e['name'] for e in self.entries if e['context_safe']}, {

@@ -1,7 +1,7 @@
 {
-  "module_abi_gen": 4164426499,
+  "module_abi_gen": 2993040752,
   "stage": "S4",
-  "count": 235,
+  "count": 239,
   "imports": [
     {
       "stage": "S1",
@@ -3525,6 +3525,66 @@
       "type_ver": 1,
       "signature": "int dma_range_ok(u32 pa, u32 size, u32 limit);",
       "source_declaration": "int dma_range_ok(u32 pa, u32 size, u32 limit);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "stage": "S4",
+      "kind": 1,
+      "symbol": "kcg_rom_read_ank",
+      "source": "kernel/kcg_module.h",
+      "context_safe": false,
+      "index": 235,
+      "name": "kcg_rom_read_ank",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "void kcg_rom_read_ank(u8 ch, u8 *buf);",
+      "source_declaration": "void kcg_rom_read_ank(u8 ch, u8 *buf);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "stage": "S4",
+      "kind": 1,
+      "symbol": "kcg_cache_stats",
+      "source": "kernel/kcg_module.h",
+      "context_safe": false,
+      "index": 236,
+      "name": "kcg_cache_stats",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "void kcg_cache_stats(KcgCacheStats *out);",
+      "source_declaration": "void kcg_cache_stats(KcgCacheStats *out);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "stage": "S4",
+      "kind": 1,
+      "symbol": "v86_io_reset_policy",
+      "source": "kernel/v86_io.h",
+      "context_safe": false,
+      "index": 237,
+      "name": "v86_io_reset_policy",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "void v86_io_reset_policy(void);",
+      "source_declaration": "void v86_io_reset_policy(void);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "stage": "S4",
+      "kind": 1,
+      "symbol": "paging_pte_flags",
+      "source": "kernel/paging.h",
+      "context_safe": false,
+      "index": 238,
+      "name": "paging_pte_flags",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "u32 paging_pte_flags(u32 virt_addr);",
+      "source_declaration": "u32 paging_pte_flags(u32 virt_addr);",
       "dtype": null,
       "array": false
     }

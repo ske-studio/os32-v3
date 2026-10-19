@@ -1880,6 +1880,38 @@
       "source": "drivers/dma8237.h",
       "context_safe": false,
       "index": 234
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "kcg_rom_read_ank",
+      "source": "kernel/kcg_module.h",
+      "context_safe": false,
+      "index": 235
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "kcg_cache_stats",
+      "source": "kernel/kcg_module.h",
+      "context_safe": false,
+      "index": 236
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "v86_io_reset_policy",
+      "source": "kernel/v86_io.h",
+      "context_safe": false,
+      "index": 237
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "paging_pte_flags",
+      "source": "kernel/paging.h",
+      "context_safe": false,
+      "index": 238
     }
   ]
 }

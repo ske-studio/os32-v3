@@ -17,3 +17,6 @@ check-display-cleanup-host:
 - lib/serial_diag.h
 - exec/exec_kapi_init.inc
 - sdk/gen_kapi.py
+- include/pc98.h
+- include/pegc.h
+- kernel/v86_bios.h

@@ -1176,4 +1176,24 @@ vfs_rm:
 dma_range_ok:
     jmp *kdebug_import_slots+936
 .size dma_range_ok, .-dma_range_ok
+.globl kcg_rom_read_ank
+.type kcg_rom_read_ank, @function
+kcg_rom_read_ank:
+    jmp *kdebug_import_slots+940
+.size kcg_rom_read_ank, .-kcg_rom_read_ank
+.globl kcg_cache_stats
+.type kcg_cache_stats, @function
+kcg_cache_stats:
+    jmp *kdebug_import_slots+944
+.size kcg_cache_stats, .-kcg_cache_stats
+.globl v86_io_reset_policy
+.type v86_io_reset_policy, @function
+v86_io_reset_policy:
+    jmp *kdebug_import_slots+948
+.size v86_io_reset_policy, .-v86_io_reset_policy
+.globl paging_pte_flags
+.type paging_pte_flags, @function
+paging_pte_flags:
+    jmp *kdebug_import_slots+952
+.size paging_pte_flags, .-paging_pte_flags
 .section .note.GNU-stack,"",@progbits

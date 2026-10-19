@@ -53,6 +53,9 @@ def target_cmd(obj):
 
 
 MUTATIONS = [
+    ("window_restore_old_f00000", MUT_TARGET,
+     "u32 base = which ? PEGC_LINEAR_ALT_BASE : PEGC_LINEAR_BASE;",
+     "u32 base = PEGC_LINEAR_BASE;"),
     ("window_always_f00_first", MUT_TARGET,
      "which = s_sys16m_ram || gfx_diag_altwin", "which = 0"),
     ("window_accepts_ng", MUT_TARGET,
