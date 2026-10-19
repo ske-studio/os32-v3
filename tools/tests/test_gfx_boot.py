@@ -170,7 +170,7 @@ def text_problems():
         exec_init = k.index('    exec_init();')
         to_gshell = k.index('gfx_client_to_gshell();')
         is_gui = k.rindex('if (is_gui) {', 0, to_gshell)
-        run_shell = k.index('rc = exec_run(cur_shell);')
+        run_shell = k.index('rc = exec_run(kcg_unavailable')
     except ValueError as e:
         return problems + ['kernel/kernel.c: 目印が見つからない (%s)' % e]
     if not gfx_cfg < reserve < exec_init:
