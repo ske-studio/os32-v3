@@ -10,6 +10,10 @@ check-tools-host:
 - tools/deploy_protect.py
 - tools/emu_agent/playbook.py
 - tools/fetch_fonts.py
+- userland/lib/font/**
+- userland/rust/font_test/Cargo.toml
+- userland/rust/font_test/src/lib.rs
+- assets/fonts/README.OS32
 - tools/mk_settings_db.py
 - tools/mkpkg.py
 - tools/nhd_deploy.py

@@ -1,0 +1,11 @@
+[package]
+name = "os32-font"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[workspace]
+exclude = ["vendor/ttf-parser-0.21.1"]
+
+[dependencies]
+ttf-parser = { path = "vendor/ttf-parser-0.21.1", default-features = false }

@@ -43,3 +43,17 @@ TTF の扱い (ユーザー決定 2026-09-30):
   配布物に入れる (同意した人がビルドした物。配布物にはライセンス文を添える)。CUI は
   内蔵フォント (KCG ROM) だけで描き、内蔵フォントの無い移植先は寛容ライセンスの欧文 OpenType
   (候補: Go fonts = 3-clause BSD、DejaVu = Bitstream Vera License。選定は T7b) で対応する。
+
+Inconsolata Regular 3.000 (ユーザー決定 2026-10-19、T7b-a1)
+----------------------------------------------------------
+取得: python3 tools/fetch_fonts.py --family inconsolata
+公式配布: https://github.com/googlefonts/Inconsolata/releases/download/v3.000/fonts_ttf.zip
+zip SHA-256: 626e8ee07501dbb544b50aa59ac2e4b9ec86b810670158a59c7a3cbaf475548a
+収録: fonts/ttf/Inconsolata-Regular.ttf → Inconsolata-Regular.ttf (無改変)
+TTF SHA-256: 127875d255d4c5973ca57267a43bb9d1c04397e6c7d236984a595b6cdcb12b7c
+原文: https://github.com/googlefonts/Inconsolata/releases/download/v3.000/OFL.txt
+OFL SHA-256: 5d362a6f8690517fd9a5573128a081d8bbbb2f92714cf00556e08fbbe9600426
+本文は取得物と同じ場所に Inconsolata-OFL.txt として保存する。
+OFL では著作権表示・本文を添える。IPA 専用の初回同意手順は流用しない。
+オフライン: --family inconsolata --zip PATH --ofl PATH。--check は TTF と OFL 両方を照合。
+TTF 本体は既存の *.ttf 除外で追跡しない。製品の deploy/packages への追加は T7b-b3。

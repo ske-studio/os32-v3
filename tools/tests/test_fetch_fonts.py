@@ -20,6 +20,8 @@ import contextlib
 import hashlib
 import importlib.util
 import io
+import json
+import tomllib
 import os
 import pathlib
 import sys
@@ -326,6 +328,119 @@ class FetchFontsTest(unittest.TestCase):
         self.assertEqual(len(mod.ZIP_SHA256), 64)
         for _, (name, digest) in mod.MEMBERS.items():
             self.assertEqual(len(digest), 64, name)
+
+
+class InconsolataTest(unittest.TestCase):
+    def setUp(self):
+        self.mod = load_module()
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.dest = pathlib.Path(self.tmp.name) / "fonts"
+        self.ofl = b"Copyright Inconsolata authors; OFL test fixture"
+        self.ttf = b"Inconsolata Regular fixture"
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr("fonts/ttf/Inconsolata-Regular.ttf", self.ttf)
+        self.zip = buf.getvalue()
+        self.mod.INCONSOLATA_ZIP_SHA256 = sha(self.zip)
+        self.mod.INCONSOLATA_MEMBERS = {
+            "fonts/ttf/Inconsolata-Regular.ttf": ("Inconsolata-Regular.ttf", sha(self.ttf))}
+        self.mod.OFL_SHA256 = sha(self.ofl)
+        self.calls = []
+
+    def fetch(self, url, stderr):
+        self.calls.append(url)
+        if url == self.mod.INCONSOLATA_ZIP_URL:
+            return self.zip
+        self.assertEqual(url, self.mod.OFL_URL)
+        return self.ofl
+
+    def run_fetch(self, *args):
+        return self.mod.run(["--family", "inconsolata", "--font-dir", str(self.dest), *args],
+                            environ={}, stdin=PipeIn(""), stdout=io.StringIO(),
+                            stderr=io.StringIO(), fetch=self.fetch)
+
+    def test_fetch_and_cache_require_font_and_ofl(self):
+        self.assertEqual(self.run_fetch("--check"), 1)
+        self.assertEqual(self.run_fetch(), 0)
+        self.assertEqual((self.dest / "Inconsolata-Regular.ttf").read_bytes(), self.ttf)
+        self.assertEqual((self.dest / self.mod.OFL_NAME).read_bytes(), self.ofl)
+        self.assertEqual(self.run_fetch("--check"), 0)
+        self.calls.clear()
+        self.assertEqual(self.run_fetch(), 0)
+        self.assertEqual(self.calls, [])
+        (self.dest / self.mod.OFL_NAME).unlink()
+        self.assertEqual(self.run_fetch("--check"), 1)
+        self.assertEqual(self.run_fetch(), 0)
+        (self.dest / self.mod.OFL_NAME).write_bytes(b"stale license")
+        self.assertEqual(self.run_fetch("--check"), 1)
+        self.assertEqual(self.run_fetch(), 0)
+        (self.dest / "Inconsolata-Regular.ttf").write_bytes(b"stale font")
+        self.assertEqual(self.run_fetch("--check"), 1)
+
+    def test_mismatched_zip_ttf_and_ofl_fail_without_outputs(self):
+        original = (self.mod.INCONSOLATA_ZIP_SHA256,
+                    dict(self.mod.INCONSOLATA_MEMBERS), self.mod.OFL_SHA256)
+        for which in ("zip", "ttf", "ofl"):
+            with self.subTest(which=which):
+                self.mod.INCONSOLATA_ZIP_SHA256, members, self.mod.OFL_SHA256 = original
+                self.mod.INCONSOLATA_MEMBERS = dict(members)
+                if which == "zip":
+                    self.mod.INCONSOLATA_ZIP_SHA256 = "0" * 64
+                elif which == "ttf":
+                    self.mod.INCONSOLATA_MEMBERS["fonts/ttf/Inconsolata-Regular.ttf"] = (
+                        "Inconsolata-Regular.ttf", "0" * 64)
+                else:
+                    self.mod.OFL_SHA256 = "0" * 64
+                self.assertEqual(self.run_fetch(), 1)
+                self.assertFalse(self.dest.exists())
+
+    def test_offline_zip_and_ofl(self):
+        archive = pathlib.Path(self.tmp.name) / "font.zip"
+        license_path = pathlib.Path(self.tmp.name) / "OFL.txt"
+        archive.write_bytes(self.zip)
+        license_path.write_bytes(self.ofl)
+        self.assertEqual(self.run_fetch("--zip", str(archive), "--ofl", str(license_path)), 0)
+        self.assertEqual(self.calls, [])
+
+    def test_release_pins(self):
+        mod = load_module()
+        self.assertEqual(mod.INCONSOLATA_ZIP_SHA256,
+                         "626e8ee07501dbb544b50aa59ac2e4b9ec86b810670158a59c7a3cbaf475548a")
+        self.assertEqual(mod.INCONSOLATA_MEMBERS["fonts/ttf/Inconsolata-Regular.ttf"][1],
+                         "127875d255d4c5973ca57267a43bb9d1c04397e6c7d236984a595b6cdcb12b7c")
+        self.assertEqual(mod.OFL_SHA256,
+                         "5d362a6f8690517fd9a5573128a081d8bbbb2f92714cf00556e08fbbe9600426")
+
+
+class FontVendorTest(unittest.TestCase):
+    def test_version_license_provenance_and_unmodified_sources(self):
+        vendor = ROOT / "userland/lib/font/vendor/ttf-parser-0.21.1"
+        record = json.loads((vendor / "UPSTREAM.json").read_text())
+        manifest = tomllib.loads((vendor / "Cargo.toml").read_text())
+        self.assertEqual(record["name"], "ttf-parser")
+        self.assertEqual(record["version"], "0.21.1")
+        self.assertEqual(manifest["package"]["version"], record["version"])
+        self.assertEqual(record["license"], "MIT")
+        self.assertEqual(record["source"],
+                         "https://static.crates.io/crates/ttf-parser/ttf-parser-0.21.1.crate")
+        self.assertEqual(record["sha256"],
+                         "2c591d83f69777866b9126b24c6dd9a18351f177e49d625920d19f989fd31cf8")
+        license_text = (vendor / "LICENSE-MIT").read_text()
+        self.assertIn("Permission is hereby granted, free of charge", license_text)
+        self.assertIn("Copyright", license_text)
+        self.assertIn("LICENSE-MIT", record["files"])
+        self.assertIn("src/lib.rs", record["files"])
+        for rel, digest in record["files"].items():
+            self.assertEqual(sha((vendor / rel).read_bytes()), digest, rel)
+        self.assertEqual(set(record["files"]), {
+            str(p.relative_to(vendor)) for p in vendor.rglob("*")
+            if p.is_file() and p.name != "UPSTREAM.json"})
+        for manifest_path in (ROOT / "userland/lib/font/Cargo.toml",
+                              ROOT / "userland/rust/font_test/Cargo.toml"):
+            dependency = tomllib.loads(manifest_path.read_text())["dependencies"]["ttf-parser"]
+            self.assertFalse(dependency["default-features"])
+            self.assertEqual((manifest_path.parent / dependency["path"]).resolve(), vendor)
 
 
 if __name__ == "__main__":

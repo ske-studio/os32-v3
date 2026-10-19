@@ -91,7 +91,9 @@ jobs:
       #    ヒットすれば fetch_fonts.py は SHA-256 を照合するだけで何も取らない。
       - name: Font cache key
         id: fontkey
-        run: echo "key=ipaex-$(python3 tools/fetch_fonts.py --print-zip-sha256)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "key=ipaex-$(python3 tools/fetch_fonts.py --print-zip-sha256)" >> "$GITHUB_OUTPUT"
+          echo "latin=inconsolata-$(python3 tools/fetch_fonts.py --family inconsolata --print-zip-sha256)" >> "$GITHUB_OUTPUT"
 
       - name: Cache IPAex fonts
         uses: actions/cache@v4
@@ -100,6 +102,18 @@ jobs:
             assets/fonts/ipaexg.ttf
             assets/fonts/ipaexm.ttf
           key: ${{ steps.fontkey.outputs.key }}
+
+      # 欧文 (Inconsolata + OFL) は IPA と別の key にして、IPA の既存キャッシュを使い続ける。
+      - name: Cache Inconsolata font
+        uses: actions/cache@v4
+        with:
+          path: |
+            assets/fonts/Inconsolata-Regular.ttf
+            assets/fonts/Inconsolata-OFL.txt
+          key: ${{ steps.fontkey.outputs.latin }}
+
+      - name: Fetch Inconsolata (verify cached font and OFL)
+        run: python3 tools/fetch_fonts.py --family inconsolata
 
       # ③ core のビルド。OS32_ACCEPT_IPA_LICENSE=1 は、リポジトリ所有者が IPA Font License v1.0 に
       #    同意している前提で CI では非対話に同意する (未取得のときだけ fetch_fonts.py が見る)。
