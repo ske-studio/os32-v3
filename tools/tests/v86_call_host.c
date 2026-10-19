@@ -212,7 +212,16 @@ static void guest_boot2_test(void)
     CHECK(guest_calls == 1 && !ptes);
     SAY("PASS kstr_v86 boot2: bad second input faults before V86, no effects");
 }
-void _start(void)
+/* v86_call only stages on the shared core stack (below the app band). A native
+ * 32-bit process on an x86_64 host starts near 4GiB, so run on our own stack. */
+static u8 core_stack[64 * 1024] __attribute__((aligned(16), used));
+void start_c(void);
+__asm__(".globl _start\n"
+        "_start:\n"
+        "  movl $core_stack + 65536, %esp\n"
+        "  call start_c\n"
+        "  hlt\n");
+void start_c(void)
 {
     slots[2].state = APP_STATE_RUNNING;
     slots[2].cpl3 = 1; slots[2].parent = APP_ID_SHELL; slots[2].as = &as;
