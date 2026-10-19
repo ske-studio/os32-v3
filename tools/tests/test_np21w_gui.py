@@ -575,7 +575,14 @@ class GuiTests(unittest.TestCase):
         self.g.transport.post = inject
 
     def test_ime_mode_relocated_fep_and_minimal(self):
+        sqlite_base = 0x310000
+        self.http.put(MODULE_RECORD_ADDRESS + MODULE_RECORD_STRIDE,
+                      struct.pack('<9I', 11, 1, 6, 2, 0x1234, sqlite_base, 8, 0, sqlite_base))
+        # Wrong-module and missing-relocation reads must return a wrong value,
+        # rather than fail because the synthetic memory is unmapped.
         for mode in (0, 1, 2):
+            for address in (sqlite_base + 0x3540, 0x3540):
+                self.http.put(address, struct.pack('<I', (mode + 1) % 3))
             self.http.put(IME_ADDRESS, struct.pack('<I', mode))
             self.assertEqual(self.g.ime_mode(), mode)
             self.assertEqual(self.g.ime_active(), mode != 0)
