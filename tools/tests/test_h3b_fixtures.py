@@ -79,15 +79,14 @@ def check_image_and_deploy():
         'flags_segment': 0x1FC0, 'flags_offset': 0x40,
         'flags_guest_phys': 0x1FC40, 'flags_bytes': 2,
         'flags_initial': 0xFFFF, 'if_mask': 0x200, 'expected_if': 0,
-        'backing_offset': 0x1EC40, 'backing_phys': None, 'flags_phys': None,
+        'flags_phys': 0x1FC40,
         'read_before_teardown': True,
     }
     assert module.observation() == expected_metadata
     header = (ROOT / 'kernel/v86.h').read_text()
     assert re.search(r'#define V86_IPL_SEG\s+0x1FC0U', header)
     memory = (ROOT / 'kernel/v86_mem.c').read_text()
-    assert 'paging_v86_map_range(V86_REMAP_START + PAGE_SIZE, V86_REMAP_END,' in memory
-    assert 'backing_phys, PAGE_RW | PTE_USER)' in memory
+    assert 'paging_v86_map_range(PAGE_SIZE, V86_REMAP_END, PAGE_SIZE,' in memory
     geometry = re.search(r'\{\s*1261568,\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+)\s*\}',
                          (ROOT / 'drivers/loop_dev.c').read_text())
     assert geometry and tuple(map(int, geometry.groups())) == (77, 2, 8, 1024)
@@ -103,13 +102,7 @@ def check_image_and_deploy():
             assert json.loads(path.with_suffix('.json').read_text()) == expected_metadata
         assert paths[0].read_bytes() == paths[1].read_bytes() == data
         assert paths[0].with_suffix('.json').read_bytes() == paths[1].with_suffix('.json').read_bytes()
-        result = subprocess.run([sys.executable, str(ROOT / 'tools/gen_v86_int80.py'),
-                                 '--out', str(paths[0]), '--backing-phys', '0x300000'],
-                                check=True, capture_output=True, text=True)
-        assert paths[0].read_bytes() == data
-        actual_metadata = dict(expected_metadata, backing_phys=0x300000, flags_phys=0x31EC40)
-        assert json.loads(paths[0].with_suffix('.json').read_text()) == actual_metadata
-        assert 'FLAGS emulator physical=0x31ec40' in result.stdout
+        assert 'FLAGS emulator physical=0x1fc40' in result.stdout
     normal = deploy_manifests.load_merged()
     host = deploy_manifests.load_merged(include_host_only=True)
     assert not any(e['host'] == 'build/out/int80.img' for e in normal['filesystem']['files'])

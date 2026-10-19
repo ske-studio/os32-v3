@@ -43,9 +43,9 @@ MUTANTS = [
     '            if (!(want & PTE_PRESENT)) { if (e & PTE_PRESENT) bad++; continue; }',
     'FAIL paging_master_audit(exec_tramp_page_addr()) > 0')
    for name, condition in (
-       ('font', 'a >= MEM_FONT_CACHE_BASE && a < MEM_KCG_LZ4_TEMP_BASE'),
-       ('scratch', 'a >= MEM_KCG_LZ4_TEMP_BASE && a < MEM_GFX_BB_BASE'),
-       ('retired-bb', 'a >= MEM_GFX_BB_BASE && a < MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE'),
+       ('font', 'a >= 0x01000UL && a < 0x4A000UL'),
+       ('scratch', 'a >= 0x4A000UL && a < 0x6A000UL'),
+       ('retired-bb', 'a >= 0x6A000UL && a < 0x6A000UL + MEM_GFX_BB_SIZE'),
        ('tvram', 'a >= TVRAM_CHAR_BASE && a < GVRAM_BRG_END'))],
 
  ('audit-line-ending', 'kernel/kaudit.c', 'serial_puts_polled("\\r\\n");', 'serial_puts_polled("\\n");', 'FAIL serial_len >= 2'),

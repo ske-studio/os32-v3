@@ -138,7 +138,7 @@ static void check_page_accounting(void)
     CHECK(!before.diff && before.total == before.phys);
     CHECK(before.slack == end - first && !before.kdebug);
     CHECK(before.meta == MEM_LEDGER_META_SIZE / PAGE_SIZE + boot_meta_end - boot_meta_first);
-    CHECK(before.bb == MEM_GFX_BB_SIZE / PAGE_SIZE);
+    CHECK(before.bb == 0); /* gfx_boot_reserve has not run yet. */
     CHECK(before.other == (memory_boot_dma_available() ? MEM_DMA_POOL_SIZE / PAGE_SIZE : 0));
     kaudit_boot_pages();
     CHECK(audit_runs == 1 && !audit_fail && page_logs == 1);
@@ -214,6 +214,23 @@ static void check_v5_ledger(void)
     u32 end = MEM_FIXED_PAGING_GUARD_BASE / PAGE_SIZE;
     u32 p, i, hits, got, owner, before = pgalloc_free_pages();
     CHECK(ledger_selfcheck("v5-boot"));
+    /* The real boot adapter must publish one reservation, never pool supply. */
+    CHECK(memory_boot_fixed[0].first == 0 && memory_boot_fixed[0].end == 160);
+    for (p = 0; p < 160; p++) {
+        hits = 0;
+        CHECK(!bit(eligible, p));
+        for (i = 0; i < ledger_region_count; i++) {
+            const struct ledger_region *r = &ledger_regions[i];
+            if (r->first <= p && p < r->end) {
+                CHECK(r->first == 0 && r->end == 160);
+                CHECK(r->type == LEDGER_R_FIXED && r->owner == LEDGER_OWNER_KERNEL &&
+                      r->cache == LEDGER_CACHE_WB && (r->flags & LEDGER_RF_PERMANENT));
+                hits++;
+            }
+        }
+        CHECK(hits == 1);
+    }
+
     hits = ledger_region_count;
     CHECK(memory_boot_fixed_region(MEM_SHM_RESV_START, MEM_SHM_RESV_START));
     CHECK(!memory_boot_fixed_region(MEM_SHM_RESV_START + PAGE_SIZE, MEM_SHM_RESV_START));
@@ -515,7 +532,7 @@ die(0);
         u32 k, n, bg, backing = 0, fixed = 0;
         CHECK(ledger_selfcheck("boot"));
         n = sizeof(memory_boot_fixed) / sizeof(memory_boot_fixed[0]);
-        CHECK(n == 6);
+        CHECK(n == 2);
         CHECK(ledger_region_count == n + 2 + (ledger_backing_mapped ? 0 : 1) +
               (7 + memory_boot_dma_available()));
         bg = 0;
@@ -531,11 +548,7 @@ die(0);
                        r->end == PHYSMEM_MAX_PFN &&
                        (r->flags & LEDGER_RF_OUTSIDE)));
             }
-            if (r->type == LEDGER_R_SURFACE_BACKING) {
-                backing++;
-                CHECK(r->owner == LEDGER_OWNER_BOOT &&
-                      r->first == MEM_GFX_BB_BASE / PAGE_SIZE);
-            }
+            if (r->type == LEDGER_R_SURFACE_BACKING) backing++;
             if (r->type == LEDGER_R_FIXED) fixed++;
             if (r->type == LEDGER_R_DMA)
                 CHECK(r->first == MEM_DMA_POOL_BASE / PAGE_SIZE &&
@@ -545,7 +558,7 @@ die(0);
                 CHECK(!ledger_backing_mapped && r->first == workspace_first);
         }
         CHECK(bg == 2);
-        CHECK(backing == 1 && fixed == 12U + (ledger_backing_mapped ? 0U : 1U));
+        CHECK(backing == 0 && fixed == 9U + (ledger_backing_mapped ? 0U : 1U));
         /* 同梱の申告は無い (bootinfo に欄が無い): 同梱域も集積域も池のまま */
         CHECK(!ledger_owner_pages(LEDGER_OWNER_BUNDLE));
     }

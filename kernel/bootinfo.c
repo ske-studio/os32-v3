@@ -2,7 +2,7 @@
 /*  BOOTINFO.C — ブート情報域 (0x7E00) を写して保存する                      */
 /*                                                                          */
 /*  kernel_main の**最初**で bootinfo_capture() を 1 回だけ呼ぶ。0x7E00 は   */
-/*  フォントキャッシュ (MEM_FONT_CACHE_BASE = 0x1000〜) の内側にあり、        */
+/*  V86_LOW の内側にあり、        */
 /*  フォント初期化・その他の低位の再利用で上書きされる。以後は写しだけを使う。 */
 /*  検証は kernel/bootinfo_check.c (純粋関数、ホスト試験の対象)。             */
 /*  票: docs/archive/realhw_v21/TASK_HDD_INSTALL.md 段 0                           */

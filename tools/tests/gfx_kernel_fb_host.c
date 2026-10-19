@@ -55,10 +55,10 @@ static void boot(void)
     u32 low_kb = CFG_KB > 15360 ? 15360 : CFG_KB;
     u32 limit = CFG_KB / 4, top;
     {
-        u32 low_args[6] = {MEM_GFX_BB_BASE, MEM_GFX_BB_SIZE, 3, 0x32, 0xffffffffUL, 0};
+        u32 low_args[6] = {0x6A000UL, MEM_GFX_BB_SIZE, 3, 0x32, 0xffffffffUL, 0};
         u32 low_result;
         __asm__ volatile("int $0x80" : "=a"(low_result) : "a"(90), "b"(low_args) : "memory");
-        CHECK(low_result == MEM_GFX_BB_BASE);
+        CHECK(low_result == 0x6A000UL);
     }
     host_map_fixed_paging();
     paging_init(CFG_KB);
@@ -90,10 +90,9 @@ static void boot(void)
     CHECK(ledger_register_region(LEDGER_R_FIXED, LEDGER_OWNER_KERNEL,
           MEM_CONV_END / PAGE_SIZE, KERNEL_LOAD_ADDR / PAGE_SIZE,
           LEDGER_CACHE_UC, 0));
-    /* ③ の区間のうち ⑥ に効くもの: planar BB の固定面と背景 2 本 */
-    CHECK(ledger_register_region(LEDGER_R_SURFACE_BACKING, LEDGER_OWNER_BOOT,
-                                 MEM_GFX_BB_BASE / PAGE_SIZE,
-                                 (MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE) / PAGE_SIZE,
+    /* ③ の区間のうち ⑥ に効くもの: V86_LOW と背景 2 本 */
+    CHECK(ledger_register_region(LEDGER_R_FIXED, LEDGER_OWNER_KERNEL,
+                                 0, MEM_CONV_END / PAGE_SIZE,
                                  LEDGER_CACHE_WB, 0));
     CHECK(ledger_register_region(LEDGER_R_BACKGROUND, LEDGER_OWNER_KERNEL,
                                  MEM_SYSTEM_SPACE_BASE / PAGE_SIZE,

@@ -257,25 +257,16 @@ def bands(m, sym):
         rows.append({"section": section, "name": name, "start": start,
                      "end": end, "attr": attr, "note": note, "parent": parent})
 
+    add(CONV, "V86_LOW", 0, (v("MEM_CONV_END") or 0) - 1, "FIXED/kernel/WB",
+        "160 PFN の単一永久予約、一般pool供給0。V86は直接低位を使用し予約は不変")
     add(CONV, "NULL ポインタ検出ガード", 0, v("MEM_NULL_GUARD_END"), "NP",
-        "ブート後は R/O (BDA 参照のため。paging.c の [DEBUG] 注記)")
-    add(CONV, "フォントキャッシュ", v("MEM_FONT_CACHE_BASE"),
-        (v("MEM_KCG_LZ4_TEMP_BASE") or 0) - 1, "RW", "kcg.c がブート後に配置")
+        "通常NP、V86 session中だけRW/USER。boot原本4096Bを終了時に復元", parent="V86_LOW")
     add(CONV, "ブート情報域 (ローダ → kernel_main)", v("MEM_BOOTINFO_BASE"),
         v("MEM_BOOTINFO_END"), "RW",
-        "INT 1Bh AH=84h の結果 (include/bootinfo.h)。kernel_main の最初で写した"
-        "後はフォントキャッシュが上書きしてよい",
-        parent="フォントキャッシュ")
-    add(CONV, "KCG scratch 固定予約", v("MEM_KCG_LZ4_TEMP_BASE"),
-        (v("MEM_GFX_BB_BASE") or 0) - 1, "RW",
-        "FIXED/KERNEL/WB。boot 限定 scratch は MEM_KCG_LZ4_TEMP_END まで BB/mailbox と共用、close 後は再使用しない")
-    add(CONV, "GFX バックバッファ (4 プレーン)", v("MEM_GFX_BB_BASE"),
-        plus("MEM_GFX_BB_BASE", "MEM_GFX_BB_SIZE", -1), "RW",
-        "CPL=3 からは常に USER (レビュー #6)")
-    add(CONV, "空き / V86 ゲスト窓の一部",
-        plus("MEM_GFX_BB_BASE", "MEM_GFX_BB_SIZE"),
-        (v("MEM_CONV_END") or 0) - 1, "RW",
-        "MEM_AUTOPLAY_MAILBOX_BASE/SIZE は自動プレイ観測メールボックス (game/app と driver.py の対)")
+        "起動時にcoreへ保存済み、以後V86が使用", parent="V86_LOW")
+    add(CONV, "自動プレイ mailbox", v("MEM_AUTOPLAY_MAILBOX_BASE"),
+        plus("MEM_AUTOPLAY_MAILBOX_BASE", "MEM_AUTOPLAY_MAILBOX_SIZE", -1), "RW",
+        "session前後で退避/復元。host側はsession中アクセスしない", parent="V86_LOW")
     add(CONV, "VRAM (テキスト + グラフィック)", v("MEM_CONV_END"),
         (v("MEM_BIOS_ROM_START") or 0) - 1, "RW", "CPL=3 からは USER。TVRAM / B,R,G / E は PCD (UC)、CG 窓は WB")
     add(CONV, "BIOS ROM", v("MEM_BIOS_ROM_START"), v("MEM_BIOS_ROM_END"), "RO", "WB (PCD なし)")
@@ -757,6 +748,10 @@ def render(m, sym, rows, map_path, root):
                      % (m.get("MEM_APP_BAND_BASE") or 0, top))
     parts.append("```")
     parts.append("")
+    parts.append("planar BB: boot時にpoolから連続 %d 頁 (%s) を確保する別SURFACE_BACKING。"
+                 "boot→gshellへ移譲し、V86_LOWとは共有しない。" %
+                 (m.get("MEM_GFX_BB_SIZE") // PAGE, human(m.get("MEM_GFX_BB_SIZE"))))
+    parts.append("")
     if lines:
         parts.append("**地図の矛盾 (%d 件)** — "
                      "`python3 tools/gen_memmap.py --check` が同じものを出す。" % len(lines))
@@ -932,9 +927,8 @@ def layout_manifest(root, map_path, elf_path, limit_name=None):
     def add(name, start, end, purpose, **extra):
         rows.append(layout_range(name, start, end, purpose, source="memmap.h", **extra))
 
-    add("KCG scratch fixed reservation", v("MEM_KCG_LZ4_TEMP_BASE"),
-        v("MEM_GFX_BB_BASE"), "kcg_scratch", reservation="FIXED",
-        lifetime="boot-only", scratch_end=v("MEM_KCG_LZ4_TEMP_END"))
+    add("V86_LOW", 0, v("MEM_CONV_END"), "v86_low", reservation="FIXED",
+        cache="WB", lifetime="permanent", pool_pages=0)
     resident = symbols.get("__kernel_resident_end", symbols["__bss_end"])
     core_pad_end = resident
     add("core tail padding", symbols["__bss_end"], core_pad_end, "core", noload=True)

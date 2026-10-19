@@ -9,29 +9,22 @@ static u32 host_cr3, host_flushes, host_flushed_cr3;
 #define HOST_POOL_IRQ_RESTORE(f) ((void)(f))
 #include "pgalloc_host_fixture.h"
 #include "shm.c"
-static int setup_map_fail, setup_alloc_fail;
+static int setup_map_fail, setup_mailbox_fail;
+static u8 host_low[MEM_CONV_END], host_mailbox[MEM_AUTOPLAY_MAILBOX_SIZE];
+void *v86_call_mailbox(void) { return setup_mailbox_fail ? 0 : host_mailbox; }
 static void page0_equal(void);
 static int checked_setup_map(u32 base, u32 end, u32 phys, u32 flags) {
     if (setup_map_fail && --setup_map_fail == 0) return -1;
     return paging_v86_map_range(base, end, phys, flags);
 }
-static u32 checked_setup_alloc(u32 owner_id, int n) {
-    if (v86_session.real_saved) page0_equal();
-    return setup_alloc_fail ? 0 : pgalloc_alloc_phys(owner_id, n);
-}
 #define paging_v86_map_range checked_setup_map
-#define pgalloc_alloc_phys checked_setup_alloc
-static int checked_backing_free(u32 owner_id, u32 pfn, int n);
 static int checked_restore(struct v86_session_state *s);
 #define paging_v86_restore checked_restore
-#define pgalloc_free_n_owner checked_backing_free
 static void host_restore_stop(void);
 #define _stop host_restore_stop
 #include "v86_mem.c"
 #undef _stop
 #undef paging_v86_restore
-#undef pgalloc_free_n_owner
-#undef pgalloc_alloc_phys
 #undef paging_v86_map_range
 static u8 host_page0[PAGE_SIZE];
 static int owner = 2;
@@ -129,7 +122,7 @@ void v86_gcap_release(void) {
     release_calls++;
 }
 void gfx_v86_return(void) {
-    CHECK(!kctx_irq_depth && !kctx_exc_depth && !backing_phys, "gfx return after release");
+    CHECK(!kctx_irq_depth && !kctx_exc_depth, "gfx return after release");
     return_calls++;
 }
 void kselftest_audit_v86_return(void) {
@@ -137,7 +130,7 @@ void kselftest_audit_v86_return(void) {
           "audit after gfx return");
     audit_calls++;
 }
-#define V86_TEST_BB MEM_GFX_BB_BASE
+#define V86_TEST_BB 0x6A000UL
 static int checked_restore(struct v86_session_state *s) {
     u32 flushes = host_flushes;
     if (v86_session.real_saved) page0_equal();
@@ -148,14 +141,6 @@ static int checked_restore(struct v86_session_state *s) {
 void v86_bios_detach_disk(void) {
     CHECK(!kctx_irq_depth && !kctx_exc_depth, "backing release trusted context");
     CHECK(_irq_enabled(), "release IF enabled");
-}
-static int checked_backing_free(u32 owner_id, u32 pfn, int n)
-{
-    CHECK(!kctx_irq_depth && !kctx_exc_depth, "backing release trusted context");
-    CHECK(_irq_enabled(), "release IF enabled");
-    for (u32 i = 0; i < V86_GUEST_MAP_END / PAGE_SIZE; i++)
-        CHECK(page_tables[0][i] == v86_session.low_pte[i], "unmap before backing free");
-    return pgalloc_free_n_owner(owner_id, pfn, n);
 }
 /* Production exception transfer/runtime unwind, with only machine edges stubbed. */
 typedef struct { int state; u32 jmpbuf[KSETJMP_BUF_LEN]; } AppSlot;
@@ -182,13 +167,13 @@ static void tss_set_esp0(u32 esp0) {
 }
 void exec_longjmp(u32 *buf) {
     if (buf == g_exit_jmpbuf) {
-        CHECK(!v86_session.open && !v86_session.active && !backing_phys &&
+        CHECK(!v86_session.open && !v86_session.active &&
               !paging_v86_session_open(), "direct kill closes session");
         return;
     }
     CHECK(!v86_session.open && !v86_session.active && v86_session.release_pending,
           "kill ends session before app jump");
-    CHECK(kctx_exc_depth == 1 && backing_phys, "kill defers allocator");
+    CHECK(kctx_exc_depth == 1 && v86_session.release_pending, "kill defers disk/module release");
     CHECK(!(host_arch_if & EFLAGS_IOPL3), "kill restores caller IOPL");
     kctx_exc_depth = 0; /* setjmp.asm restores trusted depth at landing. */
 }
@@ -197,7 +182,7 @@ void exec_longjmp(u32 *buf) {
 void v86_call_cleanup(void) {}
 static void exec_finish(int id, int status, int kind) {
     (void)id; (void)status; (void)kind;
-    CHECK(!backing_phys && !v86_session.release_pending, "kill release before owner reclaim");
+    CHECK(!v86_session.release_pending, "kill release before owner reclaim");
 }
 #include "v86_unwind_slice.inc"
 static u8 guest_memory[V86_REMAP_END];
@@ -478,14 +463,14 @@ void _start(void)
     for (int step = 1; step <= V86_IDENT_MAP_N + 2; step++) {
         setup_map_fail = step;
         CHECK(v86_mem_setup(2) == -3, "V86 partial setup rejects");
-        CHECK(!v86_session.open && !backing_phys && entry(0) == old &&
+        CHECK(!v86_session.open && entry(0) == old &&
               !paging_v86_session_open() && v86_restore_mismatch == missing,
               "V86 partial setup rollback");
     }
-    setup_alloc_fail = 1;
-    CHECK(v86_mem_setup(2) == -2 && !v86_session.open && !backing_phys &&
-          entry(0) == old, "V86 allocation failure rollback");
-    setup_alloc_fail = 0;
+    setup_mailbox_fail = 1;
+    CHECK(v86_mem_setup(2) == -2 && !v86_session.open &&
+          entry(0) == old, "V86 mailbox unavailable before writes");
+    setup_mailbox_fail = 0;
     paging_addrspace_destroy(&a);
     host_cr3 = b.pd_phys;
     CHECK(as_va_to_pa(b.pd_phys, p, &pa) == 0 && pa == p, "second AS SHM writable");
@@ -498,9 +483,12 @@ void _start(void)
     CHECK((((u32 *)P2V(b.pd_phys))[0] & PTE_USER) && perm(TRAMP, 0), "post V86 trampoline readable");
     paging_addrspace_destroy(&b);
     {
-        char count[5] = {'0' + checks / 1000, '0' + (checks / 100) % 10, '0' + (checks / 10) % 10, '0' + checks % 10, '\n'};
+        char count[11];
+        u32 n = sizeof(count), value = checks;
+        count[--n] = '\n';
+        do { count[--n] = '0' + value % 10; value /= 10; } while (value);
         SAY("PASS shm user checks:");
-        say(count, sizeof(count));
+        say(count + n, sizeof(count) - n);
     }
     die(0);
 }

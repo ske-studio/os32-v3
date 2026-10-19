@@ -94,9 +94,9 @@ static void run(void)
         paging_sqlite_stack_guard = 0;
     }
     u32 idx = TVRAM_CHAR_BASE / PAGE_SIZE, saved = pt[idx];
-    /* Font and retained low scratch (including retired BB) reject USER.
+    /* All conventional RAM (V86_LOW) rejects USER outside a session.
      * The live planar pool CLIENT is tested separately below. */
-    for (u32 a = MEM_FONT_CACHE_BASE; a < MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE; a += PAGE_SIZE) {
+    for (u32 a = PAGE_SIZE; a < MEM_CONV_END; a += PAGE_SIZE) {
         pt[a / PAGE_SIZE] |= PTE_USER;
         CHECK(paging_memmap_selftest(exec_tramp_page_addr()) > 0);
         CHECK(paging_master_audit(exec_tramp_page_addr()) > 0);
@@ -236,8 +236,8 @@ static void run(void)
     reset_scans();
     CHECK(ledger_selfcheck("bounded"));
     CHECK(scan_max[1] == pgalloc_limit_pfn() && scan_max[1] <= PHYSMEM_MAX_PFN);
-    CHECK(paging_addrspace_map_user_range(&space, MEM_KCG_LZ4_TEMP_BASE,
-          MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE, PAGE_RW | PTE_USER) == -1);
+    CHECK(paging_addrspace_map_user_range(&space, PAGE_SIZE,
+          MEM_CONV_END, PAGE_RW | PTE_USER) == -1);
     CHECK(!paging_master_audit(exec_tramp_page_addr()));
     CHECK(!paging_shm_set_rw(MEM_SHM_BASE, MEM_SHM_BASE + PAGE_SIZE, 0));
     CHECK(!paging_master_audit(exec_tramp_page_addr()));

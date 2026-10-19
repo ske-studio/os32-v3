@@ -201,25 +201,15 @@ u32 memory_boot_ram_kb(void)
 }
 
 /* 区間の表に載せる固定用途 (TASK_T1_LEDGER §3-3 ③)。番地は memmap.h の
- * 正典から引く。bootinfo (0x7E00) はフォントキャッシュの内側、固定 PD/PT は
+ * 正典から引く。bootinfo は起動時に保存済み。固定 PD/PT は
  * shell heap 後方の画像外区間として専用の行に登録する。 */
 #define MB_PFN(a) ((u16)((a) / PAGE_SIZE))
 static const struct {
     u16 first, end;
     u8 type, owner, cache, pad;
 } memory_boot_fixed[] = {
-    { 0, MB_PFN(MEM_NULL_GUARD_END + 1),
-      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
-    { MB_PFN(MEM_FONT_CACHE_BASE), MB_PFN(MEM_KCG_LZ4_TEMP_BASE),
-      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
-    /* 旧 Unicode 32頁は T7a まで KCG scratch の FIXED として保持。 */
-    { MB_PFN(MEM_KCG_LZ4_TEMP_BASE), MB_PFN(MEM_GFX_BB_BASE),
-      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
-    /* planar BB: 固定の SURFACE の backing (owner boot → gshell は T1e) */
-    { MB_PFN(MEM_GFX_BB_BASE), MB_PFN(MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE),
-      LEDGER_R_SURFACE_BACKING, LEDGER_OWNER_BOOT, LEDGER_CACHE_WB, 0 },
-    /* 低位の残り (V86 の試験語・自動プレイの mailbox 0x90000・ブートスタック) */
-    { MB_PFN(MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE), MB_PFN(MEM_CONV_END),
+    /* V86_LOW: all 160 PFNs stay reserved, including page0 and mailbox. */
+    { 0, MB_PFN(MEM_CONV_END),
       LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
     /* VRAM と BIOS ROM */
     { MB_PFN(MEM_CONV_END), MB_PFN(KERNEL_LOAD_ADDR),
@@ -418,9 +408,6 @@ void memory_boot_count_pages(const struct memory_page_input *in,
                 memory_page_overlap(r->first, r->end, in->meta_first, in->meta_end);
             c.meta += meta;
             c.fixed += n - meta;
-        } else if (r->type == LEDGER_R_SURFACE_BACKING &&
-                   r->first == MEM_GFX_BB_BASE / PAGE_SIZE) {
-            c.bb += n;
         } else {
             c.other += n; /* DMA, bundle, RAM device reservations. */
         }

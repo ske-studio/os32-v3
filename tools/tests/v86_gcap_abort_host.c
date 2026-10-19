@@ -26,6 +26,8 @@ static void say(const char *s, u32 n) { __asm__ volatile("int $0x80"::"a"(4),"b"
 #define CHECK(c, s) do { if (!(c)) { SAY("FAIL " s); die(1); } } while (0)
 volatile u32 kctx_irq_depth, kctx_exc_depth;
 struct kdebug kdebug;
+static u8 mailbox[MEM_AUTOPLAY_MAILBOX_SIZE];
+void *v86_call_mailbox(void) { return mailbox; }
 struct ledger_surface ledger_surfaces[LEDGER_MAX_SURFACES];
 u32 v86_gcap_phase, v86_gcap_alloc_count, v86_gcap_free_count, v86_gp_cs, v86_gp_ip;
 static u32 step, inject_step, injection, failure_step, calls, killed[5], landed[5];
@@ -118,9 +120,11 @@ int paging_v86_map_range(u32 a, u32 end, u32 p, u32 f) {
     (void)a; (void)end; (void)p; (void)f; boundary(); return step == failure_step ? -1 : 0;
 }
 int paging_v86_restore(struct v86_session_state *s) { (void)s; return 0; }
-u32 pgalloc_alloc_phys(u32 owner, int n) { (void)owner; (void)n; boundary(); return step == failure_step ? 0 : 0x300000; }
-int pgalloc_free_n_owner(u32 owner, u32 pfn, int n) { (void)owner; (void)pfn; (void)n; return 0; }
-void v86_bios_setup(void) { boundary(); }
+void v86_bios_setup(void) {
+    /* Model the boot original's ROM IVT after the product clears low RAM. */
+    *(volatile u32 *)P2V(0x18 * 4) = 0xf0000000;
+    boundary();
+}
 void v86_bios_restore_real(void) {}
 void v86_bios_detach_disk(void) {}
 void v86_runtime_end(void) { v86_session.active = v86_session.running = 0; }
@@ -198,6 +202,7 @@ void _start(void) {
     u32 args[6] = {0, 16*1024*1024, 3, 0x32, ~0U, 0}, result;
     __asm__ volatile("int $0x80":"=a"(result):"a"(90),"b"(args):"memory");
     CHECK(!result, "low fixture mapping");
+    v86_session.real_saved = 1;
     kdebug.ops.gcap_capture = capture_body;
     kdebug.ops.gcap_active = v86_gcap_active;
     kdebug.ops.gcap_detach = v86_gcap_detach;
@@ -228,7 +233,7 @@ void _start(void) {
                 CHECK(fault_kill_count == kills_before+1, "kills delta one");
                 CHECK(ring3_abort_count == aborts_before, "fault is not STOP");
                 CHECK(policy_deny && display_reset && cursor, "output policy and display restored");
-                if(mode == V86G_MODE_ROM && (entry == 17 || entry == 18))
+                if(mode == V86G_MODE_ROM && (entry == 16 || entry == 17))
                     CHECK(sync_restores == 1, "interrupted ROM mode restores sync");
                 after(); inject_step = 0;
                 before();
@@ -255,9 +260,9 @@ void _start(void) {
             CHECK(v86_gdc_capture(V86G_MODE_ROM, &output) >= 0 && calls == 3, "next V86 after HOTKEY succeeds");
             v86_call_cleanup(); after();
         }
-        /* Recoverable preparation failures at module, snapshot, backing and
-         * every mapping boundary (steps 2..13); all retain caller output. */
-        for(failure_step=2; failure_step<=13; failure_step++) {
+        /* No backing allocation boundary: module=2, snapshot=3, maps=4..12.
+         * All recoverable preparation failures retain caller output. */
+        for(failure_step=2; failure_step<=12; failure_step++) {
             before(); CHECK(v86_gdc_capture(mode, &output) == V86G_ST_SETUP, "prepare failure status");
             v86_call_cleanup(); after();
         }

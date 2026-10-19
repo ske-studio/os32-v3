@@ -22,10 +22,6 @@
 
 struct v86_session_state v86_session;
 u32 v86_restore_mismatch;
-#define backing_phys v86_session.backing_phys
-#define backing_owner v86_session.backing_owner
-
-u32 v86_mem_backing_phys(void) { return backing_phys; }
 
 /* VRAM/ROM 帯のマップリスト (setup と teardown で同じ表を使う)。
  * setup はゲスト用に USER を付け、teardown で元の属性に戻す。
@@ -56,13 +52,12 @@ int v86_session_begin(u32 owner)
         return -1;              /* 二重セットアップ */
     }
 
-    /* T7a-2b proves direct low RAM in the fixture. The product retains its
-     * old backing until reservation consolidation in T7a-2e. */
-#ifdef OS32_V86_DIRECT_LOW_FIXTURE
+    /* V86_LOW remains FIXED/kernel/WB; only the session changes its PTEs.
+     * Save the host mailbox before clearing physical conventional RAM. */
+    (void)owner;
     if (!v86_call_mailbox() || !v86_session.real_saved) return -2;
     kmemcpy(v86_call_mailbox(), P2V(MEM_AUTOPLAY_MAILBOX_BASE),
             MEM_AUTOPLAY_MAILBOX_SIZE);
-#endif
     if (!v86_module_session_acquire()) return -1;
     if (paging_v86_snapshot(&v86_session) != 0) {
         v86_module_session_release();
@@ -71,33 +66,14 @@ int v86_session_begin(u32 owner)
     v86_session.open = 1;
     v86_session.aborting = 0;
 
-#ifndef OS32_V86_DIRECT_LOW_FIXTURE
-    backing_phys = pgalloc_alloc_phys(owner, V86_BACKING_PAGES);
-    backing_owner = owner;
-    if (!backing_phys) {
-        v86_session_end();
-        return -2;              /* 連続領域が取れない */
-    }
-
-#else
-    (void)owner;
-#endif
-
-    /* Page zero is physical even on the legacy path: NP21/W BIOS writes
-     * physical BDA directly. Only this session may expose it to the guest. */
+    /* NP21/W BIOS writes physical BDA directly. Page zero is exposed only
+     * from PREPARING through restoration of the immutable boot original. */
     if (paging_v86_map_range(0, PAGE_SIZE, 0, PAGE_RW | PTE_USER) != 0)
         goto fail;
 
-#ifdef OS32_V86_DIRECT_LOW_FIXTURE
     if (paging_v86_map_range(PAGE_SIZE, V86_REMAP_END, PAGE_SIZE,
                              PAGE_RW | PTE_USER) != 0) goto fail;
     kmemset(P2V(V86_REMAP_START), 0, V86_REMAP_END);
-#else
-    if (paging_v86_map_range(V86_REMAP_START + PAGE_SIZE, V86_REMAP_END,
-                             backing_phys, PAGE_RW | PTE_USER) != 0) goto fail;
-    kmemset(P2V(V86_REMAP_START + PAGE_SIZE), 0,
-            V86_REMAP_END - PAGE_SIZE);
-#endif
 
     /* VRAM は実物理を直マップ。ここが #GP しないことが性能の前提。
      * ROM 帯は読み取り専用で見せる。BIOS ROM も含めて実行可能にしておく —
@@ -131,7 +107,7 @@ fail:
     /* 途中で失敗したら張りかけのマッピングを必ず巻き戻す。
      * 中途半端に USER が付いた低位ページを残したままカーネルに戻ると、
      * 次に低位メモリを使うコード (フォント/GFX) が壊れた地図の上で動く。
-     * teardown が identity 復帰・IVT/BDA 復元・バッキング解放を兼ねる。 */
+     * teardown が PTE・IVT/BDA・mailbox の復元を兼ねる。 */
     v86_mem_teardown();
     return -3;
 }
@@ -153,10 +129,8 @@ void v86_session_end(void)
         flags = (v86_session.saved_eflags & ~EFLAGS_IF) | (flags & EFLAGS_IF);
     v86_runtime_end();
     v86_bios_restore_real();
-#ifdef OS32_V86_DIRECT_LOW_FIXTURE
     kmemcpy(P2V(MEM_AUTOPLAY_MAILBOX_BASE), v86_call_mailbox(),
             MEM_AUTOPLAY_MAILBOX_SIZE);
-#endif
 
     /* Restore exact saved PTEs, including NP, USER and cache attributes.
      * The table remains the setup/teardown cache-policy contract. */
@@ -196,7 +170,7 @@ void v86_session_end(void)
         while (col < TVRAM_COLS) { text[col] = ' '; attr[col++] = TATTR_RED; }
         for (;;) _stop();
     }
-    /* All backing aliases are gone before owner reclamation can run. */
+    /* Guest permissions are gone before owner reclamation can run. */
     v86_io_reset_policy();
     if (kdebug.ops.gcap_detach) kdebug.ops.gcap_detach();
     v86_session.open = 0;
@@ -214,11 +188,6 @@ release:
         goto done;
     }
     v86_bios_detach_disk();
-    if (backing_phys)
-        pgalloc_free_n_owner(backing_owner, backing_phys / PAGE_SIZE,
-                            V86_BACKING_PAGES);
-    backing_phys = 0;
-    backing_owner = 0;
     v86_session.release_pending = 0;
     gfx_v86_return();
     kselftest_audit_v86_return();
