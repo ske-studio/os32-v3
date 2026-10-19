@@ -15,10 +15,11 @@
       既定は both の一覧表示 (dry-run)。--delete で実際に消す。
       nhd は build/nhd/os32.nhd をマウントして操作する (sudo)。Windows 側へ
       反映するのは deploy-nhd の deploy 段 (NP21/W 停止中のみ)。
-終了コード: 0 = 掃除済み or 何も無い、1 = 引数/環境エラー。
+終了コード: 0 = 掃除済み or 何も無い、1 = 環境/処理エラー、2 = 引数エラー。
 一覧の最後に必ず 1 行 `RESULT: ...` を出す (os32-cycle / emu_agent が拾う)。
 """
 
+import argparse
 import errno
 import os
 import stat
@@ -197,9 +198,19 @@ def prune_nhd(want, delete):
     import nhd_deploy  # sudo mount まわりを流用
     if not nhd_deploy.ensure_local_nhd():
         return None
-    if not nhd_deploy.ensure_mounted():
-        print("Error: NHD をマウントできない", file=sys.stderr)
-        return None
+    result = None
+    unmounted = False
+    try:
+        if not nhd_deploy.ensure_mounted():
+            print("Error: NHD をマウントできない", file=sys.stderr)
+        else:
+            result = prune_mounted_nhd(want, delete, nhd_deploy)
+    finally:
+        unmounted = nhd_deploy.do_umount()
+    return result if unmounted else None
+
+
+def prune_mounted_nhd(want, delete, nhd_deploy):
     root = nhd_deploy.MOUNT_POINT
     try:
         protect.check_tree(root)
@@ -240,12 +251,13 @@ def prune_nhd(want, delete):
 
 
 def main():
-    args = [a for a in sys.argv[1:] if not a.startswith('--')]
-    delete = '--delete' in sys.argv[1:]
-    target = args[0] if args else 'both'
-    if target not in ('hostdrv', 'nhd', 'both'):
-        print(__doc__)
-        return 1
+    parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('target', nargs='?', default='both',
+                        choices=('hostdrv', 'nhd', 'both'))
+    parser.add_argument('--delete', action='store_true', help='実際に削除する')
+    args = parser.parse_args()
+    target, delete = args.target, args.delete
     want = wanted_guest_paths()
     if want is None:
         print("RESULT: FAIL 配備マニフェストが読めない")

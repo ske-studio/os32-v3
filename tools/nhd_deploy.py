@@ -414,8 +414,7 @@ def do_umount():
         return True
 
     # sync — 失敗をここで握り潰すと「書いたつもり」でイメージを配る
-    if not run_sync():
-        return False
+    sync_ok = run_sync()  # sync 失敗でもマウント解除は試みる
 
     # アンマウント
     result = subprocess.run(
@@ -434,7 +433,7 @@ def do_umount():
                        capture_output=True)
 
     print("アンマウント完了")
-    return True
+    return sync_ok
 
 
 def ensure_mounted():

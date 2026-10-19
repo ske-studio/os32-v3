@@ -21,6 +21,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
+from contextlib import redirect_stdout, redirect_stderr, nullcontext
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
@@ -39,6 +41,7 @@ import prune_stale as ps                  # noqa: E402
 
 PROTECTED = sorted(protect.PROTECTED_BASENAMES)
 REAL_RUN = subprocess.run
+REAL_UMOUNT = nd.do_umount
 
 
 def sha256(path):
@@ -213,6 +216,10 @@ class Base(unittest.TestCase):
         self.fake = FakeRun(sandbox=str(self.root))
         self._saved = {}
         self._patch(subprocess, 'run', self.fake)
+        def unmount():
+            self.fake.mounted = False
+            return True
+        self._patch(nd, 'do_umount', unmount)
         # This suite isolates settings protection; regeneration has its own
         # artifact/deployment fixtures in test_deploy_set.
         self._patch(nd, 'refresh_deploy_set', lambda: True)
@@ -625,6 +632,86 @@ class Prune(Base):
         super(Prune, self).setUp()
         # NHD の取り込み・マウントは試験の対象外 (FakeRun が実操作を遮断する)
         self._patch(nd, 'ensure_local_nhd', lambda: True)
+
+    def test_cli_validation_and_existing_calls(self):
+        with mock.patch.object(ps, 'wanted_guest_paths', return_value=set()) as wanted, \
+             mock.patch.object(ps, 'prune_hostdrv', return_value=0) as host, \
+             mock.patch.object(ps, 'prune_nhd', return_value=0) as nhd:
+            for argv, rc in ((['--unknown'], 2), (['nhd', '--unknown', '--delete'], 2),
+                             (['--del'], 2), (['both', 'extra'], 2),
+                             (['invalid'], 2), (['--help'], 0)):
+                with nullcontext():
+                    wanted.reset_mock(); host.reset_mock(); nhd.reset_mock()
+                    self._patch(sys, 'argv', ['prune_stale.py'] + argv)
+                    out, err = io.StringIO(), io.StringIO()
+                    with redirect_stdout(out), redirect_stderr(err):
+                        with self.assertRaises(SystemExit) as caught:
+                            ps.main()
+                    self.assertEqual(caught.exception.code, rc)
+                    self.assertIn('usage:', out.getvalue() + err.getvalue())
+                    wanted.assert_not_called()
+                    host.assert_not_called()
+                    nhd.assert_not_called()
+            for target in (None, 'hostdrv', 'nhd', 'both'):
+                for flag in ([], ['--delete']):
+                    for argv in ([target] + flag, flag + [target]) if target else (flag,):
+                        self._patch(sys, 'argv', ['prune_stale.py'] + argv)
+                        with redirect_stdout(io.StringIO()):
+                            self.assertEqual(ps.main(), 0)
+
+    def test_unmount_after_sync_failure(self):
+        with mock.patch.object(nd, 'is_mounted', return_value=True), \
+             mock.patch.object(nd, 'run_sync', return_value=False), \
+             mock.patch.object(nd, 'get_loop_device', return_value=None), \
+             mock.patch.object(subprocess, 'run', return_value=R()) as run:
+            self.assertFalse(REAL_UMOUNT())
+            run.assert_called_once_with(['sudo', 'umount', nd.MOUNT_POINT],
+                                        capture_output=True, text=True)
+
+    def _assert_nhd_cleanup(self):
+        for outcome in ('dry', 'delete', 'tree', 'scan', 'rm', 'sync', 'exception',
+                        'mount-false', 'mount-exception'):
+            with mock.patch.object(nd, 'ensure_mounted') as mount, \
+                 mock.patch.object(ps, 'find_stale', return_value=[('/bin/old.bin', str(self.mount / 'bin/old.bin'))]), \
+                 mock.patch.object(ps, 'show') as show, \
+                 mock.patch.object(protect, 'check_tree') as tree:
+                self.fake.mounted = True
+                self.fake.fail_rm = outcome == 'rm'
+                self.fake.fail_sync = outcome == 'sync'
+                mount.return_value = outcome != 'mount-false'
+                if outcome == 'mount-exception':
+                    mount.side_effect = RuntimeError('mount failed')
+                if outcome == 'tree':
+                    tree.side_effect = protect.ProtectError('bad tree')
+                if outcome == 'scan':
+                    ps.find_stale.side_effect = OSError(errno.EIO, 'scan failed')
+                if outcome == 'exception':
+                    show.side_effect = RuntimeError('show failed')
+                with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                    if outcome in ('exception', 'mount-exception'):
+                        with self.assertRaises(RuntimeError):
+                            ps.prune_nhd(set(), False)
+                    else:
+                        result = ps.prune_nhd(set(), outcome != 'dry')
+                        if outcome not in ('dry', 'delete'):
+                            self.assertIsNone(result)
+                self.assertFalse(self.fake.mounted, 'mount left behind: ' + outcome)
+
+    def test_nhd_cleanup_and_mutants(self):
+        self._assert_nhd_cleanup()
+        if os.environ.get('MUTATE') == '1':
+            source = pathlib.Path(ps.__file__).read_text()
+            for old, new, method in (
+                ('parser.parse_args()', 'parser.parse_known_args()[0]', 'test_cli_validation_and_existing_calls'),
+                ('unmounted = nhd_deploy.do_umount()', 'unmounted = True', '_assert_nhd_cleanup')):
+                self.assertEqual(source.count(old), 1)
+                namespace = vars(ps).copy()
+                exec(compile(source.replace(old, new), ps.__file__, 'exec'), namespace)
+                name = 'main' if method.startswith('test_cli') else 'prune_nhd'
+                with mock.patch.object(ps, name, namespace[name]):
+                    with self.assertRaises(AssertionError):
+                        getattr(self, method)()
+                print('RED ' + old)
 
     def _deploy_retired_fonts(self):
         paths = ('sys/font/default.kcgfont', 'sys/font/default.kcg',
