@@ -1,6 +1,6 @@
 {
   "generations": {"os32x_format": 4, "kapi_abi": 1, "memory_layout": 4, "shlib_protocol": 2},
-  "version": 76,
+  "version": 77,
   "func_capacity": 300,
   "crt_kapi_symbol": "os32_kapi_v63",
   "data_fields": [
@@ -53,7 +53,7 @@
     "memory_boot.h",
     "launch.h",
     "kapi_host.h",
-    "pci.h", "pcm_cs4231.h", "bootinfo.h", "serialfs.h", "v86_gcap.h", "surface_query.h", "ring3_ls.h", "redir_access.h", "appmem.h", "unicode_file.h"
+    "pci.h", "pcm_cs4231.h", "bootinfo.h", "serialfs.h", "v86_gcap.h", "surface_query.h", "ring3_ls.h", "redir_access.h", "appmem.h", "unicode_file.h", "font_source.h"
   ],
   "externs": [
     "extern volatile u32 tick_count;",
@@ -1882,6 +1882,27 @@
       "ret": "u16",
       "args": ["u32 cp"],
       "target": "unicode_file_lookup"
+    },
+    {
+      "name": "font_source_open",
+      "ret": "i32",
+      "args": ["const char *path", "u32 *out_id", "u32 *out_size"],
+      "in": [{"arg": "path", "target": true}],
+      "out": [{"arg": "out_id", "size": 4}, {"arg": "out_size", "size": 4}],
+      "body": "return font_lease_app_open(path, out_id, out_size);"
+    },
+    {
+      "name": "font_source_read_at",
+      "ret": "i32",
+      "args": ["u32 id", "u32 offset", "void *dst", "u32 len"],
+      "out": [{"arg": "dst", "len": "len"}],
+      "body": "return font_lease_app_read_at(id, offset, dst, len);"
+    },
+    {
+      "name": "font_source_close",
+      "ret": "i32",
+      "args": ["u32 id"],
+      "body": "return font_lease_app_close(id);"
     }
   ]
 }

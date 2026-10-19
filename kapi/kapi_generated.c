@@ -47,6 +47,7 @@
 #include "redir_access.h"
 #include "appmem.h"
 #include "unicode_file.h"
+#include "font_source.h"
 
 extern volatile u32 tick_count;
 extern void kapi_sys_exit(int status);
@@ -62,7 +63,7 @@ extern i32 kapi_mem_stat(i32 app_id, void *out, u32 size);
 #include "kapi_profile.h"
 
 #ifdef KAPI_PROFILE
-volatile u32 kapi_hits[250];
+volatile u32 kapi_hits[253];
 #endif
 
 /* 各スロットの cdecl 引数バイト数 (固定分)。int 0x80 ディスパッチャが
@@ -318,6 +319,9 @@ const u16 kapi_argsize[KAPI_FUNC_COUNT] = {
     8,  /* mem_unmap */
     12,  /* mem_stat */
     4,  /* unicode_to_jis */
+    12,  /* font_source_open */
+    16,  /* font_source_read_at */
+    4,  /* font_source_close */
 };
 
 /* 各スロットの固定引数のうち早期検査するポインタのビットマスク (bit k = 引数 k)。
@@ -573,6 +577,9 @@ const u16 kapi_argptr[KAPI_FUNC_COUNT] = {
     0x0000,  /* mem_unmap */
     0x0000,  /* mem_stat */
     0x0000,  /* unicode_to_jis */
+    0x0000,  /* font_source_open */
+    0x0000,  /* font_source_read_at */
+    0x0000,  /* font_source_close */
 };
 
 /* ---- 出力ポインタの書き込み可検査 (票 TASK_KAPI_OUTPUT_GUARD) --------
@@ -2407,5 +2414,33 @@ u16 __cdecl wrap_unicode_to_jis(u32 cp)
 {
     KAPI_HIT(249);
     return unicode_file_lookup(cp);
+}
+
+i32 __cdecl wrap_font_source_open(const char *path, u32 *out_id, u32 *out_size)
+{
+    KAPI_HIT(250);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)out_id, KAPI_OUT_LEN(out_id, 4u),
+                                    (u32)out_size, KAPI_OUT_LEN(out_size, 4u))) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return font_lease_app_open(path, out_id, out_size);
+}
+
+i32 __cdecl wrap_font_source_read_at(u32 id, u32 offset, void *dst, u32 len)
+{
+    KAPI_HIT(251);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)dst, KAPI_OUT_LEN(dst, len),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return font_lease_app_read_at(id, offset, dst, len);
+}
+
+i32 __cdecl wrap_font_source_close(u32 id)
+{
+    KAPI_HIT(252);
+    return font_lease_app_close(id);
 }
 
