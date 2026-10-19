@@ -54,7 +54,7 @@ T7aの到達点は「低位を一般poolへ追加」ではなく、bootinfoの�
 
 | 現利用 | 切替先 / 条件 |
 |---|---|
-| planar BB | boot時pool連続確保→gshell所有、T2のSURFACE経由。全planeポインタを更新し旧0x6A000参照をゼロにする。撤去担当はT7a-1aが描画側、T7a-1bが `drivers/kcg.c:192`、T7a-2e (低位予約の統合) が `kernel/memory_boot.c:216,419`・`kdebug/kselftest.c:895`・`userland/tests/ring3_guard.c:25`・`tools/gen_memmap.py:270-276`、個別host試験は未割当 |
+| planar BB | boot時pool連続確保→gshell所有、T2のSURFACE経由。全planeポインタを更新し旧0x6A000参照をゼロにする。撤去担当はT7a-1aが描画側と `kdebug/kselftest.c` の自己診断 (対応済み)、T7a-1bが `drivers/kcg.c:192`、T7a-2e (低位予約の統合) が `kernel/memory_boot.c:216,419`・`userland/tests/ring3_guard.c:25`・`tools/gen_memmap.py:270-276`、個別host試験は未割当 |
 | Unicode展開表 | T3のkernel組表+KAPI。T2暫定RO leaseが残っていれば先に撤去 |
 | `.kcgfont` 展開/読込scratch | 廃止。T5c-1のtyped KCG facade・pool上のキャッシュ (64KiBは計上値、受入ではhit率を記録)へ。coreのCODE復帰口と搭載時cache失効はT7a-2cで実装する |
 | bootinfo/BDA | IVT/BDAの起動時原本とbootinfoはcoreへコピー済み (`kernel/kernel.c:197-198`)。残る低位直読を§1-1の順で撤去 |
