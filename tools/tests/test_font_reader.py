@@ -10,7 +10,17 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 CRATE = ROOT / 'userland/lib/font'
+LRU_PROMOTION = """            let rank = self.slots.get(index).ok_or(Error::Invalid)?.lru;
+            for slot in &mut self.slots {
+                if slot.valid != 0 && slot.lru < rank {
+                    slot.lru += 1;
+                }
+            }
+            self.slots.get_mut(index).ok_or(Error::Invalid)?.lru = 0;"""
 MUTATIONS = [
+    ('LRU-to-FIFO', LRU_PROMOTION,
+     '            if cached.is_none() {\n' + LRU_PROMOTION + '\n            }',
+     'read_cache_lru'),
     ('offset-length-overflow', 'let end = t.offset.checked_add(t.length).ok_or(Error::Bounds)?;',
      'let end = t.offset.wrapping_add(t.length);', 'offset_length_overflow'),
     ('directory-order', 'if t.tag <= previous {',
@@ -56,12 +66,21 @@ def main():
         normal = build_and_run(CRATE, work, 'normal')
         print(normal.stdout, end='', flush=True)
         assert normal.returncode == 0, normal.stderr
+        copy = work / 'userland/lib/font'
+        shutil.copytree(CRATE, copy, ignore=shutil.ignore_patterns('target'))
+        fonts = work / 'assets/fonts'
+        fonts.parent.mkdir(parents=True)
+        fonts.symlink_to(ROOT / 'assets/fonts', target_is_directory=True)
+        limits = copy / 'src/limits.rs'
+        original_limits = limits.read_text()
+        old = 'pub const READ_CACHE_SLOTS: usize = 2;'
+        assert original_limits.count(old) == 1
+        limits.write_text(original_limits.replace(old, 'pub const READ_CACHE_SLOTS: usize = 8;'))
+        larger = build_and_run(copy, work, 'slots-8')
+        print(larger.stdout, end='', flush=True)
+        assert larger.returncode == 0, larger.stderr
+        limits.write_text(original_limits)
         if args.mutate:
-            copy = work / 'userland/lib/font'
-            shutil.copytree(CRATE, copy, ignore=shutil.ignore_patterns('target'))
-            fonts = work / 'assets/fonts'
-            fonts.parent.mkdir(parents=True)
-            fonts.symlink_to(ROOT / 'assets/fonts', target_is_directory=True)
             original = (CRATE / 'src/reader.rs').read_text()
             for label, old, new, expected in MUTATIONS:
                 assert original.count(old) == 1, label

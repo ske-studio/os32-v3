@@ -440,11 +440,12 @@ fn exact_and_exceeded_limits() {
         let f = Face::open(memory(fixture(cmap12(groups), true, 7, 1)));
         assert_eq!(f.is_ok(), groups <= MAX_CMAP_GROUPS, "group cap {groups}");
     }
-    assert_eq!(READ_CACHE_SLOTS, 2);
+    assert!(READ_CACHE_SLOTS > 0);
     assert_eq!(READ_CACHE_SLOT_BYTES, 2048);
     println!(
-        "sizeof host Face<Memory>={} (cache data=4096, no allocation in reader)",
-        std::mem::size_of::<Face<Memory>>()
+        "sizeof host Face<Memory>={} (cache data={}, no allocation in reader)",
+        std::mem::size_of::<Face<Memory>>(),
+        READ_CACHE_SLOTS * READ_CACHE_SLOT_BYTES
     );
 }
 
@@ -595,4 +596,27 @@ fn short_reads_publish_nothing() {
     f.trim();
     assert!(f.glyph_index(0x65e5).unwrap().is_some());
     println!("PASS short reads: all {reads} open fills + lookup/loca/advance; retry after trim");
+}
+
+#[test]
+fn read_cache_lru() {
+    let (source, stats) = disk(&fonts().remove(1)); // IPAexG
+    let mut face = Face::open(source).unwrap();
+    face.trim();
+    stats.reads.set(0);
+    for gid in [0, 512, 0, 1024, 0] {
+        face.advance(gid).unwrap();
+    }
+    assert_eq!(stats.reads.get(), 3, "recently used block was evicted");
+
+    // Fill all N slots, promote the oldest, then force an eviction.
+    face.trim();
+    stats.reads.set(0);
+    for block in 0..READ_CACHE_SLOTS {
+        face.advance((block * 512) as u16).unwrap();
+    }
+    face.advance(0).unwrap();
+    face.advance((READ_CACHE_SLOTS * 512) as u16).unwrap();
+    face.advance(0).unwrap();
+    assert_eq!(stats.reads.get(), READ_CACHE_SLOTS + 1);
 }

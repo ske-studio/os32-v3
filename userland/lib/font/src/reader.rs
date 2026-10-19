@@ -39,12 +39,14 @@ pub fn read_exact_at<S: Source>(source: &mut S, offset: u64, dst: &mut [u8]) -> 
 struct Slot {
     start: u64,
     valid: usize,
+    lru: usize,
     data: [u8; READ_CACHE_SLOT_BYTES],
 }
 impl Slot {
     const EMPTY: Self = Self {
         start: 0,
         valid: 0,
+        lru: READ_CACHE_SLOTS,
         data: [0; READ_CACHE_SLOT_BYTES],
     };
 }
@@ -52,14 +54,12 @@ impl Slot {
 struct Reader<S> {
     source: S,
     slots: [Slot; READ_CACHE_SLOTS],
-    next: usize,
 }
 impl<S: Source> Reader<S> {
     fn new(source: S) -> Self {
         Self {
             source,
-            slots: [Slot::EMPTY, Slot::EMPTY],
-            next: 0,
+            slots: [const { Slot::EMPTY }; READ_CACHE_SLOTS],
         }
     }
 
@@ -80,11 +80,22 @@ impl<S: Source> Reader<S> {
             let index = match cached {
                 Some(index) => index,
                 None => {
-                    let index = self.next;
-                    self.next = (self.next + 1) % READ_CACHE_SLOTS;
+                    let index = self
+                        .slots
+                        .iter()
+                        .position(|s| s.valid == 0)
+                        .or_else(|| {
+                            self.slots
+                                .iter()
+                                .enumerate()
+                                .max_by_key(|(_, s)| s.lru)
+                                .map(|(i, _)| i)
+                        })
+                        .ok_or(Error::Invalid)?;
                     let slot = self.slots.get_mut(index).ok_or(Error::Invalid)?;
                     // Invalidate before I/O: partial data must never become a cache hit.
                     slot.valid = 0;
+                    slot.lru = READ_CACHE_SLOTS;
                     let len = (size - start).min(READ_CACHE_SLOT_BYTES as u64) as usize;
                     let bytes = slot.data.get_mut(..len).ok_or(Error::Bounds)?;
                     read_exact_at(&mut self.source, start, bytes)?;
@@ -93,6 +104,14 @@ impl<S: Source> Reader<S> {
                     index
                 }
             };
+            // Rank 0 is MRU. Promote hits as well as fills, with no clock overflow.
+            let rank = self.slots.get(index).ok_or(Error::Invalid)?.lru;
+            for slot in &mut self.slots {
+                if slot.valid != 0 && slot.lru < rank {
+                    slot.lru += 1;
+                }
+            }
+            self.slots.get_mut(index).ok_or(Error::Invalid)?.lru = 0;
             let slot = self.slots.get(index).ok_or(Error::Invalid)?;
             let count = rest
                 .len()
@@ -171,8 +190,8 @@ pub struct Metrics {
     pub line_gap: i16,
 }
 
-/// Owns its source and two fixed read-cache slots. Scalar/index management is
-/// separate from the 4096 cache bytes in the a1 budget. Dropping closes an owning
+/// Owns its source and READ_CACHE_SLOTS fixed LRU read-cache slots (default 4KiB).
+/// Scalar/index management is separate from cache bytes. Dropping closes an owning
 /// adapter through its usual Drop; no other FD or memory registry is introduced.
 pub struct Face<S> {
     reader: Reader<S>,

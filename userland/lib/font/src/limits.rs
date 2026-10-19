@@ -16,5 +16,6 @@ pub const MAX_TABLES: usize = 32;
 pub const MAX_CMAP_SUBTABLES: usize = 32;
 pub const MAX_CMAP_SEGMENTS: usize = 8192;
 pub const MAX_CMAP_GROUPS: usize = 16384;
+// Tune the fixed LRU capacity here; no heap allocation or whole-file residency.
 pub const READ_CACHE_SLOTS: usize = 2;
 pub const READ_CACHE_SLOT_BYTES: usize = 2 * 1024;
