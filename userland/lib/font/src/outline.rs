@@ -404,7 +404,9 @@ impl OutlineBuilder for Builder<'_> {
         self.record(result);
     }
     fn curve_to(&mut self, _: f32, _: f32, _: f32, _: f32, _: f32, _: f32) {
-        self.error = Some(Error::Unsupported);
+        if self.error.is_none() {
+            self.error = Some(Error::Unsupported);
+        }
     }
     fn close(&mut self) {
         if self.error.is_some() {

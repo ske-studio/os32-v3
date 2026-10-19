@@ -7,22 +7,18 @@ host testing only. Nothing is installed into the product's font assets.
 from pathlib import Path
 import argparse
 import hashlib
-import io
+import sys
 import json
 import os
 import shutil
 import subprocess
 import tempfile
-import urllib.request
-import zipfile
 
 from test_font_reader import product_grep
 
 ROOT = Path(__file__).resolve().parents[2]
 CRATE = ROOT / 'userland/lib/font'
 JF_HASH = '5e265e45349b3328afa67dc3905a3ca3c628cf7c7e0eccea9c7ce8a8acc127cc'
-ZIP_HASH = '8e574faaaa7e27294aec66464aaf427447b2f0ccec8fe00c50e69bbf509f14b1'
-JF_URL = 'https://ftp.iij.ad.jp/pub/osdn.jp/users/8/8542/jfdotfont-20150527.zip'
 MUTATIONS = [
     ('close-range', '                self.first_edge = self.edges;\n                self.current = None;',
      '                self.current = None;', 'empty_contour_keeps_its_own_edge_range'),
@@ -45,20 +41,17 @@ MUTATIONS = [
 
 
 def shinonome(work):
-    home = Path.home() / 'os32-tmp/run/shinonome'
-    path = Path(os.environ.get('OS32_FONT_SHINONOME', home / 'jf/JF-Dot-Shinonome16.ttf'))
-    if not path.exists():
-        archive = home / 'sources/jfdotfont-20150527.zip'
+    path = os.environ.get('OS32_FONT_SHINONOME')
+    if path is None:
+        # The single fetch path (pinned zip/TTF SHA-256); --zip for offline runs.
+        cmd = [sys.executable, '-B', str(ROOT / 'tools/fetch_fonts.py'),
+               '--family', 'jfdot-shinonome16', '--font-dir', str(work / 'jf')]
+        archive = Path.home() / 'os32-tmp/run/shinonome/sources/jfdotfont-20150527.zip'
         if archive.exists():
-            data = archive.read_bytes()
-        else:
-            with urllib.request.urlopen(JF_URL, timeout=120) as response:
-                data = response.read()
-        assert hashlib.sha256(data).hexdigest() == ZIP_HASH, 'JF archive hash'
-        with zipfile.ZipFile(io.BytesIO(data)) as z:
-            name = next(n for n in z.namelist() if Path(n).name == 'JF-Dot-Shinonome16.ttf')
-            path = work / 'JF-Dot-Shinonome16.ttf'
-            path.write_bytes(z.read(name))
+            cmd += ['--zip', str(archive)]
+        subprocess.run(cmd, check=True)
+        path = work / 'jf/JF-Dot-Shinonome16.ttf'
+    path = Path(path)
     assert hashlib.sha256(path.read_bytes()).hexdigest() == JF_HASH, 'JF original hash'
     print('JF fixture SHA256=' + JF_HASH, flush=True)
     return path
