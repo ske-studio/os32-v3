@@ -4,6 +4,7 @@ check-v86-call-host:
 - exec/exec.c
 - kernel/v86.c
 - kernel/v86_module.c
+- userland/tests/kstr_v86.c
 - tools/tests/v86_call_host.c
 - tools/tests/test_v86_call.py
 - tools/tests/host32.py

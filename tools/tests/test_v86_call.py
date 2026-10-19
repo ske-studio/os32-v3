@@ -16,18 +16,26 @@ MUTANTS = [
      'call.path[i], VFS_MAX_PATH) && i == 0) {', 'second-path-copy-failure'),
     ('call', 'if (!mailbox) { *result = OS32_ERR_NOSPC; return 1; }',
      'if (0) { *result = OS32_ERR_NOSPC; return 1; }', 'boot-mailbox-allocation-failure'),
+    ('call', 'i < paths;', 'i < paths && i == 0;', 'boot2-second-input-unchecked'),
+    ('guest', 'api->v86_boot2("/__t4b8b_missing__", bad);',
+     'api->v86_boot2("/__t4b8b_missing__", 0);', 'boot2-guest-second-input-NULL'),
+    ('guest', "memset(bad, '!', 16);", "memset(bad, 0, 16);",
+     'boot2-guest-second-input-terminated'),
     ('call', 'call.pinned = 0;', '(void)0;', 'pin-release'),
 ]
 
 
 def main():
     sources = {'call': (ROOT / 'exec/v86_call.c').read_text(),
-               'redir': (ROOT / 'exec/redir_access.c').read_text()}
+               'redir': (ROOT / 'exec/redir_access.c').read_text(),
+               'guest': (ROOT / 'userland/tests/kstr_v86.c').read_text().replace(
+                   '#include <string.h>', '')}
     with tempfile.TemporaryDirectory(prefix='v86-call-') as td:
         folder = Path(td)
         def run(parts, red=False):
             for key, body in parts.items():
-                (folder / ('v86_call_source.c' if key == 'call' else 'redir_source.c')).write_text(body)
+                (folder / {'call': 'v86_call_source.c', 'redir': 'redir_source.c',
+                           'guest': 'guest_host_source.c'}[key]).write_text(body)
             exe = folder / 'entry'
             subprocess.run(['gcc', '-m32', '-std=gnu11', '-Os', '-Wall', '-Wextra',
                             '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector',

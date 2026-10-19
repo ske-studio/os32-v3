@@ -1,5 +1,6 @@
 /* Actual entry and T2 checked copies. CPU root loads, slots and VA->PA walks
  * are explicit substitutes; this does not simulate V86/IRQ hardware entry. */
+#include "os32api.h"
 #include "types.h"
 #include "vfs.h"
 #include "appslot.h"
@@ -132,6 +133,85 @@ static u32 dispatch(u32 slot, u32 a, u32 b, u32 n)
     heap_used = 872;
     return result;
 }
+void *kmemset(void *p, int v, u32 n)
+{
+    for (u32 i = 0; i < n; i++) ((u8 *)p)[i] = (u8)v;
+    return p;
+}
+static int equal(const char *a, const char *b)
+{
+    while (*a && *a == *b) { a++; b++; }
+    return *a == *b;
+}
+#define main guest_main
+#define memcpy kmemcpy
+#define memset kmemset
+#define strcmp(a, b) (!equal(a, b))
+#include "guest_host_source.c"
+#undef strcmp
+#undef memset
+#undef memcpy
+#undef main
+
+static int guest_mapped, guest_unmapped, guest_armed, guest_calls;
+static void *guest_fault[5];
+static void *guest_map(u32 bytes, void *hint, u32 flags)
+{
+    CHECK(bytes == PAGE_SIZE * 2 && !hint && !flags && !guest_mapped);
+    guest_mapped++;
+    return (void *)MEM_EXEC_LOAD_ADDR;
+}
+static int guest_unmap(void *base, u32 bytes)
+{
+    CHECK(base == (void *)(MEM_EXEC_LOAD_ADDR + PAGE_SIZE) && bytes == PAGE_SIZE);
+    CHECK(guest_mapped == 1 && !guest_unmapped);
+    guest_unmapped++;
+    return 0;
+}
+static void guest_print(u8 attr, const char *format, ...)
+{
+    CHECK(attr == 7 && guest_unmapped == 1 && !guest_armed);
+    CHECK(equal(format, "KSTR armed %s; expect FAULT before target\n"));
+    __builtin_va_list ap;
+    __builtin_va_start(ap, format);
+    CHECK(equal(__builtin_va_arg(ap, const char *), "boot2"));
+    __builtin_va_end(ap);
+    guest_armed++;
+}
+static int guest_boot2(const char *path, const char *second)
+{
+    u32 va = MEM_EXEC_LOAD_ADDR, tail = va + PAGE_SIZE;
+    u8 *data = user;
+    CHECK(guest_mapped == 1 && guest_unmapped == 1 && guest_armed == 1);
+    CHECK(equal(path, "/__t4b8b_missing__"));
+    CHECK(second == (const char *)(uptr)(tail - 16));
+    for (u32 i = 0; i < 16; i++) CHECK(second[i]);
+    /* Synchronize the guest writes into the distinct B1 physical backing.
+     * The page-access substitute rejects the second page, and the real dispatch
+     * must fault before kapi_invoke (the V86 wrapper entry) is reached. */
+    CHECK(reject_second);
+    kmemcpy(data + 512, path, sizeof("/__t4b8b_missing__"));
+    kmemcpy(data + PAGE_SIZE - 16, second, 16);
+    u32 before = calls;
+    CHECK((int)dispatch(KAPI_SLOT_V86_BOOT2, va + 512, tail - 16, 8) == OS32_ERR_INVAL);
+    CHECK(entry_fault && calls == before);
+    guest_calls++;
+    __builtin_longjmp(guest_fault, 1);
+    return 0;
+}
+static void guest_boot2_test(void)
+{
+    KernelAPI api = {.mem_map = guest_map, .mem_unmap = guest_unmap,
+                     .kprintf = guest_print, .v86_boot2 = guest_boot2};
+    char *argv[] = {"kstr_v86", "boot2"};
+    CHECK(guest_main(1, argv, &api) == 1 && !guest_mapped);
+    if (!__builtin_setjmp(guest_fault)) {
+        guest_main(2, argv, &api);
+        CHECK(0); /* A surviving or missing boot2 call is never a pass. */
+    }
+    CHECK(guest_calls == 1 && !ptes);
+    SAY("PASS kstr_v86 boot2: bad second input faults before V86, no effects");
+}
 void _start(void)
 {
     slots[2].state = APP_STATE_RUNNING;
@@ -147,6 +227,12 @@ void _start(void)
     fail_alloc = 0;
     CHECK(v86_call_init() && v86_call_init() && allocations == 1);
     CHECK(heap_used == 872);
+    u32 map_args[6] = {USER_BASE, PAGE_SIZE * 2, 3, 0x32, ~0U, 0}, mapped;
+    __asm__ volatile("int $0x80" : "=a"(mapped) : "a"(90), "b"(map_args) : "memory");
+    CHECK(mapped == USER_BASE);
+    reject_second = 1;
+    guest_boot2_test();
+    reject_second = 0;
     user[0] = 'a'; user[1] = 0; user[PAGE_SIZE] = 'b';
     CHECK(!dispatch(KAPI_SLOT_V86_SELFTEST, 0, 0, 0));
     CHECK(!dispatch(KAPI_SLOT_V86_BOOT2, USER_BASE, USER_BASE + PAGE_SIZE, 8));
