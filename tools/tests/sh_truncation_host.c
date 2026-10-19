@@ -2897,7 +2897,7 @@ static void case_ui_history_and_line(void)
     key_push_run('a', 600);              /* 613 バイト — 実行はされる */
     key_push(0x0D);
     ui_exit();
-    shell_run();
+    shell_run(0);
     /* 打鍵はそのまま画面へエコーされるので、出力に 1 回は必ず出る。
      * **2 回目**が「echo が実際に走った」証拠 (外部コマンド名では T3 の
      * 510 バイト上限が先に断つので窓にならない)。 */
@@ -2913,7 +2913,7 @@ static void case_ui_history_and_line(void)
     key_push_run('a', 506);              /* 511 バイトちょうど */
     key_push(0x0D);
     ui_exit();
-    shell_run();
+    shell_run(0);
     check(hist_count == 2, "24c 511 バイトちょうどは履歴に入る");
     check(str_eq(hist_buf[1], "exit"), "24d 同上: 2 件目は exit");
 
@@ -2958,7 +2958,7 @@ static void case_ui_history_and_line(void)
     key_push_run('a', 4090);             /* 4103 バイト — 4092 で捨てる */
     key_push(0x0D);
     ui_exit();
-    shell_run();
+    shell_run(0);
     check(out_count("MK22OUT") == 1,
           "24h 打鍵を捨てた行は**実行しない** (エコーの 1 回だけ)");
     check(out_has("sh: line too long"), "24i 断りを 1 行出す");
@@ -2972,7 +2972,7 @@ static void case_ui_history_and_line(void)
     key_push_run('a', 4079);             /* 4092 バイトちょうど */
     key_push(0x0D);
     ui_exit();
-    shell_run();
+    shell_run(0);
     check(out_count("MK23OUT") == 2,
           "24k 4092 バイトちょうどは今までどおり実行する");
     check(!out_has("sh: line too long"), "24l 同上: 断らない");
@@ -2986,7 +2986,7 @@ static void case_ui_history_and_line(void)
     key_push_str("mk25");
     key_push(0x0D);
     ui_exit();
-    shell_run();
+    shell_run(0);
     check(out_count("MK24OUT") == 1, "24m ESC で捨てた行は実行されない");
     check(ran("mk25"), "24n ESC の後の行は普通に実行する");
     check(!out_has("sh: line too long"), "24o ESC で印が消えている");
@@ -3033,7 +3033,7 @@ static void case_ui_history_and_line(void)
         file_add(cut_path, "mkprof\n");
         key_push_str("exit");
         key_push(0x0D);
-        shell_run();
+        shell_run(0);
         check(!ran("mkprof"),
               "24t HOME が長いとき切れた別ディレクトリの .profile を読まない");
         check(!opened_path(cut_path), "24u 同上: そもそも開きにいかない");

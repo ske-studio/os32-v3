@@ -7,7 +7,7 @@
 配備のたびに掃除する。
 
 対象は **システム側ディレクトリ (/, /bin, /sbin, /usr/bin, /sys, /debug) 直下の
-*.bin** と撤去済み旧 font の 2 パス。旧 font は build/out からも消す。
+*.bin** と /sys/font/*.kcgfont・default.kcg。旧 font は build/out からも消す。
 /home /data /etc /tmp などのユーザデータには触れない。
 
 使い方:
@@ -93,7 +93,15 @@ def find_stale(root, want, retired_only=False):
             gp = '/' + (d + '/' if d else '') + f
             if gp not in want:
                 stale.append((gp, p))
-    for gp in RETIRED_PATHS:
+    retired = set(RETIRED_PATHS)
+    font_dir = os.path.join(root, 'sys/font')
+    try:
+        retired.update('/sys/font/' + f for f in os.listdir(font_dir)
+                       if f.endswith('.kcgfont'))
+    except OSError as exc:
+        if exc.errno != errno.ENOENT:
+            raise
+    for gp in sorted(retired):
         p = os.path.join(root, gp.lstrip('/'))
         try:
             st = os.lstat(p)

@@ -627,17 +627,21 @@ class Prune(Base):
         self._patch(nd, 'ensure_local_nhd', lambda: True)
 
     def _deploy_retired_fonts(self):
-        paths = ('sys/font/default.kcgfont', 'sys/font/default.kcg')
+        paths = ('sys/font/default.kcgfont', 'sys/font/default.kcg',
+                 'sys/font/mincho.kcgfont', 'sys/font/other.kcgfont')
         for root in (self.hostdrv, self.mount, self.build / 'build/out'):
             for rel in paths:
                 path = root / rel
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(b'OLD FONT')
+            (root / 'sys/font/listed.kcgfont').write_bytes(b'KEEP FONT')
+            (root / 'sys/font/readme.txt').write_bytes(b'KEEP DOC')
+            (root / 'outside.kcgfont').write_bytes(b'KEEP OUTSIDE')
         keep = self.build / 'build/out/current.bin'
         keep.write_bytes(b'KEEP')
         self.manifest([])
         self._patch(ps, 'PROJ_DIR', str(self.build))
-        self._patch(ps, 'wanted_guest_paths', lambda: set())
+        self._patch(ps, 'wanted_guest_paths', lambda: {'/sys/font/listed.kcgfont'})
         self._patch(sys, 'argv', ['prune_stale.py', 'both', '--delete'])
         # deploy-kernel: recursive copy followed by the existing prune CLI.
         self.assertTrue(nd.do_sync_from_hostdrv())
@@ -645,15 +649,22 @@ class Prune(Base):
         for root in (self.hostdrv, self.mount, self.build / 'build/out'):
             for rel in paths:
                 self.assertFalse((root / rel).exists(), str(root / rel))
+            for rel in ('sys/font/listed.kcgfont', 'sys/font/readme.txt', 'outside.kcgfont'):
+                self.assertTrue((root / rel).exists(), str(root / rel))
         self.assertEqual(keep.read_bytes(), b'KEEP')
 
     def test_deploy_removes_retired_fonts(self):
         self._deploy_retired_fonts()
         if os.environ.get('MUTATE') == '1':
-            self._patch(ps, 'RETIRED_PATHS', ())
+            source = pathlib.Path(ps.__file__).read_text()
+            old = "if f.endswith('.kcgfont'))"
+            self.assertEqual(source.count(old), 1)
+            namespace = vars(ps).copy()
+            exec(compile(source.replace(old, 'if False)'), ps.__file__, 'exec'), namespace)
+            self._patch(ps, 'find_stale', namespace['find_stale'])
             with self.assertRaises(AssertionError):
                 self._deploy_retired_fonts()
-            print('RED retired font prune removed (deployment assertion)')
+            print('RED wildcard font prune removed (compiled, deployment assertion)')
 
     def _stale(self, root, names):
         entries = []

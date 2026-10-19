@@ -177,6 +177,8 @@ int appslot_gfx_owner(void) { return host_gfx_owner; }
 int appslot_gfx_claim(int gui) { (void)gui;return 0; }
 static int host_kcg_ready = 1;
 int kcg_module_ready(void) { return host_kcg_ready; }
+static int host_exit_count, host_exit_status;
+void __cdecl kapi_sys_exit(int status) { host_exit_count++; host_exit_status = status; }
 int appslot_abort_request(void) { slot.abort_req = 1; return 1; }
 int con_sink_is_enabled(void) { return host_gui; }
 /* These graphics lifecycle cases model NP21/W; gate rejection is covered

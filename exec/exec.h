@@ -30,6 +30,7 @@
 /* プログラムのロード先 (固定) */
 /* ======== API ======== */
 void exec_init(void);
+void __cdecl kapi_sys_exit(int status);
 i32 exec_trim_done(u32 epoch);
 
 /* 従来の起動。子が終わるまで呼び出し元を塞ぐ (CUI の入れ子はこれ)。 */
