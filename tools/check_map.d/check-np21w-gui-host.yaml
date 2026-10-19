@@ -2,6 +2,7 @@ check-np21w-gui-host:
 - tools/np21w_mcp/gui.py
 - tools/np21w_mcp/gui_desc.py
 - tools/tests/test_gui_desc.py
+- exec/shell_service.h
 - tools/tests/os32api_host.py
 - userland/gshell/**
 - sdk/rust/os32api/**

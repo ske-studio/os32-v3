@@ -47,6 +47,14 @@ def build_fixture(gshell, out, rlib):
         for m in re.finditer(r"^#define\s+(OS32_GUI_DIAG_P[12]_[XY])\s+(\d+)", header, re.M))
     assert points.count("const ") == 4, "OS32_GUI_DIAG_P* missing"
     (out / "diag_points.rs").write_text(points)
+    # ffi.rs includes OUT_DIR/shell_service.rs, made from exec/shell_service.h (T7b-b2).
+    svc = (ROOT / "exec/shell_service.h").read_text()
+    consts = ""
+    for name in ("SHELL_SERVICE_MAGIC", "SHELL_SERVICE_VERSION", "SHELL_SERVICE_SIZE"):
+        m = re.search(r"^#define\s+%s\s+(\S+)" % name, svc, re.M)
+        assert m, name + " missing"
+        consts += f"pub const {name}: u32 = {int(m[1].rstrip('uU'), 0):#x};\n"
+    (out / "shell_service.rs").write_text(consts)
     exe = out / "fixture"
     subprocess.run(["rustc", "--edition=2021", "--test", "--crate-name=gshell",
                     "-C", "symbol-mangling-version=v0", str(root),
