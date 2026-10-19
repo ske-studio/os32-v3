@@ -39,7 +39,8 @@ make OS32_SDK=../..
 ## アプリを書くときの約束
 
 CRT の `_start` → `_start_c` が `main` を名前で呼び、戻り値を終了コードにします
-(`sdk/crt/crt0.asm:36`、`sdk/crt/crt0_c.c:47`)。ソース内の関数の順序に制約はありません。
+(`sdk/crt/crt0.asm:37`、`sdk/crt/crt0_c.c:55`)。ソース内の関数の順序に制約はありません。
+`_start_c` の第 4 引数 (`__os32_aux` に控える) は常駐 shell 向けの内部入口で、app には 0 が渡ります。app は使いません。
 
 ```c
 int main(int argc, char **argv, KernelAPI *api);

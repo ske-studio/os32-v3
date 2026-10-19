@@ -134,6 +134,16 @@ fs/fatfs/diskio.o: fs/fatfs/diskio.c fs/fatfs/ff.h fs/fatfs/diskio.h
 exec/%.o: exec/%.c kapi/kapi_generated.c
 	$(CC) $(CFLAGS_BASE) $(INC_EXEC) -c $< -o $@
 
+# 常駐 shell の内部入口 (T7b-b2、exec/shell_service.c)。wrapper は
+# __builtin_return_address(0) で呼び手を確かめるので、このファイルだけ
+# 尾呼出しを封じて組む (設計 §3-2)。
+SHELL_SERVICE_OBJ = $(KERNEL_OBJ_PREFIX)exec/shell_service.o
+$(SHELL_SERVICE_OBJ): private KERNEL_CFLAGS += -fno-optimize-sibling-calls
+# S3a: 呼ぶ先 (kernel/font_source.c の font_lease_shell_*) が S2、結線が S3b
+# なので、まだ C_KERNEL に入れずコンパイルだけする (-Werror 相当の確認は
+# tools/tests/test_shell_service.py --target)。S3b で C_KERNEL へ移し、
+# この順序だけの前提を消す。
+
 # kapi/ モジュール
 KAPI_GENERATED := kapi/kapi_generated.c exec/exec_kapi_init.inc \
     sdk/include/os32/os32_kapi_generated.h sdk/include/os32/os32_kapi_slots.h \
@@ -157,7 +167,7 @@ kapi/%.o: kapi/%.c kapi/kapi_generated.c
 lib/%.o: lib/%.c
 	$(CC) $(CFLAGS_BASE) $(INC_LIB) -c $< -o $@
 
-$(BUILD_OUT)/kernel.elf: $(BUILD_OUT)/os32.ld $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(BUILD_ID_OBJ)
+$(BUILD_OUT)/kernel.elf: $(BUILD_OUT)/os32.ld $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(BUILD_ID_OBJ) | $(SHELL_SERVICE_OBJ)
 	$(LD) $(LDFLAGS) -o $@ $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(BUILD_ID_OBJ) -lgcc
 
 $(BUILD_OUT)/kernel.bin: $(BUILD_OUT)/kernel.elf

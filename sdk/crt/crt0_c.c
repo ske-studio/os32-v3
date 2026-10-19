@@ -12,6 +12,13 @@ KernelAPI *kapi;
  * へ写す。crt0 を通るバイナリはすべてここで刻印を持つ。 */
 OS32_KAPI_LAYOUT_STAMP();
 
+/* entry frame の 4 語目 (T7b-b2)。常駐 shell (gshell) には kernel の内部入口の
+ * 表 (exec/shell_service.h の ShellService) の番地、app には 0 が渡る。
+ * KAPI ではない (表は KAPI / trampoline / import 表に載らない)。main の署名は
+ * 変えない — 使うのは常駐 shell だけで、magic / version を確かめてから読む
+ * (userland/gshell/src/ffi.rs)。 */
+void *__os32_aux;
+
 extern int main(int argc, char **argv, KernelAPI *api);
 extern void _init(void);
 
@@ -28,10 +35,11 @@ static int _is_help_flag(const char *s)
     return 0;
 }
 
-void _start_c(int argc, char **argv, KernelAPI *api) {
+void _start_c(int argc, char **argv, KernelAPI *api, void *aux) {
     int ret;
 
     kapi = api;
+    __os32_aux = aux;
 
     _init();
 

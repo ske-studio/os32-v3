@@ -1,0 +1,15 @@
+check-shell-service-host:
+- exec/shell_service.c
+- exec/shell_service.h
+- exec/ring3_str.c
+- exec/ring3_str.h
+- exec/appslot.h
+- exec/exec.h
+- kernel/gui.h
+- fs/fd_redirect.h
+- build/kernel.mk
+- tools/tests/host32.py
+- tools/tests/shell_service_host.c
+- tools/tests/test_shell_service.py
+- tools/check_map.d/check-shell-service-host.yaml
+- build/checks.d/check-shell-service-host.mk

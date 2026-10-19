@@ -30,7 +30,8 @@ _start:
     rep stosb
 .bss_done:
 
-    ; スタックには exec.c から [esp+12]=kapi, [esp+8]=argv, [esp+4]=argc 
+    ; スタックには exec.c から [esp+16]=aux (常駐 shell は内部入口の表、app は 0),
+    ; [esp+12]=kapi, [esp+8]=argv, [esp+4]=argc 
     ; 呼び出し元のリターンアドレスが[esp]に積まれている状態
     ; そのまま _start_c へジャンプすれば引数が引き継がれる
     jmp _start_c

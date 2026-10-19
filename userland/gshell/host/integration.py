@@ -378,6 +378,15 @@ MUTATIONS = [
      '    if !list[1].is_empty() && taskbar::refresh_if_hit(st, list[1]) {\n        queue_present(st, list[1]);\n    }\n    if !list[2].is_empty() && startmenu::refresh_if_hit(st, list[2]) {\n        queue_present(st, list[2]);\n    }\n    if !list[3].is_empty() && fep::refresh_if_hit(st, list[3]) {\n        queue_present(st, list[3]);\n    }\n',
      '    if !list[3].is_empty() && fep::refresh_if_hit(st, list[3]) {\n        queue_present(st, list[3]);\n    }\n    if !list[1].is_empty() && taskbar::refresh_if_hit(st, list[1]) {\n        queue_present(st, list[1]);\n    }\n    if !list[2].is_empty() && startmenu::refresh_if_hit(st, list[2]) {\n        queue_present(st, list[2]);\n    }\n',
      'fep_over_taskbar_keeps_its_order'),
+    # T7b-b2 S3a: __os32_aux の表は印と版を確かめてから使う。
+    ('shell service magic unchecked', 'src/ffi.rs',
+     '    if magic != SHELL_SERVICE_MAGIC || version != SHELL_SERVICE_VERSION {',
+     '    if version != SHELL_SERVICE_VERSION {',
+     'shell_service_aux_is_checked_before_use'),
+    ('shell service version unchecked', 'src/ffi.rs',
+     '    if magic != SHELL_SERVICE_MAGIC || version != SHELL_SERVICE_VERSION {',
+     '    if magic != SHELL_SERVICE_MAGIC {',
+     'shell_service_aux_is_checked_before_use'),
 ]
 
 
