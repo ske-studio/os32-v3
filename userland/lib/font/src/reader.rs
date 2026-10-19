@@ -192,7 +192,7 @@ pub struct Metrics {
     pub line_gap: i16,
 }
 
-/// Owns its source and READ_CACHE_SLOTS fixed LRU read-cache slots (default 4KiB).
+/// Owns its source and READ_CACHE_SLOTS fixed LRU read-cache slots (default 16 x 1KiB).
 /// Scalar/index management is separate from cache bytes. Dropping closes an owning
 /// adapter through its usual Drop; no other FD or memory registry is introduced.
 pub struct Face<S> {

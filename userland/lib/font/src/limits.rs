@@ -20,8 +20,13 @@ pub const MAX_CMAP_SUBTABLES: usize = 32;
 pub const MAX_CMAP_SEGMENTS: usize = 8192;
 pub const MAX_CMAP_GROUPS: usize = 16384;
 // Tune the fixed LRU capacity here; no heap allocation or whole-file residency.
-pub const READ_CACHE_SLOTS: usize = 2;
-pub const READ_CACHE_SLOT_BYTES: usize = 2 * 1024;
+// T7b-a6 (NP21/W, JF Dot Shinonome 16, format 4 with 4,119 segments): 2x2KiB
+// thrashed between the cmap arrays (open = 16,479 reads, 29 s); 16x1KiB opens in
+// 39 reads (0.13 s) and keeps 1,000 sequential glyphs at 188 reads. A read costs
+// ~1.1 ms at 1KiB and ~1.8 ms at 2KiB there, so slots stay 1KiB. 16KiB per face.
+// Evidence: ~/os32-tmp/evidence/2026-10-20/t7ba6/RESULT.md.
+pub const READ_CACHE_SLOTS: usize = 16;
+pub const READ_CACHE_SLOT_BYTES: usize = 1024;
 // T7b-a5 raster: the outline is rasterised once at RASTER_PPEM (unhinted,
 // FreeType-compatible 26.6 point scaling, exact area coverage); 32px is that 1bpp bitmap doubled (nearest neighbour).
 pub const RASTER_PPEM: u16 = 16;

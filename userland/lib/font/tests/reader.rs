@@ -441,7 +441,7 @@ fn exact_and_exceeded_limits() {
         assert_eq!(f.is_ok(), groups <= MAX_CMAP_GROUPS, "group cap {groups}");
     }
     assert!(READ_CACHE_SLOTS > 0);
-    assert_eq!(READ_CACHE_SLOT_BYTES, 2048);
+    assert_eq!(READ_CACHE_SLOT_BYTES, 1024);
     println!(
         "sizeof host Face<Memory>={} (cache data={}, no allocation in reader)",
         std::mem::size_of::<Face<Memory>>(),

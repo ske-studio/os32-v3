@@ -14,6 +14,11 @@
  *                  ラスタして FONTCHK 行 (字数・黒画素数・FNV-1a) を出す。値は
  *                  tools/tests/test_font_raster.py の EXPECT 行と比べる。
  *   font_test      見本の描画 (16px と 32px)。キーで戻る。
+ *   font_test -p   T7b-a6 計測: 3 書体の open、東雲で 1000 字 (seq、-s は scatter) の
+ *                  cold/warm と内訳 (lookup だけ / 輪郭まで / raster まで) の tick・
+ *                  read_at 回数・byte、1 字の最大 tick、作業域の大きさを出す。
+ *   font_test -f   T7b-a6 計測: 空き FD を開けるだけ開いて数える (FD 残数)。
+ *                  3 書体を開いたままの数も出す。開いた FD は全部閉じる。
  *
  * x87: アプリの FPU 文脈で動く (CPL=3 の前景)。gshell/製品の呼出しは
  * T7b-a2 の font_guard_run を通す (b3)。
@@ -24,7 +29,8 @@
 extern crate os32api;
 
 use os32_font::{
-    limits::MAX_BITMAP_BYTES,
+    limits::{MAX_BITMAP_BYTES, READ_CACHE_SLOTS, READ_CACHE_SLOT_BYTES},
+    outline::GlyphScratch,
     raster::{PixelSize, Placement, RasterScratch},
     reader::{Error, Face, Result, Source},
 };
@@ -41,6 +47,14 @@ const CHECK_RANGES: [(u32, u32); 4] = [(0x20, 0x7e), (0xa0, 0xff), (0x3000, 0x30
 
 const SCREEN_W: i32 = 640;
 const SCREEN_H: i32 = 400;
+
+/* T7b-a6 計測: Source 層の read_at (= read cache の miss) を数える。 */
+static mut IO_CALLS: u32 = 0;
+static mut IO_BYTES: u32 = 0;
+static mut IO_TICKS: u32 = 0;
+fn io_stats() -> (u32, u32, u32) {
+    unsafe { (IO_CALLS, IO_BYTES, IO_TICKS) }
+}
 
 /// 開いた FD の位置指定読み (lseek + read)。短読はそのまま返す。
 struct FdSource {
@@ -75,6 +89,18 @@ impl Source for FdSource {
     }
     fn read_at(&mut self, offset: u64, dst: &mut [u8]) -> Result<usize> {
         let offset = i32::try_from(offset).map_err(|_| Error::Bounds)?;
+        let t0 = os32api::get_tick();
+        let r = self.read_at_raw(offset, dst);
+        unsafe {
+            IO_CALLS += 1;
+            IO_BYTES += dst.len() as u32;
+            IO_TICKS += os32api::get_tick().wrapping_sub(t0);
+        }
+        r
+    }
+}
+impl FdSource {
+    fn read_at_raw(&mut self, offset: i32, dst: &mut [u8]) -> Result<usize> {
         unsafe {
             let a = os32api::api();
             if (a.sys_lseek)(self.fd, offset, os32api::fs::SEEK_SET) != offset {
@@ -176,6 +202,161 @@ fn check_face(path: &[u8], name: &[u8]) {
     );
 }
 
+/* ---------------- T7b-a6 計測 (-p / -f) ---------------- */
+
+static mut OUTLINE: GlyphScratch = GlyphScratch::new();
+static mut CPS: [u32; PERF_CHARS] = [0; PERF_CHARS];
+const PERF_CHARS: usize = 1000;
+
+#[derive(Clone, Copy, PartialEq)]
+enum Stage {
+    Lookup,
+    Outline,
+    Raster,
+}
+
+/// 東雲の cmap にある字を workload の順に PERF_CHARS 字集める。
+/// seq: かな 3040-30FF → 漢字 4E00- の符号順。scatter: 4E00-9FFF を
+/// 7919 刻みで巡回 (20992 と互いに素 = 置換) — 文章の漢字のばらけ方の近似。
+fn collect(face: &mut Face<FdSource>, scatter: bool) -> usize {
+    let cps = unsafe { &mut *core::ptr::addr_of_mut!(CPS) };
+    let mut n = 0;
+    let mut push = |face: &mut Face<FdSource>, cp: u32, n: &mut usize| {
+        if *n < PERF_CHARS && matches!(face.glyph_index(cp), Ok(Some(g)) if g != 0) {
+            cps[*n] = cp;
+            *n += 1;
+        }
+    };
+    if scatter {
+        for k in 0..0x5200u32 {
+            push(face, 0x4e00 + (k * 7919) % 0x5200, &mut n);
+        }
+    } else {
+        for cp in (0x3040..=0x30ffu32).chain(0x4e00..=0x9fffu32) {
+            push(face, cp, &mut n);
+        }
+    }
+    n
+}
+
+/// 1 pass: 時間 (tick)、read_at 回数・byte・その中の tick、1 字の最大 tick。
+fn pass(face: &mut Face<FdSource>, n: usize, stage: Stage, label: &[u8]) {
+    let cps = unsafe { &*core::ptr::addr_of!(CPS) };
+    let (c0, b0, i0) = io_stats();
+    let t0 = os32api::get_tick();
+    let mut worst = 0u32;
+    let mut black = 0u32;
+    let mut fail = 0u32;
+    for &cp in cps.iter().take(n) {
+        let s = os32api::get_tick();
+        let ok = match face.glyph_index(cp) {
+            Ok(Some(gid)) if gid != 0 => match stage {
+                Stage::Lookup => true,
+                Stage::Outline => unsafe { (*core::ptr::addr_of_mut!(OUTLINE)).outline(face, gid).is_ok() },
+                Stage::Raster => match work().render(face, gid, PixelSize::Px16, bits()) {
+                    Ok(p) => {
+                        for &b in bits().get(..p.bytes()).unwrap_or(&[]) {
+                            black += b.count_ones();
+                        }
+                        true
+                    }
+                    Err(_) => false,
+                },
+            },
+            _ => false,
+        };
+        if !ok {
+            fail += 1;
+        }
+        worst = worst.max(os32api::get_tick().wrapping_sub(s));
+    }
+    let t = os32api::get_tick().wrapping_sub(t0);
+    let (c1, b1, i1) = io_stats();
+    os32api::kprint!(
+        b"PERF %s n=%d t=%d rd=%d kb=%d io=%d max=%d blk=%d f=%d\r\n\0",
+        label.as_ptr(), n as i32, t as i32, (c1 - c0) as i32, ((b1 - b0) / 1024) as i32,
+        (i1 - i0) as i32, worst as i32, black as i32, fail as i32
+    );
+}
+
+fn open_face(path: &[u8], name: &[u8]) -> Option<Face<FdSource>> {
+    let (c0, b0, _) = io_stats();
+    let t0 = os32api::get_tick();
+    let face = FdSource::open(path).and_then(|s| Face::open(s).ok());
+    let t = os32api::get_tick().wrapping_sub(t0);
+    let (c1, b1, _) = io_stats();
+    os32api::kprint!(
+        b"PERF open %s ok=%d t=%d rd=%d kb=%d\r\n\0",
+        name.as_ptr(), face.is_some() as i32, t as i32, (c1 - c0) as i32, ((b1 - b0) / 1024) as i32
+    );
+    face
+}
+
+/// scatter: false = seq だけ (-p)、true = scatter だけ (-s)。1 画面に収める。
+fn perf(scatter_only: bool) {
+    os32api::kprint!(
+        b"PERF size face=%d rs=%d gs=%d bmp=%d slots=%dx%d\r\n\0",
+        core::mem::size_of::<Face<FdSource>>() as i32,
+        core::mem::size_of::<RasterScratch>() as i32,
+        core::mem::size_of::<GlyphScratch>() as i32,
+        MAX_BITMAP_BYTES as i32, READ_CACHE_SLOTS as i32, READ_CACHE_SLOT_BYTES as i32
+    );
+    if !scatter_only {
+        drop(open_face(INCONSOLATA, b"inconsolata\0"));
+        drop(open_face(IPAEXG, b"ipaexg\0"));
+    }
+    for (scatter, name) in [(false, &b"seq\0"[..]), (true, &b"scatter\0"[..])] {
+        if scatter != scatter_only {
+            continue;
+        }
+        let Some(mut face) = open_face(SHINONOME, b"shinonome\0") else { return };
+        let n = collect(&mut face, scatter);
+        drop(face);
+        os32api::kprint!(b"PERF workload %s n=%d\r\n\0", name.as_ptr(), n as i32);
+        /* 段ごとに開き直し、read cache を空にして cold で測る。 */
+        for (stage, label) in [(Stage::Lookup, &b"lookup\0"[..]), (Stage::Outline, &b"outline\0"[..])] {
+            let Some(mut f) = open_face(SHINONOME, b"shinonome\0") else { return };
+            pass(&mut f, n, stage, label);
+        }
+        let Some(mut f) = open_face(SHINONOME, b"shinonome\0") else { return };
+        pass(&mut f, n, Stage::Raster, b"cold\0");
+        pass(&mut f, n, Stage::Raster, b"warm\0");
+    }
+}
+
+/// 空き FD を開けるだけ開いて数え、全部閉じる。
+fn fd_probe(label: &[u8]) -> i32 {
+    let mut fds = [-1i32; 16];
+    let mut n = 0usize;
+    unsafe {
+        let a = os32api::api();
+        while n < fds.len() {
+            let fd = (a.sys_open)(IPAEXG.as_ptr(), os32api::fs::O_RDONLY);
+            if fd < 0 {
+                break;
+            }
+            fds[n] = fd;
+            n += 1;
+        }
+        for &fd in fds.iter().take(n) {
+            (a.sys_close)(fd);
+        }
+    }
+    os32api::kprint!(b"FDPROBE %s free=%d\r\n\0", label.as_ptr(), n as i32);
+    n as i32
+}
+
+fn fd_mode() {
+    fd_probe(b"base\0");
+    let a = FdSource::open(SHINONOME).and_then(|s| Face::open(s).ok());
+    let b = FdSource::open(INCONSOLATA).and_then(|s| Face::open(s).ok());
+    let c = FdSource::open(IPAEXG).and_then(|s| Face::open(s).ok());
+    os32api::kprint!(b"FDPROBE faces=%d\r\n\0", a.is_some() as i32 + b.is_some() as i32 + c.is_some() as i32);
+    fd_probe(b"with3faces\0");
+    drop((a, b, c));
+    fd_probe(b"after\0");
+}
+
 /* ---------------- 見本の描画 ---------------- */
 
 fn draw(x: i32, baseline: i32, p: &Placement, color: u8) {
@@ -246,16 +427,28 @@ fn show(ja: &mut Face<FdSource>, latin: &mut Option<Face<FdSource>>) {
 #[no_mangle]
 pub extern "C" fn main(argc: i32, argv: *const *const u8, api: *mut KernelAPI) -> i32 {
     os32api::os32_init(api);
-    let check = argc > 1 && unsafe {
-        let arg = *argv.add(1);
-        !arg.is_null() && *arg == b'-' && *arg.add(1) == b'c' && *arg.add(2) == 0
+    let opt = |c: u8| {
+        argc > 1 && unsafe {
+            let arg = *argv.add(1);
+            !arg.is_null() && *arg == b'-' && *arg.add(1) == c && *arg.add(2) == 0
+        }
     };
+    let check = opt(b'c');
+    if opt(b'f') {
+        fd_mode();
+        return 0;
+    }
 
     os32api::print(b"font_test: os32-font 16ppem 1bpp raster (32px = 2x nearest)\r\n\0");
     let Some(source) = FdSource::open(SHINONOME) else {
         os32api::print(b"font_test: SKIP font not deployed (/data/JF-Dot-Shinonome16.ttf)\r\n\0");
         return 2;
     };
+    if opt(b'p') || opt(b's') {
+        drop(source);
+        perf(opt(b's'));
+        return 0;
+    }
     if check {
         drop(source);
         check_face(SHINONOME, b"shinonome\0");
