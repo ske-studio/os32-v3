@@ -35,8 +35,9 @@ def product_grep():
         source = re.sub(r'//[^\n]*', '', path.read_text())
         assert not re.search(r'\b(?:unwrap|expect|panic|unreachable|unimplemented|todo|get_unchecked|unsafe)\b|\b(?:Vec|Box|alloc)\b', source), path
         # Every subscript in the production reader is a type/array declaration;
-        # data access must use get/get_mut, iterators, or checked conversions.
-        assert not re.search(r'\b(?!mut\b)\w+\s*\[[^\]\n]+\]', source), path
+        # Lifetime-qualified slices are declarations too; data access must use
+        # get/get_mut, iterators, or checked conversions.
+        assert not re.search(r"(?<!')\b(?!mut\b)\w+\s*\[[^\]\n]+\]", source), path
     print('PASS product grep: no unwrap/expect/panic/unchecked subscript/heap allocation', flush=True)
 
 

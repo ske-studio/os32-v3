@@ -20,5 +20,25 @@ simple-outline/composite iterators are not used. Do not connect the
 prototype's whole-file Face::parse to the product.
 
 Final linked 386 instruction validation remains the T7b-a5 gate (D36).
-This step preserves the prototype version/features and adds no runtime
-reader or rasterizer.
+The dependency version/features remain unchanged.
+
+T7b-a3/a4: reader::Face owns its Source and fixed LRU, and provides streaming
+cmap/loca/advance access. outline::GlyphScratch::outline(face, gid) gathers
+one glyph and each component occurrence through that LRU, validates spans,
+expanded points/contours, runs, components and depth, rewrites local gids,
+and invokes only public loca/glyf tables. XY components (including matrices)
+are supported; point attachment/scaled component offsets return Unsupported.
+An Err publishes zero committed counts, including after a previous success.
+Outline borrows bounded points, contour edge ranges and line/quadratic edges
+in font units, with the same command sequence/bbox as whole-file Face.
+MAX_POINTS counts stored glyf points; MAX_OUTLINE_POINTS also accommodates
+implicit midpoints and closing commands. MAX_EDGES bounds curve edges here;
+a5 must enforce it again after flattening. Scratch is caller-owned and can be
+shared serially between faces; use the a2 x87 guard on OS32. No raster, bitmap
+cache, source lease, shell/shlib connection or new module is added by a4.
+
+check-font-outline-host compares the complete a1 JIS/Latin corpora against
+whole-file ttf-parser Face (JF Shinonome16, Inconsolata, both IPAex originals),
+and expects the a1 unsupported/exceeded list to remain empty. Synthetic SFNTs
+exercise each independent bound, repeated components, cycle/run corruption
+and every cold-read failure, including successful retry and zero publication.
