@@ -984,6 +984,8 @@ static void test_kapi_layout(void)
  * KDEBUG=0 has no injection. Observe A9h, do not assume its dot-mode value. */
 static void test_kcg_display_return(void)
 {
+    /* ANK 'A' row 4 has dots; KAC/A9h: io_disp.md:207-218,1068-1081; Bible §2-6-5. */
+    enum { DIAG_ANK = 'A', DIAG_LINE = 4 };
     static const u32 windows[] = { TVRAM_CG_WINDOW, VRAM_PLANE_B,
         VRAM_PLANE_R, VRAM_PLANE_G, VRAM_PLANE_I };
     u32 before[5];
@@ -991,18 +993,18 @@ static void test_kcg_display_return(void)
     u8 glyph[KCG_ANK_H];
     for (u32 i = 0; i < 5; i++) before[i] = paging_pte_flags(windows[i]);
     /* The absent facade has zero stats; a live body records this boot read. */
-    kcg_rom_read_ank('A', glyph);
+    kcg_rom_read_ank(DIAG_ANK, glyph);
     kcg_cache_stats(&cold);
     int ready = cold.misses != 0;
     outp(KCG_CODE_LO, 0); io_wait();
-    outp(KCG_CODE_HI, 'A'); io_wait();
-    outp(KCG_LINE_SEL, 0); io_wait();
+    outp(KCG_CODE_HI, DIAG_ANK); io_wait();
+    outp(KCG_LINE_SEL, DIAG_LINE); io_wait();
     u32 code = inp(KCG_DATA);
     outp(MODE_FF1_PORT, MFF1_KCG_BITMAP); io_wait();
     u32 dot = inp(KCG_DATA);
     v86_io_reset_policy();
     u32 restored = inp(KCG_DATA);
-    kcg_rom_read_ank('A', glyph);
+    kcg_rom_read_ank(DIAG_ANK, glyph);
     kcg_cache_stats(&warm);
     check(!ready || (warm.misses == cold.misses + 1 && warm.hits == cold.hits),
           "kcg:return cache miss");

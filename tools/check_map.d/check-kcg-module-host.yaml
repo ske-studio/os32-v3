@@ -1,4 +1,8 @@
 check-kcg-module-host:
+- kdebug/kselftest.c
+- tools/tests/kcg_display_host.c
+- kernel/paging.h
+- gfx/gfx.h
 - kernel/module_runtime.c
 - kernel/module_runtime.h
 - kernel/module_image.c
