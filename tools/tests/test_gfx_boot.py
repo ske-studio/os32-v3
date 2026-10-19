@@ -12,15 +12,15 @@ gfx_client_to_gshell を 1 構成 1 プロセスで走らせる (見るものは
 順序を記録して実物へ渡す (写像は指定の窓で失敗させられる — T1d の Codex P3
 「map を実際に失敗させて予約と写像 (PTE) が残る」の写像部分)。
 
-構成の表 (BB の量 = 候補の最大、§4-5 のホスト試験):
+構成の表 (planar 128KiB + PEGC 候補の 300KiB):
   GFX= auto / pegc / cirrus / pc98 × PEGC の識別あり / なし、9821 でない機械、
   8MB (FIXED 型) / 17MB / 64MB、PEGC・Xe10 の写像の失敗、BB 不足、
   模擬選択で使う装置 (Cirrus / PEGC / 無し = PC98)。
 
 保証範囲: 実物の backend 選択処理・probe は呼ばず、HW と SURFACE の存在から
-g_backend を代入する。予約・写像・確保・移譲と 17 変異の検証には有効だが、
+g_backend を代入する。予約・写像・確保・移譲と 変異の検証には有効だが、
 「Cirrus probe 失敗 → PEGC 選択」や fb->planes[0] までの統合は保証しない。
-予約拒否・SURFACE 登録拒否も 17 構成には含めていない。
+planar の pool 確保失敗と SURFACE 登録拒否では owner 頁数と台帳で漏れ0を検査する。
 
 加えてテキストの検査: backend が自分で写像しない (paging_map_phys を呼ばない)、
 sys_reserve_top / sys_top_reserved が残っていない、kernel.c の順序
@@ -40,7 +40,8 @@ import tempfile
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SOURCES = ('gfx/gfx_core.c', 'kernel/paging.c', 'kernel/pgalloc.c', 'kernel/sys.c')
+SOURCES = ('gfx/gfx_core.c', 'kernel/paging.c', 'kernel/pgalloc.c', 'kernel/sys.c',
+           'kdebug/kselftest.c')
 HOST = ROOT / 'tools/tests/gfx_boot_host.c'
 
 SLICE_BEGIN = '#define GFX_CAND_PEGC'
@@ -61,6 +62,8 @@ HOOKS = (
 PEGC, CIRRUS = 2, 3
 AUTO, PC98, PREF_PEGC, PREF_CIRRUS = 0, 1, 2, 3
 CASES = [
+    ('planar-alloc-fails', dict(PREF=PC98, FAIL_PLANAR_ALLOC=1)),
+    ('planar-surface-fails', dict(PREF=PC98, FAIL_PLANAR_SURFACE=1)),
     ('17m-auto-mock-pegc', dict(CFG_KB=17408, HW=PEGC)),        # B3 の予約側 (probe は模擬)
     ('17m-auto-cirrus', dict(CFG_KB=17408, HW=CIRRUS)),
     ('17m-auto-no-hw-pc98', dict(CFG_KB=17408, HW=0)),
@@ -110,6 +113,11 @@ def build(texts, tmp):
             'irq_restore(flags)', 'host_irq_restore(flags)')
         (tmp / f'{unit}_host_source.c').write_text(source)
     (tmp / 'gfx_boot_slice.inc').write_text(slice_gfx(texts['gfx/gfx_core.c']))
+    # Execute the real planar boot assertion before and after owner transfer.
+    selftest = texts['kdebug/kselftest.c'].split('static void __attribute__((cold)) test_gfx_ledger(void)', 1)[1]
+    start = selftest.index('    check(p &&')
+    end = selftest.index('"gfx:planar surface");', start) + len('"gfx:planar surface");')
+    (tmp / 'gfx_planar_selftest.inc').write_text(selftest[start:end])
     cmd = ['gcc', *linker_flags(), '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
            '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static',
            '-no-pie', '-ffunction-sections', '-Wl,--gc-sections', '-DPHYSMEM_HOST_TEST=1',
@@ -214,6 +222,22 @@ def _swap_reserve_and_map():
 RESERVE_THEN_MAP, MAP_THEN_RESERVE = _swap_reserve_and_map()
 
 MUTATIONS = [
+    ('selftest-old-planar-address', 'kdebug/kselftest.c',
+     'p->first >= MEM_POOL_BASE / PAGE_SIZE',
+     'p->first * PAGE_SIZE == MEM_GFX_BB_BASE'),
+    ('selftest-fixed-planar-ram', 'kdebug/kselftest.c',
+     'p->backing == LEDGER_SB_RAM &&',
+     'p->backing == LEDGER_SB_FIXED_RAM &&'),
+    ('selftest-boot-owner-only', 'kdebug/kselftest.c',
+     '(p->owner == LEDGER_OWNER_BOOT || p->owner == LEDGER_OWNER_GSHELL)',
+     '(p->owner == LEDGER_OWNER_BOOT)'),
+    ('planar-pool-fails', 'gfx/gfx_core.c',
+     'if (!pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, (int)sf.npages,',
+     'if (1 || !pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, (int)sf.npages,'),
+    ('planar-failure-leaks', 'gfx/gfx_core.c',
+     '(void)pgalloc_free_n_owner(sf.owner, sf.first, (int)sf.npages);',
+     '(void)sf;'),
+
     ('pegc-alt-resource-missing', 'gfx/gfx_core.c',
      'for (i = n = 0; m && i < 4; i++)',
      'for (i = n = 0; m && i < 3; i++)'),
@@ -269,9 +293,6 @@ MUTATIONS = [
      '    ok = from == to || sf->backing != LEDGER_SB_RAM ||\n'
      '         ledger_transfer(sf->first, (int)sf->npages, from, to);',
      '    ok = 1;'),
-    # 固定 RAM の面の SURFACE_BACKING 区間を移さない
-    ('fixed-region-not-moved', 'kernel/pgalloc.c',
-     '            r->owner = (u8)to;\n', '            (void)r;\n'),
     # 凍結が AS owner のページも「永続確保」に数える
     ('freeze-counts-as', 'kernel/pgalloc.c',
      '        if (o && ledger_owners[o].kind == LEDGER_KIND_PERSIST) arena_top = p;',

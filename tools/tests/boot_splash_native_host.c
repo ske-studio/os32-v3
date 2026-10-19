@@ -120,6 +120,7 @@ struct ledger_surface *ledger_surface_find(u32 b, u32 r)
     static struct ledger_surface client;
     if (b != LEDGER_SF_PC98 || r != LEDGER_ROLE_CLIENT) return 0;
     client = gfx_sf[0];
+    client.first = MEM_POOL_BASE / PAGE_SIZE; /* simulated boot pool CLIENT */
     if (native_state_fault && starts) client.planes = 2;
     return &client;
 }
@@ -143,6 +144,8 @@ u32 ledger_arena_top(void) { return 0; }
 u32 pgalloc_arena_end(void) { return 0; }
 int pgalloc_alloc_n_owner(u32 o, int n, u32 f, u32 e, u32 d, u32 *p)
 { (void)o; (void)n; (void)f; (void)e; (void)d; (void)p; return 0; }
+int pgalloc_free_n_owner(u32 o, u32 p, int n)
+{ (void)o; (void)p; (void)n; return 0; }
 int paging_map_phys(u32 v, u32 p, u32 n, u32 f) { (void)v; (void)p; (void)n; (void)f; return -1; }
 void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 void palette_init(void) { }
@@ -175,7 +178,7 @@ int main(int argc, char **argv)
     CHECK(argc == 2 || argc == 3, "preference argument");
     pref = atoi(argv[1]);
     expected_pref = pref;
-    map_region(MEM_GFX_BB_BASE, MEM_GFX_BB_SIZE);
+    map_region(MEM_POOL_BASE, MEM_GFX_BB_SIZE);
     map_region(TVRAM_BASE, VRAM_PLANE_B - TVRAM_BASE);
     map_region(VRAM_PLANE_B, 0x18000);
     map_region(VRAM_PLANE_I, 0x8000);
