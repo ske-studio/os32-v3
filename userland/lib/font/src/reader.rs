@@ -582,4 +582,16 @@ impl<S: Source> Face<S> {
         let metric = glyph.min(self.horizontal_metrics - 1);
         u16_at(&mut self.reader, self.hmtx, u32::from(metric) * 4)
     }
+
+    /// Copy one bounded glyph through the existing LRU. No whole glyf residency.
+    pub(crate) fn read_glyph(&mut self, glyph: u16, dst: &mut [u8]) -> Result<usize> {
+        let range = self.glyph_range(glyph)?;
+        let len = usize::try_from(range.end - range.start).map_err(|_| Error::Bounds)?;
+        if len > MAX_GLYPH_SPAN_BYTES || len > dst.len() {
+            return Err(Error::Limit);
+        }
+        self.reader
+            .read(range.start, dst.get_mut(..len).ok_or(Error::Bounds)?)?;
+        Ok(len)
+    }
 }

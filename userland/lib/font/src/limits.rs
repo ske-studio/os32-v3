@@ -10,6 +10,9 @@ pub const MAX_COMPONENT_DEPTH: usize = 4;
 pub const MAX_GLYPH_SPAN_BYTES: usize = 2 * 1024;
 pub const MAX_TOTAL_INPUT_BYTES: usize = 4 * 1024;
 pub const MAX_EDGES: usize = 512;
+// Public outline commands include implicit on-curve midpoints and closing points.
+pub const MAX_OUTLINE_POINTS: usize = 2 * MAX_POINTS + MAX_CONTOURS;
+pub const MAX_GLYPH_WORK_BYTES: usize = 32 * 1024;
 pub const MAX_BBOX_PX: usize = 40;
 pub const MAX_TABLES: usize = 32;
 // Encoding records (not segments/groups); supported originals have at most 4.

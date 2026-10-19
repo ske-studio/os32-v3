@@ -1,0 +1,8 @@
+check-font-outline-host:
+- userland/lib/font/**
+- tools/tests/test_font_outline.py
+- tools/tests/test_font_reader.py
+- tools/fetch_fonts.py
+- assets/fonts/IPA_Font_License_Agreement_v1.0.txt
+- build/checks.d/check-font-outline-host.mk
+- tools/check_map.d/check-font-outline-host.yaml
