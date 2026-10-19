@@ -17,7 +17,7 @@ PREAMBLE = '''
 typedef unsigned char u8; typedef unsigned short u16; typedef unsigned int u32;
 typedef signed char i8; typedef short i16; typedef int i32; typedef unsigned int uptr;
 #define MEM_BOOTINFO_BASE 0x90000u
-#define MEM_GFX_BB_BASE 0x6a000u
+#define MEM_AUTOPLAY_MAILBOX_BASE 0x90000u
 #define TVRAM_CHAR_BASE 0xa0000u
 #define RING3_HEAP_TOP 0x500000u
 #define P2V(x) ((void *)(uptr)(x))
@@ -85,11 +85,11 @@ class ScannerTest(unittest.TestCase):
                     '(volatile u8 *)(' + typename + ')MEM_BOOTINFO_BASE; }')])
 
     def test_multiline_and_function_context(self):
-        hits = checker.scan('void probe(void)\n{\n u8 *p = (u8 *)\n MEM_GFX_BB_BASE;\n}\n')
+        hits = checker.scan('void probe(void)\n{\n u8 *p = (u8 *)\n MEM_AUTOPLAY_MAILBOX_BASE;\n}\n')
         self.assertEqual([(h[1], h[2]) for h in hits], [('probe', 'physical-cast')])
 
     def test_constant_initializers_and_converted_pointer(self):
-        source = '''u8 *p = P2V_CONST(MEM_GFX_BB_BASE);
+        source = '''u8 *p = P2V_CONST(MEM_AUTOPLAY_MAILBOX_BASE);
 static const struct sample s = {
     P2V_IO_CONST(TVRAM_CHAR_BASE)
 };
@@ -254,10 +254,10 @@ def main():
         return 1
     if args.mutate:
         cases = [
-            ('constant-cast', '    u8 *p = (u8 *)MEM_GFX_BB_BASE;', 'physical-cast'),
+            ('constant-cast', '    u8 *p = (u8 *)MEM_AUTOPLAY_MAILBOX_BASE;', 'physical-cast'),
             ('physical-cast-split', '    u8 *p = (u8 *)\n        buffer_phys;', 'physical-cast'),
             ('app-v2p', '    u32 p = V2P((void *)RING3_HEAP_TOP);', 'user-v2p'),
-            ('function-const', '    u8 *p = P2V_CONST(MEM_GFX_BB_BASE);', 'function-const'),
+            ('function-const', '    u8 *p = P2V_CONST(MEM_AUTOPLAY_MAILBOX_BASE);', 'function-const'),
             ('bootinfo-multiword-type', 'volatile u8 *low = (volatile unsigned char *)MEM_BOOTINFO_BASE;', 'physical-cast'),
             ('bootinfo-intermediate-cast', 'volatile u8 *low = (volatile u8 *)(uptr)MEM_BOOTINFO_BASE;', 'physical-cast'),
             ('bootinfo-signed-cast', 'volatile u8 *low = (volatile u8 *)(i32)MEM_BOOTINFO_BASE;', 'physical-cast'),
