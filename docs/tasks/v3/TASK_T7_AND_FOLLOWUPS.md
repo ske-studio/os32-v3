@@ -79,7 +79,7 @@ masterの検査は共有低位PTの復元検査でもあり、caller復帰時の
 
 mailboxの868B (`include/memmap.h:127-128`) は起動時に低位外のKHEAPへ1回確保し、core所有で保持する。固定BSSへ配列は足さず、pointer等の管理分はcore管理枠、868Bとallocator管理/整列はKHEAP実占有に計上する。未確保ならV86入場を低位変更前に失敗させる。H-7 (`docs/tasks/DEFERRED_TESTS.md:84`) でgameはv3ビルド外だが、hostツールとの既存の保存/復元契約は維持する。path/出力stagingの確保失敗も低位変更前に返す。mailboxはDOSへ申告する640KiBの内側なのでV86中はguestが上書きしてよい。保存・実行・復元の**全セッション中**にhostが読書きしないことをツール側のセッション所有で保証する。`game/tools/autoplay/driver.py` の変更が必要なら外部引継ぎ事項として記録し、外部リポジトリの実装を完了したと扱わない。
 
-H-6b/H-5の復元は6Ah標準/拡張、68h CODE、GRCG/EGC残状態、CG窓WBを一組で扱う。CGを根拠なくUCへ変更しない。9801で存在しない9821用I/Oを発行しないことも観測する。[HW3]に必要なメーカー資料とBSD/MIT実装の版・ファイル・行をT7a-2cの開始時に固定する (現状は未収集で、新しいポート列はこの票で確定しない)。既存根拠の `kernel/v86_io.c:238-271` と `kernel/kcg_body.c:97-105` に対し、資料との不一致と実機結果を記録する。読む口は対象固定の診断とし、公開の任意物理read KAPIを追加しない。
+H-6b/H-5の復元は6Ah標準/拡張、68h CODE、GRCG/EGC残状態、CG窓WBを一組で扱う。CGを根拠なくUCへ変更しない。9801で存在しない9821用I/Oを発行しないことも観測する。[HW3]に必要なメーカー資料とBSD/MIT実装の版・ファイル・行はT7a-2cの開始時に固定 (根拠対: UNDOCUMENTED `io_disp.md:207-218・253-328・1068-1081`、`memsys.md:4044` 付近・4100-4137、Bible §2-6-5 `2-6_テキスト.md:349-371`、FreeBSD releng/10.4 `sys/pc98/cbus/gdc.c:601・1095-1107・1356-1364`。NP21/W は振る舞いの確認だけ)。既存根拠の `kernel/v86_io.c:238-271` と `kernel/kcg_body.c:97-105` に対し、資料との不一致と実機結果を記録する。読む口は対象固定の診断とし、公開の任意物理read KAPIを追加しない。
 
 ### 1-2. OpenType前の中間段を動かす
 
@@ -162,7 +162,7 @@ parser/rasterは境界検査済み入力と上限付き領域だけを使い、a
 | T7a-2b 低位切替 / paging・v86_mem/bios | ①fixtureの直接低位640KiB実行 ②通常page0 NP ③page0/mailbox原内容一致 ④全出口CR3/PTE/PDE/TLB一致 ⑤前回データ/0x8C000ゼロ | 各準備境界失敗、末尾PTE復元/TLB反映/mailbox復元を1つずつ除去 |
 | T7a-2c 表示復元 / v86_io・KCG facade/body・固定診断 | ①[HW3]根拠対を固定 ②6Ah標準/拡張復元 ③既存kcg部品のfacade (`KcgModuleApi`) に失効口を足し `KCG_MODULE_ABI_GEN` を上げ、coreのCODE復帰口・搭載時cache失効を実装し68h=0Bh注入後に確認 (未搭載時はCODEのみ) ④CG窓WB/VRAM UCの前後一致 ⑤9801 gui_gate・9821実機再描画 ⑥R7FIX2のFFF窓とCUI復帰維持 | mode復帰/失効省略、古いF00000h窓へ戻す。A9h値は実測記録 |
 | T7a-2d 採取中断 / `kdebug/v86_gcap.c`・`kernel/v86_gcap.c`・STOP・DBGREF境界 | ①active印を見てSTOP注入 ②kills増分1 ③g/tv alloc−free差0 ④gcap_ops/active解除 ⑤TVRAM30行/CR3/出力規則復元 ⑥次のv86実行成功 | detach/release片方除去、準備失敗/#PF/#GP/STOPを各入口で注入 |
-| T7a-2e 予約統合・backing撤去 / memory_boot・memmap・gen_memmap・02_memory・v86_mem | ①低位全160PFNが単一FIXED/kernel/WB ②session前後で型/owner/PFN数不変 ③一般pool供給0 ④BBは別SURFACE_BACKING ⑤docs-genと台帳/定数/説明一致 ⑥通常経路を直接低位へ ⑦159ページ確保0 (旧経路との差636KiB) ⑧低位予約とpool不変 ⑨GUI→CUI→V86→GUI20回漏れ0 ⑩Ra266 -g/boot2/DOS回帰 | 旧低位予約1行残し、owner/端PFN違い、連続pool枯渇でもV86可 (他stagingは確保済み)、旧低位backing別名残し |
+| T7a-2e 予約統合・backing撤去 / memory_boot・memmap・gen_memmap・02_memory・v86_mem | ①低位全160PFNが単一FIXED/kernel/WB ②session前後で型/owner/PFN数不変 ③一般pool供給0 ④BBは別SURFACE_BACKING ⑤docs-genと台帳/定数/説明一致 ⑥通常経路を直接低位へ ⑦159ページ確保0 (旧経路との差636KiB) ⑧低位予約とpool不変 ⑨GUI→CUI→V86→GUI20回漏れ0 ⑩Ra266 -g/boot2/DOS回帰 (T7a-2c レビュー R1: `v86 -g -t` の後の 6Ah の読み (09A0h) と E0000h の状態を 1 行観測 — 採取中の表示の戻しは ROM AH=30h 任せ) | 旧低位予約1行残し、owner/端PFN違い、連続pool枯渇でもV86可 (他stagingは確保済み)、旧低位backing別名残し |
 | T7b-a1 採用ゲート / font crate・assets | ①公開API/必要reader範囲固定 ②IPA/欧文原本のhash/license/fetch確認 ③corpus全字形 (16/32px) の点/輪郭/component/深さ/span/edge・table/索引・read cache/作業域・bboxの実測最大表と上限決定 ④上限超過字一覧 ⑤W/M/m/アクセント/descenderの1x可読性 | CFF/可変font/未対応cmapはKCG。読めなければ欧文再選定 |
 | T7b-a2 x87 / 共通guard・exec安全点 | ①全状態一致 (save領域の予約byteは除外) ②既知CW内で実行 ③再入拒否 ④STOP/parkはleave後 ⑤非搭載はKCG ⑥faultの帰属が一致 | 値8本/CW丸め/例外mask変更、失敗出口のrestore除去。f32前に完成 |
 | T7b-a3 table reader / directory・cmap・loca/hmtx | ①全file常駐0 ②table数/索引/read cache上限はa1③の実測最大以上、超過は代替 ③format4/12対照一致 ④隣接locaとadvance一致 ⑤短読で公開0 | offset/length overflow、順序逆転、idRangeOffset境界±1 |

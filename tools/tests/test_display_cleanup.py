@@ -59,6 +59,8 @@ def build_run(tree, kind, cases):
 MUTATIONS = [
     ('standard-mode-omitted', TARGET_SRCS[0], '        io_out(MODE_FF2_PORT, PEGC_FF2_STD_GFX);',
      '', 1, 'v86', 'FAIL: standard/extended restore'),
+    ('400-line-mode-omitted', TARGET_SRCS[0], '        io_out(MODE_FF2_PORT, PEGC_FF2_VRAM_400L);',
+     '', 1, 'v86', 'FAIL: standard/extended restore'),
     ('egc-reset-omitted', TARGET_SRCS[0], '        outpw(EGC_ACCESS_PORT, EGC_ACCESS_RESET);',
      '', 1, 'v86', 'FAIL: standard/extended restore'),
     ('grcg-off-omitted', TARGET_SRCS[0], '        io_out(GRCG_MODE_PORT, GRCG_MODE_OFF);',
