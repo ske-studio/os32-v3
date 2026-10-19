@@ -3,6 +3,13 @@ use os32_font::{
     limits::*,
     reader::{read_exact_at, Error, Face, Result, Source},
 };
+
+/// T7b-a7: a Face is opened in place in caller-owned storage (here a Box).
+fn open_face<S: Source>(source: S) -> Result<Box<Face<S>>> {
+    let mut face = Box::new(Face::new());
+    face.open(source)?;
+    Ok(face)
+}
 use std::{
     cell::Cell,
     collections::BTreeMap,
@@ -222,7 +229,7 @@ fn small() -> Vec<u8> {
     fixture(cmap4(2, true), false, 7, 1)
 }
 fn rejected(b: Vec<u8>) {
-    assert!(Face::open(memory(b)).is_err(), "corrupt face published");
+    assert!(open_face(memory(b)).is_err(), "corrupt face published");
 }
 
 #[test]
@@ -264,7 +271,7 @@ fn offset_length_overflow() {
         // when the source advertises a bigger u64 file. No huge allocation.
         let mut m = memory(b);
         m.size = u64::MAX;
-        assert!(Face::open(m).is_err(), "overflow face published");
+        assert!(open_face(m).is_err(), "overflow face published");
     }
     let mut b = small();
     let r = record(&b, b"glyf");
@@ -300,7 +307,7 @@ fn reversed_order() {
         } else {
             w16(&mut b, l + 2, 3)
         }
-        let mut f = Face::open(memory(b)).unwrap();
+        let mut f = open_face(memory(b)).unwrap();
         assert_eq!(
             f.glyph_range(1),
             Err(Error::Invalid),
@@ -311,7 +318,7 @@ fn reversed_order() {
 #[test]
 fn id_range_offset_boundaries() {
     let good = small();
-    let mut f = Face::open(memory(good.clone())).unwrap();
+    let mut f = open_face(memory(good.clone())).unwrap();
     assert_eq!(f.glyph_index(0), Ok(Some(2))); // last complete u16 in subtable
     for delta in [-1i32, 1, 2] {
         let mut b = good.clone();
@@ -326,7 +333,7 @@ fn id_range_offset_boundaries() {
     let mut b = good;
     let s = subtable(&b);
     w16(&mut b, s + 32, 0);
-    let mut f = Face::open(memory(b)).unwrap();
+    let mut f = open_face(memory(b)).unwrap();
     assert_eq!(f.glyph_index(0), Ok(None));
 }
 #[test]
@@ -349,7 +356,7 @@ fn scalar_and_table_bounds() {
         w32(&mut b, t + 12, 1);
         rejected(b);
     }
-    let mut f = Face::open(memory(small())).unwrap();
+    let mut f = open_face(memory(small())).unwrap();
     assert_eq!(f.glyph_range(4), Err(Error::Bounds));
     assert_eq!(f.advance(4), Err(Error::Bounds));
     assert!(f.glyph_range(0).unwrap().is_empty());
@@ -366,7 +373,7 @@ fn scalar_and_table_bounds() {
             w16(&mut b, l + 8, 50)
         }
         assert_eq!(
-            Face::open(memory(b)).unwrap().glyph_range(3),
+            open_face(memory(b)).unwrap().glyph_range(3),
             Err(Error::Bounds)
         );
     }
@@ -375,15 +382,15 @@ fn scalar_and_table_bounds() {
 fn unsupported_and_cmap_bounds() {
     let mut b = small();
     w32(&mut b, 0, u32::from_be_bytes(*b"OTTO"));
-    assert!(matches!(Face::open(memory(b)), Err(Error::Unsupported)));
+    assert!(matches!(open_face(memory(b)), Err(Error::Unsupported)));
     let mut b = small();
     let r = record(&b, b"glyf");
     b[r..r + 4].copy_from_slice(b"fvar"); // remains sorted before head
-    assert!(matches!(Face::open(memory(b)), Err(Error::Unsupported)));
+    assert!(matches!(open_face(memory(b)), Err(Error::Unsupported)));
     let mut b = small();
     let c = table(&b, b"cmap");
     w16(&mut b, c + 4, 99);
-    assert!(matches!(Face::open(memory(b)), Err(Error::Unsupported)));
+    assert!(matches!(open_face(memory(b)), Err(Error::Unsupported)));
     for (offset, value) in [
         (4, u32::MAX),
         (12, u32::MAX),
@@ -405,7 +412,7 @@ fn unsupported_and_cmap_bounds() {
 #[test]
 fn exact_and_exceeded_limits() {
     for tables in [MAX_TABLES - 1, MAX_TABLES, MAX_TABLES + 1] {
-        let f = Face::open(memory(fixture(cmap4(2, false), false, tables, 1)));
+        let f = open_face(memory(fixture(cmap4(2, false), false, tables, 1)));
         assert_eq!(f.is_ok(), tables <= MAX_TABLES, "table cap {tables}");
     }
     for records in [
@@ -413,7 +420,7 @@ fn exact_and_exceeded_limits() {
         MAX_CMAP_SUBTABLES,
         MAX_CMAP_SUBTABLES + 1,
     ] {
-        let f = Face::open(memory(fixture(cmap4(2, false), false, 7, records)));
+        let f = open_face(memory(fixture(cmap4(2, false), false, 7, records)));
         assert_eq!(
             f.is_ok(),
             records <= MAX_CMAP_SUBTABLES,
@@ -429,7 +436,7 @@ fn exact_and_exceeded_limits() {
         MAX_CMAP_SEGMENTS,
         MAX_CMAP_SEGMENTS + 1,
     ] {
-        let f = Face::open(memory(fixture(cmap4(count, false), false, 7, 1)));
+        let f = open_face(memory(fixture(cmap4(count, false), false, 7, 1)));
         assert_eq!(
             f.is_ok(),
             count <= 8189,
@@ -437,7 +444,7 @@ fn exact_and_exceeded_limits() {
         );
     }
     for groups in [MAX_CMAP_GROUPS - 1, MAX_CMAP_GROUPS, MAX_CMAP_GROUPS + 1] {
-        let f = Face::open(memory(fixture(cmap12(groups), true, 7, 1)));
+        let f = open_face(memory(fixture(cmap12(groups), true, 7, 1)));
         assert_eq!(f.is_ok(), groups <= MAX_CMAP_GROUPS, "group cap {groups}");
     }
     assert!(READ_CACHE_SLOTS > 0);
@@ -451,12 +458,25 @@ fn exact_and_exceeded_limits() {
 
 fn fonts() -> Vec<PathBuf> {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../assets/fonts");
-    ["Inconsolata-Regular.ttf", "ipaexg.ttf", "ipaexm.ttf"]
+    let mut paths: Vec<PathBuf> = ["Inconsolata-Regular.ttf", "ipaexg.ttf", "ipaexm.ttf"]
         .iter()
         .map(|p| root.join(p))
-        .collect()
+        .collect();
+    // T7b-a7: the standard Japanese face (format 4, resident cmap). test_font_reader.py
+    // supplies the pinned original; never skip.
+    paths.push(PathBuf::from(
+        std::env::var("OS32_FONT_SHINONOME").expect("OS32_FONT_SHINONOME (test_font_reader.py)"),
+    ));
+    paths
 }
-fn compare(path: &PathBuf, bytes: &[u8], mut streamed: Face<impl Source>, label: &str) {
+/// T7b-a7 measured residency: Shinonome 32,954 B and Inconsolata 1,066 B fit
+/// MAX_CMAP_RESIDENT_BYTES; IPAex format 12 (128,616 B) and its format 4
+/// (39,970 B) take the read_at path.
+fn expect_resident(path: &PathBuf, format: u16) -> bool {
+    let name = path.file_name().unwrap().to_string_lossy();
+    !(name.starts_with("ipaex") && (format == 12 || format == 4))
+}
+fn compare(path: &PathBuf, bytes: &[u8], mut streamed: Box<Face<impl Source>>, label: &str) {
     let reference = ttf_parser::Face::parse(bytes, 0).unwrap();
     let cmap = reference.tables().cmap.unwrap();
     let selected = cmap
@@ -535,7 +555,8 @@ fn real_fonts_all_codepoints_loca_advance() {
         let bytes = fs::read(&path)
             .expect("fetch_fonts.py must obtain real fonts before tests; never skip");
         let (source, stats) = disk(&path);
-        let face = Face::open(source).unwrap();
+        let face = open_face(source).unwrap();
+        assert_eq!(face.cmap_resident(), expect_resident(&path, face.cmap_format()), "{path:?}");
         compare(&path, &bytes, face, "selected");
         assert!(stats.max.get() <= READ_CACHE_SLOT_BYTES);
         println!(
@@ -543,6 +564,11 @@ fn real_fonts_all_codepoints_loca_advance() {
             stats.reads.get(),
             stats.max.get()
         );
+        // T7b-a7: the read_at cmap path gives the same answers on every font.
+        let mut streaming = Box::new(Face::new());
+        streaming.open_streaming(disk(&path).0).unwrap();
+        assert!(!streaming.cmap_resident());
+        compare(&path, &bytes, streaming, "streaming");
         // Exercise IPA format4 too: suppress format12 encoding records in both
         // inputs. All table bytes/offsets remain identical to the real original.
         let mut forced = bytes.clone();
@@ -554,28 +580,32 @@ fn real_fonts_all_codepoints_loca_advance() {
                 w16(&mut forced, at, 99);
             }
         }
-        let f = Face::open(memory(forced.clone())).unwrap();
+        let f = open_face(memory(forced.clone())).unwrap();
         assert_eq!(f.cmap_format(), 4);
+        assert_eq!(f.cmap_resident(), expect_resident(&path, 4), "{path:?} format4");
         compare(&path, &forced, f, "format4");
+        let mut streaming = Box::new(Face::new());
+        streaming.open_streaming(memory(forced.clone())).unwrap();
+        compare(&path, &forced, streaming, "format4-streaming");
     }
 }
 #[test]
 fn short_reads_publish_nothing() {
     let path = fonts().remove(1);
     let (source, stats) = disk(&path);
-    let f = Face::open(source).unwrap();
+    let f = open_face(source).unwrap();
     drop(f);
     let reads = stats.reads.get();
     for at in 1..=reads {
         let (source, stats) = disk(&path);
         stats.fail.set(Some(at));
         assert!(
-            matches!(Face::open(source), Err(Error::ShortRead)),
+            matches!(open_face(source), Err(Error::ShortRead)),
             "short read {at}/{reads} published face"
         );
     }
     let (source, stats) = disk(&path);
-    let mut f = Face::open(source).unwrap();
+    let mut f = open_face(source).unwrap();
     stats.short.set(true);
     for op in 0..3 {
         f.trim();
@@ -601,7 +631,7 @@ fn short_reads_publish_nothing() {
 #[test]
 fn read_cache_lru() {
     let (source, stats) = disk(&fonts().remove(1)); // IPAexG
-    let mut face = Face::open(source).unwrap();
+    let mut face = open_face(source).unwrap();
     // Fill all N slots, promote the oldest, then force an eviction.
     face.trim();
     stats.reads.set(0);
@@ -612,4 +642,100 @@ fn read_cache_lru() {
     face.advance((READ_CACHE_SLOTS * 512) as u16).unwrap();
     face.advance(0).unwrap();
     assert_eq!(stats.reads.get(), READ_CACHE_SLOTS + 1);
+}
+
+/// T7b-a7: the residency limit, both sides, for format 4 and 12. A resident face
+/// answers lookups without read_at; one byte-step over the limit falls back and
+/// gives the same answers through read_at.
+#[test]
+fn cmap_resident_limit_boundary() {
+    let segments = (MAX_CMAP_RESIDENT_BYTES - 2) / 8;
+    let groups = MAX_CMAP_RESIDENT_BYTES / 12;
+    for (format, n, resident) in [
+        (4, segments, true),
+        (4, segments + 1, false),
+        (12, groups, true),
+        (12, groups + 1, false),
+    ] {
+        let sub = if format == 4 { cmap4(n, false) } else { cmap12(n) };
+        let m = memory(fixture(sub, format == 12, 7, 1));
+        let stats = m.stats.clone();
+        let mut f = open_face(m).unwrap();
+        assert_eq!(f.cmap_resident(), resident, "format {format} n={n}");
+        f.trim();
+        stats.reads.set(0);
+        // Every mapped codepoint and its unmapped neighbours, both ends.
+        let probe = |i: usize| if format == 4 { i as u32 } else { (i * 2) as u32 };
+        for i in (0..64).chain(n - 64..n - 1) {
+            assert_eq!(f.glyph_index(probe(i)), Ok(Some(1)), "format {format} n={n} #{i}");
+            if format == 12 {
+                assert_eq!(f.glyph_index(probe(i) + 1), Ok(None));
+            }
+        }
+        assert_eq!(f.glyph_index(0x10_0000), Ok(None));
+        if resident {
+            assert_eq!(stats.reads.get(), 0, "resident cmap read the file (format {format})");
+        } else {
+            assert!(stats.reads.get() > 0, "fallback must use read_at (format {format})");
+        }
+    }
+    println!(
+        "PASS cmap residency boundary: format4 {segments}/{} segments, format12 {groups}/{} groups (limit {MAX_CMAP_RESIDENT_BYTES} B)",
+        segments + 1,
+        groups + 1
+    );
+}
+
+/// T7b-a7: caller-owned storage. A closed face refuses lookups; open replaces the
+/// previous face in place (dropping its source); a failed open leaves it closed.
+#[test]
+fn open_in_place_reopen_and_close() {
+    struct Counted(Memory, Rc<Cell<usize>>);
+    impl Source for Counted {
+        fn file_size(&self) -> u64 {
+            self.0.file_size()
+        }
+        fn read_at(&mut self, offset: u64, dst: &mut [u8]) -> Result<usize> {
+            self.0.read_at(offset, dst)
+        }
+    }
+    impl Drop for Counted {
+        fn drop(&mut self) {
+            self.1.set(self.1.get() + 1);
+        }
+    }
+    let drops = Rc::new(Cell::new(0));
+    let counted = |b: Vec<u8>| Counted(memory(b), drops.clone());
+    let mut face: Box<Face<Counted>> = Box::new(Face::new());
+    assert!(!face.is_open());
+    assert_eq!(face.glyph_index(0x41), Err(Error::Closed));
+    assert_eq!(face.advance(0), Err(Error::Closed));
+    face.open(counted(fixture(cmap12(4), true, 7, 1))).unwrap();
+    assert!(face.is_open() && face.cmap_resident());
+    assert_eq!(face.glyph_index(2), Ok(Some(1)));
+    assert_eq!(face.glyph_index(3), Ok(None));
+    // A different mapping (odd codepoints) through read_at in the same storage:
+    // nothing of the previous resident cmap may answer.
+    let mut b = fixture(cmap12(4), true, 7, 1);
+    let s = subtable(&b);
+    for i in 0..4 {
+        w32(&mut b, s + 16 + i * 12, (i * 2 + 1) as u32);
+        w32(&mut b, s + 20 + i * 12, (i * 2 + 1) as u32);
+    }
+    face.open_streaming(counted(b)).unwrap();
+    assert_eq!(drops.get(), 1, "reopen drops the previous source");
+    assert!(!face.cmap_resident());
+    assert_eq!(face.glyph_index(2), Ok(None));
+    assert_eq!(face.glyph_index(3), Ok(Some(1)));
+    let mut bad = small();
+    w32(&mut bad, 0, u32::from_be_bytes(*b"OTTO"));
+    assert_eq!(face.open(counted(bad)), Err(Error::Unsupported));
+    assert_eq!(drops.get(), 3, "failed open drops both the old and the new source");
+    assert!(!face.is_open());
+    assert_eq!(face.glyph_index(3), Err(Error::Closed));
+    face.open(counted(small())).unwrap();
+    face.close();
+    assert_eq!(drops.get(), 4);
+    assert_eq!(face.glyph_range(0), Err(Error::Closed));
+    println!("PASS open in place: closed/reopen/failed open/close");
 }

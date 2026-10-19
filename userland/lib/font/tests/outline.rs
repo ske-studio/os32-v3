@@ -4,6 +4,13 @@ use os32_font::{
     outline::{GlyphScratch, Outline, Usage},
     reader::{Error, Face, Result, Source},
 };
+
+/// T7b-a7: a Face is opened in place in caller-owned storage (here a Box).
+fn open_face<S: Source>(source: S) -> Result<Box<Face<S>>> {
+    let mut face = Box::new(Face::new());
+    face.open(source)?;
+    Ok(face)
+}
 use std::{
     cell::Cell,
     collections::BTreeMap,
@@ -153,7 +160,7 @@ fn composite(children: &[u16]) -> Vec<u8> {
     b
 }
 fn expect(glyphs: Vec<Vec<u8>>, expected: core::result::Result<(), Error>) {
-    let mut face = Face::open(memory(fixture(glyphs))).unwrap();
+    let mut face = open_face(memory(fixture(glyphs))).unwrap();
     let mut work = GlyphScratch::new();
     work.outline(&mut face, 0).unwrap(); // prior committed outline must also disappear
     let result = work.outline(&mut face, 1).map(|_| ());
@@ -341,7 +348,7 @@ fn every_mid_read_failure_has_zero_commit() {
     let bytes = fixture(vec![good(), root, child, last]);
     let source = memory(bytes.clone());
     let reads = source.reads.clone();
-    let mut face = Face::open(source).unwrap();
+    let mut face = open_face(source).unwrap();
     face.trim();
     reads.count.set(0);
     let mut work = GlyphScratch::new();
@@ -352,7 +359,7 @@ fn every_mid_read_failure_has_zero_commit() {
         for fail in 1..=count {
             let source = memory(bytes.clone());
             let reads = source.reads.clone();
-            let mut face = Face::open(source).unwrap();
+            let mut face = open_face(source).unwrap();
             work.outline(&mut face, 0).unwrap();
             assert_ne!(work.committed_counts(), (0, 0, 0));
             face.trim();
@@ -450,7 +457,7 @@ fn real_corpus_matches_whole_file_face() {
         let oracle = ttf_parser::Face::parse(&bytes, 0).unwrap();
         let file = File::open(&path).unwrap();
         let size = file.metadata().unwrap().len();
-        let mut face = Face::open(Disk(file, size)).unwrap();
+        let mut face = open_face(Disk(file, size)).unwrap();
         let mut max = Usage::default();
         let mut max_edges = 0;
         let mut max_points = 0;
@@ -521,7 +528,7 @@ fn implicit_point_capacity() {
     let mut g = simple(MAX_POINTS, MAX_CONTOURS);
     let flags = 12 + MAX_CONTOURS * 2;
     g[flags..flags + MAX_POINTS].fill(0x36);
-    let mut face = Face::open(memory(fixture(vec![good(), g]))).unwrap();
+    let mut face = open_face(memory(fixture(vec![good(), g]))).unwrap();
     let mut work = GlyphScratch::new();
     let required = 2 * MAX_POINTS + MAX_CONTOURS;
     if MAX_OUTLINE_POINTS < required {
@@ -552,7 +559,7 @@ fn empty_contour_keeps_its_own_edge_range() {
     let reference = ttf_parser::Face::parse(&bytes, 0).unwrap();
     let mut oracle = Oracle::default();
     let bbox = reference.outline_glyph(ttf_parser::GlyphId(1), &mut oracle);
-    let mut face = Face::open(memory(bytes.clone())).unwrap();
+    let mut face = open_face(memory(bytes.clone())).unwrap();
     let mut work = GlyphScratch::new();
     let out = work.outline(&mut face, 1).unwrap();
     assert_eq!(out.contours.len(), 2);

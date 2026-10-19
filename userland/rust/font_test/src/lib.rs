@@ -133,6 +133,25 @@ fn bits() -> &'static mut [u8; MAX_BITMAP_BYTES] {
     unsafe { &mut *core::ptr::addr_of_mut!(BITS) }
 }
 
+/* T7b-a7: Face は値で返さない (read cache + 常駐 cmap で約 51KB)。BSS に置いた
+ * 器に open でその場で開く。和文・欧文・比較用の 3 つで、同じ器を同時に二重に借りない。 */
+static mut FACE_JA: Face<FdSource> = Face::new();
+static mut FACE_LATIN: Face<FdSource> = Face::new();
+static mut FACE_EXTRA: Face<FdSource> = Face::new();
+fn face_ja() -> &'static mut Face<FdSource> {
+    unsafe { &mut *core::ptr::addr_of_mut!(FACE_JA) }
+}
+fn face_latin() -> &'static mut Face<FdSource> {
+    unsafe { &mut *core::ptr::addr_of_mut!(FACE_LATIN) }
+}
+fn face_extra() -> &'static mut Face<FdSource> {
+    unsafe { &mut *core::ptr::addr_of_mut!(FACE_EXTRA) }
+}
+/// 開けたら true (失敗した器は閉じたまま)。
+fn open_at(face: &mut Face<FdSource>, path: &[u8]) -> bool {
+    FdSource::open(path).is_some_and(|s| face.open(s).is_ok())
+}
+
 fn render(face: &mut Face<FdSource>, cp: u32, size: PixelSize) -> Option<Placement> {
     let gid = face.glyph_index(cp).ok()??;
     if gid == 0 {
@@ -162,10 +181,11 @@ fn check_face(path: &[u8], name: &[u8]) {
         os32api::kprint!(b"FONTCHK %s SKIP not deployed\r\n\0", name.as_ptr());
         return;
     };
-    let Ok(mut face) = Face::open(source) else {
+    let face = face_ja();
+    if face.open(source).is_err() {
         os32api::kprint!(b"FONTCHK %s FAIL open\r\n\0", name.as_ptr());
         return;
-    };
+    }
     let mut c = Check { glyphs: 0, black: 0, fallback: 0, fnv: 0x811c_9dc5 };
     for (first, last) in CHECK_RANGES {
         for cp in first..=last {
@@ -173,7 +193,7 @@ fn check_face(path: &[u8], name: &[u8]) {
                 Ok(Some(g)) if g != 0 => g,
                 _ => continue,
             };
-            match work().render(&mut face, gid, PixelSize::Px16, bits()) {
+            match work().render(face, gid, PixelSize::Px16, bits()) {
                 Ok(p) => {
                     c.glyphs += 1;
                     c.bytes(&cp.to_le_bytes());
@@ -200,6 +220,7 @@ fn check_face(path: &[u8], name: &[u8]) {
         c.fallback as i32,
         c.fnv
     );
+    face.close();
 }
 
 /* ---------------- T7b-a6 計測 (-p / -f) ---------------- */
@@ -279,17 +300,18 @@ fn pass(face: &mut Face<FdSource>, n: usize, stage: Stage, label: &[u8]) {
     );
 }
 
-fn open_face(path: &[u8], name: &[u8]) -> Option<Face<FdSource>> {
+fn open_face(face: &mut Face<FdSource>, path: &[u8], name: &[u8]) -> bool {
     let (c0, b0, _) = io_stats();
     let t0 = os32api::get_tick();
-    let face = FdSource::open(path).and_then(|s| Face::open(s).ok());
+    let ok = open_at(face, path);
     let t = os32api::get_tick().wrapping_sub(t0);
     let (c1, b1, _) = io_stats();
     os32api::kprint!(
-        b"PERF open %s ok=%d t=%d rd=%d kb=%d\r\n\0",
-        name.as_ptr(), face.is_some() as i32, t as i32, (c1 - c0) as i32, ((b1 - b0) / 1024) as i32
+        b"PERF open %s ok=%d t=%d rd=%d kb=%d res=%d\r\n\0",
+        name.as_ptr(), ok as i32, t as i32, (c1 - c0) as i32, ((b1 - b0) / 1024) as i32,
+        face.cmap_resident() as i32
     );
-    face
+    ok
 }
 
 /// scatter: false = seq だけ (-p)、true = scatter だけ (-s)。1 画面に収める。
@@ -302,25 +324,35 @@ fn perf(scatter_only: bool) {
         MAX_BITMAP_BYTES as i32, READ_CACHE_SLOTS as i32, READ_CACHE_SLOT_BYTES as i32
     );
     if !scatter_only {
-        drop(open_face(INCONSOLATA, b"inconsolata\0"));
-        drop(open_face(IPAEXG, b"ipaexg\0"));
+        open_face(face_latin(), INCONSOLATA, b"inconsolata\0");
+        face_latin().close();
+        open_face(face_extra(), IPAEXG, b"ipaexg\0");
+        face_extra().close();
     }
     for (scatter, name) in [(false, &b"seq\0"[..]), (true, &b"scatter\0"[..])] {
         if scatter != scatter_only {
             continue;
         }
-        let Some(mut face) = open_face(SHINONOME, b"shinonome\0") else { return };
-        let n = collect(&mut face, scatter);
-        drop(face);
+        let face = face_ja();
+        if !open_face(face, SHINONOME, b"shinonome\0") {
+            return;
+        }
+        let n = collect(face, scatter);
+        face.close();
         os32api::kprint!(b"PERF workload %s n=%d\r\n\0", name.as_ptr(), n as i32);
         /* 段ごとに開き直し、read cache を空にして cold で測る。 */
         for (stage, label) in [(Stage::Lookup, &b"lookup\0"[..]), (Stage::Outline, &b"outline\0"[..])] {
-            let Some(mut f) = open_face(SHINONOME, b"shinonome\0") else { return };
-            pass(&mut f, n, stage, label);
+            if !open_face(face, SHINONOME, b"shinonome\0") {
+                return;
+            }
+            pass(face, n, stage, label);
         }
-        let Some(mut f) = open_face(SHINONOME, b"shinonome\0") else { return };
-        pass(&mut f, n, Stage::Raster, b"cold\0");
-        pass(&mut f, n, Stage::Raster, b"warm\0");
+        if !open_face(face, SHINONOME, b"shinonome\0") {
+            return;
+        }
+        pass(face, n, Stage::Raster, b"cold\0");
+        pass(face, n, Stage::Raster, b"warm\0");
+        face.close();
     }
 }
 
@@ -348,12 +380,14 @@ fn fd_probe(label: &[u8]) -> i32 {
 
 fn fd_mode() {
     fd_probe(b"base\0");
-    let a = FdSource::open(SHINONOME).and_then(|s| Face::open(s).ok());
-    let b = FdSource::open(INCONSOLATA).and_then(|s| Face::open(s).ok());
-    let c = FdSource::open(IPAEXG).and_then(|s| Face::open(s).ok());
-    os32api::kprint!(b"FDPROBE faces=%d\r\n\0", a.is_some() as i32 + b.is_some() as i32 + c.is_some() as i32);
+    let a = open_at(face_ja(), SHINONOME);
+    let b = open_at(face_latin(), INCONSOLATA);
+    let c = open_at(face_extra(), IPAEXG);
+    os32api::kprint!(b"FDPROBE faces=%d\r\n\0", a as i32 + b as i32 + c as i32);
     fd_probe(b"with3faces\0");
-    drop((a, b, c));
+    face_ja().close();
+    face_latin().close();
+    face_extra().close();
     fd_probe(b"after\0");
 }
 
@@ -376,12 +410,12 @@ fn draw(x: i32, baseline: i32, p: &Placement, color: u8) {
 }
 
 /// 欧文は Inconsolata (あれば)、それ以外と欠字は東雲。戻りは送り後の x。
-fn draw_text(ja: &mut Face<FdSource>, latin: &mut Option<Face<FdSource>>, x: i32, baseline: i32,
+fn draw_text(ja: &mut Face<FdSource>, latin: &mut Option<&mut Face<FdSource>>, x: i32, baseline: i32,
              text: &str, size: PixelSize, color: u8) -> i32 {
     let mut pen = x << 6;
     for ch in text.chars() {
         let cp = ch as u32;
-        let placed = match latin {
+        let placed = match latin.as_deref_mut() {
             Some(face) if cp < 0x2000 => render(face, cp, size),
             _ => None,
         }
@@ -396,7 +430,7 @@ fn draw_text(ja: &mut Face<FdSource>, latin: &mut Option<Face<FdSource>>, x: i32
     (pen + 32) >> 6
 }
 
-fn show(ja: &mut Face<FdSource>, latin: &mut Option<Face<FdSource>>) {
+fn show(ja: &mut Face<FdSource>, latin: &mut Option<&mut Face<FdSource>>) {
     unsafe {
         gfx::gfx_clear(0);
         gfx::gfx_fill_rect(0, 0, SCREEN_W, 20, 1);
@@ -456,19 +490,24 @@ pub extern "C" fn main(argc: i32, argv: *const *const u8, api: *mut KernelAPI) -
         check_face(IPAEXG, b"ipaexg\0");
         return 0;
     }
-    let Ok(mut ja) = Face::open(source) else {
+    let ja = face_ja();
+    if ja.open(source).is_err() {
         os32api::print(b"font_test: FAIL open /data/JF-Dot-Shinonome16.ttf\r\n\0");
         return 1;
-    };
-    let mut latin = FdSource::open(INCONSOLATA).and_then(|s| Face::open(s).ok());
+    }
+    let mut latin = if open_at(face_latin(), INCONSOLATA) { Some(face_latin()) } else { None };
 
     os32api::print(b"Press any key to start...\r\n\0");
     os32api::wait_key();
     unsafe {
         gfx::libos32gfx_init(api);
     }
-    show(&mut ja, &mut latin);
+    show(ja, &mut latin);
     os32api::wait_key();
     gfx::shutdown();
+    ja.close();
+    if let Some(face) = latin {
+        face.close();
+    }
     0
 }
