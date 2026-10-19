@@ -64,6 +64,37 @@ typedef struct {
 
 static VfsFile open_files[VFS_MAX_OPEN_FILES];
 
+/* font FD の予算 (vfs.h、値は T7b-a6 の実測)。FD 0〜2 は標準入出力の予約 */
+STATIC_ASSERT(VFS_FONT_FD_MAX_APP_TOTAL + VFS_FONT_FD_MAX_SHELL +
+              VFS_FONT_FD_RESERVED <= VFS_MAX_OPEN_FILES - 3,
+              vfs_font_fd_budget);
+STATIC_ASSERT(VFS_FONT_FD_MAX_APP <= VFS_FONT_FD_MAX_APP_TOTAL,
+              vfs_font_fd_app_le_total);
+
+/* 表の項目を空きに戻す (vfs_close / vfs_close_sqlite / vfs_close_font /
+ * vfs_close_owned が共有)。backend は閉じない。lifetime と generation は
+ * 残す (generation は再利用時に進め、lifetime は次の open が上書きする) */
+static void fd_release(VfsFile *f)
+{
+    f->in_use = 0;
+    f->fs_ctx = (void *)0;
+    f->protect = 0;
+    f->owner = 0;
+    f->stale = 0;
+    f->pinned = 0;
+    f->sqlite_db = 0;
+}
+
+/* backend から明示 offset で 1 回読む (位置 f->offset は触らない)。
+ * vfs_read_fd と vfs_font_read_at の共通部。戻り = 実読込長 / 負値 */
+static int fd_read_backend(VfsFile *f, u32 off, void *dst, u32 len)
+{
+    if (f->has_ino) return f->ops->ino->read(f->fs_ctx, f->ino, dst, len, off);
+    if (f->ops->read_stream)
+        return f->ops->read_stream(f->fs_ctx, f->path, dst, len, off);
+    return VFS_ERR_INVAL;
+}
+
 /* 従来の「種別を確かめ、サイズを取り、必要なら作る / 切り詰める」経路。
  * O_EXCL が付いていない open はここを通る。*out_size に開いた時点の長さ。
  * 戻り値 VFS_OK / 負値 = VFS_ERR_*。 */
@@ -135,7 +166,8 @@ static int vfs_open_probe(VfsOps *ops, void *fs_ctx, const char *resolved,
 }
 
 static int vfs_open_internal(const char *path, int mode, int owner,
-                             const VfsSqliteCookie *cookie, int sqlite_flags)
+                             const VfsSqliteCookie *cookie, int sqlite_flags,
+                             int lifetime)
 {
     int i, fd = -1;
     char resolved[VFS_MAX_PATH], rel_path[VFS_MAX_PATH];
@@ -228,7 +260,7 @@ static int vfs_open_internal(const char *path, int mode, int owner,
     open_files[fd].sqlite_main = 0;
     open_files[fd].protect = 0;
     open_files[fd].owner = owner;
-    open_files[fd].lifetime = cookie ? VFS_FD_SQLITE : VFS_FD_GENERIC;
+    open_files[fd].lifetime = lifetime;
     open_files[fd].cookie.group_index = cookie ? cookie->group_index : 0;
     open_files[fd].cookie.generation = cookie ? cookie->generation : 0;
     open_files[fd].sqlite_flags = sqlite_flags;
@@ -246,7 +278,7 @@ static int vfs_open_internal(const char *path, int mode, int owner,
 int vfs_open(const char *path, int mode)
 {
     return vfs_open_internal(path, mode, res_owner_get(),
-                             (const VfsSqliteCookie *)0, 0);
+                             (const VfsSqliteCookie *)0, 0, VFS_FD_GENERIC);
 }
 
 int vfs_open_sqlite(const char *path, int mode, int owner,
@@ -256,7 +288,8 @@ int vfs_open_sqlite(const char *path, int mode, int owner,
     int fd;
     if (!path || !out || !cookie || cookie->group_index < 0 ||
         cookie->generation == 0 || owner < 0) return VFS_ERR_INVAL;
-    fd = vfs_open_internal(path, mode, owner, cookie, sqlite_flags);
+    fd = vfs_open_internal(path, mode, owner, cookie, sqlite_flags,
+                           VFS_FD_SQLITE);
     if (fd < 0) return fd;
     out->fd = fd;
     out->cookie = *cookie;
@@ -311,27 +344,72 @@ int vfs_close_sqlite(const VfsSqliteLease *lease)
     if (vfs_validate_sqlite(lease) != VFS_OK) return VFS_ERR_INVAL;
     f = &open_files[lease->fd];
     /* 失効の印が付いていても解放できる (印は fs_ctx を触らない) */
-    f->in_use = 0;
-    f->fs_ctx = (void *)0;
-    f->protect = 0;
-    f->owner = 0;
-    f->stale = 0;
-    f->pinned = 0;
-    f->sqlite_db = 0;
+    fd_release(f);
+    return VFS_OK;
+}
+
+/* ---- font の read lease (T7b-b1、設計 t7bb12 §2-2) ---- */
+
+int vfs_open_font(const char *path, int owner, u32 flags, VfsFontLease *out,
+                  u32 *out_size)
+{
+    int fd;
+    if (!path || !out || !out_size || owner < 0 ||
+        (flags & ~(VFS_FONT_OPEN_PROTECT | VFS_FONT_OPEN_PIN)) != 0)
+        return VFS_ERR_INVAL;
+    fd = vfs_open_internal(path, O_RDONLY, owner, (const VfsSqliteCookie *)0,
+                           0, VFS_FD_FONT);
+    if (fd < 0) return fd;
+    open_files[fd].protect = (flags & VFS_FONT_OPEN_PROTECT) ? 1 : 0;
+    open_files[fd].pinned = (flags & VFS_FONT_OPEN_PIN) ? 1 : 0;
+    out->fd = fd;
+    out->generation = open_files[fd].generation;
+    out->owner = owner;
+    *out_size = open_files[fd].size;
+    return VFS_OK;
+}
+
+int vfs_validate_font(const VfsFontLease *l)
+{
+    const VfsFile *f;
+    if (!l || l->fd < 3 || l->fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
+    f = &open_files[l->fd];
+    if (!f->in_use || f->lifetime != VFS_FD_FONT) return VFS_ERR_INVAL;
+    if (f->generation != l->generation) return VFS_ERR_INVAL;
+    if (f->owner != l->owner) return VFS_ERR_INVAL;
+    if (f->stale) return VFS_ERR_STALE;
+    return VFS_OK;
+}
+
+int vfs_font_read_at(const VfsFontLease *l, u32 offset, void *dst, u32 len)
+{
+    VfsFile *f;
+    int rc = vfs_validate_font(l);
+    if (rc != VFS_OK) return rc;
+    f = &open_files[l->fd];
+    if (offset > f->size || len > f->size - offset) return VFS_ERR_INVAL;
+    if (len == 0) return 0;
+    if (!dst) return VFS_ERR_INVAL;
+    return fd_read_backend(f, offset, dst, len);
+}
+
+int vfs_close_font(const VfsFontLease *l)
+{
+    int rc = vfs_validate_font(l);
+    /* 失効 (STALE) でも generation / owner が一致すれば解放する。
+     * 印は fs_ctx を触らない (vfs_close_sqlite と同じ) */
+    if (rc != VFS_OK && rc != VFS_ERR_STALE) return VFS_ERR_INVAL;
+    fd_release(&open_files[l->fd]);
     return VFS_OK;
 }
 
 void vfs_close(int fd)
 {
     if (fd >= 0 && fd < VFS_MAX_OPEN_FILES) {
+        /* lease の FD は lease 経由でだけ閉じる (生 FD の close は素通し) */
         if (open_files[fd].lifetime == VFS_FD_SQLITE) return;
-        open_files[fd].in_use = 0;
-        open_files[fd].fs_ctx = (void *)0;
-        open_files[fd].protect = 0;
-        open_files[fd].owner = 0;
-        open_files[fd].stale = 0;
-        open_files[fd].pinned = 0;
-        open_files[fd].sqlite_db = 0;
+        if (open_files[fd].lifetime == VFS_FD_FONT) return;
+        fd_release(&open_files[fd]);
     }
 }
 
@@ -339,10 +417,13 @@ void vfs_close_owned(int owner)
 {
     int fd;
     for (fd = 3; fd < VFS_MAX_OPEN_FILES; fd++) {
-        if (!open_files[fd].in_use) continue;
-        if (open_files[fd].lifetime == VFS_FD_SQLITE) continue;
-        if (open_files[fd].protect) continue;
-        if (open_files[fd].owner != owner) continue;
+        VfsFile *f = &open_files[fd];
+        if (!f->in_use) continue;
+        if (f->lifetime == VFS_FD_SQLITE) continue;
+        if (f->protect) continue;
+        if (f->owner != owner) continue;
+        /* FONT は vfs_close が素通しするので、ここで直接解放する (安全網) */
+        if (f->lifetime == VFS_FD_FONT) { fd_release(f); continue; }
         vfs_close(fd);
     }
 }
@@ -354,6 +435,7 @@ int vfs_fd_set_protect(int fd, int on)
     if (fd < 3 || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
     if (!open_files[fd].in_use) return VFS_ERR_INVAL;
     if (open_files[fd].lifetime == VFS_FD_SQLITE) return VFS_ERR_INVAL;
+    if (open_files[fd].lifetime == VFS_FD_FONT) return VFS_ERR_INVAL;
     open_files[fd].protect = on ? 1 : 0;
     return VFS_OK;
 }
@@ -397,6 +479,7 @@ int vfs_read_fd(int fd, void *buf, u32 size)
     if (fd < 0 || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
     f = &open_files[fd];
     if (!f->in_use) return VFS_ERR_INVAL;
+    if (f->lifetime == VFS_FD_FONT) return VFS_ERR_INVAL; /* lease 経由だけ */
     if (f->stale) return VFS_ERR_STALE;   /* fs_ctx より先に見る */
     if ((f->mode & 3) == O_WRONLY) return VFS_ERR_INVAL; /* 書き込み専用 */
 
@@ -405,20 +488,9 @@ int vfs_read_fd(int fd, void *buf, u32 size)
         size = f->size - f->offset;
     }
 
-    if (f->has_ino) {
-        rc = f->ops->ino->read(f->fs_ctx, f->ino, buf, size, f->offset);
-        if (rc > 0) f->offset += rc;
-        return rc;
-    }
-    if (f->ops->read_stream) {
-        rc = f->ops->read_stream(f->fs_ctx, f->path, buf, size, f->offset);
-        if (rc > 0) {
-            f->offset += rc;
-            return rc;
-        }
-        return rc;
-    }
-    return VFS_ERR_INVAL;
+    rc = fd_read_backend(f, f->offset, buf, size);
+    if (rc > 0) f->offset += rc;
+    return rc;
 }
 
 int vfs_write_fd(int fd, const void *buf, u32 size)
@@ -440,6 +512,7 @@ int vfs_write_fd(int fd, const void *buf, u32 size)
     if (fd < 0 || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
     f = &open_files[fd];
     if (!f->in_use) return VFS_ERR_INVAL;
+    if (f->lifetime == VFS_FD_FONT) return VFS_ERR_INVAL; /* lease 経由だけ */
     if (f->stale) return VFS_ERR_STALE;   /* 書かない。fs_ctx より先に見る */
     if ((f->mode & 3) == O_RDONLY) return VFS_ERR_INVAL; /* 読み込み専用 */
 
@@ -469,6 +542,7 @@ int vfs_seek(int fd, int offset, int whence)
     if (fd < 0 || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
     f = &open_files[fd];
     if (!f->in_use) return VFS_ERR_INVAL;
+    if (f->lifetime == VFS_FD_FONT) return VFS_ERR_INVAL; /* 位置を持たない */
     if (f->stale) return VFS_ERR_STALE;
 
     if (whence == SEEK_SET) {
@@ -490,6 +564,7 @@ int vfs_tell(int fd)
 {
     if (fd < 0 || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
     if (!open_files[fd].in_use) return VFS_ERR_INVAL;
+    if (open_files[fd].lifetime == VFS_FD_FONT) return VFS_ERR_INVAL;
     return (int)open_files[fd].offset;
 }
 
@@ -623,6 +698,7 @@ int vfs_fd_set_pinned(int fd, int on)
 {
     if (fd < 3 || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
     if (!open_files[fd].in_use) return VFS_ERR_INVAL;
+    if (open_files[fd].lifetime == VFS_FD_FONT) return VFS_ERR_INVAL;
     open_files[fd].pinned = on ? 1 : 0;
     return VFS_OK;
 }
@@ -804,7 +880,9 @@ int vfs_resize_fd(int fd, u32 size)
     int rc;
     if (fd < 3 || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
     f = &open_files[fd];
-    if (!f->in_use || f->stale) return VFS_ERR_STALE;
+    if (!f->in_use) return VFS_ERR_STALE;
+    if (f->lifetime == VFS_FD_FONT) return VFS_ERR_INVAL;
+    if (f->stale) return VFS_ERR_STALE;
     if (!(f->mode & (O_RDWR | O_WRONLY))) return VFS_ERR_ROFS;
     if (!f->has_ino || !f->ops->sqlite || !f->ops->sqlite->resize)
         return VFS_ERR_NOSYS;
@@ -818,6 +896,8 @@ int vfs_sync_fd(int fd)
     VfsFile *f;
     if (fd < 3 || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
     f = &open_files[fd];
-    if (!f->in_use || f->stale) return VFS_ERR_STALE;
+    if (!f->in_use) return VFS_ERR_STALE;
+    if (f->lifetime == VFS_FD_FONT) return VFS_ERR_INVAL;
+    if (f->stale) return VFS_ERR_STALE;
     return f->ops->sync ? f->ops->sync(f->fs_ctx) : VFS_ERR_NOSYS;
 }
