@@ -1,4 +1,4 @@
-os32-font — T7b shared crate (not connected to shell/shlib yet)
+os32-font — T7b shared crate (engine/cache in the crate; shell/shlib wiring is b3 S3/S4)
 
 src/limits.rs is the single definition of the T7b-a1 corpus limits for
 IPAex 004.01 and Inconsolata Regular 3.000. These are bounds for later
@@ -80,3 +80,20 @@ then binary-search the copy and only glyphIdArray goes through read_at. A
 larger cmap (IPAex format 12) stays on the read_at path; open_streaming forces
 that path for tests. check-font-reader-host compares both paths on every real
 font (Shinonome included) over all 1,114,112 codepoints.
+
+T7b-b3 S1: cache::GlyphCache is the owner's glyph bitmap cache (glyph cache
+design): a caller-owned arena (attach/detach, &'static mut [u8]) of fixed
+16px/32px slots (limits SLOT16_*/SLOT32_*, N16/N32, 32-byte header + 1bpp
+bitmap), key (set, cp, px), single-linked hash chains (BUCKETS), approximate
+LRU by age, one invalidate_all for face/setting changes, trim and age wrap.
+Kcg/Missing/Space are committed as 0-byte entries; a bitmap larger than its
+slot is drawn uncached. engine::Engine<S> holds the (latin, ja) faces, one
+RasterScratch and the cache (all-zero == Engine::new(); about 127KiB on the
+host): begin() checks each face's lease once (Source::validate, default a
+zero-length read_at), resolve() searches latin->ja for Cell::Half and
+ja->latin for Cell::Full, commits complete results only, and lends the bitmap
+until release(); close/trim/invalidate_all/detach refuse with Busy meanwhile.
+Ascent per face (U1 (a)): ASCENT_JA_PX 14, ASCENT_LATIN_PX 13; paths.rs holds
+the guest font paths. check-font-cache-host / check-font-engine-host run
+tests/cache.rs and tests/engine.rs (the latter asserts the ascents and slot
+fit on the real Inconsolata / JF Dot Shinonome 16).

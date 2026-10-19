@@ -1,0 +1,9 @@
+check-font-engine-host:
+- userland/lib/font/**
+- tools/fetch_fonts.py
+- tools/tests/test_font_engine.py
+- tools/tests/test_font_cache.py
+- tools/tests/test_font_reader.py
+- tools/tests/test_font_outline.py
+- build/checks.d/check-font-engine-host.mk
+- tools/check_map.d/check-font-engine-host.yaml
