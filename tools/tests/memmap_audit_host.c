@@ -94,7 +94,8 @@ static void run(void)
         paging_sqlite_stack_guard = 0;
     }
     u32 idx = TVRAM_CHAR_BASE / PAGE_SIZE, saved = pt[idx];
-    /* Every font/Unicode/BB/native VRAM page must reject legacy USER. */
+    /* Font and retained low scratch (including retired BB) reject USER.
+     * The live planar pool CLIENT is tested separately below. */
     for (u32 a = MEM_FONT_CACHE_BASE; a < MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE; a += PAGE_SIZE) {
         pt[a / PAGE_SIZE] |= PTE_USER;
         CHECK(paging_memmap_selftest(exec_tramp_page_addr()) > 0);
@@ -124,6 +125,7 @@ static void run(void)
     CHECK(paging_master_audit(exec_tramp_page_addr()) > 0);
     page_directory[PAGING_MMIO_TOP_PDI] &= ~PTE_USER;
     gfx_prepare_backend();
+    gfx_client_to_gshell();
     /* OFF audits run at both boot points without changing test counts. */
     u32 boot_runs = audit_runs;
     int boot_pass = ksel_pass, boot_fail = ksel_fail;
@@ -309,6 +311,11 @@ static void run(void)
     ref.generation = tv->gen;
     CHECK(!lease_acquire(&space, &auth, &ref, 1, LEDGER_PERM_RO, &view));
     struct ledger_surface *client = ledger_surface_find(gfx_sf_backend(), LEDGER_ROLE_CLIENT);
+    CHECK(client && client->backing == LEDGER_SB_RAM);
+    CHECK(client->owner == LEDGER_OWNER_GSHELL);
+    CHECK(client->first >= MEM_POOL_BASE / PAGE_SIZE);
+    CHECK(client->npages == MEM_GFX_BB_SIZE / PAGE_SIZE);
+    CHECK(ledger_surface_validate(client));
     struct surface_ref cref = {(u32)(client-ledger_surfaces), client->gen};
     CallerAccessFrame previous;
     slot.state=APP_STATE_RUNNING; slot.cpl3=1; slot.hdr_flags=OS32X_FLAG_GFX;
@@ -324,6 +331,9 @@ static void run(void)
     for (u32 p = client->first; p < client->first + client->npages; p++) {
         u32 *entry = &page_tables[p / PTE_COUNT][p % PTE_COUNT];
         u32 old = *entry;
+        CHECK(pgalloc_page_owned(p, LEDGER_OWNER_GSHELL));
+        CHECK((old & (PAGE_RW | PTE_USER)) == PAGE_RW);
+        CHECK(!paging_master_audit(exec_tramp_page_addr()));
         *entry |= PTE_USER;
         CHECK(paging_master_audit(exec_tramp_page_addr()) > 0);
         *entry = old;

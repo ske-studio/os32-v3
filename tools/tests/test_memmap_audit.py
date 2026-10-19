@@ -27,11 +27,13 @@ MUTANTS = [
  ('low-audit-USER', 'kernel/paging.c', '        if (want == seen) { i++; continue; }',
   '        if (want == MM_RW && seen == MM_RWU) want = seen;\n        if (want == seen) { i++; continue; }',
   'FAIL paging_memmap_selftest(exec_tramp_page_addr()) > 0'),
+ # Ignore USER only on CLIENT aliases; accepting it in want would also
+ # trigger the independent PDE USER check for high pool RAM.
  ('client-alias-USER', 'kernel/paging.c',
   '            if (!(want & PTE_PRESENT)) { if (e & PTE_PRESENT) bad++; continue; }',
   '            for (u32 si = 0; si < LEDGER_MAX_SURFACES; si++) {\n'
   '                const struct ledger_surface *sf = &ledger_surfaces[si];\n'
-  '                if (sf->role == LEDGER_ROLE_CLIENT && p >= sf->first && p - sf->first < sf->npages) want |= e & PTE_USER;\n'
+  '                if (sf->role == LEDGER_ROLE_CLIENT && p >= sf->first && p - sf->first < sf->npages) e &= ~PTE_USER;\n'
   '            }\n'
   '            if (!(want & PTE_PRESENT)) { if (e & PTE_PRESENT) bad++; continue; }',
   'FAIL paging_master_audit(exec_tramp_page_addr()) > 0'),
@@ -43,7 +45,7 @@ MUTANTS = [
    for name, condition in (
        ('font', 'a >= MEM_FONT_CACHE_BASE && a < MEM_KCG_LZ4_TEMP_BASE'),
        ('scratch', 'a >= MEM_KCG_LZ4_TEMP_BASE && a < MEM_GFX_BB_BASE'),
-       ('bb', 'a >= MEM_GFX_BB_BASE && a < MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE'),
+       ('retired-bb', 'a >= MEM_GFX_BB_BASE && a < MEM_GFX_BB_BASE + MEM_GFX_BB_SIZE'),
        ('tvram', 'a >= TVRAM_CHAR_BASE && a < GVRAM_BRG_END'))],
 
  ('audit-line-ending', 'kernel/kaudit.c', 'serial_puts_polled("\\r\\n");', 'serial_puts_polled("\\n");', 'FAIL serial_len >= 2'),

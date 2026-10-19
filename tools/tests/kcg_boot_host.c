@@ -43,12 +43,12 @@ void *kmemset(void *dst, int value, u32 n)
 {
     if (watch) {
         if (dst == P2V(MEM_GFX_BB_BASE)) {
-            CHECK(!kcg_boot_phase_open, "scratch invalidated before BB");
-            CHECK(stage == 0, "BB before mailbox");
-            CHECK(n == MEM_GFX_BB_SIZE && value == 0, "BB entire range");
+            CHECK(!kcg_boot_phase_open, "scratch invalidated before clear");
+            CHECK(stage == 0, "scratch clear before mailbox");
+            CHECK(n == MEM_GFX_BB_SIZE && value == 0, "retired BB scratch entire range");
             stage = 1;
         } else if (dst == P2V(MEM_AUTOPLAY_MAILBOX_BASE)) {
-            CHECK(stage == 1, "mailbox follows BB");
+            CHECK(stage == 1, "mailbox follows scratch clear");
             CHECK(n == MEM_AUTOPLAY_MAILBOX_SIZE && value == 0, "mailbox exact range");
             stage = 2;
         } else CHECK(0, "unexpected close write");
@@ -132,7 +132,7 @@ static void tests(void)
         CHECK(ram[i] == (cleared ? 0 : before[i]), "close exact memory ranges");
     }
     closed_call("font"); closed_call((const char *)0);
-    /* A repeated close must not clear live BB/mailbox. init cannot reopen it. */
+    /* A repeated close must not clear reused low scratch/mailbox. init cannot reopen it. */
     ram[MEM_GFX_BB_BASE] = 0x7a; ram[MEM_AUTOPLAY_MAILBOX_BASE] = 0x7b;
     snapshot(); kcg_boot_phase_close();
     for (unsigned i=0; i<sizeof(ram); ++i)
