@@ -47,9 +47,9 @@ fonts: $(FONT_TTFS)
 fonts-clean:
 	rm -f $(FONT_TTFS) $(FONT_DIR)/*.ttf.part $(FONT_DIR)/.license_accepted
 
-# --- 16px ビットマップフォント (カーネルが /sys/font/default.kcgfont で読む) ---
+# --- 旧ビットマップ形式: host 画面比較 fixture 専用 (配布しない) ---
 # 本文用はゴシック。明朝は 16x16 だと細い横画が飛ぶ (CLAUDE.md の Known Gotchas)。
-# ipaexg.ttf が無ければ上の規則で取得が走る (make all → kcgfont → ttf)。
+# ipaexg.ttf が無ければ上の規則で取得が走る。
 $(FONT_DIR)/ipaexg16.kcgfont: $(FONT_DIR)/ipaexg.ttf tools/gen_font16.py
 	python3 tools/gen_font16.py $< $@
 
@@ -92,7 +92,7 @@ $(SETTINGS_V2_FIXTURE): $(SETTINGS_TSV) tools/mk_settings_db.py FORCE
 	python3 tools/mk_settings_db.py --tsv $(SETTINGS_TSV) --out $@ --schema-version 2
 
 # 配備に必要な最小限。make all はこれに依存する。
-ASSETS_DEPLOYED = $(FONT_DIR)/ipaexg16.kcgfont assets/fep.db
+ASSETS_DEPLOYED = assets/fep.db
 
 # 開発時に使うものも含めた全部。
 # settings.db は通常配備の対象ではない (媒体だけが持つ) ので ASSETS_DEPLOYED

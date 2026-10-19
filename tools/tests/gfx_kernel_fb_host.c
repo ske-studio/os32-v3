@@ -175,6 +175,9 @@ AppSlot *appslot_at(int id) { return id >= 0 && id < APP_SLOT_COUNT ? &host_slot
 AppSlot *appslot_get(int id) { return id == 2 ? &slot : 0; }
 int appslot_gfx_owner(void) { return host_gfx_owner; }
 int appslot_gfx_claim(int gui) { (void)gui;return 0; }
+static int host_kcg_ready = 1;
+int kcg_module_ready(void) { return host_kcg_ready; }
+int appslot_abort_request(void) { slot.abort_req = 1; return 1; }
 int con_sink_is_enabled(void) { return host_gui; }
 /* These graphics lifecycle cases model NP21/W; gate rejection is covered
  * with the real detector in pegc_mode_host.c. */

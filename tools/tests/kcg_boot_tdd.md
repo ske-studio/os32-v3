@@ -1,30 +1,7 @@
-# kcg boot 専用化のホスト検証 (T2e e8b)
+# KCG の旧 font 撤去 (T7a-1b)
 
-- 票: [TASK_T2D_T2H.md](../../docs/tasks/v3/TASK_T2D_T2H.md) §2-3 / e8b 実装結果。
-- 実行: `python3 -B tools/tests/test_kcg_boot.py --runner qemu --mutate`。
-- `make check-kcg-boot-host` は HOST32_RUNNERS の全runnerで正常対照、先頭で変異。
-- 実物の drivers/kcg.c / lib/utf8.c 全文を取り込む ILP32 足場
-  `kcg_boot_host.c`。変更はテスト内の物理RAM変換、I/O stub と検証の観測口だけ。
-  VFS は実際のヘッダと payload を返す stub。LZ4 は実物 lib/lz4.c を使用。
-  カーネル本番の Rust LZ4 の再検証や KAPI syscall dispatch の試験ではない。
+`check-kcg-boot-host` は実物 drivers/kcg.c を ILP32 足場へ取り込み、path/NULL の旧 load slot が起動時も NOSYS、VFS open 0、低位640KiB不変、ANK/漢字は ROM facade の字形であることを確認する。変異は scale 初期化の削除・旧 file fallback 再導入・旧低位 cache 再導入を実行時 rc=1 で検出する。
 
-正常12シナリオ: 非圧縮/圧縮boot読込、正常表で閉鎖、閉鎖後のpath/NULL呼出し、
-二重閉鎖、kcg_initでも再開しない、4点をそれぞれ壊した表、読込失敗ready=0の維持。
-閉鎖時はscratch失効→4点照合→BB全128KiB→mailboxの868Bを観測する。
-cache/Unicode/余り領域は閉鎖時に不変。閉鎖後の3呼出しでは全640KiBを
-バイト比較し、VFS open/read/close/get_size と logging のカウンタ不変を確認。
-boot_font_load→Unicode完全読込と検証→shlib_init→bootlog_save→閉鎖→通常execの
-結線順序と閉鎖1回もkernel.cで照合する。
+`check-kcg-module-host` は実物 body/facade/runtime を使い、満杯までの valid JIS 読みと衝突置換、module の頁確保失敗・欠落・init 失敗時の stub と回収を確認する。固定 corpus は JIS 3021..307e/3121..3126 の100字を10回、同じ画面を2回。cold/warm の hit/miss と IN/OUT/WAIT を出力する。ROM は模擬 port のため性能・可読性・実 ROM hash の証拠にはしない。変異はタグ照合欠落、確保失敗後の非空白 stub を含む。ビルド失敗や signal は RED と数えない。
 
-| 変異 | 期待FAIL (実行時rc=1) |
-|---|---|
-| boot終了ガード除去 | closed VFS untouched |
-| 閉鎖後にVFS open | closed VFS untouched |
-| BB消去除去 | mailbox follows BB |
-| mailbox初期化除去 | close completes order |
-| 4点照合除去 | invalid table ready zero |
-
-正常はrc=0、5/5は上のFAIL文言とrc=1で検出。コンパイル失敗・signalは合格にしない。
-最初の足場は未使用変数警告とVFS stubの署名不一致でコンパイル失敗、修正後は
-I/O stub不足によりsignal 11。足場を修正し、12シナリオと5変異が全て成功。
-本番ソースの変異は行わない。ゲスト/NP21/Wは依頼の範囲外で未実施。
+GUI/CUI 操作・実 ROM の1000字計測・配備予行は PM の NP21/W 受入で行う。CODE復帰/cache失効は T7a-2c に残す。

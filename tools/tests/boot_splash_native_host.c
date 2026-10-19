@@ -104,6 +104,8 @@ int con_sink_is_enabled(void) { return 0; }
 int ring3_call_from_user(void) { return 0; }
 int caller_access_get_user(struct caller_access *out) { (void)out; return 0; }
 int appslot_gfx_claim(int gui_mode) { (void)gui_mode; return 0; }
+int kcg_module_ready(void) { return 1; }
+int appslot_abort_request(void) { return 0; }
 int appslot_gfx_owner(void) { return 1; }   /* APP_ID_SHELL = GFX_OWNER_WM */
 /* 票 T8-2 で門が拒否の理由を端末へ出すようになった (claim が常に通る上の
  * スタブでは呼ばれないが、リンクには要る)。 */

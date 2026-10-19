@@ -355,7 +355,7 @@ TEXTモードではTVRAM属性反転 (ビット2 XOR) によるカーソル表�
 ### §5-9 漢字キャラクタジェネレータ (kcg.c / kcg.h)
 
 PC-98内蔵フォントROMの読み出しは `kcg.mod` が担い、64KiB のキャッシュは部品の BSS に持つ (`kernel/kcg_body.c:15,42-65`、facade は `kernel/kcg_module.c`)。
-0x01000〜のキャッシュは旧 `.kcgfont` を読んだときだけ使う (`drivers/kcg.c:41-44,86,111`)。旧経路は T7a-1b で撤去する。
+旧 `.kcgfont` の起動読込・低位 cache/scratch 参照と配布は撤去済み。`kcg_load_font` の旧 slot は起動中も NOSYS、副作用なし。部品欠落・確保失敗・init 失敗時は TVRAM の CUI を維持し、GUI シェルへ入らない。cache は満杯時も既存 slot を置換し、hit/miss は `kcg_cache_stats` で採る。
 
 | 項目 | 仕様 |
 |------|------|

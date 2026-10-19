@@ -12,6 +12,7 @@
 #include "wab_xe10.h"     /* Xe10 の窓の定数 (同上) */
 #include "kprintf.h"
 #include "kselftest.h"
+#include "kcg_module.h"
 #include "../exec/surface_query.h"
 #include "../exec/appslot.h"
 
@@ -1029,6 +1030,11 @@ void gfx_init_200(void)
 /* ======================================================================== */
 static int gfx_kapi_claim(void)
 {
+    if (!kcg_module_ready()) {
+        shell_print("Error: KCG unavailable -> CUI\n", ATTR_RED);
+        appslot_abort_request();
+        return -1;
+    }
     if (appslot_gfx_claim(con_sink_is_enabled()) >= 0) return 0;
     /* 票 T8-2 (受入 F6 の実測): 断って **続行させる**と、プログラムは失敗を
      * 知らないまま描画 KAPI と VRAM 直書きで描き続け GUI を壊す。断ったら

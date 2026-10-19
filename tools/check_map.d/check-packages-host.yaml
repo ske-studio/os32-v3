@@ -11,7 +11,6 @@ check-packages-host:
 - drivers/pc98pt.c
 - fs/ext2_layout.c
 - fs/fatfs_vfs.c
-- kernel/boot_font.c
 - kernel/kernel.c
 - tools/deploy_manifests.py
 - tools/mkpkg.py

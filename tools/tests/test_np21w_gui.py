@@ -894,9 +894,14 @@ class OcrTests(unittest.TestCase):
             http=Http();http.source=source
             im=draw(self.font,'Evidence',origin=(13,19))
             stream=io.BytesIO();im.save(stream,format='BMP');http.bmp=stream.getvalue()
-            http.put(0x1000+291588,self.font)
-            http.put(0x1000+295684,bytes([1])*256)
-            g=gui.Gui(http.transport())
+            cache_address = 0x1200000
+            def cache_bytes(missing=None):
+                return b''.join(struct.pack('<H32s', 0 if code == missing else 0x8000 | code,
+                                            self.font[code*16:(code+1)*16]) for code in range(256))
+            http.put(cache_address, cache_bytes())
+            g=gui.Gui(http.transport(), kernel_elf='kernel',
+                      symbol_factory=lambda path: Mock(read=lambda: {'cache': (0, 256*34)}))
+            g._module_base = lambda name: cache_address
             with tempfile.TemporaryDirectory() as tmp:
                 out=str(Path(tmp)/'proof.png')
                 with patch('urllib.request.urlopen',side_effect=AssertionError('LIVE HTTP FORBIDDEN')):
@@ -905,7 +910,7 @@ class OcrTests(unittest.TestCase):
                 self.assertEqual(result['source'],source)
                 self.assertEqual(Image.open(out).format,'PNG')
                 self.assertEqual(result['unknown_count'],0)
-                http.put(0x1000+295684+ord('E'),b'\x00')
+                http.put(cache_address, cache_bytes(ord('E')))
                 result=g.screen_text([13,19,64,16])
                 self.assertEqual(result['lines'],['?vidence'])
                 self.assertEqual(result['unknown_count'],1)

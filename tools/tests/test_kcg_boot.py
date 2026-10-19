@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""T2e e8b real kcg + C LZ4, VFS stub. --mutate uses copies only.
-Record: tools/tests/kcg_boot_tdd.md. Kernel uses Rust LZ4; decoder parity is
-covered elsewhere. This suite verifies font loader boundaries and closure.
-"""
+"""T7a-1b: real legacy KAPI stubs, no low writes/file I/O; runtime mutants."""
 import argparse
 from pathlib import Path
 import subprocess
@@ -13,27 +10,15 @@ import host32
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
     ('init-keeps-scale', 'drivers/kcg.c',
-     '    kcg_scale = 1;\n    /* Loaded glyphs', '    /* Loaded glyphs',
-     'FAIL closed init resets scale'),
-    ('init-clears-font', 'drivers/kcg.c',
-     # Bypass both init guards so a closed re-init still clears loaded glyphs.
-     '    if (!kcg_boot_phase_open) return;\n    if (cache_initialized) return;',
-     '', 'FAIL closed init preserves font'),
-    ('guard', 'drivers/kcg.c',
-     'if (!kcg_boot_phase_open || kcg_module_attempted()) return OS32_ERR_NOSYS;', '',
-     'FAIL closed VFS untouched'),
-    ('closed-open', 'drivers/kcg.c',
-     'if (!kcg_boot_phase_open || kcg_module_attempted()) return OS32_ERR_NOSYS;',
-     'if (!kcg_boot_phase_open) { vfs_open(path, 0); return OS32_ERR_NOSYS; }',
-     'FAIL closed VFS untouched'),
-    ('retired-BB-scratch-clear', 'drivers/kcg.c',
-     'kmemset(P2V(MEM_GFX_BB_BASE), 0, MEM_GFX_BB_SIZE);', '',
-     'FAIL mailbox follows scratch clear'),
-    ('mailbox-clear', 'drivers/kcg.c',
-     'kmemset(P2V(MEM_AUTOPLAY_MAILBOX_BASE), 0, MEM_AUTOPLAY_MAILBOX_SIZE);', '',
-     'FAIL close completes order'),
-
+     '    kcg_scale = 1;', '', 'FAIL init resets scale'),
+    ('old-font-fallback', 'drivers/kcg.c',
+     '    return OS32_ERR_NOSYS;',
+     '    return vfs_open(path, 0);', 'FAIL legacy VFS untouched'),
+    ('old-low-cache', 'drivers/kcg.c',
+     '    kcg_rom_read_ank(ch, buf);',
+     '    (void)ch; buf[0] = *(u8 *)P2V(MEM_FONT_CACHE_BASE);', 'FAIL ROM ANK bytes'),
 )
+
 
 
 def run(runner, mutation=None):
@@ -57,7 +42,7 @@ def run(runner, mutation=None):
                 'arch/x86', 'platform/pc98', 'kernel', 'drivers', 'lib', 'fs', 'sdk/include/os32')]
         exe = work / 'fixture'
         result = host32.build(cmd + [str(ROOT/'tools/tests/kcg_boot_host.c'),
-                str(ROOT/'lib/lz4.c'), '-o', str(exe)], capture_output=True, text=True)
+                '-o', str(exe)], capture_output=True, text=True)
         if result.returncode:
             raise RuntimeError('build failure is not runtime RED\n'+result.stdout+result.stderr)
         result = host32.run([str(exe)], runner=runner, capture_output=True, text=True)
@@ -73,13 +58,13 @@ def run(runner, mutation=None):
 
 def boot_order():
     source = (ROOT/'kernel/kernel.c').read_text()
-    ordered = ['boot_font_load();', 'unicode_file_load();', 'shlib_init();',
-               'bootlog_save();', 'kcg_boot_phase_close();', 'exec_run(cur_shell']
-    positions = [source.index(s) for s in ordered]
-    assert positions == sorted(positions), 'boot closure before normal AS'
-    assert source.count('kcg_boot_phase_close();') == 1, 'one closure'
-    assert source.count('unicode_file_load();') == 1, 'one Unicode load'
-    print('PASS boot order and single private Unicode load')
+    assert 'boot_font_load' not in source and 'kcg_font_loaded' not in source
+    assert 'kcg_boot_phase_close' not in source
+    assert source.index('cd_module_load();') < source.index('kcg_module_load();')
+    assert 'is_gui && !kcg_module_ready()' in source
+    assert source.count('unicode_file_load();') == 1
+    print('PASS POST_ROOT KCG, CUI gate, no legacy boot load/closure')
+
 
 
 @host32.control_session

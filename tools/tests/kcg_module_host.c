@@ -19,7 +19,6 @@ int vfs_open(const char *path, int flags)
 { return mode == 5 ? -1 : runtime_fixture_open(path, flags); }
 void kprintf(u8 attr, const char *fmt, ...)
 { (void)attr; if (!kstrcmp(fmt, "[KCG] ROM stub; TVRAM CUI retained\n")) ++stub_logs; }
-int kcg_font_loaded(void) { return mode == 4; }
 static int init_kcg(KcgModuleApi *out)
 {
     struct module_record *r = module_record_get(kcg_handle);
@@ -41,15 +40,20 @@ void _start(void)
         for (u32 i=0; i<16; i++) CHECK(!glyph[i]);
         CHECK(!kcg_module_abort()); empty(); finish(0);
     }
-    if (mode == 4) {
-        CHECK(kcg_module_load() == MODULE_BUSY && !opens && !initialized);
-        finish(0);
-    }
     kmemcpy(&imports[0].name_hash, file + 152, 4);
     kmemcpy(&exports[4].name_hash, file + 164, 4);
     exports[4].version = 1;
     struct module_request q = request();
     q.lifecycle = (struct module_lifecycle){.start = kcg_start, .detach = kcg_detach};
+    if (mode == 4) {
+        fail_at = 2;
+        CHECK(module_load(&q, &kcg_handle) == MODULE_NO_PAGES);
+        CHECK(!kcg_module_ready() && !initialized);
+        u8 glyph[32]; kmemset(glyph, 0xa5, sizeof(glyph));
+        kcg_rom_read_kanji(0x3021, glyph);
+        for (u32 i=0; i<sizeof(glyph); ++i) CHECK(!glyph[i]);
+        empty(); finish(0);
+    }
     CHECK(!module_load(&q, &kcg_handle));
     struct module_record *r = module_record_get(kcg_handle);
     r->init = (u32)(uptr)init_kcg;

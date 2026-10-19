@@ -26,9 +26,7 @@ CD インストール (userland/system/cdinst.c) の .PKG は、配備の正典
      rename) も。空きを表示し、**FD_2HD_MIN_FREE_KB を切ったら落ちる** (否定側:
      閾値の 1KB 下を落とす)。配布物の D88 (images/os32_boot.d88) のセクタを
      読み戻し、RAW (os32_boot.img) と一致するか (否定側: D88 を 1 セクタ壊すと落ちる)
-  8. 8.3 の短い名前へのフォールバックは FD (FAT) のときだけ: 実物の
-     kernel/boot_font.c をホストで取り込み、HDD (ext2) では正規名が無ければ
-     失敗のまま (短い名前を読まない) であることと、その否定側 (FS を見ない変異)
+  8. 旧 .kcgfont は全配備・CD・FD・hsync の生成元一覧に無い。
   9. FD → install → HDD: install.c の逆変換表 (fd_renames / fd_only) が
      packages.yaml の fd.rename / fd.only と一致し、実物の install.c を
      ホストで回すと (tools/tests/install_fresh_host.c の段 fdset) HDD に
@@ -61,7 +59,6 @@ PKG_H = os.path.join(ROOT, 'userland', 'lib', 'rt', 'pkg.h')
 fails = []
 
 D88 = os.path.join(ROOT, 'images', 'os32_boot.d88')
-BOOT_FONT_C = os.path.join(ROOT, 'kernel', 'boot_font.c')
 FD_IMAGES = [('2HD', os.path.join(ROOT, 'images', 'os32_boot.img'),
               'boot/loader_fat_new.bin'),
              ('1.44MB', os.path.join(ROOT, 'images', 'os32_boot144.img'),
@@ -126,11 +123,10 @@ def case_real_plan():
     want = sorted(['/bin/%s.bin' % c for c in MINIMAL_BASE_CMDS] +
                   ['/sbin/%s.bin' % c for c in MINIMAL_SBIN])
     check(cmds == want, f"MINIMAL のコマンドの顔ぶれ {cmds}")
-    # 既定フォント (184KB) は NORMAL (2026-09-25)。MINIMAL と起動 FD には入れない —
-    # 無ければカーネルは本体のフォント ROM で描く (kernel/boot_font.c、drivers/kcg.c)
     normal = {g for n, _, _, fs in resolved if n.startswith('normal') for g, _ in fs}
-    check(FONT_GUEST not in minimal and FONT_GUEST in normal,
-          f"既定フォント {FONT_GUEST} は NORMAL にあり MINIMAL に無い")
+    check(all(not g.endswith(('.kcgfont', '/default.kcg'))
+              for _, _, _, fs in resolved for g, _ in fs),
+          "旧fontは全パッケージから撤去")
     moved = ['/bin/%s.bin' % c for c in MOVED_TO_NORMAL_CMDS]
     check(all(g in normal for g in moved),
           f"移したコマンドは NORMAL にある (無い {[g for g in moved if g not in normal]})")
@@ -682,148 +678,14 @@ def case_d88():
     check(broken, "否定: 末尾 1 セクタ欠けた D88 は読めない (全長が合わない)")
 
 
-# ---------------------------------------------------------------- 8. 短い名前は FD だけ
-
-BOOT_FONT_HARNESS = r"""
-#include <stdio.h>
-#include <string.h>
-#include "kstring.h"
-/* FAT_NAME は fs/fatfs_vfs.c の VfsOps の名前 (Python が実物から読んで -D で渡す) */
-static const char *g_fs_root = "ext2";   /* "/" のマウントの FS */
-static const char *g_fs_sys = "";        /* "/sys" のマウント ("" = マウント点でない) */
-static int g_long_ok, g_short_ok, g_short_tried;
-int kcg_load_font(const char *path)
-{
-    if (strcmp(path, SYS_FONT_DEFAULT) == 0) return g_long_ok ? 0 : -1;
-    if (strcmp(path, SYS_FONT_DEFAULT_83) == 0) {
-        g_short_tried = 1;
-        return g_short_ok ? 0 : -1;
-    }
-    return -9;
-}
-const char *vfs_fstype(const char *prefix)
-{
-    if (strcmp(prefix, "/") == 0) return g_fs_root;
-    if (strcmp(prefix, "/sys") == 0) return g_fs_sys;
-    return "";
-}
-int kstrcmp(const char *a, const char *b) { return strcmp(a, b); }
-u32 kstrlen(const char *s) { return (u32)strlen(s); }
-char *kstrncpy(char *d, const char *s, u32 n)
-{
-    strncpy(d, s, n);
-    if (n) d[n - 1] = '\0';
-    return d;
-}
-#include "boot_font.c"
-static int fails;
-static void run(const char *root, const char *sys, int lo, int sh, int want_rc,
-                int want_tried, const char *label)
-{
-    int rc;
-    g_fs_root = root; g_fs_sys = sys;
-    g_long_ok = lo; g_short_ok = sh; g_short_tried = 0;
-    rc = boot_font_load();
-    if ((rc == 0) != (want_rc == 0) || g_short_tried != want_tried) {
-        printf("FAIL %s (rc=%d tried=%d)\n", label, rc, g_short_tried);
-        fails++;
-    } else {
-        printf("ok %s\n", label);
-    }
-}
-int main(void)
-{
-    run("ext2", "", 0, 1, -1, 0, "HDD: 正規名が無ければ失敗のまま、短い名前を読まない");
-    run("ext2", "", 1, 1, 0, 0, "HDD: 正規名を読む");
-    run(FAT_NAME, "", 0, 1, 0, 1, "FD: 正規名が無ければ短い名前を読む");
-    run(FAT_NAME, "", 1, 1, 0, 0, "FD: 正規名があれば正規名");
-    run(FAT_NAME, "", 0, 0, -1, 1, "FD: どちらも無ければ失敗");
-    run(FAT_NAME, "ext2", 0, 1, -1, 0,
-        "FD ルート + /sys に ext2 をマウント: 短い名前を読まない");
-    run("ext2", FAT_NAME, 0, 1, 0, 1, "HDD ルート + /sys に FAT: 短い名前を読む");
-    return fails ? 1 : 0;
-}
-"""
-
-
-def real_fat_name():
-    """fs/fatfs_vfs.c の VfsOps の名前 (vfs_fstype が返す文字列)"""
-    src = open(os.path.join(ROOT, 'fs', 'fatfs_vfs.c'), encoding='utf-8').read()
-    m = re.search(r'static\s+VfsOps\s+fatfs_ops\s*=\s*\{\s*"(\w+)"', src)
-    return m.group(1) if m else None
-
-
-def kernel_fd_root():
-    """kernel/kernel.c の FD 起動のルート (デバイス名, FS 名)"""
-    src = open(os.path.join(ROOT, 'kernel', 'kernel.c'), encoding='utf-8').read()
-    m = re.search(r'BOOT_DRIVE_FDD[^{]*\{\s*root_dev\s*=\s*"(\w+)";\s*'
-                  r'root_fs\s*=\s*"(\w+)";', src)
-    return (m.group(1), m.group(2)) if m else (None, None)
-
-
-def run_boot_font(src_text, fat_name):
-    """boot_font.c (src_text) をハーネスで回す。戻り値 (rc, 出力)"""
-    tmp = tempfile.mkdtemp(prefix='bootfont_')
-    try:
-        with open(os.path.join(tmp, 'boot_font.c'), 'w', encoding='utf-8') as f:
-            f.write(src_text)
-        h = os.path.join(tmp, 'h.c')
-        with open(h, 'w', encoding='utf-8') as f:
-            f.write(BOOT_FONT_HARNESS)
-        exe = os.path.join(tmp, 'a.out')
-        inc = ['-I' + tmp] + ['-I' + os.path.join(ROOT, d)
-                              for d in ('kernel', 'include', 'drivers', 'fs', 'lib',
-                                        'sdk/include', 'sdk/include/os32')]
-        r = subprocess.run(['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
-                            '-D__cdecl=',
-                            '-Wno-unused-function',   # 変異で遡りの関数が使われなくなる
-                            '-DFAT_NAME="%s"' % fat_name, '-include',
-                            os.path.join(ROOT, 'include', 'config.h'), *inc,
-                            '-o', exe, h], capture_output=True, text=True)
-        if r.returncode != 0:
-            return None, r.stderr
-        r = subprocess.run([exe], capture_output=True, text=True)
-        return r.returncode, r.stdout
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
-
+# ---------------------------------------------------------------- 8. 旧font撤去
 
 def case_boot_font():
-    print("case 8: 8.3 の短い名前へのフォールバックは LFN の無い FS (FAT) のときだけ")
-    # 試験の側で "fat" / "fd0" を決め打ちしない — 実物と突き合わせる
-    fat = real_fat_name()
-    root_dev, root_fs = kernel_fd_root()
-    check(fat is not None, f"fs/fatfs_vfs.c の VfsOps の名前が読める ({fat})")
-    check(root_fs == fat, f"kernel.c の FD ルートの FS ({root_fs}) = FAT の VfsOps 名 ({fat})")
-    cfg = open(os.path.join(ROOT, 'include', 'config.h'), encoding='utf-8').read()
-    m = re.search(r'#define\s+SYS_FONT_83_FSTYPE\s+"(\w+)"', cfg)
-    check(m is not None and m.group(1) == fat,
-          f"config.h SYS_FONT_83_FSTYPE ({m and m.group(1)}) = FAT の VfsOps 名")
-    filer = open(os.path.join(ROOT, 'userland', 'shell', 'cmd_filer.c'),
-                 encoding='utf-8').read()
-    p0 = re.search(r"#define\s+FL_FD_DEV_PREFIX0\s+'(.)'", filer)
-    p1 = re.search(r"#define\s+FL_FD_DEV_PREFIX1\s+'(.)'", filer)
-    check(root_dev is not None and p0 and p1 and root_dev[:2] == p0.group(1) + p1.group(1),
-          f"filer の FD 判定 ({p0 and p0.group(1)}{p1 and p1.group(1)}…) = kernel.c の "
-          f"FD ルート ({root_dev})")
-    if not shutil.which('gcc') or fat is None:
-        print("  SKIP gcc が無い / FAT の名前が読めない")
-        return
-    src = open(BOOT_FONT_C, encoding='utf-8').read()
-    rc, out = run_boot_font(src, fat)
-    for line in (out or '').splitlines():
-        print(f"       {line}")
-    check(rc == 0, "kernel/boot_font.c (実物): HDD は失敗のまま、FAT のマウントだけ短い名前")
-    gate = ('        kstrcmp(boot_font_fstype_of(SYS_FONT_DEFAULT), '
-            'SYS_FONT_83_FSTYPE) == 0) {')
-    check(src.count(gate) == 1, "変異の目印がちょうど 1 か所")
-    for mut, label in (
-            (gate.replace('kstrcmp(', '(kstrcmp(').replace('== 0) {', '== 0 || 1)) {'),
-             "FS を見ずに短い名前へ落ちる"),
-            (gate.replace('boot_font_fstype_of(SYS_FONT_DEFAULT)', 'vfs_fstype("/")'),
-             "対象のマウントではなくルートの FS を見る")):
-        rc, _ = run_boot_font(src.replace(gate, mut), fat)
-        check(rc not in (0, None), f"否定: {label}変異は RED")
+    print("case 8: 旧fontは配備・hsyncの正典に無い")
+    man = dm.load_merged(dm.CORE_MANIFEST_RELPATHS)
+    guests = [g for e in man['filesystem']['files'] for _, g in dm.resolve_entry(e, ROOT)]
+    check(not any(g.endswith(('.kcgfont', '/default.kcg')) for g in guests),
+          "配備/hsync一覧に旧font無し")
 
 
 # ---------------------------------------------------------------- 9. FD → install → HDD

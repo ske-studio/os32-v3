@@ -19,15 +19,14 @@
 #  **MINIMAL =「起動して、HDD に入れて、壊れたときに直して、残りを取ってこられる」
 #  レスキュー兼インストーラ** (2026-09-25、ユーザー決定)。起動 FD と同じ集合なので
 #  2HD (1232KB) に収まる大きさに保つ。それ以外は NORMAL:
-#    - 既定フォント /sys/font/default.kcgfont (184KB、data)。無ければカーネルは
-#      `FONT..NG` を出して本体のフォント ROM で描く (kernel/boot_font.c、drivers/kcg.c)
+
 #    - more / find / sort / head / tail / wc / tee / touch / sleep / diff / du / cal /
 #      man / sndctl (programs)。直すには less / grep / hexdump とシェルの組み込みで足りる
 #    gui       → GUI      gshell、libos32gui.shlib、shlib を使うアプリ (filer /
 #                         edit_gui)。shlib を使う試験アプリは test (DEBUG) のまま
 #    programs  → NORMAL   コマンドとアプリ
 #    docs      → NORMAL   man ページ
-#    data      → NORMAL   既定フォント (KCG)、FEP 辞書、TTF、MGX サンプル
+#    data      → NORMAL   FEP 辞書、TTF、MGX サンプル
 #    test      → DEBUG    試験バイナリと試験用データ (userland/tests/ 由来は必ずこれ)
 #  1 行のタグはちょうど 1 つのパッケージに当たること (検査が見る)。
 #
