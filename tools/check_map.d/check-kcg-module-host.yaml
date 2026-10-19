@@ -107,4 +107,7 @@ check-kcg-module-host:
 - userland/shell/sh_pipe.inc
 - userland/shell/sh_redraw.inc
 - exec/exec.h
+- include/pc98.h
+- include/io.h
+- platform/pc98/platform_io.h
 artifact_reader: true

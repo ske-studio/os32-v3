@@ -5,11 +5,11 @@
 #include "kstring.h"
 #define IO_H
 static u32 writes, waits, reads, mode_writes, logs;
-static u8 code_lo, code_hi, line_sel;
+static u8 code_lo, code_hi, line_sel, rom_epoch, kac_mode;
 static inline void outp(unsigned port, unsigned value)
 {
     ++writes;
-    if (port == MODE_FF1_PORT) { ++mode_writes; return; }
+    if (port == MODE_FF1_PORT) { ++mode_writes; kac_mode = value; return; }
     if (port == KCG_CODE_LO) code_lo = value;
     if (port == KCG_CODE_HI) code_hi = value;
     if (port == KCG_LINE_SEL) line_sel = value;
@@ -17,11 +17,11 @@ static inline void outp(unsigned port, unsigned value)
 static inline unsigned inp(unsigned port)
 {
     (void)port; ++reads;
-    return (code_lo * 7 + code_hi * 11 + line_sel * 13) & 255;
+    return (code_lo * 7 + code_hi * 11 + line_sel * 13 + rom_epoch) & 255;
 }
 static inline void io_wait(void) { ++waits; }
 #include "kcg_body_source.inc"
-#include "../../kernel/kcg_module.c"
+#include KCG_ADAPTER
 static int published;
 const u32 *module_exports(struct module_handle h)
 { (void)h; static const u32 ops[2] = {1, 1}; return published ? ops : 0; }
@@ -49,7 +49,7 @@ void _start(void)
     };
     CHECK(!kcg_start(&record, (u32)(uptr)kcg_module_init, 0), "first typed init");
     published = 1;
-    KcgModuleApi api = {kcg_rom_read_ank, kcg_rom_read_kanji, kcg_cache_stats};
+    KcgModuleApi api = {kcg_rom_read_ank, kcg_rom_read_kanji, kcg_cache_stats, kcg_v86_restore};
     CHECK(mode_writes == 1 && waits == 1, "code mode once");
     CHECK(kcg_module_init(&again) == MODULE_BUSY && mode_writes == 1 && !again.read_ank, "double init");
     u8 glyph[32];
@@ -103,6 +103,28 @@ void _start(void)
            sizeof("CORPUS JIS 3021..307e,3121..3126 repeated x10; ROM hash unavailable (mock ports)\n"
            "cold1000 hits=900 misses=100 hit=90% IN=3200 OUT=3400 WAIT=3400 file=0\n"
            "warm1000 hits=1000 misses=0 hit=100% IN=0 OUT=0 WAIT=0 file=0\n")-1);
+    /* Cache both ROM and writable CG RAM glyphs. Change the port fixture's
+     * contents as a guest can change user glyphs, then require fresh reads. */
+    api.read_ank('A', glyph);
+    api.read_kanji(0x7621, glyph);
+    u32 old_reads = reads;
+    KcgCacheStats before; api.stats(&before);
+    rom_epoch = 1;
+    outp(MODE_FF1_PORT, MFF1_KCG_BITMAP);
+    kcg_v86_restore();
+    CHECK(kac_mode == MFF1_KCG_CODE, "return CODE");
+    api.read_ank('A', glyph);
+    CHECK(glyph[0] == (u8)('A'*11+1), "fresh ANK");
+    api.read_kanji(0x7621, glyph);
+    CHECK(glyph[0] == (u8)(0x21*7+0x56*11+0x20*13+1), "fresh CG RAM");
+    api.stats(&s);
+    CHECK(reads == old_reads + 48 && s.misses == before.misses + 2,
+          "return invalidates cache");
+    published = 0;
+    outp(MODE_FF1_PORT, MFF1_KCG_BITMAP);
+    kcg_v86_restore();
+    CHECK(kac_mode == MFF1_KCG_CODE && reads == old_reads + 48,
+          "missing body CODE only");
     output("PASS KCG body: glyphs/ports, double init, collision; sample hit=1022/1024 (99.80%)\n",
            sizeof("PASS KCG body: glyphs/ports, double init, collision; sample hit=1022/1024 (99.80%)\n")-1);
     stop(0);

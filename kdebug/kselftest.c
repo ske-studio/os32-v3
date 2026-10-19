@@ -1,4 +1,7 @@
 #include "appmem.h"
+#include "kcg_module.h"
+#include "kcg.h"
+#include "v86_io.h"
 #include "v86_mem.h"
 /* ======================================================================== */
 /*  KSELFTEST.C — カーネル内プリミティブの自己診断                          */
@@ -977,9 +980,50 @@ static void test_kapi_layout(void)
     check((bad & (1u << 3)) == 0, "kapi:hdr v3");
 }
 
+/* T7a-2c fixed targets only; no arbitrary physical-read KAPI.
+ * KDEBUG=0 has no injection. Observe A9h, do not assume its dot-mode value. */
+static void test_kcg_display_return(void)
+{
+    static const u32 windows[] = { TVRAM_CG_WINDOW, VRAM_PLANE_B,
+        VRAM_PLANE_R, VRAM_PLANE_G, VRAM_PLANE_I };
+    u32 before[5];
+    KcgCacheStats cold, warm;
+    u8 glyph[KCG_ANK_H];
+    for (u32 i = 0; i < 5; i++) before[i] = paging_pte_flags(windows[i]);
+    /* The absent facade has zero stats; a live body records this boot read. */
+    kcg_rom_read_ank('A', glyph);
+    kcg_cache_stats(&cold);
+    int ready = cold.misses != 0;
+    outp(KCG_CODE_LO, 0); io_wait();
+    outp(KCG_CODE_HI, 'A'); io_wait();
+    outp(KCG_LINE_SEL, 0); io_wait();
+    u32 code = inp(KCG_DATA);
+    outp(MODE_FF1_PORT, MFF1_KCG_BITMAP); io_wait();
+    u32 dot = inp(KCG_DATA);
+    v86_io_reset_policy();
+    u32 restored = inp(KCG_DATA);
+    kcg_rom_read_ank('A', glyph);
+    kcg_cache_stats(&warm);
+    check(!ready || (warm.misses == cold.misses + 1 && warm.hits == cold.hits),
+          "kcg:return cache miss");
+    for (u32 i = 0; i < 5; i++) {
+        u32 after = paging_pte_flags(windows[i]);
+        check(((before[i] ^ after) & ~(PTE_ACCESSED | PTE_DIRTY)) == 0,
+              "display:cache flags unchanged");
+        check((after & (PTE_PRESENT | PTE_PCD | PTE_PWT)) ==
+              (PTE_PRESENT | (i ? PTE_PCD : 0)),
+              "display:CG WB VRAM UC");
+    }
+    kprintf(0x07, "[display] kcg=%u A9 code=%02x dot=%02x restored=%02x miss=%u/%u\n",
+            ready, code, dot, restored, cold.misses, warm.misses);
+    kprintf(0x07, "[display] PTE CG=%x B=%x R=%x G=%x I=%x\n",
+            before[0], before[1], before[2], before[3], before[4]);
+}
+
 int kselftest_run_post_unicode(void)
 {
     u32 before = ksel_fail;
+    test_kcg_display_return();
     u32 phys = unicode_file_debug_phys();
     int owned = (phys & (PAGE_SIZE - 1)) == 0;
     /* Reserved role 4 must never expose the table, with or without the file. */

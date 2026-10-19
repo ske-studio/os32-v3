@@ -71,4 +71,5 @@ check-v86-module-host:
 - build/out/v86.mod
 - build/out/vmkernel.lz4
 - build/out/kernel.elf
+- kernel/kcg_module.h
 artifact_reader: true

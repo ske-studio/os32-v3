@@ -7,6 +7,8 @@
 #include "os32_kapi_shared.h"
 #include "kstring.h"
 #include "kprintf.h"
+#include "pc98.h"
+#include "io.h"
 
 extern const u32 kcg_kexports[];
 extern const struct module_symbol_contract kcg_import_contracts[];
@@ -18,7 +20,8 @@ static KcgModuleApi candidate;
 static void stub_ank(u8 ch, u8 *buf) { (void)ch; kmemset(buf, 0, KCG_ANK_H); }
 static void stub_kanji(u16 jis, u8 *buf) { (void)jis; kmemset(buf, 0, KCG_KANJI_H * 2); }
 static void stub_stats(KcgCacheStats *out) { kmemset(out, 0, sizeof(*out)); }
-static const KcgModuleApi stub_api = {stub_ank, stub_kanji, stub_stats};
+static void stub_invalidate(void) {}
+static const KcgModuleApi stub_api = {stub_ank, stub_kanji, stub_stats, stub_invalidate};
 static const KcgModuleApi *public_api(void)
 {
     return kcg_module_ready() ? &candidate : &stub_api;
@@ -27,6 +30,15 @@ void kcg_rom_read_ank(u8 ch, u8 *buf) { public_api()->read_ank(ch, buf); }
 void kcg_rom_read_kanji(u16 jis, u8 *buf) { public_api()->read_kanji(jis, buf); }
 void kcg_cache_stats(KcgCacheStats *out) { public_api()->stats(out); }
 int kcg_module_ready(void) { return module_exports(kcg_handle) != 0; }
+
+void kcg_v86_restore(void)
+{
+    /* Bible §2-6-5 / UNDOCUMENTED io_disp 0068h KAC Mode.
+     * The mode belongs to core; absent/failed modules retain no cache. */
+    outp(MODE_FF1_PORT, MFF1_KCG_CODE);
+    io_wait();
+    public_api()->invalidate();
+}
 
 static int kcg_start(struct module_record *r, u32 entry, u32 *exports)
 {

@@ -294,6 +294,10 @@ void (*const kdebug_kexports[])(void) = {
     (void (*)(void))vfs_get_size,
     (void (*)(void))vfs_rm,
     (void (*)(void))dma_range_ok,
+    (void (*)(void))kcg_rom_read_ank,
+    (void (*)(void))kcg_cache_stats,
+    (void (*)(void))v86_io_reset_policy,
+    (void (*)(void))paging_pte_flags,
 };
 const unsigned long kdebug_abi_gen = KDEBUG_ABI_GEN;
 const unsigned long kdebug_kexport_count = KDEBUG_IMPORT_COUNT;
@@ -533,6 +537,10 @@ const struct module_symbol_contract kdebug_import_contracts[] = {
     {0xbec91a0bu, 1, 1},
     {0xf5a9fd5eu, 1, 1},
     {0x71da51aau, 1, 1},
+    {0x13ae6509u, 1, 1},
+    {0xa2bd76a9u, 1, 1},
+    {0x80dedfebu, 1, 1},
+    {0xb38c36d5u, 1, 1},
 };
 const struct module_symbol_contract kdebug_export_contracts[MODULE_OPS_SLOTS] = {
     [0] = {0xbcb84611u, 1, 0},

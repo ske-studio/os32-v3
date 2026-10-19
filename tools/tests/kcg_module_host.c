@@ -8,6 +8,9 @@
 #ifndef KCG_ADAPTER
 #define KCG_ADAPTER "../../kernel/kcg_module.c"
 #endif
+#define IO_H
+static void outp(unsigned p, unsigned v) { (void)p; (void)v; }
+static void io_wait(void) {}
 #include KCG_ADAPTER
 static u32 mode, initialized, stub_logs;
 static const struct bootinfo boot = {.img_valid = 1};
@@ -27,6 +30,7 @@ static int init_kcg(KcgModuleApi *out)
     out->read_ank = (void *)(uptr)r->text;
     out->read_kanji = (void *)(uptr)(r->text + (mode == 1 ? r->text_size : 0));
     out->stats = (void *)(uptr)r->text;
+    out->invalidate = (void *)(uptr)r->text;
     return mode == 2 ? -1 : 0;
 }
 void _start(void)

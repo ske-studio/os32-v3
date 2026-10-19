@@ -22,7 +22,7 @@ STAGE_KINDS = {
     'S2': ('FUNC',) * 134 + ('GETTER',) * 22 +
           ('GETTER', 'SETTER') * 12 + ('PTR',) * 7 + ('OP',) * 6,
     'S3': ('FUNC',) * 14 + ('GETTER',) * 2 + ('PTR',) * 4,
-    'S4': ('FUNC',) * 21,
+    'S4': ('FUNC',) * 25,
 }
 STAGES = {}
 for _stage, _kinds in STAGE_KINDS.items():

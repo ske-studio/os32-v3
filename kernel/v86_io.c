@@ -7,6 +7,8 @@
 #include "v86_kbd.h"
 #include "tss.h"
 #include "pc98.h"
+#include "pegc.h"
+#include "v86_bios.h"
 #include "io.h"
 #include "gfx_internal.h"
 #include "gfx.h"        /* PAL_IDX_PORT / PAL_G_PORT / PAL_R_PORT / PAL_B_PORT */
@@ -245,6 +247,25 @@ static void gfx_state_for_os32(void)
 
     io_out(GDC_GFX_CMD, GDC_CMD_STOP);
 
+    /* Saved boot flags, never the guest's BDA. UNDOCUMENTED io_disp 006Ah:
+     * EGC→GRCG requires 04A0h=FFF0h; 20h/68h exist only on extended gfx.
+     * FreeBSD 10.4 sys/pc98/cbus/gdc.c:1095-1107 gates the latter too. */
+    const u8 *bios = v86_bios_real_lowmem();
+    if (bios[BIOS_GRAPH_FLAGS] & BIOS_GRAPH_EGC) {
+        outpw(EGC_ACCESS_PORT, EGC_ACCESS_RESET);
+        io_wait();
+        io_out(MODE_FF2_PORT, MFF2_UNLOCK);
+        io_out(MODE_FF2_PORT, MFF2_GRCG_MODE);
+        io_out(MODE_FF2_PORT, MFF2_LOCK);
+    }
+    if (bios[BIOS_CRT_FLAGS] & BIOS_CRT_GRCG)
+        io_out(GRCG_MODE_PORT, GRCG_MODE_OFF);
+    if (bios[PEGC_BIOS_ARCH_FLAG] & PEGC_BIOS_ARCH_EXTGFX) {
+        io_out(MODE_FF2_PORT, PEGC_FF2_UNLOCK);
+        io_out(MODE_FF2_PORT, PEGC_FF2_STD_GFX);
+        io_out(MODE_FF2_PORT, PEGC_FF2_VRAM_400L);
+        io_out(MODE_FF2_PORT, PEGC_FF2_LOCK);
+    }
     io_out(MODE_FF2_PORT, MFF2_16COLOR);
     io_out(MODE_FF1_PORT, MFF1_HIRES);
 
