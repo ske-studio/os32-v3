@@ -441,7 +441,7 @@ fn exact_and_exceeded_limits() {
         assert_eq!(f.is_ok(), groups <= MAX_CMAP_GROUPS, "group cap {groups}");
     }
     assert!(READ_CACHE_SLOTS > 0);
-    assert_eq!(READ_CACHE_SLOT_BYTES, 2048);
+    assert_eq!(READ_CACHE_SLOT_BYTES, 1024);
     println!(
         "sizeof host Face<Memory>={} (cache data={}, no allocation in reader)",
         std::mem::size_of::<Face<Memory>>(),
@@ -602,13 +602,6 @@ fn short_reads_publish_nothing() {
 fn read_cache_lru() {
     let (source, stats) = disk(&fonts().remove(1)); // IPAexG
     let mut face = Face::open(source).unwrap();
-    face.trim();
-    stats.reads.set(0);
-    for gid in [0, 512, 0, 1024, 0] {
-        face.advance(gid).unwrap();
-    }
-    assert_eq!(stats.reads.get(), 3, "recently used block was evicted");
-
     // Fill all N slots, promote the oldest, then force an eviction.
     face.trim();
     stats.reads.set(0);

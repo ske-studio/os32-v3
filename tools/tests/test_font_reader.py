@@ -74,12 +74,12 @@ def main():
         fonts.symlink_to(ROOT / 'assets/fonts', target_is_directory=True)
         limits = copy / 'src/limits.rs'
         original_limits = limits.read_text()
-        old = 'pub const READ_CACHE_SLOTS: usize = 2;'
+        old = 'pub const READ_CACHE_SLOTS: usize = 16;'
         assert original_limits.count(old) == 1
-        limits.write_text(original_limits.replace(old, 'pub const READ_CACHE_SLOTS: usize = 8;'))
-        larger = build_and_run(copy, work, 'slots-8')
-        print(larger.stdout, end='', flush=True)
-        assert larger.returncode == 0, larger.stderr
+        limits.write_text(original_limits.replace(old, 'pub const READ_CACHE_SLOTS: usize = 4;'))
+        other = build_and_run(copy, work, 'slots-4')
+        print(other.stdout, end='', flush=True)
+        assert other.returncode == 0, other.stderr
         limits.write_text(original_limits)
         if args.mutate:
             original = (CRATE / 'src/reader.rs').read_text()
