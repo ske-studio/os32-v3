@@ -31,13 +31,17 @@ import zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "tools" / "fetch_fonts.py"
+MUTATION_SOURCE = None
 REAL_LICENSE = ROOT / "assets" / "fonts" / "IPA_Font_License_Agreement_v1.0.txt"
 
 
 def load_module():
     spec = importlib.util.spec_from_file_location("fetch_fonts", str(SCRIPT))
     mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    if MUTATION_SOURCE is None:
+        spec.loader.exec_module(mod)
+    else:
+        exec(compile(MUTATION_SOURCE, str(SCRIPT), "exec"), mod.__dict__)
     return mod
 
 
@@ -413,6 +417,117 @@ class InconsolataTest(unittest.TestCase):
                          "5d362a6f8690517fd9a5573128a081d8bbbb2f92714cf00556e08fbbe9600426")
 
 
+class JfDotTest(unittest.TestCase):
+    def setUp(self):
+        self.mod = load_module()
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.dest = pathlib.Path(self.tmp.name) / "fonts"
+        self.ttf = b"Shinonome16 fixture"
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr("JF-Dot-Shinonome16.ttf", self.ttf)
+            z.writestr("JF-Dot-Shinonome16B.ttf", b"unwanted bold font")
+            z.writestr("other/ignored.txt", b"unwanted document")
+        self.zip = buf.getvalue()
+        self.mod.JFDOT_ZIP_SHA256 = sha(self.zip)
+        self.mod.JFDOT_MEMBERS = {
+            "JF-Dot-Shinonome16.ttf": ("JF-Dot-Shinonome16.ttf", sha(self.ttf))}
+        self.calls = []
+        self.err = io.StringIO()
+        self.out = io.StringIO()
+
+    def fetch(self, url, stderr):
+        self.calls.append(url)
+        self.assertEqual(url, self.mod.JFDOT_ZIP_URL)
+        return self.zip
+
+    def run_fetch(self, *args):
+        return self.mod.run(["--family", "jfdot-shinonome16", "--font-dir", str(self.dest), *args],
+                            environ={}, stdin=PipeIn(""), stdout=self.out,
+                            stderr=self.err, fetch=self.fetch)
+
+    def test_only_one_font_and_full_license_without_consent(self):
+        self.assertEqual(self.run_fetch(), 0, self.err.getvalue())
+        self.assertEqual(self.calls, [self.mod.JFDOT_ZIP_URL])
+        self.assertEqual(set(p.name for p in self.dest.iterdir()),
+                         {"JF-Dot-Shinonome16.ttf", self.mod.JFDOT_LICENSE_NAME})
+        self.assertEqual((self.dest / "JF-Dot-Shinonome16.ttf").read_bytes(), self.ttf)
+        self.assertEqual((self.dest / self.mod.JFDOT_LICENSE_NAME).read_bytes(),
+                         self.mod.JFDOT_LICENSE_TEXT)
+
+    def test_cache_check_force_and_repairs(self):
+        self.assertEqual(self.run_fetch("--check"), 1)
+        self.assertEqual(self.calls, [])
+        self.assertEqual(self.run_fetch(), 0)
+        self.calls.clear()
+        for p in self.dest.iterdir():
+            os.utime(p, (1000000000, 1000000000))
+        self.assertEqual(self.run_fetch("--check"), 0)
+        self.assertEqual(self.run_fetch(), 0)
+        self.assertEqual(self.calls, [])
+        self.assertTrue(all(p.stat().st_mtime > 1000000000 for p in self.dest.iterdir()))
+        self.assertEqual(self.run_fetch("--force"), 0)
+        self.assertEqual(len(self.calls), 1)
+        for name in ("JF-Dot-Shinonome16.ttf", self.mod.JFDOT_LICENSE_NAME):
+            for replacement in (None, b"stale"):
+                with self.subTest(name=name, replacement=replacement):
+                    p = self.dest / name
+                    if replacement is None:
+                        p.unlink()
+                    else:
+                        p.write_bytes(replacement)
+                    self.assertEqual(self.run_fetch("--check"), 1)
+                    self.calls.clear()
+                    self.assertEqual(self.run_fetch(), 0)
+                    self.assertEqual(self.calls, [self.mod.JFDOT_ZIP_URL])
+                    self.assertEqual(self.run_fetch("--check"), 0)
+
+    def test_zip_and_ttf_hash_mismatches_leave_no_outputs(self):
+        original = self.mod.JFDOT_ZIP_SHA256
+        for which in ("zip", "ttf"):
+            with self.subTest(which=which):
+                self.mod.JFDOT_ZIP_SHA256 = "0" * 64 if which == "zip" else original
+                if which == "ttf":
+                    self.mod.JFDOT_MEMBERS["JF-Dot-Shinonome16.ttf"] = (
+                        "JF-Dot-Shinonome16.ttf", "0" * 64)
+                self.assertEqual(self.run_fetch(), 1)
+                self.assertIn("SHA-256 が合わない", self.err.getvalue())
+                self.assertFalse(self.dest.exists())
+
+    def test_missing_member_and_corrupt_zip_fail(self):
+        self.mod.JFDOT_MEMBERS = {"missing.ttf": ("missing.ttf", sha(self.ttf))}
+        self.assertEqual(self.run_fetch(), 1)
+        self.assertFalse(self.dest.exists())
+        self.zip = b"not a zip"
+        self.mod.JFDOT_ZIP_SHA256 = sha(self.zip)
+        self.assertEqual(self.run_fetch(), 1)
+        self.assertFalse(self.dest.exists())
+
+    def test_offline_zip_and_print_sha(self):
+        archive = pathlib.Path(self.tmp.name) / "font.zip"
+        archive.write_bytes(self.zip)
+        self.assertEqual(self.run_fetch("--print-zip-sha256"), 0)
+        self.assertEqual(self.out.getvalue(), self.mod.JFDOT_ZIP_SHA256 + "\n")
+        self.assertFalse(self.dest.exists())
+        self.assertEqual(self.run_fetch("--zip", str(archive)), 0)
+        self.assertEqual(self.calls, [])
+        self.assertEqual((self.dest / "JF-Dot-Shinonome16.ttf").read_bytes(), self.ttf)
+
+    def test_release_pins(self):
+        mod = load_module()
+        self.assertEqual(mod.JFDOT_ZIP_URL,
+                         "https://ftp.iij.ad.jp/pub/osdn.jp/users/8/8542/jfdotfont-20150527.zip")
+        self.assertEqual(mod.JFDOT_ZIP_SHA256,
+                         "8e574faaaa7e27294aec66464aaf427447b2f0ccec8fe00c50e69bbf509f14b1")
+        self.assertEqual(mod.JFDOT_MEMBERS, {"JF-Dot-Shinonome16.ttf": (
+            "JF-Dot-Shinonome16.ttf",
+            "5e265e45349b3328afa67dc3905a3ca3c628cf7c7e0eccea9c7ce8a8acc127cc")})
+        self.assertEqual(mod.JFDOT_ZIP_SIZE, 41637317)
+        self.assertEqual(mod.JFDOT_TTF_SIZE, 1954728)
+        self.assertEqual(sha(mod.JFDOT_LICENSE_TEXT), "a38a9a330458c11317ec5028df7cd4c7b44210446300e20020f942390d5d5dd2")
+
+
 class FontVendorTest(unittest.TestCase):
     def test_version_license_provenance_and_unmodified_sources(self):
         vendor = ROOT / "userland/lib/font/vendor/ttf-parser-0.21.1"
@@ -443,5 +558,35 @@ class FontVendorTest(unittest.TestCase):
             self.assertEqual((manifest_path.parent / dependency["path"]).resolve(), vendor)
 
 
+def check_mutations():
+    # Run the same behavioral tests against compiled copies; never edit production.
+    global MUTATION_SOURCE
+    source = SCRIPT.read_text()
+    mutations = [
+        ("zip-sha", "if got != expected:", "if False:"),
+        ("ttf-sha", "if got != digest:", "if False:"),
+        ("license-output", "[(JFDOT_LICENSE_NAME, JFDOT_LICENSE_TEXT)])", "[])"),
+        ("license-cache", "members[JFDOT_LICENSE_NAME] = (JFDOT_LICENSE_NAME, sha256_bytes(JFDOT_LICENSE_TEXT))",
+         "pass"),
+    ]
+    for name, old, new in [("control", "if got != expected:", "if got != expected:")] + mutations:
+        if source.count(old) != 1:
+            raise AssertionError("mutation anchor: " + name)
+        MUTATION_SOURCE = source.replace(old, new, 1)
+        compile(MUTATION_SOURCE, str(SCRIPT), "exec")
+        suite = unittest.defaultTestLoader.loadTestsFromTestCase(JfDotTest)
+        result = unittest.TextTestRunner(stream=io.StringIO()).run(suite)
+        if result.errors or result.wasSuccessful() != (name == "control"):
+            raise AssertionError((name, result.errors, result.failures))
+        print("MUTATE %s: %s" % (name, "GREEN" if name == "control" else "RED"))
+    MUTATION_SOURCE = None
+
+
 if __name__ == "__main__":
-    unittest.main(verbosity=1)
+    mutations_requested = "--mutate" in sys.argv
+    argv = [a for a in sys.argv if a != "--mutate"]
+    program = unittest.main(argv=argv, verbosity=1, exit=False)
+    if not program.result.wasSuccessful():
+        sys.exit(1)
+    if mutations_requested:
+        check_mutations()
