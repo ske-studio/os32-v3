@@ -6,6 +6,7 @@
 #include "v86.h"
 #include "v86_call.h"
 #include "idt.h"
+#include "tvram.h"
 static u32 host_cr3;
 static void flush_low(void);
 #include "paging.c"
@@ -22,9 +23,11 @@ static void say(const char *s, u32 n) {
 }
 #define SAY(s) say(s "\n", sizeof(s "\n") - 1)
 #define CHECK(c, s) do { if (!(c)) { SAY("FAIL " s); die(1); } } while (0)
+static u32 corrupt_restore_pde;
 static u32 tlb[MEM_1MB / PAGE_SIZE], tlb_pde, tlb_root, flushes;
 static void flush_low(void) {
     flushes++;
+    if (corrupt_restore_pde) page_directory[0] ^= PTE_USER;
     tlb_root = host_cr3;
     if (!page_tables[0]) return;
     tlb_pde = ((u32 *)P2V(host_cr3))[0];
@@ -41,6 +44,17 @@ static void boundary(void) {
 static void __attribute__((unused)) restore_stop(void) {
     CHECK(expect_stop, "restore must complete before caller return");
     CHECK(v86_restore_mismatch, "restore mismatch counted");
+    static const char expected[][65] = {
+        "V86 RESTORE: bad=00000100 PTE=00000100 PDE=00000000 PCD=00000000",
+        "V86 RESTORE: bad=00000001 PTE=00000000 PDE=00000001 PCD=00000000",
+        "V86 RESTORE: bad=00000001 PTE=00000000 PDE=00000000 PCD=00000001",
+    };
+    for (u32 col = 0; col < TVRAM_COLS; col++) {
+        CHECK(((volatile u16 *)P2V_IO(TVRAM_BASE))[col] ==
+              (col < sizeof(expected[0]) - 1 ? (u8)expected[expect_stop - 1][col] : ' ') &&
+              ((volatile u16 *)P2V_IO(TVRAM_ATTR))[col] == TATTR_RED,
+              "restore TVRAM diagnostic");
+    }
     __builtin_longjmp(stop_jmp, 1);
 }
 void *kmemcpy(void *d, const void *s, u32 n) {
@@ -220,12 +234,24 @@ void _start(void) {
         CHECK(!module_refs && !v86_session.release_pending, "all exits release");
     }
     /* A failed restore must never reach caller copyout/unpin. */
-    before(); CHECK(!v86_session_begin(2), "fail-stop begin");
-    v86_map_session = 0; expect_stop = 1;
-    if (!__builtin_setjmp(stop_jmp)) {
-        v86_session_end(); CHECK(0, "restore error fail-stop");
+    for (u32 kind = 1; kind <= 3; kind++) {
+        before(); CHECK(!v86_session_begin(2), "fail-stop begin");
+        expect_stop = kind;
+        if (kind == 1) v86_map_session = 0;
+        if (kind == 2) corrupt_restore_pde = 1;
+        if (kind == 3) v86_session.low_pte[V86_VRAM_START / PAGE_SIZE] ^= PTE_PCD;
+        kmemset(P2V_IO(TVRAM_BASE), 0, TVRAM_BPR);
+        if (!__builtin_setjmp(stop_jmp)) {
+            v86_session_end(); CHECK(0, "restore error fail-stop");
+        }
+        CHECK(module_refs && v86_session.open, "fail-stop retains pin");
+        /* Only the fixture resumes a fail-stop, to exercise each diagnosis. */
+        corrupt_restore_pde = v86_restore_mismatch = v86_session.closing = 0;
+        v86_map_session = &v86_session;
+        kmemcpy(v86_session.low_pte, saved_pt, sizeof(saved_pt));
+        v86_session_end();
+        restored();
     }
-    CHECK(module_refs && v86_session.open, "fail-stop retains pin");
     SAY("GREEN direct 640KiB execution / page0 NP / mailbox / prepare failures / exits / TLB / fail-stop");
     die(0);
 }

@@ -18,7 +18,8 @@ MUTATIONS = (
      '    for (u32 i = 0; i < V86_GUEST_MAP_END / PAGE_SIZE; i++)', 'restore-TLB'),
     ('kernel/v86_mem.c', '    kmemcpy(P2V(MEM_AUTOPLAY_MAILBOX_BASE), v86_call_mailbox(),\n            MEM_AUTOPLAY_MAILBOX_SIZE);', '', 'mailbox-restore'),
     ('kernel/v86_mem.c', '    kmemset(P2V(V86_REMAP_START), 0, V86_REMAP_END);', '', 'fresh-zero'),
-    ('kernel/v86_mem.c', 'if (v86_restore_mismatch) for (;;) _stop();', '', 'restore-fail-stop'),
+    ('kernel/v86_mem.c', '        for (;;) _stop();', '', 'restore-fail-stop'),
+    ('kernel/v86_mem.c', 'text[col] = (u8)line[col];', '', 'restore-diagnostic'),
     ('kernel/paging.c', 'paging_set_not_present(0, MEM_NULL_GUARD_END);',
      'paging_set_readonly(0, MEM_NULL_GUARD_END);', 'page0-NP'),
     ('kernel/v86_mem.c',
@@ -39,6 +40,7 @@ EXPECTED = {
     'mailbox-restore': 'mailbox restored',
     'fresh-zero': 'previous guest data zero',
     'restore-fail-stop': 'restore error fail-stop',
+    'restore-diagnostic': 'restore TVRAM diagnostic',
     'page0-NP': 'normal page0 NP',
 }
 

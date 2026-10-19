@@ -655,6 +655,7 @@ int paging_v86_snapshot(struct v86_session_state *s)
 int paging_v86_restore(struct v86_session_state *s)
 {
     u32 bad = 0;
+    s->restore_pte_bad = s->restore_pde_bad = 0;
     for (u32 i = 0; i < V86_GUEST_MAP_END / PAGE_SIZE; i++) {
         u32 saved = s->low_pte[i];
         if (v86_map_session != s) bad++;
@@ -665,8 +666,12 @@ int paging_v86_restore(struct v86_session_state *s)
     arch_mmu_flush_tlb();
     for (u32 i = 0; i < V86_GUEST_MAP_END / PAGE_SIZE; i++)
         if (page_tables[0][i] != s->low_pte[i]) bad++;
+    s->restore_pte_bad = bad; /* Includes a rejected session/PTE restore. */
     if (page_directory[0] != s->master_pde ||
-        ((u32 *)P2V(s->active_cr3))[0] != s->active_pde) bad++;
+        ((u32 *)P2V(s->active_cr3))[0] != s->active_pde) {
+        s->restore_pde_bad++;
+        bad++;
+    }
     v86_map_session = 0;
     return (int)bad;
 }

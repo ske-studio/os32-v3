@@ -145,6 +145,11 @@ static void release_bundle(void)
 }
 static void caller_copy_tests(void)
 {
+    /* The fail-stop path writes its diagnostic directly to TVRAM. */
+    u32 args[6] = {TVRAM_BASE, TVRAM_ATTR + PAGE_SIZE - TVRAM_BASE, 3, 0x32, ~0U, 0};
+    u32 result;
+    __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
+    CHECK(result == TVRAM_BASE);
     CallerAccessFrame frame;
     u32 owner, sid, filler_sid;
     const u32 planes[4] = {GVRAM_PLANE_B, GVRAM_PLANE_R, GVRAM_PLANE_G, GVRAM_PLANE_I};

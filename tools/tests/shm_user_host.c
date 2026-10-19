@@ -276,6 +276,10 @@ void _start(void)
     struct addrspace a, b;
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
     CHECK(result == KERNEL_LOAD_ADDR, "host mapping");
+    /* The fail-stop path writes its diagnostic directly to TVRAM. */
+    args[0] = TVRAM_BASE; args[1] = TVRAM_ATTR + PAGE_SIZE - TVRAM_BASE;
+    __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
+    CHECK(result == TVRAM_BASE, "host TVRAM mapping");
     host_map_fixed_paging();
     paging_init(17408);
     host_pool_boot(17408);

@@ -17,6 +17,7 @@
 #include "v86_bios.h"
 #include "module.h"
 #include "kselftest.h"
+#include "tvram.h"
 #include "../gfx/gfx.h"
 
 struct v86_session_state v86_session;
@@ -174,7 +175,24 @@ void v86_session_end(void)
         }
     }
     v86_restore_mismatch += paging_v86_restore(&v86_session);
-    if (v86_restore_mismatch) for (;;) _stop();
+    if (v86_restore_mismatch) {
+        char line[] = "V86 RESTORE: bad=00000000 PTE=00000000 PDE=00000000 PCD=00000000";
+        u32 counts[] = { v86_restore_mismatch, v86_session.restore_pte_bad,
+            v86_session.restore_pde_bad, v86_restore_mismatch -
+            v86_session.restore_pte_bad - v86_session.restore_pde_bad };
+        const unsigned int offsets[] = { 17, 30, 43, 56 };
+        for (unsigned int n = 0; n < 4; n++)
+            for (int i = 7; i >= 0; i--) {
+                line[offsets[n] + i] = "0123456789ABCDEF"[counts[n] & 15];
+                counts[n] >>= 4;
+            }
+        volatile u16 *text = P2V_IO(TVRAM_BASE);
+        volatile u16 *attr = P2V_IO(TVRAM_ATTR);
+        unsigned int col = 0;
+        for (; line[col]; col++) { text[col] = (u8)line[col]; attr[col] = TATTR_RED; }
+        while (col < TVRAM_COLS) { text[col] = ' '; attr[col++] = TATTR_RED; }
+        for (;;) _stop();
+    }
     /* All backing aliases are gone before owner reclamation can run. */
     if (v86_session.aborting && kdebug.ops.gcap_detach) kdebug.ops.gcap_detach();
     v86_io_reset_policy();
