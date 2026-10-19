@@ -255,7 +255,8 @@ int vfs_sync_fd(int fd);
 int  vfs_open(const char *path, int mode);
 void vfs_close(int fd);
 /* 指定所有者 (res_owner_get() の値で open 時にタグ付け) の FD を一括クローズ。
- * vfs_fd_set_protect で保護された FD は対象外。exec_exit の安全網用 */
+ * vfs_fd_set_protect で保護された FD・SQLITE の FD は対象外。FONT の FD は
+ * protect でなければ閉じる (exec_exit の安全網用) */
 void vfs_close_owned(int owner);
 int  vfs_read_fd(int fd, void *buf, u32 size);
 int  vfs_write_fd(int fd, const void *buf, u32 size);
@@ -298,6 +299,43 @@ int vfs_validate_sqlite(const VfsSqliteLease *lease);
  * No group registry, group generation allocator or quarantine reset here. */
 int vfs_count_sqlite(const VfsSqliteCookie *cookie);
 int vfs_quarantine_sqlite(const VfsSqliteCookie *cookie);
+
+/* ---- font の read lease (T7b-b1、kernel 内専用・KAPI ではない) ----
+ * 公開の FD 経路 (vfs_read_fd / write / seek / tell / resize / sync /
+ * set_protect / set_pinned) は FONT の FD を INVAL で断り、vfs_close は
+ * 素通しする (SQLITE と同じ)。読むのは vfs_font_read_at だけで、位置を
+ * 持たない (明示 offset で 1 回、短読はそのまま返す)。 */
+#define VFS_FD_FONT    2
+/* open flags。app は PIN、常駐 shell は PROTECT | PIN */
+#define VFS_FONT_OPEN_PROTECT 1u  /* vfs_close_owned の安全網から外す */
+#define VFS_FONT_OPEN_PIN     2u  /* 実体の unlink・置き換え rename を BUSY に */
+/* font FD の予算 (T7 票の状態行 T7b-a6 の実測で決めた値)。
+ *   RESERVED      … FEP 辞書・SQLite DB+journal・標準 redirect・pipe・loader の peak
+ *   MAX_SHELL     … 常駐 shell の lease
+ *   MAX_APP       … app の lease (owner ごと)
+ *   MAX_APP_TOTAL … app の lease の合計 (park 中の app も数える)
+ * 合計が FD 0〜2 を除いた VFS_MAX_OPEN_FILES に収まることは vfs_fd.c の
+ * STATIC_ASSERT が見る。 */
+#define VFS_FONT_FD_RESERVED      9
+#define VFS_FONT_FD_MAX_SHELL     2
+#define VFS_FONT_FD_MAX_APP       2
+#define VFS_FONT_FD_MAX_APP_TOTAL 2
+typedef struct {
+    int fd;
+    u32 generation;   /* open_files[fd].generation */
+    int owner;        /* open 時に呼び手が渡した固定値 */
+} VfsFontLease;
+/* O_RDONLY 固定。通常ファイル以外は ISDIR / NOTFOUND、FD 枯渇は NOSPC。
+ * 成功時だけ out / out_size を埋める。owner >= 0、flags は上の 2 つだけ */
+int vfs_open_font(const char *path, int owner, u32 flags, VfsFontLease *out,
+                  u32 *out_size);
+/* 読み取りだけ・I/O なし。不一致は INVAL、失効 (stale) は STALE */
+int vfs_validate_font(const VfsFontLease *l);
+/* offset > size / len > size - offset は INVAL、len == 0 は 0。
+ * 戻り = 実読込長 (len 未満もそのまま)、負 = VFS_ERR_* */
+int vfs_font_read_at(const VfsFontLease *l, u32 offset, void *dst, u32 len);
+/* 失効していても generation / owner が一致すれば解放する。不一致は INVAL */
+int vfs_close_font(const VfsFontLease *l);
 
 /* ファイル情報 */
 /* stat が返す st_dev。FS ドライバは埋めないので VFS が正典
