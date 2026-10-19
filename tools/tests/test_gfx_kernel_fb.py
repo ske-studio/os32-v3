@@ -107,7 +107,7 @@ static inline void io_wait_n(int n) {(void)n;}
                         old = '        gfx_reinit_pending = 0;\n        gfx_bind_client();'
                         assert body.count(old) == 1
                         body = body.replace(old, '        gfx_reinit_pending = 0;\n        if (gfx_sf_backend() == LEDGER_SF_PC98) gfx_bind_client();')
-                body = body.replace('*(volatile u8 *)P2V_IO(arch)', '(arch, PEGC_BIOS_ARCH_EXTGFX)')
+                body = body.replace('v86_bios_real_lowmem()[PEGC_BIOS_ARCH_FLAG]', 'PEGC_BIOS_ARCH_EXTGFX')
                 body += '\nint host_select_and_init(void) { return gfx_select_and_init_backend(); }\n'
             if path == 'gfx/backend_pegc.c':
                 body = replace_function(body,'int pegc_identify(void)','    return 1;')

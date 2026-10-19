@@ -1,4 +1,8 @@
 check-shm-user-host:
+- gfx/backend_pegc.c
+- gfx/gfx_core.c
+- include/pegc.h
+- gfx/gfx.h
 - kernel/v86_snapshot.c
 - kernel/v86_module.h
 - kernel/paging.*

@@ -10,11 +10,13 @@ static u32 host_cr3, host_flushes, host_flushed_cr3;
 #include "pgalloc_host_fixture.h"
 #include "shm.c"
 static int setup_map_fail, setup_alloc_fail;
+static void page0_equal(void);
 static int checked_setup_map(u32 base, u32 end, u32 phys, u32 flags) {
     if (setup_map_fail && --setup_map_fail == 0) return -1;
     return paging_v86_map_range(base, end, phys, flags);
 }
 static u32 checked_setup_alloc(u32 owner_id, int n) {
+    if (v86_session.real_saved) page0_equal();
     return setup_alloc_fail ? 0 : pgalloc_alloc_phys(owner_id, n);
 }
 #define paging_v86_map_range checked_setup_map
@@ -44,7 +46,8 @@ void *kmemcpy(void *dest, const void *src, u32 n) {
     return dest;
 }
 #include "v86_bios_slice.inc"
-void v86_bios_setup(void) {}
+/* BIOS edits after this full-page copy are covered by the guest acceptance. */
+void v86_bios_setup(void) { kmemcpy(host_page0, v86_bios_real_lowmem(), PAGE_SIZE); }
 void v86_io_apply_policy(void) {}
 void v86_io_reset_policy(void) {}
 
@@ -70,6 +73,47 @@ static void say(const char *s, u32 n)
 #define SAY(s) say(s "\n", sizeof(s "\n") - 1)
 static u32 checks;
 #define CHECK(x, s) do { checks++; if (!(x)) { SAY("FAIL " s); die(1); } } while (0)
+#include "pegc.h"
+#include "gfx.h"
+#include "gfx_hal.h"
+#define GFX_CAND_PEGC 1u
+#define GFX_CAND_CIRRUS 2u
+static int g_backend_pref;
+/* Match production weak declarations; backend port probes are tested by
+ * pegc_mode_host. Here only immutable BIOS inputs and candidate results run. */
+int pegc_identify(void) __attribute__((weak));
+int cirrus_identify(void) __attribute__((weak));
+int cirrus_identify(void) { return 0; }
+/* Model a PEGC machine with the system-space hole, independently of the
+ * generic allocator fixture's device_boot_map. */
+static int host_system_ram(u32 first, u32 end)
+{
+    CHECK(first == MEM_SYSTEM_SPACE_BASE / PAGE_SIZE && end == MEM_HIGH_RAM_BASE / PAGE_SIZE,
+          "BIOS candidate system hole");
+    return 0;
+}
+#define pgalloc_range_has_ram host_system_ram
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Waddress"
+#include "bios_consumer_slice.inc"
+#pragma GCC diagnostic pop
+#undef pgalloc_range_has_ram
+static void page0_equal(void)
+{
+    for (u32 i = 0; i < PAGE_SIZE; i++) {
+        CHECK(v86_bios_real_lowmem()[i] == (u8)(i ^ (i >> 8) ^ 0x04), "V86 original immutable");
+        CHECK(host_page0[i] == v86_bios_real_lowmem()[i], "V86 page0 all bytes");
+    }
+}
+static void consumers_equal(void)
+{
+    const u32 flags[] = {PEGC_BIOS_ARCH_FLAG, PEGC_BIOS_MODE_FLAG,
+        PEGC_BIOS_PRXCRT, PEGC_BIOS_CRT_EXT_STS, PEGC_BIOS_PRXDUPD};
+    for (u32 i = 0; i < sizeof(flags) / sizeof(flags[0]); i++)
+        CHECK(bios_flag(flags[i]) == v86_bios_real_lowmem()[flags[i]], "BIOS consumer immutable");
+    CHECK(pegc_identify(), "BIOS PEGC candidate immutable");
+    CHECK(gfx_identify_candidates() == GFX_CAND_PEGC, "BIOS gfx candidate immutable");
+}
 void v86_gcap_release(void) {
     CHECK(!kctx_irq_depth && !kctx_exc_depth, "gcap release normal context");
     release_calls++;
@@ -86,6 +130,7 @@ void kselftest_audit_v86_return(void) {
 #define V86_TEST_BB MEM_GFX_BB_BASE
 static int checked_restore(struct v86_session_state *s) {
     u32 flushes = host_flushes;
+    if (v86_session.real_saved) page0_equal();
     int rc = paging_v86_restore(s);
     CHECK(host_flushes == flushes + 1, "V86 active TLB");
     return rc;
@@ -310,25 +355,28 @@ void _start(void)
     shm_free_owned(owner);
     check_reserved();
     test_int80();
-    for (u32 i = 0; i < PAGE_SIZE; i++) host_page0[i] = (u8)(i ^ (i >> 8));
+    for (u32 i = 0; i < PAGE_SIZE; i++) host_page0[i] = (u8)(i ^ (i >> 8) ^ 0x04);
     v86_bios_save_real();
+    page0_equal();
     old = entry(0);
     CHECK(paging_v86_map_range(0, PAGE_SIZE, 0, PAGE_RW | PTE_USER) == -1 &&
           entry(0) == old, "V86 outside session unchanged");
     page_tables[0][TVRAM_CHAR_BASE / PAGE_SIZE] |= PTE_USER;
     page_tables[0][V86_TEST_BB / PAGE_SIZE] |= PTE_USER;
     CHECK(v86_mem_setup(2) == 0, "V86 setup");
+    page0_equal();
     CHECK(paging_addrspace_create(&(struct addrspace){0}, 9) == -1,
           "V86 blocks normal AS");
     CHECK(paging_memmap_selftest(TRAMP) == -1, "V86 blocks map test");
     CHECK((entry(0) & PTE_USER) && (entry(V86_REMAP_START + PAGE_SIZE) & PTE_USER),
           "V86 dedicated USER");
     for (u32 i = 0; i < PAGE_SIZE; i++) host_page0[i] = 0;
+    consumers_equal();
     v86_bios_save_real(); /* Repeated capture must not replace the original. */
     flushes = host_flushes;
     v86_mem_teardown();
     for (u32 i = 0; i < PAGE_SIZE; i++)
-        CHECK(host_page0[i] == (u8)(i ^ (i >> 8)), "V86 page0 all bytes");
+        CHECK(host_page0[i] == (u8)(i ^ (i >> 8) ^ 0x04), "V86 page0 all bytes");
     CHECK(host_flushes == flushes + 2 && host_flushed_cr3 == a.pd_phys, "V86 active TLB");
     CHECK(return_calls == 1 && audit_calls == 1, "V86 return audited");
     CHECK(page_directory[0] & PTE_USER, "V86 restores PDE0 USER");
@@ -339,9 +387,15 @@ void _start(void)
     CHECK(((u32 *)P2V(a.pd_phys))[0] & PTE_USER, "V86 active PDE restore");
     v86_mem_teardown();
     CHECK(entry(0) == old && !v86_restore_mismatch, "V86 double end");
+    page0_equal();
+    CHECK(v86_session.real_saved, "V86 second original valid");
     /* Make active PDE USER differ from master, then prove exact restoration. */
     ((u32 *)P2V(a.pd_phys))[0] &= ~PTE_USER;
     CHECK(!v86_mem_setup(2), "V86 second begin");
+    page0_equal();
+    for (u32 i = 0; i < PAGE_SIZE; i++) host_page0[i] ^= 0xFF;
+    consumers_equal();
+    v86_bios_save_real();
     v86_session.active = 1;
     v86_session.running = 1;
     v86_session.saved_esp0 = 1234;
@@ -350,6 +404,8 @@ void _start(void)
     _disable();
     exec_pending_transfer(0);
     exec_pending_finish();
+    page0_equal();
+    CHECK(v86_session.real_saved, "V86 second original valid");
     CHECK(release_calls == 1 && return_calls == 2 && audit_calls == 2, "kill gcap release audited");
     host_cr3 = a.pd_phys;
     CHECK(!(((u32 *)P2V(a.pd_phys))[0] & PTE_USER), "V86 active PDE exact");

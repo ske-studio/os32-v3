@@ -28,8 +28,8 @@ def generate(out, definition=DEFINITION, contracts_only=False, module="sqlite"):
         hashed = fnv1a(name.encode())
         if hashed in hashes:
             raise ValueError('paired import hash collision')
-        if row['context'] != 'normal' or type(row['irq']) is not bool:
-            raise ValueError('paired imports require normal context and an IRQ permission')
+        if row['context'] not in ('normal', 'normal,exception') or type(row['irq']) is not bool:
+            raise ValueError('paired imports require a supported context and an IRQ permission')
         signature = row.get('declaration') or declaration(dict(row, kind='FUNC'), ROOT)
         if not re.search(r'\b' + name + r'\s*\([^;{}]*\);$', signature):
             raise ValueError('function import required')

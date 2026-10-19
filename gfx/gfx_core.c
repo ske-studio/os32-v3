@@ -7,6 +7,7 @@
 #include "con_sink.h"     /* con_sink_is_enabled — GUI 中かどうか (票 T8) */
 #include "console.h"      /* shell_print — 拒否を端末へ (票 T8-2) */
 #include "pgalloc.h"      /* 台帳: 予約・BB・SURFACE (TASK_T1_LEDGER §3-8) */
+#include "v86_bios.h"
 #include "paging.h"       /* paging_map_phys: ⑥ の窓の写像 */
 #include "pegc.h"         /* PEGC の窓と BIOS ワークの番地 (⑥ の資源レコード) */
 #include "wab_xe10.h"     /* Xe10 の窓の定数 (同上) */
@@ -376,10 +377,9 @@ static u32 gfx_cand_of(u32 i)
 /* 副作用のない識別。GFX= と機種 (9821 系) と各 backend の identify だけ。 */
 static u32 gfx_identify_candidates(void)
 {
-    volatile u32 arch = PEGC_BIOS_ARCH_FLAG;
     u32 m = 0;
     if (g_backend_pref == GFX_PREF_PC98 ||
-        !(*(volatile u8 *)P2V_IO(arch) & PEGC_BIOS_ARCH_EXTGFX)) return 0;
+        !(v86_bios_real_lowmem()[PEGC_BIOS_ARCH_FLAG] & PEGC_BIOS_ARCH_EXTGFX)) return 0;
     if (g_backend_pref != GFX_PREF_CIRRUS && pegc_identify && pegc_identify())
         m |= GFX_CAND_PEGC;
     if (g_backend_pref != GFX_PREF_PEGC && cirrus_identify && cirrus_identify())

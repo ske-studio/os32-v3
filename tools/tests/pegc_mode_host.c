@@ -31,6 +31,7 @@
 /* Model the two CPU windows, without changing the driver under test. */
 static int host_alias, host_candidate;
 static u8 host_bios[MEM_PAGE_SIZE];
+const u8 *v86_bios_real_lowmem(void) { return host_bios; }
 static volatile void *host_pegc_window(u32 pa)
 {
     if ((host_alias & 1) && pa >= PEGC_BANK_WIN0 && pa < PEGC_BANK_WIN0 + MEM_PAGE_SIZE)
