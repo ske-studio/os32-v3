@@ -33,8 +33,6 @@
 #define FONT_LEASE_TEST_SELF  "/usr/bin/font_lease_test.bin"
 #define FONT_LEASE_TEST_OPENS 16    /* limit の打ち切り (FD 表の大きさ) */
 #define FONT_LEASE_TEST_CMD   160
-#define FONT_LEASE_TEST_FD0   3     /* 標準入出力の後 */
-#define FONT_LEASE_TEST_FDN   16
 #define SFNT_HEAD_LEN         12    /* sfnt version + numTables + 3 語 */
 
 static KernelAPI *g_api;
@@ -131,7 +129,7 @@ static void run_lease(const char *path)
     u32 id = 0, size = 0, id2 = 0, size2 = 0;
     u8 head[SFNT_HEAD_LEN], again[SFNT_HEAD_LEN], buf[4];
     i32 r;
-    int fd, leaked = 0, i, same = 1;
+    int i, same = 1;
 
     if (open_or_skip(path, &id, &size)) return;
     check(size > SFNT_HEAD_LEN, "open: size", (int)size);
@@ -147,12 +145,9 @@ static void run_lease(const char *path)
     r = g_api->font_source_read_at(id, size, buf, 0);
     check(r == 0, "read_at len 0 at end -> 0", (int)r);
 
-    /* 生 FD の公開経路は font の中身を返さない */
-    for (fd = FONT_LEASE_TEST_FD0; fd < FONT_LEASE_TEST_FDN; fd++) {
-        if (g_api->sys_read(fd, buf, 4) > 0) leaked++;
-        if (g_api->sys_lseek(fd, 0, 0) >= 0) leaked++;
-    }
-    check(leaked == 0, "raw fd sys_read/sys_lseek refused", leaked);
+    /* 生 FD の公開経路 (sys_read/sys_lseek) が FONT を断ることは host の
+     * check-font-source-host が見る。ここで 3..15 を総なめすると、owner を見ない
+     * vfs_read_fd が常駐側の FEP 辞書・redirect の位置を動かすので、ゲストではしない。 */
 
     r = g_api->font_source_open("/__font_lease_test_missing__.ttf", &id2, &size2);
     check(r < 0 && id2 == 0, "open missing -> error", (int)r);
