@@ -34,10 +34,10 @@ def display_diagnostic(folder, blank_line=False):
         result = host32.run([str(exe)], runner=runner, capture_output=True, text=True)
         assert result.returncode == int(blank_line), (result.stdout, result.stderr)
         if blank_line:
-            assert 'FAIL diagnostic blank or indistinguishable' in result.stdout
+            assert 'FAIL diagnostic fixture values' in result.stdout
             print('RED fixed diagnostic blank row (compiled, runtime assertion)', flush=True)
         else:
-            print('PASS fixed diagnostic: ROM row has dots, CODE != dot, restored == CODE; KCG present/absent', flush=True)
+            print('PASS fixed diagnostic: ROM row has dots, VSYNC samples for CODE/dot/restored; all VSYNC combinations, KCG present/absent', flush=True)
 
 
 def graphics_boundary(mutation=None):
