@@ -9,8 +9,9 @@
  *  frame[5]、ring3_context_clear) は S3b なので、ここでは呼び手の側を
  *  試験が演じる (ring3_wm_enter の代わり = 深さ +1 → 1 なら wm_mark)。
  *
- *  段 C / D の実体 (kernel/font_source.c の font_lease_shell_*) はまだ
- *  無いので、ここに registry の贋物を置く: lease は「使用中 + owner_gen」
+ *  段 C / D の実体 (kernel/font_source.c の font_lease_shell_*、S2) は
+ *  別の試験 (font_source_host.c) が見るので、ここでは registry の贋物を置く
+ *  (署名は kernel/font_source.h): lease は「使用中 + owner_gen」
  *  だけで、渡された shell_gen と違えば STALE、close_shell で全部 FREE。
  *
  *  戻り番地の範囲 (段 A) は、正当な呼び手を section "svc_in" / "svc_in2"

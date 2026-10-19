@@ -18,22 +18,13 @@
 #include "exec.h"           /* ring3_wm_depth / ring3_call_from_user / OS32_ERR_* */
 #include "gui.h"            /* GUI_SHELL_OWNER */
 #include "fd_redirect.h"    /* res_owner_get */
+#include "font_source.h"    /* font_lease_shell_* / font_lease_close_shell (段 C / D) */
 
 /* exec/exec.c の実体 (int 0x80 のディスパッチ中だけ 1)。 */
 extern volatile int ring3_in_syscall;
 
-/* ---- kernel/font_source.c (S2) の shell 側実体 — 段 C / 段 D ------------
- * shell_gen は呼んだ時点の g_shell_service.generation。registry はこれを
- * lease の owner_gen として持ち (open)、照合する (read_at/validate/close:
- * 不一致は OS32_ERR_STALE)。VFS への owner は GUI_SHELL_OWNER 固定、
- * open flags は VFS_FONT_OPEN_PROTECT|VFS_FONT_OPEN_PIN (設計 §3-2 段 C/D)。
- * 宣言は S3b で kernel/font_source.h へ移す (S3a では実体がまだ無い)。 */
-i32 font_lease_shell_open(const char *path, u32 shell_gen, u32 *out_id, u32 *out_size);
-i32 font_lease_shell_read_at(u32 id, u32 shell_gen, u32 offset, void *dst, u32 len);
-i32 font_lease_shell_validate(u32 id, u32 shell_gen);
-i32 font_lease_shell_close(u32 id, u32 shell_gen);
-/* kind==SHELL の lease を全部 vfs_close_font (protect を無視) して FREE に。 */
-void font_lease_close_shell(void);
+/* 段 C / 段 D の実体と署名は kernel/font_source.h (font_lease_shell_* /
+ * font_lease_close_shell)。 */
 
 ShellService g_shell_service;
 volatile u32 ring3_wm_shell_gen = 0;

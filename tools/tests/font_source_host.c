@@ -1,11 +1,24 @@
-/* T7b-b1 S1: font の read lease の VFS 部 (fs/vfs_fd.c を実物で組む)。
- * 設計 ~/os32-tmp/run/t7bb12/DESIGN.final.md §2-2 / §5 の b1②④⑤⑦ の VFS 側。
- * lease 表・KAPI の門 (kernel/font_source.c) は S2 でこのファイルに足す。
- * 贋物は FS backend・TTY・owner の境界だけ (vfs_fd_sqlite_host.c と同じ流儀)。 */
+/* T7b-b1: font の read lease (fs/vfs_fd.c と kernel/font_source.c を実物で組む)。
+ * 設計 ~/os32-tmp/run/t7bb12/DESIGN.final.md §2 / §5 の b1①〜⑦ と b2②④ の
+ * lease 表側。S1 = VFS 部、S2 = lease 表・app の門 (public KAPI の実体)・
+ * shell 側の段 C/D。exec.c への回収 hook の結線は S3b。
+ * 贋物は FS backend・TTY・owner・caller の境界だけ (vfs_fd_sqlite_host.c と
+ * 同じ流儀)。FONT_SOURCE_HOST_APP_TOTAL を与えた組み (試験 py の変種) は
+ * app の合計上限だけをその値にして、owner ごとの上限を合計と分けて見る。 */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "../../fs/vfs_fd.c"
+#ifdef FONT_SOURCE_HOST_APP_TOTAL
+#undef VFS_FONT_FD_MAX_APP_TOTAL
+#define VFS_FONT_FD_MAX_APP_TOTAL FONT_SOURCE_HOST_APP_TOTAL
+#endif
+/* kernel/gui.h は ILP32 の構造体の大きさを STATIC_ASSERT するので 64 ビットの
+ * ホストでは読めない。font_source.c が使うのは GUI_SHELL_OWNER だけなので、
+ * 試験 py が kernel/gui.h から読んだ値を -DHOST_GUI_SHELL_OWNER で渡す */
+#define __GUI_H
+#define GUI_SHELL_OWNER HOST_GUI_SHELL_OWNER
+#include "../../kernel/font_source.c"
 
 #define CHECK(x) do { if (!(x)) { \
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); exit(1); \
@@ -358,6 +371,353 @@ static void budget(void)
         open_font_ok(APP_OWNER, VFS_FONT_OPEN_PIN, &l);
 }
 
+/* ==== S2: lease 表と app の門 (kernel/font_source.c) ==================== */
+
+/* exec / redir_access の境界の贋物。caller は試験が演じる */
+static int from_user = 1, caller_ok = 1, copy_fail, kill_calls;
+static struct caller_access caller;
+int ring3_call_from_user(void) { return from_user; }
+int caller_access_get(struct caller_access *out)
+{
+    if (!caller_ok) return 0;
+    *out = caller;
+    return 1;
+}
+int copy_caller_cstr(const struct caller_access *c, const char *src,
+                     char *dst, u32 cap)
+{
+    CHECK(c && c->origin == caller.origin && c->owner == caller.owner);
+    if (copy_fail || !src || strlen(src) + 1 > cap) return 0;
+    memcpy(dst, src, strlen(src) + 1);
+    return 1;
+}
+void ring3_fault_kill(void) { kill_calls++; }
+
+#define APP_GEN   0x51u
+#define APP2      (APP_OWNER + 1)
+
+/* app (owner, AS 世代) として dispatch 中にする */
+static void as_app(int owner, u32 gen)
+{
+    from_user = 1;
+    caller_ok = 1;
+    caller.origin = CALLER_USER;
+    caller.app_id = owner;
+    caller.owner = (u32)owner;
+    caller.generation = gen;
+    current_owner = owner;
+}
+
+static u32 app_open_ok(void)
+{
+    u32 id = 0, size = 0;
+    CHECK(font_lease_app_open("/f.ttf", &id, &size) == 0);
+    CHECK(size == MOCK_FILE_SIZE && id != 0);
+    return id;
+}
+
+static FontLease *slot_of(u32 id) { return &g_font_leases[id & FONT_LEASE_IDX_MASK]; }
+
+/* open の結果: 枠・VFS FD の印 (owner は caller、PIN だけ)・id の符号化 */
+static void lease_open(void)
+{
+    u32 id, rej;
+    FontLease *s;
+    u8 buf[8];
+    int fd;
+    use_ino(1);
+    as_app(APP_OWNER, APP_GEN);
+    rej = font_lease_reject_count;
+    id = app_open_ok();
+    s = slot_of(id);
+    CHECK(s->kind == FONT_LEASE_APP && s->owner_gen == APP_GEN);
+    CHECK(s->file_size == MOCK_FILE_SIZE && (id >> FONT_LEASE_IDX_BITS) == s->id_gen);
+    CHECK(s->vfs.owner == APP_OWNER && open_files[s->vfs.fd].owner == APP_OWNER);
+    CHECK(open_files[s->vfs.fd].lifetime == VFS_FD_FONT);
+    CHECK(open_files[s->vfs.fd].pinned == 1 && open_files[s->vfs.fd].protect == 0);
+    CHECK(vfs_fd_pinned_busy(&mock_ctx, 1, MOCK_INO, "/f.ttf") == 1);
+    CHECK(font_lease_app_read_at(id, 10, buf, 4) == 4 && !memcmp(buf, file_data + 10, 4));
+    CHECK(font_lease_reject_count == rej && kill_calls == 0);
+    fd = s->vfs.fd;
+    CHECK(font_lease_app_close(id) == 0);
+    CHECK(!open_files[fd].in_use && !open_files[fd].pinned);
+    CHECK(vfs_fd_pinned_busy(&mock_ctx, 1, MOCK_INO, "/f.ttf") == 0);
+}
+
+/* 門 1・2 (b1①): 外れたら INVAL・出力を書かない・reject を数える */
+static void lease_gate(void)
+{
+    u32 id, oid = 0xa5a5a5a5u, osz = 0x5a5a5a5au, rej;
+    u8 buf[4];
+    int i;
+    use_ino(1);
+    as_app(APP_OWNER, APP_GEN);
+    id = app_open_ok();
+    for (i = 0; i < 4; i++) {
+        as_app(APP_OWNER, APP_GEN);
+        if (i == 0) from_user = 0;                    /* WM 中・CPL0 直呼び */
+        if (i == 1) caller_ok = 0;                    /* 保存 caller なし */
+        if (i == 2) caller.origin = CALLER_TRUSTED;
+        if (i == 3) current_owner = APP2;             /* caller と資源 owner がずれる */
+        rej = font_lease_reject_count;
+        CHECK(font_lease_app_open("/f.ttf", &oid, &osz) == OS32_ERR_INVAL);
+        CHECK(font_lease_app_read_at(id, 0, buf, 1) == OS32_ERR_INVAL);
+        CHECK(font_lease_app_close(id) == OS32_ERR_INVAL);
+        CHECK(font_lease_reject_count == rej + 3);
+        CHECK(font_lease_reject_last ==
+              (i == 0 ? FONT_LEASE_REJ_NOT_USER : FONT_LEASE_REJ_CALLER));
+        CHECK(oid == 0xa5a5a5a5u && osz == 0x5a5a5a5au);
+    }
+    CHECK(kill_calls == 0);
+    /* path を写せない USER ポインタは kill して INVAL、FD は開かない */
+    as_app(APP_OWNER, APP_GEN);
+    copy_fail = 1;
+    CHECK(font_lease_app_open("/f.ttf", &oid, &osz) == OS32_ERR_INVAL);
+    CHECK(kill_calls == 1 && font_lease_reject_last == FONT_LEASE_REJ_PATH);
+    copy_fail = 0;
+    CHECK(oid == 0xa5a5a5a5u);
+    CHECK(slot_of(id)->kind == FONT_LEASE_APP && font_lease_app_close(id) == 0);
+    for (i = 3; i < VFS_MAX_OPEN_FILES; i++) CHECK(!open_files[i].in_use);
+}
+
+/* token の判定表 3b〜3e (b1①・b2②) */
+static void lease_token(void)
+{
+    u32 id, sid = 0, ssz = 0;
+    FontLease *s;
+    u8 buf[4];
+    int fd;
+    use_ino(1);
+    as_app(APP_OWNER, APP_GEN);
+    id = app_open_ok();
+    s = slot_of(id);
+    /* 3b: id_gen 違い → STALE */
+    CHECK(font_lease_app_read_at(id + (1u << FONT_LEASE_IDX_BITS), 0, buf, 1) == OS32_ERR_STALE);
+    CHECK(font_lease_reject_last == FONT_LEASE_REJ_ID_GEN);
+    /* 3c: 使っていない枠 (id_gen 0、kind FREE) → INVAL */
+    CHECK(font_lease_app_read_at(FONT_LEASE_SLOTS - 1, 0, buf, 1) == OS32_ERR_INVAL);
+    CHECK(font_lease_reject_last == FONT_LEASE_REJ_KIND);
+    /* 3c: shell の id を KAPI に渡す → INVAL (b2②) */
+    CHECK(font_lease_shell_open("/s.ttf", 3, &sid, &ssz) == 0);
+    CHECK(font_lease_app_read_at(sid, 0, buf, 1) == OS32_ERR_INVAL);
+    CHECK(font_lease_reject_last == FONT_LEASE_REJ_KIND);
+    CHECK(font_lease_app_close(sid) == OS32_ERR_INVAL);
+    CHECK(slot_of(sid)->kind == FONT_LEASE_SHELL && open_files[slot_of(sid)->vfs.fd].in_use);
+    /* shell 側も app の id を断る */
+    CHECK(font_lease_shell_read_at(id, 3, 0, buf, 1) == OS32_ERR_INVAL);
+    CHECK(font_lease_shell_close(id, 3) == OS32_ERR_INVAL && s->kind == FONT_LEASE_APP);
+    /* 3d: 他 owner の id → INVAL、FD は閉じない */
+    as_app(APP2, APP_GEN);
+    CHECK(font_lease_app_read_at(id, 0, buf, 1) == OS32_ERR_INVAL);
+    CHECK(font_lease_reject_last == FONT_LEASE_REJ_OWNER);
+    CHECK(font_lease_app_close(id) == OS32_ERR_INVAL && open_files[s->vfs.fd].in_use);
+    /* 3e: 同じ owner 番号の次の app (AS 世代違い) → STALE */
+    as_app(APP_OWNER, APP_GEN + 1);
+    CHECK(font_lease_app_read_at(id, 0, buf, 1) == OS32_ERR_STALE);
+    CHECK(font_lease_reject_last == FONT_LEASE_REJ_OWNER_GEN);
+    CHECK(font_lease_app_close(id) == OS32_ERR_STALE && open_files[s->vfs.fd].in_use);
+    /* 本人はまだ読める */
+    as_app(APP_OWNER, APP_GEN);
+    CHECK(font_lease_app_read_at(id, 0, buf, 1) == 1);
+    /* 4: VFS の FD 世代ずれ (lease の知らない経路で FD が開き直された) → INVAL */
+    s->vfs.generation++;
+    CHECK(font_lease_app_read_at(id, 0, buf, 1) == OS32_ERR_INVAL);
+    s->vfs.generation--;
+    /* 4: 失効 → STALE、close は解放できる */
+    vfs_fd_invalidate_ino(&mock_ctx, MOCK_INO);
+    CHECK(font_lease_app_read_at(id, 0, buf, 1) == OS32_ERR_STALE);
+    fd = s->vfs.fd;
+    CHECK(font_lease_app_close(id) == 0 && !open_files[fd].in_use);
+}
+
+/* b1②: 短読はそのまま・範囲外は INVAL・位置を持たない */
+static void lease_read(void)
+{
+    u32 id;
+    u8 buf[MOCK_FILE_SIZE];
+    use_ino(0);
+    as_app(APP_OWNER, APP_GEN);
+    id = app_open_ok();
+    read_calls = 0;
+    CHECK(font_lease_app_read_at(id, 3, buf, 5) == 5 && last_off == 3 && last_len == 5);
+    CHECK(!memcmp(buf, file_data + 3, 5));
+    CHECK(font_lease_app_read_at(id, 3, buf, 5) == 5 && last_off == 3);
+    read_mode = READ_SHORT;
+    CHECK(font_lease_app_read_at(id, 8, buf, 6) == 5);
+    read_mode = READ_IO;
+    CHECK(font_lease_app_read_at(id, 8, buf, 6) == OS32_ERR_IO);
+    read_mode = READ_FULL;
+    CHECK(read_calls == 4);
+    CHECK(font_lease_app_read_at(id, MOCK_FILE_SIZE - 1, buf, 2) == OS32_ERR_INVAL);
+    CHECK(font_lease_app_read_at(id, MOCK_FILE_SIZE + 1, buf, 0) == OS32_ERR_INVAL);
+    CHECK(font_lease_app_read_at(id, MOCK_FILE_SIZE, buf, 0) == 0);
+    CHECK(read_calls == 4);
+    CHECK(font_lease_app_close(id) == 0);
+}
+
+/* b1④: close → 再 close は STALE、閉じた id で読めない、同じ枠を開き直しても
+ * 旧 id は新しい lease を閉じない。満了した枠は二度と使わない */
+static void lease_close(void)
+{
+    u32 id, id2, gen;
+    FontLease *s;
+    int fd;
+    u8 buf[4];
+    use_ino(1);
+    as_app(APP_OWNER, APP_GEN);
+    id = app_open_ok();
+    s = slot_of(id);
+    fd = s->vfs.fd;
+    gen = s->id_gen;
+    CHECK(font_lease_app_close(id) == 0);
+    CHECK(s->kind == FONT_LEASE_FREE && s->id_gen == gen + 1 && !open_files[fd].in_use);
+    CHECK(font_lease_app_close(id) == OS32_ERR_STALE);
+    CHECK(font_lease_app_read_at(id, 0, buf, 1) == OS32_ERR_STALE);
+    id2 = app_open_ok();
+    CHECK(slot_of(id2) == s && id2 != id && s->vfs.fd == fd);
+    CHECK(font_lease_app_close(id) == OS32_ERR_STALE && open_files[fd].in_use);
+    CHECK(font_lease_app_read_at(id2, 0, buf, 1) == 1);
+    CHECK(font_lease_app_close(id2) == 0);
+    /* 満了: id_gen が上限に達した枠は retire */
+    s->id_gen = FONT_LEASE_GEN_MAX - 1;
+    id = app_open_ok();
+    CHECK(slot_of(id) == s);
+    CHECK(font_lease_app_close(id) == 0 && s->id_gen == FONT_LEASE_GEN_MAX);
+    id2 = app_open_ok();
+    CHECK(slot_of(id2) != s && s->kind == FONT_LEASE_FREE);
+    CHECK(font_lease_app_close(id2) == 0);
+    /* lease の知らない経路で FD が先に解放されていても、close は他人の FD を
+     * 閉じずに枠を空ける (戻りは INVAL)、以後は STALE */
+    id = app_open_ok();
+    fd = slot_of(id)->vfs.fd;
+    vfs_close_owned(APP_OWNER);
+    CHECK(!open_files[fd].in_use);
+    current_owner = 7;
+    CHECK(vfs_open("/g", O_RDONLY) == fd);
+    current_owner = APP_OWNER;
+    CHECK(font_lease_app_close(id) == OS32_ERR_INVAL);
+    CHECK(open_files[fd].in_use && open_files[fd].lifetime == VFS_FD_GENERIC);
+    CHECK(slot_of(id)->kind == FONT_LEASE_FREE);
+    CHECK(font_lease_app_close(id) == OS32_ERR_STALE);
+}
+
+/* b1③: owner ごとの上限と app 全体の上限は NOSPC、close で 1 本戻る。
+ * FD 枯渇も NOSPC (FD 増設で逃げない) */
+static void lease_limit(void)
+{
+    u32 ids[VFS_MAX_OPEN_FILES], oid = 0, osz = 0, extra;
+    int i, n = 0;
+    use_ino(1);
+    as_app(APP_OWNER, APP_GEN);
+    for (i = 0; i < VFS_FONT_FD_MAX_APP; i++) ids[n++] = app_open_ok();
+    CHECK(font_lease_app_open("/f.ttf", &oid, &osz) == OS32_ERR_NOSPC && oid == 0);
+    /* 別 owner は全体の残りぶんだけ開ける */
+    as_app(APP2, APP_GEN);
+    for (i = VFS_FONT_FD_MAX_APP; i < VFS_FONT_FD_MAX_APP_TOTAL; i++) ids[n++] = app_open_ok();
+    CHECK(font_lease_app_open("/f.ttf", &oid, &osz) == OS32_ERR_NOSPC && oid == 0);
+    /* shell の lease は app の上限に数えない */
+    CHECK(font_lease_shell_open("/s.ttf", 1, &oid, &osz) == 0);
+    CHECK(font_lease_shell_close(oid, 1) == 0);
+    oid = 0;
+    as_app(APP_OWNER, APP_GEN);
+    CHECK(font_lease_app_close(ids[0]) == 0);
+    extra = app_open_ok();
+    CHECK(font_lease_app_open("/f.ttf", &oid, &osz) == OS32_ERR_NOSPC);
+    CHECK(font_lease_app_close(extra) == 0);
+    for (i = 1; i < n; i++) {
+        as_app(i < VFS_FONT_FD_MAX_APP ? APP_OWNER : APP2, APP_GEN);
+        CHECK(font_lease_app_close(ids[i]) == 0);
+    }
+    /* VFS の FD 枯渇 */
+    current_owner = 7;
+    for (i = 3; i < VFS_MAX_OPEN_FILES; i++) CHECK(vfs_open("/g", O_RDONLY) == i);
+    as_app(APP_OWNER, APP_GEN);
+    oid = 0;
+    CHECK(font_lease_app_open("/f.ttf", &oid, &osz) == OS32_ERR_NOSPC && oid == 0);
+    for (i = 0; i < FONT_LEASE_SLOTS; i++) CHECK(g_font_leases[i].kind == FONT_LEASE_FREE);
+}
+
+/* b1⑤ の lease 表側: font_lease_close_owned + vfs_close_owned で app の FD と
+ * 枠が全部戻る。他 owner・shell の lease は残る。shell 自身の回収
+ * (vfs_close_owned(GUI_SHELL_OWNER)) でも shell の lease (protect) は残る */
+static void lease_owned(void)
+{
+    u32 a, b, sid = 0, ssz = 0;
+    int afd, i;
+    use_ino(1);
+    as_app(APP_OWNER, APP_GEN);
+    a = app_open_ok();
+    afd = slot_of(a)->vfs.fd;
+    as_app(APP2, APP_GEN);
+    b = app_open_ok();
+    CHECK(font_lease_shell_open("/s.ttf", 2, &sid, &ssz) == 0);
+    font_lease_close_owned(APP_OWNER);
+    vfs_close_owned(APP_OWNER);
+    CHECK(slot_of(a)->kind == FONT_LEASE_FREE && !open_files[afd].in_use);
+    CHECK(slot_of(b)->kind == FONT_LEASE_APP && open_files[slot_of(b)->vfs.fd].in_use);
+    vfs_close_owned(GUI_SHELL_OWNER);
+    CHECK(slot_of(sid)->kind == FONT_LEASE_SHELL);
+    CHECK(vfs_validate_font(&slot_of(sid)->vfs) == VFS_OK);
+    as_app(APP_OWNER, APP_GEN);
+    CHECK(font_lease_app_close(a) == OS32_ERR_STALE);
+    font_lease_close_owned(APP2);
+    vfs_close_owned(APP2);
+    CHECK(slot_of(b)->kind == FONT_LEASE_FREE);
+    font_lease_close_shell();
+    for (i = 3; i < VFS_MAX_OPEN_FILES; i++) CHECK(!open_files[i].in_use);
+    for (i = 0; i < FONT_LEASE_SLOTS; i++) CHECK(g_font_leases[i].kind == FONT_LEASE_FREE);
+}
+
+/* 段 C/D (shell): owner 固定・PROTECT|PIN・登録世代の照合・上限・close_shell */
+static void lease_shell(void)
+{
+    u32 ids[VFS_FONT_FD_MAX_SHELL], id = 0, sz = 0, aid;
+    FontLease *s;
+    u8 buf[4];
+    int i, fd;
+    use_ino(1);
+    current_owner = APP_OWNER;   /* WM 中は res_owner が app のまま (b2④) */
+    CHECK(font_lease_shell_open("/s.ttf", 0, &id, &sz) == OS32_ERR_INVAL);
+    CHECK(font_lease_shell_open((const char *)0, 4, &id, &sz) == OS32_ERR_INVAL);
+    for (i = 0; i < VFS_FONT_FD_MAX_SHELL; i++) {
+        CHECK(font_lease_shell_open("/s.ttf", 4, &ids[i], &sz) == 0 && sz == MOCK_FILE_SIZE);
+        s = slot_of(ids[i]);
+        CHECK(s->kind == FONT_LEASE_SHELL && s->owner_gen == 4);
+        CHECK(s->vfs.owner == GUI_SHELL_OWNER);
+        CHECK(open_files[s->vfs.fd].owner == GUI_SHELL_OWNER);
+        CHECK(open_files[s->vfs.fd].protect == 1 && open_files[s->vfs.fd].pinned == 1);
+    }
+    CHECK(font_lease_shell_open("/s.ttf", 4, &id, &sz) == OS32_ERR_NOSPC);
+    for (i = 3; i < VFS_MAX_OPEN_FILES; i++)
+        CHECK(!open_files[i].in_use || open_files[i].owner == GUI_SHELL_OWNER);
+    CHECK(font_lease_shell_read_at(ids[0], 4, 6, buf, 3) == 3 && !memcmp(buf, file_data + 6, 3));
+    CHECK(font_lease_shell_read_at(ids[0], 4, MOCK_FILE_SIZE, buf, 1) == OS32_ERR_INVAL);
+    CHECK(font_lease_shell_validate(ids[0], 4) == 0);
+    /* 登録世代違い (reload 後の旧 token) → STALE */
+    CHECK(font_lease_shell_read_at(ids[0], 5, 0, buf, 1) == OS32_ERR_STALE);
+    CHECK(font_lease_shell_validate(ids[0], 5) == OS32_ERR_STALE);
+    CHECK(font_lease_shell_close(ids[0], 5) == OS32_ERR_STALE);
+    CHECK(font_lease_shell_read_at(ids[0] + (1u << FONT_LEASE_IDX_BITS), 4, 0, buf, 1) ==
+          OS32_ERR_STALE);
+    /* app 側は shell の lease を回収しない */
+    as_app(APP_OWNER, APP_GEN);
+    aid = app_open_ok();
+    font_lease_close_owned(GUI_SHELL_OWNER);
+    CHECK(slot_of(ids[0])->kind == FONT_LEASE_SHELL);
+    /* close → 再 close は STALE */
+    fd = slot_of(ids[1])->vfs.fd;
+    CHECK(font_lease_shell_close(ids[1], 4) == 0 && !open_files[fd].in_use);
+    CHECK(font_lease_shell_close(ids[1], 4) == OS32_ERR_STALE);
+    /* 失効 → STALE、close_shell は失効も protect も閉じる。app は残る */
+    vfs_fd_invalidate_ino(&mock_ctx, MOCK_INO);
+    CHECK(font_lease_shell_validate(ids[0], 4) == OS32_ERR_STALE);
+    fd = slot_of(ids[0])->vfs.fd;
+    font_lease_close_shell();
+    CHECK(slot_of(ids[0])->kind == FONT_LEASE_FREE && !open_files[fd].in_use);
+    CHECK(font_lease_shell_read_at(ids[0], 4, 0, buf, 1) == OS32_ERR_STALE);
+    CHECK(slot_of(aid)->kind == FONT_LEASE_APP);
+}
+
 int main(int argc, char **argv)
 {
     u32 i;
@@ -380,6 +740,14 @@ int main(int argc, char **argv)
     else if (!strcmp(argv[1], "pinned_busy")) pinned_busy();
     else if (!strcmp(argv[1], "generic_regression")) generic_regression();
     else if (!strcmp(argv[1], "budget")) budget();
+    else if (!strcmp(argv[1], "lease_open")) lease_open();
+    else if (!strcmp(argv[1], "lease_gate")) lease_gate();
+    else if (!strcmp(argv[1], "lease_token")) lease_token();
+    else if (!strcmp(argv[1], "lease_read")) lease_read();
+    else if (!strcmp(argv[1], "lease_close")) lease_close();
+    else if (!strcmp(argv[1], "lease_limit")) lease_limit();
+    else if (!strcmp(argv[1], "lease_owned")) lease_owned();
+    else if (!strcmp(argv[1], "lease_shell")) lease_shell();
     else return 2;
     printf("PASS %s\n", argv[1]);
     return 0;

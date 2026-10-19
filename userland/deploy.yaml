@@ -211,6 +211,10 @@ filesystem:
     - host: userland/tests/mem_map_test.bin
       guest: /usr/bin/
       tags: [test]
+    # --- T7b-b1 app 用 font read lease (KAPI v77)。other は自分を子として起こす ---
+    - host: userland/tests/font_lease_test.bin
+      guest: /usr/bin/
+      tags: [test]
     # --- f9 exec heap parent and --child use the same registered binary ---
     - host: userland/tests/layout_cycle_test.bin
       guest: /usr/bin/

@@ -1,4 +1,4 @@
-# KernelAPI v76 仕様書
+# KernelAPI v77 仕様書
 
 外部プログラム (OS32X) がカーネル機能を利用するためのAPIテーブル仕様。
 
@@ -16,8 +16,8 @@
 | 最大プログラムサイズ | image と暫定 heap 予算を起動時に検査 ([TASK_T2_APPBAND](tasks/v3/TASK_T2_APPBAND.md) §4) |
 | プログラム専用ヒープ | 動的配置 (sbrk_heap_limit, exec_heap 管理下) |
 | プログラム専用スタック | 動的配置 (メモリ終端付近、下向き展開) |
-| 現在のバージョン | **76** |
-| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 250・予約 50) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
+| 現在のバージョン | **77** |
+| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 253・予約 47) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
 
 ---
 
@@ -120,6 +120,7 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v70 | **実装 (2026-10-07、e11c1・統合ゲスト受入前)** | surface query/lease/bundle/unlease・値返し ls・本人識別の 6 本 (slot 240〜245)。公開値型・ページ/SHM 定数、pipe の CPL3 制限。e11b2 で memory_layout 世代 2 (版70は不変、旧世代1は拒否) | §4-10、[TASK_T2D_T2H](tasks/v3/TASK_T2D_T2H.md) e11 |
 | v71 | **受入済み (2026-10-08、f12 ゲスト受入)** | USER 専用 `mem_map` / `mem_unmap` (slot 246・247)。f12 で memory_layout 世代 3 (KAPI 71・slot・データ欄は不変)。USER の最小初期量と mem_map による伸長へ切替。旧世代は拒否。 |
 | v72 | **受入済み (2026-10-09、f13 ゲスト受入)** | `mem_stat` (slot 248)、サイズ引数つき MemStat。4 世代・データ欄は不変。 | 本書 §4-12 |
+| v77 | **実装 (T7b-b1 S2、ゲスト受入は S3b 後)** | app 用 font read lease `font_source_open` / `font_source_read_at` / `font_source_close` (slot 250〜252)。4 世代・データ欄は不変。 | 本書 §4-14 |
 | v76 | **実装 (T3d1b、ゲスト受入は未実施)** | `unicode_to_jis` (slot 249)、kernel 所有の組表を探索。4 世代・データ欄は不変。 | 本書 §4-13 |
 | v75 | **受入済み (2026-10-15、DBGREF G1)** | MemStat 末尾に kdebug の 5 欄を追記 (220B)。slot・4 世代は据置 (OS32X_MIN_API は 75)。 | 本書 §4-12 |
 | v74 | **実装 (T2h h4a、ゲスト受入は R1)** | MemStat 診断 17 欄を末尾追記 (200B)。slot・4 世代は据置。 | 本書 §4-12 |
@@ -289,7 +290,7 @@ v62 まではデータ欄 (`sbrk_heap_limit` / `shm_base`) を関数表の**直�
 |---|---|---|
 | 関数表の容量 R | **300** スロット (`KAPI_FUNC_CAPACITY`) | `sdk/kapi.json` の `func_capacity` |
 | データ欄の先頭 | **0x4B8** = 8 + 4 × R (`KAPI_DATA_FIELDS_OFF`) | `sdk/gen_kapi.py` が生成 |
-| 予約スロット | 249〜299 (`kapi_reserved[51]`、v72 時点。v68 は 240〜299、v67 は 239〜299、v66 は 238〜299、v65 は 235〜299、v64 は 234〜299、v63 は 230〜299)。カーネルの表は `kapi_reserved_nosys` (= `OS32_ERR_NOSYS`)、CPL=3 のトランポリンは int 0x80 のスタブ (ディスパッチャが `slot >= KAPI_FUNC_COUNT` で kill)。**NULL にしない** | `exec/exec.c` |
+| 予約スロット | 253〜299 (`kapi_reserved[47]`、v77 時点。v72 は 249〜299、v68 は 240〜299、v67 は 239〜299、v66 は 238〜299、v65 は 235〜299、v64 は 234〜299、v63 は 230〜299)。カーネルの表は `kapi_reserved_nosys` (= `OS32_ERR_NOSYS`)、CPL=3 のトランポリンは int 0x80 のスタブ (ディスパッチャが `slot >= KAPI_FUNC_COUNT` で kill)。**NULL にしない** | `exec/exec.c` |
 | R の上限 | トランポリン 1 ページ: `sizeof(KernelAPI)` + スタブ 8B × R + 写し場 256B ≤ 4096 → **R ≤ 318** (`STATIC_ASSERT`) | `exec/exec.c` |
 
 関数を足すときは `kapi_reserved[]` が 1 本減るだけで、データ欄は動かない。**関数数が R を
@@ -1625,7 +1626,7 @@ resident C CRT にはこの欄を組み込まず、gshell の Rust flag も偽�
 
 ### 予約スロット (v63〜)
 
-0x3EC〜0x4B4 (slot 249〜299、51 本、v72 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
+0x3FC〜0x4B4 (slot 253〜299、47 本、v77 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
 (§4-0)。カーネルの表は `kapi_reserved_nosys` (`OS32_ERR_NOSYS`)、トランポリンは
 int 0x80 のスタブで、CPL=3 からの呼び出しはアプリを kill する。
 
@@ -1918,3 +1919,23 @@ slot 249。ひらがな U+3041..3093 とカタカナ U+30A1..30F6 は算術変�
 未収録・BMP外・表が無い場合は0（かな算術は表が無くても有効）。表ポインタは公開しない。
 予約済み surface role 4 の query は `OS32_ERR_INVAL`。媒体・失敗時の契約は
 [T3d1 補遺](tasks/v3/T3D1_UNICODE_FILE.md) §1〜§3 に従う。
+
+### §4-14 font_source_open / font_source_read_at / font_source_close (v77)
+
+| オフセット | 名前 | 型 |
+|---|---|---|
+| 0x3F0 | font_source_open | `i32(const char *path, u32 *out_id, u32 *out_size)` |
+| 0x3F4 | font_source_read_at | `i32(u32 id, u32 offset, void *dst, u32 len)` |
+| 0x3F8 | font_source_close | `i32(u32 id)` |
+
+slot 250〜252。app (CPL=3) の font の read lease (T7b-b1、実体 `kernel/font_source.c`)。
+呼べるのは CPL=3 の dispatch 中だけで、caller の owner が資源 owner と一致すること
+(WM 中・CPL=0 の直呼び・常駐 shell は `OS32_ERR_INVAL`。shell は KAPI でなく内部入口を使う)。
+open は O_RDONLY で開き、実体の unlink・置き換え rename を `OS32_ERR_BUSY` にする (pinned)。
+戻りの id は不透明な値 (FD 番号ではない)、size は開いた時点の長さ。read_at は位置を持たず
+明示 offset で 1 回読み、実読込長 (短読はそのまま) を返す。`offset > size`・`len > size - offset`
+は `OS32_ERR_INVAL`。close 済みの id (再 close を含む) と、同じ owner 番号の別の app から
+来た id は `OS32_ERR_STALE`、他 owner の id は `OS32_ERR_INVAL`。owner あたり・app 全体の
+上限 (`VFS_FONT_FD_MAX_APP` / `_TOTAL`、ともに 2) と FD 枯渇は `OS32_ERR_NOSPC`。
+公開の `sys_read` / `sys_lseek` / `sys_close` は font の FD を扱わない。
+app の終了・fault で残った lease は回収で閉じる (結線は T7b-b2 S3b)。

@@ -7,6 +7,7 @@ check-shell-service-host:
 - exec/exec.h
 - kernel/gui.h
 - fs/fd_redirect.h
+- kernel/font_source.h
 - build/kernel.mk
 - tools/tests/host32.py
 - tools/tests/shell_service_host.c
