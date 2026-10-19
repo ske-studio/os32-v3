@@ -50,6 +50,7 @@ static int done_caller(struct caller_access *c)
 }
 #define caller_access_get_user done_caller
 #define exec_heap_user_trim done_trim
+static int v86_call_pinned(void) { return 0; }
 #include "trim_exec_source.c"
 #undef exec_heap_user_trim
 #undef caller_access_get_user

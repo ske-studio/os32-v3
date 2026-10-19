@@ -183,6 +183,8 @@ void exec_longjmp(u32 *buf) {
     kctx_exc_depth = 0; /* setjmp.asm restores trusted depth at landing. */
 }
 #define v86_active v86_session.active
+/* Entry staging is covered by v86_call_host; this harness owns low-PTE unwind. */
+static void v86_call_cleanup(void) {}
 static void exec_finish(int id, int status, int kind) {
     (void)id; (void)status; (void)kind;
     CHECK(!backing_phys && !v86_session.release_pending, "kill release before owner reclaim");

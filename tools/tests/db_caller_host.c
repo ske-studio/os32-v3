@@ -76,6 +76,13 @@ u32 kapi_invoke(void *fn, const void *args, u32 n) {
 static u32 host_kapi_table[KAPI_FUNC_COUNT + 2];
 #define KAPI_ADDR host_kapi_table
 #define RING3_ARG_WINDOW 64u
+/* This suite exercises DB slots; V86 admission has its own entry fixture. */
+static int v86_call_dispatch(u32 slot, void *target, const void *args,
+                              u32 bytes, u32 *result)
+{
+    (void)slot; (void)target; (void)args; (void)bytes; (void)result;
+    return 0;
+}
 #include "dispatch_host_source.c"
 
 /* Exercise the real early gate and wrappers with a mapped USER argument window. */

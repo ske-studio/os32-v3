@@ -25,7 +25,7 @@ MUTATIONS = (
     ('return-gfx', 'kernel/v86_mem.c', '    gfx_v86_return();', '', 'FAIL audit after gfx return'),
     ('kill-gcap-release', 'kernel/v86_mem.c', '    if (v86_session.aborting && kdebug.ops.gcap_release) kdebug.ops.gcap_release();', '', 'FAIL kill gcap release audited'),
     ('end-guest-iopl', 'kernel/v86_mem.c', 'flags = (v86_session.saved_eflags & ~EFLAGS_IF) | (flags & EFLAGS_IF);', 'flags = flags;', 'FAIL kill restores caller IOPL'),
-    ('direct-kill-no-end', 'exec/exec.c', '    v86_session_end();\n    ring3_context_clear();\n    exec_finish', '    ring3_context_clear();\n    exec_finish', 'FAIL kill release before owner reclaim'),
+    ('direct-kill-no-end', 'exec/exec.c', '    v86_session_end();\n    ring3_context_clear();\n    v86_call_cleanup();\n    exec_finish', '    ring3_context_clear();\n    v86_call_cleanup();\n    exec_finish', 'FAIL kill release before owner reclaim'),
     ('end-reentry', 'kernel/v86_mem.c', 'if (v86_session.closing) { irq_restore(flags); return; }', 'if (0) { irq_restore(flags); return; }', 'FAIL end recursion'),
     ('landing-if', 'exec/exec.c', '    _enable();\n    v86_session_end();', '    v86_session_end();\n    _enable();', 'FAIL release IF enabled'),
     ('restore-flush', 'kernel/paging.c', '        page_tables[0][i] = saved;', '        page_tables[0][i] = saved; arch_mmu_flush_tlb();', 'FAIL V86 active TLB'),
@@ -34,7 +34,7 @@ MUTATIONS = (
 
     ('exec-gate', 'exec/exec.c', '    if (paging_v86_session_open()) return EXEC_ERR_INVALID;', '', 'FAIL session exec gate'),
     ('resume-gate', 'exec/exec.c', '    if (paging_v86_session_open()) return OS32_ERR_BUSY;', '', 'FAIL session exec gate'),
-    ('kill-no-release', 'exec/exec.c', '    v86_session_end();\n    exec_finish(id, EXEC_ERR_FAULT, kind);', '    exec_finish(id, EXEC_ERR_FAULT, kind);', 'FAIL kill release before owner reclaim'),
+    ('kill-no-release', 'exec/exec.c', '    v86_session_end();\n    v86_call_cleanup();\n    exec_finish(id, EXEC_ERR_FAULT, kind);', '    exec_finish(id, EXEC_ERR_FAULT, kind);', 'FAIL kill release before owner reclaim'),
     ('release-on-exception', 'kernel/v86_mem.c', ' || kctx_irq_depth || kctx_exc_depth', '', 'FAIL backing release trusted context'),
     ('page0-forget', 'kernel/v86_mem.c', '    v86_bios_restore_real();', '    v86_bios_restore_real();\n    v86_session.real_saved = 0;', 'FAIL V86 second original valid'),
     ('consumer-direct', 'gfx/gfx_core.c', 'v86_bios_real_lowmem()[PEGC_BIOS_ARCH_FLAG]', '*(volatile u8 *)P2V_IO(PEGC_BIOS_ARCH_FLAG)', 'FAIL BIOS gfx candidate immutable'),

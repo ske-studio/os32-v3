@@ -1,3 +1,4 @@
+#include "v86_call.h"
 #include "v86_module.h"
 #include "v86_imports.h"
 #include "v86_mem.h"
@@ -175,6 +176,7 @@ static int v86_quiesce(struct module_record *r)
 int v86_module_load(void)
 {
     if (v86_handle.generation) return MODULE_BUSY;
+    if (!v86_call_init()) return MODULE_NO_PAGES;
     const struct bootinfo *bi = bootinfo_get();
     const struct module_request request = {
         .path = SYS_V86_MOD, .name = "v86",

@@ -1,3 +1,4 @@
+#include "v86_call.h"
 #include "v86_mem.h"
 #ifdef OS32_R1_FIXTURE
 #include "r1_fixture.h"
@@ -872,6 +873,7 @@ int ring3_user_range_writable(u32 p, u32 len)
 
 i32 exec_trim_done(u32 epoch)
 {
+    if (v86_call_pinned()) return OS32_ERR_BUSY;
     struct caller_access c;
     AppSlot *slot;
     u32 pages;
@@ -1384,6 +1386,7 @@ void exec_exit(int status, int kind)
     v86_session.aborting = 1;
     v86_session_end();
     ring3_context_clear();
+    v86_call_cleanup();
     exec_finish(appslot_cur(), status, kind);
     g_longjmp_reason = EXEC_LJ_EXIT;
     g_longjmp_id = 0;
@@ -1423,6 +1426,7 @@ static void exec_pending_finish(void)
     paging_load_cr3(paging_kernel_pd_phys());
     _enable();
     v86_session_end();
+    v86_call_cleanup();
     exec_finish(id, EXEC_ERR_FAULT, kind);
 }
 
@@ -1546,6 +1550,10 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
 
     /* --- (核) フォールトガードを立てる (v2 M2e) --- */
     ring3_in_syscall = 1;
+
+    int vcall = v86_call_dispatch(slot, (void *)wrapptr, args_src, nbytes, &frame[7]);
+    if (vcall < 0) ring3_fault_kill();
+    if (vcall) goto syscall_complete;
 
     /* Variadic input is copied by B1 on demand. Never read/copy an unused
      * word past the caller's mapped argument tail, or emit a partial line. */
@@ -1675,6 +1683,7 @@ static int exec_shell_layout(u32 text, u32 bss, u32 heap,
 static int exec_launch(const char *cmdline, int gui_arg)
 {
     if (paging_v86_session_open()) return EXEC_ERR_INVALID;
+    if (v86_call_pinned()) return EXEC_ERR_INVALID;
     /* longjmp 復帰側で読む gui。caller_context は setjmp 前の値から不変。
      * volatile でフレーム上に固定する
      * — レジスタに置かれると longjmp で失われる (他は全部グローバルで判断)。 */
@@ -2264,6 +2273,7 @@ i32 exec_start(const char *cmdline)
 /* ======================================================================== */
 i32 exec_park(void)
 {
+    if (v86_call_pinned()) return OS32_ERR_BUSY;
     int id = appslot_cur();
     AppSlot *a;
     u32 k;
@@ -2475,6 +2485,7 @@ i32 exec_sys_yield(void)
 i32 exec_resume(i32 app_id, i32 wait_ret)
 {
     if (paging_v86_session_open()) return OS32_ERR_BUSY;
+    if (v86_call_pinned()) return OS32_ERR_BUSY;
     AppSlot *a;
     int rc;
     int src;

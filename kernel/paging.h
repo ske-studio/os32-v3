@@ -212,6 +212,7 @@ u32 paging_lease_pte(const struct addrspace *as, u32 va);
 
 /* カーネル (master) PD の物理アドレス。CR3 を戻すときに使う。 */
 u32 paging_kernel_pd_phys(void);
+u32 paging_live_addrspaces(void);
 /* Registered master PT frame (0 for an absent table). */
 u32 paging_registered_pt(u32 va);
 

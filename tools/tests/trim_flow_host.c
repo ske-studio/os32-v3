@@ -94,6 +94,7 @@ void appslot_trim_request_as(struct addrspace *as)
     }
     trim_product_request(as);
 }
+static int v86_call_pinned(void) { return 0; }
 #include "trim_exec_source.c"
 void kbd_set_gui_mode(int on) { (void)on; }
 void ime_set_render(void *table) { (void)table; }
