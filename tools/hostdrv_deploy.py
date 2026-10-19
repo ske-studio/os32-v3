@@ -33,6 +33,7 @@ import glob as globmod
 import yaml
 import filecmp
 import zlib
+import re
 
 # 通常配備が /etc/settings.db* を作らない・上書きしない・消さないための共通判定
 # (票 S0-D / D0)。HostDrv は hsync でそのまま NHD へ流れるので、ここに古い
@@ -75,7 +76,7 @@ HOSTDRV_DIR = _resolve_hostdrv_dir()
 # 無いので、`key=value` の 4 行 + `---` + 1 行 1 ファイルにする。
 #
 #   format=2
-#   build=9742a6b+dirty
+#   build=9742a6b-dirty
 #   generated=2026-09-16T21:45:19Z
 #   kapi=1208
 #   kapi_version=63
@@ -145,42 +146,24 @@ def sync_failed():
     return False
 
 
-def _git(args):
-    """PROJ_DIR で git を回す。使えなければ None (配備は失敗させない)。"""
-    try:
-        out = subprocess.run(['git'] + args, cwd=PROJ_DIR,
-                             capture_output=True, timeout=30)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    if out.returncode != 0:
-        return None
-    data = out.stdout
-    if data is None:
-        return ''
-    if isinstance(data, bytes):
-        return data.decode('utf-8', 'replace')
-    return data
-
-
 def build_id():
-    """版の名札 `<短い SHA>` (+ 作業ツリーが汚れていれば `+dirty`)。
+    """組み済み成果物の ID。配備時の HEAD や dirty 状態は使わない。
 
-    **これは「同じか違うか」を見るための名札で、順序を表さない** (票 H4 §2-1)。
-    日時や SHA の大小で新旧を決めないこと。git が無い / 使えないときは
-    `unknown` を返す — 名札が無いより「確かめられない版」と言うほうが正直。
+    gen_build_id.py がカーネル用に生成した既存の C を読む。
+    未ビルド・読み取り不能・不正な内容なら unknown (HEAD で補わない)。
     """
-    sha = _git(['rev-parse', '--short', 'HEAD'])
-    if sha is None:
+    try:
+        with open(os.path.join(PROJ_DIR, 'build/out/build_id.c'),
+                  encoding='utf-8') as f:
+            source = f.read()
+    except (OSError, UnicodeError):
         return 'unknown'
-    sha = sha.strip()
-    if not sha or len(sha) > MANIFEST_BUILD_CAP or any(c.isspace() for c in sha):
+    match = re.search(
+        r'const char os32_build_commit\[BUILD_COMMIT_MAX\] = "'
+        r'([0-9a-f]+(?:-dirty)?|unknown)";', source)
+    if match is None or len(match.group(1)) > MANIFEST_BUILD_CAP:
         return 'unknown'
-    dirty = _git(['status', '--porcelain'])
-    if dirty is None:
-        return sha
-    if dirty.strip():
-        sha += '+dirty'
-    return sha if len(sha) <= MANIFEST_BUILD_CAP else 'unknown'
+    return match.group(1)
 
 
 def manifest_path_ok(rel):

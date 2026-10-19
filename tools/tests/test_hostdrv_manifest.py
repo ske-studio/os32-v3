@@ -335,15 +335,36 @@ def case_tag(tmp):
 # --------------------------------------------------------------------------
 
 def case_build_id(tmp):
-    print("== 追加: build 名札は <短い SHA>(+dirty)、空白なし ==")
-    bid = hd.build_id()
-    check(isinstance(bid, str) and bid != "", "build_id が空でない")
-    check(" " not in bid and "\t" not in bid and "\n" not in bid,
-          "build_id に空白が無い (key=value 1 行に収まる)")
-    check(len(bid) < 64, "build_id は 64 文字未満 (読む側の上限)")
-    check(bid.endswith("+dirty") or bid == "unknown" or
-          all(c in "0123456789abcdef" for c in bid),
-          "build_id は 16 進の短い SHA か +dirty か unknown: %r" % bid)
+    print("== 追加: HEAD を進めても名札は build/out の版 ==")
+    import gen_build_id
+    with Bench(tmp / "build-id") as b:
+        def git(*args):
+            return subprocess.check_output(
+                ["git", *args], cwd=b.proj, text=True).strip()
+
+        git("init", "-q")
+        git("-c", "user.name=test", "-c", "user.email=test@example.invalid",
+            "commit", "-q", "--allow-empty", "-m", "built")
+        built = git("rev-parse", "--short=7", "HEAD")
+        artifact = b.proj / "build/out/build_id.c"
+        artifact.parent.mkdir(parents=True)
+        for suffix in ("", "-dirty"):
+            artifact.write_text(gen_build_id.render(built + suffix))
+            git("-c", "user.name=test", "-c", "user.email=test@example.invalid",
+                "commit", "-q", "--allow-empty", "-m", "advance")
+            check(git("rev-parse", "--short=7", "HEAD") != built,
+                  "前提: HEAD は成果物より進んでいる")
+            check(hd.do_sync() is True, "HEAD を進めた後も配備できる")
+            kv, _ = parse(b.man_text())
+            check(kv.get("build") == built + suffix,
+                  "build= は組んだ版と dirty 状態を保持する")
+        for content in ("broken", gen_build_id.render("bad value")):
+            artifact.write_text(content)
+            check(hd.build_id() == "unknown", "不正な ID は unknown")
+        artifact.unlink()
+        check(hd.do_sync() is True, "ID が無くても配備はできる")
+        kv, _ = parse(b.man_text())
+        check(kv.get("build") == "unknown", "ID が無い場合も HEAD で補わない")
 
 
 # --------------------------------------------------------------------------
@@ -351,6 +372,9 @@ def case_build_id(tmp):
 # --------------------------------------------------------------------------
 
 MUTATIONS = [
+    ("build_from_head",
+     "    match = re.search(",
+     "    return subprocess.check_output(['git', 'rev-parse', '--short=7', 'HEAD'], cwd=PROJ_DIR, text=True).strip()\n    match = re.search("),
     ("os32x_header_truncated_to_v3",
      "f.read(os32x_hdr.OS32X_HDR_SIZE)",
      "f.read(os32x_hdr.OS32X_HDR_V3_SIZE)"),

@@ -4,6 +4,7 @@ check-h4-manifest-host:
 - docs/manpages/hsync.1
 - tools/deploy_manifests.py
 - tools/deploy_protect.py
+- tools/gen_build_id.py
 - tools/hostdrv_deploy.py
 - tools/tests/h4_manifest_host.c
 - tools/tests/test_h4_manifest.py
