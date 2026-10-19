@@ -54,6 +54,16 @@ impl FromData for i8 {
     }
 }
 
+// OS32 patch (D36, docs/tasks/v3/RUST_VS_C11.md §7-2/7-3): 32-bit big-endian
+// reads combine two 16-bit halves through an optimisation barrier, so LLVM
+// cannot emit BSWAP (486+) for the 386 floor. Recorded in UPSTREAM.json.
+#[inline]
+fn os32_be_u32(b: [u8; 4]) -> u32 {
+    let high = u16::from_be_bytes([b[0], b[1]]);
+    let low = u16::from_be_bytes([b[2], b[3]]);
+    u32::from(core::hint::black_box(high)) << 16 | u32::from(low)
+}
+
 impl FromData for u16 {
     const SIZE: usize = 2;
 
@@ -77,7 +87,7 @@ impl FromData for u32 {
 
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
-        data.try_into().ok().map(u32::from_be_bytes)
+        data.try_into().ok().map(os32_be_u32)
     }
 }
 
@@ -86,7 +96,7 @@ impl FromData for i32 {
 
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
-        data.try_into().ok().map(i32::from_be_bytes)
+        data.try_into().ok().map(|b| os32_be_u32(b) as i32)
     }
 }
 
@@ -95,7 +105,9 @@ impl FromData for u64 {
 
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
-        data.try_into().ok().map(u64::from_be_bytes)
+        let b: [u8; 8] = data.try_into().ok()?;
+        let high = os32_be_u32([b[0], b[1], b[2], b[3]]);
+        Some(u64::from(core::hint::black_box(high)) << 32 | u64::from(os32_be_u32([b[4], b[5], b[6], b[7]])))
     }
 }
 
@@ -113,7 +125,7 @@ impl FromData for U24 {
     #[inline]
     fn parse(data: &[u8]) -> Option<Self> {
         let data: [u8; 3] = data.try_into().ok()?;
-        Some(U24(u32::from_be_bytes([0, data[0], data[1], data[2]])))
+        Some(U24(os32_be_u32([0, data[0], data[1], data[2]])))
     }
 }
 

@@ -452,9 +452,10 @@ filesystem:
       guest: /test/hello.sh
       tags: [test]
 
-    # --- TrueType フォントは配らない (ユーザー決定 2026-09-30) ---
-    # 日本語 OpenType は配布物に同梱せず、使う人が assets/fonts/ipaexg.ttf を
-    # hsync などで /data/ipaexg.ttf に置く (font_test が読む)。サブセット TTF は廃止。
+    # --- TrueType フォントは配らない (ユーザー決定 2026-09-30、製品配布は T7b-b3) ---
+    # font_test (T7b-a5) は /data/JF-Dot-Shinonome16.ttf (必須) と
+    # /data/Inconsolata-Regular.ttf・/data/ipaexg.ttf (任意) を読む。使う人が
+    # tools/fetch_fonts.py で取った原本を hsync などで /data に置く。サブセット TTF は廃止。
     # --- フォントテスト ---
     - host: userland/tests/font_test.bin
       guest: /usr/bin/

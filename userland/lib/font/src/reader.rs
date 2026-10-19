@@ -159,10 +159,12 @@ fn be16(bytes: &[u8], offset: usize) -> Result<u16> {
     ))
 }
 fn be32(bytes: &[u8], offset: usize) -> Result<u32> {
-    let data = bytes.get(offset..offset + 4).ok_or(Error::Bounds)?;
-    Ok(u32::from_be_bytes(
-        data.try_into().map_err(|_| Error::Bounds)?,
-    ))
+    let high = be16(bytes, offset)?;
+    let low = be16(bytes, offset.checked_add(2).ok_or(Error::Bounds)?)?;
+    // D36 (386 floor): combine the halves through an optimisation barrier so
+    // LLVM cannot fold them into a 32-bit load + BSWAP (486+). The final
+    // linked ELF is checked by tools/check_isa386.py.
+    Ok(u32::from(core::hint::black_box(high)) << 16 | u32::from(low))
 }
 fn u16_at<S: Source>(r: &mut Reader<S>, t: Table, offset: u32) -> Result<u16> {
     let mut bytes = [0; 2];

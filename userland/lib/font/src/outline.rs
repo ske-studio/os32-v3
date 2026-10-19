@@ -60,7 +60,7 @@ struct Output {
 /// FD, global registry or bitmap cache. Failed calls expose zero committed items.
 pub struct GlyphScratch {
     input: [u8; MAX_TOTAL_INPUT_BYTES],
-    loca: [u8; (MAX_COMPONENTS + 2) * 4],
+    loca: [u8; (MAX_COMPONENTS + 2) * 2],
     output: Output,
     committed: (usize, usize, usize),
 }
@@ -75,7 +75,7 @@ impl GlyphScratch {
     pub const fn new() -> Self {
         Self {
             input: [0; MAX_TOTAL_INPUT_BYTES],
-            loca: [0; (MAX_COMPONENTS + 2) * 4],
+            loca: [0; (MAX_COMPONENTS + 2) * 2],
             output: Output {
                 points: [Point { x: 0.0, y: 0.0 }; MAX_OUTLINE_POINTS],
                 edges: [Edge {
@@ -111,11 +111,13 @@ impl GlyphScratch {
         collect.glyph(face, gid, 0)?;
         let usage = collect.usage;
         let count = NonZeroU16::new(usage.glyphs as u16).ok_or(Error::Invalid)?;
+        // Short (u16, offset/2) mini loca: ttf-parser's Long format reads u32,
+        // which compiles to BSWAP (486+, D36). Offsets are kept even below.
         let locations = loca::Table::parse(
             count,
-            IndexToLocationFormat::Long,
+            IndexToLocationFormat::Short,
             self.loca
-                .get(..(usage.glyphs + 1) * 4)
+                .get(..(usage.glyphs + 1) * 2)
                 .ok_or(Error::Bounds)?,
         )
         .ok_or(Error::Invalid)?;
@@ -188,10 +190,14 @@ struct Collector<'a> {
 }
 impl Collector<'_> {
     fn location(&mut self, index: usize, offset: usize) -> Result<()> {
+        if offset % 2 != 0 {
+            return Err(Error::Invalid);
+        }
+        let half = u16::try_from(offset / 2).map_err(|_| Error::Limit)?;
         self.loca
-            .get_mut(index * 4..(index + 1) * 4)
+            .get_mut(index * 2..(index + 1) * 2)
             .ok_or(Error::Limit)?
-            .copy_from_slice(&(offset as u32).to_be_bytes());
+            .copy_from_slice(&half.to_be_bytes());
         Ok(())
     }
 
@@ -212,15 +218,18 @@ impl Collector<'_> {
         if local > MAX_COMPONENTS {
             return Err(Error::Limit);
         }
+        // Ends are padded to an even byte for the short loca, so starts are even.
         let start = self.usage.input_bytes;
         let len = face.read_glyph(gid, self.input.get_mut(start..).ok_or(Error::Limit)?)?;
         let end = start + len;
-        self.usage.input_bytes = end;
+        let padded = end.next_multiple_of(2);
+        self.input.get(..padded).ok_or(Error::Limit)?;
+        self.usage.input_bytes = padded;
         self.usage.glyphs += 1;
         self.usage.components = local;
         self.usage.depth = self.usage.depth.max(depth);
         self.location(local, start)?;
-        self.location(local + 1, end)?;
+        self.location(local + 1, padded)?;
         if len == 0 {
             return Ok(local as u16);
         }

@@ -551,11 +551,28 @@ class FontVendorTest(unittest.TestCase):
         self.assertEqual(set(record["files"]), {
             str(p.relative_to(vendor)) for p in vendor.rglob("*")
             if p.is_file() and p.name != "UPSTREAM.json"})
-        for manifest_path in (ROOT / "userland/lib/font/Cargo.toml",
-                              ROOT / "userland/rust/font_test/Cargo.toml"):
-            dependency = tomllib.loads(manifest_path.read_text())["dependencies"]["ttf-parser"]
-            self.assertFalse(dependency["default-features"])
-            self.assertEqual((manifest_path.parent / dependency["path"]).resolve(), vendor)
+        # T7b-a5 D36 patch: only src/parser.rs, and reverting the recorded hunks
+        # reproduces the crates.io original byte for byte.
+        patched = {}
+        for hunk in record["patches"]:
+            patched.setdefault(hunk["file"], []).append(hunk)
+        self.assertEqual(set(patched), {"src/parser.rs"})
+        for rel, hunks in patched.items():
+            text = (vendor / rel).read_text()
+            for hunk in hunks:
+                self.assertEqual(text.count(hunk["os32"]), 1, hunk["os32"])
+                text = text.replace(hunk["os32"], hunk["upstream"])
+                self.assertEqual(hunk["upstream_sha256"], hunks[0]["upstream_sha256"])
+            self.assertEqual(sha(text.encode()), hunks[0]["upstream_sha256"], rel)
+        manifest_path = ROOT / "userland/lib/font/Cargo.toml"
+        dependency = tomllib.loads(manifest_path.read_text())["dependencies"]["ttf-parser"]
+        self.assertFalse(dependency["default-features"])
+        self.assertEqual((manifest_path.parent / dependency["path"]).resolve(), vendor)
+        # font_test uses ttf-parser only through the product os32-font crate.
+        font_test = tomllib.loads((ROOT / "userland/rust/font_test/Cargo.toml").read_text())["dependencies"]
+        self.assertNotIn("ttf-parser", font_test)
+        self.assertEqual((ROOT / "userland/rust/font_test" / font_test["os32-font"]["path"]).resolve(),
+                         manifest_path.parent.resolve())
 
 
 def check_mutations():

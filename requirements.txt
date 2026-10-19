@@ -9,5 +9,6 @@ numpy        # tools/img2mgx.py, img2vbz.py
 zopfli       # tools/img2mgx.py
 pyserial     # tools/rshell_serial.py (実機のシリアル会話)
 pandas       # tools/fep_compiler.py (旧形式 fep.dic のみ)
+fonttools    # tools/tests/test_font_raster.py (EBDT の原本ドットと寸法の独立した参照、ホスト試験のみ)
 pywin32 ; sys_platform == "win32"     # tools/host_agent.py, os32_server.py (非推奨)
 pyautogui ; sys_platform == "win32"   # tools/screenshot.py (非推奨 — 内蔵 /api/screenshot を使う)
