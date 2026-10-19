@@ -3,7 +3,6 @@ check-kcg-boot-host:
 - drivers/kcg.h
 - kernel/kcg_module.h
 - kernel/kernel.c
-- lib/lz4.c
 - lib/utf8.c
 - tools/tests/host32.py
 - tools/tests/kcg_boot_host.c

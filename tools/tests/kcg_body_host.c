@@ -78,6 +78,31 @@ void _start(void)
     api.read_kanji(other, glyph); api.read_kanji(0x3021, glyph);
     CHECK(reads == 112, "eviction refetch");
     api.stats(&s); CHECK(s.hits == 1022 && s.misses == 4, "hit counters");
+    /* Fill/replace every cache slot with valid ROM glyphs, then refetch. */
+    for (u32 hi=0x21; hi<=0x7e; ++hi)
+        for (u32 lo=0x21; lo<=0x7e; ++lo) {
+            api.read_kanji((hi<<8)|lo, glyph);
+            CHECK(glyph[0] == (u8)(lo*7+(hi-0x20)*11+0x20*13), "full cache bytes");
+        }
+    for (u32 i=0; i<KCG_CACHE_SLOTS; ++i) cache[i].tag = 0;
+    counters = (KcgCacheStats){0};
+    reads = writes = waits = 0;
+    /* Fixed corpus: 100 JIS glyphs repeated ten times, same screen twice. */
+    for (u32 pass=0; pass<2; ++pass) {
+        for (u32 i=0; i<1000; ++i) {
+            u32 n=i%100;
+            api.read_kanji(((0x30+n/94)<<8)|(0x21+n%94), glyph);
+        }
+        api.stats(&s);
+        CHECK(s.misses == 100 && s.hits == (pass ? 1900u : 900u), "1000 corpus hit/miss");
+        CHECK(reads == 3200 && writes == 3400 && waits == 3400, "1000 corpus I/O");
+    }
+    output("CORPUS JIS 3021..307e,3121..3126 repeated x10; ROM hash unavailable (mock ports)\n"
+           "cold1000 hits=900 misses=100 hit=90% IN=3200 OUT=3400 WAIT=3400 file=0\n"
+           "warm1000 hits=1000 misses=0 hit=100% IN=0 OUT=0 WAIT=0 file=0\n",
+           sizeof("CORPUS JIS 3021..307e,3121..3126 repeated x10; ROM hash unavailable (mock ports)\n"
+           "cold1000 hits=900 misses=100 hit=90% IN=3200 OUT=3400 WAIT=3400 file=0\n"
+           "warm1000 hits=1000 misses=0 hit=100% IN=0 OUT=0 WAIT=0 file=0\n")-1);
     output("PASS KCG body: glyphs/ports, double init, collision; sample hit=1022/1024 (99.80%)\n",
            sizeof("PASS KCG body: glyphs/ports, double init, collision; sample hit=1022/1024 (99.80%)\n")-1);
     stop(0);

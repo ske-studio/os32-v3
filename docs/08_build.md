@@ -13,17 +13,17 @@ make iso
 make clean
 ```
 
-#### ビルド前提: 日本語フォント (IPAex) は初回ビルド時に取得する
+#### host 画面比較試験用の日本語フォント (IPAex)
 
 `ipaexg.ttf` / `ipaexm.ttf` (IPAex フォント Ver.004.01) は**リポジトリに含めない** (ユーザー決定
-2026-09-30)。`make all` は `assets/fonts/ipaexg16.kcgfont` を作るために `assets/fonts/ipaexg.ttf` を
+2026-09-30)。host 画面比較試験の `assets/fonts/ipaexg16.kcgfont` は `assets/fonts/ipaexg.ttf` を
 要求し、無ければ `tools/fetch_fonts.py` (`build/assets.mk` の規則) が IPA (文字情報技術促進協議会) の
 公式配布 `https://moji.or.jp/wp-content/ipafont/IPAexfont/IPAexfont00401.zip` (SHA-256
 `bcf8374a…7974b`、スクリプトに固定) を取得して 2 本を `assets/fonts/` に展開する (zip と各 ttf の
 SHA-256 を照合。第三者ミラーは使わない。プロキシは `https_proxy` 等の環境変数)。
 **取得の前に IPA Font License Agreement v1.0 への同意が要る**:
 
-- 端末から `make all` または `make fonts` を打つと、同梱のライセンス全文
+- 端末から `make fonts` または host 画面比較試験を実行すると、同梱のライセンス全文
   (`assets/fonts/IPA_Font_License_Agreement_v1.0.txt`) を標準出力に出して `同意しますか [y/N]` と聞く。
   `y` 以外なら rc=2 で止まり、最後に案内が 1 行出る。
 - 端末が無い (CI・パイプ・`</dev/null`) ときは **`OS32_ACCEPT_IPA_LICENSE=1`** を付けたときだけ同意と
@@ -35,8 +35,8 @@ SHA-256 を照合。第三者ミラーは使わない。プロキシは `https_p
   `python3 tools/fetch_fonts.py --force`、オフラインのホストは手で取った zip を `--zip PATH` で渡す。
 - **`make clean` (と `clean-assets`) は ttf も `.license_accepted` も消さない** — 同意を聞くのは初回
   ビルドの 1 回だけ。消したいときだけ `make fonts-clean` (ttf 2 本と同意の記録を消す)。
-- ttf はゲストに配らない (`userland/deploy.yaml` にフォントの項目は無い)。ゲストが使うのは ttf から
-  焼いた `ipaexg16.kcgfont` (`/sys/font/default.kcgfont`) だけ。再配布の条件は `assets/fonts/README.OS32`。
+- ttf と旧 `.kcgfont` はゲストに配らない。`make all` は旧 font を生成せず、KCG 部品が ROM を読む。
+  host 試験 fixture のライセンス条件は `assets/fonts/README.OS32`。
 
 試験: `tools/tests/test_fetch_fonts.py` (`make check-tools-host` の 1 行。ネットワーク無し)。
 
@@ -572,7 +572,7 @@ python3 tools/mkpkg.py --list packages/NORMAL.PKG                # 中身の一�
 | `BOOT.PKG` | IPL + ローダ (`type: boot`、セクタへ直接書く。分割しない、無圧縮) | 全部 | 2 本 / 6,376 B |
 | `MINIMAL.PKG` | `core` + `base` — **CUI のレスキュー兼インストーラ** (下)。カーネル、unicode.bin、shell、filetypes、settings.tsv、install / cdinst / hsync、less / grep / hexdump / cfg + 媒体だけの settings.db。**起動 FD と同じ集合** (下) | 1. Minimal 以上 | 13 本 / 861,245 B |
 | `GUI.PKG` | `gui` — gshell、libos32gui.shlib、shlib を使うアプリ (filer / edit_gui / about)。shlib を使う試験アプリ (gui_demo / gdi_test / v12_api_test …) は `test` のまま DEBUG | 2. Normal 以上 | 5 本 / 430,530 B (2026-09-29、About を `ver` の中身に揃えた後) |
-| `NORMAL.PKG` | `programs` / `docs` / `data` — コマンドとアプリ (sh / more / find / sort / head / tail / wc / tee / touch / sleep / diff / du / cal / man / sndctl / ime / v86 …)、man ページ、**既定フォント (`/sys/font/default.kcgfont`)**、FEP 辞書。**TTF は入れない** (2026-09-30: 日本語 OpenType は同梱しない、サブセット TTF は廃止) | 2. Normal 以上 | 95 本 / 6,569,090 B (2026-09-30、サブセット TTF 3,348,916 B と MGX 7 本を外した後。外す前は 10,130,774 B) |
+| `NORMAL.PKG` | `programs` / `docs` / `data` — コマンドとアプリ (sh / more / find / sort / head / tail / wc / tee / touch / sleep / diff / du / cal / man / sndctl / ime / v86 …)、man ページ、FEP 辞書。**TTF は入れない** (2026-09-30: 日本語 OpenType は同梱しない、サブセット TTF は廃止) | 2. Normal 以上 | 95 本 / 6,569,090 B (2026-09-30、サブセット TTF 3,348,916 B と MGX 7 本を外した後。外す前は 10,130,774 B) |
 | `DEBUG.PKG` | `test` — 試験バイナリと試験用データ | 3. Full | 62 本 / 1,272,396 B |
 
 cdinst の展開は依存の順 BOOT → MINIMAL → GUI → NORMAL → DEBUG。Minimal だけの HDD で
@@ -594,27 +594,10 @@ FD が作れなくなった (`mkfat12.py` の「ディスク容量不足」)。
 | less / grep / hexdump | 壊れたファイルを見る |
 | cfg | 設定を直す |
 
-NORMAL へ移した物: 既定フォント、more / find / sort / head / tail / wc / tee / touch / sleep /
+NORMAL へ移した物: more / find / sort / head / tail / wc / tee / touch / sleep /
 diff / du / cal / man / sndctl。残すコマンド・FD の profile・インストーラはこれらを呼ばない。
 
-**既定フォントが無いとき** (MINIMAL の HDD と起動 FD):
-
-- カーネルは起動画面に `FONT..NG` (赤) と `[KCG] kernel-init load failed: -1` を出して先へ
-  進む (`kernel/kernel.c` → `kernel/boot_font.c`)。FD 起動では 8.3 の短い名前も試すので
-  `[KCG] loading:` が 2 行出る。ファイルが開けない失敗は KCG キャッシュに触る前に返る
-  (`drivers/kcg.c` の `kcg_load_font`)。
-- テキスト画面 (シェル・kprintf) の文字は元から本体の CG (テキスト VRAM) なので変わらない。
-  グラフィック画面に描く文字 (gshell / libos32gui の KCG 描画) はキャッシュに無い字を
-  本体の漢字 ROM から読む — IPAex ゴシックの代わりに ROM の字形になり、初めて描く字は
-  ポートを叩くぶん遅い。止まる経路は無い (2026-09-24 以前の FD はフォント無しで起動していた。
-  `docs/tasks/realhw/TASK_FD144.md` §5-2)。
-- cdinst の選択肢に「GUI はあるが NORMAL が無い」組み合わせは無い (2 = GUI + NORMAL が
-  一緒)。FD → install.bin の HDD は MINIMAL と同じ (フォントも移したコマンドも無い)。欲しければ
-  CD の Normal 以上か、**HDD から起動して `hsync` と `hsync sys` (+ リセット)** で入れる。
-  全体同期の `hsync` はルート直下の `/sys` を既定で外す (稼働中のシェルと shlib) ので、
-  既定フォント (`/sys/font/`) と GUI の共有ライブラリ (`/sys/lib/`) は `hsync sys` でしか
-  入らない。**FD から起動して `hsync` は打てない** — 同期先 (宛先のマウント) がフロッピー
-  なら何も書かずに `dest_on_fd` で断る (`userland/system/hsync.c` の `dst_on_floppy`)。
+**フォントの経路**: 全媒体で KCG 部品の ROM/cache を使う。旧 font ファイルは配備・hsync・CD/FD の一覧に含めない。部品欠落・確保失敗・init 失敗時も TVRAM CUI で操作を続ける。GUI は KCG 部品が RUNNING のときだけ起動する。
 
 - **タグの規則**: 配備マニフェストの 1 行はちょうど 1 つのパッケージに当たるタグを持つ。
   `userland/tests/` 由来の行は必ず `test` (試験バイナリが NORMAL に混ざらないように)。
@@ -630,7 +613,7 @@ diff / du / cal / man / sndctl。残すコマンド・FD の profile・インス
 - 検査は `make check-packages-host` ([`tools/tests/test_packages.py`](../tools/tests/test_packages.py)):
   振り分けの否定側、分割、実物の mkpkg で作った PKG と ISO の中の PKG を読み戻して
   配備の全ファイルが同じバイト列で揃うこと、cdinst.c のベース名と展開順との一致、
-  GUI.PKG = `gui` タグ、既定フォントが NORMAL にあり MINIMAL に無いこと、
+  GUI.PKG = `gui` タグ、旧 font が全一覧に無いこと、
   起動 FD = BOOT + MINIMAL と FD の空きの下限 (下)。
 - 試験用に `--defs` (ファイル一覧を直に書いた YAML) と `--name` (1 本) の形も残してある。
 

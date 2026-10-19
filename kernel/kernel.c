@@ -25,7 +25,6 @@
 #include "gfx_hal.h"   /* H2b: GFX_PREF_* / gfx_set_backend_pref (GFX= の反映先) */
 #include "kcg.h"
 #include "kcg_module.h"
-#include "boot_font.h"
 #include "boot_splash.h"
 #include "cpu_calibrate.h"
 #include "sysclk.h"   /* 0000:0501h のクロック判定 (pit_init より前に呼ぶ) */
@@ -467,38 +466,8 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     /* コンベンショナルメモリ再利用 (ブート後のローダー領域等を解放) */
     paging_reclaim_conventional();
 
-    /* KCGフォントキャッシュ初期化
-     * コンベンショナルメモリ (0x01000〜) にキャッシュを配置しているため、
-     * paging_reclaim 後にフラグをゼロクリアする必要がある。
-     * これがないとBIOSデータの残骸がキャッシュ済みと誤認される。 */
+    /* ROM/cache storage belongs to the POST_ROOT KCG module. */
     kcg_init();
-
-    /* boot 内の正規のフォント読込 (e8b: kcg_load_font は boot フェーズの
-     * 間だけ通り、boot_phase_close() の後は NOSYS)。
-     * BB/mailbox の公開前なので、低位 KCG scratch を
-     * LZ4 一時バッファとして使える。 */
-    tvram_print(0, 3, "FONT..", TATTR_GREEN);
-    {
-        int fret;
-        /* FD (FAT) だけ 8.3 の短い名前へ落ちる (kernel/boot_font.c) */
-        fret = boot_font_load();
-        if (fret == 0) {
-            tvram_print(6, 3, "OK ", TATTR_WHITE);
-        } else {
-            tvram_print(6, 3, "NG ", TATTR_RED);
-            kprintf(0x07, "[KCG] kernel-init load failed: %d\n", fret);
-        }
-        /* FD の読みの数 (シーク / 省略 / 期限切れ / まとめ読み)。FD から
-         * 起動したときフォントの読み込みが遅い件 (2026-09-24) の切り分け用。
-         * **FD 起動のときだけ出す** — HDD 起動でも /fd0 のサブマウントの
-         * 試行で数が付き、「font」と名乗るのは嘘になる (ラリー 2 の Fable)。 */
-        if (boot_drive == BOOT_DRIVE_FDD || boot_drive == BOOT_DRIVE_FDD_144) {
-            fdc_print_stats("font");
-            diskio_print_fdd_cache("font");
-        }
-    }
-
-    /* TTF由来フォントもboot内部で読む。boot後の公開口はNOSYS。 */
 
     /* FPU 初期化 (paging_init の後で CR0 に対して設定)
      * CR0.EM=0 (ネイティブFPU使用), CR0.TS=0 (タスクスイッチ不要)
@@ -539,8 +508,8 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     /* POST_ROOT: the loader needs root, paging and the page ledger. CD is
      * independent of services_boot, so MINIMAL/SQLITE_ONLY can read packages. */
     cd_module_load();
-    /* Old font and ROM cache are exclusive; page owners exist only now. */
-    if (!kcg_font_loaded()) kcg_module_load();
+    /* Page owners exist now; failure retains the TVRAM CUI. */
+    kcg_module_load();
     {
         const char *names[MAX_DEVICES];
         int num = dev_get_names(names, MAX_DEVICES);
@@ -724,11 +693,6 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * ext2 / FAT でなければ書かない。どこで失敗しても起動は続ける。 */
     bootlog_save();
 
-    /* scratch失効→planar BB全域/mailbox初期化。
-     * 台帳の予約と公開は別。gfx_started後のSURFACE publisher/USER lease、
-     * 最初の通常AS開始より前に完了する。 */
-    kcg_boot_phase_close();
-
     /* 外部シェル起動 — CUI(shell.bin) と GUI(gshell.bin) を同じシェル帯
      * (MEM_SHELL_LOAD_ADDR, Level 1) で入れ替えながら回す (契約 T9)。両者は同時に
      * 載らない。終了/クラッシュ時のフォールバックとして再起動ループにする。
@@ -762,6 +726,12 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
             }
 
             is_gui = (kstrcmp(cur_shell, SYS_GSHELL_BIN) == 0);
+            if (is_gui && !kcg_module_ready()) {
+                kprintf(0x07, "[boot] KCG unavailable -> CUI shell\n");
+                cur_shell = SYS_SHELL_BIN;
+                is_gui = 0;
+            }
+
 
             /* 共有ライブラリを断っていたら GUI は動かない。CUI に落として
              * 案内する。**直し方は理由で逆向き**なので案内を分ける:

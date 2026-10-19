@@ -451,11 +451,9 @@ MUTATIONS = [
     # --- 票 §2 (終了コードと集計行の一致) の否定側 ------------------------
     # 変異 5: 予約値 (127 = 実行ファイルが見つからない) を返す。
     ("userland/tests/font_load_test.c",
-     "        return os32_test_summary_skip(api, \"font_load_test\",\n"
-     "                                      \"font file not found (NOSYS test prerequisite)\");",
-     "        os32_test_summary_skip(api, \"font_load_test\",\n"
-     "                               \"font file not found (NOSYS test prerequisite)\");\n"
-     "        return 127;"),
+     '    return os32_test_summary(api, "font_load_test", (ret == OS32_ERR_NOSYS) ? 1 : 0, 1);',
+     '    os32_test_summary(api, "font_load_test", (ret == OS32_ERR_NOSYS) ? 1 : 0, 1);\n'
+     '    return 127;'),
     # 変異 6: `void main` に戻す (終了コードが eax の残骸になる)。
     ("userland/tests/asset_test.c",
      "int main(int argc, char **argv, KernelAPI *sys_api)",

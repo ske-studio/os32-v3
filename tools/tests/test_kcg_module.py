@@ -26,6 +26,7 @@ def product(folder):
     assert rebuilt == data
     core = mkmod.Elf((ROOT / 'build/out/kernel.elf').read_bytes())
     body = mkmod.Elf((ROOT / 'build/out/kcg/kcg.elf').read_bytes())
+    assert not {'lz4_decode', 'boot_font_load', 'kanji_cache', 'ank_cache'} & core.symbols.keys()
     assert 'kcg_module_init' not in core.symbols and 'kcg_module_init' in body.symbols
     assert 'unicode_file_load' in core.symbols and 'unicode_file_load' not in body.symbols
     contract = dict(kapi=spec['version'], layout=spec['generations']['memory_layout'],
@@ -76,15 +77,20 @@ def main():
                     else: print(result.stdout.decode().strip(), flush=True)
 
         run(adapter, 'module', range(6))
-        print('PASS adapter: missing stub/diagnostic, legacy exclusion, failed init/export/prefix, abort, duplicate', flush=True)
+        print('PASS adapter: missing stub/diagnostic, allocation failure, failed init/export/prefix, abort, duplicate', flush=True)
         run(body, 'body', [0])
         if '--mutate' in sys.argv:
             for label, source, old, new, kind, modes in (
                 ('wrong-export', adapter, 'return MODULE_INIT_FAILED;\n    return 0;',
                  'return 0;\n    return 0;', 'module', [1]),
                 ('adapter-double-init', adapter,
-                 'if (kcg_font_loaded() || kcg_handle.generation) return MODULE_BUSY;',
-                 'if (kcg_font_loaded()) return MODULE_BUSY;', 'module', [0]),
+                 'if (kcg_handle.generation) return MODULE_BUSY;',
+                 'if (0) return MODULE_BUSY;', 'module', [0]),
+                ('cache-collision-stale', body, 'slot->tag == tag && tag',
+                 'slot->tag != 0', 'body', [0]),
+                ('allocation-failure-publishes', adapter,
+                 'kmemset(buf, 0, KCG_KANJI_H * 2);',
+                 'kmemset(buf, 1, KCG_KANJI_H * 2);', 'module', [4]),
                 ('body-double-init', body, 'if (initialized) return MODULE_BUSY;',
                  'if (0) return MODULE_BUSY;', 'body', [0]),
             ):

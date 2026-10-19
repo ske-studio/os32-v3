@@ -31,7 +31,7 @@ exec/ring3_ls.o exec/exec.o: exec/ring3_ls.h
 
 # === カーネル C ソース ===
 C_KERNEL = \
-    kernel/kernel.c kernel/kstack_hw.c kernel/boot_font.c kernel/gdt.c kernel/double_fault.c kernel/tss.c kernel/v86.c kernel/v86_mem.c kernel/v86_snapshot.c kernel/v86_module.c kernel/v86_gcap.c kernel/boot_splash.c kernel/idt.c kernel/isr_handlers.c kernel/cpu_calibrate.c kernel/cpu_calibrate_math.c kernel/sysclk.c kernel/pit_math.c kernel/bootinfo.c kernel/bootinfo_check.c \
+    kernel/kernel.c kernel/kstack_hw.c kernel/gdt.c kernel/double_fault.c kernel/tss.c kernel/v86.c kernel/v86_mem.c kernel/v86_snapshot.c kernel/v86_module.c kernel/v86_gcap.c kernel/boot_splash.c kernel/idt.c kernel/isr_handlers.c kernel/cpu_calibrate.c kernel/cpu_calibrate_math.c kernel/sysclk.c kernel/pit_math.c kernel/bootinfo.c kernel/bootinfo_check.c \
     kernel/paging.c kernel/paging_app.c kernel/dma_pool.c kernel/dma_pool_math.c kernel/physmem.c kernel/pgalloc.c kernel/ledger_pci.c kernel/memory_boot.c kernel/shlib.c kernel/shm.c kernel/gui.c kernel/kmalloc.c kernel/console.c kernel/con_sink.c kernel/bootlog.c kernel/bootlog_save.c kernel/kbd_inject.c kernel/sys.c kernel/sysconfig.c kernel/kaudit.c kernel/kaudit_boot.c kernel/kselftest_report.c kernel/irq.c kernel/irq_math.c kernel/ktime.c kernel/time_math.c \
     kernel/sqlite_engine.c kernel/sqlite_outer.c lib/sqlite3/os32_sqlite_test.c kernel/module.c kernel/module_image.c kernel/module_runtime.c kernel/unicode_file.c kernel/fep_module.c kernel/cd_module.c kernel/kcg_module.c kernel/fm_module.c \
     drivers/kbd.c drivers/kbd_status.c drivers/kbd_dlog.c drivers/serial.c drivers/serial_plan.c \
@@ -157,17 +157,8 @@ kapi/%.o: kapi/%.c kapi/kapi_generated.c
 lib/%.o: lib/%.c
 	$(CC) $(CFLAGS_BASE) $(INC_LIB) -c $< -o $@
 
-# === Rust LZ4デコーダ (lib/os32_lz4/) ===
-# C版 (lib/lz4.c) をRust実装に置き換え。境界チェック付きの安全な展開を保証。
-RUST_LZ4_DIR = lib/os32_lz4
-RUST_LZ4_LIB = $(RUST_LZ4_DIR)/target/i686-os32-none/release/libos32_lz4.a
-
-$(RUST_LZ4_LIB): $(RUST_LZ4_DIR)/src/lib.rs $(RUST_LZ4_DIR)/Cargo.toml
-	cd $(RUST_LZ4_DIR) && RUSTC_WRAPPER=$(CURDIR)/sdk/rustc_stamp.py cargo build --release
-
-# === カーネルリンク ===
-$(BUILD_OUT)/kernel.elf: $(BUILD_OUT)/os32.ld $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(BUILD_ID_OBJ) $(RUST_LZ4_LIB)
-	$(LD) $(LDFLAGS) -o $@ $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(BUILD_ID_OBJ) $(RUST_LZ4_LIB) -lgcc
+$(BUILD_OUT)/kernel.elf: $(BUILD_OUT)/os32.ld $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(BUILD_ID_OBJ)
+	$(LD) $(LDFLAGS) -o $@ $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(BUILD_ID_OBJ) -lgcc
 
 $(BUILD_OUT)/kernel.bin: $(BUILD_OUT)/kernel.elf
 	$(OBJCOPY) -O binary $< $@
@@ -196,7 +187,6 @@ kernel: $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/vmkernel.lz4 $(BUILD_OUT)/layout-ma
 # === カーネルクリーン ===
 clean-kernel:
 	rm -f $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(BUILD_ID_SRC) $(BUILD_ID_OBJ) $(BUILD_OUT)/kernel.elf $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/vmkernel.lz4 $(BUILD_OUT)/kernel.map
-	cd $(RUST_LZ4_DIR) && cargo clean 2>/dev/null || true
 
 .PHONY: kernel clean-kernel
 
@@ -296,8 +286,8 @@ $(R1_OUT)/os32.ld: $(BUILD_OUT)/os32.raw.ld
 	@mkdir -p $(@D)
 	sed -E 's@([a-zA-Z0-9_/]+\.o)@$(R1_OBJ)/\1@g' $< > $@
 
-$(R1_OUT)/kernel.elf: $(R1_OBJECTS) $(RUST_LZ4_LIB) $(R1_OUT)/os32.ld
-	$(LD) $(filter-out -Map=% -T $(BUILD_OUT)/os32.ld,$(LDFLAGS)) -T $(R1_OUT)/os32.ld -Map=$(R1_OUT)/kernel.map -o $@ $(R1_OBJECTS) $(RUST_LZ4_LIB) -lgcc
+$(R1_OUT)/kernel.elf: $(R1_OBJECTS) $(R1_OUT)/os32.ld
+	$(LD) $(filter-out -Map=% -T $(BUILD_OUT)/os32.ld,$(LDFLAGS)) -T $(R1_OUT)/os32.ld -Map=$(R1_OUT)/kernel.map -o $@ $(R1_OBJECTS) -lgcc
 
 $(R1_OUT)/kernel.bin: $(R1_OUT)/kernel.elf
 	$(OBJCOPY) -O binary $< $@

@@ -34,7 +34,6 @@ check-ci-stab-host:
 - sdk/kapi.json
 - kapi/kapi_generated.c
 - kapi/kapi_host.c
-- kernel/boot_font.c
 - kernel/isr_handlers.c
 - kernel/kentry.asm
 - kernel/kstack_hw.c

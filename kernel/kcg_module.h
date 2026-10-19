@@ -1,4 +1,4 @@
-/* Paired ROM glyph reader. Unicode lookup and legacy font loading stay core. */
+/* Paired ROM glyph reader. Unicode lookup and legacy NOSYS slot stay core. */
 #ifndef KCG_MODULE_H
 #define KCG_MODULE_H
 #include "module_runtime.h"
@@ -17,7 +17,6 @@ typedef struct {
 
 int kcg_module_load(void);
 int kcg_module_abort(void);
-int kcg_module_attempted(void);
 int kcg_module_ready(void);
 void kcg_rom_read_ank(u8 ch, u8 *buf);
 void kcg_rom_read_kanji(u16 jis, u8 *buf);

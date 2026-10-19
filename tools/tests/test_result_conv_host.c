@@ -853,7 +853,7 @@ static void t_programs(void)
     fake_api_init(60);
     run_prog(klibc_test_main, "klibc_test", 'P', "ホストの libc");
 
-    /* --- font_load_test: PASS / FAIL / SKIP の 3 通り -------------------- */
+    /* --- font_load_test: file の有無を問わず NOSYS -------------------- */
     fake_api_init(60);
     fk_stat_ok = 1; fk_font_rc = OS32_ERR_NOSYS;
     run_prog(font_load_test_main, "font_load_test", 'P', "boot後NOSYS");
@@ -862,8 +862,8 @@ static void t_programs(void)
     fk_stat_ok = 1; fk_font_rc = -3;
     run_prog(font_load_test_main, "font_load_test", 'F',
              "読み込み失敗 (負値を終了コードにしない)");
-    fk_stat_ok = 0;
-    run_prog(font_load_test_main, "font_load_test", 'S', "フォントが無い");
+    fk_stat_ok = 0; fk_font_rc = OS32_ERR_NOSYS;
+    run_prog(font_load_test_main, "font_load_test", 'P', "旧font無しでもNOSYS");
 }
 
 /* ------------------------------------------------------------------------ */

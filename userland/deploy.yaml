@@ -452,18 +452,6 @@ filesystem:
       guest: /test/hello.sh
       tags: [test]
 
-    # --- ビットマップフォント (KCG キャッシュ形式) ---
-    # カーネルが起動時に /sys/font/default.kcgfont を読む
-    # (kernel.c の kcg_load_font)。tools/gen_font16.py で生成する。
-    # **data (NORMAL)。MINIMAL と起動 FD には入れない** (ユーザー決定 2026-09-25)。
-    # 無くても起動は止まらない — 画面に `FONT..NG` と `[KCG] kernel-init load
-    # failed: -1` が出て、漢字・ANK は本体のフォント ROM から読む (drivers/kcg.c。
-    # テキスト画面の文字は元から ROM)。184KB あり、入れていたころは 2HD の FD が
-    # カーネルの 4KB 増で溢れた (docs/08_build.md の「起動 FD と MINIMAL」)。
-    # FD (FAT) に置くなら 8.3 の /sys/font/default.kcg (kernel/boot_font.c)。
-    - host: assets/fonts/ipaexg16.kcgfont
-      guest: /sys/font/default.kcgfont
-      tags: [data]
     # --- TrueType フォントは配らない (ユーザー決定 2026-09-30) ---
     # 日本語 OpenType は配布物に同梱せず、使う人が assets/fonts/ipaexg.ttf を
     # hsync などで /data/ipaexg.ttf に置く (font_test が読む)。サブセット TTF は廃止。

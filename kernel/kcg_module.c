@@ -26,7 +26,6 @@ static const KcgModuleApi *public_api(void)
 void kcg_rom_read_ank(u8 ch, u8 *buf) { public_api()->read_ank(ch, buf); }
 void kcg_rom_read_kanji(u16 jis, u8 *buf) { public_api()->read_kanji(jis, buf); }
 void kcg_cache_stats(KcgCacheStats *out) { public_api()->stats(out); }
-int kcg_module_attempted(void) { return kcg_handle.generation != 0; }
 int kcg_module_ready(void) { return module_exports(kcg_handle) != 0; }
 
 static int kcg_start(struct module_record *r, u32 entry, u32 *exports)
@@ -52,7 +51,7 @@ static int kcg_detach(struct module_record *r)
 }
 int kcg_module_load(void)
 {
-    if (kcg_font_loaded() || kcg_handle.generation) return MODULE_BUSY;
+    if (kcg_handle.generation) return MODULE_BUSY;
     const struct bootinfo *bi = bootinfo_get();
     const struct module_request request = {
         .path = SYS_KCG_MOD, .name = "kcg",

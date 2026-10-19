@@ -509,6 +509,13 @@ class Gui:
         payload to record.base. The resident fep_module.c facade holds function
         pointers only, so g_ime must come from build/out/fep/fep.elf.
         """
+        base = self._module_base('MODULE_ID_FEP')
+        if base is None:
+            return 0
+        fep = self.symbol_factory(self.fep_elf).read()
+        return self.word(base + fep['g_ime'][0])
+
+    def _module_base(self, module_name):
         kernel = self.symbol_factory(self.kernel_elf).read()
         header = ROOT / 'kernel/module_runtime.h'
         constants = c_constants(header)
@@ -518,16 +525,14 @@ class Gui:
         address, size = kernel['module_records']
         if not size or size % count or size // count < offsets['base'] + 4:
             raise ValueError('invalid module_records stride')
-        module_id = schema('MODULE_ID_FEP')
+        module_id = schema(module_name)
         for slot in range(count):
             prefix = self.mem(address + slot * (size // count), offsets['base'] + 4)
             values = {name: struct.unpack_from('<I', prefix, offsets[name])[0]
                       for name in ('state', 'module_id', 'base')}
             if values['module_id'] == module_id and values['state'] == constants('MODULE_RUNNING'):
-                fep = self.symbol_factory(self.fep_elf).read()
-                # IME_State starts with int mode (kernel/ime.h); OFF is zero.
-                return self.word(values['base'] + fep['g_ime'][0])
-        return 0
+                return values['base']
+        return None
 
     def ime_active(self):
         return self.ime_mode() != 0
@@ -723,9 +728,18 @@ class Gui:
         image = Image.open(io.BytesIO(body))
         if path:
             image.convert('RGB').save(path, format='PNG')
-        address = c_constants(ROOT / 'include/memmap.h')('MEM_FONT_CACHE_BASE') + 282752 + 8836
-        cache = self.mem(address, 256 * 16)
-        fetched = self.mem(address + 256 * 16, 256)
+        base = self._module_base('MODULE_ID_KCG')
+        if base is None:
+            raise ValueError('KCG module unavailable')
+        elf = Path(self.kernel_elf).parent / 'kcg/kcg.elf'
+        address, size = self.symbol_factory(elf).read()['cache']
+        entry = struct.Struct('<H32s')  # KcgCacheEntry: u16 tag, u8 glyph[32]
+        cache, fetched = bytearray(256 * 16), bytearray(256)
+        for tag, glyph in entry.iter_unpack(self.mem(base + address, size)):
+            if tag & 0xff00 == 0x8000:
+                code = tag & 255
+                cache[code * 16:(code + 1) * 16] = glyph[:16]
+                fetched[code] = 1
         result = read_ascii(image, cache, region, fetched=fetched)
         result.update(source=headers.get('X-Screen-Source', '?'), size=list(image.size))
         if path:
