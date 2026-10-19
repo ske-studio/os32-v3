@@ -5,6 +5,13 @@ use os32_font::{
     raster::{units_to_26_6, PixelSize, Placement, RasterScratch},
     reader::{Error, Face, Result, Source},
 };
+
+/// T7b-a7: a Face is opened in place in caller-owned storage (here a Box).
+fn open_face<S: Source>(source: S) -> Result<Box<Face<S>>> {
+    let mut face = Box::new(Face::new());
+    face.open(source)?;
+    Ok(face)
+}
 use std::{
     cell::Cell,
     collections::BTreeMap,
@@ -166,7 +173,7 @@ fn good() -> Vec<u8> {
 }
 
 fn render(bytes: &[u8], gid: u16, size: PixelSize, dst: &mut [u8]) -> Result<Placement> {
-    let mut face = Face::open(Memory {
+    let mut face = open_face(Memory {
         data: bytes.to_vec(),
         reads: Rc::new(Reads::default()),
     })?;
@@ -176,7 +183,7 @@ const SENTINEL: u8 = 0xa5;
 
 /// Every Err leaves dst untouched and exposes no coverage (incl. after a success).
 fn expect_no_commit(bytes: &[u8], gid: u16, size: PixelSize, dst_len: usize, expected: Error) {
-    let mut face = Face::open(Memory {
+    let mut face = open_face(Memory {
         data: bytes.to_vec(),
         reads: Rc::new(Reads::default()),
     })
@@ -235,7 +242,7 @@ fn diagonal_coverage_is_exact_area() {
     // Triangle (0,0) (0,1px) (8px,0): one row, the hypotenuse crosses 8 columns.
     // Exact area of column c is 1 - (c + 0.5) / 8.
     let bytes = fixture(1024, vec![good(), glyph(&[vec![(0, 0, true), (0, 64, true), (512, 0, true)]])]);
-    let mut face = Face::open(Memory {
+    let mut face = open_face(Memory {
         data: bytes,
         reads: Rc::new(Reads::default()),
     })
@@ -335,7 +342,7 @@ fn flattened_edge_limit() {
             // Mid-raster failure after accumulation started: still no commit.
             expect_no_commit(&bytes, 1, PixelSize::Px16, MAX_BITMAP_BYTES, Error::Limit);
         } else {
-            let mut face = Face::open(Memory {
+            let mut face = open_face(Memory {
                 data: bytes,
                 reads: Rc::new(Reads::default()),
             })
@@ -406,7 +413,7 @@ fn every_read_failure_has_zero_commit() {
     last.resize(1024, 0);
     let bytes = fixture(1024, vec![good(), root, child, last]);
     let reads = Rc::new(Reads::default());
-    let mut face = Face::open(Memory {
+    let mut face = open_face(Memory {
         data: bytes.clone(),
         reads: reads.clone(),
     })
@@ -501,7 +508,7 @@ fn real_corpus_dump() {
     for (name, path, corpus, coverage) in fonts {
         let file = File::open(&path).unwrap();
         let size = file.metadata().unwrap().len();
-        let mut face = Face::open(Disk(file, size)).unwrap();
+        let mut face = open_face(Disk(file, size)).unwrap();
         let m = face.metrics();
         let asc = units_to_26_6(m.ascender.into(), m.units_per_em, PixelSize::Px16).unwrap();
         let desc = units_to_26_6(m.descender.into(), m.units_per_em, PixelSize::Px16).unwrap();

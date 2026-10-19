@@ -3,5 +3,6 @@ check-font-reader-host:
 - tools/fetch_fonts.py
 - assets/fonts/IPA_Font_License_Agreement_v1.0.txt
 - tools/tests/test_font_reader.py
+- tools/tests/test_font_outline.py
 - build/checks.d/check-font-reader-host.mk
 - tools/check_map.d/check-font-reader-host.yaml

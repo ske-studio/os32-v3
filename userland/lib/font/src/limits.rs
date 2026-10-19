@@ -27,6 +27,13 @@ pub const MAX_CMAP_GROUPS: usize = 16384;
 // Evidence: ~/os32-tmp/evidence/2026-10-20/t7ba6/RESULT.md.
 pub const READ_CACHE_SLOTS: usize = 16;
 pub const READ_CACHE_SLOT_BYTES: usize = 1024;
+// T7b-a7 resident cmap: the selected subtable's search arrays (format 4: 8 B per
+// segment + 2, format 12: 12 B per group) are copied at open when they fit here;
+// glyphIdArray stays on read_at. Measured: JF Dot Shinonome 16 format 4 with 4,119
+// segments = 32,954 B, Inconsolata 133 segments = 1,066 B (both resident).
+// IPAex 004.01 selects format 12 with 10,718 groups = 128,616 B (its format 4 would
+// be 39,970 B) and takes the read_at path. Every face reserves this many bytes.
+pub const MAX_CMAP_RESIDENT_BYTES: usize = 34 * 1024;
 // T7b-a5 raster: the outline is rasterised once at RASTER_PPEM (unhinted,
 // FreeType-compatible 26.6 point scaling, exact area coverage); 32px is that 1bpp bitmap doubled (nearest neighbour).
 pub const RASTER_PPEM: u16 = 16;

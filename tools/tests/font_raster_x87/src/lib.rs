@@ -33,6 +33,8 @@ impl Source for Memory {
 
 static mut SCRATCH: RasterScratch = RasterScratch::new();
 static mut BITS: [u8; MAX_BITMAP_BYTES] = [0; MAX_BITMAP_BYTES];
+// T7b-a7: the face is opened in place in static storage, as in the product.
+static mut FACE: Face<Memory> = Face::new();
 
 struct Out<'a> {
     buf: &'a mut [u8],
@@ -54,13 +56,14 @@ fn run(p: &mut Probe) -> Result<()> {
     let buf = unsafe { core::slice::from_raw_parts_mut(p.out, p.cap as usize) };
     let work = unsafe { &mut *core::ptr::addr_of_mut!(SCRATCH) };
     let bits = unsafe { &mut *core::ptr::addr_of_mut!(BITS) };
+    let face = unsafe { &mut *core::ptr::addr_of_mut!(FACE) };
     let mut out = Out { buf, at: 0 };
-    let mut face = Face::open(Memory(font))?;
+    face.open(Memory(font))?;
     for &cp in cps {
         let gid = face.glyph_index(cp)?.unwrap_or(0);
         out.put(&cp.to_le_bytes())?;
         out.put(&gid.to_le_bytes())?;
-        match work.render(&mut face, gid, PixelSize::Px16, bits) {
+        match work.render(face, gid, PixelSize::Px16, bits) {
             Ok(q) => {
                 out.put(&0i32.to_le_bytes())?;
                 for v in [q.width, q.height, q.pitch] {

@@ -1,4 +1,8 @@
-"""T7b-a3: real-font Rust differential tests and runtime reader mutations."""
+"""T7b-a3: real-font Rust differential tests and runtime reader mutations.
+
+T7b-a7: the face opens in place and keeps the cmap search arrays resident when
+they fit MAX_CMAP_RESIDENT_BYTES; both cmap paths are compared on every real
+font (Shinonome included) and on the residency boundary fixtures."""
 from pathlib import Path
 import argparse
 import json
@@ -27,6 +31,14 @@ MUTATIONS = [
      'if false && t.tag <= previous {', 'reversed_order'),
     ('idRangeOffset-minus-one', 'if range % 2 != 0 || first < 16 + count * 8',
      'if false && (range % 2 != 0 || first < 16 + count * 8)', 'id_range_offset_boundaries'),
+    # T7b-a7 resident cmap.
+    ('cmap-never-resident', 'if !allowed || len as usize > MAX_CMAP_RESIDENT_BYTES {',
+     'if true || len as usize > MAX_CMAP_RESIDENT_BYTES {', 'cmap_resident_limit_boundary'),
+    ('cmap-resident-limit', 'if !allowed || len as usize > MAX_CMAP_RESIDENT_BYTES {',
+     'if !allowed || len as usize > MAX_CMAP_RESIDENT_BYTES - 8 {', 'cmap_resident_limit_boundary'),
+    ('resident-past-arrays', '        if end > self.len {\n            return None;',
+     '        if end > self.len + 2 {\n            return None;', 'id_range_offset_boundaries'),
+    ('streaming-ignored', 'if !allowed || len as usize', 'if len as usize', 'open_in_place_reopen_and_close'),
 ]
 
 
@@ -62,8 +74,11 @@ def main():
     for family in ('ipaex', 'inconsolata'):
         subprocess.run(['python3', str(ROOT / 'tools/fetch_fonts.py'), '--family', family], check=True)
     product_grep()
+    # Imported here: test_font_outline imports this module (product_grep).
+    from test_font_outline import shinonome
     with tempfile.TemporaryDirectory(prefix='font-reader-') as directory:
         work = Path(directory)
+        os.environ['OS32_FONT_SHINONOME'] = str(shinonome(work))
         normal = build_and_run(CRATE, work, 'normal')
         print(normal.stdout, end='', flush=True)
         assert normal.returncode == 0, normal.stderr

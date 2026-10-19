@@ -67,3 +67,16 @@ advance/placement == FreeType rules on fontTools points for all four fonts;
 FreeType itself when freetype-py is importable (OS32_FREETYPE_PYTHONPATH);
 the i686-os32-none build run under kernel/font_guard.c (x87, CW 037F) vs
 host SSE by coverage tolerance; check_isa386 on the final ELFs.
+
+T7b-a7: a Face is never returned by value (about 51KB on i686: 16 x 1KiB read
+cache + MAX_CMAP_RESIDENT_BYTES). Face::new() is a closed, all-zero face for a
+static/arena slot (it lands in .bss); face.open(source) fills it in place,
+closing any face held there first. A failed open leaves it closed (lookups
+return Error::Closed) and drops the source; close() and reopen drop it too.
+At open the selected cmap's search arrays (format 4 endCode..idRangeOffset,
+format 12 groups) are copied when they fit MAX_CMAP_RESIDENT_BYTES, with
+requests of at most READ_CACHE_SLOT_BYTES that bypass the read cache; lookups
+then binary-search the copy and only glyphIdArray goes through read_at. A
+larger cmap (IPAex format 12) stays on the read_at path; open_streaming forces
+that path for tests. check-font-reader-host compares both paths on every real
+font (Shinonome included) over all 1,114,112 codepoints.
