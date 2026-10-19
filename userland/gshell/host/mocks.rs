@@ -1004,6 +1004,9 @@ pub static FB_ATTACHES: AtomicUsize = AtomicUsize::new(0);
 pub static SCREEN_READS: AtomicUsize = AtomicUsize::new(0);
 #[no_mangle]
 pub static mut gfx_ready: i32 = 1;
+// T7b-b2: CRT0 の __os32_aux (sdk/crt/crt0_c.c) の代わり。既定は app と同じ 0。
+#[no_mangle]
+pub static mut __os32_aux: *const core::ffi::c_void = core::ptr::null();
 #[no_mangle]
 pub unsafe extern "C" fn libos32gfx_init(api: *mut os32api::KernelAPI) {
     ((*api).gfx_init)();

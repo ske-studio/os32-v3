@@ -17,3 +17,60 @@ extern "C" {
     /// Unicode → ANK (半角) コード。0 なら全角 (`lib/utf8.c`)。
     pub fn unicode_to_ank(cp: u32) -> u8;
 }
+
+/* ================================================================ */
+/*  常駐 shell の内部入口 (T7b-b2、exec/shell_service.h)               */
+/*                                                                  */
+/*  kernel は entry frame の 4 語目で表の番地を渡し、CRT0 の          */
+/*  `_start_c` がそれを `__os32_aux` に控える (app には 0)。KAPI      */
+/*  ではない。印 / 版 / 大きさは exec/shell_service.h から build.rs  */
+/*  が写す ([C4])。font への接続 (呼ぶ側) は b3 — 呼ぶ関数は戻り値を  */
+/*  局所に受けて使ってから返す薄い `#[inline(never)]` 関数にする      */
+/*  (尾呼出しにすると kernel の段 A が戻り番地で断る、設計 §3-2)。    */
+/* ================================================================ */
+
+include!(concat!(env!("OUT_DIR"), "/shell_service.rs"));
+
+/// `exec/shell_service.h` の `ShellService` と同じ並び (i386 で 28 バイト)。
+#[repr(C)]
+pub struct ShellService {
+    pub magic: u32,
+    pub version: u32,
+    /// shell 登録世代 (0 = 未登録)。
+    pub generation: u32,
+    pub font_source_open:
+        Option<unsafe extern "C" fn(path: *const u8, out_id: *mut u32, out_size: *mut u32) -> i32>,
+    pub font_source_read_at:
+        Option<unsafe extern "C" fn(id: u32, offset: u32, dst: *mut u8, len: u32) -> i32>,
+    pub font_source_validate: Option<unsafe extern "C" fn(id: u32) -> i32>,
+    pub font_source_close: Option<unsafe extern "C" fn(id: u32) -> i32>,
+}
+
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(core::mem::size_of::<ShellService>() == SHELL_SERVICE_SIZE as usize);
+
+extern "C" {
+    /// CRT0 (`sdk/crt/crt0_c.c`) が控えた entry frame の 4 語目。
+    static __os32_aux: *const ShellService;
+}
+
+/// kernel から受け取った内部入口の表。番地が 0、または印・版が違えば `None`。
+#[allow(dead_code)] // 呼ぶ側は b3 (font の source 接続)
+pub fn shell_service() -> Option<&'static ShellService> {
+    let p = unsafe { core::ptr::read_volatile(core::ptr::addr_of!(__os32_aux)) };
+    if p.is_null() {
+        return None;
+    }
+    let (magic, version) = unsafe {
+        (core::ptr::read_volatile(core::ptr::addr_of!((*p).magic)),
+         core::ptr::read_volatile(core::ptr::addr_of!((*p).version)))
+    };
+    if magic != SHELL_SERVICE_MAGIC || version != SHELL_SERVICE_VERSION {
+        return None;
+    }
+    Some(unsafe { &*p })
+}
+
+#[cfg(test)]
+#[path = "../host/shell_service_tests.rs"]
+mod shell_service_tests;
