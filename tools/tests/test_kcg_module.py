@@ -14,6 +14,32 @@ from test_module_image import build_validator, validate, fnv, crc, word
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def display_diagnostic(folder, blank_line=False):
+    source = (ROOT / 'kdebug/kselftest.c').read_text()
+    start = source.index('static void test_kcg_display_return(void)\n{')
+    end = source.index('\nint kselftest_run_post_unicode(void)', start)
+    source = source[start:end]
+    if blank_line:
+        assert source.count('DIAG_LINE = 4') == 1
+        source = source.replace('DIAG_LINE = 4', 'DIAG_LINE = 0')
+    (folder / 'kcg_display_source.inc').write_text(source)
+    exe = folder / 'display'
+    result = subprocess.run(['gcc', *FLAGS, *INCLUDES, '-I'+str(folder),
+                             '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
+                             ROOT / 'tools/tests/kcg_display_host.c', '-o', exe],
+                            capture_output=True, text=True)
+    if result.returncode:
+        raise RuntimeError('compile failure is not runtime RED\n'+result.stdout+result.stderr)
+    for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
+        result = host32.run([str(exe)], runner=runner, capture_output=True, text=True)
+        assert result.returncode == int(blank_line), (result.stdout, result.stderr)
+        if blank_line:
+            assert 'FAIL diagnostic fixture values' in result.stdout
+            print('RED fixed diagnostic blank row (compiled, runtime assertion)', flush=True)
+        else:
+            print('PASS fixed diagnostic: ROM row has dots, VSYNC samples for CODE/dot/restored; all VSYNC combinations, KCG present/absent', flush=True)
+
+
 def graphics_boundary(mutation=None):
     from test_gfx_kernel_fb import run_case
     fixture = (ROOT / 'tools/tests/gfx_kernel_fb_host.c').read_text()
@@ -165,6 +191,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='kcg-module-') as td:
         folder = Path(td)
         product(folder)
+        display_diagnostic(folder)
         adapter = (ROOT / 'kernel/kcg_module.c').read_text()
         body = (ROOT / 'kernel/kcg_body.c').read_text()
 
@@ -198,6 +225,7 @@ def main():
         graphics_boundary()
         boot_notice(folder)
         if '--mutate' in sys.argv:
+            display_diagnostic(folder, blank_line=True)
             graphics_boundary(('if (!kcg_module_ready()) {', 'if (0) {'))
             graphics_boundary(('kapi_sys_exit(1);', 'appslot_abort_request();'))
             boot_notice(folder, remove_notice=True)
