@@ -7,7 +7,8 @@
 配備のたびに掃除する。
 
 対象は **システム側ディレクトリ (/, /bin, /sbin, /usr/bin, /sys, /debug) 直下の
-*.bin** だけ。/home /data /etc /tmp などのユーザデータには触れない。
+*.bin** と撤去済み旧 font の 2 パス。旧 font は build/out からも消す。
+/home /data /etc /tmp などのユーザデータには触れない。
 
 使い方:
     python3 tools/prune_stale.py [hostdrv|nhd|both] [--delete]
@@ -37,6 +38,7 @@ import deploy_protect as protect  # noqa: E402
 # 掃除してよいゲスト側ディレクトリ (末尾スラッシュ無し、'' = ルート直下)
 PRUNE_DIRS = ('', 'bin', 'sbin', 'usr/bin', 'sys', 'debug')
 EXT = '.bin'
+RETIRED_PATHS = ('/sys/font/default.kcgfont', '/sys/font/default.kcg')
 
 
 def wanted_guest_paths():
@@ -56,7 +58,7 @@ def wanted_guest_paths():
     return want
 
 
-def find_stale(root, want):
+def find_stale(root, want, retired_only=False):
     """root 配下の PRUNE_DIRS 直下にある *.bin でマニフェストに無いもの
 
     候補の判定は `os.lstat` で行う。`os.path.isdir` / `isfile` は EACCES / EIO を
@@ -66,7 +68,7 @@ def find_stale(root, want):
     symlink はツリー全体の前提検査 (check_tree) が既に拒否している。
     """
     stale = []
-    for d in PRUNE_DIRS:
+    for d in (() if retired_only else PRUNE_DIRS):
         dp = os.path.join(root, d) if d else root
         try:
             st = os.lstat(dp)
@@ -91,11 +93,21 @@ def find_stale(root, want):
             gp = '/' + (d + '/' if d else '') + f
             if gp not in want:
                 stale.append((gp, p))
+    for gp in RETIRED_PATHS:
+        p = os.path.join(root, gp.lstrip('/'))
+        try:
+            st = os.lstat(p)
+        except OSError as exc:
+            if exc.errno == errno.ENOENT:
+                continue
+            raise
+        if stat.S_ISREG(st.st_mode) and gp not in want:
+            stale.append((gp, p))
     return stale
 
 
 def show(label, stale):
-    print("[{}] マニフェストに無い {} : {} 件".format(label, EXT, len(stale)))
+    print("[{}] マニフェストに無いファイル : {} 件".format(label, len(stale)))
     for gp, p in stale:
         try:
             st = os.stat(p)
@@ -134,8 +146,9 @@ def is_protected(root, path):
     return False
 
 
-def prune_hostdrv(want, delete):
-    root = hostdrv_root()
+def prune_hostdrv(want, delete, root=None):
+    build_root = root is not None
+    root = root if build_root else hostdrv_root()
     if not os.path.isdir(root):
         print("Error: HOSTDRV_DIR {} が無い".format(root), file=sys.stderr)
         return None
@@ -146,7 +159,8 @@ def prune_hostdrv(want, delete):
         print("Error: 配備の前提検査に失敗: {}".format(exc), file=sys.stderr)
         return None
     try:
-        stale = find_stale(root, want)
+        stale = (find_stale(root, want, retired_only=True) if build_root
+                 else find_stale(root, want))
     except OSError as exc:
         print("Error: 候補を集められない: {}".format(exc), file=sys.stderr)
         return None
@@ -229,6 +243,7 @@ def main():
         print("RESULT: FAIL 配備マニフェストが読めない")
         return 1
     counts = {}
+    counts['build/out'] = prune_hostdrv(want, delete, os.path.join(PROJ_DIR, 'build/out'))
     if target in ('hostdrv', 'both'):
         counts['hostdrv'] = prune_hostdrv(want, delete)
     if target in ('nhd', 'both'):

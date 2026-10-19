@@ -49,7 +49,7 @@ deploy-nhd: $(BUILD_OUT)/vmkernel.lz4 $(KERNEL_PAIRED_MODULES) programs unicode_
 #   配備は書くだけで消さないので、KAPI 変更後の stale バイナリ (別関数へ飛んで
 #   rshell ごと沈黙する) が溜まる。deploy / deploy-nhd / deploy-kernel は既定で
 #   削除まで行う (NO_PRUNE=1 で一覧だけ)。対象はシステム側ディレクトリ直下の
-#   *.bin のみで、/home /data /etc には触れない。
+#   *.bin と撤去済み旧 font の 2 パス (build/out も掃除)。/home /data /etc には触れない。
 #   例: make prune-stale            一覧だけ (dry-run)
 #       make prune-stale-delete     削除 (NHD 側は次の deploy で Windows へ反映)
 PRUNE_STALE = python3 tools/prune_stale.py

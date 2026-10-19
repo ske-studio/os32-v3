@@ -626,6 +626,35 @@ class Prune(Base):
         # NHD の取り込み・マウントは試験の対象外 (FakeRun が実操作を遮断する)
         self._patch(nd, 'ensure_local_nhd', lambda: True)
 
+    def _deploy_retired_fonts(self):
+        paths = ('sys/font/default.kcgfont', 'sys/font/default.kcg')
+        for root in (self.hostdrv, self.mount, self.build / 'build/out'):
+            for rel in paths:
+                path = root / rel
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b'OLD FONT')
+        keep = self.build / 'build/out/current.bin'
+        keep.write_bytes(b'KEEP')
+        self.manifest([])
+        self._patch(ps, 'PROJ_DIR', str(self.build))
+        self._patch(ps, 'wanted_guest_paths', lambda: set())
+        self._patch(sys, 'argv', ['prune_stale.py', 'both', '--delete'])
+        # deploy-kernel: recursive copy followed by the existing prune CLI.
+        self.assertTrue(nd.do_sync_from_hostdrv())
+        self.assertEqual(ps.main(), 0)
+        for root in (self.hostdrv, self.mount, self.build / 'build/out'):
+            for rel in paths:
+                self.assertFalse((root / rel).exists(), str(root / rel))
+        self.assertEqual(keep.read_bytes(), b'KEEP')
+
+    def test_deploy_removes_retired_fonts(self):
+        self._deploy_retired_fonts()
+        if os.environ.get('MUTATE') == '1':
+            self._patch(ps, 'RETIRED_PATHS', ())
+            with self.assertRaises(AssertionError):
+                self._deploy_retired_fonts()
+            print('RED retired font prune removed (deployment assertion)')
+
     def _stale(self, root, names):
         entries = []
         for guest, rel in names:
