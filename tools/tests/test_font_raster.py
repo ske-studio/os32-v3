@@ -63,7 +63,7 @@ MUTATIONS = [
      'let padded = end;', 'odd_length_components_keep_even_short_loca'),
     ('i16-overflow', 'raster.rs', 'left: base.left.checked_mul(factor as i16).ok_or(Error::Bounds)?,',
      'left: base.left.wrapping_mul(factor as i16),', 'coordinate_overflow'),
-    ('flatten-coarse', 'raster.rs', '< 4.0 * d2', '< 0.25 * d2', 'flattened_edge_limit'),
+    ('flatten-coarse', 'raster.rs', '< QUAD_FLATNESS_SQ * d2', '< 0.25 * d2', 'flattened_edge_limit'),
     ('cbox-on-curve-only', 'raster.rs', '        if let Some(c) = e.control {\n            visit(c)?;\n        }\n', '',
      'control_box_includes_off_curve_points'),
     ('span-split', 'raster.rs', 'if floor(xa) == floor(xb) || ceil(xa) == ceil(xb) {', 'if true {',

@@ -22,7 +22,7 @@ impl PixelSize {
     pub const fn factor(self) -> usize {
         match self {
             PixelSize::Px16 => 1,
-            PixelSize::Px32 => 2,
+            PixelSize::Px32 => MAX_PIXEL_FACTOR,
         }
     }
 }
@@ -208,12 +208,12 @@ impl Canvas<'_> {
     }
 
     fn quad(&mut self, a: Point, c: Point, b: Point) -> Result<()> {
-        // a1 edge model: n = ceil(sqrt(2 |a - 2c + b|)) segments (<= 1/8 px).
+        // a1 edge model: n^4 >= QUAD_FLATNESS_SQ * d2 (<= 1/8 px).
         let dx = a.x - 2.0 * c.x + b.x;
         let dy = a.y - 2.0 * c.y + b.y;
         let d2 = dx * dx + dy * dy;
         let mut n = 1usize;
-        while ((n * n) as f32) * ((n * n) as f32) < 4.0 * d2 {
+        while ((n * n) as f32) * ((n * n) as f32) < QUAD_FLATNESS_SQ * d2 {
             n += 1;
             if n > MAX_EDGES {
                 return Err(Error::Limit);

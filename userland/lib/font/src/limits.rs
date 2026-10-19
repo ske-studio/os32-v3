@@ -34,3 +34,5 @@ pub const COVERAGE_THRESHOLD: f32 = 128.0 / 255.0;
 // Outline coordinates (font units) beyond this (or NaN) are rejected before
 // integer casts; 26.6 products then fit i64/i32.
 pub const MAX_COORD_UNITS: f32 = 1_048_576.0;
+// a1 quadratic flattening: n segments with n^4 >= this * |a - 2c + b|^2 (error <= 1/8 px).
+pub const QUAD_FLATNESS_SQ: f32 = 4.0;
