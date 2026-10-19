@@ -864,7 +864,8 @@ static void test_ledger(void)
 /*  ⑥ (gfx_boot_reserve) の後・⑦ (probe) の前に走るので、選択中の backend  */
 /*  はまだ決まっていない — 候補ごとに見る。                                  */
 /*  (1) 3 地点のうち boot / gfx の ledger_selfcheck が落ちていない。         */
-/*  (2) planar の固定 SURFACE (0x6A000、FIXED_RAM、owner = boot) が常にある。 */
+/*  (2) planar は pool 内の連続 32 頁、RAM、owner = boot (移譲後 gshell)。 */
+/*      ledger_surface_validate で全頁の所有と面の整合も確かめる。          */
 /*  (3) sys_usable_mem_end() <= ledger_arena_top() (§3-6)。                 */
 /*  (4) PEGC 候補なら BB は池の RAM で owner = boot、アリーナの上端より上、   */
 /*      PEGC の窓が gfx の DEVICE 区間に入っている。                        */
@@ -892,8 +893,11 @@ static void __attribute__((cold)) test_gfx_ledger(void)
     c = ledger_surface_find(LEDGER_SF_CIRRUS, LEDGER_ROLE_CLIENT);
     d = ledger_surface_find(LEDGER_SF_CIRRUS, LEDGER_ROLE_DISPLAY);
     check(ledger_check_fail == 0, "gfx:selfcheck boot+gfx");
-    check(p && p->first * PAGE_SIZE == MEM_GFX_BB_BASE &&
-          p->backing == LEDGER_SB_FIXED_RAM && p->owner == LEDGER_OWNER_BOOT,
+    check(p && p->first >= MEM_POOL_BASE / PAGE_SIZE &&
+          p->npages == MEM_GFX_BB_SIZE / PAGE_SIZE &&
+          p->backing == LEDGER_SB_RAM &&
+          (p->owner == LEDGER_OWNER_BOOT || p->owner == LEDGER_OWNER_GSHELL) &&
+          ledger_surface_validate(p),
           "gfx:planar surface");
     {
         /* probe より前の値 (kernel.c の post-exec)。probe が FFF00000h に付け替えた後は

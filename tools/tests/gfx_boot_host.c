@@ -82,6 +82,21 @@ static void report(const char *s, u32 n)
 #include "pegc.h"
 #include "wab_xe10.h"
 
+static void check(int ok, const char *label)
+{
+    if (!ok) {
+        SAY("FAIL planar boot selftest");
+        (void)label;
+        die(1);
+    }
+}
+
+static void check_planar_selftest(void)
+{
+    const struct ledger_surface *p = ledger_surface_find(LEDGER_SF_PC98, LEDGER_ROLE_CLIENT);
+#include "gfx_planar_selftest.inc"
+}
+
 /* ---- 構成 (-D) ---- */
 #ifndef CFG_KB
 #define CFG_KB 17408
@@ -447,6 +462,7 @@ void _start(void)
     CHECK(sp && sp->first >= MEM_POOL_BASE / PAGE_SIZE &&
           sp->npages == MEM_GFX_BB_SIZE / PAGE_SIZE &&
           sp->backing == LEDGER_SB_RAM && sp->owner == LEDGER_OWNER_BOOT);
+    check_planar_selftest();
     {
         const u32 planes[4] = {VRAM_PLANE_B, VRAM_PLANE_R, VRAM_PLANE_G, VRAM_PLANE_I};
         u32 count = 0;
@@ -535,6 +551,7 @@ void _start(void)
     CHECK(host_serial_count("[gfx] client ") == 1);
     CHECK(host_serial_find(" lease=0 revoke=0 transfer=0 regen=0 fail+=0 "));
     CHECK(cl->owner == LEDGER_OWNER_GSHELL);
+    check_planar_selftest();
     for (i = 0; i < LEDGER_MAX_SURFACES; i++)
         if (&ledger_surfaces[i] != cl) CHECK(ledger_surfaces[i].owner == snap[i].owner);
     if (sel == LEDGER_SF_PEGC) {

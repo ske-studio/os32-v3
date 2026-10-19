@@ -40,7 +40,8 @@ import tempfile
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SOURCES = ('gfx/gfx_core.c', 'kernel/paging.c', 'kernel/pgalloc.c', 'kernel/sys.c')
+SOURCES = ('gfx/gfx_core.c', 'kernel/paging.c', 'kernel/pgalloc.c', 'kernel/sys.c',
+           'kdebug/kselftest.c')
 HOST = ROOT / 'tools/tests/gfx_boot_host.c'
 
 SLICE_BEGIN = '#define GFX_CAND_PEGC'
@@ -112,6 +113,11 @@ def build(texts, tmp):
             'irq_restore(flags)', 'host_irq_restore(flags)')
         (tmp / f'{unit}_host_source.c').write_text(source)
     (tmp / 'gfx_boot_slice.inc').write_text(slice_gfx(texts['gfx/gfx_core.c']))
+    # Execute the real planar boot assertion before and after owner transfer.
+    selftest = texts['kdebug/kselftest.c'].split('static void __attribute__((cold)) test_gfx_ledger(void)', 1)[1]
+    start = selftest.index('    check(p &&')
+    end = selftest.index('"gfx:planar surface");', start) + len('"gfx:planar surface");')
+    (tmp / 'gfx_planar_selftest.inc').write_text(selftest[start:end])
     cmd = ['gcc', *linker_flags(), '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
            '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static',
            '-no-pie', '-ffunction-sections', '-Wl,--gc-sections', '-DPHYSMEM_HOST_TEST=1',
@@ -216,6 +222,15 @@ def _swap_reserve_and_map():
 RESERVE_THEN_MAP, MAP_THEN_RESERVE = _swap_reserve_and_map()
 
 MUTATIONS = [
+    ('selftest-old-planar-address', 'kdebug/kselftest.c',
+     'p->first >= MEM_POOL_BASE / PAGE_SIZE',
+     'p->first * PAGE_SIZE == MEM_GFX_BB_BASE'),
+    ('selftest-fixed-planar-ram', 'kdebug/kselftest.c',
+     'p->backing == LEDGER_SB_RAM &&',
+     'p->backing == LEDGER_SB_FIXED_RAM &&'),
+    ('selftest-boot-owner-only', 'kdebug/kselftest.c',
+     '(p->owner == LEDGER_OWNER_BOOT || p->owner == LEDGER_OWNER_GSHELL)',
+     '(p->owner == LEDGER_OWNER_BOOT)'),
     ('planar-pool-fails', 'gfx/gfx_core.c',
      'if (!pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, (int)sf.npages,',
      'if (1 || !pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, (int)sf.npages,'),
