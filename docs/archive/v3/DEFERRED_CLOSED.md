@@ -579,3 +579,13 @@ X-2 の前半 (e8a の RO 日本語) は `accept_e11/RESULT.md` の GUI 日本�
 | ID | 何を残したか | 理由 | 次の関門 |
 |---|---|---|---|
 | EXECNEST-1 | CPL3 のアプリが KAPI exec_run で子を繰り返し起動すると、子が終わるたびに親のカーネルの入口 (TSS esp0) が戻らず約 1,756 B ずつ深くなり、14 回目に 40KiB の shell stack を溢れさせて triple fault (#DF、cr2=004f5fd0 = shell stack の guard)。子の終わり方 (正常・fault・STOP) によらない。T3c2 の fixture で初めて踏んだ (NP21/W 64MB、`~/os32-tmp/evidence/2026-10-17/t3c2_np21w/RESULT.md`) | カーネル層の不具合 (POLICY_DEV §1、ほかの段より先に直す)。filer など子を繰り返し起動するアプリも同じ形を踏む見込み [推] | 原因の調査と直し → T3c2 の受入をやり直す |
+
+## T5完了後の台帳照合 (2026-10-19)
+
+| ID | 何を閉じたか | 閉じた日 | 根拠 |
+|---|---|---|---|
+| T4C1-CORE | engine stack 32KiB + NP 1頁の既存受入照合 (core増分+4,072 Bの実測は保持) | 2026-10-19 | `~/os32-tmp/evidence/2026-10-18/t5-0b_np21w/RESULT.md` — §2: 32KiBで全負荷high-water 4,668 B、残28,100 B。深さ100はhost実測24,388 Bとユーザー決定のまま |
+| T4C1-FD | T5部品追加後の両FD残量と容量対策の要否 | 2026-10-19 | `~/os32-tmp/evidence/2026-10-19/t5c456_np21w/RESULT.md` — §FD の空き: 2HD 84,992 B・1.44MB 304,128 B、lan/cirrus込み、下限64KBを満たす。T6b-Mは不要。集積拡張T6b-1/2は凍結、圧縮像が508KiBの8割の406.4KiB (≈416kB) に近づいたら起票 |
+| T4B7-GUI | GUI端末のdb done/stop・区間中log stop | 2026-10-19 | `~/os32-tmp/evidence/2026-10-18/t5a3_np21w/RESULT.md` — ①GUI端末db done/stopと区間中log stop (B像) 合格。節目でもdb done/stop合格、log試験像は省略 (`~/os32-tmp/evidence/2026-10-19/t5_milestone_np21w/RESULT.md`) |
+| IMEDUP-1 | 学習後の同一候補の重複なし | 2026-10-19 | `~/os32-tmp/evidence/2026-10-18/t5-0a_np21w/RESULT.md` — ④CUI/GUIで変換→学習→再変換、重複0・学習語が先頭。節目でも合格 (`~/os32-tmp/evidence/2026-10-19/t5_milestone_np21w/RESULT.md`) |
+| E11-A2b | raw KAPI待機利用者のゲスト確認 | 2026-10-19 | `~/os32-tmp/evidence/2026-10-18/t4c_fix3_np21w/RESULT.md` §4・§6 (CUI 8口done/stop、GUI 6口done/stop、区間中log stopの試験像) と `~/os32-tmp/evidence/2026-10-18/t5a3_np21w/RESULT.md` の①db・①区間中log stop (GUI端末db done/stop・区間中log stop) で残る利用者を照合 |

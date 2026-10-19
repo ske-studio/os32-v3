@@ -82,7 +82,8 @@
 | `mouse*.c` | バスマウス + NP21/W シームレスマウス (座標は移動範囲へ比例配分、480 ライン可) | [05 §5-7](05_drivers.md) |
 | `wab_glue.h` `wab_glue_xe10.c` `wab_cirrus.c` | ウィンドウアクセラレータ: ボードグルー契約 / Xe10 内蔵 (ID 5Bh、0FAAh/0FABh) / CL-GD5430 チップ (BLT は I/O 経由、8bpp、DAC)。定数は `include/wab_xe10.h` | [tasks/gui/DESIGN.md §6〜§8](tasks/gui/DESIGN.md)、[archive/gui_v11/TASK_H3](archive/gui_v11/TASK_H3_cirrus.md) |
 | `fm.c` | OPN/OPM | [05 §5-3](05_drivers.md) |
-| `kcg.c` | 漢字 ROM / ビットマップフォント | [05 §5-9](05_drivers.md) |
+| `kcg.c` | 旧 `.kcgfont` の読込 / KCG facadeへの橋 | [05 §5-9](05_drivers.md) |
+| `kernel/kcg_body.c` `kernel/kcg_module.c` | KCG ROM/cache部品 / typed facade | [05 §5-9](05_drivers.md) |
 | `np2sysp.c` | NP21/W ハイパーコール | [05 §5-10](05_drivers.md) |
 | `lgy98.c` `ne2000.c` `ne2000_ring.c` `ne2000_io.asm` `ne2000_regs.h` | LGY-98 (NE2000 互換 C バス LAN)。カード固有 / 8390 本体 / リング計算 (ホスト試験可) / 16bit PIO / レジスタ定数の正典。既定は有効 (カード未装着時は起動継続)。無効化は `make kernel-nolgy98` (`build/config.mk`) | [tasks/network/PLAN.md](tasks/network/PLAN.md) |
 | `pci.c` `pci_decode.c` `pci_bind.c` `pci_bind_match.c` | PCI の列挙 (メカニズム #1)・構成空間のデコード・結線表 (ドライバとの結び付け)、`lspci -v` — v2.1 | [tasks/realhw/TASK_LAN_82557](tasks/realhw/TASK_LAN_82557.md) (L-A)、[tasks/v3/TASK_HAL_WIRING](tasks/v3/TASK_HAL_WIRING.md) §1-4 |
