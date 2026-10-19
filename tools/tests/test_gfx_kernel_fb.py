@@ -18,6 +18,10 @@ TARGET_SRCS = ['gfx/gfx_core.c', 'gfx/backend_pc98.c', 'gfx/backend_pegc.c',
                'exec/redir_access.c', 'kernel/shlib.c', 'kernel/paging.c',
                'kernel/pgalloc.c', 'kernel/sys.c', 'kernel/physmem.c']
 MUTANTS = [
+ ('last-plane-old', 'bb_i = bb[3];',
+  'bb_i = P2V(MEM_GFX_BB_BASE + 3 * GFX_PLANE_SZ);',
+  'FAIL bb_r-bb_b == GFX_PLANE_SZ && bb_g-bb_b == 2*GFX_PLANE_SZ && bb_i-bb_b == 3*GFX_PLANE_SZ'),
+
  ('bridge-init-abort', 'if (bad_output && (valid ? caller.origin == CALLER_USER : user)',
   'if ((valid ? caller.origin == CALLER_USER : user)',
   'FAIL !slot.abort_req && gfx_bridge_fail_count == failures+1'),
@@ -53,7 +57,7 @@ MUTANTS = [
   '(void)gfx_kernel_framebuffer(&kernel);',
   'FAIL public_fb.width == si.width && public_fb.height == si.height && public_fb.pitch == client->pitch'),
  ('fallback-bind', '            gfx_bind_client(); /* bind init failure fallback */', '',
-  'FAIL bb[0] == (u8 *)P2V(MEM_GFX_BB_BASE) && bb[1] == bb[0]+GFX_PLANE_SZ'),
+  'FAIL bb[0] == (u8 *)P2V(planar->first * PAGE_SIZE) && bb[1] == bb[0]+GFX_PLANE_SZ'),
  ('packed-bind', '        gfx_bind_client(); /* bind packed init */', '',
   'FAIL bb[i] == want'),
 ]

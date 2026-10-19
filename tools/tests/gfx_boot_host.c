@@ -112,6 +112,13 @@ static void report(const char *s, u32 n)
 #define FAIL_BB 0
 #endif
 
+#ifndef FAIL_PLANAR_SURFACE
+#define FAIL_PLANAR_SURFACE 0
+#endif
+#ifndef FAIL_PLANAR_ALLOC
+#define FAIL_PLANAR_ALLOC 0
+#endif
+
 /* ---- カーネルの残りの依存 ---- */
 void *kmemset(void *dst, int val, u32 n)
 {
@@ -188,6 +195,7 @@ int host_alloc(u32 owner, int n, u32 first, u32 end, u32 dir, u32 *pfn)
 {
     int ok;
     note('B');
+    if (FAIL_PLANAR_ALLOC && n == MEM_GFX_BB_SIZE/PAGE_SIZE) return 0;
     ok = pgalloc_alloc_n_owner(owner, n, first, end, dir, pfn);
     /* Check the actual allocation before the real reserve code clears it.
      * A high-RAM mutant must fail an assertion, not fault on unmapped host RAM. */
@@ -198,6 +206,8 @@ int host_alloc(u32 owner, int n, u32 first, u32 end, u32 dir, u32 *pfn)
 int host_surface(const struct ledger_surface *sf, u32 *sid)
 {
     note('S');
+    if (FAIL_PLANAR_SURFACE && sf->backend == LEDGER_SF_PC98 &&
+        sf->role == LEDGER_ROLE_CLIENT) return 0;
     return ledger_surface_create(sf, sid);
 }
 void host_freeze(void)
@@ -338,7 +348,8 @@ void _start(void)
     if (map_pegc && !FAIL_ALT_RESOURCE) want[nw++] = 'M';
     if (map_alt) want[nw++] = 'S'; /* PEGC DISPLAY precedes BB allocation */
     if (map_alt) want[nw++] = 'B';
-    want[nw++] = 'S';
+    want[nw++] = 'B'; /* planar pool */
+    if (!FAIL_BB && !FAIL_PLANAR_ALLOC) want[nw++] = 'S';
     if (bb) want[nw++] = 'S';
     if (cirrus_ok) { want[nw++] = 'S'; want[nw++] = 'S'; }
     for (i = 0; i < 4; i++) want[nw++] = 'S';
@@ -421,9 +432,21 @@ void _start(void)
     se = ledger_surface_find(LEDGER_SF_PEGC, LEDGER_ROLE_CLIENT);
     sc = ledger_surface_find(LEDGER_SF_CIRRUS, LEDGER_ROLE_CLIENT);
     sd = ledger_surface_find(LEDGER_SF_CIRRUS, LEDGER_ROLE_DISPLAY);
-    CHECK(sp && sp->first == MEM_GFX_BB_BASE / PAGE_SIZE &&
+    if (FAIL_BB || FAIL_PLANAR_ALLOC || FAIL_PLANAR_SURFACE) {
+        CHECK(!sp);
+        CHECK(ledger_owner_pages(LEDGER_OWNER_BOOT) == (bb ? 75U : 0U));
+        CHECK(ledger_owner_pages(LEDGER_OWNER_GSHELL) == 0);
+        u32 expected_top = MEM_DMA_POOL_BASE / PAGE_SIZE;
+        if (se && se->first < expected_top) expected_top = se->first;
+        CHECK(ledger_arena_top() == expected_top); /* AS filler must not freeze it. */
+        CHECK(sys_usable_mem_end() == expected_top * PAGE_SIZE);
+        CHECK(ledger_selfcheck("planar-failure"));
+        SAY("gfx_boot: failure rollback PASS");
+        die(0);
+    }
+    CHECK(sp && sp->first >= MEM_POOL_BASE / PAGE_SIZE &&
           sp->npages == MEM_GFX_BB_SIZE / PAGE_SIZE &&
-          sp->backing == LEDGER_SB_FIXED_RAM && sp->owner == LEDGER_OWNER_BOOT);
+          sp->backing == LEDGER_SB_RAM && sp->owner == LEDGER_OWNER_BOOT);
     {
         const u32 planes[4] = {VRAM_PLANE_B, VRAM_PLANE_R, VRAM_PLANE_G, VRAM_PLANE_I};
         u32 count = 0;
@@ -455,7 +478,9 @@ void _start(void)
             ledger_surface_validate(display));
     }
     CHECK(!se == !bb);
-    CHECK(ledger_owner_pages(LEDGER_OWNER_BOOT) == (bb ? 75U : 0U));
+    CHECK(ledger_owner_pages(LEDGER_OWNER_BOOT) == 32U + (bb ? 75U : 0U));
+    for (i = 0; i < sp->npages; i++) CHECK(owner_map[sp->first+i] == LEDGER_OWNER_BOOT);
+    for (i = 0; i < MEM_GFX_BB_SIZE; i++) CHECK(((u8 *)P2V(sp->first*PAGE_SIZE))[i] == 0);
     if (bb) {
         bb_first = se->first;
         /* アリーナ内の上端 (旧 sys_reserve_top と同じ区間、X14) */
@@ -468,15 +493,12 @@ void _start(void)
         for (i = 0; i < 75; i++) CHECK(owner_map[bb_first + i] == LEDGER_OWNER_BOOT);
         for (i = 0; i < MEM_GFX_BB8_SIZE; i++)
             CHECK(((const u8 *)(bb_first * PAGE_SIZE))[i] == 0);
-        CHECK(sys_usable_mem_end() == (bb_first * PAGE_SIZE < MEM_DMA_POOL_BASE ?
-                                      bb_first * PAGE_SIZE : MEM_DMA_POOL_BASE));
-        CHECK(ledger_arena_top() == (bb_first < MEM_DMA_POOL_BASE / PAGE_SIZE ?
-                                     bb_first : MEM_DMA_POOL_BASE / PAGE_SIZE));
-    } else {
-        /* BB が無くても DMA の kernel PERSIST 予約で止まる。 */
-        CHECK(ledger_arena_top() == MEM_DMA_POOL_BASE / PAGE_SIZE);
-        CHECK(sys_usable_mem_end() == MEM_DMA_POOL_BASE);
     }
+    u32 expected_top = MEM_DMA_POOL_BASE / PAGE_SIZE;
+    if (sp->first < expected_top) expected_top = sp->first;
+    if (bb && bb_first < expected_top) expected_top = bb_first;
+    CHECK(ledger_arena_top() == expected_top);
+    CHECK(sys_usable_mem_end() == expected_top * PAGE_SIZE);
     CHECK(!sc == !cirrus_ok && !sd == !cirrus_ok);
     if (cirrus_ok) {
         CHECK(sc->first * PAGE_SIZE == WAB_XE10_LINEARWIN_BASE + MEM_GFX_BB8_SIZE &&
@@ -517,17 +539,16 @@ void _start(void)
         if (&ledger_surfaces[i] != cl) CHECK(ledger_surfaces[i].owner == snap[i].owner);
     if (sel == LEDGER_SF_PEGC) {
         for (i = 0; i < 75; i++) CHECK(owner_map[bb_first + i] == LEDGER_OWNER_GSHELL);
-        CHECK(ledger_owner_pages(LEDGER_OWNER_BOOT) == 0 &&
+        CHECK(ledger_owner_pages(LEDGER_OWNER_BOOT) == 32 &&
               ledger_owner_pages(LEDGER_OWNER_GSHELL) == 75);
     } else {
-        CHECK(ledger_owner_pages(LEDGER_OWNER_BOOT) == (bb ? 75U : 0U));
-        CHECK(ledger_owner_pages(LEDGER_OWNER_GSHELL) == 0);
+        CHECK(ledger_owner_pages(LEDGER_OWNER_GSHELL) == (sel == LEDGER_SF_PC98 ? 32U : 0U));
+        CHECK(ledger_owner_pages(LEDGER_OWNER_BOOT) == (bb ? 75U : 0U) + (sel == LEDGER_SF_PC98 ? 0U : 32U));
     }
     for (i = 0; i < ledger_region_count; i++) {
         const struct ledger_region *r = &ledger_regions[i];
         if (r->type == LEDGER_R_SURFACE_BACKING)
-            CHECK(r->owner == (sel == LEDGER_SF_PC98 ? LEDGER_OWNER_GSHELL
-                                                     : LEDGER_OWNER_BOOT));
+            CHECK(r->owner == LEDGER_OWNER_BOOT); /* old low reservation retained */
         if (r->type == LEDGER_R_DEVICE) CHECK(r->owner == LEDGER_OWNER_GFX);
     }
     /* 2 回目 (GUI → CUI → GUI) は無操作、BB の番地も変わらない */

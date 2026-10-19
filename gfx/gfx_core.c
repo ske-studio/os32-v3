@@ -23,7 +23,7 @@ extern int appslot_gfx_claim(int gui_mode);
 extern int appslot_gfx_owner(void);
 
 /* ======================================================================== */
-/*  バックバッファ (拡張メモリ固定アドレス, 128KB)                          */
+/*  バックバッファ (boot 時の連続 pool, 128KB)                          */
 /* ======================================================================== */
 u8 *bb_b, *bb_r, *bb_g, *bb_i;
 
@@ -263,7 +263,7 @@ static void gfx_bind_client(void)
 /*    4. BB: PEGC が残れば 300KB を池の CPL=0 子のアリーナ内の上端から連続    */
 /*       (owner = boot、X14 — 旧 sys_reserve_top と同じ区間)、直後に 0 で    */
 /*       埋める (CPL=3 に USER で写るので前の中身を見せない)。               */
-/*    5. SURFACE: planar の固定面 (常に)、PEGC の CLIENT (RAM)、Cirrus の     */
+/*    5. SURFACE: planar の pool 面 (常に)、PEGC の CLIENT (RAM)、Cirrus の     */
 /*       CLIENT + DISPLAY (MMIO、B9)。位置は probe を待たずに定数から決まる。 */
 /*    6. アリーナの上端を凍結 (sys_usable_mem_end が BB の下になる、§3-6)、  */
 /*       ledger_selfcheck("gfx")。                                          */
@@ -298,13 +298,13 @@ static const struct ledger_resource gfx_res[4] = {
 };
 
 /* SURFACE の型板。plane offset は pitch × height (ページ丸めなし)。
- * PEGC の first は確保した PFN で埋める。Cirrus の面の割り付け (表示面 = 窓の
+ * RAM の first は確保した PFN で埋める。Cirrus の面の割り付け (表示面 = 窓の
  * 先頭、クライアント面 = その直後、同じ 300KB) は backend_cirrus.c の
  * STATIC_ASSERT が突き合わせる。 */
 static const struct ledger_surface gfx_sf[4] = {
-    { .first = GFX_PFN(MEM_GFX_BB_BASE), .npages = GFX_PFN(MEM_GFX_BB_SIZE),
+    { .npages = GFX_PFN(MEM_GFX_BB_SIZE),
       .width = GFX_WIDTH, .height = GFX_HEIGHT, .pitch = GFX_BPL,
-      .owner = LEDGER_OWNER_BOOT, .backing = LEDGER_SB_FIXED_RAM,
+      .owner = LEDGER_OWNER_BOOT, .backing = LEDGER_SB_RAM,
       .backend = LEDGER_SF_PC98, .role = LEDGER_ROLE_CLIENT,
       .format = GFX_BB_PLANAR4, .planes = 4, .cache = LEDGER_CACHE_WB,
       .perm_max = LEDGER_PERM_RW,
@@ -439,14 +439,24 @@ void __attribute__((cold)) gfx_boot_reserve(void)
         kmemset(P2V(pfn * PAGE_SIZE), 0, (u32)MEM_GFX_BB8_SIZE);
     else
         m &= ~GFX_CAND_PEGC;
-    /* 5. SURFACE。planar は常に、他は残った候補だけ。 */
+    /* 5. planar は fallback 用にも連続 pool を保持する。登録失敗は返却。 */
     for (i = 0; i < 4; i++) {
         if (i && !(m & gfx_cand_of(i - 1))) continue;
         sf = gfx_sf[i];
+        if (!i) {
+            if (!pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, (int)sf.npages,
+                    GFX_PFN(MEM_POOL_BASE), pgalloc_arena_end(),
+                    LEDGER_TOP_DOWN, &sf.first)) continue;
+            kmemset(P2V(sf.first * PAGE_SIZE), 0, MEM_GFX_BB_SIZE);
+        }
         if (i == 1) sf.first = pfn;
-        if (!ledger_surface_create(&sf, 0) && i) m &= ~gfx_cand_of(i - 1);
-        if (!i) gfx_bind_client();
+        if (!ledger_surface_create(&sf, 0)) {
+            if (sf.backing == LEDGER_SB_RAM)
+                (void)pgalloc_free_n_owner(sf.owner, sf.first, (int)sf.npages);
+            if (i) m &= ~gfx_cand_of(i - 1);
+        }
     }
+    gfx_bind_client();
     for (i = 0; i < 4; i++) {
         sf = gfx_planar_display;
         sf.first = GFX_PFN(gfx_display_planes[i]);
@@ -608,7 +618,7 @@ void gfx_v86_return(void)
 /* ======================================================================== */
 /*  バックバッファの物理範囲 (exec が CPL=3 へ USER マップする範囲)。        */
 /*  = **選択中 backend の CLIENT の SURFACE** (TASK_T1_LEDGER §3-8、B9)。    */
-/*  9801 は 0x6A000 の 128KB (固定 RAM)、PEGC は ⑥ が池から確保した 300KB、  */
+/*  9801 は ⑥ が池から確保した 128KB、PEGC は同じく 300KB、  */
 /*  Cirrus はリニア窓 FE000000h の中の非表示面 300KB (MMIO)。backend の      */
 /*  bb_base (CPU 描画の記述子) も同じ SURFACE から引くので情報源は 1 つ。    */
 /*  **表示面は決してここに含めない** — CPL=3 に USER で見せてよいのは         */

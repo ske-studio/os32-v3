@@ -310,6 +310,31 @@ static void bridge_check(int started)
     CHECK(token && (space.leases[0].flags & AS_LEASE_GFX_COMPAT));
     gfx_framebuffer_bridge((void *)(MEM_EXEC_LOAD_ADDR+512));
     CHECK(space.leases[0].token == token && !space.leases[1].token);
+    if (gfx_sf_backend() == LEDGER_SF_PC98) {
+        const u32 vram[4] = {VRAM_PLANE_B, VRAM_PLANE_R, VRAM_PLANE_G, VRAM_PLANE_I};
+        const struct ledger_surface *sf = ledger_surface_find(LEDGER_SF_PC98,LEDGER_ROLE_CLIENT);
+        u32 span = GFX_BPL * gfx_current_height;
+        for (u32 plane = 0; plane < 4; plane++) {
+            u32 va = (u32)fb->planes[plane];
+            u32 phys = (paging_lease_pte(&space,va) & ~(u32)(PAGE_SIZE-1)) + va%PAGE_SIZE;
+            CHECK(phys == sf->first*PAGE_SIZE + sf->plane_offset[plane]);
+            for (u32 j = 0; j < span; j++)
+                ((u8 *)P2V(phys))[j] = (u8)(j + plane*37);
+        }
+        CHECK(!lease_release(&space,token));
+        gfx_framebuffer_bridge((void *)(MEM_EXEC_LOAD_ADDR+512));
+        token = space.leases[0].token;
+        CHECK(token);
+        gfx_present();
+        for (u32 plane = 0; plane < 4; plane++) {
+            u32 va = (u32)fb->planes[plane];
+            u32 phys = (paging_lease_pte(&space,va) & ~(u32)(PAGE_SIZE-1)) + va%PAGE_SIZE;
+            for (u32 j = 0; j < span; j++) {
+                CHECK(((u8 *)P2V(phys))[j] == (u8)(j + plane*37));
+                CHECK(((u8 *)P2V_IO(vram[plane]))[j] == (u8)(j + plane*37));
+            }
+        }
+    }
     /* GUI initialization failures must disable drawing without killing it. */
     slot.hdr_flags=OS32X_FLAG_GFX; host_gui=1; host_gfx_owner=3;
     gfx_framebuffer_bridge((void *)(MEM_EXEC_LOAD_ADDR+512));
@@ -428,7 +453,9 @@ static void run(void)
     if (HOST_ALT_WINDOW) map_host(PEGC_LINEAR_ALT_BASE,PEGC_LINEAR_SIZE);
     boot();
     gfx_boot_reserve();
-    CHECK(bb_b == (u8 *)P2V(MEM_GFX_BB_BASE));
+    const struct ledger_surface *planar = ledger_surface_find(LEDGER_SF_PC98,LEDGER_ROLE_CLIENT);
+    CHECK(planar && planar->backing == LEDGER_SB_RAM && planar->first >= MEM_POOL_BASE/PAGE_SIZE);
+    CHECK(bb_b == (u8 *)P2V(planar->first * PAGE_SIZE));
     CHECK(bb_r-bb_b == GFX_PLANE_SZ && bb_g-bb_b == 2*GFX_PLANE_SZ && bb_i-bb_b == 3*GFX_PLANE_SZ);
     CHECK(ledger_surface_find(LEDGER_SF_PEGC,LEDGER_ROLE_DISPLAY) != 0);
     CHECK(pegc_window_base() == PEGC_LINEAR_BASE);
@@ -509,7 +536,7 @@ static void run(void)
     fail_after_init=1;
     CHECK(!host_select_and_init());
     CHECK(gfx_sf_backend() == LEDGER_SF_PC98);
-    CHECK(bb[0] == (u8 *)P2V(MEM_GFX_BB_BASE) && bb[1] == bb[0]+GFX_PLANE_SZ);
+    CHECK(bb[0] == (u8 *)P2V(planar->first * PAGE_SIZE) && bb[1] == bb[0]+GFX_PLANE_SZ);
     CHECK(bb[2] == bb[0]+2*GFX_PLANE_SZ && bb[3] == bb[0]+3*GFX_PLANE_SZ);
     view_check(LEDGER_SF_PC98,GFX_HEIGHT,0);
     gfx_init(); view_check(LEDGER_SF_PC98,GFX_HEIGHT,1); gfx_shutdown();
