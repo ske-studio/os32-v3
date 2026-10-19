@@ -144,6 +144,9 @@ void v86_session_end(void)
 #ifdef OS32_R1_FIXTURE
     r1_fixture_v86_end();
 #endif
+    /* Capture becomes active before session_begin, and may outlive end until
+     * copyout. Disconnect even when there are no low mappings to restore. */
+    if (v86_session.aborting && kdebug.ops.gcap_detach) kdebug.ops.gcap_detach();
     if (!v86_session.open) goto release;
     /* Preserve this context's IF, but leave guest IOPL/other flags behind. */
     if (v86_session.running)
@@ -194,7 +197,6 @@ void v86_session_end(void)
         for (;;) _stop();
     }
     /* All backing aliases are gone before owner reclamation can run. */
-    if (v86_session.aborting && kdebug.ops.gcap_detach) kdebug.ops.gcap_detach();
     v86_io_reset_policy();
     if (kdebug.ops.gcap_detach) kdebug.ops.gcap_detach();
     v86_session.open = 0;
@@ -203,7 +205,14 @@ release:
     irq_restore(flags);
     /* R1 forbids allocator/VFS reclamation on an exception stack. The kill
      * landing calls end again before exec_finish can reclaim the owner. */
-    if (!v86_session.release_pending || kctx_irq_depth || kctx_exc_depth) goto done;
+    if (kctx_irq_depth || kctx_exc_depth) goto done;
+    if (v86_session.aborting && kdebug.ops.gcap_release) kdebug.ops.gcap_release();
+    if (!v86_session.release_pending) {
+        /* An interrupted preparation may have pinned the body without yet
+         * publishing a low mapping. The existing release is idempotent. */
+        if (v86_session.aborting) v86_module_session_release();
+        goto done;
+    }
     v86_bios_detach_disk();
     if (backing_phys)
         pgalloc_free_n_owner(backing_owner, backing_phys / PAGE_SIZE,
@@ -211,7 +220,6 @@ release:
     backing_phys = 0;
     backing_owner = 0;
     v86_session.release_pending = 0;
-    if (v86_session.aborting && kdebug.ops.gcap_release) kdebug.ops.gcap_release();
     gfx_v86_return();
     kselftest_audit_v86_return();
     v86_module_session_release();

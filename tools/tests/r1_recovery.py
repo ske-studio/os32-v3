@@ -121,8 +121,8 @@ RECOVERY_MUTANTS = [
     ('quarantine-pages', 'exec/exec.c', '    exec_as_leftover_pages += ledger_owner_pages(a->as->owner);',
      '    u32 lost; ledger_reclaim_owner(a->as->owner, &lost);', 'FAIL ledger_owner_pages(owner)==pages'),
     ('normal-context-release', 'kernel/v86_mem.c',
-     'if (!v86_session.release_pending || kctx_irq_depth || kctx_exc_depth) goto done;',
-     'if (!v86_session.release_pending) goto done;', 'FAIL !kctx_exc_depth'),
+     'if (kctx_irq_depth || kctx_exc_depth) goto done;',
+     '/* exception-depth guard omitted */', 'FAIL !kctx_exc_depth'),
 ]
 LEASE_MUTANTS = [
     ('lease-hook', 'exec/lease.c', '    if (r1_fixture_lease(as, auth->role)) return LEASE_FULL;',
