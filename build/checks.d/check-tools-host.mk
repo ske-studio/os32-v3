@@ -12,7 +12,7 @@ check-tools-host:
 	python3 -B tools/tests/test_gui_button_dispatch.py
 	PYTHONPATH=. python3 -B tools/tests/test_emu_playbook.py
 	python3 -B tools/tests/test_mk_settings_db.py
-	python3 -B tools/tests/test_fetch_fonts.py
+	python3 -B tools/tests/test_fetch_fonts.py $(MUT)
 	python3 -B tools/tests/test_mk_blank_nhd.py
 	python3 -B tools/tests/test_stat_cmd.py
 	python3 -B tools/tests/test_tar_cmd.py

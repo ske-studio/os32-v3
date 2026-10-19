@@ -57,3 +57,18 @@ OFL SHA-256: 5d362a6f8690517fd9a5573128a081d8bbbb2f92714cf00556e08fbbe9600426
 OFL では著作権表示・本文を添える。IPA 専用の初回同意手順は流用しない。
 オフライン: --family inconsolata --zip PATH --ofl PATH。--check は TTF と OFL 両方を照合。
 TTF 本体は既存の *.ttf 除外で追跡しない。製品の deploy/packages への追加は T7b-b3。
+
+JF ドット東雲ゴシック16 (GUI 標準和文、ユーザー決定 2026-10-19)
+----------------------------------------------------------------
+取得: python3 tools/fetch_fonts.py --family jfdot-shinonome16
+オフライン: 上のコマンドに --zip /path/to/jfdotfont-20150527.zip を足す。
+出所: https://ftp.iij.ad.jp/pub/osdn.jp/users/8/8542/jfdotfont-20150527.zip
+zip: 41,637,317 B、SHA-256 8e574faaaa7e27294aec66464aaf427447b2f0ccec8fe00c50e69bbf509f14b1
+TTF: JF-Dot-Shinonome16.ttf、1,954,728 B、
+SHA-256 5e265e45349b3328afa67dc3905a3ca3c628cf7c7e0eccea9c7ce8a8acc127cc
+zip からこの1本だけを取り出す。フォント本体は追跡しない。
+ライセンス: 東雲0.9.11の LICENSE (Public Domain 宣言) 全文を道具内に
+UTF-8で保持し、JF-Dot-Shinonome16-LICENSE.txt としてTTFに添える。
+JF の説明 (http://jikasei.me/font/jf-dotfont/) は原版のライセンスを継承し、
+変換者独自の権利を行使しないとしている。同意の入力は不要。
+CI は IPA / Inconsolata と別のkeyで、このTTFとライセンスだけをキャッシュする。

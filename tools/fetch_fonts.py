@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-fetch_fonts.py — IPAex / Inconsolata (--family inconsolata) フォント (ipaexg.ttf / ipaexm.ttf) をビルド時に取得する
+fetch_fonts.py — IPAex / Inconsolata / JF ドット東雲16 を取得する
 
 ユーザー決定 (2026-09-30): 日本語フォントはリポジトリに持たず、ビルド時に IPA の
 公式配布からダウンロードする。未取得ならビルドの前にライセンス (IPA Font License
@@ -10,6 +10,10 @@ Agreement v1.0) の全文を見せて同意を取る。
 Inconsolata Regular 3.000 は --family inconsolata で取得する。zip/TTF/OFL の
 SHA-256 を照合し、原文を Inconsolata-OFL.txt として添える。IPA 専用の同意は
 要求しない。オフラインでは --zip PATH --ofl PATH を使う。
+
+JF ドット東雲ゴシック16 は --family jfdot-shinonome16 で取得する。
+zip/TTF の SHA-256 を照合し、固定した東雲ライセンス全文を添える。
+オフラインでは --zip PATH を使う。同意の入力は不要。
 
 既定 (IPAex) の流れ:
   1. assets/fonts/ipaexg.ttf と ipaexm.ttf が両方あって SHA-256 が合えば、
@@ -79,6 +83,37 @@ INCONSOLATA_MEMBERS = {
 OFL_URL = "https://github.com/googlefonts/Inconsolata/releases/download/v3.000/OFL.txt"
 OFL_NAME = "Inconsolata-OFL.txt"
 OFL_SHA256 = "5d362a6f8690517fd9a5573128a081d8bbbb2f92714cf00556e08fbbe9600426"
+
+# JF Dot font 2015-05-27: only the unmodified Shinonome Gothic 16.
+JFDOT_ZIP_URL = "https://ftp.iij.ad.jp/pub/osdn.jp/users/8/8542/jfdotfont-20150527.zip"
+JFDOT_ZIP_SHA256 = "8e574faaaa7e27294aec66464aaf427447b2f0ccec8fe00c50e69bbf509f14b1"
+JFDOT_ZIP_SIZE = 41637317
+JFDOT_TTF_SIZE = 1954728
+JFDOT_MEMBERS = {
+    "JF-Dot-Shinonome16.ttf": (
+        "JF-Dot-Shinonome16.ttf",
+        "5e265e45349b3328afa67dc3905a3ca3c628cf7c7e0eccea9c7ce8a8acc127cc"),
+}
+# Shinonome 0.9.11 LICENSE, converted from EUC-JP to UTF-8.
+# JF inherits the original license and asserts no independent rights:
+# http://jikasei.me/font/jf-dotfont/
+# The JF zip has no license; keep the complete declaration here for offline use.
+JFDOT_LICENSE_NAME = "JF-Dot-Shinonome16-LICENSE.txt"
+JFDOT_LICENSE_TEXT = """●東雲フォントライセンス
+                                                                    2001
+                                     The Electronic Font Open Laboratory
+                                        http://openlab.ring.gr.jp/efont/
+
+このアーカイブに含まれるすべてのフォントデータ、ドキュメント、スクリプ
+ト類はすべて Public Domain で提供されています 。
+
+但し、日本に於いては現時点で著作権を放棄することは法律上不可能であり、
+AUTHORS に列挙されている作者がその権利を行使しないと宣言することで実質
+的な Public Domain であるとします。
+
+自由な改造、他フォーマットへの変換、組込み、再配布を行うことができます。
+同時に、これらはすべて完全に無保証です。
+""".encode("utf-8")
 
 # 同梱しているライセンス文 (zip の IPA_Font_License_Agreement_v1.0.txt と同一)
 LICENSE_NAME = "IPA_Font_License_Agreement_v1.0.txt"
@@ -199,7 +234,7 @@ def confirm_license(font_dir, environ, stdin, stdout, stderr):
 
 
 def download(url, stderr, opener=None):
-    """zip を丸ごとメモリに取る (9.3MB)。urllib の既定 (プロキシ環境変数) に任せる。"""
+    """zip 等を丸ごとメモリに取る。urllib の既定 (プロキシ環境変数) に任せる。"""
     stderr.write("取得中: %s\n" % url)
     req = urllib.request.Request(url, headers={"User-Agent": "os32-fetch-fonts/1"})
     open_fn = opener.open if opener is not None else urllib.request.urlopen
@@ -208,7 +243,7 @@ def download(url, stderr, opener=None):
 
 
 def extract(zip_bytes, font_dir, stderr, zip_sha256=None, members=None, extra_outputs=()):
-    """zip の SHA-256 を照合し、2 本を照合しながら置く。失敗は例外。"""
+    """zip と指定メンバーの SHA-256 を全て照合してから置く。失敗は例外。"""
     expected = ZIP_SHA256 if zip_sha256 is None else zip_sha256
     got = sha256_bytes(zip_bytes)
     if got != expected:
@@ -277,6 +312,34 @@ def run_inconsolata(args, stdout, stderr, fetch):
     return RC_OK
 
 
+def run_jfdot(args, stdout, stderr, fetch):
+    if args.print_zip_sha256:
+        stdout.write(JFDOT_ZIP_SHA256 + "\n")
+        return RC_OK
+    members = dict(JFDOT_MEMBERS)
+    members[JFDOT_LICENSE_NAME] = (JFDOT_LICENSE_NAME, sha256_bytes(JFDOT_LICENSE_TEXT))
+    valid = fonts_ok(args.font_dir, members)
+    if args.check:
+        return RC_OK if valid else RC_FETCH
+    if valid and not args.force:
+        for name, _ in members.values():
+            os.utime(os.path.join(args.font_dir, name), None)
+        return RC_OK
+    try:
+        if args.zip:
+            with open(args.zip, "rb") as f:
+                data = f.read()
+        else:
+            fetch_fn = download if fetch is None else fetch
+            data = fetch_fn(JFDOT_ZIP_URL, stderr)
+        extract(data, args.font_dir, stderr, JFDOT_ZIP_SHA256, JFDOT_MEMBERS,
+                [(JFDOT_LICENSE_NAME, JFDOT_LICENSE_TEXT)])
+    except Exception as e:
+        stderr.write("JF ドット東雲16 取得失敗: %s — オフラインでは --family jfdot-shinonome16 --zip PATH\n" % e)
+        return RC_FETCH
+    return RC_OK
+
+
 def touch_fonts(font_dir):
     for _, (name, _) in MEMBERS.items():
         os.utime(os.path.join(font_dir, name), None)
@@ -289,8 +352,8 @@ def run(argv, environ=None, stdin=None, stdout=None, stderr=None, fetch=None):
     stdout = sys.stdout if stdout is None else stdout
     stderr = sys.stderr if stderr is None else stderr
 
-    ap = argparse.ArgumentParser(description="IPAex フォントをビルド時に取得する")
-    ap.add_argument("--family", choices=("ipaex", "inconsolata"), default="ipaex")
+    ap = argparse.ArgumentParser(description="IPAex / Inconsolata / JF ドット東雲16 を取得する")
+    ap.add_argument("--family", choices=("ipaex", "inconsolata", "jfdot-shinonome16"), default="ipaex")
     ap.add_argument("--ofl", metavar="PATH", help="Inconsolata の OFL 原文 (オフライン用)")
     ap.add_argument("--font-dir", default=FONT_DIR, help="置き先 (既定 assets/fonts)")
     ap.add_argument("--force", action="store_true", help="揃っていても取り直す")
@@ -300,6 +363,9 @@ def run(argv, environ=None, stdin=None, stdout=None, stderr=None, fetch=None):
     ap.add_argument("--check", action="store_true",
                     help="揃っているかだけ見る (0 = 揃っている、1 = 揃っていない)")
     args = ap.parse_args(argv)
+
+    if args.family == "jfdot-shinonome16":
+        return run_jfdot(args, stdout, stderr, fetch)
 
     if args.family == "inconsolata":
         return run_inconsolata(args, stdout, stderr, fetch)

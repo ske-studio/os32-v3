@@ -93,6 +93,7 @@ jobs:
         id: fontkey
         run: |
           echo "key=ipaex-$(python3 tools/fetch_fonts.py --print-zip-sha256)" >> "$GITHUB_OUTPUT"
+          echo "jfdot=jfdot-shinonome16-$(python3 tools/fetch_fonts.py --family jfdot-shinonome16 --print-zip-sha256)" >> "$GITHUB_OUTPUT"
           echo "latin=inconsolata-$(python3 tools/fetch_fonts.py --family inconsolata --print-zip-sha256)" >> "$GITHUB_OUTPUT"
 
       - name: Cache IPAex fonts
@@ -114,6 +115,18 @@ jobs:
 
       - name: Fetch Inconsolata (verify cached font and OFL)
         run: python3 tools/fetch_fonts.py --family inconsolata
+
+      # 41MB の zip は保存せず、必要な TTF とライセンスだけを独立した key で保存する。
+      - name: Cache JF Dot Shinonome16 font
+        uses: actions/cache@v4
+        with:
+          path: |
+            assets/fonts/JF-Dot-Shinonome16.ttf
+            assets/fonts/JF-Dot-Shinonome16-LICENSE.txt
+          key: ${{ steps.fontkey.outputs.jfdot }}
+
+      - name: Fetch JF Dot Shinonome16 (verify cached font and license)
+        run: python3 tools/fetch_fonts.py --family jfdot-shinonome16
 
       # ③ core のビルド。OS32_ACCEPT_IPA_LICENSE=1 は、リポジトリ所有者が IPA Font License v1.0 に
       #    同意している前提で CI では非対話に同意する (未取得のときだけ fetch_fonts.py が見る)。

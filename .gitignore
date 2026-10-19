@@ -36,6 +36,8 @@
 # .license_accepted はライセンスに同意した記録 (ホストごと)。
 /assets/fonts/*.ttf
 /assets/fonts/*.ttf.part
+/assets/fonts/JF-Dot-Shinonome16-LICENSE.txt
+/assets/fonts/JF-Dot-Shinonome16-LICENSE.txt.part
 /assets/fonts/Inconsolata-OFL.txt
 /assets/fonts/Inconsolata-OFL.txt.part
 /assets/fonts/.license_accepted
