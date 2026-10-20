@@ -43,6 +43,9 @@ Windows 側の Python (pyserial 入り) で動かす:
 終了コードはゲストの子の終了コードが 0 なら 0、それ以外は 1。
 **ゲストからの書き込みは既定で禁止** — push の宛先などは `--allow-write <相対パス>`
 (複数可) で明示する (票 B-7')。
+`peek [--elf F] [--out F] [-m] [-w N] <記号|hex>[+off] [len]` はゲストの `peek`
+(kdebug のメモリ読み、KDEBUG=1) を回し、行・和・CRC・len を照合する
+(記号は ELF と動いているカーネルが同じ版のときだけ、tools/rshell_peek.py)。
 LAN 版は `--sfs-lan --timeout 600 cmd sfs run hsync boot`。
 ゲストの `sfs lan on` を先に設定し、ノートでは lanfs_host.py を別途起動する。
 `--sfs-lan` は `--serve-host` と排他。開始行・exit 行・echo・EOT を照合する。
@@ -79,6 +82,12 @@ try:
     import serialfs_host
 except ImportError:  # pragma: no cover
     serialfs_host = None
+# `peek` サブコマンドの照合 (同じディレクトリ、TASK_KPEEK §3)。無くても
+# cmd / repl は動く (試験は写しの上で import する)。
+try:
+    import rshell_peek
+except ImportError:  # pragma: no cover
+    rshell_peek = None
 
 # `serial N` を送ってから閉じるまでの間合い [秒]。9600 で 14 文字 ≒ 15ms なので
 # 十分な余裕。短くすると行の途中でポートを閉じてゲストが切り替えを始めない。
@@ -467,6 +476,9 @@ def main():
     p_cmd.add_argument("line", nargs="+")
     sub.add_parser("repl", help="対話")
     sub.add_parser("sync", help="受信を捨てて EOT を 1 つ待つ")
+    if rshell_peek is not None:
+        p_peek = sub.add_parser("peek", help="ゲストの `peek` で読んで照合 (tools/rshell_peek.py)")
+        rshell_peek.add_arguments(p_peek)
     args = ap.parse_args()
 
     baud = args.baud
@@ -583,6 +595,19 @@ def lan_result(text, line, eot):
     return int(exits[0][1])
 
 
+def run_peek(args, port, baud):
+    """`peek` サブコマンド (TASK_KPEEK §3)。1 行ずつ送り、EOT とエコーを
+    確かめた本文だけを rshell_peek に渡す (照合と保存は向こう)。"""
+    def send(line, timeout_s):
+        text, ok = send_cmd(port, line, timeout_s)
+        if not ok:
+            return text, "timeout waiting for EOT (%.0fs)" % timeout_s
+        if not check_echo(text, line):
+            return text, "desync: expected echo of %r" % line
+        return text, None
+    return rshell_peek.run(args, send, baud)
+
+
 def make_server(args):
     if not args.serve_host:
         return None
@@ -608,6 +633,8 @@ def run_mode(args, port, baud):
         sys.stdout.write(body.decode("utf-8", errors="replace"))
         print("\n[sync] EOT %s" % ("ok" if ok else "TIMEOUT"))
         return (0 if ok else 1), port, baud
+    if args.mode == "peek":
+        return run_peek(args, port, baud), port, baud
     server = make_server(args)
     if args.mode == "cmd":
         line = " ".join(args.line)

@@ -28,4 +28,5 @@ check-guest-acceptance-host:
 - tools/hostdrv_deploy.py
 - userland/deploy.yaml
 - tools/rshell_serial.py
+- tools/rshell_peek.py
 - tools/serialfs_host.py

@@ -1,0 +1,7 @@
+check-rshell-peek-host:
+- tools/rshell_peek.py
+- tools/rshell_serial.py
+- tools/serialfs_host.py
+- tools/tests/test_rshell_peek.py
+- tools/check_map.d/check-rshell-peek-host.yaml
+- build/checks.d/check-rshell-peek-host.mk
