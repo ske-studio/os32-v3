@@ -772,12 +772,13 @@ u32 paging_pte_flags(u32 virt_addr)
     return page_tables[pdi][pti] & 0xFFFu;
 }
 
-/* PTE の生値 (番地 + フラグ)。PT が無ければ 0。kdebug の peek が窓の PTE を
+/* PTE の生値 (番地 + フラグ)。ページング前・PT が無ければ 0。kdebug の peek が窓の PTE を
  * 張り替える前に退避する (TASK_KPEEK §2-4 4)。読むだけ。 */
 u32 paging_pte_raw(u32 virt_addr)
 {
     u32 pdi = virt_addr >> 22;
     u32 pti = (virt_addr >> 12) & 0x3FF;
+    if (!pg_enabled) return 0;   /* paging_pte_flags と同じ扱い */
     if (!page_tables[pdi]) return 0;
     return page_tables[pdi][pti];
 }

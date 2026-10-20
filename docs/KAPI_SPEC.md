@@ -120,12 +120,12 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v70 | **実装 (2026-10-07、e11c1・統合ゲスト受入前)** | surface query/lease/bundle/unlease・値返し ls・本人識別の 6 本 (slot 240〜245)。公開値型・ページ/SHM 定数、pipe の CPL3 制限。e11b2 で memory_layout 世代 2 (版70は不変、旧世代1は拒否) | §4-10、[TASK_T2D_T2H](tasks/v3/TASK_T2D_T2H.md) e11 |
 | v71 | **受入済み (2026-10-08、f12 ゲスト受入)** | USER 専用 `mem_map` / `mem_unmap` (slot 246・247)。f12 で memory_layout 世代 3 (KAPI 71・slot・データ欄は不変)。USER の最小初期量と mem_map による伸長へ切替。旧世代は拒否。 |
 | v72 | **受入済み (2026-10-09、f13 ゲスト受入)** | `mem_stat` (slot 248)、サイズ引数つき MemStat。4 世代・データ欄は不変。 | 本書 §4-12 |
-| v78 | **実装 (TASK_KPEEK T1、ゲスト受入は T4)** | `kdebug_call` (slot 253)。kdebug 部品の ops slot 19 (`dbg_call`) へ渡す汎用の 1 本、部品が無ければ `OS32_ERR_NOSYS`。要求 `KdebugPeek` (1064B)。4 世代・データ欄は不変。 | 本書 §4-15 |
-| v77 | **実装 (T7b-b1 S2、ゲスト受入は S3b 後)** | app 用 font read lease `font_source_open` / `font_source_read_at` / `font_source_close` (slot 250〜252)。4 世代・データ欄は不変。 | 本書 §4-14 |
-| v76 | **実装 (T3d1b、ゲスト受入は未実施)** | `unicode_to_jis` (slot 249)、kernel 所有の組表を探索。4 世代・データ欄は不変。 | 本書 §4-13 |
-| v75 | **受入済み (2026-10-15、DBGREF G1)** | MemStat 末尾に kdebug の 5 欄を追記 (220B)。slot・4 世代は据置 (OS32X_MIN_API は 75)。 | 本書 §4-12 |
-| v74 | **実装 (T2h h4a、ゲスト受入は R1)** | MemStat 診断 17 欄を末尾追記 (200B)。slot・4 世代は据置。 | 本書 §4-12 |
 | v73 | **実装 (T2g g1、ゲストは GK-1)** | MemStat 末尾に圧力 epoch・保留 mask・app epoch を追記 (132B)。slot・4 世代は据置。 | 本書 §4-12 |
+| v74 | **実装 (T2h h4a、ゲスト受入は R1)** | MemStat 診断 17 欄を末尾追記 (200B)。slot・4 世代は据置。 | 本書 §4-12 |
+| v75 | **受入済み (2026-10-15、DBGREF G1)** | MemStat 末尾に kdebug の 5 欄を追記 (220B)。slot・4 世代は据置 (OS32X_MIN_API は 75)。 | 本書 §4-12 |
+| v76 | **実装 (T3d1b、ゲスト受入は未実施)** | `unicode_to_jis` (slot 249)、kernel 所有の組表を探索。4 世代・データ欄は不変。 | 本書 §4-13 |
+| v77 | **実装 (T7b-b1 S2、ゲスト受入は S3b 後)** | app 用 font read lease `font_source_open` / `font_source_read_at` / `font_source_close` (slot 250〜252)。4 世代・データ欄は不変。 | 本書 §4-14 |
+| v78 | **実装 (TASK_KPEEK T1、ゲスト受入は T4)** | `kdebug_call` (slot 253)。kdebug 部品の ops slot 19 (`dbg_call`) へ渡す汎用の 1 本、部品が無ければ `OS32_ERR_NOSYS`。要求 `KdebugPeek` (1064B)。4 世代・データ欄は不変。 | 本書 §4-15 |
 
 調停 (2026-09-06、同日改訂): GUI (K1〜W2) を先に実装するので **v42 = GUI、v43 = ネットワーク Host Services**
 に確定。実装順が入れ替わるときは、着手前にこの表を更新してから版番号を取ること。

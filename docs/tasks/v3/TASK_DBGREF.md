@@ -182,7 +182,7 @@ LB-1: ops は版 2、18 口。版 1 の部品は init 前に ABI_MISMATCH で拒
 - 保証 B (init の戻り ≠ 0、理由 10 `INIT_FAILED`): 候補表を捨てて A と同じ回収。これが許されるのは **この部品の `init` が候補表を埋めて返すだけで副作用 (割当・IRQ/tick/DMA の登録・装置の操作・import の呼出し) を持たない**契約があるから (`check-kdebug-init-host` が固定)。T4 の一般規則とは別の、kdebug 固有の保証。
 - OFF: 割当なし、ファイルを開かない → 0 B。
 
-### 3-5. 口の表 (export) — 関数は slot 1〜18
+### 3-5. 口の表 (export) — 関数は slot 1〜19
 
 | slot | 口 | 呼ぶ文脈 | OFF |
 |---:|---|---|---|
@@ -195,9 +195,9 @@ LB-1: ops は版 2、18 口。版 1 の部品は init 前に ABI_MISMATCH で拒
 | 11〜14 | `gcap_pass_in` / `gcap_pass_out` / `gcap_note_in` / `gcap_note_out` | #GP (例外) | 0 / nop |
 | 15 | `gcap_detach()` — 記録参照を 0 に (割当・解放・VFS なし) | IRQ 停止中・例外スタック | nop |
 | 16 | `gcap_release()` — `kfree` を含む回収 | 通常文脈 (`kctx_*depth` 0) | nop |
-
 | 17 | `nic_selftest(void)` — LB-1 は NULL、LB-4 で結線 | 通常文脈のみ | nop |
 | 18 | `nic_trace(u32 stage)` — lan.log の段の印 | probe の通常文脈のみ (IRQ/tick/irq_save 内は禁止) | nop |
+| 19 | `dbg_call(op, buf, size)` — KAPI `kdebug_call` (slot 253) の本体、ops 版 3・段 S5 (peek は `kdebug/kpeek.c`、[TASK_KPEEK](TASK_KPEEK.md)) | KAPI (アプリ PD、CPL0) の通常文脈 | `OS32_ERR_NOSYS` |
 
 LB-1 の trace は 256 B に seq/crc と段を積み、毎段の全文書き直しと sync を行う。
 `void` ABI のため保存失敗は部品から本体の `kprintf` で `[e82557] trace=off` を一度出し、以後書かない (probe の最終行より前)。

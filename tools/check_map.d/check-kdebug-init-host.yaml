@@ -32,6 +32,7 @@ check-kdebug-init-host:
 - tools/gen_kdebug_imports.py
 - tools/mkmod.py
 - tools/tests/kdebug_init_host.c
+- kdebug/kpeek.h
 - tools/tests/kdebug_loader_host.c
 - tools/tests/kdebug_init_tdd.md
 - tools/tests/test_kdebug_init.py
@@ -45,6 +46,9 @@ check-kdebug-init-host:
 - kdebug/generated/**
 - kdebug/v86_gcap.c
 - kdebug/v86_gcap_math.c
+- kdebug/kpeek.c
+- kdebug/kpeek_allow.c
+- kdebug/kpeek_allow.h
 # Conservative artifact-path audit (including indirect helpers/fixtures).
 - kernel/kernel.c
 - kernel/kselftest_report.c

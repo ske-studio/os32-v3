@@ -3,6 +3,7 @@
 #include "nic_trace.h"
 #include "kernel/kselftest.h"
 #include "kernel/v86_gcap.h"
+#include "kpeek.h"
 
 static void selftest_run(void) { (void)kselftest_run(); }
 static void selftest_post_exec(void) { (void)kselftest_run_post_exec(); }
@@ -29,7 +30,8 @@ const struct kdebug_ops kdebug_ops = {
     .gcap_detach = v86_gcap_detach,
     .gcap_release = v86_gcap_release,
     .nic_selftest = 0,
-    .nic_trace = nic_trace
+    .nic_trace = nic_trace,
+    .dbg_call = kpeek_call
 };
 
 /* No imports, allocation, device access or registration during init. */

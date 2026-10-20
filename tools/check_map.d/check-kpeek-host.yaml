@@ -1,0 +1,18 @@
+check-kpeek-host:
+- kdebug/kpeek.c
+- kdebug/kpeek.h
+- kdebug/kpeek_allow.c
+- kdebug/kpeek_allow.h
+- kernel/paging.h
+- drivers/pci.h
+- drivers/pci_decode.h
+- include/memmap.h
+- include/pc98.h
+- include/io.h
+- sdk/include/os32/os32_kapi_shared.h
+- tools/tests/kpeek_host.c
+- tools/tests/test_kpeek.py
+- tools/tests/host32.py
+- tools/tests/mutpar.py
+- tools/check_map.d/check-kpeek-host.yaml
+- build/checks.d/check-kpeek-host.mk
