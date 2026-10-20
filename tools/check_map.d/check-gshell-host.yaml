@@ -11,3 +11,7 @@ check-gshell-host:
 - userland/lib/font/**
 - sdk/include/os32/os32_kapi_shared.h
 - tools/fetch_fonts.py
+- tools/tests/g16_fixture.py
+- tools/gen_g16.py
+- tools/g16/**
+- assets/ipadic/*.csv

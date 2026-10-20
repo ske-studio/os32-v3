@@ -1,5 +1,6 @@
 #![no_std]
 
+pub mod bundle;
 pub mod cache;
 pub mod engine;
 pub mod limits;

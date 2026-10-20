@@ -34,6 +34,8 @@ struct Kapi {
     closed: Vec<u32>,
     force_latin: Option<i32>,
     force_ja: Option<i32>,
+    /// TASK_FONTPERF F3: the .g16 bundle file (None: its open answers NOTFOUND).
+    g16: Option<std::path::PathBuf>,
 }
 static mut K: Option<Kapi> = None;
 fn k() -> &'static mut Kapi {
@@ -60,6 +62,19 @@ fn font_root() -> std::path::PathBuf {
 }
 unsafe extern "C" fn m_open(path: *const u8, id: *mut u32, size: *mut u32) -> i32 {
     let p = std::ffi::CStr::from_ptr(path as *const std::ffi::c_char).to_str().unwrap().to_string();
+    if p == os32_font::paths::FONT_JA_G16 {
+        let file = match k().g16.clone() {
+            Some(f) => f,
+            None => return os32api::gui::proto::OS32_ERR_NOTFOUND,
+        };
+        let f = File::open(file).unwrap();
+        *size = f.metadata().unwrap().len() as u32;
+        k().next_id += 1;
+        *id = k().next_id;
+        k().files.insert(*id, f);
+        k().opened.push(p);
+        return 0;
+    }
     let latin = p == os32_font::paths::FONT_LATIN;
     assert!(latin || p == os32_font::paths::FONT_JA, "{p}");
     let forced = if latin { k().force_latin } else { k().force_ja };
@@ -105,6 +120,7 @@ fn install() {
             closed: Vec::new(),
             force_latin: None,
             force_ja: None,
+            g16: None,
         });
         let api: &'static mut os32api::KernelAPI = Box::leak(Box::new(os32api::mock_api()));
         api.mem_alloc = m_alloc;
@@ -294,4 +310,42 @@ fn app_font_lifecycle() {
     println!("app font: opens={} retries={} reloads={} gen_checks={} gen_changes={} trims={} arena {}/{}",
              s.opens, s.retries, s.reloads, s.gen_checks, s.gen_changes, s.trims, s.arena_allocs, s.arena_frees);
     assert_eq!(k().allocs.iter().filter(|&&n| n == engine_size).count(), 1, "Engine allocated once");
+    bundle_phase();
+}
+
+fn bundle_phase() {
+    // TASK_FONTPERF F3 (continues app_font_lifecycle: the library's state is one
+    // static per process): the third lease (.g16), the preload at open
+    // (APP_PRELOAD_MAX), and F-8: every reload drops the bundle's lease with the
+    // faces (20 settings changes keep the lease count at 3, every close matched).
+    font::reload();
+    k().g16 = Some(std::path::PathBuf::from(std::env::var("OS32_FONT_G16").unwrap()));
+    cfgro::set(Some((0, 100)));
+    let before = st().engine;
+    let e = font::ensure_open().expect("engine");
+    assert_eq!(e.state(), State::Ready);
+    check(open_leases() == 3, "bundle-lease");
+    let s = st();
+    check(s.bundle.ok == 1 && s.bundle.rejected == 0, "bundle-ok");
+    let (n_all, n_pre) = e.bundle_counts();
+    let want = (n_pre as usize).min(os32_font::limits::APP_PRELOAD_MAX);
+    println!("app bundle: n_all={n_all} n_pre={n_pre} preloaded={}", e.cache().n_valid());
+    check(want > 0 && e.cache().n_valid() == want, "app-preload-count");
+    let commits = (s.engine.commit_bitmap + s.engine.commit_fallback)
+        - (before.commit_bitmap + before.commit_fallback);
+    check(commits as usize == want, "app-preload-count");
+    let closed = k().closed.len();
+    for round in 1..=20 {
+        cfgro::set(Some((0, 100 + round)));
+        check(font::check_gen(), "gen-reload");
+        check(open_leases() == 0, "bundle-lease-kept-after-reload");
+        let e = font::ensure_open().unwrap();
+        check(e.state() == State::Ready && open_leases() == 3, "bundle-lease-count");
+    }
+    check(k().closed.len() - closed == 60, "bundle-lease-close-count");
+    // trim keeps the leases (faces and bundle).
+    check(font::trim(), "trim-frees-arena");
+    check(open_leases() == 3, "trim-keeps-bundle");
+    font::reload();
+    check(open_leases() == 0, "bundle-lease-kept-after-reload");
 }

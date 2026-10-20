@@ -1102,6 +1102,8 @@ pub mod fontsvc {
         /// close をこの rc で断る (lease は開いたまま — WM の中の段 B を模す)。
         pub close_fail: Option<i32>,
         pub reads: usize,
+        /// TASK_FONTPERF F3: 束 (.g16) を置く (false = その open は NOTFOUND)。
+        pub g16: bool,
     }
     pub static FAKE: Mutex<Option<Fake>> = Mutex::new(None);
     static FILES: Mutex<Option<HashMap<String, Arc<Vec<u8>>>>> = Mutex::new(None);
@@ -1127,8 +1129,13 @@ pub mod fontsvc {
         if let Some(v) = map.get(name) {
             return Some(v.clone());
         }
-        let dir = std::env::var("OS32_GSHELL_FONT_DIR").ok()?;
-        let bytes = std::fs::read(std::path::Path::new(&dir).join(name)).ok()?;
+        let path = if name.ends_with(".g16") {
+            /* 束は integration.py が同じ TTF から作ったもの。 */
+            std::path::PathBuf::from(std::env::var("OS32_GSHELL_G16").ok()?)
+        } else {
+            std::path::Path::new(&std::env::var("OS32_GSHELL_FONT_DIR").ok()?).join(name)
+        };
+        let bytes = std::fs::read(path).ok()?;
         let v = Arc::new(bytes);
         map.insert(name.to_string(), v.clone());
         Some(v)
@@ -1155,6 +1162,9 @@ pub mod fontsvc {
         });
         if let Some(rc) = fail {
             return rc;
+        }
+        if base.ends_with(".g16") && !with(|f| f.g16) {
+            return -2;
         }
         let data = match file(&base) {
             Some(d) => d,

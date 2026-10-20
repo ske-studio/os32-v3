@@ -116,3 +116,33 @@ pub const LATIN_HALF_LAST: u32 = 0x24F;
 pub const CELL_H_PX: usize = 16;
 pub const ASCENT_JA_PX: i16 = 14;
 pub const ASCENT_LATIN_PX: i16 = 13;
+
+// TASK_FONTPERF F3 (fontperf design §2): the pre-drawn 16px glyph bundle (.g16,
+// tools/gen_g16.py) of the Japanese face. The file layout constants are the
+// generator's; the guest refuses any other value (header, cell, ascent, records).
+pub const G16_VERSION: u16 = 1;
+pub const G16_HDR_BYTES: usize = 128;
+pub const G16_CELL_PX: u8 = 16;
+// Rank index: BMP presence bitmap + cumulative counts of 256 blocks of 256 cps.
+pub const G16_BMP_CPS: usize = 0x1_0000;
+pub const G16_RANK_BLOCKS: usize = 256;
+pub const G16_RANK_BITMAP_BYTES: usize = G16_BMP_CPS / 8;
+pub const G16_RANK_BYTES: usize = G16_RANK_BITMAP_BYTES + G16_RANK_BLOCKS * 2;
+// Records: preload section cp u32 + cell, all section cell only (512 B aligned).
+pub const G16_ALL_REC: usize = CELL_BITMAP_BYTES;
+pub const G16_PRE_REC: usize = 4 + G16_ALL_REC;
+pub const G16_SECTOR: u32 = 512;
+// Bundle read unit (index and preload section); one read cache slot's worth.
+pub const G16_READ_BYTES: usize = READ_CACHE_SLOT_BYTES;
+// Consecutive record read failures that close the bundle (TTF path from then on).
+pub const G16_ERR_CLOSE: u8 = 8;
+const _: () = assert!(G16_ALL_REC == 32 && G16_PRE_REC == 36 && G16_RANK_BYTES == 8704);
+const _: () = assert!(G16_READ_BYTES >= G16_HDR_BYTES && G16_READ_BYTES >= G16_PRE_REC);
+// Boot preload (fontperf design §4, PM decision U3): gshell commits the bundle's
+// preload list (1,600 = half of its 3,200 cells) and the ASCII printable range
+// rasterised with the latin face; an app commits up to APP_PRELOAD_MAX at its
+// first text() (0 = none; F4 decides between 0 and 1,600 from the measurements).
+pub const SHELL_PRELOAD_MAX: usize = 1_600;
+pub const APP_PRELOAD_MAX: usize = 1_600;
+pub const PRELOAD_ASCII_FIRST: u32 = 0x20;
+pub const PRELOAD_ASCII_LAST: u32 = 0x7E;

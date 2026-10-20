@@ -136,6 +136,9 @@ pub fn base_violation_count() -> u32 {
 
 /// 字形 engine の数 (T7b-b3、ライブラリの `font::AppFontStats` の repr(C) の写し) を
 /// `out` へ写す。戻り = 写したバイト数 / 負のエラー。試験と観測用。
+/// 並びは u32 × 37: engine `Stats` 17・状態と数 15・束 `BundleStats` 5
+/// (ok / rejected / hit / miss / err、TASK_FONTPERF F3 で末尾に足した)。
+/// 古いライブラリは 32 個 (128 B) までしか写さない — 戻りのバイト数で見分ける。
 pub fn font_stats(out: &mut [u8]) -> i32 {
     shcall!(sh::E_FONT_STATS, extern "C" fn(*mut u8, u32) -> i32,
             out.as_mut_ptr(), out.len() as u32)

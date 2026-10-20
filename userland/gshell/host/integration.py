@@ -45,6 +45,10 @@ _fetch('inconsolata')
 _jf_zip = os.environ.get('OS32_JFDOT_ZIP', '')
 _fetch('jfdot-shinonome16', *(['--zip', _jf_zip] if _jf_zip and Path(_jf_zip).exists() else []))
 os.environ['OS32_GSHELL_FONT_DIR'] = str(FONT_DIR)
+# TASK_FONTPERF F3: the .g16 bundle of that TTF, made by the product generators
+# (font_tests f19; the other tests run without it: fontsvc answers NOTFOUND).
+from g16_fixture import g16_fixture
+os.environ['OS32_GSHELL_G16'] = str(g16_fixture(FONT_DIR / 'JF-Dot-Shinonome16.ttf', OUT / 'g16'))
 
 
 def build(gshell: Path, name: str, quiet: bool = False) -> Path:

@@ -296,6 +296,10 @@ pub struct Face<S> {
     glyphs: u16,
     horizontal_metrics: u16,
     metrics: Metrics,
+    /// TASK_FONTPERF F3: head.checkSumAdjustment (+8) and head.modified (+28),
+    /// read at open for the .g16 bundle's identity check (design §2, U1 (b)).
+    head_adjust: u32,
+    head_modified: u64,
     open: bool,
 }
 
@@ -315,6 +319,8 @@ impl<S> Face<S> {
             glyphs: 0,
             horizontal_metrics: 0,
             metrics: Metrics::NONE,
+            head_adjust: 0,
+            head_modified: 0,
             open: false,
         }
     }
@@ -333,6 +339,8 @@ impl<S> Face<S> {
         self.glyphs = 0;
         self.horizontal_metrics = 0;
         self.metrics = Metrics::NONE;
+        self.head_adjust = 0;
+        self.head_modified = 0;
     }
     pub fn is_open(&self) -> bool {
         self.open
@@ -382,6 +390,15 @@ impl<S> Default for Face<S> {
 }
 
 impl<S: Source> Face<S> {
+    /// TASK_FONTPERF F3: (file size, head.checkSumAdjustment, head.modified) of
+    /// the open face, the 12 B + size the .g16 bundle header is matched against.
+    pub fn head_identity(&self) -> Option<(u64, u32, u64)> {
+        if !self.open {
+            return None;
+        }
+        let size = self.reader.source.as_ref()?.file_size();
+        Some((size, self.head_adjust, self.head_modified))
+    }
     /// T7b-b3: validate the open face's source (Source::validate); Closed otherwise.
     pub fn validate(&mut self) -> Result<()> {
         self.ensure_open()?;
@@ -479,6 +496,9 @@ impl<S: Source> Face<S> {
         {
             return Err(Error::Invalid);
         }
+        let head_adjust = u32_at(r, head, 8)?;
+        let modified_hi = u32_at(r, head, 28)?;
+        let modified_lo = u32_at(r, head, 32)?;
         let units = u16_at(r, head, 18)?;
         let location_format = u16_at(r, head, 50)?;
         if !(16..=16384).contains(&units) || location_format > 1 || u16_at(r, head, 52)? != 0 {
@@ -517,6 +537,8 @@ impl<S: Source> Face<S> {
         self.glyphs = glyphs;
         self.horizontal_metrics = horizontal_metrics;
         self.metrics = metrics;
+        self.head_adjust = head_adjust;
+        self.head_modified = u64::from(modified_hi) << 32 | u64::from(modified_lo);
         Ok(())
     }
 

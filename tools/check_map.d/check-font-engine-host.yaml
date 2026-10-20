@@ -10,3 +10,4 @@ check-font-engine-host:
 - tools/tests/test_font_outline.py
 - build/checks.d/check-font-engine-host.mk
 - tools/check_map.d/check-font-engine-host.yaml
+- tools/tests/g16_fixture.py

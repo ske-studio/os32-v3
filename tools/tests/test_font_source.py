@@ -26,7 +26,7 @@ CASES = ["open_fields", "open_reject", "read_at", "validate", "close_reuse",
          "lease_open", "lease_gate", "lease_token", "lease_read", "lease_close",
          "lease_limit", "lease_owned", "lease_shell", "lease_reclaim",
          "lease_nofpu"]
-# 変種: app の合計上限を owner ごとの上限より大きくして組む (a6 の値は両方 2 で、
+# 変種: app の合計上限を owner ごとの上限より大きくして組む (値は両方 3 (F3) で、
 # そのままでは owner ごとの判定が合計の判定に隠れる)
 VARIANT_DEFS = ["-DFONT_SOURCE_HOST_APP_TOTAL=4"]
 VARIANT_CASES = ["lease_limit", "lease_owned"]

@@ -310,16 +310,20 @@ int vfs_quarantine_sqlite(const VfsSqliteCookie *cookie);
 #define VFS_FONT_OPEN_PROTECT 1u  /* vfs_close_owned の安全網から外す */
 #define VFS_FONT_OPEN_PIN     2u  /* 実体の unlink・置き換え rename を BUSY に */
 /* font FD の予算 (T7 票の状態行 T7b-a6 の実測で決めた値)。
+ * TASK_FONTPERF F3 (fontperf 設計 §1#5・F-6): 束 (.g16) の 3 本目の lease で
+ * SHELL / APP / APP_TOTAL を +1 (2→3)。合計を VFS_MAX_OPEN_FILES - 3 = 13 に
+ * 収めるため RESERVED を 9→7 (a6 の実測 peak 3 の 2 倍余りの元の提案値) に戻した。
+ * a6 の PM 決定で足した app の平文 open 2 本ぶんの余裕はここで無くなる (PM 判断)。
  *   RESERVED      … FEP 辞書・SQLite DB+journal・標準 redirect・pipe・loader の peak
  *   MAX_SHELL     … 常駐 shell の lease
  *   MAX_APP       … app の lease (owner ごと)
  *   MAX_APP_TOTAL … app の lease の合計 (park 中の app も数える)
  * 合計が FD 0〜2 を除いた VFS_MAX_OPEN_FILES に収まることは vfs_fd.c の
  * STATIC_ASSERT が見る。 */
-#define VFS_FONT_FD_RESERVED      9
-#define VFS_FONT_FD_MAX_SHELL     2
-#define VFS_FONT_FD_MAX_APP       2
-#define VFS_FONT_FD_MAX_APP_TOTAL 2
+#define VFS_FONT_FD_RESERVED      7
+#define VFS_FONT_FD_MAX_SHELL     3
+#define VFS_FONT_FD_MAX_APP       3
+#define VFS_FONT_FD_MAX_APP_TOTAL 3
 typedef struct {
     int fd;
     u32 generation;   /* open_files[fd].generation */

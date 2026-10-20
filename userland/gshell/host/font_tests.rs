@@ -40,10 +40,10 @@ fn f10_open_uses_leases_outside_guard_and_reads_only_inside() {
     let _st = opened();
     assert_eq!(engine().state(), State::Ready);
     assert_eq!(engine().set_slot(), 1);
-    assert_eq!(fontsvc::open_count(), 2, "lease 2 本 (latin / ja)");
+    assert_eq!(fontsvc::open_count(), 2, "lease 2 本 (latin / ja、束は無い = NOTFOUND)");
     let calls = fontsvc::calls();
-    assert_eq!(&calls[..3], &[("open", false), ("open", false), ("guard", false)],
-               "open は guard の前、guard の外");
+    assert_eq!(&calls[..4], &[("open", false), ("open", false), ("open", false), ("guard", false)],
+               "open (latin / ja / 束) は guard の前、guard の外");
     assert!(calls.iter().all(|c| c.1 == (c.0 == "read_at")),
             "read_at は guard の中だけ、他は guard の外だけ: {calls:?}");
     assert_eq!(fontsvc::with(|f| f.violations), 0);
@@ -187,6 +187,8 @@ fn f14_text_checks_once_and_guards_only_on_miss() {
 fn f15_guard_busy_draws_this_call_with_kcg_only() {
     let _st = opened();
     let clip = wm::Rect::new(0, 0, 640, 400);
+    /* open の ASCII 先読み (F3) を捨てて、Q / Z を miss にする。 */
+    assert!(trim());
     fontsvc::with(|f| f.guard_ret = Some(crate::ffi::OS32_ERR_BUSY));
     text::draw(clip, 0, 0, b"Q", 1, 0);
     assert_eq!(mocks::kcg_reads(), vec![('a', b'Q' as u16)], "BUSY の回は KCG");
@@ -294,4 +296,49 @@ fn f18_settings_change_reconfigures_through_consume() {
     assert_eq!(engine().state(), State::KcgOnly(Reason::Config));
     assert_eq!(fontsvc::open_count(), 0);
     assert!(kprinted(b"font: gen 1->1 open=KCG(config) set=1"));
+}
+
+/// TASK_FONTPERF F3: 束 (.g16) の 3 本目の lease。open の guard の中で束を開き、
+/// 先読み節 (SHELL_PRELOAD_MAX) と ASCII 95 字を cache に入れる。設定変更 20 回で
+/// lease の数は 3 のまま (F-8: face と同じ経路で閉じる)、Stale・close_all で全部閉じる。
+#[test]
+fn f19_bundle_lease_preload_and_close_paths() {
+    use os32_font::limits::{PRELOAD_ASCII_FIRST, PRELOAD_ASCII_LAST, SHELL_PRELOAD_MAX};
+    let mut st = bare();
+    fontsvc::install(SHELL_VERSION);
+    fontsvc::with(|f| f.g16 = true);
+    assert_eq!(open_at_safe_point(&st, 0), 0);
+    assert_eq!(fontsvc::open_count(), 3, "束の lease");
+    let calls = fontsvc::calls();
+    assert_eq!(&calls[..4], &[("open", false), ("open", false), ("open", false), ("guard", false)]);
+    assert!(calls.iter().all(|c| c.1 == (c.0 == "read_at")), "束も read_at は guard の中だけ: {calls:?}");
+    let s = unsafe { gshell_font_stats };
+    let (n_all, n_pre) = engine().bundle_counts();
+    let ascii = (PRELOAD_ASCII_FIRST..=PRELOAD_ASCII_LAST).count() as u32;
+    assert_eq!((s.bundle.ok, s.bundle.rejected), (1, 0));
+    assert_eq!(s.preloaded, n_pre.min(SHELL_PRELOAD_MAX as u32) + ascii, "先読みの字数");
+    assert!(kprinted(format!("font: g16 ok n_all={n_all} n_pre={n_pre} pre={n_pre}+{ascii}").as_bytes()));
+    println!("gshell g16: n_all={n_all} n_pre={n_pre} preloaded={}", s.preloaded);
+    /* 先読みの字は guard にも read_at にも行かない。 */
+    let clip = wm::Rect::new(0, 0, 640, 400);
+    let (n_guard, reads) = (fontsvc::count("guard"), fontsvc::with(|f| f.reads));
+    text::draw(clip, 0, 0, "Agあア・".as_bytes(), 1, 0);
+    assert_eq!((fontsvc::count("guard"), fontsvc::with(|f| f.reads)), (n_guard, reads));
+    /* 設定変更 20 回 (close → open): lease は 3 本のまま、閉じた数は 3 ずつ。 */
+    let closes0 = unsafe { gshell_font_stats }.closes;
+    for round in 0..20 {
+        reconfigure(&mut st, 0);
+        assert_eq!((fontsvc::open_count(), deferred_closes()), (3, 0), "round {round}");
+    }
+    assert_eq!(unsafe { gshell_font_stats }.closes - closes0, 60);
+    /* Stale: face と一緒に束も閉じる。 */
+    fontsvc::with(|f| f.validate_ret = os32api::gui::proto::OS32_ERR_STALE);
+    text::draw(clip, 0, 0, b"A", 1, 0);
+    assert_eq!((engine().state(), fontsvc::open_count()), (State::KcgOnly(Reason::Stale), 0));
+    fontsvc::with(|f| f.validate_ret = 0);
+    assert_eq!(open_at_safe_point(&st, 0), 0);
+    assert_eq!(fontsvc::open_count(), 3);
+    close_all();
+    assert_eq!(fontsvc::open_count(), 0);
+    assert_eq!(fontsvc::with(|f| f.violations), 0);
 }

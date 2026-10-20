@@ -1936,7 +1936,8 @@ open は O_RDONLY で開き、実体の unlink・置き換え rename を `OS32_E
 明示 offset で 1 回読み、実読込長 (短読はそのまま) を返す。`offset > size`・`len > size - offset`
 は `OS32_ERR_INVAL`。close 済みの id (再 close を含む) と、同じ owner 番号の別の app から
 来た id は `OS32_ERR_STALE`、他 owner の id は `OS32_ERR_INVAL`。owner あたり・app 全体の
-上限 (`VFS_FONT_FD_MAX_APP` / `_TOTAL`、ともに 2) と FD 枯渇は `OS32_ERR_NOSPC`。
+上限 (`VFS_FONT_FD_MAX_APP` / `_TOTAL`、ともに 3 — face 2 本と描き済みの字形の束 `.g16` 1 本、
+TASK_FONTPERF F3。常駐 shell の内部入口の上限 `VFS_FONT_FD_MAX_SHELL` も 3) と FD 枯渇は `OS32_ERR_NOSPC`。
 x87 の無い機械 (`font_x87_present==0`) では open が `OS32_ERR_NOSYS` を返す (raster できないので
 呼び手は KCG で描く、T7b-b3 S2。常駐 shell の内部入口の open も同じ)。
 公開の `sys_read` / `sys_lseek` / `sys_close` は font の FD を扱わない。

@@ -61,7 +61,8 @@ extern volatile u32 font_lease_reject_last;
  * 門: ring3_call_from_user() != 0、caller が USER かつ caller.app_id ==
  * res_owner_get() (lease の owner は app_id、AS の札 caller.owner ではない)。
  * 外れたら OS32_ERR_INVAL。
- * open: owner ごとの上限 VFS_FONT_FD_MAX_APP・合計 VFS_FONT_FD_MAX_APP_TOTAL・
+ * open: owner ごとの上限 VFS_FONT_FD_MAX_APP・合計 VFS_FONT_FD_MAX_APP_TOTAL
+ *   (ともに 3 = face 2 本 + 描き済みの字形の束 .g16 1 本、TASK_FONTPERF F3)・
  *   枠 / FD 枯渇は OS32_ERR_NOSPC。成功で 0 と *out_id / *out_size。
  *   x87 が無い (font_x87_present == 0) と OS32_ERR_NOSYS (T7b-b3 S2、呼び手は KCG)。
  * read_at: 戻り = 実読込長 (短読はそのまま) / 負。範囲外は INVAL。
@@ -79,7 +80,7 @@ void font_lease_close_owned(int owner);
  * owner_gen としてこれを持ち、read_at / validate / close は照合する
  * (不一致は OS32_ERR_STALE)。VFS の owner は GUI_SHELL_OWNER 固定、
  * open flags は VFS_FONT_OPEN_PROTECT | VFS_FONT_OPEN_PIN。上限は
- * VFS_FONT_FD_MAX_SHELL (超えると OS32_ERR_NOSPC)。 */
+ * VFS_FONT_FD_MAX_SHELL (3 = face 2 本 + 束 1 本、超えると OS32_ERR_NOSPC)。 */
 i32 font_lease_shell_open(const char *path, u32 shell_gen, u32 *out_id, u32 *out_size);
 i32 font_lease_shell_read_at(u32 id, u32 shell_gen, u32 offset, void *dst, u32 len);
 i32 font_lease_shell_validate(u32 id, u32 shell_gen);

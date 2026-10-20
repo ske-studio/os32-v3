@@ -70,7 +70,10 @@ def font_env(work):
     sys.path.insert(0,str(Path(__file__).resolve().parent))
     subprocess.run(['python3',str(ROOT/'tools/fetch_fonts.py'),'--family','inconsolata'],check=True)
     from test_font_outline import shinonome
-    return {**os.environ,'OS32_FONT_SHINONOME':str(shinonome(work)),'OS32_ROOT':str(ROOT)}
+    from g16_fixture import g16_fixture
+    jf=shinonome(work)
+    # TASK_FONTPERF F3: the bundle of that TTF (app_font_bundle).
+    return {**os.environ,'OS32_FONT_SHINONOME':str(jf),'OS32_FONT_G16':str(g16_fixture(jf,work/'g16')),'OS32_ROOT':str(ROOT)}
 
 def font_phase(mutate):
     with tempfile.TemporaryDirectory(prefix='t7b-gui-font-') as d:
