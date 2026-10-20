@@ -67,6 +67,8 @@ pub extern "C" fn gshell_gui_handler(op: u32, arg: u32, owner: i32) -> i32 {
          * カーネルの `gui_owner_exit` を通るので、回収はここ 1 か所で足りる。 */
         multiapp::on_owner_exit(owner);
         visible::recompute_and_expose(st);
+        /* T7b-b5: 前景が別の app に移ったら Focus(in) (NOSPC の font 再試行)。 */
+        input::focus_after_exit(st, owner);
         return 0;
     }
     if op == GUI_OP_INIT {

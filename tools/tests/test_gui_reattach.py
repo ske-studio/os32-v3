@@ -11,7 +11,7 @@ ROOT=Path(__file__).resolve().parents[2]
 GUI='userland/rust/libos32gui/src/'
 GDI='userland/rust/gdi_test/src/lib.rs'
 # T7b-b4 S5: draw.rs text() uses font.rs (and the os32-font crate), so both are compiled in.
-UNITS=('client','clip','draw','ffi','gstate','surface','utf8core','font')
+UNITS=('client','clip','draw','ffi','gstate','surface','utf8core','font','textcore')
 TARGET_SRCS=[GUI+x+'.rs' for x in UNITS]+[GDI,GUI+'shlib.rs','sdk/rust/os32api/src/lib.rs','sdk/rust/os32api/src/gui/stub.rs']
 MUTANTS=[
  ('shlib-no-detach-entry',GUI+'shlib.rs','    .long   os32gui_gfx_detach                  /* 119 */','', 'shlib detach entry missing'),

@@ -17,11 +17,19 @@ use crate::{
 };
 
 /// Cell width of the glyph, decided by the caller's width rules; it only
-/// picks the cmap search order (Half: latin -> ja, Full: ja -> latin).
+/// picks the cmap search order (Half ASCII: latin -> ja, Half above ASCII:
+/// latin only, Full: ja only).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Cell {
     Half,
     Full,
+}
+
+/// The half-width non-ASCII range (T7b-b5): Latin-1 Supplement and Latin
+/// Extended-A/B, `LATIN_HALF_FIRST..=LATIN_HALF_LAST`. Callers use it for the
+/// width rule (8px) and resolve these code points with `Cell::Half`.
+pub const fn is_latin_half(cp: u32) -> bool {
+    cp >= LATIN_HALF_FIRST && cp <= LATIN_HALF_LAST
 }
 
 #[repr(u8)]
@@ -402,9 +410,12 @@ impl<S: Source> Engine<S> {
         let s = self.cache.stats_mut();
         s.miss = s.miss.wrapping_add(1);
         // Full cells never fall back to the latin face (box/block glyphs overflow
-        // the 16px slot); a miss there goes to KCG.
+        // the 16px slot); a miss there goes to KCG. Half cells above ASCII never
+        // fall back to the ja face either (T7b-b5): its Latin-1 glyphs are
+        // full-width and would be cut in half by the 8px cell.
         let order: &[FaceId] = match cell {
-            Cell::Half => &[FaceId::Latin, FaceId::Ja],
+            Cell::Half if cp < 0x80 => &[FaceId::Latin, FaceId::Ja],
+            Cell::Half => &[FaceId::Latin],
             Cell::Full => &[FaceId::Ja],
         };
         let mut found = None;

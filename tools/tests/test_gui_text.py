@@ -5,7 +5,7 @@
 font_source_*・kcg_read_*・unicode_to_jis・gfx_screen_info) を host の贋物にして、
 実 font (Inconsolata・JF Dot 東雲 16) で次を確かめる (tools/tests/gui_text_host.rs):
 
-- 画素一致: 欧文 95 字・和文・Latin-1・¥・半角カナ・欠字を、font crate の Face と
+- 画素一致: 欧文 95 字・和文・Latin-1 (T7b-b5 で半角)・¥・半角カナ・欠字を、font crate の Face と
   RasterScratch で直に引いた期待画像と 1 画素ずつ比べる (PLANAR4 と PACKED8 の両方)。
 - clip (画素単位、全角も)・透過・オフスクリーン全角・cell 外 0 画素。
 - 幅: text() の戻り値 == measure_text()。baseline: 欧文 13・和文 14、ASCII 95 字が
@@ -58,6 +58,14 @@ MUTATIONS = [
      "        if (0x20..=0x7E).contains(&b) {", 'yen'),
     # P3-4 U+00A5 も ROM の ¥ (東雲16 の U+00A5 は \ の形、S7 のゲスト受入で検出)。
     ('u00a5-to-ttf', "    if cp == CP_YEN {", "    if cp == CP_YEN && false {", 'yen-u00a5-rom'),
+    # T7b-b5 Latin-1・Latin 拡張は半角: 幅を全角に戻す / 経路を全角 (東雲) に戻す /
+    # 欠字の KCG を詰めない (cell の右半分が落ちる)。
+    ('latin1-width-16', "    (n, false, textcore::cols_at(bytes) as i32 * ANK_W)",
+     "    (n, false, KANJI_W)", 'latin1-advance'),
+    ('latin1-route-full', "    let cell = if textcore::cp_is_half(cp) { FontCell::Half } else { FontCell::Full };",
+     "    let cell = FontCell::Full;", 'latin1-pixels'),
+    ('latin1-kcg-not-squeezed', "                        None if cw == ANK_W => squeeze_half(&kcg_cp(cp)),\n", "",
+     'latin1-missing'),
     # §2-4 借用は 1 字の間: release を抜く → 次の字から engine が KCG を返す。
     ('no-release', "            let rows = cell_from_glyph(&g, e.bitmap(&g), w);\n            e.release();",
      "            let rows = cell_from_glyph(&g, e.bitmap(&g), w);", 'pixel-match'),
@@ -78,7 +86,7 @@ def compose(unit, draw_src):
     (unit / 'draw.rs').write_text(draw_src)
     host = (ROOT / 'tools/tests/gui_text_host.rs').read_text()
     head, body = host.split('// ---- crate ----', 1)
-    mods = ''.join(f'#[path="{GUI / n}.rs"] mod {n};\n' for n in ('gstate', 'clip', 'surface', 'font'))
+    mods = ''.join(f'#[path="{GUI / n}.rs"] mod {n};\n' for n in ('gstate', 'clip', 'surface', 'font', 'textcore'))
     mods += f'#[path="{unit / "draw.rs"}"] mod draw;\n'
     (unit / 'main.rs').write_text(head + mods + body)
 

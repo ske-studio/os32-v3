@@ -37,6 +37,23 @@ fn ank_is_one_column_kanji_is_two() {
 }
 
 #[test]
+fn latin1_and_extended_are_one_column() {
+    /* T7b-b5 (PM 決定): U+00A0..=U+024F は半角 1 桁 (draw.rs の 8px と同じ)、
+     * ギリシャ・キリルは 2 桁のまま。 */
+    let s = "Ångström façade É ¥100";
+    assert_eq!(tc::columns(s.as_bytes()), s.chars().count());
+    assert_eq!(tc::cols_at("\u{A0}".as_bytes()), 1);
+    assert_eq!(tc::cols_at("\u{24F}".as_bytes()), 1);
+    assert_eq!(tc::cols_at("\u{9F}".as_bytes()), 2, "C1 制御は範囲外");
+    assert_eq!(tc::cols_at("\u{250}".as_bytes()), 2);
+    assert_eq!(tc::columns("αЖ".as_bytes()), 4);
+    assert_eq!(tc::cols_at(&"é".as_bytes()[..1]), 2, "末尾で切れた列は先頭バイトだけで決める");
+    /* 折り返し: 4 桁に Å é a b が丁度入る (2 桁と数えると 2 字しか入らない)。 */
+    let t = "Åéabc".as_bytes();
+    assert_eq!(tc::wrap_end(t, 4), "Åéab".len());
+}
+
+#[test]
 fn seq_len_matches_utf8() {
     assert_eq!(tc::seq_len(b'a'), 1);
     assert_eq!(tc::seq_len(A[0]), 3);

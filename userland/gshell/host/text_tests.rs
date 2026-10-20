@@ -202,3 +202,59 @@ fn t09_draw_ank_reads_the_byte_as_ank_not_unicode() {
     assert!((0..16).all(|y| (0..8).all(|x| p[y * mocks::W + x] == ank_a[y * mocks::W + x])),
             "draw_ank の 'A' が draw の 'A' と違う");
 }
+
+#[test]
+fn t10_latin1_and_extended_are_half_width() {
+    /* T7b-b5 (PM 決定): U+00A0..=U+024F は 8px の半角 (Inconsolata)、U+00A5 は ROM の ¥、
+     * ギリシャ・キリルなど他の 2 バイト UTF-8 は全角のまま。 */
+    kcg_only();
+    assert_eq!(route(0xC5), Route::Ttf { cp: 0xC5, cell: Cell::Half, ank: 0 }, "Å は半角");
+    assert_eq!(route(0xA0), Route::Ttf { cp: 0xA0, cell: Cell::Half, ank: 0 }, "範囲の先頭");
+    assert_eq!(route(0x24F), Route::Ttf { cp: 0x24F, cell: Cell::Half, ank: 0 }, "範囲の末尾");
+    assert_eq!(route(0x9F), Route::Ttf { cp: 0x9F, cell: Cell::Full, ank: 0 }, "C1 制御は範囲外");
+    assert_eq!(route(0x250), Route::Ttf { cp: 0x250, cell: Cell::Full, ank: 0 }, "IPA 拡張は全角");
+    assert_eq!(route(0x3B1), Route::Ttf { cp: 0x3B1, cell: Cell::Full, ank: 0 }, "ギリシャは全角");
+    assert_eq!(route(0x416), Route::Ttf { cp: 0x416, cell: Cell::Full, ank: 0 }, "キリルは全角");
+    assert_eq!(route(0xA5), Route::Ank(0x5C), "U+00A5 は ROM の ¥ (8px)");
+    assert_eq!(advance(0xC5), 8);
+    assert_eq!(advance(0xA5), 8);
+    assert_eq!(advance(0x3B1), 16);
+    assert_eq!(advance(0x3042), 16);
+    assert_eq!(advance(u32::from(b'A')), 8);
+    assert_eq!(advance(0x01), 0);
+    /* 幅は draw の送りと一致する (「Ångström façade É ¥100」= 22 字すべて半角)。 */
+    let s = "Ångström façade É ¥100";
+    let w = draw(FULL, 0, 0, s.as_bytes(), 1, 0);
+    assert_eq!(w, 8 * s.chars().count() as i32);
+    assert_eq!(w, s.chars().map(|c| advance(c as u32)).sum::<i32>());
+    assert_eq!(draw(FULL, 0, 0, "αЖ".as_bytes(), 1, 0), 32);
+}
+
+#[test]
+fn t11_latin_half_missing_goes_to_squeezed_kcg_inside_8px() {
+    /* KCG だけ (engine 無し) と Inconsolata の欠字 (U+0180): ROM の 16×16 を
+     * 横 1/2 に詰めて 8px の cell に (隣の cell を汚さない)。 */
+    kcg_only();
+    let w = draw(FULL, 0, 0, "\u{C5}x".as_bytes(), 1, 0);
+    assert_eq!(w, 16);
+    let d = draws();
+    assert_eq!(d[0].w_bytes, 1, "Å は 1 バイト幅 (8px) の cell");
+    assert!(d[0].pat.iter().all(|b| *b == 0xFF), "0xa5a5 を 2 列ずつ OR で詰めると 0xFF");
+    assert_eq!(squeeze_half(&[0x8001; 16])[0], 0x8100);
+    assert_eq!(squeeze_half(&[0x4000; 16])[0], 0x8000);
+
+    let _st = with_fonts();
+    draw(FULL, 0, 0, "\u{180}".as_bytes(), 1, 0); /* ƀ: Inconsolata に無い */
+    assert_eq!(mocks::kcg_reads(), vec![('k', 0x2222)], "欠字は KCG (東雲の全角の字形は使わない)");
+    let d = draws();
+    assert_eq!((d.len(), d[0].w_bytes), (1, 1));
+    let _st = with_fonts();
+    draw(FULL, 0, 0, "Åçé".as_bytes(), 1, 0);
+    assert!(mocks::kcg_reads().is_empty(), "Inconsolata にある字を KCG で描いた");
+    let p = mocks::pixels();
+    /* 3 字とも 8px の cell の中にインクがあり、24 列目から右は描かない。 */
+    for k in 0..3 {
+        assert!((0..16).any(|y| (8 * k..8 * k + 8).any(|x| p[y * mocks::W + x] == 1)), "字 {k} が空");
+    }
+    assert!((0..16).all(|y| (24..40).all(|x| p[y * mocks::W + x] != 1)));
+}

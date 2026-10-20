@@ -428,6 +428,10 @@ pub struct GuiState {
     /// 最後にアクティブ (前面) のクロームで描いた窓の id (0 = なし)。前面が
     /// 替わったら旧・新の両方を描き直す ([`sync_active_chrome`])。
     pub chrome_active: u32,
+    /// 最後に `Focus(in)` を送った窓の owner (0 = なし、[`crate::input::emit_focus_change`])。
+    /// 前景の app が終わったとき、次の前景へ `Focus(in)` を出すかの判定に使う
+    /// ([`crate::input::focus_after_exit`]、T7b-b5)。
+    pub focus_in_owner: i32,
     pub mouse_x: i32,
     pub mouse_y: i32,
     pub prev_buttons: u8,
@@ -509,6 +513,7 @@ impl GuiState {
         drag_dy: 0,
         drag_frame: Rect::EMPTY,
         chrome_active: 0,
+        focus_in_owner: 0,
         mouse_x: 320,
         mouse_y: 200,
         prev_buttons: 0,

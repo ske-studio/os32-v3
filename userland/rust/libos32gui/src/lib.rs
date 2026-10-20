@@ -68,6 +68,11 @@ pub mod utf8core;
  * **同じ実体**を使う (libos32gui_stub が `#[path]` でこのファイルを取り込む)。
  * utf8core と同じく core だけに依存し、ホスト TDD が直に取り込める。 */
 pub mod textcore;
+/* textcore の半角 Latin の範囲は font crate の正典の写し (T7b-b5)。ずれたらビルドで止める。 */
+const _: () = assert!(
+    textcore::LATIN_HALF_FIRST == os32_font::limits::LATIN_HALF_FIRST
+        && textcore::LATIN_HALF_LAST == os32_font::limits::LATIN_HALF_LAST
+);
 
 /* ---- v1.4 Host Services (票 N4 §1) ----
  * 表 105..=110。libos32host.a を呼ぶ薄い extern "C" ラッパー。`kapi` は

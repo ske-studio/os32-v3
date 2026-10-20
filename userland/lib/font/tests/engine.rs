@@ -172,6 +172,10 @@ const HUGE: u32 = 'X' as u32; // 41px: above MAX_BBOX_PX -> raster Limit
 const KANA: u32 = 0x3042;
 const KANJI: u32 = 0x4e9c;
 const NOWHERE: u32 = 0x2603;
+/// In the ja fixture only: an ASCII letter (half falls back latin -> ja) and a
+/// Latin-1 letter (half above ASCII is latin only, T7b-b5).
+const JA_ONLY_ASCII: u32 = 'C' as u32;
+const JA_ONLY_LATIN1: u32 = 0xE9;
 
 fn latin_font() -> Vec<u8> {
     fixture(
@@ -181,8 +185,9 @@ fn latin_font() -> Vec<u8> {
 }
 fn ja_font() -> Vec<u8> {
     fixture(
-        &[('A' as u32, 1), (KANA, 2), (KANJI, 3)],
-        vec![rect(0, 0, 1, 1), rect(0, 0, 16, 14), rect(1, -2, 15, 14), rect(2, 0, 14, 12)],
+        &[('A' as u32, 1), (JA_ONLY_ASCII, 4), (JA_ONLY_LATIN1, 5), (KANA, 2), (KANJI, 3)],
+        vec![rect(0, 0, 1, 1), rect(0, 0, 16, 14), rect(1, -2, 15, 14), rect(2, 0, 14, 12), rect(1, 0, 7, 10),
+             rect(0, 0, 16, 12)],
     )
 }
 
@@ -228,8 +233,16 @@ fn search_order_half_latin_full_ja() {
     assert_eq!((g.entry.left, g.entry.top, g.entry.width, g.entry.height), (1, 10, 6, 10));
     assert_eq!(bits.len(), 10);
     assert!(bits.iter().all(|&b| b == 0xfc));
-    let (_, g, _) = draw(&mut r.engine, KANA, Cell::Half);
-    assert_eq!(g.entry.face, FaceId::Ja, "half: latin first, then ja");
+    let (res, g, _) = draw(&mut r.engine, JA_ONLY_ASCII, Cell::Half);
+    assert_eq!((res, g.entry.face), (Resolved::Bitmap, FaceId::Ja), "half ASCII: latin first, then ja");
+    // T7b-b5: a half cell above ASCII (Latin-1/Extended) never takes the ja
+    // face's full-width glyph; the caller draws KCG.
+    let (res, g, _) = draw(&mut r.engine, JA_ONLY_LATIN1, Cell::Half);
+    assert!(res == Resolved::Missing && g.entry.face != FaceId::Ja, "half latin-1: latin only");
+    let (res, _, _) = draw(&mut r.engine, KANA, Cell::Half);
+    assert_eq!(res, Resolved::Missing, "half above ASCII: latin only");
+    assert!(os32_font::engine::is_latin_half(0xA0) && os32_font::engine::is_latin_half(0x24F));
+    assert!(!os32_font::engine::is_latin_half(0x9F) && !os32_font::engine::is_latin_half(0x250));
     r.engine.invalidate_all().unwrap();
     let (_, g, _) = draw(&mut r.engine, 'A' as u32, Cell::Full);
     assert_eq!((g.entry.face, g.ascent), (FaceId::Ja, ASCENT_JA_PX), "full: ja first");

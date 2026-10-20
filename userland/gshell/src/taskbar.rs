@@ -491,7 +491,8 @@ fn copy_label(title: &[u8; 40], out: &mut [u8; WBTN_CHARS + 1]) {
         } else {
             1
         };
-        let w = if b < 0x80 { 1 } else { 2 };
+        /* 桁 = 描画の送り幅 / 8 (text::advance、Latin-1/拡張は半角、T7b-b5)。 */
+        let w = (text::advance(crate::chrome::utf8_next(&title[..], i).1) / text::ANK_W) as usize;
         if cols + w > WBTN_CHARS || n + len > WBTN_CHARS {
             break;
         }

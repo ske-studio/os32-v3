@@ -1118,13 +1118,35 @@ pub fn emit_focus_change(st: &mut GuiState, old_id: u32, new_id: u32) {
             }
         }
     }
+    st.focus_in_owner = 0;
     if new_id != 0 {
         if let Some(ni) = st.win_by_id(new_id) {
-            if let Some(slot) = st.slot_of_owner(st.windows[ni].owner) {
+            let owner = st.windows[ni].owner;
+            st.focus_in_owner = owner;
+            if let Some(slot) = st.slot_of_owner(owner) {
                 let ev = ring::ev_simple(GUI_EV_FOCUS, 1, new_id);
                 ring::append(st, slot, &ev);
             }
         }
+    }
+}
+
+/// `GUI_OP_OWNER_EXIT` の回収の後 (T7b-b5)。最後に `Focus(in)` を受けた app が
+/// 終わり、前景が別の app の窓に移っていたら、その窓へ `Focus(in)` を 1 回出す。
+/// 窓を閉じてから終わる app (libos32gui の `Window` の Drop) では前景は
+/// `destroy_window` の時点で黙って移っているので、窓の有無でなく「最後に in を
+/// 受けた owner」で判定する。前景化の再試行 (font の NOSPC → TTF) はこの in で
+/// 走る — 終了した app の font lease は `gui_owner_exit` の前に閉じている
+/// (exec.c の `font_lease_close_owned` → `vfs_close_owned` → `gui_owner_exit`)。
+/// 他の経路で既に in を出していれば `focus_in_owner` が新しい owner なので出さない。
+pub fn focus_after_exit(st: &mut GuiState, owner: i32) {
+    if owner <= 0 || st.focus_in_owner != owner {
+        return;
+    }
+    st.focus_in_owner = 0;
+    let new_id = st.front_id();
+    if new_id != 0 {
+        emit_focus_change(st, 0, new_id);
     }
 }
 

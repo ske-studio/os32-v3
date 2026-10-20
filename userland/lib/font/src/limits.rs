@@ -79,6 +79,12 @@ pub const CACHE_STATIC_BYTES: usize = 2 * 1024;
 // Value of the `font_set` setting.
 pub const FONT_SET_STD: u16 = 0;
 pub const FONT_SET_KCG_ONLY: u16 = 1;
+// T7b-b5 (PM decision): Latin-1 Supplement and Latin Extended-A/B are half-width
+// (8px cell, latin face only, KCG when the latin face lacks the glyph). Greek,
+// Cyrillic and every other non-ASCII code point stay full-width. U+00A5 is in the
+// range but both shells draw it from the ROM yen (ANK 0x5C, P3-4).
+pub const LATIN_HALF_FIRST: u32 = 0xA0;
+pub const LATIN_HALF_LAST: u32 = 0x24F;
 // Rows above the baseline in a 16-row cell (U1 (a): per-face baseline). 16ppem:
 // Shinonome ascent 13.75 (14 rows above, 2 below); Inconsolata ASCII yMax 11.76 '(',
 // yMin -2.78 'j' (12 above, 3 below). Asserted against the fonts by check-font-engine-host.
