@@ -46,3 +46,12 @@ PCI 0:13.0 `10de:0221` (NVIDIA NV44A、GeForce 6200)、class 03.00、rev a1、su
 - 段 2: PROM の窓 128KB を 2 回読んで一致 (CRC F5ADEE03)、先頭 55 AA 7C (ROM 63,488 B、sum8=0)、後半 64KB は前半の写し。sha256 ec460969…dedd。「GeForce 6200 VGA BIOS IDG1」「Version 5.44.A2.10.00」「nv44 Board - p362h0」。
 - 段 2b (使用許諾の文字列): "Copyright (C) 1996-2004 NVIDIA Corp."・"NVIDIA"・"NVIDIA Corporation" だけ。license・reverse・disassembl を含む行は無い → **ユーザー決定 (2026-10-21)**: 段 3 に進む。ROM の**データの表** (BIT/PINS・初期化スクリプト) を envytools の nvbios・nouveau・Haiku の記述と照らして読むのは可。**ROM の x86 コードの逆アセンブルはしない — 最終手段として、要るときはユーザーが判断する**。
 - 気づき: PMC_ENABLE と PCRTC/PRAMDAC が 0 でないのは、PC-98 の BIOS が POST しない前提に対して何かが一部を有効にしている可能性 (電源投入時の既定値か)。cfg 54h=1 なので段 4b の前に PBUS 0x1854←0 (計画 G1)。
+
+### 段 3 (2026-10-21、ノートで envytools f102b823 の nvbios、逆アセンブルなし、`~/os32-tmp/evidence/2026-10-21/gf6200_s3/`、s3_nvbios.txt 823 行 sha256 f31e1363…7e68)
+
+- BIOS 5.44.a2.10.00 (08/29/05)、NV44/NV44A、BIT 0x0218 版 1.0 (表 2・B v2・C・D・I・L・t・M・P・S v2・T・U・V・i v2)。
+- 表: init script 表 0x5d4c (main 5 本)・condition 0x5d86 (3)・IO flag condition 0x5daa (8)・macro 0x5d66 (4)・PLL limits 0x5bc8 (版 21、4 件、ref_clk 0 = strap から)・DCB 0x96ac (版 3.0: ANALOG OR0・ANALOG OR1・TMDS OR0 (DVI-I)・TV)・I2C 0x9715・GPIO 0x974e・CONN 0x97da (VGA・DVI_I・COMPOSITE・S_VIDEO・RGB)・TMDS 0x95ea・perf 0xdcef (Core 300MHz・Memory 200MHz の 1 段)・memory timings 0xddd1 (全部 0)。strap の上書き select ffef81c3 / value 00001e0c は PSTRAPS の実値と一致。
+- init script: main 0〜4 と SUB/CALL 先を合わせて 9 本、命令 193 個・27 種類 (多い順 ZM_REG 42・NV_REG 36・IO_RESTRICT_PROG 32・TIME 13・ZM_CR 9・DONE 9・INDEX_IO 8・RESUME 6・MACRO 5・…・COMPUTE_MEM 1)。PLL は R[4004]=200MHz・R[4024]=400MHz・R[680508]=36MHz・R[402c]=c1c11002。
+- **基準水晶は 27MHz** (PSTRAPS bit22=1・bit6=0、nouveau の判定 strap&0x00400040 == 0x00400000)。
+- **メモリ**: RAM の組 3 (CR3C の strap bits 2-5 から)、組 3 の PFB 値 (100220=03080e0b・100224=05010405・100228=20220303・10022c=41088102・100234=00266622 ほか)。DDR 系・200MHz までの推定、量は init 3 の COMPUTE_MEM が実行時に測る (段 4a で BAR1 の大きさと合わせて確かめる)。
+- 次: 段 4a (初期化 script の試行、書き込み) は 27 種類の命令の解釈器が要る → astra の設計 (nouveau の devinit/bios の MIT 部と Haiku の coldstart を根拠) と Opus のレビューを先に。書き込みの実施は段ごとにユーザーの承認。
