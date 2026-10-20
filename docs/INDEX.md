@@ -52,6 +52,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | v3 T3以降の実装契約・分割・受入と後半接続 | [T3配置](tasks/v3/TASK_T3_LAYOUT.md)、[T4〜T6bモジュール/起動](tasks/v3/TASK_T4_T6_MODULES.md)、[T7/後半接続](tasks/v3/TASK_T7_AND_FOLLOWUPS.md) (設計中。D決定の本文はTASK_MEMMAP_V3) | V3_PLAN / TASK_MEMMAP_V3 はリンクのみ |
 | T3abの段別実装順序 | [T3ab A〜G](tasks/v3/t3ab/README.md) (設計中) | T3配置の決定を継承 |
 | 実機 Ra266 の画面ドライバ (内蔵 Trident 1023:9660) の設計・資料・段取り | [tasks/realhw/TASK_TRIDENT_DRIVER.md](tasks/realhw/TASK_TRIDENT_DRIVER.md) (設計中 — 設計票 v5 が Codex 5 回目で Approve、実装は未着手) | [tasks/realhw/PLAN.md](tasks/realhw/PLAN.md) §7、[ROADMAP.md](ROADMAP.md) (1 行) |
+| 実機 Ra266 の GeForce 6200 (PCI 0:13.0) の観測方針と手順の計画 | [tasks/realhw/TASK_GEFORCE6200.md](tasks/realhw/TASK_GEFORCE6200.md) (計画中、着手はドライバの見直しの後) | — |
 | 実機 Ra266 の PEGC 640x480 (実機 ROM の OUT 列に合わせたモード設定と受け入れ) | [tasks/realhw/TASK_PEGC480_REALHW.md](tasks/realhw/TASK_PEGC480_REALHW.md) | [RELEASE_v2.1.md](RELEASE_v2.1.md) §2-1、[POLICY_DEBUG.md §4-62](POLICY_DEBUG.md)、`archive/realhw_v21/TASK_PEGC_RA266_TIMING.md` (起票の完了記録) |
 | 現行 / 未実装 / 過去 の区別 | 各文書の冒頭に「現行仕様」「計画」「YYYY-MM-DD 時点のスナップショット」を明記 | — |
 | 票の状態行の語彙 | [POLICY_DEV.md §8](POLICY_DEV.md) の表 (`tools/check_docs_status.py` がそこから読む) | 下の「タスク」節の冒頭 (語の列挙のみ) |
