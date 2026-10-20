@@ -31,6 +31,8 @@
 # 派生アセット (make assets-all で assets/ の上流ファイルから生成する)
 # 上流 (ipadic/*.csv) と設定 (filetypes, profile) は追跡する。
 /assets/fonts/*.kcgfont
+/assets/fonts/*.g16
+/assets/fonts/*.g16.tmp
 # IPAex フォントの TTF は追跡しない — ビルド時に tools/fetch_fonts.py が IPA の
 # 公式配布から取る (ユーザー決定 2026-09-30)。ライセンス文と README.OS32 は追跡する。
 # .license_accepted はライセンスに同意した記録 (ホストごと)。

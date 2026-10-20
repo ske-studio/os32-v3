@@ -48,7 +48,7 @@ jobs:
       #   build-essential (ホスト試験の gcc、ツールチェーンの構築)、e2fsprogs (ホスト試験の e2fsck / mke2fs)、
       #   libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex (build_cross.sh: GCC / binutils の構築)。
       #   FD イメージは tools/mkfat12.py (純 Python) なので mtools は要らない。
-      # Python の依存は requirements.txt (ビルドの必須は lz4 と PyYAML、フォント生成に Pillow)。
+      # Python の依存は requirements.txt (ビルドの必須は lz4・PyYAML・fonttools (東雲 16 の束 .g16)、フォント生成に Pillow)。
       - name: Host dependencies
         run: |
           sudo apt-get update
@@ -117,6 +117,7 @@ jobs:
         run: python3 tools/fetch_fonts.py --family inconsolata
 
       # 41MB の zip は保存せず、必要な TTF とライセンスだけを独立した key で保存する。
+      # 束 (JF-Dot-Shinonome16.g16、TASK_FONTPERF) は cache せず make all が毎回 TTF から作る (1〜2 s)。
       - name: Cache JF Dot Shinonome16 font
         uses: actions/cache@v4
         with:

@@ -590,6 +590,7 @@ class FontVendorTest(unittest.TestCase):
 DEPLOY_YAML = ROOT / "userland" / "deploy.yaml"
 ASSETS_MK = ROOT / "build" / "assets.mk"
 PATHS_RS = ROOT / "userland" / "lib" / "font" / "src" / "paths.rs"
+G16_NAME = "JF-Dot-Shinonome16.g16"  # TASK_FONTPERF ⓐ (build/assets.mk GUI_FONT_G16)
 DEPLOY_SOURCE = None  # check_mutations() が差し替える (本物は書き換えない)
 
 
@@ -618,8 +619,9 @@ class GuiFontDeployTest(unittest.TestCase):
                                       "JF-Dot-Shinonome16-LICENSE.txt"},
                          "paths.rs の名前と fetch_fonts の取得物が違う")
         rows = {e["host"]: e for e in self.files if e["host"].startswith("assets/fonts/")}
-        self.assertEqual(set(rows), {"assets/fonts/" + n for n in names},
-                         "配る font は標準 set の 4 本だけ (IPAex は配らない)")
+        # TASK_FONTPERF ⓐ: 取得物 4 本 + 東雲 16 の束 (派生物、tools/gen_g16.py)。
+        self.assertEqual(set(rows), {"assets/fonts/" + n for n in names} | {"assets/fonts/" + G16_NAME},
+                         "配る font は標準 set の 4 本と東雲の束だけ (IPAex は配らない)")
         for host, e in rows.items():
             self.assertEqual(e["guest"].rstrip("/"), self.font_dir, host)
             self.assertEqual(e.get("tags"), ["gui"], host)
@@ -633,6 +635,10 @@ class GuiFontDeployTest(unittest.TestCase):
         self.assertIn("--family jfdot-shinonome16", mk)
         self.assertIn("$(filter-out $(GUI_FONT_FILES),$(ASSETS_ALL))", mk,
                       "make clean が取得したフォントを消す")
+        # 束は派生物: 配備の集合に入り、GUI_FONT_FILES (消さない取得物) の外にある。
+        self.assertIn("GUI_FONT_G16 = $(FONT_DIR)/" + G16_NAME, mk)
+        self.assertRegex(mk, r"ASSETS_DEPLOYED = assets/fep.db \$\(GUI_FONT_FILES\) \$\(GUI_FONT_G16\)")
+        self.assertNotRegex(mk, r"GUI_FONT_FILES = [^\n]*G16")
 
 
 def check_deploy_mutations():

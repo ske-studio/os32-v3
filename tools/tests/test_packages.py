@@ -90,7 +90,9 @@ GUI_FILES = ['/bin/gshell.bin', '/sys/lib/libos32gui.shlib',
              '/usr/share/fonts/JF-Dot-Shinonome16.ttf',
              '/usr/share/fonts/JF-Dot-Shinonome16-LICENSE.txt',
              '/usr/share/fonts/Inconsolata-Regular.ttf',
-             '/usr/share/fonts/Inconsolata-OFL.txt']
+             '/usr/share/fonts/Inconsolata-OFL.txt',
+             # TASK_FONTPERF ⓐ: 東雲 16 の描き済みの字形の束 (派生物、tools/gen_g16.py)
+             '/usr/share/fonts/JF-Dot-Shinonome16.g16']
 
 
 def check(cond, label):

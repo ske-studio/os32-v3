@@ -15,6 +15,9 @@ check-font-raster-host:
 - tools/tests/test_font_reader.py
 - tools/tests/host32.py
 - tools/fetch_fonts.py
+- tools/gen_g16.py
+- tools/g16/**
+- assets/ipadic/*.csv
 - build/checks.d/check-font-raster-host.mk
 - tools/check_map.d/check-font-raster-host.yaml
 - assets/fonts/IPA_Font_License_Agreement_v1.0.txt

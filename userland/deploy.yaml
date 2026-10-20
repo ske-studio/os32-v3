@@ -474,6 +474,12 @@ filesystem:
     - host: assets/fonts/Inconsolata-OFL.txt
       guest: /usr/share/fonts/
       tags: [gui]
+    # 東雲 16 の描き済みの字形の束 (TASK_FONTPERF ⓐ)。取得した TTF の EBDT 16px から
+    # ホストで作る派生物 (build/assets.mk の GUI_FONT_G16、tools/gen_g16.py)。gshell と
+    # libos32gui が TTF と head の照合をしてから読む (外れたら TTF 経路)。
+    - host: assets/fonts/JF-Dot-Shinonome16.g16
+      guest: /usr/share/fonts/
+      tags: [gui]
     # font_test (T7b-a5) は /data/JF-Dot-Shinonome16.ttf (必須) と
     # /data/Inconsolata-Regular.ttf・/data/ipaexg.ttf (任意) を読む。使う人が
     # tools/fetch_fonts.py で取った原本を hsync などで /data に置く。サブセット TTF は廃止。

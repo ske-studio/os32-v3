@@ -11,7 +11,7 @@
 #    設定       人が書くもの。git で追跡する。
 #               filetypes, profile, profile_fdd, joyo_kanji.txt
 #    派生物     上流から生成できるもの。git では追跡せず、ここで作る。
-#               fonts/*.kcgfont, fep*.db, fep.dic
+#               fonts/*.kcgfont, fonts/*.g16, fep*.db, fep.dic
 #
 #  派生物を追跡しないのは、履歴上位の巨大 blob の大半がこれだったため。
 #  生成は数秒で終わる (FEP 辞書 5.8MB で 1 秒未満)。
@@ -40,6 +40,11 @@ INCONSOLATA_FILES = $(FONT_DIR)/Inconsolata-Regular.ttf $(FONT_DIR)/Inconsolata-
 JFDOT_FILES = $(FONT_DIR)/JF-Dot-Shinonome16.ttf $(FONT_DIR)/JF-Dot-Shinonome16-LICENSE.txt
 GUI_FONT_FILES = $(INCONSOLATA_FILES) $(JFDOT_FILES)
 FONT_TTFS = $(IPAEX_TTFS) $(FONT_DIR)/Inconsolata-Regular.ttf $(FONT_DIR)/JF-Dot-Shinonome16.ttf
+# TASK_FONTPERF ⓐ: 東雲 16 の描き済みの字形の束 (.g16) とその先読み一覧。取得物ではなく
+# 派生物 (取得した TTF の EBDT 16px strike からホストで生成、決定的、1〜2 s)。追跡しない。
+# 置き場は font crate の paths.rs (FONT_JA_G16) が正典 [C4]。
+GUI_FONT_G16 = $(FONT_DIR)/JF-Dot-Shinonome16.g16
+PRELOAD16 = $(BUILD_OUT)/preload16.txt
 
 $(IPAEX_TTFS) &: tools/fetch_fonts.py
 	@python3 tools/fetch_fonts.py $(FONT_FETCH_FLAGS) || { rc=$$?; \
@@ -60,13 +65,24 @@ $(JFDOT_FILES) &: tools/fetch_fonts.py
 	@python3 tools/fetch_fonts.py --family jfdot-shinonome16 $(FONT_FETCH_JFDOT_FLAGS) || { rc=$$?; \
 	  echo "*** JF ドット東雲16 取得失敗 (tools/fetch_fonts.py rc=$$rc): オフラインなら FONT_FETCH_JFDOT_FLAGS=\"--zip PATH\"" >&2; exit $$rc; }
 
-fonts: $(FONT_TTFS) $(GUI_FONT_FILES)
+# 先読み一覧 (設計 §4): JIS 1〜8 区 + UI の字 (tools/g16/ui_chars.txt、手で更新して
+# コミット) + IPADIC のコスト順。
+$(PRELOAD16): $(FONT_DIR)/JF-Dot-Shinonome16.ttf tools/g16/gen_preload16.py tools/gen_g16.py \
+              tools/g16/ui_chars.txt $(wildcard $(IPADIC_DIR)/*.csv)
+	@mkdir -p $(dir $@)
+	python3 tools/g16/gen_preload16.py --ttf $< -o $@
+
+# 束 (設計 §2)。EBDT が無い (rc 3)・fontTools が無い (rc 4)・cell に収まらない字 (rc 5) は止める。
+$(GUI_FONT_G16): $(FONT_DIR)/JF-Dot-Shinonome16.ttf tools/gen_g16.py $(PRELOAD16)
+	python3 tools/gen_g16.py --ttf $< --preload $(PRELOAD16) -o $@
+
+fonts: $(FONT_TTFS) $(GUI_FONT_FILES) $(GUI_FONT_G16)
 	@echo "=== フォント (IPAex 2 本 + GUI 標準 set、$(FONT_DIR)/) ==="
 
 # 取得した ttf と同意の記録は `make clean` (clean-assets) では消さない (ユーザー指示
 # 2026-09-30: ライセンスの確認は初回ビルドの 1 回だけ)。消すのはこの明示の目標だけ。
 fonts-clean:
-	rm -f $(FONT_TTFS) $(GUI_FONT_FILES) $(FONT_DIR)/*.part $(FONT_DIR)/.license_accepted
+	rm -f $(FONT_TTFS) $(GUI_FONT_FILES) $(GUI_FONT_G16) $(PRELOAD16) $(FONT_DIR)/*.part $(FONT_DIR)/.license_accepted
 
 # --- 旧ビットマップ形式: host 画面比較 fixture 専用 (配布しない) ---
 # 本文用はゴシック。明朝は 16x16 だと細い横画が飛ぶ (CLAUDE.md の Known Gotchas)。
@@ -113,7 +129,8 @@ $(SETTINGS_V2_FIXTURE): $(SETTINGS_TSV) tools/mk_settings_db.py FORCE
 	python3 tools/mk_settings_db.py --tsv $(SETTINGS_TSV) --out $@ --schema-version 2
 
 # 配備に必要な最小限。make all はこれに依存する (GUI の標準 font set は取得物)。
-ASSETS_DEPLOYED = assets/fep.db $(GUI_FONT_FILES)
+# 束 (GUI_FONT_G16) は派生物なので GUI_FONT_FILES (取得物) とは別に足し、clean-assets で消す。
+ASSETS_DEPLOYED = assets/fep.db $(GUI_FONT_FILES) $(GUI_FONT_G16)
 
 # 開発時に使うものも含めた全部。
 # settings.db は通常配備の対象ではない (媒体だけが持つ) ので ASSETS_DEPLOYED
@@ -131,8 +148,8 @@ assets-deployed: $(ASSETS_DEPLOYED)
 assets-all: $(ASSETS_ALL)
 	@echo "=== 派生アセット $(words $(ASSETS_ALL)) 件 ==="
 
-# 取得したフォント (GUI_FONT_FILES) は消さない (fonts-clean だけが消す)。
+# 取得したフォント (GUI_FONT_FILES) は消さない (fonts-clean だけが消す)。束と先読み一覧は消す。
 clean-assets:
-	rm -f $(filter-out $(GUI_FONT_FILES),$(ASSETS_ALL))
+	rm -f $(filter-out $(GUI_FONT_FILES),$(ASSETS_ALL)) $(PRELOAD16)
 
 .PHONY: fonts fonts-clean assets-deployed assets-all clean-assets
