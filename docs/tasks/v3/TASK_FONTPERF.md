@@ -1,6 +1,6 @@
 # TASK_FONTPERF — 標準フォントの描画を D15 に届かせる (描き済みの字形の束・枠の詰め直し・先読み・領域の拡大・ラスタの整数化)
 
-> 状態: **実装中 (2026-10-20、詳細設計は確定)** — T7 の後、KPEEK より先に行う (ユーザー 2026-10-20「先にフォントを直しておきましょう」)。
+> 状態: **受入完了・実機確認待ち (2026-10-21、F1〜F6 着地・NP21/W と Ra266 で計測、残りは画面確認の項目 = 台帳 T7B-REALHW)** — T7 の後、KPEEK より先に行う (ユーザー 2026-10-20「先にフォントを直しておきましょう」)。
 
 ## 0. ユーザー決定と背景 (2026-10-20)
 
@@ -28,3 +28,11 @@
 | F7 | 受入の記録、NP21/W で FPU 無し 1 回、Ra266 の再計測、節目の全体検査 | 最後 |
 
 PM 決定: 束の照合は head 12B と索引の CRC32、先読み一覧は IPADIC (THIRD_PARTY の行) のコスト順 + 公的字表 + UI、起動 +0.2〜0.25s を許容 (Ra266 で 0.5s 以内、超えたら 1,000 字)、shell の lease +1、app arena 128KiB・先読み 1,600 字 (F4 で決め直す)、memmap の再割りは像の残りが 10KB 未満のときだけ。字形 cache の追い出しは age 近似 LRU から clock に替えた。
+
+## 2. 受入 (2026-10-21)
+
+- 段: F1 (束の生成)・F2 (Cell 枠と clock)・F3 (束の読みと先読み、lease 3)・F3b (gshell の像の上限 0xA5000、sbrk の余裕 64KiB、世代 4 のまま)・F5 (整数化)・F6 (x87 guard の撤去) が main に着地 (8736b65 まで)。各段は Opus 実装・Fable レビュー。
+- **Ra266 (8736b65、ノートの `~/os32-tmp/evidence/2026-10-20/realhw_fontperf/`)**: 1 回の text() (40 字) の最大 — scatter **300ms → 100ms**、seq 80 → 50ms (tick 10ms)。cold 1,000 字 — scatter 6.61 → 1.55 秒、seq 1.04 → 0.88 秒。warm は 0.02 秒。束 ok・reject 0・err 0、先読み 1,600、raster 0 (全字が束から)。FONTCHK 2 行一致、font_lease_test lease 11/11・limit 5/5 (上限 3 本)、SERVICES_READY・部品 9 個 rc=0・leftover 0。
+- **NP21/W**: `~/os32-tmp/evidence/2026-10-20/fpf3/`・`fpf3b/`・`fpf6/` (scatter cold 6.80 → 1.03 秒、text() の最大 290 → 50ms、gshell の exec_heap peak 131,656 B、x87 命令は gshell・libos32gui とも objdump で 0 件)。
+- **D15 (100ms)**: Ra266 で散った未 cache の漢字だけの 40 字が上限ちょうど (10 tick)。先読みの 1,600 字に当たる普通の文はさらに速い。P100 では超える見込みが残る → 台帳 T7B-REALHW に「P100 または Ra266 の画面で入力→描画を測る」として残す。
+- **確かめられないもの**: FPU 無しの構成 — NP21/W に FPU を外す設定が無く (CPU feature の FPU bit は情報表示だけ)、実機 2 台とも FPU あり。x87 命令 0 件 (objdump、試験 check-font-raster-host・check-font-guard-host の変異) を根拠にする。gshell の起動時間 (NP21/W 0.63 秒、Ra266 は画面が要る) は画面確認の項目。
