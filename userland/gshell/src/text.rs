@@ -1,7 +1,7 @@
 //! text.rs — gshell の文字描画の 1 本 (T7b-b3 S3、設計 t7bb34 §2-2・§3-2)。
 //!
-//! 呼び手 15 か所の `kcg_draw_utf8` をここへ置き換えるのは S6。ここは API と
-//! 描画の中身だけ:
+//! gshell の文字は全部ここを通る (S6 で `kcg_draw_utf8` 直叩き 15 か所と
+//! `kcg_set_scale` を置き換えた、FEP の ANK cell は [`draw_ank`])。中身:
 //!
 //! - [`draw`] (不透過: cell∩clip を `bg` で塗ってから `fg`) / [`draw_t`] (透過)
 //!   / [`draw_x2`] (32px: 16px の bitmap を最近傍 2 倍、Engine には Px16 で引く)。
@@ -97,21 +97,36 @@ impl Iterator for TtfGlyphs<'_> {
 }
 
 /// 不透過で描く。戻り値は送った幅 (最後の行、`kcg_draw_utf8` と同じ)。
-#[allow(dead_code)] // 呼び手は S6
 pub fn draw(clip: Rect, x: i32, y: i32, s: &[u8], fg: u8, bg: u8) -> i32 {
     draw_ex(clip, x, y, s, fg, Some(bg), 1)
 }
 
 /// 透過で描く (`fg` の画素だけ)。
-#[allow(dead_code)] // 呼び手は S6
+#[allow(dead_code)] // 呼び手は今は無い (S6 の置き換え先は全部不透過)
 pub fn draw_t(clip: Rect, x: i32, y: i32, s: &[u8], fg: u8) -> i32 {
     draw_ex(clip, x, y, s, fg, None, 1)
 }
 
 /// 32px (16px の bitmap を最近傍 2 倍)。`bg` が `None` なら透過。
-#[allow(dead_code)] // 呼び手は S6
+#[allow(dead_code)] // 呼び手は今は無い (gshell の kcg_set_scale は全部 1 だった)
 pub fn draw_x2(clip: Rect, x: i32, y: i32, s: &[u8], fg: u8, bg: Option<u8>) -> i32 {
     draw_ex(clip, x, y, s, fg, bg, 2)
+}
+
+/// ANK byte 1 字を不透過で描く (FEP の w==1 cell、設計 §3-3)。byte は Unicode
+/// でなく ANK として読む: 0x20..=0x7E で 0x5C 以外は TTF (cp = その ASCII、
+/// [`route`] と同じ entry)、**0x5C は ROM の ¥** (Inconsolata の `\` は描かない)、
+/// 半角カナ (0xA1..=0xDF) などそれ以外は ROM。0x20 未満は送らない。戻り値は送った幅。
+pub fn draw_ank(clip: Rect, x: i32, y: i32, ank: u8, fg: u8, bg: u8) -> i32 {
+    if ank < 0x20 {
+        return 0;
+    }
+    if ank <= 0x7E && ank != ANK_YEN {
+        return draw(clip, x, y, &[ank, 0], fg, bg);
+    }
+    let rows = kcg_ank(ank);
+    put_cell(clip, x, y, ANK_W, 1, &rows, fg, Some(bg));
+    ANK_W
 }
 
 /// 1 cell の 1bpp (行ごと u16、MSB = 左端の画素、半角は上位 8 bit だけ)。

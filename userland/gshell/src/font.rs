@@ -264,30 +264,69 @@ pub fn retry_armed() -> bool {
 }
 
 /// lease を閉じる。guard の中なら抜けてから ([`flush_deferred`])。
+///
+/// WM の handler / pump の中 (段 B が WM 外の close を断る文脈) で入口の検証が
+/// Stale になると、`Engine::begin` が face を閉じてここへ来る。service はそこで
+/// close を INVAL で断る (lease は retire まで残る) ので、**断られた close も保留**
+/// し、次の top-level の安全点 ([`consume_retry`] の頭) で 1 回だけ閉じ直す
+/// (Fable の S3 レビュー、設計 t7bb34「S3・S4 の取り込みで送る項目」)。
 fn close_lease(id: u32) {
-    let font = f();
-    if font.in_guard {
-        if font.n_deferred < DEFER_MAX {
-            font.deferred[font.n_deferred] = id;
-            font.n_deferred += 1;
-        }
+    if f().in_guard {
+        defer_close(id);
         return;
     }
     if let Some(t) = ffi::shell_service() {
-        let _ = svc_close(t, id);
-        stats().closes = stats().closes.wrapping_add(1);
+        if svc_close(t, id) < 0 {
+            defer_close(id);
+        } else {
+            stats().closes = stats().closes.wrapping_add(1);
+        }
+    }
+}
+
+fn defer_close(id: u32) {
+    let font = f();
+    if font.n_deferred < DEFER_MAX {
+        font.deferred[font.n_deferred] = id;
+        font.n_deferred += 1;
+    }
+}
+
+/// 保留した close を閉じ直す。`keep` = 断られたらまた保留する (guard を抜けた
+/// 直後 — WM の中かもしれない)。top-level の安全点では `false` (断られたら諦め、
+/// 残りは retire が閉じる — 同じ id を毎周叩かない)。
+fn flush_deferred_ex(keep: bool) {
+    let font = f();
+    let n = font.n_deferred;
+    let ids = font.deferred;
+    font.n_deferred = 0;
+    let t = ffi::shell_service();
+    let mut i = 0;
+    while i < n {
+        let id = ids[i];
+        i += 1;
+        let t = match t {
+            Some(t) => t,
+            None => continue,
+        };
+        if svc_close(t, id) < 0 {
+            if keep {
+                defer_close(id);
+            }
+        } else {
+            stats().closes = stats().closes.wrapping_add(1);
+        }
     }
 }
 
 fn flush_deferred() {
-    let font = f();
-    let n = font.n_deferred;
-    font.n_deferred = 0;
-    let mut i = 0;
-    while i < n {
-        close_lease(font.deferred[i]);
-        i += 1;
-    }
+    flush_deferred_ex(true);
+}
+
+/// 試験の観測点: 保留中の close の本数。
+#[cfg(test)]
+pub fn deferred_closes() -> usize {
+    f().n_deferred
 }
 
 /// guard の中で `call(ctx)` を 1 回。戻りは callback の戻りか guard の誤り。
@@ -503,8 +542,14 @@ pub fn reconfigure(st: &mut GuiState, font_set: u8) {
 }
 
 /// 前回の open 失敗 (`OpenFailed` / `Nospc` / `Busy`) を 1 回だけ開き直す
-/// (`settings::consume` の頭、top-level)。戻り値 `true` = 開き直した。
+/// (`settings::consume` の頭、top-level)。その前に WM の中で断られた close を
+/// 1 回だけ閉じ直す ([`close_lease`])。戻り値 `true` = 開き直した。
 pub fn consume_retry(st: &mut GuiState) -> bool {
+    /* WM の中で断られた close (Stale) を先に閉じる。 */
+    if f().n_deferred > 0 {
+        flush_deferred_ex(false);
+        sync_stats();
+    }
     if !f().retry {
         return false;
     }
@@ -523,7 +568,7 @@ pub fn consume_retry(st: &mut GuiState) -> bool {
 pub fn close_all() {
     let _ = f().engine.close();
     f().retry = false;
-    flush_deferred();
+    flush_deferred_ex(false);
     sync_stats();
 }
 

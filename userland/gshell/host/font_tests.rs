@@ -214,6 +214,50 @@ fn f16_stale_lease_falls_back_to_kcg_and_closes() {
     assert!(fontsvc::calls().iter().filter(|c| c.0 == "close").all(|c| !c.1));
 }
 
+/// Fable の S3 レビュー (軽): WM の handler / pump の中で Stale になると service は
+/// close を INVAL で断る。断られた close は保留し、次の `settings::consume` の頭
+/// (`consume_retry`、top-level) で 1 回だけ閉じ直す。top-level でも断られたら諦める
+/// (retire が閉じる、毎周叩かない)。
+#[test]
+fn f16b_stale_inside_wm_defers_the_rejected_close_to_consume() {
+    use os32api::gui::proto::{OS32_ERR_INVAL, OS32_ERR_STALE};
+    let mut st = opened();
+    let clip = wm::Rect::new(0, 0, 640, 400);
+    fontsvc::with(|f| {
+        f.validate_ret = OS32_ERR_STALE;
+        f.close_fail = Some(OS32_ERR_INVAL);
+    });
+    let closes0 = unsafe { gshell_font_stats }.closes;
+    text::draw(clip, 0, 0, b"A", 1, 0);
+    assert_eq!(engine().state(), State::KcgOnly(Reason::Stale));
+    assert_eq!(fontsvc::open_count(), 2, "断られた close で lease が閉じたことになっている");
+    assert_eq!(deferred_closes(), 2, "断られた close を保留していない");
+    assert_eq!(unsafe { gshell_font_stats }.closes, closes0, "断られた close を数えた");
+    /* top-level に戻った: consume の頭で閉じ直す (retry は立っていない)。 */
+    fontsvc::with(|f| f.close_fail = None);
+    assert!(!retry_armed());
+    settings::consume(&mut st);
+    assert_eq!(fontsvc::open_count(), 0, "consume で保留の close を流していない");
+    assert_eq!(deferred_closes(), 0);
+    assert_eq!(unsafe { gshell_font_stats }.closes, closes0 + 2);
+    assert!(fontsvc::calls().iter().filter(|c| c.0 == "close").all(|c| !c.1));
+
+    /* top-level でも断られる close は 1 回で諦める。 */
+    let mut st = opened();
+    fontsvc::with(|f| {
+        f.validate_ret = OS32_ERR_STALE;
+        f.close_fail = Some(OS32_ERR_INVAL);
+    });
+    text::draw(clip, 0, 0, b"A", 1, 0);
+    assert_eq!(deferred_closes(), 2);
+    let n = fontsvc::count("close");
+    settings::consume(&mut st);
+    assert_eq!(fontsvc::count("close") - n, 2, "保留の close を 1 回ずつ");
+    assert_eq!(deferred_closes(), 0, "top-level で断られた close を積み直した");
+    settings::consume(&mut st);
+    assert_eq!(fontsvc::count("close") - n, 2, "次の周も同じ id を叩いた");
+}
+
 #[test]
 fn f17_trim_empties_cache_keeps_arena_and_leases_then_rebuilds() {
     let _st = opened();

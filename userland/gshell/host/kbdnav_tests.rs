@@ -1937,3 +1937,45 @@ fn imecand_gui_on_visible_after_install_and_cancel_while_typing_enters_fep() {
     *fep::state() = fep::Fep::NEW;
     mocks::init(); fep_off();
 }
+
+// T7b-b4 S6: FEP の cell grid は text.rs を通る。w==1 の cell は ANK byte
+// (0x5C は ROM の ¥、半角カナも ROM)、w==2 は Unicode。grid・CELL_W/CELL_H は不変。
+fn s6_ank_cells_draw() {
+    let r = &fep::GSHELL_IME_RENDER_GFX;
+    (r.begin)();
+    (r.clear_row)(fep::PREEDIT_ROW as i32, 0);
+    (r.putc)(0, fep::PREEDIT_ROW as i32, 0x5C, 0xA1);
+    (r.putc)(1, fep::PREEDIT_ROW as i32, 0xB1, 0xA1);
+    (r.putc)(2, fep::PREEDIT_ROW as i32, b'A', 0xA1);
+    (r.putw)(3, fep::PREEDIT_ROW as i32, 0x3042, 0xA1);
+    (r.end)();
+}
+unsafe extern "C" fn s6_install(_table: *mut u8) {
+    s6_ank_cells_draw();
+}
+#[test]
+fn s6_fep_cells_use_ank_route_and_keep_the_grid() {
+    mocks::init(); fep_off();
+    *fep::state() = fep::Fep::NEW;
+    let shm = mocks::Shm::new();
+    let mut st = windows(&shm, &[(20, 20, 180, 120)]);
+    mocks::fep_script(&[]);
+    unsafe {
+        (*os32api::api_ptr()).ime_set_render = s6_install;
+    }
+    fep::install();
+    fep::pre_cycle(&mut st);
+    fep::post_cycle(&mut st);
+    let fr = fep::rect();
+    assert!(!fr.is_empty());
+    /* 候補窓が無い (未確定行だけ): KCG のみの mock なので全部 ROM。 */
+    assert_eq!(mocks::kcg_reads(), vec![('a', 0x5C), ('a', 0xB1), ('a', 0x41), ('k', 0x2422)],
+               "w==1 の byte を Unicode として引いた (0xB1 → U+00B1 など)");
+    let xy: Vec<_> = mocks::font_draws().iter().map(|d| (d.x - fr.x, d.y - fr.y, d.w_bytes)).collect();
+    let (x0, y0) = (1 + 2, 1 + 2); /* 枠 1 + PAD 2 */
+    assert_eq!(xy, vec![(x0, y0, 1), (x0 + fep::CELL_W, y0, 1), (x0 + 2 * fep::CELL_W, y0, 1),
+                        (x0 + 3 * fep::CELL_W, y0, 2)],
+               "cell の位置・幅 (8|16) が grid と違う");
+    *fep::state() = fep::Fep::NEW;
+    mocks::init(); fep_off();
+}

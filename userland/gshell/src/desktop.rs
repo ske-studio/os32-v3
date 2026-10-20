@@ -84,7 +84,7 @@ pub fn hint_rect() -> Rect {
 }
 
 /// 手引きの文字を描く (デバッグ専用)。掛かるウィンドウが 1 枚でもあれば描かない
-/// (kcg_draw_utf8 にクリップが無いので、はみ出して窓を壊さないための保険)。
+/// (窓の上に背景の字を重ねないため。字は画面で clip して描く)。
 pub fn draw_hint(st: &GuiState) {
     if !crate::DEBUG_SHORTCUTS {
         return;
@@ -104,8 +104,6 @@ pub fn draw_hint(st: &GuiState) {
     } else {
         (GUI_COLOR_TITLE_TEXT, st.cfg.desktop_color)
     };
-    unsafe {
-        gfx::kcg_set_scale(1);
-        gfx::kcg_draw_utf8(HINT_X, HINT_Y, HINT.as_ptr(), fg, bg);
-    }
+    let screen = Rect::new(0, 0, st.screen_w, st.screen_h);
+    crate::text::draw(screen, HINT_X, HINT_Y, HINT, fg, bg);
 }

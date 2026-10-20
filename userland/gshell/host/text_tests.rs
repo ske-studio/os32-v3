@@ -174,3 +174,31 @@ fn t08_missing_glyph_in_both_faces_goes_to_kcg() {
     draw(FULL, 0, 0, "\u{E000}".as_bytes(), 1, 0);
     assert_eq!(fontsvc::with(|f| f.reads), reads);
 }
+
+#[test]
+fn t09_draw_ank_reads_the_byte_as_ank_not_unicode() {
+    /* FEP の w==1 cell (S6): byte は ANK。0x5C は ROM の ¥、半角カナも ROM、
+     * 0x20..=0x7E の残りは draw と同じ TTF の entry、0x20 未満は送らない。 */
+    kcg_only();
+    assert_eq!(draw_ank(FULL, 0, 0, 0x5C, 1, 0), 8);
+    assert_eq!(draw_ank(FULL, 8, 0, 0xB1, 1, 0), 8);
+    assert_eq!(draw_ank(FULL, 16, 0, b'A', 1, 0), 8);
+    assert_eq!(draw_ank(FULL, 24, 0, 0x1B, 1, 0), 0);
+    assert_eq!(mocks::kcg_reads(), vec![('a', 0x5C), ('a', 0xB1), ('a', 0x41)],
+               "KCG のみでは全部 ROM の ANK (0xB1 を U+00B1 の漢字にしない)");
+    let xy: Vec<_> = draws().iter().map(|d| (d.x, d.y, d.w_bytes, d.h_lines)).collect();
+    assert_eq!(xy, vec![(0, 0, 1, 16), (8, 0, 1, 16), (16, 0, 1, 16)], "8px の cell、制御字は描かない");
+
+    let _st = with_fonts();
+    draw_ank(FULL, 0, 0, b'A', 1, 0);
+    draw_ank(FULL, 8, 0, 0x5C, 1, 0);
+    draw_ank(FULL, 16, 0, 0xB1, 1, 0);
+    assert_eq!(mocks::kcg_reads(), vec![('a', 0x5C), ('a', 0xB1)],
+               "'A' は Inconsolata、¥ (0x5C) と半角カナは ROM (Inconsolata の \\ は描かない)");
+    let ank_a = mocks::pixels();
+    mocks::clear(9);
+    draw(FULL, 0, 0, b"A", 1, 0);
+    let p = mocks::pixels();
+    assert!((0..16).all(|y| (0..8).all(|x| p[y * mocks::W + x] == ank_a[y * mocks::W + x])),
+            "draw_ank の 'A' が draw の 'A' と違う");
+}

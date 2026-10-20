@@ -87,24 +87,8 @@ pub extern "C" fn gfx_line(mut x: i32, mut y: i32, x1: i32, y1: i32, c: u8) {
         }
     }
 }
-#[no_mangle]
-pub extern "C" fn kcg_set_scale(_: i32) {}
-#[no_mangle]
-pub unsafe extern "C" fn kcg_draw_utf8(x: i32, y: i32, s: *const u8, fg: u8, bg: u8) -> i32 {
-    let mut n = 0;
-    while *s.add(n) != 0 && n < 256 {
-        n += 1;
-    }
-    let text = std::str::from_utf8(std::slice::from_raw_parts(s, n)).unwrap_or("?");
-    let mut xx = x;
-    for c in text.chars() {
-        let w = if c.is_ascii() { 8 } else { 16 };
-        gfx_fill_rect(xx, y, w, 16, bg);
-        gfx_hline(xx, y, w, fg);
-        xx += w;
-    }
-    xx - x
-}
+/* gshell の文字は text.rs (gfx_draw_font) だけを通る (T7b-b4 S6)。
+ * `kcg_draw_utf8` / `kcg_set_scale` の贋物は置かない — 呼べばリンクで落ちる。 */
 /* lib/utf8.c の unicode_to_ank と同じ対応。全角は 0 (= FEP のセル幅判定が
  * 2 桁扱いにする)。以前は libos32term_render::ank を借りていたが、gshell は
  * もう T4/T5R に依存しないのでここへ写した。 */
@@ -1115,6 +1099,8 @@ pub mod fontsvc {
         pub validate_ret: i32,
         /// guard を callback を呼ばずにこの rc で返す。
         pub guard_ret: Option<i32>,
+        /// close をこの rc で断る (lease は開いたまま — WM の中の段 B を模す)。
+        pub close_fail: Option<i32>,
         pub reads: usize,
     }
     pub static FAKE: Mutex<Option<Fake>> = Mutex::new(None);
@@ -1214,6 +1200,9 @@ pub mod fontsvc {
     unsafe extern "C" fn close(id: u32) -> i32 {
         with(|f| {
             note(f, "close");
+            if let Some(rc) = f.close_fail {
+                return rc;
+            }
             match f.leases.get_mut(id as usize - 1) {
                 Some(l) if l.is_some() => {
                     *l = None;

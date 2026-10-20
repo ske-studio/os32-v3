@@ -58,7 +58,7 @@
 #![allow(dead_code)]
 
 use crate::wm::{GuiState, Rect};
-use crate::{cursor, damage, input, modal, ring, wm};
+use crate::{cursor, damage, input, modal, ring, text, wm};
 use os32api::gfx;
 use os32api::gui::proto::{GUI_COLOR_ACCENT, GUI_COLOR_CLOSE, GUI_COLOR_LINK, GUI_COLOR_OK,
                           GUI_COLOR_TEXT, GUI_COLOR_WARN, GUI_COLOR_WINDOW, GUI_MAX_WINDOWS};
@@ -940,10 +940,10 @@ fn draw_box(_st: &GuiState, r: Rect) {
     }
 }
 
+/// cell grid を箱 `boxr` の中へ描く。grid・`CELL_W`/`CELL_H`・箱は不変 (b4⑤)。
+/// w==1 の cell は **ANK byte** として ANK 経路 ([`text::draw_ank`]: 0x5C は ROM の ¥、
+/// 半角カナも ROM)、w==2 は Unicode を [`text::draw`] で (東雲、無ければ KCG)。
 fn draw_cells(f: &Fep, r0: usize, r1: usize, c0: usize, boxr: Rect) {
-    unsafe {
-        gfx::kcg_set_scale(1);
-    }
     let mut y = r0;
     while y <= r1 && y < ROWS {
         let base = y * COLS;
@@ -953,16 +953,14 @@ fn draw_cells(f: &Fep, r0: usize, r1: usize, c0: usize, boxr: Rect) {
             let w = f.grid.wide[base + x];
             if w != 0 {
                 let px = boxr.x + 1 + PAD + ((x - c0) as i32) * CELL_W;
-                let mut buf = [0u8; 5];
-                cp_to_utf8(f.grid.cp[base + x], &mut buf);
-                unsafe {
-                    gfx::kcg_draw_utf8(
-                        px,
-                        py,
-                        buf.as_ptr(),
-                        attr_color(f.grid.attr[base + x]),
-                        GUI_COLOR_TEXT,
-                    );
+                let cp = f.grid.cp[base + x];
+                let fg = attr_color(f.grid.attr[base + x]);
+                if w == 1 {
+                    text::draw_ank(boxr, px, py, cp as u8, fg, GUI_COLOR_TEXT);
+                } else {
+                    let mut buf = [0u8; 5];
+                    cp_to_utf8(cp, &mut buf);
+                    text::draw(boxr, px, py, &buf, fg, GUI_COLOR_TEXT);
                 }
             }
             x += 1;
