@@ -20,5 +20,6 @@ crate-type = ["staticlib", "rlib"]
 [dependencies]
 # in-repo クレートのみ。crates.io からの外部依存はゼロ。
 os32api = { path = "../../../sdk/rust/os32api" }
-# T7b-b3 S4: the product font crate (in-repo; ttf-parser is vendored inside it).
+# T7b-b3 S4: the product font crate (in-repo, no dependencies; since F5 its vendored
+# ttf-parser is only the host tests' oracle).
 os32-font = { path = "../../lib/font" }

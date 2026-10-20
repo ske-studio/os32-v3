@@ -1,12 +1,17 @@
 //! T7b-a5: one glyph -> complete 1bpp bitmap. The outline (a4) is rasterised
 //! once at RASTER_PPEM, unhinted, with FreeType's 26.6 point scaling and
-//! control-box placement, exact signed-area coverage and COVERAGE_THRESHOLD; the 32px image is the 16px bitmap doubled by nearest
-//! neighbour (no 32ppem outline pass). Bitmap rows are top to bottom, byte
+//! control-box placement; the 32px image is the 16px bitmap doubled by nearest
+//! neighbour (no 32ppem outline pass). TASK_FONTPERF F5: integers only — the
+//! signed area/cover of every flattened line is accumulated per cell in
+//! 1/RASTER_SUBPIXEL px (the integer area method of FreeType `ftgrays.c` and
+//! the running-sum accumulation of font-rs; rules only, no code copied) and a
+//! pixel is black at COVERAGE_BLACK_NUM / COVERAGE_BLACK_DEN. Bitmap rows are top to bottom, byte
 //! aligned, MSB = left pixel, unused tail bits 0 (glyph cache design §1bpp).
 //! Nothing reaches the caller's buffer until every input was read, validated
 //! and rasterised; any Err leaves the destination and the exposed coverage
-//! untouched/empty. Call under the a2 x87 guard on OS32 (f32 arithmetic).
+//! untouched/empty. No floating point (the a2 x87 guard is harmless until F6).
 use crate::{
+    fixed::{div_fix, div_round, mul_fix, root4_ceil},
     limits::*,
     outline::{GlyphScratch, Outline, Point},
     reader::{Error, Face, Result, Source},
@@ -51,7 +56,7 @@ const BITS16_BYTES: usize = MAX_BBOX_PX.div_ceil(8) * MAX_BBOX_PX;
 /// FD or registry. Share serially between faces.
 pub struct RasterScratch {
     glyph: GlyphScratch,
-    accum: [f32; ACCUM_LEN],
+    accum: [i32; ACCUM_LEN],
     bits: [u8; BITS16_BYTES],
     out: [u8; MAX_BITMAP_BYTES],
     coverage_len: usize,
@@ -72,17 +77,7 @@ fn scale_16_16(units_per_em: u16) -> Result<i64> {
     if upem == 0 {
         return Err(Error::Invalid);
     }
-    Ok(((i64::from(RASTER_PPEM) * 64 << 16) + upem / 2) / upem)
-}
-
-/// FT_MulFix: round half away from zero.
-fn mul_fix(value: i64, scale: i64) -> i64 {
-    let magnitude = (value.abs() * scale + 0x8000) >> 16;
-    if value < 0 {
-        -magnitude
-    } else {
-        magnitude
-    }
+    Ok(div_fix(i64::from(RASTER_PPEM) * 64, upem))
 }
 
 /// Font units -> 26.6 at `size` exactly as FreeType scales unhinted metrics
@@ -93,72 +88,50 @@ pub fn units_to_26_6(value: i32, units_per_em: u16, size: PixelSize) -> Result<i
     base.checked_mul(size.factor() as i32).ok_or(Error::Bounds)
 }
 
-/// Outline coordinate (font units, f32 from the parser) -> 26.6. Integral and
-/// half units (implicit on-curve midpoints) are exact FT_MulFix; any other
-/// fraction (scaled components) rounds to nearest. NaN/overflow is rejected.
-fn coord_26_6(value: f32, scale: i64) -> Result<i32> {
-    if !(abs(value) <= MAX_COORD_UNITS) {
+/// Outline coordinate (half font units) -> 26.6: FT_MulFix of value/2, i.e.
+/// (|halves| * scale + 2^16) >> 17, half away from zero. Out of range is rejected.
+fn coord_26_6(halves: i32, scale: i64) -> Result<i32> {
+    let magnitude = i64::from(halves).abs();
+    if magnitude > 2 * i64::from(MAX_COORD_UNITS) {
         return Err(Error::Invalid);
     }
-    let twice = value * 2.0;
-    let halves = twice as i64;
-    let magnitude = if halves as f32 == twice {
-        (halves.abs() * scale + 0x10000) >> 17
-    } else {
-        (abs(value) * (scale as f32 / 65536.0) + 0.5) as i64
-    };
-    let signed = if value < 0.0 { -magnitude } else { magnitude };
-    i32::try_from(signed).map_err(|_| Error::Bounds)
+    let rounded = (magnitude * scale + 0x10000) >> 17;
+    i32::try_from(if halves < 0 { -rounded } else { rounded }).map_err(|_| Error::Bounds)
 }
 
-fn floor(v: f32) -> i32 {
-    let i = v as i32;
-    if (i as f32) > v {
-        i - 1
-    } else {
-        i
-    }
-}
-fn ceil(v: f32) -> i32 {
-    let i = v as i32;
-    if (i as f32) < v {
-        i + 1
-    } else {
-        i
-    }
-}
-fn abs(v: f32) -> f32 {
-    if v < 0.0 {
-        -v
-    } else {
-        v
-    }
+/// Bitmap-relative point in 1/RASTER_SUBPIXEL px, y down.
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct Sub {
+    x: i32,
+    y: i32,
 }
 
 struct Canvas<'a> {
-    accum: &'a mut [f32],
+    accum: &'a mut [i32],
     width: usize,
     height: usize,
     edges: usize,
 }
 impl Canvas<'_> {
-    fn add(&mut self, row: usize, column: usize, value: f32) -> Result<()> {
-        let at = row * self.width + column;
-        *self.accum.get_mut(at).ok_or(Error::Bounds)? += value;
+    fn add(&mut self, at: usize, value: i32) -> Result<()> {
+        let cell = self.accum.get_mut(at).ok_or(Error::Bounds)?;
+        *cell = cell.checked_add(value).ok_or(Error::Invalid)?;
         Ok(())
     }
 
-    /// One piece inside a single pixel column of one row.
-    fn cell(&mut self, row: usize, xa: f32, xb: f32, d: f32) -> Result<()> {
-        let mid = (xa + xb) * 0.5;
-        let column = floor(mid).clamp(0, self.width as i32 - 1);
-        let frac = mid - column as f32;
-        let column = column as usize;
-        self.add(row, column, d * (1.0 - frac))?;
-        self.add(row, column + 1, d * frac)
+    /// One piece inside a single pixel column of one row: `dy` (signed
+    /// subpixels) of cover; the area left of the piece's mean x stays in this
+    /// cell, the rest carries to the next (the running sum adds `dy` to every
+    /// pixel further right). Units: one full pixel = 2 * RASTER_SUBPIXEL^2.
+    fn cell(&mut self, row: usize, xa: i32, xb: i32, dy: i32) -> Result<()> {
+        let column = (xa.min(xb) >> RASTER_SUBPIXEL_BITS).clamp(0, self.width as i32 - 1);
+        let twice_mid = xa + xb - 2 * column * RASTER_SUBPIXEL;
+        let at = row * self.width + column as usize;
+        self.add(at, dy * (2 * RASTER_SUBPIXEL - twice_mid))?;
+        self.add(at + 1, dy * twice_mid)
     }
 
-    fn line(&mut self, a: Point, b: Point) -> Result<()> {
+    fn line(&mut self, a: Sub, b: Sub) -> Result<()> {
         self.edges += 1;
         if self.edges > MAX_EDGES {
             return Err(Error::Limit);
@@ -166,69 +139,76 @@ impl Canvas<'_> {
         if a.y == b.y {
             return Ok(());
         }
-        let (dir, top, bottom) = if a.y < b.y { (1.0, a, b) } else { (-1.0, b, a) };
-        let dxdy = (bottom.x - top.x) / (bottom.y - top.y);
-        let last = (ceil(bottom.y).clamp(0, self.height as i32)) as usize;
-        let mut row = (floor(top.y).clamp(0, self.height as i32)) as usize;
+        let (dir, top, bottom) = if a.y < b.y { (1, a, b) } else { (-1, b, a) };
+        let (dx, dy) = (i64::from(bottom.x - top.x), i64::from(bottom.y - top.y));
+        let x_at = |y: i32| -> Result<i32> {
+            let x = i64::from(top.x) + div_round(i64::from(y - top.y) * dx, dy);
+            i32::try_from(x).map_err(|_| Error::Bounds)
+        };
+        let rows = self.height as i32;
+        let last = ((bottom.y + RASTER_SUBPIXEL - 1) >> RASTER_SUBPIXEL_BITS).clamp(0, rows);
+        let mut row = (top.y >> RASTER_SUBPIXEL_BITS).clamp(0, rows);
         while row < last {
-            let y0 = top.y.max(row as f32);
-            let y1 = bottom.y.min((row + 1) as f32);
+            let y0 = top.y.max(row << RASTER_SUBPIXEL_BITS);
+            let y1 = bottom.y.min((row + 1) << RASTER_SUBPIXEL_BITS);
             if y1 > y0 {
-                let xa = top.x + (y0 - top.y) * dxdy;
-                let xb = top.x + (y1 - top.y) * dxdy;
-                self.span(row, xa, xb, (y1 - y0) * dir)?;
+                self.span(row as usize, x_at(y0)?, x_at(y1)?, (y1 - y0) * dir)?;
             }
             row += 1;
         }
         Ok(())
     }
 
-    /// Split a row's sub-segment at integer x so every piece is in one column.
-    fn span(&mut self, row: usize, xa: f32, xb: f32, d: f32) -> Result<()> {
-        let w = self.width as f32;
-        let xa = xa.clamp(0.0, w);
-        let xb = xb.clamp(0.0, w);
-        if floor(xa) == floor(xb) || ceil(xa) == ceil(xb) {
-            return self.cell(row, xa, xb, d);
-        }
+    /// Split a row's sub-segment at pixel columns; each piece gets its share of
+    /// `dy` from the cumulative rounding, so the pieces sum to `dy` exactly.
+    fn span(&mut self, row: usize, xa: i32, xb: i32, dy: i32) -> Result<()> {
+        let w = self.width as i32 * RASTER_SUBPIXEL;
+        let (xa, xb) = (xa.clamp(0, w), xb.clamp(0, w));
         let (lo, hi) = if xa < xb { (xa, xb) } else { (xb, xa) };
-        let width = hi - lo;
+        if lo == hi || lo >> RASTER_SUBPIXEL_BITS == (hi - 1) >> RASTER_SUBPIXEL_BITS {
+            return self.cell(row, xa, xb, dy);
+        }
+        let width = i64::from(hi - lo);
         let mut x = lo;
+        let mut done = 0;
         let mut pieces = 0;
         while x < hi {
             pieces += 1;
             if pieces > self.width + 1 {
                 return Err(Error::Invalid);
             }
-            let next = ((floor(x) + 1) as f32).min(hi);
-            self.cell(row, x, next, d * ((next - x) / width))?;
+            let next = (((x >> RASTER_SUBPIXEL_BITS) + 1) << RASTER_SUBPIXEL_BITS).min(hi);
+            let share = div_round(i64::from(dy) * i64::from(next - lo), width);
+            let share = i32::try_from(share).map_err(|_| Error::Bounds)?;
+            self.cell(row, x, next, share - done)?;
+            done = share;
             x = next;
         }
         Ok(())
     }
 
-    fn quad(&mut self, a: Point, c: Point, b: Point) -> Result<()> {
-        // a1 edge model: n^4 >= QUAD_FLATNESS_SQ * d2 (<= 1/8 px).
-        let dx = a.x - 2.0 * c.x + b.x;
-        let dy = a.y - 2.0 * c.y + b.y;
-        let d2 = dx * dx + dy * dy;
-        let mut n = 1usize;
-        while ((n * n) as f32) * ((n * n) as f32) < QUAD_FLATNESS_SQ * d2 {
-            n += 1;
-            if n > MAX_EDGES {
-                return Err(Error::Limit);
-            }
-        }
+    fn quad(&mut self, a: Sub, c: Sub, b: Sub) -> Result<()> {
+        // a1 edge model: n^4 >= QUAD_FLATNESS_SQ * d2 (px^2; <= 1/8 px).
+        let dx = i64::from(a.x - 2 * c.x + b.x);
+        let dy = i64::from(a.y - 2 * c.y + b.y);
+        let d2 = u64::try_from(dx * dx + dy * dy).map_err(|_| Error::Bounds)?;
+        let unit = (RASTER_SUBPIXEL as u64) * (RASTER_SUBPIXEL as u64);
+        let n = root4_ceil(QUAD_FLATNESS_SQ * d2, unit, MAX_EDGES as u32).ok_or(Error::Limit)?;
+        let n = i64::from(n);
+        let nn = n * n;
         let mut from = a;
         for i in 1..=n {
             let to = if i == n {
                 b
             } else {
-                let t = i as f32 / n as f32;
-                let u = 1.0 - t;
-                Point {
-                    x: u * u * a.x + 2.0 * u * t * c.x + t * t * b.x,
-                    y: u * u * a.y + 2.0 * u * t * c.y + t * t * b.y,
+                let (t, u) = (i, n - i);
+                let at = |p: i32, q: i32, r: i32| -> Result<i32> {
+                    let v = u * u * i64::from(p) + 2 * u * t * i64::from(q) + t * t * i64::from(r);
+                    i32::try_from(div_round(v, nn)).map_err(|_| Error::Bounds)
+                };
+                Sub {
+                    x: at(a.x, c.x, b.x)?,
+                    y: at(a.y, c.y, b.y)?,
                 }
             };
             self.line(from, to)?;
@@ -242,7 +222,7 @@ impl RasterScratch {
     pub const fn new() -> Self {
         Self {
             glyph: GlyphScratch::new(),
-            accum: [0.0; ACCUM_LEN],
+            accum: [0; ACCUM_LEN],
             bits: [0; BITS16_BYTES],
             out: [0; MAX_BITMAP_BYTES],
             coverage_len: 0,
@@ -250,9 +230,9 @@ impl RasterScratch {
         }
     }
 
-    /// Coverage (0..=1, row-major, RASTER_PPEM bitmap size) of the last
-    /// successful render; empty after any failure. Diagnostic/comparison only.
-    pub fn coverage(&self) -> &[f32] {
+    /// Coverage (0..=COVERAGE_ONE, row-major, RASTER_PPEM bitmap size) of the
+    /// last successful render; empty after any failure. Diagnostic/comparison only.
+    pub fn coverage(&self) -> &[i32] {
         self.accum.get(..self.coverage_len).unwrap_or(&[])
     }
 
@@ -316,7 +296,7 @@ impl RasterScratch {
 fn raster(
     outline: &Outline<'_>,
     upem: u16,
-    accum: &mut [f32; ACCUM_LEN],
+    accum: &mut [i32; ACCUM_LEN],
     bits: &mut [u8; BITS16_BYTES],
 ) -> Result<(Placement, usize, usize)> {
     let scale = scale_16_16(upem)?;
@@ -361,18 +341,19 @@ fn raster(
         return Ok((Placement { width: 0, height: 0, pitch: 0, ..placement }, 0, 0));
     }
     let len = width * height;
-    accum.get_mut(..len + 2).ok_or(Error::Bounds)?.fill(0.0);
+    accum.get_mut(..len + 2).ok_or(Error::Bounds)?.fill(0);
     let mut canvas = Canvas {
         accum: accum.as_mut_slice(),
         width,
         height,
         edges: 0,
     };
-    // Bitmap-relative pixels; exact in f32 (|26.6 offsets| <= 64 * MAX_BBOX_PX).
-    let to_px = |p: &Point| -> Result<Point> {
-        Ok(Point {
-            x: (coord_26_6(p.x, scale)? - left * 64) as f32 / 64.0,
-            y: (top * 64 - coord_26_6(p.y, scale)?) as f32 / 64.0,
+    // Bitmap-relative subpixels (26.6 x 64; |offsets| <= RASTER_SUBPIXEL * MAX_BBOX_PX).
+    let per_26_6 = RASTER_SUBPIXEL / 64;
+    let to_sub = |p: &Point| -> Result<Sub> {
+        Ok(Sub {
+            x: (coord_26_6(p.x, scale)? - left * 64) * per_26_6,
+            y: (top * 64 - coord_26_6(p.y, scale)?) * per_26_6,
         })
     };
     for c in outline.contours {
@@ -383,7 +364,7 @@ fn raster(
         let mut first = None;
         let mut last = None;
         for e in edges {
-            let point = |i: u16| outline.points.get(usize::from(i)).ok_or(Error::Bounds).and_then(to_px);
+            let point = |i: u16| outline.points.get(usize::from(i)).ok_or(Error::Bounds).and_then(to_sub);
             let from = point(e.from)?;
             let to = point(e.to)?;
             first.get_or_insert(from);
@@ -393,7 +374,7 @@ fn raster(
             }
             last = Some(to);
         }
-        // ttf-parser closes glyf contours explicitly; close defensively anyway.
+        // glyf contours are closed explicitly; close defensively anyway.
         if let (Some(f), Some(l)) = (first, last) {
             if f != l {
                 canvas.line(l, f)?;
@@ -403,14 +384,14 @@ fn raster(
     let edges = canvas.edges;
     let pitch = width.div_ceil(8);
     bits.get_mut(..pitch * height).ok_or(Error::Bounds)?.fill(0);
-    let mut sum = 0.0f32;
+    let mut sum = 0i32;
     for row in 0..height {
         for column in 0..width {
             let cell = accum.get_mut(row * width + column).ok_or(Error::Bounds)?;
-            sum += *cell;
-            let coverage = abs(sum).min(1.0);
-            *cell = coverage;
-            if coverage >= COVERAGE_THRESHOLD {
+            sum = sum.checked_add(*cell).ok_or(Error::Invalid)?;
+            let area = sum.unsigned_abs();
+            *cell = (area >> (2 * RASTER_SUBPIXEL_BITS + 1 - COVERAGE_BITS)).min(COVERAGE_ONE as u32) as i32;
+            if u64::from(area) * COVERAGE_BLACK_DEN >= COVERAGE_BLACK_NUM * RASTER_AREA_ONE {
                 *bits.get_mut(row * pitch + column / 8).ok_or(Error::Bounds)? |= 0x80 >> (column % 8);
             }
         }

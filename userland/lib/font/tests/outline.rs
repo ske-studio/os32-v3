@@ -1,7 +1,9 @@
 //! Whole-file Face is only the oracle; production reads through pread and a3 LRU.
+//! TASK_FONTPERF F5: the product outliner is integer (half font units); the
+//! unmodified ttf-parser (a dev-dependency only) is the command/bbox oracle.
 use os32_font::{
     limits::*,
-    outline::{GlyphScratch, Outline, Usage},
+    outline::{GlyphScratch, Outline, Point, Rect, Usage},
     reader::{Error, Face, Result, Source},
 };
 
@@ -408,22 +410,29 @@ impl OutlineBuilder for Oracle {
         self.0.push(Command::Close);
     }
 }
+/// Half font units -> the oracle's float units (exact: |halves| < 2^24).
+fn units(p: Point) -> (f32, f32) {
+    (p.x as f32 / 2.0, p.y as f32 / 2.0)
+}
+fn bbox(r: Option<Rect>) -> Option<ttf_parser::Rect> {
+    r.map(|r| ttf_parser::Rect { x_min: r.x_min, y_min: r.y_min, x_max: r.x_max, y_max: r.y_max })
+}
 fn commands(out: &Outline<'_>) -> Vec<Command> {
     let mut result = Vec::new();
     for c in out.contours {
         let edges = &out.edges[c.first_edge as usize..c.end_edge as usize];
         if let Some(first) = edges.first() {
-            let p = out.points[first.from as usize];
-            result.push(Command::Move(p.x, p.y));
+            let (x, y) = units(out.points[first.from as usize]);
+            result.push(Command::Move(x, y));
         }
         for e in edges {
-            let p = out.points[e.to as usize];
+            let (x, y) = units(out.points[e.to as usize]);
             result.push(match e.control {
                 Some(i) => {
-                    let q = out.points[i as usize];
-                    Command::Quad(q.x, q.y, p.x, p.y)
+                    let (cx, cy) = units(out.points[i as usize]);
+                    Command::Quad(cx, cy, x, y)
                 }
-                None => Command::Line(p.x, p.y),
+                None => Command::Line(x, y),
             });
         }
         result.push(Command::Close);
@@ -469,11 +478,11 @@ fn real_corpus_matches_whole_file_face() {
                 oracle.glyph_index(char::from_u32(cp).unwrap())
             );
             let mut reference = Oracle::default();
-            let bbox = oracle.outline_glyph(ttf_parser::GlyphId(gid), &mut reference);
+            let bbox_ref = oracle.outline_glyph(ttf_parser::GlyphId(gid), &mut reference);
             match work.outline(&mut face, gid) {
                 Ok(out) => {
                     assert_eq!(commands(&out), reference.0, "{path:?} U+{cp:04X}");
-                    assert_eq!(out.bounds, bbox, "U+{cp:04X}");
+                    assert_eq!(bbox(out.bounds), bbox_ref, "U+{cp:04X}");
                     max.input_bytes = max.input_bytes.max(out.usage.input_bytes);
                     max.points = max.points.max(out.usage.points);
                     max.contours = max.contours.max(out.usage.contours);
@@ -558,12 +567,128 @@ fn empty_contour_keeps_its_own_edge_range() {
     let bytes = fixture(vec![good(), g]);
     let reference = ttf_parser::Face::parse(&bytes, 0).unwrap();
     let mut oracle = Oracle::default();
-    let bbox = reference.outline_glyph(ttf_parser::GlyphId(1), &mut oracle);
+    let bbox_ref = reference.outline_glyph(ttf_parser::GlyphId(1), &mut oracle);
     let mut face = open_face(memory(bytes.clone())).unwrap();
     let mut work = GlyphScratch::new();
     let out = work.outline(&mut face, 1).unwrap();
     assert_eq!(out.contours.len(), 2);
     assert_eq!(out.contours[1].first_edge, out.contours[1].end_edge);
     assert_eq!(commands(&out), oracle.0);
-    assert_eq!(out.bounds, bbox);
+    assert_eq!(bbox(out.bounds), bbox_ref);
+}
+
+/// Simple glyph from absolute (x, y, on_curve) points per contour (word deltas).
+fn points_glyph(contours: &[Vec<(i32, i32, bool)>]) -> Vec<u8> {
+    let points: Vec<_> = contours.iter().flatten().copied().collect();
+    let mut b = vec![0; 10];
+    w16(&mut b, 0, contours.len() as u16);
+    let mut end = 0;
+    for c in contours {
+        end += c.len();
+        word(&mut b, (end - 1) as u16);
+    }
+    word(&mut b, 0);
+    for p in &points {
+        b.push(if p.2 { 1 } else { 0 });
+    }
+    let (mut x, mut y) = (0, 0);
+    let mut ys = Vec::new();
+    for p in &points {
+        word(&mut b, (p.0 - x) as i16 as u16);
+        ys.push((p.1 - y) as i16 as u16);
+        x = p.0;
+        y = p.1;
+    }
+    for v in ys {
+        word(&mut b, v);
+    }
+    b
+}
+/// One composite record list: (flags without MORE, child, dx, dy, F2Dot14 words).
+fn transformed(parts: &[(u16, u16, i16, i16, Vec<i16>)]) -> Vec<u8> {
+    let mut b = vec![0; 10];
+    w16(&mut b, 0, 0xffff);
+    for (i, (flags, child, dx, dy, scale)) in parts.iter().enumerate() {
+        word(&mut b, flags | 2 | if i + 1 < parts.len() { 0x20 } else { 0 });
+        word(&mut b, *child);
+        if flags & 1 != 0 {
+            word(&mut b, *dx as u16);
+            word(&mut b, *dy as u16);
+        } else {
+            b.push(*dx as i8 as u8);
+            b.push(*dy as i8 as u8);
+        }
+        for v in scale {
+            word(&mut b, *v as u16);
+        }
+    }
+    b
+}
+/// Commands equal within `tol` font units (F2Dot14 products round to halves).
+fn near(ours: &[Command], oracle: &[Command], tol: f32) -> bool {
+    let close = |a: f32, b: f32| (a - b).abs() <= tol;
+    ours.len() == oracle.len()
+        && ours.iter().zip(oracle).all(|pair| match pair {
+            (Command::Move(a, b), Command::Move(c, d)) | (Command::Line(a, b), Command::Line(c, d)) => {
+                close(*a, *c) && close(*b, *d)
+            }
+            (Command::Quad(a, b, c, d), Command::Quad(e, f, g, h)) => {
+                close(*a, *e) && close(*b, *f) && close(*c, *g) && close(*d, *h)
+            }
+            (Command::Close, Command::Close) => true,
+            _ => false,
+        })
+}
+
+#[test]
+fn synthetic_glyf_matches_oracle() {
+    // Implicit midpoints in every position, all-off-curve, lone point, odd sums.
+    let shapes = vec![
+        points_glyph(&[vec![(0, 0, true), (101, 300, false), (200, 0, true)]]),
+        points_glyph(&[vec![(0, 0, false), (100, 301, false), (201, 0, false), (99, -7, false)]]),
+        points_glyph(&[vec![(3, 5, false), (100, 300, true), (201, 1, false), (0, 0, true), (-51, -3, false)]]),
+        points_glyph(&[vec![(7, 9, true)]]),
+        points_glyph(&[vec![(0, 0, true), (64, 64, true)], vec![(1, 1, false), (5, 9, false), (11, 3, true)]]),
+        points_glyph(&[vec![(-32768, 32767, true), (32767, -32768, true), (0, 0, false)]]),
+    ];
+    let base = shapes.len() as u16 + 1;
+    let child = base; // gid of the plain child below
+    let composites = vec![
+        transformed(&[(0, child, 5, -7, vec![]), (1, child, -300, 1000, vec![])]),
+        transformed(&[(8, child, 0, 0, vec![0x2000])]),             // scale 0.5
+        transformed(&[(0x40, child, 3, 4, vec![0x6000, -0x1000])]), // x/y scale 1.5, -0.25
+        transformed(&[(0x80, child, -9, 2, vec![0x0b50, 0x2d41, -0x2d41, 0x0b50])]), // 2x2
+        transformed(&[(0x08, base + 2, 1, 1, vec![0x3000])]),       // nested scaled composite
+    ];
+    let mut glyphs = vec![good()];
+    glyphs.extend(shapes.iter().cloned());
+    glyphs.push(points_glyph(&[vec![(1, 2, true), (33, 47, false), (65, -3, true), (19, -40, false)]]));
+    glyphs.extend(composites.iter().cloned());
+    glyphs.push(transformed(&[(0x80, base + 4, 10, 0, vec![0x4000, 0x0100, 0, -0x4000])]));
+    let n = glyphs.len() as u16;
+    let bytes = fixture(glyphs);
+    let reference = ttf_parser::Face::parse(&bytes, 0).unwrap();
+    let mut face = open_face(memory(bytes.clone())).unwrap();
+    let mut work = GlyphScratch::new();
+    let mut exact = 0;
+    for gid in 1..n {
+        let mut oracle = Oracle::default();
+        let bbox_ref = reference.outline_glyph(ttf_parser::GlyphId(gid), &mut oracle);
+        let out = work.outline(&mut face, gid).unwrap_or_else(|e| panic!("gid {gid}: {e:?}"));
+        let ours = commands(&out);
+        let scaled = gid > base + 1;
+        if ours == oracle.0 && bbox(out.bounds) == bbox_ref {
+            exact += 1;
+        } else {
+            // Only F2Dot14 products may differ (by the rounding to half units,
+            // once per nesting level); never the structure.
+            assert!(scaled && near(&ours, &oracle.0, 0.5), "assertion: gid {gid}: {ours:?} vs {:?}", oracle.0);
+            let (a, b) = (bbox(out.bounds).unwrap(), bbox_ref.unwrap());
+            for (p, q) in [(a.x_min, b.x_min), (a.y_min, b.y_min), (a.x_max, b.x_max), (a.y_max, b.y_max)] {
+                assert!((p - q).abs() <= 1, "assertion: gid {gid} bbox {a:?} vs {b:?}");
+            }
+        }
+    }
+    println!("synthetic glyf: {} glyphs, {exact} bit-exact vs ttf-parser, rest within 1/2 unit (F2Dot14)", n - 1);
+    assert!(exact >= (n - 1) as usize - 4);
 }

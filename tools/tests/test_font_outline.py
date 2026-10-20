@@ -20,8 +20,8 @@ ROOT = Path(__file__).resolve().parents[2]
 CRATE = ROOT / 'userland/lib/font'
 JF_HASH = '5e265e45349b3328afa67dc3905a3ca3c628cf7c7e0eccea9c7ce8a8acc127cc'
 MUTATIONS = [
-    ('close-range', '                self.first_edge = self.edges;\n                self.current = None;',
-     '                self.current = None;', 'empty_contour_keeps_its_own_edge_range'),
+    ('close-range', '        self.first_edge = self.edges;\n        self.current = None;',
+     '        self.current = None;', 'empty_contour_keeps_its_own_edge_range'),
     ('cycle', '.contains(&gid)',
      '.contains(&gid) && false', 'cycles_and_runs'),
     ('run', 'if run > left {\n            return Err(Error::Invalid);\n        }',
@@ -36,6 +36,9 @@ MUTATIONS = [
     ('outline-points', '.get_mut(index)', '.get_mut(index + 1)', 'implicit_point_capacity'),
     ('short-read', 'if source.read_at(offset, dst)? != dst.len()',
      'if source.read_at(offset, dst)? != dst.len() && false', 'every_mid_read_failure_has_zero_commit'),
+    # F5 integer outliner: the F2Dot14 2x2 product must use c (scale10) for x.
+    ('f2dot14-xy', 'let x = f2dot14_dot(self.a, p.x, self.c, p.y)', 'let x = f2dot14_dot(self.a, p.x, self.b, p.y)',
+     'synthetic_glyf_matches_oracle'),
     ('partial-commit', 'self.committed = (0, 0, 0);', 'self.committed = (1, 1, 1);', 'every_mid_read_failure_has_zero_commit'),
 ]
 

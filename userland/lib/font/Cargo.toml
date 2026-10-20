@@ -7,5 +7,8 @@ license = "MIT"
 [workspace]
 exclude = ["vendor/ttf-parser-0.21.1"]
 
-[dependencies]
+# TASK_FONTPERF F5 (F-10): the product glyf outliner is our own integer code;
+# ttf-parser stays only as the host tests' oracle (tests/outline.rs) and never
+# reaches a product binary.
+[dev-dependencies]
 ttf-parser = { path = "vendor/ttf-parser-0.21.1", default-features = false }

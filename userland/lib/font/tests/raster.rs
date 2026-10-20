@@ -228,7 +228,8 @@ fn pixel_square_is_exact_and_doubles() {
 fn threshold_is_half_coverage_boundary() {
     // A 1px-tall bar covering exactly x in [0, 0.5+e] of a pixel column.
     for (units, black) in [(31, false), (32, false), (33, true)] {
-        // 128/255 = 0.50196: 32/64 = 0.5 stays white, 33/64 = 0.5156 is black.
+        // 128/255 = 0.50196 (exact integer test): 32/64 = 0.5 stays white,
+        // 33/64 = 0.5156 is black.
         let bytes = fixture(1024, vec![good(), glyph(&[rect(0, 0, 64 + units, 64)])]);
         let mut dst = [0u8; MAX_BITMAP_BYTES];
         let p = render(&bytes, 1, PixelSize::Px16, &mut dst).unwrap();
@@ -252,8 +253,9 @@ fn diagonal_coverage_is_exact_area() {
     let p = work.render(&mut face, 1, PixelSize::Px16, &mut dst).unwrap();
     assert_eq!((p.width, p.height), (8, 1));
     for (c, &v) in work.coverage().iter().enumerate() {
-        let exact = 1.0 - (c as f32 + 0.5) / 8.0;
-        assert!((v - exact).abs() < 1e-5, "column {c}: {v} vs {exact}");
+        // Integer coverage (COVERAGE_ONE = 1 px): exact to the subpixel rounding.
+        let exact = COVERAGE_ONE as f64 * (1.0 - (c as f64 + 0.5) / 8.0);
+        assert!((v as f64 - exact).abs() <= 1.0, "column {c}: {v} vs {exact}");
     }
     assert_eq!(dst[0], 0xf0); // 0.9375 .. 0.5625 black, 0.4375 .. 0.0625 white
 }
@@ -528,7 +530,8 @@ fn real_corpus_dump() {
             h = h.max(p.height);
             edges = edges.max(work.flattened_edges());
             let cov = if coverage && !work.coverage().is_empty() {
-                let q: Vec<u8> = work.coverage().iter().map(|c| (c * 255.0 + 0.5) as u8).collect();
+                // 8-bit like FreeType's gray output: min(coverage, 255).
+                let q: Vec<u8> = work.coverage().iter().map(|&c| c.min(255) as u8).collect();
                 hex(&q)
             } else {
                 String::from("-")

@@ -6,9 +6,11 @@ fontTools exact-rational metrics for every corpus glyph, FreeType 2 (only
 when freetype-py is importable, e.g. via OS32_FREETYPE_PYTHONPATH; otherwise
 a SKIP line). The x87 run compiles the product raster for i686-os32-none and
 executes it on the host inside the product a2 guard (kernel/font_guard.c +
-font_x87.asm, CW 037F): host f32 (SSE) and x87 are compared by coverage
-tolerance, not bit equality (acceptance 5). The final linked font_test.elf
-is checked by tools/check_isa386.py (acceptance 4).
+font_x87.asm, CW 037F). TASK_FONTPERF F5: the raster is integer only, so the
+guest build and the host build must agree bit for bit (X87_TOLERANCE 0), and
+the old float raster's dump (REF_F32, taken before F5) is compared pixel by
+pixel when present (Shinonome must not change; the rest is recorded). The
+final linked font_test.elf is checked by tools/check_isa386.py (acceptance 4).
 """
 from fractions import Fraction
 from pathlib import Path
@@ -31,8 +33,10 @@ ROOT = Path(__file__).resolve().parents[2]
 CRATE = ROOT / 'userland/lib/font'
 FONTS = ROOT / 'assets/fonts'
 PPEM = 16
-THRESHOLD = 128          # coverage byte >= 128 is black (limits.rs COVERAGE_THRESHOLD)
-X87_TOLERANCE = 1        # quantised coverage units (of 255) allowed between SSE and x87
+THRESHOLD = 128          # FreeType coverage byte >= 128 is "black" for the flip count below
+X87_TOLERANCE = 0        # F5 integer raster: guest code generation == host, bit for bit
+# The float (pre-F5) raster's dump of the same corpora (design §6 acceptance).
+REF_F32 = Path.home() / 'os32-tmp/run/fontperf/ref_f32/dump.txt'
 # a1 edge model: chord error <= 1/8 px (32/255) plus FreeType's own conic split.
 FREETYPE_TOLERANCE = 40
 GUEST_RANGES = ((0x20, 0x7e), (0xa0, 0xff), (0x3000, 0x30ff), (0x4e00, 0x4fff))  # font_test CHECK_RANGES
@@ -51,25 +55,28 @@ MUTATIONS = [
      'destination_capacity'),
     ('early-coverage', 'raster.rs', '        self.coverage_len = 0;\n        self.edges = 0;\n',
      '', 'flattened_edge_limit'),
-    ('nonzero-abs', 'raster.rs', 'let coverage = abs(sum).min(1.0);', 'let coverage = sum.min(1.0);',
+    ('coord-round', 'raster.rs', '(magnitude * scale + 0x10000) >> 17', '(magnitude * scale) >> 17',
+     'bitmap_box_uses_26_6_points'),
+    ('nonzero-abs', 'raster.rs', 'let area = sum.unsigned_abs();', 'let area = sum.max(0) as u32;',
      'pixel_square_is_exact_and_doubles'),
-    ('threshold', 'limits.rs', 'COVERAGE_THRESHOLD: f32 = 128.0 / 255.0;',
-     'COVERAGE_THRESHOLD: f32 = 127.0 / 255.0;', 'threshold_is_half_coverage_boundary'),
+    ('cover-threshold-64', 'limits.rs', 'COVERAGE_BLACK_NUM: u64 = 128;', 'COVERAGE_BLACK_NUM: u64 = 64;',
+     'threshold_is_half_coverage_boundary'),
     ('nearest-2x', 'raster.rs', 'let bit = 0x80u8 >> ((column / factor) % 8);',
      'let bit = 0x80u8 >> (column % 8);', 'pixel_square_is_exact_and_doubles'),
-    ('round-26.6', 'raster.rs', '(value.abs() * scale + 0x8000) >> 16', '(value.abs() * scale) >> 16',
+    ('round-26.6', 'fixed.rs', '(value.abs() * scale + 0x8000) >> 16', '(value.abs() * scale) >> 16',
      'units_to_26_6_rounding'),
     ('short-loca-even', 'outline.rs', 'let padded = end.next_multiple_of(2);',
      'let padded = end;', 'odd_length_components_keep_even_short_loca'),
     ('i16-overflow', 'raster.rs', 'left: base.left.checked_mul(factor as i16).ok_or(Error::Bounds)?,',
      'left: base.left.wrapping_mul(factor as i16),', 'coordinate_overflow'),
-    ('flatten-coarse', 'raster.rs', '< QUAD_FLATNESS_SQ * d2', '< 0.25 * d2', 'flattened_edge_limit'),
+    ('quad-n-fixed-1', 'raster.rs', 'let n = root4_ceil(QUAD_FLATNESS_SQ * d2, unit, MAX_EDGES as u32).ok_or(Error::Limit)?;',
+     'let n = 1u32;', 'flattened_edge_limit'),
     ('cbox-on-curve-only', 'raster.rs', '        if let Some(c) = e.control {\n            visit(c)?;\n        }\n', '',
      'control_box_includes_off_curve_points'),
-    ('span-split', 'raster.rs', 'if floor(xa) == floor(xb) || ceil(xa) == ceil(xb) {', 'if true {',
+    ('span-split', 'raster.rs', 'if lo == hi || lo >> RASTER_SUBPIXEL_BITS == (hi - 1) >> RASTER_SUBPIXEL_BITS {', 'if true {',
      'diagonal_coverage_is_exact_area'),
-    ('flip-y', 'raster.rs', 'y: (top * 64 - coord_26_6(p.y, scale)?) as f32 / 64.0,',
-     'y: (coord_26_6(p.y, scale)? - bottom * 64) as f32 / 64.0,', 'control_box_includes_off_curve_points'),
+    ('flip-y', 'raster.rs', 'y: (top * 64 - coord_26_6(p.y, scale)?) * per_26_6,',
+     'y: (coord_26_6(p.y, scale)? - bottom * 64) * per_26_6,', 'control_box_includes_off_curve_points'),
     # Only real fonts see this one (synthetic hmtx is uniform): every Rust test
     # stays green and the corpus metric reference must catch it.
     ('advance-gid', 'raster.rs', 'i32::from(face.advance(gid)?)', 'i32::from(face.advance(gid.saturating_sub(1))?)',
@@ -232,6 +239,32 @@ def check_dots(jf, glyphs, ja, jis):
           f'only the known cmap half-width {sorted(map(hex, differ))}', flush=True)
 
 
+def check_ref_f32(glyphs):
+    """Design §6: pixel differences against the float raster's dump (REF_F32)."""
+    if not REF_F32.exists():
+        print(f'SKIP float-raster comparison: {REF_F32} absent', flush=True)
+        return
+    _, ref = parse_dump(REF_F32)
+    assert set(ref) == set(glyphs), 'REF_F32 corpus differs'
+    for name in ('shinonome', 'inconsolata', 'ipaexg', 'ipaexm'):
+        keys = sorted(k for k in ref if k[0] == name)
+        n = px = ink = place = 0
+        differ = []
+        for k in keys:
+            a, b = ref[k], glyphs[k]
+            assert (a['w'], a['h'], a['left'], a['top'], a['adv']) == (b['w'], b['h'], b['left'], b['top'], b['adv']), (
+                name, f'U+{k[1]:04X}', 'placement differs from the float raster')
+            d = black(a) ^ black(b)
+            ink += len(black(a))
+            if d:
+                n += 1
+                px += len(d)
+                differ.append(f'U+{k[1]:04X}')
+        assert name != 'shinonome' or n == 0, ('Shinonome differs from the float raster', differ[:20])
+        print(f'RECORD integer vs float raster {name}: placement equal for {len(keys)}, differing glyphs {n}, '
+              f'pixels {px} / {ink} ink; {" ".join(differ[:40])}', flush=True)
+
+
 def ft_scale(upem):
     """FreeType FT_DivFix(16 * 64, upem) (16.16, round half up)."""
     return ((PPEM * 64 << 16) + upem // 2) // upem
@@ -333,7 +366,7 @@ def check_freetype(glyphs, corpus, jf):
 
 
 def build_probe(work, crate):
-    """The product raster for i686-os32-none (x87 f32) linked with the a2 guard."""
+    """The product raster for i686-os32-none (integer since F5) linked with the a2 guard."""
     fixture = work / 'x87'
     shutil.copytree(ROOT / 'tools/tests/font_raster_x87', fixture, ignore=shutil.ignore_patterns('target'))
     manifest = fixture / 'Cargo.toml'
@@ -400,7 +433,7 @@ def run_probe(exe, run, path, cps):
 
 
 def run_x87(work, crate, glyphs, fonts):
-    """x87 (guest code generation, guard CW 037F) vs host SSE f32 by coverage."""
+    """Guest code generation (inside the guard, CW 037F) vs the host build: bit equal since F5."""
     exe = build_probe(work, crate)
     for name, path, cps in fonts:
         bit_equal = pixels = flips = max_delta = 0
@@ -620,6 +653,8 @@ def verify(work, crate, env, jf, corpus, ja, jis, label, x87=True):
             check_g16(jf, glyphs, g16, pre)
             G16_GLYPHS.update(glyphs)
         check_metrics(faces, glyphs, corpus, jf)
+        if label == 'normal':
+            check_ref_f32(glyphs)
         check_freetype(glyphs, corpus, jf)
         if x87:
             exe = run_x87(work / (label + '-x87'), crate, glyphs, [
@@ -655,7 +690,7 @@ def main():
             shutil.copytree(CRATE, copy, ignore=shutil.ignore_patterns('target'))
             (work / 'mut/assets').mkdir()
             (work / 'mut/assets/fonts').symlink_to(FONTS, target_is_directory=True)
-            originals = {n: (copy / 'src' / n).read_text() for n in ('raster.rs', 'limits.rs', 'outline.rs')}
+            originals = {n: (copy / 'src' / n).read_text() for n in ('raster.rs', 'limits.rs', 'outline.rs', 'fixed.rs')}
             for label, name, old, new, expected in MUTATIONS:
                 for n, text in originals.items():
                     (copy / 'src' / n).write_text(text)
