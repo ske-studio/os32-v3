@@ -16,14 +16,10 @@ use crate::{
     reader::{Error, Face, Source},
 };
 
-/// Cell width of the glyph, decided by the caller's width rules; it only
-/// picks the cmap search order (Half ASCII: latin -> ja, Half above ASCII:
-/// latin only, Full: ja only).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Cell {
-    Half,
-    Full,
-}
+/// Cell width of the glyph, decided by the caller's width rules; it picks the
+/// cmap search order (Half ASCII: latin -> ja, Half above ASCII: latin only,
+/// Full: ja only) and the cache's cell (Half 8px, Full 16px).
+pub use crate::cache::Cell;
 
 /// The half-width non-ASCII range (T7b-b5): Latin-1 Supplement and Latin
 /// Extended-A/B, `LATIN_HALF_FIRST..=LATIN_HALF_LAST`. Callers use it for the
@@ -177,17 +173,19 @@ impl<S> Engine<S> {
         self.checked = false;
     }
 
-    /// Give the cache an arena (only when none is attached and not busy).
+    /// Give the cache an arena (only when none is attached and not busy);
+    /// the layout is `limits::layout(arena.len())` for the owners.
     pub fn attach_arena(
         &mut self,
         arena: &'static mut [u8],
+        n_cell: usize,
         n16: usize,
         n32: usize,
     ) -> Result<(), &'static mut [u8]> {
         if self.busy {
             return Err(arena);
         }
-        self.cache.attach(arena, n16, n32)
+        self.cache.attach(arena, n_cell, n16, n32)
     }
 
     /// Empty the cache and return its arena (the app frees it on trim).
@@ -323,8 +321,13 @@ impl<S> Engine<S> {
     }
 
     /// Commit a bitmap-less result (fits any slot; no slot -> stays uncached).
-    fn settle(&mut self, key: GlyphKey, entry: Entry, px: PixelSize, out: &mut Glyph) -> Resolved {
-        let cached = self.cache.commit(key, &entry, &[]).is_ok();
+    /// A committed result answers as a later hit would.
+    fn settle(&mut self, key: GlyphKey, mut entry: Entry, cell: Cell, px: PixelSize, out: &mut Glyph) -> Resolved {
+        let slot = self.cache.commit(key, &entry, &[], cell).ok();
+        let cached = slot.is_some();
+        if let Some(stored) = slot.and_then(|s| self.cache.entry(s)) {
+            entry = stored;
+        }
         *out = Glyph {
             entry,
             ascent: ascent_of(entry.face, px),
@@ -440,11 +443,11 @@ impl<S: Source> Engine<S> {
         };
         let (id, gid) = match found {
             Some(f) => f,
-            None if failed => return self.settle(key, fallback(Kind::Kcg), px, out),
+            None if failed => return self.settle(key, fallback(Kind::Kcg), cell, px, out),
             None => {
                 let s = self.cache.stats_mut();
                 s.cmap_missing = s.cmap_missing.wrapping_add(1);
-                return self.settle(key, fallback(Kind::Missing), px, out);
+                return self.settle(key, fallback(Kind::Missing), cell, px, out);
             }
         };
         let s = self.cache.stats_mut();
@@ -455,7 +458,7 @@ impl<S: Source> Engine<S> {
             Err(_) => {
                 let s = self.cache.stats_mut();
                 s.raster_err = s.raster_err.wrapping_add(1);
-                return self.settle(key, fallback(Kind::Kcg), px, out);
+                return self.settle(key, fallback(Kind::Kcg), cell, px, out);
             }
         };
         let mut entry = Entry {
@@ -472,11 +475,17 @@ impl<S: Source> Engine<S> {
             entry.width = 0;
             entry.height = 0;
             entry.pitch = 0;
-            return self.settle(key, entry, px, out);
+            return self.settle(key, entry, cell, px, out);
         }
         let bits = self.tmp.get(..entry.bytes()).unwrap_or(&[]);
-        let (cached, at) = match self.cache.commit(key, &entry, bits) {
-            Ok(slot) => (true, At::Slot(slot)),
+        let (cached, at) = match self.cache.commit(key, &entry, bits, cell) {
+            Ok(slot) => {
+                // A Cell holds the bitmap in cell form: answer as a hit would.
+                if let Some(stored) = self.cache.entry(slot) {
+                    entry = stored;
+                }
+                (true, At::Slot(slot))
+            }
             Err(_) => {
                 let s = self.cache.stats_mut();
                 s.uncached = s.uncached.wrapping_add(1);
@@ -485,7 +494,7 @@ impl<S: Source> Engine<S> {
         };
         *out = Glyph {
             entry,
-            ascent: ascent_of(id, px),
+            ascent: ascent_of(entry.face, px),
             cached,
             at,
         };

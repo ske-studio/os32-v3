@@ -4,7 +4,7 @@
 //!   text() (S5) ── ensure_open ──> Engine<AppSource> (exec_heap、mem_alloc 1 回)
 //!                                   ├ latin / ja Face ── AppSource ── KAPI font_source_* (v77)
 //!                                   ├ RasterScratch
-//!                                   └ GlyphCache ── arena 64KiB (mem_alloc 1 回、trim で free)
+//!                                   └ GlyphCache ── arena 128KiB (mem_alloc 1 回、trim で free)
 //! ```
 //!
 //! - **Engine 本体** (2 face + scratch + cache 文脈) は `ensure_open` が exec_heap に
@@ -13,7 +13,7 @@
 //!   host 試験が Engine<AppSource> で assert する。stack に一時値を作らない
 //!   (`ptr::write(p, Engine::new())` は使わない)。trim でも保つ。static はポインタだけ
 //!   (shlib の .bss はアプリごとに実頁で複製されるので、本体を .bss に置かない)。
-//! - **arena** (`ARENA_BYTES`) は別の `mem_alloc` 1 回。`trim` で `mem_free`、次の需要で
+//! - **arena** (`ARENA_BYTES_APP`) は別の `mem_alloc` 1 回 (LARGE)。`trim` で `mem_free`、次の需要で
 //!   再確保。取れなければ cache 無し (字は scratch から描く、`stats.uncached`)。
 //! - **face** は KAPI `font_source_*` の lease。FPU 無しは kernel が open を NOSYS で
 //!   断る → `KcgOnly(NoFpu)`。枠不足 (NOSPC) → `KcgOnly(Nospc)`。
@@ -33,7 +33,7 @@ use core::ptr;
 
 use os32_font::cache::Stats;
 use os32_font::engine::{Engine, Reason, State};
-use os32_font::limits::{ARENA_BYTES, FONT_SET_KCG_ONLY, FONT_SET_STD, N16, N32};
+use os32_font::limits::{layout, ARENA_BYTES_APP, FONT_SET_KCG_ONLY, FONT_SET_STD, N32};
 use os32_font::paths::{FONT_JA_C, FONT_LATIN_C};
 use os32_font::reader::{Error, Result as FontResult, Source};
 use os32api::gui::proto::{OS32_ERR_IO, OS32_ERR_NOSPC, OS32_ERR_NOSYS};
@@ -244,14 +244,15 @@ fn engine() -> Option<&'static mut AppEngine> {
 /// arena を 1 回確保して cache に渡す。取れなければ cache 無しで続ける。
 fn attach_arena(e: &mut AppEngine) {
     let f = st();
-    let p = unsafe { (os32api::api().mem_alloc)(ARENA_BYTES as u32) };
+    let p = unsafe { (os32api::api().mem_alloc)(ARENA_BYTES_APP as u32) };
     if p.is_null() {
         f.arena_blocked = true;
         f.alloc_fails = f.alloc_fails.wrapping_add(1);
         return;
     }
-    let arena = unsafe { core::slice::from_raw_parts_mut(p, ARENA_BYTES) };
-    match e.attach_arena(arena, N16, N32) {
+    let arena = unsafe { core::slice::from_raw_parts_mut(p, ARENA_BYTES_APP) };
+    let (n_cell, n16) = layout(ARENA_BYTES_APP);
+    match e.attach_arena(arena, n_cell, n16, N32) {
         Ok(()) => f.arena_allocs = f.arena_allocs.wrapping_add(1),
         Err(back) => unsafe { (os32api::api().mem_free)(back.as_mut_ptr()) },
     }

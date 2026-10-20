@@ -6,7 +6,7 @@
 //! | 何 | どこで | 形 |
 //! |---|---|---|
 //! | Engine 本体 (Face×2・raster scratch・cache の静的部) | .bss (`FONT`) | `Engine<ShellSource>` |
-//! | cache の arena (64KiB) | shell heap から 1 回だけ (`mem_alloc`) | 返さない (trim に結ばない) |
+//! | cache の arena (`ARENA_BYTES_SHELL` 128KiB) | .bss (`ARENA`、TASK_FONTPERF F2) | 返さない (trim に結ばない) |
 //! | lease の open / close | top-level (段 B の open 文脈、WM 外・guard 外) | [`open_at_safe_point`] / [`close_all`] |
 //! | `Face::open` の読込み、miss の raster + commit | `font_guard_run` の callback の中 | [`open_cb`] / [`raster_cb`] |
 //! | 描画 (hit の借用) | guard の外 (x87 不要) | `text.rs` → [`glyph`] |
@@ -29,7 +29,7 @@ use core::cell::UnsafeCell;
 
 use os32_font::cache::Stats;
 use os32_font::engine::{Cell, Engine, EngineError, Glyph, Reason, Resolved, State};
-use os32_font::limits::{ARENA_BYTES, FONT_SET_KCG_ONLY, N16, N32};
+use os32_font::limits::{layout, ARENA_BYTES_SHELL, FONT_SET_KCG_ONLY, N32};
 use os32_font::paths::{FONT_JA_C, FONT_LATIN_C};
 use os32_font::raster::PixelSize;
 use os32_font::reader::{Error as FontError, Result as FontResult, Source};
@@ -207,7 +207,7 @@ struct Font {
     in_guard: bool,
     deferred: [u32; DEFER_MAX],
     n_deferred: usize,
-    /// arena の確保を試みた (失敗しても 2 度目はしない — uncached = KCG)。
+    /// arena を渡した (attach が断っても 2 度目はしない — uncached = KCG)。
     arena_tried: bool,
     /// 次の `consume` で 1 回だけ開き直す。
     retry: bool,
@@ -230,6 +230,12 @@ struct FontCell(UnsafeCell<Font>);
 // OS32 はシングルタスク・協調切替。描画・open の途中で park / yield しない。
 unsafe impl Sync for FontCell {}
 static FONT: FontCell = FontCell(UnsafeCell::new(Font::NEW));
+
+/// cache の arena (fontperf 設計 §5): exec heap の peak を増やさないよう像の .bss に置く。
+/// 渡すのは `arena_once` の 1 回だけ (試験の `reset` は古い Engine を捨ててから)。
+struct ArenaCell(UnsafeCell<[u8; ARENA_BYTES_SHELL]>);
+unsafe impl Sync for ArenaCell {}
+static ARENA: ArenaCell = ArenaCell(UnsafeCell::new([0; ARENA_BYTES_SHELL]));
 
 #[inline]
 fn f() -> &'static mut Font {
@@ -450,14 +456,11 @@ fn arena_once() {
         return;
     }
     font.arena_tried = true;
-    /* shell heap から 1 回だけ (os32api の再試行つき wrapper は使わない)。
-     * 取れなければ cache 無し = 描画段の peek が全部 Miss → KCG。 */
-    let p = unsafe { (os32api::api().mem_alloc)(ARENA_BYTES as u32) };
-    if p.is_null() {
-        return;
-    }
-    let arena = unsafe { core::slice::from_raw_parts_mut(p, ARENA_BYTES) };
-    let _ = font.engine.attach_arena(arena, N16, N32);
+    /* .bss の arena を 1 回だけ渡す (mem_alloc はしない)。attach が断れば cache 無し
+     * = 描画段の peek が全部 Miss → KCG。 */
+    let arena: &'static mut [u8] = unsafe { &mut *ARENA.0.get() };
+    let (n_cell, n16) = layout(ARENA_BYTES_SHELL);
+    let _ = font.engine.attach_arena(arena, n_cell, n16, N32);
 }
 
 fn open_inner(font_set: u8, arm_retry: bool) -> i32 {
@@ -573,7 +576,7 @@ pub fn close_all() {
 }
 
 /// cache を空にする (face の read cache も)。arena と lease は保つ。
-/// gshell は trim を font に結ばない (設計 §2-3、arena は固定 heap) — host 試験用。
+/// gshell は trim を font に結ばない (設計 §2-3、arena は .bss) — host 試験用。
 #[cfg_attr(not(test), allow(dead_code))]
 pub fn trim() -> bool {
     let ok = f().engine.trim().is_ok();

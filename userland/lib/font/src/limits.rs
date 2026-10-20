@@ -49,11 +49,16 @@ pub const MAX_COORD_UNITS: f32 = 1_048_576.0;
 // a1 quadratic flattening: n segments with n^4 >= this * |a - 2c + b|^2 (error <= 1/8 px).
 pub const QUAD_FLATNESS_SQ: f32 = 4.0;
 
-// T7b-b3 glyph cache (glyph cache design §3, b3/b4 design §2-1). One owner
-// arena of fixed slots per pixel class: a SLOT_HDR_BYTES header followed by the
-// 1bpp bitmap (byte-aligned rows). The slot rectangle is the standard face's
-// measured maximum plus margin (re-measure in a5 when the face changes; JF Dot
-// Shinonome 16 at 16px is 16x16). A glyph that does not fit is drawn uncached.
+// T7b-b3 glyph cache (glyph cache design §3, b3/b4 design §2-1) with the
+// TASK_FONTPERF F2 packed cell class (fontperf design §3). One owner arena of
+// fixed slots in three classes, in this order:
+//  - Cell: CELL_SLOT_BYTES = an 8 B header + the 16-row cell bitmap (Full 16x16
+//    pitch 2, Half 8x16 pitch 1 in the first 16 B). 16px keys whose bitmap fits
+//    the cell at the face's ascent, and 16px Space/Kcg/Missing (0 B).
+//  - Big16: SLOT16_BYTES = SLOT_HDR_BYTES + 20x21; 16px bitmaps that leave the cell.
+//  - Big32: SLOT32_BYTES = SLOT_HDR_BYTES + 36x37; every 32px key (N32 = 0: uncached).
+// The big slot rectangle is the standard face's measured maximum plus margin
+// (re-measure in a5 when the face changes). A glyph that does not fit is drawn uncached.
 pub const SLOT_HDR_BYTES: usize = 32;
 pub const SLOT16_W: usize = 20;
 pub const SLOT16_H: usize = 21;
@@ -65,17 +70,35 @@ pub const fn slot_bytes(w: usize, h: usize) -> usize {
 pub const SLOT16_BYTES: usize = slot_bytes(SLOT16_W, SLOT16_H);
 pub const SLOT32_BYTES: usize = slot_bytes(SLOT32_W, SLOT32_H);
 const _: () = assert!(SLOT16_BYTES == 96 && SLOT32_BYTES == 224);
-pub const ARENA_BYTES: usize = 65536;
-// Standard set is 16px only (32px draws the 16px bitmap doubled): the whole arena
-// is 16px slots. N16/N32 change only right after invalidate_all (cache design T2).
-pub const N16: usize = 682;
+// Cell class: cell width 16 (Full) or 8 (Half), CELL_H_PX rows.
+pub const CELL_FULL_W: usize = 16;
+pub const CELL_HALF_W: usize = 8;
+pub const CELL_HDR_BYTES: usize = 8;
+pub const CELL_BITMAP_BYTES: usize = CELL_FULL_W / 8 * CELL_H_PX;
+pub const CELL_SLOT_BYTES: usize = CELL_HDR_BYTES + CELL_BITMAP_BYTES;
+const _: () = assert!(CELL_SLOT_BYTES == 40);
+// Arena per owner (fontperf design §5): gshell's is a static (.bss) array, the
+// app's one LARGE mem_alloc returned on trim (256KiB is decided in F4).
+pub const ARENA_BYTES_SHELL: usize = 128 * 1024;
+pub const ARENA_BYTES_APP: usize = 128 * 1024;
+// Big16 slots are fixed; the rest of the arena is cells. N32 stays 0 (32px is the
+// 16px bitmap doubled, drawn uncached). The layout changes only on attach.
+pub const N16: usize = 32;
 pub const N32: usize = 0;
-const _: () = assert!(N16 * SLOT16_BYTES + N32 * SLOT32_BYTES <= ARENA_BYTES);
-// Hash buckets (power of two) holding u16 slot numbers.
-pub const BUCKETS: usize = 256;
+/// (n_cell, n16) for an arena of `arena_bytes` (n32 is N32).
+pub const fn layout(arena_bytes: usize) -> (usize, usize) {
+    let big = N16 * SLOT16_BYTES + N32 * SLOT32_BYTES;
+    let n_cell = if arena_bytes > big { (arena_bytes - big) / CELL_SLOT_BYTES } else { 0 };
+    (n_cell, N16)
+}
+const _: () = assert!(layout(64 * 1024).0 == 1_561);
+const _: () = assert!(layout(ARENA_BYTES_SHELL).0 == 3_200 && layout(ARENA_BYTES_APP).0 == 3_200);
+const _: () = assert!(layout(256 * 1024).0 == 6_476);
+// Hash buckets (power of two) holding u16 slot numbers (chains 1.5-3.1 at 1,561-3,200 cells).
+pub const BUCKETS: usize = 1024;
 const _: () = assert!(BUCKETS.is_power_of_two());
-// Static context (buckets/state/stats) budget beside the arena (cache design §1).
-pub const CACHE_STATIC_BYTES: usize = 2 * 1024;
+// Static context (buckets/clock state/stats) budget beside the arena.
+pub const CACHE_STATIC_BYTES: usize = 4 * 1024;
 // Value of the `font_set` setting.
 pub const FONT_SET_STD: u16 = 0;
 pub const FONT_SET_KCG_ONLY: u16 = 1;

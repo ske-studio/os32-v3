@@ -1,9 +1,11 @@
-"""T7b-b3 S1: glyph cache host tests (glyph cache design ⑥, b4⑥) and mutations.
+"""T7b-b3 S1 / TASK_FONTPERF F2: glyph cache host tests (glyph cache design ⑥, b4⑥,
+fontperf design §3 and §7 ①) and mutations.
 
-Runs userland/lib/font/tests/cache.rs (small slot layouts: LRU by age, hash
-chain unlink, class independence, invalid-slot preference, age ties/wrap,
-setting generation, fit limits, reuse). --mutate rebuilds a copy of the crate
-per mutation and requires the named test to fail at run time."""
+Runs userland/lib/font/tests/cache.rs (64/128KiB capacity, cell fit boundaries
+and cell copy, clock second chance / G-1 / G-2 / probe bound when full, hash
+chain unlink, class independence, setting generation, fit limits, reuse).
+--mutate rebuilds a copy of the crate per mutation and requires the named test
+to fail at run time."""
 from pathlib import Path
 import argparse
 import json
@@ -19,20 +21,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 MUTATIONS = [
     # b4⑥: an entry of another set generation must never hit.
-    ('lookup-ignores-set', 'src/cache.rs', 'if h.valid != 0 && h.key() == key {',
-     'if h.valid != 0 && h.codepoint == key.cp && h.px == key.px {', 'setting_change_old_entries_never_hit'),
-    ('age-not-refreshed', 'src/cache.rs', '        h.age = self.age;\n        self.set_hdr(slot, &h)?;',
-     '        self.set_hdr(slot, &h)?;', 'lru_a_b_a_c_evicts_b'),
-    ('unlink-head-only', 'src/cache.rs', '        if cur == target {\n            self.set_head(bucket, h.next);',
-     '        if true {\n            self.set_head(bucket, h.next);', 'collision_unlink_middle_head_tail'),
-    ('no-invalid-preference', 'src/cache.rs', '            if h.valid == 0 {\n                victim = slot;',
-     '            if false && h.valid == 0 {\n                victim = slot;', 'invalid_slot_preferred'),
-    ('age-tie-highest-slot', 'src/cache.rs', 'if best.is_none_or(|age| h.age < age) {',
-     'if best.is_none_or(|age| h.age <= age) {', 'age_tie_lowest_slot'),
-    ('age-wrap-kept', 'src/cache.rs', '        if self.age == u32::MAX {\n            self.stats.age_wrap',
-     '        if false {\n            self.stats.age_wrap', 'age_wrap_invalidates_all'),
-    ('slot-width-unchecked', 'src/cache.rs', '(usize::from(e.width) > class.width\n',
-     '(false\n', 'fit_limits_per_glyph'),
+    ('lookup-ignores-set', 'src/cache.rs', 'if m.valid && m.key == key {',
+     'if m.valid && m.key.cp == key.cp && m.key.px == key.px {', 'setting_change_old_entries_never_hit'),
+    ('unlink-head-only', 'src/cache.rs', '        if cur == target {\n            self.set_head(bucket, m.next);',
+     '        if true {\n            self.set_head(bucket, m.next);', 'collision_unlink_middle_head_tail'),
+    ('slot-width-unchecked', 'src/cache.rs', '&& (usize::from(e.width) > width\n',
+     '&& (false\n', 'fit_limits_per_glyph'),
+    # F2 (fontperf design §7 ①): cells, clock, G-1.
+    ('fit-always-big', 'src/cache.rs', '16 if self.n_cell > 0 && fits_cell(e, cell.width()) =>',
+     '16 if false && fits_cell(e, cell.width()) =>', 'cell_fit_boundaries'),
+    ('cell-shift-dropped', 'src/cache.rs', 'let v = (((hi << 8) | lo) & mask) >> left;',
+     'let v = ((hi << 8) | lo) & mask;', 'cell_copy_matches_placement'),
+    ('clock-ignores-ref', 'src/cache.rs', 'if !m.valid || !m.referenced {',
+     'if !m.valid || !m.referenced || slot >= first {', 'clock_second_chance'),
+    ('hand-kept-on-invalidate', 'src/cache.rs', '        self.hand = [0; CLASSES];\n        self.stats.invalidate',
+     '        self.stats.invalidate', 'invalidate_resets_fill_and_hand'),
 ]
 
 

@@ -206,7 +206,7 @@ fn rig(n16: usize) -> Rig {
     let (latin, ja) = (Rc::new(Probe::default()), Rc::new(Probe::default()));
     let mut engine = Box::new(Engine::new());
     if n16 != 0 {
-        engine.attach_arena(arena(n16 * SLOT16_BYTES), n16, 0).unwrap();
+        engine.attach_arena(arena(n16 * SLOT16_BYTES), 0, n16, 0).unwrap();
     }
     engine.open(src("latin", latin_font(), &latin), src("ja", ja_font(), &ja)).unwrap();
     assert_eq!(engine.state(), State::Ready);
@@ -273,6 +273,58 @@ fn hits_read_nothing_and_match_cold_and_trimmed() {
     assert_eq!(r.engine.cache().n_valid(), 0);
     let again: Vec<_> = [(KANJI, Cell::Full), ('B' as u32, Cell::Half)].iter().map(|&(cp, c)| draw(&mut r.engine, cp, c)).collect();
     assert_eq!(again, cold, "regenerated after trim");
+}
+
+/// Rows of a glyph placed in its cell (column `left`, row `ascent - top`, cut
+/// to the cell), as gshell text.rs / libos32gui draw.rs draw it.
+fn cell_rows(g: &Glyph, bits: &[u8], cw: i16) -> Vec<u16> {
+    let mut rows = vec![0u16; CELL_H_PX];
+    let pitch = usize::from(g.entry.pitch);
+    for r in 0..usize::from(g.entry.height) {
+        for x in 0..usize::from(g.entry.width) {
+            if bits[r * pitch + x / 8] & (0x80 >> (x % 8)) != 0 {
+                let (px, py) = (g.entry.left + x as i16, g.ascent - g.entry.top + r as i16);
+                if (0..cw).contains(&px) && (0..CELL_H_PX as i16).contains(&py) {
+                    rows[py as usize] |= 0x8000 >> px;
+                }
+            }
+        }
+    }
+    rows
+}
+
+#[test]
+fn cells_draw_like_uncached() {
+    // F2 (fontperf design §3): a glyph committed to a cell answers in cell form
+    // (left 0, top = ascent, the cell's size), cold and warm alike, and draws
+    // the same rows as the uncached raster placement. Space is 0 B, width 0.
+    let probe = Rc::new(Probe::default());
+    let open = |e: &mut Engine<Memory>| {
+        e.open(src("latin", latin_font(), &probe), src("ja", ja_font(), &probe)).unwrap();
+        assert!(e.begin());
+    };
+    let mut plain: Box<Engine<Memory>> = Box::new(Engine::new());
+    let mut cells: Box<Engine<Memory>> = Box::new(Engine::new());
+    cells.attach_arena(arena(8 * CELL_SLOT_BYTES + 2 * SLOT16_BYTES), 8, 2, 0).unwrap();
+    open(&mut plain);
+    open(&mut cells);
+    for (cp, cell) in [(KANJI, Cell::Full), (KANA, Cell::Full), ('A' as u32, Cell::Half), ('B' as u32, Cell::Half), (JA_ONLY_ASCII, Cell::Half)] {
+        let cw = if cell == Cell::Full { 16 } else { 8 };
+        let (r0, g0, b0) = draw(&mut plain, cp, cell);
+        let (r1, g1, b1) = draw(&mut cells, cp, cell);
+        let (r2, g2, b2) = draw(&mut cells, cp, cell);
+        assert_eq!((r0, r1, r2), (Resolved::Bitmap, Resolved::Bitmap, Resolved::Bitmap), "U+{cp:04X}");
+        assert!(!g0.cached && g1.cached && g2.cached, "U+{cp:04X}");
+        assert_eq!((g1, &b1), (g2, &b2), "U+{cp:04X}: cold miss == warm hit");
+        let e = g1.entry;
+        assert_eq!((e.left, e.top, e.width, e.height, e.pitch), (0, g1.ascent, cw as u16, 16, cw as u16 / 8), "U+{cp:04X}");
+        assert_eq!(g1.entry.face, g0.entry.face);
+        assert_eq!(cell_rows(&g1, &b1, cw), cell_rows(&g0, &b0, cw), "U+{cp:04X}: drawn the same");
+        assert!(cell_rows(&g0, &b0, cw).iter().any(|&r| r != 0));
+    }
+    let (r, g, b) = draw(&mut cells, SPACE, Cell::Half);
+    assert_eq!((r, g.entry.kind, g.entry.width, g.cached, b.len()), (Resolved::Space, Kind::Space, 0, true, 0));
+    assert_eq!(cells.cache().n_valid(), 6);
 }
 
 #[test]
@@ -352,7 +404,7 @@ fn borrowed_bitmap_blocks_release_paths() {
     assert_eq!(r.engine.invalidate_all(), Err(EngineError::Busy));
     assert_eq!(r.engine.set_kcg_only(Reason::Config), Err(EngineError::Busy));
     assert_eq!(r.engine.detach_arena().map(|a| a.is_some()), Err(EngineError::Busy));
-    assert!(r.engine.attach_arena(arena(SLOT16_BYTES), 1, 0).is_err());
+    assert!(r.engine.attach_arena(arena(SLOT16_BYTES), 0, 1, 0).is_err());
     assert!(!r.engine.begin(), "no entry check while borrowed");
     // A second resolve would evict the borrowed slot (1 slot): refused.
     let mut other = Glyph::default();
@@ -411,7 +463,7 @@ fn reopen_closes_invalidates_then_opens() {
     assert!(r.ja.log.borrow().contains(&"close ja".to_string()));
     // Reopen in place without close: old sources dropped before the new ones read.
     let mut e2: Box<Engine<Memory>> = Box::new(Engine::new());
-    e2.attach_arena(arena(8 * SLOT16_BYTES), 8, 0).unwrap();
+    e2.attach_arena(arena(8 * SLOT16_BYTES), 0, 8, 0).unwrap();
     e2.open(src("old-latin", latin_font(), &probe), src("old-ja", ja_font(), &probe)).unwrap();
     assert!(e2.begin());
     draw(&mut e2, KANJI, Cell::Full);
@@ -544,7 +596,8 @@ fn real_fonts_ascent_and_slot_fit() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../assets/fonts");
     let jf = PathBuf::from(std::env::var("OS32_FONT_SHINONOME").expect("OS32_FONT_SHINONOME"));
     let mut e: Box<Engine<Disk>> = Box::new(Engine::new());
-    e.attach_arena(arena(ARENA_BYTES), N16, N32).unwrap();
+    let (n_cell, n16) = layout(ARENA_BYTES_SHELL);
+    e.attach_arena(arena(ARENA_BYTES_SHELL), n_cell, n16, N32).unwrap();
     e.open(disk(root.join("Inconsolata-Regular.ttf")), disk(jf)).unwrap();
     assert!(e.begin());
     let below = CELL_H_PX as i16 - ASCENT_LATIN_PX;
@@ -579,6 +632,27 @@ fn real_fonts_ascent_and_slot_fit() {
     assert_eq!(jis.top, ASCENT_JA_PX, "Shinonome rows above the baseline");
     assert_eq!(jis.below, CELL_H_PX as i16 - ASCENT_JA_PX, "Shinonome rows below the baseline");
     assert_eq!((jis.over_left, jis.over_right), (0, 0), "Shinonome stays in its 16px cell");
+    // F-15: Inconsolata ASCII + Latin-1/Extended (the half range) bitmaps that
+    // leave the 8x16 cell take a Big16 slot (N16 of them) instead of a cell.
+    let mut over_cell = Vec::new();
+    for cp in (0x20..0x7f).chain(LATIN_HALF_FIRST..=LATIN_HALF_LAST) {
+        let mut g = Glyph::default();
+        if e.resolve(cp, Cell::Half, Px16, &mut g) == Resolved::Bitmap {
+            let x = g.entry;
+            if !(x.left == 0 && x.top == g.ascent && x.width == 8 && x.height == 16) {
+                over_cell.push(format!("U+{cp:04X}"));
+            }
+        }
+        e.release();
+    }
+    let latin1_over = over_cell.iter().filter(|u| u.as_str() < "U+0100").count();
+    println!("Inconsolata half range outside the cell: {} (Latin-1 {latin1_over}) {over_cell:?}", over_cell.len());
+    // Measured 2026-10-20 (F2): 44 of the half range leave the cell by their
+    // bitmap box (Latin-1: U+00B8, U+00C7, U+00E7; the rest Latin Extended-A/B
+    // with ogonek/cedilla/comma below or a tall accent), 17 of them with ink
+    // outside it. The design bound N16/2 (16) is not met: the PM decides (F2
+    // report). Pinned to the measurement so a regression shows.
+    assert!(latin1_over <= 3 && over_cell.len() <= 44, "{} glyphs leave the cell", over_cell.len());
     // Standard font set corpus (Shinonome, Inconsolata ASCII/Latin-1): no glyph
     // exceeds its slot. Inconsolata's own box drawing/blocks (reached only as the
     // fallback for codepoints Shinonome lacks) are 23 rows: uncached, counted.

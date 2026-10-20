@@ -30,8 +30,8 @@ MUTATIONS = [
     # T7b-b5: a half cell above ASCII must not take the ja face's full-width glyph.
     ('half-latin1-falls-to-ja', 'src/engine.rs', 'Cell::Half => &[FaceId::Latin],',
      'Cell::Half => &[FaceId::Latin, FaceId::Ja],', 'search_order_half_latin_full_ja'),
-    ('fallback-not-committed', 'src/engine.rs', 'let cached = self.cache.commit(key, &entry, &[]).is_ok();',
-     'let cached = false;', 'fallback_entries_are_committed_and_hit'),
+    ('fallback-not-committed', 'src/engine.rs', 'let slot = self.cache.commit(key, &entry, &[], cell).ok();',
+     'let slot: Option<u16> = None;', 'fallback_entries_are_committed_and_hit'),
     # b4④ baseline: ascent 14 for Inconsolata cuts g/j/p/q/y.
     ('latin-ascent-14', 'src/limits.rs', 'pub const ASCENT_LATIN_PX: i16 = 13;',
      'pub const ASCENT_LATIN_PX: i16 = 14;', 'real_fonts_ascent_and_slot_fit'),

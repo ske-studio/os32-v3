@@ -9,7 +9,7 @@ use std::os::unix::fs::FileExt;
 
 use font::{AppSource, AppFontStats};
 use os32_font::engine::{Cell, Engine, Glyph, Reason, Resolved, State};
-use os32_font::limits::ARENA_BYTES;
+use os32_font::limits::{layout, ARENA_BYTES_APP, N32};
 use os32_font::raster::PixelSize;
 
 fn check(condition: bool, label: &str) {
@@ -190,11 +190,15 @@ fn app_font_lifecycle() {
     // (1) First demand: Engine once (zero-filled garbage), arena once, both leases.
     let e = font::ensure_open().expect("engine");
     check(e.state() == State::Ready, "zero-fill: a garbage Engine did not open");
-    assert_eq!(k().allocs, vec![engine_size, ARENA_BYTES]);
+    assert_eq!(k().allocs, vec![engine_size, ARENA_BYTES_APP]);
     assert_eq!(k().opened, vec![os32_font::paths::FONT_LATIN.to_string(), os32_font::paths::FONT_JA.to_string()]);
     let s = st();
     assert_eq!((s.state, s.opens, s.open_gen, s.open_rc, s.has_arena, s.arena_allocs), (1, 1, 5, 0, 1, 1));
     assert_eq!(cfgro::reads(), 1);
+    // F2: the 128KiB app arena is cells + Big16 (layout()).
+    let (n_cell, n16) = layout(ARENA_BYTES_APP);
+    assert_eq!(e.cache().layout(), (n_cell, n16, N32));
+    assert_eq!(n_cell, 3_200);
 
     // (2) Later demands allocate and open nothing.
     let _ = font::ensure_open().unwrap();
@@ -219,7 +223,7 @@ fn app_font_lifecycle() {
     let before = e.cache().n_valid();
     assert!(before > 0);
     check(font::trim(), "trim-frees-arena");
-    check(k().frees == vec![ARENA_BYTES], "trim-frees-arena");
+    check(k().frees == vec![ARENA_BYTES_APP], "trim-frees-arena");
     assert!(!e.cache().has_arena() && e.state() == State::Ready && open_leases() == 2);
     assert!(k().closed.is_empty());
     // (5) The next demand reallocates the arena, opens nothing.
