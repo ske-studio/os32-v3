@@ -1,4 +1,6 @@
 check-rshell-peek-host:
+- tools/lanfs_host.py
+- tools/lan_bridge.py
 - tools/rshell_peek.py
 - tools/rshell_serial.py
 - tools/serialfs_host.py

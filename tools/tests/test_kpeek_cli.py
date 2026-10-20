@@ -3,7 +3,8 @@
 実物の cmd_peek.c を tools/tests/kpeek_cli_host.c が #include し、KernelAPI の
 kprintf / kdebug_call / version だけを偽物にして回す。見るのは引数の解釈、
 64 KB 上限と幅の倍数、1 KB の分割、行の書式と 8 bit 和、最後の端数行、
-CRC32・frames、誤りは 1 行だけ、NOSYS の案内。
+CRC32・frames、誤りは 1 行だけ、NOSYS の案内。T5 の -l: probe と flags・tag・dst、
+LAN では見出しと ok (tag) の 2 行だけ、使えなければ 1 行の後にシリアル版。
 
   python3 -B tools/tests/test_kpeek_cli.py            # 全ケース
   python3 -B tools/tests/test_kpeek_cli.py --mutate   # 否定側 (変異が RED になるか)
@@ -17,7 +18,7 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = "tools/tests/kpeek_cli_host.c"
 SRC = "userland/shell/cmd_peek.c"
-CASES = ["golden", "format", "split", "args", "errors"]
+CASES = ["golden", "format", "split", "args", "errors", "lan"]
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror", "-D__cdecl="]
 
 # 否定側 (パターン, 置換, 説明)。どれも cmd_peek.c の 1 か所だけを壊す。
@@ -40,6 +41,13 @@ MUTATIONS = [
      "4 GB ちょうどで終わる範囲を断る"),
     (r"(rc = g_api->kdebug_call\(KDEBUG_OP_PEEK, &kpeek_req,\n\s*\(u32\)sizeof\(kpeek_req\)\);\n)\s*frames\+\+;",
      r"\1", "frames を数えない"),
+    (r"if \(tag == kpeek_last_tag\) tag\+\+;", "", "同じ tick の 2 回目に同じ tag を使う"),
+    (r"kpeek_req\.flags = KDEBUG_PEEK_F_LAN;", "kpeek_req.flags = 0;", "LAN の印を立てない"),
+    (r"if \(lan == 1\) memset\(dst, 0, sizeof\(dst\)\);", "if (lan == 1) memset(dst, 0xFF, sizeof(dst));",
+     "-l で宛先を空にしない (ペアを使わない)"),
+    (r"(lan = kpeek_lan_probe\(dst\);)", r"\1 lan = lan || 1;", "probe の断りを見ない"),
+    (r"    if \(lan\) \{\n        /\* 本文は LAN", "    if (0) {\n        /* 本文は LAN",
+     "LAN でも 16 進行を出す"),
     (r"memcpy\(buf \+ off, kpeek_req\.data, n\);\n    \}\n",
      "memcpy(buf + off, kpeek_req.data, n);\n        g_api->kprintf(ATTR_WHITE, \"%s\", \"\");\n    }\n",
      "読んだ回ごとに kprintf (誤りの前に何か出す — 1 行 1 回を壊す)"),

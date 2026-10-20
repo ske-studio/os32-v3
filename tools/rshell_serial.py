@@ -43,9 +43,10 @@ Windows 側の Python (pyserial 入り) で動かす:
 終了コードはゲストの子の終了コードが 0 なら 0、それ以外は 1。
 **ゲストからの書き込みは既定で禁止** — push の宛先などは `--allow-write <相対パス>`
 (複数可) で明示する (票 B-7')。
-`peek [--elf F] [--out F] [-m] [-w N] <記号|hex>[+off] [len]` はゲストの `peek`
-(kdebug のメモリ読み、KDEBUG=1) を回し、行・和・CRC・len を照合する
+`peek [--elf F] [--out F] [-m] [-w N] [--lan --iface IF] <記号|hex>[+off] [len]`
+はゲストの `peek` (kdebug のメモリ読み、KDEBUG=1) を回し、行・和・CRC・len を照合する
 (記号は ELF と動いているカーネルが同じ版のときだけ、tools/rshell_peek.py)。
+`--lan` は本文を 82557 の LAN フレームで受ける (AF_PACKET、ゲストが使えなければシリアル)。
 LAN 版は `--sfs-lan --timeout 600 cmd sfs run hsync boot`。
 ゲストの `sfs lan on` を先に設定し、ノートでは lanfs_host.py を別途起動する。
 `--sfs-lan` は `--serve-host` と排他。開始行・exit 行・echo・EOT を照合する。

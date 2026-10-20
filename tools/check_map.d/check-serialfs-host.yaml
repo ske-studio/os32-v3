@@ -1,4 +1,6 @@
 check-serialfs-host:
+- tools/lanfs_host.py
+- tools/lan_bridge.py
 - tools/tests/mutpar.py
 - drivers/serial.c
 - drivers/serial_plan.c

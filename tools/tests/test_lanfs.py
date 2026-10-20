@@ -227,6 +227,22 @@ def run_suite(lib_path, py_path, root):
         rig.check()
         print("PASS exchange", mode, flush=True)
 
+    # KPEEK T5 (L1): kdebug's one-way T_DUMP carries a peek tag in the session
+    # ID field. Even when the tag equals the live sid and its seq is the next
+    # one, it must be dropped before the sid/seq tracking (no high_seq advance).
+    rig = Rig(lib, host, root)
+    rig.hello()
+    rig.read()
+    sid, high, before = rig.server.sid, rig.host.high_seq, rig.server.executed
+    dump = sfs.encode(sfs.T_DUMP, sid, high + 1,
+                      struct.pack("<I", 0x100000) + bytes(1024), sfs.LAN_MAX_PAYLOAD)
+    assert rig.host.handle(packet(dump)) is None
+    assert rig.host.high_seq == high and rig.server.executed == before
+    rig.read()
+    assert rig.server.executed == before + 1 and rig.host.high_seq == high + 1
+    rig.check()
+    print("PASS one-way T_DUMP dropped before sid/seq tracking", flush=True)
+
     rig = Rig(lib, host, root)
     lib.test_wait(0)
     assert lib.test_hello(1) < 0 and not rig.sent and lib.test_ticks() == 0
@@ -505,6 +521,8 @@ def run_mutations(tmp, root):
          "f->sid != c->sid"),
         ("old_seq", "tools/lanfs_host.py", "elif fr.seq <= self.high_seq:",
          "elif False:"),
+        ("dump_oneway", "tools/lanfs_host.py",
+         "(sfs.T_LOG, sfs.T_EXIT, sfs.T_DUMP)", "(sfs.T_LOG, sfs.T_EXIT)"),
         ("host_peer", "tools/lanfs_host.py",
          "if self.peer is not None and src != self.peer:", "if False:"),
         ("put_deadline", "fs/sfs_lan.c",

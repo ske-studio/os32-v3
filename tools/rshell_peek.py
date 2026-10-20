@@ -19,12 +19,23 @@ TASK_KPEEK §3 (段 T3)。rshell_serial.py のサブコマンド `peek` から�
    1 つでも違えば (または `peek: err`) 終了コード 1 で **ファイルを書かない**。
 4. `--out FILE` に生バイト、標準出力に `addr len crc32 lines` の 1 行。
    「2 回読んで一致」は呼び手が 2 回回して CRC を比べる。
+5. `--lan --iface IF` (T5、§3 5): AF_PACKET (tools/lanfs_host.py の NicPort) を
+   開き、自分の MAC を `-l<mac>` に入れて送る。本文はゲストの kdebug が送る
+   SFS_T_DUMP のフレーム (セッション ID 欄 = tag、番号 = 通し番号、ペイロード
+   = [addr u32][data])。シリアルの `peek: ok len= crc32= tag= frames=` の後も
+   1 秒の猶予でフレームを待ち (L5)、tag の違うものは捨て、番号で並べ直し、
+   欠け・番号の重複の矛盾・番地や長さの違い・crc32 の不一致は rc 1 で
+   ファイルを書かない (再送は無い、呼び手が再実行)。`peek: lan unavailable`
+   の行が来たらシリアル版の受け方に切り替える。
 """
 import os
 import re
 import shutil
+import select
+import socket
 import struct
 import subprocess
+import time
 import zlib
 
 PEEK_CMD_MAX = 0x10000      # ゲストの 1 コマンドの上限 (KPEEK_CMD_MAX)
@@ -45,6 +56,12 @@ SHF_ALLOC = 2
 HEX_RE = re.compile(r"^(?:0[xX])?([0-9A-Fa-f]{1,8})$")
 ROW_RE = re.compile(r"^([0-9A-F]{8}):((?: [0-9A-F]{2})+)  \|s=([0-9A-F]{2})$")
 OK_RE = re.compile(r"^peek: ok len=([0-9A-F]{8}) crc32=([0-9A-F]{8}) frames=([0-9]+)$")
+OK_LAN_RE = re.compile(r"^peek: ok len=([0-9A-F]{8}) crc32=([0-9A-F]{8}) "
+                       r"tag=([0-9A-F]{8}) frames=([0-9]+)$")
+LAN_UNAVAILABLE = "peek: lan unavailable"
+LAN_GRACE_S = 1.0           # ok 行の後もフレームを待つ猶予 (L5)
+LAN_ADDR_LEN = 4            # ペイロード先頭の addr u32
+LAN_RCVBUF = 4 << 20        # 64 フレーム × 1 KB を ok 行まで溜める
 
 
 class PeekError(Exception):
@@ -157,12 +174,14 @@ def check_identity(ver_text, elf_data, syms, lz4_data):
 # ---------------------------------------------------------------------------
 #  応答の照合 (§3 3)
 # ---------------------------------------------------------------------------
-def peek_command(addr, length, mmio, width):
+def peek_command(addr, length, mmio, width, lan_mac=None):
     parts = ["peek"]
     if mmio:
         parts.append("-m")
     if width:
         parts.append("-w%d" % width)
+    if lan_mac is not None:
+        parts.append("-l" + ":".join("%02x" % b for b in lan_mac))
     parts += ["%08X" % addr, "%X" % length]
     return " ".join(parts)
 
@@ -216,6 +235,146 @@ def parse_peek_output(text, addr, length, mmio, width):
     return bytes(data)
 
 
+# ---------------------------------------------------------------------------
+#  LAN の出口 (§3 5、T5)
+# ---------------------------------------------------------------------------
+def _lan_modules():
+    import lanfs_host
+    import serialfs_host
+    return lanfs_host, serialfs_host
+
+
+def parse_lan_reply(text, addr, length, mmio, width):
+    """`peek -l` のシリアルの応答。('serial', 生バイト) (lan unavailable の後の
+    シリアル版) か ('lan', tag, crc32, frames) を返す。違えば PeekError。"""
+    lines = [l.rstrip("\r") for l in text.split("\n")]
+    lines = [l for l in lines if l and not l.startswith("> ")]
+    for l in lines:
+        if l.startswith("peek: err"):
+            raise PeekError(l)
+    if lines and lines[0].startswith(LAN_UNAVAILABLE):
+        return ("serial", parse_peek_output("\n".join(lines[1:]), addr, length,
+                                            mmio, width))
+    head = "peek %s %08X w%d len=%08X" % ("m" if mmio else "k", addr, width or 1,
+                                          length)
+    if len(lines) != 2 or lines[0] != head:
+        raise PeekError("lan reply %r, want header and ok line" % lines[:3])
+    m = OK_LAN_RE.match(lines[1])
+    if not m:
+        raise PeekError("bad lan ok line %r" % lines[1])
+    if int(m.group(1), 16) != length:
+        raise PeekError("ok len %s, requested %08X" % (m.group(1), length))
+    frames = (length + PEEK_KAPI_CHUNK - 1) // PEEK_KAPI_CHUNK
+    if int(m.group(4)) != frames:
+        raise PeekError("frames %s, want %d" % (m.group(4), frames))
+    return ("lan", int(m.group(3), 16), int(m.group(2), 16), frames)
+
+
+def dump_frame(packet, own_mac):
+    """自分宛ての SFS_T_DUMP なら Frame、それ以外は None (L2: LAN の上限で解く)。"""
+    lanfs, sfs = _lan_modules()
+    if (len(packet) < lanfs.ETH_HDR + len(lanfs.MARK) or
+            packet[12:14] != struct.pack(">H", lanfs.ETHERTYPE) or
+            packet[14:17] != lanfs.MARK or packet[:6] != own_mac):
+        return None
+    parsed = sfs.try_frame(packet, lanfs.ETH_HDR, sfs.LAN_MAX_PAYLOAD)
+    if parsed[0] != "frame" or parsed[2].type != sfs.T_DUMP:
+        return None
+    return parsed[2]
+
+
+class DumpCollector(object):
+    """1 コマンド (tag) のフレームを番号で集めて組み直す。"""
+
+    def __init__(self, tag, addr, length):
+        self.tag = tag
+        self.addr = addr
+        self.length = length
+        self.got = {}
+
+    def feed(self, fr):
+        if fr.sid != self.tag:
+            return                       # 別のコマンドの残り
+        if fr.seq in self.got:
+            if self.got[fr.seq] != fr.payload:
+                raise PeekError("frame seq %d repeated with other bytes" % fr.seq)
+            return
+        self.got[fr.seq] = fr.payload
+
+    def complete(self, frames):
+        return all(i in self.got for i in range(frames))
+
+    def assemble(self, frames, crc):
+        missing = [i for i in range(frames) if i not in self.got]
+        if missing:
+            raise PeekError("lan frames missing: %s of %d" % (
+                ",".join(str(i) for i in missing[:8]), frames))
+        extra = sorted(set(self.got) - set(range(frames)))
+        if extra:
+            raise PeekError("lan frame seq %d beyond frames=%d" % (extra[0], frames))
+        data = bytearray()
+        for seq in range(frames):
+            payload = self.got[seq]
+            want_addr = self.addr + seq * PEEK_KAPI_CHUNK
+            want_n = min(PEEK_KAPI_CHUNK, self.length - seq * PEEK_KAPI_CHUNK)
+            if len(payload) < LAN_ADDR_LEN:
+                raise PeekError("lan frame seq %d too short" % seq)
+            got_addr, = struct.unpack_from("<I", payload, 0)
+            if got_addr != want_addr or len(payload) - LAN_ADDR_LEN != want_n:
+                raise PeekError("lan frame seq %d holds %08X+%X, want %08X+%X" % (
+                    seq, got_addr, len(payload) - LAN_ADDR_LEN, want_addr, want_n))
+            data += payload[LAN_ADDR_LEN:]
+        if zlib.crc32(bytes(data)) & 0xFFFFFFFF != crc:
+            raise PeekError("crc32 %08X, rebuilt from lan %08X" % (
+                crc, zlib.crc32(bytes(data)) & 0xFFFFFFFF))
+        return bytes(data)
+
+
+def collect_frames(port, collector, frames, grace=LAN_GRACE_S):
+    """ok 行の後、揃うか猶予が切れるまでフレームを読む (L5)。揃った後も既に
+    届いている分は読み切る (番号の重複の矛盾を見落とさない)。時計は port.now。"""
+    now = port.now
+    deadline = now() + grace
+
+    def feed(packets):
+        for packet in packets:
+            fr = dump_frame(packet, port.mac)
+            if fr is not None:
+                collector.feed(fr)
+    while not collector.complete(frames):
+        remaining = deadline - now()
+        if remaining <= 0:
+            break
+        feed(port.poll(remaining))
+    while True:
+        packets = port.poll(0)
+        if not packets:
+            break
+        feed(packets)
+
+
+class LanPort(object):
+    """AF_PACKET の受け口 (lanfs_host.NicPort、同じ IF の lanfs_host と並べてよい)。"""
+
+    def __init__(self, iface):
+        lanfs, _ = _lan_modules()
+        self.nic = lanfs.NicPort(iface, lanfs.ETHERTYPE)
+        try:
+            self.nic.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, LAN_RCVBUF)
+        except OSError:
+            pass
+        self.mac = self.nic.mac
+        self.now = time.monotonic
+
+    def poll(self, timeout):
+        if not select.select([self.nic], [], [], max(0.0, timeout))[0]:
+            return []
+        return self.nic.recv_frames()
+
+    def close(self):
+        self.nic.close()
+
+
 def piece_timeout(length, baud, base):
     lines = (length + PEEK_ROW - 1) // PEEK_ROW + 2
     wire = lines * PEEK_LINE_BYTES * SERIAL_BITS_PER_BYTE / float(baud or 9600)
@@ -248,8 +407,27 @@ def resolve(target, length, syms):
     return base + off, PEEK_DEFAULT_LEN if length is None else length, False
 
 
-def run(args, send, baud=9600, out=print):
-    """send(line, timeout) -> (text, err or None)。終了コードを返す。"""
+def run(args, send, baud=9600, out=print, lan_port=None):
+    """send(line, timeout) -> (text, err or None)。終了コードを返す。
+    lan_port は --lan の受け口 (試験は偽物、無ければ --iface で開く)。"""
+    lan = getattr(args, "lan", False)
+    if lan and lan_port is None:
+        if not getattr(args, "iface", None):
+            out("[rshell_peek] --lan needs --iface")
+            return 2
+        try:
+            lan_port = LanPort(args.iface)
+        except Exception as e:  # noqa: BLE001 (BridgeError / OSError)
+            out("[rshell_peek] --lan: %s" % e)
+            return 1
+        try:
+            return _run(args, send, baud, out, lan_port)
+        finally:
+            lan_port.close()
+    return _run(args, send, baud, out, lan_port if lan else None)
+
+
+def _run(args, send, baud, out, lan_port):
     length = None
     if args.len is not None:
         length = parse_int_hex(args.len)
@@ -300,13 +478,25 @@ def run(args, send, baud=9600, out=print):
     lines = 0
     for off in range(0, length, PEEK_CMD_MAX):
         n = min(PEEK_CMD_MAX, length - off)
-        line = peek_command(addr + off, n, args.m, args.w)
+        line = peek_command(addr + off, n, args.m, args.w,
+                            lan_port.mac if lan_port is not None else None)
         text, err = send(line, piece_timeout(n, baud, args.timeout or 0))
         if err:
             out("[rshell_peek] %s: %s" % (line, err))
             return 1
         try:
-            data += parse_peek_output(text, addr + off, n, args.m, args.w)
+            if lan_port is None:
+                data += parse_peek_output(text, addr + off, n, args.m, args.w)
+            else:
+                reply = parse_lan_reply(text, addr + off, n, args.m, args.w)
+                if reply[0] == "serial":
+                    out("[rshell_peek] lan unavailable on the guest: serial reply")
+                    data += reply[1]
+                else:
+                    _, tag, crc, frames = reply
+                    got = DumpCollector(tag, addr + off, n)
+                    collect_frames(lan_port, got, frames)
+                    data += got.assemble(frames, crc)
         except PeekError as e:
             out("[rshell_peek] %s: %s" % (line, e))
             return 1
@@ -328,5 +518,8 @@ def add_arguments(p):
     p.add_argument("--out", default=None, help="生バイトを書くファイル (全部合ったときだけ)")
     p.add_argument("-m", action="store_true", help="MMIO (許可リストの PCI BAR)")
     p.add_argument("-w", type=int, choices=(1, 2, 4), default=0, help="読みの幅")
+    p.add_argument("--lan", action="store_true",
+                   help="本文を LAN (82557、SFS_T_DUMP) で受ける。--iface 必須、root か CAP_NET_RAW")
+    p.add_argument("--iface", default=None, help="--lan の受け口 (例 enp1s0)")
     p.add_argument("target", help="記号[+off] か 16 進の番地[+off]")
     p.add_argument("len", nargs="?", default=None, help="16 進の長さ")

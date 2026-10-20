@@ -1,4 +1,6 @@
 check-guest-host:
+- tools/lanfs_host.py
+- tools/lan_bridge.py
 - tools/tests/guest_tests.txt
 - build/core.yaml
 - tools/deploy_manifests.py

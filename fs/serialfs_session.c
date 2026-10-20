@@ -305,6 +305,16 @@ int serialfs_session_begin(void)
     return 0;
 }
 
+/* kdebug の peek -l (TASK_KPEEK §2-8) の宛先: いまのペアの MAC。
+ * 0 = out に写した / -1 = ペアが無い (未接続かつ SFS_LAN_PEER 無し)。 */
+int sfs_lan_peer_mac(u8 *out)
+{
+    u32 i;
+    if (!out || !(g_lan.linked || g_lan.peer_fixed)) return -1;
+    for (i = 0; i < SFS_LAN_MAC_LEN; i++) out[i] = g_lan.peer[i];
+    return 0;
+}
+
 int serialfs_session_end(int exit_code)
 {
     if (res_owner_get() != APP_ID_SHELL) return OS32_ERR_INVAL;

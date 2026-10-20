@@ -70,7 +70,7 @@ class LanServer:
         else:
             if dst != self.mac or (self.peer is not None and src != self.peer):
                 return None
-            if fr.type in (sfs.T_LOG, sfs.T_EXIT) or fr.type & sfs.T_RESP:
+            if fr.type in (sfs.T_LOG, sfs.T_EXIT, sfs.T_DUMP) or fr.type & sfs.T_RESP:
                 return None
             if fr.sid != self.server.sid or not fr.sid:
                 response = self.server.handle(fr)

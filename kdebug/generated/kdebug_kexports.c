@@ -304,6 +304,10 @@ void (*const kdebug_kexports[])(void) = {
     (void (*)(void))paging_pte_restore,
     (void (*)(void))pci_find,
     (void (*)(void))pci_get,
+    (void (*)(void))e82557_send,
+    (void (*)(void))e82557_get_mac,
+    (void (*)(void))e82557_state,
+    (void (*)(void))sfs_lan_peer_mac,
 };
 const unsigned long kdebug_abi_gen = KDEBUG_ABI_GEN;
 const unsigned long kdebug_kexport_count = KDEBUG_IMPORT_COUNT;
@@ -553,6 +557,10 @@ const struct module_symbol_contract kdebug_import_contracts[] = {
     {0xad5cc9c0u, 1, 1},
     {0x3f359573u, 1, 1},
     {0xe2843d64u, 1, 1},
+    {0x114537c8u, 1, 1},
+    {0xef33472eu, 1, 1},
+    {0x3e66697fu, 1, 1},
+    {0x2a2e778au, 1, 1},
 };
 const struct module_symbol_contract kdebug_export_contracts[MODULE_OPS_SLOTS] = {
     [0] = {0xbcb84611u, 1, 0},

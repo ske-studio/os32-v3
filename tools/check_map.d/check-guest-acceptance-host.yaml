@@ -1,4 +1,6 @@
 check-guest-acceptance-host:
+- tools/lanfs_host.py
+- tools/lan_bridge.py
 - tools/tests/guest_acceptance.yaml
 - tools/tests/guest_tests.txt
 - tools/gen_guest_acceptance.py

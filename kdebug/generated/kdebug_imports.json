@@ -1,7 +1,7 @@
 {
-  "module_abi_gen": 1964366424,
+  "module_abi_gen": 3534065117,
   "stage": "S5",
-  "count": 245,
+  "count": 249,
   "imports": [
     {
       "stage": "S1",
@@ -3675,6 +3675,66 @@
       "type_ver": 1,
       "signature": "int pci_get(u32 idx, void *out);",
       "source_declaration": "int pci_get(u32 idx, void *out);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "stage": "S5",
+      "kind": 1,
+      "symbol": "e82557_send",
+      "source": "drivers/e82557.h",
+      "context_safe": false,
+      "index": 245,
+      "name": "e82557_send",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "int e82557_send(const void *buf, u32 len);",
+      "source_declaration": "int e82557_send(const void *buf, u32 len);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "stage": "S5",
+      "kind": 1,
+      "symbol": "e82557_get_mac",
+      "source": "drivers/e82557.h",
+      "context_safe": false,
+      "index": 246,
+      "name": "e82557_get_mac",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "void e82557_get_mac(u8 *mac);",
+      "source_declaration": "void e82557_get_mac(u8 *mac);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "stage": "S5",
+      "kind": 1,
+      "symbol": "e82557_state",
+      "source": "drivers/e82557.h",
+      "context_safe": false,
+      "index": 247,
+      "name": "e82557_state",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "int e82557_state(void);",
+      "source_declaration": "int e82557_state(void);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "stage": "S5",
+      "kind": 1,
+      "symbol": "sfs_lan_peer_mac",
+      "source": "fs/serialfs.h",
+      "context_safe": false,
+      "index": 248,
+      "name": "sfs_lan_peer_mac",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "int sfs_lan_peer_mac(u8 *out);",
+      "source_declaration": "int sfs_lan_peer_mac(u8 *out);",
       "dtype": null,
       "array": false
     }

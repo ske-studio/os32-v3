@@ -1,4 +1,6 @@
 check-gserial-host:
+- tools/lanfs_host.py
+- tools/lan_bridge.py
 - tools/gserial.py
 - tools/rshell_serial.py
 - tools/rshell_peek.py
