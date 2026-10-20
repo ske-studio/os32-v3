@@ -157,6 +157,11 @@ int paging_is_present(u32 virt_addr);
  * 番地は USER で張られたページでなければならない)。 */
 u32 paging_pte_flags(u32 virt_addr);
 
+/* PTE の生値の退避と書き戻し (kdebug の peek の窓、TASK_KPEEK §2-4 4)。
+ * raw は PT が無ければ 0、restore は PT が無ければ -1 (書いたら TLB を flush)。 */
+u32 paging_pte_raw(u32 virt_addr);
+int paging_pte_restore(u32 virt_addr, u32 raw);
+
 /* ======================================================================== */
 /*  リング3 アドレス空間 (M1b: PD 複製)                                     */
 /*                                                                          */

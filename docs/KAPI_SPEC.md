@@ -1,4 +1,4 @@
-# KernelAPI v77 仕様書
+# KernelAPI v78 仕様書
 
 外部プログラム (OS32X) がカーネル機能を利用するためのAPIテーブル仕様。
 
@@ -16,8 +16,8 @@
 | 最大プログラムサイズ | image と暫定 heap 予算を起動時に検査 ([TASK_T2_APPBAND](tasks/v3/TASK_T2_APPBAND.md) §4) |
 | プログラム専用ヒープ | 動的配置 (sbrk_heap_limit, exec_heap 管理下) |
 | プログラム専用スタック | 動的配置 (メモリ終端付近、下向き展開) |
-| 現在のバージョン | **77** |
-| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 253・予約 47) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
+| 現在のバージョン | **78** |
+| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 254・予約 46) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
 
 ---
 
@@ -120,6 +120,7 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v70 | **実装 (2026-10-07、e11c1・統合ゲスト受入前)** | surface query/lease/bundle/unlease・値返し ls・本人識別の 6 本 (slot 240〜245)。公開値型・ページ/SHM 定数、pipe の CPL3 制限。e11b2 で memory_layout 世代 2 (版70は不変、旧世代1は拒否) | §4-10、[TASK_T2D_T2H](tasks/v3/TASK_T2D_T2H.md) e11 |
 | v71 | **受入済み (2026-10-08、f12 ゲスト受入)** | USER 専用 `mem_map` / `mem_unmap` (slot 246・247)。f12 で memory_layout 世代 3 (KAPI 71・slot・データ欄は不変)。USER の最小初期量と mem_map による伸長へ切替。旧世代は拒否。 |
 | v72 | **受入済み (2026-10-09、f13 ゲスト受入)** | `mem_stat` (slot 248)、サイズ引数つき MemStat。4 世代・データ欄は不変。 | 本書 §4-12 |
+| v78 | **実装 (TASK_KPEEK T1、ゲスト受入は T4)** | `kdebug_call` (slot 253)。kdebug 部品の ops slot 19 (`dbg_call`) へ渡す汎用の 1 本、部品が無ければ `OS32_ERR_NOSYS`。要求 `KdebugPeek` (1064B)。4 世代・データ欄は不変。 | 本書 §4-15 |
 | v77 | **実装 (T7b-b1 S2、ゲスト受入は S3b 後)** | app 用 font read lease `font_source_open` / `font_source_read_at` / `font_source_close` (slot 250〜252)。4 世代・データ欄は不変。 | 本書 §4-14 |
 | v76 | **実装 (T3d1b、ゲスト受入は未実施)** | `unicode_to_jis` (slot 249)、kernel 所有の組表を探索。4 世代・データ欄は不変。 | 本書 §4-13 |
 | v75 | **受入済み (2026-10-15、DBGREF G1)** | MemStat 末尾に kdebug の 5 欄を追記 (220B)。slot・4 世代は据置 (OS32X_MIN_API は 75)。 | 本書 §4-12 |
@@ -290,7 +291,7 @@ v62 まではデータ欄 (`sbrk_heap_limit` / `shm_base`) を関数表の**直�
 |---|---|---|
 | 関数表の容量 R | **300** スロット (`KAPI_FUNC_CAPACITY`) | `sdk/kapi.json` の `func_capacity` |
 | データ欄の先頭 | **0x4B8** = 8 + 4 × R (`KAPI_DATA_FIELDS_OFF`) | `sdk/gen_kapi.py` が生成 |
-| 予約スロット | 253〜299 (`kapi_reserved[47]`、v77 時点。v72 は 249〜299、v68 は 240〜299、v67 は 239〜299、v66 は 238〜299、v65 は 235〜299、v64 は 234〜299、v63 は 230〜299)。カーネルの表は `kapi_reserved_nosys` (= `OS32_ERR_NOSYS`)、CPL=3 のトランポリンは int 0x80 のスタブ (ディスパッチャが `slot >= KAPI_FUNC_COUNT` で kill)。**NULL にしない** | `exec/exec.c` |
+| 予約スロット | 254〜299 (`kapi_reserved[46]`、v78 時点。v77 は 253〜299、v72 は 249〜299、v68 は 240〜299、v67 は 239〜299、v66 は 238〜299、v65 は 235〜299、v64 は 234〜299、v63 は 230〜299)。カーネルの表は `kapi_reserved_nosys` (= `OS32_ERR_NOSYS`)、CPL=3 のトランポリンは int 0x80 のスタブ (ディスパッチャが `slot >= KAPI_FUNC_COUNT` で kill)。**NULL にしない** | `exec/exec.c` |
 | R の上限 | トランポリン 1 ページ: `sizeof(KernelAPI)` + スタブ 8B × R + 写し場 256B ≤ 4096 → **R ≤ 318** (`STATIC_ASSERT`) | `exec/exec.c` |
 
 関数を足すときは `kapi_reserved[]` が 1 本減るだけで、データ欄は動かない。**関数数が R を
@@ -1626,7 +1627,7 @@ resident C CRT にはこの欄を組み込まず、gshell の Rust flag も偽�
 
 ### 予約スロット (v63〜)
 
-0x3FC〜0x4B4 (slot 253〜299、47 本、v77 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
+0x400〜0x4B4 (slot 254〜299、46 本、v78 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
 (§4-0)。カーネルの表は `kapi_reserved_nosys` (`OS32_ERR_NOSYS`)、トランポリンは
 int 0x80 のスタブで、CPL=3 からの呼び出しはアプリを kill する。
 
@@ -1942,3 +1943,16 @@ open は FPU の有無を見ない (字形のラスタは整数だけ。T7b-b3 S
 `OS32_ERR_NOSYS`」は TASK_FONTPERF F6 で撤去、常駐 shell の内部入口の open も同じ)。
 公開の `sys_read` / `sys_lseek` / `sys_close` は font の FD を扱わない。
 app の終了・fault で残った lease は回収で閉じる (結線は T7b-b2 S3b)。
+
+### §4-15 kdebug_call (v78)
+
+| オフセット | 名前 | 型 |
+|---|---|---|
+| 0x3FC | kdebug_call | `i32(u32 op, void *buf, u32 size)` |
+
+slot 253。kdebug 部品 (`/boot/kdebug.bin`、`KDEBUG=1` のときだけ読む) の ops slot 19
+`dbg_call` へそのまま渡す受け口 (`kernel/kdebug_call.c`)。部品が動いていない・slot 19 が
+空なら `OS32_ERR_NOSYS`。`buf` は `size` バイトの入出力 (生成ラッパの出力検査)。
+op は `KDEBUG_OP_*` (`os32_kapi_shared.h`)、peek の要求は `KdebugPeek` (1064 バイト、
+LAN の欄 flags / tag / dst を含む最終形)。以後の kdebug コマンドはこの 1 本に載せる
+(設計 TASK_KPEEK §1)。

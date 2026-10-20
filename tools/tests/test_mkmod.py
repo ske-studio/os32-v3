@@ -48,9 +48,9 @@ def rejected(call, word):
 def fixture(directory):
     cross = Path(os.environ['CROSS_DIR']) / 'bin'
     entries = imports_gen.load_def()
-    imports_gen.generate(entries, directory, stage='S4')
+    imports_gen.generate(entries, directory, stage='S5')
     metadata = json.loads((directory / 'kdebug_imports.json').read_text())
-    assert len(metadata['imports']) == 239
+    assert len(metadata['imports']) == 245
     source = directory / 'fixture.S'
     source.write_text('''
 .section .text
@@ -71,11 +71,11 @@ helper:
 .globl kdebug_ops
 .type kdebug_ops,@object
 kdebug_ops:
-    .long 2
+    .long 3
     .long helper
     .zero 12
     .long kdebug_init
-    .zero 52
+    .zero 56
 .size kdebug_ops, .-kdebug_ops
 .section .bss
 .balign 4
@@ -103,18 +103,18 @@ def verify(module, elf, metadata, kernel, pair, validator):
     words = struct.unpack_from('<36I', image)
     assert words[:3] == (int.from_bytes(b'KMOD', 'little'), 1, 144)
     assert words[4:6] == (KAPI, LAYOUT) and words[7:10] == (1, 2, 1)
-    assert words[33] == 2 and len(module.OPS_NAMES) == 18
+    assert words[33] == 3 and len(module.OPS_NAMES) == 19
     assert words[31] == pair
     checked = bytearray(image)
     struct.pack_into('<I', checked, 128, 0)
     assert zlib.crc32(checked) == words[32]
     reloc = struct.unpack_from('<' + 'I' * words[22], image, words[21])
     # Immediate at byte 1 + two ops pointers + one absolute operand per stub.
-    assert len(reloc) == 242 and 1 in reloc and 6 not in reloc
-    assert words[24] == 239 and words[26] == 2
+    assert len(reloc) == 248 and 1 in reloc and 6 not in reloc
+    assert words[24] == 245 and words[26] == 2
     export = [struct.unpack_from('<IHHI', image, words[25] + 12*i) for i in range(2)]
     assert [(e[1], e[3]) for e in export] == [(1, 11), (5, 0)]
-    assert stats['prefix_size'] == 144 + 242*4 + 239*12 + 2*12 + words[28]
+    assert stats['prefix_size'] == 144 + 248*4 + 245*12 + 2*12 + words[28]
     assert stats['prefix_alloc'] == words[11]
     expected_imports = [(mkmod.fnv1a(e['name'].encode()), e['type_ver'], e['kind'])
                         for e in metadata['imports']]
@@ -226,9 +226,9 @@ def main():
         print('PASS shared schema; CLI requires paired VK32; CLI/API require explicit KAPI and layout generations')
         assert 'prefix=' + str(stats['prefix_size']) + ' B' in output
         print(output.strip())
-        print('prefix fixture (239 real generated imports, 2 exports): '
+        print('prefix fixture (245 real generated imports, 2 exports): '
               f"{stats['prefix_size']} B unpadded / {stats['prefix_alloc']} B allocated; "
-              'full S4 body relocation/export counts remain unmeasured')
+              'full S5 body relocation/export counts remain unmeasured')
         if args.mutate:
             source = (ROOT / 'tools/mkmod.py').read_text()
             for name, old, new in MUTATIONS:

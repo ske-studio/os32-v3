@@ -27,13 +27,13 @@ def build_validator(directory, source=None):
 
 
 def validate(exe, image, *, kapi=75, layout=3, abi=0x12345678, pair=0xabcdef01,
-             ops=2, img_valid=1, imports=(), exports=(), module_id=1, runner=None, relocate_base=None):
+             ops=3, img_valid=1, imports=(), exports=(), module_id=1, runner=None, relocate_base=None):
     contract = bytearray(struct.pack("<11I", kapi, layout, abi, pair, ops, img_valid,
                                      len(imports), len(image), module_id,
                                      int(relocate_base is not None), relocate_base or 0))
     for entry in imports:
         contract.extend(struct.pack("<IHH", *entry))
-    slots = [(0, 0, 0)] * 18
+    slots = [(0, 0, 0)] * 19  # KDEBUG ops slots (v3: slot 19 dbg_call)
     for slot, name_hash, version in exports:
         slots[slot - 1] = (name_hash, version, 0)
     for entry in slots:
@@ -68,7 +68,7 @@ def fixture():
     h = [0x444f4d4b, 1, 144, 4160, 75, 3, 0x12345678, 1, 2, 1,
          4096, 4096, 64, 0, 24, 24, 8, 32, 32, 64, 32,
          144, 2, 152, 1, 164, 1, 176, len(names), 0, 0,
-         0xabcdef01, 0, 2, 0, 0]
+         0xabcdef01, 0, 3, 0, 0]
     image = bytearray(struct.pack("<36I", *h) + bytes(4160 - 144))
     struct.pack_into("<2I", image, 144, 1, 5)  # Unaligned, exactly adjacent writes.
     struct.pack_into("<IHHI", image, 152, fnv("kprintf"), 1, 1, 32)
@@ -128,7 +128,7 @@ def cases():
     add("reloc-range", "reloc-value", lambda b: struct.pack_into("<I", b, 4097, 4097), 11)
     for off in (0, 24, 31, 33, 62, 64, 0xfffffffc):
         add("import-slot", f"import-slot-{off}", lambda b, off=off: word(b, 40, off), 12)
-    for slot in (0, 17, 19, 65535):
+    for slot in (0, 17, 19, 20, 65535):  # 19 = no contract, 20 = past ops_slots
         add("export-slot", f"export-slot-{slot}", lambda b, slot=slot: struct.pack_into("<H", b, 168, slot))
     add("export-slot", "export-outside-text", lambda b: word(b, 43, 24))
     def duplicate_export(b):

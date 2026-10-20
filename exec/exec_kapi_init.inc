@@ -251,10 +251,11 @@ extern u16 __cdecl wrap_unicode_to_jis(u32 cp);
 extern i32 __cdecl wrap_font_source_open(const char *path, u32 *out_id, u32 *out_size);
 extern i32 __cdecl wrap_font_source_read_at(u32 id, u32 offset, void *dst, u32 len);
 extern i32 __cdecl wrap_font_source_close(u32 id);
+extern i32 __cdecl wrap_kdebug_call(u32 op, void *buf, u32 size);
 extern i32 __cdecl kapi_reserved_nosys(void);
 
 kapi->magic = 0x4B415049UL;
-kapi->version = 77;
+kapi->version = 78;
 
     kapi->gfx_init = wrap_gfx_init;
     kapi->gfx_init_200 = wrap_gfx_init_200;
@@ -509,6 +510,7 @@ kapi->version = 77;
     kapi->font_source_open = wrap_font_source_open;
     kapi->font_source_read_at = wrap_font_source_read_at;
     kapi->font_source_close = wrap_font_source_close;
+    kapi->kdebug_call = wrap_kdebug_call;
     {
         u32 _kr;
         for (_kr = 0; _kr < (u32)KAPI_FUNC_RESERVED; _kr++)

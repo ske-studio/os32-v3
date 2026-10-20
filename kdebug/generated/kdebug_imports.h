@@ -4,6 +4,7 @@
 #include "types.h"
 #include "drivers/dma8237.h"
 #include "drivers/kbd.h"
+#include "drivers/pci.h"
 #include "drivers/pcm_cs4231.h"
 #include "exec/appmem.h"
 #include "exec/appslot.h"
@@ -117,8 +118,8 @@ struct v86_session_state *kdi_ptr_v86_session(void);
 u32 *kdi_ptr_v86_gcap_phase(void);
 u32 *kdi_ptr_v86_gcap_alloc_count(void);
 u32 *kdi_ptr_v86_gcap_free_count(void);
-#define KDEBUG_IMPORT_COUNT 239
-#define KDEBUG_ABI_GEN 0xb2662d70u
+#define KDEBUG_IMPORT_COUNT 245
+#define KDEBUG_ABI_GEN 0x7515da58u
 #include "kernel/module_image.h"
 extern void (*const kdebug_kexports[])(void);
 extern const struct module_symbol_contract kdebug_import_contracts[];

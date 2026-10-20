@@ -1196,4 +1196,34 @@ v86_io_reset_policy:
 paging_pte_flags:
     jmp *kdebug_import_slots+952
 .size paging_pte_flags, .-paging_pte_flags
+.globl paging_is_present
+.type paging_is_present, @function
+paging_is_present:
+    jmp *kdebug_import_slots+956
+.size paging_is_present, .-paging_is_present
+.globl paging_map_phys
+.type paging_map_phys, @function
+paging_map_phys:
+    jmp *kdebug_import_slots+960
+.size paging_map_phys, .-paging_map_phys
+.globl paging_pte_raw
+.type paging_pte_raw, @function
+paging_pte_raw:
+    jmp *kdebug_import_slots+964
+.size paging_pte_raw, .-paging_pte_raw
+.globl paging_pte_restore
+.type paging_pte_restore, @function
+paging_pte_restore:
+    jmp *kdebug_import_slots+968
+.size paging_pte_restore, .-paging_pte_restore
+.globl pci_find
+.type pci_find, @function
+pci_find:
+    jmp *kdebug_import_slots+972
+.size pci_find, .-pci_find
+.globl pci_get
+.type pci_get, @function
+pci_get:
+    jmp *kdebug_import_slots+976
+.size pci_get, .-pci_get
 .section .note.GNU-stack,"",@progbits

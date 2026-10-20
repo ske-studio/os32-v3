@@ -180,6 +180,25 @@ static void check_boot_dispatch(void)
         CHECK(not_run_logs == (state >= KDEBUG_NOT_FOUND));
     }
 }
+/* KAPI kdebug_call (kernel/kdebug_call.c): NOSYS without slot 19, else pass-through. */
+static u32 call_op, call_size;
+static void *call_buf;
+static i32 fake_dbg_call(u32 op, void *buf, u32 size)
+{
+    call_op = op; call_buf = buf; call_size = size;
+    return 0x5a;
+}
+static void check_kdebug_call(void)
+{
+    static u8 req[8];
+    i32 (*saved)(u32, void *, u32) = kdebug.ops.dbg_call;
+    kdebug.ops.dbg_call = 0;
+    CHECK(kdebug_call(KDEBUG_OP_PEEK, req, sizeof(req)) == OS32_ERR_NOSYS);
+    kdebug.ops.dbg_call = fake_dbg_call;
+    CHECK(kdebug_call(KDEBUG_OP_PEEK_LAN_PROBE, req, sizeof(req)) == 0x5a);
+    CHECK(call_op == KDEBUG_OP_PEEK_LAN_PROBE && call_buf == req && call_size == sizeof(req));
+    kdebug.ops.dbg_call = saved;
+}
 void _start(void)
 {
     read_input(input, sizeof(input)); CHECK(input[3] <= CAP);
@@ -216,5 +235,6 @@ void _start(void)
         if (!input[0]) CHECK(!owners && !kdebug.owner);
     }
     check_boot_dispatch();
+    check_kdebug_call();
     finish(0);
 }

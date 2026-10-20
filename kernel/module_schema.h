@@ -20,7 +20,7 @@
 #define MODULE_ID_V86 8U
 #define MODULE_ID_LAN 9U
 #define MODULE_ID_CIRRUS 10U
-#define MODULE_RUNTIME_SLOTS 18U
+#define MODULE_RUNTIME_SLOTS 19U
 #define MODULE_RECORD_CAP 10U
 #define MODULE_REQUIRED_PATHS { "/boot/sqlite.mod", "/boot/fep.mod" }
 
@@ -29,7 +29,7 @@
 #define MODULE_RELOC_MAX 16384U
 #define MODULE_IMPORT_MAX 1024U
 #define MODULE_EXPORT_MAX 64U
-#define MODULE_OPS_SLOTS 18U
+#define MODULE_OPS_SLOTS 19U
 
 /* Wire word numbers; decode little-endian bytes explicitly. */
 enum module_field {
@@ -79,8 +79,8 @@ enum module_field {
         .required_flags = 1U, \
         .allowed_flags = 1U, \
         .stop_allowed = 0U, \
-        .ops_version = 2U, \
-        .ops_slots = 18U, \
+        .ops_version = 3U, \
+        .ops_slots = 19U, \
         .image_max = 262144U, \
         .mem_max = 262144U, \
         .reloc_max = 16384U, \
