@@ -1,13 +1,19 @@
 /* ========================================================================
  *  shell_service_host.c — 常駐 shell の内部入口の段 A / B と登録 (T7b-b2 S3a)
+ *                         + exec/exec.c への結線 (S3b)
  *
- *  設計: ~/os32-tmp/run/t7bb12/DESIGN.final.md §3・§5 (b2①③⑥)
+ *  設計: ~/os32-tmp/run/t7bb12/DESIGN.final.md §3・§5 (b2①③⑤⑥)
  *  実行: python3 -B tools/tests/test_shell_service.py [--target] [--mutate]
  *
  *  実物 exec/shell_service.c と exec/ring3_str.c (ring3_guard_active) を
- *  #include する。exec/exec.c への結線 (publish/retire/wm_mark の呼出し、
- *  frame[5]、ring3_context_clear) は S3b なので、ここでは呼び手の側を
- *  試験が演じる (ring3_wm_enter の代わり = 深さ +1 → 1 なら wm_mark)。
+ *  #include する。exec/exec.c はカーネル一式を引くので丸ごとは組めない —
+ *  試験 py が exec.c から結線の部分を切り出して tmp に書き、ここで #include
+ *  する (S3b、手本 test_caller_access.py の wm.inc):
+ *    wire_wm.inc     ring3_wm_enter / ring3_wm_leave (深さと WM の印)
+ *    wire_ctx.inc    Ring3CallContext と ring3_context_save / clear / restore
+ *    wire_commit.inc exec_run の shell 確定 (appslot_shell_commit → retire → publish)
+ *    wire_finish.inc exec_finish の shell 分岐 (exec_reclaim_owned → retire)
+ *  dispatch 入口の印の 0 と frame[5] は字面で見る (試験 py の static_checks)。
  *
  *  段 C / D の実体 (kernel/font_source.c の font_lease_shell_*、S2) は
  *  別の試験 (font_source_host.c) が見るので、ここでは registry の贋物を置く
@@ -27,10 +33,12 @@
 #include "exec.h"
 #include "gui.h"
 #include "fd_redirect.h"
+#include "redir_access.h"   /* CallerAccessFrame (wire_ctx.inc の Ring3CallContext) */
 
 /* ---- exec/exec.c・exec/appslot.c・fs/fd_redirect.c の代わり ------------- */
 volatile int ring3_in_syscall = 0;
 volatile int ring3_wm_depth = 0;
+volatile u32 ring3_wm_depth_underflow = 0;
 static int host_cur = APP_ID_SHELL;
 static int host_owner = GUI_SHELL_OWNER;
 static AppSlot host_slot;
@@ -192,18 +200,48 @@ static void plain_context(void)
     host_slot.state = APP_STATE_RUNNING;
 }
 
-/* exec/exec.c の ring3_wm_enter / leave に S3b で入る形 (設計 §3-3)。 */
-static void wm_enter(void)
+/* ---- exec/exec.c から切り出した結線 (S3b) ------------------------------ */
+/* ring3_context_* が引く外部 (caller の控え・TSS・IRQ) の贋物。 */
+static u32 *g_cur_frame = 0;
+static u32 host_esp0;
+static int host_caller_saves, host_caller_invalidates, host_caller_leaves;
+void caller_access_save(volatile CallerAccessFrame *out) { (void)out; host_caller_saves++; }
+void caller_access_invalidate(void) { host_caller_invalidates++; }
+void caller_access_leave(const volatile CallerAccessFrame *previous)
+{ (void)previous; host_caller_leaves++; }
+u32 tss_get_esp0(void) { return host_esp0; }
+void tss_set_esp0(u32 esp0) { host_esp0 = esp0; }
+static unsigned int irq_save(void) { return 0; }
+static void irq_restore(unsigned int flags) { (void)flags; }
+
+/* exec_run / exec_finish の shell 分岐が呼ぶ外部の贋物。 */
+static int host_commit_calls, host_reclaim_calls, host_reclaim_seen_close;
+void appslot_shell_commit(void) { host_commit_calls++; }
+static void exec_reclaim_owned(int id, int kind)
 {
-    ring3_wm_depth++;
-    if (ring3_wm_depth == 1) shell_service_wm_mark();
+    (void)id; (void)kind;
+    host_reclaim_calls++;
+    host_reclaim_seen_close = fake_close_shell_calls;   /* retire はこの後のはず */
 }
 
-static void wm_leave(void)
+#include "wire_wm.inc"
+#include "wire_ctx.inc"
+
+/* exec_run の `if (is_shell) { appslot_shell_commit(); ... }` の中身。 */
+static void host_shell_commit(u32 load_base, u32 text_sz)
 {
-    if (ring3_wm_depth > 0) ring3_wm_depth--;
-    if (ring3_wm_depth == 0) ring3_wm_shell_gen = 0;
+#include "wire_commit.inc"
 }
+
+/* exec_finish の `if (id == APP_ID_SHELL)` 分岐の res_owner_set(0) より後。 */
+static void host_shell_finish(int id, int kind)
+{
+#include "wire_finish.inc"
+}
+
+/* 実物の ring3_wm_enter / leave (exec/exec.c) を通す。 */
+static void wm_enter(void) { ring3_wm_enter(); }
+static void wm_leave(void) { ring3_wm_leave(); }
 
 static int rejected_with(u32 before, u32 reason)
 {
@@ -402,13 +440,83 @@ static void case_reload(void)
     shell_service_retire();
 }
 
+/* ========================================================================
+ *  5. S3b: exec/exec.c の結線 (切り出した実物)
+ * ======================================================================== */
+static void case_wire(void)
+{
+    u32 id = 99, size = 0, gen;
+    u8 buf[4];
+    volatile Ring3CallContext saved;
+    report("5 S3b exec.c の結線\n");
+    plain_context();
+    g_shell_service.generation = 0;
+    shell_service_retire();
+
+    /* (a) ring3_wm_enter / leave: 一番外の enter で印、深さ 0 で 0。 */
+    publish_in();
+    gen = g_shell_service.generation;
+    ring3_wm_enter();
+    check(ring3_wm_depth == 1 && ring3_wm_shell_gen == gen, "5a enter (深さ 1) で印 = 現 generation");
+    ring3_wm_shell_gen = 77;
+    ring3_wm_enter();
+    check(ring3_wm_depth == 2 && ring3_wm_shell_gen == 77, "5b 入れ子の enter は印を書き換えない");
+    ring3_wm_leave();
+    check(ring3_wm_depth == 1 && ring3_wm_shell_gen == 77, "5c 深さ 1 に戻る leave は印を残す");
+    ring3_wm_leave();
+    check(ring3_wm_depth == 0 && ring3_wm_shell_gen == 0, "5d 深さ 0 に戻る leave で印 0");
+    ring3_wm_shell_gen = 5;
+    ring3_wm_leave();
+    check(ring3_wm_depth == 0 && ring3_wm_shell_gen == 0 && ring3_wm_depth_underflow == 1,
+          "5e 対の無い leave も印 0 (深さは 0 で止まる)");
+
+    /* (b) b2⑤ ring3_context_*: clear で印 0、restore で親の印に戻る。 */
+    ring3_wm_enter();
+    ring3_in_syscall = 1;
+    ring3_context_save(&saved);
+    check(saved.wm_shell_gen == gen && saved.wm_depth == 1, "5f save が印を控える");
+    ring3_context_clear();
+    check(ring3_wm_shell_gen == 0 && ring3_wm_depth == 0 && ring3_in_syscall == 0,
+          "5g clear (park/STOP/fault/sys_exit の longjmp 前) で印 0");
+    ring3_context_restore(&saved);
+    check(ring3_wm_shell_gen == gen && ring3_wm_depth == 1 && ring3_in_syscall == 1,
+          "5h restore で親の印へ戻す");
+    plain_context();
+
+    /* (c) exec_run の shell 確定: retire → publish の順 (旧 shell の lease を閉じ、
+     *     新しい text で登録する)。exec_finish を経ない reload でも旧 lease は残らない。 */
+    check(open_in(&id, &size) == 0 && fake_in_use() == 1, "5i 旧 shell が open");
+    host_commit_calls = 0;
+    host_shell_commit((u32)(uptr)__start_svc_in2, (u32)(uptr)(__stop_svc_in2 - __start_svc_in2));
+    check(host_commit_calls == 1, "5j appslot_shell_commit を 1 回");
+    check(fake_in_use() == 0, "5k 確定は retire してから publish (旧 lease を閉じる)");
+    check(g_shell_active && g_shell_service.generation == gen + 1 &&
+          g_shell_text_lo == (u32)(uptr)__start_svc_in2 &&
+          g_shell_text_hi == (u32)(uptr)__stop_svc_in2,
+          "5l publish は確定した text 範囲 (load_base, text_sz) で登録中になる");
+    check(read_in2(id, buf, 4) == OS32_ERR_STALE, "5m 旧 id は新 shell で STALE");
+    check(open_in(&id, &size) == OS32_ERR_INVAL, "5n 旧 text からの open は INVAL");
+
+    /* (d) exec_finish の shell 分岐: 回収 (exec_reclaim_owned) の後に retire。 */
+    check(open_in2(&id, &size) == 0 && fake_in_use() == 1, "5o 新 shell が open");
+    host_reclaim_calls = 0;
+    fake_close_shell_calls = 0;
+    host_shell_finish(APP_ID_SHELL, 0);
+    check(host_reclaim_calls == 1 && host_reclaim_seen_close == 0 && fake_close_shell_calls == 1,
+          "5p exec_reclaim_owned の後に retire");
+    check(!g_shell_active && fake_in_use() == 0, "5q shell の終了で登録を外し lease を閉じる");
+    check(read_in2(id, buf, 4) == OS32_ERR_INVAL, "5r 終了後の read_at は INVAL (未登録)");
+    plain_context();
+}
+
 void _start(void)
 {
-    report("shell_service_host (T7b-b2 S3a)\n");
+    report("shell_service_host (T7b-b2 S3a + S3b)\n");
     case_publish();
     case_gate();
     case_wm();
     case_reload();
+    case_wire();
     if (failures) {
         report("FAILED\n");
         die(1);

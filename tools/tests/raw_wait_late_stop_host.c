@@ -53,6 +53,7 @@ static void exec_notify_owned(int id, int kind)
 { if (id != 3 || kind != EXEC_KIND_EXITED || appslot_cur() != 2) bad++; notices++; }
 
 #include "late_stop_appslot.inc"
+#include "shell_service_stub_host.h"   /* T7b-b2 S3b: exec.c の結線の弱い贋物 */
 #include "late_stop_exec.inc"
 
 static int test(void)

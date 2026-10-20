@@ -38,6 +38,8 @@ MUTATIONS = [
     ("dispatch", "caller_access_enter(&prev_caller, CALLER_USER)", "caller_access_enter(&prev_caller, CALLER_TRUSTED)", "dispatcher origin"),
     ("dispatch", "caller_access_leave(&prev_caller);", "(void)prev_caller;", "dispatcher leave"),
     ("dispatch", "ring3_in_syscall = prev_in_syscall;", "ring3_in_syscall = 0; (void)prev_in_syscall;", "nested guard"),
+    ("dispatch", "    ring3_wm_shell_gen = 0;   /* T7b-b2", "    (void)0;   /* T7b-b2", "dispatch entry WM mark (b2⑤)"),
+    ("wm", "    if (ring3_wm_depth == 1) shell_service_wm_mark();", "", "WM enter mark (b2③)"),
 ]
 
 

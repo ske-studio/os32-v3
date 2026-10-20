@@ -58,8 +58,9 @@ extern volatile u32 font_lease_reject_count;
 extern volatile u32 font_lease_reject_last;
 
 /* ---- app (public KAPI v77 の実体) ----
- * 門: ring3_call_from_user() != 0、caller が USER かつ caller.owner ==
- * res_owner_get()。外れたら OS32_ERR_INVAL。
+ * 門: ring3_call_from_user() != 0、caller が USER かつ caller.app_id ==
+ * res_owner_get() (lease の owner は app_id、AS の札 caller.owner ではない)。
+ * 外れたら OS32_ERR_INVAL。
  * open: owner ごとの上限 VFS_FONT_FD_MAX_APP・合計 VFS_FONT_FD_MAX_APP_TOTAL・
  *   枠 / FD 枯渇は OS32_ERR_NOSPC。成功で 0 と *out_id / *out_size。
  * read_at: 戻り = 実読込長 (短読はそのまま) / 負。範囲外は INVAL。

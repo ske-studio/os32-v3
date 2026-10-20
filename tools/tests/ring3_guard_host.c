@@ -30,8 +30,9 @@
  *                            表を歩いて断る。WM が張ったバッファは素通し。
  *  kernel/gui.c の外部参照 (res_owner_get / appslot_gui_op_* / kbd_set_gui_mode
  *  / ime_set_render / kstrncpy / kmemset / ring3_wm_enter / ring3_wm_leave) は
- *  ここで贋物にする。ring3_wm_enter / leave の贋物は exec/exec.c の実装と
- *  同じ 2 行 (深さ +1 / 0 で止める -1)。
+ *  ここで贋物にする。ring3_wm_enter / leave の贋物は exec/exec.c の実装の
+ *  深さの部分と同じ 2 行 (深さ +1 / 0 で止める -1)。T7b-b2 の WM の印
+ *  (ring3_wm_shell_gen) は持たない — 実物は shell_service_host.c が見る。
  *
  *  tools/tests/ring3_str_host.c と同じ様式 — ホスト ILP32 GNU89 で走らせ、
  *  libc は使わない (-nostdlib、Linux の int 0x80 で write/exit するだけ)。

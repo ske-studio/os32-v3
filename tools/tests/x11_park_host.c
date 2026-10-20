@@ -53,6 +53,7 @@ static void ring3_resume(u32 *frame, u32 pd, struct tss_entry *tss);
 
 /* exec_pending_finish is a no-op for a park landing. Its pending machinery is
  * covered by test_exec_r1; no owner-exit/IME cleanup substitute is called here. */
+#include "shell_service_stub_host.h"   /* T7b-b2 S3b: exec.c の結線の弱い贋物 */
 #include "exec_source.inc"
 
 static void prepare_wait(void)

@@ -58,6 +58,9 @@ mod dbgdesc;
 mod desktop;
 mod fep;
 mod ffi;
+/* T7b-b2 b2③ のゲスト fixture (feature `r1_fixture`、製品 build には入らない)。 */
+#[cfg(feature = "r1_fixture")]
+mod fixture;
 mod fullscreen;
 mod handler;
 mod input;
@@ -180,6 +183,9 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
             pump::gshell_gui_pump as *const () as *mut u8,
         );
     }
+    /* b2③ fixture: 通常文脈 (gui_register の後) で shell lease を開く。 */
+    #[cfg(feature = "r1_fixture")]
+    fixture::open();
 
     /* 設定レジストリ (票 S4 §2)。**gfx attach の後・最初の合成の前**に 1 回。
      * DB が無い / 壊れている / 版が新しいときも既定値で起動を続ける

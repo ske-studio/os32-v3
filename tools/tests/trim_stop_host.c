@@ -1,6 +1,7 @@
 /* g4: Rust Box + real SDK loop/allocator, kernel map/heap/DONE/kill, WM forget.
  * The reused fixture supplies host MMU/IRQ and absent devices. */
 #include "mem_fixture.c"
+#include "shell_service_stub_host.h"   /* T7b-b2 S3b: exec.c の結線の弱い贋物 */
 #include "wm_source.c"
 void *kmemcpy(void *d, const void *s, u32 n) { heap_copy(d, s, n); return d; }
 void *memcpy(void *d, const void *s, u32 n) { heap_copy(d, s, n); return d; }

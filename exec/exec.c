@@ -49,6 +49,8 @@
 #include "tss.h"
 #include "ring3_ls.h"
 #include "os32_kapi_slots.h"
+#include "shell_service.h" /* T7b-b2: 常駐 shell の内部入口 (publish / retire / WM の印) */
+#include "font_source.h"   /* T7b-b1: app の font lease の回収 (font_lease_close_owned) */
 
 extern void shell_print(const char *s, u8 attr);
 extern void shell_print_dec(u32 val, u8 color);
@@ -313,6 +315,9 @@ volatile int ring3_wm_depth = 0;
 void ring3_wm_enter(void)
 {
     ring3_wm_depth++;
+    /* T7b-b2 §3-3: 一番外側の WM 区間に入ったとき、登録中の shell の世代を
+     * 印にする (shell の font read はこの印が現世代の間だけ WM 中でも通る)。 */
+    if (ring3_wm_depth == 1) shell_service_wm_mark();
 }
 
 volatile u32 ring3_wm_depth_underflow = 0;
@@ -337,6 +342,8 @@ void ring3_wm_leave(void)
          * 数える (exec.h の注記)。 */
         ring3_wm_depth_underflow++;
     }
+    /* T7b-b2 §3-3: WM 区間を出きったら印を消す。 */
+    if (ring3_wm_depth == 0) ring3_wm_shell_gen = 0;
 }
 
 /* A launch/resume stack survives the child's longjmp; dispatch stacks do not.
@@ -347,6 +354,7 @@ typedef struct {
     u32 *frame;
     u32 esp0;
     int in_syscall, wm_depth;
+    u32 wm_shell_gen;   /* T7b-b2: WM 区間の世代付きの印 (ring3_wm_shell_gen) */
 } Ring3CallContext;
 
 static void ring3_context_save(volatile Ring3CallContext *out) __attribute__((noinline));
@@ -360,6 +368,7 @@ static void ring3_context_save(volatile Ring3CallContext *out)
     out->esp0 = tss_get_esp0();
     out->in_syscall = ring3_in_syscall;
     out->wm_depth = ring3_wm_depth;
+    out->wm_shell_gen = ring3_wm_shell_gen;
 }
 
 static void ring3_context_clear(void)
@@ -368,6 +377,7 @@ static void ring3_context_clear(void)
     g_cur_frame = 0;
     ring3_in_syscall = 0;
     ring3_wm_depth = 0;
+    ring3_wm_shell_gen = 0;
 }
 
 static void ring3_context_restore(const volatile Ring3CallContext *saved)
@@ -380,6 +390,7 @@ static void ring3_context_restore(const volatile Ring3CallContext *saved)
     tss_set_esp0(saved->esp0);
     ring3_in_syscall = saved->in_syscall;
     ring3_wm_depth = saved->wm_depth;
+    ring3_wm_shell_gen = saved->wm_shell_gen;
     irq_restore(flags);
 }
 
@@ -1185,7 +1196,11 @@ static void exec_reclaim_resources(int id)
      * リダイレクトすることはできない (D3 の限界。GUI アプリは使わない)。 */
     fd_redirect_reset_owned(id);
     /* (3) FD自動クローズ (この ID が open した FD 3 以上)。
-     * カーネル常駐FD (vfs_fd_set_protect で保護) は除外される。 */
+     * カーネル常駐FD (vfs_fd_set_protect で保護) は除外される。
+     * (3a) その直前に app の font lease 表を畳む (T7b-b1 §2-4)。vfs_close_owned
+     * も FONT の FD を閉じるが lease 表は知らないので、表の枠を先に返す
+     * (shell の lease は kind が違い、protect なのでどちらにも掛からない)。 */
+    font_lease_close_owned(id);
     vfs_close_owned(id);
     /* (4) パイプバッファ自動解放 */
     pipe_free_owned(id);
@@ -1367,6 +1382,9 @@ static void exec_finish(int id, int status, int kind)
         exec_nest_level = 0;
         res_owner_set(0);
         exec_reclaim_owned(id, kind);
+        /* T7b-b2 §3-1: shell の内部入口を外し shell lease を全部閉じる。
+         * 次の shell の publish はこの後 (exec_run の appslot_shell_commit 直後)。 */
+        shell_service_retire();
     } else {
 #ifdef OS32_R1_FIXTURE
         r1_fixture_parent(id);
@@ -1525,6 +1543,7 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
      * WM を longjmp で抜けた (park / kill) 後に 1 が残っていても、ここで
      * 立ち直る — 残ると 3 つの門がアプリのポインタを素通しする穴になる。 */
     ring3_wm_depth = 0;
+    ring3_wm_shell_gen = 0;   /* T7b-b2: 深さと同じく WM の印も 0 から始まる */
     /* 暴走判定の起点 (票 T9 §12 S6b)。**代入 1 つだけ** — ここは hot path。
      * start / resume だけを起点にしていると、GetMessage 型の GUI アプリ
      * (端末) が WM の op_wait の中で待っている間は更新されず、2 秒待った
@@ -2066,7 +2085,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
     {
         u32 launch_argv[OS32_MAX_ARGS];
         u32 str_addr, argv_addr;
-        u32 frame[4];
+        u32 frame[5];
         int argc = 0;
         int cmd_len = launch_cmd_len;
         const char *s = cmdline;
@@ -2123,13 +2142,16 @@ static int exec_launch(const char *cmdline, int gui_arg)
             return exec_launch_abort(launcher_id, id, EXEC_ERR_INVALID);
 
         /* ---- 呼び出しフレームを子スタック上に自分で組む ----
-         * ExecEntry は __cdecl (int argc, char **argv, KernelAPI *api) なので
-         * 低位から argc, argv, kapi の順に並べる。call 時点で ESP を 16 バイト
-         * 境界に揃えるのは SysV i386 ABI の要求。 */
-        new_esp = (stack_top - 3 * sizeof(u32)) & ~(u32)15;
+         * ExecEntry は __cdecl (int argc, char **argv, KernelAPI *api) で、
+         * CRT0 `_start_c` は 4 語目 aux (常駐 shell には内部入口の表の番地、
+         * app には 0 — T7b-b2 §3-1) も受ける。低位から argc, argv, kapi, aux
+         * の順に並べる。call 時点で ESP を 16 バイト境界に揃えるのは
+         * SysV i386 ABI の要求。 */
+        new_esp = (stack_top - 4 * sizeof(u32)) & ~(u32)15;
         frame[1] = (u32)argc;
         frame[2] = argv_addr;
         frame[3] = (u32)kapi;
+        frame[4] = is_shell ? (u32)(uptr)&g_shell_service : 0;
 
         if (want_ring3) {
             /* --- M2c: CPL=3 アプリには本物の表でなくトランポリン表を渡す ---
@@ -2150,7 +2172,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
 
         if (app_store(ctx, want_ring3 ? u_esp : new_esp,
                       want_ring3 ? frame : frame + 1,
-                      (want_ring3 ? 4 : 3) * sizeof(u32)))
+                      (want_ring3 ? 5 : 4) * sizeof(u32)))
             return exec_launch_abort(launcher_id, id, EXEC_ERR_INVALID);
         /* The heap header needs its user VA; switch only after image and argv. */
         if (want_ring3) paging_load_cr3(ctx->as->pd_phys);
@@ -2162,6 +2184,12 @@ static int exec_launch(const char *cmdline, int gui_arg)
         /* ======== ここで初めて「走っているのはこの ID」になる ======== */
         if (is_shell) {
             appslot_shell_commit();
+            /* T7b-b2 §3-1: 確定した shell の text 範囲で内部入口を登録する。
+             * 順は retire → publish に固定 — 前の shell の終了 (exec_finish)
+             * で retire 済みでも、ここで重ねて retire してから publish する
+             * (retire 抜きの publish は旧 shell の lease を開いたまま残す)。 */
+            shell_service_retire();
+            shell_service_publish(load_base, text_sz);
         } else {
             appslot_start_commit(id, gui, need_pages);
             if (want_ring3) exec_owner_diag(ctx, 0, 0, 0);

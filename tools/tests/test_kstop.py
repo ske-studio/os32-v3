@@ -11,6 +11,7 @@ from test_exec_r1 import function
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PRE = r'''
 #include "font_guard_inactive.h"
+#include "shell_service_stub_host.h"   /* T7b-b2 S3b: exec.c の結線の弱い贋物 */
 #include "appslot.h"
 #include "exec.h"
 #include "ring3_ls.h"

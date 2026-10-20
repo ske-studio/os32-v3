@@ -1,7 +1,9 @@
 /* T7b-b1: font の read lease (fs/vfs_fd.c と kernel/font_source.c を実物で組む)。
  * 設計 ~/os32-tmp/run/t7bb12/DESIGN.final.md §2 / §5 の b1①〜⑦ と b2②④ の
  * lease 表側。S1 = VFS 部、S2 = lease 表・app の門 (public KAPI の実体)・
- * shell 側の段 C/D。exec.c への回収 hook の結線は S3b。
+ * shell 側の段 C/D。S3b = exec.c の回収 hook (exec_reclaim_resources を
+ * 試験 py が exec.c から切り出して exec_reclaim.inc に書き、lease_reclaim が
+ * 実物として呼ぶ。回収の他の段は贋物)。
  * 贋物は FS backend・TTY・owner・caller の境界だけ (vfs_fd_sqlite_host.c と
  * 同じ流儀)。FONT_SOURCE_HOST_APP_TOTAL を与えた組み (試験 py の変種) は
  * app の合計上限だけをその値にして、owner ごとの上限を合計と分けて見る。 */
@@ -403,7 +405,9 @@ static void as_app(int owner, u32 gen)
     caller_ok = 1;
     caller.origin = CALLER_USER;
     caller.app_id = owner;
-    caller.owner = (u32)owner;
+    /* AS の所有者の札 (paging の as->owner) は app_id と別の番号 (ゲストでは
+     * app 2 に札 18 など)。同じ値にすると取り違えが隠れる (S3b) */
+    caller.owner = (u32)owner + 0x40u;
     caller.generation = gen;
     current_owner = owner;
 }
@@ -668,6 +672,66 @@ static void lease_owned(void)
     for (i = 0; i < FONT_LEASE_SLOTS; i++) CHECK(g_font_leases[i].kind == FONT_LEASE_FREE);
 }
 
+/* S3b b1⑤: exec/exec.c の exec_reclaim_resources (切り出した実物) が app の
+ * lease 表の枠と VFS の FD を両方返す。他の回収の段は贋物で、前後の段から
+ * lease の状態を見る (font_lease_close_owned は fd_redirect の後・pipe の前)。 */
+static int reclaim_target = -1, reclaim_mid_ok, reclaim_steps;
+static u32 reclaim_watch;
+void kapi_strings_cleanup_owned(int id) { (void)id; reclaim_steps++; }
+void db_cleanup_owned(int id) { (void)id; reclaim_steps++; }
+void fd_redirect_reset_owned(int id)
+{
+    reclaim_steps++;
+    if (id == reclaim_target && slot_of(reclaim_watch)->kind == FONT_LEASE_APP) reclaim_mid_ok++;
+}
+void pipe_free_owned(int id)
+{
+    reclaim_steps++;
+    if (id == reclaim_target && slot_of(reclaim_watch)->kind == FONT_LEASE_FREE) reclaim_mid_ok++;
+}
+void shm_free_owned(int id) { (void)id; reclaim_steps++; }
+void snd_owner_exit(int id) { (void)id; reclaim_steps++; }
+void pcm_reclaim(int id) { (void)id; reclaim_steps++; }
+#include "exec_reclaim.inc"
+
+static void lease_reclaim(void)
+{
+    u32 a, b, sid = 0, ssz = 0;
+    int afd, bfd, i;
+    use_ino(1);
+    as_app(APP_OWNER, APP_GEN);
+    a = app_open_ok();
+    afd = slot_of(a)->vfs.fd;
+    as_app(APP2, APP_GEN);
+    b = app_open_ok();
+    bfd = slot_of(b)->vfs.fd;
+    CHECK(font_lease_shell_open("/s.ttf", 2, &sid, &ssz) == 0);
+    reclaim_target = APP_OWNER;
+    reclaim_watch = a;
+    reclaim_mid_ok = reclaim_steps = 0;
+    exec_reclaim_resources(APP_OWNER);
+    CHECK(reclaim_steps == 7 && reclaim_mid_ok == 2);
+    CHECK(slot_of(a)->kind == FONT_LEASE_FREE && !open_files[afd].in_use);
+    CHECK(slot_of(b)->kind == FONT_LEASE_APP && open_files[bfd].in_use);
+    CHECK(slot_of(sid)->kind == FONT_LEASE_SHELL);
+    as_app(APP_OWNER, APP_GEN + 1);   /* 同じ owner 番号の次の app */
+    CHECK(font_lease_app_close(a) == OS32_ERR_STALE);
+    /* 次の app は上限まで開ける (枠が漏れていない) */
+    a = app_open_ok();
+    CHECK(font_lease_app_close(a) == 0);
+    reclaim_target = APP2;
+    reclaim_watch = b;
+    exec_reclaim_resources(APP2);
+    CHECK(slot_of(b)->kind == FONT_LEASE_FREE && !open_files[bfd].in_use);
+    /* shell の回収 (owner = GUI_SHELL_OWNER) でも shell の lease は残る */
+    reclaim_target = -1;
+    exec_reclaim_resources(GUI_SHELL_OWNER);
+    CHECK(slot_of(sid)->kind == FONT_LEASE_SHELL);
+    font_lease_close_shell();
+    for (i = 3; i < VFS_MAX_OPEN_FILES; i++) CHECK(!open_files[i].in_use);
+    for (i = 0; i < FONT_LEASE_SLOTS; i++) CHECK(g_font_leases[i].kind == FONT_LEASE_FREE);
+}
+
 /* 段 C/D (shell): owner 固定・PROTECT|PIN・登録世代の照合・上限・close_shell */
 static void lease_shell(void)
 {
@@ -748,6 +812,7 @@ int main(int argc, char **argv)
     else if (!strcmp(argv[1], "lease_limit")) lease_limit();
     else if (!strcmp(argv[1], "lease_owned")) lease_owned();
     else if (!strcmp(argv[1], "lease_shell")) lease_shell();
+    else if (!strcmp(argv[1], "lease_reclaim")) lease_reclaim();
     else return 2;
     printf("PASS %s\n", argv[1]);
     return 0;

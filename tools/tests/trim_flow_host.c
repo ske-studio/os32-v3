@@ -3,6 +3,7 @@
  * The scheduler is included unchanged; its input/derived/poll rules pick next.
  */
 #include "mem_fixture.c"
+#include "shell_service_stub_host.h"   /* T7b-b2 S3b: exec.c の結線の弱い贋物 */
 #include "wm_source.c"
 #include "os32_gui_shared.h"
 #define u32 ma_u32
