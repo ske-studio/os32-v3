@@ -309,7 +309,7 @@ def bands(m, sym):
 
     shell_guard = v("MEM_SHELL_GUARD")
     add(SHELL, "シェル .text/.data/.bss + newlib sbrk", v("MEM_SHELL_LOAD_ADDR"),
-        v("MEM_SHELL_HEAP_BASE") - 1, "RW", "画像の後に sbrk 余裕128KiB以上")
+        v("MEM_SHELL_HEAP_BASE") - 1, "RW", "画像の後に sbrk 余裕64KiB以上")
     add(SHELL, "シェルスタックガード", shell_guard,
         (shell_guard + PAGE - 1) if shell_guard else None, "NP")
     stack_top = v("MEM_SHELL_STACK_TOP")
@@ -590,7 +590,8 @@ def defects(rows, m=None, sym=None, root=None):
                     he + PAGE + m.get("MEM_SHELL_STACK_SIZE") == stack == band + 1 == pool and
                     b == m.get("MEM_FIXED_PAGING_GUARD_BASE") + PAGE and
                     end + 15 * PAGE == m.get("MEM_STACK_GUARD") == m.get("MEM_FIXED_PAGING_FRAME_END") and
-                    size == 0x40000 and stack - m.get("MEM_SHELL_LOAD_ADDR") == 0x100000):
+                    size == m.get("MEM_SHELL_EXEC_HEAP_SIZE") and
+                    stack - m.get("MEM_SHELL_LOAD_ADDR") == 0x100000):
                 lines.append("固定paging: shell heap/上端予約の境界不一致")
     for r in reversed_ranges(rows):
         lines.append("逆転: %s  開始 0x%06X > 終端 0x%06X "

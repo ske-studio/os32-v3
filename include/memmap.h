@@ -234,7 +234,7 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 #define MEM_FIXED_PAGING_FRAME_END 0x3FB000UL
 #define MEM_FIXED_PAGING_FRAME_PAGES 26UL
 #define MEM_FIXED_PAGING_SPARE_PAGES 15UL
-#define MEM_SHELL_IMAGE_HEADROOM 0x020000UL
+#define MEM_SHELL_IMAGE_HEADROOM 0x010000UL
 #define MEM_SHELL_EXEC_HEAP_SIZE 0x040000UL
 #define MEM_SHELL_HEAP_ALIGN 4UL
 #define MEM_LAYOUT_LOAD_END MEM_FIXED_PAGING_GUARD_BASE
@@ -269,8 +269,12 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 
 /* ====================================================================== */
 /*  シェル常駐帯域 (0x400000-0x4FFFFF, 1MiB)                                */
-/*  image + sbrk は 0x4B5000 まで。画像末尾から 128KiB 以上を確保する。     */
+/*  image + sbrk は 0x4B5000 まで。画像末尾から 64KiB 以上を確保する。      */
 /*  exec_heap: 0x4B5000-0x4F4FFF、guard: 0x4F5000、stack: 0x4F6000-。       */
+/*  FONTPERF F3b (2026-10-20): sbrk の余裕 IMAGE_HEADROOM を 128→64KiB に   */
+/*  下げ、像の上限 MAX_SIZE を 596→660KiB に広げた。sbrk の実測 peak は      */
+/*  gshell 0 B (Rust は mem_alloc)・CUI shell 1,032 B。実行時の境界         */
+/*  (HEAP_BASE = sbrk 上限・exec_heap) は変えないので配置の世代は据え置き。 */
 /*                                                                          */
 /*  sbrk ヒープと exec_heap は **必ず別領域** にすること。かつて両方が BSS   */
 /*  終端から始まっていたため、newlib の stdio バッファと mem_alloc のブロック */
@@ -278,7 +282,7 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 /*  double free 警告として現れていた (2026-09-03 実測)。                     */
 /* ====================================================================== */
 #define MEM_SHELL_LOAD_ADDR 0x400000UL
-#define MEM_SHELL_MAX_SIZE 0x095000UL
+#define MEM_SHELL_MAX_SIZE 0x0A5000UL
 #define MEM_SHELL_GUARD 0x4F5000UL
 #define MEM_SHELL_STACK_TOP 0x500000UL
 #define MEM_SHELL_STACK_SIZE  0x00A000UL  /* シェルスタックサイズ (40KB) */

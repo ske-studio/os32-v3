@@ -27,8 +27,8 @@ EXPECTED = {'MEM_DMA_POOL_BASE': 0x7f0000, 'MEM_FIXED_PAGING_GUARD_BASE': 0x3e00
             'MEM_KSTACK_BASE': 0x3fc000, 'MEM_SHELL_LOAD_ADDR': 0x400000,
             'MEM_POOL_BASE': 0x500000, 'MEM_SHELL_HEAP_BASE': 0x4b5000,
             'MEM_SHELL_HEAP_SIZE': 0x40000, 'MEM_SHELL_GUARD': 0x4f5000,
-            'MEM_SHELL_STACK_SIZE': 0xa000, 'MEM_SHELL_MAX_SIZE': 0x95000,
-            'MEM_SHELL_IMAGE_HEADROOM': 0x20000, 'KHEAP_SIZE': 0x30000}
+            'MEM_SHELL_STACK_SIZE': 0xa000, 'MEM_SHELL_MAX_SIZE': 0xa5000,
+            'MEM_SHELL_IMAGE_HEADROOM': 0x10000, 'KHEAP_SIZE': 0x30000}
 
 def run(cmd):
     result = subprocess.run([str(x) for x in cmd], cwd=ROOT, capture_output=True, text=True)

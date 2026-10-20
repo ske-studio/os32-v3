@@ -3,6 +3,7 @@ Normal control always precedes runtime mutants. File I/O and entry are boundarie
 """
 import os
 import pathlib
+import re
 import struct
 import subprocess
 import sys
@@ -113,13 +114,15 @@ def resident_link_contract():
             assert r.returncode == 0, r.stderr
             r = subprocess.run(cmd + ['--load', hex(address + 4096)], capture_output=True, text=True)
             assert r.returncode != 0 and 'load address' in r.stderr, r.stderr
+        layout = (out / 'memmap_layout.h').read_text()
+        max_size = int(re.search(r'^#define LAYOUT_MEM_SHELL_MAX_SIZE (0x[0-9A-Fa-f]+)$', layout, re.M).group(1), 16)
         for extra in (0, 1):
-            (tmp / 'image.s').write_text('.globl _start\n.text\n_start: ret\n.bss\n.space '+str(0x95000 - 1 + extra)+'\n')
+            (tmp / 'image.s').write_text('.globl _start\n.text\n_start: ret\n.bss\n.space '+str(max_size - 1 + extra)+'\n')
             subprocess.run([str(cross / 'i386-elf-as'), '--32', str(tmp / 'image.s'), '-o', str(tmp / 'image.o')], check=True)
             r = subprocess.run([str(cross / 'i386-elf-ld'), '-m', 'elf_i386', '-T', str(out / 'app_sys.ld'),
                                 str(tmp / 'image.o'), '-o', str(tmp / 'image.elf')], capture_output=True, text=True)
             assert (r.returncode == 0) == (extra == 0), r.stderr
-            if extra: assert '128KiB' in r.stderr, r.stderr
+            if extra: assert '64KiB sbrk' in r.stderr, r.stderr
     print('PASS resident ELF/header selection, mismatched load refusal, link headroom')
 
 

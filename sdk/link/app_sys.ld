@@ -31,7 +31,7 @@ SECTIONS
     }
     _end = .;
     ASSERT(ALIGN(_end, LAYOUT_MEM_SHELL_HEAP_ALIGN) + LAYOUT_MEM_SHELL_IMAGE_HEADROOM
-           <= LAYOUT_MEM_SHELL_HEAP_BASE, "resident image leaves less than 128KiB sbrk")
+           <= LAYOUT_MEM_SHELL_HEAP_BASE, "resident image leaves less than 64KiB sbrk")
 
     /* KAPI データ欄の配置の刻印 (票 TASK_KAPI_DATA_FIELDS、ヘッダ v3)。
      * crt0 / os32api が置く 1 語を mkos32x.py が OS32X ヘッダの kapi_data_off
