@@ -15,6 +15,11 @@
  *    wire_finish.inc exec_finish の shell 分岐 (exec_reclaim_owned → retire)
  *  dispatch 入口の印の 0 と frame[5] は字面で見る (試験 py の static_checks)。
  *
+ *  version 2 (T7b-b3 S2): 表の末尾の font_guard_run の wrapper (段 A/B) と
+ *  x87 無しの open の NOSYS を 6 で見る。kernel/font_guard.c の実物は
+ *  test_font_guard.py が見るので、ここでは贋物 (呼ばれた数・戻りを差し替え
+ *  可能、既定は call(ctx) をそのまま呼ぶ) を置く。
+ *
  *  段 C / D の実体 (kernel/font_source.c の font_lease_shell_*、S2) は
  *  別の試験 (font_source_host.c) が見るので、ここでは registry の贋物を置く
  *  (署名は kernel/font_source.h): lease は「使用中 + owner_gen」
@@ -128,6 +133,18 @@ void font_lease_close_shell(void)
     for (i = 0; i < FAKE_LEASES; i++) fake[i].used = 0;
 }
 
+/* ---- kernel/font_guard.c の贋物 (version 2 の wrapper の先) ------------ */
+u32 font_x87_present = 1;
+static int fake_guard_calls;
+static i32 fake_guard_rc;          /* 0 なら call(ctx) を呼ぶ、他はそれを返す */
+int font_guard_run(int (*call)(void *), void *context)
+{
+    fake_guard_calls++;
+    if (fake_guard_rc) return fake_guard_rc;
+    if (!call) return OS32_ERR_INVAL;
+    return call(context);
+}
+
 /* 実物 */
 #include "ring3_str.c"
 #include "shell_service.c"
@@ -167,7 +184,9 @@ static __attribute__((noinline, unused, section(sec))) i32 read_##sfx(u32 id, u8
 static __attribute__((noinline, unused, section(sec))) i32 validate_##sfx(u32 id)         \
 { volatile i32 r = g_shell_service.font_source_validate(id); return r; }        \
 static __attribute__((noinline, unused, section(sec))) i32 close_##sfx(u32 id)            \
-{ volatile i32 r = g_shell_service.font_source_close(id); return r; }
+{ volatile i32 r = g_shell_service.font_source_close(id); return r; }        \
+static __attribute__((noinline, unused, section(sec))) i32 guard_##sfx(int (*cb)(void *), void *ctx) \
+{ volatile i32 r = g_shell_service.font_guard_run(cb, ctx); return r; }
 
 SVC_CALLERS("svc_in", in)     /* 1 本目の shell の text */
 SVC_CALLERS("svc_in2", in2)   /* reload 後の shell の text */
@@ -261,8 +280,12 @@ static void case_publish(void)
           g_shell_service.version == SHELL_SERVICE_VERSION, "1b magic / version");
     check(g_shell_service.generation == 1, "1c publish で generation 1");
     check(g_shell_service.font_source_open && g_shell_service.font_source_read_at &&
-          g_shell_service.font_source_validate && g_shell_service.font_source_close,
-          "1d 関数 4 本が埋まる");
+          g_shell_service.font_source_validate && g_shell_service.font_source_close &&
+          g_shell_service.font_guard_run, "1d 関数 5 本が埋まる (version 2 の font_guard_run)");
+    check(SHELL_SERVICE_VERSION == 2 && SHELL_SERVICE_SIZE == 32 &&
+          sizeof(ShellService) == SHELL_SERVICE_SIZE &&
+          __builtin_offsetof(ShellService, font_guard_run) == 28,
+          "1d' version 2・SIZE 32・font_guard_run は末尾 (offset 28)");
     check(g_shell_active && g_shell_text_lo == (u32)(uptr)__start_svc_in &&
           g_shell_text_hi == (u32)(uptr)__stop_svc_in, "1e text 範囲を控える");
     shell_service_retire();
@@ -509,6 +532,108 @@ static void case_wire(void)
     plain_context();
 }
 
+/* ========================================================================
+ *  6. T7b-b3 S2: version 2 の font_guard_run (段 A/B) と x87 無しの open
+ * ======================================================================== */
+static u32 guard_lease_id;
+static int guard_cb_calls;
+static i32 guard_cb_read;
+
+/* callback は shell text (svc_in) の中。guard の中で read_at を 1 回呼ぶ
+ * (Face の読込み・miss の raster の形)。戻り値は ctx の値。 */
+static __attribute__((noinline, section("svc_in"))) int guard_cb(void *ctx)
+{
+    u8 buf[4];
+    guard_cb_calls++;
+    guard_cb_read = read_in(guard_lease_id, buf, 4);
+    return (int)(uptr)ctx;
+}
+
+static void case_guard(void)
+{
+    u32 id = 99, size = 0, c;
+    int calls;
+    report("6 b3 S2 font_guard_run / x87 無し\n");
+    plain_context();
+    g_shell_service.generation = 0;
+    shell_service_retire();
+    publish_in();
+    fake_guard_rc = 0;
+    font_x87_present = 1;
+    check(open_in(&id, &size) == 0, "6a 通常文脈で open (guard の外)");
+    guard_lease_id = id;
+
+    calls = fake_guard_calls;
+    guard_cb_calls = 0;
+    guard_cb_read = 0;
+    check(guard_in(guard_cb, (void *)(uptr)42) == 42 && fake_guard_calls == calls + 1 &&
+          guard_cb_calls == 1 && guard_cb_read == 4,
+          "6b 通常文脈の guard は call(ctx) の戻りを返し、中の read_at が通る");
+
+    c = shell_service_reject_count;
+    calls = fake_guard_calls;
+    check(guard_out(guard_cb, 0) == OS32_ERR_INVAL && rejected_with(c, SHELL_SVC_REJ_TEXT) &&
+          fake_guard_calls == calls, "6c 段 A: text の外からの guard は INVAL (guard を呼ばない)");
+
+    ring3_in_syscall = 1;
+    c = shell_service_reject_count;
+    calls = fake_guard_calls;
+    check(guard_in(guard_cb, 0) == OS32_ERR_INVAL && rejected_with(c, SHELL_SVC_REJ_CTX_GUARD) &&
+          fake_guard_calls == calls, "6d 段 B: WM の外の app 文脈 (in_syscall=1) は INVAL");
+    plain_context();
+
+    /* 登録済み WM 区間 (handler / pump) は read と同じく通る。 */
+    ring3_in_syscall = 1;
+    host_cur = APP_ID_SHELL + 1;
+    host_owner = APP_ID_SHELL + 1;
+    wm_enter();
+    guard_cb_calls = 0;
+    guard_cb_read = 0;
+    check(guard_in(guard_cb, (void *)(uptr)7) == 7 && guard_cb_calls == 1 && guard_cb_read == 4,
+          "6e 段 B: WM 中で印の世代が一致すれば通る");
+    ring3_wm_shell_gen = 0;
+    c = shell_service_reject_count;
+    check(guard_in(guard_cb, 0) == OS32_ERR_INVAL && rejected_with(c, SHELL_SVC_REJ_CTX_GUARD),
+          "6f 段 B: 印 0 の WM 区間は INVAL");
+    ring3_wm_shell_gen = g_shell_service.generation - 1;
+    check(guard_in(guard_cb, 0) == OS32_ERR_INVAL, "6g 段 B: 旧世代の印の WM 区間は INVAL");
+    ring3_wm_shell_gen = g_shell_service.generation;
+    wm_leave();
+    plain_context();
+
+    /* kernel の guard の戻りはそのまま返す (NOSYS = x87 無し、BUSY = 再入)。 */
+    fake_guard_rc = OS32_ERR_NOSYS;
+    guard_cb_calls = 0;
+    check(guard_in(guard_cb, 0) == OS32_ERR_NOSYS && guard_cb_calls == 0,
+          "6h guard の NOSYS をそのまま返す");
+    fake_guard_rc = OS32_ERR_BUSY;
+    check(guard_in(guard_cb, 0) == OS32_ERR_BUSY, "6i guard の BUSY をそのまま返す");
+    fake_guard_rc = 0;
+
+    /* x87 無し: shell の open は段 A/B の後で NOSYS (lease を取らない)。 */
+    check(close_in(id) == 0 && fake_in_use() == 0, "6j close (guard の外)");
+    font_x87_present = 0;
+    c = shell_service_reject_count;
+    check(open_in(&id, &size) == OS32_ERR_NOSYS && fake_in_use() == 0 &&
+          shell_service_reject_count == c, "6k x87 無しの open は NOSYS、lease を取らない");
+    check(open_out(&id, &size) == OS32_ERR_INVAL && rejected_with(c, SHELL_SVC_REJ_TEXT),
+          "6l x87 無しでも段 A が先 (text の外は INVAL)");
+    font_x87_present = 1;
+
+    /* reload: 旧 text からの guard は INVAL、未登録も INVAL。 */
+    shell_service_retire();
+    c = shell_service_reject_count;
+    check(guard_in(guard_cb, 0) == OS32_ERR_INVAL && rejected_with(c, SHELL_SVC_REJ_INACTIVE),
+          "6m 未登録 (retire 後) の guard は INVAL");
+    publish_in2();
+    c = shell_service_reject_count;
+    check(guard_in(guard_cb, 0) == OS32_ERR_INVAL && rejected_with(c, SHELL_SVC_REJ_TEXT),
+          "6n reload 後の旧 text からの guard は INVAL");
+    check(guard_in2(guard_cb, (void *)(uptr)3) == 3, "6o 新 shell の text からの guard");
+    shell_service_retire();
+    plain_context();
+}
+
 void _start(void)
 {
     report("shell_service_host (T7b-b2 S3a + S3b)\n");
@@ -517,6 +642,7 @@ void _start(void)
     case_wm();
     case_reload();
     case_wire();
+    case_guard();
     if (failures) {
         report("FAILED\n");
         die(1);

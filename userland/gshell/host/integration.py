@@ -380,12 +380,17 @@ MUTATIONS = [
      'fep_over_taskbar_keeps_its_order'),
     # T7b-b2 S3a: __os32_aux の表は印と版を確かめてから使う。
     ('shell service magic unchecked', 'src/ffi.rs',
-     '    if magic != SHELL_SERVICE_MAGIC || version != SHELL_SERVICE_VERSION {',
-     '    if version != SHELL_SERVICE_VERSION {',
+     '    if magic != SHELL_SERVICE_MAGIC {\n        return ShellServiceState::Absent;',
+     '    if false {\n        return ShellServiceState::Absent;',
      'shell_service_aux_is_checked_before_use'),
     ('shell service version unchecked', 'src/ffi.rs',
-     '    if magic != SHELL_SERVICE_MAGIC || version != SHELL_SERVICE_VERSION {',
-     '    if magic != SHELL_SERVICE_MAGIC {',
+     '    if version != SHELL_SERVICE_VERSION {\n        return ShellServiceState::Absent;',
+     '    if false {\n        return ShellServiceState::Absent;',
+     'shell_service_aux_is_checked_before_use'),
+    # T7b-b3 S2: version < 2 の表は OldShell (欄が足りないので v2 として読まない)。
+    ('shell service old version read as v2', 'src/ffi.rs',
+     '    if version < SHELL_SERVICE_VERSION {\n        return ShellServiceState::OldShell;\n    }\n',
+     '',
      'shell_service_aux_is_checked_before_use'),
 ]
 

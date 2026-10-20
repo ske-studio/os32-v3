@@ -34,6 +34,7 @@ FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
 INC_DIRS = ("include", "kernel", "lib", "exec", "fs", "sdk/include/os32",
             "arch/x86", "platform/pc98")
 SRC = "exec/shell_service.c"
+HDR = "exec/shell_service.h"
 EXEC = "exec/exec.c"
 KERNEL_MK = "build/kernel.mk"
 
@@ -49,8 +50,8 @@ MUTATIONS = [
     (SRC, "    if (ring3_in_syscall != 0 || ring3_wm_depth != 0) return 0;\n",
      "    if (ring3_in_syscall != 0) return 0;\n", "段 B open が WM 中を断らない"),
     (SRC, "    if (!shell_plain_context()) return shell_service_reject(SHELL_SVC_REJ_CTX_OPEN);\n"
-          "    r = font_lease_shell_open(",
-     "    r = font_lease_shell_open(", "open の段 B を外す"),
+          "    if (!font_x87_present)",
+     "    if (!font_x87_present)", "open の段 B を外す"),
     (SRC, "    return slot && !slot->cpl3 && res_owner_get() == GUI_SHELL_OWNER &&\n",
      "    return slot && !slot->cpl3 &&\n", "段 B が res_owner を見ない"),
     (SRC, "    if (g_shell_active) ring3_wm_shell_gen = g_shell_service.generation;\n",
@@ -61,6 +62,26 @@ MUTATIONS = [
     (SRC, "    r = font_lease_shell_read_at(id, g_shell_service.generation, offset, dst, len);",
      "    r = font_lease_shell_read_at(id, 1, offset, dst, len);",
      "段 C へ現 generation を渡さない"),
+    # ---- T7b-b3 S2: version 2 の font_guard_run (段 A/B) と x87 無しの NOSYS ----
+    (SRC, "    if (!shell_caller_ok((u32)(uptr)__builtin_return_address(0), &reason))\n"
+          "        return shell_service_reject(reason);\n"
+          "    if (!shell_read_context()) return shell_service_reject(SHELL_SVC_REJ_CTX_GUARD);\n",
+     "    (void)reason;\n    if (!shell_read_context()) return shell_service_reject(SHELL_SVC_REJ_CTX_GUARD);\n",
+     "b3 S2 guard wrapper の段 A (戻り番地の範囲) を外す"),
+    (SRC, "    if (!shell_read_context()) return shell_service_reject(SHELL_SVC_REJ_CTX_GUARD);\n", "",
+     "b3 S2 guard wrapper の段 B を外す"),
+    (SRC, "    if (!shell_read_context()) return shell_service_reject(SHELL_SVC_REJ_CTX_GUARD);\n",
+     "    if (!shell_plain_context()) return shell_service_reject(SHELL_SVC_REJ_CTX_GUARD);\n",
+     "b3 S2 guard wrapper の段 B を open の文脈にする (WM 中の handler/pump を断る)"),
+    (SRC, "    r = font_guard_run(call, ctx);\n",
+     "    r = font_guard_run(call, ctx);\n    if (r < 0) r = 0;\n",
+     "b3 S2 guard の NOSYS/BUSY を握りつぶす"),
+    (SRC, "    g_shell_service.font_guard_run = shell_svc_font_guard_run;\n", "",
+     "b3 S2 publish が font_guard_run を埋めない"),
+    (SRC, "    if (!font_x87_present) return OS32_ERR_NOSYS;   /* x87 無しは raster できない → KCG */\n", "",
+     "b3 S2 x87 無しでも shell の open を通す"),
+    (HDR, "#define SHELL_SERVICE_VERSION 2u\n", "#define SHELL_SERVICE_VERSION 1u\n",
+     "b3 S2 版を 1 のまま (欄を足したのに版を上げない)"),
     # ---- S3b: exec/exec.c の結線 ----
     (EXEC, "    if (ring3_wm_depth == 1) shell_service_wm_mark();\n", "",
      "b2③ ring3_wm_enter が印を立てない"),
@@ -142,8 +163,9 @@ def static_checks(root, quiet=False):
     """wrapper の形 (noinline・volatile 受け) と kernel.mk の旗。落ちた数を返す。"""
     bad = []
     src = (root / SRC).read_text(encoding="utf-8")
-    for name in ("open", "read_at", "validate", "close"):
-        head = "shell_svc_font_source_%s(" % name
+    for head in ("shell_svc_font_source_open(", "shell_svc_font_source_read_at(",
+                 "shell_svc_font_source_validate(", "shell_svc_font_source_close(",
+                 "shell_svc_font_guard_run("):
         i = src.find(head)
         decl = src[src.rfind("\n\n", 0, i):i] if i >= 0 else ""
         body = _func_body(src, head)

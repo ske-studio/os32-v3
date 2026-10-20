@@ -27,11 +27,15 @@ extern "C" {
 /*  が写す ([C4])。font への接続 (呼ぶ側) は b3 — 呼ぶ関数は戻り値を  */
 /*  局所に受けて使ってから返す薄い `#[inline(never)]` 関数にする      */
 /*  (尾呼出しにすると kernel の段 A が戻り番地で断る、設計 §3-2)。    */
+/*                                                                  */
+/*  version 2 (T7b-b3 S2): 末尾に `font_guard_run` (x87 guard の中で */
+/*  callback を 1 回呼ぶ)。version < 2 の表は font を開かず KCG だけ  */
+/*  (`ShellServiceState::OldShell` → b3 の `KcgOnly(OldShell)`)。     */
 /* ================================================================ */
 
 include!(concat!(env!("OUT_DIR"), "/shell_service.rs"));
 
-/// `exec/shell_service.h` の `ShellService` と同じ並び (i386 で 28 バイト)。
+/// `exec/shell_service.h` の `ShellService` と同じ並び (i386 で 32 バイト、version 2)。
 #[repr(C)]
 pub struct ShellService {
     pub magic: u32,
@@ -44,6 +48,12 @@ pub struct ShellService {
         Option<unsafe extern "C" fn(id: u32, offset: u32, dst: *mut u8, len: u32) -> i32>,
     pub font_source_validate: Option<unsafe extern "C" fn(id: u32) -> i32>,
     pub font_source_close: Option<unsafe extern "C" fn(id: u32) -> i32>,
+    /// version 2: x87 guard の中で `call(ctx)` を 1 回呼びその戻りを返す。
+    /// FPU 無しは `OS32_ERR_NOSYS`、再入・IRQ 文脈は `OS32_ERR_BUSY`。
+    /// lease の open/close は guard の外で、callback の中では read_at 以外を呼ばない。
+    pub font_guard_run: Option<
+        unsafe extern "C" fn(call: Option<unsafe extern "C" fn(ctx: *mut u8) -> i32>,
+                             ctx: *mut u8) -> i32>,
 }
 
 #[cfg(target_pointer_width = "32")]
@@ -54,21 +64,47 @@ extern "C" {
     static __os32_aux: *const ShellService;
 }
 
-/// kernel から受け取った内部入口の表。番地が 0、または印・版が違えば `None`。
-#[allow(dead_code)] // 呼ぶ側は b3 (font の source 接続)
-pub fn shell_service() -> Option<&'static ShellService> {
+/// `__os32_aux` の表の見立て。
+#[allow(dead_code)] // OldShell を見るのは b3 (font の source 接続)
+pub enum ShellServiceState {
+    /// 番地 0 (app)、印違い、または知らない新しい版 — 表を使わない。
+    Absent,
+    /// 版が `SHELL_SERVICE_VERSION` より古い (欄が足りない) — font は KCG だけ。
+    OldShell,
+    /// 印・版とも一致。
+    Ready(&'static ShellService),
+}
+
+/// kernel から受け取った内部入口の表を見立てる。版が古い表は欄を読まない
+/// (印と版の 2 語だけ読む)。
+pub fn shell_service_state() -> ShellServiceState {
     let p = unsafe { core::ptr::read_volatile(core::ptr::addr_of!(__os32_aux)) };
     if p.is_null() {
-        return None;
+        return ShellServiceState::Absent;
     }
     let (magic, version) = unsafe {
         (core::ptr::read_volatile(core::ptr::addr_of!((*p).magic)),
          core::ptr::read_volatile(core::ptr::addr_of!((*p).version)))
     };
-    if magic != SHELL_SERVICE_MAGIC || version != SHELL_SERVICE_VERSION {
-        return None;
+    if magic != SHELL_SERVICE_MAGIC {
+        return ShellServiceState::Absent;
     }
-    Some(unsafe { &*p })
+    if version < SHELL_SERVICE_VERSION {
+        return ShellServiceState::OldShell;
+    }
+    if version != SHELL_SERVICE_VERSION {
+        return ShellServiceState::Absent;
+    }
+    ShellServiceState::Ready(unsafe { &*p })
+}
+
+/// kernel から受け取った内部入口の表。番地が 0、印違い、版違い (古い・新しい) は `None`。
+#[allow(dead_code)] // 呼ぶ側は b3 (font の source 接続)
+pub fn shell_service() -> Option<&'static ShellService> {
+    match shell_service_state() {
+        ShellServiceState::Ready(t) => Some(t),
+        _ => None,
+    }
 }
 
 #[cfg(test)]

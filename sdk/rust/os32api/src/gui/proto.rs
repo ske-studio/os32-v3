@@ -76,6 +76,8 @@ pub const GUI_EV_MODAL: u8 = 11;
 pub const GUI_EV_QUIT: u8 = 12;
 pub const GUI_EV_PALETTE: u8 = 13;
 pub const GUI_EV_TRIM: u8 = 14;
+/// font 設定が変わった (T7b-b3、payload なし)。face を閉じ全窓を再描画、TRIM_DONE は送らない。
+pub const GUI_EV_FONT: u8 = 15;
 
 /* ======================================================================== */
 /*  Style.flags (u8) — G6                                                    */

@@ -63,6 +63,7 @@ extern volatile u32 font_lease_reject_last;
  * 外れたら OS32_ERR_INVAL。
  * open: owner ごとの上限 VFS_FONT_FD_MAX_APP・合計 VFS_FONT_FD_MAX_APP_TOTAL・
  *   枠 / FD 枯渇は OS32_ERR_NOSPC。成功で 0 と *out_id / *out_size。
+ *   x87 が無い (font_x87_present == 0) と OS32_ERR_NOSYS (T7b-b3 S2、呼び手は KCG)。
  * read_at: 戻り = 実読込長 (短読はそのまま) / 負。範囲外は INVAL。
  * close: 0。close 済み id の再 close は OS32_ERR_STALE。 */
 i32 font_lease_app_open(const char *path, u32 *out_id, u32 *out_size);

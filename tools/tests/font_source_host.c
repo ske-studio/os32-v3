@@ -394,6 +394,8 @@ int copy_caller_cstr(const struct caller_access *c, const char *src,
     return 1;
 }
 void ring3_fault_kill(void) { kill_calls++; }
+/* kernel/font_guard.c の印 (kentry が起動時に立てる)。lease_nofpu だけが 0 にする */
+u32 font_x87_present = 1;
 
 #define APP_GEN   0x51u
 #define APP2      (APP_OWNER + 1)
@@ -446,6 +448,29 @@ static void lease_open(void)
     CHECK(font_lease_app_close(id) == 0);
     CHECK(!open_files[fd].in_use && !open_files[fd].pinned);
     CHECK(vfs_fd_pinned_busy(&mock_ctx, 1, MOCK_INO, "/f.ttf") == 0);
+}
+
+/* T7b-b3 S2: x87 の無い機械では app の open が NOSYS (呼び手は KCG)。
+ * 枠も VFS の FD も取らず、出力を書かず、kill しない。門は先に見る */
+static void lease_nofpu(void)
+{
+    u32 id = 0x5a5a5a5au, size = 0xa5a5a5a5u, i;
+    int fds = 0;
+    use_ino(1);
+    for (i = 0; i < VFS_MAX_OPEN_FILES; i++) fds += open_files[i].in_use;
+    font_x87_present = 0;
+    as_app(APP_OWNER, APP_GEN);
+    CHECK(font_lease_app_open("/f.ttf", &id, &size) == OS32_ERR_NOSYS);
+    CHECK(id == 0x5a5a5a5au && size == 0xa5a5a5a5u && kill_calls == 0);
+    CHECK(font_lease_count(FONT_LEASE_APP, 0, 1) == 0);
+    for (i = 0; i < VFS_MAX_OPEN_FILES; i++) fds -= open_files[i].in_use;
+    CHECK(fds == 0);
+    from_user = 0;   /* 門 1 は x87 より先 (WM 中・CPL0 は INVAL のまま) */
+    CHECK(font_lease_app_open("/f.ttf", &id, &size) == OS32_ERR_INVAL);
+    font_x87_present = 1;
+    as_app(APP_OWNER, APP_GEN);
+    id = app_open_ok();
+    CHECK(font_lease_app_close(id) == 0);
 }
 
 /* 門 1・2 (b1①): 外れたら INVAL・出力を書かない・reject を数える */
@@ -813,6 +838,7 @@ int main(int argc, char **argv)
     else if (!strcmp(argv[1], "lease_owned")) lease_owned();
     else if (!strcmp(argv[1], "lease_shell")) lease_shell();
     else if (!strcmp(argv[1], "lease_reclaim")) lease_reclaim();
+    else if (!strcmp(argv[1], "lease_nofpu")) lease_nofpu();
     else return 2;
     printf("PASS %s\n", argv[1]);
     return 0;
