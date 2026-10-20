@@ -56,6 +56,8 @@ MUTATIONS = [
     # §3-1 0x5C は ROM の ¥ (Inconsolata の \ を描かない)。
     ('yen-to-ttf', "        if (0x20..=0x7E).contains(&b) && b != ANK_YEN {",
      "        if (0x20..=0x7E).contains(&b) {", 'yen'),
+    # P3-4 U+00A5 も ROM の ¥ (東雲16 の U+00A5 は \ の形、S7 のゲスト受入で検出)。
+    ('u00a5-to-ttf', "    if cp == CP_YEN {", "    if cp == CP_YEN && false {", 'yen-u00a5-rom'),
     # §2-4 借用は 1 字の間: release を抜く → 次の字から engine が KCG を返す。
     ('no-release', "            let rows = cell_from_glyph(&g, e.bitmap(&g), w);\n            e.release();",
      "            let rows = cell_from_glyph(&g, e.bitmap(&g), w);", 'pixel-match'),

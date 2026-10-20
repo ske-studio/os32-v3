@@ -409,7 +409,8 @@ fn expect_cells(s: &str, ttf: bool) -> Vec<(i32, Cell)> {
             };
             out.push((8, cell));
         } else {
-            let cell = if ttf { ttf_cell(cp, false, 16) } else { None };
+            // P3-4: U+00A5 is the ROM yen too (JF-Dot-Shinonome16 draws a backslash shape there).
+            let cell = if ttf && cp != 0xA5 { ttf_cell(cp, false, 16) } else { None };
             out.push((16, cell.unwrap_or_else(|| rom_cp_cell(cp))));
         }
     }
@@ -726,7 +727,7 @@ fn t10_ev_font_draws_no_old_entry() {
     for (_, _, t) in corpus() {
         for ch in t.chars() {
             let cp = ch as u32;
-            if cp >= 0x80 || ((0x20..=0x7E).contains(&cp) && cp != 0x5C) {
+            if (cp >= 0x80 && cp != 0xA5) || ((0x20..=0x7E).contains(&cp) && cp != 0x5C) {
                 distinct.insert(cp);
             }
         }
@@ -735,6 +736,21 @@ fn t10_ev_font_draws_no_old_entry() {
     println!("after EV_FONT: misses={misses} distinct TTF code points={}", distinct.len());
     check(misses as usize == distinct.len(), "ev-font");
     check(fb() == first, "ev-font");
+}
+
+#[test]
+fn t11_yen_sign_is_rom() {
+    // P3-4 (S7 guest acceptance): U+00A5 is drawn from the ROM ANK 0x5C in a 16px cell,
+    // never from JF-Dot-Shinonome16 (whose U+00A5 glyph is a backslash shape).
+    set_mode(false);
+    fill_fb(0);
+    let _ = rom_reads();
+    let w = draw::text(screen(), 0, 0, "\u{A5}".as_bytes(), Style::new(15, 1));
+    check(w == 16, "yen-advance");
+    check(rom_reads() == vec![('a', 0x5C)], "yen-u00a5-rom");
+    let mut want = vec![0u8; (ffi::W * ffi::H) as usize];
+    expect_draw(&mut want, ffi::W, FULL, 0, 0, "\u{A5}", 15, Some(1), true);
+    check(fb() == want, "yen-u00a5-pixels");
 }
 
 #[test]

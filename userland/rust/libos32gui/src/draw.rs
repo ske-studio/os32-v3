@@ -518,7 +518,7 @@ pub fn blit(surface: SurfaceId, dx: i32, dy: i32, bitmap: SurfaceId, src_rect: R
 // T7b-b4 S5 (設計 t7bb34 §2-2・§3-1): 全字を同じ mask 経路で描く。
 // - 幅は `decode_glyph` の規則のまま (ASCII = 8px、多バイト = 16px、不正バイトは 8px)。
 // - 経路: ASCII 0x20..=0x7E のうち **0x5C (¥) 以外**は TTF (`Cell::Half`)、多バイトは
-//   TTF (`Cell::Full`)。0x5C・制御字・不正バイトは ROM の ANK (従来どおり
+//   TTF (`Cell::Full`)。0x5C・U+00A5・制御字・不正バイトは ROM の ANK (従来どおり
 //   `kcg_read_ank(byte)`)。engine が使えない・欠字・raster 失敗は KCG
 //   (ASCII は `kcg_read_ank(byte)`、多バイトは `unicode_to_ank` → `kcg_read_ank`、
 //   0 なら `unicode_to_jis` (0 なら 0x2222) → `kcg_read_kanji`)。
@@ -530,6 +530,8 @@ pub fn blit(surface: SurfaceId, dx: i32, dy: i32, bitmap: SurfaceId, src_rect: R
 
 /// ROM の ¥ (ANK 0x5C)。Inconsolata の `\` は描かない (設計 P3-4)。
 const ANK_YEN: u8 = 0x5C;
+/// U+00A5 YEN SIGN。ROM の ¥ (ANK 0x5C) で描く。
+const CP_YEN: u32 = 0xA5;
 /// JIS に無い字の代わり (□、gfx_kcg.c と同じ)。
 const JIS_FALLBACK: u16 = 0x2222;
 
@@ -568,7 +570,7 @@ fn decode_cp(seq: &[u8]) -> u32 {
 /// 1 字の行き先。
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Route {
-    /// ROM の ANK (0x5C・制御字・不正バイト)。
+    /// ROM の ANK (0x5C・U+00A5・制御字・不正バイト)。
     Ank(u8),
     /// 字形 engine。KCG に落ちたら `ank` (ASCII) か `cp` の KCG。
     Ttf { cp: u32, cell: FontCell, ank: u8 },
@@ -582,7 +584,14 @@ fn route(seq: &[u8], is_ank: bool) -> Route {
         }
         return Route::Ank(b);
     }
-    Route::Ttf { cp: decode_cp(seq), cell: FontCell::Full, ank: 0 }
+    let cp = decode_cp(seq);
+    if cp == CP_YEN {
+        /* P3-4: U+00A5 も ROM の ¥。東雲16 は JIS X 0201 の名残で U+00A5 に `\` の
+         * 字形を持つ (U+005C が ¥ の形) ので TTF に回さない。gshell は
+         * unicode_to_ank → 0x5C で同じ ROM ¥ になる。cell 幅は多バイトの 16 のまま。 */
+        return Route::Ank(ANK_YEN);
+    }
+    Route::Ttf { cp, cell: FontCell::Full, ank: 0 }
 }
 
 /// ROM の ANK 8×16 (cell の先頭行から)。
