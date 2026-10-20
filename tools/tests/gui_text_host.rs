@@ -343,7 +343,8 @@ const CH: i32 = CELL_H_PX as i32;
 /// TTF glyph cut to a cell of width `w` (None: in no face of the search order).
 fn ttf_cell(cp: u32, half: bool, w: i32) -> Option<Cell> {
     let r = reference();
-    let order: &[bool] = if half { &[true, false] } else { &[false] }; // true = latin
+    // true = latin. Half above ASCII is latin only (T7b-b5, engine search order).
+    let order: &[bool] = if half && cp < 0x80 { &[true, false] } else if half { &[true] } else { &[false] };
     for &latin in order {
         let face = if latin { &mut r.latin } else { &mut r.ja };
         let gid = match face.glyph_index(cp).unwrap() {
@@ -395,6 +396,19 @@ fn rom_cp_cell(cp: u32) -> Cell {
     c
 }
 
+/// The ROM 16x16 squeezed to the left 8 columns (independent of draw.rs::squeeze_half).
+fn squeeze(c: &Cell) -> Cell {
+    let mut out: Cell = [0; CELL_H_PX];
+    for r in 0..CELL_H_PX {
+        for x in 0..8 {
+            if c[r] & (0x8000 >> (2 * x)) != 0 || c[r] & (0x8000 >> (2 * x + 1)) != 0 {
+                out[r] |= 0x8000 >> x;
+            }
+        }
+    }
+    out
+}
+
 /// Expected cells of `s` (width, cell) with the design §2-2 routes for the app.
 fn expect_cells(s: &str, ttf: bool) -> Vec<(i32, Cell)> {
     let mut out = Vec::new();
@@ -408,9 +422,17 @@ fn expect_cells(s: &str, ttf: bool) -> Vec<(i32, Cell)> {
                 rom_ank_cell(b)
             };
             out.push((8, cell));
+        } else if cp == 0xA5 {
+            // P3-4: U+00A5 is the ROM yen (JF-Dot-Shinonome16 draws a backslash shape there),
+            // in an 8px cell (T7b-b5: Latin-1 is half-width).
+            out.push((8, rom_ank_cell(0x5C)));
+        } else if (0xA0..=0x24F).contains(&cp) {
+            // T7b-b5: Latin-1 / Latin Extended-A/B: 8px, Inconsolata only; a glyph it lacks is
+            // the ROM 16x16 squeezed to 8 columns (OR of each column pair).
+            let cell = if ttf { ttf_cell(cp, true, 8) } else { None };
+            out.push((8, cell.unwrap_or_else(|| squeeze(&rom_cp_cell(cp)))));
         } else {
-            // P3-4: U+00A5 is the ROM yen too (JF-Dot-Shinonome16 draws a backslash shape there).
-            let cell = if ttf && cp != 0xA5 { ttf_cell(cp, false, 16) } else { None };
+            let cell = if ttf { ttf_cell(cp, false, 16) } else { None };
             out.push((16, cell.unwrap_or_else(|| rom_cp_cell(cp))));
         }
     }
@@ -740,17 +762,68 @@ fn t10_ev_font_draws_no_old_entry() {
 
 #[test]
 fn t11_yen_sign_is_rom() {
-    // P3-4 (S7 guest acceptance): U+00A5 is drawn from the ROM ANK 0x5C in a 16px cell,
+    // P3-4 (S7 guest acceptance): U+00A5 is drawn from the ROM ANK 0x5C in an 8px cell (T7b-b5),
     // never from JF-Dot-Shinonome16 (whose U+00A5 glyph is a backslash shape).
     set_mode(false);
     fill_fb(0);
     let _ = rom_reads();
     let w = draw::text(screen(), 0, 0, "\u{A5}".as_bytes(), Style::new(15, 1));
-    check(w == 16, "yen-advance");
+    check(w == 8, "yen-advance");
     check(rom_reads() == vec![('a', 0x5C)], "yen-u00a5-rom");
     let mut want = vec![0u8; (ffi::W * ffi::H) as usize];
     expect_draw(&mut want, ffi::W, FULL, 0, 0, "\u{A5}", 15, Some(1), true);
     check(fb() == want, "yen-u00a5-pixels");
+}
+
+#[test]
+fn t12_latin1_is_half_width() {
+    // T7b-b5 (PM decision): Latin-1 / Latin Extended-A/B in 8px cells from Inconsolata,
+    // U+00A5 the ROM yen in 8px, Greek / Cyrillic stay 16px; no gap between letters.
+    set_mode(false);
+    let s = "Ångström façade É ¥100";
+    fill_fb(0);
+    let _ = rom_reads();
+    let w = draw::text(screen(), 0, 0, s.as_bytes(), Style::new(15, 1));
+    check(w == 8 * s.chars().count() as i32, "latin1-advance");
+    check(draw::measure_text(s.as_bytes()).0 == w, "latin1-advance");
+    check(rom_reads() == vec![('a', 0x5C)], "latin1-ttf");
+    let mut want = vec![0u8; (ffi::W * ffi::H) as usize];
+    expect_draw(&mut want, ffi::W, FULL, 0, 0, s, 15, Some(1), true);
+    if fb() != want {
+        println!("latin1: {}", diff_at(&fb(), &want, ffi::W));
+    }
+    check(fb() == want, "latin1-pixels");
+    // Every letter has ink inside its own 8px cell (the S7 "Å ngströ m" gap is gone).
+    let f = fb();
+    for (k, ch) in s.chars().enumerate() {
+        if ch == ' ' {
+            continue;
+        }
+        let x0 = 8 * k as i32;
+        let ink = (0..CH).any(|r| (x0..x0 + 8).any(|x| f[(r * ffi::W + x) as usize] == 15));
+        check(ink, "latin1-pixels");
+    }
+    check(draw::measure_text("αЖ".as_bytes()).0 == 32, "latin1-greek-full");
+    check(draw::text(screen(), 0, 20, "αЖ".as_bytes(), Style::new(15, 1)) == 32, "latin1-greek-full");
+    // A Latin Extended-B letter Inconsolata lacks (U+0180): the squeezed ROM glyph in 8px,
+    // never the ja face's full-width glyph cut in half; nothing right of the cell.
+    fill_fb(0);
+    let _ = rom_reads();
+    check(draw::text(screen(), 0, 0, "\u{180}".as_bytes(), Style::new(15, 1)) == 8, "latin1-missing");
+    check(rom_reads() == vec![('k', jis_of(0x180))], "latin1-missing");
+    let mut want = vec![0u8; (ffi::W * ffi::H) as usize];
+    expect_draw(&mut want, ffi::W, FULL, 0, 0, "\u{180}", 15, Some(1), true);
+    check(fb() == want, "latin1-missing");
+    // KCG only: the same 8px cells (width never depends on the font set).
+    cfgro::set(Some((1, 1)));
+    font::reload();
+    fill_fb(0);
+    check(draw::text(screen(), 0, 0, s.as_bytes(), Style::new(15, 1)) == w, "latin1-advance");
+    let mut want = vec![0u8; (ffi::W * ffi::H) as usize];
+    expect_draw(&mut want, ffi::W, FULL, 0, 0, s, 15, Some(1), false);
+    check(fb() == want, "latin1-kcg");
+    cfgro::set(Some((0, 1)));
+    font::reload();
 }
 
 #[test]

@@ -4407,3 +4407,70 @@ fn t7b3_font_change_delivers_ev_font_to_every_tracked_app() {
         assert_eq!(g2w_events(&st, id).len(), 1, "ID {id}: 変更なしで配った");
     }
 }
+
+/* ---- T7b-b5: 前景の app が終わったら次の前景へ Focus(in) を 1 回 ----
+ *  字を持つ app (edit) の終了で前景が filer に移っても EV_FOCUS が出ず、NOSPC で
+ *  KCG の filer が TTF に戻れなかった (S7 受入の「気になった」1)。libos32gui の
+ *  `Window` は Drop で窓を閉じるので、前景は destroy_window の時点で黙って移る。
+ *  in は OWNER_EXIT (font lease を閉じた後) で出し、他の経路で出ていれば出さない。 */
+fn b5_focus_ins(st: &crate::wm::GuiState, id: i32) -> Vec<u32> {
+    use os32api::gui::proto::GUI_EV_FOCUS;
+    g2w_events(st, id).iter().filter(|e| e.kind == GUI_EV_FOCUS && e.sub == 1).map(|e| e.window).collect()
+}
+
+fn b5_setup(shm: &crate::mocks::Shm) {
+    use crate::{input, mocks, wm};
+    mocks::init();
+    {
+        let g = wm::g();
+        *g = four_app_state(shm);
+        g.inited = true;
+    }
+    seed_four_apps();
+    /* 前面は窓 3 (owner 5 = edit)、その下が窓 2 (owner 4 = filer)。 */
+    let g = wm::g();
+    let front = g.front_id();
+    input::emit_focus_change(g, 0, front);
+    assert_eq!(g.focus_in_owner, 5);
+}
+
+#[test]
+fn b5_owner_exit_focuses_the_next_front_once() {
+    use crate::{handler, wm};
+    use os32api::gui::proto::GUI_OP_OWNER_EXIT;
+    let shm = crate::mocks::Shm::new();
+
+    /* (1) 窓を閉じてから終わる (Drop): destroy では出さず、exit で 1 回。 */
+    b5_setup(&shm);
+    let g = wm::g();
+    let edit = g.windows[3].id(3);
+    let filer = g.windows[2].id(2);
+    assert_eq!(wm::destroy_window(g, 5, edit), 0);
+    assert_eq!(g.front_id(), filer);
+    assert!(b5_focus_ins(g, 4).is_empty(), "destroy で出した (exit 前は font lease が開いている)");
+    assert_eq!(handler::gshell_gui_handler(GUI_OP_OWNER_EXIT, 0, 5), 0);
+    let g = wm::g();
+    assert_eq!(b5_focus_ins(g, 4), vec![filer], "前景の app の終了で次の前景へ Focus(in) が無い");
+    assert_eq!(g.focus_in_owner, 4);
+    /* 背面の app (owner 2) の終了では前景は変わらず、出さない。 */
+    assert_eq!(handler::gshell_gui_handler(GUI_OP_OWNER_EXIT, 0, 2), 0);
+    assert_eq!(b5_focus_ins(wm::g(), 4).len(), 1, "背面の app の終了で出した");
+    wm::g().inited = false;
+
+    /* (2) 窓を持ったまま終わる (fault / STOP): 回収で前景が移り、1 回。 */
+    b5_setup(&shm);
+    let filer = wm::g().windows[2].id(2);
+    assert_eq!(handler::gshell_gui_handler(GUI_OP_OWNER_EXIT, 3, 5), 0);
+    assert_eq!(b5_focus_ins(wm::g(), 4), vec![filer]);
+    wm::g().inited = false;
+
+    /* (3) 終了の前に filer が前景化 (既存の経路で in 済み): exit では重ねない。 */
+    b5_setup(&shm);
+    let g = wm::g();
+    let filer = g.windows[2].id(2);
+    wm::activate_index(g, 2);
+    assert_eq!(b5_focus_ins(g, 4), vec![filer]);
+    assert_eq!(handler::gshell_gui_handler(GUI_OP_OWNER_EXIT, 0, 5), 0);
+    assert_eq!(b5_focus_ins(wm::g(), 4), vec![filer], "既存の前景切替と二重に出した");
+    wm::g().inited = false;
+}

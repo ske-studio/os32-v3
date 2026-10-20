@@ -54,8 +54,15 @@ MUTATIONS = [
     (
         "wide_char_counted_as_one",
         TEXTCORE,
-        "        COLS_KANJI\n    }\n}",
-        "        COLS_ANK\n    }\n}",
+        "    }\n    COLS_KANJI\n}",
+        "    }\n    COLS_ANK\n}",
+    ),
+    # 1c. T7b-b5: Latin-1・Latin 拡張を全角 2 桁に戻す (draw.rs の 8px とずれる)。
+    (
+        "latin1_counted_as_two",
+        TEXTCORE,
+        "    cp >= LATIN_HALF_FIRST && cp <= LATIN_HALF_LAST\n",
+        "    false && cp >= LATIN_HALF_FIRST && cp <= LATIN_HALF_LAST\n",
     ),
     # 2. 見える範囲の計算がずれる — 行が 1 本飛ぶ。
     (

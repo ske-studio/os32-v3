@@ -10,6 +10,7 @@
 //! - ステートレス: 呼び出しごとに `Style` を受ける。DC 相当の選択状態は持たない。
 use crate::clip::{self, Target};
 use crate::ffi;
+use crate::textcore;
 use crate::gstate::{screen_info_cached, st, SurfaceKind};
 use crate::surface::offscreen_ptr;
 use os32api::gui::proto::{
@@ -516,12 +517,15 @@ pub fn blit(surface: SurfaceId, dx: i32, dy: i32, bitmap: SurfaceId, src_rect: R
 /* ================================================================ */
 //
 // T7b-b4 S5 (設計 t7bb34 §2-2・§3-1): 全字を同じ mask 経路で描く。
-// - 幅は `decode_glyph` の規則のまま (ASCII = 8px、多バイト = 16px、不正バイトは 8px)。
-// - 経路: ASCII 0x20..=0x7E のうち **0x5C (¥) 以外**は TTF (`Cell::Half`)、多バイトは
-//   TTF (`Cell::Full`)。0x5C・U+00A5・制御字・不正バイトは ROM の ANK (従来どおり
-//   `kcg_read_ank(byte)`)。engine が使えない・欠字・raster 失敗は KCG
-//   (ASCII は `kcg_read_ank(byte)`、多バイトは `unicode_to_ank` → `kcg_read_ank`、
-//   0 なら `unicode_to_jis` (0 なら 0x2222) → `kcg_read_kanji`)。
+// - 幅は `decode_glyph` (= `textcore::cols_at`): ASCII = 8px、Latin-1・Latin 拡張
+//   (U+00A0..=U+024F) = 8px (T7b-b5、PM 決定)、他の多バイト = 16px、不正バイトは 8px。
+// - 経路: ASCII 0x20..=0x7E のうち **0x5C (¥) 以外**は TTF (`Cell::Half`)、Latin-1・
+//   Latin 拡張は TTF (`Cell::Half` — Inconsolata だけ、東雲の全角の字形は使わない)、
+//   他の多バイトは TTF (`Cell::Full`)。0x5C・U+00A5・制御字・不正バイトは ROM の ANK
+//   (`kcg_read_ank(byte)`、U+00A5 も 8px の cell)。engine が使えない・欠字・raster 失敗は
+//   KCG (ASCII は `kcg_read_ank(byte)`、多バイトは `unicode_to_ank` → `kcg_read_ank`、
+//   0 なら `unicode_to_jis` (0 なら 0x2222) → `kcg_read_kanji`。半角の Latin はその
+//   16×16 を横 1/2 に詰めて 8px の cell に入れる)。
 // - TTF の字は `cell.y + ascent - top` から (face ごとの baseline)、KCG は cell の
 //   先頭行から。**cell 矩形 (8|16 × 16) の外の画素は描かない**、その上で Painter の
 //   clip で画素単位に切る (全角もオフスクリーンも同じ)。
@@ -543,28 +547,20 @@ fn decode_glyph(bytes: &[u8]) -> (usize, bool, i32) {
     if bytes.is_empty() {
         return (0, true, 0);
     }
-    let b0 = bytes[0];
-    if b0 < 0x80 {
-        (1, true, ANK_W)
-    } else if b0 & 0xE0 == 0xC0 {
-        if bytes.len() >= 2 { (2, false, KANJI_W) } else { (0, false, 0) }
-    } else if b0 & 0xF0 == 0xE0 {
-        if bytes.len() >= 3 { (3, false, KANJI_W) } else { (0, false, 0) }
-    } else if b0 & 0xF8 == 0xF0 {
-        if bytes.len() >= 4 { (4, false, KANJI_W) } else { (0, false, 0) }
-    } else {
-        (1, true, ANK_W) /* 継続/不正バイト: 1 個スキップ、半角扱い */
+    let n = textcore::seq_len(bytes[0]);
+    if n == 1 {
+        return (1, true, ANK_W); /* ASCII、継続/不正バイト: 1 個スキップ、半角扱い */
     }
+    if bytes.len() < n {
+        return (0, false, 0);
+    }
+    /* 幅の規則は textcore の 1 本 (edit_gui の桁・折り返しと同じ実体)。 */
+    (n, false, textcore::cols_at(bytes) as i32 * ANK_W)
 }
 
 /// 多バイト列 (`decode_glyph` が長さ 2..=4 と判定したもの) のコードポイント。
 fn decode_cp(seq: &[u8]) -> u32 {
-    let lead = match seq.len() {
-        2 => u32::from(seq[0] & 0x1F),
-        3 => u32::from(seq[0] & 0x0F),
-        _ => u32::from(seq[0] & 0x07),
-    };
-    seq[1..].iter().fold(lead, |cp, b| (cp << 6) | u32::from(b & 0x3F))
+    textcore::decode_cp(seq)
 }
 
 /// 1 字の行き先。
@@ -588,10 +584,12 @@ fn route(seq: &[u8], is_ank: bool) -> Route {
     if cp == CP_YEN {
         /* P3-4: U+00A5 も ROM の ¥。東雲16 は JIS X 0201 の名残で U+00A5 に `\` の
          * 字形を持つ (U+005C が ¥ の形) ので TTF に回さない。gshell は
-         * unicode_to_ank → 0x5C で同じ ROM ¥ になる。cell 幅は多バイトの 16 のまま。 */
+         * unicode_to_ank → 0x5C で同じ ROM ¥ になる。cell 幅は 8px (T7b-b5)。 */
         return Route::Ank(ANK_YEN);
     }
-    Route::Ttf { cp, cell: FontCell::Full, ank: 0 }
+    /* T7b-b5: Latin-1・Latin 拡張は半角 (Inconsolata)。幅は decode_glyph が同じ規則で 8px。 */
+    let cell = if textcore::cp_is_half(cp) { FontCell::Half } else { FontCell::Full };
+    Route::Ttf { cp, cell, ank: 0 }
 }
 
 /// ROM の ANK 8×16 (cell の先頭行から)。
@@ -621,6 +619,23 @@ fn kcg_cp(cp: u32) -> CellRows {
     let mut rows: CellRows = [0; CELL_H as usize];
     for (r, row) in rows.iter_mut().enumerate() {
         *row = (u16::from(pat[2 * r]) << 8) | u16::from(pat[2 * r + 1]);
+    }
+    rows
+}
+
+/// 16×16 を横 1/2 の 8×16 に詰める (隣り合う 2 列の OR)。半角の Latin が TTF で
+/// 描けないとき (欠字・KCG だけの設定) の ROM の字 (T7b-b5、gshell の text.rs と同じ)。
+pub(crate) fn squeeze_half(full: &CellRows) -> CellRows {
+    let mut rows: CellRows = [0; CELL_H as usize];
+    for (r, out) in rows.iter_mut().enumerate() {
+        let v = full[r];
+        let mut c = 0;
+        while c < 8 {
+            if v & (0xC000 >> (2 * c)) != 0 {
+                *out |= 0x8000 >> c;
+            }
+            c += 1;
+        }
     }
     rows
 }
@@ -747,6 +762,7 @@ pub fn text(surface: SurfaceId, x: i32, y: i32, utf8: &[u8], style: Style) -> i3
                     match drawn {
                         Some(rows) => rows,
                         None if ank != 0 => kcg_ank(ank),
+                        None if cw == ANK_W => squeeze_half(&kcg_cp(cp)),
                         None => kcg_cp(cp),
                     }
                 }
@@ -762,7 +778,7 @@ pub fn text(surface: SurfaceId, x: i32, y: i32, utf8: &[u8], style: Style) -> i3
     penx - x
 }
 
-/// レイアウト用の寸法 (契約 G2)。半角 8px / 全角 16px、高さ 16px (scale1)。
+/// レイアウト用の寸法 (契約 G2)。半角 8px (ASCII・Latin-1/拡張) / 全角 16px、高さ 16px (scale1)。
 pub fn measure_text(utf8: &[u8]) -> (i32, i32) {
     let mut w = 0i32;
     let mut i = 0usize;

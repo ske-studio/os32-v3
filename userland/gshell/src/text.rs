@@ -6,12 +6,17 @@
 //! - [`draw`] (不透過: cell∩clip を `bg` で塗ってから `fg`) / [`draw_t`] (透過)
 //!   / [`draw_x2`] (32px: 16px の bitmap を最近傍 2 倍、Engine には Px16 で引く)。
 //! - 幅と制御字は `kcg_draw_utf8` (gfx_kcg.c:87-100) と同じ: `unicode_to_ank` が
-//!   0 でなければ 8px、0 なら 16px。cp<0x20 と U+FEFF は送らない、`\t` は +32、
-//!   `\n` は行頭へ戻り 18px 下げる。`kcg_set_scale` は呼ばない。
+//!   0 でなければ 8px、0 なら 16px。ただし **Latin-1・Latin 拡張 (U+00A0..=U+024F、
+//!   `os32_font::engine::is_latin_half`) は 8px** (T7b-b5、PM 決定。kernel の
+//!   `unicode_to_ank` (lib/utf8.c) は console・IME の TVRAM 格子も使うので変えない)。
+//!   cp<0x20 と U+FEFF は送らない、`\t` は +32、`\n` は行頭へ戻り 18px 下げる。
+//!   `kcg_set_scale` は呼ばない。幅だけを知りたい呼び手は [`advance`]。
 //! - 経路: ANK byte が 0x20..=0x7E で **0x5C 以外**は TTF (cp = その ASCII、
-//!   U+FF21 'Ａ' も 'A' と同じ entry)、0x5C (¥) と半角カナは ANK (ROM)、全角は TTF。
-//!   cache に無い字・欠字・slot 超過・engine が KCG のときは KCG
-//!   (`kcg_read_ank` / `unicode_to_jis` → `kcg_read_kanji`、無ければ 0x2222)。
+//!   U+FF21 'Ａ' も 'A' と同じ entry)、0x5C (¥、U+00A5 も) と半角カナは ANK (ROM)、
+//!   Latin-1・Latin 拡張は TTF の半角 (Inconsolata だけ、東雲の全角の字形は使わない)、
+//!   全角は TTF。cache に無い字・欠字・slot 超過・engine が KCG のときは KCG
+//!   (`kcg_read_ank` / `unicode_to_jis` → `kcg_read_kanji`、無ければ 0x2222。
+//!   半角の Latin は ROM の 16×16 を横 1/2 に詰めて 8px の cell に入れる)。
 //! - 字は `cell.y + ascent - top` から。**cell 矩形 (8|16 × 16) の外の画素は描かない**、
 //!   その上で `clip` で画素単位に切る (行の範囲は pat の先頭と `h_lines`、列は
 //!   bit mask)。描画口は libos32gfx の `gfx_draw_font` だけ [HW1]。
@@ -21,7 +26,7 @@ use crate::ffi;
 use crate::font;
 use crate::wm::Rect;
 use os32_font::cache::Entry;
-use os32_font::engine::{Cell, Glyph};
+use os32_font::engine::{is_latin_half, Cell, Glyph};
 use os32_font::limits::CELL_H_PX;
 
 /// cell の高さ (16px、font crate の正典)。
@@ -64,12 +69,26 @@ pub fn route(cp: u32) -> Route {
     }
     let ank = unsafe { ffi::unicode_to_ank(cp) };
     if ank == 0 {
-        return Route::Ttf { cp, cell: Cell::Full, ank: 0 };
+        /* T7b-b5: Latin-1・Latin 拡張は半角 (U+00A5 は上で ANK 0x5C になっている)。 */
+        let cell = if is_latin_half(cp) { Cell::Half } else { Cell::Full };
+        return Route::Ttf { cp, cell, ank: 0 };
     }
     if (0x20..=0x7E).contains(&ank) && ank != ANK_YEN {
         return Route::Ttf { cp: u32::from(ank), cell: Cell::Half, ank };
     }
     Route::Ank(ank)
+}
+
+/// 1 字の送り幅 (px、scale 1)。[`draw`] の戻り値と同じ規則 (送らない字と `\n` は 0、
+/// `\t` は [`TAB_W`])。入力欄の caret・切り詰めの幅はこれで数える。
+pub fn advance(cp: u32) -> i32 {
+    match route(cp) {
+        Route::Skip | Route::Newline => 0,
+        Route::Tab => TAB_W,
+        Route::Ank(_) => ANK_W,
+        Route::Ttf { cell: Cell::Half, .. } => ANK_W,
+        Route::Ttf { .. } => KANJI_W,
+    }
 }
 
 /// 文字列の TTF 経路の字 (raster の対象と need_raster の照会)。
@@ -163,7 +182,13 @@ fn draw_ex(clip: Rect, x: i32, y: i32, s: &[u8], fg: u8, bg: Option<u8>, scale: 
                     None
                 };
                 if drawn.is_none() {
-                    rows = if ank != 0 { kcg_ank(ank) } else { kcg_kanji(cp) };
+                    rows = if ank != 0 {
+                        kcg_ank(ank)
+                    } else if cell == Cell::Half {
+                        squeeze_half(&kcg_kanji(cp))
+                    } else {
+                        kcg_kanji(cp)
+                    };
                 }
                 put_cell(clip, cx, cy, w, scale, &rows, fg, bg);
                 cx += w * scale;
@@ -197,6 +222,27 @@ fn kcg_kanji(cp: u32) -> CellRows {
     let mut r = 0;
     while r < CELL_H_PX {
         rows[r] = (u16::from(pat[2 * r]) << 8) | u16::from(pat[2 * r + 1]);
+        r += 1;
+    }
+    rows
+}
+
+/// 16×16 を横 1/2 の 8×16 に詰める (隣り合う 2 列の OR)。半角の Latin が TTF で
+/// 描けないとき (欠字・KCG だけの設定) の ROM の字 (T7b-b5)。
+pub fn squeeze_half(full: &CellRows) -> CellRows {
+    let mut rows: CellRows = [0; CELL_H_PX];
+    let mut r = 0;
+    while r < CELL_H_PX {
+        let v = full[r];
+        let mut out = 0u16;
+        let mut c = 0;
+        while c < 8 {
+            if v & (0xC000 >> (2 * c)) != 0 {
+                out |= 0x8000 >> c;
+            }
+            c += 1;
+        }
+        rows[r] = out;
         r += 1;
     }
     rows

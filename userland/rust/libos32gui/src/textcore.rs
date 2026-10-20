@@ -11,10 +11,13 @@
 //! 3. ホスト TDD (`tools/tests/test_edit_doc.py`) が `#[path]` で直に取り込む。
 //!    ここが壊れたら `WK_TEXTBOX` の振る舞いも RED になる (受入 E10)。
 //!
-//! # 桁の規約 (`draw.rs` の `decode_glyph` と**同じ規則**)
+//! # 桁の規約 (`draw.rs` の `decode_glyph` と**同じ規則**、[`cols_at`])
 //!
 //! - `b < 0x80` … 半角 1 桁 (ANK 8px)
-//! - 多バイトの先頭 (`0xC0`/`0xE0`/`0xF0` 系) … 全角 2 桁 (16px)
+//! - 多バイトで復号した字が Latin-1・Latin 拡張 (U+00A0..=U+024F、
+//!   [`LATIN_HALF_FIRST`]..=[`LATIN_HALF_LAST`]) … 半角 1 桁 (T7b-b5、PM 決定。
+//!   U+00A5 も 1 桁で ROM の ¥)
+//! - それ以外の多バイト (ギリシャ・キリル・和文…) … 全角 2 桁 (16px)
 //! - 継続バイト / 不正バイト … 1 個読み飛ばして半角 1 桁
 //!
 //! ここを `draw.rs` とずらすと、折り返した桁と実際に描かれる幅が食い違う
@@ -45,7 +48,56 @@ pub fn seq_len(b: u8) -> usize {
     }
 }
 
-/// 先頭バイトから桁数 (`draw.rs` の `decode_glyph` と同じ規則)。
+/// 半角で描く多バイトの範囲 (Latin-1 Supplement・Latin Extended-A/B)。正典は
+/// `os32_font::limits` の同名の定数 (このファイルは core だけに依存するので写しを
+/// 持ち、libos32gui の lib.rs が const assert で一致を確かめる)。
+pub const LATIN_HALF_FIRST: u32 = 0xA0;
+pub const LATIN_HALF_LAST: u32 = 0x24F;
+
+/// 多バイト列 (先頭バイトから `seq_len` 本) のコードポイント。継続バイトは
+/// 検査しない (`draw.rs` の `decode_cp` と同じ)。
+#[inline]
+pub fn decode_cp(seq: &[u8]) -> u32 {
+    let lead = match seq.len() {
+        2 => u32::from(seq[0] & 0x1F),
+        3 => u32::from(seq[0] & 0x0F),
+        _ => u32::from(seq[0] & 0x07),
+    };
+    let mut cp = lead;
+    let mut i = 1;
+    while i < seq.len() {
+        cp = (cp << 6) | u32::from(seq[i] & 0x3F);
+        i += 1;
+    }
+    cp
+}
+
+/// 多バイトの字のうち半角 (1 桁) のもの。
+#[inline]
+pub const fn cp_is_half(cp: u32) -> bool {
+    cp >= LATIN_HALF_FIRST && cp <= LATIN_HALF_LAST
+}
+
+/// `s` の先頭の 1 字の桁数 (**幅の規則の 1 本**、`draw.rs` の `decode_glyph` と
+/// `measure_text` もこれを使う)。末尾で切れた多バイトは先頭バイトだけで決める
+/// (全角 2 桁、描画はそこで止まる)。空なら 0。
+#[inline]
+pub fn cols_at(s: &[u8]) -> usize {
+    if s.is_empty() {
+        return 0;
+    }
+    let b = s[0];
+    let n = seq_len(b);
+    if n == 1 {
+        return COLS_ANK;
+    }
+    if s.len() >= n && cp_is_half(decode_cp(&s[..n])) {
+        return COLS_ANK;
+    }
+    COLS_KANJI
+}
+
+/// 先頭バイトだけから見た桁数 (Latin-1 の字は分からない — 幅の規則は [`cols_at`])。
 #[inline]
 pub fn cols_of(b: u8) -> usize {
     if b < 0x80 {
@@ -89,7 +141,7 @@ pub fn columns(s: &[u8]) -> usize {
     let mut c = 0usize;
     let mut i = 0usize;
     while i < s.len() {
-        c += cols_of(s[i]);
+        c += cols_at(&s[i..]);
         i += seq_len(s[i]).max(1);
     }
     c
@@ -107,7 +159,7 @@ pub fn wrap_end(s: &[u8], cols: usize) -> usize {
     let mut used = 0usize;
     let mut i = 0usize;
     while i < s.len() {
-        let w = cols_of(s[i]);
+        let w = cols_at(&s[i..]);
         if used + w > cols {
             break;
         }

@@ -1199,14 +1199,12 @@ fn next_boundary(t: &[u8], len: usize, i: usize) -> usize {
     }
 }
 
-/// 1 コードポイントの表示幅 (ANK 8px / それ以外は全角 16px)。
+/// `i` (コードポイント先頭) の 1 字の表示幅。描画 ([`text::draw`]) と同じ規則
+/// ([`text::advance`]: ANK・Latin-1/拡張は 8px、全角は 16px、T7b-b5)。
 #[inline]
-fn cp_width(b: u8) -> i32 {
-    if b < 0x80 {
-        8
-    } else {
-        16
-    }
+fn cp_width_at(t: &[u8], len: usize, i: usize) -> i32 {
+    let (_, cp) = chrome::utf8_next(&t[..len], i);
+    text::advance(cp)
 }
 
 /// `from`〜`to` (バイト、境界前提) の表示幅。
@@ -1214,7 +1212,7 @@ fn text_width(t: &[u8], len: usize, from: usize, to: usize) -> i32 {
     let mut w = 0;
     let mut i = from;
     while i < to && i < len {
-        w += cp_width(t[i]);
+        w += cp_width_at(t, len, i);
         i = next_boundary(t, len, i);
     }
     w
@@ -1635,7 +1633,7 @@ fn caret_from_x(st: &mut GuiState, mx: i32) {
         let mut i = m.view_off;
         let mut x = tr.x;
         while i < m.text_len {
-            let w = cp_width(m.text[i]);
+            let w = cp_width_at(&m.text, m.text_len, i);
             if mx < x + w / 2 {
                 break;
             }
@@ -2149,7 +2147,7 @@ fn draw_input(m: &Modal, mono: bool, face: u8) {
     let mut i = m.view_off;
     let mut w = 0;
     while i < m.text_len {
-        let cw = cp_width(m.text[i]);
+        let cw = cp_width_at(&m.text, m.text_len, i);
         if w + cw > tr.w {
             break;
         }
@@ -2225,3 +2223,7 @@ pub fn present_rect(st: &GuiState) {
         wm::queue_present(st, m.rect);
     }
 }
+
+#[cfg(test)]
+#[path = "../host/modal_tests.rs"]
+mod tests;

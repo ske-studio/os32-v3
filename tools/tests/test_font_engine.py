@@ -1,7 +1,7 @@
 """T7b-b3 S1: font engine host tests (b3/b4 design §2-1..§2-4, §5) and mutations.
 
-Runs userland/lib/font/tests/engine.rs: cmap search order (half latin->ja, full
-ja->latin), fallback entries, complete-bitmap commit under injected Err/short
+Runs userland/lib/font/tests/engine.rs: cmap search order (half ASCII latin->ja, half Latin-1 latin
+only, full ja only), fallback entries, complete-bitmap commit under injected Err/short
 reads (cache design ③), warm hit == cold miss == after trim (④), borrowing
 (b3⑤), the once-per-text() lease check and Stale, reopen order (b3②), the
 all-zero Engine == Engine::new() (P2-10), and the per-face baseline measured on
@@ -27,6 +27,9 @@ MUTATIONS = [
     ('stale-ignored', 'src/engine.rs', 'if latin.is_err() || ja.is_err() {', 'if false {', 'entry_check_once_and_stale'),
     ('full-falls-to-latin', 'src/engine.rs', 'Cell::Full => &[FaceId::Ja],',
      'Cell::Full => &[FaceId::Ja, FaceId::Latin],', 'search_order_half_latin_full_ja'),
+    # T7b-b5: a half cell above ASCII must not take the ja face's full-width glyph.
+    ('half-latin1-falls-to-ja', 'src/engine.rs', 'Cell::Half => &[FaceId::Latin],',
+     'Cell::Half => &[FaceId::Latin, FaceId::Ja],', 'search_order_half_latin_full_ja'),
     ('fallback-not-committed', 'src/engine.rs', 'let cached = self.cache.commit(key, &entry, &[]).is_ok();',
      'let cached = false;', 'fallback_entries_are_committed_and_hit'),
     # b4④ baseline: ascent 14 for Inconsolata cuts g/j/p/q/y.
