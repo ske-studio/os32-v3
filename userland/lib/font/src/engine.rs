@@ -7,8 +7,9 @@
 //! per glyph -> `bitmap()` while drawing -> `release()` -> ... -> `end()`.
 //! A returned Bitmap is borrowed until `release`; meanwhile close/trim/
 //! invalidate_all/detach refuse with Busy and further resolves answer Kcg.
-//! `open` and a resolve that misses read and rasterise: call them inside
-//! the x87 guard/fp scope on OS32. Hits and `peek` do not read or use x87.
+//! `open` and a resolve that misses read and rasterise (integer only, F5): the
+//! shell calls them inside its guard section (read context, F6); apps call them
+//! directly. Hits and `peek` do not read.
 //!
 //! TASK_FONTPERF F3: an optional .g16 bundle (`open_bundle`, after `open`) answers
 //! Full 16px misses with the pre-drawn cell (one read_at, no cmap/raster); it is
@@ -38,6 +39,9 @@ pub const fn is_latin_half(cp: u32) -> bool {
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Reason {
+    /// Not used since TASK_FONTPERF F6 (the raster is integer only and the kernel
+    /// no longer answers NOSYS without an FPU). Kept as value 0 for the repr(u8)
+    /// reason in `os32gui_font_stats` / `gshell_font_stats` (F-4).
     NoFpu,
     OpenFailed,
     Nospc,
@@ -177,7 +181,7 @@ impl<S> Engine<S> {
     pub fn bundle_counts(&self) -> (u32, u32) {
         self.bundle.counts()
     }
-    /// The shell's x87 guard answered BUSY for this text() (drawn KCG).
+    /// The shell's guard answered BUSY for this text() (drawn KCG).
     pub fn note_guard_busy(&mut self) {
         let s = self.cache.stats_mut();
         s.guard_busy = s.guard_busy.wrapping_add(1);
@@ -279,7 +283,7 @@ impl<S> Engine<S> {
     }
 
     /// Cached-only presence for the glyphs of one text(): true when some
-    /// resolve would rasterise (the shell then enters its x87 guard once).
+    /// resolve would rasterise (the shell then enters its guard once).
     pub fn need_raster<I: IntoIterator<Item = u32>>(&self, px: PixelSize, cps: I) -> bool {
         if !self.usable() {
             return false;
@@ -399,7 +403,7 @@ fn kind_result(kind: Kind) -> Resolved {
 }
 
 impl<S: Source> Engine<S> {
-    /// Open the set in place (call at a safe point, inside the x87 scope):
+    /// Open the set in place (call at a safe point; the shell: inside its guard):
     /// close the old faces -> invalidate_all -> set_slot += 1 -> open both.
     /// Any failure leaves both closed and the state KcgOnly(OpenFailed).
     pub fn open(&mut self, latin: S, ja: S) -> Result<(), EngineError> {
@@ -459,7 +463,7 @@ impl<S: Source> Engine<S> {
     }
 
     /// F3 ⓑ: resolve the printable ASCII range (Half, 16px) once so the first
-    /// text() hits; call right after `open` inside the x87 scope (the leases
+    /// text() hits; call right after `open` (the shell: inside its guard; the leases
     /// were checked by the open). Returns the number of cached results.
     pub fn preload_ascii(&mut self) -> Result<u32, EngineError> {
         self.not_busy()?;

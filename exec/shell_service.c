@@ -20,7 +20,7 @@
 #include "gui.h"            /* GUI_SHELL_OWNER */
 #include "fd_redirect.h"    /* res_owner_get */
 #include "font_source.h"    /* font_lease_shell_* / font_lease_close_shell (段 C / D) */
-#include "font_guard.h"     /* font_guard_run / font_x87_present (version 2) */
+#include "font_guard.h"     /* font_guard_run (version 2) */
 
 /* exec/exec.c の実体 (int 0x80 のディスパッチ中だけ 1)。 */
 extern volatile int ring3_in_syscall;
@@ -89,7 +89,6 @@ shell_svc_font_source_open(const char *path, u32 *out_id, u32 *out_size)
     if (!shell_caller_ok((u32)(uptr)__builtin_return_address(0), &reason))
         return shell_service_reject(reason);
     if (!shell_plain_context()) return shell_service_reject(SHELL_SVC_REJ_CTX_OPEN);
-    if (!font_x87_present) return OS32_ERR_NOSYS;   /* x87 無しは raster できない → KCG */
     r = font_lease_shell_open(path, g_shell_service.generation, out_id, out_size);
     return r;
 }
@@ -130,7 +129,8 @@ shell_svc_font_source_close(u32 id)
     return r;
 }
 
-/* version 2: x87 guard の中で call(ctx)。段 B は read_at と同じ (callback の
+/* version 2: guard 区間 (kernel/font_guard.c、x87 の保存は F6 で撤去) の中で
+ * call(ctx)。段 B は read_at と同じ (callback の
  * 中で read_at を呼ぶので、read_at が通る文脈でだけ通す)。 */
 static __attribute__((noinline)) i32 __cdecl
 shell_svc_font_guard_run(int (*call)(void *), void *ctx)

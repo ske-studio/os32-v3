@@ -1,5 +1,5 @@
 // T7b-b3 S4: the production libos32gui font.rs (Engine on the exec heap, arena
-// trim/reallocate, lease open/close, font/gen check, focus retry, fp_scope) over
+// trim/reallocate, lease open/close, font/gen check, focus retry) over
 // the real os32-font crate, real Inconsolata / JF Dot Shinonome 16 files and
 // mocked KAPI mem_alloc/mem_free/font_source_*. Appended after the mock modules
 // `cfgro` / `client` and `#[path] mod font` by tools/tests/test_gui_trim.py.
@@ -152,51 +152,6 @@ fn zero_fill_equals_new() {
     println!("Engine<AppSource> {size} B, align {}", std::mem::align_of::<Engine<AppSource>>());
 }
 
-fn cw() -> u16 {
-    let mut v: u16 = 0;
-    unsafe { core::arch::asm!("fnstcw word ptr [{0}]", in(reg) &mut v as *mut u16) };
-    v
-}
-
-#[test]
-fn fp_scope_restores_caller_cw() {
-    let other: u16 = 0x0F7F;
-    unsafe { core::arch::asm!("fldcw word ptr [{0}]", in(reg) &other as *const u16) };
-    let inside = font::fp_scope(cw);
-    let after = cw();
-    let std_cw: u16 = 0x037F;
-    unsafe { core::arch::asm!("fldcw word ptr [{0}]", in(reg) &std_cw as *const u16) };
-    check(inside == 0x037F, "fp-scope-default-cw");
-    check(after == other, "fp-scope-restore");
-}
-
-fn sw() -> u16 {
-    let mut v: u16 = 0;
-    unsafe { core::arch::asm!("fnstsw word ptr [{0}]", in(reg) &mut v as *mut u16) };
-    v
-}
-
-#[test]
-fn fp_scope_status_flags_kept() {
-    // T7b-b5⑤: the caller's sticky exception flags (here ZE from 1/0, masked) survive,
-    // and flags raised inside the scope do not leak out (C11 7.6 convention).
-    let std_cw: u16 = 0x037F;
-    unsafe {
-        core::arch::asm!("fninit", "fldcw word ptr [{0}]", "fld1", "fldz", "fdivp st(1), st", "fstp st(0)",
-                         in(reg) &std_cw as *const u16);
-    }
-    let before = sw();
-    font::fp_scope(|| unsafe {
-        // raise IE inside (0/0, masked)
-        core::arch::asm!("fldz", "fldz", "fdivp st(1), st", "fstp st(0)");
-    });
-    let after = sw();
-    unsafe { core::arch::asm!("fninit", "fldcw word ptr [{0}]", in(reg) &std_cw as *const u16) };
-    check(before & 0x3F == 0x04, "fp-scope-fixture-ze");
-    check(after & 0x3F == before & 0x3F, "fp-scope-status-flags");
-    check(after & 0x3800 == before & 0x3800, "fp-scope-top");
-}
-
 #[test]
 fn app_font_lifecycle() {
     install();
@@ -225,7 +180,7 @@ fn app_font_lifecycle() {
     let e = font::ensure_open().unwrap();
     assert!(e.begin());
     let mut g = Glyph::default();
-    let r = font::fp_scope(|| e.resolve(u32::from(b'A'), Cell::Half, PixelSize::Px16, &mut g));
+    let r = e.resolve(u32::from(b'A'), Cell::Half, PixelSize::Px16, &mut g);
     assert_eq!(r, Resolved::Bitmap);
     assert!(e.is_busy());
     check(!font::trim(), "trim-while-busy: arena returned during a borrow");
@@ -247,7 +202,7 @@ fn app_font_lifecycle() {
     assert!(e.cache().has_arena());
     assert_eq!((k().allocs.len(), k().opened.len()), (3, 2));
     assert!(e.begin());
-    let r = font::fp_scope(|| e.resolve(u32::from(b'A'), Cell::Half, PixelSize::Px16, &mut g));
+    let r = e.resolve(u32::from(b'A'), Cell::Half, PixelSize::Px16, &mut g);
     assert_eq!(r, Resolved::Bitmap);
     e.release();
     e.end();
@@ -288,7 +243,8 @@ fn app_font_lifecycle() {
     check(client::log().iter().any(|l| l == "font: retry rc= 0"), "retry-log");
     check(!font::on_focus_in(), "focus on a ready engine changes nothing");
 
-    // (9) Other open failures; NOSYS (no FPU) is permanent.
+    // (9) Other open failures. F6: NOSYS is no longer "no FPU" (Reason::NoFpu is
+    // unused); it is an ordinary open failure.
     font::reload();
     k().force_latin = Some(os32api::gui::proto::OS32_ERR_NOTFOUND);
     let e = font::ensure_open().unwrap();
@@ -296,8 +252,7 @@ fn app_font_lifecycle() {
     font::reload();
     k().force_latin = Some(os32api::gui::proto::OS32_ERR_NOSYS);
     let e = font::ensure_open().unwrap();
-    assert_eq!(e.state(), State::KcgOnly(Reason::NoFpu));
-    check(!font::on_focus_in(), "no-fpu-retried");
+    assert_eq!((e.state(), open_leases()), (State::KcgOnly(Reason::OpenFailed), 0));
     k().force_latin = None;
 
     // (10) font_set = KCG only: no lease at all.

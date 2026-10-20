@@ -645,7 +645,7 @@ fn t07_cell_contract() {
     let mut out_of_cell = 0;
     for b in 0x21u8..=0x7E {
         let mut g = Glyph::default();
-        let r = font::fp_scope(|| e.resolve(u32::from(b), os32_font::engine::Cell::Half, PixelSize::Px16, &mut g));
+        let r = e.resolve(u32::from(b), os32_font::engine::Cell::Half, PixelSize::Px16, &mut g);
         if r != os32_font::engine::Resolved::Bitmap {
             continue;
         }

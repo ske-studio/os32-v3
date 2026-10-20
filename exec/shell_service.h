@@ -52,9 +52,10 @@ typedef struct {
     i32 (__cdecl *font_source_read_at)(u32 id, u32 offset, void *dst, u32 len);
     i32 (__cdecl *font_source_validate)(u32 id);
     i32 (__cdecl *font_source_close)(u32 id);
-    /* version 2: x87 guard の中で call(ctx) を 1 回呼び、その戻り値を返す
-     * (kernel/font_guard.h)。FPU 無しは OS32_ERR_NOSYS (以後 KCG)、
-     * 再入・IRQ/例外文脈は OS32_ERR_BUSY (この呼出しだけ KCG)。 */
+    /* version 2: guard 区間 (kernel/font_guard.h) の中で call(ctx) を 1 回呼び、
+     * その戻り値を返す。x87 の保存・復元と FPU 無しの NOSYS は TASK_FONTPERF F6
+     * で撤去 (ラスタは整数だけ)、欄・版はそのまま。再入・IRQ/例外文脈は
+     * OS32_ERR_BUSY (この呼出しだけ KCG)。 */
     i32 (__cdecl *font_guard_run)(int (*call)(void *), void *ctx);
 } ShellService;
 

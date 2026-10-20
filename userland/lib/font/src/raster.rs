@@ -9,7 +9,7 @@
 //! aligned, MSB = left pixel, unused tail bits 0 (glyph cache design §1bpp).
 //! Nothing reaches the caller's buffer until every input was read, validated
 //! and rasterised; any Err leaves the destination and the exposed coverage
-//! untouched/empty. No floating point (the a2 x87 guard is harmless until F6).
+//! untouched/empty. No floating point (the a2 x87 guard was removed in F6).
 use crate::{
     fixed::{div_fix, div_round, mul_fix, root4_ceil},
     limits::*,

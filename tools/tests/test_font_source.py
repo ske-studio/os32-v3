@@ -24,8 +24,7 @@ CASES = ["open_fields", "open_reject", "read_at", "validate", "close_reuse",
          "stale_close", "public_reject", "close_owned", "pinned_busy",
          "generic_regression", "budget",
          "lease_open", "lease_gate", "lease_token", "lease_read", "lease_close",
-         "lease_limit", "lease_owned", "lease_shell", "lease_reclaim",
-         "lease_nofpu"]
+         "lease_limit", "lease_owned", "lease_shell", "lease_reclaim"]
 # 変種: app の合計上限を owner ごとの上限より大きくして組む (値は両方 3 (F3) で、
 # そのままでは owner ごとの判定が合計の判定に隠れる)
 VARIANT_DEFS = ["-DFONT_SOURCE_HOST_APP_TOTAL=4"]
@@ -126,9 +125,6 @@ MUTATIONS = [
      "b2④ GUI_SHELL_OWNER → res_owner_get()"),
     (LEASE, "                              VFS_FONT_OPEN_PROTECT | VFS_FONT_OPEN_PIN,\n",
      "                              VFS_FONT_OPEN_PIN,\n", "shell の open が PROTECT を立てない"),
-    # ---- T7b-b3 S2: x87 の無い機械の app open は NOSYS ----
-    (LEASE, "    if (!font_x87_present) return OS32_ERR_NOSYS;   /* x87 無しは raster できない → KCG */\n",
-     "", "b3 S2 x87 無しでも app の open を通す"),
     (LEASE, "    if (font_lease_count(FONT_LEASE_SHELL, 0, 1) >= VFS_FONT_FD_MAX_SHELL)\n",
      "    if (font_lease_count(FONT_LEASE_SHELL, 0, 1) > VFS_FONT_FD_MAX_SHELL)\n",
      "shell の上限 >= → >"),

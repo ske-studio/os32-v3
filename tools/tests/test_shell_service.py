@@ -50,8 +50,8 @@ MUTATIONS = [
     (SRC, "    if (ring3_in_syscall != 0 || ring3_wm_depth != 0) return 0;\n",
      "    if (ring3_in_syscall != 0) return 0;\n", "段 B open が WM 中を断らない"),
     (SRC, "    if (!shell_plain_context()) return shell_service_reject(SHELL_SVC_REJ_CTX_OPEN);\n"
-          "    if (!font_x87_present)",
-     "    if (!font_x87_present)", "open の段 B を外す"),
+          "    r = font_lease_shell_open(",
+     "    r = font_lease_shell_open(", "open の段 B を外す"),
     (SRC, "    return slot && !slot->cpl3 && res_owner_get() == GUI_SHELL_OWNER &&\n",
      "    return slot && !slot->cpl3 &&\n", "段 B が res_owner を見ない"),
     (SRC, "    if (g_shell_active) ring3_wm_shell_gen = g_shell_service.generation;\n",
@@ -62,7 +62,7 @@ MUTATIONS = [
     (SRC, "    r = font_lease_shell_read_at(id, g_shell_service.generation, offset, dst, len);",
      "    r = font_lease_shell_read_at(id, 1, offset, dst, len);",
      "段 C へ現 generation を渡さない"),
-    # ---- T7b-b3 S2: version 2 の font_guard_run (段 A/B) と x87 無しの NOSYS ----
+    # ---- T7b-b3 S2: version 2 の font_guard_run (段 A/B)、F6 で x87 無しの NOSYS は撤去 ----
     (SRC, "    if (!shell_caller_ok((u32)(uptr)__builtin_return_address(0), &reason))\n"
           "        return shell_service_reject(reason);\n"
           "    if (!shell_read_context()) return shell_service_reject(SHELL_SVC_REJ_CTX_GUARD);\n",
@@ -75,11 +75,9 @@ MUTATIONS = [
      "b3 S2 guard wrapper の段 B を open の文脈にする (WM 中の handler/pump を断る)"),
     (SRC, "    r = font_guard_run(call, ctx);\n",
      "    r = font_guard_run(call, ctx);\n    if (r < 0) r = 0;\n",
-     "b3 S2 guard の NOSYS/BUSY を握りつぶす"),
+     "b3 S2 guard の BUSY を握りつぶす"),
     (SRC, "    g_shell_service.font_guard_run = shell_svc_font_guard_run;\n", "",
      "b3 S2 publish が font_guard_run を埋めない"),
-    (SRC, "    if (!font_x87_present) return OS32_ERR_NOSYS;   /* x87 無しは raster できない → KCG */\n", "",
-     "b3 S2 x87 無しでも shell の open を通す"),
     (HDR, "#define SHELL_SERVICE_VERSION 2u\n", "#define SHELL_SERVICE_VERSION 1u\n",
      "b3 S2 版を 1 のまま (欄を足したのに版を上げない)"),
     # ---- S3b: exec/exec.c の結線 ----

@@ -7,8 +7,6 @@ cpu 386
 bits 32
 
 extern kernel_main
-extern font_x87_boot_init
-extern font_x87_present
 extern __bss_start
 extern __bss_end
 ;; LAYOUT_* は $(BUILD_OUT)/memmap_layout.h (LAYOUT_CPP で展開) から。
@@ -61,6 +59,4 @@ kentry:
         push    dword 0                 ;; ダミーリターンアドレス
         xor     ebp, ebp
 
-        call    font_x87_boot_init
-        mov     [font_x87_present], eax
         jmp     kernel_main

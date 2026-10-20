@@ -1,6 +1,8 @@
-/* Real x87 instructions + product guard and exec/ISR slices. IRQ/CR3 and
- * nonreturning kernel transitions are modeled; no signal/alternate stack is
- * claimed to model delivery through the IDT. Guest injection remains separate. */
+/* Product guard and exec/ISR slices. IRQ/CR3 and nonreturning kernel
+ * transitions are modeled; no signal/alternate stack is claimed to model
+ * delivery through the IDT. Guest injection remains separate.
+ * TASK_FONTPERF F6: the guard has no x87 save/restore and no NOSYS any more;
+ * test_font_guard.py checks the guard object has no x87 instruction. */
 #include "font_guard.h"
 #include "appslot.h"
 #include "exec.h"
@@ -44,23 +46,8 @@ static void exec_restore_context(int id) { (void)id; }
 u32 paging_kernel_pd_phys(void) { return 0x1000; }
 void paging_load_cr3(u32 n) { (void)n; }
 void exec_longjmp(u32 *buf) { (void)buf; __builtin_longjmp(jump,1); }
-static u8 before[108], after[108];
-static void snapshot(u8 *p) {
-    __asm__ volatile("fnsave (%0); fwait; frstor (%0)"::"r"(p):"memory");
-}
-static int same(const u8 *a, const u8 *b) {
-    /* Intel protected-mode 32-bit save: reserved words and high five FOP bits
-     * are excluded. All 80 register bytes, including empty tags, are compared. */
-    for (u32 i=0; i<108; i++) {
-        if (i==2 || i==3 || i==6 || i==7 || i==10 || i==11 || i==26 || i==27) continue;
-        u8 mask = i==19 ? 7 : 255;
-        if ((a[i]&mask)!=(b[i]&mask)) return 0;
-    }
-    return 1;
-}
 void ring3_abort_kill(void) {
-    snapshot(after);
-    CHECK(!font_guard_active && same(before,after), "STOP after restore");
+    CHECK(!font_guard_active, "STOP after leave");
     aborts++;
 }
 void font_guard_fault(u32 vector,u32 pc,u32 addr) {
@@ -76,18 +63,10 @@ static void sput_hex32(u32 v) { (void)v; }
 #include "fault.inc"
 static int unexpected_callback(void *context) { (void)context; calls++; return 123; }
 static int callback(void *context) {
-    u16 cw, sw;
     int failure=(int)(uptr)context;
     calls++;
-    __asm__ volatile("fnstcw %0; fnstsw %1":"=m"(cw),"=m"(sw));
-    CHECK(font_guard_active && cw==0x037f && sw==0,"known CW and clean status");
-    snapshot(after);
-    CHECK(after[8]==255 && after[9]==255,"empty stack inside");
+    CHECK(font_guard_active,"active inside");
     CHECK(font_guard_run(unexpected_callback,0)==OS32_ERR_BUSY,"reentry");
-    /* Fill all eight slots, change rounding and exception masks inside too. */
-    for (int i=0;i<8;i++) __asm__ volatile("fld1":::"st");
-    cw=0x0b7e;
-    __asm__ volatile("fldcw %0"::"m"(cw));
     app.abort_req=1; stop_pending=1;
     ring3_abort_check();
     CHECK(app.abort_req && !aborts,"STOP retained");
@@ -101,56 +80,16 @@ static int callback(void *context) {
     CHECK(!parks,"STOP park held");
     return failure ? -77 : 42;
 }
-static void seed(u16 cw,int sparse,int pending) {
-    __asm__ volatile("fninit");
-    /* Sticky invalid status, then eight distinct finite values. */
-    __asm__ volatile("fldz; fldz; fdivp; fstp %%st(0)":::"st");
-    for (int i=0;i<8;i++) {
-        int n=(i+3)*17;
-        __asm__ volatile("fildl %0"::"m"(n):"st");
-    }
-    __asm__ volatile("fincstp; fincstp; fincstp");
-    if (sparse) __asm__ volatile("ffree %%st(2); ffree %%st(5)":::"st");
-    /* Use FRSTOR to seed a pending unmasked exception without delivering it. */
-    __asm__ volatile("fnsave %0; fwait":"=m"(before));
-    before[0]=(u8)cw; before[1]=(u8)(cw>>8);
-    if (pending) before[4]|=0x81; else before[4]&=~0x81;
-    __asm__ volatile("frstor %0"::"m"(before):"memory");
-    snapshot(before);
-}
-u32 host_cr0, host_ac, host_no_fpu;
-extern int font_x87_boot_init(void);
-static void probe(void) {
-    for (u32 cpu=0;cpu<2;cpu++) for(u32 absent=0;absent<2;absent++) {
-        host_cr0=0x8000001f; /* PG, ET, TS, EM, MP, PE */
-        host_ac=cpu ? 1u<<18 : 0;
-        host_no_fpu=absent;
-        CHECK(font_x87_boot_init()==!absent,"boot FPU detection");
-        CHECK(host_cr0==(0x80000013u | (cpu ? 32u:0)),"boot CR0 386/486");
-    }
-    say("GREEN probe branches (CR0/absent ESC modeled)\n");
-}
 static void normal(void) {
     app.gui=app.cpl3=1; app.state=APP_STATE_RUNNING;
-    font_x87_present=1;
-    for (int r=0;r<4;r++) for(int m=0;m<3;m++) for(int sparse=0;sparse<2;sparse++) for(int fail=0;fail<2;fail++) {
-        u16 cw=(u16)(0x0300 | (r<<10) | (m==0 ? 0x7f : m==1 ? 0x7e : 0x40));
-        seed(cw,sparse,m==1);
+    for (int fail=0;fail<2;fail++) {
+        int old=calls;
         aborts=parks=0;
-        CHECK(font_guard_run(callback,(void *)(uptr)fail)==(fail ? -77:42),"callback result");
-        snapshot(after);
-        CHECK(!font_guard_active && same(before,after),"full state restored");
+        CHECK(font_guard_run(callback,(void *)(uptr)fail)==(fail ? -77:42) && calls==old+1,"callback result");
+        CHECK(!font_guard_active,"active cleared");
         ring3_abort_check();
         CHECK(aborts==1 && !app.abort_req,"STOP delivered once");
-        __asm__ volatile("fninit");
     }
-    /* No FPU: callback never executes; dispatch tells future caller to use KCG. */
-    seed(0x037f,0,0);
-    int old=calls;
-    font_x87_present=0;
-    CHECK(font_guard_run(unexpected_callback,0)==OS32_ERR_NOSYS && calls==old,"no FPU KCG");
-    snapshot(after); CHECK(same(before,after),"no FPU no instructions");
-    font_x87_present=1;
     kctx_irq_depth=1; CHECK(font_guard_run(callback,0)==OS32_ERR_BUSY,"IRQ refusal");
     kctx_irq_depth=0; kctx_exc_depth=1;
     CHECK(font_guard_run(callback,0)==OS32_ERR_BUSY,"exception refusal");
@@ -170,7 +109,7 @@ static void normal(void) {
         }
         CHECK(parks==prior+1,"park after leave");
     }
-    say("GREEN state/CW/reentry/STOP/park/KCG\n");
+    say("GREEN active/reentry/STOP/park/refusals\n");
 }
 static int fault_body(void *context) {
     u32 regs[13]={0}; /* CPL0 syscall/WM context, as actual font callbacks. */
@@ -187,11 +126,11 @@ static void faults(void) {
         CHECK(fault_vector==vectors[i] && fault_pc==0x123456,"fault identity");
         CHECK(fault_address==(vectors[i]==14 ? 0xdead1000u:0),"fault address");
         /* Simulated reboot after terminal fail-stop; do not claim recovery. */
-        font_guard_active=0; __asm__ volatile("fninit");
+        font_guard_active=0;
         fault_seen=0;
         if (!__builtin_setjmp(jump)) fault_body((void *)(uptr)vectors[i]);
         CHECK(fault_seen==-1,"ordinary app fault unchanged");
     }
     say("GREEN font fault attribution / ordinary app fault\n");
 }
-void _start(void) { probe(); normal(); faults(); die(0); }
+void _start(void) { normal(); faults(); die(0); }

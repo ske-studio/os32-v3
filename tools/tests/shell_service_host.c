@@ -15,8 +15,8 @@
  *    wire_finish.inc exec_finish の shell 分岐 (exec_reclaim_owned → retire)
  *  dispatch 入口の印の 0 と frame[5] は字面で見る (試験 py の static_checks)。
  *
- *  version 2 (T7b-b3 S2): 表の末尾の font_guard_run の wrapper (段 A/B) と
- *  x87 無しの open の NOSYS を 6 で見る。kernel/font_guard.c の実物は
+ *  version 2 (T7b-b3 S2): 表の末尾の font_guard_run の wrapper (段 A/B) を
+ *  6 で見る (x87 無しの open の NOSYS は TASK_FONTPERF F6 で撤去)。kernel/font_guard.c の実物は
  *  test_font_guard.py が見るので、ここでは贋物 (呼ばれた数・戻りを差し替え
  *  可能、既定は call(ctx) をそのまま呼ぶ) を置く。
  *
@@ -134,7 +134,6 @@ void font_lease_close_shell(void)
 }
 
 /* ---- kernel/font_guard.c の贋物 (version 2 の wrapper の先) ------------ */
-u32 font_x87_present = 1;
 static int fake_guard_calls;
 static i32 fake_guard_rc;          /* 0 なら call(ctx) を呼ぶ、他はそれを返す */
 int font_guard_run(int (*call)(void *), void *context)
@@ -533,7 +532,7 @@ static void case_wire(void)
 }
 
 /* ========================================================================
- *  6. T7b-b3 S2: version 2 の font_guard_run (段 A/B) と x87 無しの open
+ *  6. T7b-b3 S2: version 2 の font_guard_run (段 A/B)。F6: open は FPU を見ない
  * ======================================================================== */
 static u32 guard_lease_id;
 static int guard_cb_calls;
@@ -553,13 +552,12 @@ static void case_guard(void)
 {
     u32 id = 99, size = 0, c;
     int calls;
-    report("6 b3 S2 font_guard_run / x87 無し\n");
+    report("6 b3 S2 font_guard_run (F6: x87 無しの NOSYS 撤去)\n");
     plain_context();
     g_shell_service.generation = 0;
     shell_service_retire();
     publish_in();
     fake_guard_rc = 0;
-    font_x87_present = 1;
     check(open_in(&id, &size) == 0, "6a 通常文脈で open (guard の外)");
     guard_lease_id = id;
 
@@ -601,24 +599,25 @@ static void case_guard(void)
     wm_leave();
     plain_context();
 
-    /* kernel の guard の戻りはそのまま返す (NOSYS = x87 無し、BUSY = 再入)。 */
-    fake_guard_rc = OS32_ERR_NOSYS;
-    guard_cb_calls = 0;
-    check(guard_in(guard_cb, 0) == OS32_ERR_NOSYS && guard_cb_calls == 0,
-          "6h guard の NOSYS をそのまま返す");
+    /* kernel の guard の戻りはそのまま返す (BUSY = 再入、他の負も同じ)。 */
     fake_guard_rc = OS32_ERR_BUSY;
-    check(guard_in(guard_cb, 0) == OS32_ERR_BUSY, "6i guard の BUSY をそのまま返す");
+    guard_cb_calls = 0;
+    check(guard_in(guard_cb, 0) == OS32_ERR_BUSY && guard_cb_calls == 0,
+          "6h guard の BUSY をそのまま返す");
+    fake_guard_rc = OS32_ERR_INVAL;
+    check(guard_in(guard_cb, 0) == OS32_ERR_INVAL && guard_cb_calls == 0,
+          "6i guard の他の負もそのまま返す");
     fake_guard_rc = 0;
 
-    /* x87 無し: shell の open は段 A/B の後で NOSYS (lease を取らない)。 */
+    /* F6: open は FPU の有無を見ない (段 A/B を通れば lease を取る)。 */
     check(close_in(id) == 0 && fake_in_use() == 0, "6j close (guard の外)");
-    font_x87_present = 0;
     c = shell_service_reject_count;
-    check(open_in(&id, &size) == OS32_ERR_NOSYS && fake_in_use() == 0 &&
-          shell_service_reject_count == c, "6k x87 無しの open は NOSYS、lease を取らない");
+    check(open_in(&id, &size) == 0 && fake_in_use() == 1 &&
+          shell_service_reject_count == c, "6k 段 A/B の後の open は NOSYS を返さず lease を取る");
+    check(close_in(id) == 0 && fake_in_use() == 0, "6l close (guard の外)");
+    c = shell_service_reject_count;
     check(open_out(&id, &size) == OS32_ERR_INVAL && rejected_with(c, SHELL_SVC_REJ_TEXT),
-          "6l x87 無しでも段 A が先 (text の外は INVAL)");
-    font_x87_present = 1;
+          "6l' 段 A: text の外の open は INVAL");
 
     /* reload: 旧 text からの guard は INVAL、未登録も INVAL。 */
     shell_service_retire();
