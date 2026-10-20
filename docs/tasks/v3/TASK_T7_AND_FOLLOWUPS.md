@@ -232,7 +232,7 @@ FD正常起動 (SQLITE_ONLY、FEP stub・予約0) と部品等の実失敗によ
 | control panel/i18n/GUI apps | 設定保存と実行中state適用を分離、FEP再起動要求、font API | [CONTROL_PANEL](../gui/TASK_CONTROL_PANEL.md)→[I18N](../gui/TASK_I18N.md)。設定保存失敗で表示を成功にしない。画像/音楽アプリ等は個別票と終了owner試験を起こす |
 | network CD/HostDrv | 82557 L-B〜Eに加えL-F、既存Host Service、通常I/O期限 | LANFS/L-FのNIC/session結線・実機hsyncは受入済み (`docs/tasks/realhw/TASK_LAN_82557.md:3`)。`TASK_LAN_82557.md:8` の決定どおりL-CはL-Fに必要な分、lpr/wgetは後回し。実機で済んだのはL-Fのhsyncだけで、残りの段 (L-C/L-E・cdinstのLAN経由) では接続断・短読・再試行冪等・cdinst契約・実機/NP21分離を測る。LAN /hostも製品font sourceにはしない。host virtual memory/EMSは混入しない |
 
-**T7 の後のリファクタリング (ユーザー決定 2026-10-20: T7 を予定どおり実装した後に切り出す)**: 字形ラスタの整数化。輪郭の受取りを ttf-parser の f32 から自前の i16 点集め (outline.rs) へ、合成字の拡大は F2Dot14 の固定小数点、曲線の分割数は整数平方根、面積・被覆は 26.6 の整数累積 (FreeType ftgrays 型)、`userland/rust/os32_math` (fix16・sqrt・recip) を使う。終われば x87 guard (a2 の FNSAVE/FRSTOR、service 表 v2 の `font_guard_run`、FPU 無しの NOSYS・`KcgOnly(NoFpu)`) を撤去し、FPU 無しでも新フォントで描ける (台帳 NOFPU-1 の font 部分)。受入は a5 のやり直し (FONTCHK、東雲の EBDT 全字一致、変異)。T7 の実装中は x87 guard のまま進める。
+**T7 の後のリファクタリング (ユーザー決定 2026-10-20: T7 を予定どおり実装した後に切り出す)**: 字形ラスタの整数化。輪郭の受取りを ttf-parser の f32 から自前の i16 点集め (outline.rs) へ、合成字の拡大は F2Dot14 の固定小数点、曲線の分割数は整数平方根、面積・被覆は 26.6 の整数累積 (FreeType ftgrays 型)、`userland/rust/os32_math` (fix16・sqrt・recip) を使う (font crate はユーザーランドの部品なので同じ層の依存。カーネル層からは使わない — POLICY_DEV §2)。終われば x87 guard (a2 の FNSAVE/FRSTOR、service 表 v2 の `font_guard_run`、FPU 無しの NOSYS・`KcgOnly(NoFpu)`) を撤去し、FPU 無しでも新フォントで描ける (台帳 NOFPU-1 の font 部分)。受入は a5 のやり直し (FONTCHK、東雲の EBDT 全字一致、変異)。T7 の実装中は x87 guard のまま進める。
 
 ## 5. 受入一式・データ移行・残る判断
 
