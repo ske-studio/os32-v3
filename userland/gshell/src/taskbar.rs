@@ -31,7 +31,7 @@
 //! 幅が変わった周は帯も描き直す。
 
 use crate::wm::{GuiState, Rect};
-use crate::{chrome, lease, startmenu};
+use crate::{chrome, lease, startmenu, text};
 use os32api::gfx;
 use os32api::gui::proto::{
     GUI_COLOR_FACE, GUI_COLOR_LIGHT, GUI_COLOR_SHADOW, GUI_COLOR_TEXT, GUI_COLOR_TITLE_ACTIVE,
@@ -404,7 +404,6 @@ pub fn draw(st: &GuiState, clip: Rect) {
         } else {
             gfx::gfx_hline(r.x, r.y, r.w, GUI_COLOR_LIGHT);
         }
-        gfx::kcg_set_scale(1);
     }
     /* Start */
     let sr = start_rect(st);
@@ -456,14 +455,14 @@ fn draw_button(br: Rect, mono: bool, pressed: bool, label: &[u8], center: bool) 
             gfx::gfx_hline(br.x + 1, br.y + br.h - 2, br.w - 2, GUI_COLOR_SHADOW);
             gfx::gfx_vline(br.x + br.w - 2, br.y + 1, br.h - 2, GUI_COLOR_SHADOW);
         }
-        let off = if pressed { 1 } else { 0 };
-        let lx = if center {
-            br.x + (br.w - label_width(label)) / 2
-        } else {
-            br.x + 4
-        };
-        gfx::kcg_draw_utf8(lx + off, br.y + 2 + off, label.as_ptr(), GUI_COLOR_TEXT, face);
     }
+    let off = if pressed { 1 } else { 0 };
+    let lx = if center {
+        br.x + (br.w - label_width(label)) / 2
+    } else {
+        br.x + 4
+    };
+    text::draw(br, lx + off, br.y + 2 + off, label, GUI_COLOR_TEXT, face);
 }
 
 /// 窓ボタン: 最前面のものは沈めて描き、タイトルを 11 文字で切る。
@@ -518,9 +517,8 @@ fn draw_clock(cr: Rect, mono: bool, face: u8) {
     unsafe {
         gfx::gfx_fill_rect(cr.x, cr.y, cr.w, cr.h, bg);
         gfx::gfx_rect(cr.x, cr.y, cr.w, cr.h, GUI_COLOR_TEXT);
-        gfx::kcg_set_scale(1);
-        gfx::kcg_draw_utf8(cr.x + 4, cr.y + 2, b.clock.as_ptr(), fg, bg);
     }
+    text::draw(cr, cr.x + 4, cr.y + 2, &b.clock, fg, bg);
     let _ = face;
 }
 

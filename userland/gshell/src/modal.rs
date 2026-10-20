@@ -54,7 +54,7 @@
 #![allow(dead_code)]
 
 use crate::wm::{self, GuiState, Rect};
-use crate::{chrome, damage, fep, lease, ring, session, visible};
+use crate::{chrome, damage, fep, lease, ring, session, text, visible};
 use os32api::gfx;
 use os32api::gui::proto::{
     GuiString, GUI_COLOR_FACE, GUI_COLOR_HIGHLIGHT, GUI_COLOR_LIGHT, GUI_COLOR_SEL_BG,
@@ -1930,8 +1930,7 @@ pub fn draw(st: &GuiState, clip: Rect) {
         let tcol = if mono { GUI_COLOR_TEXT } else { GUI_COLOR_TITLE_ACTIVE };
         let ttxt = if mono { GUI_COLOR_WINDOW } else { GUI_COLOR_TITLE_TEXT };
         gfx::gfx_fill_rect(tb.x, tb.y, tb.w, tb.h, tcol);
-        gfx::kcg_set_scale(1);
-        gfx::kcg_draw_utf8(tb.x + 4, tb.y + 1, title_label(m).as_ptr(), ttxt, tcol);
+        text::draw(r, tb.x + 4, tb.y + 1, title_label(m), ttxt, tcol);
     }
 
     if m.wm_owned && m.wm_purpose == WM_PURPOSE_SETTINGS {
@@ -1947,15 +1946,9 @@ pub fn draw(st: &GuiState, clip: Rect) {
     match m.buttons {
         GUI_MODAL_FILE_OPEN => draw_list(m, mono, face),
         GUI_MODAL_INPUT => draw_input(m, mono, face),
-        _ => unsafe {
-            gfx::kcg_draw_utf8(
-                r.x + PAD,
-                r.y + TITLE_H + PAD,
-                m.msg.as_ptr(),
-                GUI_COLOR_TEXT,
-                face,
-            );
-        },
+        _ => {
+            text::draw(r, r.x + PAD, r.y + TITLE_H + PAD, &m.msg, GUI_COLOR_TEXT, face);
+        }
     }
 
     /* ボタン */
@@ -1967,14 +1960,9 @@ pub fn draw(st: &GuiState, clip: Rect) {
 }
 
 fn draw_list(m: &Modal, mono: bool, face: u8) {
-    unsafe {
-        gfx::kcg_set_scale(1);
-    }
     /* パス表示 */
     let r = m.rect;
-    unsafe {
-        gfx::kcg_draw_utf8(r.x + PAD, r.y + TITLE_H + 2, m.cwd.as_ptr(), GUI_COLOR_TEXT, face);
-    }
+    text::draw(r, r.x + PAD, r.y + TITLE_H + 2, &m.cwd, GUI_COLOR_TEXT, face);
     let mut row = 0;
     while row < LIST_ROWS {
         let rr = row_rect(m, row);
@@ -1999,10 +1987,8 @@ fn draw_list(m: &Modal, mono: bool, face: u8) {
         }
         if idx < m.nentries {
             let mark: &[u8] = if m.is_dir[idx] { b"[D] \0" } else { b"    \0" };
-            unsafe {
-                gfx::kcg_draw_utf8(rr.x + 2, rr.y + 1, mark.as_ptr(), fg, bg);
-                gfx::kcg_draw_utf8(rr.x + 2 + 32, rr.y + 1, m.names[idx].as_ptr(), fg, bg);
-            }
+            text::draw(rr, rr.x + 2, rr.y + 1, mark, fg, bg);
+            text::draw(rr, rr.x + 2 + 32, rr.y + 1, &m.names[idx], fg, bg);
         }
         row += 1;
     }
@@ -2015,9 +2001,6 @@ fn draw_list(m: &Modal, mono: bool, face: u8) {
 /// `(preview off: palette leased)` と数値だけを出す。WM モーダルは前面アプリを
 /// 入れ替えないので、借り手が変えた色がそのまま残っているため。
 fn draw_settings(m: &Modal, mono: bool, face: u8) {
-    unsafe {
-        gfx::kcg_set_scale(1);
-    }
     let mut row = 0;
     while row < SET_ROWS {
         let rr = set_row_rect(m, row);
@@ -2075,7 +2058,8 @@ fn draw_settings(m: &Modal, mono: bool, face: u8) {
 /// 行矩形 `r` の中へ ANK 文字列を置く。**入り切らない分は切る**
 /// (実装レビュー往復 1 の B2 / B3)。
 ///
-/// `kcg_draw_utf8` にクリップは無く、描いた画素はモーダルの遮蔽にも損傷にも
+/// 字は行矩形で clip して描く (`text::draw`) が、ここでも文字数で切っておく —
+/// 描いた画素はモーダルの遮蔽にも損傷にも
 /// 入らない (WM はクライアント面を持たないので消せない)。版面は
 /// [`layout_settings`] が実表示幅から決めるので普通は切られないが、
 /// 画面幅 (`screen_w - 16`) に収まらない極端な状態行でも**枠の外へは 1 画素も
@@ -2096,9 +2080,7 @@ fn draw_clipped(r: Rect, buf: &mut [u8; SET_ROW_CAP], len: usize, fg: u8, bg: u8
     if n == 0 {
         return;
     }
-    unsafe {
-        gfx::kcg_draw_utf8(r.x + SET_TEXT_X, r.y + 1, buf.as_ptr(), fg, bg);
-    }
+    text::draw(r, r.x + SET_TEXT_X, r.y + 1, &buf[..], fg, bg);
 }
 
 /// 行 `row` の本文 (NUL 終端)。戻り値は長さ。
@@ -2148,17 +2130,8 @@ fn settings_row_text(
 /// Input dialog: prompt + 沈んだ edit field + caret。
 fn draw_input(m: &Modal, mono: bool, face: u8) {
     let r = m.rect;
-    unsafe {
-        gfx::kcg_set_scale(1);
-        /* prompt = GuiReqModal.message */
-        gfx::kcg_draw_utf8(
-            r.x + PAD,
-            r.y + TITLE_H + PAD,
-            m.msg.as_ptr(),
-            GUI_COLOR_TEXT,
-            face,
-        );
-    }
+    /* prompt = GuiReqModal.message */
+    text::draw(r, r.x + PAD, r.y + TITLE_H + PAD, &m.msg, GUI_COLOR_TEXT, face);
     let fr = field_rect(m);
     let tr = field_text_rect(m);
     unsafe {
@@ -2192,9 +2165,7 @@ fn draw_input(m: &Modal, mono: bool, face: u8) {
     }
     buf[n] = 0;
     if n > 0 {
-        unsafe {
-            gfx::kcg_draw_utf8(tr.x, tr.y, buf.as_ptr(), GUI_COLOR_TEXT, GUI_COLOR_WINDOW);
-        }
+        text::draw(tr, tr.x, tr.y, &buf[..], GUI_COLOR_TEXT, GUI_COLOR_WINDOW);
     }
     /* caret (縦線)。 */
     let cx = tr.x + text_width(&m.text, m.text_len, m.view_off, m.caret);
@@ -2213,16 +2184,10 @@ fn draw_button(m: &Modal, i: usize, mono: bool, focused: bool) {
             gfx::gfx_hline(br.x + 1, br.y + 1, br.w - 2, GUI_COLOR_LIGHT);
             gfx::gfx_hline(br.x + 1, br.y + br.h - 2, br.w - 2, GUI_COLOR_SHADOW);
         }
-        let label = button_label(m.buttons, i);
-        let lw = label_width(label);
-        gfx::kcg_draw_utf8(
-            br.x + (br.w - lw) / 2,
-            br.y + 2,
-            label.as_ptr(),
-            GUI_COLOR_TEXT,
-            face,
-        );
     }
+    let label = button_label(m.buttons, i);
+    let lw = label_width(label);
+    text::draw(br, br.x + (br.w - lw) / 2, br.y + 2, label, GUI_COLOR_TEXT, face);
     if focused {
         /* フォーカスは点線矩形 (契約 G6 の DOTTED)。 */
         let fr = Rect::new(br.x + 3, br.y + 3, br.w - 6, br.h - 6);

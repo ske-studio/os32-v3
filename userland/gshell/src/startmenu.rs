@@ -685,7 +685,6 @@ pub fn draw(st: &GuiState, clip: Rect) {
             gfx::gfx_hline(r.x + 1, r.y + r.h - 2, r.w - 2, GUI_COLOR_SHADOW);
             gfx::gfx_vline(r.x + r.w - 2, r.y + 1, r.h - 2, GUI_COLOR_SHADOW);
         }
-        gfx::kcg_set_scale(1);
     }
     let rows = visible_rows(mm.kind);
     let mut row = 0;
@@ -717,9 +716,7 @@ pub fn draw(st: &GuiState, clip: Rect) {
         if idx < mm.nitems {
             let mut buf = [0u8; NAME_LEN + 1];
             let label = item_label(mm, idx, &mut buf);
-            unsafe {
-                gfx::kcg_draw_utf8(rr.x + 4, rr.y + 1, label, fg, bg);
-            }
+            crate::text::draw(rr, rr.x + 4, rr.y + 1, label, fg, bg);
         }
         row += 1;
     }
@@ -781,15 +778,15 @@ pub fn winmenu_target() -> Option<u32> {
     }
 }
 
-/// 項目 idx のラベル (NUL 終端のポインタ)。Programs は cache から組む。
-fn item_label(mm: &Menu, idx: usize, buf: &mut [u8; NAME_LEN + 1]) -> *const u8 {
+/// 項目 idx のラベル (NUL 終端)。Programs は cache から組む。
+fn item_label<'a>(mm: &Menu, idx: usize, buf: &'a mut [u8; NAME_LEN + 1]) -> &'a [u8] {
     match mm.kind {
         /* 文字列は [`root_label`] が正典 (試験が見るのと同じ表)。 */
-        KIND_ROOT => root_label(idx).as_ptr(),
+        KIND_ROOT => root_label(idx),
         KIND_CTX => match idx {
-            CT_FILEMAN => b"File Manager\0".as_ptr(),
-            CT_RUN => b"Run...\0".as_ptr(),
-            _ => b"Refresh Programs\0".as_ptr(),
+            CT_FILEMAN => b"File Manager\0",
+            CT_RUN => b"Run...\0",
+            _ => b"Refresh Programs\0",
         },
         KIND_WIN => {
             let l = win_label(idx);
@@ -799,11 +796,11 @@ fn item_label(mm: &Menu, idx: usize, buf: &mut [u8; NAME_LEN + 1]) -> *const u8 
                 i += 1;
             }
             buf[i] = 0;
-            buf.as_ptr()
+            &buf[..]
         }
         _ => {
             if idx >= mm.nprogs {
-                return b"...\0".as_ptr();
+                return b"...\0";
             }
             let mut i = 0;
             while i < NAME_LEN && mm.progs[idx][i] != 0 {
@@ -811,7 +808,7 @@ fn item_label(mm: &Menu, idx: usize, buf: &mut [u8; NAME_LEN + 1]) -> *const u8 
                 i += 1;
             }
             buf[i] = 0;
-            buf.as_ptr()
+            &buf[..]
         }
     }
 }

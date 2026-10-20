@@ -112,8 +112,8 @@ fn regression_w3_lower_chrome_never_enters_a_higher_windows_client() {
 }
 
 /// 背面窓のタイトル文字も前面窓のクライアント面へ出てはいけない。
-/// `kcg_draw_utf8` にはクリップが無いので、セルが可視領域に収まらない文字は
-/// **落とす** (半分だけ描くと WM には消せない)。
+/// 字は可視領域で画素単位に clip する (`text::draw`、T7b-b4 S6 まではセルが
+/// 収まらない字を落としていた)。前面窓の面へは 1 画素も出さない。
 #[test]
 fn regression_w3_lower_title_text_is_dropped_instead_of_spilling() {
     use crate::mocks;

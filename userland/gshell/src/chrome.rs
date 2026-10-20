@@ -239,39 +239,11 @@ pub(crate) fn utf8_next(s: &[u8], i: usize) -> (usize, u32) {
     (n, cp)
 }
 
-/// `clip` の内側にだけ NUL 終端の UTF-8 を描く。
-///
-/// `kcg_draw_utf8` にクリップが無いので **1 文字ずつ**呼び、セル
-/// (半角 8 / 全角 16 × 16px) が `clip` に**丸ごと入るときだけ**描く。
-/// はみ出す文字は落とす — 前面窓のクライアント面へ半分だけ書くより、
-/// その文字を描かない方が安全 (WM は書いた分を消せない)。
-/// 送り幅は `kcg_draw_utf8` と同じ規則 (`unicode_to_ank` が 0 でなければ半角)。
+/// `clip` の内側にだけ NUL 終端の UTF-8 を描く ([`crate::text::draw`]、画素単位の
+/// clip)。前面窓のクライアント面へは 1 画素も書かない (WM は書いた分を消せない)。
+/// 送り幅と制御字の規則は `kcg_draw_utf8` と同じ (`unicode_to_ank` が 0 でなければ半角)。
 fn draw_text_in(clip: Rect, x: i32, y: i32, s: &[u8], fg: u8, bg: u8) {
-    let mut cx = x;
-    let mut i = 0;
-    while i < s.len() && s[i] != 0 {
-        let (n, cp) = utf8_next(s, i);
-        i += n;
-        if cp == 0xFEFF || cp < 0x20 {
-            continue; /* 制御文字は送らない (kcg と同じ) */
-        }
-        let cw = if unsafe { crate::ffi::unicode_to_ank(cp) } != 0 {
-            8
-        } else {
-            16
-        };
-        if covers(clip, Rect::new(cx, y, cw, 16)) {
-            /* 1 文字 + NUL の私有バッファ (最長 4 バイト)。 */
-            let mut one = [0u8; 8];
-            let mut k = 0;
-            while k < n && k < 4 {
-                one[k] = s[i - n + k];
-                k += 1;
-            }
-            unsafe { gfx::kcg_draw_utf8(cx, y, one.as_ptr(), fg, bg) };
-        }
-        cx += cw;
-    }
+    crate::text::draw(clip, x, y, s, fg, bg);
 }
 
 /* ================================================================ */
@@ -289,7 +261,7 @@ pub fn draw_window_chrome(win: &Win, active: bool, mono: bool, clip: Rect) {
     if !win.visible || clip.is_empty() {
         return;
     }
-    unsafe {
+    {
         /* 立体枠 (2px)。外周 = 影 / ハイライトで簡易ベベル。 */
         if win.has_border() {
             /* 外枠 (黒) */
@@ -324,7 +296,6 @@ pub fn draw_window_chrome(win: &Win, active: bool, mono: bool, clip: Rect) {
             (GUI_COLOR_TITLE_INACTIVE, GUI_COLOR_TITLE_TEXT)
         };
         fill_in(clip, tb.x, tb.y, tb.w, tb.h, tcol);
-        gfx::kcg_set_scale(1);
         /* title は create/set_title で必ず NUL 終端されている。 */
         draw_text_in(clip, tb.x + 4, tb.y + 1, &win.title, ttxt, tcol);
 
