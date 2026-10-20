@@ -6,6 +6,10 @@
   - 64 KB ごとの分割と組み直し、標準出力の 1 行
   - 記号: nm の解析、os32_build_commit を節ヘッダから引く (名前は見ない、R1)、
     ELF の commit と VK32 の CRC が `ver` と **2 つとも** 合うときだけ引く (K4)
+  - --lan (T5、§3 5): 偽の AF_PACKET 口に SFS_T_DUMP のフレームを流し、欠け・
+    CRC 違い・順序の入れ替え・重複 (同じ / 違う中身)・別 tag や別種別の混入・
+    宛先違い・猶予 (ok 行の後 1 秒、L5) の内と外・1 KB の大きさ (L2)・
+    `lan unavailable` の戻りを扱い、合うときだけファイル
 
   python3 -B tools/tests/test_rshell_peek.py            # 全ケース
   python3 -B tools/tests/test_rshell_peek.py --mutate   # 否定側
@@ -22,6 +26,8 @@ import zlib
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SRC = ROOT / "tools/rshell_peek.py"
+sys.path.insert(0, str(ROOT / "tools"))       # rshell_peek が使う lanfs_host / serialfs_host
+import serialfs_host as sfs                    # noqa: E402
 
 
 def load(path=None):
@@ -81,9 +87,94 @@ class FakeGuest(object):
         return text, None
 
 
-def make_args(target, length=None, elf=None, out=None, m=False, w=0, timeout=15.0):
+def make_args(target, length=None, elf=None, out=None, m=False, w=0, timeout=15.0,
+              lan=False):
     return argparse.Namespace(target=target, len=length, elf=elf, out=out, m=m, w=w,
-                              timeout=timeout, nm=None)
+                              timeout=timeout, nm=None, lan=lan, iface=None)
+
+
+# ---- LAN (T5): 偽の AF_PACKET 口と、ゲストの kdebug が送るフレーム -------------
+OWN_MAC = bytes.fromhex("020000000001")
+GUEST_MAC = bytes.fromhex("00aa00112233")
+
+
+def dump_packet(tag, seq, addr, data, dst=OWN_MAC, ftype=None):
+    """kdebug/kpeek.c の組み方を独立に: Ethernet 14 + SFS (T_DUMP) + 60 B 詰め。"""
+    body = sfs.encode(sfs.T_DUMP if ftype is None else ftype, tag, seq,
+                      struct.pack("<I", addr) + data, sfs.LAN_MAX_PAYLOAD)
+    return (dst + GUEST_MAC + b"\x88\xb5" + body).ljust(60, b"\0")
+
+
+class FakeLanPort(object):
+    """時計つきの受け口。push(packet, at) で届く時刻を決め、poll は時計を進める。"""
+
+    def __init__(self):
+        self.mac = OWN_MAC
+        self.t = 0.0
+        self.queue = []
+
+    def now(self):
+        return self.t
+
+    def push(self, packet, delay=0.0):
+        self.queue.append((self.t + delay, packet))
+
+    def poll(self, timeout):
+        due = sorted(self.queue, key=lambda q: q[0])
+        if due and due[0][0] <= self.t + timeout:
+            self.queue.remove(due[0])
+            self.t = max(self.t, due[0][0])
+            return [due[0][1]]
+        self.t += timeout
+        return []
+
+
+class FakeLanGuest(FakeGuest):
+    """`peek -l<mac>` には見出しと ok (tag) の 2 行を返し、フレームを口に積む。
+    frames_hook(list of (delay, packet), tag) で並べ替え・欠け・化けを作る。"""
+
+    def __init__(self, port, frames_hook=None, unavailable=False, tag=0x00001234,
+                 ok_crc=None):
+        FakeGuest.__init__(self)
+        self.port, self.hook, self.unavailable = port, frames_hook, unavailable
+        self.tag, self.ok_crc = tag, ok_crc
+
+    def __call__(self, line, timeout):
+        self.sent.append((line, timeout))
+        f = line.split()
+        lan = [x for x in f if x.startswith("-l")]
+        addr, n = int(f[-2], 16), int(f[-1], 16)
+        data = mem(addr, n)
+        if not lan:
+            return guest_reply(addr, data, echo=line), None
+        if self.unavailable:
+            return ("> %s\r\npeek: lan unavailable (state=OFF), serial\r\n" % line +
+                    guest_reply(addr, data)), None
+        check(lan[0] == "-l" + ":".join("%02x" % b for b in OWN_MAC), "-l carries own MAC")
+        frames = [(0.0, dump_packet(self.tag, i, addr + off, data[off:off + 1024]))
+                  for i, off in enumerate(range(0, n, 1024))]
+        if self.hook:
+            frames = self.hook(frames, self.tag)
+        for delay, pkt in frames:
+            self.port.push(pkt, delay)
+        crc = zlib.crc32(data) & 0xFFFFFFFF if self.ok_crc is None else self.ok_crc
+        reply = ("> %s\r\npeek k %08X w1 len=%08X\r\n"
+                 "peek: ok len=%08X crc32=%08X tag=%08X frames=%d\r\n" % (
+                     line, addr, n, n, crc, self.tag, len(range(0, n, 1024))))
+        self.tag += 1
+        return reply, None
+
+
+def lan_run(mod, length, hook=None, **kw):
+    """(rc, ファイルの中身 or None, 送った行)。"""
+    with tempfile.TemporaryDirectory() as tmp:
+        out = os.path.join(tmp, "lan.bin")
+        port = FakeLanPort()
+        g = FakeLanGuest(port, hook, **kw)
+        rc = mod.run(make_args("100000", "%X" % length, out=out, lan=True), g, 115200,
+                     out=lambda s: None, lan_port=port)
+        data = open(out, "rb").read() if os.path.exists(out) else None
+        return rc, data, [x[0] for x in g.sent]
 
 
 def make_elf(commit, sym_addr=0x2010):
@@ -323,7 +414,90 @@ def case_serial_glue(mod):
         mod.run = mod_print
 
 
-CASES = [case_parse, case_reject, case_run_address, case_symbol, case_serial_glue]
+def case_lan(mod):
+    want = mem(0x100000, 0x10000)
+    rc, data, sent = lan_run(mod, 0x10000)
+    check(rc == 0 and data == want, "lan 64 frames in order")
+    check(sent == ["peek -l02:00:00:00:00:01 00100000 10000"], "lan command %r" % sent)
+    # 1 KB を越える 2 回 (64 KB の分割): tag ごとに 0 から
+    rc, data, sent = lan_run(mod, 0x10400)
+    check(rc == 0 and data == mem(0x100000, 0x10400) and len(sent) == 2, "lan two pieces")
+    # 順序の入れ替え (逆順と飛び飛び)
+    rc, data, _ = lan_run(mod, 0x2400, lambda fr, tag: fr[::-1])
+    check(rc == 0 and data == mem(0x100000, 0x2400), "lan reversed order")
+    rc, data, _ = lan_run(mod, 0x2400, lambda fr, tag: fr[1::2] + fr[0::2])
+    check(rc == 0 and data == mem(0x100000, 0x2400), "lan interleaved order")
+    # 欠け
+    rc, data, _ = lan_run(mod, 0x2400, lambda fr, tag: fr[:4] + fr[5:])
+    check(rc == 1 and data is None, "lan missing frame: rc 1, no file")
+    rc, data, _ = lan_run(mod, 0x2400, lambda fr, tag: fr[:-1])
+    check(rc == 1 and data is None, "lan missing last frame")
+
+    # CRC 違い (ペイロード 1 B を化かす → try_frame が捨てる → 欠け)
+    def bad_crc(fr, tag):
+        pkt = bytearray(fr[2][1]); pkt[40] ^= 1
+        return fr[:2] + [(0.0, bytes(pkt))] + fr[3:]
+    rc, data, _ = lan_run(mod, 0x2400, bad_crc)
+    check(rc == 1 and data is None, "lan crc-bad frame")
+    # 化けたフレームの後に正しい再送が来れば (同じ番号) 組める
+    rc, data, _ = lan_run(mod, 0x2400, lambda fr, tag: bad_crc(fr, tag) + [fr[2]])
+    check(rc == 0 and data == mem(0x100000, 0x2400), "lan crc-bad then good copy")
+    # 重複: 同じ中身は無害、違う中身は矛盾 (rc 1)
+    rc, data, _ = lan_run(mod, 0x2400, lambda fr, tag: fr + fr[3:5])
+    check(rc == 0 and data == mem(0x100000, 0x2400), "lan duplicate same bytes")
+    rc, data, _ = lan_run(mod, 0x2400, lambda fr, tag: fr + [
+        (0.0, dump_packet(tag, 3, 0x100000 + 3 * 1024, bytes(1024)))])
+    check(rc == 1 and data is None, "lan duplicate with other bytes")
+    # 別 tag・別種別・別宛先の混入 (同じ番号で中身違い) は捨てる
+    noise = lambda fr, tag: [
+        (0.0, dump_packet(tag - 1, 0, 0x100000, bytes(1024))),
+        (0.0, dump_packet(tag + 1, 1, 0x100400, bytes(1024))),
+        (0.0, dump_packet(tag, 0, 0x100000, bytes(1024), ftype=sfs.T_LOG)),
+        (0.0, dump_packet(tag, 1, 0x100400, bytes(1024), dst=GUEST_MAC)),
+    ] + fr
+    rc, data, _ = lan_run(mod, 0x2400, noise)
+    check(rc == 0 and data == mem(0x100000, 0x2400), "lan other tag/type/dst ignored")
+    # 別 tag のフレームだけ (このコマンドの分が来ない)
+    rc, data, _ = lan_run(mod, 0x800, lambda fr, tag: [
+        (0.0, dump_packet(tag + 7, i, 0x100000 + i * 1024, mem(0x100000 + i * 1024, 1024)))
+        for i in range(2)])
+    check(rc == 1 and data is None, "lan only other tag")
+    # 番地の違い (番号は合うが addr が別)
+    rc, data, _ = lan_run(mod, 0x800, lambda fr, tag: [
+        fr[0], (0.0, dump_packet(tag, 1, 0x100800, mem(0x100400, 1024)))])
+    check(rc == 1 and data is None, "lan wrong addr")
+    # 番号が frames を越える余り
+    rc, data, _ = lan_run(mod, 0x800, lambda fr, tag: fr + [
+        (0.0, dump_packet(tag, 2, 0x100800, mem(0x100800, 16)))])
+    check(rc == 1 and data is None, "lan seq beyond frames")
+    # ok 行の crc32 が組み直しと違う
+    rc, data, _ = lan_run(mod, 0x800, ok_crc=0x12345678)
+    check(rc == 1 and data is None, "lan ok crc mismatch")
+    # 猶予 (L5): ok の 0.9 秒後は待つ、1.5 秒後は欠け
+    rc, data, _ = lan_run(mod, 0x2400, lambda fr, tag: fr[:-1] + [(0.9, fr[-1][1])])
+    check(rc == 0 and data == mem(0x100000, 0x2400), "lan late frame within grace")
+    rc, data, _ = lan_run(mod, 0x2400, lambda fr, tag: fr[:-1] + [(1.5, fr[-1][1])])
+    check(rc == 1 and data is None, "lan frame after grace is missing")
+    # lan unavailable → シリアルの受け方
+    rc, data, _ = lan_run(mod, 0x24, unavailable=True)
+    check(rc == 0 and data == mem(0x100000, 0x24), "lan unavailable falls back to serial")
+    # ゲストの err は LAN でも 1 行で断る
+    try:
+        mod.parse_lan_reply("> peek\r\npeek: err LAN at 00100400\r\n", 0x100000, 0x800,
+                            False, 0)
+        check(False, "lan err line")
+    except mod.PeekError as e:
+        check(str(e) == "peek: err LAN at 00100400", "lan err line message")
+    # --lan で --iface が無い
+    rc = mod.run(make_args("100000", "10", lan=True), FakeGuest(), out=lambda s: None)
+    check(rc == 2, "--lan without --iface")
+    # L2: 1028 B のペイロードは LAN の上限で解く (既定 512 では落ちる)
+    check(mod.dump_frame(dump_packet(5, 0, 0x100000, bytes(1024)), OWN_MAC) is not None,
+          "1 KB dump frame parsed with LAN max payload")
+
+
+CASES = [case_parse, case_reject, case_run_address, case_symbol, case_serial_glue,
+         case_lan]
 
 # 否定側 (パターン, 置換, 説明)
 MUTATIONS = [
@@ -345,6 +519,23 @@ MUTATIONS = [
      "照合の前にファイルを作る"),
     (r"for l in lines:\n        if l\.startswith\(\"peek: err\"\):\n            raise PeekError\(l\)",
      "pass", "err 行を見ない"),
+    # T5 (LAN)
+    (r"payload = self\.got\[seq\]", "payload = list(self.got.values())[seq]",
+     "順序入れ替えの並べ直しを消す (届いた順に繋ぐ)"),
+    (r"deadline = now\(\) \+ grace", "deadline = now()", "ok 行の後の猶予を待たない (L5)"),
+    (r"sfs\.try_frame\(packet, lanfs\.ETH_HDR, sfs\.LAN_MAX_PAYLOAD\)",
+     "sfs.try_frame(packet, lanfs.ETH_HDR)", "既定の 512 で解く (L2)"),
+    (r"if fr\.sid != self\.tag:\n            return", "pass", "tag を見ない"),
+    (r"if self\.got\[fr\.seq\] != fr\.payload:", "if False:", "重複の矛盾を見ない"),
+    (r" or parsed\[2\]\.type != sfs\.T_DUMP", "", "種別を見ない"),
+    (r" or packet\[:6\] != own_mac", "", "宛先を見ない"),
+    (r"if zlib\.crc32\(bytes\(data\)\) & 0xFFFFFFFF != crc:", "if False:",
+     "LAN の組み直しの crc32 を比べない"),
+    (r"if got_addr != want_addr or", "if", "フレームの番地を見ない"),
+    (r"        extra = sorted\(set\(self\.got\) - set\(range\(frames\)\)\)\n",
+     "        extra = []\n", "frames を越える番号を見ない"),
+    (r"if lines and lines\[0\]\.startswith\(LAN_UNAVAILABLE\):", "if False:",
+     "lan unavailable でシリアルへ切り替えない"),
 ]
 
 

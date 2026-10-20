@@ -1226,4 +1226,24 @@ pci_find:
 pci_get:
     jmp *kdebug_import_slots+976
 .size pci_get, .-pci_get
+.globl e82557_send
+.type e82557_send, @function
+e82557_send:
+    jmp *kdebug_import_slots+980
+.size e82557_send, .-e82557_send
+.globl e82557_get_mac
+.type e82557_get_mac, @function
+e82557_get_mac:
+    jmp *kdebug_import_slots+984
+.size e82557_get_mac, .-e82557_get_mac
+.globl e82557_state
+.type e82557_state, @function
+e82557_state:
+    jmp *kdebug_import_slots+988
+.size e82557_state, .-e82557_state
+.globl sfs_lan_peer_mac
+.type sfs_lan_peer_mac, @function
+sfs_lan_peer_mac:
+    jmp *kdebug_import_slots+992
+.size sfs_lan_peer_mac, .-sfs_lan_peer_mac
 .section .note.GNU-stack,"",@progbits

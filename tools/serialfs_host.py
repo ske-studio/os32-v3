@@ -66,6 +66,7 @@ T_UNLINK = 0x16
 T_RENAME = 0x17
 T_LOG = 0x20
 T_EXIT = 0x21
+T_DUMP = 0x22  # 片道 (LAN の kdebug peek)。T_DUMP は通し番号 (他の片道フレームは 0)
 T_RESP = 0x80
 T_ERR = 0xFF
 

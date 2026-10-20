@@ -50,7 +50,7 @@ def fixture(directory):
     entries = imports_gen.load_def()
     imports_gen.generate(entries, directory, stage='S5')
     metadata = json.loads((directory / 'kdebug_imports.json').read_text())
-    assert len(metadata['imports']) == 245
+    assert len(metadata['imports']) == 249
     source = directory / 'fixture.S'
     source.write_text('''
 .section .text
@@ -110,11 +110,11 @@ def verify(module, elf, metadata, kernel, pair, validator):
     assert zlib.crc32(checked) == words[32]
     reloc = struct.unpack_from('<' + 'I' * words[22], image, words[21])
     # Immediate at byte 1 + two ops pointers + one absolute operand per stub.
-    assert len(reloc) == 248 and 1 in reloc and 6 not in reloc
-    assert words[24] == 245 and words[26] == 2
+    assert len(reloc) == 252 and 1 in reloc and 6 not in reloc
+    assert words[24] == 249 and words[26] == 2
     export = [struct.unpack_from('<IHHI', image, words[25] + 12*i) for i in range(2)]
     assert [(e[1], e[3]) for e in export] == [(1, 11), (5, 0)]
-    assert stats['prefix_size'] == 144 + 248*4 + 245*12 + 2*12 + words[28]
+    assert stats['prefix_size'] == 144 + 252*4 + 249*12 + 2*12 + words[28]
     assert stats['prefix_alloc'] == words[11]
     expected_imports = [(mkmod.fnv1a(e['name'].encode()), e['type_ver'], e['kind'])
                         for e in metadata['imports']]
@@ -226,7 +226,7 @@ def main():
         print('PASS shared schema; CLI requires paired VK32; CLI/API require explicit KAPI and layout generations')
         assert 'prefix=' + str(stats['prefix_size']) + ' B' in output
         print(output.strip())
-        print('prefix fixture (245 real generated imports, 2 exports): '
+        print('prefix fixture (249 real generated imports, 2 exports): '
               f"{stats['prefix_size']} B unpadded / {stats['prefix_alloc']} B allocated; "
               'full S5 body relocation/export counts remain unmeasured')
         if args.mutate:

@@ -8,6 +8,10 @@ tools/tests/kpeek_host.c が実物の kpeek.c と kpeek_allow.c を 1 行も写�
 DENY (読まない・fail_addr はページ先頭)、許可リストの行と幅、BAR の 3 条件、
 4MB 境界またぎの ARG、窓の順序 (irq_save → 退避 → 張る → 読む → 戻す →
 irq_restore、失敗でも戻す)、窓の flags に RW が無いことを見る。
+LAN の出口 (T5、§2-8・§4): 偽 e82557_send でフレームを捕り、Ethernet・SFS の
+封筒 (T_DUMP、tag、通し番号 0 から)・addr・data・CRC32 (種別〜末尾)・60 B の
+詰め物、AGAIN だけ 2 tick 再試行で LAN (7)、他の負は即 LAN、probe は RUNNING
+かつ宛先 (明示かペア) のときだけ OK。
 同じ 2 ファイルを i386-elf-gcc -Wall -Wextra -Werror でも通す (実物の io.h・P2V_IO)。
 
   python3 -B tools/tests/test_kpeek.py            # ホスト + i386-elf
@@ -79,6 +83,21 @@ MUTATIONS = [
      "#define KPEEK_WIN_FLAGS   (PTE_PRESENT | PTE_RW | PTE_PCD)"),
     ("no_io_bar", ALLOW,
      "    if (bar & KPEEK_BAR_IO_BIT) return 0;\n", ""),
+    # T5 (LAN の出口)
+    ("lan_crc_shift", KPEEK,
+     "crc32_core_update(CRC32_INIT, sfs + 3,", "crc32_core_update(CRC32_INIT, sfs + 4,"),
+    ("lan_seq_init", KPEEK,
+     "        kpeek_lan_seq = 0;\n", "        kpeek_lan_seq = 1;\n"),
+    ("lan_retry_ticks", KPEEK,
+     "#define KPEEK_LAN_RETRY_TICKS 2U", "#define KPEEK_LAN_RETRY_TICKS 3U"),
+    ("lan_retry_busy", KPEEK,
+     "if (rc != OS32_ERR_AGAIN ||", "if ((rc != OS32_ERR_AGAIN && rc != OS32_ERR_BUSY) ||"),
+    ("lan_no_tag_reset", KPEEK,
+     "if (!kpeek_lan_have || req->tag != kpeek_lan_tag) {", "if (!kpeek_lan_have) {"),
+    ("lan_probe_any_state", KPEEK,
+     "    if (state != E82557_RUNNING) return KDEBUG_PEEK_LAN;\n", ""),
+    ("lan_no_pad", KPEEK,
+     "    while (size < SFS_LAN_MIN_FRAME) f[size++] = 0;\n", ""),
 ]
 
 

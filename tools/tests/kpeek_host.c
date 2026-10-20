@@ -8,6 +8,9 @@
 /*  張り替えと戻しをそのまま記録する。呼ばれた順は ev[] に 1 文字ずつ積む:  */
 /*  S = irq_save、r = pte_raw、M = map_phys、L = 読み、R = pte_restore、     */
 /*  U = irq_restore。                                                       */
+/*  LAN の出口 (T5) は e82557_send / get_mac / state と sfs_lan_peer_mac を  */
+/*  贋物にし、送られたフレームを捕って独立に組んだ期待値と比べる。tick は    */
+/*  send を呼ぶたびに tick_step ずつ進める。                                 */
 /*                                                                          */
 /*  python3 -B tools/tests/test_kpeek.py [--mutate]                          */
 /* ======================================================================== */
@@ -140,6 +143,43 @@ int pci_get(u32 idx, void *out)
     return 0;
 }
 
+/* ---- 贋の lan.mod (T5) -------------------------------------------- */
+volatile u32 tick_count;
+#define FAKE_FRAMES 72
+#define FAKE_FRAME_CAP 1600
+static u8 sent[FAKE_FRAMES][FAKE_FRAME_CAP];
+static u32 sent_len[FAKE_FRAMES];
+static u32 nsent, send_calls, tick_step;
+static int send_rc;              /* 返す値 (0 = 受け付けた) */
+static u32 send_rc_times;        /* send_rc を返す回数 (以後 0) */
+static int lan_state;
+static int peer_ok;
+static u32 peer_calls;
+static const u8 fake_mac[6] = { 0x00, 0xAA, 0x00, 0x11, 0x22, 0x33 };
+static const u8 fake_peer[6] = { 0x52, 0x54, 0x00, 0x12, 0x34, 0x56 };
+
+int e82557_send(const void *buf, u32 len)
+{
+    int rc = 0;
+    send_calls++;
+    if (send_rc_times) { send_rc_times--; rc = send_rc; }
+    if (rc == 0 && nsent < FAKE_FRAMES && len <= FAKE_FRAME_CAP) {
+        memcpy(sent[nsent], buf, len);
+        sent_len[nsent++] = len;
+    }
+    tick_count += tick_step;
+    return rc;
+}
+void e82557_get_mac(u8 *mac) { memcpy(mac, fake_mac, 6); }
+int e82557_state(void) { return lan_state; }
+int sfs_lan_peer_mac(u8 *out)
+{
+    peer_calls++;
+    if (!peer_ok) return -1;
+    memcpy(out, fake_peer, 6);
+    return 0;
+}
+
 #include "../../kdebug/kpeek_allow.c"
 #include "../../kdebug/kpeek.c"
 
@@ -153,6 +193,8 @@ static void reset(void)
     nev = 0; ev[0] = 0;
     map_fail = 0; map_flags = 0; map_calls = 0; restore_calls = 0;
     irq_depth = 0; load_calls = 0; load_phys = 0; load_pte = 0;
+    nsent = 0; send_calls = 0; tick_step = 0; send_rc = 0; send_rc_times = 0;
+    lan_state = E82557_RUNNING; peer_ok = 0; peer_calls = 0;
     memset(&nv, 0, sizeof(nv));
     nv.vendor = KPEEK_NV_VENDOR; nv.device = KPEEK_NV44A_DEVICE;
     nv.bar[0] = NV_BAR0;                  /* メモリ BAR、32bit、非 prefetch */
@@ -201,7 +243,7 @@ static void t_entry(void)
     CHECK(kpeek_call(KDEBUG_OP_PEEK, &q, sizeof(q) - 1) == OS32_ERR_INVAL);
     CHECK(q.status == 0x11111111U);                 /* 1 バイトも書かない */
     CHECK(kpeek_call(KDEBUG_OP_PEEK, 0, sizeof(q)) == OS32_ERR_INVAL);
-    CHECK(kpeek_call(KDEBUG_OP_PEEK_LAN_PROBE, &q, sizeof(q)) == OS32_ERR_NOSYS);
+    CHECK(kpeek_call(KDEBUG_OP_PEEK_LAN_PROBE, &q, sizeof(q) - 1) == OS32_ERR_INVAL);
     CHECK(kpeek_call(99, &q, sizeof(q)) == OS32_ERR_NOSYS);
     CHECK(q.status == 0x11111111U);
 }
@@ -227,8 +269,9 @@ static void t_args(void)
     CHECK(call(2, 0x100000, 1, 16) == KDEBUG_PEEK_ARG);             /* 知らない空間 */
     CHECK(data_untouched());
     memset(&rq, 0, sizeof(rq));
-    rq.space = 0; rq.addr = 0x100000; rq.width = 1; rq.len = 16; rq.flags = KDEBUG_PEEK_F_LAN;
+    rq.space = 0; rq.addr = 0x100000; rq.width = 1; rq.len = 16; rq.flags = 2;  /* 知らない flag */
     CHECK(kpeek_call(KDEBUG_OP_PEEK, &rq, sizeof(rq)) == 0 && rq.status == KDEBUG_PEEK_ARG);
+    CHECK(send_calls == 0);
     CHECK(load_calls == 2);                          /* OK の 2 回だけ読んだ */
 }
 
@@ -373,6 +416,140 @@ static void t_window(void)
     CHECK(pt_get(win) == (0xFE000000U | PTE_PRESENT | PTE_RW | PTE_PCD));
 }
 
+/* ---- LAN の出口 (T5) ---------------------------------------------- */
+static u32 ref_crc32(const u8 *p, u32 n)       /* ビット版 (zlib と同じ) */
+{
+    u32 c = 0xFFFFFFFFU, i;
+    int k;
+    for (i = 0; i < n; i++) {
+        c ^= p[i];
+        for (k = 0; k < 8; k++) c = (c >> 1) ^ (0xEDB88320U & (0U - (c & 1U)));
+    }
+    return c ^ 0xFFFFFFFFU;
+}
+static int mem_eq(const u8 *a, const u8 *b, u32 n)
+{ while (n--) if (*a++ != *b++) return 0; return 1; }
+static int data_eq(u32 pa, u32 n)
+{ u32 i; for (i = 0; i < n; i++) if (rq.data[i] != val_at(pa + i)) return 0; return 1; }
+static u32 rd16(const u8 *p) { return (u32)p[0] | ((u32)p[1] << 8); }
+static u32 rd32(const u8 *p) { return rd16(p) | (rd16(p + 2) << 16); }
+
+static u32 lan_call(u32 space, u32 addr, u32 width, u32 len, u32 tag)
+{
+    i32 rc;
+    memset(&rq, 0, sizeof(rq));
+    rq.space = space; rq.addr = addr; rq.width = width; rq.len = len;
+    rq.flags = KDEBUG_PEEK_F_LAN; rq.tag = tag;
+    memcpy(rq.dst, fake_peer, 6);
+    rq.status = 0xFFFFFFFFU; rq.fail_addr = 0xFFFFFFFFU;
+    rc = kpeek_call(KDEBUG_OP_PEEK, &rq, sizeof(rq));
+    CHECK(rc == 0);
+    return rq.status;
+}
+
+/* 捕ったフレーム k が仕様どおりか (§2-8): Ethernet・封筒・addr・data・CRC・詰め物 */
+static int frame_ok(u32 k, u32 tag, u32 seq, u32 pa, u32 n)
+{
+    const u8 *f = sent[k];
+    const u8 *x = f + 14;
+    u32 plen = 4 + n, i, size = 14 + 12 + plen + 4;
+    int ok = 1;
+    if (size < 60) size = 60;
+    ok &= sent_len[k] == size;
+    for (i = 0; i < 6; i++) ok &= f[i] == fake_peer[i] && f[6 + i] == fake_mac[i];
+    ok &= f[12] == 0x88 && f[13] == 0xB5;
+    ok &= x[0] == 0x05 && x[1] == 'S' && x[2] == 'F' && x[3] == 0x22;
+    ok &= rd32(x + 4) == tag && rd16(x + 8) == seq && rd16(x + 10) == plen;
+    ok &= rd32(x + 12) == pa;
+    for (i = 0; i < n; i++) ok &= x[16 + i] == val_at(pa + i);
+    ok &= rd32(x + 12 + plen) == ref_crc32(x + 3, 9 + plen);
+    for (i = 14 + 12 + plen + 4; i < size; i++) ok &= f[i] == 0;
+    return ok;
+}
+
+static void t_lan(void)
+{
+    KdebugPeek q;
+    u32 i;
+    /* 1 KB ずつ 3 回 (同じ tag): 通し番号 0, 1, 2、data も返す */
+    reset();
+    ram(0x100000, 0x110000, 0);
+    for (i = 0; i < 3; i++) {
+        CHECK(lan_call(0, 0x100000 + i * 1024U, 1, 1024, 0x1234ABCDU) == KDEBUG_PEEK_OK);
+        CHECK(data_eq(0x100000 + i * 1024U, 1024));     /* LAN でも data を返す */
+    }
+    CHECK(nsent == 3);
+    for (i = 0; i < 3 && i < nsent; i++)
+        CHECK(frame_ok(i, 0x1234ABCDU, i, 0x100000 + i * 1024U, 1024));
+    CHECK(sent_len[0] == 1058);                      /* 14 + 12 + 1028 + 4 */
+    /* 別の tag は 0 から。端数 (4 B) は 60 B へ詰める */
+    CHECK(lan_call(0, 0x100010, 4, 4, 0x1234ABCEU) == KDEBUG_PEEK_OK);
+    CHECK(nsent == 4 && frame_ok(3, 0x1234ABCEU, 0, 0x100010, 4));
+    CHECK(lan_call(0, 0x100020, 2, 0x22, 0x1234ABCEU) == KDEBUG_PEEK_OK);
+    CHECK(nsent == 5 && frame_ok(4, 0x1234ABCEU, 1, 0x100020, 0x22));
+    /* -m の読みも送る */
+    CHECK(lan_call(1, NV_BAR0 + KPEEK_NV_PMC_OFF, 4, 0x10, 7) == KDEBUG_PEEK_OK);
+    CHECK(nsent == 6 && frame_ok(5, 7, 0, NV_BAR0, 0x10));
+    /* 読めなければ送らない */
+    CHECK(lan_call(0, 0x200000, 1, 0x10, 7) == KDEBUG_PEEK_NOMAP && nsent == 6);
+
+    /* AGAIN: tick が進まなければ何度でも、1 tick 内で受け付ければ OK */
+    reset();
+    ram(0x100000, 0x101000, 0);
+    send_rc = OS32_ERR_AGAIN; send_rc_times = 5; tick_step = 0;
+    CHECK(lan_call(0, 0x100000, 1, 0x10, 1) == KDEBUG_PEEK_OK);
+    CHECK(send_calls == 6 && nsent == 1 && frame_ok(0, 1, 0, 0x100000, 0x10));
+    /* AGAIN のまま 2 tick で LAN (7)、fail_addr はそのチャンク */
+    reset();
+    ram(0x100000, 0x101000, 0);
+    send_rc = OS32_ERR_AGAIN; send_rc_times = 100; tick_step = 1; tick_count = 0xFFFFFFFFU;
+    CHECK(lan_call(0, 0x100000, 1, 0x10, 1) == KDEBUG_PEEK_LAN);
+    CHECK(send_calls == 2 && nsent == 0 && rq.fail_addr == 0x100000);
+    /* 1 tick 目で受け付ければ OK (上限ちょうど手前) */
+    reset();
+    ram(0x100000, 0x101000, 0);
+    send_rc = OS32_ERR_AGAIN; send_rc_times = 1; tick_step = 1;
+    CHECK(lan_call(0, 0x100000, 1, 0x10, 1) == KDEBUG_PEEK_OK && send_calls == 2);
+    /* AGAIN 以外の負の値は再試行しない (L4) */
+    reset();
+    ram(0x100000, 0x101000, 0);
+    send_rc = OS32_ERR_NOSYS; send_rc_times = 100;
+    CHECK(lan_call(0, 0x100000, 1, 0x10, 1) == KDEBUG_PEEK_LAN && send_calls == 1);
+    CHECK(rq.fail_addr == 0x100000);
+    reset();
+    ram(0x100000, 0x101000, 0);
+    send_rc = OS32_ERR_BUSY; send_rc_times = 100;
+    CHECK(lan_call(0, 0x100000, 1, 0x10, 1) == KDEBUG_PEEK_LAN && send_calls == 1);
+    reset();
+    ram(0x100000, 0x101000, 0);
+    send_rc = OS32_ERR_INVAL; send_rc_times = 100;
+    CHECK(lan_call(0, 0x100000, 1, 0x10, 1) == KDEBUG_PEEK_LAN && send_calls == 1);
+
+    /* probe: RUNNING かつ宛先 (明示かペア) のときだけ OK、fail_addr は state */
+    reset();
+    memset(&q, 0, sizeof(q));
+    CHECK(kpeek_call(KDEBUG_OP_PEEK_LAN_PROBE, &q, sizeof(q)) == 0);
+    CHECK(q.status == KDEBUG_PEEK_LAN && q.fail_addr == E82557_RUNNING);   /* ペア無し */
+    peer_ok = 1;
+    memset(&q, 0, sizeof(q));
+    CHECK(kpeek_call(KDEBUG_OP_PEEK_LAN_PROBE, &q, sizeof(q)) == 0);
+    CHECK(q.status == KDEBUG_PEEK_OK && mem_eq(q.dst, fake_peer, 6));
+    reset();
+    memset(&q, 0, sizeof(q));
+    memcpy(q.dst, fake_mac, 6);                      /* -l<mac> の明示 */
+    CHECK(kpeek_call(KDEBUG_OP_PEEK_LAN_PROBE, &q, sizeof(q)) == 0);
+    CHECK(q.status == KDEBUG_PEEK_OK && mem_eq(q.dst, fake_mac, 6) && peer_calls == 0);
+    for (i = 0; i <= E82557_QUARANTINED; i++) {
+        if (i == E82557_RUNNING) continue;
+        reset(); lan_state = (int)i; peer_ok = 1;
+        memset(&q, 0, sizeof(q));
+        memcpy(q.dst, fake_mac, 6);
+        CHECK(kpeek_call(KDEBUG_OP_PEEK_LAN_PROBE, &q, sizeof(q)) == 0);
+        CHECK(q.status == KDEBUG_PEEK_LAN && q.fail_addr == i);
+    }
+    CHECK(send_calls == 0);
+}
+
 void _start(void)
 {
     CHECK(sizeof(u32) == 4 && sizeof(KdebugPeek) == 40 + KDEBUG_PEEK_CHUNK);
@@ -381,6 +558,7 @@ void _start(void)
     t_ram();
     t_allow();
     t_window();
+    t_lan();
     if (fails) { output("kpeek_host: FAIL "); out_dec((u32)fails); output("\n"); finish(1); }
     output("kpeek_host: PASS\n");
     finish(0);

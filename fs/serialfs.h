@@ -40,5 +40,8 @@ int     serialfs_is_mounted(void);
  *   OS32_ERR_INVAL … セッションが無い・常駐シェル以外から */
 int     serialfs_session_begin(void);
 int     serialfs_session_end(int exit_code);
+/* kdebug の peek -l の宛先 (TASK_KPEEK §2-8)。out は 6 バイト。
+ * 0 = ペアの MAC を写した / -1 = ペアが無い (out は変えない)。 */
+int     sfs_lan_peer_mac(u8 *out);
 
 #endif /* FS_SERIALFS_H */

@@ -1960,6 +1960,38 @@
       "source": "drivers/pci.h",
       "context_safe": false,
       "index": 244
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "e82557_send",
+      "source": "drivers/e82557.h",
+      "context_safe": false,
+      "index": 245
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "e82557_get_mac",
+      "source": "drivers/e82557.h",
+      "context_safe": false,
+      "index": 246
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "e82557_state",
+      "source": "drivers/e82557.h",
+      "context_safe": false,
+      "index": 247
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "sfs_lan_peer_mac",
+      "source": "fs/serialfs.h",
+      "context_safe": false,
+      "index": 248
     }
   ]
 }

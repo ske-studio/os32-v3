@@ -9,6 +9,8 @@
 /*    - 1 KB ずつの分割 (回数・番地・長さ・端数)、要求の大きさ 1064          */
 /*    - 行の書式と 8 bit 和、**最後の行だけ端数** (K10)、CRC32 と frames     */
 /*    - 誤りは 1 行だけ (読めた分の行を出さない)、NOSYS は KDEBUG=1 の案内   */
+/*    - -l (T5、§2-8): probe → flags・tag・dst、行を出さず見出しと ok だけ、  */
+/*      使えなければ `lan unavailable (state=..), serial` の後にシリアル版   */
 /*  試験: tools/tests/test_kpeek_cli.py                                     */
 /* ======================================================================== */
 #include <stdio.h>
@@ -53,7 +55,7 @@ static void h_kprintf(u8 attr, const char *fmt, ...)
 #include "../../userland/shell/cmd_peek.c"
 
 /* ---- 偽の kdebug_call --------------------------------------------------- */
-typedef struct { u32 op, size, space, addr, width, len; } CallLog;
+typedef struct { u32 op, size, space, addr, width, len, flags, tag; u8 dst[6]; } CallLog;
 static CallLog g_calls[256];
 static int     g_ncalls;
 static int     g_fail_at = -1;     /* この回 (0 起点) で断る */
@@ -61,6 +63,12 @@ static u32     g_fail_status;
 static u32     g_fail_addr;
 static i32     g_fail_rc;          /* 0 なら status で断る、負なら rc で */
 static int     g_leave_status;     /* 1 = status を書かない */
+/* probe (KDEBUG_OP_PEEK_LAN_PROBE) の答え */
+static i32     g_probe_rc;
+static u32     g_probe_status;
+static u32     g_probe_state;
+static u8      g_probe_peer[6];
+static u32     g_tick;
 
 static u8 mem_byte(u32 a) { return (u8)((a * 7U + (a >> 8) * 13U + 3U) & 0xFFU); }
 
@@ -73,6 +81,17 @@ static i32 h_kdebug_call(u32 op, void *buf, u32 size)
         g_calls[idx].op = op; g_calls[idx].size = size;
         g_calls[idx].space = r->space; g_calls[idx].addr = r->addr;
         g_calls[idx].width = r->width; g_calls[idx].len = r->len;
+        g_calls[idx].flags = r->flags; g_calls[idx].tag = r->tag;
+        memcpy(g_calls[idx].dst, r->dst, 6);
+    }
+    if (op == KDEBUG_OP_PEEK_LAN_PROBE) {
+        static const u8 zero[6];
+        if (g_probe_rc < 0) return g_probe_rc;
+        r->status = g_probe_status;
+        r->fail_addr = g_probe_state;
+        if (g_probe_status == KDEBUG_PEEK_OK && memcmp(r->dst, zero, 6) == 0)
+            memcpy(r->dst, g_probe_peer, 6);
+        return 0;
     }
     if (idx == g_fail_at) {
         if (g_fail_rc < 0) return g_fail_rc;
@@ -100,6 +119,7 @@ static int failed;
 } } while (0)
 
 static void *h_mem_alloc(u32 n) { return malloc(n); }
+static u32 h_get_tick(void) { return g_tick; }
 static void h_mem_free(void *p) { free(p); }
 
 static void reset(void)
@@ -109,6 +129,7 @@ static void reset(void)
     g_fake.kdebug_call = h_kdebug_call;
     g_fake.mem_alloc = h_mem_alloc;
     g_fake.mem_free = h_mem_free;
+    g_fake.get_tick = h_get_tick;
     g_fake.version = KAPI_VERSION;
     g_api = &g_fake;
     g_out[0] = '\0';
@@ -119,6 +140,11 @@ static void reset(void)
     g_fail_addr = 0;
     g_fail_rc = 0;
     g_leave_status = 0;
+    g_probe_rc = 0;
+    g_probe_status = KDEBUG_PEEK_OK;
+    g_probe_state = 2;              /* E82557_RUNNING */
+    memcpy(g_probe_peer, "\x52\x54\x00\x12\x34\x56", 6);
+    g_tick = 0x1000;
 }
 
 static int run(const char *line)
@@ -313,11 +339,83 @@ static void case_errors(void)
     CHECK(strncmp(g_out, "peek: err STATUS=", 17) == 0);
 }
 
+static void case_lan(void)
+{
+    static const u8 mac[6] = { 0x00, 0xAA, 0x00, 0x11, 0x22, 0x33 };
+    char want[256];
+    int i, ok = 1;
+    u32 tag1;
+
+    /* -l<mac>: probe に宛先、1 KB ずつ flags=LAN・同じ tag・dst、行は出さない */
+    reset();
+    CHECK(run("peek -l00:aa:00:11:22:33 100000 800") == SH_STATUS_OK);
+    CHECK(g_ncalls == 3 && g_calls[0].op == KDEBUG_OP_PEEK_LAN_PROBE &&
+          g_calls[0].size == 1064 && memcmp(g_calls[0].dst, mac, 6) == 0);
+    for (i = 1; i < 3; i++)
+        ok &= g_calls[i].op == KDEBUG_OP_PEEK && g_calls[i].flags == KDEBUG_PEEK_F_LAN &&
+              g_calls[i].tag == 0x1000U && memcmp(g_calls[i].dst, mac, 6) == 0 &&
+              g_calls[i].addr == 0x100000U + (u32)(i - 1) * 1024U;
+    CHECK(ok);
+    snprintf(want, sizeof(want),
+             "peek k 00100000 w1 len=00000800\n"
+             "peek: ok len=00000800 crc32=%08X tag=00001000 frames=2\n",
+             ref_crc(0x100000U, 0x800U));
+    CHECK(strcmp(g_out, want) == 0);
+    CHECK(g_lines == 2);
+
+    /* --lan / -l: 宛先は probe が写すペア。同じ tick でも tag を変える */
+    reset();
+    CHECK(run("peek --lan -w4 200000 10") == SH_STATUS_OK);
+    tag1 = g_calls[1].tag;
+    CHECK(g_calls[0].op == KDEBUG_OP_PEEK_LAN_PROBE && g_calls[0].dst[0] == 0 &&
+          memcmp(g_calls[1].dst, g_probe_peer, 6) == 0 && g_calls[1].width == 4);
+    reset();
+    CHECK(run("peek -l 200000 10") == SH_STATUS_OK);
+    CHECK(g_calls[1].tag != tag1 && g_calls[1].flags == KDEBUG_PEEK_F_LAN);
+
+    /* lan.mod が無い (NP21/W): 1 行の後にシリアル版をそのまま */
+    reset();
+    g_probe_status = KDEBUG_PEEK_LAN; g_probe_state = 0;
+    CHECK(run("peek -l 100000 24") == SH_STATUS_OK);
+    ref_output(g_ref, sizeof(g_ref), "k", 0x100000, 1, 0x24);
+    snprintf(want, sizeof(want), "%s", "peek: lan unavailable (state=OFF), serial\n");
+    CHECK(strncmp(g_out, want, strlen(want)) == 0 &&
+          strcmp(g_out + strlen(want), g_ref) == 0);
+    CHECK(g_ncalls == 2 && g_calls[1].flags == 0 && g_calls[1].tag == 0);
+    reset();
+    g_probe_status = KDEBUG_PEEK_LAN; g_probe_state = 2;
+    CHECK(run("peek -l 100000 10") == SH_STATUS_OK);
+    CHECK(strncmp(g_out, "peek: lan unavailable (state=RUNNING no peer), serial\n", 54) == 0);
+    reset();
+    g_probe_status = KDEBUG_PEEK_LAN; g_probe_state = 7;
+    CHECK(run("peek -l 100000 10") == SH_STATUS_OK);
+    CHECK(strncmp(g_out, "peek: lan unavailable (state=QUARANTINED), serial\n", 50) == 0);
+    reset();
+    g_probe_rc = OS32_ERR_NOSYS;
+    g_fail_at = 1; g_fail_rc = OS32_ERR_NOSYS;
+    CHECK(run("peek -l 100000 10") == SH_STATUS_ERROR);
+    snprintf(want, sizeof(want), "peek: lan unavailable (kdebug rc=%d), serial\n"
+             "peek: err NOSYS (kdebug not loaded; boot with KDEBUG=1)\n", (int)OS32_ERR_NOSYS);
+    CHECK(strcmp(g_out, want) == 0);
+
+    /* 送れなかった: err LAN の 1 行だけ */
+    reset();
+    g_fail_at = 2; g_fail_status = KDEBUG_PEEK_LAN; g_fail_addr = 0x00100400U;
+    CHECK(run("peek -l 100000 800") == SH_STATUS_ERROR);
+    CHECK(strcmp(g_out, "peek: err LAN at 00100400\n") == 0);
+
+    expect_arg("peek -l00:aa:00:11:22 100000");      /* MAC が短い */
+    expect_arg("peek -l00:aa:00:11:22:3g 100000");
+    expect_arg("peek -l00-aa-00-11-22-33 100000");
+    expect_arg("peek -l00:aa:00:11:22:33: 100000");
+}
+
 int main(int argc, char **argv)
 {
     static const struct { const char *name; void (*fn)(void); } cases[] = {
         { "golden", case_golden }, { "format", case_format },
         { "split", case_split }, { "args", case_args }, { "errors", case_errors },
+        { "lan", case_lan },
     };
     size_t i;
     int ran = 0;

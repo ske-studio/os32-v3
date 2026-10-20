@@ -14,6 +14,7 @@
 /*    3    1     種別 (SFS_T_*)。応答は要求 | 0x80、拒否は SFS_T_ERR         */
 /*    4    4     セッション ID (HELLO の要求だけ 0)                          */
 /*    8    2     番号 (u16、HELLO と片道フレームは 0。**周回させない**)      */
+/*               T_DUMP は通し番号 (0 から、他の片道フレームは 0)          */
 /*    10   2     ペイロード長 (0〜SFS_MAX_PAYLOAD)                           */
 /*    12   len   ペイロード                                                 */
 /*    12+len 4   CRC32 (zlib.crc32 と同じ) — 種別からペイロードの末尾まで    */
@@ -54,6 +55,7 @@
 #define SFS_T_RENAME       0x17    /* old path, new path */
 #define SFS_T_LOG          0x20    /* 片道 (ゲスト → ホスト): 溜めた出力の断片 */
 #define SFS_T_EXIT         0x21    /* 片道: code i32, dropped u32, flags u32 */
+#define SFS_T_DUMP         0x22    /* 片道 (LAN): kdebug peek。addr u32 + data、番号は通し番号 */
 #define SFS_T_RESP         0x80    /* 応答 = 要求の種別 | 0x80 */
 #define SFS_T_ERR          0xFF    /* 拒否 (未知のセッションなど)。status だけ */
 
