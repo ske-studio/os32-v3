@@ -13,6 +13,8 @@
 資料: `docs/hw/undocumented/io_pci.md` (PC-98 の PCI)、**`docs/hw/intel/8255x_open_source_sdm.pdf`** (Intel 8255x Open Source Software Developer Manual、
 341 ページ、2026-09-22 に Intel の公開 URL から取得。`docs/hw/` は著作権物のミラーで gitignore)。テキスト版 `8255x_open_source_sdm.txt` (9,133 行、`pdftotext -layout`) も同じ場所 — grep で引く。要点の所在: SCB = §6.3.2 (34 ページ)、EEPROM = §5/§6.3.4、Configure = 62 ページ、RFD = 100 ページ、PCI Interrupt Line = §4.1.15。
 
+> この票は、PCI などの外部デバイスの実装方法のモデル (専用の文書群、[ROADMAP](../../ROADMAP.md) の長期テーマ、ユーザー決定 2026-10-20) の**前例**として一般化の材料にする。
+
 ## 0. 到達点
 
 実機 PC-9821Ra266 のオンボード 82557 で **LAN 越しの `hsync` を優先して動かす** (2026-10-15 のユーザー決定)。既存リンク層を使い、印刷・クリップボード・HTTP・時刻などの Host Services 全体の受入は後続段とする。エミュレータ側の LGY-98 経路は回帰用に残す。

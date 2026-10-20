@@ -11,6 +11,8 @@
 - ホスト側は `tools/rshell_serial.py` に `peek <記号名|番地> <長さ>`。記号名は動いているカーネルと同じ版の ELF (`ver` の Commit と Image CRC で照合) から番地に直す。
 - GeForce 6200 の観測の段 1・2 (BAR0 の読み取り、VBIOS の吸い出し) はこの道具で行う (MMIO の許可リストを足して回す)。
 
+- 外部デバイスの実装方法のモデル (専用の文書群、[ROADMAP](../../ROADMAP.md) の長期テーマ) で、実機観測の道具として扱う。
+
 ## 1. 詳細設計
 
 (Fable が起草 → Opus レビュー。`~/os32-tmp/run/kpeek/DESIGN.r1.md` を確定させてここへ要約する)
