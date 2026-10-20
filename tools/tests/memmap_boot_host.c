@@ -76,7 +76,7 @@ static void shell_heap_test(void)
 {
     void *parent, *child;
     u32 used, hash = fixed_hash();
-    CHECK(MEM_SHELL_HEAP_SIZE == 256UL * 1024);
+    CHECK(MEM_SHELL_HEAP_SIZE == MEM_SHELL_EXEC_HEAP_SIZE && MEM_SHELL_HEAP_SIZE == 192UL * 1024);
     exec_heap_init_at(MEM_SHELL_HEAP_BASE, MEM_SHELL_HEAP_SIZE);
     parent = exec_heap_alloc(MEM_SHELL_HEAP_SIZE - 8);
     CHECK(parent && (u32)parent + MEM_SHELL_HEAP_SIZE - 8 == MEM_SHELL_HEAP_END);

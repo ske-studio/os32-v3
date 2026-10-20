@@ -343,13 +343,13 @@ def shell_output(output, app):
     assert len(screens) == 3, 'FAIL: scenarios'
     first = screens[0]
     check(r'Memory Info:\n  Physical : 17408 KB \(17 MB\)\n  RAM      : 16384 KB \(16 MB\).*\n  Paging   : ENABLED\n  Heap Tot : 196608 B, Used: 8192 B, Free: 188416 B', first, 'existing lines')
-    for pattern in [r'実測: phys pages total=4096 free=3000; resident heap total=262144 used=48 B',
+    for pattern in [r'実測: phys pages total=4096 free=3000; resident heap total=196608 used=48 B',
                     r'定数: 00000000-00001000 NULL guard; 00000000-000A0000 V86 窓',
                     r'定数: 000A0000-000F0000 VRAM; 00100000-003E0000 Kernel band',
                     r'定数: 003E0000-003FB000 paging guard/PT; DMA pool 007F0000-00800000',
                     r'定数: 003FB000-003FC000 kstack guard; 003FC000-00400000 kstack',
-                    r'定数: Shell band load=00400000 sbrk上限=004B5000 stack=004F6000-00500000',
-                    r'定数: Shell exec_heap 予約=004B5000-004F5000 \(256 KiB\)',
+                    r'定数: Shell band load=00400000 sbrk上限=004C5000 stack=004F6000-00500000',
+                    r'定数: Shell exec_heap 予約=004C5000-004F5000 \(192 KiB\)',
                     r'定数: shlib=80000000-80100000 image起点=80100000',
                     r'定数: exec_heap 予約起点=88000000; stack top=90000000 既定=262144 B; lease=F0000000-FE000000',
                     r'実測: app=2 st=2 fl=1 ext=6 \[1,1,2,1,1\] free=26 ar=3 heap=136B',
@@ -362,10 +362,10 @@ def shell_output(output, app):
         assert '実測: Shell band' not in output, 'FAIL: CPL3 resident limit'
         assert 'sbrk_used=' not in output, 'FAIL: CPL3 resident diagnostic'
     else:
-        diagnostic = '  diag: sbrk_used=1024 sbrk_peak=2048 sbrk_capacity=131072 exec_peak=0 exec_capacity=262144\n'
+        diagnostic = '  diag: sbrk_used=1024 sbrk_peak=2048 sbrk_capacity=131072 exec_peak=0 exec_capacity=196608\n'
         assert diagnostic in first and diagnostic in screens[1], 'FAIL: resident diagnostic'
         assert 'sbrk_used=' not in screens[2], 'FAIL: failed system diagnostic'
-        check(r'実測: Shell band sbrk上限=004B5000', first, 'resident limit')
+        check(r'実測: Shell band sbrk上限=004C5000', first, 'resident limit')
         check(r'実測: app=4 ', first, 'all live IDs')
         for id in (3, 5):
             assert f'mem_stat app={id}:' not in first, 'FAIL: NOTFOUND output'

@@ -73,7 +73,9 @@ SHELL_OBJ = $(SHELL_SRC:.c=.o)
 # 走査しないので userland の .d は読まれない。sh_launch.inc / sh_pipe.inc /
 # sh_redraw.inc を直しても .o が作り直されないと、直したつもりの sh.bin が
 # 出来上がる。常駐側にも同じ依存を足す (レシピは変えないので .o は不変)。
-SHELL_DEPS = sdk/include/os32/ls.h userland/shell/shell.h userland/shell/hdprep_plan.h drivers/pc98pt.h $(wildcard userland/shell/*.inc)
+# include/memmap.h: cmd_sys.c の `mem` が常駐帯の定数を印字する (FONTPERF F3b で
+# 帯を再割りしたとき、これが無いと旧い番地を印字する shell.bin が出来た)。
+SHELL_DEPS = sdk/include/os32/ls.h userland/shell/shell.h userland/shell/hdprep_plan.h drivers/pc98pt.h include/memmap.h $(wildcard userland/shell/*.inc)
 
 userland/shell/%.o: userland/shell/%.c $(SHELL_DEPS)
 	$(CC) $(PROGRAM_FLAGS) -Iuserland/shell $(INC_libos32filer) -c $< -o $@
