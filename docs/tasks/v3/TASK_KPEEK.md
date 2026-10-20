@@ -32,3 +32,4 @@
 - **NP21/W** (`~/os32-tmp/evidence/2026-10-21/kpt2/`・`kpt5/`): `-k` が emu_read_mem とバイト一致、NOMAP・DENY・WIDTH・INVAL、LAN は LGY-98 なので常にシリアルへ戻る。NP21/W に PCI バスは無い (窓の付け替えの成功経路は実機で)。
 - **実機 Ra266 (1f1d115、KDEBUG=1、ノートの `~/os32-tmp/evidence/2026-10-21/realhw_kpeek/`)**: `peek -k 00100000 40` rc 0 (0.53 秒)、A8000 → DENY、F0000000 → NOMAP。64KB のホスト照合: シリアル (115200) 46.1 秒・**LAN 3.3 秒**、CRC 13DA1FAF で一致 (cmp も一致)。**GeForce 6200 (BAR0 0x24000000) の PMC_BOOT_0 = 0x04A100A1** (bits 20-27 = 0x4A、bits 16-19 = 1 で NV44A、固まらない)、PMC_ENABLE = 0x03010000 — 窓の付け替えの成功経路が実機で初めて通った。
 - **未確認**: 記号名の照合 (Commit と Image CRC) — CI の成果物に kernel.elf が無かった → build.yml で kernel.elf を成果物に足した (この後の版で実機で 1 回確かめる)。番地指定で os32_build_commit を読んで "1f1d115" は一致。
+- 記号名を引くため、CI の成果物の kernel.elf は strip しない (build.yml に注記)。

@@ -175,7 +175,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf out && mkdir -p out/packages
-          # kernel.elf: 実機の peek が記号名を引く (os32_build_commit と Image CRC の照合、TASK_KPEEK §3)。
+          # kernel.elf: 実機の peek が記号名を引く (os32_build_commit と Image CRC の照合、TASK_KPEEK §3)。strip しない。
           cp build/out/vmkernel.lz4 build/out/kernel.map build/out/kernel.elf out/
           cp images/os32_boot.d88 images/os32_boot.img images/os32_boot144.img images/os32_install.iso out/
           cp build/out/deploy-set.json out/
