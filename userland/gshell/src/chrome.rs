@@ -217,7 +217,7 @@ fn utf8_len(b: u8) -> usize {
 }
 
 /// UTF-8 1 文字を復号する (長さ, コードポイント)。壊れていれば 1 バイト分を U+FFFD。
-fn utf8_next(s: &[u8], i: usize) -> (usize, u32) {
+pub(crate) fn utf8_next(s: &[u8], i: usize) -> (usize, u32) {
     let b = s[i];
     let n = utf8_len(b);
     if n == 1 {

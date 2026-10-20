@@ -5,9 +5,9 @@
 #
 #    上流       第三者の配布物そのもの。再生成できないので git で追跡する。
 #               ipadic/*.csv
-#               例外: fonts/ipaexg.ttf, fonts/ipaexm.ttf は追跡せず、ビルド時に
-#               IPA の公式配布から tools/fetch_fonts.py が取る (ユーザー決定
-#               2026-09-30。初回はライセンスの同意が要る — 下の `fonts`)。
+#               例外: fonts/*.ttf とそのライセンス文は追跡せず、ビルド時に
+#               上流の配布から tools/fetch_fonts.py が取る (ユーザー決定
+#               2026-09-30。IPAex は初回にライセンスの同意が要る — 下の `fonts`)。
 #    設定       人が書くもの。git で追跡する。
 #               filetypes, profile, profile_fdd, joyo_kanji.txt
 #    派生物     上流から生成できるもの。git では追跡せず、ここで作る。
@@ -16,22 +16,32 @@
 #  派生物を追跡しないのは、履歴上位の巨大 blob の大半がこれだったため。
 #  生成は数秒で終わる (FEP 辞書 5.8MB で 1 秒未満)。
 #
-#  TrueType フォントはゲストに配らない (ユーザー決定 2026-09-30): 日本語
-#  OpenType は配布物に同梱せず、使う人が別途置く。以前あった JIS X 0208 の
-#  サブセット TTF (tools/subset_font.py、ipaexg_subset.ttf) は廃止した。
+#  TrueType フォントはリポジトリに持たず、取得物から配備する (ユーザー決定
+#  2026-09-30)。ゲストに配るのは GUI の標準 set (T7b-b3): JF ドット東雲ゴシック16
+#  と Inconsolata Regular の原本とライセンス文 (userland/deploy.yaml →
+#  /usr/share/fonts/)。IPAex は配備しない (比較と font_test の任意入力だけ)。
+#  以前あった JIS X 0208 のサブセット TTF (tools/subset_font.py) は廃止した。
 # ============================================================================
 
 FONT_DIR   = assets/fonts
 IPADIC_DIR = assets/ipadic
 
-# --- IPAex フォントの取得 (ビルド時ダウンロード) ---
-# 2 本は 1 回の実行で揃う (grouped target `&:`、GNU make 4.3 以上)。揃っていて
-# SHA-256 が合えば fetch_fonts.py は何も聞かず mtime だけ更新する。未取得なら
-# ライセンス全文を出して同意を聞く (端末が無ければ OS32_ACCEPT_IPA_LICENSE=1 で
-# 非対話に同意)。失敗のときは案内を make の失敗文の直前にもう 1 度出す。
-FONT_TTFS = $(FONT_DIR)/ipaexg.ttf $(FONT_DIR)/ipaexm.ttf
+# --- フォントの取得 (ビルド時ダウンロード) ---
+# 家族ごとに 1 回の実行で揃う (grouped target `&:`、GNU make 4.3 以上)。揃っていて
+# SHA-256 が合えば fetch_fonts.py は何も聞かず mtime だけ更新する。
+#
+# IPAex: 未取得ならライセンス全文を出して同意を聞く (端末が無ければ
+# OS32_ACCEPT_IPA_LICENSE=1 で非対話に同意)。失敗のときは案内を make の失敗文の
+# 直前にもう 1 度出す。
+IPAEX_TTFS = $(FONT_DIR)/ipaexg.ttf $(FONT_DIR)/ipaexm.ttf
+# GUI の標準 set (T7b-b3、配備する)。名前は fetch_fonts.py の取得物、ゲスト側の
+# 置き場は font crate の paths.rs (FONT_DIR / FONT_JA / FONT_LATIN) が正典 [C4]。
+INCONSOLATA_FILES = $(FONT_DIR)/Inconsolata-Regular.ttf $(FONT_DIR)/Inconsolata-OFL.txt
+JFDOT_FILES = $(FONT_DIR)/JF-Dot-Shinonome16.ttf $(FONT_DIR)/JF-Dot-Shinonome16-LICENSE.txt
+GUI_FONT_FILES = $(INCONSOLATA_FILES) $(JFDOT_FILES)
+FONT_TTFS = $(IPAEX_TTFS) $(FONT_DIR)/Inconsolata-Regular.ttf $(FONT_DIR)/JF-Dot-Shinonome16.ttf
 
-$(FONT_TTFS) &: tools/fetch_fonts.py
+$(IPAEX_TTFS) &: tools/fetch_fonts.py
 	@python3 tools/fetch_fonts.py $(FONT_FETCH_FLAGS) || { rc=$$?; \
 	  if [ $$rc -eq 2 ]; then \
 	    echo "*** フォント未取得: \`make fonts\` でライセンスに同意して取得するか、OS32_ACCEPT_IPA_LICENSE=1 を付けて非対話で同意" >&2; \
@@ -39,13 +49,24 @@ $(FONT_TTFS) &: tools/fetch_fonts.py
 	    echo "*** フォント取得失敗 (tools/fetch_fonts.py rc=$$rc): 上の理由を見る。オフラインなら zip を手で置いて \`python3 tools/fetch_fonts.py --zip PATH\`" >&2; \
 	  fi; exit $$rc; }
 
-fonts: $(FONT_TTFS)
-	@echo "=== IPAex フォント 2 本 ($(FONT_DIR)/) ==="
+# Inconsolata (OFL) / JF ドット東雲16 (東雲フォントライセンス) は同意の確認なし。
+# オフラインでは FONT_FETCH_INCONSOLATA_FLAGS="--zip PATH --ofl PATH" /
+# FONT_FETCH_JFDOT_FLAGS="--zip PATH" で手で取った配布物を渡す。
+$(INCONSOLATA_FILES) &: tools/fetch_fonts.py
+	@python3 tools/fetch_fonts.py --family inconsolata $(FONT_FETCH_INCONSOLATA_FLAGS) || { rc=$$?; \
+	  echo "*** Inconsolata 取得失敗 (tools/fetch_fonts.py rc=$$rc): オフラインなら FONT_FETCH_INCONSOLATA_FLAGS=\"--zip PATH --ofl PATH\"" >&2; exit $$rc; }
+
+$(JFDOT_FILES) &: tools/fetch_fonts.py
+	@python3 tools/fetch_fonts.py --family jfdot-shinonome16 $(FONT_FETCH_JFDOT_FLAGS) || { rc=$$?; \
+	  echo "*** JF ドット東雲16 取得失敗 (tools/fetch_fonts.py rc=$$rc): オフラインなら FONT_FETCH_JFDOT_FLAGS=\"--zip PATH\"" >&2; exit $$rc; }
+
+fonts: $(FONT_TTFS) $(GUI_FONT_FILES)
+	@echo "=== フォント (IPAex 2 本 + GUI 標準 set、$(FONT_DIR)/) ==="
 
 # 取得した ttf と同意の記録は `make clean` (clean-assets) では消さない (ユーザー指示
 # 2026-09-30: ライセンスの確認は初回ビルドの 1 回だけ)。消すのはこの明示の目標だけ。
 fonts-clean:
-	rm -f $(FONT_TTFS) $(FONT_DIR)/*.ttf.part $(FONT_DIR)/.license_accepted
+	rm -f $(FONT_TTFS) $(GUI_FONT_FILES) $(FONT_DIR)/*.part $(FONT_DIR)/.license_accepted
 
 # --- 旧ビットマップ形式: host 画面比較 fixture 専用 (配布しない) ---
 # 本文用はゴシック。明朝は 16x16 だと細い横画が飛ぶ (CLAUDE.md の Known Gotchas)。
@@ -91,8 +112,8 @@ $(SETTINGS_V2_FIXTURE): $(SETTINGS_TSV) tools/mk_settings_db.py FORCE
 	@mkdir -p $(dir $@)
 	python3 tools/mk_settings_db.py --tsv $(SETTINGS_TSV) --out $@ --schema-version 2
 
-# 配備に必要な最小限。make all はこれに依存する。
-ASSETS_DEPLOYED = assets/fep.db
+# 配備に必要な最小限。make all はこれに依存する (GUI の標準 font set は取得物)。
+ASSETS_DEPLOYED = assets/fep.db $(GUI_FONT_FILES)
 
 # 開発時に使うものも含めた全部。
 # settings.db は通常配備の対象ではない (媒体だけが持つ) ので ASSETS_DEPLOYED
@@ -110,7 +131,8 @@ assets-deployed: $(ASSETS_DEPLOYED)
 assets-all: $(ASSETS_ALL)
 	@echo "=== 派生アセット $(words $(ASSETS_ALL)) 件 ==="
 
+# 取得したフォント (GUI_FONT_FILES) は消さない (fonts-clean だけが消す)。
 clean-assets:
-	rm -f $(ASSETS_ALL)
+	rm -f $(filter-out $(GUI_FONT_FILES),$(ASSETS_ALL))
 
 .PHONY: fonts fonts-clean assets-deployed assets-all clean-assets

@@ -97,4 +97,5 @@ check-trim-flow-host:
 - tools/tests/kernel_layout.py
 - kernel/kaudit_boot.c
 - kernel/memory_boot.c
+- tools/fetch_fonts.py
 artifact_reader: true

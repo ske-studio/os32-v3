@@ -4,6 +4,7 @@ check-tools-host:
 - assets/settings/defaults.tsv
 - build/core.yaml
 - build/packages.yaml
+- build/assets.mk
 - fs/vfs.c
 - lib/microtar/microtar.c
 - tools/deploy_manifests.py

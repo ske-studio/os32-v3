@@ -9,7 +9,11 @@
     置き先に何も残さない)。
   * .license_accepted の扱い — 同意したら書く、あれば聞かない、別のライセンス文の
     記録なら聞き直す。
-  * 揃っていれば聞かず・取らず mtime だけ更新する。--force は取り直す。
+  * 揃っていれば聞かず・取らず、fetch_fonts.py より古いときだけ mtime を更新する。
+    --force は取り直す。
+  * T7b-b3: GUI の標準 set の配備 — deploy.yaml の 4 行・build/assets.mk の取得規則
+    が fetch_fonts の名前と font crate の paths.rs (置き場) に合っているか
+    (--mutate で deploy.yaml の写しを変えて RED を見る)。
 
 取得は fetch= で差し替え、zip は temp dir に偽物 (MEMBERS / ZIP_SHA256 を
 差し替えて照合が通る形) を作る。実ネットワーク・実 assets/fonts には触れない。
@@ -292,6 +296,14 @@ class FetchFontsTest(unittest.TestCase):
         self.assertFalse(os.path.exists(self.accepted_path()))
         for n in ("ipaexg.ttf", "ipaexm.ttf"):
             self.assertGreater(os.stat(self.font_path(n)).st_mtime, 1000000000)  # touch した
+        # 既に fetch_fonts.py より新しければ触らない (T7b-b3: 配備の入力の mtime を動かさない)。
+        fresh = os.stat(SCRIPT).st_mtime + 100
+        for n in ("ipaexg.ttf", "ipaexm.ttf"):
+            os.utime(self.font_path(n), (fresh, fresh))
+        rc, out, err = self.run_script(stdin=PipeIn(""))
+        self.assertEqual(rc, 0, err)
+        for n in ("ipaexg.ttf", "ipaexm.ttf"):
+            self.assertEqual(os.stat(self.font_path(n)).st_mtime, fresh)
 
     def test_present_but_wrong_content_refetches(self):
         with open(self.font_path("ipaexg.ttf"), "wb") as f:
@@ -575,6 +587,75 @@ class FontVendorTest(unittest.TestCase):
                          manifest_path.parent.resolve())
 
 
+DEPLOY_YAML = ROOT / "userland" / "deploy.yaml"
+ASSETS_MK = ROOT / "build" / "assets.mk"
+PATHS_RS = ROOT / "userland" / "lib" / "font" / "src" / "paths.rs"
+DEPLOY_SOURCE = None  # check_mutations() が差し替える (本物は書き換えない)
+
+
+class GuiFontDeployTest(unittest.TestCase):
+    """T7b-b3: GUI の標準 set は取得物の名前のまま、font crate の置き場へ配る。"""
+
+    def setUp(self):
+        import yaml
+        self.mod = load_module()
+        text = DEPLOY_YAML.read_text() if DEPLOY_SOURCE is None else DEPLOY_SOURCE
+        self.files = yaml.safe_load(text)["filesystem"]["files"]
+        paths = PATHS_RS.read_text()
+        import re
+        self.font_dir = re.search(r'macro_rules! font_dir \{\s*\(\) => \{\s*"([^"]+)"', paths).group(1)
+        self.ja = re.search(r'pub const FONT_JA: &str = concat!\(font_dir!\(\), "/([^"]+)"\)', paths).group(1)
+        self.latin = re.search(r'pub const FONT_LATIN: &str = concat!\(font_dir!\(\), "/([^"]+)"\)', paths).group(1)
+
+    def fetched_names(self):
+        m = self.mod
+        return ([name for name, _ in m.INCONSOLATA_MEMBERS.values()] + [m.OFL_NAME]
+                + [name for name, _ in m.JFDOT_MEMBERS.values()] + [m.JFDOT_LICENSE_NAME])
+
+    def test_standard_set_is_deployed_to_the_font_crate_dir(self):
+        names = self.fetched_names()
+        self.assertEqual(set(names), {self.ja, self.latin, "Inconsolata-OFL.txt",
+                                      "JF-Dot-Shinonome16-LICENSE.txt"},
+                         "paths.rs の名前と fetch_fonts の取得物が違う")
+        rows = {e["host"]: e for e in self.files if e["host"].startswith("assets/fonts/")}
+        self.assertEqual(set(rows), {"assets/fonts/" + n for n in names},
+                         "配る font は標準 set の 4 本だけ (IPAex は配らない)")
+        for host, e in rows.items():
+            self.assertEqual(e["guest"].rstrip("/"), self.font_dir, host)
+            self.assertEqual(e.get("tags"), ["gui"], host)
+
+    def test_build_fetches_what_is_deployed(self):
+        mk = ASSETS_MK.read_text()
+        for name in self.fetched_names():
+            self.assertIn("$(FONT_DIR)/" + name, mk)
+        self.assertRegex(mk, r"ASSETS_DEPLOYED = assets/fep.db \$\(GUI_FONT_FILES\)")
+        self.assertIn("--family inconsolata", mk)
+        self.assertIn("--family jfdot-shinonome16", mk)
+        self.assertIn("$(filter-out $(GUI_FONT_FILES),$(ASSETS_ALL))", mk,
+                      "make clean が取得したフォントを消す")
+
+
+def check_deploy_mutations():
+    global DEPLOY_SOURCE
+    source = DEPLOY_YAML.read_text()
+    mutations = [
+        ("deploy-guest-data", "    - host: assets/fonts/JF-Dot-Shinonome16.ttf\n      guest: /usr/share/fonts/",
+         "    - host: assets/fonts/JF-Dot-Shinonome16.ttf\n      guest: /data/"),
+        ("deploy-drops-license", "    - host: assets/fonts/Inconsolata-OFL.txt\n      guest: /usr/share/fonts/\n      tags: [gui]\n",
+         ""),
+    ]
+    for name, old, new in [("control", "filesystem:", "filesystem:")] + mutations:
+        if source.count(old) != 1:
+            raise AssertionError("mutation anchor: " + name)
+        DEPLOY_SOURCE = source.replace(old, new, 1)
+        suite = unittest.defaultTestLoader.loadTestsFromTestCase(GuiFontDeployTest)
+        result = unittest.TextTestRunner(stream=io.StringIO()).run(suite)
+        if result.errors or result.wasSuccessful() != (name == "control"):
+            raise AssertionError((name, result.errors, result.failures))
+        print("MUTATE %s: %s" % (name, "GREEN" if name == "control" else "RED"))
+    DEPLOY_SOURCE = None
+
+
 def check_mutations():
     # Run the same behavioral tests against compiled copies; never edit production.
     global MUTATION_SOURCE
@@ -607,3 +688,4 @@ if __name__ == "__main__":
         sys.exit(1)
     if mutations_requested:
         check_mutations()
+        check_deploy_mutations()

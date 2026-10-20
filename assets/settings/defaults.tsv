@@ -21,3 +21,5 @@
 gshell	desktop/color	int	12
 gshell	desktop/wallpaper	text	
 gshell	taskbar/clock_24h	int	1
+gshell	font_set	int	0
+gshell	font/gen	int	0

@@ -17,7 +17,8 @@ zip/TTF の SHA-256 を照合し、固定した東雲ライセンス全文を添
 
 既定 (IPAex) の流れ:
   1. assets/fonts/ipaexg.ttf と ipaexm.ttf が両方あって SHA-256 が合えば、
-     何も聞かず・何も取らずに mtime だけ更新して rc=0 (make の依存を満たす)。
+     何も聞かず・何も取らずに rc=0。fetch_fonts.py より古いものだけ mtime を
+     更新する (make の依存を満たす。新しいものは触らない — 配備の入力なので)。
   2. 無い (または --force) ならライセンスの同意を確かめる:
        - assets/fonts/.license_accepted に同じライセンス文の SHA-256 が記録済み → 同意済み
        - OS32_ACCEPT_IPA_LICENSE=1                                          → 同意 (非対話)
@@ -283,7 +284,7 @@ def run_inconsolata(args, stdout, stderr, fetch):
         return RC_OK if valid else RC_FETCH
     if valid and not args.force:
         for name, _ in members.values():
-            os.utime(os.path.join(args.font_dir, name), None)
+            touch_if_stale(os.path.join(args.font_dir, name))
         return RC_OK
     try:
         fetch_fn = download if fetch is None else fetch
@@ -323,7 +324,7 @@ def run_jfdot(args, stdout, stderr, fetch):
         return RC_OK if valid else RC_FETCH
     if valid and not args.force:
         for name, _ in members.values():
-            os.utime(os.path.join(args.font_dir, name), None)
+            touch_if_stale(os.path.join(args.font_dir, name))
         return RC_OK
     try:
         if args.zip:
@@ -340,9 +341,17 @@ def run_jfdot(args, stdout, stderr, fetch):
     return RC_OK
 
 
+def touch_if_stale(path):
+    """make の依存 (tools/fetch_fonts.py) より古いときだけ mtime を進める。
+    T7b-b3 から GUI の標準 set は配備の入力なので、揃っている取得物を毎回 touch
+    すると作った媒体が入力より古く見える (check_artifacts.require_fresh)。"""
+    if os.stat(path).st_mtime < os.stat(os.path.abspath(__file__)).st_mtime:
+        os.utime(path, None)
+
+
 def touch_fonts(font_dir):
     for _, (name, _) in MEMBERS.items():
-        os.utime(os.path.join(font_dir, name), None)
+        touch_if_stale(os.path.join(font_dir, name))
 
 
 def run(argv, environ=None, stdin=None, stdout=None, stderr=None, fetch=None):

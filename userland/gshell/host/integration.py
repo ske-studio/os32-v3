@@ -27,6 +27,24 @@ os.environ['OUT_DIR'] = str(OUT)
 os.environ['CARGO_MANIFEST_DIR'] = str(ROOT/'userland/gshell')
 run([str(OUT/'diag-build')])
 
+# T7b-b3 S3: the product font crate (os32-font + its vendored ttf-parser) as a
+# host rlib (tools/tests/os32api_host.py, shared with test_gui_desc.py).
+FONT_RLIB, FONT_DEPS = os32api_host.build_font()
+
+# The real standard set for text_tests/font_tests (same fetch path as the deploy:
+# pinned SHA-256; --zip for the JF archive when it is cached locally). No SKIP.
+FONT_DIR = ROOT / 'assets/fonts'
+# Only fetch when missing: a cache hit would touch the deployed fonts and make
+# the built images look older than their inputs (check_artifacts.require_fresh).
+def _fetch(family, *extra):
+    cmd = [sys.executable, '-B', str(ROOT / 'tools/fetch_fonts.py'), '--family', family]
+    if subprocess.run(cmd + ['--check'], cwd=ROOT).returncode != 0:
+        run(cmd + list(extra))
+_fetch('inconsolata')
+_jf_zip = Path.home() / 'os32-tmp/run/shinonome/sources/jfdotfont-20150527.zip'
+_fetch('jfdot-shinonome16', *(['--zip', str(_jf_zip)] if _jf_zip.exists() else []))
+os.environ['OS32_GSHELL_FONT_DIR'] = str(FONT_DIR)
+
 
 def build(gshell: Path, name: str, quiet: bool = False) -> Path:
     """gshell の src/lib.rs を試験用の根に書き換えて rustc --test でビルドする。"""
@@ -37,7 +55,8 @@ def build(gshell: Path, name: str, quiet: bool = False) -> Path:
     rs = OUT / (name + '_root.rs')
     rs.write_text(root)
     exe = OUT / (name + '-tests')
-    args = ['rustc', '--edition=2021', '--test', str(rs), '-L', str(OUT), '--extern', 'os32api='+str(OUT/'libos32api.rlib'), '-o', str(exe)]
+    args = ['rustc', '--edition=2021', '--test', str(rs), '-L', str(OUT), '--extern', 'os32api='+str(OUT/'libos32api.rlib'),
+            '-L', 'dependency='+str(FONT_DEPS), '--extern', 'os32_font='+str(FONT_RLIB), '-o', str(exe)]
     if quiet:
         subprocess.run(args, cwd=ROOT, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
@@ -392,6 +411,33 @@ MUTATIONS = [
      '    if version < SHELL_SERVICE_VERSION {\n        return ShellServiceState::OldShell;\n    }\n',
      '',
      'shell_service_aux_is_checked_before_use'),
+    # T7b-b3 S3 (設計 t7bb34 §2-3・§2-5・§3-2、§5 b3②③・b4④)。
+    ('font change does not deliver EV_FONT', 'src/font.rs',
+     '    deliver_ev_font(st);\n', '',
+     't7b3_font_change_delivers_ev_font_to_every_tracked_app'),
+    ('font/gen not bumped on save', 'src/settings.rs',
+     'let font_gen = s().base_font_gen.wrapping_add(1);', 'let font_gen = s().base_font_gen;',
+     'f02_font_row_saves_font_set_and_bumps_gen_once_then_applies'),
+    ('lease closed inside the x87 guard', 'src/font.rs',
+     '    if font.in_guard {', '    if false {',
+     'f13_engine_open_failure_inside_guard_defers_the_close'),
+    ('failed retry re-arms itself', 'src/font.rs',
+     'if open_set(st, font_set, false) == 0 {', 'if open_set(st, font_set, true) == 0 {',
+     'f12_open_failures_pick_the_reason_and_retry_once'),
+    ('yen drawn from the TTF', 'src/text.rs',
+     ' && ank != ANK_YEN {', ' {', 't01_route_keeps_the_kcg_width_rules'),
+    ('row clip off by one', 'src/text.rs',
+     '    let row0 = r.y - cy;', '    let row0 = r.y - cy + 1;',
+     't03_clip_cuts_rows_by_pointer_and_columns_by_mask'),
+    ('column clip off by one', 'src/text.rs',
+     '    while c < c1 {', '    while c <= c1 {',
+     't03_clip_cuts_rows_by_pointer_and_columns_by_mask'),
+    ('glyph leaves the half cell', 'src/text.rs',
+     'let wmask: u16 = if w >= 16 { 0xFFFF } else { 0xFF00 };', 'let wmask: u16 = 0xFFFF;',
+     't06_cell_from_glyph_places_by_ascent_and_drops_outside_the_cell'),
+    ('text checks the lease per glyph', 'src/font.rs',
+     '    if !font.engine.begin() {\n        /* Stale', '    if !font.engine.begin() || !font.engine.begin() {\n        /* Stale',
+     'f14_text_checks_once_and_guards_only_on_miss'),
 ]
 
 

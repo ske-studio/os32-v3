@@ -118,12 +118,56 @@ pub extern "C" fn unicode_to_ank(cp: u32) -> u8 {
         _ => 0,
     }
 }
-unsafe extern "C" fn ank(_: u8, p: *mut u8) {
+/* T7b-b3: text.rs の描画口。呼出しを記録し、画素も置く (透過、1bpp MSB 左)。 */
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FontDraw {
+    pub x: i32,
+    pub y: i32,
+    pub w_bytes: i32,
+    pub h_lines: i32,
+    pub fg: u8,
+    pub pat: Vec<u8>,
+}
+pub static FONT_DRAWS: Mutex<Vec<FontDraw>> = Mutex::new(Vec::new());
+pub fn font_draws() -> Vec<FontDraw> {
+    lk(&FONT_DRAWS).clone()
+}
+#[no_mangle]
+pub unsafe extern "C" fn gfx_draw_font(x: i32, y: i32, pat: *const u8, w_bytes: i32, h_lines: i32, fg: u8) {
+    let n = (w_bytes.max(0) * h_lines.max(0)) as usize;
+    let bytes = std::slice::from_raw_parts(pat, n).to_vec();
+    for row in 0..h_lines {
+        for b in 0..w_bytes {
+            let v = bytes[(row * w_bytes + b) as usize];
+            for col in 0..8 {
+                if v & (0x80 >> col) != 0 {
+                    gfx_pixel(x + b * 8 + col, y + row, fg);
+                }
+            }
+        }
+    }
+    lk(&FONT_DRAWS).push(FontDraw { x, y, w_bytes, h_lines, fg, pat: bytes });
+}
+/* KCG の ROM の代わり (0xa5 埋め)。どの字を引いたかは KCG_READS に残す。 */
+pub static KCG_READS: Mutex<Vec<(char, u16)>> = Mutex::new(Vec::new());
+pub fn kcg_reads() -> Vec<(char, u16)> {
+    lk(&KCG_READS).clone()
+}
+unsafe extern "C" fn unicode_to_jis(cp: u32) -> u16 {
+    match cp {
+        0x4E9C => 0x3021, /* 亜 */
+        0x3042 => 0x2422, /* あ */
+        _ => 0,
+    }
+}
+unsafe extern "C" fn ank(c: u8, p: *mut u8) {
     READS.fetch_add(1, Ordering::SeqCst);
+    lk(&KCG_READS).push(('a', c as u16));
     std::ptr::write_bytes(p, 0xa5, 16);
 }
-unsafe extern "C" fn kanji(_: u16, p: *mut u8) {
+unsafe extern "C" fn kanji(j: u16, p: *mut u8) {
     READS.fetch_add(1, Ordering::SeqCst);
+    lk(&KCG_READS).push(('k', j));
     std::ptr::write_bytes(p, 0xa5, 32);
 }
 unsafe extern "C" fn alloc(n: u32) -> *mut u8 {
@@ -491,6 +535,9 @@ pub struct CfgFake {
     pub color: Option<i32>,
     /// `taskbar/clock_24h` の値 (同上)。
     pub clock: Option<i32>,
+    /// `font_set` / `font/gen` の値 (同上、T7b-b3)。
+    pub font_set: Option<i32>,
+    pub font_gen: Option<i32>,
     pub begin_ret: i32,
     pub set_ret: i32,
     /// `cfg_set_int` を**呼び出しごとに**この列で返す (尽きたら [`CfgFake::set_ret`])。
@@ -514,6 +561,8 @@ impl CfgFake {
         schema: 1,
         color: None,
         clock: None,
+        font_set: None,
+        font_gen: None,
         begin_ret: 0,
         set_ret: 0,
         set_ret_script: Vec::new(),
@@ -614,6 +663,10 @@ pub unsafe extern "C" fn cfg_get_int(
         c.color
     } else if k == b"taskbar/clock_24h" {
         c.clock
+    } else if k == b"font_set" {
+        c.font_set
+    } else if k == b"font/gen" {
+        c.font_gen
     } else {
         None
     };
@@ -920,6 +973,9 @@ pub fn init() {
     a.ime_feed_key = ime_idle;
     a.kcg_read_ank = ank;
     a.kcg_read_kanji = kanji;
+    a.unicode_to_jis = unicode_to_jis;
+    lk(&FONT_DRAWS).clear();
+    lk(&KCG_READS).clear();
     a.mem_alloc = alloc;
     a.mem_free = free;
     a.gfx_add_dirty_rect = dirty;
@@ -996,6 +1052,9 @@ pub fn init() {
     crate::taskbar::reset();
     crate::multiapp::reset();
     os32api::os32_init(Box::into_raw(Box::new(a)));
+    /* T7b-b3: font engine (lease は表が無ければ閉じに行かない)。 */
+    unsafe { __os32_aux = core::ptr::null() };
+    crate::font::reset();
     clear(9);
 }
 
@@ -1021,4 +1080,186 @@ unsafe extern "C" fn screen_info(out: *mut u8) {
     let mut info = os32api::gui::types::ScreenInfo::ZERO;
     info.width = 640; info.height = 400; info.bpp = 4;
     *(out as *mut os32api::gui::types::ScreenInfo) = info;
+}
+
+/* ================================================================ */
+/*  T7b-b3 S3: shell service 表 v2 の贋物 (font の lease と guard)     */
+/*                                                                  */
+/*  lease は実ファイル (OS32_GSHELL_FONT_DIR の標準 set、integration */
+/*  .py が fetch_fonts で揃える) を名前の basename で開く。guard は   */
+/*  callback を 1 回呼ぶだけで、その中で read_at 以外が呼ばれたら     */
+/*  `violations` に数える (kernel/font_guard.h の約束)。               */
+/* ================================================================ */
+pub mod fontsvc {
+    use super::lk;
+    use crate::ffi::{ShellService, SHELL_SERVICE_MAGIC, SHELL_SERVICE_VERSION};
+    use std::collections::HashMap;
+    use std::sync::{Arc, Mutex};
+
+    pub const ERR_IO: i32 = -1;
+
+    #[derive(Default)]
+    pub struct Fake {
+        /// id - 1 → 開いている lease の中身 (None = 閉じた)。
+        pub leases: Vec<Option<Arc<Vec<u8>>>>,
+        /// (呼んだ入口, guard の中だったか)。
+        pub calls: Vec<(&'static str, bool)>,
+        pub in_guard: bool,
+        /// guard の中で read_at 以外を呼んだ回数。
+        pub violations: usize,
+        /// basename がこれで終わる path の open を rc で断る。
+        pub open_fail: Option<(&'static str, i32)>,
+        /// read_at を全部 ERR_IO にする。
+        pub read_fail: bool,
+        /// validate の答え (0 = OK)。
+        pub validate_ret: i32,
+        /// guard を callback を呼ばずにこの rc で返す。
+        pub guard_ret: Option<i32>,
+        pub reads: usize,
+    }
+    pub static FAKE: Mutex<Option<Fake>> = Mutex::new(None);
+    static FILES: Mutex<Option<HashMap<String, Arc<Vec<u8>>>>> = Mutex::new(None);
+
+    pub fn with<R>(f: impl FnOnce(&mut Fake) -> R) -> R {
+        let mut g = lk(&FAKE);
+        f(g.get_or_insert_with(Fake::default))
+    }
+    /// 開いている lease の本数。
+    pub fn open_count() -> usize {
+        with(|f| f.leases.iter().filter(|l| l.is_some()).count())
+    }
+    pub fn calls() -> Vec<(&'static str, bool)> {
+        with(|f| f.calls.clone())
+    }
+    pub fn count(op: &str) -> usize {
+        with(|f| f.calls.iter().filter(|c| c.0 == op).count())
+    }
+
+    fn file(name: &str) -> Option<Arc<Vec<u8>>> {
+        let mut g = lk(&FILES);
+        let map = g.get_or_insert_with(HashMap::new);
+        if let Some(v) = map.get(name) {
+            return Some(v.clone());
+        }
+        let dir = std::env::var("OS32_GSHELL_FONT_DIR").ok()?;
+        let bytes = std::fs::read(std::path::Path::new(&dir).join(name)).ok()?;
+        let v = Arc::new(bytes);
+        map.insert(name.to_string(), v.clone());
+        Some(v)
+    }
+
+    fn note(f: &mut Fake, op: &'static str) {
+        let g = f.in_guard;
+        f.calls.push((op, g));
+        if g && op != "read_at" {
+            f.violations += 1;
+        }
+    }
+
+    unsafe extern "C" fn open(path: *const u8, out_id: *mut u32, out_size: *mut u32) -> i32 {
+        let mut n = 0;
+        while *path.add(n) != 0 {
+            n += 1;
+        }
+        let p = std::str::from_utf8(std::slice::from_raw_parts(path, n)).unwrap().to_string();
+        let base = p.rsplit('/').next().unwrap().to_string();
+        let fail = with(|f| {
+            note(f, "open");
+            f.open_fail.filter(|(s, _)| base.ends_with(s)).map(|(_, rc)| rc)
+        });
+        if let Some(rc) = fail {
+            return rc;
+        }
+        let data = match file(&base) {
+            Some(d) => d,
+            None => return -2,
+        };
+        with(|f| {
+            f.leases.push(Some(data.clone()));
+            *out_id = f.leases.len() as u32;
+        });
+        *out_size = data.len() as u32;
+        0
+    }
+    unsafe extern "C" fn read_at(id: u32, off: u32, dst: *mut u8, len: u32) -> i32 {
+        let data = with(|f| {
+            note(f, "read_at");
+            f.reads += 1;
+            if f.read_fail {
+                return Err(ERR_IO);
+            }
+            f.leases.get(id as usize - 1).cloned().flatten().ok_or(-11)
+        });
+        let data = match data {
+            Ok(d) => d,
+            Err(rc) => return rc,
+        };
+        let off = off as usize;
+        if off > data.len() {
+            return -9;
+        }
+        let n = (len as usize).min(data.len() - off);
+        std::ptr::copy_nonoverlapping(data.as_ptr().add(off), dst, n);
+        n as i32
+    }
+    unsafe extern "C" fn validate(id: u32) -> i32 {
+        with(|f| {
+            note(f, "validate");
+            if f.leases.get(id as usize - 1).map_or(true, |l| l.is_none()) {
+                return -11;
+            }
+            f.validate_ret
+        })
+    }
+    unsafe extern "C" fn close(id: u32) -> i32 {
+        with(|f| {
+            note(f, "close");
+            match f.leases.get_mut(id as usize - 1) {
+                Some(l) if l.is_some() => {
+                    *l = None;
+                    0
+                }
+                _ => -11,
+            }
+        })
+    }
+    unsafe extern "C" fn guard(
+        call: Option<unsafe extern "C" fn(*mut u8) -> i32>,
+        ctx: *mut u8,
+    ) -> i32 {
+        let early = with(|f| {
+            note(f, "guard");
+            f.guard_ret
+        });
+        if let Some(rc) = early {
+            return rc;
+        }
+        with(|f| f.in_guard = true);
+        let rc = match call {
+            Some(c) => c(ctx),
+            None => -9,
+        };
+        with(|f| f.in_guard = false);
+        rc
+    }
+
+    pub static mut TABLE: ShellService = ShellService {
+        magic: SHELL_SERVICE_MAGIC,
+        version: SHELL_SERVICE_VERSION,
+        generation: 1,
+        font_source_open: Some(open),
+        font_source_read_at: Some(read_at),
+        font_source_validate: Some(validate),
+        font_source_close: Some(close),
+        font_guard_run: Some(guard),
+    };
+
+    /// 贋物を空にして `__os32_aux` に表を置く (`version` で古い表も作れる)。
+    pub fn install(version: u32) {
+        *lk(&FAKE) = Some(Fake::default());
+        unsafe {
+            TABLE.version = version;
+            super::__os32_aux = core::ptr::addr_of!(TABLE) as *const core::ffi::c_void;
+        }
+    }
 }

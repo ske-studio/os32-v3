@@ -1,0 +1,253 @@
+//! font_tests.rs — T7b-b3 S3: gshell の font engine の持ち主 (src/font.rs) のホスト TDD。
+//!
+//! service 表 v2 は `mocks::fontsvc` の贋物で、lease は実物の標準 set
+//! (JF-Dot-Shinonome16 / Inconsolata Regular、integration.py が fetch_fonts で揃える)。
+//! 見るもの:
+//! - lease の open/close は guard の外、guard の中は read_at だけ (b12 §3-3)
+//! - 失敗の理由 (NoFpu / OldShell / OpenFailed / Nospc / Busy / Config / Stale) と後始末
+//! - 失敗の再試行は次の consume で 1 回だけ
+//! - text() の入口: 検証は face ごとに 1 回、cache に無いときだけ guard を 1 回
+//! - trim: cache は空になり arena と lease は残る、次の描画で作り直す (b3④)
+use super::*;
+use crate::mocks::{self, fontsvc};
+use crate::{settings, text, wm};
+use os32_font::engine::{Reason, State};
+
+fn bare() -> wm::GuiState {
+    mocks::init();
+    let mut st = wm::GuiState::NEW;
+    st.screen_w = 640;
+    st.screen_h = 400;
+    st
+}
+
+/// 表を置いて標準 set を開く。
+fn opened() -> wm::GuiState {
+    let st = bare();
+    fontsvc::install(SHELL_VERSION);
+    assert_eq!(open_at_safe_point(&st, 0), 0, "標準 set が開けない");
+    st
+}
+
+const SHELL_VERSION: u32 = crate::ffi::SHELL_SERVICE_VERSION;
+
+fn kprinted(needle: &[u8]) -> bool {
+    mocks::kprint_lines().iter().any(|l| l.windows(needle.len()).any(|w| w == needle))
+}
+
+#[test]
+fn f10_open_uses_leases_outside_guard_and_reads_only_inside() {
+    let _st = opened();
+    assert_eq!(engine().state(), State::Ready);
+    assert_eq!(engine().set_slot(), 1);
+    assert_eq!(fontsvc::open_count(), 2, "lease 2 本 (latin / ja)");
+    let calls = fontsvc::calls();
+    assert_eq!(&calls[..3], &[("open", false), ("open", false), ("guard", false)],
+               "open は guard の前、guard の外");
+    assert!(calls.iter().all(|c| c.1 == (c.0 == "read_at")),
+            "read_at は guard の中だけ、他は guard の外だけ: {calls:?}");
+    assert_eq!(fontsvc::with(|f| f.violations), 0);
+    assert!(engine().cache().has_arena(), "arena を付けていない");
+    let s = unsafe { gshell_font_stats };
+    assert_eq!((s.state, s.opens, s.open_fail, s.last_rc, s.set_slot), (ST_READY, 1, 0, 0, 1));
+    assert!(kprinted(b"font: gen 0->1 open=OK set=0 rc=0"), "open のログ");
+    /* 見本 1 字 ('亜') は東雲の bitmap (b3⑦ の比較材料)。 */
+    let sample = unsafe { gshell_font_sample };
+    assert_eq!((sample.cp, sample.kind), (0x4E9C, 1));
+    assert!(sample.width > 0 && sample.height > 0 && sample.bits.iter().any(|b| *b != 0));
+}
+
+#[test]
+fn f11_reopen_closes_old_leases_first_and_bumps_slot() {
+    let st = opened();
+    let n = fontsvc::calls().len();
+    assert_eq!(open_at_safe_point(&st, 0), 0);
+    let calls = fontsvc::calls();
+    assert_eq!(&calls[n..n + 4], &[("close", false), ("close", false), ("open", false), ("open", false)],
+               "旧 lease を閉じてから開く");
+    assert_eq!(fontsvc::open_count(), 2);
+    assert_eq!(engine().set_slot(), 2);
+    /* 設定で KCG のみ: lease を全部閉じ、開かない。 */
+    assert_eq!(open_at_safe_point(&st, 1), 0);
+    assert_eq!(engine().state(), State::KcgOnly(Reason::Config));
+    assert_eq!(fontsvc::open_count(), 0);
+    assert!(!retry_armed(), "設定の KCG は再試行しない");
+    /* 終了は全部閉じる。 */
+    assert_eq!(open_at_safe_point(&st, 0), 0);
+    close_all();
+    assert_eq!(fontsvc::open_count(), 0);
+    assert_eq!(engine().state(), State::Closed);
+}
+
+#[test]
+fn f12_open_failures_pick_the_reason_and_retry_once() {
+    /* ja の open 失敗: latin は guard の外で閉じ、次の consume で 1 回だけ開き直す。 */
+    let mut st = bare();
+    fontsvc::install(SHELL_VERSION);
+    fontsvc::with(|f| f.open_fail = Some(("Shinonome16.ttf", -2)));
+    assert_eq!(open_at_safe_point(&st, 0), -2);
+    assert_eq!(engine().state(), State::KcgOnly(Reason::OpenFailed));
+    assert_eq!(fontsvc::open_count(), 0, "開けた latin を閉じていない");
+    assert!(fontsvc::calls().iter().all(|c| !c.1), "guard に入っていない");
+    assert!(retry_armed());
+    assert!(consume_retry(&mut st), "再試行していない");
+    assert_eq!(fontsvc::count("open"), 4);
+    assert!(!retry_armed(), "再試行の失敗で再び予約した (1 回だけ)");
+    assert!(!consume_retry(&mut st));
+    /* 再試行で開ければ Ready。 */
+    fontsvc::with(|f| f.open_fail = None);
+    assert_eq!(open_at_safe_point(&st, 0), 0);
+    assert_eq!(engine().state(), State::Ready);
+
+    /* NOSPC (app の lease で埋まっている) も再試行の対象。 */
+    let st = bare();
+    fontsvc::install(SHELL_VERSION);
+    fontsvc::with(|f| f.open_fail = Some(("Regular.ttf", crate::ffi::OS32_ERR_NOSPC)));
+    open_at_safe_point(&st, 0);
+    assert_eq!(engine().state(), State::KcgOnly(Reason::Nospc));
+    assert!(retry_armed());
+
+    /* shell open の NOSYS = FPU 無し: 恒久、再試行しない。 */
+    let st = bare();
+    fontsvc::install(SHELL_VERSION);
+    fontsvc::with(|f| f.open_fail = Some(("Regular.ttf", crate::ffi::OS32_ERR_NOSYS)));
+    open_at_safe_point(&st, 0);
+    assert_eq!(engine().state(), State::KcgOnly(Reason::NoFpu));
+    assert!(!retry_armed());
+
+    /* guard の NOSYS: callback は走らず、lease は guard の外で閉じる。 */
+    let st = bare();
+    fontsvc::install(SHELL_VERSION);
+    fontsvc::with(|f| f.guard_ret = Some(crate::ffi::OS32_ERR_NOSYS));
+    open_at_safe_point(&st, 0);
+    assert_eq!(engine().state(), State::KcgOnly(Reason::NoFpu));
+    assert_eq!(fontsvc::open_count(), 0);
+    assert!(!retry_armed());
+
+    /* guard の BUSY: KcgOnly(Busy)、次の consume で 1 回。 */
+    let st = bare();
+    fontsvc::install(SHELL_VERSION);
+    fontsvc::with(|f| f.guard_ret = Some(crate::ffi::OS32_ERR_BUSY));
+    open_at_safe_point(&st, 0);
+    assert_eq!(engine().state(), State::KcgOnly(Reason::Busy));
+    assert_eq!(fontsvc::open_count(), 0);
+    assert!(retry_armed());
+
+    /* 版 1 の表: 開かず KcgOnly(OldShell)。表が無い (app と同じ 0): OpenFailed、再試行なし。 */
+    let st = bare();
+    fontsvc::install(SHELL_VERSION - 1);
+    open_at_safe_point(&st, 0);
+    assert_eq!(engine().state(), State::KcgOnly(Reason::OldShell));
+    assert_eq!(fontsvc::count("open"), 0);
+    let st = bare();
+    open_at_safe_point(&st, 0);
+    assert_eq!(engine().state(), State::KcgOnly(Reason::OpenFailed));
+    assert!(!retry_armed());
+}
+
+#[test]
+fn f13_engine_open_failure_inside_guard_defers_the_close() {
+    let st = bare();
+    fontsvc::install(SHELL_VERSION);
+    fontsvc::with(|f| f.read_fail = true);
+    assert!(open_at_safe_point(&st, 0) < 0);
+    assert_eq!(engine().state(), State::KcgOnly(Reason::OpenFailed));
+    assert_eq!(fontsvc::with(|f| f.violations), 0, "guard の中で close した");
+    assert_eq!(fontsvc::open_count(), 0, "Face::open の失敗で lease が残った");
+    let calls = fontsvc::calls();
+    let closes: Vec<_> = calls.iter().filter(|c| c.0 == "close").collect();
+    assert_eq!(closes.len(), 2);
+    assert!(closes.iter().all(|c| !c.1));
+}
+
+#[test]
+fn f14_text_checks_once_and_guards_only_on_miss() {
+    let _st = opened();
+    let clip = wm::Rect::new(0, 0, 640, 400);
+    let n_guard = fontsvc::count("guard");
+    let n_validate = fontsvc::count("validate");
+    text::draw(clip, 0, 0, "Ag亜あ¥".as_bytes(), 1, 0);
+    assert_eq!(fontsvc::count("validate") - n_validate, 2, "face ごとに 1 回");
+    assert_eq!(fontsvc::count("guard") - n_guard, 1, "miss の raster は guard 1 回");
+    assert_eq!(fontsvc::with(|f| f.violations), 0);
+    /* 2 回目は全部 hit: guard に入らず read_at もしない。 */
+    let reads = fontsvc::with(|f| f.reads);
+    text::draw(clip, 0, 20, "Ag亜あ¥".as_bytes(), 1, 0);
+    assert_eq!(fontsvc::count("guard") - n_guard, 1, "hit で guard に入った");
+    assert_eq!(fontsvc::with(|f| f.reads), reads, "hit で read_at した");
+    /* TTF に行った字は KCG を引かない (¥ は ROM の ANK)。 */
+    assert_eq!(mocks::kcg_reads(), vec![('a', 0x5C), ('a', 0x5C)]);
+    let s = unsafe { gshell_font_stats };
+    assert_eq!(s.texts, 2);
+    assert_eq!(s.over_slot, 0);
+    assert!(s.cache.hit_bitmap >= 4);
+}
+
+#[test]
+fn f15_guard_busy_draws_this_call_with_kcg_only() {
+    let _st = opened();
+    let clip = wm::Rect::new(0, 0, 640, 400);
+    fontsvc::with(|f| f.guard_ret = Some(crate::ffi::OS32_ERR_BUSY));
+    text::draw(clip, 0, 0, b"Q", 1, 0);
+    assert_eq!(mocks::kcg_reads(), vec![('a', b'Q' as u16)], "BUSY の回は KCG");
+    assert_eq!(engine().state(), State::Ready, "BUSY は恒久にしない");
+    assert_eq!(unsafe { gshell_font_stats }.cache.guard_busy, 1);
+    fontsvc::with(|f| f.guard_ret = None);
+    text::draw(clip, 0, 0, b"Q", 1, 0);
+    assert_eq!(mocks::kcg_reads().len(), 1, "次の回は TTF");
+    /* guard の NOSYS は以後ずっと KCG (lease は閉じる)。 */
+    fontsvc::with(|f| f.guard_ret = Some(crate::ffi::OS32_ERR_NOSYS));
+    text::draw(clip, 0, 0, b"Z", 1, 0);
+    assert_eq!(engine().state(), State::KcgOnly(Reason::NoFpu));
+    assert_eq!(fontsvc::open_count(), 0);
+}
+
+#[test]
+fn f16_stale_lease_falls_back_to_kcg_and_closes() {
+    let _st = opened();
+    let clip = wm::Rect::new(0, 0, 640, 400);
+    fontsvc::with(|f| f.validate_ret = os32api::gui::proto::OS32_ERR_STALE);
+    text::draw(clip, 0, 0, b"A", 1, 0);
+    assert_eq!(engine().state(), State::KcgOnly(Reason::Stale));
+    assert_eq!(mocks::kcg_reads(), vec![('a', b'A' as u16)]);
+    assert_eq!(fontsvc::open_count(), 0, "STALE の lease を閉じていない");
+    assert!(fontsvc::calls().iter().filter(|c| c.0 == "close").all(|c| !c.1));
+}
+
+#[test]
+fn f17_trim_empties_cache_keeps_arena_and_leases_then_rebuilds() {
+    let _st = opened();
+    let clip = wm::Rect::new(0, 0, 640, 400);
+    text::draw(clip, 0, 0, "Ag亜".as_bytes(), 1, 0);
+    let first = mocks::pixels();
+    assert!(engine().cache().n_valid() > 0);
+    assert!(trim());
+    assert_eq!(engine().cache().n_valid(), 0, "trim で cache が空にならない");
+    assert!(engine().cache().has_arena(), "trim で arena を手放した (gshell は固定 heap)");
+    assert_eq!(fontsvc::open_count(), 2, "trim で lease を閉じた");
+    mocks::clear(9);
+    let n_guard = fontsvc::count("guard");
+    text::draw(clip, 0, 0, "Ag亜".as_bytes(), 1, 0);
+    assert_eq!(fontsvc::count("guard") - n_guard, 1, "trim の後に作り直していない");
+    assert_eq!(mocks::pixels(), first, "trim の前後で字形が違う");
+    assert!(mocks::kcg_reads().is_empty());
+}
+
+#[test]
+fn f18_settings_change_reconfigures_through_consume() {
+    /* 起動時は標準 set、設定で KCG のみ → 標準に戻す: 毎回 close → open。 */
+    let mut st = opened();
+    mocks::cfg(|c| c.font_gen = Some(3));
+    settings::request_open();
+    settings::consume(&mut st);
+    for _ in 0..2 {
+        crate::modal::on_key(&mut st, 0x3D, 0, 0); /* ↓ */
+    }
+    crate::modal::on_key(&mut st, 0x3C, 0, 0); /* → (KCG のみ) */
+    assert!(crate::modal::on_key(&mut st, 0x1C, 0, 0)); /* RETURN */
+    settings::consume(&mut st);
+    assert_eq!(st.cfg.font_set, 1);
+    assert_eq!(engine().state(), State::KcgOnly(Reason::Config));
+    assert_eq!(fontsvc::open_count(), 0);
+    assert!(kprinted(b"font: gen 1->1 open=KCG(config) set=1"));
+}
