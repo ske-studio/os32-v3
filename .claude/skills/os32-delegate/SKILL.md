@@ -6,8 +6,8 @@ description: 段の実装 (または後片付け・ゲスト受入) を実装者
 # os32-delegate — 実装の依頼とレビューの依頼
 
 役の割り当ての正典は [ROLES §0](../../../docs/tasks/agents/ROLES.md) と [HANDOVER](../../../docs/tasks/agents/HANDOVER_2026-10-09.md) §2
-(2026-10-20 からの一時体制: 実装 = Opus (`model: opus`, general-purpose)、レビュー = Fable (`model: fable`)。
-通常は sol/astra (Codex) が実装し、ROLES §0 の組み合わせでレビュー)。**書き手とレビュアーは別のモデル。**
+(2026-10-21 に通常の体制へ戻した: 実装 = Codex (既定 sol、難所は astra)、sol の差分 → astra、astra の実装・設計票 → Opus reviewer。一時体制 (Fable/Opus) は終了)。
+Codex は ROLES §2 の `codex exec` の形で起動する。**書き手とレビュアーは別のモデル。**
 
 ## 1. 作業木
 
@@ -34,7 +34,7 @@ cp assets/fonts/ipaex*.ttf ~/wt/os32-v3/<名>/assets/fonts/   # 同意済みの 
 - ゲスト受入を含める段: 配備はスキル run-os32 (作業木の成果物)、GUI は os32-gui-drive、カーネルの入れ替えは hsync + emu_reset、
   rshell 中の ESC は rshell を閉じる (閉じたら emu_key で `rshell` + RETURN)、MCP の emu_gui_launch / consink は本体の ELF を引くので
   `OS32_KERNEL_ELF` / `OS32_GSHELL_ELF` で作業木の ELF を渡す、証拠は `~/os32-tmp/evidence/<日付>/<名>/RESULT.md` (項目ごとに 合格/不合格/未確認、PNG を自分で開いて見る)。
-- **設計の欠けが報告されたら** (ユーザー指示 2026-10-21): PM が実装を決めずに、設計者 (一時体制では Fable) に確定設計の追記として埋めさせ (os32-design-rally の差分依頼の形)、必要ならレビュアーに短く見せてから、同じ実装者に続きを頼む。
+- **設計の欠けが報告されたら** (ユーザー指示 2026-10-21): PM が実装を決めずに、設計者 (通常は astra) に確定設計の追記として埋めさせ (os32-design-rally の差分依頼の形)、必要ならレビュアーに短く見せてから、同じ実装者に続きを頼む。
 - 実装者が報告ファイルを書けないことがある → PM が返答本文から `~/os32-tmp/run/<名>/report.md` に要約して写す (レビュアーに渡すため)。
 
 ## 3. PM が報告で見る点

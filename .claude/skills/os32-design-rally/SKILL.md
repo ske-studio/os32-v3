@@ -6,7 +6,7 @@ description: 設計票・計画票を「起草 → 独立レビュー → 直し
 # os32-design-rally — 設計の往復と確定
 
 役の割り当ての正典は [ROLES §0](../../../docs/tasks/agents/ROLES.md) と [HANDOVER](../../../docs/tasks/agents/HANDOVER_2026-10-09.md) §2
-(2026-10-20 からの一時体制: 起草 = Fable (`model: fable`, general-purpose)、レビュー = Opus (`reviewer` subagent))。
+(2026-10-21 に通常の体制へ戻した: 実装 = Codex (既定 sol、難所は astra)、sol の差分 → astra、astra の実装・設計票 → Opus reviewer。一時体制 (Fable/Opus) は終了)。
 **レビューは PM が代行しない。3 往復で決着しない争点はユーザーへ。**
 
 ## 1. 置き場
