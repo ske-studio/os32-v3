@@ -158,11 +158,21 @@ def pair_runtime_suite(folder, mutate=False):
     harness = (ROOT / 'tools/tests/module_runtime_host.c').read_text()
     harness = harness.replace('MODULE_ID_KDEBUG', 'MODULE_ID_SQLITE')
     harness = harness.replace('exports[4]', 'exports[0]')
-    harness_path = folder / 'sqlite_runtime_host.c'
-    harness_path.write_text(harness)
     image_source = (ROOT / 'kernel/module_image.c').read_text().replace(
         '"../lib/crc32_core.inc"', '"' + str(ROOT / 'lib/crc32_core.inc') + '"')
     schema = (ROOT / 'kernel/module_schema.h').read_text()
+    # The shared fixture follows KDEBUG's ops version; the caller policy and
+    # image must carry the actual SQLITE row's version so that only the field
+    # under test (flags / pair CRC / ops) decides the rejection.
+    sqlite_row = schema.split('.module_id = 2U,', 1)[1].split('.module_id = 3U,', 1)[0]
+    sqlite_ops = int(re.search(r'\.ops_version = (\d+)U,', sqlite_row).group(1))
+    assert sqlite_ops != 1  # run(33, 1, 6) must stay a real mismatch
+    caller_policy = '.policy = {75, 3, 0x12345678, 0xabcdef01, '
+    assert harness.count(caller_policy) == 1
+    head, tail = harness.split(caller_policy)
+    harness = head + caller_policy + str(sqlite_ops) + tail[tail.index(','):]
+    harness_path = folder / 'sqlite_runtime_host.c'
+    harness_path.write_text(harness)
     (folder / 'module_image.h').write_bytes((ROOT / 'kernel/module_image.h').read_bytes())
     source_path = folder / 'module_image.c'
     schema_path = folder / 'module_schema.h'
@@ -187,6 +197,7 @@ def pair_runtime_suite(folder, mutate=False):
         names = b'kprintf\0' + name + b'\0'
         data[176:176 + len(names)] = names
         word(data, 28, len(names))
+        word(data, 33, sqlite_ops)
         word(data, field, value)
         payload = struct.pack('<2I', 9, rc) + crc(data)
         for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
