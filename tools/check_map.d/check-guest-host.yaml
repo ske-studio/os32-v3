@@ -24,6 +24,7 @@ check-guest-host:
 - include/memmap.h
 - sdk/include/os32/os32_kapi_slots.h
 - tools/rshell_serial.py
+- tools/rshell_peek.py
 - tools/serialfs_host.py
 - tools/tvdump_recv.py
 # Conservative artifact-path audit (including indirect helpers/fixtures).

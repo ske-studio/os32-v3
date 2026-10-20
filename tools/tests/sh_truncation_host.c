@@ -955,6 +955,9 @@ u32 save_crc32(const void *data, u32 len)
 #include "../../userland/shell/cmd_script.c"
 #include "../../userland/shell/cmd_sys.c"
 #include "../../userland/shell/kbd_watch.c"   /* kbdstat -w の行 (票 TASK_KBD_NAV §3) */
+/* `peek` (cmd_sys.c の表の 1 行) の本体 cmd_peek.c は heap と CRC32 を使うので
+ * ここへは取り込まない — 本体は tools/tests/kpeek_cli_host.c が回す。 */
+int shell_cmd_peek(int argc, char **argv) { (void)argc; (void)argv; return 0; }
 /* cmd_pci.c (lspci / pcidump、票 TASK_LAN_82557 L-A)。main.c が
  * shell_cmd_pci_init() を呼ぶので**取り込まないとリンクが通らない**。
  * 復号の実体 drivers/pci_decode.c は実ビルドでも同じ 1 本をリンクする

@@ -14,6 +14,7 @@ check-serialfs-host:
 - kernel/sys.c
 - lib/crc32.c
 - tools/rshell_serial.py
+- tools/rshell_peek.py
 - tools/serialfs_host.py
 - tools/tests/serial_gate_host.c
 - tools/tests/serial_portc_host.c
