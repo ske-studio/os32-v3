@@ -32,6 +32,8 @@
 //! | `input.rs`   | 入力取り込み → Key / Text / Pointer / Button (T3 / U2a) |
 //! | `kbdnav.rs`  | キーボードだけの WM 操作とマウスキー (票 KBD_NAV) |
 //! | `fep.rs`     | 日本語入力 (U2a)。cooked 待ち行列 = FEP、未確定行と候補窓 |
+//! | `font.rs`    | 字形 engine の持ち主 (T7b-b3)。shell lease の open/close・x87 guard・EV_FONT |
+//! | `text.rs`    | 文字描画の 1 本 (T7b-b3)。TTF cache → KCG fallback、cell と clip で切る |
 //! | `lease.rs`   | 14 色パレットのリースとフォーカス追従 (G8) |
 //! | `modal.rs`   | モーダルと標準ダイアログ (U4)。入れ子ループなし |
 //! | `timer.rs`   | アプリタイマ 8 本 (U5) |
@@ -58,6 +60,7 @@ mod dbgdesc;
 mod desktop;
 mod fep;
 mod ffi;
+mod font;
 /* T7b-b2 b2③ のゲスト fixture (feature `r1_fixture`、製品 build には入らない)。 */
 #[cfg(feature = "r1_fixture")]
 mod fixture;
@@ -77,6 +80,7 @@ mod settings;
 mod slot;
 mod startmenu;
 mod taskbar;
+mod text;
 mod timer;
 mod trim;
 mod diagnostics;
@@ -192,6 +196,11 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
      * (DESIGN §5 の fallback)。 */
     st.cfg = settings::load(0);
 
+    /* 字形 engine (T7b-b3)。lease の open は段 B の open 文脈 (WM 外の通常
+     * 文脈) でだけ通るので、gui_register の後・最初の合成の前のここで開く。
+     * 開けなければ KCG だけで描く (次の consume で 1 回だけ開き直す)。 */
+    font::open_at_safe_point(st, st.cfg.font_set);
+
     /* デスクトップ。全画面 present は WM だけ (契約 G4)。 */
     wm::composite_full(st);
 
@@ -202,6 +211,7 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
     settings::startup_notice(&st.cfg);
     loop_notice();
     gserial::open(st, serial_timeout);
+    font::announce(st);
 
     /* ---- 単独ループ (契約 T8: アプリが居ないときは gshell が X3 を回す) ---- */
     if !standalone_loop(st) {
@@ -213,6 +223,7 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
      *      下の `switch_cui` (SessionAction) 側だけ。 ---- */
     cursor::hide(st);
     st.inited = false;
+    font::close_all();
     unsafe {
         let a = os32api::api();
         /* FEP の描画先を TVRAM 版へ戻す (レビュー #4 ①)。gshell が抜けると同じ
@@ -683,6 +694,8 @@ fn switch_cui(st: &mut wm::GuiState) -> bool {
         return true;
     }
     session::clear();
+    /* shell lease を閉じる (retire も残りを閉じるが、閉じてから抜ける)。 */
+    font::close_all();
     unsafe {
         let a = os32api::api();
         (a.tvram_clear)();
@@ -698,6 +711,7 @@ fn switch_cui(st: &mut wm::GuiState) -> bool {
 fn shutdown(st: &mut wm::GuiState) -> ! {
     cursor::hide(st);
     st.inited = false;
+    font::close_all();
     unsafe {
         let a = os32api::api();
         (a.ime_set_render)(core::ptr::null_mut());

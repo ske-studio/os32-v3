@@ -55,10 +55,21 @@ def build_fixture(gshell, out, rlib):
         assert m, name + " missing"
         consts += f"pub const {name}: u32 = {int(m[1].rstrip('uU'), 0):#x};\n"
     (out / "shell_service.rs").write_text(consts)
+    # ffi.rs includes OUT_DIR/kapi_err.rs, made from os32_kapi_shared.h (T7b-b3).
+    kapi = (ROOT / "sdk/include/os32/os32_kapi_shared.h").read_text()
+    errs = ""
+    for name in ("OS32_ERR_NOSPC", "OS32_ERR_NOSYS", "OS32_ERR_BUSY"):
+        m = re.search(r"^#define\s+%s\s+(-?\d+)" % name, kapi, re.M)
+        assert m, name + " missing"
+        errs += f"pub const {name}: i32 = {int(m[1])};\n"
+    (out / "kapi_err.rs").write_text(errs)
+    # gshell links the product font crate (T7b-b3).
+    font_rlib, font_deps = os32api_host.build_font()
     exe = out / "fixture"
     subprocess.run(["rustc", "--edition=2021", "--test", "--crate-name=gshell",
                     "-C", "symbol-mangling-version=v0", str(root),
                     "--extern", f"os32api={rlib}", "-L", str(rlib.parent),
+                    "--extern", f"os32_font={font_rlib}", "-L", f"dependency={font_deps}",
                     "-o", str(exe)], cwd=ROOT, check=True,
                    env={**os.environ, "OUT_DIR": str(out)})
     subprocess.run([str(exe), "--exact", "dbgdesc_fixture::dbgdesc_fixture", "--test-threads=1"],

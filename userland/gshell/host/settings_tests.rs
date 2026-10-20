@@ -24,6 +24,8 @@ use os32api::cfg::{CFG_CORRUPT, CFG_ERROR, CFG_MISSING, CFG_OK, CFG_VERSION};
 const SCOPE: &[u8] = b"gshell";
 const K_COLOR: &[u8] = b"desktop/color";
 const K_CLOCK: &[u8] = b"taskbar/clock_24h";
+const K_FONT_SET: &[u8] = b"font_set";
+const K_FONT_GEN: &[u8] = b"font/gen";
 
 /* スキャンコード (drivers/kbd.h)。 */
 const SC_ESC: u8 = 0x00;
@@ -89,7 +91,7 @@ fn s01_load_fills_defaults_and_status_on_every_path() {
     assert_eq!(c.close_error, 0);
     assert_eq!(
         mocks::cfg_calls(),
-        vec![Open(0), get_int(K_COLOR), get_int(K_CLOCK), Close],
+        vec![Open(0), get_int(K_COLOR), get_int(K_CLOCK), get_int(K_FONT_SET), get_int(K_FONT_GEN), Close],
         "open(0) → get ×2 → close で閉じきっていない"
     );
 
@@ -241,7 +243,7 @@ fn s04_dialog_state_machine() {
     /* 開いた周回で load が走っている。 */
     assert_eq!(
         mocks::cfg_calls(),
-        vec![Open(0), get_int(K_COLOR), get_int(K_CLOCK), Close],
+        vec![Open(0), get_int(K_COLOR), get_int(K_CLOCK), get_int(K_FONT_SET), get_int(K_FONT_GEN), Close],
         "開いたときに load が呼ばれていない"
     );
     assert_eq!(modal::settings_values(), (3, true, 0));
@@ -264,7 +266,10 @@ fn s04_dialog_state_machine() {
     modal::on_key(&mut st, SC_SPACE, 0, 0);
     assert_eq!(modal::settings_values().1, false, "SPACE で clock が変わらない");
     modal::on_key(&mut st, SC_DOWN, 0, 0);
-    assert_eq!(modal::settings_values().2, 1, "行が 2 を超えた");
+    assert_eq!(modal::settings_values().2, 2, "font 行へ進まない");
+    modal::on_key(&mut st, SC_DOWN, 0, 0);
+    assert_eq!(modal::settings_values().2, 2, "行が 3 を超えた");
+    modal::on_key(&mut st, SC_UP, 0, 0);
     modal::on_key(&mut st, SC_UP, 0, 0);
     modal::on_key(&mut st, SC_UP, 0, 0);
     assert_eq!(modal::settings_values().2, 0, "行が 0 を下回った");
@@ -302,12 +307,12 @@ fn s04_dialog_state_machine() {
     /* `finish_wm` の中では `cfg_*` が 1 本も呼ばれない (票 §5 の (10))。 */
     assert_eq!(
         mocks::cfg_calls(),
-        vec![Open(0), get_int(K_COLOR), get_int(K_CLOCK), Close],
+        vec![Open(0), get_int(K_COLOR), get_int(K_CLOCK), get_int(K_FONT_SET), get_int(K_FONT_GEN), Close],
         "OK の処理 (finish_wm) の中で DB に触った"
     );
     settings::consume(&mut st);
     assert_eq!(
-        mocks::cfg_calls()[4..],
+        mocks::cfg_calls()[6..],
         [Open(1), Begin, set_int(K_COLOR, 4), Commit, Close],
         "保存の順序が違う (clock は変わっていないので set は 1 本)"
     );
@@ -520,7 +525,7 @@ fn s09_settings_from_an_app_wait_context_parks_and_runs_at_top_level() {
     settings::consume(&mut st);
     assert_eq!(
         mocks::cfg_calls(),
-        vec![Open(0), get_int(K_COLOR), get_int(K_CLOCK), Close]
+        vec![Open(0), get_int(K_COLOR), get_int(K_CLOCK), get_int(K_FONT_SET), get_int(K_FONT_GEN), Close]
     );
     assert!(modal::is_settings());
     assert!(!settings::pending(), "消費したのに予約が残っている");
@@ -922,7 +927,7 @@ fn s16b_save_runs_but_its_notice_waits_for_a_free_frame() {
     settings::consume(&mut st);
     /* DB 操作と適用は**枠と無関係に**この周回で終わる。 */
     assert_eq!(
-        mocks::cfg_calls()[4..],
+        mocks::cfg_calls()[6..],
         [Open(1), Begin, set_int(K_COLOR, 4), Commit, Close]
     );
     assert_eq!(st.cfg.desktop_color, 4, "枠が塞がっていると適用しない");
@@ -1398,4 +1403,117 @@ fn s21_tab_never_moves_the_button_focus_in_settings() {
         "TAB の後の ESC で DB に触った"
     );
     assert_eq!(st.cfg.desktop_color, 3, "ESC で適用値が動いた");
+}
+
+/* ================================================================ */
+/*  T7b-b3 S3: font の設定 (`font_set` / `font/gen`)                   */
+/* ================================================================ */
+
+const SC_DOWN_FONT: [u8; 2] = [SC_DOWN, SC_DOWN];
+
+/// 設定を開き、font 行へ移って値を 1 つ進める。
+fn bump_font(st: &mut wm::GuiState) {
+    for sc in SC_DOWN_FONT {
+        modal::on_key(st, sc, 0, 0);
+    }
+    assert_eq!(modal::settings_values().2, 2, "font 行に来ていない");
+    modal::on_key(st, SC_RIGHT, 0, 0);
+}
+
+#[test]
+fn f01_load_reads_font_set_and_gen_and_clamps() {
+    let _ = bare();
+    mocks::cfg(|c| {
+        c.font_set = Some(1);
+        c.font_gen = Some(5);
+    });
+    let cfg = settings::load(0);
+    assert_eq!((cfg.font_set, cfg.font_gen), (1, 5));
+    mocks::cfg(|c| c.font_set = Some(7));
+    assert_eq!(settings::load(0).font_set, 0, "範囲外の font_set は標準へ");
+    mocks::cfg(|c| c.font_set = Some(-1));
+    assert_eq!(settings::load(0).font_set, 0);
+    /* 未設定 (行が無い) は既定 = 標準・世代 0。 */
+    let _ = bare();
+    let cfg = settings::load(0);
+    assert_eq!((cfg.font_set, cfg.font_gen), (0, 0));
+    /* status が OK でなければ取得値を採らない (他の key と同じ)。 */
+    mocks::cfg(|c| {
+        c.font_set = Some(1);
+        c.status = CFG_CORRUPT;
+    });
+    assert_eq!(settings::load(0).font_set, 0);
+}
+
+#[test]
+fn f02_font_row_saves_font_set_and_bumps_gen_once_then_applies() {
+    let mut st = bare();
+    mocks::cfg(|c| {
+        c.color = Some(3);
+        c.clock = Some(1);
+        c.font_gen = Some(41);
+    });
+    open_settings(&mut st);
+    assert_eq!(modal::settings_font(), 0);
+    bump_font(&mut st);
+    assert_eq!(modal::settings_font(), 1, "→ で font が進まない");
+    modal::on_key(&mut st, SC_RIGHT, 0, 0);
+    assert_eq!(modal::settings_font(), 0, "2 値を循環しない");
+    modal::on_key(&mut st, SC_LEFT, 0, 0);
+    assert_eq!(modal::settings_font(), 1);
+    let before = mocks::cfg_calls().len();
+    assert!(modal::on_key(&mut st, SC_RETURN, 0, 0));
+    settings::consume(&mut st);
+    assert_eq!(
+        mocks::cfg_calls()[before..],
+        [Open(1), Begin, set_int(K_FONT_SET, 1), set_int(K_FONT_GEN, 42), Commit, Close],
+        "font_set と font/gen を同じ transaction で書いていない"
+    );
+    assert_eq!((st.cfg.font_set, st.cfg.font_gen), (1, 42), "適用値が更新されていない");
+    /* gshell の engine は設定どおり KCG のみ (lease を開かない)。 */
+    assert_eq!(
+        crate::font::engine().state(),
+        os32_font::engine::State::KcgOnly(os32_font::engine::Reason::Config)
+    );
+    assert!(printed(b"font: gen "), "font の open ログが無い");
+    /* もう一度開いて OK だけ = 変更なし (gen を進めない)。 */
+    open_settings(&mut st);
+    let before = mocks::cfg_calls().len();
+    assert!(modal::on_key(&mut st, SC_RETURN, 0, 0));
+    settings::consume(&mut st);
+    assert_eq!(mocks::cfg_calls()[before..], [], "無編集の OK で書いた");
+}
+
+#[test]
+fn f03_font_save_failure_keeps_applied_font() {
+    let mut st = bare();
+    mocks::cfg(|c| c.font_gen = Some(2));
+    open_settings(&mut st);
+    bump_font(&mut st);
+    assert!(modal::on_key(&mut st, SC_RETURN, 0, 0));
+    /* font_set の set は通り、font/gen の set が落ちる。 */
+    mocks::cfg(|c| c.set_ret_script = vec![0, -1]);
+    settings::consume(&mut st);
+    assert_eq!((st.cfg.font_set, st.cfg.font_gen), (0, 0), "失敗で適用値が動いた");
+    assert_eq!(crate::font::engine().state(), os32_font::engine::State::Closed,
+               "失敗で engine を開き直した");
+    assert!(modal_msg().starts_with(b"save failed: set"));
+}
+
+#[test]
+fn f04_other_keys_do_not_touch_font_keys() {
+    let mut st = bare();
+    mocks::cfg(|c| {
+        c.color = Some(3);
+        c.font_gen = Some(9);
+    });
+    open_settings(&mut st);
+    modal::on_key(&mut st, SC_RIGHT, 0, 0); /* color 3 → 4 */
+    let before = mocks::cfg_calls().len();
+    assert!(modal::on_key(&mut st, SC_RETURN, 0, 0));
+    settings::consume(&mut st);
+    assert_eq!(mocks::cfg_calls()[before..], [Open(1), Begin, set_int(K_COLOR, 4), Commit, Close]);
+    assert_eq!(st.cfg.font_gen, 0, "色だけの保存で font/gen を動かした");
+    assert_eq!(crate::font::engine().state(), os32_font::engine::State::Closed,
+               "色だけの保存で font を開き直した");
 }

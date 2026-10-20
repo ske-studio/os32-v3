@@ -6,9 +6,21 @@ version = 4
 name = "gshell"
 version = "0.1.0"
 dependencies = [
+ "os32-font",
  "os32api",
+]
+
+[[package]]
+name = "os32-font"
+version = "0.1.0"
+dependencies = [
+ "ttf-parser",
 ]
 
 [[package]]
 name = "os32api"
 version = "0.1.0"
+
+[[package]]
+name = "ttf-parser"
+version = "0.21.1"

@@ -1,12 +1,14 @@
 //! settings.rs — 設定レジストリ (`/etc/settings.db`) の gshell 側 (票 S4 §2・§3)。
 //!
-//! gshell は設定レジストリの**最初の消費者**で、読むのは `gshell` scope の 2 キー
-//! だけ (票 §1):
+//! gshell は設定レジストリの**最初の消費者**で、読むのは `gshell` scope の 4 キー
+//! だけ (票 §1、font の 2 本は T7b-b3):
 //!
 //! | key | 意味 | 既定 |
 //! |---|---|---|
 //! | `desktop/color` | デスクトップ背景のシステム色 index (0〜15) | 12 (`GUI_COLOR_DESKTOP`) |
 //! | `taskbar/clock_24h` | 1 = `HH:MM`、0 = `h:MM AM/PM` | 1 |
+//! | `font_set` | 0 = 標準 (東雲 16 / Inconsolata)、1 = KCG のみ | 0 |
+//! | `font/gen` | font 設定の世代。`font_set` を保存するたびに +1 (app が取りこぼしを拾う) | 0 |
 //!
 //! ## DB に触れる場所は 1 か所だけ
 //!
@@ -60,6 +62,7 @@ use os32api::cfg::{
     cfg_schema_version, cfg_set_int, cfg_status, CfgDb, CFG_CORRUPT, CFG_ERROR, CFG_MISSING,
     CFG_OK, CFG_VERSION,
 };
+use os32_font::limits::{FONT_SET_KCG_ONLY, FONT_SET_STD};
 use os32api::gui::proto::{GUI_COLOR_DESKTOP, GUI_MODAL_OK};
 
 /* ================================================================ */
@@ -72,6 +75,10 @@ pub static SCOPE: &[u8] = b"gshell\0";
 pub static KEY_COLOR: &[u8] = b"desktop/color\0";
 /// 時計の 24 時間表記の key (NUL 終端)。
 pub static KEY_CLOCK: &[u8] = b"taskbar/clock_24h\0";
+/// 字形の設定 (`FONT_SET_*`、T7b-b3) の key (NUL 終端)。app (libos32gui) も読む。
+pub static KEY_FONT_SET: &[u8] = b"font_set\0";
+/// font 設定の世代 (保存ごとに +1、T7b-b3) の key (NUL 終端)。
+pub static KEY_FONT_GEN: &[u8] = b"font/gen\0";
 
 /// `desktop/color` の既定 = 現行の `GUI_COLOR_DESKTOP` (既定で見た目が変わらない)。
 pub const DEFAULT_DESKTOP_COLOR: u8 = GUI_COLOR_DESKTOP;
@@ -79,6 +86,12 @@ pub const DEFAULT_DESKTOP_COLOR: u8 = GUI_COLOR_DESKTOP;
 pub const DEFAULT_CLOCK_24H: bool = true;
 /// システム色の index の上限 (G6 の 16 色)。
 pub const COLOR_MAX: u8 = 15;
+/// `font_set` の既定 = 標準 set (正典は font crate の `limits.rs`、[C4])。
+pub const DEFAULT_FONT_SET: u8 = FONT_SET_STD as u8;
+/// `font_set` の上限。
+pub const FONT_SET_MAX: u8 = FONT_SET_KCG_ONLY as u8;
+/// `font/gen` の既定。
+pub const DEFAULT_FONT_GEN: u32 = 0;
 
 /// `cfg_open` が負 (引数 / メモリ) だったときの [`GuiCfg::status`]。
 /// `CFG_*` はどれも 0 以上なので衝突しない。
@@ -101,6 +114,10 @@ pub struct GuiCfg {
     pub desktop_color: u8,
     /// 時計を 24 時間表記にするか。
     pub clock_24h: bool,
+    /// 字形の設定 (`FONT_SET_*`)。
+    pub font_set: u8,
+    /// font 設定の世代 (`font/gen`)。
+    pub font_gen: u32,
     /// `CFG_*` / [`STATUS_OPEN_FAILED`]。
     pub status: i32,
     /// `cfg_schema_version` の実値 (VERSION の表示用)。
@@ -121,6 +138,8 @@ impl GuiCfg {
     pub const NEW: GuiCfg = GuiCfg {
         desktop_color: DEFAULT_DESKTOP_COLOR,
         clock_24h: DEFAULT_CLOCK_24H,
+        font_set: DEFAULT_FONT_SET,
+        font_gen: DEFAULT_FONT_GEN,
         status: CFG_OK,
         schema_version: 0,
         sqlite: 0,
@@ -146,7 +165,7 @@ pub enum Req {
     /// 現在値を読み直して設定ダイアログを開く。
     Open,
     /// 編集値を書き戻す (変わった key だけ。マスクは私有状態)。
-    Save { color: u8, clock_24h: bool },
+    Save { color: u8, clock_24h: bool, font_set: u8 },
 }
 
 /// 枠が空いた周回で 1 回だけ出すメッセージ。**同時に 1 本だけ**。
@@ -177,10 +196,13 @@ struct State {
     /* ---- 再読込値 = 編集の起点 (ダイアログを開いた周回の `load()`) ---- */
     base_color: u8,
     base_clock: bool,
+    base_font: u8,
+    base_font_gen: u32,
     base_status: i32,
     /* ---- 変更マスク (OK で決めて、保存の周回まで持ち越す) ---- */
     mask_color: bool,
     mask_clock: bool,
+    mask_font: bool,
     /* ---- 計測 (再 Open の `load()` で消さない) ---- */
     save_ticks: u32,
 }
@@ -191,9 +213,12 @@ impl State {
         notice: None,
         base_color: DEFAULT_DESKTOP_COLOR,
         base_clock: DEFAULT_CLOCK_24H,
+        base_font: DEFAULT_FONT_SET,
+        base_font_gen: DEFAULT_FONT_GEN,
         base_status: CFG_OK,
         mask_color: false,
         mask_clock: false,
+        mask_font: false,
         save_ticks: 0,
     };
 }
@@ -257,11 +282,12 @@ pub fn startup_notice(cfg: &GuiCfg) {
 /// 1. 編集値が再読込値と同じ → 何もしない (`gshell: cfg write skipped`)。
 /// 2. 再読込が `CFG_OK` でない → 保存せず `cannot save: <status>`。
 /// 3. それ以外 → 変更マスクを立てて `Req::Save` を予約する。
-pub fn on_ok(color: u8, clock_24h: bool) {
+pub fn on_ok(color: u8, clock_24h: bool, font_set: u8) {
     let st = s();
     let changed_color = color != st.base_color;
     let changed_clock = clock_24h != st.base_clock;
-    if !changed_color && !changed_clock {
+    let changed_font = font_set != st.base_font;
+    if !changed_color && !changed_clock && !changed_font {
         kprint(b"gshell: cfg write skipped\n\0");
         return;
     }
@@ -271,7 +297,8 @@ pub fn on_ok(color: u8, clock_24h: bool) {
     }
     st.mask_color = changed_color;
     st.mask_clock = changed_clock;
-    st.req = Some(Req::Save { color, clock_24h });
+    st.mask_font = changed_font;
+    st.req = Some(Req::Save { color, clock_24h, font_set });
 }
 
 /* ================================================================ */
@@ -296,6 +323,16 @@ pub fn clamp_color(v: i32) -> u8 {
     }
 }
 
+/// `FONT_SET_*` 以外は既定 (標準 set) へ落とす。
+#[inline]
+pub fn clamp_font_set(v: i32) -> u8 {
+    if v >= 0 && v <= FONT_SET_MAX as i32 {
+        v as u8
+    } else {
+        DEFAULT_FONT_SET
+    }
+}
+
 /// 0 / 1 以外は既定 (= 24h) へ落とす (票 §1)。
 #[inline]
 pub fn clamp_clock(v: i32) -> bool {
@@ -306,7 +343,7 @@ pub fn clamp_clock(v: i32) -> bool {
     }
 }
 
-/// `cfg_open(&db, 0)` → `cfg_get_int` ×2 → `cfg_close`。**全経路で既定値を埋める**
+/// `cfg_open(&db, 0)` → `cfg_get_int` ×4 → `cfg_close`。**全経路で既定値を埋める**
 /// ので、失敗しても起動は止まらない (DESIGN §5 の fallback)。
 ///
 /// `prev_close_error` は「まだ利用者に見せていない close 失敗」。再 load が
@@ -329,7 +366,7 @@ pub fn load(prev_close_error: i32) -> GuiCfg {
     }
     /* SAFETY: `db` は直前の `cfg_open` が返した接続。scope / key は NUL 終端の
      * 静的バイト列。`cfg_get_int` は失敗も未設定も `def` を返す。 */
-    let (color, clock) = unsafe {
+    let (color, clock, font_set, font_gen) = unsafe {
         (
             cfg_get_int(db, SCOPE.as_ptr(), KEY_COLOR.as_ptr(), DEFAULT_DESKTOP_COLOR as i32),
             cfg_get_int(
@@ -338,6 +375,8 @@ pub fn load(prev_close_error: i32) -> GuiCfg {
                 KEY_CLOCK.as_ptr(),
                 DEFAULT_CLOCK_24H as i32,
             ),
+            cfg_get_int(db, SCOPE.as_ptr(), KEY_FONT_SET.as_ptr(), DEFAULT_FONT_SET as i32),
+            cfg_get_int(db, SCOPE.as_ptr(), KEY_FONT_GEN.as_ptr(), DEFAULT_FONT_GEN as i32),
         )
     };
     /* 状態は **get の後**に採る (票 §5 の (18)): 読んでいる途中の I/O 失敗で
@@ -367,6 +406,8 @@ pub fn load(prev_close_error: i32) -> GuiCfg {
     if c.status == CFG_OK || c.status == CFG_VERSION {
         c.desktop_color = clamp_color(color);
         c.clock_24h = clamp_clock(clock);
+        c.font_set = clamp_font_set(font_set);
+        c.font_gen = font_gen as u32;
     }
     c.load_ticks = tick().wrapping_sub(t0);
     c
@@ -389,10 +430,15 @@ pub fn load(prev_close_error: i32) -> GuiCfg {
 pub fn consume(st: &mut GuiState) -> bool {
     let mut did = false;
 
+    /* (0) 前回の font open が失敗していれば 1 回だけ開き直す (T7b-b3)。 */
+    if crate::font::consume_retry(st) {
+        did = true;
+    }
+
     /* (1) 保存。枠が塞がっていても実行する (票 §3 の R1)。 */
-    if let Some(Req::Save { color, clock_24h }) = s().req {
+    if let Some(Req::Save { color, clock_24h, font_set }) = s().req {
         s().req = None;
-        save(st, color, clock_24h);
+        save(st, color, clock_24h, font_set);
         did = true;
     }
 
@@ -427,9 +473,12 @@ pub fn consume(st: &mut GuiState) -> bool {
             let ss = s();
             ss.base_color = cfg.desktop_color;
             ss.base_clock = cfg.clock_24h;
+            ss.base_font = cfg.font_set;
+            ss.base_font_gen = cfg.font_gen;
             ss.base_status = cfg.status;
             ss.mask_color = false;
             ss.mask_clock = false;
+            ss.mask_font = false;
         }
         /* **戻り値を見る** (実装レビュー往復 1 の non-blocker)。いまの
          * `open_wm_settings` は直前の `is_open()` から呼び出しまでに枠を塞ぐ
@@ -447,10 +496,12 @@ pub fn consume(st: &mut GuiState) -> bool {
 
 /// `Req::Save` の実体。**1 つの周回の中で** `cfg_open(&db, 1)` → `cfg_begin` →
 /// `cfg_set_int` (変わった key だけ) → `cfg_commit` → `cfg_close` を完結させる
-/// (間に yield / 合成 / 他イベント処理を挟まない)。
-fn save(st: &mut GuiState, color: u8, clock_24h: bool) {
+/// (間に yield / 合成 / 他イベント処理を挟まない)。`font_set` を書くときは同じ
+/// transaction で `font/gen` を再読込値 + 1 にする (T7b-b3、app の取りこぼし対策)。
+fn save(st: &mut GuiState, color: u8, clock_24h: bool, font_set: u8) {
     let t0 = tick();
-    let (mask_color, mask_clock) = (s().mask_color, s().mask_clock);
+    let (mask_color, mask_clock, mask_font) = (s().mask_color, s().mask_clock, s().mask_font);
+    let font_gen = s().base_font_gen.wrapping_add(1);
 
     let mut db: *mut CfgDb = core::ptr::null_mut();
     /* SAFETY: [`load`] と同じ。書きたいので writable = 1。 */
@@ -486,6 +537,15 @@ fn save(st: &mut GuiState, color: u8, clock_24h: bool) {
         stage = STAGE_SET;
         work = unsafe { cfg_set_int(db, SCOPE.as_ptr(), KEY_CLOCK.as_ptr(), clock_24h as i32) };
     }
+    if work >= 0 && mask_font {
+        stage = STAGE_SET;
+        work = unsafe { cfg_set_int(db, SCOPE.as_ptr(), KEY_FONT_SET.as_ptr(), font_set as i32) };
+        if work >= 0 {
+            work = unsafe {
+                cfg_set_int(db, SCOPE.as_ptr(), KEY_FONT_GEN.as_ptr(), font_gen as i32)
+            };
+        }
+    }
     if work >= 0 {
         stage = STAGE_COMMIT;
         work = unsafe { cfg_commit(db) };
@@ -516,6 +576,9 @@ fn save(st: &mut GuiState, color: u8, clock_24h: bool) {
     /* commit 済みの値が正。**適用値を更新して画面に反映してから**、close の
      * 失敗を別のメッセージで伝える (DB と画面をずらさない。票 §3 の B2)。 */
     apply(st, color, clock_24h);
+    if mask_font {
+        apply_font(st, font_set, font_gen);
+    }
     if cerr != 0 {
         s().notice = Some(Notice::SavedCloseFailed { code: cerr });
     }
@@ -553,6 +616,19 @@ fn apply(st: &mut GuiState, color: u8, clock_24h: bool) {
          * `taskbar` の持ち物なので、次の tick で作り直させる。 */
         taskbar::invalidate_clock(st);
     }
+}
+
+/// font 設定を適用する (保存が成功したときだけ、top-level)。gshell の engine を
+/// 開き直し、tracked app 全部に `GUI_EV_FONT` を配って全面を描き直す。
+fn apply_font(st: &mut GuiState, font_set: u8, font_gen: u32) {
+    st.cfg.font_set = font_set;
+    st.cfg.font_gen = font_gen;
+    {
+        let ss = s();
+        ss.base_font = font_set;
+        ss.base_font_gen = font_gen;
+    }
+    crate::font::reconfigure(st, font_set);
 }
 
 /* ================================================================ */

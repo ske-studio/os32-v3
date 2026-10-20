@@ -23,10 +23,11 @@
 #    - more / find / sort / head / tail / wc / tee / touch / sleep / diff / du / cal /
 #      man / sndctl (programs)。直すには less / grep / hexdump とシェルの組み込みで足りる
 #    gui       → GUI      gshell、libos32gui.shlib、shlib を使うアプリ (filer /
-#                         edit_gui)。shlib を使う試験アプリは test (DEBUG) のまま
+#                         edit_gui)、GUI の標準 font set (/usr/share/fonts、T7b-b3)。
+#                         shlib を使う試験アプリは test (DEBUG) のまま
 #    programs  → NORMAL   コマンドとアプリ
 #    docs      → NORMAL   man ページ
-#    data      → NORMAL   FEP 辞書、TTF、MGX サンプル
+#    data      → NORMAL   FEP 辞書、MGX サンプル
 #    test      → DEBUG    試験バイナリと試験用データ (userland/tests/ 由来は必ずこれ)
 #  1 行のタグはちょうど 1 つのパッケージに当たること (検査が見る)。
 #

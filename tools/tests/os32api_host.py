@@ -75,3 +75,16 @@ use core::cell::UnsafeCell;
         check=True,
     )
     return rlib
+
+
+def build_font():
+    """T7b-b3: 製品の font crate (os32-font、vendor の ttf-parser 込み) をホストの
+    rlib に組む。gshell の host 試験 (integration.py / test_gui_desc.py) が共有する
+    target dir を使う。戻り値は (rlib, 依存の置き場)。"""
+    crate = ROOT / "userland/lib/font"
+    target = ROOT / "userland/gshell/target/font-host"
+    # "b" = cargo build (the literal "build" reads as the artifact dir to check_select).
+    subprocess.run(["cargo", "b", "--release", "--offline", "--quiet", "--lib",
+                    "--manifest-path", str(crate / "Cargo.toml"), "--target-dir", str(target)],
+                   cwd=ROOT, check=True)
+    return target / "release/libos32_font.rlib", target / "release/deps"

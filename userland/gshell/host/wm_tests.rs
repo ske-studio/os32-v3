@@ -4363,3 +4363,47 @@ fn guirunkey_run_wait_after_poll_is_also_reclaimed() {
     assert!(!multiapp::is_tracked(3));
     assert_eq!(crate::modal::msg_bytes(), b"No keyboard input. Run from a terminal.");
 }
+
+/* T7b-b3 S3: font 設定の変更は tracked app 全部 (前景を含む) に GUI_EV_FONT を
+ * 1 件ずつ配り、全クライアントを描き直させる (設計 t7bb34 §2-3)。 */
+#[test]
+fn t7b3_font_change_delivers_ev_font_to_every_tracked_app() {
+    use crate::{mocks, settings};
+    use os32api::gui::proto::GUI_EV_FONT;
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = g2w_state(&shm);
+    for id in 2..=5 {
+        assert!(g2w_events(&st, id).is_empty());
+    }
+    for w in st.windows.iter_mut().filter(|w| w.used) {
+        w.dirty.clear();
+    }
+    mocks::cfg(|c| c.font_gen = Some(7));
+    settings::request_open();
+    settings::consume(&mut st);
+    for _ in 0..2 {
+        crate::modal::on_key(&mut st, 0x3D, 0, 0); /* ↓ font 行 */
+    }
+    crate::modal::on_key(&mut st, 0x3C, 0, 0); /* → KCG のみ */
+    assert!(crate::modal::on_key(&mut st, 0x1C, 0, 0)); /* RETURN = OK */
+    settings::consume(&mut st);
+    assert_eq!(st.cfg.font_gen, 8);
+    for id in 2..=5 {
+        let ev = g2w_events(&st, id);
+        assert_eq!(ev.len(), 1, "ID {id}: EV_FONT が 1 件でない");
+        assert_eq!((ev[0].kind, ev[0].sub, ev[0].window, ev[0].payload), (GUI_EV_FONT, 0, 0, [0; 8]));
+    }
+    let s = unsafe { crate::font::gshell_font_stats };
+    assert_eq!((s.ev_font_sent, s.ev_font_full), (4, 0));
+    assert!(st.windows.iter().filter(|w| w.used).all(|w| !w.dirty.is_empty()),
+            "全クライアントを描き直させていない");
+    /* 変更なしの OK は配らない。 */
+    settings::request_open();
+    settings::consume(&mut st);
+    assert!(crate::modal::on_key(&mut st, 0x1C, 0, 0));
+    settings::consume(&mut st);
+    for id in 2..=5 {
+        assert_eq!(g2w_events(&st, id).len(), 1, "ID {id}: 変更なしで配った");
+    }
+}

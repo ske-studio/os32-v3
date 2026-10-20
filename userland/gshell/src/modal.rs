@@ -386,7 +386,9 @@ pub struct Modal {
     /// **編集中の値** (適用値でも再読込値でもない。票 §2 の 3 区別)。
     set_color: u8,
     set_clock: bool,
-    /// 選択中の行 (0 = Desktop color、1 = Clock)。
+    /// 字形の設定 (`FONT_SET_*`、T7b-b3)。
+    set_font: u8,
+    /// 選択中の行 (0 = Desktop color、1 = Clock、2 = Font)。
     set_row: usize,
     /// 状態行 (開いた周回の `load()` から組んだ本文、NUL 終端)。
     /// **最大 3 行に分ける** (実装レビュー往復 1 の B3: 1 行に連結すると
@@ -431,6 +433,7 @@ impl Modal {
         wm_purpose: WM_PURPOSE_FILE_LAUNCH,
         set_color: 0,
         set_clock: true,
+        set_font: 0,
         set_row: 0,
         set_status: [[0; crate::settings::STATUS_LINE_CAP]; crate::settings::STATUS_LINES_MAX],
         set_status_len: [0; crate::settings::STATUS_LINES_MAX],
@@ -514,6 +517,18 @@ pub fn settings_hit_rects() -> (Rect, Rect, Rect, Rect) {
 pub fn settings_values() -> (u8, bool, usize) {
     let m = state();
     (m.set_color, m.set_clock, m.set_row)
+}
+
+/// 設定ダイアログの font 行の編集値 (`FONT_SET_*`、T7b-b3)。
+#[inline]
+pub fn settings_font() -> u8 {
+    state().set_font
+}
+
+/// 設定ダイアログの行 `row` の当たり矩形 (画面座標、試験と台本の窓口)。
+#[allow(dead_code)]
+pub fn settings_row_rect(row: usize) -> Rect {
+    set_row_rect(state(), row)
 }
 
 /// ダイアログの外形 (画面座標)。閉じていれば空。
@@ -632,7 +647,7 @@ pub fn open_wm_message(st: &mut GuiState, buttons: u16, msg: &[u8], purpose: u8)
 
 /// Start → Settings... の設定ダイアログ (票 S4 §3)。開けたら `true`。
 ///
-/// 既存の部品 (list band の 2 行 + OK / Cancel) だけで組む。新しいウィジェットは
+/// 既存の部品 (list band の 3 行 + OK / Cancel) だけで組む。新しいウィジェットは
 /// 作らない。渡す `cfg` は**開ける周回で読み直した値** = 編集の起点。
 pub fn open_wm_settings(st: &mut GuiState, cfg: &crate::settings::GuiCfg) -> bool {
     if state().used {
@@ -650,6 +665,7 @@ pub fn open_wm_settings(st: &mut GuiState, cfg: &crate::settings::GuiCfg) -> boo
         let m = state();
         m.set_color = cfg.desktop_color;
         m.set_clock = cfg.clock_24h;
+        m.set_font = cfg.font_set;
         m.set_row = 0;
         m.set_status = lines;
         m.set_status_n = n;
@@ -822,7 +838,7 @@ fn finish_wm(st: &mut GuiState, purpose: u8, result: i16, value: &[u8], vlen: us
             /* **ここでは DB に触らない** — 判定と予約だけ (票 §3)。編集値は
              * `finish` が `used` を落としただけなので、まだ読める。 */
             let (color, clock, _row) = settings_values();
-            crate::settings::on_ok(color, clock);
+            crate::settings::on_ok(color, clock, settings_font());
         }
         _ => {}
     }
@@ -928,8 +944,8 @@ fn msg_display_width(m: &Modal) -> i32 {
 /*  設定ダイアログ (票 S4 §3) の版面                                  */
 /* ================================================================ */
 
-/// 行数 (0 = Desktop color、1 = Clock)。
-pub const SET_ROWS: usize = 2;
+/// 行数 (0 = Desktop color、1 = Clock、2 = Font)。
+pub const SET_ROWS: usize = 3;
 /// 色見本 (16px 角) の左端を置く桁 (ANK 8px)。行の文字より右。
 const SET_SWATCH_COL: i32 = 8 * 24;
 /// 色見本の 1 辺。
@@ -943,7 +959,7 @@ const SET_ROW_CAP: usize = 64;
 /// 幅を測るときの色の値 (**最大桁数**。開いたまま 9 → 10 でも伸びない)。
 const COLOR_WIDEST: u8 = crate::settings::COLOR_MAX;
 
-/// 本文 2 行 + 状態行 (1〜3 行) + ボタン。
+/// 本文 3 行 + 状態行 (1〜3 行) + ボタン。
 ///
 /// **幅も高さも実表示幅から出す** (実装レビュー往復 1 の B2 / B3)。
 /// `kcg_draw_utf8` にはクリップが無いので、版面が文字より狭いとそのまま枠外の
@@ -967,7 +983,7 @@ fn layout_settings(st: &GuiState, m: &mut Modal) {
     let mut row = 0usize;
     while row < SET_ROWS {
         let mut buf = [0u8; SET_ROW_CAP];
-        let n = settings_row_text(COLOR_WIDEST, m.set_clock, row, true, &mut buf);
+        let n = settings_row_text(COLOR_WIDEST, m.set_clock, m.set_font, row, true, &mut buf);
         let w = SET_TEXT_X + (n as i32) * 8;
         if w > body {
             body = w;
@@ -1016,7 +1032,7 @@ fn set_row_rect(m: &Modal, row: usize) -> Rect {
     )
 }
 
-/// 2 行ぶんの帯 (損傷を絞る用)。
+/// 本文の行ぶんの帯 (損傷を絞る用)。
 fn set_rows_band(m: &Modal) -> Rect {
     Rect::new(
         m.rect.x + 1,
@@ -1333,7 +1349,8 @@ fn set_move_row(st: &mut GuiState, delta: i32) {
     st.dirty_screen(band);
 }
 
-/// 選択中の行の値を `delta` だけ進める (color は 0..15 を循環、clock はトグル)。
+/// 選択中の行の値を `delta` だけ進める (color は 0..15 を循環、clock と font は
+/// 2 値を循環)。
 fn set_bump(st: &mut GuiState, delta: i32) {
     {
         let m = state();
@@ -1341,8 +1358,12 @@ fn set_bump(st: &mut GuiState, delta: i32) {
             let n = crate::settings::COLOR_MAX as i32 + 1;
             let v = (m.set_color as i32 + delta + n) % n;
             m.set_color = v as u8;
-        } else {
+        } else if m.set_row == 1 {
             m.set_clock = !m.set_clock;
+        } else {
+            let n = crate::settings::FONT_SET_MAX as i32 + 1;
+            let v = (m.set_font as i32 + delta + n) % n;
+            m.set_font = v as u8;
         }
     }
     let band = set_rows_band(state());
@@ -1987,7 +2008,7 @@ fn draw_list(m: &Modal, mono: bool, face: u8) {
     }
 }
 
-/// 設定ダイアログ: 2 行 + 状態行。
+/// 設定ダイアログ: 3 行 (色・時計・font) + 状態行。
 ///
 /// **16 色リース中 (契約 G8、`lease::mono`) は `draw_list` と同じ 2 色分岐**
 /// (票 S4 §3 の R2): 選択行は `TEXT` / `WINDOW` の反転、色見本は描かず
@@ -2019,7 +2040,7 @@ fn draw_settings(m: &Modal, mono: bool, face: u8) {
             gfx::gfx_fill_rect(rr.x, rr.y, rr.w, rr.h, bg);
         }
         let mut buf = [0u8; SET_ROW_CAP];
-        let n = settings_row_text(m.set_color, m.set_clock, row, mono, &mut buf);
+        let n = settings_row_text(m.set_color, m.set_clock, m.set_font, row, mono, &mut buf);
         draw_clipped(rr, &mut buf, n, fg, bg);
         /* 色見本は 16 色が使えるときだけ (2 色モードでは数値表記に倒す)。 */
         if row == 0 && !mono && rr.x + SET_SWATCH_COL + SET_SWATCH <= rr.right() {
@@ -2087,6 +2108,7 @@ fn draw_clipped(r: Rect, buf: &mut [u8; SET_ROW_CAP], len: usize, fg: u8, bg: u8
 fn settings_row_text(
     color: u8,
     clock: bool,
+    font: u8,
     row: usize,
     mono: bool,
     buf: &mut [u8; SET_ROW_CAP],
@@ -2111,9 +2133,13 @@ fn settings_row_text(
         if mono {
             put(buf, &mut n, b" (preview off: palette leased)");
         }
-    } else {
+    } else if row == 1 {
         put(buf, &mut n, b"Clock : ");
         put(buf, &mut n, if clock { b"24h" } else { b"12h" });
+    } else {
+        /* 2 つの語は同じ長さ (版面の幅を変えない)。 */
+        put(buf, &mut n, b"Font : ");
+        put(buf, &mut n, if u16::from(font) == os32_font::limits::FONT_SET_STD { b"Standard" } else { b"KCG only" });
     }
     buf[n] = 0;
     n

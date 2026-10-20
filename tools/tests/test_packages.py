@@ -85,7 +85,12 @@ MOVED_TO_NORMAL_CMDS = ['more', 'find', 'sort', 'head', 'tail', 'wc', 'tee', 'to
                         'sleep', 'diff', 'du', 'cal', 'man', 'sndctl']
 FONT_GUEST = '/sys/font/default.kcgfont'
 GUI_FILES = ['/bin/gshell.bin', '/sys/lib/libos32gui.shlib',
-             '/usr/bin/filer.bin', '/usr/bin/edit_gui.bin', '/usr/bin/about.bin']
+             '/usr/bin/filer.bin', '/usr/bin/edit_gui.bin', '/usr/bin/about.bin',
+             # T7b-b3: GUI の標準 font set (取得物、userland/deploy.yaml)
+             '/usr/share/fonts/JF-Dot-Shinonome16.ttf',
+             '/usr/share/fonts/JF-Dot-Shinonome16-LICENSE.txt',
+             '/usr/share/fonts/Inconsolata-Regular.ttf',
+             '/usr/share/fonts/Inconsolata-OFL.txt']
 
 
 def check(cond, label):

@@ -456,7 +456,24 @@ filesystem:
       guest: /test/hello.sh
       tags: [test]
 
-    # --- TrueType フォントは配らない (ユーザー決定 2026-09-30、製品配布は T7b-b3) ---
+    # --- フォント: GUI の標準 set (T7b-b3) ---
+    #     リポジトリに持たず tools/fetch_fonts.py の取得物 (原本・SHA-256 照合済み) を
+    #     配る (ユーザー決定 2026-09-30、build/assets.mk の GUI_FONT_FILES)。置き場は
+    #     font crate の paths.rs (FONT_DIR / FONT_JA / FONT_LATIN) が正典 [C4]。
+    #     ライセンス文は原本の隣に置く (OFL・東雲フォントライセンス)。gshell と
+    #     libos32gui が読むので GUI.PKG。IPAex は配備しない。
+    - host: assets/fonts/JF-Dot-Shinonome16.ttf
+      guest: /usr/share/fonts/
+      tags: [gui]
+    - host: assets/fonts/JF-Dot-Shinonome16-LICENSE.txt
+      guest: /usr/share/fonts/
+      tags: [gui]
+    - host: assets/fonts/Inconsolata-Regular.ttf
+      guest: /usr/share/fonts/
+      tags: [gui]
+    - host: assets/fonts/Inconsolata-OFL.txt
+      guest: /usr/share/fonts/
+      tags: [gui]
     # font_test (T7b-a5) は /data/JF-Dot-Shinonome16.ttf (必須) と
     # /data/Inconsolata-Regular.ttf・/data/ipaexg.ttf (任意) を読む。使う人が
     # tools/fetch_fonts.py で取った原本を hsync などで /data に置く。サブセット TTF は廃止。

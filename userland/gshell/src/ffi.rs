@@ -16,6 +16,11 @@ extern "C" {
 
     /// Unicode → ANK (半角) コード。0 なら全角 (`lib/utf8.c`)。
     pub fn unicode_to_ank(cp: u32) -> u8;
+
+    /// 1bpp の字形 (MSB 左、行 `w_bytes` バイト、`h_lines` 行) を `fg` で置く
+    /// (透過。画面外だけ切る、libos32gfx.h)。T7b-b3 の `text.rs` が cell と
+    /// clip で切った後の mask を渡す口 [HW1]。
+    pub fn gfx_draw_font(x: i32, y: i32, pat: *const u8, w_bytes: i32, h_lines: i32, fg: u8);
 }
 
 /* ================================================================ */
@@ -34,6 +39,8 @@ extern "C" {
 /* ================================================================ */
 
 include!(concat!(env!("OUT_DIR"), "/shell_service.rs"));
+// OS32_ERR_NOSPC / NOSYS / BUSY (os32_kapi_shared.h から build.rs が写す、[C4])。
+include!(concat!(env!("OUT_DIR"), "/kapi_err.rs"));
 
 /// `exec/shell_service.h` の `ShellService` と同じ並び (i386 で 32 バイト、version 2)。
 #[repr(C)]
@@ -65,7 +72,6 @@ extern "C" {
 }
 
 /// `__os32_aux` の表の見立て。
-#[allow(dead_code)] // OldShell を見るのは b3 (font の source 接続)
 pub enum ShellServiceState {
     /// 番地 0 (app)、印違い、または知らない新しい版 — 表を使わない。
     Absent,
@@ -99,7 +105,6 @@ pub fn shell_service_state() -> ShellServiceState {
 }
 
 /// kernel から受け取った内部入口の表。番地が 0、印違い、版違い (古い・新しい) は `None`。
-#[allow(dead_code)] // 呼ぶ側は b3 (font の source 接続)
 pub fn shell_service() -> Option<&'static ShellService> {
     match shell_service_state() {
         ShellServiceState::Ready(t) => Some(t),
