@@ -117,8 +117,8 @@ KernelAPI・共有ライブラリの読み込みを指す。アプリ 1 本の�
   なぜ整数では足りないのかと、FPU の無い機体での扱いを書いて示す。
 - 理由: FPU の無い機体 (386・486SX) でも動くこと、x87 の状態の退避と復元 (FNSAVE/FRSTOR と guard) の
   費用と複雑さを持ち込まないこと。
-- 既にある例外: 字形のラスタ (T7b-a2 の x87 guard) は T7 の後に整数化して guard を撤去する
-  ([T7 票 §4 の後](tasks/v3/TASK_T7_AND_FOLLOWUPS.md))。SQLite の double は台帳 NOFPU-1 で扱う。
+- 既にある例外: 字形のラスタ (T7b-a2 の x87 guard) は整数化して x87 の保存・復元を撤去した
+  (TASK_FONTPERF F5・F6、[T7 票 §4 の後](tasks/v3/TASK_T7_AND_FOLLOWUPS.md))。SQLite の double は台帳 NOFPU-1 で扱う。
   アプリ (ゲームなど) の浮動小数点は対象外。
 
 ### 定数定義の3層管理

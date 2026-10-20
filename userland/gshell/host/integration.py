@@ -423,7 +423,7 @@ MUTATIONS = [
     ('font/gen not bumped on save', 'src/settings.rs',
      'let font_gen = s().base_font_gen.wrapping_add(1);', 'let font_gen = s().base_font_gen;',
      'f02_font_row_saves_font_set_and_bumps_gen_once_then_applies'),
-    ('lease closed inside the x87 guard', 'src/font.rs',
+    ('lease closed inside the guard', 'src/font.rs',
      '    if f().in_guard {', '    if false {',
      'f13_engine_open_failure_inside_guard_defers_the_close'),
     ('failed retry re-arms itself', 'src/font.rs',

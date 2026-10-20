@@ -4,7 +4,7 @@
 //! (JF-Dot-Shinonome16 / Inconsolata Regular、integration.py が fetch_fonts で揃える)。
 //! 見るもの:
 //! - lease の open/close は guard の外、guard の中は read_at だけ (b12 §3-3)
-//! - 失敗の理由 (NoFpu / OldShell / OpenFailed / Nospc / Busy / Config / Stale) と後始末
+//! - 失敗の理由 (OldShell / OpenFailed / Nospc / Busy / Config / Stale、NoFpu は F6 から不使用) と後始末
 //! - 失敗の再試行は次の consume で 1 回だけ
 //! - text() の入口: 検証は face ごとに 1 回、cache に無いときだけ guard を 1 回
 //! - trim: cache は空になり arena と lease は残る、次の描画で作り直す (b3④)
@@ -107,12 +107,13 @@ fn f12_open_failures_pick_the_reason_and_retry_once() {
     assert_eq!(engine().state(), State::KcgOnly(Reason::Nospc));
     assert!(retry_armed());
 
-    /* shell open の NOSYS = FPU 無し: 恒久、再試行しない。 */
+    /* shell open の NOSYS = 表の欄が無い (F6: FPU 無しの NOSYS は撤去、NoFpu は
+     * 使わない): OpenFailed で恒久、再試行しない。 */
     let st = bare();
     fontsvc::install(SHELL_VERSION);
     fontsvc::with(|f| f.open_fail = Some(("Regular.ttf", crate::ffi::OS32_ERR_NOSYS)));
     open_at_safe_point(&st, 0);
-    assert_eq!(engine().state(), State::KcgOnly(Reason::NoFpu));
+    assert_eq!(engine().state(), State::KcgOnly(Reason::OpenFailed));
     assert!(!retry_armed());
 
     /* guard の NOSYS: callback は走らず、lease は guard の外で閉じる。 */
@@ -120,7 +121,7 @@ fn f12_open_failures_pick_the_reason_and_retry_once() {
     fontsvc::install(SHELL_VERSION);
     fontsvc::with(|f| f.guard_ret = Some(crate::ffi::OS32_ERR_NOSYS));
     open_at_safe_point(&st, 0);
-    assert_eq!(engine().state(), State::KcgOnly(Reason::NoFpu));
+    assert_eq!(engine().state(), State::KcgOnly(Reason::OpenFailed));
     assert_eq!(fontsvc::open_count(), 0);
     assert!(!retry_armed());
 
@@ -200,7 +201,7 @@ fn f15_guard_busy_draws_this_call_with_kcg_only() {
     /* guard の NOSYS は以後ずっと KCG (lease は閉じる)。 */
     fontsvc::with(|f| f.guard_ret = Some(crate::ffi::OS32_ERR_NOSYS));
     text::draw(clip, 0, 0, b"Z", 1, 0);
-    assert_eq!(engine().state(), State::KcgOnly(Reason::NoFpu));
+    assert_eq!(engine().state(), State::KcgOnly(Reason::OpenFailed));
     assert_eq!(fontsvc::open_count(), 0);
 }
 

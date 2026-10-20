@@ -1,16 +1,16 @@
-"""T7b-a5: 16ppem 1bpp raster, 32px = 2x nearest, references and x87.
+"""T7b-a5: 16ppem 1bpp raster, 32px = 2x nearest, references and guest expectations.
 
 References are independent of the Rust code: Shinonome's own 16ppem EBDT
 strike (the original dots; also the BDF original when present locally),
 fontTools exact-rational metrics for every corpus glyph, FreeType 2 (only
 when freetype-py is importable, e.g. via OS32_FREETYPE_PYTHONPATH; otherwise
-a SKIP line). The x87 run compiles the product raster for i686-os32-none and
-executes it on the host inside the product a2 guard (kernel/font_guard.c +
-font_x87.asm, CW 037F). TASK_FONTPERF F5: the raster is integer only, so the
-guest build and the host build must agree bit for bit (X87_TOLERANCE 0), and
-the old float raster's dump (REF_F32, taken before F5) is compared pixel by
-pixel when present (Shinonome must not change; the rest is recorded). The
-final linked font_test.elf is checked by tools/check_isa386.py (acceptance 4).
+a SKIP line). TASK_FONTPERF F5: the raster is integer only, and the old float
+raster's dump (REF_F32, taken before F5) is compared pixel by pixel when present
+(Shinonome must not change; the rest is recorded). F6 removed the x87 guard
+and its i686 probe (font_raster_x87): the guest `font_test -c` FONTCHK lines
+are computed from the host dump of the same integer code, and the final linked
+ELFs are checked by tools/check_isa386.py (acceptance 4) and for x87
+instructions in the font code (objdump -d, by mnemonic, design G-4).
 """
 from fractions import Fraction
 from pathlib import Path
@@ -34,7 +34,6 @@ CRATE = ROOT / 'userland/lib/font'
 FONTS = ROOT / 'assets/fonts'
 PPEM = 16
 THRESHOLD = 128          # FreeType coverage byte >= 128 is "black" for the flip count below
-X87_TOLERANCE = 0        # F5 integer raster: guest code generation == host, bit for bit
 # The float (pre-F5) raster's dump of the same corpora (design §6 acceptance).
 REF_F32 = Path.home() / 'os32-tmp/run/fontperf/ref_f32/dump.txt'
 # a1 edge model: chord error <= 1/8 px (32/255) plus FreeType's own conic split.
@@ -220,7 +219,7 @@ def check_dots(jf, glyphs, ja, jis):
         levels |= set(g['cov'] or b'')
         exact += 1
     # JF outlines sit 1/4 px off the pixel grid vertically: coverage is 0, 1/4,
-    # 3/4 or 1, so the threshold decision has a wide margin (x87 cannot flip it).
+    # 3/4 or 1, so the threshold decision has a wide margin (no rounding detail can flip it).
     margin = min(abs(v - THRESHOLD) for v in levels)
     print(f'PASS Shinonome 16ppem raster == original 16px dots (EBDT strike) for all {exact} glyphs; '
           f'coverage levels {sorted(levels)}, threshold margin {margin}/255', flush=True)
@@ -365,41 +364,6 @@ def check_freetype(glyphs, corpus, jf):
               f'only near the threshold (worst glyph {worst})', flush=True)
 
 
-def build_probe(work, crate):
-    """The product raster for i686-os32-none (integer since F5) linked with the a2 guard."""
-    fixture = work / 'x87'
-    shutil.copytree(ROOT / 'tools/tests/font_raster_x87', fixture, ignore=shutil.ignore_patterns('target'))
-    manifest = fixture / 'Cargo.toml'
-    manifest.write_text(manifest.read_text().replace('../../../userland/lib/font', str(crate)))
-    target = work / 'x87-target'
-    build = subprocess.run(['cargo', 'build', '--release', '--offline',
-                            '-Z', 'build-std=core,compiler_builtins',
-                            '-Z', 'build-std-features=compiler-builtins-mem', '-Z', 'json-target-spec',
-                            '--target', str(ROOT / 'sdk/rust/i686-os32-none.json'),
-                            '--manifest-path', str(manifest)],
-                           env={**os.environ, 'CARGO_TARGET_DIR': str(target)},
-                           text=True, capture_output=True)
-    assert build.returncode == 0, build.stderr
-    lib = target / 'i686-os32-none/release/libfont_raster_x87.a'
-    subprocess.run(['nasm', '-f', 'elf32', str(ROOT / 'kernel/font_x87.asm'), '-o', str(work / 'fp.o')], check=True)
-    inc = ['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'include', 'kernel', 'exec', 'fs', 'lib',
-                                          'gfx', 'drivers', 'arch/x86', 'platform/pc98', 'sdk/include/os32')]
-    exe = work / 'x87-probe'
-    subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
-                    '-ffreestanding', '-fno-builtin', '-fno-pie', '-fno-stack-protector', '-nostdlib',
-                    '-static', '-no-pie', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections', *inc,
-                    str(ROOT / 'tools/tests/font_raster_x87_host.c'), str(ROOT / 'kernel/font_guard.c'),
-                    str(work / 'fp.o'), str(lib), '-o', str(exe)], check=True)
-    # The probe is 386/387 code that really uses x87 (no SSE path to hide behind).
-    isa = subprocess.run([sys.executable, '-B', str(ROOT / 'tools/check_isa386.py'), str(exe)],
-                         text=True, capture_output=True)
-    assert isa.returncode == 0, isa.stdout + isa.stderr
-    dis = subprocess.run([objdump(), '-d', str(exe)], text=True, capture_output=True, check=True).stdout
-    x87 = len(re.findall(r'\t(?:fld|fst|fadd|fmul|fdiv|fsub)[a-z]*\s', dis))
-    assert x87 > 0, 'probe has no x87 instructions'
-    return exe
-
-
 def objdump():
     sys.path.insert(0, str(ROOT / 'tools'))
     from check_privileged import objdump_bin
@@ -408,73 +372,66 @@ def objdump():
     return found
 
 
-def run_probe(exe, run, path, cps):
-    """[(cp, gid, w, h, pitch, left, top, adv, bits, cov)] from the guarded x87 run."""
-    run.mkdir(parents=True)
-    shutil.copyfile(path, run / 'font.bin')
-    (run / 'cps.bin').write_bytes(b''.join(struct.pack('<I', cp) for cp in cps))
-    result = host32.run([str(exe)], cwd=str(run), capture_output=True, timeout=600)
-    assert result.returncode == 0, (str(path), 'x87 probe rc (4 = caller CW not restored)', result.returncode)
-    data = (run / 'out.bin').read_bytes()
-    out, at = [], 0
-    for cp in cps:
-        rcp, gid, err = struct.unpack_from('<IHi', data, at)
-        at += 10
-        assert rcp == cp and err == 0, (str(path), cp, err)
-        w, h, pitch, left, top, adv = struct.unpack_from('<HHHhhi', data, at)
-        at += 14
-        bits = data[at:at + pitch * h]
-        at += pitch * h
-        cov = data[at:at + w * h]
-        at += w * h
-        out.append((cp, gid, w, h, pitch, left, top, adv, bits, cov))
-    assert at == len(data)
-    return out
-
-
-def run_x87(work, crate, glyphs, fonts):
-    """Guest code generation (inside the guard, CW 037F) vs the host build: bit equal since F5."""
-    exe = build_probe(work, crate)
-    for name, path, cps in fonts:
-        bit_equal = pixels = flips = max_delta = 0
-        for cp, gid, w, h, pitch, left, top, adv, bits, cov in run_probe(exe, work / ('x87-' + name), path, cps):
-            g = glyphs[(name, cp)]
-            assert (gid, w, h, pitch, left, top, adv) == (g['gid'], g['w'], g['h'], g['pitch'], g['left'],
-                                                          g['top'], g['adv']), (name, cp)
-            if g['cov'] is not None:
-                for i, (a, b) in enumerate(zip(cov, g['cov'])):
-                    max_delta = max(max_delta, abs(a - b))
-                    r, c = divmod(i, w)
-                    xb = bits[r * pitch + c // 8] >> (7 - c % 8) & 1
-                    sb = g['bits'][r * pitch + c // 8] >> (7 - c % 8) & 1
-                    if xb != sb:
-                        # A flip is only allowed where the SSE coverage sits on the threshold.
-                        assert abs(b - THRESHOLD) <= X87_TOLERANCE, (name, f'U+{cp:04X}', a, b)
-                        flips += 1
-                assert max_delta <= X87_TOLERANCE, (name, f'U+{cp:04X}', 'x87 vs SSE coverage', max_delta)
-            bit_equal += bits == g['bits']
-            pixels += w * h
-        print(f'PASS x87 (i686-os32-none, guard CW 037F, 64-bit precision) {name}: {len(cps)} glyphs, '
-              f'placement/26.6 equal, coverage |x87-SSE| <= {max_delta}/255 (limit {X87_TOLERANCE}), '
-              f'1bpp flips {flips}/{pixels} px only at the threshold, bit-identical glyphs {bit_equal}',
-              flush=True)
-    return exe
-
-
-def guest_expect(work, exe, fonts):
-    """EXPECT lines for `font_test -c` (same ranges, FNV-1a over the same bytes)."""
+def guest_expect(work, crate, env, fonts):
+    """EXPECT lines for `font_test -c` (same ranges, FNV-1a over the same bytes),
+    from the host dump of the product raster (integer, F5; the guest is the same code)."""
     from fontTools.ttLib import TTFont
+    lists = {}
     for name, path in fonts:
         font = TTFont(str(path))
-        cmap, order = font.getBestCmap(), font.getGlyphOrder()
-        cps = [cp for first, last in GUEST_RANGES for cp in range(first, last + 1)
-               if cp in cmap and order.index(cmap[cp]) != 0]
-        fnv, black = 0x811c9dc5, 0
-        for cp, gid, w, h, pitch, left, top, adv, bits, cov in run_probe(exe, work / ('guest-' + name), path, cps):
-            for byte in struct.pack('<IHHhhi', cp, w, h, left, top, adv) + bits:
+        cmap, order = font.getBestCmap(), {n: i for i, n in enumerate(font.getGlyphOrder())}
+        lists[name] = [cp for first, last in GUEST_RANGES for cp in range(first, last + 1)
+                       if cp in cmap and order[cmap[cp]] != 0]
+    work.mkdir(parents=True, exist_ok=True)
+    files = {}
+    for key, name in (('JA', 'shinonome'), ('LATIN', 'inconsolata'), ('JIS', 'ipaexg')):
+        files[key] = work / (name + '.txt')
+        files[key].write_text(''.join(f'{cp}\n' for cp in lists[name]))
+    dump = work / 'guest-dump.txt'
+    result = build_run(crate, work, {**env, 'OS32_RASTER_DUMP': str(dump),
+                                     **{'OS32_FONT_' + k: str(v) for k, v in files.items()}},
+                       'guest', 'real_corpus_dump')
+    assert result.returncode == 0, result.stdout[-4000:] + result.stderr[-4000:]
+    _, glyphs = parse_dump(dump)
+    for name, _ in fonts:
+        fnv, black_px = 0x811c9dc5, 0
+        for cp in lists[name]:
+            g = glyphs[(name, cp)]
+            for byte in struct.pack('<IHHhhi', cp, g['w'], g['h'], g['left'], g['top'], g['adv']) + g['bits']:
                 fnv = ((fnv ^ byte) * 16777619) & 0xffffffff
-            black += sum(bin(b).count('1') for b in bits)
-        print(f'EXPECT FONTCHK {name} glyphs={len(cps)} black={black} fallback=0 fnv={fnv:x}', flush=True)
+            black_px += sum(bin(b).count('1') for b in g['bits'])
+        print(f'EXPECT FONTCHK {name} glyphs={len(lists[name])} black={black_px} fallback=0 fnv={fnv:x}', flush=True)
+
+
+# x87 mnemonics (every x87 instruction starts with "f"; FWAIT is also "wait").
+X87_MNEMONIC = re.compile(r'^\s*[0-9a-f]+:\t(?:[0-9a-f]{2} )+\s*\t(f[a-z0-9]*|wait)\b', re.M)
+X87_ELVES = ('userland/gshell.elf', 'userland/libos32gui.elf')
+
+
+def no_x87(elves):
+    """Design G-4/F-11: the font code linked into gshell / libos32gui holds no x87
+    instruction (objdump -d, counted by mnemonic). Font code = the os32_font crate
+    and the callers (gshell font/text, libos32gui font/draw text)."""
+    font_fn = re.compile(r'os32_font|gshell\d*font|gshell\d*text|libos32gui\d*font|'
+                         r'libos32gui\d*draw|open_cb|raster_cb|sample_cb|guard_run|engine_cell')
+    for elf in elves:
+        dis = subprocess.run([objdump(), '-d', str(elf)], text=True, capture_output=True, check=True).stdout
+        total, in_font, funcs, by_name = 0, 0, 0, {}
+        for block in re.split(r'\n(?=[0-9a-f]+ <)', dis):
+            head = re.match(r'[0-9a-f]+ <([^>]+)>:', block)
+            if not head:
+                continue
+            hits = X87_MNEMONIC.findall(block)
+            total += len(hits)
+            if font_fn.search(head.group(1)):
+                funcs += 1
+                in_font += len(hits)
+                for h in hits:
+                    by_name[h] = by_name.get(h, 0) + 1
+        assert funcs > 0, (str(elf), 'no font function found')
+        assert in_font == 0, (str(elf), 'x87 in font code', by_name)
+        print(f'PASS no x87 {elf.name}: font functions {funcs}, x87 instructions 0 '
+              f'(whole ELF {total}; objdump -d by mnemonic)', flush=True)
 
 
 def isa386():
@@ -486,6 +443,7 @@ def isa386():
                             text=True, capture_output=True)
     print(result.stdout, end='', flush=True)
     assert result.returncode == 0, result.stdout + result.stderr
+    no_x87([ROOT / p for p in X87_ELVES])
 
 
 # --- TASK_FONTPERF F1: the pre-drawn glyph bundle (.g16, tools/gen_g16.py) ---------
@@ -637,7 +595,7 @@ def g16_mutations(work, jf, glyphs):
         raise AssertionError(f'g16 mutation {label} survived')
 
 
-def verify(work, crate, env, jf, corpus, ja, jis, label, x87=True):
+def verify(work, crate, env, jf, corpus, ja, jis, label, guest=True):
     """One full pass on `crate`: None on success, else (stage, detail)."""
     dump = work / (label + '-dump.txt')
     result = build_run(crate, work, {**env, 'OS32_RASTER_DUMP': str(dump)}, label)
@@ -656,11 +614,8 @@ def verify(work, crate, env, jf, corpus, ja, jis, label, x87=True):
         if label == 'normal':
             check_ref_f32(glyphs)
         check_freetype(glyphs, corpus, jf)
-        if x87:
-            exe = run_x87(work / (label + '-x87'), crate, glyphs, [
-                ('shinonome', jf, ja), ('inconsolata', FONTS / 'Inconsolata-Regular.ttf', corpus['inconsolata']),
-                ('ipaexg', FONTS / 'ipaexg.ttf', jis)])
-            guest_expect(work / (label + '-x87'), exe, [
+        if guest:
+            guest_expect(work / (label + '-guest'), crate, env, [
                 ('shinonome', jf), ('inconsolata', FONTS / 'Inconsolata-Regular.ttf'), ('ipaexg', FONTS / 'ipaexg.ttf')])
     except AssertionError as error:
         return 'python', error
@@ -697,7 +652,7 @@ def main():
                 assert originals[name].count(old) == 1, label
                 (copy / 'src' / name).write_text(originals[name].replace(old, new))
                 if expected.startswith('py:'):
-                    failed = verify(work, copy, env, jf, corpus, ja, jis, 'mut-' + label, x87=False)
+                    failed = verify(work, copy, env, jf, corpus, ja, jis, 'mut-' + label, guest=False)
                     assert failed is not None and failed[0] == 'python', (label, failed)
                     print(f'RED reference {label} (compiled, Rust tests green): {failed[1]!s:.160}', flush=True)
                     continue

@@ -2,8 +2,6 @@ check-font-guard-host:
 - tools/tests/font_guard_inactive.h
 - kernel/font_guard*
 - kernel/r1_fixture.h
-- kernel/font_x87.asm
-- kernel/kentry.asm
 - kernel/isr_handlers.c
 - exec/exec_heap.c
 - exec/exec_kapi_init.inc

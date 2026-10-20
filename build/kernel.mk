@@ -4,7 +4,7 @@
 
 # === カーネル ASM ソース ===
 ASM_KERNEL_PRE  = kernel/kentry.asm kernel/isr_stub.asm kernel/v86_entry.asm kernel/ring3_entry.asm kernel/setjmp.asm
-ASM_KERNEL_POST = kernel/font_x87.asm lib/sqlite3/sqlite_stack.asm drivers/ne2000_io.asm
+ASM_KERNEL_POST = lib/sqlite3/sqlite_stack.asm drivers/ne2000_io.asm
 
 # kstring の 13 本 (kmemcpy / memcpy / kmemset / memset / kstrlen / strlen /
 # kstrcmp / strcmp / kstrncmp / strncmp / kstrcpy / kstrncpy / memcmp) は

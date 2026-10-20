@@ -530,7 +530,7 @@ pub fn blit(surface: SurfaceId, dx: i32, dy: i32, bitmap: SurfaceId, src_rect: R
 //   先頭行から。**cell 矩形 (8|16 × 16) の外の画素は描かない**、その上で Painter の
 //   clip で画素単位に切る (全角もオフスクリーンも同じ)。
 // - engine は text() 1 回につき `begin` (face ごとの検証 1 回) 〜 `end`。cache に無い字
-//   だけ `fp_scope` の中で raster する。bitmap の借用は 1 字の間 (`release`)。
+//   だけ raster する (整数だけ)。bitmap の借用は 1 字の間 (`release`)。
 
 /// ROM の ¥ (ANK 0x5C)。Inconsolata の `\` は描かない (設計 P3-4)。
 const ANK_YEN: u8 = 0x5C;
@@ -678,12 +678,12 @@ pub(crate) fn cell_from_glyph(g: &Glyph, bits: &[u8], w: i32) -> CellRows {
 }
 
 /// TTF の 1 字を cell の mask に。描けなければ None (呼び手が KCG)。
-/// cache に無い字だけ `fp_scope` の中で raster する。
+/// cache に無い字だけ raster する (整数だけ、F6 で fp_scope を撤去)。
 fn engine_cell(e: &mut AppEngine, cp: u32, cell: FontCell, w: i32) -> Option<CellRows> {
     let mut g = Glyph::default();
     let mut r = e.peek(cp, PixelSize::Px16, &mut g);
     if r == Resolved::Miss {
-        r = crate::font::fp_scope(|| e.resolve(cp, cell, PixelSize::Px16, &mut g));
+        r = e.resolve(cp, cell, PixelSize::Px16, &mut g);
     }
     match r {
         Resolved::Bitmap => {

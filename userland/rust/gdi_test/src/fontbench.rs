@@ -7,7 +7,8 @@
 //!   1 回の text() (40 字) の最大 tick・字形 engine の数の差 (`font_stats`)・
 //!   stack の high-water (入口から下 48KiB に印を塗って数える) を出す。
 //! `gdi_test font x87` : CW=0x0E7F・ZE を立てた状態で未 cache 字を描き、
-//!   text() の前後の FNSTENV (CW / SW / TAG) を比べる (b5⑤)。
+//!   text() の前後の FNSTENV (CW / SW / TAG) を比べる (b5⑤。F6 で fp_scope を撤去
+//!   した後は、整数だけの raster が呼び手の x87 を触らないことの確かめ)。
 //!
 //! 結果は gfx を閉じてから kprintf (rshell で読む)。試験アプリ ([test])、製品ではない。
 
@@ -210,7 +211,7 @@ fn x87(screen: SurfaceId) -> i32 {
     let mut after = Env { w: [0; 7] };
     stenv(&mut before);
     let s0 = fstats();
-    /* 未 cache の字 (この process で初めて描く) — miss → raster が fp_scope の中で走る。 */
+    /* 未 cache の字 (この process で初めて描く) — miss → 整数の raster (F6: fp_scope 無し)。 */
     g::text(screen, 0, 0, "鬱薔薇議機械設定".as_bytes(), Style::new(GUI_COLOR_TEXT, GUI_COLOR_WINDOW));
     stenv(&mut after);
     let s1 = fstats();

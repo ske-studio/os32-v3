@@ -9,9 +9,13 @@
 //! | cache の arena (`ARENA_BYTES_SHELL` 128KiB) | .bss (`ARENA`、TASK_FONTPERF F2) | 返さない (trim に結ばない) |
 //! | lease の open / close | top-level (段 B の open 文脈、WM 外・guard 外) | [`open_at_safe_point`] / [`close_all`] |
 //! | `Face::open` の読込み、miss の raster + commit | `font_guard_run` の callback の中 | [`open_cb`] / [`raster_cb`] |
-//! | 描画 (hit の借用) | guard の外 (x87 不要) | `text.rs` → [`glyph`] |
+//! | 描画 (hit の借用) | guard の外 | `text.rs` → [`glyph`] |
 //!
 //! callback の中では service の `read_at` 以外を呼ばない (kernel/font_guard.h)。
+//! guard は TASK_FONTPERF F6 から x87 を保存しない (ラスタは整数だけ) が、shell の
+//! read_at の文脈規則 (段 A/B、b12 §3-3) と fault の帰属を担う区間として残す。
+//! kernel は FPU の有無で NOSYS を返さなくなったので `Reason::NoFpu` は使わない。
+//! NOSYS は service 表の欄が無いときだけ (OpenFailed で恒久、再試行しない)。
 //! `Engine::open` が失敗して Face を閉じると `ShellSource` が drop されるが、
 //! そのときの `font_source_close` は guard を抜けるまで保留する ([`close_lease`])。
 //!
@@ -524,11 +528,10 @@ fn open_inner(font_set: u8, arm_retry: bool) -> i32 {
         if rc < 0 {
             /* 開けた方は sources の drop (guard の外) で閉じる。 */
             let reason = match rc {
-                OS32_ERR_NOSYS => Reason::NoFpu,
                 OS32_ERR_NOSPC => Reason::Nospc,
                 _ => Reason::OpenFailed,
             };
-            return fail(reason, rc, arm_retry);
+            return fail(reason, rc, arm_retry && rc != OS32_ERR_NOSYS);
         }
         sources[k] = Some(ShellSource { id, size });
     }
@@ -547,7 +550,7 @@ fn open_inner(font_set: u8, arm_retry: bool) -> i32 {
             sample_once(t);
             0
         }
-        OS32_ERR_NOSYS => fail(Reason::NoFpu, rc, false),
+        OS32_ERR_NOSYS => fail(Reason::OpenFailed, rc, false),
         OS32_ERR_BUSY => fail(Reason::Busy, rc, arm_retry),
         _ => fail(Reason::OpenFailed, rc, arm_retry),
     }
@@ -691,9 +694,9 @@ pub fn begin_text(s: &[u8]) -> bool {
     let mut job = RasterJob { s: s.as_ptr(), len: s.len() };
     let rc = guard_run(t, raster_cb, &mut job as *mut RasterJob as *mut u8);
     if rc == OS32_ERR_NOSYS {
-        /* FPU 無し: 以後ずっと KCG。 */
+        /* service 表に guard の欄が無い: 以後ずっと KCG。 */
         font.engine.end();
-        let _ = font.engine.set_kcg_only(Reason::NoFpu);
+        let _ = font.engine.set_kcg_only(Reason::OpenFailed);
         return false;
     }
     if rc == OS32_ERR_BUSY {

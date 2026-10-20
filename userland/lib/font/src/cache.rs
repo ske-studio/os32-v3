@@ -246,7 +246,7 @@ pub struct Stats {
     pub kcg_only: u32,
     /// Requests refused while a bitmap is borrowed.
     pub busy: u32,
-    /// x87 guard BUSY on the shell side (counted by the caller).
+    /// guard BUSY on the shell side (counted by the caller).
     pub guard_busy: u32,
     pub invalidate: u32,
     /// Always 0 since F2 (the clock has no age to wrap); kept for the layout.

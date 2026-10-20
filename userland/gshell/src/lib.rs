@@ -32,7 +32,7 @@
 //! | `input.rs`   | 入力取り込み → Key / Text / Pointer / Button (T3 / U2a) |
 //! | `kbdnav.rs`  | キーボードだけの WM 操作とマウスキー (票 KBD_NAV) |
 //! | `fep.rs`     | 日本語入力 (U2a)。cooked 待ち行列 = FEP、未確定行と候補窓 |
-//! | `font.rs`    | 字形 engine の持ち主 (T7b-b3)。shell lease の open/close・x87 guard・EV_FONT |
+//! | `font.rs`    | 字形 engine の持ち主 (T7b-b3)。shell lease の open/close・guard 区間・EV_FONT |
 //! | `text.rs`    | 文字描画の 1 本 (T7b-b3)。TTF cache → KCG fallback、cell と clip で切る |
 //! | `lease.rs`   | 14 色パレットのリースとフォーカス追従 (G8) |
 //! | `modal.rs`   | モーダルと標準ダイアログ (U4)。入れ子ループなし |

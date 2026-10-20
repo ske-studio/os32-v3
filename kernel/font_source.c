@@ -18,7 +18,6 @@
 #include "redir_access.h"   /* caller_access_get / copy_caller_cstr */
 #include "fd_redirect.h"    /* res_owner_get */
 #include "gui.h"            /* GUI_SHELL_OWNER */
-#include "font_guard.h"     /* font_x87_present */
 
 static FontLease g_font_leases[FONT_LEASE_SLOTS];
 
@@ -145,7 +144,6 @@ i32 font_lease_app_open(const char *path, u32 *out_id, u32 *out_size)
     i32 rc = font_lease_app_gate(&c);
     if (rc) return rc;
     if (!out_id || !out_size) return OS32_ERR_INVAL;
-    if (!font_x87_present) return OS32_ERR_NOSYS;   /* x87 無しは raster できない → KCG */
     if (!copy_caller_cstr(&c, path, kpath, sizeof(kpath))) {
         /* USER の不正な入力ポインタ (NUL が範囲内に無い・写せない) */
         ring3_fault_kill();

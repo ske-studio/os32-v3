@@ -33,8 +33,9 @@ extern "C" {
 /*  局所に受けて使ってから返す薄い `#[inline(never)]` 関数にする      */
 /*  (尾呼出しにすると kernel の段 A が戻り番地で断る、設計 §3-2)。    */
 /*                                                                  */
-/*  version 2 (T7b-b3 S2): 末尾に `font_guard_run` (x87 guard の中で */
-/*  callback を 1 回呼ぶ)。version < 2 の表は font を開かず KCG だけ  */
+/*  version 2 (T7b-b3 S2): 末尾に `font_guard_run` (guard 区間の中で  */
+/*  callback を 1 回呼ぶ、F6 から x87 は保存しない)。version < 2 の表 */
+/*  は font を開かず KCG だけ                                        */
 /*  (`ShellServiceState::OldShell` → b3 の `KcgOnly(OldShell)`)。     */
 /* ================================================================ */
 
@@ -55,8 +56,9 @@ pub struct ShellService {
         Option<unsafe extern "C" fn(id: u32, offset: u32, dst: *mut u8, len: u32) -> i32>,
     pub font_source_validate: Option<unsafe extern "C" fn(id: u32) -> i32>,
     pub font_source_close: Option<unsafe extern "C" fn(id: u32) -> i32>,
-    /// version 2: x87 guard の中で `call(ctx)` を 1 回呼びその戻りを返す。
-    /// FPU 無しは `OS32_ERR_NOSYS`、再入・IRQ 文脈は `OS32_ERR_BUSY`。
+    /// version 2: guard 区間の中で `call(ctx)` を 1 回呼びその戻りを返す
+    /// (TASK_FONTPERF F6 で x87 の保存と FPU 無しの NOSYS は撤去)。
+    /// 再入・IRQ 文脈は `OS32_ERR_BUSY`。
     /// lease の open/close は guard の外で、callback の中では read_at 以外を呼ばない。
     pub font_guard_run: Option<
         unsafe extern "C" fn(call: Option<unsafe extern "C" fn(ctx: *mut u8) -> i32>,

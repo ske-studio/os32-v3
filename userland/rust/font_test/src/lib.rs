@@ -20,8 +20,8 @@
  *   font_test -f   T7b-a6 計測: 空き FD を開けるだけ開いて数える (FD 残数)。
  *                  3 書体を開いたままの数も出す。開いた FD は全部閉じる。
  *
- * x87: アプリの FPU 文脈で動く (CPL=3 の前景)。gshell/製品の呼出しは
- * T7b-a2 の font_guard_run を通す (b3)。
+ * 浮動小数点は使わない (ラスタは整数だけ、TASK_FONTPERF F5)。gshell の呼出しは
+ * guard 区間 (font_guard_run、F6 から x87 は保存しない) を通す (b3)。
  */
 #![no_std]
 #![no_main]

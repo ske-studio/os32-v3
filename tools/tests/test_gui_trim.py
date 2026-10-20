@@ -36,9 +36,6 @@ FONT_MUTATIONS=[
     ('gen-ignored',FONT,'Some((_, gen)) if gen != f.open_gen =>','Some((_, gen)) if false && gen != f.open_gen =>','gen-reload'),
     ('retry-never',FONT,'    if !matches!(e.state(), State::KcgOnly(Reason::Nospc) | State::KcgOnly(Reason::OpenFailed)) {','    if true {','retry'),
     ('arena-every-text',FONT,'    if !e.cache().has_arena() && !st().arena_blocked {','    if !st().arena_blocked {','arena-once'),
-    ('fp-scope-no-restore',FONT,'''        core::arch::asm!("fldenv [{0}]", in(reg) saved.as_ptr(),
-                         options(nostack, preserves_flags));''','','fp-scope-restore'),
-    ('fp-scope-cw-only',FONT,'''        core::arch::asm!("fldenv [{0}]", in(reg) saved.as_ptr(),''','''        core::arch::asm!("fldcw word ptr [{0}]", in(reg) saved.as_ptr(),''','fp-scope-status-flags'),
 ]
 FONT_MOCKS='''#![allow(dead_code, unused_imports, static_mut_refs)]
 mod cfgro {

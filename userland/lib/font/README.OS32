@@ -39,7 +39,7 @@ in font units, with the same command sequence/bbox as whole-file Face.
 MAX_POINTS counts stored glyf points; MAX_OUTLINE_POINTS also accommodates
 implicit midpoints and closing commands. MAX_EDGES bounds curve edges here;
 a5 must enforce it again after flattening. Scratch is caller-owned and can be
-shared serially between faces; use the a2 x87 guard on OS32. No raster, bitmap
+shared serially between faces (no x87 guard since F6). No raster, bitmap
 cache, source lease, shell/shlib connection or new module is added by a4.
 
 check-font-outline-host compares the complete a1 JIS/Latin corpora against
@@ -65,8 +65,9 @@ check-font-raster-host: JF Shinonome16 raster == its own 16px EBDT dots for
 all JIS+Latin glyphs (and the BDF original when present locally); 26.6
 advance/placement == FreeType rules on fontTools points for all four fonts;
 FreeType itself when freetype-py is importable (OS32_FREETYPE_PYTHONPATH);
-the i686-os32-none build run under kernel/font_guard.c (x87, CW 037F) vs
-host SSE by coverage tolerance; check_isa386 on the final ELFs.
+the guest FONTCHK expectations from the host dump of the integer raster (F6
+removed the x87 guard and its i686 probe); check_isa386 and no x87 instruction
+in the font code (objdump -d) on the final ELFs.
 
 T7b-a7: a Face is never returned by value (about 51KB on i686: 16 x 1KiB read
 cache + MAX_CMAP_RESIDENT_BYTES). Face::new() is a closed, all-zero face for a
