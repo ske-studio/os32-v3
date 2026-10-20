@@ -179,6 +179,8 @@ pub const GUI_HDR_FLAG_OVERFLOW: u16 = 0x0001;
 /* ======================================================================== */
 pub const OS32_ERR_IO: i32 = -1;
 pub const OS32_ERR_NOTFOUND: i32 = -2;
+/// 空き不足 (FD・lease の枠など)。font_source_open の app 枠 (T7b-b3)。
+pub const OS32_ERR_NOSPC: i32 = -4;
 pub const OS32_ERR_INVAL: i32 = -9; /* = ERR_ARG */
 pub const OS32_ERR_NOSYS: i32 = -10;
 pub const OS32_ERR_STALE: i32 = -11;

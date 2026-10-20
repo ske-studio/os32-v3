@@ -1,6 +1,11 @@
 check-gui-host:
 - tools/tests/test_gui_trim.py
 - tools/tests/gui_trim_host.rs
+- tools/tests/gui_font_host.rs
+- userland/lib/font/**
+- tools/tests/test_font_reader.py
+- tools/fetch_fonts.py
+- tools/tests/test_font_outline.py
 - tools/tests/rust_alloc_host.rs
 - userland/rust/libos32gui_stub/src/lib.rs
 - tools/tests/mutpar.py

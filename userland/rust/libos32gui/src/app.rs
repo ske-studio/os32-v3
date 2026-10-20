@@ -23,7 +23,8 @@ use crate::window;
 use os32api::gui::proto::{
     GuiEvent, GUI_COLOR_TEXT, GUI_COLOR_WINDOW, GUI_EV_BUTTON, GUI_EV_CLOSE, GUI_EV_CONFIGURE,
     GUI_EV_FOCUS, GUI_EV_KEY, GUI_EV_MODAL, GUI_EV_PAINT, GUI_EV_PALETTE, GUI_EV_POINTER,
-    GUI_EV_QUIT, GUI_EV_TEXT, GUI_EV_TIMER, GUI_EV_TRIM, GUI_OP_TRIM_DONE, GUI_RING_CAPACITY,
+    GUI_EV_FONT, GUI_EV_QUIT, GUI_EV_TEXT, GUI_EV_TIMER, GUI_EV_TRIM, GUI_OP_TRIM_DONE,
+    GUI_RING_CAPACITY,
 };
 use os32api::gui::stub::AppVTable;
 use os32api::gui::types::{Rect, Style};
@@ -180,6 +181,12 @@ pub fn run_vt(vt: *const AppVTable, this: *mut c_void, ui: &mut Ui) -> GuiResult
                 s().trim_batch = true;
                 s().trim_epoch = u32::from_le_bytes(buf[i].payload[..4].try_into().unwrap());
                 s().trim_events = s().trim_events.wrapping_add(1);
+            } else if buf[i].kind == GUI_EV_FONT {
+                /* font 設定が変わった (T7b-b3 §2-3)。window 0 宛なので dispatch
+                 * (窓の表に無い window を捨てる) より前で受ける。face を閉じて全窓を
+                 * 描き直す。TRIM_DONE は送らない (EV_TRIM の epoch とは無関係)。 */
+                crate::font::reload();
+                window::invalidate_all_windows();
             } else {
                 dispatch(app, ui, &buf[i]);
             }
@@ -206,6 +213,8 @@ pub fn run_vt(vt: *const AppVTable, this: *mut c_void, ui: &mut Ui) -> GuiResult
         // Safe point: all handlers, painting and after_commit have returned.
         if s().trim_batch {
             s().trim_batch = false;
+            /* 字形 cache の arena を返す (face / Engine 本体は保つ、T7b-b3 §2-3)。 */
+            crate::font::trim();
             if let Some(h) = s().hook {
                 s().hook_calls = s().hook_calls.wrapping_add(1);
                 let pages = h();
@@ -291,6 +300,10 @@ fn dispatch(app: &VApp, ui: &mut Ui, ev: &GuiEvent) {
             }
             if ev.sub != 0 {
                 widget::report_text_cursor(i);
+                /* 前景化: font/gen の照合と NOSPC / open 失敗の再試行 (T7b-b3 §2-3)。 */
+                if crate::font::on_focus_in() {
+                    window::invalidate_all_windows();
+                }
             }
             app.on_focus(ui, win, ev.sub != 0);
         }
@@ -369,6 +382,11 @@ fn emit(app: &VApp, ui: &mut Ui, out: &widget::WidgetOut) {
 
 fn paint_damaged(app: &VApp, ui: &mut Ui) {
     let n = s().paint.len;
+    /* font/gen の照合は paint 1 周に 1 回だけ (EV_FONT の取りこぼし対策、T7b-b3 §2-3)。
+     * 食い違えば reload して全窓を次の周で描き直す。 */
+    if n != 0 && crate::font::check_gen() {
+        window::invalidate_all_windows();
+    }
     let mut i = 0;
     while i < n {
         let req = s().paint.items[i];

@@ -92,6 +92,34 @@ mod tests {
     /*  純粋部: 分岐表と scope 検査                                      */
     /* ================================================================ */
 
+    /* T7b-b3 S4: font 設定 (gshell scope の font_set / font/gen) を 1 回の接続で読む。 */
+    #[test]
+    fn w_font_settings_one_connection() {
+        fake::reset();
+        fake::set_get_int(3);
+        assert_eq!(font_settings(0, 0), Some((3, 3)));
+        assert_eq!(
+            fake::log(),
+            vec![Call::Open(0), Call::GetInt, Call::GetInt, Call::Close],
+            "RO 1 本で 2 キー"
+        );
+        assert_eq!(fake::last_scope(), b"gshell".to_vec());
+        assert_eq!(fake::last_key(), b"font/gen".to_vec());
+
+        fake::reset();
+        fake::set_get_int_passthrough_def(true);
+        assert_eq!(font_settings(0, 9), Some((0, 9)), "未設定は既定値");
+
+        fake::reset();
+        fake::set_open_rc(ERR_IO);
+        assert_eq!(font_settings(0, 0), None, "open 失敗は None (照合を空振りさせない)");
+        assert_eq!(fake::log(), vec![Call::Open(0)]);
+
+        fake::reset();
+        fake::set_close_rc(ERR_IO);
+        assert_eq!(font_settings(0, 0), None, "close 失敗も None");
+    }
+
     #[test]
     fn w01_fold_get_int_is_def_on_any_failure() {
         assert_eq!(fold_get_int(0, 5, 0, 7), 5, "全成功なら値");
