@@ -55,6 +55,8 @@ MUTATIONS = [
      'destination_capacity'),
     ('early-coverage', 'raster.rs', '        self.coverage_len = 0;\n        self.edges = 0;\n',
      '', 'flattened_edge_limit'),
+    ('coord-round', 'raster.rs', '(magnitude * scale + 0x10000) >> 17', '(magnitude * scale) >> 17',
+     'bitmap_box_uses_26_6_points'),
     ('nonzero-abs', 'raster.rs', 'let area = sum.unsigned_abs();', 'let area = sum.max(0) as u32;',
      'pixel_square_is_exact_and_doubles'),
     ('cover-threshold-64', 'limits.rs', 'COVERAGE_BLACK_NUM: u64 = 128;', 'COVERAGE_BLACK_NUM: u64 = 64;',

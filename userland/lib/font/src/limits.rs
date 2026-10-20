@@ -49,7 +49,7 @@ pub const MAX_BITMAP_BYTES: usize =
 // is the a5 threshold (FONTCHK and the EBDT equality were accepted with it);
 // the design's 128/256 (FreeType's 8-bit >= 128) would turn every pixel at
 // exactly 0.5 black (F5 measured: IPAex Gothic 2,217 glyphs / 7,853 px,
-// Inconsolata 18 / 40 px of the corpora) and is left to the PM. 1/4096 px keeps
+// Inconsolata 18 / 40 px of the corpora); the PM kept 128/255 (FONTPERF design, F5 decisions). 1/4096 px keeps
 // the integer coverage within the old float raster's threshold decisions
 // (1/256 px flipped 194 IPAex glyphs near 128/255, 1/4096 px 11); the products
 // stay in i32 (one pixel = 2^25) / i64.
