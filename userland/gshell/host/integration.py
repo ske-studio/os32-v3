@@ -41,8 +41,9 @@ def _fetch(family, *extra):
     if subprocess.run(cmd + ['--check'], cwd=ROOT).returncode != 0:
         run(cmd + list(extra))
 _fetch('inconsolata')
-_jf_zip = Path.home() / 'os32-tmp/run/shinonome/sources/jfdotfont-20150527.zip'
-_fetch('jfdot-shinonome16', *(['--zip', str(_jf_zip)] if _jf_zip.exists() else []))
+# Offline: OS32_JFDOT_ZIP names a locally cached jfdotfont zip (pinned SHA-256 still checked).
+_jf_zip = os.environ.get('OS32_JFDOT_ZIP', '')
+_fetch('jfdot-shinonome16', *(['--zip', _jf_zip] if _jf_zip and Path(_jf_zip).exists() else []))
 os.environ['OS32_GSHELL_FONT_DIR'] = str(FONT_DIR)
 
 

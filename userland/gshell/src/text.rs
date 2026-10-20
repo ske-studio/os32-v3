@@ -121,6 +121,8 @@ pub fn draw_ank(clip: Rect, x: i32, y: i32, ank: u8, fg: u8, bg: u8) -> i32 {
     if ank < 0x20 {
         return 0;
     }
+    // `!= ANK_YEN` は保険: draw → route も 0x5C を ROM に回すので結果は同じ。
+    // ここで先に分けておくと route の規則が変わっても FEP の ¥ は ROM のまま。
     if ank <= 0x7E && ank != ANK_YEN {
         return draw(clip, x, y, &[ank, 0], fg, bg);
     }
